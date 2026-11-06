@@ -859,7 +859,9 @@ export function installTouchInput({ documentObject = globalThis.document, window
   nameInput.addEventListener('keyup', showTakenName);
   // Enter is forwarded once and goes no further: the forwarded one creates the hero and starts the
   // game, so the real one reaching the window a moment later would open the chat bar.
-  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { tapKey('Enter', 'Enter'); e.preventDefault(); e.stopPropagation(); } });
+  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { tapKey('Enter', 'Enter'); e.preventDefault(); e.stopPropagation(); nameInput.blur(); } });
+  // The phone keyboard opens on a tap on the box, never on its own when the box appears.
+  nameInput.addEventListener('pointerdown', () => nameInput.focus());
 
   // The shell already exposes exactly the signal retail's own name box uses to appear (a class
   // picked): polled, so this needs no new hook into the hot shared shell file.
@@ -867,7 +869,7 @@ export function installTouchInput({ documentObject = globalThis.document, window
     const shell = windowObject.__d2Shell;
     const show = revealed && shell?.screen === 'create' && Boolean(shell?.charCreateEvidence?.chosen);
     if (show) placeNameBox(shell);
-    if (show && nameInput.style.display === 'none') { nameInput.style.display = 'block'; prevValue = nameInput.value = ''; showTakenName(); nameInput.focus(); }
+    if (show && nameInput.style.display === 'none') { nameInput.style.display = 'block'; prevValue = nameInput.value = ''; showTakenName(); }
     else if (!show && nameInput.style.display !== 'none') { nameInput.style.display = 'none'; nameInput.blur(); }
   }, 200);
   // Over the box the screen actually draws. On a phone the canvas takes the screen's shape, not 4:3,

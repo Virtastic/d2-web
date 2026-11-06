@@ -15,6 +15,7 @@ import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 import { BORDER_LEFT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
 import { characterPanelCloseFrame } from './character-panel-close.mjs';
+import { skillRowHasDamage, skillRowHasRating } from './character-skill-rows.mjs';
 
 // Retail's own stat ids (D2StatList.h): the values the 0x3A packet carries.
 export const STAT = Object.freeze({ STRENGTH: 0, ENERGY: 1, DEXTERITY: 2, VITALITY: 3 });
@@ -24,6 +25,14 @@ export const STAT = Object.freeze({ STRENGTH: 0, ENERGY: 1, DEXTERITY: 2, VITALI
 // panels agree on art and palette without a second asset.
 const PANEL_FRAMES = [0, 1, 2, 3];
 // Retail puts the character screen against the left edge, the inventory against the right.
+/** Retail's attribute cell (D2Client+0xBCEA0): it draws the TOTAL (base plus every item, charm and
+ *  state bonus), in colour 3 (blue) when the total is above the base and colour 1 (red) when below.
+ *  `total` undefined (an older caller) falls back to the base in the default colour. */
+export function attributeCell(base, total) {
+  if (total === undefined || total === null || base === undefined || base === null) return { value: base, c: 0 };
+  return { value: total, c: base < total ? 3 : total < base ? 1 : 0 };
+}
+
 export const CHARACTER_LAYOUT = Object.freeze({ screenX: 0, screenY: 60, width: 320, height: 441 });
 
 // The panel's OWN slots, read off the retail art rather than invented (s154). Every frame is a
@@ -180,7 +189,10 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
   };
   const faces = new Map();
   const facesFor = (act) => { let f = faces.get(act); if (!f) { const palette = decodeDatPalette(read(`data\\global\\palette\\ACT${Math.min(5, Math.max(1, act | 0))}\\pal.dat`));
-    f = { 6: createFont({ ...f6, palette, documentObject }), 16: createFont({ ...f16, palette, documentObject }), c3: createFont({ ...f16, palette: textColourPalette(statPl2, palette, 3), documentObject }) }; faces.set(act, f); } return f; };
+    f = { 6: createFont({ ...f6, palette, documentObject }), 16: createFont({ ...f16, palette, documentObject }), c3: createFont({ ...f16, palette: textColourPalette(statPl2, palette, 3), documentObject }), c1: createFont({ ...f16, palette: textColourPalette(statPl2, palette, 1), documentObject }) };
+    // the colour a skill-row damage cell is drawn in (0x2F0A0's mode), per font size, built on first use
+    const tinted = new Map(); f.colour = (c, size) => { const k = `${c}:${size}`; if (!tinted.has(k)) tinted.set(k, createFont({ ...(size === 6 ? f6 : f16), palette: textColourPalette(statPl2, palette, c), documentObject })); return tinted.get(k); };
+    faces.set(act, f); } return f; };
   const font6 = facesFor(1)[6], font16 = facesFor(1)[16];
   const F = { 6: font6, 16: font16 };
   // Value-box centres: the intersection of every retail charpanel capture's x = floor(centre - w/2)
@@ -238,27 +250,49 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
       const two = (k) => S(k).split(/[}\n]/);
       const sc = state?.screen || [];
       const attack = (S('skillname0') || '').toUpperCase(), dmg = sc.length ? `${sc[2]}-${sc[3]}` : '', ar = sc.length ? String(sc[1]) : '';
+      // Each row is its hand's skill (D2Client+0x2FD30 for the left then the right skill, character-skill-rows.mjs): the
+      // SkillDesc wStrAlt title, the damage cell only for a non-null descdam calc, the rating cell only for a non-null descatt.
+      const arLine2 = (S('strchrrat').split(/[}\n]/)[1] || '');
+      const row = (h) => { if (sc.length < 25 || sc[17 + 4 * h] < 0 || sc[18 + 4 * h] < 0) return { title: attack, dmg: true, ar: true, ar1: attack, ar2: arLine2 };
+        const id = sc[17 + 4 * h], title = (state?.line?.(sc[18 + 4 * h]) || '').toUpperCase();
+        // the rating label: string 0xFE1 ("%s\nRating") for Attack, 0xFDF ("%s\nAttack Rating") otherwise, split at the line feed
+        const ar2 = String(state?.line?.(id === 0 ? 0xfe1 : 0xfdf) || '').split(/[}\n]/)[1] || '';
+        // descdam 5: the value and colour D2Client 0x35270 drew (sc[25..32] the cells, sc[33..34] their texts)
+        const own = sc.length > 33 + h && sc[25 + 4 * h] === 1 ? { text: sc[33 + h], c: sc[26 + 4 * h] } : null;
+        return { title, dmg: skillRowHasDamage(sc[19 + 4 * h]), own, ar: skillRowHasRating(sc[20 + 4 * h]), ar1: title, ar2 }; };
+      const rowA = row(0), rowB = row(1);
+      const tot = state?.totals || {}, cell = { strength: attributeCell(state?.strength, tot.strength), dexterity: attributeCell(state?.dexterity, tot.dexterity),
+        vitality: attributeCell(state?.vitality, tot.vitality), energy: attributeCell(state?.energy, tot.energy) };
       const text = {
         lvlLabel: S('strchrlvl'), expLabel: S('strchrexp'), nextLabel: S('strchrnxtlvl'), strLabel: S('strchrstr'), dexLabel: S('strchrdex'),
         defLabel: S('strchrdef'), vitLabel: S('strchrvit'), stmLabel: S('strchrstm'), lifLabel: S('strchrlif'), engLabel: S('strchreng'), manLabel: S('strchrman'),
         fir1: two('strchrfir')[0], fir2: two('strchrfir')[1], col1: two('strchrcol')[0], col2: two('strchrcol')[1],
         lit1: two('strchrlit')[0], lit2: two('strchrlit')[1], pos1: two('strchrpos')[0], pos2: two('strchrpos')[1],
-        dmgA1: attack, dmgA2: S('strchrskm'), dmgA: dmg, arA1: attack, arA2: (S('strchrrat').split(/[}\n]/)[1] || ''), arA: ar,
-        dmgB1: attack, dmgB2: S('strchrskm'), dmgB: dmg, arB1: attack, arB2: (S('strchrrat').split(/[}\n]/)[1] || ''), arB: ar,
+        dmgA1: rowA.title, dmgA2: rowA.dmg ? S('strchrskm') : null, dmgA: rowA.dmg ? (rowA.own ? rowA.own.text : dmg) : null,
+        arA1: rowA.ar ? rowA.ar1 : null, arA2: rowA.ar ? rowA.ar2 : null, arA: rowA.ar ? ar : null,
+        dmgB1: rowB.title, dmgB2: rowB.dmg ? S('strchrskm') : null, dmgB: rowB.dmg ? (rowB.own ? rowB.own.text : dmg) : null,
+        arB1: rowB.ar ? rowB.ar1 : null, arB2: rowB.ar ? rowB.ar2 : null, arB: rowB.ar ? ar : null,
         className: state?.className ?? '', name: state?.name ?? '',
         level: state?.level, experience: grouped(u32(state?.experience)), nextExperience: grouped(u32(sc.length > 10 ? sc[10] : state?.nextExperience)),
-        strength: state?.strength, dexterity: state?.dexterity, defense: sc[0], vitality: state?.vitality,
-        stamina: sc[4], staminaMax: sc[16] ?? sc[5], life: sc.length > 11 ? sc[11] : state?.life, lifeMax: sc.length > 12 ? sc[12] : state?.lifeMax, energy: state?.energy,
+        strength: cell.strength.value, dexterity: cell.dexterity.value, defense: sc[0], vitality: cell.vitality.value,
+        stamina: sc[4], staminaMax: sc[16] ?? sc[5], life: sc.length > 11 ? sc[11] : state?.life, lifeMax: sc.length > 12 ? sc[12] : state?.lifeMax, energy: cell.energy.value,
         mana: sc.length > 13 ? sc[13] : state?.mana, manaMax: sc.length > 14 ? sc[14] : state?.manaMax,
         fireRes: sc[6], coldRes: sc[7], lightRes: sc[8], poisonRes: sc[9],
       };
+      // D2Client+0xBCEA0: max life (stat 7) and max mana (stat 9) are drawn in colour 3 when the total exceeds the
+      // base (charms, shield and other item or skill bonuses), colour 1 when below; the screen's last two entries,
+      // after the skill rows, are total - base (readCharacterScreen).
+      const above = (d) => (d == null ? 0 : d > 0 ? 3 : d < 0 ? 1 : 0), over = sc.length >= 27 ? sc.slice(-2) : [];
+      cell.lifeMax = { c: above(over[0]) }; cell.manaMax = { c: above(over[1]) };
       const face = facesFor(state?.act || 1);
       // Every string drawn, as retail T2 records it: left x and anchor y, in the T2 frame (screen - (80,60)),
       // colour 0, uncentred. The list is the evidence a retail recording-text diffs.
       const texts = [];
       for (const f of FIELDS) { const t = text[f.key]; if (t === undefined || t === null) continue;
-        const over = f.key === 'stamina' && text.stamina > text.staminaMax, str = String(t), font = over ? face.c3 : face[f.size], left = LEFT[f.key] ?? Math.floor(f.centre - font.measure(str) / 2);
-        font.drawAnchored(ctx, str, left, f.y); texts.push({ text: str, x: left - T2_OFFSET.x, y: f.y - T2_OFFSET.y, c: over ? 3 : 0 }); }
+        const own = f.key === 'dmgA' ? rowA.own : f.key === 'dmgB' ? rowB.own : null,
+          c = own ? own.c : f.key === 'stamina' ? (text.stamina > text.staminaMax ? 3 : 0) : (cell[f.key]?.c ?? 0), str = String(t),
+          font = own && c ? face.colour(c, f.size) : c === 3 ? face.c3 : c === 1 ? face.c1 : face[f.size], left = LEFT[f.key] ?? Math.floor(f.centre - font.measure(str) / 2);
+        font.drawAnchored(ctx, str, left, f.y); texts.push({ text: str, x: left - T2_OFFSET.x, y: f.y - T2_OFFSET.y, c }); }
       chrome.cel(ctx, state?.act || 1, CHROME_ART.close, characterPanelCloseFrame(state?.closePressed), 208, 480);
       // The "+" is retail art, blitted as retail blits the pair (socket first, then the button on
       // top), and every blit is carried out to the evidence by the cel's own requested/drawn record.

@@ -18,6 +18,7 @@ import { inventoryCloseFrame } from './inventory-close-gesture.mjs';
 import { inventoryItemAsset, SOCKET_ART } from './inventory-panel.mjs';
 import { BORDER_LEFT, BORDER_RIGHT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
 import { createItemBlendCache, drawItemCel } from './item-draw-mode.mjs';
+import { inventoryItemRemap, inventoryItemColourKey } from './inventory-item-colour.mjs';
 import { boxTables, heldItemBoxes, itemBoxState, paintBoxes, placedItemBoxes } from './grid-highlight.mjs';
 
 export const STASH_ART = 'data\\global\\ui\\PANEL\\TradeStash.dc6';
@@ -88,9 +89,12 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
     return a;
   };
   const itemBlend = createItemBlendCache(read);
-  const icon = (a, invFile) => {
-    let c = a.icons.get(invFile);
-    if (!c) { const f = decodeDc6(read(inventoryItemAsset(invFile))).frames[0]; c = frameCanvas(f, a.palette, documentObject); c.frame = f; a.icons.set(invFile, c); }
+  // The item's own remap (inventory-item-colour.mjs, D2Client+0x6B5A0), baked into the opaque canvas.
+  const icon = (a, invFile, item = null) => {
+    const key = invFile + ':' + inventoryItemColourKey(read, item);
+    let c = a.icons.get(key);
+    if (!c) { const f = decodeDc6(read(inventoryItemAsset(invFile))).frames[0], remap = inventoryItemRemap(read, item);
+      c = frameCanvas(remap ? { ...f, indices: Uint8Array.from(f.indices, (i) => remap[i]) } : f, a.palette, documentObject); c.frame = f; c.remap = remap; a.icons.set(key, c); }
     return c;
   };
   const origin = (width, height) => {
@@ -183,10 +187,10 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
       for (const item of items || []) {
         if (item.invPage !== page || !item.invFile) continue;
         boxes.push(...paintBoxes(ctx, tables, placedItemBoxes(grid, item, itemBoxState(item, hover?.itemBoxState), hoverItem?.id === item.id, hover?.cursorMode || 0)).map((b) => ({ ...b, id: item.id })));
-        const c = icon(a, item.invFile);
+        const c = icon(a, item.invFile, item);
         // The art lands one row below the cell's top, like every other grid (item-cel-place.mjs).
         const { left: x, top: y } = gridCelAt(geometry.gridLeft, geometry.gridTop, geometry.boxW, geometry.boxH, item.gridX, item.gridY);
-        drawItemCel(ctx, c, c.frame, x, y, item.itemFlags, itemBlend(act));
+        drawItemCel(ctx, c, c.frame, x, y, item.itemFlags, itemBlend(act), c.remap ? (i) => c.remap[i] : null);
         drawn.push({ id: item.id, invFile: item.invFile, cell: [item.gridX, item.gridY], at: [x, y] });
       }
       // The hovered item's sockets over its art (the inventory grid's rule): the empty-socket cel at the engine's

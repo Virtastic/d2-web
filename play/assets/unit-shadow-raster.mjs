@@ -43,6 +43,24 @@ export function shadowMaskLayout(plane) {
   return layout;
 }
 
+// The same clip as shadowVisibleBounds, kept per destination row: [y, first, afterLast] triples into the
+// layout's offset pairs, in the layout's row order, for each row with at least one pixel on the canvas.
+// Walking those ranges visits exactly the in-canvas mask pixels, in mask order, with no per-pixel test.
+export function shadowVisibleSpans(layout, baseX, baseY, width, height) {
+  const out = [], minOffsetX = -baseX, maxOffsetX = width - 1 - baseX, offsets = layout.offsets;
+  for (const row of layout.rows) {
+    const y = baseY + row.dy;
+    if (y < 0 || y >= height) continue;
+    let low = row.start, high = row.end;
+    while (low < high) { const middle = (low + high) >>> 1; if (offsets[middle * 2] < minOffsetX) low = middle + 1; else high = middle; }
+    const first = low;
+    high = row.end;
+    while (low < high) { const middle = (low + high) >>> 1; if (offsets[middle * 2] <= maxOffsetX) low = middle + 1; else high = middle; }
+    if (first !== low) out.push(y, first, low);
+  }
+  return out;
+}
+
 // Write the exact pixel-bounded rectangle of the translated mask into `out` as
 // [minX, minY, maxX, maxY]. Sorted row values make clipping two binary searches
 // per destination row instead of another pass over every opaque pixel.

@@ -42,7 +42,10 @@ export function parseBnetServers(text) {
   // only when it carries `ws`; without it the region still lists, but selecting it dials nothing.
   const servers = raw
     .map((s) => ({ region: String(s?.region ?? s?.name ?? '').trim(), host: String(s?.host ?? s?.address ?? '').trim(),
-      ws: String(s?.ws ?? '').trim() }))
+      ws: String(s?.ws ?? '').trim(),
+      // Optional: a server whose AUTH_INFO asks for the classic revision check needs its own revision files
+      // and CD keys (BNClient+0x12060); they live only in this config, never in the repo.
+      ...(s?.auth && typeof s.auth === 'object' ? { auth: s.auth } : {}) }))
     .filter((s) => s.region && s.host);
   return { enabled: servers.length > 0, servers, error: '' };
 }

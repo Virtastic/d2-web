@@ -28,10 +28,23 @@
 // source, so nothing under `play/` draws them and nothing may until their cels are identified. That is
 // a gap; the maintainer owns its row id.
 //
-// THE ANCHORS ARE RETAIL'S OWN RECORDS, NOT PIXELS. The same captures carry the whole block, and
-// between them the right edge is DERIVED rather than guessed -- retail right-aligns the block on
-// x=784 (= 800 - 16), which is exactly where all four records end when they are laid out with
-// font16's own .tbl advances:
+// THE RULE IS D2CLIENT'S OWN (1.13c), NOT A FIT TO 800x600. The automap overlay draw D2Client+0x62680
+// (called from the frame draw 0xC39E0 while the automap is up) sets font 1 (font16) with D2Win
+// #10184, resets the line cursor DAT_6fbcc21c to 0x18 (24) and calls, in this order:
+//   0x5FFE0  `Game: <name>` (eng string 4181) when the game info's name (+0x1b) is non-empty, then
+//            `Password: <pw>` (4182) when +0x241 is non-empty; each advances the cursor when drawn;
+//   0x60AA0  the current level's name (D2Common #10826, then 0xBE240); advances when drawn;
+//   0x5FE90  `v %d.%02d` from the launcher's version getter; the cursor advances ALWAYS;
+//   0x5FD20  `Difficulty: %s` (4183) with `Nightmare` (5155) at difficulty 1, `Hell` (5154) at 2,
+//            nothing at Normal (DAT_6fbcc390);
+//   0x5FE10  the host address, only for game types 6 and 8 (DAT_6fbcc394);
+//   0x5FF70  `EXPANSION` (expansion string 22730), only when DAT_6fbc9854 is set.
+// Each line is D2Win #10150(text, x, y, 4, 0) with x = DAT_6fba9e14 - #10028(text) - 16, where
+// DAT_6fba9e14 is the screen width (the resolution switch at 0x6fac0e58 copies DAT_6fb8bc48 into it).
+// So the block is right-aligned 16px inside the SCREEN's right edge at every resolution (640: 624,
+// 800: 784, a 2000px view: 1984), the rows step 16px from y=24, and the automap is the only caller.
+// At 800x600 the rule reproduces the four retail records this module was first fitted to (Normal
+// single-player expansion games: no Game/Password, Difficulty or address line):
 //
 //   capture                    record                                  left   advance   right
 //   a3-forest-walkin.txt:1033  text 'Spider Forest'    x=684 y=24     684    100       784
@@ -39,16 +52,11 @@
 //   a3-forest-walkin.txt:1047  text 'v 1.13'           x=743 y=40     743     41       784
 //   a3-forest-walkin.txt:1054  text 'EXPANSION'        x=700 y=56     700     84       784
 //
-// Four records, two different name lengths (13 and 16 characters) and two fixed lines, one single
-// right edge: the rule has no free parameter left, so `x = right - measure(text)` reproduces every
-// one of retail's own anchors. The block's first write-up said the alignment rule was NOT measured and
-// the two name anchors were unrelated left edges (x=684 and x=643); the arithmetic above refutes that
-// and is why this module can draw a name retail never captured (Flayer Jungle, also 13 characters,
-// lands on 684 like the Spider Forest). The anchors survive the re-scoping of the row: they are
-// retail's own records, and they are the automap's own anchors.
+// The module's first version hard-coded right=784, so on any screen wider than 800 the block sat
+// short of the right edge (1216px short on a 2000px view).
 //
-// Prior art: none. D2MOO (1.10f) has no D2Client at all, and no other catalogued repo draws this
-// block, so the anchors above are the whole specification and retail's own records are the oracle.
+// Prior art: none. D2MOO (1.10f) has no D2Client at all; the rule above is read from the 1.13c
+// disassembly of the functions named.
 import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 import { decodeDatPalette, decodeDc6 } from './d2-formats.mjs';
 
@@ -60,24 +68,48 @@ export const AREA_NAME_BLOCK = Object.freeze({
   // D2Win's text colour index: retail's own `color=4` on every record of the block, carried onto each
   // glyph blit as the draw list's `extra` (recordDc6), the field s198 asserts for the trademark screen.
   colour: 4,
-  // 800 - 16: retail's right edge for the whole block, fitted exactly by the four records in the
-  // header. Not a margin this file chose -- it is what the four anchors have in common.
-  right: 784,
-  // The block's three rows, retail's own bottom-row anchors (font16 is 16 rows tall: 24, 40, 56).
-  rows: Object.freeze({ name: 24, version: 40, expansion: 56 }),
-  // Retail draws these two as literals under the name (they are the build's, not a level's): the
-  // title screen already draws `v 1.13` from its own constant (frontend.mjs TITLE_VERSION), and
-  // neither string is a .tbl entry in retail's three tables.
+  // x = screenWidth - width - 16 (every line function: `sub edx,eax; sub edx,0x10` on DAT_6fba9e14).
+  margin: 16,
+  // The line cursor DAT_6fbcc21c: 0x18 at the start of 0x62680, += 0x10 per line.
+  top: 24,
+  step: 16,
+  // 0x5FE90 formats `v %d.%02d` from the launcher's version getter: `v 1.13` for this build.
   version: 'v 1.13',
-  expansion: 'EXPANSION',
+  // The eng .tbl texts the other line functions read through D2Lang (indexes in the header).
+  strings: Object.freeze({ game: 'Game: ', password: 'Password: ', difficulty: 'Difficulty: %s',
+    nightmare: 'Nightmare', hell: 'Hell', expansion: 'EXPANSION' }),
 });
 
 /**
  * Where retail starts a right-aligned line: `measure` is the font's own advance sum (the .tbl's byte
- * 3 per code point, which is what D2Win lays text out with -- the DC6 cell width is not the advance).
+ * 3 per code point, which is what D2Win #10028 lays text out with -- the DC6 cell width is not the
+ * advance), `screenWidth` the game's screen width (D2Client DAT_6fba9e14).
  */
-export function rightAlignedX(measure, text, right = AREA_NAME_BLOCK.right) {
-  return right - measure(text);
+export function rightAlignedX(measure, text, screenWidth) {
+  return (screenWidth | 0) - measure(text) - AREA_NAME_BLOCK.margin;
+}
+
+/**
+ * D2Client+0x62680's line sequence: which lines show and on which row. `gameName`/`password`: the
+ * game info's (+0x1b / +0x241, empty in single player); `difficulty` 0..2 (DAT_6fbcc390);
+ * `address` the host address, given only for game types 6 and 8 (DAT_6fbcc394); `expansion`
+ * DAT_6fbc9854. The version line takes its row even when it draws nothing (0x5FE90).
+ */
+export function areaNameBlockLines({ name = '', gameName = '', password = '', difficulty = 0, address = '',
+  expansion = true, version = AREA_NAME_BLOCK.version } = {}) {
+  const t = AREA_NAME_BLOCK.strings, out = [];
+  let y = AREA_NAME_BLOCK.top;
+  const put = (key, text) => { out.push({ key, text, y }); y += AREA_NAME_BLOCK.step; };
+  if (gameName) put('game', t.game + gameName);
+  if (password) put('password', t.password + password);
+  if (name) put('name', name);
+  if (version) put('version', version); else y += AREA_NAME_BLOCK.step;
+  if (difficulty === 1 || difficulty === 2) {
+    put('difficulty', t.difficulty.replace('%s', difficulty === 2 ? t.hell : t.nightmare));
+  }
+  if (address) put('address', address);
+  if (expansion) put('expansion', t.expansion);
+  return out;
 }
 
 export function createAreaNameBlockRenderer(read, documentObject = globalThis.document) {
@@ -116,22 +148,19 @@ export function createAreaNameBlockRenderer(read, documentObject = globalThis.do
      * this module never invents, caches or defaults a level name, because the browser holding a second
      * copy of the level table is exactly the divergence F115 is about.
      */
-    draw(ctx, name, act = 1) {
+    draw(ctx, name, act = 1, { screenWidth = ctx?.canvas?.width ?? 800, ...state } = {}) {
       const text = String(name || '');
       if (!text) throw new Error('the area name block needs the engine\'s own level name');
       const entry = fontFor(act);
       const lines = [];
-      const line = (key, body, y) => {
-        const x = rightAlignedX((t) => entry.font.measure(t), body);
+      for (const { key, text: body, y } of areaNameBlockLines({ ...state, name: text })) {
+        const x = rightAlignedX((t) => entry.font.measure(t), body, screenWidth);
         const glyphs = [];
         capture = glyphs;
         try { entry.font.drawAnchored(ctx, body, x, y); } finally { capture = null; }
         lines.push({ key, text: body, x, y, glyphs });
-      };
-      line('name', text, AREA_NAME_BLOCK.rows.name);
-      line('version', AREA_NAME_BLOCK.version, AREA_NAME_BLOCK.rows.version);
-      line('expansion', AREA_NAME_BLOCK.expansion, AREA_NAME_BLOCK.rows.expansion);
-      return { name: text, act, colour: AREA_NAME_BLOCK.colour, right: AREA_NAME_BLOCK.right,
+      }
+      return { name: text, act, colour: AREA_NAME_BLOCK.colour, right: screenWidth - AREA_NAME_BLOCK.margin,
         font: AREA_NAME_BLOCK.font, palette: entry.palette, paletteShifted: entry.shifted, lines };
     },
   };

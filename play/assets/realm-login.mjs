@@ -1,5 +1,8 @@
 // Browser frontend for the configured Battle.net-compatible realm path. The endpoint comes from
 // bnet-servers.json; these controls collect only player credentials and game/character choices.
+// The account login itself is retail's own screen (bnet-login-screen.mjs); the shell opens this dialog
+// only for the character and game stage that follows it (showCharacters), which retail draws as its
+// realm character-select and channel screens -- those are not drawn on the canvas yet.
 import { GATEWAY_LAYOUT as G } from './bnet-servers.mjs';
 const CLASSES = ['Amazon', 'Sorceress', 'Necromancer', 'Paladin', 'Barbarian', 'Druid', 'Assassin'];
 
@@ -16,7 +19,7 @@ export function realmLoginLayout() {
 const rel = (r) => ({ left: pct(parseFloat(r.left) / 100 * 800 - G.panel.x, G.panel.w), top: pct(G.button.y - G.panel.y, G.panel.h), width: pct(G.button.w, G.panel.w), height: pct(G.button.h, G.panel.h) });
 const css = (o) => Object.entries(o).map(([k, v]) => `${k}:${v}`).join(';');
 
-export function createRealmLoginDialog({ documentObject = globalThis.document, onAuthenticate, onJoin, onClose, panelImage = '', buttonImage = '' }) {
+export function createRealmLoginDialog({ documentObject = globalThis.document, onAuthenticate, onJoin, onClose, onRetry = null, panelImage = '', buttonImage = '' }) {
   const L = realmLoginLayout();
   const btn = (o) => `position:absolute;${css(o)};padding:0;border:0;color:#c7b377;font:bold 13px Georgia,serif;cursor:pointer;background:${buttonImage ? `${buttonImage} center/100% 100% no-repeat` : '#2a2418'}`;
   const panel = documentObject.createElement('section');
@@ -62,21 +65,13 @@ export function createRealmLoginDialog({ documentObject = globalThis.document, o
   const status = (message) => { $('realm-status').textContent = message; };
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    documentObject.activeElement?.blur?.();   // Enter (Go/Done) closes the phone keyboard
     if (busy) return;
     if (!$('realm-login-fields').hidden) {
       if (!$('realm-account').value.trim() || !$('realm-password').value) { status('Enter an account and password.'); return; }
       setBusy(true); status('Connecting to the configured realm…');
       try {
-        const characters = await onAuthenticate({ account: $('realm-account').value.trim(), password: $('realm-password').value });
-        const select = $('realm-character'); select.replaceChildren();
-        for (const character of characters) {
-          const option = documentObject.createElement('option'); option.value = character.name;
-          option.textContent = `${character.name} · level ${character.level} ${CLASSES[character.charClass] || `class ${character.charClass}`}`;
-          select.append(option);
-        }
-        if (!characters.length) throw new Error('This realm account has no characters.');
-        $('realm-login-fields').hidden = true; $('realm-character-fields').hidden = false; syncControls();
-        $('realm-dialog-title').textContent = 'SELECT CHARACTER'; status('Choose a character and create a game.');
+        enterCharacters(await onAuthenticate({ account: $('realm-account').value.trim(), password: $('realm-password').value }));
       } catch (error) { status(String(error)); }
       finally { setBusy(false); }
     } else {
@@ -84,6 +79,7 @@ export function createRealmLoginDialog({ documentObject = globalThis.document, o
       setBusy(true); status('Creating the game and joining its game server…');
       try { status(await onJoin({ character: $('realm-character').value, gameName: $('realm-game').value.trim(), gamePassword: $('realm-game-password').value })); }
       catch (error) {
+        if (onRetry) { close(); onRetry(`${String(error)} Log in again to retry.`); return; }
         // The shell tears down MCP/D2GS on failure; return to a real login state so the
         // visible retry control cannot submit against a freed protocol session.
         $('realm-character-fields').hidden = true; $('realm-login-fields').hidden = false;
@@ -93,6 +89,18 @@ export function createRealmLoginDialog({ documentObject = globalThis.document, o
       finally { setBusy(false); }
     }
   });
+  const enterCharacters = (characters) => {
+    const select = $('realm-character'); select.replaceChildren();
+    for (const character of characters) {
+      const option = documentObject.createElement('option'); option.value = character.name;
+      option.textContent = `${character.name} · level ${character.level} ${CLASSES[character.charClass] || `class ${character.charClass}`}`;
+      select.append(option);
+    }
+    if (!characters.length) throw new Error('This realm account has no characters.');
+    $('realm-login-fields').hidden = true; $('realm-character-fields').hidden = false; syncControls();
+    $('realm-dialog-title').textContent = 'SELECT CHARACTER'; status('Choose a character and create a game.');
+  };
+  const close = () => { panel.hidden = true; panel.style.display = 'none'; };
   $('realm-cancel').addEventListener('click', () => { if (!busy) onClose(); });
   return {
     element: panel,
@@ -102,9 +110,16 @@ export function createRealmLoginDialog({ documentObject = globalThis.document, o
       $('realm-dialog-title').textContent = 'BATTLE.NET LOGIN';
       $('realm-login-fields').hidden = false; $('realm-character-fields').hidden = true; syncControls();
       $('realm-account').value = ''; $('realm-password').value = ''; $('realm-game').value = '';
-      status(''); panel.hidden = false; panel.style.display = 'grid'; $('realm-account').focus();
+      status(''); panel.hidden = false; panel.style.display = 'grid';
     },
-    close() { panel.hidden = true; panel.style.display = 'none'; },
+    // The stage after retail's login screen: the account is already authenticated.
+    showCharacters(characters, region = '') {
+      $('realm-region').textContent = region ? `Configured region: ${region}` : '';
+      $('realm-game').value = ''; $('realm-game-password').value = '';
+      enterCharacters(characters);
+      panel.hidden = false; panel.style.display = 'grid'; $('realm-character').focus();
+    },
+    close,
     status,
     evidence() { return { visible: !panel.hidden, title: $('realm-dialog-title').textContent,
       selectedCharacter: $('realm-character').value, status: $('realm-status').textContent }; },

@@ -210,13 +210,12 @@ const u32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 
  * Returns the challenge the server issued, the realm list it advertised, and the LOGONREALMEX
  * handoff (the MCP ticket) -- the read offsets the server cannot check for us.
  */
-export async function bncsLogin(transport, protocol, { account, password, realm = 'd2-web', product = 'D2XP', timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+export async function bncsLogin(transport, protocol, { account, password, realm = 'd2-web', product = 'D2XP', auth = null, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
   const reader = makeReader(transport);
   const sent = [], received = [];
   const send = (id, body) => { const frame = protocol.bncsFrame(id, body); sent.push({ id, bytes: frame.length }); transport.send(frame); };
 
   transport.send(protocol.bncsSelector());                       // single 0x01 protocol selector
-  const clientToken = protocol.clientToken();
   send(0x50, protocol.bncsAuthInfo(product));
 
   const authInfo = await readBncsFrame(reader, timeoutMs); received.push(authInfo.id);
@@ -226,19 +225,30 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
   const mpq = authInfo.body.subarray(20, mpqEnd < 0 ? authInfo.body.length : mpqEnd);
   const challenge = authInfo.body.subarray(mpqEnd + 1);
 
-  send(0x51, protocol.bncsAuthCheck({ clientToken, serverToken, challenge, product }));
+  // BNClient+0x12060: the token is its running seed (seed += tick + time); the version, hash and info
+  // come from the server's revision formula over the configured files, the key blocks from `auth`.
+  const { body: authCheckBody, clientToken } = protocol.bncsAuthCheck({ serverToken, mpq: new TextDecoder().decode(mpq), challenge, product, auth });
+  send(0x51, authCheckBody);
   const authCheck = await readBncsFrame(reader, timeoutMs); received.push(authCheck.id);
   if (authCheck.id !== 0x51) throw new Error(`expected AUTH_CHECK reply 0x51, got 0x${authCheck.id.toString(16)}`);
   const versionResult = u32(authCheck.body, 0);
   if (versionResult !== 0) throw new Error(`AUTH_CHECK rejected the version (result 0x${versionResult.toString(16)})`);
 
-  send(0x3a, protocol.bncsLogon({ clientToken, serverToken, account, password }));
+  // BNClient+0xC9E0 tokens the logon with GetTickCount; +0xBFD0 with its own counter (1, 2, ...).
+  send(0x3a, protocol.bncsLogon({ clientToken: protocol.tickCount(), serverToken, account, password }));
   const logon = await readBncsFrame(reader, timeoutMs); received.push(logon.id);
   if (logon.id !== 0x3a) throw new Error(`expected LOGONRESPONSE2 reply 0x3a, got 0x${logon.id.toString(16)}`);
   const logonResult = u32(logon.body, 0);
-  if (logonResult !== 0) throw new Error(`LOGONRESPONSE2 rejected the account (result ${logonResult})`);
+  if (logonResult !== 0) {
+    // The result picks retail's message box (Bnclient+0x109A0): 1 no such account, 2 wrong password,
+    // 3 account closed, 6 the server's own text, which follows the result as a C string.
+    const error = new Error(`LOGONRESPONSE2 rejected the account (result ${logonResult})`);
+    error.logonResult = logonResult;
+    if (logonResult === 6) { const end = logon.body.indexOf(0, 4); error.logonReason = new TextDecoder().decode(logon.body.subarray(4, end < 0 ? logon.body.length : end)); }
+    throw error;
+  }
 
-  send(0x40, new Uint8Array(0));                                  // QUERYREALMS2, empty body
+  send(0x40, protocol.bncsQueryRealms());                         // QUERYREALMS2, empty body
   const realms = await readBncsFrame(reader, timeoutMs); received.push(realms.id);
   if (realms.id !== 0x40) throw new Error(`expected QUERYREALMS2 reply 0x40, got 0x${realms.id.toString(16)}`);
   const count = u32(realms.body, 4);
@@ -253,13 +263,15 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
     o = descriptionEnd + 1;
   }
 
-  send(0x3e, protocol.bncsRealmEx({ clientToken, serverToken, realm, password }));
+  send(0x3e, protocol.bncsRealmEx({ clientToken: protocol.realmToken(), serverToken, realm, password }));
   const realmEx = await readBncsFrame(reader, timeoutMs); received.push(realmEx.id);
   if (realmEx.id !== 0x3e) throw new Error(`expected LOGONREALMEX reply 0x3e, got 0x${realmEx.id.toString(16)}`);
-  // MCPStatus is 1 on success -- the value the engine's own server sends and the independent 1.13
-  // schema pins (`test/realm-protodef.test.mjs`), NOT the 0 the other replies use.
+  // MCPStatus is 0 or 1 on success: the engine's own server sends 1, a stock Battle.net realm sends 0,
+  // and a failure sets the high bit (0x80000001...). Either way a real hand-off carries a non-zero IP.
   const status = u32(realmEx.body, 4);
-  if (status !== 1) throw new Error(`LOGONREALMEX did not hand off the realm (MCPStatus 0x${status.toString(16)})`);
+  if (status >= 0x80000000 || ![0, 1].includes(status) || !realmEx.body.subarray(16, 20).some(Boolean)) {
+    throw new Error(`LOGONREALMEX did not hand off the realm (MCPStatus 0x${status.toString(16)})`);
+  }
   // The 1.13 schema lays the body out as MCPCookie(0) MCPStatus(4) MCPChunk1 x2(8,12)
   // IP[4] bytes(16) port u16 BE(20) zero(22) MCPChunk2 x12(24..72) name; so the IP is the four BYTES
   // at 16, not the u32 at 8, and the port is a big-endian u16 at 20.
@@ -398,12 +410,16 @@ export function startD2gsKeepAlive(transport, protocol, { intervalMs = 5000, now
   timer = setIntervalFn(() => {
     if (!active) return;
     const tick = (now() - started) >>> 0;
-    transport.send(protocol.d2gsPing(tick));
+    const frame = protocol.d2gsPing(tick);              // null: D2Client+0x14B00's five-second gate held it
+    if (!frame) return;
+    transport.send(frame);
     sent++;
     onSent(sent, tick);
   }, intervalMs);
   transport.onClose?.(stop);
-  return { stop, get active() { return active; }, get sent() { return sent; } };
+  // D2Client+0x422E0: feed each 0x8F pong back so the next ping carries the averaged round trip.
+  const pong = (payload) => protocol.d2gsPong?.(payload, (now() - started) >>> 0);
+  return { stop, pong, get active() { return active; }, get sent() { return sent; } };
 }
 
 /** Decode later server frames continuously so an idle socket cannot grow the reader buffer. */
@@ -432,8 +448,20 @@ export function startD2gsReceiveLoop(readFrame, { onFrame = () => {}, onClose = 
  * client never re-implements a wire layout. Common to the test runner scenario and the page, so neither
  * can drift from the other. Call `protocol.free()` when done.
  */
-export function bindEngineProtocol(Module, scratch = 65536) {
+export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
   const P = Module._malloc(scratch), O = Module._malloc(scratch), T = Module._malloc(4096), E = Module._malloc(1);
+  // The host values retail reads from Windows, supplied explicitly so a test pins every byte. A browser
+  // has no socket address (+0x14 stays 0) and no Windows modules (the ping's module word is "not found").
+  const env = { tick: () => Math.floor(globalThis.performance?.now?.() ?? Date.now()) >>> 0,
+    time: () => Math.floor(Date.now() / 1000) >>> 0, language: 0, localIp: 0,
+    timezoneBias: () => new Date().getTimezoneOffset(), lcid: 0x409, uiLanguage: 0x409,
+    countryAbbr: 'USA', country: 'United States', pingModule: () => null, ...host };
+  const SEED = Module._malloc(4), PING = Module._malloc(64), PN = Module._malloc(16);
+  Module.HEAPU8.fill(0, Number(SEED), Number(SEED) + 4);
+  Module.HEAPU8.fill(0, Number(PING), Number(PING) + 64);
+  let realmCounter = 0;
+  const u32at = (p) => { const b = Module.HEAPU8, o = Number(p); return (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0; };
+  const put32 = (p, v) => { const b = Module.HEAPU8, o = Number(p); b[o] = v & 0xff; b[o + 1] = (v >>> 8) & 0xff; b[o + 2] = (v >>> 16) & 0xff; b[o + 3] = (v >>> 24) & 0xff; };
   const call = (n, rt, a, v) => Module.ccall(n, rt, a, v);
   const rd = (p, n) => Array.from(Module.HEAPU8.subarray(Number(p), Number(p) + n));
   const str = (bytes) => String.fromCharCode(...bytes.filter((b) => b !== 0));
@@ -455,25 +483,59 @@ export function bindEngineProtocol(Module, scratch = 65536) {
   };
   const protocol = {
     bncsSelector: () => [0x01],
-    clientToken: () => 0xcafebabe,
+    tickCount: () => env.tick() >>> 0,
+    realmToken: () => (realmCounter = (realmCounter + 1) >>> 0),
     bncsFrame: (id, body) => { call('d2_realm_bncs_header', 'number', ['number', 'number', 'bigint'], [id, body.length, BigInt(T)]); return [...rd(T, 4), ...body]; },
-    bncsAuthInfo: (product) => { const n = call('d2_realm_bncs_auth_info_request', 'number', ['string', 'bigint'], [product, BigInt(T)]); return rd(T, n); },
-    bncsAuthCheck: ({ clientToken, challenge, product }) => {
-      const challengeStr = str(challenge);
-      const revLen = call('d2_realm_bncs_checkrev', 'number', ['string', 'string', 'number', 'bigint'], [challengeStr, '1.13.2.0', 0, BigInt(O)]);
-      const checkrev = str(rd(O, revLen));
-      const n = call('d2_realm_bncs_auth_check_request', 'number', ['number', 'number', 'number', 'number', 'bigint', 'number', 'string', 'string', 'bigint'], [clientToken, 0x0e, 0, 0, BigInt(E), 0, product + ';' + checkrev, 'd2-web', BigInt(T)]);
+    // AUTH_INFO and AUTH_CHECK carry the host-filled words; LOGONRESPONSE2, QUERYREALMS2, LOGONREALMEX and the MCP
+    // requests are composed by the 1.13c BNClient/D2MCPClient ports (src/core/realm/realm_client_retail.cpp).
+    // BNClient+0x11960 with the host-filled words: language, local IP, timezone bias, LCIDs, country.
+    bncsAuthInfo: (product) => {
+      const n = call('d2_realm_bncs_auth_info_env', 'number',
+        ['number', 'number', 'number', 'number', 'number', 'number', 'string', 'string', 'bigint'],
+        [product === 'D2XP' ? 1 : 0, env.language, env.localIp, env.timezoneBias() | 0, env.lcid, env.uiLanguage, env.countryAbbr, env.country, BigInt(T)]);
       return rd(T, n);
     },
-    bncsLogon: ({ clientToken, serverToken, account, password }) => { const n = call('d2_realm_bncs_logonresponse2_request', 'number', ['number', 'number', 'string', 'string', 'bigint'], [clientToken, serverToken, account, password, BigInt(T)]); return rd(T, n); },
-    bncsRealmEx: ({ clientToken, serverToken, realm, password }) => { const n = call('d2_realm_bncs_logonrealmex_request', 'number', ['number', 'number', 'string', 'string', 'bigint'], [clientToken, serverToken, password, realm, BigInt(T)]); return rd(T, n); },
+    // BNClient+0x12060. A classic formula ("A=.. B=.. C=.. 4 ...") runs the 1.13c path over the configured
+    // revision files and CD keys; our own realmd's base64 challenge keeps the project's keyless form.
+    bncsAuthCheck: ({ serverToken, mpq = '', challenge, product, auth }) => {
+      const challengeStr = str(challenge), expansion = product === 'D2XP' ? 1 : 0;
+      if (!challengeStr.includes('=') || /^[A-Za-z0-9+/]*=*$/.test(challengeStr)) {
+        const clientToken = (u32at(SEED) + env.tick() + env.time()) >>> 0;
+        put32(SEED, clientToken);
+        const revLen = call('d2_realm_bncs_checkrev', 'number', ['string', 'string', 'number', 'bigint'], [challengeStr, '1.13.2.0', 0, BigInt(O)]);
+        const checkrev = str(rd(O, revLen));
+        const n = call('d2_realm_bncs_auth_check_request', 'number', ['number', 'number', 'number', 'number', 'bigint', 'number', 'string', 'string', 'bigint'], [clientToken, 0x0e, 0, 0, BigInt(E), 0, product + ';' + checkrev, 'd2-web', BigInt(T)]);
+        return { body: rd(T, n), clientToken };
+      }
+      const files = auth?.revisionFiles, keys = auth?.cdKeys ?? [];
+      if (!files || files.length !== 3 || !auth.exeTime || !keys[0] || (expansion && !keys[1]))
+        throw new Error('AUTH_CHECK: this server asks for a classic revision check; its config needs auth.revisionFiles (3), auth.exeTime and auth.cdKeys');
+      const total = files.reduce((a, f) => a + f.length, 0);
+      const F = Module._malloc(total + 16), Z = Module._malloc(16);
+      let off = 0;
+      for (const [i, f] of files.entries()) { Module.HEAPU8.set(f, Number(F) + off); put32(Number(Z) + 4 * i, f.length); off += f.length; }
+      try {
+        const n = call('d2_realm_bncs_auth_check_env', 'number',
+          ['bigint', 'number', 'number', 'number', 'number', 'string', 'string', 'bigint', 'bigint', 'string', 'string', 'string', 'string', 'bigint'],
+          [BigInt(SEED), env.time(), env.tick(), serverToken, expansion, challengeStr, mpq, BigInt(F), BigInt(Z), auth.exeTime,
+            keys[0], keys[1] ?? '', auth.keyOwner ?? '', BigInt(O)]);
+        if (n === -1) throw new Error('AUTH_CHECK: a configured CD key does not decode');
+        if (n <= 0) throw new Error(`AUTH_CHECK: the revision check failed for ${mpq}`);
+        return { body: rd(O, n), clientToken: u32at(SEED) };
+      } finally { Module._free(F); Module._free(Z); }
+    },
+    bncsLogon: ({ clientToken, serverToken, account, password }) => { const n = call('d2_realm_client_bncs_logon', 'number', ['number', 'number', 'string', 'string', 'bigint'], [clientToken, serverToken, account, password, BigInt(T)]); return rd(T, n); },
+    bncsQueryRealms: () => { const n = call('d2_realm_client_bncs_query_realms', 'number', ['bigint'], [BigInt(T)]); if (n < 0) throw new Error('QUERYREALMS2 composer failed'); return rd(T, n); },
+    // D2Launch passes the literal realm password "password" to BNClient+0x0BFD0 (slot +0x44), never the account's.
+    bncsRealmEx: ({ clientToken, serverToken, realm }) => { const n = call('d2_realm_client_bncs_logon_realm', 'number', ['number', 'number', 'string', 'string', 'bigint'], [clientToken, serverToken, realm, 'password', BigInt(T)]); return rd(T, n); },
     mcpSelector: () => { const n = call('d2_realm_mcp_protocol_selector', 'number', ['bigint'], [BigInt(T)]); return rd(T, n); },
     mcpFrame: (op, body) => { const n = call('d2_realm_mcp_header', 'number', ['number', 'number', 'bigint'], [op, body.length, BigInt(T)]); if (n < 3) throw new Error('MCP frame composer rejected the body'); return [...rd(T, 3), ...body]; },
-    mcpStartup: (realmReply) => { Module.HEAPU8.set(realmReply, Number(P)); const n = call('d2_realm_mcp_startup_request', 'number', ['bigint', 'number', 'bigint'], [BigInt(P), realmReply.length, BigInt(T)]); return rd(T, n); },
-    mcpCharlist: (count) => { const n = call('d2_realm_mcp_charlist2_request', 'number', ['number', 'bigint'], [count, BigInt(T)]); return rd(T, n); },
-    mcpCharlogon: (name) => { const n = call('d2_realm_mcp_charlogon_request', 'number', ['string', 'bigint'], [name, BigInt(T)]); return rd(T, n); },
-    mcpCreateGame: ({ requestId, difficulty, maxPlayers, name, password, description }) => { const n = call('d2_realm_mcp_creategame_request', 'number', ['number', 'number', 'number', 'string', 'string', 'string', 'bigint'], [requestId, difficulty, maxPlayers, name, password, description, BigInt(T)]); return rd(T, n); },
-    mcpJoinGame: ({ requestId, name, password }) => { const n = call('d2_realm_mcp_joingame_request', 'number', ['number', 'string', 'string', 'bigint'], [requestId, name, password, BigInt(T)]); return rd(T, n); },
+    mcpStartup: (realmReply) => { Module.HEAPU8.set(realmReply, Number(P)); const n = call('d2_realm_client_mcp_startup', 'number', ['bigint', 'number', 'bigint'], [BigInt(P), realmReply.length, BigInt(T)]); if (!n) throw new Error('MCP STARTUP composer rejected the realm handoff'); return rd(T, n); },
+    // Retail always asks for eight characters; the count argument is kept for the call sites only.
+    mcpCharlist: (_count) => { const n = call('d2_realm_client_mcp_charlist', 'number', ['bigint'], [BigInt(T)]); return rd(T, n); },
+    mcpCharlogon: (name) => { const n = call('d2_realm_client_mcp_charlogon', 'number', ['string', 'bigint'], [name, BigInt(T)]); if (!n) throw new Error('MCP CHARLOGON composer rejected the name'); return rd(T, n); },
+    mcpCreateGame: ({ requestId, difficulty, maxPlayers, name, password, description }) => { const n = call('d2_realm_client_mcp_creategame', 'number', ['number', 'number', 'number', 'string', 'string', 'string', 'bigint'], [requestId, difficulty, maxPlayers, name, password, description, BigInt(T)]); if (!n) throw new Error('MCP CREATEGAME composer failed'); return rd(T, n); },
+    mcpJoinGame: ({ requestId, name, password }) => { const n = call('d2_realm_client_mcp_joingame', 'number', ['number', 'string', 'string', 'bigint'], [requestId, name, password, BigInt(T)]); if (!n) throw new Error('MCP JOINGAME composer failed'); return rd(T, n); },
     greetingParse: (bytes) => { Module.HEAPU8.set(bytes, Number(P)); return call('d2_realm_greeting_parse', 'number', ['bigint', 'number'], [BigInt(P), bytes.length]); },
     d2gsFrameSize: (bytes) => { Module.HEAPU8.set(bytes, Number(P)); return call('d2_realm_d2gs_frame_size', 'number', ['bigint', 'number'], [BigInt(P), bytes.length]); },
     d2gsPacketSize: (bytes) => { Module.HEAPU8.set(bytes, Number(P)); return call('d2_realm_d2gs_packet_size', 'number', ['bigint', 'number'], [BigInt(P), bytes.length]); },
@@ -647,8 +709,23 @@ export function bindEngineProtocol(Module, scratch = 65536) {
     d2gsClientProjectileSupported: (skillId) => call('d2_realm_client_projectile_supported', 'number', ['number'], [skillId]),
     d2gsClientPredictRightCast: (x,y) => call('d2_realm_client_player_predict_right_cast', 'number', ['number','number'], [x,y]),
     d2gsClientMotionTick: () => call('d2_realm_client_motion_tick', 'number', [], []),
-    d2gsGamelogon: ({ character, charClass, gameToken, gameHash }) => { const n = call('d2_realm_d2gs_gamelogon', 'number', ['number', 'number', 'number', 'number', 'string', 'bigint'], [gameHash, gameToken, charClass, 0x0e, character, BigInt(T)]); return rd(T, n); },
-    d2gsPing: (tick) => { const n = call('d2_realm_d2gs_ping', 'number', ['number', 'bigint'], [tick, BigInt(T)]); if (n !== 13) throw new Error(`D2GS ping composer returned ${n} bytes`); return rd(T, n); },
+    d2gsGamelogon: ({ character, charClass, gameToken, gameHash }) => { const n = call('d2_realm_d2gs_gamelogon', 'number', ['number', 'number', 'number', 'number', 'string', 'bigint'], [gameHash, gameToken, charClass, 0x0d, character, BigInt(T)]); return rd(T, n); },
+    // D2Client+0x14B00: [6D][tick][avg rtt >> 1][module word * 0xB640DE41]; null while the 5 s gate holds.
+    d2gsPing: (tick) => {
+      const offset = call('d2_realm_d2gs_ping_module', 'number', ['bigint', 'bigint'], [BigInt(PING), BigInt(PN)]);
+      const module = rd(PN, 8), name = str(module);
+      const found = name ? env.pingModule(name, offset) : null;
+      const n = call('d2_realm_d2gs_ping', 'number', ['bigint', 'number', 'number', 'number', 'number', 'bigint'],
+        [BigInt(PING), tick >>> 0, found ? 1 : 0, found?.w20 ?? 0, found?.w24 ?? 0, BigInt(T)]);
+      if (n === 0) return null;
+      if (n !== 13) throw new Error(`D2GS ping composer returned ${n} bytes`);
+      return rd(T, n);
+    },
+    // D2Client+0x422E0: the 0x8F pong's eight words land in the ping state and the round trip is averaged.
+    d2gsPong: (payload, tick) => {
+      Module.HEAPU8.set(payload.slice(0, Math.min(payload.length, 4096)), Number(T));
+      return call('d2_realm_d2gs_pong', 'number', ['bigint', 'bigint', 'number', 'number'], [BigInt(PING), BigInt(T), Math.min(payload.length, 4096), tick >>> 0]);
+    },
     d2gsSelectedSkills: () => {
       const p = Number(call('d2_realm_client_selected_skills', 'bigint', [], []));
       if (!p) throw new Error('engine returned no selected skill record');
@@ -696,7 +773,7 @@ export function bindEngineProtocol(Module, scratch = 65536) {
       return Uint8Array.from(rd(T, n));
     },
     d2gsDecompress: (bytes) => { Module.HEAPU8.set(bytes, Number(P)); const n = call('d2_realm_huffman_decompress', 'number', ['bigint', 'number', 'bigint', 'number'], [BigInt(P), bytes.length, BigInt(O), scratch]); if (n < 0) throw new Error('huffman decompress failed'); return rd(O, n); },
-    free: () => { Module._free(P); Module._free(O); Module._free(T); Module._free(E); },
+    free: () => { for (const p of [P, O, T, E, SEED, PING, PN]) Module._free(p); },
   };
   return protocol;
 }

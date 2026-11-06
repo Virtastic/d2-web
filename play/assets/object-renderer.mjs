@@ -1,7 +1,7 @@
 import { decodeDatPalette } from './d2-formats.mjs';
 import { cofLayerRecord, composeCofFrame, decodeCof, decodeDcc } from './unit-formats.mjs';
 import { dccDirection, indexedToRgba } from './unit-renderer.mjs';
-import { fourcc } from './monster-renderer.mjs';
+import { dc6AsDcc, fourcc } from './monster-renderer.mjs';
 import { createBlender } from './frontend.mjs';
 import { highlightMap } from './unit-highlight.mjs';
 import { createUnitShadowRenderer } from './unit-shadow-renderer.mjs';
@@ -91,6 +91,9 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
           // has no sprite to pick. Draw another waypoint's art with the same frame count instead.
           const alt = STAND_IN[object.token];
           if (alt) try { components.set(layer.component, decodeDcc(read(path.split(object.token).join(alt)), { directions: [direction] })); } catch {}
+          // Some objects ship their layers as DC6 cels and not DCCs, as some monsters do (dc6AsDcc). The Worldstone Chamber
+          // portal (4x, object 563) is one: its OP/ON TR and S1 layers exist only as .DC6, so a DCC-only lookup left it undrawn.
+          if (!components.has(layer.component)) try { components.set(layer.component, dc6AsDcc(read(path.replace(/\.DCC$/, '.DC6')))); } catch {}
         }
       }
       if (!components.size) throw new Error('no DCC components');

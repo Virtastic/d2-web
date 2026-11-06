@@ -30,7 +30,7 @@
 // either name reaches the same table.  The base palette and pal.dat are identical in all five acts and
 // their 256 colours are distinct, so a canvas pixel's index is recoverable exactly.
 import { cofLayerRecord, composeCofFrame } from './unit-formats.mjs';
-import { shadowMaskLayout, shadowVisibleBounds } from './unit-shadow-raster.mjs';
+import { shadowMaskLayout, shadowVisibleSpans } from './unit-shadow-raster.mjs';
 import { perfT0, perfT } from './frame-perf.mjs';
 
 const ACT_PALETTE = ['ACT1', 'ACT2', 'ACT3', 'ACT4', 'ACT5'];
@@ -63,7 +63,10 @@ export function createUnitShadowRenderer(read) {
       value = null;
       try {
         const pl2 = read(`data\\global\\palette\\${ACT_PALETTE[act0]}\\pal.pl2`);
-        if (pl2.length >= LIGHT_LEVEL_7 + 256) value = { pl2, shadow: pl2.subarray(LIGHT_LEVEL_7, LIGHT_LEVEL_7 + 256), index: indexOfPalette(pl2) };
+        if (pl2.length >= LIGHT_LEVEL_7 + 256) {
+          const shadow = pl2.subarray(LIGHT_LEVEL_7, LIGHT_LEVEL_7 + 256), index = indexOfPalette(pl2);
+          value = { pl2, shadow, index, shade: shadeOf(pl2, shadow, index) };
+        }
       } catch { value = null; }
       acts.set(act0, value);
     }
@@ -88,7 +91,6 @@ export function createUnitShadowRenderer(read) {
       const layers = [];
       const eligibleComponents = [];
       let minX = width, minY = height, maxX = -1, maxY = -1;
-      const clippedBounds = [0, 0, 0, 0];
       const pFootprint = perfT0();
       for (const component of cof.priority[direction][frame]) {
         const dcc = components.get ? components.get(component) : components[component];
@@ -129,14 +131,18 @@ export function createUnitShadowRenderer(read) {
         // Kept source rows have unique k values, so their destination y offsets do not overlap; pixels
         // within each row also have unique x offsets. The mask builder can append directly without a Set.
         const layout = shadowMaskLayout(plane), mask = layout.offsets;
-        // Per-row binary search returns the same exact clipped pixel bounds as
-        // scanning every offset, with work proportional to cel height.
-        if (shadowVisibleBounds(layout, baseX, baseY, width, height, clippedBounds)) {
-          if (clippedBounds[0] < minX) minX = clippedBounds[0];
-          if (clippedBounds[1] < minY) minY = clippedBounds[1];
-          if (clippedBounds[2] > maxX) maxX = clippedBounds[2];
-          if (clippedBounds[3] > maxY) maxY = clippedBounds[3];
-          layers.push({ component, mask, baseX, baseY });
+        // Per-row binary search returns the exact in-canvas pixel range of every destination row, with
+        // work proportional to cel height; the raster pass below walks only those ranges.
+        const spans = shadowVisibleSpans(layout, baseX, baseY, width, height);
+        if (spans.length) {
+          for (let s = 0; s < spans.length; s += 3) {
+            const py = spans[s], left = baseX + mask[spans[s + 1] * 2], right = baseX + mask[(spans[s + 2] - 1) * 2];
+            if (left < minX) minX = left;
+            if (right > maxX) maxX = right;
+            if (py < minY) minY = py;
+            if (py > maxY) maxY = py;
+          }
+          layers.push({ component, mask, baseX, spans });
         }
       }
       perfT('unit-shadow-footprint', pFootprint);
@@ -155,33 +161,37 @@ export function createUnitShadowRenderer(read) {
       // getImageData is linear in them. Read it in BANDS rows tall, each only as wide as its own rows' extent.
       // Each pixel is still read, shadowed and written once, layers in the same order: identical output.
       const BANDS = 4, rows = maxY - minY + 1, rowLo = new Int32Array(rows).fill(maxX + 1), rowHi = new Int32Array(rows).fill(minX - 1);
-      for (const layer of layers) for (let i = 0; i < layer.mask.length; i += 2) {
-        const px = layer.baseX + layer.mask[i], py = layer.baseY + layer.mask[i + 1];
-        if (px < minX || py < minY || px > maxX || py > maxY) continue;
-        const r = py - minY; if (px < rowLo[r]) rowLo[r] = px; if (px > rowHi[r]) rowHi[r] = px;
+      for (const { mask, baseX, spans } of layers) for (let s = 0; s < spans.length; s += 3) {
+        const r = spans[s] - minY, left = baseX + mask[spans[s + 1] * 2], right = baseX + mask[(spans[s + 2] - 1) * 2];
+        if (left < rowLo[r]) rowLo[r] = left; if (right > rowHi[r]) rowHi[r] = right;
       }
-      const pal = table.pl2;
-      let pixels = 0, darkened = 0;
+      // PERF (throne wave, 38 shadowed units): the bands are disjoint row ranges, so every in-rect mask pixel
+      // lies in exactly one band. Read the bands first, then walk the masks ONCE in layer order (the per-band
+      // walk re-scanned every mask BANDS times), darkening through a per-colour memo of the destination's
+      // shadow colour, then write the bands back. Same pixels, same order per pixel, same counts.
+      const images = [], views = [], rowBand = new Uint8Array(rows), bandX = new Int32Array(BANDS), bandY = new Int32Array(BANDS), bandW = new Int32Array(BANDS);
       for (let band = 0; band < BANDS; band++) {
         const r0 = Math.floor(rows * band / BANDS), r1 = Math.floor(rows * (band + 1) / BANDS) - 1;
         let bx0 = maxX + 1, bx1 = minX - 1;
-        for (let r = r0; r <= r1; r++) { if (rowLo[r] < bx0) bx0 = rowLo[r]; if (rowHi[r] > bx1) bx1 = rowHi[r]; }
-        if (bx1 < bx0) continue;
-        const by0 = minY + r0, by1 = minY + r1;
-        const image = ctx.getImageData(bx0, by0, bx1 - bx0 + 1, by1 - by0 + 1);
-        const data = image.data, iw = image.width;
-        for (const layer of layers) for (let i = 0; i < layer.mask.length; i += 2) {
-          const px = layer.baseX + layer.mask[i], py = layer.baseY + layer.mask[i + 1];
-          if (px < bx0 || py < by0 || px > bx1 || py > by1) continue;
-          const p = ((py - by0) * iw + px - bx0) * 4;
-          const out = table.shadow[table.index(data[p], data[p + 1], data[p + 2])];
-          const r = pal[out * 4], g = pal[out * 4 + 1], b = pal[out * 4 + 2];
-          if (r + g + b < data[p] + data[p + 1] + data[p + 2]) darkened++;
-          data[p] = r; data[p + 1] = g; data[p + 2] = b; data[p + 3] = 255;
-          pixels++;
-        }
-        ctx.putImageData(image, bx0, by0);
+        for (let r = r0; r <= r1; r++) { if (rowLo[r] < bx0) bx0 = rowLo[r]; if (rowHi[r] > bx1) bx1 = rowHi[r]; rowBand[r] = band; }
+        if (bx1 < bx0) { images.push(null); views.push(null); continue; }
+        const image = ctx.getImageData(bx0, minY + r0, bx1 - bx0 + 1, r1 - r0 + 1);
+        images.push(image); views.push(new Uint32Array(image.data.buffer, image.data.byteOffset, image.data.length >>> 2));
+        bandX[band] = bx0; bandY[band] = minY + r0; bandW[band] = image.width;
       }
+      const shade = table.shade;
+      let pixels = 0, darkened = 0;
+      for (const { mask, baseX, spans } of layers) for (let s = 0; s < spans.length; s += 3) {
+        const py = spans[s], band = rowBand[py - minY], d = views[band];
+        const k0 = (py - bandY[band]) * bandW[band] + baseX - bandX[band], end = spans[s + 2] * 2;
+        for (let i = spans[s + 1] * 2; i < end; i += 2) {
+          const k = k0 + mask[i], v = shade(d[k]);
+          if (v < 0) darkened++;
+          d[k] = v | 0xff000000;
+        }
+        pixels += spans[s + 2] - spans[s + 1];
+      }
+      for (let band = 0; band < BANDS; band++) if (images[band]) ctx.putImageData(images[band], bandX[band], bandY[band]);
       perfT('unit-shadow-total', pShadow);
       const blit = { ...identity, x: Math.round(x), y: Math.round(y), layers: layers.length, components: layers.map((l) => l.component), pixels, darkened,
         method: 'pl2-lightlevel-7', projection: 'x=-0.5h,y=-0.5h', act: act0Of(identity.act) + 1, rasterized: true,
@@ -189,6 +199,22 @@ export function createUnitShadowRenderer(read) {
       if (Array.isArray(globalThis.__d2UnitShadows)) globalThis.__d2UnitShadows.push(blit);
       return blit;
     },
+  };
+}
+
+// One destination pixel (a little-endian RGBA word) through the shadow: LightLevelVariations[7] of its palette
+// index, as the PL2 colour r | g << 8 | b << 16, with bit 31 set when it is darker (r+g+b) than the pixel was.
+// A pure function of the pixel's RGB, so a direct-mapped memo in front of indexOfPalette returns its own answer.
+function shadeOf(pl2, shadow, index) {
+  const ck = new Int32Array(4096).fill(-1), cv = new Int32Array(4096);
+  return (pixel) => {
+    const key = pixel & 0xffffff, h = Math.imul(key, 0x9E3779B1) >>> 20;
+    if (ck[h] === key) return cv[h];
+    const r = key & 0xff, g = (key >>> 8) & 0xff, b = key >>> 16, out = shadow[index(r, g, b)] * 4;
+    const R = pl2[out], G = pl2[out + 1], B = pl2[out + 2];
+    const v = (R | (G << 8) | (B << 16) | (R + G + B < r + g + b ? 0x80000000 : 0)) | 0;
+    ck[h] = key; cv[h] = v;
+    return v;
   };
 }
 
