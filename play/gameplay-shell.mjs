@@ -82,7 +82,6 @@ import { ensureFont, drawCentredBitmap, drawCentredLines, drawLeftBitmap, drawCe
 import { createFont, createTitleScreen, decodeFontTbl, FRONTEND, textColourPalette } from './assets/frontend.mjs';
 import { createExitSequence } from './assets/exit-sequence.mjs';
 import { loadBnetServers } from './assets/bnet-servers.mjs';
-import { createRealmLoginDialog } from './assets/realm-login.mjs';
 import { BOOT_MOVIES, openMovie } from './assets/cinematics.mjs';
 import { createBikAudioPlayer } from './assets/cinematic-audio.mjs';
 import { createClassSelectSoundPlayer } from './assets/class-create-sounds.mjs';
@@ -92,6 +91,7 @@ import { createScreenshotAction } from './assets/screenshot-action.mjs';
 import { sendCharacterPhrase } from './assets/chat-macros.mjs';
 import { createOtherMultiplayerScreen } from './assets/other-multiplayer.mjs';
 import { createBnetLoginScreen } from './assets/bnet-login-screen.mjs';
+import { createBnetLobbyScreen } from './assets/bnet-lobby-screen.mjs';
 import { createBnetConnectingPopup } from './assets/bnet-connecting.mjs';
 import { goldLabel } from './assets/gold-label.mjs';
 import { hoveredLabel, labelItemAt, nearestGroundItem, pickupNeedsWalk } from './item-pick.mjs';
@@ -229,6 +229,7 @@ const frontendPointerControl = () => {
   if (screen === SCREEN.CINEMATICS) return cinematicsScreen;
   if (screen === SCREEN.OTHER_MULTIPLAYER) return otherMultiplayerScreen;
   if (screen === SCREEN.BNET_LOGIN) return bnetLoginScreen;
+  if (screen === SCREEN.BNET_LOBBY) return bnetLobbyScreen;
   if (screen === SCREEN.SELECT) return charSelect;
   if (screen === SCREEN.CREATE) return charCreate;
   return null;
@@ -801,7 +802,7 @@ const PLAY_MODE = new URLSearchParams(window.__d2Entry.search).get('play') === '
 // Retail opens on a title screen, so that is what a plain visit gets. `play=1` keeps booting
 // straight into a session: every browser scenario drives the game directly and must not have to
 // click through a menu to reach it.
-const SCREEN = { TITLE: 'title', CREDITS: 'credits', CINEMATICS: 'cinematics', OTHER_MULTIPLAYER: 'other-multiplayer', BNET_LOGIN: 'bnet-login', SELECT: 'select', CREATE: 'create', GAME: 'game' };
+const SCREEN = { TITLE: 'title', CREDITS: 'credits', CINEMATICS: 'cinematics', OTHER_MULTIPLAYER: 'other-multiplayer', BNET_LOGIN: 'bnet-login', BNET_LOBBY: 'bnet-lobby', SELECT: 'select', CREATE: 'create', GAME: 'game' };
 // Construct the boot-movie context with the shell, while the initial black loading screen is up.
 // Browsers may require a user gesture to unlock audio, and that gesture can happen before the MPQs
 // are ready and the first Bink packet is decoded. Creating the listener only in ensureBootMovie()
@@ -829,6 +830,7 @@ let bnetConfigPromise = null;
 let cinematicsScreen = null, cinematicsError = '';
 let otherMultiplayerScreen = null, otherMultiplayerError = '';
 let bnetLoginScreen = null, bnetLoginError = '';
+let bnetLobbyScreen = null, bnetLobbyError = '';
 // The connection attempt behind retail's connecting popup: { server, popup, bncs }.
 let bnetConnecting = null;
 const LAST_BNET_KEY = 'd2web.lastBnet';
@@ -848,7 +850,7 @@ let realmSkillEvidence = { attempts: 0, sent: 0, last: null };
 let realmMoveDuplicateState = {};
 let realmDirection = { x: 0, y: 0 };
 let realmDirectionTicks = 0;
-let realmLoginDialog = null, realmFlow = null;
+let realmFlow = null, realmSelect = false;
 let creditsScreen = null, creditsError = '', creditsTick = 0, exitEvidence = { count: 0, screen: null };
 // Retail's front end opens on the Blizzard logo movies -- New_Bliz, then BlizNorth -- and only then
 // shows the trademark screen and the menu, which is what `titlePhase` counts through (assets/
@@ -907,7 +909,11 @@ function ensureGameMenu() {
       onChoose: (item) => {
       if (item === 'CONFIGURE CONTROLS') { ensureConfigureControls()?.openPanel(); return; }
       if (item === 'RETURN TO GAME') gameMenu.close();
-      else if (item === 'SAVE AND EXIT GAME') {
+      else if (item === 'SAVE AND EXIT GAME' && realmSceneActive) {
+        // A Battle.net game: the server holds the character; the realm session is released.
+        // NOT retail yet: retail goes back to the lobby, which needs a fresh MCP logon.
+        gameMenu.close(); leaveRealmLogin(); exitToTitle();
+      } else if (item === 'SAVE AND EXIT GAME') {
         // Keep the session and menu available if persistence fails; only leave once the store
         // confirms the character has been written.
         void saveBeforeExit(persistCurrentCharacter, async () => {
@@ -1520,7 +1526,6 @@ function ensureTitleScreen(entryPhase = null) {
         { label: 'SINGLE PLAYER', action: () => { enterSinglePlayer(); } },
         // With no servers configured BATTLE.NET stays inert, exactly as before. A configured region
         // opens the credentials/character flow and dials only its repo-owned WebSocket paths.
-        // The login panel after the region choice reuses the gateway panel's retail art and measured rects (realm-login.mjs).
         // F89: OTHER MULTIPLAYER now opens retail's OWN front-end screens (its menu, then TCP/IP
         // Options; the retail captures, captured 2026-10-02). HOST GAME advances to character
         // select as retail does; the host/join TRANSPORT (and the join dialog behind JOIN GAME) is
@@ -1648,19 +1653,6 @@ function releaseRealmFlow({ closeTransports = true } = {}) {
   });
   return flow.releasePromise;
 }
-function ensureRealmLoginDialog() {
-  if (realmLoginDialog) return realmLoginDialog;
-  realmLoginDialog = createRealmLoginDialog({
-    onAuthenticate: authenticateConfiguredRealm,
-    onJoin: createAndJoinConfiguredGame,
-    ...(titleScreen?.gatewayArt?.() ?? {}),
-    onClose: () => { realmLoginDialog.close(); leaveRealmLogin(); },
-    // A failed join has torn the realm session down: back to retail's login screen to log in again.
-    onRetry: (message) => { bnetLoginScreen?.reset(); bnetLoginScreen?.fail(new Error(message)); },
-  });
-  document.querySelector('#viewport').append(realmLoginDialog.element);
-  return realmLoginDialog;
-}
 function readRealmPlayerView() {
   if (realmTransport.state !== 'session-open' || !realmFlow?.protocol) return null;
   const state = realmFlow.protocol.d2gsClientPlayerState?.();
@@ -1695,12 +1687,51 @@ function leaveRealmLogin() {
   realmWorldView = null;
   try { realmFlow?.bncs?.close(); } catch { /* socket already closed */ }
   void releaseRealmFlow();
-  realmLoginDialog?.close();
-  bnetLoginScreen = null; bnetLoginError = '';
-  if (screen === SCREEN.BNET_LOGIN) exitToTitle();
+  bnetLoginScreen = null; bnetLoginError = ''; realmSelect = false;
+  bnetLobbyScreen = null; bnetLobbyError = '';
+  if (screen === SCREEN.BNET_LOGIN || screen === SCREEN.BNET_LOBBY || screen === SCREEN.SELECT) exitToTitle();
 }
 // Retail's Battle.net account login screen (D2Launch+0x19290), on the canvas. LOG IN authenticates
-// against the committed region; the character and game stage after it is still the DOM dialog.
+// against the committed region; the account's characters then go on retail's own character-select
+// screen (the single-player one, fed the MCP list), and OK there opens retail's Battle.net lobby
+// (D2Multi), where CREATE and JOIN make or join the game. The list's statstring carries class, level
+// and flags; the portrait's components are not read from it.
+let realmCharacters = [];
+function enterRealmCharacterSelect(characters) {
+  realmCharacters = characters;
+  savedCharacters = characters.map((c) => ({ name: c.name, playerClass: c.charClass, level: c.level,
+    expansion: (c.flags & 0x20) !== 0, hardcore: (c.flags & 0x04) !== 0, dead: (c.flags & 0x08) !== 0 }));
+  bnetLobbyScreen = null; bnetLobbyError = '';
+  charSelect = null; charSelectError = '';
+  realmSelect = true; realmCreate = false;
+  screen = SCREEN.SELECT; ensureCharSelect();
+}
+// Retail's Battle.net lobby (D2Multi) for the character picked on the realm character select. A
+// rejected CREATE or JOIN keeps the MCP session and shows retail's notice; any other failure has torn
+// the realm session down, and the player is back on the login screen to log in again.
+function enterBnetLobby(name) {
+  const c = realmCharacters.find((x) => x.name.toLowerCase() === String(name).toLowerCase());
+  if (!c) return;
+  const string = (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]);
+  // A game joined stays behind the lobby's busy state until the first map reveal puts the scene up.
+  const play = (options) => createAndJoinConfiguredGame({ character: c.name, ...options }).then(() => { render(); }, (error) => {
+    if (error?.mcpStage) throw error;
+    realmSelect = false; bnetLobbyScreen = null; screen = SCREEN.BNET_LOGIN;
+    bnetLoginScreen?.reset(); bnetLoginScreen?.fail(error);
+    render();
+    throw Object.assign(error, { sessionLost: true });
+  });
+  bnetLobbyError = '';
+  try { bnetLobbyScreen = createBnetLobbyScreen({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, string,
+    character: { name: c.name, charClass: c.charClass, level: c.level, expansion: (c.flags & 0x20) !== 0,
+      hardcore: (c.flags & 0x04) !== 0, dead: (c.flags & 0x08) !== 0, progression: 0 },
+    onCreateGame: (game) => play(game),
+    onJoinGame: (game) => play({ ...game, join: true }),
+    onQuit: () => enterRealmCharacterSelect(realmCharacters) }); }
+  catch (error) { bnetLobbyScreen = null; bnetLobbyError = String(error); }
+  screen = SCREEN.BNET_LOBBY;
+  render();
+}
 function ensureBnetLoginScreen(server) {
   if (bnetLoginScreen || bnetLoginError) return;
   try { bnetLoginScreen = createBnetLoginScreen({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette,
@@ -1713,7 +1744,7 @@ function ensureBnetLoginScreen(server) {
       const characters = await authenticateConfiguredRealm(credentials);
       // An account with no characters goes straight to character creation, as retail does.
       if (!characters.length) { realmCreate = true; screen = SCREEN.CREATE; ensureCharCreate(); return; }
-      ensureRealmLoginDialog().showCharacters(characters, realmFlow?.server?.region ?? '');
+      enterRealmCharacterSelect(characters);
     },
     onCreateAccount: createConfiguredRealmAccount,
     onExit: () => leaveRealmLogin() }); }
@@ -1773,7 +1804,6 @@ function showConfiguredRealmLogin(server, bncs = null) {
   // Restore retail geometry before a realm login can progress into a game.
   if (Module._d2_session_configure_plugy_stash_grid)
     Module.ccall('d2_session_configure_plugy_stash_grid', 'number', ['number', 'number'], [0, 0]);
-  realmLoginDialog?.close();
   bnetLoginScreen = null; bnetLoginError = '';
   realmFlow = { server, realmReply: null, bncs };
   realmPlayerView = null;
@@ -1850,17 +1880,17 @@ async function authenticateConfiguredRealm({ account, password }) {
     if (!keepRealmSession) { try { protocol?.free(); } catch { /* engine gone */ } }
   }
 }
-async function createAndJoinConfiguredGame({ character, gameName, gamePassword }) {
+async function createAndJoinConfiguredGame({ character, gameName, gamePassword, difficulty = 0, maxPlayers = 8, description = '', join = false }) {
   const { server, realmReply } = realmFlow || {};
   const started = { server: { region: server?.region, host: server?.host } };
   realmTransport = { state: 'joining', ...started, result: null, error: '' };
   const { webSocketTransport, mcpCreateAndJoin, d2gsJoin, startD2gsKeepAlive, startD2gsReceiveLoop } = await import('./assets/realm-client.mjs');
   const protocol = realmFlow?.protocol;
-  let mcp = realmFlow?.mcp, d2gs, keepD2gs = false;
+  let mcp = realmFlow?.mcp, d2gs, keepD2gs = false, keepMcp = false;
   try {
     if (!realmReply || !protocol || !mcp) throw new Error('log in before selecting a character');
     const joined = await mcpCreateAndJoin(mcp, protocol, { realmReply, character, gameName, gamePassword,
-      session: realmFlow.mcpSession });
+      difficulty, maxPlayers, description, join, session: realmFlow.mcpSession });
     mcp.close(); mcp = null;
     realmFlow.mcp = null; realmFlow.mcpSession = null;
     // The game server occasionally drops the first socket before the greeting completes; the ticket is
@@ -1921,12 +1951,15 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword }
     d2gs = null; keepD2gs = true;
     return `D2GS server session open for ${joined.character.name}; gameplay synchronization is still pending.`;
   } catch (error) {
-    realmTransport = { state: 'failed', ...started, result: null, error: String(error) };
+    // The realm turned the game down (MCP_CREATEGAME / MCP_JOINGAME result): the character stays
+    // logged on to MCP for the next attempt, as retail's lobby does.
+    keepMcp = Boolean(error?.mcpStage) && mcp === realmFlow?.mcp;
+    realmTransport = { state: keepMcp ? 'lobby' : 'failed', ...started, result: null, error: String(error) };
     throw error;
   } finally {
-    try { mcp?.close(); } catch { /* socket already closed */ }
+    if (!keepMcp) { try { mcp?.close(); } catch { /* socket already closed */ } }
     try { d2gs?.close(); } catch { /* socket already closed */ }
-    if (!keepD2gs) {
+    if (!keepD2gs && !keepMcp) {
       try { realmFlow?.protocol?.free(); } catch { /* engine gone */ }
       if (realmFlow) { realmFlow.protocol = null; realmFlow.mcp = null; realmFlow.mcpSession = null; }
     }
@@ -2120,7 +2153,7 @@ async function enterSavedCharacterScreen(singlePlayer) {
     isCurrent: () => screen === sourceScreen,
     describeError: savedCharacterReadError,
     apply: (profile, error) => {
-      charSelect = null; charSelectError = error;
+      charSelect = null; charSelectError = error; realmSelect = false;
       savedCharacters = profile.characters; savedCharacterFilesExist = profile.hasSaveFiles;
       const destination = singlePlayer
         ? singlePlayerDestination({ hasSaveFiles: savedCharacterFilesExist, error }) : 'select';
@@ -2196,13 +2229,17 @@ function ensureCharSelect() {
     charSelect = createCharacterSelect({
       read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette,
       characters: savedCharacters,
-      onPlay: (name) => { charSelectError = ''; playSavedCharacter(name); },
+      onPlay: (name) => {
+        charSelectError = '';
+        if (realmSelect) { enterBnetLobby(name); return; }
+        playSavedCharacter(name);
+      },
       onPlayRefused: ({ stringId }) => {
         charSelectError = Module.ccall('d2_lang_string_by_index', 'string', ['number'], [stringId]) || 'This Hardcore character is dead.';
       },
-      onCreate: () => { screen = SCREEN.CREATE; warmTowns([]); ensureCharCreate(); },
-      onCancel: () => { screen = SCREEN.TITLE; },
-      onDelete: deleteSavedCharacter,
+      onCreate: () => { if (realmSelect) realmCreate = true; screen = SCREEN.CREATE; warmTowns([]); ensureCharCreate(); },
+      onCancel: () => { if (realmSelect) { realmSelect = false; leaveRealmLogin(); return; } screen = SCREEN.TITLE; },
+      onDelete: realmSelect ? null : deleteSavedCharacter,
       onConvert: convertSavedCharacter,
       // The portrait's item components: the engine's own component table (needs the data tables).
       componentToken: (i) => { if (!componentTablesReady) componentTablesReady = Boolean(Module.ccall('d2_drlg_init', 'number', [], [])); return Module._d2_component_token ? Module.ccall('d2_component_token', 'string', ['number'], [i]) : ''; },
@@ -2315,7 +2352,7 @@ async function createRealmCharacter({ playerClass, name, checkboxes }) {
     const { mcpCreateCharacter } = await import('./assets/realm-client.mjs');
     const session = realmFlow.mcpSession;
     await mcpCreateCharacter(session, { name, charClass: playerClass, hardcore: !!checkboxes?.hardcore, expansion: checkboxes?.expansion !== false });
-    ensureRealmLoginDialog().showCharacters(session.list.characters, realmFlow?.server?.region ?? '');
+    enterRealmCharacterSelect(session.list.characters);
   } catch (error) { bnetLoginScreen?.reset(); bnetLoginScreen?.fail(error); }
 }
 function ensureCharCreate() {
@@ -2334,6 +2371,7 @@ function ensureCharCreate() {
       },
       onCancel: () => {
         charCreate = null;
+        if (realmCreate && realmSelect) { realmCreate = false; enterRealmCharacterSelect(realmCharacters); return; }
         if (realmCreate) { realmCreate = false; screen = SCREEN.BNET_LOGIN; bnetLoginScreen?.reset(); return; }
         screen = SCREEN.TITLE;
       },
@@ -2949,6 +2987,7 @@ function update(forceTick = false, live = false) {
   if (screen === SCREEN.CINEMATICS) { ensureCinematicsScreen(); cinematicsScreen?.step(); return; }
   if (screen === SCREEN.OTHER_MULTIPLAYER) { ensureOtherMultiplayerScreen(); otherMultiplayerScreen?.step(); return; }
   if (screen === SCREEN.BNET_LOGIN) { bnetLoginScreen?.step(); return; }
+  if (screen === SCREEN.BNET_LOBBY) { bnetLobbyScreen?.step(); return; }
   if (screen === SCREEN.SELECT) { ensureCharSelect(); charSelect?.step(); return; }
   if (screen === SCREEN.CREATE) { ensureCharCreate(); charCreate?.step(); return; }
   // "is the game's data mounted" has ONE answer, `window.__d2Entry.retail`, decided by
@@ -4106,7 +4145,6 @@ async function syncRealmScene() {
     realmSceneRevision = realmWorldView.mapRevision;
     realmSceneError = '';
     realmSceneActive = true;
-    realmLoginDialog?.close();
     snapshot = { act: realmWorldView.act + 1, difficulty: realmWorldView.difficulty, level: realmWorldView.mapLevel,
       tick: 0, mode: 1, playerClass: realmPlayerView.classId, playerId: realmPlayerView.guid,
       player: { x: realmPlayerView.x, y: realmPlayerView.y, weaponClass: 'hth' }, entities: [], objects: [], items: [],
@@ -4128,7 +4166,7 @@ function drawFrame() {
   // system arrow would be a second one. IN GAME the pointer layer below owns this style instead: the
   // arrow has to be hidden exactly while a pointer is actually drawn, which only that layer knows.
   if (screen !== SCREEN.GAME) {
-    const cursorStyle = (screen === SCREEN.TITLE || screen === SCREEN.CINEMATICS || screen === SCREEN.OTHER_MULTIPLAYER || screen === SCREEN.BNET_LOGIN || screen === SCREEN.SELECT || screen === SCREEN.CREATE) ? 'none' : '';
+    const cursorStyle = (screen === SCREEN.TITLE || screen === SCREEN.CINEMATICS || screen === SCREEN.OTHER_MULTIPLAYER || screen === SCREEN.BNET_LOGIN || screen === SCREEN.BNET_LOBBY || screen === SCREEN.SELECT || screen === SCREEN.CREATE) ? 'none' : '';
     if (canvas.style.cursor !== cursorStyle) canvas.style.cursor = cursorStyle;
   }
   if (screen !== SCREEN.TITLE) window.__d2Shown = true;
@@ -4171,6 +4209,13 @@ function drawFrame() {
     if (bnetLoginScreen) bnetLoginScreen.draw(ctx, w, h);
     else { drawCentredMessage(ctx, hoverFont, bnetLoginError || 'loading…', w, h); }
     hud.textContent = bnetLoginError ? `battle.net login: ${bnetLoginError}` : '';
+    return;
+  }
+  if (screen === SCREEN.BNET_LOBBY) {
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
+    if (bnetLobbyScreen) bnetLobbyScreen.draw(ctx, w, h);
+    else { drawCentredMessage(ctx, hoverFont, bnetLobbyError || 'loading…', w, h); }
+    hud.textContent = bnetLobbyError ? `battle.net lobby: ${bnetLobbyError}` : '';
     return;
   }
   if (screen === SCREEN.CREDITS) {
@@ -4795,6 +4840,7 @@ setInterval(() => {
   else if (screen === SCREEN.CINEMATICS) { ensureCinematicsScreen(); cinematicsScreen?.step(); }
   else if (screen === SCREEN.OTHER_MULTIPLAYER) { ensureOtherMultiplayerScreen(); otherMultiplayerScreen?.step(); }
   else if (screen === SCREEN.BNET_LOGIN) bnetLoginScreen?.step();
+  else if (screen === SCREEN.BNET_LOBBY) bnetLobbyScreen?.step();
   else if (screen === SCREEN.SELECT) ensureCharSelect();
   else if (screen === SCREEN.CREATE) ensureCharCreate();
   // play=1 boots straight into a session; the same trap applies (d2-lxc's headless tabs report
@@ -5642,10 +5688,16 @@ addEventListener('keydown', (e) => {
   if (screen === SCREEN.CREDITS && e.code === 'Escape' && !e.repeat) { exitToTitle(); e.preventDefault(); return; }
   if (screen === SCREEN.CINEMATICS && e.code === 'Escape' && !e.repeat) { cinematicsScreen?.escape(); e.preventDefault(); return; }
   if (screen === SCREEN.OTHER_MULTIPLAYER && e.code === 'Escape' && !e.repeat) { otherMultiplayerScreen?.escape(); e.preventDefault(); return; }
-  // Retail's login edit boxes take the keyboard while the character/game dialog is not up over them.
-  if (screen === SCREEN.BNET_LOGIN && !realmLoginDialog?.visible) {
+  // Retail's login edit boxes take the keyboard.
+  if (screen === SCREEN.BNET_LOGIN) {
     if (e.code === 'Escape') { if (!e.repeat) bnetLoginScreen?.escape(); e.preventDefault(); return; }
     if (!e.ctrlKey && !e.metaKey && !e.altKey && bnetLoginScreen?.typeKey(e.code, e.key)) { e.preventDefault(); render(); }
+    return;
+  }
+  // The lobby's chat line and the CREATE / JOIN panels' edit boxes.
+  if (screen === SCREEN.BNET_LOBBY) {
+    if (e.code === 'Escape') { if (!e.repeat) bnetLobbyScreen?.escape(); e.preventDefault(); render(); return; }
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && bnetLobbyScreen?.typeKey(e.code, e.key)) { e.preventDefault(); render(); }
     return;
   }
   if (screen === SCREEN.TITLE && titlePhase === 'menu' && titleScreen?.key(e.code)) {
@@ -5829,6 +5881,7 @@ function frontendHoverTarget() {
   if (screen === SCREEN.CINEMATICS) return at(cinematicsScreen, (...a) => cinematicsScreen.hover(...a));
   if (screen === SCREEN.OTHER_MULTIPLAYER) return at(otherMultiplayerScreen, (...a) => otherMultiplayerScreen.hover(...a));
   if (screen === SCREEN.BNET_LOGIN) return at(bnetLoginScreen, (...a) => bnetLoginScreen.hover(...a));
+  if (screen === SCREEN.BNET_LOBBY) return at(bnetLobbyScreen, (...a) => bnetLobbyScreen.hover(...a));
   if (screen === SCREEN.SELECT) return at(charSelect, (...a) => charSelect.hover(...a));
   if (screen === SCREEN.CREATE) return at(charCreate, (...a) => charCreate.hover(...a));
   return null;
@@ -5920,7 +5973,7 @@ canvas.addEventListener('pointerdown', (e) => {
     npcMenuPointerPress = { pointerId: e.pointerId, button: e.button, menuState };
     canvas.focus(); e.preventDefault(); return;
   }
-  if (screen === SCREEN.TITLE || screen === SCREEN.CREDITS || screen === SCREEN.CINEMATICS || screen === SCREEN.OTHER_MULTIPLAYER || screen === SCREEN.BNET_LOGIN || screen === SCREEN.CREATE || screen === SCREEN.SELECT) {
+  if (screen === SCREEN.TITLE || screen === SCREEN.CREDITS || screen === SCREEN.CINEMATICS || screen === SCREEN.OTHER_MULTIPLAYER || screen === SCREEN.BNET_LOGIN || screen === SCREEN.BNET_LOBBY || screen === SCREEN.CREATE || screen === SCREEN.SELECT) {
     click.spent = `screen-${screen}`;
     if (screen === SCREEN.TITLE && titlePhase === 'menu') {
       actMusic?.playTitle().catch((error) => { musicError = String(error); });
@@ -6715,7 +6768,7 @@ canvas.addEventListener('pointerup', (e) => {
       render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
     }
   }
-  if (!(screen === SCREEN.TITLE || screen === SCREEN.CREDITS || screen === SCREEN.CINEMATICS || screen === SCREEN.OTHER_MULTIPLAYER || screen === SCREEN.BNET_LOGIN || screen === SCREEN.CREATE || screen === SCREEN.SELECT)) return;
+  if (!(screen === SCREEN.TITLE || screen === SCREEN.CREDITS || screen === SCREEN.CINEMATICS || screen === SCREEN.OTHER_MULTIPLAYER || screen === SCREEN.BNET_LOGIN || screen === SCREEN.BNET_LOBBY || screen === SCREEN.CREATE || screen === SCREEN.SELECT)) return;
   const [x, y] = canvasPoint(e);
   frontendPointerStates.release(e.pointerId, frontendPointerControl(), x, y, canvas.width, canvas.height, e.button);
   canvas.focus(); e.preventDefault();
@@ -7350,8 +7403,12 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
    */
   get inGameMovieEvidence() { return { played: inGameMovies.map((i) => ({ index: i, row: CINEMATICS[i - 1]?.path ?? null })), unmapped: [...inGameMoviesUnmapped] }; },
   bnetLoginClock(ms) { bnetLoginScreen?.pinClock(ms); },
+  bnetLobbyClock(ms) { bnetLobbyScreen?.pinClock(ms); },
+  // Leave a Battle.net game the way SAVE AND EXIT GAME does (scenarios cannot reach the in-game menu's boxes).
+  leaveRealm() { leaveRealmLogin(); exitToTitle(); },
   bnetConnectingClock(ms) { bnetConnecting?.popup.clock(ms); },
   get bnetConnectingEvidence() { return bnetConnecting ? { region: bnetConnecting.server?.region ?? '', ...bnetConnecting.popup.evidence } : null; },
+  get bnetLobbyEvidence() { return bnetLobbyScreen ? bnetLobbyScreen.evidence : { error: bnetLobbyError || 'not built' }; },
   get bnetLoginEvidence() { return bnetLoginScreen ? bnetLoginScreen.evidence : { error: bnetLoginError || 'not built' }; },
   get otherMultiplayerEvidence() { return otherMultiplayerScreen ? otherMultiplayerScreen.evidence : { error: otherMultiplayerError || 'not built' }; },
   // F89: what the page's own realm client did when a configured region was committed.
@@ -7379,6 +7436,7 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
     if (screen === SCREEN.CINEMATICS && cinematicsScreen) out.cinematics = cinematicsScreen.targets(w, h);
     if (screen === SCREEN.OTHER_MULTIPLAYER && otherMultiplayerScreen) out.otherMultiplayer = otherMultiplayerScreen.targets(w, h);
     if (screen === SCREEN.BNET_LOGIN && bnetLoginScreen) out.bnetLogin = bnetLoginScreen.targets(w, h);
+    if (screen === SCREEN.BNET_LOBBY && bnetLobbyScreen) out.bnetLobby = bnetLobbyScreen.targets(w, h);
     if (screen === SCREEN.CREDITS && creditsScreen) out.credits = creditsScreen.targets(w, h);
     if (screen === SCREEN.CREATE && charCreate?.targets) out.create = charCreate.targets(w, h);
     if (screen === SCREEN.SELECT && charSelect?.targets) out.select = charSelect.targets(w, h);
