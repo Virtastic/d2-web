@@ -24,7 +24,7 @@ static inline uint32_t rd32(uint32_t a) { uint32_t v; std::memcpy(&v, (const voi
 static inline void wr32(uint32_t a, uint32_t v) { std::memcpy((void*)(uintptr_t)a, &v, 4); }
 
 // 1.13c D2Game+0x245A0
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_245a0(int32_t minCount, uint32_t owner, uint32_t game, uint32_t mode,
+extern "C" EMSCRIPTEN_KEEPALIVE void d2game_245a0_probe(int32_t minCount, uint32_t owner, uint32_t game, uint32_t mode,
                                                        int32_t maxCount, const D2Game245A0Env* env)
 {
     if (owner != 0 && rd32(owner) == 1) {

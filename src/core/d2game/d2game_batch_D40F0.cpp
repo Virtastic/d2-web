@@ -198,52 +198,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_6b200(uint32_t ecxSelf, uint32_t esiUnit,
     env->sub7ADF0(self, esiUnit, param1);
 }
 
-// 1.13c D2Game+0x6F620
-// Missile finalize step called from 0x6F930 after the missile unit is linked: 0x37540, then
-// Ordinal_10413 over a 124-byte stack buffer, then 0x10484.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_6f620(const D2GameBatchD40F0Env* env)
-{
-    uint8_t local[124];
-    env->sub37540();
-    env->ordinal10413(local);
-    env->ordinal10484();
-}
-
-// 1.13c D2Game+0x6F660
-// Missile on-hit effect roll. EAX = missile unit, param_1 = the hit unit, EBX = the 32-bit low half
-// of the LCG state (the missile unit supplies the high half). Guards: both units non-null, the hit
-// unit's type is 3, the missile's type is 0 or 1, and 0x1250 (missile id in EAX) has the bit at
-// gdwBitMasks[8] set on its byte +4. After Ordinal_10910 and #10973 give the chance denominator, the
-// state is advanced at most four times with the 0x6AC690C5 multiplier; each roll below the summed
-// chance keeps the counter. The final counter is written through #10887 as stat 0x148.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_6f660(uint32_t eaxUnit, const uint32_t* param1,
-                                             uint32_t ebxSeed, const D2GameBatchD40F0Env* env)
-{
-    if (eaxUnit == 0 || param1 == nullptr) return;
-    if (rd32(param1, 0) != 3) return;
-    const uint32_t type = rd32((void*)(uintptr_t)eaxUnit, 0);
-    if (type != 0 && type != 1) return;
-    const uint32_t missile = env->sub1250();
-    if ((rd8(env->bitMasks, 8) & rd8((void*)(uintptr_t)missile, 4)) == 0) return;
-
-    const int32_t chance1 = env->ordinal10910(eaxUnit);
-    const int32_t chance2 = env->ordinal10973(eaxUnit);
-    const int32_t chance = chance1 + chance2;
-    if (chance == 0) return;
-
-    uint64_t state = ((uint64_t)eaxUnit << 32) | (uint64_t)ebxSeed;
-    env->ordinal10587();
-    env->ordinal10614();
-    int32_t count = 0;
-    while (count < 4) {
-        state = (state & 0xFFFFFFFFull) * 0x6AC690C5ull + (state >> 32);
-        if (!((int32_t)((uint32_t)state % 100u) < chance)) break;
-        ++count;
-    }
-    env->ordinal10887(0, 0x148, (uint32_t)count, 0);
-}
+// 1.13c D2Game+0x6F620 and 0x6F660 moved to d2game_6f620.cpp / d2game_6f660.cpp
 
 // 1.13c D2Game+0x6F8A0
 // Missile unit initialisation. EAX = unit, EDI = game, and the return address is stored at unit+0xC
@@ -362,7 +317,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_97a20(uint32_t ebxGame, uint32_t ecxP
 // the unit is null, bit 4 of unit+0xC4 is set, or unit+0x10 is not 3. 0x4AD10(0) runs first; bit
 // 0xC of unit+0xC4 then routes to 0x8E030, otherwise to 0x8DFD0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d40f0(uint32_t ediUnit, uint32_t ebxArg,
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d40f0_old(uint32_t ediUnit, uint32_t ebxArg,
                                              const D2GameBatchD40F0Env* env)
 {
     if (ediUnit == 0) return;

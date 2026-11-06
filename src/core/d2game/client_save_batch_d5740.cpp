@@ -47,7 +47,7 @@ void D2GAME_EB5D0_DecodeSkill(const uint16_t* saved, uint32_t* owner,
     *owner = saved[1] ? saved[1] : UINT32_MAX;
 }
 
-// 1.13c D2Game+0xEB8B0
+// engine entry for D2Game EB8B0 (retail-layout port with injectable callees: d2game_eb8b0.cpp)
 uint32_t D2GAME_EB8B0_InventoryItemId(D2UnitStrc* unit, int32_t index)
 {
     if (!unit->pInventory) return UINT32_MAX;

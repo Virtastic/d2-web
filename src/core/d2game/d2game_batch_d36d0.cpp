@@ -98,7 +98,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d36d0(uint32_t p1, uint32_t ga
 // old D3950 (superseded by d2game_d3950.cpp g_d3950)
 // reg: EDI = player/client record. Frees via o10920 when its first dword is 0, clears a 0x20 slot
 // (Ordinal_10758(&0, 0x20, 1)), then 0x8D3D0 and 0xD2CF0 on EDI.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d3950(uint32_t ediPlayer, E)
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d3950_old(uint32_t ediPlayer, E)
 {
     if (ediPlayer != 0 && rd32(H(ediPlayer), 0) == 0) call(env->o10920);
     uint32_t zero = 0;
@@ -364,7 +364,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d5c30(uint32_t eaxId, uint
 // old D6710 (superseded by d2game_d6710.cpp g_d6710)
 // reg: EAX = unit. Sets flag 0x10 (Ordinal_10977(param_1, 0x10, 1)); when param_1 is null or its
 // +0x10 is 0 and Ordinal_11057(param_1) holds: 0xD47C0, 0xD51A0, Ordinal_10201.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d6710(uint32_t param1, uint32_t eaxUnit, E)
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d6710_old(uint32_t param1, uint32_t eaxUnit, E)
 {
     call(env->o10977, param1, 0x10, 1);
     if ((param1 == 0 || rd32(H(param1), 0x10) == 0) && call(env->o11057, param1) != 0) {
@@ -383,7 +383,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d6bc0(uint32_t eaxUnit, uint32
     uint32_t h = rd32(H(eaxUnit), 0x60);
     if (call(env->o10202) != 0 || h == 0) return;
     if (call(env->o11051) != 0) FATAL(0x1384);
-    d2_fn_d2game_d6710(ediArg, eaxUnit, env);
+    d2_fn_d2game_d6710_old(ediArg, eaxUnit, env);
     call(env->o10977);
     if (call(env->o10202) != 0) call(env->o10977);
     call(env->o10050, h);

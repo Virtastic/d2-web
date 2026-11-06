@@ -80,16 +80,6 @@ void sub_7C340(Env& e,P g,P u,P t) {
 // 1.13c D2Game+0x7C460 (same body as 7C340; only the unaff registers differ: EDI/EBP)
 void sub_7C460(Env& e,P g,P u,P t) { sub_7C340(e,g,u,t); }
 
-// 1.13c D2Game+0x7C580
-void sub_7C580(Env& e,P g,P u,P t) {
-    P ai=e.ptr(t,0),m=e.ptr(t,0x1c);
-    if (r(t,8)!=0 && s(t,0x14)<=prm(g,m,0x56) && s(ai,0x14)<prm(g,m,0x5c)) {
-        if (!r(ai,0x18)) { e.modeTarget(g,u,e.ptr(t,8)); w(ai,0x14,r(ai,0x14)+1); w(ai,0x18,1); return; }
-        w(ai,0x18,0); e.idle(g,u,prm(g,m,0x62)); return;
-    }
-    flee(e,g,u);
-}
-
 // 1.13c D2Game+0x7C6E0 (ECX = self, EAX = other unit, stack: game, rec = monster stat row)
 I sub_7C6E0(Env& e,P g,P self,P other,P rec) {
     static const uint8_t order[8]={6,4,2,2,2,0,6,6};

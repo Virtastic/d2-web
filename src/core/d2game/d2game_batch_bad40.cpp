@@ -33,36 +33,6 @@ struct D2GameBatchBad40Env {
     const uint8_t* strTable;                                     // s_r01_r02_r03... (D2Game+0x?)
 };
 
-// Quest a4q3 init: clears 15 dwords at +0xa0, installs callbacks, allocates the 32 byte state.
-// 1.13c D2Game+0xBAD40  (ECX = quest record)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_BAD40(uint8_t* q, const D2GameBatchBad40Env* e)
-{
-    std::memset(q + 0xa0, 0, 15 * 4);
-    wr32(q, 0x18, 0);
-    q[0xb] = 0; q[0xc] = 0;
-    wr32(q, 0xe8, 0);
-    wr32(q, 0xa0, e->cbFn_a0);
-    wr32(q, 0xec, e->cbFn_ec);
-    wr32(q, 0xdc, e->cbData_dc);
-    q[10] = 1;
-    wr32(q, 0xf0, e->cbFn_f0);
-    wr32(q, 0x10, 0x17);
-    wr32(q, 0xe0, 0x1b);
-    q[0xd] = 4;
-    wr32(q, 200, e->cbFn_c8);
-    wr32(q, 0xac, e->cbFn_ac);
-    wr32(q, 0xa8, e->cbFn_a8);
-    wr32(q, 0xcc, e->cbFn_cc);
-    wr32(q, 0xd4, e->cbFn_d4);
-    wr32(q, 0xd8, e->cbFn_d8);
-    wr32(q, 0xc4, e->cbFn_c4);
-    wr32(q, 0xc0, e->cbFn_c0);
-    wr32(q, 0xb0, e->cbFn_b0);
-    uint8_t* s = (uint8_t*)e->alloc("..\\Source\\D2Game/Quests/a4q3.cpp", 0x358, 0);
-    wr32(q, 0x18, (uint32_t)(uintptr_t)s);
-    std::memset(s, 0, 32);
-}
-
 // 1.13c D2Game+0xBAF20  (ECX = game/quest owner, EDX = unit)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_BAF20(void* game, uint32_t unit, const D2GameBatchBad40Env* e)
 {
@@ -87,15 +57,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_BAF20(void* game, uint32_t uni
     while (rd32(n, 0) != 0x18) { n = (const uint8_t*)(uintptr_t)rd32(n, 0xf4); if (!n) return; }
     uint8_t* st = (uint8_t*)(uintptr_t)rd32(n, 0x18);
     wr32(st, 0x14, rd32(st, 0x14) + 1);
-}
-
-// 1.13c D2Game+0xBB4F0  (EAX = arg to 0x9E170, ESI = unit)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_BB4F0(void* eax, int32_t* esi, const D2GameBatchBad40Env* e)
-{
-    e->sub9E170(eax);
-    if (esi && *esi == 0) e->unitData((uint32_t)(uintptr_t)esi);
-    uint8_t msg[6] = {0x5d, 0x17, 0x01, 0x00, 0, 0};   // local_8 = 0x1175d, local_4 = 0
-    e->sub8A3E0(msg, 6);
 }
 
 // 1.13c D2Game+0xBB6A0  (stack arg = quest record, ESI = unit)
@@ -193,37 +154,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_BC6B0(uint8_t* self, uint32
         }
         it = e->ord(10836, inv, 0, it);   // next from the same container, continuing after it
     }
-}
-
-// 1.13c D2Game+0xBC7D0  (EBX = out hi?, ESI = out max, EDI = out min)
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_BC7D0(uint8_t* self, uint32_t* ebx, uint32_t* esi, uint32_t* edi,
-                                                           const D2GameBatchBad40Env* e)
-{
-    uint8_t* r = (uint8_t*)(uintptr_t)e->ord(10427, rd32(self, 0x70), 0, 0);
-    if (!r) { *edi = 0; *esi = 0; *ebx = 0; return -1; }
-    *edi = rd16(r, 0x114);
-    *esi = rd16(r, 0x116);
-    if (ebx) *ebx = rd32(r, 8);
-    int32_t n = (int32_t)(*esi - *edi) + 1;
-    if (n == -1) e->fatal(0x5b);
-    return n;
-}
-
-// 1.13c D2Game+0xBCA20  (EBX = game)
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BCA20(uint8_t* ebx, const D2GameBatchBad40Env* e)
-{
-    if (!ebx || !rd32(ebx, 0x60)) return 0;
-    int32_t it = e->ord(10460, rd32(ebx, 0x60), 0, 0);
-    while (it) {
-        int32_t next = e->ord(10464, it, 0, 0);
-        int32_t* d = (int32_t*)(uintptr_t)e->ord(11147, it, 0, 0);
-        it = next;
-        if (d && *d == 4 && e->ord(11160, (uint32_t)(uintptr_t)d, 0, 0)) {   // 2nd arg: local on caller stack
-            e->ord(11127, 0, 0, 0);
-            e->ord(10164, 0, 0, 0);
-        }
-    }
-    return 1;
 }
 
 // 1.13c D2Game+0xBCAA0  (EBX = game, param_1 = item)

@@ -168,35 +168,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_F10F0(void* unit, const D2Game
     e->fn_9C840();
 }
 
-// 1.13c D2Game+0xF1420 (EAX = a, ESI = unit, EBX = out)
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_F1420(uintptr_t a, void* unit, uint32_t* out, const D2GameF05B0Env* e)
-{
-    e->fn_E07A0(a);
-    void* slot = rdptr(unit, 0x2c);
-    uintptr_t r = e->ord10392(0);
-    if (r == (uintptr_t)unit || r == 0) {
-        uint32_t* p = (uint32_t*)e->fn_E09D0(a);
-        e->ord11129();
-        if (out) {
-            *out = p ? p[0] : 6;
-            wr32(slot, 0, p ? p[3] : 0xFFFFFFFFu);
-        }
-    }
-    return 1;
-}
-
-// 1.13c D2Game+0xF1490 (ESI = unit, EBX = out, retaddr slot = out2)
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_F1490(uintptr_t self, void* unit, int p1, uint32_t* out, uint32_t* out2, const D2GameF05B0Env* e)
-{
-    e->fn_E07A0(self);
-    e->ord10392((uintptr_t)rdptr(unit, 0x2c));
-    uint32_t* p = (uint32_t*)e->fn_9E810(unit, p1);
-    if (!p) return 0;
-    e->ord11129();
-    if (out) { *out = p[0]; *out2 = p[3]; }
-    return 1;
-}
-
 // 1.13c D2Game+0xF1730
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_F1730(void* inEax, uint32_t p2, uint32_t p3, void* retaddrArg, void* p3ptr, uint32_t ebx, const D2GameF05B0Env* e)
 {

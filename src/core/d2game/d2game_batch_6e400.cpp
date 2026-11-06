@@ -192,19 +192,7 @@ void d2_fn_d2game_70010(A dst, A src, A bSet, const D2GameBatch6E400Env* e)
         e->o10782(dst, e->o10083(src));
 }
 
-// 1.13c D2Game+0x70190
-extern "C" EMSCRIPTEN_KEEPALIVE
-int32_t d2_fn_d2game_70190(A inv, const D2GameBatch6E400Env* e)
-{
-    int32_t n = 0;
-    A it = e->o10460(inv);
-    while (it) {
-        A rec = e->o11147(it);
-        it = e->o10464(it);
-        if ((uint8_t)e->o10020(rec) == 3) n++;
-    }
-    return n;
-}
+// 1.13c D2Game+0x70190 moved to d2game_70190.cpp
 
 // Quest/item requirement check against one 8-byte condition row at esi+0x14+idx*8.
 // esi = condition table, iStack20 = unit's class record (+0x80 mask), iStack10 = required count,
@@ -317,9 +305,30 @@ bool d2_fn_d2game_70240(A param1, A param2, int32_t param3, A param4, A esi,
     return count == iStack10;
 }
 
-// 1.13c D2Game+0x70BF0
+// 1.13c D2Game+0x70BF0 (layout from the disassembly; see the 70BF0 row).
+// Packet-by-unit send. P = 40-byte stack block, zeroed: P[0] = 0x5a, P[1] = DL. When unit A (EAX) is non-null, ordinal 501 fills
+// P+8 from A (3 stack words: P+8, A, 0x7FFFFFFF) and P[0x17] is cleared. Value = [10920(B)+0x9C] when B (ESI) is non-null and
+// [B] == 0, else 0. Then 0x8B400 (EAX = P, one stack word = value, ret 4); the result of 0x8B400 is the result of 70BF0.
+struct D2Game70BF0Env {
+    void (*o501)(A buf, A unit, uint32_t limit);   // Ordinal 501, 0xA280
+    A    (*o10920)(A unit);                        // Ordinal 10920, 0xA4C0: the client record
+    uint32_t (*ab400)(A buf, uint32_t value);      // 0x8B400: the send, EAX = buffer, stack word 0 = value
+};
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2game_70BF0(A eax, A esi, const D2GameBatch6E400Env* e)
+uint32_t d2_fn_d2game_70BF0(A eax, uint32_t edx, A esi, const D2Game70BF0Env* e)
+{
+    uint8_t pkt[0x28] = {};
+    pkt[0] = 0x5a;
+    pkt[1] = (uint8_t)edx;
+    if (eax != 0) { e->o501((A)(pkt + 8), eax, 0x7fffffff); pkt[0x17] = 0; }
+    uint32_t value = 0;
+    if (esi && rd32(esi, 0) == 0) value = rd32(e->o10920(esi), 0x9c);
+    return e->ab400((A)pkt, value);
+}
+
+// 1.13c D2Game+0x70BF0, the earlier transcription (kept for the batch's callers; not the proven port).
+extern "C" EMSCRIPTEN_KEEPALIVE
+void d2_fn_d2game_70BF0_old(A eax, A esi, const D2GameBatch6E400Env* e)
 {
     uint32_t local[8] = {};
     if (eax != 0) { e->o501((A)local); local[5] &= 0xffffff; }
@@ -327,10 +336,25 @@ void d2_fn_d2game_70BF0(A eax, A esi, const D2GameBatch6E400Env* e)
     e->fAB400(esi, eax);
 }
 
-// eax = unit (EAX), ebx = condition table (EBX), esi forwarded to 0x70240.
-// 1.13c D2Game+0x70CF0
+// 1.13c D2Game+0x70CF0 (layout from the disassembly). EAX = unit (copied to ESI), EBX = condition table, stack = param_1, param_2 (ret 8).
+// Both registers non-null: a zeroed 0xC0-byte local, then 0x70240 for slot 0..6 with stack (param_1, EBX, slot, param_2, &local) and ESI = the
+// unit (ret 0x14); a zero result ends the loop with 0, seven non-zero results give 1.
+struct D2Game70CF0Env {
+    uint32_t (*f70240)(A esi, A param1, A table, int32_t slot, A param2, A local);
+};
 extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2_fn_d2game_70CF0(A param1, A param2, A eax, A ebx, A esi, A iStack20,
+uint32_t d2_fn_d2game_70CF0(A eax, A ebx, A param1, A param2, const D2Game70CF0Env* e)
+{
+    if (!ebx || !eax) return 0;
+    uint32_t local[0x30] = {};
+    for (int i = 0; i < 7; i++)
+        if (e->f70240(eax, param1, ebx, i, param2, (A)local) == 0) return 0;
+    return 1;
+}
+
+// 1.13c D2Game+0x70CF0, the earlier transcription (kept for reference; not the proven port).
+extern "C" EMSCRIPTEN_KEEPALIVE
+uint32_t d2_fn_d2game_70CF0_old(A param1, A param2, A eax, A ebx, A esi, A iStack20,
                             int32_t iStack10, int32_t iStack8, const D2GameBatch6E400Env* e)
 {
     if (!ebx || !eax) return 0;

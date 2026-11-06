@@ -421,7 +421,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2game_crt_init_crit_sec_and_spin_count(void* cs, u
 }
 
 // ---- inventory item-id lookup --------------------------------------------------------------------
-// 1.13c D2Game+0xEBD10 (sub_EBD10): the 1-based index of the inventory item whose unit id (+0x0C) is `itemId`.
+// D2Game EBD10 (sub_EBD10; retail-layout port d2game_ebd10.cpp): the 1-based index of the inventory item whose unit id (+0x0C) is `itemId`.
 // Both arguments are stack dwords (unit, itemId). -1, a null inventory or an absent id give 0; the walk
 // counts every chain node, using -1 for a node that INVENTORY_UnitIsItem rejects. Index 0x7FFF and
 // above is a Fog assertion (id 0x185). Only the low 16 bits are the result.

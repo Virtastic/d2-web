@@ -103,12 +103,12 @@ template <class T> static inline T& at(void* p, int off) { return *(T*)((u8*)p +
 // 1.13c D2Game+0x6AE60  (caller 0x6E400; REG? unit=edi)
 void D2GAME_6AE60(void* p1, int* unit)
 {
-    void* game = Ordinal_10331();
+    void* game = Ordinal_10331(unit);
     void* rec = Ordinal_10688(unit ? unit[1] : -1);
     Ordinal_10141();
     for (int* u = at<int*>(game, 0x74); u; u = (int*)u[0x3a])
         if (u[0] == 0 && u[4] != 0x11 && Ordinal_10522() <= at<int>(rec, 0x178) + 1)
-            FUN_6fd142d0(p1, unit, u);
+            FUN_6fd142d0(p1, unit, u, 1);
 }
 
 // 1.13c D2Game+0x6AFA0  (caller 0x6F040; REG? ebx)
@@ -128,10 +128,11 @@ int D2GAME_6B280(int* ctx)
 {
     void* u = (void*)ctx[1];
     if (!u || at<int>(u, 0x10) == 0) {
-        u8 tmp[8];
+        u8 tmp[8], out[8];
         Ordinal_10141(u, tmp);
-        void* g = Ordinal_10331();
-        FUN_6fc31e20(g, (void*)ctx[1], tmp, -1, 0);
+        // retail: ESI = ctx[0] (game), one stack word = the Ordinal_10331(unit, &out, -1, 0, 0) result
+        auto r = Ordinal_10331(u, out, -1, 0, 0);
+        FUN_6fc31e20((void*)ctx[0], (int)r);
         Ordinal_11090((void*)ctx[1], 2, 0);
         if (ctx[1]) at<uint32_t>((void*)ctx[1], 0xc4) &= ~2u;
     }

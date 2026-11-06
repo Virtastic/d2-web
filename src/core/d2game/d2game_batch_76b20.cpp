@@ -70,20 +70,6 @@ typedef uint8_t u8;
 template <class T> static inline T& at(void* p, int off) { return *(T*)((u8*)p + off); }
 [[noreturn]] static void fatal(int id) { Ordinal_10024(DAT_6fd19ff9, Ordinal_10265(id)); _Exit(-1); }
 
-// 1.13c D2Game+0x76B20  (fastcall: ecx=game, edx=client)
-extern "C" void D2GAME_76B20(int game, int* cl)
-{
-    Ordinal_11103(cl, 0);
-    if (cl) FUN_6fc21320();
-    FUN_6fd007a0(game);
-    Ordinal_10392(cl[0xb]);
-    u8 tmp[64]; // GUESS: stack out-buffer for 0x75E10
-    FUN_6fc95e10(game, tmp);
-    int r = Ordinal_10494(cl, 1);
-    if ((r == 0 || FUN_6fcffa90() != 0) && PTR_FUN_6fd1bc1c)
-        ((void (*)(int, int))PTR_FUN_6fd1bc1c)(0, 0);
-}
-
 // 1.13c D2Game+0x77A50  (REG: edi = obj)
 extern "C" void D2GAME_77A50(void* edi)
 {

@@ -95,24 +95,6 @@ uint32_t Quest17PickupBitsAndAdvance(const D2GameBatchBbf30Env* e, uint32_t p1) 
     return 0;
 }
 
-// 1.13c D2Game+0xBC920 -- no arguments. For each data-table entry that is active, notifies the unit and
-// returns 1 when at least one notification was sent.
-uint32_t NotifyAnyActiveSlot(const D2GameBatchBbf30Env* e) {
-    uint32_t r = 0;
-    int32_t count = e->dataTableCount();
-    for (int32_t i = 0; i < count; ++i) {
-        if (e->o10494() != 0 && e->o10590(i) != 0) {
-            uint32_t x = e->o10871();
-            if (x != 0) {
-                e->o11111();
-                e->o11108(x);
-                r = 1;
-            }
-        }
-    }
-    return r;
-}
-
 // 1.13c D2Game+0xBCB90 -- EAX = a record pointer (may be null); the record gets the reset values, then
 // the timer routine runs. The decompile has the same call on both branches of its EAX test, so the
 // test is not reproduced; the EAX read has no effect of its own.

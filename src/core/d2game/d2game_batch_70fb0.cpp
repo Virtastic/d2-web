@@ -34,15 +34,15 @@ struct D2Game71170Env {
     void* (*unitIsItem)(void* node);      // #11147
     void* (*nextItem)(void* node);        // #10464
     char  (*getUnitType)(void* unit);     // #10020
-    int   (*check)(int* p);               // 0xD2F00
+    int   (*check)(int* p, void* item);   // 0xD2F00: ret 8, stack = param_1 then the item (disassembly; the decompile shows one)
 };
 // 1.13c D2Game+0x71170: unit (EAX) inventory walk; 0 when a type-2 unit passes check(param_1), else 1.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_71170(void* unit, int* param1, const D2Game71170Env* e) {
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_71170_old(void* unit, int* param1, const D2Game71170Env* e) {
     void* n = e->firstItem(rdp(unit, 0x60));
     while (n) {
         void* u = e->unitIsItem(n);
         n = e->nextItem(n);
-        if (e->getUnitType(u) == 2 && e->check(param1) == 0) return 0;
+        if (e->getUnitType(u) == 2 && e->check(param1, u) == 0) return 0;
     }
     return 1;
 }

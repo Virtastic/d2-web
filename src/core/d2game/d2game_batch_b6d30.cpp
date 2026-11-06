@@ -243,30 +243,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_B9970(uint32_t unit, uint3
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_B9D20(uint32_t unit, uint32_t p2, const D2GameBatchB6D30Env* e)
 { return stateGate(e, unit, p2, 0x19); }
 
-// 1.13c D2Game+0xBA080  EAX = game
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_BA080(uint32_t game, const D2GameBatchB6D30Env* e)
-{
-    uint32_t l = e->r32(game + 0x10f4);
-    if (!l) return;
-    for (uint32_t n = e->r32(l); n; n = e->r32(n + 0xf4)) {
-        if (e->r32(n) != 0x16) continue;
-        if (!e->r8(n + 9) || e->r8(n + 0xb) > 1) return;
-        e->w8(n + 0x14, 0); e->w8(n + 0xb, 2);
-        e->sFFCC0(n, 0);
-        return;
-    }
-}
-
-// 1.13c D2Game+0xBA180  cbAddr is the retail address of the callback 0x6FCD94F0
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BA180(uint32_t unit, uint32_t p2, uint32_t cbAddr,
-                                                            const D2GameBatchB6D30Env* e)
-{
-    uint32_t t = e->r32(e->ord10920(p2) + 0x10 + e->r8(unit + 0x6d) * 4);
-    if (e->ord10174(t, 0x19, 0xd) && p2 && e->r32(p2 + 0x80) && e->r32(p2) == 0 && e->sBBEB0() != -1)
-        e->sBC160(cbAddr);
-    return 0;
-}
-
 // 1.13c D2Game+0xBA850  p3 is a record whose byte +0x11 is set; returns the node from 0xEEF10 (tried 3 times)
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BA850(uint32_t p1, uint32_t p2, uint32_t p3,
                                                             const D2GameBatchB6D30Env* e)

@@ -13,7 +13,7 @@ struct D2Game479B0Env {
 };
 
 // 1.13c D2Game+0x479B0
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_479b0(uint32_t a, uint32_t b, uint32_t p1, uint32_t p2, const D2Game479B0Env* env)
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2game_479b0_probe(uint32_t a, uint32_t b, uint32_t p1, uint32_t p2, const D2Game479B0Env* env)
 {
     const uint32_t u = env->sub24950(1, p2, b, p1, a, 0, 0, 0xffffffffu);
     if (u == 0) return 0;

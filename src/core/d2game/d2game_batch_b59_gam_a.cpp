@@ -75,16 +75,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_b1660(void* unused, void* p2, void* u
     return 0;
 }
 
-// 1.13c D2Game+0xB99D0
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_b99d0(uint8_t* game, void* unit, const D2GameBatchB59Env* env) {
-    uint32_t pd = O(10920, unit, 0, 0, 0, 0);
-    uint32_t u = rd32(P(pd), 0x10 + game[0x6D] * 4);
-    bool a = O(10174, u, 0x1A, 0, 0, 0) != 0 || O(10174, u, 0x1A, 0xF, 0, 0) != 0;
-    if (a && O(10174, u, 0x1A, 0xD, 0, 0) == 0 && O(10174, u, 0x1A, 0xE, 0, 0) == 0) return 0;
-    env->sub354F0(unit, game);
-    return 0;
-}
-
 // 1.13c D2Game+0xB9A30  (game = unaff_EBX)
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_b9a30(uint8_t* unit, uint8_t* game, uint32_t qh, const D2GameBatchB59Env* env) {
     // qh = EAX at entry: the quest handle the callers (b9f20) hold in EBP.
@@ -123,16 +113,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_b9f20(uint8_t* game, void* unit, cons
         for (uint32_t i = 0; i < n && !hit; i++) hit = arr[i] == rd32(P(q), 0x3C);
     }
     if (O(10174, u, 0x1A, 0, 0, 0) == 0 && O(10174, u, 0x1A, 1, 0, 0) == 0 && hit) b9a30(unit, u);
-    return 0;
-}
-
-// 1.13c D2Game+0xBA490
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_ba490(uint8_t* game, uint8_t* unit, const D2GameBatchB59Env* env,
-                                                 int16_t (*sub9BEB0)(), void (*sub9C160)(void*), void* cb) {
-    uint32_t pd = O(10920, unit, 0, 0, 0, 0);
-    uint32_t u = rd32(P(pd), 0x10 + game[0x6D] * 4);
-    if (O(10174, u, 0x1A, 0xD, 0, 0) && unit && rd32(unit, 0x80) && rd32(unit, 0) == 0 && sub9BEB0() != -1)
-        sub9C160(cb);  // cb = FUN_6fcda010
     return 0;
 }
 

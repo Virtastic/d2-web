@@ -101,9 +101,6 @@ void D2Game_76A50(D2GameBatch76Env& e, void* game, void* unit)
     if ((e.Ord10494(unit, 1) == 0 || (e.FnFFA90(), e.FnFFA90r()) != 0) && e.hook) e.hook(0, 0);
 }
 
-// 1.13c D2Game+0x76B20 (identical to 0x76A50)
-void D2Game_76B20(D2GameBatch76Env& e, void* game, void* unit) { D2Game_76A50(e, game, unit); }
-
 // 1.13c D2Game+0x77790
 void D2Game_77790(D2GameBatch76Env& e, void* game, void* esiUnit)
 {

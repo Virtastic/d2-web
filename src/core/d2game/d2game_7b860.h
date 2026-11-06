@@ -29,6 +29,7 @@ struct D2g7b860Env {
     uint32_t (*c8ea80)(const uint8_t* game, const uint8_t* unit, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e);  // ECX, EDX, 5 stack
     uint32_t (*f22c0)(const uint8_t* game, const uint8_t* unit, int32_t v);   // EAX = game, ESI = unit, stack = frames
     uint32_t (*f2380)(uint32_t eax, const uint8_t* unit, int32_t skill, uint32_t target, uint32_t z0, uint32_t z1);  // EAX = skill|AL mode, ECX = unit, 4 stack
+    void (*f2220)(const uint8_t* game, const uint8_t* unit, const uint8_t* target);  // EAX = 4, EDI = unit, stack = game, target (ret 8)
     uint32_t (*c75e10)(const uint8_t* game, const uint32_t* blk, uint32_t n); // stdcall(game, &blk[8], n)
     int32_t tableCount;                                           // *(*sgptDataTables + 0xA80)
     const uint8_t* bitMasks;                                      // gdwBitMasks
@@ -41,6 +42,7 @@ extern "C" uint32_t d2_game_7bb00(const uint8_t* unit, const uint8_t* cand, uint
 extern "C" uint32_t d2_game_7be10(const uint8_t* game, uint8_t* unit, const D2g7b860Env* e);
 extern "C" uint32_t d2_game_7bf50(const uint8_t* game, uint8_t* unit, const uint8_t* ctx, const D2g7b860Env* e);
 extern "C" uint32_t d2_game_7c060(const uint8_t* game, uint8_t* unit, const uint8_t* ctx, const D2g7b860Env* e);
+extern "C" uint32_t d2_game_7c580(const uint8_t* game, uint8_t* unit, const uint8_t* ctx, const D2g7b860Env* e);
 extern "C" uint32_t d2_game_7c1d0(const uint8_t* game, uint8_t* unit, const uint8_t* ctx, const D2g7b860Env* e);
 
 namespace d2g7b860 {

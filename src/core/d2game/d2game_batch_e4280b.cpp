@@ -627,17 +627,6 @@ void D2GAME_F18B0(P self, P param_1, u16 param_2, P in_EAX, P unaff_EBX)
     }
 }
 
-// 1.13c D2Game+0xF1FF0 (__thiscall: this = unit, param_1 = value; in_EAX = the record; uStack_4 = the stack slot).
-void D2GAME_F1FF0(P self, u32 param_1, P in_EAX, u32 uStack_4)
-{
-    i32 local_20[2] = {0, 0};
-    r_75070(in_EAX);
-    o11005(rd(self, 0x2C), 1);
-    u32 uStack_18 = param_1;
-    (void)uStack_18;
-    r_75E10(uStack_4, AD(local_20));
-}
-
 // D2Game F21E0 stand-in (param_1..param_3 as the decompile names them); superseded by d2game_f21e0.cpp.
 void D2GAME_F21E0(u32 param_1, u32 param_2, u32 param_3, P in_EAX)
 {

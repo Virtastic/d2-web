@@ -175,18 +175,6 @@ static int32_t IronGolemSection(void* pGame, void* pPlayer, uint8_t** ppSection,
     return 0;
 }
 
-// ---- 0xEC0E0: item section through 0x53B40 -----------------------------------------------------
-// game/unit/a5 are the formal arguments; the write cursor arrived in EAX and its address in EDI.
-static int32_t WriteItemsSection(void* pGame, void* pUnit, uint8_t** ppSection,
-                                 const uint8_t* pEnd, int32_t a6, const D2GameBatchEEnv* env)
-{
-    uint8_t* cur = *ppSection;
-    const int32_t n = env->writeItems(pGame, pUnit, cur, (uint32_t)(pEnd - cur), a6);
-    if (n < 0) return 3;
-    *ppSection = cur + n;
-    return 0;
-}
-
 // ---- 0xEC1E0: pet item section ('fj') ----------------------------------------------------------
 // pGame arrived in EAX, pPlayer in ECX; the marker is written before the pet lookup and there is no
 // bounds check in front of it (the 1.10f caller had one).
@@ -314,15 +302,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ec020(uint32_t* r)
     r[4] = (uint32_t)IronGolemSection((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1],
                                       (uint8_t**)(uintptr_t)r[2], (const uint8_t*)(uintptr_t)r[3],
                                       (int32_t)r[5], &g_batchEEnv);
-}
-
-// 1.13c D2Game+0xEC0E0
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ec0e0(uint32_t* r)
-{
-    r[4] = (uint32_t)WriteItemsSection((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1],
-                                       (uint8_t**)(uintptr_t)r[2], (const uint8_t*)(uintptr_t)r[3],
-                                       (int32_t)r[5], &g_batchEEnv);
 }
 
 // 1.13c D2Game+0xEC1E0

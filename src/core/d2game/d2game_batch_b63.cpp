@@ -257,25 +257,37 @@ i32 D2GAME_70FB0(i32 ebx, i32 edi, i32 unitArg)
     return (v & ~0xff) | 1;
 }
 
-// 1.13c D2Game+0x711D0  EAX=player (in_EAX), EBX=count (unaff_EBX), stack retaddr slot=arg for FUN_6fcf2d90.
-i32 D2GAME_711D0(i32 in_eax, i32 ebx, i32 arg)
+// 1.13c D2Game+0x711D0 (layout from the disassembly). EAX = player (EDI); ECX is copied to EBX and never used; the count starts at 0 (the
+// decompile's unaff_EBX is a local initialised to 0); one stack word `arg` (ret 4). Every callee is a seam in retail's argument order.
+struct D2Game711D0Env {
+    intptr_t (*firstNode)(intptr_t list);                // #10460, 0xA3DC (1 stack word)
+    intptr_t (*nodeUnit)(intptr_t node);                 // #11147, 0xA46C (1)
+    intptr_t (*nextNode)(intptr_t node);                 // #10464, 0xA4CC (1)
+    int32_t  (*unitType)(intptr_t unit);                 // #10020, 0xA6C4 (1; al is compared)
+    void     (*clearFlag)(i32* flag, i32 mask, i32 on);  // #10758, 0xAA5A (3; writes *flag)
+    void     (*setMode)(intptr_t unit, i32 mode);        // #11030, 0xA958 (2)
+    void     (*send)(intptr_t item, i32 flag);           // 0x8C810: EAX = item, stack word = flag (ret 4)
+    void     (*update)(intptr_t unit, i32 arg, i32 zero);// 0xD2D90: EAX = unit, stack words arg, 0 (ret 8)
+};
+extern "C" i32 D2GAME_711D0(i32 in_eax, i32 arg, const D2Game711D0Env* e)
 {
     if (W(in_eax, 0x60) == 0) return 0;
-    i32 local8[2] = {0, 0};
-    i32 it = (i32)Ordinal_10460(W(in_eax, 0x60));
+    i32 count = 0;
+    i32 flag = 0;
+    intptr_t it = e->firstNode(W(in_eax, 0x60));
     while (it) {
-        i32 u = (i32)Ordinal_11147(it);
-        it = (i32)Ordinal_10464(it);
-        if (u && (char)Ordinal_10020(u) == 3) {
-            local8[0] = 0;
-            Ordinal_10758(P(local8), 0x20, 1);
-            Ordinal_11030(u, 3);
-            FUN_6fcac810();
-            FUN_6fcf2d90(arg);
-            ebx++;
+        intptr_t u = e->nodeUnit(it);
+        it = e->nextNode(it);
+        if (u && (char)e->unitType(u) == 3) {
+            flag = 0;
+            e->clearFlag(&flag, 0x20, 1);
+            e->setMode(u, 3);
+            e->send(u, flag);
+            e->update(in_eax, arg, 0);
+            count++;
         }
     }
-    return ebx;
+    return count;
 }
 
 // 1.13c D2Game+0x717E0  __fastcall ECX=param_1, EDX=param_2; EAX=in_EAX id, SI=unaff_SI op.

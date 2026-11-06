@@ -42,10 +42,6 @@ I sub_F1C30(Env& e,P a,P b,P info) {
     (void)a;(void)b;(void)info;
     return 0; // ponytail: body is a register-only prologue (10867/10750 results discarded); behavior via change
 }
-// 1.13c D2Game+0xF1FA0
-void sub_F1FA0(Env& e,P thisUnit,P eax,P info,P game) {
-    e.f75070(eax); e.r11005(e.ptr(thisUnit,0x2c),0); e.change(game,info,0);
-}
 // 1.13c D2Game+0xF29B0
 void sub_F29B0(Env& e,P game,P u,uint8_t al,I(*rand)(P seed)) {
     I x=xOf(e,u), y=yOf(e,u);

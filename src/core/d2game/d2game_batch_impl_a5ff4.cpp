@@ -580,9 +580,3 @@ extern "C" void d2game_a5ff4_fn_bb3b0(int param_1, int eax)
         }
     }
 }
-
-// 1.13c D2Game+0xBCB20   __fastcall(ecx = pGame)
-extern "C" void d2game_a5ff4_fn_bcb20(int param_1)
-{
-    if (rd8(param_1, 0x6D) == 0) d2game_a5ff4_saf5c0(param_1);
-}

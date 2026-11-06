@@ -209,35 +209,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_37c90(void* client, void* owner, co
     }
 }
 
-// 0x6F740: 0x73 missile-event packet, always 0x20 bytes via 0x8AA10. Game in ECX, missile unit in
-// ESI. The stack argument feeds the packet's future fields (it is non-zero on the client path) and
-// is also the send target; the second stack argument is unused (ret 8).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_6f740(void* game, void* unit, void* client, uint32_t unusedArg2, const D2GameBatch16Env* env) { // 1.13c D2Game+0x6F740
-    (void)unusedArg2;
-    if (!unit || rd32(unit, 0) != 3) return;
-    if (!((rd32(unit, 0xC8) >> 10) & 1)) return;
-    void* u = env->getUnit(game, rd32(unit, 0x94), rd32(unit, 0x98));
-    if (!u) return;
-    int32_t lvl = (int32_t)rd32(unit, 4);
-    if (lvl < 0 || (uint32_t)lvl >= env->levelRecordCount) return;
-    const uint8_t* rec = env->levelRecords + (uint32_t)lvl * 0x1A4;
-    if (!(rd8(env->gdwBitMasks, 0x14) & rd8(rec, 4))) return;
-    uint8_t b[0x20];
-    std::memset(b, 0, sizeof b);
-    b[0] = 0x73;
-    wr16(b, 0x01, (uint16_t)env->ordinal10191(unit));
-    wr32(b, 0x03, env->sub21100(unit));
-    wr32(b, 0x07, env->sub21130(unit));
-    if (client) {
-        wr32(b, 0x0B, env->ordinal10983(rdptr(unit, 0x2C)));
-        wr32(b, 0x0F, env->ordinal10764(rdptr(unit, 0x2C)));
-    }
-    wr16(b, 0x13, (uint16_t)env->ordinal10737(unit));
-    b[0x15] = (uint8_t)rd32(u, 0);
-    wr32(b, 0x16, rd32(u, 0xC));
-    b[0x1A] = (uint8_t)env->ordinal11029(unit);
-    env->send8AA10(b, client);
-}
+// 0x6F740 moved to d2game_6f740.cpp
 
 // 0x8D040: 0x82 party/unit record. Game in EAX, unit id in EDI; stack args are the client and a
 // packet field. Walks the 0x1520 (index 2) list for the id, follows #10181 to the linked id (0xFFFFFFFF when
