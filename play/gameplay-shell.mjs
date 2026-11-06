@@ -1733,8 +1733,15 @@ function connectConfiguredRealm(server) {
       if (!server?.ws) throw new Error('selected region has no browser WebSocket transport');
       const { webSocketTransport } = await import('./assets/realm-client.mjs');
       if (bnetConnecting !== attempt) return;
-      attempt.bncs = webSocketTransport(realmServiceUrl(server.ws, 'bncs'));
-      await attempt.bncs.ready();
+      // One quiet redial: a socket that drops during the handshake should not surface the failure popup.
+      for (let dial = 0; ; dial++) {
+        attempt.bncs = webSocketTransport(realmServiceUrl(server.ws, 'bncs'));
+        try { await attempt.bncs.ready(); break; }
+        catch (error) {
+          try { attempt.bncs.close(); } catch { /* socket already closed */ }
+          if (dial >= 1 || bnetConnecting !== attempt) throw error;
+        }
+      }
       if (bnetConnecting !== attempt) { attempt.bncs.close(); return; }
       bnetConnecting = null; titleScreen?.setOverlay(null);
       showConfiguredRealmLogin(server, attempt.bncs);
