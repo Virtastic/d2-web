@@ -14,11 +14,27 @@
 // Usage:  node tools/realmd/ws-bridge.mjs --listen 7900 \
 //           --bncs 127.0.0.1:6112 --mcp 127.0.0.1:6113 --d2gs 127.0.0.1:4000
 // The WebSocket URL path selects the target: ws://host:7900/bncs, /mcp, /d2gs.
+//
+// Hardening (all optional, all with safe defaults; a public deployment sits behind a reverse proxy):
+//   --host 127.0.0.1        bind address (default loopback)
+//   --trust-proxy           take the client address from CF-Connecting-IP / X-Forwarded-For
+//   --origins a,b           accept only these Origin header values (default: any)
+//   --max-per-ip 8          concurrent sockets per client address
+//   --max-total 512         concurrent sockets overall
+//   --max-message 65536     largest WebSocket message in bytes; a bigger one closes the socket
+//   --rate 30               new connections per client address per minute
+//   --idle 600              seconds without traffic in either direction before closing
+//   --handshake 10          seconds to complete the upgrade and the TCP connect
 import http from 'node:http';
 import net from 'node:net';
 import crypto from 'node:crypto';
 
 const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
+
+export const DEFAULTS = Object.freeze({
+  host: '127.0.0.1', trustProxy: false, origins: null,
+  maxPerIp: 8, maxTotal: 512, maxMessage: 65536, ratePerMin: 30, idleSec: 600, handshakeSec: 10,
+});
 
 /** The RFC 6455 accept token: base64(sha1(key ++ GUID)). */
 export function acceptKey(key) {
@@ -39,8 +55,10 @@ export function encodeFrame(payload, opcode = 0x2) {
  * A WebSocket frame parser that ACCUMULATES. TCP and WebSocket both hand over arbitrary fragments,
  * so a frame can arrive split and several can arrive in one chunk; this returns whole frames only
  * and keeps the tail for the next call. Client frames are always masked, so each is unmasked here.
+ * A frame whose declared length exceeds `maxFrame` throws BEFORE any of it is buffered, so a peer
+ * cannot make the bridge allocate by announcing a huge frame.
  */
-export function makeWsParser() {
+export function makeWsParser(maxFrame = Infinity) {
   let buf = Buffer.alloc(0);
   return (chunk) => {
     buf = Buffer.concat([buf, chunk]);
@@ -52,6 +70,8 @@ export function makeWsParser() {
       if (len === 126) { if (buf.length < 4) break; len = buf.readUInt16BE(2); off = 4; }
       else if (len === 127) { if (buf.length < 10) break; len = Number(buf.readBigUInt64BE(2)); off = 10; }
       if (!masked) throw new Error('a client frame must be masked (RFC 6455 5.1)');
+      if (len > maxFrame) throw new Error(`frame of ${len} bytes exceeds the ${maxFrame} byte cap`);
+      if (opcode >= 0x8 && (len > 125 || !fin)) throw new Error('a control frame must be short and unfragmented (RFC 6455 5.5)');
       if (buf.length < off + 4 + len) break;
       const mask = buf.subarray(off, off + 4);
       const data = Buffer.allocUnsafe(len);
@@ -63,14 +83,60 @@ export function makeWsParser() {
   };
 }
 
+/** The client address: the socket peer, or the proxy's header when --trust-proxy is on. */
+function clientAddr(req, trustProxy) {
+  if (trustProxy) {
+    const cf = req.headers['cf-connecting-ip'];
+    if (cf) return String(cf).trim();
+    const xff = req.headers['x-forwarded-for'];
+    if (xff) return String(xff).split(',')[0].trim();
+  }
+  return req.socket.remoteAddress || 'unknown';
+}
+
 /** Start the bridge. Returns the http.Server so a test can close it. */
-export function createWsBridge({ listen, targets, onLog = () => {} }) {
+export function createWsBridge({ listen, targets, onLog = () => {}, ...overrides }) {
+  const cfg = { ...DEFAULTS, ...overrides };
+  const perIp = new Map();      // address -> open sockets
+  const recent = new Map();     // address -> connection timestamps within the last minute
+  let total = 0;
+
+  const admit = (addr) => {
+    if (total >= cfg.maxTotal) return 'server full';
+    if ((perIp.get(addr) || 0) >= cfg.maxPerIp) return 'too many connections from this address';
+    const now = Date.now();
+    const times = (recent.get(addr) || []).filter((t) => now - t < 60000);
+    if (times.length >= cfg.ratePerMin) { recent.set(addr, times); return 'connecting too fast'; }
+    times.push(now); recent.set(addr, times);
+    return null;
+  };
+  // Forget addresses that went quiet, so the maps cannot grow without bound.
+  const sweep = setInterval(() => {
+    const now = Date.now();
+    for (const [a, ts] of recent) if (!ts.some((t) => now - t < 60000)) recent.delete(a);
+  }, 60000);
+  sweep.unref();
+
   const server = http.createServer((req, res) => { res.writeHead(426); res.end('WebSocket only'); });
+  server.on('close', () => clearInterval(sweep));
   server.on('upgrade', (req, sock) => {
+    const reject = (code, why, addr) => { onLog(`refused ${addr || ''} ${why}`); try { sock.end(`HTTP/1.1 ${code}\r\nConnection: close\r\n\r\n`); } catch { /* gone */ } sock.destroy(); };
     const key = req.headers['sec-websocket-key'];
     const name = String(req.url || '').replace(/^\/+/, '').split('?')[0];
-    const target = targets[name];
-    if (!key || !target) { sock.destroy(); return; }
+    const target = Object.hasOwn(targets, name) ? targets[name] : null;
+    const addr = clientAddr(req, cfg.trustProxy);
+    if (!key || !target) { reject('404 Not Found', `unknown path /${name}`, addr); return; }
+    if (cfg.origins && !cfg.origins.includes(String(req.headers.origin || ''))) { reject('403 Forbidden', `origin ${req.headers.origin || '(none)'}`, addr); return; }
+    const why = admit(addr);
+    if (why) { reject('429 Too Many Requests', why, addr); return; }
+
+    total++; perIp.set(addr, (perIp.get(addr) || 0) + 1);
+    let released = false;
+    const release = () => {
+      if (released) return; released = true;
+      total--; const n = (perIp.get(addr) || 1) - 1; if (n > 0) perIp.set(addr, n); else perIp.delete(addr);
+    };
+
     sock.write(
       'HTTP/1.1 101 Switching Protocols\r\n' +
       'Upgrade: websocket\r\nConnection: Upgrade\r\n' +
@@ -78,29 +144,47 @@ export function createWsBridge({ listen, targets, onLog = () => {} }) {
     sock.setNoDelay(true);
 
     const tcp = net.createConnection({ host: target.host, port: target.port });
-    const closeBoth = () => { sock.destroy(); tcp.destroy(); };
-    tcp.on('connect', () => onLog(`ws /${name} -> ${target.host}:${target.port}`));
-    tcp.on('data', (d) => { try { sock.write(encodeFrame(d)); } catch { closeBoth(); } });
+    tcp.setNoDelay(true);
+    let timers = [];
+    const closeBoth = () => { release(); timers.forEach(clearTimeout); timers = []; sock.destroy(); tcp.destroy(); };
+    let idle = null;
+    const touch = () => { clearTimeout(idle); idle = setTimeout(() => { onLog(`idle close ${addr} /${name}`); closeBoth(); }, cfg.idleSec * 1000); timers.push(idle); };
+    const connectTimer = setTimeout(() => { onLog(`connect timeout ${addr} /${name}`); closeBoth(); }, cfg.handshakeSec * 1000);
+    timers.push(connectTimer);
+    tcp.on('connect', () => { clearTimeout(connectTimer); touch(); onLog(`ws /${name} -> ${target.host}:${target.port} from ${addr}`); });
+    tcp.on('data', (d) => {
+      touch();
+      try { sock.write(encodeFrame(d)); } catch { closeBoth(); return; }
+      // Backpressure: a browser that stops reading must not make the bridge buffer the realm's output.
+      if (sock.writableLength > cfg.maxMessage * 16) { onLog(`slow reader ${addr} /${name}`); closeBoth(); }
+    });
     tcp.on('error', closeBoth); tcp.on('close', closeBoth);
 
-    const parse = makeWsParser();
+    const parse = makeWsParser(cfg.maxMessage);
     let fragment = null; // accumulate a fragmented message (browsers may split a large binary send)
     sock.on('data', (chunk) => {
+      touch();
       let frames;
-      try { frames = parse(chunk); } catch { closeBoth(); return; }
+      try { frames = parse(chunk); } catch (e) { onLog(`bad frame from ${addr}: ${e.message}`); closeBoth(); return; }
       for (const f of frames) {
         if (f.opcode === 0x8) { closeBoth(); return; }                        // close
         if (f.opcode === 0x9) { sock.write(encodeFrame(f.data, 0xa)); continue; } // ping -> pong
         if (f.opcode === 0xa) continue;                                         // pong
-        if (f.opcode === 0x0) { if (fragment) { fragment = Buffer.concat([fragment, f.data]); if (f.fin) { tcp.write(fragment); fragment = null; } } continue; }
+        if (f.opcode === 0x0) {
+          if (!fragment) { closeBoth(); return; }                             // continuation with nothing to continue
+          fragment = Buffer.concat([fragment, f.data]);
+          if (fragment.length > cfg.maxMessage) { onLog(`message too large from ${addr}`); closeBoth(); return; }
+          if (f.fin) { tcp.write(fragment); fragment = null; }
+          continue;
+        }
         if (f.opcode === 0x1 || f.opcode === 0x2) {                             // text / binary
           if (f.fin) tcp.write(f.data); else fragment = f.data;
         }
       }
     });
-    sock.on('error', closeBoth); sock.on('close', closeBoth);
+    sock.on('error', closeBoth); sock.on('end', closeBoth); sock.on('close', closeBoth);
   });
-  server.listen(listen, '127.0.0.1', () => onLog(`ws-bridge listening on 127.0.0.1:${listen}`));
+  server.listen(listen, cfg.host, () => onLog(`ws-bridge listening on ${cfg.host}:${server.address().port}`));
   return server;
 }
 
@@ -108,15 +192,29 @@ const parseAddr = (s) => { const i = s.lastIndexOf(':'); return { host: s.slice(
 
 function main(argv) {
   const opt = {};
-  for (let i = 0; i < argv.length; i += 2) if (argv[i].startsWith('--')) opt[argv[i].slice(2)] = argv[i + 1];
+  for (let i = 0; i < argv.length; i++) {
+    if (!argv[i].startsWith('--')) continue;
+    const k = argv[i].slice(2);
+    if (k === 'trust-proxy') opt[k] = '1'; else opt[k] = argv[++i];
+  }
   const listen = Number(opt.listen || 7900);
   const targets = {};
   for (const k of ['bncs', 'mcp', 'd2gs']) if (opt[k]) targets[k] = parseAddr(opt[k]);
   if (!Object.keys(targets).length) { console.error('ws-bridge: no --bncs/--mcp/--d2gs targets given'); process.exit(2); }
+  const num = (k, d) => (opt[k] !== undefined ? Number(opt[k]) : d);
   const log = (m) => { console.log(`ws-bridge: ${m}`); };
-  createWsBridge({ listen, targets, onLog: log });
-  // Announce readiness on stdout so a supervisor can wait rather than sleep.
-  log(`listening ws://127.0.0.1:${listen} for ${Object.keys(targets).join(',')}`);
+  createWsBridge({
+    listen, targets, onLog: log,
+    host: opt.host || DEFAULTS.host,
+    trustProxy: !!opt['trust-proxy'],
+    origins: opt.origins ? opt.origins.split(',').map((s) => s.trim()).filter(Boolean) : null,
+    maxPerIp: num('max-per-ip', DEFAULTS.maxPerIp),
+    maxTotal: num('max-total', DEFAULTS.maxTotal),
+    maxMessage: num('max-message', DEFAULTS.maxMessage),
+    ratePerMin: num('rate', DEFAULTS.ratePerMin),
+    idleSec: num('idle', DEFAULTS.idleSec),
+    handshakeSec: num('handshake', DEFAULTS.handshakeSec),
+  });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main(process.argv.slice(2));

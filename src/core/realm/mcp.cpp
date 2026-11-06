@@ -83,12 +83,16 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_mcp_protocol_selector(uint8_t* out) { out[0] =
 
 // MCP_STARTUP (0x01) request body: 64 bytes forwarded verbatim out of the BNCS realm-logon reply --
 // cookie+status (its first 16 bytes) then the 48-byte chunk at its offset 24 (d2-clientless
-// realm.zig).  Short input is zero-filled.  Returns 64.
+// realm.zig), then the NUL-terminated unique name.  Short input is zero-filled.  Returns 65 + name.
 EMSCRIPTEN_KEEPALIVE int d2_realm_mcp_startup_request(const uint8_t* realmReply, int len, uint8_t* out) {
     for (int i = 0; i < 64; i++) out[i] = 0;
     for (int i = 0; i < 16 && i < len; i++) out[i] = realmReply[i];
     for (int i = 0; i < 48 && 24 + i < len; i++) out[16 + i] = realmReply[24 + i];
-    return 64;
+    // 1.13c D2MCPClient+0x07510 then appends the unique name the reply carries at 0x48, NUL included.
+    int w = 64;
+    for (int i = 72; i < len && realmReply[i] && w < 64 + 0x3ff; i++) out[w++] = realmReply[i];
+    out[w++] = 0;
+    return w;
 }
 
 // MCP_STARTUP (0x01) reply body: result(u32 LE) -- 0 accepted, 0x02 rejected (tristramd

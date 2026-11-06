@@ -32,10 +32,14 @@ int abnormal_termination(const SehRegistration& registration, const void* finall
 }
 // 1.13c BNClient+0x18244 -- x86 SEH filter returns 1: handler faults fall
 // through to abort. Native C++ exceptions use the corresponding catch boundary.
-[[noreturn]]
-void terminate(ThreadState& thread, void (*abort_import)()) {
+// The body up to the abort call (0x183BA, which never returns) is its own core.
+void terminate_body(ThreadState& thread, void (*abort_import)()) {
     try { if (thread.terminate_handler) thread.terminate_handler(); } catch (...) {}
     abort_import();
+}
+[[noreturn]]
+void terminate(ThreadState& thread, void (*abort_import)()) {
+    terminate_body(thread, abort_import);
     std::abort(); // imported retail abort never returns
 }
 // 1.13c BNClient+0x18279 -- the inconsistency hook is distinct from the thread handler.

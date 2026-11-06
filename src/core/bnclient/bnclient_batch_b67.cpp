@@ -1,21 +1,17 @@
 // BNClient batch b67: IDEA block/key helpers, download recv loop, news table parse, EH try-range.
 #include <cstdint>
 #include <initializer_list>
+#include "core/bnclient/bnclient_12a70.h"
 
 extern "C" {
 __attribute__((weak)) uint32_t Ordinal_10265(uint32_t);
 __attribute__((weak)) void Ordinal_10024(const void*, uint32_t);
 void* Ordinal_401(uint32_t, const char*, int, int);
 void Ordinal_403(void*, const char*, int, int);
-int q_bnclient_batch_b67_Ordinal_16(void* sock, void* buf, int len, int flags);
-void bnclient_33a00(char* esi, uint8_t* data, uint32_t size, void* ebx, uint32_t a, uint32_t b);
-void bnclient_2d280(void);
 int bnclient_34050(const char* name, uint32_t* ftime, int** data, uint32_t* size);
 void bnclient_211c0(uint32_t want, uint32_t* cap);  // EAX = want, EBX = &cap
 uint32_t bnclient_21180(uint32_t index, uint32_t* cap);  // EAX = index, &cap pushed; returns the step
 void bnclient_inconsistency(void);
-extern uint32_t bn_dl_abort;      // DAT_6ff3f614
-extern uint32_t bn_dl_percent;    // DAT_6ff3f508
 extern uint32_t bn_news_cap, bn_news_count, bn_news_stride_base, bn_news_flag, bn_news_i, bn_news_hdr;
 extern const char* bn_news_name;  // PTR_s_BNNews_D2DV
 }
@@ -28,28 +24,7 @@ static uint16_t idea_mul(uint32_t a, uint32_t b) {
     return (uint16_t)(lo - hi + (lo < hi));
 }
 
-// 1.13c BNClient+0x0DB70
-// register inputs: out=EAX (int* receiving buffer), esi/ebx forwarded to 0x13A00, mode=caller stack word
-uint32_t sub_DB70(uint8_t** out, void* sock, uint8_t flags, uint32_t size, char* esi, void* ebx, int mode) {
-    uint8_t* buf = (uint8_t*)Ordinal_401(size, "..\\Source\\D2BNClient\\BnDownload.cpp", 0x387, 8);
-    uint32_t got = 0;
-    *out = buf;
-    while (got < size) {
-        uint32_t n = size - got;
-        if (n > 0x5b4) n = 0x5b4;
-        int r = q_bnclient_batch_b67_Ordinal_16(sock, buf + got, (int)n, 0);
-        if (r == -1 || r < 1 || bn_dl_abort != 0) {
-            Ordinal_403(*out, "..\\Source\\D2BNClient\\BnDownload.cpp", 0x391, 0);
-            *out = nullptr;
-            return 0;
-        }
-        got += (uint32_t)r;
-        if (mode == -0x7ffffffe) bn_dl_percent = got * 100 / size;
-    }
-    if (flags & 1) bnclient_33a00(esi, *out, size, ebx, 0x13c680, 0x278d00);
-    if (flags & 2) bnclient_2d280();
-    return 1;
-}
+// 0x0DB70 moved to src/core/bnclient/bnclient_db70.cpp.
 
 // 1.13c BNClient+0x12390
 // register inputs: in=EAX (4 words); ecx unused. key = 52 words.
@@ -117,53 +92,23 @@ void sub_125E0(const uint16_t* key, uint16_t* out) {
     for (int i = 0; i < 52; ++i) out[i] = t[i];
 }
 
-// 1.13c BNClient+0x12A70
+// 1.13c BNClient+0x12A70: the rule lives in src/core/bnclient/bnclient_12a70.cpp; this binds it to the module globals and imports.
+namespace {
+uint32_t news_load(uint32_t* stamp, uint32_t** data, uint32_t* size) { return (uint32_t)bnclient_34050(bn_news_name, stamp, (int**)data, size); }
+uint32_t* g_news;
+void news_sync_out() { bn_news_cap = g_news[0]; bn_news_i = g_news[1]; bn_news_stride_base = g_news[2]; bn_news_count = g_news[3]; bn_news_flag = g_news[4]; bn_news_hdr = g_news[5]; }
+void news_grow(uint32_t want, uint32_t* g) { news_sync_out(); bnclient_211c0(want, &bn_news_cap); g[0] = bn_news_cap; g[1] = bn_news_i; g[2] = bn_news_stride_base; }
+uint32_t news_step(uint32_t want, uint32_t*) { return bnclient_21180(want, &bn_news_cap); }
+void news_free(void* p, uint32_t which) {
+    if (which == 0) Ordinal_403(p, ".?AUItem@NewsTable@@", -2, 0); else Ordinal_403(p, "..\\Source\\D2BNClient\\BNNews.cpp", 0x12B, 0);
+}
+}
 uint32_t sub_12A70(void) {
-    uint32_t ok = 0, ft[2];
-    int* data = nullptr;
-    uint32_t sz;
-    if (bnclient_34050(bn_news_name, ft, &data, &sz)) {
-        bn_news_hdr = (uint32_t)data[0];
-        uint32_t n = (uint32_t)data[1];
-        const uint8_t* p = (const uint8_t*)(data + 2);
-        if (n < 0x101) {
-            bn_news_i = 0;
-            if (bn_news_cap < n) bnclient_211c0(n, &bn_news_cap);
-            bn_news_flag = 0;
-            uint32_t prev = 0, k = 0;
-            bool bad = false;
-            while (k < n) {
-                uint32_t idx = bn_news_i + 1;
-                if (idx > bn_news_cap) {
-                    uint32_t step = bn_news_count ? bn_news_count : bnclient_21180(idx, &bn_news_cap);
-                    uint32_t rem = idx % step;
-                    if (rem) idx += step - rem;
-                    bnclient_211c0(idx, &bn_news_cap);
-                }
-                uint8_t* e = (uint8_t*)(uintptr_t)(bn_news_i * 0x408 + bn_news_stride_base);
-                bn_news_i++;
-                *(uint32_t*)e = 0;
-                *(uint32_t*)(e + 4) = *(const uint32_t*)p;
-                const char* s = (const char*)p + 4;
-                uint32_t len = 0;
-                while (s[len]) ++len;
-                if (len > 0x3ff) { bad = true; break; }
-                for (uint32_t i = 0; i <= len; ++i) e[8 + i] = (uint8_t)s[i];
-                uint32_t cur = *(uint32_t*)(e + 4);
-                p += 4 + len + 1;
-                if (prev > cur) break;
-                ++k; prev = cur;
-            }
-            (void)bad;
-            ok = (k == n);
-        }
-    }
-    if (!ok) {
-        // retail frees the table (line -2) and zeroes cap, index, table, flag and header; count is kept
-        if (bn_news_stride_base) Ordinal_403((void*)(uintptr_t)bn_news_stride_base, "AUItem NewsTable", -2, 0);
-        bn_news_cap = bn_news_i = bn_news_stride_base = bn_news_flag = bn_news_hdr = 0;
-    }
-    if (data) Ordinal_403(data, "..\\Source\\D2BNClient\\BNNews.cpp", 299, 0);
+    uint32_t g[6] = { bn_news_cap, bn_news_i, bn_news_stride_base, bn_news_count, bn_news_flag, bn_news_hdr };
+    g_news = g;
+    const BnNews12a70Env env{ news_load, news_grow, news_step, news_free };
+    const uint32_t ok = bn_news_load_12a70(g, &env);
+    news_sync_out();
     return ok;
 }
 

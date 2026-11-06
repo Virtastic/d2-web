@@ -1,6 +1,6 @@
 // 1.13c BNClient+0x0B0C0 (345 B): SRP client shared secret, retail register layout: EAX = pointer to the cell holding the server value v,
 // stack (ret 0x10): P (+4 = g, +8 = N handles), A1 (cell: addend), C (cell: secret exponent), R (cell: result handle). Rule: v < N and v != 0, u = 0xA910(EDX = &v)
-// non-zero, W = g^(*C) mod N, T = v < W ? v + N : v, T2 = T - W, T3 = 0xA180(*C, u), T3 += *A1, *R = T3^T2 mod N. Returns 1 (0 on a failed check).
+// non-zero, W = g^(*C) mod N, T = v < W ? v + N : v, T2 = T - W, T3 = 0xA180(*C, u), T3 += *A1, *R = T2^T3 mod N. Returns 1 (0 on a failed check).
 // Every callee is an injected seam carrying its retail operands: Storm #601 cmp (0x871C), #624 new (0x8740), #612 set (0x872E), #628 powmod (0x86FE),
 // add (0x873A), sub (0x8722), #606 del (0x870A), BNClient 0xA910 and 0xA180.
 #include <cstdint>
@@ -45,7 +45,7 @@ extern "C" uint32_t d2_bnclient_b0c0(const uint32_t* vc, const uint32_t* p, cons
     }
     e->step_a180(t3, *c, u);
     e->big_add(t3, t3, *a1);
-    e->big_powmod(*rc, t3, t2, n);
+    e->big_powmod(*rc, t2, t3, n);
     e->big_del(t3);
     e->big_del(t2);
     e->big_del(w);

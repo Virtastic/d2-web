@@ -51,15 +51,16 @@ void fatal(const Bn15260Env& e, uint32_t line) {
 }  // namespace
 
 // 1.13c BNClient+0x15260
-extern "C" void bnclient_15260_UpdateGatewaysFromIni(uint32_t self, uint32_t data, const Bn15260Env& e) {
+// Returns retail's EAX at the ret: the stored version +0x18 on the no-newer path (it is loaded into EAX for the cmp; jbe), else 0.
+extern "C" uint32_t bnclient_15260_UpdateGatewaysFromIni(uint32_t self, uint32_t data, const Bn15260Env& e) {
     const uint32_t dataEnd = data + cstrlen(data);
     uint32_t p = e.findSection(self, data, e.sListVersion);
-    if (p == 0) { fatal(e, 0x236); return; }
+    if (p == 0) { fatal(e, 0x236); return 0; }
     p = e.findKey(self, p, e.sVer);
-    if (p == 0) { fatal(e, 0x23B); return; }
+    if (p == 0) { fatal(e, 0x23B); return 0; }
     uint32_t endp = 0;
     const uint32_t ver = e.strtoul(p, (uint32_t)(uintptr_t)&endp, 10);
-    if (ver <= rd32(self + 0x18)) return;                 // jbe: unsigned
+    if (ver <= rd32(self + 0x18)) return rd32(self + 0x18);   // jbe: unsigned; EAX holds +0x18
     e.log(e.sLogFmt, ver);
     int32_t gmt = rd32(self + 0x10) != 0 ? e.gmt(self, rd32(self + 0x0C)) * 60   // imul 0x3c at the site
                                          : e.systemTimeZone(self);
@@ -117,11 +118,12 @@ extern "C" void bnclient_15260_UpdateGatewaysFromIni(uint32_t self, uint32_t dat
     }
     wr8(cur, 0);
     const int32_t size = (int32_t)(cur + 1 - buf);
-    if (!(size < (int32_t)allocation)) { fatal(e, 0x2A5); return; }   // jl: signed
-    if (rd8(buf + size - 1) != 0 || rd8(buf + size - 2) != 0) { fatal(e, 0x2A7); return; }
+    if (!(size < (int32_t)allocation)) { fatal(e, 0x2A5); return 0; }   // jl: signed
+    if (rd8(buf + size - 1) != 0 || rd8(buf + size - 2) != 0) { fatal(e, 0x2A7); return 0; }
     wr32(self + 0x10, buf);
     wr32(self + 0x14, (uint32_t)size);
     e.pickClosestZone(self, gmt);
     e.saveAndUnload(self);
     e.load(self);
+    return 0;
 }
