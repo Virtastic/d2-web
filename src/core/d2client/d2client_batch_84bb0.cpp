@@ -237,44 +237,6 @@ done:
     return item;
 }
 
-// 1.13c D2Client+0x854E0 (packet in EAX)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_854e0(const D2cItmEnv* e, const uint8_t* p) {
-    D2cHdr h; memset(&h, 0, sizeof h);
-    int len = p[2] - 0xd;
-    C(11105, A(p + 0xd), len, 0, A(&h));
-    uint8_t* u = (uint8_t*)C(F_UNPACK_PLAYER, rd<uint32_t>(p, 9), p[8], 0, 0);
-    if (!u) return;
-    W inv = rd<uint32_t>(u, 0x60);
-    if (!inv) FATAL(0xb77);
-    uint8_t* it = nullptr;
-    bool bad;
-    if (u == e->player) {
-        it = findItem(e, rd<uint32_t>(p, 4), bad);
-        if (bad) FATAL(0x5a);
-        if (!it) return;
-        if ((uint8_t*)C(10646, inv, A(it), 0, 0) != it) FATAL(0xb83);
-        C(10869, A(e->file), 0xb85, A(p + 0xd), C(10584, A(u), 0, e->tick, 0));
-        C(F_SELECT, 0, 0, 0, 0);
-        C(F_DONE, 0, 0, 0, 0);
-    }
-    if (!C(10197, h.a, 1, 0, 0)) {
-        if (!it) { it = (uint8_t*)C(F_MAKE, A(p), A(&h), 0, 0); if (!it) FATAL(0xb93); }
-        else C(V(0x6fb32980), 0, h.act, 0, 0);
-    } else {
-        C(F_CHAIN, 0x6fbbae08, rd<uint32_t>(p, 4) & 0x7f, rd<uint32_t>(p, 4), 4);
-        it = (uint8_t*)C(F_MAKE, A(p), A(&h), 0, 0);
-        if (!it) FATAL(0xb8d);
-    }
-    C(10058, A(it), h.slot, 0, 0);
-    if (!C(10405, len, A(it), isEquipSlot(h.slot) ? 4 : 3)) return;
-    if (!C(F_TRY, 0, 0, 0, 0)) return;
-    C(F_PRE, A(u), 0, 0, 0);
-    C(10138, len, A(it), 0, 0);
-    C(F_UI3, 0, 0, 0, 0);
-    C(F_UI1, 0, 0, 0, 0);
-    tail(e, A(u));
-    C(F_REFRESH, 0, 0, 0, 0);
-}
 
 // 1.13c D2Client+0x85710 (packet in EAX)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_85710(const D2cItmEnv* e, const uint8_t* p) {

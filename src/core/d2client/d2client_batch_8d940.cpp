@@ -122,19 +122,6 @@ int32_t personalizedNameInPlace(Env& e,wc* out){
  e.personalize(res,tmp,0x200); ucpy(out,res); return 1;
 }
 
-// 1.13c D2Client+0x8E180
-void itemFlagsText(Env& e,int32_t unit,wc* out){
- wc t[16]; (void)e.str(0); w2u(t,"",15); ucpy(out,t);
- bool eth=e.q(10202,unit,0x400000)!=0;
- if(eth){ w2u(t,"Ethereal",15); ucat(out,e.str(1)); }
- if(e.q(10202,unit,0x800)){
-  if(eth){ w2u(t,", ",15); ucat(out,t); }
-  ucat(out,e.str(2));
-  char b[12]; wc n[20]; e.fmt(b,10,(uint8_t)e.q(10366,unit,0)); w2u(n,b,9);
-  ucat(out,e.str(3)); ucat(out,n); ucat(out,e.str(4));
- }
-}
-
 // 1.13c D2Client+0x8E2F0
 void hoverItemPickup(Env& e){
  if((e.g(0xBCBC34)!=1 || e.g(0x8BC48)/2<=e.g(0xBCB828)) && e.g(0xBCB824)<e.g(0x8BC4C)-0x27){

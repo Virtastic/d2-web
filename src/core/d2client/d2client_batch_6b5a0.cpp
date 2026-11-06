@@ -149,9 +149,4 @@ void sub_6C130(Host& h,Anim* a){
  }
 }
 
-// 1.13c D2Client+0x6D010 : per-frame group pump
-void sub_6D010(Host& h,I n,U unit,U arg){
- for(I i=0;i<n;++i){ sub_6C3B0(h); sub_6C3F0(h,unit,arg); }
-}
-
 } // namespace

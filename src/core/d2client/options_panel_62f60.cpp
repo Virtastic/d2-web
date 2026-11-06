@@ -102,13 +102,13 @@ struct Imp63e90 { U(*o10227)(); void(*o10004)(char*,U); U(*load)(const char*,U);
 void entriesLoad_63e90(const Imp63e90&f,const I*cnt,B*tbl){
  if(!cnt){ f.fatal(0x524); return; }
  if(!tbl){ f.fatal(0x525); return; }
- char lang[4]={0,0,0,0}; f.o10004(lang,0);
- char path[0x104];
+ char lang[8]={0}; f.o10004(lang,0);   // retail: 8-byte local, zeroed; the buffers below are zeroed once, before the loop
+ char path[0x105]; std::memset(path,0,sizeof path);
  U*p=(U*)(tbl+0x120);
  for(I i=0;i<*cnt;i++,p+=0x154){
+  std::memcpy(lang+4,&i,4);   // retail keeps the loop index in the 4 bytes after the language code, so entry n>0 sees "enUS\x0n"
   if(p[-0x47]==0||f.o10227()!=0){
    if(*(const char*)(p-0x45)){
-    std::memset(path,0,sizeof path);
     std::snprintf(path,sizeof path,"%s\\UI\\%s\\%s","DATA\\LOCAL",lang,(const char*)(p-0x45));
     p[0x107]=f.load(path,0);
     if(p[-0x48]==1){

@@ -290,49 +290,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_83ec0(D2cItem83* s, const D2cItem
     }
 }
 
-// 1.13c D2Client+0x84080 (pkt in EDI; x/y words in EBX; ESI)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_84080(D2cItem83* s, const D2cItem83Env* e, const uint8_t* pkt, uint32_t ebx, uint32_t esi) {
-    uint8_t buf[24];
-    e->decode(pkt + 8, rd<uint8_t>(pkt, 2) - 8, 0, buf);
-    if (buf[0] == 0xff || !s->c9721) return;
-    P mon = nullptr;
-    for (P u = s->monHash[s->c971d & 0x7f]; ; u = e->next(u)) {
-        if (!u) return;
-        if (rd<uint32_t>(u, 0xC) == s->c971d) { mon = u; break; }
-    }
-    if (rd<int32_t>(mon, 0) != 1) { e->fatal(0); return; }
-    P owner = (P)(uintptr_t)rd<uint64_t>(mon, 0x60);
-    if (!owner) return;
-    uint32_t id = rd<uint32_t>(pkt, 4);
-    P it = findItem(s, e, id);
-    if (rd<uint8_t>(pkt, 1) == 0xc) {
-        if (!it) return;
-        if (s->c9663) e->fn3bbf0();
-        if (!e->o10646(owner, it)) return;
-        uint8_t c = e->o10020(it);
-        if (c == 0xff) return;
-        uint32_t q = e->o10584(mon, c, s->aux);
-        e->o10869(kItemCpp, 0x81b, owner, ebx & 0xffff, ebx >> 16, q, 1, c);
-        e->fn6e2b0();
-        e->hashRemove(id);
-        e->fn7a70(id);
-        return;
-    }
-    if (!it) { it = d2_client_835c0(s, e, pkt, buf, 0, 0, 0); e->o10012(it, buf[0]); }
-    else {
-        e->o10391(owner, it);
-        if (!e->flagTest(rd<uint32_t>(buf, 0xC), 1)) e->fn32980(0, 0, 0);
-        else {
-            e->hashRemove(id);
-            it = d2_client_835c0(s, e, pkt, nullptr, 0, 0, 0);
-            if (!it) return;
-            if (buf[0x10] != e->o10020(it)) return;
-        }
-    }
-    e->o10012(it, buf[0x10]);
-    uint32_t q = e->o10584(mon, buf[0], s->aux);
-    if (e->o11148(it, it, esi & 0xffff, esi >> 16, q)) { e->fn32660(it); s->cbc54 = 1; e->fn31aa0(); }
-}
 
 // 1.13c D2Client+0x84300 (this=item, pkt=param_1, dec=EAX)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_84300(D2cItem83* s, const D2cItem83Env* e, P self, const uint8_t* pkt, const uint8_t* dec) {

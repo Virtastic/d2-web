@@ -127,24 +127,6 @@ void sub_BFA10(const Env& e, P ctx, P s) {
   else e.wr32(cell, x.def);
  }
 }
-// 1.13c D2Client+0xBFCA0
-void sub_BFCA0(const Env& e, P u) {
- if (u && (int32_t)e.rd32(u + 4) >= 0x2c0 && (int32_t)e.rd32(u + 4) <= 0x2c5) return;
- const W* sep2 = e.o10003(); const W* sep1 = e.o10003();
- W acc[256] = {0};
- for (int i = 0; i < 6; i++) {
-  P r = e.tblB834F0 + (P)i * 10;
-  if (e.o10973(u, e.rd32(r), 0) > 99) {
-   W t[256] = {0};
-   if (acc[0]) { wcat(acc, sep2); wcat(acc, sep1); }
-   wcpy(t, e.o10003());
-   sub_BF5F0(e, (char)e.rd32(r + 6), t);
-   wcat(acc, t);
-  }
- }
- wcpy((W*)e.gCC578, acc);  // gCC578 holds a host pointer to the 256-wchar retail buffer
- e.wr32(e.gCC778, 4);
-}
 // 1.13c D2Client+0xBFEC0  (in = EAX string; out/outSize = caller stack args)
 void sub_BFEC0(const Env& e, const W* in, W* out, int32_t outSize) {
  e.wr32(e.gBC58, e.rd32(e.gBC58) - 0x10);
