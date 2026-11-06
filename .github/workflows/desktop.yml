@@ -38,7 +38,7 @@ jobs:
           node-version: 24
 
       - name: Fetch the staged site
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.site_artifact }}
           path: build-wasm/site
