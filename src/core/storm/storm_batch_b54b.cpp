@@ -18,10 +18,6 @@ const char* const g_defaultStrings[1] = {nullptr};  // 0x6FC35CB0 table
 void Storm_SetLastError(uint32_t) {}
 void Storm_Sub1F590(uint32_t, uint32_t*, int32_t, uint8_t*, int32_t, int32_t) {}
 void Storm_Sub1ABF0() {}   // the heap-block free (0x1ABF0, register args) is a seam here; its port is storm_sub_1abf0.cpp
-void Storm_Sub1A9E0(int32_t, uint32_t, uint32_t);
-int32_t Storm_Sub1AA70(uint16_t* hdr, uint32_t oldSize, uint32_t newSize);
-uint32_t* Storm_Sub1C390(int32_t, uint32_t);
-void Storm_Memcpy12C80(void*, const void*, uint32_t);
 int32_t Storm_InterlockedIncrement(int32_t*);
 int32_t Storm_InterlockedDecrement(int32_t*);
 void Storm_InitCriticalSection();
@@ -61,20 +57,19 @@ void Storm_Sub1ACF0(uint32_t* p1, int32_t p2, uint32_t err) {
 // Storm+0x1ACF0's 0x6FC45388 slot (the last recorded error), for the function-mode probe.
 uint32_t Storm_Sub1ACF0_LastError() { return g_lastError; }
 
-// 1.13c Storm+0x1B170: debug-fill the freed block payload with 0xDD, then release.
-void Storm_Sub1B170(uint32_t, uint16_t* hdr, uint32_t, uint32_t* p) {
-    if (g_debugFill != 0 && (((uint8_t*)hdr)[3] & 4) == 0) {
-        uint32_t n = (((uint32_t)hdr[0] + (((uint8_t*)hdr)[3] & 1) * -2) - (uint8_t)hdr[1]) - 8;
-        for (uint32_t i = n >> 2; i; --i) *p++ = 0xDDDDDDDD;
-        uint8_t* b = (uint8_t*)p;
-        for (uint32_t i = n & 3; i; --i) *b++ = 0xDD;
-    }
-    Storm_Sub1ABF0();
-}
-
 // 1.13c Storm+0x1C660: realloc a heap block (EAX = header).
-uint32_t* Storm_Sub1C660(uint16_t* hdr, uint32_t a1, int32_t a2, uint32_t* oldp, uint32_t newSize, uint8_t flags) {
-    (void)a1;
+// Callees of the realloc (retail 0x1A9E0 shrink, 0x1AA70 grow in place, 0x1C390 allocate, 0x12C80 copy, 0x1B170 release); the
+// function-mode probe supplies them, the heap ports elsewhere implement them.
+struct Storm1C660Env {
+    void (*shrink)(int32_t heap, uint32_t oldSize, uint32_t newSize);
+    int32_t (*grow)(uint16_t* hdr, int32_t heap, uint32_t oldSize, uint32_t newSize);
+    uint32_t* (*alloc)(uint32_t slot, int32_t heap, uint32_t size);
+    void (*copy)(void* dst, const void* src, uint32_t n);
+    void (*release)(uint16_t* hdr, int32_t heap, uint32_t* p);
+    const int32_t* debugFill;   // Storm+0x55164
+};
+uint32_t* Storm_Sub1C660(const Storm1C660Env& e, uint16_t* hdr, uint32_t a1, int32_t a2, uint32_t* oldp, uint32_t newSize, uint8_t flags) {
+    const int32_t g_debugFill = *e.debugFill;
     uint32_t oldSize;
     uint8_t ext = ((uint8_t*)hdr)[3] & 4;
     uint32_t* np;
@@ -88,9 +83,9 @@ uint32_t* Storm_Sub1C660(uint16_t* hdr, uint32_t a1, int32_t a2, uint32_t* oldp,
     bool done = false;
     if (ext == 0) {
         if (newSize < oldSize) {
-            Storm_Sub1A9E0(a2, oldSize, newSize);
-        } else if (newSize > oldSize && Storm_Sub1AA70(hdr, oldSize, newSize) == 0) {
-            goto relocate;
+            e.shrink(a2, oldSize, newSize);
+        } else if (newSize <= oldSize || e.grow(hdr, a2, oldSize, newSize) == 0) {
+            goto relocate;   // retail relocates an equal size too
         }
         np = oldp;
         if (np != nullptr) done = true;
@@ -98,9 +93,9 @@ uint32_t* Storm_Sub1C660(uint16_t* hdr, uint32_t a1, int32_t a2, uint32_t* oldp,
 relocate:
     if (!done) {
         if (flags & 0x10) return nullptr;
-        np = Storm_Sub1C390(0, newSize);
-        if (np && oldSize && newSize) Storm_Memcpy12C80(np, oldp, oldSize < newSize ? oldSize : newSize);
-        Storm_Sub1B170(a2, hdr, a2, oldp);
+        np = e.alloc(a1, a2, newSize);
+        if (np && oldSize && newSize) e.copy(np, oldp, oldSize < newSize ? oldSize : newSize);
+        e.release(hdr, a2, oldp);
         if (!np) return nullptr;
     }
     if (oldSize < newSize) {

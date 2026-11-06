@@ -1061,6 +1061,7 @@ bool Storm_Sub37ED0(uint32_t param_1, int32_t param_2, char* param_3, int32_t pa
 extern "C" uint32_t* storm_1efc0_global(uint32_t rva) {
     switch (rva) {
     case 0x45388: return (uint32_t*)&g_lastError;
+    case 0x45978: return (uint32_t*)&g_list_45978;
     case 0x41a00: return &g_chunk_41a00;
     case 0x4313c: return &g_4313c;
     case 0x43138: return &g_43138;

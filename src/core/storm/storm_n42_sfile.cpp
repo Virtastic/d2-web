@@ -123,6 +123,19 @@ extern "C" void storm_n42_26190_install(char** dir, u32** lastErr) {
     G.h = &g_26190Host; *dir = G.dir; *lastErr = &G.lastErr;
 }
 
+// Capture-probe install for 0x28960 (SFileOpenFile core): lock/unlock/setErr are no-op pins, the archive init and archive search are empty (no archive holds the
+// name), the disk probe reports a missing path, the path builder writes nothing observable. Exposes G.lastErr (Storm+0x45388) and zeroes the archive globals.
+static u32 probeAttrMissing(const char*) { return 0xFFFFFFFFu; }
+static int probeFindNone() { return -1; }
+static void probeBuildPath(char* out, int) { out[0] = 0; }
+static N42Host g_28960Host;
+extern "C" void storm_n42_28960_install(u32** lastErr) {
+    g_28960Host.lock = probeNop; g_28960Host.unlock = probeNop; g_28960Host.setErr = probeSetErr;
+    g_28960Host.initArchives = probeNop; g_28960Host.findArchiveList = probeFindNone; g_28960Host.buildPath = probeBuildPath;
+    g_28960Host.getAttr = probeAttrMissing; g_28960Host.strstr_ = [](const char* a, const char* b) { return strstr(a, b); };
+    G.h = &g_28960Host; G.archHead = 0; G.archList = 0; *lastErr = &G.lastErr;
+}
+
 // 1.13c Storm+0x25D30
 u32 Storm_25D30(u32 a, u32 b) { G.cbA = (int)a; G.cbB = (int)b; return 1; }
 // Accessors for the file callback's two stored words, for the function replay.

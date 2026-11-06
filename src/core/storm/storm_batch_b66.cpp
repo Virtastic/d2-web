@@ -10,12 +10,18 @@
 #include <Windows.h>
 #include "storm_image_leaves.h"
 
+// Capture-probe seams (src/core/fn/storm_28e80.cpp): the cache fill and the sector read, replaced by recorders; null = the empty-state default.
+extern "C" {
+uint32_t (*g_storm_b66_cachefill)(void* file, uint32_t off) = nullptr;
+uint32_t (*g_storm_b66_read)(void* file, uint32_t off, void* dst, uint32_t len) = nullptr;
+}
+
 namespace {
 
 // ---- seams for unmapped callees (provider/cache state is empty in ours) ---------------------
 uint8_t g_crcTable[256 * 4];                                   // 0x6FC41600 CRC32 table (4 B/entry)
-uint32_t SeamCacheFill28DF0(void*, uint32_t) { return 0; }       // 0x28DF0 (cache, aligned offset) -> bytes valid
-uint32_t SeamRead28450(void*, uint32_t, void*, uint32_t) { return 0; }  // 0x28450 (obj, off, dst, len) -> bytes read
+uint32_t SeamCacheFill28DF0(void* f, uint32_t off) { return g_storm_b66_cachefill ? g_storm_b66_cachefill(f, off) : 0; }  // 0x28DF0 (file in ESI, offset in EDX) -> bytes valid
+uint32_t SeamRead28450(void* f, uint32_t o, void* d, uint32_t n) { return g_storm_b66_read ? g_storm_b66_read(f, o, d, n) : 0; }  // 0x28450 (obj, off, dst, len) -> bytes read
 void SeamFree1B960(void*, const char*, int32_t) {}               // 0xB960 SMemFree
 void* SeamAlloc1C580(uint32_t n, const char*, int32_t, uint32_t) { return ::operator new(n); }  // 0xC580 SMemAlloc
 void SeamNetFree4D60(void*) {}                                   // 0x4D60 list unlink
@@ -58,7 +64,7 @@ uint32_t Storm_sub_28E80(File* f, uint32_t off, uint8_t* dst, uint32_t len) {
     };
     if (off & (bs - 1)) {                       // unaligned head, served from the block cache
         seq(off);
-        uint32_t valid = SeamCacheFill28DF0(&f->cache->blockSize, off & ~(bs - 1));
+        uint32_t valid = SeamCacheFill28DF0(f, off & ~(bs - 1));
         uint32_t inb = off & (bs - 1);
         head = bs - inb < len ? bs - inb : len;
         std::memcpy(dst, f->cache->data + inb, head);
@@ -84,12 +90,29 @@ uint32_t Storm_sub_28E80(File* f, uint32_t off, uint8_t* dst, uint32_t len) {
     uint32_t tail = 0;
     if (len) {                                  // unaligned tail, via the block cache
         seq(pos);
-        uint32_t valid = SeamCacheFill28DF0(&f->cache->blockSize, pos);
+        uint32_t valid = SeamCacheFill28DF0(f, pos);
         std::memcpy(dst, f->cache->data, len);
         tail = len < valid ? len : valid;
         hash(dst, tail);
     }
     return mid + tail + head;
+}
+
+// Capture-probe runner: builds the port's File view from the retail-layout object (cache +0x110, info +0x114, crc +0x144, crcOn +0x14C, state +0x150,
+// hashed +0x154; cache blockSize +0x120, data +0x124; info size +8), pins the CRC table, runs 0x28E80 and writes crc/state/hashed back.
+extern "C" uint32_t storm_28e80_fnrun(uint8_t* rf, uint32_t off, uint8_t* dst, uint32_t len, const uint8_t* crcTable) {
+    auto rd = [](const uint8_t* p) { uint32_t v; std::memcpy(&v, p, 4); return v; };
+    auto wr = [](uint8_t* p, uint32_t v) { std::memcpy(p, &v, 4); };
+    const uint8_t* cx = (const uint8_t*)(uintptr_t)rd(rf + 0x110);
+    const uint8_t* inf = (const uint8_t*)(uintptr_t)rd(rf + 0x114);
+    Cache c{}; Info in{}; File f{};
+    c.blockSize = rd(cx + 0x120); c.data = (uint8_t*)(uintptr_t)rd(cx + 0x124);
+    in.size = rd(inf + 8);
+    f.cache = &c; f.info = &in; f.crc = rd(rf + 0x144); f.crcOn = rd(rf + 0x14c); f.state = rd(rf + 0x150); f.hashed = rd(rf + 0x154);
+    std::memcpy(g_crcTable, crcTable, sizeof g_crcTable);
+    uint32_t r = Storm_sub_28E80(&f, off, dst, len);
+    wr(rf + 0x144, f.crc); wr(rf + 0x150, f.state); wr(rf + 0x154, f.hashed);
+    return r;
 }
 
 // Earlier draft (native Node layout, superseded by storm_361c0.cpp): the global hash-bucket table; g_buckets = 0x6FC45370, count 0x6FC45374

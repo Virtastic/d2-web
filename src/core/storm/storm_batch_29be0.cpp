@@ -31,7 +31,7 @@ void Storm_Sub3B080(char* dst, const char* src, uint32_t n);        // 0x3B080 s
 void Storm_Sub3AE00(char* dst, const char* src, uint32_t cap);      // 0x3AE00 append, cap = buffer
 uint32_t Storm_Sub295B0(uint32_t h, uint32_t* buf, uint32_t n, int32_t* read, int32_t ov,
                         uint32_t a, uint32_t b);                    // 0x295B0 read core
-bool Storm_Sub29C10(void* a, uint32_t* b, int32_t* outPtr, uint32_t* outSize, uint32_t extra,
+extern "C" bool Storm_Sub29C10(void* a, uint32_t* b, int32_t* outPtr, uint32_t* outSize, uint32_t extra,
                     uint32_t flags, int32_t param7, uint32_t param8);  // 0x29C10 load core
 extern "C" int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);    // 0x1B960 SMemFree
 

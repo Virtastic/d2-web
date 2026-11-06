@@ -6,7 +6,7 @@ struct Storm22420Env {
     void (*setup)(void* tree, uint8_t mode);       // Storm+0x21E40
     uint32_t (*readSym)(void* tree);               // Storm+0x4980
     void (*addSym)(void* tree, uint32_t sym);      // Storm+0x21CB0
-    void (*adapt)(void* tree);                     // Storm+0x4810
+    void (*adapt)(void* tree, uint32_t sym);       // Storm+0x4810 (EAX = the node slot tree[0xC1B + sym])
 };
 static uint32_t byte22420(Storm22420Bits& b) {
     if (b.cnt < 9) { b.bits |= (uint32_t)*b.p++ << (b.cnt & 31); b.cnt += 16; }
@@ -21,13 +21,14 @@ int32_t storm_sub_22420(const Storm22420Env& e, uint32_t* tree, Storm22420Bits& 
     for (;;) {
         uint32_t s = e.readSym(tree);
         if (s == 0x101) {
-            e.addSym(tree, byte22420(b));
-            if (*tree == 0) e.adapt(tree);
+            { const uint32_t sb = byte22420(b);
+            e.addSym(tree, sb);
+            if (*tree == 0) e.adapt(tree, sb); }
         }
         if (s == 0x100) break;
         *out++ = (uint8_t)s;
         if (--cap == 0) break;
-        if (*tree != 0) e.adapt(tree);
+        if (*tree != 0) e.adapt(tree, s);
     }
     return (int32_t)(out - dst);
 }
