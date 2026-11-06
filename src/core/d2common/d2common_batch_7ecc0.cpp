@@ -1,4 +1,4 @@
-// 1.13c D2Common batch 7ecc0: +0x7ECC0, +0x42920, +0x68CD0, +0x68F00, +0x814C0, +0x81650, +0x81AD0.
+// 1.13c D2Common batch 7ecc0: +0x7ECC0, +0x42920, +0x68F00, +0x814C0, +0x81650, +0x81AD0.
 // Naming-level implementations from the cached decompile; not called by the engine, no vectors.
 // GUESSED INPUTS: every register-passed argument (in_EAX/unaff_EBX/EDI/ESI) is given as an explicit
 // parameter; struct types are unknown, so they are raw byte views at the retail 32-bit offsets.
@@ -93,19 +93,6 @@ static void InitRec(int32_t* r, void* pRoom, int32_t** pHead, int32_t x, int32_t
     r[1] = (((y + 1 + x) * 0x50) >> 1) + 0x28;
     r[6] = v6; r[7] = v7; r[5] = 0; r[9] = 0;
     wr<B>(r, 0x29, 0xff); wr<B>(r, 0x2a, 0xff); wr<B>(r, 0x28, 0xff);
-}
-
-// 1.13c D2Common+0x68CD0: allocate record #(+0x10) of the 0x30-byte array at (+0x24) in the pool at
-// pRoom+0x54, link it, fill it with type 0xd and the flags word. Returns the record.
-int32_t* D2Common_68CD0(void* pRoom, int32_t x, int32_t** pHead, int32_t y, int32_t v6,
-                        uint32_t flags, uint32_t (*ord10051)(int32_t))
-{
-    void* pool = rd<void*>(pRoom, 0x54);
-    int32_t* r = (int32_t*)(rd<B*>(pool, 0x24) + rd<int32_t>(pool, 0x10) * 0x30);
-    wr<int32_t>(pool, 0x10, rd<int32_t>(pool, 0x10) + 1);
-    InitRec(r, pRoom, pHead, x, y, v6, 0xd);
-    ApplyFlags(r, flags, ord10051);
-    return r;
 }
 
 // 1.13c D2Common+0x68F00: same for the array at (+0x14)/count (+8); calls 0x68A90(pRoom,v7); when

@@ -1,4 +1,4 @@
-// D2Common implementation batch (1.13c RVAs 0x12AF0, 0x32E10, 0x382F0, 0x3D250, 0x4F120, 0x66630).
+// D2Common implementation batch (1.13c RVAs 0x12AF0, 0x32E10, 0x382F0, 0x3D250, 0x4F120).
 // Cached 1.13c decompiles define the control flow. Calls into retail globals, CRT state, and the
 // engine's not-yet-mapped helpers are explicit seams so the behavior can be wired as those rows land.
 #include <cstdarg>
@@ -68,36 +68,6 @@ extern "C" void D2Common_3D250_ClearTextList(uint8_t* pTextOwner, void* pFirstNo
         pNode = pNext;
     }
     *reinterpret_cast<uint16_t*>(pTextOwner + 4) = 0;
-}
-
-// 1.13c D2Common+0x66630: usercall (ESI=pRoom, EDI=pUnit, stack bCheckList). Reads the unit's
-// tile (dynamic: pPath+0xC/+0x10 dwords; else pPath ? +2/+6 words), tests it against the room's
-// box (+0x4C x,+0x50 y,+0x54 w,+0x58 h); outside -> fatal 0x2e. Inside: walk room unit list
-// (+0x74, next at +0xE8); found -> 1 (or fatal 0x36 when bCheckList); absent -> 0 for !bCheckList.
-// The fatal path (ordinals 10265/10024 then _exit(-1)) is reported through pfnFatal.
-extern "C" int32_t D2Common_66630_ValidateRoomMembership(const uint8_t* pRoom, const uint8_t* pUnit,
-    int32_t bCheckList, void (*pfnFatal)(uint32_t))
-{
-    const int32_t nType = *reinterpret_cast<const int32_t*>(pUnit);
-    const uint8_t* pPath = *reinterpret_cast<const uint8_t* const*>(pUnit + 0x2c);
-    const bool bDyn = nType == 2 || (nType > 3 && nType < 6);
-    int32_t x, y;
-    if (bDyn) { x = *reinterpret_cast<const int32_t*>(pPath + 0xc); y = *reinterpret_cast<const int32_t*>(pPath + 0x10); }
-    else { x = pPath ? *reinterpret_cast<const uint16_t*>(pPath + 2) : 0; y = pPath ? *reinterpret_cast<const uint16_t*>(pPath + 6) : 0; }
-    const int32_t* r = reinterpret_cast<const int32_t*>(pRoom);
-    uint32_t nCode = 0x2e;
-    if (pRoom && x >= r[0x4c / 4] && x < r[0x4c / 4] + r[0x54 / 4] && y >= r[0x50 / 4] && y < r[0x50 / 4] + r[0x58 / 4])
-    {
-        for (const uint8_t* u = *reinterpret_cast<const uint8_t* const*>(pRoom + 0x74); ; u = *reinterpret_cast<const uint8_t* const*>(u + 0xe8))
-        {
-            if (!u) return 1;
-            if (u == pUnit) break;
-        }
-        if (!bCheckList) return 0;
-        nCode = 0x36;
-    }
-    if (pfnFatal) pfnFatal(nCode);
-    return -1;
 }
 
 // 1.13c D2Common+0x12AF0: emits a timestamped tab-separated diagnostic prefix and the caller's

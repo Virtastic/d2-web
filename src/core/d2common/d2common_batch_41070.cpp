@@ -11,48 +11,20 @@
 #include "D2Seed.h"
 #include <algorithm>
 #include <cstdlib>
+#include "d2common_41340.h"
 
 // 1.13c D2Common+0x42A70: the footprint stamp retail calls directly (ECX=level, EDX=x, stack y, idx, flag, extra).
 extern "C" void D2Common_42A70(void*, int32_t, int32_t, int32_t, int32_t, int32_t);
 
 // 1.13c D2Common+0x41070 is in src/core/d2common/d2common_41070.cpp (one file per function).
 
-// 1.13c D2Common+0x41340
+// Forwarder for the callers; the 1.13c port of 0x41340 is d2common_41340.cpp (one file per function).
+static void Stamp41340(uint32_t level, int32_t x, int32_t y, int32_t preset, int32_t a, int32_t b) {
+    D2Common_42A70(reinterpret_cast<void*>(uintptr_t(level)), x, y, preset, a, b);
+}
 void D2Common_41340(D2DrlgLevelStrc* level) {
-    auto* out = level->pOutdoors;
-    auto* previous = out->pVertex;
-    auto* current = previous->pNext;
-    const int lookup = 4 + (level->nLevelId == 0x75);
-    do {
-        int dx, dy, nx, ny;
-        DRLGVER_GetCoordDiff(previous, &dx, &dy);
-        DRLGVER_GetCoordDiff(current, &nx, &ny);
-        int x = previous->nPosX & ~1, y = previous->nPosY & ~1;
-        const int endX = current->nPosX & ~1, endY = current->nPosY & ~1;
-        const int preset = sub_6FD80BE0(dx, dy, lookup);
-        if (!(previous->dwFlags & 2)) {
-            while (x != endX || y != endY) {
-                x += dx * 2; y += dy * 2;
-                DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(level, x, y, preset, -1, 0);
-                DRLGGRID_AlterGridFlag(&out->pGrid[2], x, y, 1, FLAG_OPERATION_OR);
-            }
-        }
-        if (previous->dwFlags & 1) {
-            const int capX = (std::max(previous->nPosX, current->nPosX) - 4 * std::abs(dx)) & ~1;
-            const int capY = (std::max(previous->nPosY, current->nPosY) - 4 * std::abs(dy)) & ~1;
-            DRLGGRID_AlterGridFlag(&out->pGrid[2], capX, capY, 0x400, FLAG_OPERATION_OR);
-            DRLGGRID_AlterGridFlag(&out->pGrid[2], capX + 2 * std::abs(dx), capY + 2 * std::abs(dy), 0x400, FLAG_OPERATION_OR);
-        }
-        if (const int corner = sub_6FD80C10(dx * 2, dy * 2, nx * 2, ny * 2, lookup)) {
-            DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(level, endX, endY, corner, -1, 0);
-            DRLGGRID_AlterGridFlag(&out->pGrid[2], endX, endY, 1, FLAG_OPERATION_OR);
-        }
-        previous = current; current = current->pNext;
-    } while (previous != out->pVertex);
-    if (level->nLevelId == 0x6f) {
-        DRLGGRID_AlterGridFlag(&out->pGrid[2], out->nGridWidth - 2, out->nGridHeight - 4, 0x400, FLAG_OPERATION_OR);
-        DRLGGRID_AlterGridFlag(&out->pGrid[2], out->nGridWidth - 2, out->nGridHeight - 3, 0x400, FLAG_OPERATION_OR);
-    }
+    const D2Common41340Env env = { Stamp41340 };
+    D2Common_41340_Port(uint32_t(uintptr_t(level)), &env);
 }
 
 // 1.13c D2Common+0x4A5C0: EAX flags, ECX level, stack rectangle/outdoor flags/DT1 mask.

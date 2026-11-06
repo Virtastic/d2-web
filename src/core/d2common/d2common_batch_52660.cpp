@@ -225,12 +225,19 @@ uint32_t D2Common_50020_MonStats2Flags(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x4F610 (#10029) skill setter wrapper. 0x4EE00 is the 1.13c equivalent of the
 // vendored D2Common_10954(pUnit, nOwnerGUID, nSkillId, nSkillLevel, nCharges, bFreeMemory); the
 // skill id travels in EAX (param_3), so the stack args map to owner/level/charges/free.
-// partial: 0x4EE00 also reads EBX and its return-address slot, which the wrapper cannot recover;
-// the vendored 1.10f D2Common_10954 stands in for it.
+// The vendored 1.10f D2Common_10954 stands in for 0x4EE00; the callee is an injectable seam so the
+// FN probe (src/core/fn/d2common_4f610.cpp) can record the forwarded call. Retail drops the third
+// stack word and hands it to 0x4EE00 in EAX; the other five words go on in order.
+static void D2Common_4F610_DefaultCallee(D2UnitStrc* pUnit, D2UnitGUID nOwnerGUID, int32_t nSkillId,
+	int32_t nSkillLevel, int32_t nCharges, BOOL bFreeMemory)
+{
+	D2Common_10954(pUnit, nOwnerGUID, nSkillId, nSkillLevel, nCharges, bFreeMemory);
+}
+void (*g_D2Common_4F610_Callee)(D2UnitStrc*, D2UnitGUID, int32_t, int32_t, int32_t, BOOL) = D2Common_4F610_DefaultCallee;
 void D2Common_4F610_SetSkill(D2UnitStrc* pUnit, D2UnitGUID nOwnerGUID, uint32_t nSkillId,
 	int32_t nSkillLevel, int32_t nCharges, BOOL bFreeMemory)
 {
-	D2Common_10954(pUnit, nOwnerGUID, (int32_t)nSkillId, nSkillLevel, nCharges, bFreeMemory);
+	g_D2Common_4F610_Callee(pUnit, nOwnerGUID, (int32_t)nSkillId, nSkillLevel, nCharges, bFreeMemory);
 }
 
 // 1.13c D2Common+0x4EC50 (#10030) skill sequence number: a player's skills.txt nSeqNum (+0x13);

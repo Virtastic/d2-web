@@ -35,7 +35,7 @@ __attribute__((weak)) uint32_t d2_fn_d2common_70650(const uint8_t* owner, const 
 
 // 1.13c D2Common+0x70BB0: build the (w+6)x(h+6) search frame, retry the walker with growing
 // distance (+5) until it finds a node or the limit is hit, then flatten the chain; 0 if >0x4d.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_70bb0(uint32_t owner, const uint16_t* p2, const uint32_t* p3) {
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2common_70bb0_port(uint32_t owner, const uint16_t* p2, const uint32_t* p3) {
  static D2C70BB0Frame f;
  const int32_t w = *reinterpret_cast<const int32_t*>(p2 + 4), h = *reinterpret_cast<const int32_t*>(p2 + 6);
  if (50000 < w * h) __builtin_trap();  // retail logs then _exit(-1)

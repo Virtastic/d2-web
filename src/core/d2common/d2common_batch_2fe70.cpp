@@ -84,6 +84,7 @@ namespace
 	{
 		int32_t (*collectStatList)(void* pOut, int32_t nStatId, int32_t nMax, void* pStatList); // 0x382F0
 		void (*addStat)(D2UnitStrc* pUnit, int32_t nStatId, int32_t nValue);                     // 0x3A740
+		int32_t (*setStat)(D2StatListStrc* pStatList, int32_t nStatId, int32_t nValue, uint16_t nLayer); // 0x3A280 (null: STATLIST_SetStat)
 	};
 }
 
@@ -114,10 +115,20 @@ EMSCRIPTEN_KEEPALIVE void D2Common_6B4A0_ApplyAffixStats(D2UnitStrc* pOwner, D2U
 
 	D2StatListExStrc* pStatList = pMissile->pStatListEx;
 
-	STATLIST_SetStat(pStatList, nStatIds[0], (int32_t)nValue12, 0);
+	struct Setter
+	{
+		const Batch2_6B4A0Env* pEnv;
+		int32_t operator()(D2StatListStrc* pList, int32_t nId, int32_t nVal, uint16_t nLayer) const
+		{
+			if (pEnv && pEnv->setStat) return pEnv->setStat(pList, nId, nVal, nLayer);
+			return (int32_t)STATLIST_SetStat(pList, nId, nVal, nLayer);
+		}
+	} SetStat = { pEnv };
+
+	SetStat(pStatList, nStatIds[0], (int32_t)nValue12, 0);
 	for (int32_t i = 0; i < 30; ++i)
 	{
-		STATLIST_SetStat(pStatList, nStatIds[i + 1], (int32_t)pValues[i + 1], 0);
+		SetStat(pStatList, nStatIds[i + 1], (int32_t)pValues[i + 1], 0);
 	}
 
 	if (pEnv && pEnv->addStat)
@@ -140,7 +151,8 @@ EMSCRIPTEN_KEEPALIVE void D2Common_6B4A0_ApplyAffixStats(D2UnitStrc* pOwner, D2U
 
 	for (int32_t i = 0; i < nCount; ++i)
 	{
-		STATLIST_SetStat(pStatList, 0xB4, (int32_t)values[i * 2 + 1], 0);
+		// retail: SetStat(list, 0xB4, word 2i+1, layer = low 16 bits of word 2i) (mov bx, word [buf + 8i])
+		SetStat(pStatList, 0xB4, (int32_t)values[i * 2 + 1], (uint16_t)values[i * 2]);
 	}
 }
 

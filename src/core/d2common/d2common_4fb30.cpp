@@ -38,8 +38,9 @@ extern "C" uint32_t D2Common_4FB30_SkillPrereqsMet(uint32_t pUnit, int32_t nSkil
 	}
 
 	const int32_t p2 = rds(row + 0x180);
+	// Prerequisites 2 and 3: 0x1250 (EAX = prerequisite id) gives that skill's row, 0x4EB40 checks the unit owns it.
 	if (p2 >= 0) {
-		const uint32_t pl = env->player();
+		const uint32_t pl = env->skillRow(p2);
 		if (pl == 0) return 0;
 		if (!env->rowOwned(pUnit, pl)) return 0;
 		if (env->skillLevel(pUnit, p2) < 1) return 0;
@@ -47,7 +48,7 @@ extern "C" uint32_t D2Common_4FB30_SkillPrereqsMet(uint32_t pUnit, int32_t nSkil
 
 	const int32_t p3 = rds(row + 0x182);
 	if (p3 >= 0) {
-		const uint32_t pl = env->player();
+		const uint32_t pl = env->skillRow(p3);
 		if (pl == 0) return 0;
 		if (!env->rowOwned(pUnit, pl)) return 0;
 		if (env->skillLevel(pUnit, p3) < 1) return 0;

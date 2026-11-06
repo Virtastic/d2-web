@@ -13,7 +13,7 @@ extern "C" {
 // 1.13c D2Common+0x69360: (edi = level/room ctx). Find the list node at edi+0x4c whose (+0x10)->[0]
 // equals table[a2>>20&0x3f] from 0x69950; if type byte (a2>>8) is 0/4 or 0x69090 accepts, link a1 onto the
 // node's +0xc list and (when (+0x10)+0x24 set) add a flagged entry via 0x68F00. Fatal ids 0x2b1/0x2cb.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_69360(uintptr_t self, uintptr_t a1, uint32_t a2, uintptr_t a3, uintptr_t edi,
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_69360_old(uintptr_t self, uintptr_t a1, uint32_t a2, uintptr_t a3, uintptr_t edi,
 	uintptr_t (*w69950)(uintptr_t, uint32_t), int32_t (*w69090)(uintptr_t, int32_t, int32_t, uintptr_t),
 	void (*w68800)(uintptr_t, uintptr_t), uint32_t (*w68b90)(uintptr_t, uintptr_t),
 	uintptr_t (*w68f00)(uintptr_t, uintptr_t, int32_t, int32_t, uint32_t, uint32_t, uintptr_t),
@@ -43,18 +43,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_69360(uintptr_t self, uintptr_t a1, uin
 		}
 		n = w(n, 4);
 	}
-}
-
-// 1.13c D2Common+0x697C0: dispatch; w68780 yields a node (or 0) and an out value; node -> 0x695D0, else 0x69470.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_697c0(uint32_t a1, uintptr_t a2, uintptr_t a3, uint32_t ebx, uint32_t edi, uint32_t esi,
-	uintptr_t (*w68780)(uintptr_t, uint32_t, uint32_t, uint32_t, uintptr_t*),
-	void (*w695d0)(uintptr_t, uint32_t, uintptr_t, uintptr_t, uint32_t, uint32_t, uint32_t),
-	void (*w69470)(uintptr_t, uint32_t, uint32_t, uint32_t, uint32_t)) {
-	uint32_t isNull = a3 == 0;
-	uintptr_t out = 0;
-	uintptr_t node = w68780(a2, isNull, edi, esi, &out);
-	if (node != 0) { w695d0(node, a1, a2, out, ebx, edi, esi); return; }
-	w69470(a2, a1, ebx, edi, esi);
 }
 
 // superseded by d2common_816c0.cpp, D2Common 0x816C0: (ecx=x, edx=roomA, eax=y, a3=roomB). If (x,y) is inside roomA's rect (+0x34/38,

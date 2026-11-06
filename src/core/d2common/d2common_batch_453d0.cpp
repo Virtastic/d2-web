@@ -3,6 +3,7 @@
 // Registers the decompile shows as implicit (EAX/EDI) are explicit parameters.
 #include <cstdint>
 #include "d2common_fatal.h"
+#include "d2common_84ad0.h"
 
 struct D2B453 { uint8_t* base; };
 static inline int32_t& I32(void* p, uint32_t off) { return *(int32_t*)((uint8_t*)p + off); }
@@ -68,17 +69,14 @@ void D2Common_3DC90(void* a, void* b)
             if (I32(n, 0x10)) d2common_36cd0_port(n, rect, tgt + 0x3C, 1, 0, 2);
 }
 
-// 1.13c D2Common+0x84AD0: fastcall(a), EDI=self. self[0xC] = entry index (-1 none), self[0xE] =
-// bitmask; entries are 0x15C apart, one per set bit. self[0] -> +0x58 -> +0x1B4 -> +0x464 is ctx.
+// 1.13c D2Common+0x84AD0: fastcall(a), EDI=self; the body is d2c_84ad0_run (d2common_84ad0.cpp) with the real callees.
+static uint32_t s_84ad0_a;
+static void* Entries84AD0(int32_t idx) { return D2Common_6C4D0(s_84ad0_a, idx); }
+static void Flat84AD0(void* self, void* e) { D2Common_84500(self, e); }
+static void Scatter84AD0(void* self, void* e) { D2Common_84890(self, e); }
 void D2Common_84AD0(uint32_t a, int32_t* self)
 {
-    if (self[0xC] == -1) return;
-    uint8_t* e = (uint8_t*)D2Common_6C4D0(a, self[0xC]);
-    void* ctx = P32(P32(P32(self, 0), 0x58), 0x1B4);
-    ctx = P32(ctx, 0x464);
-    for (uint32_t m = (uint32_t)self[0xE]; m; m >>= 1, e += 0x15C)
-        if (m & 1) {
-            D2Common_83CA0(ctx, e);
-            if (I32(e, 0x40) == 0) D2Common_84500(self, e); else D2Common_84890(self, e);
-        }
+	s_84ad0_a = a;
+	const D2c84AD0Env env = { Entries84AD0, D2Common_83CA0, Flat84AD0, Scatter84AD0 };
+	d2c_84ad0_run(self, &env);
 }

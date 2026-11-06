@@ -6,10 +6,12 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include "d2common_84890.h"
 
 struct B81Grid { int32_t* data; int32_t* rowOff; };                 // cell (r,c) = data[rowOff[r] + c]
 struct B81Dims { char _0[0x3c]; int32_t w; int32_t h; };            // +0x3c, +0x40
 
+extern "C" uint32_t d2c_837f0_port(uintptr_t lvl, uint32_t eax, int32_t p1, uintptr_t p2, uintptr_t p3);
 extern "C" {
 __attribute__((weak)) void D2Common_817A0(void* self, int x, int y, int arg);
 __attribute__((weak)) void D2Common_4CA90(void* a, int flag, int count, int zero);   // register order as decompiled
@@ -210,31 +212,15 @@ void D2Common_83CA0_InitPresetDescriptor(void* self, char* param)
 // stride; +8 w, +0xC h, +0x14 n). Mode 1: every interior cell passing 834D0 -> 84220(...,0). Mode 2: every cell
 // passing 837F0 whose seeded roll % 100 exceeds param_2[+0x11C + ctx[0xD]*4] -> 84220(..., (w+1)*(roll+1)),
 // roll = seed&(n-1) for power-of-two n, seed % n otherwise, 0 for n<1 (no seed step).
+static int Match1_834D0(int x, int y, void* ctx, void* e, void* p2) { return D2Common_834D0(x, y, ctx, e, p2); }
+static int Match2_837F0(int y, int x, void* ctx, void* e, void* p2) {
+	return (int)d2c_837f0_port((uintptr_t)p2, (uint32_t)y, x, (uintptr_t)ctx, (uintptr_t)e);
+}
+static void Place_84220(uint32_t v, int x, int y, void* ctx, void* e, void* p2, int extra) { D2Common_84220((int)v, x, y, ctx, e, p2, extra); }
 void D2Common_84890_ScatterObjects(char** ctx, char* param2)
 {
-    auto seedStep = [](char* A) { uint64_t s = (uint64_t) * (uint32_t*)(A + 0x14) * 0x6ac690c5u + *(uint32_t*)(A + 0x18); std::memcpy(A + 0x14, &s, 8); return (uint32_t)s; };
-    char* A = ctx[0];
-    const int v = *(int32_t*)(*(char**)(*(char**)(A + 0x58) + 0x1b4) + 0x478);
-    char* P = *(char**)(param2 + 0x50);
-    const int w0 = *(int32_t*)(A + 0x3c), h0 = *(int32_t*)(A + 0x40);
-    for (int i = 0; i < *(int32_t*)(P + 0x4c); ++i) {
-        char* e = *(char**)(P + 0x50) + i * 0x18;
-        const int w = w0 - *(int32_t*)(e + 8) + 1, h = h0 - *(int32_t*)(e + 0xc) + 1;
-        if (w <= 0 || h <= 0) continue;
-        if (*(int32_t*)P == 1) {
-            for (int y = 1; y < h; ++y) for (int x = 1; x < w; ++x)
-                if (D2Common_834D0(x, y, ctx, e, param2)) D2Common_84220(v, x, y, ctx, e, param2, 0);
-        } else if (*(int32_t*)P == 2) {
-            for (int y = 0; y < h; ++y) for (int x = 0; x < w; ++x) {
-                if (!D2Common_837F0(x, y, ctx, e)) continue;
-                const int chance = *(int32_t*)(param2 + 0x11c + *(int32_t*)((char*)ctx + 0x34) * 4);
-                if (chance >= (int)(seedStep(A) % 100)) continue;
-                int32_t n = *(int32_t*)(e + 0x14); uint32_t r = 0;
-                if (n > 0) r = (n & (n - 1)) == 0 ? ((uint32_t)(n - 1) & seedStep(A)) : seedStep(A) % (uint32_t)n;
-                D2Common_84220(v, x, y, ctx, e, param2, (*(int32_t*)(e + 8) + 1) * (int)(r + 1));
-            }
-        }
-    }
+	const D2c84890Env env = { Match1_834D0, Match2_837F0, Place_84220 };
+	d2c_84890_run(ctx, param2, &env);
 }
 
 extern "C" void D2Common_84890(void* self, void* e) { D2Common_84890_ScatterObjects((char**)self, (char*)e); }   // symbol 84AD0 calls

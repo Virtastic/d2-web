@@ -5,8 +5,8 @@
 #include "Path/AStar.h"
 
 extern "C" {
-// 1.13c D2Common+0x7B630: A* search; returns the number of path points written.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_7b630(D2PathInfoStrc* info) {
+// Vendored A* driver wrapper (the 1.13c D2Common+0x7B630 seam port is d2common_7b630.cpp); returns the number of path points written.
+EMSCRIPTEN_KEEPALIVE uint32_t d2c_astar_compute_path_vendored(D2PathInfoStrc* info) {
  return (uint32_t)PATH_AStar_ComputePath(info);
 }
 }

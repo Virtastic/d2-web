@@ -98,30 +98,9 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2c_7eb40_port(uintptr_t obj, int32_t x,
 	return m;   // retail falls out with the loop counter, which equals m
 }
 
-// 1.13c D2Common+0x68970: (ECX = this, EAX = x) fire a sound for the table entry of param_2 when the
-// tile lies inside the room, unless unit param_1 already has flag 0x20; then flag the unit.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_68970(uintptr_t self, int32_t x, uintptr_t unit, uint32_t id, int32_t y,
-	const uint8_t* tbl /*retail 6fddbf34, stride 0x1c*/, int32_t (*find)(uintptr_t, uint32_t),
-	int32_t (*c1280)(), uint32_t (*c10b0)(uintptr_t), void (*play)(int32_t, int32_t)) {
-	if (unit != 0 && (w(unit, 0x14) & 0x20)) return;
-	int32_t i = find(w(w(self, 0x58), 0x1d0), id);
-	if (i == -1) return;
-	const uint8_t* e = tbl + i * 0x1c;
-	auto f = [&](int o) { return *reinterpret_cast<const int32_t*>(e + o); };
-	int32_t px = (x - iw(self, 0x34)) * 5 + f(8);
-	int32_t py = (y - iw(self, 0x38)) * 5 + f(12);
-	if (px < 0 || py < 0 || iw(self, 0x3c) * 5 <= px || iw(self, 0x40) * 5 <= py) return;
-	int32_t v = f(0), ty = f(4);
-	if (ty == 1) v = c1280();
-	else if (ty == 2 && v > 0x5a && v < 0x5d && c10b0(self + 0x14) == 0) goto done;
-	play(ty, v);
-done:
-	if (unit != 0) w(unit, 0x14) |= 0x20;
-}
-
 // 1.13c D2Common+0x69090: (this) look up entry 0x6c (0x72 when a3 == 0xb) of the room's owner and,
 // if the tile offset differs on both axes from the room origin, play the entry's sound.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_69090(uintptr_t self, int32_t x, int32_t y, int32_t a3,
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_69090_old(uintptr_t self, int32_t x, int32_t y, int32_t a3,
 	void (*c19950)(uintptr_t, uint32_t), uintptr_t (*c6c5d0)(int32_t), void (*play)(int32_t, uint32_t)) {
 	c19950(self, w(w(self, 0x58), 0x1d0));
 	uintptr_t e = c6c5d0(((a3 != 0xb) - 1u & 6) + 0x6c);

@@ -1,83 +1,118 @@
-// D2Common 1.13c implementation: room-tile placement dispatcher. eax carries the tile flag word (`fl`).
-// Every callee (incl. sub_68DF0 and the Ordinal_10045 allocator) is a seam; the glue binds register args.
+// 1.13c D2Common+0x69820 (sub_69820): room-tile placement dispatcher. Retail layout: EAX = tile flag word (fl); stack = p1, room, kind, p4, p5, p6 (ret 0x18).
+// Every callee is injectable with its retail register layout (the Raw export takes the seam table; the probe binds hook recorders):
+//   0x68970 EAX=p1 ECX=room, stack 0, fl, p5, kind    0x69090 EAX=fl ECX=room, stack p4, p5, kind   0x691C0 EAX=fl, stack room, p4, p5, kind
+//   0x68780 EAX=fl, stack room, 1, p4, p5, &out       0x695D0 EAX=type ECX=node, stack p1, room, out, fl, p4, p5
+//   0x9222 (Fog alloc) ECX=p1, EDX=12, stack "RoomTile.cpp", 0x37B, 0     0x68B90 EAX=fl ECX=room, stack kind
+//   0x69170 EAX=room ECX=node+4, stack p4, p5, fl, u  0x697C0 EBX=fl ESI=p5 EDI=p4, stack p1, room, kind
+//   0x44740 EAX=rect ESI=x EDI=y (point in rect)      0x68DF0 EAX=room ECX=p5 EDX=p4 ESI=slot, stack fl, t
+//   0x68F00 ECX=room EDX=out, stack p4, p5, fl, t, kind   0x69360 EDI=room, stack r, fl, kind   0x68CD0 EBX=fl ECX=room EDX=p4, stack 0, p5, t
 #include <cstdint>
-#include <emscripten.h>
 
-extern "C" {
-struct D2C69820Seams {
-	void (*f8970)(uintptr_t room, int32_t z, uint32_t fl, int32_t p5);
-	void (*f9090)(uintptr_t room, int32_t p4, int32_t p5, int32_t kind);
-	void (*f91c0)(uintptr_t room, int32_t p4, int32_t p5, int32_t kind);
-	uintptr_t (*f8780)(uintptr_t room, int32_t one, int32_t p4, int32_t p5, int32_t* out);
-	void (*f95d0)(uintptr_t a, uint32_t p1, uintptr_t room, int32_t o, uint32_t fl, int32_t p4, int32_t p5);
-	uintptr_t (*alloc)(void); // Ordinal_10045(RoomTile.cpp,0x37b,0)
-	uint32_t (*f8b90)(uintptr_t room, int32_t kind);
-	void (*f9170)(uintptr_t node1, int32_t p4, int32_t p5, uint32_t fl, uint32_t t);
-	void (*f97c0)(uint32_t p1, uintptr_t room, int32_t kind);
-	int (*f4740)(void);
-	void (*f8df0)(int32_t p5, int32_t p4, uint32_t fl, uint32_t t); // sub_68DF0, slot/room bound by glue
-	uintptr_t (*f8f00)(uintptr_t room, int32_t z, int32_t p4, int32_t p5, uint32_t fl, uint32_t t, int32_t kind);
-	void (*f9360)(uintptr_t r58, uintptr_t n, uint32_t fl, int32_t kind);
-	void (*f8cd0)(uintptr_t room, int32_t p4, int32_t z, int32_t p5, uint32_t t);
+struct D2Common69820Env
+{
+	void (*f68970)(uint32_t eaxP1, uintptr_t ecxRoom, uint32_t zero, uint32_t fl, int32_t p5, uint32_t kind);
+	void (*f69090)(uint32_t eaxFl, uintptr_t ecxRoom, int32_t p4, int32_t p5, uint32_t kind);
+	void (*f691c0)(uint32_t eaxFl, uintptr_t room, int32_t p4, int32_t p5, uint32_t kind);
+	uintptr_t (*f68780)(uint32_t eaxFl, uintptr_t room, uint32_t one, int32_t p4, int32_t p5, uint32_t* out);
+	void (*f695d0)(uint32_t eaxType, uintptr_t ecxNode, uint32_t p1, uintptr_t room, uint32_t out, uint32_t fl, int32_t p4, int32_t p5);
+	uintptr_t (*alloc)(uint32_t pool, uint32_t size, uint32_t srcName, int32_t line, int32_t zero);
+	uint32_t (*f68b90)(uint32_t eaxFl, uintptr_t ecxRoom, uint32_t kind);
+	uintptr_t (*f69170)(uintptr_t eaxRoom, uintptr_t ecxNode4, int32_t p4, int32_t p5, uint32_t fl, uint32_t u);
+	void (*f697c0)(uint32_t ebxFl, int32_t esiP5, int32_t ediP4, uint32_t p1, uintptr_t room, uint32_t kind);
+	int32_t (*f44740)(uintptr_t eaxRect, int32_t esiX, int32_t ediY);
+	void (*f68df0)(uintptr_t eaxRoom, int32_t ecxP5, int32_t edxP4, uintptr_t esiSlot, uint32_t fl, uint32_t t);
+	uintptr_t (*f68f00)(uintptr_t ecxRoom, uintptr_t edxOut, int32_t p4, int32_t p5, uint32_t fl, uint32_t t, uint32_t kind);
+	void (*f69360)(uintptr_t ediRoom, uintptr_t r, uint32_t fl, uint32_t kind);
+	void (*f68cd0)(uint32_t ebxFl, uintptr_t ecxRoom, int32_t edxP4, uint32_t zero, int32_t p5, uint32_t t);
 };
 
-// 1.13c D2Common+0x69820
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_69820(uint32_t fl, uint32_t p1, uintptr_t room, int32_t kind,
-	int32_t p4, int32_t p5, int32_t p6, const D2C69820Seams* s) {
-	auto I = [](uintptr_t a, uint32_t o) { return *reinterpret_cast<int32_t*>(a + o); };
-	uint32_t bv = (fl >> 0x14) & 0x3f;
-	uint8_t c9 = (uint8_t)(fl >> 8);
-	int32_t k = kind;
-	if ((k == 0xb || k == 0xa) && bv >= 8) return;
-	if (k == 0 && bv == 0x1e && (c9 == 0 || c9 == 1)) fl |= 0x80000000u;
-	if (fl & 0x80000000u) {
-		if (k == 8 || k == 9) {
-			int32_t v = I(I(room, 0x58), 0x1d0);
-			if (v < 0x6f || (0x70 < v && v != 0x75)) { s->f8970(room, 0, fl, p5); return; }
-		} else if (k == 0xa || k == 0xb) {
-			if (bv > 7) return;
-			s->f9090(room, p4, p5, k);
-			s->f91c0(room, p4, p5, k);
+namespace {
+inline uint32_t& w(uintptr_t a, int o) { return *reinterpret_cast<uint32_t*>(a + o); }
+}
+
+extern "C" void D2Common_69820_Raw(uint32_t fl, uint32_t p1, uintptr_t room, uint32_t kind, int32_t p4, int32_t p5, int32_t p6, const D2Common69820Env* env)
+{
+	const uint32_t bv = (fl >> 0x14) & 0x3f;
+	const uint8_t c9 = static_cast<uint8_t>(fl >> 8);
+	const bool special = bv == 0x1e && (c9 == 0 || c9 == 1);
+	if ((kind == 0xb || kind == 0xa) && bv >= 8)
+		return;
+	if (kind == 0 && special)
+		fl |= 0x80000000u;
+	const bool hi = (fl & 0x80000000u) != 0;
+	if (hi) {
+		if (kind == 8 || kind == 9) {
+			const int32_t lvl = static_cast<int32_t>(w(w(room, 0x58), 0x1d0));
+			if (lvl < 0x6f || (lvl > 0x70 && lvl != 0x75)) {
+				env->f68970(p1, room, 0, fl, p5, kind);
+				return;
+			}
+		} else if (kind == 0xa || kind == 0xb) {
+			if (bv >= 8)
+				return;
+			env->f69090(fl, room, p4, p5, kind);
+			env->f691c0(fl, room, p4, p5, kind);
 			return;
 		}
 	}
+	// bump: claim the next 0x30-byte slot of the room's slot table (room+0x54: count at +0xc, base at +0x1c)
+	auto bump = [&](uint32_t nfl, uint32_t t) {
+		const uintptr_t r54 = w(room, 0x54);
+		const uintptr_t slot = w(r54, 0xc) * 0x30 + w(r54, 0x1c);
+		w(slot, 0x20) = 0;
+		w(r54, 0xc) = w(r54, 0xc) + 1;
+		env->f68df0(room, p5, p4, slot, nfl, t);
+	};
 	if (fl & 4) {
 		if (fl & 2) {
-			if (bv == 0x1e && (c9 == 0 || c9 == 1)) fl &= 0xffffff7fu;
-			int32_t out = 0;
-			uintptr_t n = s->f8780(room, 1, p4, p5, &out);
-			if (n) { s->f95d0(n, p1, room, out, fl, p4, p5); return; }
-			uintptr_t* head = reinterpret_cast<uintptr_t*>(I(room, 0x54));
-			uintptr_t p = *head;
-			for (; p; p = (uintptr_t)I(p, 8)) if (I(p, 0)) goto found;
-			p = s->alloc();
-			*reinterpret_cast<int32_t*>(p) = 1;
-			*reinterpret_cast<int32_t*>(p + 4) = 0;
-			*reinterpret_cast<int32_t*>(p + 8) = (int32_t)*head;
-			*head = p;
-		found:
-			s->f9170(p + 4, p4, p5, fl, s->f8b90(room, 0));
+			if (special)
+				fl &= 0xffffff7fu;
+			uint32_t out = 0;
+			const uintptr_t node = env->f68780(fl, room, 1, p4, p5, &out);
+			if (node != 0) {
+				env->f695d0(0, node, p1, room, out, fl, p4, p5);
+				return;
+			}
+			uintptr_t n = w(w(room, 0x54), 0);
+			for (; n != 0; n = w(n, 8))
+				if (w(n, 0) != 0)
+					break;
+			if (n == 0) {
+				n = env->alloc(p1, 12, 0xB2000000u | 0x900F0u, 0x37b, 0);
+				w(n, 0) = 1;
+				w(n, 4) = 0;
+				w(n, 8) = w(w(room, 0x54), 0);
+				w(w(room, 0x54), 0) = static_cast<uint32_t>(n);
+			}
+			const uint32_t u = env->f68b90(fl, room, 0);
+			env->f69170(room, n + 4, p4, p5, fl, u);
 			return;
 		}
-		if (fl & 1) { s->f97c0(p1, room, k); return; }
-		if ((fl & 0x8000000) && !(fl & 0x80000000u)) { s->f97c0(p1, room, 0xd); return; }
+		if (fl & 1) {
+			env->f697c0(fl, p5, p4, p1, room, kind);
+			return;
+		}
+		if ((fl & 0x8000000u) && !hi) {
+			env->f697c0(fl, p5, p4, p1, room, 0xd);
+			return;
+		}
 	}
-	auto bump = [&](uint32_t t, uint32_t f) {
-		uintptr_t r54 = (uintptr_t)I(room, 0x54);
-		*reinterpret_cast<int32_t*>((uintptr_t)(I(r54, 0xc) * 0x30 + I(r54, 0x1c) + 0x20)) = 0;
-		*reinterpret_cast<int32_t*>(r54 + 0xc) = I(r54, 0xc) + 1;
-		s->f8df0(p5, p4, f, t);
-	};
-	if (!(fl & 2)) {
-		if (p6 != 0 && s->f4740()) bump(s->f8b90(room, 0), (fl & 0xffffff7fu) | 0x80000000u);
-	} else {
-		bump(s->f8b90(room, 0), fl);
+	if (fl & 2) {
+		bump(fl, env->f68b90(fl, room, 0));
+	} else if (p6 != 0) {
+		if (env->f44740(room + 0x34, p4, p5)) {
+			const uint32_t lvl = w(w(room, 0x58), 0x1d0);
+			const uint32_t nfl = (fl & 0xffffff7fu) | 0x80000000u;
+			const uint32_t t = env->f68b90(lvl == 0x4a ? 0x1e00100u : 0x1e00000u, room, 0);
+			bump(nfl, t);
+		}
 	}
 	if (fl & 1) {
-		uint32_t t = s->f8b90(room, k);
-		uintptr_t n = s->f8f00(room, 0, p4, p5, fl, t, k);
-		if ((k == 0xb || k == 0xa) && I(I(room, 0x58), 0x1d0) != 0x85) s->f9360(I(room, 0x58), n, fl, k);
+		const uint32_t t = env->f68b90(fl, room, kind);
+		const uintptr_t r = env->f68f00(room, 0, p4, p5, fl, t, kind);
+		if ((kind == 0xb || kind == 0xa) && w(w(room, 0x58), 0x1d0) != 0x85)
+			env->f69360(room, r, fl, kind);
 	}
-	if (fl & 0x8000000) s->f8cd0(room, p4, 0, p5, s->f8b90(room, 0xd));
-}
+	if (fl & 0x8000000u)
+		env->f68cd0(fl, room, p4, 0, p5, env->f68b90(fl, room, 0xd));
 }

@@ -18,7 +18,7 @@ struct D2Common6ABE0Env
 };
 
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_6abe0(uint32_t pUnit, uint32_t nShift, uint32_t pDmg, const D2Common6ABE0Env* env)
+void D2Common_6ABE0_Raw(uint32_t pUnit, uint32_t nShift, uint32_t pDmg, const D2Common6ABE0Env* env)
 {
 	if (!pDmg || !env)
 		return;

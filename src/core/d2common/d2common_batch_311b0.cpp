@@ -39,7 +39,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_311B0_CanBeStunned(uint32_t pUnit, uint32
 // +0x4E110: store nValue at +0x10 of the record; a null record is retail's fatal
 // path and becomes a no-op.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_4e110(uint32_t pRecord, uint32_t nValue) {   // 1.13c D2Common+0x4e110
+void d2_fn_d2common_4e110_batch(uint32_t pRecord, uint32_t nValue) {   // 1.13c D2Common+0x4e110
 	if (!pRecord)
 		return;
 	*reinterpret_cast<uint32_t*>(P(pRecord) + 0x10) = nValue;

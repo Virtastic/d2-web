@@ -96,7 +96,16 @@ int16_t D2Common_22970_ItemDexBonus(D2UnitStrc* pUnit)
 
 // 1.13c D2Common+0x70610 (#10126): export that always fatals. Retail takes Fog message 0x65,
 // reports it and calls _exit(-1), so it has no observable output and no return to model.
+// The three callees are seams so a probe can record them: #10265 text for message 0x65, #10024 report
+// against the module's error context, then _exit(-1). A seam exit may return; retail's never does.
+void D2Common_70610_FatalCore(const void* errorContext, uint32_t (*getErrorText)(uint32_t),
+    void (*display)(const void*, uint32_t), void (*fnExit)(int))
+{
+    display(errorContext, getErrorText(0x65));
+    fnExit(-1);
+}
+
 void D2Common_70610_FatalStub(void)
 {
-    __builtin_trap(); // retail: Fog message 0x65 report (not wired), then _exit(-1)
+    d2_fatal(0x65);   // Ordinal_10024(&DAT_6fdda728, Ordinal_10265(0x65)), then _exit(-1)
 }

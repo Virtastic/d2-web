@@ -241,7 +241,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_51c60(D2UnitStrc* pUnit, int32_t* pMinO
 // 1.13c D2Common+0x4E0A0 (#10325) stores the dword at +0x14. A null object is fatal in retail
 // (message 0xA3F); here it is a no-op.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_4e0a0(uint8_t* pObject, uint32_t nValue)
+void d2_fn_d2common_4e0a0_batch(uint8_t* pObject, uint32_t nValue)
 {
 	if (!pObject) return;
 	*(uint32_t*)(pObject + 0x14) = nValue;

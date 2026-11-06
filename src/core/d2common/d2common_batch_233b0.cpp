@@ -207,7 +207,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3a030(uint32_t pTarget, uint32_t pU
 
 // 1.13c D2Common+0x4e0e0: dword at unit+0x14. Null unit is retail fatal 0xA36.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4e0e0(uint32_t pUnit)
+uint32_t d2_fn_d2common_4e0e0_batch(uint32_t pUnit)
 {
 	uint8_t* u = P(pUnit);
 	if (!u)
