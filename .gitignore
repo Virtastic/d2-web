@@ -2,6 +2,16 @@
 electron/app-site/
 electron/dist/
 electron/node_modules/
+# Android app (android/): the staged-site copy, generated launcher icons, build output, signing keys
+android/app/src/main/assets/
+android/app/src/main/res/mipmap-*/
+android/app/build/
+android/build/
+android/.gradle/
+android/dist/
+android/local.properties
+*.keystore
+*.jks
 
 # Game content is never committed: bring your own install.
 *.iso
@@ -123,6 +133,7 @@ tools/manifest_lock.py
 !tools/dcc-decode-bench.mjs
 !tools/docker-release.sh
 !tools/desktop-release.sh
+!tools/android-release.sh
 !tools/engine-cache.sh
 !tools/engine-key.sh
 !tools/link-check.mjs
