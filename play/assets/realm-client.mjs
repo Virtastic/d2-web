@@ -109,7 +109,7 @@ function decodeMcpCharacters(body) {
     if (statstring.length < 26) throw new Error(`MCP CHARLIST2 entry ${i} statstring is short (${statstring.length} bytes)`);
     if (statstring[13] < 1 || statstring[13] > 7) throw new Error(`MCP CHARLIST2 entry ${i} has invalid class byte ${statstring[13]}`);
     characters.push({ name: new TextDecoder().decode(rawName), expiry,
-      charClass: statstring[13] - 1, level: statstring[25] });
+      charClass: statstring[13] - 1, level: statstring[25], flags: statstring[26] ?? 0 });
   }
   return { total, returned, characters };
 }
@@ -120,7 +120,7 @@ function decodeMcpCharacters(body) {
  * the engine exports, as with BNCS and D2GS; this function owns only the sequence and read offsets.
  */
 export async function mcpCreateAndJoin(transport, protocol, { realmReply, character, gameName, gamePassword = '',
-  difficulty = 0, maxPlayers = 8, description = '', characterCount = 8, session = null, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+  difficulty = 0, maxPlayers = 8, description = '', characterCount = 8, session = null, join = false, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
   if (!Array.isArray(realmReply) && !(realmReply instanceof Uint8Array)) throw new Error('MCP requires the BNCS realm handoff bytes');
   if (!character || !gameName) throw new Error('MCP requires a character and game name');
   const reader = session?.reader || makeReader(transport), sent = [], received = session ? [...session.received] : [];
@@ -156,27 +156,35 @@ export async function mcpCreateAndJoin(transport, protocol, { realmReply, charac
   }
 
   const requestState = session || { nextRequestId: 2 };
-  const createId = requestState.nextRequestId; requestState.nextRequestId = (createId + 1) & 0xffff;
-  send(0x03, protocol.mcpCreateGame({ requestId: createId, difficulty, maxPlayers,
-    name: titleCaseGameText(gameName), password: titleCaseGameText(gamePassword), description }));
-  const created = await readMcpFrame(reader, timeoutMs); received.push(created.op);
-  if (created.op !== 0x03) throw new Error(`expected MCP CREATEGAME reply 0x03, got 0x${created.op.toString(16)}`);
-  if (created.body.length < 10 || u16(created.body, 0) !== createId) throw new Error(`MCP CREATEGAME reply id ${u16(created.body, 0)} does not match request ${createId}`);
-  if (u32(created.body, 6) !== 0) throw new Error('MCP CREATEGAME was rejected');
-  const gameToken = created.body[2] | (created.body[3] << 8);
+  // `join` is the lobby's JOIN GAME: only MCP_JOINGAME is sent. Otherwise CREATE GAME sends
+  // MCP_CREATEGAME and then joins the game it made. The create form's difficulty is the radio index
+  // shifted into the request's flags (D2Multi's CREATE GAME callback, `shl 0xc`); D2GS takes the index.
+  let gameToken = null;
+  if (!join) {
+    const createId = requestState.nextRequestId; requestState.nextRequestId = (createId + 1) & 0xffff;
+    send(0x03, protocol.mcpCreateGame({ requestId: createId, difficulty: (difficulty & 3) << 12, maxPlayers,
+      name: titleCaseGameText(gameName), password: titleCaseGameText(gamePassword), description }));
+    const created = await readMcpFrame(reader, timeoutMs); received.push(created.op);
+    if (created.op !== 0x03) throw new Error(`expected MCP CREATEGAME reply 0x03, got 0x${created.op.toString(16)}`);
+    if (created.body.length < 10 || u16(created.body, 0) !== createId) throw new Error(`MCP CREATEGAME reply id ${u16(created.body, 0)} does not match request ${createId}`);
+    const result = u32(created.body, 6);
+    if (result !== 0) throw Object.assign(new Error(`MCP CREATEGAME was rejected (0x${result.toString(16)})`), { mcpStage: 'create', mcpResult: result });
+    gameToken = created.body[2] | (created.body[3] << 8);
+  }
 
   const joinId = requestState.nextRequestId; requestState.nextRequestId = (joinId + 1) & 0xffff;
   send(0x04, protocol.mcpJoinGame({ requestId: joinId, name: titleCaseGameText(gameName), password: titleCaseGameText(gamePassword) }));
   const joined = await readMcpFrame(reader, timeoutMs); received.push(joined.op);
   if (joined.op !== 0x04) throw new Error(`expected MCP JOINGAME reply 0x04, got 0x${joined.op.toString(16)}`);
   if (joined.body.length < 18 || u16(joined.body, 0) !== joinId) throw new Error(`MCP JOINGAME reply id ${u16(joined.body, 0)} does not match request ${joinId}`);
-  if (u32(joined.body, 14) !== 0) throw new Error('MCP JOINGAME was rejected');
+  const joinResult = u32(joined.body, 14);
+  if (joinResult !== 0) throw Object.assign(new Error(`MCP JOINGAME was rejected (0x${joinResult.toString(16)})`), { mcpStage: 'join', mcpResult: joinResult });
   const token = joined.body[2] | (joined.body[3] << 8);
-  if (token !== gameToken) throw new Error(`MCP JOINGAME token ${token} does not match CREATEGAME token ${gameToken}`);
+  if (gameToken !== null && token !== gameToken) throw new Error(`MCP JOINGAME token ${token} does not match CREATEGAME token ${gameToken}`);
   const ip = [...joined.body.subarray(6, 10)].join('.');
   const hash = u32(joined.body, 10);
   if (session) session.joined = true;
-  return { character: selected, game: { name: titleCaseGameText(gameName), createToken: gameToken, difficulty }, ticket: { ip, token, hash }, sent, received };
+  return { character: selected, game: { name: titleCaseGameText(gameName), createToken: gameToken ?? token, difficulty }, ticket: { ip, token, hash }, sent, received };
 }
 
 const u16 = (b, o) => (b[o] | (b[o + 1] << 8)) >>> 0;
