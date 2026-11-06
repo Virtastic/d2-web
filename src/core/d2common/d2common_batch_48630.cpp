@@ -15,8 +15,8 @@ struct D2Common48630Callees {
  void (*apply)(void*, int32_t*, int32_t, int32_t, int32_t, int32_t, int32_t, uint32_t);
 };
 
-// 1.13c D2Common+0x48630
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_48630(uint32_t, void* p2, int32_t* u, int32_t p4, int32_t p5, uint32_t, uint32_t,
+// D2MOO-style form of D2Common 0x48630 (the 1.13c port is d2common_48630.cpp)
+EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_48630(uint32_t, void* p2, int32_t* u, int32_t p4, int32_t p5, uint32_t, uint32_t,
                                                   int32_t p8, int32_t p9, uint32_t p10, const D2Common48630Callees* c) {
  if (p4 == 0) return 0;
  if (u == nullptr || *u != 4) return 0;

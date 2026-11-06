@@ -154,10 +154,20 @@ uint8_t __fastcall CLIENTS_GetWeaponSwitch(D2ClientStrc* pClient) { return pClie
 // entries and 21 colourField values gTxtComponentItemTypeMap+D2StatesTxt/D2MagicAffixTxt use). A
 // stable non-null address per (nTrans, nColor) satisfies every caller without palette pixels; nothing
 // dereferences the pointer's pointee.
+static uint8_t g_mixPaletteSentinel[9][21];
 uint8_t* __stdcall D2CMP_MixPalette(uint8_t nTrans, int nColor) {
     if (nTrans < 1 || nTrans > 8 || nColor < 0 || nColor > 20) return nullptr;
-    static uint8_t sentinel[9][21];
-    return &sentinel[nTrans][nColor];
+    return &g_mixPaletteSentinel[nTrans][nColor];
+}
+// The (nTrans, nColor) a D2CMP_MixPalette return names, packed 1 + nColor + 32*nTrans (the key
+// play/assets/mix-palette.mjs decodes to data\global\items\palette\<name>.dat row nColor; nTrans 8 is
+// above 255, hence 16 bits); 0 for null. The inventory/cursor cel (D2Client+0x6B5A0) draws through ITEMS_GetColor(0, item, &c, 1)'s
+// RETURN -- MixPalette(nInvTrans, colour) -- whose pair the *pColor byte does not carry.
+uint16_t D2CMP_MixPaletteKey(const uint8_t* p) {
+    const uint8_t* base = &g_mixPaletteSentinel[0][0];
+    if (!p || p < base || p >= base + sizeof g_mixPaletteSentinel) return 0;
+    const int off = (int)(p - base);
+    return (uint16_t)(1 + off % 21 + 32 * (off / 21));
 }
 int32_t __fastcall CLIENTS_GetClassId(D2ClientStrc* pClient) { return pClient ? pClient->nClassId : 0; }
 int32_t __fastcall CLIENTS_GetClientId(D2ClientStrc* pClient) { return pClient ? (int32_t)pClient->dwClientId : 0; }

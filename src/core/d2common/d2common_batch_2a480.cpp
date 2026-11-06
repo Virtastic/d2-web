@@ -67,7 +67,7 @@ extern "C" void D2Common_2A480_ItemSocketCount(uint32_t pUnit, uint32_t nMax) { 
 // and 0x221C0 (item format) pick the element, 0x45AA0 emits, 0x458C0 selects the slot, 0x1800/0x1830
 // gate modes 3/4 -- with iteration counts 3 for modes 0/2/5, 2 for mode 1, 12 for mode 3 and 2/9/10
 // for mode 4. Unknown modes fatal 0xAF.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_460b0(uint32_t nMode, uint32_t nArg2, uint32_t pArg3, uint32_t pArg4, uint32_t nArg5) { // 1.13c D2Common+0x460b0
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_port_d2common_460b0(uint32_t nMode, uint32_t nArg2, uint32_t pArg3, uint32_t pArg4, uint32_t nArg5) { // D2MOO-style form of D2Common 0x460B0 (the 1.13c port is d2common_460b0.cpp)
 	(void)nMode;
 	(void)nArg2;
 	(void)pArg3;

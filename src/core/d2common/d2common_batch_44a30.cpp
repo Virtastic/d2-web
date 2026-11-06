@@ -25,7 +25,7 @@ struct D2CommonBatch44A30Env {
 
 // 0x44A30 moved to d2common_44a30.cpp (retail-layout port, FN-vectored).
 
-// 1.13c D2Common+0x45240 : prepend a new 0x18-byte node to list at EDI+0x4c; ESI = payload.
+// Old 0x45240 sketch; the 1.13c port is D2Common_45240_With in d2common_45240.cpp.
 void D2Common_45240(const D2CommonBatch44A30Env& e, P esi, P edi, uint32_t ecxAfter69950)
 {
     P n = e.alloc10045("..\\Source\\D2Common\\DRLG\\DrlgRoom.cpp", 0x322, 0);

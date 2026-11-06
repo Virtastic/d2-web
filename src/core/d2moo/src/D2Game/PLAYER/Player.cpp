@@ -407,7 +407,7 @@ void __fastcall PLAYER_StopInteractions(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC7BEC0
-// 1.13c D2Game+0x74200
+// 1.10f body (1.10f 0x6FC7BEC0); not 1.13c 0x74200, which is the trade packet handler
 void __fastcall sub_6FC7BEC0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     int32_t nUnitType = 0;

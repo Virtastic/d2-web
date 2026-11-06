@@ -2,6 +2,7 @@
 // (`hook 0x8a3e0 2 aB`: eax = client, bytes at stack word 0, length stack word 1) and the blob tagging the capture applies to
 // recorded pointers (0xB1<blob index><offset>), using the blob table the harness hands the probe (r[13] = count, r[14+2k] = address, r[15+2k] = size).
 #pragma once
+#include "fn_bloblen.h"
 #include "hookenv.h"
 struct HkWlog {
     uint8_t* base = nullptr; uint8_t* p = nullptr; uint32_t n = 0;
@@ -19,12 +20,13 @@ static inline void hk_send(HookEnv& e, HkWlog& w, const void* client, const void
     std::memcpy(m, buf, len); for (uint32_t i = 0; i < len && i < 64; ++i) if (!(mask >> i & 1)) m[i] = 0;
     w.add(m, len);
 }
-static inline void hk_tag(const uint32_t* r, uint32_t* L) {
+// `lens` (optional, one entry per blob): the descriptor's sizes, for probes with more than eight blobs where fnBlobLen can only derive an extent
+static inline void hk_tag(const uint32_t* r, uint32_t* L, const uint32_t* lens = nullptr) {
     for (uint32_t i = 0; i < L[0]; i++) {
         if (L[1 + i * 10] & 0x40000000u) continue;   // hookblk data words are not pointers
         for (int w = 1; w < 10; w++) {
             uint32_t& v = L[1 + i * 10 + w];
-            for (uint32_t k = 0; k < r[13]; k++) if (v >= r[14 + 2 * k] && v < r[14 + 2 * k] + r[15 + 2 * k]) { v = 0xB1000000u | (k << 16) | (v - r[14 + 2 * k]); break; }
+            for (uint32_t k = 0; k < r[13]; k++) if (v >= r[14 + 2 * k] && v < r[14 + 2 * k] + (lens ? lens[k] : fnBlobLen(r, k))) { v = 0xB1000000u | (k << 16) | (v - r[14 + 2 * k]); break; }
         }
     }
 }

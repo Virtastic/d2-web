@@ -10,8 +10,8 @@ struct D2Batch48A40Env {
 };
 
 extern "C" {
-// 1.13c D2Common+0x48A40
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_48a40(void* p2, const int32_t* u, const int32_t* p4, int32_t p5, int16_t p6,
+// D2MOO-style form of D2Common 0x48A40 (the 1.13c port is d2common_48a40.cpp)
+EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_48a40(void* p2, const int32_t* u, const int32_t* p4, int32_t p5, int16_t p6,
                                                   int32_t p9, uint32_t p10, const D2Batch48A40Env* e) {
 	if (!p4) return 0;
 	if (u && u[0] == 4) e->check46e50(u);

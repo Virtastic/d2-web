@@ -7363,7 +7363,7 @@ enum D2C_MegademonAIParams
 };
 
 //D2Game.0x6FCDF780
-// 1.13c D2Game+0x18CE0 (both approach walks pass flags 0: FUN_6fd12540(..., 2, 0, 0, 1))
+// 1.10f body for D2Game 0x18CE0, 1.13c port in src/core/d2game/d2g_18ce0.cpp (both approach walks pass flags 0: FUN_6fd12540(..., 2, 0, 0, 1))
 void __fastcall AITHINK_Fn089_Megademon(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	int32_t nSkillLevel = 1;

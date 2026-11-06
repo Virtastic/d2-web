@@ -133,7 +133,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_82E00(int32_t nOverlayId)
 	return 0;
 }
 
-// 1.13c D2Common+0x4A3D0 (#10300)
+// Old sketch of D2Common 0x4A3D0 (#10300); the 1.13c port is D2Common_4A3D0_With in d2common_4a3d0.cpp.
 // The profiler dump: a QueryPerformanceFrequency whose answer retail never reads, one configured log
 // line (ProfCore.cpp line 0x4E), then one log line per profiling record (line 0x54) over the 23
 // records of 0x78 bytes at 0x6FDE9EC8. The records' name/time/count operands are varargs the

@@ -1,169 +1,67 @@
-// D2Common 1.13c batch: DATATBLS_UnloadAllBins driver (flat form). Globals are retail 32-bit slots
-// declared as weak 4-byte arrays; each guarded step reports a leaked allocation through Ordinal_10046.
+// D2Common 1.13c 0x5E870 (DATATBLS_UnloadAllBins driver): engine entry. The body is d2common_5e870.cpp; this file binds the
+// real callees and the retail module words (weak 4-byte arrays) to its seam. Fog thunk 0x9228 is a pool free whose hidden
+// register arguments (ecx, edx) the link signature drops, so the engine form reports through Ordinal_10046(file, line, 0) as before.
 #include <cstdint>
+#include <cstring>
 #include <emscripten.h>
 #include "D2DataTbls.h"
+#include "d2common_5e870.h"
 
 extern "C" {
 #define W __attribute__((weak))
 W void Ordinal_10046(const char* file, int32_t line, int32_t z);
-__attribute__((weak)) W void Ordinal_10043(int32_t a, int32_t b);
+W void Ordinal_10043(int32_t a, int32_t b);
 W void Ordinal_10212(uint32_t p);
 W void d2_batch_d2common_18f90();
-extern "C" void d2_batch_d2common_53bd0();
+void d2_batch_d2common_53bd0();
 W void d2_fn_d2common_54200();
 W void d2_port_d2common_5de00();
 W void d2_fn_d2common_6c7e0();
 W void d2_fn_d2common_71180();
 W void d2_fn_d2common_716b0();
-W char DAT_6fde9e20[4];
-W char DAT_6fdefa5c[8];
-W char DAT_6fdefbbc[8];
-W char DAT_6fdefbd0[8];
-W char DAT_6fdefbd8[8];
-W char DAT_6fdefbe0[8];
-W char DAT_6fdefbf0[8];
-W char DAT_6fdefbf4[8];
-W char DAT_6fdefd8c[8];
-W char DAT_6fdefd94[8];
-W char DAT_6fdefd9c[8];
-W char DAT_6fdefda4[8];
-W char DAT_6fdeff7c[8];
-W char DAT_6fdeff80[8];
-W char DAT_6fdeff88[8];
-W char DAT_6fdf0a90[8];
-W char DAT_6fdf0a94[8];
-W char DAT_6fdf0a9c[8];
-W char DAT_6fdf0ac0[8];
-W char DAT_6fdf0ac4[8];
-W char DAT_6fdf0af8[8];
-W char DAT_6fdf0afc[8];
-W char DAT_6fdf0b00[8];
-W char DAT_6fdf0b38[8];
-W char DAT_6fdf0b4c[8];
-W char DAT_6fdf0b50[8];
-W char DAT_6fdf0b54[8];
-W char DAT_6fdf0b60[8];
-W char DAT_6fdf0b8c[8];
-W char DAT_6fdf0b90[8];
-W char DAT_6fdf0b94[8];
-W char DAT_6fdf0b98[8];
-W char DAT_6fdf0b9c[8];
-W char DAT_6fdf0ba0[8];
-W char DAT_6fdf13dc[8];
-W char DAT_6fdf13f8[8];
-W char DAT_6fdf1400[8];
-W char DAT_6fdf1404[8];
-W char DAT_6fdf1408[8];
-W char DAT_6fdf140c[8];
-W char DAT_6fdf1410[8];
-W char DAT_6fdf1414[8];
-W char DAT_6fdf1418[8];
-W char DAT_6fdf141c[8];
-W char DAT_6fdf1420[8];
-W char DAT_6fdf142c[8];
-W char DAT_6fdf1434[8];
-W char DAT_6fdf1448[8];
-W char DAT_6fdf1454[8];
-W char DAT_6fdf1464[8];
+#define D2C5E870_W(n, r) W char DAT_##n[4];
+D2C5E870_SLOTS(D2C5E870_W)
+}
 
-#define V(g) (*reinterpret_cast<volatile uint32_t*>(g))
-static const char* const DT = "..\\Source\\D2Common\\DATATBLS\\DataTbls.cpp";
-static void leak(char* g) { if (V(g)) Ordinal_10046(DT, V(DAT_6fde9e20) == 0 ? 0x8f8 : 0x8f6, 0); }
+static const char* strOf(uint32_t rva) {
+  switch (rva) {
+    case D2C5E870_STR_FIELD: return "..\\Source\\D2Common\\DATATBLS\\FieldTbls.cpp";
+    case D2C5E870_STR_ITEM: return "..\\Source\\D2Common\\DATATBLS\\ItemTbls.cpp";
+    case D2C5E870_STR_LVL: return "..\\Source\\D2Common\\DATATBLS\\LvlTbls.cpp";
+    case D2C5E870_STR_ANIM: return "..\\Source\\D2Common\\DATATBLS\\AnimTbls.cpp";
+    default: return "..\\Source\\D2Common\\DATATBLS\\DataTbls.cpp";
+  }
+}
+static void callReal(uint32_t rva) {
+  switch (rva) {
+    case 0x5de00: d2_port_d2common_5de00(); break;
+    case 0x7c4f0: DATATBLS_UnloadMissilesTxt(); break;
+    case 0x5db60: DATATBLS_UnloadSkills_SkillDescTxt(); break;
+    case 0x71330: DATATBLS_UnloadItemStatCostTxt(); break;
+    case 0x5d8b0: DATATBLS_UnloadStatesTxt(); break;
+    case 0x71a50: DATATBLS_UnloadItemsTxt(); break;
+    case 0x716b0: d2_fn_d2common_716b0(); break;
+    case 0x71180: d2_fn_d2common_71180(); break;
+    case 0x53bd0: d2_batch_d2common_53bd0(); break;
+    case 0x18f90: d2_batch_d2common_18f90(); break;
+    case 0x54200: d2_fn_d2common_54200(); break;
+    case 0x6c7e0: d2_fn_d2common_6c7e0(); break;
+    case 0x6c9c0: DATATBLS_UnloadLvlPrestTxt(); break;
+    case 0x6c840: DATATBLS_UnloadLvlSubTxt(); break;
+  }
+}
+static void free9228(uint32_t, uint32_t str, uint32_t line) { Ordinal_10046(strOf(str), (int32_t)line, 0); }
+static void free9246(uint32_t p) { Ordinal_10212(p); }
+static void anim922e(uint32_t, uint32_t, uint32_t a, uint32_t b) { Ordinal_10043((int32_t)a, (int32_t)b); }
+static uint32_t rd32(uint32_t p) { uint32_t v; memcpy(&v, reinterpret_cast<const void*>(static_cast<uintptr_t>(p)), 4); return v; }
 
 // 1.13c D2Common+0x5E870
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_5e870() {
-
-  d2_port_d2common_5de00();
-  leak(DAT_6fdf0a9c);
-  DATATBLS_UnloadMissilesTxt();
-  Ordinal_10212(V(DAT_6fdf0a90));
-  leak(DAT_6fdf0a94);
-  V(DAT_6fdf0a94) = 0;
-  DATATBLS_UnloadSkills_SkillDescTxt();
-  DATATBLS_UnloadItemStatCostTxt();
-  DATATBLS_UnloadStatesTxt();
-  leak(DAT_6fdf0ac0);
-  Ordinal_10212(V(DAT_6fdf0ac4));
-  DATATBLS_UnloadItemsTxt();
-  leak(DAT_6fdeff7c);
-  Ordinal_10212(V(DAT_6fdeff80));
-  if (V(DAT_6fdefbbc)) {
-    Ordinal_10046("..\\Source\\D2Common\\DATATBLS\\ItemTbls.cpp",0x2b7,0);
-  }
-  V(DAT_6fdefbbc) = 0;
-  if (V(DAT_6fdefbe0)) {
-    Ordinal_10046("..\\Source\\D2Common\\DATATBLS\\ItemTbls.cpp",0x30b,0);
-  }
-  V(DAT_6fdefbe0) = 0;
-  Ordinal_10212(V(DAT_6fdf0af8));
-  leak(DAT_6fdf0afc);
-  V(DAT_6fdf0b00) = 0;
-  d2_fn_d2common_716b0();
-  leak(DAT_6fdefd94);
-  leak(DAT_6fdefd9c);
-  leak(DAT_6fdefbd0);
-  leak(DAT_6fdefda4);
-  leak(DAT_6fdefd8c);
-  if (V(DAT_6fdefbf4)) {
-    Ordinal_10046("..\\Source\\D2Common\\DATATBLS\\ItemTbls.cpp",0x80d,0);
-    V(DAT_6fdefbf4) = 0;
-    V(DAT_6fdefbf0) = 0;
-  }
-  d2_fn_d2common_71180();
-  d2_batch_d2common_53bd0();
-  d2_batch_d2common_18f90();
-  leak(DAT_6fdf0b50);
-  if (V(DAT_6fdf0b4c)) {
-     Ordinal_10043(0xbb,0);
-    Ordinal_10046("..\\Source\\D2Common\\DATATBLS\\AnimTbls.cpp",0xbc,0);
-  }
-  d2_fn_d2common_54200();
-  d2_fn_d2common_6c7e0();
-  leak(DAT_6fdf0b38);
-  if (V(DAT_6fdf1420)) {
-    Ordinal_10046("..\\Source\\D2Common\\DATATBLS\\LvlTbls.cpp",0x1d9,0);
-  }
-  leak(DAT_6fdf141c);
-  DATATBLS_UnloadLvlPrestTxt();
-  leak(DAT_6fdf142c);
-  leak(DAT_6fdf1434);
-  if (V(DAT_6fdf1448)) {
-    Ordinal_10046("..\\Source\\D2Common\\DATATBLS\\LvlTbls.cpp",1099,0);
-  }
-  DATATBLS_UnloadLvlSubTxt();
-  if (V(DAT_6fdf1454)) {
-    Ordinal_10046("..\\Source\\D2Common\\DATATBLS\\LvlTbls.cpp",0x562,0);
-  }
-  V(DAT_6fdf1454) = 0;
-  leak(DAT_6fdf0b94);
-  V(DAT_6fdf0b94) = 0;
-  V(DAT_6fdf0b98) = 0;
-  leak(DAT_6fdf0b9c);
-  V(DAT_6fdf0b9c) = 0;
-  V(DAT_6fdf0ba0) = 0;
-  leak(DAT_6fdf0b8c);
-  V(DAT_6fdf0b8c) = 0;
-  V(DAT_6fdf0b90) = 0;
-  leak(DAT_6fdefa5c);
-  leak(DAT_6fdefbd8);
-  Ordinal_10212(V(DAT_6fdeff88));
-  if (V(DAT_6fdf1404)) {
-    Ordinal_10046("..\\Source\\D2Common\\DATATBLS\\FieldTbls.cpp",0x5b,0);
-  }
-  V(DAT_6fdf1404) = 0;
-  V(DAT_6fdf140c) = 0;
-  V(DAT_6fdf1408) = 0;
-  V(DAT_6fdf1410) = 0;
-  V(DAT_6fdf1414) = 0;
-  V(DAT_6fdf1418) = 0;
-  leak(DAT_6fdf13dc);
-  leak(DAT_6fdf0b60);
-  leak(DAT_6fdf1400);
-  V(DAT_6fdf1400) = 0;
-  leak(DAT_6fdf1464);
-  leak(DAT_6fdf13f8);
-  V(DAT_6fdf13f8) = 0;
-  leak(DAT_6fdf0b54);
-}
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_port_d2common_5e870() {
+  D2Common5E870Slots s;
+#define D2C5E870_LD(n, r) memcpy(&s.n, DAT_##n, 4);
+  D2C5E870_SLOTS(D2C5E870_LD)
+  const D2Common5E870Env e{ callReal, free9228, free9246, anim922e, rd32 };
+  d2_seam_d2common_5e870(&s, &e);
+#define D2C5E870_ST(n, r) memcpy(DAT_##n, &s.n, 4);
+  D2C5E870_SLOTS(D2C5E870_ST)
 }

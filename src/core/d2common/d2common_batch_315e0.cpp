@@ -62,7 +62,7 @@ int __stdcall D2Common_10693_DATABLS_GetPreDrawFromOverlayTxt(int nOverlayId)
     return DATABLS_GetPreDrawFromOverlayTxt(nOverlayId);
 }
 
-// 1.13c D2Common+0x46600: searches an item (and, recursively, the items it contains) for a
+// D2MOO-style form of D2Common 0x46600 (the 1.13c port is d2common_46600.cpp): searches an item (and, recursively, the items it contains) for a
 // charged skill: nulls both outputs first, requires a UNIT_ITEM whose skill id is a valid SkillsTxt
 // record and a level in 1..63, then walks the 0x40-flag stat list chain for STAT_ITEM_CHARGED_SKILL
 // in the layer packed from skill id/level. On a hit writes the value & 0xFF and the owning stat list

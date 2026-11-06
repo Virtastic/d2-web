@@ -51,7 +51,7 @@ void __fastcall d2c_42070_normalize_and_merge_vertices(void* pool,
 	while (vertex != *vertices);
 }
 
-// 1.13c D2Common+0x43190
+// D2MOO-struct form of D2Common 0x43190 (the 1.13c port is d2common_43190.cpp).
 void __fastcall d2c_43190_build_outdoor_rooms(D2DrlgLevelStrc* level)
 {
 	uint32_t mask = 0;

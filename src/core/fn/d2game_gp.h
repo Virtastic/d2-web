@@ -4,6 +4,7 @@
 //  - tok(): the capture tags a dword that points into descriptor blob k as 0xB1<k><offset> (log tokenisation).
 // Blob 0 = sc (rva,value pairs, zero rva ends), blob 1 = hook log; user blobs follow at r[14+2k], size r[15+2k].
 #pragma once
+#include "fn_bloblen.h"
 #include "hookenv.h"
 #include <initializer_list>
 struct GE : HookEnv {
@@ -34,7 +35,7 @@ struct GE : HookEnv {
         for (uint32_t i = 0; i < L[0]; i++)
             for (int w = 1; w < 10; w++) {
                 uint32_t& v = L[1 + i * 10 + w];
-                for (int k = 2; k < nb; k++) if (v >= B(k) && v < B(k) + r[15 + 2 * k]) { v = 0xB1000000u | (uint32_t)(k << 16) | (v - B(k)); break; }
+                for (int k = 2; k < nb; k++) if (v >= B(k) && v < B(k) + fnBlobLen(r, k)) { v = 0xB1000000u | (uint32_t)(k << 16) | (v - B(k)); break; }
             }
     }
 };
