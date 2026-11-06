@@ -167,7 +167,7 @@ export function frontDoor({ onReady, hosted = false } = {}) {
     const s = col.state;
     if (s.busy) return ['Reading files…', 'tan'];
     if (msg && performance.now() < msgUntil) return msg;
-    const bad = s.issues.find((i) => i.code === 'casc' || i.code === 'truncated'), other = s.issues[s.issues.length - 1];
+    const bad = s.issues.find((i) => i.code === 'casc' || i.code === 'truncated' || i.code === 'damaged'), other = s.issues[s.issues.length - 1];
     if (!ready() && (bad || other)) return [(bad || other).text, bad ? 'red' : 'tan'];
     const n = FILES.filter(have).length;
     return ready() ? ['All files found.', 'gold'] : [`${n} of ${FILES.length} found. Drop them here, or choose:`, 'tan'];

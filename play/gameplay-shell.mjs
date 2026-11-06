@@ -1512,8 +1512,10 @@ function ensureTitleScreen(entryPhase = null) {
       string: (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]),
       // Under the hood, not a player setting: the page reads the repo's server-list file at boot.
       bnet: (bnetConfigPromise ??= loadBnetServers()),
-      // Committing a region opens the player's login flow. Endpoints still come only from our config.
-      onGateway: (server) => { connectConfiguredRealm(server); },
+      // Retail's GATEWAY button opens the list; OK only commits and persists the region (D2Launch
+      // FUN_6FA58810), it never dials. Endpoints still come only from our config.
+      onGatewayOpen: () => { characterEntryReader.cancel(); },
+      storage: (() => { try { return globalThis.localStorage; } catch { return null; } })(),
       items: [
         { label: 'SINGLE PLAYER', action: () => { enterSinglePlayer(); } },
         // With no servers configured BATTLE.NET stays inert, exactly as before. A configured region
@@ -1523,7 +1525,8 @@ function ensureTitleScreen(entryPhase = null) {
         // Options; the retail captures, captured 2026-10-02). HOST GAME advances to character
         // select as retail does; the host/join TRANSPORT (and the join dialog behind JOIN GAME) is
         // the realm backend's work, so JOIN is handed to the shell and is a gap.
-        { label: 'BATTLE.NET', action: () => { characterEntryReader.cancel(); titleScreen?.openGateways(); } },
+        // BATTLE.NET dials the committed (persisted) gateway at once; the region list is the GATEWAY bar's.
+        { label: 'BATTLE.NET', action: () => { const server = titleScreen?.selectedGateway(); if (!server) return; characterEntryReader.cancel(); connectConfiguredRealm(server); } },
         // Multiplayer is not working yet, so for players OTHER MULTIPLAYER is clickable but does nothing,
         // like BATTLE.NET. Automated runs (navigator.webdriver) still open the screen so its tests keep running.
         { label: 'OTHER MULTIPLAYER', action: () => { if (!navigator.webdriver) return; characterEntryReader.cancel(); screen = SCREEN.OTHER_MULTIPLAYER; ensureOtherMultiplayerScreen(); } },
