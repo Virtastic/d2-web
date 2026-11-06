@@ -166,8 +166,13 @@ async function unpackPicked(archives) {
 /** Chromium pickers return handles (which can be remembered); elsewhere an <input> returns Files, copied to OPFS where it exists. */
 export async function pickFiles({ progress } = {}) {
   if (window.showOpenFilePicker) {
-    try { return { handles: await window.showOpenFilePicker({ multiple: true, types: [{ description: 'Diablo II archives', accept: { 'application/octet-stream': ['.mpq', '.exe'] } }] }), files: [] }; }
-    catch (e) { if (e.name === 'AbortError') return { handles: [], files: [] }; }
+    try {
+      const hs = await window.showOpenFilePicker({ multiple: true, types: [{ description: 'Diablo II archives', accept: { 'application/octet-stream': ['.mpq', '.exe', '.zip', '.7z'] } }] });
+      const arc = [], plain = [];
+      for (const h of hs) (isArchiveName(h.name) ? arc : plain).push(h);
+      const unpacked = await unpackPicked(await Promise.all(arc.map((h) => h.getFile())));
+      return { handles: [...plain, ...unpacked.handles], files: unpacked.files };
+    } catch (e) { if (e.name === 'AbortError') return { handles: [], files: [] }; }
   }
   const picked = await inputFiles(false);
   const unpacked = await unpackPicked(picked.filter((f) => isArchiveName(f.name)));
@@ -183,7 +188,7 @@ export async function pickFolder({ progress } = {}) {
 }
 const inputFiles = (folder) => new Promise((res) => {
   const i = document.createElement('input');
-  i.type = 'file'; i.multiple = true; if (folder) i.webkitdirectory = true; else i.accept = '.mpq,.exe,.zip,.7z';
+  i.type = 'file'; i.multiple = true; if (folder) i.webkitdirectory = true; else if (!/Android/i.test(navigator.userAgent)) i.accept = '.mpq,.exe,.zip,.7z';   // Android's chooser greys out any file whose type it cannot map from an unknown extension; the names are filtered below instead
   i.onchange = () => res([...i.files].filter((f) => WANT.test(f.name) || (!folder && isArchiveName(f.name))));
   i.oncancel = () => res([]);
   i.click();
