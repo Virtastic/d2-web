@@ -1,22 +1,19 @@
-// Prior art: none in D2MOO. Rules from cached 1.13c body (register arg ESI = Storm handle).
+// 1.13c D2CMP+0x8F70: ret 0xC, three stack arguments after the Storm handle in ESI.
 #include <cstdint>
+#include "d2cmp_8f70.h"
 
-struct D2Cmp8f70Ops {
-    int32_t (*storm10106)(void);   // Ordinal_10106: -1 = failure
-    void (*ord276)(void);
-    void (*ord10265)(void);
-    void (*ord10024)(const char* msg);
-    void (*exit_)(int);            // _exit(-1), does not return
-};
-
-// 1.13c D2CMP+0x8f70
-// Returns when handle nonzero and Ordinal_10106 != -1; otherwise reports and exits.
-extern "C" void d2cmp_8f70(void* esi, const char* msg, const D2Cmp8f70Ops& ops) {
+// Returns when the handle is nonzero and Ordinal_10106(handle, a0, a1, a2) != -1. Otherwise reports and exits; a -1 result first calls
+// Ordinal_276 with a 0x104-byte buffer. The report is Ordinal_10265 (code 0x79 after a failed Storm call, 0x70 for a zero handle), then
+// Ordinal_10024(msg, result, code), then _exit(-1). The exit path does not return in retail.
+extern "C" void d2cmp_8f70(void* esi, uint32_t a0, uint32_t a1, uint32_t a2, const char* msg, const D2Cmp8f70Ops& ops) {
+    uint32_t code = 0x70;
     if (esi) {
-        if (ops.storm10106() != -1) return;
-        ops.ord276();
+        if (ops.storm10106(esi, a0, a1, a2) != -1) return;
+        uint8_t buf[0x104];
+        ops.ord276(esi, buf, sizeof buf);
+        code = 0x79;
     }
-    ops.ord10265();
-    ops.ord10024(msg);
+    uint32_t v = ops.ord10265(code);
+    ops.ord10024(msg, v, code);
     ops.exit_(-1);
 }
