@@ -197,11 +197,11 @@ export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, strin
   const labelFont = createFont({ dc6: decodeDc6(read(FRONTEND.font)), tbl: decodeFontTbl(read(FRONTEND.fontTbl)), palette: tinted, documentObject,
     path: FRONTEND.font, drawAs: { op: 'celcolor', mode: 4, blend } });
   const font16Dc6 = decodeDc6(read(FRONTEND.versionFont)), font16Tbl = decodeFontTbl(read(FRONTEND.versionFontTbl));
-  const font16 = (colour) => createFont({ dc6: font16Dc6, tbl: font16Tbl, palette: textColourPalette(skyPl2, skyPalette, colour), documentObject,
+  const font16 = (colour) => createFont({ dc6: font16Dc6, tbl: font16Tbl, palette: colour ? textColourPalette(skyPl2, skyPalette, colour) : skyPalette, documentObject,
     path: FRONTEND.versionFont, drawAs: { op: 'celcolor', mode: 5, extra: colour } });
   const labelText = font16(BNET_LOGIN_LAYOUT.labels.colour);
   const infoText = font16(BNET_LOGIN_LAYOUT.info.colour);
-  const boxFont = (dc6, tbl) => createFont({ dc6: decodeDc6(read(dc6)), tbl: decodeFontTbl(read(tbl)), palette: textColourPalette(skyPl2, skyPalette, 0),
+  const boxFont = (dc6, tbl) => createFont({ dc6: decodeDc6(read(dc6)), tbl: decodeFontTbl(read(tbl)), palette: skyPalette,
     documentObject, path: dc6, drawAs: { op: 'celcolor', mode: 5, extra: 0 } });
   const titleText = boxFont(A.titleFont, A.titleFontTbl);
   const bodyText = boxFont(A.bodyFont, A.bodyFontTbl);
@@ -300,8 +300,8 @@ export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, strin
     mode = 'read';
   };
   // PLEASE READ's OK (D2Launch+0x19FB0) connects and sends the account to Battle.net.
-  // NOT retail: this client's realm has no account creation (BNCS CREATEACCOUNT2), so without an
-  // `onCreateAccount` the login screen comes back with the login failure box naming that.
+  // `onCreateAccount` sends the account to the realm (BNCS CREATEACCOUNT); without one the login
+  // screen comes back with the login failure box naming that.
   const readOk = async () => {
     const credentials = { account, password };
     init(); account = credentials.account; focus = 'password';

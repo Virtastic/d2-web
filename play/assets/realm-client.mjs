@@ -205,6 +205,54 @@ export async function mcpListCharacters(transport, protocol, { realmReply, chara
 
 const u32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
 
+const rol32 = (v, n) => ((v << n) | (v >>> (32 - n))) >>> 0;
+
+/** Battle.net's SHA-1 variant (the schedule rotates by one bit less): the account password hash. */
+export function bsha1(data) {
+  const block = new Uint8Array(64); block.set(data.subarray(0, 64));
+  const w = new Array(80);
+  for (let i = 0; i < 16; i++) w[i] = u32(block, i * 4);
+  for (let i = 16; i < 80; i++) w[i] = rol32(1, (w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]) & 0x1f);
+  const h = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0];
+  let [a, b, c, d, e] = h;
+  for (let i = 0; i < 80; i++) {
+    let f, k;
+    if (i < 20) { f = (b & c) | (~b & d); k = 0x5a827999; }
+    else if (i < 40) { f = b ^ c ^ d; k = 0x6ed9eba1; }
+    else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8f1bbcdc; }
+    else { f = b ^ c ^ d; k = 0xca62c1d6; }
+    const t = (rol32(a, 5) + (f >>> 0) + e + k + w[i]) >>> 0;
+    e = d; d = c; c = rol32(b, 30); b = a; a = t;
+  }
+  const out = new Uint8Array(20), dv = new DataView(out.buffer);
+  [a, b, c, d, e].forEach((v, i) => dv.setUint32(i * 4, (h[i] + v) >>> 0, true));
+  return out;
+}
+
+/** SID_CREATEACCOUNT (0x3d): the password hash then the account name. Resolves on success. */
+export async function bncsCreateAccount(transport, protocol, { account, password, product = 'D2XP', timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+  const reader = makeReader(transport);
+  transport.send(protocol.bncsSelector());
+  transport.send(protocol.bncsFrame(0x50, protocol.bncsAuthInfo(product)));
+  const authInfo = await readBncsFrame(reader, timeoutMs);
+  if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
+  const enc = new TextEncoder();
+  const hash = bsha1(enc.encode(password.toLowerCase()));
+  const name = enc.encode(account);
+  const body = new Uint8Array(hash.length + name.length + 1);
+  body.set(hash); body.set(name, hash.length);
+  transport.send(protocol.bncsFrame(0x3d, body));
+  const reply = await readBncsFrame(reader, timeoutMs);
+  if (reply.id !== 0x3d) throw new Error(`expected CREATEACCOUNT reply 0x3d, got 0x${reply.id.toString(16)}`);
+  const result = u32(reply.body, 0);
+  if (result !== 1 && result !== 0) {
+    const error = new Error(`This account name could not be created (result ${result})`);
+    error.createResult = result;
+    throw error;
+  }
+  return { result };
+}
+
 /**
  * The BNCS login: selector, AUTH_INFO, AUTH_CHECK, LOGONRESPONSE2, QUERYREALMS2, LOGONREALMEX.
  * Returns the challenge the server issued, the realm list it advertised, and the LOGONREALMEX
@@ -499,11 +547,13 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
     // revision files and CD keys; our own realmd's base64 challenge keeps the project's keyless form.
     bncsAuthCheck: ({ serverToken, mpq = '', challenge, product, auth }) => {
       const challengeStr = str(challenge), expansion = product === 'D2XP' ? 1 : 0;
-      if (!challengeStr.includes('=') || /^[A-Za-z0-9+/]*=*$/.test(challengeStr)) {
+      const keyless = !challengeStr.includes('=') || /^[A-Za-z0-9+/]*=*$/.test(challengeStr);
+      // With no revision files configured, a formula challenge gets the keyless request: the project's own realm does not verify it.
+      if (keyless || !auth?.revisionFiles) {
         const clientToken = (u32at(SEED) + env.tick() + env.time()) >>> 0;
         put32(SEED, clientToken);
-        const revLen = call('d2_realm_bncs_checkrev', 'number', ['string', 'string', 'number', 'bigint'], [challengeStr, '1.13.2.0', 0, BigInt(O)]);
-        const checkrev = str(rd(O, revLen));
+        const revLen = keyless ? call('d2_realm_bncs_checkrev', 'number', ['string', 'string', 'number', 'bigint'], [challengeStr, '1.13.2.0', 0, BigInt(O)]) : 0;
+        const checkrev = keyless ? str(rd(O, revLen)) : '';
         const n = call('d2_realm_bncs_auth_check_request', 'number', ['number', 'number', 'number', 'number', 'bigint', 'number', 'string', 'string', 'bigint'], [clientToken, 0x0e, 0, 0, BigInt(E), 0, product + ';' + checkrev, 'd2-web', BigInt(T)]);
         return { body: rd(T, n), clientToken };
       }
