@@ -18,6 +18,7 @@
 #include "Drlg/D2DrlgRoomTile.h"
 #include "Drlg/D2DrlgDrlgGrid.h"
 #include "Drlg/D2DrlgDrlgLogic.h"
+#include "d2common_4a9b0.h"
 #include "Drlg/D2DrlgTileSub.h"
 #include "DataTbls/LevelsIds.h"
 
@@ -126,7 +127,7 @@ void D2Common_45550_RoomWarps(void* pool, D2DrlgRoomStrc* room,
     finish(room);
 }
 
-// 1.13c D2Common+0x4A670
+// D2MOO-style form of D2Common 0x4A670 (the 1.13c port is d2common_4a670.cpp)
 void D2Common_4A670_OutdoorGrids(D2DrlgRoomStrc* room)
 {
     auto* outdoor = room->pOutdoor;
@@ -168,19 +169,20 @@ void D2Common_4A670_OutdoorGrids(D2DrlgRoomStrc* room)
     DRLGGRID_AlterEdgeGridFlags(&outdoor->pFloorGrid, 4, FLAG_OPERATION_OR);
 }
 
-// 1.13c D2Common+0x4A9B0
+// D2Common 0x4A9B0 lives in d2common_4a9b0.cpp; this wrapper hands it the D2MOO callees.
+namespace {
+uint32_t P4a9b0(void* p) { return uint32_t(uintptr_t(p)); }
+D2DrlgRoomStrc* R4a9b0(uint32_t r) { return reinterpret_cast<D2DrlgRoomStrc*>(uintptr_t(r)); }
+D2DrlgGridStrc* G4a9b0(uint32_t g) { return reinterpret_cast<D2DrlgGridStrc*>(uintptr_t(g)); }
+uint32_t A4a9b0(uint32_t pool, uint32_t size, uint32_t line) { return P4a9b0(FOG_AllocPool(reinterpret_cast<void*>(uintptr_t(pool)), size, "..\\Source\\D2Common\\DRLG\\RoomTile.cpp", line, 0)); }
+void W4a9b0(uint32_t r, uint32_t w, uint32_t t, uint32_t x, uint32_t y) { DRLGROOMTILE_CountWallWarpTiles(R4a9b0(r), G4a9b0(w), G4a9b0(t), x, y); }
+uint32_t C4a9b0(uint32_t r, uint32_t g) { DRLGROOMTILE_CountAllTileTypes(R4a9b0(r), G4a9b0(g), 0, 0, 0); return r; }   // engine: the room rides on in EAX
+void D4a9b0(uint32_t r) { DRLGROOMTILE_AllocTileData(R4a9b0(r)); }
+void L4a9b0(uint32_t r, uint32_t g, uint32_t t) { DRLGROOMTILE_LoadInitRoomTiles(R4a9b0(r), G4a9b0(g), G4a9b0(t), 0, 0, 0); }
+void K4a9b0(uint32_t r) { DRLGLOGIC_AllocCoordLists(R4a9b0(r)); }
+}
 void D2Common_4A9B0_OutdoorTiles(D2DrlgRoomStrc* room)
 {
-    DRLGROOMTILE_AllocTileGrid(room);
-    auto* outdoor = room->pOutdoor;
-    DRLGROOMTILE_CountWallWarpTiles(room, &outdoor->pWallGrid, &outdoor->pTileTypeGrid, 0, 0);
-    DRLGROOMTILE_CountAllTileTypes(room, &outdoor->pWallGrid, 0, 0, 0);
-    DRLGROOMTILE_CountAllTileTypes(room, &outdoor->pFloorGrid, 0, 0, 0);
-    DRLGROOMTILE_AllocTileData(room);
-    DRLGROOMTILE_LoadInitRoomTiles(room, &outdoor->pWallGrid, &outdoor->pTileTypeGrid, 0, 0, 0);
-    DRLGROOMTILE_LoadInitRoomTiles(room, &outdoor->pFloorGrid, nullptr, 0, 0, 0);
-    room->pTileGrid->pTiles.nWalls = room->pTileGrid->nWalls;
-    room->pTileGrid->pTiles.nFloors = room->pTileGrid->nFloors;
-    room->pTileGrid->pTiles.nRoofs = room->pTileGrid->nShadows;
-    DRLGLOGIC_AllocCoordLists(room);
+    static const D2Common4a9b0Env env = { A4a9b0, W4a9b0, C4a9b0, D4a9b0, L4a9b0, K4a9b0 };
+    D2Common_4A9B0_With(P4a9b0(room), &env);
 }

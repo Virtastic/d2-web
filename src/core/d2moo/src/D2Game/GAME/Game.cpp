@@ -1724,7 +1724,7 @@ void __fastcall sub_6FC38140(void *a1, int32_t a2)
 }
 
 //D2Game.0x6FC38530 (#10003)
-// 1.13c D2Game+0x2E460
+// 1.13c port of 0x2E460: src/core/d2game/d2g_2e460.cpp
 void __fastcall GAME_ProcessNetworkMessages()
 {
     uint8_t buffer[520] = {};

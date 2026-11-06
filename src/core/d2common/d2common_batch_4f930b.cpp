@@ -71,7 +71,7 @@ void D2Common_7B8D0_InitDrlgLists(void* drlg) {  // retail pointers are 32-bit: 
     put<uint8_t>(drlg, 0x3a8, 3);
 }
 
-// 1.13c D2Common+0x43580
+// Seam form of D2Common 0x43580 kept for reference (the 1.13c port is d2common_43580.cpp).
 void D2Common_43580_InitDrlgRoom(
     void* drlg, const int32_t* levelThresholds,
     void (*grid)(int, int),

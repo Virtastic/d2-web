@@ -41,14 +41,13 @@ extern "C" uint32_t d2_port_d2common_7afb0(uint32_t cur, uint32_t ctx, uint32_t 
     }
     n = E->find2(ctx, tNew);
     if (n) {
-        uint32_t eax;
-        link(cur, n, &eax);
+        link(cur, n, nullptr);
         int16_t* h = P16(n);
         if (g < h[4]) {
             h[2] = (int16_t)(h[3] + g);
             *P32(n + 0xC) = cur;
             h[4] = g;
-            E->resort(eax, n);
+            E->resort(ctx, n);   // retail: mov eax,edi (EDI = the search context) before the call
         }
         return 1;
     }

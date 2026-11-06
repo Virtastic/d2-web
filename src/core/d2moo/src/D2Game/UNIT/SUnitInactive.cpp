@@ -943,7 +943,7 @@ void __fastcall SUNITINACTIVE_CompressInactiveUnit(D2GameStrc* pGame, D2UnitStrc
 	{
 		D2InactiveUnitListStrc* pInactiveUnitList = SUNITINACTIVE_GetListNodeFromRoom(pGame, pRoom, 1);
 
-		if (pUnit->dwUnitType == UNIT_ITEM) // 1.13c D2Game+0x203D0 (item branch, split out of 0x204E0)
+		if (pUnit->dwUnitType == UNIT_ITEM) // item branch: 1.13c splits it out as D2Game 0x203D0, ported in src/core/d2game/d2g_203d0.cpp
 		{
 			uint8_t pBitstream[1024] = {};
 			const size_t nBitstreamSize = ITEMS_SerializeItemToBitstream(pUnit, pBitstream, ARRAY_SIZE(pBitstream), 1, 1, 0);

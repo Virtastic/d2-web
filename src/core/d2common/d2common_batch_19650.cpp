@@ -54,7 +54,7 @@ extern "C" void d2_port_d2common_616d0(HD2ARCHIVE archive)
 }
 
 // 1.13c D2Common+0x6CCF0
-extern "C" void d2_fn_d2common_6ccf0(HD2ARCHIVE archive)
+extern "C" void d2_port_d2common_6ccf0(HD2ARCHIVE archive)
 {
     // Resolves level/tile names, counts cels up to -1, builds contiguous ranges.
     DATATBLS_LoadAutomapTxt(archive);

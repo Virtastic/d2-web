@@ -473,7 +473,7 @@ int32_t __fastcall sub_6FC42120(D2UnitStrc* pUnit, D2UnitStrc* pItem, int32_t a3
 }
 
 //D2Game.0x6FC42310
-// 1.13c D2Game+0xD47C0
+// 1.10f body; the 1.13c port of 0xD47C0 is src/core/d2game/d2g_d47c0.cpp
 void __fastcall D2GAME_ITEMS_UpdateItemStatlist_6FC42310(D2GameStrc* pGame, D2UnitStrc* pItem, D2UnitStrc* pUnit, int32_t a4)
 {
     if (!pUnit || !pItem)
@@ -4008,6 +4008,14 @@ int32_t __fastcall sub_6FC47D30(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nI
                         return 1;
                     }
                 }
+                else
+                {
+                    // 1.13c D2Game+0xD9BF0: any other item whose spell handler declined (a Scroll or
+                    // Tome of Identify / Town Portal that only armed its cursor, a potion, ...) ends here
+                    // with 0 and no sound. The "Impossible" voice is only for a quest item whose quest
+                    // step does not apply. (The Token of Absolution branch is not ported.)
+                    return 0;
+                }
 
                 SUNIT_AttachSound(pUnit, 19, pUnit);
             }
@@ -4605,7 +4613,7 @@ void __fastcall D2GAME_ITEMS_Identify_6FC49670(D2GameStrc* pGame, D2UnitStrc* pP
 }
 
 //D2Game.0x6FC49760
-// 1.13c D2Game+0xD2C70 (a non-player holder sends the cursor clear with no client instead of asserting)
+// 1.10f body; the 1.13c port of 0xD2C70 (thunk 0xAA5A and 0xE20A0 added) is src/core/d2game/d2g_d2c70.cpp
 int32_t __fastcall D2GAME_RemoveItemIfOnCursor_6FC49760(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem)
 {
     if (!pItem || INVENTORY_GetCursorItem(pPlayer->pInventory) != pItem)

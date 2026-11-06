@@ -5,7 +5,7 @@
 
 extern "C" {
 const uint8_t* D2Common_45A40_ItemsRecord(const int32_t* pUnit, const int32_t* pRec);
-int32_t d2_fn_d2common_475e0(int32_t in_eax, void* p1, uint32_t p2, int32_t p3, int16_t p4,
+int32_t d2_port_d2common_475e0(int32_t in_eax, void* p1, uint32_t p2, int32_t p3, int16_t p4,
                              uint32_t p5, int32_t p6, int32_t p7, uint32_t p8, const uint8_t* dt);
 
 struct D2Common49340Env {
@@ -21,17 +21,17 @@ struct D2Common49340Env {
  void (*fatal)(int32_t line);                                         // 10265+10024 message, then _exit
 };
 
-// 1.13c D2Common+0x49340: item param_3 gets min-stat adjustments from its type row, then either
+// D2MOO-style form of D2Common 0x49340 (the 1.13c port is d2common_49340.cpp): item param_3 gets min-stat adjustments from its type row, then either
 // the 0x48630 path (no ratio gain) or two 0x475E0 notifications. Not an item: both 0x475E0 calls.
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_49340(int32_t param_1, void* param_2, int32_t* param_3, int32_t param_4,
+EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_49340(int32_t param_1, void* param_2, int32_t* param_3, int32_t param_4,
                                                   int32_t param_5, int32_t param_6, uint32_t param_7,
                                                   int32_t param_8, int32_t param_9, uint32_t param_10,
                                                   const D2Common49340Env* env, const uint8_t* dt) {
  if (param_4 == 0) return 0;
  if (param_8 == 0) param_8 = env->roll_465b0(*(int32_t*)(uintptr_t)(param_4 + 8), param_3);
  if (!param_3 || *param_3 != 4) {
-  d2_fn_d2common_475e0(0, param_2, (uint32_t)(uintptr_t)param_3, param_5, 0x12, 0, param_8, param_9, param_10, dt);
-  d2_fn_d2common_475e0(0, param_2, (uint32_t)(uintptr_t)param_3, param_5, 0x11, 0, param_8, param_9, param_10, dt);
+  d2_port_d2common_475e0(0, param_2, (uint32_t)(uintptr_t)param_3, param_5, 0x12, 0, param_8, param_9, param_10, dt);
+  d2_port_d2common_475e0(0, param_2, (uint32_t)(uintptr_t)param_3, param_5, 0x11, 0, param_8, param_9, param_10, dt);
   return 1;
  }
  const uint8_t* rec = D2Common_45A40_ItemsRecord(param_3, nullptr);
@@ -74,8 +74,8 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_49340(int32_t param_1, void* param_2
   if ((int32_t)(g + v) <= (int32_t)v)
    return env->fn_48630(param_3, param_1, 0, 1, param_6, (int32_t)param_7, 0, 0, 0);
  }
- d2_fn_d2common_475e0(0, param_2, (uint32_t)(uintptr_t)param_3, param_5, 0x12, 0, param_8, param_6, param_7, dt);
- d2_fn_d2common_475e0(0, param_2, (uint32_t)(uintptr_t)param_3, param_5, 0x11, 0, param_5, param_6, param_7, dt);
+ d2_port_d2common_475e0(0, param_2, (uint32_t)(uintptr_t)param_3, param_5, 0x12, 0, param_8, param_6, param_7, dt);
+ d2_port_d2common_475e0(0, param_2, (uint32_t)(uintptr_t)param_3, param_5, 0x11, 0, param_5, param_6, param_7, dt);
  return param_5;
 }
 }

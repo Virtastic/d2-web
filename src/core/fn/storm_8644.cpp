@@ -26,7 +26,10 @@ uint32_t mapc(uint32_t f, uint32_t c) {
 uint32_t g_gle = 0;
 bool okflags(uint32_t f) { uint32_t m = f & 0x300; return m == 0x100 || m == 0x200; }
 int lmw(uint32_t loc, uint32_t f, const uint16_t* s, int n, uint16_t* d, int dn) {
-    if (loc == 0) { g_gle = 0x57; return 0; }  // capture host: locale 0 is rejected (mode stays 0)
+    // Locale 0 (LOCALE_NEUTRAL) maps like any locale: the capture's mode-1 call with locale 0 returns the full length (11).
+    // Only the mode probe itself (locale 0, L"", one unit, flags 0x100) fails on the capture host, with an error other than
+    // 0x78, so DAT 42494 stays 0 (the readback at g+0xC).
+    if (loc == 0 && f == 0x100 && n == 1 && s[0] == 0) { g_gle = 0x57; return 0; }
     if (!okflags(f) || n <= 0) return 0;
     if (!dn) return n;
     if (dn < n) return 0;

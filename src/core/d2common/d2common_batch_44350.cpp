@@ -58,14 +58,14 @@ namespace
 	}
 }
 
-// 1.13c D2Common+0x46a40 (#10890)
+// D2MOO-style form of D2Common 0x46A40 (#10890; the 1.13c port is d2common_46a40.cpp)
 // Seeds an item unit's base stats: an item of item type 0x2D (ITEMTYPE_WEAPON) gets the six damage
 // stats below, any other item gets armour class. Each stat is written as 3/2 of the stat list's
 // current base value (0 when the ItemStatCost row, the table or the list is missing); a successful
 // write on a player unit also inserts the stat mod. An item unit with item data first gets
 // 0x00400000 in its item flags. The retail fatal path for a null unit is modelled as a return.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_46a40(uint32_t pUnitAddress)
+EMSCRIPTEN_KEEPALIVE void d2_port_d2common_46a40(uint32_t pUnitAddress)
 {
 	D2UnitStrc* pUnit = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnitAddress));
 	if (pUnit == nullptr)

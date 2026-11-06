@@ -27,7 +27,7 @@ void D2Common_41340(D2DrlgLevelStrc* level) {
     D2Common_41340_Port(uint32_t(uintptr_t(level)), &env);
 }
 
-// 1.13c D2Common+0x4A5C0: EAX flags, ECX level, stack rectangle/outdoor flags/DT1 mask.
+// D2MOO-struct form of D2Common 0x4A5C0 (the 1.13c port is d2common_4a5c0.cpp): EAX flags, ECX level, stack rectangle/outdoor flags/DT1 mask.
 D2DrlgRoomStrc* D2Common_4A5C0(D2DrlgLevelStrc* level, int x, int y, int width, int height, uint32_t roomFlags, uint32_t outdoorFlags, uint32_t outdoorFlagsEx, uint32_t dt1Mask) {
     auto* room = DRLGROOM_AllocRoomEx(level, DRLGTYPE_MAZE);
     room->nTileXPos = x; room->nTileYPos = y;

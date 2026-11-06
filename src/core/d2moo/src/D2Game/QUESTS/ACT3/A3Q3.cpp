@@ -850,7 +850,7 @@ int32_t __fastcall OBJECTS_OperateFunction31_GidbinnDecoy(D2ObjOperateFnStrc* pO
 	return 0;
 }
 
-// 1.13c D2Game+0xE8780 (split out of the boss-spawn check; the unique spawn helper is inlined in retail)
+// 1.10f body for D2Game 0xE8780, ported in src/core/d2game/d2game_e8780.cpp (split out of the boss-spawn check; the unique spawn helper is inlined in retail)
 static void ACT3Q3_SpawnFetishBoss(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2Act3Quest3Strc* pQuestDataEx)
 {
 	pQuestDataEx->bBossIsSpawning = 1;

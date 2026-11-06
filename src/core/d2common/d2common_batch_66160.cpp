@@ -17,7 +17,7 @@ void d2_port_d2common_60920(HD2ARCHIVE a);
 W void d2_fn_d2common_5d570(void* a);
 W void d2_fn_d2common_6c3a0(void* a);
 W void d2_fn_d2common_6fba0(void* a, int32_t b, int32_t c);
-void d2_fn_d2common_6ccf0(HD2ARCHIVE a);
+void d2_port_d2common_6ccf0(HD2ARCHIVE a);
 void* D2ReadFile(void*, const char* filename, uint32_t* size);
 W void d2_fn_d2common_7e4f0(void* a);
 W void Ordinal_10046(const char* file, int32_t line, int32_t z);
@@ -74,7 +74,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_66160(HD2ARCHIVE h, int32_t p2, int32_t
  DATATBLS_LoadLvlWarpTxt(h);
  DATATBLS_LoadLvlMazeTxt(h);
  d2_fn_d2common_6fba0(a, p2, p3);
- d2_fn_d2common_6ccf0(h);
+ d2_port_d2common_6ccf0(h);
  DATATBLS_LoadObjectsTxt(h);
  DATATBLS_LoadObjGroupTxt(h);
  DATATBLS_LoadShrinesTxt(h);
