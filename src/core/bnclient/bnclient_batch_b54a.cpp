@@ -51,38 +51,7 @@ int32_t bnclient_send_frame(BnNetState* s, const BnNetEnv* e, uint32_t len, uint
     return 0;
 }
 
-// 1.13c BNClient+0x0EC50
-int32_t bnclient_recv_loop(BnNetState* s, const BnNetEnv* e) {
-    int32_t ret = 1;
-    if (s->reader_active != 0) return 1;
-    s->reader_active++;
-    while (s->closing == 0 && s->reader_ready == 0) e->sleep_ms(10);
-    uint32_t last = e->tick();
-    if (s->conn != nullptr) {
-        int32_t have = 0;
-        do {
-            if (s->closing != 0 || s->conn_flag != 0) break;
-            int32_t ready = e->poll();
-            if (s->conn == nullptr || s->closing != 0 || s->conn_flag != 0) break;
-            if (ready != 0) {
-                int32_t n = e->recv(0x2000 - have);
-                if (n < 1) { s->disconnect = 1; ret = 0; break; }
-                have = e->consume(n + have);
-            }
-            uint32_t now = e->tick();
-            if (now - last > 179999) {            // keepalive: FF 00 04 00
-                last = now;
-                if (s->conn == nullptr || s->closing != 0) s->disconnect = 1;
-                else {
-                    e->sendbuf[0] = 0xff; e->sendbuf[1] = 0; e->sendbuf[2] = 4; e->sendbuf[3] = 0;
-                    e->send(4);
-                }
-            }
-        } while (s->conn != nullptr);
-    }
-    s->reader_active--;
-    return ret;
-}
+// 0x0EC50 moved to src/core/bnclient/bnclient_ec50.cpp.
 
 // 1.13c BNClient+0x0EE20
 int32_t bnclient_shutdown(BnNetState* s, const BnNetEnv* e) {

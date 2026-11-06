@@ -26,13 +26,9 @@ extern "C" uint32_t d2_bnclient_11780(const uint32_t* p, int len, uint32_t* patc
     return 1;
 }
 
-// 1.13c BNClient+0x11960
-// Builds 0x128-byte client-info block (arch 'X86I', product 'VD2D'/'PD2D'-style +0x13fa, tz bias minutes, LCID, UI lang, locale strings), sends 0x50. Always 1.
-extern "C" uint32_t d2_bnclient_11960(void (*build)(), void (*send)()) { build(); send(); return 1; }
+// 1.13c BNClient+0x11960: src/core/bnclient/bnclient_11960.cpp
 
-// 1.13c BNClient+0x11B00
-// Tick + lowercased 0x100 string hash + seed hash, rotate buffer DAT+0x3EC58 (0x40), send 0x58. Returns 0.
-extern "C" uint32_t d2_bnclient_11b00(void (*gather)(), void (*hash)(), void (*send)()) { gather(); hash(); send(); return 0; }
+// 1.13c BNClient+0x11B00: src/core/bnclient/bnclient_11b00.cpp
 
 // The three login frame builders below (0x11CB0, 0x11DC0, 0x11E60) are straight-line: every callee is a seam. Addresses are 32-bit words
 // (a stack/blob address, or 0xB2000000|rva for a module global: the seam records them, nothing dereferences a module word here).
@@ -104,17 +100,7 @@ extern "C" uint32_t d2_bnclient_11f80(int r, void (*clear)(), void (*sendBlock)(
     return 1;
 }
 
-// 1.13c BNClient+0x12060
-// Seed = time + tick + prior; spin (Sleep 10) until DAT+0x3F510 set (return 0 if DAT+0x3F644); if lookup fails set DAT+0x3F1F4=1 under CS, return 0;
-// else build 1 or 2 hashed blocks, free handles (Ordinal_280), send 0x51, return 1.
-extern "C" uint32_t d2_bnclient_12060(uint32_t* seed, uint32_t timeNow, uint32_t tick, const volatile char* ready, const uint32_t* abort,
-                                      void* (*lookup)(), void (*markFail)(), void (*buildAndSend)()) {
-    *seed += tick + timeNow;
-    while (!*ready) { if (*abort) return 0; }
-    if (!lookup()) { markFail(); return 0; }
-    buildAndSend();
-    return 1;
-}
+// 1.13c BNClient+0x12060: src/core/bnclient/bnclient_12060.cpp
 
 // 1.13c BNClient+0x185C0
 // SEH unwind funclet: FUN_21110(*(frame+4)).

@@ -159,17 +159,20 @@ int variablePacketSize(uint8_t opcode, const uint8_t* packet, int length) {
     }
 }
 
+}  // namespace
+extern "C" uint32_t d2_realm_d2net_6750(const uint8_t* buf, uint32_t avail, uint32_t* out);
+namespace {
+// The size comes from the D2Net+0x6750 port. Retail returns 0 both for "more bytes needed" (the table's -1
+// left in *out) and for an opcode or declared size it cannot use (*out 0 or untouched); its splitter waits
+// on either. This wrapper keeps the two apart so the browser fails closed instead of stalling.
 int d2gsPacketSize113c(const uint8_t* packet, int length) {
     if (!packet || length < 0) return -1;
     if (length == 0) return 0;
-    const uint8_t opcode = packet[0];
-    if (opcode >= sizeof(kServerPacketSize113c) / sizeof(kServerPacketSize113c[0])) return -1;
-    const int entry = kServerPacketSize113c[opcode];
-    if (entry == 0) return -1;
-    const int size = entry > 0 ? entry : variablePacketSize(opcode, packet, length);
-    if (size == -2 || size == 0) return 0;
-    if (size < 0) return -1;
-    return length >= size ? size : 0;
+    uint32_t entry = 0;
+    const uint32_t size = d2_realm_d2net_6750(packet, static_cast<uint32_t>(length), &entry);
+    if (size == 0) return entry == 0xFFFFFFFFu ? 0 : -1;
+    if (size > 0x204) return -1;   // retail's splitter exits on a size over its node
+    return static_cast<uint32_t>(length) >= size ? static_cast<int>(size) : 0;
 }
 }  // namespace
 

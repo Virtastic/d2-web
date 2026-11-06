@@ -11,9 +11,9 @@ struct BnStream {
 
 struct BnCloseSeams {
     int32_t (*flush)(BnStream* s);       // __flush (0x7AED)
-    void    (*freebuf)(BnStream* s);     // __freebuf (0x3CF4)
+    void    (*freebuf)(BnStream* s);     // __freebuf (0x7F92)
     int32_t (*close)(int32_t file);      // __close (0x7EF7): negative on failure
-    void    (*free_name)(void* p);       // _free (0x7F92)
+    void    (*free_name)(void* p);       // _free (0x3CF4)
 };
 
 // Rule: result = -1. If _flag & 0x83 is set: result = flush(); freebuf(); if close(_file) < 0 then

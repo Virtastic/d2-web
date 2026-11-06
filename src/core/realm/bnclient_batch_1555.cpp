@@ -205,8 +205,9 @@ extern "C" void d2_bnclient_sha1_final(BnSeedSha1*, uint8_t*);
 // 1.13c BNClient+0x0ABE0 (180 B): reseed. Retail layout: EAX = seed argument, ESI = s, plain ret. Input is the 12 bytes
 // {__time32(&in[0]) (0x1621), EAX (stored at +4 before the call to srand), rand() after srand(EAX) (0x15F2/0x15FF)},
 // hashed with SHA-1 (stack context, update 0x9D00 / final 0x9DC0) into s+0xC (5 dwords), copied to s+0x20, then
-// s+0x34..0x4B zeroed. The clock is the injected seam (retail: GetSystemTimeAsFileTime).
-extern "C" void d2_bnclient_abe0(uint32_t* s, uint32_t eax, int32_t (*time32)(int32_t*)) {
+// s+0x34..0x4B zeroed. The clock is the injected seam (retail: GetSystemTimeAsFileTime). Returns the EAX retail leaves: the last
+// digest dword (s+0x30, loaded for the copy).
+extern "C" uint32_t d2_bnclient_abe0(uint32_t* s, uint32_t eax, int32_t (*time32)(int32_t*)) {
     int32_t in[3];
     time32(&in[0]);
     in[1] = (int32_t)eax;
@@ -217,4 +218,5 @@ extern "C" void d2_bnclient_abe0(uint32_t* s, uint32_t eax, int32_t (*time32)(in
     d2_bnclient_sha1_final(&c, (uint8_t*)(s + 3));
     for (int i = 0; i < 5; ++i) s[8 + i] = s[3 + i];
     for (int i = 0; i < 6; ++i) s[13 + i] = 0;
+    return s[12];
 }

@@ -8,28 +8,29 @@ typedef void (*BnFreeFn)(void* p, uint32_t line, uint32_t flags); // Ordinal_100
 typedef int (*BnSendFn)(uint32_t len, uint32_t id);          // 0xEB00 (<0 on failure)
 typedef void (*BnFatalFn)(uint32_t code);                    // Ordinal_10265/10024/_exit(-1); no return
 
-static void bn_replace_blob(void** slot, const void* src, uint32_t n, uint32_t freeLine, uint32_t allocLine,
+static uint32_t bn_replace_blob(void** slot, const void* src, uint32_t n, uint32_t freeLine, uint32_t allocLine,
                             BnAllocFn a, BnFreeFn f) {
     if (*slot) f(*slot, freeLine, 0);
     *slot = 0;
     *slot = a(allocLine, 0);
     memcpy(*slot, src, n);
+    return n;   // EAX = the length (copied to EAX ahead of the rep movs)
 }
 
 // 1.13c BNClient+0x0B5F0
 // Replace the blob in global DAT+0x3F888: free old (line 0x39A), alloc (line 0x356), copy n bytes.
-extern "C" void d2_bnclient_b5f0(void** slot, const void* src, uint32_t n, BnAllocFn a, BnFreeFn f) {
-    bn_replace_blob(slot, src, n, 0x39A, 0x356, a, f);
+extern "C" uint32_t d2_bnclient_b5f0(void** slot, const void* src, uint32_t n, BnAllocFn a, BnFreeFn f) {
+    return bn_replace_blob(slot, src, n, 0x39A, 0x356, a, f);
 }
 // 1.13c BNClient+0x0B700
 // Same, global DAT+0x3F880: free line 0x224, alloc line 0x21B.
-extern "C" void d2_bnclient_b700(void** slot, const void* src, uint32_t n, BnAllocFn a, BnFreeFn f) {
-    bn_replace_blob(slot, src, n, 0x224, 0x21B, a, f);
+extern "C" uint32_t d2_bnclient_b700(void** slot, const void* src, uint32_t n, BnAllocFn a, BnFreeFn f) {
+    return bn_replace_blob(slot, src, n, 0x224, 0x21B, a, f);
 }
 // 1.13c BNClient+0x0B7F0
 // Same, global DAT+0x3F884: free line 0x1CF, alloc line 0x1A0.
-extern "C" void d2_bnclient_b7f0(void** slot, const void* src, uint32_t n, BnAllocFn a, BnFreeFn f) {
-    bn_replace_blob(slot, src, n, 0x1CF, 0x1A0, a, f);
+extern "C" uint32_t d2_bnclient_b7f0(void** slot, const void* src, uint32_t n, BnAllocFn a, BnFreeFn f) {
+    return bn_replace_blob(slot, src, n, 0x1CF, 0x1A0, a, f);
 }
 
 // 1.13c BNClient+0x0B9B0

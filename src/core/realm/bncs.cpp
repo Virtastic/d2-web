@@ -204,7 +204,7 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_bncs_checkrev(const char* challenge, const cha
 }
 
 // SID_AUTH_INFO (0x50) request body -- the version gauntlet's opening, before any account exists:
-// nine u32s { 0, fourcc("IX86"), fourcc(product), 0x0E, 0, 0, 0, 0, 0 } then "USA\0United States\0"
+// nine u32s { 0, fourcc("IX86"), fourcc(product), 0x0D, 0, 0, 0, 0, 0 } then "USA\0United States\0"
 // (d2-clientless realm.zig connect).  `fourcc` packs the first char into the HIGH byte, so writing
 // it little-endian lands the tag reversed on the wire -- the classic BNCS convention.  The BNCS
 // socket, like MCP's, opens with a single 0x01 protocol-selector byte before any frame.
@@ -213,7 +213,7 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_bncs_auth_info_request(const char* product, ui
     const char* p = product && product[0] && product[1] && product[2] && product[3] ? product : "D2XP";
     const uint32_t ix86 = ((uint32_t)'I' << 24) | ((uint32_t)'X' << 16) | ((uint32_t)'8' << 8) | (uint32_t)'6';
     const uint32_t prod = ((uint32_t)(uint8_t)p[0] << 24) | ((uint32_t)(uint8_t)p[1] << 16) | ((uint32_t)(uint8_t)p[2] << 8) | (uint32_t)(uint8_t)p[3];
-    const uint32_t words[9] = { 0, ix86, prod, 0x0E, 0, 0, 0, 0, 0 };
+    const uint32_t words[9] = { 0, ix86, prod, 0x0D, 0, 0, 0, 0, 0 };   // 1.13c BNClient+0x11960 writes 0xD
     int w = 0;
     for (int i = 0; i < 9; i++) {
         out[w++] = (uint8_t)words[i]; out[w++] = (uint8_t)(words[i] >> 8);

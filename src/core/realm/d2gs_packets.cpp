@@ -109,8 +109,9 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_player_in_game(uint32_t unitId, uint8_t p
 // GAMELOGON (0x68), 37 bytes -- D2GSPacketClt0x68, packed and raw (d2-clientless session.zig).
 // The hash and token identify the game the realm assigned (they come straight out of the MCP
 // JOINGAME reply); the two constants are the expansion/version pair the engine checks before it
-// will admit anyone. `verByte` is GetGameVersion() -- 0x0E is 1.14d. The character name is a
-// 16-byte null-padded field, truncated if longer.
+// will admit anyone. 1.13c D2Client+0x13A50 builds +12 as 0x2185EDD6 + (expansion ? 0xCBD7DE7A : 0),
+// i.e. 0xED5DCC50 for LoD, and takes `verByte` from the BNClient interface (+0x5C returns 0x0D). The
+// character name is a 16-byte null-padded field, truncated if longer.
 EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_gamelogon(uint32_t gameHash, uint16_t gameToken, uint8_t charClass, uint32_t verByte, const char* character, uint8_t* out) {
     for (int i = 0; i < 37; i++) out[i] = 0;
     out[0] = 0x68;
@@ -118,23 +119,69 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_gamelogon(uint32_t gameHash, uint16_t gam
     wu16(out + 5, gameToken);
     out[7] = charClass;
     wu32(out + 8, verByte);
-    wu32(out + 12, 0xED5FCC50u);   // nVersionConstant (expansion)
+    wu32(out + 12, 0xED5DCC50u);   // nVersionConstant (expansion)
     wu32(out + 16, 0x91A519B6u);   // nConstant
     out[20] = 0;                   // nLanguageCode
     wstr(out + 21, character, 16);
     return 37;
 }
 
-// SCMD 0x6d, the client keep-alive: opcode, a tick count, and eight zeros -- exactly 13 bytes.
+// SCMD 0x6d, the client keep-alive: exactly 13 bytes, [0x6D][tick][average RTT >> 1][check * 0xB640DE41].
 // The length has to be exact.  The server frames client->server traffic by the same size table the
 // client does, so a SHORT ping is not rejected: it is sized at 13 anyway and eats the eight bytes
 // after it, so every later command is read at an offset and the game goes quiet rather than
 // erroring.  The engine also hangs up silently on a connection that stops pinging.
-EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_ping(uint32_t tick, uint8_t* out) {
-    for (int i = 0; i < 13; i++) out[i] = 0;
+//
+// `st` is D2Client's keep-alive state, one dword each: [0] DAT_9800 the send tick, [1] DAT_9804 the last
+// round trip, [2] DAT_982C the sample count, [3] DAT_9830 the average round trip, [4..11] DAT_9834..9850 the
+// last pong's eight dwords, [12] DAT_CC4F4 the last ping tick, [13] DAT_CC4E0 bytes sent, [14] DAT_CC4E8 pings sent.
+// All zero at load.
+//
+// 1.13c D2Client+0x14B00. The check word comes from the pong: (DAT_9848, DAT_984C) * 0x470E31C1 is an
+// eight-byte module name and DAT_9850 * 0x470E31C1 an offset into it; an empty name gives 0, a module
+// GetModuleHandleA does not find gives the uninitialised 0xCCCCCCCC, and a found one gives the words at
+// +offset (w20) and +offset+0x20 (w24) as w24 << 16 | w20. The host answers the lookup through `found`,
+// `w20` and `w24` (d2_realm_d2gs_ping_module names it). Sent only when tick - DAT_CC4F4 > 4999; the
+// callers (D2Client 0x44B50, 0xC1760) then store the send tick in DAT_9800. Returns 13, or 0 when gated.
+EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_ping(uint32_t* st, uint32_t tick, int found, uint32_t w20, uint32_t w24, uint8_t* out) {
+    const uint32_t name = st[9] * 0x470E31C1u;
+    uint32_t check = 0;
+    if ((uint8_t)name != 0) check = found ? ((w24 & 0xFFFFu) << 16) | (w20 & 0xFFFFu) : 0xCCCCCCCCu;
+    if (tick - st[12] <= 4999) return 0;
+    st[12] = tick;
     out[0] = 0x6D;
     wu32(out + 1, tick);
+    wu32(out + 5, st[3] >> 1);
+    wu32(out + 9, check * 0xB640DE41u);
+    st[13] += 13;
+    st[14] += 1;
+    st[0] = tick;
     return 13;
+}
+
+// The module the next ping reads: writes the NUL-terminated eight-byte name to `name` (9 bytes) and returns
+// the offset, or returns 0 with an empty name when the ping's check word is 0 without a lookup.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_realm_d2gs_ping_module(const uint32_t* st, char* name) {
+    const uint32_t a = st[9] * 0x470E31C1u, b = st[10] * 0x470E31C1u;
+    for (int i = 0; i < 4; ++i) { name[i] = (char)(a >> (8 * i)); name[4 + i] = (char)(b >> (8 * i)); }
+    name[8] = 0;
+    return name[0] ? st[11] * 0x470E31C1u : 0;
+}
+
+// SCMD 0x8F, the pong (33 bytes). 1.13c D2Client+0x422E0 (EAX = the packet): the eight dwords at +1 go to
+// DAT_9834..9850, DAT_9844 is then overwritten with GetTickCount, DAT_9804 = tick - DAT_9800, and while
+// fewer than ten samples are held the average becomes (average * count + rtt) / (count + 1).
+EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_pong(uint32_t* st, const uint8_t* pkt, int len, uint32_t tick) {
+    if (len < 33 || pkt[0] != 0x8F) return 0;
+    for (int i = 0; i < 8; ++i)
+        st[4 + i] = (uint32_t)pkt[1 + 4 * i] | ((uint32_t)pkt[2 + 4 * i] << 8) | ((uint32_t)pkt[3 + 4 * i] << 16) | ((uint32_t)pkt[4 + 4 * i] << 24);
+    st[8] = tick;
+    st[1] = tick - st[0];
+    if (st[2] < 10) {
+        st[3] = (st[3] * st[2] + st[1]) / (st[2] + 1);
+        st[2] += 1;
+    }
+    return 1;
 }
 
 // 0xa8 StateSet: unitType(u8), unitId(u32), packetLength(u8), state(u8), stateEffects(bytes).  The

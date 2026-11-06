@@ -40,6 +40,12 @@ EMSCRIPTEN_KEEPALIVE void bn_set_sbcs(void) {
     g_bn_mbcs_1fa98 = 0;
 }
 
+// The SBCS state words in retail order {0x1FA84, 0x1F960, 0x1F958, 0x1FA90, 0x1FA94, 0x1FA98}.
+extern "C" void bn_sbcs_state(uint32_t* out6) {
+    const uint32_t v[6] = {g_bn_mbcs_1fa84, g_bn_mbcs_1f960, g_bn_mbcs_1f958, g_bn_mbcs_1fa90, g_bn_mbcs_1fa94, g_bn_mbcs_1fa98};
+    std::memcpy(out6, v, sizeof v);
+}
+
 // The parser reads the CRT owner's byte classification table, including its trailing byte.
 extern "C" const uint8_t* bn_mbctype() {
     return reinterpret_cast<const uint8_t*>(g_bn_sbcs_table_1f980);
