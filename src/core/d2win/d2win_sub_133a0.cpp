@@ -1,7 +1,7 @@
 // 1.13c D2Win+0x133A0 (size 482): draw the popup text (0x6F9A9E58) in a filled box, then restore the font.
 // Seams: D2Gfx #10080/#10014/#10049, D2Win 0x11FB0 (max width) 0x11E80 (height) 0x12940 (draw) 0x12FE0 (set font).
 // Arguments checked against the retail disassembly (not the decompile): the draw takes x in EAX (the clamped box
-// x); the remainder strip's first corner is the slot at [esp+0x20], which holds posY+2, not x; the fill modes are
+// x); the remainder strip starts at x + fw, the end of the tiled part (as captured); the fill modes are
 // 1 (tiled, cache palette) and 2 (plain) as pushed; the closing restore sets the font to the entry font when the
 // loop left it changed (the entry value sits at [esp+0x28]).
 #include <cstdint>
@@ -53,7 +53,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_133a0(D2Win133A0Env& e) {
     if (!*e.fillCache) *e.fillCache = e.mkTrans();
     int32_t fw = (e.fillPct * w) >> 7, ty = yb - h;
     e.fill(x, ty, x + fw, yb, *e.fillCache, 1);
-    if (w - fw) e.fill(y0, ty, y0 + (w - fw), yb, 0, 2);   // retail first corner is [esp+0x20] = posY+2
+    if (w - fw) e.fill(x + fw, ty, x + fw + (w - fw), yb, 0, 2);   // the strip starts where the tiled part ends (the captured corner is x + fw)
   }
   const int32_t lineH = e.fontHeight(*e.curFont) * e.fontScale;
   e.draw(x, e.text, yb - lineH / 10, w, e.textColor, 1);

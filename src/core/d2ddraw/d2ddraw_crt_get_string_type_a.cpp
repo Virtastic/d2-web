@@ -1,4 +1,4 @@
-// src/core/d2ddraw/d2ddraw_crt_get_string_type_a.cpp -- UNMAPPED 1.13c D2DDraw.dll row reimplemented
+// src/core/d2ddraw/d2ddraw_crt_get_string_type_a.cpp -- old D2DDraw.dll reading
 // from the cached decompile build-wasm/ghidra-d2ddraw/decomp/0x4F88.c (alpha lane: no spec, no vector).
 // Retail base 0x6F8C0000; every global is named at its retail RVA.
 //
@@ -45,7 +45,7 @@ struct D2DDrawCrtGetStringTypeAEnv {
     void     (*free)(void* p);                                                     // +0x01E94
 };
 
-// 1.13c D2DDraw+0x04F88 (421 B): the ANSI/wide GetStringTypeA described above.
+// (old reading of 0x4F88 with a shifted argument list, superseded by d2ddraw_4f88.cpp)
 extern "C"
 int32_t d2ddraw_crt_get_string_type_a(uint32_t plocinfo, uint32_t info_type, const char* src,
         int32_t cch, uint16_t* out, uint32_t code_page, int32_t b_error,

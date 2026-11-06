@@ -13,7 +13,7 @@ void FUN_6fa51aa0(char mode) {
   if ((uint8_t)mode < 7) p[slot[(uint8_t)mode]] = 1;
 }
 
-// 1.13c D2Launch+0x110C0
+// Earlier form of D2Launch 0x110C0 (the faithful port is d2launch_110c0.cpp)
 extern int32_t DAT_6fa61e58, DAT_6fa61408, DAT_6fa61438, DAT_6fa61468, DAT_6fa614f8, DAT_6fa61528,
     DAT_6fa620f8, DAT_6fa634d8, DAT_6fa63508, DAT_6fa63298, DAT_6fa636b8, DAT_6fa632f8,
     DAT_6fa63358, DAT_6fa633b8, DAT_6fa63fb8, DAT_6fa64168;

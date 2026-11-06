@@ -14,12 +14,13 @@
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t* d2win_sub_194D0(double v, int32_t* out, char* buf) {
     char t[40];
-    snprintf(t, sizeof t, "%.16e", v < 0 ? -v : v);   // d.dddddddddddddddde+XX
+    snprintf(t, sizeof t, "%.16e", std::fabs(v));   // d.dddddddddddddddde+XX
     char dg[20]; int n = 0;
     for (char* p = t; *p && *p != 'e'; p++) if (*p != '.') dg[n++] = *p;
+    while (n > 1 && dg[n - 1] == '0') n--;   // the mantissa string ends at its last nonzero digit
     dg[n] = 0;
     int e = atoi(strchr(t, 'e') + 1);
-    out[0] = (v < 0 || (v == 0 && std::signbit(v))) ? '-' : ' ';
+    out[0] = v < 0 ? '-' : ' ';   // a negative zero converts without its sign
     out[1] = (int16_t)(v == 0 ? 0 : e + 1);
     out[2] = 1;
     strcpy(buf, dg);

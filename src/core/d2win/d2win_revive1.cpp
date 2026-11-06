@@ -78,12 +78,13 @@ int32_t d2win_8790(uint16_t* s, int32_t maxWidth, const D2WinGlyphEnv* e) {
 }
 
 struct D2WinTile10280Env {
-    void (*draw3)(uint32_t surface, int32_t x, int32_t y);                                 // Ordinal 10079, 3 words
-    void (*draw5)(uint32_t surface, int32_t x, int32_t y, const int32_t* clip, int32_t m); // Ordinal 10079, 5 words
+    // D2Gfx ordinal 10079 through thunk 0x7852, stdcall 5 words (the decompile shows only three on the equal-size path)
+    void (*draw5)(uint32_t surface, int32_t x, int32_t y, const int32_t* clip, int32_t m);
 };
 
 // tile the source rect over the destination rect. src = {left, right, top, bottom}, dst in
-// EAX the same layout. Equal sizes: one draw3(surface, dst.left - src.left, dst.bottom - src.bottom + 0x100).
+// EAX the same layout. Equal sizes: one draw5(surface, dst.left - src.left, dst.bottom - src.bottom + 0x100, dst, 5)
+// (the disassembly passes the destination rect itself as the clip).
 // Otherwise ceil-division columns x rows, each cell clipped to dst and drawn by draw5(surface, x, y, clip, 5).
 // 1.13c D2Win+0x10280
 void d2win_10280(const int32_t* src, uint32_t surface, const int32_t* dst, const D2WinTile10280Env* e) {
@@ -92,7 +93,7 @@ void d2win_10280(const int32_t* src, uint32_t surface, const int32_t* dst, const
     int32_t dw = dst[1] - dst[0];
     int32_t dh = dst[3] - dst[2];
     if (sw == dw && sh == dh) {
-        e->draw3(surface, dst[0] - src[0], (dst[3] - src[3]) + 0x100);
+        e->draw5(surface, dst[0] - src[0], (dst[3] - src[3]) + 0x100, dst, 5);
         return;
     }
     int32_t cols = (dw - 1 + sw) / sw;
@@ -118,27 +119,28 @@ void d2win_10280(const int32_t* src, uint32_t surface, const int32_t* dst, const
 }
 
 struct D2WinMpqEnv {
-    void* (*open)(const char* who, const char* file, const char* tag); // FUN_6F8E7E60: archive open, handle or null
-    int32_t (*ord10117)(void);                                         // already-open probe
-    int32_t (*ord10227)(void);                                         // expansion-check probe
+    // FUN_6F8E7E60: archive open, EAX = priority, stdcall (caller tag, file, label, 0, 0), ret 0x14; a 32-bit handle or 0
+    uint32_t (*open)(uint32_t prio, const char* who, const char* file, const char* tag, uint32_t a3, uint32_t a4);
+    int32_t (*ord10117)(void);                                         // thunk 0x76EA (IAT 0x1B158): already-open probe
+    int32_t (*ord10227)(void);                                         // thunk 0x76F6 (IAT 0x1B150): expansion-check probe
 };
 
-struct D2WinArchives {                // the seven archive handles, in open order
-    void* data; void* sfx; void* speech; void* delta; void* kfixup; void* patch; void* exp;
+struct D2WinArchives {                // the seven archive handles (32-bit retail words), in open order
+    uint32_t data, sfx, speech, delta, kfixup, patch, exp;   // 0xC9CCC 0xC9CB8 0xC9CD4 0xC9CBC 0xC9CD0 0xC9CE0 0xC9CE4
 };
 
-// export 10086. Opens D2DATA, D2SFX, D2SPEECH, D2DELTA, D2KOREANFIXUP, PATCH_D2, D2EXPANSION
-// (each with the "D2Win.DLL" caller tag). Returns 1 when 10117 is nonzero; with data+sfx+speech open, 1 when 10227
+// export 10086. Opens D2DATA, D2SFX, D2SPEECH, D2DELTA, D2KOREANFIXUP (priority 1000), PATCH_D2 (5000), D2EXPANSION (3000),
+// each with the "D2Win.DLL" caller tag. Returns 1 when 10117 is nonzero; with data+sfx+speech open, 1 when 10227
 // is zero or the expansion archive opened; else 0.
 // 1.13c D2Win+0x0AA20
 int32_t d2win_aa20(D2WinArchives* a, const D2WinMpqEnv* e) {
-    a->data = e->open("D2Win.DLL", "d2data.mpq", "D2DATA");
-    a->sfx = e->open("D2Win.DLL", "d2sfx.mpq", "D2SFX");
-    a->speech = e->open("D2Win.DLL", "d2speech.mpq", "D2SPEECH");
-    a->delta = e->open("D2Win.DLL", "d2delta.mpq", "D2DELTA");
-    a->kfixup = e->open("D2Win.DLL", "d2kfixup.mpq", "D2KOREANFIXUP");
-    a->patch = e->open("D2Win.DLL", "patch_d2.mpq", "PATCH_D2");
-    a->exp = e->open("D2Win.DLL", "d2exp.mpq", "D2EXPANSION");
+    a->data = e->open(1000, "D2Win.DLL", "d2data.mpq", "D2DATA", 0, 0);
+    a->sfx = e->open(1000, "D2Win.DLL", "d2sfx.mpq", "D2SFX", 0, 0);
+    a->speech = e->open(1000, "D2Win.DLL", "d2speech.mpq", "D2SPEECH", 0, 0);
+    a->delta = e->open(1000, "D2Win.DLL", "d2delta.mpq", "D2DELTA", 0, 0);
+    a->kfixup = e->open(1000, "D2Win.DLL", "d2kfixup.mpq", "D2KOREANFIXUP", 0, 0);
+    a->patch = e->open(5000, "D2Win.DLL", "patch_d2.mpq", "PATCH_D2", 0, 0);
+    a->exp = e->open(3000, "D2Win.DLL", "d2exp.mpq", "D2EXPANSION", 0, 0);
     if (e->ord10117() != 0) return 1;
     if (a->data && a->sfx && a->speech) {
         if (e->ord10227() == 0) return 1;

@@ -23,10 +23,10 @@ struct D2WinB66Env {
     int32_t cb8d70, cb8c60, cb9840;                    // 0x9C00 callbacks / key-handler address
     int32_t (*textWidth)(const uint16_t* s, int32_t n);  // 0x12080 / 0x12080-family
     int32_t (*sub_9200)(int32_t* w);
-    void (*sub_8B50)(void);
+    void (*sub_8B50)(int32_t eax);                     // EAX = the widget's [0x25]
     int32_t* gCurFont;                                 // DAT_6f900c68
-    int32_t (*sub_93C0)(int32_t* w, const uint16_t* text, int32_t flag, int32_t mode);
-    int32_t* (*sub_B160)(int32_t a, int32_t b, int32_t c, int32_t d);
+    int32_t (*sub_93C0)(int32_t* w, const uint16_t* text, int32_t p3, int32_t p4, int32_t p5);  // 0x93C0 (ECX, EDX, 3 stack)
+    int32_t* (*sub_B160)(int32_t a, int32_t b, int32_t s0, int32_t s1, int32_t s2, int32_t s3);  // fastcall ECX, EDX + 4 stack (ret 0x10)
     void (*sub_2FE0)(int32_t font);                    // 0x12FE0
     const uint8_t* (*glyph)(uint16_t ch);              // (*DAT_6f901508)(), ECX = ch
     const char* (*fontName)(int32_t idx, int32_t ingame, int32_t* dirTag, const char** dirOut);
@@ -97,34 +97,33 @@ int32_t* d2win_b66_115A0(int32_t x, int32_t y, int32_t width, int32_t height, in
     return w;
 }
 
-// 1.13c D2Win+0x09c00 -- new type-4 widget (0xAC bytes). this=ECX=x(w0); hidden: ebx=w[3], ebp=w[4],
-// retaddr=w[6] (stack). Decompile names: param_1..4 = [0x10],[0x11],[1],[0xd].
+// 1.13c D2Win+0x09C00 -- new type-4 widget (Fog alloc 0xAC, line 0x63). __fastcall ECX = x (w[3]), EDX = y (w[4]), nine
+// stack words (ret 0x24): s0 = width (w[5], less 0x1A when flags&4 and no s8 rect), s1 = height (w[6]), s2 = [0x10], s3 = [0x11],
+// s4 = [1] (also the child's third stack word), s5 = [0xd], s6 = flags, s7 = optional {[0x25], [0x26]}, s8 = optional child rect.
 extern "C" EMSCRIPTEN_KEEPALIVE
-int32_t* d2win_b66_9C00(int32_t thisX, int32_t p1, int32_t p2, int32_t p3, int32_t p4, uint32_t flags,
-                        const int32_t* p6, const int32_t* p7,
-                        int32_t ebx, int32_t ebp, int32_t stk, const D2WinB66Env* e) {
-    int32_t* w = (int32_t*)e->alloc(99, 0);
+int32_t* d2win_b66_9C00(int32_t x, int32_t y, int32_t width, int32_t height, int32_t s2, int32_t s3, int32_t s4, int32_t s5,
+                        uint32_t flags, const int32_t* s7, const int32_t* s8, const D2WinB66Env* e) {
+    int32_t* w = (int32_t*)e->alloc(0xAC, 0x63);
     for (int i = 0; i < 0x2b; i++) w[i] = 0;
-    int32_t x = thisX;
-    if ((flags & 4) && !p7) x -= 0x1a;
+    if ((flags & 4) && !s8) width -= 0x1a;
     if (flags & 1) flags |= 0x20;
     w[0] = 4;
     w[2] = (w[2] | e->bitMasks[0]) | e->bitMasks[2];
-    w[1] = p3; w[5] = x; w[3] = ebx; w[0x10] = p1; w[4] = ebp; w[0xd] = p4; w[0x11] = p2;
-    w[0x17] = (int32_t)flags; w[6] = stk;
+    w[1] = s4; w[5] = width; w[3] = x; w[0x10] = s2; w[4] = y; w[0xd] = s5; w[0x11] = s3;
+    w[0x17] = (int32_t)flags; w[6] = height;
     w[7] = e->cb8d70; w[9] = e->cb8c60;
     w[10] = 0; w[0xb] = 0;
     w[0xc] = (flags & 1) ? e->cb9840 : 0;
     w[0x18] = -1; w[0xf] = 0; w[0x14] = 0; w[0x12] = 0; w[0x13] = 0; w[0x15] = 0; w[0x16] = 0; w[0x19] = 1;
-    if (!p6) { w[0x25] = 1; w[0x26] = 0; } else { w[0x25] = p6[0]; w[0x26] = p6[1]; }
-    e->sub_8B50();
+    if (!s7) { w[0x25] = 1; w[0x26] = 0; } else { w[0x25] = s7[0]; w[0x26] = s7[1]; }
+    e->sub_8B50(w[0x25]);
     w[0x2a] = *e->gCurFont;
     if (!(flags & 4)) { w[0x24] = 0; appendWidget(w, e); return w; }
     w[1] = 0;
     int32_t a, b, c;
-    if (!p7) { b = ebp - 2; a = ebx + 8 + x; c = stk - 0x10; }
-    else { a = p7[0]; b = p7[1]; c = p7[2]; }
-    int32_t* sb = e->sub_B160(a, b, 10, c);
+    if (!s8) { b = y - 2; a = x + width + 8; c = height - 0x10; }
+    else { a = s8[0]; b = s8[1]; c = s8[2]; }
+    int32_t* sb = e->sub_B160(a, b, 10, c, s4, 0);
     w[0x24] = e->h(sb);
     if (*sb != 5) e->fatal(0x7f);
     sb[0x15] = e->h(w);
@@ -137,45 +136,43 @@ int32_t* d2win_b66_9C00(int32_t thisX, int32_t p1, int32_t p2, int32_t p3, int32
     return w;
 }
 
-// 1.13c D2Win+0x099F0 -- text-box: wrap text at width limit, add the two halves via 0x93C0.
-// this=ECX widget, text=ESI (hidden), limit=EBP (hidden), param_1 = mode, param_2 = kind.
+// 1.13c D2Win+0x099F0 -- text box word wrapper: fastcall(ECX = type-4 box, EDX = text), stack p3, p5;
+// ret 8. Width = box[5] - 2 * box[0x10] (less the width of five spaces when p5 == 2); the line breaks at the last space before
+// the first prefix of the ORIGINAL text that measures >= width (no space: at that character; none too wide: the whole text).
+// Both halves go to 0x93C0 (p4 = 1 then 0; p5 1 becomes 2 for the second). Fog #10042 / #10043 via thunks 0x7630 / 0x7636.
 extern "C" EMSCRIPTEN_KEEPALIVE
-int32_t d2win_b66_99F0(int32_t* w, const uint16_t* text, int32_t limit, int32_t mode, int32_t kind,
-                       const D2WinB66Env* e) {
+int32_t d2win_b66_99F0(int32_t* w, const uint16_t* text, int32_t p3, int32_t p5, const D2WinB66Env* e) {
     static const char* F = "..\\Source\\D2Win\\Src\\D2WinTextBox.cpp";
     if (!w) e->fatal(0x482);
     if (*w != 4) e->fatal(0x483);
-    uint16_t sp[6] = {0x20, 0x20, 0x20, 0x20, 0x20, 0};  // only measured (decompile discards result)
-    if (kind == 2) e->textWidth(sp, u16len(sp));
+    int32_t width = w[5] - 2 * w[0x10];
+    if (p5 == 2) {
+        uint16_t sp[6] = {0x20, 0x20, 0x20, 0x20, 0x20, 0};
+        width -= e->textWidth(sp, u16len(sp));
+    }
     uint16_t* all = (uint16_t*)e->allocSrc(0x800, F, 0x497);
     u16cpy(all, text);
-    int32_t len = u16len(all);
+    const int32_t len = u16len(all);
     const uint16_t* lastSp = nullptr;
-    int32_t cut = 0, i = 0;
-    if (len > 0) {
-        const uint16_t* cur = all;
-        do {
-            if (*cur == 0x20) lastSp = cur;
-            cut = i + 1;
-            if (e->textWidth(text, cut) >= limit) {
-                cut = i;
-                if (lastSp) cut = (int32_t)(lastSp - all);
-                break;
-            }
-            cur++; i = cut;
-        } while (cut < len);
+    int32_t cut = 0;
+    while (cut < len) {
+        if (all[cut] == 0x20) lastSp = all + cut;
+        if (e->textWidth(text, cut + 1) >= width) {
+            if (lastSp) cut = (int32_t)(lastSp - all);
+            break;
+        }
+        cut++;
     }
     uint16_t* a = (uint16_t*)e->allocSrc(0x800, F, 0x4b7);
     uint16_t* b = (uint16_t*)e->allocSrc(0x800, F, 0x4b8);
     for (int32_t k = 0; k < cut; k++) a[k] = all[k];
     a[cut] = 0;
-    // decompile copies from the register-held source for the tail; same buffer in the original
     for (int32_t k = 0; k < len - cut; k++) b[k] = all[cut + k];
     b[len - cut] = 0;
     e->freeSrc(all, F, 0x4bf);
-    e->sub_93C0(w, a, 1, mode);
-    if (mode == 1) mode = 2;
-    e->sub_93C0(w, b, 0, mode);
+    e->sub_93C0(w, a, p3, 1, p5);
+    if (p5 == 1) p5 = 2;
+    e->sub_93C0(w, b, p3, 0, p5);
     e->freeSrc(a, F, 0x4c4);
     e->freeSrc(b, F, 0x4c5);
     return 1;

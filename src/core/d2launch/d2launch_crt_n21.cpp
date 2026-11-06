@@ -90,20 +90,26 @@ int32_t FUN_6fa47c41(MbcState* s, const MbcHost* h, const CpTableEntry* tbl, uin
 void FUN_6fa47f1c(void (*unlock)(int)) { unlock(0xd); }
 
 // 1.13c D2Launch+0x7DD5
+// The pseudo pages -2 / -3 / -4 ask GetOEMCP / GetACP / the cached ANSI page and raise the ctype flag. A page already current
+// returns 0. Otherwise the saved block (DAT_6fa66d24) is reused when its first dword is 0, else a 0x220 block is allocated; the
+// tables are rebuilt (0x7C41) and, on success, copied into the block, which becomes the saved one. A failed rebuild frees a
+// block that is not the saved one (a NULL one too: retail calls _free(NULL) when malloc failed under a live saved block).
+// Null seams fall back to the host (setCp = FUN_6fa47c41, malloc_/free_ = the C library).
 int32_t __setmbcp(MbcState* s, const MbcHost* h, const CpTableEntry* tbl, uint8_t** saved,
-                  int32_t cp, uint32_t oemcp, uint32_t acp, uint32_t cachedAcp, void (*lock)(int),
-                  void (*unlock)(int)) {
+                  int32_t cp, uint32_t (*getOEMCP)(void), uint32_t (*getACP)(void), uint32_t cachedAcp, void (*lock)(int),
+                  void (*unlock)(int), void* (*malloc_)(uint32_t), void (*free_)(void*),
+                  int32_t (*setCp)(MbcState*, const MbcHost*, const CpTableEntry*, uint32_t)) {
   int32_t r = -1;
   lock(0xd);
   s->ctypeFlag = 0;
-  if (cp == -2) { s->ctypeFlag = 1; cp = (int32_t)oemcp; }
-  else if (cp == -3) { s->ctypeFlag = 1; cp = (int32_t)acp; }
+  if (cp == -2) { s->ctypeFlag = 1; cp = (int32_t)getOEMCP(); }
+  else if (cp == -3) { s->ctypeFlag = 1; cp = (int32_t)getACP(); }
   else if (cp == -4) { s->ctypeFlag = 1; cp = (int32_t)cachedAcp; }
   if ((uint32_t)cp == s->codePage) r = 0;
   else {
     uint8_t* m = *saved;
-    if (!m || *(int32_t*)m != 0) m = (uint8_t*)malloc(0x220);
-    if (m && (r = FUN_6fa47c41(s, h, tbl, (uint32_t)cp)) == 0) {
+    if (!m || *(int32_t*)m != 0) m = (uint8_t*)(malloc_ ? malloc_(0x220) : malloc(0x220));
+    if (m && (r = (setCp ? setCp : FUN_6fa47c41)(s, h, tbl, (uint32_t)cp)) == 0) {
       *(int32_t*)m = 0;
       ((uint32_t*)m)[1] = s->codePage; ((uint32_t*)m)[2] = s->isMulti; ((uint32_t*)m)[3] = s->locale;
       memcpy(m + 0x10, s->cp, 10);
@@ -111,7 +117,7 @@ int32_t __setmbcp(MbcState* s, const MbcHost* h, const CpTableEntry* tbl, uint8_
       memcpy(m + 0x11d, s->lower, 0x100);
       *saved = m;
     }
-    if (r == -1 && m != *saved) free(m);
+    if (r == -1 && m != *saved) (free_ ? free_ : free)(m);
   }
   FUN_6fa47f1c(unlock);
   return r;
@@ -184,7 +190,8 @@ uint32_t ___isctype_mt(const uint16_t* ctypeTab, const uint8_t* lead, uint32_t c
   if ((uint32_t)(c + 1) < 0x101) t = ctypeTab[c];
   else {
     uint8_t s[2]; int n;
-    if (lead[(c >> 8) & 0xff] & 0x80) { s[0] = (uint8_t)(c >> 8); s[1] = (uint8_t)c; n = 2; }
+    (void)lead;   // retail reads the lead flag from the class table itself: bit 0x8000 of the high byte's entry
+    if (ctypeTab[(c >> 8) & 0xff] & 0x8000) { s[0] = (uint8_t)(c >> 8); s[1] = (uint8_t)c; n = 2; }
     else { s[0] = (uint8_t)c; s[1] = 0; n = 1; }
     if (!getStringType(s, n, &t, cp, lcid)) return 0;
   }

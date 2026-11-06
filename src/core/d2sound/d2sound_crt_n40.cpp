@@ -55,12 +55,16 @@ void d2s_cftog(const uint32_t* dbl, char* buf, int32_t prec, int32_t caps, D2sFl
 // 1.13c D2sound+0xB1C9
 int32_t d2s_b1c9() { return 1; }
 
-// 1.13c D2sound+0xB1FE  CPU feature probe; cpuid results and EFLAGS.ID-toggle result are host args
-int32_t d2s_b1fe(int32_t cpuidSupported, const char vendor[12], uint32_t verEax, uint32_t verEdx, uint32_t* sse2Flag, uint32_t* fastFlag) {
+// 1.13c D2sound+0xB1FE  CPU feature probe. The CPU state is a seam: cpuidSupported = the EFLAGS.ID toggle stuck, vendor = CPUID 0
+// EBX:EDX:ECX, verEax/verEdx = CPUID 1 EAX/EDX; osSse = 0xB1C9 (the guarded SSE2 instruction; null = d2s_b1c9). fastFlag = DAT_6f9c6604,
+// sse2Flag = DAT_6f9c6600.
+typedef int32_t (*D2sOsSse)();
+int32_t d2s_b1fe(int32_t cpuidSupported, const char vendor[12], uint32_t verEax, uint32_t verEdx, uint32_t* sse2Flag, uint32_t* fastFlag,
+                 D2sOsSse osSse = nullptr) {
     uint32_t edx = 0, eax = 0;
     if (cpuidSupported) { eax = verEax; edx = verEdx; }
     *fastFlag = 0; *sse2Flag = 0;
-    if ((edx & 0x4000000) && d2s_b1c9()) {
+    if ((edx & 0x4000000) && (osSse ? osSse() : d2s_b1c9())) {
         *fastFlag = 1;
         uint32_t fam = eax >> 8 & 0xf;
         if (memcmp("AuthenticAMD", vendor, 12) != 0 || ((fam != 0xf ? 0u : 0xffu) & (eax >> 20)) + fam != 0xf)

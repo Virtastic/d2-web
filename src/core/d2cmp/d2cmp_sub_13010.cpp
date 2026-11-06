@@ -30,7 +30,7 @@ uint32_t d2cmp_sub_13010(uint8_t* out, const D2CMP13010Env* env) {
         out[0x14] = h[2]; out[0x15] = out[0x16] = out[0x17] = 0;
         std::memcpy(out + 0x18, h + 3, 4);
         if (n > 0x20) { env->fatal(0x50a); _Exit(-1); }
-        if (env->read(n * 4, nullptr) && env->readCount() == n * 4) {
+        if (env->read(n * 4, out + 0x1c) && env->readCount() == n * 4) {
             uint32_t t = env->tell();
             std::memcpy(out + 0x1c + n * 4, &t, 4);
             env->close();

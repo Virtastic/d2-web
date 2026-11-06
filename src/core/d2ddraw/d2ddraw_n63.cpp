@@ -23,7 +23,7 @@ static uint32_t n63_isctype(const d2ddraw_n63_Env* e, int c, int mask)
     return e->isctype_mt(c, mask);
 }
 
-// 1.13c D2DDRAW+0x05891
+// (old reading of 0x5891, superseded by d2ddraw_5891.cpp)
 long d2ddraw_atol(const d2ddraw_n63_Env* e, const char* s)
 {
     while (n63_isctype(e, (uint8_t)*s, 8)) s++;
@@ -35,7 +35,7 @@ long d2ddraw_atol(const d2ddraw_n63_Env* e, const char* s)
     return c == '-' ? -v : v;
 }
 
-// 1.13c D2DDRAW+0x05919
+// (old reading of 0x5919, superseded by d2ddraw_5919.cpp)
 long d2ddraw_locale_info_long(const d2ddraw_n63_Env* e, uint32_t lcid)
 {
     char b[7];
@@ -44,7 +44,7 @@ long d2ddraw_locale_info_long(const d2ddraw_n63_Env* e, uint32_t lcid)
     return d2ddraw_atol(e, b);
 }
 
-// 1.13c D2DDRAW+0x05960
+// (old reading of 0x5960, superseded by d2ddraw_5960.cpp)
 int* d2ddraw_convert_string_cp(const d2ddraw_n63_Env* e, uint32_t from, uint32_t to,
                                const char* in, uint32_t* pcb, int* out, int outcb)
 {
@@ -75,7 +75,7 @@ int* d2ddraw_convert_string_cp(const d2ddraw_n63_Env* e, uint32_t from, uint32_t
     return res;
 }
 
-// 1.13c D2DDRAW+0x05B3A
+// (old reading of 0x5B3A, superseded by d2ddraw_5b3a.cpp)
 int d2ddraw_isdigit(const d2ddraw_n63_Env* e, int c) { return (int)n63_isctype(e, c, 4); }
 
 // 1.13c D2DDRAW+0x05C3C

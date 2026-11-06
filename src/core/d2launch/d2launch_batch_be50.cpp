@@ -38,7 +38,7 @@ __attribute__((weak)) extern int32_t FUN_6fa4c720(const char*, const char*, int3
 __attribute__((weak)) extern int32_t FUN_6fa4b5b0(void);
 __attribute__((weak)) extern int32_t DAT_6fa65e78, DAT_6fa65ad4, DAT_6fa65ed0, DAT_6fa64db4, DAT_6fa64db8, DAT_6fa65eb8, DAT_6fa65eb0, DAT_6fa65edc, DAT_6fa65ee0, DAT_6fa65ab4, DAT_6fa65aa8, DAT_6fa65ee4;
 __attribute__((weak)) extern uint8_t DAT_6fa65758[];
-__attribute__((weak)) extern int32_t** DAT_6fa65e74;
+__attribute__((weak)) extern uint32_t* DAT_6fa65e74;   // 32-bit slot words
 __attribute__((weak)) extern uint8_t* DAT_6fa65abc;
 __attribute__((weak)) extern uint8_t* DAT_6fa656c4;
 __attribute__((weak)) extern uint8_t* DAT_6fa65ec8;
@@ -48,7 +48,7 @@ int32_t d2l_be50_FUN_6fa4be50(const char* name) {
   for (int32_t i = 0;; i++) {
     int32_t v = 0;
     if (i < DAT_6fa65e78) {
-      int32_t* p = DAT_6fa65e74[i];
+      int32_t* p = (int32_t*)(uintptr_t)DAT_6fa65e74[i];
       if (!p) { Ordinal_10024("", Ordinal_10265(0x1143)); _exit(-1); }
       v = *p;
     }

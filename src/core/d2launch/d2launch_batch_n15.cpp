@@ -8,6 +8,3 @@ extern "C" int32_t d2launch_sub_9b70(int32_t v) { g_launch_9b70_value = v; retur
 // The counterpart of DAT_6fa65efc, for the seeded-state replay.
 extern "C" int32_t* d2launch_sub_9b70_global(void) { return &g_launch_9b70_value; }
 
-// 1.13c D2Launch+0x93E6 -- GetLocaleInfoA(lcid, 0x1004 = LOCALE_IDEFAULTANSICODEPAGE) then atol; -1 on failure.
-// ponytail: no Win32 locale in wasm; the failure result (-1) is the only reachable one.
-extern "C" int32_t d2launch_sub_93e6(uint32_t lcid) { (void)lcid; return -1; }

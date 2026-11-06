@@ -19,6 +19,7 @@
 static inline uint32_t rd32(const void* p, uint32_t off) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + off, 4); return v; }
 static inline void wr32(void* p, uint32_t off, uint32_t v) { std::memcpy((uint8_t*)p + off, &v, 4); }
 static inline void* rdptr(const void* p, uint32_t off) { void* v; std::memcpy(&v, (const uint8_t*)p + off, sizeof v); return v; }
+static inline uint32_t g32(uint32_t addr, uint32_t off);   // a retail 4-byte word at a guest address (defined below)
 static inline uint8_t rd8(const void* p, uint32_t off) { return ((const uint8_t*)p)[off]; }
 static inline float rdf(const void* p, uint32_t off) { float v; std::memcpy(&v, (const uint8_t*)p + off, 4); return v; }
 
@@ -52,6 +53,10 @@ static float  g_c097C = 0.0001f;       // 0x38D1B717
 struct D2SoundNode { uint32_t value; D2SoundNode* next; };
 
 // Host seams for the unmapped internal callees, in their retail argument order.
+struct D2SoundFreeEnv {
+    void (*stop)(void* obj);                    // 0x6980
+    void (*fogFree)(void* p, uint32_t line);    // Fog#10043 (thunk 0x5F68; ECX = block, EDX = source file, stack line, 0)
+};
 struct D2SoundEnv {
     void (*releaseStream)(void* obj);                                         // 0x6680
     void (*stopAll)(void* obj);                                               // 0x69F0 (EAX = obj)
@@ -68,6 +73,7 @@ struct D2SoundEnv {
     int32_t (*storm258)(uint32_t h, uint32_t* a, uint8_t* b);                 // Storm.dll#258 (0x5F4A thunk)
     void* (*loadFile)(void* name, int32_t* outSize);                          // 0x6360 (name = 0: the pending file)
     void (*shutdownWorker)(void);                                             // Ordinal_256 + SetEvent/Wait/CloseHandle of the worker thread (0x65D0/0x65D4)
+    const D2SoundFreeEnv* freeEnv;                                            // 0x6FA0 seams (stop, Fog#10043)
 };
 
 // 1.13c D2Sound+0x67C0
@@ -101,9 +107,8 @@ void D2Sound_6980(void* obj, const D2SoundEnv* env) {
     if (!obj || !rd32(obj, 0)) d2sound_fatal(0x292);
     EnterCriticalSection(&g_lock);
     if (rd32(obj, 0x48)) env->releaseStream(obj);
-    void* iface = rdptr(obj, 0);
-    void** vt = *(void***)iface;
-    ((void (*)(void*))vt[0x48 / 4])(iface);
+    const uint32_t iface = rd32(obj, 0);   // retail 4-byte words: the interface and its slot table
+    ((void (*)(uint32_t))(uintptr_t)g32(g32(iface, 0), 0x48))(iface);
     wr32(obj, 0x1C, 0);
     LeaveCriticalSection(&g_lock);
 }
@@ -311,9 +316,12 @@ void D2Sound_8640(D2SoundNode** list, uint32_t value) {
 // The distance/pan curve: 1.0f above the 0.0f bound, 0.0f below -10000.0f, and pow(10.0, x * 0.0005f)
 // (0x9CF0's x87 fyl2x path) in between. Both bounds are fcomps compares, so NaN takes the pow branch.
 double D2Sound_87D0(float x) {
-    if (g_c0978 < x + g_c097C) return (double)g_c0974;
-    if (x - g_c097C < g_c0970) return (double)g_c0978;
-    return std::pow(g_c0968, (double)(x * g_c0964));  // 10^(x*0.0005): -10000..0 hundredths-dB -> 1e-5..1
+    // x87 fadd/fsub/fmul with float operands stay at stack precision, not float: the sums and the product
+    // are taken in double, so -10000 minus the bias stays below -10000 (float rounding would lose the bias).
+    const double xd = (double)x, bias = (double)g_c097C;
+    if ((double)g_c0978 < xd + bias) return (double)g_c0974;
+    if (xd - bias < (double)g_c0970) return (double)g_c0978;
+    return std::pow((double)g_c0968, xd * (double)g_c0964);  // 10^(x*0.0005): -10000..0 hundredths-dB -> 1e-5..1
 }
 
 // D2Sound 0x8980 (1.13c)
@@ -461,26 +469,29 @@ uint32_t D2Sound_6F30(void* obj) {
 
 // Host seams for 0x66F0's imports.
 struct D2SoundPlayEnv {
-    uint32_t (*fogReady)(void);                                                         // Fog#10102 (0x5F6E)
-    void (*fogFail)(void);                                                              // Fog#10103 (0x5F74)
-    int32_t (*storm255)(void*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t); // Storm#255 (0x5F3E)
+    uint32_t (*fogOpen)(uint32_t name, uint32_t* handle);                               // Fog#10102 (0x5F6E; ECX = name, EDX = &handle)
+    void (*fogClose)(uint32_t handle);                                                  // Fog#10103 (0x5F74; ECX = handle)
+    int32_t (*storm255)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t); // Storm#255 (0x5F3E, stdcall 7 words)
 };
 
 // 1.13c D2sound+0x066F0
-// Start the stream under the lock via Storm#255(obj,+4,flags,volume*4,max,max,*obj); on success +0x48=+4, +0x1C=1, +0x30=-1, return 1.
-uint32_t D2Sound_66F0(void* obj, int32_t volume, int32_t loop, const D2SoundPlayEnv* pe) {
+// fastcall (ECX = stream record, EDX = name; stack volume, loop; ret 8). Fog#10102(name, &handle) opens the source; under the lock
+// Storm#255(handle, +4, loop ? 0x40000 : 0, volume*4, max, max, *obj) starts it; success: +0x48 = handle, +0x1C = 1, +0x30 = -1, return 1.
+// Failure closes the handle (Fog#10103) and returns 0. The handle slot is the stack word of retail's `push ecx`, so it starts as the record
+// pointer when Fog does not write it.
+uint32_t D2Sound_66F0(void* obj, uint32_t name, int32_t volume, int32_t loop, const D2SoundPlayEnv* pe) {
     if (!obj) d2sound_fatal(0x3DB);
-    if (!pe->fogReady()) return 0;
+    uint32_t handle = (uint32_t)(uintptr_t)obj;
+    if (!pe->fogOpen(name, &handle)) return 0;
     EnterCriticalSection(&g_lock);
-    uint32_t f4 = rd32(obj, 4);
-    if (pe->storm255(obj, f4, loop ? 0x40000u : 0u, (uint32_t)volume * 4, 0x7FFFFFFFu, 0x7FFFFFFFu, rd32(obj, 0))) {
-        wr32(obj, 0x48, f4);
+    if (pe->storm255(handle, rd32(obj, 4), loop ? 0x40000u : 0u, (uint32_t)volume * 4, 0x7FFFFFFFu, 0x7FFFFFFFu, rd32(obj, 0))) {
+        wr32(obj, 0x48, handle);
         wr32(obj, 0x1C, 1);
         wr32(obj, 0x30, 0xFFFFFFFFu);
         LeaveCriticalSection(&g_lock);
         return 1;
     }
-    pe->fogFail();
+    pe->fogClose(handle);
     LeaveCriticalSection(&g_lock);
     return 0;
 }
@@ -494,9 +505,8 @@ void D2Sound_6680(void* obj, void (*freeBacking)(uint32_t), void (*afterRelease)
     EnterCriticalSection(&g_lock);
     if (rd32(obj, 0x48)) {
         freeBacking(rd32(obj, 0x48));
-        void* iface = rdptr(obj, 0);
-        void** vt = *(void***)iface;
-        ((void (*)(void*))vt[0x48 / 4])(iface);
+        const uint32_t iface = rd32(obj, 0);   // 4-byte guest pointers, as in 0x6980
+        ((void (*)(void*))(uintptr_t)rd32((const void*)(uintptr_t)rd32((const void*)(uintptr_t)iface, 0), 0x48))((void*)(uintptr_t)iface);
         afterRelease();
         wr32(obj, 0x48, 0);
         wr32(obj, 0x1C, 0);
@@ -543,10 +553,9 @@ static uint8_t* g_pending;             // 0x6F9C65BC  queue of {name, ..., +0x50
 uint32_t D2Sound_6EC0(void* obj) {
     if (!obj || !rd32(obj, 0)) d2sound_fatal(0x2B0);
     EnterCriticalSection(&g_lock);
-    void* iface = rdptr(obj, 0);
-    void** vt = *(void***)iface;
+    const uint32_t iface = rd32(obj, 0);   // retail 4-byte words: the interface and its slot table
     uint32_t local = (uint32_t)(uintptr_t)obj;
-    int32_t hr = ((int32_t (*)(void*, uint32_t*))vt[0x24 / 4])(iface, &local);
+    int32_t hr = ((int32_t (*)(void*, uint32_t*))(uintptr_t)g32(g32(iface, 0), 0x24))((void*)(uintptr_t)iface, &local);
     LeaveCriticalSection(&g_lock);
     return hr < 0 ? 0u : (local & 1u);
 }
@@ -608,12 +617,12 @@ void* D2Sound_7740(uint32_t flags, uint32_t tag, const D2SoundEnvB* e) {
 }
 
 // D2sound 0x07C60 (1.13c) (Ordinal 10068)
-// Restart the primary stream from 0 at volume 0x6E when it is idle; 1 on success.
+// Restart the primary stream from 0 at volume 0x6E when it is idle; 1 on success. ECX (`enable`) is also the name 0x66F0 hands Fog#10102.
 uint32_t D2Sound_7C60(int32_t enable, int32_t loop, const D2SoundEnvB* e) {
     if (g_primary && g_soundOn && g_masterVolume && rd32(g_primary, 0x48) == 0 && enable) {
         D2Sound_7650(g_primary, e->base);
         e->base->setVolume(g_primary, 0x6E);
-        if (D2Sound_66F0(g_primary, 0, loop, e->play)) return 1;
+        if (D2Sound_66F0(g_primary, (uint32_t)enable, 0, loop, e->play)) return 1;
     }
     return 0;
 }
@@ -739,27 +748,33 @@ void D2Sound_6CE0(void* obj, float v, const D2SoundEnv* env) {
     }
 }
 
-// 1.13c D2Sound+0x6FA0
-// Destroy a stream record: stop it (0x6980), release its three COM objects (+0x10, +0xC, +0), zero the
-// 0x60-byte record, and unlink + free its node from the global list.
-void D2Sound_6FA0(void* obj, const D2SoundEnv* env) {
+// 1.13c D2Sound+0x6FA0 (Ordinal 10049; fastcall, ECX = record)
+// Destroy a stream record under the lock: stop it (0x6980, ECX = record), Release (vtable +8, stdcall this) the COM objects at +0x10,
+// +0xC and +0 (each cleared), zero the 0x60-byte record, unlink the node whose value is the record from the list at 0x6F9C65CC
+// (the head moves when it is the first; the previous node's next is relinked) and free it through Fog#10043 (line 0xF0), leave the
+// lock, then free the record itself through Fog#10043 (line 0x21D). The record and its interfaces hold 4-byte guest pointers.
+void* D2Sound_fnListHead() { return g_list; }
+void D2Sound_6FA0(void* obj, const D2SoundFreeEnv* fe) {
     if (!obj) d2sound_fatal(0x211);
     EnterCriticalSection(&g_lock);
-    D2Sound_6980(obj, env);
+    fe->stop(obj);
     for (uint32_t off : {0x10u, 0xCu, 0u}) {
-        void* c = rdptr(obj, off);
-        if (c) { void** vt = *(void***)c; ((void (*)(void*))vt[2])(c); std::memset((uint8_t*)obj + off, 0, sizeof(void*)); }
+        const uint32_t c = rd32(obj, off);
+        if (!c) continue;
+        ((void (*)(void*))(uintptr_t)rd32((const void*)(uintptr_t)rd32((const void*)(uintptr_t)c, 0), 8))((void*)(uintptr_t)c);
+        wr32(obj, off, 0);
     }
     std::memset(obj, 0, 0x60);
     D2SoundNode* prev = nullptr;
     for (D2SoundNode* n = (D2SoundNode*)g_list; n; prev = n, n = n->next) {
-        if ((uintptr_t)n->value != (uintptr_t)obj) continue;
+        if (n->value != (uint32_t)(uintptr_t)obj) continue;
         if (g_list == n) g_list = n->next;
         if (prev) prev->next = n->next;
-        std::free(n);
+        fe->fogFree(n, 0xF0);
         break;
     }
     LeaveCriticalSection(&g_lock);
+    fe->fogFree(obj, 0x21D);
 }
 
 // 1.13c D2Sound+0x8020
@@ -821,7 +836,7 @@ void D2Sound_8B50(int32_t* left, int32_t* right, float x, float y, float z) {
     *right = r > 0 ? (r < 0xFF ? r : 0xFF) : 0;
 }
 
-// 1.13c D2Sound+0x9230
+// D2Sound 0x9230 (1.13c), env form of z34_9230 (src/core/d2sound/d2sound_batch_z34.cpp, the proved body).
 // Shutdown (ordinal 10031): drop master volume and re-apply every list entry's volume, destroy the primary
 // stream, join the worker thread, release the COM objects, delete the lock.
 void D2Sound_9230(const D2SoundEnv* env) {
@@ -836,7 +851,7 @@ void D2Sound_9230(const D2SoundEnv* env) {
         }
         LeaveCriticalSection(&g_lock);
     }
-    if (g_primary) { D2Sound_6FA0(g_primary, env); g_primary = nullptr; }
+    if (g_primary) { D2Sound_6FA0(g_primary, env->freeEnv); g_primary = nullptr; }
     env->shutdownWorker();
     for (int i = 0; i < 5; ++i) com_release(g_com[i]);
     g_soundOn = 0;

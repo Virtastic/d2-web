@@ -157,7 +157,7 @@ uint32_t z34_9AD0(const Z34Seams& s, Z34G& g, uint32_t v) {
     return g.d64a4 = v;
 }
 
-// D2sound 0x9230 (1.13c)
+// 1.13c D2sound+0x9230 (Ordinal 10031). The FN-proved body (src/core/fn/d2sound_9230.cpp); D2Sound_9230 in d2sound_batch_67c0.cpp is the env form.
 void z34_9230(const Z34Seams& s, Z34G& g) {
     g.d6588 = 0;
     if (g.d658c && g.d5994) {

@@ -4,8 +4,8 @@
 #include <cstring>
 #include <emscripten.h>
 
-extern "C" void d2win_sub_1978A(const char* digits, int32_t n, uint32_t* out12);  // D2Win+0x1978A
-extern "C" void d2win_sub_1A184(uint32_t* ext12, int32_t exp10, int32_t flag);    // D2Win+0x1A184
+extern "C" void d2win_sub_1978a(const char* digits, int n, uint32_t* out12);       // D2Win+0x1978A
+extern "C" void d2win_scale10(uint32_t* ext12, int32_t exp10, int32_t flag);      // D2Win+0x1A184 over the DLL tables
 
 static inline bool dig(uint8_t c) { return c >= '0' && c <= '9'; }
 
@@ -151,7 +151,7 @@ fin:
         }
         if (nd != 0) {
             while (*--w == 0) { nd--; dexp++; }
-            d2win_sub_1978A(digits, nd, (uint32_t*)buf);
+            d2win_sub_1978a(digits, nd, (uint32_t*)buf);
             if (sign < 0) expv = -expv;
             int32_t e = expv + dexp;
             if (!b2) e += p5;
@@ -162,7 +162,7 @@ fin:
                 ret = 2;
                 goto done;
             }
-            if (e > -0x1451) { d2win_sub_1A184((uint32_t*)buf, e, p4); goto done; }
+            if (e > -0x1451) { d2win_scale10((uint32_t*)buf, e, p4); goto done; }
             ret = 1;
         }
     } else {

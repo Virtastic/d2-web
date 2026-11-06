@@ -12,10 +12,15 @@ extern CpEntry g_cpTable[5] __attribute__((weak));
 struct CpInfo { uint32_t maxChar; uint8_t def[2]; uint8_t lead[12]; };
 extern "C" int32_t GetCPInfo(uint32_t, CpInfo*) __attribute__((weak));
 uint32_t d2cmp_6839(int32_t);
-void d2cmp_6868();
-void d2cmp_6891();
+void d2cmp_6868() __attribute__((weak));
+void d2cmp_6891() __attribute__((weak));
+// Seams for the FN probe (the OS-facing callees are recorders there); null = the real callee.
+void (*g_6a2c_set68)() = nullptr;
+void (*g_6a2c_ctype)() = nullptr;
+static void call68() { if (g_6a2c_set68) g_6a2c_set68(); else if (d2cmp_6868) d2cmp_6868(); }
+static void call91() { if (g_6a2c_ctype) g_6a2c_ctype(); else if (d2cmp_6891) d2cmp_6891(); }
 
-// ponytail: extraout_ECX_00 in the GetCPInfo path is an unrecovered register leftover; 0 used.
+// The GetCPInfo multibyte path stores ECX at 6B7E, which is the 1 from `xor ecx,ecx; inc ecx` at 6B5E (6839 leaves ECX alone).
 int32_t d2cmp_6a2c(uint32_t cp) {
     if (cp) {
         for (int i = 0; i < 5; i++) {
@@ -29,7 +34,7 @@ int32_t d2cmp_6a2c(uint32_t cp) {
             g_mb13c0c = 1;
             g_mb13c04 = (int32_t)d2cmp_6839(cp);
             g_mbRanges[0] = g_cpTable[i].r[0]; g_mbRanges[1] = g_cpTable[i].r[1]; g_mbRanges[2] = g_cpTable[i].r[2];
-            d2cmp_6891();
+            call91();
             return 0;
         }
         CpInfo ci;
@@ -43,15 +48,15 @@ int32_t d2cmp_6a2c(uint32_t cp) {
                     for (uint32_t c = p[0]; c <= p[1]; c++) g_sbcsTable[c + 1] |= 4;
                 for (uint32_t c = 1; c < 0xff; c++) g_sbcsTable[c + 1] |= 8;
                 g_mb13c04 = (int32_t)d2cmp_6839(cp);
-                g_mb13c0c = 0;
+                g_mb13c0c = 1;
             }
             g_mbRanges[0] = g_mbRanges[1] = g_mbRanges[2] = 0;
-            d2cmp_6891();
+            call91();
             return 0;
         }
         if (!g_mbHaveFallback) return -1;
     }
-    d2cmp_6868();
-    d2cmp_6891();
+    call68();
+    call91();
     return 0;
 }

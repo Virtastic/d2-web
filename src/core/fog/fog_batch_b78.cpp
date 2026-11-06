@@ -32,8 +32,8 @@ extern const char DAT_6ff768ec[];
 void EnterCriticalSection(void*);
 void LeaveCriticalSection(void*);
 void DeleteCriticalSection(void*);
-long InterlockedDecrement(volatile long*);
-long InterlockedIncrement(volatile long*);
+inline long InterlockedDecrement(volatile long* p) { return *p = *p - 1; }
+inline long InterlockedIncrement(volatile long* p) { return *p = *p + 1; }
 }
 
 [[noreturn]] static void b78_fatal(int line) {
@@ -167,7 +167,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t Fog_E8C0(int* esi, uint32_t* ebx, uint3
 }
 
 // 1.13c Fog+0x1FF60  (EDI = async log/queue object, hidden; Win32 calls injected as seams)
-extern "C" void FUN_6ff5e420(void);
+// Fog+0x5E420 is not ported yet; only the WriteFile-error path of 0x1FF60 calls it. A no-op keeps the object linking.
+extern "C" void FUN_6ff5e420(void) {}
 typedef int (*b78_writefile_fn)(void*, const void*, uint32_t, uint32_t*, void*);
 typedef uint32_t (*b78_u32_fn)(void);
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t Fog_1FF60(uint8_t* edi, b78_writefile_fn WriteFile, b78_u32_fn GetLastError) {

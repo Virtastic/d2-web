@@ -13,14 +13,17 @@ static inline uint32_t rd32(const void* p, uint32_t off) { uint32_t v; std::memc
 static inline void wr32(void* p, uint32_t off, uint32_t v) { std::memcpy((uint8_t*)p + off, &v, 4); }
 static inline void* rdptr(const void* p, uint32_t off) { void* v; std::memcpy(&v, (const uint8_t*)p + off, sizeof v); return v; }
 static void fatal69(uint32_t) { _exit(-1); }  // Ordinal_10265 -> Ordinal_10024 -> _exit(-1)
-static void comRelease(void* itf) { void** vt = *(void***)itf; ((void (*)(void*))vt[2])(itf); }
 
 // 1.13c D2sound+0x69F0
 // Stop the stream (0x6980), release the COM objects at +0x10, +0x0C, +0x00 (clearing each slot), zero 0x60 bytes.
 void D2sound_69F0(void* obj, void (*stop6980)(void*)) {
     stop6980(obj);
-    for (uint32_t off : {0x10u, 0x0Cu, 0x00u}) {
-        if (void* itf = rdptr(obj, off)) { comRelease(itf); wr32(obj, off, 0); }
+    for (uint32_t off : {0x10u, 0x0Cu, 0x00u}) {   // retail 4-byte interface words; Release is vtable slot +8 (stdcall, this)
+        if (const uint32_t itf = rd32(obj, off)) {
+            const uint32_t vt = rd32((const void*)(uintptr_t)itf, 0);
+            ((void (*)(uint32_t))(uintptr_t)rd32((const void*)(uintptr_t)vt, 8))(itf);
+            wr32(obj, off, 0);
+        }
     }
     std::memset(obj, 0, 0x60);
 }

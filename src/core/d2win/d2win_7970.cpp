@@ -5,12 +5,12 @@
 // Every failure is fatal, so fatal() is a seam the caller supplies.
 #include <cstdint>
 
-// read(handle, &size) is retail's Ordinal_10104 thunk (0x78B6): status in eax, the file size through the out-pointer.
+// read(handle, expect, &size) is retail's Ordinal_10104 thunk (0x78B6): status in eax, the file size through the out-pointer.
 extern "C" uint32_t d2win_7970(uint32_t handle, uint32_t expect,
-                               uint32_t (*read)(uint32_t handle, uint32_t* size), void (*fatal)(uint32_t id)) {
+                               uint32_t (*read)(uint32_t handle, uint32_t expect, uint32_t* size), void (*fatal)(uint32_t id)) {
     if (handle == 0) { fatal(0x87); return 0; }
     uint32_t size = 0;
-    uint32_t status = read(handle, &size);
+    uint32_t status = read(handle, expect, &size);
     if (status == 0) { fatal(0x8f); return 0; }        // retail also calls Ordinal_276 before this fatal
     if (size != expect) { fatal(0x92); return 0; }
     return status;

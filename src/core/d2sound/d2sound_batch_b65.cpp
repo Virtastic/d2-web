@@ -55,20 +55,7 @@ void D2sound_b65_7CD0(uint32_t eax_in, const D2soundB65_7CD0Env* e)
     *e->result6580 = e->fn7740(1, *e->store65c8);
 }
 
-// 1.13c D2sound+0x8DB0  (__fastcall: param_1 in ECX)
-int D2sound_b65_8DB0(int mode)
-{
-    if (!g_b65_prop) return 0;
-    int32_t v = 0;
-    if (mode == 1) {
-        if (((B65PropFn)g_b65_prop->vt->slots[4])(g_b65_prop, g_b65_guidA, 2, 0, 0, &v, 4) < 0) return 0;
-        g_b65_flag = 1; return 1;
-    }
-    v = -10000;
-    if (((B65PropFn)g_b65_prop->vt->slots[4])(g_b65_prop, g_b65_guidB, 2, 0, 0, &v, 4) < 0) return 0;
-    if (((B65PropFn)g_b65_prop->vt->slots[4])(g_b65_prop, g_b65_guidB, 3, 0, 0, &v, 4) < 0) return 0;
-    g_b65_flag = 1; return 1;
-}
+// 0x8DB0 moved to d2sound_8db0.cpp
 
 // FN probe seam for 0x8FD0: the module globals 0x16594 / 0x164B8 / 0x16598 / 0x1659C.
 void D2sound_b65_fnSet8FD0(uint32_t prop, uint32_t enabled, uint32_t mode, uint32_t flag) {

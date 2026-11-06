@@ -116,34 +116,6 @@ static void ld(H* h, uint32_t va, const char* sfx) {  // wsprintfA("%s\\<sfx>","
 }
 #define LD(va, s) ld(h, 0x##va, s)
 
-// 1.13c D2LAUNCH+0x11170  character-create frontend images
-void load_charcreate_11170(H* h) {
-    if (D(0x65c10)) return;
-    LD(65c30, "ui\\FrontEnd\\MediumSelButtonBlank");
-    LD(65c10, O(h, 10227) ? "ui\\FrontEnd\\charactercreationscreenEXP" : "ui\\FrontEnd\\CharacterCreate");
-    LD(65c14, "ui\\FrontEnd\\fire");
-    LD(65ca8, "ui\\FrontEnd\\textbox");
-    LD(65cac, "ui\\FrontEnd\\clickbox");
-    if (O(h, 10227)) {
-        LD(65cb0, "ui\\FrontEnd\\joingameclickboxgrey");
-        static const struct { uint32_t va; const char* n; } e[] = {
-            {0x65ccc, "assassin\\asnu1"}, {0x65cd0, "assassin\\asnu2"}, {0x65cd4, "assassin\\asfw"}, {0x65cd8, "assassin\\asnu3"},
-            {0x65cdc, "assassin\\asbw"}, {0x65ce0, "druid\\dznu1"}, {0x65ce4, "druid\\dznu2"}, {0x65ce8, "druid\\dzfw"},
-            {0x65cec, "druid\\dznu3"}, {0x65cf0, "druid\\dzbw"}};
-        for (auto& q : e) { char b[64]; snprintf(b, sizeof b, "ui\\FrontEnd\\%s", q.n); ld(h, q.va, b); }
-    }
-    static const struct { uint32_t va; const char* n; } c[] = {
-        {0x65cf4, "amazon\\amnu1"}, {0x65cf8, "amazon\\amnu2"}, {0x65cfc, "amazon\\amfw"}, {0x65d00, "amazon\\amnu3"}, {0x65d04, "amazon\\ambw"},
-        {0x65d08, "necromancer\\nenu1"}, {0x65d0c, "necromancer\\nenu2"}, {0x65d10, "necromancer\\nefw"}, {0x65d14, "necromancer\\nenu3"}, {0x65d18, "necromancer\\nebw"},
-        {0x65d1c, "barbarian\\banu1"}, {0x65d20, "barbarian\\banu2"}, {0x65d24, "barbarian\\bafw"}, {0x65d28, "barbarian\\banu3"}, {0x65d2c, "barbarian\\babw"},
-        {0x65d30, "sorceress\\sonu1"}, {0x65d34, "sorceress\\sonu2"}, {0x65d38, "sorceress\\sofw"}, {0x65d3c, "sorceress\\sonu3"}, {0x65d40, "sorceress\\sobw"},
-        {0x65d44, "paladin\\panu1"}, {0x65d48, "paladin\\panu2"}, {0x65d4c, "paladin\\pafw"}, {0x65d50, "paladin\\panu3"}, {0x65d54, "paladin\\pabw"},
-        {0x65d88, "sorceress\\sofws"}, {0x65d8c, "sorceress\\sonu3s"}, {0x65d90, "sorceress\\sobws"},
-        {0x65d74, "necromancer\\nefws"}, {0x65d78, "necromancer\\nenu3s"}, {0x65d7c, "necromancer\\nebws"},
-        {0x65d9c, "barbarian\\bafws"}, {0x65db0, "paladin\\pafws"}};
-    for (auto& q : c) { char b[64]; snprintf(b, sizeof b, "ui\\FrontEnd\\%s", q.n); ld(h, q.va, b); }
-}
-
 // 1.13c D2LAUNCH+0x13010  common frontend images
 void load_frontend_13010(H* h) {
     bool x = O(h, 10227) != 0;
@@ -572,71 +544,5 @@ void charsel_d5d0(H* h) {
     F(h, 0xD050);
     if (O(h, 10035)) O(h, 10045);
     O(h, 10147);
-}
-
-// 1.13c D2LAUNCH+0x18E10  terms-of-service screen: load tos-unicode_<lang>.txt and wrap it into lines
-int tos_18e10(H* h) {
-    D(0x65294) = 0;
-    F(h, 0x14A20);
-    char lang[8] = {0}, fname[0x100] = {0};
-    O(h, 10004, lang, 2);
-    O(h, 501, fname, "tos-unicode_", 0x80);
-    O(h, 503, fname, lang, 0x80);
-    O(h, 503, fname, h->dat(0x6fa5e090u), 0x80);
-    F(h, VT | 0x50, fname);
-    O(h, 10014, 0x548d0);
-    if (D(0x65294)) {
-        for (int i = 0; i < (int)D(0x65e34); i++) O(h, 10050, h->dat(0x6fa653c0u + i * 4));
-        D(0x65e34) = 0;
-        return 0;
-    }
-    if (F(h, VT | 0x68)) {
-        F(h, 0x12B60); F(h, 0x176C0); pool_idx(h, 0x4d); uint32_t hdl = pool_idx(h, 0x4e);
-        intptr_t hf = O(h, 10107, 0, 0, 3, 0x8000000, 0);
-        if (hf != -1) {
-            uint32_t size = (uint32_t)F(h, SEAM_GETFILESIZE, hf);
-            char16_t* buf = (char16_t*)O(h, 10042, size, 0xc34, 0);
-            uint32_t got = 0;
-            O(h, 10110, hf, buf, size, &got, 0);
-            O(h, 10109, hf); O(h, 10108, hf);
-            const char16_t* text = nullptr; int chars = 0;
-            if (size == got && size > 2) {
-                if (buf[0] == 0xfeff) { chars = (int)((size - 2) >> 1); text = buf + 1; }
-                else if (buf[0] == 0xfffe) { chars = (int)((size - 2) >> 1); text = buf + 1; F(h, 0x1000, text, chars); }
-                else { char16_t* w = (char16_t*)O(h, 10042, size * 2, 0xc52, 0); h->win2uni(w, (const char*)buf, (int)size); O(h, 10043, buf, 0xc54, 0); text = w; chars = (int)size; }
-            }
-            int pos = 0;
-            while (pos < chars) {
-                char16_t line[200] = {0};
-                int start = pos, j = 0;
-                do {
-                    if (pos >= chars) break;
-                    char16_t c = text[pos];
-                    if (c == 0xd || c == 10) { line[j] = 0x20; j = 200; }
-                    else if (c == 9) { line[j++] = 0x20; }
-                    else line[j++] = c;
-                    pos++;
-                    if (O(h, 10028, line) > 0x21c) {
-                        int k = ulen(line);
-                        if (k >= 2) for (;;) { if (F(h, SEAM_ISLINEBREAK, text + start, k)) break; if (!(--k > 1)) break; }
-                        pos = start + k;
-                        line[k] = 0;
-                        if (k && line[k - 1] == 0x20) line[k - 1] = 0;
-                        break;
-                    }
-                } while (j < 200);
-                int len = ulen(line);
-                for (int i = 0; i < len; i++) if (line[i] != 0x20) { O(h, 10000, line, 0, 0); break; }
-            }
-            O(h, 10043, text, 0xc9b, 0);
-            O(h, 10037, hdl, 0);
-            pool_add(h, REC(0x61df0)); pool_add(h, REC(0x61e20)); pool_add(h, REC(0x61e50));
-            O(h, 10003, 0, 0, 0); O(h, 10000);
-            pool_add(h, REC(0x61e80)); pool_add(h, REC(0x61eb0));
-            return 1;
-        }
-    }
-    popup_15090(h, O(h, 10003, 0x14e3), 0x57df0, 1);
-    return 0;
 }
 }  // namespace n75

@@ -1,26 +1,32 @@
-// D2CMP GfxHash node insert. Native pointers replace retail dwords; hash (16E80) and alloc injected.
+// D2CMP GfxHash node insert. Retail 32-bit node layout (the probe is wasm32): +0 bucket, +4 id, +8..+0x18 key words, +0x1C hash (written by 16E80),
+// +0x20 stack arg 0, +0x28 prev, +0x2C next. The allocator and the record hash (16E80) are injected.
 #include <cstdint>
-#include <cstddef>
+#include <cstring>
 
-struct GhNode {
-    uint32_t bucket, id, k[5], hash, _20;   // +0, +4, +8..+18, +1C, +20 (retail +0x24 slot unused here)
-    GhNode *prev, *next;                    // retail +28, +2C
+struct D2Cmp16F70Env {
+    uint8_t* (*alloc)(const char* file, int line, int z);   // thunk 0x8D84 (EDX = 0x30), Ordinal_10045(GfxHash.cpp, 0xEF, 0)
+    // Fog-side 0x16E80: EAX = key, ECX = arg1, EDX = &zeroed stack slot, stack word = &node+0x1C, EBX = table, ESI = node; returns the bucket
+    uint32_t (*hashKey)(const uint8_t* key, uint32_t arg1, uint32_t* slot, uint32_t* outHash, uint32_t* table, uint8_t* node);
 };
-struct GhKey { uint32_t _0, flags, kind, idA, _10, idB, k[5]; };  // retail +4,+8,+C,+14,+18..+28
 
-// 1.13c D2CMP+0x16F70
-// Retail: EBX = table (bucket heads at +0x8000), EDI = key; hash/bucket from sub_16E80 on the hash slot.
-GhNode* d2cmp_16f70(GhNode** buckets, const GhKey& key, GhNode* (*alloc)(), uint32_t (*hashKey)(uint32_t& outHash)) {
-    GhNode* n = alloc();                    // Ordinal_10045(GfxHash.cpp, 0xef)
-    n->_20 = 0;
-    uint32_t b = hashKey(n->hash);
-    for (int i = 0; i < 5; i++) n->k[i] = key.k[i];
-    if (key.kind == 6 && (key.flags & 2)) n->id = key.idB;
-    else if (key.kind == 4 || key.kind == 3) n->id = key.idA;
-    n->prev = nullptr;
-    n->next = buckets[b];
-    if (n->next) n->next->prev = n;
-    n->bucket = b;
-    buckets[b] = n;
+static uint32_t rd(const uint8_t* p) { uint32_t v; std::memcpy(&v, p, 4); return v; }
+static void wr(uint8_t* p, uint32_t v) { std::memcpy(p, &v, 4); }
+
+// 1.13c D2CMP+0x16F70 (EBX = table, EDI = key; stack arg0, arg1; ret 8)
+uint8_t* d2cmp_16f70(uint32_t* table, const uint8_t* key, uint32_t arg0, uint32_t arg1, const D2Cmp16F70Env* e) {
+    uint8_t* n = e->alloc("..\\Source\\D2CMP\\SRC\\GfxHash.cpp", 0xef, 0);
+    wr(n + 0x20, arg0);
+    uint32_t slot = 0;
+    uint32_t b = e->hashKey(key, arg1, &slot, reinterpret_cast<uint32_t*>(n + 0x1c), table, n);
+    wr(n + 8, rd(key + 0x18)); wr(n + 0xc, rd(key + 0x1c)); wr(n + 0x10, rd(key + 0x20)); wr(n + 0x14, rd(key + 0x24)); wr(n + 0x18, rd(key + 0x28));
+    uint32_t kind = rd(key + 8);
+    if (kind == 6 && (key[4] & 2)) wr(n + 4, rd(key + 0x14));
+    else if (kind == 4 || kind == 3) wr(n + 4, rd(key + 0xc));
+    wr(n + 0x28, 0);
+    uint32_t head = table[0x8000 / 4 + b];
+    wr(n + 0x2c, head);
+    if (head) wr(reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(head)) + 0x28, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(n)));
+    wr(n, b);
+    table[0x8000 / 4 + b] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(n));
     return n;
 }

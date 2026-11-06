@@ -18,13 +18,15 @@ static inline long double r64(long double x) {
 // 1.13c D2CMP+0x0A1B0
 // hue > 360 loses 360, hue < 0 gains 360 (once each). Below 60 the value rises linearly from m1 to m2, below 180
 // it holds m2, below 240 it falls linearly back, else m1. The slope multiplies by the double 1/60 (0x6FE300C8).
-extern "C" double d2cmp_a1b0(double m1, double m2, double hue) {
+// The x87 value left in ST0 (64-bit mantissa, not rounded to a double): 0xA710 multiplies it by 255 in extended precision.
+long double d2cmp_a1b0_st0(double m1, double m2, double hue) {
     const long double kInv60 = (long double)(1.0 / 60.0);
     long double h = hue;
     if (h > 360.0L) h = r64(h - 360.0L);
     if (h < 0.0L) h = r64(h + 360.0L);
-    if (h < 60.0L) return (double)r64(r64(r64(h * r64((long double)m2 - m1)) * kInv60) + m1);
+    if (h < 60.0L) return r64(r64(r64(h * r64((long double)m2 - m1)) * kInv60) + m1);
     if (h < 180.0L) return m2;
-    if (h < 240.0L) return (double)r64(r64(r64(r64((long double)m2 - m1) * r64(240.0L - h)) * kInv60) + m1);
+    if (h < 240.0L) return r64(r64(r64(r64((long double)m2 - m1) * r64(240.0L - h)) * kInv60) + m1);
     return m1;
 }
+extern "C" double d2cmp_a1b0(double m1, double m2, double hue) { return (double)d2cmp_a1b0_st0(m1, m2, hue); }

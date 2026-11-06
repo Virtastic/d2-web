@@ -43,7 +43,7 @@ struct D2WinBatch93C0Env {
     void     (*setTextFont)(uint32_t fontIndex);                                    // 0x12FE0
     int32_t  (*textWidth)(const uint16_t* text, int32_t maxChars);                  // 0x12080
     int32_t  (*visibleLines)(void* box);                                            // 0x9200
-    uint32_t (*splitLines)(void* box, int32_t param3, int32_t param5);              // 0x99F0
+    uint32_t (*splitLines)(void* box, const uint16_t* text, int32_t param3, int32_t param5);   // 0x99F0 (ECX = box, EDX = text, ret 8)
     void*    (*alloc)(uint32_t size, const char* file, int32_t line, int32_t n0);   // Fog #10042 (ECX=size, EDX=file)
     void     (*freeMemory)(void* p, const char* file, int32_t line, int32_t n0);    // Fog #10043 (ECX=p, EDX=file)
     // 0x170B0: the dword pair Fog publishes at gdwBitMasks+0xC / gdwInvBitMasks+0xC.
@@ -95,8 +95,8 @@ uint32_t d2win_g_6f8ffba8;                       // 0x18980, nonzero suppresses 
 // fatal 0x132, type != 4 fatal 0x133. The text is copied into a 0x400-unit stack buffer and leading
 // whitespace is skipped. Unless box+0x5C bit 0x20 is set, the usable width
 // (box+0x14 - 2*box+0x40, less the width of five spaces when param5 == 2) is compared with the
-// measured text; if the text does not fit, 0x99F0 takes over (its result is returned). Otherwise a
-// 0x20-byte node is allocated and its column string ("     " + text when param3 == 2, else text),
+// measured text; if the text does not fit, 0x99F0 takes over with the skipped text (its result is returned). Otherwise a
+// 0x20-byte node is allocated and its column string ("     " + text when param5 == 2, else text),
 // param3 at +0x14 and param4's low byte at +0x18; the node is appended through box+0x48/+0x4C, the
 // count at +0x54 is bumped, the current line (+0x50) and the shown index (+0x58) advance when the
 // visible count is smaller, and the scrollbar at +0x90 gets its maximum (+0x48) and step (+0x4C).
@@ -124,12 +124,12 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_93C0(void* box, const uint16_t* text, in
             width -= env->textWidth(spaces, (int32_t)u16_len(spaces));
         }
         const int32_t measured = env->textWidth(p, 0xFF);
-        if (width <= measured) return env->splitLines(box, param3, param5);
+        if (width <= measured) return env->splitLines(box, p, param3, param5);
     }
 
     uint8_t* node = (uint8_t*)env->alloc(0x20, kTextBoxCpp, 0x15D, 0);
     uint8_t* col;
-    if (param3 == 2) {
+    if (param5 == 2) {   // [esp+0x82c]: the same word that narrowed the width
         const uint32_t len = u16_len(p);
         col = (uint8_t*)env->alloc(2 * len + 0xC, kTextBoxCpp, 0x161, 0);
         for (uint32_t i = 0; i < 5; ++i) wr16(col, i * 2, 0x20);

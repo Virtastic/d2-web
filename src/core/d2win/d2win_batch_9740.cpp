@@ -15,6 +15,12 @@ extern "C" uint32_t d2win_sub_93C0(void* box, const uint16_t* text, int32_t para
                                    uint32_t param4, int32_t param5,
                                    const D2WinBatch93C0Env* env);
 
+// The appender 0x93C0 (fastcall ECX = box, EDX = text, stack p3, p4, p5); an FN probe replaces it with its recorder.
+using D2Win9740Append = uint32_t (*)(void* box, const uint16_t* text, int32_t param3, uint32_t param4, int32_t param5,
+                                     const D2WinBatch93C0Env* env);
+static D2Win9740Append g_9740Append = d2win_sub_93C0;
+extern "C" void d2win_9740_set_append(D2Win9740Append fn) { g_9740Append = fn ? fn : d2win_sub_93C0; }
+
 // Retail: Fog #10265(0x11e) -> #10024("") -> _exit(-1).
 [[noreturn]] static void d2win_fatal(uint32_t) { _exit(-1); }
 
@@ -38,5 +44,5 @@ EMSCRIPTEN_KEEPALIVE void d2win_sub_9740(int32_t* param_1, const char* param_2, 
     for (int32_t i = 0; i < n; ++i) str[i] = (uint16_t)u[(size_t)i];
     str[n] = 0;
 
-    d2win_sub_93C0(param_1, str, param_3, 0, 0, env);
+    g_9740Append(param_1, str, param_3, 0, 0, env);
 }

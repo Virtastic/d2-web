@@ -24,16 +24,29 @@ unsigned d2s_isctype_mt_n34(const uint16_t* ctype, int c, unsigned mask,
 }
 
 // 1.13c D2sound+0x7230  DirectSound buffer start: lock, vtbl+0x24 probe, retry vtbl+0x50 while busy.
-// Seams: enter/leave/sleep/fatal host callbacks; vt = buffer vtable (slot 0x24/4 and 0x50/4).
-typedef int (*D2sVfn)(void* self, void* arg);
-int d2s_buffer_start_n34(void** pbuf, void (*enter)(), void (*leave)(), void (*sleepMs)(int), void (*fatal)()) {
-    if (!*pbuf) { fatal(); return 0; }
+// Seams: enter/leave/sleep/fatal host callbacks, stop = sub_6980 (ECX = the object); vt = buffer vtable (slot 0x24/4 and 0x50/4).
+// GetStatus writes the status word; bit 2 (DSBSTATUS_BUFFERLOST) runs Restore until it succeeds (sleeping 10 ms on
+// DSERR_BUFFERLOST), re-reading the vtable each try, then stops the object through sub_6980.
+typedef int32_t (*D2sStatusFn)(void* self, uint32_t* status);
+typedef int32_t (*D2sRestoreFn)(void* self);
+// The object, the interface and its vtable hold 4-byte guest pointers (a void* element is 8 bytes on wasm64).
+static inline uint32_t d2s_rd32_n34(const void* p, uint32_t off) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + off, 4); return v; }
+static inline void* d2s_vfn_n34(uint32_t iface, uint32_t off) {
+    return (void*)(uintptr_t)d2s_rd32_n34((const void*)(uintptr_t)d2s_rd32_n34((const void*)(uintptr_t)iface, 0), off);
+}
+int d2s_buffer_start_n34(void** pbuf, void (*enter)(), void (*leave)(), void (*sleepMs)(int), void (*fatal)(), void (*stop)(void** obj)) {
+    if (!d2s_rd32_n34(pbuf, 0)) { fatal(); return 0; }
     enter();
-    void* b = *pbuf; D2sVfn* vt = *(D2sVfn**)b; char out[4];
-    if (vt[0x24 / 4](b, out) < 0) { leave(); return 0; }
-    if ((uintptr_t)b & 2) {
-        int r;
-        do { while ((r = vt[0x50 / 4](*pbuf, nullptr)) == -0x7787ff6a) sleepMs(10); } while (r < 0);
+    const uint32_t b = d2s_rd32_n34(pbuf, 0); uint32_t status = 0;
+    if (((D2sStatusFn)d2s_vfn_n34(b, 0x24))((void*)(uintptr_t)b, &status) < 0) { leave(); return 0; }
+    if (status & 2) {
+        int32_t r;
+        do {
+            const uint32_t cur = d2s_rd32_n34(pbuf, 0);
+            r = ((D2sRestoreFn)d2s_vfn_n34(cur, 0x50))((void*)(uintptr_t)cur);
+            if (r == -0x7787ff6a) { sleepMs(10); r = -1; }
+        } while (r < 0);
+        stop(pbuf);
     }
     leave();
     return 1;
@@ -70,9 +83,12 @@ void d2s_fassign_n34(int flag, char* dst, const char* number, double (*parse)(co
 // 1.13c D2sound+0xAE20  __shift: memmove(p+n, p, strlen(p)+1) when n != 0
 void d2s_shift_n34(char* p, int n) { if (n) memmove(p + n, p, strlen(p) + 1); }
 
-// 1.13c D2sound+0xAE3D  __cftoe2: fixed-form digits to d.ddde+XXX
-void d2s_cftoe2_n34(D2sStrFlt* f, char* buf, int ndec, int caps, char shiftFirst) {
-    if (shiftFirst) d2s_shift_n34(buf, 1);
+// 1.13c D2sound+0xAE3D  __cftoe2: fixed-form digits to d.ddde+XXX (EAX = f, EBX = buf; returns buf).
+// shiftFirst opens one byte for the decimal point after the sign (only when ndec > 0).
+void d2s_set_decpoint_n34(char c) { g_d2sDecPoint = c; }
+char* d2s_cftoe2_n34(D2sStrFlt* f, char* buf, int ndec, int caps, char shiftFirst) {
+    char* const out = buf;
+    if (shiftFirst) d2s_shift_n34(buf + (f->sign == '-'), ndec > 0);
     if (f->sign == '-') *buf++ = '-';
     char* p = buf;
     if (ndec > 0) { p = buf + 1; buf[0] = p[0]; *p = g_d2sDecPoint; }
@@ -86,6 +102,7 @@ void d2s_cftoe2_n34(D2sStrFlt* f, char* buf, int ndec, int caps, char shiftFirst
         if (e > 9) { p[3] += (char)(e / 10); e %= 10; }
         p[4] += (char)e;
     }
+    return out;
 }
 
 // 1.13c D2sound+0xAEEB  _cftoe: convert via host seams (double->STRFLT, STRFLT->digits), then __cftoe2

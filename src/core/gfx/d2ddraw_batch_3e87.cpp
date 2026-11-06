@@ -648,3 +648,27 @@ zero_pad:
     } while (--count != 0);
     return dest;
 }
+
+// Probe state window over the code-page globals, laid out as retail's block at +0x10284 (0x23C bytes):
+// +0x00 locale id, +0x04 saved block pointer (32-bit), +0x08 multi-byte flag, +0x1C __mbctype[0x101],
+// +0x120 code page, +0x12C the three code-page words, +0x13C the case map. store = 0 loads the
+// statics from the window, 1 writes them back; bytes the port does not model are left as they are.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2ddraw_mbcs_window(uint8_t* w, int store) {
+    struct F { uint32_t off; void* p; uint32_t n; };
+    uint32_t saved = (uint32_t)(uintptr_t)g_saved_mbcinfo;
+    const F f[] = {{0x00, &g_locale_id, 4}, {0x04, &saved, 4}, {0x08, &g_mb_cur_max, 4}, {0x1C, g_mbctype, 0x101},
+                   {0x120, &g_codepage, 4}, {0x12C, g_cp_extra, 12}, {0x13C, g_mbtolower, 0x100}};
+    for (const F& e : f) {
+        if (store) std::memcpy(w + e.off, e.p, e.n);
+        else std::memcpy(e.p, w + e.off, e.n);
+    }
+    if (!store) g_saved_mbcinfo = (uint8_t*)(uintptr_t)saved;
+}
+
+// The three scalar flags the code-page selection reads outside that block: +0xF214 pseudo-code-page flag,
+// +0xF274 OEM code page, +0x10614 ___initmbctable done. Same load/store rule.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2ddraw_mbcs_flags(uint32_t* setmbcp_flag, uint32_t* oem_cp, uint32_t* init_done, int store) {
+    uint32_t* g[3] = {&g_setmbcp_flag, &g_oem_cp, &g_initmbc_done};
+    uint32_t* w[3] = {setmbcp_flag, oem_cp, init_done};
+    for (int i = 0; i < 3; ++i) if (w[i]) { if (store) *w[i] = *g[i]; else *g[i] = *w[i]; }
+}

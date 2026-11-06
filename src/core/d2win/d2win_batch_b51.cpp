@@ -32,7 +32,8 @@ uint32_t d2win_sub_17af0(const D2WinB51Env* e) { *e->g_ffd30 = 0; return 1; }
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2win_sub_16470(D2WinCtl* c, void* cb6360, const D2WinB51Env* e) {
     if (c->type != 8) e->fatal(0x45);
-    c->cb20 = cb6360;
+    // Retail stores one dword at +0x20 (the 4-byte address); a pointer-width store would also zero +0x24..+0x27.
+    *(uint32_t*)((uint8_t*)c + 0x20) = (uint32_t)(uintptr_t)cb6360;
 }
 
 // 1.13c D2Win+0x136e0

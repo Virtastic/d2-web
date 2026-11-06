@@ -2,6 +2,7 @@
 // 32-bit addresses stay uint32_t and are dereferenced only through Env::rd/wr.
 #include <cstdint>
 #include <cmath>
+#include <cstring>
 
 struct D2soundB144Env {
     uint32_t (*rd)(uint32_t a);              // read dword at retail address
@@ -301,38 +302,32 @@ void D2sound_cc84(const double* p1, const double* p2, double* p3, int op,
     *p3 = m.ret;
 }
 
-// 1.13c D2sound+0x9f40 FUN_6f9b9f40(int p1, uint p2, ushort p3, undefined4 p4, uint p5, uint p6), cdecl.
-// p1/p2/p3 are an 80-bit x87 value (mantissa lo/hi, sign+exponent); retail never reads p4; p5 is the fallback
-// operand and p6 its exponent word. The scale is FMUL by DAT_6f9c59d8, which is float32 2^63 (exact), so on the
-// denormal path it is a normalise: shift the mantissa left by clz64 and set the exponent to 64 - clz64.
-// Table DAT_6f9c59c0 (16 bytes) is read at (hi & 0x7fffffff) >> 27.
-static const uint8_t kTbl59c0[16] = { 0x00, 0x01, 0x00, 0x00, 0x04, 0x00, 0x00, 0x07,
-                                      0x00, 0x00, 0x0a, 0x00, 0x00, 0x0d, 0x00, 0x00 };
-uint32_t D2sound_9f40(uint32_t p1, uint32_t p2, uint16_t p3, uint32_t p4, uint32_t p5, uint32_t p6) {
-    (void)p4;
-    uint32_t lo = p1, hi = p2;
-    uint16_t se = p3;
-    while (!((hi >> 31) != 0)) {                       // !CARRY4(hi,hi): top bit clear = denormal/zero path
-        if (lo == 0 && hi == 0) return 0;
-        if ((se & 0x7fff) != 0) return se & 0x7fff;
-        uint32_t v = p6 & 0x7fff;
-        if (v == 0) { if (p5 >> 31) return p5 * 2; }
-        else if (v == 0x7fff || (v = p5 * 2, !(p5 >> 31))) return v;
-        uint64_t m = ((uint64_t)hi << 32) | lo;          // m != 0 here (zero returned above)
+// 1.13c D2sound+0x9f40  _adj_fdiv core (the Pentium FDIV-flaw-safe divide), cdecl: two 80-bit operands on the stack,
+// a at [esp+4] (mantissa lo, hi, sign|exponent) and b at [esp+0x10]; returns ST0 = b / a. When a's mantissa bits 59..62
+// hit a flaw pattern (table DAT_6f9c59c0 at (hi*2 ^ 0x0e000000) >> 28, checked only when bits 25..27 of hi*2 are 0b111),
+// both operands are first multiplied by 15/16 (or 17/16 when b's exponent is 1) at 64-bit precision: exact for every
+// operand with at most 60 significant bits, so the quotient is the plain one. A denormal a is classified on a copy scaled by
+// 2^63 (DAT_6f9c59d8) while the registers keep the original. Operands here are doubles widened exactly to 80 bits (the
+// caller runs at 53-bit precision), so the result is the IEEE quotient. Our port: widen-back and divide.
+static double d2s_ext80_to_double(uint32_t lo, uint32_t hi, uint16_t se) {
+    uint64_t m = ((uint64_t)hi << 32) | lo;
+    uint64_t sign = (uint64_t)(se & 0x8000) << 48;
+    int32_t e = se & 0x7fff;
+    uint64_t bits;
+    if (m == 0) bits = sign;
+    else if (e == 0x7fff) bits = sign | 0x7ff0000000000000ull | ((m << 1) >> 12);   // inf (m = 1 << 63) or NaN payload
+    else {
         int lz = __builtin_clzll(m);
-        m <<= lz;
-        lo = (uint32_t)m;
-        hi = (uint32_t)(m >> 32);
-        se = (uint16_t)((se & 0x8000) | (64 - lz));
+        m <<= lz; e -= lz;
+        int32_t de = e - 16383 + 1023;
+        if (de >= 0x7ff) bits = sign | 0x7ff0000000000000ull;
+        else if (de >= 1) bits = sign | ((uint64_t)de << 52) | ((m >> 11) & 0x000fffffffffffffull);
+        else { int sh = 12 - de; bits = sign | (sh < 64 ? (m >> sh) : 0); }  // double denormal (truncated; not reached from doubles)
     }
-    uint32_t u = hi * 2 ^ 0xe000000u;
-    if (u & 0xe000000u) return u;
-    u = (hi & 0x7fffffffu) >> 0x1b;
-    if (kTbl59c0[u]) {
-        if ((se & 0x7fff) != 0 && (se & 0x7fff) != 0x7fff) return (p6 & 0x7fff) != 1 ? (p6 & 0x7fff) : 1;
-        return se & 0x7fff;
-    }
-    return u;
+    double d; std::memcpy(&d, &bits, 8); return d;
+}
+double D2sound_9f40(uint32_t a_lo, uint32_t a_hi, uint16_t a_se, uint32_t b_lo, uint32_t b_hi, uint16_t b_se) {
+    return d2s_ext80_to_double(b_lo, b_hi, b_se) / d2s_ext80_to_double(a_lo, a_hi, a_se);
 }
 
 // 1.13c D2sound+0xb2e9 -- SSE2 table-driven pow(x, y) (CRT __libm_sse2_pow body; callers: thunk 0xB2D0).

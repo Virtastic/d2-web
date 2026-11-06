@@ -23,7 +23,7 @@ W int q_d2launch_batch_11be0_Ordinal_422(const char*, const char*, int, char*, i
 W void Ordinal_425(const char*, const char*, int, const char*);
 W uint32_t DAT_6fa65e68, DAT_6fa65e64, DAT_6fa65504, DAT_6fa64d94, DAT_6fa64d90;
 W int32_t DAT_6fa65e78;
-W int32_t** DAT_6fa65e74;  // table of slot ptrs (host-width)
+W uint32_t* DAT_6fa65e74;  // table of 32-bit slot words (retail stores 4-byte pointers)
 #undef W
 
 static int32_t g_lastX, g_lastY;
@@ -63,11 +63,11 @@ int FUN_6fa52020(const uint8_t* const* const* a, const uint8_t* const* const* b)
 uint32_t FUN_6fa52070(void) {
   if (DAT_6fa65e74) {
     for (int i = 0; i < DAT_6fa65e78; i++) {
-      int32_t* e = DAT_6fa65e74[i];
+      int32_t* e = (int32_t*)(uintptr_t)DAT_6fa65e74[i];
       if (!e) continue;
       if (e[1] == 0) { q_d2launch_batch_11be0_Ordinal_10024("", q_d2launch_batch_11be0_Ordinal_10265(0x1120)); exit(-1); }
       Ordinal_10043(0x1121, 0);
-      if (*DAT_6fa65e74[i] == 0) { q_d2launch_batch_11be0_Ordinal_10024("", q_d2launch_batch_11be0_Ordinal_10265(0x1122)); exit(-1); }
+      if (*e == 0) { q_d2launch_batch_11be0_Ordinal_10024("", q_d2launch_batch_11be0_Ordinal_10265(0x1122)); exit(-1); }
       Ordinal_10043(0x1123, 0);
       Ordinal_10043(0x1125, 0);
     }
@@ -81,7 +81,7 @@ uint32_t FUN_6fa52070(void) {
 uint32_t FUN_6fa52140(int32_t* p) {
   if (!DAT_6fa65e74) { q_d2launch_batch_11be0_Ordinal_10024("", q_d2launch_batch_11be0_Ordinal_10265(0x1106)); exit(-1); }
   for (int i = 0; i < DAT_6fa65e78; i++)
-    if (!DAT_6fa65e74[i]) { DAT_6fa65e74[i] = p; return 1; }
+    if (!DAT_6fa65e74[i]) { DAT_6fa65e74[i] = (uint32_t)(uintptr_t)p; return 1; }
   return 0;
 }
 

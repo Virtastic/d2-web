@@ -1,19 +1,18 @@
-// src/core/d2cmp/d2cmp_9070.cpp -- 1.13c D2CMP.dll 0x9070, transcribed from the cached Ghidra decompile.
-// Host seams: Fog #10102 (open file), GetLastError, Fog #10029 (log "Error opening file: %s").
+// 1.13c D2CMP+0x9070: ESI = the file object, stack word 0 = quiet (ret 4). Host seams: Fog open thunk 0x8DB4 (ECX = esi), GetLastError (IAT 0x1C068),
+// Fog log thunk 0x8DBA (cdecl: format string, esi).
 #include <cstdint>
 
 struct D2CMP9070Env {
-    int      (*openFile)(void);          // Fog #10102; nonzero = opened
-    uint32_t (*getLastError)(void);      // kernel32 GetLastError
-    void     (*logError)(const char*);   // Fog #10029("Error opening file: %s")
+    int      (*openFile)(uint32_t esi);                   // thunk 0x8DB4; nonzero = opened
+    uint32_t (*getLastError)(void);                       // kernel32 GetLastError
+    void     (*logError)(const char* fmt, uint32_t esi);  // thunk 0x8DBA("Error opening file: %s", esi)
 };
 
 // 1.13c D2CMP+0x09070 (57 bytes): open; on failure log unless quiet && error==2 (not found).
-// 1.13c D2CMP+0x09070
 extern "C"
-uint32_t d2cmp_9070(const D2CMP9070Env* env, int quiet) {
-    if (env->openFile()) return 1;
+uint32_t d2cmp_9070(const D2CMP9070Env* env, uint32_t esi, int quiet) {
+    if (env->openFile(esi)) return 1;
     uint32_t err = env->getLastError();
-    if (quiet == 0 || err != 2) env->logError("Error opening file: %s");
+    if (quiet == 0 || err != 2) env->logError("Error opening file: %s", esi);
     return 0;
 }

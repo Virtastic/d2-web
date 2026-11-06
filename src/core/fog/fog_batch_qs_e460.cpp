@@ -91,18 +91,7 @@ extern "C" uint32_t fog_qs_ban_by_addr(void* srv, const FogQsSeams* s, uint32_t*
     return 1;
 }
 
-// 1.13c Fog+0x1E550 -- D2QSSocket teardown: if the connection has a handle at +0 and +8, close it under its CS (+0xC).
-extern "C" void fog_qssocket_release(void* sock, void (*closeHandle)(uint32_t)) {  // 1.13c Fog+0x1E550
-    if (!sock) return;
-    char* c = at<char*>(sock, 0x110);
-    if (!c || !at<int>(c, 0) || !at<uint32_t>(c, 8)) return;
-    CRITICAL_SECTION* cs = reinterpret_cast<CRITICAL_SECTION*>(c + 0xc);
-    EnterCriticalSection(cs);
-    closeHandle(at<uint32_t>(at<char*>(sock, 0x110), 8));
-    at<uint32_t>(at<char*>(sock, 0x110), 8) = 0;
-    at<uint32_t>(at<char*>(sock, 0x110), 0) = 0;
-    LeaveCriticalSection(reinterpret_cast<CRITICAL_SECTION*>(at<char*>(sock, 0x110) + 0xc));
-}
+// 1.13c Fog+0x1E550 moved to src/core/fog/fog_1e550.cpp (injectable seams).
 
 // 1.13c Fog+0x1E620 -- split a received stream into frames: u16 length at buf[+0x11c-offset], dispatch each
 // to the handler at sock+0x168 (or queue it into sock+0x170 and SetEvent); the tail is copied back.

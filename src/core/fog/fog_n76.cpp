@@ -4,20 +4,20 @@
 #include <cstring>
 #include <cmath>
 extern "C" {
-void Sleep(uint32_t);
-void EnterCriticalSection(void*);
-void LeaveCriticalSection(void*);
-int QueryPerformanceCounter(void*);
-void* CreateIoCompletionPort(void*, void*, uintptr_t, uint32_t);
-void _exit(int);
-void FUN_6ff61690(void*);
-void fog_crt_mantissa_0C1D6(const char*, int32_t, uint32_t*);  // Fog+0xC1D6
-char* fog_strcpy_8e70(char*, const char*);                     // Fog+0x8E70
-int FUN_6ff66800(void*);
-int FUN_6ff6e620(void*, int);
-void q_fog_n76_FUN_6ff6e550(void);
-int Ordinal_16(uint32_t, void*, int, int);
-uint32_t q_fog_n76_Ordinal_111(void);
+void Sleep(uint32_t) __attribute__((weak));
+void EnterCriticalSection(void*) __attribute__((weak));
+void LeaveCriticalSection(void*) __attribute__((weak));
+int QueryPerformanceCounter(void*) __attribute__((weak));
+void* CreateIoCompletionPort(void*, void*, uintptr_t, uint32_t) __attribute__((weak));
+void _exit(int) __attribute__((weak));
+void FUN_6ff61690(void*) __attribute__((weak));
+void fog_crt_mantissa_0C1D6(const char*, int32_t, uint32_t*) __attribute__((weak));  // Fog+0xC1D6
+char* fog_strcpy_8e70(char*, const char*) __attribute__((weak));                     // Fog+0x8E70
+int FUN_6ff66800(void*) __attribute__((weak));
+int FUN_6ff6e620(void*, int) __attribute__((weak));
+void q_fog_n76_FUN_6ff6e550(void) __attribute__((weak));
+int Ordinal_16(uint32_t, void*, int, int) __attribute__((weak));
+uint32_t q_fog_n76_Ordinal_111(void) __attribute__((weak));
 }
 // host seam: CRT 10^n tables (DAT_6ff7ecf0 positive, DAT_6ff7ee50 negative), 12-byte entries; null -> generated.
 extern "C" { const uint8_t* fog_n76_pow10_tab[2] = {nullptr, nullptr}; }
@@ -307,15 +307,29 @@ fin:
 #define U32(p, o) (*(uint32_t*)((uint8_t*)(p) + (o)))
 #define NODE(h) ((uint8_t*)(intptr_t)(h))
 
+// Probe seam for FOG+0x1E9C0: every callee and the lock go through it when set (nullptr = the externals above, unchanged).
+struct Fog1E9C0Env {
+	void* ctx;
+	void (*sleep0)(void*);
+	int (*f16800)(void*, void* p);                       // ECX = the 0x110 object
+	void (*cs)(void*, void* cs, bool enter);             // 0x11690 validate + EnterCriticalSection / LeaveCriticalSection (no validate on leave in retail; the seam sees both)
+	int (*recv)(void*, uint32_t sock, void* buf, int len);  // Ordinal_16 via thunk 0xCD5E
+	uint32_t (*wsaErr)(void*);                           // Ordinal_111 via thunk 0xCD3A
+	int (*f1e620)(void*, void* buf, int n);              // stdcall (buf, count)
+	void (*e550)(void*, void* o);                        // ESI = o
+};
+const Fog1E9C0Env* fog_n76_recv_env = nullptr;
+
 // 1.13c FOG+0x1E9C0 -- safesock receive thread body; o = socket object (32-bit handle fields)
 extern "C" uint32_t fog_safesock_recv_1E9C0(uint8_t* o) {  // 1.13c FOG+0x1E9C0
+	const Fog1E9C0Env* e = fog_n76_recv_env;
 	uint8_t buf[0x2064]; int fill = 0;
-	while (U32(o, 0x110) == 0) { if (U32(o, 0x124)) goto done; Sleep(0); }
+	while (U32(o, 0x110) == 0) { if (U32(o, 0x124)) goto done; if (e) e->sleep0(e->ctx); else Sleep(0); }
 	if (U32(o, 0x124) == 0) {
 		for (;;) {
 			uint8_t* p = NODE(U32(o, 0x110));
 			if (!p || !U32(p, 0) || U32(p, 0x2c) || U32(p, 0x30)) break;
-			int r = FUN_6ff66800(p);
+			int r = e ? e->f16800(e->ctx, p) : FUN_6ff66800(p);
 			if (!U32(o, 0x110) || U32(NODE(U32(o, 0x110)), 0x2c)) break;
 			if (r) {
 				for (;;) {
@@ -323,14 +337,15 @@ extern "C" uint32_t fog_safesock_recv_1E9C0(uint8_t* o) {  // 1.13c FOG+0x1E9C0
 					uint8_t* q = NODE(U32(o, 0x110)); int n;
 					if (!q || U32(q, 0x2c)) n = 0;
 					else {
-						void* cs = q + 0xc; FUN_6ff61690(cs); EnterCriticalSection(cs);
-						n = Ordinal_16(U32(q, 8), buf + fill, 0x2064 - fill, 0);
-						LeaveCriticalSection(cs);
-						if (n < 1) { U32(q, 0x34) = q_fog_n76_Ordinal_111(); U32(q, 0x30) = 4; }
+						void* cs = q + 0xc;
+						if (e) e->cs(e->ctx, cs, true); else { FUN_6ff61690(cs); EnterCriticalSection(cs); }
+						n = e ? e->recv(e->ctx, U32(q, 8), buf + fill, 0x2064 - fill) : Ordinal_16(U32(q, 8), buf + fill, 0x2064 - fill, 0);
+						if (e) e->cs(e->ctx, cs, false); else LeaveCriticalSection(cs);
+						if (n < 1) { U32(q, 0x34) = e ? e->wsaErr(e->ctx) : q_fog_n76_Ordinal_111(); U32(q, 0x30) = 4; }
 					}
 					int room = 0x2064 - fill;
 					if (U32(NODE(U32(o, 0x110)), 0x30) || n == 0) goto done;
-					fill = FUN_6ff6e620(buf, fill + n);
+					fill = e ? e->f1e620(e->ctx, buf, fill + n) : FUN_6ff6e620(buf, fill + n);
 					if ((uint32_t)n < (uint32_t)room) break;
 				}
 			}
@@ -338,7 +353,7 @@ extern "C" uint32_t fog_safesock_recv_1E9C0(uint8_t* o) {  // 1.13c FOG+0x1E9C0
 		}
 	}
 done:
-	q_fog_n76_FUN_6ff6e550();
+	if (e) e->e550(e->ctx, o); else q_fog_n76_FUN_6ff6e550();
 	return 0;
 }
 
@@ -368,23 +383,23 @@ extern "C" void fog_sub_22dee(Fog76Unwind* s) {  // 1.13c FOG+0x22DEE
 // 1.13c FOG+0x20420 -- QServer accept of one connection into slot idx; st carries the register inputs (srv=EAX, sock=EBX, etc.)
 struct Fog76Accept { uint8_t* srv; uint32_t* sock; uint32_t edi; uint32_t ebp; uint32_t* listen; uint8_t* acc; uint32_t reject; uint8_t ov[32]; };
 extern "C" {
-int Ordinal_1(void);
-void Ordinal_11(uint32_t, const char*);
-void q_fog_n76_Ordinal_3(void*);
-void Ordinal_12(void*, uint32_t, void*);
-void Ordinal_5(uint32_t, void*);
-void Ordinal_494(void*, int);
-void Ordinal_6(int, void*, void*);
-void Ordinal_116(void);
-int FUN_6ff5dd90(uint32_t);
-uint8_t FUN_6ff5dd10(void*);
-void FUN_6ff5f250(void*);
-int FUN_6ff5dbe0(void*);
-int FUN_6ff5ceb0(uint32_t);
-void FUN_6ff5df00(uint32_t, const char*, int);
-uint32_t* FUN_6ff5e5f0(uint32_t, uint32_t);
-void FUN_6ff690a0(const void*, const char*);
-int FUN_6ff70010(void);
+int Ordinal_1(void) __attribute__((weak));
+void Ordinal_11(uint32_t, const char*) __attribute__((weak));
+void q_fog_n76_Ordinal_3(void*) __attribute__((weak));
+void Ordinal_12(void*, uint32_t, void*) __attribute__((weak));
+void Ordinal_5(uint32_t, void*) __attribute__((weak));  // import thunk 0xCDB8: provided by the host stand-ins when linked
+void Ordinal_494(void*, int) __attribute__((weak));
+void Ordinal_6(int, void*, void*) __attribute__((weak));
+void Ordinal_116(void) __attribute__((weak));
+int FUN_6ff5dd90(uint32_t) __attribute__((weak));
+uint8_t FUN_6ff5dd10(void*) __attribute__((weak));
+void FUN_6ff5f250(void*) __attribute__((weak));
+int FUN_6ff5dbe0(void*) __attribute__((weak));
+int FUN_6ff5ceb0(uint32_t) __attribute__((weak));
+void FUN_6ff5df00(uint32_t, const char*, int) __attribute__((weak));
+uint32_t* FUN_6ff5e5f0(uint32_t, uint32_t) __attribute__((weak));
+void FUN_6ff690a0(const void*, const char*) __attribute__((weak));
+int FUN_6ff70010(void) __attribute__((weak));
 void FUN_6ff60f30(int, const char*, int, const char*);
 void FUN_6ff5fc20(void);
 void FUN_6ff684a0(void);

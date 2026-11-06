@@ -7,27 +7,17 @@ extern "C" { void (*d2ddraw_fatal)(uint32_t code) = d2ddraw_fatal_default; }   /
 extern "C" void d2ddraw_fill_rect(int32_t* r, uint8_t color);
 extern "C" void d2ddraw_draw_line(const int32_t* p1, const int32_t* p0, uint8_t color);
 
-// 1.13c D2DDraw+0x063C0 (UtilPoint): size 0 draws nothing; else a square of side 2*(size-1)+1 centred on pt.
-extern "C" void d2ddraw_util_point(const int32_t* pt, uint8_t size, uint8_t color) {
-    if (size == 0) return;
-    uint32_t e = (uint32_t)(uint8_t)(size - 1);
-    int32_t r[4] = { (int32_t)((uint32_t)pt[0] - e), (int32_t)((uint32_t)pt[1] - e),
-                     (int32_t)((uint32_t)pt[0] + 1 + e), (int32_t)((uint32_t)pt[1] + 1 + e) };
-    d2ddraw_fill_rect(r, color);
-}
+extern "C" void d2ddraw_util_point_63c0(void (*)(int32_t*, int32_t, int32_t, int32_t, int32_t), void (*)(int32_t*, uint8_t),
+                                        const int32_t*, uint8_t, uint8_t);
+extern "C" void d2ddraw_util_diamond_64e0(void (*)(const int32_t*, const int32_t*, uint8_t), void (*)(uint32_t),
+                                          const int32_t*, uint8_t);
+static void set_rect(int32_t* r, int32_t l, int32_t t, int32_t rt, int32_t b) { r[0] = l; r[1] = t; r[2] = rt; r[3] = b; }
+static void fatal_thunk(uint32_t code) { d2ddraw_fatal(code); }
 
-// 1.13c D2DDraw+0x064E0 (UtilDiamond): rect {l,t,r,b}; inverted rect is fatal (0x12D / 0x12E);
-// an empty width or height draws nothing; else four DrawLine8 edges between the edge midpoints.
+// Engine entries over the 1.13c ports in d2ddraw_63c0.cpp and d2ddraw_64e0.cpp.
+extern "C" void d2ddraw_util_point(const int32_t* pt, uint8_t size, uint8_t color) {
+    d2ddraw_util_point_63c0(set_rect, d2ddraw_fill_rect, pt, size, color);
+}
 extern "C" void d2ddraw_util_diamond(const int32_t* rc, uint8_t color) {
-    int32_t left = rc[0], top = rc[1], right = rc[2], bottom = rc[3];
-    if (right < left) { d2ddraw_fatal(0x12D); return; }
-    if (bottom < top) { d2ddraw_fatal(0x12E); return; }
-    if (right - left == 0 || bottom - top == 0) return;
-    int32_t midY = top + (int32_t)((uint32_t)(bottom - top) >> 1);
-    int32_t midX = left + (int32_t)((uint32_t)(right - left) >> 1);
-    int32_t pR[2] = { right, midY }, pB[2] = { midX, bottom }, pL[2] = { left, midY }, pT[2] = { midX, top };
-    d2ddraw_draw_line(pR, pT, color);
-    d2ddraw_draw_line(pB, pR, color);
-    d2ddraw_draw_line(pL, pB, color);
-    d2ddraw_draw_line(pT, pL, color);
+    d2ddraw_util_diamond_64e0(d2ddraw_draw_line, fatal_thunk, rc, color);
 }
