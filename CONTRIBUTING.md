@@ -13,3 +13,20 @@ Thanks for helping. A few rules keep the project legal and reviewable:
   if you touched `src/`.
 
 Bug reports: say what you did, what you expected, what happened, your browser, and the URL flags.
+
+## New here? Quick start
+
+You never need write access. Every change comes in through a pull request and is reviewed before it is merged.
+
+1. **Fork** the repository on GitHub and clone your fork.
+2. Create a branch: `git checkout -b my-change`.
+3. Make one small, focused change and test it as described above.
+4. Push the branch to your fork and open a **pull request** against `main`.
+5. A maintainer reviews it. Requests for changes are normal; they are not a rejection.
+
+**Finding something to work on:** look for issues labelled
+[`good first issue`](https://github.com/Virtastic/d2-web/labels/good%20first%20issue) or
+[`help wanted`](https://github.com/Virtastic/d2-web/labels/help%20wanted), and comment on the issue to claim it.
+For anything bigger than a small fix, open an issue first so we can agree on the approach.
+
+**Questions?** Ask in the [Discord](https://discord.gg/PzFfDkbSue). Security issues go through [SECURITY.md](SECURITY.md), not a public issue.
