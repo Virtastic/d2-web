@@ -13,7 +13,7 @@ struct D2Win138C0Env {
 };
 
 // 1.13c D2Win+0x138C0
-const char* d2win_sub_138c0(const D2Win138C0Env& e) {
+extern "C" const char* d2win_sub_138c0(const D2Win138C0Env& e) {
     if (!e.available() || !e.open()) return "";
     if (const char* s = e.get_locked()) { strncpy(e.buf, s, 0x200); e.unlock(); }
     e.close();

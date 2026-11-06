@@ -1,33 +1,44 @@
-// 1.13c D2Win+0x17260 -- screenshot writer: pick first unused "ScreenshotNNN.jpg", JPEG-encode frame.
-// Callees are weak seams (file probe/close, JPEG encoder ordinals 2/3/5); the 20 KB stack frame is a zeroed
-// encoder state whose layout stays opaque. Hidden ESI input (frame width) is an explicit param.
+// 1.13c D2Win+0x17260 -- screenshot writer: pick the first unused "ScreenshotNNN.jpg" name, JPEG-encode a frame.
+// Hidden register inputs ESI (frame width) and EBX (frame height) are explicit parameters. The file probe (Fog 10107),
+// its close (Fog 10109) and the three ijl11 calls (init #2, write #5, free #3) are env seams; the 0x1390-dword encoder
+// state is local, zeroed, with the property words the retail code fills (byte offsets below).
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <emscripten.h>
-extern "C" {
-__attribute__((weak)) int32_t Ordinal_10107(int32_t);
-__attribute__((weak)) void Ordinal_10109(void);
-__attribute__((weak)) void Ordinal_2(void*);
-__attribute__((weak)) void d2win_Ordinal_3_free(void*);
-__attribute__((weak)) void Ordinal_5(uint32_t, void*) {} // host seam: Fog+Ordinal_5 has no wasm analogue; no-op unless a strong definition is linked
-extern int32_t DAT_6f8ffba4_screenshot_n;
-int32_t DAT_6f8ffba4_screenshot_n;
-EMSCRIPTEN_KEEPALIVE void d2win_sub_17260(int32_t frame, int32_t width) {  // 1.13c D2Win+0x17260
+
+struct D2Win17260Env {
+    int32_t* counter;                       // DAT_6f8ffba4, the screenshot number
+    int32_t (*openFile)(const char* name);  // Fog 10107: returns -1 when the name is free
+    void (*closeFile)(int32_t h);           // Fog 10109
+    void (*ijlInit)(void* st);              // ijl11 #2
+    void (*ijlWrite)(void* st, int32_t opt);// ijl11 #5
+    int32_t (*ijlFree)(void* st);           // ijl11 #3
+};
+
+// returns ijlFree's result (EAX when the retail function returns)
+int32_t d2win_sub_17260(int32_t frame, uint32_t width, uint32_t height, const D2Win17260Env& e) {  // 1.13c D2Win+0x17260
     char name[224];
-    int32_t st[0x1390 + 4];
-    uint8_t hdr[8];
     for (;;) {
-        snprintf(name, sizeof name, "Screenshot%03d.jpg", (int)DAT_6f8ffba4_screenshot_n);
-        DAT_6f8ffba4_screenshot_n++;
-        if (!Ordinal_10107 || Ordinal_10107(0) == -1) break;
-        Ordinal_10109();
+        snprintf(name, sizeof name, "Screenshot%03d.jpg", (int)*e.counter);
+        int32_t h = e.openFile(name);
+        (*e.counter)++;
+        if (h == -1) break;
+        e.closeFile(h);
     }
+    uint32_t st[0x1390];
     memset(st, 0, sizeof st);
-    if (Ordinal_2) Ordinal_2(st);
-    st[0] = frame;
-    st[3] = (int32_t)((((uint32_t)width * 3 + 3) & ~3u) - (uint32_t)width * 3);  // row pad to 4 bytes
-    if (Ordinal_5) Ordinal_5(8, hdr);
-    if (d2win_Ordinal_3_free) d2win_Ordinal_3_free(hdr);
-}
+    e.ijlInit(st);
+    st[1] = (uint32_t)frame;                                   // +0x04 DIB bytes
+    uint32_t w3 = width * 3;
+    st[2] = width;                                             // +0x08
+    st[3] = height;                                            // +0x0C
+    st[4] = ((w3 + 3) & ~3u) - w3;                             // +0x10 row pad to 4 bytes
+    st[6] = 1;                                                 // +0x18 colour model
+    st[8] = (uint32_t)(uintptr_t)name;                         // +0x20 file name
+    st[0x2C / 4] = width;                                      // +0x2C JPEG width
+    st[0x30 / 4] = height;                                     // +0x30 JPEG height
+    st[0x50 / 4] = 100;                                        // +0x50 quality
+    e.ijlWrite(st, 8);
+    return e.ijlFree(st);
 }

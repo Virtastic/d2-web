@@ -204,7 +204,7 @@ void d2win_12B40(int32_t idx, const D2Win12B40Env* e) {
 }
 
 // 1.13c D2Win+0x13ac0 -- edit-box scroll window [0x4c,0x50] recompute. ESI = edit widget (hidden).
-extern "C" EMSCRIPTEN_KEEPALIVE
+EMSCRIPTEN_KEEPALIVE
 void d2win_b66_13AC0(uint8_t* esi, const D2WinB66Env* e) {
     auto I = [&](int off) -> int32_t& { return *(int32_t*)(esi + off); };
     e->sub_2FE0(I(0x270));
