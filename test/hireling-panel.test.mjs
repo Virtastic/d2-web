@@ -1,15 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { hirelingTextRows } from '../play/assets/hireling-panel.mjs';
-test('hireling rows: empty and one merc', () => {
-  assert.deepEqual(hirelingTextRows([]).map((r) => r.text), ['No hireling']);
-  const r = hirelingTextRows([{ name: 'Rogue', level: 3, life: 40, maxLife: 50 }]);
-  assert.deepEqual(r.map((t) => [t.text, t.y]), [['Hireling', 18], ['Rogue', 58], ['Level 3', 80], ['40 / 50', 102]]);
+import { hirelingPanelDrawList, serializedBodyLoc } from '../play/assets/hireling-panel.mjs';
+
+test('hireling panel: no merc draws nothing, so O shuts it', () => {
+  assert.deepEqual(hirelingPanelDrawList(null, { string: () => '', measure: () => 0 }), []);
 });
-test('hireling rows: two mercs stack by step, no canvas-font path in the shell panel', async () => {
-  const r = hirelingTextRows([{ name: 'A', level: 1, life: 1, maxLife: 2 }, { name: 'B', level: 2, life: 3, maxLife: 4 }]);
-  assert.equal(r[4].y - r[1].y, 72);
+test('hireling panel: the body location is bits 61..64 of the serialized item', () => {
+  const bits = new Uint8Array(16);
+  bits[7] = 0xa0;   // value 5 (left arm): bits 61 and 63 set, LSB first
+  assert.equal(serializedBodyLoc(bits), 5);
+});
+test('hireling panel: the shell draws the left panel through the renderer, no canvas fonts', async () => {
   const src = (await import('node:fs')).readFileSync(new URL('../play/gameplay-shell.mjs', import.meta.url), 'utf8');
   const panel = src.slice(src.indexOf('hirelingPanelEvidence = null;\n  if (hirelingVisible'), src.indexOf("composition: 'retail-frame'"));
-  assert.ok(panel.length > 100 && !/Georgia|fillRect/.test(panel));
+  assert.ok(panel.length > 100 && !/Georgia|fillRect|drawFrame|400/.test(panel));
+  assert.ok(src.includes("inside({ left: 80, top: 60, width: 320, height: 432 })) return 'hireling'"));
 });

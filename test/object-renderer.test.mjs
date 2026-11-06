@@ -223,3 +223,27 @@ test('mayLoad defers a new object first decode, never one already on screen', ()
     else globalThis.ImageData = oldImageData;
   }
 });
+
+test('an object layer shipped as a DC6 cel (the Worldstone Chamber portal, 4x) is drawn when no DCC exists', () => {
+  const cof = new Uint8Array(39); cof.set([1, 1, 1], 0); cof[24] = 128; cof.set([1, 0, 1, 0, 0, 0x48, 0x54, 0x48, 0], 28); cof[38] = 1;
+  const pointer = 32, pixels = Uint8Array.of(2, 7, 8, 0x80), dc6 = new Uint8Array(pointer + 32 + pixels.length + 3), v = new DataView(dc6.buffer);
+  v.setInt32(0, 6, true); v.setUint32(16, 1, true); v.setUint32(20, 1, true); v.setUint32(24, pointer, true);
+  v.setUint32(pointer + 4, 2, true); v.setUint32(pointer + 8, 1, true); v.setUint32(pointer + 28, pixels.length, true);
+  dc6.set(pixels, pointer + 32);
+  const reads = [];
+  const read = (path) => { reads.push(path);
+    if (path.endsWith('.COF')) return cof;
+    if (path.endsWith('.DC6')) return dc6;
+    if (path.endsWith('pal.dat')) return new Uint8Array(768);
+    throw new Error(`missing fixture ${path}`); };
+  const documentObject = { createElement() { return { width: 0, height: 0, getContext() { return { putImageData() {}, drawImage() {} }; } }; } };
+  const oldImageData = globalThis.ImageData; globalThis.ImageData = class { constructor(data) { this.data = data; } };
+  try {
+    const box = createObjectRenderer(read, documentObject).measure({ id: 73, classId: 563, token: '4x', mode: 2, direction: 0, componentMask: 2, framePrecise: 0 }, 5);
+    assert.deepEqual(box && [box.width, box.height, box.layers], [2, 1, 1]);
+    assert.ok(reads.includes('data\\global\\OBJECTS\\4x\\TR\\4xTRLITONHTH.DC6'), 'the DC6 sibling of the missing DCC is read');
+  } finally {
+    if (oldImageData === undefined) delete globalThis.ImageData;
+    else globalThis.ImageData = oldImageData;
+  }
+});

@@ -43,7 +43,7 @@ test('the confirm no longer reuses the stash-gold amount box; Yes reaches the 0x
   const mod = readFileSync('play/assets/vendor-repair-confirm.mjs', 'utf8');
   assert.doesNotMatch(mod, /stash-gold-dialog/);
   const shell = readFileSync('play/gameplay-shell.mjs', 'utf8');
-  assert.match(shell, /createRepairConfirm\(\(id\) => repairAtVendor\(id\)/);
+  assert.match(shell, /create(?:Repair|Trade)Confirm\((?:\(id\) => )?repairAtVendor\b/);
   const send = shell.slice(shell.indexOf('function repairAtVendor('));
   assert.match(send.slice(0, 400), /d2_session_command_vendor_repair'/);
   assert.match(shell, /d2_session_item_repair_cost/);
@@ -116,6 +116,6 @@ test('Repair mode survives Yes and a repair; No and the refusal Continue end it 
   assert.equal(vendorRepairArmed(), false);          // Continue (Enter) ends it
   assert.equal(c.no(), false);                       // nothing open: no end
   const shell = readFileSync(new URL('../play/gameplay-shell.mjs', import.meta.url), 'utf8');
-  assert.match(shell, /createRepairConfirm\([^;]*disarmVendorRepair\);/);
+  assert.match(shell, /create(?:Repair|Trade)Confirm\([^;]*disarmVendorRepair[,)]/);
   assert.doesNotMatch(shell, /repairConfirm\.request\(target\.id\)\) \{ disarmVendorRepair\(\)/);
 });
