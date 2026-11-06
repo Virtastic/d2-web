@@ -1709,6 +1709,7 @@ function ensureBnetLoginScreen(server) {
       const characters = await authenticateConfiguredRealm(credentials);
       ensureRealmLoginDialog().showCharacters(characters, realmFlow?.server?.region ?? '');
     },
+    onCreateAccount: createConfiguredRealmAccount,
     onExit: () => leaveRealmLogin() }); }
   catch (error) { bnetLoginError = String(error); }
 }
@@ -1782,6 +1783,24 @@ async function realmAuthConfig(auth) {
   return { ...auth, revisionFiles };
 }
 
+// CREATE ACCOUNT's last step: a connection of its own makes the account, then the screen is back at LOG IN.
+async function createConfiguredRealmAccount({ account, password }) {
+  const server = realmFlow?.server;
+  if (!server?.ws) throw new Error('selected region has no browser WebSocket transport');
+  const { webSocketTransport, bncsCreateAccount, bindEngineProtocol } = await import('./assets/realm-client.mjs');
+  try { realmFlow.bncs?.close(); } catch { /* socket already closed */ }
+  realmFlow.bncs = null;
+  const bncs = webSocketTransport(realmServiceUrl(server.ws, 'bncs'));
+  let protocol;
+  try {
+    await bncs.ready();
+    protocol = bindEngineProtocol(Module);
+    await bncsCreateAccount(bncs, protocol, { account, password });
+  } finally {
+    try { bncs.close(); } catch { /* socket already closed */ }
+    try { protocol?.free(); } catch { /* engine gone */ }
+  }
+}
 async function authenticateConfiguredRealm({ account, password }) {
   const server = realmFlow?.server;
   realmTransport = { state: 'authenticating', server: { region: server?.region, host: server?.host }, result: null, error: '' };

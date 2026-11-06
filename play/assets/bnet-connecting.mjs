@@ -65,7 +65,7 @@ export function createBnetConnectingPopup({ read, decodeDc6, decodeDatPalette, s
   const labelFont = createFont({ dc6: decodeDc6(read(FRONTEND.font)), tbl: decodeFontTbl(read(FRONTEND.fontTbl)), palette: tinted, documentObject,
     path: FRONTEND.font, drawAs: { op: 'celcolor', mode: 4, blend: createBlender(skyPl2, palette) } });
   const boxFont = (dc6, tbl, colour) => createFont({ dc6: decodeDc6(read(dc6)), tbl: decodeFontTbl(read(tbl)),
-    palette: textColourPalette(skyPl2, skyPalette, colour), documentObject, path: dc6, drawAs: { op: 'celcolor', mode: 5, extra: colour } });
+    palette: colour ? textColourPalette(skyPl2, skyPalette, colour) : skyPalette, documentObject, path: dc6, drawAs: { op: 'celcolor', mode: 5, extra: colour } });
   const titleFont = boxFont(A.titleFont, A.titleFontTbl, 0);
   const statusFont = boxFont(A.statusFont, A.statusFontTbl, 0);
   const dotsFont = boxFont(A.dotsFont, A.dotsFontTbl, L.dots.colour);
