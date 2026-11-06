@@ -3,6 +3,7 @@
 // Not parity evidence; delete an entry when its row is merged.
 #include <cstdint>
 #include <cstddef>
+#include <cstdlib>
 #define W __attribute__((weak))
 char* Storm_Sub3BB00_z14(char*, char, int);
 extern "C" {
@@ -26,6 +27,27 @@ W void fog_sub_15f50(void*, uint32_t, void*) {}
 W void FUN_6ff5fc20() {}
 W void FUN_6ff60f30() {}
 W void FUN_6ff62020() {}
+W void* FUN_6ff520d7(void* p, size_t n) { return realloc(p, n); }  // CRT realloc stand-in (link fix)
+W uint32_t* FUN_6ff5e4e0(uint8_t*, uint32_t) { return nullptr; }  // roster lookup stand-in (link fix)
+W int Ordinal_3(int) { return 0; }  // Storm ordinal stand-in (link fix)
+W void FUN_6ff6b0c0(void**) {}
+W void Ordinal_111(void) {}
+W int Ordinal_19(int) { return 0; }
+W void FUN_6ff6ad20(const char*) {}
+W void* FUN_6ff6cd10(int, const char*, int) { return nullptr; }
+W int FUN_6ff5ceb0(uint32_t) { return 0; }
+W void FUN_6ff5d230(void) {}
+W void FUN_6ff5e1b0(uint32_t) {}
+W void FUN_6ff5e3b0(void) {}
+W void FUN_6ff690a0(const char*, const char*) {}
+W int FUN_6ff70180(int*, uint32_t*, uint32_t) { return 0; }
+W void FUN_6ff5e420(void) {}
+W long InterlockedDecrement(volatile long* p) { return __atomic_sub_fetch(p, 1, __ATOMIC_SEQ_CST); }
+W long InterlockedIncrement(volatile long* p) { return __atomic_add_fetch(p, 1, __ATOMIC_SEQ_CST); }
+W void Sleep(uint32_t) {}  // single-threaded host: a yield is a no-op
+W void EnterCriticalSection(void*) {}
+W void LeaveCriticalSection(void*) {}
+W void DeleteCriticalSection(void*) {}
 W void FUN_6ff684a0() {}
 W void FUN_6ff6cda0() {}
 W void Ordinal_116() {}
