@@ -37,7 +37,7 @@ struct D2GameB61Env {
 // row, ...} and, if the unit's two data rows exist and none of the three veto checks fire, calls
 // the handler at table+4.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2game_9d3b0(void* param_1, int32_t* param_2, const D2GameB61Env* env)
+void d2g_b61_9d3b0(void* param_1, int32_t* param_2, const D2GameB61Env* env)
 {
     int32_t ctx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     int32_t local_4;
@@ -73,7 +73,7 @@ void d2_fn_d2game_9d3b0(void* param_1, int32_t* param_2, const D2GameB61Env* env
 // the client's slot byte (+0x6D) says yes, sends packet 5D 17 02 00 00 00, then rebinds the unit:
 // +0x6E = 0x4B, +0x70 = self, Fog #10158, flags(+0xC4) |= 0x400. Always returns 0.
 extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2_fn_d2game_b9b00(uint8_t* param_1, int32_t* param_2, const D2GameB61Env* env)
+uint32_t d2_port_d2game_b9b00(uint8_t* param_1, int32_t* param_2, const D2GameB61Env* env)
 {
     uint8_t* tbl = (uint8_t*)env->ord10920(param_2);
     uint32_t ent = b61_u32(tbl + 0x10 + (uint32_t)param_1[0x6D] * 4);

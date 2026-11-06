@@ -145,7 +145,7 @@ void D2Game_2C2D0(uint32_t flags, uint8_t a6a, uint8_t a6b, uint8_t a6d)
     die(0x52b);
 }
 
-// 1.13c D2GAME+0x2CBE0
+// sketch of D2Game 0x2CBE0 (the 1.13c port is src/core/d2game/d2g_2cbe0.cpp)
 // Per-tick unit sweep over game+0xBC[5] room lists. Seams for the unit iterator/update calls.
 struct SweepSeams {
     void* (*firstUnit_10717)(void* room);

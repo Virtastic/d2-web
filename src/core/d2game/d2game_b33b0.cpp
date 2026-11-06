@@ -6,19 +6,21 @@
 
 typedef intptr_t I;
 typedef uint32_t U;
-#define O(n) extern "C" __attribute__((weak)) I Ord##n(...)
-#define F(n) extern "C" __attribute__((weak)) I D2GAME_##n(...)
+#define W extern "C" __attribute__((weak))
 #define R32(b, o) (*(uint32_t*)((uintptr_t)(b) + (o)))
-
-O(10331); O(10973); O(10887); O(10826); O(10014); O(11056); O(10704); O(10750); O(10867); O(10123); O(10565);
-F(CF920); F(EA490); F(55890); F(EBE70);
+// Fixed signatures (stdcall thunks, stack words; the D2GAME_ ones take EAX / EBX first as noted at the calls) so an FN probe can define them.
+W I Ord10331(I unit); W I Ord10973(I u, I a, I b); W I Ord10887(I u, I a, I b, I c); W I Ord10826(I room); W I Ord10014(I area);
+W I Ord11056(I own, I kind); W I Ord10704(I unit); W I Ord10750(I own); W I Ord10867(I own); W I Ord10123(I unit, I kind);
+W I Ord10565(I rec, I x, I y, I pat);
+W I D2GAME_CF920(I owner, I unit); W I D2GAME_EA490(I unit, I owner_f0); W I D2GAME_55890(I unit, I f, I owner);
+W I D2GAME_EBE70(I a, I msg, I b, I owner);
 extern "C" __attribute__((weak)) U D2GAME_DAT_F31C20;   // DAT_6fd31c20, error-log enable flag
 static const char kAttachErr[] = "Error attaching to unit";
 
-// 1.13c D2Game+0xB33B0 -- EAX = owner (game-side unit holder, kept in EDI), ESI = the new unit. Returns 1, or 0 when 10331(owner) is null.
+// 1.13c D2Game+0xB33B0 -- EAX = owner (game-side unit holder, kept in EDI), ESI = the new unit. Returns 1, or 0 when 10331(unit) is null.
 extern "C" U d2_fn_d2game_B33B0(I owner, I unit)
 {
-    I rec = Ord10331(owner);
+    I rec = Ord10331(unit);   // retail: the entry's `push esi` is the argument 0xA478 (10331) pops, so the unit, not the owner
     if (!rec) return 0;
     Ord10887(unit, 6, Ord10973(unit, 7, 0), 0);   // A42A (10973) result is the value A472 (10887) stores
     U kind = 0x80;
@@ -34,7 +36,7 @@ extern "C" U d2_fn_d2game_B33B0(I owner, I unit)
                 I ar = Ord10014(area);                // 0xA74E
                 uint8_t f = *(uint8_t*)((uintptr_t)ar + 0x30);
                 if (f && D2GAME_55890(unit, (U)f, owner) == 1 && D2GAME_DAT_F31C20)
-                    D2GAME_EBE70(0, kAttachErr, 4, owner);   // EDX = message
+                    D2GAME_EBE70(0, (I)kAttachErr, 4, owner);   // EDX = message
             }
             kind = 0x100;
         }

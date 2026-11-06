@@ -15,7 +15,7 @@
 static inline uint8_t  rd8 (const void* p, uint32_t o) { return ((const uint8_t*)p)[o]; }
 static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
 static inline void     wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
-static inline void*    rdptr(const void* p, uint32_t o) { void* v; std::memcpy(&v, (const uint8_t*)p + o, sizeof v); return v; }
+static inline void*    rdptr(const void* p, uint32_t o) { return (void*)(uintptr_t)rd32(p, o); }  // retail pointers are 32-bit words
 // Retail addresses arrive as 32-bit integers in the decompile (unaff_EDI, in_EAX, ...).
 static inline uint8_t  rd8 (uint32_t a, uint32_t o) { return rd8((const void*)(uintptr_t)a, o); }
 static inline uint32_t rd32(uint32_t a, uint32_t o) { return rd32((const void*)(uintptr_t)a, o); }
@@ -42,9 +42,9 @@ struct D2GameBatch268E0Env {
     // 0x1320: resolves the record whose +0x104.. byte block is tested.
     int32_t  (*sub1320)();
     // 0xA496, Fog #11103.
-    void     (*ordinal11103)();
+    void     (*ordinal11103)(void* unit);
     // 0xDFA90: the probe behind the 0x750F0 guard.
-    int32_t  (*subDFA90)();
+    int32_t  (*subDFA90)(void* unit);
     // 0xA2EC, Fog #10046(file, line, 0): the per-node call of the 0x37500 list walk.
     void     (*ordinal10046)(const char* file, uint32_t line, uint32_t zero);
 };
@@ -117,14 +117,16 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2GAME_ClassStateProbe(uint32_t param1, uint32_t e
 // returned. EDI and the two stack values are explicit here.
 // 1.13c D2Game+0x750F0
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t D2GAME_750F0_GuardedEntry(uint32_t param1, int32_t edi, void* ctx,
+EMSCRIPTEN_KEEPALIVE uint32_t D2GAME_750F0_GuardedEntry(uint32_t param1, void* esi, int32_t edi,
                                                  const D2GameBatch268E0Env* env)
 {
-    env->ordinal11103();
+    // Disassembly 0x740F0: ESI = the unit (pushed to A496 with 0, EAX for DFA90), EDI = the mode, stack word 0 = param1 (-> ECX of 74E60).
+    env->ordinal11103(esi);
     if (edi != 0 && edi != 0xC) {
-        if (env->subDFA90() != 0) return 1;
+        if (env->subDFA90(esi) != 0) return 1;
     }
-    d2_fn_d2game_74E60(param1, ctx, env);          // FUN_6fc94e60(iStack_4, &stack0xffffffd8)
+    uint32_t frame[8] = { 1, (uint32_t)(uintptr_t)esi, 0, 0, 0, 0, 0, 0 };   // the 0x20-byte frame EDX points at: {1, unit, 0...}
+    d2_fn_d2game_74E60(param1, frame, env);
     return 0;
 }
 

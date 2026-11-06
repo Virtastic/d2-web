@@ -43,7 +43,7 @@ extern "C" void D2Game_7F370(void* unit, void* aiCtl, void* args) {
         if ((int)(roll(aiCtl) % 100) < rds16(P(rec), 0x5C + diff * 2)) {
             E.ordinal_11103(aiCtl, 0);
             uint32_t cmd[7] = {0, 0, 0, 0, 0, 0, 0};   // GUESS: stack command block at local_28..local_c
-            cmd[0] = 4; cmd[1] = (uint32_t)(uintptr_t)aiCtl;
+            cmd[0] = 4; cmd[1] = (uint32_t)(uintptr_t)aiCtl; cmd[2] = (uint32_t)(uintptr_t)target;   // retail 0x8043C stores the task block's +8 word as event word 2
             uint8_t flag = 100;
             if (aiCtl) {
                 void* r = E.fn_1320();

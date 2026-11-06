@@ -22,21 +22,7 @@ static inline void     wr32(uint32_t a, uint32_t o, uint32_t v) { std::memcpy((u
 
 [[noreturn]] static void d2game_fatal(uint32_t) { _exit(-1); }
 
-// Host seams for the callees the cached decompiles name but src/ does not implement. Argument lists
-// follow the retail call sites (ECX/EDX/EAX at the call, then the pushed stack arguments).
-struct D2GameBatch1019jEnv {
-    // 0x8A3E0: append size bytes of data to the context's packet buffer; the context arrives in EAX.
-    void     (*fn8A3E0)(uint32_t ctx, const void* data, uint32_t size);
-    // 0xE03A0: path node at [pos] of the path base; the path index arrives in EAX.
-    uint32_t (*fnE03A0)(uint32_t pathBase, uint32_t pos, uint32_t pathIndex);
-
-    // D2Common ordinals (1.13c import numbers).
-    uint32_t (*ordinal10920)(uint32_t ctx);
-    uint32_t (*ordinal11157)(uint32_t unit);
-    uint32_t (*ordinal11106)(uint32_t unit, uint32_t arg);
-    uint32_t (*ordinal10331)(uint32_t room);
-    void     (*ordinal10383)(uint32_t room, void** array, uint32_t* count);
-};
+#include "d2game_batch_tiny_1019j_env.h"
 
 // 0x6FFA0: ask D2Common #10920 for the player-data record of the EAX argument, then walk the
 // inventory list at +0x5C (nodes linked through +8) to its end. The walk has no side effects, so the
@@ -66,7 +52,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_9E2E0(uint32_t unit, uint3
 
 // The callback 0xB11A0 fires: __fastcall with ECX/EDX from the caller's first two arguments and the
 // candidate value and third argument pushed left to right.
-typedef uint32_t (*D2GameBatch1019jHitFn)(uint32_t ecx, uint32_t edx, uint32_t value, uint32_t arg3);
 
 // 0xB11A0: room sweep. D2Common #10331(param_2) is the room; #10383 yields its unit array + count.
 // Each unit's path node at +0x174 is resolved: live flag bit 0 at +0x3D4 uses it as is, otherwise

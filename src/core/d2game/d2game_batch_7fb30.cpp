@@ -79,9 +79,13 @@ void D2GAME_81F50_AiThink(D2GameStrc* g, D2UnitStrc* u, D2AiTickParamStrc* t)
             return;
         }
         if (t->bCombat) {
-            if (Pct(u) < (uint32_t)P(g, t, 2)) Attack1Or2(g, u, t, Lim100(u));
-            else AITACTICS_IdleInNeutralMode(g, u, P(g, t, 4));
-            return;
+            if (Pct(u) < (uint32_t)P(g, t, 2)) {
+                // retail compares the limited roll and the word as signed ints
+                Attack(g, u, t, (int32_t)Lim100(u) < P(g, t, 3) ? MONMODE_ATTACK1 : MONMODE_ATTACK2);
+                return;
+            }
+            // a strike-roll miss idles and then falls through to the walk below (retail has no return here)
+            AITACTICS_IdleInNeutralMode(g, u, P(g, t, 4));
         }
     }
     AITACTICS_WalkToTargetUnitWithFlags(g, u, t->pTarget, 7);

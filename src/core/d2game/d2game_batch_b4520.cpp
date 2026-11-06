@@ -156,7 +156,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B4FF0(void* game, void* unit, i
     d.w[5] = U(SUB(0x1100, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0));
     d.w[6] = U(SUB(0x1130, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0));
     d.w[0xC] = p4; d.w[4] = U(mi);
-    d.w[0x15] = 0x6FCD31D0;   // retail callback address (LAB_6fcd31d0)
+    d.w[0x15] = 0xB20B31D0u;   // retail callback (RVA 0xB31D0); the capture logs a code pointer as 0xB2000000 | RVA
     // 9FA30: ECX = game, EAX = unit, EBX = &w[7], stack = &w[8]
     if (!SUB(0x9FA30, U((uintptr_t)game), U((uintptr_t)unit), U((uintptr_t)&d.w[7]), U((uintptr_t)&d.w[8]), 0, 0, 0)) return 0;
     for (i32 i = 0; i < n; ++i) {
@@ -167,6 +167,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B4FF0(void* game, void* unit, i
 }
 
 // 1.13c D2Game+0xB5110  (ECX = game, EDX = unit; stack: skill id, p4 = skill level)
+// Retail call order: 1100(unit), 1130(unit), 10786, E07A0, 10392; the end vector re-reads the unit position (1100/1130) after the
+// room lookups, it does not reuse the first read.
 extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B5110(void* game, void* unit, i32 skillId, u32 p4, const D2GameBatchB4520Env* env)
 {
     const uint8_t* s = skillRec(env, skillId);
@@ -174,25 +176,31 @@ extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B5110(void* game, void* unit, i
     i32 mi = rd16s(s, 0x48);
     if (!(rd32(env->dt, 0xb64) + (u32)mi * 0x1a4)) return 0;
     if (unit) wr32(unit, 0xc4, rd32(unit, 0xc4) | 0x40);
-    Desc d{}; d.w[0] = 3; d.w[1] = d.w[2] = U((uintptr_t)unit); d.w[4] = U(mi);
-    i32 ux = SUB(0x1100, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0);
-    i32 uy = SUB(0x1130, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0);
-    d.w[5] = U(ux); d.w[6] = U(uy);
+    const u32 un = U((uintptr_t)unit);
+    Desc d{}; d.w[0] = 3; d.w[1] = d.w[2] = un; d.w[4] = U(mi);
+    d.w[5] = U(SUB(0x1100, un, 0, 0, 0, 0, 0, 0));
+    d.w[6] = U(SUB(0x1130, un, 0, 0, 0, 0, 0, 0));
     d.w[0xB] = U(skillId); d.w[0xC] = p4;
-    d.w[0xD] = U(ORD(10786, U((uintptr_t)unit), rd32(s, 0x138), U(skillId), p4));
-    SUB(0xE07A0, U((uintptr_t)game), U((uintptr_t)unit), 0, 0, 0, 0, 0);
+    d.w[0xD] = U(ORD(10786, un, rd32(s, 0x138), U(skillId), p4));
+    SUB(0xE07A0, U((uintptr_t)game), un, 0, 0, 0, 0, 0);
     u32 room = rd32(unit, 0x2c);
-    void* t = (void*)(uintptr_t)ORD(10392, room, 0, 0, 0);
+    u32 t = U(ORD(10392, room, 0, 0, 0));
     i32 ex, ey;
-    if (t == unit || !t) {
+    if (t == un || !t) {
         i32 v = ORD(10983, room, 0, 0, 0);
-        ex = v - ux;
-        ey = ORD(10764, room, 0, 0, 0) - uy;
+        ex = v - SUB(0x1100, un, 0, 0, 0, 0, 0, 0);
+        i32 w = ORD(10764, room, 0, 0, 0);
+        ey = w - SUB(0x1130, un, 0, 0, 0, 0, 0, 0);
     } else {
-        i32 ty = SUB(0x1130, U((uintptr_t)t), 0, 0, 0, 0, 0, 0), tx = SUB(0x1100, U((uintptr_t)t), 0, 0, 0, 0, 0, 0);
+        i32 ty = SUB(0x1130, t, 0, 0, 0, 0, 0, 0);
+        i32 tx = SUB(0x1100, t, 0, 0, 0, 0, 0, 0);
         ORD(10739, room, U(tx), U(ty), 0);
-        ex = SUB(0x1100, U((uintptr_t)t), 0, 0, 0, 0, 0, 0) - ux;
-        ey = SUB(0x1130, U((uintptr_t)t), 0, 0, 0, 0, 0, 0) - uy;
+        i32 tx2 = SUB(0x1100, t, 0, 0, 0, 0, 0, 0);
+        i32 ux2 = SUB(0x1100, un, 0, 0, 0, 0, 0, 0);
+        ex = tx2 - ux2;
+        i32 ty2 = SUB(0x1130, t, 0, 0, 0, 0, 0, 0);
+        i32 uy2 = SUB(0x1130, un, 0, 0, 0, 0, 0, 0);
+        ey = ty2 - uy2;
     }
     d.w[7] = U(ex); d.w[8] = U(ey);
     SUB(0x6F930, U((uintptr_t)game), U((uintptr_t)&d), 0, 0, 0, 0, 0);
@@ -227,26 +235,43 @@ extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B5450(void* game, void* unit, i
     return 1;
 }
 
-// 1.13c D2Game+0xB56C0  (ECX = game)
-extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B56C0(void* game, void* unit, i32 skillId, const D2GameBatchB4520Env* env)
+// 1.13c D2Game+0xB56C0  (ECX = game, EDX = unit; stack: skill id, p4). The per-class offset tables are the module bytes at
+// D2Game+0xFB510 (8 bytes, one per class) and +0xFB518 (8 rows of 9).
+extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B56C0(void* game, void* unit, i32 skillId, u32 p4, const D2GameBatchB4520Env* env)
 {
     const uint8_t* s = skillRec(env, skillId);
     if (!s || !missileIdOk(env, s)) return 0;
-    i32 h = ORD(10511, U((uintptr_t)unit), 0, 0, 0);
+    i32 mi = rd16s(s, 0x48);
+    const u32 un = U((uintptr_t)unit);
+    i32 h = ORD(10511, un, 0, 0, 0);
     if (!h) return 0;
-    i32 a = ORD(10980, 0, 0, 0, 0), b = ORD(10649, 0, 0, 0, 0), pos[2];
-    if (!a || !b) { if (!SUB(0x9FA30, U((uintptr_t)game), U((uintptr_t)pos), 0, 0, 0, 0, 0)) return 0; a = pos[0]; }
-    u32 c1 = U(ORD(10192, 0, 0, 0, 0)) & 0xff;
-    u32 cls = U(ORD(10266, 0, 0, 0, 0)) & 7;
-    SUB(0x1100, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0);
-    i32 y = SUB(0x1130, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0);
-    ORD(10740, env->tbl1B510[cls], 0, 0, 0);
-    i32 idx = ORD(10569, U((uintptr_t)unit), U(a), 0, 0);
-    if (idx < 1) idx = 0; else if (idx > 7) idx = 8;
-    uint8_t v = env->tbl1B518[cls * 9 + idx];
-    if (v != 'c') ORD(10740, v, c1, U(y + h), 0);
-    Desc d{}; d.w[0] = 0x20;
-    SUB(0x6F930, U(h), U((uintptr_t)&d), 0, 0, 0, 0, 0);
+    i32 a = ORD(10980, U(h), 0, 0, 0);
+    i32 b = ORD(10649, U(h), 0, 0, 0);
+    if (!a || !b) {   // 9FA30: ECX = game, EAX = unit, EBX = &a, stack = &b
+        if (!SUB(0x9FA30, U((uintptr_t)game), un, U((uintptr_t)&a), U((uintptr_t)&b), 0, 0, 0)) return 0;
+    }
+    u32 w = (U(a) & ~0xffu) | (U(ORD(10192, un, U(a), U(b), 0)) & 0xff);
+    u32 cls = U(ORD(10266, w, 0, 0, 0)) & 7;
+    i32 ux = SUB(0x1100, un, 0, 0, 0, 0, 0, 0);
+    i32 uy = SUB(0x1130, un, 0, 0, 0, 0, 0, 0);
+    i32 o1 = 0, o2 = 0, junk = 0;
+    ORD(10740, env->tbl1B510[cls], U((uintptr_t)&o1), U((uintptr_t)&o2), 0);
+    ux += o1; uy += o2;
+    i32 i = uy;   // the frame slot 10569 fills holds the spilled uy until it writes
+    ORD(10569, un, U((uintptr_t)&i), U((uintptr_t)&junk), 0);
+    i32 idx = i - 4;
+    if (idx <= 0) idx = 0; else if (idx >= 8) idx = 8;
+    uint8_t v = env->tbl1B518[cls * 9 + (u32)idx];
+    i32 w8 = b;   // retail leaves the 10649 slot as the y word when the class has no second offset ('c')
+    if (v != 'c') {
+        w = (w & ~0xffu) | v;
+        ORD(10740, w, U((uintptr_t)&o1), U((uintptr_t)&o2), 0);
+        ux += o1; uy += o2;
+        w8 = uy;
+    }
+    Desc d{}; d.w[0] = 0x20; d.w[1] = d.w[2] = un; d.w[4] = U(mi);
+    d.w[7] = U(ux); d.w[8] = U(w8); d.w[0xC] = p4;
+    SUB(0x6F930, U((uintptr_t)game), U((uintptr_t)&d), 0, 0, 0, 0, 0);
     return 1;
 }
 
@@ -285,10 +310,11 @@ static u32 b6840(void* game, void* unit, i32 skillId, u32 p4, const D2GameBatchB
     d.w[0xA] = U(((m + ((m >> 31) & 7)) >> 3) + r[0x9a]);
     d.w[0xC] = p4; d.w[4] = U(mi);
     // 9FA30: ECX = game, EAX = unit, EBX = &w[7], stack = &w[8]
+    u32 mon = 0;
     if (SUB(0x9FA30, U((uintptr_t)game), U((uintptr_t)unit), U((uintptr_t)&d.w[7]), U((uintptr_t)&d.w[8]), 0, 0, 0) &&
-        SUB(0x6F930, U((uintptr_t)game), U((uintptr_t)&d), 0, 0, 0, 0, 0)) {
-        SUB(0xB32E0, U(skillId), U((uintptr_t)unit), p4, 0, 0, 0, 0);   // EAX = skill id
-        SUB(0xB3270, U((uintptr_t)s), 0, 0, 0, 0, 0, 0);
+        (mon = U(SUB(0x6F930, U((uintptr_t)game), U((uintptr_t)&d), 0, 0, 0, 0, 0)))) {
+        SUB(0xB32E0, U(skillId), mon, U((uintptr_t)unit), p4, 0, 0, 0);   // EAX = skill id, EBX = the new missile, stack = unit, level
+        SUB(0xB3270, U((uintptr_t)unit), U((uintptr_t)s), 0, 0, 0, 0, 0);   // ESI = unit, stack = the skill record
         i32 now = ORD(10980, U(h), 0, 0, 0);
         if ((i32)rd32(game, 0xa8) < now && ORD(10494, U((uintptr_t)unit), 0xc, 0, 0)) {
             i32 n = ORD(10786, U((uintptr_t)unit), rd32(s, 0x140), U(skillId), p4);

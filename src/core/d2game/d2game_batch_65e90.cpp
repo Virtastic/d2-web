@@ -10,7 +10,7 @@ typedef uint8_t  u8;
 typedef uint32_t u32;
 typedef int32_t  s32;
 
-// 1.13c D2Game+0x68250
+// (superseded by the seam port d2g_68250.cpp) D2Game 0x68250
 // Env: sub_DFCC0(ecx, arg) -> void ; rd32/wr8.
 template <class E> u32 ClearFlag46ReturnTrue(E& e, u32 ecx, u32 p2)
 {
@@ -64,7 +64,7 @@ template <class E> void ApplyQuestNpcStateChange(E& e, u32 thisp, u32 p1, u8 p2,
     e.wr8(q + 0x50, 1);
 }
 
-// 1.13c D2Game+0x68F90
+// (superseded by the seam port d2g_68f90.cpp) D2Game 0x68F90
 // __fastcall: p = ecx; p[0] = game, p[1] = unit.
 template <class E> void RaiseQuestNodeFlagAndSend(E& e, u32 p)
 {
@@ -73,7 +73,7 @@ template <class E> void RaiseQuestNodeFlagAndSend(E& e, u32 p)
     e.sub_8EA80(game, unit, 7, e.rd32(game + 0xA8) + 0x19, 0, 0, 0);
 }
 
-// 1.13c D2Game+0x697A0
+// (superseded by the seam port d2g_697a0.cpp) D2Game 0x697A0
 // Drain mana into life: the stat-8 value is cut by p2[1]% and p2[2]% of it is added to stat 6.
 template <class E> void DrainManaIntoLife(E& e, u32 p1, u32 p2)
 {
@@ -83,7 +83,7 @@ template <class E> void DrainManaIntoLife(E& e, u32 p1, u32 p2)
     e.ord10551(unit, 6, (e.rd32(p2 + 8) * cur) / 100, 0);
 }
 
-// 1.13c D2Game+0x69800
+// (superseded by the seam port d2g_69800.cpp) D2Game 0x69800
 // Drain life into mana: stat 6 is kept in its high byte (cur >> 8) and the same percentages move it to stat 8.
 template <class E> void DrainLifeIntoMana(E& e, u32 p1, u32 p2)
 {
@@ -94,7 +94,7 @@ template <class E> void DrainLifeIntoMana(E& e, u32 p1, u32 p2)
     e.ord10551(unit, 8, (e.rd32(p2 + 8) * cur * 0x100u) / 100, 0);
 }
 
-// 1.13c D2Game+0x69940
+// (superseded by the seam port d2g_69940.cpp) D2Game 0x69940
 // REG?: EAX = in_EAX (the unit the caller passed in the register); item class 0xEA needs a non-zero EAX and
 // ord10459 of the ord10826 result. Returns 0 only for that refused case.
 template <class E> u32 CheckItemClassEA(E& e, u32 param1, u32 eax)
@@ -125,7 +125,7 @@ template <class E> u32 ClearMinionFlagIfUnowned(E& e, u32 p)
     return 1;
 }
 
-// 1.13c D2Game+0x69DE0
+// (superseded by the seam port d2g_69de0.cpp) D2Game 0x69DE0
 // Clamp HP to max; when it was below max, the byte at esi is set to 1. States 2 and 1 are cleared from the unit.
 // Ends in the sub_DC920 seam.
 template <class E> void ClampHpToMaxAndClearStates(E& e, u32 unit, u32 esi)

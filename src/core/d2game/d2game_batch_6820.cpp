@@ -153,12 +153,13 @@ void D2Game_RemoveAllMissiles(void* game, const D2GameBatch10Seams& s)
 void D2Game_RemoveAllMonsters(void* game, const D2GameBatch10Seams& s)
 {
     for (uint32_t i = 0; i < kUnitListRows; ++i) {
-        void** bucket = (void**)((uint8_t*)game + kGameUnitList + 0x200 + i * 4);
-        void* unit = *bucket;
+        // retail's 32-bit link words (a host pointer is wider than the 4-byte bucket slot)
+        const uint32_t slot = kGameUnitList + 0x200 + i * 4;
+        void* unit = (void*)(uintptr_t)rd32(game, slot);
         while (unit != nullptr) {
             if (unit == nullptr) d2game_fatal(0xDF);
-            void* next = rdptr(unit, kUnitListNext);
-            *bucket = next;
+            void* next = (void*)(uintptr_t)rd32(unit, kUnitListNext);
+            wr32(game, slot, (uint32_t)(uintptr_t)next);
             s.removeUnit(game, unit);
             unit = next;
         }

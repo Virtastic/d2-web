@@ -105,7 +105,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_8e8c0(int id, uint8_t* owner, uint32_t type, c
     }
 }
 
-// 1.13c D2Game+0x91040
+// sketch of D2Game 0x91040; the 1.13c port is src/core/d2game/d2g_91040.cpp
 // fastcall: ecx = unit (edx is unused). Fills a random walk of min(#10534(unit), 0x4D) points as u16 x,y pairs into
 // the buffer #10817 returns through its out-pointer. Start x/y = path+0xC/+0x10 for unit types 2/4/5, else
 // #10867/#10750 of the path (0 when no path). Register-argument thunks follow the disassembly, not the decompile.
@@ -175,7 +175,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_91040(int32_t* u, const D2GameB91040Env* e)
     e->o10165(path, n);
 }
 
-// 1.13c D2Game+0x91400
+// 0x91400 retail port: src/core/d2game/d2g_91400.cpp (this sketch is superseded)
 // stack args (ret 0xC): a0 = unit, a1 = skill-holder (also the stat-lookup target), a2 = accumulator whose +0x38/+0x3C
 // get the bonus. Disassembly-checked: 0x21B10 takes (eax = skill row, edx = value).
 EMSCRIPTEN_KEEPALIVE void d2_game_91400(void* p1, void* p2, uint8_t* acc, const uint8_t* dt,
@@ -215,7 +215,7 @@ EMSCRIPTEN_KEEPALIVE bool d2_game_91610(int32_t* unit, int threshold, const D2Ga
     return false;
 }
 
-// 1.13c D2Game+0x91660
+// sketch of D2Game 0x91660; the 1.13c port is src/core/d2game/d2g_91660.cpp
 // in_EAX = skill-holder record, param_2 = unit, param_3 = skills.txt row, param_4 = level. Raises unit
 // stats 7/6 by a percentage of the unit's base (#10913), then applies states from the record.
 // Seams are carried as raw function pointers; the 0x23260/0xF44B0 calls keep their decompile arguments.

@@ -190,172 +190,146 @@ extern "C" U d2_fn_d2game_AEDC0(U p1, I p2, I p3, I esi)
 }
 
 // ---------------------------------------------------------------------------------------------------
-// 1.13c D2Game+0xAF450 -- FUN_6fccf450(undefined4 param_1, int *param_2); unaff_EDI is the caller's
-// record pointer (its fields at +0xc / +0x0 are read on the tail path).
-extern "C" I d2_fn_d2game_AF450(U p1, I p2, I edi)
+// 1.13c D2Game+0xAF450 -- FUN_6fccf450: ECX = game, EDX = unit (the decompile's param_1 / param_2), five unused stack words (ret 0x14).
+// Every callee is a seam in D2GameAF450Env with the registers the disassembly gives it; a unit of type 0 only (the tail's [unit] != 0
+// branch is dead because the unit type was tested at entry).
+struct D2GameAF450Env {
+    U (*room)(U unit);                                      // Ordinal 10331 (0xA478)
+    U (*area)(U room);                                      // Ordinal 10826 (0xA556)
+    U (*b10459)(U area);                                    // Ordinal 10459 (0xA56E), result byte
+    U (*c10585)(U b);                                       // Ordinal 10585 (0xAADE)
+    U (*s10057)(U room);                                    // Ordinal 10057 (0xA808)
+    void (*s386f0)(U unit);                                 // 0x386F0, EAX = unit
+    U (*s1130)(U unit);                                     // 0x1130, ECX = unit
+    U (*s1100)(U unit);                                     // 0x1100, ECX = unit
+    U (*sa24c0)(U game, U unit, U room, U r1100, U r1130, U c, U* out);   // 0xA24C0, EAX = unit, stack ..., &out, 0x3B, 0
+    void (*sffd0)(U unit, U a, U b);                        // 0xDFFD0, ESI = unit, stack (a, b)
+    void (*s37480)(U unit, U v);                            // 0x37480, EAX = unit, stack v
+    void (*s2e4f0)(U obj, U v);                             // 0x2E4F0, ECX = obj, stack v
+    U (*se1570)(U game, U obj);                             // 0xE1570, stack (game, obj)
+    void (*s5e3c0)(U obj, U game);                          // 0x5E3C0, EAX = obj, ESI = game
+    U (*a4c0)(U unit);                                      // Ordinal 10920 (0xA4C0)
+    void (*s8c3b0)(U al, U cl, U edx, U arg);               // 0x8C3B0
+};
+
+// edi: the caller's EDI, which the routine reads without setting (the decompile's unaff_EDI): non-zero adds the 0x8C3B0 notification and
+// returns the created object instead of the 0xA24C0 result. The recorded retail calls carry EDI = 0.
+extern "C" U d2_fn_d2game_AF450(U game, U unit, const D2GameAF450Env* env, U edi)
 {
-    if (p2 == 0 || R32(p2, 0) != 0) return 0;
-    R32(p2, 0xc4) |= 0x40;
-    I piStack_1c = p2;
-    I iVar5 = Ord10331();
-    U uVar6 = (U)Ord10826(iVar5);
-    U uVar4 = (U)Ord10459(uVar6) & 0xff;
-    I iVar7 = Ord10585(uVar4);
-    I iVar8 = Ord10057(iVar5);
-    I iVar5r = iVar5;
-    if (iVar8 == 0) {
-        iVar8 = Ord10826(iVar5);
-        if (iVar8 != 0x88) {
-            D2GAME_386F0();
-            iVar8 = 0x3b;
-            I *ppiVar11 = &piStack_1c;   // passed by address, as the decompile does
-            piStack_1c = 0;
-            U uVar9 = (U)D2GAME_1130(p2);
-            I puVar10 = D2GAME_1100(p2);
-            iVar5 = D2GAME_A24C0(p1, iVar5r, puVar10, uVar9, iVar7, (I)ppiVar11, iVar8);
-            D2GAME_DFFD0(7, 0);
-            I piVar3 = piStack_1c;
-            if (iVar5 != 0) {
-                I iVar7b = (piStack_1c == 0) ? -1 : R32(piStack_1c, 0xc);
-                D2GAME_37480(iVar7b);
-                if (piVar3 != 0) {
-                    D2GAME_2E4F0(R32(p2, 0xc));
-                    iVar7 = D2GAME_E1570(p1, piVar3);
-                    if (iVar7 != 0) {
-                        D2GAME_2E4F0(R32(p2, 0xc));
-                        D2GAME_5E3C0();
-                    }
-                    D2GAME_5E3C0();
-                }
+    if (unit == 0 || R32(unit, 0) != 0) return 0;
+    R32(unit, 0xc4) |= 0x40;
+    U room = env->room(unit);
+    U area = env->area(room);
+    U b = env->b10459(area) & 0xff;
+    U c = env->c10585(b);
+    if (env->s10057(room) != 0 || env->area(room) == 0x88) {
+        env->sffd0(unit, 0x18, unit);
+        return 0;
+    }
+    env->s386f0(unit);
+    U out = 0;
+    U r1130 = env->s1130(unit);
+    U r1100 = env->s1100(unit);
+    U res = env->sa24c0(game, unit, room, r1100, r1130, c, &out);
+    env->sffd0(unit, 7, 0);
+    if (res != 0) {
+        env->s37480(unit, out == 0 ? 0xffffffffu : R32(out, 0xc));
+        if (out != 0) {
+            env->s2e4f0(out, R32(unit, 0xc));
+            U e = env->se1570(game, out);
+            if (e != 0) {
+                env->s2e4f0(e, R32(unit, 0xc));
+                env->s5e3c0(e, game);
             }
-            if (edi != 0) {
-                U uVar1 = R32(edi, 0xc);
-                U uVar2 = R32(edi, 0);
-                if (R32(p2, 0) == 0) {
-                    Ord10920(p2);
-                    D2GAME_8C3B0(uVar2 & 0xff, uVar1);
-                    return piStack_1c;
-                }
-                D2GAME_8C3B0(uVar2 & 0xff, uVar1);
-            }
-            return iVar5;
+            env->s5e3c0(out, game);
         }
     }
-    D2GAME_DFFD0(0x18, p2);
-    return 0;
+    if (edi != 0) {
+        U id = R32(edi, 0xc), t = R32(edi, 0);
+        env->s8c3b0(0x7c, t & 0xff, id, R32(env->a4c0(unit), 0x9c));
+        return out;
+    }
+    return res;
 }
 
 // ---------------------------------------------------------------------------------------------------
-// 1.13c D2Game+0xB1820 -- FUN_6fcd1820(int param_1, undefined4 param_2, int param_3, undefined4 *param_4,
-// int *param_5); the receiver is in EAX (in_EAX). Returns 1 with *param_4/*param_5 filled, else 0.
-// The decompile's _exit(-1) on a null game pointer is kept as std::abort().
-extern "C" U d2_fn_d2game_B1820(I eax, I param_1, U param_2, I param_3, U *param_4, int32_t *param_5)
+// 1.13c D2Game+0xB1820 -- FUN_6fcd1820(int param_1, undefined4 param_2, int param_3, undefined4 *param_4, int *param_5), ret 0x14;
+// the unit is in EAX. param_1 is the game (the three node tables at +0x1120/+0x1320/+0x1920, 128 buckets each, chained through +0xE4,
+// key +0xC), param_3 a flag. [[unit+0x14]+0x38] is the mode: 1/2/4 look the unit's id (0x48560) up in their table, 3 asks B17B0 for a
+// target. Returns 1 with *param_4 = node and *param_5 = value, else 0 (clearing +0x34/+0x38 of the unit's data on the way out).
+// Every callee is a seam in D2GameB1820Env with the registers the disassembly gives it. Null game with mode 1/2/4 is retail's fatal path
+// (std::abort here).
+struct D2GameB1820Env {
+    U (*s48560)(U unit);                                   // ECX = unit
+    U (*sb0a20)(U node, U unit);                           // EBX = ESI = node, stack unit (ret 4)
+    U (*sad78)(U node, U unit, U four);                    // thunk, stack (node, unit, 4)
+    U (*sa514)(U unit);                                    // thunk, stack unit
+    U (*s1450)(U esi, U two);                              // ESI = unit+0x20, stack 2
+    void (*se0460)(U unit, U bl, U one);                   // EAX = unit, BL, stack 1
+    U (*s1130)(U unit);                                    // ECX = unit
+    U (*s1100)(U unit);                                    // ECX = unit
+    U (*sa478)(U unit, U r1100, U r1130);                  // thunk, stack (unit, r1100, r1130)
+    U (*sad66)(U v);                                       // thunk, stack v
+    void (*sb17b0)(U eax, U* blk, U game, U unit, U zero, int nwords);   // EAX = 5/6, ECX = &blk, EDX = game, stack (unit, 0)
+    U (*sdfa90)(U node);                                   // EAX = node
+};
+extern "C" U d2_fn_d2game_B1820(U unit, U game, U param_2, U param_3, U *param_4, int32_t *param_5, const D2GameB1820Env* env)
 {
-    I in_EAX = eax;
-    I piVar5 = 0;
-    I iVar3 = 0;
-    I iVar4 = 0;
-    I piStack_28 = 0;
-    I iStack_24 = 0x7fffffff;
-    U uStack_20 = 0, uStack_1c = 0, uStack_18 = 0, uStack_14 = 0, uStack_10 = 0;
-    U uVar1;
-    U uVar2;
-    bool haveTarget = false;
-
-    if (in_EAX == 0 || R32(in_EAX, 0) != 1 || R32(in_EAX, 0x14) == 0) return 0;
-    iVar3 = (I)R32(R32(in_EAX, 0x14), 0x38);
-    if (iVar3 == 0) return 0;
-
-    auto fatal = [&]() {
-        Ord10265(0x2d3);
-        Ord10024((I)(uintptr_t)0, 0);   // DAT_6fd19ff9 message, retail data not dumped here
-        std::abort();
-    };
-
-    switch (iVar3) {
-    case 1:
-        uVar1 = (U)D2GAME_48560(in_EAX);
-        if (param_1 == 0) { fatal(); }
-        for (piVar5 = (I)R32(param_1, 0x1120 + (uVar1 & 0x7f) * 4);
-             piVar5 != 0; piVar5 = (I)R32(piVar5, 0xec)) {
-            if (R32(piVar5, 0xc) == uVar1) { haveTarget = true; break; }
-        }
-        break;
-    case 2:
-        uVar1 = (U)D2GAME_48560(in_EAX);
-        if (param_1 == 0) { fatal(); }
-        for (piVar5 = (I)R32(param_1, 0x1320 + (uVar1 & 0x7f) * 4);
-             piVar5 != 0; piVar5 = (I)R32(piVar5, 0xec)) {
-            if (R32(piVar5, 0xc) == uVar1) { haveTarget = true; break; }
-        }
-        break;
-    case 3: {
-        I iVar3b = Ord10830();
-        uVar2 = (U)D2GAME_1450(2);
-        if (iVar3b == 1 || (uVar2 != 0 && (iVar3b == 0 || iVar3b == 2))) {
-            D2GAME_E0460();
-        }
-        piStack_28 = 0;
-        iStack_24 = 0x7fffffff;
-        if (param_3 == 0) {
-            D2GAME_1130(in_EAX);
-            D2GAME_1100(in_EAX);
-            I uVar2b = Ord10331();
-            uStack_18 = (U)Ord10916(uVar2b);
-            uStack_20 = param_2;
-            uStack_1c = 0x23;
-            uStack_14 = 0;
-            uStack_10 = 0x7fffffff;
+    if (unit == 0 || R32(unit, 0) != 1 || R32(unit, 0x14) == 0) return 0;
+    U mode = R32(R32(unit, 0x14), 0x38);
+    if (mode == 0) return 0;
+    U node = 0, val = 0;
+    bool have = false;
+    if (mode - 1 <= 3) {
+        if (mode == 3) {
+            U ebx = env->sa514(unit);
+            U eax = env->s1450(unit + 0x20, 2);
+            U bl = 0;
+            bool call = false;
+            if (ebx == 1) { call = true; bl = (eax == 0) ? 0 : 2; }
+            else if (eax != 0) {
+                if (ebx == 0) { call = true; bl = 2; }
+                else if (ebx == 2) { call = true; bl = 0; }
+            }
+            if (call) env->se0460(unit, bl, 1);
+            U blk[7] = { 0, 0x7fffffff, 0, 0, 0, 0, 0 };
+            if (param_3 == 0) {
+                U r1130 = env->s1130(unit);
+                U r1100 = env->s1100(unit);
+                U ad = env->sad66(env->sa478(unit, r1100, r1130));
+                blk[2] = param_2; blk[3] = 0x23; blk[4] = ad; blk[5] = 0; blk[6] = 0x7fffffff;
+                env->sb17b0(5, blk, game, unit, 0, 7);
+            } else {
+                blk[3] = 0x7fffffff;
+                env->sb17b0(6, blk, game, unit, 0, 4);
+            }
+            node = blk[0]; val = blk[1];
+            env->se0460(unit, ebx, 1);   // BL is reloaded from the saved A514 result
+            have = true;
         } else {
-            uStack_20 = 0;
-            uStack_1c = 0x7fffffff;
-        }
-        D2GAME_B17B0(&piStack_28, param_1, in_EAX, 0);
-        iVar3 = iStack_24;
-        piVar5 = piStack_28;
-        D2GAME_E0460();
-        goto found_tail;
-    }
-    case 4:
-        uVar1 = (U)D2GAME_48560(in_EAX);
-        if (param_1 == 0) { fatal(); }
-        for (piVar5 = (I)R32(param_1, 0x1920 + (uVar1 & 0x7f) * 4);
-             piVar5 != 0; piVar5 = (I)R32(piVar5, 0xec)) {
-            if (R32(piVar5, 0xc) == uVar1) { haveTarget = true; break; }
-        }
-        break;
-    default:
-        break;
-    }
-
-    if (!haveTarget) goto no_target;
-    iVar3 = D2GAME_B0A20(in_EAX);
-    if (param_3 != 0 && Ord10839(piVar5) != 0) goto no_target;
-
-found_tail:
-    if (piVar5 != 0) {
-        I iVar4b = S32(piVar5, 0);
-        if (iVar4b > -1) {
-            if (iVar4b < 2) {
-                iVar4b = D2GAME_DFA90();
-                if (iVar4b == 0) {
-                    *param_4 = (U)piVar5;
-                    *param_5 = (int32_t)iVar3;
-                    return 1;
-                }
-            } else if (iVar4b == 3) {
-                *param_4 = (U)piVar5;
-                *param_5 = (int32_t)iVar3;
-                return 1;
+            U id = env->s48560(unit);
+            U base = mode == 1 ? 0x1120 : mode == 2 ? 0x1320 : 0x1920;
+            if (game == 0) std::abort();
+            U n = R32(game, base + (id & 0x7f) * 4);
+            while (n != 0 && R32(n, 0xc) != id) n = R32(n, 0xe4);
+            if (n != 0) {
+                node = n;
+                val = env->sb0a20(n, unit);
+                have = !(param_3 != 0 && env->sad78(n, unit, 4) != 0);
             }
         }
     }
-no_target:
-    if (R32(in_EAX, 0) == 1 && R32(in_EAX, 0x14) != 0) {
-        I iVar3c = (I)R32(in_EAX, 0x14);
-        R32(iVar3c, 0x38) = 0;
-        R32(iVar3c, 0x34) = 0;
+    if (have && node != 0) {
+        int32_t k = S32(node, 0);
+        if (k >= 0) {
+            bool ok = false;
+            if (k <= 1) ok = env->sdfa90(node) == 0;
+            else if (k == 3) ok = true;
+            if (ok) { *param_4 = node; *param_5 = (int32_t)val; return 1; }
+        }
     }
+    R32(R32(unit, 0x14), 0x38) = 0;
+    R32(R32(unit, 0x14), 0x34) = 0;
     return 0;
 }
 

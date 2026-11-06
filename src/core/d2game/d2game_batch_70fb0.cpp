@@ -77,45 +77,60 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_711d0(void* unit, int32_t c
     return count;
 }
 
-// ---- 0x717E0 (NAMED) -------------------------------------------------------------------------------
+// ---- 0x717E0 ------------------------------------------------------------------------------------------
+// Retail 0x717E0 (disassembled; the decompile misplaces the arguments): EAX = unit id, ECX = unit (ESI inside), EDX = game (EBX inside),
+// stack arg1 = the op (low word), stack arg2 = the amount, `ret 8`. Callees: A478(unit) owner; A808(owner) valid; A42A(unit, stat, 0) a stat
+// (ret 0xC); A45A(unit) and A4A8(unit) the limits; 0x1670 (ESI = unit, EBX = stat slot, [amount]) adjusts a stat; 0x12DF0 (ESI = unit, game, amount);
+// 0xDFFD0 (EAX residue = the A45A result, 0x13, unit; ret 8); 0xD4570 (EAX = unit, no stack).
 struct D2Game717e0Env {
-    void* (*getOwner)(void* u);        // #10331
-    int   (*isValid)(void* o);         // #10057
-    uint32_t (*getStat)(void* u, int stat, int layer);   // #10973
-    int   (*getHp)(void* u);           // #10049
-    uint32_t (*getMax)(void* u);       // #11060
-    void  (*f32df0)(); void (*f21670)(int delta); void (*fd4570)(); void (*fdffd0)(int a, void* u);
+    uint32_t (*owner)(uint32_t unit);                                  // 0xA478
+    uint32_t (*valid)(uint32_t owner);                                 // 0xA808
+    int32_t  (*stat)(uint32_t unit, uint32_t stat, uint32_t layer);    // 0xA42A
+    int32_t  (*limitA)(uint32_t unit);                                 // 0xA45A
+    int32_t  (*limitB)(uint32_t unit);                                 // 0xA4A8
+    void (*adjust)(uint32_t unit, uint32_t slot, int32_t amount);      // 0x1670
+    void (*move)(uint32_t unit, uint32_t game, int32_t amount);        // 0x12DF0
+    void (*fail)(uint32_t eaxResidue, uint32_t code, uint32_t unit);   // 0xDFFD0
+    void (*reset)(uint32_t unit);                                      // 0xD4570
+    void (*fatal)(uint32_t line);                                      // 0xA2DA / 0xA2C2 / 0x22A3C
 };
-// 1.13c-NAMED D2Game+0x717E0: GUESS on every hidden register: EAX=unitId, SI=message (0x12/0x13/0x14),
-// the f21670/f32df0/fd4570 arguments are not shown. Looks the unit up in the game hash at +0x1520+(id&0x7f)*4
-// (chain next at +0xE4), requires type 0x10b at +4, then dispatches on the message.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_717e0(void* param1, void* game, uint32_t unused, int32_t param4,
-                                                        uint32_t unitId, int16_t msg, const D2Game717e0Env* e) {
-    (void)unused;
-    if (!game) d2game_fatal();                                // line 0x2d3
-    void* n = rdp(game, 0x1520 + (unitId & 0x7f) * 4);
+// 1.13c D2Game+0x717E0
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_717E0(uint32_t id, uint32_t unit, uint32_t game, uint32_t opWord, int32_t amount, const D2Game717e0Env* e) {
+    if (!game) e->fatal(0x2d3);
+    uint32_t n = rd32((void*)(uintptr_t)game, 0x1520 + (id & 0x7f) * 4);
+    while (n && rd32((void*)(uintptr_t)n, 0xc) != id) n = rd32((void*)(uintptr_t)n, 0xe4);
     if (!n) return;
-    while (rd32(n, 0xc) != unitId) { n = rdp(n, 0xe4); if (!n) return; }
-    if (rd32(n, 4) != 0x10b) return;
-    void* a = e->getOwner(param1); if (!a || !e->isValid(a)) return;
-    void* b = e->getOwner(n);      if (!b || !e->isValid(b)) return;
-    if (msg == 0x12) {
-        if (rd8(param1, 0x6c) != 0 && rd32(param1, 0x68) == 2) { wr32(param1, 100, 0xffffffff); wr32(param1, 0x68, 6); wr8(param1, 0x6c, 0); }
-        e->fd4570();
-    } else if (msg == 0x13) {
-        if (param4 > 0 && (int32_t)e->getStat(param1, 0xf, 0) >= param4) {
-            int32_t cur = (int32_t)e->getStat(param1, 0xe, 0);
-            if (cur + param4 <= e->getHp(param1)) { e->f32df0(); e->f21670(-param4); return; }
-            e->fdffd0(0x13, param1);
-        }
-    } else if (msg == 0x14 && param4 > 0) {
-        int32_t have = (int32_t)e->getStat(param1, 0xe, 0);
-        if (param4 <= have) {
-            uint32_t mx = e->getMax(param1);
-            uint32_t o = e->getStat(param1, 0xf, 0);
-            if (o + param4 <= mx) { e->f21670(-param4); e->f21670(param4); return; }
-            if (o < mx) { e->f21670(mx - o); e->f21670(o - 0xe); return; }
-        }
+    if (rd32((void*)(uintptr_t)n, 4) != 0x10b) return;
+    uint32_t a = e->owner(unit); if (!a || !e->valid(a)) return;
+    uint32_t b = e->owner(n);    if (!b || !e->valid(b)) return;
+    void* u = (void*)(uintptr_t)unit;
+    switch ((opWord & 0xFFFFu) - 0x12u) {
+    case 0:   // 0x12
+        if (rd8(u, 0x6c) != 0 && rd32(u, 0x68) == 2) { wr32(u, 0x64, 0xffffffffu); wr32(u, 0x68, 6); wr8(u, 0x6c, 0); }
+        e->reset(unit);
+        return;
+    case 1: { // 0x13
+        if (amount <= 0) return;
+        if (amount > e->stat(unit, 0xf, 0)) return;
+        int32_t sum = e->stat(unit, 0xe, 0) + amount;
+        int32_t lim = e->limitA(unit);
+        if (sum > lim) { e->fail((uint32_t)lim, 0x13, unit); return; }
+        e->move(unit, game, amount);
+        e->adjust(unit, 0xf, -amount);
+        return;
+    }
+    case 2: { // 0x14
+        if (amount <= 0) return;
+        if (amount > e->stat(unit, 0xe, 0)) return;
+        uint32_t mx = (uint32_t)e->limitB(unit);
+        uint32_t f = (uint32_t)e->stat(unit, 0xf, 0);
+        if (f + (uint32_t)amount <= mx) { e->adjust(unit, 0xe, -amount); e->adjust(unit, 0xf, amount); return; }
+        if (f >= mx) return;
+        e->adjust(unit, 0xf, (int32_t)(mx - f));
+        e->adjust(unit, 0xe, (int32_t)(f - mx));
+        return;
+    }
+    default: return;
     }
 }
 

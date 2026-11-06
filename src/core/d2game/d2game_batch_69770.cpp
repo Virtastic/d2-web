@@ -48,14 +48,14 @@ const EffEntry& entry(uint8_t idx, int line)
 }
 }
 
-// 1.13c D2Game+0x69770
+// (superseded by the seam port d2g_69770.cpp) D2Game 0x69770
 extern "C" void D2GAME_69770(uintptr_t c)
 {
     char* s = reinterpret_cast<char*>(Ordinal_10920(r32(c, 8)));
     if (s) FUN_6fc22e50(s, FUN_6fc22e10(s), 0x10);
 }
 
-// 1.13c D2Game+0x697A0 DrainManaIntoLife: move e[4] percent of mana (stat 8) out, e[8] percent of that into life (stat 6)
+// (superseded by the seam port d2g_697a0.cpp) D2Game 0x697A0 DrainManaIntoLife: move e[4] percent of mana (stat 8) out, e[8] percent of that into life (stat 6)
 extern "C" void D2GAME_DrainManaIntoLife_697A0(uintptr_t c, uintptr_t e)
 {
     uint32_t cur = Ordinal_10973(r32(c, 8), 8, 0);
@@ -64,7 +64,7 @@ extern "C" void D2GAME_DrainManaIntoLife_697A0(uintptr_t c, uintptr_t e)
     Ordinal_10551(r32(c, 8), 6, (r32(e, 8) * amt) / 100u, 0);
 }
 
-// 1.13c D2Game+0x69800 DrainLifeIntoMana: same with the 8.8 fixed-point life stat 6 and mana stat 8
+// (superseded by the seam port d2g_69800.cpp) D2Game 0x69800 DrainLifeIntoMana: same with the 8.8 fixed-point life stat 6 and mana stat 8
 extern "C" void D2GAME_DrainLifeIntoMana_69800(uintptr_t c, uintptr_t e)
 {
     int32_t cur = Ordinal_10973(r32(c, 8), 6, 0);
@@ -74,7 +74,7 @@ extern "C" void D2GAME_DrainLifeIntoMana_69800(uintptr_t c, uintptr_t e)
     Ordinal_10551(r32(c, 8), 8, (r32(e, 8) * amt256) / 100u, 0);
 }
 
-// 1.13c D2Game+0x69860 : bring stat 8 up to Ordinal_10186(unit)
+// (superseded by the seam port d2g_69860.cpp) D2Game 0x69860 : bring stat 8 up to Ordinal_10186(unit)
 extern "C" void D2GAME_69860(uintptr_t c)
 {
     int32_t cur = Ordinal_10973(r32(c, 8), 8, 0);

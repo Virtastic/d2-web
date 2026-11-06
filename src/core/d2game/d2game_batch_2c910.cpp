@@ -112,7 +112,7 @@ static bool nameFits15(const char* name)
     }
 }
 
-// 1.13c D2Game+0x2C910
+// 0x2C910 retail-layout port: src/core/d2game/d2g_2c910.cpp (this pointer-width draft is superseded)
 // GAME_TriggerClientSave(client, game): when client has a player (0x4AD10) and its save (0x54320)
 // succeeds, walk the game's client list (game+0x88, next +0x4A8). Per client the save unit is
 // flag(+0x3D4) bit 0 ? +0x174 : (+0x174 == 0 ? none : E03A0(+0x1A8, +0x170), a failed lookup
@@ -255,7 +255,7 @@ void D2GAME_SAVE_AttachSaveFile_113c(void* client, void* player, void* game, uin
 
 // 1.13c D2Game+0x53F10 and +0x54000 moved to d2game_53f10.cpp / d2game_54000.cpp (their own probes).
 
-// 1.13c D2Game+0x2A740
+// 0x2A740 retail-layout port: src/core/d2game/d2g_2a740.cpp (this draft is superseded)
 // GAME_VerifyJoinGame (1.13c split): reject a non-NUL-terminated/over-15 name, locale >= 13, a
 // client already in that game (0x498B0/0x497C0), an unknown game id (0x2A3B0), a class >= 7, or a
 // name failing 0x2A110. Without a callback table this is the whole check (return 1); otherwise the
