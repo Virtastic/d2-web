@@ -118,6 +118,9 @@ export function normalizeSnapshot(value) {
       ...(Number.isInteger(e?.lastHitClass) ? { lastHitClass: e.lastHitClass } : {}),
       ...(e?.states instanceof Set ? { states: e.states } : {}),
       ...(e?.hitPacket ? { hitPacket: true } : {}), // the engine's 0x0C hit packet this tick (combat-sound-trigger)
+      ...(Number.isInteger(e?.hitPacketClass) ? { hitPacketClass: e.hitPacketClass } : {}), // that packet's hit class (the hero's hit overlay, D2Client 19830)
+      ...(e?.overlay && typeof e.overlay === 'object' ? { overlay: e.overlay } : {}), // the unit's server hit overlay (unit-overlay-fx) and its state/hit overlays (state-fx): drawn around the body
+      ...(Array.isArray(e?.stateOverlays) && e.stateOverlays.length ? { stateOverlays: e.stateOverlays } : {}),
       ...(Number.isInteger(e?.typeFlags) ? { typeFlags: e.typeFlags & 0xFF } : {}),
       ...(Number.isInteger(e?.superUniqueId) ? { superUniqueId: e.superUniqueId } : {}),
       ...(Number.isInteger(e?.usedSkill) ? { usedSkill: e.usedSkill, animEvent: e.animEvent | 0 } : {}), // a monster's used skill id (-1 none) and its client animation event, for its stsound and dosound

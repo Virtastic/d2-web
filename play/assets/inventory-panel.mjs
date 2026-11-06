@@ -5,7 +5,7 @@ import { fnv1a32, paperdollIdentity } from './paperdoll-identity.mjs';
 import { PANEL_CLOSE_ART, panelCloseLayout } from './panel-close.mjs';
 import { inventoryCloseFrame } from './inventory-close-gesture.mjs';
 import { boxTables, cellBoxes, gridBoxSlot, heldItemBoxes, itemBoxState, paintBoxes, slotBoxSlot } from './grid-highlight.mjs';
-import { inventoryItemColourIndex, inventoryItemColourKey } from './inventory-item-colour.mjs';
+import { inventoryItemRemap, inventoryItemColourKey } from './inventory-item-colour.mjs';
 import { createItemTooltip, itemTooltipSpec } from './item-tooltip.mjs';
 import { createItemBlendCache, drawItemCel } from './item-draw-mode.mjs';
 
@@ -87,6 +87,39 @@ export function weaponTabHit(x, y, slotRect) {
   return null;
 }
 export const weaponSetArmShift = (weaponSet, bodyLoc) => (weaponSet === 1 && (bodyLoc === 4 || bodyLoc === 5) ? [4, -4] : [0, 0]);
+// The engine's d2_session_weapon_hands bits (src/core/d2client/inv_weapon_hands.h).
+export const WEAPON_HANDS = Object.freeze({ SILHOUETTE_RARM: 1, SILHOUETTE_LARM: 2, GHOST_RARM_IN_LARM: 4, GHOST_LARM_IN_RARM: 8 });
+// Every placement the panel makes for the two weapon boxes in the active set, in 800x600 pixels, as
+// D2Client 1.13c computes it from the Inventory.txt hand rects:
+//   * tabs (set II only): invchar6tab frame 0 at lArm (left-5, bottom+4), frame 1 at rArm, bottom-anchored;
+//   * tab hit strips: [left, right] x [top-24, top) of each hand rect, in both sets;
+//   * silhouettes: inv_weapons frame 0 at (left, bottom-2) + the set-II shift, per `hands` (all empty
+//     hands when the engine has not said);
+//   * boxes: the hand rect itself in both sets (the highlight never shifts);
+//   * item cels: the cell box centred in the rect + the set-II shift (+4,-4), art one row below;
+//   * ghosts: a two-hander drawn again centred in the other hand's rect (by its own rect's size), with
+//     a red box over that rect.
+// `items` are the worn hand items ({ id, bodyLoc, invWidth, invHeight }); `hands` is the engine's bitmask or -1.
+export function weaponSlotLayout(weaponSet, slotRect, items = [], hands = -1, cell = 29) {
+  const set2 = weaponSet === 1, [ax, ay] = set2 ? [4, -4] : [0, 0];
+  const r4 = slotRect(4), r5 = slotRect(5), rect = { 4: r4, 5: r5 };
+  const held = { 4: items.find((i) => i.bodyLoc === 4) || null, 5: items.find((i) => i.bodyLoc === 5) || null };
+  const bits = hands >= 0 ? hands : (held[4] ? 0 : WEAPON_HANDS.SILHOUETTE_RARM) | (held[5] ? 0 : WEAPON_HANDS.SILHOUETTE_LARM);
+  const out = { tabs: weaponSetTabs(weaponSet, slotRect), hits: [], silhouettes: [], boxes: [], cels: [], ghosts: [] };
+  for (const [bodyLoc, frame] of [[5, 0], [4, 1]]) { const s = rect[bodyLoc];
+    if (s) out.hits.push({ bodyLoc, frame, left: s.left, right: s.left + s.width, top: s.top - WEAPON_TAB_HEIGHT, bottom: s.top }); }
+  for (const [bodyLoc, bit] of [[5, WEAPON_HANDS.SILHOUETTE_LARM], [4, WEAPON_HANDS.SILHOUETTE_RARM]]) { const s = rect[bodyLoc];
+    if (s && (bits & bit)) out.silhouettes.push({ bodyLoc, file: 'inv_weapons', frame: 0, x: s.left + ax, y: s.top + s.height - 2 + ay }); }
+  for (const bodyLoc of [4, 5]) { const it = held[bodyLoc], s = rect[bodyLoc]; if (!it || !s) continue;
+    const other = bodyLoc === 4 ? 5 : 4, o = rect[other], w = it.invWidth || 1, h = it.invHeight || 1;
+    if (o && (bits & (bodyLoc === 4 ? WEAPON_HANDS.GHOST_RARM_IN_LARM : WEAPON_HANDS.GHOST_LARM_IN_RARM))) {
+      const at = slotCelAt({ left: o.left, top: o.top, width: s.width, height: s.height }, w, h, cell, cell, [ax, ay]);
+      out.ghosts.push({ id: it.id, from: bodyLoc, bodyLoc: other, left: at.left, top: at.top, box: { x: o.left, y: o.top, w: o.width, h: o.height } }); }
+    out.boxes.push({ id: it.id, bodyLoc, x: s.left, y: s.top, w: s.width, h: s.height });
+    const at = slotCelAt(s, w, h, cell, cell, [ax, ay]);
+    out.cels.push({ id: it.id, bodyLoc, left: at.left, top: at.top }); }
+  return out;
+}
 const INV_PANEL = [[4, 400, 316], [5, 656, 316], [6, 400, 492], [7, 656, 492]];
 
 export const ITEM_PRESENTATION_BYTES = 112;
@@ -165,11 +198,11 @@ export function inventoryTipCell(item, gridRect, slotRect) {
   return { x: s.left + Math.floor((s.width - w) / 2), y: s.top + Math.floor((s.height - h) / 2), w, h };
 }
 
-function frameCanvas(frame, palette, documentObject, item = null) {
+function frameCanvas(frame, palette, documentObject, remap = null) {
   const canvas = documentObject.createElement('canvas'); canvas.width = frame.width; canvas.height = frame.height;
   const rgba = dc6FrameToRgba(frame, palette);
-  if (item) for (let i = 0; i < frame.indices.length; i++) if (frame.opaque[i]) {
-    const colour = inventoryItemColourIndex(item, frame.indices[i]), source = colour * 4;
+  if (remap) for (let i = 0; i < frame.indices.length; i++) if (frame.opaque[i]) {
+    const source = remap[frame.indices[i]] * 4;
     rgba.set(palette.subarray(source, source + 4), i * 4);
   }
   canvas.getContext('2d').putImageData(new ImageData(rgba, frame.width, frame.height), 0, 0);
@@ -187,21 +220,23 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
   // The canvas AND the decoded frame, so an item's drawn identity (its cel bytes' FNV hash, the same
   // function the draw list uses) is available to the evidence without a second decode.
   function iconAt(invFile, act = 1, item = null) {
-    const colourKey = inventoryItemColourKey(item), key = act + ':' + invFile + ':' + colourKey;
+    const colourKey = inventoryItemColourKey(read, item), key = act + ':' + invFile + ':' + colourKey;
     let entry = icons.get(key);
     if (!entry) {
       const decoded = decodeDc6(read(inventoryItemAsset(invFile)));
       if (!decoded.frames.length) throw new Error(`empty inventory item ${invFile}`);
       const frame = decoded.frames[0];
-      entry = { image: frameCanvas(frame, decodeDatPalette(read(actPal(act))), documentObject, colourKey === 'identity' ? null : item), frame }; icons.set(key, entry);
+      entry = { image: frameCanvas(frame, decodeDatPalette(read(actPal(act))), documentObject, inventoryItemRemap(read, item)), frame }; icons.set(key, entry);
     }
     return entry;
   }
   const icon = (invFile, act = 1, item = null) => iconAt(invFile, act, item).image;
   const itemBlend = createItemBlendCache(read);
   // The item's art through retail's blit: opaque, or the AlphaBlend mode for an ethereal item.
-  const drawArt = (ctx, item, act, image, left, top) => drawItemCel(ctx, image, iconAt(item.invFile, act).frame, left, top, item.itemFlags, itemBlend(act),
-    inventoryItemColourKey(item) === 'identity' ? null : (i) => inventoryItemColourIndex(item, i));
+  const drawArt = (ctx, item, act, image, left, top) => {
+    const remap = inventoryItemRemap(read, item);
+    return drawItemCel(ctx, image, iconAt(item.invFile, act).frame, left, top, item.itemFlags, itemBlend(act), remap ? (i) => remap[i] : null);
+  };
   // A grid item sits on retail's own box: `box 419 315 448 344 color=138 mode=0` in
   // the retail captures, one per cell of the item.
   //
@@ -235,6 +270,7 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
   };
   const toScreen = (width, height, x, y) => { const v = view(width, height); return [(x - v.ox) / v.scale, (y - v.oy) / v.scale]; };
   const inside = (x, y, r) => r && x >= r.left && x < r.left + r.width && y >= r.top && y < r.top + r.height;
+  const slotHit = (x, y, r) => r && x >= r.left && x <= r.left + r.width && y >= r.top && y <= r.top + r.height;
   return {
   setLayout(value) { layout = value || null; },
   get layout() { return layout; },
@@ -265,7 +301,8 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
   // The worn item under the pointer, or the empty slot: { bodyLoc, item }.
   slotAt(screenX, screenY, width, height, state) {
     const [x, y] = toScreen(width, height, screenX, screenY);
-    for (let bodyLoc = 1; bodyLoc <= 10; bodyLoc++) if (inside(x, y, slotRect(bodyLoc)))
+    // D2Client 1.13c +0x98DC0: the body-slot click is inclusive on all four edges of the unshifted rect.
+    for (let bodyLoc = 1; bodyLoc <= 10; bodyLoc++) if (slotHit(x, y, slotRect(bodyLoc)))
       return { bodyLoc, item: (state?.items || []).find((i) => i.mode === 1 && i.bodyLoc === bodyLoc) || null };
     return null;
   },
@@ -303,8 +340,9 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     // Retail's rule in 800x600 pixels (item-cel-place.mjs cursorCelAt), carried to the canvas scale.
     const at = cursorCelAt(0, 0, image.width, image.height);
     const x = Math.round(pointerX + at.left * v.scale), y = Math.round(pointerY + at.top * v.scale);
-    ctx.save(); ctx.translate(x, y); ctx.scale(v.scale, v.scale); ctx.drawImage(image, 0, 0); ctx.restore();
-    return { id: item.id, invFile: item.invFile, x, y, width: image.width, height: image.height };
+    // The grid's own blit (D2Client+0x16910 calls 0x6B5A0): the item's remap, mode 1 when ethereal.
+    ctx.save(); ctx.translate(x, y); ctx.scale(v.scale, v.scale); const mode = drawArt(ctx, item, 1, image, 0, 0); ctx.restore();
+    return { id: item.id, invFile: item.invFile, x, y, width: image.width, height: image.height, mode };
   },
   // Retail's right-hand panel frame alone (invchar6, the hireling screen's backdrop), 800x600 anchored.
   drawFrame(ctx, width, height, act = 1) {
@@ -328,10 +366,11 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     const set2 = state?.weaponSet === 1, tabs = [];
     for (const t of weaponSetTabs(state?.weaponSet, slotRect)) tabs.push({ frame: t.frame, blit: chrome.cel(ctx, act, WEAPON_TAB_ART, t.frame, t.x, t.y) });
     const worn = new Set((state?.items || []).filter((item) => item.mode === 1).map((item) => item.bodyLoc));
+    const weaponSlots = weaponSlotLayout(state?.weaponSet, slotRect, (state?.items || []).filter((item) => item.mode === 1 && item.invFile), state?.weaponHands ?? -1);
     const silhouettes = [];
     for (const [loc, [file, frame, x, y]] of Object.entries(EMPTY_SLOT_ART))
-      if (!worn.has(Number(loc))) { const [ax, ay] = weaponSetArmShift(state?.weaponSet, Number(loc));
-        silhouettes.push({ loc: Number(loc), blit: chrome.cel(ctx, act, `data\\global\\ui\\PANEL\\${file}.dc6`, frame, x + ax, y + ay) }); }
+      if (loc !== '4' && loc !== '5' && !worn.has(Number(loc))) silhouettes.push({ loc: Number(loc), blit: chrome.cel(ctx, act, `data\\global\\ui\\PANEL\\${file}.dc6`, frame, x, y) });
+    for (const sil of weaponSlots.silhouettes) silhouettes.push({ loc: sil.bodyLoc, blit: chrome.cel(ctx, act, `data\\global\\ui\\PANEL\\${sil.file}.dc6`, sil.frame, sil.x, sil.y) });
     ctx.restore();
     ctx.save(); ctx.translate(baseX, baseY); ctx.scale(scale, scale);
     let itemPixels = 0, equippedItemPixels = 0, equippedItemCount = 0;
@@ -344,8 +383,15 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     const hoverItem = p && !held ? (this.itemAt(p.x, p.y, width, height, state) || this.slotAt(p.x, p.y, width, height, state)?.item || null) : null;
     const boxState = (item) => itemBoxState(item, state?.itemBoxState), tables = boxTransform(act), boxes = [];
     for (const item of state?.items || []) { const slot = item.mode === 1 && item.invFile ? slotRect(item.bodyLoc) : null; if (!slot) continue;
-      const k = slotBoxSlot(boxState(item), hoverItem?.id === item.id, cursorMode), [ax, ay] = weaponSetArmShift(state?.weaponSet, item.bodyLoc);
-      if (k !== null) boxes.push(...paintBoxes(ctx, tables, [{ x: slot.left + ax, y: slot.top + ay, w: slot.width, h: slot.height, slot: k, order: 'behind' }], -sx, -sy).map((b) => ({ ...b, id: item.id, bodyLoc: item.bodyLoc }))); }
+      // The highlight is the slot rect in both weapon sets: only the arm cels take the set-II shift.
+      const k = slotBoxSlot(boxState(item), hoverItem?.id === item.id, cursorMode);
+      if (k !== null) boxes.push(...paintBoxes(ctx, tables, [{ x: slot.left, y: slot.top, w: slot.width, h: slot.height, slot: k, order: 'behind' }], -sx, -sy).map((b) => ({ ...b, id: item.id, bodyLoc: item.bodyLoc }))); }
+    // A two-hander's ghost in the other hand: the same cel again, then a red box over that hand's rect.
+    const ghosts = [];
+    for (const g of weaponSlots.ghosts) { const item = state.items.find((i) => i.id === g.id && i.mode === 1);
+      drawArt(ctx, item, act, icon(item.invFile, act, item), g.left - sx, g.top - sy);
+      const box = paintBoxes(ctx, tables, [{ ...g.box, slot: 0, order: 'over' }], -sx, -sy).map((b) => ({ ...b, id: item.id, bodyLoc: g.bodyLoc, ghost: true }));
+      boxes.push(...box); ghosts.push({ ...g, invFile: item.invFile }); }
     for (const item of state?.items || []) {
       if (!item.invFile) continue;
       const image = icon(item.invFile, act, item);
@@ -428,7 +474,7 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     return { x: baseX, y: baseY, scale, panelFrames: 4, tooltip: tooltipEvidence, tooltipDraw,
       panelPixels: [4, 5, 6, 7].reduce((sum, i) => sum + dc6.frames[i].width * dc6.frames[i].height, 0),
       sockets, itemCount: (state?.items || []).filter((item) => item.invPage === 0).length, itemPixels,
-      equippedItemCount, equippedItemPixels, drawn, boxes, weaponSet: set2 ? 1 : 0, tabs, silhouettes, layout: layout ? 'engine' : 'amazon2',
+      equippedItemCount, equippedItemPixels, drawn, boxes, weaponSet: set2 ? 1 : 0, tabs, silhouettes, ghosts, weaponSlots, layout: layout ? 'engine' : 'amazon2',
       gold: { path: CHROME_ART.gold, frame: goldFrame, blit: goldBlit },
       close: { ...close, path: PANEL_CLOSE_ART.path, frame: closeFrame, blit: closeBlit } };
   } };

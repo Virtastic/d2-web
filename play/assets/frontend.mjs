@@ -564,6 +564,9 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
   if (bnet) Promise.resolve(bnet).then(applyBnet, (error) => applyBnet({ enabled: false, servers: [], error: String(error) }));
 
   let hot = -1, pressed = -1, pointer = null;
+  // A modal popup over the menu (retail's connecting popup, bnet-connecting.mjs): drawn after the
+  // menu and the version text, and while it is up only it answers the pointer and the keyboard.
+  let overlay = null;
   // The glyphs the gateway bar ACTUALLY blitted last frame -- identity evidence for the bar text,
   // which is retail's own until the player picks a configured region.
   let barDrawn = null;
@@ -614,7 +617,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
     },
     hitTest(x, y, width, height) {
       // The region dialog is modal over the menu: while it is up, no menu entry is under the pointer.
-      if (gatewaySelector?.open) return -1;
+      if (gatewaySelector?.open || overlay) return -1;
       const v = view(width, height);
       const sx = (x - v.ox) / v.scale, sy = (y - v.oy) / v.scale;
       const i = boxes.findIndex((b) => sx >= b.x && sx < b.x + b.w && sy >= b.y && sy < b.y + b.h);
@@ -630,7 +633,14 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
     },
     /** Whether the Battle.net config listed servers, and the region dialog's row centres if so. */
     gatewaysOpen() { return Boolean(gatewaySelector?.open); },
-    key(code) { return gatewaySelector?.key(code) ?? false; },
+    setOverlay(next) { overlay = next ?? null; pressed = -1; },
+    get overlay() { return overlay; },
+    overlayTargets(width, height) {
+      if (!overlay) return {};
+      const v = view(width, height);
+      return Object.fromEntries(Object.entries(overlay.targets()).map(([k, [x, y]]) => [k, [Math.round(v.ox + x * v.scale), Math.round(v.oy + y * v.scale)]]));
+    },
+    key(code) { if (overlay) return overlay.key(code); return gatewaySelector?.key(code) ?? false; },
     // The retail gateway panel (4 GWListBox tiles) and a button blank, as CSS urls for the realm login dialog.
     gatewayArt() {
       const c = documentObject.createElement('canvas'); c.width = GATEWAY_LAYOUT.panel.w; c.height = GATEWAY_LAYOUT.panel.h;
@@ -644,10 +654,12 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
       const v = view(width, height);
       const sx = (x - v.ox) / v.scale, sy = (y - v.oy) / v.scale;
       pointer = [Math.trunc(sx), Math.trunc(sy)];
+      if (overlay) { hot = -1; return -1; }
       if (gatewaySelector?.open) return gatewaySelector.hover(sx, sy);
       hot = this.hitTest(x, y, width, height); return hot;
     },
     click(x, y, width, height) {
+      if (overlay) { const v = view(width, height), sx = (x - v.ox) / v.scale, sy = (y - v.oy) / v.scale; overlay.release(overlay.press(sx, sy), sx, sy); return -1; }
       if (gatewaySelector?.open) {
         const v = view(width, height), sx = (x - v.ox) / v.scale, sy = (y - v.oy) / v.scale;
         const token = gatewaySelector.press(sx, sy);
@@ -660,18 +672,20 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
     // Press arms the button under the pointer and shows its down cel; the release fires only when
     // it is still over the same button. Hover alone never draws the down cel (retail's mouse-up).
     press(x, y, width, height) {
+      if (overlay) { const v = view(width, height); return overlay.press((x - v.ox) / v.scale, (y - v.oy) / v.scale); }
       if (gatewaySelector?.open) { const v = view(width, height); return gatewaySelector.press((x - v.ox) / v.scale, (y - v.oy) / v.scale); }
       hot = this.hitTest(x, y, width, height);
       pressed = hot; return pressed >= 0 ? pressed : null;
     },
     release(token, x, y, width, height) {
+      if (overlay) { const v = view(width, height); overlay.release(token, (x - v.ox) / v.scale, (y - v.oy) / v.scale); return -1; }
       if (gatewaySelector?.open) { const v = view(width, height); return gatewaySelector.release(token, (x - v.ox) / v.scale, (y - v.oy) / v.scale); }
       const i = this.hitTest(x, y, width, height); pressed = -1;
       if (i >= 0 && i === token) items[i].action?.();
       return i >= 0 && i === token ? i : -1;
     },
     /** A cancelled gesture drops the down cel without activating the button. */
-    cancel() { if (gatewaySelector?.open) gatewaySelector.cancel(); pressed = -1; },
+    cancel() { overlay?.cancel(); if (gatewaySelector?.open) gatewaySelector.cancel(); pressed = -1; },
     draw(outCtx, width, height, tick, phase = 'menu') {
       outCtx.fillStyle = '#000'; outCtx.fillRect(0, 0, width, height);
       const v = view(width, height);
@@ -718,6 +732,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
         drawLabel(ctx, b.item.label, b.x, b.y, b.w, b.h, down ? -2 : 0, down ? 2 : 0);
       }
       if (!gatewaySelector?.open) versionFont.drawAnchored(ctx, TITLE_VERSION.text, TITLE_VERSION.x, TITLE_VERSION.y);
+      overlay?.draw(ctx);
       // Retail draws the pointer last (D2WinMain.cpp), so the region dialog goes under the pointer cel.
       if (pointer) {
         const f = cursorDc6.frames[0];

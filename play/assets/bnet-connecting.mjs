@@ -1,0 +1,123 @@
+// Retail's "Connecting to Battle.net" popup (1.13c D2Launch+0xFC40), drawn over the main menu while
+// the client dials the committed region. D2Launch+0x19290 opens it (through +0xEE10) when Bnclient is
+// not connected yet; its modal loop's idle (+0xF950) refreshes the status (+0xF800) every frame until
+// Bnclient reports the connection, and only then is the login screen built.
+//
+// The five controls are retail's descriptors (D2Launch+0x23980..0x23A40), D2Win's (type, x, bottom
+// row, width, height, inset x, inset y):
+//   - the PopUp_340x224 frame, two cels, at (222, 426);
+//   - CANCEL (string 5103), a MediumButtonBlank at (330, 416);
+//   - the title, a centred Font30 text box (222, 280, 340x60) holding 5171;
+//   - the status, a centred Font24 text box (222, 360, 340x70, inset 10/8): Bnclient+0x80's code 0..6
+//     names strings 5171..5177, any other code leaves the box empty;
+//   - the dots, a centred FontFormal12 colour-4 box (222, 370, 340x20, inset 10/4): "%.*s" of twenty
+//     dots, ((GetTickCount - opened) / 1000) % 20 + 1 of them.
+// A D2Win text box draws its first line one font line height below its top, inset included.
+import { createBlender, createFont, decodeFontTbl, textColourPalette, LABEL_TINT, FRONTEND } from './frontend.mjs';
+import { recordDc6 } from './drawlist.mjs';
+
+const P = 'data\\global\\ui\\FrontEnd\\';
+const F = 'data\\local\\font\\latin\\';
+export const BNET_CONNECTING_ASSETS = {
+  popup: P + 'PopUp_340x224.dc6', button: P + 'MediumButtonBlank.dc6',
+  titleFont: F + 'font30.dc6', titleFontTbl: F + 'font30.tbl',
+  statusFont: F + 'font24.dc6', statusFontTbl: F + 'font24.tbl',
+  dotsFont: F + 'fontformal12.dc6', dotsFontTbl: F + 'fontformal12.tbl',
+};
+export const BNET_CONNECTING_STRINGS = { title: 5171, status: [5171, 5172, 5173, 5174, 5175, 5176, 5177], cancel: 5103 };
+export const BNET_CONNECTING_LAYOUT = {
+  popup: { x: 222, anchorY: 426 },
+  cancel: { x: 330, anchorY: 416, w: 128, h: 35 },
+  title: { x: 222, bottom: 280, w: 340, h: 60, inset: 0, insetY: 0, step: 23 },
+  status: { x: 222, bottom: 360, w: 340, h: 70, inset: 10, insetY: 8, step: 19 },
+  dots: { x: 222, bottom: 370, w: 340, h: 20, inset: 10, insetY: 4, colour: 4 },
+};
+
+// D2Win's text box wrap: the longest run of space-separated words that fits the width.
+const wrap = (text, width, measure) => {
+  const lines = [];
+  let line = null;
+  for (const word of String(text).split(' ')) {
+    const next = line === null ? word : `${line} ${word}`;
+    if (line !== null && measure(next) > width) { lines.push(line); line = word; } else line = next;
+  }
+  if (line) lines.push(line);
+  return lines;
+};
+
+export function createBnetConnectingPopup({ read, decodeDc6, decodeDatPalette, string = () => '', now = () => performance.now(),
+  onCancel = () => {}, documentObject = globalThis.document }) {
+  const palette = decodeDatPalette(read(FRONTEND.palette));
+  const skyPalette = decodeDatPalette(read(FRONTEND.backgroundPalette));
+  const skyPl2 = read('data\\global\\palette\\Sky\\pal.pl2');
+  const frameCanvas = (f) => {
+    const c = documentObject.createElement('canvas');
+    c.width = Math.max(1, f.width); c.height = Math.max(1, f.height);
+    const rgba = new Uint8ClampedArray(f.width * f.height * 4);
+    for (let i = 0; i < f.indices.length; i++) if (f.opaque[i]) rgba.set(skyPalette.subarray(f.indices[i] * 4, f.indices[i] * 4 + 4), i * 4);
+    c.getContext('2d').putImageData(new ImageData(rgba, c.width, c.height), 0, 0);
+    return c;
+  };
+  const cels = (path) => { const dc6 = decodeDc6(read(path)); return { path, dc6, canvases: dc6.frames.map(frameCanvas) }; };
+  const A = BNET_CONNECTING_ASSETS, L = BNET_CONNECTING_LAYOUT, S = BNET_CONNECTING_STRINGS;
+  const popup = cels(A.popup), button = cels(A.button);
+  const tinted = palette.slice(); for (let i = 0; i < tinted.length; i += 4) for (let k = 0; k < 3; k++) tinted[i + k] = Math.round(tinted[i + k] * LABEL_TINT);
+  const labelFont = createFont({ dc6: decodeDc6(read(FRONTEND.font)), tbl: decodeFontTbl(read(FRONTEND.fontTbl)), palette: tinted, documentObject,
+    path: FRONTEND.font, drawAs: { op: 'celcolor', mode: 4, blend: createBlender(skyPl2, palette) } });
+  const boxFont = (dc6, tbl, colour) => createFont({ dc6: decodeDc6(read(dc6)), tbl: decodeFontTbl(read(tbl)),
+    palette: textColourPalette(skyPl2, skyPalette, colour), documentObject, path: dc6, drawAs: { op: 'celcolor', mode: 5, extra: colour } });
+  const titleFont = boxFont(A.titleFont, A.titleFontTbl, 0);
+  const statusFont = boxFont(A.statusFont, A.statusFontTbl, 0);
+  const dotsFont = boxFont(A.dotsFont, A.dotsFontTbl, L.dots.colour);
+
+  // D2Launch+0xFC40 takes GetTickCount for the dots and starts on code 0's text.
+  let opened = now(), code = 0, failure = null, pressed = false;
+
+  const drawCel = (ctx, c, index, x, anchorY) => {
+    const f = c.dc6.frames[index]; if (!f) return 0;
+    const left = x + f.offsetX, top = anchorY + f.offsetY - f.height + 1;
+    ctx.drawImage(c.canvases[index], left, top);
+    recordDc6(c.path, index, f, left, top, { op: 'cel', mode: 5 });
+    return f.width;
+  };
+  const drawBox = (ctx, font, text, box) => {
+    const x = box.x + box.inset, w = box.w - 2 * box.inset, top = box.bottom - box.h + box.insetY;
+    for (const [i, line] of wrap(text, w, (t) => font.measure(t)).entries())
+      font.drawAnchored(ctx, line, x + Math.max(Math.trunc((w - font.measure(line)) / 2), 0), top + font.lineHeight + i * (box.step ?? 0));
+  };
+  const statusText = () => {
+    if (failure !== null) return failure;
+    return code >= 0 && code < S.status.length ? string(S.status[code]) || '' : '';
+  };
+  const inCancel = (sx, sy) => { const c = L.cancel; return sx >= c.x && sx < c.x + c.w && sy > c.anchorY - c.h && sy <= c.anchorY; };
+
+  return {
+    get evidence() { return { code, status: statusText(), failed: failure !== null, dots: this.dots() }; },
+    // Bnclient+0x80's connection stage, as D2Launch+0xF800 reads it each frame.
+    setStatus(next) { code = next; },
+    // NOT retail: retail closes the popup and raises a separate notice (5189) when the connection
+    // fails; this client keeps the popup up with that text in the status box until CANCEL.
+    fail(text) { failure = String(text ?? ''); },
+    get failed() { return failure !== null; },
+    clock(ms) { opened = 0; now = () => ms; },
+    dots() { return (Math.trunc(Math.max(0, now() - opened) / 1000) % 20) + 1; },
+    draw(ctx) {
+      let x = L.popup.x;
+      for (const i of [0, 1]) x += drawCel(ctx, popup, i, x, L.popup.anchorY);
+      const c = L.cancel, state = pressed ? 1 : 0;
+      drawCel(ctx, button, state, c.x, c.anchorY);
+      const label = string(S.cancel) || '';
+      labelFont.drawAnchored(ctx, label, c.x + (pressed ? -2 : 0) + Math.max(Math.trunc((c.w - labelFont.measure(label)) / 2), 0),
+        c.anchorY + (pressed ? 2 : 0) + 4 - Math.trunc((c.h - labelFont.lineHeight) / 2));
+      drawBox(ctx, titleFont, string(S.title) || '', L.title);
+      drawBox(ctx, statusFont, statusText(), L.status);
+      if (failure === null) drawBox(ctx, dotsFont, '.'.repeat(this.dots()), L.dots);
+    },
+    // Scene coordinates (800x600). The popup is modal: only CANCEL answers.
+    press(sx, sy) { pressed = inCancel(sx, sy); return pressed ? 'cancel' : null; },
+    release(token, sx, sy) { const hit = pressed && token === 'cancel' && inCancel(sx, sy); pressed = false; if (hit) onCancel(); return hit; },
+    cancel() { pressed = false; },
+    key(code) { if (code === 'Escape') { onCancel(); return true; } return false; },
+    targets() { const c = L.cancel; return { CANCEL: [c.x + c.w / 2, c.anchorY - c.h / 2] }; },
+  };
+}

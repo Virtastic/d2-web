@@ -35,8 +35,10 @@ export const AUTOMAP_PATH = AUTOMAP_PATHS.full;
 // explicit: the binary's initial value is zero, but its runtime producer/meaning is not yet recovered.
 export function automapViewport(width, height, { mode = 'full', left = true, selector284 = 0 } = {}) {
   const mini = nativeAutomapMode(mode) === 1;
-  const anchorX = left ? (selector284 === 2 ? 0 : 96) : Math.floor(2 * width / 3);
-  const anchorY = left ? 0 : 78;
+  // 0x6fb0f9f0: AutoMapLeft writes 0 to the X anchor (0x6fbcc23c) and `(sel == 2) - 1 & 0x60` to the Y anchor (0x6fbcc238);
+  // the viewport's left/right are built from 0x23c and its top/bottom from 0x238, and 0x608D0's scroll subtracts 0x23c from W/3.
+  const anchorX = left ? 0 : Math.floor(2 * width / 3);
+  const anchorY = left ? (selector284 === 2 ? 0 : 96) : 78;
   const viewport = mini
     ? { left: anchorX - 8, top: anchorY, right: anchorX + Math.floor(width / 3), bottom: anchorY + Math.floor(height / 3) }
     : { left: -16, top: -16, right: width, bottom: height };
@@ -503,7 +505,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
       // a3-forest-walkin.txt sits on that lattice, offset by the hero's sub-tile position (0 in the town, where
       // the hero starts on a tile origin; 4,3 in the forest).
       // AutoMapLeft defaults on at native startup. Its initial selector state is zero in `.data`, so
-      // 0x6fb0f9f0 places the mini-map anchor at (96,0); the exact marker viewport and cell clip are
+      // 0x6fb0f9f0 places the mini-map anchor at (0,96); the exact marker viewport and cell clip are
       // carried in layout. AutoMapCenter is a SCROLL offset, so projected cells move opposite it.
       const viewport = automapViewport(width, height, { mode, left: settings.left !== 'no' });
       const centre = automapScrollOffset(width, height, { mode, center: settings.center,

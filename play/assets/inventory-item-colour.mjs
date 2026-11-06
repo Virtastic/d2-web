@@ -1,22 +1,21 @@
-// F515: retail's captured transform for the equipped unique light boots in cov-a4g-inv.
-// These source-index remaps are recovered per pixel from that same retail frame buffer, after
-// matching the encoded invlbt cel and anchor. Unobserved indices remain identity; they do not occur
-// in this frame. Do not key this off ItemsTxt.Transform: this item has Transform=0 and InvTrans=8.
-const CAPTURED_UNIQUE_LBT_INDEX = new Uint8Array(256);
-for (let i = 0; i < CAPTURED_UNIQUE_LBT_INDEX.length; i++) CAPTURED_UNIQUE_LBT_INDEX[i] = i;
-for (const [source, retail] of [
-  [3,33],[7,47],[15,172],[16,172],[18,33],[20,41],[23,57],[33,172],[36,172],[37,172],[40,172],[42,172],
-  [50,35],[53,38],[55,41],[56,41],[64,49],[68,49],[172,172],[173,172],[174,172],[175,172],[176,172],[177,172],
-  [178,33],[182,35],[184,38],[187,45],[189,47],[193,47],[196,58],[201,57],[204,65],[207,66],[211,79],
-]) CAPTURED_UNIQUE_LBT_INDEX[source] = retail;
+// The colour remap of an item's inventory/cursor cel. Retail's inventory-style item blit
+// (D2Client+0x6B5A0: grid, worn slot, sockets, the cursor item) draws the cel through the palette
+// ITEMS_GetColor(0, item, &c, 1) returns: D2CMP_MixPalette(ItemsTxt.InvTrans, colour), the colour
+// being the affix's / unique's / set's own (magic and rare: the affix TransformColor; unique and set:
+// the record's InvTransform). The engine reports that (nTrans, nColor) pair packed the way
+// mix-palette.mjs reads it, `1 + nColor + 32*nTrans` (16 bits: InvTrans 8, invgreybrown, is above
+// 255), as `item.invColourByte` (d2_session_item_inv_colours); 0 or absent = no remap.
+//
+// F515's captured unique light boots (cov-a4g-inv: InvTrans 8, colour 9) are this rule's row 9 of
+// invgreybrown.dat; test/inventory-item-colour.test.mjs checks the retail pixels against it.
+import { mixTable } from './mix-palette.mjs';
 
-export function inventoryItemColourIndex(item, index) {
-  if (item?.classId === 339 && item?.code === 0x2074626c && item?.quality === 7 && (item?.itemFlags >>> 0) === 0x00880011)
-    return CAPTURED_UNIQUE_LBT_INDEX[index];
-  return index;
+/** The 256-entry index remap for the item's inventory cel, or null (no remap). */
+export function inventoryItemRemap(read, item) {
+  return mixTable(read, item?.invColourByte ?? 0);
 }
 
-export function inventoryItemColourKey(item) {
-  return item?.classId === 339 && item?.code === 0x2074626c && item?.quality === 7 && (item?.itemFlags >>> 0) === 0x00880011
-    ? 'captured-unique-lbt-cov-a4g-inv' : 'identity';
+/** A cache key naming the remap, 'identity' when there is none. */
+export function inventoryItemColourKey(read, item) {
+  return inventoryItemRemap(read, item) ? `mix${item.invColourByte}` : 'identity';
 }

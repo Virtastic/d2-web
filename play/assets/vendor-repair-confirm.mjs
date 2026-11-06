@@ -12,6 +12,7 @@
 import { createNpcMenu } from './npc-menu.mjs';
 
 export const REPAIR_TITLE_STRING = 3351;   // 0xd17 "Repair"
+export const BUY_TITLE_STRING = 3348;      // 0xd14 "Buy" (0x47500 state 1, the same box)
 export const GOLD_STRING = 3346;           // 0xd12 "Gold:"
 export const YES_STRING = 3344;            // 0xd10 "Yes"
 export const NO_STRING = 3345;             // 0xd11 "No"
@@ -52,11 +53,11 @@ export function createRepairConfirm(send, needsRepair = () => true, end = () => 
  * 0x914F0 writes a multi-line name bottom-up (D2Win draws the last line on top), and 0x47500 keeps the text
  * before its first '\n': the bottom line, i.e. the LAST line of a top-down title.
  */
-export function repairConfirmMenu(title, cost, string) {
+export function repairConfirmMenu(title, cost, string, titleString = REPAIR_TITLE_STRING) {
   const t = (id, d) => string(id) || d;
   const name = String(title ?? '').split('\n').filter(Boolean).at(-1) ?? '';
   return {
-    heads: [t(REPAIR_TITLE_STRING, 'Repair'), name, t(GOLD_STRING, 'Gold:'), String(Math.trunc(cost) | 0)],
+    heads: [t(titleString, titleString === BUY_TITLE_STRING ? 'Buy' : 'Repair'), name, t(GOLD_STRING, 'Gold:'), String(Math.trunc(cost) | 0)],
     entries: [{ stringId: YES_STRING, action: 'yes' }, { stringId: NO_STRING, action: 'no' }],
   };
 }
@@ -66,7 +67,7 @@ export function createRepairConfirmRenderer(deps) {
   const menu = createNpcMenu(deps);
   return {
     get open() { return menu.open; },
-    show(npcId, title, cost) { const m = repairConfirmMenu(title, cost, deps.string); menu.show(npcId, 0, m.heads, m.entries); },
+    show(npcId, title, cost, titleString = REPAIR_TITLE_STRING) { const m = repairConfirmMenu(title, cost, deps.string, titleString); menu.show(npcId, 0, m.heads, m.entries); },
     /** 0x4B5D0's box: the refusal line in red (colour 1), then "Continue". */
     showRefusal(npcId, stringId) { menu.show(npcId, 0, [deps.string(stringId) || String(stringId)], [{ stringId: CONTINUE_STRING, action: 'no' }], 1); },
     close() { menu.close(); },

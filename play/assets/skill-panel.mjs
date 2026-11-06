@@ -76,15 +76,35 @@ const PLATE_PAD = TOOLTIP_FRAME.pad, PLATE_LINE = TOOLTIP_FRAME.line;
 
 /** The plate's box (see the comment where it is drawn); `cell` is the hovered icon's rect. */
 export function drawPlate(ctx, font, cell, lines) {
-  const box = plateBox(cell, Math.max(...lines.map((l) => font.measure(l.text))), lines.length);
-  drawTooltipFrame(ctx, box.x, box.y, box.w, box.h, 'rgba(0,0,0,0.75)'); // retail-measured skill plate fill
-  lines.forEach((l, i) => { l.x = Math.floor(box.x + box.w / 2 - font.measure(l.text) / 2); l.y = box.y + 13 + i * PLATE_LINE;
-    if (l.text) font.drawAnchored(ctx, l.text, l.x, l.y); });
+  const box = layoutPlate(font, cell, lines);
+  paintPlate(ctx, font, box, lines);
   return box;
 }
-export function plateBox(cell, textWidth, lines) {
+/** The plate's box and each line's (left-x, baseline) without painting: the tree defers the paint (see draw()). */
+export function layoutPlate(font, cell, lines) {
+  const box = plateBox(cell, Math.max(...lines.map((l) => font.measure(l.text))), lines.length);
+  lines.forEach((l, i) => { l.x = Math.floor(box.x + box.w / 2 - font.measure(l.text) / 2); l.y = box.y + 13 + i * PLATE_LINE; });
+  return box;
+}
+export function paintPlate(ctx, font, box, lines) {
+  drawTooltipFrame(ctx, box.x, box.y, box.w, box.h, 'rgba(0,0,0,0.75)'); // retail-measured skill plate fill
+  for (const l of lines) if (l.text) font.drawAnchored(ctx, l.text, l.x, l.y);
+}
+/**
+ * The plate's rectangle on the 800x600 screen. 1.13c D2Client+0x33550 (the tree's tooltip) hands
+ * D2Win #10085 (0x118F0, PrintPopup) x = the icon's left and y = the icon's bottom + text height + 3;
+ * D2Win #10110 (0x133A0) draws the stored popup at the END of the frame, after the control panel:
+ * W = text width + 8, H = lines x 16; x := 0 if x < 1, then min(x, screenW - W); the box's bottom
+ * := max(y + 2, H - 5), then min(that, screenH - 5). So the top is the icon's bottom + 5 (cell.y +
+ * cell.h + 4 here, the cell's h being exclusive) pulled up until the box ends 5 above the screen.
+ * (#10110 also steps the font down to Font8 then Font6 while H > screenH - 10; a skill plate is
+ * at most ~22 lines of Font16, 352 px, so that branch is never reached on a 600-row screen.)
+ */
+export function plateBox(cell, textWidth, lines, screen = SKILL_LAYOUT) {
   const w = textWidth + PLATE_PAD * 2, h = lines * PLATE_LINE;
-  return { x: Math.max(0, Math.min(SKILL_LAYOUT.width - w, cell.x)), y: Math.min(cell.y + cell.h + 4, SKILL_LAYOUT.height - 5 - h), w, h };
+  const x = Math.min(cell.x < 1 ? 0 : cell.x, screen.width - w);
+  const bottom = Math.min(Math.max(cell.y + cell.h + 4 + h, h - 5), screen.height - 5);
+  return { x, y: bottom - h, w, h };
 }
 
 /**
@@ -102,6 +122,14 @@ export function formatManaCost(cost) {
   const whole = Math.floor(cost / 256), fraction = cost % 256;
   // 0x314D0: above 0x1900 (25.0) the cost prints as a whole number (Hydra 12: 6528/256 = 25.5 shows "25").
   return fraction && cost <= 0x1900 ? `${whole}.${Math.trunc(fraction * 10 / 256)}` : String(whole);
+}
+
+/** Where the panel's 800x600 screen lands on a canvas of width x height: scaled down to fit, never up, centred. */
+export function skillPanelOrigin(width, height) {
+  const scale = Math.min(1, width / 800, height / 600);
+  return { scale,
+    x: (width - 800 * scale) / 2 + SKILL_LAYOUT.screenX * scale,
+    y: (height - 600 * scale) / 2 + SKILL_LAYOUT.screenY * scale };
 }
 
 export function parseClassSkills(bytes, count) {
@@ -242,12 +270,7 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
   let hovered = null;
   let plate = null;
 
-  const origin = (width, height) => {
-    const scale = Math.min(1, width / 800, height / 600);
-    return { scale,
-      x: (width - 800 * scale) / 2 + SKILL_LAYOUT.screenX * scale,
-      y: (height - 600 * scale) / 2 + SKILL_LAYOUT.screenY * scale };
-  };
+  const origin = skillPanelOrigin;
   // Retail rows count from the top of the tab; column 1 is the leftmost.
   // SkillColumn/SkillRow are used RAW here, not as (n-1): OpenDiablo2 multiplies the table value
   // straight, and SkillDesc numbers its columns and rows from 1.
@@ -392,7 +415,7 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
       // the one case where retail's order differs -- named in V19).
       const line = state.line || (() => '');
       const key = state.string || (() => '');
-      let namePlate = null, unmodelled = [];
+      let namePlate = null, unmodelled = [], plateDraw = null;
       if (hovered) {
         const built = buildSkillPlate(hovered, state); const plateLines = built.lines; unmodelled = built.unmodelled;
         const shown = plateLines;
@@ -402,7 +425,11 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
           // side of the widest line, 16 px per line, first glyph row 13 below the top; x = the icon's
           // left clamped to the screen's right edge, y = 4 under the icon's bottom row clamped so the
           // bottom stays 5 above the screen's; every line centred on the box.
-          const { x: nx, y: ny, w, h } = drawPlate(ctx, font, r, shown);
+          const { x: nx, y: ny, w, h } = layoutPlate(font, r, shown);
+          // Painted later, by plateDraw: retail stores the plate (D2Win #10085) and draws it after
+          // the control panel (#10110), so the HUD never covers its bottom lines.
+          const tipFont = font, at = o;
+          plateDraw = (c) => { c.save(); c.translate(at.x, at.y); c.scale(at.scale, at.scale); paintPlate(c, tipFont, { x: nx, y: ny, w, h }, shown); c.restore(); };
           namePlate = { id: hovered.id, label: shown.find((l) => l.kind === 'name')?.text ?? shown[0].text, x: nx, y: ny };
           plate = { id: hovered.id, x: nx, y: ny, w, h, lines: shown,
             manaStr: hovered.manaStr, manaTemplate: hovered.manaStr ? line(hovered.manaStr) : '',
@@ -413,7 +440,7 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
 
       // missingIcons is reported, not swallowed: an iconCel with no frame behind it is the exact
       // shape of the defect that drew a green block, and a count of drawn icons cannot see it.
-      return { x: o.x, y: o.y, scale: o.scale, tab, drawn, plus, missingIcons, namePlate, plate, cels, labels, digits,
+      return { x: o.x, y: o.y, scale: o.scale, tab, drawn, plus, missingIcons, namePlate, plate, plateDraw, cels, labels, digits,
         icons: icons.length, skillPoints: state.skillPoints ?? 0, total: (state.skills || []).length,
         close: { ...close, path: PANEL_CLOSE_ART.path, frame: closeFrame, pressed: Boolean(state.closePressed), blit: closeBlit } };
     },
