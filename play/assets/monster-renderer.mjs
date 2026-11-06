@@ -10,7 +10,10 @@ import { createRenderCache } from './render-cache.mjs';
 const COMPONENT = ['HD','TR','LG','RA','LA','RH','LH','SH','S1','S2','S3','S4','S5','S6','S7','S8'];
 const MODE = ['DT','NU','WL','GH','A1','A2','BL','SC','S1','S2','S3','S4','DD','KB','SQ','RN'];
 const PALETTE = ['ACT1','ACT2','ACT3','ACT4','ACT5'];
-const MONSTER_LAYER_RASTER_ENTRIES = 256;
+// PERF: a layer-blended monster (the throne's skeletons) draws every opaque layer from its own small canvas
+// (~1.2 KB each). A Baal wave cycles ~4,200 of them; 256 entries thrashed and re-created ~85 canvases a frame.
+// The byte bound, not the entry count, is what keeps a long session's memory finite.
+const MONSTER_LAYER_RASTER_ENTRIES = 16384;
 const MONSTER_LAYER_RASTER_BYTES = 16 * 1024 * 1024;
 const MONSTER_RASTER_ENTRIES = 1024, MONSTER_RASTER_BYTES = 64 * 1024 * 1024;
 const MONSTER_FILE_ENTRIES = 512, MONSTER_FILE_BYTES = 48 * 1024 * 1024, MONSTER_ANIMATION_ENTRIES = 1024;

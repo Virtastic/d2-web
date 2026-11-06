@@ -369,7 +369,7 @@ export function recordTiled(path, tiled, ox, oy) {
  * The flaming logo is two DC6s (left and right halves), each 30 frames, positioned by their own
  * frame offsets -- retail animates them over the static black logo underneath, in both phases.
  */
-export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, string = null, documentObject = globalThis.document, bnet = null, onGateway = null }) {
+export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, string = null, documentObject = globalThis.document, bnet = null, onGateway = null, onGatewayOpen = null, storage = null }) {
   const palette = decodeDatPalette(read(FRONTEND.palette));
   // The whole title is ONE 8-bit frame shown through Sky (retail's frame buffer, s194), the buttons
   // too: Units differs from Sky in a few entries, the button gems among them. The trademark phase is
@@ -544,6 +544,14 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
     f.drawAnchored(ctx, text, x + dx + Math.max(Math.trunc((w - f.measure(text)) / 2), 0), bottom + dy + offY - Math.trunc((h - f.lineHeight) / 2), onGlyph);
   };
   const drawOrder = [...boxes].sort((a, b) => TITLE_LAYOUT[a.item.label].order - TITLE_LAYOUT[b.item.label].order);
+  // The GATEWAY bar under BATTLE.NET is its own button (D2Launch FUN_6FA53D60 builds it; its action is
+  // the gateway list, FUN_6FA565D0). It takes the index after the caller's items, and it is a control
+  // only while the config lists servers: with Battle.net off it stays the inert retail bar.
+  const GATEWAY_INDEX = items.length;
+  const gatewayBox = (() => {
+    const b = boxes.find((x) => x.gateway); if (!b) return null;
+    const g = buttons.narrow[0]; return { x: b.gateway.x, y: b.gateway.y, w: g.width, h: g.height };
+  })();
 
   // Battle.net is a CONFIG FILE the project owns (`play/assets/bnet-servers.json` through
   // `bnet-servers.mjs`), not a player setting. This is the whole of it: with the shipped empty file
@@ -558,12 +566,17 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
       error: cfg?.error ?? '', url: cfg?.url ?? null, configured: (cfg?.servers ?? []).map((s) => ({ region: s.region, host: s.host })) };
     if (!bnetState.enabled) return;
     gatewaySelector = createGatewaySelector({
-      servers: cfg.servers, screen: gatewayScreen, width: 800, height: 600, onCommit: onGateway,
+      servers: cfg.servers, screen: gatewayScreen, width: 800, height: 600, onCommit: onGateway, storage,
     });
   };
   if (bnet) Promise.resolve(bnet).then(applyBnet, (error) => applyBnet({ enabled: false, servers: [], error: String(error) }));
 
   let hot = -1, pressed = -1, pointer = null;
+  const activate = (i) => {
+    if (i !== GATEWAY_INDEX) { items[i].action?.(); return; }
+    if (!gatewaySelector) return;
+    onGatewayOpen?.(); gatewaySelector.openDialog();
+  };
   // A modal popup over the menu (retail's connecting popup, bnet-connecting.mjs): drawn after the
   // menu and the version text, and while it is up only it answers the pointer and the keyboard.
   let overlay = null;
@@ -621,13 +634,18 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
       const v = view(width, height);
       const sx = (x - v.ox) / v.scale, sy = (y - v.oy) / v.scale;
       const i = boxes.findIndex((b) => sx >= b.x && sx < b.x + b.w && sy >= b.y && sy < b.y + b.h);
-      return i < 0 ? -1 : items.indexOf(boxes[i].item);
+      if (i >= 0) return items.indexOf(boxes[i].item);
+      const g = gatewaySelector && gatewayBox;
+      return g && sx >= g.x && sx < g.x + g.w && sy >= g.y && sy < g.y + g.h ? GATEWAY_INDEX : -1;
     },
-    labelAt(index) { return items[index]?.label ?? null; },
+    labelAt(index) { return index === GATEWAY_INDEX && gatewaySelector ? 'GATEWAY' : items[index]?.label ?? null; },
+    /** The committed gateway (the persisted one at boot), or null when Battle.net is off. */
+    selectedGateway() { return gatewaySelector?.selected ?? null; },
     /** Canvas-pixel centres of the SAME boxes hitTest() and click() use. */
     targets(width, height) {
       const v = view(width, height);
-      return Object.fromEntries(boxes.map((b) => [b.item.label, [
+      const all = gatewaySelector && gatewayBox ? [...boxes, { ...gatewayBox, item: { label: 'GATEWAY' } }] : boxes;
+      return Object.fromEntries(all.map((b) => [b.item.label, [
         Math.round(v.ox + (b.x + b.w / 2) * v.scale), Math.round(v.oy + (b.y + b.h / 2) * v.scale),
       ]]));
     },
@@ -666,7 +684,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
         return token === null ? -1 : gatewaySelector.release(token, sx, sy);
       }
       const i = this.hitTest(x, y, width, height);
-      if (i >= 0) items[i].action?.();
+      if (i >= 0) activate(i);
       return i;
     },
     // Press arms the button under the pointer and shows its down cel; the release fires only when
@@ -681,7 +699,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
       if (overlay) { const v = view(width, height); overlay.release(token, (x - v.ox) / v.scale, (y - v.oy) / v.scale); return -1; }
       if (gatewaySelector?.open) { const v = view(width, height); return gatewaySelector.release(token, (x - v.ox) / v.scale, (y - v.oy) / v.scale); }
       const i = this.hitTest(x, y, width, height); pressed = -1;
-      if (i >= 0 && i === token) items[i].action?.();
+      if (i >= 0 && i === token) activate(i);
       return i >= 0 && i === token ? i : -1;
     },
     /** A cancelled gesture drops the down cel without activating the button. */
@@ -714,14 +732,15 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
         gatewaySelector.draw(ctx);
       } else for (const b of drawOrder) {
         if (b.gateway) {
-          const g = buttons.narrow[0];
+          const gDown = isButtonHeldOverTarget(pressed, hot) && pressed === GATEWAY_INDEX;
+          const g = buttons.narrow[gDown ? 1 : 0];
           ctx.drawImage(g.canvas, b.gateway.x, b.gateway.y);
           recordButton(g, b.gateway.x, b.gateway.y);
           // Retail's own text until the player picks a region (`gatewayBar`); either way the glyphs we
           // blit are recorded, so a scenario compares the PAINTED bar to the configured region.
           const glyphs = [];
           const bar = gatewaySelector ? gatewaySelector.gatewayBar() : b.gateway.label;
-          drawLabel(ctx, bar, b.gateway.x, b.gateway.y, g.width, g.height, 0, 0, (gl) => glyphs.push(gl));
+          drawLabel(ctx, bar, b.gateway.x, b.gateway.y, g.width, g.height, gDown ? -2 : 0, gDown ? 2 : 0, (gl) => glyphs.push(gl));
           barDrawn = { text: glyphs.map((gl) => gl.character).join(''), glyphs: glyphs.map((gl) => ({ character: gl.character, index: gl.index, path: gl.path })) };
         }
         // Hover keeps retail's up cel; only a held pointer gets the down cel.

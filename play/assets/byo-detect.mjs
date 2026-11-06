@@ -16,7 +16,8 @@ const MAGIC = 0x1a51504d;
 export const ROLES = {
   d2data:   { file: 'd2data.mpq',   hashN: 65536, blockN: 10851, required: true,  label: 'Game data',        note: 'd2data.mpq' },
   d2char:   { file: 'd2char.mpq',   hashN: 16384, blockN: 10013, required: true,  label: 'Characters',       note: 'd2char.mpq' },
-  d2exp:    { file: 'd2exp.mpq',    hashN: 65536, blockN: 9888,  required: true,  label: 'Expansion data',   note: 'd2exp.mpq' },
+  // 10149: a later disc's d2exp.mpq, the same archive with extra locale files appended.
+  d2exp:    { file: 'd2exp.mpq',    hashN: 65536, blockN: 9888,  alt: [10149], required: true,  label: 'Expansion data',   note: 'd2exp.mpq' },
   d2sfx:    { file: 'd2sfx.mpq',    hashN: 8192,  blockN: 2329,  required: true,  label: 'Sound effects',    note: 'd2sfx.mpq' },
   patch_d2: { file: 'patch_d2.mpq', hashN: 512,   blockN: null,  required: true,  label: 'Patch',            note: 'Patch_D2.mpq' },
   d2speech: { file: 'd2speech.mpq', hashN: 8192,  blockN: 1566,  required: true , label: 'Speech',           note: 'd2speech.mpq' },
@@ -28,6 +29,9 @@ export const ROLES = {
 };
 // The engine mounts in this order (play/index.html RETAIL_ORDER): later archives lose to earlier ones.
 export const ORDER = ['patch_d2', 'd2exp', 'd2xmusic', 'd2xtalk', 'd2xvideo', 'd2data', 'd2char', 'd2music', 'd2sfx', 'd2speech', 'd2video'];
+
+const DAMAGE_PROBES = ['data\\global\\objects\\8o\\tr\\8otrlitophth.dcc', 'data\\global\\objects\\8p\\tr\\8ptrlitophth.dcc',
+  'data\\global\\objects\\5h\\tr\\5htrlitophth.dcc', 'data\\global\\objects\\yy\\tr\\yytrlitonhth.dcc'];
 
 const u32 = (dv, o) => dv.getUint32(o, true);
 const bytes = async (blob, pos, len) => new Uint8Array(await blob.slice(pos, pos + len).arrayBuffer());
@@ -98,7 +102,7 @@ export async function inspect(file) {
   const t = await tables(file, base, hashPos, hashN, blockPos, blockN);
   m.sha256 = await sha256hex(new Uint8Array([...h, ...new Uint8Array(t.block.buffer)]));
   for (const [role, r] of Object.entries(ROLES)) {
-    if (r.hashN === hashN && (r.blockN === null || r.blockN === blockN)) { m.role = role; break; }
+    if (r.hashN === hashN && (r.blockN === null || r.blockN === blockN || (r.alt || []).includes(blockN))) { m.role = role; break; }
   }
   // Not every release's archives carry the measured table sizes (other installers repack them): a plain
   // MPQ named like one of the game's archives is taken by its name.
@@ -111,6 +115,17 @@ export async function inspect(file) {
     const looksLikeD2 = ['data\\global\\excel\\Levels.txt', 'data\\global\\excel\\Skills.txt', 'data\\local\\lng\\eng\\patchstring.tbl']
       .some((n) => lookup(t, hashN, blockN, n));
     if (!looksLikeD2) delete m.role;
+  }
+  // A copy made from a scratched disc keeps its tables but reads the sectors it could not read as zeros.
+  // d2exp.mpq's Act V object art (Worldstone Keep torches, shrines, the Worldstone Chamber portal) sits in
+  // one stretch of the disc: these stored DCCs start with their 0x74 signature, never with zeros.
+  if (m.role === 'd2exp') {
+    for (const n of DAMAGE_PROBES) {
+      const e = lookup(t, hashN, blockN, n);
+      if (!e || e.csize < 4 || e.pos + 4 > avail) continue;
+      const b = await bytes(file, base + e.pos, 4);
+      if (!(b[0] | b[1] | b[2] | b[3])) { m.damaged = n; break; }
+    }
   }
   // A patch installer carries the patch as a stored/compressed file inside; remember where it sits.
   if (base > 0) m.inner = ['Patch_D2.mpq', 'patch_d2.mpq'].map((n) => lookup(t, hashN, blockN, n)).find(Boolean) || null;
@@ -148,6 +163,7 @@ export function classify(infos, known = { patch_d2: [] }) {
       continue;
     }
     if (f.truncated) { slots[f.role].problem = 'incomplete'; issues.push({ code: 'truncated', file: f.name, text: `${f.name} looks incomplete. Copy it again.` }); continue; }
+    if (f.damaged) { slots[f.role].problem = 'damaged'; issues.push({ code: 'damaged', file: f.name, text: `${f.name} is damaged: parts of it read as blank, so some art would be missing. Copy it again from a good disc or install.` }); continue; }
     const s = slots[f.role];
     if (s.have) continue;
     Object.assign(s, { have: true, file: f });

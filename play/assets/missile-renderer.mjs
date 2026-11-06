@@ -110,12 +110,16 @@ export function createMissileRenderer(read, documentObject = globalThis.document
       const hmap = highlightMap(read('data\\global\\palette\\units\\pal.dat'));
       drawPal = new Uint8Array(1024); for (let k = 0; k < 256; k++) drawPal.set(pal.subarray(hmap[k] * 4, hmap[k] * 4 + 4), k * 4);
     }
-    const key = `${folder === 'missiles' ? '' : folder + ':'}${celFile_}:${dir}:${frameIndex}:${act0}:${mode === 7 ? 7 : 0}`; let canvas = rasters.get(key);
-    if (!canvas) { canvas = documentObject.createElement('canvas'); canvas.width = drawnFrame.width; canvas.height = drawnFrame.height;
-      canvas.getContext('2d').putImageData(new ImageData(indexedToRgba(drawnFrame.indexed, drawnFrame.opaque, drawPal),drawnFrame.width,drawnFrame.height),0,0);rasters.set(key,canvas); }
     const left = Math.round(x + drawnFrame.xOffset), top = Math.round(y + (drawnFrame.bottomUp ? drawnFrame.yOffset : drawnFrame.yOffset - drawnFrame.height + 1));
     if (blend && mode !== 5 && mode !== 7) blend(ctx, { width: drawnFrame.width, height: drawnFrame.height, indices: drawnFrame.indexed, opaque: drawnFrame.opaque }, left, top, mode);
-    else ctx.drawImage(canvas, left, top);
+    else {
+      // PERF: the raster is only the drawImage path's source; a blended missile never reads it, so it is built here
+      // (it was built and cached for every missile, ~9 canvases a frame in a Baal wave fight).
+      const key = `${folder === 'missiles' ? '' : folder + ':'}${celFile_}:${dir}:${frameIndex}:${act0}:${mode === 7 ? 7 : 0}`; let canvas = rasters.get(key);
+      if (!canvas) { canvas = documentObject.createElement('canvas'); canvas.width = drawnFrame.width; canvas.height = drawnFrame.height;
+        canvas.getContext('2d').putImageData(new ImageData(indexedToRgba(drawnFrame.indexed, drawnFrame.opaque, drawPal),drawnFrame.width,drawnFrame.height),0,0);rasters.set(key,canvas); }
+      ctx.drawImage(canvas, left, top);
+    }
     const { pixelHash, opaque } = spriteMetrics(drawnFrame, drawnFrame.indexed, drawnFrame.opaque);
     return {classId:missile.classId,celFile:celFile_,palette:PALETTE[act0],direction:direction,directionIndex:dir,directions:dcc.directions,
       drawMode:mode,frame:frameIndex,frames:count,framePrecise:frame == null ? null : Math.trunc(frame),trans,width:drawnFrame.width,

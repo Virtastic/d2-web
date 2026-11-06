@@ -89,11 +89,27 @@ export function gatewayRows(servers) {
     w: GATEWAY_LAYOUT.rows.w, h: GATEWAY_LAYOUT.rows.pitch, anchorY: GATEWAY_LAYOUT.rows.firstAnchorY + i * GATEWAY_LAYOUT.rows.pitch }));
 }
 
+/**
+ * Where the chosen gateway persists. Retail's OK callback (D2Launch FUN_6FA58810) calls
+ * BNGatewayAccess::SetCurGateway and writes the realm to the registry ("Diablo II" / "Preferred Realm"),
+ * so the next boot opens on it; the browser keeps the region name in localStorage instead.
+ */
+export const GATEWAY_STORAGE_KEY = 'd2web.bnet.gateway';
+
+/** The committed index at boot: the persisted region if it is still configured, else U.S. EAST, else the first. */
+export function initialGatewayIndex(servers, storage = null) {
+  if (!servers.length) return -1;
+  let stored = null;
+  try { stored = storage?.getItem(GATEWAY_STORAGE_KEY) ?? null; } catch { /* blocked storage keeps the default */ }
+  const byName = (name) => servers.findIndex((s) => s.region.toUpperCase() === String(name).toUpperCase());
+  const persisted = stored == null ? -1 : byName(stored);
+  return persisted >= 0 ? persisted : Math.max(0, byName('U.S. EAST'));
+}
+
 /** A repo-owned server list presented in retail 1.13c's measured gateway selection screen. */
-export function createGatewaySelector({ servers, screen, width = 800, height = 600, onCommit = null }) {
+export function createGatewaySelector({ servers, screen, width = 800, height = 600, onCommit = null, storage = null }) {
   const rows = gatewayRows(servers);
-  const defaultIndex = Math.max(0, servers.findIndex((s) => s.region.toUpperCase() === 'U.S. EAST'));
-  let open = false, committed = servers.length ? defaultIndex : -1, choice = committed, hot = null, pressed = null;
+  let open = false, committed = initialGatewayIndex(servers, storage), choice = committed, hot = null, pressed = null;
   let drawn = { panel: [], heading: null, body: [], rows: [], selection: null, buttons: [] };
   const rowAt = (x, y) => rows.findIndex((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
   const buttonAt = (x, y) => Object.entries(GATEWAY_LAYOUT.button).filter(([k]) => k === 'ok' || k === 'cancel')
@@ -105,6 +121,7 @@ export function createGatewaySelector({ servers, screen, width = 800, height = 6
     open = false;
     if (button === 'ok') {
       committed = choice;
+      if (committed >= 0) { try { storage?.setItem(GATEWAY_STORAGE_KEY, servers[committed].region); } catch { /* storage failure keeps the in-memory choice */ } }
       if (onCommit && committed >= 0) onCommit({ ...servers[committed] });
       return committed;
     }

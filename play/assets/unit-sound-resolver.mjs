@@ -56,9 +56,14 @@ export function resolveUnitSound({ unitType, classId, soundEvent, isLocalPlayer 
   return null;
 }
 
+// PERF: Sounds.txt is about 4,700 lines and was split again on every played row (about 4% of a Baal wave
+// fight's frame). The split is kept for the last table text seen; every caller still builds a fresh row object.
+let linesText = null, linesMemo = null;
+const tableLines = (soundsTxt) => (soundsTxt === linesText ? linesMemo : (linesMemo = soundsTxt.split(/\r?\n/), linesText = soundsTxt, linesMemo));
+
 /** Map a row to its Sounds.txt line (name, file) given the table's text. */
 export function soundRow(soundsTxt, row) {
-  const line = soundsTxt.split(/\r?\n/)[row + 1];
+  const line = tableLines(soundsTxt)[row + 1];
   if (!line) return null;
   const c = line.split('\t');
   return { row, handle: c[0], file: c[2], volume: c[3] === undefined ? 255 : Number(c[3]), stereo: Number(c[18] ?? 0) === 1, tracking: Number(c[19] ?? 0) === 1, music: Number(c[21] ?? 0) === 1 };
@@ -67,7 +72,7 @@ export function soundRow(soundsTxt, row) {
 /** Resolve a retail Sounds.txt handle (used by Speech.txt) to its indexed row and WAV path. */
 export function soundRowByHandle(soundsTxt, handle) {
   if (!handle) return null;
-  const lines = soundsTxt.split(/\r?\n/);
+  const lines = tableLines(soundsTxt);
   for (let row = 1; row < lines.length; row++) {
     const c = lines[row].split('\t');
     if (c[0]?.toLowerCase() === String(handle).toLowerCase())
@@ -80,7 +85,7 @@ export function soundRowByHandle(soundsTxt, handle) {
 export function soundRowByFile(soundsTxt, file) {
   if (!file) return null;
   const wanted = String(file).replaceAll('/', '\\').toLowerCase();
-  const lines = soundsTxt.split(/\r?\n/);
+  const lines = tableLines(soundsTxt);
   const matches = [];
   for (let row = 1; row < lines.length; row++) {
     const c = lines[row].split('\t');

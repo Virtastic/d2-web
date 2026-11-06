@@ -91,3 +91,26 @@ test('a game archive whose tables were repacked is taken by its name', async () 
   assert.equal(i.byName, true);
   assert.equal((await inspect(file([Buffer.from(buildMpq([{ name: 'x', data: Buffer.from('x') }]))], 'mod.mpq'))).role, undefined);
 });
+
+test('a d2exp.mpq copied from a scratched disc (art sectors read as zeros) is reported damaged', async () => {
+  const probe = 'data\\global\\objects\\8o\\tr\\8otrlitophth.dcc';
+  const archive = (data) => file([Buffer.from(buildMpq([{ name: probe, data }, { name: 'data\\global\\x', data: Buffer.from('x') }]))], 'd2exp.mpq');
+  const good = await inspect(archive(Buffer.from([0x74, 6, 1, 5, 0, 0, 0, 1])));
+  assert.equal(good.role, 'd2exp');
+  assert.equal(good.damaged, undefined);
+  assert.equal(classify([good], known).slots.d2exp.have, true);
+  const bad = await inspect(archive(Buffer.alloc(64)));
+  assert.equal(bad.damaged, probe);
+  const c = classify([bad], known);
+  assert.equal(c.slots.d2exp.have, false);
+  assert.equal(c.slots.d2exp.problem, 'damaged');
+  assert.equal(c.issues[0].code, 'damaged');
+  assert.ok(c.missing.includes('d2exp'));
+});
+
+const damaged = process.env.D2_DAMAGED_D2EXP;
+test('retail: the scratched-disc d2exp.mpq is reported damaged', { skip: !damaged || !existsSync(damaged) }, async () => {
+  const i = await inspect(new File([await openAsBlob(damaged)], 'x'));
+  assert.equal(i.role, 'd2exp');
+  assert.ok(i.damaged);
+});
