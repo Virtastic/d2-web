@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Diablo II (d2-web)</string>
+    <string name="unsupported_title">This device cannot start the game</string>
+    <string name="unsupported_body">The game engine needs WebAssembly Memory64 and a cross-origin isolated page (SharedArrayBuffer). The Android System WebView on this device does not provide them. Play the web version in Chrome instead; it keeps your game files in the browser.</string>
+    <string name="open_in_chrome">Play in the browser</string>
+    <string name="close">Close</string>
+</resources>
