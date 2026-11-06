@@ -861,6 +861,7 @@ let bootMovieGeneration = 0, bootMovieOpeningGeneration = -1;
 // >= 0 holds the movie on one frame for a row (pinMovieFrame); -1 is live playback.
 let moviePin = -1;
 let charCreate = null, charCreateError = '';
+let realmCreate = false;   // the create screen is making a Battle.net character, not starting a local game
 let charSelect = null, charSelectError = '', savedCharacters = [], savedCharacterFilesExist = false, componentTablesReady = false;
 const characterEntryReader = createCharacterEntryReader();
 // Esc's in-game menu (retail: OPTIONS / SAVE AND EXIT GAME / RETURN TO GAME). Single player pauses
@@ -1707,6 +1708,8 @@ function ensureBnetLoginScreen(server) {
     string: (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]),
     onAuthenticate: async (credentials) => {
       const characters = await authenticateConfiguredRealm(credentials);
+      // An account with no characters goes straight to character creation, as retail does.
+      if (!characters.length) { realmCreate = true; screen = SCREEN.CREATE; ensureCharCreate(); return; }
       ensureRealmLoginDialog().showCharacters(characters, realmFlow?.server?.region ?? '');
     },
     onCreateAccount: createConfiguredRealmAccount,
@@ -1829,7 +1832,6 @@ async function authenticateConfiguredRealm({ account, password }) {
     mcp = webSocketTransport(realmServiceUrl(server.ws, 'mcp')); await mcp.ready();
     const roster = await mcpListCharacters(mcp, protocol, { realmReply: login.handoff.realmReply });
     const characters = roster.characters;
-    if (!characters.length) throw new Error('realm account has no characters');
     realmTransport = { state: 'characters', server: { region: server.region, host: server.host },
       result: { realms: login.realmList.map((r) => r.title), mpq: login.mpq,
         characters: characters.map(({ name, charClass, level }) => ({ name, charClass, level })) }, error: '' };
@@ -2304,6 +2306,15 @@ function applyClientSaveFlags(states) {
 // Retail's character creation sits between SINGLE PLAYER and the game. Saved characters
 // (client-parity C3) would be selected before this; there is no save file support yet, so every
 // game starts by creating one.
+async function createRealmCharacter({ playerClass, name, checkboxes }) {
+  charCreate = null; realmCreate = false; screen = SCREEN.BNET_LOGIN;
+  try {
+    const { mcpCreateCharacter } = await import('./assets/realm-client.mjs');
+    const session = realmFlow.mcpSession;
+    await mcpCreateCharacter(session, { name, charClass: playerClass, hardcore: !!checkboxes?.hardcore, expansion: checkboxes?.expansion !== false });
+    ensureRealmLoginDialog().showCharacters(session.list.characters, realmFlow?.server?.region ?? '');
+  } catch (error) { bnetLoginScreen?.reset(); bnetLoginScreen?.fail(error); }
+}
 function ensureCharCreate() {
   if (screen !== SCREEN.CREATE || charCreate || charCreateError) return;
   if (!window.__d2?.ready || window.__d2.error) return;
@@ -2312,12 +2323,17 @@ function ensureCharCreate() {
       read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette,
       string: (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]),
       onCreate: ({ playerClass, name, checkboxes }) => {
+        if (realmCreate) { createRealmCharacter({ playerClass, name, checkboxes }); return; }
         chosenClass = playerClass; chosenName = name;
         applyClientSaveFlags(checkboxes);
         screen = SCREEN.GAME; charCreate = null;
         startGame();
       },
-      onCancel: () => { screen = SCREEN.TITLE; charCreate = null; },
+      onCancel: () => {
+        charCreate = null;
+        if (realmCreate) { realmCreate = false; screen = SCREEN.BNET_LOGIN; bnetLoginScreen?.reset(); return; }
+        screen = SCREEN.TITLE;
+      },
       onSound: ({ key, trigger }) => {
         charCreateSounds?.play(key, trigger).catch((error) => { charCreateSoundError = String(error); });
       },

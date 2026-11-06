@@ -205,6 +205,27 @@ export async function mcpListCharacters(transport, protocol, { realmReply, chara
 
 const u32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
 
+/** MCP CHARCREATE (0x02): class, flags, name. On success the new character joins the session's roster. */
+export async function mcpCreateCharacter(session, { name, charClass, expansion = true, hardcore = false, ladder = false, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+  if (!session || session.joined) throw new Error('MCP character session is not reusable');
+  if (!/^[A-Za-z][A-Za-z_-]{1,14}$/.test(name || '')) throw new Error('Character names are 2-15 letters.');
+  const flags = (expansion ? 0x20 : 0) | (hardcore ? 0x04 : 0) | (ladder ? 0x40 : 0);
+  const body = new Uint8Array(4 + 2 + name.length + 1);
+  body[0] = charClass & 0xff; body[4] = flags & 0xff; body[5] = flags >> 8;
+  body.set(new TextEncoder().encode(name), 6);
+  session.transport.send(session.protocol.mcpFrame(0x02, body));
+  const reply = await readMcpFrame(session.reader, timeoutMs);
+  if (reply.op !== 0x02) throw new Error(`expected MCP CHARCREATE reply 0x02, got 0x${reply.op.toString(16)}`);
+  const result = reply.body.length >= 4 ? u32(reply.body, 0) : 0;
+  if (result !== 0) {
+    const error = new Error(result === 0x14 ? 'That character name is already taken.' : 'That character name is not allowed.');
+    error.result = result; throw error;
+  }
+  const character = { name, expiry: 0, charClass, level: 1 };
+  session.list.characters.push(character); session.list.total++; session.list.returned++;
+  return character;
+}
+
 const rol32 = (v, n) => ((v << n) | (v >>> (32 - n))) >>> 0;
 
 /** Battle.net's SHA-1 variant (the schedule rotates by one bit less): the account password hash. */
