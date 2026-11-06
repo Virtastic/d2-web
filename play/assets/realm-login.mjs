@@ -96,7 +96,6 @@ export function createRealmLoginDialog({ documentObject = globalThis.document, o
       option.textContent = `${character.name} · level ${character.level} ${CLASSES[character.charClass] || `class ${character.charClass}`}`;
       select.append(option);
     }
-    if (!characters.length) throw new Error('This realm account has no characters.');
     $('realm-login-fields').hidden = true; $('realm-character-fields').hidden = false; syncControls();
     $('realm-dialog-title').textContent = 'SELECT CHARACTER'; status('Choose a character and create a game.');
   };
