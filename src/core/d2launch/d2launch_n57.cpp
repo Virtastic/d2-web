@@ -1,6 +1,7 @@
 // D2Launch n57: small leaf/helper functions. Win32/Ordinal services arrive as host seams.
 // Register-passed args (EAX/ESI/EBX) are explicit parameters.
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -11,16 +12,17 @@ void d2launch_sub_149E0(void (*release)(uint32_t h), uint32_t* handles, int32_t*
 }
 
 // 1.13c D2LAUNCH+0x129D0  (progress bar: percent from callback, bar width scaled)
-void d2launch_sub_129D0(void (*pump)(void), int32_t (*percent)(void), int32_t (*width)(uint32_t),
-                        void (*setw)(uint32_t, int32_t), void (*settext)(const char*),
-                        uint32_t bar, int32_t hastext) {
-  pump();
+// label = DAT_6fa65e64 (ECX of Ordinal_10106 and Ordinal_10022), bar = DAT_6fa65e68. The scaled width is the 32-bit product over a signed /100 (imul, then the 0x51EB851F reciprocal);
+// the text is "%d%%" of the clamped percent, handed to Ordinal_10022 (ECX = label, EDX = text, stack 0) when the label control exists.
+void d2launch_sub_129D0(void (*pump)(uint32_t label), int32_t (*percent)(void), int32_t (*width)(uint32_t),
+                        void (*setw)(uint32_t, int32_t), void (*settext)(uint32_t label, const char*),
+                        uint32_t bar, uint32_t label) {
+  pump(label);
   int32_t p = percent();
   if (p > 100) p = 100;
-  setw(bar, (width(bar) * p) / 100);
-  if (hastext) { char b[16]; b[0] = 0; int32_t v = p, i = 0; char t[12];
-    do { t[i++] = char('0' + v % 10); v /= 10; } while (v);
-    int32_t k = 0; while (i) b[k++] = t[--i]; b[k++] = '%'; b[k] = 0; settext(b); }
+  setw(bar, (int32_t)((uint32_t)width(bar) * (uint32_t)p) / 100);
+  char b[16]; snprintf(b, sizeof b, "%d%%", p);
+  if (label) settext(label, b);
 }
 
 // 1.13c D2LAUNCH+0x128D0  (registry "Diablo II"/"Aux Battle.net" version quad flag)

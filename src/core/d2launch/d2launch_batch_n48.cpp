@@ -39,19 +39,25 @@ static u push(const LaunchHost& H, uint32_t addr) {
 }
 typedef bool (*fn_t)();
 
-// 1.13c D2Launch+0x12A70
-extern "C" uint32_t d2launch_sub_12A70(const LaunchHost& H, const uint16_t* text, u param3) {
+// 1.13c D2Launch+0x12A70  (stdcall: ECX-less; stack p1 = control handle, p2 = text, p3; EBX is the caller's register, passed through)
+// The text is copied into a zeroed 0x400-wchar buffer and split on 0x0A; each line (EDX = its start in the buffer, a NUL now ends it) goes to Ordinal_10000
+// (thunk 0x99BE: ECX = p1, EDX = line, stack p3, EBX, 0). A non-empty tail gets one last call. `line` is that call.
+extern "C" uint32_t d2l_12a70_core(const uint16_t* text, void (*line)(void* ctx, const uint16_t* start), void* ctx) {
     uint16_t buf[1024] = {0};
     for (int i = 0; i < 1024 && text[i]; ++i) buf[i] = text[i];
     uint16_t* start = buf; uint16_t* p = buf;
     if (buf[0] != 0) {
         do {
-            if (*p == 10) { *p = 0; H.ord(10000, param3, 0, 0); start = p + 1; }
+            if (*p == 10) { *p = 0; line(ctx, start); start = p + 1; }
             ++p;
         } while (*p != 0);
-        if (start < p) H.ord(10000, param3, 0, 0);
+        if (start < p) line(ctx, start);
     }
     return 1;
+}
+extern "C" uint32_t d2launch_sub_12A70(const LaunchHost& H, const uint16_t* text, u param3) {
+    struct W { const LaunchHost* h; u p3; } w = { &H, param3 };
+    return d2l_12a70_core(text, [](void* c, const uint16_t*) { W* x = (W*)c; x->h->ord(10000, x->p3, 0, 0); }, &w);
 }
 
 // 1.13c D2Launch+0x12B10 (EAX = descriptor index)

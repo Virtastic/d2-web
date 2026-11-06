@@ -22,16 +22,22 @@ WK int FUN_6fa541b0(int); WK int FUN_6fa541f0(void*);
 }
 
 // 1.13c D2Launch+0x12BF0  (EAX = path string)
-extern "C" uint32_t sub_12BF0(const char* in_eax, const char* name) {
+// The core takes the two globals and the D2Win call as parameters, so a test harness can supply them.
+// The DAT_ externs are weak and null in the wasm build; sub_12BF0 keeps its behaviour.
+extern "C" uint32_t d2l_12bf0_core(uint32_t* feChar, uint32_t* isFeCharPal, const char* in_eax, const char* name,
+                                   void (*ord10128)(const char*, const char*)) {
   char a[260], b[260];
-  DAT_6fa65e5c = 1;
+  *feChar = 1;
   wsprintfA(a, "%s\\%s", "DATA\\GLOBAL");
   wsprintfA(b, "%s\\%s", "DATA\\GLOBAL", name);
   const char* k = "palette\\fechar\\pal.dat";  // 0x17 bytes incl. NUL
   int i = 0; while (i < 0x17 && in_eax[i] == k[i]) i++;
-  DAT_6fa65ad8 = i == 0x17;
-  q_d2launch_batch_n25_Ordinal_10128(a, b);
+  *isFeCharPal = i == 0x17;
+  ord10128(a, b);
   return 1;
+}
+extern "C" uint32_t sub_12BF0(const char* in_eax, const char* name) {
+  return d2l_12bf0_core(&DAT_6fa65e5c, &DAT_6fa65ad8, in_eax, name, q_d2launch_batch_n25_Ordinal_10128);
 }
 
 // 1.13c D2Launch+0x13D60

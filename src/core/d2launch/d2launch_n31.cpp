@@ -38,41 +38,50 @@ int FUN_6fa4e320(State& s, Host& h, uint8_t* p) {
 }
 
 // 1.13c D2Launch+0xE510  (msg = param_1[0], arg = param_1[1] as utf8/win text)
+// Retail order per code: strncpy(B <- str(c1)); if t2 != -1 strncpy(C <- str(t2)); strncpy(A <- str(dlg)); then 0x155B0(A,B,cb) or 0x15400(A,B,C,cb);
+// then (disc) Ordinal_10018 and Bnclient slot 0x10. Handlers: 0 = 0x17DF0, 1 = 0x19290, 2 = 0x17780 (h.dlgSel receives kind and handler index).
 int FUN_6fa4e510(State& s, Host& h, const uint32_t* msg, const char* arg, const std::function<std::u16string(const char*)>& win2uni) {
-  bool disc = true; int dlgStr = -1, titleStr = -1, kind;  // kind 0 ok-cb, 1 info, 2 yesno
-  std::function<void()> cb = nullptr;  // FUN_6fa57df0 (default) / FUN_6fa59290 / LAB_6fa57780
-  int cbSel = 0;                       // 0 57df0, 1 59290, 2 57780
-  std::u16string t1 = h.str(0), t2, t3;
+  bool disc = true; int dlgStr, c1, t2 = -1, kind = 1, cbSel = 0;  // kind 1 info (155B0), 2 yes/no (15400)
   switch (msg[0]) {
-    case 1: dlgStr = 0x147d; titleStr = 0x1444; kind = 2; break;
-    case 2: dlgStr = 0x147e; kind = 1; break;
-    case 3: case 7: dlgStr = 0x147f; titleStr = 0x144a; kind = 2; break;
-    case 4: case 8: case 5: case 9: case 0xb: dlgStr = 0x147f; kind = 1; break;
+    case 1: dlgStr = 0x147d; c1 = 0x1443; t2 = 0x1444; kind = 2; break;
+    case 2: dlgStr = 0x147e; c1 = 0x143f; break;
+    case 3: dlgStr = 0x147f; c1 = 0x1442; t2 = 0x144a; kind = 2; break;
+    case 7: dlgStr = 0x147f; c1 = 0x2aa0; t2 = 0x144a; kind = 2; break;
+    case 4: dlgStr = 0x147f; c1 = 0x144f; break;
+    case 8: dlgStr = 0x147f; c1 = 0x2aa1; break;
+    case 5: case 9: dlgStr = 0x147f; c1 = 0x1452; break;
     case 6: case 10:
       if (!arg) { h.fatal(0x2ad); return 0; }
       h.dlg6(win2uni(arg)); return 0;
-    case 0xc: dlgStr = 0x147f; titleStr = 0x1446; kind = 2; break;
-    case 0xd: dlgStr = 0x147c; kind = 1; disc = false; cbSel = 1; break;
+    case 0xb: dlgStr = 0x147f; c1 = 0x14ec; break;
+    case 0xc: dlgStr = 0x147f; c1 = 0x1445; t2 = 0x1446; kind = 2; break;
+    case 0xd: dlgStr = 0x147c; c1 = 0x1458; disc = false; cbSel = 1; break;
     case 0xe:
       if (h.ctl(-1) == 0) s.dac++;                  // Ordinal_508 compare of last-error string
       else { s.dac = 1; h.ctl(-2); }                // Ordinal_501 remember string
-      disc = false; dlgStr = 0x147c; kind = 1; cbSel = 1;
-      if (s.dac > 1) s.e6c = 1;
+      disc = false; dlgStr = 0x147c; cbSel = 1;
+      if (s.dac >= 2) { c1 = 0x2b63; s.e6c = 1; } else c1 = 0x1457;
       break;
-    case 0xf: dlgStr = 0x147c; kind = 1; disc = false; cbSel = 1; break;
-    case 0x10: case 0x11: case 0x12: dlgStr = 0x1480; kind = 1; break;
-    case 0x13: case 0x14: case 0x15: case 0x16: case 0x17: case 0x18: case 0x19: case 0x1a:
-      dlgStr = 0x1481; kind = 1; cbSel = 2; disc = false; break;
-    case 0x1b: h.dlgInfo(); return 0;
-    default: dlgStr = 0x1480; titleStr = 0x1446; kind = 2; break;
+    case 0xf: dlgStr = 0x147c; c1 = 0x1459; disc = false; cbSel = 1; break;
+    case 0x10: dlgStr = 0x1480; c1 = 0x14e5; break;
+    case 0x11: dlgStr = 0x1480; c1 = 0x14ea; break;
+    case 0x12: dlgStr = 0x1480; c1 = 0x14e3; break;
+    case 0x13: case 0x14: case 0x15: case 0x16: case 0x17: case 0x18: case 0x19: case 0x1a: {
+      static const int ids[8] = {0x146f, 0x1470, 0x1471, 0x1477, 0x1472, 0x1473, 0x1474, 0x1475};
+      dlgStr = 0x1481; c1 = ids[msg[0] - 0x13]; cbSel = 2; disc = false; break;
+    }
+    case 0x1b:
+      h.str(0x147c);                                // after utf8ToUnicode(B, text)
+      if (h.dlgSel) h.dlgSel(1, 1);
+      h.dlgInfo(); return 0;
+    default: dlgStr = 0x1480; c1 = 0x1445; t2 = 0x1446; kind = 2; break;
   }
-  (void)cb; (void)cbSel;
-  t1 = h.str(0x1445);                                // Ordinal_10003 base string (id lost in decompile)
-  if (titleStr != -1) t2 = h.str(titleStr);
-  if (dlgStr != -1) t3 = h.str(dlgStr);
-  if (kind == 0) h.dlgOk(t1, cb, 1);
-  else if (kind == 1) h.dlgInfo();
-  else h.dlgYesNo(t3, t1, t2);
+  std::u16string tB = h.str(c1), tC, tA;
+  if (t2 != -1) tC = h.str(t2);
+  tA = h.str(dlgStr);
+  if (h.dlgSel) h.dlgSel(kind, cbSel);
+  if (kind == 1) h.dlgInfo();
+  else h.dlgYesNo(tA, tB, tC);
   if (disc) { h.o10018(); s.bn->vt(0x10); }
   return 0;
 }
@@ -261,4 +270,25 @@ extern "C" void d2l_e250_core(int32_t* eb0, uint8_t* ctx, uint32_t hasBn, const 
     s.eb0 = *eb0;
     d2launch_n31::FUN_6fa4e250(s, h);
     *eb0 = s.eb0;
+}
+
+// Replay seam for the dialog selector (0xE510): the port with raw seams. dac / e6c are the two globals it updates.
+struct D2lE510Seams { void (*str)(uint32_t id); void (*dlg)(int kind, int cbSel); void (*o10018)(); void (*vtDisc)(); int (*cmp)(); void (*cpy)(); };
+extern "C" int32_t d2l_e510_core(const uint32_t* msg, int32_t* dac, int32_t* e6c, const D2lE510Seams* sk) {
+    d2launch_n31::BnClient bn;
+    bn.vt = [sk](int) { sk->vtDisc(); return 0; };
+    d2launch_n31::Host h;
+    h.str = [sk](int id) { sk->str((uint32_t)id); return std::u16string(); };
+    h.dlgInfo = []() {};
+    h.dlgYesNo = [](const std::u16string&, const std::u16string&, const std::u16string&) {};
+    h.dlgSel = [sk](int k, int c) { sk->dlg(k, c); };
+    h.o10018 = [sk]() { sk->o10018(); };
+    h.ctl = [sk](int op) { if (op == -1) return sk->cmp(); sk->cpy(); return 0; };
+    d2launch_n31::State s;
+    s.bn = &bn;
+    s.dac = *dac; s.e6c = *e6c;
+    auto w = [](const char*) { return std::u16string(); };
+    int r = d2launch_n31::FUN_6fa4e510(s, h, msg, nullptr, w);
+    *dac = s.dac; *e6c = s.e6c;
+    return r;
 }

@@ -19,6 +19,7 @@ struct Host {
   std::function<void(const std::u16string&)> dlg6;  // FUN_6fa55230
   std::function<uint32_t()> tick;                  // GetTickCount
   std::function<int(int)> ctl;                     // BNclient vtable-free call by offset
+  std::function<void(int, int)> dlgSel;            // optional: dialog kind (1 = 0x155B0, 2 = 0x15400) and handler index, before the dialog seam
 };
 
 struct State {
