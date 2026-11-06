@@ -19,7 +19,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_6dca0(i32 p1, i32* p4, u32* p5, i32* p6, i32* p7, 
     char c = f6d960(p1);
     *p7 = (i32)c;
     if (p9 != 0) { f6d220(*p7); f6d590(*p5); }
-    *p4 = ord10020(*p5, p8);
+    *p6 = ord10020(*p5, p8);   // retail stores the ordinal result through param_6 (esp+0x24 after 3 pushes); p4 is never written
 }
 
 // old form of D2Client 72080 (now d2client_72080.cpp)  (esi = unit)

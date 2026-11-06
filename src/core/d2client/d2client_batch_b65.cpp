@@ -10,7 +10,7 @@ struct D2cB65Env {
     const uint32_t* t_6fbc3fb8; const uint32_t* t_6fbc4018;
     uint32_t (*f1510)(const void* p, int32_t n);         // FUN_6fab1510
     uint32_t (*ord10491)(uint32_t a, uint32_t b, uint32_t c);
-    void (*f1d540)(const char* s);                       // D2Client+0x6D540 (ecx hidden)
+    int32_t (*f1d540)(const char* s);                    // D2Client+0x6D540 (ecx hidden); returns the dword it stores through EAX (a zeroed stack local)
     // 6E670
     int32_t (*ord10013)(); void (*ord10651)(); void (*ord11142)(); int32_t (*ord11168)(); uint32_t (*ord11080)();
     void (*ord10023)(uint32_t); int32_t* g_6fbcc414; int32_t* g_6fb8bc48;
@@ -51,60 +51,65 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2c_6dd30(const D2cB65Env* e, int32_t eax, uint8_t
         uint8_t c = ((const uint8_t*)p4)[p2 * 0x10 + b + 4];
         if ((p3 != 0 && p3 != 0xc) || e->f1510(p4, 0x10) != 0)
             at<uint32_t>(esi, 0x20) = e->ord10491(at<uint32_t>(esi, 0xc), b, c);
-        e->f1d540((const char*)(ent + 5));
-        at<int32_t>(esi, 0x28) = 0;
-        e->fatal(at<int32_t>(esi, 0x1c) == 0 ? 0x425 : at<int32_t>(esi, 0x18) == 0 ? 0x426 : 0x427);
-        return 0;
+        int32_t got = e->f1d540((const char*)(ent + 5));
+        at<int32_t>(esi, 0x28) = got;
+        if (at<int32_t>(esi, 0x1c) == 0) { e->fatal(0x425); return 0; }
+        if (at<int32_t>(esi, 0x18) == 0) { e->fatal(0x426); return 0; }
+        if (got == 0) { e->fatal(0x427); return 0; }
+        if (at<uint32_t>(esi, 0x20) == 0) at<uint32_t>(esi, 0x20) = 0x20787878;
+        if (at<uint32_t>(esi, 0x24) == 0) at<uint32_t>(esi, 0x24) = 0x20787878;
+        return 1;
     }
     return 0;
 }
 
-// 1.13c D2Client+0x6E670  (eax=unit)
-EMSCRIPTEN_KEEPALIVE uint8_t d2c_6e670(const D2cB65Env* e, const uint8_t* unit) {
-    int32_t y;
-    if (e->ord10013() == 0) { e->ord10651(); e->ord11142(); y = 0; /* uninitialised in original */ }
-    else {
-        y = e->ord11168(); e->ord10023(e->ord11080());
-        int32_t w = *e->g_6fb8bc48, q = (w + ((w >> 31) & 3)) >> 2;
-        if (*e->g_6fbcc414 == 1) y -= q; else if (*e->g_6fbcc414 == 2) y += q;
+// 1.13c D2Client+0x6E670  (eax=unit; stdcall p1 = the 6D700 key)
+// Seams: the callees of the routine and the five globals it reads.
+// The unit+0x54 == 0 path logs, then _exit, which falls into the next function in retail: returns 0 here, never captured.
+struct D2cB6E670Env {
+    int32_t (*d07e)(); int32_t (*c232)(const uint8_t*, int32_t*, int32_t*); int32_t (*c1ae)(const uint8_t*, int32_t); void (*d084)(int32_t);
+    int32_t (*c1d2)(const uint8_t*); int32_t (*c1f6)(const uint8_t*); int32_t (*a3d0)(const uint8_t*, int32_t, int32_t);
+    int32_t (*cbda)(const uint8_t*, int32_t); const uint8_t* (*a60d0)(const uint8_t*);
+    int32_t (*c2aa)(const uint8_t*, int32_t, int32_t*, int32_t, int32_t); int32_t (*f1af0)(); int32_t (*f6a2f0)(int32_t, int32_t, const uint8_t*);
+    int32_t g414, gbc48, g418, g960, g995c;
+};
+static uint8_t lookup6d700(const uint8_t* t, int32_t key) {   // the 6D700 table lookup (ecx=table, edi=key)
+    if (!t || key >= 0x10) return 0;
+    const uint8_t* p = t + 0x1c;
+    for (int i = 0; i < t[0]; i++, p += 9) if (*p == (uint32_t)key) return p[2];
+    return 0;
+}
+EMSCRIPTEN_KEEPALIVE uint8_t d2c_6e670(const D2cB6E670Env* e, const uint8_t* unit, int32_t key) {
+    int32_t A = 0, B = 0;
+    if (e->d07e()) {
+        int32_t r232 = e->c232(unit, &A, &B);
+        e->d084(e->c1ae(unit, r232));
+        int32_t q = (e->gbc48 + ((e->gbc48 >> 31) & 3)) >> 2;
+        if (e->g414 == 1) A -= q; else if (e->g414 == 2) A += q;
+    } else {
+        A = e->c1d2(unit) - (e->g960 - e->g418);
+        B = e->c1f6(unit) - (e->g995c - 8);
     }
-    if (!e->f1a3d0(y)) return 0;
-    if (unit && ((at<uint32_t>(unit, 0xc8) >> 3) & 1) && e->ord10866()) e->f560d0();
-    int32_t k = e->ord10431();
+    if (!e->a3d0(unit, A, B)) return 0;
+    const uint8_t* hu = unit;
+    if (unit && ((at<uint32_t>(unit, 0xc8) >> 3) & 1) && e->cbda(unit, 0x25)) { const uint8_t* r = e->a60d0(unit); if (r) hu = r; }
+    int32_t loc2 = 0;
+    int32_t k = e->c2aa(unit, at<int32_t>(hu, 0x60), &loc2, -1, 1);
     const uint8_t* sub = at<const uint8_t*>(unit, 0x54);
-    if (!sub) { e->fatal(0x3ac); return 0; }
+    if (!sub) return 0;
     int32_t v = e->f1af0();
     int32_t* n = at<int32_t*>(sub, 0x28);
     for (; n; n = (int32_t*)(intptr_t)n[4]) if (n[0] == v && n[1] == k) break;
-    if (!n && !e->f1a2f0(k, unit)) return 0;
+    if (!n && !e->f6a2f0(-1, k, unit)) return 0;
     int32_t v2 = e->f1af0();
     sub = at<const uint8_t*>(unit, 0x54);
     if (!sub) return 0;
     for (n = at<int32_t*>(sub, 0x28); n; n = (int32_t*)(intptr_t)n[4])
         if (n[0] == v2) {
             const uint8_t* p = at<const uint8_t*>((const void*)(intptr_t)n[2], 0x14);
-            return p ? e->f1d700(p) : 0;
+            return p ? lookup6d700(p, key) : 0;
         }
     return 0;
-}
-
-// 1.13c D2Client+0x72610  (ecx=p1, edx=p2 unit, eax=skill id)
-EMSCRIPTEN_KEEPALIVE int32_t d2c_72610(const D2cB65Env* e, int32_t eax, int32_t p1, const int32_t* p2, int32_t p3, int8_t p4) {
-    if (!p2) return 0;
-    if (!p3) {
-        p3 = e->ord10871(p2, p1);
-        if (!p3) { p3 = e->ord11013(0, 0, 0, p2[0], p2[3]); e->ord10785(p3, p1); e->ord10807(p2, p3, 1); }
-        else e->ord10680(p3);
-    }
-    e->ord10188(p3);
-    if (eax == 0xac) e->f559e0(p4);
-    else if (eax < 0) return p3;
-    const uint8_t* dt = *e->sgptDataTables;
-    if (eax < at<int32_t>(dt, 0xbd4)) {
-        const uint8_t* r = at<const uint8_t*>(dt, 0xbcc) + eax * 0x144;
-        if (r && (e->gdwBitMasks[16] & r[5])) e->ord10819(p2, "..\\Source\\D2Client\\UNIT\\PlrSkills.cpp", 0x5d2);
-    }
-    return p3;
 }
 
 static void buysell(const D2cB65Env* e, const int32_t* flag, int32_t x, int32_t y) {

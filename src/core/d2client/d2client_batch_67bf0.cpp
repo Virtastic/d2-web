@@ -38,9 +38,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_67bf0(const uint8_t* b) {
                 if (rd<int16_t>(b, p + sh[k] * 2)) acc += rowh;
             acc += pad;
         }
-        if (lim < acc) break;
+        if (lim < acc) return (i - first < 1) ? 1 : i - first; // retail: sub eax,ebx; eax = i-first when >= 1
     }
-    return i; // GUESS: retail returns unaff_EDI (decompiler lost the value); both exits identical
+    return (int32_t)n; // full walk
 }
 
 // 1.13c D2Client+0x67CC0 -- base destructor: only resets the vtable pointer (stores are dead here)
@@ -156,7 +156,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_68670(uint8_t* b, const uint8_
         }
         wr<int32_t>(b, 0x180728, 0);
         if (env->hit_67360(b, msg) == 1) {
-            d2_client_68560(b, msg, env); // GUESS: retail passes msg in EAX
+            d2_client_68560(b, msg, env); // retail: msg in EAX, this in ESI, EBX result discarded
             wr<int32_t>(b, 0x180734, -1);
             return 0;
         }
@@ -172,23 +172,37 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_68810(const uint8_t* tbl, int32_t
     // GUESS: bucket chain pointers are 32-bit retail addresses; walk is host-heap dependent, filed as seam
 }
 
-// 1.13c D2Client+0x689F0 -- radio-group exclusivity; ids and the +0x2c/+0x38 object lists are retail-shaped.
-// Node: type@0 (8 = radio), +8 state, +0x38 group, +0x3c checked, next@0xa4.
-struct D2ClientRadioNode { int32_t type, _p[1], st, _q[11], grp, chk; };
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_689f0(uint8_t* first, int32_t grp,
-                                                    uint8_t* (*next)(const uint8_t*)) {
-    // GUESS: the Ordinal_10494/10945/10625 lock+query block only gates +8 of EBX; omitted
-    for (uint8_t* n = first; n; n = next(n))
-        if (rd<int32_t>(n, 0x38) == grp && rd<int32_t>(n, 0) == 8) { wr<int32_t>(n, 0x3c, 0); wr<int32_t>(n, 8, -1); }
+// 1.13c D2Client+0x689F0 -- radio-group exclusivity. Retail registers: EAX = holder (kept in ESI), EBX = record, one stack word = holder.
+// Node: type@0 (8 = radio), +8 state, +0x38 group, +0x3c checked, next@0xa4 (a 32-bit address); holder+0x2c = first node.
+// The three imports behind the 0xC1FC / 0xC30A / 0xCBAA thunks (Ordinal 10494 query, 10945 lock-release flag, 10625 predicate) go through the env.
+struct D2Client689F0Env {
+    uint32_t (*o10494)(uint32_t holder, int32_t key);
+    void (*o10945)(uint32_t holder, int32_t key, int32_t flag);
+    int32_t (*o10625)(uint32_t holder);
+};
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_689f0(uint8_t* holder, uint8_t* rec, const D2Client689F0Env* env) {
+    auto nxt = [](const uint8_t* n) { return (uint8_t*)(uintptr_t)rd<uint32_t>(n, 0xa4); };
+    uint32_t h = (uint32_t)(uintptr_t)holder;
+    int32_t old = rd<int32_t>(rec, 0x38);
+    uint32_t lk = env->o10494(h, old);
+    if (lk) env->o10945(h, old, 0);
+    if (env->o10625(h) == 0) {
+        wr<int32_t>(rec, 8, 0);
+        if (lk) env->o10945(h, old, 1);
+    }
+    if (lk) env->o10945(h, old, 1);
+    uint8_t* first = (uint8_t*)(uintptr_t)rd<uint32_t>(holder, 0x2c);
+    for (uint8_t* n = first; n; n = nxt(n))
+        if (rd<int32_t>(n, 0x38) == old && rd<int32_t>(n, 0) == 8) { wr<int32_t>(n, 0x3c, 0); wr<int32_t>(n, 8, -1); }
     int32_t pick = 0, mn = 0;
-    for (uint8_t* n = first; n; n = next(n)) {
+    for (uint8_t* n = first; n; n = nxt(n)) {
         if (rd<int32_t>(n, 0) != 8) continue;
         int32_t g = rd<int32_t>(n, 0x38);
-        if ((pick == 0 || g < pick) && grp < g) pick = g;
+        if ((pick == 0 || g < pick) && old < g) pick = g;
         if (mn == 0 || g < mn) mn = g;
     }
     if (!pick) pick = mn;
-    for (uint8_t* n = first; n; n = next(n))
+    for (uint8_t* n = first; n; n = nxt(n))
         if (rd<int32_t>(n, 0x38) == pick && rd<int32_t>(n, 0) == 8) { wr<int32_t>(n, 0x3c, 1); wr<int32_t>(n, 8, 0); }
 }
 

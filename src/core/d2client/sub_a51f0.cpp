@@ -1,35 +1,23 @@
-// D2Client+0xA51F0: register-arg predicate (EAX=a, EDI=b, int32 dword arrays); env-seam style.
+// D2Client rva 0xA51F0: register-arg predicate (EAX = a, EDI = b). True when a's owner record matches b's id and either of
+// a's two class lookups (import thunks 0xC5BC / 0xC5CE, each resolved through 0xC42A and the 0x23C-stride table at 0x15B0)
+// has its +7 flag byte set in byte 4 of the imported bit-mask table. Callees in retail order.
 #include <cstdint>
-#include <emscripten.h>
-struct D2cA51F0Env {
-    int32_t (*ord10828)();                       // Ordinal_10828 (unverified ordinal -> id; 0 = none)
-    int32_t (*ord10507)();                       // Ordinal_10507 (unverified ordinal -> id; 0 = none)
-    void (*ord10601)(int32_t v, const char* file, int32_t line);  // Ordinal_10601 (unverified)
-    const uint8_t* (*f15B0)(int32_t id);         // D2Client+0x15B0: record (0x23C stride) or null
-    int32_t (*f216A0)(int32_t key);              // D2Client+0x216A0: list lookup, -1 if absent
-    uint32_t bitMask4;                           // gdwBitMasks[4]
-};
-extern "C" {
-// 1.13c D2Client+0xA51F0
-EMSCRIPTEN_KEEPALIVE int32_t d2c_a51f0(const D2cA51F0Env* e, const int32_t* a, const int32_t* b) {
-    static const char* F = "..\\Source\\D2Client\\UNIT\\CUnit.cpp";
-    bool r = false;
-    if (a && b && (a[0] == 0 || b[0] == 1)) {
-        int32_t id = e->ord10828();
-        if (id) {
-            e->ord10601(id, F, 0xb4a);
-            const uint8_t* p = e->f15B0(id);
-            if (p && ((uint8_t)e->bitMask4 & p[7])) r = true;
-        }
-        bool hit = false;
-        id = e->ord10507();
-        if (id) {
-            e->ord10601(id, F, 0xb55);
-            const uint8_t* p = e->f15B0(id);
-            if (p && ((uint8_t)e->bitMask4 & p[7])) hit = true;
-        }
-        if (hit || r) return e->f216A0(b[3]) == a[3];
-    }
-    return 0;
+#include "d2client_callee.h"
+
+static bool a51f0_hit(const D2cSvc& v, uint32_t thunk, uint32_t a, uint32_t line, const uint8_t* bitMasks) {
+    const uint32_t id = d2c_call(v, thunk, 0, 0, 0, 0, 0, a);
+    if (!id) return false;
+    const uint32_t q = d2c_call(v, 0xc42a, 0, 0, 0, 0, 0, id, 0xB2000000u | 0xd4144, line);   // CUnit.cpp
+    const uint32_t x = d2c_call(v, 0x15b0, q, 0, 0, 0, 0);
+    return x && (bitMasks[4] & ((const uint8_t*)(uintptr_t)x)[7]);
 }
+
+// 1.13c D2Client+0xA51F0. bitMasks = the table the import pointer D2Client+0xCEE50 points at.
+extern "C" uint32_t d2_client_a51f0(const D2cSvc& v, uint32_t a, const uint32_t* ap, const uint32_t* bp, const uint8_t* bitMasks) {
+    if (!ap || !bp) return 0;
+    if (ap[0] != 0 && bp[0] != 1) return 0;
+    const bool h1 = a51f0_hit(v, 0xc5bc, a, 0xb4a, bitMasks);
+    const bool h2 = a51f0_hit(v, 0xc5ce, a, 0xb55, bitMasks);
+    if (!h1 && !h2) return 0;
+    return d2c_call(v, 0x216a0, 0, bp[3], 0, 0, 0) == ap[3];
 }

@@ -109,7 +109,7 @@ void sub_46910(uint8_t* tbl, bool isDefaultTbl, uint32_t count, uint32_t& pick, 
  }
 }
 
-// 1.13c D2Client+0x3FC20 (automap party/NPC marker pass); layout of 0x30-byte slots from the decompile.
+// Draft of D2Client 0x3FC20 (automap marker pass), superseded by d2client_3fc20.cpp; kept for its callers in this file.
 struct Slot { int32_t pad0, x, y, flags, unit, kind; };
 void sub_3FC20(Services& sv, int32_t ox, int32_t oy, const uint8_t* slots, uint32_t n,
                int32_t scrX, int32_t scrY) {

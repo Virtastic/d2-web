@@ -28,6 +28,7 @@ struct Svc {
  virtual void* alloc(int32_t size,int32_t tag,int32_t n)=0; // Ordinal_10042 (ECX = size, stack = line, 0)
  virtual void o10112()=0; virtual void o10111(int32_t n,void* buf,int32_t z)=0;
 };
+void sub_5EBC0(Svc& s,G& g,int32_t idx,int32_t eax,int32_t p1);
 void sub_5F1C0(Svc& s,G& g,int32_t x,int32_t y,int32_t col);
 void sub_5F240(Svc& s,G& g,uint32_t p1);
 }

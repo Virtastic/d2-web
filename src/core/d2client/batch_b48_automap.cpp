@@ -50,7 +50,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_60250(D2cHost h, D2cAutomapG* g, const uint8_t* no
                 if (rc[1] <= x && x <= rc[2]) {
                     i32 rec[18] = {};
                     rec[0] = *(const int16_t*)(node + 4); rec[13] = rc[0];
-                    i32 col = 5; u32 hi = 0;
+                    i32 col = 5;
                     u32 k = go(h, 0x5F9C0, P(node), P(node));
                     if (k == 1) {
                         if (rc[0] == *g->cel[0] && *g->mode == 0) {
@@ -61,9 +61,11 @@ EMSCRIPTEN_KEEPALIVE void d2c_60250(D2cHost h, D2cAutomapG* g, const uint8_t* no
                                 if (dy < 0) dy = -dy;
                                 i32 d = dy < dx ? dy + dx * 2 : dx + dy * 2;
                                 if (d / 2 < 0x96) {
-                                    u32 lo = go(h, 0x5F9C0, P(node), P(node), 0, 0, 0, 0, &hi);  // 64-bit result: edx in out[0]
+                                    // retail passes d/2 in EDX and the callee leaves EDX alone: the 64-bit result's high dword is that input
+                                    const i32 hi = d / 2;
+                                    u32 lo = go(h, 0x5F9C0, P(node), P(node));
                                     col = (lo != 2) + 1;
-                                    if ((i32)hi < 0x64) { col = 1; if ((i32)hi < 0x32) col = 0; }
+                                    if (hi < 0x64) { col = 1; if (hi < 0x32) col = 0; }
                                 }
                             }
                         }
@@ -78,7 +80,9 @@ EMSCRIPTEN_KEEPALIVE void d2c_60250(D2cHost h, D2cAutomapG* g, const uint8_t* no
                         else { r4[0] = 0; r4[2] = (((*g->act == 2) - 1) & 0x60) - 0x15; }
                         r4[1] = r4[0] + 0x117; r4[3] = r4[2] + 0xe1;
                     } else { r4[0] = 0; r4[2] = 0; r4[1] = *g->gW - 1; r4[3] = *g->gH - 1; }
-                    go(h, 0x80000000u | 10079, P(rec), P(rec), (u32)x, (u32)y, P(r4), (u32)col);
+                    D2cCall c = {};   // Ordinal_10079 is stdcall, 5 stack words: &rec, x, y, &r4, col
+                    c.rva = 0x80000000u | 10079; c.s[0] = P(rec); c.s[1] = (u32)x; c.s[2] = (u32)y; c.s[3] = P(r4); c.s4 = (u32)col;
+                    h(&c);
                 }
             }
         }
@@ -140,7 +144,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_60c40(D2cHost h, D2cAutomapG* g) {
 
 // 1.13c D2Client+0x5FB50
 EMSCRIPTEN_KEEPALIVE void d2c_5fb50(D2cHost h, D2cAutomapG* g) {
-    char p[260];
+    char p[260] = {};   // retail zeroes its 260-byte path buffer first
     static const char* const nm[4] = {"MaxiMap", "Act2Map", "Act4Map", "ExTnMap"};
     go(h, 0x5F180, 0, 0);
     bool small = *g->mode == 1;
@@ -148,7 +152,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_5fb50(D2cHost h, D2cAutomapG* g) {
         if (i == 3 && !small && ord(h, 10227) == 0) { *g->cel[3] = 0; *g->celH[3] = 0; return; }
         snprintf(p, sizeof p, "%s\\UI\\AutoMap\\%s%s", "DATA\\GLOBAL", nm[i], small ? "S" : "");
         *g->cel[i] = (i32)go(h, 0x2B420, P(p), 0, 0);   // path in EAX, one stack arg = 0
-        *g->celH[i] = (i32)ord(h, 10086, (u32)*g->cel[i]);
+        *g->celH[i] = (i32)go(h, 0x80000000u | 10086, 0, 0, (u32)*g->cel[i]);   // stdcall: the cel is stack word 0
     }
 }
 }

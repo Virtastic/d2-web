@@ -53,11 +53,7 @@ void sub_AC800(Env& e, const uint8_t* pk) {
   void* h = e.ord10708(-1); if (!h) { e.fatal(0xad6); return; }
   e.ord10252(h, pk[9]);
 }
-// 1.13c D2Client+0xAC910
-void sub_AC910(Env& e, const uint8_t* pk) {
-  Node* n = e.findPlayerNode(rd32(pk, 3), 0, pk[1]);
-  if (n) { e.ord10302(n, rd16(pk, 7), pk[9], pk[2], "..\\Source\\D2Client\\GAME\\SCmd.cpp", 0xa8c); *e.g_bfb8 = 0; }
-}
+// D2Client+0xAC910: own file d2client_ac910.cpp
 // 1.13c D2Client+0xAC970  (EBX = unit; walks list at +0x60)
 void sub_AC970(Env& e, uint8_t* unit) {
   if (!unit) return;

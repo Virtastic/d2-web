@@ -87,13 +87,30 @@ void sub_693C0(Services& s, int32_t* p){
  else if(type==1){ if(mode==0||mode==0xc) return; }
  if(type==0) s.notify(7,p);
 }
-// 1.13c D2Client+0x68CF0 (esi = optional {type,id}): colour index by ownership / health percent
-// GUESS: needs data tables and Ordinals 10190/10175/10350/10913/10973; surface only.
-struct ColorServices { virtual ~ColorServices()=default; virtual uint8_t rgb(int,int,int)=0; virtual bool isTarget(int32_t type,int32_t id,int32_t& cls)=0;
- virtual bool flagA(int32_t cls)=0; virtual int32_t maxLife()=0; virtual int32_t life()=0; };
-uint8_t sub_68CF0(ColorServices& c, const int32_t* esi, uint8_t pal[4]){
- int32_t cls; bool t=c.isTarget(esi?esi[0]:6, esi?esi[1]:-1, cls);
- if(t){ if(c.flagA(cls)) return pal[3]; int32_t m=c.maxLife(); if(m){ int32_t pc=c.life()*100/m; if(pc<0x21) return pal[2]; if(pc<0x42) return pal[1]; } }
+// 1.13c D2Client+0x68CF0 (ESI = optional {type,id}): health-orb colour byte. Retail callees, each through the env:
+// pal(a,b,c) = thunk 0xD390 (Ordinal 10190, three stack words, AL result), resolve(esi) = thunk 0xC65E (Ordinal 10175),
+// query(esi,&kind,&cls,&third) = thunk 0xC658 (Ordinal 10350, six stack words, three out dwords), maxLife(esi) = 0xC196 (10913),
+// stat(esi,6,0) = 0xC1C6 (10973). flag/pal are the module globals +0x11C050 / +0x1154E8..EB; tab = sgptDataTables (rows at +0xA78, count at +0xA80,
+// stride 0x1A8, flag byte at +0xD), masks = gdwBitMasks (byte +4 tested). A class outside the table reads address 0xD in retail; not modelled.
+struct D2Client68CF0Env {
+ uint8_t (*pal)(int32_t a, int32_t b, int32_t c);
+ int32_t (*resolve)(const int32_t* esi);
+ void (*query)(const int32_t* esi, int32_t* kind, int32_t* cls, int32_t* third);
+ int32_t (*maxLife)(const int32_t* esi);
+ int32_t (*stat)(const int32_t* esi, int32_t id, int32_t x);
+};
+uint8_t sub_68CF0(const D2Client68CF0Env& e, const int32_t* esi, uint32_t* flag, uint8_t pal[4], const uint8_t* tab, const uint8_t* masks){
+ if(*flag==0){ pal[0]=e.pal(0,0xc0,0); pal[1]=e.pal(0xe0,0xe0,0); pal[2]=e.pal(0xe0,0,0); pal[3]=e.pal(0,0,0xc0); *flag=1; }
+ int32_t kind = esi? esi[0] : 6, cls = esi? esi[1] : -1, third = 0;
+ third = e.resolve(esi);
+ e.query(esi, &kind, &cls, &third);
+ if(kind==1){
+  uint32_t rows=rd<uint32_t>(tab,0xa78); int32_t cnt=rd<int32_t>(tab,0xa80);
+  const uint8_t* row = (cls<0 || cls>=cnt) ? nullptr : (const uint8_t*)(uintptr_t)(rows + (uint32_t)cls*0x1a8u);
+  if(masks[4] & row[0xd]) return pal[3];
+  int32_t m=e.maxLife(esi);
+  if(m){ int32_t pc=(int32_t)((uint32_t)e.stat(esi,6,0)*100u)/m; if(pc<0x21) return pal[2]; if(pc<0x42) return pal[1]; }
+ }
  return pal[0];
 }
 // 1.13c D2Client+0x69410 (eax = monstat index, param_1 = mode): COF path builder. GUESS: surface only, not implemented

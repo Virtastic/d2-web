@@ -1,19 +1,16 @@
-// Mapping lane: D2Client+0xBF6C0, build "DATA\GLOBAL\UI\<name>" and hand it to the loader at 0x2B420.
-// Register arg: esi = name (NUL-terminated). Seam: 0xBE90 = Storm#506 strlen (ecx=str), 0x2B420 (eax=path, s0=0).
+// D2Client rva 0xBF6C0: load a UI cel file. Builds "DATA\GLOBAL\UI\<name>" in a 0x104-byte stack buffer (wsprintfA
+// for the prefix, the import thunk 0xBE90 (stdcall 1, the buffer) for its length, then the name copied in after it)
+// and returns what the cel loader 0x2B420 (EAX = path, one stack word 0) returns.
 #include <cstdint>
 #include <cstdio>
-#include <emscripten.h>
-#include "client_host.h"
-extern "C" {
-// 1.13c D2Client+0xBF6C0
-EMSCRIPTEN_KEEPALIVE void d2c_bf6c0(D2cHost h, const char* name) {
-    char buf[260];
-    snprintf(buf, sizeof buf, "%s\\UI\\", "DATA\\GLOBAL");  // wsprintfA
-    D2cCall c = {}; c.rva = 0xBE90; c.ecx = (uint32_t)(uintptr_t)buf;
-    uint32_t n = h(&c);
-    char* p = buf + n;
-    while ((*p++ = *name++) != 0) {}
-    D2cCall d = {}; d.rva = 0x2B420; d.eax = (uint32_t)(uintptr_t)buf; d.s[0] = 0;
-    h(&d);
-}
+#include "d2client_callee.h"
+
+// 1.13c D2Client+0xBF6C0 (ESI = name)
+extern "C" uint32_t d2_client_bf6c0(const D2cSvc& v, const char* name) {
+    char buf[0x104];
+    std::snprintf(buf, sizeof buf, "%s\\UI\\", "DATA\\GLOBAL");   // wsprintfA through the IAT
+    char* p = buf + d2c_call(v, 0xbe90, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)buf);
+    for (; *name; ++name) *p++ = *name;
+    *p = 0;
+    return d2c_call(v, 0x2b420, (uint32_t)(uintptr_t)buf, 0, 0, 0, 0, 0);
 }

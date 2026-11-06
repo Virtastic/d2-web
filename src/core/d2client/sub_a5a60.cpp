@@ -1,24 +1,23 @@
-// D2Client sub_A5A60: "find room for unit" assert. Globals passed in (each names its RVA); callees via D2cHost.
+// D2Client rva 0xA5A60: check that a position (ECX = x, EAX = y) lies in a room. With a control unit (D2Client+0x11BBFC)
+// its room (thunk 0xC1F0) is tried first through 0x1400 (EAX = room, EBX = x, EDI = y); otherwise or on a miss the act
+// (D2Client+0x11C3B8) is asked through thunk 0xC2E0 (act, x, y). Neither: the assert text is formatted (0xBEA2, cdecl),
+// logged (0xBF92 / 0xBF80) and the process exits (0x3664). Returns the hit (EAX as retail leaves it).
 #include <cstdint>
-#include <emscripten.h>
-#include "client_host.h"
-typedef uint32_t u32;
-namespace {
-inline u32 go(D2cHost h, u32 rva, u32 a = 0, u32 s0 = 0) {
-    D2cCall c = {}; c.rva = rva; c.eax = a; c.ecx = a; c.edx = a; c.s[0] = s0; return h(&c);
-}
-}
-extern "C" {
-// 1.13c D2Client+0xA5A60  (nX = ecx, nY = eax; ctl = DAT_6fbcbbfc, act = DAT_6fbcc3b8)
-// Returns false where retail calls _exit(-1) after the assert text (Ordinal_578/10265/10024 are issued, then the caller aborts).
-EMSCRIPTEN_KEEPALIVE bool d2c_a5a60(D2cHost h, u32 nX, u32 nY, u32 ctl, u32 act) {
-    if (nX == 0 && nY == 0) return true;
+#include "d2client_callee.h"
+
+// 1.13c D2Client+0xA5A60
+extern "C" uint32_t d2_client_a5a60(const D2cSvc& v, uint32_t x, uint32_t y, uint32_t ctl, uint32_t act) {
+    uint32_t room = 0;
+    if (x == 0 && y == 0) return y;
     if (ctl) {
-        go(h, 0x80000000u | 10331, ctl);
-        if (go(h, 0x1400) != 0) return true;
+        room = d2c_call(v, 0xc1f0, 0, 0, 0, 0, 0, ctl);
+        if (const uint32_t r = d2c_call(v, 0x1400, room, 0, 0, x, 0)) return r;
     }
-    if (go(h, 0x80000000u | 11010, act, nX) != 0) return true;
-    go(h, 0x80000000u | 10265, 0x13c);
-    return false;
-}
+    if (const uint32_t r = d2c_call(v, 0xc2e0, 0, 0, 0, 0, 0, act, x, y)) return r;
+    char buf[0x200];
+    d2c_call(v, 0xbea2, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)buf, 0x200, 0xB2000000u | 0xd4168, ctl, room, act);   // + x, y
+    const uint32_t m = d2c_call(v, 0xbf92, 0, 0, 0, 0, 0, 0x13c);
+    d2c_call(v, 0xbf80, 0, 0, 0, 0, 0, 0xB2000000u | 0xd359f, m);
+    d2c_call(v, 0x3664, 0, 0, 0, 0, 0, 0xffffffffu);
+    return 0;
 }

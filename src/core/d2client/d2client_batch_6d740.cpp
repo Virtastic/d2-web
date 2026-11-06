@@ -2,6 +2,7 @@
 // Register inputs (EAX/EBX/ECX/EDI/ESI) are explicit parameters; Ordinal_N / FUN_ callees are hooks
 // (unresolved ordinals: see per-function notes). Retail fatal-error paths (_exit) return false/0.
 #include <cstdint>
+#include "d2client_query_env.h"
 namespace d2client_b6d740 {
 using U=uint32_t; using I=int32_t; using P=void*;
 static U rdu(const uint8_t*p){U v=0;for(int i=3;i>=0;--i)v=v<<8|p[i];return v;}
@@ -34,9 +35,9 @@ struct H {
  U (*o10813)(); I (*o10208)(); U (*f1b50)(); U (*f18a0)(I); U (*f1870)(I);
  P (*f1a80)(); I (*o10866)(); I* (*f560d0)(); I (*o10062)(I,I); I (*o11066)(I); I (*o10394)(I);
  I (*o10893)(); I (*o10973)(); I (*o10460)(I); I (*o11147)(I); I (*o10464)(I); I (*o10431)();
- I (*o10494)(); I (*o10854)(I,I); I (*f1a3d0)(I); I (*f1d280)(); I (*f1e2c0)(U*,uint8_t*);
- I (*o10005)(uint8_t*,I,I); I (*o10663)(P); I (*o10569)(P,U*,uint8_t*); I (*o10060)(I); I (*o10000)(I);
- I (*o10069)(I); I (*o11142)();
+ I (*o10494)(); I (*o10854)(I,I); I (*f1a3d0)(P,I,I); I (*f1d280)(I,I,I); I (*f1e2c0)(U*,uint8_t*);
+ I (*o10005)(uint8_t*,I,I); I (*o10663)(P); I (*o10569)(P,U*,U*); I (*o10060)(I); I (*o10000)(I);
+ I (*o10069)(I); I (*o11142)(P);
 };
 
 // 1.13c D2Client+0x6DB40 (edi=obj; obj+0x10 kind, +4 flags, +0x2c out). Return paths via obj only.
@@ -48,20 +49,20 @@ void sub_6DB40(H&h,uint8_t* obj){
   if(kind!=3) return;
   wru(obj+0x2c,U(uintptr_t(base)));
   const uint8_t* p;
-  if(h.o10106()==7){ if(h.o10620()<0) return; h.o10620(); p=reinterpret_cast<uint8_t*>(uintptr_t(h.f18a0(0))); if(!p) return; p+=0x3a; }
-  else { if(h.o10106()!=5) return; h.o10620(); p=reinterpret_cast<uint8_t*>(uintptr_t(h.f1870(0))); if(!p) return; p+=0x42; }
+  if(h.o10106()==7){ if(h.o10620()<0) return; I x=h.o10620(); p=reinterpret_cast<uint8_t*>(uintptr_t(h.f18a0(x))); if(!p) return; p+=0x3a; }
+  else { if(h.o10106()!=5) return; I x=h.o10620(); p=reinterpret_cast<uint8_t*>(uintptr_t(h.f1870(x))); if(!p) return; p+=0x42; }
   if(*p) setp(p);
   return;
  }
  h.o10931();
  if(h.o10202(0,0,0,nullptr)&&h.o10106()==5){
-  h.o10620(); const uint8_t* a=reinterpret_cast<uint8_t*>(uintptr_t(h.f1870(0))); const uint8_t* q=nullptr;
+  I x=h.o10620(); const uint8_t* a=reinterpret_cast<uint8_t*>(uintptr_t(h.f1870(x))); const uint8_t* q=nullptr;
   if(a&&a[0x62]) q=a+0x62; else if(base[0x60]) q=base+0x60;
   if(q){ obj[4]|=0x10; setp(q); return; }
  }
  if(h.o10202(0,0,0,nullptr)&&h.o10106()==7){
   const uint8_t* q=nullptr;
-  if(h.o10620()>0){ const uint8_t* a=reinterpret_cast<uint8_t*>(uintptr_t(h.f18a0(0))); if(a&&a[0x5a]) q=a+0x5a; }
+  I x=h.o10620(); if(x>0){ const uint8_t* a=reinterpret_cast<uint8_t*>(uintptr_t(h.f18a0(x))); if(a&&a[0x5a]) q=a+0x5a; }
   if(!q&&base[0x40]) q=base+0x40;
   if(q){ obj[4]|=1; setp(q); return; }
  }
@@ -76,7 +77,7 @@ static I ownerHandle(H&h,const uint8_t* owner){
 // 1.13c D2Client+0x6DEE0 (eax=owner, ecx=param_1 slot, edx=param_2 default). Strings: GfxUtil.cpp lines 0x656/0x657.
 I sub_6DEE0(H&h,const uint8_t* owner,I slot,I def){
  static const char*F="..\\Source\\D2Client\\ENGINE\\GfxUtil.cpp";
- if(U(slot)>0xf) return def;
+ if(slot>0xf) return def;
  if(owner&&!h.f1a80()){
   I s=ownerHandle(h,owner); if(!s) return def;
   I r=h.o10062(s,slot);
@@ -116,40 +117,50 @@ bool sub_6DFE0(H&h,const uint8_t* owner,I ebx,I kind,U* out){
 }
 
 // 1.13c D2Client+0x6E1E0 (ebx=slot, esi=owner). Returns 'lit '/'hsh ' style fourCC or a handle.
-I sub_6E1E0(H&h,I slot,const uint8_t* owner){
- if(U(slot)>0xf) return 0x2074696c;
- I s=ownerHandle(h,owner);
- U t=U(h.o10431());
+// Callees as retail calls them: CBDA = Ordinal_10866(owner, 0x25), A60D0 (eax = owner), C2AA = Ordinal_10431(owner, handle, &local, -1, 1),
+// CBE0 = Ordinal_10062(handle, 5), C1BA = Ordinal_10695(r[+4]), C1FC = Ordinal_10494(owner, 0x65), C274 = Ordinal_10854(handle, 0).
+struct D2c6E1E0Env {
+ I (*o10866)(const uint8_t* owner,I k); const uint8_t* (*f560d0)(const uint8_t* owner); I (*o10431)(const uint8_t* owner,I handle,I* out,I a,I b);
+ I (*o10062)(I handle,I k); I (*o10695)(I v); I (*o10494)(const uint8_t* owner,I k); I (*o10854)(I handle,I k);
+};
+I sub_6E1E0(const D2c6E1E0Env& e,I slot,const uint8_t* owner){
+ if(slot>=0x10) return   /* signed: cmp ebx,0x10; jl */ 0x2074696c;
+ I s;
+ if(owner&&((rdu(owner+200)>>3)&1)&&e.o10866(owner,0x25)){ const uint8_t* p=e.f560d0(owner); s=I(rdu(p?p+0x60:owner+0x60)); }
+ else s=I(rdu(owner+0x60));
+ I loc=0;
+ I t=e.o10431(owner,s,&loc,-1,1);
  if(t==0x20776278){
   if(slot==5||slot==6){
-   I r=h.o10062(s,5);
-   if(r){ const uint8_t* p=reinterpret_cast<uint8_t*>(uintptr_t(h.o10695(I(rdu(reinterpret_cast<uint8_t*>(uintptr_t(r))+4))))); 
+   I r=e.o10062(s,5);
+   if(r){ const uint8_t* p=reinterpret_cast<uint8_t*>(uintptr_t(e.o10695(I(rdu(reinterpret_cast<uint8_t*>(uintptr_t(r))+4)))));
     if(p){ U v=rdu(p+0x90); return I(v?v:rdu(p+0x80)); } }
    return 0x2074696c;
   }
  } else if(t==0x20776f62&&slot==5) return 0x2074696c;
- if(slot==7&&h.o10494()&&h.o10854(s,0)) return 0x20687368;
+ if(slot==7&&e.o10494(owner,0x65)&&e.o10854(s,0)) return 0x20687368;
  return 0;
 }
 
-// Query block shared by 6E860/6E930/6E9C0/6EA50: 0x48 zeroed bytes, byte +1 = 1, then f1e2c0 + o10005.
-// Stack-frame field offsets are decompiler-inferred (local_54..); NOT verified against asm.
-// 1.13c D2Client+0x6E860 (ecx=param_1, edx=param_2): low-confidence layout, see above.
-bool sub_6E860(H&h,U* p1,I p2){
- if(!h.f1a3d0(p2)) return false;
- uint8_t q[0x48]={0}; U a[2]; (void)a; uint8_t extra[40];
- h.o10569(p1,reinterpret_cast<U*>(q),extra);
- for(auto&b:q) b=0;
- q[1]=1; wru(q+0x3c,U(h.o10663(p1))&0xff); wru(q+0x30,0);
- if(!h.f1e2c0(p1,q)||!h.o10005(q,0,1)||!rdu(q+0x2c)) return false;
- return h.f1d280()!=0;
+// Query block shared by 6E860/6E930/6E9C0/6EA50: 0x48 zeroed bytes; +0 = p5/out1, +5 = slot (1), +0x34 = 0, +0x40 = param, result handle at +0x3C
+// after f1e2c0 (6E2C0) + o10005. Frame offsets read from the disassembly (the decompile's are off).
+// 1.13c D2Client+0x6E860 (ecx=unit, edx=x, eax=eaxIn; globals gCC418 gC9960 gC995C = +0xCC418 +0xC9960 +0xC995C). Returns 6D280's eax or 0.
+I sub_6E860(H&h,P unit,I x,I eaxIn,I gCC418,I gC9960,I gC995C){
+ I ebp=eaxIn-gC995C+8, ebx=(gCC418-gC9960)+x;
+ if(!h.f1a3d0(unit,ebx,ebp)) return 0;
+ U out[2]={0,0}; h.o10569(unit,&out[0],&out[1]); U out1=out[0];
+ uint8_t q[0x48]={0};
+ wru(q+0x40,U(h.o10663(unit))&0xff); wru(q,out1); q[5]=1; wru(q+0x34,0);
+ if(!h.f1e2c0(reinterpret_cast<U*>(unit),q)||!h.o10005(q,0,1)) return 0;
+ U node=rdu(q+0x3c); if(!node) return 0;
+ return h.f1d280(I(node),ebx,ebp);
 }
-// 1.13c D2Client+0x6E930: writes via a hidden stack-arg pointer (unaff_retaddr); decompile ambiguous.
-void sub_6E930(H&h,U* p1,U p2,U p3,U* retOut){
- uint8_t q[0x48]={0}; wru(q+0x40,0); wru(q+0x50-0x48+0x48-8,0); // see note: local_8/local_14 offsets approximate
- wru(q,p3); q[5]=1; wru(q+0x40,p2);
- if(h.f1e2c0(p1,q)&&h.o10005(q,0,1)&&rdu(q+0x34)){
-  *retOut=U(h.o10060(I(rdu(q+0x34)))); *retOut=U(h.o10000(I(rdu(q+0x30))));
+// 1.13c D2Client+0x6E930 (stdcall unit,p2,p3,out1,out2; eax=-1 at 6E2C0).
+void sub_6E930(H&h,P unit,U p2,U p3,U* out1,U* out2){
+ uint8_t q[0x48]={0};
+ wru(q,p3); q[5]=1; wru(q+0x34,0); wru(q+0x40,p2);
+ if(h.f1e2c0(reinterpret_cast<U*>(unit),q)&&h.o10005(q,0,1)&&rdu(q+0x3c)){
+  *out1=U(h.o10060(I(rdu(q+0x3c)))); *out2=U(h.o10000(I(rdu(q+0x3c))));
  }
 }
 // 1.13c D2Client+0x6E9C0 (ecx unused, edx=param_2, param_3)
@@ -159,18 +170,42 @@ I sub_6E9C0(H&h,const uint8_t* p2,P p3){
  if(h.f1e2c0(nullptr,q)&&h.o10005(q,0,1)) return I(rdu(q+0x20)<<8);
  return 1;
 }
-// 1.13c D2Client+0x6EA50 (ebx=unit; gOff=DAT_6fbc995c). Fatal path (slot>0xf) returns -1 in place of _exit.
-I sub_6EA50(H&h,const uint8_t* p1,const uint8_t* p2,I* maxOut,U p4,U p5,U* unit,I gOff){
+// 1.13c D2Client+0x6EA50 (ebx=unit; stdcall p1 = byte count then slot list p2, p3 = running max, p4 = q+0x40, p5 = q+0; gOff=DAT_6fbc995c).
+// Fatal path (slot>0xf: log writers then _exit, which falls into the next function) returns -1 here; the FN capture never takes it.
+I sub_6EA50(H&h,const uint8_t* p1,const uint8_t* p2,I* maxOut,U p4,U p5,P unit,I gOff){
  I count=0;
  for(int i=0;i<p1[0];++i){
   uint8_t s=p2[i]; if(s>0xf) return -1;
-  uint8_t q[0x48]={0}; wru(q+0x2c,0); wru(q+0x38,p4); wru(q,p5); q[5]=s;
-  if(h.f1e2c0(unit,q)&&h.o10005(q,0,1)&&rdu(q+0x34)){
-   I v=(h.o10069(I(rdu(q+0x34)))-(gOff-8))+h.o11142();
+  uint8_t q[0x48]={0}; wru(q+0x34,0); wru(q+0x40,p4); wru(q,p5); q[5]=s;
+  if(h.f1e2c0(reinterpret_cast<U*>(unit),q)&&h.o10005(q,0,1)&&rdu(q+0x3c)){
+   I v=(h.o10069(I(rdu(q+0x3c)))-(gOff-8))+h.o11142(unit);
    if(*maxOut<v) *maxOut=v;
    ++count;
   }
  }
  return count;
 }
+}
+
+// FUNCTION-mode entry for the 6E9C0 probe (src/core/fn/d2client_6e9c0.cpp): the three seams sub_6E9C0 calls, nothing else.
+struct D2c6E9C0Env { int32_t (*f1e2c0)(uint32_t*, uint8_t*); int32_t (*o10005)(uint8_t*, int32_t, int32_t); int32_t (*o10663)(void*); };
+extern "C" int32_t d2c_port_6e9c0(const uint8_t* p2, void* p3, const D2c6E9C0Env* e) {
+ using namespace d2client_b6d740;
+ H h{}; h.f1e2c0=e->f1e2c0; h.o10005=e->o10005; h.o10663=e->o10663;
+ return sub_6E9C0(h,p2,p3);
+}
+
+// FUNCTION-mode entries for the 6E860 / 6E930 / 6EA50 probes (src/core/fn/d2client_6e*.cpp): the seams those routines call, nothing else.
+static d2client_b6d740::H d2cQueryH(const D2cQueryEnv* e){
+ d2client_b6d740::H h{}; h.f1a3d0=e->f1a3d0; h.o10569=e->o10569; h.o10663=e->o10663; h.f1e2c0=e->f1e2c0; h.o10005=e->o10005;
+ h.f1d280=e->f1d280; h.o10060=e->o10060; h.o10000=e->o10000; h.o10069=e->o10069; h.o11142=e->o11142; return h;
+}
+extern "C" int32_t d2c_port_6e860(void* unit, int32_t x, int32_t eaxIn, int32_t gCC418, int32_t gC9960, int32_t gC995C, const D2cQueryEnv* e) {
+ auto h=d2cQueryH(e); return d2client_b6d740::sub_6E860(h,unit,x,eaxIn,gCC418,gC9960,gC995C);
+}
+extern "C" void d2c_port_6e930(void* unit, uint32_t p2, uint32_t p3, uint32_t* out1, uint32_t* out2, const D2cQueryEnv* e) {
+ auto h=d2cQueryH(e); d2client_b6d740::sub_6E930(h,unit,p2,p3,out1,out2);
+}
+extern "C" int32_t d2c_port_6ea50(const uint8_t* p1, const uint8_t* p2, int32_t* maxOut, uint32_t p4, uint32_t p5, void* unit, int32_t gC995C, const D2cQueryEnv* e) {
+ auto h=d2cQueryH(e); return d2client_b6d740::sub_6EA50(h,p1,p2,maxOut,p4,p5,unit,gC995C);
 }
