@@ -18,6 +18,9 @@ W void d2win_sub_1978A(const char*, int32_t, uint32_t*) {}
 W void d2win_sub_1A184(uint32_t*, int32_t, int32_t) {}
 W void d2win_sub_19F4E(int32_t*, int32_t*) {}
 W int32_t d2win_f410_pumpDepth() { return 0; }
+W void Ordinal_10167(void) {}
+W int32_t DAT_6fa09efc;
+W uint8_t DAT_6f9ebf20[0x140];
 // Fog
 W void fog_sub_15f50(void*, uint32_t, void*) {}
 W void FUN_6ff5fc20() {}
@@ -30,15 +33,12 @@ void Fog_Ordinal_501_SStrCopy(char*, const char*, uint32_t);
 W void Ordinal_501(char* d, const char* s, uint32_t n) { Fog_Ordinal_501_SStrCopy(d, s, n); }
 W void Storm_Ordinal_501(void* d, const void* s, int32_t n) { Fog_Ordinal_501_SStrCopy((char*)d, (const char*)s, (uint32_t)n); }
 // Multiplayer batch helpers (Fog/Storm string imports and the roster count); weak, real definitions win.
-W int32_t DAT_6fa09efc;
-W int __stricmp(const char* a, const char* b) { for (;; a++, b++) { int x = (unsigned char)*a, y = (unsigned char)*b; if (x >= 'A' && x <= 'Z') x += 32; if (y >= 'A' && y <= 'Z') y += 32; if (x != y) return x < y ? -1 : 1; if (!x) return 0; } }
 W size_t ustrlen(const uint16_t* s) { size_t n = 0; while (s[n]) n++; return n; }
 W uint16_t* ustrcpy(uint16_t* d, const uint16_t* s) { uint16_t* r = d; while ((*d++ = *s++)) {} return r; }
 W uint16_t* ustrcat(uint16_t* d, const uint16_t* s) { ustrcpy(d + ustrlen(d), s); return d; }
 W uint16_t* ustrncat(uint16_t* d, const uint16_t* s, int32_t n) { uint16_t* e = d + ustrlen(d); while (n-- > 0 && *s) *e++ = *s++; *e = 0; return d; }
 W void utoUnicode(uint16_t* d, const char* s, int32_t n) { while (n-- > 0 && *s) *d++ = (uint8_t)*s++; *d = 0; }
 W void uwin2Unicode(uint16_t* d, const char* s, int32_t n) { while (n-- > 0 && *s) *d++ = (uint8_t)*s++; *d = 0; }
-W char* Ordinal_571(const char* s, int32_t c) { return ::Storm_Sub3BB00_z14((char*)s, (char)c, 0); }
 W void Ordinal_10097(void) {}
 W int32_t Ordinal_10098(const void*) { return 0; }
 W intptr_t Ordinal_10020(intptr_t) { return 0; }
@@ -55,3 +55,11 @@ W void Ordinal_10109(void) {}
 W void Ordinal_10043(int32_t a, int32_t b) { Fog_Ordinal_10043(a, b); }
 W int wsprintfA(char*, const char*, ...) { return 0; }
 }
+
+// Storm #571 (SStrChr, first occurrence): the port is C++-linkage.
+char* Storm_Sub3BB00_z14(char*, char, int);
+extern "C" W char* Ordinal_571(const char* s, int32_t c) { return Storm_Sub3BB00_z14((char*)s, (char)c, 0); }
+
+// CRT __stricmp (ASCII path): the port is d2_client_39c9.
+extern "C" int32_t d2_client_39c9(const char*, const char*);
+extern "C" W int __stricmp(const char* a, const char* b) { return d2_client_39c9(a, b); }

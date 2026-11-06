@@ -100,12 +100,13 @@ char* D2Lang_Unicode_toUtf(char* out, const uint16_t* in, int cap, const Utf8Row
     return out;
 }
 
-// 1.13c D2Lang+0xac40 (Unicode::unloadSysMap): globals 10a58 / 10a50 / 10a5c by reference.
-void D2Lang_Unicode_unloadSysMap(void*& g10a58, void*& g10a50, void*& g10a5c)
+// 1.13c D2Lang+0xac40 (Unicode::unloadSysMap): globals 10a58 / 10a50 / 10a5c by reference, freed in that order
+// through Storm #403 (SMemFree, thunk 0x7ACA) = memFree.
+void D2Lang_Unicode_unloadSysMap(void*& g10a58, void*& g10a50, void*& g10a5c, void (*memFree)(void*) = free)
 {
-    if (g10a58) { free(g10a58); g10a58 = nullptr; }
-    if (g10a50) { free(g10a50); g10a50 = nullptr; }
-    if (g10a5c) { free(g10a5c); g10a5c = nullptr; }
+    if (g10a58) { memFree(g10a58); g10a58 = nullptr; }
+    if (g10a50) { memFree(g10a50); g10a50 = nullptr; }
+    if (g10a5c) { memFree(g10a5c); g10a5c = nullptr; }
 }
 
 // 1.13c D2Lang+0xacf0 (Unicode::unicodeWidth): g10a5c = map ptr, g10a54 = range count, g10a58 = {lo,hi} byte pairs.

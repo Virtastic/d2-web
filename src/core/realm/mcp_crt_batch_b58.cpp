@@ -54,6 +54,21 @@ EMSCRIPTEN_KEEPALIVE void d2_mcp_setsbcs_3036(void) {
     g_mbcs_32398 = 0;
 }
 
+// FN probe access (src/core/fn/d2mcpclient_3036.cpp): copy the module state above to or from an image of retail's
+// [0x12268, 0x1239C) range (put != 0: image into state). Bytes of the range this file does not own are left alone.
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_mcp_sbcs_state_3036(uint8_t* img, int32_t put) {
+    struct F { uint32_t off; void* p; uint32_t n; } f[] = {
+        {0x12268 - 0x12268, &g_mbcs_32268, 4}, {0x12270 - 0x12268, &g_mbcs_32270, 4},
+        {0x12280 - 0x12268, g_sbcs_table_32280, sizeof g_sbcs_table_32280}, {0x12380 - 0x12268, &g_mbcs_32380, 1},
+        {0x12384 - 0x12268, &g_mbcs_32384, 4}, {0x12390 - 0x12268, &g_mbcs_32390, 4},
+        {0x12394 - 0x12268, &g_mbcs_32394, 4}, {0x12398 - 0x12268, &g_mbcs_32398, 4} };
+    for (const F& x : f) {
+        if (put) memcpy(x.p, img + x.off, x.n);
+        else memcpy(img + x.off, x.p, x.n);
+    }
+}
+
 // 1.13c D2MCPClient+0x03007 (47 B, caller 0x031FA): the codepage-to-charset word table read through
 // EAX (`in_EAX` in the decompile). 0x3A4 -> 0x411, 0x3A8 -> 0x804, 0x3B5 -> 0x412, 0x3B6 -> 0x404,
 // anything else 0. Pure.

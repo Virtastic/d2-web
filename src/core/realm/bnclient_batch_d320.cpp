@@ -118,16 +118,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void bn_gateway_start(const BnGatewayStartEnv* e
         env->sleep_ms(10);
 }
 
-// 1.13c BNCLIENT+0x0F3C0: empty the output string, load the gateway list, take the Nth entry
-// (index DAT_6ff3e9fc) into it, and if a following Storm #422 check passes copy once more.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_f3c0(BnEnv* env, char* out) {
-    out[0] = 0;
-    env->call(0x8090, nullptr, nullptr, nullptr, nullptr);   // BNGatewayAccess::Load
-    env->call(0x804E, out, nullptr, nullptr, nullptr);       // BNGatewayAccess::Nth -> Ordinal_501 copy
-    if (env->call(0xFFFF01A6, out, nullptr, nullptr, nullptr) != 0)  // Ordinal_422
-        env->call(0xFFFF01F5, out, nullptr, nullptr, nullptr);        // Ordinal_501
-}
-
 // 1.13c BNCLIENT+0x12000: copy the reply into the shared record; when it validates (0xB3A0), clear the
 // 0x20-byte block at 6ff3ecb8, copy 0x14 bytes from 6ff3ed40 and send the 0x54 packet (0xEB00).
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t bnclient_batch_12000(BnEnv* env, int32_t* arg) {

@@ -144,38 +144,7 @@ char* convertcp(unsigned from, unsigned to, const char* src, int* plen, char* ds
   return out;
 }
 
-// 1.13c D2NET+0x04F78
-int crtGetStringTypeA(unsigned type, const char* src, int cch, uint16_t* out, unsigned cp, unsigned lcid, int err) {
-  if (!g.stype_mode) {                                    // probe the wide API once
-    uint16_t t;
-    if (g.GetStringTypeW(1, (const uint16_t*)L"", 1, &t)) g.stype_mode = 1;
-    else if (g.GetLastError() == 0x78) g.stype_mode = 2;  // ERROR_CALL_NOT_IMPLEMENTED
-  }
-  if (g.stype_mode == 1 || g.stype_mode == 0) {
-    if (!cp) cp = g.lc_codepage;
-    int n = g.MBToWC(cp, err ? 9 : 1, src, cch, nullptr, 0);
-    if (!n) return 0;
-    uint16_t* w = (uint16_t*)g.calloc_(2, n);
-    if (!w) return 0;
-    int r = 0;
-    if (g.MBToWC(cp, 1, src, cch, w, n)) r = g.GetStringTypeW(type, w, n, out);
-    g.free_(w);
-    return r;
-  }
-  if (!lcid) lcid = g.lc_handle;
-  if (!cp) cp = g.lc_codepage;
-  unsigned acp = ansicp(lcid);
-  if (acp == 0xFFFFFFFFu) return 0;
-  if (acp != cp) {                                        // convert the source into the LCID's ANSI page
-    int len = cch;
-    char* s = convertcp(cp, acp, src, &len, nullptr, 0);
-    if (!s) return 0;
-    int r = g.GetStringTypeA(lcid, type, s, len, out);
-    g.free_(s);
-    return r;
-  }
-  return g.GetStringTypeA(lcid, type, src, cch, out);
-}
+// 0x04F78 ___crtGetStringTypeA: the per-function port src/core/d2net/d2net_4f78.cpp.
 
 // ---- __crtLCMapStringA (D2Net+0x051C0)
 // 1.13c D2NET+0x051C0

@@ -27,22 +27,7 @@ struct State {
   uint32_t sbcs_fallback;   // 0xB0D0: nonzero = an unknown codepage falls back to SBCS instead of failing
 };
 
-// 1.13c D2NET+0x03347
-uint32_t getmbcp(const State& s) { return s.mbcodepage; }
-
-// 1.13c D2NET+0x03376
-void setSBCS(State& s) {
-  std::memset(s.mbctype, 0, sizeof s.mbctype);
-  s.mbcodepage = 0; s.mbcsflag = 0;
-  std::memset(s.mbulinfo, 0, sizeof s.mbulinfo);
-}
-
-// 1.13c D2NET+0x0339F  (-3 ANSI, -4 OEM, -2 thread = ANSI; 0 = SBCS; else the codepage)
-int getSystemCP(const Host& h, int cp) {
-  if (cp == -2 || cp == -3) return (int)h.get_acp();
-  if (cp == -4) return (int)h.get_oemcp();
-  return cp;
-}
+// 0x3376 setSBCS, 0x339F, 0x36CE __setmbcp and 0x381E ___initmbctable: per-function ports in src/core/d2net/.
 
 // 1.13c D2NET+0x03347 (eax = codepage): the language id of the four East Asian codepages, else 0
 uint32_t cpLangId(uint32_t cp) {
@@ -90,20 +75,6 @@ int buildMbctable(const Host& h, State& s, uint32_t cp) {
   h.build_casemap();
   return 0;
 }
-
-// 1.13c D2NET+0x036CE: __setmbcp, 0 on success, -1 on a codepage with no table
-int setmbcp(const Host& h, State& s, int cp) {
-  h.lock(0x19);
-  int r = -1;
-  int c = getSystemCP(h, cp);
-  if (c == 0) { setSBCS(s); r = 0; }
-  else if (buildMbctable(h, s, (uint32_t)c)) r = 0;
-  h.unlock(0x19);
-  return r;
-}
-
-// 1.13c D2NET+0x0381E: ___initmbctable, seeds the table from the ANSI codepage once
-int initmbctable(const Host& h, State& s) { return s.mbcsflag ? 0 : setmbcp(h, s, -3); }
 
 // 1.13c D2NET+0x03D84: ___sbh_resize_block; 1 when the block can change to newParas in place
 int sbh_resize_block(uint32_t* sizeParas, uint32_t newParas) {

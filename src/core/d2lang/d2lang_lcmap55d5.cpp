@@ -16,19 +16,23 @@ struct d2lang_lcmap_env
 	int state;       // DAT_6fc10928
 	uint32_t lcid;   // DAT_6fc10894
 	uint32_t acp;    // DAT_6fc108a4
+	void (*freeFn)(void* p);  // _free 0x3091
+	const uint16_t* emptyW;   // the module's L"" (0x6fc0c89c) the probe call passes
 };
-static d2lang_lcmap_env d2lang_lcmap_env_g;
+static const uint16_t d2lang_lcmap_empty[1] = {0};
+static d2lang_lcmap_env d2lang_lcmap_env_g = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0, 0, 0, free, d2lang_lcmap_empty};
 extern "C" d2lang_lcmap_env* d2lang_lcmap_getEnv() { return &d2lang_lcmap_env_g; }
 
 // 1.13c D2Lang+0x55D5
+// The wide and mapped buffers are _alloca blocks of (2n+3)&~3 bytes (W path, not zeroed) and n bytes (A path, zeroed);
+// retail's stack-overflow fallback to _malloc is never reached by a fixed-size call.
 extern "C" uint32_t d2lang_lcmap55d5_sub_55D5(uint32_t lcid, uint32_t flags, const char* src, int cch,
                                               char* dst, int dcch, uint32_t cp, int bErr)
 {
 	d2lang_lcmap_env& e = d2lang_lcmap_env_g;
-	static const uint16_t kEmpty[1] = {0};
 	if (e.state == 0)
 	{
-		if (e.lcMapW(0, 0x100, kEmpty, 1, nullptr, 0) == 0)
+		if (e.lcMapW(0, 0x100, e.emptyW, 1, nullptr, 0) == 0)
 		{
 			if (e.getLastError() == 0x78) e.state = 2;
 		}
@@ -41,8 +45,7 @@ extern "C" uint32_t d2lang_lcmap55d5_sub_55D5(uint32_t lcid, uint32_t flags, con
 		if (cp == 0) cp = e.acp;
 		int wn = e.mbToWc(cp, bErr ? 9 : 1, src, cch, nullptr, 0);
 		if (wn == 0) return 0;
-		uint16_t* w = (uint16_t*)malloc((size_t)wn * 2);
-		if (!w) return 0;
+		uint16_t* w = (uint16_t*)__builtin_alloca(((size_t)(uint32_t)wn * 2 + 3) & ~(size_t)3);
 		uint32_t r = 0;
 		if (e.mbToWc(cp, 1, src, cch, w, wn) != 0)
 		{
@@ -51,19 +54,14 @@ extern "C" uint32_t d2lang_lcmap55d5_sub_55D5(uint32_t lcid, uint32_t flags, con
 			{
 				if (!(flags & 0x400))
 				{
-					uint16_t* m = (uint16_t*)malloc((size_t)r * 2);
-					if (m)
-					{
-						if (e.lcMapW(lcid, flags, w, wn, m, (int)r) != 0)
-							r = (uint32_t)e.wcToMb(cp, 0, m, (int)r, dst, dst ? dcch : 0, nullptr, nullptr);
-						free(m);
-					}
+					uint16_t* m = (uint16_t*)__builtin_alloca(((size_t)r * 2 + 3) & ~(size_t)3);
+					if (e.lcMapW(lcid, flags, w, wn, m, (int)r) != 0)
+						r = (uint32_t)e.wcToMb(cp, 0, m, (int)r, dcch ? dst : nullptr, dcch, nullptr, nullptr);
 				}
 				else if (dcch != 0 && (int)r <= dcch)
 					e.lcMapW(lcid, flags, w, wn, (uint16_t*)dst, dcch);
 			}
 		}
-		free(w);
 		return r;
 	}
 	if (lcid == 0) lcid = e.lcid;
@@ -79,19 +77,16 @@ extern "C" uint32_t d2lang_lcmap55d5_sub_55D5(uint32_t lcid, uint32_t flags, con
 	int n = e.lcMapA(lcid, flags, conv, cch, nullptr, 0);
 	if (n != 0)
 	{
-		char* tmp = (char*)calloc((size_t)n, 1);
-		if (tmp)
+		char* tmp = (char*)__builtin_alloca((size_t)(uint32_t)n);
+		memset(tmp, 0, (size_t)(uint32_t)n);
+		n = e.lcMapA(lcid, flags, conv, cch, tmp, n);
+		if (n != 0)
 		{
-			n = e.lcMapA(lcid, flags, conv, cch, tmp, n);
-			if (n != 0)
-			{
-				back = e.cpConvert(lc, cp, tmp, &n, dst, dcch);
-				r = back ? (uint32_t)n : 0;
-			}
-			free(tmp);
+			back = e.cpConvert(lc, cp, tmp, &n, dst, dcch);
+			r = back ? (uint32_t)n : 0;
 		}
 	}
-	free(conv);
-	if (back && back != dst) free(back);
+	e.freeFn(conv);
+	if (back && back != dst) e.freeFn(back);
 	return r;
 }

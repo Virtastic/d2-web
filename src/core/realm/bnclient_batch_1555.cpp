@@ -202,15 +202,15 @@ struct BnSeedSha1 { uint32_t state[5], bitLow, bitHigh; uint8_t block[64]; };
 extern "C" void d2_bnclient_sha1_update(BnSeedSha1*, uint8_t*, uint32_t);
 extern "C" void d2_bnclient_sha1_final(BnSeedSha1*, uint8_t*);
 
-// 1.13c BNClient+0x0ABE0 (180 B): reseed -- hash {time32, <uninit>, rand()} (12 B) with SHA-1 into
-// s+0xC (5 dwords), then copy those to s+0x20 and zero s+0x34..0x4B. Hidden ESI = s, EAX = time32 result
-// (srand seed). r[0] = s. The middle 4 input bytes are uninitialised stack in retail; zero here.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_bnclient_abe0(uint32_t* r) {
-    uint32_t* s = (uint32_t*)(uintptr_t)r[0];
-    int32_t in[3] = {0, 0, 0};
-    uint32_t seed = (uint32_t)bn_time32(&in[0]);
-    bn_srand(seed);
+// 1.13c BNClient+0x0ABE0 (180 B): reseed. Retail layout: EAX = seed argument, ESI = s, plain ret. Input is the 12 bytes
+// {__time32(&in[0]) (0x1621), EAX (stored at +4 before the call to srand), rand() after srand(EAX) (0x15F2/0x15FF)},
+// hashed with SHA-1 (stack context, update 0x9D00 / final 0x9DC0) into s+0xC (5 dwords), copied to s+0x20, then
+// s+0x34..0x4B zeroed. The clock is the injected seam (retail: GetSystemTimeAsFileTime).
+extern "C" void d2_bnclient_abe0(uint32_t* s, uint32_t eax, int32_t (*time32)(int32_t*)) {
+    int32_t in[3];
+    time32(&in[0]);
+    in[1] = (int32_t)eax;
+    bn_srand(eax);
     in[2] = bn_rand();
     BnSeedSha1 c = {{0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0}, 0, 0, {0}};
     d2_bnclient_sha1_update(&c, (uint8_t*)in, 12);

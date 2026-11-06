@@ -29,7 +29,7 @@ uint16_t* ustrncat(uint16_t*, const uint16_t*, int32_t);
 void utoUnicode(uint16_t*, const char*, int32_t);
 void uwin2Unicode(uint16_t*, const char*, int32_t);
 int wsprintfA(char*, const char*, ...);
-int __stricmp(const char*, const char*);
+int __stricmp(const char* a, const char* b) { extern int Storm_stricmp_5C57(const char*, const char*); return Storm_stricmp_5C57(a, b); }
 }
 
 // 1.13c D2Multi+0xED60

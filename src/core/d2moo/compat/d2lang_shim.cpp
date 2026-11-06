@@ -87,15 +87,16 @@ int __fastcall Unicode::stricmp(const Unicode* a, const Unicode* b) {
         if (x != y) return x < y ? -1 : 1;
     }
 }
-// 1.13c D2Lang+0xB560 (#10045): stricmp over at most count units. The first pair is compared
-// unconditionally (retail quirk: empty/zero-count still orders a differing first pair); after that
-// a terminator or exhausted count ends the loop, but the pointers have already advanced, so the
-// result compares the post-advance upper units (retail: returns (b<=a) ? (b<a) : -1).
+// 1.13c D2Lang+0xB560 (#10045): stricmp over at most count units. The first pair is folded before
+// the loop (an empty string or a zero count still orders a differing first pair). Each pass folds
+// the CURRENT pair, then advances, and tests the raw units it advanced to: so the result compares the
+// last pair folded, which lags the terminator test by one unit (u"A" vs u"AB" is 0; "AB"/"AC" n=1 is 0).
 int __fastcall Unicode::strnicmp(const Unicode* a, const Unicode* b, size_t n) {
-    unsigned short x = a->toUpper().ch, y = b->toUpper().ch;
-    while (a->ch && b->ch && n && x == y) {
-        a++; b++; n--;
-        x = a->toUpper().ch; y = b->toUpper().ch;
+    unsigned short x = a->toUpper().ch, y = b->toUpper().ch, ca = a->ch;
+    while (ca && b->ch && n && x == y) {
+        x = a->toUpper().ch; a++;
+        y = b->toUpper().ch; b++;
+        ca = a->ch; n--;
     }
     return y <= x ? (y < x ? 1 : 0) : -1;
 }
@@ -293,6 +294,15 @@ Unicode* __fastcall Unicode::win2Unicode(Unicode* dst, const char* src, int n) {
     for (; i < n && src[i]; i++) d[i] = (uint8_t)src[i];
     if (src[i]) d[i - 1] = 0; else d[i] = 0;
     return dst;
+}
+// Flat C names the multiplayer ports import for the Unicode:: statics (weak: a ported definition wins).
+extern "C" {
+__attribute__((weak)) size_t ustrlen(const uint16_t* s) { return (size_t)Unicode::strlen((const Unicode*)s); }
+__attribute__((weak)) uint16_t* ustrcpy(uint16_t* d, const uint16_t* s) { return (uint16_t*)Unicode::strcpy((Unicode*)d, (const Unicode*)s); }
+__attribute__((weak)) uint16_t* ustrcat(uint16_t* d, const uint16_t* s) { return (uint16_t*)Unicode::strcat((Unicode*)d, (const Unicode*)s); }
+__attribute__((weak)) uint16_t* ustrncat(uint16_t* d, const uint16_t* s, int32_t n) { return (uint16_t*)Unicode::strncat((Unicode*)d, (const Unicode*)s, n); }
+__attribute__((weak)) void utoUnicode(uint16_t* d, const char* s, int32_t n) { Unicode::toUnicode((Unicode*)d, s, n); }
+__attribute__((weak)) void uwin2Unicode(uint16_t* d, const char* s, int32_t n) { Unicode::win2Unicode((Unicode*)d, s, n); }
 }
 // D2Lang 0x8520 (1.13c) (ESI=wide str, stack=narrow set; caller Personalize): true when the wide string's last unit
 // equals any of the first 19 narrow chars. Custom register convention: NAMED, no vector.

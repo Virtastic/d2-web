@@ -42,7 +42,7 @@ struct z27_LangState {
     void (*release)(int32_t id);      // Ordinal_10043(id, 0)
     void (*unloadSysMap)();           // Unicode::unloadSysMap
     uint32_t (*lookup)(uint32_t table, int32_t aux, const uint8_t* key, uint32_t* out); // FUN_6fc09360
-    uint32_t (*missing)();            // FUN_6fc09fb0
+    uint32_t (*missing)(const uint8_t* key); // FUN_6fc09fb0 (EAX = key)
     const z27_wc* emptyStr;           // DAT_6fc10a98
     void (*fatal)(int32_t msgId);     // Ordinal_10265 + 10024 + _exit(-1)
 };
@@ -72,14 +72,15 @@ extern "C++" uint32_t z27_lookup_key(z27_LangState* s, const uint8_t* key, uint3
     if (!s->w80) { s->fatal(0x2bd); return 0; }
     if (!key) { s->fatal(0x2c2); return 0; }
     if (!*key) { *out = (uint32_t)(uintptr_t)s->emptyStr; return (uint32_t)(uintptr_t)out & 0xffff0000; }
-    uint32_t r = s->lookup(s->patch80, s->tbl6c, key, out);
-    if ((int16_t)r != -1) return r + 10000;
+    // retail pushes the table words themselves (DAT a80/a6c, a84/a70, a64/a68); ax == 0xFFFF is a miss
+    uint32_t r = s->lookup((uint32_t)s->w80, s->tbl6c, key, out);
+    if ((uint16_t)r != 0xffff) return r + 10000;
     if (s->w84) {
-        r = s->lookup(s->exp84, s->tbl70, key, out);
-        if ((int16_t)r != -1) return r + 20000;
+        r = s->lookup((uint32_t)s->w84, s->tbl70, key, out);
+        if ((uint16_t)r != 0xffff) return r + 20000;
     }
-    r = s->lookup(s->base64, s->tbl68, key, out);
-    if ((int16_t)r == -1) { r = s->missing(); *out = r; r &= 0xffff0000; }
+    r = s->lookup((uint32_t)s->loaded64, s->tbl68, key, out);
+    if ((uint16_t)r == 0xffff) { r = s->missing(key); *out = r; r &= 0xffff0000; }
     return r;
 }
 
