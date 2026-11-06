@@ -24,8 +24,9 @@ function element() {
     appendChild(child) { this.children.push(child); return child; },
     setAttribute() {},
     querySelector() { return null; },
-    focus() {},
-    blur() {},
+    focusCalls: 0, blurCalls: 0,
+    focus() { this.focusCalls++; },
+    blur() { this.blurCalls++; },
     getBoundingClientRect() { return { left: 0, top: 0, width: 800, height: 600 }; },
   };
 }
@@ -181,5 +182,22 @@ test('a name typed before the box showed is in the box when it opens', () => {
     assert.equal(box.value, 'Ka', 'the box opens on the name the game holds');
     type('K');   // one Backspace on the phone keyboard
     assert.equal(shell.name, 'K', 'deletes the last real letter');
+  } finally { restore(); }
+});
+
+test('the phone keyboard opens on a tap on the box, not when the box shows, and Enter closes it', () => {
+  const { shell, box, poll, type, press, restore } = mount();
+  try {
+    assert.equal(box.style.display, 'block');
+    assert.equal(box.focusCalls, 0, 'showing the box does not focus it');
+    poll(); poll();
+    assert.equal(box.focusCalls, 0, 'nor does a later poll');
+    box.fire('pointerdown', {});
+    assert.equal(box.focusCalls, 1, 'a tap on the box focuses it');
+    type('Ak');
+    assert.equal(box.blurCalls, 0);
+    press('Enter', 'Enter');
+    assert.equal(box.blurCalls, 1, 'Enter blurs the box');
+    assert.equal(shell.created, 'Ak', 'the engine still receives the typed name and Enter once');
   } finally { restore(); }
 });

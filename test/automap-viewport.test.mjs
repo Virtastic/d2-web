@@ -10,7 +10,7 @@ test('F234 native startup default is AutoMapLeft enabled, without adding a menu 
 
 test('F234 full map keeps the whole-screen viewport while AutoMapLeft selects its native anchor', () => {
   assert.deepEqual(automapViewport(800, 600, { mode: 'full', left: true }), {
-    anchorX: 96, anchorY: 0,
+    anchorX: 0, anchorY: 96,
     viewport: { left: -16, top: -16, right: 800, bottom: 600 },
     cellClip: null,
   });
@@ -23,8 +23,8 @@ test('F234 full map keeps the whole-screen viewport while AutoMapLeft selects it
 
 test('F234 mini map uses one-third viewport and the matching left/right cell clip', () => {
   assert.deepEqual(automapViewport(800, 600, { mode: 'mini', left: true }), {
-    anchorX: 96, anchorY: 0,
-    viewport: { left: 88, top: 0, right: 362, bottom: 200 },
+    anchorX: 0, anchorY: 96,
+    viewport: { left: -8, top: 96, right: 266, bottom: 296 },
     cellClip: { left: 0, top: 75, right: 279, bottom: 300 },
   });
   assert.deepEqual(automapViewport(800, 600, { mode: 'mini', left: false }), {
@@ -44,15 +44,15 @@ test('F234 keeps the unresolved selector 0x6fbcc284 explicit in its alternative 
 
 test('F234 native mini viewport predicate is inclusive and separate from the cell clip', () => {
   const { viewport, cellClip } = automapViewport(800, 600, { mode: 'mini', left: true });
-  assert.equal(automapMarkerInViewport(88, 0, viewport), true);
-  assert.equal(automapMarkerInViewport(87, 0, viewport), false);
-  assert.equal(automapMarkerInViewport(362, 100, viewport), true);
-  assert.equal(automapMarkerInViewport(363, 100, viewport), false);
-  assert.equal(automapMarkerInViewport(200, 200, viewport), true);
-  assert.equal(automapMarkerInViewport(200, 201, viewport), false);
+  assert.equal(automapMarkerInViewport(-8, 96, viewport), true);
+  assert.equal(automapMarkerInViewport(-9, 96, viewport), false);
+  assert.equal(automapMarkerInViewport(266, 200, viewport), true);
+  assert.equal(automapMarkerInViewport(267, 200, viewport), false);
+  assert.equal(automapMarkerInViewport(100, 296, viewport), true);
+  assert.equal(automapMarkerInViewport(100, 297, viewport), false);
   // The native unit viewport extends beyond the cell clip; using the latter would cull this marker.
-  assert.equal(350 >= cellClip.left && 350 <= cellClip.right, false);
-  assert.equal(automapMarkerInViewport(350, 100, viewport), true);
+  assert.equal(-4 >= cellClip.left && -4 <= cellClip.right, false);
+  assert.equal(automapMarkerInViewport(-4, 200, viewport), true);
 });
 
 test('F234 native full-map viewport predicate retains the inclusive near-screen bounds', () => {
@@ -66,8 +66,8 @@ test('F234 native full-map viewport predicate retains the inclusive near-screen 
 });
 
 test('F234 mini Center applies the native scroll offset only to the mini map', () => {
-  assert.deepEqual(automapScrollOffset(800, 600, { mode: 'mini', center: 'yes', anchorX: 96, anchorY: 0 }),
-    { x: 154, y: 184 });
+  assert.deepEqual(automapScrollOffset(800, 600, { mode: 'mini', center: 'yes', anchorX: 0, anchorY: 96 }),
+    { x: 250, y: 88 });
   assert.deepEqual(automapScrollOffset(800, 600, { mode: 'mini', center: 'yes', anchorX: 533, anchorY: 78 }),
     { x: -283, y: 106 });
   assert.deepEqual(automapScrollOffset(800, 600, { mode: 'mini', center: 'no', anchorX: 96, anchorY: 0 }),
