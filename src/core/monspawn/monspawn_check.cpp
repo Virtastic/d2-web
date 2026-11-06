@@ -131,6 +131,7 @@
 #include "weather_runtime.h"
 #include "../d2client/weather_sim.h"
 #include "../d2client/inv_sockets_95140.h"
+#include "../d2client/inv_weapon_hands.h"
 #include "hellforge_diagnostic.h"
 #include "../d2common/d2common_33110.h"
 #include "../../../tools/vectorfmt/vectorfmt.h"
@@ -723,6 +724,10 @@ static std::vector<D2SessionItemPresentation> g_sessionItemPresentations;
 // component colour byte the save header carries. A monster's drop is magic/rare/unique/set: its ground
 // flippy is drawn through that item's MixPalette remap, a normal item's is not.
 static std::vector<uint8_t> g_sessionItemColours;
+// Parallel too: the inventory/cursor cel's remap (D2Client+0x6B5A0 draws through ITEMS_GetColor(0,
+// item, &c, 1)'s returned MixPalette(nInvTrans, colour)), packed by D2CMP_MixPaletteKey; 0 = none.
+static std::vector<uint16_t> g_sessionItemInvColours;
+uint16_t D2CMP_MixPaletteKey(const uint8_t* p);
 static std::vector<D2SessionItemSockets> g_sessionItemSockets;
 // The shop's stock as PRESENTATION records, parallel to the existing vendor list rather than bolted
 // onto it. D2SessionVendorItem is 32 bytes with a hash over its own fields, and proven rows read it
@@ -1154,6 +1159,7 @@ static void appendSessionItemPresentation(D2UnitStrc* item) {
     appendSessionItemSockets(item, out);
     uint8_t colour = 0;
     g_sessionItemColours.push_back(ITEMS_GetColor(nullptr, item, &colour, 0) ? (uint8_t)(colour + 1) : 0xFF);
+    g_sessionItemInvColours.push_back(D2CMP_MixPaletteKey(ITEMS_GetColor(nullptr, item, &colour, 1)));
 }
 
 static void syncSessionLevelFromPlayer() {
@@ -1682,7 +1688,7 @@ static bool clientAnimEvent(const D2UnitStrc* unit) {
 static void updateSessionWorld() {
     if (g_worldHold && g_worldHoldBuilt) return;
     if (g_worldHold) g_worldHoldBuilt = true;
-    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionUnitFacings.clear(); g_sessionUnitOverlays.clear(); g_sessionUnitStates.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionItemColours.clear(); g_sessionItemSockets.clear(); g_sessionWarps.clear(); g_sessionWarpOrigins.clear(); g_sessionMissileAnimations.clear();
+    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionUnitFacings.clear(); g_sessionUnitOverlays.clear(); g_sessionUnitStates.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionItemColours.clear(); g_sessionItemInvColours.clear(); g_sessionItemSockets.clear(); g_sessionWarps.clear(); g_sessionWarpOrigins.clear(); g_sessionMissileAnimations.clear();
     g_sessionWorldHash = D2VEC_FNV_INIT;
     g_sessionNavigationHash = D2VEC_FNV_INIT;
     // The tile lists are built from this world only when a tile export asks (ensureSessionTiles):
@@ -5545,6 +5551,9 @@ EMSCRIPTEN_KEEPALIVE int d2_session_character_screen(int32_t* out) {
 // The character screen's stamina maximum is the BASE stat (retail panel: 1200 beside a current of 1560 while the
 // Increased Stamina passive's 30% is in the total; the HUD bar reads the total, out[5]).
 EMSCRIPTEN_KEEPALIVE int d2_session_character_stamina_base() { return g_targetPlayer ? STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_MAXSTAMINA, 0) >> 8 : 0; }
+// Character panel colours: retail D2Client+0xBCEA0 draws max life / max mana (stats 7, 9) in colour 3 when the
+// total (D2Common ord 10973) exceeds the base (ord 10587), colour 1 when below; this is the base read.
+EMSCRIPTEN_KEEPALIVE int d2_session_player_base_stat(int stat) { return g_targetPlayer ? STATLIST_GetUnitBaseStat(g_targetPlayer, stat, 0) : -1; }
 EMSCRIPTEN_KEEPALIVE int d2_session_player_gold() { return g_targetPlayer ? STATLIST_UnitGetStatValue(g_targetPlayer, STAT_GOLD, 0) : -1; }
 // The stash panel's two numbers: gold in the stash (STAT_GOLDBANK) and its limit (UNITS_GetStashGoldLimit).
 EMSCRIPTEN_KEEPALIVE int d2_session_stash_gold(int limit) { return !g_targetPlayer ? -1 : limit ? (int)UNITS_GetStashGoldLimit(g_targetPlayer) : STATLIST_UnitGetStatValue(g_targetPlayer, STAT_GOLDBANK, 0); }
@@ -8128,6 +8137,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_select_skill(uint32_t skillId, int l
 }
 // The player's selected skills: [left id, right id] (-1 = none).
 static int32_t g_sessionSelectedSkills[2];
+D2UnitStrc* d2_session_target_player_unit() { return g_targetPlayer; }   // the character screen's unit (d2client_35270_wire.cpp)
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_selected_skills() {
     D2SkillStrc* l = g_targetPlayer ? UNITS_GetLeftSkill(g_targetPlayer) : nullptr;
     D2SkillStrc* r = g_targetPlayer ? UNITS_GetRightSkill(g_targetPlayer) : nullptr;
@@ -8964,6 +8974,17 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_swap_weapons() {
 EMSCRIPTEN_KEEPALIVE int d2_session_weapon_switch() {
     if (!g_sessionLive || !g_targetClient) return -1;
     return (int)CLIENTS_GetWeaponSwitch(g_targetClient);
+}
+
+// The inventory panel's weapon boxes (d2client/inv_weapon_hands.h): which silhouettes and which
+// two-hander ghost the panel draws for the active set. -1 outside a session.
+EMSCRIPTEN_KEEPALIVE int d2_session_weapon_hands() {
+    if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pInventory) return -1;
+    D2InventoryStrc* inv = g_targetPlayer->pInventory;
+    D2UnitStrc* r = INVENTORY_GetItemFromBodyLoc(inv, BODYLOC_RARM);
+    D2UnitStrc* l = INVENTORY_GetItemFromBodyLoc(inv, BODYLOC_LARM);
+    return d2client_weapon_hands::rule(r != nullptr, l != nullptr, INVENTORY_GetWieldType(g_targetPlayer, inv),
+                                       ITEMS_GetQuiverType(r), ITEMS_GetQuiverType(l));
 }
 
 EMSCRIPTEN_KEEPALIVE int d2_session_command_respawn() {
@@ -9855,6 +9876,9 @@ EMSCRIPTEN_KEEPALIVE const D2SessionItemPresentation* d2_session_item_presentati
 }
 EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_item_colours() {
     updateSessionSnapshot(); return g_sessionItemColours.data();
+}
+EMSCRIPTEN_KEEPALIVE const uint16_t* d2_session_item_inv_colours() {
+    updateSessionSnapshot(); return g_sessionItemInvColours.data();
 }
 EMSCRIPTEN_KEEPALIVE const D2SessionItemSockets* d2_session_item_sockets() {
     updateSessionSnapshot(); return g_sessionItemSockets.data();
@@ -11249,7 +11273,7 @@ EMSCRIPTEN_KEEPALIVE void d2_session_destroy() {
     g_sessionAttackTarget = nullptr; g_sessionAttackSkill = nullptr;
     g_sessionApproachKind = 0; g_sessionApproachTarget = 0;
     g_sessionPendingObject = 0;
-    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionUnitFacings.clear(); g_sessionUnitOverlays.clear(); g_sessionUnitStates.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionItemColours.clear(); g_sessionItemSockets.clear(); g_sessionTiles.clear(); g_sessionSeamTiles.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear(); g_sessionWarps.clear(); g_sessionWarpOrigins.clear(); g_sessionMissileAnimations.clear();
+    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionUnitFacings.clear(); g_sessionUnitOverlays.clear(); g_sessionUnitStates.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionItemColours.clear(); g_sessionItemInvColours.clear(); g_sessionItemSockets.clear(); g_sessionTiles.clear(); g_sessionSeamTiles.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear(); g_sessionWarps.clear(); g_sessionWarpOrigins.clear(); g_sessionMissileAnimations.clear();
     memset(&g_sessionItemState, 0, sizeof g_sessionItemState);
     memset(&g_sessionNpcInteraction, 0, sizeof g_sessionNpcInteraction);
     memset(&g_sessionNpcDialog, 0, sizeof g_sessionNpcDialog); D2WEB_ResetLastDialogPacket(); D2WEB_ResetNpcAlerts();

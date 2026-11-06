@@ -311,7 +311,7 @@ static inline void subSet(uint32_t unit, uint32_t off, uint32_t v) {
 
 // 1.13c D2Game+0x800C0
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_800c0(const D2Game77dEnv* env, uint32_t game, uint32_t unit,
+EMSCRIPTEN_KEEPALIVE void d2game_800c0_port(const D2Game77dEnv* env, uint32_t game, uint32_t unit,
                                              uint32_t task) {
     const uint32_t M = rd32(task, 0);
     const uint32_t row = rd32(task, 0x1C);
@@ -398,7 +398,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_800c0(const D2Game77dEnv* env, uint32_t g
 
 // 1.13c D2Game+0x81C80
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_81c80(const D2Game77dEnv* env, uint32_t game, uint32_t unit,
+EMSCRIPTEN_KEEPALIVE void d2game_81c80_port(const D2Game77dEnv* env, uint32_t game, uint32_t unit,
                                              uint32_t task) {
     const uint32_t M = rd32(task, 0);
     const uint32_t row = rd32(task, 0x1C);
@@ -944,7 +944,7 @@ EMSCRIPTEN_KEEPALIVE void d2game_89c30_port(const D2Game77dEnv* env, uint32_t ga
 
 // 1.13c D2Game+0x7E640
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_7e640(const D2Game77dEnv* env, uint32_t game, uint32_t unit,
+EMSCRIPTEN_KEEPALIVE void d2game_7e640_port(const D2Game77dEnv* env, uint32_t game, uint32_t unit,
                                              uint32_t task) {
     // Retail reads the target distance from its first local (task+0x14); it is not a caller stack argument.
     const uint32_t M = rd32(task, 0);

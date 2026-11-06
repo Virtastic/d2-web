@@ -235,7 +235,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_79100(uint32_t eaxUnit, uint32_t param1,
 // decompile also carries a zero-trip byte loop left from the typed initialiser; it is kept as is.
 // EBX = game.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_97120(uint32_t param1, uint32_t ebxGame,
+EMSCRIPTEN_KEEPALIVE void d2game_port_97120(uint32_t param1, uint32_t ebxGame,
                                              const D2GameBatchD40F0Env* env)
 {
     static const char kFile[] = "..\\Source\\D2Game\\PLAYER\\PlayerPets.cpp";

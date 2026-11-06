@@ -134,7 +134,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2g_55050(void* pGame, uint32_t nVersion
 // 0x4D4A 'JM' magic and the count at +2, and walks that many 0x550A0 records, accumulating their
 // consumed byte counts on top of the 4-byte list header. Version 0x47 is accepted here even though
 // the item dispatcher treats it separately.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_55a10(const uint8_t* pSection, void* p1, uint32_t nVersion, int32_t* pSize, const D2GameBatch53640Env* env) {  // 1.13c D2Game+0x55A10
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_old_55a10(const uint8_t* pSection, void* p1, uint32_t nVersion, int32_t* pSize, const D2GameBatch53640Env* env) {  // 1.13c D2Game+0x55A10
     *pSize = 0;
     if (!(nVersion > 0x46 && nVersion < 0x61)) {
         return 1;

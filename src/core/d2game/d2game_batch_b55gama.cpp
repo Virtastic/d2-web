@@ -26,7 +26,7 @@ static inline int16_t b55gama_s16(const uint8_t* p, uint32_t o) { return *(const
 
 // 1.13c D2Game+0x7FE60
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_7fe60(uint8_t* param_1, uint8_t* param_2, uint8_t* param_3,
+EMSCRIPTEN_KEEPALIVE void d2game_b55gama_7fe60(uint8_t* param_1, uint8_t* param_2, uint8_t* param_3,
                                              const D2GameB55gamaEnv* env)
 {
     uint32_t uVar2 = *(uint32_t*)(param_3 + 8);
@@ -48,6 +48,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_7fe60(uint8_t* param_1, uint8_t* param_2,
         ev[0] = 4;
         uint8_t pct = 100;
         ev[1] = (uint32_t)(uintptr_t)param_2;  // ponytail: host-pointer truncation; event layout is env-owned
+        ev[2] = uVar2;                         // retail writes uStack_4 (B+8) into the event word 2 (0x7FE60 at 6fc9ff6c)
         if (param_2) {
             uint8_t* r = (uint8_t*)env->fn_1320();
             if (r && (r[0x104] & *(const uint32_t*)(env->gdwBitMasks + 0x10)))

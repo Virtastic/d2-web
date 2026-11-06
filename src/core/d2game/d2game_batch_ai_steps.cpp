@@ -1,105 +1,73 @@
-// 1.13c D2Game monster AI steps (plain transcriptions of the cached decompiles, raw struct offsets as in
-// d2game_batch_86900.cpp). Callees are weak externs named after their 1.13c address; the wasm link resolves
-// them. Pointer-valued fields are read as 32-bit words and widened to intptr_t.
+// 1.13c D2Game monster AI steps. Registers and stack words follow the retail calls (ECX = game, EDX = unit, stack word 0 = the AI
+// context t, ret 4); every callee is an Env seam so a probe can record exactly what retail passes. Pointer fields go through Env::ptr.
 #include <cstdint>
 #include <cstring>
+namespace d2game_aisteps {
+using U = uint32_t; using I = int32_t; using P = void*;
+static U r(P p, U o) { U v; std::memcpy(&v, (uint8_t*)p + o, 4); return v; }
+static I s(P p, U o) { return I(r(p, o)); }
+static I h(P p, U o) { int16_t v; std::memcpy(&v, (uint8_t*)p + o, 2); return v; }
+static uint8_t b(P p, U o) { return ((uint8_t*)p)[o]; }
+static void w(P p, U o, U v) { std::memcpy((uint8_t*)p + o, &v, 4); }
+struct Env {
+    P (*ptr)(P, U);
+    P (*lookup)(U a, U c, U d);                         // E03A0: EAX = record+0x30, ECX = record+0x28, EDX = record+0x2C; returns the monster record
+    void (*endAttack)(P game, P unit, P target, I flag); // DEEE0: ECX = game, EDX = unit, stack (target, flag)
+    void (*e07a0)(P mon, P game);                       // E07A0: EAX = monster record, ECX = game
+    P (*a598)(U v);                                     // A598 (D2Common 10392): stack (value), returns a record
+    void (*castAt)(P unit, I skill, P target, I x, I y, I lvl, P game); // F2380: ECX = unit, EBX = game, stack (skill, target, x, y), AL = level
+    void (*idle20C0)(P game, P unit, I frames);         // F20C0: EAX = game, EBX = unit, stack frames
+    void (*idle)(P game, P unit, I frames);             // F22C0: EAX = game, ESI = unit, stack frames
+    void (*modeTarget)(P game, P unit, P target);       // F2220: EAX = 4, EDI = unit, stack (game, target)
+    I (*roll)(P unit, I n);                             // 1180: EAX = n, ECX = &unit+0x20
+};
+// the inline seed step (mul 0x6AC690C5, add hi): unit+0x20/+0x24 hold lo/hi, the result is lo mod 100
+static U roll100(P u) {
+    uint64_t v = uint64_t(r(u, 0x20)) * 0x6ac690c5u + r(u, 0x24);
+    w(u, 0x20, U(v)); w(u, 0x24, U(v >> 32)); return U(v) % 100;
+}
 
-#define W(a, o) (*(int32_t*)((intptr_t)(a) + (o)))
-#define S(a, o) (*(int16_t*)((intptr_t)(a) + (o)))
-#define UB(a, o) (*(uint8_t*)((intptr_t)(a) + (o)))
-#define PTR(a, o) ((intptr_t)(uint32_t)W(a, o))
-#define EXT(n) extern "C" __attribute__((weak)) intptr_t n(...)
-
-EXT(d2game_aisteps_e03a0);   // 0xE03A0 SUNIT_GetServerUnit (unit, id) -> unit
-EXT(FUN_6fcfeee0);   // 0xDEEE0 (unit, unit, unit|0, flag): end the attack
-EXT(FUN_6fd007a0);   // 0xE07A0 (unit)
-EXT(FUN_6fd12380);   // 0xF2380 AITACTICS_UseSkill (unit)
-EXT(FUN_6fd120c0);   // 0xF20C0 (value)
-EXT(FUN_6fd12220);   // 0xF2220 AITACTICS_ChangeModeAndTargetUnit (unit, target)
-EXT(FUN_6fd122c0);   // 0xF22C0 (value)
-EXT(FUN_6fc21180);   // 0x1180 ITEMS_RollLimitedRandomNumber (seed*) -> roll
-EXT(d2game_aisteps_ord10392);  // D2Common ordinal, (value) -> value
-
-// 1.13c D2Game+0x7CB10 (AI_RollGatedSkillState): the monster AI step for gated skills. ai context (p3):
-// +0 control, +0x08 target record, +0x14 threshold, +0x18 timer, +0x1c state; p1 monster; p2 unit (seed +0x20).
-extern "C" void d2game_7cb10(intptr_t p1, intptr_t p2, intptr_t p3)
-{
-    const int32_t iVar1 = W(p3, 0x18);
-    const int32_t iVar2 = W(p3, 0x14);
-    const intptr_t iVar3 = PTR(p3, 0x08);
-    const intptr_t iVar4 = PTR(p3, 0x00);
-    const intptr_t iVar5 = PTR(p3, 0x1c);
-    const uint32_t idx = (uint32_t)UB(p1, 0x6d) * 2;
-    intptr_t iVar6 = 0;
-    intptr_t uVar8 = 0;
-    uint32_t r;
-
-    // Roll: seed = lo*0x6ac690c5 + hi, stored back; returns seed mod 100 (low 32 bits).
-    auto Roll100 = [&]() -> uint32_t {
-        uint64_t s = (uint64_t)(uint32_t)W(p2, 0x20) * 0x6ac690c5ull + (uint32_t)W(p2, 0x24);
-        memcpy((void*)(p2 + 0x20), &s, 8);
-        return (uint32_t)s % 100;
-    };
-    auto dead = [&] { FUN_6fcfeee0(p1, p2, 0, 1); };
-    auto set1 = [&] {
-        FUN_6fd12380(p2);
-        FUN_6fd120c0(8);
-        W(iVar4, 0x18) = (int32_t)S(iVar5, 0x62 + idx) * 0x19 + W(p1, 0xa8);
-        W(iVar4, 0x1c) = 1;
-    };
-    auto set2 = [&] {
-        FUN_6fd12380(p2);
-        W(iVar4, 0x18) = (int32_t)S(iVar5, 0x68 + idx) * 0x19 + W(p1, 0xa8);
-        W(iVar4, 0x1c) = 2;
-    };
-
-    if (p2 == 0 || W(p2, 0) != 1 || PTR(p2, 0x14) == 0 ||
-        (iVar6 = PTR(PTR(p2, 0x14), 0x28)) == 0 || W(iVar6, 0x28) == 0) {
-        dead();
+// 1.13c D2Game+0x7CB10 (AI_RollGatedSkillState): the monster AI step for gated skills. t: +0 ai, +8 target, +0x14 distance, +0x18 flag, +0x1C monster row.
+// ai: +0x18 next-frame stamp, +0x1C state (0 none, 1 first skill cast, 2 second skill cast). Row words are one per difficulty (index game+0x6D).
+inline void d2game_7cb10(Env& e, P g, P u, P t) {
+    P ai = e.ptr(t, 0), tgt = e.ptr(t, 8), m = e.ptr(t, 0x1c);
+    I dist = s(t, 0x14), flag = s(t, 0x18);
+    const U idx = U(b(g, 0x6d)) * 2;
+    auto prm = [&](U o) { return I(h(m, o + idx)); };
+    P rec = nullptr, mon = nullptr;
+    if (u && s(u, 0) == 1) { P pd = e.ptr(u, 0x14); if (pd) rec = e.ptr(pd, 0x28); }
+    if (rec && r(rec, 0x28)) mon = e.lookup(r(rec, 0x30), r(rec, 0x28), r(rec, 0x2c));
+    if (!mon) { e.endAttack(g, u, nullptr, 1); return; }
+    const I kind = s(mon, 0x10);
+    if (kind == 0xc && roll100(u) < 0x28) {
+        e.e07a0(mon, g);
+        P x = e.a598(r(mon, 0x2c));
+        e.endAttack(g, u, x == mon ? nullptr : x, 1);
         return;
     }
-    uVar8 = d2game_aisteps_e03a0(PTR(iVar6, 0x28), (uint32_t)W(iVar6, 0x2c));
-    if (uVar8 == 0) { dead(); return; }
-    const int32_t kind = W(uVar8, 0x10);
-    if (kind == 0xc) {
-        if (Roll100() < 0x28) {
-            FUN_6fd007a0(p1);
-            uint32_t uVar9 = (uint32_t)d2game_aisteps_ord10392((uint32_t)W(uVar8, 0x2c));
-            FUN_6fcfeee0(p1, p2, (uVar9 == (uint32_t)uVar8) ? 0 : (intptr_t)uVar9, 1);
-            return;
+    auto first = [&] {
+        e.castAt(u, h(m, 0x170), tgt, 0, 0, b(m, 0x180), g);
+        e.idle20C0(g, u, 8);
+        w(ai, 0x18, U(prm(0x62) * 0x19 + s(g, 0xa8))); w(ai, 0x1c, 1);
+    };
+    auto second = [&] {
+        e.castAt(u, h(m, 0x172), u, 0, 0, b(m, 0x181), g);
+        w(ai, 0x18, U(prm(0x68) * 0x19 + s(g, 0xa8))); w(ai, 0x1c, 2);
+    };
+    if (h(m, 0x170) >= 0) {
+        if (s(ai, 0x1c) == 0) { first(); return; }
+        if (s(ai, 0x1c) == 2 && s(ai, 0x18) < s(g, 0xa8)) {
+            if (prm(0x74) < dist) { first(); return; }
+            if (flag == 0 && e.roll(u, 100) < prm(0x5c)) { first(); return; }
+            if (kind == 0xe && e.roll(u, 100) < 0x32) { first(); return; }
         }
     }
-    if (S(iVar5, 0x170) >= 0) {
-        if (W(iVar4, 0x1c) == 0) { set1(); return; }
-        if (S(iVar5, 0x170) >= 0 && W(iVar4, 0x1c) == 2 && W(iVar4, 0x18) < W(p1, 0xa8)) {
-            if (S(iVar5, 0x74 + idx) < iVar2) { set1(); return; }
-            if (iVar1 == 0) {
-                r = (uint32_t)FUN_6fc21180(p2 + 0x20);
-                if ((int)r < (int)S(iVar5, 0x5c + idx)) { set1(); return; }
-            }
-            if (kind == 0xe) {
-                r = (uint32_t)FUN_6fc21180(p2 + 0x20);
-                if ((int)r < 0x32) { set1(); return; }
-            }
-        }
+    if (h(m, 0x172) >= 0 && s(ai, 0x1c) == 1 && s(ai, 0x18) < s(g, 0xa8)) {
+        if (flag != 0 || dist < prm(0x74)) { second(); return; }
+        if (kind != 0xe && e.roll(u, 100) < 5) { second(); return; }
     }
-    if (S(iVar5, 0x172) >= 0 && W(iVar4, 0x1c) == 1 && W(iVar4, 0x18) < W(p1, 0xa8)) {
-        if (iVar1 != 0 || iVar2 < (int32_t)S(iVar5, 0x74 + idx)) { set2(); return; }
-        if (kind != 0xe) {
-            r = (uint32_t)FUN_6fc21180(p2 + 0x20);
-            if ((int)r < 5) { set2(); return; }
-        }
-    }
-    if (W(iVar4, 0x1c) == 1) {
-        FUN_6fd120c0((int32_t)S(iVar5, 0x6e + idx));
-        return;
-    }
-    if (iVar1 != 0) {
-        r = (uint32_t)FUN_6fc21180(p2 + 0x20);
-        if ((int)r < (int)S(iVar5, 0x56 + idx)) {
-            FUN_6fd12220(p1, iVar3);
-            return;
-        }
-    }
-    FUN_6fd122c0((int32_t)S(iVar5, 0x6e + idx));
+    if (s(ai, 0x1c) == 1) { e.idle20C0(g, u, prm(0x6e)); return; }
+    if (flag != 0 && e.roll(u, 100) < prm(0x56)) { e.modeTarget(g, u, tgt); return; }
+    e.idle(g, u, prm(0x6e));
+}
 }

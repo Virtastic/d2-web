@@ -63,8 +63,6 @@ extern "C" uint32_t d2net_sub_6ac0(uint8_t* dst, uint32_t len, uint32_t* headSlo
 }
 // 1.13c D2Net+0x61F0 (void): pushes (server, &local, 1) with local = 0xB0 to the import at IAT +0x804c; DAT_6fbfb424 is then cleared (the caller's store).
 extern "C" void d2net_sub_61f0(uint32_t server, void (*imp)(uint32_t, const uint8_t*, uint32_t)) { const uint8_t b = 0xB0; imp(server, &b, 1); }
-// 1.13c D2Net+0x7540 (ord 10034, edi = mode): queue head/tail cleared, CS + zeroed 0x7bc-byte block set up (not modelled), mode stored, sub_63E0 run; modes 1/2 return 1 (other modes start the receive thread, not modelled).
-extern "C" uint32_t d2net_sub_7540(uint32_t mode) { return mode == 1 || mode == 2; }
 // 1.13c D2Net+0x7120 (stdcall, 1 arg): mode (DAT_6fbfb418) not 1/2 -> under the CS (Fog import, not modelled) DAT_6fbfb420 := v.
 extern "C" uint32_t d2net_sub_7120(uint32_t mode, uint32_t* slot, uint32_t v) { if (mode != 1 && mode != 2) { *slot = v; return 0; } return mode; }   // eax at return as retail leaves it: the mode (1/2), else 0
 // 1.13c D2Net+0x7240 (fastcall ecx = a, eax passed through): r = Fog#19(server DAT_6fbfb248, a, eax, 0); r != -1 -> r.

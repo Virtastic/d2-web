@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstring>
 #include <unistd.h>
+#include <emscripten.h>
 
 static inline uint8_t  rd8 (const void* p, uint32_t o) { return ((const uint8_t*)p)[o]; }
 static inline uint16_t rd16(const void* p, uint32_t o) { uint16_t v; std::memcpy(&v, (const uint8_t*)p + o, 2); return v; }
@@ -42,11 +43,12 @@ struct D2GameBatch57dd0Env {
     void     (*ord10024)(const char* module, uint32_t id);     // Ordinal_10024, tail is _exit(-1)
     void     (*ord10158)(void* unit);                          // Ordinal_10158
     void     (*ord11103)(void* unit, uint32_t a);              // Ordinal_11103
-    void     (*sub21320)(void);                                // 0x21320
+    const uint8_t* (*sub21320)(void);                          // 0x21320 (EAX = [unit+4]) -> record (+0x104 flag byte)
     void     (*sub95E10)(void* unit, void* frame);             // 0x95E10
     void     (*subF2540)(void* unit, void* m, void* a, uint32_t b, uint32_t c, uint32_t d, uint32_t e);  // 0xF2540
     void     (*subF22C0)(int32_t v);                           // 0xF22C0
     int32_t  (*ord10826i)(void* p);                            // Ordinal_10826 as an int compare (0x599E0)
+    const uint8_t* gdwBitMasks;                                // gdwBitMasks_exref (0x6FD18BE0 -> mask table, +0x10 used by 0x7F9A0)
 };
 static D2GameBatch57dd0Env g;
 
@@ -242,11 +244,24 @@ void d2game_7f9a0(void* unit, void* m, void* p3) {
     if (rd32(st, 0x14) == 0 && roll() < rds16(tbl, 0x56 + lv * 2)) {
         wr32(st, 0x14, 1);
         g.ord11103(m, 0);
-        if (m) g.sub21320();
-        uint8_t frame[64] = {0};  // stack0xffffffd8: caller-frame scratch, zeroed for replay
-        g.sub95E10(unit, frame);
+        // The event block the decompile hides in stack0xffffffd8 (retail 0x7F9FA..0x7FA83): word 0 = 4, word 1 = the target, word 2 = B+8,
+        // byte 21 = 100, or 101 when the target's record byte +0x104 meets the 0x10 mask word; the other words zero.
+        uint32_t ev[8] = {0};
+        ev[0] = 4;
+        ev[1] = (uint32_t)(uintptr_t)m;
+        ev[2] = (uint32_t)(uintptr_t)a;
+        uint8_t pct = 100;
+        if (m) {
+            const uint8_t* r = g.sub21320();
+            if (r && (r[0x104] & rd32(g.gdwBitMasks, 0x10))) pct = 0x65;
+        }
+        ((uint8_t*)&ev[5])[1] = pct;
+        g.sub95E10(unit, ev);
         return;
     }
     wr32(st, 0x14, 0);
     g.subF22C0(rds16(tbl, 0x5c + lv * 2));
 }
+
+// Probe entry: runs d2game_7f9a0 on a caller-supplied seam table (the table is copied into the file's env).
+extern "C" EMSCRIPTEN_KEEPALIVE void d2game_7f9a0_port(void* unit, void* m, void* p3, const D2GameBatch57dd0Env* env) { g = *env; d2game_7f9a0(unit, m, p3); }

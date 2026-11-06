@@ -290,41 +290,6 @@ extern "C" i32 D2GAME_711D0(i32 in_eax, i32 arg, const D2Game711D0Env* e)
     return count;
 }
 
-// 1.13c D2Game+0x717E0  __fastcall ECX=param_1, EDX=param_2; EAX=in_EAX id, SI=unaff_SI op.
-void D2GAME_717E0(u32 in_eax, i32 param_1, i32 param_2, i32 param_4, int16_t op)
-{
-    if (param_2 == 0) b63_fatal(0x2d3);
-    i32 n = W(param_2, 0x1520 + (in_eax & 0x7f) * 4);
-    if (!n) return;
-    while ((u32)W(n, 0xc) != in_eax) { n = W(n, 0xe4); if (!n) return; }
-    if (W(n, 4) != 0x10b) return;
-    i32 a = (i32)Ordinal_10331(param_1);
-    if (!a || !Ordinal_10057(a)) return;
-    i32 b = (i32)Ordinal_10331(n);
-    if (!b || !Ordinal_10057(b)) return;
-    if (op == 0x12) {
-        if (B(param_1, 0x6c) != 0 && W(param_1, 0x68) == 2) {
-            W(param_1, 100) = -1; W(param_1, 0x68) = 6; B(param_1, 0x6c) = 0;
-        }
-        FUN_6fcf4570();
-    } else if (op == 0x13) {
-        if (param_4 > 0 && param_4 <= (i32)Ordinal_10973(param_1, 0xf, 0)) {
-            i32 x = (i32)Ordinal_10973(param_1, 0xe, 0);
-            i32 y = (i32)Ordinal_10049(param_1);
-            if (x + param_4 <= y) { FUN_6fc32df0(); FUN_6fc21670(-param_4); return; }
-            FUN_6fcfffd0(0x13, param_1);
-        }
-    } else if (op == 0x14 && param_4 > 0) {
-        i32 e = (i32)Ordinal_10973(param_1, 0xe, 0);
-        if (param_4 <= e) {
-            u32 mx = (u32)Ordinal_11060(param_1);
-            u32 f = (u32)Ordinal_10973(param_1, 0xf, 0);
-            if (f + param_4 <= mx) { FUN_6fc21670(-param_4); FUN_6fc21670(param_4); return; }
-            if (f < mx) { FUN_6fc21670(mx - f); FUN_6fc21670(f - 0xe); }
-        }
-    }
-}
-
 // 1.13c D2Game+0xBAFF0  EAX=in_eax (pointer to {game, ?, unit}); Ordinal args hidden in regs.
 void D2GAME_BAFF0(i32* in_eax, i32 arg)
 {

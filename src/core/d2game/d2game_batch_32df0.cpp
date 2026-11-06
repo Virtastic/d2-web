@@ -61,7 +61,7 @@ void questScrollEvent(D2GameStrc* game /* EAX */, uint32_t targetGuid /* ECX */,
     QUESTS_EventCallback(&args, true, true);
 }
 
-// 1.13c D2Game+0x366C0
+// sketch of D2Game 0x366C0 (the 1.13c port is src/core/d2game/d2g_366c0.cpp)
 void hellPortalTransition(D2GameStrc* game /* EAX */, D2UnitStrc* player /* ESI */,
                           int32_t level, D2UnitStrc* portal)
 {

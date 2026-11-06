@@ -12,30 +12,7 @@ static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy
 static inline void     wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
 static inline int16_t  rd16(const void* p, uint32_t o) { int16_t v; std::memcpy(&v, (const uint8_t*)p + o, 2); return v; }
 
-struct D2GameBatchAD860Env {
-    const void* dt;                                                         // *sgptDataTables
-    uint32_t (*ord)(uint32_t n, uintptr_t a, uintptr_t b, uintptr_t c, uintptr_t d, uintptr_t e);
-    void     (*subDE0C0)(void* self, void* unit, uint32_t one, void* buf);  // 0xDE0C0
-    void     (*subDCF20)(void* self, void* unit, void* buf);                // 0xDCF20
-    uint32_t (*subE03A0)(uint32_t a, uint32_t b);                           // 0xE03A0
-    uint32_t (*subC9E0)();                                                  // 0xAC9E0
-    void     (*subF6BC0)();                                                 // 0xD6BC0
-    void     (*subF1730)(int32_t a, uint32_t b, void* c);                   // 0xF1730
-    void     (*subF17E0)(void* unit);                                       // 0xF17E0
-    uint32_t (*sub211D0)(const void* p);                                    // D2Game+0x11D0 (64-bit at p)
-    uint32_t (*sub21420)();                                                 // 0x1420
-    uint32_t (*sub210D0)();                                                 // 0x10D0
-    void     (*subBEA30)(int32_t a, uint32_t b);                            // 0x9EA30
-    void     (*subBF7A0)();                                                 // 0x9F7A0 (callback address)
-    void     (*subAEA80)(uint32_t a, void* b, uint32_t c, uint32_t d, uint32_t e, uint32_t f, uint32_t g); // 0x8EA80
-    uint32_t (*subCE4D0)(uint32_t a, void* b, void* c);                     // 0xAE4D0
-    uint32_t (*subB0A20)(void* unit);                                       // 0xB0A20
-    uint32_t (*sub41260)(void* unit);                                       // 0x21260
-    uint32_t (*subC21320)();                                                // 0x1320
-    uint32_t (*sub07A0)(uint32_t a);                                        // 0xE07A0
-    void     (*subDDDE0)(uint32_t a, void* b, void* c);                     // 0xDDDE0
-    uint32_t (*callPtr)(uint32_t fn, uint32_t a, uint32_t b);               // indirect call through a retail fn pointer
-};
+#include "d2game_batch_ad860_env.h"
 #define O(n, a, b, c, d, e) env->ord(n, (uintptr_t)(a), (uintptr_t)(b), (uintptr_t)(c), (uintptr_t)(d), (uintptr_t)(e))
 
 // AD860 / AD910 share one body: SKILLITEM_EventFunc10 (lightning, +0x1C, hit class 0x4D) and EventFunc06 (physical, +0x08, 0x8D).
@@ -177,11 +154,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2game_B08A0(const int32_t* p1, co
     return 0;
 }
 
-// 1.13c D2Game+0xB12B0   p4 = {unit*, count, dist, maxDist}.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_B12B0(uint32_t p1, uint32_t p2, int32_t* u, uint32_t* p4, const D2GameBatchAD860Env* env)
+// 1.13c D2Game+0xB12B0   p4 = {unit*, count, dist, maxDist}; ebx = edx (retail does mov ebx,edx), 0xB0A20 first operand.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_B12B0(uint32_t p1, uint32_t p2, int32_t* u, uint32_t* p4, void* ebx, const D2GameBatchAD860Env* env)
 {
     (void)p1;
-    int32_t d = (int32_t)env->subB0A20(u);
+    int32_t d = (int32_t)env->subB0A20(ebx, u);
     if (d <= (int32_t)p4[3] && u && u[0] == 1 && u[4] == 0xc && (((uint32_t)u[0x31] >> 1) & 1)) {
         if (O(10541, u, 0, 0, 0, 0) == 0 && env->sub41260(u) == p2) {
             p4[1]++;

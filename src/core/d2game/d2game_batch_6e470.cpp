@@ -15,12 +15,12 @@ void D2C_11090(void* unit, int mode);              // Ordinal_11090: SetUnitMode
 void* D2C_10688(int cls);                          // Ordinal_10688: monstats row
 int D2C_11044(void* a, int b);                     // Ordinal_11044
 void D2GAME_AEA80(void* game, void* unit, int type, int frame, int a, int b, int c); // 0x8EA80 event enqueue
-int D2GAME_8B570(void* st);                        // 0x6B570
-int D2GAME_21560(void* p, int n);                  // 0x1560
-void* D2GAME_24950(int id, int a, void* game, void* x, int b, int c, int d); // 0x24950
+int D2GAME_8B570(void* ctx, int zero);              // 0x6B570 (stdcall 2 words: ctx, 0)
+int D2GAME_21560(int id, int two);                  // 0x1560 (EAX = id, EDX = 2)
+void* D2GAME_24950(int one, int id, int zero, void* game, void* x, int b, int c, int d); // 0x24950 (EAX = 1, ECX = id, EDX = 0, five stack words)
 void D2GAME_23CA0(void* game, void* p, int v);     // 0x23CA0
-void D2GAME_248A0(int a, void* game);              // 0x248A0
-void D2C_10826(void* x);
+void D2GAME_248A0(int one, int zero, void* game, void* x, int three, int six); // 0x248A0 (EAX = 1, ECX = 0, EDX = game, three stack words)
+uint32_t D2C_10826(void* x);
 void D2C_10408(void* unit);                        // Ordinal_10408
 void D2GAME_6DD60(int v);                          // 0x6DD60
 void D2GAME_6E680(void* thisv, void* game, uint32_t id, short kind); // 0x6E680 (args guessed, see header)
@@ -85,37 +85,39 @@ void D2GAME_6E4E0(u8* game, u8* unit)
     D2GAME_AEA80(game, unit, 8, I(game, 0xa8) + 600, 0, 0, 0);
 }
 
-// 1.13c D2Game+0x6EDB0  (param_1 = AI/ctx struct: [0]=game [1]=unit [3]=seed ptr [4]=class)
+// 1.13c D2Game+0x6EDB0  (ECX = ctx: [0]=game [1]=unit [3]=seed ptr [4]=class). Written from the disassembly: the table index is the #10826 result.
+// 1.13c record pointers are 32-bit words; the module is built with 64-bit pointers, so a field is read as a zero-extended dword
+static inline u8* P32(u8* p, int off) { return (u8*)(uintptr_t)*(uint32_t*)(p + off); }
 uint32_t D2GAME_6EDB0(int* c)
 {
     u8* ctx = (u8*)c;
-    u8* unit = PT(ctx, 4);
-    if ((!unit || !I(unit, 0x10)) && D2GAME_8B570(c)) {
-        D2C_10331(*(void**)(ctx + 4));
-        D2C_10826(*(void**)(ctx + 4));
-        D2C_11090(PT(ctx, 4), 1);
-        unit = PT(ctx, 4);
+    u8* unit = P32(ctx, 4);
+    if ((!unit || !I(unit, 0x10)) && D2GAME_8B570(c, 0)) {
+        void* x0 = D2C_10331(P32(ctx, 4));
+        uint32_t idx = D2C_10826(x0);
+        D2C_11090(P32(ctx, 4), 1);
+        unit = P32(ctx, 4);
         if (unit) I(unit, 0xc4) &= ~2;
-        u8* game = PT(ctx, 0);
+        u8* game = P32(ctx, 0);
         u8* ms = (u8*)D2C_10688(I(ctx, 0x10));
-        D2GAME_AEA80(game, PT(ctx, 4), 1, (int)(*(uint32_t*)(ms + 0xdc) >> 8) + 1 + I(game, 0xa8), 0, 0, 0);
-        uint32_t r = Rnd(PT(ctx, 0xc));
+        D2GAME_AEA80(game, P32(ctx, 4), 1, (int)(*(uint32_t*)(ms + 0xdc) >> 8) + 1 + I(game, 0xa8), 0, 0, 0);
+        uint32_t r = Rnd(P32(ctx, 0xc));
         if (r % 0xff <= *(uint32_t*)(ms + 0x194)) {
-            u8* tbl = PT(game, 0xf0 + I(ctx, 0x10) * 4);  // decompile indexes by class (iVar5)
-            unsigned n = tbl[0x10];
-            short* sp = (short*)(tbl + 0x14);
-            for (unsigned i = 0; i < n; i++, sp += 0x1a) {
-                short id = *sp;
-                if (D2GAME_21560(sp, 2)) {
-                    void* x = D2C_10331(PT(ctx, 4));
-                    void* m = D2GAME_24950(id, 0, game, x, 0, 0, -1);
-                    if (m) { D2GAME_23CA0(game, m, 1); D2GAME_248A0(0, game); }
+            u8* tbl = P32(game, 0xf0 + idx * 4);
+            int n = tbl[0x10];
+            u8* sp = tbl + 0x14;
+            for (int i = 0; i < n; i++, sp += 0x34) {
+                int id = *(short*)sp;
+                if (D2GAME_21560(id, 2)) {
+                    void* x = D2C_10331(P32(ctx, 4));
+                    void* m = D2GAME_24950(1, id, 0, game, x, 0, 0, -1);
+                    if (m) { D2GAME_23CA0(game, m, 1); D2GAME_248A0(1, 0, game, x, 3, 6); }
                     break;
                 }
             }
         }
-        if (ms[0x121] == 0) D2C_10408(PT(ctx, 4));
-        D2GAME_6DD60(PT(PT(ctx, 4), 0x14)[4] & 0x7f);
+        if (ms[0x121] == 0) D2C_10408(P32(ctx, 4));
+        D2GAME_6DD60(P32(P32(ctx, 4), 0x14)[4] & 0x7f);
     }
     return 1;
 }

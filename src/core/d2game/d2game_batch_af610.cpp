@@ -126,39 +126,45 @@ extern "C" uint32_t D2Game_54BC0_DropPickupMercItem(const PickupOps* o, void* ct
     return 0;
 }
 
+// Retail 0x719A0 (disassembled): EAX = game, ESI = unit a, stack = (unit b, stateA, stateB, retVal), ret 0x10. EBP/EBX are not inputs.
+// Every callee is an op: 10201 touch(u, 1); 0x716D0 reset(game, u); 0x700C0 post(game = EBX, u = EAX); 0xD4570 notify(u = EAX);
+// 10920 client(u) returns the record whose +0x9C is the client (only when *u == 0, else the client is 0); 0x8A3E0 send(client = EAX, buf, len);
+// 0x8E6F0 killRoom(node = EAX); 0x8EA80 event(game = ECX, u = EDX, 0xd, frame + 1, 0, 0, 0).
 namespace {
 struct DuelOps {
     void (*touch)(int32_t*, int32_t);          // 10201
     void (*reset)(void* game, int32_t* u);     // 0x716D0
-    void (*post)();                            // 0x700C0
+    void (*post)(void* game, int32_t* u);      // 0x700C0
     void (*notify)(int32_t*);                  // 0xD4570
-    void (*free)(int32_t*);                    // 10920
-    void (*clear)(void*, int);                 // 0x8A3E0
-    void (*killRoom)(int32_t*);                // 0x8E6F0
-    void (*event)(void*, int32_t*, int, int, int, int, int); // 0x8EA80
+    uint8_t* (*client)(int32_t*);              // 10920 (0xA4C0): record, +0x9C = client
+    void (*send)(uint32_t client, const uint8_t* buf, uint32_t len); // 0x8A3E0
+    void (*killRoom)(uint8_t* node);           // 0x8E6F0
+    void (*event)(void* game, int32_t* u, int, int, int, int, int); // 0x8EA80
 };
 }
 
 // 1.13c D2Game+0x719A0 -- end of a duel: flag both units, reset state, post events.
 extern "C" void D2Game_719A0_EndDuel(const DuelOps* o, uint8_t* game, int32_t* a, int32_t* b,
-        uint32_t retVal, int32_t* stateA, int32_t* stateB)
+        int32_t* stateA, int32_t* stateB, uint32_t retVal)
 {
     for (int32_t* u : {a, b}) o->touch(u, 1);
     for (int32_t* u : {a, b}) if (u) u[0x32] |= 0x800000;
     for (int32_t* u : {a, b}) { u[0x19] = -1; u[0x1a] = 6; *(uint8_t*)(u + 0x1b) = 0; }
     for (int32_t* u : {a, b}) o->reset(game, u);
-    o->post(); o->post();
+    for (int32_t* u : {a, b}) o->post(game, u);
     stateA[0x14] = (int32_t)retVal;
     stateB[0x14] = 9;
-    o->notify(a); o->notify(b);
+    for (int32_t* u : {a, b}) o->notify(u);
     for (int32_t* u : {a, b}) {
-        if (*u == 0) o->free(u);
-        o->clear(nullptr, 2);
+        uint32_t client = 0;
+        if (*u == 0) client = *(uint32_t*)(o->client(u) + 0x9c);
+        const uint8_t pkt[2] = {0x77, 0x0c};
+        o->send(client, pkt, 2);
     }
     for (int32_t* u : {a, b})
-        for (char* p = (char*)(uintptr_t)u[0x37]; p;) {
-            char c = *p; p = *(char**)(p + 0x24);
-            if (c == '\r') o->killRoom(u);
+        for (uint8_t* p = (uint8_t*)(uintptr_t)u[0x37]; p;) {
+            uint8_t c = *p; uint8_t* node = p; p = *(uint8_t**)(p + 0x24);
+            if (c == 0x0d) o->killRoom(node);
         }
     for (int32_t* u : {a, b})
         o->event(game, u, 0xd, *(int32_t*)(game + 0xa8) + 1, 0, 0, 0);

@@ -14,7 +14,7 @@ struct D2GameBatch15BB0Env {
 };
 D2GameBatch15BB0Env g_d2gameBatch15BB0Env;
 
-// 1.13c D2Game+0x15BB0
+// 0x15BB0 retail port: src/core/d2game/d2g_15bb0.cpp (this draft is superseded)
 extern "C" uint32_t D2Game_15BB0(void* unit) {
     D2GameBatch15BB0Env& E = g_d2gameBatch15BB0Env;
     uint32_t list = 0;  // retail derefs a null here and faults; callers never pass that

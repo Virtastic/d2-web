@@ -33,9 +33,9 @@ W u32 d2game_a5ff4_ord10397(int pInfo);
 W void d2game_a5ff4_ord10137(int pInfo, int a);
 W void d2game_a5ff4_ord10542(int pUnit, int a);
 W void d2game_a5ff4_ord10168(int pPath, int nValue);
-W void d2game_a5ff4_ord10441(int pUnit);
-W void d2game_a5ff4_ord10558(int pUnit);
-W void d2game_a5ff4_ord10970(int pUnit);
+W void d2game_a5ff4_ord10441(int pUnit, int a);
+W void d2game_a5ff4_ord10558(int pUnit, int a);
+W void d2game_a5ff4_ord10970(int pUnit, int a);
 W void d2game_a5ff4_ord10243(int pInfo, int a);
 W void d2game_a5ff4_ord10554(int pInfo, int a);
 W void d2game_a5ff4_ord10336(int pPath, int a);
@@ -52,7 +52,7 @@ W int d2game_a5ff4_ord10436(int a);
 W void d2game_a5ff4_ord11154(int a, int pUnit);
 W int d2game_a5ff4_ord10265(int a);
 W void d2game_a5ff4_ord10024(const void* pStr, int a);
-W void d2game_a5ff4_ord11129(void);
+W void d2game_a5ff4_ord11129(int pUnit, int e);
 
 // --- D2Game seams (1.13c RVA in the name) ---
 W int  d2game_a5ff4_s967b0(void);
@@ -65,19 +65,19 @@ W void d2game_a5ff4_sbf210(void);
 W void d2game_a5ff4_sdddde0(int a, int b, int pUnit);
 W void d2game_a5ff4_s95e10(int pGame, void* pEvent);
 W int  d2game_a5ff4_sffa90(int pUnit);
-W unsigned char d2game_a5ff4_s42a80(int n);
+W int  d2game_a5ff4_s42a80(int n);
 W void d2game_a5ff4_s21220(void);
 W int  d2game_a5ff4_sbc9a0(int a, int b);
-W void d2game_a5ff4_sc00b0(void);
-W void d2game_a5ff4_sbd230(int pGame, int pUnit);
-W void d2game_a5ff4_sae6f0(void);
+W void d2game_a5ff4_sc00b0(int* pBlock);
+W void d2game_a5ff4_sbd230(int pGame, int pUnit, int pData, int nMode);
+W void d2game_a5ff4_sae6f0(int pNode);
 W void d2game_a5ff4_saea80(int pGame, int pUnit, int a, int b, int c, int d, int e);
 W void d2game_a5ff4_s41490(void* pIn, void* pOut);
 W int  d2game_a5ff4_s473c0(int a, int pUnit, int nSkill);
 W void d2game_a5ff4_s97240(int pUnit);
 W int  d2game_a5ff4_sbee50(int a, void* pOut, int pUnit, int b, int nSkill, int c);
 W void d2game_a5ff4_sefb80(int pThis, int pGame, int pRoom, int pUnit, int a, int b);
-W int  d2game_a5ff4_seddb0(int a, int pUnit);
+W int  d2game_a5ff4_seddb0(int eax, int ecx, int pUnit, int pGame, int s1, int s2);
 W void d2game_a5ff4_sdfeee0(int a, int pUnit, int pUnit2, int one);
 W int  d2game_a5ff4_sb7090(int pGame, int pUnit, void* pA, void* pB, int zero, void* pCb);
 W void d2game_a5ff4_sb6d30(void); // address only: callback handed to 0xB7090
@@ -86,7 +86,7 @@ W int  d2game_a5ff4_sb79b0(int pUnit, int pGame, int a, int b, int c, int pEv);
 W void d2game_a5ff4_sb8070(int pUnit, int nR, int pGame, int a, int pEv);
 W void d2game_a5ff4_sffcc0(int pThis, int zero);
 W void d2game_a5ff4_saf5c0(int pGame);
-W int  d2game_a5ff4_sd19c0(int nX, int pRoom, int a, int pUnit, int pUnit2);
+W int  d2game_a5ff4_sd19c0(int nX, int pRoom, int a, int pUnit, int pUnit2, int nY); // EAX = nY (the register argument)
 
 extern "C" char* sgptDataTables_exref;
 static inline int dt(int off) { return *(int*)(*(intptr_t*)sgptDataTables_exref + off); }
@@ -128,8 +128,9 @@ static inline void sweep_ae6f0(int u)
 {
     for (char* p = (char*)(intptr_t)rd(u, 0xDC); p;) {
         char c = *p;
-        p = (char*)(intptr_t)rd((int)(intptr_t)p, 0x24);
-        if (c == 2) d2game_a5ff4_sae6f0();
+        int node = (int)(intptr_t)p;
+        p = (char*)(intptr_t)rd(node, 0x24);
+        if (c == 2) d2game_a5ff4_sae6f0(node);
     }
 }
 
@@ -259,8 +260,8 @@ extern "C" int d2game_a5ff4_fn_b1320(int param_1, int param_2, int param_3, int 
     return 0;
 }
 
-// 1.13c D2Game+0xB2120   __fastcall(ecx = pGame), esi = pUnit
-extern "C" void d2game_a5ff4_fn_b2120(int param_1, int esi)
+// 1.13c D2Game+0xB2120   ecx = pGame (edi), esi = pUnit, eax = e (ebx), one stack word s0 (ret 4)
+extern "C" void d2game_a5ff4_fn_b2120(int param_1, int esi, int eax, int s0)
 {
     if (esi == 0 || (rd8(esi, 0xC6) & 1) != 0) return;
     int t = rd(esi, 0);
@@ -274,9 +275,11 @@ extern "C" void d2game_a5ff4_fn_b2120(int param_1, int esi)
         (((u32)rd(esi, 0xC4) >> 2 & 1) != 0 || d2game_a5ff4_sffa90(esi) != 0) && d2game_a5ff4_s42a80(10) == 0 &&
         (rd(esi, 0) != 1 || rd(esi, 0x14) == 0 || (rd8(rd(esi, 0x14), 0x16) & 2) == 0) &&
         d2game_a5ff4_ord11085(esi) != 0) {
-        d2game_a5ff4_sc00b0();
-        d2game_a5ff4_ord11129();
-        d2game_a5ff4_sbd230(param_1, esi);
+        int blk[9] = {eax, esi, 0x4D, 1, s0, -1, 0, 0x38, 0};
+        d2game_a5ff4_sc00b0(blk);
+        d2game_a5ff4_ord11129(esi, eax);
+        int pd = (rd(esi, 0) == 1 && rd(esi, 0x14) != 0) ? rd(rd(esi, 0x14), 0x28) : 0;
+        d2game_a5ff4_sbd230(param_1, esi, pd, 0xB);
         sweep_ae6f0(esi);
         d2game_a5ff4_saea80(param_1, esi, 2, rd(param_1, 0xA8) + 1, 0, 0, 0);
     }
@@ -327,8 +330,8 @@ extern "C" int d2game_a5ff4_fn_b2fc0(int param_1, int param_2, int param_3, int 
     return 1;
 }
 
-// 1.13c D2Game+0xB32E0   eax = nSkill, ebx = pMonster. Ghidra shows 10786 with two arguments; skill and
-// level were register-carried and are not recoverable, passed as 0.
+// 1.13c D2Game+0xB32E0   eax = nSkill, ebx = pMonster, stack (pUnit, nLevel), ret 8. Retail passes 10786 (pUnit, [rec+0x138], nSkill,
+// nLevel), then calls 10441/10558/10970 each with (pMonster, value): the first gets ([monrow+0x178] << 8) / level, the other two the level.
 extern "C" int d2game_a5ff4_fn_b32e0(int param_1, int param_2, int eax, int ebx)
 {
     int rec = skill_rec(eax);
@@ -337,14 +340,14 @@ extern "C" int d2game_a5ff4_fn_b32e0(int param_1, int param_2, int eax, int ebx)
         if (c >= 0 && c < dt(0xB6C)) {
             int m = c * 0x1A4 + dt(0xB64);
             if (m != 0) {
-                int lvl = d2game_a5ff4_ord10786(param_1, rd(rec, 0x138), 0, 0);
+                int lvl = d2game_a5ff4_ord10786(param_1, rd(rec, 0x138), eax, param_2);
                 if (lvl < 1) lvl = rd(m, 0x3C) - 1 + param_2;
                 if (lvl < 2) lvl = 1;
                 else if (lvl > 0xFE) lvl = 0xFF;
                 d2game_a5ff4_ord10168(rd(ebx, 0x2C), lvl);
-                d2game_a5ff4_ord10441(ebx);
-                d2game_a5ff4_ord10558(ebx);
-                d2game_a5ff4_ord10970(ebx);
+                d2game_a5ff4_ord10441(ebx, (int)((u32)rd8(m, 0x178) << 8) / lvl);
+                d2game_a5ff4_ord10558(ebx, lvl);
+                d2game_a5ff4_ord10970(ebx, lvl);
                 return 1;
             }
         }
@@ -419,15 +422,14 @@ extern "C" int d2game_a5ff4_fn_b4410(int param_1, int param_2, int param_3, int 
 }
 
 // 1.13c D2Game+0xB4760   __fastcall(ecx = pGame-like arg, edx = pUnit)
-// The first Ordinal_10750 call's result is unused in retail; Ordinal_10331's extra stack arguments in the
+// The first Ordinal_10750 call's result is the EAX argument of 0xE19C0; Ordinal_10331's extra stack arguments in the
 // decompile are not part of it (it takes the unit); Ordinal_10565 takes (room, x, y, 1, 0x1000).
 extern "C" int d2game_a5ff4_fn_b4760(int param_1, int param_2)
 {
-    int t = rd(param_2, 0);
-    if (t != 2 && (t < 4 || 5 < t) && rd(param_2, 0x2C) != 0) d2game_a5ff4_ord10750(rd(param_2, 0x2C));
+    int yy = uy(param_2);   // the first Ordinal_10750 call: its result is EAX of the 0xE19C0 call
     int x = ux(param_2);
     int room = d2game_a5ff4_ord10331(param_2);
-    if (d2game_a5ff4_sd19c0(x, room, param_1, param_2, param_2) != 0) {
+    if (d2game_a5ff4_sd19c0(x, room, param_1, param_2, param_2, yy) != 0) {
         wr(param_2, 0xC4, rd(param_2, 0xC4) | 0xE);
         int y = uy(param_2);
         int x2 = ux(param_2);
@@ -437,23 +439,25 @@ extern "C" int d2game_a5ff4_fn_b4760(int param_1, int param_2)
     return 0;
 }
 
-// 1.13c D2Game+0xB65E0   __fastcall(ecx, edx = pUnit, nSkill, param_4); ebp = first DDB0 argument
-extern "C" int d2game_a5ff4_fn_b65e0(int param_1, int param_2, int param_3, int param_4, int ebp)
+// 1.13c D2Game+0xB65E0   __fastcall(ecx = pGame, edx = pUnit, nSkill, param_4)
+// BEE50's result (EAX out) is the first DDB0's EAX and the value it writes through EDX the first DDB0's ECX; later DDB0 calls pass ecx = 8
+// and the failure count as the second stack word. FEEE0 always runs after the loop.
+extern "C" int d2game_a5ff4_fn_b65e0(int param_1, int param_2, int param_3, int param_4)
 {
-    (void)param_1;
     int rec = skill_rec(param_3);
     if (rec == 0) return 0;
-    char scratch[4];
-    if (d2game_a5ff4_sbee50(0, scratch, param_2, 1, param_3, param_4) >= 0 && d2game_a5ff4_ord10511(param_2) != 0) {
+    int scratch = 0;
+    int ebp = d2game_a5ff4_sbee50(0, &scratch, param_2, 1, param_3, param_4);
+    if (ebp >= 0 && d2game_a5ff4_ord10511(param_2) != 0) {
         wr(param_2, 0x3C, 0);
-        int n = d2game_a5ff4_ord10786(param_2, rd(rec, 0x138), param_3, param_3);
+        int n = d2game_a5ff4_ord10786(param_2, rd(rec, 0x138), param_3, param_4);
         if (n > 0) {
-            int s = d2game_a5ff4_seddb0(ebp, param_2);
+            int s = d2game_a5ff4_seddb0(ebp, scratch, param_2, param_1, -1, 0);
             if (s != 0) wr(s, 0xC4, rd(s, 0xC4) | 0x4000000);
             int made = s != 0;
             int fail = 1;
             for (int i = 0; made < n && fail < 5 && i < n * 2; ++i) {
-                int c = d2game_a5ff4_seddb0(8, param_2);
+                int c = d2game_a5ff4_seddb0(ebp, 8, param_2, param_1, fail, 0);
                 if (c == 0) {
                     ++fail;
                 } else {
@@ -462,7 +466,7 @@ extern "C" int d2game_a5ff4_fn_b65e0(int param_1, int param_2, int param_3, int 
                 }
             }
         }
-        d2game_a5ff4_sdfeee0(param_2, param_2, param_2, 1);
+        d2game_a5ff4_sdfeee0(param_1, param_2, param_2, 1);
         return 1;
     }
     return 0;

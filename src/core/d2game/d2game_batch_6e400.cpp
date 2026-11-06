@@ -129,50 +129,74 @@ uint32_t d2_fn_d2game_6E680(uint32_t thisId, A game, uint32_t param2, int16_t pa
     return 1;
 }
 
-// Decompile is stack-garbled around the packet block; semantics kept, REG? args noted.
-// eax = node id, ebx = game, esi = unit record, edi = spell id source, retaddr word = skill id.
+// Retail 0x6E930 (disassembled; the decompile is stack-garbled): a mid-function continuation entered by `call` with EAX = unit id, EBX = game,
+// ESI = unit record, [esp+4] = a dword whose LOW WORD is the skill id (the rest is stack residue); `ret 4`; EBP/EDI are saved and not inputs.
+// Callees (all stdcall, sizes as the disassembly pushes them): B156(node) record; A478(unit) owner; A556(owner) current skill;
+// 1720(EAX = unit, [game]) client record; AB02(skill, &out) writes out; AAD2(g, out); B0B4(skill); 9E170(EAX = unit, game, flag);
+// A56E(skill, skill, flag, &o1, &o2) returns AL = table index; B162(game[0xBC + 4 * idx]); A4C0(unit) record with +0x9C client; A544(unit, &xy) writes {x, y};
+// 78550(ECX = game, EDX = unit, 0, 2, x, y, 0); 8A3E0(EAX = client, packet, 13); B800(EAX = game, ECX = unit, [owner2]).
+namespace {
+struct D2Game6E930Ops {
+    A (*unitRec)(A node);                       // 0xB156 (Ordinal 10296)
+    A (*owner)(A unit);                         // 0xA478 (10331)
+    uint32_t (*curSkill)(A owner);              // 0xA556 (10826)
+    A (*clientRec)(A unit, A game);             // 0x1720
+    uint32_t (*skillOut)(uint32_t skill, uint32_t* out);  // 0xAB02 (10436)
+    uint32_t (*check)(A g, uint32_t v);         // 0xAAD2 (10373)
+    uint32_t (*skillClass)(uint32_t skill);     // 0xB0B4 (10416)
+    void (*prep)(A unit, A game, uint32_t flag);          // 0x9E170
+    uint32_t (*lookup)(uint32_t skill, uint32_t skill2, uint32_t flag, uint32_t* o1, uint32_t* o2);  // 0xA56E (10459)
+    A (*target)(A p);                           // 0xB162 (10942)
+    A (*clientOf)(A unit);                      // 0xA4C0 (10920)
+    void (*pos)(A unit, uint32_t* xy);          // 0xA544 (10141)
+    void (*cast)(A game, A unit, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);  // 0x78550
+    void (*send)(A client, const void* buf, uint32_t len);   // 0x8A3E0
+    void (*done)(A game, A unit, A owner);      // 0xB800
+    void (*fatal)(uint32_t size);               // 0x2A2DA / 0x2A2C2 / 0x22A3C: asserts and exits
+    A handlerTable;                             // module 0x107BB8: a dword per +0x1B3 byte
+    uint32_t fn8CF90;                           // the table entry that selects this path
+};
+}
 // 1.13c D2Game+0x6E930
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2game_6E930(uint32_t eax, A ebx, A esi, A edi, uint16_t retaddr, int16_t sStack8,
-                        const D2GameBatch6E400Env* e)
+void d2_fn_d2game_6E930(uint32_t eax, A ebx, A esi, uint32_t skillWord, const D2Game6E930Ops* o)
 {
-    if (!ebx) fatal6E400(e, 0x41);
+    if (!ebx) o->fatal(0x2D3);
     A n = rdA(ebx, 0x1520 + (eax & 0x7F) * 4);
     while (n && rd32(n, 0xC) != eax) n = rdA(n, 0xE4);
     if (!n) return;
-    A i3 = e->o10296(n);
-    if (!i3 || rd8(i3, 0x1B3) >= 0x65) return;
-    if (rdA(e->handlerTable27BB8, rd8(i3, 0x1B3) * 4) != e->fn8CF90) return;
-    uint32_t sk = retaddr;
-    A u2 = e->o10331(n);                               // REG? n
-    uint32_t cur = (uint32_t)e->o10826(n);             // REG? n
+    A rec = o->unitRec(n);
+    if (!rec) return;
+    uint8_t b = rd8(rec, 0x1B3);
+    if (b >= 0x65 || rd32(o->handlerTable, b * 4u) != o->fn8CF90) return;
+    uint32_t sk = skillWord & 0xFFFF;
+    uint32_t cur = o->curSkill(o->owner(n));
     wr32(esi, 0x64, (uint32_t)-1); wr32(esi, 0x68, 6); wr8(esi, 0x6C, 0);
-    if (cur == sk || sStack8 == 0) return;
-    A g = e->f21720();
-    if (!e->o10436(sk)) return;                         // REG? skill
-    if (!e->o10373(g)) return;                          // REG? u2
-    A flag = (e->o10416(sk) == 0 && sk != 0x2E && sk != 0x4A && sk != 0x85 && sk != 0x86 &&
-              sk != 0x87 && sk != 0x88) ? 0 : 0xD;
-    e->fBE170(ebx);
-    A u3 = e->o10331(n);                                // REG?
+    if (cur == sk || sk == 0) return;
+    A g = o->clientRec(esi, ebx);
+    uint32_t l1 = 0;
+    if (!o->skillOut(sk, &l1)) return;
+    if (!o->check(g, l1)) return;
+    uint32_t flag = (o->skillClass(sk) != 0 || sk == 0x2E || sk == 0x4A || sk == 0x85 || sk == 0x86 || sk == 0x87 || sk == 0x88) ? 0xD : 0;
+    o->prep(esi, ebx, flag);
+    A u3 = o->owner(esi);
     if (u3) {
-        A xy[2] = {0, 0};
-        A idx = e->o10459(sk, sk, flag, (A)&xy[0], (A)&xy[1]);
-        A u4 = e->o10942(rd32(ebx, 0xBC + (idx & 0xFF) * 4));
-        if (u3 == u4) {
-            if (rd32(esi, 0) == 0) e->o10920(esi);
+        uint32_t o1[1] = {0}, o2[1] = {0};
+        uint32_t idx = o->lookup(sk, sk, flag, o1, o2) & 0xFF;
+        if (u3 == o->target(rdA(ebx, 0xBC + idx * 4))) {
+            A client = rd32(esi, 0) == 0 ? rdA(o->clientOf(esi), 0x9C) : 0;
             uint32_t uid = rd32(esi, 0xC);
-            e->o10141(u3);                              // REG?
-            e->f98550(ebx, esi, 0, 2, (A)xy[0], u2, 0);
-            uint8_t b[13] = {};
-            b[0] = 0x0D;
-            std::memcpy(b + 2, &uid, 4);
-            b[6] = 1;
-            e->fAA3E0(b, 0xD);
+            uint32_t xy[2] = {0, 0};
+            o->pos(esi, xy);
+            o->cast(ebx, esi, 0, 2, xy[0], xy[1], 0);
+            uint8_t pk[13] = {};
+            pk[0] = 0x0D; std::memcpy(pk + 2, &uid, 4); pk[6] = 1;
+            uint16_t px = (uint16_t)(xy[0] + 3), py = (uint16_t)(xy[1] + 3);
+            std::memcpy(pk + 7, &px, 2); std::memcpy(pk + 9, &py, 2);
+            o->send(client, pk, 0xD);
         }
     }
-    e->f2B800(esi);
-    (void)edi;
+    o->done(ebx, esi, u3);
 }
 
 // 1.13c D2Game+0x70010: copy the ear / personalised-name data of a source item onto its duplicate.
@@ -197,113 +221,7 @@ void d2_fn_d2game_70010(A dst, A src, A bSet, const D2GameBatch6E400Env* e)
 // Quest/item requirement check against one 8-byte condition row at esi+0x14+idx*8.
 // esi = condition table, iStack20 = unit's class record (+0x80 mask), iStack10 = required count,
 // iStack8 = "exact count" flag (0 => at-least). Both stack values are caller-set (REG?).
-// 1.13c D2Game+0x70240
-extern "C" EMSCRIPTEN_KEEPALIVE
-bool d2_fn_d2game_70240(A param1, A param2, int32_t param3, A param4, A esi,
-                        A iStack20, int32_t iStack10, int32_t iStack8, const D2GameBatch6E400Env* e)
-{
-    if (param2 == 0) return false;
-    uint16_t cond0 = rd16(esi, 0x14 + param3 * 8);
-    if ((cond0 & 3) == 0) return true;
-    int32_t local1c = 0;
-    if ((cond0 & 1) && (int16_t)rd16(esi, 0x16 + param3 * 8) != -1)
-        local1c = (int32_t)e->o10695((int16_t)rd16(esi, 0x16 + param3 * 8));
-    int32_t count = 0;
-    A cur = e->o10460(param2);
-    const A idxBase = 0x14 + (A)param2 * 8;  // NB: row is indexed by param_2 in the body (as decompiled)
-    while (cur) {
-        A rec8 = e->o11147(cur);
-        cur = e->o10464(cur);
-        if (!rec8 || (uint8_t)e->o10020(rec8) != 3) continue;
-        local1c++;
-        A r9 = e->o10695(rd32(param1, 4));
-        if (!r9) continue;
-        A cls = e->o10802(param1);
-        uint16_t c = rd16(esi, idxBase);
-        uint16_t arg = rd16(esi, 0x16 + param2 * 8);
-        bool pass1;
-        if (!(c & 1)) {
-            pass1 = !(c & 2) || e->o10744(param1, arg) != 0;
-        } else if (arg == 0xFFFF) {
-            pass1 = true;
-        } else if ((int8_t)c < 0) {
-            A c84 = rd32(r9, 0x84), c88 = rd32(r9, 0x88), c8c = rd32(r9, 0x8C), m = rd32(iStack20, 0x80);
-            if (cls == c84)      pass1 = (m == c84);
-            else if (cls == c88) pass1 = (m == c84 || m == c88);
-            else                 pass1 = (cls == c8c) && (m == c84 || m == c88 || m == c8c);
-        } else {
-            pass1 = (A)arg == rd32(param1, 4);
-        }
-        if (!pass1) continue;
-        uint8_t b1a = rd8(esi, 0x1A + param2 * 8);
-        if (b1a != 0 && e->o10106(param1) != b1a) {
-            if (b1a == 9) e->o11165(param1);
-            continue;
-        }
-        if ((rd8(esi, 0x14 + param2 * 8) & 0x40) &&
-            (int32_t)e->o10620(param1) != (int32_t)rd16(esi, 0x18 + param2 * 8) - 1) continue;
-        c = rd16(esi, idxBase);
-        if (c & 4) { if ((uint8_t)e->o10366(param1) != 0) continue; }
-        else if ((c & 8) && (uint8_t)e->o10366(param1) == 0) continue;
-        c = rd16(esi, idxBase);
-        if (c & 0x20) { if (e->o10225(param1) != 0) continue; }
-        else if ((c & 0x10) && e->o10225(param1) == 0) continue;
-        c = rd16(esi, idxBase);
-        if (c & 0x100)      { if (cls != rd32(r9, 0x84)) continue; }
-        else if (c & 0x200) { if (cls != rd32(r9, 0x88)) continue; }
-        else if (c & 0x400) { if (cls != rd32(r9, 0x8C)) continue; }
-        if ((c & 0x800) && (e->o10838(param1) & 0x4000000)) continue;
-        if (rd8(esi, 4) == 0x1C && rd8(r9, 0x12A) != 0 && rd8(r9, 0x12B) != 0 &&
-            (int32_t)rd8(rec8, 0x6D) <= (int32_t)e->o10973(param1, 0x164, 0)) continue;
-        if (param2 == 0 && rd8(esi, 0x54) != 0xFF && rd8(esi, 0x54) != 0xFE &&
-            (rd8(esi, 0x4C) & 2) && (uint8_t)e->o11151(param1) == 0) continue;
-        if (!(local1c > 0x2F || rd32(param4, local1c * 4 - 4) == 0)) continue;
-        if (param2 == 0) {
-            uint8_t t = rd8(esi, 4);
-            if (t != 0) {
-                int32_t id = (int32_t)rd32(esi, 8);
-                bool inRange = id > -1 && id <= (int32_t)rd32(e->dataTables, 0xBD4);
-                if (t >= 0x0F && t <= 0x1A && inRange) {
-                    int k = (t - 0x0F) % 4, g = (t - 0x0F) / 4;
-                    A r = e->f210D0(id);
-                    if (!r) goto skip;
-                    int32_t thr = (int32_t)rd32(esi, 0xC) >> (rd8(r, 0x18) & 0x1F);
-                    int32_t val = (int32_t)(g == 0 ? e->o10973(param1, id, 0)
-                                          : g == 1 ? e->o10587(param1, id, 0) : e->o10379(param1, id, 0));
-                    bool s = k == 0 ? val < thr : k == 1 ? thr < val : k == 2 ? val == thr : val != thr;
-                    if (s) goto skip;
-                } else if (t == 0x1B && (int32_t)e->o10620(param1) == (int32_t)rd32(esi, 0xC)) {
-                    goto skip;
-                }
-            }
-            // three output slots at param3+4: {unit,itemId,flags}
-            A p = (A)param3 + 4;
-            for (int k = 3; k; k--, p += 12) {
-                wr32(p, 4, (uint32_t)e->o10086(param1));
-                if (rd8(esi, 0x4C) & 1) wr32(p, (uint32_t)-4, (uint32_t)param1);
-                uint8_t m = rd8(esi, 0x54);
-                if (m == 0xFF || m == 0xFE) {
-                    wr32(p, (uint32_t)-4, (uint32_t)param1);
-                    wr32(p, 0, m == 0xFF ? rd32(param1, 4) : 0xFFFFFFFFu);
-                    uint32_t k4c = rd16(esi, 0x4C);
-                    uint32_t code = ((int8_t)k4c < 0) ? rd32(r9, 0x88) : (k4c & 0x100) ? rd32(r9, 0x8C) : 0x20202020;
-                    if (code != 0x20202020) {
-                        int32_t id2 = (int32_t)e->o10213(rd32(e->dataTables, 0x94), code, 0);
-                        A r2 = id2 > -1 ? e->o10695(id2) : 0;
-                        if (r2 && (m == 0xFE || rd32(rec8, 0x70) != 0 || rd16(r2, 0xF6) < 100))
-                            wr32(p, 0, (uint32_t)id2);
-                    }
-                }
-            }
-        }
-        if (local1c < 0x30) wr32(param4, local1c * 4 - 4, 1);
-        count++;
-        if (e->o10048(param1) != 0) iStack8 = 0;
-        skip:;
-    }
-    if (iStack8 == 0) return iStack10 <= count;
-    return count == iStack10;
-}
+// 1.13c D2Game+0x70240 lives in d2game_70240.cpp (rewritten from the disassembly)
 
 // 1.13c D2Game+0x70BF0 (layout from the disassembly; see the 70BF0 row).
 // Packet-by-unit send. P = 40-byte stack block, zeroed: P[0] = 0x5a, P[1] = DL. When unit A (EAX) is non-null, ordinal 501 fills
@@ -349,20 +267,6 @@ uint32_t d2_fn_d2game_70CF0(A eax, A ebx, A param1, A param2, const D2Game70CF0E
     uint32_t local[0x30] = {};
     for (int i = 0; i < 7; i++)
         if (e->f70240(eax, param1, ebx, i, param2, (A)local) == 0) return 0;
-    return 1;
-}
-
-// 1.13c D2Game+0x70CF0, the earlier transcription (kept for reference; not the proven port).
-extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2_fn_d2game_70CF0_old(A param1, A param2, A eax, A ebx, A esi, A iStack20,
-                            int32_t iStack10, int32_t iStack8, const D2GameBatch6E400Env* e)
-{
-    if (!ebx || !eax) return 0;
-    uint32_t flags[0x30] = {};
-    for (int i = 0; i < 7; i++)
-        if (!d2_fn_d2game_70240(param1, ebx, i, (A)(flags + 0x30), esi, iStack20, iStack10, iStack8, e))
-            return 0;
-    (void)param2;
     return 1;
 }
 

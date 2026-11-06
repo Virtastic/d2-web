@@ -513,7 +513,7 @@ EMSCRIPTEN_KEEPALIVE void d2_old_9f9a0(uint32_t* r)
 
 // 1.13c D2Game+0xCA5B0 (r[0]=this, r[1]=param_2, r[2]=unit A, r[3]=level-record table)
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ca5b0(uint32_t* r)
+EMSCRIPTEN_KEEPALIVE void d2_old_ca5b0(uint32_t* r)
 {
     d2game_CA5B0_113c((void*)(uintptr_t)r[0], r[1], (void*)(uintptr_t)r[2],
                       (void**)(uintptr_t)r[3], batchEnv(r));

@@ -133,7 +133,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C2150(uint32_t param1, uint8_t inAL,
 // With the guard set nothing is created: *param3 = 0 and the status 0xE is returned. param4..6 unused.
 // 1.13c D2Game+0x563C0
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_563C0(uint32_t param1, uint32_t param2, uint32_t outRecord,
+EMSCRIPTEN_KEEPALIVE uint32_t d2_old_563C0(uint32_t param1, uint32_t param2, uint32_t outRecord,
                                                  uint32_t param4, uint32_t param5, uint32_t param6,
                                                  uint32_t ebx, const D2GameBatchC2150Env* env)
 {

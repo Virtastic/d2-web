@@ -201,8 +201,8 @@ template <class E> void PLRTRADE_AddItemTradePair(E& e, u32 esi, u32 eax)
 // 1.13c D2Game+0x75350
 // Clear a unit's state and sound: stop the sound handle at +0xA4 (sets flag 0x100 on the unit's +0xC4), resolve
 // the state record through the unit's +0x14 (type 1), run the sub_41040 / sub_410D0 pair on the state's flag
-// bits, clear the table record's bits, and finish with the sub_13B0 / ord10706 hand-off. EAX = unit.
-template <class E> void UNIT_ClearStateAndSound(E& e, u32 p1, u32 unit)
+// bits, clear the table record's bits, and finish with the sub_13B0 / ord10706 hand-off. EAX = unit, ECX = game, stackArg = [esp+4].
+template <class E> void UNIT_ClearStateAndSound(E& e, u32 p1, u32 unit, u32 stackArg)
 {
     u32 st = 0;
     if (unit != 0) {
@@ -235,7 +235,7 @@ have_state:
     if (e.ord10341() != 0 && unit != 0) e.wr32(unit + 0xC4, e.rd32(unit + 0xC4) & 0xFFFFFFFDu);
     u32 cl = e.rd32(unit + 0x2C);
     if (e.sub_13B0(unit, 0x13) == 0) e.ord10084();
-    e.ord10706(cl, unit);
+    e.ord10706(cl, stackArg);   // retail: the function's own stack word (ret 4), not the unit
     e.sub_AF8D0();
 }
 
@@ -247,13 +247,15 @@ template <class E> void GAME_BroadcastNearbyStatePackets(E& e, u32 p1, u32 ebx)
 {
     u32 room = e.ord10331();
     for (u32 u = e.rd32(room + 0x74); u != 0; u = e.rd32(u + 0xE8)) {
-        if (e.rd32(u) == 0 && e.rd32(u + 0x10) != 0x11 && e.ord10522() < 3 && e.ord10324(u) == 0) {
+        if (e.rd32(u) == 0 && e.rd32(u + 0x10) != 0x11 && e.ord10522(ebx, u) <= 2 && e.ord10324(u, ebx, 0x3C01) == 0) {
             u32 rec[0x1C] = { 0 };
-            e.ord10973(u, 6, 0);
-            e.ord10494(u, 0x36);
+            // retail (disassembly 0x755F7..0x9563A): word at rec+4 := 1 (|4 when ord10494 answers 0), dword at rec+8 := ord10973 >> 5
+            rec[2] = (u32)((s32)e.ord10973(u, 6, 0) >> 5);
+            rec[1] = 1;
+            if (e.ord10494(u, 0x36) == 0) rec[1] |= 4;
             e.sub_DC0B0(p1, ebx, u, rec);
-            e.sub_DE0C0(p1, ebx, 1, rec);
-            e.sub_DCF20(p1, ebx, rec);
+            e.sub_DE0C0(u, p1, ebx, 1, rec);   // EAX = u
+            e.sub_DCF20(u, p1, ebx, rec);      // EAX = u
         }
     }
 }
