@@ -13,7 +13,7 @@ __attribute__((weak)) extern void FUN_6fa52070(void);
 __attribute__((weak)) extern void _exit(int);
 __attribute__((weak)) extern uint32_t DAT_6fa64db0, DAT_6fa65ad4, DAT_6fa65e34, DAT_6fa65984, DAT_6fa65e78, DAT_6fa65ef4;
 __attribute__((weak)) extern void* DAT_6fa653c0[];
-__attribute__((weak)) extern int32_t** DAT_6fa65e74;
+__attribute__((weak)) extern uint32_t* DAT_6fa65e74;   // 32-bit slot words
 
 // The pinned globals B4F0 reads (cnt 25ED0, 24DB0, 24DB4) and the control cells it hands to D2Win#10147 (thunk 0x9862: ECX = control, EDX = enable).
 struct D2lB4f0G { int32_t cnt, g24db0, g24db4, c25708, c25980, c2570c, c25730, c2587c, c25998, g25ec4, c25aac; };
@@ -40,7 +40,7 @@ extern "C" void d2l_b4f0_core(D2lB4f0G* g, const D2lB4f0S* s) {
 // 1.13c D2Launch+0xB5B0  (idx in EAX)
 int32_t d2l_b5b0_FUN_6fa4b5b0(int32_t idx) {
   if ((int32_t)DAT_6fa65e78 <= idx) return 0;
-  int32_t* p = DAT_6fa65e74[idx];
+  int32_t* p = (int32_t*)(uintptr_t)DAT_6fa65e74[idx];
   if (!p) { Ordinal_10024("", Ordinal_10265(0x1143)); _exit(-1); }
   return *p;
 }

@@ -424,17 +424,15 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1fa0(uint32_t* r) {
     r[4] = 0;
 }
 
+extern "C" uint32_t* Storm_Ctor2020(uint32_t* w);
 // 1.13c Storm+0x2020: TSHashTableReuse<RGN> ctor([esp+4]=this) -> this
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_storm_2020(uint32_t* r) {
-    StormHashTable* h = P(StormHashTable*, 0);
+    uint32_t* w = P(uint32_t*, 0);
     if (r[13] >= 2) g_stormArena = { (uint8_t*)(uintptr_t)r[16], r[31], 0x10 };   // FN vector: blob 1 is the allocator arena
-    StormHashTableReuseInit(h);
+    Storm_Ctor2020(w);
     g_stormArena.base = nullptr;
-    h->vtable = (void*)kStormVtblHashReuseRgn;
-    h->field48 = (~(uintptr_t)h) & 0x0fffffffu;
-    h->field4c = 0;
-    r[4] = (uint32_t)(uintptr_t)h;
+    r[4] = (uint32_t)(uintptr_t)w;
 }
 
 // 1.13c Storm+0x2080: TSHashTable dtor body(edi=this)
@@ -580,6 +578,10 @@ extern "C" void Storm_Sub1CF0(void* e) { Storm_GuestUnlink((uint8_t*)e + 0xC); S
 extern "C" void Storm_Port1990(void* h) { StormHashTableFoundationDestroy((StormHashTable*)h); }
 extern "C" void Storm_Port16B0(void* h) { StormHashTableReuseDestroy((StormHashTable*)h); }
 extern "C" void Storm_FnArena(void* base, uintptr_t cap, uintptr_t start) { g_stormArena.base = (uint8_t*)base; g_stormArena.cap = base ? cap : 0; g_stormArena.off = start; }
+// Arena-aware SMem entries for ports whose probes serve the allocator from a blob (null = no arena active).
+extern "C" bool Storm_FnArenaOn() { return g_stormArena.base != nullptr; }
+extern "C" void* Storm_FnArenaAlloc(uintptr_t size) { return StormAlloc(size); }
+extern "C" void* Storm_FnArenaRealloc(void* p, uintptr_t size) { return StormRealloc(p, size); }
 extern "C" void Storm_Port2560(void* h) { StormHashTableReuseInit((StormHashTable*)h); }
 extern "C" void Storm_Port2740(void* c) { StormChunkDestroy((StormChunk*)c); }
 extern "C" void Storm_Port27D0(void* c) { StormChunkDelete((StormChunk*)c); }

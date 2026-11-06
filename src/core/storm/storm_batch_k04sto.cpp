@@ -30,6 +30,9 @@ const char kEvt[] = "(AUEVENTREC)";// retail s___AUEVENTREC___6fc41ca8
 }
 
 extern "C" void Storm_Sub2C60(uint32_t cap, uint32_t* self);
+extern "C" bool Storm_FnArenaOn();
+extern "C" void* Storm_FnArenaAlloc(uintptr_t size);
+extern "C" void* Storm_FnArenaRealloc(void* p, uintptr_t size);
 
 // 1.13c Storm+0x26E0
 extern "C" void* Storm_Sub26E0(uint32_t* self) {
@@ -51,10 +54,12 @@ extern "C" void Storm_Sub2C60(uint32_t cap, uint32_t* self) {
         for (uint32_t i = cap; i < self[1]; i++, p += 0x60) Storm_Sub1C30(p);
     }
     self[0] = cap;
-    uint8_t* n = (uint8_t*)Storm_SMemReAlloc(old, cap * 0x60, kAurgn, -2, 0x10);
+    const bool arena = Storm_FnArenaOn();   // capture probes serve SMem from a blob
+    uint8_t* n = (uint8_t*)(arena ? Storm_FnArenaRealloc(old, cap * 0x60)
+                                  : Storm_SMemReAlloc(old, cap * 0x60, kAurgn, -2, 0x10));
     self[2] = (uint32_t)(uintptr_t)n;
     if (!n) {
-        n = (uint8_t*)Storm_Sub1C580(cap * 0x60, kAurgn, -2, 0);
+        n = (uint8_t*)(arena ? Storm_FnArenaAlloc(cap * 0x60) : Storm_Sub1C580(cap * 0x60, kAurgn, -2, 0));
         self[2] = (uint32_t)(uintptr_t)n;
         if (old) {
             uint32_t c = self[1] < cap ? self[1] : cap;
@@ -63,7 +68,7 @@ extern "C" void Storm_Sub2C60(uint32_t cap, uint32_t* self) {
                 Storm_Sub3080(p, n + off);
                 Storm_Sub1C30(p);
             }
-            Storm_Sub1B960(old, kAurgn, -2);
+            if (!arena) Storm_Sub1B960(old, kAurgn, -2);
         }
     }
 }

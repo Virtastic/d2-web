@@ -20,11 +20,11 @@ struct D2WinInit13110Env {
     void** monsterFont;                                // 0x6F901628
     void (*sub12350)(int32_t);                         // builds the font path in the caller's buffer
     void* (*loadFont)(const char* path, int32_t);      // 0x6EA7A0
-    void (*sub12B40)();
+    void (*sub12B40)(int32_t);                         // EAX = 1 (the disassembly's EBX)
     uint32_t* cache;                                   // 0x6F9A9E58, 0x200 dwords
     void*** fontPtrPtr;                                // 0x6F9014F0
     void* mainFontSlot;                                // &0x6F901524
-    void (*toUnicode)(void* dst, const char* src, int32_t n);
+    void (*toUnicode)(void* dst, const char* src, int32_t n); // Fog Unicode::toUnicode (fastcall ECX dst, EDX src, n on the stack)
     void* uniC;                                        // 0x6F9AA670
     void* uniM;                                        // 0x6F9AA66C
     char* pathBuf;                                     // 0x50-byte buffer shared with sub12350
@@ -55,7 +55,7 @@ void d2win_init_13110(D2WinInit13110Env* e) {
     if (!*e->mainFont) {
         e->sub12350(0x4f);
         *e->mainFont = e->loadFont(e->pathBuf, 0);
-        e->sub12B40();
+        e->sub12B40(1);
     }
     if (!*e->monsterFont) {
         char p[260];

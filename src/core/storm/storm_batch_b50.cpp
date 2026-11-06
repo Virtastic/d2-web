@@ -17,8 +17,10 @@ uint32_t& u32(uint32_t p, uintptr_t off) { return *(uint32_t*)at(p, off); }
 // Win32 not in compat/Windows.h: deterministic no-op seams (StormLib replaces Storm)
 void StormSetLastError(uint32_t) {}
 void SetEvent(HANDLE) {}
-uint32_t* Storm_Sub4150(void* list, uint32_t a, uint32_t b);        // node alloc
 }
+
+// 0x4150 (storm_sub_4150.cpp): node alloc from the request pool; the fourth parameter is EDI
+extern "C" uint32_t* Storm_Sub4150(uint32_t list, int32_t size, uint32_t flags, int32_t edi);
 
 // Storm+0x271D0 (storm_sub_271d0.cpp, C++ linkage): EAX = cur node, ESI = prev node at the wake call (measured from the capture).
 void Storm_Sub271D0(int* cur /*EAX*/, int* prev /*ESI*/);
@@ -55,7 +57,7 @@ uint32_t* Storm_Sub27A70(uint32_t p1, uint32_t p2, uint32_t p3, uint32_t p4, uin
         return nullptr;
     }
     EnterCriticalSection(&g_lock);
-    uint32_t* n = Storm_Sub4150(&g_list45970, 0, 0);
+    uint32_t* n = Storm_Sub4150((uint32_t)(uintptr_t)&g_list45970, 0, 0, 0);
     DWORD tick = GetTickCount();
     n[2] = p10;
     n[3] = ebx;

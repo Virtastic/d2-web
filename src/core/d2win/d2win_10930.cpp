@@ -1,6 +1,8 @@
 // 1.13c D2Win+0x10930 (286 bytes): per-tick state step of a type-2 control. ESI = control (implicit
 // register argument; the caller 0x10A50 holds it there). Seams: hit = D2Win+0x107C0, cmp10086 =
-// D2CMP #10086 (frame count), tick = GetTickCount. Type != 2 is fatal 0x9A (Fog #10265/#10024/_exit).
+// D2CMP #10086 (frame count, thunk 0x774A), tick = GetTickCount, cb = the +0x58 handler call
+// (stdcall, one word: a stack event block {control, ?, ?, new state == 1}; words 1-2 are never written).
+// Type != 2 is fatal 0x9A (Fog #10265/#10024/_exit).
 #include <cstdint>
 #include <cstring>
 #include <unistd.h>
@@ -10,9 +12,10 @@ static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy
 static inline void wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
 
 struct D2Win10930Env {
-    int32_t  (*hit)(void* obj);
+    int32_t  (*hit)(void* obj, uint32_t state);
     int32_t  (*cmp10086)(uint32_t p);
     uint32_t (*tick)();
+    void     (*cb)(uint32_t fn, uint32_t* ev);   // null: call fn directly
 };
 
 // 1.13c D2Win+0x10930
@@ -27,10 +30,14 @@ EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_10930(void* obj, const D2Win10930Env* env
     };
     const uint32_t s0 = rd32(obj, 0x50);
     if (s0 == 0 || s0 == 1) {
-        const uint32_t ns = env->hit(obj) != 0;
+        const uint32_t ns = env->hit(obj, s0) != 0;
         wr32(obj, 0x50, ns);
         const uint32_t cb = rd32(obj, 0x58);
-        if (s0 != ns && cb) ((void (*)(void*))(uintptr_t)cb)(obj);
+        if (s0 != ns && cb) {
+            uint32_t ev[4] = { (uint32_t)(uintptr_t)obj, 0, 0, ns == 1 };
+            if (env->cb) env->cb(cb, ev);
+            else ((void (*)(uint32_t*))(uintptr_t)cb)(ev);
+        }
     }
     int32_t n = 1;
     if (uint32_t f = first(rd32(obj, 0x50))) n = env->cmp10086(f);

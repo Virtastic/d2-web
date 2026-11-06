@@ -1,37 +1,24 @@
-// src/core/d2ddraw/d2ddraw_6a90.cpp -- 1.13c D2DDraw.dll CelDrawShadow. Decompile-derived.
-// Gate the shadow cel, then hand it to the shadow rasteriser (ordinal 10072). The colour is the
-// first table dword only when the mode flag at DAT_6f8d01d0+0x14 is set.
-#include <cstdint>
+// src/core/d2ddraw/d2ddraw_6a90.cpp -- 1.13c D2DDraw.dll CelDrawShadow. Decompile-derived (disassembly 0x6A90).
+// fastcall: ECX = cel context, EDX = x, one stack word y (ret 4). The cel is dropped when D2CMP 10005 refuses it
+// or its shadow box (x offset less the height, half the height above y) misses the screen; otherwise D2CMP 10072
+// draws it. The shadow colour is the table's first dword when the mode flag (+0x14) is set, else 0.
 #include <cstring>
-
-struct D2DDraw6A90Env {
-    uint32_t (*valid)(const uint8_t* ctx, uint32_t a, uint32_t b);           // ordinal 10005(ctx, 0, 1)
-    int32_t  (*celTop)(uint32_t h);                                          // ordinal 10000
-    int32_t  (*celLeft)(uint32_t h);                                         // ordinal 10002
-    int32_t  (*celWidth)(uint32_t h);                                        // ordinal 10060
-    int32_t  (*celHeight)(uint32_t h);                                       // ordinal 10069
-    void     (*rasterShadow)(uint32_t ebx, uint32_t ebp, int32_t zero, int32_t ox, int32_t oy,
-                             uint8_t* buf, int32_t h, int32_t w, uint32_t colour, uint32_t extra);  // ordinal 10072
-    int32_t  screenW, screenH, originX, originY;                             // DAT_6f8d01c8/01d8/01e8/01ec
-    uint8_t* surface;                                                        // DAT_6f8cf8a8
-    const uint8_t* table;                                                    // DAT_6f8cf784, byte-addressed
-    int32_t  colourFlag;                                                     // dword at DAT_6f8d01d0+0x14
-};
+#include "d2ddraw_cel.h"
 
 // 1.13c D2DDraw+0x06A90
-// reg: ecx = ctx, edx = x, ebx = index, ebp = mode word. Returns nothing; the gate just skips the draw.
-void d2ddraw_cel_draw_shadow(const D2DDraw6A90Env* e, const uint8_t* ctx, int32_t x, uint32_t ebx, uint32_t ebp) {
-    if (e->valid(ctx, 0, 1) == 0) return;
-    uint32_t h = 0;
-    memcpy(&h, ctx + 0x3C, 4);
-    int32_t w = e->celWidth(h);
-    int32_t top = e->celTop(h);
-    int32_t left = e->celLeft(h);
-    int32_t xx = (x - top) + left;
-    if (!(xx < e->screenW && -1 < w + top + xx)) return;
-    int32_t ch = e->celHeight(h);
-    if (!(-1 < ch && ch - (top >> 1) < e->screenH)) return;
+extern "C" void d2ddraw_cel_draw_shadow_6a90(const D2DDrawCelEnv* e, const uint8_t* ctx, int32_t x, int32_t y) {
+    if (e->cmp10005(ctx, 0, 1) == 0) return;
+    uint32_t h; memcpy(&h, ctx + 0x3C, 4);
+    int32_t w = e->cmp10060(h);
+    int32_t t = e->cmp10000(h);
+    int32_t xx = x - t + e->cmp10002(h);
+    if (xx >= e->screenW) return;
+    if ((int32_t)((uint32_t)w + (uint32_t)t + (uint32_t)xx) < 0) return;
+    int32_t v = (int32_t)((uint32_t)e->cmp10069(h) + (uint32_t)y);
+    if (v < 0) return;
+    if (v - (t >> 1) >= e->screenH) return;
+    uint32_t flag; memcpy(&flag, e->mode + 0x14, 4);
     uint32_t colour = 0;
-    if (e->colourFlag != 0) memcpy(&colour, e->table, 4);
-    e->rasterShadow(ebx, ebp, 0, e->originX, e->originY, e->surface, e->screenH, e->screenW, colour, 0);
+    if (flag != 0) memcpy(&colour, e->table, 4);
+    e->cmp10072(ctx, x, y, e->originX, e->originY, e->surface, e->screenH, e->screenW, colour, 0);
 }

@@ -88,9 +88,13 @@ void fog_qserver_remove_e1b0(QServer* q, const QSHost* h, uint32_t id, uint32_t 
     h->leave(h->user, &q->countLock);
 }
 
+// Probe seam: when set, the refcount-zero teardown (owner callback, 0xE1B0 remove, 0xE3B0 free) is handed to it instead.
+void (*fog_qs_zero_seam)(QServer*, const QSHost*, QSConn*) = nullptr;
+
 static void qs_unref(QServer* q, const QSHost* h, QSConn* c)
 {
     if (__atomic_sub_fetch(&c->refs, 1, __ATOMIC_SEQ_CST) == 0) {
+        if (fog_qs_zero_seam) { fog_qs_zero_seam(q, h, c); return; }
         if (q->freeCb) q->freeCb("..\\Source\\Fog\\Src\\QServer\\QServer.cpp", 0x374);
         fog_qserver_remove_e1b0(q, h, c->id, c->id);
         h->e3b0(h->user, q);
@@ -127,24 +131,7 @@ uint32_t fog_qserver_send_20180(QServer* q, const QSHost* h, QSConn* c, const ui
     return 1;
 }
 
-// 1.13c Fog+0x202B0
-void fog_qserver_shutdown_202b0(QServer* q, const QSHost* h)
-{
-    uint64_t w[8]; uint32_t n = 0;
-    h->enter(h->user, &q->countLock);
-    for (int i = 0; i < 4; i++) {
-        if (q->hA[i]) w[n++] = q->hA[i];
-        q->fA[i] = 1;
-        if (q->hasB && q->hB[i]) w[n++] = q->hB[i];
-        q->fB[i] = 1;
-    }
-    h->leave(h->user, &q->countLock);
-    if (n) h->waitAll(h->user, n, w, 1000);
-    for (int i = 0; i < 4; i++) {
-        if (q->hA[i]) { h->closeH(h->user, q->hA[i]); q->hA[i] = 0; q->pA[i] = 0; }
-        if (q->hasB && q->hB[i]) { h->closeH(h->user, q->hB[i]); q->hB[i] = 0; q->pB[i] = 0; }
-    }
-}
+// 1.13c Fog+0x202B0 moved to src/core/fog/fog_202b0.cpp (retail layout, injectable seams).
 
 // 1.13c Fog+0x207F0
 uint32_t fog_qserver_poll_207f0(QServer* q, const QSHost* h, int port, uint32_t timeoutMs)

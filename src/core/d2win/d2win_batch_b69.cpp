@@ -1,5 +1,5 @@
 // src/core/d2win/d2win_batch_b69.cpp -- 1.13c D2Win rows 0xDFF0 0xB250 0x7970 0x12280 0xD790 0xC810 0xCBA0
-// 0xCFC0 0xD4D0 0xE5F0 0xEA30 from cached decompiles.
+// 0xCFC0 0xD4D0 0xEA30 from cached decompiles.
 // Skipped: CRT/chkstk (0x1B3C 0x35E0), 0x17260 (alloca'd 20 KB screenshot frame, unresolved layout).
 // Hidden register inputs are explicit leading params. Callees are seams; retail globals are externs.
 #include <cstdint>
@@ -30,7 +30,7 @@ __attribute__((weak)) void Ordinal_10207(void*, uint32_t, void*, int32_t, uint32
 __attribute__((weak)) void Ordinal_10209(void*);
 #define wsprintfA sprintf   // the Win32 wsprintfA formats like sprintf for the %s/%d uses here (the link stub in compat_link_weak.cpp writes nothing)
 void _exit(int);
-extern const uint32_t* gdwBitMasks_exref;
+extern uint32_t gdwBitMasks_exref[];   // the shared table is an array (D2Common/D2Multi define it); a pointer declaration read its first word as an address
 __attribute__((weak)) extern const uint32_t* d2win_ea30_masks;
 extern uint32_t d2win_g_6f8ffdac, d2win_g_6f8ffe00, d2win_g_6f8ffe98;
 extern uint32_t d2win_g_6f8ffe5c[];   // the table 0xDFF0 indexes by rec[9]; its entry is the EAX argument of sub_D790
@@ -130,9 +130,9 @@ void d2win_sub_B250(uint32_t slot, const char* name, const D2WinB69Env* env) {
     char path[256];
     strcpy(path, "Data\\Global\\Items\\Palette\\");
     strcat(path, name);
-    memcpy(path + strlen(path), d2win_g_6f8fcc00, 4);
-    size_t n = strlen(path);
-    path[n] = d2win_g_6f8fcc04; path[n + 1] = 0;
+    size_t n = strlen(path);   // the 4-byte suffix is copied without a NUL, so measure before it (the local is uninitialised)
+    memcpy(path + n, d2win_g_6f8fcc00, 4);
+    path[n + 4] = d2win_g_6f8fcc04; path[n + 5] = 0;
     uint32_t handle = 0;
     if ((env->open_76BA ? env->open_76BA(path, &handle) : Ordinal_10102()) == 0) {
         // GetLastError()==2 (file not found) stays silent; the host seam reports other errors.
@@ -352,64 +352,6 @@ uint32_t d2win_sub_D4D0(uint32_t* p, const D2WinB69Env* env) {
     env->sub_1E80();
     if (two) env->sub_2940(name, y - 1, 0, 6, 0);
     env->sub_2940(name, y, 0, color, 0);
-    return 1;
-}
-
-// 1.13c D2Win+0x0E5F0 -- EBX = p, param_1 = draw arg: draw a character's animated paper-doll layers.
-extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2win_sub_E5F0(uint32_t arg, uint32_t* p, const D2WinB69Env* env) {
-    uint32_t s[18];
-    if (!p) d2win_fatal(0x5e8);
-    const uint32_t* m = gdwBitMasks_exref;
-    if (!(m[0] & p[0])) return 0;
-    if (m[10] & p[0]) {
-        if (!d2win_g_6f9a9e48) d2win_fatal(0x5f3);
-        memset(s, 0, sizeof s);
-        s[13] = d2win_g_6f9a9e48; s[0] = d2win_g_6f9a9e50; s[16] = 0;
-        Ordinal_10041(s, (int32_t)p[5] + 5, (int32_t)p[6] - 5, 0xffffffffu, 3, nullptr);
-    }
-    if (p[0x2f]) {
-        uint8_t ex[3] = {0, (uint8_t)p[0x30], *((uint8_t*)p + 0xc1)};
-        memset(s, 0, sizeof s);
-        s[16] = 0; s[0] = 0; s[14] = 1; s[13] = p[0x2f];
-        Ordinal_10041(s, (int32_t)p[5] - 0x14, (int32_t)p[6] - 0x3c, 0xffffffffu, 5, ex);
-    }
-    if (!p[0x2e]) d2win_fatal(0x617);
-    int32_t* e = env->sub_B860(p[9], p[8]);
-    if (!e) return 0;
-    if (*(int32_t*)(uintptr_t)(*e + 0x14) == 0) d2win_fatal(0x620);
-    uint8_t* cnt = env->sub_BAD0();
-    uint32_t cur = p[2];
-    uint8_t* lay = env->sub_C680((uint8_t)p[1], (int32_t)cur >> 8);
-    if (!lay) d2win_fatal(0x625);
-    uint32_t mode = 5;
-    if (((m[5] & p[0]) && (m[4] & p[0])) || (m[13] & p[0])) mode = 1;
-    for (int32_t i = 0; i < *cnt; i++) {
-        uint8_t l = lay[i];
-        memset(s, 0, sizeof s);
-        s[16] = env->sub_B7B0((uint8_t)p[1], *((uint8_t*)p + 5)) & 0xff;
-        s[13] = 0; s[0] = (uint32_t)((int32_t)cur >> 8);
-        ((uint8_t*)s)[5] = l;
-        env->sub_E0D0();
-        s[17] |= 2;
-        uint32_t idx = *((uint8_t*)p + l + 0x28);
-        void* pal = idx != 0xff ? env->sub_B810(idx) : nullptr;
-        Ordinal_10041(s, (int32_t)p[5], (int32_t)p[6], arg, mode, pal);
-    }
-    p[2] = cur + p[4];
-    if ((int32_t)(p[3] - 1) <= (int32_t)(cur + p[4]) >> 8) p[2] = 0;
-    uint32_t now = (uint32_t)emscripten_get_now();  // GetTickCount, ms
-    if (d2win_g_6f9a9e38 < now) {
-        d2win_g_6f9a9e38 = now + 0x42;
-        if (d2win_g_6f9a9e40 <= ++d2win_g_6f9a9e44) d2win_g_6f9a9e44 = 0;
-        if (d2win_g_6f9a9e4c <= ++d2win_g_6f9a9e50) d2win_g_6f9a9e50 = 0;
-    }
-    if (m[9] & p[0]) {
-        if (!d2win_g_6f9a9e3c) d2win_fatal(0x666);
-        memset(s, 0, sizeof s);
-        s[13] = d2win_g_6f9a9e3c; s[16] = 0; s[0] = d2win_g_6f9a9e44;
-        Ordinal_10041(s, (int32_t)p[5], (int32_t)p[6] + 10, 0xffffffffu, 3, nullptr);
-    }
     return 1;
 }
 

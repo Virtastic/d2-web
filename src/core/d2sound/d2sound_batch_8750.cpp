@@ -45,9 +45,4 @@ const char* D2sound_8C70(int32_t hr) {
     return nullptr;
 }
 
-// 1.13c D2sound+0x8EB0
-// Release (vtable slot 2) and clear the three COM globals DAT_6f9c64b8 / 6524 / 6528.
-void D2sound_8EB0(void** slots[3]) {
-    for (int i = 0; i < 3; i++)
-        if (void* itf = *slots[i]) { (*(void (**)(void*))(*(void***)itf + 2))(itf); *slots[i] = nullptr; }
-}
+// 0x8EB0 moved to d2sound_8eb0.cpp

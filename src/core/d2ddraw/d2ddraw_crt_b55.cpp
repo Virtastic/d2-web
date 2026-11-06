@@ -7,9 +7,9 @@ struct d2ddraw_crt_b55_Env {
     uint32_t (*msP5MpTestFdiv)();               // 0x9AA7
     void (*setDefaultPrecision)();              // 0x9AF9
     uint32_t* fdivFlag;                         // DAT_6f8d0260
-    int (*isZeroMan)(uint32_t* man);            // 0x9BA1
-    void (*copyMan)(uint32_t* dst, uint32_t* src); // 0x9C2E
-    int (*roundMan)(uint32_t* man, int bits);   // 0x9C13
+    int (*isZeroMan)(uint32_t* man);            // 0x9C2E
+    void (*copyMan)(uint32_t* dst, uint32_t* src); // 0x9C13
+    int (*roundMan)(uint32_t* man, int bits);   // 0x9BA1
     void (*shrMan)(uint32_t* man, int n);       // 0x9C47
     const int* tblDouble;                       // DAT_6f8cebe4
     const int* tblFloat;                        // DAT_6f8cebfc

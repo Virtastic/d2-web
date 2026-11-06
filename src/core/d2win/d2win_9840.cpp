@@ -11,6 +11,8 @@ struct D2Win9840Env {
     int32_t (*sub_9200)(int32_t* c);
     const uint32_t* bitMasks;
     uint32_t captureFlag;
+    uint32_t (*sub_88A0)(int32_t* c, int32_t top);    // 0x88A0 (ECX = control, EDX = top); null = the port
+    void (*callback)(uint32_t fn, int32_t* arg);       // the stdcall change callback at control+0x34; null = a direct call
 };
 
 // 1.13c D2Win+0x9840
@@ -33,10 +35,13 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_9840(int32_t* param_1, const D2Win9840En
     switch (param_1[2]) {
     case 0x21:
         sel = top;
-        if (sel0 <= top && top > 0) {
-            newTop = top - lines + 1;
-            newTop &= (newTop < 1) - 1;
-            sel = newTop;
+        if (sel0 <= top) {
+            sel = sel0;   // retail keeps the selection when the view is already at the top
+            if (top > 0) {
+                newTop = top - lines + 1;
+                newTop &= (newTop < 1) - 1;
+                sel = newTop;
+            }
         }
         break;
     case 0x22: {
@@ -77,7 +82,12 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_9840(int32_t* param_1, const D2Win9840En
         break;
     }
     c[0x18] = sel;
-    if (lines < cnt && newTop != c[0x16]) d2win_sub_88A0(c, newTop);
-    if (sel != sel0 && c[0xd]) ((void (*)(int32_t*))(intptr_t)c[0xd])(param_1);
+    if (lines < cnt && newTop != c[0x16]) {
+        if (env->sub_88A0) env->sub_88A0(c, newTop); else d2win_sub_88A0(c, newTop);
+    }
+    if (sel != sel0 && c[0xd]) {
+        if (env->callback) env->callback((uint32_t)c[0xd], param_1);
+        else ((void (*)(int32_t*))(intptr_t)c[0xd])(param_1);
+    }
     return 0;
 }

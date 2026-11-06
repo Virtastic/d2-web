@@ -27,7 +27,7 @@ static void freeCur() {
   DAT_6fa65ecc = nullptr;
 }
 
-// 1.13c D2Launch+0xA150
+// Earlier form of D2Launch 0xA150 (the faithful port is d2launch_a150.cpp)
 void FUN_6fa4a150(void) {
   freeCur();
   Ordinal_10106(); Ordinal_10106(); Ordinal_10106();
@@ -37,7 +37,7 @@ void FUN_6fa4a150(void) {
   Ordinal_10131();
 }
 
-// 1.13c D2Launch+0xAE60
+// Earlier form of D2Launch 0xAE60 (the faithful port is d2launch_ae60.cpp)
 void FUN_6fa4ae60(void) {
   uint8_t* n = DAT_6fa65ec8;
   while (n) {

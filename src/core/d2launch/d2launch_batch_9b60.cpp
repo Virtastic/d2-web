@@ -34,12 +34,13 @@ void d2launch_sub_1000(uint16_t* buf, uint32_t count) {
 // print: a FILE is fixed at {_cnt = 0x7FFFFFFF, _flag = 0x42, _base = _ptr = dest}, the engine at
 // 0x1D45 writes it, then the terminator runs (*ptr = 0 when _cnt stays positive, __flsbuf(0) when
 // the count ran out). Destination NULL skips the terminator. Returns the engine's char count, NUL
-// excluded. The host formatter stands in for 0x1D45; the count is what would be written.
+// excluded. The host formatter stands in for 0x1D45 over the integer, char and string conversions
+// D2Launch uses (unbounded, as retail: a size of (size_t)-1 makes musl's vsnprintf fail with EOVERFLOW).
 extern "C"
 EMSCRIPTEN_KEEPALIVE int d2launch_sprintf(char* dest, const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    const int n = std::vsnprintf(dest, (size_t)-1, fmt, ap);
+    const int n = std::vsprintf(dest, fmt, ap);
     va_end(ap);
     return n;
 }

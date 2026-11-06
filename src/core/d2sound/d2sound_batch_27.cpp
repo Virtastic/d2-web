@@ -3,12 +3,15 @@
 
 void d2s_unlock(int);
 
-// 1.13c D2sound+0x93A0  DirectSound bring-up (CreateDirectSound, SetCooperativeLevel, primary buffer 22050/16/stereo,
-// EAX probe, then the 3D/volume/channel init and flag 6588=1). Web audio replaces DirectSound; init is a no-op here.
+// Web audio stand-in for the DirectSound bring-up (the retail routine is ported in d2sound_93a0.cpp); a no-op here.
 void d2s_dsound_init() {}
 
-// 1.13c D2sound+0xACCC  _ftol: x87 ST0 -> int64 truncated toward zero
-int64_t d2s_ftol(double x) { return (int64_t)x; }
+// 1.13c D2sound+0xACCC  _ftol: x87 ST0 -> int64 truncated toward zero (fistp, then a one-step correction by the sign of the
+// remainder). Out of range or NaN, fistp stores the integer indefinite 0x8000000000000000, which retail returns unchanged.
+int64_t d2s_ftol(double x) {
+    if (!(x >= -9223372036854775808.0 && x < 9223372036854775808.0)) return INT64_MIN;
+    return (int64_t)x;
+}
 
 // 1.13c D2sound+0x260C  _FF_MSGBANNER-style runtime error writer (console write or MessageBox); no UI here
 void d2s_rterr_write(int) {}

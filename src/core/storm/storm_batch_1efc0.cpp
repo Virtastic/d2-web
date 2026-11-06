@@ -32,6 +32,10 @@ extern "C" __attribute__((weak)) void Storm_Sub28F90(void);                     
 extern "C" __attribute__((weak)) void Storm_Sub14FD0(void);                                                 // 0x24FD0
 extern "C" __attribute__((weak)) void Storm_Sub17020(void);                                                 // 0x27020
 extern "C" __attribute__((weak)) void Storm_Sub26D40(void);                                                 // 0x36D40
+// 0x27FC0 crypt-table init (external linkage: the DllMain port also calls it)
+void Storm_Sub17FC0(void);
+uint32_t Storm_Sub27FC0(uint32_t* t, uint32_t seed);
+
 namespace {
 
 int32_t g_lastError = 0;            // 0x6FC45388  last Storm error, mirrored to SetLastError
@@ -80,7 +84,6 @@ constexpr const char* kSFileCpp = "..\\3rdParty\\STORM\\SOURCE\\SFILE.CPP";
 void* Storm_Sub41D0(uint32_t* anchor, uint32_t, uint32_t);                 // 0x41D0 alloc open-file
 void* Storm_Sub40D0(uint32_t* anchor, uint32_t, uint32_t);                 // 0x40D0 alloc archive
 extern "C" void* Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, uint32_t flags); // 0x1C580 alloc
-void Storm_Sub17FC0(void);                                                 // 0x17FC0 init archive set
 void Storm_Sub16BD0(char* out, int32_t which);                             // 0x16BD0 install dir
 uint32_t Storm_Sub2B080(uint8_t* dst, const uint32_t* src, uint32_t n);    // 0x2B080 strncpy max
 char* Storm_Sub2B2D0(const char* s, int32_t c);                            // 0x2B2D0 strchr
@@ -1056,6 +1059,17 @@ bool Storm_Sub37ED0(uint32_t param_1, int32_t param_2, char* param_3, int32_t pa
 }
 
 }  // namespace
+
+// 1.13c Storm+0x27FC0: allocate the 0x1400-byte crypt table once (the module global holds it) and
+// fill it from the fixed seed 0x100001 the SFile entry points load into EAX.
+void Storm_Sub17FC0(void) {
+    static uint32_t* tbl = nullptr;
+    if (g_43120 == 0 || tbl == nullptr) {
+        tbl = (uint32_t*)Storm_Sub1C580(0x1400, kSFileCpp, 0x425, 0);
+        g_43120 = (int32_t)(uint32_t)(uintptr_t)tbl;
+    }
+    Storm_Sub27FC0(tbl, 0x100001);
+}
 
 // Capture-probe accessor: the port globals by retail RVA (the probes copy the pinned state in/out).
 extern "C" uint32_t* storm_1efc0_global(uint32_t rva) {

@@ -28,7 +28,7 @@ extern "C" uint32_t d2l_12bf0_core(uint32_t* feChar, uint32_t* isFeCharPal, cons
                                    void (*ord10128)(const char*, const char*)) {
   char a[260], b[260];
   *feChar = 1;
-  wsprintfA(a, "%s\\%s", "DATA\\GLOBAL");
+  wsprintfA(a, "%s\\%s", "DATA\\GLOBAL", in_eax);
   wsprintfA(b, "%s\\%s", "DATA\\GLOBAL", name);
   const char* k = "palette\\fechar\\pal.dat";  // 0x17 bytes incl. NUL
   int i = 0; while (i < 0x17 && in_eax[i] == k[i]) i++;

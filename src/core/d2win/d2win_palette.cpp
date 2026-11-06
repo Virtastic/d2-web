@@ -33,6 +33,10 @@ const uint32_t kRgbaVA = 0x6F922338;   // the bank D2Gfx #10061 is handed
 // takes the banks directly, so the 0x120-byte table of +0xEE60 has no consumer here and is not built.
 uint32_t g_seamCalls, g_seamLast;
 void palette_seam(uint32_t bank) { ++g_seamCalls; g_seamLast = bank; }
+// Injectable callees of +0xEF20 (null: the counting seam above). setTable is D2Gfx #10022 as +0xEE60 calls it
+// (one argument, the address of its stack-built pointer table), setPalette is D2Gfx #10061 (the rgba bank's address).
+void (*g_setTable)(const void* table) = nullptr;
+void (*g_setPalette)(uint32_t rgbaVA) = nullptr;
 
 // D2CMP+0x9D30 (ordinal 10049, GetNearestPaletteIndex), a local copy: the summed squared distance
 // (pal[0]-a0)^2 + (pal[1]-a1)^2 + (pal[2]-a2)^2 in 32-bit wrap, strict `<` so the first of equal
@@ -48,7 +52,7 @@ uint32_t nearest_index(const uint8_t* pal, uint32_t n, uint32_t a0, uint32_t a1,
     return (n & 0xFFFFFF00u) | (idx & 0xFFu);
 }
 
-// 1.13c D2Win+0x0ef20 (sub_EF20): this whole bank load. Retail also
+// 1.13c D2Win+0xEF20 (sub_EF20): this whole bank load. Retail also
 // opens pal.dat and reads it into a 0xCF*4 buffer, both unused, and prints a message (Fog #10265)
 // then _exit(-1) when a file is missing -- not modelled, a miss is a 0 return.
 int palette_banks_load(const char* pl2) {
@@ -72,12 +76,23 @@ int palette_banks_load(const char* pl2) {
         g_nearScaled[i] = (uint8_t)nearest_index(g_rgba, 0x100, s0 < 0x100 ? s0 : 0xFF, s1 < 0x100 ? s1 : 0xFF, s2 < 0x100 ? s2 : 0xFF);
         g_nearRed[i] = (uint8_t)nearest_index(g_rgba, 0x100, c0, 0, 0);
     }
-    palette_seam(0);           // +0xEE60's palette-table call (its argument is a stack table retail never exposes)
-    palette_seam(kRgbaVA);     // +0xEF20's SetPalette(rgba)
+    // +0xEE60's palette-table call: its argument is a stack table retail never exposes past the call
+    if (g_setTable) { uint32_t table[0x48] = {}; g_setTable(table); } else palette_seam(0);
+    if (g_setPalette) g_setPalette(kRgbaVA); else palette_seam(kRgbaVA);   // +0xEF20's SetPalette(rgba)
     return 1;
 }
 
 }  // namespace
+
+// 1.13c D2Win+0xEF20 with its two D2Gfx callees injected (the FN probe's entry; the play path calls it through
+// d2win_LoadActPalette with both null). Returns 1 on a loaded bank, 0 on a missing or short file.
+extern "C" int d2win_palette_banks_load_ef20(const char* pl2, void (*setTable)(const void*), void (*setPalette)(uint32_t)) {
+    g_setTable = setTable; g_setPalette = setPalette;
+    const int r = palette_banks_load(pl2);
+    g_setTable = nullptr; g_setPalette = nullptr;
+    return r;
+}
+extern "C" uint8_t* d2win_palette_block_mut(uint32_t k, uint32_t* len);
 
 // 1.13c D2Win+0xF2D0 (ordinal 10065). `act` is masked to a byte and used as `(act & 0xff) + 1`;
 // outside 1..5 that is 1. The pal.dat path is formatted and never opened.
@@ -107,5 +122,6 @@ extern "C" const uint8_t* d2win_palette_block(uint32_t k, uint32_t* len) {
     *len = blk[k - 1].n;
     return blk[k - 1].p;
 }
+extern "C" uint8_t* d2win_palette_block_mut(uint32_t k, uint32_t* len) { return const_cast<uint8_t*>(d2win_palette_block(k, len)); }
 extern "C" uint32_t d2win_palette_seam_calls() { return g_seamCalls; }
 extern "C" uint32_t d2win_palette_seam_last() { return g_seamLast; }

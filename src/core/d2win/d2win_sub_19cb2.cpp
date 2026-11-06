@@ -5,8 +5,15 @@
 #include <emscripten.h>
 
 extern "C" char* d2win_sub_4ed0(char* dst, const char* src);
-extern "C" void d2win_sub_1A184(int32_t* x, uint32_t pow10, int32_t keep);  // 12-byte x *= 10^pow10 (other row)
-extern "C" void d2win_sub_19F4E(int32_t* x, int32_t* y);                    // 12-byte x *= y (other row)
+extern "C" void d2win_sub_1a184(int32_t* x, uint32_t exp10, int32_t noClear, const void* env);  // D2Win+0x1A184
+extern "C" void d2win_sub_19f4e(uint8_t* a, const uint8_t* b);                                  // D2Win+0x19F4E
+struct D2Win1A184Env { const uint8_t* posTable; const uint8_t* negTable; void (*mul)(void*, const void*); };
+// The DLL's power-of-ten tables (D2Win+0x20CC0, negative half at +0x160); set by the host before use.
+extern "C" { const uint8_t* g_d2win_tenpow_pos = nullptr; const uint8_t* g_d2win_tenpow_neg = nullptr; }
+extern "C" void d2win_scale10(uint32_t* x, int32_t e, int32_t keep) {
+    D2Win1A184Env env{g_d2win_tenpow_pos, g_d2win_tenpow_neg, (void (*)(void*, const void*))d2win_sub_19f4e};
+    d2win_sub_1a184((int32_t*)x, (uint32_t)e, keep, &env);
+}
 
 static void shl12(uint32_t* p) { p[2] = p[2] << 1 | p[1] >> 31; p[1] = p[1] << 1 | p[0] >> 31; p[0] <<= 1; }
 static void shr12(uint32_t* p) { p[0] = p[0] >> 1 | p[1] << 31; p[1] = p[1] >> 1 | p[2] << 31; p[2] >>= 1; }
@@ -44,8 +51,8 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_19CB2(uint32_t lo, uint32_t hi, uint16_t
         int16_t dp = (int16_t)(((e15 >> 8) + (hi >> 24) * 2) * 0x4d - 0x134312f4 + e15 * 0x4d10 >> 16);
         b[10] = (uint8_t)e15; b[11] = (uint8_t)(e15 >> 8);
         memcpy(b + 2, &lo, 4); memcpy(b + 6, &hi, 4);
-        d2win_sub_1A184((int32_t*)b, (uint32_t)-(int32_t)dp, 1);
-        if (0x3ffe < (uint32_t)(b[11] << 8 | b[10])) { dp++; d2win_sub_19F4E((int32_t*)b, (int32_t*)k); }
+        d2win_scale10((uint32_t*)b, -(int32_t)dp, 1);
+        if (0x3ffe < (uint32_t)(b[11] << 8 | b[10])) { dp++; d2win_sub_19f4e((uint8_t*)b, k); }
         out[0] = dp;
         if ((mode & 1) && (ndig += dp, ndig < 1)) zero = true;
         else {
@@ -63,8 +70,8 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_19CB2(uint32_t lo, uint32_t hi, uint16_t
                 *p++ = (char)((m[2] >> 24) + '0');
                 m[2] &= 0x00ffffff;
             }
-            char* q = p - 1;
-            if (*q < '5') {
+            char* q = p - 2;   // the last of the ndig + 1 digits only rounds: the strip and carry start one before it
+            if (p[-1] < '5') {
                 for (; d <= q && *q == '0'; q--) {}
                 if (q < d) { *d = '0'; zero = true; }
             } else {

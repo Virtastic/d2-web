@@ -86,7 +86,7 @@ int FUN_6fa4e510(State& s, Host& h, const uint32_t* msg, const char* arg, const 
   return 0;
 }
 
-// 1.13c D2Launch+0xEA90
+// Earlier form of D2Launch 0xEA90 (the faithful port is d2launch_ea90.cpp)
 void FUN_6fa4ea90(State& s, Host& h, const std::function<std::u16string(const char*)>& w) {
   uint32_t m[2] = {0, 0}; FUN_6fa4e510(s, h, m, nullptr, w);
 }
@@ -193,7 +193,7 @@ int FUN_6fa4f190(uint8_t* out, const char* name, const uint8_t* classDefault, co
   return ret;
 }
 
-// 1.13c D2Launch+0xF5B0  (out = in_EAX; cls = param_1; name = param_2; flagsLo = unaff_BX)
+// Earlier form of D2Launch 0xF5B0 (the faithful port is d2launch_f5b0.cpp)  (out = in_EAX; cls = param_1; name = param_2; flagsLo = unaff_BX)
 void FUN_6fa4f5b0(State& s, uint8_t* out, char cls, const char* name, uint16_t flagsLo) {
   uint8_t* o = s.d2sOut; memset(o, 0, 0x14f);
   uint32_t v = 0xaa55aa55; memcpy(o, &v, 4); v = 0x60; memcpy(o + 4, &v, 4);

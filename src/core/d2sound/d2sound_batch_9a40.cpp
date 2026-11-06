@@ -33,12 +33,4 @@ void D2sound_9B30(const D2SndOptSeams& s, D2SndOpts& o) {
     if (s.regRead("Diablo II", "Options Music", 0, &v) && v < 2) o.optMusic = v;
 }
 
-// 1.13c D2sound+0x8A50
-// Version of a file: `ffi` is the VS_FIXEDFILEINFO (host seam for 0x84A0 size probe + GetFileVersionInfo + VerQueryValue "\\").
-// out1 = FileVersionMS hi (+10), out2 = MS lo (+8), out3 = LS lo (+0xC). Returns 1 on success, 0 if ffi is null.
-int D2sound_8A50(const uint8_t* ffi, uint32_t* out1, uint32_t* out2, uint32_t* out3) {
-    if (!ffi) return 0;
-    auto r32 = [&](int o) { return (uint32_t)ffi[o] | (uint32_t)ffi[o+1] << 8 | (uint32_t)ffi[o+2] << 16 | (uint32_t)ffi[o+3] << 24; };
-    *out1 = (r32(8) >> 16) & 0xffff; *out2 = r32(8) & 0xffff; *out3 = r32(12) & 0xffff;
-    return 1;
-}
+// 0x8A50 moved to d2sound_8a50.cpp

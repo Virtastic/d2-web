@@ -18,7 +18,7 @@ extern "C" {
 void _exit(int);
 W int32_t DAT_6f8cf2a4, DAT_6f8cf264, DAT_6f8cf274;
 W void (*DAT_6f8cf2a8)(void);
-W uint8_t DAT_6f8ce7e4;  // locale decimal point
+W uint8_t DAT_6f8ce7e4 = '.';  // locale decimal point (image .data 0xE7E4 holds '.')
 W void* DAT_6f8d0210; W void* DAT_6f8d0218; W void* DAT_6f8d021c; W void* DAT_6f8d0220; W void* DAT_6f8d0230;
 W int32_t DAT_6f8cfdc4, DAT_6f8d0204, DAT_6f8d0208, DAT_6f8d0234, DAT_6f8d0250;
 W int32_t DAT_6f8d01c8, DAT_6f8d01cc, DAT_6f8d01d4, DAT_6f8d01d8, DAT_6f8d01e0, DAT_6f8d01e4, DAT_6f8d01e8,
@@ -160,7 +160,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t b144_FUN_6f8c5b74(void* thisp, const uint8_t* t, u
   return n == 1 ? out[0] : (uint32_t)(out[0] << 8 | out[1]);
 }
 
-// 1.13c D2DDraw+0x6e20: clip a rect (r[0..3]=l,r,t,b) against the screen; out[4]. reg: ecx=h, esi=lo, edi=x.
+// (old reading of 0x6E20, superseded by d2ddraw_6e20.cpp) clip a rect (r[0..3]=l,r,t,b) against the screen; out[4]. reg: ecx=h, esi=lo, edi=x.
 EMSCRIPTEN_KEEPALIVE uint32_t FUN_6f8c6e20(int32_t ecx, uint32_t obj, const int32_t* r, int32_t* out,
                                             int32_t esi, int32_t edi) {
   int32_t s8 = 0, s4 = 0;
@@ -185,7 +185,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t FUN_6f8c6e20(int32_t ecx, uint32_t obj, const int3
   return 0;
 }
 
-// 1.13c D2DDraw+0x6ff0: per-frame Bink decode + copy into the primary surface. reg: edi = surface ptr (DDSURFACEDESC+0x24).
+// (old reading of 0x6FF0, superseded by d2ddraw_6ff0.cpp): per-frame Bink decode + copy into the primary surface. reg: edi = surface ptr (DDSURFACEDESC+0x24).
 EMSCRIPTEN_KEEPALIVE void FUN_6f8c6ff0(void) {
   if (!DAT_6f8cfdc4) return;
   _BinkDoFrame_4(DAT_6f8d0244);
@@ -262,9 +262,9 @@ fail:
 static void b144_shift(char* p, int n) { if (n) memmove(p + n, p, strlen(p) + 1); }
 EMSCRIPTEN_KEEPALIVE void __shift_b144(char* p, int n) { b144_shift(p, n); }
 
-// 1.13c D2DDraw+0x9796: __cftoe2. reg: f=eax (STRFLT), buf=ebx. The __shift args are reg-inferred (unverified).
+// 1.13c D2DDraw+0x9796: __cftoe2. reg: f=eax (STRFLT), buf=ebx; __shift gets EAX = buf + (sign == '-'), EDI = (nd > 0).
 static void cftoe2(STRFLT* f, char* buf, int nd, int caps, char g) {
-  if (g) b144_shift(buf + (f->sign == 0x2d), 1);
+  if (g) b144_shift(buf + (f->sign == 0x2d), nd > 0);   // EDI = (nd > 0)
   if (f->sign == 0x2d) *buf++ = '-';
   char* p = buf;
   if (nd > 0) { p = buf + 1; buf[0] = buf[1]; buf[1] = (char)DAT_6f8ce7e4; }

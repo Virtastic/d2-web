@@ -1,5 +1,5 @@
 // 1.13c D2Win+0x14140 (sub_14140): textbox mouse-down/drag handler (caret placement, selection, double-click).
-// Stateful (globals, GetTickCount, widget struct, callbacks); NAMED only, no vector.
+// Stateful (globals, GetTickCount, widget struct); every callee, the clock and the control's own callback are seams on the Env, so a probe replays the retail call log.
 #include <cstdint>
 
 struct D2WinMsg { int32_t* box; int32_t msg; };
@@ -18,8 +18,10 @@ struct D2Win14140Env {
     void (*f3770)(int32_t*);
     int32_t (*f2080)(int16_t*, int32_t);
     int32_t (*ustrlen)(int16_t*);
+    uint32_t (*callback)(int32_t** p, uint32_t fn);   // the control's handler at +0x34 (stdcall, one word: the message pointer)
 };
 
+// 1.13c D2Win+0x14140
 uint32_t d2win_sub_14140(int32_t** p, D2Win14140Env& e) {
     int32_t* b = p[0];
     if (!b) { e.assertFail(0x6d0); return 0; }
@@ -68,5 +70,5 @@ uint32_t d2win_sub_14140(int32_t** p, D2Win14140Env& e) {
     }
     e.lastBox = b; e.lastTick = t;
     if (!b[0xd]) return 0;
-    return ((uint32_t(*)(int32_t**))(uintptr_t)(uint32_t)b[0xd])(p);
+    return e.callback(p, (uint32_t)b[0xd]);
 }

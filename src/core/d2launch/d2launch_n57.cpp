@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include "d2launch_12560.h"
 
 // 1.13c D2LAUNCH+0x149E0
 void d2launch_sub_149E0(void (*release)(uint32_t h), uint32_t* handles, int32_t* count) {
@@ -84,16 +85,25 @@ bool d2launch_sub_11BE0(const uint32_t* msg, uint32_t (*tick)(void), void (*curs
   uint32_t t = tick();
   int32_t dt = int32_t(t - *lasttick);
   int32_t pt[2]; cursor(pt);
-  int32_t dx = pt[0] - *lastx, dy = pt[1] - *lasty;
+  uint32_t dx = uint32_t(pt[0]) - uint32_t(*lastx), dy = uint32_t(pt[1]) - uint32_t(*lasty);
+  uint32_t sx = uint32_t(int32_t(dx) >> 31), sy = uint32_t(int32_t(dy) >> 31);
   *lasty = pt[1]; *lasttick = t; *lastx = pt[0];
-  return (std::abs(dx) + std::abs(dy)) < 5 && dt < 0x12d && m == 0x201;
+  // retail's branch-free abs wraps: |INT_MIN| stays INT_MIN, and the sum is a signed 32-bit compare
+  return int32_t(((dx ^ sx) - sx) + ((dy ^ sy) - sy)) < 5 && dt < 0x12d && m == 0x201;
 }
 
 // 1.13c D2LAUNCH+0x12560  (host "127.0.0.1" -> local branch, else remote branch)
-void d2launch_sub_12560(const char* (*gethost)(void), void (*a)(void), void (*b)(void),
-                        void (*c)(void), void (*d)(void), void (*lbl)(void)) {
-  const char* h = gethost();  // Ordinal_10013
-  a();                        // Ordinal_10106
-  if (strncmp(h, "127.0.0.1", 10) == 0) { b(); c(); d(); d(); d(); }
-  else { lbl(); d(); d(); d(); }
+// h = D2Win#10013 (thunk 0x97C6); #10106 (0x996A, ECX = g54F8); a ten-byte compare against "127.0.0.1\0".
+// Local: #10020 (0x98C8, ECX = g54F8, EDX = D2Lang#10003(0x1404) via 0x9B32); remote: #10167 (0x9976, ECX = g54F8, EDX = h).
+// Then #10147 (0x9862) on g5514, g5510, g52A0 with EDX = 0 (local) or 1 (remote); the last is a tail jump, so its EAX is the result.
+uint32_t d2launch_sub_12560(const D2l12560* s) {
+  const char* h = (const char*)(uintptr_t)s->o10013();
+  s->o10106(s->g54f8);
+  const bool local = memcmp(h, "127.0.0.1", 10) == 0;
+  if (local) s->o10020(s->g54f8, s->o10003(0x1404));
+  else s->o10167(s->g54f8, (uint32_t)(uintptr_t)h);
+  const uint32_t v = local ? 0u : 1u;
+  s->o10147(s->g5514, v);
+  s->o10147(s->g5510, v);
+  return s->o10147(s->g52a0, v);
 }

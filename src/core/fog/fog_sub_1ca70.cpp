@@ -37,6 +37,17 @@ void (*g_getDiskFreeSpace)(const char*, uint32_t*, uint32_t*, uint32_t*, uint32_
 
 }  // namespace
 
+// Probe seam: replaces the three host callees (nullptr restores the defaults above). A probe passes
+// its HookEnv-backed stand-ins here, so the port runs the same control flow retail does.
+extern "C"
+void fog_sub_1ca70_seams(void (*savePath)(char*, uint32_t),
+                         int (*diskFreeSpaceEx)(const char*, uint64_t*, uint64_t*, uint64_t*),
+                         void (*diskFreeSpace)(const char*, uint32_t*, uint32_t*, uint32_t*, uint32_t*)) {
+    g_getSavePath = savePath ? savePath : noSavePath;
+    g_getDiskFreeSpaceEx = diskFreeSpaceEx ? diskFreeSpaceEx : noDiskFreeSpaceEx;
+    g_getDiskFreeSpace = diskFreeSpace ? diskFreeSpace : noDiskFreeSpace;
+}
+
 // 1.13c Fog+0x1CA70
 // Free space, in bytes, of the save directory. GetDiskFreeSpaceExA gives it directly (its first
 // output, free bytes available to the caller). On the hosts where that export is missing, the path
@@ -64,5 +75,6 @@ uint64_t fog_sub_1ca70(void) {
     uint32_t freeClusters = 0;
     uint32_t totalClusters = 0;
     g_getDiskFreeSpace(path, &sectorsPerCluster, &bytesPerSector, &freeClusters, &totalClusters);
-    return (uint64_t)freeClusters * bytesPerSector * sectorsPerCluster;
+    // retail multiplies in 32 bits (imul), xor edx,edx: the product wraps, the high dword is zero
+    return (uint64_t)(uint32_t)(freeClusters * bytesPerSector * sectorsPerCluster);
 }

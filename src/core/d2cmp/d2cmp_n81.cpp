@@ -25,7 +25,7 @@ void d2cmp_8ef0(uint32_t esi, uint32_t edi, const D2Cmp8ef0Env* e) {
     e->fatal(code);
 }
 
-// ---- 0x9720 lives in src/core/d2moo/compat/d2cmp_tilelib.cpp (loadLibrary) ----
+// ---- 0x9720 lives in src/core/d2cmp/d2cmp_9720.cpp ----
 
 // ---- 0x9880: free the global node list (DAT_6fe88328) ----
 struct D2Cmp9880Env {
@@ -112,68 +112,70 @@ void d2cmp_d680(uint32_t p1, uint32_t p2, uint32_t p3, uint32_t p4, const D2CmpD
     s->fc0b0(p1, p2);
 }
 
-// ---- 0xE1D0: Ordinal 10005, load a cel's frame (thiscall) ----
-// 0x17020 reports two counts through out-pointers (EDI = &A, EDX = &B); Ghidra folded them to 0 and dropped
-// the rescale and the post-load 0xE090 paths, so this follows the disassembly.
+// ---- 0xE1D0: load a cel's frame, stdcall (p, p2, p3), ret 0xC ----
+// Transcribed from the disassembly (the decompile folds the register conventions). 17020 reports two counts through out-pointers (EDX = &Y, EDI = &X).
+// The flag byte (D350's out-dword, low byte tested) and the name buffer are stack locals.
 struct D2CmpE1d0Env {
-    uint32_t (*f222e0)(void* self, uint32_t* p);                                   // 0x122E0
-    uint8_t* (*fd350)(void* self, uint32_t* p, char* name1, char* buf2);           // 0xD350 (EAX = buf2)
-    uint32_t (*f27020)(uint32_t tbl, uint8_t* a, uint32_t* p, uint32_t* outA, uint32_t* outB);   // 0x17020
-    uint32_t (*f221c0)(uint32_t v, uint32_t n, uint32_t b, uint32_t flag);         // 0x121C0
+    uint32_t (*f222e0)(uint32_t* p);                                               // 0x122E0 (stack p)
+    uint8_t* (*fd350)(char* name, uint32_t* p, uint8_t* flagOut);                  // 0xD350 (EAX = name, stack p, &flag)
+    uint8_t* (*f27020)(uint8_t* r, uint32_t* y, uint32_t* x, uint32_t key);        // 0x17020 (ECX = r, EDX = &Y, EDI = &X, stack key)
+    uint32_t (*f221c0)(uint32_t a, uint32_t b, uint32_t c, uint32_t d);            // 0x121C0
     uint32_t (*ord10092)(uint32_t h);                                              // 0x8DD8 (ECX = h)
-    void (*fcae0)(uint32_t edi, uint32_t esiTbl);                                  // 0xCAE0
-    void (*fcfc0)(uint8_t* a, uint32_t* p, uint32_t cel);                          // 0xCFC0 (EAX = cel)
-    uint32_t (*fd310)(uint32_t cel, uint32_t* p);                                  // 0xD310 (EAX, EDI)
-    int (*fc2d0)(char* name1, char* buf2, uint32_t* p);                            // 0xC2D0 (EBX, ESI)
-    uint32_t (*fddc0)(uint32_t* p, uint8_t* a, uint32_t A, uint32_t B, char* name1);           // 0xDDC0
-    void (*fe090)(uint32_t* p, char* buf2, uint32_t A, uint32_t B, uint8_t* a, char* name1, int p3);   // 0xE090 (ECX, EAX)
+    void (*fcae0)(uint32_t edi, uint32_t esiTbl);                                  // 0xCAE0 (ESI = &cache, EDI = ent[0x24])
+    void (*fcfc0)(uint8_t* t, uint8_t* r, uint32_t* p);                            // 0xCFC0 (EAX = t, stack r, p)
+    uint32_t (*fd310)(uint8_t* t, uint32_t* p);                                    // 0xD310 (EAX = t, EDI = p)
+    uint32_t (*fc2d0)(char* name, uint32_t* p, uint8_t* flagOut);                  // 0xC2D0 (EBX = name, ESI = p, stack &flag)
+    uint32_t (*fddc0)(uint32_t* p, uint8_t* r, uint32_t x, uint32_t y, uint8_t* flagOut);   // 0xDDC0 (stack p, r, X, Y, &flag)
+    void (*fe090)(uint32_t* p, char* name, uint32_t x, uint32_t y, uint8_t* r, uint8_t* flagOut, uint32_t p3);   // 0xE090 (ECX = p, EAX = name, stack X, Y, r, &flag, p3)
     uint32_t* g88398;                                                              // DAT_6fe88398
 };
 // 1.13c D2CMP+0x0E1D0
-uint32_t d2cmp_e1d0(void* self, uint32_t* p, int p2, int p3, const D2CmpE1d0Env* e) {
-    char name1[0x104], buf2[0x104];
+extern "C" uint32_t d2cmp_e1d0(uint32_t* p, uint32_t p2, uint32_t p3, const D2CmpE1d0Env* e) {
+    char name[0x104];
+    uint8_t flag[4] = { 0, 0, 0, 0 };
     if (!p) return 0;
     p[0xf] = 0;
-    if (p[0xd]) { p[0xf] = e->f222e0(self, p); return 1; }
-    uint8_t* a = e->fd350(self, p, name1, buf2);
-    uint32_t A = 0, B = 0;
-    uint32_t t = e->f27020(0x6fe772b0, a, p, &A, &B);
-    uint32_t R = 1, D = 0;
-    if (B > 1 && A != 0) {
-        bool rescale = true;
-        if (t) {
-            uint32_t h = G(G(t)[0x20 / 4])[0xb0 / 4];
-            if (!h) return 0;
-            D = e->ord10092(h);
-            if (D) rescale = false;
+    if (p[0xd]) { p[0xf] = e->f222e0(p); return 1; }
+    uint8_t* r = e->fd350(name, p, flag);
+    uint32_t X = 0, Y = 0;
+    uint8_t* ent = e->f27020(r, &Y, &X, 0x672b0u);
+    uint32_t l1c = 0;
+    if (Y > 1 && X != 0) {
+        bool skip = false;
+        if (ent) {
+            const uint32_t s = *(uint32_t*)(*(uint8_t**)(ent + 0x20) + 0xb0);
+            if (!s) return 0;
+            l1c = e->ord10092(s);
+            if (l1c) skip = true;
         }
-        if (rescale && !(a[0] & 1)) {
-            uint32_t n = *(uint32_t*)(a + 0x14);
-            uint32_t r = e->f221c0((p[0x10] * n) >> 6, n, B, ((uint8_t*)p)[4] & 4);
-            uint32_t n2 = *(uint32_t*)(a + 0x14);
-            p[0x10] = n2 > 1 ? (r << 6) / n2 : 1;
-            t = e->f27020(0x6fe772b0, a, p, &A, &B);
+        if (!skip && !(r[0] & 1)) {
+            const uint32_t per = *(uint32_t*)(r + 0x14);
+            const uint32_t v = e->f221c0((p[0x10] * per) >> 6, per, Y, ((uint8_t*)p)[4] & 4);
+            const uint32_t per2 = *(uint32_t*)(r + 0x14);
+            p[0x10] = per2 > 1 ? (v << 6) / per2 : 1;
+            ent = e->f27020(r, &Y, &X, 0x672b0u);
         }
     }
-    if (t == 0) {
-        if (p2) return 0;
-        if (name1[0] == 0 && e->fc2d0(name1, buf2, p) == 0) return 0;
-        R = e->fddc0(p, a, A, B, name1);
-        if (R) e->fe090(p, buf2, A, B, a, name1, p3);
-        return R;
+    if (ent) {
+        uint8_t* t = *(uint8_t**)(ent + 0x20);
+        if (!t || (t[0x20] & 1) || !*(uint32_t*)(t + 0xb0)) return 0;
+        if (p2) return e->ord10092(*(uint32_t*)(t + 0xb0)) != 0;
+        e->fcae0(*(uint32_t*)(ent + 0x24), 0x67240u);
+        if (*(uint32_t*)(t + 0x28) == 0) e->fcfc0(t, r, p);
+        const uint32_t v = e->fd310(t, p);
+        p[0xf] = v;
+        if (!v) { if (*e->g88398 == 0) *e->g88398 = 1; return 0; }
+        if (l1c || X != 0 || Y <= 1) return 1;
+        if (flag[0] == 0 && !e->fc2d0(name, p, flag)) return 0;
+        e->fe090(p, name, 0, Y, r, flag, p3);
+        return 1;
     }
-    uint32_t cel = G(t)[0x20 / 4];
-    if (!cel || (((uint8_t*)G(cel))[0x20] & 1) || !G(cel)[0xb0 / 4]) return 0;
-    if (p2) return e->ord10092(G(cel)[0xb0 / 4]) != 0;
-    e->fcae0(G(t)[0x24 / 4], 0x6fe77240);
-    if (G(cel)[0x28 / 4] == 0) e->fcfc0(a, p, cel);
-    uint32_t v = e->fd310(cel, p);
-    p[0xf] = v;
-    if (!v) { if (*e->g88398 == 0) *e->g88398 = 1; return 0; }
-    if (D || A || B <= 1) return R;
-    if (name1[0] == 0 && e->fc2d0(name1, buf2, p) == 0) return 0;
-    e->fe090(p, buf2, 0, B, a, name1, p3);
-    return R;
+    if (p2) return 0;
+    if (flag[0] == 0 && !e->fc2d0(name, p, flag)) return 0;
+    const uint32_t l20 = e->fddc0(p, r, X, Y, flag);
+    if (!l20) return 0;
+    e->fe090(p, name, X, Y, r, flag, p3);
+    return l20;
 }
 
 // ---- 0x11890: Ordinal 10015, clipped blit dispatch ----

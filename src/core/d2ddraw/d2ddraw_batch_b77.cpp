@@ -24,7 +24,7 @@ W int32_t DAT_6f8d01c8, DAT_6f8d01d8;  // width, height
 W uint8_t DAT_6f8cfdcc[1];  // palette entries
 W void q_d2ddraw_batch_b77_FUN_6f8c7690(void* hr, const char* msg);
 
-// 1.13c D2DDraw+0x082F0: blit render surface to the screen (BltFast), then flush a dirty palette.
+// (old reading of 0x082F0, superseded by d2ddraw_82f0.cpp): blit render surface to the screen (BltFast), then flush a dirty palette.
 EMSCRIPTEN_KEEPALIVE int32_t b77_FUN_6f8c82f0(void) {
   void* hr;
   int32_t r[4];

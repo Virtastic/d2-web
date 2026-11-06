@@ -47,7 +47,7 @@ struct D2WinB64Env {
     void** mpqVideo; void** mpqExpansion;                  // DAT_6f9a9cc4 / DAT_6f9a9cdc
     void (*unicodeInit)(uint16_t*);                        // closure ctor
     void (*win2Unicode)(uint16_t*, const char*, int32_t);
-    void (*sub_8920)(uint16_t*, int32_t, int32_t);
+    void (*sub_8920)(uint32_t ctl, uint16_t*, int32_t, int32_t);   // 0x8920: EAX = control, stack text, row, col
     int32_t (*fog10117)(void);                             // Fog #10117 (nonzero zeroes 0xA820's ecx)
     const uint32_t* handlersA250;                          // {LAB_6f8ea0e0, LAB_6f8e9e10} as the host names them
 };
@@ -291,10 +291,17 @@ void d2win_sub_F6B0(int32_t* w, int32_t v) {
     w[0x17] = v;
 }
 
-// 1.13c D2Win+0x08a50 -- __fastcall(ecx unused)
-void d2win_sub_8A50(uint32_t /*ecx*/, const char* s, int32_t a, int32_t b) {
+// FN probe seam (src/core/fn/d2win_8a50.cpp): the three callees sub_8A50 reaches.
+extern "C" void d2win_b64_set_8a50_seams(void (*unicodeInit)(uint16_t*), void (*win2Unicode)(uint16_t*, const char*, int32_t),
+                                         void (*sub8920)(uint32_t, uint16_t*, int32_t, int32_t)) {
+    E.unicodeInit = unicodeInit; E.win2Unicode = win2Unicode; E.sub_8920 = sub8920;
+}
+
+// 1.13c D2Win+0x08a50 -- __fastcall(ecx = list control, edx = ANSI text, stack row, col), ret 8: widens the text into a 0x400-unit
+// buffer and hands it to 0x8920 with EAX = the control.
+void d2win_sub_8A50(uint32_t ecx, const char* s, int32_t a, int32_t b) {
     uint16_t buf[0x400];
     for (auto& c : buf) E.unicodeInit(&c);
     E.win2Unicode(buf, s, 0x400);
-    E.sub_8920(buf, a, b);
+    E.sub_8920(ecx, buf, a, b);
 }

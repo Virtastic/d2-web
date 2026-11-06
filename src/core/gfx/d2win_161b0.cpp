@@ -1,6 +1,6 @@
 // 1.13c D2Win+0x161B0 (size 340, caller 0x18560): allocate and link a 0x284-byte (0xA1 dword) window control.
-// Decompile oddities: unaff_EBX / unaff_retaddr are stored at +0x14/+0x18 as register/caller-frame values (kept as
-// explicit args e_ebx, e_ret); the six pointer-sized callbacks (0x5A80/0x4A20, 0x5A10/0x4140, 0x35E0) are seams.
+// __fastcall: p1 = ECX (+0x0C), p2 = EDX (+0x10), then nine stack words (ret 0x24): e_ebx, e_ret are stack words 0 and 1
+// (+0x14, +0x18), p3..p9 stack words 2..8. The five handler words (0x5A80/0x4A20, 0x5A10/0x4140, 0x35E0) are seams.
 #include <cstdint>
 #include <cstring>
 struct D2WinCtlEnv {

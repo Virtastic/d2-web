@@ -23,27 +23,30 @@ struct D2WinB52Env {
     int (*fmt)(char* buf, const char* f, const char* a);   // wsprintfA
 };
 
-// 1.13c D2Win+0x08b50
+// 1.13c D2Win+0x08b50. EAX = font. Returns what retail leaves in EAX (callers ignore it): the tail call's result in the
+// 7 and 9 branches, the state in the 6 branch, 10 in the 10 branch, else the fourth mode read.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2win_sub_8b50(int32_t font, const D2WinB52Env* e) {
+uint32_t d2win_sub_8b50(int32_t font, const D2WinB52Env* e) {
     auto cls = [&]() { return e->fontTab[*e->curFont * 5][10]; };
     int32_t m = e->getMode();
     if (m == 7) {
         int32_t prev = e->setFont(font);
-        *e->cursorState = cls() > 0xd ? 8 : (cls() > 7) + 6;
-        e->setFont(prev);
-        return;
+        const uint8_t c = cls();
+        *e->cursorState = c > 0xd ? 8 : (c > 7) + 6;
+        return (uint32_t)e->setFont(prev);
     }
     if (e->getMode() == 9) {
         int32_t prev = e->setFont(font);
-        *e->cursorState = cls() < 0xe ? (cls() > 7) + 6 : 8;
+        const uint8_t c = cls();
+        *e->cursorState = c > 0xd ? 8 : (c > 7) + 6;
         if (*e->flag) *e->cursorState = 3;
-        e->setFont(prev);
-        return;
+        return (uint32_t)e->setFont(prev);
     }
+    if (e->getMode() == 6) { *e->cursorState = *e->flag ? 0 : 4; return (uint32_t)*e->cursorState; }
     m = e->getMode();
-    if (m == 6 || e->getMode() == 10) { *e->cursorState = *e->flag ? 0 : 4; return; }
+    if (m == 10) { *e->cursorState = *e->flag ? 0 : 4; return 10; }
     *e->cursorState = 4;
+    return (uint32_t)m;
 }
 
 // 1.13c D2Win+0xBD70
