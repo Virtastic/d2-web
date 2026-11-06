@@ -68,33 +68,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2_client_87fe0(D2cSnd87* s, const D2cS
     return nullptr;
 }
 
-// 1.13c D2Client+0x880E0 (entry in EDI)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_880e0(D2cSnd87*, const D2cSnd87Env* e, uint8_t* p) {
-    if (rd<int32_t>(p, 0x30) == 1) {
-        uint8_t* b = (uint8_t*)rd<uintptr_t>(p, 0x2c);
-        if (rd<int32_t>(b, 0)) {
-            uintptr_t c = rd<uintptr_t>(b, 8);
-            if (c) wr<uint32_t>((uint8_t*)c, 0x41, e->ord10032());
-            e->ord10006();
-        }
-        uintptr_t c = rd<uintptr_t>(b, 8);
-        if (c) {
-            wr<int32_t>((uint8_t*)c, 0x30, 2);
-            wr<uintptr_t>((uint8_t*)c, 0x2c, 0);
-            wr<uintptr_t>(b, 8, 0);
-        }
-    }
-    if (rd<uintptr_t>(p, 0x2c)) e->fatal(0x93);
-}
+// 1.13c D2Client+0x880E0: moved to d2client_880e0.cpp (register and stack arguments passed explicitly).
 
-// 1.13c D2Client+0x88150 (entry in EDI); chain nodes are {item*, next*}, item[0] must be nonzero
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_88150(D2cSnd87*, const D2cSnd87Env* e, uint8_t* p) {
-    for (void** n = (void**)rd<uintptr_t>(p, 0x28); n; n = (void**)n[1]) {
-        if (n[0] == nullptr) { e->fatal(0xc2c); return; }
-        e->ord10062();
-    }
-    e->ord10063();
-}
+// 1.13c D2Client+0x88150: moved to d2client_88150.cpp (register and stack arguments passed explicitly).
 
 // 1.13c D2Client+0x881B0 (stdcall unit, ret 4). Ordinal_10628 (thunk 0xC21A,
 // stdcall unit, POINT*) fills the player's position ([0x6FBCBBFC]) then the argument unit's; dx = B.x - A.x, dy = B.y - A.y

@@ -7,6 +7,7 @@
 // the decompiler could not resolve; a faithful port needs the disassembly, not a guess.
 #include <cstdint>
 #include <cstring>
+#include <cstdio>
 #include <emscripten.h>
 #include "client_host.h"
 
@@ -130,24 +131,31 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_6f200(D2cChatState* s, uint32_t* 
     }
 }
 
-// 1.13c D2Client+0x6F260 (379 B, caller 0x70140): draw the numbered message list "n: text".
-// Ordinal 10083 = line height, 10150 = draw text (args as retail: x/y computed, 0,0).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_6f260(D2cChatState* s, D2cHost h) {
-    int32_t* L = s->list;
+// 1.13c D2Client+0x6F260 (379 B, caller 0x70140): draw the numbered message list "n: text". L = DAT_6fbcc034 (0x11C034), baseY = DAT_6fb8bc4c (0xDBC4C).
+// env.lineH = Ordinal 10083; env.draw = Ordinal 10150 (ECX = wide text, EDX = 0x14 label / 0x1e text, stack y, 0, 0). The label is sprintf("%d: ") widened
+// (win2Unicode, 0x14 chars); the entry is MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, text, -1, buf, 0x101): a string of 0x101 or more bytes (with the NUL) fails and is not drawn.
+struct D2c6F260Env { int32_t (*lineH)(); void (*draw)(const uint16_t* text, uint32_t edx, int32_t y); };
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_6f260(const D2c6F260Env* e, const int32_t* L, int32_t baseY) {
     if (!L) return;
     int32_t first, end;
-    if (L[5] == 0) { end = L[2]; first = 0; if (end > 0x13) end = 0x14; }
+    if (L[5] == 0) { first = 0; end = L[2]; if (end > 0x13) end = 0x14; }
     else { first = L[4]; end = L[5] + first; if (L[2] < end) end = L[2]; }
-    D2cCall hc = {}; hc.rva = 10083; int32_t lh = (int32_t)h(&hc);
+    const int32_t lh = e->lineH();
     int32_t y = 0, n = 0;
     for (int32_t i = first; i < end; ++i) {
-        int32_t off = L[6 + i];
+        const int32_t off = L[6 + i];
         ++n; y += lh;
-        D2cCall a = {}; a.rva = 10150; a.ecx = (uint32_t)(y - 0x170 + s->baseY); a.s[0] = 0; a.s[1] = 0;
-        a.s[2] = (uint32_t)n; h(&a);                    // "%d: " label (s[2] = number)
-        D2cCall b = {}; b.rva = 10150; b.ecx = a.ecx;
-        b.eax = (uint32_t)(uintptr_t)((const char*)L + off);   // MultiByteToWideChar of the entry
-        h(&b);
+        uint16_t lab[40] = {}; char tmp[20];
+        snprintf(tmp, sizeof tmp, "%d: ", n);
+        for (int k = 0; k < 0x14 && tmp[k]; ++k) lab[k] = (uint8_t)tmp[k];
+        e->draw(lab, 0x14, y - 0x170 + baseY);
+        uint16_t txt[0x200] = {};
+        const char* sp = (const char*)L + off;
+        size_t len = strlen(sp);
+        if (len + 1 <= 0x101) {
+            for (size_t k = 0; k < len; ++k) txt[k] = (uint8_t)sp[k];
+            e->draw(txt, 0x1e, y - 0x170 + baseY);
+        }
         if (y > 0x118) return;
     }
 }

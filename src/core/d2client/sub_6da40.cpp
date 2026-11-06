@@ -12,8 +12,13 @@ extern "C" {
 EMSCRIPTEN_KEEPALIVE int32_t d2c_6da40(const D2c6DA40Env* e, int32_t idx, const uint32_t* esi) {
     if (idx >= 0x10) return 0;
     uint32_t id = esi ? esi[1] : 0xffffffffu;
+    // Ordinal_10175 (C65E) is stored to a local that Ordinal_10350 receives; the switch reads
+    // local_8, which holds esi[0] (type) or 6 when esi is null. Retail's selector is that type, not
+    // the C65E answer (the 19-diff pattern on the first prove matches this exactly).
+    (void)e->ord10175(esi);
     // Ordinal_10350 (assert/log, no result used) omitted.
-    switch ((uint32_t)e->ord10175(esi)) {
+    const uint32_t selector = esi ? esi[0] : 6u;
+    switch (selector) {
     case 0: return (idx >= 0 && idx <= 4) || idx == 8 || idx == 9;
     case 1: { const uint8_t* p = e->f1260(id);
         return p && (e->bitMasks[idx & 7] & p[(idx >> 3) + 0xe8]) ? 1 : 0; }

@@ -1,25 +1,32 @@
-// Prior art: none. Derived from cached 1.13c decompile. Env-seam style: every Ordinal_/FUN_ callee comes in through Env.
-// Ordinal names UNVERIFIED. `self` is the register-passed unaff_EDI struct: self[0]=kind, self[0xb]=handle.
+// D2Client rva 0xC5F20 (SkillsBar.cpp): set up a skill-bar overlay on the unit's +0x2C handle (EDI = self, stack p).
+// Two thunk lookups on p (0xCB68 / 0xCB6E) must both succeed; the handle is then configured (0xC60A on p, 0xC3AC, 0xC400,
+// 0xC3EE with both lookups, 0xC38E 9), its frame word comes from the class record (self type 1: 0x1230 +0x34 signed
+// short; else 0x1300 +0x41 byte; EAX = self+4 for both) shifted left 8, and it is attached to self (0xC376). Retail order.
 #include <cstdint>
-namespace d2client_c5f20 {
-using I=int32_t; using U=uint32_t;
-struct Env {
- I (*o10980)(I p); I (*o10649)(I p); void (*o10137)(I p,I v);
- void (*o11164)(I h,I v); void (*o11056)(I h,I v); void (*o10286)(I h,I a,I p); void (*o10647)(I h,I v);
- I (*f1230)(); I (*f1300)();        // FUN_6fab1230 / FUN_6fab1300 -> record ptr (0 = none)
- I (*rd16)(I a); I (*rd8)(I a);     // read short at +0x34 / byte at +0x41 of the record
- void (*o10488)(I h,U v,const char* file,I line); void (*o10334)(I h);
-};
-// 1.13c D2Client+0xC5F20
-I c5f20(const Env& e,const I* self,I p){
- I h=self[0xb]; if(!h) return 0;
- I a=e.o10980(p), b=e.o10649(p);
- if(!a||!b) return 0;
- e.o10137(p,0x1101); e.o11164(h,0); e.o11056(h,0); e.o10286(h,a,p); e.o10647(h,9);
- U v;
- if(self[0]==1){ I r=e.f1230(); if(!r) return 0; v=(U)(I)(int16_t)e.rd16(r+0x34); }
- else { I r=e.f1300(); v=(U)(uint8_t)e.rd8(r+0x41); }
- e.o10488(h,v<<8,"..\\Source\\D2Client\\SKILLS\\SkillsBar.cpp",0x237); e.o10334(h);
- return 1;
-}
+#include "d2client_callee.h"
+
+// 1.13c D2Client+0xC5F20 (EDI = self, ret 4)
+extern "C" uint32_t d2_client_c5f20(const D2cSvc& v, uint32_t self, const uint32_t* selfp, uint32_t p) {
+    const uint32_t h = selfp[0xb];
+    if (!h) return 0;
+    const uint32_t a = d2c_call(v, 0xcb68, 0, 0, 0, 0, 0, p);
+    const uint32_t b = d2c_call(v, 0xcb6e, 0, 0, 0, 0, 0, p);
+    if (!a || !b) return 0;
+    d2c_call(v, 0xc60a, 0, 0, 0, 0, 0, p, 0x1101);
+    d2c_call(v, 0xc3ac, 0, 0, 0, 0, 0, h, 0);
+    d2c_call(v, 0xc400, 0, 0, 0, 0, 0, h, 0);
+    d2c_call(v, 0xc3ee, 0, 0, 0, 0, 0, h, a, b);
+    d2c_call(v, 0xc38e, 0, 0, 0, 0, 0, h, 9);
+    uint32_t w;
+    if (selfp[0] == 1) {
+        const uint32_t r = d2c_call(v, 0x1230, selfp[1], 0, 0, 0, 0);
+        if (!r) return 0;
+        w = (uint32_t)(int32_t)*(const int16_t*)(uintptr_t)(r + 0x34) << 8;
+    } else {
+        const uint32_t r = d2c_call(v, 0x1300, selfp[1], 0, 0, 0, 0);
+        w = (uint32_t)*(const uint8_t*)(uintptr_t)(r + 0x41) << 8;
+    }
+    d2c_call(v, 0xc328, 0, 0, 0, 0, 0, h, w, 0xB2000000u | 0xd5f6c, 0x237);   // SkillsBar.cpp
+    d2c_call(v, 0xc376, 0, 0, 0, 0, 0, h, self, 0);
+    return 1;
 }

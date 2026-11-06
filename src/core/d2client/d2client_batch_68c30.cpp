@@ -92,16 +92,7 @@ void d2_client_8afd0(int32_t* p1, int32_t* p2, uint32_t now, uint32_t t0_b9cc, u
     sub8ad30();
 }
 
-// 1.13c D2Client+0x8B0C0 (76 B): obj[3]/obj[4] nonzero -> call sub, clear bit 0 of obj[0].
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_8b0c0(int32_t arg, uint32_t* obj_esi, int32_t state_cc414, void (*sub2a9f0)(int32_t),
-                     void (*fatal)()) {
-    if (!obj_esi) { fatal(); return; }  // Ordinal_10265(0x1dd); Ordinal_10024; _exit(-1)
-    if (obj_esi[3] || obj_esi[4]) {
-        if (state_cc414 != 3) sub2a9f0(arg);
-        *obj_esi &= 0xfffffffe;
-    }
-}
+// 1.13c D2Client+0x8B0C0: moved to d2client_8b0c0.cpp (register and stack arguments passed explicitly).
 
 // 1.13c D2Client+0x8B2F0 (505 B): four button cells; g[] = DAT_6fb91118/1c/30/34/58/5c/60/64 pairs and cbd offsets.
 extern "C" EMSCRIPTEN_KEEPALIVE

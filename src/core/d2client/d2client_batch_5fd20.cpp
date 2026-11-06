@@ -17,50 +17,66 @@ static void toW(W* d, const char* s, int n) { int i = 0; for (; i < n - 1 && s[i
 static unsigned wlen(const W* s) { unsigned n = 0; while (s[n]) n++; return n; }
 struct Globals { int32_t& lineY; uint8_t mode; const uint8_t* game; };
 
-// 1.13c D2Client+0x5FD20  (DAT_6fbcc390 in {1,2}; DAT_6fbcc21c = lineY)
-void sub_5FD20(Host& h, uint8_t mode, int32_t& lineY, bool& fatal) {
+// The four status-line writers 0x5FD20, 0x5FE10, 0x5FE90, 0x5FF70 share one tail: width := D35A(ECX = buf), then
+// D37E(ECX = buf, EDX = rightEdge - width - 0x10; stack lineY, 4, 0), then lineY += 0x10 (rightEdge = DAT_6fba9e14).
+struct Line {
+ virtual ~Line() = default;
+ virtual const W* str(int32_t id) = 0;                                 // D2Lang Ordinal_10003 (fastcall ECX = id)
+ virtual const char* narrow(int32_t n) = 0;                            // 0xC01C calls Ordinal_10013 (no stack argument; n is toUnicode's max)
+ virtual void fmt(W* buf, int32_t n, const W* f, const W* a) = 0;      // Unicode::sprintf(n, buf, f, a)
+ virtual int32_t measure(const W* buf) = 0;                            // 0xD35A (ECX = buf)
+ virtual void draw(const W* buf, int32_t x, int32_t y) = 0;            // 0xD37E (ECX = buf, EDX = x; stack y, 4, 0)
+};
+static void tail(Line& h, const W* buf, int32_t rightEdge, int32_t& lineY) {
+ int32_t w = h.measure(buf);
+ h.draw(buf, rightEdge - w - 0x10, lineY);
+ lineY += 0x10;
+}
+// 1.13c D2Client+0x5FD20  mode = DAT_6fbcc390 (1 selects string 0x1423, 2 selects 0x1422); fatal = the length >= 300 branch (Ordinal_10265 + _exit)
+void sub_5FD20(Line& h, uint8_t mode, int32_t rightEdge, int32_t& lineY, bool& fatal) {
  if (mode != 1 && mode != 2) return;
+ const int32_t id = mode == 1 ? 0x1423 : 0x1422;
  W buf[300] = {};
- unsigned a = wlen(h.str(0)), b = wlen(h.str(0));   // both Ordinal_10003 ids GUESS
- if (299 < a + 3 + b) { fatal = true; return; }     // retail: Ordinal_10265(0xb3e), _exit(-1)
- // Unicode::sprintf(300,buf,fmt) with fmt=str(str(0)) -- format args GUESS
- const W* s = h.str(0); unsigned n = wlen(s); if (n > 299) n = 299; std::memcpy(buf, s, n * 2);
- h.drawText(buf, 4, 0); h.emit(buf, 0, 0); lineY += 0x10;
+ unsigned a = wlen(h.str(id)), b = wlen(h.str(0x1057));
+ if (299 < a + 3 + b) { fatal = true; return; }
+ const W* g = h.str(id); const W* f = h.str(0x1057);   // sprintf(300, buf, fmt = string 0x1057, arg = string id)
+ h.fmt(buf, 300, f, g);
+ tail(h, buf, rightEdge, lineY);
 }
-// 1.13c D2Client+0x5FE10
-void sub_5FE10(Host& h, const char* narrow /*Ordinal_10013 result GUESS*/, int32_t& lineY) {
- W buf[300] = {}; toW(buf, narrow, 300);
- h.drawText(buf, 4, 0); h.emit(buf, 0, 0); lineY += 0x10;
+// 1.13c D2Client+0x5FE10: the Ordinal_10013(300) string widened (Unicode::toUnicode, 300)
+void sub_5FE10(Line& h, int32_t rightEdge, int32_t& lineY) {
+ W buf[300] = {}; toW(buf, h.narrow(300), 300);
+ tail(h, buf, rightEdge, lineY);
 }
-// 1.13c D2Client+0x5FE90   gameIf/version via vtable +0x5c, +0xb0 (GUESS: version, build char)
-void sub_5FE90(Host& h, bool haveIf, int32_t ver, bool showBuild /*game+0x21f!=0*/, int8_t build, int32_t& lineY) {
+// 1.13c D2Client+0x5FE90: obj = DAT_6fbcc378 (vtable +0x5c version, +0xb0 build char); showBuild = *(DAT_6fbcb980 + 0x21f) != 0
+void sub_5FE90(Line& h, int32_t rightEdge, bool haveIf, int32_t ver, bool showBuild, int8_t build, int32_t& lineY) {
  if (haveIf) {
   char t[100];
   if (!showBuild) std::snprintf(t, sizeof t, "v %d.%02d", ver / 100 + 1, ver % 100);
   else std::snprintf(t, sizeof t, "v %d.%02d %d", ver / 100 + 1, ver % 100, (int)build);
   W buf[100] = {}; toW(buf, t, 100);
-  h.drawText(buf, 4, 0); h.emit(buf, 0, 0);
- }
- lineY += 0x10;
+  tail(h, buf, rightEdge, lineY);
+ } else lineY += 0x10;
 }
-// 1.13c D2Client+0x5FF70
-void sub_5FF70(Host& h, int32_t& lineY) {
- W buf[100] = {}; const W* s = h.str(0); unsigned n = wlen(s); if (n > 99) n = 99; std::memcpy(buf, s, n * 2);
- h.drawText(buf, 4, 0); h.emit(buf, 0, 0); lineY += 0x10;
+// 1.13c D2Client+0x5FF70: Unicode::strcpy of string 0x58CA into a 50-char buffer
+void sub_5FF70(Line& h, int32_t rightEdge, int32_t& lineY) {
+ W buf[50] = {}; const W* s = h.str(0x58ca); unsigned n = wlen(s); if (n > 49) n = 49; std::memcpy(buf, s, n * 2);
+ tail(h, buf, rightEdge, lineY);
 }
-// 1.13c D2Client+0x5FFE0  game = DAT_6fbcb980 (names at +0x1b, +0x33, +0x241 -- field meaning GUESS)
-static void line(Host& h, const char* name, int32_t& lineY) {
- W nm[26] = {}, buf[100] = {}; toW(nm, name, 25);
- const W* p = h.str(0); unsigned n = wlen(p); if (n > 99) n = 99; std::memcpy(buf, p, n * 2);
+// 1.13c D2Client+0x5FFE0  game = DAT_6fbcb980 (names at +0x1b, +0x33, +0x241); each present name is widened (toUnicode, 25), prefixed by string 0x1055
+// (+0x1b) or 0x1056 (+0x241), and written through the shared measure/draw tail.
+static void nameLine(Line& h, int32_t id, const char* name, int32_t rightEdge, int32_t& lineY) {
+ W nm[25] = {}, buf[100] = {}; toW(nm, name, 25);
+ const W* p = h.str(id); unsigned n = wlen(p); if (n > 99) n = 99; std::memcpy(buf, p, n * 2);
  for (unsigned i = 0; n + i < 99 && nm[i]; i++) buf[n + i] = nm[i];
- h.drawText(buf, 4, 0); h.emit(buf, 0, 0); lineY += 0x10;
+ tail(h, buf, rightEdge, lineY);
 }
-void sub_5FFE0(Host& h, const uint8_t* game, int32_t& lineY) {
+void sub_5FFE0(Line& h, const uint8_t* game, int32_t rightEdge, int32_t& lineY) {
  if (!game) return;
- bool a = game[0x1b] != 0, b = game[0x33] != 0;   // empty string => absent (retail strlen==1 check)
+ bool a = game[0x1b] != 0, b = game[0x33] != 0;   // empty string => absent
  if (!a && !b) return;
- if (a) line(h, (const char*)game + 0x1b, lineY);
- if (game[0x241]) line(h, (const char*)game + 0x241, lineY);
+ if (a) nameLine(h, 0x1055, (const char*)game + 0x1b, rightEdge, lineY);
+ if (game[0x241]) nameLine(h, 0x1056, (const char*)game + 0x241, rightEdge, lineY);
 }
 // 1.13c D2Client+0x601A0  (string arrives in EBX: unaff_EBX; param_1 unused GUESS)
 void sub_601A0(Host& h, const char* s /*EBX*/, int32_t y /*param_2*/, uint8_t color /*param_3*/) {
@@ -71,30 +87,39 @@ void sub_601A0(Host& h, const char* s /*EBX*/, int32_t y /*param_2*/, uint8_t co
  h.drawText(buf, color, 0); h.emit(buf, y - 10, 0);
  h.setFont(0);
 }
-// 1.13c D2Client+0x60510  file-offset table update; Ordinals 10109..10112 = Storm file ops (names GUESS).
-// Reaches the table through EBX/EDI registers; semantics unverified, so the control flow is kept as an interface.
-struct FileOps {
- virtual ~FileOps() = default;
- virtual long open() = 0;                        // FUN_6fb0f3e0, -1 on fail
- virtual void read(void* p, int n) = 0;          // Ordinal_10110 GUESS
- virtual void seek(int32_t pos) = 0;             // Ordinal_10112 GUESS
- virtual void write(const void* p, int n) = 0;   // Ordinal_10111 GUESS
- virtual uint32_t size() = 0;                    // GetFileSize
- virtual void close() = 0;                       // Ordinal_10109
+// 1.13c D2Client+0x60510  record append to the save-index file (EBX = record dword array; file-open helper 0x5F3E0).
+// File ops are the retail thunks: C028 seek(handle ECX, pos EDX), C034 read(ECX, buf EDX, len, &got), C046 write(ECX, buf EDX, len, &put),
+// C03A close(ECX), kernel32 GetFileSize(handle, 0). The file is a 100-dword table of chain heads, then records: each record is
+// {next=0, rec[0..6], rec[7..10] blobs sized by rec[3..6]}; the table slot rec[0] heads a singly-linked chain by file offset.
+struct FileEnv {
+ int32_t (*open)();
+ void (*seek)(int32_t h, int32_t pos);
+ void (*read)(int32_t h, void* buf, int32_t len, int32_t* got);
+ void (*write)(int32_t h, const void* buf, int32_t len);
+ uint32_t (*size)(int32_t h);
+ void (*close)(int32_t h);
 };
-void sub_60510(FileOps& f, const int32_t* rec /*EBX*/, int32_t edi /*EDI*/) {
- if (f.open() == -1) return;
- uint32_t tab[104] = {};
- f.read(tab, 4);
- if (edi != 400) { std::memset(tab, 0, 400); f.seek(0); f.read(tab, 400); }
- uint32_t cur = tab[rec[0]], sz = f.size();
+void sub_60510(const FileEnv& f, const int32_t* rec /*EBX*/) {
+ const int32_t h = f.open();
+ if (h == -1) return;
+ uint32_t tab[100] = {};
+ int32_t got = 0;
+ f.read(h, tab, 0x190, &got);
+ if (got != 0x190) { std::memset(tab, 0, sizeof tab); f.seek(h, 0); f.write(h, tab, 0x190); }
+ uint32_t cur = tab[rec[0]];
+ uint32_t sz = f.size(h);
  if (cur == 0) tab[rec[0]] = sz;
- else { do { f.seek(0); f.read(&cur, 4); } while (cur != 0); f.seek(0); f.write(&cur, 4); }
- f.seek(0); f.write(tab, 400);
- for (int i = 0; i < 6; i++) f.write(&rec[i], 4);   // six 4-byte header writes (sources GUESS)
- f.write(&rec[1], 4);
- for (int i = 3; i < 7; i++) if (rec[i]) f.write(&rec[i], rec[i]);   // sized blobs (pointers GUESS)
- f.close();
+ else {
+  uint32_t last;
+  do { f.seek(h, (int32_t)cur); last = cur; f.read(h, &cur, 4, &got); } while (cur != 0);
+  f.seek(h, (int32_t)last); f.write(h, &sz, 4);
+ }
+ f.seek(h, 0); f.write(h, tab, 0x190);
+ f.seek(h, (int32_t)sz);
+ uint32_t zero = 0; f.write(h, &zero, 4);
+ for (int i = 0; i < 7; i++) f.write(h, &rec[i], 4);
+ for (int i = 3; i < 7; i++) if (rec[i]) f.write(h, (const void*)(uintptr_t)rec[i + 4], rec[i]);
+ f.close(h);
 }
 // 1.13c D2Client+0x60AA0  (DAT_6fbcbbfc = handle; Ordinal_10331 lookup, 10826 + FUN_6fb6e240 GUESS)
 void sub_60AA0(Host& h, int32_t looked /*Ordinal_10331(handle)*/, int32_t handle, int32_t& lineY) {
@@ -144,10 +169,22 @@ int32_t sub_679F0(Panel* p, const uint16_t* ev /*mouse x at +0xc, y at +0xe*/) {
  if (p->hasList) p->listSel = p->listIdx(p);
  return 1;
 }
-// 1.13c D2Client+0x67AF0  truncate text until width <= panelW-0x32, then draw (x=param_3,y=param_4)
-void sub_67AF0(Host& h, const W* text, int32_t panelW, int32_t x, int32_t y) {
+// 1.13c D2Client+0x67AF0  (EBX = list object, stack: text, a1, a2, a3). The limit is *(this+0x180710) - 0x32 (limitField is that dword).
+// Copy the text into a 1024-slot buffer, measure it (Ordinal_10171 via 0xD3E4: ECX = buffer, EDX = its length); a width at or past the limit measures
+// once more and truncates the last character until the width is <= limit; draw (0xD37E: ECX = buffer, EDX = a1, words a2, a3, 0). The text is clamped to
+// 1023 characters here (retail overflows its buffer past 1024: not a real input).
+struct Env67AF0 {
+ int32_t (*measure)(const W* buf, int32_t len);
+ void (*draw)(const W* buf, int32_t a1, int32_t a2, int32_t a3);
+};
+void sub_67AF0(const Env67AF0& e, const W* text, int32_t limitField, int32_t a1, int32_t a2, int32_t a3) {
  W buf[1024] = {}; unsigned n = wlen(text); if (n > 1023) n = 1023; std::memcpy(buf, text, n * 2);
- while (panelW - 0x32 < h.textWidth(buf) && wlen(buf)) buf[wlen(buf) - 1] = 0;
- h.emit(buf, x, y);
+ int32_t lim = limitField - 0x32;
+ int32_t w = e.measure(buf, (int32_t)wlen(buf));
+ if (w >= lim) {
+  w = e.measure(buf, (int32_t)wlen(buf));
+  while (w > lim) { buf[wlen(buf) - 1] = 0; w = e.measure(buf, (int32_t)wlen(buf)); }
+ }
+ e.draw(buf, a1, a2, a3);
 }
 }

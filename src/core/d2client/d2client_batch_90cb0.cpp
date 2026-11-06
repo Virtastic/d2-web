@@ -92,16 +92,7 @@ void d2_client_90eb0(G* g, Host h) {
     H(h, ORD(10184));
 }
 
-// 1.13c D2Client+0x90F60 (101 B) fastcall(ecx=param_1).
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_90f60(G* g, Host h, uint32_t param_1) {
-    if (!H(h, ORD(10227), param_1) || !g->c9854) return;
-    H(h, 0x88A70, 0, 0, 0, 0);
-    H(h, 0x143E0);
-    uint32_t u; memcpy(&u, (const uint8_t*)(uintptr_t)g->bbfc + 0x60, 4);
-    if (H(h, ORD(11139), u, 4)) H(h, 0x31CE0);
-    if (H(h, ORD(11139), u, 5)) H(h, 0x31CE0);
-}
+// 1.13c D2Client+0x90F60: moved to d2client_90f60.cpp (register and stack arguments passed explicitly).
 
 // 1.13c D2Client+0x91070 (300 B)
 extern "C" EMSCRIPTEN_KEEPALIVE

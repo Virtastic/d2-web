@@ -9,6 +9,6 @@ extern "C" void d2c_73890(uint32_t u /*ECX*/, int32_t skill /*EDX*/, const cl::E
     if (m < 0 || m >= (int32_t)e.R(e.dt + 0xb6c)) return;
     int32_t s = e.R16s(rec + 0x38);
     uint32_t q[0x17] = {};
-    q[1] = q[2] = u; q[4] = (uint32_t)m; q[10] = s < 0 ? 0 : (uint32_t)s; q[11] = 1;
+    q[1] = q[2] = u; q[4] = (uint32_t)m; q[11] = s < 0 ? 0 : (uint32_t)s; q[12] = 1;
     e.HB(0xb30f0, (uint32_t)(uintptr_t)q);
 }

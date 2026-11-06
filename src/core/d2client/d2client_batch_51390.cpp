@@ -20,30 +20,7 @@ static U ux(P u,Calls&c){I t=I(rd(u,0));P p=reinterpret_cast<P>(uintptr_t(rd(u,0
  return (t==2||(t>3&&t<6))?rd(p,12):(p?U(c.pathX(p)):0);}
 static U uy(P u,Calls&c){I t=I(rd(u,0));P p=reinterpret_cast<P>(uintptr_t(rd(u,0x2c)));
  return (t==2||(t>3&&t<6))?rd(p,16):(p?U(c.pathY(p)):0);}
-// 1.13c D2Client+0x51390
-// Tries to place on the client room at (x,y); returns 0 and writes out-params on success, else the unit.
-I* sub_51390(U* out0,U* out1,I* unit,U x,U fallback,P client,Calls& c,U unk){
- U v; if(!unit)v=*out0; else v=ux(unit,c);
- if(unit){ (void)uy(unit,c); }
- if(client){ P r=c.resolve(U(uintptr_t(client))); if(r){ (void)unk; (void)x; (void)fallback; (void)v; } }
- return unit;
-}
-// 1.13c D2Client+0x51500
-// unit = EBX, start = EBP (initial rotation reset), st = [ebp-4] state struct, tbl = {order[5] @85ec8, dy[8] @85ee4, dx[8] @85f04}.
-// Probes the 5 order entries; returns first object whose +0xc4 bit2 passes the st[6]/mask test, else null.
-struct Probe { const I* order; const I* dx; const I* dy; I n; };
-P sub_51500(P unit,Calls& c,const Probe& t,U start,const uint8_t* st,U mask10,U cb11b0,
-            U (*f1510)(const uint8_t*,I),U (*f562a0)(P)){
- U s0=(c.o11117()&0xff)>>3, s=s0; P room=c.resolve(U(uintptr_t(unit))); (void)start; // Ordinal_10331(unit); the rotation resets to the initial value, not a caller register
- for(I i=0;i<5;++i){
-  s=(U(t.order[i])+s)&7; I x=I(ux(unit,c))+t.dx[s], y=I(uy(unit,c))+t.dy[s];
-  if(int16_t(c.o10573(room,x,y,1,0x180))!=0){
-   P o=c.o10389(room,x,y,reinterpret_cast<P>(uintptr_t(cb11b0)),0,1);
-   if(o&&((rd(o,0xc4)>>2)&1)&&(((mask10&st[6])&0xff)==0||(I(rd(o,0))==1&&f1510(st,6)!=0)||f562a0(unit)!=0)){c.o11129();return o;} }
-  s=s0;
- }
- return nullptr;
-}
+// 1.13c D2Client+0x51390 and +0x51500 live in their own files (d2client_51390.cpp, d2client_51500.cpp).
 // old form of D2Client 51D10 (now d2client_51d10.cpp)  (ECX=px out, EAX=py out; fn10f0 takes px and EBX=py)
 struct S51D10 { I mode,c414,b848,bc4c,b828,b824,c2fc,x0,y0,x1,y1,c2f8,a68,c2f4,c64c,c9638; U* c3c4; };
 I sub_51D10(I* px,I* py,S51D10& g,I (*fn2c5c0)(),void (*fn1860)(),void (*fn10f0)(I*,I*),U* d3afa,

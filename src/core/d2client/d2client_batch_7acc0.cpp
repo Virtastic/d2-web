@@ -98,9 +98,9 @@ extern "C" void d2_client_7b240(const Msg* list_hdr_unused, void** head, uint32_
     void* p = *head;
     if (!n || !p || y < 0 || (int32_t)h + y >= g_screenH) return;
     d2_win_fill_rect(x, y + 4, w + x, h - 5 + y + 4, 0, 1);
-    d2_win_set_font(0);
-    for (uint32_t i = 0; i < n && p; i++, p = nextOf(p))
-        d2_win_draw_text(textOf(p), (int32_t)((i - n + count) * 0xf + 0x12), 0, 0);
+    d2_win_set_font(0xd);   // retail: ECX = 0xD on entry, the restore passes back the first call's return
+    for (uint32_t i = 0; i < n && p; i++, p = nextOf(p))   // retail: ECX = text, EDX = x+10, stack (yi, 0, 0), yi = (i-n+count)*15 + 0x12 + y
+        d2_win_draw_text(textOf(p), x + 10, (int32_t)((i - n + count) * 0xf + 0x12 + y), 0);
     d2_win_set_font(0);
 }
 
@@ -120,8 +120,8 @@ extern "C" {
 void d2_win_10422(uint32_t a, uint32_t h);                    // Ordinal_10422 (release)
 uint32_t d2_win_10454(uint32_t a, const char* s, uint32_t b); // Ordinal_10454 (create)
 void d2_win_10097(uint32_t h, uint32_t v);                    // Ordinal_10097
-uint32_t d2_lang_10009();                                     // current language id
 }
+uint32_t (*d2_client_lang_env)();  // env seam: D2Lang ordinal 10009 (current language id); the host or probe supplies it
 uint32_t g_3ace;  // DAT_6fbc3ace
 
 // 1.13c D2Client+0x7B470  (obj@+0xa4 = handle)
@@ -139,7 +139,7 @@ extern "C" void d2_client_7b470(uint8_t* obj, const char* s, uint32_t esi) {
 extern "C" uint32_t d2_client_7b4f0(uint16_t* out, const char* s, uint32_t lang) {
     if (lang == 7 || lang == 0xc || lang == 6 || lang == 9) {
         for (int i = 0; i < 0x100; i++) out[i] = (uint8_t)s[i];  // MultiByteToWideChar(0,1,...)
-        uint32_t cur = d2_lang_10009();
+        uint32_t cur = d2_client_lang_env ? d2_client_lang_env() : 0;
         if (cur != lang) {
             if (cur == 7 && lang == 0xc) return 1;
             if (!(cur == 0xc && lang == 7))

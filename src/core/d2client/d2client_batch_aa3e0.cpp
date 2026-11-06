@@ -40,7 +40,7 @@ enum : uint32_t { // global RVAs (ptr - 0x6fab0000)
  R_NAME=0x119928, R_SAVELEN=0x11BBD0, R_SAVEBUF=0x11BBCC, R_CHAR=0x11B980, R_UNIC=0x11FED8, R_FLAG=0x1177E4 };
 static const uint32_t NODE_NEXT=0x1f48; // node link; 8000 / 0x1f44 are cleared fields
 
-// 1.13c D2Client+0xAA3E0
+// D2Client+0xAA3E0 (superseded: own file d2client_aa3e0.cpp)
 void loadWaygateAssets(Env& e){
  char p[260];
  if(!GP(e,R_WAYBG)){ snprintf(p,sizeof p,"%s\\ui\\menu\\waygatebackground","DATA\\GLOBAL"); SP(e,R_WAYBG,e.loadCel(p)); }

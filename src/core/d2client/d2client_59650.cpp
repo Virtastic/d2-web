@@ -6,7 +6,7 @@ extern "C" void d2c_59650(uint32_t tick, const cl::Env& e) {
     const uint8_t p[8] = {'O', 2, 0, 0, 0, 0, 0, 0};
     e.H(0x143e0, (uint32_t)(uintptr_t)p, 0, 0, 0, 0, 0, 0, 0, 7, 0);
     if (e.R(g + 0x14) != 7) {
-        e.W(g + 0x10, 1);
+        e.W(g + 0x10, (e.R(g + 0x10) & 0xFFFFFF00u) | 1u);   // retail: mov BYTE [flag], 1 (the upper three bytes stay)
         e.W(g + 0xc, tick);
         e.W(g + 0x14, 7);
     }

@@ -31,7 +31,7 @@ void scrollbar_64fd0(const Env& e, I y, U ecx) {
      double a = (double)(y - (t2 + 0xc));
      I n = (I)e.rd32(ent + 0x120) - 1;
      double b = (double)n; if (n < 0) b += 4294967296.0;
-     v = (I)(a / (132.5 / b) + 1.0);   // _ftol truncates; b==0 -> inf, retail UB
+     v = (I)(int64_t)(a / (132.5 / b) + 1.0);   // retail _ftol: 64-bit truncation, the low 32 bits are kept (wraps past 2^31); b==0 -> inf, retail UB
      v /= 2;                            // cdq/sub/sar: round toward zero
     }
     e.wr32(ent + 0x124, (U)v);

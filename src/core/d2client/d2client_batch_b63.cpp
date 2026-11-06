@@ -125,54 +125,7 @@ tail:
     }
 }
 
-struct D2cE51AE0 {
-    i32 (*ord10858)(); i32 (*f55440)(); i32* (*f2c5c0)(); i32 (*f55b40)(i32 id, i32 type);
-    i32 (*ord10331)(i32 p, i32 q); void (*ord10742)(i32); i32 (*f1630)(i32*); i32 (*f1660)(i32*);
-    i32 (*pathx)(i32 path); i32 (*pathy)(i32 path); void (*f50b30)(i32*);
-    i32 (*ord10143)(i32*); i32 (*ord10787)(i32*, i32*);
-    i32* (*f1650)(i32* p1, i32* p2, const i32* p3, i32* p4); i32* (*f1500)(); i32* (*f1390)(const i32*);
-};
-struct D2cG51AE0 { i32 g2f8, g3a68, g2f4, g964c, g9638, g985c, g97f8; uint8_t* g3afa; i32* flags; i32* player; };
-static i32 unit_pos(const D2cE51AE0* e, const i32* u, int off) {
-    i32 t = u[0];
-    if (t == 2 || (t > 3 && t < 6)) return rd((const void*)(intptr_t)u[0xb], off);
-    return u[0xb] == 0 ? 0 : (off == 0xc ? e->pathx(u[0xb]) : e->pathy(u[0xb]));
-}
-// 1.13c D2Client+0x51AE0  (eax = in_EAX target unit; retaddr = unaff_retaddr; g->player = DAT_6fbcbbfc)
-EMSCRIPTEN_KEEPALIVE i32* d2c_51AE0(const D2cE51AE0* e, D2cG51AE0* g, const i32* bitmask, i32* in_EAX, i32* param_1,
-    i32* param_2, i32* param_3, uint8_t param_4, const i32* retaddr) {
-    const uint8_t* st = (const uint8_t*)(intptr_t)e->ord10858();
-    i32* piVar6 = g->player;
-    bool skip = false;
-    if (in_EAX) {
-        if (in_EAX[0] == 0 && ((in_EAX[0x31] & 0x10000) || in_EAX[4] == 0 || in_EAX[4] == 0x11)) return in_EAX;
-        if (((uint8_t)bitmask[0] & st[7]) || !e->f55440()) skip = true;
-        else {
-            if (g->g2f8 == 0) {
-                if (!g->g3a68 || e->f2c5c0()) {
-                    *g->g3afa = 0;
-                    if (g->g2f4 && g->g964c == 5) {
-                        i32 p = e->f55b40(g->g9638, 5);
-                        if (p) { e->ord10742(e->ord10331(p, rd((void*)(intptr_t)p, 4))); *g->flags |= 1; }
-                    }
-                    g->g2f4 = 0;
-                } else *g->g3afa = 0;
-            }
-            *param_2 = e->f1630(in_EAX);
-            *param_3 = e->f1660(in_EAX);
-            in_EAX = nullptr;
-        }
-    }
-    if (!skip && *param_2 == unit_pos(e, piVar6, 0xc) && *param_3 == unit_pos(e, piVar6, 0x10)) e->f50b30(param_2);
-    if ((!((param_4 & 8) && (param_4 & 1) && !(param_4 & 0x20)) || !e->ord10143(piVar6)) &&
-        !e->ord10787(piVar6, param_1) && (piVar6 != g->player || g->g985c <= g->g97f8)) {
-        u32 b6 = st[6];
-        if ((u32)bitmask[6] & b6) return e->f1650(param_1, in_EAX, retaddr, param_1);  // retail pushes param_1 twice (param_1 and param_4)
-        if (!in_EAX && ((u32)bitmask[5] & b6) && param_3) return e->f1500();
-        if ((u32)bitmask[7] & b6) return e->f1390(retaddr);
-    }
-    return in_EAX;
-}
+// The click-target resolver (D2Client 51AE0) lives in d2client_51ae0.cpp (faithful port with injectable seams).
 
 // 1.13c D2Client+0x51E80  (no register inputs; every global and callee is an injected seam)
 // Hover resolver: direct pick via 0x51A80/0xA68E0, else walk the rooms around the head unit and keep the

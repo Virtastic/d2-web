@@ -42,21 +42,25 @@ void d2_client_750b0(int32_t panel_x_b9a0, int32_t panel_y_b9a4, int32_t off_bc4
     ord10041(&k3, panel_x_b9a0 + 0x100, y1, -1, 5, 0);
 }
 
-// 1.13c D2Client+0x75220 (328 B): tooltip backdrop sized to the wider of two strings (ids param_1, param_2).
+// 1.13c D2Client+0x75220 (328 B), stdcall(a0, a1, a2, a3): a0/a1 = string ids (a1 looked up only when its low word is nonzero), a2 is the x offset (read after a push, so [esp+0x1B0] is a2 there),
+// a3 is the two-line flag (zero: top 0x2a height 0xf; nonzero: top 0x23 height 0x1e). Retail looks the ids up with
+// D2Lang 10003 (ECX = the full dword), copies each into a stack buffer and measures it (D2Win 10028); the rectangle (D2Gfx 10014) is
+// (x, top - gB9A4, x + w + 10, top - gB9A4 + h, byte gBFF8, 2) with w = max(w1, w2) signed and x = gB9A0 - w/2 (truncating) + a2 - 5.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_75220(uint32_t id1, int16_t id2, int32_t param_3, int32_t two_line, int32_t panel_x_b9a0,
+void d2_client_75220(uint32_t id1, uint32_t id2, int32_t a2, int32_t a3, int32_t panel_x_b9a0,
                      int32_t panel_y_b9a4, uint32_t col_bff8, const Uni* U,
                      const wch* (*ord10003)(uint32_t), int (*ord10028)(const wch*),
-                     void (*ord10014)(int, int, int, int, uint32_t, int)) {
+                     void (*ord10014)(int32_t, int32_t, int32_t, int32_t, uint32_t, int)) {
     wch b1[200] = {0}, b2[200] = {0};
     U->strcpy(b1, ord10003(id1));
-    int w1 = ord10028(b1), w2 = 0;
-    if (id2) { U->strcpy(b2, ord10003((uint32_t)(uint16_t)id2)); w2 = ord10028(b2); }
-    int top = 0x23, h = 0x1e;
-    if (!two_line) { top = 0x2a; h = 15; }
-    int w = w2 < w1 ? w1 : w2;
-    int x = (panel_x_b9a0 - w / 2) - 5 + param_3;
-    ord10014(x, top - panel_y_b9a4, x + 10 + w, top - panel_y_b9a4 + h, col_bff8, 2);
+    int32_t w1 = ord10028(b1), w2 = 0;
+    if ((uint16_t)id2) { U->strcpy(b2, ord10003(id2)); w2 = ord10028(b2); }
+    int32_t top = 0x23, h = 0x1e;
+    if (!a3) { top = 0x2a; h = 15; }
+    int32_t w = w1 > w2 ? w1 : w2;
+    uint32_t x = (uint32_t)panel_x_b9a0 - (uint32_t)(w / 2) + (uint32_t)a2 - 5u;
+    uint32_t t = (uint32_t)top - (uint32_t)panel_y_b9a4;
+    ord10014((int32_t)x, (int32_t)t, (int32_t)(x + (uint32_t)w + 10u), (int32_t)(t + (uint32_t)h), col_bff8 & 0xffu, 2);
 }
 
 // 1.13c D2Client+0x75370 (91 B): centred text x = param_2 - width(string param_1)/2.
@@ -68,65 +72,75 @@ int32_t d2_client_75370(uint32_t id, int32_t param_2, const Uni* U, const wch* (
     return param_2 - ord10028(b) / 2;
 }
 
-// 1.13c D2Client+0x753D0 (196 B): from the player list (head list_bc14, next at +0x80, id u16 at +0x22) fill
-// ids_3f38[8] with the party id when >=2 members share it else 0xffff; then call 75030 for each slot whose
-// successor differs and is not 0xffff.
+// 1.13c D2Client+0x753D0 (196 B), cdecl(): head = gBC14 (read once, next at +0x80, id word at +0x22). ids = the dword array at +0x113F38: the first eight are
+// set to 0xFFFF, then one dword per node is stored with NO bound (a list of more than eight nodes writes past the array): the node's id when more than
+// one list node shares it, else 0xFFFF. Then for q = 0..6, ids[q+1] != ids[q] && ids[q] != 0xFFFF calls 0x75030 with EAX = 0x43 + 0x26*q.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_753d0(uint32_t list_bc14, uint32_t* ids_3f38 /*8*/, void (*sub_75030)(void)) {
-    for (int i = 0; i < 8; i++) ids_3f38[i] = 0xffff;
-    uint32_t cur = list_bc14;
-    uint32_t* p = ids_3f38;
-    while (list_bc14 && cur) {
-        uint32_t v = (uint16_t)rd16(cur + 0x22);
-        int n = 0;
-        for (uint32_t q = list_bc14; q; q = rd32(q + 0x80)) if (rd16(q + 0x22) == rd16(cur + 0x22)) n++;
-        if (n < 2) v = 0xffff;
-        *p++ = v;  // ponytail: original has no bound; 8 slots by the 3f38..3f54 range
-        cur = rd32(cur + 0x80);
-        if (p >= ids_3f38 + 8) break;
+void d2_client_753d0(uint32_t head, uint32_t* ids, void (*sub_75030)(uint32_t eax)) {
+    for (int i = 0; i < 8; i++) ids[i] = 0xffff;
+    if (head) {
+        uint32_t cur = head, *p = ids;
+        do {
+            uint16_t id = (uint16_t)rd16(cur + 0x22);
+            int n = 0;
+            for (uint32_t q = head; q; q = rd32(q + 0x80)) if ((uint16_t)rd16(q + 0x22) == id) n++;
+            *p++ = n > 1 ? (uint32_t)id : 0xffffu;
+            cur = rd32(cur + 0x80);
+        } while (cur);
     }
-    for (uint32_t* q = ids_3f38; q < ids_3f38 + 7; q++)  // loop stops at address 0x6fbc3f54 (slot 7 is last compared as q[1])
-        if (q[1] != q[0] && q[0] != 0xffff) sub_75030();
+    for (int q = 0; q < 7; q++)
+        if (ids[q + 1] != ids[q] && ids[q] != 0xffff) sub_75030(0x43u + 0x26u * (uint32_t)q);
 }
 
-// 1.13c D2Client+0x754A0 (295 B): copies string 0xBE240(), truncates to width 0x8c with the "..." tail
-// (bytes at 84ca0), draws via Ordinal_10150(x-panel_y+0xc, y, 0). param_3 = y (guess).
+// 1.13c D2Client+0x754A0 (295 B), stdcall(unit, a1, a2): be240(ESI = dword at unit+0xC1) returns the text; it is copied into a 255-char buffer and measured
+// (D2Win 10028). Wider than 0x8C: last = b[strlen-1]; d = toUnicode(dots5, 5) with d[3] = last; esi = 0x8B - width(d); if width(b) > esi, zero b from index 253 down
+// (one char per pass, unbounded in retail; stops at the buffer start here) until width(b) <= esi; then strcat(b, d). Finally D2Win 10150 draws b at
+// (gB9A0 + 0x7E, a1 - gB9A4 + 0xC, a2, 0). dots5 = the five bytes at D2Client+0xD4CA0 ("...." and a NUL).
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_754a0(int32_t param_2, int32_t param_3, int32_t panel_y_b9a4, const char* dots_84ca0, const Uni* U,
-                     const wch* (*sub_be240)(void), int (*ord10028)(const wch*),
-                     void (*ord10150)(int, int, int)) {
+void d2_client_754a0(uint32_t unit, int32_t a1, int32_t a2, int32_t px_b9a0, int32_t py_b9a4, const char* dots5, const Uni* U,
+                     const wch* (*sub_be240)(uint32_t esi), int (*ord10028)(const wch*),
+                     void (*ord10150)(const wch* ecx, int32_t x, int32_t s0, int32_t s1, int32_t s2)) {
     wch b[255] = {0}, d[5] = {0};
-    U->strcpy(b, sub_be240());
+    U->strcpy(b, sub_be240(rd32(unit + 0xc1)));
     if (ord10028(b) > 0x8c) {
-        U->toUnicode(d, dots_84ca0, 5);
         int n = U->strlen(b);
-        int dw = ord10028(d);
-        while (0x8b - dw < ord10028(b) && n > 0) b[--n] = 0;  // ponytail: bound added; retail trusts width shrink
+        wch last = n > 0 ? b[n - 1] : 0;
+        U->toUnicode(d, dots5, 5);
+        d[3] = last;
+        int32_t lim = 0x8b - ord10028(d);
+        if (ord10028(b) > lim) {
+            wch* e = b + 254;
+            do { if (e > b) *--e = 0; } while (ord10028(b) > lim);
+        }
         U->strcat(b, d);
     }
-    ord10150((param_2 - panel_y_b9a4) + 0xc, param_3, 0);
+    ord10150(b, px_b9a0 + 0x7e, a1 - py_b9a4 + 0xc, a2, 0);
 }
 
-// 1.13c D2Client+0x755D0 (192 B): party-count badge for the local player's party, drawn if >=2 and id != -1.
+// 1.13c D2Client+0x755D0 (192 B), cdecl(): head = gBC14. D2Win 10184 is called with ECX = 0 first and ECX = 1 last. When head != 0, n = nodes (next at +0x80, id word
+// at +0x22) sharing the head's id is > 1 and the id != 0xFFFF: 0x74FD0 (ECX = n, EDX = 0x23, stack gBFE0, 0xE3, 0); p = D2Lang 10003 (0x1038); w = D2Win 10028 (p);
+// x = gB9A0 + 0xE3, plus (0x36 - w) >> 1 (arithmetic) when w < 0x36; D2Win 10150 (ECX = p, EDX = x, stack 0x21 - gB9A4, 2, 0).
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_755d0(uint32_t list_bc14, uint32_t* list_bc14_now, int32_t panel_y_b9a4, uint32_t col_bfe0,
-                     const wch* (*ord10003)(uint32_t), int (*ord10028)(const wch*), void (*ord10150)(int, int, int),
-                     void (*ord10184)(void), void (*sub_74fd0)(int, int, uint32_t, int, int)) {
-    ord10184();
-    int n = 0;
-    uint32_t head = *list_bc14_now;
-    if (list_bc14 && head) {
-        int16_t id = rd16(list_bc14 + 0x22);
-        for (uint32_t q = head; q; q = rd32(q + 0x80)) if (rd16(q + 0x22) == id) n++;
-        if (n > 1 && id != -1) {
-            sub_74fd0(n, 0x23, col_bfe0, 0xe3, 0);
-            ord10003(0);  // string id unrecovered (decompile shows none)
-            int y = 0x21 - panel_y_b9a4;
-            ord10028(0);
-            ord10150(y, 2, 0);
-        }
+void d2_client_755d0(uint32_t head, uint32_t col_bfe0, int32_t px_b9a0, int32_t py_b9a4,
+                     void (*ord10184)(uint32_t ecx), void (*sub_74fd0)(uint32_t ecx, uint32_t edx, uint32_t s0, uint32_t s1, uint32_t s2),
+                     const wch* (*ord10003)(uint32_t ecx), int32_t (*ord10028)(const wch*),
+                     void (*ord10150)(const wch* ecx, uint32_t edx, uint32_t s0, uint32_t s1, uint32_t s2)) {
+    ord10184(0);
+    int32_t n = 0;
+    uint16_t id = 0;
+    if (head) {
+        id = (uint16_t)rd16(head + 0x22);
+        for (uint32_t q = head; q; q = rd32(q + 0x80)) if ((uint16_t)rd16(q + 0x22) == id) n++;
     }
-    ord10184();
+    if (head && n > 1 && id != 0xffff) {
+        sub_74fd0((uint32_t)n, 0x23, col_bfe0, 0xe3, 0);
+        const wch* p = ord10003(0x1038);
+        uint32_t x = (uint32_t)px_b9a0 + 0xe3u;
+        int32_t w = ord10028(p);
+        if (w < 0x36) x += (uint32_t)((int32_t)(0x36u - (uint32_t)w) >> 1);
+        ord10150(p, x, 0x21u - (uint32_t)py_b9a4, 2, 0);
+    }
+    ord10184(1);
 }
 
 // 1.13c D2Client+0x75690 (216 B): mode in EAX, x in ECX(this) (guesses). Mode 1 colours by param_1/param_2.

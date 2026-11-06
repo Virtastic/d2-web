@@ -152,7 +152,7 @@ void sub_BDCA0(const Env& e, P ev) {
  int32_t q = (h + ((h >> 31) & 3)) >> 2;
  F(e, 0x3CC60, h - q, 0, (P)-q, 0);
 }
-// 1.13c D2Client+0xBE020
+// D2Client+0xBE020 (superseded: own file d2client_be020.cpp)
 void sub_BE020(const Env& e, P bufA, P bufB, P fmtA, P fmtB, P dirStr) {
  e.snprintfPath(bufA, fmtA, dirStr);   // "%s\\Palette\\Loading\\pal.dat"
  e.snprintfPath(bufB, fmtB, dirStr);   // "%s\\Palette\\Loading\\pal.pl2"

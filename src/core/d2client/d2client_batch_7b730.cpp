@@ -76,10 +76,10 @@ void d2_client_7b730(const Msg7B730* c, uint32_t* head_c3aa4, int32_t* count_c3a
 // 1.13c D2Client+0x7B9C0 (118 B): push a fresh node (0x7B120) on the list at [0x11C3AB0]; at >= 0x80
 // entries drop the tail first (0x7B330) and unlink it.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_7b9c0(uint32_t* head_c3ab0, int32_t* count_c3ab4,
+void d2_client_7b9c0(uint32_t* head_c3ab0, uint16_t* count_c3ab4,   // count: the WORD at 0x113AB4 (cmp/dec/inc word ptr)
                      uint32_t (*alloc_7b120)(void), void (*free_7b330)(void)) {
     uint32_t node = alloc_7b120();
-    if ((uint32_t)*count_c3ab4 > 0x7f && *head_c3ab0 != 0) {
+    if (*count_c3ab4 >= 0x80 && *head_c3ab0 != 0) {
         uint32_t prev = 0, cur = *head_c3ab0;
         for (uint32_t nx = W(cur, 0x22); nx; nx = W(nx, 0x22)) { prev = cur; cur = nx; }
         free_7b330();
@@ -125,26 +125,7 @@ void d2_client_7beb0(uint32_t* list, void (*free_)(uint32_t id, uint32_t), void 
     fatal(0x6c9);   // Ordinal_10265 + Ordinal_10024 + _exit(-1)
 }
 
-// 1.13c D2Client+0x7C380 (437 B): draw the 4 scroll-panel cells (frames 0..3, scroin) and the buy/sell
-// button (frame 10, buysellbtn); loaders (0x6FADB420) fill the two cached cell pointers on first use.
-struct Draw7C380 {
-    void (*rect)(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t);   // Ordinal_10014
-    void (*cel)(uint32_t cellfile, int32_t frame, int32_t x, int32_t y, int32_t color, int32_t mode, int32_t);  // Ordinal_10041
-    uint32_t (*load)(const char* path);                                   // wsprintfA + FUN_6fadb420(0)
-};
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_7c380(const Draw7C380* c, uint32_t* scroin_cbfb0, uint32_t* buysell_cb9c4,
-                     int32_t x_cb9a0, int32_t y_cb9a4, int32_t width_8bc48, int32_t height_8bc4c) {
-    c->rect(x_cb9a0, y_cb9a4 - 0xe0 + height_8bc4c, width_8bc48 / 2, height_8bc4c - 0x30, 0, 5);
-    if (!*scroin_cbfb0) *scroin_cbfb0 = c->load("DATA\\GLOBAL\\UI\\MENU\\scroin");
-    int32_t ya = y_cb9a4 - 0x6d + height_8bc4c, yb = y_cb9a4 - 0x31 + height_8bc4c;
-    c->cel(*scroin_cbfb0, 0, x_cb9a0, ya, -1, 5, 0);
-    c->cel(*scroin_cbfb0, 1, x_cb9a0 + 0x100, ya, -1, 5, 0);
-    c->cel(*scroin_cbfb0, 2, x_cb9a0, yb, -1, 5, 0);
-    c->cel(*scroin_cbfb0, 3, x_cb9a0 + 0x100, yb, -1, 5, 0);
-    if (!*buysell_cb9c4) *buysell_cb9c4 = c->load("DATA\\GLOBAL\\ui\\panel\\buysellbtn");
-    c->cel(*buysell_cb9c4, 10, x_cb9a0 + 0x115, y_cb9a4 - 0x3d + height_8bc4c, -1, 5, 0);
-}
+// retired, see d2client_7c380.cpp: D2Client 0x7C380.
 
 // 1.13c D2Client+0x7C580 (57 B): if Ordinal_10612() != 0 { 0x7B3D0(); free(0x68a); Ordinal_10357(); }
 // then Ordinal_10422(0).
@@ -192,35 +173,7 @@ void d2_client_7c730(uint32_t* win_c3a70, uint32_t* obj_c3a74, void (*sub_a3d20)
     if (*obj_c3a74) { vdtor(*obj_c3a74, 1); *obj_c3a74 = 0; }
 }
 
-// 1.13c D2Client+0x7C770 (382 B): build the two-label window (SEH frame omitted). win[0x17]=1 after create,
-// win[0x14] must be < 0x80000000 (else fatal 0x4f8), then win[0x11] = -1.
-struct Win7C770 {
-    uint32_t (*create)(int32_t, int32_t, uint32_t cb, int32_t, int32_t, int32_t, int32_t, int32_t w, int32_t h); // 0xA3E40
-    uint32_t (*str)(void);                                                          // Ordinal_10003
-    void (*label)(uint32_t win, uint32_t s, int32_t y, int32_t, int32_t, uint32_t cb, int32_t);   // 0xA36F0 area
-    uint32_t (*alloc)(void);                                                        // Ordinal_401(0xc,..)
-    uint32_t (*ctor)(uint32_t obj, int32_t, int32_t, int32_t w, int32_t h, int32_t); // 0x67F20
-    void (*sub_a3400)(void); void (*sub_7aea0)(void);
-    void (*fatal)(uint32_t code);
-};
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_7c770(const Win7C770* c, uint32_t* win_c3a70, uint32_t* obj_c3a74, int32_t w_8bc48, int32_t h_8bc4c) {
-    const uint32_t cb = 0x6fb2ac90;
-    if (*win_c3a70) return;
-    *win_c3a70 = c->create(5, 0x1e, cb, 0, 0, 0, 0, w_8bc48 - 0x14, h_8bc4c - 0x82);
-    if (!*win_c3a70) { c->fatal(0x529); return; }
-    W(*win_c3a70, 0x5c) = 1;
-    c->label(*win_c3a70, c->str(), 0x15, 0, 1, 0, 0);
-    c->label(*win_c3a70, c->str(), h_8bc4c - 0xa5, 0, 1, cb, 1);
-    uint32_t o = c->alloc();
-    *obj_c3a74 = o ? c->ctor(o, 5, 0x41, w_8bc48 - 0x14, h_8bc4c - 200, 2) : 0;
-    if (!*obj_c3a74) return;
-    c->sub_a3400();
-    c->sub_7aea0();
-    if (!*win_c3a70) { c->fatal(0x4f2); return; }
-    if (W(*win_c3a70, 0x50) < 0x80000000u) { W(*win_c3a70, 0x44) = 0xffffffffu; return; }
-    c->fatal(0x4f8);
-}
+// retired, see d2client_7c770.cpp: D2Client 0x7C770.
 
 // 1.13c D2Client+0x7C8F0 (244 B): replace the message box [0x11C3A60]: free the old one, take string
 // Ordinal_10003, node = Ordinal_10042(0x659) with buffer Ordinal_10059(0xb4) + 0x7BF60, then on success
