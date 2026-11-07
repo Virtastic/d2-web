@@ -7,6 +7,7 @@
 // in hidden registers (10003, 10028) take none. 7A0D0's return is the leftover mul-high operand, kept as int32.
 #include <cstdint>
 #include <emscripten.h>
+#include "d2client_callee.h"
 
 static inline uint32_t rd32(uint32_t a) { return *(const uint32_t*)(uintptr_t)a; }
 static inline void wr32(uint32_t a, uint32_t v) { *(uint32_t*)(uintptr_t)a = v; }
@@ -65,71 +66,95 @@ void d2_client_781d0(int32_t off, int32_t y0_b9a4, int32_t y1_bc4c, void (*ord10
     ord10150(off - 0x1e0 + base, 0, 0);
 }
 
-// 1.13c D2Client+0x78330 (1174 B): three fixed text draws, then the per-class offset list through 0x781D0.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_78330(uint8_t cls_c991c, int32_t y0_b9a4, int32_t y1_bc4c, void (*ord10003)(void),
-                     void (*ord10028)(void), void (*ord10150)(int, int, int), void (*sub_781d0)(int32_t)) {
-    static const int16_t T0[] = {0x96, 0xa2, 0xae, 0x102, 0x10e, 0x11a, 0x167, 0x173, 0x17f, 0};
-    static const int16_t T1[] = {0x9c, 0xa8, 0x108, 0x114, 0x172, 0x17e, 0};
-    static const int16_t T2[] = {0x9c, 0xa8, 0x102, 0x10e, 0x11a, 0x178, 0};
-    static const int16_t T3[] = {0x9c, 0xa8, 0x108, 0x114, 0x172, 0x17e, 0};
-    static const int16_t T4[] = {0xa2, 0x108, 0x114, 0x172, 0x17e, 0};
-    static const int16_t T5[] = {0xa2, 0x108, 0x114, 0x172, 0};
-    static const int16_t T6[] = {0x96, 0xa2, 0x108, 0x114, 0x172, 0};
-    static const int16_t* const T[7] = {T0, T1, T2, T3, T4, T5, T6};
-    static const int16_t pre[3] = {0x1c7, 0x1bb, 0x1af};
-    for (int i = 0; i < 3; i++) {
-        ord10003();
-        int32_t a = y0_b9a4 - pre[i] + y1_bc4c;
-        ord10028(); ord10150(a, 0, 0);
-    }
-    if (cls_c991c > 6) return;
-    for (const int16_t* p = T[cls_c991c]; *p; p++) { ord10003(); sub_781d0(*p); }
+// 1.13c D2Client+0x78330 (1174 B): three centred labels (D2Lang strings 0x1083..0x1085, drawn through D2Win 0xD37E), then a
+// per-class list of (string id, x) pairs, each drawn by sub_781D0 (EDX = x, EBX = the D2Lang string).
+// cls = byte [0x11991C], b8bc4c = [0xDBC4C], b9a0/b9a4 = [0x11B9A0]/[0x11B9A4], f9e14 = [0xF9E14].
+struct L78330 { uint16_t id, x; };
+static void lbl78330(const D2cSvc& v, uint32_t id, int32_t yb, int32_t b8bc4c, int32_t b9a0, int32_t b9a4, int32_t f9e14) {
+    uint32_t text = d2c_call(v, 0xd1ec, 0, id, 0, 0, 0);
+    int32_t y = b9a4 + b8bc4c - yb, ax = f9e14 - b9a0, x = ax - 0x5a, w = 0x5b;
+    int32_t tw = (int32_t)d2c_call(v, 0xd35a, 0, text, 0, 0, 0);
+    if (tw < w) x += (w - tw) >> 1;
+    d2c_call(v, 0xd37e, 0, text, (uint32_t)x, 0, 0, (uint32_t)y, 0, 0);
 }
-
-// 1.13c D2Client+0x78AA0 (432 B): draw "0" when 0xBFC0==0; then for each slot whose datatable chain matches
-// 0x6FB924F8 mark 3D38=-1,3B38=5, try ord10306, clear on success, and call 0x78820.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_78aa0(uint32_t unit_bbfc, int32_t flag_bfc0, int32_t y0_b9a4, int32_t y1_bc4c,
-                     uint32_t dt_sgpt, int32_t* tab_3d38, int32_t* tab_3b38, uint8_t want_24f8,
-                     int (*ord11120)(uint32_t), int (*ord10044)(uint32_t, int), int (*ord10708)(int),
-                     int (*ord10306)(uint32_t, int, int), void (*to_unicode_zero)(void),
-                     void (*ord10028)(void), void (*ord10150)(int, int, int), void (*sub_78820)(void)) {
-    if (!unit_bbfc) return;
-    if (flag_bfc0 == 0) {
-        to_unicode_zero(); // wsprintfA("%d",0) + Unicode::toUnicode(buf,.,9)
-        ord10028(); ord10150(y0_b9a4 - 400 + y1_bc4c, 0, 0);
+void d2_client_78330(const D2cSvc& v, uint8_t cls, int32_t b8bc4c, int32_t b9a0, int32_t b9a4, int32_t f9e14) {
+    lbl78330(v, 0x1083, 0x1c7, b8bc4c, b9a0, b9a4, f9e14);
+    lbl78330(v, 0x1084, 0x1bb, b8bc4c, b9a0, b9a4, f9e14);
+    lbl78330(v, 0x1085, 0x1af, b8bc4c, b9a0, b9a4, f9e14);
+    static const L78330 c0[] = { {0x1088,0x96},{0x1089,0xa2},{0x1086,0xae},{0x108a,0x102},{0x108b,0x10e},{0x1086,0x11a},{0x108c,0x167},{0x108d,0x173},{0x1086,0x17f} };
+    static const L78330 c3[] = { {0x108e,0x9c},{0x108f,0xa8},{0x1090,0x108},{0x108f,0x114},{0x1091,0x172},{0x1086,0x17e} };
+    static const L78330 c2[] = { {0x1092,0x9c},{0x1087,0xa8},{0x1093,0x102},{0x1094,0x10e},{0x1087,0x11a},{0x1095,0x178} };
+    static const L78330 c4[] = { {0x1096,0xa2},{0x1097,0x108},{0x1098,0x114},{0x1097,0x172},{0x1086,0x17e} };
+    static const L78330 c1[] = { {0x1099,0x9c},{0x1087,0xa8},{0x109a,0x108},{0x1087,0x114},{0x109b,0x172},{0x1087,0x17e} };
+    static const L78330 c6[] = { {0x57f4,0x96},{0x57f5,0xa2},{0x57f2,0x108},{0x57f3,0x114},{0x57f1,0x172} };
+    static const L78330 c5[] = { {0x57f0,0xa2},{0x57ee,0x108},{0x57ef,0x114},{0x57ed,0x172} };
+    const L78330* l = nullptr; unsigned n = 0;
+    switch (cls) {
+    case 0: l = c0; n = sizeof c0 / sizeof *c0; break;
+    case 3: l = c3; n = sizeof c3 / sizeof *c3; break;
+    case 2: l = c2; n = sizeof c2 / sizeof *c2; break;
+    case 4: l = c4; n = sizeof c4 / sizeof *c4; break;
+    case 1: l = c1; n = sizeof c1 / sizeof *c1; break;
+    case 6: l = c6; n = sizeof c6 / sizeof *c6; break;
+    case 5: l = c5; n = sizeof c5 / sizeof *c5; break;
     }
-    for (int i = 0; i < ord11120(rd32(unit_bbfc + 4)); i++) {
-        int32_t id = ord10044(rd32(unit_bbfc + 4), i);
-        if (id < 0 || id >= (int32_t)rd32(dt_sgpt + 0xba0)) continue;
-        uint32_t e = rd32(dt_sgpt + 0xb98) + (uint32_t)id * 0x23c;
-        if (!e) continue;
-        int32_t k = rd16(e + 0x194);
-        if (k < 0 || k >= (int32_t)rd32(dt_sgpt + 0xb94)) continue;
-        uint32_t r = (uint32_t)k * 0x120 + rd32(dt_sgpt + 0xb8c);
-        if (!r || want_24f8 != *(const uint8_t*)(uintptr_t)(r + 2)) continue;
-        tab_3d38[i] = -1; tab_3b38[i] = 5;
-        int v = ord10708(-1);
-        if (v && ord10306(unit_bbfc, v, 1) > 0) { tab_3d38[i] = 0; tab_3b38[i] = 0; }
-        sub_78820();
+    for (unsigned k = 0; k < n; ++k) {
+        uint32_t text = d2c_call(v, 0xd1ec, 0, l[k].id, 0, 0, 0);
+        d2c_call(v, 0x781d0, 0, 0, l[k].x, text, 0);
     }
 }
 
-// 1.13c D2Client+0x78F20 (149 B): panel draw driver.
+// 1.13c D2Client+0x78AA0 (432 B, cdecl, no input): the skills-page slot scan. unit = [0xBBFC] (0 = nothing), flag = [0xBFC0],
+// x/y from [0xDBC48] [0xDBC4C] [0x11B9A0] [0x11B9A4], page = [0x924F8], ds = the D2Common data-table struct (reached through the
+// IAT slot at 0xCE474; +0xB8C skill-desc rows (0x120 B, page byte +2), +0xB94 their count, +0xB98 skill rows (0x23C B, word +0x194
+// = desc index), +0xBA0 their count), a3d38/a3b38 = the two per-slot arrays at 0x113D38 / 0x113B38 (written).
+// Callees by RVA: 0xCB38 (inventory slot count, 1 stack word), 0xCB3E (skill id of slot k), 0xC4EA/0xC718 (skill lookup / level), 0xD35A/0xD37E (text), 0x78820.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_78f20(uint32_t unit_bbfc, uint8_t cls_c991c, const uint32_t* tab_2500_stride34,
-                     uint8_t* f_bfc8, uint32_t* f_bfbc, uint32_t* f_bfc0,
-                     void (*ord10184)(void), void (*sub_77a50)(uint32_t), void (*sub_78330)(void),
-                     int (*ord10587)(uint32_t, int, int), void (*sub_78aa0)(void), void (*sub_78c50)(void),
-                     void (*sub_78240)(void), void (*sub_77de0)(void), void (*sub_77f30)(void)) {
-    ord10184();
-    *f_bfc8 = 1; // DAT_6fbcbfc8 (byte-width unrecovered; word stored)
-    sub_77a50(*(const uint32_t*)((const uint8_t*)tab_2500_stride34 + (uint32_t)cls_c991c * 0x22));
-    sub_78330();
-    if (ord10587(unit_bbfc, 5, 0) < 1) { *f_bfbc = 0; *f_bfc0 = 0; sub_78aa0(); }
-    else { *f_bfbc = 1; *f_bfc0 = 1; sub_78c50(); }
-    sub_78240(); sub_77de0(); sub_77f30();
+void d2_client_78aa0(const D2cSvc& v, uint32_t unit, int32_t flag, int32_t b9a4, int32_t bc4c, int32_t bc48, int32_t b9a0,
+                     uint32_t page, const uint8_t* ds, uint32_t* a3d38, uint32_t* a3b38) {
+    if (!unit) return;
+    if (flag == 0) {
+        uint16_t wbuf[10] = { '0', 0 };   // sprintf("%d", 0) widened by toUnicode(.., 9)
+        int32_t x = bc48 - b9a0 - 0x41, y = b9a4 + bc4c - 0x190;
+        int32_t w = (int32_t)d2c_call(v, 0xd35a, 0, (uint32_t)(uintptr_t)wbuf, 0, 0, 0);
+        if (w < 0x29) x += (0x29 - w) >> 1;
+        d2c_call(v, 0xd37e, 0, (uint32_t)(uintptr_t)wbuf, (uint32_t)x, 0, 0, (uint32_t)y, 0, 0);
+    }
+    auto rd = [&](uint32_t off) { return *(const uint32_t*)(ds + off); };
+    for (int32_t i = 0; i < (int32_t)d2c_call(v, 0xcb38, 0, 0, 0, 0, 0, *(const uint32_t*)(uintptr_t)(unit + 4)); ++i) {
+        int32_t id = (int32_t)d2c_call(v, 0xcb3e, 0, 0, 0, 0, 0, *(const uint32_t*)(uintptr_t)(unit + 4), (uint32_t)i);
+        if (id < 0 || id >= (int32_t)rd(0xba0)) continue;
+        const uint8_t* e = (const uint8_t*)(uintptr_t)rd(0xb98) + (uint32_t)id * 0x23c;
+        int32_t k = (int16_t)(e[0x194] | e[0x195] << 8);
+        if (k < 0 || k >= (int32_t)rd(0xb94)) continue;
+        const uint8_t* r = (const uint8_t*)(uintptr_t)rd(0xb8c) + (uint32_t)k * 0x120;
+        if (page != (uint32_t)(int32_t)(int8_t)r[2]) continue;
+        a3d38[i] = 0xffffffffu; a3b38[i] = 5;
+        uint32_t esi = 0;
+        uint32_t c4 = d2c_call(v, 0xc4ea, 0, unit, (uint32_t)id, 0, 0, 0xffffffffu);
+        if (c4) {
+            esi = d2c_call(v, 0xc718, 0, 0, 0, 0, 0, unit, c4, 1);
+            if ((int32_t)esi > 0) { a3d38[i] = 0; a3b38[i] = 0; }
+        }
+        d2c_call(v, 0x78820, 0, 0, 0, 0, 0, (uint32_t)id, (uint32_t)(uintptr_t)e, esi, a3d38[i], a3b38[i]);
+    }
+}
+
+// 1.13c D2Client+0x78F20 (149 B, cdecl, no input): the trade/skills panel draw driver. unit = [0xBBFC], cls = byte [0x11991C],
+// page = [0xE24F8], tbl = the 0x22-stride dword table at 0xE2500, bfbc/bfc0/bfc8 = [0x11BFBC] [0x11BFC0] [0x11BFC8] (written).
+extern "C" EMSCRIPTEN_KEEPALIVE
+void d2_client_78f20(const D2cSvc& v, uint32_t unit, uint8_t cls, uint32_t page, const uint8_t* tbl,
+                     uint32_t* bfbc, uint32_t* bfc0, uint32_t* bfc8) {
+    d2c_call(v, 0xd3a8, 0, 1, 0, 0, 0);
+    *bfc8 = 1;
+    d2c_call(v, 0x77a50, 0, 0, 0, 0, 0, *(const uint32_t*)(tbl + (uint32_t)cls * 0x22), page);
+    d2c_call(v, 0x78330, 0, 0, 0, 0, 0);
+    if ((int32_t)d2c_call(v, 0xc250, 0, 0, 0, 0, 0, unit, 5, 0) > 0) { *bfbc = 1; *bfc0 = 1; d2c_call(v, 0x78c50, 0, 0, 0, 0, 0); }
+    else { *bfbc = 0; *bfc0 = 0; d2c_call(v, 0x78aa0, 0, 0, 0, 0, 0); }
+    d2c_call(v, 0x78240, 0, 0, 0, 0, 0);
+    d2c_call(v, 0x77de0, 0, 0, 0, 0, 0);
+    d2c_call(v, 0x77f30, 0, 0, 0, 0, 0, page);
 }
 
 // Shared: reserve a 0x14-byte draw-list entry in ctx (count at +0xEA64, entries at +4), max 3000.
