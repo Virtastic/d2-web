@@ -8,7 +8,7 @@ int main() {
     assert(flagLines(0x10, 0, E, S, sp).empty());
     assert(flagLines(0x10 | 0x400000, 0, E, S, sp) == "\x01" "3Ethereal (Cannot be Repaired)");
     assert(flagLines(0x10 | 0x800, 2, E, S, sp) == "\x01" "3Socketed (2)");
-    assert(flagLines(0x10 | 0x800 | 0x400000, 2, E, S, sp) == "\x01" "3Ethereal (Cannot be Repaired)\n\x01" "3Socketed (2)");
+    assert(flagLines(0x10 | 0x800 | 0x400000, 2, E, S, sp) == "\x01" "3Ethereal (Cannot be Repaired), Socketed (2)");
     assert(flagLines(0x800, 0, E, S, sp) == "\x01" "3Socketed (0)");
     return 0;
 }

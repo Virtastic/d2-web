@@ -1119,10 +1119,12 @@ static const char* sessionItemInventoryFile(D2UnitStrc* item, const D2ItemsTxt* 
     return txt->szInvFile;
 }
 
-// 1.13c D2Client+0x95140: the gates (identified, socketed flag, an inventory, sockets > 0) and the
+// 1.13c D2Client+0x95140: the gates (identified, socketed flag, sockets > 0) and the
 // footprint placement; the gem in socket n is the n-th item of the item's own inventory.
 static void appendSessionItemSockets(D2UnitStrc* item, const D2SessionItemPresentation& pres) {
-    if (!item->pInventory || !ITEMS_CheckItemFlag(item, IFLAG_IDENTIFIED, __LINE__, __FILE__) ||
+    // Retail has no inventory gate: the first-child walk (D2Common #10460) is null-safe, and an empty socketed item
+    // (one loaded from a save, never socketed in play) carries no inventory yet still draws its empty sockets.
+    if (!ITEMS_CheckItemFlag(item, IFLAG_IDENTIFIED, __LINE__, __FILE__) ||
         !ITEMS_CheckItemFlag(item, IFLAG_SOCKETED, __LINE__, __FILE__)) return;
     const int sockets = ITEMS_GetSockets(item);
     D2SessionItemSockets rec = {};
@@ -10099,14 +10101,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_lines(uint32_t itemId, char* buf, 
     auto range = [&](int lo, int hi) { return " " + std::to_string(lo) + " " + [&] { std::string x; appendNarrow(x, langIdx(3464)); return x; }() + " " + std::to_string(hi); };
     const bool itemIdentified = d2::item_text::identified(item->pItemData ? item->pItemData->dwItemFlags : 0);
     const bool weapon = t->dwWeapClass != 0 || t->nMaxDam || t->n2HandMaxDam || t->nMaxMisDam;
-    // 1.13c D2Client+0x8E180: the ethereal and socketed lines, before Defense/Damage (blue).
-    if (item->pItemData) {
-        const uint32_t fl = item->pItemData->dwItemFlags;
-        auto tbl = [&](int id) { std::string x; appendNarrow(x, langIdx(id)); return x; };
-        const std::string fl3 = d2::item_text::flagLines(fl, (fl & d2::item_text::kSocketedItemFlag) ? ITEMS_GetSockets(item) : 0,
-            tbl(d2::item_text::kEtherealStringId), tbl(d2::item_text::kSocketedStringId), tbl(3995));
-        if (!fl3.empty()) out += fl3;
-    }
     if (weapon) {
         // Identified items use the affix-adjusted values (ITEMMODS_PropertyFunc05-07). The
         // complete serializer withholds the stat-list payload for unidentified client items,
@@ -10303,6 +10297,14 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_lines(uint32_t itemId, char* buf, 
         std::stable_sort(lns.begin(), lns.end(), [](const Ln& a, const Ln& b) { return a.prio > b.prio; });
         { std::set<std::string> seen; lns.erase(std::remove_if(lns.begin(), lns.end(), [&](const Ln& l) { return !seen.insert(l.text).second; }), lns.end()); }   // 21/22 and 23/24 fold to the same text
         for (const Ln& l : lns) { if (l.text.empty()) continue; if (!out.empty()) out.push_back('\n'); out += "\x01" "3"; out += l.text; }
+    }
+    // 1.13c D2Client+0x8E180: the ethereal and socketed lines, the LAST line (retail appends it first, the name last, and draws the string bottom-up).
+    if (item->pItemData) {
+        const uint32_t fl = item->pItemData->dwItemFlags;
+        auto tbl = [&](int id) { std::string x; appendNarrow(x, langIdx(id)); return x; };
+        const std::string fl3 = d2::item_text::flagLines(fl, (fl & d2::item_text::kSocketedItemFlag) ? ITEMS_GetSockets(item) : 0,
+            tbl(d2::item_text::kEtherealStringId), tbl(d2::item_text::kSocketedStringId), tbl(3995));
+        if (!fl3.empty()) { if (!out.empty()) out.push_back('\n'); out += fl3; }
     }
     const uint32_t n = out.size() < cap - 1 ? (uint32_t)out.size() : cap - 1;
     memcpy(buf, out.data(), n); buf[n] = 0;
