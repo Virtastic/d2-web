@@ -442,6 +442,19 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
       if (chat.input.length < L.chatEdit.limit) chat.input += key;
       return true;
     },
+    // Touch typing: the text the keyboard edits (the chat line, or the focused CREATE / JOIN edit box),
+    // null when nothing takes text; `editAt` is the chat line's own hit test (the panels' edit boxes
+    // are ordinary controls whose press already focuses them).
+    editValue() {
+      if (busy || notice) return null;
+      if (panel) { const e = editsFor().find((x) => x.id === form.focus); return e ? String(form[e.id]) : null; }
+      return mode === 'chat' ? chat.input : null;
+    },
+    editAt(x, y, w, h) {
+      if (busy || notice || panel || mode !== 'chat') return false;
+      const [sx, sy] = at(x, y, w, h), r = box(L.chatEdit);
+      return sx >= r.x && sx < r.x + r.w && sy >= r.y && sy < r.y + r.h;
+    },
     targets(w, h) { const v = view(w, h); return Object.fromEntries(controls().map((b) => { const r = box(b); return [b.id, [Math.round(v.ox + (r.x + r.w / 2) * v.scale), Math.round(v.oy + (r.y + r.h / 2) * v.scale)]]; })); },
     hover(x, y, w, h) { const [sx, sy] = at(x, y, w, h); pointer = [Math.trunc(sx), Math.trunc(sy)]; },
     press(x, y, w, h) { const b = hit(x, y, w, h); if (!b || disabled(b)) return null; pressed = b.id; return pressed; },

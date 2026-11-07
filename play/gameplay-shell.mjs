@@ -165,6 +165,7 @@ import { weaponClassTokenForMode } from './assets/player-weapon-class.mjs';
 import { decideGridPlace } from './assets/grid-place.mjs';
 import { installWorkerGuard, workerMode } from './worker-guard.mjs';
 import { fitSize } from './assets/fit-size.mjs';
+import { createTouchTextEntry } from './assets/touch-text-entry.mjs';
 
 const canvas = document.querySelector('#game');
 const screenshotAction = createScreenshotAction();
@@ -5947,6 +5948,11 @@ canvas.addEventListener('pointerleave', (e) => {
   else if (screen === SCREEN.SELECT) charSelect?.hover(-1, -1, canvas.width, canvas.height);
   else if (screen === SCREEN.CREATE) charCreate?.setPointer(-1, -1, canvas.width, canvas.height);
 });
+// The lobby's chat line and CREATE / JOIN edit boxes on a touch screen: a hidden input raises the keyboard.
+const lobbyTextEntry = createTouchTextEntry({
+  typeKey: (code, key) => { bnetLobbyScreen?.typeKey(code, key); },
+  getValue: () => (screen === SCREEN.BNET_LOBBY ? bnetLobbyScreen?.editValue() ?? null : null),
+  onChange: () => render(), onBlur: () => canvas.focus() });
 canvas.addEventListener('pointerdown', (e) => {
   gameCursor?.noteInput();
   const altFix = altSync(configuredActionForKey('AltLeft') === 'Show Items', e.altKey, heldShowItemsKeys.has('AltLeft'));
@@ -6805,6 +6811,10 @@ canvas.addEventListener('pointerup', (e) => {
   if (!(screen === SCREEN.TITLE || screen === SCREEN.CREDITS || screen === SCREEN.CINEMATICS || screen === SCREEN.OTHER_MULTIPLAYER || screen === SCREEN.BNET_LOGIN || screen === SCREEN.BNET_LOBBY || screen === SCREEN.CREATE || screen === SCREEN.SELECT)) return;
   const [x, y] = canvasPoint(e);
   frontendPointerStates.release(e.pointerId, frontendPointerControl(), x, y, canvas.width, canvas.height, e.button);
+  if (screen === SCREEN.BNET_LOBBY && bnetLobbyScreen) {
+    if ((bnetLobbyScreen.editAt(x, y, canvas.width, canvas.height) || e.pointerType === 'touch') && lobbyTextEntry.open()) { e.preventDefault(); return; }
+    lobbyTextEntry.close();
+  }
   canvas.focus(); e.preventDefault();
 });
 // Browsers cancel a touch for an interruption or a gesture the page is not handling; that gesture
