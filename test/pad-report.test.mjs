@@ -53,9 +53,9 @@ test('a disconnect or a new pad index starts the classification over', () => {
   r.read(mk([0, 0, 0, 0, 0.7, 0, 0, 0]));          // axis 4 is a trigger on index 0
   assert.deepEqual(pressed(r.read(mk([0, 0, 0, 0, 0.9, 0, 0, 0]))), [6]);
   assert.equal(r.read(null), null);                // disconnect
-  assert.deepEqual(pressed(r.read(mk([0, 0, 0, 0, 1, 0, 0, 0]))), [], 'after a reconnect, a full pull has not yet shown it analog');
-  assert.deepEqual(pressed(r.read(mk([0, 0, 0, 0, 0.7, 0, 0, 0]))), [6], 'the analog reading re-classifies it');
-  assert.deepEqual(pressed(r.read(mk([0, 0, 0, 0, 1, 0, 0, 0], {}, { index: 1 }))), [], 'a new index is a new device');
+  assert.deepEqual(pressed(r.read(mk([0, 0, 0, 0, 1, 0, 0, 0]))), [6], 'after a reconnect, a full pull on a trigger slot reads as a digital trigger');
+  assert.deepEqual(pressed(r.read(mk([0, 0, 0, 0, 0.7, 0, 0, 0]))), [6]);
+  assert.deepEqual(pressed(r.read(mk([0, 0, 0, 0, 0, 0, 1, 0], {}, { index: 1 }))), [], 'a new index is a new device: axis 6 has not yet paired');
 });
 
 test('an unused constant axis is neither a hat nor a trigger', () => {
@@ -79,4 +79,13 @@ test('a browser Gamepad (fields are prototype getters) keeps its axes, id, index
   assert.equal(out.index, 0);
   assert.equal(out.mapping, '');
   assert.match(out.id, /Retroid/);
+});
+
+test('a digital trigger axis (0 and 1 only) is a trigger, never a hat', () => {
+  const r = createReportReader();
+  const pressed = (p) => p.buttons.flatMap((b, i) => (b.pressed ? [i] : []));
+  r.read(mk([0, 0, 0, 0, 0, 0]));
+  assert.deepEqual(pressed(r.read(mk([0, 0, 0, 0, 1, 1]))), [6, 7], 'LT and RT, not right and down');
+  assert.deepEqual(pressed(r.read(mk([0, 0, 0, 0, 0, 0]))), []);
+  assert.deepEqual(pressed(r.read(mk([0, 0, 0, 0, 1, 0]))), [6]);
 });

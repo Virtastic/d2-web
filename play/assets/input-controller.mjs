@@ -50,6 +50,8 @@ const CURSOR_SPEED = 14;     // canvas px per poll at full right-stick deflectio
 
 const BUTTON = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, BACK: 8, START: 9, L3: 10, R3: 11, DPAD_UP: 12, DPAD_DOWN: 13, DPAD_LEFT: 14, DPAD_RIGHT: 15 };
 // A pad key is "the retail function, else its default code": [function, default code, key name].
+const CODE_KEY = { Space: ' ', Enter: 'Enter', Tab: 'Tab', Backquote: '`', Minus: '-', Equal: '=', Backspace: 'Backspace', Escape: 'Escape' };
+export const keyNameForCode = (code) => (/^Key[A-Z]$/.test(code) ? code[3].toLowerCase() : /^Digit\d$/.test(code) ? code[5] : /^F\d{1,2}$/.test(code) ? code : CODE_KEY[code] || '');
 const FN = {
   belt1: ['Use Belt 1', 'Digit1', '1'], belt2: ['Use Belt 2', 'Digit2', '2'], belt3: ['Use Belt 3', 'Digit3', '3'], belt4: ['Use Belt 4', 'Digit4', '4'],
   inventory: ['Inventory Screen', 'KeyI', 'i'], character: ['Character Screen', 'KeyC', 'c'], skillTree: ['Skill Tree', 'KeyT', 't'],
@@ -389,8 +391,10 @@ function start() {
   // Press the key the player's own Configure Controls table binds to a retail function.
   const fnKey = (name) => {
     const [label, def, keyName] = FN[name];
-    const code = globalThis.__d2Shell?.controlCodeFor?.(label) ?? def;
-    tapKey(code, code === def ? keyName : '');
+    const code = globalThis.__d2Shell?.controlCodeFor?.(label) || def;
+    // A rebound code carries its own key name; one with none is not pressed rather than sent as an empty key.
+    const shown = code === def ? keyName : keyNameForCode(code);
+    if (shown) tapKey(code, shown);
   };
 
   // The name grid is up exactly while retail's own name box is: the create screen with a class chosen.
@@ -469,7 +473,7 @@ function start() {
     // pad-report.mjs: an unmapped pad's d-pad hat and analog triggers become the standard buttons; a standard pad passes through.
     const rawPad = reader.read(pickPad(pads, state.connected ? state.index : -1));
     if (!rawPad) {
-      if (state.connected) { applyHold(holds.a.release(), 0); applyHold(holds.b.release(), 2); state.connected = false; state.wasPressed = {}; cursorEl.style.display = 'none'; nameGrid.el.style.display = 'none'; }
+      if (state.connected) { applyHold(holds.a.release(), 0); applyHold(holds.b.release(), 2); state.connected = false; state.wasPressed = {}; cursorEl.style.display = 'none'; for (const g of [nameGrid, goldGrid, chatGrid]) g.el.style.display = 'none'; }
       return;
     }
     if (!state.connected || state.index !== rawPad.index) { state.connected = true; state.index = rawPad.index; }
@@ -511,9 +515,11 @@ function start() {
     // `panelPoints` picks whichever one, if any, is actually open this poll.
     const targets = !fieldOpen && shell?.uiTargets ? shell.uiTargets() : null;
     const basePanel = panelPoints(targets);
-    const panel = enhancePanelPoints(basePanel, targets, { items: shell?.snapshot?.items, width: canvas.width, height: canvas.height,
+    const panelAll = enhancePanelPoints(basePanel, targets, { items: shell?.snapshot?.items, width: canvas.width, height: canvas.height,
       held: shell?.cursorItem ? (shell.snapshot?.items?.find((i) => i.id === shell.cursorItem) || { id: shell.cursorItem }) : null,
       layout: targets && shell?.touchPanelLayout ? shell.touchPanelLayout() : null });
+    // An empty point list is no panel: every use below indexes into it.
+    const panel = panelAll?.length ? panelAll : null;
     // D2R's own world mode: the game screen with nothing modal, no snap panel and no typed field up --
     // the ONE state with no free cursor at all.
     const worldMode = screenName === 'game' && !modal && !panel && !fieldOpen;

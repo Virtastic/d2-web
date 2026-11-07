@@ -76,3 +76,12 @@ test('a controller button reaching the page as an unidentified key, or the Back 
     assert.equal(isBackKey(e), eaten);
   }
 });
+
+test('isBackKey: a soft keyboard or IME "Unidentified" keystroke is typing, not Back', () => {
+  assert.equal(isBackKey({ key: 'Unidentified', code: '' }), true, 'a pad button with no key of its own');
+  assert.equal(isBackKey({ key: 'Unidentified', code: '', keyCode: 229 }), false);
+  assert.equal(isBackKey({ key: 'Unidentified', code: '', isComposing: true }), false);
+  assert.equal(isBackKey({ key: 'Unidentified', code: '', target: { tagName: 'INPUT' } }), false);
+  assert.equal(isBackKey({ key: 'Unidentified', code: '', target: { tagName: 'DIV', isContentEditable: true } }), false);
+  assert.equal(isBackKey({ key: 'GoBack', code: '' }), true);
+});

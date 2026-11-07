@@ -19,7 +19,11 @@ const ACTIVATION = ['keydown', 'pointerup', 'mousedown', 'touchend'];
 export function isBackKey(e) {
   if (!e) return false;
   if (e.key === 'GoBack' || e.key === 'BrowserBack' || e.code === 'BrowserBack') return true;
-  return e.key === 'Unidentified' && !e.code;
+  if (e.key !== 'Unidentified' || e.code) return false;
+  // A soft keyboard or an IME also reports 'Unidentified' with no code (keyCode 229, composing): that is typing, not a pad button.
+  if (e.isComposing || e.keyCode === 229) return false;
+  const t = e.target;
+  return !(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || '')));
 }
 
 export function createBackGuard({ windowObject = globalThis.window, historyObject = windowObject?.history } = {}) {
