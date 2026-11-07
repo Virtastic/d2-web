@@ -68,10 +68,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2_client_87fe0(D2cSnd87* s, const D2cS
     return nullptr;
 }
 
-// 1.13c D2Client+0x880E0: moved to d2client_880e0.cpp (register and stack arguments passed explicitly).
-
-// 1.13c D2Client+0x88150: moved to d2client_88150.cpp (register and stack arguments passed explicitly).
-
 // 1.13c D2Client+0x881B0 (stdcall unit, ret 4). Ordinal_10628 (thunk 0xC21A,
 // stdcall unit, POINT*) fills the player's position ([0x6FBCBBFC]) then the argument unit's; dx = B.x - A.x, dy = B.y - A.y
 // (int32 wrap); retail sums dx*dx + (2*dy)*(2*dy) on the x87 and returns 1 when it is <= 490000.0f ([0x6FB87570]). Past
