@@ -229,7 +229,7 @@ export async function mcpCreateCharacter(session, { name, charClass, expansion =
     const error = new Error(result === 0x14 ? 'That character name is already taken.' : 'That character name is not allowed.');
     error.result = result; throw error;
   }
-  const character = { name, expiry: 0, charClass, level: 1 };
+  const character = { name, expiry: 0, charClass, level: 1, flags: flags & 0xff };
   session.list.characters.push(character); session.list.total++; session.list.returned++;
   return character;
 }
