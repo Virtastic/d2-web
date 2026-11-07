@@ -5,7 +5,7 @@ import { readSessionActiveNearFeed } from './assets/session-active-near-feed.mjs
 import { createFrameSnapshots, fromSnapshot } from './frame-snapshot.mjs';
 import { perfSync, perfEnabled, perfT0, perfT, perfSample, perfCountFrame, perfReset, perfReport, perfFrameStart, perfFrameTop } from './assets/frame-perf.mjs';
 import { gameInitSeed, clockInputs } from './assets/game-seed.mjs';
-import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, groundItemsUnderPointerAt, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeObjectHoverContains, nativeHoverSpecialGate, selectPointerCandidate, selectPrimaryTarget, selectHoverUnit, viewportToWorld } from './gameplay-model.mjs';
+import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, groundItemsUnderPointerAt, hostileUnitHoverHit, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeObjectHoverContains, nativeHoverSpecialGate, selectPointerCandidate, selectPrimaryTarget, selectHoverUnit, viewportToWorld } from './gameplay-model.mjs';
 import { altSync } from './item-pick.mjs';
 import { createMpqAssetReader } from './assets/mpq-assets.mjs';
 import { itemTables, itemSizer } from './assets/d2-item-size.mjs';
@@ -5371,7 +5371,10 @@ function objectUnderPointer(px, py, { nativeHover = false, allCandidates = false
 function unitBoxHit(entity, px, py) {
   const camera = worldToScreen(cameraGrid().x, cameraGrid().y), [anchorX, anchorY] = unitAnchor(entity), point = worldToScreen(anchorX, anchorY);   // F14: hover around the same engine-precise anchor the sprite pass draws; grid x/y lags a moving unit.
   // the cel anchor is an integer pixel (retail's measurement is 1 px exact), so round it the way the sprite is placed
-  return inUnitHoverBox(px - Math.round(point.x - camera.x + viewCX()), py - Math.round(point.y - camera.y + (canvas.height / 2 + UNIT_CENTRE_Y)), entity.hostile === true);
+  const dx = px - Math.round(point.x - camera.x + viewCX()), dy = py - Math.round(point.y - camera.y + (canvas.height / 2 + UNIT_CENTRE_Y));
+  if (entity.hostile !== true) return inUnitHoverBox(dx, dy, false);
+  const cel = unitDrawEvidence.find((u) => u.id === entity.id && u.celWidth > 0);   // the previous frame's draw: hover runs before this frame's
+  return hostileUnitHoverHit(dx, dy, cel && { xOffset: cel.celXOffset, yOffset: cel.celYOffset, width: cel.celWidth, height: cel.celHeight });
 }
 
 function nativeUnitState143(entity) {
