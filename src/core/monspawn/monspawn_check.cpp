@@ -2917,7 +2917,9 @@ EMSCRIPTEN_KEEPALIVE int d2_mondrop_run() {
 // this difficulty, so a boss with a TCQuestId rolls its ordinary treasure class.
 EMSCRIPTEN_KEEPALIVE int d2_mondrop_quest_done(uint32_t questFilter) {
     if (!g_game || !g_targetPlayer) return 0;
-    QUESTRECORD_SetQuestState(UNITS_GetPlayerData(g_targetPlayer)->pQuestData[g_game->nDifficulty], (int32_t)questFilter, QFLAG_COMPLETEDBEFORE);
+    D2PlayerDataStrc* pd = UNITS_GetPlayerData(g_targetPlayer);
+    if (!pd || g_game->nDifficulty >= 3 || !pd->pQuestData[g_game->nDifficulty]) return 0;
+    QUESTRECORD_SetQuestState(pd->pQuestData[g_game->nDifficulty], (int32_t)questFilter, QFLAG_COMPLETEDBEFORE);
     return 1;
 }
 EMSCRIPTEN_KEEPALIVE const D2VecMonDrop* d2_mondrop_monsters(int* count) { *count = (int)g_dropMons.size(); return g_dropMons.data(); }
