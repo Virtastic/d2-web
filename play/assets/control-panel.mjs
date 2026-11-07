@@ -222,7 +222,7 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     // SGD2FreeRes: the orbs sit at the screen edges; `edge` is how far each moves out, 0 at 800x600.
     const edge = x0 / scale;
     // Per-blit records in retail's own order: the six panel frames, then each orb's fluid
-    // (celex, extra = its percentage) and its overlap.
+    // (celex, extra = the fluid rows shown, of the cel's height) and its overlap.
     const PANEL_PATH = 'data\\global\\ui\\PANEL\\800ctrlpnl7.dc6', top = PANEL_SCREEN_TOP;
     ctx.drawImage(p[0], CONTROL_LAYOUT.healthX - edge, 0);
     recordDc6(PANEL_PATH, 0, panel.frames[0], CONTROL_LAYOUT.healthX - edge, top);
@@ -236,9 +236,9 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     drawFluid(fluid[0], 29 - edge, 12, life); drawFluid(fluid[1], 689 + edge, 12, mana);
     ctx.drawImage(overlap[0], 28 - edge, 12); ctx.drawImage(overlap[1], 690 + edge, 8);
     const FLUID_PATH = 'data\\global\\ui\\PANEL\\hlthmana.dc6', OVERLAP_PATH = 'data\\global\\ui\\PANEL\\overlap.dc6';
-    recordDc6(FLUID_PATH, 0, fluids.frames[0], 29 - edge, top + 12, { op: 'celex', extra: Math.round(life * 100) });
+    recordDc6(FLUID_PATH, 0, fluids.frames[0], 29 - edge, top + 12, { op: 'celex', extra: fluid[0].height - Math.round(fluid[0].height * (1 - life)) });
     recordDc6(OVERLAP_PATH, 0, overlaps.frames[0], 28 - edge, top + 12);
-    recordDc6(FLUID_PATH, 1, fluids.frames[1], 689 + edge, top + 12, { op: 'celex', extra: Math.round(mana * 100) });
+    recordDc6(FLUID_PATH, 1, fluids.frames[1], 689 + edge, top + 12, { op: 'celex', extra: fluid[1].height - Math.round(fluid[1].height * (1 - mana)) });
     recordDc6(OVERLAP_PATH, 1, overlaps.frames[1], 690 + edge, top + 8);
     // The ornate strips between each skill button and the console (wide views only): hud.strips paints them.
     if (edge > 0 && hud.strips) hud.strips(ctx);
