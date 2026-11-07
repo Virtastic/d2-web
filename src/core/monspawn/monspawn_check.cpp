@@ -2913,6 +2913,13 @@ EMSCRIPTEN_KEEPALIVE int d2_mondrop_run() {
     g_d2webOnDropTC = nullptr;
     return (int)g_dropMons.size();
 }
+// kind-29 replay of the capture's D2CAPTURE_DROPS_QDONE: the attached player has quest `questFilter` COMPLETEDBEFORE on
+// this difficulty, so a boss with a TCQuestId rolls its ordinary treasure class.
+EMSCRIPTEN_KEEPALIVE int d2_mondrop_quest_done(uint32_t questFilter) {
+    if (!g_game || !g_targetPlayer) return 0;
+    QUESTRECORD_SetQuestState(UNITS_GetPlayerData(g_targetPlayer)->pQuestData[g_game->nDifficulty], (int32_t)questFilter, QFLAG_COMPLETEDBEFORE);
+    return 1;
+}
 EMSCRIPTEN_KEEPALIVE const D2VecMonDrop* d2_mondrop_monsters(int* count) { *count = (int)g_dropMons.size(); return g_dropMons.data(); }
 EMSCRIPTEN_KEEPALIVE const D2VecMonDropItem* d2_mondrop_items(int* count) { *count = (int)g_dropItems.size(); return g_dropItems.data(); }
 EMSCRIPTEN_KEEPALIVE const D2VecAiTargetUnit* d2_aitarget_units(int* count) { *count = (int)g_targetUnits.size(); return g_targetUnits.data(); }
