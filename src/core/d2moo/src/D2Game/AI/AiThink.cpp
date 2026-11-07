@@ -16702,7 +16702,8 @@ void __fastcall AITHINK_Fn134_BaalThrone(D2GameStrc* pGame, D2UnitStrc* pUnit, D
 
 	if (arg.unk0x08)
 	{
-		if (pAiTickParam->pTarget)
+		// 1.13c D2Game+0xA8430: the skill branch needs nSkill[0] > 0
+		if (pAiTickParam->pTarget && pAiTickParam->pMonstatsTxt->nSkill[0] > 0)
 		{
 			D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(pAiTickParam->pMonstatsTxt->nSkill[0]);
 			if (pSkillsTxtRecord
@@ -16799,18 +16800,21 @@ void __fastcall AITHINK_Fn134_BaalThrone(D2GameStrc* pGame, D2UnitStrc* pUnit, D
 			}
 
 			D2SuperUniquesTxt* pSuperUniquesTxtRecord = DATATBLS_GetSuperUniquesTxtRecord(nSuperUnique);
-			if (pSuperUniquesTxtRecord && pSuperUniquesTxtRecord->dwClass >= 0)
+			// 1.13c D2Game+0xA8430: a missing record or class < 0 leaves the tick without casting or flag changes
+			if (!pSuperUniquesTxtRecord || pSuperUniquesTxtRecord->dwClass < 0)
 			{
-				sub_6FCC6470(pUnit, pSuperUniquesTxtRecord->dwClass);
+				return;
+			}
 
-				if (pSuperUniquesTxtRecord->dwClass == MONSTER_FALLENSHAMAN5)
-				{
-					sub_6FCC6470(pUnit, MONSTER_FALLEN5);
-				}
-				else if (pSuperUniquesTxtRecord->dwClass == MONSTER_UNRAVELER5)
-				{
-					sub_6FCC6470(pUnit, MONSTER_SKMAGE_COLD3);
-				}
+			sub_6FCC6470(pUnit, pSuperUniquesTxtRecord->dwClass);
+
+			if (pSuperUniquesTxtRecord->dwClass == MONSTER_FALLENSHAMAN5)
+			{
+				sub_6FCC6470(pUnit, MONSTER_FALLEN5);
+			}
+			else if (pSuperUniquesTxtRecord->dwClass == MONSTER_UNRAVELER5)
+			{
+				sub_6FCC6470(pUnit, MONSTER_SKMAGE_COLD3);
 			}
 		}
 
