@@ -119,3 +119,5 @@ behaviour differs from 1.10f.
 
 - D2Common+0x5A790, +0x5A7D0, +0x5A810, +0x5A850 (MonsterTbls.cpp unique appellation/suffix/prefix/title rollers): the bodies moved to src/core/d2common/d2common_<rva>.cpp with the D2Lang lookup as a seam; the vendored functions forward with D2LANG_GetStringFromTblIndex (no behaviour change).
 - D2Game+0xB23D0 (owner record field), +0xC2120 and +0xC2460 (game list entry tests), +0xCB370 (same-group test), +0xDA930 and +0xDA970 (mana and life spend), +0xF0060 and +0xF0220 (player-list node lookup and state set): rules over E in src/core/d2game/d2game_<rva>.h, each with an FN probe; the old batch-file copies are gone (B23D0, C2120, CB370, DA930, DA970) or point at the header (C2460, F0060, F0220). Delta: DA930/DA970 read stat 10/8 and write the remainder back, where the old copies guessed stat 0.
+
+- QUESTSFX_MainHandler (1.13c D2Game+0xEA730): the Diablo clone (class 333) is skipped when a boss death turns evil neighbours into temp summons.

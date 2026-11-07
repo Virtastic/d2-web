@@ -439,6 +439,8 @@ void __fastcall ACT5Q6_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 
 		if (pQuestArg->pPlayer)
 		{
+			// 1.13c D2Game+0x5FE30: the killer's reward flag is read before the iterations set it
+			const bool bDropGold = !QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty], QUESTSTATEFLAG_A5Q6, QFLAG_REWARDGRANTED);
 			pQuestDataEx->nPlayersInWorldStoneChamber = 0;
 
 			SUNIT_IterateUnitsOfType(pQuestArg->pGame, 0, pQuestArg->pTarget, ACT5Q6_UnitIterate_SetRewardGranted);
@@ -446,7 +448,7 @@ void __fastcall ACT5Q6_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 			SUNIT_IterateUnitsOfType(pQuestArg->pGame, 0, pQuestArg->pTarget, ACT5Q6_UnitIterate_SetCompletionFlag);
 			SUNIT_IterateUnitsOfType(pQuestArg->pGame, 0, pQuestArg->pTarget, ACT5Q6_UnitIterate_AttachCompletionSound);
 
-			if (pQuestData->bNotIntro && !QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty], QUESTSTATEFLAG_A5Q6, QFLAG_REWARDGRANTED))
+			if (bDropGold)
 			{
 				const int32_t nMin = 6000 * pQuestData->pGame->nDifficulty + 1500;
 				int32_t nMax = 6000 * pQuestData->pGame->nDifficulty + 3000;

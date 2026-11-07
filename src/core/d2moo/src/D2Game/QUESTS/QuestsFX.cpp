@@ -57,7 +57,8 @@ void __fastcall QUESTSFX_MainHandler(D2GameStrc* pGame, D2UnitStrc* pUnit, int32
                 bAllied = 1;
             }
 
-            if ((!bCheckIfUndead || MONSTERS_IsUndead(pMonster)) && bAllied)
+            // 1.13c D2Game+0xEA730: the Diablo clone is never turned into a temp summon by a boss death
+            if ((!bCheckIfUndead || MONSTERS_IsUndead(pMonster)) && bAllied && pMonster->dwClassId != MONSTER_DIABLOCLONE)
             {
                 EVENT_SetEvent(pGame, pMonster, EVENTTYPE_MONUMOD, nDelayMin + ITEMS_RollLimitedRandomNumber(&pUnit->pSeed, nDelayMax - nDelayMin) + pGame->dwGameFrame, 0, 0);
                 D2GAME_BOSSES_AssignUMod_6FC6FF10(pGame, pMonster, MONUMOD_TEMPSUMMON, 0);
