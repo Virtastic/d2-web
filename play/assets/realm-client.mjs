@@ -79,13 +79,34 @@ async function readBncsFrame(reader, timeoutMs) {
 
 /** One MCP frame: `[total:u16 LE][op:u8][body]`; total includes its own 3-byte header. */
 async function readMcpFrame(reader, timeoutMs) {
-  const head = await reader.want(3, timeoutMs);
-  const total = head[0] | (head[1] << 8);
-  if (total < 3) throw new Error(`MCP frame length ${total} is shorter than its header`);
-  if (total > 8192) throw new Error(`MCP frame length ${total} exceeds the client buffer`);
-  const frame = await reader.want(total, timeoutMs);
-  reader.skip(total);
-  return { op: frame[2], body: frame.subarray(3) };
+  for (;;) {
+    const head = await reader.want(3, timeoutMs);
+    const total = head[0] | (head[1] << 8);
+    if (total < 3) throw new Error(`MCP frame length ${total} is shorter than its header`);
+    if (total > 8192) throw new Error(`MCP frame length ${total} exceeds the client buffer`);
+    const frame = await reader.want(total, timeoutMs);
+    reader.skip(total);
+    // The reply to an idle-time MOTD request (the lobby's keep-alive) is never an answer to a call.
+    if (frame[2] === MCP_MOTD) continue;
+    return { op: frame[2], body: frame.subarray(3) };
+  }
+}
+
+const MCP_MOTD = 0x12, MCP_KEEPALIVE_MS = 30000;
+/**
+ * An idle MCP socket is dropped by the proxies in front of the realm (about 100 s with no traffic), and
+ * the lobby sits idle that long. Ask for the message of the day on a timer; the reply is skipped by
+ * readMcpFrame. Stops when the transport closes or the session has joined its game.
+ */
+function startMcpKeepAlive(session, ms = MCP_KEEPALIVE_MS) {
+  const { transport, protocol } = session;
+  const timer = setInterval(() => {
+    if (session.joined || transport.isOpen === false) { clearInterval(timer); return; }
+    try { transport.send(protocol.mcpFrame(MCP_MOTD, [])); } catch { clearInterval(timer); }
+  }, ms);
+  timer.unref?.();
+  transport.onClose?.(() => clearInterval(timer));
+  return timer;
 }
 
 function decodeMcpCharacters(body) {
@@ -194,7 +215,7 @@ function titleCaseGameText(value) {
 }
 
 /** Open the MCP login leg far enough to populate the character picker. */
-export async function mcpListCharacters(transport, protocol, { realmReply, characterCount = 8, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+export async function mcpListCharacters(transport, protocol, { realmReply, characterCount = 8, timeoutMs = CONNECT_TIMEOUT_MS, keepAliveMs = MCP_KEEPALIVE_MS } = {}) {
   if (!Array.isArray(realmReply) && !(realmReply instanceof Uint8Array)) throw new Error('MCP requires the BNCS realm handoff bytes');
   const reader = makeReader(transport), received = [];
   const send = (op, body) => transport.send(protocol.mcpFrame(op, body));
@@ -206,9 +227,11 @@ export async function mcpListCharacters(transport, protocol, { realmReply, chara
   const reply = await readMcpFrame(reader, timeoutMs); received.push(reply.op);
   if (reply.op !== 0x19) throw new Error(`expected MCP CHARLIST2 reply 0x19, got 0x${reply.op.toString(16)}`);
   const list = decodeMcpCharacters(reply.body);
-  return { ...list, received, session: { reader, transport, protocol, list, nextRequestId: 2,
+  const session = { reader, transport, protocol, list, nextRequestId: 2,
     characterLoggedOn: false, joined: false,
-    received: [...received] } };
+    received: [...received] };
+  session.keepAlive = startMcpKeepAlive(session, keepAliveMs);
+  return { ...list, received, session };
 }
 
 const u32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
