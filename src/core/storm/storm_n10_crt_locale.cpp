@@ -10,7 +10,7 @@
 
 namespace {
 
-struct CpInfo { uint32_t maxCharSize; uint8_t leadByte[12]; };
+struct CpInfo { uint32_t maxCharSize; uint8_t defChar[2]; uint8_t leadByte[12]; };   // retail CPINFO: lead bytes start at +6
 
 struct Host {
     bool (*getCPInfo)(uint32_t cp, CpInfo* out);
@@ -18,6 +18,8 @@ struct Host {
     int  (*lcMapString)(uint32_t lcid, uint32_t flags, const char* s, int n, char* out, int outN, uint32_t cp);
     int  (*getLocaleInfoA)(uint32_t lcid, uint32_t type, char* out, int n);
     void (*crtExit)(int code);
+    void* (*mallocFn)(uint32_t n);   // _malloc / _free (null: the C library); the AC37 probe logs them
+    void (*freeFn)(void* p);
 };
 
 struct CrtState {
@@ -131,9 +133,11 @@ rest:
 // 1.13c Storm+0xAC37  (_setmbcp ctype tables; 0 ok, 1 fail)
 uint32_t storm_AC37(CrtState& g, const Host& h) {
     if (!g.mbcsOn) { g.ptrCtype = nullptr; g.ptr47b80 = nullptr; g.ptr47b84 = nullptr; return 0; }
-    uint32_t* cnt = (uint32_t*)malloc(4);
-    uint8_t* tbl = (uint8_t*)malloc(0x300);
-    uint8_t* ident = (uint8_t*)malloc(0x101);
+    auto mal = [&](uint32_t n) { return h.mallocFn ? h.mallocFn(n) : malloc(n); };
+    auto fre = [&](void* p) { if (h.freeFn) h.freeFn(p); else free(p); };
+    uint32_t* cnt = (uint32_t*)mal(4);
+    uint8_t* tbl = (uint8_t*)mal(0x300);
+    uint8_t* ident = (uint8_t*)mal(0x101);
     uint32_t rc = 1;
     if (cnt && tbl && ident) {
         *cnt = 0;
@@ -155,8 +159,8 @@ uint32_t storm_AC37(CrtState& g, const Host& h) {
             }
         }
     }
-    if (rc) { free(cnt); free(tbl); }
-    free(ident);
+    if (rc) { fre(cnt); fre(tbl); }
+    fre(ident);
     return rc;
 }
 
@@ -327,4 +331,22 @@ extern "C" int storm_fn_b45f(uint32_t lcid, uint32_t type, char* out, int n, con
     Host h{};
     h.getLocaleInfoA = cb;
     return storm_B45F(h, table, lcid, type, out, n);
+}
+
+// FUNCTION-mode entry for 0xAC37 with plain types: the globals by value in/out, the Win32 seams as callbacks.
+// io: [0] mbcsOn, [1] code page, [2] mbCurMax; *tabOut/*p80Out/*p84Out receive the new pointers (null when off or failed).
+extern "C" uint32_t Storm_AC37_env(uint32_t* io, uint8_t** tabOut, uint8_t** p80Out, void** p84Out,
+                                   bool (*getCP)(uint32_t, uint32_t*, uint8_t*),
+                                   bool (*gst)(uint32_t, const char*, int, uint16_t*, uint32_t),
+                                   void* (*mal)(uint32_t), void (*fre)(void*)) {
+    static bool (*s_cp)(uint32_t, uint32_t*, uint8_t*); s_cp = getCP;
+    Host h{};
+    h.getCPInfo = [](uint32_t cp, CpInfo* o) { uint8_t raw[16]; uint32_t mx; if (!s_cp(cp, &mx, raw)) return false; o->maxCharSize = mx; memcpy(o->defChar, raw + 4, 14); return true; };
+    h.getStringTypeA = gst; h.mallocFn = mal; h.freeFn = fre;
+    CrtState g{};
+    g.mbcsOn = io[0]; g.mbCodePage = io[1]; g.mbCurMax = io[2];
+    const uint32_t rc = storm_AC37(g, h);
+    io[2] = g.mbCurMax;
+    *tabOut = (uint8_t*)g.ptrCtype; *p80Out = (uint8_t*)g.ptr47b80; *p84Out = (void*)g.ptr47b84;
+    return rc;
 }

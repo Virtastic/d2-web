@@ -231,6 +231,7 @@ static int32_t Storm_Sub11F10(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d
 // 1.13c Storm+0x12690
 // The local player's own connection record: the tail of the 0x6FC45A3C list, created (0x214 bytes,
 // mark bytes +0x212/+0x213 = 0xFF, start tick at +0x11C) when the list is empty.
+extern "C" uint32_t (*g_storm_snet_tick)() = nullptr;   // FN probe seam: the pinned GetTickCount
 int32_t* Snet12690(void) {
     uint32_t c = tail(g_self);
     if (!c) {
@@ -240,7 +241,7 @@ int32_t* Snet12690(void) {
         U32(c, 0x108) = U32(c, 0x10c) = U32(c, 0x110) = U32(c, 0x114) = 0;
         U8(c, 0x212) = 0xff;
         U8(c, 0x213) = 0xff;
-        U32(c, 0x11c) = GetTickCount();
+        U32(c, 0x11c) = g_storm_snet_tick ? g_storm_snet_tick() : GetTickCount();
     }
     return (int32_t*)P(c);
 }

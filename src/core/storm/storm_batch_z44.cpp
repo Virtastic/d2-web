@@ -21,23 +21,23 @@ inline void* at(uint32_t ebp, int32_t off) { return P<void>(ebp + (uint32_t)off)
 // 1.13c STORM+0x41652: empty (returns).
 extern "C" void Storm_Sub41652(void) {}
 
-// 1.13c STORM+0x41C28
+// superseded by the per-function port file for rva 41C28
 extern "C" void Storm_Sub41C28(uint32_t ebp, const StormBatchZ44Env* e) { e->sub_4910(at(ebp, -0x3a80)); }
-// 1.13c STORM+0x41C3F
+// superseded by the per-function port file for rva 41C3F
 extern "C" void Storm_Sub41C3F(uint32_t ebp, const StormBatchZ44Env* e) { e->sub_4910(at(ebp, -0x3480)); }
-// 1.13c STORM+0x41C4C
+// superseded by the per-function port file for rva 41C4C
 extern "C" void Storm_Sub41C4C(uint32_t ebp, const StormBatchZ44Env* e) { e->sub_4B40(at(ebp, -0x3480)); }
-// 1.13c STORM+0x41C59
+// superseded by the per-function port file for rva 41C59
 extern "C" void Storm_Sub41C59(uint32_t ebp, const StormBatchZ44Env* e) { e->sub_4910(at(ebp, -0x3480)); }
-// 1.13c STORM+0x41C7F
+// superseded by the per-function port file for rva 41C7F
 extern "C" void Storm_Sub41C7F(uint32_t ebp, const StormBatchZ44Env* e) { e->sub_11A0(at(ebp, -300)); }
-// 1.13c STORM+0x41C8C
+// superseded by the per-function port file for rva 41C8C
 extern "C" void Storm_Sub41C8C(uint32_t ebp, const StormBatchZ44Env* e) { e->sub_1250(at(ebp, -300)); }
-// 1.13c STORM+0x41C99
+// superseded by the per-function port file for rva 41C99
 extern "C" void Storm_Sub41C99(uint32_t ebp, const StormBatchZ44Env* e) { e->sub_11A0(at(ebp, -300)); }
-// 1.13c STORM+0x41CA6
+// superseded by the per-function port file for rva 41CA6
 extern "C" void Storm_Sub41CA6(uint32_t ebp, const StormBatchZ44Env* e) { e->sub_11A0(at(ebp, -300)); }
-// 1.13c STORM+0x41CC2
+// superseded by the per-function port file for rva 41CC2
 extern "C" void Storm_Sub41CC2(const StormBatchZ44Env* e) { e->sub_4C20(); }
 // 1.13c STORM+0x41CCD: arg is the pointer stored at [ebp-0x210].
 extern "C" void Storm_Sub41CCD(uint32_t ebp, const StormBatchZ44Env* e) { e->sub_4B80(*P<void*>(ebp - 0x210)); }

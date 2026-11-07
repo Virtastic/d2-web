@@ -140,7 +140,7 @@ struct StormStrType {
   void (*free_)(void*);
 };
 int Storm_BDA8(StormStrType* g, uint32_t infoType, const char* src, int cch, uint16_t* out,
-               uint32_t codePage, int bError, uint32_t charType) {
+               uint32_t charType, uint32_t locale, int bError) {   // words 4, 5, 6: source code page, LCID, BOOL
   static const uint16_t kEmpty[1] = {0};
   if (*g->state == 0) {
     uint16_t t[2];
@@ -148,7 +148,7 @@ int Storm_BDA8(StormStrType* g, uint32_t infoType, const char* src, int cch, uin
     else *g->state = 1;
   }
   if (*g->state == 2 || *g->state == 0) {
-    uint32_t loc = codePage ? codePage : g->codePageDef;
+    uint32_t loc = locale ? locale : g->codePageDef;
     uint32_t ct = charType ? charType : g->charTypeDef;
     uint32_t cp = g->d703(loc);
     if (cp == 0xffffffffu) return 0;

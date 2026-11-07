@@ -27,8 +27,19 @@ void trimBlock(Ctx& c,uint8_t* heap,uint8_t* blk,int32_t* off,int32_t* total) {
 }
 // 1.13c Storm+0x25290
 bool loadFile(Ctx& c,const char* path,int32_t* a,uint32_t* b,void* cc,void* errCb) {
+    if(c.fileOpen) {
+        // retail reports a failed open with EDI = 0x6E and EBX = the path, never GetLastError
+        intptr_t h=c.fileOpen(path);
+        if(h==-1) { if(errCb) c.reportError(errCb,0x6E,(uint32_t)(uintptr_t)path); return false; }
+        uint32_t n=c.fileSize(h);
+        char* buf=static_cast<char*>(c.alloc(n+1,kScmd,0x153));
+        uint32_t got=0; c.fileRead(h,buf,n,&got); c.fileClose(h);
+        buf[got]=0; char* cur=buf;   // retail writes the NUL at the request's own length slot: got == n for a whole read
+        bool r=c.parse(c,&cur,a,b,cc,errCb);
+        c.free(buf,kScmd,0x164); return r;
+    }
     std::FILE* f=std::fopen(path,"rb");
-    if(!f) { if(errCb) c.reportError(errCb,c.lastError(),0); return false; }
+    if(!f) { if(errCb) c.reportError(errCb,0x6E,(uint32_t)(uintptr_t)path); return false; }
     std::fseek(f,0,SEEK_END); long n=std::ftell(f); std::fseek(f,0,SEEK_SET);
     char* buf=static_cast<char*>(c.alloc((uint32_t)n+1,kScmd,0x153));
     size_t got=std::fread(buf,1,(size_t)n,f); (void)got; std::fclose(f);

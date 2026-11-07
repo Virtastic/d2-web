@@ -19,7 +19,7 @@ extern "C" uint32_t Storm_Sub21780(int16_t* out, uint32_t outSize, const int16_t
     int32_t budget = (int32_t)(inBytes / 2) - (int32_t)pos; if (budget < 0) budget = 0;
     uint32_t c = ch - 1, n = ch;
     while (n < inBytes >> 1) {
-        if ((int32_t)outSize < (int32_t)(pos + 1)) return pos + 1;
+        if ((int32_t)outSize < (int32_t)(pos + 2)) return pos + 2;
         if (ch == 2) c = (c == 0);
         int32_t s = *in++;
         uint32_t d = s - last[c]; int32_t m = (int32_t)d >> 31; uint32_t ad = (d ^ m) - m;

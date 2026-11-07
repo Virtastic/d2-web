@@ -1,17 +1,18 @@
-// 1.13c Storm+0x21B30 -- picks (bits, *param_5) from the mode in param_6 and forwards to 0x21780.
-// mode 0 or >=4 -> 5/7; 1,2 -> 4/6; 3 -> 6/8. Unmapped callee 0x21780 is a seam.
+// 1.13c Storm+0x21B30 -- picks (shift, *outShift) from the level and encodes stereo (2 channels) with 0x21780.
+// level 0 or >=4: shift 5, *outShift 7; 1,2: 4, 6; 3: 6, 8. The encoder's returned position replaces *outSize.
+// Retail passes its own stack argument inBytes on in EAX to 0x21780.
 #include <cstdint>
 
-struct StormSub21B30Env {
-    uint8_t* (*f_21780)(int16_t* a, uint8_t* cur, int16_t* b, uint32_t two, uint8_t bits);
-};
+extern "C" uint32_t Storm_Sub21780(int16_t* out, uint32_t outSize, const int16_t* in, uint32_t ch, uint8_t shift, uint32_t inBytes);
 
 // 1.13c Storm+0x21B30
-void Storm_Sub21B30(int16_t* p1, uint8_t** p2, int16_t* p3, uint32_t* p5, uint32_t mode,
-                    const StormSub21B30Env& env) {
-    uint8_t bits = 5;
-    *p5 = 7;
-    if (mode == 1 || mode == 2) { bits = 4; *p5 = 6; }
-    else if (mode == 3) { bits = 6; *p5 = 8; }
-    *p2 = env.f_21780(p1, *p2, p3, 2, bits);
+extern "C" void Storm_Sub21B30(int16_t* out, uint32_t* pOutSize, const int16_t* in, uint32_t inBytes,
+                               uint32_t* pOutShift, uint32_t level) {
+    uint8_t shift = 5;
+    *pOutShift = 7;
+    if (level != 0) {
+        if (level < 3) { shift = 4; *pOutShift = 6; }
+        else if (level == 3) { shift = 6; *pOutShift = 8; }
+    }
+    *pOutSize = Storm_Sub21780(out, *pOutSize, in, 2, shift, inBytes);
 }

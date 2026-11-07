@@ -16,15 +16,15 @@ void z28_Unwind_41A5A(uint32_t* ebp) { z28_vec(ebp, 0x130); }
 void z28_Unwind_41A72(uint32_t* ebp) { z28_vec(ebp, 0x160); }
 // 1.13c Storm+0x41A8A
 void z28_Unwind_41A8A(uint32_t* ebp) { z28_vec(ebp, 400); }
-// 1.13c Storm+0x41AA2
+// superseded by the per-function port file for rva 41AA2
 void z28_Unwind_41AA2(uint32_t* ebp) { z28_Storm_53C0(z28_obj(ebp) + 0x1c0); }
-// 1.13c Storm+0x41AC8
+// superseded by the per-function port file for rva 41AC8
 void z28_Unwind_41AC8(uint32_t* ebp) { z28_Storm_4B80((uint32_t*)(uintptr_t)ebp[1]); }
-// 1.13c Storm+0x41AD2
+// superseded by the per-function port file for rva 41AD2
 void z28_Unwind_41AD2(uint32_t* ebp) { z28_vec(ebp, 0x130); }
-// 1.13c Storm+0x41AEA
+// superseded by the per-function port file for rva 41AEA
 void z28_Unwind_41AEA(uint32_t* ebp) { z28_vec(ebp, 0x160); }
-// 1.13c Storm+0x41B02
+// superseded by the per-function port file for rva 41B02
 void z28_Unwind_41B02(uint32_t* ebp) { z28_vec(ebp, 400); }
-// 1.13c Storm+0x41B1A
+// superseded by the per-function port file for rva 41B1A
 void z28_Unwind_41B1A() { z28_Storm_4C20(); }

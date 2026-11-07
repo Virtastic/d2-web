@@ -16,7 +16,7 @@ namespace stormhk {
 inline uint32_t tagRva(const char* s) {
     if (!s) return 0;
     static const struct { const char* k; uint32_t rva; } t[] = {
-        { "delete", 0x46838 }, { "STRANS.CPP", 0x46A04 }, { "SEVT.CPP", 0x46A28 }, { "SCMD.CPP", 0x47130 }, { "SNET.CPP", 0x47AB0 }, { ".I", 0x41C80 }, { ".E", 0x41C74 }, { ".D", 0x41C68 }, { "AUTRANS", 0x515D0 }, { "AUWNDREC", 0x51B70 }, { "SCODE.CPP", 0x46908 }, { "SBMP.CPP", 0x46AB0 }, { "SFILE.CPP", 0x470F4 }, { "AUINST", 0x515A4 }, { "AUBREAKCMD", 0x51B58 },
+        { "delete", 0x46838 }, { "STRANS.CPP", 0x46A04 }, { "SEVT.CPP", 0x46A28 }, { "SCMD.CPP", 0x47130 }, { "SNET.CPP", 0x47AB0 }, { ".I", 0x51C80 }, { ".E", 0x51C74 }, { ".D", 0x51C68 }, { "AUTRANS", 0x515D0 }, { "AUWNDREC", 0x51B70 }, { "SCODE.CPP", 0x46908 }, { "SBMP.CPP", 0x46AB0 }, { "SFILE.CPP", 0x470F4 }, { "AUINST", 0x515A4 }, { "AUBREAKCMD", 0x51B58 },
         { "AU_FOUNDPARAM", 0x51BF4 }, { "AURECTF", 0x51C10 }, { "AU_SOURCE", 0x51C24 }, { "AURGN", 0x51C3C },
         { "AUAUDIOSTREAM", 0x51C8C }, { "AUCMDDEF", 0x51D0C }, { "AUVIDEOREC", 0x51D24 }, { "AUBITMAPREC", 0x51D54 }, { "AUSGDIOBJ", 0x51D74 }, { "AU_PLAYERNAME", 0x51DA4 }, { "AUMESSAGE", 0x51DF4 },
         { "AV_TSHashObjectChunk_URGN_VH", 0x51B88 },

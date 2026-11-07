@@ -12,6 +12,11 @@ struct Ctx {
     void (*free)(void* p, const char* file, int32_t line){};           // 0x1B960
     void (*reportError)(void* errCb, uint32_t code, uint32_t ebx){};    // 0x24CD0 (EDI = code, EBX = the caller's string address, stack = errCb)
     uint32_t (*lastError)(){};
+    // Win32 file seams (CreateFileA 0x80000000/share 1/OPEN_EXISTING, GetFileSize, ReadFile, CloseHandle at the Storm IAT); null = the host's stdio
+    intptr_t (*fileOpen)(const char* path){};
+    uint32_t (*fileSize)(intptr_t h){};
+    void (*fileRead)(intptr_t h, void* buf, uint32_t n, uint32_t* got){};
+    void (*fileClose)(intptr_t h){};
     int (*parse)(Ctx&, char** cursor, int32_t* st, uint32_t* a, void* b, void* errCb){}; // 0x257F0
     uint32_t (*callCb)(uint32_t cb, const uint32_t* args, uint32_t n){}; // net callback
     uint32_t (*callOpt)(uint32_t cb, const uint32_t* frame, const char* str){}; // rec+0x34 option callback (stdcall: &frame[7], str)
