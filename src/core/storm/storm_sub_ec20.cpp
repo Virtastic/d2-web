@@ -14,7 +14,7 @@ struct StormExplodeEnv {
 static inline uint32_t& W(uint8_t* s, uint32_t o) { return *(uint32_t*)(s + o); }
 // 1.13c Storm+0x0EC20: returns 0 ok, 1 bad dict size, 2 bad type, 3 short input, 4 EDA0==0x306.
 extern "C" uint8_t Storm_SubEC20(StormExplodeEnv& e, uint32_t cbLo, uint32_t cbHi, uint8_t* st, void* user) {
-  e.user = user; W(st, 0x28) = cbLo; W(st, 0x2c) = cbHi; W(st, 0x24) = 0;
+  e.user = user; W(st, 0x28) = cbLo; W(st, 0x2c) = cbHi; W(st, 0x24) = (uint32_t)(uintptr_t)user;
   uint32_t sz = 0x800; W(st, 0x1c) = sz;
   uint32_t n = e.read(st + 0x2234, &sz, e.user); W(st, 0x1c) = sz; W(st, 0x20) = n;
   if (n < 5) return 3;
