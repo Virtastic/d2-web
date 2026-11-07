@@ -4725,6 +4725,18 @@ function drawFrame() {
       hoverFont.drawAnchored(ctx, tip.text, left + 4, bottom - 3);
     }
   }
+  // The belt is chrome under every hover text (retail draws item names over the belt grid), so it goes before them.
+  // The belt is drawn with the HUD row's boxes, not the whole worn record (readBeltHudBoxes above):
+  // `record`/`recordBoxes` carry which Belts.txt row the engine read and how many boxes it has, so a
+  // row can tell a 16-box Girdle from the four-box record a bare character has, and `boxes` is what
+  // was actually laid out.
+  if (beltRenderer && !RENDER_WIRE?.ownsWorld) { const bo = hudOrigin(w, h, 'bottom');   // belt boxes are retail 800x600 coordinates; bottom-centre anchored
+    ctx.save(); ctx.translate(bo.x, bo.y);
+    beltEvidence = { ...beltRenderer.draw(ctx, snapshot.items, (beltPopup.frame(), snapOr('beltShown' + beltPopup.open, beltShownBoxes)), true, beltKeyNames(controlsPanel?.bindings ?? bootControlBindings), beltPopup.open ? { rows: popupRows(readBeltIndex(), readBeltBoxes()?.length) } : null),
+      record: snapOr('beltIndex', readBeltIndex), recordBoxes: snapOr('beltBoxCount', () => readBeltBoxes()?.length ?? 0), origin: { x: bo.x, y: bo.y } };
+    ctx.restore(); }
+  else if (clearScreen) beltEvidence = null;
+  else if (RENDER_WIRE?.ownsWorld && RENDER_WIRE.evidence?.belt) beltEvidence = { ...RENDER_WIRE.evidence.belt, record: snapOr('beltIndex', readBeltIndex), recordBoxes: snapOr('beltBoxCount', () => readBeltBoxes()?.length ?? 0) };
   skillPanelEvidence?.plateDraw?.(ctx); // the skill tree's tooltip over the HUD (D2Win #10110 draws it last)
   // The inventory item hover text goes over every panel (stash, cube, waypoint, ...) and the HUD, uncut at the seam between panels.
   if (inventoryPanelEvidence?.tooltipDraw) { try { inventoryPanelEvidence.tooltip = inventoryPanelEvidence.tooltipDraw(ctx); } catch (error) { inventoryPanelEvidence.tooltip = null; } }
@@ -4783,17 +4795,6 @@ function drawFrame() {
   if (messageLogRenderer && !messageVisible && chat === null && messageLines.length && performance.now() - postedAt < POSTED_MS && !clearScreen) {
     postedEvidence = messageLogRenderer.drawPosted(ctx, w, h, messageLines[messageLines.length - 1], snapshot.act || 1);
   }
-  // The belt is drawn with the HUD row's boxes, not the whole worn record (readBeltHudBoxes above):
-  // `record`/`recordBoxes` carry which Belts.txt row the engine read and how many boxes it has, so a
-  // row can tell a 16-box Girdle from the four-box record a bare character has, and `boxes` is what
-  // was actually laid out.
-  if (beltRenderer && !RENDER_WIRE?.ownsWorld) { const bo = hudOrigin(w, h, 'bottom');   // belt boxes are retail 800x600 coordinates; bottom-centre anchored
-    ctx.save(); ctx.translate(bo.x, bo.y);
-    beltEvidence = { ...beltRenderer.draw(ctx, snapshot.items, (beltPopup.frame(), snapOr('beltShown' + beltPopup.open, beltShownBoxes)), true, beltKeyNames(controlsPanel?.bindings ?? bootControlBindings), beltPopup.open ? { rows: popupRows(readBeltIndex(), readBeltBoxes()?.length) } : null),
-      record: snapOr('beltIndex', readBeltIndex), recordBoxes: snapOr('beltBoxCount', () => readBeltBoxes()?.length ?? 0), origin: { x: bo.x, y: bo.y } };
-    ctx.restore(); }
-  else if (clearScreen) beltEvidence = null;
-  else if (RENDER_WIRE?.ownsWorld && RENDER_WIRE.evidence?.belt) beltEvidence = { ...RENDER_WIRE.evidence.belt, record: snapOr('beltIndex', readBeltIndex), recordBoxes: snapOr('beltBoxCount', () => readBeltBoxes()?.length ?? 0) };
   // The item on the cursor and the world cel are drawn by the pointer layer in render(), after the
   // Esc menu -- the last draw of the frame, which is where retail's own pointer goes.
   if (skillSelectRenderer && session && !clearScreen) { try { skillSelectEvidence = skillSelectRenderer.draw(ctx, w, h, snapOr('skillChoices', readSkillChoices), snapOr('selectedSkills', readSelectedSkills),
