@@ -322,6 +322,48 @@ export async function bncsCreateAccount(transport, protocol, { account, password
   return { result };
 }
 
+const cString = (text) => { const b = new TextEncoder().encode(text); const out = new Uint8Array(b.length + 1); out.set(b); return out; };
+const joinBytes = (...parts) => { const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); let at = 0; for (const p of parts) { out.set(p, at); at += p.length; } return out; };
+
+/**
+ * SID_CHANGEPASSWORD (0x31): { u32 clientToken, u32 serverToken, u8[20] old proof, u8[20] new hash, STRING account }.
+ * The old proof is the LOGONRESPONSE2 proof (the tokens and double hash the engine builds), the new hash the
+ * single hash of the lowercased new password. Resolves to the reply's u32 (0 = changed).
+ */
+export async function bncsChangePassword(transport, protocol, { account, password, newPassword, product = 'D2XP', timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+  const reader = makeReader(transport);
+  transport.send(protocol.bncsSelector());
+  transport.send(protocol.bncsFrame(0x50, protocol.bncsAuthInfo(product)));
+  const authInfo = await readBncsFrame(reader, timeoutMs);
+  if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
+  const logon = protocol.bncsLogon({ clientToken: protocol.tickCount(), serverToken: u32(authInfo.body, 4), account, password });
+  const newHash = bsha1(new TextEncoder().encode(newPassword.toLowerCase()));
+  transport.send(protocol.bncsFrame(0x31, joinBytes(logon.subarray(0, 28), newHash, logon.subarray(28))));
+  const reply = await readBncsFrame(reader, timeoutMs);
+  if (reply.id !== 0x31) throw new Error(`expected CHANGEPASSWORD reply 0x31, got 0x${reply.id.toString(16)}`);
+  return u32(reply.body, 0);
+}
+
+/** SID_RESETPASSWORD (0x5A): { STRING account, STRING email }. Battle.net sends no reply. */
+export async function bncsResetPassword(transport, protocol, { account, email, product = 'D2XP', timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+  const reader = makeReader(transport);
+  transport.send(protocol.bncsSelector());
+  transport.send(protocol.bncsFrame(0x50, protocol.bncsAuthInfo(product)));
+  const authInfo = await readBncsFrame(reader, timeoutMs);
+  if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
+  transport.send(protocol.bncsFrame(0x5a, joinBytes(cString(account), cString(email))));
+}
+
+/** SID_CHANGEEMAIL (0x5B): { STRING account, STRING old email, STRING new email }. No reply. */
+export async function bncsChangeEmail(transport, protocol, { account, oldEmail, newEmail, product = 'D2XP', timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+  const reader = makeReader(transport);
+  transport.send(protocol.bncsSelector());
+  transport.send(protocol.bncsFrame(0x50, protocol.bncsAuthInfo(product)));
+  const authInfo = await readBncsFrame(reader, timeoutMs);
+  if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
+  transport.send(protocol.bncsFrame(0x5b, joinBytes(cString(account), cString(oldEmail), cString(newEmail))));
+}
+
 /**
  * The BNCS login: selector, AUTH_INFO, AUTH_CHECK, LOGONRESPONSE2, QUERYREALMS2, LOGONREALMEX.
  * Returns the challenge the server issued, the realm list it advertised, and the LOGONREALMEX

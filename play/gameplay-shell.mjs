@@ -1802,6 +1802,9 @@ function ensureBnetLoginScreen(server) {
       enterRealmCharacterSelect(characters);
     },
     onCreateAccount: createConfiguredRealmAccount,
+    onChangePassword: (request) => withRealmRequest((m, t, p) => m.bncsChangePassword(t, p, request)),
+    onResetPassword: (request) => withRealmRequest((m, t, p) => m.bncsResetPassword(t, p, request)),
+    onChangeEmail: (request) => withRealmRequest((m, t, p) => m.bncsChangeEmail(t, p, request)),
     onExit: () => leaveRealmLogin() }); }
   catch (error) { bnetLoginError = String(error); }
 }
@@ -1894,6 +1897,24 @@ async function createConfiguredRealmAccount({ account, password }) {
     await bncs.ready();
     protocol = bindEngineProtocol(Module);
     await bncsCreateAccount(bncs, protocol, { account, password });
+  } finally {
+    try { bncs.close(); } catch { /* socket already closed */ }
+    try { protocol?.free(); } catch { /* engine gone */ }
+  }
+}
+// An account request (change password, new password, change email): a connection of its own, closed after.
+async function withRealmRequest(run) {
+  const server = realmFlow?.server;
+  if (!server?.ws) throw new Error('selected region has no browser WebSocket transport');
+  const realm = await import('./assets/realm-client.mjs');
+  try { realmFlow.bncs?.close(); } catch { /* socket already closed */ }
+  realmFlow.bncs = null;
+  const bncs = realm.webSocketTransport(realmServiceUrl(server.ws, 'bncs'));
+  let protocol;
+  try {
+    await bncs.ready();
+    protocol = realm.bindEngineProtocol(Module);
+    return await run(realm, bncs, protocol);
   } finally {
     try { bncs.close(); } catch { /* socket already closed */ }
     try { protocol?.free(); } catch { /* engine gone */ }

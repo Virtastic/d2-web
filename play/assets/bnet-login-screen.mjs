@@ -13,7 +13,9 @@
 // The screens the login screen's buttons open are retail's too, read off the same capture:
 //   - CREATE NEW ACCOUNT (D2Launch+0x17780): account / password / verify, OK validates (D2Launch+0x19880)
 //     and raises D2Launch+0x15090's notice box per rule, or the PLEASE READ screen (D2Launch+0x184D0);
-//   - ACCOUNT SETTINGS (D2Launch+0x10844): the title, three explanations and three buttons.
+//   - ACCOUNT SETTINGS (D2Launch+0x10844): the title, three explanations and three buttons;
+//   - CHANGE PASSWORD (D2Launch+0x15F10, OK +0x1A030), GET NEW PASSWORD (+0x10A40, SEND +0x10F70) and
+//     CHANGE EMAIL (+0x103E5, SEND +0x10D40): four, two and four labelled edit boxes, their rules and notices.
 import { composeTiled, createBlender, createFont, decodeFontTbl, recordTiled, textColourPalette,
   LABEL_TINT, FRONTEND, TITLE_COLUMNS } from './frontend.mjs';
 import { recordDc6, recordPrim } from './drawlist.mjs';
@@ -29,6 +31,7 @@ export const BNET_LOGIN_ASSETS = {
   popup: P + 'PopUpWide.dc6',               // the message box frame, two cels
   noticePopup: P + 'PopUpOK.dc6',           // D2Launch+0x15090's notice box frame, two cels
   noticeButton: P + 'CancelButtonBlank.dc6', // its OK button
+  wideTextbox: P + 'EditTextBoxWide.dc6',   // the email forms' edit frame, two cels
   readBackground: P + 'TermsofUseBckg.dc6',  // the PLEASE READ panel, six cels
   bigFont: F + 'font42.dc6', bigFontTbl: F + 'font42.tbl',
   tinyFont: F + 'fontridiculous.dc6', tinyFontTbl: F + 'fontridiculous.tbl',
@@ -42,7 +45,15 @@ export const BNET_LOGIN_STRINGS = { account: 5224, password: 5225, info: 5205,
   create: 5221, settings: 11108, login: 5288, exit: 5101, ok: 5102, cancel: 5103,
   createInfo: 5223, verify: 10834,
   settingsTitle: 11109, settingsLines: [11110, 11111, 11112], changePassword: 11050, getPassword: 11113, changeEmail: 11115,
-  readTitle: 5227, readBodies: [5228, 5229, 11127] };
+  readTitle: 5227, readBodies: [5228, 5229, 11127],
+  // The three account forms (descriptors D2Launch+0x21310.. and +0x24730..): titles, labels, SEND.
+  changePasswordTitle: 11051, currentPassword: 11052, newPassword: 11053, verifyNewPassword: 11054,
+  getPasswordTitle: 11114, getPasswordInfo: 11103, email: 11095, send: 11062,
+  changeEmailTitle: 11116, changeEmailInfo: 11120, oldEmail: 11117, newEmail: 11118, verifyNewEmail: 11119 };
+
+// The account forms' notices: the change-email refusals (D2Launch+0x10D40), the get-password receipt
+// (+0x10F70) and the connect failure every one of them raises (D2Launch+0x103C0, 0x10A40, 0x10E50).
+export const BNET_ACCOUNT_STRINGS = { emailSame: 11121, emailMismatch: 11122, passwordSent: 11104, disconnected: 5347 };
 
 // The create form's refusals (D2Launch+0x19880), in the order it tests them.
 export const BNET_CREATE_ERROR_STRINGS = { accountShort: 5216, accountLong: 5217, mismatch: 5218, passwordShort: 5219, passwordLong: 5220 };
@@ -87,6 +98,30 @@ export const BNET_LOGIN_LAYOUT = {
       { id: 'get-password', label: 'getPassword', kind: 'login', x: 264, anchorY: 420 },
       { id: 'change-email', label: 'changeEmail', kind: 'login', x: 264, anchorY: 505 },
       { id: 'settings-cancel', label: 'cancel', kind: 'medium', x: 33, anchorY: 572 }] },
+  // The account forms. CHANGE PASSWORD frames are textbox2 cels at x=319 (descriptors D2Launch+0x21310..), the other
+  // two EditTextBoxWide (two cels, 300 wide) at x=248 (+0x247F0..). Per row: the frame's bottom row `frame`,
+  // the label's text row, the edit text's x and row, the characters it takes. A label text row sits 22 above
+  // its box's bottom row, an edit's text 1 below the descriptor row, as on the login form. Titles are Font30
+  // boxes 800 wide whose top is row 261, the explanations Font16 boxes 480 wide at x=158 whose top is row 281.
+  forms: {
+    cpass: { title: 'changePasswordTitle', frameArt: 'textbox', frameX: 319, frameW: 169, labelX: 321, editX: 330, editW: 162,
+      rows: [{ id: 'account', label: 'account', frame: 347, labelY: 318, editY: 343, limit: 16 },
+        { id: 'old', label: 'currentPassword', frame: 401, labelY: 372, editY: 397, limit: 13, mask: true },
+        { id: 'password', label: 'newPassword', frame: 455, labelY: 426, editY: 451, limit: 13, mask: true },
+        { id: 'verify', label: 'verifyNewPassword', frame: 509, labelY: 480, editY: 505, limit: 13, mask: true }],
+      buttons: [{ id: 'cpass-ok', label: 'ok', kind: 'medium', x: 627, anchorY: 572 }, { id: 'cpass-exit', label: 'exit', kind: 'medium', x: 33, anchorY: 572 }] },
+    gpass: { title: 'getPasswordTitle', info: 'getPasswordInfo', frameArt: 'wideTextbox', frameX: 248, frameW: 300, labelX: 250, editX: 259, editW: 293,
+      rows: [{ id: 'account', label: 'account', frame: 427, labelY: 398, editY: 423, limit: 16 },
+        { id: 'email', label: 'email', frame: 477, labelY: 448, editY: 473, limit: 255 }],
+      buttons: [{ id: 'gpass-ok', label: 'send', kind: 'medium', x: 627, anchorY: 572 }, { id: 'gpass-cancel', label: 'cancel', kind: 'medium', x: 33, anchorY: 572 }] },
+    cemail: { title: 'changeEmailTitle', info: 'changeEmailInfo', frameArt: 'wideTextbox', frameX: 248, frameW: 300, labelX: 250, editX: 259, editW: 293,
+      rows: [{ id: 'account', label: 'account', frame: 402, labelY: 373, editY: 398, limit: 16 },
+        { id: 'oldEmail', label: 'oldEmail', frame: 452, labelY: 423, editY: 448, limit: 255 },
+        { id: 'newEmail', label: 'newEmail', frame: 502, labelY: 473, editY: 498, limit: 255 },
+        { id: 'verifyEmail', label: 'verifyNewEmail', frame: 552, labelY: 523, editY: 548, limit: 255 }],
+      buttons: [{ id: 'cemail-ok', label: 'send', kind: 'medium', x: 627, anchorY: 572 }, { id: 'cemail-cancel', label: 'cancel', kind: 'medium', x: 33, anchorY: 572 }] },
+    title: { top: 261 }, info: { x: 158, width: 480, top: 281 },
+  },
   // D2Launch+0x15090's notice (descriptors D2Launch+0x238C0..0x23920): the PopUpOK frame at
   // (268, 350), OK a CancelButtonBlank at (351, 337) labelled in FontRidiculous, the text a centred
   // Font24 box at x=268 264 wide whose top is row 200; its lines start 8 rows lower and step 19.
@@ -108,6 +143,18 @@ export function createAccountError(account, password, verify) {
   if (password.toLowerCase() !== verify.toLowerCase()) return S.mismatch;
   if (password.length < 2) return S.passwordShort;
   if (password.length > 20) return S.passwordLong;
+  return null;
+}
+
+// D2Launch+0x1A030, CHANGE PASSWORD's OK: the account, then new against verify (case does not count),
+// then the new password's length; the same notices as the create form. A new password is 2..20 long.
+export function changePasswordError(account, password, verify) { return createAccountError(account, password, verify); }
+
+// D2Launch+0x10D40, CHANGE EMAIL's SEND: the two new addresses must match (byte for byte), then differ from the old.
+export function changeEmailError(oldEmail, newEmail, verifyEmail) {
+  const S = BNET_ACCOUNT_STRINGS;
+  if (newEmail !== verifyEmail) return S.emailMismatch;
+  if (oldEmail === newEmail) return S.emailSame;
   return null;
 }
 
@@ -166,7 +213,7 @@ export function loginErrorBody(error, account, string) {
 
 export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, string = () => '', region = '',
   lastAccount = '', now = () => performance.now(), onRemember = () => {}, onAuthenticate = async () => {}, onExit = () => {},
-  onCreateAccount = null, documentObject = globalThis.document }) {
+  onCreateAccount = null, onChangePassword = null, onResetPassword = null, onChangeEmail = null, documentObject = globalThis.document }) {
   const palette = decodeDatPalette(read(FRONTEND.palette));
   const skyPalette = decodeDatPalette(read(FRONTEND.backgroundPalette));
   const skyPl2 = read('data\\global\\palette\\Sky\\pal.pl2');
@@ -185,6 +232,7 @@ export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, strin
   const login = cels(A.loginButton);
   const medium = cels(A.mediumButton);
   const popup = cels(A.popup);
+  const wideTextbox = (() => { let c = null; return () => (c ??= cels(A.wideTextbox)); })();
   // The other screens' art is read on first use, so the login screen costs what it did.
   const lazy = (path) => { let c = null; return () => (c ??= cels(path)); };
   const noticePopup = lazy(A.noticePopup), noticeButton = lazy(A.noticeButton), readBg = lazy(A.readBackground);
@@ -217,17 +265,21 @@ export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, strin
   const sctx = scene.getContext('2d', { willReadFrequently: true });
   const view = (w, h) => { const scale = Math.min(w / 800, h / 600); return { scale, ox: Math.round((w - 800 * scale) / 2), oy: Math.round((h - 600 * scale) / 2) }; };
 
-  const L = BNET_LOGIN_LAYOUT, C = L.create;
-  const S = BNET_LOGIN_STRINGS;
+  const L = BNET_LOGIN_LAYOUT, C = L.create, FORMS = L.forms;
+  const S = BNET_LOGIN_STRINGS, AS = BNET_ACCOUNT_STRINGS;
   const text = (key) => string(S[key]) || '';
-  // The screen on show: 'login' (D2Launch+0x19290), 'create' (+0x17780), 'settings' (+0x10844) or
-  // 'read' (+0x184D0, PLEASE READ). `message` is the login failure box, `notice` D2Launch+0x15090's box.
+  // The screen on show: 'login' (D2Launch+0x19290), 'create' (+0x17780), 'settings' (+0x10844),
+  // 'read' (+0x184D0, PLEASE READ) or an account form: 'cpass' (+0x15F10), 'gpass' (+0x10A40), 'cemail' (+0x103E5).
+  // `message` is the message box (login failure, get-password receipt, email refusals), `notice` D2Launch+0x15090's box;
+  // each carries `then`, what its OK does.
   let mode = 'login';
   // D2Launch+0x19290 fills the account box from the "Last BNet" registry value and then focuses the
   // password; LOG IN writes that value before it connects (D2Launch+0x19FE5), so a failed attempt's
   // account is back in the box when OK rebuilds the screen.
   let account = '', password = '', verify = '', focus = 'account', busy = false, message = null, notice = null;
-  const init = () => { mode = 'login'; notice = null; account = String(lastAccount ?? '').slice(0, L.limits.account); password = ''; verify = ''; focus = account ? 'password' : 'account'; };
+  // The account forms' boxes by id (the account box is `account` on every screen).
+  let fv = {};
+  const init = () => { mode = 'login'; notice = null; message = null; fv = {}; account = String(lastAccount ?? '').slice(0, L.limits.account); password = ''; verify = ''; focus = account ? 'password' : 'account'; };
   init();
   // D2Launch+0x11950 keeps the typed account and password in the launcher's state (+0x89, +0xA1) as
   // CREATE NEW ACCOUNT leaves the login screen and again on the create form's OK; D2Launch+0x17780
@@ -238,6 +290,15 @@ export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, strin
     account = saved.account.slice(0, C.limits.account); password = saved.password.slice(0, C.limits.password); verify = '';
     focus = !account ? 'account' : !password ? 'password' : 'verify';
   };
+  // D2Launch+0x15F10, +0x10A40, +0x103E5: the account box from the launcher's saved account, the others empty;
+  // CHANGE PASSWORD focuses the current password when the account is filled, the others always the account box.
+  const openForm = (m) => {
+    mode = m; notice = null; message = null;
+    fv = { account: saved.account.slice(0, FORMS[m].rows[0].limit) };
+    focus = m === 'cpass' && fv.account ? 'old' : 'account';
+  };
+  // D2Launch+0x10820: the settings screen again.
+  const openSettings = () => { mode = 'settings'; notice = null; message = null; };
   let pressed = null, pointer = [799, 599], tick = 0;
 
   // One cel at its retail anchor (left x, bottom row y).
@@ -268,12 +329,13 @@ export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, strin
   const buttonWidth = (b) => (b.kind === 'medium' ? 128 : b.kind === 'notice' ? L.notice.ok.w : 272);
   const buttonHeight = (b) => (b.kind === 'notice' ? L.notice.ok.h : 35);
   const button = (b) => ({ ...b, y: b.anchorY - buttonHeight(b) + 1, w: buttonWidth(b), h: buttonHeight(b) });
-  const field = (id, anchorY) => ({ id: `field-${id}`, kind: 'field', x: L.boxes.x, y: anchorY - 25, w: 169, h: 26 });
+  const field = (id, anchorY, x = L.boxes.x, w = 169) => ({ id: `field-${id}`, kind: 'field', x, y: anchorY - 25, w, h: 26 });
   const boxes = () => {
     if (message) return [{ id: 'ok', kind: 'medium', x: L.box.ok.x, y: L.box.ok.anchorY - 34, w: 128, h: 35 }];
     if (notice) return [button({ id: 'notice-ok', kind: 'notice', x: L.notice.ok.x, anchorY: L.notice.ok.anchorY })];
     if (mode === 'create') return [...C.buttons.map(button), ...['account', 'password', 'verify'].map((id) => field(id, C.boxes[id]))];
     if (mode === 'settings') return L.settings.buttons.map(button);
+    if (FORMS[mode]) { const F = FORMS[mode]; return [...F.buttons.map(button), ...F.rows.map((r) => field(r.id, r.frame, F.frameX, F.frameW))]; }
     if (mode === 'read') return L.read.buttons.map(button);
     return [...L.buttons.map((b) => ({ id: b.id, kind: b.kind, x: b.x, y: b.anchorY - 34, w: buttonWidth(b), h: 35 })),
       field('account', L.boxes.account), field('password', L.boxes.password)];
@@ -309,11 +371,61 @@ export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, strin
     busy = true;
     try { await onCreateAccount(credentials); } catch (error) { fail(error); } finally { busy = false; }
   };
+  // A request that never reached the realm: D2Launch's connect failure notice (+0x10E50, string 5347), whose
+  // OK (+0x17DF0) drops the connection and builds the login screen.
+  const disconnected = () => { notice = { body: string(AS.disconnected) || '', then: init }; };
+  const send = async (request) => {
+    busy = true;
+    try { return { value: await request() }; } catch { disconnected(); return null; } finally { busy = false; }
+  };
+  // D2Launch+0x1A030: keep the typed account, test the rules, then ask Battle.net (BNCS CHANGEPASSWORD). A notice's
+  // OK rebuilds the form (+0x15F10). The accepted change continues as a log on with the new password.
+  const changePasswordOk = async () => {
+    saved.account = fv.account ?? '';
+    const error = changePasswordError(fv.account ?? '', fv.password ?? '', fv.verify ?? '');
+    if (error !== null) { notice = { body: string(error) || '', then: () => openForm('cpass') }; return; }
+    const request = { account: fv.account, password: fv.old ?? '', newPassword: fv.password };
+    if (!onChangePassword) { fail(new Error('this realm does not change passwords')); return; }
+    const sent = await send(() => onChangePassword(request));
+    if (sent === null) return;
+    const result = sent.value;
+    if (result !== 0 && result !== true) {
+      // NOT retail: the text of Battle.net's refusal is raised by a Bnclient event this client has not recovered;
+      // the login failure box with its wrong password text stands in, and its OK rebuilds the form.
+      message = { title: string(BNET_LOGIN_ERROR_STRINGS.title) || '', body: string(BNET_LOGIN_ERROR_STRINGS.password) || '', then: () => openForm('cpass') };
+      return;
+    }
+    // Retail follows the accepted change straight into its log on (D2Launch+0x19FA0).
+    account = request.account; password = request.newPassword; verify = ''; lastAccount = account; onRemember(account);
+    init(); account = request.account; focus = 'password';
+    busy = true;
+    try { await onAuthenticate({ account: request.account, password: request.newPassword }); }
+    catch (error) { fail(error); } finally { busy = false; }
+  };
+  // D2Launch+0x10F70: SEND asks for a new password (BNCS RESETPASSWORD) and shows the receipt (11104), whose OK
+  // builds the login screen.
+  const getPasswordOk = async () => {
+    saved.account = fv.account ?? '';
+    const request = { account: fv.account ?? '', email: fv.email ?? '' };
+    if (!onResetPassword) { fail(new Error('this realm does not reset passwords')); return; }
+    if ((await send(() => onResetPassword(request))) === null) return;
+    message = { title: '', body: string(AS.passwordSent) || '', then: init };
+  };
+  // D2Launch+0x10D40: SEND tests the two rules (popups 11122, 11121, whose OK rebuilds the form with the saved
+  // account), then asks Battle.net (BNCS CHANGEEMAIL) and builds the login screen.
+  const changeEmailOk = async () => {
+    const error = changeEmailError(fv.oldEmail ?? '', fv.newEmail ?? '', fv.verifyEmail ?? '');
+    if (error !== null) { message = { title: '', body: string(error) || '', then: () => openForm('cemail') }; return; }
+    const request = { account: fv.account ?? '', oldEmail: fv.oldEmail ?? '', newEmail: fv.newEmail };
+    if (!onChangeEmail) { fail(new Error('this realm does not change emails')); return; }
+    if ((await send(() => onChangeEmail(request))) === null) return;
+    init();
+  };
   const activate = (b) => {
     if (busy) return;
     // OK closes the box and its callback (D2Launch+0x19290) builds the login screen afresh.
-    if (b.id === 'ok') { message = null; init(); return; }
-    if (b.id === 'notice-ok') { openCreate(); return; }
+    if (b.id === 'ok') { const next = message.then ?? init; message = null; next(); return; }
+    if (b.id === 'notice-ok') { const next = notice.then ?? openCreate; notice = null; next(); return; }
     if (b.id.startsWith('field-')) { focus = b.id.slice(6); return; }
     if (b.id === 'login') { void submit(); return; }
     if (b.id === 'exit') { onExit(); return; }
@@ -322,11 +434,19 @@ export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, strin
     // text a file Battle.net sends); its AGREE (D2Launch+0x18E00) is what opens the form.
     if (b.id === 'create') { saved.account = account; saved.password = password; openCreate(); return; }
     if (b.id === 'create-ok') { createOk(); return; }
-    if (b.id === 'settings') { mode = 'settings'; return; }
+    // D2Launch+0x11950 keeps the typed account as the launcher leaves the login screen.
+    if (b.id === 'settings') { saved.account = account; saved.password = password; openSettings(); return; }
+    if (b.id === 'change-password') { openForm('cpass'); return; }
+    if (b.id === 'get-password') { openForm('gpass'); return; }
+    if (b.id === 'change-email') { openForm('cemail'); return; }
+    // The forms' EXIT and CANCEL (D2Launch+0x186F0, +0x10A30, +0x10D30) all run +0x10820: the settings screen.
+    if (b.id === 'cpass-exit' || b.id === 'gpass-cancel' || b.id === 'cemail-cancel') { openSettings(); return; }
+    if (b.id === 'cpass-ok') { void changePasswordOk(); return; }
+    if (b.id === 'gpass-ok') { void getPasswordOk(); return; }
+    if (b.id === 'cemail-ok') { void changeEmailOk(); return; }
     // EXIT, CANCEL and PLEASE READ's CANCEL all rebuild the login screen (D2Launch+0x19290).
     if (b.id === 'create-exit' || b.id === 'settings-cancel' || b.id === 'read-cancel') { init(); return; }
     if (b.id === 'read-ok') { void readOk(); return; }
-    // CHANGE PASSWORD, GET NEW PASSWORD and CHANGE EMAIL open retail forms this client does not draw yet.
   };
 
   // A D2Win button: its cels, then its label centred over the whole button width (Exocet10, or
@@ -375,11 +495,13 @@ export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, strin
   };
   // Each edit box draws its text, then (the focused one, while GetTickCount / 250 is odd) its "_"
   // caret after the text before the caret (D2Win+0x14D6F). The caret here is always at the end.
-  const drawEdits = (edits) => {
+  const drawEdits = (edits, x = L.edit.x, width = Infinity) => {
     const caret = Math.floor(clock() / 250) % 2 === 1;
-    for (const [id, shown, y] of edits) {
-      editFont.drawAnchored(sctx, shown, L.edit.x, y);
-      if (caret && focus === id) editFont.drawAnchored(sctx, '_', L.edit.x + editFont.measure(shown), y);
+    for (const [id, full, y] of edits) {
+      let shown = full;
+      while (shown && editFont.measure(shown) > width) shown = shown.slice(1);
+      editFont.drawAnchored(sctx, shown, x, y);
+      if (caret && focus === id) editFont.drawAnchored(sctx, '_', x + editFont.measure(shown), y);
     }
   };
   const drawLoginForm = () => {
@@ -401,6 +523,16 @@ export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, strin
     drawEdits([['account', account, C.edit.account], ['password', '*'.repeat(password.length), C.edit.password], ['verify', '*'.repeat(verify.length), C.edit.verify]]);
     for (const b of C.buttons) drawButton(b);
   };
+  // D2Launch+0x15F10 / +0x10A40 / +0x103E5: frames, labels, the title box and the info text, then the boxes' text.
+  const drawForm = () => {
+    const F = FORMS[mode], art = F.frameArt === 'wideTextbox' ? wideTextbox() : textbox;
+    for (const r of F.rows) drawCel(art, 0, F.frameX, r.frame);
+    for (const r of F.rows) labelText.drawAnchored(sctx, text(r.label), F.labelX, r.labelY);
+    drawCentred(titleText, text(F.title), 0, 800, FORMS.title.top, titleText.lineHeight);
+    if (F.info) drawCentred(infoText, text(F.info), FORMS.info.x, FORMS.info.width, FORMS.info.top, 14);
+    drawEdits(F.rows.map((r) => [r.id, r.mask ? '*'.repeat((fv[r.id] ?? '').length) : fv[r.id] ?? '', r.editY]), F.editX, F.editW);
+    for (const b of F.buttons) drawButton(b);
+  };
   const drawSettings = () => {
     const T = L.settings;
     drawCentred(titleText, text('settingsTitle'), 0, 800, T.titleTop, titleText.lineHeight);
@@ -416,22 +548,25 @@ export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, strin
     S.readBodies.forEach((id, i) => drawCentred(editFont, string(id) || '', R.body.x, R.body.width, R.body.tops[i], R.body.step));
   };
 
-  const fields = { account: () => account, password: () => password, verify: () => verify };
-  const limit = (id) => (mode === 'create' ? C.limits[id] : L.limits[id]);
-  const setField = (id, value) => { if (id === 'account') account = value; else if (id === 'password') password = value; else verify = value; };
-  const order = () => (mode === 'create' ? ['account', 'password', 'verify'] : ['account', 'password']);
+  const fieldValue = (id) => (FORMS[mode] ? fv[id] ?? '' : id === 'account' ? account : id === 'password' ? password : verify);
+  const limit = (id) => (FORMS[mode] ? FORMS[mode].rows.find((r) => r.id === id).limit : mode === 'create' ? C.limits[id] : L.limits[id]);
+  const setField = (id, value) => {
+    if (FORMS[mode]) fv[id] = value; else if (id === 'account') account = value; else if (id === 'password') password = value; else verify = value;
+  };
+  const order = () => (FORMS[mode] ? FORMS[mode].rows.map((r) => r.id) : mode === 'create' ? ['account', 'password', 'verify'] : ['account', 'password']);
 
   return {
     get focus() { return focus; },
     get busy() { return busy; },
     get mode() { return mode; },
     get evidence() {
-      return { region, mode, account, passwordLength: password.length, verifyLength: verify.length, focus, busy, message, notice, loginEnabled: enabled(),
+      return { region, mode, form: { ...fv, old: undefined, password: undefined, verify: undefined, oldLength: (fv.old ?? '').length,
+          passwordLength: (fv.password ?? '').length, verifyLength: (fv.verify ?? '').length }, account, passwordLength: password.length, verifyLength: verify.length, focus, busy, message, notice, loginEnabled: enabled(),
         boxes: boxes().map(({ id, x, y, w, h }) => ({ id, x, y, w, h })), cursor: pointer };
     },
     // Raise retail's failure box for a rejected logon (the error carries `logonResult`).
     fail(error) { fail(error); },
-    reset() { message = null; busy = false; pressed = null; init(); },
+    reset() { message = null; notice = null; busy = false; pressed = null; init(); },
     // Typing. Retail's edit box takes printable characters, Backspace, Tab (next box) and Enter
     // (LOG IN on the login form, OK on the create form: its boxes' Enter callback is D2Launch+0x19880).
     typeKey(code, key) {
@@ -444,14 +579,17 @@ export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, strin
       if (code === 'Tab') { focus = ids[(ids.indexOf(focus) + 1) % ids.length]; return true; }
       if (enter) {
         if (mode === 'create') createOk();
+        else if (mode === 'cpass') void changePasswordOk();
+        else if (mode === 'gpass') void getPasswordOk();
+        else if (mode === 'cemail') void changeEmailOk();
         else if (focus === 'account' && !password) focus = 'password'; else void submit();
         return true;
       }
-      if (code === 'Backspace') { setField(focus, fields[focus]().slice(0, -1)); return true; }
+      if (code === 'Backspace') { setField(focus, fieldValue(focus).slice(0, -1)); return true; }
       if (!key || key.length !== 1) return false;
-      if (fields[focus]().length >= limit(focus)) return true;
-      if (focus === 'account') { if (accountCharAllowed(key)) account += key; return true; }
-      if (key >= ' ' && key < '\x7f') setField(focus, fields[focus]() + key);
+      if (fieldValue(focus).length >= limit(focus)) return true;
+      if (focus === 'account') { if (accountCharAllowed(key)) setField('account', fieldValue('account') + key); return true; }
+      if (key >= ' ' && key < '\x7f') setField(focus, fieldValue(focus) + key);
       return true;
     },
     targets(w, h) { const v = view(w, h); return Object.fromEntries(boxes().map((b) => [b.id, [Math.round(v.ox + (b.x + b.w / 2) * v.scale), Math.round(v.oy + (b.y + b.h / 2) * v.scale)]])); },
@@ -466,6 +604,7 @@ export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, strin
       if (message) activate({ id: 'ok' });
       else if (notice) activate({ id: 'notice-ok' });
       else if (mode === 'login') onExit();
+      else if (FORMS[mode]) openSettings();
       else init();
     },
     step() { tick++; },
@@ -481,6 +620,7 @@ export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, strin
       drawBg(sctx, bg.path, bg.canvas); recordTiled(bg.path, bg, 0, 0);
       if (mode !== 'read') drawLogos();
       if (mode === 'create') drawCreateForm();
+      else if (FORMS[mode]) drawForm();
       else if (mode === 'settings') drawSettings();
       else if (mode === 'read') drawRead();
       else drawLoginForm();
