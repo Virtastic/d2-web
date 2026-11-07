@@ -145,6 +145,14 @@ export function controlActionForKey(bindings, code) {
   return null;
 }
 
+/** The physical key code a retail function is bound to (primary, else secondary), null when unbound. A pad
+ *  presses the key the player's own table names, so a rebound function stays reachable from the controller. */
+export function controlCodeForAction(bindings, action) {
+  const slot = CONFIGURE_CONTROLS_SLOTS.findIndex((e) => e && e[0] === action);
+  const name = slot < 0 ? null : bindings?.[slot]?.find((k) => k);
+  return keyCodes.find(([, n]) => n === name)?.[0] ?? null;
+}
+
 /** The key name bound to each Use Belt 1-4 slot (primary, else secondary), null when unbound: the belt's hotkey labels. */
 export function beltKeyNames(bindings) {
   return [1, 2, 3, 4].map((n) => {

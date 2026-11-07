@@ -157,6 +157,48 @@ function composedFor(t, pal) {
   if (!c || c.pal !== pal) { const tab = new Uint32Array(t.length); for (let k = 0; k < tab.length; k++) tab[k] = pal[t[k]]; litComposed.set(t, c = { pal, tab }); }
   return c.tab;
 }
+// PERF (handheld): a lit floor's pixels as row runs -- [row, column, length] triples and the run pixels packed in
+// order -- so the floor pass can copy them into one frame buffer instead of one drawImage per tile. Null when any
+// pixel is neither transparent nor opaque: source-over of a partial alpha is the canvas's to compute, not ours.
+export function opaqueRuns(px32, w, h) {
+  let runs = 0, count = 0;
+  for (let y = 0, q = 0; y < h; y++) for (let x = 0, open = false; x < w; x++, q++) {
+    const a = px32[q] >>> 24; if (a !== 0 && a !== 255) return null;
+    if (a) { count++; if (!open) { runs++; open = true; } } else open = false;
+  }
+  const r = new Int32Array(runs * 3), pix = new Uint32Array(count);
+  for (let y = 0, q = 0, k = 0, p = 0; y < h; y++) for (let x = 0; x < w; x++, q++) {
+    if (!(px32[q] >>> 24)) continue;
+    if (x === 0 || !(px32[q - 1] >>> 24)) { r[k] = y; r[k + 1] = x; r[k + 2] = 0; k += 3; }
+    r[k - 1]++; pix[p++] = px32[q];
+  }
+  // One view per run, made here once: a subarray per run per frame was ~10k short-lived objects a frame (GC tails).
+  const views = new Array(runs);
+  for (let j = 0, s = 0; j < runs; j++) { views[j] = pix.subarray(s, s + r[j * 3 + 2]); s += r[j * 3 + 2]; }
+  return { runs: r, pix, views };
+}
+// Floors over an opaque backdrop through one putImageData: every pixel is the backdrop or the LAST floor whose opaque
+// run covers it, which is what fillRect(backdrop) + source-over drawImage of each binary-alpha floor in order leaves.
+let floorImage = null;
+export function composeFloors(ctx, width, height, backdrop, items) {
+  if (floorImage?.width !== width || floorImage.height !== height) floorImage = new ImageData(width, height);
+  const u = new Uint32Array(floorImage.data.buffer); u.fill(backdrop);
+  for (const { r, x, y } of items) {
+    const R = r.runs, P = r.pix, V = r.views;
+    for (let k = 0, j = 0, s = 0; k < R.length; k += 3, j++) {
+      const dy = y + R[k], len = R[k + 2], a0 = s; s += len;
+      if (dy < 0 || dy >= height) continue;
+      let dx = x + R[k + 1], a = a0, n = len;
+      // A memcpy per run (TypedArray.set), ~3x a JS element loop on the handheld; only a run the canvas edge cuts
+      // needs a new view.
+      if (dx >= 0 && dx + n <= width) { u.set(V[j], dy * width + dx); continue; }
+      if (dx < 0) { a -= dx; n += dx; dx = 0; }
+      if (dx + n > width) n = width - dx;
+      if (n > 0) u.set(P.subarray(a, a + n), dy * width + dx);
+    }
+  }
+  ctx.putImageData(floorImage, 0, 0);
+}
 const litBase = new WeakMap();
 export function litFloorPixels(px, blocks, grid, t, pal, tileX, tileY, out) {
   const ltab = composedFor(t, pal);
@@ -596,6 +638,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     // PERF (perf-deep2): the 2d context is kept on the pooled canvas and the ImageData over the scratch is reused per size (it wraps litScratch, whose bytes are rewritten each miss).
     if (litImage?.data.buffer !== px32.buffer || litImage.width !== px.width || litImage.height !== px.height) litImage = new ImageData(rgba, px.width, px.height);
     (canvas.d2ctx ||= canvas.getContext('2d')).putImageData(litImage, 0, 0);
+    canvas.d2runs = opaqueRuns(px32, px.width, px.height);   // the same pixels as row runs, for composeFloors
     perfT('lit-floor-put', pPut);
     if (key !== null) litCache.set(key, canvas); else { inner.set(keyBase, canvas); litFloorEntries++; litEvict(); }
     return canvas;
@@ -684,6 +727,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   // gone. `lightGridKeyed` is false for any caller that does not hand over the map (the roof pass's own
   // grids, a test grid), which then takes the old path verbatim.
   let lightGridSource = null, lightGridKeyed = false, gridGen = 0;
+  let floorBackdrop = null;   // setBackdrop
   const grids = new Map();   // worldSubtileX -> Map(worldSubtileY -> { gen, grid, key })
   function gridFor(a, b) {
     let byB = grids.get(a);
@@ -836,6 +880,9 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     // Decode one DT1 library ahead of the level that wants it (area-prefetch, one per tick): library() is keyed by path and
     // pure, so the later level finds the identical entry already built instead of decoding it inside its first frame.
     preload(path) { library(0, [path]); },
+    // The caller has just filled the whole canvas with this opaque colour (packed RGBA word, as ImageData reads it),
+    // or null. Only then may the floor pass write the frame with putImageData (composeFloors).
+    setBackdrop(word) { floorBackdrop = word; },
     /**
      * Light floors from a grid source: fn(a, b) -> 36 intensities or null.
      * `source` is readSessionLightmap's result when fn is that map's own grid; it is compared
@@ -1016,7 +1063,17 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       // stay on THIS pass -- their 800-px art runs beneath the neighbouring ground and drawing them in
       // the wall pass painted a vertical band over the Bloody Foothills' ground (F31) -- so only their
       // pixels change, never their order.
-      for (const l of walls.filter(isLower).sort((a, b) => (a.depth - b.depth) || (a.ordinal - b.ordinal))) {
+      const lowers = walls.filter(isLower);
+      // PERF (handheld): with the canvas just filled opaque and nothing on it yet, the floors are copied into one
+      // frame buffer and written with a single putImageData -- the pixels fillRect + one drawImage per floor leave,
+      // without ~100 software blits of mostly transparent 160x80 rectangles. Any floor without runs (unlit, partial
+      // alpha) or any non-default canvas state takes the drawImage path, from the first floor not yet painted.
+      const m = floorBackdrop !== null && !lowers.length && ctx.canvas?.width === width && ctx.canvas.height === height
+        && typeof ctx.putImageData === 'function' && typeof ctx.getTransform === 'function' && ctx.getTransform();
+      const pending = m && m.isIdentity && ctx.globalAlpha === 1 && ctx.globalCompositeOperation === 'source-over'
+        && (ctx.filter === undefined || ctx.filter === 'none') && !ctx.shadowBlur && !ctx.shadowOffsetX && !ctx.shadowOffsetY ? [] : null;
+      let fast = pending !== null;
+      for (const l of lowers.sort((a, b) => (a.depth - b.depth) || (a.ordinal - b.ordinal))) {
         const E = wallEntries(l.tile, l.dt1Tile);
         // Off unless globalThis.__d2TraceLower is an array: a lower wall (o16-19) is a lit `wall`
         // record like the wall pass's, so a pixel attributed to one needs the same six light entries
@@ -1040,8 +1097,14 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         // and the 8x8 light grid it was lit from, so a row can recompute the LEVEL litFloor gave a
         // pixel (F96: our floor level is 1-2 above retail's on the frame's left edge). s448 reads it.
         if (globalThis.__d2TraceBlits) globalThis.__d2TraceBlits.push({ x: f.x, y: f.y, path: files[f.slot], want: f.want, variantNo: f.variantNo, dt1Tile: f.dt1Tile, grid, a, b, seam: Boolean(f.tile.seam) });
-        ctx.drawImage(lit || cv(f.bitmap), f.x, f.y); drawn++; recordTile(f, files);
+        if (fast && lit?.d2runs) pending.push({ r: lit.d2runs, x: f.x, y: f.y, c: lit });
+        else {
+          if (fast) { fast = false; for (const p of pending) ctx.drawImage(p.c, p.x, p.y); }
+          ctx.drawImage(lit || cv(f.bitmap), f.x, f.y);
+        }
+        drawn++; recordTile(f, files);
       }
+      if (fast && pending.length) composeFloors(ctx, width, height, floorBackdrop, pending);
       if (afterFloors) afterFloors(ctx, floors, { width, height, offsetX, offsetY });
       perfT('terrain-floor', pFloor);
 

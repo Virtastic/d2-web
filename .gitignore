@@ -263,6 +263,8 @@ test/*
 !test/hud-bar-tooltip.test.mjs
 !test/hud-help-hover.test.mjs
 !test/indexed-rgba-palette-cache.test.mjs
+!test/input-controller-field-navigation.test.mjs
+!test/input-controller.test.mjs
 !test/inventory-close-gesture.test.mjs
 !test/inventory-gold-gesture.test.mjs
 !test/inventory-hover-desc.test.mjs
@@ -406,3 +408,13 @@ test/stub/Windows.h
 # The BYO 1.13c patch shim (tools/patch-shim.mjs): Blizzard bytes, generated at stage time, never committed
 patch-113c.patch
 reference/
+!test/pad-fixture.mjs
+!test/pad-layout.test.mjs
+!test/pad-panels.test.mjs
+!test/pad-menus.test.mjs
+!test/pad-targeting.test.mjs
+!test/pad-hold-target.test.mjs
+!test/pad-hold-stat.test.mjs
+!test/pad-settings.test.mjs
+!test/pad-gold.test.mjs
+!test/pad-inventory.test.mjs

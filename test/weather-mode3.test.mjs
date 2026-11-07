@@ -94,7 +94,7 @@ test('production weather draw blends each ripple against its existing canvas und
     if (key.endsWith('rain3.dc6') || key.endsWith('rain4.dc6')) return dc6;
     throw new Error(`unexpected weather fixture asset ${path}`);
   };
-  const renderer = createWeatherRenderer({ read });
+  const renderer = createWeatherRenderer({ read, rippleOffset: () => ({ dx: 0, dy: 0 }) });
   renderer.setLevel(1, 0);
   const ctx = onePixelContext(underlay);
   const blits = renderer.draw(ctx, 2, 64, 0, 0, 0, [{ x: 0, y: 0, sx: 0, sy: -24 }]);
@@ -130,7 +130,7 @@ test('ripple submission uses native vertical anchor bounds before cel offsets', 
   }
   const dat = new Uint8Array(768), pl2 = new Uint8Array(PL2_MULTIPLICATIVE + 65536);
   const drawAt = (y, height = 600) => {
-    const renderer = createWeatherRenderer({ read(path) {
+    const renderer = createWeatherRenderer({ rippleOffset: () => ({ dx: 0, dy: 0 }), read(path) {
       return path.endsWith('pal.dat') ? dat : path.endsWith('pal.pl2') ? pl2 : dc6;
     } });
     renderer.setLevel(1, 0);
