@@ -157,7 +157,7 @@ const labelRise = (h) => (h >= 35 ? 4 : h === 32 ? 3 : h > 20 ? 2 : 1);
 
 export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, string = () => '', character = {},
   now = () => performance.now(), registryDifficulty = 0, onCreateGame = async () => {}, onJoinGame = async () => {},
-  onQuit = () => {}, documentObject = globalThis.document }) {
+  onQuit = () => {}, onEnterChat = () => {}, onSendChat = () => false, documentObject = globalThis.document }) {
   const A = BNET_LOBBY_ASSETS, L = BNET_LOBBY_LAYOUT, S = BNET_LOBBY_STRINGS;
   const palette = decodeDatPalette(read(FRONTEND.palette));
   const skyPalette = decodeDatPalette(read(FRONTEND.backgroundPalette));
@@ -213,7 +213,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   // 'lobby' (the first view after character select) or 'chat'; `panel` is null, 'create' or 'join'.
   let mode = 'lobby', panel = null, notice = null, busy = false;
   let pressed = null, pointer = [799, 599];
-  const chat = { lines: [], input: '' };
+  const chat = { lines: [], input: '', live: false };
   const form = { name: '', password: '', description: '', maxPlayers: '4', levelDifference: '', levelLimit: false, difficulty: 0, focus: 'name' };
   let created = now(), pinned = null;
   const clock = () => (pinned === null ? now() : pinned);
@@ -286,7 +286,9 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     if (id === 'create') { if (panel === 'create') closePanel(); else openCreate(); return; }
     if (id === 'join') { if (panel === 'join') closePanel(); else openJoin(); return; }
     if (id === 'panel-cancel') { closePanel(); return; }
-    if (id === 'enter-chat') { mode = 'chat'; return; }
+    if (id === 'enter-chat') { mode = 'chat'; onEnterChat(); return; }
+    if (id === 'whisper') { chat.input = '/w '; return; }
+    if (id === 'emote') { chat.input = '/me '; return; }
     if (id === 'send') { sendChat(); return; }
     if (id === 'create-game') { createGame(); return; }
     if (id === 'join-game') { joinGame(); return; }
@@ -299,10 +301,13 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     // CHANNEL, LADDER, HELP, WHISPER, SQUELCH, UNSQUELCH, EMOTE and the scroll arrows open retail
     // panels and commands that need the Battle.net chat connection, which this client does not hold.
   };
-  // NOT retail: the line is echoed into the log only; the chat channel is not joined over BNCS.
+  // A line goes out as CHATCOMMAND on the open BNCS socket; the server's TALK event brings it back
+  // into the log. With no chat connection the line is only echoed here.
   const sendChat = () => {
     const line = chat.input.trim(); chat.input = '';
-    if (line) chat.lines.push({ text: `<${character.name ?? ''}> ${line}`, colour: 0 });
+    if (!line) return;
+    if (chat.live && onSendChat(line)) return;
+    chat.lines.push({ text: `<${character.name ?? ''}> ${line}`, colour: 0 });
   };
 
   // One cel at its anchor (left x, bottom row y); D2Win draws a disabled control 50% translucent.
@@ -411,6 +416,8 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
         boxes: controls().map((b) => ({ id: b.id, ...box(b), disabled: disabled(b) })), cursor: pointer };
     },
     // A failed create/join that kept the session: retail's notice over the lobby.
+    chatLine(line) { chat.lines.push(line); if (chat.lines.length > 200) chat.lines.shift(); },
+    chatLive(on) { chat.live = Boolean(on); },
     fail(error) { notice = { body: gameErrorText(error, string) }; busy = false; },
     typeKey(code, key) {
       if (busy) return true;
@@ -428,7 +435,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
         return true;
       }
       // ENTER CHAT's key is Enter (descriptor D2Multi+0x1A060, key 13).
-      if (mode === 'lobby') { if (enter) { mode = 'chat'; return true; } return false; }
+      if (mode === 'lobby') { if (enter) { mode = 'chat'; onEnterChat(); return true; } return false; }
       if (enter) { sendChat(); return true; }
       if (code === 'Backspace') { chat.input = chat.input.slice(0, -1); return true; }
       if (!key || key.length !== 1 || key < ' ') return false;

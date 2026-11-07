@@ -360,7 +360,8 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
     // A plain array, so the value survives the CDP hop a scenario result crosses (a typed array does not).
     startup: [...cat(realmEx.body.subarray(0, 16), realmEx.body.subarray(24, 72))] };
 
-  return { clientToken, serverToken, mpq: new TextDecoder().decode(mpq), challenge, versionResult, logonResult, realmList, handoff, sent, received };
+  // `reader` stays attached to the open socket: retail keeps the BNCS chat connection for the session.
+  return { clientToken, serverToken, mpq: new TextDecoder().decode(mpq), challenge, versionResult, logonResult, realmList, handoff, sent, received, reader };
 }
 
 /**

@@ -98,3 +98,17 @@ test('every view draws: lobby, chat, CREATE, JOIN, notice', () => {
   s.activate('join'); s.draw(ctx, 800, 600);
   s.fail(new Error('x')); s.draw(ctx, 800, 600);
 });
+
+test('chat: typing and Enter go out through the chat socket; the server\'s lines land in the log', () => {
+  const out = []; let entered = 0;
+  const s = screen({ name: 'Ama', charClass: 0, level: 3 }, { onSendChat: (t) => { out.push(t); return true; }, onEnterChat: () => { entered++; } });
+  s.activate('enter-chat'); assert.equal(s.mode, 'chat'); assert.equal(entered, 1);
+  s.typeKey('KeyH', 'h'); s.typeKey('KeyI', 'i'); s.typeKey('Enter');
+  assert.deepEqual(out, []);                       // no live socket yet: echoed locally
+  assert.deepEqual(s.evidence.chat, ['<Ama> hi']);
+  s.chatLive(true);
+  s.typeKey('KeyY', 'y'); s.typeKey('Enter');
+  assert.deepEqual(out, ['y']); assert.deepEqual(s.evidence.chat, ['<Ama> hi']);
+  s.chatLine({ text: '<Bob> yo', colour: 0 }); assert.equal(s.evidence.chat.at(-1), '<Bob> yo');
+  s.activate('whisper'); s.typeKey('KeyB', 'b'); s.typeKey('Enter'); assert.deepEqual(out.at(-1), '/w b');
+});

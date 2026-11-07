@@ -93,6 +93,7 @@ import { sendCharacterPhrase } from './assets/chat-macros.mjs';
 import { createOtherMultiplayerScreen } from './assets/other-multiplayer.mjs';
 import { createBnetLoginScreen } from './assets/bnet-login-screen.mjs';
 import { createBnetLobbyScreen } from './assets/bnet-lobby-screen.mjs';
+import { createBnetChat } from './assets/bnet-chat.mjs';
 import { createBnetConnectingPopup } from './assets/bnet-connecting.mjs';
 import { goldLabel } from './assets/gold-label.mjs';
 import { hoveredLabel, labelItemAt, nearestGroundItem, pickupNeedsWalk } from './item-pick.mjs';
@@ -1628,6 +1629,8 @@ function releaseRealmFlow({ closeTransports = true } = {}) {
   // can be freed. Await its loop before releasing the scratch memory used by Huffman decoding.
   flow.d2gsReceiver?.stop();
   if (closeTransports) {
+    try { flow.chatSession?.close(); } catch { /* already closed */ }
+    try { flow.chat?.transport?.close(); } catch { /* already closed */ }
     try { flow.d2gs?.close(); } catch { /* already closed */ }
     try { flow.mcp?.close(); } catch { /* already closed */ }
   }
@@ -1687,6 +1690,8 @@ function leaveRealmLogin() {
   realmPlayerReassignFade.reset();
   realmWorldView = null;
   try { realmFlow?.bncs?.close(); } catch { /* socket already closed */ }
+  try { realmFlow?.chatSession?.close(); } catch { /* socket already closed */ }
+  try { realmFlow?.chat?.transport?.close(); } catch { /* socket already closed */ }
   void releaseRealmFlow();
   bnetLoginScreen = null; bnetLoginError = ''; realmSelect = false;
   bnetLobbyScreen = null; bnetLobbyError = '';
@@ -1710,6 +1715,18 @@ function enterRealmCharacterSelect(characters) {
 // Retail's Battle.net lobby (D2Multi) for the character picked on the realm character select. A
 // rejected CREATE or JOIN keeps the MCP session and shows retail's notice; any other failure has torn
 // the realm session down, and the player is back on the login screen to log in again.
+// The chat session over the BNCS socket the login kept; null when this realm path holds none.
+function startLobbyChat(name) {
+  const flow = realmFlow;
+  if (!flow?.chat) return null;
+  if (flow.chatSession?.open) return flow.chatSession;
+  flow.chatSession = createBnetChat({ ...flow.chat, character: name, realm: flow.realms?.[0] ?? flow.server?.region ?? '',
+    onLine: (line) => { bnetLobbyScreen?.chatLine(line); render(); },
+    onClose: () => { bnetLobbyScreen?.chatLive(false); } });
+  flow.chatSession.enter();
+  bnetLobbyScreen?.chatLive(true);
+  return flow.chatSession;
+}
 function enterBnetLobby(name) {
   const c = realmCharacters.find((x) => x.name.toLowerCase() === String(name).toLowerCase());
   if (!c) return;
@@ -1728,9 +1745,14 @@ function enterBnetLobby(name) {
       hardcore: (c.flags & 0x04) !== 0, dead: (c.flags & 0x08) !== 0, progression: 0 },
     onCreateGame: (game) => play(game),
     onJoinGame: (game) => play({ ...game, join: true }),
+    // The BNCS chat socket the login left open: ENTERCHAT now (retail names the character on OK), the
+    // channel join when ENTER CHAT is pressed, lines in and out through the lobby's chat log.
+    onEnterChat: () => { startLobbyChat(c.name)?.join(); },
+    onSendChat: (text) => realmFlow?.chatSession?.say(text) === true,
     onQuit: () => enterRealmCharacterSelect(realmCharacters) }); }
   catch (error) { bnetLobbyScreen = null; bnetLobbyError = String(error); }
   screen = SCREEN.BNET_LOBBY;
+  startLobbyChat(c.name);
   render();
 }
 function ensureBnetLoginScreen(server) {
@@ -1854,12 +1876,17 @@ async function authenticateConfiguredRealm({ account, password }) {
     if (!server?.ws) throw new Error('selected region has no browser WebSocket transport');
     // The connection the popup opened; a later attempt (after a failed logon closed it) dials again.
     // NOT retail: retail shows the connecting popup again for that redial; this client does not.
+    try { realmFlow.chatSession?.close(); } catch { /* already closed */ }
+    try { realmFlow.chat?.transport?.close(); } catch { /* already closed */ }
+    realmFlow.chat = null; realmFlow.chatSession = null;
     bncs = realmFlow.bncs?.isOpen ? realmFlow.bncs : webSocketTransport(realmServiceUrl(server.ws, 'bncs'));
     realmFlow.bncs = null;
     await bncs.ready();
     protocol = bindEngineProtocol(Module);
     const login = await bncsLogin(bncs, protocol, { account, password, realm: server.region, auth: await realmAuthConfig(server.auth) });
-    bncs.close(); bncs = null;
+    // The BNCS socket stays open for the session, as retail's does: it carries the lobby's chat.
+    try { realmFlow.chat?.close(); } catch { /* already closed */ }
+    realmFlow.chat = { transport: bncs, reader: login.reader }; bncs = null;
     realmFlow.realmReply = login.handoff.realmReply;
     realmFlow.realms = login.realmList.map((r) => r.title);
     realmFlow.mpq = login.mpq;
