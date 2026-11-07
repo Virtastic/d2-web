@@ -318,12 +318,13 @@ extern "C" uint32_t d2cmp_11520(D2CMPCelFileOwner* file, const D2CMPCelCloseOps&
     return 1;
 }
 
-using D2CMPCelStripDraw = void (*)(int32_t x, uint32_t a, uint32_t b,
+// fastcall: ECX = frame, EDX = dst + end * pitch + x (the row the strip ends on), then 9 stack words (ret 0x24).
+using D2CMPCelStripDraw = void (*)(const D2CMPCelFrameOwner* frame, uint32_t dst, int32_t x, uint32_t a, uint32_t b,
     uint32_t c, int32_t y, int32_t height, uint32_t d, uint32_t e, uint32_t f);
 static int32_t add32(int32_t a, int32_t b) { return static_cast<int32_t>(uint32_t(a) + uint32_t(b)); }
 static int32_t sub32(int32_t a, int32_t b) { return static_cast<int32_t>(uint32_t(a) - uint32_t(b)); }
 
-// Vertical strip clipping. Width is only a required nonzero input; retail does
+// Vertical strip clipping. "width" is the destination base (required nonzero); c is the pitch. Retail does
 // not clip x here. Arithmetic retains x86 wrap before the signed comparisons.
 // 1.13c D2CMP+0x11780
 extern "C" void d2cmp_11780(const D2CMPCelDrawOwner& context,
@@ -349,7 +350,9 @@ extern "C" void d2cmp_11780(const D2CMPCelDrawOwner& context,
         if (rows) {
             auto draw = codecs[file->codec];
             if (!draw) std::_Exit(-1);       // 0x4e9
-            draw(add32(x, frame->xOffset), a, b, c, sub32(frameY, end), rows, d, e, f);
+            const int32_t fx = add32(x, frame->xOffset);
+            const uint32_t dst = uint32_t(end) * c + uint32_t(fx) + uint32_t(width);
+            draw(frame, dst, fx, a, b, c, sub32(frameY, end), rows, d, e, f);
         }
     }
 }

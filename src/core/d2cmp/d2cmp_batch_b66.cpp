@@ -23,17 +23,17 @@ void sub_4E66(uint32_t in_eax, uint32_t ebp, uint32_t ebp_plus8)
     g_unwind_b66.g2454 = ebp;
 }
 
-// 1.13c D2CMP+0x0bfd0  register-arg: in_EAX = owner, unaff_ESI = node become leading params;
-// GetTickCount result becomes a param (no direct Win32). Appends node to list head 0x14/0x18
-// (param_1==0) or 0x1c/0x20 (else); node+0x14 = next, +0x18 = prev, +0x10 = tick.
-struct Node_b66;
-struct Owner_b66 { uint8_t p[0x14]; Node_b66* h14; Node_b66* t18; Node_b66* h1c; Node_b66* t20; };
-struct Node_b66 { uint8_t p[0x10]; uint32_t tick; Node_b66* next; Node_b66* prev; };
-void sub_BFD0(Owner_b66* owner, Node_b66* node, int param_1, uint32_t tick)
+// 1.13c D2CMP+0x0bfd0  register-arg: EAX = owner, ECX = list select, ESI = node, as 32-bit
+// retail addresses of the SpriteCache structs (flat guest image). GetTickCount is the tick seam.
+// Appends node to list head/tail 0x14/0x18 (select == 0) or 0x1c/0x20 (else); node+0x14 = next,
+// +0x18 = prev, +0x10 = tick. The node's own next is left as it is.
+static inline uint32_t rdg_b66(uint32_t a) { uint32_t v; __builtin_memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }
+static inline void wrg_b66(uint32_t a, uint32_t v) { __builtin_memcpy((void*)(uintptr_t)a, &v, 4); }
+void sub_BFD0(uint32_t owner, uint32_t node, int param_1, uint32_t (*tick)())
 {
-    Node_b66*& head = param_1 == 0 ? owner->h14 : owner->h1c;
-    Node_b66*& tail = param_1 == 0 ? owner->t18 : owner->t20;
-    if (!tail) { head = node; tail = node; }
-    else { tail->next = node; node->prev = tail; tail = node; }
-    node->tick = tick;
+    const uint32_t ho = param_1 == 0 ? 0x14 : 0x1c, to = ho + 4;
+    const uint32_t tail = rdg_b66(owner + to);
+    if (!tail) { wrg_b66(owner + ho, node); wrg_b66(owner + to, node); }
+    else { wrg_b66(tail + 0x14, node); wrg_b66(node + 0x18, rdg_b66(owner + to)); wrg_b66(owner + to, node); }
+    wrg_b66(node + 0x10, tick());
 }
