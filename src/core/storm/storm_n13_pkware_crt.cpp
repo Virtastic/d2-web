@@ -408,7 +408,8 @@ extern "C" int32_t Storm_InflateRefill(uint8_t* st, uint32_t n) {
     bitbuf >>= nbits;
     if (pos == len) {
         pos = 0x800;
-        len = (*(uint32_t(**)(void*, uint32_t*, void*))(st + 0x28))(st + 0x2234, &pos, *(void**)(st + 0x24));
+        // wasm64: the stored callback and user are 32-bit slots, read through Io (not an 8-byte pointer load).
+        len = Io(st, 0x28)(st + 0x2234, &pos, (void*)(uintptr_t)U32(st, 0x24));
         if (len == 0) return 1;
         pos = 0;
     }

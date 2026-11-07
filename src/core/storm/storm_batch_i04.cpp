@@ -69,8 +69,9 @@ extern "C" char *storm_getdcwd(uint32_t drive, char *buf, size_t len, int (*vali
 extern "C" uint32_t pk_explode_loop(uint8_t *c, uint32_t (*decode_sym)(uint8_t *), int (*copy_dist)(uint8_t *, uint32_t),
                                     void (*mv)(void *, void *, int)) {
     typedef void (*Cb)(void *, uint32_t *, void *);
-    auto cb = *(Cb *)(c + 0x2c);
-    auto user = *(void **)(c + 0x24);
+    // wasm64: the stored callback and user are 32-bit state slots (retail layout), not 8-byte pointers.
+    auto cb = (Cb)(uintptr_t)*(uint32_t *)(c + 0x2c);
+    auto user = (void *)(uintptr_t)*(uint32_t *)(c + 0x24);
     auto &pos = *(int32_t *)(c + 8);
     pos = 0x1000;
     uint32_t sym;
