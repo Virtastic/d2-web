@@ -443,6 +443,16 @@ export function groundItemsUnderPointerAt(items, x, y, project, measure) {
   return hits;
 }
 
+// A hostile's hover test: the measured box above, limited to the padded rect of the cel it was last
+// drawn with (D2Client 0xA68E0 -> 0xA6730, the same rule items and objects use). `cel` is the
+// renderer's anchor-relative {xOffset, yOffset, width, height}; without one the box alone decides.
+// The box reaches 54 px right of and 26 px below the anchor, so a monster whose art does not (the
+// tomb sarcophagus: cel x -6..48, y -92..1) took the hover and the click from an item lying beside it.
+export function hostileUnitHoverHit(dx, dy, cel) {
+  if (!inUnitHoverBox(dx, dy, true)) return false;
+  return !(cel?.width > 0 && cel?.height > 0) || nativeDccHoverContains(dx, dy, cel, 0, 0);
+}
+
 // D2Client's object hover validator must obtain a current DCC cell before it can form a hit rect.
 // Preserve the measured painted-box/anchor fallback for multi-layer compositions, but a missing
 // cell cannot become a hover hit just because the object's anchor is near the pointer.

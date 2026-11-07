@@ -352,6 +352,7 @@ test/*
 !test/wide-hud.test.mjs
 !test/wide-hud-art.test.mjs
 !test/xp-bar-ratio.test.mjs
+!test/hostile-hover-cel-rect.test.mjs
 
 # The loop's private store: RE notes, ledger, captures, scenarios, agent briefs and the rule files
 # (GOAL/OBJECTIVE/AGENTS/CLAUDE) live in a separate private checkout linked here, never in this repo.
