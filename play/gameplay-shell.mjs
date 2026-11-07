@@ -94,6 +94,7 @@ import { createOtherMultiplayerScreen } from './assets/other-multiplayer.mjs';
 import { createBnetLoginScreen } from './assets/bnet-login-screen.mjs';
 import { createBnetLobbyScreen } from './assets/bnet-lobby-screen.mjs';
 import { createBnetChat } from './assets/bnet-chat.mjs';
+import { returnToLobby } from './assets/realm-lobby-return.mjs';
 import { createBnetConnectingPopup } from './assets/bnet-connecting.mjs';
 import { goldLabel } from './assets/gold-label.mjs';
 import { hoveredLabel, labelItemAt, nearestGroundItem, pickupNeedsWalk } from './item-pick.mjs';
@@ -913,9 +914,8 @@ function ensureGameMenu() {
       if (item === 'CONFIGURE CONTROLS') { ensureConfigureControls()?.openPanel(); return; }
       if (item === 'RETURN TO GAME') gameMenu.close();
       else if (item === 'SAVE AND EXIT GAME' && realmSceneActive) {
-        // A Battle.net game: the server holds the character; the realm session is released.
-        // NOT retail yet: retail goes back to the lobby, which needs a fresh MCP logon.
-        gameMenu.close(); leaveRealmLogin(); exitToTitle();
+        // A Battle.net game: the server holds the character. Retail returns to the lobby.
+        gameMenu.close(); void leaveRealmGame();
       } else if (item === 'SAVE AND EXIT GAME') {
         // Keep the session and menu available if persistence fails; only leave once the store
         // confirms the character has been written.
@@ -1698,6 +1698,37 @@ function leaveRealmLogin() {
   bnetLobbyScreen = null; bnetLobbyError = '';
   if (screen === SCREEN.BNET_LOGIN || screen === SCREEN.BNET_LOBBY || screen === SCREEN.SELECT) exitToTitle();
 }
+// Save and Exit from a Battle.net game: the game's sockets and engine state go, the BNCS login (and its
+// chat socket) stay, MCP is dialled afresh and the same character logs on, then the lobby is up again.
+// A failure of that return is a lost session: the login screen, as for a failed create.
+async function leaveRealmGame() {
+  const old = realmFlow;
+  const name = realmTransport.result?.character?.name;
+  if (!old || !name) { leaveRealmLogin(); exitToTitle(); return; }
+  realmTransport = { state: 'lobby', server: realmTransport.server, result: null, error: '' };
+  try { old.d2gs?.close(); } catch { /* already closed */ }
+  bnetLobbyScreen = null; bnetLobbyError = '';
+  const released = releaseRealmFlow({ closeTransports: false });
+  screen = SCREEN.BNET_LOBBY;   // release put the title up for a moment; the lobby is rebuilt below
+  try {
+    await released;
+    const rc = await import('./assets/realm-client.mjs');
+    const back = await returnToLobby({ flow: old, character: name,
+      dialMcp: async (server) => { const t = rc.webSocketTransport(realmServiceUrl(server.ws, 'mcp')); await t.ready(); return t; },
+      bindProtocol: () => rc.bindEngineProtocol(Module), mcpReturnToLobby: rc.mcpReturnToLobby });
+    realmFlow = back.flow; realmCharacters = back.characters;
+    realmTransport = { state: 'lobby', server: realmTransport.server, result: null, error: '' };
+    enterBnetLobby(name);
+  } catch (error) {
+    try { old.chatSession?.close(); } catch { /* already closed */ }
+    try { old.chat?.transport?.close(); } catch { /* already closed */ }
+    realmFlow = { server: old.server, realmReply: null, bncs: null };
+    realmTransport = { state: 'login-required', server: realmTransport.server, result: null, error: String(error) };
+    realmSelect = false; screen = SCREEN.BNET_LOGIN; ensureBnetLoginScreen(old.server);
+    bnetLoginScreen?.reset(); bnetLoginScreen?.fail(error);
+    render();
+  }
+}
 // Retail's Battle.net account login screen (D2Launch+0x19290), on the canvas. LOG IN authenticates
 // against the committed region; the account's characters then go on retail's own character-select
 // screen (the single-player one, fed the MCP list), and OK there opens retail's Battle.net lobby
@@ -1720,7 +1751,7 @@ function enterRealmCharacterSelect(characters) {
 function startLobbyChat(name) {
   const flow = realmFlow;
   if (!flow?.chat) return null;
-  if (flow.chatSession?.open) return flow.chatSession;
+  if (flow.chatSession?.open) { bnetLobbyScreen?.chatLive(true); return flow.chatSession; }
   flow.chatSession = createBnetChat({ ...flow.chat, character: name, realm: flow.realms?.[0] ?? flow.server?.region ?? '',
     onLine: (line) => { bnetLobbyScreen?.chatLine(line); render(); },
     onClose: () => { bnetLobbyScreen?.chatLive(false); } });

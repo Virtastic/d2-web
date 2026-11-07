@@ -234,6 +234,23 @@ export async function mcpListCharacters(transport, protocol, { realmReply, chara
   return { ...list, received, session };
 }
 
+/**
+ * Back to the lobby after a game: a fresh MCP connection on the realm handoff the BNCS logon already
+ * gave (the realm accepts the same session on every STARTUP), the character list, then MCP_CHARLOGON
+ * for the character that left the game. Returns the list plus a session that create and join reuse.
+ */
+export async function mcpReturnToLobby(transport, protocol, { realmReply, character, timeoutMs = CONNECT_TIMEOUT_MS, keepAliveMs = MCP_KEEPALIVE_MS } = {}) {
+  const roster = await mcpListCharacters(transport, protocol, { realmReply, timeoutMs, keepAliveMs });
+  const found = roster.characters.find((c) => c.name.toLowerCase() === String(character).toLowerCase());
+  if (!found) { clearInterval(roster.session.keepAlive); throw new Error(`character "${character}" is not in the MCP character list`); }
+  transport.send(protocol.mcpFrame(0x07, protocol.mcpCharlogon(found.name)));
+  const reply = await readMcpFrame(roster.session.reader, timeoutMs);
+  if (reply.op !== 0x07) throw new Error(`expected MCP CHARLOGON reply 0x07, got 0x${reply.op.toString(16)}`);
+  if (reply.body.length < 4 || u32(reply.body, 0) !== 0) throw new Error('MCP CHARLOGON was rejected');
+  roster.session.characterLoggedOn = found.name;
+  return roster;
+}
+
 const u32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
 
 /** MCP CHARCREATE (0x02): class, flags, name. On success the new character joins the session's roster. */
