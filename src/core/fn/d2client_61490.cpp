@@ -17,9 +17,9 @@ u32 f1760(u32 t, u32 g) { L(0x1760, t, 0, g, 0, 0, 0, 0); return g_hv[2]; }
 void c658(u32 u, i32* k, i32*, i32*, u32, u32) { L(0xc658, 0, 0, 0, P(u), 0xB3000000u, 0xB3000000u, 0xB3000000u); *k = (i32)g_hv[3]; }
 u32 cbda(u32 u, u32 w) { L(0xcbda, 0, 0, 0, P(u), w, 0, 0); return g_hv[4]; }
 // The descriptor hooks D2Client+0xA60D0 and +0xA5B60 (0x6FB560D0 / 0x6FB55B60), the retail callees. They log, and return the
-// recorded values: A60D0 returns hv[5] when [unit+0xC8] bit 10 is set, else 0; A5B60 returns hv[6] on the first call, hv[7] after.
-u32 f560d0(u32) { L(0xa60d0, 0, 0, 0, 0, 0, 0, 0); return (*(const u32*)(uintptr_t)(g_unit + 0xc8) >> 10) & 1 ? g_hv[5] : 0; }
-u32 f55b60(u32) { L(0xa5b60, 0, 0, 0, 0, 0, 0, 0); return g_n55++ ? g_hv[7] : g_hv[6]; }
+// recorded values: A60D0 returns hv[5]; A5B60 returns hv[6] on the first call, hv[7] after.
+u32 f560d0(u32 u) { L(0xa60d0, P(u), 0, 0, 0, 0, 0, 0); return g_hv[5]; }
+u32 f55b60(u32 u) { L(0xa5b60, P(u), 0, 0, 0, 0, 0, 0); return g_n55++ ? g_hv[7] : g_hv[6]; }
 u32 f219f0(u32 v) { L(0x219f0, v, 0, 0, 0, 0, 0, 0); return g_hv[8]; }
 u32 cc52(u32 p) { L(0xcc52, 0, 0, 0, p, 0, 0, 0); return g_hv[9]; }
 }

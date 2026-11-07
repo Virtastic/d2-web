@@ -12,7 +12,7 @@ void d2c_6d010(const D2Client6d010Env& e, U arg) {
     for (uint32_t i = 0; i < cnt; i++) {
         if (e.g04c() && (!edi || e.g054())) {
             const uint32_t al = ctr & 0x1f; ctr++;
-            if (!al) e.fc1760(1);
+            if (al) e.fc1760(1);              // retail: test al,al; je skip
         }
         if (!e.g04c() && e.fc11e() >= 0x1e) return;
         U node = e.ldp(e.ldp(arr, i * (uint32_t)sizeof(U)), 0x74);
