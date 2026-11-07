@@ -1,59 +1,49 @@
-// 1.13c D2Client+0x78820 (638 B): stat/count label draw beside a panel slot, from the cached decompile.
-// Decompiler stack aliasing makes the Ordinal_10708 out-record ambiguous; modeled as a record
-// {item=0x24? see spec}. Imports and globals are host seams (Env).
+// 1.13c D2Client+0x78820 (638 B): the stat/count label beside a panel slot. stdcall (ret 0x14), no register input.
+//   a0 = slot id, a1 = a struct whose byte +5 is tested against the byte [gdwBitMasks+8], a2 = the count, a3 = the state
+//   (1 = frame + 1, -1 = no row), a4 = the draw mode (forced to 3 under the mouse, to 1 when the mask test fails).
+// Globals: cls = byte [0x11991C], celTbl = the 0x22-stride cell table at 0xF4970 (dword per class = the cell), mouseX/mouseY =
+// [0x11B828]/[0x11B824], unit = [0x11BBFC], bm8 = byte [gdwBitMasks + 8] (IAT data slot 0xCEE50).
+// Callees (D2cSvc, keyed by RVA): 0x17F0 (EAX = a0, returns the slot record), 0x77CA0 (EAX = record ptr with its low byte
+// := rec[3], returns y), 0x77C50 (EAX = y with its low byte := rec[4], returns x), 0xC4EA (1 stack word: -1) / 0xC718 (unit, c4, 0) / 0xCB32 (D2Common thunks),
+// 0xD0E4 (cell draw, 6 stack words, blk[0] = frame, blk[13] = cell), 0x33550/0x33B50 (hover tooltips), 0xD3A8 (font), 0xD37E (text).
 #include <cstdint>
+#include <cstdio>
 #include <emscripten.h>
+#include "d2client_callee.h"
 
-struct D2Client78820Rec {      // filled by Ordinal_10708 (ebp-relative locals in the decompile)
-    int32_t sel;               // iStack_8
-    int32_t mode;              // iStack_4 (forced to 3 when 10306==0 && 11146!=0 && sel!=-1)
-    int32_t x;                 // iStack_c
-    int32_t kind;              // iStack_20 (-1 selects FUN_6fae3550 else FUN_6fae3b50)
-    int32_t count;             // iStack_24
-    void* obj;                 // pvStack_2c
-};
-
-struct D2Client78820Env {
-    uint32_t mouseY;                                         // DAT 0x6FBCBBFC
-    int32_t (*gate)();                                       // FUN 0x6FAB17F0
-    int32_t (*getY)();                                       // 0x77CA0 (iVar1)
-    int32_t (*getX)();                                       // 0x77C50 (iVar2)
-    void (*fill)(D2Client78820Rec*);                         // Ordinal_10708
-    int32_t (*ord10306)(uint32_t);
-    int32_t (*ord11146a)(D2Client78820Rec*);                 // Ordinal_11146()
-    int32_t (*ord11146b)(uint32_t, void*);                   // Ordinal_11146(y,obj)
-    void (*ord10019)(uint32_t* desc, int32_t x, int32_t y, int32_t a, int32_t b);
-    void (*fn3550)(uint32_t, void*, int32_t);                // 0x33550
-    void (*fn3b50)(void*, uint32_t, int32_t);                // 0x33B50
-    void (*toUni)(uint16_t* dst, const char* src, int32_t n);
-    void (*ord10184)();                                      // both branches identical call
-    void (*ord10150)(int32_t x, uint32_t color, int32_t z);
-    void (*fmtInt)(char* dst, int32_t v);                    // wsprintfA("%d")
-};
-
-// 1.13c D2Client+0x78820
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_78820(D2Client78820Env* e) {
-    if (!e->gate()) return;
-    int32_t y = e->getY(), x = e->getX();
-    uint32_t my = e->mouseY;
-    D2Client78820Rec r = {};
-    r.sel = -1;
-    e->fill(&r);
-    int32_t m = r.mode;
-    if (e->ord10306(my) == 0 && e->ord11146a(&r) != 0 && r.sel != -1) m = 3;
-    uint32_t d[0x13] = {};
-    d[0] = 0xffffffffu;
-    e->ord10019(d, x, y, -1, 5);
-    if (x < r.x && r.x < x + 0x30 && y - 0x30 < (int32_t)my && (int32_t)my < y) {
-        if (r.kind == -1) e->fn3550(e->mouseY, r.obj, r.count);
-        else e->fn3b50(r.obj, e->mouseY, r.count);
+extern "C" EMSCRIPTEN_KEEPALIVE
+void d2_client_78820(const D2cSvc& v, uint32_t a0, const uint8_t* a1, int32_t a2, int32_t a3, int32_t a4,
+                     uint8_t cls, const uint8_t* celTbl, int32_t mouseX, int32_t mouseY, uint32_t unit, uint8_t bm8) {
+    uint32_t esi = d2c_call(v, 0x17f0, a0, 0, 0, 0, 0);
+    if (!esi) return;
+    const uint8_t* rec = (const uint8_t*)(uintptr_t)esi;
+    uint32_t ebp = d2c_call(v, 0x77ca0, (esi & ~0xffu) | rec[3], 0, 0, 0, 0);
+    uint32_t ebx = d2c_call(v, 0x77c50, (ebp & ~0xffu) | rec[4], 0, 0, 0, 0);
+    uint32_t cel = *(const uint32_t*)(celTbl + (uint32_t)cls * 0x22);
+    uint32_t frame = rec[7];
+    if (a3 == 1) frame++;
+    const bool hov = mouseX > (int32_t)ebx && mouseX < (int32_t)ebx + 0x30 && mouseY > (int32_t)ebp - 0x30 && mouseY < (int32_t)ebp;
+    if (hov) a4 = 3;
+    if (!(bm8 & a1[5])) a4 = 1;
+    uint32_t c4 = d2c_call(v, 0xc4ea, 0, unit, a0, 0, 0, 0xffffffffu);
+    uint32_t r718 = d2c_call(v, 0xc718, 0, 0, 0, 0, 0, unit, c4, 0);
+    uint32_t cb = d2c_call(v, 0xcb32, 0, 0, 0, 0, 0, unit, a0);
+    if (r718 == 0 && cb != 0 && a3 != -1) a4 = 3;
+    uint32_t blk[18] = {};
+    blk[0] = frame; blk[13] = cel; blk[16] = 0;
+    d2c_call(v, 0xd0e4, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)blk, ebx, ebp, 0xffffffffu, 5, (uint32_t)a4);
+    if (hov) {
+        if (a3 == -1) d2c_call(v, 0x33550, 0, 0, 0, 0, 0, unit, a0, (uint32_t)a2, 0, ebx, ebp);
+        else d2c_call(v, 0x33b50, 0, a0, 0, 0, 0, unit, (uint32_t)a2, 0, ebx, ebp);
     }
-    if (m != 0 || r.count != 0) {
-        char s[40]; uint16_t u[20];
-        e->fmtInt(s, r.count);
-        e->toUni(u, s, 9);
-        e->ord10184();
-        int32_t c = e->ord11146b(e->mouseY, r.obj);
-        e->ord10150(y + 0xc, c > 0 ? 3 : (c < 0 ? 1 : 0), 0);
+    if (r718 || a2) {
+        char buf[16]; uint16_t wbuf[10] = {};
+        std::snprintf(buf, sizeof buf, "%d", a2);
+        for (int i = 0; i < 8 && buf[i]; ++i) wbuf[i] = (uint8_t)buf[i];   // toUnicode(wbuf, buf, 9): the count includes the terminator
+        if (a2 > 9) { d2c_call(v, 0xd3a8, 0, 4, 0, 0, 0); ebx -= 4; }
+        else d2c_call(v, 0xd3a8, 0, 1, 0, 0, 0);
+        int32_t cbv = (int32_t)d2c_call(v, 0xcb32, 0, 0, 0, 0, 0, unit, a0);
+        uint32_t col = cbv > 0 ? 3 : cbv < 0 ? 1 : 0;
+        d2c_call(v, 0xd37e, 0, (uint32_t)(uintptr_t)wbuf, ebx + 0x30, 0, 0, ebp + 0xc, col, 0);
     }
 }

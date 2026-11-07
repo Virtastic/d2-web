@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <emscripten.h>
+#include "d2client_callee.h"
 template <class T> static inline T& at(const void* b, int32_t o) { return *(T*)((const uint8_t*)b + o); }
 struct D2cB65Env {
     void (*fatal)(int32_t code);                         // Ordinal_10265(code); Ordinal_10024(); _exit(-1)
@@ -123,10 +124,22 @@ static void buysell(const D2cB65Env* e, const int32_t* flag, int32_t x, int32_t 
 EMSCRIPTEN_KEEPALIVE void d2c_76050(const D2cB65Env* e) {
     buysell(e, e->g_6fbcbff4, *e->g_6fbcb9a0 + 0x116, 0x1a5 - *e->g_6fbcb9a4);
 }
-// 1.13c D2Client+0x78240
-EMSCRIPTEN_KEEPALIVE void d2c_78240(const D2cB65Env* e) {
-    int32_t v = e->g_6fb925f4[*e->g_6fb924f8 + (uint32_t)*e->g_6fbc991c * 3];
-    if (v == -0x95) *e->g_6fb925f0 = 1; else if (v == -0xdc) *e->g_6fb925f0 = 2; else if (v == -0x131) *e->g_6fb925f0 = 3;
-    buysell(e, e->g_6fbcbfb4, v + (*e->g_6fb8bc48 - *e->g_6fbcb9a0), *e->g_6fbcb9a4 - 0x3f + *e->g_6fb8bc4c);
+// 1.13c D2Client+0x78240: the buy/sell button cell, drawn through D2Gfx#10041 (0xD096 thunk). The draw block is 18 dwords:
+// [0] = 10 + (flag != 0), [13] (+0x34) = the lazily loaded cell (0x2B420 loader, EAX = the path string), [16] = 0.
+// g925f0 = [0xE25F0] (set 1/2/3 by the column x -149/-220/-305), g925f4 = the table at 0xE25F4 (12-byte stride per class,
+// 4 per [0xE24F8]), cls = byte [0x11991C], b8bc48/b8bc4c = [0xDBC48]/[0xDBC4C], b9a0/b9a4 = [0x11B9A0]/[0x11B9A4],
+// b9c4 = the cell global [0x11B9C4], bfb4 = [0x11BFB4].
+EMSCRIPTEN_KEEPALIVE void d2c_78240(const D2cSvc& v, uint32_t* g925f0, const uint8_t* g925f4, uint32_t g924f8, uint8_t cls,
+                                    int32_t b8bc48, int32_t b8bc4c, int32_t b9a0, int32_t b9a4, uint32_t* b9c4, int32_t bfb4) {
+    int32_t x = at<int32_t>(g925f4, (int32_t)(g924f8 * 4 + cls * 12));
+    if (x == -0x95) *g925f0 = 1; else if (x == -0xdc) *g925f0 = 2; else if (x == -0x131) *g925f0 = 3;
+    x += b8bc48 - b9a0;
+    uint32_t blk[18] = {};
+    char path[0x100] = "DATA\\GLOBAL\\ui\\panel\\buysellbtn";
+    if (!*b9c4) *b9c4 = d2c_call(v, 0x2b420, (uint32_t)(uintptr_t)path, 0, 0, 0, 0, 0);
+    blk[13] = *b9c4;
+    blk[0] = (bfb4 != 0) + 10;
+    d2c_call(v, 0xd096, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)blk, (uint32_t)x, (uint32_t)(b9a4 + b8bc4c - 0x3f), 0xffffffffu, 5, 0);
 }
+
 }
