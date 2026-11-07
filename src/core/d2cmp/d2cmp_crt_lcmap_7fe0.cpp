@@ -2,6 +2,7 @@
 // RVA 0x07FE0. Callers: 0x6891, 0x8A6D. Internal helpers 0x86C9 (locale ANSI code page) and 0x8710
 // (code-page to code-page converter), and the Win32 locale APIs, are supplied through the host env.
 // Prior art: src/core/d2common/d2common_crt_lcmap_4ef4.cpp (same CRT routine).
+#include <alloca.h>
 #include <emscripten.h>
 #include <cstddef>
 #include <cstdint>
@@ -24,11 +25,12 @@ struct D2cmpLcmapStringAEnv {
     int32_t (*locale_ansi_codepage)(uint32_t locale);                                 // D2CMP+0x086C9
     char* (*multibyte_to_multibyte)(uint32_t cp_from, uint32_t cp_to, const char* src, uint32_t* pcb_src,
                                     char* dst, int32_t cch_dst);                      // D2CMP+0x08710
+    void (*free_)(void* p);                                                           // D2CMP+0x02EBE
 };
 
-static uint32_t g_d2cmp_lcmap_api;          // DAT_6fe349d0: 0 undetected, 1 LCMapStringW works, 2 absent
-static uint32_t g_d2cmp_default_locale;     // DAT_6fe34990
-static uint32_t g_d2cmp_default_codepage;   // DAT_6fe349a0
+uint32_t g_d2cmp_lcmap_api;          // DAT_6fe349d0: 0 undetected, 1 LCMapStringW works, 2 absent
+uint32_t g_d2cmp_default_locale;     // DAT_6fe34990
+uint32_t g_d2cmp_default_codepage;   // DAT_6fe349a0
 
 // The decompile's leading length fold: cch_src clipped at the first NUL (NUL not counted). A zero or
 // negative cch_src is left alone.
@@ -42,8 +44,8 @@ static uint32_t d2cmp_lcmap_cch(const char* src, uint32_t cch_src) {
     return cch_src;                                       // no NUL within cch_src bytes
 }
 
-// The retail wide buffer and the ANSI-path mapped buffer are `_alloca` blocks; malloc stands in here
-// (the allocation strategy is not observable in the return value or the destination bytes).
+// The retail wide buffers and the ANSI-path mapped buffer are `_alloca` blocks (the malloc fallback only
+// runs when the stack probe fails); the port allocas them too, so they never reach free.
 // 1.13c D2CMP+0x07FE0
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2cmp_7fe0(uint32_t locale, uint32_t flags, const char* src,
@@ -70,16 +72,14 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2cmp_7fe0(uint32_t locale, uint32_t flags, const 
                 codepage, static_cast<uint32_t>(b_error != 0) * 8u + 1u, src,
                 static_cast<int32_t>(cch_src), nullptr, 0);
             if (wlen != 0) {
-                uint16_t* wide = static_cast<uint16_t*>(std::malloc(static_cast<size_t>(wlen) * 2));
-                if (wide == nullptr) return 0;
+                uint16_t* wide = static_cast<uint16_t*>(alloca((static_cast<uint32_t>(wlen) * 2u + 3u) & ~3u));
                 if (env->multi_byte_to_wide_char(codepage, 1, src, static_cast<int32_t>(cch_src), wide,
                                                  wlen) != 0) {
                     result = static_cast<uint32_t>(env->lcmap_string_w(locale, flags, wide, wlen, nullptr, 0));
                     if (result != 0) {
                         if ((flags & 0x400) == 0) {   // not LCMAP_SORTKEY: narrow the mapped text
-                            uint16_t* mapped = static_cast<uint16_t*>(
-                                std::malloc(static_cast<size_t>(result) * 2));
-                            if (mapped != nullptr) {
+                            uint16_t* mapped = static_cast<uint16_t*>(alloca((result * 2u + 3u) & ~3u));
+                            {
                                 if (env->lcmap_string_w(locale, flags, wide, wlen, mapped,
                                                         static_cast<int32_t>(result)) != 0) {
                                     char* out = cch_dst == 0 ? nullptr : dst;
@@ -87,7 +87,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2cmp_7fe0(uint32_t locale, uint32_t flags, const 
                                         codepage, 0, mapped, static_cast<int32_t>(result), out, cch_dst,
                                         nullptr, nullptr));
                                 }
-                                std::free(mapped);
                             }
                         } else if (cch_dst != 0 && static_cast<int32_t>(result) <= cch_dst) {
                             env->lcmap_string_w(locale, flags, wide, wlen,
@@ -95,7 +94,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2cmp_7fe0(uint32_t locale, uint32_t flags, const 
                         }
                     }
                 }
-                std::free(wide);
             }
             return result;
         }
@@ -124,8 +122,8 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2cmp_7fe0(uint32_t locale, uint32_t flags, const 
     uint32_t n = static_cast<uint32_t>(env->lcmap_string_a(locale, flags, converted,
                                                            static_cast<int32_t>(cch_src), nullptr, 0));
     if (n != 0) {
-        mapped = static_cast<char*>(std::malloc(n));
-        if (mapped != nullptr) {
+        mapped = static_cast<char*>(alloca((n + 3u) & ~3u));
+        {
             std::memset(mapped, 0, n);
             uint32_t m = static_cast<uint32_t>(env->lcmap_string_a(
                 locale, flags, converted, static_cast<int32_t>(cch_src), mapped, static_cast<int32_t>(n)));
@@ -138,8 +136,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2cmp_7fe0(uint32_t locale, uint32_t flags, const 
         }
     }
 
-    std::free(converted);
-    if (mapped != nullptr) std::free(mapped);
-    if (back != nullptr && back != dst) std::free(back);
+    env->free_(converted);
+    if (back != nullptr && back != dst) env->free_(back);
     return result;
 }

@@ -6,10 +6,11 @@ extern uint8_t g_sbcsTable[0x101] __attribute__((weak));  // DAT_6ff13c20
 extern int32_t g_mbCodePage __attribute__((weak));        // DAT_6ff13d24
 extern int32_t g_mb13c0c __attribute__((weak));           // DAT_6ff13c0c
 extern int32_t g_mb13c04 __attribute__((weak));           // DAT_6ff13c04
-extern uint16_t g_mbRanges[3] __attribute__((weak));      // DAT_6ff13d30..38 (3 dwords: 6 words)
+extern uint32_t g_mbRanges[3] __attribute__((weak));      // DAT_6ff13d30..38
 extern int32_t g_mbInit __attribute__((weak));            // DAT_6ff14fb4
 extern "C" void d2cmp_2dd8(int32_t) __attribute__((weak));
 extern "C" int32_t d2cmp_setmbcp(int32_t) __attribute__((weak));
+int32_t (*g_d2cmp_6d10_setmbcp)(int32_t) = nullptr;   // FN probe seam for 0x6BC0; null = the real callee
 
 // 1.13c D2CMP+0x6868
 void d2cmp_6868() {
@@ -17,8 +18,7 @@ void d2cmp_6868() {
     g_mbCodePage = 0;
     g_mb13c0c = 0;
     g_mb13c04 = 0;
-    uint32_t* r = reinterpret_cast<uint32_t*>(g_mbRanges);
-    r[0] = 0; r[1] = 0; r[2] = 0;
+    g_mbRanges[0] = 0; g_mbRanges[1] = 0; g_mbRanges[2] = 0;
 }
 
 // 1.13c D2CMP+0x6D07
@@ -27,7 +27,7 @@ void d2cmp_6d07() { d2cmp_2dd8(0xd); }
 // 1.13c D2CMP+0x6D10
 int32_t d2cmp_6d10() {
     if (g_mbInit == 0) {
-        d2cmp_setmbcp(-3);
+        if (g_d2cmp_6d10_setmbcp) g_d2cmp_6d10_setmbcp(-3); else if (d2cmp_setmbcp) d2cmp_setmbcp(-3);
         g_mbInit = 1;
     }
     return 0;
