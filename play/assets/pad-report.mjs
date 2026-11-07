@@ -7,7 +7,8 @@
 //   * the triggers arrive as ANALOG AXES (0..1, rising as the trigger is pulled) with no buttons 6 and 7.
 // Neither is guessed from the id. Each axis (index 4 and up; 0-3 are the sticks and are never touched) is
 // classified from the samples it has produced since the pad connected:
-//   * a HAT axis has only ever read -1, 0 or +1, and has moved off 0 at least once. A constant 0 axis is
+//   * a HAT axis has only ever read -1, 0 or +1, and has moved off 0 at least once. Before it has read -1, an axis
+//     in a trigger slot (4 or 5) is a digital trigger (0 and 1 only), not a hat; A constant 0 axis is
 //     not a hat; neither is a stick, which reads fractions as it moves;
 //   * a TRIGGER axis has never read below 0, and has read a fraction strictly between 0 and 1.
 // Hat axes, in index order, are the X pair then the Y pair; trigger axes, in index order, are LT (button 6)
@@ -18,6 +19,7 @@
 // the classification over (reset()), so one device's history never steers another.
 
 const HAT_FIRST_AXIS = 4;   // axes 0-3 are the two sticks
+const TRIGGER_AXES_END = 6; // axes 4 and 5 are trigger slots; a never-negative digital axis there is a trigger
 const HAT_HIT = 0.5;        // a hat or trigger reads as pressed past this
 const EXACT = 0.02;         // a hat reads -1, 0 or +1; anything else is an analog axis
 
@@ -32,8 +34,10 @@ export function createReportReader() {
     for (let i = HAT_FIRST_AXIS; i < axes.length; i++) {
       const s = stats.get(i);
       if (!s) continue;
-      if (s.exact && s.moved) hats.push(i);
-      else if (!s.neg && s.analog) triggers.push(i);
+      const digital = s.exact && s.moved;
+      // An axis that has never read -1 and sits in a trigger slot (4, 5) is a digital trigger, not a hat.
+      if (digital && (s.neg || i >= TRIGGER_AXES_END)) hats.push(i);
+      else if (!s.neg && (s.analog || digital)) triggers.push(i);
     }
     return { hats, triggers };
   }
