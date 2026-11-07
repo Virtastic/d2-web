@@ -7,7 +7,7 @@
 struct D2WinCtl {                  // control header, common prefix
     uint32_t type;                 // +0
     uint32_t pad[7];
-    void* cb20;                    // +0x20 (index 8)
+    uint32_t cb20;                 // +0x20 (index 8): the retail 4-byte code address
     uint32_t pad2[6];
     D2WinCtl* next;                // +0x3C
     uint32_t pad3[2];
