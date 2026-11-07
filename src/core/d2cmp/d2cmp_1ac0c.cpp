@@ -1,7 +1,7 @@
 #include <cstdint>
 #include <cstring>
 
-// Host-bound: 1A9D6 = 80-bit multiply (x *= y); tables at RVA 0x342E0 (positive) / 0x34440 (negative), 12-byte entries.
+// Host-bound: 1A9D6 = 80-bit multiply (x *= y); tables at RVA 0x242E0 (positive) / 0x24440 (negative), 12-byte entries.
 void (*g_d2cmp_mul80)(int* x, int* y) = nullptr;
 const uint8_t* g_d2cmp_tenpow_pos = nullptr;
 const uint8_t* g_d2cmp_tenpow_neg = nullptr;
