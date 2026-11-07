@@ -8,7 +8,7 @@ namespace d2::object_clock {
 // wraps; a non-cycling mode clamps and never wraps; a non-cycling OPERATING (1) hands off to OPENED (2) once its
 // last cel is reached. A non-cycling single-cel mode (a shrine's opened mode: one cel shown at Start2) holds its
 // start cel -- the wrap used to count it down a cel per tick, replaying the use in reverse.
-struct State { uint32_t shown = ~0u; int32_t clock = 0, count = 0; int16_t speed = 0; };
+struct State { uint32_t shown = ~0u; int32_t clock = 0, count = 0; int16_t speed = 0; int32_t start = 0; };   // start: Objects.txt Start[mode] << 8
 
 // Advances one client tick. Returns true when the caller must switch to mode 2 (and reload its record); the
 // clock is then unchanged.
@@ -21,7 +21,9 @@ inline bool step(State& c, bool isDoor, bool cycling) {
     }
     if (!isDoor && !cycling) return false;
     c.clock += c.speed;
-    if (c.count > 0 && c.clock >= c.count) c.clock -= c.count;
+    // 1.13c D2Client+0x25660 (6FAD5660): a cycling mode wraps to Start[mode]<<8 + the overshoot, not to cel 0
+    // (the fire objects' 26-cel ON run starts at cel 10; wrapping to 0 replayed the 10 ignition cels every loop).
+    if (c.count > 0 && c.clock >= c.count) c.clock = c.start - c.count + c.clock;
     return false;
 }
 

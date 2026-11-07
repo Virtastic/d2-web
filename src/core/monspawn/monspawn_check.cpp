@@ -7857,7 +7857,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
                         ClientObjectClock& c = clientObjectClock(animUnit);
                         const D2ObjectsTxt* ot = animUnit->pObjectData->pObjectTxt;
                         const bool cycling = c.shown < 8 && ot->nCycleAnim[c.shown];
-                        d2::object_clock::State st{c.shown, c.clock, c.count, c.speed};
+                        d2::object_clock::State st{c.shown, c.clock, c.count, c.speed, c.shown < 8 ? (int32_t)((uint32_t)ot->nStart[c.shown] << 8) : 0};
                         const bool toOn = d2::object_clock::step(st, ot->nIsDoor != 0, cycling);
                         c.clock = st.clock;
                         if (toOn) setClientObjectShown(c, ot, 2);
