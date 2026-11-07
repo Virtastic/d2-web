@@ -480,3 +480,10 @@ extern "C" uint32_t Storm_23250_FnRun(uint32_t* g, uint32_t* vl) {
     vl[0] = g_videoList;
     return r;
 }
+
+// Probe seam for the 0x2F590 re-entry guards (the two retail globals are file statics): write != 0
+// loads {fatal, inError} from the arguments, write == 0 stores the current values back out.
+extern "C" void Storm_SErrDisplayErrorGuards(uint32_t* fatal, uint32_t* inError, int write) {
+    if (write) { g_fatalActive = *fatal; g_inError = *inError; }
+    else { *fatal = g_fatalActive; *inError = g_inError; }
+}
