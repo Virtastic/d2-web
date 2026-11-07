@@ -243,7 +243,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_97420(void* game, void* player, void* petList,
                     wrptr(modeChange, 0x04, pet);
                     wr8(modeChange, 0x15, 0x64);   // MONMODE_DEATH in 1.13c's packed record
                     if (((rd32(pet, 0xC8) >> 10) & 1) != 0)
-                        wr32(modeChange, 0x0C,
+                        wr32(modeChange, 0x08,
                              (uint32_t)(uintptr_t)env->getOwner(game, rd32(pet, 0x94), rd32(pet, 0x98)));
                     env->modeChange(game, modeChange, 1);
                 }
