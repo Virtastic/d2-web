@@ -314,7 +314,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   const drawCel = (c, index, x, y, mode = 5) => {
     const f = c.dc6.frames[index]; if (!f) return;
     const left = x + f.offsetX, top = y + f.offsetY - f.height + 1;
-    if (mode === 1) { sctx.save(); sctx.globalAlpha = 0.5; sctx.drawImage(c.canvases[index], left, top); sctx.restore(); }
+    if (mode === 1) logoBlend(sctx, f, left, top, 1);
     else sctx.drawImage(c.canvases[index], left, top);
     recordDc6(c.path, index, f, left, top, { op: 'cel', mode });
   };
