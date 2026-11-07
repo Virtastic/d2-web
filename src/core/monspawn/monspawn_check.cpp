@@ -74,6 +74,7 @@
 #include "path_attempt_trace.h"
 #include "item_text_visibility.h"
 #include "item_flag_lines.h"
+#include "item_stat_desc_value.h"
 #include "drop_flip.h"
 #include <D2Environment.h>
 #include <DataTbls/ObjectsTbls.h>
@@ -10244,7 +10245,10 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_lines(uint32_t itemId, char* buf, 
         }
         // One stat through one (func, val, strpos, strneg, str2) tuple; "" when the function is not ported.
         auto fmt = [&](const D2ItemStatCostTxt* r, int func, int val, int sp, int sn, int s2, const D2StatStrc& st) -> std::string {
-            int32_t v = st.nValue;
+            // 1.13c D2Client+0x546E0: op 2..5 per-level scaling, then the stat's ValShift (life/mana/stamina hold value << 8).
+            const D2ItemStatCostTxt* ob = (r->nOp > 1 && r->nOp < 6) ? rec(r->wOpBase) : nullptr;
+            int32_t v = d2::item_text::descValue(st.nValue, ob ? r->nOp : 0, r->nOpParam,
+                ob ? STATLIST_UnitGetStatValue(g_targetPlayer, r->wOpBase, 0) : 0, ob ? ob->nValShift : 0, r->nValShift);
             const std::string pos = str(sp), neg = str(sn), two = str(s2);
             auto pre = [&](const char* sign, const char* unit) { return val == 1 ? std::string(sign) + std::to_string(v) + unit + " " : std::string(); };
             auto post = [&](const char* sign, const char* unit) { return val == 2 ? " " + std::string(sign) + std::to_string(v) + unit : std::string(); };
@@ -10255,8 +10259,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_lines(uint32_t itemId, char* buf, 
             case 3: return pre("", "") + body(v) + post("", "");
             case 4: return pre("+", "%") + body(v) + post("+", "%");
             case 5: v = v * 100 / 128; return pre("", "%") + body(v) + post("", "%");
-            case 6: case 7: case 8: case 9: {   // per-level: value scaled by the character's level (ItemStatCost op 2/4/5)
-                if (r->nOp == 2 || r->nOp == 4 || r->nOp == 5) v = (int32_t)(((int64_t)v * STATLIST_UnitGetStatValue(g_targetPlayer, r->wOpBase, 0)) >> r->nOpParam);
+            case 6: case 7: case 8: case 9: {   // per-level: v already carries the op scaling (descValue)
                 const char* sign = func == 6 || func == 8 ? "+" : ""; const char* unit = func == 7 || func == 8 ? "%" : "";
                 return pre(sign, unit) + body(v) + " " + two + post(sign, unit); }
             case 10: v = v * 100 / 128; return pre("", "%") + body(v) + " " + two + post("", "%");
