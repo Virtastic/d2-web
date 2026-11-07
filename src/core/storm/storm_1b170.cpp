@@ -12,6 +12,7 @@ struct Storm1B170Env {
 void Storm_Sub1B170(const Storm1B170Env& e, uint16_t* hdr, uint32_t heap, uint32_t* p) {
     const uint8_t flags = ((const uint8_t*)hdr)[3];
     if (*e.debugFill != 0 && (flags & 4) == 0) {
+        // 32-bit unsigned wrap exactly as retail: a header whose size is below pad + overhead + 8 yields a huge n, as in the DLL.
         const uint32_t n = (uint32_t)hdr[0] - (uint32_t)(flags & 1) * 2u - ((const uint8_t*)hdr)[2] - 8u;
         for (uint32_t i = n >> 2; i; --i) *p++ = 0xDDDDDDDDu;
         uint8_t* b = (uint8_t*)p;
