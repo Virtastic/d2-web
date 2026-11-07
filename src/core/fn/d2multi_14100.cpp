@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0x14100 probe (stdcall, one ignored stack word; r[4] = 0/1). Blobs (r[14+2k]): k0 gh (DAT_6fa09ccc.., 0x10 bytes), k1 cnt (DAT_6fa09dcc), k2 tb (the record
+// 1.13c D2Multi 0x14100 probe (stdcall, one ignored stack word; r[4] = 0/1). Blobs (r[14+2k]): k0 gh (DAT_6fa09ccc.., 0x10 bytes), k1 cnt (DAT_6fa09dcc), k2 tb (the record
 // table at DAT_6f9fa598), k3 hl (hook log), k4 ua / k5 ub (the two wide strings 7C50 hands out), k6 rv (the 0x3C-byte record 139B0 writes through EBX), k7 cfg
 // (dwords: 7C62 answer, 7C50 first call gives ua, 7E2A answer, 139B0 answer). unicode2Win runs for real in the capture; the probe narrows ASCII, which is what it does for it.
 #include "d2multi_probe.h"

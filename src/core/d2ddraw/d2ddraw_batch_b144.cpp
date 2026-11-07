@@ -203,7 +203,7 @@ EMSCRIPTEN_KEEPALIVE void FUN_6f8c6ff0(void) {
   _BinkNextFrame_4(DAT_6f8d0244);
 }
 
-// 1.13c D2DDraw+0x85a0: open the DirectDraw display; reg: mode = eax (0 = 640x480, else 800x600).
+// D2DDraw 0x85a0 (1.13c; the maintained port is d2ddraw_85a0.cpp): open the DirectDraw display; reg: mode = eax (0 = 640x480, else 800x600).
 // Unverified: DDSURFACEDESC flags/caps the decompiler dropped (guessed per mode), SetCooperativeLevel flags arg.
 EMSCRIPTEN_KEEPALIVE int32_t FUN_6f8c85a0(int mode) {
   if (DAT_6f8d0204 != 0 || !DAT_6f8d0210) { Ordinal_10024("", Ordinal_10265(0)); _exit(-1); }
