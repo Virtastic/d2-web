@@ -7245,6 +7245,85 @@ EMSCRIPTEN_KEEPALIVE int d2_session_fixture_a1q6_timer_to_completion() {
 }
 EMSCRIPTEN_KEEPALIVE const D2SessionAct1Quest6Complete* d2_session_act1q6_complete() { return &g_sessionAct1Quest6Complete; }
 
+// Player-defect check: a player whose A1Q6 record already says REWARDGRANTED (arm 1) or COMPLETEDBEFORE (arm 2)
+// before the game is made. The record is preset on every difficulty, the quest list's join pass runs, and
+// the kill takes the real dispatch (QUESTS_ParseKill with the player as killer), then 24 quest-updater
+// ticks. The packed 40-byte record has the layout of the retail capture's A1Q6 defect kind.
+#pragma pack(push, 1)
+struct D2SessionA1Q6Defect {
+    uint32_t seed; uint8_t difficulty, arm; uint16_t presetFlags;
+    uint16_t flagsBeforeCycler, flagsAfterCycler;
+    uint8_t notIntroBefore, activeBefore, notIntroAfterCycler, activeAfterCycler;
+    uint8_t andarielListed, callbackRan, stateAfterKill, timerListNonEmptyAfterKill;
+    uint16_t ticksAfterKill, ticksFinal;
+    uint8_t updaterCalls, portalCount, timerListNonEmptyFinal, objectsAdded;
+    uint32_t portalId; uint8_t firstPortalCall, listLength; uint16_t flagsFinal; uint32_t hash;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2SessionA1Q6Defect) == 40, "defect record layout");
+static D2SessionA1Q6Defect g_sessionA1Q6Defect;
+static uint16_t sessionA1Q6PlayerFlags() {
+    D2BitBufferStrc* flags = UNITS_GetPlayerData(g_targetPlayer)->pQuestData[g_game->nDifficulty];
+    uint16_t out = 0;
+    for (uint32_t bit = 0; bit < 16; ++bit) if (QUESTRECORD_GetQuestState(flags, QUESTSTATEFLAG_A1Q6, bit)) out |= (uint16_t)(1u << bit);
+    return out;
+}
+static void sessionA1Q6Portals(uint8_t* count, uint32_t* firstId) {
+    updateSessionWorld();
+    *count = 0;
+    for (const D2SessionObjectPresentation& object : g_sessionObjectPresentations) {
+        if (object.classId != 59) continue;
+        if (!*count) *firstId = object.id;
+        ++*count;
+    }
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_fixture_a1q6_defect(int arm) {
+    memset(&g_sessionA1Q6Defect, 0, sizeof g_sessionA1Q6Defect);
+    static const uint16_t kPreset[3] = { 0x0000, 0x0001, 0x8000 };
+    if (arm < 0 || arm > 2 || !g_sessionLive || !g_game || !g_targetPlayer || !g_game->pQuestControl) return 0;
+    D2SessionA1Q6Defect& r = g_sessionA1Q6Defect;
+    D2UnitStrc* andariel = nullptr;
+    for (const D2SessionUnit& unit : g_sessionUnits) {
+        if (unit.type == UNIT_MONSTER && unit.classId == 156) { andariel = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)unit.id); break; }
+    }
+    D2QuestDataStrc* quest = QUESTS_GetQuestData(g_game, QUEST_A1Q6_ANDARIEL);
+    D2QuestInfoStrc* control = g_game->pQuestControl;
+    if (!andariel || !quest || !quest->pQuestDataEx) return 0;
+    r.seed = g_game->dwInitSeed; r.difficulty = g_game->nDifficulty; r.arm = (uint8_t)arm; r.presetFlags = kPreset[arm];
+    for (int d = 0; d < 3; ++d) {
+        D2BitBufferStrc* rec = UNITS_GetPlayerData(g_targetPlayer)->pQuestData[d];
+        if (!rec || !rec->pBuffer) continue;
+        rec->pBuffer[12] = (uint8_t)(r.presetFlags & 0xFF); rec->pBuffer[13] = (uint8_t)(r.presetFlags >> 8);
+    }
+    r.flagsBeforeCycler = sessionA1Q6PlayerFlags();
+    r.notIntroBefore = quest->bNotIntro; r.activeBefore = quest->bActive;
+    control->bPickedSet = 0;
+    QUESTS_SequenceCycler(g_game, g_targetPlayer, 0);
+    r.flagsAfterCycler = sessionA1Q6PlayerFlags();
+    r.notIntroAfterCycler = quest->bNotIntro; r.activeAfterCycler = quest->bActive;
+    uint8_t portals = 0; uint32_t portalId = 0;
+    sessionA1Q6Portals(&portals, &portalId);
+    const size_t objectsBefore = g_sessionObjectPresentations.size();
+    for (D2QuestChainStrc* n = andariel->pQuestEventList; n; n = n->pNext) { ++r.listLength; if (n->pQuestData == quest) r.andarielListed = 1; }
+    D2Act1Quest6Strc* ex = static_cast<D2Act1Quest6Strc*>(quest->pQuestDataEx);
+    QUESTS_ParseKill(g_game, andariel, g_targetPlayer);
+    r.callbackRan = ex->bAndarielKilled; r.stateAfterKill = quest->fState; r.ticksAfterKill = (uint16_t)ex->nTimerInvocations;
+    r.timerListNonEmptyAfterKill = control->pTimer != nullptr;
+    for (int i = 1; i <= 24; ++i) {
+        QUESTS_QuestUpdater(g_game);
+        r.updaterCalls = (uint8_t)i;
+        uint8_t n = 0; uint32_t id = 0; sessionA1Q6Portals(&n, &id);
+        if (n && !r.firstPortalCall) r.firstPortalCall = (uint8_t)i;
+        if (n) { r.portalCount = n; r.portalId = id; }
+    }
+    r.ticksFinal = (uint16_t)ex->nTimerInvocations; r.timerListNonEmptyFinal = control->pTimer != nullptr;
+    r.flagsFinal = sessionA1Q6PlayerFlags();
+    r.objectsAdded = (uint8_t)(g_sessionObjectPresentations.size() - objectsBefore);
+    r.hash = sessionHashBytes(D2VEC_FNV_INIT, &r, offsetof(D2SessionA1Q6Defect, hash));
+    return 1;
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionA1Q6Defect* d2_session_a1q6_defect() { return &g_sessionA1Q6Defect; }
+
 // GAME_UpdateProgress's pending-rooms step (D2Game, D2MOO GAME/Game.cpp), run where retail runs it:
 // at the start of a frame, before events and the client update. The client-room change
 // (sub_6FC33670, below) is retail's activation wave -- it creates active rooms around the player
