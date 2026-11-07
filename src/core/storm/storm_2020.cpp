@@ -1,3 +1,4 @@
+// 1.13c Storm+0x2020
 // 1.13c Storm+0x2020: TSHashTable<RGN>-reuse ctor in the guest's 32-bit word layout (this = word array). It runs 0x2AF0 (base ctor:
 // list {0xC}, 4-element list array, each element link offset 4), then the 0x2560 steps (list {4} at word 10, list {0x10} at word 14,
 // word 13 = 0x10), the vtable, word 0x12 = ~this & 0x0FFFFFFF, word 0x13 = 0.
