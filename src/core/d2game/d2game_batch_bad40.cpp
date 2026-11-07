@@ -45,8 +45,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_BAF20(void* game, uint32_t uni
     a = e->ord(10826, a, 0, 0);
     if (!a) return;
     if ((char)e->ord(10459, a, 0, 0) != 3) return;
-    e->findQuestState((uint32_t)(uintptr_t)game, 0);
-    e->findQuestState((uint32_t)(uintptr_t)game, 0);
+    e->findQuestState((uint32_t)(uintptr_t)game, 0x20686668);   // EAX = the quest-state id (retail: mov eax, imm)
+    e->findQuestState((uint32_t)(uintptr_t)game, 0x2073736d);
     e->ord(10003, q, 0x1b, 0xd);
     e->ord(10003, q, 0x1b, 1);
     e->ord(10495, q, 0x1b, 0);
