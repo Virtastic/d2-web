@@ -11,7 +11,7 @@
 // section; the art slots resolve to the BIGMENU files D2Multi's loader (D2Multi+0x9400..0x9E00) opens.
 import { composeTiled, createBlender, createFont, decodeFontTbl, recordTiled, textColourPalette,
   LABEL_TINT, FRONTEND, TITLE_COLUMNS } from './frontend.mjs';
-import { recordDc6, recordPrim } from './drawlist.mjs';
+import { recordDc6, recordDcc, recordPrim } from './drawlist.mjs';
 import { drawBg, present } from './widebg.mjs';
 import { wrapSpaces } from './bnet-login-screen.mjs';
 
@@ -23,7 +23,7 @@ export const BNET_LOBBY_ASSETS = {
   panel: B + 'blankbckg2.dc6', createPanel: B + 'creategamebckg.dc6', joinPanel: B + 'joingamebckg.dc6',
   topButton: B + 'chatrighttopbuttons.dc6', rightButton: B + 'chatrightbuttons.dc6',
   leftButton: B + 'chatleftbuttons.dc6', leftButton1: B + 'chatleftbuttons1.dc6', leftButton2: B + 'chatleftbuttons2.dc6',
-  arrows: B + 'chatarrows.dc6',
+  arrows: B + 'chatarrows.dc6', gem: B + 'gembutton.dc6',
   gameButton: B + 'GameButtonBlank.dc6', cancelButton: B + 'CancelButtonBlank.dc6',
   clickBox: B + 'joingameclickbox.dc6', greyBox: B + 'GreyLevelBox.dc6',
   radio: B + 'radiobutton.dc6', radioGrey: B + 'radiobuttonGrey.dc6',
@@ -31,7 +31,7 @@ export const BNET_LOBBY_ASSETS = {
   popup: B + 'PopUpOK.dc6',
   // D2Multi's font slots (R19C60.. R19C80).
   formal10: F + 'fontformal10', font16: F + 'font16', font24: F + 'font24', font30: F + 'font30',
-  exocet10: F + 'fontexocet10', ridiculous: F + 'fontridiculous',
+  exocet10: F + 'fontexocet10', ridiculous: F + 'fontridiculous', sucker: F + 'reallythelastsucker',
 };
 
 export const BNET_LOBBY_STRINGS = {
@@ -65,9 +65,12 @@ export const BNET_LOBBY_LAYOUT = {
   enterChat: button('enter-chat', 27, 480, 120, 20, 'topButton', 0, 'enterChat'),
   help: button('help', 146, 480, 120, 20, 'topButton', 0, 'help'),
   charInfo: { x: 143, y: 588, w: 230, h: 87, font: 'formal10' },
-  chatLog: { x: 28, y: 410, w: 354, h: 298, font: 'formal10' },
+  chatLog: { x: 28, y: 410, w: 354, h: 298, font: 'formal10', pitch: 19 },
   chatEdit: { x: 28, y: 450, w: 335, h: 32, font: 'formal10', limit: 255 },
   newsTitle: { x: 28, y: 138, w: 354, h: 60, font: 'formal10', centred: true },
+  gem: { x: 398, y: 474 },
+  // The user band (D2Multi+0xF750): eleven 60-wide cells from x=40, portrait at y=571, name under it alternating 577 / 592.
+  band: { x: 40, cell: 60, visible: 11, portraitY: 571, nameY: [577, 592], font: 'sucker' },
   serverBox: { x: 447, y: 398, w: 290, h: 269, font: 'formal10', centred: true },
   logos: [{ x: 84, y: 52 }, { x: 726, y: 52 }],
   panel: { x: 415, y: 447 },
@@ -213,7 +216,8 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   // 'lobby' (the first view after character select) or 'chat'; `panel` is null, 'create' or 'join'.
   let mode = 'lobby', panel = null, notice = null, busy = false;
   let pressed = null, pointer = [799, 599];
-  const chat = { lines: [], input: '', live: false };
+  const chat = { lines: [], input: '', live: false, channel: '', users: [] };
+  const headerText = () => (chat.channel ? `${chat.channel} (${chat.users.length})` : '');
   const form = { name: '', password: '', description: '', maxPlayers: '4', levelDifference: '', levelLimit: false, difficulty: 0, focus: 'name' };
   let created = now(), pinned = null;
   const clock = () => (pinned === null ? now() : pinned);
@@ -321,13 +325,17 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   // A D2Win 2x2 image (the 373x373 panels): the top cels anchored 117 rows above the bottom ones.
   const drawPanel = (key, x, y) => {
     const c = art(key), f = c.dc6.frames;
-    drawCel(c, 0, x, y - f[2].height); drawCel(c, 1, x + f[0].width, y - f[3].height);
+    drawCel(c, 0, x, y - f[2].height + 1); drawCel(c, 1, x + f[0].width, y - f[3].height + 1);
     drawCel(c, 2, x, y); drawCel(c, 3, x + f[2].width, y);
   };
+  // Drawn 50% translucent though still pressable: SEND / WHISPER / EMOTE with nothing typed, SQUELCH / UNSQUELCH with
+  // no user picked, the scroll arrows while every user fits the band.
+  const dim = (b) => mode === 'chat' && (['send', 'whisper', 'emote'].includes(b.id) ? !chat.input.trim() : ['squelch', 'unsquelch'].includes(b.id) ||
+    b.id.startsWith('arrow-') && chat.users.length <= L.band.visible);
   const drawButton = (b) => {
     const off = disabled(b), down = pressed === b.id || toggled(b);
     const key = b.id.startsWith('difficulty-') && !allowed[Number(b.id.slice(11))] ? 'radioGrey' : b.art;
-    drawCel(art(key), b.base + (down ? 1 : 0), b.x, b.y, off ? 1 : 5);
+    drawCel(art(key), b.base + (down ? 1 : 0), b.x, b.y, off || dim(b) ? 1 : 5);
     if (!b.label) return;
     const label = text(b.label), lf = labelFont(b.h);
     let x = b.x + Math.max(Math.trunc((b.w - lf.measure(label)) / 2), 0), y = b.y + labelRise(b.h) - Math.trunc((b.h - lf.lineHeight) / 2);
@@ -355,11 +363,45 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     f.drawAnchored(sctx, shown, e.x, y);
     if (focused && Math.floor(clock() / 250) % 2 === 1) f.drawAnchored(sctx, '_', e.x + f.measure(shown), y);
   };
-  const drawLogos = () => {
+  // The chat log: each line's `<name> ` in gold, the rest in its colour; lines one pitch apart from the box top.
+  const drawChatLog = (t, lines) => {
+    const f0 = font(t.font), pitch = t.pitch ?? f0.lineHeight, rows = Math.floor(t.h / pitch), out = [];
+    for (const l of lines) {
+      const f = font(t.font, l.colour ?? 0);
+      for (const [i, part] of wrapSpaces(l.text, t.w, (x) => f.measure(x)).entries()) out.push({ part, l, first: i === 0 });
+    }
+    let y = t.y - t.h;
+    for (const { part, l, first } of out.slice(-rows)) {
+      const f = font(t.font, l.colour ?? 0);
+      let x = t.x;
+      if (l.name && first && part.startsWith(l.name)) {
+        const nf = font(t.font, l.nameColour); nf.drawAnchored(sctx, l.name, x, y + f0.lineHeight); x += nf.measure(l.name);
+        f.drawAnchored(sctx, part.slice(l.name.length), x, y + f0.lineHeight);
+      } else f.drawAnchored(sctx, part, x, y + f0.lineHeight);
+      y += pitch;
+    }
+  };
+  // Portrait token by class (the class byte is statstring byte 13, less one: D2Multi+0xF340). The classes retail
+  // has art for come first; an out-of-range class draws the tokens the retail capture shows for one (RO, O2 for 11).
+  const portraitToken = (stat) => {
+    const b = typeof stat === 'string' ? Uint8Array.from(stat, (c) => c.charCodeAt(0) & 255) : stat;
+    const tail = b.indexOf(0x2c, b.indexOf(0x2c) + 1) + 1, c = tail > 0 && b[tail + 2] ? (b[tail + 13] ?? 0) - 1 : -1;
+    return ['AM', 'SO', 'NE', 'PA', 'BA', 'DZ', 'AI'][c] ?? (c === 11 ? 'O2' : 'RO');
+  };
+  const drawBand = () => {
+    const B = L.band, f = font(B.font), shown = chat.users.slice(0, B.visible);
+    for (let i = shown.length - 1; i >= 0; i--) recordDcc(`${portraitToken(shown[i].stat)}`, [4, 5, 0, 2][i % 4], B.x + 30 + B.cell * i, B.portraitY);
+    for (let i = shown.length - 1; i >= 0; i--) {
+      const n = shown[i].name.replace(/^\*/, '');
+      f.drawAnchored(sctx, n, B.x + 30 + B.cell * i - Math.trunc(f.measure(n) / 2), B.nameY[i % 2]);
+    }
+  };
+  // The two logos are controls 34 and 37 around the panel (control 35): the first is drawn before it, the second after.
+  const drawLogos = (k) => {
     const black = art('logoBlack'), fire = art('logoFire');
-    for (const { x, y } of L.logos) {
-      drawCel(black, 0, x, y);
+    for (const { x, y } of [L.logos[k]]) {
       const n = fire.dc6.frames.length, i = Math.floor(Math.max(0, clock() - created) / 40) % (n - 1), f = fire.dc6.frames[i];
+      drawCel(black, i, x, y);
       const left = x + f.offsetX, top = y + f.offsetY - f.height + 1;
       logoBlend(sctx, f, left, top, 3);
       recordDc6(fire.path, i, f, left, top, { op: 'cel', mode: 3 });
@@ -416,6 +458,24 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
         boxes: controls().map((b) => ({ id: b.id, ...box(b), disabled: disabled(b) })), cursor: pointer };
     },
     // A failed create/join that kept the session: retail's notice over the lobby.
+    // A BNCS chat event as D2Multi's table (D2Multi+0x39BC8) takes it: 1 / 2 user in channel / joins, 3 leaves,
+    // 5 talk, 7 channel. True when the screen drew it (the rest go through chatLine).
+    chatEvent(e) {
+      const say = (line) => { chat.lines.push(line); if (chat.lines.length > 200) chat.lines.shift(); };
+      const plain = (n) => n.replace(/^\*/, '');
+      switch (e.event) {
+        case 0x07: chat.channel = e.text; chat.users = []; say({ text: `You have joined channel: ${e.text}`, colour: 5 }); return true;
+        case 0x01: case 0x02: {
+          const user = { name: e.username, stat: e.raw ?? e.text ?? '' }, at = chat.users.findIndex((u) => plain(u.name) === plain(user.name));
+          if (at >= 0) chat.users[at] = user; else chat.users.push(user);
+          if (e.event === 0x02) say({ text: `${e.username} has joined the channel.`, colour: 5 });
+          return true;
+        }
+        case 0x03: chat.users = chat.users.filter((u) => plain(u.name) !== plain(e.username)); say({ text: `${e.username} has left the channel.`, colour: 5 }); return true;
+        case 0x05: say({ text: `<${e.username}> ${e.text}`, name: `<${e.username}> `, colour: 0, nameColour: 4 }); return true;
+        default: return false;
+      }
+    },
     chatLine(line) { chat.lines.push(line); if (chat.lines.length > 200) chat.lines.shift(); },
     chatLive(on) { chat.live = Boolean(on); },
     fail(error) { notice = { body: gameErrorText(error, string) }; busy = false; },
@@ -473,22 +533,24 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
       if (mode === 'chat') { for (const b of [L.send, L.whisper, L.chatHelp, L.squelch, L.unsquelch, L.emote]) drawButton(b); }
       for (const b of [L.create, L.channel, L.join, L.ladder, L.quit]) drawButton(b);
       if (mode === 'chat') {
-        for (const b of L.arrows) drawButton(b);
-        const C = L.chatLog, f = font(C.font), rows = Math.floor(C.h / f.lineHeight);
-        drawTextBox(C, chat.lines.slice(-rows));
+        if (chat.channel) drawTextBox(L.newsTitle, [{ text: headerText(), colour: 3 }]);
+        drawChatLog(L.chatLog, chat.lines);
         drawEdit(L.chatEdit, chat.input, !panel && !notice);
+        drawCel(art('gem'), 0, L.gem.x, L.gem.y);
       } else {
         drawButton(L.enterChat); drawButton(L.help);
         drawTextBox(L.newsTitle, [{ text: text('newsTitle'), colour: 3 }]);
       }
-      drawTextBox(L.charInfo, characterInfoLines(character, string));
-      drawLogos();
+      if (mode !== 'chat') drawTextBox(L.charInfo, characterInfoLines(character, string));
+      drawLogos(0);
       if (panel === 'create') drawCreate();
       else if (panel === 'join') drawJoin();
       else {
         drawPanel('panel', L.panel.x, L.panel.y);
         if (deadHardcore) drawTextBox(L.serverBox, [{ text: text('deadHardcore') }]);
       }
+      drawLogos(1);
+      if (mode === 'chat') { drawBand(); for (const b of L.arrows) drawButton(b); }
       if (notice) drawNotice();
       const f = cursorDc6.frames[0];
       const left = pointer[0] + f.offsetX, top = pointer[1] - 1 + f.offsetY - f.height + 1;

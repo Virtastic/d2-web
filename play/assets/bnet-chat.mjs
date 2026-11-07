@@ -17,7 +17,8 @@ export function parseChatEvent(body) {
   const nameEnd = body.indexOf(0, 24); if (nameEnd < 0) return null;
   const textEnd = body.indexOf(0, nameEnd + 1);
   return { event: u32(body, 0), flags: u32(body, 4), ping: u32(body, 8), username: dec.decode(body.subarray(24, nameEnd)),
-    text: dec.decode(body.subarray(nameEnd + 1, textEnd < 0 ? body.length : textEnd)) };
+    text: dec.decode(body.subarray(nameEnd + 1, textEnd < 0 ? body.length : textEnd)),
+    raw: body.subarray(nameEnd + 1) };
 }
 
 // A chat event as a log line (D2Win colour: 0 white, 1 red, 2 green, 3 blue, 4 gold, 5 grey), or null.
@@ -37,8 +38,9 @@ export function chatLine({ event, username, text }) {
   }
 }
 
-// Owns the open BNCS transport and its reader. `onLine` gets each displayable line.
-export function createBnetChat({ transport, reader, character, realm = '', channel = 'Diablo II', onLine = () => {}, onClose = () => {} }) {
+// Owns the open BNCS transport and its reader. `onEvent` sees every parsed event first (true: handled);
+// `onLine` gets each displayable line it left.
+export function createBnetChat({ transport, reader, character, realm = '', channel = 'Diablo II', onLine = () => {}, onEvent = () => false, onClose = () => {} }) {
   let entered = false, wantJoin = false, joined = false, closed = false;
   const send = (bytes) => transport.send(bytes);
   const handle = ({ id, body }) => {
@@ -47,6 +49,7 @@ export function createBnetChat({ transport, reader, character, realm = '', chann
     else if (id === 0x0f) {
       const e = parseChatEvent(body); if (!e) return;
       if (e.event === 0x07) joined = true;
+      if (onEvent(e)) return;
       const line = chatLine(e); if (line) onLine(line);
     }
   };

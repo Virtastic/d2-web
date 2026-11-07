@@ -1753,6 +1753,7 @@ function startLobbyChat(name) {
   if (!flow?.chat) return null;
   if (flow.chatSession?.open) { bnetLobbyScreen?.chatLive(true); return flow.chatSession; }
   flow.chatSession = createBnetChat({ ...flow.chat, character: name, realm: flow.realms?.[0] ?? flow.server?.region ?? '',
+    onEvent: (e) => { const handled = bnetLobbyScreen?.chatEvent(e) ?? false; if (handled) render(); return handled; },
     onLine: (line) => { bnetLobbyScreen?.chatLine(line); render(); },
     onClose: () => { bnetLobbyScreen?.chatLive(false); } });
   flow.chatSession.enter();
