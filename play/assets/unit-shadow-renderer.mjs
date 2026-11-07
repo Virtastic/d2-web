@@ -157,10 +157,13 @@ export function createUnitShadowRenderer(read) {
         // return value so zero-pixel calls cannot masquerade as visible shadows in pixel probes.
         return blit;
       }
+      // PERF (handheld): each band is one getImageData + one putImageData, each allocating; a short shadow (a torch, a
+      // banner) has no diagonal worth banding, so it gets one band per 8 rows (1..4). The destination colour feeds the
+      // darkening, so a readback of the covered pixels is inherent; this only cuts the calls, never a pixel.
       // PERF (a retail recording): the shadow is a thin diagonal, so its bounding rect is mostly untouched pixels and
       // getImageData is linear in them. Read it in BANDS rows tall, each only as wide as its own rows' extent.
       // Each pixel is still read, shadowed and written once, layers in the same order: identical output.
-      const BANDS = 4, rows = maxY - minY + 1, rowLo = new Int32Array(rows).fill(maxX + 1), rowHi = new Int32Array(rows).fill(minX - 1);
+      const rows = maxY - minY + 1, BANDS = Math.min(4, Math.max(1, rows >> 3)), rowLo = new Int32Array(rows).fill(maxX + 1), rowHi = new Int32Array(rows).fill(minX - 1);
       for (const { mask, baseX, spans } of layers) for (let s = 0; s < spans.length; s += 3) {
         const r = spans[s] - minY, left = baseX + mask[spans[s + 1] * 2], right = baseX + mask[(spans[s + 2] - 1) * 2];
         if (left < rowLo[r]) rowLo[r] = left; if (right > rowHi[r]) rowHi[r] = right;

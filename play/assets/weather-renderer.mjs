@@ -47,6 +47,7 @@
 // draw from: inventing one would be a stand-in that looks right.  This file draws the peak intensity
 // continuously, which over-rains against retail's own dry captures; s561 counts it and F11b carries it
 // as the open half.
+import { createRippleRng } from './weather-ripple-offset.mjs';
 import { decodeDatPalette, decodeDc6 } from './d2-formats.mjs';
 import { createBlender } from './frontend.mjs';
 import { recordDc6, recordPrim } from './drawlist.mjs';
@@ -71,7 +72,7 @@ const MPQ_PATH = (path) => path.toLowerCase();
 /** The renderer needs the active act because DrawMode 3 maps indices through that act's palette/PL2. */
 const ACT_PALETTE = (act) => `data\\global\\palette\\ACT${Math.min(5, Math.max(1, (act | 0) + 1))}\\pal.dat`;
 
-export function createWeatherRenderer({ read }) {
+export function createWeatherRenderer({ read, rippleOffset }) {
   const layers = [];
   const errors = [];
   let prepared = false, levelRain = 0;
@@ -79,6 +80,7 @@ export function createWeatherRenderer({ read }) {
   const cycle = createWeatherCycle(), clock = { tick: null };
   const parity = !globalThis.__d2Entry?.fill;
   let live = [];
+  const rippleRng = rippleOffset ? { offset: rippleOffset } : createRippleRng();
   const streaks = { drops: [], w: 0, h: 0, tick: null, camX: null, camY: null, seed: 0x2545f491 };
 
   /** Load the active act's palette for source cels and PL2-composited ripple output. */
@@ -248,7 +250,7 @@ export function createWeatherRenderer({ read }) {
           if (particle.wx === undefined) {
             const anchor = waterAnchors[particle.seed % waterAnchors.length];
             particle.waterCell = { x: anchor.x, y: anchor.y };
-            particle.wx = anchor.sx + width / 2; particle.wy = anchor.sy + height / 2 - 8;
+            { const o = rippleRng.offset(); particle.wx = anchor.sx + o.dx + width / 2; particle.wy = anchor.sy + o.dy + height / 2 - 8; }
           }
           if (particle.last === undefined) particle.last = index;
           // The animation wrapped (9 -> 0): retail gives the particle a NEW position, and keeps it for
@@ -257,7 +259,7 @@ export function createWeatherRenderer({ read }) {
             particle.seed = (Math.imul(particle.seed ^ step, 1664525) + 1013904223) >>> 0;
             const anchor = waterAnchors[particle.seed % waterAnchors.length];
             particle.waterCell = { x: anchor.x, y: anchor.y };
-            particle.wx = anchor.sx + width / 2; particle.wy = anchor.sy + height / 2 - 8;
+            { const o = rippleRng.offset(); particle.wx = anchor.sx + o.dx + width / 2; particle.wy = anchor.sy + o.dy + height / 2 - 8; }
           }
           particle.x = particle.wx - cx; particle.y = particle.wy - cy;
           particle.last = index;

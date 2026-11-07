@@ -1,3 +1,4 @@
+import './assets/back-guard.mjs';   // Android Back (a pad's B) never leaves the game
 import { parseSessionTiles, readSessionTerrain, readSessionLightmap, worldToScreen, screenDeltaToWorld, UNIT_CENTRE_Y } from './assets/session-terrain.mjs';
 import { inventoryOwnsClick } from './assets/shop-click-owner.mjs';
 import { unitInView } from './assets/unit-view-cull.mjs';
@@ -144,7 +145,7 @@ import { createPointerLayer } from './assets/pointer-layer.mjs';
 import { createFrontendHoverSync } from './assets/frontend-hover-sync.mjs';
 import { DROPPED_GAMEPLAY_KEYS } from './assets/retail-key-bindings.mjs';
 import { createHelpOverlayRenderer } from './assets/help-overlay.mjs';
-import { CONFIGURE_CONTROLS_SLOTS, CONFIGURE_CONTROLS_STORAGE_KEY, beltKeyNames, controlActionForKey, createConfigureControls, restoreControlBindings } from './assets/configure-controls.mjs';
+import { CONFIGURE_CONTROLS_SLOTS, CONFIGURE_CONTROLS_STORAGE_KEY, beltKeyNames, controlActionForKey, controlCodeForAction, createConfigureControls, restoreControlBindings } from './assets/configure-controls.mjs';
 import { createAutomapOverlay } from './assets/automap-overlay.mjs';
 import { parseMa0 } from './assets/ma0.mjs';
 import { panelCloseAt } from './assets/panel-close.mjs';
@@ -4246,8 +4247,8 @@ function drawFrame() {
   ensureTerrain();
   // Retail leaves unpainted world pixels black. A tinted near-black field survives the display
   // ramp as RGB(12,15,12), creating visible green islands in terrain holes (F38, s260).
-  if (RENDER_WIRE?.ownsWorld) ctx.clearRect(0, 0, w, h);   // ?render=w: the worker's canvas under this one paints the world
-  else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h); }
+  if (RENDER_WIRE?.ownsWorld) { ctx.clearRect(0, 0, w, h); terrain?.setBackdrop?.(null); }   // ?render=w: the worker's canvas under this one paints the world
+  else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h); terrain?.setBackdrop?.(w === canvas.width && h === canvas.height ? 0xff000000 : null); }
   // The real map: one draw per placed tile, floors then walls, positioned by the engine's own
   // isometric screen coordinates. Falls back to the old act atlas only if terrain failed to load.
   // Diablo II is isometric. Everything world-anchored projects through the SAME transform the
@@ -6662,7 +6663,9 @@ globalThis.addEventListener('pointerup', (e) => {
     else if (activated === 'hud:menu') hudIconRow = !hudIconRow;
     else if (activated === 'hud:run') { const from = readRunToggle(); lastRunToggle = { at: [x, y], from, to: toggleRunLock() }; }
     else if (activated?.startsWith('stat:')) {
-      Module.ccall('d2_session_command_add_stat', 'number', ['number', 'number'], [Number(activated.slice(5)), 1]);
+      // Shift+click spends up to five points at once, never more than the character has.
+      const avail = Number(readAdvancement()?.statPoints) || 1;
+      Module.ccall('d2_session_command_add_stat', 'number', ['number', 'number'], [Number(activated.slice(5)), e.shiftKey ? Math.max(1, Math.min(5, avail)) : 1]);
       propCache.clear(); advancement = null;
     }
     else if (activated === 'waypoint-close') takeWaypoint(0);
@@ -6933,6 +6936,7 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
   get waypointEvidence() { return { open: Boolean(waypointMenu), waypointId: waypointMenu?.id ?? 0, shownAct: waypointMenu?.act ?? 0, error: waypointPanelError,
     drawn: waypointEvidence && JSON.parse(JSON.stringify(waypointEvidence)), art: waypointPanelRenderer?.evidence ?? null,
     lastTravel: lastWaypointTravel }; },
+  get chatOpen() { return chat !== null; },   // the Enter chat bar is up (the controller shows its key grid)
   waypointTargets() { return waypointMenu ? waypointMenuInput.targets(canvas.width, canvas.height, waypointEvidence?.tabs ?? []) : null; },
   get plugyStash() { return { fail: plugyFail, ready: plugyReady, error: plugyError, settle: () => plugyLast, pages: plugySets, live: plugyLive, gold: plugyGold, meta: plugyMeta, moveGold: plugyMoveGold, artReady: Boolean(plugyStash.art), get enabled() { return plugyStash.enabled; }, set enabled(v) { plugyStash.enabled = v; }, page: plugyStash.page, drawn: plugyEvidence }; },
   get stashEvidence() { return { open: stashOpen, error: stashPanelError, drawn: stashEvidence && JSON.parse(JSON.stringify(stashEvidence)),
@@ -7427,6 +7431,8 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
    * Canvas-pixel click targets for the front-end screens, from the same hit tests their clicks use.
    * s000 aims real pointer events with these, the way world clicks are aimed with project().
    */
+  controlCodeFor(action) { return controlCodeForAction(controlsPanel?.bindings ?? bootControlBindings, action); },
+  get chatOpen() { return chat !== null; },
   uiTargets() {
     const w = canvas.width, h = canvas.height, out = { screen };
     if (screen === SCREEN.TITLE && titleScreen && titlePhase === 'menu') {
@@ -7462,6 +7468,14 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
     // hit-tests the click handler uses, so an aimed click cannot land somewhere else.
     const probe = (hit) => { const found = {}; for (let y = 2; y < h; y += 4) for (let x = 2; x < w; x += 4) { const k = hit(x, y); if (k !== null && k !== undefined && !(k in found)) found[k] = [[x, y]]; else if (k !== null && k !== undefined) found[k].push([x, y]); }
       return Object.fromEntries(Object.entries(found).map(([k, pts]) => [k, [Math.round(pts.reduce((a, p) => a + p[0], 0) / pts.length), Math.round(pts.reduce((a, p) => a + p[1], 0) / pts.length)]])); };
+    // The waypoint menu and quest log, for the controller's snap-nav: the same boxes their click handlers test.
+    if (screen === SCREEN.GAME && waypointMenu && waypointPanelRenderer) {
+      const t = waypointMenuInput.targets(w, h, waypointEvidence?.tabs ?? []);
+      out.waypoint = { close: t.close, ...Object.fromEntries(Object.entries(t.tabs).map(([act, at]) => [`tab${act}`, at])),
+        ...Object.fromEntries(waypointMenuInput.rowTargets(w, h, readWaypointTable().rows(waypointMenu.act), snapshot.level).map((at, i) => [`row${i}`, at])) };
+    }
+    if (screen === SCREEN.GAME && questVisible && questLogRenderer && questEvidence && !clearScreen)
+      out.quest = probe((x, y) => { const q = questLogRenderer.hit(x, y, w, h, questEvidence.tabs, questEvidence.act); return q ? (q.tab ? `tab${q.tab}` : q.quest ? `quest${q.quest}` : q.descr ? 'descr' : 'close') : null; });
     if (screen === SCREEN.GAME && skillSelectRenderer && session) out.skillSelect = skillSelectRenderer.targets(w, h, readSkillChoices());
     if (screen === SCREEN.GAME && characterVisible && characterPanelRenderer && session)
       out.character = probe((x, y) => characterPanelRenderer.buttonAt(x, y, w, h, readAdvancement()));
@@ -7489,8 +7503,13 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
     // has no digit keys, so the amount box is the one field it has to reach by grid (the same
     // one-line shape as `out.shopButtons` above). `modal` means "the dialog's background", which
     // is most of the screen; it is reported for completeness and no row should aim at it.
-    if (screen === SCREEN.GAME && stashOpen && stashGoldRenderer && session)
-      out.stashGold = probe((x, y) => stashGoldRenderer.hitAt(x, y, w, h, readStashLayout(), Boolean(stashGoldDialog))?.action ?? null);
+    if (screen === SCREEN.GAME && (stashOpen || inventoryVisible) && stashGoldRenderer && session)
+      out.stashGold = probe((x, y) => stashGoldRenderer.hitAt(x, y, w, h, stashOpen ? readStashLayout() : null, Boolean(stashGoldDialog))?.action ?? null);
+    // The belt boxes (shown ones) while the inventory is open: lift, put, swap and drink are clicks on them.
+    if (screen === SCREEN.GAME && !clearScreen && inventoryVisible && beltRenderer && session) {
+      const bo = hudOrigin(w, h, 'bottom');
+      out.belt = (beltShownBoxes() || []).map((b) => [Math.round(bo.x + (b.left + b.right) / 2), Math.round(bo.y + (b.top + b.bottom) / 2)]);
+    }
     return out;
   },
   titleClick(label) {

@@ -77,8 +77,8 @@ async function entryFiles(e, depth = 3) {
 // remembered set the Chromium pickers fill. A later boot reopens it through restore(), and the door mounts it as
 // it mounts a remembered desktop handle. Without OPFS, or where a picker exists, nothing here runs.
 const OPFS_DIR = 'd2-byo', CHUNK = 16 << 20;
-const storeAvailable = () => !window.showOpenFilePicker && !window.showDirectoryPicker
-  && !!navigator.storage?.getDirectory && typeof FileSystemFileHandle !== 'undefined';
+const opfsAvailable = () => !!navigator.storage?.getDirectory && typeof FileSystemFileHandle !== 'undefined';
+const storeAvailable = () => !window.showOpenFilePicker && !window.showDirectoryPicker && opfsAvailable();
 
 /**
  * Copy each File into OPFS, asking the browser to keep the storage first. Resolves { handles, files }: a file
@@ -118,8 +118,9 @@ async function keepFiles(files, progress) {
   try { return await stashFiles(files, progress); } catch { return { handles: [], files }; }
 }
 
+// An archive entry has no handle of its own, so it is copied to OPFS on every browser that has it, pickers or not.
 async function archiveDir() {
-  if (!storeAvailable()) return null;
+  if (!opfsAvailable()) return null;
   try { await navigator.storage.persist?.(); } catch { /* refused: the copies still work, the browser may evict them */ }
   try { return await (await navigator.storage.getDirectory()).getDirectoryHandle(OPFS_DIR, { create: true }); }
   catch { return null; }

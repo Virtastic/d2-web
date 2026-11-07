@@ -267,3 +267,19 @@ test('without OPFS: the zip\'s MPQ is kept as a File, and a zip with no game fil
   const none = await pickFiles();
   assert.deepEqual(none, { handles: [], files: [] });
 });
+
+test('desktop picker with OPFS: a zip\'s MPQ is still copied to OPFS, so it is remembered across visits', async () => {
+  const d2data = bytes(1500, 31);
+  const zip = makeZip([{ name: 'Diablo II/Data/D2Data.MPQ', data: d2data, method: 8 }]);
+  const opfs = fakeOpfs();
+  setPicked([], { opfs });
+  const zipFile = archive(zip, 'Diablo II.zip');
+  globalThis.showOpenFilePicker = async () => [{ name: 'Diablo II.zip', kind: 'file', getFile: async () => zipFile }];
+  const { pickFiles } = await import('../play/assets/byo-source.mjs');
+  const got = await pickFiles();
+  delete globalThis.showOpenFilePicker;
+  assert.equal(got.files.length, 0, 'nothing is left as a session-only File');
+  assert.equal(got.handles.length, 1);
+  assert.deepEqual(Buffer.from(await got.handles[0].getFile().then((f) => f.arrayBuffer())), d2data);
+  assert.ok(opfs.root.dirs.get('d2-byo').dirs.get('archive-0').files.has('D2Data.MPQ'));
+});
