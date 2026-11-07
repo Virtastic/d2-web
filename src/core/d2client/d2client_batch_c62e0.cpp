@@ -269,9 +269,9 @@ uint32_t sub_C76C0(const Env& e, P u, P a2, int32_t lim) {
    y = 2 * (int32_t)e.f1660(k, 0, 0, 0, 0, 0) - (int32_t)e.f1660(u, 0, 0, 0, 0, 0);
   }
   int32_t pt[2] = {x, y};
-  P room = e.o10331(u, 0, 0, 0, 0, 0);
-  P m = e.o10589(u, 0, 0, 0, 0, 0);
-  if (!e.o10509(room, (P)pt, m, 0x3c01, 0, 0)) return 0;
+  P m = e.o10589(u, 0x3c01, 0, 0, 0, 0);
+  P room = e.o10331(u, (P)pt, m, 0, 0, 0);   // 1.13c passes (unit, &pt, 10589 result); 10509 takes that result
+  if (!e.o10509(room, 0, 0, 0, 0, 0)) return 0;
   x = pt[0]; y = pt[1];
  } else {
   if (!e.f51340(u, (P)&X, (P)&Y, 0, 0, 0)) return 0;

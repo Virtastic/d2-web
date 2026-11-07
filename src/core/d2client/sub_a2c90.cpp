@@ -5,7 +5,7 @@
 struct D2cA2C90Env {
     const uint8_t* (*rec)(int32_t idx);                  // sgptDataTables+0xb98 table, 0x23c stride; null if idx>=count(+0xba0)
     int32_t handlerCount;                                // DAT_6fb8ec50
-    int32_t bitMask4;                                    // gdwBitMasks[4]
+    int32_t bitMask4;                                    // byte at gdwBitMasks+4 (ds:0x6fb7ee50 deref, +4; disassembly: mov dl,[ecx+4])
     int32_t (*hasHandler)(int32_t i);                    // DAT_6fb8ea48[i] != 0
     int32_t (*callHandler)(int32_t i, int32_t unit, int32_t idx, int32_t p3);  // ECX=unit, EDX=idx, stack p3; returns EAX
     void (*f51340)(int32_t unit, int32_t* pY, int32_t* pX);   // EBX=unit, EDI=&X (local+0x20), stack arg=&Y (local+0x1c)
