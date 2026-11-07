@@ -221,7 +221,7 @@ void d2_fn_d2game_70010(A dst, A src, A bSet, const D2GameBatch6E400Env* e)
 // Quest/item requirement check against one 8-byte condition row at esi+0x14+idx*8.
 // esi = condition table, iStack20 = unit's class record (+0x80 mask), iStack10 = required count,
 // iStack8 = "exact count" flag (0 => at-least). Both stack values are caller-set (REG?).
-// 1.13c D2Game+0x70240 lives in d2game_70240.cpp (rewritten from the disassembly)
+// D2Game 0x70240 lives in d2game_70240.cpp (rewritten from the disassembly)
 
 // 1.13c D2Game+0x70BF0 (layout from the disassembly; see the 70BF0 row).
 // Packet-by-unit send. P = 40-byte stack block, zeroed: P[0] = 0x5a, P[1] = DL. When unit A (EAX) is non-null, ordinal 501 fills
