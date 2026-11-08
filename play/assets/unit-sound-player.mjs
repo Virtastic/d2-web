@@ -13,6 +13,10 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
   if (typeof read !== 'function') throw new TypeError('retail asset reader is required');
   if (!AudioContextClass) throw new Error('Web Audio is unavailable');
   const context = new AudioContextClass(), buffers = new Map(), events = [];
+  // Bounded: a long session would otherwise grow this log forever.
+  events.push = function (...xs) { const n = Array.prototype.push.apply(this, xs); if (n > 512) this.splice(0, n - 512); return this.length; };
+  // Bounded: a long session would otherwise grow this log forever.
+  events.push = function (...xs) { const n = Array.prototype.push.apply(this, xs); if (n > 512) this.splice(0, n - 512); return this.length; };
   // F235: the Sound slider drives every SFX player through one gain node (see audio-volume.mjs).
   const gain = typeof context.createGain === 'function' ? context.createGain() : null;
   if (gain) gain.connect(context.destination);

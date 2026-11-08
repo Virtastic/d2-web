@@ -521,6 +521,10 @@ let questLogRenderer = null, messageLogRenderer = null, questVisible = false, me
 const questCloseGesture = createQuestCloseGesture();
 const characterPanelCloseGesture = createCharacterPanelCloseGesture();
 const messageLines = [];
+// Bounded: the log is drawn every frame and would otherwise grow for the whole session.
+messageLines.push = function (...xs) { const n = Array.prototype.push.apply(this, xs); if (n > 200) this.splice(0, n - 200); return this.length; };
+// Bounded: the log is drawn every frame and would otherwise grow for the whole session.
+messageLines.push = function (...xs) { const n = Array.prototype.push.apply(this, xs); if (n > 200) this.splice(0, n - 200); return this.length; };
 let chatEvidence = null, postedEvidence = null, postedAt = 0;   // V8c: bar/posted-line geometry evidence; the line shows for POSTED_MS after posting
 const POSTED_MS = 10000;   // V8d: retail's posted-line duration, measured in F191 (posted-multi-caps: present 9.7 s, gone 10.2 s)
 let chat = null;   // V8c: the Enter chat bar's text while open (null = closed)
