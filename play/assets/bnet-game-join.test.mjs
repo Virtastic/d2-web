@@ -53,6 +53,17 @@ test('character creation sends the name as UTF-8 with the ladder and hardcore bi
   assert.equal(sent[sent.length - 1], 0);
 });
 
+test('character creation leaves the ladder bit clear unless asked, and flag bytes are class,0,0,0,flags,0,name', async () => {
+  let sent;
+  const reader = { want: async () => Uint8Array.from([7, 0, 2, 0, 0, 0, 0]), skip: () => {} };
+  const session = { reader, list: { characters: [], total: 0, returned: 0 }, protocol: { mcpFrame: (op, body) => body },
+    transport: { send: (b) => { sent = b; } } };
+  await mcpCreateCharacter(session, { name: 'Ab', charClass: 1 });
+  assert.deepEqual([...sent], [1, 0, 0, 0, 0x20, 0, 0x41, 0x62, 0]);
+  await mcpCreateCharacter(session, { name: 'Ab', charClass: 1, ladder: true });
+  assert.deepEqual([...sent], [1, 0, 0, 0, 0x60, 0, 0x41, 0x62, 0]);
+});
+
 import { gameErrorText } from './bnet-lobby-screen.mjs';
 test('a join the realm never answers fails as Join Failed (5141) in the lobby, not as a lost session', async () => {
   const transport = { onData: () => {}, onClose: () => {}, send: () => {} };

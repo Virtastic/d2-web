@@ -2587,8 +2587,8 @@ async function createRealmCharacter({ playerClass, name, checkboxes }) {
   try {
     const { mcpCreateCharacter } = await import('./assets/realm-client.mjs');
     const session = realmFlow.mcpSession;
-    // Retail sets the ladder bit on every character the Battle.net create screen makes.
-    await mcpCreateCharacter(session, { name, charClass: playerClass, hardcore: !!checkboxes?.hardcore, expansion: checkboxes?.expansion !== false, ladder: true });
+    // The LADDER box on the Battle.net create screen sets the 0x40 ladder bit.
+    await mcpCreateCharacter(session, { name, charClass: playerClass, hardcore: !!checkboxes?.hardcore, expansion: checkboxes?.expansion !== false, ladder: !!checkboxes?.ladder });
     charCreate = null; realmCreate = false; screen = SCREEN.BNET_LOGIN;
     enterRealmCharacterSelect(session.list.characters);
   } catch (error) {

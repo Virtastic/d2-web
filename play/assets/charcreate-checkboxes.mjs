@@ -15,6 +15,9 @@ export const CHARACTER_CREATE_CHECKBOXES = Object.freeze({
     // low against that, which this corrects.
     Object.freeze({ key: 'expansion', x: 319, y: 525, labelX: 339, labelY: 524, initial: true, labelIndex: 11077 }),
     Object.freeze({ key: 'hardcore', x: 319, y: 545, labelX: 339, labelY: 544, initial: false, labelIndex: 5126 }),
+    // Battle.net only: the third box, one 20 px step down (same label column), unchecked at first. Its label is patchstring 927
+    // ("LADDER CHARACTER", string index 10927); a checked box sets the 0x40 ladder bit in the MCP CHARCREATE flags.
+    Object.freeze({ key: 'ladder', x: 319, y: 565, labelX: 339, labelY: 564, initial: false, labelIndex: 10927, realmOnly: true }),
   ]),
 });
 
@@ -49,11 +52,13 @@ function celCanvas(frame, palette, documentObject) {
   return canvas;
 }
 
-export function createCharacterCreateCheckboxes({ read, decodeDc6, palette, smallFont, string = () => '', documentObject = globalThis.document }) {
+export function createCharacterCreateCheckboxes({ read, decodeDc6, palette, smallFont, string = () => '', documentObject = globalThis.document, realm = false }) {
+  // The LADDER box exists only on the Battle.net create screen; the single-player screen has the other two.
+  const entries = CHARACTER_CREATE_CHECKBOXES.entries.filter((entry) => realm || !entry.realmOnly);
   const dc6 = decodeDc6(read(CHARACTER_CREATE_CHECKBOXES.asset));
   if (dc6.frames.length !== 2) throw new Error(`${CHARACTER_CREATE_CHECKBOXES.asset} has ${dc6.frames.length} cels, expected 2`);
   const cels = dc6.frames.map((frame) => celCanvas(frame, palette, documentObject));
-  const states = Object.fromEntries(CHARACTER_CREATE_CHECKBOXES.entries.map((entry) => [entry.key, entry.initial]));
+  const states = Object.fromEntries(entries.map((entry) => [entry.key, entry.initial]));
   let drawn = [];
   const box = (entry) => ({ x: entry.x, y: entry.y, w: cels[0].width, h: cels[0].height });
   const inBox = (point, target) => point.x >= target.x && point.x < target.x + target.w && point.y >= target.y && point.y < target.y + target.h;
@@ -67,9 +72,9 @@ export function createCharacterCreateCheckboxes({ read, decodeDc6, palette, smal
     // d2_session_set_client_flags. Nothing else in the client keeps a second copy of them.
     states() { return { ...states }; },
     /** Both boxes back to the state a freshly built screen has them in. */
-    reset() { for (const entry of CHARACTER_CREATE_CHECKBOXES.entries) states[entry.key] = entry.initial; },
+    reset() { for (const entry of entries) states[entry.key] = entry.initial; },
     targets() {
-      return Object.fromEntries(CHARACTER_CREATE_CHECKBOXES.entries.map((entry) => {
+      return Object.fromEntries(entries.map((entry) => {
         const target = box(entry);
         // The two retail cels overlap by a couple of rows.  An inner top-left pixel is unambiguous,
         // unlike the visual centre of the upper box, and is still inside the exact hit rect.
@@ -77,24 +82,24 @@ export function createCharacterCreateCheckboxes({ read, decodeDc6, palette, smal
       }));
     },
     click(point) {
-      const entry = CHARACTER_CREATE_CHECKBOXES.entries.find((candidate) => inBox(point, box(candidate)));
+      const entry = entries.find((candidate) => inBox(point, box(candidate)));
       if (!entry) return null;
       return this.toggle(entry.key);
     },
     toggle(key) { if (!(key in states)) return null; states[key] = !states[key]; return key; },
     hitTest(point) {
-      return CHARACTER_CREATE_CHECKBOXES.entries.find((candidate) => inBox(point, box(candidate)))?.key ?? null;
+      return entries.find((candidate) => inBox(point, box(candidate)))?.key ?? null;
     },
     contains(key, point) {
-      const entry = CHARACTER_CREATE_CHECKBOXES.entries.find((candidate) => candidate.key === key);
+      const entry = entries.find((candidate) => candidate.key === key);
       return Boolean(entry && inBox(point, box(entry)));
     },
     draw(ctx) {
-      drawn = CHARACTER_CREATE_CHECKBOXES.entries.map((entry) => {
+      drawn = entries.map((entry) => {
         const frame = states[entry.key] ? 1 : 0;
         // Retail draws each checkbox's LABEL before its box (the retail captures records
         // 131-150 and 151-159); the two are at the same band and the draw list is identity evidence.
-        smallFont.draw(ctx, string(entry.labelIndex) || (entry.key === 'hardcore' ? 'Hardcore' : 'Expansion Character'), entry.labelX, entry.labelY);
+        smallFont.draw(ctx, string(entry.labelIndex) || ({ hardcore: 'Hardcore', ladder: 'Ladder Character' }[entry.key] ?? 'Expansion Character'), entry.labelX, entry.labelY);
         ctx.drawImage(cels[frame], entry.x, entry.y);
         recordDc6(CHARACTER_CREATE_CHECKBOXES.asset, frame, dc6.frames[frame], entry.x, entry.y);
         // requested and drawn are deliberately separate: s375 rejects a fallback or swapped cel.

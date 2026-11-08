@@ -57,7 +57,8 @@ function frame(screen) {
   return identity(l);
 }
 function compare(name, ours, { fromPopup = false } = {}) {
-  let retail = identity(parseDrawListVector(readFileSync(vec(name), 'utf8')));
+  // The captured screen prints the expiry block (Font8); the player does not want it, so it is not compared.
+  let retail = identity(parseDrawListVector(readFileSync(vec(name), 'utf8'))).filter((r) => !/font8/i.test(r.path));
   if (fromPopup) {
     const first = (l) => l.findIndex((r) => /PopUpOK/i.test(r.path));
     retail = retail.slice(first(retail)); ours = ours.slice(first(ours));
@@ -107,4 +108,22 @@ test('OK on a Hardcore character raises the confirmation, CANCEL restarts and OK
   s.chooseByKey('barbarian'); s.setName('Aelwyn'); s.click(...s.targets(800, 600).checkboxes.hardcore, 800, 600); s.submit();
   s.click(470, 322, 800, 600); // OK
   assert.equal(created?.name, 'Aelwyn'); assert.equal(created.checkboxes.hardcore, true);
+});
+
+test('no expiry text is drawn, and the LADDER box sits under HARDCORE', { skip: !rd }, () => {
+  const s = build(); s.chooseByKey('barbarian'); s.tick = 40;
+  const l = frame(s);
+  assert.equal(l.filter((r) => /font8/i.test(r.path)).length, 0);
+  const boxes = l.filter((r) => /clickbox/i.test(r.path));
+  assert.equal(boxes.length, 3);
+  assert.equal(s.evidence.checkboxes.states.ladder, false);
+});
+test('the LADDER box toggles and rides to the create callback', { skip: !rd }, () => {
+  let created = null;
+  const s = build({ onCreate: (c) => { created = c; } });
+  s.chooseByKey('barbarian'); s.tick = 40; s.setName('Aelwyn');
+  s.click(...s.targets(800, 600).checkboxes.ladder, 800, 600);
+  assert.equal(s.evidence.checkboxes.states.ladder, true);
+  s.submit();
+  assert.equal(created.checkboxes.ladder, true);
 });
