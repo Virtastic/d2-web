@@ -1902,6 +1902,7 @@ function enterBnetLobby(name) {
     onSendChat: (text) => realmFlow?.chatLink?.say(text, lobbyChatUser(c.name)) === true,
     onJoinChannel: (channel) => { startLobbyChat(c.name); realmFlow?.chatLink?.join(channel); },
     onRefreshChannels: () => { realmFlow?.chatLink?.channels(); },
+    onLadder: async (kind) => { const flow = realmFlow; if (!flow?.mcpSession) throw transportFailure('the Battle.net connection is not open'); const { fetchLadder } = await import('./assets/realm-ladder.mjs'); return fetchLadder(flow.mcpSession, kind); },
     onQuit: () => enterRealmCharacterSelect(realmCharacters) }); }
   catch (error) { bnetLobbyScreen = null; bnetLobbyError = String(error); }
   screen = SCREEN.BNET_LOBBY;

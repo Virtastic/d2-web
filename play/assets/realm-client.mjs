@@ -285,6 +285,18 @@ export async function mcpCreateCharacter(session, { name, charClass, expansion =
   return character;
 }
 
+const MCP_LADDERDATA = 0x11;
+/** MCP LADDERDATA (0x11): ask for one ladder by mode and read its answer (see realm-ladder.mjs for the layout). */
+export async function mcpLadderRequest(session, mode, { timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+  if (!session || session.joined) throw new Error('MCP character session is not reusable');
+  const { parseLadderReply, ladderRequestBody } = await import('./realm-ladder.mjs');
+  session.transport.send(session.protocol.mcpFrame(MCP_LADDERDATA, ladderRequestBody(mode)));
+  for (;;) {
+    const reply = await readMcpFrame(session.reader, timeoutMs);
+    if (reply.op === MCP_LADDERDATA) return parseLadderReply(reply.body);
+  }
+}
+
 const MCP_CHARDELETE = 0x0a, MCP_DELETE_COOKIE = 1;
 /** MCP CHARDELETE request (0x0A): `[cookie:u16 LE][name\0]`; retail's reply handler keeps only the answer whose cookie it sent. */
 export function mcpCharDeleteBody(name, cookie = MCP_DELETE_COOKIE) {

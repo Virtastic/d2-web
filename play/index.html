@@ -139,7 +139,8 @@
 // since issue 18 (`window.__d2Entry.retail` above; `?retail=0` is this smoke page with no game data).
 // Everything real replaces this in M3/M5.
 const RETAIL_ORDER = ['patch_d2.mpq', 'd2exp.mpq', 'd2xmusic.mpq', 'd2xtalk.mpq', 'd2xvideo.mpq', 'd2data.mpq', 'd2char.mpq', 'd2music.mpq', 'd2sfx.mpq', 'd2speech.mpq', 'd2video.mpq'];
-const log = (s) => { document.getElementById('log').textContent += s + '\n'; console.log(s); };
+const logLines = [];
+const log = (s) => { logLines.push(s); if (logLines.length > 200) logLines.splice(0, logLines.length - 200); document.getElementById('log').textContent = logLines.join('\n'); console.log(s); };
 window.__d2 = { ready: false, smoke: null, error: null };
 // Stamped by version-engine.sh; untouched placeholder = local dev, engine next to this page.
 const VER = '__ENGINE_VERSION__';

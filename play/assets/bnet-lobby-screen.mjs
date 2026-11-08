@@ -52,6 +52,8 @@ export const BNET_LOBBY_STRINGS = {
   diffNormal: 10018, diffNightmare: 10017, diffHell: 10016,
 };
 // The class names by class index (D2Multi+0x8D80); anything else is 5383.
+// No retail string is known for an empty ladder yet, so the screen says it in its own words.
+const LADDER_EMPTY_TEXT = 'No characters are ranked on this ladder yet.';
 export const CLASS_STRINGS = [4011, 4010, 4009, 4008, 4007, 10097, 10098];
 
 // The lobby's controls (D2Multi+0x19D30..0x1A270): [id, type, x, y (bottom row), w, h, art, base frame, label].
@@ -135,6 +137,14 @@ export const BNET_LOBBY_LAYOUT = {
     buttons: [button('ladder-hardcore', 463, 238, 272, 32, 'wideButton', 0, 'hardcoreLadder', { kind: 1 }), button('ladder-standard', 463, 188, 272, 32, 'wideButton', 0, 'standardLadder', { kind: 0 }),
       button('ladder-expansion-hardcore', 463, 338, 272, 32, 'wideButton', 0, 'expansionHardcoreLadder', { kind: 3 }), button('ladder-expansion', 463, 288, 272, 32, 'wideButton', 0, 'expansionLadder', { kind: 2 })],
     cancel: button('panel-cancel', 433, 433, 96, 32, 'cancelButton', 0, 'cancel'),
+  },
+  // The ranked list: the HELP panel's art and list box, rank / name / level / experience columns.
+  ladderList: {
+    title: { x: 500, y: 112, w: 200, h: 22, font: 'font30', centred: true },
+    list: { x: 447, w: 290, font: 'formal10', firstBaseline: 144, pitch: 19, rows: 13, colour: 4, scrollbar: { x: 753, bottom: 390, top: 134 },
+      cols: { rank: 24, name: 32, level: 208, experience: 290 } },
+    ok: button('ladder-list-ok', 671, 433, 96, 32, 'cancelButton', 0, 'ok'),
+    back: button('ladder-list-back', 433, 433, 96, 32, 'cancelButton', 0, 'cancel'),
   },
   // JOIN GAME (D2Multi+0x48F0).
   joinGame: {
@@ -227,7 +237,7 @@ export function portraitFrameAt(token, elapsedMs) {
 export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, string = () => '', character = {},
   now = () => performance.now(), registryDifficulty = 0, onCreateGame = async () => {}, onJoinGame = async () => {}, onRefreshGames = () => {},
   offline = false,
-  portraitFrame = null, auraFrame = null, figure = null, onQuit = () => {}, onEnterChat = () => {}, onSendChat = () => false, onJoinChannel = () => {}, onRefreshChannels = () => {}, onLadder = () => {}, documentObject = globalThis.document }) {
+  portraitFrame = null, auraFrame = null, figure = null, onQuit = () => {}, onEnterChat = () => {}, onSendChat = () => false, onJoinChannel = () => {}, onRefreshChannels = () => {}, onLadder = null, documentObject = globalThis.document }) {
   const A = BNET_LOBBY_ASSETS, L = BNET_LOBBY_LAYOUT, S = BNET_LOBBY_STRINGS;
   const palette = decodeDatPalette(read(FRONTEND.palette));
   const skyPalette = decodeDatPalette(read('data\\global\\palette\\Act1\\pal.dat')); // the lobby is drawn under the Act 1 palette; Sky turns the floor blue
@@ -329,11 +339,19 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   // HELP, CHANNEL and LADDER: panels of their own. HELP's list keeps its place while the panel is shut; CHANNEL's list is what the chat
   // connection last reported (`setChannels`), its name edit starts on the channel in.
   let helpFirst = 0, channels = [], chanFirst = 0;
+  // The ranked list a LADDER button opens: rows null while the realm is asked, [] for an empty ladder.
+  let ladder = { kind: 0, rows: null }, ladderFirst = 0;
   const openHelp = () => { panel = 'help'; };
   let chanSel = -1;
   const openChannel = () => { onRefreshChannels(); panel = 'channel'; form.channel = chat.channel; form.focus = 'channel'; chanSel = -1; chanFirst = 0; };
   const openLadder = () => { panel = 'ladder'; };
   const closePanel = () => { panel = null; };
+  const openLadderList = (kind) => {
+    if (!onLadder) return;   // no realm behind the lobby (the headless front end): retail's button changes nothing
+    const mine = ladder = { kind, rows: null }; ladderFirst = 0; panel = 'ladder-list';
+    Promise.resolve().then(() => onLadder(kind)).then((rows) => { if (ladder === mine) mine.rows = Array.isArray(rows) ? rows : []; },
+      (error) => { if (ladder !== mine) return; panel = 'ladder'; notice = { body: gameErrorText(error, string, character) }; });
+  };
   // The help list: each string wrapped to the list's width, a blank row after it unless the string runs on into the next one.
   let helpRows = null;
   const helpLines = () => {
@@ -375,6 +393,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
       const C = L.channelPanel, e = C.edit;
       out.push(C.ok, C.cancel, { id: `field-${e.id}`, type: 'field', x: e.x, y: e.y, w: e.w, h: e.h });
     } else if (panel === 'ladder') out.push(...L.ladderPanel.buttons, L.ladderPanel.cancel);
+    else if (panel === 'ladder-list') out.push(L.ladderList.ok, L.ladderList.back);
     return out;
   };
   const box = (b) => ({ x: b.x, y: b.y - b.h + 1, w: b.w, h: b.h });
@@ -426,6 +445,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   const barOf = () => {
     if (busy || notice) return null;
     if (panel === 'join') { const S = L.joinGame.list.scrollbar, max = barMax(); return max ? { S, max, pos: () => listFirst, set: (p) => { listFirst = Math.max(0, Math.min(max, p)); } } : null; }
+    if (panel === 'ladder-list') { const S = L.ladderList.list.scrollbar, max = Math.max(0, (ladder.rows?.length ?? 0) - L.ladderList.list.rows); return max ? { S, max, pos: () => Math.min(ladderFirst, max), set: (p) => { ladderFirst = Math.max(0, Math.min(max, p)); } } : null; }
     if (panel === 'channel') { const S = L.channelPanel.list.scrollbar, max = Math.max(0, channels.length - L.channelPanel.list.rows); return max ? { S, max, pos: () => Math.min(chanFirst, max), set: (p) => { chanFirst = Math.max(0, Math.min(max, p)); } } : null; }
     return null;
   };
@@ -508,13 +528,14 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     // CREATE and JOIN are toggles: a second press closes their panel (D2Multi+0x15380 / +0x14B70).
     if (id === 'create') { if (panel !== 'create') openCreate(); return; }
     if (id === 'join') { if (panel !== 'join') openJoin(); return; }
-    if (id === 'panel-cancel' || id === 'help-ok') { closePanel(); return; }
+    if (id === 'ladder-list-back') { panel = 'ladder'; return; }
+    if (id === 'panel-cancel' || id === 'help-ok' || id === 'ladder-list-ok') { closePanel(); return; }
     // HELP opens its panel from either button; CHANNEL and LADDER are toggles like CREATE and JOIN.
     if (id === 'help' || id === 'chat-help') { if (panel !== 'help') openHelp(); return; }
     if (id === 'channel') { if (panel !== 'channel') openChannel(); return; }
     if (id === 'ladder') { if (panel !== 'ladder') openLadder(); return; }
     if (id === 'channel-ok') { joinChannel(); return; }
-    if (id.startsWith('ladder-')) { onLadder(L.ladderPanel.buttons.find((x) => x.id === id).kind); return; }
+    if (id.startsWith('ladder-')) { openLadderList(L.ladderPanel.buttons.find((x) => x.id === id).kind); return; }
     if (id === 'enter-chat') { mode = 'chat'; onEnterChat(); return; }
     // The chat buttons only act on a live chat connection; WHISPER and the SQUELCHes need a picked user.
     if (id === 'whisper') { if (chat.picked && chat.input.length) { sendChat(true); reeval(); } return; }
@@ -842,6 +863,26 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     for (const b of D.buttons) drawWide(b);
     drawButton(D.cancel);
   };
+  const drawLadderList = () => {
+    const H = L.ladderList, S = H.list.scrollbar, rows = ladder.rows ?? [], art2 = art('joinScrollbar');
+    drawPanel('helpPanel', L.panel.x, L.panel.y);
+    drawTextBox(H.title, [{ text: text(L.ladderPanel.buttons.find((b) => b.kind === ladder.kind).label), colour: 4 }]);
+    const max = Math.max(0, rows.length - H.list.rows), first = Math.min(ladderFirst, max);
+    if (max > 0) {
+      drawCel(art2, 1, S.x, S.bottom);
+      for (let sy = S.bottom - 10; sy > S.top; sy -= 10) drawCel(art2, 5, S.x, sy);
+      drawCel(art2, 0, S.x, S.top); drawCel(art2, 4, S.x, S.top + 10 + Math.trunc((S.bottom - 20 - S.top) * first / max));
+    }
+    const f = font(H.list.font, H.list.colour), c = H.list.cols, x = H.list.x;
+    const right = (t, edge, y) => f.drawAnchored(sctx, t, x + edge - f.measure(t), y);
+    if (ladder.rows === null) f.drawAnchored(sctx, text('pleaseWait'), x, H.list.firstBaseline);
+    else if (!rows.length) wrapSpaces(LADDER_EMPTY_TEXT, H.list.w, (t) => f.measure(t)).forEach((line, i) => f.drawAnchored(sctx, line, x, H.list.firstBaseline + i * H.list.pitch));
+    rows.slice(first, first + H.list.rows).forEach((r, i) => {
+      const y = H.list.firstBaseline + i * H.list.pitch;
+      right(String(r.rank), c.rank, y); f.drawAnchored(sctx, r.name, x + c.name, y); right(String(r.level), c.level, y); right(String(r.experience), c.experience, y);
+    });
+    drawButton(H.back); drawButton(H.ok);
+  };
   const drawJoining = () => {
     const N = L.notice, J = L.joining, p = art('popup');
     drawCel(p, 0, N.x, N.y); drawCel(p, 1, N.x + p.dc6.frames[0].width, N.y);
@@ -874,6 +915,10 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
       const H = L.helpPanel, max = Math.max(0, helpLines().length - H.list.rows);
       return max ? { id: 'help', S: H.list.scrollbar, art: 'joinScrollbar', max, at: Math.min(helpFirst, max), area: { x: H.list.x, top: H.list.firstBaseline - 12, bottom: H.list.firstBaseline - 12 + H.list.rows * H.list.pitch }, set: (p) => { helpFirst = p; } } : null;
     }
+    if (panel === 'ladder-list') {
+      const H = L.ladderList, max = Math.max(0, (ladder.rows?.length ?? 0) - H.list.rows);
+      return max ? { id: 'ladder-list', S: H.list.scrollbar, art: 'joinScrollbar', max, at: Math.min(ladderFirst, max), area: { x: H.list.x, top: H.list.firstBaseline - 12, bottom: H.list.firstBaseline - 12 + H.list.rows * H.list.pitch }, set: (p) => { ladderFirst = p; } } : null;
+    }
     if (panel === 'channel') {
       const CL = L.channelPanel.list, max = Math.max(0, channels.length - CL.rows);
       return max ? { id: 'channels', S: CL.scrollbar, art: 'joinScrollbar', max, at: Math.min(chanFirst, max), area: { x: CL.area.x, top: CL.area.top, bottom: CL.area.top + CL.area.h }, set: (p) => { chanFirst = p; } } : null;
@@ -899,6 +944,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     get mode() { return mode; },
     // The channel names the chat connection reported, in its order.
     // The help list's scroll (the list call at D2Win 0x88A0): the first row on show.
+    ladderState() { return { panel, kind: ladder.kind, rows: ladder.rows }; },
     scrollHelp(pos) { helpFirst = Math.max(0, pos); },
     setChannels(list) { channels = list.map(String); chanFirst = 0; },
     setGames(list) {
@@ -1088,6 +1134,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
       else if (panel === 'help') drawHelp();
       else if (panel === 'channel') drawChannel();
       else if (panel === 'ladder') drawLadder();
+      else if (panel === 'ladder-list') drawLadderList();
       if (mode === 'chat') { drawBand(); for (const b of L.arrows) drawButton(b); }
       if (joining) drawJoining();
       if (notice) drawNotice();
