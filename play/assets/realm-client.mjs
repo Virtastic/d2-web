@@ -514,7 +514,7 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
   // carries a 128-byte inline table), so read the flag pair first and then the whole thing.
   const flag = await reader.want(2, timeoutMs);
   const greeting = protocol.greetingParse(flag);
-  const greetingSize = greeting >> 8, mode = greeting & 0xff;
+  const greetingSize = greeting < 0 ? 0 : greeting >> 8, mode = greeting & 0xff;
   if (!greetingSize) throw new Error(`not a D2GS greeting: ${hex(flag)}`);
   await reader.want(greetingSize, timeoutMs);
   reader.skip(greetingSize);
@@ -526,12 +526,18 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
   let frameCount = 0, assignOffset = -1, handshakeEnd = -1, playerAssignment = null;
   let receiptScanAt = 0;
   const joinReassignments = [];
+  // `AF 00` is the unframed dialect the stock 1.13c game server speaks: after the greeting the stream is a bare
+  // run of packets that only the size table delimits. Reading it as Huffman frames drops the join on the
+  // server's first bytes (01 .. 00 02), so the client would hang up before ever asking to enter the game.
+  const raw = mode === 0;
+  const nextFrame = () => (raw ? readD2gsRawPackets : readD2gsFrame)(reader, protocol, timeoutMs);
+  let enterSent = false;
   if (typeof protocol.d2gsFindPlayerAssign !== 'function') throw new Error('engine D2GS packet framing is unavailable');
   if (typeof protocol.d2gsClientPlayerFeed !== 'function') throw new Error('engine D2GS client state is unavailable');
   protocol.d2gsClientPlayerReset?.();
   protocol.d2gsClientSetDifficulty?.(difficulty);
   while (handshakeEnd < 0) {
-    const frame = await readD2gsFrame(reader, protocol, timeoutMs);
+    const frame = await nextFrame();
     decoded.push(...frame);
     frameCount++;
     if (decoded.length > 65536 || frameCount > 32) throw new Error('D2GS join stream exceeded the player selection scan limit');
@@ -546,6 +552,8 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
       if (packetLength === 0) break;
       const deny = readD2gsDeny(packet);
       if (deny) throw d2gsDenyError(deny.code, (charClass ?? 0) >= 5 || expansion);
+      // The server's 0x02 (game load success) is answered with the one-byte 0x6B before it sends the world.
+      if (raw && packet[0] === 0x02 && !enterSent) { enterSent = true; transport.send(Uint8Array.of(0x6b)); }
       if (packet[0] === 0x15) {
         const reassignment = protocol.d2gsPlayerReassign?.(packet.subarray(0, packetLength));
         if (reassignment) joinReassignments.push({ offset: receiptScanAt, update: reassignment });
@@ -604,7 +612,7 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
     playerAssignment, playerState, worldState, transitionFade, gamelogon: gamelogon.length, gamelogonBytes: Array.from(gamelogon) };
   const tail = response.subarray(handshakeEnd);
   const pending = tail.length ? [tail] : [];
-  const readFrame = async () => pending.length ? pending.shift() : readD2gsFrame(reader, protocol, null);
+  const readFrame = async () => pending.length ? pending.shift() : (raw ? readD2gsRawPackets : readD2gsFrame)(reader, protocol, null);
   readFrame.cancel = () => reader.cancel();
   // D2GS remains a continuous stream after the entry burst; reuse this reader for later frames.
   // Keep the method non-enumerable so browser-harness evidence stays plain JSON data.
@@ -1008,6 +1016,28 @@ export async function readD2gsFrame(reader, protocol, timeoutMs = CONNECT_TIMEOU
   if (reader.cancelled) throw new Error('D2GS reader cancelled');
   reader.skip(size);
   return protocol.d2gsDecompress(frame);
+}
+
+/**
+ * One read of the unframed (`AF 00`) server stream: every whole packet buffered so far, delimited by the
+ * engine's 1.13c size table (0 = the packet is not all here yet, negative = an opcode the build does not use).
+ */
+export async function readD2gsRawPackets(reader, protocol, timeoutMs = CONNECT_TIMEOUT_MS) {
+  let have = 1;
+  for (;;) {
+    await reader.want(have, timeoutMs);
+    if (reader.cancelled) throw new Error('D2GS reader cancelled');
+    const buf = reader.buffered();
+    let at = 0;
+    for (;;) {
+      const n = at < buf.length ? protocol.d2gsPacketSize(buf.subarray(at)) : 0;
+      if (n < 0) throw new Error('D2GS stream contains an invalid 1.13c server packet');
+      if (n === 0) break;
+      at += n;
+    }
+    if (at > 0) { const out = buf.slice(0, at); reader.skip(at); return out; }
+    have = buf.length + 1;
+  }
 }
 
 // --- transports ---------------------------------------------------------------------------------
