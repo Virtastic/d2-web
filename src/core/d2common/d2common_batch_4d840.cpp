@@ -178,7 +178,7 @@ uint8_t* D2Common_10529_GetLayerCell(int32_t* pUnit)
 }
 
 // 0x66800's callees: 0x665C0 refreshes the unit's room membership, 0x391F0 answers its
-// alignment, and 0x66630 validates (room, unit, allow-already-present) — register-ordered in
+// alignment, and 0x66630 validates (room, unit, allow-already-present) - register-ordered in
 // retail (ESI=room, EDI=unit, stack flag). All three are still UNMAPPED rows.
 struct D2Common_10531_Env
 {

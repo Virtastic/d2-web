@@ -160,7 +160,7 @@ void GAME_SendMessageToAllClients(int32_t nMessageType, int32_t nPacketParam, co
 }
 
 // 1.13c D2Game+0x2DEC0 (ord 10034)
-// GAME_DisconnectClientByName: resolve the client id, then the inlined GAME_DisconnectClientById — lock the
+// GAME_DisconnectClientByName: resolve the client id, then the inlined GAME_DisconnectClientById - lock the
 // client's game, ask 0x2D090 to disconnect it (it tolerates a null client), unlock. TRUE whenever the name
 // resolved, even if the client has no game.
 int32_t GAME_DisconnectClientByName(const char* szClientName, uint32_t nEventType, const D2GameBatch2Env* pEnv)
@@ -375,7 +375,7 @@ uint32_t GAME_GetInitSeed(const D2GameBatch2Env* pEnv)
 
 // 1.13c D2Game+0x522D0 (ord 10056)
 // TASK_GetTaskTimeoutAndType (1.10f D2Game_10043): the same deadline as 0x52240, plus the task record when
-// the deadline has expired — then the task is unlinked from the balance list and *ppTask receives it.
+// the deadline has expired - then the task is unlinked from the balance list and *ppTask receives it.
 int32_t TASK_GetTaskTimeoutAndType(uint32_t nTaskNumber, void** ppTask, const D2GameBatch2Env* pEnv)
 {
     int32_t nResult = 100;
