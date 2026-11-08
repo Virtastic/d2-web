@@ -21,7 +21,7 @@ struct D2GameBatchC7130Env {
     void*    (*ptr)(uint32_t v);                       // retail 32-bit pointer -> host record
     uint32_t (*ord10265)(uint32_t code);
     void     (*ord10024)(uint32_t text, uint32_t code);
-    uint32_t (*ord10920)();                            // Ordinal_10920
+    uint32_t (*ord10920)(const void* unit);            // Ordinal_10920 (thunk 0xA4C0, 1 stack word = unit)
     void     (*sendPacket8A3E0)(const void* buf, uint32_t len);
     uint8_t  (*subC6A30)(void* ecx);
     void     (*ord11090)(void* unit, uint32_t v);
@@ -82,7 +82,7 @@ void d2_fn_d2game_c7130(void* ecx, void* quest, int32_t* edi, const D2GameBatchC
     if (e->subC6A30(ecx)) { d[2] = 1; return; }
     d[3] = 1;
     uint8_t pkt[6]; uint32_t id = 0x10a5d; std::memcpy(pkt, &id, 4); pkt[4] = pkt[5] = 0;
-    if (edi && *edi == 0) e->ord10920();
+    if (edi && *edi == 0) e->ord10920(edi);
     e->sendPacket8A3E0(pkt, 6);
 }
 
@@ -284,8 +284,11 @@ int32_t d2_fn_d2game_cbc70(const void* p1, int32_t p2, const D2GameBatchC7130Env
 
 // 1.13c D2Game+0xCBED0
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2game_cbed0(const int32_t* eax, const D2GameBatchC7130Env* e, void (*sub8B400)())
+void d2_port_d2game_cbed0(const int32_t* eax, const D2GameBatchC7130Env* e, void (*sub8B400)(const uint8_t* pkt, uint32_t arg))
 {
-    if (eax && *eax == 0) e->ord10920();
-    sub8B400();
+    uint8_t pkt[0x28] = {0};
+    pkt[0] = 0x5a; pkt[1] = 0x0e; pkt[2] = 1;
+    uint32_t arg = 0;
+    if (eax && *eax == 0) arg = r32(e->ptr(e->ord10920(eax)), 0x9c);
+    sub8B400(pkt, arg);
 }

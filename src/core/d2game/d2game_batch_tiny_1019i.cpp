@@ -97,6 +97,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fnenv_d2game_ee70(uint32_t game, uint32_
 
 // 0x5D080: iterate the player unit list (type 0) with the fixed retail callback 0x7CFF0 and a null
 // argument; the iterate helper's result (the first unit the callback accepts, or null) is returned.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_5d080(uint32_t game, const D2GameBatchTiny1019iEnv* env) {   // 1.13c D2Game+0x5D080
+int32_t d2game_5D080(uint32_t game, const D2GameBatchTiny1019iEnv* env) {   // 1.13c D2Game+0x5D080
     return env->fnDFCC0(game, 0, nullptr, env->fn7CFF0);
 }

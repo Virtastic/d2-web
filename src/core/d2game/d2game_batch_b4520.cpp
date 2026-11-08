@@ -36,25 +36,30 @@ static bool missileIdOk(const D2GameBatchB4520Env* e, const uint8_t* s) {
 // zeroed 0x17-dword missile/event descriptor
 struct Desc { u32 w[0x17]; };
 
-// 1.13c D2Game+0xB4520  (EAX = skill id, ESI = flags word)
-extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B4520(u32 game, void* unit, i32 skillId, u32 esi, const D2GameBatchB4520Env* env)
+// 1.13c D2Game+0xB4520  (EAX = skill id, ESI = flags word; stack: game, unit, a2). The descriptor is 0x70 zero bytes: w[0] flags, w[1] = the
+// 0xDE5A0 result in its low word, w[2] = the 10786 count, w[0x18] = the row's +0x134 word when set. SUB(0x9F210/0xDDDE0/0xDE5A0) take their register inputs first.
+extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B4520(u32 game, void* unit, i32 skillId, u32 esi, u32 a2, const D2GameBatchB4520Env* env)
 {
     const uint8_t* s = skillRec(env, skillId);
     if (!s || !unit) return 0;
-    ORD(11129, 0, 0, 0, 0);
-    u32 flags = esi;
-    u32 o = ORD(10653, 0, 0, 0, 0);
-    // ponytail: piStack_10/piStack_c are the (game, unit) pair on the stack
-    u32 r = SUB(0xDE5A0, game, o, esi, 0, 0, 0, 0) & 0xffff;
-    if (r & 1) {
-        flags = esi | rd32(s, 0x130);
-        ORD(10786, 0, 0, 0, 0);
-        SUB(0x9F210, 0, 0, 0, 0, 0, 0, 0);
+    const u32 un = U((uintptr_t)unit);
+    ORD(11129, esi, un, 0, 0);
+    u32 d[0x1c]; std::memset(d, 0, sizeof d);
+    u32 o = U(ORD(10653, esi, U(skillId), a2, 0));
+    u32 ax = SUB(0xDE5A0, un, esi, game, o, 0, 0, 0) & 0xffff;   // EAX = unit, EDI = esi, stack game, o, 0
+    d[1] = ax;
+    if (ax & 1) {
+        uint16_t w; std::memcpy(&w, s + 0x12e, 2);
+        d[1] = (ax | w) & 0xffff;
+        d[0] |= rd32(s, 0x130);
+        if (rd32(s, 0x134)) d[0x18] = rd32(s, 0x134);
+        d[2] = U(ORD(10786, esi, rd32(s, 0x13c), U(skillId), a2));
+        SUB(0x9F210, U(skillId), esi, U((uintptr_t)d), a2, 0, 0, 0);   // EAX = skill id, EDI = esi, stack desc, a2
     }
-    SUB(0xDDDE0, 0x80, game, U((uintptr_t)unit), 0, 0, 0, 0);
-    SUB(0xDED30, game, esi, U((uintptr_t)unit), 0, 0, 0, 0);
-    i32 h = ORD(10511, 0, 0, 0, 0);
-    if (h) ORD(10243, U(h), (flags & 1) ? 1 : 0, 0, 0);
+    SUB(0xDDDE0, esi, U((uintptr_t)d), game, un, 0, 0, 0);   // EAX = esi, CL = 0x80, EDI = desc, stack game, unit
+    SUB(0xDED30, game, esi, un, 0, 0, 0, 0);
+    i32 h = ORD(10511, esi, 0, 0, 0);
+    if (h) ORD(10243, U(h), (d[0] & 1) ? 1 : 0, 0, 0);
     return 1;
 }
 

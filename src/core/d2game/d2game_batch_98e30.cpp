@@ -77,10 +77,10 @@ int D2Game_993A0(Env98& e, uint32_t p1, int* p2, int p3) {
 
 // 1.13c D2Game+0x9BC70 ; in_EAX = amount, unaff_EDI = out1
 void D2Game_9BC70(Env98& e, void* unit, int* out2, int amount, int* out1) {
-  int a = e.ord10049(unit), b = e.ord10973(unit, 0, 0);
+  int a = e.ord10049(unit), b = e.ord10973(unit, 0xe, 0);   // 10973(unit, 0xe, 0): retail pushes 0, 0xe, EBX (stat 0xE)
   *out2 = 0;
   *out1 = amount;
-  if (a < b + amount) { *out1 = a - b; *out2 = amount - (a - b); }
+  if (a < (int)((unsigned)b + (unsigned)amount)) { *out1 = a - b; *out2 = (int)((unsigned)amount - (unsigned)(a - b)); }   // 32-bit wrap as retail's lea/cmp/jle
 }
 
 // 1.13c D2Game+0x9BD40 ; in_EAX = game (party list at +0x1d2c); returns nothing, bumps *list

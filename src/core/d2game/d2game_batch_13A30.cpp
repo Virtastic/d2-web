@@ -287,3 +287,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8D120(void* unit, void* player
     wr16(buf, 0xB, env->sub101D0(unit, playerUnit));
     env->send8A3E0(client, buf, 0xD);
 }
+
+// Probe entry for 0x8AA10 (EAX = 32-byte source, client on the stack); `send` takes the place of 0x8A3E0.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2game_8aa10_send(const void* buf32, void* client, void (*send)(void*, const void*, uint32_t))
+{
+    D2GameBatchB87Env env{};
+    env.send8A3E0 = send;
+    d2_fn_d2game_8AA10(buf32, client, &env);
+}

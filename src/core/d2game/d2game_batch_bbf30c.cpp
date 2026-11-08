@@ -396,52 +396,42 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CAB30(uint32_t* out, uint8_t* region, uin
 }
 
 // 1.13c D2Game+0xCC370
-// Builds the 0x28-byte server packet 0x5A (kind 6, sub 4) naming the speaker (b) to player a and
-// hands it to 0xCBDB0. b of type 1 is first remapped through 0x41260 when that yields a type-0 unit.
-// Layout from the decompile's stack slots: [0]=0x5A [1]=6 [2]=4 [3..6]=b id (-1 none) [7]=b type
-// (6 none) [8..0x17]=name (D2Common 501 of the player data +0xD) [0x18..]=speaker word. Failure is
-// the 10265/10024/_exit path.
+// ECX = b (speaker), EAX = a (player), stack 0 = x (ret 4). Builds the 0x28-byte server packet 0x5A (kind 6, sub 4)
+// naming the speaker (b) and hands it to 0xCBDB0 (EAX = packet, stack x). b of type 1 is first remapped through
+// 0x41260 when that yields a type-0 unit. Layout from the asm (packet = esp+0x18): [0]=0x5A [1]=6 [2]=4 [3..6]=b id
+// (-1 none) [7]=b type (6 none) [8..0x17]=name (SStrCopy #501 of a's player data +0x9C name at +0xD, 16 bytes; byte 0 cleared
+// when #506 rejects it) [0x18..]=speaker word (the item-data word at +0x26 when b is a type-1 unit whose +0x14 record has
+// flag 2 in +0x16) or, for a type-0 b, b's own name (copied to a temporary, kept when #506 accepts it). Failures are the
+// 10265/10024/_exit path: 0x190B when a is null or not a player, 0x9D9 on a missing player-data tag.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CC370(uint8_t* a, uint8_t* b, const D2GameBbf30cEnv* env)
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CC370(uint8_t* a, uint8_t* b, uint32_t x, const D2GameBbf30cEnv* env)
 {
-    if (a != nullptr && rd32(a, 0) == 0) {
-        if (b != nullptr && rd32(b, 0) == 1) {
-            uint8_t* t = PN(Q(f21260, b));
-            if (t != nullptr && rd32(t, 0) == 0) b = t;
-        }
-        uint8_t pkt[0x28];
-        std::memset(pkt, 0, sizeof pkt);
-        uint8_t nameTmp[16];
-        pkt[0] = 0x5A; pkt[1] = 6; pkt[2] = 4;
-        wr32(pkt, 3, b == nullptr ? 0xFFFFFFFFu : rd32(b, 4));
-        pkt[7] = b == nullptr ? 6 : (uint8_t)rd32(b, 0);
-        if (rd32(a, 0) == 0) {
-            uint8_t* pd = PN(Q(o10920));
-            uint8_t* tag = P(pd, 0x9C);
-            if (tag != nullptr) {
-                if (Q(o506) == 0) pkt[8] = 0; else Q(o501, pkt + 8, tag + 0xD);
-                uint32_t type = b == nullptr ? 6 : rd32(b, 0);
-                if (type != 0) {
-                    if (type == 1 && b != nullptr && rd32(b, 0) == 1 && P(b, 0x14) != nullptr
-                        && (rd8(P(b, 0x14), 0x16) & 2) != 0) {
-                        wr16(pkt, 0x18, rd16(P(b, 0x14), 0x26));
-                    }
-                    Q(fCBDB0, a, pkt);
-                    return;
-                }
-                if (b != nullptr && rd32(b, 0) == 0) {
-                    uint8_t* pd2 = PN(Q(o10920));
-                    if (P(pd2, 0x9C) != nullptr) {
-                        Q(o501, nameTmp, P(pd2, 0x9C) + 0xD);
-                        if (Q(o506, nameTmp) != 0) Q(o501, pkt + 0x18, nameTmp);
-                        Q(fCBDB0, a, pkt);
-                        return;
-                    }
-                }
-            }
-        }
+    if (a == nullptr || rd32(a, 0) != 0) die(env, 0x190B);
+    if (b != nullptr && rd32(b, 0) == 1) {
+        uint8_t* t = PN(Q(f21260, b));
+        if (t != nullptr && rd32(t, 0) == 0) b = t;
     }
-    die(env, 0);
+    uint8_t pkt[0x28];
+    std::memset(pkt, 0, sizeof pkt);
+    uint8_t nameTmp[16];
+    pkt[0] = 0x5A; pkt[1] = 6; pkt[2] = 4;
+    wr32(pkt, 3, b == nullptr ? 0xFFFFFFFFu : rd32(b, 4));
+    pkt[7] = b == nullptr ? 6 : (uint8_t)rd32(b, 0);
+    pkt[0x18] = 0;
+    uint8_t* tag = P(PN(Q(o10920, a)), 0x9C);
+    if (tag == nullptr) die(env, 0x9D9);
+    if (Q(o506, tag + 0xD) != 0) Q(o501, pkt + 8, tag + 0xD, 16); else pkt[8] = 0;
+    uint32_t type = b == nullptr ? 6 : rd32(b, 0);
+    if (type == 0) {
+        if (b == nullptr || rd32(b, 0) != 0) die(env, 0x9D9);
+        uint8_t* tag2 = P(PN(Q(o10920, b)), 0x9C);
+        if (tag2 == nullptr) die(env, 0x9D9);
+        Q(o501, nameTmp, tag2 + 0xD, 16);
+        if (Q(o506, nameTmp) != 0) Q(o501, pkt + 0x18, nameTmp, 16);
+    } else if (type == 1 && b != nullptr && P(b, 0x14) != nullptr && (rd8(P(b, 0x14), 0x16) & 2) != 0) {
+        wr16(pkt, 0x18, rd16(P(b, 0x14), 0x26));
+    }
+    Q(fCBDB0, pkt, x);
 }
 
 // 1.13c D2Game+0xCF810

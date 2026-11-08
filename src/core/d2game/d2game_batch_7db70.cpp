@@ -17,8 +17,21 @@ __attribute__((weak, import_module("env"), import_name("FUN_6fd122c0"))) void FU
 __attribute__((weak, import_module("env"), import_name("FUN_6fd12540"))) void FUN_6fd12540(...);
 }
 
+// Callee seam: a probe replaces these pointers with retail-recorded results (default: the weak imports above).
+namespace env_7db70 {
+decltype(&ordns_7db70::Ordinal_11027) Ordinal_11027 = &ordns_7db70::Ordinal_11027;
+decltype(&ordns_7db70::Ordinal_10494) Ordinal_10494 = &ordns_7db70::Ordinal_10494;
+decltype(&ordns_7db70::Ordinal_11103) Ordinal_11103 = &ordns_7db70::Ordinal_11103;
+decltype(&ordns_7db70::FUN_6fc21180) FUN_6fc21180 = &ordns_7db70::FUN_6fc21180;
+decltype(&ordns_7db70::FUN_6fc21320) FUN_6fc21320 = &ordns_7db70::FUN_6fc21320;
+decltype(&ordns_7db70::FUN_6fc95e10) FUN_6fc95e10 = &ordns_7db70::FUN_6fc95e10;
+decltype(&ordns_7db70::FUN_6fd12380) FUN_6fd12380 = &ordns_7db70::FUN_6fd12380;
+decltype(&ordns_7db70::FUN_6fd122c0) FUN_6fd122c0 = &ordns_7db70::FUN_6fd122c0;
+decltype(&ordns_7db70::FUN_6fd12540) FUN_6fd12540 = &ordns_7db70::FUN_6fd12540;
+}
+
 namespace {
-using namespace ordns_7db70;
+using namespace env_7db70;
 inline uint8_t* at8(uintptr_t b, uint32_t o) { return reinterpret_cast<uint8_t*>(b + o); }
 inline uint32_t* at32(uintptr_t b, uint32_t o) { return reinterpret_cast<uint32_t*>(b + o); }
 inline int rowS16(uintptr_t row, uint32_t base, uint32_t mode) { return *reinterpret_cast<int16_t*>(row + base + mode * 2); }
@@ -36,7 +49,7 @@ inline uintptr_t unitAi(uintptr_t t) {
 }
 
 extern "C" int* sgptDataTables_exref;
-extern "C" int gdwBitMasks_exref;
+extern "C" uint32_t gdwBitMasks_exref[];
 
 // 1.13c D2Game+0x7DB70
 extern "C" void D2GAME_AI_UseSkillOrCommandStep_7DB70(uintptr_t U, uintptr_t T, uint32_t* B)
@@ -59,8 +72,8 @@ extern "C" void D2GAME_AI_UseSkillOrCommandStep_7DB70(uintptr_t U, uintptr_t T, 
             int16_t st = *reinterpret_cast<int16_t*>(srec + 0x80);
             if (st >= 0 && Ordinal_10494(reinterpret_cast<void*>(T), st) == 0 && dist < rowS16(R, 0x56, mode) &&
                 static_cast<int>(FUN_6fc21180(seed, 100)) < rowS16(R, 0x5C, mode)) {
-                // ecx = T, al = byte R+0x181, stack (skill, P, 0, 0)
-                FUN_6fd12380(T, static_cast<int>(*reinterpret_cast<int16_t*>(R + 0x172)), P, 0, 0, *at8(R, 0x181));
+                // ecx = T, al = byte R+0x181, stack (skill, 0, 0, 0): the original pushes three zeros here (P rides only in step 4)
+                FUN_6fd12380(T, static_cast<int>(*reinterpret_cast<int16_t*>(R + 0x172)), 0, 0, 0, *at8(R, 0x181));
                 return;
             }
         }
@@ -75,7 +88,7 @@ extern "C" void D2GAME_AI_UseSkillOrCommandStep_7DB70(uintptr_t U, uintptr_t T, 
             uint32_t val = 100;
             if (T) {
                 uintptr_t rec = reinterpret_cast<uintptr_t>(FUN_6fc21320(*at32(T, 4)));
-                if (rec && (*at8(rec, 0x104) & *reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(gdwBitMasks_exref) + 0x10))) val = 101;
+                if (rec && (*at8(rec, 0x104) & gdwBitMasks_exref[4])) val = 101;
             }
             pkt[2] = P;
             reinterpret_cast<uint8_t*>(pkt)[0x15] = static_cast<uint8_t>(val);

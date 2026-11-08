@@ -548,13 +548,23 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_972C0(uint32_t eaxList, uint32_t ebx,
     }
 }
 
-// 7-byte 0x9B message; the decompile initialises only byte 0 and hands the stack block to 0x8A3E0, so
-// bytes 1..6 are indeterminate there and are zero here.
+// 7-byte 0x9B message: byte 0 = 0x9B, bytes 1..4 = ECX, bytes 5..6 = AX (the disassembly stores both registers;
+// the decompile shows only the opcode byte). The client is the stack argument and goes to 0x8A3E0 in EAX.
 // 1.13c D2Game+0x8a690
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8A690(const D2GameBatch1EF50Env* env)
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8A690(uint32_t ecx, uint32_t eax, const D2GameBatch1EF50Env* env)
 {
-    uint8_t buf[7] = {};
+    uint8_t buf[7];
     buf[0] = 0x9B;
+    std::memcpy(buf + 1, &ecx, 4);
+    std::memcpy(buf + 5, &eax, 2);
     env->sub8A3E0(buf, 7);
+}
+
+// Probe entry for 0x8A690 (ECX, AX, client on the stack); `send` takes the place of 0x8A3E0.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2game_8a690_send(uint32_t ecx, uint32_t eax, void (*send)(void*, uint32_t))
+{
+    D2GameBatch1EF50Env env{};
+    env.sub8A3E0 = send;
+    d2_fn_d2game_8A690(ecx, eax, &env);
 }

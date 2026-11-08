@@ -59,7 +59,7 @@ struct B64Env {
     uint32_t (*o11088)(uint32_t item);
     uint32_t (*o10744)(uint32_t item, uint32_t stat);
     uint32_t (*o10631)(uint32_t inv);
-    uint32_t (*o10708)(uint32_t v);
+    uint32_t (*o10708)(uint32_t unit, uint32_t idx, int32_t m1);   // 0xA3D0: ecx = unit, edx = idx, stack = -1
     void     (*o11031)(uint32_t inv, uint32_t slot);
     uint16_t (*o10764)(uint32_t path);
     uint16_t (*o10983)(uint32_t path);
@@ -242,13 +242,13 @@ uint32_t d2game_cb1f0(uint32_t param1, uint32_t ebxUnit) {
     b = g_b->o11139(inv, 5);
     if (b && (!g_b->o11006(b) || g_b->o11088(b) == 0x26)) b = 0;
     if (a && b && g_b->o10744(a, 0x2d) && g_b->o10744(b, 0x2d)) {
-        if (!g_b->o10631(inv)) {
-            uint32_t r = g_b->o10708(0xffffffffu);
-            if (r) { g_b->o11031(inv, 5); return r; }
+        if (!g_b->o10631(param1)) {                       // retail pushes the stack word (ESI = param_1) to 0xAB44 / 0xAB20, not the inventory
+            uint32_t r = g_b->o10708(ebxUnit, 5, -1);
+            if (r) { g_b->o11031(param1, 5); return r; }
             g_b->o10024("", g_b->o10265(0x6ee));   // retail _exit(-1)
             return 0;
         }
-        g_b->o11031(inv, 0);
+        g_b->o11031(param1, 0);
     }
     return param1;
 }
@@ -271,9 +271,11 @@ void d2game_cba20(uint32_t ecx, uint32_t unit, uint32_t tblIdx, uint32_t ebp) {
     pk[6] = (uint8_t)g_b->tab_ce4(tblIdx);
     std::memcpy(pk + 7, &w10983, 2);
     std::memcpy(pk + 9, &w10764, 2);
-    pk[11] = (uint8_t)(ebp >> 24);
-    uint16_t y = (uint16_t)unitX(unit);   // retail's last stored word is the path X getter result
-    std::memcpy(pk + 12, &y, 2);
+    (void)ebp;
+    pk[11] = rd8(unit, 0xb0);
+    uint16_t x = (uint16_t)unitX(unit), y = (uint16_t)unitY(unit);   // retail: word at +12 = X (0xA454 / path +0xC), word at +14 = Y (0xA3B8 / path +0x10)
+    std::memcpy(pk + 12, &x, 2);
+    std::memcpy(pk + 14, &y, 2);
     g_b->fAA3E0(ecx, pk, 0x10);
 }
 

@@ -33,14 +33,14 @@ struct D2GameBatchCc75Env {
     void     (*sub0xDFFD0)(uint32_t a, uint32_t b);
     void     (*sub0x8A3E0)(const void* pkt, uint32_t len);
     void*    (*sub0x4AD10)(uint32_t a);
-    int      (*sub0xF02A0)();
-    void     (*sub0x8B470)();
+    int      (*sub0xF02A0)(uint32_t flag, const void* esi, const void* edi);   // FUN_6fd102a0: stack word flag, ESI/EDI units
+    void     (*sub0x8B470)(uint32_t eax, void* game);                           // FUN_6fcab470: EAX = packet word 0, stack game
     // CD790 seams, in call order.
     void*    (*ord10331b)(const void* u);
     int      (*sub0x21280)();
     int      (*ord10494)(const void* u, uint32_t id);
     void     (*cd790pre)(void* unit);                  // 11083,10471,11058
-    void     (*sub0xE07A0)(void* edi);
+    void     (*sub0xE07A0)(void* unit, uint32_t ecx, uint32_t edi);   // FUN_6fd007a0: EAX = unit, ECX = param_1, EDI = in_EAX
     void     (*cd790mid)(void* unit);                  // 10392,10983,10764
     void     (*ord11164)(void* u, uint32_t v);
     void     (*ord10647)(void* u, uint32_t v);
@@ -62,6 +62,14 @@ struct D2GameBatchCc75Env {
     void     (*sub0x78430)(uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e);
     const uint8_t* gdwBitMasks;
     const uint8_t* clientTable;                        // DAT_6fd22ce4 (0xC bytes per entry)
+    // CD790, from the asm (the decompile hides the saved getter results): appended so the other probes' copies of this struct stay valid.
+    uint32_t (*dAB56)(void* d);                        // getter of the 0x409 slot (ord 11164's old value)
+    uint32_t (*dAB5C)(void* d);
+    uint8_t  (*dAB4A)(void* d);
+    uint32_t (*dA598)(void* d);
+    uint32_t (*dAAC6)(void* d);
+    uint32_t (*dAAD8)(void* d);
+    void     (*dAB2C)(void* d, uint32_t a, uint32_t b);
 };
 
 static void* c7chain(const void* base, uint32_t off, uint32_t id) {
@@ -193,13 +201,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CD530(void* game, const void* 
         void* a = c7chain(g, 0x1120, id);
         void* b = env->sub0x4AD10(0);
         if (a && b && a != b) {
-            if (env->sub0xF02A0()) return;
-            if (env->sub0xF02A0()) return;
+            if (env->sub0xF02A0(4, a, b)) return;
+            if (env->sub0xF02A0(2, b, a)) return;
             if (d2_fn_d2game_CCB10(a, g, b, env)) return;
             if (d2_fn_d2game_CCB10(b, g, a, env)) return;
         }
     }
-    env->sub0x8B470();
+    env->sub0x8B470(c7rd32(pkt, 0), game);
 }
 
 // 1.13c D2Game+0xCD630  (this = packet length, in_EAX = packet, unaff_EBX = out id; param_3 = out type)
@@ -216,30 +224,38 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_CD630(uint32_t len, const u
     return r;
 }
 
-// 1.13c D2Game+0xCD790  (this = id, in_EAX = value compared with 11001, unaff_EDI = game)
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_CD790(void* thisp, int eax, void* edi, void* unit,
+// 1.13c D2Game+0xCD790  (this = ECX compared with 0xAAAE, in_EAX = EDI compared with 0xAB32, stack: param_1, unit; ret 8)
+// Rewritten from the asm: the three setters (0x409 / 0xf / 0x4d) are restored from the getters read before them, and the last call is
+// 0xA5FE(d, S4) when 0xA598 returned the unit itself, else 0xAB2C(d, X5, X6). The byte getter's dword keeps stack residue above bit 7
+// (the capture masks it: hookmask 0xab14 0x1f).
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_CD790(void* thisp, uint32_t eax, uint32_t param_1, void* unit,
                                                             const D2GameBatchCc75Env* env)
 {
     env->ord10331b(unit);
     if (!env->sub0x21280()) return 0;
     if (env->ord10494(unit, 0x36) || env->ord10494(unit, 0x6c)) return 0;
-    void* u = c7rdp(unit, 0x2c);
-    env->cd790pre(u);
-    env->sub0xE07A0(edi);
-    env->cd790mid(u);
-    env->ord11164(u, 0x409);
-    env->ord10647(u, 0xf);
-    env->ord10168(u, 0x4d);
-    env->ord10286(u, thisp);
+    void* d = c7rdp(unit, 0x2c);
+    uint32_t x1 = env->dAB56(d);
+    uint32_t x2 = env->dAB5C(d);
+    uint32_t x3 = env->dAB4A(d);
+    env->sub0xE07A0(unit, param_1, eax);
+    uint32_t y = env->dA598(c7rdp(unit, 0x2c));
+    uint32_t s4 = (y == (uint32_t)(uintptr_t)unit) ? y : 0;
+    uint32_t x5 = env->dAAC6(d);
+    uint32_t x6 = env->dAAD8(d);
+    env->ord11164(d, 0x409);
+    env->ord10647(d, 0xf);
+    env->ord10168(d, 0x4d);
+    env->dAB2C(d, (uint32_t)(uintptr_t)thisp, eax);
     uint32_t r = 0;
-    if (env->ord10334(u, unit, 0)) {
-        if (thisp == env->ord10976(u) && eax == env->ord11001(u)) r = 1;
+    if (env->ord10334(d, unit, 0)) {
+        if ((uint32_t)(uintptr_t)thisp == (uint32_t)(uintptr_t)env->ord10976(d) && eax == (uint32_t)env->ord11001(d)) r = 1;
     }
-    // restore: decompile restores the saved values (0x409 / 0xf / 0x4d slots) through the same seams
-    env->ord11164(u, 0x409);
-    env->ord10647(u, 0);
-    env->ord10168(u, (uint32_t)(uintptr_t)unit);
-    env->ord10336(u, u);
+    env->ord11164(d, x1);
+    env->ord10647(d, x2);
+    env->ord10168(d, x3);
+    if (s4) env->ord10336(d, (void*)(uintptr_t)s4);
+    else env->dAB2C(d, x5, x6);
     return r;
 }
 

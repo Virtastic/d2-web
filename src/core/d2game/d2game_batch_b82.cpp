@@ -77,6 +77,14 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8A770(const void* src, const D
     e->fn_8A3E0(b, 6);
 }
 
+// Probe entry for 0x8A770 (EAX = 6-byte source, client on the stack); `send` takes the place of 0x8A3E0.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2game_8a770_send(const void* src, void (*send)(const void*, uint32_t))
+{
+    D2GameB82Env env{};
+    env.fn_8A3E0 = send;
+    d2_fn_d2game_8A770(src, &env);
+}
+
 // 1.13c D2Game+0x8B3D0  (EAX = 40-byte source)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8B3D0(const void* src, const D2GameB82Env* e)
 {

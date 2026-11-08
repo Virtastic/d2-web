@@ -90,7 +90,7 @@ extern "C" void D2GAME_698A0(uintptr_t c)
     if (d) Ordinal_10551(r32(c, 8), 6, d, 0);
 }
 
-// 1.13c D2Game+0x6AB60 : spawn effect 0xB from the table row's arg, then notify the unit
+// (superseded by the seam port d2g_6ab60.cpp) D2Game 0x6AB60 : spawn effect 0xB from the table row's arg, then notify the unit
 extern "C" void D2GAME_6AB60(uintptr_t c, uintptr_t e)
 {
     const EffEntry& t = g_D2Game_effTable[*reinterpret_cast<uint8_t*>(e)];
