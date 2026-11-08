@@ -55,15 +55,19 @@ EMSCRIPTEN_KEEPALIVE bool d2c_80450(D2cHost h, i32 flag, u32 player) {
 EMSCRIPTEN_KEEPALIVE void d2c_80940(D2cHost h, uint8_t* player, uint8_t* obj, i32 p1, i32 p2, i32 p3, i32 p4) {
     if (!player) return;
     uint8_t* seed = player + 0x20;
-    i32 slot = (i32)ord(h, 10064);
+    i32 slot = (i32)ord(h, 10064, (u32)(uintptr_t)obj);   // ECX = pool object
     if (slot == -1) return;
     uint8_t* e = (uint8_t*)(uintptr_t)rd(obj, 0x11c) + (int16_t)((u32)slot >> 16) * 0x18;
     auto step = [&]() { uint64_t v = (uint64_t)(u32)rd(seed, 0) * 0x6ac690c5u + (u32)rd(player, 0x24); memcpy(seed, &v, 8); return (u32)v; };
     i32 y;
     if (ord(h, 10013) == 0) {
         u32 v = step();
-        wr(e, 4, (i32)go(h, 0x18D0, (u32)(uintptr_t)seed) + p1);
-        y = (i32)(v % 0x50) - 0x1e + p2;
+        // retail: 0x18D0(ECX = seed, ESI = 2*(0x50-2|d-0x28|), EDI = -(0x50-2|d-0x28|)), d = v % 0x50 (second draw; ESI is a range, EDI its base)
+        i32 d = (i32)(v % 0x50), ad = d - 0x28 < 0 ? 0x28 - d : d - 0x28, base = 0x50 - 2 * ad, range = 2 * base;
+        i32 rx = -base;
+        if (range > 0) { u32 w = step(); rx += (range & (range - 1)) == 0 ? (i32)(w & (u32)(range - 1)) : (i32)(w % (u32)range); }
+        wr(e, 4, rx + p1);
+        y = d - 0x1e + p2;
     } else {
         wr(e, 4, ((i32)(step() % 5) - 2) * 0x10000 + p3);
         y = ((i32)(step() % 5) - 2) * 0x10000 + p4;
@@ -97,7 +101,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_7fc70(D2cHost h, const uint8_t* obj, const i32* tb
                     done = ord(h, 10041, (u32)(uintptr_t)rec, (u32)x, sy, 0xffffffffu, 3) != 0;
                 }
             }
-            if (!done) ord(h, 10065);
+            if (!done) ord10065(h, (u32)(uintptr_t)obj, (u32)i);
         }
     }
 }
