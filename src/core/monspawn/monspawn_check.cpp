@@ -4565,6 +4565,15 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_level_rect(int32_t levelId) {
     return g_sessionLevelRect;
 }
 
+// The preset file DRLGPRESET_GenerateLevel picked for the level (pPreset->nDirection, equal to
+// pDrlgMap->nPickedFile): D2Client 0x62760 receives it as the town-picture callback's second argument
+// and Lut Gholein's start frame depends on it. -1 if the level is not built.
+EMSCRIPTEN_KEEPALIVE int32_t d2_session_level_picked_file(int32_t levelId) {
+    if (!g_sessionLive || !g_lastLevel || !g_lastLevel->pDrlg) return -1;
+    D2DrlgLevelStrc* level = DRLG_GetLevel(g_lastLevel->pDrlg, levelId);
+    return level && level->pPreset ? level->pPreset->nDirection : -1;
+}
+
 // Where this level's rooms share an edge with rooms of `destinationLevel` (a seam), as up to 32
 // segments {x0, y0, x1, y1} in subtiles -- the DRLG's own room adjacency, what the automap shows.
 // Read-only: unlike d2_session_command_seam it activates nothing. Returns the segment count.

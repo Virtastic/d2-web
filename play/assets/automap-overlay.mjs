@@ -11,7 +11,7 @@ import { fullMapFadeDrawMode } from './automap-full-fade.mjs';
 // DATATBLS_LoadAutomapTxt turns these LevelName strings into its automap-type
 // enum.  This is the same 1.13c table order as D2MOO's gszAutomapLevelNames;
 // the cells themselves are *only* selected from AutoMap.txt below.
-const LEVEL_NAMES = Object.freeze([
+export const LEVEL_NAMES = Object.freeze([
   'None', '1 Town', '1 Wilderness', '1 Cave', '1 Crypt', '1 Monestary', '1 Courtyard',
   '1 Barracks', '1 Jail', '1 Cathedral', '1 Catacombs', '1 Tristram', '2 Town', '2 Sewer',
   '2 Harem', '2 Basement', '2 Desert', '2 Tomb', '2 Lair', '2 Arcane', '3 Town', '3 Jungle',
@@ -160,7 +160,7 @@ export function automapTileOnScreen(tile, hero, cx, cy, width, height) {
   return sx + 80 > 0 && sx - 80 < width && sy + 80 > 0 && sy < height;
 }
 // LvlPrest AutoMap=1 levels that take pfAutomap at generation: every room revealed with clipFlag 1.
-const ENTRY_REVEAL_LEVELS = new Set([1, 75]);
+export const ENTRY_REVEAL_LEVELS = new Set([1, 40, 75, 103, 109]);   // every LvlPrest AutoMap=1 level
 function line(ctx, x0, y0, x1, y1) {   // Bresenham, 1 px, no antialiasing
   const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
   let err = dx + dy;
@@ -169,6 +169,10 @@ function line(ctx, x0, y0, x1, y1) {   // Bresenham, 1 px, no antialiasing
 function levelRect(Module, levelId) {
   const pointer = Number(Module.ccall('d2_session_level_rect', 'number', ['number'], [levelId]));
   return pointer ? Array.from(new Int32Array(Module.HEAPU8.buffer, pointer, 4)) : [0, 0, 0, 0];
+}
+function pickedFileOf(Module, levelId) {   // -1: the level is not built yet, so the town picture is not laid
+  const n = Module.ccall('d2_session_level_picked_file', 'number', ['number'], [levelId]);
+  return n >= 0 ? n : null;
 }
 function seamEdges(Module, destinationLevel) {
   const count = Module.ccall('d2_session_seam_edges', 'number', ['number'], [destinationLevel]);
@@ -483,11 +487,10 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
       }
       // pExtras: the town picture, laid once when the level is generated (0x62760).
       if (!rv.pictures && TOWN_PICTURES[levelId]) {
-        rv.pictures = true;
-        const pic = townPictureCells(levelId, levelRect(Module, levelId));
+        const pic = townPictureCells(levelId, levelRect(Module, levelId), levelId === 40 ? pickedFileOf(Module, levelId) : null);
         for (const c of pic?.cells || []) layer.set(`p:${levelId},${c.frame}`, { kind: 'picture', family: pic.family, frame: c.frame, requestedFrames: [c.frame],
           levelName: pic.family, tileName: 'picture', style: -1, startSequence: -1, endSequence: -1, orientation: -1, mainIndex: -1, subIndex: -1, layer: 4, world: null, map: [c.x, c.y] });
-        if (pic) orderedCells.invalidate(layer);
+        if (pic) { rv.pictures = true; orderedCells.invalidate(layer); }
       }
       if (!visible) return (evidence = { open: false, drawn: [], unresolved: [], layout, error: null });
       const levelType = Module.ccall('d2_session_level_type', 'number', [], []);

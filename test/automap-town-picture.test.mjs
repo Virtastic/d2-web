@@ -100,3 +100,34 @@ test('the Act 4 picture draws after the MaxiMap cells, anchored at the hero map 
     if (oldImageData === undefined) delete globalThis.ImageData; else globalThis.ImageData = oldImageData;
   }
 });
+
+test('the Lut Gholein picture is laid from the level\'s picked preset file, not left empty (Act 2 map)', () => {
+  const oldImageData = globalThis.ImageData;
+  globalThis.ImageData = class { constructor(data, width, height) { Object.assign(this, { data, width, height }); } };
+  try {
+    const palette = new Uint8Array(768), text = (s) => new TextEncoder().encode(s);
+    const assets = new Map([
+      [AUTOMAP_PATHS.full, dc6([[16, 32]])], [TOWN_PICTURE_PATHS.act2.full, dc6(Array.from({ length: 40 }, () => [160, 100]))],
+      ['data\\global\\excel\\automap.txt', text('LevelName\tTileName\tStyle\tStartSequence\tEndSequence\tCel1\n2 Town\tfl\t0\t0\t0\t0')],
+      ['data\\global\\excel\\levels.txt', text('Id\tLayer\n40\t0')],
+      ['data\\global\\palette\\act2\\pal.dat', palette], ['data\\global\\palette\\act2\\pal.pl2', new Uint8Array(500000)],
+      ['data\\global\\palette\\act1\\pal.dat', palette], ['data\\global\\palette\\act1\\pal.pl2', new Uint8Array(500000)],
+    ]);
+    const heap = new Uint8Array(64); new Int32Array(heap.buffer, 16, 4).set([25, 10, 40, 40]);
+    const asked = [];
+    const overlay = createAutomapOverlay({
+      read(path) { if (!assets.has(path)) throw new Error(path); return assets.get(path); },
+      Module: { HEAPU8: heap, ccall(name) { asked.push(name); if (name === 'd2_session_level_type') return 12; if (name === 'd2_session_level_rect') return 16; if (name === 'd2_session_level_picked_file') return 0; throw new Error(name); } },
+      documentObject: { createElement: () => ({ getContext: () => ({ putImageData() {} }) }) },
+    });
+    overlay.toggle();
+    const ctx = { save() {}, restore() {}, beginPath() {}, rect() {}, clip() {}, fillRect() {}, drawImage() {},
+      getImageData(x, y, w, h) { return { data: new Uint8ClampedArray(w * h * 4) }; }, putImageData() {} };
+    overlay.setSettings({ mode: 2 });
+    const e = overlay.draw(ctx, 800, 600, { level: 40, act: 2, player: { x: 0, y: 0 }, warps: [] }, null, { camera: { x: 3.125, y: 3.125 }, npcs: [], fadeTargetX: 400 });
+    const pics = e.drawn.filter((d) => d.source === TOWN_PICTURE_PATHS.act2.full);
+    assert.deepEqual(pics.map((d) => d.frame), [21, 22, 23, 24, 26, 27, 28, 29, 31, 32, 33, 34, 37, 38]);
+  } finally {
+    if (oldImageData === undefined) delete globalThis.ImageData; else globalThis.ImageData = oldImageData;
+  }
+});
