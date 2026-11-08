@@ -76,16 +76,11 @@ static void gameUnlockOrDie(void* game)
 }
 
 // ---- TASK.cpp queue state (0x6FD30318..0x6FD31C58) -----------------------------------------------
-// A slot descriptor is allocated by Fog #10045 in 0x52650: [0] slot index, [1] queued count,
-// [2..3] the circular queue links the empty-slot initialisation points at itself. 0x52390 addresses
-// the same descriptor through a tail pointer at word 4, so the model reserves six words; retail's
-// allocation size is not recovered (partial).
-struct TaskSlot { uintptr_t idx, count, first, last, unk4, unk5; };
-static TaskSlot* g_taskSlots[32];             // 0x6FD30318, indexed by counter & 0x1F
-static uint32_t  g_taskSlotCounter;           // 0x6FD303A8
+// A slot descriptor (0x52650) is [0] lock index, [1] queued count, [2..3] the slot's own task list
+// {next, prev}, [4..5] its node in the global queue {next, prev}. The global queue head is the two words at
+// 0x6FD30398 {next, prev}; an uninitialised head is 0. Every link is a 32-bit retail word.
+static uint32_t  g_taskHead[2];               // 0x6FD30398 / 0x6FD3039C
 static uint32_t  g_taskQueuedTotal;           // 0x6FD303AC
-static uintptr_t g_taskHeadVar;               // 0x6FD30398: holds its own address once initialised
-static uintptr_t* g_taskTail;                 // 0x6FD3039C
 static CRITICAL_SECTION g_taskLock;           // 0x6FD31F58
 static CRITICAL_SECTION g_taskSlotLocks[32];  // 0x6FD31C58, stride 0x18
 
@@ -422,55 +417,60 @@ extern "C" uint32_t d2game_2b550_run(uint32_t p1, uint32_t* out, uint32_t slot0,
 // initialised and returns 0; a null node, null record node or missing head is a fatal (0x77/0x78/0x6C).
 // partial: the tail-based link at words 4/5 of the slot descriptor and the two unlinks through it are
 // transcribed literally; the descriptor's retail size (Fog #10045 in 0x52650) is not recovered.
+// FN probe access: the queue head words and the queued counter.
+void d2game_52390_state(uint32_t** head, uint32_t** queued) { *head = g_taskHead; *queued = &g_taskQueuedTotal; }
+static inline uint32_t* w32(uint32_t a) { return (uint32_t*)(uintptr_t)a; }
+static inline uint32_t a32(const void* p) { return (uint32_t)(uintptr_t)p; }
 uint32_t TASK_InsertTask(uint32_t* rec, uint32_t param_2, uint32_t param_3, const D2GameBatchEnv* env)
 {
-    uint32_t result = 0;
     rec[0] = (uint32_t)env->taskClock();   // 0x52020 returns a 64-bit count; the low word is stored
     rec[1] = param_2;
     rec[2] = param_3;
     EnterCriticalSection(&g_taskLock);
-    uintptr_t* tail = g_taskTail;
-    if (g_taskHeadVar == 0) {
-        g_taskHeadVar = (uintptr_t)&g_taskHeadVar;
-        g_taskTail = &g_taskHeadVar;
+    const uint32_t headAddr = a32(g_taskHead);
+    if (g_taskHead[0] == 0) {              // first use: the head points at itself; the record is not linked
+        g_taskHead[0] = headAddr;
+        g_taskHead[1] = headAddr;
         LeaveCriticalSection(&g_taskLock);
         return 0;
     }
-    if (tail != &g_taskHeadVar && tail != nullptr) {
-        const uint32_t slot = (uint32_t)tail[-4];
-        EnterCriticalSection(&g_taskSlotLocks[slot & 31]);
-        uintptr_t* node = (uintptr_t*)(rec + 3);    // rec word 3 (byte 12)
-        if (tail - 2 == nullptr) {
-            result = 0x77;
-        } else if (node == nullptr) {
-            result = 0x78;
-        } else {
-            wrptr(rec, 12, tail - 2);
-            const uintptr_t prev = tail[-1];
-            wrptr(rec, 16, (const void*)prev);
-            wrptr((void*)prev, 0, node);
-            tail[-1] = (uintptr_t)node;
-            LeaveCriticalSection(&g_taskSlotLocks[slot & 31]);
-            tail[-3] += 1;
-            g_taskQueuedTotal += 1;
-            wr32((void*)*tail, 4, (uint32_t)tail[1]);
-            wr32((void*)tail[1], 0, (uint32_t)*tail);
-            const uintptr_t head = g_taskHeadVar;
-            if (head != 0) {
-                *tail = head;
-                const uintptr_t next = (uintptr_t)rdptr((const void*)head, 4);
-                tail[1] = next;
-                wrptr((void*)next, 0, tail);
-                wrptr((void*)head, 4, tail);
-                LeaveCriticalSection(&g_taskLock);
-                return 1;
-            }
-            result = 0x6C;
-        }
-        LeaveCriticalSection(&g_taskSlotLocks[slot & 31]);
-        d2game_fatal(result);
+    const uint32_t tailAddr = g_taskHead[1];   // the queue node (word 4) of the last slot descriptor
+    if (tailAddr == headAddr || tailAddr == 0) {
+        LeaveCriticalSection(&g_taskLock);
+        return 0;
     }
-    LeaveCriticalSection(&g_taskLock);
+    uint32_t* tail = w32(tailAddr);
+    uint32_t* slot = tail - 4;
+    EnterCriticalSection(&g_taskSlotLocks[slot[0] & 31]);   // retail indexes the lock array with slot[0] unmasked
+    uint32_t result;
+    if (tailAddr - 8 == 0) {
+        result = 0x77;
+    } else if (a32(rec + 3) == 0) {
+        result = 0x78;
+    } else {
+        // link the record's node (rec+3) at the end of the slot's list {next, prev} at slot+8
+        rec[3] = tailAddr - 8;
+        rec[4] = slot[3];
+        *w32(slot[3]) = a32(rec + 3);
+        slot[3] = a32(rec + 3);
+        LeaveCriticalSection(&g_taskSlotLocks[slot[0] & 31]);
+        slot[1] += 1;
+        g_taskQueuedTotal += 1;
+        // move the slot's queue node to the back of the global queue
+        w32(tail[0])[1] = tail[1];
+        *w32(tail[1]) = tail[0];
+        const uint32_t head = g_taskHead[0];
+        if (head != 0) {
+            tail[0] = head;
+            tail[1] = w32(head)[1];
+            *w32(tail[1]) = tailAddr;
+            w32(head)[1] = tailAddr;
+            LeaveCriticalSection(&g_taskLock);
+            return 1;
+        }
+        result = 0x6C;
+    }
+    d2game_fatal(result);
     return result;
 }
 
