@@ -116,10 +116,12 @@ void d2_client_9d910(uint32_t* head_bc14, uint32_t* head_bc1c, uint32_t (*ord100
     }
 }
 
-// 1.13c D2Client+0x9D990 (55 B): 9D630(ecx, cur unit id or -1) == 0 -> fatal(0x72).
+// 1.13c D2Client+0x9D990 (55 B): returns 9D630(ecx, cur unit id or -1) (EAX stays the lookup result); 0 calls fatal(0x72).
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_9d990(uint32_t ecx, uint32_t unit_bbfc, Find4D630 sub_4d630, Fatal fatal) {
-    if (!sub_4d630(ecx, unit_bbfc ? rd32(unit_bbfc + 0xc) : 0xFFFFFFFFu)) fatal(0x72);
+uint32_t d2_client_9d990(uint32_t ecx, uint32_t unit_bbfc, Find4D630 sub_4d630, Fatal fatal) {
+    uint32_t rec = sub_4d630(ecx, unit_bbfc ? rd32(unit_bbfc + 0xc) : 0xFFFFFFFFu);
+    if (!rec) fatal(0x72);
+    return rec;
 }
 
 // 1.13c D2Client+0x9DA70 (87 B): cur = unit id or -1 (ESI); rec = 9D630(ecx, cur); s = rec[+0x22] or -1.

@@ -15,50 +15,52 @@ struct D2c9dNode { int32_t id; int32_t flags; D2c9dNode* next; };  // list node:
 struct D2c9dEnv {
     void*   root;                                       // *(+0x10BBFC) DAT_6fbcbbfc; id at +0xc
     uint8_t* (*fn9d630)(void* root, int32_t id);        // entry for id; +0x34 -> D2c9dNode** head
-    void    (*fnffe20)(uint32_t a, int32_t id);
-    uint32_t (*fnffd90)(int32_t id, uint32_t v);
-    void    (*fnffdd0)(int32_t id, uint32_t v);
+    void    (*fnffe20)(uint32_t ecx, int32_t unitId, int32_t own);   // EAX=unit id, EDX=own, ECX passes through
+    uint32_t (*fnffd90)(int32_t unitId, int32_t own, uint32_t mask);   // ESI=unit id, EDX=own, stack=mask
+    void    (*fnffdd0)(uint32_t mask, int32_t unitId, int32_t own, uint32_t set);   // EAX=mask, ESI=unit id, EDX=own, stack=set
     void    (*fn143e0)(const uint8_t* pkt);             // send packet
     uint8_t* (*fn9d990)(void);
     void    (*fn14850)(int32_t id, int32_t a, uint32_t b);
     void    (*fn9da70)(void);
     void    (*fn772e0)(void);
     void    (*fatal)(uint32_t code);                    // Ordinal 10265+10024+_exit(-1)
+    void    (*fn9dcc0)(const void* unit, uint32_t a, uint32_t bx);  // optional seam for the 9DCC0 call made by the senders (null: the port's own)
 };
 
 static int32_t rootId(const D2c9dEnv* e) { return e->root ? rd<int32_t>(e->root, 0xc) : -1; }
 
-// Shared walk: flags of the unit's node in the root entry's list, or -1 when not found / short-circuited.
-static int32_t flagsOf(const D2c9dEnv* e, int32_t unitId, int32_t pid) {
+// Shared walk: the unit's node in the root entry's list. False when 9D630 finds no entry, the entry has no list
+// header, the player id equals the unit id, or no node carries the unit id (a node's flag word may be any 32-bit value).
+static bool flagsOf(const D2c9dEnv* e, int32_t unitId, int32_t pid, int32_t* out) {
     uint8_t* ent = e->fn9d630(e->root, pid);
     if (ent && pid != unitId) {
         D2c9dNode** head = rd<D2c9dNode**>(ent, 0x34);
         if (head)
             for (D2c9dNode* n = *head; n; n = n->next)
-                if (n->id == unitId) return n->flags;
+                if (n->id == unitId) { *out = n->flags; return true; }
     }
-    return -1;
+    return false;
 }
 static uint32_t flagMask(const D2c9dEnv* e, const void* unit, uint32_t m) {
     if (!unit) return 0;
-    int32_t f = flagsOf(e, rd<int32_t>(unit, 0x10), rootId(e));
-    return f < 0 ? 0 : ((uint32_t)f & m);
+    int32_t f;
+    return flagsOf(e, rd<int32_t>(unit, 0x10), rootId(e), &f) ? ((uint32_t)f & m) : 0;
 }
 
 // 1.13c D2Client+0x9DCC0
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9dcc0(const D2c9dEnv* e, const void* unit, uint32_t a, uint32_t bx) {
     int32_t id = rootId(e);
     if (!unit) e->fatal(0x460);
-    e->fnffe20(a, id);
-    uint32_t r = e->fnffd90(id, bx & 0xffff);
-    e->fnffdd0(id, r == 0);
+    int32_t uid = rd<int32_t>(unit, 0x10);
+    e->fnffe20(a, uid, id);
+    uint32_t r = e->fnffd90(uid, id, bx & 0xffff);
+    e->fnffdd0(bx & 0xffff, uid, id, r == 0);
 }
 
 // 1.13c D2Client+0x9DD20
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_9dd20(const D2c9dEnv* e, const void* unit) {
     if (!unit) return 0;
-    int32_t f = flagsOf(e, rd<int32_t>(unit, 0x10), rootId(e));
-    return f >= 0 && (f & 8) ? 1 : 0;
+    return flagMask(e, unit, 8) ? 1 : 0;
 }
 // 1.13c D2Client+0x9DD80
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_9dd80(const D2c9dEnv* e, const void* unit) { return flagMask(e, unit, 4); }
@@ -67,16 +69,17 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_9ddd0(const D2c9dEnv* e, cons
 // 1.13c D2Client+0x9DE20
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_9de20(const D2c9dEnv* e, const void* unit) { return flagMask(e, unit, 1); }
 
-static void sendFlag(const D2c9dEnv* e, const void* unit, uint32_t a, uint32_t bx, uint8_t sub, uint32_t m) {
+static void sendFlag(const D2c9dEnv* e, const void* unit, uint32_t a, uint8_t sub, uint32_t m) {
     if (!unit) return;
-    d2_client_9dcc0(e, unit, a, bx);
+    // retail loads EBX := m (the mask) before calling 9DCC0; the caller's EBX is not an input
+    if (e->fn9dcc0) e->fn9dcc0(unit, a, m); else d2_client_9dcc0(e, unit, a, m);
     int32_t id = rd<int32_t>(unit, 0x10);
     uint8_t pkt[7] = { 0x5d, sub, (uint8_t)(flagMask(e, unit, m) != 0) };
     memcpy(pkt + 3, &id, 4);
     e->fn143e0(pkt);
 }
 // 1.13c D2Client+0x9DE90
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9de90(const D2c9dEnv* e, const void* unit, uint32_t a, uint32_t bx) { sendFlag(e, unit, a, bx, 3, 4); }
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9de90(const D2c9dEnv* e, const void* unit, uint32_t a, uint32_t bx) { (void)bx; sendFlag(e, unit, a, 3, 4); }
 
 // 1.13c D2Client+0x9E520
 extern "C" EMSCRIPTEN_KEEPALIVE intptr_t d2_client_9e520(const D2c9dEnv* e, const uint8_t* unit, uint32_t a, uint32_t esi) {
@@ -84,13 +87,14 @@ extern "C" EMSCRIPTEN_KEEPALIVE intptr_t d2_client_9e520(const D2c9dEnv* e, cons
     intptr_t ret = (intptr_t)e->root;
     if (!unit) return ret;
     int32_t uid = rd<int32_t>(unit, 0x10);
-    int32_t f = flagsOf(e, uid, id);
+    int32_t f = 0;
+    bool have = flagsOf(e, uid, id, &f);
     ret = 0;
-    if ((f >= 0 && (f & 8)) || rd<uint16_t>(unit, 0x20) > 8) {
-        d2_client_9dcc0(e, unit, a, 0);
-        uint32_t r = e->fnffd90(id, 8);
+    if ((have && (f & 8)) || rd<uint16_t>(unit, 0x20) > 8) {
+        d2_client_9dcc0(e, unit, a, 8);
+        uint32_t r = e->fnffd90(uid, id, 8);
         e->fn14850(uid, 4, r);
-        ret = (intptr_t)e->fnffd90(id, 8);
+        ret = (intptr_t)e->fnffd90(uid, id, 8);
         if (ret && rd<uint16_t>(unit, 0x22) != 0xffff) {
             uint8_t* o = e->fn9d990();
             if (rd<uint16_t>(o, 0x22) == rd<uint16_t>(unit, 0x22)) {

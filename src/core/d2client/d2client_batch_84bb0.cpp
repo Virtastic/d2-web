@@ -492,39 +492,65 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_861a0(const D2cItmEnv* e, const u
     C(F_REFRESH, 0, 0, 0, 0);
 }
 
-// 1.13c D2Client+0x86810 (packet in param_1)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_86810(const D2cItmEnv* e, const uint8_t* p) {
-    uint8_t buf[24];
-    C(11105, 0, 0, A(buf), 0);
-    uint8_t* pl = e->player;
+// 1.13c D2Client+0x86810 (packet in param_1): the item named by the packet is looked up in the unit hash table; a mode-1 item is taken out of the
+// player's inventory, the chain entry is removed and the packet's new unit is looked up. Every callee is a typed seam in retail's argument order.
+struct D2c86810Env {
+    void (*dec11105)(const uint8_t* body, int32_t len, uint32_t z, uint8_t* hdr);    // thunk 0xCA90
+    const uint32_t* buckets;                                                             // unit hash table 0x10AE08, 128 chains, link +0xE4
+    uint8_t*  player;                                                               // 0x11BBFC
+    void (*fatal)(uint32_t code);                                                   // Ordinal 10265 + 10024 + _exit(-1)
+    void (*pre)(uint8_t* pl);                                                       // 0x693C0, EDX = player
+    void (*o10694)(void* inv, void* unit);                                          // 0xCA2A
+    uint32_t (*o10921)(void* pl, void* unit);                                       // 0xC9F4, returns AL
+    void (*fn19a90)(uint8_t* pl, uint32_t al);                                      // 0x69A90, EAX = al, ECX = player
+    uint32_t (*o10417)(void* unit);                                                 // 0xCA54, returns AL
+    void (*o10605)(void* pl, void* inv, void** unit, uint32_t kind);                // 0xC9CA
+    void* (*o10646)(void* inv, void* unit);                                         // 0xC6D0
+    void (*o10608)(void* inv, uint32_t kind);                                       // 0xCAA8
+    void (*o10061)(void* inv);                                                      // 0xCA0C
+    int  (*o10202)(void* p, uint32_t a, uint32_t b, uint32_t file);                 // 0xC1A8
+    void (*o11127)(void* pl, void* p);                                              // 0xC544
+    void (*fn32fe0)(void* pl);                                                      // 0x82FE0
+    void (*fn1a220)(void* pl);                                                      // 0x6A220, EAX = player
+    void (*chain)(uint32_t tbl, uint32_t idx, uint32_t id, uint32_t four);          // 0xA6EF0, ECX = table, EDX = index
+    void* (*lookup)(const uint8_t* pkt, uint8_t* hdr, uint32_t w6, uint32_t z);     // 0x835C0
+    void (*refresh)(void* it);                                                      // 0x81AA0, ESI = unit
+    uint32_t file;                                                                  // 0x6FB84964, the Item.cpp path
+};
+static uint8_t* rp86810(const uint8_t* p, size_t o) { uint32_t v; memcpy(&v, p + o, 4); return (uint8_t*)(uintptr_t)v; }   // retail pointers in structs are 32-bit words
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_86810(const uint8_t* p, const D2c86810Env* e) {
+    uint8_t hdr[24] = {0};
+    e->dec11105(p + 8, (int32_t)p[2] - 8, 0, hdr);
     uint32_t id = rd<uint32_t>(p, 4);
-    bool bad;
-    uint8_t* n = findItem(e, id, bad);
-    if (bad) FATAL(0);
+    uint8_t* n = nullptr;
+    for (uint8_t* u = (uint8_t*)(uintptr_t)e->buckets[id & 0x7f]; u; u = rp86810(u, 0xE4))
+        if (rd<uint32_t>(u, 0xC) == id) { if (rd<int32_t>(u, 0) != 4) { e->fatal(0x5a); return; } n = u; break; }
     if (n) {
         int32_t m = rd<int32_t>(n, 0x10);
-        if (m == 0) FATAL(0);
+        if (m == 0) { e->fatal(0x3fd); return; }
         if (m == 1) {
-            if (!pl) FATAL(0);
-            W inv = rd<uint32_t>(pl, 0x60);
-            C(F_PRE, A(pl), 0, 0, 0);
-            C(10694, inv, 0, 0, 0);
-            C(10921, A(pl), 0, 0, 0);
-            C(F_PRE2, A(pl), 0, 0, 0);
-            W kind = C(10417, 0, 0, 0, 0);
-            C(10605, A(pl), inv, A(buf), kind);
-            W old = C(10646, inv, 0, 0, 0);
+            uint8_t* pl = e->player;
+            if (!pl) { e->fatal(0x3e9); return; }
+            uint8_t* inv = rp86810(pl, 0x60);
+            e->pre(pl);
+            e->o10694(inv, n);
+            uint32_t al = e->o10921(pl, n) & 0xff;
+            e->fn19a90(pl, al);
+            uint32_t kind = e->o10417(n) & 0xff;
+            void* loc = n;
+            e->o10605(pl, inv, &loc, kind);
+            void* old = e->o10646(inv, loc);
             if (old) {
-                C(10608, inv, 0, 0, 0);
-                C(10061, rd<uint32_t>(pl, 0x60), 0, 0, 0);
-                if (!C(10202, old, 0x100, 0x96, A(e->file))) C(11127, A(pl), 0, 0, 0);
+                e->o10608(inv, kind);
+                if (rd<int32_t>(pl, 0) == 0) e->o10061(rp86810(pl, 0x60));
+                if (!e->o10202(old, 0x100, 0x96, e->file)) e->o11127(pl, old);
             }
-            C(F_UNREF, A(pl), 0, 0, 0);
-            C(F_UI3, 0, 0, 0, 0);
+            e->fn32fe0(pl);
+            e->fn1a220(pl);
         }
-        C(F_CHAIN, 0x6fbbae08, id & 0x7f, id, 4);
+        e->chain(0x6fbbae08, id & 0x7f, id, 4);
     }
-    uint8_t* it = (uint8_t*)C(F_LOOKUP, A(p), 0, 0, 0);
-    if (!it) FATAL(0);
-    C(F_REFRESH, 0, 0, 0, 0);
+    void* it = e->lookup(p, hdr, rd<uint32_t>(hdr, 6), 0);
+    if (!it) { e->fatal(0x405); return; }
+    e->refresh(it);
 }

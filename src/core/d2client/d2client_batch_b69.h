@@ -34,9 +34,10 @@ struct D2cB69Env {
     int32_t *g_9e14, *g_8bc48, *g_cc418, *g_cc414, *g_cc3dc, *g_cc3e0, *g_cc3f8, *g_cc3fc;
     int32_t *g_cb834, *g_cb858, *g_cb864, *g_cb854;
     uint8_t* g_c9721;
-    void (*ord10227)(); void (*ord10006)(); int32_t (*ord10048)(); void (*ord10977)(int32_t*, int32_t, int32_t);
-    void (*f72790)(uint32_t, int32_t, int32_t); void (*f7b20)(); int32_t (*f55440)(); void (*f3bb90)(); void (*f3bbf0)();
-    void (*feccc0)(int32_t, const void*); const void* g_805b0; void (*f3a4d0)(int32_t, int32_t, int32_t); void (*f31aa0)();
+    void (*ord10227)(); void (*ord10006)(uint32_t ecx); int32_t (*ord10048)(); void (*ord10977)(int32_t*, int32_t, int32_t);
+    void (*f72790)(uint32_t, int32_t, int32_t); void (*f7b20)(uint32_t edi); int32_t (*f55440)(); void (*f3bb90)(); void (*f3bbf0)();
+    void (*feccc0)(uint32_t eax, int32_t, const void*); const void* g_805b0; void (*f3a4d0)(uint32_t eax, int32_t ecx, int32_t edx, uint32_t esi, int32_t stk); void (*f31aa0)(void* esi);
+    const int32_t *g_9e18, *g_cc3c4;
     int32_t* (*f54e20)(uint32_t id, uint32_t* tbl, int32_t n);
 };
 

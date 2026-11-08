@@ -20,26 +20,26 @@ static void d2c_b69_panel_body(const D2cB69Env* e) {
         if (e->g_aad80[u] != 1) continue;
         int32_t kind = *(const int32_t*)((intptr_t)e->g_8d538[u] + 4);
         if (kind == 1) e->f72790((uint32_t)u, 1, 0);
-        else if (kind == 4) { if (*e->g_9721) e->f7b20(); }
+        else if (kind == 4) { if (*e->g_c9721) e->f7b20((uint32_t)*e->g_971d); }
         else if (kind != 0) return;
     }
     uint8_t* pl = *e->unit;
     if (!pl || (*(int32_t*)pl == 0 && e->f55440() == 0)) *e->g_aad84 = 1;
     int32_t a = *e->g_aad84, b;
-    if (a) { e->f3bb90(); e->feccc0(e->ord10048(), e->g_805b0); }
+    if (a) { e->f3bb90(); e->feccc0(4, e->ord10048(), e->g_805b0); }
     e->f3bbf0();
     int32_t w = *e->g_9e14, h = *e->g_8bc48;
     if (!*e->g_aad88 && !*e->g_aadd0 && !*e->g_aadbc && !*e->g_aadc0 && !*e->g_aae10 && !*e->g_aae14 && !*e->g_aadd8) {
-        if (!a) { *e->g_cc418 = 0; *e->g_cc414 = 0; e->ord10006(); b = 0; a = w; }
-        else { *e->g_cc418 = -((h + ((h >> 31) & 3)) >> 2); *e->g_cc414 = 1; e->ord10006();
+        if (!a) { *e->g_cc418 = 0; *e->g_cc414 = 0; e->ord10006((uint32_t)*e->g_cc418); b = 0; a = w; }
+        else { *e->g_cc418 = -((h + ((h >> 31) & 3)) >> 2); *e->g_cc414 = 1; e->ord10006((uint32_t)*e->g_cc418);
                b = (w + ((w >> 31) & 3)) >> 2; a = w - b; b = -b; }
     } else {
-        if (a) { *e->g_cc418 = 0; *e->g_cc414 = 3; e->ord10006(); e->f3a4d0(w, 0, 0);
+        if (a) { *e->g_cc418 = 0; *e->g_cc414 = 3; e->ord10006((uint32_t)*e->g_cc418); e->f3a4d0((uint32_t)*e->g_9e18, w, 0, (uint32_t)*e->g_cc3c4, 0);
                  *e->g_cc3dc = 0; *e->g_cc3e0 = 0; *e->g_cc3f8 = 0; *e->g_cc3fc = 0; return; }
-        *e->g_cc418 = (h + ((h >> 31) & 3)) >> 2; *e->g_cc414 = 2; e->ord10006();
+        *e->g_cc418 = (h + ((h >> 31) & 3)) >> 2; *e->g_cc414 = 2; e->ord10006((uint32_t)*e->g_cc418);
         b = (w + ((w >> 31) & 3)) >> 2; a = w + b;
     }
-    e->f3a4d0(a, 0, b);
+    e->f3a4d0((uint32_t)*e->g_9e18, a, 0, (uint32_t)*e->g_cc3c4, b);
 }
 
 extern "C" {
@@ -227,7 +227,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_86a40(const D2cB69Env* e, const uint8_t* pkt) {
     };
     if (fl == -1 && slot == 0xff) {
         int32_t* p = d2c_b69_find(e->tbl_bae08, id);
-        if (p) { if (*p != 4) { e->fatal(0x5a); return; } e->ord10977(p, 4, 0); e->f31aa0(); }
+        if (p) { if (*p != 4) { e->fatal(0x5a); return; } e->ord10977(p, 4, 0); e->f31aa0(p); }
         setstate(nullptr, 0, 1, 5);
         return;
     }

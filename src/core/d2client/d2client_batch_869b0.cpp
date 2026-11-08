@@ -52,6 +52,13 @@ struct D2cWardenEnv {
     uint32_t (*call_entry)(D2cWardenNode* n); // (*node+0x10)()
     void (*send4)(D2cWardenNode* n, const void* p, int32_t len); // (**node->iface)(&seed,4)
     void (*release)(D2cWardenNode* n);        // (**(cur+0xC)+4)()
+    void (*dec11105)(const uint8_t* data, int32_t len, uint32_t zero, uint32_t* hdr);   // thunk 0xCA90 (0x869E0)
+    int  (*flag10197)(uint32_t v, uint32_t mask);                                      // thunk 0xCA3C
+    void (*call85cf0)(const uint8_t* pkt, uint32_t* hdr);                              // EAX = pkt, stack = hdr
+    void (*call84300)(uint32_t* hdr, const uint8_t* pkt);                              // EAX = hdr, stack = pkt
+    void (*hinit)(void* ctx);                                                          // thunk 0xBFDA (ECX = ctx)
+    void (*hupd)(void* ctx, const void* p, int32_t n);                                 // thunk 0xBFD4 (ECX = ctx, stdcall 2)
+    void (*hfin)(void* ctx, void* out);                                                // thunk 0xBFCE (ECX = ctx, stdcall 1)
 };
 
 // 1.13c D2Client+0x869B0
@@ -60,25 +67,28 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_869b0(const uint8_t* esi, const D
     e->fn85b30(esi + 0xd, (int32_t)esi[2] - 0xd);
 }
 
-// 1.13c D2Client+0x869E0
+// 1.13c D2Client+0x869E0: Ordinal 11105 (stdcall 4: pkt+0xD, len, 0, &hdr) fills a 24-byte header; Ordinal 10197 tests its dword 3
+// (hdr[3] & mask): 0x40 runs 0x85CF0 (EAX = pkt, stack = &hdr), else 0x80 runs 0x84300 (EAX = &hdr, stack = pkt).
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_869e0(const uint8_t* esi, const D2cWardenEnv* e) {
-    int32_t len = (int32_t)esi[2] - 0xd;
-    e->ord11105();
-    if (e->ord10197(len, 0x40)) { e->fn85cf0(esi + 0xd, len); return; }
-    if (e->ord10197(len, 0x80)) e->fn84300(esi);
+    uint32_t hdr[6] = {0, 0, 0, 0, 0, 0};
+    e->dec11105(esi + 0xd, (int32_t)esi[2] - 0xd, 0, hdr);
+    if (e->flag10197(hdr[3], 0x40)) { e->call85cf0(esi, hdr); return; }
+    if (e->flag10197(hdr[3], 0x80)) e->call84300(hdr, esi);
 }
 
-// 1.13c D2Client+0x87160
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_87160(int32_t eax, int32_t esi, const uint8_t* ebx, void* src, const D2cWardenEnv* e) {
-    uint8_t b408[0x400], b414[12], b418[4], b41c[4];
-    e->ord10248();
-    if (esi) e->ord10249(ebx + esi, eax - esi);
-    e->ord10249(nullptr, 0);
-    e->ord501(b408, src, 0x400);
-    e->ord510(b414);
-    int v = e->ord506(b418);
-    e->ord10249(b41c, v);
-    e->ord10250();
+// 1.13c D2Client+0x87160 (stdcall 2: src, out; EAX = total length, ESI = split, EBX = data): hash context on the stack (thiscall ECX = ctx):
+// init; ESI != 0 feeds data[esi..eax) then data[0..esi), else data[0..eax); then the 0x400-byte string at src is copied (501), normalised (510),
+// its length taken (506) and fed too; the digest goes to out.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_87160(int32_t eax, int32_t esi, const uint8_t* ebx, void* src, void* out, const D2cWardenEnv* e) {
+    uint8_t ctx[0x5c], buf[0x400];
+    e->hinit(ctx);
+    if (esi) { e->hupd(ctx, ebx + esi, eax - esi); e->hupd(ctx, ebx, esi); }
+    else e->hupd(ctx, ebx, eax);
+    e->ord501(buf, src, 0x400);
+    e->ord510(buf);
+    int v = e->ord506(buf);
+    e->hupd(ctx, buf, v);
+    e->hfin(ctx, out);
 }
 
 // 1.13c D2Client+0x87230 -- hex-format 16 bytes, copy 5-byte tag, ask the Warden ctx slot +0xD0
