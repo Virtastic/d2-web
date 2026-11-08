@@ -10,6 +10,9 @@ node tools/patch-shim.mjs --check build-wasm/site/assets/patch-113c.patch   # ex
 [ -f "build-wasm/site/e/$(cat build-wasm/site/engine-version.txt 2>/dev/null)/d2.wasm" ] && [ -f build-wasm/site/serve.mjs ] || { echo "FATAL: no staged site -- run ci/build.sh" >&2; exit 1; }
 if [ -e build-wasm/site/widebg/manifest.json ]; then
   [ ! -L build-wasm/site/widebg/manifest.json ] || { echo "FATAL: widebg/manifest.json is a link -- restage with ci/stage.sh (it copies .widebg/ with cp -rL)" >&2; exit 1; }
+  for k in trademarkscreenexp gameselectscreenexp characterselectscreenexp charactercreationscreenexp creditsbckgexpand bnet; do
+    grep -q "\"$k\"" build-wasm/site/widebg/manifest.json || echo "WARNING: widebg/manifest.json has no \"$k\" -- that screen (the Battle.net lobby for bnet) falls back to the game's 4:3 background" >&2
+  done
 else echo "WARNING: no widescreen menu backgrounds staged (widebg/) -- the menus use the game's 4:3 backgrounds; stage with .widebg/ or D2_WIDEBG_DIR" >&2; fi
 [ -f build-wasm/site/door-art/meta.json ] || { echo "FATAL: no title-screen art staged (door-art/) -- run node tools/setup.mjs \"/path/to/Diablo II\", then bash ci/build.sh" >&2; exit 1; }
 [ "$(ls build-wasm/site/freeres/*.dc6 2>/dev/null | wc -l)" -eq 16 ] && [ -f build-wasm/site/freeres/LICENSE.md ] || { echo "FATAL: no widescreen HUD art staged (freeres/: 16 DC6 + LICENSE.md) -- the wide bar would not draw; run ci/stage.sh (art is tracked in play/freeres/)" >&2; exit 1; }

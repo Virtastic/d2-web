@@ -420,7 +420,8 @@ backgrounds:
    - `gameselectscreenexp` (game select);
    - `characterselectscreenexp` (character select);
    - `charactercreationscreenexp` (character creation);
-   - `creditsbckgexpand` (credits).
+   - `creditsbckgexpand` (credits);
+   - `bnet` (the Battle.net lobby; its waiting-room view borrows this image outside the game's 800×600).
 
    ```json
    {

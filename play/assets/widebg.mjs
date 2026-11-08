@@ -15,7 +15,33 @@ export const widebgReady = (async () => {
   } catch { /* no local images: retail DC6 */ }
 })();
 
-export const wideBg = (dc6Path) => entries[dc6Path.split('\\').pop().replace(/\.dc6$/i, '').toLowerCase()] || null;
+const nameOf = (dc6Path) => dc6Path.split('\\').pop().replace(/\.dc6$/i, '').toLowerCase();
+const derived = {};
+/** A screen with no painted image of its own borrows a sibling's: the sibling image with the retail 800x600 rect repainted from `canvas`. */
+/** `blankBelow` = a retail y: outside the 800x600 the sibling's art below that line is blanked to black (its floor is not this screen's). */
+export function deriveWideBg(dc6Path, fromPath, canvas, { documentObject = globalThis.document, blankBelow = null } = {}) { derived[nameOf(dc6Path)] = { from: nameOf(fromPath), canvas, documentObject, blankBelow }; }
+const SIDE_FRAME = 40;   // image px kept at the far left/right and bottom: the painted thorn border
+function buildDerived(base, canvas, documentObject, blankBelow) {
+  const c = documentObject.createElement('canvas'); c.width = base.w; c.height = base.h;
+  const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  g.drawImage(base.img, 0, 0);
+  if (blankBelow !== null) {
+    const y = base.oy + blankBelow * (base.sy ?? base.s), W = 800 * base.s, bottom = base.h - SIDE_FRAME;
+    g.fillStyle = '#000';
+    if (base.ox > SIDE_FRAME + 8) g.fillRect(SIDE_FRAME, y, base.ox - SIDE_FRAME + 1, bottom - y);
+    if (base.w - base.ox - W > SIDE_FRAME + 8) g.fillRect(base.ox + W - 1, y, base.w - SIDE_FRAME - base.ox - W + 1, bottom - y);
+  }
+  g.drawImage(canvas, base.ox, base.oy, 800 * base.s, 600 * (base.sy ?? base.s));
+  return { ...base, img: c, bg800: null, back: undefined };
+}
+export const wideBg = (dc6Path) => {
+  const k = nameOf(dc6Path);
+  if (entries[k]) return entries[k];
+  const d = derived[k];
+  return d && entries[d.from] ? (entries[k] = buildDerived(entries[d.from], d.canvas, d.documentObject, d.blankBelow)) : null;
+};
+/** Test seam: install a loaded entry (the fetch above has no site in node). */
+export const setWideBgEntry = (name, e) => { entries[name] = e; };
 
 /** The image resampled into the 800x600 scene (what blends read back and overlay diffs compare to). */
 export function sceneBg(e, ctx) {
