@@ -16,13 +16,15 @@ int64_t z20_ftol(double v) { return (int64_t)v; }
 double z20_pow_sse2_body(double x, double y) { return std::pow(x, y); }
 
 // 1.13c Storm+0x3DB30: thunk, forwards ST1/ST0 to Storm+0x3DB49.
-double z20_pow_sse2(double x, double y) { return z20_pow_sse2_body(x, y); }
+double z20_pow_sse2(double x, double y, double (*body)(double, double)) { return body(x, y); }
+double z20_pow_sse2(double x, double y) { return z20_pow_sse2(x, y, z20_pow_sse2_body); }
 
 // 1.13c Storm+0x3C9C0: pow dispatcher; SSE2 path iff flag set and FP exceptions all masked.
-double z20_pow(double x, double y) {
-    if (g_z20_sse2Flag != 0 && z20_fpuMasked()) return z20_pow_sse2(x, y);
+double z20_pow(double x, double y, double (*sse2Body)(double, double)) {
+    if (g_z20_sse2Flag != 0 && z20_fpuMasked()) return z20_pow_sse2(x, y, sse2Body);
     return z20_pow_x87(x, y);
 }
+double z20_pow(double x, double y) { return z20_pow(x, y, z20_pow_sse2_body); }
 
 // 1.13c Storm+0x3EAC0: 2^x via f2xm1/fscale.
 double z20_exp2(double x) { return std::exp2(x); }
@@ -39,13 +41,17 @@ uint32_t z20_fload_withFB(const uint32_t* p) {
 }
 
 // 1.13c Storm+0x3EA60: __fastcall(ecx=ecx, edx=type, stack cw, p4..p8). Record is
-// {0, ecx, p5, p6, p7, p8} (p4 unused); calls matherr(type, &rec, &cw); ST0 passes through.
+// the 8-dword _exception record at ebp-0x20: {eax (type slot), ecx (name), p5, p6 (arg1), p7, p8 (arg2),
+// ST0 (retval, fstp at ebp-8)} (p4 unused); calls matherr(type, &rec, &cw), then returns the record's retval
+// (fld [ebp-8]: the handler may rewrite it). The trailing fldcw restores host FPU state only.
 double z20_3EA60(uint32_t ecx, int type, uint16_t cw, uint32_t p4, uint32_t p5, uint32_t p6,
                  uint32_t p7, uint32_t p8, double st0) {
-    uint32_t rec[6] = {0, ecx, p5, p6, p7, p8};
+    uint32_t rec[8] = {0, ecx, p5, p6, p7, p8, 0, 0};
+    std::memcpy(rec + 6, &st0, 8);
     (void)p4;
     z20_matherr(type, rec, &cw);
-    return st0;
+    double ret; std::memcpy(&ret, rec + 6, 8);
+    return ret;
 }
 
 // 1.13c Storm+0x3EA77 (__startOneArgErrorHandling): same, one-arg record.

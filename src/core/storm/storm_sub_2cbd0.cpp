@@ -1,9 +1,16 @@
 // 1.13c Storm+0x2CBD0 -- bignum: this = src * (64-bit scalar), little-endian dword vectors.
 #include <cstdint>
 struct S2CBigVec { uint32_t cap, size; uint32_t* data; uint32_t grow, off; };  // retail dwords 0..4
-// seams: Storm+0x3C80 (set capacity), Storm+0x3C40 (default grow); unmapped here
-void Seam3C80_2CBD0(S2CBigVec*, uint32_t) {}
-uint32_t Seam3C40_2CBD0(S2CBigVec*) { return 1; }
+struct StormBnVec;
+void storm_bnvec_setcap(StormBnVec* v, uint32_t n);
+// Storm+0x3C80: set the capacity to n words (the verified storm_bnvec_setcap; same 20-byte field order).
+void Seam3C80_2CBD0(S2CBigVec* v, uint32_t n) { storm_bnvec_setcap((StormBnVec*)v, n); }
+// Storm+0x3C40 (EAX = wanted length, stack = vector): the largest power of two <= n, 0x40 stored as the grain from 0x40 up.
+uint32_t Seam3C40_2CBD0(S2CBigVec* v, uint32_t n) {
+    if (n >= 0x40) { v->grow = 0x40; return 0x40; }
+    for (uint32_t u = (n - 1) & n; u != 0; u = (u - 1) & u) n = u;
+    return n ? n : 1;
+}
 
 void Storm_2CBD0(S2CBigVec* dst, const S2CBigVec* src, uint32_t mlo, uint32_t mhi) {
     uint64_t m = ((uint64_t)mhi << 32) | mlo;
@@ -37,7 +44,7 @@ void Storm_2CBD0(S2CBigVec* dst, const S2CBigVec* src, uint32_t mlo, uint32_t mh
     }
     uint32_t e = dst->off + i;
     if (dst->size < e && dst->cap < e) {
-        uint32_t g = dst->grow ? dst->grow : Seam3C40_2CBD0(dst);
+        uint32_t g = dst->grow ? dst->grow : Seam3C40_2CBD0(dst, e);
         uint32_t c = e;
         if (e % g) c = (g - e % g) + e;
         Seam3C80_2CBD0(dst, c);

@@ -556,31 +556,4 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_16260(uint32_t* r) {
     r[4] = 0;
 }
 
-// 1.13c Storm+0x27560: verify the archive's signature hash. Skeleton: advapi32/CryptoAPI is not
-// present on the wasm target, so the LoadLibraryA branch is skipped and the error is retail's 0x4DC.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_27560(uint32_t* r) {
-    uint32_t p1 = r[0];
-    uint32_t p2 = r[1];
-    if (p2 != 0) wr32((uintptr_t)p2, 0, 0);
-    uint32_t entry = StormSub16AC0((void*)(uintptr_t)p1, 0);
-    if (entry == 0xFFFFFFFFu) {
-        if (p2 != 0) wr32((uintptr_t)p2, 0, 1);
-        g_lastError = 0x4DC;
-        StormSetLastError(0x4DC);
-        r[4] = 0;
-        return;
-    }
-    int32_t verified = 0;
-    HMODULE advapi = StormLoadLibraryA("advapi32.dll");
-    if (advapi != nullptr) {
-        // Retail imports CryptAcquireContextA .. CryptVerifySignatureA, maps +0x10C of the archive
-        // and verifies the BLIZZARDKEY resource. Our LoadLibraryA seam has no advapi32, so this
-        // branch is unreachable; left as a named seam rather than a fake crypto implementation.
-    }
-    if (verified == 0) {
-        g_lastError = 0x4DC;
-        StormSetLastError(0x4DC);
-    }
-    r[4] = (uint32_t)verified;
-}
+// 1.13c Storm+0x27560 lives in src/core/storm/storm_27560.cpp (Storm_Sub27560 with its host-call seams).

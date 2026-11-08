@@ -52,6 +52,11 @@ struct StormBatch34110Env {
     // ---- kernel32 --------------------------------------------------------------------------------
     void     (*set_last_error)(uint32_t e);
     void     (*exit_process)(uint32_t code);
+    // ---- generated blitter (Storm_Sub387F0) -----------------------------------------------------
+    // Runs the generated stub code from pc with the six blitter registers {edi, esi, ebp, ecx, edx, ebx}
+    // until a jump leaves it; returns that jump's target (one of the two row-end addresses below).
+    uint32_t (*run_stub)(uint32_t pc, uint32_t* regs);
+    uint32_t end_plain, end_strided;   // the row-end code addresses the stubs are patched to (0: this file's)
 };
 
 namespace {
@@ -292,55 +297,65 @@ uint32_t Storm_Sub3C370(uint32_t* key, const char* name, uint32_t flags, uint8_t
                         (uint32_t*)(uintptr_t)param_6);
 }
 
-// 1.13c Storm+0x387F0: pick and patch the pixel blitter for width desc[8] (and the desc[0x18] & 3
-// misalignment when flags bit 0x40000 is set), then tail-call it through self+0x10 with
-// (desc[0xc], desc, desc[0x14], desc[0x10], stack). The two patched jump targets live at
-// self[0x14]+self[0x18]-4 and, when misaligned, self[0x2c]/self[0x44] as well.
+// The blitter trampoline: pick and patch the generated pixel blitter for width desc[8] (and the
+// desc[0x18] & 3 misalignment when flags bit 0x40000 is set), then run it row by row. A patched jump
+// at stub+len-4 holds target - (stub + len). The rows run from self[0x10] with edi = desc[0x18],
+// esi = desc[0x1c], ebp = desc[0x20], ecx/edx/ebx = desc[0x24..0x2c]; each row ends in one of the two
+// row-end blocks, which step esi/edi by the strides (desc[0x14]/desc[0x10]; the strided end uses
+// desc[0x34]/desc[0x30] after an odd row count) and re-enter until desc[0xc] rows are done. Then
+// ecx/edx/ebx go back to desc[0x24..0x2c] and the result is 1 (stdcall, two arguments).
+namespace {
+void patch_jump(uint8_t* self, uintptr_t stub, uint32_t target) {
+    const uint32_t base = rd32(self, stub), len = rd32(self, stub + 4);
+    *(uint32_t*)(uintptr_t)(base + len - 4) = target - (base + len);
+}
+}
+
 extern "C"
-void Storm_Sub387F0(uint8_t* self, uint8_t* desc, const StormBatch34110Env* env) {
-    (void)env;
-    uint32_t uVar1 = rd32(desc, 8);
+uint32_t Storm_Sub387F0(uint8_t* self, uint8_t* desc, const StormBatch34110Env* env) {
+    const uint32_t endPlain = env->end_plain ? env->end_plain : (uint32_t)(uintptr_t)&blit_end_plain;
+    const uint32_t endStrided = env->end_strided ? env->end_strided : (uint32_t)(uintptr_t)&blit_end_strided;
+    const uint32_t end = (rd32(self, 8) & 0x4000000) == 0 ? endPlain : endStrided;
+    uint32_t w = rd32(desc, 8);
     if ((rd32(self, 8) & 0x40000) == 0) {
-        if (rd32(self, 0xc) != uVar1) {
-            wr32(self, 0xc, uVar1);
+        if (rd32(self, 0xc) != w) {
+            wr32(self, 0xc, w);
             wr32(self, 0x10, rd32(self, 0x14));
-            int32_t dst = (int32_t)rd32(self, 0x14) + (int32_t)rd32(self, 0x18) - 4;
-            *(int32_t*)(uintptr_t)dst = (int32_t)rd32(self, 0x4c + uVar1 * 4) - dst;
-            void* target = ((rd32(self, 8) & 0x4000000) == 0) ? (void*)&blit_end_plain
-                                                              : (void*)&blit_end_strided;
-            int32_t dst2 = (int32_t)rd32(self, 0x44) + (int32_t)rd32(self, 0x48) - 4;
-            *(int32_t*)(uintptr_t)dst2 = (int32_t)(uintptr_t)target - dst2;
+            patch_jump(self, 0x14, rd32(self, 0x4c + w * 4));
+            patch_jump(self, 0x44, end);
         }
     } else {
-        uint32_t uVar2 = (uVar1 << 2) ^ (rd32(desc, 0x18) & 3);
-        if (rd32(self, 0xc) != uVar2) {
-            wr32(self, 0xc, uVar2);
-            uint32_t local_24 = (4 - (rd32(desc, 0x18) & 3)) & 3;
-            if (uVar1 < local_24) local_24 = uVar1;
-            uVar2 = (uVar1 - local_24) >> 2;
-            uVar1 = (uVar1 - local_24) & 3;
-            if (local_24 == 0 && uVar1 == 0) {
-                wr32(self, 0x10, rd32(self, 0x4c + uVar2 * 4));
-                void* target = ((rd32(self, 8) & 0x4000000) == 0) ? (void*)&blit_end_plain
-                                                                  : (void*)&blit_end_strided;
-                int32_t dst = (int32_t)rd32(self, 0x44) + (int32_t)rd32(self, 0x48) - 4;
-                *(int32_t*)(uintptr_t)dst = (int32_t)(uintptr_t)target - dst;
+        const uint32_t key = (w << 2) ^ (rd32(desc, 0x18) & 3);
+        if (rd32(self, 0xc) != key) {
+            wr32(self, 0xc, key);
+            uint32_t head = (4 - (rd32(desc, 0x18) & 3)) & 3;
+            if (w < head) head = w;
+            const uint32_t n = (w - head) >> 2, tail = (w - head) & 3;
+            if (head == 0 && tail == 0) {
+                wr32(self, 0x10, rd32(self, 0x4c + n * 4));
+                patch_jump(self, 0x44, end);
             } else {
-                wr32(self, 0x10, rd32(self, 0x1c + local_24 * 4));
-                int32_t dst1 = (int32_t)rd32(self, 0x14) + (int32_t)rd32(self, 0x18) - 4;
-                *(int32_t*)(uintptr_t)dst1 = (int32_t)rd32(self, 0x4c + uVar2 * 4) - dst1;
-                int32_t dst2 = (int32_t)rd32(self, 0x44) + (int32_t)rd32(self, 0x48) - 4;
-                *(int32_t*)(uintptr_t)dst2 = (int32_t)rd32(self, 0x34 + uVar1 * 4) - dst2;
-                void* target = ((rd32(self, 8) & 0x4000000) == 0) ? (void*)&blit_end_plain
-                                                                  : (void*)&blit_end_strided;
-                int32_t dst3 = (int32_t)rd32(self, 0x2c) + (int32_t)rd32(self, 0x30) - 4;
-                *(int32_t*)(uintptr_t)dst3 = (int32_t)(uintptr_t)target - dst3;
+                wr32(self, 0x10, rd32(self, 0x1c + head * 4));
+                patch_jump(self, 0x14, rd32(self, 0x4c + n * 4));
+                patch_jump(self, 0x44, rd32(self, 0x34 + tail * 4));
+                patch_jump(self, 0x2c, end);
             }
         }
     }
-    typedef void (*BlitFn)(uint32_t, uint8_t*, uint32_t, uint32_t, void*);
-    BlitFn fn = (BlitFn)(uintptr_t)rd32(self, 0x10);
-    fn(rd32(desc, 0xc), desc, rd32(desc, 0x14), rd32(desc, 0x10), nullptr);
+    const uint32_t entry = rd32(self, 0x10), srcStride = rd32(desc, 0x14), dstStride = rd32(desc, 0x10);
+    uint32_t rows = rd32(desc, 0xc);
+    uint32_t r[6] = { rd32(desc, 0x18), rd32(desc, 0x1c), rd32(desc, 0x20), rd32(desc, 0x24), rd32(desc, 0x28), rd32(desc, 0x2c) };
+    for (;;) {
+        const uint32_t t = env->run_stub(entry, r);
+        if (t == endStrided && (rows & 1) == 0) { --rows; r[1] += srcStride; r[0] += dstStride; continue; }
+        if (--rows == 0) break;
+        if (t == endStrided) { r[1] += rd32(desc, 0x34); r[0] += rd32(desc, 0x30); }
+        else { r[1] += srcStride; r[0] += dstStride; }
+    }
+    wr32(desc, 0x24, r[3]);
+    wr32(desc, 0x28, r[4]);
+    wr32(desc, 0x2c, r[5]);
+    return 1;
 }
 
 // 1.13c Storm+0x3A330: open an AUSTREAM. The directory part param_1 and the file name param_2 are

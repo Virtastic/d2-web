@@ -615,161 +615,71 @@ void Storm_ProviderPlay(void* iface, uint32_t);
 void Storm_ProviderSetVolume(void* iface, uint32_t v);
 void Storm_ProviderSetPan(void* iface, uint32_t v);
 
-// 1.13c Storm+0x2A0B0: SFileOpenArchive -- open an MPQ, read and decrypt its tables, link it into
-// the priority-ordered archive list.
+// 1.13c Storm+0x2A0B0: SFileOpenArchive -- the port is storm_2a0b0.cpp; this binds it to the module words, the kernel32 calls and the callees.
+struct Storm2A0B0Env {
+    uint32_t* g45388; uint32_t* g43120; uint32_t* g45984; uint32_t* g45980;
+    void (*setLastError)(uint32_t code);
+    void (*enter)(); void (*leave)();
+    void (*init)(uint32_t eax);
+    void (*copy)(uint32_t dst, uint32_t src, uint32_t n);
+    uint32_t (*getAttr)(uint32_t path);
+    uint32_t (*strstr)(uint32_t hay, uint32_t needleRva);
+    void (*sub26BD0)(uint32_t name, uint32_t buf, uint32_t zero);
+    uint32_t (*sub26750)(uint32_t path);
+    uint32_t (*createFile)(uint32_t path);
+    uint32_t (*sub40D0)(uint32_t listRva, uint32_t a, uint32_t b);
+    uint32_t (*alloc)(uint32_t size, uint32_t tagRva, uint32_t line, uint32_t flags);
+    void (*release)(uint32_t p, uint32_t tagRva, uint32_t line, uint32_t flags);
+    void (*setFilePointer)(uint32_t h, uint32_t off);
+    void (*readFile)(uint32_t h, uint32_t buf, uint32_t n, uint32_t* got);
+    void (*sub3E20)(uint32_t rec);
+    void (*sub26D70)(uint32_t state, uint32_t buf, uint32_t size, uint32_t name, uint32_t esi, uint32_t edi);
+    uint32_t (*sub25ED0)(uint32_t nameRva, uint32_t type);
+    void (*sub25F30)(uint32_t key, uint32_t size, uint32_t table);
+    void (*sub25E50)(uint32_t table, uint32_t count);
+    void (*sub29560)(uint32_t mode);
+    void (*sub26CB0)(uint32_t rec);
+    void (*sub29F60)(uint32_t rec, uint32_t table, uint32_t count);
+};
+extern "C" uint32_t Storm13c_2A0B0(const Storm2A0B0Env* e, uint32_t name, uint32_t prio, uint32_t flags, uint32_t out);
+static const char* Storm2A0B0Str(uint32_t rva) {   // the module strings the port names by RVA
+    switch (rva) {
+        case 0x46FA0: return ":\\";
+        case 0x46F9C: return "\\\\";
+        case 0x46F8C: return "(hash table)";
+        case 0x46F7C: return "(block table)";
+        case 0x46838: return "delete";
+        default: return kSFileCpp;   // 0x470F4
+    }
+}
 extern "C"
 uint32_t Storm_SFileOpenArchive_2A0B0(uint32_t* param_1, uint32_t param_2, uint32_t param_3,
                                       void** param_4) {
-    uint32_t uVar2;
-    if (param_4 == nullptr) {
-        uVar2 = 0;
-    } else {
-        *param_4 = nullptr;
-        uVar2 = 0xFFFFFFFF;
-    }
-    if ((uVar2 & -(uint32_t)(param_1 != nullptr) & -(uint32_t)(*(char*)param_1 != '\0')) == 0) {
-        g_lastError = 0x57;
-        StormSetLastError(0x57);
-        return 0;
-    }
-    EnterCriticalSection(&g_lock);
-    if (g_43120 == 0) Storm_Sub17FC0();
-    char local_104[260];
-    Storm_Sub2B080((uint8_t*)local_104, param_1, 0x104);
-    if ((~(StormGetFileAttributes(local_104) >> 4) & 1) == 0) {   // a directory: use it as search path
-        if (*(char*)param_1 == '\\' || Storm_Sub6460(param_1, ":\\") != nullptr ||
-            Storm_Sub6460(param_1, "\\\\") != nullptr) {
-            Storm_Sub2B080((uint8_t*)local_104, param_1, 0x104);
-        } else {
-            Storm_Sub16BD0(local_104, 0);
-        }
-    }
-    int32_t iVar5 = Storm_Sub16750();
-    uint32_t local_110 = param_3 & 1;
-    int32_t local_10c = iVar5;
-    if (local_110 != 0 && iVar5 == 0) {
-        g_lastError = 0xf;
-        StormSetLastError(0xf);
-        LeaveCriticalSection(&g_lock);
-        return 0;
-    }
-    HANDLE hFile = StormCreateFile(local_104, 0x80000000, 1, 3, 0);
-    if (hFile == kInvalidHandle()) {
-        LeaveCriticalSection(&g_lock);
-        return 0;
-    }
-    uint8_t* rec = (uint8_t*)Storm_Sub40D0(&g_4597c, 0, 0);
-    Storm_Sub2B080(rec + 8, (const uint32_t*)local_104, 0x104);
-    wr32(rec, 0x114, param_2);
-    wr32(rec, 0x10c, (uint32_t)(uintptr_t)hFile);
-    wr32(rec, 0x140, 1);
-    if (iVar5 == 0) {
-        wr32(rec, 0x110, (param_3 & 2) != 0 ? 1u : 0u);
-    } else {
-        wr32(rec, 0x110, 3);
-    }
-    uint8_t* pHdr = (uint8_t*)Storm_Sub1C580(0x20, kSFileCpp, 0x1024, 0);
-    wr32(rec, 0x130, (uint32_t)(uintptr_t)pHdr);
-    wr32(rec, 0x12c, 0);
-    uint8_t* local_118 = (uint8_t*)Storm_Sub1C580(0x1000, kSFileCpp, 0x1029, 0);
-    uint32_t uVar2b = 0;
-    DWORD local_120 = 0;
-    for (;;) {
-        uint32_t uVar1 = rd32(rec, 0x12c);
-        if (local_120 + uVar2b <= uVar1) {
-            uint32_t local_114 = uVar1;
-            StormSetFilePointer(hFile, (LONG)uVar1, nullptr, 0);
-            DWORD local_11c = 0;
-            StormReadFile(hFile, local_118, 0x1000, &local_11c);
-            if (local_11c < 0x20) {
-                Storm_Sub3E20((uint32_t)(uintptr_t)rec);
-                Storm_SubB960(rec, "delete", -1);
-                g_lastError = 0x8510006c;
-                StormSetLastError(0x8510006c);
-                LeaveCriticalSection(&g_lock);
-                Storm_SubB960(local_118, kSFileCpp, 0x1044);
-                return 0;
-            }
-            local_120 = local_11c;
-            uVar2b = local_114;
-        }
-        std::memcpy(pHdr, local_118 + (rd32(rec, 0x12c) - uVar2b), 0x20);
-        if ((int32_t)rd32(pHdr, 0) == 0x1A51504D && (int32_t)rd32(pHdr, 4) > 0x1F) break;
-        wr32(rec, 0x12c, rd32(rec, 0x12c) + 0x200);
-    }
-    Storm_SubB960(local_118, kSFileCpp, 0x106b);
-    uVar2b = 0x200u << (*(uint8_t*)(pHdr + 0xe) & 0x1F);
-    wr32(rec, 0x120, uVar2b);
-    uint8_t* puVar6 = (uint8_t*)Storm_Sub1C580(uVar2b, kSFileCpp, 0x1070, 0);
-    wr32(rec, 0x124, (uint32_t)(uintptr_t)puVar6);
-    uint32_t hashCount = rd32(pHdr, 0x18);
-    puVar6 = (uint8_t*)Storm_Sub1C580(hashCount << 4, kSFileCpp, 0x1079, 0);
-    wr32(rec, 0x138, (uint32_t)(uintptr_t)puVar6);
-    Storm_Sub16D70((uint32_t*)(rec + 0x13c), puVar6, hashCount << 4, (uint32_t*)(rec + 8));
-    uVar2b = Storm_Sub15ED0((const char*)(rec + 8), 3);
-    Storm_Sub15F30(uVar2b, (uint32_t*)(uintptr_t)rd32(rec, 0x138));
-    uint32_t blockCount = rd32(pHdr, 0x1c);
-    puVar6 = (uint8_t*)Storm_Sub1C580(blockCount * 0x1c, kSFileCpp, 0x1092, 0);
-    wr32(rec, 0x134, (uint32_t)(uintptr_t)puVar6);
-    Storm_Sub16D70((uint32_t*)(rec + 0x13c), puVar6, blockCount << 4, (uint32_t*)(rec + 8));
-    uVar2b = Storm_Sub15ED0((const char*)(rec + 8), 3);
-    Storm_Sub15F30(uVar2b, (uint32_t*)(uintptr_t)rd32(rec, 0x134));
-    Storm_Sub15E50(rd32(pHdr, 0x1c));
-    if (rd32(rec, 0x12c) != 0 && blockCount != 0) {
-        uint32_t tableBase = rd32(rec, 0x134);
-        for (uint32_t i = 0; i < blockCount; ++i) {
-            uint32_t at = tableBase + i * 0x1c;
-            if (rd32((void*)(uintptr_t)at, 0) != 0)
-                wr32((void*)(uintptr_t)at, 0, rd32((void*)(uintptr_t)at, 0) + rd32(rec, 0x12c));
-        }
-    }
-    // priority-ordered insert into the archive list
-    uint32_t* anchor = nullptr;
-    if ((int32_t)g_45984 >= 1) {
-        uint32_t node = (uint32_t)g_45984;
-        anchor = (uint32_t*)(uintptr_t)node;
-        for (;;) {
-            if ((int32_t)rd32((void*)(uintptr_t)node, 0x114) <= (int32_t)param_2) break;
-            node = rd32((void*)(uintptr_t)node, 4);
-            if ((int32_t)node < 1) {
-                anchor = nullptr;
-                break;
-            }
-        }
-    }
-    // unlink the fresh record (all links zero) then splice it after the anchor
-    uint32_t link = rd32(rec, 0);
-    if (link != 0) {
-        uint32_t tag = rd32(rec, 4);
-        uint8_t* prev;
-        if ((int32_t)tag < 0) prev = (uint8_t*)(uintptr_t)~tag;
-        else prev = (uint8_t*)(uintptr_t)((uint32_t)(uintptr_t)rec + (tag - rd32((void*)(uintptr_t)link, 4)));
-        wr32(prev, 0, link);
-        wr32((void*)(uintptr_t)link, 4, tag);
-        wr32(rec, 0, 0);
-        wr32(rec, 4, 0);
-    }
-    if (anchor == nullptr) anchor = &g_45980;
-    uint32_t head = *anchor;
-    wr32(rec, 0, head);
-    wr32(rec, 4, rd32((void*)(uintptr_t)head, 4));
-    wr32((void*)(uintptr_t)head, 4, (uint32_t)(uintptr_t)rec);
-    *anchor = (uint32_t)(uintptr_t)rec;
-    if (rd32(rec, 0x110) == 0) {
-        if (local_110 != 0 && local_10c == 0) {
-            Storm_Sub16CB0((uint32_t*)rec);
-            g_lastError = 0xf;
-            StormSetLastError(0xf);
-            LeaveCriticalSection(&g_lock);
-            return 0;
-        }
-    } else {
-        Storm_Sub19560();
-    }
-    *param_4 = rec;
-    LeaveCriticalSection(&g_lock);
-    Storm_Sub19F60(rec, (void*)(uintptr_t)rd32(rec, 0x134), (int32_t)rd32(pHdr, 0x1c));
-    return 1;
+    static_assert(sizeof(uint32_t) == 4, "words");
+    Storm2A0B0Env e{ (uint32_t*)&g_lastError, (uint32_t*)&g_43120, (uint32_t*)&g_45984, &g_45980,
+        [](uint32_t c) { StormSetLastError(c); },
+        []() { EnterCriticalSection(&g_lock); }, []() { LeaveCriticalSection(&g_lock); },
+        [](uint32_t) { Storm_Sub17FC0(); },
+        [](uint32_t d, uint32_t s, uint32_t n) { Storm_Sub2B080((uint8_t*)(uintptr_t)d, (const uint32_t*)(uintptr_t)s, n); },
+        [](uint32_t p) { return (uint32_t)StormGetFileAttributes((const char*)(uintptr_t)p); },
+        [](uint32_t h, uint32_t n) { return (uint32_t)(uintptr_t)Storm_Sub6460((const void*)(uintptr_t)h, Storm2A0B0Str(n)); },
+        [](uint32_t, uint32_t b, uint32_t w) { Storm_Sub16BD0((char*)(uintptr_t)b, (int32_t)w); },
+        [](uint32_t) { return (uint32_t)Storm_Sub16750(); },
+        [](uint32_t p) { return (uint32_t)(uintptr_t)StormCreateFile((const char*)(uintptr_t)p, 0x80000000, 1, 3, 0); },
+        [](uint32_t, uint32_t a, uint32_t b) { return (uint32_t)(uintptr_t)Storm_Sub40D0(&g_4597c, a, b); },
+        [](uint32_t n, uint32_t t, uint32_t l, uint32_t f) { return (uint32_t)(uintptr_t)Storm_Sub1C580(n, Storm2A0B0Str(t), (int32_t)l, f); },
+        [](uint32_t p, uint32_t t, uint32_t l, uint32_t) { Storm_SubB960((void*)(uintptr_t)p, Storm2A0B0Str(t), (int32_t)l); },
+        [](uint32_t h, uint32_t o) { StormSetFilePointer((HANDLE)(uintptr_t)h, (LONG)o, nullptr, 0); },
+        [](uint32_t h, uint32_t b, uint32_t n, uint32_t* got) { DWORD g = 0; StormReadFile((HANDLE)(uintptr_t)h, (void*)(uintptr_t)b, n, &g); *got = g; },
+        [](uint32_t r) { Storm_Sub3E20(r); },
+        [](uint32_t s, uint32_t b, uint32_t z, uint32_t n, uint32_t, uint32_t) { Storm_Sub16D70((uint32_t*)(uintptr_t)s, (void*)(uintptr_t)b, z, (uint32_t*)(uintptr_t)n); },
+        [](uint32_t n, uint32_t) { return Storm_Sub15ED0(Storm2A0B0Str(n), 3); },
+        [](uint32_t k, uint32_t, uint32_t t) { Storm_Sub15F30(k, (uint32_t*)(uintptr_t)t); },
+        [](uint32_t, uint32_t c) { Storm_Sub15E50(c); },
+        [](uint32_t) { Storm_Sub19560(); },
+        [](uint32_t r) { Storm_Sub16CB0((uint32_t*)(uintptr_t)r); },
+        [](uint32_t r, uint32_t t, uint32_t c) { Storm_Sub19F60((uint8_t*)(uintptr_t)r, (void*)(uintptr_t)t, (int32_t)c); } };
+    return Storm13c_2A0B0(&e, (uint32_t)(uintptr_t)param_1, param_2, param_3, (uint32_t)(uintptr_t)param_4);
 }
 
 // WAVEFORMATEX as retail reads it (18 bytes, cbSize zeroed by the caller).

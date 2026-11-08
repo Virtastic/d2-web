@@ -25,7 +25,6 @@ void    Storm_Sub17FC0(void);
 void    Storm_Sub38220(int32_t* p);                                                     // 0x38220
 void    Storm_Sub3BB50(void);                                                           // 0x3BB50
 void    Storm_Sub22C50(void* buf, uint32_t n, uint8_t fill);
-int32_t* Storm_Sub25DC0(void);
 uint32_t* Storm_Sub27A70(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t,
                          int32_t, uint32_t, uint32_t, uint32_t, int32_t, uint32_t, uint32_t);
 uint32_t Storm_Sub28E80(uint32_t a, uint32_t* b, uint32_t c);
@@ -85,6 +84,8 @@ const uint32_t kStep[89] = {  // 0x6FC36690
  10442,11487,12635,13899,15289,16818,18500,20350,22385,24623,27086,29794,32767};
 
 }  // namespace
+
+extern "C" uint32_t* Storm_B144B_BitmapHead() { return &g_45a08; }  // FN-probe accessor for the __AUBITMAPREC__ list head
 
 // 1.13c Storm+0x1bd00: tear down all 0x100 heap lists (frees empty pages, reports leaks via 1B1C0).
 // Slots are retail's 32-bit words; the seams are the critical sections, 2FB30, 1B1C0 and VirtualFree.
@@ -383,12 +384,12 @@ void Storm_Sub26930(uint8_t* req, uint32_t esi) {
 
 // 1.13c Storm+0x27250: pick the next request to service from the list at g_45978. Returns non-zero when
 // a "due" class (<1000ms and ready / queued / short) was chosen; *out is the chosen node or null.
-uint32_t Storm_Sub27250(int32_t curArchive, uint32_t curPos, uint32_t* out) {
+// The pure core: head = the word at the list head (g_45978), useArchive = g_41a08, now = GetTickCount().
+extern "C" uint32_t Storm_Pick27250(uint32_t head, uint32_t useArchive, uint32_t now, int32_t curArchive, uint32_t curPos, uint32_t* out) {
     uint32_t best = 0, fDue = 0, fQueued = 0, fShort = 0;
     int32_t bestDelta = 0x7fffffff;
     uint32_t score = 0xffffffffu;
-    uint32_t now = GetTickCount();
-    uint32_t n = Pos(g_45978);
+    uint32_t n = Pos(head);
     while ((int32_t)n > 0) {
         uint8_t* r = N(n);
         uint32_t t;
@@ -409,7 +410,7 @@ uint32_t Storm_Sub27250(int32_t curArchive, uint32_t curPos, uint32_t* out) {
                     if (delta < 1000 && delta < bestDelta) { fShort = 1; take = true; }
                     else if (fShort == 0 && (best == 0 || (int32_t)U(N(best), 0x1c) <= pri)) {
                         sc = 0;
-                        if (g_41a08 != 0) {
+                        if (useArchive != 0) {
                             uint8_t* ar = N(U(N(U(r, 0x0c)), 0x110));
                             uint32_t d = 0;
                             if (ar && U(ar, 0x120) < curPos) d = curPos - U(ar, 0x120);
@@ -431,92 +432,49 @@ uint32_t Storm_Sub27250(int32_t curArchive, uint32_t curPos, uint32_t* out) {
     *out = best;
     return fShort | fQueued | fDue;
 }
+uint32_t Storm_Sub27250(int32_t curArchive, uint32_t curPos, uint32_t* out) {
+    return Storm_Pick27250(g_45978, g_41a08, GetTickCount(), curArchive, curPos, out);
+}
 
-// 1.13c Storm+0x27b80: advance every active stream record (state at +0x18: 0 start, 2 playing, 3 finishing).
-// Heavily DirectSound / thread bound; the position arithmetic is transcribed, every COM call is a W() seam.
-int32_t* Storm_Sub27B80(void) {
-    if (g_4311c != 0) return (int32_t*)(uintptr_t)g_4311c;
-    int32_t* ret = (int32_t*)(uintptr_t)g_459cc;
-    for (uint32_t n = Pos(g_459cc); (int32_t)n > 0; n = U(N(n), 4)) {
-        uint8_t* s = N(n);
-        uint8_t* owner = N(U(s, 8));
-        uint32_t st = U(s, 0x18);
-        if (st == 3 || (st == 2 && U(s, 0x24) + U(s, 0x20) <= U(owner, 0x11c))) {
-            if (U(s, 0x14) != 0) {
-                U(owner, 0x11c) = U(s, 0x20); U(s, 0x30) = 0; U(s, 0x1c) = 0;
-            } else {
-                ret = Storm_Sub25DC0();
-                if (ret != (int32_t*)0xffffffff) {
-                    if (U(s, 0x2c) < U(s, 0x24)) {
-                        if (g_43114 <= ((uint32_t)(uintptr_t)ret - U(s, 0xc)) % U(s, 0x40)) {
-                            uint32_t m = U(s, 0x40) - U(s, 0xc);
-                            if (g_43114 < m) m = g_43114;
-                            uint8_t* p = nullptr;
-                            if (W("IDirectSoundBuffer::Lock", N(U(s, 0x3c)), U(s, 0xc), m, &p, &m) >= 0) {
-                                Storm_Sub22C50(p, m, *(uint8_t*)(s + 0x48));
-                                W("IDirectSoundBuffer::Unlock", N(U(s, 0x3c)), p, m, 0, 0);
-                                U(s, 0x30) += m; U(s, 0x1c) += m; U(s, 0xc) += m;
-                                if (U(s, 0x40) <= U(s, 0xc)) U(s, 0xc) -= U(s, 0x40);
-                            }
-                        }
-                        U(s, 0x18) = 3;
-                        goto cont;
-                    }
-                    ret = (int32_t*)W("IDirectSoundBuffer::Stop", N(U(s, 0x3c)));  // vtable +0x48
-                    U(s, 0x18) = 4;
-                }
-                continue;
-            }
-        }
-    cont:
-        st = U(s, 0x18);
-        if (st == 2) {
-            ret = Storm_Sub25DC0();
-            if (ret != (int32_t*)0xffffffff) {
-                uint32_t sz = U(s, 0x40), d = (uint32_t)(uintptr_t)ret - U(s, 0xc);
-                if (g_43114 <= d % sz) {
-                    uint32_t len = sz - U(s, 0xc);
-                    if (g_43114 < len) len = g_43114;
-                    uint32_t pos = U(owner, 0x11c);
-                    uint32_t left = (U(s, 0x24) + U(s, 0x20)) - pos;
-                    if (left <= len) len = left;
-                    if (g_43140 != 0) {
-                        uint32_t al = (U(N(U(owner, 0x110)), 0x120) - 1) & (len + pos);
-                        if (al != 0 && al < len) len -= al;
-                    }
-                    Storm_Sub27A70(pos, 0, 0, U(s, 0x3c), U(s, 0xc), Lo(s), len,
-                                   (int32_t)(((sz + g_43114 * -2u) * 1000u) / U(s, 0x10)), 0, 0, 1, 0, 0, 0);
-                    U(owner, 0x11c) += len;
-                    U(s, 0xc) += g_43114;
-                    if (U(s, 0x40) <= U(s, 0xc)) U(s, 0xc) -= U(s, 0x40);
-                }
-            }
-        } else if (st == 0) {
-            uint32_t total = U(s, 0x24) - U(s, 0x28), done = 0;
-            if (U(s, 0x40) < total) total = U(s, 0x40);
-            U(owner, 0x11c) = U(s, 0x20) + U(s, 0x28);
-            uint32_t delay = 0, chunk = g_43114;
-            if (g_43140 != 0) {
-                done = chunk < total ? chunk : total;
-                uint32_t pos = U(owner, 0x11c);
-                uint32_t al = (U(N(U(owner, 0x110)), 0x120) - 1) & (pos + done);
-                if (al != 0 && al < done) done -= al;
-                Storm_Sub27A70(pos, 0, 0, U(s, 0x3c), 0, Lo(s), done, 0, 0, 0, 1, 0, 0, 0);
-                U(owner, 0x11c) += done;
-            }
-            while (done < total) {
-                uint32_t c2 = total - done < g_43114 ? total - done : g_43114;
-                Storm_Sub27A70(U(owner, 0x11c), 0, 0, U(s, 0x3c), done, Lo(s), c2, (int32_t)delay, 0, 0, 1, 0, 0, 0);
-                done += g_43114;
-                delay += (g_43114 * 1000u) / U(s, 0x10);
-                U(owner, 0x11c) += c2;
-            }
-            ret = (int32_t*)(uintptr_t)(done / U(s, 0x40));
-            U(s, 0x18) = 1;
-            U(s, 0xc) = done % U(s, 0x40);
-        }
-    }
-    return ret;
+// 1.13c Storm+0x27b80: the stream service step. The port is storm_27b80.cpp; this binds it to the module words, the 0x25DC0
+// position probe (through the buffer's GetCurrentPosition) and the DirectSound calls, which stay W() seams.
+struct Storm27B80Env {
+    uint32_t g4311c, g459cc, g43114, g43140;
+    uint32_t (*cursor)(uint32_t rec);
+    void (*fill)(uint32_t p, uint32_t n, uint32_t byte);
+    int32_t (*lock)(uint32_t buf, uint32_t off, uint32_t len, uint32_t* p, uint32_t* n);
+    void (*unlock)(uint32_t buf, uint32_t p, uint32_t n);
+    uint32_t (*stop)(uint32_t buf);
+    void (*queue)(uint32_t owner, const uint32_t* a);
+};
+extern "C" uint32_t Storm13c_27B80(const Storm27B80Env* e);
+static uint32_t Storm27B80Cursor(uint32_t rec) {   // 0x25DC0
+    uint8_t* o = N(rec);
+    uint32_t a = 0, b = 0;
+    if ((int32_t)W("IDirectSoundBuffer::GetCurrentPosition", N(U(o, 0x3c)), &a, &b) < 0) return 0xffffffffu;
+    int32_t d = (int32_t)(U(o, 0x30) % U(o, 0x40) - a);
+    if (d < 1) d += (int32_t)U(o, 0x40);
+    uint32_t v = U(o, 0x30) - (uint32_t)d;
+    if (U(o, 0x24) <= v) v = U(o, 0x24);
+    U(o, 0x2c) = v;
+    return a;
+}
+static int32_t Storm27B80Lock(uint32_t buf, uint32_t off, uint32_t len, uint32_t* p, uint32_t* n) {
+    uint8_t* q = nullptr;
+    int32_t r = (int32_t)W("IDirectSoundBuffer::Lock", N(buf), off, len, &q, n);
+    *p = Lo(q);
+    return r;
+}
+uint32_t Storm_Sub27B80(void) {
+    Storm27B80Env e{ g_4311c, g_459cc, g_43114, g_43140, Storm27B80Cursor,
+        [](uint32_t p, uint32_t n, uint32_t byte) { Storm_Sub22C50(N(p), n, (uint8_t)byte); },
+        Storm27B80Lock,
+        [](uint32_t buf, uint32_t p, uint32_t n) { W("IDirectSoundBuffer::Unlock", N(buf), N(p), n, 0, 0); },
+        [](uint32_t buf) { return (uint32_t)W("IDirectSoundBuffer::Stop", N(buf)); },
+        [](uint32_t owner, const uint32_t* a) {
+            Storm_Sub27A70(a[0], a[1], a[2], a[3], a[4], a[5], a[6], (int32_t)a[7], a[8], a[9], a[10], (int32_t)a[11], a[12], owner);
+        } };
+    return Storm13c_27B80(&e);
 }
 
 // 1.13c Storm+0x29200: audio worker thread body. Loops until g_43104 is set; each pass wakes waiters, advances

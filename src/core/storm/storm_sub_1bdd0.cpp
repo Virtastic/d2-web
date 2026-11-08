@@ -6,7 +6,8 @@
 #include <cstdlib>
 
 // Win32 seams: reserve+commit collapse to one zeroed block; fatal error 8 (0x2F590) has no UI here.
-static void* Storm_VirtualReserve(size_t n) { return calloc(1, n); }
+void* (*g_storm_vreserve_hook)(size_t) = nullptr;  // FN probe seam: the VirtualAlloc pin's block
+static void* Storm_VirtualReserve(size_t n) { return g_storm_vreserve_hook ? g_storm_vreserve_hook(n) : calloc(1, n); }
 static void* Storm_VirtualCommit(void* p, size_t) { return p; }
 static void Storm_SErrDisplayError(uint32_t, const char*, int32_t, void*, uint32_t, uint32_t) {}
 

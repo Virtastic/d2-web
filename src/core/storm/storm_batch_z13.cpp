@@ -16,7 +16,7 @@ struct StormZ13Seam {
     u32* cacheCap;                                  // DAT_6fc45368
     void* rowTable;                                 // DAT_6fc45360 (int* per-row base table)
     u32 shiftRow, mask, shiftCol, bits;             // DAT_6fc415f0/415f4/415e8/415ec
-    void (*blit)(i32* rc, u32 a, int b, u32 c, char d, int e, char* out, u32* sz, u32* x); // Storm+0x36A50
+    void (*blit)(i32* rc, u32 a, int b, u32 c, char d, int e, char* out, u32* sz, u32* x, i32* bnd); // Storm+0x36A50
 };
 static const char* kStrans = "..\\3rdParty\\STORM\\SOURCE\\STRANS.CPP";
 static void z13err(const StormZ13Seam& s) { *s.lastErr = 0x57; s.setLastError(0x57); }
@@ -273,10 +273,10 @@ u32 Storm_Z13_37A60(const StormZ13Seam& s, u32 flags, i32 eax8, i32* rc, i32 p1,
     if (eax8 != 8) return 0;
     char c4 = (flags & 0x1000000) ? (char)flags : 0;
     u32 L[6] = {0, 0, 0, 0, 0, 0};   // local_18,local_14,local_10..local_4
-    s.blit(rc, p2, p1, p3, c4, p4, nullptr, &L[0], &L[1]);
+    s.blit(rc, p2, p1, p3, c4, p4, nullptr, &L[0], &L[1], (i32*)&L[2]);
     u32 sz = L[0];
     char* buf = (char*)s.alloc(sz, kStrans, 0x115, 0);
-    s.blit(rc, p2, p1, p3, c4, p4, buf, nullptr, nullptr);
+    s.blit(rc, p2, p1, p3, c4, p4, buf, nullptr, nullptr, (i32*)&L[2]);
     u32* r = s.newRec(s.pool, 0, 0);
     r[8] = L[2]; r[9] = L[3]; r[10] = L[4]; r[11] = L[5];
     r[2] = (u32)(uintptr_t)buf; r[3] = sz; r[4] = sz; r[5] = L[1];

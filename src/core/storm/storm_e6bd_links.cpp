@@ -17,14 +17,23 @@ WEAK int32_t g_cnt_6fc41a78, g_cnt_6fc41a98;
 WEAK void *g_cb_6fc11c70, *g_cb_6fc11c30;
 WEAK int (*g_cmp_6fc1fcf0)(const void*, const void*);
 
+struct StormLocSeam {  // FN-probe seam (src/core/fn/storm_e6bd.cpp, storm_e7ed.cpp): answers the Win locale imports
+    int (*getLocaleInfoW)(uint32_t, uint32_t, wchar16*, int);
+    int (*getLocaleInfoA)(uint32_t, uint32_t, char*, int);
+    int (*multiByteToWideChar)(uint32_t, uint32_t, const char*, int, wchar16*, int);
+    int (*wideCharToMultiByte)(uint32_t, uint32_t, const wchar16*, int, char*, int, const char*, int*);
+    uint32_t (*getLastError)();
+};
+WEAK const StormLocSeam* g_storm_locseam = nullptr;
+WEAK void Storm_Sub16BD0(char* out, int32_t) { if (out) out[0] = 0; }   // not yet ported (install dir)
 static uint32_t s_lastError;
-WEAK uint32_t Win_GetLastError() { return s_lastError; }
+WEAK uint32_t Win_GetLastError() { if (g_storm_locseam) return g_storm_locseam->getLastError(); return s_lastError; }
 WEAK void Win_SetLastError(uint32_t e) { s_lastError = e; }
 // No locale provider: report "not implemented" (0x78), which the callers treat as "use the A/W fallback".
-WEAK int Win_GetLocaleInfoW(uint32_t, uint32_t, wchar16*, int) { s_lastError = 0x78; return 0; }
-WEAK int Win_GetLocaleInfoA(uint32_t, uint32_t, char*, int) { s_lastError = 0x78; return 0; }
-WEAK int Win_MultiByteToWideChar(uint32_t, uint32_t, const char*, int, wchar16*, int) { s_lastError = 0x78; return 0; }
-WEAK int Win_WideCharToMultiByte(uint32_t, uint32_t, const wchar16*, int, char*, int, const char*, int*) { s_lastError = 0x78; return 0; }
+WEAK int Win_GetLocaleInfoW(uint32_t a, uint32_t b, wchar16* c, int d) { if (g_storm_locseam) return g_storm_locseam->getLocaleInfoW(a, b, c, d); s_lastError = 0x78; return 0; }
+WEAK int Win_GetLocaleInfoA(uint32_t a, uint32_t b, char* c, int d) { if (g_storm_locseam) return g_storm_locseam->getLocaleInfoA(a, b, c, d); s_lastError = 0x78; return 0; }
+WEAK int Win_MultiByteToWideChar(uint32_t a, uint32_t b, const char* c, int d, wchar16* e, int f) { if (g_storm_locseam) return g_storm_locseam->multiByteToWideChar(a, b, c, d, e, f); s_lastError = 0x78; return 0; }
+WEAK int Win_WideCharToMultiByte(uint32_t a, uint32_t b, const wchar16* c, int d, char* e, int f, const char* g, int* h) { if (g_storm_locseam) return g_storm_locseam->wideCharToMultiByte(a, b, c, d, e, f, g, h); s_lastError = 0x78; return 0; }
 WEAK void Win_EnterCS(void*) {}
 WEAK void Win_LeaveCS(void*) {}
 WEAK void Win_SetEvent(uint32_t) {}

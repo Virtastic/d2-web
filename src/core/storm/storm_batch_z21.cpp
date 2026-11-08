@@ -56,7 +56,7 @@ uint32_t z21_powhlp(double a, double b, double* r) {
   // retail tests the high dword of the *second* operand against +inf and the first against +-inf
   if ((uint32_t)bhi == 0x7ff00000u && blo == 0) {
     if (z21_dat_37b78 < x) { *r = res; return 0; }
-    if (!(z21_dat_37b78 <= x)) { *r = 0.0; return 0; }
+    if (x < z21_dat_37b78) { *r = 0.0; return 0; }   // jnp: ordered less only; x >= 1 or unordered is the NaN row
     *r = z21_dat_42078; return 1;
   }
   if (b == -__builtin_inf()) {
@@ -67,13 +67,14 @@ uint32_t z21_powhlp(double a, double b, double* r) {
   if (ahi != 0x7ff00000) {
     if (ahi != -0x100000 || alo != 0) return 0;
     int it = z21_d_inttype(b);
-    if (b <= z21_dat_37b10) res = (z21_dat_37b10 <= b) ? 1.0 : (it == 1 ? z21_dat_42090 : 0.0);
-    else if (it == 1) res = -z21_dat_42070;
+    // x87 flag tests: `test ah,41 / jne` is taken unless y > 0 (ordered); `test ah,5 / jp` unless y < 0 (ordered): a NaN y gives 1.0
+    if (z21_dat_37b10 < b) res = (it == 1) ? -z21_dat_42070 : z21_dat_42070;
+    else res = (b < z21_dat_37b10) ? (it == 1 ? z21_dat_42090 : 0.0) : 1.0;
     *r = res; return 0;
   }
   if (alo != 0) return 0;
   if (z21_dat_37b10 < b) { *r = res; return rc; }
-  *r = (z21_dat_37b10 <= b) ? 1.0 : 0.0;
+  *r = (b < z21_dat_37b10) ? 0.0 : 1.0;   // unordered (NaN y) takes the jp to fld1
   return rc;
 }
 

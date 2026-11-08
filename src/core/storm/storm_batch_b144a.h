@@ -17,6 +17,13 @@ struct Ctx {
     uint32_t (*fileSize)(intptr_t h){};
     void (*fileRead)(intptr_t h, void* buf, uint32_t n, uint32_t* got){};
     void (*fileClose)(intptr_t h){};
+    // 0x25710 callee seams (null = the real b144a function below, or a direct call of the callback)
+    bool (*load)(Ctx&, const char* path, int32_t* st, uint32_t* cur, void* cb, void* errCb){};   // 0x25290
+    bool (*option)(Ctx&, const char* str, int32_t* st, void* errCb){};                           // 0x255A0
+    bool (*chain)(Ctx&, const char* str, int32_t* st, int32_t* used){};                          // 0x25520
+    bool (*arg)(Ctx&, uint8_t* rec, const char* str, int32_t* used){};                           // 0x253C0
+    uint32_t (*callTok)(void* cb, const char* tok){};                                            // the token callback (stdcall, one word)
+    const char* switches{"-/"};                                                                  // Storm+0x47118
     int (*parse)(Ctx&, char** cursor, int32_t* st, uint32_t* a, void* b, void* errCb){}; // 0x257F0
     uint32_t (*callCb)(uint32_t cb, const uint32_t* args, uint32_t n){}; // net callback
     uint32_t (*callOpt)(uint32_t cb, const uint32_t* frame, const char* str){}; // rec+0x34 option callback (stdcall: &frame[7], str)
@@ -32,6 +39,8 @@ bool loadFile(Ctx&, const char* path, int32_t* a, uint32_t* b, void* c, void* er
 bool applyArg(Ctx&, uint8_t* rec, const char* str, int32_t* consumed);
 bool applyChain(Ctx&, const char* str, int32_t* st, int32_t* maxConsumed);
 bool parseOption(Ctx&, const char* str, int32_t* st, void* errCb);
+uint32_t handleToken(Ctx&, const char* tok, uint32_t* cur, int32_t* st, uint32_t quoted, void* cb, void* errCb); // 0x25710
+bool tokenize(Ctx&, char** cursor, int32_t* st, uint32_t* cur, void* cb, void* errCb);                     // 0x257F0
 void setBool(uint8_t* rec, const char* str, int32_t* consumed);
 void setNumber(Ctx&, uint8_t* rec, const char* str, int32_t* consumed);
 void setString(Ctx&, uint8_t* rec, const char* str, int32_t* consumed);

@@ -691,7 +691,10 @@ extern "C" uint32_t Storm_19_FnRun(uint32_t which, uint32_t a, uint32_t b, uint3
     StormBatch19040Env env{};
     env.f_18f00 = f18f00; env.f_18f90 = f18f90; env.is_window_visible = vis; env.is_iconic = ico;
     addr[0] = g_rect; addr[1] = g_palette;
-    uint32_t r = which == 0 ? Storm_Sub19040(a, b, c, d, &env) : which == 1 ? Storm_Sub19150(a, b, &env) : Storm_Sub19520(a, b, (uint32_t*)(uintptr_t)c, d, &env);
+    // which 3: 0x192A0 (its fifth argument only feeds the recursion; the probe passes 0 as the descriptor does)
+    uint32_t r = which == 0 ? Storm_Sub19040(a, b, c, d, &env) : which == 1 ? Storm_Sub19150(a, b, &env)
+               : which == 3 ? Storm_Sub192A0(a, ptr<uint32_t>(b), ptr<uint32_t>(c), ptr<uint32_t>(d), 0, &env)
+               : Storm_Sub19520(a, b, (uint32_t*)(uintptr_t)c, d, &env);
     p->err = g_lastError; p->rectLock = g_rectLock; memcpy(p->palette, g_palette, sizeof g_palette);
     return r;
 }

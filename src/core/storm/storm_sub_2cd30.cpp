@@ -7,7 +7,7 @@
 struct StormVec { uint32_t cap, size; uint32_t* data; uint32_t grow, off; };
 
 struct StormSub2CD30Env {
-    uint32_t (*growStep)(StormVec*);          // Storm+0x3C40
+    uint32_t (*growStep)(StormVec*, uint32_t n);         // Storm+0x3C40
     void (*reserve)(StormVec*, uint32_t n);   // Storm+0x3C80
     void (*trim)(StormVec*);                  // Storm+0x36D0
 };
@@ -17,7 +17,7 @@ void storm_sub_2cd30(const StormSub2CD30Env* env, StormVec* dst, uint32_t* rem,
     uint32_t n = src->size - src->off;
     uint32_t want = dst->off + n;
     if (dst->size < want && dst->cap < want) {
-        uint32_t g = dst->grow ? dst->grow : env->growStep(dst);
+        uint32_t g = dst->grow ? dst->grow : env->growStep(dst, want);
         env->reserve(dst, want % g ? want + g - want % g : want);
     }
     dst->size = want;

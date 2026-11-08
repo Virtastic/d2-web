@@ -9,9 +9,12 @@
 
 extern CRITICAL_SECTION g_stormLogLocks[4];  // storm_349e0.cpp, 0x6FC42F60
 
-static uint8_t g_regCode[16];          // DAT_6fc35554 (reg id -> modrm bits)
-static uint8_t g_regCode2[32];         // DAT_6fc3555f (indexed [reg*2+sub])
-static uint8_t g_opTab[64];            // UNK_6fc35524 (opcode pairs, stride 2 per (kind*3+mode))
+static uint8_t g_regCode[16] = { 0x04, 0x00, 0x07, 0x06, 0x05, 0x01, 0x02, 0x03 };   // DAT_6fc35554 (reg id -> modrm bits)
+static uint8_t g_regCode2[32] = { 0, 0, 0, 0, 0x04, 0, 0, 0, 0, 0, 0, 0x01, 0x05, 0x02, 0x06, 0x03, 0x07 };   // DAT_6fc3555f ([reg*2+sub])
+// UNK_6fc35524: (opcode, /digit) per (kind*3 + mode): mov, add, and, or, sub(ins), adc, xor, ..., shl-group
+static uint8_t g_opTab[64] = { 0x8b, 0x00, 0x89, 0x00, 0xc7, 0x00, 0x23, 0x00, 0x21, 0x00, 0x81, 0x04, 0x0b, 0x00, 0x09, 0x00,
+                               0x81, 0x01, 0x33, 0x00, 0x31, 0x00, 0x81, 0x06, 0x03, 0x00, 0x01, 0x00, 0x81, 0x00, 0x2b, 0x00,
+                               0x29, 0x00, 0x81, 0x05, 0xf7, 0x02, 0xf7, 0x02, 0xf7, 0x02, 0xc1, 0x01, 0xc1, 0x01, 0xc1, 0x01 };
 static uint32_t g_dat4535c;            // DAT_6fc4535c
 static const char kRegCh[] = "?wdstabc01";      // s_?wdstabc01
 static const char* g_opNames[16];      // PTR_s_move_6fc354f8 (mnemonic strings)
