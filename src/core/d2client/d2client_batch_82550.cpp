@@ -41,15 +41,15 @@ static uint8_t* findUnit(const D2cGlob82* g, const D2cEnv82* e, uint32_t id, uin
 // 1.13c D2Client+0x82550   (EAX = obj)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82550(const D2cGlob82* g, const D2cEnv82* e, uint8_t* eax) {
     e->fn(0x69700, 0, 0, 0, 0);
-    if (e->ord(10757, 0, 0, 0, 0)) {
-        e->fn(0x55c50, 0, 0, 0, 0);
+    if (e->ord(10757, P(eax), 0, 0, 0)) {
+        e->fn(0xa5c50, 0, 0, 0, 0);
         e->ord(10820, rd<uint32_t>(eax, 0x60), 0, 0, 0);
         wr<uint32_t>(eax, 0x60, 0);
     }
     if (g->tick) {
-        e->ord(10408, 0, 0, 0, 0);
-        U u = e->ord(10331, 0, 0, 0, 0);
-        if (e->ord(10821, u, 0, 0, 0)) e->ord(11016, 0, 0, 0, 0);
+        e->ord(10408, P(eax), 0, 0, 0);
+        U u = e->ord(10331, P(eax), 0, 0, 0);
+        if (e->ord(10821, u, P(eax), 0, 0)) e->ord(11016, P(eax), 0, 0, 0);
     }
 }
 
@@ -78,13 +78,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82610(const D2cEnv82* e, uint8_t*
     e->fn(0x69a90, P(esi), 0, 0, 0);
 }
 
-// 1.13c D2Client+0x82660   (ECX = unit, EAX = x, EBP = owner(+0x60 = room/inv handle) / y)
+// 1.13c D2Client+0x82660   (ECX = unit, EAX = x, stack: arg1 = y, arg2 = kind (bl), arg3 = owner (+0x60 = room/inv handle); ret 0xC)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82660(const D2cGlob82* g, const D2cEnv82* e, uint8_t* unit,
-                                                    uint32_t eax, uint8_t* ebp, uint32_t ebpLow) {
+                                                    uint32_t eax, uint8_t* owner, uint32_t arg1, uint32_t kind) {
     uint32_t x = eax & 0xffff;
     e->ord(10882, P(unit), x, 0, 0);
-    e->ord(11118, P(unit), ebpLow & 0xffff, 0, 0);
-    U h = rd<U>(ebp, 0x60);
+    e->ord(11118, P(unit), arg1 & 0xffff, 0, 0);
+    U h = rd<U>(owner, 0x60);
     if (!h) { e->fatal(0x413); return; }
     if (!e->ord(10405, h, P(unit), 1, 0)) return;
     int32_t t = rd<int32_t>(unit, 0);
@@ -94,11 +94,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82660(const D2cGlob82* g, const D
     if (t == 2 || (t > 3 && t < 6)) v = rd<uint32_t>((uint8_t*)sub, 0xc);
     else if (sub) v = (uint32_t)e->ord(10867, sub, 0, 0, 0);
     uint32_t g854 = *g->g854;
-    U r = e->ord(10584, x, P(unit), g854, 1);
-    if (e->ord(11107, h, P(unit), v, r) && g854 == (uint32_t)(U)g->player) {
-        if ((uint8_t)P(unit) == 1) { e->fn(0x81e40, 0, 0, 0, 0); e->fn(0x88a70, 0, 0, 0, 0); }
-        else { e->ord(10466, h, 0, 0, 0); e->ord(11017, h, 0, 0, 0); e->fn(0x162d0, 0, 0, 0, 0); }
-        if ((uint8_t)P(unit) == 3) {
+    U r = e->ord(10584, P(owner), kind, g854, 1);
+    if (e->ord(11107, h, P(unit), v, P(owner)) && P(owner) == (U)g->player) {
+        (void)r;
+        if ((uint8_t)kind == 1) { e->fn(0x81e40, P(unit), 0, 0, 0); e->fn(0x88a70, 0, 0, 0, 0); }
+        else { e->ord(10466, h, 0, 0, 0); U c = e->ord(11017, h, 0, 0, 0); e->fn(0x162d0, c, 0, 0, 0); }
+        if (P(owner) == (U)g->player && (uint8_t)kind == 3) {
             U q = e->ord(10695, rd<uint32_t>(unit, 4), 0, 0, 0);
             int32_t k = rd<int32_t>((uint8_t*)q, 0x80);
             if (k == 0x20747368 || k == 0x20326671) e->fn(0x8ca80, (U)k, 0, 0, 0);

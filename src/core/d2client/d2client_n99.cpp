@@ -220,37 +220,43 @@ extern "C" uint32_t d2c_58A70_n99(uint32_t unit, int32_t idx, uint32_t p3) {
 }
 
 // 1.13c D2CLIENT+0x58B80
-// ecx = unit (param_1), edx = idx, stack0 = retaddr slot read as unaff_retaddr (the counter arg)
+// fastcall(ecx=unit, edx=idx) + stack count (ret 4). The Ordinal_10786 result is the limit the thunk-10980 counter is compared against.
+// 51340: ebx=unit, edi=&X, stack=&Y. 58370: eax=sub, esi=unit, stack (0x85BE0 = table rva, X, Y, idx, count). 56DA0: esi=unit, stack rec.
 extern "C" uint32_t d2c_58B80_n99(uint32_t unit, int32_t idx, int32_t count) {
     int32_t sub; uint32_t rec = n99_rec(idx, &sub, true); if (!rec) return 0;
-    uint32_t h = ORD(10511);
+    uint32_t h = ORD(10511, unit);
     if (!h) return 0;
-    uint32_t v = R(rec + 0x114);
-    ORD(10786, unit, v);
+    int32_t lim = (int32_t)ORD(10786, unit, R(rec + 0x114), (uint32_t)idx, (uint32_t)count);
     int32_t k = (int32_t)ORD(10980, h);
-    if (k + 1 < count) { ORD(10243, h, (uint32_t)(k + 1)); return 0; }
+    if (k + 1 < lim) { ORD(10243, h, (uint32_t)(k + 1)); return 0; }
     ORD(10243, h, 0);
     int32_t out[2] = {0, 0};
-    if (!CALL(0xA1340, (uint32_t)(uintptr_t)out)) return 0;
-    ORD(10739, R(unit + 0x2c), v, (uint32_t)out[0], 0);
-    CALL(0x58370, unit, idx);
-    CALL(0x56DA0, rec);
+    if (!CALL(0xA1340, unit, (uint32_t)(uintptr_t)out)) return 0;
+    ORD(10739, R(unit + 0x2c), (uint32_t)out[0], (uint32_t)out[1], 0);
+    uint32_t stk[5] = { 0x85BE0, (uint32_t)out[0], (uint32_t)out[1], (uint32_t)idx, (uint32_t)count };
+    g99.callStk(0x58370, (uint32_t)sub, unit, stk, 5);
+    CALL(0x56DA0, unit, rec);
     return 1;
 }
 
 // 1.13c D2CLIENT+0x58C90
-// ebx = count (unaff_EBX)
-extern "C" uint32_t d2c_58C90_n99(uint32_t unit, int32_t idx, int32_t ebx) {
-    int32_t sub; if (!n99_rec(idx, &sub, true)) return 0;
+// fastcall(ecx=unit, edx=idx) + stack p3 (ret 4). T = short rec[0xEC] (not range-checked); twice: if T > 0 the unit RNG steps and an odd low bit
+// picks T as the 58370 entry index, else the sub index (short rec[0xEA]).
+extern "C" uint32_t d2c_58C90_n99(uint32_t unit, int32_t idx, uint32_t p3) {
+    int32_t sub; uint32_t rec = n99_rec(idx, &sub, true); if (!rec) return 0;
+    int32_t T = (int16_t)(R(rec + 0xec) & 0xffff);
     int32_t out[2] = {0, 0};
-    if (!CALL(0xA1340, (uint32_t)(uintptr_t)out)) return 0;
-    ORD(10739, R(unit + 0x2c), (uint32_t)out[1], (uint32_t)out[0], 0);
+    if (!CALL(0xA1340, unit, (uint32_t)(uintptr_t)out)) return 0;
+    ORD(10739, R(unit + 0x2c), (uint32_t)out[0], (uint32_t)out[1], 0);
     for (int i = 2; i; i--) {
-        if (ebx > 0) {
+        int32_t e = sub;
+        if (T > 0) {
             uint64_t s = (uint64_t)R(unit + 0x20) * 0x6ac690c5ull + R(unit + 0x24);
             W(unit + 0x20, (uint32_t)s); W(unit + 0x24, (uint32_t)(s >> 32));
+            if ((uint32_t)s & 1) e = T;
         }
-        CALL(0x58370, unit, idx);
+        uint32_t stk[5] = { 0x85C78, (uint32_t)out[0], (uint32_t)out[1], (uint32_t)idx, p3 };
+        g99.callStk(0x58370, (uint32_t)e, unit, stk, 5);
     }
     return 1;
 }

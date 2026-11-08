@@ -6,8 +6,9 @@
 #include "client_host.h"
 typedef int32_t i32; typedef uint32_t u32;
 namespace {
-u32 ord(D2cHost h, u32 n, u32 a = 0, u32 s1 = 0, u32 s2 = 0, u32 s3 = 0) {
-    D2cCall c = {}; c.rva = 0x80000000u | n; c.eax = a; c.ecx = a; c.s[0] = a; c.s[1] = s1; c.s[2] = s2; c.s[3] = s3;
+// one retail call by RVA: ecx = the register argument, edx = the second register, s0..s2 = stack words (pushed order 0 = lowest)
+u32 call(D2cHost h, u32 rva, u32 ecx, u32 edx, u32 s0 = 0, u32 s1 = 0, u32 s2 = 0) {
+    D2cCall c = {}; c.rva = rva; c.ecx = ecx; c.edx = edx; c.s[0] = s0; c.s[1] = s1; c.s[2] = s2;
     return h(&c);
 }
 }
@@ -22,6 +23,10 @@ EMSCRIPTEN_KEEPALIVE void d2c_77de0(D2cHost h, D2cB58G* g) {
     else return;
     if (*g->mouseY < lo || *g->mouseY > hi) return;
     i32 y = *g->offY - 0x3f + *g->gH;
-    if (y - 0x22 <= *g->mouseX && *g->mouseX <= y) { ord(h, 10003, (u32)(*g->offY - 0x62 + *g->gH), 0, 1); ord(h, 10085); }
+    if (y - 0x22 <= *g->mouseX && *g->mouseX <= y) {
+        // retail: push 1; push 0; push (offY-0x62+gH); mov ecx,0x1030; call 0xD1EC; mov ecx,eax; mov edx,esi; call 0xD384
+        u32 r = call(h, 0xD1EC, 0x1030, 0, (u32)(*g->offY - 0x62 + *g->gH), 0, 1);
+        call(h, 0xD384, r, (u32)(base - 0x122));
+    }
 }
 }

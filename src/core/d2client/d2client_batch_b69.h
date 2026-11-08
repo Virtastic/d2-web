@@ -13,7 +13,7 @@ struct D2cB69Env {
     uint8_t* g_bf68; uint8_t* g_bf60; uint8_t* g_bf64;   // units, +0x114 tested
     int32_t *g_bf78, *g_bf7c;
     void (*f80ca0)(); void (*f814f0)(); void (*f80e30)(); void (*f80160)(); void (*f800d0)();
-    void (*f80f60)(uint64_t*); void (*f80be0)(); void (*f812f0)(); void (*f81470)(const uint8_t*);
+    void (*f80f60)(uint64_t*); void (*f80be0)(); void (*f812f0)(int32_t eax); void (*f81470)(uint32_t param, int32_t esi);
     int32_t (*f18d0)(uint64_t*, int32_t esi, int32_t edi);   // 0x18D0: ESI/EDI are hidden register inputs
     const int32_t* tblEsi; const int32_t* tblEdi;            // DAT_6fbc38ac[4] / DAT_6fbc38c4[4], written by 0x81750
     int32_t (*ord10331)(const uint8_t*); int32_t (*ord10826)(int32_t); char (*ord10215)(int32_t);

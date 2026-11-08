@@ -305,5 +305,5 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82490(D2cB8G* g, const D2cB8Env* 
     }
     int32_t t = 6; uint32_t k = 0xffffffffu;
     if (bp) { t = bp[0]; k = (uint32_t)bp[3]; }
-    e->fn56ef0(g->hashB + (size_t)t * 0x80, k & 0x7f, k, t);
+    e->fn56ef0(g->hashB + (size_t)t * 0x200, k & 0x7f, k, t);
 }

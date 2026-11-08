@@ -41,7 +41,8 @@ EMSCRIPTEN_KEEPALIVE int d2c_58070(const SkillMslEnv* e, uint8_t* unit, int skil
         r[7] = e->c31c(room) - e->unitX(unit);
         tgtY = e->c340(room);
     } else {
-        e->c478(room, e->unitX(t), e->unitY(t), 0);
+        const int ty0 = e->unitY(t); const int tx0 = e->unitX(t);   // retail reads Y before X (the 0xC478 arguments are pushed right to left)
+        e->c478(room, tx0, ty0, 0);
         r[7] = e->unitX(t) - e->unitX(unit);
         tgtY = e->unitY(t);
     }

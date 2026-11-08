@@ -27,6 +27,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2client_578f0(const D2c73Env* e, uint3
     rec[0] = 0x25; rec[1] = self; rec[4] = 0x8f; rec[5] = x; rec[6] = y;
     rec[7] = x + (uint32_t)d[0] * 2; rec[8] = y + (uint32_t)d[1] * 2; rec[10] = 3; rec[12] = lvl;
     const uint32_t ret = C(e, 0xb30f0, 0, ptr(rec));
+    e->blk(e->ctx, 0xb30f0, rec, 23);   // the capture's `hookblk` record of the request block
     C(e, 0x88a70, 0, 0, 0, 0x726, 0, 0, self, 0, 0, 0);
     return ret;
 }

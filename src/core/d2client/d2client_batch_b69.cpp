@@ -110,7 +110,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_81340(const D2cB69Env* e) {
 }
 
 // 1.13c D2Client+0x814F0
-EMSCRIPTEN_KEEPALIVE int32_t d2c_814f0(const D2cB69Env* e) {
+EMSCRIPTEN_KEEPALIVE int32_t d2c_814f0(const D2cB69Env* e, uint32_t param) {   // param = entry ECX (0x81750 passes 1)
     uint8_t* u = *e->unit;
     if (!u) return 0;
     uint64_t* seed = (uint64_t*)(u + 0x20);
@@ -126,25 +126,26 @@ EMSCRIPTEN_KEEPALIVE int32_t d2c_814f0(const D2cB69Env* e) {
     }
     e->f80be0();
     uint32_t chance = 0;
+    int32_t ebx = 0;
     switch (st) {
     case 0x6d: case 0x6e: case 0x6f: case 0x70: *e->g_bf7c = 0; chance = 0x19; break;
-    case 0x78: case 0x79: case 0x75: *e->g_bf7c = 1; chance = 0; break;
+    case 0x78: case 0x79: case 0x75: *e->g_bf7c = 1; ebx = 1; chance = 0; break;
     }
     uint64_t s = (uint64_t)*(uint32_t*)seed * 0x6ac690c5u + (uint64_t)*(uint32_t*)(u + 0x24);
     *seed = s;
-    if ((uint32_t)(s & 0xffffffffu) % 100 < chance && u == nullptr) {   // original tests iVar3 == 0 (never true here)
+    if ((uint32_t)(s & 0xffffffffu) % 100 < chance && param == 0) {   // the asm tests the stack copy of ECX (param) against 0
         *e->g_bf80 = 0;
         if (*e->g_bf78) { e->ord10063(); if (*(int32_t*)(e->g_bf68 + 0x114)) { e->fatal(0x15b); return 0; } }
         *e->g_bf78 = 0;
         return 0;
     }
-    e->f812f0(); e->f81470(u);
+    e->f812f0(ebx); e->f81470(param, 1);
     return 0;
 }
 
 // 1.13c D2Client+0x81750
 EMSCRIPTEN_KEEPALIVE void d2c_81750(const D2cB69Env* e, int32_t act) {  // act = entry EAX, pushed to both 10459 calls
-    d2c_814f0(e);
+    d2c_814f0(e, 1);
     if (*e->g_d3444 == 0) { e->f80be0(); *e->g_d3444 = 1; }
     *e->g_c38c4 = 0x1d4c; *e->g_c38c8 = 0xfa; *e->g_c38cc = 3000; *e->g_c38d0 = 0x7d;
     if (e->ord10459(act) == 2) *e->g_c38cc *= 3;
