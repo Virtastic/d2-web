@@ -35,6 +35,10 @@ int d2_realm_mcp_session_feed(const uint8_t* in, int len, uint8_t* out, int outC
 void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t charClass, uint8_t act, uint16_t level,
                                   uint16_t gameToken, uint32_t gameHash);
 void d2_realm_d2gs_session_disconnect_client(uint32_t clientId);
+void d2_realm_d2gs_session_reset_client(uint32_t clientId, uint32_t unitId, uint8_t charClass, uint8_t act,
+                                        uint16_t level, uint16_t gameToken, uint32_t gameHash);
+int d2_realm_d2gs_session_feed_client(uint32_t clientId, const uint8_t* in, int len, uint8_t* out, int outCap);
+int d2_realm_d2gs_session_take_client(uint32_t clientId, uint8_t* out, int outCap);
 void d2_realm_d2gs_session_pin_seed(uint32_t seed);
 #if defined(D2_REALMD_TEST_FIXTURE)
 void d2_realm_d2gs_session_fixture_reassign_on_keepalive(int enabled);
@@ -74,8 +78,9 @@ bool fixtureFireballOnJoin = false;
 bool fixtureFireballSent = false;
 bool fixtureOutdoorOnWalk = false;
 bool fixtureOutdoorSent = false;
-uint8_t fixtureInput[512]{};
-int fixtureInputLength = 0;
+uint8_t fixtureInputs[8][512]{};
+int fixtureInputLengths[8]{};
+int fixtureSeat = 0;
 
 int appendD2gsFixtureFrame(const uint8_t* payload, int length, uint8_t* out, int outLength, int outCap) {
     uint8_t compressed[256], framed[320];
@@ -88,7 +93,9 @@ int appendD2gsFixtureFrame(const uint8_t* payload, int length, uint8_t* out, int
 }
 
 int applyD2gsFixtureReplies(const uint8_t* input, int length, uint8_t* out, int outLength, int outCap) {
-    if (length < 0 || length > int(sizeof fixtureInput) - fixtureInputLength) return -1;
+    uint8_t* fixtureInput = fixtureInputs[fixtureSeat];
+    int& fixtureInputLength = fixtureInputLengths[fixtureSeat];
+    if (length < 0 || length > 512 - fixtureInputLength) return -1;
     std::memcpy(fixtureInput + fixtureInputLength, input, static_cast<size_t>(length));
     fixtureInputLength += length;
     int consumed = 0;
@@ -161,8 +168,49 @@ bool writeAll(int fd, const uint8_t* p, int n) {
 }
 
 void closeConnection(int fd, Proto proto) {
-    if (proto == kD2gs) d2_realm_d2gs_session_disconnect_client(0);
     close(fd);
+}
+
+// One D2GS socket per seat, up to eight, each on its own engine session.
+const int kSeats = 8;
+int seatFd[kSeats] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+
+void closeSeat(int seat) {
+    if (seatFd[seat] < 0) return;
+    d2_realm_d2gs_session_disconnect_client((uint32_t)seat);
+    close(seatFd[seat]);
+    seatFd[seat] = -1;
+}
+
+// Notices one seat's packets queued for the others (party invites, relation changes) go out live.
+void deliverSeatNotices(int except) {
+    for (int s = 0; s < kSeats; s++) {
+        if (s == except || seatFd[s] < 0) continue;
+        uint8_t out[4096];
+        const int n = d2_realm_d2gs_session_take_client((uint32_t)s, out, (int)sizeof out);
+        if (n > 0 && !writeAll(seatFd[s], out, n)) closeSeat(s);
+    }
+}
+
+bool pumpSeat(int seat) {
+    uint8_t in[4096];
+    uint8_t out[16384];
+    const ssize_t r = read(seatFd[seat], in, sizeof in);
+    if (r <= 0) return false;
+    int n = d2_realm_d2gs_session_feed_client((uint32_t)seat, in, (int)r, out, (int)sizeof out);
+#if defined(D2_REALMD_TEST_FIXTURE)
+#if defined(D2_REALMD_TEST_FIXTURE)
+    fixtureSeat = seat;
+#endif
+    if (n >= 0) n = applyD2gsFixtureReplies(in, static_cast<int>(r), out, n, static_cast<int>(sizeof out));
+#endif
+    if (n < 0) {
+        fprintf(stderr, "[D2GS] framing failed; dropping the connection rather than desyncing\n");
+        return false;
+    }
+    if (n > 0 && !writeAll(seatFd[seat], out, n)) return false;
+    deliverSeatNotices(seat);
+    return true;
 }
 
 // Handle whatever is readable on one connection. Returns false when it should be closed.
@@ -175,14 +223,8 @@ bool pump(int fd, Proto proto) {
     switch (proto) {
         case kBncs: n = d2_realm_bncs_session_feed(in, (int)r, out, (int)sizeof out); break;
         case kMcp:  n = d2_realm_mcp_session_feed(in, (int)r, out, (int)sizeof out); break;
-        case kD2gs: n = d2_realm_d2gs_session_feed(in, (int)r, out, (int)sizeof out); break;
         default: return false;
     }
-#if defined(D2_REALMD_TEST_FIXTURE)
-    if (n >= 0 && proto == kD2gs) {
-        n = applyD2gsFixtureReplies(in, static_cast<int>(r), out, n, static_cast<int>(sizeof out));
-    }
-#endif
     if (n < 0) {
         fprintf(stderr, "[%s] framing failed; dropping the connection rather than desyncing\n", kProtoName[proto]);
         return false;
@@ -201,18 +243,6 @@ void resetFor(Proto proto) {
 #else
             d2_realm_mcp_session_reset(sessionConfig.gsIp, sessionConfig.gameToken, sessionConfig.gameHash,
                                        sessionConfig.charClass, sessionConfig.charLevel);
-#endif
-            break;
-        case kD2gs:
-#if defined(D2_REALMD_TEST_FIXTURE)
-            fixtureInputLength = 0;
-            fixtureFireballSent = false;
-            fixtureOutdoorSent = false;
-            d2_realm_d2gs_session_reset(sessionConfig.unitId, sessionConfig.charClass, 0, sessionConfig.charLevel,
-                                        sessionConfig.gameToken, sessionConfig.gameHash);
-#else
-            d2_realm_d2gs_session_reset(sessionConfig.unitId, sessionConfig.charClass, 0, sessionConfig.charLevel,
-                                        sessionConfig.gameToken, sessionConfig.gameHash);
 #endif
             break;
         default: break;
@@ -297,6 +327,7 @@ int main(int argc, char** argv) {
             if (lfd[p] > mx) mx = lfd[p];
             if (conn[p] >= 0) { FD_SET(conn[p], &rs); if (conn[p] > mx) mx = conn[p]; }
         }
+        for (int s = 0; s < kSeats; s++) if (seatFd[s] >= 0) { FD_SET(seatFd[s], &rs); if (seatFd[s] > mx) mx = seatFd[s]; }
         if (select(mx + 1, &rs, nullptr, nullptr, nullptr) < 0) { if (errno == EINTR) continue; break; }
 
         // Existing connections first, so a client that is mid-handshake is not starved by a new
@@ -305,10 +336,38 @@ int main(int argc, char** argv) {
             if (conn[p] < 0 || !FD_ISSET(conn[p], &rs)) continue;
             if (!pump(conn[p], (Proto)p)) { closeConnection(conn[p], (Proto)p); conn[p] = -1; }
         }
+        for (int s = 0; s < kSeats; s++) {
+            if (seatFd[s] < 0 || !FD_ISSET(seatFd[s], &rs)) continue;
+            if (!pumpSeat(s)) { closeSeat(s); deliverSeatNotices(-1); }
+        }
         for (int p = 0; p < kProtoCount; p++) {
             if (!FD_ISSET(lfd[p], &rs)) continue;
             const int fd = accept(lfd[p], nullptr, nullptr);
             if (fd < 0) continue;
+            if ((Proto)p == kD2gs) {
+                int seat = 0;
+                while (seat < kSeats && seatFd[seat] >= 0) seat++;
+                if (seat == kSeats) { close(fd); continue; }   // the game is full
+                int on = 1;
+                setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof on);
+#if defined(D2_REALMD_TEST_FIXTURE)
+                bool idle = true;
+                for (int s = 0; s < kSeats; s++) if (seatFd[s] >= 0) idle = false;
+                if (idle) { fixtureFireballSent = false; fixtureOutdoorSent = false; }
+#endif
+#if defined(D2_REALMD_TEST_FIXTURE)
+                fixtureInputLengths[seat] = 0;
+#endif
+                d2_realm_d2gs_session_reset_client((uint32_t)seat, sessionConfig.unitId + (uint32_t)seat,
+                                                   sessionConfig.charClass, 0, sessionConfig.charLevel,
+                                                   sessionConfig.gameToken, sessionConfig.gameHash);
+                seatFd[seat] = fd;
+                // The engine greets unprompted, before the client says anything.
+                uint8_t g[8];
+                const int gn = d2_realm_d2gs_session_greeting(g);
+                if (!writeAll(fd, g, gn)) closeSeat(seat);
+                continue;
+            }
             // One session instance per protocol: a second connection replaces the first rather
             // than quietly sharing its state.
             if (conn[p] >= 0) { closeConnection(conn[p], (Proto)p); }
@@ -316,14 +375,9 @@ int main(int argc, char** argv) {
             setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof one);
             resetFor((Proto)p);
             conn[p] = fd;
-            if ((Proto)p == kD2gs) {
-                // The engine greets unprompted, before the client says anything.
-                uint8_t g[8];
-                const int n = d2_realm_d2gs_session_greeting(g);
-                if (!writeAll(fd, g, n)) { closeConnection(fd, (Proto)p); conn[p] = -1; }
-            }
         }
     }
+    for (int s = 0; s < kSeats; s++) closeSeat(s);
     for (int p = 0; p < kProtoCount; p++) if (conn[p] >= 0) closeConnection(conn[p], (Proto)p);
     for (int p = 0; p < kProtoCount; p++) close(lfd[p]);
     return 0;
