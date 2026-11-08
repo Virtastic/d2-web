@@ -18,7 +18,8 @@ import { hudState } from './render-worker-hud.mjs';
 import { loadLiveLevelTerrain, loadRealmClientTerrain, actPalettePath } from './assets/live-level-terrain.mjs';
 import { decodeDatPalette } from './assets/d2-formats.mjs';
 import { createPlayerRenderer, playerClassInfo } from './assets/unit-renderer.mjs';
-import { applyRealmPlayerFrame, selectPlayerRenderSource, sendRealmGroundWalk, sendRealmRightSkillAt, sendRealmRightSkillOnMonster, realmDirectionalAim, realmClientProjectilePredictor, realmFireballMonsterPredictor, visibleRealmPlayers, realmScenePlayers, realmPlayerGate } from './assets/realm-player-state.mjs';
+import { createRealmInput } from './assets/realm-input.mjs';
+import { applyRealmPlayerFrame, selectPlayerRenderSource, visibleRealmPlayers, realmScenePlayers, realmPlayerGate } from './assets/realm-player-state.mjs';
 import { createRealmPlayerReassignFade } from './assets/realm-player-reassign-fade.mjs';
 import { createMonsterRenderer, parseMonsterAnimations, realmMonsterAnimationActor } from './assets/monster-renderer.mjs';
 import { warmEntryFiles } from './assets/entry-warm.mjs';
@@ -64,7 +65,7 @@ import { hudOrigin } from './assets/hud-origin.mjs';
 import { chromeGates } from './assets/scene-chrome.mjs';
 import { realmViewSnapshot, realmFrameReads } from './assets/realm-client-view.mjs';
 import { createRealmWorld } from './assets/realm-world.mjs';
-import { createItemTable, createObjectTable, createLevelTable, createInventoryTable, createBeltTable } from './assets/realm-tables.mjs';
+import { createItemTable, createObjectTable, createLevelTable, createInventoryTable, createBeltTable, createMonsterTable } from './assets/realm-tables.mjs';
 import { panelSides as panelViewSides, viewCentreX } from './assets/panel-view-shift.mjs';
 import { createFreeResArt, barParts, halfParts, stoneTiles, drawParts } from './assets/wide-hud.mjs';
 import { createBeltRenderer } from './assets/belt-renderer.mjs';
@@ -789,16 +790,8 @@ function skillPlateState() {
 function selectSkill(id, side) {
   if (realmTransport.state === 'session-open') {
     if (!realmSceneActive || !realmPlayerView?.active || !realmFlow?.d2gs?.isOpen) return 0;
-    const packet = realmFlow.protocol.d2gsSelectSkill(id, side === 'left');
-    const time = performance.now() >>> 0;
-    if (realmMoveDuplicateState.packet?.length === packet.length &&
-        ((time - realmMoveDuplicateState.time) >>> 0) < 200 &&
-        packet.every((byte,i) => byte === realmMoveDuplicateState.packet[i])) return 0;
-    // Native selection also replaces the shared outgoing cache, so a following cast
-    // cannot be suppressed as a duplicate of the cast that preceded this request.
-    realmMoveDuplicateState.packet = Array.from(packet); realmMoveDuplicateState.time = time;
-    // Only a subsequent server 0x23 changes the selected canonical CUnit skill.
-    return realmFlow.d2gs.send(packet) === false ? 0 : 1;
+    // Only a subsequent server 0x23 changes the selected skill.
+    return realmInput().selectSkill(id, side === 'left') ? 1 : 0;
   }
   const rc = Module.ccall('d2_session_command_select_skill', 'number', ['number', 'number'], [id, side === 'left' ? 1 : 0]);
   return rc;
@@ -878,11 +871,7 @@ let realmWorldView = null;
 let realmSceneActive = false, realmSceneError = '', realmSceneEvidence = null, realmSceneTiles = [], realmSceneRevision = 0;
 let realmMonsterViews = [];
 let realmMissileViews = [];
-let realmMoveEvidence = { attempts: 0, sent: 0, last: null };
-let realmSkillEvidence = { attempts: 0, sent: 0, last: null };
-let realmMoveDuplicateState = {};
-let realmDirection = { x: 0, y: 0 };
-let realmDirectionTicks = 0;
+let realmInputState = null;   // the joined game's input -> D2GS packet sender (assets/realm-input.mjs), made on first use
 let realmFlow = null, realmSelect = false;
 let creditsScreen = null, creditsError = '', creditsTick = 0, exitEvidence = { count: 0, screen: null };
 // Retail's front end opens on the Blizzard logo movies -- New_Bliz, then BlizNorth -- and only then
@@ -1678,7 +1667,7 @@ function releaseRealmFlow({ closeTransports = true } = {}) {
   realmGameClock = 0;
   realmAnimationFrame = 0;
   worldRightPointerHeld = false; heldRightPointerTicks = 0;
-  realmMoveDuplicateState = {}; realmDirection = { x: 0, y: 0 }; realmDirectionTicks = 0;
+  realmInputState = null;
   worldPointerHeld = false;
   if (realmSceneActive) { gameRoster.clear(); gameBubbles.clear(); partyLocal.clear(); partyVisible = false; gameSlash.replyTo = ""; realmSceneActive = false; realmSceneTiles = []; realmSceneRevision = 0; realmSceneEvidence = null; terrain = null; snapshot = null; session = null; screen = SCREEN.TITLE; }
   if (realmFlow === flow) realmFlow = null;
@@ -3137,10 +3126,9 @@ function advanceEngine(forced) {
   return n;
 }
 
-// Realm actors own client DynamicPaths, but there is no offline D2Session to tick in that scene.
-// Advance those paths on the same 25 Hz game clock and refresh only their render snapshots here;
-// renderer getters remain read-only and cannot move units more than once per frame.
-function advanceRealmMotion(forced) {
+// The client's units walk the paths the server's packets gave them (the retail client's own per-tick unit update);
+// nothing here starts a move or predicts one.  Tick them on the 25 Hz game clock and refresh the render snapshots.
+function advanceRealmClientUnits(forced) {
   if (!realmSceneActive || realmTransport.state !== 'session-open' || !realmFlow?.protocol?.d2gsClientMotionTick) {
     if (realmTransport.state !== 'session-open') { realmGameClock = 0; realmAnimationFrame = 0; }
     return 0;
@@ -3272,80 +3260,21 @@ function update(forceTick = false, live = false) {
   const commands = input.drain();
   if (commands.length) worldDirty = true;
   if (realmTransport.state === 'session-open') {
-    const latestPointerMove = commands.findLast((command) => command.type === COMMAND.MOVE && !command.directional);
+    // The same commands a local game reads, sent as the retail D2GS packets; the server answers with the movement and state.
+    const pointerMoves = commands.filter((command) => command.type === COMMAND.MOVE && !command.directional);
     for (const command of commands) {
       if (command.type === COMMAND.PRIMARY && command.secondary && command.x != null) {
-        // Use the current renderer evidence for the client-side monster hit test, then send its
-        // server GUID. Ground remains the coordinate path when no rendered monster owns the point.
-        const monsterHits = (realmSceneEvidence?.monsters ?? []).filter((monster) => monster.drawn &&
-          inUnitHoverBox(command.x - monster.anchorX, command.y - monster.anchorY, true));
-        monsterHits.sort((a, b) => {
-          const da = (command.x - a.anchorX) ** 2 + (command.y - a.anchorY) ** 2;
-          const db = (command.x - b.anchorX) ** 2 + (command.y - b.anchorY) ** 2;
-          return da - db || b.anchorY - a.anchorY;
-        });
-        const monsterTarget = monsterHits[0] ?? null;
         castHand = 'right';
-        // A monster the native hover test refuses (1.13c D2Client 0x1B7F0 a5440: MONMODE_DEATH/DEAD) is no unit target:
-        // the refused prediction sends nothing and the cast falls through to the ground branch at the cursor subtile.
-        if (monsterTarget) {
-          const result = sendRealmRightSkillOnMonster(realmFlow?.protocol, realmFlow?.d2gs,
-            realmSceneActive && Boolean(realmPlayerView?.active), monsterTarget.guid,
-            Boolean(command.held), realmMoveDuplicateState, performance.now(),
-            realmFireballMonsterPredictor(realmFlow?.protocol));
-          if (result.reason !== 'prediction-refused') {
-            result.held = Boolean(command.held); result.playerGuid = realmPlayerView?.guid ?? null;
-            result.targetType = 1; result.targetCode = monsterTarget.code;
-            realmSkillEvidence.attempts++;
-            if (result.sent) realmSkillEvidence.sent++;
-            realmSkillEvidence.last = result;
-            continue;
-          }
-        }
-        const destination = pointerWorldAt(command.x, command.y);
-        const realmProtocol = realmFlow?.protocol;
-        const predictLocal = realmClientProjectilePredictor(realmProtocol);
-        const result = sendRealmRightSkillAt(realmFlow?.protocol, realmFlow?.d2gs,
-          realmSceneActive && Boolean(realmPlayerView?.active), destination.x, destination.y,
-          Boolean(command.held), realmMoveDuplicateState, performance.now(), predictLocal);
-        result.held = Boolean(command.held); result.playerGuid = realmPlayerView?.guid ?? null;
-        realmSkillEvidence.attempts++;
-        if (result.sent) realmSkillEvidence.sent++;
-        realmSkillEvidence.last = result;
-        continue;
-      }
-      if (command.type !== COMMAND.MOVE) continue;
-      if (heldStandStillKeys.size) { standStillSuppressedMoves++; continue; }
-      lastMoveCommand = { type: command.type, x: command.x, y: command.y, directional: !!command.directional, held: !!command.held };
-      // Several pointer events can arrive before one client frame. Use its latest aim,
-      // then let native packet duplicate suppression ration unchanged destinations.
-      if (!command.directional && command !== latestPointerMove) continue;
-      if (command.directional) { realmDirection = { x: command.x, y: command.y }; realmDirectionTicks = 0; }
-      else { realmDirection = { x: 0, y: 0 }; realmDirectionTicks = 0; }
-      const destination = command.directional ? realmDirectionalAim(realmPlayerView, command.x, command.y)
-        : pointerWorldAt(command.x, command.y);
-      if (!destination) continue;
-      const result = sendRealmGroundWalk(realmFlow?.protocol, realmFlow?.d2gs,
-        realmSceneActive && Boolean(realmPlayerView?.active), destination.x, destination.y,
-        realmMoveDuplicateState, performance.now(), readRunToggle());
-      result.directional = !!command.directional; result.held = !!command.held;
-      result.playerGuid = realmPlayerView?.guid ?? null;
-      realmMoveEvidence.attempts++;
-      if (result.sent) realmMoveEvidence.sent++;
-      realmMoveEvidence.last = result;
+        realmInput().rightClick(command.x, command.y, { held: Boolean(command.held) });
+      } else if (command.type === COMMAND.MOVE && !command.directional && !heldStandStillKeys.size && command === pointerMoves.at(-1)) {
+        realmInput().leftClick(command.x, command.y, { held: Boolean(command.held) });
+      } else if (command.type === COMMAND.BELT) realmInput().useBelt(command.slot);
     }
   }
   if (!session) {
-    const advanced = advanceRealmMotion(forceTick);
+    const advanced = advanceRealmClientUnits(forceTick);
     queueHeldPointerRepeat(input, worldPointerHeld, advanced, pointer.x, pointer.y, heldPointerCanRetargetWorld);
     queueHeldPointerRepeat(input, worldRightPointerHeld, advanced, pointer.x, pointer.y, heldPointerCanRetargetWorld, 2);
-    if (advanced && (realmDirection.x || realmDirection.y)) {
-      realmDirectionTicks += advanced;
-      if (realmDirectionTicks >= 6) {
-        input.queue.push({ type: COMMAND.MOVE, ...realmDirection, directional: true, held: true });
-        realmDirectionTicks = 0;
-      }
-    }
   }
   let engineAdvanced = false;
   if (session) {
@@ -4204,9 +4133,28 @@ function realmTables() {
   if (realmTableSet) return realmTableSet;
   const read = createMpqAssetReader(Module);
   return (realmTableSet = { items: createItemTable(read), objects: createObjectTable(read), levels: createLevelTable(read), inventory: createInventoryTable(read),
-    belt: createBeltTable(read), inventoryLayoutFromEngine, stashGeometry });
+    belt: createBeltTable(read), monsters: createMonsterTable(read), inventoryLayoutFromEngine, stashGeometry });
 }
 function realmWorldData() { return (realmWorldState ??= createRealmWorld(realmTables())); }
+// Input in a joined game: what the pointer and keys mean is read from the client state the server's packets built, and
+// each action leaves as the retail D2GS packet (assets/realm-input.mjs).
+function realmInput() {
+  return (realmInputState ??= createRealmInput({
+    transmit: (bytes) => realmFlow?.d2gs?.isOpen ? realmFlow.d2gs.send(bytes) : false,
+    now: () => performance.now(),
+    scene: () => {
+      const me = selectedPlayerSource();
+      if (!realmSceneActive || !realmPlayerView?.active || !realmFlow?.d2gs?.isOpen || me.source === 'none' || !snapshot) return { ready: false };
+      const camera = worldToScreen(cameraCentre().x, cameraCentre().y);
+      return { ready: true, player: { x: Math.round(me.x), y: Math.round(me.y) },
+        monsters: realmSceneEvidence?.monsters ?? [], objects: snapshot.objects ?? [], items: snapshot.items ?? [],
+        isNpc: (classId) => realmTables().monsters.isNpc(classId),
+        hoverBox: (dx, dy) => inUnitHoverBox(dx, dy, true),
+        toScreen: (x, y) => { const p = worldToScreen(x, y); return { x: p.x - camera.x + viewCX(), y: p.y - camera.y + (canvas.height / 2 + UNIT_CENTRE_Y) }; },
+        pointerWorld: pointerWorldAt, run: readRunToggle() };
+    },
+  }));
+}
 function feedRealmWorld(bytes) {
   const protocol = realmFlow?.protocol;
   if (!protocol) return;
@@ -5543,6 +5491,32 @@ function itemCommand(name, ...args) {
   return result;
 }
 // A held item dropped on grid `page` at cell (x, y): put (0x18), swap with the one item it overlaps (0x1F), or refused (two or more).
+// The open inventory panel in a joined game: lift (0x19), unequip (0x1C), put in a cell (0x18) or swap with its item (0x1F),
+// equip (0x1A) or swap a worn item (0x1D), use a carried item on a right click (0x20); a click in the world with an item held drops it (0x17).
+function realmInventoryClick(x, y, button) {
+  const W = canvas.width, H = canvas.height, panel = inventoryPanelRenderer, ri = realmInput();
+  const cursorId = realmWorldState?.cursorId ?? 0;
+  if (!(inventoryVisible && panel?.contains(x, y, W, H))) {
+    if (button !== 0 || !cursorId || openPanelAt(x, y)) return false;
+    ri.dropCursor(cursorId); return true;
+  }
+  const slot = panel.slotAt(x, y, W, H, snapshot);
+  if (button === 2) { const item = panel.itemAt(x, y, W, H, snapshot) || slot?.item; if (item && !cursorId) ri.useItem(item.id); return true; }
+  if (!cursorId) {
+    const item = panel.itemAt(x, y, W, H, snapshot);
+    if (item) ri.lift(item.id); else if (slot?.item) ri.unequip(slot.bodyLoc);
+    return true;
+  }
+  const held = snapshot.items.find((i) => i.id === cursorId) || { id: cursorId };
+  const cell = panel.cellAt(x, y, W, H, held);
+  if (slot) { if (slot.item) ri.swapBody(cursorId, slot.bodyLoc); else ri.equip(cursorId, slot.bodyLoc); }
+  else if (cell) {
+    const d = decideGridPlace(snapshot.items, 0, cell.x, cell.y, held);
+    if (d.action === 'swap') ri.swapGrid(cursorId, d.item.id, cell.x, cell.y);
+    else if (d.action !== 'refuse') ri.putInGrid(cursorId, cell.x, cell.y);
+  }
+  return true;
+}
 function gridDrop(cursorId, page, cell) {
   const held = snapshot.items.find((i) => i.id === cursorId) || { id: cursorId };
   const d = decideGridPlace(snapshot.items, page, cell.x, cell.y, held);
@@ -6623,6 +6597,10 @@ canvas.addEventListener('pointerdown', (e) => {
   // with an item held puts it in the grid at the cell under it (0x18) or on a body slot (0x1A, or
   // 0x1D to swap with what is worn there); shift+click sends a carried potion to the belt (0x63).
   // Anywhere else in the world, a held item is dropped (0x17). The panel swallows its own clicks.
+  // A joined game: the inventory panel's clicks and a click in the world with an item held leave as the retail item packets.
+  if (realmSceneActive && realmTransport.state === 'session-open' && (e.button === 0 || e.button === 2) && realmInventoryClick(x, y, e.button)) {
+    pointer.x = x; pointer.y = y; canvas.focus(); e.preventDefault(); return;
+  }
   if (session && e.button === 0 && inventoryOwnsClick(shopOpen(), inventoryVisible && !!inventoryPanelRenderer?.contains(x, y, canvas.width, canvas.height)) && inventoryPanelRenderer && Module._d2_session_cursor_item) { // D39: with a shop open the inventory panel still owns its clicks (equipped slots lift/swap, empty area is inert)
     pointer.x = x; pointer.y = y;
     const cursorId = Module.ccall('d2_session_cursor_item', 'number', [], []);
@@ -7787,8 +7765,7 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
   get otherMultiplayerEvidence() { return otherMultiplayerScreen ? otherMultiplayerScreen.evidence : { error: otherMultiplayerError || 'not built' }; },
   // F89: what the page's own realm client did when a configured region was committed.
   get realmTransportEvidence() { return realmTransport; },
-  get realmSkillEvidence() { return JSON.parse(JSON.stringify(realmSkillEvidence)); },
-  get realmMoveEvidence() { return { ...realmMoveEvidence, last: realmMoveEvidence.last ? { ...realmMoveEvidence.last } : null }; },
+  get realmInputEvidence() { const e = realmInputState?.evidence; return e ? { ...e, last: e.last ? { ...e.last } : null } : null; },
   get realmWorldState() { return realmWorldView ? { ...realmWorldView } : null; },
   get realmSceneEvidence() { return realmSceneEvidence ? { ...realmSceneEvidence } : null; },
   get creditsEvidence() { return creditsScreen ? { ...creditsScreen.evidence, error: creditsError } : { error: creditsError || 'not built' }; },

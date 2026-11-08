@@ -975,15 +975,12 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
       if (!ptr) throw new Error('engine returned no client missile records');
       return parseRealmMissiles(Module.HEAPU8.subarray(ptr, ptr + count * 76), count);
     },
-    d2gsClientPredictRightCastOnMonster: (guid) => call('d2_realm_client_player_predict_right_cast_on_monster', 'number', ['number'], [guid]),
     d2gsClientTakeMissileSounds: () => {
       const cap = 128;
       const count = call('d2_realm_client_take_missile_sounds', 'number', ['bigint','number'], [BigInt(T),cap]);
       if (count < 0 || count > cap) throw new Error(`invalid client missile sound count ${count}`);
       return parseRealmMissileSoundEvents(Module.HEAPU8.subarray(T, T + count * 24), count);
     },
-    d2gsClientProjectileSupported: (skillId) => call('d2_realm_client_projectile_supported', 'number', ['number'], [skillId]),
-    d2gsClientPredictRightCast: (x,y) => call('d2_realm_client_player_predict_right_cast', 'number', ['number','number'], [x,y]),
     d2gsClientMotionTick: () => call('d2_realm_client_motion_tick', 'number', [], []),
     d2gsGamelogon: ({ character, charClass, gameToken, gameHash }) => { const n = call('d2_realm_d2gs_gamelogon', 'number', ['number', 'number', 'number', 'number', 'string', 'bigint'], [gameHash, gameToken, charClass, 0x0d, character, BigInt(T)]); return rd(T, n); },
     // D2Client+0x14B00: [6D][tick][avg rtt >> 1][module word * 0xB640DE41]; null while the 5 s gate holds.

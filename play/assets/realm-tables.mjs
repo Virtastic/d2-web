@@ -119,3 +119,10 @@ export function createBeltTable(read) {
     },
   };
 }
+
+/** MonStats.txt by class id (the row's position): whether the unit is a town person the player talks to. */
+export function createMonsterTable(read) {
+  let list = null;
+  const load = () => (list ??= rows(read('data\\global\\excel\\monstats.txt')));
+  return { isNpc(classId) { const row = load()[classId]; return Boolean(row) && (row.npc === '1' || row.interact === '1'); } };
+}
