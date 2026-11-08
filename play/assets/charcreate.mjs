@@ -21,7 +21,8 @@ import { drawBg, present } from './widebg.mjs';
 import { createCharacterCreateCheckboxes, createCharacterCreateCheckboxInput } from './charcreate-checkboxes.mjs';
 import { createCharacterNameRenderer, NAME_FIELD } from './charcreate-name.mjs';
 import { isRetailEditBoxCharacter } from './charcreate-name-input.mjs';
-import { recordDc6 } from './drawlist.mjs';
+import { recordDc6, recordPrim } from './drawlist.mjs';
+import { wrapSpaces } from './bnet-login-screen.mjs';
 import { createHeroStances, HERO_STANCE } from './charcreate-stances.mjs';
 import { d2winHeldFrame } from './d2win-button-frame.mjs';
 import { isControlHeld } from './frontend-pointer-states.mjs';
@@ -278,7 +279,22 @@ function selectOverlayAnimations(overlay, cls, base, read, decodeDc6, palette, d
  * `onSound({ key, trigger })` lets the shell play the
  * screen's retail WAV without teaching this visual component how an AudioContext works.
  */
-export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCreate, onCancel, onSound, string = () => '', documentObject = globalThis.document }) {
+// The two boxes the screen raises over itself (retail's popup builder, drawn on the create screen's
+// own palette): a refusal's notice (PopUpOK2 and one OK) and the Hardcore confirmation (PopUpOKCancel
+// with CANCEL on the left and OK on the right). Both frames sit at x=268 with their bottom row at 350.
+export const REALM_EXPIRY = { x: 210, width: 430, firstBottom: 504, step: 12, lastBottom: 570, rules: [11143, 11144] };
+
+export const POPUP = {
+  x: 268, anchorY: 350, labelDy: -9,
+  notice: { art: 'data\\global\\ui\\FrontEnd\\PopUpOK2.dc6', ok: { x: 351, anchorY: 337 },
+    body: { x: 268, width: 264, top: 200, inset: 10, insetY: 8, step: 19 } },
+  confirm: { art: 'data\\global\\ui\\FrontEnd\\PopUpOKCancel.dc6', back: { x: 281, anchorY: 337 }, go: { x: 421, anchorY: 337 },
+    body: { x: 284, width: 232, firstBottom: 218, step: 14 } },
+  button: { w: 96, h: 32, art: 'data\\global\\ui\\FrontEnd\\OkCancelButtonBlank.dc6' },
+  strings: { ok: 5102, cancel: 5103, hardcore: 5303 },
+};
+
+export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCreate, onCancel, onSound, string = () => '', documentObject = globalThis.document, realm = false }) {
   const palette = decodeDatPalette(read(CREATE_ASSETS.palette));
   const fontPalette = decodeDatPalette(read(FRONTEND.palette));
   const background = composeTiled(decodeDc6(read(CREATE_ASSETS.background)), palette, TITLE_COLUMNS, documentObject);
@@ -315,6 +331,13 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     documentObject, path: FONT16.font, drawAs: { op: 'celcolor', mode: 5, extra: 4 },
     onGlyph: (blit) => labelGlyphs.push(blit),
   });
+  // On the Battle.net create screen retail also prints the characters' expiry rules in Font8 (colour shift 1),
+  // left-aligned at x=210 in two boxes, under the heading.
+  const expiryFont = realm ? createFont({
+    dc6: decodeDc6(read('data\\local\\font\\latin\\font8.dc6')), tbl: decodeFontTbl(read('data\\local\\font\\latin\\font8.tbl')),
+    palette: textColourPalette(read(CREATE_ASSETS.palette.replace(/pal\.dat$/i, 'pal.pl2')), palette, 1),
+    documentObject, path: 'data\\local\\font\\latin\\font8.dc6', drawAs: { op: 'celcolor', mode: 5, extra: 1 },
+  }) : null;
   // OpenDiablo2's SelectHeroClass gives clickbox.dc6's fechar cels and these anchors.  The
   // labels use this screen's existing Units Font16, exactly as its other small labels do.
   const checkboxes = createCharacterCreateCheckboxes({ read, decodeDc6, palette, smallFont: goldLabelFont, string, documentObject });
@@ -330,6 +353,21 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
   const cursorDc6 = decodeDc6(read(FRONTEND.cursor));
   const cursorCanvas = frameCanvas(cursorDc6.frames[0], palette, documentObject);
   let pointer = null, drawnCursor = null;
+  // The popups' own art and fonts, built the first time one is drawn.
+  const popupArt = new Map();
+  const art = (path) => {
+    if (!popupArt.has(path)) { const dc6 = decodeDc6(read(path)); popupArt.set(path, { path, dc6, canvases: dc6.frames.map((f) => frameCanvas(f, palette, documentObject)) }); }
+    return popupArt.get(path);
+  };
+  let bodyFont = null, buttonFont = null, confirmFont = null;
+  const popupFonts = () => {
+    const F = 'data\\local\\font\\latin\\';
+    bodyFont ??= createFont({ dc6: decodeDc6(read(`${F}font24.dc6`)), tbl: decodeFontTbl(read(`${F}font24.tbl`)), palette: fontPalette, documentObject, path: `${F}font24.dc6` });
+    confirmFont ??= smallFont;
+    buttonFont ??= createFont({ dc6: decodeDc6(read(`${F}fontridiculous.dc6`)), tbl: decodeFontTbl(read(`${F}fontridiculous.tbl`)), palette,
+      documentObject, path: `${F}fontridiculous.dc6`, drawAs: { op: 'celcolor', mode: 4, blend } });
+    return { bodyFont, confirmFont, buttonFont };
+  };
   const campfire = animation(read, decodeDc6, CREATE_ASSETS.campfire, palette, documentObject);
   // The scene is composed at 800x600 (the blend reads pixels back), then scaled onto the page.
   const scene = documentObject.createElement('canvas'); scene.width = 800; scene.height = 600;
@@ -374,7 +412,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     const w = buttons[0].width, h = buttons[0].height;
     labelFont.drawAnchored(ctx, text, at.x + Math.max(Math.trunc((w - labelFont.measure(text)) / 2), 0), at.y + h - 1 + 4 - Math.trunc((h - labelFont.lineHeight) / 2));
   };
-  let hovered = -1, chosen = -1, name = '', tick = 0, drawnDescription = null, drawnClassName = null, drawnName = null, pressed = null, drawnHeroes = [], releaseEvidence = null;
+  let popup = null, hovered = -1, chosen = -1, name = '', tick = 0, drawnDescription = null, drawnClassName = null, drawnName = null, pressed = null, drawnHeroes = [], releaseEvidence = null;
   const clock = () => Math.floor(tick * RETAIL_HZ / UPDATE_HZ);   // retail's 25 Hz front-end tick
   // Retail drives NU1 (idle) and NU3 (selected idle) from the SAME 25 Hz front-end clock, and its
   // loops show frames `floor(t / idleEvery) mod (frames - 1)` -- the last DC6 frame is never shown.
@@ -390,6 +428,40 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
   // no single capture fixes, so the row aligns the two sequences and compares them frame for frame.
   const caretLit = () => nameRenderer.caretLit(clock());
 
+  // Retail's popup builder: D2Gfx dims the whole surface, then the frame's two cels, each button
+  // with its label, then the text.
+  const popCel = (a, index, x, anchorY, mode = 5) => {
+    const f = a.dc6.frames[index]; if (!f) return;
+    const left = x + f.offsetX, top = anchorY + f.offsetY - f.height + 1;
+    sceneCtx.drawImage(a.canvases[index], left, top);
+    recordDc6(a.path, index, f, left, top, { mode });
+  };
+  const popButton = (b, label, fonts) => {
+    const a = art(POPUP.button.art), held = isButtonHeld(b.id);
+    popCel(a, held && a.dc6.frames.length > 1 ? 1 : 0, b.x, b.anchorY);
+    fonts.buttonFont.drawAnchored(sceneCtx, label, b.x + Math.max(Math.trunc((POPUP.button.w - fonts.buttonFont.measure(label)) / 2), 0), b.anchorY + POPUP.labelDy);
+  };
+  const drawPopup = (ctx) => {
+    const fonts = popupFonts();
+    ctx.save(); ctx.globalAlpha = 0x7f / 0xff; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 800, 600); ctx.restore();
+    recordPrim('boxalpha', 0, 0, 800, 600, 0, 0x7f);
+    if (popup.kind === 'confirm') {
+      const C = POPUP.confirm, frame = art(C.art);
+      popCel(frame, 0, POPUP.x, POPUP.anchorY); popCel(frame, 1, POPUP.x + frame.dc6.frames[0].width, POPUP.anchorY);
+      popButton({ id: 'popup-back', ...C.back }, string(POPUP.strings.cancel) || 'CANCEL', fonts);
+      popButton({ id: 'popup-go', ...C.go }, string(POPUP.strings.ok) || 'OK', fonts);
+      const lines = wrapSpaces(string(POPUP.strings.hardcore) || '', C.body.width, (t) => fonts.confirmFont.measure(t));
+      lines.forEach((line, i) => fonts.confirmFont.drawAnchored(ctx, line, C.body.x + Math.max(Math.trunc((C.body.width - fonts.confirmFont.measure(line)) / 2), 0), C.body.firstBottom + i * C.body.step));
+      return;
+    }
+    const N = POPUP.notice, frame = art(N.art), B = N.body;
+    popCel(frame, 0, POPUP.x, POPUP.anchorY); popCel(frame, 1, POPUP.x + frame.dc6.frames[0].width, POPUP.anchorY);
+    popButton({ id: 'popup-ok', ...N.ok }, string(POPUP.strings.ok) || 'OK', fonts);
+    const width = B.width - 2 * B.inset;
+    wrapSpaces(popup.text, width, (t) => fonts.bodyFont.measure(t)).forEach((line, i) =>
+      fonts.bodyFont.drawAnchored(ctx, line, B.x + B.inset + Math.max(Math.trunc((width - fonts.bodyFont.measure(line)) / 2), 0), B.top + B.insetY + fonts.bodyFont.lineHeight + i * B.step));
+  };
+
   // Everything is authored for 800x600; one transform maps it onto whatever the canvas is.
   const view = (width, height) => {
     const scale = Math.min(width / SCREEN.width, height / SCREEN.height);
@@ -402,7 +474,14 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
   const okBox = () => ({ x: LAYOUT.okButton.x, y: LAYOUT.okButton.y, w: buttons[0].width, h: buttons[0].height });
   const exitBox = () => ({ x: LAYOUT.exitButton.x, y: LAYOUT.exitButton.y, w: buttons[0].width, h: buttons[0].height });
   const inBox = (p, b) => p.x >= b.x && p.x < b.x + b.w && p.y >= b.y && p.y < b.y + b.h;
+  // A raised popup owns the pointer: only its buttons answer.
+  const popupButtons = () => {
+    if (!popup) return [];
+    const B = POPUP.button, at = (id, b) => ({ id, x: b.x, y: b.anchorY - B.h + 1, w: B.w, h: B.h, ...b });
+    return popup.kind === 'confirm' ? [at('popup-back', POPUP.confirm.back), at('popup-go', POPUP.confirm.go)] : [at('popup-ok', POPUP.notice.ok)];
+  };
   const hitControl = (p) => {
+    if (popup) return popupButtons().find((b) => inBox(p, b))?.id ?? null;
     if (inBox(p, okBox())) return 'ok';
     const checkbox = chosen >= 0 ? checkboxes.hitTest(p) : null;
     if (checkbox) return `checkbox-${checkbox}`;
@@ -412,6 +491,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
   };
   const releaseMatches = (token, p) => {
     if (!token) return false;
+    if (token.startsWith('popup-')) return popupButtons().some((b) => b.id === token && inBox(p, b));
     if (token === 'ok') return inBox(p, okBox());
     if (token === 'exit') return inBox(p, exitBox());
     if (token.startsWith('checkbox-')) return checkboxes.contains(token.slice('checkbox-'.length), p);
@@ -423,6 +503,24 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     pointer ? hitControl({ x: pointer[0], y: pointer[1] }) : null);
 
   const canCreate = () => chosen >= 0 && name.trim().length >= 2;
+  // The screen as retail's init leaves it after a refusal or a declined confirmation: no class
+  // chosen, no hover, an empty name box, both boxes at their defaults.
+  const restart = () => {
+    popup = null; chosen = -1; hovered = -1; name = ''; pressed = null; checkboxInput.cancel();
+    checkboxes.reset(); stances.reset();
+  };
+  const create = () => onCreate?.({ playerClass: heroes[chosen].playerClass, name: name.trim(), key: heroes[chosen].key, checkboxes: checkboxes.states() });
+  // OK on a Hardcore character asks first, in every mode; everything else creates straight away.
+  const submitCreate = () => {
+    if (!canCreate()) return;
+    if (checkboxes.states().hardcore) popup = { kind: 'confirm' }; else create();
+  };
+  const activatePopup = (id) => {
+    const was = popup; popup = null; pressed = null;
+    if (id === 'popup-go') { create(); return id; }
+    if (id === 'popup-ok' || id === 'popup-back') { restart(); return id; }
+    popup = was; return null;
+  };
   // A hover that began mid-walk lands once the walk ends (Codex F99 review).
   const rehover = () => { if (hovered >= 0) stances.hover(hovered, tick); };
   const sound = (index, trigger) => { if (index >= 0) onSound?.({ key: heroes[index].key, trigger }); };
@@ -494,13 +592,21 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     },
     setName(value) { name = String(value).slice(0, 15); return name; },
     typeKey(code, key) {
+      if (popup) {
+        if (code === 'Enter') activatePopup(popup.kind === 'confirm' ? 'popup-go' : 'popup-ok');
+        else if (code === 'Escape') activatePopup(popup.kind === 'confirm' ? 'popup-back' : 'popup-ok');
+        return true;
+      }
       if (code === 'Backspace') { name = name.slice(0, -1); return true; }
       if (code === 'Enter') { if (canCreate()) this.submit(); return true; }
       if (code === 'Escape') { onCancel?.(); return true; }
       if (isRetailEditBoxCharacter(key) && name.length < 15) { name += key; return true; }
       return false;
     },
-    submit() { if (canCreate()) onCreate?.({ playerClass: heroes[chosen].playerClass, name: name.trim(), key: heroes[chosen].key, checkboxes: checkboxes.states() }); },
+    submit() { if (!popup) submitCreate(); },
+    /** The box retail raises over the create screen when the realm refuses the character: its text, then OK restarts the screen. */
+    showNotice(text) { pressed = null; popup = { kind: 'notice', text: String(text) }; },
+    get popup() { return popup ? { ...popup } : null; },
     setPointer(x, y, width, height) {
       const p = toScreen(x, y, width, height);
       pointer = [Math.trunc(p.x), Math.trunc(p.y)];
@@ -508,6 +614,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     hover(x, y, width, height) {
       const p = toScreen(x, y, width, height);
       pointer = [Math.trunc(p.x), Math.trunc(p.y)];
+      if (popup) return -1;
       const next = heroes.findIndex((h) => inBox(p, h.hit));
       if (hovered >= 0 && hovered !== next) stances.unhover(hovered, tick);
       if (next >= 0) stances.hover(next, tick);
@@ -528,6 +635,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     },
     click(x, y, width, height) {
       const p = toScreen(x, y, width, height);
+      if (popup) { const id = hitControl(p); return id ? activatePopup(id) : null; }
       if (inBox(p, okBox())) { this.submit(); return 'ok'; }
       if (chosen >= 0) {
         const checkbox = checkboxes.click(p);
@@ -549,6 +657,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     release(token, x, y, width, height) {
       if (!token) { checkboxInput.cancel(); pressed = null; return null; }
       const p = toScreen(x, y, width, height), now = hitControl(p), matches = releaseMatches(token, p); pressed = null;
+      if (token.startsWith('popup-')) { const action = matches && popup ? activatePopup(token) : null; releaseEvidence = { token, now, matches, action }; return action; }
       // Mode 2 has no release callback. Preserve the captured identity only to end the gesture;
       // overlapping checkbox hit regions must not redirect the already-committed down action.
       const buttonAction = releaseCharacterCreateButton(token, {
@@ -577,6 +686,11 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
 
       const centred = (text, x, y) => font.draw(ctx, text, x - font.measure(text) / 2, y);
       centred(heading, LAYOUT.heading.x, LAYOUT.heading.y);
+      if (expiryFont) {
+        const E = REALM_EXPIRY;
+        wrapSpaces(string(E.rules[0]) || '', E.width, (t) => expiryFont.measure(t)).forEach((line, i) => expiryFont.drawAnchored(ctx, line, E.x, E.firstBottom + i * E.step));
+        expiryFont.drawAnchored(ctx, string(E.rules[1]) || '', E.x, E.lastBottom);
+      }
       drawnDescription = null; drawnClassName = null; drawnName = null;
       if (chosen >= 0 || hovered >= 0) {
         const hero = heroes[chosen >= 0 ? chosen : hovered];
@@ -693,6 +807,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
         if ((pass === 'moving') === moving) renderHero(i, pass);
       }
       campfire.drawBlended(ctx, clock() % (campfire.count - 1), CAMPFIRE.x, CAMPFIRE.y, blend, 3);
+      if (popup) drawPopup(ctx);
       // D2Win draws ohand last at mouse (x,y-1), using the screen's palette.
       // Retail create-hover-barbarian.txt records anchor (409,285) for pointer (409,286).
       drawnCursor = null;

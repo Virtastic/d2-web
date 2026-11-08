@@ -49,6 +49,8 @@ import { parseItemLines } from './assets/item-tooltip.mjs';
 import { createNpcNameLabelCache } from './assets/npc-name-label-cache.mjs';
 import { savedCharacterReadError, setFrontdoorError } from './assets/frontdoor-error.mjs';
 import { createQuestLogRenderer, createMessageLogRenderer, QUESTS_IN_ACT, ACT_BASE, ACT_DONE, questStatus, messageScrollMax, COMPLETING } from './assets/quest-log.mjs';
+import { createPartyPanelRenderer, partyRows, ownState, clickResult as partyClickResult } from './assets/party-panel.mjs';
+import { createBubbleRenderer } from './assets/game-bubbles.mjs';
 import { createQuestCloseGesture } from './assets/quest-close-gesture.mjs';
 import { createSkillPanelRenderer, parseClassSkills, SESSION_SKILL_BYTES } from './assets/skill-panel.mjs';
 import { createSkillPointOverlay } from './assets/skill-plus.mjs';
@@ -90,12 +92,19 @@ import { createCreditsScreen } from './assets/credits-screen.mjs';
 import { createCinematicsScreen, CINEMATICS } from './assets/cinematics-screen.mjs';
 import { createScreenshotAction } from './assets/screenshot-action.mjs';
 import { sendCharacterPhrase } from './assets/chat-macros.mjs';
+import { gameChatPacket, isSayable, gameChatLine, gameChatBubble, routeGameLine } from './assets/bnet-game-chat.mjs';
+import { newTrade, applyTradePacket } from './assets/bnet-game-trade.mjs';
+import { Roster, rosterEventLine, eventLineText } from './assets/bnet-roster.mjs';
+import { localSlash } from './assets/bnet-slash.mjs';
 import { createOtherMultiplayerScreen } from './assets/other-multiplayer.mjs';
 import { createBnetLoginScreen } from './assets/bnet-login-screen.mjs';
 import { createBnetLobbyScreen } from './assets/bnet-lobby-screen.mjs';
 import { createBnetChat } from './assets/bnet-chat.mjs';
+import { parseGameList, filterGames } from './assets/bnet-gamelist.mjs';
+import { createSessionGames } from './assets/bnet-session-games.mjs';
+import { createChatLink } from './assets/bnet-chat-link.mjs';
 import { returnToLobby } from './assets/realm-lobby-return.mjs';
-import { createBnetConnectingPopup } from './assets/bnet-connecting.mjs';
+import { createBnetConnectingPopup, createBnetConnectNotice } from './assets/bnet-connecting.mjs';
 import { goldLabel } from './assets/gold-label.mjs';
 import { hoveredLabel, labelItemAt, nearestGroundItem, pickupNeedsWalk } from './item-pick.mjs';
 import { createSpeechBox } from './assets/speech-box.mjs';
@@ -133,6 +142,7 @@ import { npcVendorIsOpen, closeInventoryPanel } from './assets/npc-vendor-state.
 import { createAreaNameBlockRenderer } from './assets/area-name-block.mjs';
 import { createEntryBanner, ENTRY_BANNER } from './assets/level-entry-banner.mjs';
 import { hudBarTooltip, levelButtonTooltip } from './assets/hud-bar-tooltip.mjs';
+import { miniPanelTooltip } from './assets/minipanel-tooltip.mjs';
 import { createHirelingPanelRenderer } from './assets/hireling-panel.mjs';
 import { createVendorPanel, vendorLayoutFromEngine, SMITH_CLASSES, tooltipSpec } from './assets/vendor-panel.mjs';
 import { createRepairConfirmRenderer, refusalString, BUY_TITLE_STRING } from './assets/vendor-repair-confirm.mjs';
@@ -166,7 +176,10 @@ import { weaponClassTokenForMode } from './assets/player-weapon-class.mjs';
 import { decideGridPlace } from './assets/grid-place.mjs';
 import { installWorkerGuard, workerMode } from './worker-guard.mjs';
 import { fitSize } from './assets/fit-size.mjs';
-import { createTouchTextEntry } from './assets/touch-text-entry.mjs';
+import { canvasPoint as pointOnCanvas } from './assets/canvas-point.mjs';
+import { createBnetInput } from './assets/bnet-input.mjs';
+import { findD2gsDeny, d2gsDenyError } from './assets/d2gs-deny.mjs';
+import { createGameLife, joinDeadline, TICK_MS } from './assets/bnet-game-life.mjs';
 
 const canvas = document.querySelector('#game');
 const screenshotAction = createScreenshotAction();
@@ -214,6 +227,9 @@ const sessionBar = document.querySelector('#session-bar');
 const ctx = canvas.getContext('2d', { alpha: renderMode(window.__d2Entry.search) === 'w', willReadFrequently: true })   // ?render=w: transparent, the worker's world canvas sits under it;
 const input = new CommandInput();
 const frontendPointerStates = createFrontendPointerStates();
+// The Battle.net login and lobby screens' keyboard, wheel, scrollbar drag and touch keyboard (assets/bnet-input.mjs).
+const bnetInput = createBnetInput({ canvas, render: () => render(),
+  current: () => (screen === SCREEN.BNET_LOGIN ? { kind: 'login', screen: bnetLoginScreen } : screen === SCREEN.BNET_LOBBY ? { kind: 'lobby', screen: bnetLobbyScreen } : null) });
 const frontendHoverSync = createFrontendHoverSync();
 // The front-end screen that owns a pointer gesture, with TITLE's trademark phase exempt: it owns
 // its own countdown (s198), so it arms a control of its own that only advances the phase.
@@ -499,6 +515,7 @@ let characterPanelRenderer = null, characterPanelEvidence = null, advancement = 
 let skillPanelRenderer = null, skillPanelEvidence = null, classSkills = null;
 // V8c: the quest log (Q) and message log (M). State is the engine's quest record; the client keeps only which
 // tab and quest are showing. `messageLines` is the log's feed (nothing wired yet: V8c).
+let partyRenderer = null, bubbleRenderer = null, partyVisible = false, partyEvidence = null; const partyLocal = new Map(), TOWN_LEVELS = [1, 40, 75, 103, 109];
 let questLogRenderer = null, messageLogRenderer = null, questVisible = false, messageVisible = false, questAct = 0, questSelected = 0, questDescrOn = false, questEvidence = null, messageEvidence = null;
 const questCloseGesture = createQuestCloseGesture();
 const characterPanelCloseGesture = createCharacterPanelCloseGesture();
@@ -915,7 +932,9 @@ function ensureGameMenu() {
       if (item === 'RETURN TO GAME') gameMenu.close();
       else if (item === 'SAVE AND EXIT GAME' && realmSceneActive) {
         // A Battle.net game: the server holds the character. Retail returns to the lobby.
-        gameMenu.close(); void leaveRealmGame();
+        gameMenu.close();
+        { const bye = realmFlow?.d2gsLife?.saveAndExit(); if (bye) { try { realmFlow.d2gs?.send(bye); } catch { /* socket already closed */ } } }
+        void leaveRealmGame();
       } else if (item === 'SAVE AND EXIT GAME') {
         // Keep the session and menu available if persistence fails; only leave once the store
         // confirms the character has been written.
@@ -1356,7 +1375,7 @@ async function bootstrapSession() {
     hirelingPanelRenderer = createHirelingPanelRenderer(createMpqAssetReader(Module));
     skillPanelRenderer = createSkillPanelRenderer(createMpqAssetReader(Module), document, createSkillPointOverlay());
     if (!navigator.webdriver) await entryYield();
-    try { questLogRenderer = createQuestLogRenderer(createMpqAssetReader(Module), document); messageLogRenderer = createMessageLogRenderer(createMpqAssetReader(Module), document); } catch (error) { sessionError = String(error); }
+    try { questLogRenderer = createQuestLogRenderer(createMpqAssetReader(Module), document); messageLogRenderer = createMessageLogRenderer(createMpqAssetReader(Module), document); partyRenderer = createPartyPanelRenderer(createMpqAssetReader(Module), document); bubbleRenderer = createBubbleRenderer(createMpqAssetReader(Module), document); } catch (error) { sessionError = String(error); }
     try { stashPanelRenderer = createStashPanelRenderer(createMpqAssetReader(Module), document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]),
       stashGold: (limit) => (plugyStash.showShared && !limit) ? plugyGold : Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [limit]) : 0 }); } catch (error) { stashPanelError = String(error); }
     try { cubePanelRenderer = createStashPanelRenderer(createMpqAssetReader(Module), document, { page: INVPAGE_CUBE, string: null,
@@ -1630,6 +1649,7 @@ function releaseRealmFlow({ closeTransports = true } = {}) {
   // can be freed. Await its loop before releasing the scratch memory used by Huffman decoding.
   flow.d2gsReceiver?.stop();
   if (closeTransports) {
+    try { flow.chatLink?.close(); } catch { /* already closed */ }
     try { flow.chatSession?.close(); } catch { /* already closed */ }
     try { flow.chat?.transport?.close(); } catch { /* already closed */ }
     try { flow.d2gs?.close(); } catch { /* already closed */ }
@@ -1647,7 +1667,7 @@ function releaseRealmFlow({ closeTransports = true } = {}) {
   worldRightPointerHeld = false; heldRightPointerTicks = 0;
   realmMoveDuplicateState = {}; realmDirection = { x: 0, y: 0 }; realmDirectionTicks = 0;
   worldPointerHeld = false;
-  if (realmSceneActive) { realmSceneActive = false; realmSceneTiles = []; realmSceneRevision = 0; realmSceneEvidence = null; terrain = null; snapshot = null; session = null; screen = SCREEN.TITLE; }
+  if (realmSceneActive) { gameRoster.clear(); gameBubbles.clear(); partyLocal.clear(); partyVisible = false; gameSlash.replyTo = ""; realmSceneActive = false; realmSceneTiles = []; realmSceneRevision = 0; realmSceneEvidence = null; terrain = null; snapshot = null; session = null; screen = SCREEN.TITLE; }
   if (realmFlow === flow) realmFlow = null;
   Promise.resolve(flow.d2gsReceiver?.done).catch(() => {}).then(() => {
     try { flow.protocol?.d2gsClientPlayerReset?.(); } catch { /* realm state already reset */ }
@@ -1663,9 +1683,42 @@ function readRealmPlayerView() {
   const state = realmFlow.protocol.d2gsClientPlayerState?.();
   return state?.active ? state : null;
 }
+// Game chat state: the players in the game (0x5b/0x5c), the last whisperer for /r, and the speech bubbles
+// by speaking unit (data only; drawing them is not wired).
+const gameRoster = new Roster();
+const gameSlash = { replyTo: '', notify: false };
+const gameBubbles = new Map();
+const latin1 = (a) => String.fromCharCode(...(a ?? []));
+// One Enter in a game: the routed actions, and the realm chat takes the "/" lines no game command claims.
+function sendGameLine(text) {
+  for (const a of routeGameLine(text, { roster: gameRoster, multiplayer: true })) {
+    if (a.send) realmFlow.d2gs.send(a.send);
+    else if (a.notice) messageLines.push(a.notice);
+    else if (a.realm !== undefined) {
+      const local = localSlash(a.realm, gameSlash);
+      if (local?.notice) messageLines.push(local.notice);
+      const out = local ? local.send : a.realm;
+      if (out) realmFlow.chatLink?.say(out, lobbyChatUser(chosenName));
+    }
+  }
+  postedAt = performance.now();
+}
 function feedRealmPlayerFrame(bytes) {
   const protocol = realmFlow?.protocol;
   const update = applyRealmPlayerFrame(protocol, bytes);
+  gameRoster.feed(bytes);
+  if (update.state?.guid != null) gameRoster.myId = update.state.guid >>> 0;
+  if (bytes[0] === 0x26) {
+    const chat = protocol.d2gsClientGameChat?.();
+    const line = gameChatLine(chat, langIdx);
+    if (line) { messageLines.push(line); postedAt = performance.now(); if (chat.messageType === 2) gameSlash.replyTo = latin1(chat.name); }
+    const bubble = gameChatBubble(chat);
+    if (bubble) gameBubbles.set(`${bubble.unitType}:${bubble.unitGuid}`, { text: bubble.text, at: performance.now() });
+  } else if (bytes[0] >= 0x77 && bytes[0] <= 0x79) applyTradePacket(realmFlow.trade ??= newTrade(), bytes);
+  else if (bytes[0] === 0x5a) {
+    const line = eventLineText(rosterEventLine(bytes, langIdx, gameRoster, chosenName));
+    if (line) { messageLines.push(line); postedAt = performance.now(); }
+  }
   realmPlayerView = update.state;
   realmPlayerRosterView = update.players;
   realmPlayerReassignFade.observe(update.players, update.state, performance.now());
@@ -1691,6 +1744,8 @@ function leaveRealmLogin() {
   realmPlayerReassignFade.reset();
   realmWorldView = null;
   try { realmFlow?.bncs?.close(); } catch { /* socket already closed */ }
+  try { realmFlow?.chatLink?.close(); } catch { /* socket already closed */ }
+  bnetRedialCredentials = null;
   try { realmFlow?.chatSession?.close(); } catch { /* socket already closed */ }
   try { realmFlow?.chat?.transport?.close(); } catch { /* socket already closed */ }
   void releaseRealmFlow();
@@ -1720,6 +1775,8 @@ async function leaveRealmGame() {
     realmTransport = { state: 'lobby', server: realmTransport.server, result: null, error: '' };
     enterBnetLobby(name);
   } catch (error) {
+    try { old.chatLink?.close(); } catch { /* already closed */ }
+    bnetRedialCredentials = null;
     try { old.chatSession?.close(); } catch { /* already closed */ }
     try { old.chat?.transport?.close(); } catch { /* already closed */ }
     realmFlow = { server: old.server, realmReply: null, bncs: null };
@@ -1735,10 +1792,27 @@ async function leaveRealmGame() {
 // (D2Multi), where CREATE and JOIN make or join the game. The list's statstring carries class, level
 // and flags; the portrait's components are not read from it.
 let realmCharacters = [];
+const realmCharacterCard = (c) => ({ name: c.name, playerClass: c.charClass, level: c.level,
+  expansion: (c.flags & 0x20) !== 0, hardcore: (c.flags & 0x04) !== 0, dead: (c.flags & 0x08) !== 0 });
+// DELETE CHARACTER on the realm: MCP CHARDELETE; a refusal leaves the roster and shows its reason, a dead session drops to the login.
+async function deleteRealmCharacterFromSelect(name) {
+  const flow = realmFlow;
+  try {
+    const { deleteRealmCharacter } = await import('./assets/realm-delete.mjs');
+    const result = await deleteRealmCharacter(flow.mcpSession, name, realmCharacterCard);
+    charSelectError = result.refused ? 'The character could not be deleted.' : '';
+    savedCharacters = result.characters; realmCharacters = flow.mcpSession.list.characters;
+    charSelect?.setCharacters(savedCharacters);
+    return result;
+  } catch (error) {
+    realmSelect = false; charSelect = null; screen = SCREEN.BNET_LOGIN; leaveRealmLogin();
+    bnetLoginScreen?.reset(); bnetLoginScreen?.fail(error);
+    return { status: 'delete-failed', error: String(error?.message || error) };
+  }
+}
 function enterRealmCharacterSelect(characters) {
   realmCharacters = characters;
-  savedCharacters = characters.map((c) => ({ name: c.name, playerClass: c.charClass, level: c.level,
-    expansion: (c.flags & 0x20) !== 0, hardcore: (c.flags & 0x04) !== 0, dead: (c.flags & 0x08) !== 0 }));
+  savedCharacters = characters.map(realmCharacterCard);
   bnetLobbyScreen = null; bnetLobbyError = '';
   charSelect = null; charSelectError = '';
   realmSelect = true; realmCreate = false;
@@ -1748,17 +1822,58 @@ function enterRealmCharacterSelect(characters) {
 // rejected CREATE or JOIN keeps the MCP session and shows retail's notice; any other failure has torn
 // the realm session down, and the player is back on the login screen to log in again.
 // The chat session over the BNCS socket the login kept; null when this realm path holds none.
+// A dead chat socket is dialled again with the BNCS logon the player gave (held in memory only), chat is
+// entered again and the last channel rejoined; the MCP character logon is left alone.
+let bnetRedialCredentials = null;
+async function redialBncs() {
+  const flow = realmFlow, c = bnetRedialCredentials;
+  if (!flow?.server?.ws || !c) throw new Error('no logon to redial the chat connection with');
+  const rc = await import('./assets/realm-client.mjs');
+  const transport = rc.webSocketTransport(realmServiceUrl(flow.server.ws, 'bncs'));
+  let protocol = null;
+  try {
+    await transport.ready(); protocol = rc.bindEngineProtocol(Module);
+    const login = await rc.bncsLogin(transport, protocol, { account: c.account, password: c.password, realm: flow.server.region,
+      auth: await realmAuthConfig(flow.server.auth) });
+    if (realmFlow !== flow) throw new Error('realm session ended during the chat redial');
+    flow.realmReply = login.handoff.realmReply; flow.mpq = login.mpq; flow.realms = login.realmList.map((r) => r.title);
+    return { transport, reader: login.reader };
+  } catch (error) { try { transport.close(); } catch { /* already closed */ } throw error; }
+  finally { try { protocol?.free(); } catch { /* engine gone */ } }
+}
+function lobbyChatUser(name) {
+  const flow = realmFlow;
+  return { character: name, realm: flow?.realms?.[0] ?? flow?.server?.region ?? '',
+    onEvent: (e) => { const handled = bnetLobbyScreen?.chatEvent(e) ?? false; if (handled) render(); return handled; },
+    onLine: (line) => { if (realmSceneActive) { messageLines.push(line); postedAt = performance.now(); } else bnetLobbyScreen?.chatLine(line); render(); },
+    onChannels: (list) => { bnetLobbyScreen?.setChannels(list); render(); },
+    // SID_GETADVLISTEX's reply, kept by retail's own filter (names only), under this session's games.
+    onGames: (body) => { if (!realmFlow) return; sessionGamesOf(realmFlow).setRealm(parseGameList(body)); pushLobbyGames(name); render(); } };
+}
+// The session's games (bnet-session-games.mjs) live on the realm flow, so a new login starts with none.
+function sessionGamesOf(flow) { return flow.sessionGames ??= createSessionGames(); }
+// The join panel's rows: the realm's last reply and this session's games, under the character's own filter.
+function pushLobbyGames(name) {
+  const c = lobbyCharacter(name);
+  if (!c || !bnetLobbyScreen || !realmFlow) return;
+  bnetLobbyScreen.setGames(filterGames(sessionGamesOf(realmFlow).list(), c));
+}
+function lobbyCharacter(name) {
+  const c = realmCharacters.find((x) => x.name.toLowerCase() === String(name).toLowerCase());
+  return c && { name: c.name, charClass: c.charClass, level: c.level, expansion: (c.flags & 0x20) !== 0,
+    hardcore: (c.flags & 0x04) !== 0, dead: (c.flags & 0x08) !== 0, ladder: (c.flags & 0x40) !== 0, progression: c.progression ?? 0 };
+}
 function startLobbyChat(name) {
   const flow = realmFlow;
-  if (!flow?.chat) return null;
-  if (flow.chatSession?.open) { bnetLobbyScreen?.chatLive(true); return flow.chatSession; }
-  flow.chatSession = createBnetChat({ ...flow.chat, character: name, realm: flow.realms?.[0] ?? flow.server?.region ?? '',
-    onEvent: (e) => { const handled = bnetLobbyScreen?.chatEvent(e) ?? false; if (handled) render(); return handled; },
-    onLine: (line) => { bnetLobbyScreen?.chatLine(line); render(); },
-    onClose: () => { bnetLobbyScreen?.chatLive(false); } });
-  flow.chatSession.enter();
-  bnetLobbyScreen?.chatLive(true);
-  return flow.chatSession;
+  if (!flow?.chat && !flow?.chatLink) return null;
+  if (!flow.chatLink) {
+    flow.chatLink = createChatLink({ dial: redialBncs, createChat: createBnetChat,
+      onState: (on) => { if (realmFlow === flow) flow.chatSession = flow.chatLink?.session ?? null; bnetLobbyScreen?.chatLive(on); },
+      onFail: (error) => { bnetLobbyScreen?.chatLine({ text: `Chat connection lost: ${error?.message ?? error}`, colour: 1 }); render(); } });
+    flow.chatLink.attach(flow.chat, lobbyChatUser(name));
+  } else if (flow.chatLink.session?.open) bnetLobbyScreen?.chatLive(true);
+  else void flow.chatLink.ensure(lobbyChatUser(name));   // the socket died while away: dial, enter chat, rejoin the channel
+  return flow.chatLink.session;
 }
 function enterBnetLobby(name) {
   const c = realmCharacters.find((x) => x.name.toLowerCase() === String(name).toLowerCase());
@@ -1774,14 +1889,16 @@ function enterBnetLobby(name) {
   });
   bnetLobbyError = '';
   try { bnetLobbyScreen = createBnetLobbyScreen({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, string,
-    character: { name: c.name, charClass: c.charClass, level: c.level, expansion: (c.flags & 0x20) !== 0,
-      hardcore: (c.flags & 0x04) !== 0, dead: (c.flags & 0x08) !== 0, progression: 0 },
-    onCreateGame: (game) => play(game),
+    character: lobbyCharacter(c.name),
+    onRefreshGames: () => { pushLobbyGames(c.name); const link = startLobbyChat(c.name) && realmFlow?.chatLink; if (link?.session?.open) link.session.games(); else void link?.ensure(lobbyChatUser(c.name)).then((s) => s?.games()); },
+    onCreateGame: (game) => play({ ...game, listing: { difficulty: (game.difficulty ?? 0) + (lobbyCharacter(c.name)?.hardcore ? 3 : 0), description: game.description ?? '' } }),
     onJoinGame: (game) => play({ ...game, join: true }),
     // The BNCS chat socket the login left open: ENTERCHAT now (retail names the character on OK), the
     // channel join when ENTER CHAT is pressed, lines in and out through the lobby's chat log.
-    onEnterChat: () => { startLobbyChat(c.name)?.join(); },
-    onSendChat: (text) => realmFlow?.chatSession?.say(text) === true,
+    onEnterChat: () => { startLobbyChat(c.name); realmFlow?.chatLink?.join(); },
+    onSendChat: (text) => realmFlow?.chatLink?.say(text, lobbyChatUser(c.name)) === true,
+    onJoinChannel: (channel) => { startLobbyChat(c.name); realmFlow?.chatLink?.join(channel); },
+    onRefreshChannels: () => { realmFlow?.chatLink?.channels(); },
     onQuit: () => enterRealmCharacterSelect(realmCharacters) }); }
   catch (error) { bnetLobbyScreen = null; bnetLobbyError = String(error); }
   screen = SCREEN.BNET_LOBBY;
@@ -1792,6 +1909,7 @@ function ensureBnetLoginScreen(server) {
   if (bnetLoginScreen || bnetLoginError) return;
   try { bnetLoginScreen = createBnetLoginScreen({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette,
     region: server?.region ?? '',
+    isConnected: () => realmTransport.state !== 'failed' && realmTransport.state !== 'server-disconnected',
     // Retail's "Last BNet" registry value; the browser's per-machine store holds it here.
     lastAccount: (() => { try { return localStorage.getItem(LAST_BNET_KEY) ?? ''; } catch { return ''; } })(),
     onRemember: (account) => { try { localStorage.setItem(LAST_BNET_KEY, account); } catch { /* private window */ } },
@@ -1802,6 +1920,7 @@ function ensureBnetLoginScreen(server) {
       if (!characters.length) { realmCreate = true; screen = SCREEN.CREATE; ensureCharCreate(); return; }
       enterRealmCharacterSelect(characters);
     },
+    onTermsOfService: fetchConfiguredRealmTerms,
     onCreateAccount: createConfiguredRealmAccount,
     onChangePassword: (request) => withRealmRequest((m, t, p) => m.bncsChangePassword(t, p, request)),
     onResetPassword: (request) => withRealmRequest((m, t, p) => m.bncsResetPassword(t, p, request)),
@@ -1829,22 +1948,20 @@ function connectConfiguredRealm(server) {
       if (!server?.ws) throw new Error('selected region has no browser WebSocket transport');
       const { webSocketTransport } = await import('./assets/realm-client.mjs');
       if (bnetConnecting !== attempt) return;
-      // One quiet redial: a socket that drops during the handshake should not surface the failure popup.
-      for (let dial = 0; ; dial++) {
-        attempt.bncs = webSocketTransport(realmServiceUrl(server.ws, 'bncs'));
-        try { await attempt.bncs.ready(); break; }
-        catch (error) {
-          try { attempt.bncs.close(); } catch { /* socket already closed */ }
-          if (dial >= 1 || bnetConnecting !== attempt) throw error;
-        }
-      }
+      // One dial, as retail's connect (D2Launch+0xEE10) makes one: a failed dial is the notice below, with no quiet redial.
+      attempt.bncs = webSocketTransport(realmServiceUrl(server.ws, 'bncs'));
+      await attempt.bncs.ready();
       if (bnetConnecting !== attempt) { attempt.bncs.close(); return; }
       bnetConnecting = null; titleScreen?.setOverlay(null);
       showConfiguredRealmLogin(server, attempt.bncs);
     } catch (error) {
       if (bnetConnecting !== attempt) return;
+      try { attempt.bncs?.close(); } catch { /* socket already closed */ }
+      bnetConnecting = null;
       realmTransport = { state: 'failed', server: { region: server?.region, host: server?.host }, result: null, error: String(error) };
-      popup.fail(lang(LANG_UNABLE_TO_CONNECT));
+      // Retail closes the Connecting popup and raises its own notice (5189); the notice's OK leaves the menu as retail's does (D2Launch+0x17DF0).
+      titleScreen?.setOverlay(createBnetConnectNotice({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, string: lang,
+        text: [5248, LANG_UNABLE_TO_CONNECT, 5190].map(lang).filter(Boolean).join(' '), onOk: () => { titleScreen?.setOverlay(null); if (realmTransport.state === 'failed') realmTransport = { state: 'idle', server: null, result: null, error: '' }; } }));
     }
   })();
 }
@@ -1885,7 +2002,16 @@ async function realmAuthConfig(auth) {
   return { ...auth, revisionFiles };
 }
 
-// CREATE ACCOUNT's last step: a connection of its own makes the account, then the screen is back at LOG IN.
+// A transport failure before the logon reply: the login screen raises the connect failure notice for it (5189).
+function transportFailure(message) { return Object.assign(new Error(message), { transport: true }); }
+// CREATE NEW ACCOUNT's terms (D2Launch+0x18E10) ask the open Battle.net connection for tos-unicode_<lang>.txt. The local realm
+// answers no file request, so the text is empty: retail's terms screen with no text (+0x18E10's empty-file path). NOT retail:
+// retail waits for the file with CANCEL; a file that never comes is answered here at once.
+async function fetchConfiguredRealmTerms() {
+  if (!realmFlow?.bncs?.isOpen) throw transportFailure('the Battle.net connection is not open');
+  return '';
+}
+// CREATE NEW ACCOUNT's last step: a connection of its own makes the account, then the screen logs on with it, as retail's does.
 async function createConfiguredRealmAccount({ account, password }) {
   const server = realmFlow?.server;
   if (!server?.ws) throw new Error('selected region has no browser WebSocket transport');
@@ -1895,7 +2021,7 @@ async function createConfiguredRealmAccount({ account, password }) {
   const bncs = webSocketTransport(realmServiceUrl(server.ws, 'bncs'));
   let protocol;
   try {
-    await bncs.ready();
+    await bncs.ready().catch(() => { throw transportFailure('the Battle.net connection could not open'); });
     protocol = bindEngineProtocol(Module);
     await bncsCreateAccount(bncs, protocol, { account, password });
   } finally {
@@ -1925,17 +2051,18 @@ async function authenticateConfiguredRealm({ account, password }) {
   const server = realmFlow?.server;
   realmTransport = { state: 'authenticating', server: { region: server?.region, host: server?.host }, result: null, error: '' };
   const { webSocketTransport, bncsLogin, mcpListCharacters, bindEngineProtocol } = await import('./assets/realm-client.mjs');
-  let bncs, mcp, protocol, keepRealmSession = false;
+  let bncs, mcp, protocol, keepRealmSession = false, keepBncs = false;
   try {
     if (!server?.ws) throw new Error('selected region has no browser WebSocket transport');
-    // The connection the popup opened; a later attempt (after a failed logon closed it) dials again.
-    // NOT retail: retail shows the connecting popup again for that redial; this client does not.
+    // The lobby's chat sockets close here: LOG IN takes the connection the connect opened, which a refused logon kept.
+    try { realmFlow.chatLink?.close(); } catch { /* already closed */ }
     try { realmFlow.chatSession?.close(); } catch { /* already closed */ }
     try { realmFlow.chat?.transport?.close(); } catch { /* already closed */ }
-    realmFlow.chat = null; realmFlow.chatSession = null;
-    bncs = realmFlow.bncs?.isOpen ? realmFlow.bncs : webSocketTransport(realmServiceUrl(server.ws, 'bncs'));
+    realmFlow.chat = null; realmFlow.chatSession = null; realmFlow.chatLink = null;
+    // The connection the connect opened, and no other: a dropped one is the connect failure notice, not a quiet dial (D2Launch+0xE510).
+    bncs = realmFlow.bncs;
+    if (!bncs?.isOpen) throw transportFailure('the Battle.net connection was lost');
     realmFlow.bncs = null;
-    await bncs.ready();
     protocol = bindEngineProtocol(Module);
     const login = await bncsLogin(bncs, protocol, { account, password, realm: server.region, auth: await realmAuthConfig(server.auth) });
     // The BNCS socket stays open for the session, as retail's does: it carries the lobby's chat.
@@ -1944,6 +2071,7 @@ async function authenticateConfiguredRealm({ account, password }) {
     realmFlow.realmReply = login.handoff.realmReply;
     realmFlow.realms = login.realmList.map((r) => r.title);
     realmFlow.mpq = login.mpq;
+    bnetRedialCredentials = { account, password };   // memory only: a dead chat socket logs on again with these
     mcp = webSocketTransport(realmServiceUrl(server.ws, 'mcp')); await mcp.ready();
     const roster = await mcpListCharacters(mcp, protocol, { realmReply: login.handoff.realmReply });
     const characters = roster.characters;
@@ -1955,14 +2083,16 @@ async function authenticateConfiguredRealm({ account, password }) {
     return characters;
   } catch (error) {
     realmTransport = { state: 'failed', server: { region: server?.region, host: server?.host }, result: null, error: String(error) };
+    // A refused logon keeps the connection, as retail's does (D2Launch+0xE510 leaves the connection up); the next LOG IN uses it.
+    if (error?.logonResult !== undefined && bncs) { realmFlow.bncs = bncs; keepBncs = true; }
     throw error;
   } finally {
     if (!keepRealmSession) { try { mcp?.close(); } catch { /* socket already closed */ } }
-    try { bncs?.close(); } catch { /* socket already closed */ }
+    if (!keepBncs) { try { bncs?.close(); } catch { /* socket already closed */ } }
     if (!keepRealmSession) { try { protocol?.free(); } catch { /* engine gone */ } }
   }
 }
-async function createAndJoinConfiguredGame({ character, gameName, gamePassword, difficulty = 0, maxPlayers = 8, description = '', join = false }) {
+async function createAndJoinConfiguredGame({ character, gameName, gamePassword, difficulty = 0, maxPlayers = 8, description = '', join = false, listing = null }) {
   const { server, realmReply } = realmFlow || {};
   const started = { server: { region: server?.region, host: server?.host } };
   realmTransport = { state: 'joining', ...started, result: null, error: '' };
@@ -1975,22 +2105,29 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
       difficulty, maxPlayers, description, join, session: realmFlow.mcpSession });
     mcp.close(); mcp = null;
     realmFlow.mcp = null; realmFlow.mcpSession = null;
+    // The game is known to the realm now: this session lists it (a join only when the row it came from had its details).
+    if (listing) sessionGamesOf(realmFlow).remember({ name: joined.game.name, password: Boolean(gamePassword), difficulty: listing.difficulty, description: listing.description });
     // The game server occasionally drops the first socket before the greeting completes; the ticket is
     // still valid, so reconnect and send the same logon again.
+    // Retail ends a join that has not entered the game after 30 seconds with the timeout notice.
+    const deadline = joinDeadline({ expansion: !!((joined.character.flags ?? 0) & 0x20) });
     let game;
-    for (let attempt = 0; ; attempt++) {
-      d2gs = webSocketTransport(realmServiceUrl(server.ws, 'd2gs'));
-      try {
-        await d2gs.ready();
-        game = await d2gsJoin(d2gs, protocol, { character: joined.character.name,
-          charClass: joined.character.charClass, gameToken: joined.ticket.token, gameHash: joined.ticket.hash,
-          difficulty: joined.game.difficulty });
-        break;
-      } catch (error) {
-        try { d2gs.close(); } catch { /* socket already closed */ }
-        if (attempt >= 2) throw error;
-      }
-    }
+    try {
+      game = await Promise.race([deadline.promise, (async () => {
+        for (let attempt = 0; ; attempt++) {
+          d2gs = webSocketTransport(realmServiceUrl(server.ws, 'd2gs'));
+          try {
+            await d2gs.ready();
+            return await d2gsJoin(d2gs, protocol, { character: joined.character.name,
+              charClass: joined.character.charClass, expansion: !!((joined.character.flags ?? 0) & 0x20), gameToken: joined.ticket.token, gameHash: joined.ticket.hash,
+              difficulty: joined.game.difficulty });
+          } catch (error) {
+            try { d2gs.close(); } catch { /* socket already closed */ }
+            if (attempt >= 2 || deadline.expired) throw error;
+          }
+        }
+      })()]);
+    } finally { deadline.cancel(); }
     realmPlayerView = game.playerState;
     realmPlayerRosterView = protocol.d2gsClientPlayers?.() ?? (game.playerState ? [game.playerState] : []);
     realmPlayerReassignFade.installRoster(realmPlayerRosterView);
@@ -2010,10 +2147,24 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
       realmTransport = { ...realmTransport, result: { ...realmTransport.result,
         d2gs: { ...realmTransport.result.d2gs, keepalivesSent: count, lastKeepaliveTick: tick } } };
     } });
+    // Retail keeps the first exit reason up in the game for 600 ticks before it leaves.
+    const exitLobbyNotice = {};
+    const life = createGameLife({ expansion: !!((joined.character.flags ?? 0) & 0x20),
+      onNotice: (id) => { if (id) { exitLobbyNotice.id = id; messageLines.push(Module.ccall('d2_lang_string_by_index', 'string', ['number'], [id])); postedAt = performance.now(); } },
+      onLeave: () => { clearInterval(lifeTimer); keepAlive.stop(); receiver?.stop?.();
+        void leaveRealmGame().then(() => { bnetLobbyScreen?.fail({ noticeString: exitLobbyNotice.id ?? 5357, message: 'game ended' }); render(); }); } });
+    life.inGame();
+    const lifeTimer = setInterval(() => { life.checkTimers(); life.tick(); }, TICK_MS);
     const receiver = startD2gsReceiveLoop(game.readFrame, {
       onFrame: (frame, bytes) => {
         if (bytes[0] === 0x8f) keepAlive.pong(bytes);
         if (realmTransport.state !== 'session-open') return;
+        // A refusal mid-game (the server dropping or kicking the player) ends the game with that reason's notice.
+        const denied = findD2gsDeny(bytes, (b) => protocol.d2gsPacketSize(b));
+        if (denied !== null) {
+          life.deny(denied);
+          return;
+        }
         const update = feedRealmPlayerFrame(bytes);
         realmTransport = { ...realmTransport, result: { ...realmTransport.result,
           d2gs: { ...realmTransport.result.d2gs, postJoinFrames: frame.count,
@@ -2023,13 +2174,14 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
       },
       onClose: (error) => {
         keepAlive.stop();
-        if (realmTransport.state !== 'session-open') return;
+        if (realmTransport.state !== 'session-open') { clearInterval(lifeTimer); return; }
         realmTransport = { ...realmTransport, state: 'server-disconnected', error: String(error),
           result: { ...realmTransport.result, d2gs: { ...realmTransport.result.d2gs, socketOpen: false } } };
-        void releaseRealmFlow({ closeTransports: false });
+        // A lost connection is exit reason 7: its text stays up for the countdown, then the lobby.
+        if (!life.connectionLost() && !life.exiting) clearInterval(lifeTimer);
       },
     });
-    realmFlow.d2gs = d2gs; realmFlow.d2gsKeepAlive = keepAlive; realmFlow.d2gsReceiver = receiver;
+    realmFlow.d2gsLife = life; realmFlow.d2gs = d2gs; realmFlow.d2gsKeepAlive = keepAlive; realmFlow.d2gsReceiver = receiver;
     d2gs = null; keepD2gs = true;
     return `D2GS server session open for ${joined.character.name}; gameplay synchronization is still pending.`;
   } catch (error) {
@@ -2321,8 +2473,9 @@ function ensureCharSelect() {
       },
       onCreate: () => { if (realmSelect) realmCreate = true; screen = SCREEN.CREATE; warmTowns([]); ensureCharCreate(); },
       onCancel: () => { if (realmSelect) { realmSelect = false; leaveRealmLogin(); return; } screen = SCREEN.TITLE; },
-      onDelete: realmSelect ? null : deleteSavedCharacter,
+      onDelete: realmSelect ? deleteRealmCharacterFromSelect : deleteSavedCharacter,
       onConvert: convertSavedCharacter,
+      realm: () => realmSelect,
       // The portrait's item components: the engine's own component table (needs the data tables).
       componentToken: (i) => { if (!componentTablesReady) componentTablesReady = Boolean(Module.ccall('d2_drlg_init', 'number', [], [])); return Module._d2_component_token ? Module.ccall('d2_component_token', 'string', ['number'], [i]) : ''; },
       // DELETE CHARACTER's confirmation text is retail's own string table (numeric labels YesLabel,
@@ -2429,20 +2582,32 @@ function applyClientSaveFlags(states) {
 // (client-parity C3) would be selected before this; there is no save file support yet, so every
 // game starts by creating one.
 async function createRealmCharacter({ playerClass, name, checkboxes }) {
-  charCreate = null; realmCreate = false; screen = SCREEN.BNET_LOGIN;
+  const screenAtStart = charCreate;
   try {
     const { mcpCreateCharacter } = await import('./assets/realm-client.mjs');
     const session = realmFlow.mcpSession;
-    await mcpCreateCharacter(session, { name, charClass: playerClass, hardcore: !!checkboxes?.hardcore, expansion: checkboxes?.expansion !== false });
+    // Retail sets the ladder bit on every character the Battle.net create screen makes.
+    await mcpCreateCharacter(session, { name, charClass: playerClass, hardcore: !!checkboxes?.hardcore, expansion: checkboxes?.expansion !== false, ladder: true });
+    charCreate = null; realmCreate = false; screen = SCREEN.BNET_LOGIN;
     enterRealmCharacterSelect(session.list.characters);
-  } catch (error) { bnetLoginScreen?.reset(); bnetLoginScreen?.fail(error); }
+  } catch (error) {
+    if (error?.result !== undefined && screenAtStart && charCreate === screenAtStart) {
+      // A refused name keeps the player on the create screen with the reason in a popup: a taken name has its own text, any other
+      // refusal is "Name <name> rejected by Server". OK restarts the screen.
+      const text = (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]);
+      charCreate.showNotice(error.result === 0x14 ? text(11059).replace('%s', name) : `${text(5214)}${name}${text(5215)}`);
+      return;
+    }
+    charCreate = null; realmCreate = false; screen = SCREEN.BNET_LOGIN;
+    bnetLoginScreen?.reset(); bnetLoginScreen?.fail(error);
+  }
 }
 function ensureCharCreate() {
   if (screen !== SCREEN.CREATE || charCreate || charCreateError) return;
   if (!window.__d2?.ready || window.__d2.error) return;
   try {
     charCreate = createCharacterCreate({
-      read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette,
+      realm: realmCreate, read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette,
       string: (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]),
       onCreate: ({ playerClass, name, checkboxes }) => {
         if (realmCreate) { createRealmCharacter({ playerClass, name, checkboxes }); return; }
@@ -3485,6 +3650,7 @@ function viewCX() {
 // the panel's: that is exactly the 461 px s251 read at x=400, the one column inside retail's panel
 // bbox where retail's own frame buffer shows shifted world rather than panel paint. s256 already does
 // this for the vendor panel as __d2HideShop.
+function partyView() { return { rows: partyRows(gameRoster, chosenName, partyLocal), own: ownState(gameRoster, chosenName, TOWN_LEVELS.includes(realmWorldView?.mapLevel)) }; }
 function panelShown(open) { return Boolean(open) && !globalThis.__d2HidePanel; }
 // SGD2FreeRes's art (not retail; staged by ci/stage.sh). Fill mode only -- ?parity=1 never loads it.
 let freeResArt = null, wideFrameEvidence = null;
@@ -4034,6 +4200,7 @@ function clientMonsters() {   // the capture's join box (the retail capture tool
 const FOLD_RENDER = !globalThis.navigator?.webdriver;
 let rafAt = -Infinity, renderOwed = false;
 function render(now = false) {
+  bnetInput.sync();   // the touch keyboard goes down once no Battle.net box takes text
   if (FOLD_RENDER && !now && !liveFrame && performance.now() - rafAt < 100) { renderOwed = true; return; }
   renderOwed = false;
   W?.park();
@@ -4201,6 +4368,15 @@ function drawRealmFrame() {
     realmSceneError = String(error); terrainError = realmSceneError;
     realmSceneEvidence.error = realmSceneError;
   }
+  if (bubbleRenderer && gameBubbles.size) {
+    const anchors = [...scenePlayers.filter((p) => p?.active && (p.x !== 0 || p.y !== 0)).map((p) => {
+      const sel = p.guid === source.guid, pt = sel ? null : worldToScreen(p.x, p.y);
+      return { key: `0:${p.guid}`, player: true, x: sel ? sx : pt.x - cam.x + sx, y: sel ? sy : pt.y - cam.y + sy };
+    }), ...realmMonsterViews.map((m) => { const pt = worldToScreen(m.x, m.y); return { key: `1:${m.guid}`, player: false, x: pt.x - cam.x + sx, y: pt.y - cam.y + sy }; })];
+    try { bubbleRenderer.draw(ctx, w, h, anchors, gameBubbles, performance.now(), realmWorldView.act + 1); } catch (error) { realmSceneEvidence.bubbleError = String(error); }
+  }
+  partyEvidence = null;
+  if (partyRenderer && partyVisible && realmFlow?.d2gs) partyEvidence = partyRenderer.draw(ctx, w, h, { act: realmWorldView.act + 1, ...partyView(), string: langStr, pointer, lootShown: true }, true);
   const transition = realmPlayerReassignFade.drawState(performance.now(), w, h);
   if (transition) {
     ctx.save();
@@ -4792,6 +4968,16 @@ function drawFrame() {
         strips: w > 800 && ensureFreeRes()?.ready ? (c) => { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); drawParts(c, freeResArt, barParts(w, h)); c.restore(); } : null,
         stamina: screen ? { value: screen[4], maximum: screen[5] } : null });
   }
+  // The mini-panel row's button hover text: name plus the keys bound to it (string.tbl 4169..4176, " (%s)" 4178).
+  const miniHoverTip = (w, h) => {
+    const bindings = controlsPanel?.bindings ?? bootControlBindings, slotOf = (n) => CONFIGURE_CONTROLS_SLOTS.findIndex((e) => e && e[0] === n);
+    for (let i = 0; i < 7; i++) {
+      const left = controlPanelRenderer.miniButtonScreenLeft(controlPanelEvidence, i, w);
+      const tip = left === null ? null : miniPanelTooltip(i, left, w, h, pointer.x, pointer.y, { lang: hudLang, bindings, slotOf });
+      if (tip) return tip;
+    }
+    return null;
+  };
   // Retail D2Client+0x26970/+0x278B0: XP / stamina bar hover text,
   // a centred Font16 plate (D2Win #10085: box = text + 8, bottom = y + 2, glyphs 3 above the bottom).
   if (controlPanelRenderer && !clearScreen && hoverFont) {
@@ -4800,7 +4986,7 @@ function drawFrame() {
     const tip = (adv && scr && hudBarTooltip(w, h, pointer.x, pointer.y, { experience: adv.experience, nextExperience: adv.nextExperience,
       stamina: scr[4], staminaMax: scr[5], fmtExp: hudLang(4163),
       fmtStamina: hudLang(4164) })) ||
-      levelButtonTooltip(lvIndex, w, h, [3986, 3987].map(hudLang));
+      levelButtonTooltip(lvIndex, w, h, [3986, 3987].map(hudLang)) || miniHoverTip(w, h);
     if (tip) {
       const bw = hoverFont.measure(tip.text) + 8, left = Math.min(Math.max(tip.x - (bw >> 1), 0), w - bw), bottom = tip.y + 2;
       ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(left, bottom - 16, bw, 16); ctx.restore();
@@ -5752,10 +5938,7 @@ function heldPointerCanRetargetWorld(x, y) {
     modalOwner, panelOwner: openPanelAt(x, y), overlayOwnsPointer });
 }
 
-function canvasPoint(event) {
-  const r = canvas.getBoundingClientRect();
-  return [(event.clientX - r.left) * canvas.width / r.width, (event.clientY - r.top) * canvas.height / r.height];
-}
+const canvasPoint = (event) => pointOnCanvas(canvas, event);
 hudHelpPointer = bindHudHelpPointer(canvas, {
   point: canvasPoint,
   hit: () => hudHelpEvidence?.hit,
@@ -5774,22 +5957,13 @@ addEventListener('keydown', (e) => {
   if (screen === SCREEN.CREDITS && e.code === 'Escape' && !e.repeat) { exitToTitle(); e.preventDefault(); return; }
   if (screen === SCREEN.CINEMATICS && e.code === 'Escape' && !e.repeat) { cinematicsScreen?.escape(); e.preventDefault(); return; }
   if (screen === SCREEN.OTHER_MULTIPLAYER && e.code === 'Escape' && !e.repeat) { otherMultiplayerScreen?.escape(); e.preventDefault(); return; }
-  // Retail's login edit boxes take the keyboard.
-  if (screen === SCREEN.BNET_LOGIN) {
-    if (e.code === 'Escape') { if (!e.repeat) bnetLoginScreen?.escape(); e.preventDefault(); return; }
-    if (!e.ctrlKey && !e.metaKey && !e.altKey && bnetLoginScreen?.typeKey(e.code, e.key)) { e.preventDefault(); render(); }
-    return;
-  }
-  // The lobby's chat line and the CREATE / JOIN panels' edit boxes.
-  if (screen === SCREEN.BNET_LOBBY) {
-    if (e.code === 'Escape') { if (!e.repeat) bnetLobbyScreen?.escape(); e.preventDefault(); render(); return; }
-    if (!e.ctrlKey && !e.metaKey && !e.altKey && bnetLobbyScreen?.typeKey(e.code, e.key)) { e.preventDefault(); render(); }
-    return;
-  }
+  // Retail's login edit boxes, and the lobby's chat line and CREATE / JOIN edit boxes, take the keyboard.
+  if (bnetInput.key(e)) return;
   if (screen === SCREEN.TITLE && titlePhase === 'menu' && titleScreen?.key(e.code)) {
     actMusic?.playTitle().catch((error) => { musicError = String(error); });
     e.preventDefault(); render(); return;
   }
+  if (screen === SCREEN.SELECT) { if (charSelect?.key(e.code)) { e.preventDefault(); render(); } return; }
   if (screen === SCREEN.CREATE) { if (charCreate?.typeKey(e.code, e.key)) e.preventDefault(); return; }
   // The amount box is modal. It gets Esc/Enter and numeric typing before the
   // global bindings, so Esc does not accidentally close the stash behind it.
@@ -5817,7 +5991,7 @@ addEventListener('keydown', (e) => {
   // V8c: Enter opens the chat bar; typing fills it; Enter posts `<name>: text` to the message log (single player echoes it); Esc closes.
   if (chat !== null) {
     if (e.code === 'Escape') chat = null;
-    else if (e.code === 'Enter') { if (chat) { messageLines.push(`ÿc4${chosenName || 'Player'}ÿc0: ${chat}`); postedAt = performance.now(); } chat = null; }
+    else if (e.code === 'Enter') { if (chat && realmSceneActive && realmFlow?.d2gs) sendGameLine(chat); else if (chat) { messageLines.push(`ÿc4${chosenName || 'Player'}ÿc0: ${chat}`); postedAt = performance.now(); } chat = null; }
     else if (e.code === 'Backspace') chat = chat.slice(0, -1);
     else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) chat += e.key;
     else return;
@@ -5846,6 +6020,7 @@ addEventListener('keydown', (e) => {
   if (configuredAction === 'Hireling Screen' && !e.repeat) { hirelingVisible = !hirelingVisible; if (hirelingVisible) { characterVisible = false; questVisible = false; } e.preventDefault(); return; }
   if (configuredAction === 'Character Screen' && !e.repeat) { characterVisible = !characterVisible; if (characterVisible) questVisible = hirelingVisible = false; e.preventDefault(); return; }
   if (configuredAction === 'Quest Log' && !e.repeat) { toggleQuest(); e.preventDefault(); return; }
+  if (configuredAction === 'Party Screen' && !e.repeat && realmFlow?.d2gs) { partyVisible = !partyVisible; if (partyVisible) questVisible = characterVisible = hirelingVisible = false; e.preventDefault(); return; }
   if (configuredAction === 'Message Log' && !e.repeat) { toggleMessage(); e.preventDefault(); return; }
   // Retail's Clear Messages binding clears both the message-log feed and the transient line
   // drawn over the world. The chat bar above owns its keystrokes, so N typed there remains text.
@@ -5861,7 +6036,7 @@ addEventListener('keydown', (e) => {
   // click where a hidden control used to be reaches the world instead of the invisible control (F3c).
   // F3c, retail's own frames: Space closes an open
   // panel and hides NO chrome -- the orbs, belt and mini panel stay drawn -- and with no panel open it does nothing.
-  if (configuredAction === 'Clear Screen' && !e.repeat) { inventoryVisible = characterVisible = skillsVisible = questVisible = messageVisible = hirelingVisible = false; e.preventDefault(); return; }
+  if (configuredAction === 'Clear Screen' && !e.repeat) { inventoryVisible = characterVisible = skillsVisible = questVisible = messageVisible = hirelingVisible = partyVisible = false; e.preventDefault(); return; }
   // Retail's right-hand skill selector (`CfgSkillPick`; OpenDiablo2's ToggleRightSkillSelector is
   // KeyS): the SAME primitive as a click on the right socket, so there is one popup and one owner --
   // what it lists and what it selects is the engine's, exactly as the clicked path is.
@@ -5927,6 +6102,7 @@ addEventListener('keydown', (e) => {
     closeCubeWindow();
     e.preventDefault(); return; }
   if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && gameMenu?.open) { gameMenu.back(); e.preventDefault(); return; }
+  if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && partyVisible) { partyVisible = false; e.preventDefault(); return; }
   if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && (messageVisible || questVisible) && !(waypointMenu || stashOpen || npcState || inventoryVisible || hirelingVisible || characterVisible || skillsVisible)) { messageVisible = false; questVisible = false; e.preventDefault(); return; }
   if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && !(waypointMenu || stashOpen || npcState || inventoryVisible || hirelingVisible || characterVisible || skillsVisible)) {
     ensureGameMenu()?.toggle(); e.preventDefault(); return;
@@ -5959,7 +6135,7 @@ document.addEventListener('visibilitychange', () => {
     inventoryGoldPress = null; inventoryClosePress = null; cubeClosePress = null; clearStashGoldPress();
   }
 });
-canvas.addEventListener('wheel', (e) => { if (npcMenu?.hireOpen) { npcMenu.hireScroll(Math.sign(e.deltaY)); e.preventDefault(); } }, { passive: false });
+canvas.addEventListener('wheel', (e) => { if (bnetInput.wheel(e)) return; if (npcMenu?.hireOpen) { npcMenu.hireScroll(Math.sign(e.deltaY)); e.preventDefault(); } }, { passive: false });
 // The front-end screen that takes hover right now, as { key, hover(x, y) }; a screen entered or rebuilt under a still mouse is seeded from frontendHoverSync.
 function frontendHoverTarget() {
   const at = (o, f) => (o ? { key: o, hover: (x, y) => f(x, y, canvas.width, canvas.height) } : null);
@@ -5974,6 +6150,7 @@ function frontendHoverTarget() {
 }
 canvas.addEventListener('pointermove', (e) => {
   gameCursor?.noteInput();
+  if (bnetInput.move(e)) return;
   const [x, y] = canvasPoint(e);
   pointer.x = x; pointer.y = y;
   if (session && !clearScreen) { const o = hudOrigin(canvas.width, canvas.height, 'bottom'), all = readBeltBoxes(); beltPopup.mouseMove(x - o.x, y - o.y, 800, 600, all, popupRows(readBeltIndex(), all?.length)); }
@@ -6001,11 +6178,6 @@ canvas.addEventListener('pointerleave', (e) => {
   else if (screen === SCREEN.SELECT) charSelect?.hover(-1, -1, canvas.width, canvas.height);
   else if (screen === SCREEN.CREATE) charCreate?.setPointer(-1, -1, canvas.width, canvas.height);
 });
-// The lobby's chat line and CREATE / JOIN edit boxes on a touch screen: a hidden input raises the keyboard.
-const lobbyTextEntry = createTouchTextEntry({
-  typeKey: (code, key) => { bnetLobbyScreen?.typeKey(code, key); },
-  getValue: () => (screen === SCREEN.BNET_LOBBY ? bnetLobbyScreen?.editValue() ?? null : null),
-  onChange: () => render(), onBlur: () => canvas.focus() });
 canvas.addEventListener('pointerdown', (e) => {
   gameCursor?.noteInput();
   const altFix = altSync(configuredActionForKey('AltLeft') === 'Show Items', e.altKey, heldShowItemsKeys.has('AltLeft'));
@@ -6075,6 +6247,7 @@ canvas.addEventListener('pointerdown', (e) => {
     // the control it went down on. The press is also what puts the button in its down cel -- hover
     // alone never does. TITLE keeps titleAdvance(): the trademark phase owns its own countdown, so
     // a press during it arms the phase rather than reaching the menu behind it (s198).
+    if (bnetInput.down(e)) { canvas.focus(); e.preventDefault(); return; }   // a lobby scrollbar grabbed
     frontendPointerStates.press(e.pointerId, frontendPointerControl(), tx, ty, canvas.width, canvas.height, e.button);
     canvas.focus(); e.preventDefault(); return;
   }
@@ -6124,6 +6297,12 @@ canvas.addEventListener('pointerdown', (e) => {
     else { const dir = messageLogRenderer.hitScroll(x, y, canvas.width, canvas.height);   // V8d: one arrow click scrolls ONE line
       if (dir) messageScroll = Math.max(0, Math.min(messageScrollMax(messageLines.length), messageScroll + (dir === 'down' ? 1 : -1))); }
     click.spent = 'message-log'; canvas.focus(); e.preventDefault(); return;
+  }
+  if (e.button === 0 && screen === SCREEN.GAME && partyVisible && partyRenderer && partyEvidence) {
+    const view = partyView(), hit = partyRenderer.hit(x, y, canvas.width, canvas.height, view);
+    if (hit?.close) partyVisible = false;
+    else { const r = partyClickResult(hit, view.own); if (r) { realmFlow.d2gs.send(r.packet); if (r.patch?.flags !== undefined) { if (gameRoster.set) gameRoster.set(hit.row.id, { flags: r.patch.flags }); else partyLocal.set(hit.row.id, { flags: r.patch.flags }); } } }
+    if (hit) { click.spent = 'party'; canvas.focus(); e.preventDefault(); return; }
   }
   if (e.button === 0 && screen === SCREEN.GAME && questVisible && questLogRenderer && questEvidence) {
     const words = readQuestWords(), hit = questLogRenderer.hit(x, y, canvas.width, canvas.height, questEvidence.tabs, questEvidence.act);
@@ -6863,16 +7042,15 @@ canvas.addEventListener('pointerup', (e) => {
   }
   if (!(screen === SCREEN.TITLE || screen === SCREEN.CREDITS || screen === SCREEN.CINEMATICS || screen === SCREEN.OTHER_MULTIPLAYER || screen === SCREEN.BNET_LOGIN || screen === SCREEN.BNET_LOBBY || screen === SCREEN.CREATE || screen === SCREEN.SELECT)) return;
   const [x, y] = canvasPoint(e);
+  if (bnetInput.dragEnd(e)) { canvas.focus(); e.preventDefault(); return; }
   frontendPointerStates.release(e.pointerId, frontendPointerControl(), x, y, canvas.width, canvas.height, e.button);
-  if (screen === SCREEN.BNET_LOBBY && bnetLobbyScreen) {
-    if ((bnetLobbyScreen.editAt(x, y, canvas.width, canvas.height) || e.pointerType === 'touch') && lobbyTextEntry.open()) { e.preventDefault(); return; }
-    lobbyTextEntry.close();
-  }
+  if ((screen === SCREEN.BNET_LOBBY || screen === SCREEN.BNET_LOGIN) && bnetInput.tap(e)) { e.preventDefault(); return; }
   canvas.focus(); e.preventDefault();
 });
 // Browsers cancel a touch for an interruption or a gesture the page is not handling; that gesture
 // is over, so it must neither activate its control later nor keep drawing it pressed.
 canvas.addEventListener('pointercancel', (e) => {
+  bnetInput.dragEnd(e);
   if (miniPointerId === e.pointerId) { miniDown = -1; miniPointerId = null; render(); }
   if (npcMenuPointerPress?.pointerId === e.pointerId) npcMenuPointerPress = null;
   if (cancelInventoryClosePress(stashClosePress, e.pointerId)) { stashClosePress = null; render(); }

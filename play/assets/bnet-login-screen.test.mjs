@@ -65,7 +65,7 @@ test('validation order: change password and change email', () => {
 
 test('CHANGE PASSWORD: a rule failure raises the notice whose OK rebuilds the form; success logs on with the new password', async () => {
   const calls = [], logons = [];
-  const s = screen({ onChangePassword: async (r) => { calls.push(r); return 0; }, onAuthenticate: async (r) => { logons.push(r); } });
+  const s = screen({ onChangePassword: async (r) => { calls.push(r); return 1; }, onAuthenticate: async (r) => { logons.push(r); } });
   s.activate('settings'); s.activate('change-password');
   type(s, 'old1'); s.typeKey('Tab'); type(s, 'new1'); s.typeKey('Tab'); type(s, 'new2');
   s.activate('cpass-ok'); await tick();
@@ -77,13 +77,18 @@ test('CHANGE PASSWORD: a rule failure raises the notice whose OK rebuilds the fo
   assert.deepEqual(logons, [{ account: 'Ama', password: 'new1' }]);
 });
 
-test('CHANGE PASSWORD refused by the realm reopens the form; a dead socket shows the disconnect notice', async () => {
-  let result = 1;
-  const s = screen({ onChangePassword: async () => { if (result === 'x') throw new Error('down'); return result; } });
+test('CHANGE PASSWORD refused by the realm shows the login failure box (11107 on a repeat) whose OK returns to login; a dead socket shows the disconnect notice', async () => {
+  let result = 0;
+  const logons = [];
+  const s = screen({ lastAccount: 'Refused', onAuthenticate: async (r) => { logons.push(r); }, onChangePassword: async () => { if (result === 'x') throw new Error('down'); return result; } });
   const fill = () => { s.activate('settings'); s.activate('change-password'); type(s, 'o1'); s.typeKey('Tab'); type(s, 'n1'); s.typeKey('Tab'); type(s, 'n1'); s.activate('cpass-ok'); };
   fill(); await tick(); await tick();
-  assert.ok(s.evidence.message); s.activate('ok'); assert.equal(s.mode, 'cpass');
-  s.escape(); s.escape(); s.reset(); result = 'x'; fill(); await tick(); await tick();
+  assert.deepEqual([s.evidence.message.title, s.evidence.message.body], ['s5244', 's5207']);
+  s.activate('ok'); assert.equal(s.mode, 'login');
+  fill(); await tick(); await tick();
+  assert.deepEqual([s.evidence.message.title, s.evidence.message.body], ['s5244', 's11107']);
+  s.activate('ok'); assert.equal(s.mode, 'login'); assert.equal(logons.length, 0);
+  result = 'x'; fill(); await tick(); await tick();
   assert.equal(s.evidence.notice.body, 's5347'); s.activate('notice-ok'); assert.equal(s.mode, 'login');
 });
 
@@ -94,8 +99,18 @@ test('GET NEW PASSWORD sends account and email, shows the receipt, OK returns to
   s.typeKey('Backspace'); type(s, 'Z'); s.typeKey('Tab'); type(s, 'a@b.c');
   s.activate('gpass-ok'); await tick(); await tick();
   assert.deepEqual(calls, [{ account: 'AmZ', email: 'a@b.c' }]);
-  assert.deepEqual(s.evidence.message, { title: '', body: 's11104', then: s.evidence.message.then });
+  assert.deepEqual(s.evidence.message, { title: '', body: 's11104', form: true, then: s.evidence.message.then });
   s.activate('ok'); assert.equal(s.mode, 'login');
+});
+
+test('GET NEW PASSWORD and CHANGE EMAIL with an empty argument send nothing and show the disconnect notice', async () => {
+  const s = screen({ onResetPassword: (r) => bncsResetPassword({}, {}, r), onChangeEmail: (r) => bncsChangeEmail({}, {}, r) });
+  s.activate('settings'); s.activate('get-password'); s.activate('gpass-ok'); await tick(); await tick();
+  assert.equal(s.evidence.notice.body, 's5347'); s.activate('notice-ok');
+  s.activate('settings'); s.activate('change-email');
+  s.typeKey('Tab'); type(s, 'a@b'); s.typeKey('Tab'); type(s, 'c@d'); s.typeKey('Tab'); type(s, 'c@d');
+  s.activate('cemail-ok'); await tick(); await tick();
+  assert.equal(s.evidence.notice.body, 's5347');
 });
 
 test('CHANGE EMAIL: mismatch and same-address popups reopen the form; a valid SEND returns to login', async () => {
@@ -137,13 +152,76 @@ test('request bytes: RESETPASSWORD and CHANGEEMAIL are C strings; CHANGEPASSWORD
   const email = await run((t, p) => bncsChangeEmail(t, p, { account: 'Ama', oldEmail: 'a@b', newEmail: 'c@d' }), [authInfo]);
   assert.deepEqual(email.frames.map((f) => f[0]), [0x50, 0x5b]);
   assert.deepEqual(email.frames[1][1], [...text('Ama'), ...text('a@b'), ...text('c@d')]);
-  const change = await run((t, p) => bncsChangePassword(t, p, { account: 'Ama', password: 'old', newPassword: 'New' }), [authInfo, reply(0x31, [0, 0, 0, 0])]);
-  assert.equal(change.result, 0);
+  const change = await run((t, p) => bncsChangePassword(t, p, { account: 'Ama', password: 'old', newPassword: 'New' }), [authInfo, reply(0x31, [1, 0, 0, 0])]);
+  assert.equal(change.result, 1);
   const body = change.frames[1][1];
   assert.equal(change.frames[1][0], 0x31);
   assert.deepEqual(body.slice(0, 28), Array.from({ length: 28 }, (_, i) => i));
   assert.equal(body.length, 28 + 20 + 4);
   assert.deepEqual(body.slice(48), [0x41, 0x42, 0x43, 0x44]);
-  const denied = await run((t, p) => bncsChangePassword(t, p, { account: 'Ama', password: 'old', newPassword: 'x' }), [authInfo, reply(0x31, [1, 0, 0, 0])]);
-  assert.equal(denied.result, 1);
+  const denied = await run((t, p) => bncsChangePassword(t, p, { account: 'Ama', password: 'old', newPassword: 'x' }), [authInfo, reply(0x31, [0, 0, 0, 0])]);
+  assert.equal(denied.result, 0);
+});
+
+test('the email forms draw SEND disabled until the addresses look valid, and a click on it does nothing', async () => {
+  const { emailLooksValid } = await import('./bnet-login-screen.mjs');
+  assert.deepEqual(['a@b.c', 'a@b.cc', 'a@bc.d'].map(emailLooksValid), [true, true, true]);
+  assert.deepEqual(['', 'a@b', '@b.c', 'a@.c', 'a@b.', 'ab.c@d', 'a.b'].map(emailLooksValid), [false, false, false, false, false, false, false]);
+  const s = screen({ onResetPassword: async () => {} });
+  s.activate('settings'); s.activate('get-password');
+  const target = () => s.targets(800, 600)['gpass-ok'];
+  assert.equal(s.press(...target(), 800, 600), null);
+  s.typeKey('Tab'); type(s, 'a@b.c');
+  assert.equal(s.press(...target(), 800, 600), 'gpass-ok');
+});
+
+// Boundaries of the rules the decompile shows (D2Launch+0x19880 create OK and +0x1A030 change password OK: account
+// 2..15 long, then the passwords match without regard to case, then the new password 2..20 long; +0x122C0 LOG IN
+// and +0x126C0 the account box's character filter). The first failing rule in that order is the one that counts.
+test('create and change password rules sit on retail boundaries, in retail order', async () => {
+  const { createAccountError, BNET_CREATE_ERROR_STRINGS: S, accountCharAllowed, loginEnabled } = await import('./bnet-login-screen.mjs');
+  assert.equal(createAccountError('a', 'pw', 'pw'), S.accountShort);
+  assert.equal(createAccountError('ab', 'pw', 'pw'), null);
+  assert.equal(createAccountError('a'.repeat(15), 'pw', 'pw'), null);
+  assert.equal(createAccountError('a'.repeat(16), 'pw', 'pw'), S.accountLong);
+  assert.equal(createAccountError('ab', 'pw', 'PW'), null);
+  assert.equal(createAccountError('ab', 'pw', 'px'), S.mismatch);
+  assert.equal(createAccountError('a', 'pw', 'px'), S.accountShort, 'account length is tested before the match');
+  assert.equal(createAccountError('ab', 'p', 'p'), S.passwordShort);
+  assert.equal(createAccountError('ab', 'pp', 'pp'), null);
+  assert.equal(createAccountError('ab', 'p'.repeat(21), 'p'.repeat(21)), S.passwordLong);
+  assert.equal(createAccountError('ab', 'p'.repeat(20), 'p'.repeat(20)), null);
+  assert.equal(changePasswordError('ab', 'pp', 'PP'), null);
+  assert.equal(changePasswordError('ab', 'p', 'p'), S.passwordShort);
+  assert.deepEqual([loginEnabled('', 'x'), loginEnabled('a', ''), loginEnabled('a', 'x'.repeat(13)), loginEnabled('a', 'x'.repeat(14)),
+    loginEnabled('a'.repeat(50), 'x'), loginEnabled('a'.repeat(51), 'x')], [false, false, true, false, true, false]);
+  assert.deepEqual([' ', '"', '\\', '\x7f', '!', '~', 'A'].map(accountCharAllowed), [false, false, false, false, true, true, true]);
+});
+
+test('an unmapped login failure shows the status-0x12 box (title 5248, body 5347), never the engine English text', async () => {
+  const { loginErrorBody, loginErrorMessage } = await import('./bnet-login-screen.mjs');
+  const string = (i) => `s${i}`;
+  assert.equal(loginErrorBody(new Error('AUTH_CHECK rejected the version (result 0x100)'), 'Ama', string), 's5347');
+  assert.equal(loginErrorBody(Object.assign(new Error('x'), { logonResult: 9 }), 'Ama', string), 's5347');
+  assert.equal(loginErrorBody(new TypeError('socket closed'), 'Ama', string), 's5347');
+  assert.equal(loginErrorBody({ logonResult: 1 }, 'Ama', string), 's5208');
+  assert.deepEqual(loginErrorMessage(new TypeError('x'), 'Ama', string), { title: 's5248', body: 's5347' });
+  assert.deepEqual(loginErrorMessage(Object.assign(new Error('x'), { authResult: 0x100 }), 'Ama', string), { title: 's5248', body: 's5347' });
+  assert.deepEqual(loginErrorMessage({ logonResult: 1 }, 'Ama', string), { title: 's5244', body: 's5208' });
+});
+
+test('AUTH_CHECK refusals pick the key and version boxes Bnclient+0x11330 and D2Launch+0xE510 pick', async () => {
+  const { loginErrorMessage } = await import('./bnet-login-screen.mjs');
+  const string = (i) => `s${i}`;
+  const m = (authResult, authInfo) => loginErrorMessage(Object.assign(new Error('x'), { authResult, authInfo }), 'Ama', string);
+  assert.deepEqual(m(0x101), { title: 's5245', body: 's5187\ns5188' });
+  assert.deepEqual(m(0x102), { title: 's5245', body: 's5187\ns5188' });
+  assert.deepEqual(m(0x200), { title: 's5247', body: 's5186\ns5194' });
+  assert.deepEqual(m(0x210), { title: 's5247', body: 's10912\ns5194' });
+  assert.deepEqual(m(0x201, 'Bob'), { title: 's5247', body: 's5200\nBob\ns5201' });
+  assert.deepEqual(m(0x211, 'Bob'), { title: 's5247', body: 's10914\nBob\ns5201' });
+  assert.deepEqual(m(0x202), { title: 's5247', body: 's5199' });
+  assert.deepEqual(m(0x212), { title: 's5247', body: 's10913' });
+  assert.deepEqual(m(0x203), { title: 's5247', body: 's5202' });
+  assert.deepEqual(m(0x213), { title: 's5247', body: 's5202' });
 });

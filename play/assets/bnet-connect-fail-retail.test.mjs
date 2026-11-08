@@ -1,0 +1,77 @@
+// The two connect-failure notices against retail's own frames (headless front-end capture of 1.13c D2Launch with the realm
+// connection failing): the large popup raised for a dead connection at LOG IN (string 5189 with the small print 5190), its OK
+// hovered, pressed and released into the main menu; and the small notice raised when the terms cannot be fetched (string 5347),
+// its OK leading to the same menu. Identity is path + frame + colour shift, the anchor and the mode, in call order. Skipped
+// without the retail archives or the captures.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { openRetail } from '../../tools/dcc-decode-bench.mjs';
+import { decodeDc6, decodeDatPalette } from './d2-formats.mjs';
+import { diffDrawLists, parseDrawListVector } from './drawlist.mjs';
+import { createBnetLoginScreen } from './bnet-login-screen.mjs';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const vec = (name) => join(root, 'vectors', 'drawlist', `${name}.txt`);
+const NAMES = ['connect-fail', 'connect-fail-hover', 'connect-fail-press', 'connect-fail-menu', 'tos-fail-notice', 'tos-fail-menu'];
+const have = NAMES.every((n) => existsSync(vec(`bnet-${n}`)));
+const rd = have ? openRetail() : null;
+
+// D2Lang indices as the screen asks: below 10000 string.tbl, 10000s patchstring.tbl, 20000s expansionstring.tbl.
+function stringTable(read) {
+  const tbl = (name, i) => { const d = Buffer.from(read(`data\\local\\lng\\eng\\${name}.tbl`)); const n = d.readUInt16LE(2);
+    const e = 21 + n * 2 + d.readUInt16LE(21 + i * 2) * 17, vo = d.readUInt32LE(e + 11); return d.toString('latin1', vo, d.indexOf(0, vo)); };
+  return { get: (i) => (i < 10000 ? tbl('string', i) : i < 20000 ? tbl('patchstring', i - 10000) : tbl('expansionstring', i - 20000)) };
+}
+globalThis.ImageData ??= class { constructor(data, w, h) { Object.assign(this, { data, width: w, height: h }); } };
+const ctx = new Proxy({}, { get: (t, k) => (k in t ? t[k] : (t[k] = () => ({ data: new Uint8ClampedArray(4) }))), set: (t, k, v) => { t[k] = v; return true; } });
+const documentObject = { createElement: () => ({ width: 1, height: 1, getContext: () => ctx }) };
+
+
+const transport = (m) => Object.assign(new Error(m), { transport: true });
+const tick = () => new Promise((r) => setTimeout(r, 0));
+const clock = { ms: 0 };
+async function failed(which) {
+  clock.ms = 0;
+  const strings = stringTable(rd);
+  const screen = createBnetLoginScreen({ read: rd, decodeDc6, decodeDatPalette, string: (i) => strings.get(i) ?? '', documentObject, region: 'test', now: () => clock.ms,
+    onTermsOfService: async () => { throw transport('x'); }, onAuthenticate: async () => { throw transport('x'); }, onExit: () => { screen.left = (screen.left ?? 0) + 1; } });
+  if (which === 'terms') { screen.activate('create'); await tick(); } else { screen.typeKey('KeyA', 'a'); screen.typeKey('Tab', 'Tab'); screen.typeKey('KeyP', 'p'); screen.activate('login'); await tick(); }
+  return screen;
+}
+// The capture's login fields are empty (LOG IN greyed); ours hold the two characters that let the request go, so the
+// login form's own records (login button, edit text) are left out -- bnet-login-retail covers them.
+const identity = (l) => l.filter((r) => (r.op === 'cel' || r.op === 'celcolor') && !/ohand|fontformal12|3widebuttonblank/i.test(r.path))
+  .map((r) => ({ ...r, path: `${r.path}#${r.extra ?? 0}`, hash: 0 }));
+
+function compare(name, screen) {
+  globalThis.__d2DrawList = [];
+  try { screen.draw(ctx, 800, 600); } finally { var l = globalThis.__d2DrawList; delete globalThis.__d2DrawList; }
+  const retail = identity(parseDrawListVector(readFileSync(vec(name), 'utf8')));
+  const ours = identity(l);
+  const d = diffDrawLists(retail, ours);
+  const show = (x) => `${x.op} ${x.path} #${x.frame} @${x.x},${x.y} m${x.mode}`;
+  console.log(`${name}: retail ${retail.length}, ours ${ours.length}, differing records ${d.diffs} (missing ${d.missing.length}, extra ${d.extra.length}, differing ${d.differing.length})`);
+  for (const m of d.missing.slice(0, 10)) console.log('  missing', show(m));
+  for (const m of d.extra.slice(0, 10)) console.log('  extra', show(m));
+  for (const m of d.differing.slice(0, 10)) console.log('  differs', m.draw, m.diff);
+  assert.ok(diffDrawLists(retail, ours.slice(0, -1)).diffs > 0, 'the comparison cannot fail');
+  assert.equal(d.diffs, 0);
+}
+
+test('a dead connection at LOG IN raises the large popup; hover changes nothing, press moves the OK label, OK leaves for the menu', { skip: !rd }, async () => {
+  const s = await failed('login');
+  compare('bnet-connect-fail', s);
+  s.hover(380, 440, 800, 600); compare('bnet-connect-fail-hover', s);
+  clock.ms = 40; // the capture draws the logos at frame 1 on this tick
+  const token = s.press(380, 440, 800, 600); assert.equal(token, 'notice-ok'); compare('bnet-connect-fail-press', s);
+  assert.ok(s.release(token, 380, 440, 800, 600)); assert.equal(s.left, 1);
+});
+test('terms that cannot be fetched raise the disconnect notice, OK leaves for the menu', { skip: !rd }, async () => {
+  const s = await failed('terms');
+  compare('bnet-tos-fail-notice', s);
+  const token = s.press(400, 330, 800, 600); assert.equal(token, 'notice-ok');
+  assert.ok(s.release(token, 400, 330, 800, 600)); assert.equal(s.left, 1);
+});

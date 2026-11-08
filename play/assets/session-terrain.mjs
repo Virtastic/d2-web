@@ -713,6 +713,9 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     }
     ctx.putImageData(img, x0, y0); return true;
   };
+  // PERF: the fade key is a seven-field string; a tile never changes it, so it is built once per tile, not per wall per frame.
+  const fadeKeys = new WeakMap();
+  const fadeKeyOf = (t) => { let k = fadeKeys.get(t); if (k === undefined) fadeKeys.set(t, k = `${t.room}:${t.ordinal}:${t.worldX}:${t.worldY}:${t.orientation}:${t.mainIndex}:${t.subIndex}`); return k; };
   const roofFade = createRoofFades();   // F66b: per-tile alpha of hidden walls
   let lightAmbient = null;   // the light map's ambient: roofs are lit flat at it
   let lightCell = null;   // (subtileX, subtileY) -> the light map cell, for walls
@@ -1114,7 +1117,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       // One sample per frame for the wall/overlay/roof pass, with the unit draws and the hidden-wall
       // FADED blend accumulated out of it so each is attributable on its own.
       const pWall = perfT0();
-      let unitsMs = 0, fadeMs = 0;
+      let unitsMs = 0, fadeMs = 0, cellsMs = 0, litMs = 0, blitMs = 0;
       const key = overlayKey;
       // Roofs (orientation 15) are retail's LAST terrain pass: every roof draw in arrival, the Den and the
       // Cold Plains captures follows every wall and unit (arrival.txt: the six tent roofs at the end,
@@ -1201,9 +1204,11 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
           // 32-px block reads is the question the gate frame asks). Off unless __d2TraceWalls is an
           // array; never populated otherwise, and it changes no drawing.
           const t = o.tile, fade = t.layer === 1 && t.hidesPlayer !== undefined
-            ? roofFade(`${t.room}:${t.ordinal}:${t.worldX}:${t.worldY}:${t.orientation}:${t.mainIndex}:${t.subIndex}`, t.hidesPlayer, (globalThis.__d2Now || Date.now)()) : 0xff;
+            ? roofFade(fadeKeyOf(t), t.hidesPlayer, (globalThis.__d2Now || Date.now)()) : 0xff;
+          const pc = perfT0();
           const sampledCells = !roofGrid ? sampleWallCells(o.tile, o.dt1Tile, A, B) : null;
           const wallE = at && sampledCells ? sampledCells.map(([a, b]) => at(a, b)) : null;
+          cellsMs += perfT0() - pc;
           if (globalThis.__d2TraceWalls) globalThis.__d2TraceWalls.push({ x: o.x, y: o.y, path: files[o.slot], want: o.want, o: o.tile.orientation,
             dt1Tile: o.dt1Tile, A, B, hidden: Boolean(o.tile.hidesPlayer), room: o.tile.room, ordinal: o.tile.ordinal,
             cells: sampledCells, E: wallE, roof: Boolean(roofGrid), fade });
@@ -1214,13 +1219,15 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
           if (globalThis.__d2TraceBlits && wallE) globalThis.__d2TraceBlits.push({ x: o.x, y: o.y, path: files[o.slot], want: o.want, variantNo: o.variantNo,
             dt1Tile: o.dt1Tile, orientation: o.tile.orientation, hidden: Boolean(o.tile.hidesPlayer), room: o.tile.room,
             ordinal: o.tile.ordinal, cells: sampledCells, E: wallE, a: A, b: B, wall: true });
+          const pl = perfT0();
           const lit = roofGrid ? litFloor(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo, roofGrid, o.x, o.y, roofGrid.key) : wallE && litWall(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo, wallE, fade < 255);
+          litMs += perfT0() - pl;
           // F66b: a wall the client hides fades to retail's transparent entry's alpha (roof-fade.mjs); alpha 0 draws nothing.
           if (fade > 0 && !(globalThis.__d2SkipFaded && fade < 255)) {   // __d2SkipFaded: a probe drawing the frame WITHOUT the hidden walls (their blend needs the pixel under them)
             const pf = perfT0();
             if (fade < 255 && !globalThis.__d2CanvasAlphaFade && drawFaded(ctx, o, lit, fade)) { /* per-pixel PL2 blend, like retail's entry 40 */ }
             else { const prev = ctx.globalAlpha; ctx.globalAlpha = prev * fade / 255; ctx.drawImage(lit || cv(o.bitmap), o.x, o.y); ctx.globalAlpha = prev; }   // no PL2 / unlit: the canvas-alpha stand-in
-            fadeMs += perfT0() - pf;
+            const dt = perfT0() - pf; fadeMs += dt; blitMs += dt;
           }
         }
         drawn++; recordTile(o, files);
@@ -1228,6 +1235,9 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       perfT('terrain-wall', pWall);
       perfSample('units', unitsMs);
       perfSample('terrain-fade', fadeMs);
+      perfSample('wall-cells', cellsMs);
+      perfSample('wall-lit', litMs);
+      perfSample('wall-blit', blitMs);
       // Identity of every blit (level 2 evidence): which file, which (orientation:main:sub) was asked
       // for and drawn, and the screen box it covers -- so a wrong patch on screen names its tiles.
       const blits = floors.concat(walls).map((e) => ({ file: e.file, want: e.want, got: e.got, variant: e.variant,

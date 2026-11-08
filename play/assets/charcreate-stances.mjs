@@ -37,6 +37,8 @@ export function createHeroStances(heroes, { retailHz = 25, updateHz = 60 } = {})
 
   return {
     settle,
+    /** Every hero back to its idle pose, as a freshly built screen has them. */
+    reset() { for (const state of states) { state.stance = HERO_STANCE.IDLE; state.since = 0; } },
     stance(index, now) { settle(now); return states[index]?.stance ?? HERO_STANCE.IDLE; },
     elapsed(index, now) {
       settle(now);

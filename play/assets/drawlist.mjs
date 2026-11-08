@@ -153,7 +153,7 @@ export function parseDrawListVector(text) {
  * at most once: unpaired on either side, or paired but out of order, at another anchor, or in another
  * draw mode.
  */
-export function diffDrawLists(retail, ours) {
+export function diffDrawLists(retail, ours, { colour = null } = {}) {
   const key = (r) => `${r.op} ${r.path} ${r.frame} ${r.hash ?? ''}`;
   const a = retail.map(key), b = ours.map(key);
   const n = a.length, m = b.length;
@@ -188,6 +188,7 @@ export function diffDrawLists(retail, ours) {
     if (!inOrder) d.push('out of call order');
     if (r.x !== o.x || r.y !== o.y) d.push(`at ${o.x},${o.y} not ${r.x},${r.y} (${o.x - r.x >= 0 ? '+' : ''}${o.x - r.x},${o.y - r.y >= 0 ? '+' : ''}${o.y - r.y})`);
     if (r.mode !== o.mode) d.push(`mode ${o.mode} not ${r.mode}`);
+    if (colour && r.op === 'celcolor' && colour(r) && (r.extra ?? 0) !== (o.extra ?? 0)) d.push(`colour ${o.extra} not ${r.extra}`);
     if (d.length) differing.push({ draw: key(r), diff: d.join(', ') });
   }
   const identical = pairs.length - differing.length;

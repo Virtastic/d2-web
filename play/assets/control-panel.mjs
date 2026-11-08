@@ -215,6 +215,12 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
   // The mini-panel icon under (x, y) on the boxes the LAST frame placed: index into miniButtons.frames, or -1.
   const hitMiniButton = (evidence, x, y, width, height) => (evidence?.hud?.miniPanel?.buttons || [])
     .findIndex((b) => hitControlBox(b, x, y, width, height));
+  // The button column the pointer is over for the hover text (retail tests the 20-wide column inside the row's
+  // box, strictly, not the button art): its index and its left edge in screen pixels.
+  const miniButtonScreenLeft = (evidence, index, width) => {
+    const b = evidence?.hud?.miniPanel?.buttons?.[index], scale = Math.min(1, width / 800);
+    return b ? panelOriginX(width, scale) + b.left * scale : null;
+  };
   const hitRunButton = (evidence, x, y, width, height) => hitControlBox(evidence?.hud?.runButton, x, y, width, height);
   function draw(ctx, width, height, snapshot, advancement, hud = {}) {
     const scale = Math.min(1, width / 800), x0 = panelOriginX(width, scale), y0 = height - CONTROL_LAYOUT.height * scale;
@@ -354,7 +360,7 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
   const hitLevelButton = (evidence, x, y, width, height) => (evidence?.hud?.levelButtons || [])
     .findIndex((b) => (b.frame === HUD_LAYOUT.levelButtons.litFrame || b.frame === HUD_LAYOUT.levelButtons.pressedFrame)
       && hitControlBox(b, x, y, width, height));
-  return { draw, hitMenuButton, hitRunButton, hitMiniButton, hitLevelButton };
+  return { draw, hitMenuButton, hitRunButton, hitMiniButton, miniButtonScreenLeft, hitLevelButton };
 }
 
 // ---- Row 2 (touch): the console gap a shift rest finger may land on ----------------------------

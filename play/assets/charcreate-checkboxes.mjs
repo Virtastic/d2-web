@@ -66,6 +66,8 @@ export function createCharacterCreateCheckboxes({ read, decodeDc6, palette, smal
     // ARE retail's client save flags (Expansion/Hardcore), and the shell is what turns them into
     // d2_session_set_client_flags. Nothing else in the client keeps a second copy of them.
     states() { return { ...states }; },
+    /** Both boxes back to the state a freshly built screen has them in. */
+    reset() { for (const entry of CHARACTER_CREATE_CHECKBOXES.entries) states[entry.key] = entry.initial; },
     targets() {
       return Object.fromEntries(CHARACTER_CREATE_CHECKBOXES.entries.map((entry) => {
         const target = box(entry);

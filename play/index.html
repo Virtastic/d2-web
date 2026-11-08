@@ -52,6 +52,10 @@
     padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
   main{width:min(var(--d2-vw),1000px);padding:16px}
   h1{font:26px/30px Georgia,serif;height:30px;color:#c9ad68;margin:0 0 10px;letter-spacing:.08em}
+  /* The game draws all of its own text from the game's font files; the page's web-font text stays in the DOM for
+     assistive tech and scripts but is not painted. */
+  h1,.controls,#log,#session-bar{visibility:hidden}
+  .controls,#log,#session-bar{height:0;margin:0;overflow:hidden}
   /* the largest 4:3 box that fits BOTH main's own width budget (unchanged) and the viewport's
      height (new) -- width is the min of the two so aspect-ratio (definite width -> derived height)
      never needs to guess; margin:auto centres it when the height term wins. The -60px is what sits

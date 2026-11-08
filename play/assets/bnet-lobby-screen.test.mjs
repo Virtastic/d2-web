@@ -8,7 +8,7 @@ const ctx = new Proxy({}, { get: (_, k) => (k === 'getImageData' ? () => ({ data
 const documentObject = { createElement: () => ({ width: 0, height: 0, getContext: () => ctx }) };
 const frame = { width: 1, height: 1, offsetX: 0, offsetY: 0, indices: new Uint8Array(1), opaque: new Uint8Array([1]) };
 const strings = { 4057: 'Level', 4011: 'Amazon', 4009: 'Necromancer', 11124: 'Last Difficulty Setting Completed:', 11125: 'None', 5156: 'Normal', 5155: 'Nightmare', 5154: 'Hell', 5138: 'A Game Already Exists With That Name' };
-const screen = (character, hooks = {}) => createBnetLobbyScreen({ read: (path) => (path.endsWith('.tbl') ? tbl : new Uint8Array(1 << 22)), decodeDc6: () => ({ frames: [frame, frame, frame, frame] }),
+const screen = (character, hooks = {}) => createBnetLobbyScreen({ read: (path) => (path.endsWith('.tbl') ? tbl : new Uint8Array(1 << 22)), decodeDc6: () => ({ frames: [frame, frame, frame, frame, frame, { ...frame, width: 10 }] }),
   decodeDatPalette: () => new Uint8Array(1024), string: (i) => strings[i] ?? '', character, documentObject, now: () => 0, ...hooks });
 // A font table: the Woo! header, 10 rows high, every printable code point one 6-wide glyph.
 const tbl = new Uint8Array(12 + 95 * 14); tbl.set([0x57, 0x6f, 0x6f, 0x21]); tbl[10] = 10;
@@ -32,6 +32,19 @@ test('difficulty gating: Nightmare after 4 (classic) / 5 (expansion), Hell after
 test('MCP rejections map to the D2Lang notice', () => {
   assert.equal(gameErrorText({ mcpStage: 'create', mcpResult: 0x1f, message: 'x' }, (i) => strings[i]), 'A Game Already Exists With That Name');
   assert.equal(gameErrorText(new Error('socket closed'), () => ''), 'socket closed');
+  assert.equal(gameErrorText({ noticeString: 5357, message: 'closed' }, (i) => (i === 5357 ? 'Disconnected' : '')), 'Disconnected');
+});
+
+test('every create and join result raises the notice the retail switch picks, and unknown results the generic failure', () => {
+  const str = (i) => `s${i}`, err = (mcpStage, mcpResult) => ({ mcpStage, mcpResult, message: 'x' });
+  const create = (r) => gameErrorText(err('create', r), str);
+  assert.deepEqual([0x1e, 0x1f, 0x20, 0x6e, 0x55].map(create), ['s5137', 's5138', 's5139', 's5140', 's5140']);
+  const join = (r, c) => gameErrorText(err('join', r), str, c);
+  assert.deepEqual([0x29, 0x2a, 0x2b, 0x2c, 0x71, 0x78, 0x79, 0x6e, 0x01].map((r) => join(r)),
+    ['s5160', 's5159', 's5161', 's5162', 's5158', 's10101', 's10102', 's5141', 's5141']);
+  assert.deepEqual([join(0x73, { expansion: false }), join(0x73, { expansion: true }), join(0x74, {}), join(0x74, { expansion: true })],
+    ['s5364', 's21794', 's5363', 's21793']);
+  assert.deepEqual([join(0x7d, { ladder: true }), join(0x7d, { ladder: false })], ['s10929', 's10930']);
 });
 
 test('lobby -> CREATE -> typed game -> Enter creates it with the form', async () => {
@@ -74,6 +87,25 @@ test('JOIN sends name and password; Escape closes the panel, then quits', async 
   s.escape(); assert.equal(quit, 1);
 });
 
+test('a click on a game row fills the name box, enables JOIN and joins that game with the typed password', async () => {
+  const joins = [];
+  const s = screen({ name: 'Ama', charClass: 0 }, { onJoinGame: async (g) => { joins.push(g); throw Object.assign(new Error('x'), { sessionLost: true }); } });
+  s.activate('join');
+  s.setGames(Array.from({ length: 12 }, (_, i) => ({ name: `game${i}`, password: i === 2, description: `text ${i}` })));
+  assert.equal(s.evidence.boxes.find((b) => b.id === 'join-game').disabled, true, 'no name yet');
+  assert.equal(s.press(440, 100, 800, 600), null, 'above the list: no row');
+  assert.equal(s.press(440, 392 - 19 * 2 - 2, 800, 600) === 'list', true);
+  assert.equal(s.selectedGame().name, 'game6', 'row 6 from the top: (y - 220) / 19');
+  assert.equal(s.editValue(), null, 'the click moved the focus off the edit boxes');
+  assert.equal(s.evidence.boxes.find((b) => b.id === 'join-game').disabled, false);
+  s.scrollGames(3); s.press(440, 229, 800, 600);
+  assert.equal(s.selectedGame().name, 'game3', 'the first row on show counts');
+  s.press(440, 392, 800, 600); assert.equal(s.selectedGame(), null, 'a click below the last game clears the pick');
+  s.pinClock(60000, 0); s.press(440, 229, 800, 600); assert.equal(s.selectedGame().name, 'game3');
+  s.activate('field-password'); s.typeKey('KeyP', 'p'); s.activate('join-game'); await tick();
+  assert.deepEqual(joins, [{ gameName: 'game3', gamePassword: 'p', listing: { difficulty: 0, description: 'text 3' } }]);
+});
+
 test('a dead hardcore character cannot open CREATE or JOIN', () => {
   const s = screen({ name: 'H', charClass: 0, hardcore: true, dead: true });
   s.activate('create'); s.activate('join');
@@ -110,5 +142,107 @@ test('chat: typing and Enter go out through the chat socket; the server\'s lines
   s.typeKey('KeyY', 'y'); s.typeKey('Enter');
   assert.deepEqual(out, ['y']); assert.deepEqual(s.evidence.chat, ['<Ama> hi']);
   s.chatLine({ text: '<Bob> yo', colour: 0 }); assert.equal(s.evidence.chat.at(-1), '<Bob> yo');
-  s.activate('whisper'); s.typeKey('KeyB', 'b'); s.typeKey('Enter'); assert.deepEqual(out.at(-1), '/w b');
+  s.activate('whisper'); s.typeKey('KeyB', 'b'); assert.equal(s.evidence.chat.length, 2);
+  s.activate('whisper'); assert.deepEqual(out, ['y']);                   // WHISPER needs a picked user
+  s.pickUser('*Bob'); s.activate('whisper'); assert.deepEqual(out.at(-1), '/whisper *Bob b');
+  s.typeKey('KeyC', 'c'); s.activate('emote'); assert.deepEqual(out.at(-1), '/me c');
+  s.pickUser('Bob'); s.activate('squelch'); assert.deepEqual(out.at(-1), '/me c');   // inside the 1 s gate
 });
+
+test('join panel asks for the game list on open, then on retail\'s free-running 15 s idle timer while it stays open', () => {
+  let asked = 0;
+  const s = screen({ name: 'Ama', charClass: 0, level: 3 }, { onRefreshGames: () => { asked++; } });
+  s.pinClock(1000, 0); s.tick(); assert.equal(asked, 0, 'no panel, no request');
+  s.activate('join'); assert.equal(asked, 1, 'asked when it opens');
+  s.tick(); assert.equal(asked, 2, 'the timer was never started: the first idle look is due at once');
+  s.pinClock(15999, 0); s.tick(); assert.equal(asked, 2);
+  s.pinClock(16000, 0); s.tick(); assert.equal(asked, 3, '15 s after the timer last fired');
+  s.pinClock(20000, 0); s.draw(ctx, 800, 600); assert.equal(asked, 3, 'draw ticks too, nothing due');
+  s.pinClock(31000, 0); s.draw(ctx, 800, 600); assert.equal(asked, 4, 'draw runs the due refresh');
+  s.activate('panel-cancel'); s.pinClock(60000, 0); s.tick(); assert.equal(asked, 4, 'closed: the timer is not looked at');
+  s.activate('join'); assert.equal(asked, 5, 'reopened: the open request');
+  s.tick(); assert.equal(asked, 6, 'and the stale timer is due at once');
+  s.activate('panel-cancel'); s.pinClock(65000, 0); s.activate('join'); assert.equal(asked, 7); s.tick(); assert.equal(asked, 7, 'reopened 5 s after the last firing: it waits out the rest');
+  s.pinClock(75000, 0); s.tick(); assert.equal(asked, 8);
+});
+
+const games = (n) => Array.from({ length: n }, (_, i) => ({ name: `game${i}`, description: `text ${i}` }));
+const pinned = (hooks) => { const s = screen({ name: 'Ama', charClass: 0 }, hooks); s.activate('join'); return s; };
+
+test('a refresh keeps the pick by name, or the same row number when the game is gone; the description empties', () => {
+  const s = pinned(); s.setGames(games(12)); s.press(440, 248, 800, 600);
+  assert.equal(s.selectedGame().name, 'game1');
+  s.setGames([{ name: 'fresh', description: '' }, ...games(12)]);
+  assert.equal(s.selectedGame().name, 'game1', 'followed to its new row');
+  s.setGames(games(12).filter((g) => g.name !== 'game1'));
+  assert.equal(s.selectedGame().name, 'game3', 'same row number (2), another game');
+});
+
+test('the same row twice within 500 ms joins; a slower second click only selects', async () => {
+  const joins = []; let t = 1000;
+  const s = pinned({ onJoinGame: async (g) => { joins.push(g); throw Object.assign(new Error('x'), { sessionLost: true }); } });
+  s.pinClock(t, 0); s.setGames(games(12));
+  s.press(440, 229, 800, 600); s.pinClock(t += 600, 0); s.press(440, 229, 800, 600); await tick();
+  assert.deepEqual(joins, [], 'too slow');
+  s.pinClock(t += 300, 0); s.press(440, 229, 800, 600); await tick();
+  assert.deepEqual(joins, [{ gameName: 'game0', gamePassword: '', listing: { difficulty: 0, description: 'text 0' } }]);
+});
+
+test('the list scrollbar: arrows step a row, the track pages, a grabbed thumb follows the pointer, release lets go', () => {
+  const s = pinned(); s.setGames(games(14));
+  assert.equal(s.press(597, 392, 800, 600), 'scrollbar'); s.release('scrollbar', 597, 392, 800, 600);
+  s.press(440, 229, 800, 600); assert.equal(s.selectedGame().name, 'game1', 'one row down');
+  s.press(597, 300, 800, 600); s.release('scrollbar', 597, 300, 800, 600);
+  s.press(440, 229, 800, 600); assert.equal(s.selectedGame().name, 'game5', 'clamped at the last position (14 - 9 rows)');
+  s.press(597, 229, 800, 600); s.release('scrollbar', 597, 229, 800, 600);
+  s.press(440, 229, 800, 600); assert.equal(s.selectedGame().name, 'game4', 'one row up');
+  const d = pinned(); d.setGames(games(14));
+  assert.equal(d.press(597, 245, 800, 600), 'scrollbar'); d.hover(597, 400, 800, 600);
+  d.press(440, 229, 800, 600); assert.equal(d.selectedGame().name, 'game5', 'the grabbed thumb followed the pointer to the end');
+  d.release('scrollbar', 597, 400, 800, 600); d.hover(597, 229, 800, 600); d.press(440, 229, 800, 600);
+  assert.equal(d.selectedGame().name, 'game5', 'after release the thumb no longer follows');
+});
+
+test('no scrollbar press when every game fits', () => {
+  const s = pinned(); s.setGames(games(5));
+  assert.equal(s.press(597, 300, 800, 600), null);
+});
+
+import { displayName as _dn, accountName as _an } from './bnet-lobby-screen.mjs';
+test('realm Char*account names show the character and keep the account', () => {
+  assert.equal(_dn('Bob*acct'), 'Bob'); assert.equal(_an('Bob*acct'), 'acct');
+  assert.equal(_dn('*acct'), '*acct'); assert.equal(_an('*acct'), 'acct');
+  assert.equal(_dn('Bob'), 'Bob'); assert.equal(_an('Bob'), 'Bob');
+});
+
+test('a join of a listed name carries that row\'s difficulty and description, a name the list does not show carries none', async () => {
+  const joins = [];
+  const s = screen({ name: 'Ama', charClass: 0 }, { onJoinGame: async (g) => { joins.push(g); throw Object.assign(new Error('x'), { sessionLost: true }); } });
+  s.activate('join');
+  s.setGames([{ name: 'Cows', password: false, difficulty: 3, description: 'cow level' }]);
+  s.press(440, 229, 800, 600); s.typeKey('Enter');
+  await tick();
+  assert.deepEqual(joins[0], { gameName: 'Cows', gamePassword: '', listing: { difficulty: 3, description: 'cow level' } });
+  const typed = screen({ name: 'Ama', charClass: 0 }, { onJoinGame: async (g) => { joins.push(g); throw Object.assign(new Error('x'), { sessionLost: true }); } });
+  typed.activate('join');
+  typed.setGames([{ name: 'Cows', difficulty: 3, description: '' }]);
+  typed.typeKey('KeyC', 'c'); typed.typeKey('Enter');
+  await tick();
+  assert.equal('listing' in joins[1], false, 'a typed name the list does not show is not remembered');
+});
+
+test('CREATE clamps a typed player count as retail does: 0 is 1, 9 and up is 8', async () => {
+  const sent = [];
+  for (const typed of ['0', '00', '9', '50', '3']) {
+    const s = screen({ name: 'Ama', charClass: 0, level: 3 }, { onCreateGame: async (g) => { sent.push(g.maxPlayers); } });
+    s.activate('create');
+    s.typeKey('KeyA', 'a'); s.typeKey('Tab'); s.typeKey('Tab'); s.typeKey('Tab');
+    s.typeKey('Backspace'); s.typeKey(`Digit${typed[0]}`, typed[0]); for (const k of typed.slice(1)) s.typeKey(`Digit${k}`, k);
+    s.typeKey('Enter'); await tick();
+  }
+  assert.deepEqual(sent, [1, 1, 8, 8, 3]);
+});
+
+
+
+

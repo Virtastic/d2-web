@@ -85,7 +85,7 @@ export const DELETE_STRINGS = { confirm: 5163, yes: 5166, no: 5167 };
 export const PORTRAIT = { x: 67, anchor: 165 };
 
 /** `characters` is the store's listing. onPlay(name), onCreate(), onCancel(), onDelete(name). */
-export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, characters, onPlay, onPlayRefused = null, onCreate, onCancel, onDelete = null, onConvert = null, string = null, componentToken = null, documentObject = globalThis.document }) {
+export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, characters, onPlay, onPlayRefused = null, onCreate, onCancel, onDelete = null, onConvert = null, realm = () => false, string = null, componentToken = null, documentObject = globalThis.document }) {
   // Keep the requested path separate from the bytes that were actually decoded.  The latter is
   // carried to every confirmation blit: a constant copied into both sides of an assertion cannot
   // make a substituted DC6 or palette look correct.
@@ -359,7 +359,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       const character = list[selected];
       // D2Launch's selected-character OK callback refuses a save carrying both HARDCORE and DEAD
       // before it enters game creation (FUN_6FA4DEC0, 1.13c). Preserve that front-door result here.
-      if (character.hardcore && character.dead) {
+      if (!realm() && character.hardcore && character.dead) {
         onPlayRefused?.({ name: character.name, stringId: 0x14B8 });
         return false;
       }
@@ -382,6 +382,15 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       const dialog = deleteFlow.armed >= 0 ? { DELETE_YES: centre(dialogButtonBox('yes')), DELETE_NO: centre(dialogButtonBox('no')) } : {};
       return { characters, rows: characters, play, create, exit, OK: play, 'CREATE NEW CHARACTER': create, EXIT: exit,
         'DELETE CHARACTER': centre(buttonBox('delete')), 'CONVERT TO EXPANSION': centre(buttonBox('convert')), ...dialog };
+    },
+    /** Enter is OK and Escape is EXIT (the screen's descriptors carry those activation keys). */
+    key(code) {
+      // Escape on the delete confirmation answers NO (it closes the box and deletes nothing); a delete in flight takes no key.
+      if (deleteFlow.armed >= 0 && deleteFlow.state === 'armed') { if (code === 'Escape') { deleteFlow.cancel(); return 'delete-cancel'; } return null; }
+      if (deleteFlow.armed >= 0 || deleteFlow.blocked) return null;
+      if (code === 'Enter' || code === 'NumpadEnter') { this.play(); return 'play'; }
+      if (code === 'Escape') { onCancel?.(); return 'exit'; }
+      return null;
     },
     click(x, y, width, height) {
       const p = toScreen(x, y, width, height);

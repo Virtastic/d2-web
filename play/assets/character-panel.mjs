@@ -77,11 +77,11 @@ export const STAT_PLUS_DISABLED_FRAME = 2;     // OpenDiablo2's DisabledFrame, r
                                                // capture shows retail drawing the unlit state
 export const STAT_PLUS_SOCKET_OFFSET = Object.freeze({ x: -3, y: -2 });
 
-// OpenDiablo2's hero_stats_panel.go places the remaining-stat label as two localized Font6 rows
-// beside a separate Font16 count. Its positions are top-left coordinates; drawAnchored uses an
-// inclusive bottom-row anchor, so drawStatPoints converts with each decoded font's actual cell height.
+// Retail draws the remaining-stat block as two Font6 label lines (strings 0xFEB and 0xFEC, colour 1) and the
+// count in retail font 1 (our 16-px face), colour 0. All numbers are retail's own 640x480 coordinates, panel
+// origin 0,0: x is a centre, rows are baselines. The 800x600 canvas places them at +PANEL_SHIFT.
 export const STAT_POINTS_LAYOUT = Object.freeze({
-  labelX: Object.freeze([100, 103]), labelRows: Object.freeze([405, 413]), countX: 190, countY: 405,
+  labelCentre: 50, labelRows: Object.freeze([355, 363]), countCentre: 110, countRow: 360,
   palette: 'data\\global\\palette\\SKY\\pal.dat',
   pl2: 'data\\global\\palette\\SKY\\pal.pl2',
   labelColour: 1,
@@ -93,17 +93,16 @@ const u32 = (v) => (v === undefined || v === null ? v : v >>> 0);
 const grouped = (v) => (v === undefined || v === null ? v : String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ','));
 // retail T2 x,y is screen minus (80,60) (CHARACTER_LAYOUT.screenY), not the frame-0 origin (80,61).
 const T2_OFFSET = Object.freeze({ x: 80, y: 60 });
-// Draws the stat-points block and returns its three strings as T2 records (screen minus (80,60)).
+// Draws the stat-points block and returns its three strings as T2 records (retail 640x480 coordinates).
 export function drawStatPoints(font6, font16, ctx, points, string) {
   if (!(points > 0)) return [];
-  const labelAnchor = (top) => top + font6.cellHeight - 1;
-  const redFont = font6.red || font6;
-  const labels = [[string('strchrstat'), STAT_POINTS_LAYOUT.labelRows[0], STAT_POINTS_LAYOUT.labelX[0]], [string('strchrrema'), STAT_POINTS_LAYOUT.labelRows[1], STAT_POINTS_LAYOUT.labelX[1]]];
-  const out = [];
-  for (const [text, top, left] of labels) { redFont.drawAnchored(ctx, text, left, labelAnchor(top)); out.push({ text, x: left - T2_OFFSET.x, y: labelAnchor(top) - T2_OFFSET.y, c: STAT_POINTS_LAYOUT.labelColour }); }
-  const count = String(points), cx = STAT_POINTS_LAYOUT.countX - Math.trunc(font16.measure(count) / 2), cy = STAT_POINTS_LAYOUT.countY + font16.cellHeight - 1;
-  font16.drawAnchored(ctx, count, cx, cy);
-  out.push({ text: count, x: cx - T2_OFFSET.x, y: cy - T2_OFFSET.y, c: 0 });
+  const L = STAT_POINTS_LAYOUT, redFont = font6.red || font6, out = [];
+  const put = (font, text, centre, row, c) => {
+    const x = Math.floor(centre - font.measure(text) / 2);
+    font.drawAnchored(ctx, text, x + T2_OFFSET.x, row + T2_OFFSET.y); out.push({ text, x, y: row, c });
+  };
+  for (const [i, text] of [string('strchrstat'), string('strchrrema')].entries()) put(redFont, text, L.labelCentre, L.labelRows[i], L.labelColour);
+  put(font16, String(points), L.countCentre, L.countRow, 0);
   return out;
 }
 

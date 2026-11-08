@@ -71,7 +71,7 @@ export function createBnetConnectingPopup({ read, decodeDc6, decodeDatPalette, s
   const dotsFont = boxFont(A.dotsFont, A.dotsFontTbl, L.dots.colour);
 
   // D2Launch+0xFC40 takes GetTickCount for the dots and starts on code 0's text.
-  let opened = now(), code = 0, failure = null, pressed = false;
+  let opened = now(), code = 0, pressed = false;
 
   const drawCel = (ctx, c, index, x, anchorY) => {
     const f = c.dc6.frames[index]; if (!f) return 0;
@@ -86,19 +86,14 @@ export function createBnetConnectingPopup({ read, decodeDc6, decodeDatPalette, s
       font.drawAnchored(ctx, line, x + Math.max(Math.trunc((w - font.measure(line)) / 2), 0), top + font.lineHeight + i * (box.step ?? 0));
   };
   const statusText = () => {
-    if (failure !== null) return failure;
     return code >= 0 && code < S.status.length ? string(S.status[code]) || '' : '';
   };
   const inCancel = (sx, sy) => { const c = L.cancel; return sx >= c.x && sx < c.x + c.w && sy > c.anchorY - c.h && sy <= c.anchorY; };
 
   return {
-    get evidence() { return { code, status: statusText(), failed: failure !== null, dots: this.dots() }; },
+    get evidence() { return { code, status: statusText(), dots: this.dots() }; },
     // Bnclient+0x80's connection stage, as D2Launch+0xF800 reads it each frame.
     setStatus(next) { code = next; },
-    // NOT retail: retail closes the popup and raises a separate notice (5189) when the connection
-    // fails; this client keeps the popup up with that text in the status box until CANCEL.
-    fail(text) { failure = String(text ?? ''); },
-    get failed() { return failure !== null; },
     clock(ms) { opened = 0; now = () => ms; },
     dots() { return (Math.trunc(Math.max(0, now() - opened) / 1000) % 20) + 1; },
     draw(ctx) {
@@ -111,7 +106,7 @@ export function createBnetConnectingPopup({ read, decodeDc6, decodeDatPalette, s
         c.anchorY + (pressed ? 2 : 0) + 4 - Math.trunc((c.h - labelFont.lineHeight) / 2));
       drawBox(ctx, titleFont, string(S.title) || '', L.title);
       drawBox(ctx, statusFont, statusText(), L.status);
-      if (failure === null) drawBox(ctx, dotsFont, '.'.repeat(this.dots()), L.dots);
+      drawBox(ctx, dotsFont, '.'.repeat(this.dots()), L.dots);
     },
     // Scene coordinates (800x600). The popup is modal: only CANCEL answers.
     press(sx, sy) { pressed = inCancel(sx, sy); return pressed ? 'cancel' : null; },
@@ -119,5 +114,67 @@ export function createBnetConnectingPopup({ read, decodeDc6, decodeDatPalette, s
     cancel() { pressed = false; },
     key(code) { if (code === 'Escape') { onCancel(); return true; } return false; },
     targets() { const c = L.cancel; return { CANCEL: [c.x + c.w / 2, c.anchorY - c.h / 2] }; },
+  };
+}
+
+// D2Launch+0x15090's notice, raised over the menu when the connection fails (D2Launch+0xE510 event 0 with string 5189): the
+// PopUpOK frame at (268, 350), OK a CancelButtonBlank at (351, 337) labelled in FontRidiculous, the text a centred Font24 box
+// at x=268 264 wide whose top is row 200, its lines starting 8 rows lower and stepping 19. Its OK runs `onOk`.
+export const BNET_CONNECT_NOTICE_ASSETS = {
+  popup: P + 'PopUpOK.dc6', button: P + 'CancelButtonBlank.dc6',
+  bodyFont: F + 'font24.dc6', bodyFontTbl: F + 'font24.tbl',
+  labelFont: F + 'fontridiculous.dc6', labelFontTbl: F + 'fontridiculous.tbl',
+};
+export const BNET_CONNECT_NOTICE_LAYOUT = {
+  x: 268, anchorY: 350, ok: { x: 351, anchorY: 337, w: 96, h: 32, labelDy: -9, label: 5102 },
+  body: { x: 268, width: 264, top: 200, inset: 10, insetY: 8, step: 19 },
+};
+
+export function createBnetConnectNotice({ read, decodeDc6, decodeDatPalette, string = () => '', text = '', onOk = () => {}, documentObject = globalThis.document }) {
+  const palette = decodeDatPalette(read(FRONTEND.palette));
+  const skyPalette = decodeDatPalette(read(FRONTEND.backgroundPalette));
+  const skyPl2 = read('data\\global\\palette\\Sky\\pal.pl2');
+  const frameCanvas = (f) => {
+    const c = documentObject.createElement('canvas');
+    c.width = Math.max(1, f.width); c.height = Math.max(1, f.height);
+    const rgba = new Uint8ClampedArray(f.width * f.height * 4);
+    for (let i = 0; i < f.indices.length; i++) if (f.opaque[i]) rgba.set(skyPalette.subarray(f.indices[i] * 4, f.indices[i] * 4 + 4), i * 4);
+    c.getContext('2d').putImageData(new ImageData(rgba, c.width, c.height), 0, 0);
+    return c;
+  };
+  const cels = (path) => { const dc6 = decodeDc6(read(path)); return { path, dc6, canvases: dc6.frames.map(frameCanvas) }; };
+  const A = BNET_CONNECT_NOTICE_ASSETS, N = BNET_CONNECT_NOTICE_LAYOUT;
+  const frame = cels(A.popup), button = cels(A.button);
+  const tinted = palette.slice(); for (let i = 0; i < tinted.length; i += 4) for (let k = 0; k < 3; k++) tinted[i + k] = Math.round(tinted[i + k] * LABEL_TINT);
+  const labelFont = createFont({ dc6: decodeDc6(read(A.labelFont)), tbl: decodeFontTbl(read(A.labelFontTbl)), palette: tinted, documentObject,
+    path: A.labelFont, drawAs: { op: 'celcolor', mode: 4, blend: createBlender(skyPl2, palette) } });
+  const bodyFont = createFont({ dc6: decodeDc6(read(A.bodyFont)), tbl: decodeFontTbl(read(A.bodyFontTbl)), palette: skyPalette, documentObject,
+    path: A.bodyFont, drawAs: { op: 'celcolor', mode: 5, extra: 0 } });
+  let pressed = false;
+  const inOk = (sx, sy) => { const o = N.ok; return sx >= o.x && sx < o.x + o.w && sy > o.anchorY - o.h && sy <= o.anchorY; };
+  const drawCel = (ctx, c, index, x, anchorY) => {
+    const f = c.dc6.frames[index]; if (!f) return 0;
+    const left = x + f.offsetX, top = anchorY + f.offsetY - f.height + 1;
+    ctx.drawImage(c.canvases[index], left, top);
+    recordDc6(c.path, index, f, left, top, { op: 'cel', mode: 5 });
+    return f.width;
+  };
+  return {
+    get evidence() { return { text, pressed }; },
+    draw(ctx) {
+      let x = N.x;
+      for (const i of [0, 1]) x += drawCel(ctx, frame, i, x, N.anchorY);
+      drawCel(ctx, button, pressed ? 1 : 0, N.ok.x, N.ok.anchorY);
+      const label = string(N.ok.label) || '';
+      labelFont.drawAnchored(ctx, label, N.ok.x + Math.max(Math.trunc((N.ok.w - labelFont.measure(label)) / 2), 0), N.ok.anchorY + N.ok.labelDy + 4 - Math.trunc((35 - labelFont.lineHeight) / 2));
+      const b = N.body, bw = b.width - 2 * b.inset;
+      for (const [i, line] of wrap(text, bw, (t) => bodyFont.measure(t)).entries())
+        bodyFont.drawAnchored(ctx, line, b.x + b.inset + Math.max(Math.trunc((bw - bodyFont.measure(line)) / 2), 0), b.top + b.insetY + bodyFont.lineHeight + i * b.step);
+    },
+    press(sx, sy) { pressed = inOk(sx, sy); return pressed ? 'ok' : null; },
+    release(token, sx, sy) { const hit = pressed && token === 'ok' && inOk(sx, sy); pressed = false; if (hit) onOk(); return hit; },
+    cancel() { pressed = false; },
+    key(code) { if (code === 'Enter' || code === 'NumpadEnter' || code === 'Escape') { onOk(); return true; } return false; },
+    targets() { const o = N.ok; return { OK: [o.x + o.w / 2, o.anchorY - o.h / 2] }; },
   };
 }

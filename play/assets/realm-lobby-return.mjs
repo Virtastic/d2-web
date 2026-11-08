@@ -11,7 +11,7 @@ export async function returnToLobby({ flow, character, dialMcp, bindProtocol, mc
     const roster = await mcpReturnToLobby(mcp, protocol, { realmReply: flow.realmReply, character });
     return { characters: roster.characters,
       flow: { server: flow.server, realmReply: flow.realmReply, realms: flow.realms, mpq: flow.mpq, bncs: null,
-        chat: flow.chat, chatSession: flow.chatSession, mcp, protocol, mcpSession: roster.session } };
+        chat: flow.chat, chatSession: flow.chatSession, chatLink: flow.chatLink, mcp, protocol, mcpSession: roster.session } };
   } catch (error) {
     try { mcp.close(); } catch { /* already closed */ }
     try { protocol?.free(); } catch { /* engine gone */ }

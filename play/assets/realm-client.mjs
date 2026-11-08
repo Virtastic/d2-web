@@ -1,4 +1,5 @@
 import { parseMonsterAnimations } from './monster-renderer.mjs';
+import { readD2gsDeny, d2gsDenyError } from './d2gs-deny.mjs';
 import { parseRealmMissiles } from './realm-missiles.mjs';
 import { parseRealmMissileSoundEvents } from './realm-missile-sounds.mjs';
 // The realm CLIENT half: it drives our protocol (BNCS/MCP/D2GS) over a byte-pipe transport.
@@ -48,7 +49,7 @@ function makeReader(transport) {
   return {
     want: (n, ms = CONNECT_TIMEOUT_MS) => new Promise((resolve, reject) => {
       const w = { n, resolve, reject, t: null };
-      if (ms !== null) w.t = setTimeout(() => { const i = waiters.indexOf(w); if (i >= 0) waiters.splice(i, 1); reject(new Error(`timed out after ${buf.length}/${n} bytes`)); }, ms);
+      if (ms !== null) w.t = setTimeout(() => { const i = waiters.indexOf(w); if (i >= 0) waiters.splice(i, 1); reject(Object.assign(new Error(`timed out after ${buf.length}/${n} bytes`), { timedOut: true })); }, ms);
       waiters.push(w);
       pump();
     }),
@@ -93,6 +94,8 @@ async function readMcpFrame(reader, timeoutMs) {
 }
 
 const MCP_MOTD = 0x12, MCP_KEEPALIVE_MS = 30000;
+// D2Multi's pump gives a create or join 30 s from the Please Wait popup; then it raises 5141 (Join Failed) and returns to the lobby.
+const GAME_REPLY_MS = 30000;
 /**
  * An idle MCP socket is dropped by the proxies in front of the realm (about 100 s with no traffic), and
  * the lobby sits idle that long. Ask for the message of the day on a timer; the reply is skipped by
@@ -130,7 +133,7 @@ function decodeMcpCharacters(body) {
     if (statstring.length < 26) throw new Error(`MCP CHARLIST2 entry ${i} statstring is short (${statstring.length} bytes)`);
     if (statstring[13] < 1 || statstring[13] > 7) throw new Error(`MCP CHARLIST2 entry ${i} has invalid class byte ${statstring[13]}`);
     characters.push({ name: new TextDecoder().decode(rawName), expiry,
-      charClass: statstring[13] - 1, level: statstring[25], flags: statstring[26] ?? 0 });
+      charClass: statstring[13] - 1, level: statstring[25], flags: statstring[26] ?? 0, progression: statstring[27] ?? 0 });
   }
   return { total, returned, characters };
 }
@@ -141,7 +144,7 @@ function decodeMcpCharacters(body) {
  * the engine exports, as with BNCS and D2GS; this function owns only the sequence and read offsets.
  */
 export async function mcpCreateAndJoin(transport, protocol, { realmReply, character, gameName, gamePassword = '',
-  difficulty = 0, maxPlayers = 8, description = '', characterCount = 8, session = null, join = false, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+  difficulty = 0, maxPlayers = 8, description = '', characterCount = 8, session = null, join = false, timeoutMs = CONNECT_TIMEOUT_MS, gameReplyMs = GAME_REPLY_MS } = {}) {
   if (!Array.isArray(realmReply) && !(realmReply instanceof Uint8Array)) throw new Error('MCP requires the BNCS realm handoff bytes');
   if (!character || !gameName) throw new Error('MCP requires a character and game name');
   const reader = session?.reader || makeReader(transport), sent = [], received = session ? [...session.received] : [];
@@ -181,11 +184,15 @@ export async function mcpCreateAndJoin(transport, protocol, { realmReply, charac
   // MCP_CREATEGAME and then joins the game it made. The create form's difficulty is the radio index
   // shifted into the request's flags (D2Multi's CREATE GAME callback, `shl 0xc`); D2GS takes the index.
   let gameToken = null;
+  const startedAt = Date.now();
+  const gameReply = () => readMcpFrame(reader, Math.max(1, gameReplyMs - (Date.now() - startedAt))).catch((error) => {
+    throw error?.timedOut ? Object.assign(error, { mcpStage: 'join', mcpResult: -1 }) : error;
+  });
   if (!join) {
     const createId = requestState.nextRequestId; requestState.nextRequestId = (createId + 1) & 0xffff;
     send(0x03, protocol.mcpCreateGame({ requestId: createId, difficulty: (difficulty & 3) << 12, maxPlayers,
       name: titleCaseGameText(gameName), password: titleCaseGameText(gamePassword), description }));
-    const created = await readMcpFrame(reader, timeoutMs); received.push(created.op);
+    const created = await gameReply(); received.push(created.op);
     if (created.op !== 0x03) throw new Error(`expected MCP CREATEGAME reply 0x03, got 0x${created.op.toString(16)}`);
     if (created.body.length < 10 || u16(created.body, 0) !== createId) throw new Error(`MCP CREATEGAME reply id ${u16(created.body, 0)} does not match request ${createId}`);
     const result = u32(created.body, 6);
@@ -195,13 +202,13 @@ export async function mcpCreateAndJoin(transport, protocol, { realmReply, charac
 
   const joinId = requestState.nextRequestId; requestState.nextRequestId = (joinId + 1) & 0xffff;
   send(0x04, protocol.mcpJoinGame({ requestId: joinId, name: titleCaseGameText(gameName), password: titleCaseGameText(gamePassword) }));
-  const joined = await readMcpFrame(reader, timeoutMs); received.push(joined.op);
+  const joined = await gameReply(); received.push(joined.op);
   if (joined.op !== 0x04) throw new Error(`expected MCP JOINGAME reply 0x04, got 0x${joined.op.toString(16)}`);
   if (joined.body.length < 18 || u16(joined.body, 0) !== joinId) throw new Error(`MCP JOINGAME reply id ${u16(joined.body, 0)} does not match request ${joinId}`);
-  const joinResult = u32(joined.body, 14);
+  // Retail (D2MCPClient 0x64D0): the join failed only when the IP dword is zero; the code is then the result dword, or 0x28 when that is zero too.
+  const joinResult = u32(joined.body, 6) === 0 ? (u32(joined.body, 14) || 0x28) : 0;
   if (joinResult !== 0) throw Object.assign(new Error(`MCP JOINGAME was rejected (0x${joinResult.toString(16)})`), { mcpStage: 'join', mcpResult: joinResult });
   const token = joined.body[2] | (joined.body[3] << 8);
-  if (gameToken !== null && token !== gameToken) throw new Error(`MCP JOINGAME token ${token} does not match CREATEGAME token ${gameToken}`);
   const ip = [...joined.body.subarray(6, 10)].join('.');
   const hash = u32(joined.body, 10);
   if (session) session.joined = true;
@@ -256,11 +263,15 @@ const u32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 
 /** MCP CHARCREATE (0x02): class, flags, name. On success the new character joins the session's roster. */
 export async function mcpCreateCharacter(session, { name, charClass, expansion = true, hardcore = false, ladder = false, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
   if (!session || session.joined) throw new Error('MCP character session is not reusable');
-  if (!/^[A-Za-z][A-Za-z_-]{1,14}$/.test(name || '')) throw new Error('Character names are 2-15 letters.');
-  const flags = (expansion ? 0x20 : 0) | (hardcore ? 0x04 : 0) | (ladder ? 0x40 : 0);
-  const body = new Uint8Array(4 + 2 + name.length + 1);
+  // Retail sends whatever its edit box took (letters, digits, punctuation, Latin-1) as UTF-8 and lets the realm decide: a name
+  // it will not have comes back as a refusal, not as a client-side error. The box's 0x91 and 0x92 are the curly single quotes.
+  const text = String(name || '').replace(/\u0091/g, '\u2018').replace(/\u0092/g, '\u2019');
+  const encoded = new TextEncoder().encode(text);
+  // Druids and Assassins exist only in the expansion, so retail always creates them as expansion characters.
+  const flags = (expansion || charClass >= 5 ? 0x20 : 0) | (hardcore ? 0x04 : 0) | (ladder ? 0x40 : 0);
+  const body = new Uint8Array(4 + 2 + encoded.length + 1);
   body[0] = charClass & 0xff; body[4] = flags & 0xff; body[5] = flags >> 8;
-  body.set(new TextEncoder().encode(name), 6);
+  body.set(encoded, 6);
   session.transport.send(session.protocol.mcpFrame(0x02, body));
   const reply = await readMcpFrame(session.reader, timeoutMs);
   if (reply.op !== 0x02) throw new Error(`expected MCP CHARCREATE reply 0x02, got 0x${reply.op.toString(16)}`);
@@ -272,6 +283,39 @@ export async function mcpCreateCharacter(session, { name, charClass, expansion =
   const character = { name, expiry: 0, charClass, level: 1, flags: flags & 0xff };
   session.list.characters.push(character); session.list.total++; session.list.returned++;
   return character;
+}
+
+const MCP_CHARDELETE = 0x0a, MCP_DELETE_COOKIE = 1;
+/** MCP CHARDELETE request (0x0A): `[cookie:u16 LE][name\0]`; retail's reply handler keeps only the answer whose cookie it sent. */
+export function mcpCharDeleteBody(name, cookie = MCP_DELETE_COOKIE) {
+  const encoded = new TextEncoder().encode(String(name || '').slice(0, 1023));
+  const body = new Uint8Array(2 + encoded.length + 1);
+  body[0] = cookie & 0xff; body[1] = (cookie >> 8) & 0xff; body.set(encoded, 2);
+  return body;
+}
+/** MCP CHARDELETE reply (0x0A): `[cookie:u16 LE][result:u32 LE]`; null when it is not the answer to `cookie`. */
+export function parseMcpCharDeleteReply(body, cookie = MCP_DELETE_COOKIE) {
+  if (body.length < 6 || (body[0] | (body[1] << 8)) !== cookie) return null;
+  return { result: u32(body, 2) };
+}
+/**
+ * Delete a character on the realm. A zero result removes it from the session's roster; any other result is a refusal
+ * (the roster is untouched, the session stays usable) thrown as an Error carrying `.result`.
+ */
+export async function mcpDeleteCharacter(session, name, { timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+  if (!session || session.joined) throw new Error('MCP character session is not reusable');
+  session.transport.send(session.protocol.mcpFrame(MCP_CHARDELETE, mcpCharDeleteBody(name)));
+  for (;;) {
+    const reply = await readMcpFrame(session.reader, timeoutMs);
+    if (reply.op !== MCP_CHARDELETE) continue;   // MOTD and friends can arrive in between
+    const parsed = parseMcpCharDeleteReply(reply.body);
+    if (!parsed) continue;
+    if (parsed.result !== 0) throw Object.assign(new Error(`MCP CHARDELETE was refused (0x${parsed.result.toString(16)})`), { result: parsed.result });
+    break;
+  }
+  const list = session.list, at = list.characters.findIndex((c) => c.name === name);
+  if (at >= 0) { list.characters.splice(at, 1); list.total = Math.max(0, list.total - 1); list.returned = Math.max(0, list.returned - 1); }
+  return list.characters;
 }
 
 const rol32 = (v, n) => ((v << n) | (v >>> (32 - n))) >>> 0;
@@ -314,7 +358,7 @@ export async function bncsCreateAccount(transport, protocol, { account, password
   const reply = await readBncsFrame(reader, timeoutMs);
   if (reply.id !== 0x3d) throw new Error(`expected CREATEACCOUNT reply 0x3d, got 0x${reply.id.toString(16)}`);
   const result = u32(reply.body, 0);
-  if (result !== 1 && result !== 0) {
+  if (result !== 0) {
     const error = new Error(`This account name could not be created (result ${result})`);
     error.createResult = result;
     throw error;
@@ -328,7 +372,7 @@ const joinBytes = (...parts) => { const out = new Uint8Array(parts.reduce((n, p)
 /**
  * SID_CHANGEPASSWORD (0x31): { u32 clientToken, u32 serverToken, u8[20] old proof, u8[20] new hash, STRING account }.
  * The old proof is the LOGONRESPONSE2 proof (the tokens and double hash the engine builds), the new hash the
- * single hash of the lowercased new password. Resolves to the reply's u32 (0 = changed).
+ * single hash of the lowercased new password. Resolves to the reply's u32: 1 = changed, anything else is refused (D2Launch's pump tests the reply against 1).
  */
 export async function bncsChangePassword(transport, protocol, { account, password, newPassword, product = 'D2XP', timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
   const reader = makeReader(transport);
@@ -336,7 +380,7 @@ export async function bncsChangePassword(transport, protocol, { account, passwor
   transport.send(protocol.bncsFrame(0x50, protocol.bncsAuthInfo(product)));
   const authInfo = await readBncsFrame(reader, timeoutMs);
   if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
-  const logon = protocol.bncsLogon({ clientToken: protocol.tickCount(), serverToken: u32(authInfo.body, 4), account, password });
+  const logon = Uint8Array.from(protocol.bncsLogon({ clientToken: protocol.tickCount(), serverToken: u32(authInfo.body, 4), account, password }));
   const newHash = bsha1(new TextEncoder().encode(newPassword.toLowerCase()));
   transport.send(protocol.bncsFrame(0x31, joinBytes(logon.subarray(0, 28), newHash, logon.subarray(28))));
   const reply = await readBncsFrame(reader, timeoutMs);
@@ -346,6 +390,7 @@ export async function bncsChangePassword(transport, protocol, { account, passwor
 
 /** SID_RESETPASSWORD (0x5A): { STRING account, STRING email }. Battle.net sends no reply. */
 export async function bncsResetPassword(transport, protocol, { account, email, product = 'D2XP', timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+  if (!account || !email) throw new Error('retail sends no reset request without an account and an email');
   const reader = makeReader(transport);
   transport.send(protocol.bncsSelector());
   transport.send(protocol.bncsFrame(0x50, protocol.bncsAuthInfo(product)));
@@ -356,6 +401,7 @@ export async function bncsResetPassword(transport, protocol, { account, email, p
 
 /** SID_CHANGEEMAIL (0x5B): { STRING account, STRING old email, STRING new email }. No reply. */
 export async function bncsChangeEmail(transport, protocol, { account, oldEmail, newEmail, product = 'D2XP', timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+  if (!account || !oldEmail || !newEmail) throw new Error('retail sends no email change without an account and both emails');
   const reader = makeReader(transport);
   transport.send(protocol.bncsSelector());
   transport.send(protocol.bncsFrame(0x50, protocol.bncsAuthInfo(product)));
@@ -391,7 +437,17 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
   const authCheck = await readBncsFrame(reader, timeoutMs); received.push(authCheck.id);
   if (authCheck.id !== 0x51) throw new Error(`expected AUTH_CHECK reply 0x51, got 0x${authCheck.id.toString(16)}`);
   const versionResult = u32(authCheck.body, 0);
-  if (versionResult !== 0) throw new Error(`AUTH_CHECK rejected the version (result 0x${versionResult.toString(16)})`);
+  if (versionResult !== 0) {
+    // Bnclient+0x11330: the reply is a result and a C string (the key owner's name for 0x201); a body whose
+    // last byte is not NUL, or with a NUL before it, is not handled at all, so no refusal result is kept.
+    const error = new Error(`AUTH_CHECK rejected the version (result 0x${versionResult.toString(16)})`);
+    const info = authCheck.body.subarray(4);
+    if (authCheck.body.length >= 5 && info[info.length - 1] === 0 && !info.subarray(0, -1).includes(0)) {
+      error.authResult = versionResult;
+      error.authInfo = new TextDecoder().decode(info.subarray(0, -1));
+    }
+    throw error;
+  }
 
   // BNClient+0xC9E0 tokens the logon with GetTickCount; +0xBFD0 with its own counter (1, 2, ...).
   send(0x3a, protocol.bncsLogon({ clientToken: protocol.tickCount(), serverToken, account, password }));
@@ -452,7 +508,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
  * which arrives Huffman-compressed and length-framed. The engine's 1.13c packet table frames the
  * decoded stream; this routine waits until a complete player assignment is available.
  */
-export async function d2gsJoin(transport, protocol, { character, charClass, gameToken, gameHash, difficulty = 0, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+export async function d2gsJoin(transport, protocol, { character, charClass, gameToken, gameHash, difficulty = 0, expansion = false, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
   const reader = makeReader(transport);
   // The greeting's size is decided by its first two bytes (`AF 00`/`AF 01` are 2 bytes, `AF 81`
   // carries a 128-byte inline table), so read the flag pair first and then the whole thing.
@@ -488,6 +544,8 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
       const packetLength = protocol.d2gsPacketSize(packet);
       if (packetLength < 0) throw new Error('D2GS join stream contains an invalid 1.13c server packet');
       if (packetLength === 0) break;
+      const deny = readD2gsDeny(packet);
+      if (deny) throw d2gsDenyError(deny.code, (charClass ?? 0) >= 5 || expansion);
       if (packet[0] === 0x15) {
         const reassignment = protocol.d2gsPlayerReassign?.(packet.subarray(0, packetLength));
         if (reassignment) joinReassignments.push({ offset: receiptScanAt, update: reassignment });

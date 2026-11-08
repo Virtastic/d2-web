@@ -1,18 +1,18 @@
-// streamfs.js — copied near-verbatim from openmw-web/play/streamfs.js (GPL-3.0-or-later,
+// streamfs.js - copied near-verbatim from openmw-web/play/streamfs.js (GPL-3.0-or-later,
 // Copyright (C) 2025-2026 Virtastic). Divergences are marked 'd2-web divergence'. It assumes nothing but `FS` and
 // crossOriginIsolated, and it is how user-supplied MPQs get read without hosting them.
 //
-// streamfs.js — synchronous-read streaming files for the openmw-web build.
+// streamfs.js - synchronous-read streaming files for the openmw-web build.
 //
 // Mounts a byte source as a read-only file in the emscripten FS whose bytes are fetched ON
 // DEMAND in chunks by a helper Web Worker. The engine's synchronous main-thread read()
-// spin-waits on a SharedArrayBuffer flag while the worker does the async read — the standard
+// spin-waits on a SharedArrayBuffer flag while the worker does the async read - the standard
 // emscripten sync-over-async pattern (requires crossOriginIsolated, which server.py's
 // COOP/COEP headers provide). Fetched chunks are LRU-cached in JS memory.
 //
 // Two byte sources are supported by the same machinery:
-//   - a URL, read via HTTP Range requests (server-hosted mwdata) — StreamFS.mount()
-//   - a local FileSystemFileHandle, read via getFile().slice() (user-picked Data Files) —
+//   - a URL, read via HTTP Range requests (server-hosted mwdata) - StreamFS.mount()
+//   - a local FileSystemFileHandle, read via getFile().slice() (user-picked Data Files) -
 //     StreamFS.mountLocal()
 //
 // Why: modern Chrome forbids synchronous binary XHR on the main thread (so
@@ -158,7 +158,7 @@
   }
 
   // Streaming cost counters, exposed as window.__streamfsStats. Chunk misses block the main thread
-  // (see fetchChunkSync), so this is the only place the stall is observable. Two adds per read —
+  // (see fetchChunkSync), so this is the only place the stall is observable. Two adds per read -
   // cheap enough to leave always-on, unlike the flag-gated ?glcount/?perfstats probes.
   // lastReadMs/lastReadUrl: the most recent Firefox synchronous read and what it cost. A read
   // that stalls is the one fact a report of a frozen tab needs, and it is gone by the time the error
@@ -244,7 +244,7 @@
           } else {
             // Persistent chunk cache. The in-memory LRU dies with the page, so without this
             // every boot re-downloaded every byte the engine touched (~300MB measured). Keyed
-            // by m.pkey — the ORIGINAL mount URL plus file size, so a renewed presigned URL
+            // by m.pkey - the ORIGINAL mount URL plus file size, so a renewed presigned URL
             // still hits, and a re-uploaded file of a new size misses. pkey is null for URLs
             // that should not persist (cross-origin or query-carrying, i.e. presigned S3).
             const ckey = m.pkey ? 'https://sfs.chunk/' + encodeURIComponent(m.pkey) + '/' + m.start : null;
@@ -347,7 +347,7 @@
     //
     // NB this BLOCKS the main thread for the whole worker round-trip. For a local file handle
     // that is a disk read; for an HTTP source it is a network round-trip, so a miss here stalls
-    // the frame. ST.stallMs is what makes that cost visible (window.__streamfsStats) — an
+    // the frame. ST.stallMs is what makes that cost visible (window.__streamfsStats) - an
     // eviction-thrashing working set shows up as misses climbing without bytes growing.
     const t0 = performance.now();
     while (Atomics.load(S.ctrl, 0) !== gen) {
@@ -517,16 +517,16 @@
       const abs = new URL(url, location.href).href;
       const u = new URL(abs);
       // Persist chunks only for plain same-origin files (server-hosted mwdata). A URL with a
-      // query is presigned and expiring — its bytes are cached by the locker's own layer, and
+      // query is presigned and expiring - its bytes are cached by the locker's own layer, and
       // keying on a signature would never hit twice.
       // CHUNK is part of the key: chunks are cached at fetch granularity, and a ?chunk= retune
-      // would otherwise hit a cached chunk shorter than the read loop expects — a short read
+      // would otherwise hit a cached chunk shorter than the read loop expects - a short read
       // the engine treats as EOF mid-file.
       const pkey = u.origin === location.origin && !u.search
         ? u.pathname + '@' + size + (mtime ? '@' + mtime : '') + '@' + CHUNK : null;
       const src = { url: abs, pkey };
       // Registered so the URL can be refreshed later (presigned locker URLs expire): the cache
-      // key stays `abs` (stable across renewals — the bytes are the same file), only src.url
+      // key stays `abs` (stable across renewals - the bytes are the same file), only src.url
       // changes, so a re-signed URL is used for future Range fetches without dropping the cache.
       const m = { src, abs, size };
       S.urlSrcs.set(path, src); S.mounts.set(path, m);
@@ -543,7 +543,7 @@
 
     // Mount a local `FileSystemFileHandle` at FS path `path` with known byte size. The handle
     // is posted to the worker once (keyed by a per-file id); reads slice bytes from disk on
-    // demand — nothing is copied into browser memory up front.
+    // demand - nothing is copied into browser memory up front.
     mountLocal(path, handle, size) {
       const id = S.nextId++;
       S.worker.postMessage({ mountLocal: { id, handle } });
@@ -555,7 +555,7 @@
     },
 
     // Mount a Blob (e.g. a BSA held in the browser Cache API) at FS path `path`. Reads slice
-    // bytes from the Blob on demand — a LOCAL read (disk-backed Cache blob), so no network and
+    // bytes from the Blob on demand - a LOCAL read (disk-backed Cache blob), so no network and
     // no main-thread stall, unlike streaming from S3. The Blob is posted to the worker once.
     mountBlob(path, blob, size) {
       const { src, abs } = this.registerBlob(path, blob, size);

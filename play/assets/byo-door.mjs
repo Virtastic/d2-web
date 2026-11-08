@@ -63,9 +63,8 @@ async function loadArchiveArt(col) {
   return { meta, img };
 }
 
-// Before the art: the same screen in canvas text.
-const PLAIN = { font30: '26px Georgia,serif', font16: '13px Georgia,serif', fontexocet10: '600 13px Georgia,serif' };
-const INK = { white: '#d8d8d8', red: '#e05050', gold: '#c7b377', grey: '#8b8b8b', tan: '#a8997a' };
+// Text is drawn only from the game's own font sheets; before the art is in there is no text at all.
+const LOGO_Y = 120;   // the logo's baseline in the 800x600 frame, where the title screen anchors it (the flames rise 110 above it)
 
 // hosted: the desktop app (electron/) serves the player's own archives under /retail/, so the door has nothing to
 // read. Every file counts as found, the two choose buttons and the drop target are not there, and boot waits for ENTER
@@ -104,16 +103,13 @@ export function frontDoor({ onReady, hosted = false } = {}) {
   // ---- text ----
   function measure(name, s) {
     const f = art?.meta.fonts[name];
-    if (!f) { g.save(); g.font = PLAIN[name]; const w = g.measureText(s).width; g.restore(); return w; }
+    if (!f) return 0;
     let w = 0; for (const ch of s) w += f.glyphs[ch.charCodeAt(0)]?.[1] || 0; return w;
   }
   function text(name, colour, s, x, y, op) {
     const f = art?.meta.fonts[name], img = art?.img[`f_${name}_${colour}`] || art?.img[`f_${name}_white`] || art?.img[`f_${name}_gold`];
     g.save(); if (op) g.globalCompositeOperation = op;
-    if (!f || !img) {
-      g.font = PLAIN[name]; g.textBaseline = 'top'; g.fillStyle = name === 'fontexocet10' ? '#d8cdb0' : INK[colour] || INK.white;
-      g.globalCompositeOperation = 'source-over'; g.fillText(s, x, y + 1);
-    } else {
+    if (f && img) {
       let cx = Math.round(x); const cy = Math.round(y);
       for (const ch of s) {
         const gl = f.glyphs[ch.charCodeAt(0)]; if (!gl) continue;
@@ -137,7 +133,7 @@ export function frontDoor({ onReady, hosted = false } = {}) {
     for (const k of ['blackL', 'fireL', 'blackR', 'fireR']) {
       const frs = art.meta['logo_' + k], [sx, w, h, ox, oy] = frs[f % Math.max(1, frs.length - 1)];
       g.save(); if (k.startsWith('fire')) g.globalCompositeOperation = 'lighter';
-      g.drawImage(art.img['logo_' + k], sx, 0, w, h, 400 + ox, 102 + oy - h + 1, w, h);
+      g.drawImage(art.img['logo_' + k], sx, 0, w, h, 400 + ox, LOGO_Y + oy - h + 1, w, h);
       g.restore();
     }
   }
@@ -227,7 +223,7 @@ export function frontDoor({ onReady, hosted = false } = {}) {
     if (logoBox || !art) return logoBox;
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     for (const k of ['blackL', 'fireL', 'blackR', 'fireR']) for (const [, w, h, ox, oy] of art.meta['logo_' + k]) {
-      const x = 400 + ox, y = 102 + oy - h + 1; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + w); y1 = Math.max(y1, y + h);
+      const x = 400 + ox, y = LOGO_Y + oy - h + 1; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + w); y1 = Math.max(y1, y + h);
     }
     return (logoBox = [x0, y0, x1 - x0, y1 - y0]);
   }
@@ -268,7 +264,7 @@ export function frontDoor({ onReady, hosted = false } = {}) {
     g.save();
     if (partial) {
       g.beginPath();
-      for (const r of [logoArea(), curBox, cur]) if (r) g.rect(Math.floor(r[0] * s + view.x) - 2, Math.floor(r[1] * s + view.y) - 2, Math.ceil(r[2] * s) + 4, Math.ceil(r[3] * s) + 4);
+      for (const r of [logoArea(), curBox, cur]) if (r) g.rect(Math.floor(r[0] * s + view.x) - 4, Math.floor(r[1] * s + view.y) - 4, Math.ceil(r[2] * s) + 8, Math.ceil(r[3] * s) + 8);
       g.clip();
     }
     curBox = cur;
