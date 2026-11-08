@@ -39,6 +39,7 @@ export const SELECT_ASSETS = {
   // on the Fechar palette at (270,175), the confirmation in Font16/Units centred on x=400 above it,
   // and Cancel/OK (CancelButtonBlank, FontRediculous) at (282,308) and (422,308).
   popup: 'data\\global\\ui\\FrontEnd\\PopUpOKCancel.dc6',
+  noticePopup: 'data\\global\\ui\\FrontEnd\\PopUpOK.dc6',
   okCancel: 'data\\global\\ui\\FrontEnd\\CancelButtonBlank.dc6',
   popupPalette: 'data\\global\\palette\\fechar\\pal.dat',
 };
@@ -78,14 +79,14 @@ function frameCanvas(frame, palette, documentObject) {
 // the engine): 5163 is the whole delete question ("Are you sure that you want to delete this
 // character? Take note: this will delete all versions of this Character."), and 5166/5167 are the
 // button labels. These were 0 placeholders, so the dialog could only ever draw its fallback text.
-export const DELETE_STRINGS = { confirm: 5163, yes: 5166, no: 5167 };
+export const DELETE_STRINGS = { confirm: 5163, yes: 5166, no: 5167, ok: 5102 };
 // The portrait's card-local anchor (retail's draw list: the composite DCC at the card's (67,165)).
 // Exported so a row can turn a layer's card-local `left`/`top` (charSelectEvidence.drawnPortraits[].
 // layers[]) into the actual scene position: sceneX = layer.left + (portrait.x - PORTRAIT.x).
 export const PORTRAIT = { x: 67, anchor: 165 };
 
 /** `characters` is the store's listing. onPlay(name), onCreate(), onCancel(), onDelete(name). */
-export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, characters, onPlay, onPlayRefused = null, onCreate, onCancel, onDelete = null, onConvert = null, realm = () => false, string = null, componentToken = null, documentObject = globalThis.document }) {
+export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, characters, onPlay, onPlayRefused = null, onCreate, onCancel, onDelete = null, connected = null, onConvert = null, realm = () => false, string = null, componentToken = null, documentObject = globalThis.document }) {
   // Keep the requested path separate from the bytes that were actually decoded.  The latter is
   // carried to every confirmation blit: a constant copied into both sides of an assertion cannot
   // make a substituted DC6 or palette look correct.
@@ -133,6 +134,12 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
   const okCancelSource = source(SELECT_ASSETS.okCancel);
   const okCancelDc6 = decodeDc6(okCancelSource.bytes);
   const okCancel = { path: SELECT_ASSETS.okCancel, states: okCancelDc6.frames.map((frame) => ({ frame, canvas: frameCanvas(frame, units, documentObject) })) };
+  // The OK-only popup (PopUpOK, as the login notices): retail's refusal of a delete with the realm connection gone.
+  const noticeSource = source(SELECT_ASSETS.noticePopup);
+  const noticeDc6 = decodeDc6(noticeSource.bytes);
+  const noticeParts = noticeDc6.frames.slice(0, 2).map((f) => frameCanvas(f, popupPalette, documentObject));
+  const noticeBox = () => ({ x: 268, y: 350 - noticeDc6.frames[0].height, w: noticeDc6.frames[0].width + (noticeDc6.frames[1]?.width || 0), h: noticeDc6.frames[0].height });
+  const noticeOkBox = () => ({ x: 351, y: 337 - okCancel.states[0].frame.height, w: okCancel.states[0].frame.width, h: okCancel.states[0].frame.height });
   let dialogDraws = [];
   const dialogDraw = (kind, requestedAsset, actualAsset, requestedPalette, actualPalette, record = null) => {
     dialogDraws.push({ kind, requested: { asset: drawPath(requestedAsset), palette: drawPath(requestedPalette) },
@@ -284,7 +291,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
   let selected = list.length ? 0 : -1;
   // The delete confirmation retail opens over the screen (character_select.go
   // toggleDeleteCharacterDialog): while it is open nothing behind it takes a click.
-  const deleteFlow = createDeleteConfirmFlow(onDelete);
+  const deleteFlow = createDeleteConfirmFlow(onDelete, connected);
   // The pointer in 800x600 screen pixels, retail's own anchor for the ohand cel (D2Win draws it last,
   // at (mouse x, mouse y - 1)); null until the pointer has moved over the canvas.
   let pointer = null, pressed = null, hot = null;
@@ -305,6 +312,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
   const dialogButtonBox = (id) => ({ x: DELETE_DIALOG[id].x, y: DELETE_DIALOG[id].top, w: okCancel.states[0].frame.width, h: okCancel.states[0].frame.height });
   const inBox = (p, b) => p.x >= b.x && p.x < b.x + b.w && p.y >= b.y && p.y < b.y + b.h;
   const hitControl = (p) => {
+    if (deleteFlow.state === 'notice') return inBox(p, noticeOkBox()) ? 'notice-ok' : null;
     if (deleteFlow.armed >= 0) {
       if (inBox(p, dialogButtonBox('no'))) return 'delete-no';
       if (inBox(p, dialogButtonBox('yes'))) return 'delete-yes';
@@ -385,6 +393,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
     },
     /** Enter is OK and Escape is EXIT (the screen's descriptors carry those activation keys). */
     key(code) {
+      if (deleteFlow.state === 'notice') { if (code === 'Enter' || code === 'NumpadEnter' || code === 'Escape') { deleteFlow.dismissNotice(); return 'delete-notice-ok'; } return null; }
       // Escape on the delete confirmation answers NO (it closes the box and deletes nothing); a delete in flight takes no key.
       if (deleteFlow.armed >= 0 && deleteFlow.state === 'armed') { if (code === 'Escape') { deleteFlow.cancel(); return 'delete-cancel'; } return null; }
       if (deleteFlow.armed >= 0 || deleteFlow.blocked) return null;
@@ -394,6 +403,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
     },
     click(x, y, width, height) {
       const p = toScreen(x, y, width, height);
+      if (deleteFlow.state === 'notice') { if (inBox(p, noticeOkBox())) { deleteFlow.dismissNotice(); return 'delete-notice-ok'; } return null; }
       if (deleteFlow.armed >= 0) {
         if (inBox(p, dialogButtonBox('no'))) { deleteFlow.cancel(); return 'delete-cancel'; }
         if (inBox(p, dialogButtonBox('yes'))) { void deleteFlow.confirm(list[deleteFlow.armed].name); return 'delete-confirm'; }
@@ -501,6 +511,22 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
         }
         // Retail draws the question after both buttons (trace d56 tick 2).
         confirmLines.forEach((l) => confirmFont.drawAnchored(g, l.text, l.x, l.anchor));
+      }
+      if (deleteFlow.state === 'notice') {
+        dialogDraws = [];
+        g.fillStyle = HALF_BLACK; g.fillRect(0, 0, SCREEN.width, SCREEN.height);
+        const nb = noticeBox(), f0 = noticeDc6.frames[0];
+        g.drawImage(noticeParts[0], nb.x, nb.y);
+        dialogDraw('popup', SELECT_ASSETS.noticePopup, noticeSource, SELECT_ASSETS.popupPalette, popupPaletteSource, recordDc6(SELECT_ASSETS.noticePopup, 0, f0, nb.x, nb.y));
+        if (noticeParts[1]) { g.drawImage(noticeParts[1], nb.x + noticeParts[0].width, nb.y);
+          dialogDraw('popup', SELECT_ASSETS.noticePopup, noticeSource, SELECT_ASSETS.popupPalette, popupPaletteSource, recordDc6(SELECT_ASSETS.noticePopup, 1, noticeDc6.frames[1], nb.x + noticeParts[0].width, nb.y)); }
+        const ob = noticeOkBox(), os = pressed === 'notice-ok' && hot === 'notice-ok' ? 1 : 0, face = okCancel.states[os] || okCancel.states[0];
+        g.drawImage(face.canvas, ob.x, ob.y);
+        dialogDraw('button', SELECT_ASSETS.okCancel, okCancelSource, 'data\\global\\palette\\Units\\pal.dat', unitsPaletteSource, recordDc6(okCancel.path, os < okCancel.states.length ? os : 0, face.frame, ob.x, ob.y));
+        const okText = (string && string(DELETE_STRINGS.ok)) || 'OK';
+        okCancelFont.drawAnchored(g, okText, ob.x + Math.trunc((ob.w - okCancelFont.measure(okText)) / 2), ob.y + ob.h - 10);
+        const body = (string && string(deleteFlow.notice)) || '';
+        layoutLines(body, (t) => confirmFont.measure(t), confirmFont.lineHeight).forEach((l) => confirmFont.drawAnchored(g, l.text, l.x, l.anchor));
       }
       // Retail's pointer last, an ohand cel at (mouse x, mouse y - 1) with the DC6's own offsets
       // (D2MOO D2WinMain.cpp; the title draws it the same way, and the retail captures

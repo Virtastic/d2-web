@@ -2474,6 +2474,7 @@ function ensureCharSelect() {
       onCreate: () => { if (realmSelect) realmCreate = true; screen = SCREEN.CREATE; warmTowns([]); ensureCharCreate(); },
       onCancel: () => { if (realmSelect) { realmSelect = false; leaveRealmLogin(); return; } screen = SCREEN.TITLE; },
       onDelete: realmSelect ? deleteRealmCharacterFromSelect : deleteSavedCharacter,
+      connected: realmSelect ? () => Boolean(realmFlow?.mcpSession) && realmTransport.state !== 'failed' && realmTransport.state !== 'server-disconnected' : null,
       onConvert: convertSavedCharacter,
       realm: () => realmSelect,
       // The portrait's item components: the engine's own component table (needs the data tables).
