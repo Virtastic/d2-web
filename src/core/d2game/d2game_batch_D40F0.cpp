@@ -263,7 +263,7 @@ EMSCRIPTEN_KEEPALIVE void d2game_port_97120(uint32_t param1, uint32_t ebxGame,
 // six zeroed dwords: GUID +0x04, the first three pet-info dwords at +0x08..+0x10, next +0x14.
 // Count +4 is incremented after the append; a count above max is fatal 0x330.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_97a20(uint32_t ebxGame, uint32_t ecxPlayer,
+EMSCRIPTEN_KEEPALIVE uint32_t d2_port_d2game_97a20(uint32_t ebxGame, uint32_t ecxPlayer,
                                                  uint32_t esiPetList, uint32_t edxPet,
                                                  const uint32_t* param3,
                                                  const D2GameBatchD40F0Env* env)
