@@ -80,6 +80,7 @@ test('production keydown forwards menu keys through the modal before the gamepla
     actMusic: { playTitle: () => { titleMusicStarts++; return Promise.resolve(); } }, musicError: '',
     bootMovieSpec: () => null, titleScreen: { key: (code) => selector.key(code) },
     render: () => { renders++; },
+    bnetInput: { key() { return false; }, move() { return false; }, leave() { return false; } },
   };
   vm.runInNewContext(source.slice(start, end) + '});', context);
   handler({ code: 'Enter', preventDefault() { prevented++; } });

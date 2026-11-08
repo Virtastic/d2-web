@@ -57,7 +57,7 @@ const EXEMPT = {
   'play/assets/state-fx.mjs': 'the 0x0C combat hit effect, not a clickable control',
 };
 // Controls no aim reaches yet. Each is a known gap with the reason; a new one fails the test.
-const KNOWN_GAPS = {};
+const KNOWN_GAPS = { 'play/assets/party-panel.mjs': 'party panel hit tests are owned by the bnet party branch' };
 
 test('every hit-tested module under play/ is in the manifest (covered, owned by another row, or a known gap)', () => {
   const unlisted = hitTested().filter((f) => !(f in COVERED || f in OWNED || f in KNOWN_GAPS || f in EXEMPT));

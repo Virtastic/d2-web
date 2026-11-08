@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import { createCharacterEntryReader, singlePlayerDestination } from '../play/assets/title-single-player-route.mjs';
 
 const source = readFileSync(new URL('../play/gameplay-shell.mjs', import.meta.url), 'utf8');
-const entryCode = source.slice(source.indexOf('async function enterSavedCharacterScreen('), source.indexOf('// DELETE CHARACTER'));
+const entryCode = source.slice(source.indexOf('async function enterSavedCharacterScreen('), source.indexOf('// DELETE CHARACTER (client-parity'));
 function deferred() {
   let resolve, reject;
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });

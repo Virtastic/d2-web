@@ -239,6 +239,7 @@ test/*
 !test/f199-asheara-hire-layout.test.mjs
 !test/f557-object-hover-presentation.test.mjs
 !test/fixtures
+test/fixtures/bnet-tos-*.txt
 !test/frame-pack.test.mjs
 !test/frame-ramp.test.mjs
 !test/frontdoor-error.test.mjs
