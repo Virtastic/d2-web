@@ -12,6 +12,7 @@ import { openRetail } from '../../tools/dcc-decode-bench.mjs';
 import { decodeDc6, decodeDatPalette } from './d2-formats.mjs';
 import { diffDrawLists, parseDrawListVector } from './drawlist.mjs';
 import { createBnetLoginScreen } from './bnet-login-screen.mjs';
+import { createBnetConnectFailureNotice } from './bnet-connecting.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const vec = (name) => join(root, 'vectors', 'drawlist', `${name}.txt`);
@@ -74,4 +75,19 @@ test('terms that cannot be fetched raise the disconnect notice, OK leaves for th
   compare('bnet-tos-fail-notice', s);
   const token = s.press(400, 330, 800, 600); assert.equal(token, 'notice-ok');
   assert.ok(s.release(token, 400, 330, 800, 600)); assert.equal(s.left, 1);
+});
+
+test('the main menu connect failure raises the same large popup, sized to its wrapped text, as retail draws', { skip: !rd }, () => {
+  const strings = stringTable(rd);
+  const n = createBnetConnectFailureNotice({ read: rd, decodeDc6, decodeDatPalette, string: (i) => strings.get(i) ?? '', documentObject });
+  globalThis.__d2DrawList = [];
+  try { n.draw(ctx); } finally { var l = globalThis.__d2DrawList; delete globalThis.__d2DrawList; }
+  const all = identity(parseDrawListVector(readFileSync(vec('bnet-connect-fail'), 'utf8')));
+  const retail = all.slice(all.findIndex((r) => /PopUpLargest/i.test(r.path)));
+  const ours = identity(l);
+  const d = diffDrawLists(retail, ours);
+  console.log(`menu connect-fail popup: retail ${retail.length}, ours ${ours.length}, differing records ${d.diffs}`);
+  assert.ok(retail.length > 100);
+  assert.ok(diffDrawLists(retail, ours.slice(0, -1)).diffs > 0, 'the comparison cannot fail');
+  assert.equal(d.diffs, 0);
 });

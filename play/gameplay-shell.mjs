@@ -116,7 +116,7 @@ import { parseGameList, filterGames } from './assets/bnet-gamelist.mjs';
 import { createSessionGames } from './assets/bnet-session-games.mjs';
 import { createChatLink } from './assets/bnet-chat-link.mjs';
 import { returnToLobby } from './assets/realm-lobby-return.mjs';
-import { createBnetConnectingPopup, createBnetConnectNotice } from './assets/bnet-connecting.mjs';
+import { createBnetConnectingPopup, createBnetConnectFailureNotice } from './assets/bnet-connecting.mjs';
 import { goldLabel } from './assets/gold-label.mjs';
 import { hoveredLabel, labelItemAt, nearestGroundItem, pickupNeedsWalk } from './item-pick.mjs';
 import { createSpeechBox } from './assets/speech-box.mjs';
@@ -1948,7 +1948,6 @@ function ensureBnetLoginScreen(server) {
 // Retail's connecting popup (D2Launch+0xEE10, which builds it at +0xFC40): committing a region dials
 // Battle.net with the popup over the main menu, and the login screen is built only once the
 // connection is up. The socket stays open for LOG IN, as retail's Bnclient connection does.
-const LANG_UNABLE_TO_CONNECT = 5189;
 function connectConfiguredRealm(server) {
   characterEntryReader.cancel();
   cancelRealmConnect();
@@ -1977,8 +1976,8 @@ function connectConfiguredRealm(server) {
       bnetConnecting = null;
       realmTransport = { state: 'failed', server: { region: server?.region, host: server?.host }, result: null, error: String(error) };
       // Retail closes the Connecting popup and raises its own notice (5189); the notice's OK leaves the menu as retail's does (D2Launch+0x17DF0).
-      titleScreen?.setOverlay(createBnetConnectNotice({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, string: lang,
-        text: [5248, LANG_UNABLE_TO_CONNECT, 5190].map(lang).filter(Boolean).join(' '), onOk: () => { titleScreen?.setOverlay(null); if (realmTransport.state === 'failed') realmTransport = { state: 'idle', server: null, result: null, error: '' }; } }));
+      titleScreen?.setOverlay(createBnetConnectFailureNotice({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, string: lang,
+        onOk: () => { titleScreen?.setOverlay(null); if (realmTransport.state === 'failed') realmTransport = { state: 'idle', server: null, result: null, error: '' }; } }));
     }
   })();
 }

@@ -14,7 +14,7 @@
 //     dots, ((GetTickCount - opened) / 1000) % 20 + 1 of them.
 // A D2Win text box draws its first line one font line height below its top, inset included.
 import { createBlender, createFont, decodeFontTbl, textColourPalette, LABEL_TINT, FRONTEND } from './frontend.mjs';
-import { recordDc6 } from './drawlist.mjs';
+import { recordDc6, recordPrim } from './drawlist.mjs';
 
 const P = 'data\\global\\ui\\FrontEnd\\';
 const F = 'data\\local\\font\\latin\\';
@@ -176,5 +176,70 @@ export function createBnetConnectNotice({ read, decodeDc6, decodeDatPalette, str
     cancel() { pressed = false; },
     key(code) { if (code === 'Enter' || code === 'NumpadEnter' || code === 'Escape') { onOk(); return true; } return false; },
     targets() { const o = N.ok; return { OK: [o.x + o.w / 2, o.anchorY - o.h / 2] }; },
+  };
+}
+
+// The status-2 failure box (D2Launch+0xE510 default row: title 5248, body 5189, small print 5190), raised over the main menu when the
+// dial fails. It is the large popup, not the small PopUpOK: D2Gfx dims the surface, four PopUpLargest cels, a MediumButtonBlank OK,
+// a centred Font30 title, the Font24 body on one line and the Font16 small print in colour 4 wrapped to its own box. The geometry is
+// the capture the login screen's same box was measured from (vectors/drawlist/bnet-connect-fail.txt). Its OK runs `onOk`.
+export const BNET_CONNECT_FAILURE_LAYOUT = {
+  cels: [[0, 158, 427], [1, 414, 427], [2, 158, 460], [3, 414, 460]], ok: { x: 335, anchorY: 450, w: 128, h: 35, label: 5102 },
+  title: { baseline: 199, width: 458 }, line: { x: 172, baseline: 235 }, small: { x: 172, width: 456, baseline: 330, step: 14 },
+};
+export function createBnetConnectFailureNotice({ read, decodeDc6, decodeDatPalette, string = () => '', title = 5248, body = 5189, detail = 5190,
+  onOk = () => {}, documentObject = globalThis.document }) {
+  const palette = decodeDatPalette(read(FRONTEND.palette));
+  const skyPalette = decodeDatPalette(read(FRONTEND.backgroundPalette));
+  const skyPl2 = read('data\\global\\palette\\Sky\\pal.pl2');
+  const frameCanvas = (f) => {
+    const c = documentObject.createElement('canvas');
+    c.width = Math.max(1, f.width); c.height = Math.max(1, f.height);
+    const rgba = new Uint8ClampedArray(f.width * f.height * 4);
+    for (let i = 0; i < f.indices.length; i++) if (f.opaque[i]) rgba.set(skyPalette.subarray(f.indices[i] * 4, f.indices[i] * 4 + 4), i * 4);
+    c.getContext('2d').putImageData(new ImageData(rgba, c.width, c.height), 0, 0);
+    return c;
+  };
+  const cels = (path) => { const dc6 = decodeDc6(read(path)); return { path, dc6, canvases: dc6.frames.map(frameCanvas) }; };
+  const L = BNET_CONNECT_FAILURE_LAYOUT;
+  const frame = cels(P + 'PopUpLargest.dc6'), button = cels(P + 'MediumButtonBlank.dc6');
+  const tinted = palette.slice(); for (let i = 0; i < tinted.length; i += 4) for (let k = 0; k < 3; k++) tinted[i + k] = Math.round(tinted[i + k] * LABEL_TINT);
+  const font = (dc6, tbl, pal, extra) => createFont({ dc6: decodeDc6(read(F + dc6)), tbl: decodeFontTbl(read(F + tbl)), palette: pal, documentObject,
+    path: F + dc6, drawAs: { op: 'celcolor', mode: 5, extra } });
+  const titleFont = font('font30.dc6', 'font30.tbl', skyPalette, 0), bodyFont = font('font24.dc6', 'font24.tbl', skyPalette, 0);
+  const smallFont = createFont({ dc6: decodeDc6(read(FRONTEND.versionFont)), tbl: decodeFontTbl(read(FRONTEND.versionFontTbl)),
+    palette: textColourPalette(skyPl2, skyPalette, 4), documentObject, path: FRONTEND.versionFont, drawAs: { op: 'celcolor', mode: 5, extra: 4 } });
+  const labelFont = createFont({ dc6: decodeDc6(read(FRONTEND.font)), tbl: decodeFontTbl(read(FRONTEND.fontTbl)), palette: tinted, documentObject,
+    path: FRONTEND.font, drawAs: { op: 'celcolor', mode: 4, blend: createBlender(skyPl2, palette) } });
+  const text = { title: string(title) || '', body: string(body) || '', detail: string(detail) || '' };
+  let pressed = false;
+  const inOk = (sx, sy) => { const o = L.ok; return sx >= o.x && sx < o.x + o.w && sy > o.anchorY - o.h && sy <= o.anchorY; };
+  const drawCel = (ctx, c, index, x, anchorY) => {
+    const f = c.dc6.frames[index]; if (!f) return 0;
+    const left = x + f.offsetX, top = anchorY + f.offsetY - f.height + 1;
+    ctx.drawImage(c.canvases[index], left, top);
+    recordDc6(c.path, index, f, left, top, { op: 'cel', mode: 5 });
+    return f.width;
+  };
+  return {
+    get evidence() { return { text: [text.title, text.body, text.detail], pressed }; },
+    draw(ctx) {
+      ctx.save(); ctx.globalAlpha = 0x7f / 0xff; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 800, 600); ctx.restore();
+      recordPrim('boxalpha', 0, 0, 800, 600, 0, 0x7f);
+      for (const [i, x, y] of L.cels) drawCel(ctx, frame, i, x, y);
+      drawCel(ctx, button, pressed ? 1 : 0, L.ok.x, L.ok.anchorY);
+      const nudge = pressed ? 2 : 0, label = string(L.ok.label) || '';
+      labelFont.drawAnchored(ctx, label, L.ok.x + Math.max(Math.trunc((L.ok.w - labelFont.measure(label)) / 2), 0) - nudge,
+        L.ok.anchorY + 4 - Math.trunc((35 - labelFont.lineHeight) / 2) + nudge);
+      titleFont.drawAnchored(ctx, text.title, L.line.x + Math.max(Math.trunc((L.title.width - titleFont.measure(text.title)) / 2), 0), L.title.baseline);
+      bodyFont.drawAnchored(ctx, text.body, L.line.x, L.line.baseline);
+      const S = L.small;
+      for (const [i, line] of wrap(text.detail, S.width, (t) => smallFont.measure(t)).entries()) smallFont.drawAnchored(ctx, line, S.x, S.baseline + i * S.step);
+    },
+    press(sx, sy) { pressed = inOk(sx, sy); return pressed ? 'ok' : null; },
+    release(token, sx, sy) { const hit = pressed && token === 'ok' && inOk(sx, sy); pressed = false; if (hit) onOk(); return hit; },
+    cancel() { pressed = false; },
+    key(code) { if (code === 'Enter' || code === 'NumpadEnter' || code === 'Escape') { onOk(); return true; } return false; },
+    targets() { const o = L.ok; return { OK: [o.x + o.w / 2, o.anchorY - o.h / 2] }; },
   };
 }
