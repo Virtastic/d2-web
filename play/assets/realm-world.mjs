@@ -72,9 +72,10 @@ export function createRealmWorld({ items: itemTable, objects: objectTable }) {
   const itemsByGuid = new Map();    // guid -> { ...decoded, id, owner: null (0x9C) | owner guid (0x9D) }
   const objectsByGuid = new Map();
   let gold = 0, stashGold = 0, cursorId = 0, received = 0;
+  const uiEvents = [];              // 0x77 UpdateUi codes not yet taken (16 opens the stash, 17 closes it, 21 opens the cube)
 
   function reset() {
-    itemsByGuid.clear(); objectsByGuid.clear(); gold = 0; stashGold = 0; cursorId = 0; received = 0;
+    itemsByGuid.clear(); objectsByGuid.clear(); uiEvents.length = 0; gold = 0; stashGold = 0; cursorId = 0; received = 0;
   }
   const isOwn = (item) => item.owner === null || item.owner === ownGuid;
 
@@ -96,7 +97,7 @@ export function createRealmWorld({ items: itemTable, objects: objectTable }) {
     if (deleting && decoded.mode !== MODE.CURSOR) { removeItem(guid); return; }
     const entry = itemTable.byCode(decoded.code);
     if (!entry) { removeItem(guid); return; }   // a code outside Weapons/Armor/Misc.txt cannot be drawn
-    const item = { ...decoded, id: guid, owner, classId: entry.classId, entry };
+    const item = { ...decoded, id: guid, owner, classId: entry.classId, entry, raw: packet.slice(withOwner ? 13 : 8) };
     if (item.mode === MODE.EQUIP) {   // one item per body location of an owner
       for (const [other, held] of itemsByGuid) {
         if (other !== guid && held.mode === MODE.EQUIP && held.bodyLoc === item.bodyLoc && held.owner === owner) itemsByGuid.delete(other);
@@ -130,6 +131,7 @@ export function createRealmWorld({ items: itemTable, objects: objectTable }) {
       case 0x1e: applyStat(p[1], u16(p, 2)); break;
       case 0x1f: applyStat(p[1], u32(p, 2)); break;
       case 0x20: if (ownGuid !== null && u32(p, 1) === ownGuid) applyStat(p[5], u32(p, 6)); break;
+      case 0x77: if (p.length >= 2) uiEvents.push(p[1]); break;
       case 0x9c: if (p.length >= 8) applyItem(p, false); break;
       case 0x9d: if (p.length >= 13) applyItem(p, true); break;
       default: break;
@@ -169,6 +171,10 @@ export function createRealmWorld({ items: itemTable, objects: objectTable }) {
         framePrecise: 0, frameCountPrecise: 0, componentMask: 0, animSpeed: 0, direction: 0, selectable: o.selectable,
         portalLevel: 0, locked: false, inClientRoom: true }));
     },
+    /** The saved-item bitstream the server sent for an item (what its tooltip text is decoded from). */
+    rawItem(guid) { return itemsByGuid.get(guid >>> 0)?.raw ?? null; },
+    /** The 0x77 UpdateUi codes received since the last call. */
+    takeUiEvents() { return uiEvents.splice(0); },
     get gold() { return gold; },
     get stashGold() { return stashGold; },
     get cursorId() { return cursorId; },

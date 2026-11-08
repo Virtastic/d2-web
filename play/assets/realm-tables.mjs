@@ -32,7 +32,13 @@ export function createItemTable(read) {
           flippyFile: row.flippyfile ?? '', invFile: row.invfile ?? '',
           invWidth: num(row.invwidth, 1) || 1, invHeight: num(row.invheight, 1) || 1,
           wclass: row.wclass ?? '', twoHandedWclass: row['2handedwclass'] ?? '', twoHanded: row['2handed'] === '1',
-          belt: file === 'armor' ? num(row.belt, -1) : -1 };
+          belt: file === 'armor' ? num(row.belt, -1) : -1,
+          // The columns an item's tooltip reads (assets/realm-item-text.mjs).
+          level: num(row.level), levelReq: num(row.levelreq), reqStr: num(row.reqstr), reqDex: num(row.reqdex),
+          minAc: num(row.minac), maxAc: num(row.maxac), minDam: num(row.mindam), maxDam: num(row.maxdam),
+          minDam2: num(row['2handmindam']), maxDam2: num(row['2handmaxdam']), minMis: num(row.minmisdam), maxMis: num(row.maxmisdam),
+          durability: num(row.durability), noDurability: row.nodurability === '1', stackable: row.stackable === '1',
+          speed: num(row.speed) };
         byClass.push(entry); byCode.set(fourcc(row.code), entry);
       }
     }
@@ -125,4 +131,86 @@ export function createMonsterTable(read) {
   let list = null;
   const load = () => (list ??= rows(read('data\\global\\excel\\monstats.txt')));
   return { isNpc(classId) { const row = load()[classId]; return Boolean(row) && (row.npc === '1' || row.interact === '1'); } };
+}
+
+/** ItemTypes.txt: whether a type code is, or descends from, another (the engine's ITEMS_CheckItemTypeId on the code). */
+export function createItemTypeTable(read) {
+  let table = null;
+  const load = () => (table ??= new Map(rows(read('data\\global\\excel\\itemtypes.txt')).filter((r) => r.code)
+    .map((r) => [r.code, [r.equiv1, r.equiv2].filter(Boolean)])));
+  return {
+    is(type, wanted) {
+      const seen = new Set(), walk = (t) => t === wanted || (!seen.has(t) && seen.add(t) && (load().get(t) ?? []).some(walk));
+      return walk(type);
+    },
+  };
+}
+
+/**
+ * ItemStatCost.txt by stat id: the bit widths the item bitstream stores a stat with and the columns the
+ * property text reads (descpriority, descfunc, descval, the three string keys, the dgrp group, op, op param,
+ * op base, ValShift). The string columns are KEYS of the game's string table, read through its key lookup.
+ */
+export function createItemStatTable(read) {
+  let list = null;
+  function load() {
+    if (list) return list;
+    list = [];
+    rows(read('data\\global\\excel\\itemstatcost.txt')).forEach((row, index) => {
+      if (!row.stat) return;
+      const id = num(row['*id'] ?? row.id, index);
+      list[id] = { id, name: row.stat, saveBits: num(row['save bits']), saveAdd: num(row['save add']), paramBits: num(row['save param bits']),
+        valShift: num(row.valshift), priority: num(row.descpriority), func: num(row.descfunc), val: num(row.descval),
+        strPos: row.descstrpos ?? '', strNeg: row.descstrneg ?? '', str2: row.descstr2 ?? '',
+        group: num(row.dgrp), groupFunc: num(row.dgrpfunc), groupVal: num(row.dgrpval),
+        groupStrPos: row.dgrpstrpos ?? '', groupStrNeg: row.dgrpstrneg ?? '', groupStr2: row.dgrpstr2 ?? '',
+        op: num(row.op), opParam: num(row['op param']), opBase: num(row['op base'], -1) };
+    });
+    return list;
+  }
+  return { get(id) { return load()[id] ?? null; }, get count() { return load().length; } };
+}
+
+/**
+ * MagicPrefix/MagicSuffix/RarePrefix/RareSuffix/UniqueItems/SetItems.txt: the string key an affix id names.
+ * The magic affix ids the item bitstream holds count each file's data rows from 1 (0 is "none"); rare ids
+ * count the suffix rows then the prefix rows as one array from 1; unique and set ids count from 0. Magic affixes also give the level requirement they raise.
+ */
+export function createAffixTable(read) {
+  const cache = new Map();
+  const file = (name) => { if (!cache.has(name)) cache.set(name, rows(read(`data\\global\\excel\\${name}.txt`)).filter((r) => (r.name ?? r.index) !== 'Expansion')); return cache.get(name); };   // the Expansion divider row is not a record
+  const at = (name, i) => file(name)[i] ?? null;
+  return {
+    magicPrefix(id) { const r = id > 0 ? at('magicprefix', id - 1) : null; return r ? { key: r.name, levelReq: num(r.levelreq) } : null; },
+    magicSuffix(id) { const r = id > 0 ? at('magicsuffix', id - 1) : null; return r ? { key: r.name, levelReq: num(r.levelreq) } : null; },
+    // Rare ids index RareSuffix.txt's rows then RarePrefix.txt's as one array (the engine's combined table), from 1.
+    rare(id) { const suffixes = file('raresuffix'), r = id > 0 ? (id <= suffixes.length ? suffixes[id - 1] : at('rareprefix', id - 1 - suffixes.length)) : null; return r ? { key: r.name } : null; },
+    unique(id) { const r = at('uniqueitems', id); return r ? { key: r.index, levelReq: num(r['lvl req']) } : null; },
+    setItem(id) { const r = at('setitems', id); return r ? { key: r.index, levelReq: num(r['lvl req']) } : null; },
+  };
+}
+
+/** CharStats.txt: the string keys the class-skill property lines name (StrAllSkills, StrSkillTab1-3, StrClassOnly), by class id. */
+export function createCharStatsTable(read) {
+  let table = null;
+  const load = () => (table ??= rows(read('data\\global\\excel\\charstats.txt')).filter((r) => r.class && r.class !== 'Expansion'));
+  return {
+    byClass(classId) {
+      const r = load()[classId];
+      return r ? { allSkills: r.strallskills ?? '', tabs: [r.strskilltab1 ?? '', r.strskilltab2 ?? '', r.strskilltab3 ?? ''], classOnly: r.strclassonly ?? '' } : null;
+    },
+  };
+}
+
+/** Skills.txt + SkillDesc.txt: the string key naming a skill id (what the charged-skill property line prints). */
+export function createSkillNameTable(read) {
+  let skills = null, descs = null;
+  const load = () => {
+    if (skills) return;
+    skills = new Map(rows(read('data\\global\\excel\\skills.txt')).map((r) => [num(r['*id'] ?? r.id, -1), r]));
+    descs = new Map(rows(read('data\\global\\excel\\skilldesc.txt')).map((r) => [r.skilldesc, r]));
+  };
+  return {
+    nameKey(id) { load(); const desc = descs.get(skills.get(id)?.skilldesc); return desc?.['str name'] ?? ''; },
+  };
 }

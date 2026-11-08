@@ -171,3 +171,12 @@ test('the level table answers Levels.txt Rain by level id, -1 for a level it doe
   const levels = createLevelTable(() => new TextEncoder().encode(text));
   assert.deepEqual([levels.rain(2), levels.rain(0), levels.rain(99)], [1, 0, -1]);
 });
+
+test('raw item bytes and UpdateUi codes are kept for the shell', () => {
+  const w = createRealmWorld(tables()); w.setOwner(GUID);
+  feed(w, itemPacket(10, 0, { mode: 0, x: 2, y: 1, page: 0, code: 'wsd' }), Uint8Array.of(0x77, 16), Uint8Array.of(0x77, 21));
+  assert.ok(w.rawItem(10).length > 8);
+  assert.equal(w.rawItem(11), null);
+  assert.deepEqual(w.takeUiEvents(), [16, 21]);
+  assert.deepEqual(w.takeUiEvents(), []);
+});

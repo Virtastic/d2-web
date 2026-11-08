@@ -19,6 +19,9 @@ import { loadLiveLevelTerrain, loadRealmClientTerrain, actPalettePath } from './
 import { decodeDatPalette } from './assets/d2-formats.mjs';
 import { createPlayerRenderer, playerClassInfo } from './assets/unit-renderer.mjs';
 import { createRealmInput } from './assets/realm-input.mjs';
+import { realmStorageClick } from './assets/realm-storage-input.mjs';
+import { itemPackets, BUTTON as ITEM_BUTTON } from './assets/realm-item-packets.mjs';
+import { createItemText } from './assets/realm-item-text.mjs';
 import { applyRealmPlayerFrame, selectPlayerRenderSource, visibleRealmPlayers, realmScenePlayers, realmPlayerGate } from './assets/realm-player-state.mjs';
 import { createRealmPlayerReassignFade } from './assets/realm-player-reassign-fade.mjs';
 import { createMonsterRenderer, parseMonsterAnimations, realmMonsterAnimationActor } from './assets/monster-renderer.mjs';
@@ -67,7 +70,8 @@ import { realmViewSnapshot, realmFrameReads } from './assets/realm-client-view.m
 import { createRealmHud, waypointTravelPacket } from './assets/realm-hud-state.mjs';
 import { createExperienceTable, createWaypointTable, createSkillTable } from './assets/realm-hud-tables.mjs';
 import { createRealmWorld } from './assets/realm-world.mjs';
-import { createItemTable, createObjectTable, createLevelTable, createInventoryTable, createBeltTable, createMonsterTable } from './assets/realm-tables.mjs';
+import { createItemTable, createObjectTable, createLevelTable, createInventoryTable, createBeltTable, createMonsterTable,
+  createItemTypeTable, createItemStatTable, createAffixTable, createCharStatsTable, createSkillNameTable } from './assets/realm-tables.mjs';
 import { panelSides as panelViewSides, viewCentreX } from './assets/panel-view-shift.mjs';
 import { createFreeResArt, barParts, halfParts, stoneTiles, drawParts } from './assets/wide-hud.mjs';
 import { createBeltRenderer } from './assets/belt-renderer.mjs';
@@ -565,7 +569,7 @@ const toggleMessage = () => { messageVisible = !messageVisible; if (messageVisib
 // its items live on invPage 3 and the Transmute button is TRADEBTN_TRANSMUTE (24).
 let cubePanelRenderer = null, cubeOpen = false, cubeLayout = null, cubeEvidence = null, cubeClosePress = null;
 // The cube's close (the cel at 352,445) and Escape run this one function: TRADEBTN_CLOSECUBE (23), the window closes only on acceptance.
-const closeCubeWindow = () => closeCubeFromPanel({ cubeOpen, commandButton: (button, amount) => Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [button, amount]), onAccepted: () => { cubeOpen = false; } });
+const closeCubeWindow = () => closeCubeFromPanel({ cubeOpen, commandButton: (button, amount) => commandButton(button, amount), onAccepted: () => { cubeOpen = false; } });
 let stashPanelRenderer = null, stashPanelError = '', stashEvidence = null, stashOpen = false, stashLayout = null;
 // Stash pages and the shared stash (PlugY-style, off by default, ?plugy=1 turns it on). Sidecars: the character's .d2x and the shared .sss; the .d2s stays retail.
 // Page 0 of a fresh character is the engine's own stash, so a player who never turns a page sees only the larger grid.
@@ -4153,7 +4157,8 @@ function realmTables() {
   if (realmTableSet) return realmTableSet;
   const read = createMpqAssetReader(Module);
   return (realmTableSet = { items: createItemTable(read), objects: createObjectTable(read), levels: createLevelTable(read), inventory: createInventoryTable(read),
-    belt: createBeltTable(read), monsters: createMonsterTable(read), inventoryLayoutFromEngine, stashGeometry });
+    belt: createBeltTable(read), monsters: createMonsterTable(read), types: createItemTypeTable(read), stats: createItemStatTable(read),
+    affixes: createAffixTable(read), chars: createCharStatsTable(read), skills: createSkillNameTable(read), inventoryLayoutFromEngine, stashGeometry });
 }
 function realmWorldData() { return (realmWorldState ??= createRealmWorld(realmTables())); }
 // Input in a joined game: what the pointer and keys mean is read from the client state the server's packets built, and
@@ -4218,10 +4223,23 @@ const realmClientView = {
   cursorItem: () => realmWorldState?.cursorId ?? 0, itemBoxState: null, stashGold: () => realmWorldState?.stashGold ?? -1, weaponSet: () => 0, weaponHands: () => -1,
   hotkeySkill: () => 0, hotkeyHand: () => 0,
 };
-// A joined game's item hover text: the item's name and quality. The server's stat lines are not decoded yet.
+// A joined game's item hover text: the stat and affix lines decoded from the item bitstream the server sent
+// (assets/realm-item-text.mjs), worded as the single-player tooltip is and drawn by the same tooltip renderer.
+let realmItemTextState = null;
 function realmItemTip(item) {
   const entry = realmTables().items.byClass(item.classId);
-  return { name: entry?.name ?? '', quality: item.quality, flags: item.itemFlags, props: [], propColours: [] };
+  const plain = { name: entry?.name ?? '', quality: item.quality, flags: item.itemFlags, props: [], propColours: [] };
+  const raw = realmWorldState?.rawItem(item.id);
+  if (!raw) return plain;
+  realmItemTextState ??= createItemText({ tables: realmTables(), heroStat: (id) => realmHud().stat(id),
+    lang: { key: (k) => Module.ccall('d2_lang_string', 'string', ['string'], [k]), index: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) } });
+  const text = realmItemTextState.describe(raw);
+  return text ? { ...text, flags: item.itemFlags } : plain;
+}
+// A joined game's stash and cube buttons (0x4F): the engine's command in a local game, the packet in a joined one.
+function commandButton(button, amount) {
+  if (session) return Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [button, amount]);
+  return realmFlow?.d2gs?.isOpen && realmFlow.d2gs.send(itemPackets.stashButton(button, amount)) !== false ? 1 : 0;
 }
 // The other players in the room, with the render state their unit is drawn from (mode, direction, frame, worn gear).
 function realmOtherPlayers() {
@@ -4333,7 +4351,7 @@ function render(now = false) {
     const p = perfT0();
     const drawn = pointerLayer.draw(ctx, canvas, { session: session || realmSceneActive, items: snapshot.items, pointerX: pointer.x, pointerY: pointer.y,
       context: realmSceneActive ? { kind: 'hand' } : gameCursorContext(),
-      cursorId: realmSceneActive ? 0 : frameSnap?.cursorItemId !== undefined ? frameSnap.cursorItemId : (Module._d2_session_cursor_item ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0) });
+      cursorId: realmSceneActive ? (realmWorldState?.cursorId ?? 0) : frameSnap?.cursorItemId !== undefined ? frameSnap.cursorItemId : (Module._d2_session_cursor_item ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0) });
     cursorItemEvidence = drawn.item; gameCursorEvidence = drawn.game;
     perfT('pointer', p);
   }
@@ -4905,7 +4923,7 @@ function drawFrame() {
   } else npcPanelEvidence = null;
   // Inventory.txt's record is per class: re-read whenever the session's character changes (a new
   // session, a loaded save, another class), not only when none is cached.
-  const panelData = engine || (session?.realm ? session : null);   // a joined game's panels read the server's items, not an engine
+  const panelData = engine || (realmSceneActive ? REALM_LIVE : null);   // a joined game's panels read the server's items, not an engine
   const layoutKey = panelData ? `${snapshot.playerClass}/${snapshot.playerId}/${snapshot.seed}` : '';
   if (inventoryPanelRenderer && panelData && (!inventoryPanelRenderer.layout || inventoryLayoutKey !== layoutKey)) {
     inventoryPanelRenderer.setLayout(snapOr('inventoryLayout', readInventoryLayout)); inventoryLayoutKey = layoutKey; }
@@ -5393,7 +5411,14 @@ function frame(now) {
 // The talkable NPC under a canvas point, if any. Uses the same projection the world is drawn with.
 // Retail's 0x77 UpdateUi codes the engine has sent since the last read (16 opens the stash).
 function pollUiEvents() {
-  if (!session) return;
+  if (!session) {   // a joined game: the server's own 0x77 codes (assets/realm-world.mjs)
+    for (const code of realmWorldState?.takeUiEvents() ?? []) {
+      if (code === 16) { stashOpen = true; inventoryVisible = true; }
+      else if (code === 21) { cubeOpen = true; inventoryVisible = true; }
+      else if (code === 17) { stashOpen = false; inventoryVisible = false; closeStashGold(); }
+    }
+    return;
+  }
   const p = Module._malloc(64);
   try {
     const n = Module.ccall('d2_session_take_ui_events', 'number', ['bigint', 'number'], [BigInt(p), 64]);
@@ -5558,6 +5583,14 @@ function realmInventoryClick(x, y, button) {
   }
   return true;
 }
+// A joined game's stash and cube panels and shift+click to the belt (assets/realm-storage-input.mjs).
+function realmStorageClickAt(x, y, e) {
+  return realmStorageClick({ width: canvas.width, height: canvas.height, items: snapshot.items, snapshot, cursorId: realmWorldState?.cursorId ?? 0,
+    input: realmInput(), send: (bytes) => realmFlow?.d2gs?.send(bytes),
+    inventory: { visible: inventoryVisible, renderer: inventoryPanelRenderer },
+    stash: { open: stashOpen, renderer: stashPanelRenderer, layout: stashOpen ? snapOr('stashLayout', readStashLayout) : null },
+    cube: { open: cubeOpen, renderer: cubePanelRenderer, layout: cubeOpen ? snapOr('cubeLayout', readCubeLayout) : null } }, x, y, { button: e.button, shift: e.shiftKey });
+}
 function gridDrop(cursorId, page, cell) {
   const held = snapshot.items.find((i) => i.id === cursorId) || { id: cursorId };
   const d = decideGridPlace(snapshot.items, page, cell.x, cell.y, held);
@@ -5587,6 +5620,7 @@ function readStashLayout() { return (stashLayout = stashLayoutReader.read()); }
 // Both figures are read from retail's stat list on every use. The dialog owns
 // no balance and never predicts a capped transfer; button 19/20 decides that.
 function stashGoldStat(which) {
+  if (!session) return realmSceneActive && realmWorldState ? (which === STASH_GOLD.bank ? realmWorldState.stashGold : realmWorldState.gold) : 0;
   return session ? Module.ccall('d2_session_player_stat', 'number', ['number', 'number'], [which, 0]) : 0;
 }
 function openStashGold(mode) {
@@ -5617,16 +5651,16 @@ function submitStashGold() {
   if (stashGoldDialog.mode === 'drop') {
     // D2Client+0xBFDF0: OK sends the 0x50 drop-gold packet (nothing for 0), then closes the dialog.
     const dropAmount = Math.max(0, Math.min(stashGoldDialog.available, stashGoldDialog.amount | 0));
-    const sent = dropAmount ? Module.ccall('d2_session_command_drop_gold_packet', 'number', ['number', 'bigint'], [dropAmount, 0n]) : 0;
-    snapshot = session.snapshot(); closeStashGold();
+    const sent = dropAmount && session ? Module.ccall('d2_session_command_drop_gold_packet', 'number', ['number', 'bigint'], [dropAmount, 0n]) : 0;
+    if (session) snapshot = session.snapshot(); closeStashGold();
     return sent;
   }
   const button = stashGoldDialog.mode === 'withdraw' ? STASH_GOLD.withdraw : STASH_GOLD.deposit;
   const amount = Math.max(0, Math.min(stashGoldDialog.available, stashGoldDialog.amount | 0));
-  const result = Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [button, amount]);
+  const result = commandButton(button, amount);
   // Retail owns every consequence (including capacity refusal); reread it and
   // close this client dialog rather than locally adjusting either balance.
-  snapshot = session.snapshot(); closeStashGold();
+  if (session) snapshot = session.snapshot(); closeStashGold();
   return result;
 }
 // The level exit under the pointer: retail hit-tests the warp's LvlWarp selection box in SCREEN space
@@ -6036,8 +6070,8 @@ function openPanelAt(x, y) {
   if (skillsVisible && inside(skillPanelRenderer?.panelRect?.())) return 'skills';
   if (inventoryVisible && inside(inventoryPanelRenderer?.panelRect?.())) return 'inventory';
   if (hirelingVisible && inside({ left: 80, top: 60, width: 320, height: 432 })) return 'hireling';
-  if (stashOpen && inside(stashPanelRenderer?.panelRect?.(readStashLayout()))) return 'stash';
-  if (cubeOpen && inside(cubePanelRenderer?.panelRect?.(readCubeLayout()))) return 'cube';
+  if (stashOpen && inside(stashPanelRenderer?.panelRect?.(snapOr('stashLayout', readStashLayout)))) return 'stash';
+  if (cubeOpen && inside(cubePanelRenderer?.panelRect?.(snapOr('cubeLayout', readCubeLayout)))) return 'cube';
   return null;
 }
 
@@ -6227,7 +6261,7 @@ addEventListener('keydown', (e) => {
     } else if (stashOpen) {
       // Retail's client closes the stash and tells the server with 0x4F TRADEBTN_CLOSESTASH (18);
       // the window closes when the engine accepts it.
-      if (Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [18, 0])) { stashOpen = false; inventoryVisible = false; closeStashGold(); }
+      if (commandButton(18, 0)) { stashOpen = false; inventoryVisible = false; closeStashGold(); }
     } else if (npcState) {
       if (dismissSpeech()) { e.preventDefault(); return; }
     } else { inventoryVisible = false; hirelingVisible = false; characterVisible = false; skillsVisible = false; }
@@ -6639,7 +6673,7 @@ canvas.addEventListener('pointerdown', (e) => {
   // 0x1D to swap with what is worn there); shift+click sends a carried potion to the belt (0x63).
   // Anywhere else in the world, a held item is dropped (0x17). The panel swallows its own clicks.
   // A joined game: the inventory panel's clicks and a click in the world with an item held leave as the retail item packets.
-  if (realmSceneActive && realmTransport.state === 'session-open' && (e.button === 0 || e.button === 2) && realmInventoryClick(x, y, e.button)) {
+  if (realmSceneActive && realmTransport.state === 'session-open' && (e.button === 0 || e.button === 2) && (realmStorageClickAt(x, y, e) || realmInventoryClick(x, y, e.button))) {
     pointer.x = x; pointer.y = y; canvas.focus(); e.preventDefault(); return;
   }
   if (session && e.button === 0 && inventoryOwnsClick(shopOpen(), inventoryVisible && !!inventoryPanelRenderer?.contains(x, y, canvas.width, canvas.height)) && inventoryPanelRenderer && Module._d2_session_cursor_item) { // D39: with a shop open the inventory panel still owns its clicks (equipped slots lift/swap, empty area is inert)
@@ -6653,7 +6687,7 @@ canvas.addEventListener('pointerdown', (e) => {
     if (cubeGeometry && cubePanelRenderer && cubePanelRenderer.contains(x, y, canvas.width, canvas.height, cubeGeometry)) {
       if (cubePanelRenderer.transmuteAt(x, y, canvas.width, canvas.height, cubeGeometry)) {
         // The engine's own cube recipe pass (TRADEBTN_TRANSMUTE); the result lands on page 3.
-        lastItemCommand = { name: 'transmute', args: [], result: Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [24, 0]), cursor: cursorId };
+        lastItemCommand = { name: 'transmute', args: [], result: commandButton(24, 0), cursor: cursorId };
         propCache.clear();
       } else if (!cursorId) { const item = cubePanelRenderer.itemAt(x, y, canvas.width, canvas.height, cubeGeometry, snapshot.items); if (item) itemCommand('lift', item.id); }
       else {
@@ -6992,7 +7026,7 @@ globalThis.addEventListener('pointerup', (e) => {
     const press = stashClosePress; stashClosePress = null;
     const [x, y] = canvasPoint(e);
     if (finishInventoryClosePress(press, e.pointerId, e.button === 0, stashOpen, stashCloseAt(x, y, canvas.width, canvas.height, stashOpen)).activate)
-      closeStashFromInventory({ stashOpen, commandButton: (button, amount) => Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [button, amount]), onAccepted: () => { stashOpen = false; inventoryVisible = false; closeStashGold(); } });
+      closeStashFromInventory({ stashOpen, commandButton: (button, amount) => commandButton(button, amount), onAccepted: () => { stashOpen = false; inventoryVisible = false; closeStashGold(); } });
     render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
   }
   if (inventoryClosePress?.pointerId === e.pointerId) {
@@ -7001,7 +7035,7 @@ globalThis.addEventListener('pointerup', (e) => {
     const releasedOverClose = inventoryCloseAt(x, y, canvas.width, canvas.height, inventoryVisible);
     const result = finishInventoryClosePress(press, e.pointerId, e.button === 0, inventoryVisible, releasedOverClose);
     if (result.activate) {
-      if (stashOpen) closeStashFromInventory({ stashOpen, commandButton: (button, amount) => Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [button, amount]), onAccepted: () => { stashOpen = false; inventoryVisible = false; closeStashGold(); } });
+      if (stashOpen) closeStashFromInventory({ stashOpen, commandButton: (button, amount) => commandButton(button, amount), onAccepted: () => { stashOpen = false; inventoryVisible = false; closeStashGold(); } });
       else closeInventoryPanel({ shopOpen: shopOpen(), endNpc: () => { Module.ccall('d2_session_command_end_npc', 'number', ['number'], [npcState.npcId]); npcState = readNpcState(); }, hide: () => { inventoryVisible = false; } });
     }
     render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
