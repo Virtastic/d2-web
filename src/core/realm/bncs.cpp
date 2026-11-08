@@ -281,6 +281,12 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_bncs_logonresponse2_reply(uint32_t result, uin
     return wle32(out, result);
 }
 
+// SID_CHANGEPASSWORD (0x31) reply: result(u32). Retail's pump (D2Launch+0xEAB0) continues into the log on only
+// when it is 1; anything else raises the wrong password state (BNClient+0x10D10 sets it when the u32 is 0).
+EMSCRIPTEN_KEEPALIVE int d2_realm_bncs_changepassword_reply(uint32_t result, uint8_t* out) {
+    return wle32(out, result);
+}
+
 // SID_QUERYREALMS2 (0x40) reply, one realm: unknown(u32=0) count(u32) then per realm unknown(u32=1),
 // title and description null-terminated (tristramd sid_queryrealms2.c).
 EMSCRIPTEN_KEEPALIVE int d2_realm_bncs_queryrealms2_reply(const char* title, const char* description, uint8_t* out) {

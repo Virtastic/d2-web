@@ -15,6 +15,7 @@ int d2_realm_mcp_charlist2_reply_header(uint16_t requested, uint32_t total, uint
 int d2_realm_mcp_charlist2_entry(uint32_t expiry, const char* name, const uint8_t* statstring, int statLen, uint8_t* out);
 int d2_realm_mcp_charlogon_reply(uint32_t result, uint8_t* out);
 int d2_realm_mcp_creategame_reply(uint16_t requestId, uint16_t token, uint32_t result, uint8_t* out);
+int d2_realm_listed_game(const char* name, const char** pass, uint32_t* status);
 int d2_realm_mcp_joingame_reply(uint16_t requestId, uint16_t token, uint32_t gsIp, uint32_t hash, uint32_t result, uint8_t* out);
 }
 
@@ -31,16 +32,74 @@ struct McpSession {
     uint32_t gameHash;
     uint8_t charClass;
     uint8_t charLevel;
+    bool charDeleted;   // the one fixture character was removed by MCP_CHARDELETE
+    bool charLoggedOn;  // it was logged on: the realm refuses to delete a character that is in use
     int error;
 };
 McpSession g_m;
 
 const char kCharName[] = "player";
+
+// MCP_CREATEGAME / MCP_JOINGAME results (D2Multi's two result switches; BNETDocs): 0 ok; create 0x1e bad name,
+// 0x1f the name is taken; join 0x29 wrong password, 0x2a no such game, 0x2b the game is full.
+constexpr uint32_t kCreateBadName = 0x1e, kCreateTaken = 0x1f, kJoinBadPassword = 0x29, kJoinNoGame = 0x2a, kJoinFull = 0x2b;
+// The games players made on this realm. They outlive an MCP connection (a character leaves the lobby for the game and
+// comes back), so a reset does not clear them.
+struct MadeGame { char name[20]; char pass[20]; };
+MadeGame g_made[16];
+int g_madeCount = 0;
+bool sameText(const char* a, const char* b) {
+    for (; *a && *b; a++, b++) { char x = *a, y = *b; if (x >= 'A' && x <= 'Z') x += 32; if (y >= 'A' && y <= 'Z') y += 32; if (x != y) return false; }
+    return !*a && !*b;
+}
+// Reads a NUL-terminated string out of [p, end); null when it runs off the body.
+const char* readText(const uint8_t* p, const uint8_t* end, const uint8_t** next) {
+    for (const uint8_t* q = p; q < end; q++) if (!*q) { *next = q + 1; return (const char*)p; }
+    return nullptr;
+}
+const MadeGame* findMade(const char* name) {
+    for (int i = 0; i < g_madeCount; i++) if (sameText(g_made[i].name, name)) return &g_made[i];
+    return nullptr;
+}
+bool gameExists(const char* name) {
+    const char* pass; uint32_t status;
+    return findMade(name) || d2_realm_listed_game(name, &pass, &status) >= 0;
+}
+uint32_t createResult(const uint8_t* b, int bodyLen) {
+    const uint8_t* end = b + bodyLen; const uint8_t* next;
+    if (bodyLen < 10) return kCreateBadName;
+    const char* name = readText(b + 9, end, &next);
+    if (!name || !*name) return kCreateBadName;
+    int len = 0; while (name[len]) len++;
+    if (len > 15) return kCreateBadName;
+    if (gameExists(name)) return kCreateTaken;
+    const char* pass = readText(next, end, &next);
+    if (g_madeCount < 16) {
+        MadeGame& g = g_made[g_madeCount++];
+        int i = 0; for (; i < 19 && name[i]; i++) g.name[i] = name[i]; g.name[i] = 0;
+        int j = 0; for (; pass && j < 19 && pass[j]; j++) g.pass[j] = pass[j]; g.pass[j] = 0;
+    }
+    return 0;
+}
+uint32_t joinResult(const uint8_t* b, int bodyLen) {
+    const uint8_t* end = b + bodyLen; const uint8_t* next = nullptr;
+    const char* name = bodyLen > 2 ? readText(b + 2, end, &next) : nullptr;
+    if (!name) return kJoinNoGame;
+    const char* given = readText(next, end, &next); if (!given) given = "";
+    const char* pass = ""; uint32_t status = 0;
+    if (const MadeGame* g = findMade(name)) pass = g->pass;
+    else if (d2_realm_listed_game(name, &pass, &status) < 0) return kJoinNoGame;
+    if (*pass && !sameText(pass, given)) return kJoinBadPassword;
+    return (status & 1) ? kJoinFull : 0;
+}
 constexpr uint32_t kCharLogonRefused = 0x46;
+// MCP_CHARDELETE results: 0 deleted, 0x49 no such character (1.10+, tristramd mcp_chardelete.c), 1 the
+// character is still in a game (d2-dedicated-server d2cs.zig refuses the same case).
+constexpr uint32_t kCharDeleteGone = 0x49, kCharDeleteBusy = 1;
 
 bool isListedCharacter(const uint8_t* name, int nameLen) {
     constexpr int expectedLen = sizeof(kCharName); // includes the required NUL
-    if (!name || nameLen != expectedLen) return false;
+    if (g_m.charDeleted || !name || nameLen != expectedLen) return false;
     for (int i = 0; i < expectedLen; ++i) {
         if (name[i] != static_cast<uint8_t>(kCharName[i])) return false;
     }
@@ -90,6 +149,8 @@ EMSCRIPTEN_KEEPALIVE void d2_realm_mcp_session_reset(uint32_t gsIp, uint16_t gam
     g_m.gameHash = gameHash;
     g_m.charClass = charClass;
     g_m.charLevel = charLevel;
+    g_m.charDeleted = false;
+    g_m.charLoggedOn = false;
     g_m.error = 0;
 }
 
@@ -135,8 +196,9 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_mcp_session_feed(const uint8_t* in, int len, u
                 // Reading only b[0] treated valid counts such as 0x00000100 as zero.
                 const uint32_t requested = bodyLen >= 4 ? rd32(b) : 8;
                 const uint16_t returnedLimit = (uint16_t)(requested > 8 ? 8 : requested);
-                n = d2_realm_mcp_charlist2_reply_header(returnedLimit, 1, 1, body);
-                n += d2_realm_mcp_charlist2_entry(0x7FFFFFFFu, kCharName, stat, sn, body + n);
+                const uint16_t have = g_m.charDeleted ? 0 : 1;
+                n = d2_realm_mcp_charlist2_reply_header(returnedLimit, have, have, body);
+                if (have) n += d2_realm_mcp_charlist2_entry(0x7FFFFFFFu, kCharName, stat, sn, body + n);
                 written = emit(0x19, body, n, out, outCap, written);
                 break;
             }
@@ -146,19 +208,36 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_mcp_session_feed(const uint8_t* in, int len, u
                 // as a recoverable character-selection refusal, allowing a retry on this MCP
                 // session. tristramd also names 0x7A for logon failure, but that is not a safe
                 // refusal on the local 1.13c client path.
+                if (isListedCharacter(b, bodyLen)) g_m.charLoggedOn = true;
                 n = d2_realm_mcp_charlogon_reply(
                     isListedCharacter(b, bodyLen) ? 0u : kCharLogonRefused, body);
                 written = emit(0x07, body, n, out, outCap, written);
                 break;
+            case 0x0A: { // CHARDELETE: the request id echoed, then a u32 result
+                if (bodyLen < 3) { g_m.error = 1; return -1; }
+                const uint16_t reqId = rd16(b);
+                uint32_t result = kCharDeleteGone;
+                if (isListedCharacter(b + 2, bodyLen - 2)) {
+                    if (g_m.charLoggedOn) result = kCharDeleteBusy;
+                    else { g_m.charDeleted = true; result = 0; }
+                }
+                body[0] = (uint8_t)reqId; body[1] = (uint8_t)(reqId >> 8);
+                n = 2 + d2_realm_mcp_charlogon_reply(result, body + 2);   // same layout: a u32 LE
+                written = emit(0x0A, body, n, out, outCap, written);
+                break;
+            }
             case 0x03: { // CREATEGAME -> created, hand back the token
                 const uint16_t reqId = bodyLen >= 2 ? rd16(b) : 0;
-                n = d2_realm_mcp_creategame_reply(reqId, g_m.gameToken, 0, body);
+                const uint32_t result = createResult(b, bodyLen);
+                n = d2_realm_mcp_creategame_reply(reqId, result ? 0 : g_m.gameToken, result, body);
                 written = emit(0x03, body, n, out, outCap, written);
                 break;
             }
             case 0x04: { // JOINGAME -> the ticket: token, game server, hash
                 const uint16_t reqId = bodyLen >= 2 ? rd16(b) : 0;
-                n = d2_realm_mcp_joingame_reply(reqId, g_m.gameToken, g_m.gsIp, g_m.gameHash, 0, body);
+                const uint32_t result = joinResult(b, bodyLen);
+                n = result ? d2_realm_mcp_joingame_reply(reqId, 0, 0, 0, result, body)
+                           : d2_realm_mcp_joingame_reply(reqId, g_m.gameToken, g_m.gsIp, g_m.gameHash, 0, body);
                 written = emit(0x04, body, n, out, outCap, written);
                 break;
             }

@@ -24,6 +24,13 @@ int d2_realm_huffman_frame(const uint8_t* payload, int plen, uint8_t* out, int o
 int d2_realm_d2gs_act_load(uint8_t act, uint32_t mapId, uint16_t areaId, uint32_t unk1, uint8_t* out);
 int d2_realm_d2gs_player_assign(uint32_t unitId, uint8_t playerClass, const char* name, uint16_t x, uint16_t y, uint8_t* out);
 int d2_realm_d2gs_player_in_game(uint32_t unitId, uint8_t playerClass, const char* name, uint16_t level, uint16_t partyId, uint8_t* out);
+void d2_realm_d2gs_party_reset(uint32_t self, uint8_t cls, uint16_t level, int hardcore);
+int d2_realm_d2gs_party_add(uint32_t id, uint8_t cls, uint16_t level);
+void d2_realm_d2gs_party_clock(uint32_t nowMs);
+int d2_realm_d2gs_party_take_for(uint32_t id, uint8_t* out, int cap);
+void d2_realm_d2gs_party_remove(uint32_t id);
+int d2_realm_d2gs_recv_5d_from(uint32_t issuerId, const uint8_t* packet, int size);
+int d2_realm_d2gs_recv_5e_from(uint32_t issuerId, const uint8_t* packet, int size);
 }
 
 namespace {
@@ -66,7 +73,10 @@ struct D2gsSession {
     int error;
     int joined;
 };
-D2gsSession g_g;
+// One session per connected client: the game server keeps a state and an output queue for each
+// seat, and a notice for player B (party invite, relation change) is delivered on B's connection.
+constexpr int kClients = 8;
+D2gsSession g_all[kClients];
 #if defined(D2_REALMD_TEST_FIXTURE)
 bool g_fixtureReassignOnKeepalive;
 bool g_fixtureReassignSent;
@@ -159,8 +169,12 @@ static uint32_t newGameMapSeed() {
     return seedRandom(0x6AC690C5u * low + 666u, sec, ms);
 }
 
-EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t charClass, uint8_t act, uint16_t level,
-                                                       uint16_t gameToken, uint32_t gameHash) {
+EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_reset_client(uint32_t clientId, uint32_t unitId, uint8_t charClass,
+                                                              uint8_t act, uint16_t level, uint16_t gameToken,
+                                                              uint32_t gameHash) {
+    if (clientId >= (uint32_t)kClients) return;
+    D2gsSession& g_g = g_all[clientId];
+    if (g_g.joined) d2_realm_d2gs_party_remove(g_g.unitId);   // a seat re-used without a disconnect
     g_g.rxLen = 0;
     g_g.clientActive = 1;
     g_g.unitId = unitId;
@@ -178,11 +192,18 @@ EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t c
 #endif
 }
 
+EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t charClass, uint8_t act, uint16_t level,
+                                                       uint16_t gameToken, uint32_t gameHash) {
+    d2_realm_d2gs_session_reset_client(0, unitId, charClass, act, level, gameToken, gameHash);
+}
+
 // 0x6090 (ordinal 10000) retires the indexed server client. The realmd host owns the
 // socket; this core half clears the matching D2GS session before the host closes it. realmd
 // currently supports one D2GS connection, assigned client slot zero.
 EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_disconnect_client(uint32_t clientId) {
-    if (clientId != 0 || !g_g.clientActive) return;
+    if (clientId >= (uint32_t)kClients || !g_all[clientId].clientActive) return;
+    D2gsSession& g_g = g_all[clientId];
+    if (g_g.joined) d2_realm_d2gs_party_remove(g_g.unitId);   // the others are told this seat left
     g_g.clientActive = 0;
     g_g.rxLen = 0;
     g_g.joined = 0;
@@ -216,9 +237,11 @@ EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_fixture_return_self_remove_other
 }
 #endif
 
-EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_pending() { return g_g.rxLen; }
-EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_error() { return g_g.error; }
-EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_joined() { return g_g.joined; }
+EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_pending() { return g_all[0].rxLen; }
+EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_error() { return g_all[0].error; }
+EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_joined() { return g_all[0].joined; }
+EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_error_client(uint32_t c) { return c < (uint32_t)kClients ? g_all[c].error : -1; }
+EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_joined_client(uint32_t c) { return c < (uint32_t)kClients ? g_all[c].joined : 0; }
 
 // The greeting the engine sends unprompted the moment a client connects, before any frame:
 // AF 01 selects the stock Huffman table and length framing for the server->client stream.
@@ -228,12 +251,28 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_greeting(uint8_t* out) {
     return 2;
 }
 
+// The compressed, framed notices queued for one client by other seats' commands (party invites,
+// relation changes).  0 when nothing is waiting, -1 when `out` is too small or framing fails; the
+// host calls it for every other connection after feeding one, and feed_client calls it for its own.
+EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_take_client(uint32_t clientId, uint8_t* out, int outCap) {
+    if (clientId >= (uint32_t)kClients || !g_all[clientId].joined) return 0;
+    uint8_t burst[512];
+    uint8_t packed[1200];
+    const int rn = d2_realm_d2gs_party_take_for(g_all[clientId].unitId, burst, (int)sizeof burst);
+    if (rn <= 0) return rn;
+    const int pn = d2_realm_huffman_compress(burst, rn, packed, (int)sizeof packed);
+    if (pn < 0 || pn + 2 > outCap) return -1;
+    return d2_realm_huffman_frame(packed, pn, out, outCap);
+}
+
 // Feed raw client->server bytes.  Returns reply bytes (Huffman-compressed and framed) written to
 // `out`, or -1 when the stream cannot be framed -- an opcode this build does not use, or a declared
 // length past the engine's cap.  That is reported rather than skipped: silently guessing a length
 // is how a stream desyncs with nothing in the log to explain it.  A packet that is merely
 // incomplete is not an error; it stays buffered for the next read.
-EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_feed(const uint8_t* in, int len, uint8_t* out, int outCap) {
+EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_feed_client(uint32_t clientId, const uint8_t* in, int len, uint8_t* out, int outCap) {
+    if (clientId >= (uint32_t)kClients) return -1;
+    D2gsSession& g_g = g_all[clientId];
     if (g_g.error) return -1;
     if (g_g.rxLen + len > kRxCap) { g_g.error = 1; return -1; }
     for (int i = 0; i < len; i++) g_g.rx[g_g.rxLen++] = in[i];
@@ -320,6 +359,32 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_feed(const uint8_t* in, int len, 
             if (fn < 0) { g_g.error = 1; return -1; }
             written += fn;
             g_g.joined = 1;
+            {
+                // The first seat in opens the game's party state; later seats join it.
+                bool others = false;
+                for (int k = 0; k < kClients; k++) if (k != (int)clientId && g_all[k].joined) others = true;
+                if (others) d2_realm_d2gs_party_add(g_g.unitId, g_g.charClass, g_g.level);
+                else d2_realm_d2gs_party_reset(g_g.unitId, g_g.charClass, g_g.level, 0);
+            }
+#if defined(D2_REALMD_TEST_FIXTURE)
+            if (g_fixtureOtherPlayerOnJoin) d2_realm_d2gs_party_add(g_g.unitId + 1, 1, 1);
+#endif
+        } else if ((op == 0x5d || op == 0x5e) && g_g.joined) {
+            // Relation and party requests from the player: the party code answers with the roster
+            // notices (0x8b, 0x8c, 0x8d, 0x5a) that belong to this client.
+            d2_realm_d2gs_party_clock((uint32_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count());
+            if (op == 0x5d) d2_realm_d2gs_recv_5d_from(g_g.unitId, g_g.rx + off, size);
+            else d2_realm_d2gs_recv_5e_from(g_g.unitId, g_g.rx + off, size);
+            // Notices for other players stay in their queues; this client takes only its own.
+            const int rn = d2_realm_d2gs_party_take_for(g_g.unitId, burst, (int)sizeof burst);
+            if (rn > 0) {
+                const int pn = d2_realm_huffman_compress(burst, rn, packed, (int)sizeof packed);
+                if (pn < 0 || written + pn + 2 > outCap) { g_g.error = 1; return -1; }
+                const int fn = d2_realm_huffman_frame(packed, pn, out + written, outCap - written);
+                if (fn < 0) { g_g.error = 1; return -1; }
+                written += fn;
+            }
 #if defined(D2_REALMD_TEST_FIXTURE)
         } else if (op == 0x6d && g_g.joined && g_fixtureReassignOnKeepalive && !g_fixtureReassignSent) {
             // Deterministic local fixture: one server location reassignment after the client's
@@ -389,7 +454,17 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_feed(const uint8_t* in, int len, 
     const int rest = g_g.rxLen - off;
     for (int i = 0; i < rest; i++) g_g.rx[i] = g_g.rx[off + i];
     g_g.rxLen = rest;
+    // Notices other seats' packets queued for this one go out with this read's reply.
+    if (g_g.joined) {
+        const int more = d2_realm_d2gs_session_take_client(clientId, out + written, outCap - written);
+        if (more < 0) { g_g.error = 1; return -1; }
+        written += more;
+    }
     return written;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_feed(const uint8_t* in, int len, uint8_t* out, int outCap) {
+    return d2_realm_d2gs_session_feed_client(0, in, len, out, outCap);
 }
 
 }  // extern "C"
