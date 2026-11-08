@@ -99,6 +99,7 @@ import { localSlash } from './assets/bnet-slash.mjs';
 import { createOtherMultiplayerScreen } from './assets/other-multiplayer.mjs';
 import { createBnetLoginScreen } from './assets/bnet-login-screen.mjs';
 import { createBnetLobbyScreen } from './assets/bnet-lobby-screen.mjs';
+import { createLobbyFigure } from './assets/lobby-figure.mjs';
 import { createBnetChat } from './assets/bnet-chat.mjs';
 import { parseGameList, filterGames } from './assets/bnet-gamelist.mjs';
 import { createSessionGames } from './assets/bnet-session-games.mjs';
@@ -1888,7 +1889,9 @@ function enterBnetLobby(name) {
     throw Object.assign(error, { sessionLost: true });
   });
   bnetLobbyError = '';
-  try { bnetLobbyScreen = createBnetLobbyScreen({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, string,
+  try { const lobbyRead = createMpqAssetReader(Module);
+    bnetLobbyScreen = createBnetLobbyScreen({ read: lobbyRead, decodeDc6, decodeDatPalette, string,
+    figure: createLobbyFigure({ read: lobbyRead, decodeDatPalette, componentToken: (i) => { if (!componentTablesReady) componentTablesReady = Boolean(Module.ccall('d2_drlg_init', 'number', [], [])); return Module._d2_component_token ? Module.ccall('d2_component_token', 'string', ['number'], [i]) : ''; } }).figure,
     character: lobbyCharacter(c.name),
     onRefreshGames: () => { pushLobbyGames(c.name); const link = startLobbyChat(c.name) && realmFlow?.chatLink; if (link?.session?.open) link.session.games(); else void link?.ensure(lobbyChatUser(c.name)).then((s) => s?.games()); },
     onCreateGame: (game) => play({ ...game, listing: { difficulty: (game.difficulty ?? 0) + (lobbyCharacter(c.name)?.hardcore ? 3 : 0), description: game.description ?? '' } }),

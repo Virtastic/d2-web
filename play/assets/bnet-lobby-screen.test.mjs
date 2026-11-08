@@ -246,3 +246,32 @@ test('CREATE clamps a typed player count as retail does: 0 is 1, 9 and up is 8',
 
 
 
+
+test('chat keeps working with HELP / LADDER open, and a press on the chat line takes the keys back from CREATE', () => {
+  const out = [], created = [];
+  const s = screen({ name: 'Ama', charClass: 0, level: 3 }, { onSendChat: (t) => { out.push(t); return true; }, onCreateGame: async (g) => { created.push(g); } });
+  s.activate('enter-chat'); s.chatLive(true);
+  s.activate('ladder'); assert.equal(s.panel, 'ladder');
+  assert.equal(s.editAt(40, 435, 800, 600), true, 'the chat line takes a tap while LADDER is up');
+  s.typeKey('KeyA', 'a'); s.typeKey('Enter'); assert.deepEqual(out, ['a']);
+  s.activate('create'); s.typeKey('KeyN', 'n');
+  assert.equal(s.evidence.form.name, 'n', 'CREATE owns the keys at first');
+  assert.ok(s.activate('field-chat'), 'the chat line is a control under CREATE');
+  s.typeKey('KeyB', 'b'); s.typeKey('Enter');
+  assert.deepEqual(out, ['a', 'b']); assert.deepEqual(created, []); assert.equal(s.evidence.form.name, 'n');
+  s.activate('field-name'); s.typeKey('KeyZ', 'z'); assert.equal(s.evidence.form.name, 'nz', 'a press on a CREATE box gives them back');
+});
+
+test('the user band paints the figure the statstring names, in the band cell, once per user', () => {
+  const drawn = [], seen = [];
+  const rec = new Proxy({}, { get: (_, k) => (k === 'getImageData' ? () => ({ data: new Uint8ClampedArray(4) }) : k === 'drawImage' ? (c, x, y) => drawn.push([c.tag, x, y]) : () => {}), set: () => true });
+  const doc = { createElement: () => ({ width: 0, height: 0, getContext: () => rec }) };
+  const layer = { canvas: { tag: 'L' }, left: -10, top: -50 };
+  const s = screen({ name: 'Ama', charClass: 0, level: 3 }, { documentObject: doc, figure: (stat) => { seen.push(stat); return { layers: [layer] }; } });
+  s.activate('enter-chat');
+  s.chatEvent({ event: 0x01, username: 'Ama*Acct', raw: 'PX2Dr,Ama,\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x05' + '\xff'.repeat(11) + '\x20\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', flags: 0 });
+  drawn.length = 0; s.draw(rec, 800, 600);
+  assert.equal(seen.length, 1);
+  const B = BNET_LOBBY_LAYOUT.band;
+  assert.ok(drawn.some(([t, x, y]) => t === 'L' && x === B.x + 30 - 10 && y === B.portraitY - 50), 'the layer lands at the cell anchor plus its offsets');
+});

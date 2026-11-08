@@ -226,7 +226,7 @@ export function portraitFrameAt(token, elapsedMs) {
 export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, string = () => '', character = {},
   now = () => performance.now(), registryDifficulty = 0, onCreateGame = async () => {}, onJoinGame = async () => {}, onRefreshGames = () => {},
   offline = false,
-  portraitFrame = null, auraFrame = null, onQuit = () => {}, onEnterChat = () => {}, onSendChat = () => false, onJoinChannel = () => {}, onRefreshChannels = () => {}, onLadder = () => {}, documentObject = globalThis.document }) {
+  portraitFrame = null, auraFrame = null, figure = null, onQuit = () => {}, onEnterChat = () => {}, onSendChat = () => false, onJoinChannel = () => {}, onRefreshChannels = () => {}, onLadder = () => {}, documentObject = globalThis.document }) {
   const A = BNET_LOBBY_ASSETS, L = BNET_LOBBY_LAYOUT, S = BNET_LOBBY_STRINGS;
   const palette = decodeDatPalette(read(FRONTEND.palette));
   const skyPalette = decodeDatPalette(read('data\\global\\palette\\Act1\\pal.dat')); // the lobby is drawn under the Act 1 palette; Sky turns the floor blue
@@ -351,6 +351,8 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     const out = [];
     if (mode === 'chat') out.push(L.send, L.whisper, L.chatHelp, L.squelch, L.unsquelch, L.emote);
     out.push(L.create, L.channel, L.join, L.ladder, L.quit);
+    // The chat line stays a control under CREATE / JOIN / CHANNEL: a press on it takes the keyboard back from the panel's box.
+    if (mode === 'chat' && editsFor().length) out.push({ id: 'field-chat', type: 'field', ...L.chatEdit });
     if (mode === 'chat') out.push(...L.arrows); else out.push(L.enterChat, L.help);
     if (panel === 'create') {
       const C = L.createGame;
@@ -689,6 +691,11 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
       const frame = portraitFrame ? portraitFrame(i) : portraitFrameAt(token, clock() - (shown[i].since ?? 0));
       if (dead) recordDcc('RH', frame, x, B.portraitY, { mode: 1 });
       else for (let k = 0; k < (PORTRAIT_LAYERS[token] ?? 1); k++) recordDcc(token, frame, x, B.portraitY);
+      // The figure itself: the class's layers dressed from the user's statstring (nothing is painted by the records above).
+      if (figure && !ft) {
+        let fig = null; try { fig = figure(shown[i].stat, clock() - (shown[i].since ?? 0)); } catch { /* art the player's assets lack: the name still draws */ }
+        for (const l of fig?.layers ?? []) sctx.drawImage(l.canvas, x + l.left, B.portraitY + l.top);
+      }
       if (fl & 0x20) { const c = art('squelch'), ak = auraFrame ? auraFrame() : Math.floor(clock() / 250) % c.dc6.frames.length, fr = c.dc6.frames[ak]; if (fr) { const left = x + fr.offsetX, top = B.portraitY + 10 + fr.offsetY - fr.height + 1;
         logoBlend(sctx, fr, left, top, 3); recordDc6(c.path, ak, fr, left, top, { op: 'cel', mode: 3 }); } }
     }
@@ -954,7 +961,8 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
       if (busy) return true;
       const enter = code === 'Enter' || code === 'NumpadEnter';
       if (notice) { if (enter || code === 'Escape') notice = null; return true; }
-      if (panel) {
+      // HELP and LADDER have no edit box, and a press on the chat line moves the focus to it: the keys are the chat line's.
+      if (panel && editsFor().length && form.focus !== 'chat') {
         const edits = editsFor(), ids = edits.map((e) => e.id);
         if (code === 'Tab') { form.focus = ids[(ids.indexOf(form.focus) + 1) % ids.length]; return true; }
         // Every edit's Enter callback is the panel's OK (D2Multi+0x142C0 create, +0x14100 join).
@@ -981,11 +989,11 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     // are ordinary controls whose press already focuses them).
     editValue() {
       if (busy || notice) return null;
-      if (panel) { const e = editsFor().find((x) => x.id === form.focus); return e ? String(form[e.id]) : null; }
+      if (panel && editsFor().length && form.focus !== 'chat') { const e = editsFor().find((x) => x.id === form.focus); return e ? String(form[e.id]) : null; }
       return mode === 'chat' ? chat.input : null;
     },
     editAt(x, y, w, h) {
-      if (busy || notice || panel || mode !== 'chat') return false;
+      if (busy || notice || (panel && editsFor().length) || mode !== 'chat') return false;
       const [sx, sy] = at(x, y, w, h), r = box(L.chatEdit);
       return sx >= r.x && sx < r.x + r.w && sy >= r.y && sy < r.y + r.h;
     },
@@ -1056,7 +1064,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
       if (mode === 'chat') {
         if (chat.channel) drawTextBox(L.newsTitle, [{ text: headerText(), colour: 3 }]);
         drawChatLog(L.chatLog, chat.lines, chat.first ?? null);
-        drawEdit(L.chatEdit, chat.input, (!panel || panel === 'ladder' || panel === 'help') && !notice);   // HELP and LADDER take no edit box, so the chat line keeps the caret
+        drawEdit(L.chatEdit, chat.input, (!editsFor().length || form.focus === 'chat') && !notice);   // HELP and LADDER take no edit box, so the chat line keeps the caret
         drawCel(art('gem'), 0, L.gem.x, L.gem.y);
       } else {
         drawButton(L.enterChat); drawButton(L.help);
