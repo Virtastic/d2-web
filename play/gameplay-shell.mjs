@@ -64,6 +64,8 @@ import { decodeWalkProbe } from './assets/walk-command-trace.mjs';
 import { hudOrigin } from './assets/hud-origin.mjs';
 import { chromeGates } from './assets/scene-chrome.mjs';
 import { realmViewSnapshot, realmFrameReads } from './assets/realm-client-view.mjs';
+import { createRealmHud, waypointTravelPacket } from './assets/realm-hud-state.mjs';
+import { createExperienceTable, createWaypointTable, createSkillTable } from './assets/realm-hud-tables.mjs';
 import { createRealmWorld } from './assets/realm-world.mjs';
 import { createItemTable, createObjectTable, createLevelTable, createInventoryTable, createBeltTable, createMonsterTable } from './assets/realm-tables.mjs';
 import { panelSides as panelViewSides, viewCentreX } from './assets/panel-view-shift.mjs';
@@ -425,6 +427,7 @@ const ADVANCEMENT = Object.freeze({ level: 12, experience: 16, nextExperience: 2
 // skill's level is the engine's, never a local increment.
 const SKILL_CAP = 128;
 function readClassSkills() {
+  if (realmSceneActive) return realmReads?.classSkills ?? null;   // a joined game: the server's skills, no engine session
   if (classSkills) return classSkills;
   if (!session || typeof Module === 'undefined') return null;
   // wasm64: a pointer ARGUMENT is BigInt at the ccall boundary, even though a pointer RETURN reads
@@ -507,6 +510,7 @@ function beltShownBoxes() {
 }
 
 function readAdvancement() {
+  if (realmSceneActive) return realmReads?.advancement ?? null;
   if (advancement) return advancement;
   if (!session || typeof Module === 'undefined') return null;
   const ptr = Number(Module.ccall('d2_session_advancement', 'number', [], []));
@@ -541,7 +545,7 @@ let questOpenedAt = 0;   // V8d: the engine tick the quest log was opened on, fo
 // which have already played it -- the client's stand-in for retail moving COMPLETEDNOW -> COMPLETEDBEFORE
 // when the log closes (there is no engine export to clear the record bit; declared in client-parity.md).
 const questAnim = new Set(), questPlayed = new Set();
-const readQuestWords = () => { const p = Number(Module.ccall('d2_session_quest_record', 'number', [], [])); return p ? new Uint16Array(Module.HEAPU8.buffer.slice(p, p + 96)) : new Uint16Array(48); };
+const readQuestWords = () => { if (realmSceneActive) return realmReads?.questWords ?? new Uint16Array(48); const p = Number(Module.ccall('d2_session_quest_record', 'number', [], [])); return p ? new Uint16Array(Module.HEAPU8.buffer.slice(p, p + 96)) : new Uint16Array(48); };
 // An act shows a tab once any of its OWN quest words is set (its six quests, or the trailing COMPLETED
 // word where it has one). Act V's words are 35..40, not 32..39 -- ACT_BASE, F411.
 const questTabs = (words, act) => { let top = act; for (let a = 1; a <= 5; a++) { const end = ACT_DONE[a - 1] || QUESTS_IN_ACT[a - 1];
@@ -784,7 +788,7 @@ function readSkillStrings(id) {
 // V9b: the popup icon's plate is the tree's (buildSkillPlate) over the class tree's record for that skill.
 function skillPlateState() {
   return { string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]), line: (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]),
-    skillDesc: readSkillDesc, skillStrings: readSkillStrings, skillMana: (id, level) => Module.ccall("d2_session_skill_mana", "number", ["number", "number"], [id, level]), record: (id) => (readClassSkills() || []).find((k) => k.id === id) || null };
+    skillDesc: readSkillDesc, skillStrings: readSkillStrings, skillMana: (id, level) => (realmSceneActive ? 0 : Module.ccall("d2_session_skill_mana", "number", ["number", "number"], [id, level])), record: (id) => (readClassSkills() || []).find((k) => k.id === id) || null };
 }
 // Retail's 0x3C through the engine; the right hand's choice is also what a right click casts.
 function selectSkill(id, side) {
@@ -1662,6 +1666,7 @@ function releaseRealmFlow({ closeTransports = true } = {}) {
   realmPlayerReassignFade.reset();
   realmWorldView = null;
   realmWorldState?.reset();
+  realmHudState?.reset();
   realmMonsterViews = [];
   realmMissileViews = [];
   realmGameClock = 0;
@@ -3647,7 +3652,14 @@ function drawPlayer(c) {
       playerRenderError = '';
     }
     // One animation that fails to draw is reported, not fatal: the next mode may draw fine.
-    catch (error) { playerRenderError = String(error); }
+    catch (error) {
+      playerRenderError = String(error);
+      // A joined game's own character must stay on screen when its worn gear cannot be composed (an item the
+      // tables do not know): draw the bare body, and keep the error on the scene evidence.
+      if (source.source === 'realm' && source.renderState && !source.renderState.form) {
+        try { playerRenderer.draw(c, viewCX(), (h / 2 + UNIT_CENTRE_Y), { ...source.renderState, items: [], weaponClass: 'hth' }); } catch (bare) { playerRenderError += ` / bare: ${bare}`; }
+      }
+    }
     drawFx(false);
   }
   if (!playerRenderer) {
@@ -4128,7 +4140,15 @@ function fillFrameSnapshot() {
 let realmReads = null;
 // The objects, items, gold and worn gear the D2GS server sends (assets/realm-world.mjs), and the data tables that
 // name them; both are made on first use, once the MPQ reader exists.
-let realmWorldState = null, realmTableSet = null;
+let realmWorldState = null, realmTableSet = null, realmHudState = null;
+// The character, skill, quest and waypoint panels' data, from the packets the server sent (assets/realm-hud-state.mjs).
+function realmHud() {
+  if (realmHudState) return realmHudState;
+  const read = createMpqAssetReader(Module);
+  return (realmHudState = createRealmHud({ experience: createExperienceTable(read), waypoints: createWaypointTable(read),
+    skills: createSkillTable(read, (key) => Module.ccall('d2_lang_index', 'number', ['string'], [key])) },
+    { levelName: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) || key }));
+}
 function realmTables() {
   if (realmTableSet) return realmTableSet;
   const read = createMpqAssetReader(Module);
@@ -4161,6 +4181,9 @@ function feedRealmWorld(bytes) {
   const world = realmWorldData();
   if (realmPlayerView?.guid != null) world.setOwner(realmPlayerView.guid);
   world.feed(bytes, (b) => protocol.d2gsPacketSize(b));
+  const hud = realmHud();
+  if (realmPlayerView?.guid != null) hud.setOwner(realmPlayerView.guid);
+  hud.feed(bytes, (b) => protocol.d2gsPacketSize(b));
 }
 const snapOr = (key, live) => (realmSceneActive && realmReads && key in realmReads ? realmReads[key] : fromSnapshot(frameSnap, key, live));
 // The single-player clientView: the sim's snapshot and the engine's d2_session_* reads that drawFrame
@@ -4222,7 +4245,15 @@ function refreshRealmView() {
     missiles: realmMissileViews, players: realmOtherPlayers(), level: realmWorldView?.mapLevel, actor: realmMonsterAnimationActor, frame: realmAnimationFrame,
     world: realmWorldState });
   if (next) snapshot = next;
-  realmReads = realmFrameReads(resources, realmWorldState, realmWorldState ? realmTables() : null, next?.playerClass ?? 0);
+  const levels = new Map();
+  for (const k of (realmPlayerView?.active ? readSkillChoices() : [])) levels.set(k.id, k.level);
+  realmReads = realmFrameReads(resources, realmWorldState, realmWorldState ? realmTables() : null, next?.playerClass ?? 0, realmHud(), levels);
+  // A panel the server has sent nothing for stays closed; the waypoint menu opens when the server says so.
+  if (!realmReads.advancement) characterVisible = false;
+  if (!realmReads.classSkills) skillsVisible = false;
+  if (!realmReads.questWords) questVisible = false;
+  const menu = realmHud().takeMenu();
+  if (menu) waypointMenu = { id: menu.id, act: snapshot.act };
 }
 const clientView = () => (realmSceneActive ? realmClientView : spClientView);
 const hudLang = (i) => (frameSnap?.lang?.has(i) ? frameSnap.lang.get(i) : Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]));
@@ -4379,6 +4410,10 @@ function ensureRealmChrome() {
   hoverFont ??= makeHoverFont();
   controlPanelRenderer ??= createControlPanelRenderer(assetReader);
   beltRenderer ??= createBeltRenderer(assetReader);
+  characterPanelRenderer ??= createCharacterPanelRenderer(assetReader);
+  skillPanelRenderer ??= createSkillPanelRenderer(assetReader, document, createSkillPointOverlay());
+  try { questLogRenderer ??= createQuestLogRenderer(assetReader, document); } catch (error) { realmSceneError = String(error); }
+  try { waypointPanelRenderer ??= createWaypointPanelRenderer(assetReader, document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) }); } catch (error) { waypointPanelError = String(error); }
   if (!pointerLayer) {
     gameCursor ??= createGameCursor({ read: assetReader, decodeDc6, documentObject: document });
     pointerLayer = createPointerLayer({ gameCursor, cursorItem: (c, cw, ch, item, x, y) => inventoryPanelRenderer?.drawCursorItem(c, cw, ch, item, x, y) });
@@ -4942,7 +4977,7 @@ function drawFrame() {
     }, panelShown(characterVisible));
   }
   questEvidence = null;
-  if (questLogRenderer && panelShown(questVisible) && engine && !clearScreen) {
+  if (questLogRenderer && panelShown(questVisible) && (engine || realmSceneActive) && !clearScreen) {
     const words = snapOr('questWords', readQuestWords), act = questAct || (questAct = snapshot.act || 1, questSelected = questFirst(words, questAct), questAct);
     questEvidence = questLogRenderer.draw(ctx, w, h, { act, tabs: questTabs(words, snapshot.act || 1), words, selected: questSelected, descrOn: questDescrOn,
       pressed: questCloseGesture.pressed ? 'close' : null,
@@ -5387,6 +5422,7 @@ function engineLevelName(levelId) {
 // the rows of one act (what the menu lists) and the acts retail draws a tab for (tabActsOf -- one
 // per act with an active waypoint; retail's captures draw one, two and four).
 function readWaypointTable() {
+  if (realmSceneActive) return realmReads?.waypointTable ?? { rows: () => [], tabs: [] };
   const p = Module._malloc(64 * 16);
   try {
     const n = Module.ccall('d2_session_waypoints', 'number', ['bigint', 'number'], [BigInt(p), 256]);
@@ -5411,6 +5447,11 @@ function readWaypointActCompletion() {
 // Retail's 0x49: travel to levelId through the open waypoint, or close the menu with 0.
 function takeWaypoint(levelId) {
   if (!waypointMenu) return 0;
+  if (realmSceneActive) {   // a joined game: retail's 0x49 goes to the server, which answers with the move
+    realmFlow?.d2gs?.send?.(waypointTravelPacket(waypointMenu.id, levelId));
+    waypointMenu = null; lastWaypointTravel = { levelId, result: 1 };
+    return 1;
+  }
   const previousAct = snapshot.act;
   const result = Module.ccall('d2_session_command_waypoint', 'number', ['number', 'number'], [waypointMenu.id, levelId]);
   if (result) {
@@ -6235,7 +6276,7 @@ canvas.addEventListener('pointermove', (e) => {
   }
   if (screen === SCREEN.GAME && gameMenu?.open) { gameMenu.hover(x, y, canvas.width, canvas.height); return; }
   if (session && skillSelectRenderer && screen === SCREEN.GAME) skillSelectRenderer.hover(x, y, canvas.width, canvas.height, readSkillChoices());
-  if (session && skillPanelRenderer)   // a closed panel clears its hover, else the plate is stale when it reopens
+  if ((session || realmSceneActive) && skillPanelRenderer)   // a closed panel clears its hover, else the plate is stale when it reopens
     skillPanelRenderer.hover(x, y, canvas.width, canvas.height, { skills: skillsVisible ? readClassSkills() || [] : [] });
   if (screen === SCREEN.GAME && npcMenu?.open) npcMenu.hover(x, y);
   if (screen === SCREEN.GAME && repairConfirm.open) repairConfirmRenderer?.hover(x, y);

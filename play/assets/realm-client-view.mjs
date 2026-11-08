@@ -37,14 +37,20 @@ export function realmViewSnapshot({ base: given, resources, monsters, missiles, 
 // snapOr() key of drawFrame; a key that is absent here is read as the single-player engine reads it (and
 // answers "nothing" with no session).
 //   characterScreen: slots 4 and 5 are the stamina and its maximum (whole points), what the stamina bar reads.
-//   advancement:     none; the experience bar stays empty until the server's experience reaches the shell.
+//   advancement:     the server's level, experience and attributes (assets/realm-hud-state.mjs); null, so the experience bar
+//                    and the character and skill panels stay empty, until the server has sent its level.
 //   runToggle / hotkeys / belt: nothing is worn, bound or held yet.
-export function realmFrameReads(resources, world = null, tables = null, playerClass = 0) {
+export function realmFrameReads(resources, world = null, tables = null, playerClass = 0, hud = null, skillLevels = null) {
   const whole = (v) => (v ?? 0) >> 8;
-  const screen = new Array(11).fill(0);
+  const screen = new Array(15).fill(0);
   screen[4] = whole(resources?.stamina); screen[5] = whole(resources?.staminaMax);
-  const reads = { characterScreen: resources ? screen : null, advancement: null, runToggle: false, beltIndex: 2,
-    beltHudBoxes: null, beltBoxCount: 0 };
+  screen[11] = whole(resources?.hp); screen[12] = whole(resources?.hpMax); screen[13] = whole(resources?.mana); screen[14] = whole(resources?.manaMax);
+  // The character screen shows the server's stats; with no level from the server it has nothing to show.
+  const advancement = hud?.advancement(playerClass) ?? null;
+  const reads = { characterScreen: resources ? (hud ? hud.characterSlots(playerClass, screen) && screen : screen.slice(0, 11)) : null, advancement,
+    attributeTotals: hud?.attributeTotals() ?? null, questWords: hud?.questWords ?? null,
+    classSkills: hud?.classSkills(playerClass, skillLevels) ?? null, waypointTable: hud?.waypointTable() ?? null,
+    runToggle: false, beltIndex: 2, beltHudBoxes: null, beltBoxCount: 0 };
   if (!world || !tables) return reads;
   // The panels' geometry is Inventory.txt / Belts.txt read through the shell's asset reader, in the numeric
   // shapes the single-player engine hands the same readers.
@@ -57,8 +63,8 @@ export function realmFrameReads(resources, world = null, tables = null, playerCl
   const record = world.beltRecord(), boxes = tables.belt.boxes(record) ?? [];
   let bottom = boxes.length ? boxes[0].bottom : 0;
   for (const b of boxes) if (b.bottom > bottom) bottom = b.bottom;
-  const hud = boxes.filter((b) => b.bottom === bottom);
-  reads.beltIndex = record; reads.beltBoxCount = boxes.length; reads.beltHudBoxes = hud.length ? hud : null;
+  const hudBoxes = boxes.filter((b) => b.bottom === bottom);
+  reads.beltIndex = record; reads.beltBoxCount = boxes.length; reads.beltHudBoxes = hudBoxes.length ? hudBoxes : null;
   reads.beltShowntrue = reads.beltShownfalse = reads.beltHudBoxes;
   return reads;
 }
