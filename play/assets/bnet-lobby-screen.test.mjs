@@ -140,9 +140,9 @@ test('chat: typing and Enter go out through the chat socket; the server\'s lines
   assert.deepEqual(s.evidence.chat, ['<Ama> hi']);
   s.chatLive(true);
   s.typeKey('KeyY', 'y'); s.typeKey('Enter');
-  assert.deepEqual(out, ['y']); assert.deepEqual(s.evidence.chat, ['<Ama> hi']);
+  assert.deepEqual(out, ['y']); assert.deepEqual(s.evidence.chat, ['<Ama> hi', '<Ama> y']);   // Battle.net does not echo the speaker: drawn here
   s.chatLine({ text: '<Bob> yo', colour: 0 }); assert.equal(s.evidence.chat.at(-1), '<Bob> yo');
-  s.activate('whisper'); s.typeKey('KeyB', 'b'); assert.equal(s.evidence.chat.length, 2);
+  s.activate('whisper'); s.typeKey('KeyB', 'b'); assert.equal(s.evidence.chat.length, 3);
   s.activate('whisper'); assert.deepEqual(out, ['y']);                   // WHISPER needs a picked user
   s.pickUser('*Bob'); s.activate('whisper'); assert.deepEqual(out.at(-1), '/whisper *Bob b');
   s.typeKey('KeyC', 'c'); s.activate('emote'); assert.deepEqual(out.at(-1), '/me c');

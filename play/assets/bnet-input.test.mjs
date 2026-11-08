@@ -124,7 +124,7 @@ for (const vp of VIEWPORTS) {
     r.screen.draw(ctx, vp.w, vp.h);
     const x = C.scrollbar.x + 2, up = r.ev(x, C.scrollbar.top + 10);
     r.down(up); assert.ok(r.input.dragging, 'the bar is there once the log overflows'); r.up(up);
-    assert.deepEqual(r.screen.evidence.chat.length, 40);
+    assert.deepEqual(r.screen.evidence.chat.length, 41);
     const w1 = { ...r.ev(C.x + 10, C.y - 20), deltaY: -100, deltaMode: 0 }; assert.equal(r.input.wheel(w1), true);
     // Escape: one QUIT per press, a held key's repeats ignored.
     r.key('Escape', 'Escape'); r.key('Escape', 'Escape', { repeat: true }); r.key('Escape', 'Escape', { repeat: true });

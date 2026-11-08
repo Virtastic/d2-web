@@ -76,6 +76,7 @@ export function createItemRenderer(read, documentObject = globalThis.document) {
       catch { failures.add(name); return null; }
     const index = dc6.frames.length > 1 && Number.isFinite(item.goldAmount) && item.goldAmount >= 0
       ? goldPileFrame(item.goldAmount, dc6.frames.length, item.framePrecise, dc6.directions)
+      : item.landed ? dc6.frames.length - 1   // a realm item the server says has settled shows its last frame
       : Math.min(dc6.frames.length - 1, Math.max(0, (item.framePrecise >>> 8) % dc6.frames.length));
     return { name, dc6, index, frame: dc6.frames[index] };
   }

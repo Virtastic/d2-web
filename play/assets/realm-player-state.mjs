@@ -9,7 +9,7 @@ export function applyRealmPlayerFrame(protocol, bytes) {
     monsters: protocol.d2gsClientMonsters?.() ?? [] };
 }
 
-export function selectPlayerRenderSource(snapshot, motion, realmSessionOpen, realmPlayer, realmAct = null) {
+export function selectPlayerRenderSource(snapshot, motion, realmSessionOpen, realmPlayer, realmAct = null, worn = null) {
   if (realmSessionOpen && realmPlayer?.active && realmPlayer.clientRoomActive && (realmPlayer.x !== 0 || realmPlayer.y !== 0)) {
     // Draw the client CUnit's current animation, not the fixed assignment record: a server mode
     // change (walk, gethit, death) is written to that unit and must reach the renderer.
@@ -21,7 +21,7 @@ export function selectPlayerRenderSource(snapshot, motion, realmSessionOpen, rea
         direction: live?.direction ?? realmPlayer.initialDirection ?? 0, framePrecise: live?.framePrecise,
         frameCountPrecise: live?.frameCountPrecise, animSpeed: live?.animSpeed, seqMode: live?.seqMode, seqFrame: live?.seqFrame,
         tick: snapshot?.tick ?? 0, act: realmAct ?? snapshot?.act ?? 0,
-        weaponClass: 'hth', items: [], form: realmPlayer.form ?? null },
+        weaponClass: worn?.weaponClass ?? 'hth', items: worn?.items ?? [], form: realmPlayer.form ?? null },
     };
   }
   if (realmSessionOpen) return { source: 'none', x: 0, y: 0, classId: null, renderState: null };
@@ -46,6 +46,25 @@ export function visibleRealmPlayers(players, selectedPlayer, renderLevel) {
   if (!level || Number(renderLevel) !== level) return [];
   return (players || []).filter((player) => player?.active && player.clientRoomActive &&
     (player.x !== 0 || player.y !== 0) && player.clientRoomLevel === level);
+}
+
+// The players to draw: the level-matched roster, and always the selected player when the camera
+// follows it. The camera is placed on the selected player whenever it is active with a position, so
+// a roster whose level field disagrees with the world's must not leave the camera on an empty spot.
+export function realmScenePlayers(roster, selectedPlayer, renderLevel) {
+  const players = visibleRealmPlayers(roster, selectedPlayer, renderLevel);
+  const drawable = selectedPlayer?.active && selectedPlayer.clientRoomActive && (selectedPlayer.x !== 0 || selectedPlayer.y !== 0);
+  if (drawable && !players.some((player) => player.guid === selectedPlayer.guid)) players.push(selectedPlayer);
+  return players;
+}
+
+// Why the selected player is not drawn, for the scene evidence ('' when it is).
+export function realmPlayerGate(player) {
+  if (!player) return 'no-player-state';
+  if (!player.active) return 'inactive';
+  if (!player.clientRoomActive) return 'client-room-inactive';
+  if (player.x === 0 && player.y === 0) return 'no-position';
+  return '';
 }
 
 // A realm ground click is a request to the server. The local simulation must not advance or

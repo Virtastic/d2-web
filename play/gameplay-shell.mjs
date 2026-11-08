@@ -18,7 +18,7 @@ import { hudState } from './render-worker-hud.mjs';
 import { loadLiveLevelTerrain, loadRealmClientTerrain, actPalettePath } from './assets/live-level-terrain.mjs';
 import { decodeDatPalette } from './assets/d2-formats.mjs';
 import { createPlayerRenderer, playerClassInfo } from './assets/unit-renderer.mjs';
-import { applyRealmPlayerFrame, selectPlayerRenderSource, sendRealmGroundWalk, sendRealmRightSkillAt, sendRealmRightSkillOnMonster, realmDirectionalAim, realmClientProjectilePredictor, realmFireballMonsterPredictor, visibleRealmPlayers } from './assets/realm-player-state.mjs';
+import { applyRealmPlayerFrame, selectPlayerRenderSource, sendRealmGroundWalk, sendRealmRightSkillAt, sendRealmRightSkillOnMonster, realmDirectionalAim, realmClientProjectilePredictor, realmFireballMonsterPredictor, visibleRealmPlayers, realmScenePlayers, realmPlayerGate } from './assets/realm-player-state.mjs';
 import { createRealmPlayerReassignFade } from './assets/realm-player-reassign-fade.mjs';
 import { createMonsterRenderer, parseMonsterAnimations, realmMonsterAnimationActor } from './assets/monster-renderer.mjs';
 import { warmEntryFiles } from './assets/entry-warm.mjs';
@@ -61,6 +61,10 @@ import { nearestStandableNear } from './assets/walk-route.mjs';
 import { withinNativeWarpInteractionRange } from './assets/warp-interaction.mjs';
 import { decodeWalkProbe } from './assets/walk-command-trace.mjs';
 import { hudOrigin } from './assets/hud-origin.mjs';
+import { chromeGates } from './assets/scene-chrome.mjs';
+import { realmViewSnapshot, realmFrameReads } from './assets/realm-client-view.mjs';
+import { createRealmWorld } from './assets/realm-world.mjs';
+import { createItemTable, createObjectTable, createLevelTable, createInventoryTable, createBeltTable } from './assets/realm-tables.mjs';
 import { panelSides as panelViewSides, viewCentreX } from './assets/panel-view-shift.mjs';
 import { createFreeResArt, barParts, halfParts, stoneTiles, drawParts } from './assets/wide-hud.mjs';
 import { createBeltRenderer } from './assets/belt-renderer.mjs';
@@ -181,6 +185,8 @@ import { canvasPoint as pointOnCanvas } from './assets/canvas-point.mjs';
 import { createBnetInput } from './assets/bnet-input.mjs';
 import { findD2gsDeny, d2gsDenyError } from './assets/d2gs-deny.mjs';
 import { createGameLife, joinDeadline, TICK_MS } from './assets/bnet-game-life.mjs';
+import { createJoinLoading, createJoinLoadingArt } from './assets/bnet-join-loading.mjs';
+import { reasonString, REASON_DISCONNECTED } from './assets/d2gs-deny.mjs';
 
 const canvas = document.querySelector('#game');
 const screenshotAction = createScreenshotAction();
@@ -857,6 +863,7 @@ let cinematicsScreen = null, cinematicsError = '';
 let otherMultiplayerScreen = null, otherMultiplayerError = '';
 let bnetLoginScreen = null, bnetLoginError = '';
 let bnetLobbyScreen = null, bnetLobbyError = '';
+const joinLoading = createJoinLoading(); let joinLoadingArt = null;   // retail's lobby-to-game loading screen, up from the CREATE/JOIN click until the world is ready
 // The connection attempt behind retail's connecting popup: { server, popup, bncs }.
 let bnetConnecting = null;
 const LAST_BNET_KEY = 'd2web.lastBnet';
@@ -1665,6 +1672,7 @@ function releaseRealmFlow({ closeTransports = true } = {}) {
   realmPlayerRosterView = [];
   realmPlayerReassignFade.reset();
   realmWorldView = null;
+  realmWorldState?.reset();
   realmMonsterViews = [];
   realmMissileViews = [];
   realmGameClock = 0;
@@ -1711,6 +1719,8 @@ function sendGameLine(text) {
 function feedRealmPlayerFrame(bytes) {
   const protocol = realmFlow?.protocol;
   const update = applyRealmPlayerFrame(protocol, bytes);
+  if (update.state?.guid != null) realmWorldData().setOwner(update.state.guid);
+  feedRealmWorld(bytes);
   gameRoster.feed(bytes);
   if (update.state?.guid != null) gameRoster.myId = update.state.guid >>> 0;
   if (bytes[0] === 0x26) {
@@ -1885,13 +1895,14 @@ function enterBnetLobby(name) {
   if (!c) return;
   const string = (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]);
   // A game joined stays behind the lobby's busy state until the first map reveal puts the scene up.
-  const play = (options) => createAndJoinConfiguredGame({ character: c.name, ...options }).then(() => { render(); }, (error) => {
+  const play = (options) => { joinLoading.start(); return createAndJoinConfiguredGame({ character: c.name, ...options }).then(() => { render(); }, (error) => {
+    joinLoading.fail();
     if (error?.mcpStage) throw error;
     realmSelect = false; bnetLobbyScreen = null; screen = SCREEN.BNET_LOGIN;
     bnetLoginScreen?.reset(); bnetLoginScreen?.fail(error);
     render();
     throw Object.assign(error, { sessionLost: true });
-  });
+  }); };
   bnetLobbyError = '';
   try { const lobbyRead = createMpqAssetReader(Module);
     bnetLobbyScreen = createBnetLobbyScreen({ read: lobbyRead, decodeDc6, decodeDatPalette, string,
@@ -2137,6 +2148,8 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
       })()]);
     } finally { deadline.cancel(); }
     realmPlayerView = game.playerState;
+    realmWorldData().reset(); realmWorldData().setOwner(game.playerAssignment?.guid);
+    feedRealmWorld(Uint8Array.from(game.headBytes ?? []));   // the items and objects the join burst carried
     realmPlayerRosterView = protocol.d2gsClientPlayers?.() ?? (game.playerState ? [game.playerState] : []);
     realmPlayerReassignFade.installRoster(realmPlayerRosterView);
     if (game.transitionFade) realmPlayerReassignFade.queue();
@@ -2159,7 +2172,7 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
     const exitLobbyNotice = {};
     const life = createGameLife({ expansion: !!((joined.character.flags ?? 0) & 0x20),
       onNotice: (id) => { if (id) { exitLobbyNotice.id = id; messageLines.push(Module.ccall('d2_lang_string_by_index', 'string', ['number'], [id])); postedAt = performance.now(); } },
-      onLeave: () => { clearInterval(lifeTimer); keepAlive.stop(); receiver?.stop?.();
+      onLeave: () => { joinLoading.fail(); clearInterval(lifeTimer); keepAlive.stop(); receiver?.stop?.();
         void leaveRealmGame().then(() => { bnetLobbyScreen?.fail({ noticeString: exitLobbyNotice.id ?? 5357, message: 'game ended' }); render(); }); } });
     life.inGame();
     const lifeTimer = setInterval(() => { life.checkTimers(); life.tick(); }, TICK_MS);
@@ -3625,7 +3638,8 @@ function cameraCentre() {
 }
 function selectedPlayerSource() {
   if (realmTransport.state === 'session-open')
-    return selectPlayerRenderSource(snapshot, motion, true, realmPlayerView, (realmWorldView?.act ?? 0) + 1);
+    return selectPlayerRenderSource(snapshot, motion, true, realmPlayerView, (realmWorldView?.act ?? 0) + 1,
+      realmWorldState ? { weaponClass: realmWorldState.weaponClassOf(), items: realmWorldState.itemViews().filter((i) => i.mode === 1) } : null);
   if (!snapshot?.player) return { source: 'none', x: 0, y: 0, classId: null, renderState: null };
   const selected = selectPlayerRenderSource(snapshot, motion, false, realmPlayerView);
   if (Number.isInteger(motion?.presentationMode) && motion.presentationMode !== snapshot.mode && selected.renderState) {
@@ -4126,8 +4140,9 @@ const rampedCopy = () => { const c = document.createElement('canvas'); c.width =
 const frameSnaps = createFrameSnapshots();
 let frameSnap = null;   // always frameSnaps.front(): the draw reads only the front buffer
 function frameGates() {
-  const live = Boolean(session) && typeof Module !== 'undefined' && !realmSceneActive;
-  const hud = live && Boolean(controlPanelRenderer) && !clearScreen;
+  const live = Boolean(session) && typeof Module !== 'undefined';   // the single-player engine: the reads below are its
+  const shown = (live || realmSceneActive) && typeof Module !== 'undefined';   // a world whose HUD is drawn: the engine's or a joined game's
+  const hud = shown && Boolean(controlPanelRenderer) && !clearScreen;
   return { session: live, hud,
     pointerLayer: live && Boolean(pointerLayer) && screen === SCREEN.GAME,
     world: live && Boolean(terrain),
@@ -4148,6 +4163,10 @@ function frameGates() {
     shop: live && shopOpen() && !globalThis.__d2HideShop,
     entryBanner: live && Boolean(entryBannerRenderer) && entryBannerLevel > 0 && !clearScreen && engineTicks - entryBannerAt < ENTRY_BANNER.frames ? entryBannerLevel : 0,
     skillTips: live && (Boolean(skillPanelRenderer) && Boolean(skillsVisible) || Boolean(skillSelectRenderer) && !clearScreen) };
+}
+function sceneChrome() {
+  return chromeGates({ engineLive: Boolean(session) && typeof Module !== 'undefined', realmSceneActive, hasControlPanel: controlPanelRenderer,
+    hasPointerLayer: pointerLayer, hasBelt: beltRenderer, clearScreen, screenIsGame: screen === SCREEN.GAME });
 }
 // Keys the draw looked up last frame / is looking up this frame (see collectFrameSnapshot's `seen`).
 const SEEN_KEYS = ['langStr', 'langIdx', 'missileCel', 'skillDesc', 'skillMana', 'skillStrings'];
@@ -4176,7 +4195,88 @@ function fillFrameSnapshot() {
     skillDesc: readSkillDesc, skillStrings: readSkillStrings, seen: seenPrev } } : null);
   frameSnaps.swap(); frameSnap = frameSnaps.front();
 }
-const snapOr = (key, live) => fromSnapshot(frameSnap, key, live);
+// A joined Battle.net game has no engine session to read: the keys the HUD asks for come from its own state.
+let realmReads = null;
+// The objects, items, gold and worn gear the D2GS server sends (assets/realm-world.mjs), and the data tables that
+// name them; both are made on first use, once the MPQ reader exists.
+let realmWorldState = null, realmTableSet = null;
+function realmTables() {
+  if (realmTableSet) return realmTableSet;
+  const read = createMpqAssetReader(Module);
+  return (realmTableSet = { items: createItemTable(read), objects: createObjectTable(read), levels: createLevelTable(read), inventory: createInventoryTable(read),
+    belt: createBeltTable(read), inventoryLayoutFromEngine, stashGeometry });
+}
+function realmWorldData() { return (realmWorldState ??= createRealmWorld(realmTables())); }
+function feedRealmWorld(bytes) {
+  const protocol = realmFlow?.protocol;
+  if (!protocol) return;
+  const world = realmWorldData();
+  if (realmPlayerView?.guid != null) world.setOwner(realmPlayerView.guid);
+  world.feed(bytes, (b) => protocol.d2gsPacketSize(b));
+}
+const snapOr = (key, live) => (realmSceneActive && realmReads && key in realmReads ? realmReads[key] : fromSnapshot(frameSnap, key, live));
+// The single-player clientView: the sim's snapshot and the engine's d2_session_* reads that drawFrame
+// makes. A second source (the realm client) supplies the same shape; drawFrame never names the session.
+const spClientView = {
+  get snapshot() { return snapshot; },
+  get live() { return session; },
+  get engine() { return session; },   // the engine the d2_session_* panel reads go to: a panel that reads it draws only when this is set
+  get hasClientFlags() { return Boolean(Module._d2_session_client_flags); },
+  clientFlags: () => Module.ccall('d2_session_client_flags', 'number', [], []),
+  levelRain: () => (Module._d2_session_level_rain ? Module.ccall('d2_session_level_rain', 'number', [], []) : -1),
+  playerStat: (stat) => Module.ccall('d2_session_player_stat', 'number', ['number', 'number'], [stat, 0]),
+  playerGold: () => Module.ccall('d2_session_player_gold', 'number', [], []),
+  cursorItem: () => (Module._d2_session_cursor_item ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0),
+  itemBoxState: Module._d2_session_item_box_state ? (n) => Module._d2_session_item_box_state(n) : null,
+  stashGold: () => (Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [0]) : -1),
+  weaponSet: () => (Module._d2_session_weapon_switch ? Module.ccall('d2_session_weapon_switch', 'number', [], []) : 0),
+  weaponHands: () => (Module._d2_session_weapon_hands ? Module.ccall('d2_session_weapon_hands', 'number', [], []) : -1),
+  hotkeySkill: (i) => Module.ccall('d2_session_hotkey_skill', 'number', ['number'], [i]),
+  hotkeyHand: (i) => Module.ccall('d2_session_hotkey_hand', 'number', ['number'], [i]),
+};
+// The Battle.net clientView: the joined game's D2GS client state, shaped like the single-player snapshot
+// (assets/realm-client-view.mjs). It has no engine session, so the panels that read one (inventory, quest
+// log, hireling, belt contents...) stay shut until the server's items and quests reach the shell; the world,
+// orbs, belt frame, control panel and pointer are the single-player drawFrame's own.
+const REALM_LIVE = Object.freeze({ realm: true });
+const realmClientView = {
+  get snapshot() { return snapshot; },   // refreshRealmView() sets it once per frame
+  get live() { return realmSceneActive ? REALM_LIVE : null; },
+  engine: null,
+  hasClientFlags: false, clientFlags: () => 0, levelRain: () => (realmWorldView ? realmTables().levels.rain(realmWorldView.mapLevel) : -1), playerStat: () => 0, playerGold: () => realmWorldState?.gold ?? 0,
+  cursorItem: () => realmWorldState?.cursorId ?? 0, itemBoxState: null, stashGold: () => realmWorldState?.stashGold ?? -1, weaponSet: () => 0, weaponHands: () => -1,
+  hotkeySkill: () => 0, hotkeyHand: () => 0,
+};
+// A joined game's item hover text: the item's name and quality. The server's stat lines are not decoded yet.
+function realmItemTip(item) {
+  const entry = realmTables().items.byClass(item.classId);
+  return { name: entry?.name ?? '', quality: item.quality, flags: item.itemFlags, props: [], propColours: [] };
+}
+// The other players in the room, with the render state their unit is drawn from (mode, direction, frame, worn gear).
+function realmOtherPlayers() {
+  if (!realmWorldView || !realmPlayerView) return [];
+  const selected = selectedPlayerSource().guid, act = realmWorldView.act + 1, out = [];
+  for (const player of realmScenePlayers(realmPlayerRosterView.length ? realmPlayerRosterView : [realmPlayerView], realmPlayerView, realmWorldView.mapLevel)) {
+    if (!player?.active || !player.clientRoomActive || (player.x === 0 && player.y === 0) || player.guid === selected) continue;
+    const live = player.motion?.active ? player.motion : null;
+    out.push({ guid: player.guid, name: player.name, classId: player.classId, x: player.x, y: player.y, clientRoomLevel: player.clientRoomLevel,
+      renderState: { playerClass: player.classId, mode: live?.mode ?? player.initialMode ?? 5, direction: live?.direction ?? player.initialDirection ?? 0,
+        framePrecise: live?.framePrecise, frameCountPrecise: live?.frameCountPrecise, animSpeed: live?.animSpeed,
+        tick: snapshot?.tick ?? 0, act, weaponClass: realmWorldState?.weaponClassOf(player.guid) ?? 'hth',
+        items: realmWorldState?.wornBy(player.guid) ?? [], form: player.form ?? null } });
+  }
+  return out;
+}
+function refreshRealmView() {
+  const protocol = realmFlow?.protocol;
+  const resources = protocol?.d2gsClientResources?.() ?? null;
+  const next = realmViewSnapshot({ base: protocol?.d2gsClientSnapshot?.() ?? null, resources, monsters: realmMonsterViews,
+    missiles: realmMissileViews, players: realmOtherPlayers(), level: realmWorldView?.mapLevel, actor: realmMonsterAnimationActor, frame: realmAnimationFrame,
+    world: realmWorldState });
+  if (next) snapshot = next;
+  realmReads = realmFrameReads(resources, realmWorldState, realmWorldState ? realmTables() : null, next?.playerClass ?? 0);
+}
+const clientView = () => (realmSceneActive ? realmClientView : spClientView);
 const hudLang = (i) => (frameSnap?.lang?.has(i) ? frameSnap.lang.get(i) : Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]));
 
 // Render worker: `w` by default (Stage 6, ), `?render=0` the old path, `t` the selftest.
@@ -4227,7 +4327,8 @@ function render(now = false) {
   perfSync();
   const pRender = perfT0();
   const pWorld = perfT0();
-  if (realmSceneActive) drawRealmFrame(); else drawFrame();
+  if (realmSceneActive) refreshRealmView();
+  drawFrame();
   if (RENDER_WIRE) RENDER_WIRE.end(renderTok, { ready: !!(typeof Module !== 'undefined' && window.__d2?.ready && terrain && !realmSceneActive), frameSnap, entities: snapshot?.entities, objects: snapshot?.objects,
     meta: { playerId: snapshot?.playerId, act: snapshot?.act, tick: snapshot?.tick,
       missileCels: Object.fromEntries((snapshot?.entities ?? []).filter((e) => e.kind === 'missile').map((e) => [e.classId, missileCelFile(e.classId)])), player: { ...snapshot?.player, ...cameraCentre() }, width: canvas.width, height: canvas.height, viewCX: viewCX(), palettePath: actPalettePath(terrainAct + 1),
@@ -4244,16 +4345,16 @@ function render(now = false) {
         iconRow: hudIconRow, runToggle: snapOr('runToggle', readRunToggle), miniDown, ...hudHeld(pointer), beltBoxes: snapOr('beltHudBoxes', readBeltHudBoxes),
         beltKeys: beltKeyNames(controlsPanel?.bindings ?? bootControlBindings), clearScreen: clearScreen || !controlPanelRenderer || screen !== SCREEN.GAME }) } });
   perfT('world', pWorld);
-  if (!realmSceneActive && screen === SCREEN.GAME && gameMenu?.open && !controlsPanel?.open) { const p = perfT0(); gameMenu.draw(ctx, canvas.width, canvas.height); perfT('menu', p); }
-  if (!realmSceneActive && screen === SCREEN.GAME && controlsPanel?.open) { const p = perfT0(); controlsPanel.draw(ctx, canvas.width, canvas.height); perfT('controls', p); }   // F218
+  if (screen === SCREEN.GAME && gameMenu?.open && !controlsPanel?.open) { const p = perfT0(); gameMenu.draw(ctx, canvas.width, canvas.height); perfT('menu', p); }
+  if (screen === SCREEN.GAME && controlsPanel?.open) { const p = perfT0(); controlsPanel.draw(ctx, canvas.width, canvas.height); perfT('controls', p); }   // F218
   // THE POINTER IS THE LAST THING DRAWN, over the menu as over everything else: it is what retail's
   // D2Client paints its own cursor cel as, and the layer takes the browser arrow with it (never
   // neither). Before the ramp, because retail's cursor cel is a palette frame like every other.
-  if (!realmSceneActive && pointerLayer && screen === SCREEN.GAME) {
+  if (sceneChrome().pointerLayer) {
     const p = perfT0();
-    const drawn = pointerLayer.draw(ctx, canvas, { session, items: snapshot.items, pointerX: pointer.x, pointerY: pointer.y,
-      context: gameCursorContext(),
-      cursorId: frameSnap?.cursorItemId !== undefined ? frameSnap.cursorItemId : (Module._d2_session_cursor_item ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0) });
+    const drawn = pointerLayer.draw(ctx, canvas, { session: session || realmSceneActive, items: snapshot.items, pointerX: pointer.x, pointerY: pointer.y,
+      context: realmSceneActive ? { kind: 'hand' } : gameCursorContext(),
+      cursorId: realmSceneActive ? 0 : frameSnap?.cursorItemId !== undefined ? frameSnap.cursorItemId : (Module._d2_session_cursor_item ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0) });
     cursorItemEvidence = drawn.item; gameCursorEvidence = drawn.game;
     perfT('pointer', p);
   }
@@ -4274,115 +4375,44 @@ function render(now = false) {
   perfCountFrame();
 }
 
-function drawRealmFrame() {
-  fitView();
-  const w = canvas.width, h = canvas.height;
-  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
+// What the joined game's own scene adds to the shared frame: the other players in the room (the own character is
+// drawn by drawPlayer, as in a local game), and the evidence the monster click test and the rows read.
+function beginRealmSceneEvidence() {
+  const players = [];
   realmSceneEvidence = { active: true, player: realmPlayerView ? { guid: realmPlayerView.guid, classId: realmPlayerView.classId,
-    name: realmPlayerView.name, x: realmPlayerView.x, y: realmPlayerView.y } : null, players: [], world: realmWorldView ? { act: realmWorldView.act,
+    name: realmPlayerView.name, x: realmPlayerView.x, y: realmPlayerView.y } : null, players, world: realmWorldView ? { act: realmWorldView.act,
     difficulty: realmWorldView.difficulty, level: realmWorldView.mapLevel, revealCount: realmWorldView.mapRevealCount } : null,
-    tileCount: 0, terrainDrawn: 0, playerDrawn: false, playerRenderError: '', monsters: [] };
-  if (!terrain || !realmPlayerView?.active || !realmPlayerView?.clientRoomActive || !realmWorldView?.hasLoadAct || !realmWorldView?.loadCompleteEvent ||
-      realmWorldView?.unloadCompleteEvent || !realmWorldView?.hasMapReveal) {
-    drawCentredMessage(ctx, hoverFont, realmSceneError || 'Waiting for D2GS LoadAct, PlayerAssign, LoadComplete and MapReveal…', w, h);
-    return;
-  }
+    tileCount: 0, terrainDrawn: 0, playerDrawn: false, playerRenderError: '', playerGate: realmPlayerGate(realmPlayerView), monsters: [] };
   const source = selectedPlayerSource();
-  const cam = worldToScreen(cameraGrid().x, cameraGrid().y);
-  const sx = viewCX(), sy = h / 2 + UNIT_CENTRE_Y;
-  const scenePlayers = visibleRealmPlayers(realmPlayerRosterView.length ? realmPlayerRosterView : [realmPlayerView],
+  const scenePlayers = realmScenePlayers(realmPlayerRosterView.length ? realmPlayerRosterView : [realmPlayerView],
     realmPlayerView, realmWorldView.mapLevel);
-  const playerEvidence = [];
-  const playerSprites = scenePlayers.filter((player) => player?.active && player.clientRoomActive &&
-    (player.x !== 0 || player.y !== 0)).map((player) => {
-    const selected = player.guid === source.guid;
-    const point = selected ? null : worldToScreen(player.x, player.y);
-    const x = selected ? sx : point.x - cam.x + sx;
-    const y = selected ? sy : point.y - cam.y + sy;
-    return { depth: y, wx: player.x, wy: player.y, pass: selected ? 'realm-current-player' : 'realm-player', draw(c) {
-      const liveMotion = player.motion?.active ? player.motion : null;
-      const renderState = { playerClass: player.classId, mode: liveMotion?.mode ?? player.initialMode ?? 5,
-        direction: liveMotion?.direction ?? player.initialDirection ?? 0,
-        framePrecise: liveMotion?.framePrecise, frameCountPrecise: liveMotion?.frameCountPrecise,
-        animSpeed: liveMotion?.animSpeed, tick: snapshot?.tick ?? 0, act: realmWorldView.act + 1,
-        weaponClass: 'hth', items: [] };
-      let drawn = null, error = '';
-      try {
-        if (player.form && monsterRenderer) drawn = monsterRenderer.draw(c, x, y, player.form, renderState.act);
-        else if (playerRenderer) drawn = playerRenderer.draw(c, x, y, renderState);
-        else {
-          c.fillStyle = '#d9b85c'; c.beginPath(); c.arc(x, y, 7, 0, Math.PI * 2); c.fill();
-          drawn = { playerClass: player.classId, token: 'TN', engineDirection: renderState.direction };
-        }
-        playerRenderError = '';
-      } catch (exception) { error = String(exception); playerRenderError = error; }
-      playerEvidence.push({ guid: player.guid, name: player.name, classId: player.classId,
-        x: player.x, y: player.y, mode: renderState.mode, direction: renderState.direction,
-        framePrecise: renderState.framePrecise ?? null, frameCountPrecise: renderState.frameCountPrecise ?? null,
-        motionActive: Boolean(liveMotion), motionMode: liveMotion?.mode ?? null,
-        motionDirection: liveMotion?.direction ?? null, initialMode: player.initialMode,
-        initialDirection: player.initialDirection,
-        selected, clientRoomLevel: player.clientRoomLevel, anchorX: Math.round(x), anchorY: Math.round(y),
-        drawn: Boolean(drawn), evidence: drawn || null, error });
-    } };
-  });
-  const monsterEvidence = [];
-  const monsterSprites = realmMonsterViews.map((monster) => {
-    const point = worldToScreen(monster.x, monster.y);
-    const x = point.x - cam.x + sx, y = point.y - cam.y + sy;
-    return { depth: y, wx: monster.x, wy: monster.y, pass: 'realm-monster', draw(c) {
-      const actor = realmMonsterAnimationActor(monster, realmAnimationFrame);
-      try {
-        const drawn = monsterRenderer?.draw(c, x, y, actor, realmWorldView.act + 1);
-        monsterEvidence.push({ guid: monster.guid, classId: monster.classId, code: monster.code,
-          mode: monster.mode, framePrecise: monster.framePrecise, frameCountPrecise: monster.frameCountPrecise,
-          animSpeed: monster.animSpeed, x: monster.x, y: monster.y, hpPct: monster.hpPct, typeFlags: monster.typeFlags,
-          components: monster.components, anchorX: Math.round(x), anchorY: Math.round(y),
-          drawn: Boolean(drawn), evidence: drawn || null });
-      } catch (error) {
-        monsterEvidence.push({ guid: monster.guid, classId: monster.classId, code: monster.code,
-          mode: monster.mode, x: monster.x, y: monster.y, anchorX: Math.round(x), anchorY: Math.round(y),
-          drawn: false, error: String(error) });
-      }
-    } };
-  });
-  const realmMissileEvidence = [];
-  const missileSprites = realmMissileViews.filter((unit) => unit.level === realmWorldView.mapLevel).map((unit) => {
-    const point = worldToScreen(unit.x, unit.y);
-    const x = point.x - cam.x + sx, y = point.y - cam.y + sy;
-    return { depth: y, wx: unit.x, wy: unit.y, pass: 'realm-missile', draw(c) {
-      const drawn = missileRenderer?.draw(c, x, y, unit, unit.direction, snapshot?.tick ?? 0,
-        unit.framePrecise >>> 8, unit.trans, realmWorldView.act + 1);
-      realmMissileEvidence.push({ ...unit, anchorX: x, anchorY: y, drawn: Boolean(drawn), evidence: drawn ?? null });
-    } };
-  });
-  const sprites = [...playerSprites, ...monsterSprites, ...missileSprites];
-  try {
-    terrainStats = terrain.draw(ctx, realmSceneTiles, terrainFiles,
-      { ...cameraCentre(), act: realmWorldView.act + 1, level: realmWorldView.mapLevel }, w, h, sprites, null, viewCX());
-    realmSceneEvidence.terrainDrawn = terrainStats?.drawn ?? 0;
-    realmSceneEvidence.tileCount = realmSceneTiles.length;
-    realmSceneEvidence.terrainIdentity = { requested: terrainStats?.requested ?? 0, resolved: terrainStats?.resolved ?? 0,
-      wrongIdentity: terrainStats?.wrongIdentity ?? 0,
-      blits: (terrainStats?.blits ?? []).map(({ file, want, got, x, y, w: width, h: height, wall, room, layer }) =>
-        ({ file, want, got, x, y, width, height, wall, room, layer })) };
-    realmSceneEvidence.camera = { x: cameraCentre().x, y: cameraCentre().y, screenX: cam.x, screenY: cam.y };
-    realmSceneEvidence.players = playerEvidence;
-    realmSceneEvidence.playerDrawn = Boolean(playerEvidence.find((player) => player.selected)?.drawn);
-    realmSceneEvidence.playerRenderError = playerRenderError;
-    realmSceneEvidence.monsters = monsterEvidence;
-    realmSceneEvidence.missiles = realmMissileEvidence;
-    hud.textContent = 'Realm terrain and assigned players and monsters are driven by server packets. Player and monster movement, objects and actions are not synchronized.';
-  } catch (error) {
-    realmSceneError = String(error); terrainError = realmSceneError;
-    realmSceneEvidence.error = realmSceneError;
+  for (const player of scenePlayers) {
+    if (!player?.active || !player.clientRoomActive || (player.x === 0 && player.y === 0)) continue;
+    if (player.guid === source.guid) players.push({ guid: player.guid, name: player.name, classId: player.classId, x: player.x, y: player.y, selected: true, clientRoomLevel: player.clientRoomLevel });
   }
+}
+function finishRealmSceneEvidence() {
+  const cam = worldToScreen(cameraGrid().x, cameraGrid().y), c = cameraCentre();
+  realmSceneEvidence.terrainDrawn = terrainStats?.drawn ?? 0;
+  realmSceneEvidence.tileCount = realmSceneTiles.length;
+  realmSceneEvidence.terrainIdentity = { requested: terrainStats?.requested ?? 0, resolved: terrainStats?.resolved ?? 0,
+    wrongIdentity: terrainStats?.wrongIdentity ?? 0,
+    blits: (terrainStats?.blits ?? []).map(({ file, want, got, x, y, w: width, h: height, wall, room, layer }) =>
+      ({ file, want, got, x, y, width, height, wall, room, layer })) };
+  realmSceneEvidence.camera = { x: c.x, y: c.y, screenX: cam.x, screenY: cam.y };
+  realmSceneEvidence.playerDrawn = Boolean(selectedPlayerSource().source !== 'none' && playerRenderer);
+  realmSceneEvidence.playerRenderError = playerRenderError;
+}
+// Speech bubbles over the players and monsters, the party panel and the area-change fade.
+function drawRealmOverlays(w, h, proj) {
+  const source = selectedPlayerSource();
   if (bubbleRenderer && gameBubbles.size) {
+    const scenePlayers = realmScenePlayers(realmPlayerRosterView.length ? realmPlayerRosterView : [realmPlayerView], realmPlayerView, realmWorldView.mapLevel);
     const anchors = [...scenePlayers.filter((p) => p?.active && (p.x !== 0 || p.y !== 0)).map((p) => {
-      const sel = p.guid === source.guid, pt = sel ? null : worldToScreen(p.x, p.y);
-      return { key: `0:${p.guid}`, player: true, x: sel ? sx : pt.x - cam.x + sx, y: sel ? sy : pt.y - cam.y + sy };
-    }), ...realmMonsterViews.map((m) => { const pt = worldToScreen(m.x, m.y); return { key: `1:${m.guid}`, player: false, x: pt.x - cam.x + sx, y: pt.y - cam.y + sy }; })];
-    try { bubbleRenderer.draw(ctx, w, h, anchors, gameBubbles, performance.now(), realmWorldView.act + 1); } catch (error) { realmSceneEvidence.bubbleError = String(error); }
+      const [x, y] = p.guid === source.guid ? [viewCX(), h / 2 + UNIT_CENTRE_Y] : proj(p.x, p.y);
+      return { key: `0:${p.guid}`, player: true, x, y };
+    }), ...realmMonsterViews.map((m) => { const [x, y] = proj(m.x, m.y); return { key: `1:${m.guid}`, player: false, x, y }; })];
+    try { bubbleRenderer.draw(ctx, w, h, anchors, gameBubbles, performance.now(), realmWorldView.act + 1); } catch (error) { if (realmSceneEvidence) realmSceneEvidence.bubbleError = String(error); }
   }
   partyEvidence = null;
   if (partyRenderer && partyVisible && realmFlow?.d2gs) partyEvidence = partyRenderer.draw(ctx, w, h, { act: realmWorldView.act + 1, ...partyView(), string: langStr, pointer, lootShown: true }, true);
@@ -4395,6 +4425,17 @@ function drawRealmFrame() {
     ctx.restore();
   }
 }
+// The HUD, belt and pointer renderers are built when a local game starts; a realm game builds them here.
+function ensureRealmChrome() {
+  const assetReader = createMpqAssetReader(Module);
+  hoverFont ??= makeHoverFont();
+  controlPanelRenderer ??= createControlPanelRenderer(assetReader);
+  beltRenderer ??= createBeltRenderer(assetReader);
+  if (!pointerLayer) {
+    gameCursor ??= createGameCursor({ read: assetReader, decodeDc6, documentObject: document });
+    pointerLayer = createPointerLayer({ gameCursor, cursorItem: (c, cw, ch, item, x, y) => inventoryPanelRenderer?.drawCursorItem(c, cw, ch, item, x, y) });
+  }
+}
 
 async function syncRealmScene() {
   if (realmTransport.state !== 'session-open' || !realmPlayerView?.active || !realmWorldView?.hasLoadAct ||
@@ -4405,6 +4446,7 @@ async function syncRealmScene() {
     if (!playerRenderer) playerRenderer = createPlayerRenderer(createMpqAssetReader(Module), document, { shadow: true });
     if (!monsterRenderer) monsterRenderer = createMonsterRenderer(createMpqAssetReader(Module), document, { shadow: true });
     if (!missileRenderer) missileRenderer = createMissileRenderer(createMpqAssetReader(Module), document, missileCelFile);
+    ensureRealmChrome();
     const loaded = loadRealmClientTerrain(Module, realmWorldView.act);
     if (!loaded.terrain) throw new Error(loaded.error || 'client DRLG has no drawable terrain');
     terrain = loaded.terrain; terrainFiles = loaded.files; terrainError = '';
@@ -4412,12 +4454,10 @@ async function syncRealmScene() {
     realmSceneRevision = realmWorldView.mapRevision;
     realmSceneError = '';
     realmSceneActive = true;
-    snapshot = { act: realmWorldView.act + 1, difficulty: realmWorldView.difficulty, level: realmWorldView.mapLevel,
-      tick: 0, mode: 1, playerClass: realmPlayerView.classId, playerId: realmPlayerView.guid,
-      player: { x: realmPlayerView.x, y: realmPlayerView.y, weaponClass: 'hth' }, entities: [], objects: [], items: [],
-      units: [], warps: [], quests: [], town: false };
+    refreshRealmView();
     motion = {};
     screen = SCREEN.GAME;
+    joinLoading.ready();
     render();
   } catch (error) {
     realmSceneError = String(error); realmSceneActive = false; realmSceneTiles = []; terrain = null; terrainFiles = null;
@@ -4426,6 +4466,9 @@ async function syncRealmScene() {
 }
 
 function drawFrame() {
+  // Everything below reads the world through ONE clientView (the single-player sim's today; a realm
+  // client's later): `snapshot`, `session` (whether a world is live) and the view's getters.
+  const view = clientView();
   fitView();   // also per frame: a resize that lands between events must never leave a stale view
   frontendHoverSync.frame(frontendHoverTarget());
   const w = canvas.width, h = canvas.height;
@@ -4480,7 +4523,9 @@ function drawFrame() {
   }
   if (screen === SCREEN.BNET_LOBBY) {
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
-    if (bnetLobbyScreen) bnetLobbyScreen.draw(ctx, w, h);
+    if (joinLoading.expired()) { joinLoading.fail(); bnetLobbyScreen?.fail({ noticeString: reasonString(REASON_DISCONNECTED, false), message: 'game ended' }); }
+    if (joinLoading.shown && (joinLoadingArt ??= (() => { try { return createJoinLoadingArt({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette }); } catch { return false; } })())) joinLoadingArt.draw(ctx, w, h, joinLoading.progress());
+    else if (bnetLobbyScreen) bnetLobbyScreen.draw(ctx, w, h);
     else { drawCentredMessage(ctx, hoverFont, bnetLobbyError || 'loading…', w, h); }
     hud.textContent = bnetLobbyError ? `battle.net lobby: ${bnetLobbyError}` : '';
     return;
@@ -4510,10 +4555,15 @@ function drawFrame() {
     hud.textContent = charCreateError ? `character creation: ${charCreateError}` : '';
     return;
   }
+  const snapshot = view.snapshot, session = view.live, engine = view.engine;
+  // The worker's canvas paints a single-player world; a Battle.net game's world is always this thread's.
+  // The worker is fed the engine's frame snapshot (tiles, light map, near feed, hero effects) that a joined game, with no local engine session, does not have, so it stays off there.
+  const ownsWorld = view === spClientView && Boolean(RENDER_WIRE?.ownsWorld);
+  const realmWorld = view === realmClientView;
   ensureTerrain();
   // Retail leaves unpainted world pixels black. A tinted near-black field survives the display
   // ramp as RGB(12,15,12), creating visible green islands in terrain holes (F38, s260).
-  if (RENDER_WIRE?.ownsWorld) { ctx.clearRect(0, 0, w, h); terrain?.setBackdrop?.(null); }   // ?render=w: the worker's canvas under this one paints the world
+  if (ownsWorld) { ctx.clearRect(0, 0, w, h); terrain?.setBackdrop?.(null); }   // ?render=w: the worker's canvas under this one paints the world
   else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h); terrain?.setBackdrop?.(w === canvas.width && h === canvas.height ? 0xff000000 : null); }
   // The real map: one draw per placed tile, floors then walls, positioned by the engine's own
   // isometric screen coordinates. Falls back to the old act atlas only if terrain failed to load.
@@ -4559,6 +4609,23 @@ function drawFrame() {
       } });
       continue;
     }
+    if (entity.kind === 'player' && entity.playerRender && entity.mode !== 0 && entity.mode !== 8) {
+      // Another player standing in the room: the player renderer draws it from the unit's mode, direction, frame and worn gear.
+      if (!unitInView(sx, sy, w, h)) continue;
+      sprites.push({ depth: sy, wx: entity.x, wy: entity.y, u: [0, entity.classId, entity.mode], draw(c) {
+        const r = entity.playerRender;
+        let drawn = null, error = '';
+        try {
+          if (r.form && monsterRenderer) drawn = monsterRenderer.draw(c, sx, sy, r.form, r.act);
+          else if (playerRenderer) drawn = playerRenderer.draw(c, sx, sy, r);
+        } catch (exception) { error = String(exception); if (error !== playerRenderError) console.warn('realm player sprite failed:', error); playerRenderError = error; }
+        realmSceneEvidence?.players.push({ guid: entity.id, name: entity.name, classId: entity.classId, x: entity.x, y: entity.y,
+          mode: r.mode, direction: r.direction, framePrecise: r.framePrecise ?? null, frameCountPrecise: r.frameCountPrecise ?? null,
+          motionActive: r.framePrecise !== undefined, selected: false, clientRoomLevel: entity.clientRoomLevel,
+          anchorX: Math.round(sx), anchorY: Math.round(sy), drawn: Boolean(drawn), evidence: drawn || null, error });
+      } });
+      continue;
+    }
     if (entity.kind === 'player') {
       // The player's own body (F19). The evidence carries the ENGINE unit the recovery command
       // acts on (id/class/position/mode) and the anchor this blit was painted at -- the same point
@@ -4601,6 +4668,8 @@ function drawFrame() {
       const pAlert = perfT0();
       const alert = npcSpeechAlertRenderer?.draw(c, sx, sy, entity, entity.speechPending, snapshot.tick, snapshot.act);
       perfT('units-npc-speech', pAlert);
+      if (realmWorld) realmSceneEvidence?.monsters.push({ guid: entity.id, classId: entity.classId, code: entity.animation?.code ?? null,
+        mode: entity.mode, x: entity.x, y: entity.y, anchorX: Math.round(sx), anchorY: Math.round(sy), drawn, evidence: being || null });
       if (alert && alert.drawn) npcAlertEvidence.push({ id: entity.id, classId: entity.classId,
         anchorX: Math.round(sx), anchorY: Math.round(sy), tick: snapshot.tick, ...alert });
       // Per unit, what was drawn and where (s000e asserts Harrogath's townsfolk against retail's draw list).
@@ -4635,13 +4704,14 @@ function drawFrame() {
       const waypoint = waypointPadAnchor(Module, object, drawn, sx, sy); if (waypoint) waypointPadEvidence.push(waypoint);
     } });
   }
-  if (!RENDER_WIRE?.ownsWorld) for (const item of snapshot.items) if ((item.mode === 3 || item.mode === 5) && item.invPage === 255) {
+  if (!ownsWorld) for (const item of snapshot.items) if ((item.mode === 3 || item.mode === 5) && item.invPage === 255) {
     const [sx, sy] = projStatic(item.x, item.y);
     // The hovered ground item is drawn in retail's DrawMode 7, like a hovered object/unit (V5).
     const isHovered = hovered?.kind === 'item' && hovered.id === item.id;
     sprites.push({ depth: sy, wx: item.x, wy: item.y, pass: 'item', dropping: item.mode === 5, u: [4, item.classId, 3], draw(c) { itemRenderer?.draw(c, sx, sy, item, isHovered); } });
   }
   const source = selectedPlayerSource();
+  if (realmWorld) beginRealmSceneEvidence();
   sprites.push({ depth: (h / 2 + UNIT_CENTRE_Y), wx: source.x, wy: source.y, pass: 'player', u: [0, source.classId, 0], draw: drawPlayer });
 
   terrainStats = null;
@@ -4649,7 +4719,25 @@ function drawFrame() {
   // rather than reading the tiles a second time (F5b/V6; the layer must fill on frames the player is
   // not looking at the map too, so it cannot be scoped to the overlay's own draw).
   let terrainTiles = null;
-  if (terrain && session) {
+  if (terrain && realmWorld) {
+    // The joined game's world: the tiles the client DRLG built for the act (loadRealmClientTerrain), lit by no
+    // engine light map (none exists without a local engine session), under the level's own Levels.txt weather.
+    try {
+      terrainTiles = realmSceneTiles;
+      terrain.setLightGrid(null);
+      const rain = view.levelRain(), ticks = realmAnimationFrame;
+      weatherRenderer?.setLevel(rain);
+      weatherRenderer?.advance(ticks);
+      weatherEvidence = { rain, blits: [] };
+      const wcam = worldToScreen(cameraGrid().x, cameraGrid().y);
+      terrainStats = terrain.draw(ctx, realmSceneTiles, terrainFiles, { ...snapshot.player, ...cameraCentre(), act: snapshot.act, level: snapshot.level },
+        w, h, sprites, weatherRenderer ? (c, floors) => {
+          try { weatherEvidence = { rain, blits: weatherRenderer.draw(c, w, h, ticks, wcam.x, wcam.y, weatherWaterAnchors(floors, null)), errors: weatherRenderer.errors }; }
+          catch (error) { weatherEvidence = { rain, blits: [], errors: weatherRenderer.errors, error: String(error) }; }
+        } : null, viewCX());
+      finishRealmSceneEvidence();
+    } catch (error) { realmSceneError = String(error); terrainError = realmSceneError; if (realmSceneEvidence) realmSceneEvidence.error = realmSceneError; }
+  } else if (terrain && session) {
     try {
       // The engine's library list is rebuilt with the world (rooms of a neighbouring level bring
       // their own): read it with the tiles that index it, never from an earlier frame. The tiles of
@@ -4664,11 +4752,11 @@ function drawFrame() {
         terrain.setLightGrid(lightmap ? (a, b) => lightmap.grid(a, b) : null, lightmap?.at, lightmap?.ambient, lightmap);
         // Retail's weather (F11b): the level's own Levels.txt `Rain` byte decides, and the rain draws
         // between the floors and the walls, where retail's own frame puts it (session-terrain.mjs).
-        const rain = snapOr('rain', () => weatherRenderer && Module._d2_session_level_rain ? Module.ccall('d2_session_level_rain', 'number', [], []) : -1);
+        const rain = snapOr('rain', () => weatherRenderer ? view.levelRain() : -1);
         weatherRenderer?.setLevel(rain);
         weatherRenderer?.advance(engineTicks);
         weatherEvidence = { rain, blits: [] };
-        wireWeather = RENDER_WIRE?.ownsWorld ? { rain, ticks: engineTicks, nearFeed: snapOr('activeNearFeed', () => readSessionActiveNearFeed(Module)), wcam: { x: 0, y: 0 }, cam: { x: 0, y: 0 } } : undefined;
+        wireWeather = ownsWorld ? { rain, ticks: engineTicks, nearFeed: snapOr('activeNearFeed', () => readSessionActiveNearFeed(Module)), wcam: { x: 0, y: 0 }, cam: { x: 0, y: 0 } } : undefined;
         // Retail's camera is the player's PRECISE position, a subtile's centre (x + 0.5, y + 0.5): the
         // static world (floors, walls, objects, ground items) sits on the integer grid under it, while
         // units stand at their centres too.
@@ -4676,10 +4764,10 @@ function drawFrame() {
         if (wireWeather) { wireWeather.wcam = { x: wcam.x, y: wcam.y }; const cm = worldToScreen(cameraGrid().x, cameraGrid().y); wireWeather.cam = { x: cm.x, y: cm.y }; }
         perfT('worldRead', pRead);
         const pTerrain = perfT0();
-        terrainStats = RENDER_WIRE?.ownsWorld ? (RENDER_WIRE.evidence?.terrainStats ?? null) : terrain.draw(ctx, tiles, terrainFiles, { ...snapshot.player, ...cameraCentre() }, w, h, sprites,
+        terrainStats = ownsWorld ? (RENDER_WIRE.evidence?.terrainStats ?? null) : terrain.draw(ctx, tiles, terrainFiles, { ...snapshot.player, ...cameraCentre() }, w, h, sprites,
           // A broken weather must not take the world down with it: the terrain pass catches nothing, and
           // the error is reported on the evidence a row reads rather than swallowed.
-          weatherRenderer && !RENDER_WIRE?.ownsWorld ? (c, floors, viewport) => {
+          weatherRenderer && !ownsWorld ? (c, floors, viewport) => {
             try {
               const activeNearFeed = snapOr('activeNearFeed', () => readSessionActiveNearFeed(Module));
               // PERF (a retail recording): the feed's audit is NOT computed here. It was, once per frame, into a
@@ -4696,11 +4784,11 @@ function drawFrame() {
     } catch (error) { terrainError = String(error); terrain = null; }
   }
   // Without terrain there is no wall pass to interleave into, so the sprites still need painting.
-  if (!terrainStats?.drawn && !RENDER_WIRE?.ownsWorld) for (const sprite of sprites) { gUnit(sprite.u, sprite.wx, sprite.wy); sprite.draw(ctx); }
+  if (!terrainStats?.drawn && !ownsWorld) for (const sprite of sprites) { gUnit(sprite.u, sprite.wx, sprite.wy); sprite.draw(ctx); }
   // Retail's falling rain drops are line primitives drawn after the whole world, before the HUD (F11b).
-  if (weatherRenderer && terrain && weatherEvidence.rain > 0 && !RENDER_WIRE?.ownsWorld) {
+  if (weatherRenderer && terrain && weatherEvidence.rain > 0 && !ownsWorld) {
     const pWeather = perfT0();
-    try { const cam = worldToScreen(cameraGrid().x, cameraGrid().y); weatherEvidence.lines = weatherRenderer.drawStreaks(ctx, w, h, engineTicks, cam.x, cam.y); weatherEvidence.cycle = { ...weatherRenderer.cycle.state, intensity: weatherRenderer.cycle.intensity }; }
+    try { const cam = worldToScreen(cameraGrid().x, cameraGrid().y); weatherEvidence.lines = weatherRenderer.drawStreaks(ctx, w, h, realmWorld ? realmAnimationFrame : engineTicks, cam.x, cam.y); weatherEvidence.cycle = { ...weatherRenderer.cycle.state, intensity: weatherRenderer.cycle.intensity }; }
     catch (error) { weatherEvidence.streakError = String(error); }
     perfT('weather', pWeather);
   }
@@ -4735,6 +4823,7 @@ function drawFrame() {
   hoverEvidence = clearScreen ? null : drawHoverLabel(ctx,
     heldShowItemsKeys.size && hovered?.kind === 'item' ? null : hovered, proj, projStatic);
   perfT('hover', pHover);
+  if (realmWorld) drawRealmOverlays(w, h, proj);
   // The whole statement (argument construction included) is the automap pass: its npc-name projection
   // runs retail string lookups per npc every frame, and a pass timed only around the call would miss it.
   const pAutomap = perfT0();
@@ -4783,12 +4872,11 @@ function drawFrame() {
   // Dead: retail's lettering (play/assets/death-screen.mjs); Esc continues. Stat 175 is
   // STAT_GOLDLOST, which the engine's own death path (PLRMODE_StartID_Death ->
   // PLAYER_ApplyDeathPenalty) sets; retail draws its string only when it is non-zero.
-  if (session && deathScreenShown(snapshot.mode) && ensureDeathScreen()) {
-    const clientFlags = Module._d2_session_client_flags
-      ? snapOr('clientFlags', () => Module.ccall('d2_session_client_flags', 'number', [], [])) : 0;
+  if (engine && deathScreenShown(snapshot.mode) && ensureDeathScreen()) {
+    const clientFlags = view.hasClientFlags ? snapOr('clientFlags', () => view.clientFlags()) : 0;
     deathScreenEvidence = deathScreen.draw(ctx, w, h, { hardcore: Boolean(clientFlags & 0x04),
       difficulty: snapshot.difficulty ?? 0, act: snapshot.act,
-      goldLost: snapOr('goldLost', () => Module.ccall('d2_session_player_stat', 'number', ['number', 'number'], [175, 0])) });
+      goldLost: snapOr('goldLost', () => view.playerStat(175)) });
   } else deathScreenEvidence = null;
   // The NPC's menu hangs over their head until an entry is picked.
   npcMenuEvidence = null;
@@ -4811,7 +4899,7 @@ function drawFrame() {
   // the speech box over Akara's own shop forever once Trade was picked. A shop that is actually open
   // (her stock fetched -- shopOpen()) cannot happen in retail before its greeting is already gone.
   let pendingSpeech = null, vendorState = null;
-  const gridBoxHover = () => { const id = Module._d2_session_cursor_item ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0; return { pointer, cursorItem: id ? snapshot?.items?.find((i) => i.id === id) || null : null, itemBoxState: Module._d2_session_item_box_state ? (n) => Module._d2_session_item_box_state(n) : null }; };   // grid-highlight.mjs
+  const gridBoxHover = () => { const id = view.cursorItem(); return { pointer, cursorItem: id ? snapshot?.items?.find((i) => i.id === id) || null : null, itemBoxState: view.itemBoxState }; };   // grid-highlight.mjs
   if (npcState?.spoken != null) {
     // Ordinary dialogue uses retail's viewport-centred dialog origin, regardless of side panels.
     // Defer the draw until after those panels so they cannot paint over the text. Retail sets the
@@ -4819,7 +4907,7 @@ function drawFrame() {
     if (!shopOpen() && ensureSpeechBox() && npcSpeechScrollGate.ready)
       pendingSpeech = { text: npcState.greeting, messageInstance: npcVoiceGeneration, scrolling: true };
   } else if (shopOpen() && !globalThis.__d2HideShop && ensureVendorPanel()) {
-    try { vendorState = { ...npcState, ...gridBoxHover(), pressedButton: vendorButtonGesture.token && vendorButtonGesture.token === vendorPanel.buttonAt(pointer.x, pointer.y, w, h, npcState.classId) ? vendorButtonGesture.token : null, act: snapshot?.act, stashGold: snapOr('vendorStashGold', () => Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [0]) : -1) }; npcPanelEvidence = vendorPanel.draw(ctx, w, h, vendorState); npcPanelError = ''; }
+    try { vendorState = { ...npcState, ...gridBoxHover(), pressedButton: vendorButtonGesture.token && vendorButtonGesture.token === vendorPanel.buttonAt(pointer.x, pointer.y, w, h, npcState.classId) ? vendorButtonGesture.token : null, act: snapshot?.act, stashGold: snapOr('vendorStashGold', () => view.stashGold()) }; npcPanelEvidence = vendorPanel.draw(ctx, w, h, vendorState); npcPanelError = ''; }
     catch (error) { npcPanelError = String(error); npcPanelEvidence = null; }
   } else if (npcState && npcSpeechHasText(npcSpeechSetting.mode) && ensureSpeechBox()) {
     // Plain talk, no shop, no active speech message: still the speech box (
@@ -4834,16 +4922,17 @@ function drawFrame() {
   } else npcPanelEvidence = null;
   // Inventory.txt's record is per class: re-read whenever the session's character changes (a new
   // session, a loaded save, another class), not only when none is cached.
-  const layoutKey = session ? `${snapshot.playerClass}/${snapshot.playerId}/${snapshot.seed}` : '';
-  if (inventoryPanelRenderer && session && (!inventoryPanelRenderer.layout || inventoryLayoutKey !== layoutKey)) {
+  const panelData = engine || (session?.realm ? session : null);   // a joined game's panels read the server's items, not an engine
+  const layoutKey = panelData ? `${snapshot.playerClass}/${snapshot.playerId}/${snapshot.seed}` : '';
+  if (inventoryPanelRenderer && panelData && (!inventoryPanelRenderer.layout || inventoryLayoutKey !== layoutKey)) {
     inventoryPanelRenderer.setLayout(snapOr('inventoryLayout', readInventoryLayout)); inventoryLayoutKey = layoutKey; }
-  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, ...gridBoxHover(), deferTooltip: true, weaponSet: Module._d2_session_weapon_switch ? Module.ccall('d2_session_weapon_switch', 'number', [], []) : 0, weaponHands: Module._d2_session_weapon_hands ? Module.ccall('d2_session_weapon_hands', 'number', [], []) : -1, pointer, itemTip: (item) => tipFields(item.id, item.code), gold: snapOr('playerGold', () => Module.ccall('d2_session_player_gold', 'number', [], [])), inventoryGoldPressed: Boolean(inventoryGoldPress), inventoryClosePressed: Boolean(inventoryClosePress) } : snapshot, panelShown(inventoryVisible));
+  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && panelData ? { ...snapshot, ...gridBoxHover(), deferTooltip: true, weaponSet: view.weaponSet(), weaponHands: view.weaponHands(), pointer, itemTip: (item) => (engine ? tipFields(item.id, item.code) : realmItemTip(item)), gold: snapOr('playerGold', () => view.playerGold()), inventoryGoldPressed: Boolean(inventoryGoldPress), inventoryClosePressed: Boolean(inventoryClosePress) } : snapshot, panelShown(inventoryVisible));
   // The shop's tooltip and button hint go over the inventory panel, as retail draws them last (vendor-panel.mjs drawOverlay).
   if (vendorState && npcPanelEvidence) Object.assign(npcPanelEvidence, vendorPanel.drawOverlay(ctx, w, h, vendorState));
   // O / the Hireling Screen binding: retail's left mercenary panel (play/assets/hireling-panel.mjs,
   // D2Client+0x9AE80). With no merc unit retail draws nothing, so the panel shuts itself.
   hirelingPanelEvidence = null;
-  if (hirelingVisible && session && !clearScreen && hirelingPanelRenderer) {
+  if (hirelingVisible && engine && !clearScreen && hirelingPanelRenderer) {
     const roster = snapOr('hirelingRoster', readHirelingRoster), merc = hirelingPanelRenderer.merc(Module, roster, currentFixture?.difficulty ?? loadDifficulty);
     hirelingPanelEvidence = hirelingPanelRenderer.draw(ctx, w, h, merc, { act: snapshot?.act || 1, string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) });
     if (!hirelingPanelEvidence.open) hirelingVisible = false;
@@ -4891,7 +4980,7 @@ function drawFrame() {
     // Life and mana are the snapshot's, not the advancement record's: the panel shows what the
     // player has right now, and the engine is the only thing that decides that.
     // Retail draws each attribute's total (items and charms included) against its base: STATLIST total, layer 0.
-    const total = (stat) => Module.ccall('d2_session_player_stat', 'number', ['number', 'number'], [stat, 0]);
+    const total = (stat) => view.playerStat(stat);
     characterPanelEvidence = characterPanelRenderer.draw(ctx, w, h, adv && {
       ...adv, totals: characterVisible ? snapOr('attributeTotals', () => ({ strength: total(0), energy: total(1), dexterity: total(2), vitality: total(3) })) : null, name: chosenName || '', className: langStr(CLASS_NAMES[snapshot.playerClass] || '') || CLASS_NAMES[snapshot.playerClass] || '',
       // Retail stores life and mana as 8.8 fixed point (50 life is 12800) and displays the whole
@@ -4905,7 +4994,7 @@ function drawFrame() {
     }, panelShown(characterVisible));
   }
   questEvidence = null;
-  if (questLogRenderer && panelShown(questVisible) && session && !clearScreen) {
+  if (questLogRenderer && panelShown(questVisible) && engine && !clearScreen) {
     const words = snapOr('questWords', readQuestWords), act = questAct || (questAct = snapshot.act || 1, questSelected = questFirst(words, questAct), questAct);
     questEvidence = questLogRenderer.draw(ctx, w, h, { act, tabs: questTabs(words, snapshot.act || 1), words, selected: questSelected, descrOn: questDescrOn,
       pressed: questCloseGesture.pressed ? 'close' : null,
@@ -4934,14 +5023,14 @@ function drawFrame() {
   // the level id is the engine's, never the client's. The 120 is retail's own measured window (assets/level-entry-banner.mjs). Nothing is
   // drawn for a ClearScreen (F3c) or before a session exists.
   entryBannerEvidence = null; entryBannerError = '';
-  if (session && entryBannerRenderer && entryBannerLevel > 0) {
+  if (engine && entryBannerRenderer && entryBannerLevel > 0) {
     if (!clearScreen && engineTicks - entryBannerAt < ENTRY_BANNER.frames) {
       try {
         entryBannerEvidence = entryBannerRenderer.draw(ctx, w, h, { levelId: entryBannerLevel, act: snapshot.act,
           entryFile: frameSnap?.entryFileLevel === entryBannerLevel ? frameSnap.entryFile : Module.ccall('d2_level_entry_file', 'string', ['number'], [entryBannerLevel]) });
       } catch (error) { entryBannerEvidence = null; entryBannerError = String(error); }
     }
-  } else if (!session) entryBannerLevel = -1;
+  } else if (!engine) entryBannerLevel = -1;
   // The bar receives the engine's advancement record directly. It does not keep a client-side XP
   // counter: a kill, quest reward, or level-up can change both fields at any engine tick.
   // The control panel's HUD pieces (the stamina bar, the run/walk button, the icon row and its
@@ -4962,7 +5051,7 @@ function drawFrame() {
     const left = characterVisible || questVisible || hirelingVisible || stashOpen || waypointMenu || shopOpen();
     const right = skillsVisible || inventoryVisible;
     const shift = HUD_LAYOUT.miniPanelShift;
-    controlPanelEvidence = RENDER_WIRE?.ownsWorld ? (RENDER_WIRE.evidence?.controlPanel ?? controlPanelEvidence) : controlPanelRenderer.draw(ctx, w, h, snapshot, snapOr('advancement', readAdvancement),
+    controlPanelEvidence = ownsWorld ? (RENDER_WIRE.evidence?.controlPanel ?? controlPanelEvidence) : controlPanelRenderer.draw(ctx, w, h, snapshot, snapOr('advancement', readAdvancement),
       { iconRow: hudIconRow && !(left && right), offsetX: left && !right ? shift.left : right && !left ? shift.right : 0,
         // The ARROW's own toggle, which is a different state from the row being hidden: retail
         // keeps menubutton frame 2 while the row is gone (stash-town.txt), so only the arrow's own
@@ -5007,19 +5096,19 @@ function drawFrame() {
   // `record`/`recordBoxes` carry which Belts.txt row the engine read and how many boxes it has, so a
   // row can tell a 16-box Girdle from the four-box record a bare character has, and `boxes` is what
   // was actually laid out.
-  if (beltRenderer && !RENDER_WIRE?.ownsWorld) { const bo = hudOrigin(w, h, 'bottom');   // belt boxes are retail 800x600 coordinates; bottom-centre anchored
+  if (beltRenderer && !ownsWorld) { const bo = hudOrigin(w, h, 'bottom');   // belt boxes are retail 800x600 coordinates; bottom-centre anchored
     ctx.save(); ctx.translate(bo.x, bo.y);
     beltEvidence = { ...beltRenderer.draw(ctx, snapshot.items, (beltPopup.frame(), snapOr('beltShown' + beltPopup.open, beltShownBoxes)), true, beltKeyNames(controlsPanel?.bindings ?? bootControlBindings), beltPopup.open ? { rows: popupRows(readBeltIndex(), readBeltBoxes()?.length) } : null),
       record: snapOr('beltIndex', readBeltIndex), recordBoxes: snapOr('beltBoxCount', () => readBeltBoxes()?.length ?? 0), origin: { x: bo.x, y: bo.y } };
     ctx.restore(); }
   else if (clearScreen) beltEvidence = null;
-  else if (RENDER_WIRE?.ownsWorld && RENDER_WIRE.evidence?.belt) beltEvidence = { ...RENDER_WIRE.evidence.belt, record: snapOr('beltIndex', readBeltIndex), recordBoxes: snapOr('beltBoxCount', () => readBeltBoxes()?.length ?? 0) };
+  else if (ownsWorld && RENDER_WIRE.evidence?.belt) beltEvidence = { ...RENDER_WIRE.evidence.belt, record: snapOr('beltIndex', readBeltIndex), recordBoxes: snapOr('beltBoxCount', () => readBeltBoxes()?.length ?? 0) };
   skillPanelEvidence?.plateDraw?.(ctx); // the skill tree's tooltip over the HUD (D2Win #10110 draws it last)
   // The inventory item hover text goes over every panel (stash, cube, waypoint, ...) and the HUD, uncut at the seam between panels.
   if (inventoryPanelEvidence?.tooltipDraw) { try { inventoryPanelEvidence.tooltip = inventoryPanelEvidence.tooltipDraw(ctx); } catch (error) { inventoryPanelEvidence.tooltip = null; } }
   // A belt potion's hover text, when no inventory tooltip took the hover: the box under the pointer (a mouse's hover, or a phone's inspect tap, which is a hover too).
-  if (beltTooltip && beltRenderer && screen === SCREEN.GAME && !clearScreen && session && !inventoryPanelEvidence?.tooltip) {
-    const plan = beltHoverPlan({ boxes: beltShownBoxes(), origin: hudOrigin(w, h, 'bottom'), x: pointer.x, y: pointer.y, items: snapshot.items, tip: (item) => tipFields(item.id, item.code) });
+  if (beltTooltip && beltRenderer && screen === SCREEN.GAME && !clearScreen && panelData && !inventoryPanelEvidence?.tooltip) {
+    const plan = beltHoverPlan({ boxes: beltShownBoxes(), origin: hudOrigin(w, h, 'bottom'), x: pointer.x, y: pointer.y, items: snapshot.items, tip: (item) => (engine ? tipFields(item.id, item.code) : realmItemTip(item)) });
     try { beltTooltip.draw(ctx, snapshot.act, plan, w, h); } catch (error) { /* no font, no tooltip: the belt still draws */ }
   }
   // FUN_6FB739E0 draws ordinary speech after the main gameplay/panel passes. Match that late
@@ -5042,8 +5131,8 @@ function drawFrame() {
   // every time it is drawn, so a level the client never saw named still draws its own name. Chrome like
   // the rest of the HUD, so ClearScreen draws none of it (F3c).
   areaNameEvidence = null; areaNameError = '';
-  if (session && !clearScreen && automapOverlay?.isOpen) {
-    try { areaNameEvidence = areaNameRenderer?.draw(ctx, engineLevelName(snapshot.level), snapshot.act, { screenWidth: canvas.width, difficulty: snapshot.difficulty ?? 0, expansion: Module._d2_session_client_flags ? Boolean(snapOr('clientFlags', () => Module.ccall('d2_session_client_flags', 'number', [], [])) & 0x20) : true }); }
+  if (engine && !clearScreen && automapOverlay?.isOpen) {
+    try { areaNameEvidence = areaNameRenderer?.draw(ctx, engineLevelName(snapshot.level), snapshot.act, { screenWidth: canvas.width, difficulty: snapshot.difficulty ?? 0, expansion: view.hasClientFlags ? Boolean(snapOr('clientFlags', () => view.clientFlags()) & 0x20) : true }); }
     catch (error) { areaNameEvidence = null; areaNameError = String(error); }
   }
   hudHelpEvidence = null;
@@ -5074,8 +5163,8 @@ function drawFrame() {
   }
   // The item on the cursor and the world cel are drawn by the pointer layer in render(), after the
   // Esc menu -- the last draw of the frame, which is where retail's own pointer goes.
-  if (skillSelectRenderer && session && !clearScreen) { try { skillSelectEvidence = skillSelectRenderer.draw(ctx, w, h, snapOr('skillChoices', readSkillChoices), snapOr('selectedSkills', readSelectedSkills),
-    { act: snapshot.act, hotkeys: snapOr('hotkeys', () => Array.from({ length: 8 }, (_, i) => ({ skill: Number(Module.ccall('d2_session_hotkey_skill', 'number', ['number'], [i])), left: Boolean(Module.ccall('d2_session_hotkey_hand', 'number', ['number'], [i])) }))), skillStrings: skillStringsSnap, plateState: skillPlateState(), line: (i) => (i ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) : '') }); } catch (error) { skillSelectError = String(error); } }
+  if (skillSelectRenderer && engine && !clearScreen) { try { skillSelectEvidence = skillSelectRenderer.draw(ctx, w, h, snapOr('skillChoices', readSkillChoices), snapOr('selectedSkills', readSelectedSkills),
+    { act: snapshot.act, hotkeys: snapOr('hotkeys', () => Array.from({ length: 8 }, (_, i) => ({ skill: Number(view.hotkeySkill(i)), left: Boolean(view.hotkeyHand(i)) }))), skillStrings: skillStringsSnap, plateState: skillPlateState(), line: (i) => (i ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) : '') }); } catch (error) { skillSelectError = String(error); } }
   else if (clearScreen) { skillSelectEvidence = null; skillSelectError = ''; }
   orbReadoutEvidence = !clearScreen && session && hoverFont
     ? drawOrbReadouts(ctx, hoverFont, snapshot, w, h, pointer, orbPins,

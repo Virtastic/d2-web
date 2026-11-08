@@ -2,6 +2,7 @@ import { parseMonsterAnimations } from './monster-renderer.mjs';
 import { readD2gsDeny, d2gsDenyError } from './d2gs-deny.mjs';
 import { parseRealmMissiles } from './realm-missiles.mjs';
 import { parseRealmMissileSoundEvents } from './realm-missile-sounds.mjs';
+import { parseSessionSnapshot } from '../gameplay-model.mjs';
 // The realm CLIENT half: it drives our protocol (BNCS/MCP/D2GS) over a byte-pipe transport.
 //
 // Everything here is ORCHESTRATION and PARSING. The message BODIES are composed by the engine's own
@@ -536,7 +537,7 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
 
   const decoded = [];
   let frameCount = 0, assignOffset = -1, handshakeEnd = -1, playerAssignment = null;
-  let receiptScanAt = 0;
+  let receiptScanAt = 0, fed = null, tail = null, applied = 0;
   const joinReassignments = [];
   // `AF 00` is the unframed dialect the stock 1.13c game server speaks: after the greeting the stream is a bare
   // run of packets that only the size table delimits. Reading it as Huffman frames drops the join on the
@@ -600,6 +601,19 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
       }
       at += packetLength;
     }
+    // The stock game server names the player (0x59) BEFORE it sends the act (0x03 LoadAct), and the engine's
+    // client state refuses a player assigned with no act. Feed the act first when it is here; when the engine
+    // still refuses (the act or its rooms are not all here yet) read on and try again instead of failing a join
+    // that would then retry against a spent ticket.
+    if (raw && handshakeEnd >= 0) {
+      const act = findPacket(response, protocol, 0x03);
+      const move = act && act.at > assignOffset;
+      const cut = (from, to) => [...response.subarray(from, to)].filter((_, i) => !move || from + i < act.at || from + i >= act.at + act.size);
+      fed = Uint8Array.from(move ? [...response.subarray(0, assignOffset), ...response.subarray(act.at, act.at + act.size), ...cut(assignOffset, handshakeEnd)] : response.subarray(0, handshakeEnd));
+      tail = Uint8Array.from(cut(handshakeEnd, response.length));
+      applied = protocol.d2gsClientPlayerFeed(fed);
+      if (applied < 1) { handshakeEnd = -1; applied = 0; fed = null; }   // the engine resets itself on a refusal
+    }
   }
   const response = Uint8Array.from(decoded);
   // Keep packet offsets from the engine table for transport evidence, without assuming any order.
@@ -611,7 +625,7 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
     opcodes.push(at);
     at += size;
   }
-  const applied = protocol.d2gsClientPlayerFeed(response.subarray(0, handshakeEnd));
+  if (!fed) { fed = response.subarray(0, handshakeEnd); tail = response.subarray(handshakeEnd); applied = protocol.d2gsClientPlayerFeed(fed); }
   if (applied < 1) throw new Error(`D2GS engine did not parse the assigned player before selection (applied ${applied})`);
   const playerState = protocol.d2gsClientPlayerState?.();
   if (!playerState?.active || playerState.guid !== playerAssignment.guid)
@@ -620,9 +634,8 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
   const transitionFade = joinReassignments.some(({ offset, update }) => offset < handshakeEnd &&
     update.unitType === 0 && update.guid === playerAssignment.guid && (update.value & 0xff) !== 0);
 
-  const result = { greeting: { size: greetingSize, mode }, burstBytes: [...response], opcodes, bytes: response.length,
+  const result = { greeting: { size: greetingSize, mode }, burstBytes: [...response], headBytes: Array.from(fed), opcodes, bytes: response.length,
     playerAssignment, playerState, worldState, transitionFade, gamelogon: gamelogon.length, gamelogonBytes: Array.from(gamelogon) };
-  const tail = response.subarray(handshakeEnd);
   const pending = tail.length ? [tail] : [];
   const readFrame = async () => pending.length ? pending.shift() : (raw ? readD2gsRawPackets : readD2gsFrame)(reader, protocol, null);
   readFrame.cancel = () => reader.cancel();
@@ -632,6 +645,17 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
     readFrame: { value: readFrame },
   });
   return result;
+}
+
+// The first complete packet with `opcode` at or after byte `from` of an unframed stream, as { at, size }.
+function findPacket(stream, protocol, opcode, from = 0) {
+  for (let at = 0; at < stream.length;) {
+    const size = protocol.d2gsPacketSize(stream.subarray(at));
+    if (size <= 0) return null;
+    if (at >= from && stream[at] === opcode) return { at, size };
+    at += size;
+  }
+  return null;
 }
 
 /** Retail's 13-byte D2GS keep-alive, sent every five seconds while the game socket is retained. */
@@ -875,6 +899,18 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
         }
       }
       return players;
+    },
+    // The bnet client's state in the single-player snapshot's shape (same parser as d2_session_snapshot).
+    d2gsClientSnapshot: () => {
+      const ptr = call('d2_realm_client_snapshot', 'bigint', [], []);
+      return ptr ? parseSessionSnapshot(Module.HEAPU8.subarray(Number(ptr), Number(ptr) + 68)) : null;
+    },
+    // The selected player's life, mana and stamina (8.8 fixed point stat values), with their maxima.
+    d2gsClientResources: () => {
+      const ptr = call('d2_realm_client_resources', 'bigint', [], []);
+      if (!ptr) return null;
+      const v = new Int32Array(Module.HEAPU8.buffer.slice(Number(ptr), Number(ptr) + 32));
+      return v[0] === 1 && v[1] === 32 ? { hp: v[2], hpMax: v[3], mana: v[4], manaMax: v[5], stamina: v[6], staminaMax: v[7] } : null;
     },
     d2gsClientWorldState: () => {
       const ptr = call('d2_realm_client_world_state', 'bigint', [], []);

@@ -14,7 +14,7 @@ import { composeTiled, createBlender, createFont, decodeFontTbl, recordTiled, te
   LABEL_TINT, FRONTEND, TITLE_COLUMNS } from './frontend.mjs';
 import { recordDc6, recordDcc, recordPrim } from './drawlist.mjs';
 import { parseStatstring } from './bnet-statstring.mjs';
-import { deriveWideBg, drawBg, present } from './widebg.mjs';
+import { drawBg, present, deriveWideBg } from './widebg.mjs';
 import { wrapSpaces } from './bnet-login-screen.mjs';
 import { localSlash } from './bnet-slash.mjs';
 
@@ -585,7 +585,16 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     const local = !whisper ? localSlash(line, chat) : null;
     if (local) { if (local.notice) chat.lines.push({ text: local.notice, colour: local.colour }); if (!local.send) return; }
     const out = local ? local.send : whisper && chat.picked ? `/whisper *${chat.picked.replace(/^.*\*/, '') || chat.picked} ${line}` : line;
-    if (chat.live && onSendChat(out)) return;
+    if (chat.live && onSendChat(out)) {
+      // Battle.net never sends a talk line back to the one who said it (PvPGN skips the sender), so the line is drawn here;
+      // a server that does echo it is matched by chatEvent and not drawn twice.
+      if (out === line && line[0] !== '/') {
+        const me = character.name ?? ''; chat.first = null;
+        chat.lines.push({ text: `<${me}> ${line}`, name: `<${me}> `, colour: 0, nameColour: 4 }); if (chat.lines.length > 200) chat.lines.shift();
+        (chat.selfSaid ??= []).push(line); if (chat.selfSaid.length > 20) chat.selfSaid.shift();
+      }
+      return;
+    }
     chat.lines.push({ text: `<${character.name ?? ''}> ${line}`, colour: 0 });
   };
 
@@ -607,22 +616,26 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   // no user picked, the scroll arrows while every user fits the band.
   const dim = (b) => mode === 'chat' && (['whisper', 'squelch', 'unsquelch'].includes(b.id) ? !chat.enable[b.id] : ['send', 'emote'].includes(b.id) ? !chat.input.length :
     b.id.startsWith('arrow-') && (b.id === 'arrow-0' || b.id === 'arrow-2' ? chat.scroll <= 0 : chat.scroll >= chat.users.length - L.band.visible));
+  // A pressed button shows its held cel only while the pointer is still over it (D2Win's button draw); leaving it shows the up cel, and the release there activates nothing.
+  const held = (b) => { if (pressed !== b.id) return false; const r = box(b); return pointer[0] >= r.x && pointer[0] < r.x + r.w && pointer[1] >= r.y && pointer[1] < r.y + r.h; };
   const drawButton = (b) => {
-    const off = disabled(b), down = pressed === b.id || toggled(b);
+    const off = disabled(b), down = held(b) || toggled(b);
     const key = b.id.startsWith('difficulty-') && !allowed[Number(b.id.slice(11))] ? 'radioGrey' : b.art;
     drawCel(art(key), b.base + (down ? 1 : 0), b.x, b.y, off || dim(b) ? 1 : 5);
     if (!b.label) return;
     const label = text(b.label), lf = labelFont(b.h);
     let x = b.x + Math.max(Math.trunc((b.w - lf.measure(label)) / 2), 0), y = b.y + labelRise(b.h) - Math.trunc((b.h - lf.lineHeight) / 2);
-    if (pressed === b.id || (['create', 'join', 'channel', 'ladder'].includes(b.id) && toggled(b))) { x -= 2; y += 2; }
+    if (held(b) || (['create', 'join', 'channel', 'ladder'].includes(b.id) && toggled(b))) { x -= 2; y += 2; }
     lf.drawAnchored(sctx, label, x, y);
   };
-  // A wide button is two cels side by side (frames base and base + 1), its label centred over both; retail never draws it pressed.
+  // A wide button is two cels side by side (frames base and base + 1; the held pair is base + 2 and base + 3, as the other screens draw
+  // widebuttonblank), its label centred over both and 2 px left and down while held.
   const drawWide = (b) => {
-    const c = art(b.art), down = 0, w = c.dc6.frames[0].width;
+    const c = art(b.art), down = held(b) ? 2 : 0, w = c.dc6.frames[0].width;
     drawCel(c, b.base + down, b.x, b.y); drawCel(c, b.base + down + 1, b.x + w, b.y);
     const label = text(b.label), lf = labelFont(b.h);
-    const x = b.x + Math.max(Math.trunc((b.w - lf.measure(label)) / 2), 0), y = b.y + labelRise(b.h) - Math.trunc((b.h - lf.lineHeight) / 2);
+    let x = b.x + Math.max(Math.trunc((b.w - lf.measure(label)) / 2), 0), y = b.y + labelRise(b.h) - Math.trunc((b.h - lf.lineHeight) / 2);
+    if (down) { x -= 2; y += 2; }
     lf.drawAnchored(sctx, label, x, y);
   };
   // A D2Win text box: lines from one font height under its top (plus the inset), one font height apart.
@@ -990,7 +1003,9 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
           return true;
         }
         case 0x03: chat.users = chat.users.filter((u) => plain(u.name) !== plain(e.username)); scrollUsers(0); if (chat.notify) say({ text: `${shown} has left the channel.`, colour: 5 }); return true;
-        case 0x05: { const fl = chat.users.find((u) => u.name === e.username)?.flags ?? 0; say({ text: `<${shown}> ${e.text}`, name: `<${shown}> `, colour: fl & 2 ? 0 : fl & 9 ? 3 : 0, nameColour: fl & 2 ? 0 : fl & 9 ? 3 : 4 }); return true; }
+        case 0x05: {
+          if (chat.selfSaid?.length && shown.toLowerCase() === String(character.name ?? '').toLowerCase()) { const at = chat.selfSaid.indexOf(e.text); if (at >= 0) { chat.selfSaid.splice(0, at + 1); return true; } }
+          const fl = chat.users.find((u) => u.name === e.username)?.flags ?? 0; say({ text: `<${shown}> ${e.text}`, name: `<${shown}> `, colour: fl & 2 ? 0 : fl & 9 ? 3 : 0, nameColour: fl & 2 ? 0 : fl & 9 ? 3 : 4 }); return true; }
         case 0x04: chat.replyTo = e.username.replace(/^.*\*/, '') || e.username; say({ text: e.username.startsWith('*') && shown === e.username ? `${shown} whispers: ${e.text}` : `${shown} (*${acct}) whispers: ${e.text}`, colour: 2 }); return true;
         case 0x0A: say({ text: `You whisper to ${shown}: ${e.text}`, colour: 2 }); return true;
         case 0x0D: say({ text: `The channel "${e.text}" is full. If you are having problems using Battle.net commands, please click the Help button.`, colour: 1 }); return true;
@@ -1075,6 +1090,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
       const b = barOf(); if (bar.grab && bar.held && b) barDrag(b, sy);
     },
     press(x, y, w, h) {
+      { const [px, py] = at(x, y, w, h); pointer = [Math.trunc(px), Math.trunc(py)]; }
       if (barPress(x, y, w, h)) { pressed = null; return 'scrollbar'; }
       if (inList(x, y, w, h)) { pickRow(listRow(x, y, w, h)); pressed = null; return 'list'; }
       if (inChanList(x, y, w, h)) { pickChannel(x, y, w, h); pressed = null; return 'list'; }

@@ -32,6 +32,7 @@
 #include <Units/UnitRoom.h>
 #include <Drlg/D2DrlgDrlg.h>
 #include "d2gs_client_motion.h"
+#include "d2gs_client_snapshot.h"
 #include "d2gs_client_target_relations.h"
 #include "d2gs_client_owned_item.h"
 #include "d2gs_client_unit_resources.h"
@@ -1947,6 +1948,36 @@ static int apply_player_stat(const uint8_t* packet, int length) {
     return 1;
 }
 
+// 1.13c D2Client+0xAEBE0 (0x95, 13 bytes) and +0xAECA0 (0x18, 15 bytes): after the opcode byte the packet
+// is a little-endian bit stream whose first three 15-bit fields are life, mana and stamina (the readers at
+// +0xAC1B0 / +0xAC240); the handlers store each into the current player's stat list (stats 6, 8, 10) in the
+// stat's 8.8 form, i.e. shifted left by 8.
+static int apply_life_mana(const uint8_t* packet, int length) {
+    if (length != (packet[0] == 0x95 ? 13 : 15)) return -1;
+    if (g_selectedPlayer < 0 || size_t(g_selectedPlayer) >= g_players.size()) return 0;
+    D2UnitStrc* unit = g_players[g_selectedPlayer].motionUnit;
+    if (!unit) return 0;
+    uint64_t bits = 0;
+    for (int i = 0; i < 6; ++i) bits |= uint64_t(packet[1 + i]) << (i * 8);
+    STATLIST_SetUnitStat(unit, 6, static_cast<int32_t>((bits & 0x7fff) << 8), 0);
+    STATLIST_SetUnitStat(unit, 8, static_cast<int32_t>(((bits >> 15) & 0x7fff) << 8), 0);
+    STATLIST_SetUnitStat(unit, 10, static_cast<int32_t>(((bits >> 30) & 0x7fff) << 8), 0);
+    return 1;
+}
+
+// The selected player's life, mana and stamina with their maxima (stat list values, 8.8 fixed point):
+// { version 1, size 32, life, lifeMax, mana, manaMax, stamina, staminaMax }; zeros until a player is selected.
+EMSCRIPTEN_KEEPALIVE const uint32_t* d2_realm_client_resources() {
+    static uint32_t out[8];
+    std::memset(out, 0, sizeof out);
+    out[0] = 1; out[1] = 32;
+    if (g_selectedPlayer >= 0 && size_t(g_selectedPlayer) < g_players.size()) {
+        D2UnitStrc* unit = g_players[g_selectedPlayer].motionUnit;
+        if (unit) for (int i = 0; i < 6; ++i) out[2 + i] = static_cast<uint32_t>(STATLIST_UnitGetStatValue(unit, 6 + i, 0));
+    }
+    return out;
+}
+
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_stat(uint32_t guid, int stat) {
     if (stat < 0 || stat > 255) return 0;
     for (auto& player : g_players) if (player.view.guid == guid && player.motionUnit)
@@ -2053,6 +2084,10 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_feed(const uint8_t* bytes, int l
             applied += result;
         } else if ((packet[0] >= 0x1d && packet[0] <= 0x1f) || packet[0] == 0x20) {
             const int result = apply_player_stat(packet, size);
+            if (result < 0) return reject_stream(-2);
+            applied += result;
+        } else if (packet[0] == 0x95 || packet[0] == 0x18) {
+            const int result = apply_life_mana(packet, size);
             if (result < 0) return reject_stream(-2);
             applied += result;
         } else if (packet[0] == 0x21 || packet[0] == 0x22) {
@@ -2583,5 +2618,31 @@ EMSCRIPTEN_KEEPALIVE const D2RealmClientPlayerEntry::MotionView* d2_realm_client
     return &out;
 }
 EMSCRIPTEN_KEEPALIVE const D2RealmClientWorldState* d2_realm_client_world_state() { return &g_world; }
+// The single-player snapshot's shape (68 bytes, see d2gs_client_snapshot.h) from the game-server
+// client state: the selected player's CUnit (position, life, mode, flags), the act/seed/difficulty
+// the server sent, the live monster roster size. Empty until a player is assigned.
+EMSCRIPTEN_KEEPALIVE const d2::realm::ClientSnapshot* d2_realm_client_snapshot() {
+    static d2::realm::ClientSnapshot snapshot;
+    d2::realm::ClientSnapshotInput in{};
+    in.playerActive = g_player.active != 0;
+    in.seed = g_world.mapSeed; in.frame = g_clientMissileTick;
+    in.level = g_player.clientRoomActive ? g_player.clientRoomLevel : g_world.area;
+    in.difficulty = g_clientDifficulty; in.act = g_world.act;
+    in.classId = g_player.classId; in.guid = g_player.guid;
+    in.x = static_cast<int32_t>(g_player.x); in.y = static_cast<int32_t>(g_player.y);
+    in.mode = g_player.initialMode;
+    in.monsters = static_cast<uint32_t>(g_monsters.size());
+    if (g_selectedPlayer >= 0 && static_cast<size_t>(g_selectedPlayer) < g_players.size()) {
+        const D2UnitStrc* unit = g_players[static_cast<size_t>(g_selectedPlayer)].motionUnit;
+        if (unit && unit->pDynamicPath) {
+            in.x = unit->pDynamicPath->tGameCoords.wPosX; in.y = unit->pDynamicPath->tGameCoords.wPosY;
+            in.mode = unit->dwAnimMode; in.flags = unit->dwFlags;
+            in.hp = STATLIST_UnitGetStatValue(const_cast<D2UnitStrc*>(unit), STAT_HITPOINTS, 0);
+            in.maxHp = STATLIST_UnitGetStatValue(const_cast<D2UnitStrc*>(unit), STAT_MAXHP, 0);
+        }
+    }
+    snapshot = d2::realm::build_client_snapshot(in);
+    return &snapshot;
+}
 
 }  // extern "C"

@@ -288,9 +288,8 @@ const STATES = {
     'chan-ten': [26, 10, 0], 'chan-eleven': [26, 11, 0], 'chan-many': [26, 30, 5], 'chan-many-s5': [30, 30, 5],
   }).map(([name, [tick, n, scroll]]) => [name, { tick, known: 0, feed: (s) => { uiFeed(s);
     s.setChannels(['Diablo II Test Channel', ...Array.from({ length: n }, (_, i) => `Chan ${String(i + 1).padStart(2, '0')}`)]); click(s, 575, 480); if (scroll) s.wheel(500, 300, 800, 600, scroll); } }])),
-  // The wide ladder buttons never draw pressed and a click on one changes nothing on screen: the held press (mouse down only) at each, then a whole click.
-  ...Object.fromEntries(Object.entries({ 'ladder-down-hc': [26, 600, 222], 'ladder-down-std': [26, 600, 172], 'ladder-down-xhc': [26, 600, 322], 'ladder-down-xp': [26, 600, 272] })
-    .map(([name, [tick, x, y]]) => [name, { tick, known: 0, feed: (s) => { uiFeed(s); click(s, 654, 480); s.hover(x, y, 800, 600); s.press(x, y, 800, 600); } }])),
+  // A whole click on a wide ladder button (released, so drawn up). The held captures of these buttons (bnet-ladder-down-*) drew them unpressed, but
+  // their held press never reached the button (see bnet-lobby-pressed.test.mjs for the held cels), so they no longer gate the lobby.
   'ladder-click-hc': { tick: 28, known: 0, feed: (s) => { uiFeed(s); click(s, 654, 480); click(s, 600, 222); } },
   'ladder-click-hc-later': { tick: 32, known: 0, feed: (s) => { uiFeed(s); click(s, 654, 480); click(s, 600, 222); } },
   // A name typed over the edit's text (the capture sets it whole): the list's highlight stays where the last pick left it.
