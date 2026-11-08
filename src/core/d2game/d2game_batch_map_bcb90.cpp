@@ -45,26 +45,39 @@ static P findQuest(P game, i32 type)
     return 0;
 }
 
-// 1.13c D2Game+0xBD330 (in_EAX = item record, param_1 = unit, param_2 = client/player)
-void D2GAME_BD330(P in_EAX, P param_1, P param_2)
+// 1.13c D2Game+0xBD330 (in_EAX = item record, param_1 = unit, param_2 = client/player; ret 8). The retail callees go through env:
+// 0x8A3E0 (EAX = client, stack buffer and length), 0x8F5C0 (ECX = client+0x1A8, ESI = id), 0xBCED0 (EAX = record, stack client+0x1A8 and id),
+// ordinal 10427 (unit+0x70, id, 0, 0). A slot's notice is 0x4E, the word at slot-8 and the dword at slot-4 (the bytes between are not sent).
+struct D2GameBD330Env {
+    void (*send)(P client, const void* buf, u32 len);
+    P (*findRecord)(P clientField, i32 id);
+    void (*fillRecord)(P rec, P clientField, i32 id);
+    P (*dataRow)(P unitField, i32 id);
+    void (*fatal)(u32 msg);
+};
+void D2GAME_BD330(P in_EAX, P param_1, P param_2, const D2GameBD330Env* env)
 {
     if (in_EAX == 0) return;
     i32 id = rd(in_EAX, 4);
     if (id != 0x96 && id != 0xC6 && id != 0x203 && id != 0xFC) return;
-    u8 notice[8] = { 0x4F };
-    r_8A3E0(AD(notice), 1);
-    if (param_2 == 0) fatal(0x996);
-    P rec = (P)r_8F5C0(rp(param_2, 0x1A8));
+    u8 notice = 0x4F;
+    env->send(param_2, &notice, 1);
+    if (param_2 == 0) { env->fatal(0x996); return; }
+    P rec = env->findRecord(rp(param_2, 0x1A8), id);
     if (rec == 0) return;
-    if (rb(rec, 0x21) == 0) r_BCED0(rp(param_2, 0x1A8));
+    if (rb(rec, 0x21) == 0) env->fillRecord(rec, rp(param_2, 0x1A8), id);
     P slots = rp(rec, 0x10);
-    P data = (P)o10427(rp(param_1, 0x70), id, 0, 0);
-    if (data == 0) fatal(0x1F6);
+    P data = env->dataRow(rp(param_1, 0x70), id);
+    if (data == 0) { env->fatal(0x1F6); return; }
     i32 n = (i32)rw(data, 0x116) - (i32)rw(data, 0x114) + 1;
-    if (n == -1) fatal(0x5B);
-    u8 notice7[8] = { 7 };   // the decompile leaves the notice buffer to the frame; only the code 7 is visible
+    if (n == -1) { env->fatal(0x5B); return; }
     for (P e = slots + 8; n > 0; --n, e += 16)
-        if (rd(e, 4) != 0 && rd(e, 0) == 0) r_8A3E0(AD(notice7), 7);
+        if (rd(e, 4) != 0 && rd(e, 0) == 0) {
+            u8 pkt[7] = { 0x4E };
+            std::memcpy(pkt + 1, (const void*)(e - 8), 2);
+            std::memcpy(pkt + 3, (const void*)(e - 4), 4);
+            env->send(param_2, pkt, 7);
+        }
 }
 
 // 1.13c D2Game+0xC6D20 (in_EAX = game, param_1 = player)

@@ -33,65 +33,7 @@ static inline void     wr8 (uint32_t a, uint32_t o, uint8_t v)  { wr8 ((void*)(u
 static inline void     wr32(uint32_t a, uint32_t o, uint32_t v) { wr32((void*)(uintptr_t)a, o, v); }
 
 // Every callee of the twelve that src/ does not implement, at its retail address.
-struct D2GameBatchED540Env {
-    // ---- 0xED540 ------------------------------------------------------------------------------
-    uint32_t (*ordinal10265)(uint32_t id);
-    void     (*ordinal10024)(const char* module, uint32_t id);   // tail is _exit(-1)
-    void*    (*ordinal11153)(uint32_t a, uint32_t b);
-    uint32_t (*ordinal10826)(uint32_t v);
-    uint8_t  (*ordinal10459)(uint32_t v);
-    void     (*sub38620)(int32_t v);                   // 0x38620
-    void     (*subEFED0)();                            // 0xEFED0
-    void     (*subEBA40)(void* v);                     // 0xEBA40
-    void     (*sub7B0A0)(void* edi, void* v);          // 0x7B0A0
-    void     (*subEB2C0)(void* v);                     // 0xEB2C0
-    void     (*sub385C0)(void* v, void* edi);          // 0x385C0
-    int32_t  (*ordinal10920)(void* unit);              // the visible-argument form
-    int32_t  (*ordinal10630)();
-    void     (*subA2100)(void* unit, uint32_t a, void* p, uint32_t d);  // 0xA2100
-    void     (*sub35090)(void* edi, void* v, int32_t one);               // 0x35090
-    const uint8_t* dataTables;                         // *sgptDataTables: rows at +0xBC4, count +0xBC8
-    // ---- 0x70B70 ------------------------------------------------------------------------------
-    int32_t  (*ordinal10920_v)();                      // the no-visible-argument form
-    void     (*sub8A3E0)(void* buf, uint32_t len);     // 0x8A3E0
-    // ---- 0xD22C0 ------------------------------------------------------------------------------
-    void*    (*ordinal10858_v)();
-    void*    (*ordinal11034)(int32_t a, uint32_t size);
-    int32_t  (*subD1A30)(void* esi);                   // 0xD1A30
-    // ---- 0xD2310 ------------------------------------------------------------------------------
-    void     (*ordinal10180_v)();
-    void     (*ordinal10289_v)();
-    void*    (*ordinal10708)(void* esi);
-    int32_t  (*ordinal10787_v)();
-    // ---- 0xDA9E0 ------------------------------------------------------------------------------
-    int32_t  (*ordinal10989)(uint32_t v);
-    // ---- 0xDAA40 ------------------------------------------------------------------------------
-    int32_t  (*sub14D0)(uint32_t a, int32_t b);        // 0x14D0
-    const int32_t* table1A048;                         // 0x6FD1A048
-    const int32_t* table1A01C;                         // 0x6FD1A01C
-    // ---- 0xDB6B0 ------------------------------------------------------------------------------
-    void*    (*subE03A0)(uint32_t a, uint32_t b);      // 0xE03A0
-    void*    (*sub96570_v)();                          // 0x96570
-    void*    (*ordinal11156)(uint32_t a, uint32_t b, int32_t c);
-    int32_t  (*ordinal10448)(int32_t a, uint32_t b);
-    // ---- 0x9C070 ------------------------------------------------------------------------------
-    void*    (*ordinal10331_v)();
-    void*    (*ordinal10331)(void* v);                 // the visible-argument form
-    int16_t  (*sub9BEB0_v)();                          // 0x9BEB0
-    void*    (*sub9BD00)(int16_t idx);                 // 0x9BD00
-    // ---- 0xF4FE8 ------------------------------------------------------------------------------
-    void     (*fdivpSTiST)();                          // 0xF4EF6 __fdivp_sti_st
-    // ---- 0xF01D0 ------------------------------------------------------------------------------
-    int32_t  (*ordinal10920r_v)();                     // no-visible-argument form returning the record
-    // ---- 0x78B60 ------------------------------------------------------------------------------
-    uint32_t (*ordinal10829)(uint32_t v);
-    uint8_t  (*ordinal10020)(void* v);
-    void*    (*ordinal10391)(int32_t a, void* b);
-    void*    (*subD2610)(uint32_t unit, uint32_t* p, uint32_t zero);  // 0xD2610
-    int32_t  (*ordinal11139)(int32_t a, uint32_t b);
-    void     (*subD57F0)(void* ctx, uint32_t v);       // 0xD57F0
-    void     (*ordinal11055)(uint32_t unit, uint32_t zero);
-};
+#include "d2game_batch_ed540_env.h"
 
 // 0xED540: NULL-check the caller record, mark bit 0 of its +0x3D4, then (for record byte +8 < 7)
 // allocate and initialise a unit from the owner's +0x1C, stamp it with a fresh id, link it and run the
@@ -208,9 +150,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_DB6B0(int32_t param_1, int
     const int32_t iVar2 = (int32_t)rd32(eax5, 0x28);
     if (iVar2 == 0) return 0;
     if (rd32((int32_t)iVar2, 0x28) == 0) return 0;
-    void* piVar1 = env->subE03A0(rd32((int32_t)iVar2, 0x28), rd32((int32_t)iVar2, 0x2C));
+    void* piVar1 = env->subE03A0(rd32((int32_t)iVar2, 0x30), rd32((int32_t)iVar2, 0x28), rd32((int32_t)iVar2, 0x2C));
     if (piVar1 == nullptr || rd32(piVar1, 0) != 0) return 0;
-    void* p = env->sub96570_v();
+    void* p = env->sub96570_v(rd32(eax, 0xC));
     if (p == nullptr) return 0;
     void* r = env->ordinal11156(rd32((int32_t)param_1, 0x70), rd32(p, 8), param_2);
     if (r == nullptr) return 0;

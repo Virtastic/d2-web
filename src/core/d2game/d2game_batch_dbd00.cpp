@@ -13,59 +13,7 @@ static inline uint32_t rd32(uint32_t a, uint32_t o) { uint32_t v; std::memcpy(&v
 static inline uint8_t  rd8 (uint32_t a, uint32_t o) { return *(const uint8_t*)(uintptr_t)(a + o); }
 static inline void     wr32(uint32_t a, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)(uintptr_t)(a + o), &v, 4); }
 
-struct D2GameBatchDBD00Env {
-    // 0xDBD00
-    int32_t  (*subDB3C0)();                                   // no visible args
-    int32_t  (*sub14D0)(int32_t pct, int32_t v);
-    int32_t  (*subDAD00)(uint32_t thisp);
-    // 0xDC940 / 0xDCAB0
-    int32_t  (*ordinal10871)(uint32_t unit);
-    uint32_t (*ordinal10265)(uint32_t size);
-    void     (*ordinal10024)(const char* file, uint32_t v);
-    const char* assertFile;                                   // DAT_6FD19FF9
-    void     (*sub8E6F0)();
-    void     (*sub8EA80)(uint32_t game, uint32_t unit, uint32_t type, uint32_t frame, uint32_t a, uint32_t b, uint32_t c);
-    void     (*ordinal10945)(uint32_t unit, uint32_t skill, uint32_t one);
-    uint32_t (*ordinal11013)(uint32_t a, uint32_t b, uint32_t c, uint32_t d);
-    void     (*ordinal10261)(uint32_t h, uint32_t stat, int32_t val, uint32_t z);
-    void     (*ordinal10785)(uint32_t h, uint32_t skill);
-    void     (*ordinal10911)(uint32_t h, uint32_t fn);
-    void     (*ordinal10807)(uint32_t unit, uint32_t h, uint32_t one);
-    int32_t  (*ordinal10680)(int32_t a, uint32_t stat, uint32_t z);
-    void     (*ordinal11043)(uint32_t game, uint32_t frame);
-    void     (*ordinal10188)(uint32_t unit, uint32_t stat, int32_t val, uint32_t z);
-    uint32_t subBF7A0;                                        // retail fn address 0x6FCBF7A0
-    // 0xDCD80
-    int32_t  (*ordinal10973)();
-    uint32_t (*subDBED0)(uint32_t a, int32_t b, uint32_t edi, int32_t d, uint32_t esi);
-    // 0xDEBA0
-    void*    (*sub572C0)(uint32_t p);
-    uint32_t (*sub32EE0)();
-    uint32_t weightCount;                                     // DAT_6FD2E628
-    const uint32_t* weightTable;                              // DAT_6FD2E62C: {id, weight} pairs
-    uint32_t (*ordinal11139)(uint32_t a, uint32_t id);
-    int32_t  (*ordinal10744)(uint32_t a, uint32_t b);
-    // 0xDFDC0
-    uint32_t (*ordinal10867)(uint32_t unit);
-    uint32_t (*ordinal10750)(uint32_t unit);
-    uint32_t (*ordinal10331)(uint32_t unit);
-    void     (*ordinal10561)(uint32_t h, uint32_t out[2]);
-    // 0xE0410
-    uint32_t (*ordinal10920)(uint32_t unit);
-    void     (*sub8E8C0)(uint32_t fn);
-    // 0xE0570
-    uint32_t (*subE03A0)(uint32_t a, uint32_t b);
-    uint32_t (*ordinal10666)(uint32_t a, uint32_t b);
-    int16_t  (*subBBEB0)(uint32_t a);
-    // 0xE2600
-    void     (*ordinal10153)(uint32_t h, uint32_t pos, uint32_t* out);
-    // 0xE2900
-    uint32_t (*ordinal10826)(uint32_t h);
-    // 0xE2A40
-    uint32_t (*sub53F30)(uint32_t id);
-    int32_t  (*isBadCodePtr)(uint32_t fn);
-    uint32_t (*callPtr)(uint32_t fn);
-};
+#include "d2game_batch_dbd00.h"
 
 static void dbd00Fatal(const D2GameBatchDBD00Env* e, uint32_t size)
 {
@@ -177,13 +125,15 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_DEBA0(uint32_t eax, uint32
 
 // 1.13c D2Game+0xDFDC0  ESI = unit A, EDI = unit B. Swaps type-dependent id/class fields into each other's
 // +0x14 sub-record (+0x20/+0x24), then copies the Ordinal_10331 point (via 10561) to +0x18/+0x1C.
-// GUESS: 10561's out buffer is a two-dword local, first call's output is the stale uStack_14/_10 pair.
+// The getters (#10867 / #10750) take the unit's data record ([unit+0x2c]), not the unit. #10331 is called on the
+// OTHER unit than the record it fills (ESI's point goes to EDI's record first, EDI's to ESI's), and #10561 fills a
+// 0x20-byte stack local of which words 4 and 5 are read (disassembly 6FCFFEB2..6FCFFEFE).
 static uint32_t dbd00Field(uint32_t u, uint32_t off, bool second, const D2GameBatchDBD00Env* e)
 {
     uint32_t t = rd32(u, 0);
     if (t == 2 || (3 < t && t < 6)) return rd32(rd32(u, 0x2c), off);
     if (rd32(u, 0x2c) == 0) return 0;
-    return second ? e->ordinal10750(u) : e->ordinal10867(u);
+    return second ? e->ordinal10750(rd32(u, 0x2c)) : e->ordinal10867(rd32(u, 0x2c));
 }
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DFDC0(uint32_t esi, uint32_t edi, const D2GameBatchDBD00Env* e)
 {
@@ -192,11 +142,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DFDC0(uint32_t esi, uint32_t e
     wr32(rd32(edi, 0x14), 0x24, dbd00Field(esi, 0x10, true, e));
     wr32(rd32(esi, 0x14), 0x20, dbd00Field(edi, 0xc, false, e));
     wr32(rd32(esi, 0x14), 0x24, dbd00Field(edi, 0x10, true, e));
-    uint32_t out[2] = {0, 0};
-    uint32_t h = e->ordinal10331(edi);
-    if (h) { e->ordinal10561(h, out); wr32(rd32(edi, 0x14), 0x18, out[0]); wr32(rd32(edi, 0x14), 0x1c, out[1]); }
-    h = e->ordinal10331(esi);
-    if (h) { e->ordinal10561(h, out); wr32(rd32(esi, 0x14), 0x18, out[0]); wr32(rd32(esi, 0x14), 0x1c, out[1]); }
+    uint32_t out[8] = {0};
+    uint32_t h = e->ordinal10331(esi);
+    if (h) { e->ordinal10561(h, out); wr32(rd32(edi, 0x14), 0x18, out[4]); wr32(rd32(edi, 0x14), 0x1c, out[5]); }
+    h = e->ordinal10331(edi);
+    if (h) { e->ordinal10561(h, out); wr32(rd32(esi, 0x14), 0x18, out[4]); wr32(rd32(esi, 0x14), 0x1c, out[5]); }
 }
 
 // 1.13c D2Game+0xE0410 moved to src/core/d2game/d2game_e0410.cpp (it passes 0x8E8C0 its registers).

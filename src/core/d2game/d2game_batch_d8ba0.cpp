@@ -19,45 +19,7 @@ static inline const void* d8_ptr(const void* p, uint32_t o) { const void* v; std
 
 [[noreturn]] static void d8_fatal(uint32_t) { _exit(-1); }  // Fog #10265 -> #10024 -> _exit(-1)
 
-struct D2GameBatchD8baEnv {
-    int32_t (*stat)(void* unit, int32_t id, int32_t layer);        // D2Common #10973 stat get
-    int32_t (*statBase)(void* unit, int32_t id, int32_t layer);    // D2Common #10910
-    int32_t (*hasState)(void* unit, int32_t state);                // D2Common #10494
-    int32_t (*hasSkill)(void* unit, int32_t id);                   // D2Common #10744
-    int32_t (*isPlayer)(void* unit);                               // D2Common #10239
-    int32_t (*isPlayerLike)(void* unit);                           // D2Common #10255
-    int32_t (*isMonsterLike)(void* unit);                          // D2Common #11104
-    int32_t (*unitTest10064)(int32_t a, void* unit);               // D2Common #10064
-    int32_t (*unitTest10278)(void* unit);                          // D2Common #10278
-    int32_t (*stat10702)(void* unit, int32_t id, void* buf, int32_t n); // D2Common #10702 stat list
-    int32_t (*statMax)(void* unit);                                // D2Common #10186
-    void    (*statSet)(void* unit, int32_t, int32_t);              // D2Common #10887
-    // 0xD8BA0 / 0xD8DE0 seams
-    void    (*sub29F0)(void* unit);                                // 0xD29F0
-    int32_t (*ord11017)(int32_t v);
-    int32_t (*ord10478)(void* node);
-    int32_t (*sub70D60)(void* unit, void* game);                   // 0x70D60
-    void*   (*ord10920)(void* unit);
-    int32_t (*subAD0F0)();                                         // 0xAD0F0
-    void    (*sub21100)(void* node);                               // 0x21100
-    int32_t (*sub17B0)();                                          // 0xD17B0
-    void*   (*ord10708)(int32_t id);
-    int32_t (*ord10353)(void* h);
-    void*   (*ord10507)(void* unit);
-    void    (*sub2100)(void* unit, int, void*, int32_t);           // 0xA2100
-    void    (*ord10252)(void* h, int32_t v);
-    void    (*sub8D570)(int32_t a, uint32_t b, int8_t c);          // 0x8D570
-    void    (*sub3950)();                                          // 0xD3950
-    void    (*sub2540)(void* unit);                                // 0xD2540
-    const uint8_t* dataTables;                                     // sgptDataTables deref
-    // misc
-    void*   (*sub372C0)(void* x);                                  // 0x372C0
-    int32_t (*sub214D0)(int32_t a, int32_t b);                     // 0x214D0
-    uint32_t (*sub21620)(uint32_t v);                              // 0x21620
-    int32_t (*ord10064_1)(void* a);
-    int32_t (*sub42A80)(int32_t v);                                // 0xF44B0 / 0x42A80 flag test
-    int64_t (*alldiv)(int64_t n, int64_t d);
-};
+#include "d2game_batch_d8ba0_env.h"
 const D2GameBatchD8baEnv* d2game_d8ba_env = nullptr; // unbound until a probe sets it
 #define E (*d2game_d8ba_env)
 
@@ -187,31 +149,29 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2game_dad70(const int32_t* eax, void* unit
             d8_wr32(acc, 0xc, d8_rds32(acc, 0xc) + d8_rds32(buf, k * 8 + 4));
 }
 
-// 1.13c D2Game+0xDB1F0 -- param_2 = int* value, unaff_EBX = int* accumulator, unaff_EDI = unit; #10910/#10064 etc register args GUESSED.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2game_db1f0(void* attacker, int32_t* val, int32_t* acc, int32_t* edi) {
-    if (E.statBase(attacker, 0, 0) && edi && edi[0] == 1 &&
+// 1.13c D2Game+0xDB1F0 -- EBX = attacker unit, EDI = target unit, stack = (int* accumulator, int* value) (ret 8).
+// Stat ids 0x73 (zero the value), 0x74 (percent cut, halved for some targets), 0x7b / 0x7c (flat adds).
+extern "C" EMSCRIPTEN_KEEPALIVE void d2game_db1f0(void* attacker, int32_t* acc, int32_t* val, int32_t* edi) {
+    if (E.statBase(attacker, 0x73, 0) && edi && edi[0] == 1 &&
         (edi[5] == 0 || (d8_rd8((void*)(intptr_t)edi[5], 0x16) & 10) == 0) &&
         !E.unitTest10064(0, edi) && !E.isMonsterLike(edi))
         *val = 0;
-    int32_t p = E.statBase(attacker, 0, 0);
+    int32_t p = E.statBase(attacker, 0x74, 0);
     if (p > 0) {
         if (edi && (edi[0] == 0 ||
-                    (edi[0] == 1 && (E.unitTest10064(0, edi) || E.sub42A80(2) || E.isMonsterLike(edi)))))
+                    (edi[0] == 1 && (E.unitTest10064(0, edi) || E.sub42A80(edi, 2) || E.isMonsterLike(edi)))))
             p /= 2;
         p = p < 1 ? 0 : (p > 99 ? 100 : p);
         int32_t v = *val, t;
-        if (v <= 0x100000) {
-            if (p <= 0x10000) t = (int32_t)((uint32_t)v * (uint32_t)p) / 100;
-            else if ((p & ~0xf) < 0x640) t = (int32_t)E.alldiv((int64_t)v * p, 100);
-            else t = (p / 100) * v;
-        } else if ((v & ~0xf) < 0x640) t = (int32_t)E.alldiv((int64_t)v * p, 100);
+        if (v <= 0x100000) t = (int32_t)((uint32_t)v * (uint32_t)p) / 100;
+        else if ((v & ~0xf) < 0x640) t = (int32_t)E.alldiv((int64_t)v * p, 100);
         else t = (v / 100) * p;
         *val = v - t;
     }
-    int32_t s = E.statBase(attacker, 0, 0);
-    if (s && E.isPlayerLike(attacker)) *acc += s;
-    s = E.statBase(attacker, 0, 0);
-    if (s && E.isPlayer(attacker)) *acc += s;
+    int32_t s = E.statBase(attacker, 0x7b, 0);
+    if (s && E.isPlayerLike(edi)) *acc += s;
+    s = E.statBase(attacker, 0x7c, 0);
+    if (s && E.isPlayer(edi)) *acc += s;
 }
 
 // 1.13c D2Game+0xDB3C0 -- unaff_EBX = row (+4,+8,+0xc stat ids), unaff_EDI = ctx (+0 mon rec, +4 int*, +8/+0xc units, +0x14 flag).
