@@ -162,6 +162,7 @@ wasm-build/*
 test/*
 !test/input-touch-name.test.mjs
 !test/door-finger.test.mjs
+!test/upload-modal.test.mjs
 !test/input-touch-coverage.test.mjs
 !test/touch-panel-aim.test.mjs
 !test/cube-close.test.mjs

@@ -7,8 +7,10 @@ import { decodeFontTbl, textColourPalette } from './frontend.mjs';
 
 const FE = 'data\\global\\ui\\FrontEnd\\', PAL = 'data\\global\\palette\\', FONT = 'data\\local\\font\\latin\\';
 const COL = { white: 0, red: 1, gold: 4, grey: 5, tan: 7 };
-export const DOOR_FONTS = [['font16', ['white', 'red', 'gold', 'grey', 'tan'], 'act1'], ['font30', ['gold'], 'act1'], ['fontexocet10', ['white'], 'sky']];
-export const DOOR_IMAGES = ['logo_blackL', 'logo_fireL', 'logo_blackR', 'logo_fireR', 'wide', 'loading', 'cursor',
+// The upload popup (upload-modal.mjs) draws the Battle.net connecting popup's fonts: Font30 and Font24 plain, FontFormal12 gold.
+export const DOOR_FONTS = [['font16', ['white', 'red', 'gold', 'grey', 'tan'], 'act1'], ['font30', ['gold'], 'act1'], ['fontexocet10', ['white'], 'sky'],
+  ['font30', ['white'], 'sky'], ['font24', ['white'], 'sky'], ['fontformal12', ['gold'], 'sky']];
+export const DOOR_IMAGES = ['logo_blackL', 'logo_fireL', 'logo_blackR', 'logo_fireR', 'wide', 'loading', 'cursor', 'popup', 'medium',
   ...DOOR_FONTS.flatMap(([n, cols]) => cols.map((c) => `f_${n}_${c}`))];
 
 const surf = (w, h) => ({ w, h, px: new Uint8ClampedArray(w * h * 4) });
@@ -41,6 +43,12 @@ export async function buildDoorArt(rd) {
   // The hand cursor (ohand), frame 0 in the title screen's palette, with [w, h, offsetX, offsetY].
   { const f = (await dc6('data\\global\\ui\\CURSOR\\ohand.DC6')).frames[0], s = surf(f.width, f.height);
     blit(s, f, pal.sky, 0, 0); images.cursor = s; meta.cursor = [f.width, f.height, f.offsetX, f.offsetY]; }
+  // The upload popup: PopUp_340x224's two cels and MediumButtonBlank's up and pressed cels, each a strip with [x, w, h, offsetX, offsetY].
+  for (const [k, n] of [['popup', 'PopUp_340x224.dc6'], ['medium', 'MediumButtonBlank.dc6']]) {
+    const fr = (await dc6(FE + n)).frames.slice(0, 2), s = surf(fr.reduce((a, f) => a + f.width, 0), Math.max(...fr.map((f) => f.height)));
+    let x = 0; meta[k] = fr.map((f) => { blit(s, f, pal.sky, x, 0); const r = [x, f.width, f.height, f.offsetX, f.offsetY]; x += f.width; return r; });
+    images[k] = s;
+  }
   // The join-game loading screen: its frames in a strip of 256x256 cells.
   { const fr = (await dc6('data\\global\\ui\\Loading\\loadingscreen.dc6')).frames, s = surf(256 * fr.length, 256);
     fr.forEach((f, i) => blit(s, f, pal.loading, i * 256, 0)); images.loading = s; meta.loading = fr.length; }

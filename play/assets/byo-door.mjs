@@ -9,6 +9,7 @@ import { ROLES } from './byo-detect.mjs';
 import { readMpqFile } from './mpq-read.mjs';
 import { buildDoorArt, DOOR_IMAGES } from './door-art-build.mjs';
 import { fingerHit, fingerReachGame } from './door-finger.mjs';
+import { createUploadModal, runUpload, drawUploadModal, uploadOkHit, UPLOAD_DONE_MS } from './upload-modal.mjs';
 
 const CSS = `
 body.door #viewport,body.door #session-bar,body.door .controls,body.door #log,body.door #hud{display:none}
@@ -81,6 +82,14 @@ export function frontDoor({ onReady, hosted = false } = {}) {
   const g0 = cv.getContext('2d');
   let g = g0;   // the drawing helpers paint into g: the window, or a cached layer while it is rebuilt
   const col = createCollection();
+  // The upload popup: open from the first step of a read until its done view times out or OK dismisses it.
+  let uploadAt = 0;
+  const upload = createUploadModal({ onChange: (v) => {
+    if (v && !uploadAt) uploadAt = performance.now();
+    if (!v) uploadAt = 0;
+    if (v?.phase === 'done') setTimeout(() => { if (upload.view === v) upload.dismiss(); }, UPLOAD_DONE_MS);
+  } });
+  const uploadDots = () => (Math.trunc((performance.now() - uploadAt) / 1000) % 20) + 1;
 
   let art = null, artTried = false, back = null, offerAgain = false;
   let msg = null, msgUntil = 0, down = null, hover = null, mouse = null, loading = null, done = false;
@@ -192,6 +201,7 @@ export function frontDoor({ onReady, hosted = false } = {}) {
     wideButton(BTNS.discord, down === 'discord');
     if (hover && hover.f) { const b = entryBox(hover), left = COLS[0].includes(hover);
       tooltip([[hover.f, 'white'], [hover.what, 'grey'], have(hover) ? ['Found', 'gold'] : ['Required', 'red']], left ? b.x : b.x + b.w, b.y + b.h / 2, left ? -1 : 1); }
+    drawUploadModal(g, upload.view, { art, measure, text, pressed: down === 'uploadok', dots: uploadDots() });
   }
 
   // ---- loading: retail's join-game door (ui\Loading\loadingscreen.dc6), its frame the boot's progress ----
@@ -246,7 +256,7 @@ export function frontDoor({ onReady, hosted = false } = {}) {
         const b = layer(bgC, W, H), kx = s / back.s, ky = s / back.sy; b.imageSmoothingEnabled = true; b.imageSmoothingQuality = 'high';
         b.drawImage(back.img, view.x - back.ox * kx, view.y - back.oy * ky, back.w * kx, back.h * ky); bgKey = `${W}x${H}`;
       }
-      key = JSON.stringify([W, H, !!art, hover?.f ?? hover, down, ready(), FILES.map(have).join(), status(), offerAgain]);
+      key = JSON.stringify([W, H, !!art, hover?.f ?? hover, down, ready(), FILES.map(have).join(), status(), offerAgain, upload.view, upload.view?.busy && uploadDots()]);
       if (key !== ovKey) {
         g = layer(ovC, W, H); g.setTransform(s, 0, 0, s, view.x, view.y); g.imageSmoothingEnabled = smooth;
         scene(); g = g0; ovKey = key;
@@ -290,29 +300,32 @@ export function frontDoor({ onReady, hosted = false } = {}) {
   // less than its reach (16 CSS px, door-finger.mjs) snaps to the nearest; a mouse keeps the exact hit test.
   function hit(p, touch = false) {
     if (loading) return null;
+    if (upload.open) return uploadOkHit(upload.view, p) ? 'uploadok' : null;   // the popup is modal
     const controls = Object.keys(BTNS).map((k) => ({ key: k, ...BTNS[k], w: 272, h: 35 }));
     if (offerAgain && !ready()) { const b = againBox(); controls.push({ key: 'again', x: b.x, y: b.y, w: b.w, h: b.h }); }
     return fingerHit(p, controls, touch ? fingerReachGame(cv.width / (cv.getBoundingClientRect().width || 1), view.s) : 0);
   }
   function say(s, c = 'tan', ms = 2600) { msg = [s, c]; msgUntil = performance.now() + ms; }
-  async function add(src) {
+  async function add(src, step) {
     const before = FILES.filter(have).length;
-    const p = col.add(src); paint(); await p; paint();
+    const p = col.add(src, step); paint(); await p; paint();
     const got = FILES.filter(have).length - before;
     if (got > 0) say(`Found ${got} file${got > 1 ? 's' : ''}`, 'white', 1600);
     if (!art && !artTried && ['d2data', 'd2exp', 'patch_d2'].every((r) => col.state.slots[r]?.have)) {
       artTried = true;
       loadArchiveArt(col).then((a) => { art ??= a; }).catch((e) => console.warn('front door art:', e.message));
     }
+    return { found: FILES.filter(have).length, total: FILES.length };
   }
   const sysCursor = (h) => art?.meta.cursor ? 'none' : h ? 'pointer' : '';   // the game's hand replaces the system pointer once the art is in
   function paint() { cv.style.cursor = sysCursor(); }   // the canvas repaints every frame; kept for the test hook
   async function act(h) {
     if (h === 'discord') window.open(DISCORD, '_blank', 'noopener');
     const progress = (s) => say(s, 'tan', 4000);   // a pickerless phone copies the files to OPFS; its progress shows here
-    if (h === 'dir') add(await pickFolder({ progress }));
-    if (h === 'files') add(await pickFiles({ progress }));
-    if (h === 'again') { offerAgain = false; const r = await restore(true); await add({ handles: r.handles }); }
+    if (h === 'uploadok') upload.dismiss();
+    if (h === 'dir') await runUpload(upload, (step) => pickFolder({ progress, step }), add);
+    if (h === 'files') await runUpload(upload, (step) => pickFiles({ progress, step }), add);
+    if (h === 'again') { offerAgain = false; await runUpload(upload, async () => ({ handles: (await restore(true)).handles }), add); }
     if (h === 'enter') {
       const miss = FILES.filter((x) => !have(x));
       if (col.state.busy) say('Still reading your files…');
@@ -322,12 +335,15 @@ export function frontDoor({ onReady, hosted = false } = {}) {
     }
   }
   const onMove = (e) => { const p = at(e), h = hit(p); mouse = p;
-    hover = loading ? null : h === 'again' ? 'again' : FILES.find((x) => inside(p, entryBox(x))) || null;
+    hover = loading || upload.open ? null : h === 'again' ? 'again' : FILES.find((x) => inside(p, entryBox(x))) || null;
     cv.style.cursor = sysCursor(h); };
   const onUp = (e) => { const h = hit(at(e), e.pointerType === 'touch'); if (h && h === down) act(h); down = null; };
   const onOver = (e) => e.preventDefault();
-  const onDrop = async (e) => { e.preventDefault(); if (!loading) add(await fromDrop(e.dataTransfer)); };
-  const onKey = (e) => { if (e.key === 'Enter' && !loading && e.target === document.body) act('enter'); };
+  const onDrop = (e) => { e.preventDefault(); if (!loading && !upload.open) runUpload(upload, (step) => fromDrop(e.dataTransfer, step), add); };
+  const onKey = (e) => {
+    if (upload.open) { if (e.key === 'Enter' || e.key === 'Escape') upload.dismiss(); return; }
+    if (e.key === 'Enter' && !loading && e.target === document.body) act('enter');
+  };
   cv.addEventListener('pointermove', onMove);
   cv.addEventListener('pointerleave', () => { hover = null; mouse = null; });
   cv.addEventListener('pointerdown', (e) => { down = hit(at(e), e.pointerType === 'touch'); });
@@ -338,7 +354,7 @@ export function frontDoor({ onReady, hosted = false } = {}) {
   // A returning visitor on Chromium: the browser remembered the handles; re-open them quietly if it
   // still allows, else offer one click that may prompt. A hosted door reads nothing, so it remembers nothing.
   if (!hosted) restore(false).then(async ({ count, handles }) => {
-    if (handles.length) await add({ handles });
+    if (handles.length) await runUpload(upload, async () => ({ handles }), add);
     if (count && !col.state.ready) offerAgain = true;
   });
 
@@ -359,7 +375,7 @@ export function frontDoor({ onReady, hosted = false } = {}) {
   requestAnimationFrame(frame);
   return new Promise((resolve) => {
     resolveDoor = resolve;
-    window.__d2Door = { collection: col, add, paint, forget, enter: () => act('enter') };   // test hook: feed files without a picker
+    window.__d2Door = { collection: col, add, paint, forget, upload, enter: () => act('enter') };   // test hook: feed files without a picker
     if (onReady) onReady(col);
   });
 }

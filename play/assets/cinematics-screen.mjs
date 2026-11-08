@@ -34,6 +34,13 @@ export const CINEMATICS = [
   { path: 'data\\local\\video\\ENG\\D2x_Out_640x292.bik' },
 ];
 
+// Frame of a control's cel while it is held (D2Win type-6: the next frame, only while pressed, over
+// the control and enabled). A wide row is a body+tail pair per state (frames 0,1 up; 2,3 down), CANCEL a
+// single cel (0 up, 1 down).
+export function cinematicsHeldBase(frames, perState, held) {
+  return held && frames.length >= 2 * perState ? perState : 0;
+}
+
 export function createCinematicsScreen({ read, decodeDc6, decodeDatPalette, onExit = () => {}, string = () => '', documentObject = globalThis.document }) {
   const L = CINEMATICS_LAYOUT;
   const palette = decodeDatPalette(read(FRONTEND.backgroundPalette));
@@ -65,6 +72,8 @@ export function createCinematicsScreen({ read, decodeDc6, decodeDatPalette, onEx
   const hit = (x, y, w, h) => { const v = view(w, h), sx = (x - v.ox) / v.scale, sy = (y - v.oy) / v.scale;
     return boxes.find((b) => b.on && sx >= b.x && sx < b.x + b.w && sy >= b.y && sy < b.y + b.h) ?? null; };
   let pressed = null, pointer = [799, 599];
+  const setPointer = (x, y, w, h) => { const v = view(w, h); pointer = [Math.trunc((x - v.ox) / v.scale), Math.trunc((y - v.oy) / v.scale)]; };
+  const pointerAbs = (w, h) => { const v = view(w, h); return [v.ox + pointer[0] * v.scale + v.scale / 2, v.oy + pointer[1] * v.scale + v.scale / 2]; };
   // An engine-requested film (D2GS 0x61 -> D2Client+0xAF940) is not a menu choice: when it ends --
   // or fails to open, or is skipped -- the screen leaves instead of falling back to the selection UI.
   let requested = false;
@@ -83,12 +92,13 @@ export function createCinematicsScreen({ read, decodeDc6, decodeDatPalette, onEx
   };
   const text = (font, s, x, y, w) => font.drawAnchored(sctx, s, x + Math.max(Math.trunc((w - font.measure(s)) / 2), 0), y);
   return {
+    get pressedId() { return pressed?.id ?? null; },
     get evidence() { const movie = playback.movie; return { boxes: boxes.map(({ id, x, y, w, h, on }) => ({ id, x, y, w, h, on })), rows: CINEMATICS.map((c) => ({ label: c.label ?? null, path: c.path })),
       playing: playback.playing, movie: movie ? movie.evidence() : null, error: playback.error }; },
     targets(w, h) { const v = view(w, h); return Object.fromEntries(boxes.filter((b) => b.on).map((b) => [b.id, [Math.round(v.ox + (b.x + b.w / 2) * v.scale), Math.round(v.oy + (b.y + b.h / 2) * v.scale)]])); },
-    hover(x, y, w, h) { const v = view(w, h); pointer = [Math.trunc((x - v.ox) / v.scale), Math.trunc((y - v.oy) / v.scale)]; },
+    hover: setPointer,
     // While a film plays any press ends it (retail skips a movie on a click); otherwise a press arms a control.
-    press(x, y, w, h) { if (playback.playing !== null) return 'movie'; pressed = hit(x, y, w, h); return pressed?.id ?? null; },
+    press(x, y, w, h) { if (playback.playing !== null) return 'movie'; setPointer(x, y, w, h); pressed = hit(x, y, w, h); return pressed?.id ?? null; },
     // The engine's film for row `i` (0-based into CINEMATICS = D2Client row i+1), played as the game's
     // own act film. false when there is no such row.
     playIndex(i) { if (!CINEMATICS[i]) return false; playback.play(i, CINEMATICS[i].path); requested = true; return true; },
@@ -120,12 +130,14 @@ export function createCinematicsScreen({ read, decodeDc6, decodeDatPalette, onEx
       sctx.fillStyle = '#000'; sctx.fillRect(0, 0, 800, 600); drawBg(sctx, FRONTEND.background, bg.canvas); recordTiled(FRONTEND.background, bg, 0, 0);
       dialog.forEach((c, i) => drawCel(c, CINEMATICS_ASSETS.dialog, i, ...L.dialogAt[i]));
       heading.drawAnchored(sctx, 'SELECT CINEMATICS', L.headingX, L.headingY);
+      const held = (id) => pressed?.id === id && hit(...pointerAbs(w, h), w, h)?.id === id;
       L.rowY.forEach((y, i) => {
-        const on = !!CINEMATICS[i].label, a = !on;
-        drawCel(row[0], CINEMATICS_ASSETS.row, 0, L.rowX, y, a); drawCel(row[1], CINEMATICS_ASSETS.row, 1, L.rowX + row[0].frame.width, y, a);
+        const on = !!CINEMATICS[i].label, a = !on, base = cinematicsHeldBase(row, 2, on && held(`row${i}`));
+        drawCel(row[base], CINEMATICS_ASSETS.row, base, L.rowX, y, a); drawCel(row[base + 1], CINEMATICS_ASSETS.row, base + 1, L.rowX + row[base].frame.width, y, a);
         if (on) text(label, CINEMATICS[i].label, L.rowX, y - 8 - 0, rowW);
       });
-      drawCel(cancel[0], CINEMATICS_ASSETS.cancel, 0, L.cancel.x, L.cancel.y);
+      const cb = cinematicsHeldBase(cancel, 1, held('cancel'));
+      drawCel(cancel[cb], CINEMATICS_ASSETS.cancel, cb, L.cancel.x, L.cancel.y);
       text(label, string('strCancel') || 'CANCEL', L.cancel.x, L.cancel.y - 8, cancel[0].frame.width);
       const f = cursor.frame; sctx.drawImage(cursor.canvas, pointer[0] + f.offsetX, pointer[1] - 1 + f.offsetY - f.height + 1);
       recordDc6(FRONTEND.cursor, 0, f, pointer[0] + f.offsetX, pointer[1] - 1 + f.offsetY - f.height + 1);

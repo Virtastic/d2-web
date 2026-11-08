@@ -49,16 +49,19 @@ async function walk(dir, depth = 3, out = []) {
   return out;
 }
 
+// `step` (every reader below takes one) reports progress to the door's upload popup; upload-modal.mjs lists the steps.
+const quiet = () => {};
+
 /** Files (and handles, where the browser gives them) from a drop. */
-export async function fromDrop(dt) {
+export async function fromDrop(dt, step = quiet) {
   const handles = [], files = [];
   const items = [...(dt.items || [])];
   for (const it of items) {
     if (it.kind !== 'file') continue;
     const h = it.getAsFileSystemHandle ? await it.getAsFileSystemHandle().catch(() => null) : null;
-    if (h) { if (h.kind === 'directory') handles.push(...await walk(h)); else if (WANT.test(h.name)) handles.push(h); continue; }
+    if (h) { if (h.kind === 'directory') { step({ kind: 'reading' }); handles.push(...await walk(h)); } else if (WANT.test(h.name)) handles.push(h); continue; }
     const e = it.webkitGetAsEntry && it.webkitGetAsEntry();
-    if (e) files.push(...await entryFiles(e)); else { const f = it.getAsFile(); if (f && WANT.test(f.name)) files.push(f); }
+    if (e) { if (e.isDirectory) step({ kind: 'reading' }); files.push(...await entryFiles(e)); } else { const f = it.getAsFile(); if (f && WANT.test(f.name)) files.push(f); }
   }
   if (!items.length) files.push(...[...dt.files].filter((f) => WANT.test(f.name)));
   return { handles, files };
@@ -84,7 +87,7 @@ const storeAvailable = () => !window.showOpenFilePicker && !window.showDirectory
  * Copy each File into OPFS, asking the browser to keep the storage first. Resolves { handles, files }: a file
  * whose copy fails (quota, a locked file) stays a File for this visit only, so the page still works without OPFS.
  */
-export async function stashFiles(files, progress = () => {}) {
+export async function stashFiles(files, progress = () => {}, step = quiet) {
   try { await navigator.storage.persist?.(); } catch { /* refused: the copy still works, the browser may evict it */ }
   const dir = await (await navigator.storage.getDirectory()).getDirectoryHandle(OPFS_DIR, { create: true });
   const total = files.reduce((n, f) => n + f.size, 0) || 1, names = new Set(), handles = [], kept = [];
@@ -98,6 +101,7 @@ export async function stashFiles(files, progress = () => {}) {
         for (let p = 0; p < f.size; p += CHUNK) {
           const part = f.slice(p, p + CHUNK);
           await w.write(part); done += part.size;
+          step({ kind: 'store', name: f.name, pct: Math.floor(100 * done / total) });
           progress(`Copying your files to this browser: ${Math.floor(100 * done / total)}%`);
         }
         await w.close();
@@ -113,9 +117,9 @@ export async function stashFiles(files, progress = () => {}) {
 }
 
 /** Pickerless browsers copy into OPFS; everyone else, or a host where OPFS will not open, keeps the Files. */
-async function keepFiles(files, progress) {
+async function keepFiles(files, progress, step) {
   if (!files.length || !storeAvailable()) return { handles: [], files };
-  try { return await stashFiles(files, progress); } catch { return { handles: [], files }; }
+  try { return await stashFiles(files, progress, step); } catch { return { handles: [], files }; }
 }
 
 // An archive entry has no handle of its own, so it is copied to OPFS on every browser that has it, pickers or not.
@@ -129,7 +133,7 @@ async function archiveDir() {
  * The .mpq/.exe/PlugY entries of each picked .zip or .7z (byo-archive.mjs). Where OPFS exists each entry is
  * written there, in a folder of its own, so it is remembered like a copied pick; elsewhere it is kept as a File.
  */
-async function unpackPicked(archives) {
+async function unpackPicked(archives, step = quiet) {
   const handles = [], files = [];
   if (!archives.length) return { handles, files };
   const dir = await archiveDir();
@@ -149,10 +153,13 @@ async function unpackPicked(archives) {
     for (;;) { const { done, value } = await r.read(); if (done) break; parts.push(value); }
     return new File(parts, name, { type: 'application/octet-stream' });
   };
-  for (const a of archives) {
+  for (const [i, a] of archives.entries()) {
+    const at = { kind: 'unzip', name: a.name, n: i + 1, m: archives.length };
+    step(at);
     await unpackArchive(a, {
       wanted: (n) => WANT.test(n),
       place: async (name, size, open) => {
+        step({ ...at, entry: name });
         if (dir) {
           try { handles.push(await copy(name, open)); return; }
           catch (e) { if (e.corrupt) throw e; }   // a bad entry is skipped; a copy the disk refused is kept in memory
@@ -165,27 +172,28 @@ async function unpackPicked(archives) {
 }
 
 /** Chromium pickers return handles (which can be remembered); elsewhere an <input> returns Files, copied to OPFS where it exists. */
-export async function pickFiles({ progress } = {}) {
+export async function pickFiles({ progress, step } = {}) {
   if (window.showOpenFilePicker) {
     try {
       const hs = await window.showOpenFilePicker({ multiple: true, types: [{ description: 'Diablo II archives', accept: { 'application/octet-stream': ['.mpq', '.exe', '.zip', '.7z'] } }] });
       const arc = [], plain = [];
       for (const h of hs) (isArchiveName(h.name) ? arc : plain).push(h);
-      const unpacked = await unpackPicked(await Promise.all(arc.map((h) => h.getFile())));
+      const unpacked = await unpackPicked(await Promise.all(arc.map((h) => h.getFile())), step);
       return { handles: [...plain, ...unpacked.handles], files: unpacked.files };
     } catch (e) { if (e.name === 'AbortError') return { handles: [], files: [] }; }
   }
   const picked = await inputFiles(false);
-  const unpacked = await unpackPicked(picked.filter((f) => isArchiveName(f.name)));
-  const kept = await keepFiles(picked.filter((f) => !isArchiveName(f.name)), progress);
+  const unpacked = await unpackPicked(picked.filter((f) => isArchiveName(f.name)), step);
+  const kept = await keepFiles(picked.filter((f) => !isArchiveName(f.name)), progress, step);
   return { handles: [...unpacked.handles, ...kept.handles], files: [...unpacked.files, ...kept.files] };
 }
-export async function pickFolder({ progress } = {}) {
+export async function pickFolder({ progress, step = quiet } = {}) {
   if (window.showDirectoryPicker) {
-    try { return { handles: await walk(await window.showDirectoryPicker()), files: [] }; }
-    catch (e) { if (e.name === 'AbortError') return { handles: [], files: [] }; }
+    let dir = null;
+    try { dir = await window.showDirectoryPicker(); } catch (e) { if (e.name === 'AbortError') return { handles: [], files: [] }; }
+    if (dir) { step({ kind: 'reading' }); return { handles: await walk(dir), files: [] }; }   // a folder that cannot be read is an error, not a second picker
   }
-  return keepFiles(await inputFiles(true), progress);
+  return keepFiles(await inputFiles(true), progress, step);
 }
 const inputFiles = (folder) => new Promise((res) => {
   const i = document.createElement('input');
@@ -218,13 +226,14 @@ export function createCollection() {
     state,
     entries,
     plugy,
-    async add({ handles = [], files = [] }) {
+    async add({ handles = [], files = [] }, step = quiet) {
       state.busy++;
       try {
         const incoming = [];
         for (const h of handles) { try { incoming.push({ file: await h.getFile(), handle: h }); } catch { /* moved or denied */ } }
         for (const f of files) incoming.push({ file: f });
-        for (const e of incoming) {
+        for (const [i, e] of incoming.entries()) {
+          step({ kind: 'process', name: e.file.name, n: i + 1, m: incoming.length });
           const key = e.file.name + ':' + e.file.size + ':' + e.file.lastModified;
           if (seen.has(key)) continue;
           seen.add(key);
