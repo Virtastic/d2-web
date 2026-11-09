@@ -99,6 +99,8 @@ async function readMcpFrame(reader, timeoutMs) {
     reader.skip(total);
     // The reply to an idle-time MOTD request (the lobby's keep-alive) is never an answer to a call.
     if (frame[2] === MCP_MOTD) continue;
+    // Likewise the character-list reply to a keep-alive sent before the character is logged on.
+    if (frame[2] === 0x19 && reader.keepAliveLists > 0) { reader.keepAliveLists--; continue; }
     return { op: frame[2], body: frame.subarray(3) };
   }
 }
@@ -115,7 +117,12 @@ function startMcpKeepAlive(session, ms = MCP_KEEPALIVE_MS) {
   const { transport, protocol } = session;
   const timer = setInterval(() => {
     if (session.joined || transport.isOpen === false) { clearInterval(timer); return; }
-    try { transport.send(protocol.mcpFrame(MCP_MOTD, [])); } catch { clearInterval(timer); }
+    // The realm answers MOTD only once the character is logged on; before that the lobby asks for the
+    // character list again (valid at either stage) and the reply is skipped by readMcpFrame.
+    try {
+      if (session.characterLoggedOn) transport.send(protocol.mcpFrame(MCP_MOTD, []));
+      else { session.reader.keepAliveLists = (session.reader.keepAliveLists || 0) + 1; transport.send(protocol.mcpFrame(0x19, protocol.mcpCharlist(8))); }
+    } catch { clearInterval(timer); }
   }, ms);
   timer.unref?.();
   transport.onClose?.(() => clearInterval(timer));

@@ -19,8 +19,12 @@ function realm({ idleMs = 100 } = {}) {
   const emit = (b) => queueMicrotask(() => dataCb(new Uint8Array(b)));
   const arm = () => { clearTimeout(timer); timer = setTimeout(() => { open = false; closeCbs.forEach((c) => c()); }, idleMs); };
   const stat = Buffer.alloc(30, 1); stat[13] = 2; stat[25] = 5;
+  let loggedOn = false;
   const reply = (op, body) => {
     log.push(op);
+    // d2cs: MOTD is valid only after CHARLOGON; anything else is a state mismatch and the socket is dropped.
+    if (op === 0x12 && !loggedOn) { open = false; clearTimeout(timer); closeCbs.forEach((c) => c()); return; }
+    if (op === 0x07) loggedOn = true;
     if (op === 0x01) emit(frame(1, u32(0)));
     if (op === 0x19) emit(frame(0x19, [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, ...Buffer.from('Ama\0'), ...stat, 0]));
     if (op === 0x07) emit(frame(7, u32(0)));
@@ -50,10 +54,11 @@ test('an idle lobby socket is kept alive; create and join then succeed', async (
   const roster = await mcpListCharacters(transport, protocol, { realmReply: [], keepAliveMs: 30 });
   await new Promise((r) => setTimeout(r, 350));            // 3.5 idle windows
   assert.equal(transport.isOpen, true);
-  assert.ok(log.filter((o) => o === 0x12).length >= 5);
+  assert.ok(log.filter((o) => o === 0x19).length >= 6, 'pre-logon keep-alive is a character-list request');
+  assert.equal(log.includes(0x12), false, 'no MOTD before CHARLOGON');
   const joined = await mcpCreateAndJoin(transport, protocol, { realmReply: [], character: 'Ama', gameName: 'g', session: roster.session });
   assert.equal(joined.ticket.token, 0x9e);
-  assert.deepEqual(joined.received.filter((o) => o !== 0x12).slice(-3), [0x07, 0x03, 0x04]);
+  assert.deepEqual(joined.received.filter((o) => o !== 0x12 && o !== 0x19).slice(-3), [0x07, 0x03, 0x04]);
   transport.close();
 });
 
