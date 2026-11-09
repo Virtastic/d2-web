@@ -24,6 +24,8 @@ static bool g_mcp_ptd_ready;
 struct D2McpCrt2F0BEnv {
     void* (*getptd)(void);          // 0x18DE __getptd
     void  (*freetlocinfo)(void*);   // 0x2E3B ___freetlocinfo
+    int** defaultSlot;              // +0xA484 PTR_DAT_6fa2a484 (null: the module's own)
+    const void* staticRec;          // +0xA430 DAT_6fa2a430, never freed (null: the module's own)
 };
 
 // 1.13c D2MCPClient+0x018DE (113 B, callers 0x246D, 0x2838, 0x2F0B, 0x5881): __getptd. Retail saves
@@ -45,15 +47,18 @@ extern "C" EMSCRIPTEN_KEEPALIVE void* d2_mcp_getptd_18de(void) {
 }
 static void mcp_default_freetlocinfo(void*) {}
 
-static const D2McpCrt2F0BEnv g_mcp_crt_2f0b_default = {d2_mcp_getptd_18de, mcp_default_freetlocinfo};
+static const D2McpCrt2F0BEnv g_mcp_crt_2f0b_default = {d2_mcp_getptd_18de, mcp_default_freetlocinfo, nullptr, nullptr};
 
+// Retail's records hold 32-bit pointers (+0x2C/+0x30/+0x34/+0x40/+0x4C, the ptd's +0x64 slot): a slot
+// is one dword, so a host pointer is stored and read as its low 32 bits (the heap is below 4 GiB).
 static int* mcp_load_ptr(const void* base, uint32_t off) {
-    int* p;
+    uint32_t p;
     std::memcpy(&p, (const uint8_t*)base + off, sizeof p);
-    return p;
+    return (int*)(uintptr_t)p;
 }
 static void mcp_store_ptr(void* base, uint32_t off, int* p) {
-    std::memcpy((uint8_t*)base + off, &p, sizeof p);
+    uint32_t v = (uint32_t)(uintptr_t)p;
+    std::memcpy((uint8_t*)base + off, &v, sizeof v);
 }
 
 // Retail's file image: the static record's refcount is 1 and +0x4C points at a non-null lconv; the
@@ -75,9 +80,11 @@ extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_updatetlocinfo_lk(const D2McpCrt2F0BEnv* env) {
     if (env == nullptr) env = &g_mcp_crt_2f0b_default;
     mcp_locale_init();
-    int** slot = (int**)((uint8_t*)env->getptd() + 0x64);   // _tfpecode / ptlocinfo
-    int* loc = *slot;
-    int* def = g_mcp_default_locale;
+    int** dslot = env->defaultSlot ? env->defaultSlot : &g_mcp_default_locale;
+    const void* srec = env->staticRec ? env->staticRec : g_mcp_static_tlocinfo;
+    void* ptd = env->getptd();
+    int* loc = mcp_load_ptr(ptd, 0x64);   // _tfpecode / ptlocinfo
+    int* def = *dslot;
     if (loc != def) {
         if (loc != nullptr) {
             int* p = mcp_load_ptr(loc, 0x2C);
@@ -92,7 +99,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_updatetlocinfo_lk(const D2McpCrt2F0BEnv* env
             p = mcp_load_ptr(loc, 0x4C);
             if (p != nullptr) --*(int*)((uint8_t*)p + 0xB4);
         }
-        *slot = def;
+        mcp_store_ptr(ptd, 0x64, def);
         ++*def;
         int* p;
         if ((p = mcp_load_ptr(def, 0x2C)) != nullptr) ++*p;
@@ -100,8 +107,8 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_updatetlocinfo_lk(const D2McpCrt2F0BEnv* env
         if ((p = mcp_load_ptr(def, 0x30)) != nullptr) ++*p;
         if ((p = mcp_load_ptr(def, 0x40)) != nullptr) ++*p;
         if ((p = mcp_load_ptr(def, 0x4C)) != nullptr) ++*(int*)((uint8_t*)p + 0xB4);
-        if (loc != nullptr && *loc == 0 && loc != (int*)g_mcp_static_tlocinfo)
+        if (loc != nullptr && *loc == 0 && (const void*)loc != srec)
             env->freetlocinfo(loc);
     }
-    return (int32_t)(intptr_t)*slot;
+    return (int32_t)(uintptr_t)mcp_load_ptr(ptd, 0x64);
 }
