@@ -957,8 +957,9 @@ function ensureGameMenu() {
       else if (item === 'SAVE AND EXIT GAME' && realmSceneActive) {
         // A Battle.net game: the server holds the character. Retail returns to the lobby.
         gameMenu.close();
-        { const bye = realmFlow?.d2gsLife?.saveAndExit(); if (bye) { try { realmFlow.d2gs?.send(bye); } catch { /* socket already closed */ } } }
-        void leaveRealmGame();
+        // Retail (0x59650): 4F 02 00 now, state 7; the life sends 0x69 after 30 s and then tears the game down. With no
+        // armed game life (an exit countdown is running) the teardown runs at once.
+        if (!realmFlow?.d2gsLife?.leaveGame()) void leaveRealmGame();
       } else if (item === 'SAVE AND EXIT GAME') {
         // Keep the session and menu available if persistence fails; only leave once the store
         // confirms the character has been written.
@@ -2189,8 +2190,11 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
     const exitLobbyNotice = {};
     const life = createGameLife({ expansion: !!((joined.character.flags ?? 0) & 0x20),
       onNotice: (id) => { if (id) { exitLobbyNotice.id = id; messageLines.push(Module.ccall('d2_lang_string_by_index', 'string', ['number'], [id])); postedAt = performance.now(); } },
-      onLeave: () => { joinLoading.fail(); clearInterval(lifeTimer); keepAlive.stop(); receiver?.stop?.();
-        void leaveRealmGame().then(() => { bnetLobbyScreen?.fail({ noticeString: exitLobbyNotice.id ?? 5357, message: 'game ended' }); render(); }); } });
+      // The life's packets (the explicit leave's 4F 02 00 and the 0x69 after its wait) go out on the live D2GS socket.
+      onSend: (bytes) => { try { realmFlow?.d2gs?.send(bytes); } catch { /* socket already closed */ } },
+      onLeave: (reason) => { joinLoading.fail(); clearInterval(lifeTimer); keepAlive.stop(); receiver?.stop?.();
+        // An explicit leave (reason 0) returns to the lobby with no notice; an exit reason shows its text there.
+        void leaveRealmGame().then(() => { if (reason) bnetLobbyScreen?.fail({ noticeString: exitLobbyNotice.id ?? 5357, message: 'game ended' }); render(); }); } });
     life.inGame();
     const lifeTimer = setInterval(() => { life.checkTimers(); life.tick(); }, TICK_MS);
     const receiver = startD2gsReceiveLoop(game.readFrame, {
@@ -8075,9 +8079,12 @@ Object.defineProperty(window.__d2Shell, 'audioVolume', { get: () => audioVolume.
 installUnloadAutosave({ shouldSave: () => Boolean(session && chosenName), saveBytes: saveCurrentCharacterBytes, store: saveStore,
   onStored: () => { savesWritten++; lastSaveError = ''; }, onError: (error) => { lastSaveError = String(error); },
   teardown: () => { if (session) destroyNativeSession(session, monsterRenderer); actMusic?.close(); ambient?.close(); bootMovieAudio?.close?.(); charCreateSounds?.close(); canvas.__d2UiClickSound?.close(); } });
-// Closing the tab inside a Battle.net game sends the Save and Exit byte first, so the game server frees the player at once
-// instead of holding the dropped socket until it times out (a held player blocks the next join).
+// Closing the tab inside a Battle.net game sends the same bytes as the explicit leave, back to back: 4F 02 00 (unless the
+// menu already sent it), then 0x69. Retail waits 30 s in state 7 first; a closing page cannot wait, so this is the
+// unavoidable divergence. The server frees the player at once instead of holding the dropped socket until it times out.
 window.addEventListener('pagehide', () => {
-  try { const bye = realmFlow?.d2gsLife?.saveAndExit(); if (bye) realmFlow.d2gs?.send(bye); } catch { /* socket already closed */ }
+  for (const bytes of realmFlow?.d2gsLife?.unload() ?? []) {
+    try { realmFlow.d2gs?.send(bytes); } catch { /* socket already closed */ }
+  }
 });
 requestAnimationFrame(frame);

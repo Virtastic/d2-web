@@ -167,6 +167,9 @@ export const BNET_LOBBY_LAYOUT = {
     body: { x: 268, y: 320, w: 264, h: 120, insetX: 10, insetY: 8, font: 'font24', centred: true } },
 };
 
+// GUESS: the name colour (1 when hardcore, else 0) is not read from D2Multi's own draw of this box.
+// capture: d2multi -- the colour index passed to the text draw for the name row of a hardcore and a softcore
+// character in the character box (the box's draw routine is not yet located in the decompile cache); no descriptor yet.
 // The character box (D2Multi+0xB4B6..0xB65C): title and name (red when hardcore), "Level N Class",
 // "Last Difficulty Setting Completed:" and the last difficulty finished. `progression` is the
 // character's +0x1EC & 0x1F; an expansion character counts five per difficulty, a classic one four.

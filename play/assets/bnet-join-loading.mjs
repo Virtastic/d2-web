@@ -2,9 +2,13 @@
 // black, from the CREATE GAME / JOIN GAME click until the world is ready. Its frame is the progress:
 // it climbs toward the last-but-one frame while the join runs and reaches the last when the world is
 // up. The state is deterministic (clock passed in); the shell draws it and hands over to the game.
-// Neither number below is a retail value. Retail's loading screen has no timeout and no clock: its frame
-// advances once per 32 graphic-load steps (clamped to the last frame), so the real curve follows the
-// engine's load work. Until the engine reports that count, this browser guard and a time curve stand in.
+// The 180000 ms bound is retail's: D2Client's own timer (0x435D0) gives up a load after the same 180000 ms,
+// counted from a start tick it keeps itself. This browser copy counts from the join click, so the two start
+// points are not yet shown to be the same tick, and retail's exit reason for that path is not recovered.
+// GUESS, the progress curve: retail's frame is a counter that the load loop (D2Client 0x6D010) steps through
+// 0xC1760(1) on every pass but each 32nd, clamped to the last frame. The browser's time curve stands in until
+// the per-join step count is captured: capture: d2client/c1760 -- count the 0xC1760(1) calls one join makes
+// and the frame each leaves on screen; no descriptor yet.
 export const JOIN_LOADING_TIMEOUT_MS = 180000;
 const ART = 'data\\global\\ui\\Loading\\loadingscreen.dc6', PALETTE = 'data\\global\\palette\\Loading\\pal.dat';
 

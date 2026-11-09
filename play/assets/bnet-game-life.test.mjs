@@ -1,17 +1,63 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGameLife, EXIT_TICKS, JOIN_TIMEOUT_MS, LOADING_TIMEOUT_MS, SAVE_AND_EXIT_PACKET } from './bnet-game-life.mjs';
+import { createGameLife, EXIT_TICKS, JOIN_TIMEOUT_MS, LEAVE_CANCEL_PACKET, LEAVE_WAIT_MS, LOADING_TIMEOUT_MS, SAVE_AND_EXIT_PACKET } from './bnet-game-life.mjs';
 import { reasonString } from './d2gs-deny.mjs';
 
-const mk = (opts = {}) => { let t = 0; const log = { notice: [], left: [] };
-  const life = createGameLife({ now: () => t, onNotice: (s, r) => log.notice.push([s, r]), onLeave: (r) => log.left.push(r), ...opts });
+const mk = (opts = {}) => { let t = 0; const log = { notice: [], left: [], sent: [] };
+  const life = createGameLife({ now: () => t, onNotice: (s, r) => log.notice.push([s, r]), onLeave: (r) => log.left.push(r),
+    onSend: (b) => log.sent.push([...b]), ...opts });
   return { life, log, at: (v) => { t = v; } }; };
 
-test('save and exit is the single byte 0x69, sent once', () => {
-  const { life } = mk();
+test('save and exit is the single byte 0x69', () => {
   assert.deepEqual([...SAVE_AND_EXIT_PACKET], [0x69]);
-  assert.equal(life.saveAndExit(), SAVE_AND_EXIT_PACKET);
-  assert.equal(life.saveAndExit(), null);
+});
+test('the explicit leave sends the trade CANCEL bytes 4F 02 00 at once and waits in state 7', () => {
+  const { life, log, at } = mk();
+  life.inGame();
+  assert.deepEqual([...LEAVE_CANCEL_PACKET], [0x4f, 0x02, 0, 0, 0, 0, 0]);
+  assert.equal(life.leaveGame(), true);
+  assert.equal(life.leaveGame(), false);
+  assert.deepEqual(log.sent, [[0x4f, 0x02, 0, 0, 0, 0, 0]]);
+  assert.equal(life.leaving, true);
+  assert.equal(life.exiting, false);
+});
+test('0x69 goes out only after 30 s, strictly more than 30000 ms, then the teardown runs once', () => {
+  const { life, log, at } = mk();
+  life.inGame(); at(1000); life.leaveGame();
+  at(1000 + LEAVE_WAIT_MS); life.checkTimers();
+  assert.equal(log.sent.length, 1);
+  assert.equal(log.left.length, 0);
+  at(1000 + LEAVE_WAIT_MS + 1); life.checkTimers();
+  assert.deepEqual(log.sent[1], [0x69]);
+  assert.deepEqual(log.left, [0]);
+  life.checkTimers(); life.tick();
+  assert.equal(log.sent.length, 2);
+  assert.equal(log.left.length, 1);
+});
+test('a deny during the leave wait is swallowed; the leave still completes', () => {
+  const { life, log, at } = mk();
+  life.inGame(); life.leaveGame();
+  assert.equal(life.deny(0x10), false);
+  assert.equal(log.notice.length, 0);
+  at(LEAVE_WAIT_MS + 1); life.checkTimers();
+  assert.deepEqual(log.left, [0]);
+});
+test('a leave after an exit countdown has started is refused, so the menu tears down at once', () => {
+  const { life } = mk();
+  life.inGame(); life.fail(7);
+  assert.equal(life.leaveGame(), false);
+});
+test('unload while in game sends 4F 02 00 then 0x69 back to back, with no wait', () => {
+  const { life } = mk();
+  life.inGame();
+  assert.deepEqual(life.unload().map((b) => [...b]), [[0x4f, 0x02, 0, 0, 0, 0, 0], [0x69]]);
+  assert.deepEqual(life.unload(), []);
+});
+test('unload after the menu leave sends only 0x69, and never twice', () => {
+  const { life } = mk();
+  life.inGame(); life.leaveGame();
+  assert.deepEqual(life.unload().map((b) => [...b]), [[0x69]]);
+  assert.deepEqual(life.unload(), []);
 });
 test('a deny shows its text and leaves after 600 ticks', () => {
   const { life, log } = mk();
@@ -45,9 +91,9 @@ test('expansion characters get the expansion wording for reasons 0x14 and 0x15',
   const { life, log } = mk({ expansion: true });
   life.fail(0x14); assert.equal(log.notice[0][0], 21794);
 });
-test('an out-of-range reason becomes 9; save and exit blocks later reasons', () => {
+test('an out-of-range reason becomes 9; a leave in progress blocks later reasons', () => {
   const a = mk(); a.life.fail(0x40); assert.equal(a.life.reason, 9);
-  const b = mk(); b.life.saveAndExit(); assert.equal(b.life.fail(7), false);
+  const b = mk(); b.life.leaveGame(); assert.equal(b.life.fail(7), false);
 });
 
 import { joinDeadline } from './bnet-game-life.mjs';
