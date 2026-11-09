@@ -77,6 +77,76 @@ test('left on a monster is the left skill on that unit; on a person, a talk; rig
   assert.equal(h.out[0][0], 1);                                   // a corpse is not a target
 });
 
+// The server never echoes the owner's own walk, so the click itself must start the local route.
+test('a ground click starts the local player route after the packet leaves, never otherwise', () => {
+  const moves = [];
+  const make = (extra, transmit = () => true) => createRealmInput({ transmit, scene: sceneOf(extra), now: () => 0,
+    move: (x, y, run) => { moves.push([x, y, run]); return 1; } });
+  make().leftClick(200, 120);
+  make({ run: true }).leftClick(200, 120);
+  assert.deepEqual(moves, [[100, 120, false], [100, 120, true]]);
+  moves.length = 0;
+  make({}, () => false).leftClick(200, 120);                       // connection closed: nothing moves
+  make({ monsters: [{ guid: 77, classId: 5, mode: 1, x: 101, y: 101, anchorX: 200, anchorY: 120, drawn: true }] }).leftClick(200, 120);
+  assert.deepEqual(moves, []);
+  const input = make(); input.leftClick(200, 120); input.leftClick(200, 120);  // the gate drops the repeat
+  assert.equal(moves.length, 1);
+  assert.equal(input.evidence.localMove, 1);
+});
+
+// The server ignores a talk from 9 or more tiles; a far person is approached and talked to on arrival.
+test('a far person is approached first and talked to once in range; items and objects walk there locally', () => {
+  const moves = []; let scene = sceneOf({ monsters: [{ guid: 78, classId: 99, mode: 1, x: 120, y: 100, anchorX: 200, anchorY: 120, drawn: true }] })();
+  const out = [];
+  const input = createRealmInput({ transmit: (b) => out.push(Array.from(b)), scene: () => scene, now: () => 0,
+    move: (x, y, run) => { moves.push([x, y, run]); return 1; } });
+  input.leftClick(200, 120);
+  assert.deepEqual(out, [[0x02, 1, 0, 0, 0, 78, 0, 0, 0]]);
+  assert.deepEqual(moves, [[120, 100, false]]);
+  input.tick(); assert.equal(out.length, 1);                      // still far: nothing more
+  scene = { ...scene, player: { x: 116, y: 100 } };
+  input.tick(); assert.deepEqual(out.at(-1), [0x13, 1, 0, 0, 0, 78, 0, 0, 0]);
+  input.tick(); assert.equal(out.length, 2);                      // one talk only
+  moves.length = 0;
+  const h = createRealmInput({ transmit: () => true, scene: sceneOf({ items: [{ id: 9, mode: 3, x: 100, y: 120 }] }), now: () => 0,
+    move: (x, y, run) => { moves.push([x, y, run]); return 1; } });
+  h.leftClick(200, 120);
+  assert.deepEqual(moves, [[100, 120, false]]);
+});
+
+test('arrow keys walk a step from the player; the interact key talks to the nearest person', () => {
+  const moves = [];
+  const make = (extra) => { const out = []; return { out, input: createRealmInput({ transmit: (b) => out.push(Array.from(b)), scene: sceneOf(extra), now: () => 0,
+    move: (x, y, run) => { moves.push([x, y, run]); return 1; } }) }; };
+  let h = make(); h.input.step(1, -1);
+  assert.deepEqual(h.out, [[1, 101, 0, 99, 0]]); assert.deepEqual(moves, [[101, 99, false]]);
+  h = make({ monsters: [{ guid: 5, classId: 99, mode: 1, x: 103, y: 100 }, { guid: 6, classId: 5, mode: 1, x: 101, y: 100 }],
+    objects: [{ id: 12, x: 100, y: 101 }] });
+  h.input.interactNearest();
+  assert.deepEqual(h.out, [[0x13, 1, 0, 0, 0, 5, 0, 0, 0]]);
+  h = make({ objects: [{ id: 12, x: 100, y: 101 }] }); h.input.interactNearest();
+  assert.deepEqual(h.out, [[0x13, 2, 0, 0, 0, 12, 0, 0, 0]]);
+});
+
+test('the realm shell routes arrow keys, the interact key and the pending talk', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const shell = await readFile(new URL('../gameplay-shell.mjs', import.meta.url), 'utf8');
+  const branch = shell.slice(shell.indexOf("if (realmTransport.state === 'session-open') {\n    // The same commands"), shell.indexOf('if (!session) {\n    const advanced'));
+  assert.match(branch, /realmInput\(\)\.step\(command\.x, command\.y\)/);
+  assert.match(branch, /realmInput\(\)\.interactNearest\(\)/);
+  assert.match(branch, /realmInput\(\)\.tick\(\)/);
+});
+
+test('the realm shell wires the local route to the engine export', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const root = new URL('../../', import.meta.url);
+  const shell = await readFile(new URL('play/gameplay-shell.mjs', root), 'utf8');
+  const call = shell.slice(shell.indexOf('createRealmInput({'), shell.indexOf('createRealmInput({') + 2000);
+  assert.match(call, /move:[^\n]*d2_realm_client_local_move/);
+  const link = await readFile(new URL('wasm-build/link-d2.sh', root), 'utf8');
+  assert.match(link, /_d2_realm_client_local_move[,\s]/);
+});
+
 test('ground items are picked up and objects interacted with by guid', () => {
   let h = harness({ items: [{ id: 9, mode: 3, x: 100, y: 120 }] }); h.input.leftClick(200, 120);
   assert.deepEqual(h.out, [[0x16, 4, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0]]);

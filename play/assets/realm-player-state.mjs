@@ -9,6 +9,13 @@ export function applyRealmPlayerFrame(protocol, bytes) {
     monsters: protocol.d2gsClientMonsters?.() ?? [] };
 }
 
+// The camera follows the selected player's path position at 16.16 precision, as a local game's does; a
+// whole-subtile centre steps the world a subtile at a time under a walking hero. At rest both are x.5.
+export function realmCameraCentre(source) {
+  if (source?.preciseX != null && source?.preciseY != null) return { x: source.preciseX, y: source.preciseY };
+  return { x: (source?.x ?? 0) + 0.5, y: (source?.y ?? 0) + 0.5 };
+}
+
 export function selectPlayerRenderSource(snapshot, motion, realmSessionOpen, realmPlayer, realmAct = null, worn = null) {
   if (realmSessionOpen && realmPlayer?.active && realmPlayer.clientRoomActive && (realmPlayer.x !== 0 || realmPlayer.y !== 0)) {
     // Draw the client CUnit's current animation, not the fixed assignment record: a server mode
@@ -16,6 +23,7 @@ export function selectPlayerRenderSource(snapshot, motion, realmSessionOpen, rea
     const live = realmPlayer.motion?.active ? realmPlayer.motion : null;
     return {
       source: 'realm', guid: realmPlayer.guid, x: realmPlayer.x, y: realmPlayer.y,
+      preciseX: realmPlayer.preciseX ?? null, preciseY: realmPlayer.preciseY ?? null,
       classId: realmPlayer.classId, reassignments: realmPlayer.reassignments,
       renderState: { playerClass: realmPlayer.classId, mode: live?.mode ?? realmPlayer.initialMode ?? 5,
         direction: live?.direction ?? realmPlayer.initialDirection ?? 0, framePrecise: live?.framePrecise,

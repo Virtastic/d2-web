@@ -784,6 +784,18 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
   const call = (n, rt, a, v) => Module.ccall(n, rt, a, v);
   const rd = (p, n) => Array.from(Module.HEAPU8.subarray(Number(p), Number(p) + n));
   const str = (bytes) => String.fromCharCode(...bytes.filter((b) => b !== 0));
+  // The unit's path position at 16.16 precision, so an online unit glides between subtiles as it
+  // does offline instead of stepping a whole subtile at a time. Null before its room is active.
+  const unitPrecise = (type, guid) => {
+    if (!Module._d2_realm_client_unit_precise) return null;
+    if (!call('d2_realm_client_unit_precise', 'number', ['number', 'number', 'bigint'], [type, guid, BigInt(T)])) return null;
+    return { preciseX: u32at(T) / 65536, preciseY: u32at(Number(T) + 4) / 65536 };
+  };
+  const withPrecise = (record, type) => {
+    const precise = record ? unitPrecise(type, record.guid) : null;
+    if (precise) Object.assign(record, precise);
+    return record;
+  };
   const readPlayerPointer = (ptr) => {
     if (!ptr) return null;
     const p = Number(ptr), view = new DataView(Module.HEAPU8.buffer, p, 92);
@@ -902,6 +914,7 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
           const other = readPlayerPointer(call('d2_realm_client_player_at', 'bigint', ['number'], [index]));
           if (other?.guid === player.guid) { player.motion = protocol.d2gsClientPlayerMotionAt(index); player.form = protocol.d2gsClientPlayerFormAt(index); break; }
         }
+        withPrecise(player, 0);
       }
       return player;
     },
@@ -953,7 +966,7 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
         if (player?.active) {
           player.motion = protocol.d2gsClientPlayerMotionAt(index);
           player.form = protocol.d2gsClientPlayerFormAt(index);
-          players.push(player);
+          players.push(withPrecise(player, 0));
         }
       }
       return players;
@@ -1024,7 +1037,7 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
           animationFlags: view.getUint8(at + 99), modeEvents: eventsByGuid.get(view.getUint32(at + 8, true)) ?? [],
           x: view.getUint32(at + 100, true), y: view.getUint32(at + 104, true),
           hpPct: view.getUint32(at + 108, true), typeFlags: view.getUint32(at + 112, true) };
-      });
+      }).map((monster) => withPrecise(monster, 1));
     },
     d2gsClientMissiles: () => {
       const count = call('d2_realm_client_missile_count', 'number', [], []);

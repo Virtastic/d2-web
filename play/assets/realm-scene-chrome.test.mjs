@@ -18,6 +18,41 @@ test('a realm scene draws the HUD, belt and pointer like a local game, without e
   assert.equal(chromeGates({ engineLive: false, realmSceneActive: true, ...have, clearScreen: true }).hud, false);
 });
 
+test('a realm scene draws the skill buttons beside the orbs, so the bar has no gap a local game lacks', () => {
+  const realm = chromeGates({ engineLive: false, realmSceneActive: true, ...have, hasSkillSelect: {} });
+  const local = chromeGates({ engineLive: true, realmSceneActive: false, ...have, hasSkillSelect: {} });
+  assert.equal(realm.skillSelect, true);
+  assert.equal(realm.skillSelect, local.skillSelect);
+  assert.equal(chromeGates({ engineLive: false, realmSceneActive: true, ...have, hasSkillSelect: {}, clearScreen: true }).skillSelect, false);
+  const shell = readFileSync(new URL('../gameplay-shell.mjs', import.meta.url), 'utf8');
+  const realmChrome = shell.slice(shell.indexOf('function ensureRealmChrome()'), shell.indexOf('async function syncRealmScene()'));
+  assert.match(realmChrome, /skillSelectRenderer \?\?= createSkillSelectRenderer\(/, 'the joined game builds the skill buttons');
+  assert.ok(shell.includes('if (sceneChrome().skillSelect) {'), 'the skill buttons draw on the shared gate, not on a local engine');
+});
+
+test('the realm HUD binds no hotkey before the server binds one', () => {
+  const r = realmFrameReads(null);
+  assert.equal(r.hotkeys.length, 8);
+  assert.ok(r.hotkeys.every((k) => k.skill === -1));
+});
+
+const belts = (counts) => ({ inventory: { playerRow: () => null, grid: () => null, components: () => null },
+  belt: { boxes: (record) => Array.from({ length: counts[record] }, (_, i) => ({ left: 422 + (i % 4) * 31, right: 450 + (i % 4) * 31, top: 562 - (i >> 2) * 32, bottom: 590 - (i >> 2) * 32 })) } });
+test('the realm belt shows the HUD row closed and the same popup rows as a local game when open', () => {
+  const world = (record) => ({ beltRecord: () => record });
+  const sash = realmFrameReads(null, world(1), belts({ 1: 8 }));
+  assert.equal(sash.beltShownfalse.length, 4);
+  assert.ok(sash.beltShownfalse.every((b) => b.bottom === 590));
+  assert.equal(sash.beltShowntrue.length, 8);
+  const girdle = realmFrameReads(null, world(3), belts({ 3: 16 }));
+  assert.equal(girdle.beltShowntrue.length, 16);
+  const none = realmFrameReads(null, world(2), belts({ 2: 4 }));
+  assert.equal(none.beltShowntrue, none.beltShownfalse);
+  const shell = readFileSync(new URL('../gameplay-shell.mjs', import.meta.url), 'utf8');
+  const shown = shell.slice(shell.indexOf('function beltShownBoxes()'), shell.indexOf('function readAdvancement()'));
+  assert.ok(shown.includes('if (realmSceneActive) return realmReads'), 'the belt hover reads the realm boxes, not an absent engine session');
+});
+
 const base = { tick: 5, act: 1, level: 3, playerId: 7, player: { x: 10, y: 20, hp: 99, hpMax: 99 } };
 const actor = (m, f) => ({ code: m.classId, frame: f });
 test('the realm view snapshot carries the client state in the single-player shape', () => {

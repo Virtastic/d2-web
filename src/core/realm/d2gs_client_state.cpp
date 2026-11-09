@@ -44,6 +44,11 @@
 #include "cast_target_relation.h"
 #include "remote_unit_skill_start.h"
 #include "d2gs_client_monster_death_clock.h"
+#include "d2gs_client_pkt_route.h"
+#include "../d2client/d2client_pkt_env.h"
+
+extern "C" uint32_t d2c_port_af5f0(uint32_t val, const uint8_t* rec,
+    uint32_t (*f2a750)(uint32_t ecx, uint32_t edx, uint32_t* blk, uint32_t one));
 
 struct D2RealmPlayerAssign {
     uint32_t guid;
@@ -636,37 +641,6 @@ static void refresh_monster_motion_view(D2RealmClientMonster& monster) {
     monster.view.direction = PATH_GetDirection(monster.motionUnit->pDynamicPath);
 }
 
-static int apply_monster_move(const uint8_t* packet, int length) {
-    // The local 1.13c 0x67 action-1 and action-0x17 branches use the packet GUID, mode,
-    // and destination. The remaining fixed bytes are framed but unused by those branches.
-    if (!packet || length != 16 || packet[0] != 0x67) return -1;
-    const uint32_t guid = static_cast<uint32_t>(packet[1]) |
-        (static_cast<uint32_t>(packet[2]) << 8) | (static_cast<uint32_t>(packet[3]) << 16) |
-        (static_cast<uint32_t>(packet[4]) << 24);
-    const uint8_t action = packet[5];
-    if (action != 1 && action != 0x17) return 0;
-    const int x = static_cast<int>(packet[6]) | (static_cast<int>(packet[7]) << 8);
-    const int y = static_cast<int>(packet[8]) | (static_cast<int>(packet[9]) << 8);
-    auto it = std::find_if(g_monsters.begin(), g_monsters.end(), [guid](const auto& unit) {
-        return unit.view.guid == guid;
-    });
-    if (it == g_monsters.end() || !create_monster_motion(*it)) return 0;
-    const uint32_t mode = action == 1 ? MONMODE_WALK : MONMODE_RUN;
-    D2UnitStrc* const unit = it->motionUnit;
-    const int pathPoints = d2_realm_client_motion_set_target(unit, x, y);
-    it->lastPlanResult = pathPoints;
-    if (pathPoints > 0) {
-        d2_realm_client_motion_set_mode(unit, mode);
-    } else {
-        // FUN_6FAFDC70 falls back to FUN_6FAFDC30 after a rejected route. The recovered
-        // helper selects neutral mode 1 for monster modes 1..15 except mode 12.
-        const uint32_t fallbackMode = d2_realm_client_motion_refusal_mode(unit->dwUnitType, unit->dwAnimMode);
-        if (fallbackMode != unit->dwAnimMode) d2_realm_client_motion_set_mode(unit, fallbackMode);
-    }
-    refresh_monster_motion_view(*it);
-    return pathPoints > 0 ? 1 : 0;
-}
-
 static void refresh_player_room_level(D2RealmClientPlayerState& player, bool selected) {
     if (!player.active) return;
     uint32_t level = 0, roomX = 0, roomY = 0, initSeed = 0;
@@ -935,39 +909,6 @@ static bool remove_monster(const uint8_t* packet, int length) {
     return true;
 }
 
-static int apply_monster_death_mode(const uint8_t* packet, int length) {
-    d2::realm::MonsterDeathModePacket decoded{};
-    const int decodedResult = d2::realm::decodeMonsterDeathModePacket(packet, length, &decoded);
-    if (decodedResult <= 0) return decodedResult;
-    auto it = std::find_if(g_monsters.begin(), g_monsters.end(), [&decoded](const auto& monster) {
-        return monster.view.guid == decoded.guid;
-    });
-    if (it == g_monsters.end() || !it->motionUnit) return 0;
-
-    D2UnitStrc* const unit = it->motionUnit;
-    const uint32_t previousMode = unit->dwAnimMode;
-    if (decoded.wireState == 8) {
-        D2MonStatsTxt* stats = DATATBLS_GetMonStatsTxtRecord(static_cast<int>(it->view.classId));
-        const int minion = stats ? stats->wMinion[0] : -1;
-        if (stats && stats->nSplEndDeath == 1 && minion >= 0 &&
-            sgptDataTables && minion < sgptDataTables->nMonStatsTxtRecordCount) return 0;
-    }
-    // State 9 has an Izual-specific SQ replacement path. The ordinary DD path is
-    // grounded here; leave that class-specific transition to its own client behavior.
-    if (decoded.wireState == 9 && it->view.classId == 0x11c && previousMode == MONMODE_SEQUENCE) return 0;
-    // The projected family is the whole 0x69/0x6A selector column, so a GETHIT selector (6)
-    // reaches the same mode setter as the two death selectors.
-    if (d2_realm_client_unit_set_mode(unit, decoded.mode) < 0) return -1;
-    refresh_monster_motion_view(*it);
-    if (d2::realm::appendMonsterDeathModeEvent(g_monsterDeathModeEvents,
-            g_nextMonsterDeathModeSequence, decoded.guid, decoded.opcode, decoded.wireState,
-            previousMode, decoded.mode)) {
-        ++g_nextMonsterDeathModeSequence;
-        return 1;
-    }
-    return 0;
-}
-
 static int reject_stream(int error) {
     clear_client_missiles();
     reset_monster_death_mode_events();
@@ -1101,18 +1042,6 @@ static int remove_player(const uint8_t* packet, int length) {
     return 0;
 }
 
-static int apply_player_move(const uint8_t* packet, int length) {
-    D2RealmPlayerMove move{};
-    if (d2_realm_d2gs_parse_player_move(packet, length, &move) != 16) return -1;
-    if (move.unitType != UNIT_PLAYER) return 0;
-    auto it = std::find_if(g_players.begin(), g_players.end(), [&move](const auto& player) {
-        return player.view.guid == move.guid;
-    });
-    if (it == g_players.end() || !it->motionUnit || !it->motionUnit->pDynamicPath) return 0;
-    const int result = d2_realm_client_apply_player_move(it->motionUnit, &move);
-    return result > 0 ? 1 : 0;
-}
-
 struct D2RealmClientStateStat {
     uint16_t statId;
     uint16_t layer;
@@ -1134,6 +1063,231 @@ static D2UnitStrc* find_realm_client_unit(uint8_t unitType, uint32_t guid) {
             if (monster.view.guid == guid) return monster.motionUnit;
     }
     return nullptr;
+}
+
+// The movement and mode packets (0x0C, 0x0F, 0x10, 0x67..0x6D) run through the retail client's
+// own handlers (src/core/d2client/d2client_af*.cpp). The handlers read the record, build the
+// request block and call two engine routines; this is the native side of those two calls: the
+// unit placement (D2Client 0x2A1B0) and the action dispatch (D2Client 0x2A750 / 0x4DC70).
+namespace {
+D2cPktEnv g_pktEnv{};
+d2::realm::PktRoute g_pktRoute{};
+D2RealmClientMonster* g_pktMonster = nullptr;
+D2UnitStrc* g_pktUnit = nullptr;
+uint8_t g_pktOpcode = 0;
+int g_pktResult = 0;
+}
+
+static uint32_t pkt_word(const uint32_t* l, uint32_t i) {
+    return l && i < g_pktRoute.block ? l[i] : 0;
+}
+
+static uint32_t pkt_get_stat(uintptr_t unit, uint32_t stat, uint32_t layer) {
+    D2UnitStrc* u = reinterpret_cast<D2UnitStrc*>(unit);
+    if (!u || !u->pStatListEx) return 0;
+    return static_cast<uint32_t>(STATLIST_UnitGetStatValue(u, static_cast<int>(stat), static_cast<uint16_t>(layer)));
+}
+
+static void pkt_set_stat(uintptr_t unit, uint32_t stat, uint32_t value, uint32_t layer) {
+    D2UnitStrc* u = reinterpret_cast<D2UnitStrc*>(unit);
+    if (!u || !u->pStatListEx) return;
+    STATLIST_SetUnitStat(u, static_cast<int>(stat), static_cast<int>(value), static_cast<uint16_t>(layer));
+}
+
+// 0x2A1B0: x in EAX, y the first stack word, the radius selector the second.
+static void pkt_place(uint32_t x, uintptr_t unitBits, uint32_t y, uint32_t radiusSel, uint32_t, uint32_t) {
+    D2UnitStrc* unit = reinterpret_cast<D2UnitStrc*>(unitBits);
+    x &= 0xffff;
+    y &= 0xffff;
+    if (!unit) return;
+    const bool isPlayer = unit->dwUnitType == UNIT_PLAYER;
+    if (d2::realm::placeIgnored(isPlayer, unit->dwAnimMode, unit->dwFlags, x, y)) return;
+    unit->nLastClickX = static_cast<uint16_t>(x);
+    unit->nLastClickY = static_cast<uint16_t>(y);
+    // Players keep their path: the local player's resync and the remote player's re-place are
+    // not modelled yet.
+    if (isPlayer || !g_pktMonster) return;
+    if (!unit->pDynamicPath) {
+        g_pktMonster->view.x = x;
+        g_pktMonster->view.y = y;
+        return;
+    }
+    const int radius = d2::realm::monsterPlaceRadius(unit->dwAnimMode, radiusSel);
+    const int dx = std::abs(static_cast<int>(PATH_GetXPosition(unit->pDynamicPath)) - static_cast<int>(x));
+    const int dy = std::abs(static_cast<int>(PATH_GetYPosition(unit->pDynamicPath)) - static_cast<int>(y));
+    if (dx > radius || dy > radius) {
+        d2_realm_client_motion_detach(unit);
+        d2_realm_client_motion_attach(unit, static_cast<int>(x), static_cast<int>(y));
+    }
+}
+
+// The request's target: a point, or for the unit-target handlers the (type, guid) of a unit.
+static bool pkt_target(const uint32_t* l, int* x, int* y) {
+    if (!g_pktRoute.unitTarget) {
+        *x = static_cast<int>(pkt_word(l, 0));
+        *y = static_cast<int>(pkt_word(l, 1));
+        return true;
+    }
+    D2UnitStrc* target = find_realm_client_unit(static_cast<uint8_t>(pkt_word(l, 0)), pkt_word(l, 1));
+    if (!target || !target->pDynamicPath) return false;
+    *x = static_cast<int>(PATH_GetXPosition(target->pDynamicPath));
+    *y = static_cast<int>(PATH_GetYPosition(target->pDynamicPath));
+    return true;
+}
+
+static int pkt_player_action(D2UnitStrc* unit, uint32_t code, const uint32_t* l) {
+    if (code == 1 || code == 0x17) {
+        int x = 0, y = 0;
+        if (!pkt_target(l, &x, &y)) return 0;
+        return d2_realm_client_motion_apply_player_move(unit, static_cast<uint8_t>(code), 0,
+            static_cast<uint16_t>(x), static_cast<uint16_t>(y)) > 0 ? 1 : 0;
+    }
+    if (code == 6) {
+        unit->dwLastHitClass = pkt_word(l, 2);
+        return d2_realm_client_unit_set_mode(unit, PLRMODE_GETHIT) > 0 ? 1 : 0;
+    }
+    return 0;
+}
+
+static int pkt_monster_mode(D2RealmClientMonster& monster, uint32_t code, uint32_t mode) {
+    D2UnitStrc* const unit = monster.motionUnit;
+    const uint32_t previousMode = unit->dwAnimMode;
+    if (d2_realm_client_unit_set_mode(unit, mode) < 0) return 0;
+    // The old 0x69/0x6A projection's event queue stays the view the page reads.
+    if (g_pktOpcode != 0x69 && g_pktOpcode != 0x6a) return 1;
+    if (!d2::realm::appendMonsterDeathModeEvent(g_monsterDeathModeEvents,
+            g_nextMonsterDeathModeSequence, monster.view.guid, g_pktOpcode, code, previousMode, mode)) return 0;
+    ++g_nextMonsterDeathModeSequence;
+    return 1;
+}
+
+static int pkt_monster_action(D2RealmClientMonster& monster, uint32_t code, const uint32_t* l) {
+    D2UnitStrc* const unit = monster.motionUnit;
+    using d2::realm::MonsterAction;
+    switch (d2::realm::monsterAction(code)) {
+    case MonsterAction::Move: {
+        int x = 0, y = 0;
+        if (!unit->pDynamicPath || !pkt_target(l, &x, &y)) return 0;
+        const int points = d2_realm_client_motion_set_target(unit, x, y);
+        monster.lastPlanResult = points;
+        if (points > 0) {
+            d2_realm_client_motion_set_mode(unit, code == 1 ? MONMODE_WALK : MONMODE_RUN);
+            return 1;
+        }
+        const uint32_t fallback = d2_realm_client_motion_refusal_mode(unit->dwUnitType, unit->dwAnimMode);
+        if (fallback != unit->dwAnimMode) d2_realm_client_motion_set_mode(unit, fallback);
+        return 0;
+    }
+    case MonsterAction::GetHit: {
+        const uint32_t hit = d2::realm::getHitLife(pkt_word(l, 2));
+        const uintptr_t bits = reinterpret_cast<uintptr_t>(unit);
+        if (hit && (pkt_get_stat(bits, 6, 0) >> 8) != hit) pkt_set_stat(bits, 6, hit << 8, 0);
+        unit->dwLastHitClass = pkt_word(l, 6);
+        return pkt_monster_mode(monster, code, MONMODE_GETHIT);
+    }
+    case MonsterAction::Death: {
+        // A monster whose death spawns its minion is replaced by the spawn, not played out here.
+        D2MonStatsTxt* stats = DATATBLS_GetMonStatsTxtRecord(static_cast<int>(monster.view.classId));
+        const int minion = stats ? stats->wMinion[0] : -1;
+        if (stats && stats->nSplEndDeath == 1 && minion >= 0 &&
+            sgptDataTables && minion < sgptDataTables->nMonStatsTxtRecordCount) return 0;
+        unit->dwLastHitClass = pkt_word(l, 6);
+        pkt_set_stat(reinterpret_cast<uintptr_t>(unit), 6, 0, 0);
+        return pkt_monster_mode(monster, code, MONMODE_DEATH);
+    }
+    case MonsterAction::Dead:
+        // Izual's DEAD from his sequence mode is his own transition.
+        if (monster.view.classId == 0x11c && unit->dwAnimMode == MONMODE_SEQUENCE) return 0;
+        return pkt_monster_mode(monster, code, MONMODE_DEAD);
+    case MonsterAction::Stop: {
+        const uint32_t hp = pkt_word(l, 2);
+        monster.view.hpPct = hp;
+        if (hp) pkt_set_stat(reinterpret_cast<uintptr_t>(unit), 6, hp << 8, 0);
+        const int x = static_cast<int>(pkt_word(l, 0)), y = static_cast<int>(pkt_word(l, 1));
+        if (unit->pDynamicPath) {
+            const int dx = std::abs(static_cast<int>(PATH_GetXPosition(unit->pDynamicPath)) - x);
+            const int dy = std::abs(static_cast<int>(PATH_GetYPosition(unit->pDynamicPath)) - y);
+            if ((dx > 2 || dy > 2) && d2_realm_client_motion_set_target(unit, x, y) > 0) {
+                d2_realm_client_motion_set_mode(unit, MONMODE_WALK);
+                return 1;
+            }
+        }
+        if (unit->dwAnimMode != MONMODE_DEAD && unit->dwAnimMode != MONMODE_DEATH)
+            d2_realm_client_unit_set_mode(unit, MONMODE_NEUTRAL);
+        return 1;
+    }
+    case MonsterAction::Unhandled:
+        break;
+    }
+    return 0;
+}
+
+// 0x2A750: ECX = action code, EDX = unit, the request block on the stack.
+static void pkt_action(uint32_t code, uintptr_t unitBits, const uint32_t* l) {
+    D2UnitStrc* unit = reinterpret_cast<D2UnitStrc*>(unitBits);
+    code &= 0xff;
+    g_pktResult = 0;
+    if (!unit) return;
+    if (unit->dwUnitType == UNIT_PLAYER) {
+        g_pktResult = pkt_player_action(unit, code, l);
+    } else if (unit->dwUnitType == UNIT_MONSTER && g_pktMonster && g_pktMonster->motionUnit == unit) {
+        g_pktResult = pkt_monster_action(*g_pktMonster, code, l);
+        refresh_monster_motion_view(*g_pktMonster);
+    }
+}
+
+// The 0x0C handler takes the 0x2A750 call with the unit as a 32-bit register; the unit is the
+// one the record named, held here.
+static uint32_t pkt_action_af5f0(uint32_t code, uint32_t, uint32_t* l, uint32_t) {
+    pkt_action(code, reinterpret_cast<uintptr_t>(g_pktUnit), l);
+    return static_cast<uint32_t>(g_pktResult);
+}
+
+// One record: < 0 malformed, else the count of units it changed.
+static int apply_retail_unit_packet(const uint8_t* packet, int length) {
+    const d2::realm::PktRoute route = d2::realm::pktRoute(packet[0]);
+    if (route.handler == d2::realm::PktHandler::None || length != route.length) return -1;
+    uint32_t guid = 0;
+    std::memcpy(&guid, packet + route.guidOffset, sizeof guid);
+    D2RealmClientMonster* monster = nullptr;
+    D2UnitStrc* unit = nullptr;
+    const uint8_t unitType = route.typed ? packet[1] : static_cast<uint8_t>(UNIT_MONSTER);
+    if (unitType == UNIT_MONSTER) {
+        for (auto& candidate : g_monsters)
+            if (candidate.view.guid == guid) { monster = &candidate; break; }
+        if (!monster || !create_monster_motion(*monster)) return 0;
+        unit = monster->motionUnit;
+    } else {
+        unit = find_realm_client_unit(unitType, guid);
+    }
+    if (!unit) return 0;
+    g_pktEnv.f2A750 = pkt_action;
+    g_pktEnv.f2A1B0 = pkt_place;
+    g_pktEnv.getStat = pkt_get_stat;
+    g_pktEnv.setStat = pkt_set_stat;
+    g_pktRoute = route;
+    g_pktMonster = monster;
+    g_pktUnit = unit;
+    g_pktOpcode = packet[0];
+    g_pktResult = 0;
+    const uintptr_t bits = reinterpret_cast<uintptr_t>(unit);
+    using d2::realm::PktHandler;
+    switch (route.handler) {
+    case PktHandler::AF5F0: d2c_port_af5f0(0, packet, pkt_action_af5f0); break;
+    case PktHandler::AF510: d2c_af510(&g_pktEnv, bits, packet); break;
+    case PktHandler::AF4C0: d2c_af4c0(&g_pktEnv, bits, packet); break;
+    case PktHandler::AF460: d2c_af460(&g_pktEnv, bits, packet); break;
+    case PktHandler::AF3F0: d2c_af3f0(&g_pktEnv, bits, packet); break;
+    case PktHandler::AF390: d2c_af390(&g_pktEnv, bits, packet); break;
+    case PktHandler::AF340: d2c_af340(&g_pktEnv, bits, packet); break;
+    case PktHandler::AF7C0: d2c_af7c0(&g_pktEnv, bits, packet); break;
+    case PktHandler::AF750: d2c_af750(&g_pktEnv, bits, packet); break;
+    case PktHandler::AF2B0: d2c_af2b0(&g_pktEnv, bits, packet); break;
+    case PktHandler::None: break;
+    }
+    g_pktMonster = nullptr;
+    g_pktUnit = nullptr;
+    return g_pktResult;
 }
 
 // The selector-6 arm writes the record's hit-class byte to D2UnitStrc+0xB0 (retail:
@@ -1762,6 +1916,19 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_predict_right_cast_on_monster(ui
     return 1;
 }
 
+// The local player's ground click starts its own route at once. The game server never echoes the
+// owner's walk/run (0x0F/0x10 go only to the other clients; the owner is corrected by 0x15), so a
+// client that waits for the echo never moves. Same target/route branch as a remote 0x0F:
+// action 0x01 walk, 0x17 run. Returns 1 when a route started, 0 when refused or no local unit.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_local_move(int x, int y, int run) {
+    if (g_selectedPlayer < 0 || size_t(g_selectedPlayer) >= g_players.size()) return 0;
+    auto* unit = g_players[g_selectedPlayer].motionUnit;
+    if (!unit || !unit->pDynamicPath || !UNITS_GetRoom(unit)) return 0;
+    if (unit->dwAnimMode == PLRMODE_DEATH || unit->dwAnimMode == PLRMODE_DEAD) return 0;
+    return d2_realm_client_motion_apply_player_move(unit, run ? 0x17 : 0x01, 0,
+        static_cast<uint16_t>(x), static_cast<uint16_t>(y)) > 0 ? 1 : 0;
+}
+
 // Apply the server's targeted-skill start to a remote player's canonical CUnit.
 static int apply_remote_unit_skill_start(const uint8_t* packet, int length) {
     D2RealmPlayerCast cast{};
@@ -2068,7 +2235,11 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_feed(const uint8_t* bytes, int l
         if (size == 0) break;
         if (size < 0 || size > g_pendingLength - offset) return reject_stream(-2);
         const uint8_t* packet = g_pending + offset;
-        if (packet[0] == 0x26) {
+        if (d2::realm::pktRoute(packet[0]).handler != d2::realm::PktHandler::None) {
+            const int result = apply_retail_unit_packet(packet, size);
+            if (result < 0) return reject_stream(d2::realm::pktRoute(packet[0]).typed ? -2 : -4);
+            applied += result;
+        } else if (packet[0] == 0x26) {
             D2RealmGameChat parsed{};
             if (d2_realm_d2gs_parse_gamechat(packet, size, &parsed) != size) return reject_stream(-2);
             g_gameChat = parsed;
@@ -2104,10 +2275,6 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_feed(const uint8_t* bytes, int l
             const int result = apply_player_stop(packet, size);
             if (result < 0) return reject_stream(-2);
             applied += result;
-        } else if (packet[0] == 0x0f) {
-            const int result = apply_player_move(packet, size);
-            if (result < 0) return reject_stream(-2);
-            applied += result;
         } else if (packet[0] == 0x9d) {
             const int result = apply_owned_item(packet, size);
             if (result < 0) return reject_stream(-4);
@@ -2122,10 +2289,6 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_feed(const uint8_t* bytes, int l
         } else if (packet[0] == 0xac) {
             if (!apply_monster_assign(packet, size)) return reject_stream(-4);
             applied++;
-        } else if (packet[0] == 0x69 || packet[0] == 0x6a) {
-            const int result = apply_monster_death_mode(packet, size);
-            if (result < 0) return reject_stream(-4);
-            applied += result;
         } else if (packet[0] == 0x0a) {
             if (packet[1] == 0) {
                 const int result = remove_player(packet, size);
@@ -2134,10 +2297,6 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_feed(const uint8_t* bytes, int l
                 if (!remove_monster(packet, size)) return reject_stream(-4);
                 applied++;
             }
-        } else if (packet[0] == 0x67) {
-            const int result = apply_monster_move(packet, size);
-            if (result < 0) return reject_stream(-4);
-            applied += result;
         } else if (packet[0] == 0x15) {
             const int result = reassign_player(packet, size);
             if (result < 0) return reject_stream(-2);
@@ -2320,6 +2479,15 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_unit_state(uint8_t unitType, uint32_t g
     D2UnitStrc* unit = find_realm_client_unit(unitType, guid);
     if (!unit || state < 0 || !sgptDataTables || state >= sgptDataTables->nStatesTxtRecordCount) return -1;
     return STATES_CheckState(unit, state) ? 1 : 0;
+}
+
+// The unit's path position at 16.16 precision, as the single-player renderer reads it.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_unit_precise(uint8_t unitType, uint32_t guid, uint32_t* out) {
+    D2UnitStrc* unit = find_realm_client_unit(unitType, guid);
+    if (!out || !unit || !unit->pDynamicPath) return 0;
+    out[0] = static_cast<uint32_t>(PATH_GetPrecisionX(unit->pDynamicPath));
+    out[1] = static_cast<uint32_t>(PATH_GetPrecisionY(unit->pDynamicPath));
+    return 1;
 }
 
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_unit_state_stat(uint8_t unitType, uint32_t guid,

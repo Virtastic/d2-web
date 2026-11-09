@@ -1,3 +1,4 @@
+import { popupRows } from './belt-popup.mjs';
 // The joined Battle.net game's side of the shell's clientView. The game screen is drawn by the same
 // drawFrame a local game uses; this shapes what the D2GS client state knows (assets/realm-client.mjs)
 // into the snapshot that function reads, and into the few engine-side reads the HUD makes, so no part
@@ -9,18 +10,20 @@ const EMPTY = Object.freeze({ tick: 0, seed: 0, act: 1, level: 0, difficulty: 0,
   monsterCount: 0, hash: 0, area: '', player: Object.freeze({ x: 0, y: 0, hp: 0, hpMax: 0, mana: 0, manaMax: 0 }) });
 // `players` are the other players in the room (the selected player is drawn as the hero): each carries the render
 // state the player renderer reads (mode, direction, frame, worn items, weapon class), shaped here into a
-// kind 'player' entity of the same list the monsters and missiles are in.
+// kind 'player' entity of the same list the monsters and missiles are in. A unit that carries its path's
+// 16.16 position (preciseX/preciseY) is drawn there, as an offline unit is, so it glides between subtiles.
+const precise = (u) => (u.preciseX != null && u.preciseY != null ? { preciseX: u.preciseX, preciseY: u.preciseY } : null);
 export function realmViewSnapshot({ base: given, resources, monsters, missiles, players, level, actor, frame, world = null }) {
   const base = given ?? EMPTY;   // before the first PlayerAssign the snapshot is empty, as the single-player one is
   const entities = [];
   for (const m of monsters ?? []) {
     entities.push({ kind: 'monster', type: 1, id: m.guid, classId: m.classId, mode: m.mode, x: m.x, y: m.y, hp: 0, hpMax: 0,
-      hostile: true, roomOrdinal: 0, direction: m.direction, animation: actor(m, frame) });
+      hostile: true, roomOrdinal: 0, direction: m.direction, animation: actor(m, frame), ...precise(m) });
   }
   for (const p of players ?? []) {
     const r = p.renderState;
     entities.push({ kind: 'player', type: 0, id: p.guid, classId: p.classId, mode: r.mode, x: p.x, y: p.y, hp: 0, hpMax: 0,
-      hostile: false, roomOrdinal: 0, direction: r.direction, name: p.name, clientRoomLevel: p.clientRoomLevel, playerRender: r });
+      hostile: false, roomOrdinal: 0, direction: r.direction, name: p.name, clientRoomLevel: p.clientRoomLevel, playerRender: r, ...precise(p) });
   }
   for (const u of missiles ?? []) {
     if (u.level !== level) continue;
@@ -39,7 +42,7 @@ export function realmViewSnapshot({ base: given, resources, monsters, missiles, 
 //   characterScreen: slots 4 and 5 are the stamina and its maximum (whole points), what the stamina bar reads.
 //   advancement:     the server's level, experience and attributes (assets/realm-hud-state.mjs); null, so the experience bar
 //                    and the character and skill panels stay empty, until the server has sent its level.
-//   runToggle / hotkeys / belt: nothing is worn, bound or held yet.
+//   runToggle / hotkeys / belt: nothing is worn, bound or held yet (a hotkey slot of -1 is unbound, as the engine answers).
 export function realmFrameReads(resources, world = null, tables = null, playerClass = 0, hud = null, skillLevels = null) {
   const whole = (v) => (v ?? 0) >> 8;
   const screen = new Array(15).fill(0);
@@ -50,7 +53,7 @@ export function realmFrameReads(resources, world = null, tables = null, playerCl
   const reads = { characterScreen: resources ? (hud ? hud.characterSlots(playerClass, screen) && screen : screen.slice(0, 11)) : null, advancement,
     attributeTotals: hud?.attributeTotals() ?? null, questWords: hud?.questWords ?? null,
     classSkills: hud?.classSkills(playerClass, skillLevels) ?? null, waypointTable: hud?.waypointTable() ?? null,
-    runToggle: false, beltIndex: 2, beltHudBoxes: null, beltBoxCount: 0 };
+    runToggle: false, hotkeys: Array.from({ length: 8 }, () => ({ skill: -1, left: false })), beltIndex: 2, beltHudBoxes: null, beltBoxCount: 0 };
   if (!world || !tables) return reads;
   // The panels' geometry is Inventory.txt / Belts.txt read through the shell's asset reader, in the numeric
   // shapes the single-player engine hands the same readers.
@@ -65,6 +68,9 @@ export function realmFrameReads(resources, world = null, tables = null, playerCl
   for (const b of boxes) if (b.bottom > bottom) bottom = b.bottom;
   const hudBoxes = boxes.filter((b) => b.bottom === bottom);
   reads.beltIndex = record; reads.beltBoxCount = boxes.length; reads.beltHudBoxes = hudBoxes.length ? hudBoxes : null;
-  reads.beltShowntrue = reads.beltShownfalse = reads.beltHudBoxes;
+  // The popup shows the rows above the HUD row, as many as the single-player read opens for the same record.
+  const rows = popupRows(record, boxes.length);
+  reads.beltShownfalse = reads.beltHudBoxes;
+  reads.beltShowntrue = rows ? boxes.slice(0, 4 * (rows + 1)) : reads.beltHudBoxes;
   return reads;
 }

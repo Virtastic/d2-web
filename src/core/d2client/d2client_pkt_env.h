@@ -10,6 +10,10 @@ struct D2cPktEnv {
     void (*f2A1B0)(uint32_t eax, uintptr_t esi, uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3);
     // D2Client+0xc9030: EAX = 0, stack 5 words
     void (*f79030)(uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4);
+    // D2Common #10973 (stdcall unit, stat, layer): the unit stat read
+    uint32_t (*getStat)(uintptr_t unit, uint32_t stat, uint32_t layer);
+    // D2Common #10887 (stdcall unit, stat, value, layer): the unit stat write
+    void (*setStat)(uintptr_t unit, uint32_t stat, uint32_t value, uint32_t layer);
 };
 extern "C" {
 void d2c_af090(const D2cPktEnv* e, const uint8_t* p);
@@ -23,4 +27,6 @@ void d2c_af460(const D2cPktEnv* e, uintptr_t unit, const uint8_t* p);
 void d2c_af4c0(const D2cPktEnv* e, uintptr_t unit, const uint8_t* p);
 void d2c_af510(const D2cPktEnv* e, uintptr_t unit, const uint8_t* p);
 void d2c_af750(const D2cPktEnv* e, uintptr_t unit, const uint8_t* p);
+void d2c_af7c0(const D2cPktEnv* e, uintptr_t unit, const uint8_t* p);
+void d2c_af2b0(const D2cPktEnv* e, uintptr_t unit, const uint8_t* p);
 }

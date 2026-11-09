@@ -135,7 +135,7 @@ const run = async (request, replies) => {
   const frames = [], cbs = [], queue = [...replies];
   const transport = { send: (b) => { const bytes = Uint8Array.from(b); if (bytes[0] === 0xff) { frames.push([bytes[1], [...bytes.subarray(4)]]); const r = queue.shift(); if (r) setImmediate(() => cbs.forEach((cb) => cb(r))); } return true; },
     onData: (cb) => cbs.push(cb), onClose: () => {}, close() {}, isOpen: true };
-  const protocol = { bncsSelector: () => [1], tickCount: () => 7, bncsAuthInfo: () => new Uint8Array(0),
+  const protocol = { bncsSelector: () => [1], tickCount: () => 7, bncsAuthInfo: () => new Uint8Array(0), bncsAuthCheck: () => ({ body: [], clientToken: 1 }),
     bncsFrame: (id, body) => [0xff, id, (body.length + 4) & 0xff, (body.length + 4) >> 8, ...body],
     bncsLogon: () => Uint8Array.from({ length: 32 }, (_, i) => (i < 28 ? i : 0x41 + (i - 28))) };
   const result = await request(transport, protocol);
@@ -143,23 +143,24 @@ const run = async (request, replies) => {
 };
 const reply = (id, body) => Uint8Array.from([0xff, id, (body.length + 4) & 0xff, (body.length + 4) >> 8, ...body]);
 const authInfo = reply(0x50, [0, 0, 0, 0, 9, 0, 0, 0, ...new Array(12).fill(0), 0]);
+const authCheck = reply(0x51, [0, 0, 0, 0]);
 const text = (v) => [...new TextEncoder().encode(v), 0];
 
 test('request bytes: RESETPASSWORD and CHANGEEMAIL are C strings; CHANGEPASSWORD splices the new hash before the name', async () => {
-  const reset = await run((t, p) => bncsResetPassword(t, p, { account: 'Ama', email: 'a@b.c' }), [authInfo]);
-  assert.deepEqual(reset.frames.map((f) => f[0]), [0x50, 0x5a]);
-  assert.deepEqual(reset.frames[1][1], [...text('Ama'), ...text('a@b.c')]);
-  const email = await run((t, p) => bncsChangeEmail(t, p, { account: 'Ama', oldEmail: 'a@b', newEmail: 'c@d' }), [authInfo]);
-  assert.deepEqual(email.frames.map((f) => f[0]), [0x50, 0x5b]);
-  assert.deepEqual(email.frames[1][1], [...text('Ama'), ...text('a@b'), ...text('c@d')]);
-  const change = await run((t, p) => bncsChangePassword(t, p, { account: 'Ama', password: 'old', newPassword: 'New' }), [authInfo, reply(0x31, [1, 0, 0, 0])]);
+  const reset = await run((t, p) => bncsResetPassword(t, p, { account: 'Ama', email: 'a@b.c' }), [authInfo, authCheck]);
+  assert.deepEqual(reset.frames.map((f) => f[0]), [0x50, 0x51, 0x5a]);
+  assert.deepEqual(reset.frames[2][1], [...text('Ama'), ...text('a@b.c')]);
+  const email = await run((t, p) => bncsChangeEmail(t, p, { account: 'Ama', oldEmail: 'a@b', newEmail: 'c@d' }), [authInfo, authCheck]);
+  assert.deepEqual(email.frames.map((f) => f[0]), [0x50, 0x51, 0x5b]);
+  assert.deepEqual(email.frames[2][1], [...text('Ama'), ...text('a@b'), ...text('c@d')]);
+  const change = await run((t, p) => bncsChangePassword(t, p, { account: 'Ama', password: 'old', newPassword: 'New' }), [authInfo, authCheck, reply(0x31, [1, 0, 0, 0])]);
   assert.equal(change.result, 1);
-  const body = change.frames[1][1];
-  assert.equal(change.frames[1][0], 0x31);
+  const body = change.frames[2][1];
+  assert.equal(change.frames[2][0], 0x31);
   assert.deepEqual(body.slice(0, 28), Array.from({ length: 28 }, (_, i) => i));
   assert.equal(body.length, 28 + 20 + 4);
   assert.deepEqual(body.slice(48), [0x41, 0x42, 0x43, 0x44]);
-  const denied = await run((t, p) => bncsChangePassword(t, p, { account: 'Ama', password: 'old', newPassword: 'x' }), [authInfo, reply(0x31, [0, 0, 0, 0])]);
+  const denied = await run((t, p) => bncsChangePassword(t, p, { account: 'Ama', password: 'old', newPassword: 'x' }), [authInfo, authCheck, reply(0x31, [0, 0, 0, 0])]);
   assert.equal(denied.result, 0);
 });
 

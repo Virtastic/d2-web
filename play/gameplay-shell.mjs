@@ -22,7 +22,7 @@ import { createRealmInput } from './assets/realm-input.mjs';
 import { realmStorageClick } from './assets/realm-storage-input.mjs';
 import { itemPackets, BUTTON as ITEM_BUTTON } from './assets/realm-item-packets.mjs';
 import { createItemText } from './assets/realm-item-text.mjs';
-import { applyRealmPlayerFrame, selectPlayerRenderSource, visibleRealmPlayers, realmScenePlayers, realmPlayerGate } from './assets/realm-player-state.mjs';
+import { applyRealmPlayerFrame, selectPlayerRenderSource, realmCameraCentre, visibleRealmPlayers, realmScenePlayers, realmPlayerGate } from './assets/realm-player-state.mjs';
 import { createRealmPlayerReassignFade } from './assets/realm-player-reassign-fade.mjs';
 import { createMonsterRenderer, parseMonsterAnimations, realmMonsterAnimationActor } from './assets/monster-renderer.mjs';
 import { warmEntryFiles } from './assets/entry-warm.mjs';
@@ -124,6 +124,7 @@ import { dispatchObjectSpeechPointer } from './assets/object-speech-input.mjs';
 import { createCharacterCreate, CREATE_ASSETS, CLASSES } from './assets/charcreate.mjs';
 import { keepWhileOpen } from './assets/charcreate-lifetime.mjs';
 import { createCharacterSelect, SELECT_ASSETS } from './assets/charselect.mjs';
+import { realmCharacterCard } from './assets/realm-character-card.mjs';
 import { deleteAndRefreshCharacter } from './assets/character-delete-store.mjs';
 import { createSaveStore, CLASS_NAMES } from './assets/save-store.mjs';
 import { importCharacterFiles } from './assets/character-import.mjs';
@@ -506,6 +507,7 @@ function readBeltHudBoxes() {
 
 // The boxes the belt shows and takes clicks on: the bottom row, or every row the popup opens (belt-popup.mjs).
 function beltShownBoxes() {
+  if (realmSceneActive) return realmReads?.['beltShown' + beltPopup.open] ?? null;   // a joined game: Belts.txt through the realm tables
   const all = readBeltBoxes();
   if (!all?.length) return readBeltHudBoxes();
   const rows = popupRows(readBeltIndex(), all.length);
@@ -1804,8 +1806,6 @@ async function leaveRealmGame() {
 // (D2Multi), where CREATE and JOIN make or join the game. The list's statstring carries class, level
 // and flags; the portrait's components are not read from it.
 let realmCharacters = [];
-const realmCharacterCard = (c) => ({ name: c.name, playerClass: c.charClass, level: c.level,
-  expansion: (c.flags & 0x20) !== 0, hardcore: (c.flags & 0x04) !== 0, dead: (c.flags & 0x08) !== 0 });
 // DELETE CHARACTER on the realm: MCP CHARDELETE; a refusal leaves the roster and shows its reason, a dead session drops to the login.
 async function deleteRealmCharacterFromSelect(name) {
   const flow = realmFlow;
@@ -3275,8 +3275,13 @@ function update(forceTick = false, live = false) {
         realmInput().rightClick(command.x, command.y, { held: Boolean(command.held) });
       } else if (command.type === COMMAND.MOVE && !command.directional && !heldStandStillKeys.size && command === pointerMoves.at(-1)) {
         realmInput().leftClick(command.x, command.y, { held: Boolean(command.held) });
+      } else if (command.type === COMMAND.MOVE && command.directional && !heldStandStillKeys.size) {
+        realmInput().step(command.x, command.y);
+      } else if (command.type === COMMAND.INTERACT) {
+        realmInput().interactNearest();
       } else if (command.type === COMMAND.BELT) realmInput().useBelt(command.slot);
     }
+    realmInput().tick();
   }
   if (!session) {
     const advanced = advanceRealmClientUnits(forceTick);
@@ -3566,7 +3571,7 @@ function updateAfterAdvance(engineAdvanced, live = false) {
 // replaces meant -- so a standing player draws on the same pixel as before.
 function cameraCentre() {
   const source = selectedPlayerSource();
-  if (source.source === 'realm') return { x: source.x + 0.5, y: source.y + 0.5 };
+  if (source.source === 'realm') return realmCameraCentre(source);
   if (source.source === 'none' && realmTransport.state === 'session-open') return { x: 0, y: 0 };
   if (!snapshot?.player) return { x: 0, y: 0 };
   const centre = { x: snapshot.player.x + 0.5, y: snapshot.player.y + 0.5 };
@@ -4109,7 +4114,7 @@ function frameGates() {
 }
 function sceneChrome() {
   return chromeGates({ engineLive: Boolean(session) && typeof Module !== 'undefined', realmSceneActive, hasControlPanel: controlPanelRenderer,
-    hasPointerLayer: pointerLayer, hasBelt: beltRenderer, clearScreen, screenIsGame: screen === SCREEN.GAME });
+    hasPointerLayer: pointerLayer, hasBelt: beltRenderer, hasSkillSelect: skillSelectRenderer, clearScreen, screenIsGame: screen === SCREEN.GAME });
 }
 // Keys the draw looked up last frame / is looking up this frame (see collectFrameSnapshot's `seen`).
 const SEEN_KEYS = ['langStr', 'langIdx', 'missileCel', 'skillDesc', 'skillMana', 'skillStrings'];
@@ -4165,6 +4170,8 @@ function realmInput() {
   return (realmInputState ??= createRealmInput({
     transmit: (bytes) => realmFlow?.d2gs?.isOpen ? realmFlow.d2gs.send(bytes) : false,
     now: () => performance.now(),
+    // The owner's walk is never echoed by the server: start the local route on the click, as single player does.
+    move: (x, y, run) => (Module._d2_realm_client_local_move ? Module.ccall('d2_realm_client_local_move', 'number', ['number', 'number', 'number'], [x, y, run ? 1 : 0]) : -1),
     scene: () => {
       const me = selectedPlayerSource();
       if (!realmSceneActive || !realmPlayerView?.active || !realmFlow?.d2gs?.isOpen || me.source === 'none' || !snapshot) return { ready: false };
@@ -4247,7 +4254,7 @@ function realmOtherPlayers() {
   for (const player of realmScenePlayers(realmPlayerRosterView.length ? realmPlayerRosterView : [realmPlayerView], realmPlayerView, realmWorldView.mapLevel)) {
     if (!player?.active || !player.clientRoomActive || (player.x === 0 && player.y === 0) || player.guid === selected) continue;
     const live = player.motion?.active ? player.motion : null;
-    out.push({ guid: player.guid, name: player.name, classId: player.classId, x: player.x, y: player.y, clientRoomLevel: player.clientRoomLevel,
+    out.push({ guid: player.guid, name: player.name, classId: player.classId, x: player.x, y: player.y, preciseX: player.preciseX, preciseY: player.preciseY, clientRoomLevel: player.clientRoomLevel,
       renderState: { playerClass: player.classId, mode: live?.mode ?? player.initialMode ?? 5, direction: live?.direction ?? player.initialDirection ?? 0,
         framePrecise: live?.framePrecise, frameCountPrecise: live?.frameCountPrecise, animSpeed: live?.animSpeed,
         tick: snapshot?.tick ?? 0, act, weaponClass: realmWorldState?.weaponClassOf(player.guid) ?? 'hth',
@@ -4429,6 +4436,7 @@ function ensureRealmChrome() {
   beltRenderer ??= createBeltRenderer(assetReader);
   characterPanelRenderer ??= createCharacterPanelRenderer(assetReader);
   skillPanelRenderer ??= createSkillPanelRenderer(assetReader, document, createSkillPointOverlay());
+  try { skillSelectRenderer ??= createSkillSelectRenderer(assetReader); } catch (error) { skillSelectError = String(error); }
   try { questLogRenderer ??= createQuestLogRenderer(assetReader, document); } catch (error) { realmSceneError = String(error); }
   try { waypointPanelRenderer ??= createWaypointPanelRenderer(assetReader, document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) }); } catch (error) { waypointPanelError = String(error); }
   if (!pointerLayer) {
@@ -5163,7 +5171,7 @@ function drawFrame() {
   }
   // The item on the cursor and the world cel are drawn by the pointer layer in render(), after the
   // Esc menu -- the last draw of the frame, which is where retail's own pointer goes.
-  if (skillSelectRenderer && engine && !clearScreen) { try { skillSelectEvidence = skillSelectRenderer.draw(ctx, w, h, snapOr('skillChoices', readSkillChoices), snapOr('selectedSkills', readSelectedSkills),
+  if (sceneChrome().skillSelect) { try { skillSelectEvidence = skillSelectRenderer.draw(ctx, w, h, snapOr('skillChoices', readSkillChoices), snapOr('selectedSkills', readSelectedSkills),
     { act: snapshot.act, hotkeys: snapOr('hotkeys', () => Array.from({ length: 8 }, (_, i) => ({ skill: Number(view.hotkeySkill(i)), left: Boolean(view.hotkeyHand(i)) }))), skillStrings: skillStringsSnap, plateState: skillPlateState(), line: (i) => (i ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) : '') }); } catch (error) { skillSelectError = String(error); } }
   else if (clearScreen) { skillSelectEvidence = null; skillSelectError = ''; }
   orbReadoutEvidence = !clearScreen && session && hoverFont
