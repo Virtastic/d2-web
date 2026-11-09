@@ -151,21 +151,4 @@ extern "C" uint32_t d2_client_7b4f0(uint16_t* out, const char* s, uint32_t lang)
     return 1;
 }
 
-// 1.13c D2Client+0x7B580
-extern "C" void d2_client_7b580(uint32_t now, uint32_t color_unused, int32_t boxX) {
-    (void)color_unused;
-    if (!g_3aae) return;
-    d2_win_set_font(0);
-    for (Msg* m = g_3aaa; m; m = m->next) { (void)boxX; (void)m; }  // ponytail: draw pass pinned by FUNCTION capture; layout reads register state
-    Msg *prev = nullptr, *m = g_3aaa;
-    while (m) {
-        if (m->expiry < now) {
-            g_3aae--; Msg* nx = m->next;
-            if (g_3aaa == m) g_3aaa = nx;
-            for (int i = 0; i < 6; i++) if (m->s[i]) d2_fog_free(m->s[i], 0x6af);
-            d2_fog_free(m, 0x6b2);
-            m = nx; if (prev) prev->next = nx;
-        } else { prev = m; m = m->next; }
-    }
-    d2_win_set_font(0);
-}
+// 1.13c D2Client+0x7B580: ported in d2client_7b580.cpp

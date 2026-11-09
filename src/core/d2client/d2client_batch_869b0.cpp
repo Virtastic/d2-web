@@ -91,14 +91,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_87160(int32_t eax, int32_t esi, c
     e->hfin(ctx, out);
 }
 
-// 1.13c D2Client+0x87230 -- hex-format 16 bytes, copy 5-byte tag, ask the Warden ctx slot +0xD0
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_87230(const uint8_t* key16, D2cWarden* w, const D2cWardenEnv* e,
-                                                     void (*slot_d0)(void*, void*, int32_t, int32_t), void* ret) {
-    char hex[33]; uint8_t tag[8];
-    for (int i = 0; i < 16; i++) snprintf(hex + i * 2, 3, "%02x", key16[i]);
-    e->ord501(tag, w->sig5, 5);
-    if (w->ctx) { uint8_t ft[8] = {0}; slot_d0(ret, ft, -1, -1); }  // GetSystemTimeAsFileTime -> slot
-}
+// 1.13c D2Client+0x87230: ported in d2client_87230.cpp
 
 
 static void d2c_drop(D2cWardenNode*& n, const D2cWardenEnv* e) {

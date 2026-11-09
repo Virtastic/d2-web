@@ -48,11 +48,11 @@ uint32_t d2_client_74770(uint32_t unit, int32_t idx, uint32_t extra, uint32_t tb
     m[11] = (uint32_t)idx; m[12] = extra;
     uint32_t dx = e->c1630(unit) - x;
     uint32_t dy = e->c1660(unit) - y;
-    m[8] = x - dy; m[9] = dx + y;
+    m[7] = x - dy; m[8] = dx + y;   // retail [esp+0x48]/[esp+0x4c] of the block at esp+0x2c
     e->b30f0(m);
-    m[8] = dy + x; m[9] = y - dx;
+    m[7] = dy + x; m[8] = y - dx;
     e->b30f0(m);
-    m[4] = (uint32_t)sk; m[8] = 0; m[9] = 0; m[0] = 1;
+    m[4] = (uint32_t)sk; m[7] = 0; m[8] = 0; m[0] = 1;
     e->b30f0(m);
     return 1;
 }
