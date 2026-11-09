@@ -154,41 +154,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE P d2_client_835c0(D2cItem83* s, const D2cItem83E
     return r;
 }
 
-// 1.13c D2Client+0x83790 (pkt in EAX)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_83790(D2cItem83* s, const D2cItem83Env* e, const uint8_t* pkt) {
-    uint8_t buf[24];
-    e->decode(pkt + 0xd, rd<uint8_t>(pkt, 2) - 0xd, 0, buf);
-    P pl = e->findPlayer(rd<uint32_t>(pkt, 9), rd<uint8_t>(pkt, 8));
-    if (!pl) return;
-    e->hashRemove(rd<uint32_t>(pkt, 4));
-    P it = e->fn333f0(pkt, buf);
-    if (!it) { e->fatal(0xd35); return; }
-    e->o10887(it, 0x46, 1, 0);
-    P owner = (P)(uintptr_t)rd<uint64_t>(pl, 0x60);   // retail piVar2[0x18]
-    setCur(s, e, owner, it);
-}
-
-// 1.13c D2Client+0x83880 (pkt in EAX, pos in EDI)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_83880(D2cItem83* s, const D2cItem83Env* e, const uint8_t* pkt, uint32_t edi) {
-    uint8_t buf[24];
-    e->decode(pkt + 0xd, rd<uint8_t>(pkt, 2) - 0xd, 0, buf);
-    P pl = e->findPlayer(rd<uint32_t>(pkt, 9), rd<uint8_t>(pkt, 8));
-    if (!pl) return;
-    P it = findItem(s, e, rd<uint32_t>(pkt, 4));
-    if (!it) it = e->fn333f0(pkt, buf);
-    else { e->fn32820(edi & 0xffff, edi >> 16); e->o10012(it, buf[0]); }
-    P owner = (P)(uintptr_t)rd<uint64_t>(pl, 0x60);
-    if (!owner) { e->fatal(0xb34); return; }
-    if (e->o10405(owner, it, 1)) {
-        if (!e->flagTest(rd<uint32_t>(it, 0x14), 8)) {
-            P po = (P)(uintptr_t)rd<uint64_t>(s->player, 0x60);
-            if (!po) { e->fatal(0xb3a); return; }
-            e->setCursor(po, nullptr); e->getCursor(po); e->fn62d0();
-        }
-        e->fn31ff0();
-    }
-    e->fn31aa0();
-}
+// 0x83790 and 0x83880 are ported to d2client_83790.cpp and d2client_83880.cpp.
 
 // 1.13c D2Client+0x839E0 (pkt in EAX)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_839e0(D2cItem83* s, const D2cItem83Env* e, const uint8_t* pkt) {

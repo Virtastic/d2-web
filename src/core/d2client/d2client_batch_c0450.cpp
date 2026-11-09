@@ -1,4 +1,4 @@
-// D2Client 0xC0450..0xC2F40 batch: env-seam implementations from the decompile.
+// D2Client 0xC0450..0xC2790 batch: env-seam implementations from the decompile.
 // Globals are retail VAs (image base 0x6fb50000) read/written through Env; unrecovered callees and imported
 // ordinals are Env function pointers (names positional: fNNNN = D2Client RVA, oNNNNN = ordinal).
 #include <cstdint>
@@ -215,29 +215,6 @@ void sub_C2D10(const Env& e) {
  if (e.rd32(0x6fbd349c) == 1) { e.wr32(0x6fbd349c, 0); e.fecc60(e.o10048(), e.tbl_fba51bc); }
  e.f13d90();
  freeHandle(e, 0x6fbcc544);
-}
-// 1.13c D2Client+0xC2F40  (switch table PTR_DAT_6fb8d538 at 0x6fb8d538, stride 4; panel +0x54 = kind)
-void sub_C2F40(const Env& e) {
- uint8_t sc[4];
- if (e.o423("Diablo II", "Mini Panel", 1, (P)sc)) return;
- uint32_t old = e.rd32(0x6fbaadd4);
- e.o10227();
- int32_t cnt = (int32_t)e.rd32(0x6fb8d5d0);
- if (cnt != 0x26) { fatalExit(e); return; }
- if (old == 0) {
-  if (e.rd32(0x6fbc3a68)) return;
-  for (int32_t i = 0; i < cnt; i++) {
-   if (e.rd32(0x6fbaad80 + i * 4) != 1) continue;
-   uint32_t k = e.rd32(e.rd32(0x6fb8d538 + i * 4) + 0x54);
-   if (k == 1) e.f72790(i, 1, 0);
-   else if (k == 4) { if (e.rd8(0x6fbc9721)) e.faf7b20(); }
-   else if (k != 0) return;
-  }
- }
- uint32_t cur = old; uint32_t pl = e.rd32(0x6fbcbbfc);
- if (!pl || (e.rd32(pl) == 0 && e.f55440() == 0)) { cur = (cur == 0); e.wr32(0x6fbaadd4, cur); }
- if (old == 0) { if (cur) e.feccc0(e.o10048(), e.tbl_fb80864); }
- else if (!cur) e.fecc60(e.o10048(), e.tbl_fb80864);
 }
 
 // ---- G-trace seam for the loading-screen frame (D2Client+0xC1760), a retail recording-g tick 1 ----

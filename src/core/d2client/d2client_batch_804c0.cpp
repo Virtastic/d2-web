@@ -103,43 +103,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_80700(D2cB8G* g, const D2cB8Env* 
     wr<int32_t>(p, 0x20, 3);
 }
 
-// 1.13c D2Client+0x80F60
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_80f60(D2cB8G* g, const D2cB8Env* e, uint64_t* seed) {
-    if (g->rainMode) e->ord10083((uint32_t)g->trigHandle);
-    uint8_t* p = rd<uint8_t*>(g->ctx, 0x11c);
-    for (int32_t i = 0; i <= rd<int32_t>(g->ctx, 0x110); i++, p += 0x28) {
-        if (rd<int16_t>(p, 0) == 0) continue;
-        e->ftol();
-        e->ord10083((uint32_t)g->trigHandle);
-        int32_t d = e->ftol();
-        e->ord10084((uint32_t)g->trigHandle);
-        int32_t t = rd<int32_t>(p, 8) + (e->ftol() - g->tickDY);
-        wr<int32_t>(p, 8, t);
-        if (rd<int32_t>(p, 0xc) < t) { wr<int16_t>(p, 0x1c, 1); wr<int16_t>(p, 0x1e, 0); }
-        if (rd<int32_t>(p, 0x1c) != 0) {
-            if (rd<int32_t>(p, 0x20) == 0) {
-                e->ord10065();
-                if (rd<int32_t>(g->ctx, 0x114) < g->maxLive) d2_client_80700(g, e, seed);
-            } else {
-                d = 0; wr<int16_t>(p, 0x14, 0); wr<int16_t>(p, 0x16, 0);
-                wr<int32_t>(p, 0x20, rd<int32_t>(p, 0x20) - 1);
-            }
-        }
-        if (rd<int16_t>(p, 0) != 0) {
-            if (g->rainMode && rd<int32_t>(p, 0x1c) == 0) {
-                e->ord10084((((uint32_t)g->frame << 9) / 0x19 + rd<int32_t>(p, 0x18)) & 0x1ff);
-                d += e->ftol();
-            }
-            int32_t w = g->cellW;
-            d = (rd<int32_t>(p, 4) - g->tickDX) + d;
-            wr<int32_t>(p, 4, d);
-            if (w <= d) wr<int32_t>(p, 4, d - w);
-            if (rd<int32_t>(p, 4) < 0) wr<int32_t>(p, 4, rd<int32_t>(p, 4) + w);
-        }
-    }
-    g->frame++;
-}
-
 // 1.13c D2Client+0x81D70
 extern "C" EMSCRIPTEN_KEEPALIVE int d2_client_81d70(D2cB8G* g, const D2cB8Env* e, const uint8_t* unit) {
     int r = 0;

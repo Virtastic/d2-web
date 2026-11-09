@@ -94,7 +94,7 @@ struct Env {
     void (*fn7c730)(); void (*fn7c770)(); void (*fn72790)(uint32_t,uint32_t,uint32_t);
     void (*fn7b20)(); void (*ord10227)(); uint32_t (*fn55440)();
     // 7FE80
-    int32_t (*ord10047)(); int32_t (*cellW)(uint32_t); int32_t (*cellH)(uint32_t);
+    int32_t (*ord10047)(); float (*cosF)(int32_t); float (*sinF)(int32_t);   // Fog 10083 / 10084 (x87 ST0 in retail)
     void (*line10010)(int32_t,int32_t,int32_t,int32_t,uint8_t,uint8_t);
 };
 static G g; static Env e;
@@ -451,7 +451,8 @@ void sub_7FE80() {
         uint8_t c1 = (uint8_t)rd16(e0, 0x24), c2 = e0[0x25];
         if (!g.cbf78) {
             if (rd32(e0, 0x1c) == 0) {
-                int32_t w = e.cellW(g.c3918), h = e.cellH(g.c3918);
+                int32_t mul = (int32_t)rd32(e0, 0x10);   // fimul dword [esi+0x10]; the product is exact in the x87 extended format, _ftol truncates
+                int32_t w = (int32_t)((long double)e.cosF((int32_t)g.c3918) * mul), h = (int32_t)((long double)e.sinF((int32_t)g.c3918) * mul);
                 int32_t span = (int32_t)rd32(e0, 0xc) - y;
                 if (span < h) { w = (span * w) / h; h = span; }
                 int32_t x2 = w + x, y2 = h + y;

@@ -177,34 +177,7 @@ static void unlinkUnit(const D2cGlob82* g, const D2cEnv82* e, uint32_t id) {
 }
 
 // 1.13c D2Client+0x82C60   (param_1 = pkt)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82c60(const D2cGlob82* g, const D2cEnv82* e, const uint8_t* p1) {
-    uint32_t n = rd<uint8_t>(p1, 2) - 8;
-    uint8_t loc[24];
-    e->ord(11105, P(p1 + 8), n, 0, P(loc));
-    uint8_t* pl = g->player;
-    if (!pl) { e->fatal(0x92c); return; }
-    uint8_t* u = findUnit(g, e, rd<uint32_t>(p1, 4), 4);
-    uint32_t h = rd<uint32_t>(pl, 0x60);
-    if (!h) { e->fatal(0x931); return; }
-    U f = e->ord(10646, h, P(u), 0, 0);
-    if (!f) return;
-    if (f != P(u)) { e->fatal(0x93a); return; }
-    e->ord(10267, h, rd<uint16_t>(loc, 0), 0, 0);
-    e->fn(0x26410, 0, 0, 0, 0);
-    if ((n & 0xffff) < 4) g->slot484[n & 0xffff] = 0;
-    if (rd<int32_t>(pl, 0) == 0) e->ord(10061, rd<uint32_t>(pl, 0x60), 0, 0, 0);
-    if (!e->ord(10202, P(u), 0x100, 0x96, 0)) e->ord(11127, P(pl), P(u), 0, 0);
-    if (!e->ord(10197, 0, 0x20, 0, 0)) {
-        e->fn(0x82980, 0, h & 0xff, 0, 0);
-        e->ord(10466, h, P(u), 0, 0);
-        e->ord(11017, h, 0, 0, 0);
-        e->fn(0x162d0, 0, 0, 0, 0);
-        e->fn(0x81aa0, 0, 0, 0, 0);
-        return;
-    }
-    unlinkUnit(g, e, rd<uint32_t>(p1, 4));
-    g->g834[0] = 0; g->g834[3] = 1; g->g834[1] = 5; g->g834[2] = 0;   // b834,b864,b854,b858
-}
+// ported to d2client_82c60.cpp
 
 // 1.13c D2Client+0x82E10   (ESI = pkt)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82e10(const D2cGlob82* g, const D2cEnv82* e, const uint8_t* esi) {

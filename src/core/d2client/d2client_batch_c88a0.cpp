@@ -283,3 +283,20 @@ uint32_t sub_CA496(const Env& e, X80 st0, X80 st1) { return sub_C9EE0(e, st0, st
 // 1.13c D2Client+0xCA4A9 (__fdivrp_sti_st: ST1 first)
 uint32_t sub_CA4A9(const Env& e, X80 st0, X80 st1) { return sub_C9EE0(e, st1, st0); }
 } // namespace d2client_batch_c88a0
+// 1.13c D2Client+0xC9EE0 entry with the classifier's two pieces of module state made explicit: the 16-byte
+// risk table at DAT_6fbaa420 (tbl) and the scale at DAT_6fbaa438 (float 2^63). The scale step runs with the
+// control word forced to 64-bit precision, so a denormal times 2^63 is exact: the mantissa shifts left until
+// its top bit is set and the biased exponent becomes 64 - shift (always >= 1, so one pass normalises).
+namespace {
+uint32_t rd8_host(uintptr_t a) { return *(const uint8_t*)a; }
+void scale80_2p63(uint32_t& lo, uint32_t& hi, uint16_t& se) {
+ uint64_t m = ((uint64_t)hi << 32) | lo; uint32_t s = 0;
+ while (!(m >> 63)) { m <<= 1; s++; }
+ lo = (uint32_t)m; hi = (uint32_t)(m >> 32); se = (uint16_t)((se & 0x8000) | (64 - s));
+}
+}
+extern "C" uint32_t d2c_c9ee0(const uint8_t* tbl, uint32_t alo, uint32_t ahi, uint32_t ase, uint32_t blo, uint32_t bhi, uint32_t bse) {
+ using namespace d2client_batch_c88a0;
+ Env e{}; e.rd8 = rd8_host; e.tblAA420 = (P)(uintptr_t)tbl; e.scale80 = scale80_2p63;
+ return sub_C9EE0(e, X80{alo, ahi, (uint16_t)ase}, X80{blo, bhi, (uint16_t)bse});
+}

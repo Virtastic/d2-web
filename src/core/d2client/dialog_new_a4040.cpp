@@ -1,73 +1,58 @@
-// 1.13c D2Client+0xA4040 (663 B): modal dialog-box node constructor, from the cached decompile.
-// Node = 0x2C4 dwords (retail 32-bit layout, byte-addressed); imports/globals are host seams.
+// 1.13c D2Client+0xA4040 (663 B): modal dialog-box node constructor, read off the disassembly.
+// stdcall, six stack words (ret 0x18): a1/a2 position, a3 kind (0 = none), a4, a5 name index (the node is built only
+// when a5 < 1), a6. Module globals are reached at base + RVA; callees go through Env::H with the registers and stack
+// words retail passes. The node is 0xB10 bytes from the allocator (ECX size, EDX file string, stack line and 0).
 #include <cstdint>
-#include <cstring>
-#include <emscripten.h>
+#include <initializer_list>
+#include "cl_env.h"
 
-struct D2ClientDlgA4040Env {
-    uint32_t* g_ba46c4; uint32_t* g_ba46c8;        // 0x6FBA46C4/C8 (set 0x10)
-    uint32_t* g_90ea0;                             // 0x6FB90EA0 (=0)
-    uint32_t* g_90ea8_ebc;                         // 0x6FB90EA8..EBC, 6 dwords (=-1)
-    uint32_t* g_bcbc28_2c_38_3c;                   // 0x6FBCBC28,2C,38,3C (4 dwords =0)
-    uint32_t* g_bcc3dc_e0_f8_fc;                   // 0x6FBCC3DC,E0,F8,FC (4 dwords =0)
-    uint32_t* g_bcc2f8_f4;                         // 0x6FBCC2F8,F4 (2 dwords =0)
-    uint32_t* g_bcbc08;                            // dialog count
-    uint32_t* g_bcbc00;                            // list head (node ptr as uint32)
-    uint32_t* g_bcbc04;                            // =1
-    uint32_t* g_bbb208;                            // ++
-    uint32_t  g_baada8;                            // 0x6FBAADA8
-    void (*fn_ecc60)(uint32_t, uint32_t);          // D2Client+0x3CC60 (release)
-    void (*fn_eccc0)(uint32_t, uint32_t);          // D2Client+0x3CCC0
-    uint32_t (*ord10048)();
-    uint8_t* (*ord10042)(uint32_t id, uint32_t z); // Fog alloc(0x399,0)
-    uint32_t (*getTick)();
-    void (*fmtPath)(char* buf, const char* name);  // sprintf("%s\\ui\\menu\\%s","DATA\\GLOBAL",name)
-    const char* const* nameTbl;                    // PTR table 0x6FB8E920
-    uint32_t (*sub2b420)(uint32_t zero);           // returns char* handle
-    uint32_t (*ord10021)(uint32_t* frame18);
-    uint32_t (*ord10060)(uint32_t);
-    uint32_t (*ord10000)(uint32_t);
-    void (*sub53a20)(uint32_t);                    // D2Client+0xA3A20
-    uint32_t (*sub42090)();                        // D2Client+0x42090
-    void (*fatal)(uint32_t id);                    // Ordinal_10265 + 10024 + _exit(-1)
-    uint32_t datB80780, datB8E858, datB8E900;
-};
+namespace {
+constexpr uint32_t kRun = 0xFADA8, kHead = 0x11BC00, kOpen = 0x11BC04, kCount = 0x11BC08, kSeq = 0x10B208, kNames = 0xDE920;
+constexpr uint32_t kTick = 0xCEF5C;   // kernel32!GetTickCount IAT slot
+void fatal(const cl::Env& e, uint32_t base, uint32_t code) {
+    uint32_t v = e.H(0xbf92, code);
+    e.H(0xbf80, base + 0xd359f, v);
+    e.H(0x3664, 0xffffffffu);          // exits in retail; returns only under a recorder
+}
+}
 
 // 1.13c D2Client+0xA4040
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t* d2_client_a4040(
-    uint32_t p1, uint32_t p2, int32_t p3, uint32_t p4, int32_t p5, D2ClientDlgA4040Env* e) {
-    if (e->g_baada8) e->fn_ecc60(e->ord10048(), e->datB80780);
-    *e->g_ba46c8 = 0x10; *e->g_ba46c4 = 0x10; *e->g_90ea0 = 0;
-    for (int i = 0; i < 6; i++) e->g_90ea8_ebc[i] = 0xffffffffu;
-    for (int i = 0; i < 4; i++) e->g_bcbc28_2c_38_3c[i] = 0;
-    for (int i = 0; i < 4; i++) e->g_bcc3dc_e0_f8_fc[i] = 0;
-    e->g_bcc2f8_f4[0] = 0; e->g_bcc2f8_f4[1] = 0;
-    if (p3 == 0 || p5 > 0) return 0;
-    ++*e->g_bcbc08;
-    uint32_t* n = (uint32_t*)e->ord10042(0x399, 0);
-    memset(n, 0, 0x2c4 * 4);
-    n[0x2c3] = *e->g_bcbc00;
-    memset(n, 0, 0x2c4 * 4);                       // retail clears twice; [0x2c3] ends 0
-    *e->g_bcbc00 = (uint32_t)(uintptr_t)n;
-    n[0xd] = 0; n[0xe] = 0; n[0x14] = 0; n[0x13] = 0; n[0x11] = 0xffffffffu;
-    n[0x17] = 2; n[0xb] = 0; n[0xc] = 0; n[0x2c2] = 0;
-    n[0x18] = p1; n[0x19] = p2; n[0x16] = 0; n[5] = 0;
-    n[0] = e->getTick();
-    n[6] = p4; n[0x12] = 0xffffffffu; n[4] = 0; n[0x15] = 0; n[3] = 1;
-    char buf[252];
-    e->fmtPath(buf, e->nameTbl[p3]);
-    n[2] = e->sub2b420(0);
-    uint32_t f[0x12] = {};                         // f[0xc]=DStack_10, f[0xd]=DStack_c after the call
-    uint32_t h = e->ord10021(f);
-    if (!h) { e->fatal(0x3b6); return 0; }
-    n[0xd] = e->ord10060(h);
-    n[0xe] = e->ord10000(h);
-    n[9] = f[0xc]; n[10] = f[0xd]; n[0xb] = f[0xc]; n[0xc] = f[0xd];
-    *e->g_bcbc04 = 1;
-    e->sub53a20(f[0xc]);
-    e->fn_eccc0(e->ord10048(), e->datB8E858);
-    if (e->sub42090() & 0xff) e->fn_eccc0(e->ord10048(), e->datB8E900);
-    ++*e->g_bbb208;
-    if (*e->g_bcbc08 != 1) { e->fatal(0x3ce); return 0; }
+extern "C" uint32_t d2c_a4040(const cl::Env& e, uint32_t base, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4,
+                              int32_t a5, uint32_t a6) {
+    if (e.R(base + kRun)) { uint32_t s = e.H(0xd0b4, base + 0xd0780); e.H(0x3cc60, s, 0, 0, 0, 0, 5); }
+    e.W(base + 0xF46C8, 0x10); e.W(base + 0xF46C4, 0x10);
+    e.W(base + 0xE0EA0, 0);
+    for (uint32_t o = 0xE0EA8; o <= 0xE0EBC; o += 4) e.W(base + o, 0xffffffffu);
+    for (uint32_t o : { 0x11BC28u, 0x11BC2Cu, 0x11BC38u, 0x11BC3Cu, 0x11C3DCu, 0x11C3E0u, 0x11C3F8u, 0x11C3FCu, 0x11C2F8u, 0x11C2F4u })
+        e.W(base + o, 0);
+    if (a3 == 0 || a5 >= 1) return 0;
+    e.W(base + kCount, e.R(base + kCount) + 1);
+    uint32_t n = e.H(0xbf7a, 0x399, 0, 0, 0, 0, 0, 0xb10, base + 0xd41d4);
+    for (uint32_t o = 0; o < 0xb10; o += 4) e.W(n + o, 0);
+    e.W(n + 0xb0c, e.R(base + kHead));
+    for (uint32_t o = 0; o < 0xb10; o += 4) e.W(n + o, 0);   // retail clears twice; the list link ends 0
+    e.W(base + kHead, n);
+    e.W(n + 0x34, 0); e.W(n + 0x38, 0); e.W(n + 0x50, 0); e.W(n + 0x4c, 0); e.W(n + 0x44, 0xffffffffu);
+    e.W(n + 0x5c, 2); e.W(n + 0x2c, 0); e.W(n + 0x30, 0); e.W(n + 0xb08, 0);
+    e.W(n + 0x60, a3); e.W(n + 0x64, a4); e.W(n + 0x58, 0); e.W(n + 0x14, 0);
+    e.W(n, e.H(kTick));
+    e.W(n + 0x18, a6); e.W(n + 0x48, 0xffffffffu); e.W(n + 0x10, 0); e.W(n + 0x54, 0); e.W(n + 0xc, 1);
+    char buf[0x100];
+    uint32_t pb = (uint32_t)(uintptr_t)buf;
+    e.H(0x3146, pb, base + 0xd41c4, base + 0xd357c, e.R(base + kNames + (uint32_t)a5 * 4));
+    e.W(n + 8, e.H(0x2b420, 0, 0, 0, 0, 0, pb));
+    uint32_t f[0x12] = {};
+    f[0xd] = e.R(n + 8);
+    uint32_t h = e.H(0xc0e8, (uint32_t)(uintptr_t)f);
+    if (!h) fatal(e, base, 0x3b6);
+    e.W(n + 0x34, e.H(0xc0d6, h));
+    e.W(n + 0x38, e.H(0xc0e2, h));
+    e.W(n + 0x24, a1); e.W(n + 0x28, a2); e.W(n + 0x2c, a1); e.W(n + 0x30, a2);
+    e.W(base + kOpen, 1);
+    e.H(0xa3a20);
+    e.H(0x3ccc0, e.H(0xd0b4, base + 0xde858), 0, 0, 0, 0, 0xe);
+    if (e.H(0x42090)) e.H(0x3ccc0, e.H(0xd0b4, base + 0xde900), 0, 0, 0, 0, 1);
+    e.W(base + kSeq, e.R(base + kSeq) + 1);
+    if (e.R(base + kCount) != 1) fatal(e, base, 0x3ce);
     return n;
 }

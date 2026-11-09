@@ -143,37 +143,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2c_814f0(const D2cB69Env* e, uint32_t param) {   /
     return 0;
 }
 
-// 1.13c D2Client+0x81750
-EMSCRIPTEN_KEEPALIVE void d2c_81750(const D2cB69Env* e, int32_t act) {  // act = entry EAX, pushed to both 10459 calls
-    d2c_814f0(e, 1);
-    if (*e->g_d3444 == 0) { e->f80be0(); *e->g_d3444 = 1; }
-    *e->g_c38c4 = 0x1d4c; *e->g_c38c8 = 0xfa; *e->g_c38cc = 3000; *e->g_c38d0 = 0x7d;
-    if (e->ord10459(act) == 2) *e->g_c38cc *= 3;
-    if (e->ord10459(act) == 4) *e->g_c38cc *= 3;
-    *e->g_c38b4 = 3000; *e->g_c38ac = 0x1d4c; *e->g_c38b0 = 0xfa; *e->g_c38b8 = 0x32;
-    int32_t i7 = 0, i9 = 0, i6 = 0, i8 = 0;
-    do {
-        int8_t c5 = (int8_t)(i9 / 12), c1 = (int8_t)(-c5 + 'b');
-        e->g_c38d4[i7] = e->ord10190(c1, (int8_t)(-c5 + '{'), c1);
-        c1 = (int8_t)-(i8 / 12); int8_t c3 = (int8_t)(c1 + '-');
-        e->g_c38a0[i7] = e->ord10190(c3, (int8_t)(c1 + '7'), c3);
-        c1 = (int8_t)-(i6 / 12); c3 = (int8_t)(c1 + 0x19);
-        e->g_c38f8[i7] = e->ord10190(c3, (int8_t)(c1 + 0x1e), c3);
-        c1 = (int8_t)(c5 + 'x');
-        e->g_c38e0[i7] = e->ord10190(c1, c1, c1);
-        c5 = (int8_t)(c5 - 0x56);
-        e->g_c3940[i7] = e->ord10190(c5, c5, c5);
-        i8 += 0x28; i9 += 0x50; i7++; i6 += 0x18;
-    } while (i8 < 0x1e0);
-    char buf[268];
-    static const char* const rain[4] = {"Rain1", "Rain2", "Rain3", "Rain4"};
-    static const char* const bub[4] = {"bubble1", "bubble2", "bubble3", "bubble4"};
-    for (int k = 0; k < 4; k++) { e->fmt_overlay(buf, rain[k]); e->g_rain[k] = e->fadb380(buf, 0); }
-    for (int k = 0; k < 4; k++) e->g_rainH[k] = e->ord10086(e->g_rain[k]);
-    for (int k = 0; k < 4; k++) { e->fmt_overlay(buf, bub[k]); e->g_bub[k] = e->fadb380(buf, 0); }
-    for (int k = 0; k < 4; k++) e->g_bubH[k] = e->ord10086(e->g_bub[k]);
-    *e->g_c38f4 = 0;
-}
+// 1.13c D2Client+0x81750: ported to d2client_81750.cpp
 
 // 1.13c D2Client+0x8F430
 EMSCRIPTEN_KEEPALIVE void d2c_8f430(const D2cB69Env* e) {
