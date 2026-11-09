@@ -58,6 +58,7 @@ src/core/fn/*
 !src/core/fn/d2game_3cb00.cpp
 !src/core/fn/d2game_6f930.cpp
 !src/core/fn/d2client_a4b60.cpp
+!src/core/fn/d2client_c1760.cpp
 !src/core/fn/d2game_78550.cpp
 !src/core/fn/d2game_9ec80.cpp
 !src/core/fn/d2game_gp.h

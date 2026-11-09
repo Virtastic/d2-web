@@ -38,4 +38,5 @@ struct Env {
  void (*freeFile)(P, P, int32_t, int32_t); void (*o10065cl)(uint8_t); void (*o10024w)(uint32_t); void (*f31750a)(uint32_t);
 };
 void sub_C0CE0(const Env& e);
+void sub_C1760(const Env& e, int32_t p);   // the join loading-screen frame: one stdcall word
 } // namespace d2client_batch_c0450
