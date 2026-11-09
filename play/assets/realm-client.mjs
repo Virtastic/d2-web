@@ -929,9 +929,11 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
       return call('d2_realm_client_set_quest_flags', 'number', ['bigint', 'number'], [BigInt(P), bytes.length]);
     },
     // The stats of a hire offer (S2C 0x4E: name id, seed) for the selected player, or null: { level, life, def, cost, id, exp }.
-    // GUESS, the hire roll: the seed and the difficulty are taken as the server sends them. Whether retail rolls the
-    // stats client-side from the same seed, and with which difficulty, is not recovered.
-    // capture: d2client/5c7f0 -- the hire roll for one (name id, seed, difficulty) and the stats it returns; no descriptor yet.
+    // The roll is the server's. The game rolls each hire at purchase, with the game's difficulty and the hirer's level, in the
+    // shared monster-roll routine; the client does not roll offers. The offer rows draw only the portrait, the name and the
+    // owned count. The seed and the difficulty are the server's inputs, as the server sends them.
+    // Open: the Lvl/Life/Def/Cost header is drawn by this file, and the hirer's level term has not been pinned against a
+    // player unit with a level stat.
     d2gsClientHireStats: (mercName, seed, expansion) => {
       const at = Number(P);
       if (!call('d2_realm_client_hire_stats', 'number', ['number', 'number', 'number', 'bigint'], [mercName, seed, expansion ? 1 : 0, BigInt(P)])) return null;

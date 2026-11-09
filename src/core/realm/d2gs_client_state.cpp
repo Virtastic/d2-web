@@ -1396,10 +1396,10 @@ static void unit_remove_cb(uintptr_t, uint32_t, uint32_t guid, uint32_t type) {
 
 // 0x0E and 0x17: the unit-queue handlers (D2Client+0xAF560 / +0xAF240) resolve the named unit and hand
 // the request to the action dispatch. TODO: objects have no CUnit here, so an object target is skipped.
-// The 0x17 handler loads the packet word at +8 and reads the u16 at that address in the client's own
-// memory: the value is process memory a server packet names, which a wasm port has no defined equivalent
-// for. No server sender of 0x17 is in the client's table of well-formed packets.
-// GUESS: 0 stands in for the read; no fixture can pin it from a server packet.
+// The 0x17 handler reads the u16 at the address that the word at +8 names, and the same for the word at +10; the two
+// loaded u16s are the pair it passes on. So those words are client-memory addresses, not packet data: below 0x10000 the
+// read is unmapped and the client faults. No server sender of 0x17 is in the client's table of well-formed packets.
+// GUESS: 0 stands in for both reads; the native capture cannot run that branch.
 static uint16_t unit_queue_rd16(uint32_t) { return 0; }
 static int apply_unit_queue_packet(const uint8_t* packet, int length) {
     const bool is0e = packet[0] == 0x0e;
