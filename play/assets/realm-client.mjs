@@ -592,7 +592,7 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
       const deny = readD2gsDeny(packet);
       if (deny) throw d2gsDenyError(deny.code, (charClass ?? 0) >= 5 || expansion);
       // The server's 0x02 (game load success) is answered with the one-byte 0x6B before it sends the world.
-      if (raw && packet[0] === 0x02 && !enterSent) { enterSent = true; transport.send(Uint8Array.of(0x6b)); }
+      if (packet[0] === 0x02 && !enterSent) { enterSent = true; transport.send(Uint8Array.of(0x6b)); }
       if (packet[0] === 0x15) {
         const reassignment = protocol.d2gsPlayerReassign?.(packet.subarray(0, packetLength));
         if (reassignment) joinReassignments.push({ offset: receiptScanAt, update: reassignment });
