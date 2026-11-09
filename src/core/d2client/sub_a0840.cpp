@@ -3,7 +3,7 @@
 
 struct D2cA0840Env {
     void* context;
-    // Reads the dword at D2Client+0xBEC54 + index*4 (retail table of two slots).
+    // Reads the dword at D2Client+0xDEC54 + index*4 (retail table of two slots).
     uint32_t (*slot)(void*, uint32_t index);
     // D2Client+0x214B0; ESI is the caller's, passed through untouched.
     uint32_t (*addEvent)(void*, uint32_t p1, uint32_t p2, uint32_t p3);
