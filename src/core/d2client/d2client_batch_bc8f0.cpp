@@ -84,7 +84,7 @@ int32_t sub_BCB90(const Env& e, P u, int32_t ebx) {
  if (o > 4) return o > 0x5f ? 0x5f : o;
  return 5;
 }
-// 1.13c D2Client+0xBDCA0
+// superseded by d2client_bdca0.cpp (D2Client BDCA0)
 void sub_BDCA0(const Env& e, P ev) {
  int32_t x = e.rd16(ev + 0xc), y = e.rd16(ev + 0xe);
  int32_t ox = i32(e, gOrgX), oy = i32(e, gOrgY), sh = i32(e, gScrH);

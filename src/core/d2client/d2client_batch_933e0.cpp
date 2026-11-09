@@ -99,7 +99,7 @@ void sub_97770(Env& e, Globals& g, Unit* (*find)(int32_t id)) {
   g.g_BCC98 = 0;
  }
 }
-// 1.13c D2Client+0x958A0  (grid render of one inventory panel; frame/colour logic summarised)
+// GUESS for D2Client 0x958A0, superseded by d2client_958a0.cpp (the retail register port)
 void sub_958A0(Env& e, Globals& g, Unit* panelUnit, int32_t panelKind, const Area* A, void* inv) {
  // panelKind 0: area chosen by g.panelId (1:B370 2:B288 3:B3C8 4:B398/B2D0 else B3E0); 1: B3B0; else return.
  if (panelKind != 0 && panelKind != 1) return;

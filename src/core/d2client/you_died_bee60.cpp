@@ -25,7 +25,7 @@ struct D2cBee60Env {
     void (*drawLine2)(int32_t x, int32_t y, int32_t a, int32_t b);           // 0x6fabd37e on string 0x13e7
 };
 extern "C" {
-// 1.13c D2Client+0xBEE60
+// superseded by d2client_bee60.cpp (D2Client BEE60)
 EMSCRIPTEN_KEEPALIVE void d2c_bee60(const D2cBee60Env* e) {
     int32_t* p = e->player;
     if (!p) return;

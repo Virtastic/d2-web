@@ -2,31 +2,7 @@
 // Called from 0x8B110. Imports/relocs are behind the Env; globals live in D2c8A6C0State (RVA = VA - 0x6FAB0000).
 #include <cstdint>
 #include <emscripten.h>
-struct D2c8A6C0Cell { uint32_t frame; uint32_t pad[12]; uint32_t cel; uint32_t pad2[4]; };  // 0x48 bytes
-static_assert(sizeof(D2c8A6C0Cell) == 0x48, "cell ctx");
-struct D2c8A6C0State {
-    uint32_t gate;        // 0x11C3A4: nonzero -> do nothing
-    uint32_t tickInit;    // 0x123708 bit0
-    uint32_t tickBase;    // 0x123704
-    uint8_t  baseInit;    // 0x123428
-    uint32_t delta;       // 0x12342C
-    uint32_t summitCel;   // 0x11BF1C
-    uint32_t cloudCel;    // 0x11BF20
-    uint8_t  cloudInit;   // 0x11BF28
-    uint32_t seedLo, seedHi;  // *PTR_DAT_6fb91308
-    int32_t  cloudPos[10];    // 0x10B9A0
-    int32_t  cloudY[10];      // 0x10B548
-    int32_t  cloudSpd[10];    // 0x10B570
-    int32_t  viewW;           // 0xF9E14 (+0x170 -> scroll limit)
-};
-struct D2c8A6C0Env {
-    uint32_t (*tick)();                                   // Ordinal_10651
-    uint32_t (*loadCel)(const char* path);                // D2Client+0x2B420
-    void (*drawCel)(D2c8A6C0Cell*, int32_t x, int32_t y, uint32_t color, uint32_t mode, uint32_t pal);  // Ordinal_10041
-    int32_t (*renderMode)();                              // Ordinal_10031
-    void (*seedInit)();                                   // Ordinals 10936/GetTickCount/10995/10614 (one-time)
-    uint32_t (*rand)(uint32_t* lo, uint32_t* hi);         // D2Client+0x1330 on the seed (count arg lost in decompile)
-};
+#include "sub_8a6c0.h"
 static int32_t smod(uint32_t v, uint32_t mask, uint32_t m) {  // x & 0x80000000|mask, signed-fixed as the compiler emits
     uint32_t r = v & (0x80000000u | mask);
     if ((int32_t)r < 0) r = ((r - 1) | ~mask) + 1;
@@ -36,11 +12,19 @@ static void step(D2c8A6C0State* s) {
     uint64_t v = (uint64_t)s->seedLo * 0x6ac690c5u + s->seedHi;
     s->seedLo = (uint32_t)v; s->seedHi = (uint32_t)(v >> 32);
 }
-extern "C" EMSCRIPTEN_KEEPALIVE void d2c_8a6c0(D2c8A6C0State* s, const D2c8A6C0Env* e) {
+// 1.13c D2Client+0x1330 (EAX = n, ECX = seed): n < 1 -> 0, seed untouched; else step, power of two -> (n-1)&lo, else lo % n.
+static uint32_t rand1330(D2c8A6C0State* s, int32_t n) {
+    if (n < 1) return 0;
+    step(s);
+    const uint32_t un = (uint32_t)n;
+    return (un & (un - 1)) ? s->seedLo % un : (un - 1) & s->seedLo;
+}
+// 1.13c D2Client+0x8A6C0 (ECX = self, passed on to the tick call)
+extern "C" EMSCRIPTEN_KEEPALIVE void d2c_8a6c0(D2c8A6C0State* s, const D2c8A6C0Env* e, uint32_t self) {
     if (s->gate) return;
-    if (!(s->tickInit & 1)) { s->tickInit |= 1; s->tickBase = e->tick(); }
+    if (!(s->tickInit & 1)) { s->tickInit |= 1; s->tickBase = e->tick(self); }
     if (!s->baseInit) { s->baseInit = 1; s->tickBase = 0x274f; }
-    s->delta = e->tick() - s->tickBase;
+    s->delta = e->tick(self) - s->tickBase;
     int32_t d = (int32_t)s->delta;
     int32_t i3 = d + (int32_t)((uint32_t)(d >> 31) & 7u);
     uint32_t u4 = (uint32_t)(i3 >> 3);
@@ -76,7 +60,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2c_8a6c0(D2c8A6C0State* s, const D2c8A6C0E
         if (!s->cloudInit) {
             e->seedInit();
             for (int i = 0; i < 10; i++) {
-                s->cloudPos[i] = (int32_t)e->rand(&s->seedLo, &s->seedHi);
+                s->cloudPos[i] = (int32_t)rand1330(s, (int32_t)((uint32_t)s->viewW << 4));
                 step(s); s->cloudY[i] = (int32_t)(s->seedLo % 0xfa);
                 step(s); s->cloudSpd[i] = (int32_t)((s->seedLo & 0xf) + 8);
             }
@@ -93,8 +77,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2c_8a6c0(D2c8A6C0State* s, const D2c8A6C0E
         for (int i = 0; i < 10; i++) {
             int32_t p = s->cloudPos[i];
             int32_t x = (p + ((uint32_t)(p >> 31) & 0xfu)) >> 4;
-            e->drawCel(&c, x, s->cloudY[i], 0xddddddddu, 3, 0);
-            e->drawCel(&c, x + 0x100, s->cloudY[i], 0xddddddddu, 3, 0);
+            c.frame = 0; e->drawCel(&c, x, s->cloudY[i], 0xddddddddu, 3, 0);
+            c.frame = 1; e->drawCel(&c, x + 0x100, s->cloudY[i], 0xddddddddu, 3, 0);
         }
     }
 }

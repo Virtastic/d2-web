@@ -34,7 +34,7 @@ void sub_BEB90(const Env& e) {
  uint8_t b[9] = {0x27, (uint8_t)v, (uint8_t)(v >> 8), (uint8_t)(v >> 16), (uint8_t)(v >> 24), (uint8_t)v, (uint8_t)(v >> 8), (uint8_t)(v >> 16), (uint8_t)(v >> 24)};
  e.f143e0(b, 9);
 }
-// 1.13c D2Client+0xBF0D0
+// superseded by d2client_bf0d0.cpp (D2Client BF0D0)
 void sub_BF0D0(const Env& e) {
  P u = e.rd32(e.gBBFC);
  P nm = u ? e.o10331(u) : 0;
@@ -127,7 +127,7 @@ void sub_BFA10(const Env& e, P ctx, P s) {
   else e.wr32(cell, x.def);
  }
 }
-// 1.13c D2Client+0xBFEC0  (in = EAX string; out/outSize = caller stack args)
+// superseded by d2client_bfec0.cpp (D2Client BFEC0)
 void sub_BFEC0(const Env& e, const W* in, W* out, int32_t outSize) {
  e.wr32(e.gBC58, e.rd32(e.gBC58) - 0x10);
  if (!in) return;
