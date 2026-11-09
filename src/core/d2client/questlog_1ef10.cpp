@@ -1,4 +1,4 @@
-// 1.13c D2Client+0x1EF10: the Quest Log panel's per-frame draw.
+// The quest log panel model (superseded by d2client_1ef10.cpp, the retail-form port of that function).
 // Background, the five act tabs, the per-quest icon rows and their sockets, the selected quest's title
 // and wrapped description, the buy/sell button and the two hover tooltips. No args, plain ret.
 // Every draw is D2Gfx#10041 (thunk +0xD096) with a zeroed 0x48-byte context (frame at +0x00, cel at

@@ -247,7 +247,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_20340(int32_t* param_1, uint32_t param_2, in
     }
 }
 
-// 1.13c D2Client+0x20620: __fastcall(param_1, param_2 /*EDX*/, param_3). param_3 == 0 returns.
+// The former 0x20620 port (now d2client_20620.cpp): __fastcall(param_1, param_2 /*EDX*/, param_3). param_3 == 0 returns.
 // Builds a 600-wide-character Unicode buffer (300 default constructions at stride 4), converts the
 // single space, then: for a live type-1 object, bit 2 of obj[5]+0x16 draws 10038(word at +0x26)
 // through 10971; bit 4 appends the 10003 strings via the format helper 0x90CB0 and prints. Otherwise
