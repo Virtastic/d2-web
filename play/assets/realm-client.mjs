@@ -636,7 +636,7 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
     // client state refuses a player assigned with no act. Feed the act first when it is here; when the engine
     // still refuses (the act or its rooms are not all here yet) read on and try again instead of failing a join
     // that would then retry against a spent ticket.
-    if (raw && handshakeEnd >= 0) {
+    if (handshakeEnd >= 0) {
       // The act, then every room reveal (0x07) of the burst, go ahead of the player: the player's room must be
       // active when the engine places it, and the stock server sends the reveals after the assignment.
       const act = findPacket(response, protocol, 0x03);
