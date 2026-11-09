@@ -575,6 +575,11 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
   if (typeof protocol.d2gsClientPlayerFeed !== 'function') throw new Error('engine D2GS client state is unavailable');
   protocol.d2gsClientPlayerReset?.();
   protocol.d2gsClientSetDifficulty?.(difficulty);
+  // The game server repeats its 2-byte AF greeting once the logon is accepted; it is not part of the frame stream.
+  if (!raw) {
+    const head = await reader.want(2, timeoutMs);
+    if (head[0] === 0xaf && head[1] <= 1) reader.skip(2);
+  }
   while (handshakeEnd < 0) {
     const frame = await nextFrame();
     decoded.push(...frame);
