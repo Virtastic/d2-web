@@ -74,8 +74,12 @@ export function uploadErrorText(e) {
 }
 
 // ---- drawing, in the door's 800x600 frame. `art` is the door art; `font(name, colour, text, x, top)` draws a door font ----
-const L = BNET_CONNECTING_LAYOUT;
-const OK = { x: 330, anchorY: 416, w: 128, h: 35 };   // the connecting popup's CANCEL slot, MediumButtonBlank
+// The connecting popup sits 8px left of the 800-wide frame's middle; the upload popup is centred (340 wide -> x 230).
+const DX = (800 - 340) / 2 - BNET_CONNECTING_LAYOUT.popup.x;
+const shift = (b) => ({ ...b, x: b.x + DX });
+const B = BNET_CONNECTING_LAYOUT;
+const L = { popup: shift(B.popup), title: shift(B.title), status: shift(B.status), dots: shift(B.dots) };
+const OK = { x: (800 - 128) / 2, anchorY: 416, w: 128, h: 35 };   // MediumButtonBlank in the connecting popup's CANCEL row, centred
 const wrap = (text, width, measure) => {   // D2Win's text box wrap, as bnet-connecting.mjs does it
   const lines = []; let line = null;
   for (const word of String(text).split(' ')) {
@@ -98,7 +102,7 @@ export function drawUploadModal(g, view, { art, measure, text, pressed = false, 
     return w;
   };
   if (art?.img.popup) { let x = L.popup.x; for (const i of [0, 1]) x += cel(art.img.popup, art.meta.popup, i, x, L.popup.anchorY); }
-  else { g.fillStyle = '#0b0a08'; g.fillRect(222, 202, 340, 224); g.strokeStyle = '#5a4a2a'; g.lineWidth = 2; g.strokeRect(223, 203, 338, 222); }
+  else { g.fillStyle = '#0b0a08'; g.fillRect(230, 202, 340, 224); g.strokeStyle = '#5a4a2a'; g.lineWidth = 2; g.strokeRect(231, 203, 338, 222); }
   const box = (font, colour, s, b) => {
     const lh = art?.meta.fonts[font]?.ch ?? 0, x = b.x + b.inset, w = b.w - 2 * b.inset, top = b.bottom - b.h + b.insetY;
     for (const [i, line] of wrap(s, w, (t) => measure(font, t)).entries())

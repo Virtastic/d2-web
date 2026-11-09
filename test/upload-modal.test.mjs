@@ -90,7 +90,8 @@ test('folder the browser will not read: reading, then an error that stays until 
   const modal = createUploadModal();
   await runUpload(modal, (step) => pickFolder({ step }), doorAdd(createCollection()));
   assert.deepEqual(shown(modal), ['reading|Reading Files|Reading the folder', 'error|Error|The browser did not allow reading these files.']);
-  assert.equal(uploadOkHit(modal.view, { x: 394, y: 400 }), true, 'OK sits in the connecting popup\'s button slot');
+  assert.equal(uploadOkHit(modal.view, { x: 400, y: 400 }), true, 'OK is centred in the popup');
+  assert.equal(uploadOkHit(modal.view, { x: 334, y: 400 }), false);
   assert.equal(uploadOkHit(modal.view, { x: 300, y: 300 }), false);
   assert.equal(modal.dismiss(), true);
   assert.equal(modal.view, null);
