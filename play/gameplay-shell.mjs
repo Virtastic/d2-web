@@ -4202,7 +4202,8 @@ const spClientView = {
   playerStat: (stat) => Module.ccall('d2_session_player_stat', 'number', ['number', 'number'], [stat, 0]),
   playerGold: () => Module.ccall('d2_session_player_gold', 'number', [], []),
   cursorItem: () => (Module._d2_session_cursor_item ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0),
-  itemBoxState: Module._d2_session_item_box_state ? (n) => Module._d2_session_item_box_state(n) : null,
+  // A getter: this literal evaluates when the module loads, before the boot script has created Module.
+  get itemBoxState() { return Module._d2_session_item_box_state ? (n) => Module._d2_session_item_box_state(n) : null; },
   stashGold: () => (Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [0]) : -1),
   weaponSet: () => (Module._d2_session_weapon_switch ? Module.ccall('d2_session_weapon_switch', 'number', [], []) : 0),
   weaponHands: () => (Module._d2_session_weapon_hands ? Module.ccall('d2_session_weapon_hands', 'number', [], []) : -1),
