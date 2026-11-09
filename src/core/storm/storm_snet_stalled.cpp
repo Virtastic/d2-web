@@ -235,6 +235,11 @@ int32_t Storm_Sub11F10(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d, uint3
     return Storm_Sub11F10Full(nullptr, scratch, a, b, c, d, e, f);
 }
 
+// capture seams for 0x12F40: the pacing stamp 0x6FC4583C, the queued-bytes counter 0x6FC41AB8 and a pinned clock (0 = live)
+uint32_t g_tickPin;
+extern "C" void storm_snet_pin_pace(uint32_t stamp, uint32_t sent, uint32_t tick) { g_4583c = stamp; g_41ab8 = sent; g_tickPin = tick; }
+extern "C" uint32_t storm_snet_sent(void) { return g_41ab8; }
+
 // Storm 0x12690 lives in storm_snet_n16.cpp (one definition; it owns the connection list).
 
 // 1.13c Storm+0x12740
@@ -330,13 +335,13 @@ uint32_t* Storm_Sub12F40Peer(uint8_t* ebx, uint8_t param_1, char param_2, const 
     else if (param_1 == 3) skip = true;
     else headOff = param_1 * 3u + 0x4c;
     if (!skip) {
-        node = Storm_Sub4EF0(0, 0, 0, A(ebx + headOff * 4));
+        node = Storm_Sub4EF0(A(ebx + headOff * 4), 0, 0, 2);   // retail: own = list head (stack), EDI = 2
         if (node) {
             wr32(P(node) + 8, A(hdr));
             wr32(P(node) + 12, A(pkt));
             wr32(P(node) + 16, param_4 + 0xc);
             wr32(P(node) + 20, 1);
-            wr32(P(node) + 24, GetTickCount());
+            wr32(P(node) + 24, g_tickPin ? g_tickPin : GetTickCount());
         }
     }
     if (ebx != self) {

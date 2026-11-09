@@ -7,9 +7,9 @@ struct Snet13170Hooks {
   uint8_t* (*node)(uint32_t handle);                       // handle -> node bytes
   uint8_t* (*sessionGet)();                                // sub_12690
   void (*expire)();                                        // sub_11630
-  void (*enqueue)(uint32_t, uint8_t, const uint32_t*, uint32_t);  // sub_12F40
+  void (*enqueue)(uint8_t* sess, uint8_t idx, uint8_t type, const uint32_t*, uint32_t);  // sub_12F40 (EBX = session)
   void (*sendPkt)(uint8_t* sess, const uint8_t* pkt, uint32_t n); // sub_10D20 via sess+0x108
-  void (*proc)(uint8_t* sess, uint8_t* pktNode);           // sub_11D90
+  void (*proc)(uint8_t* sess, uint8_t* pktNode, uint32_t len);  // sub_11D90 (EAX = node+0x10)
   int32_t gap, gapA, gapB, gapC; uint32_t rate, base;       // DAT_6fc41b48/38/44/..., NET+0x21c/0x228
 };
 template <class T> static T& at(uint8_t* b, uint32_t o) { return *reinterpret_cast<T*>(b + o); }
@@ -33,7 +33,7 @@ extern "C" uint32_t Storm_Sub13170(uint32_t now, uint8_t* s, const Snet13170Hook
     }
     if (live) {
       if (now - at<uint32_t>(s, 0x124) > 19999 && at<int32_t>(s, 0x204) == 0) {
-        at<uint32_t>(s, 0x124) = now; h.enqueue(0, 4, nullptr, 0);
+        at<uint32_t>(s, 0x124) = now; h.enqueue(s, 0, 4, nullptr, 0);
       }
       for (int i = 0; i < 4; i++) {
         if (i == 3) continue;
@@ -62,7 +62,7 @@ extern "C" uint32_t Storm_Sub13170(uint32_t now, uint8_t* s, const Snet13170Hook
         if (n <= 0 || i == 2 || i == 3) continue;
         uint8_t* nd = h.node(n); uint32_t t = at<uint32_t>(nd, 0x1c); int32_t left;
         if (t == 0 || (left = (int32_t)(t - now + (h.base ? (uint32_t)((h.gapC + 0x80 + at<int32_t>(nd, 0x10)) * 1000) / h.rate : 0) + 200 + h.gap * 2)) < 1) {
-          at<uint32_t>(nd, 0x1c) = now; h.proc(s, h.node(at<uint32_t>(nd, 0xc)));
+          at<uint32_t>(nd, 0x1c) = now; h.proc(s, h.node(at<uint32_t>(nd, 0xc)), at<uint32_t>(nd, 0x10));
         } else if ((uint32_t)left <= best) best = left;
       }
       for (int i = 0; i < 4; i++) {
