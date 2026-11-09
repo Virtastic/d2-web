@@ -14,6 +14,7 @@ import { composeTiled, createBlender, createFont, decodeFontTbl, recordTiled, te
   LABEL_TINT, FRONTEND, TITLE_COLUMNS } from './frontend.mjs';
 import { recordDc6, recordDcc, recordPrim } from './drawlist.mjs';
 import { parseStatstring } from './bnet-statstring.mjs';
+import { advanceBandRecord, bandTipLines } from './bnet-band-record.mjs';
 import { drawBg, present, deriveWideBg } from './widebg.mjs';
 import { wrapSpaces } from './bnet-login-screen.mjs';
 import { localSlash } from './bnet-slash.mjs';
@@ -777,8 +778,8 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     const tipCell = mode === 'chat' && !busy && !notice && !joining ? bandCell(pointer[0], pointer[1]) : -1;
     for (const i of order) {
       const fl = shown[i].flags ?? 0, nf = font(B.font), y = B.nameY[(chat.scroll + i) % 2], cx = B.x + 30 + B.cell * i;
-      const product = bandReadsStatstring(fl) ? parseStatstring(shown[i].stat).product : '', style = bandNameStyle(fl, info[i].hardcore);
-      const n = bandNameText(shown[i].name, product);
+      const rec = recOf(shown[i]), style = bandNameStyle(fl, info[i].hardcore && rec.hardcore);
+      const n = bandNameText(shown[i].name, rec.tag);
       const x = cx - Math.trunc(nf.measure(n) / 2);
       for (const [colour, dx, dy] of style.layers) font(B.font, colour).drawAnchored(sctx, n, x + dx, y + dy);
       // The hovered user's tooltip comes right after their name, before the names of the users drawn after them.
@@ -787,13 +788,12 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   };
   // Hovering a user in the band: their expansion, level, hardcore, realm and account, centred on the cell, the last line on a fixed row and the rest above it.
   const TIP_RIGHT = 797;
+  // The retail record behind a channel user: advanced by every update, so a field an update does not reach keeps its old value.
+  const recOf = (u) => (u.rec ??= advanceBandRecord(null, u.stat, u.flags ?? 0));
   const drawUserTip = (i) => {
     const B = L.band;
-    const u = chat.users[chat.scroll + i], p = parseStatstring(u.stat), lines = [];
-    if (p.product === 'PX2D') lines.push('Expansion');
-    lines.push(text('levelN').replace('%d', String(p.level)));
-    if (p.hardcore) lines.push(text('hardcore'));
-    lines.push(`Realm: ${p.realm.slice(0, 31)}`, `${text('accountName')}: *${accountName(u.name)}`);
+    const u = chat.users[chat.scroll + i];
+    const lines = bandTipLines(recOf(u), `*${accountName(u.name)}`, (n) => text('levelN').replace('%d', String(n)), text('hardcore'));
     const f = font('font16'), cx = B.x + 30 + B.cell * i, widest = Math.max(...lines.map((l) => f.measure(l)));
     // The block is centred on the cell and held 3 pixels in from the screen's left edge.
     const shift = Math.max(0, 3 - (cx - Math.trunc(widest / 2))) + Math.min(0, TIP_RIGHT - (cx + widest - Math.trunc(widest / 2)));
@@ -1028,7 +1028,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
         case 0x07: chat.channel = e.text; chat.users = []; chat.scroll = 0; say({ text: `You have joined channel: ${e.text}`, colour: 5 }); return true;
         case 0x01: case 0x02: {
           const user = { name: e.username, stat: e.raw ?? e.text ?? '', flags: e.flags ?? 0, since: clock(), seq: chat.seq = (chat.seq ?? 0) + 1 }, at = chat.users.findIndex((u) => plain(u.name) === plain(user.name));
-          if (at >= 0) chat.users[at] = { ...user, since: chat.users[at].since ?? user.since, seq: chat.users[at].seq };
+          if (at >= 0) chat.users[at] = { ...user, since: chat.users[at].since ?? user.since, seq: chat.users[at].seq, rec: advanceBandRecord(recOf(chat.users[at]), user.stat, user.flags) };
           else { let k = chat.users.length; while (k > 0 && flagRank(chat.users[k - 1].flags ?? 0) < flagRank(user.flags)) k--; chat.users.splice(k, 0, user); }
           scrollUsers(0);
           if (e.event === 0x02 && chat.notify) say({ text: `${shown} has joined the channel.`, colour: 5 });
@@ -1041,7 +1041,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
         case 0x04: chat.replyTo = e.username.replace(/^.*\*/, '') || e.username; say({ text: e.username.startsWith('*') && shown === e.username ? `${shown} whispers: ${e.text}` : `${shown} (*${acct}) whispers: ${e.text}`, colour: 2 }); return true;
         case 0x0A: say({ text: `You whisper to ${shown}: ${e.text}`, colour: 2 }); return true;
         case 0x0D: say({ text: `The channel "${e.text}" is full. If you are having problems using Battle.net commands, please click the Help button.`, colour: 1 }); return true;
-        case 0x09: { const u = chat.users.find((x) => x.name === e.username); if (u) { u.flags = e.flags ?? 0; if (e.raw?.length) u.stat = e.raw; } return true; }
+        case 0x09: { const u = chat.users.find((x) => x.name === e.username); if (u) { const prev = recOf(u); u.flags = e.flags ?? 0; if (e.raw?.length) u.stat = e.raw; u.rec = advanceBandRecord(prev, u.stat, u.flags); } return true; }
         case 0x0E: return true;
         case 0x0F: say({ text: `The channel "${e.text}" is restricted. If you are having problems using Battle.net commands, please click the Help button.`, colour: 1 }); return true;
         case 0x06: case 0x12: case 0x15: case 0x16: say({ text: e.text, colour: 3 }); return true;
