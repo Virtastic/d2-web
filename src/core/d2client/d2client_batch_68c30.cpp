@@ -67,30 +67,7 @@ found:
     sub87ed0(obj, h, nx);
 }
 
-// 1.13c D2Client+0x8AFD0 (229 B)
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_8afd0(int32_t* p1, int32_t* p2, uint32_t now, uint32_t t0_b9cc, uint32_t d0_b9d0, uint32_t d1_b9d4,
-                     uint32_t d2_b9d8, uint32_t* amp_cbefc, int32_t* o0_cbf00, int32_t* o1_b9dc,
-                     uint32_t (*sub18d0)(uint32_t*), uint32_t* rng, void (*sub8ad30)()) {
-    uint32_t el = now - t0_b9cc, v;
-    if (d2_b9d8 + d1_b9d4 + d0_b9d0 < el) { sub8ad30(); *amp_cbefc = 0; *o0_cbf00 = 0; *o1_b9dc = 0; return; }
-    if (el < d0_b9d0) {
-        if (d0_b9d0 == 0) { sub8ad30(); return; }
-        v = *amp_cbefc * el / d0_b9d0;
-    } else {
-        v = *amp_cbefc;
-        if (d1_b9d4 + d0_b9d0 <= el) {
-            if (d2_b9d8 == 0) { sub8ad30(); return; }
-            v = (uint32_t)((uint64_t)(uint32_t)((int32_t)(d2_b9d8 - el + d1_b9d4 + d0_b9d0) * (int32_t)*amp_cbefc) / d2_b9d8);
-        }
-    }
-    if (v != 0) {
-        *o0_cbf00 = (int32_t)sub18d0(rng);
-        *o1_b9dc = (int32_t)sub18d0(rng);
-        *p1 += *o0_cbf00; *p2 += *o1_b9dc;
-    }
-    sub8ad30();
-}
+// retired, see d2client_8afd0.cpp: D2Client 0x8AFD0.
 
 // 1.13c D2Client+0x8B0C0: moved to d2client_8b0c0.cpp (register and stack arguments passed explicitly).
 

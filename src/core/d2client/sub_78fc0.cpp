@@ -1,4 +1,4 @@
-// 1.13c D2Client+0x78FC0 (1791 B): per-tick UI-bar reconcile; from the cached decompile.
+// Older control-bar mouse-up sketch (the game rule is d2client_78fc0.cpp): kept for its existing export.
 // INTERIM: the DAT_6fbcbfb4==0 branch (decompile has clobbered register vars) is a host seam `scan`.
 #include <cstdint>
 #include <emscripten.h>

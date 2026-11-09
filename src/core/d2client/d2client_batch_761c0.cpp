@@ -163,7 +163,7 @@ void d2_client_769e0(uint32_t entry, int32_t x_base, uint32_t unit, uint32_t g_b
     wr32(entry + 0xc5, unit ? rd32(unit + 0x10) : 0xffffffffu);
 }
 
-// 1.13c D2Client+0x76B20 (1602 B) NAMED: party panel hover/tooltip dispatch. Per row: inside the row name
+// Older party-panel tooltip sketch (the game rule is d2client_76b20.cpp): hover/tooltip dispatch. Per row: inside the row name
 // band -> 763C0; else over one of the 5 buttons (kind at +0x34+32*i) -> tooltip pair (string ids 0x1019-0x101b,
 // 0x100a-0x1017) by relation. ord10003/10150 args dropped by the decompiler (text call with y,flags).
 extern "C" EMSCRIPTEN_KEEPALIVE

@@ -130,23 +130,6 @@ I sub_6B5A0(Host& h,const U* obj,I param2){
  return h.lookup(0x6B5A0,I(tier),param2,0)?1:0;
 }
 
-// 1.13c D2Client+0x6C130 : per-tick animation state machine (record kinds 0..9). Host-driven step.
-// Returns number of records advanced.
-struct Anim { U kind,a,b,c,d,step,pos,limit,u8,u9,delay,stamp,f; };
-void sub_6C130(Host& h,Anim* a){
- U now=h.tick();
- if(!a||a->stamp==now) return;
- a->stamp=now;
- a->pos+=a->step;
- if(I(a->limit)<=I(a->pos)){
-  switch(a->kind){
-   case 1: case 3: case 8: a->pos-=a->limit; break;
-   case 2: a->a=0; break;
-   case 5: a->step=0; a->pos=a->limit-1; a->a=1; break;
-   case 6: a->pos-=a->limit; a->a=0; a->stamp=h.tick(); break;
-   default: h.lookup(0x69180,0,0,0); break;
-  }
- }
-}
+// 0x6C130 moved to d2client_6c130.cpp (from the disassembly).
 
 } // namespace
