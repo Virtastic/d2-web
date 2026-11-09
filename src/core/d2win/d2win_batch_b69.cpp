@@ -50,12 +50,13 @@ extern uint32_t d2win_g_6f9a8ca4;
 extern const char d2win_g_6f8fcc00[4];
 extern const char d2win_g_6f8fcdb0[];   // table-file extension
 __attribute__((weak)) void Ordinal_10046_p(const char*, int32_t, int32_t) __asm__("Ordinal_10046"); // link sig matches d2common b5e870; hidden-reg ptr dropped
-__attribute__((weak)) void Unicode_toUnicode(char16_t*, const char*, int32_t);
-__attribute__((weak)) void Unicode_strcat(char16_t*, const char16_t*);
-__attribute__((weak)) void Unicode_strcpy(char16_t*, const char16_t*);
+// The Unicode helpers are the d2lang_shim's u* wrappers (same wasm signatures); a bare weak Unicode_* name has no definition and traps when called.
+__attribute__((weak)) void Unicode_toUnicode(char16_t*, const char*, int32_t) __asm__("utoUnicode");
+__attribute__((weak)) char16_t* Unicode_strcat(char16_t*, const char16_t*) __asm__("ustrcat");
+__attribute__((weak)) char16_t* Unicode_strcpy(char16_t*, const char16_t*) __asm__("ustrcpy");
 __attribute__((weak)) void Unicode_sprintf(int32_t, char16_t*, const char16_t*, ...);
-__attribute__((weak)) void Unicode_win2Unicode(char16_t*, const char*, int32_t);
-__attribute__((weak)) int32_t Unicode_strlen(const char16_t*);
+__attribute__((weak)) void Unicode_win2Unicode(char16_t*, const char*, int32_t) __asm__("uwin2Unicode");
+__attribute__((weak)) size_t Unicode_strlen(const char16_t*) __asm__("ustrlen");
 extern char d2win_g_6f8fcc04;
 extern const char* d2win_g_fontNames[];       // 6f8fc588 table
 extern const char* d2win_g_6f9014f4;
