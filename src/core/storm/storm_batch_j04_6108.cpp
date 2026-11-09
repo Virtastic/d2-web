@@ -96,7 +96,7 @@ extern "C" uint32_t Storm_ExplodeLitEEA0(uint8_t* st) {
             } else {
                 s = st[0x2c34 + s];
                 if (s == 0xff) {
-                    if ((bb & 0x3f) == 0) {
+                    if ((*(uint32_t*)(st + 0x14) & 0x3f) == 0) {
                         if (R(6)) return 0x306;
                         s = st[(*(uint32_t*)(st + 0x14) & 0x7f) + 0x2e34];
                     } else {

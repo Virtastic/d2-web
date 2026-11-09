@@ -395,7 +395,7 @@ extern "C" uint32_t Storm_Pick27250(uint32_t head, uint32_t useArchive, uint32_t
         uint32_t t;
         bool skip = false;
         if (U(r, 0x24) != 0) {
-            t = U(N(U(r, 0)), 4);
+            t = U(N(U(N(U(r, 0)), 0)), 4);   // retail: mov edx,[ecx]; mov edx,[edx]; mov esi,[edx+4]
             if ((int32_t)t > 0 && U(r, 0x24) == U(N(Pos(t)), 0x24)) skip = true;
         }
         if (!skip) {
@@ -424,7 +424,7 @@ extern "C" uint32_t Storm_Pick27250(uint32_t head, uint32_t useArchive, uint32_t
                     }
                 }
             }
-            if (take) { best = n; bestDelta = delta; score = sc; } else score = sc;
+            if (take) { best = n; bestDelta = delta; score = sc; }   // tiers 1-3 jump past the score store (0x273be)
         }
         n = U(r, 4);
         if ((int32_t)n < 1) break;
