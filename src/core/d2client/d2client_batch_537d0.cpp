@@ -134,25 +134,26 @@ void sub_53C30(Svc& s,G& g,int32_t id){
 }
 
 // 1.13c D2Client+0x54000  (esi = int32_t out[0x2a]; ebp = unit/context)
-void sub_54000(Svc& s,G& g,int32_t* o){
+template<class S,class S73>
+void run54000(S stat,S73 stat73,int32_t n,const G::Ent* tab,int32_t* o){
  for(int i=0;i<0x2a;i++) o[i]=0;
- for(int i=0;i<g.t20c0;i++){
-  switch(g.t17d0[i].key){
-  case 0x11: o[7]=s.stat(0x11,0); break;
-  case 0x12: o[6]=s.stat(0x12,0); break;
-  case 0x15: o[0]=s.stat(0x15,0); if(!o[0]) o[0]=s.stat(0x17,0); break;
-  case 0x16: o[1]=s.stat(0x16,0); if(!o[1]) o[1]=s.stat(0x18,0); break;
-  case 0x30: o[0x18]=s.stat(0x30,0); break;
-  case 0x31: o[0x19]=s.stat(0x31,0); break;
-  case 0x32: o[0x12]=s.stat(0x32,0); break;
-  case 0x33: o[0x13]=s.stat(0x33,0); break;
-  case 0x34: o[0x24]=s.stat(0x34,0); break;
-  case 0x35: o[0x25]=s.stat(0x35,0); break;
-  case 0x36: o[0xc]=s.stat(0x36,0); break;
-  case 0x37: o[0xd]=s.stat(0x37,0); break;
-  case 0x39: o[0x1e]=s.stat(0x39,0); break;
-  case 0x3a: o[0x1f]=s.stat(0x3a,0); break;
-  case 0x3b: o[0x20]=s.stat(0x3b,0); o[0x21]=s.stat10973(0x146); break;
+ for(int i=0;i<n;i++){
+  switch(tab[i].key){
+  case 0x11: o[7]=stat(0x11,0); break;
+  case 0x12: o[6]=stat(0x12,0); break;
+  case 0x15: o[0]=stat(0x15,0); if(!o[0]) o[0]=stat(0x17,0); break;
+  case 0x16: o[1]=stat(0x16,0); if(!o[1]) o[1]=stat(0x18,0); break;
+  case 0x30: o[0x18]=stat(0x30,0); break;
+  case 0x31: o[0x19]=stat(0x31,0); break;
+  case 0x32: o[0x12]=stat(0x32,0); break;
+  case 0x33: o[0x13]=stat(0x33,0); break;
+  case 0x34: o[0x24]=stat(0x34,0); break;
+  case 0x35: o[0x25]=stat(0x35,0); break;
+  case 0x36: o[0xc]=stat(0x36,0); break;
+  case 0x37: o[0xd]=stat(0x37,0); break;
+  case 0x39: o[0x1e]=stat(0x39,0); break;
+  case 0x3a: o[0x1f]=stat(0x3a,0); break;
+  case 0x3b: o[0x20]=stat(0x3b,0); o[0x21]=stat73(0x146); break;
   }
  }
  if(o[0]>0&&o[1]>0) o[4]=1;
@@ -162,6 +163,9 @@ void sub_54000(Svc& s,G& g,int32_t* o){
  if(o[0x18]>0&&o[0x19]>0) o[0x1c]=1;
  if(o[0x1e]>0&&o[0x1f]>0) o[0x22]=1;
  if(o[0x24]>0&&o[0x25]>0) o[0x28]=1;
+}
+void sub_54000(Svc& s,G& g,int32_t* o){
+ run54000([&](int32_t k,int32_t r){return s.stat(k,r);},[&](int32_t i){return s.stat10973(i);},g.t20c0,g.t17d0,o);
 }
 
 // 1.13c D2Client+0x54280  (eax = int32_t* in[0x2a] (output of 54000), param_1 = key, param_2 = out string)
@@ -273,4 +277,7 @@ extern "C" uint32_t d2c_53a30(const uint8_t* tab,int32_t c2d4,int32_t c380,uint3
 extern "C" void d2c_53b20(int32_t monId,uint8_t* d,const uint8_t* remap,const uint8_t* dt){
  auto w=[&](uint32_t o){ uint32_t v; std::memcpy(&v,dt+o,4); return v; };
  d2client_batch_537d0::run53B20(monId,(d2client_batch_537d0::Pal*)d,remap,(const uint8_t*)(uintptr_t)w(0xa78),(int32_t)w(0xa80),(const uint8_t*)(uintptr_t)w(0xa90),(int32_t)w(0xa98));
+}
+extern "C" void d2c_54000(int32_t (*stat)(int32_t,int32_t),int32_t (*stat73)(int32_t),int32_t n,const int32_t* tab,int32_t* o){
+ d2client_batch_537d0::run54000(stat,stat73,n,(const d2client_batch_537d0::G::Ent*)tab,o);
 }
