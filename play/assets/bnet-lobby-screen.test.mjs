@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBnetLobbyScreen, characterInfoLines, difficultiesAllowed, gameErrorText, bandNameStyle, BNET_LOBBY_LAYOUT } from './bnet-lobby-screen.mjs';
+import { createBnetLobbyScreen, characterInfoLines, difficultiesAllowed, gameErrorText, bandNameStyle, bandNameText, BNET_LOBBY_LAYOUT } from './bnet-lobby-screen.mjs';
 
 // No canvas in node: a context that swallows every call, and one-pixel art for every file.
 globalThis.ImageData ??= class { constructor(data, w, h) { Object.assign(this, { data, width: w, height: h }); } };
@@ -22,17 +22,29 @@ test('character box lines follow D2Multi: name, Level N Class, last difficulty c
   assert.equal(characterInfoLines({ name: 'N', charClass: 2, progression: 4 }, (i) => strings[i])[3].text, 'Normal');
 });
 
-test('band names: a plain name is colour 1 with any event flag or a hardcore statstring, else 0', () => {
-  assert.equal(bandNameStyle(0, false).colour, 0);
-  assert.equal(bandNameStyle(0, true).colour, 1, 'statstring 0x04 alone');
-  for (const fl of [0x02, 0x10, 0x20, 0x40, 0x80, 0x100, 0x200, 0x400, 0x800]) assert.deepEqual(bandNameStyle(fl, false), { star: false, colour: 1 }, `event 0x${fl.toString(16)}`);
+test('band names: colour 1 only for a hardcore statstring, else 0 (operators and other event flags included)', () => {
+  assert.deepEqual(bandNameStyle(0, false).layers, [[0, 0, 0]]);
+  assert.deepEqual(bandNameStyle(0, true).layers, [[1, 0, 0]], 'statstring 0x04 alone');
+  assert.deepEqual(bandNameStyle(0x02, true).layers, [[1, 0, 0]], 'operator, hardcore');
+  for (const fl of [0x02, 0x04, 0x10, 0x20, 0x40, 0x80, 0x100, 0x200, 0x400, 0x800, 0x1000, 0x100000]) assert.deepEqual(bandNameStyle(fl, false).layers, [[0, 0, 0]], `event 0x${fl.toString(16)}`);
 });
 
-test('band names: operator 0x02 takes no star; 0x01 and 0x08 draw the star twice (6 at -1,-1, then 3); 0x04, 0x1000, 0x100000 a colour-0 star', () => {
-  assert.deepEqual(bandNameStyle(0x02, false), { star: false, colour: 1 });
-  assert.deepEqual(bandNameStyle(0x01, false), { star: true, layers: [[6, -1, -1], [3, 0, 0]] });
-  assert.deepEqual(bandNameStyle(0x08, true), { star: true, layers: [[6, -1, -1], [3, 0, 0]] });
-  for (const fl of [0x04, 0x1000, 0x100000]) assert.deepEqual(bandNameStyle(fl, false), { star: true, layers: [[0, 0, 0]] }, `event 0x${fl.toString(16)}`);
+test('band names: 0x01 and 0x08 without the operator flag draw colour 6 one pixel up and left, then colour 3', () => {
+  assert.deepEqual(bandNameStyle(0x0b, false).layers, [[0, 0, 0]], 'operator with 0x08: token is the operator one');
+  assert.deepEqual(bandNameStyle(0x01, false).layers, [[6, -1, -1], [3, 0, 0]]);
+  assert.deepEqual(bandNameStyle(0x08, true).layers, [[6, -1, -1], [3, 0, 0]]);
+});
+
+test('band text: the character name for Diablo II products, the star account text for any other product', () => {
+  for (const p of ['VD2D', 'TS2D', 'PX2D']) {
+    assert.equal(bandNameText('Bob*acct', p), 'Bob');
+    assert.equal(bandNameText('Bob', p), 'Bob');
+    assert.equal(bandNameText('*acct', p), '', 'a leading star leaves the character name empty');
+  }
+  assert.equal(bandNameText('Bob*acct', 'RATS'), '*acct');
+  assert.equal(bandNameText('Bob*', ''), '*Bob*', 'an empty account part shows the whole name');
+  assert.equal(bandNameText('Bob', ''), '*Bob');
+  assert.equal(bandNameText('*acct', 'RATS'), '*acct');
 });
 
 test('difficulty gating: Nightmare after 4 (classic) / 5 (expansion), Hell after 8 / 10', () => {

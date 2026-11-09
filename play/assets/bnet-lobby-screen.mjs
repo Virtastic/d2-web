@@ -167,26 +167,34 @@ export const BNET_LOBBY_LAYOUT = {
     body: { x: 268, y: 320, w: 264, h: 120, insetX: 10, insetY: 8, font: 'font24', centred: true } },
 };
 
-// GUESS: the name colour (1 when hardcore, else 0) is not read from D2Multi's own draw of this box. The decompile
-// cache settles the flags (the character word at +0x1EB: 0x04 hardcore, 0x08 dead, 0x20 expansion, as in D2Multi+0x139B0
-// and +0x14850) but not the colour: D2Multi+0xB300 (the box builder, covering the 0xB4B6..0xB65C name row) passes no colour
-// index, and the draw helper that takes it is not in the cache. The lobby list (D2Multi+0x14100 area) and the chat
-// names (D2Multi+0xEEA0, colour from a D2Common flag word's bits 5, 6 and 7) are separate draws; their bit meanings are unlabelled.
-// capture: d2multi -- the colour index passed to the text draw for the name row of a hardcore and a softcore
-// character in the character box (the box's draw routine is not yet located in the decompile cache); no descriptor yet.
+// The character box's title and name line is appended to the box's text list with colour 1 when the character record's
+// hardcore bit (bit 2 of its flag word) is set, else 0: the colour is the third argument of the text-box append call.
+// The statstring and event-flag meanings used below are read from the decompile: statstring flags 0x04 hardcore, 0x08 dead,
+// 0x20 expansion, 0x40 ladder; the portrait token by event flag is 0x02, 0x08, 0x01, 0x04, 0x101000 in that priority.
 // The character box (D2Multi+0xB4B6..0xB65C): title and name (red when hardcore), "Level N Class",
 // "Last Difficulty Setting Completed:" and the last difficulty finished. `progression` is the
 // character's +0x1EC & 0x1F; an expansion character counts five per difficulty, a classic one four.
 // Realm names arrive as `Char*account`: retail shows the part before the first '*' (a leading '*' keeps the name whole) and takes the account from after it.
 export const displayName = (n) => { if (n.startsWith('*')) return n; const i = n.indexOf('*'); return i > 0 ? n.slice(0, i) : n; };
 export const accountName = (n) => { const i = n.indexOf('*'); return i >= 0 && i < n.length - 1 ? n.slice(i + 1) : n; };
-// A channel user's name in the band (retail's text draws). The event flag word decides the star: not an
-// operator (0x02) and any of 0x01, 0x08, 0x04, 0x1000, 0x100000. 0x01 and 0x08 draw the star twice, colour 6 one pixel up and left
-// then colour 3 at the base; the other star names are colour 0. A plain name is colour 1 when the user has any event flag or a
-// hardcore statstring (0x04), else 0; the statstring's 0x08, 0x20 and 0x40 bits change no colour.
+// A channel user's name in the band (caption routine D2Win+0xD4D0). The portrait token comes from the event flags (operator 0x02
+// first, then 0x08, then 0x01, then 0x04, then 0x101000); the tokens for 0x08 and 0x01 (not with 0x02) draw colour 3 over a colour-6
+// shadow one pixel up AND one pixel left (the disassembly subtracts one from both the x and the y of the shadow call); every other
+// user, operators included, draws colour 1 when the statstring is hardcore, else 0. No event flag puts a star in the text: the
+// star is part of the account text the lobby stores for a user whose product is not Diablo II (see bandNameText).
 export function bandNameStyle(flags, hardcore) {
-  if (!(flags & 2) && flags & 0x10100d) return { star: true, layers: flags & 9 ? [[6, -1, -1], [3, 0, 0]] : [[0, 0, 0]] };
-  return { star: false, colour: flags || hardcore ? 1 : 0 };
+  if (!(flags & 2) && flags & 9) return { layers: [[6, -1, -1], [3, 0, 0]] };
+  return { layers: [[hardcore ? 1 : 0, 0, 0]] };
+}
+// The band text. The name arrives as `Char*account`. The lobby stores two strings for the user: "*account" (the whole name when it
+// already starts with '*'; the whole name after the star only when the account part is empty) and the character name (the part before
+// the '*', 16 characters at most, empty when the name starts with '*'). The caption draws the character name for the three Diablo II
+// products and the "*account" text for every other product. Ladder-title prefixes (the caption's control-mask title bits) are not modelled.
+const D2_PRODUCT_CODES = new Set(['VD2D', 'TS2D', 'PX2D']);
+export function bandNameText(name, product) {
+  const lead = name.startsWith('*');
+  if (D2_PRODUCT_CODES.has(product)) return lead ? '' : displayName(name).slice(0, 16);
+  return lead ? name.slice(0, 50) : `*${accountName(name)}`.slice(0, 50);
 }
 export function characterInfoLines(character, string) {
   const c = character ?? {};
@@ -755,12 +763,10 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     }
     const tipCell = mode === 'chat' && !busy && !notice && !joining ? bandCell(pointer[0], pointer[1]) : -1;
     for (const i of order) {
-      const fl = shown[i].flags ?? 0, n = displayName(shown[i].name).replace(/^\*/, ''), nf = font(B.font), y = B.nameY[(chat.scroll + i) % 2], cx = B.x + 30 + B.cell * i;
-      const style = bandNameStyle(fl, info[i].hardcore);
-      if (style.star) {
-        const s = `*${n}`, x = cx - Math.trunc(nf.measure(s) / 2);
-        for (const [colour, dx, dy] of style.layers) font(B.font, colour).drawAnchored(sctx, s, x + dx, y + dy);
-      } else font(B.font, style.colour).drawAnchored(sctx, n, cx - Math.trunc(nf.measure(n) / 2), y);
+      const fl = shown[i].flags ?? 0, nf = font(B.font), y = B.nameY[(chat.scroll + i) % 2], cx = B.x + 30 + B.cell * i;
+      const n = bandNameText(shown[i].name, parseStatstring(shown[i].stat).product), style = bandNameStyle(fl, info[i].hardcore);
+      const x = cx - Math.trunc(nf.measure(n) / 2);
+      for (const [colour, dx, dy] of style.layers) font(B.font, colour).drawAnchored(sctx, n, x + dx, y + dy);
       // The hovered user's tooltip comes right after their name, before the names of the users drawn after them.
       if (i === tipCell) drawUserTip(i);
     }
