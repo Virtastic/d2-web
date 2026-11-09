@@ -5102,7 +5102,7 @@ function drawFrame() {
     // Retail draws each attribute's total (items and charms included) against its base: STATLIST total, layer 0.
     const total = (stat) => view.playerStat(stat);
     characterPanelEvidence = characterPanelRenderer.draw(ctx, w, h, adv && {
-      ...adv, totals: characterVisible ? snapOr('attributeTotals', () => ({ strength: total(0), energy: total(1), dexterity: total(2), vitality: total(3) })) : null, name: chosenName || '', className: langStr(CLASS_NAMES[snapshot.playerClass] || '') || CLASS_NAMES[snapshot.playerClass] || '',
+      ...adv, resMax: characterVisible ? [0x28, 0x2a, 0x2c, 0x2e].map(total) : null, totals: characterVisible ? snapOr('attributeTotals', () => ({ strength: total(0), energy: total(1), dexterity: total(2), vitality: total(3) })) : null, name: chosenName || '', className: langStr(CLASS_NAMES[snapshot.playerClass] || '') || CLASS_NAMES[snapshot.playerClass] || '',
       // Retail stores life and mana as 8.8 fixed point (50 life is 12800) and displays the whole
       // part. Drawing the raw stat put "14848" in the Life slot.
       life: (snapshot.player?.hp ?? 0) >> 8, lifeMax: (snapshot.player?.hpMax ?? 0) >> 8,

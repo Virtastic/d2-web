@@ -177,6 +177,7 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
   // Fonts through the ACT's palette (the screen is shown in any act), cached per act.
   const f6 = { dc6: decodeDc6(read('data\\local\\font\\latin\\font6.dc6')), tbl: decodeFontTbl(read('data\\local\\font\\latin\\font6.tbl')) };
   const f16 = { dc6: decodeDc6(read('data\\local\\font\\latin\\font16.dc6')), tbl: decodeFontTbl(read('data\\local\\font\\latin\\font16.tbl')) };
+  const f8 = { dc6: decodeDc6(read('data\\local\\font\\latin\\font8.dc6')), tbl: decodeFontTbl(read('data\\local\\font\\latin\\font8.tbl')) };
   const statPalette = decodeDatPalette(read(STAT_POINTS_LAYOUT.palette));
   const statPl2 = read(STAT_POINTS_LAYOUT.pl2);
   const statPointFonts = {
@@ -188,9 +189,9 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
   };
   const faces = new Map();
   const facesFor = (act) => { let f = faces.get(act); if (!f) { const palette = decodeDatPalette(read(`data\\global\\palette\\ACT${Math.min(5, Math.max(1, act | 0))}\\pal.dat`));
-    f = { 6: createFont({ ...f6, palette, documentObject }), 16: createFont({ ...f16, palette, documentObject }), c3: createFont({ ...f16, palette: textColourPalette(statPl2, palette, 3), documentObject }), c1: createFont({ ...f16, palette: textColourPalette(statPl2, palette, 1), documentObject }) };
+    f = { 6: createFont({ ...f6, palette, documentObject }), 8: createFont({ ...f8, palette, documentObject }), 16: createFont({ ...f16, palette, documentObject }), c3: createFont({ ...f16, palette: textColourPalette(statPl2, palette, 3), documentObject }), c1: createFont({ ...f16, palette: textColourPalette(statPl2, palette, 1), documentObject }) };
     // the colour a skill-row damage cell is drawn in (0x2F0A0's mode), per font size, built on first use
-    const tinted = new Map(); f.colour = (c, size) => { const k = `${c}:${size}`; if (!tinted.has(k)) tinted.set(k, createFont({ ...(size === 6 ? f6 : f16), palette: textColourPalette(statPl2, palette, c), documentObject })); return tinted.get(k); };
+    const tinted = new Map(); f.colour = (c, size) => { const k = `${c}:${size}`; if (!tinted.has(k)) tinted.set(k, createFont({ ...(size === 6 ? f6 : size === 8 ? f8 : f16), palette: textColourPalette(statPl2, palette, c), documentObject })); return tinted.get(k); };
     faces.set(act, f); } return f; };
   const font6 = facesFor(1)[6], font16 = facesFor(1)[16];
   const F = { 6: font6, 16: font16 };
@@ -204,7 +205,11 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
   // Value boxes retail LEFT-aligns at a fixed x (stamina, life and mana: the 4-digit values sit at T2 x 236/277 for
   // every digit count, where a centred box would move them 2-5 px). Screen x, measured from retail's T2 records.
   // The damage value (retail T2 x 268 for both rows, "13-26") is LEFT-aligned too: screen x 348 = 268 + T2_OFFSET.x.
-  const LEFT = { stamina: 316, staminaMax: 357, life: 316, lifeMax: 357, mana: 316, manaMax: 357, dmgA: 348, dmgB: 348 };
+  const LEFT = { dmgA: 348, dmgB: 348 };
+  // D2Client+0xBCEA0's value table (.data 0xDD6F0): the LEFT box of Stamina, Life and Mana (x 232..267) is the MAXIMUM (stats 11, 7, 9)
+  // and the RIGHT box (x 273..308) the current (stats 10, 6, 8). Those six cells use font 1, or font 0 (our 8-px face) when the
+  // number is 1000 or more or the font-1 text is at least the box's width, centred in the box.
+  const BOX = { staminaMax: [232, 267], stamina: [273, 308], lifeMax: [232, 267], life: [273, 308], manaMax: [232, 267], mana: [273, 308] };
   const FIELDS = [
     ['lvlLabel', 6, 'Level', 98, 104], ['expLabel', 6, 'Experience', 175, 104], ['nextLabel', 6, 'Next Level', 303, 104],
     ['strLabel', 6, 'Strength', 99, 157], ['dexLabel', 6, 'Dexterity', 96, 220], ['defLabel', 6, 'Defense', 280, 267],
@@ -219,8 +224,8 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
     ['className', 16, 'Barbarian', 294, 85], ['name', 16, 'Oracle', 167, 85],
     ['level', 16, '1', 111, 119], ['experience', 16, '0', 198, 119], ['nextExperience', 16, '500', 315, 119],
     ['strength', 16, '30', 165, 159], ['dexterity', 16, '20', 164, 221], ['defense', 16, '10', 362, 269], ['vitality', 16, '25', 166, 307],
-    ['stamina', 16, '92', 321, 306], ['staminaMax', 16, '92', 362, 306], ['life', 16, '55', 321, 330], ['lifeMax', 16, '55', 362, 330],
-    ['energy', 16, '10', 166, 368], ['mana', 16, '10', 321, 368], ['manaMax', 16, '10', 362, 368],
+    ['staminaMax', 16, '92', 321, 306], ['stamina', 16, '92', 362, 306], ['lifeMax', 16, '55', 321, 330], ['life', 16, '55', 362, 330],
+    ['energy', 16, '10', 166, 368], ['manaMax', 16, '10', 321, 368], ['mana', 16, '10', 362, 368],
     ['fireRes', 16, '0', 364, 408], ['coldRes', 16, '0', 364, 432], ['lightRes', 16, '0', 364, 456], ['poisonRes', 16, '0', 364, 480],
   ].map(([key, f, sample, x, y]) => ({ key, size: f, centre: CENTRE[key] ?? x + F[f].measure(sample) / 2, y }));
   const chrome = createPanelChrome(read, documentObject);
@@ -275,7 +280,7 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
         level: state?.level, experience: grouped(u32(state?.experience)), nextExperience: grouped(u32(sc.length > 10 ? sc[10] : state?.nextExperience)),
         strength: cell.strength.value, dexterity: cell.dexterity.value, defense: sc[0], vitality: cell.vitality.value,
         stamina: sc[4], staminaMax: sc[16] ?? sc[5], life: sc.length > 11 ? sc[11] : state?.life, lifeMax: sc.length > 12 ? sc[12] : state?.lifeMax, energy: cell.energy.value,
-        mana: sc.length > 13 ? sc[13] : state?.mana, manaMax: sc.length > 14 ? sc[14] : state?.manaMax,
+        mana: sc.length > 13 ? sc[13] : state?.mana, manaMax: sc.length > 14 ? sc[14] : state?.manaMax,   // the *Max keys are the LEFT boxes
         fireRes: sc[6], coldRes: sc[7], lightRes: sc[8], poisonRes: sc[9],
       };
       // D2Client+0xBCEA0: max life (stat 7) and max mana (stat 9) are drawn in colour 3 when the total exceeds the
@@ -283,14 +288,19 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
       // after the skill rows, are total - base (readCharacterScreen).
       const above = (d) => (d == null ? 0 : d > 0 ? 3 : d < 0 ? 1 : 0), over = sc.length >= 27 ? sc.slice(-2) : [];
       cell.lifeMax = { c: above(over[0]) }; cell.manaMax = { c: above(over[1]) };
+      // resistances: colour 1 below zero, colour 4 (gold) at the cap, which the screen's values are already clamped to (0xBCEA0, stats 39/41/43/45)
+      state?.resMax?.forEach((m, i) => { const v = sc[6 + i], cap = Math.min(95, m + 75); cell[['fireRes', 'coldRes', 'lightRes', 'poisonRes'][i]] = { c: v >= cap ? 4 : v < 0 ? 1 : 0 }; });
       const face = facesFor(state?.act || 1);
       // Every string drawn, as retail T2 records it: left x and anchor y, in the T2 frame (screen - (80,60)),
       // colour 0, uncentred. The list is the evidence a retail recording-text diffs.
       const texts = [];
       for (const f of FIELDS) { const t = text[f.key]; if (t === undefined || t === null) continue;
         const own = f.key === 'dmgA' ? rowA.own : f.key === 'dmgB' ? rowB.own : null,
-          c = own ? own.c : f.key === 'stamina' ? (text.stamina > text.staminaMax ? 3 : 0) : (cell[f.key]?.c ?? 0), str = String(t),
-          font = own && c ? face.colour(c, f.size) : c === 3 ? face.c3 : c === 1 ? face.c1 : face[f.size], left = LEFT[f.key] ?? Math.floor(f.centre - font.measure(str) / 2);
+          c = own ? own.c : (cell[f.key]?.c ?? 0), str = String(t), box = BOX[f.key];
+        let size = f.size;
+        if (box && (Number(t) >= 1000 || face[16].measure(str) >= box[1] - box[0])) size = 8;
+        const font = (own || box || c > 3) && c ? face.colour(c, size) : c === 3 ? face.c3 : c === 1 ? face.c1 : face[size],
+          left = box ? (w => box[0] + T2_OFFSET.x + (w < box[1] - box[0] + 1 ? (box[1] - box[0] + 1 - w) >> 1 : 0))(font.measure(str)) : LEFT[f.key] ?? Math.floor(f.centre - font.measure(str) / 2);
         font.drawAnchored(ctx, str, left, f.y); texts.push({ text: str, x: left - T2_OFFSET.x, y: f.y - T2_OFFSET.y, c }); }
       chrome.cel(ctx, state?.act || 1, CHROME_ART.close, characterPanelCloseFrame(state?.closePressed), 208, 480);
       // The "+" is retail art, blitted as retail blits the pair (socket first, then the button on
