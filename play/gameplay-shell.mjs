@@ -1936,9 +1936,9 @@ function ensureBnetLoginScreen(server) {
     },
     onTermsOfService: fetchConfiguredRealmTerms,
     onCreateAccount: createConfiguredRealmAccount,
-    onChangePassword: (request) => withRealmRequest((m, t, p) => m.bncsChangePassword(t, p, request)),
-    onResetPassword: (request) => withRealmRequest((m, t, p) => m.bncsResetPassword(t, p, request)),
-    onChangeEmail: (request) => withRealmRequest((m, t, p) => m.bncsChangeEmail(t, p, request)),
+    onChangePassword: (request) => withRealmRequest((m, t, p, auth) => m.bncsChangePassword(t, p, { ...request, auth })),
+    onResetPassword: (request) => withRealmRequest((m, t, p, auth) => m.bncsResetPassword(t, p, { ...request, auth })),
+    onChangeEmail: (request) => withRealmRequest((m, t, p, auth) => m.bncsChangeEmail(t, p, { ...request, auth })),
     onExit: () => leaveRealmLogin() }); }
   catch (error) { bnetLoginError = String(error); }
 }
@@ -2036,7 +2036,7 @@ async function createConfiguredRealmAccount({ account, password }) {
   try {
     await bncs.ready().catch(() => { throw transportFailure('the Battle.net connection could not open'); });
     protocol = bindEngineProtocol(Module);
-    await bncsCreateAccount(bncs, protocol, { account, password });
+    await bncsCreateAccount(bncs, protocol, { account, password, auth: await realmAuthConfig(server.auth) });
   } finally {
     try { bncs.close(); } catch { /* socket already closed */ }
     try { protocol?.free(); } catch { /* engine gone */ }
@@ -2054,7 +2054,7 @@ async function withRealmRequest(run) {
   try {
     await bncs.ready();
     protocol = realm.bindEngineProtocol(Module);
-    return await run(realm, bncs, protocol);
+    return await run(realm, bncs, protocol, await realmAuthConfig(server.auth));
   } finally {
     try { bncs.close(); } catch { /* socket already closed */ }
     try { protocol?.free(); } catch { /* engine gone */ }

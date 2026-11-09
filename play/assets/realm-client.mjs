@@ -364,13 +364,31 @@ export function bsha1(data) {
   return out;
 }
 
-/** SID_CREATEACCOUNT (0x3d): the password hash then the account name. Resolves on success. */
-export async function bncsCreateAccount(transport, protocol, { account, password, product = 'D2XP', timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
-  const reader = makeReader(transport);
+/**
+ * The version check every account request makes before its own packet (Battle.net refuses SID_CREATEACCOUNT,
+ * SID_CHANGEPASSWORD and the rest until AUTH_CHECK has passed): selector, AUTH_INFO, AUTH_CHECK.
+ * Resolves to the AUTH_INFO reply.
+ */
+async function bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs }) {
   transport.send(protocol.bncsSelector());
   transport.send(protocol.bncsFrame(0x50, protocol.bncsAuthInfo(product)));
   const authInfo = await readBncsFrame(reader, timeoutMs);
   if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
+  const mpqEnd = authInfo.body.indexOf(0, 20);
+  const mpq = authInfo.body.subarray(20, mpqEnd < 0 ? authInfo.body.length : mpqEnd);
+  const { body } = protocol.bncsAuthCheck({ serverToken: u32(authInfo.body, 4), mpq: new TextDecoder().decode(mpq),
+    challenge: authInfo.body.subarray(mpqEnd + 1), product, auth });
+  transport.send(protocol.bncsFrame(0x51, body));
+  const check = await readBncsFrame(reader, timeoutMs);
+  if (check.id !== 0x51) throw new Error(`expected AUTH_CHECK reply 0x51, got 0x${check.id.toString(16)}`);
+  if (u32(check.body, 0) !== 0) throw new Error(`AUTH_CHECK rejected the version (result 0x${u32(check.body, 0).toString(16)})`);
+  return authInfo;
+}
+
+/** SID_CREATEACCOUNT (0x3d): the password hash then the account name. Resolves on success. */
+export async function bncsCreateAccount(transport, protocol, { account, password, product = 'D2XP', auth = null, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+  const reader = makeReader(transport);
+  const authInfo = await bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs });
   const enc = new TextEncoder();
   const hash = bsha1(enc.encode(password.toLowerCase()));
   const name = enc.encode(account);
@@ -396,12 +414,9 @@ const joinBytes = (...parts) => { const out = new Uint8Array(parts.reduce((n, p)
  * The old proof is the LOGONRESPONSE2 proof (the tokens and double hash the engine builds), the new hash the
  * single hash of the lowercased new password. Resolves to the reply's u32: 1 = changed, anything else is refused (D2Launch's pump tests the reply against 1).
  */
-export async function bncsChangePassword(transport, protocol, { account, password, newPassword, product = 'D2XP', timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+export async function bncsChangePassword(transport, protocol, { account, password, newPassword, product = 'D2XP', auth = null, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
   const reader = makeReader(transport);
-  transport.send(protocol.bncsSelector());
-  transport.send(protocol.bncsFrame(0x50, protocol.bncsAuthInfo(product)));
-  const authInfo = await readBncsFrame(reader, timeoutMs);
-  if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
+  const authInfo = await bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs });
   const logon = Uint8Array.from(protocol.bncsLogon({ clientToken: protocol.tickCount(), serverToken: u32(authInfo.body, 4), account, password }));
   const newHash = bsha1(new TextEncoder().encode(newPassword.toLowerCase()));
   transport.send(protocol.bncsFrame(0x31, joinBytes(logon.subarray(0, 28), newHash, logon.subarray(28))));
@@ -411,24 +426,18 @@ export async function bncsChangePassword(transport, protocol, { account, passwor
 }
 
 /** SID_RESETPASSWORD (0x5A): { STRING account, STRING email }. Battle.net sends no reply. */
-export async function bncsResetPassword(transport, protocol, { account, email, product = 'D2XP', timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+export async function bncsResetPassword(transport, protocol, { account, email, product = 'D2XP', auth = null, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
   if (!account || !email) throw new Error('retail sends no reset request without an account and an email');
   const reader = makeReader(transport);
-  transport.send(protocol.bncsSelector());
-  transport.send(protocol.bncsFrame(0x50, protocol.bncsAuthInfo(product)));
-  const authInfo = await readBncsFrame(reader, timeoutMs);
-  if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
+  const authInfo = await bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs });
   transport.send(protocol.bncsFrame(0x5a, joinBytes(cString(account), cString(email))));
 }
 
 /** SID_CHANGEEMAIL (0x5B): { STRING account, STRING old email, STRING new email }. No reply. */
-export async function bncsChangeEmail(transport, protocol, { account, oldEmail, newEmail, product = 'D2XP', timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+export async function bncsChangeEmail(transport, protocol, { account, oldEmail, newEmail, product = 'D2XP', auth = null, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
   if (!account || !oldEmail || !newEmail) throw new Error('retail sends no email change without an account and both emails');
   const reader = makeReader(transport);
-  transport.send(protocol.bncsSelector());
-  transport.send(protocol.bncsFrame(0x50, protocol.bncsAuthInfo(product)));
-  const authInfo = await readBncsFrame(reader, timeoutMs);
-  if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
+  const authInfo = await bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs });
   transport.send(protocol.bncsFrame(0x5b, joinBytes(cString(account), cString(oldEmail), cString(newEmail))));
 }
 
