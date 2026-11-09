@@ -159,7 +159,7 @@ export function createWsBridge({ listen, targets, onLog = () => {}, ...overrides
     let lastRx = Date.now();
     const closeBoth = (why = 'closed') => {
       if (!released) onLog(`${why} ${addr} /${name} after ${((Date.now() - opened) / 1000).toFixed(1)}s`);
-      release(); tap?.close(); timers.forEach(clearTimeout); timers = []; sock.destroy(); tcp.destroy();
+      release(); tap?.close(String(why).startsWith("realm")); timers.forEach(clearTimeout); timers = []; sock.destroy(); tcp.destroy();
     };
     if (cfg.pingSec > 0) {
       const ms = cfg.pingSec * 1000;
@@ -175,7 +175,7 @@ export function createWsBridge({ listen, targets, onLog = () => {}, ...overrides
     timers.push(connectTimer);
     tcp.on('connect', () => { clearTimeout(connectTimer); touch(); onLog(`ws /${name} -> ${target.host}:${target.port} from ${addr}`); });
     tcp.on('data', (d) => {
-      touch(); mcp?.fromRealm(d);
+      touch(); mcp?.fromRealm(d); tap?.fromRealm(d);
       try { sock.write(encodeFrame(d)); } catch { closeBoth(); return; }
       // Backpressure: a browser that stops reading must not make the bridge buffer the realm's output.
       if (sock.writableLength > cfg.maxMessage * 16) { onLog(`slow reader ${addr} /${name}`); closeBoth(); }
@@ -184,12 +184,19 @@ export function createWsBridge({ listen, targets, onLog = () => {}, ...overrides
 
     // The one place client bytes reach the realm: the character guard may swap a doomed create/join
     // for the realm's own failure reply; every other byte goes through unchanged.
+    let gated = null;                      // client bytes that arrived while a create/join waits for the unlock
     const toRealm = (data) => {
+      if (gated) { gated.push(data); return; }
       tap?.fromClient(data);
       if (!mcp) { tcp.write(data); return; }
-      const { forward, reply } = mcp.fromClient(data);
+      const { forward, reply, delayMs, later } = mcp.fromClient(data);
       if (forward.length) tcp.write(forward);
       if (reply) sock.write(encodeFrame(reply));
+      if (later) {
+        gated = [];
+        const t = setTimeout(() => { const q = gated; gated = null; for (const d of [later, ...q]) toRealm(d); }, delayMs);
+        timers.push(t);
+      }
     };
     const parse = makeWsParser(cfg.maxMessage);
     let fragment = null; // accumulate a fragmented message (browsers may split a large binary send)

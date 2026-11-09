@@ -53,37 +53,66 @@ export function refusalReply(req) {
   return frame(MCP_JOINGAME, b);
 }
 
-export function createCharGuard({ graceMs = 1500, onLog = () => {} } = {}) {
-  const held = new Map();               // lowercase name -> { n: live game connections holding it }
+/**
+ * Lock state is read from what the realm does, not from memory of who asked: the realm's character lock
+ * (taken when a game server loads the character, dropped when that server has saved it after the game
+ * connection closed) shows here as two observations.
+ *  - a game connection closed: the unlock trails it, so a create/join in that window is delayed until it
+ *    lands (the realm would have accepted it a moment later), not refused;
+ *  - a game connection whose character load the realm failed (closed without ever sending game data) means
+ *    the lock is held by something this bridge did not see, another bridge or a stale game: requests for
+ *    that character get the realm's own refusal until the observation ages out, and the next one is
+ *    forwarded as a probe, so a lock that has cleared costs nothing.
+ */
+export function createCharGuard({ graceMs = 1500, lockedMs = 8000, onLog = () => {}, now = Date.now } = {}) {
+  const live = new Map();               // lowercase name: live game connections holding it
+  const trail = new Map();              // lowercase name: when the realm's unlock should have landed
+  const locked = new Map();             // lowercase name: until when a failed load says it is locked
 
   const hold = (name) => {
     const k = key(name);
-    const rec = held.get(k) || { n: 0 };
-    rec.n++; held.set(k, rec);
+    live.set(k, (live.get(k) || 0) + 1);
     let done = false;
-    return () => {                      // the game connection closed; the realm's own unlock trails it by about a second
-      if (done) return; done = true;
-      const t = setTimeout(() => { if (--rec.n <= 0) held.delete(k); }, graceMs);
-      t.unref?.();
+    return {
+      loaded() { locked.delete(k); },
+      failed() { locked.set(k, now() + lockedMs); },
+      release() {                       // the game connection closed
+        if (done) return; done = true;
+        const n = (live.get(k) || 1) - 1;
+        if (n <= 0) live.delete(k); else live.set(k, n);
+        trail.set(k, now() + graceMs);
+      },
     };
   };
-  const isHeld = (name) => (held.get(key(name))?.n || 0) > 0;
+  /** 'refuse', or the ms to wait for the unlock, or 0 (go ahead). */
+  const verdict = (name) => {
+    const k = key(name), t = now();
+    if ((live.get(k) || 0) > 0) return 'refuse';
+    if ((locked.get(k) || 0) > t) return 'refuse';
+    locked.delete(k);
+    const w = (trail.get(k) || 0) - t;
+    if (w > 0) return w;
+    trail.delete(k);
+    return 0;
+  };
+  const isHeld = (name) => verdict(name) !== 0;
 
-  /** Watch one /d2gs connection's client bytes; the first GAMELOGON names the character it holds. */
+  /** Watch one /d2gs connection; the first GAMELOGON names the character it holds, the realm's answer tells if the load worked. */
   function d2gsTap() {
-    let buf = Buffer.alloc(0), release = null, off = false;
+    let buf = Buffer.alloc(0), h = null, off = false, answered = false;
     return {
       fromClient(chunk) {
-        if (off || release) return;
+        if (off || h) return;
         buf = Buffer.concat([buf, chunk]);
         if (buf[0] !== GAMELOGON) { off = true; return; }
         if (buf.length < GAMELOGON_LEN) return;
         const raw = buf.subarray(GAMELOGON_NAME_AT, GAMELOGON_NAME_AT + NAME_LEN);
         const z = raw.indexOf(0), name = raw.subarray(0, z < 0 ? NAME_LEN : z).toString('latin1');
         buf = Buffer.alloc(0);
-        if (name) release = hold(name);
+        if (name) h = hold(name);
       },
-      close() { if (release) { release(); release = null; } },
+      fromRealm(chunk) { if (h && !answered && chunk.length) { answered = true; h.loaded(); } },
+      close(byRealm = true) { if (h) { if (byRealm && !answered) h.failed(); h.release(); h = null; } },
     };
   }
 
@@ -99,7 +128,7 @@ export function createCharGuard({ graceMs = 1500, onLog = () => {} } = {}) {
         first = false;
         const frames = toRealm.push(data);
         if (toRealm.bad) { off = true; return { forward: data, reply: null }; }
-        let reply = null, refused = false;
+        let reply = null, refused = false, delayMs = 0, later = null;
         const keep = [];
         for (const f of frames) {
           const op = f[2];
@@ -107,15 +136,23 @@ export function createCharGuard({ graceMs = 1500, onLog = () => {} } = {}) {
             const z = f.indexOf(0, 3);
             pending = z > 3 ? f.subarray(3, z).toString('latin1') : null;
           } else if ((op === MCP_CREATEGAME || op === MCP_JOINGAME) && f.length >= 5
-                     && character && fromRealm.atBoundary && isHeld(character)) {
-            onLog(`char guard: refused op ${op}, character already in a game`);
-            reply = refusalReply(f); refused = true; continue;
+                     && character && fromRealm.atBoundary) {
+            const v = verdict(character);
+            if (v === 'refuse') {
+              onLog(`char guard: refused op ${op}, character already in a game`);
+              reply = refusalReply(f); refused = true; continue;
+            }
+            if (v > 0 && toRealm.atBoundary) {   // the unlock is on its way: send this and what follows when it lands
+              onLog(`char guard: op ${op} waits ${v} ms for the unlock`);
+              delayMs = v; later = Buffer.concat(frames.slice(frames.indexOf(f))); break;
+            }
           }
           keep.push(f);
         }
         // Only a chunk that held a refused request is rewritten; every other chunk is forwarded as received.
         // A chunk that ends inside a frame is never rewritten (the tail would be lost): the realm handles it.
         if (refused && !toRealm.atBoundary) return { forward: data, reply: null };
+        if (later) return { forward: Buffer.concat([head, ...keep]), reply, delayMs, later };
         return { forward: refused ? Buffer.concat([head, ...keep]) : data, reply };
       },
       fromRealm(chunk) {
