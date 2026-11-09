@@ -180,3 +180,14 @@ test('raw item bytes and UpdateUi codes are kept for the shell', () => {
   assert.deepEqual(w.takeUiEvents(), [16, 21]);
   assert.deepEqual(w.takeUiEvents(), []);
 });
+
+test('belt boxes come from the 800x600 row set, seven rows after the 640x480 one', () => {
+  const rowText = (name, left) => `${name}\t4\t${left}\t${left + 29}\t562\t591\n`;
+  const names = ['belt', 'sash', 'default', 'girdle', 'light belt', 'heavy belt', 'uber belt'];
+  const text = 'name\tnumboxes\tbox1left\tbox1right\tbox1top\tbox1bottom\n'
+    + names.map((n) => rowText(n, 343)).join('') + names.map((n) => rowText(n + '2', 423)).join('');
+  const belt = createBeltTable(() => new TextEncoder().encode(text));
+  assert.equal(belt.boxes(2)[0].left, 423);
+  assert.equal(belt.boxes(0)[0].left, 423);
+  assert.equal(belt.boxes(2, 0)[0].left, 343);
+});

@@ -111,12 +111,15 @@ export function createInventoryTable(read) {
 }
 
 /** Belts.txt: record index -> the box rectangles (what d2_session_belt_boxes returns). Row 2 is the beltless record. */
+const BELTS_PER_RESOLUTION = 7;
 export function createBeltTable(read) {
   let table = null;
   const load = () => (table ??= rows(read('data\\global\\excel\\belts.txt')));
   return {
-    boxes(record) {
-      const row = load()[record];
+    // Belts.txt holds seven rows per resolution, the 640x480 set first; retail's GetGlobalBeltSlotPosition
+    // reads row `higherRes * 7 + record`, and the 800x600 HUD takes the second set.
+    boxes(record, higherRes = 1) {
+      const row = load()[higherRes * BELTS_PER_RESOLUTION + record];
       if (!row) return null;
       const n = num(row.numboxes), boxes = [];
       for (let i = 1; i <= n; i++) boxes.push({ left: num(row[`box${i}left`]), right: num(row[`box${i}right`]),
