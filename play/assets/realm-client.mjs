@@ -794,12 +794,13 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
       const challengeStr = str(challenge), expansion = product === 'D2XP' ? 1 : 0;
       const keyless = !challengeStr.includes('=') || /^[A-Za-z0-9+/]*=*$/.test(challengeStr);
       // With no revision files configured, a formula challenge gets the keyless request: the project's own realm does not verify it.
+      // A server that checks a fixed Game.exe version and checksum has them in its config (auth.exeVersion, auth.exeHash, auth.exeInfo).
       if (keyless || !auth?.revisionFiles) {
         const clientToken = (u32at(SEED) + env.tick() + env.time()) >>> 0;
         put32(SEED, clientToken);
         const revLen = keyless ? call('d2_realm_bncs_checkrev', 'number', ['string', 'string', 'number', 'bigint'], [challengeStr, '1.13.2.0', 0, BigInt(O)]) : 0;
         const checkrev = keyless ? str(rd(O, revLen)) : '';
-        const n = call('d2_realm_bncs_auth_check_request', 'number', ['number', 'number', 'number', 'number', 'bigint', 'number', 'string', 'string', 'bigint'], [clientToken, 0x0e, 0, 0, BigInt(E), 0, product + ';' + checkrev, 'd2-web', BigInt(T)]);
+        const n = call('d2_realm_bncs_auth_check_request', 'number', ['number', 'number', 'number', 'number', 'bigint', 'number', 'string', 'string', 'bigint'], [clientToken, auth?.exeVersion ?? 0x0e, auth?.exeHash ?? 0, 0, BigInt(E), 0, auth?.exeInfo ?? product + ';' + checkrev, auth?.keyOwner ?? 'd2-web', BigInt(T)]);
         return { body: rd(T, n), clientToken };
       }
       const files = auth?.revisionFiles, keys = auth?.cdKeys ?? [];
