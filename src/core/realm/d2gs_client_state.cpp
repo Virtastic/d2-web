@@ -453,6 +453,7 @@ int d2_realm_d2gs_parse_player_reassign(const uint8_t*, int, D2RealmPlayerReassi
 int d2_realm_d2gs_parse_player_move(const uint8_t*, int, D2RealmPlayerMove*);
 int d2_realm_client_apply_player_move(D2UnitStrc*, const D2RealmPlayerMove*);
 int d2_realm_d2gs_packet_size(const uint8_t*, int);
+void d2_client_lightmap_set_den_quest_avail(int);
 int d2_drlg_init();
 int d2_drlg_client_act_begin(uint32_t, int, int, int);
 D2DrlgActStrc* d2_drlg_client_act();
@@ -2554,6 +2555,12 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_feed(const uint8_t* bytes, int l
             const int result = reassign_player(packet, size);
             if (result < 0) return reject_stream(-2);
             applied += result;
+        } else if (packet[0] == 0x5e) {
+            // 1.13c D2Client+0xAC090: the server's quest-available record. The 37 bytes after the opcode (one per
+            // quest id) are copied to g_QuestAvail, the table the monster light setter reads at [1] for Den of Evil.
+            if (size != 38) return reject_stream(-2);
+            d2_client_lightmap_set_den_quest_avail(packet[2]);
+            ++applied;
         } else if (packet[0] == 0x03) {
             // Native 1.13c LoadAct allocates a bClient act with the map seed. Packet act is
             // zero-based; the DRLG adapter takes the existing 1-based vector convention.
@@ -2792,8 +2799,8 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_owned_item_readback_by_guid(uint32_t ow
 // Objects settled: the radius (nLit[mode] >> 1) and position are the rule the session lightmap uses
 // (monspawn_check.cpp, measured against retail's light captures). Monsters take the light setter's rule in the
 // compose step (max of MonStats2 nLight and the item light, at most 18; on Den of Evil a radius of 3 while the
-// Den quest flag is set). GUESS: the Den quest flag has no online source yet; it reads 0 until
-// d2_client_lightmap_set_den_quest_avail is fed.
+// Den quest byte is set). The byte is g_QuestAvail[1], the second byte after the opcode of server packet 0x5E (D2Client
+// +0xAC090), fed to d2_client_lightmap_set_den_quest_avail when that packet arrives.
 // Returns the session lightmap record (same layout as d2_session_lightmap), or null without a player/act.
 EMSCRIPTEN_KEEPALIVE const void* d2_realm_client_lightmap(int ambientOverride, int occludeUnits) {
     D2DrlgActStrc* act = d2_drlg_client_act();
