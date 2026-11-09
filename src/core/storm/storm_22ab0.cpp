@@ -31,6 +31,9 @@ void decodeF1A0(uint8_t* st) { pk_gen_asc_tabs(st, ChCodeAsc); }
 int distW(uint8_t* st, uint32_t len) { return Storm_ExplodeDistF050(st, (int32_t)len); }
 void mvW(void* d, void* s, int n) { Storm_SubF2A0(d, s, (uint32_t)n); }
 uint32_t fillEDA0(uint8_t* st) { return pk_explode_loop(st, Storm_ExplodeLitEEA0, distW, mvW); }
+// EDA0 calls the write slot as void(buf, &size, user) (retail drops 0x21C30's eax); an indirect call through a word-returning
+// callback is a signature trap in wasm, so the slot holds this void form.
+void writeV(uint8_t* b, uint32_t* n, void* u) { scomp::writeCb(b, n, u); }
 }
 
 // 1.13c Storm+0x22AB0
@@ -42,7 +45,7 @@ extern "C" int32_t Storm_Sub22AB0(uint8_t* dst, uint32_t* dstSize, const uint8_t
   e.read = scomp::readCb; e.copy = copyBytes; e.build = buildF160; e.decodeTbl = decodeF1A0; e.fill = fillEDA0;
   e.t40d60 = ChBitsAsc; e.t40d40 = LenBits; e.t40d50 = LenCode; e.t40d10 = ExLenBits;
   e.t40d20 = (const uint8_t*)LenBase; e.t40c90 = DistBits; e.t40cd0 = DistCode;
-  Storm_SubEC20(e, scomp::cb32(scomp::readCb), scomp::cb32(scomp::writeCb), st, ctx);
+  Storm_SubEC20(e, scomp::cb32(scomp::readCb), scomp::cb32(writeV), st, ctx);
   const int32_t r = Storm_Sub1B960(st, kF, 0x42E);
   *dstSize = ctx[1];
   return r;
