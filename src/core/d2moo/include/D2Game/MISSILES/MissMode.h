@@ -275,6 +275,13 @@ void __fastcall MISSMODE_SrvDmg11_RabiesContagion(D2GameStrc* pGame, D2UnitStrc*
 void __fastcall MISSMODE_SrvDmg13_BlessedHammerEx(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit, D2DamageStrc* pDamage);
 //D2Game.0x6FC5F250
 void __fastcall MISSMODE_SrvDmg14_MoltenBoulder(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit, D2DamageStrc* pDamage);
+// d2-web: 1.13c D2Game+0x39A40 callee seam (sub_13B0 monstats2 flag, sub_1180 seed roll); both null in the game
+struct D2SrvDmg14Seam
+{
+    uint32_t (*flag)(int32_t nMonsterId, int32_t nFlag);
+    uint32_t (*roll)(D2SeedStrc* pSeed, int32_t nMax);
+};
+extern D2SrvDmg14Seam g_d2SrvDmg14;
 //D2Game.0x6FC5F4B0
 D2MonStats2Txt* __fastcall D2GAME_GetMonStats2TxtRecord_6FC5F4B0(int32_t nRecordId);
 //D2Game.0x6FC5F4E0
