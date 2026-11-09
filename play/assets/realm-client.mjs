@@ -795,7 +795,7 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
       const keyless = !challengeStr.includes('=') || /^[A-Za-z0-9+/]*=*$/.test(challengeStr);
       // With no revision files configured, a formula challenge gets the keyless request: the project's own realm does not verify it.
       // A server that checks a fixed Game.exe version and checksum has them in its config (auth.exeVersion, auth.exeHash, auth.exeInfo).
-      if (keyless || !auth?.revisionFiles) {
+      if (keyless || !auth?.revisionFiles?.length) {
         const clientToken = (u32at(SEED) + env.tick() + env.time()) >>> 0;
         put32(SEED, clientToken);
         const revLen = keyless ? call('d2_realm_bncs_checkrev', 'number', ['string', 'string', 'number', 'bigint'], [challengeStr, '1.13.2.0', 0, BigInt(O)]) : 0;
