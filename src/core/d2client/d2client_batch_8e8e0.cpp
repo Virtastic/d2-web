@@ -41,10 +41,14 @@ struct Env {
     virtual uint32_t rd32(uint32_t addr) = 0;
     virtual void wr32(uint32_t addr, uint32_t v) = 0;
     virtual uint32_t dataTables() = 0;                        // *sgptDataTables
+    uint8_t b330_bbb330 = 0, b331_bbb331 = 0;
+    virtual uint32_t fn5(uint32_t rva, uint32_t a, uint32_t b, uint32_t c, uint32_t, uint32_t) { return fn(rva, a, b, c); }
 };
 
-// 1.13c D2Client+0x8E8E0
-void sub_8E8E0(Env& e, uint32_t edi, uint32_t retaddr) {
+// 1.13c D2Client+0x8E8E0: stdcall, one stack word p (ret 4). 10217 takes (item, slot index); 0x8C760 takes EBX = item, EDI = a stack
+// local, stack p; 10244 (item, p, 0, 0, 0, 0). 0x68970: EAX = top, ECX = left, EDX = 0, stack (rect byte +0x10, byte +0x11,
+// byte 0x10B331 when all three calls succeeded, else byte 0x10B330).
+void sub_8E8E0(Env& e, uint32_t p) {
     uint32_t it = e.ord(11017, e.rd32(e.player_cbbfc + 0x60));
     if (!it) return;
     for (int i = 0; i < 11; ++i) {
@@ -52,10 +56,11 @@ void sub_8E8E0(Env& e, uint32_t edi, uint32_t retaddr) {
         if (0 < r[0] && r[0] <= e.mouseX_cb828 && e.mouseX_cb828 <= r[1] &&
             r[2] <= e.mouseY_cb824 && e.mouseY_cb824 <= r[3]) {
             e.ord(10114, it, 0, 0, 0x6da);
-            uint32_t a = e.ord(10217, it, edi);
-            bool hit = a && e.fn(0x3c760, retaddr) && e.ord(10244, it, retaddr);
-            (void)hit;  // both arms of the decompile make the same bounds test and the same call
-            if (r[0] >= 0 && r[0] < e.limX_a9e14 && r[2] >= 0 && r[2] < e.limY_a9e18) e.fn(0x18970, r[0]);
+            const bool hit = e.ord(10217, it, (uint32_t)i) && e.fn(0x8c760, it, p) && e.ord(10244, it, p);
+            if (r[0] >= 0 && r[0] < e.limX_a9e14 && r[2] >= 0 && r[2] < e.limY_a9e18) {
+                const uint32_t w = (uint32_t)r[4];
+                e.fn5(0x68970, (uint32_t)r[2], (uint32_t)r[0], w & 0xff, (w >> 8) & 0xff, hit ? e.b331_bbb331 : e.b330_bbb330);
+            }
         }
     }
 }
