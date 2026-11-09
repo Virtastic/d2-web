@@ -2041,6 +2041,10 @@ async function createConfiguredRealmAccount({ account, password }) {
     try { bncs.close(); } catch { /* socket already closed */ }
     try { protocol?.free(); } catch { /* engine gone */ }
   }
+  // The terms OK goes straight into the log on (D2Launch+0x19FB0), which takes the connection the login screen holds: this one is fresh.
+  const next = webSocketTransport(realmServiceUrl(server.ws, 'bncs'));
+  await next.ready().catch(() => { throw transportFailure('the Battle.net connection could not open'); });
+  realmFlow.bncs = next;
 }
 // An account request (change password, new password, change email): a connection of its own, closed after.
 async function withRealmRequest(run) {
