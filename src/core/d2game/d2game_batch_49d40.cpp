@@ -205,7 +205,7 @@ static uint32_t d2game_seed_step(void* pSeed)
 // MonStats record its id and nRarity are written into pMonData (+0x14, stride 0x34), nTotalRarity
 // (+0x11) and nSpawnCount (+0x12) accumulate, and nMonCount (+0x10) increments. An empty spawn list
 // returns early. The ranged retry is unrolled 5 check+roll steps per pass, 4 passes (20 rolls), same as 1.10f.
-EMSCRIPTEN_KEEPALIVE void d2_game_ca760(const void* pLevels, void* pMonsterRegion, void* pSeed,
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_ca760(const void* pLevels, void* pMonsterRegion, void* pSeed,
                                         uint32_t bNightmareHell, const D2GameBatch12Env* env)
 {
     uint32_t nSpawn = (uint32_t)rd8(pLevels, 0x32);
