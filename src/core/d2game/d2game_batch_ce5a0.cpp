@@ -31,9 +31,9 @@ struct D2GameCE5A0Env {
     void     (*fnDF30)(void* pUnit);
     void     (*fnE620)(void* pUnit);
     // 0xCF5B0
-    bool     (*fnCDB0)(void* pThis, void* pUnit);
-    int32_t  (*fnB690)(uint16_t a, uint16_t b);
-    void     (*fn8BA0)(void* pThis, int32_t game, void* pUnit, int32_t a);
+    int32_t  (*fnCDB0)(int32_t game, uint32_t id, void* pUnit);   // EAX = game, ECX = id, stack unit
+    int32_t  (*fnB690)(void* pUnit, int32_t a, int32_t b);        // EAX = unit, EBX = 0x32, stack a, b
+    int32_t  (*fn8BA0)(uint32_t id, int32_t* pFlag, int32_t game, void* pUnit, int32_t a, int32_t b, uint32_t v5);   // EAX = &flag, ECX = id
     int32_t  (*ord10867)(void* p);
     int32_t  (*ord10750)(void* p);
     // 0xD16B0 .. 0xD1B20 (unit / skill compare helpers)
@@ -136,22 +136,23 @@ int d2game_CE9D0_113c(int32_t a1, void* unit, uint32_t a3, void* a4, const D2Gam
     return 0;
 }
 
-// 1.13c D2Game+0xCF5B0 (param_3 = packet, param_4 = packet id)
+// 1.13c D2Game+0xCF5B0 (ECX = game, EDX = unit, stack: pkt, id; ret 8). The 0xD8BA0 worker takes EAX = &flag (a caller-frame local that
+// doubles as the id argument slot): nonzero from the worker returns 0, else a flag it set returns 3.
 int d2game_CF5B0_113c(int32_t game, int32_t* unit, const uint8_t* pkt, int32_t id, const D2GameCE5A0Env* e)
 {
     if (id != 0xd) return 3;
-    void* self = rdptr(pkt, 1);
+    uint32_t self = rd32(pkt, 1), v5 = rd32(pkt, 5);
     int32_t t = unit[0];
     void* sub = rdptr(unit, 0x2c);
     bool plain = t == 2 || (t > 3 && t < 6);
     int32_t a = plain ? (int32_t)rd32(sub, 0xc) : sub ? e->ord10867(sub) : 0;
-    uint16_t b = plain ? (uint16_t)rd32(sub, 0x10) : sub ? (uint16_t)e->ord10750(sub) : 0;
-    int32_t r = e->fnCDB0(self, unit);
-    if (r == 0 && (r = e->fnB690((uint16_t)a, b)) == 0) {
-        e->fn8BA0(self, game, unit, a);
-        r = 0;
-    }
-    return r;
+    int32_t b = plain ? (int32_t)rd32(sub, 0x10) : sub ? e->ord10750(sub) : 0;
+    int32_t r = e->fnCDB0(game, self, unit);
+    if (r != 0) return r;
+    if ((r = e->fnB690(unit, a, b)) != 0) return r;
+    int32_t flag = 0;
+    if (e->fn8BA0(self, &flag, game, unit, a, b, v5) != 0) return 0;
+    return flag != 0 ? 3 : 0;
 }
 
 // 1.13c D2Game+0xD16B0

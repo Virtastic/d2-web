@@ -156,9 +156,9 @@ void d2_fn_d2game_c9400(void* q, const D2GameBatchC7130Env* e)
     p[0] = p[1] = p[2] = p[3] = 0; p[4] = 0;
 }
 
-// 1.13c D2Game+0xC8CD0
+// Superseded by src/core/d2game/d2game_c8cd0.cpp (d2_fn_d2game_C8CD0: coords, retry and register args); kept for the old seam table.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2game_c8cd0(void* quest, const D2GameBatchC7130Env* e)
+void d2_fn_d2game_c8cd0_v0(void* quest, const D2GameBatchC7130Env* e)
 {
     uint8_t* d = (uint8_t*)e->ptr(r32(quest, 0x18));
     e->ord10141();

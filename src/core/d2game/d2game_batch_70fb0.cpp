@@ -205,7 +205,7 @@ struct D2Game765e0Env {
 };
 // 1.13c-NAMED D2Game+0x765E0: ECX=game, EDX=unit. GUESS: f1560's ECX and f75e10's stack-local block are
 // hidden; class 0x4e units reschedule at +0x2d / +0xf frames, otherwise reset to state 0xa0.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_765e0(void* game, int32_t* unit, uint32_t ecx, void* locals, const D2Game765e0Env* e) {
+extern "C" EMSCRIPTEN_KEEPALIVE void d2game_765e0_env(void* game, int32_t* unit, uint32_t ecx, void* locals, const D2Game765e0Env* e) {
     e->a10498(unit[0xb]);
     int32_t cls = unit[1];
     if (e->f1560(ecx, 3) == 0) { e->f8ea80(game, unit, 2, rd32(game, 0xa8) + 1, 0, 0, 0); return; }

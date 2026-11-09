@@ -388,16 +388,27 @@ int32_t GAME_GetUnitCount(void* const* pUnitLists)
 // (counter * 1000 / frequency) result in EDX:EAX; the 1.10f comment's "truncated to 32 bits" is a
 // 1.10f artifact. Without the high-resolution clock the result is GetTickCount().
 // 1.13c D2Game+0x52020
+// The FN probe (src/core/fn/d2game_52020.cpp) answers the two kernel32 clocks through these seams; null = the shims.
+uint64_t (*g_taskQpcSeam)() = nullptr;
+uint32_t (*g_taskTickSeam)() = nullptr;
+// The FN probe's state accessor: the three module globals TASK_GetClockTime reads.
+extern "C" void d2game_52020_state(uint32_t** hr, uint32_t** fqLo, uint32_t** fqHi)
+{
+    *hr = &g_bHighResolutionClock; *fqLo = &g_perfFrequencyLow; *fqHi = &g_perfFrequencyHigh;
+}
 uint64_t TASK_GetClockTime()
 {
     if (g_bHighResolutionClock != 0)
     {
         LARGE_INTEGER nCounter;
-        QueryPerformanceCounter(&nCounter);
-        return static_cast<uint64_t>(nCounter.QuadPart) * 1000u /
-            (static_cast<uint64_t>(g_perfFrequencyHigh) << 32 | g_perfFrequencyLow);
+        if (g_taskQpcSeam) nCounter.QuadPart = static_cast<int64_t>(g_taskQpcSeam());
+        else QueryPerformanceCounter(&nCounter);
+        // __allmul (low 64 bits of counter * 1000), then the SIGNED __alldiv by the frequency.
+        const int64_t nScaled = static_cast<int64_t>(static_cast<uint64_t>(nCounter.QuadPart) * 1000u);
+        return static_cast<uint64_t>(nScaled /
+            static_cast<int64_t>(static_cast<uint64_t>(g_perfFrequencyHigh) << 32 | g_perfFrequencyLow));
     }
-    return GetTickCount();
+    return g_taskTickSeam ? g_taskTickSeam() : GetTickCount();
 }
 
 // 1.10f sibling: the queue-balancing body of TASK_Create (GAME/Task.cpp 0x6FC405B0); 1.13c factored

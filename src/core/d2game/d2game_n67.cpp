@@ -28,7 +28,7 @@ void n67_SendPacket0x81(const N67Seams* s, uint32_t p2, uint8_t p4, uint32_t p5,
     s->sendPacket(b, 0x14);
 }
 
-// 1.13c D2GAME+0xE12D0
+// (superseded for D2Game+0xE12D0 by d2game_e12d0.cpp: this seam copy drops the hidden register/stack inputs)
 int* n67_CreatePresetUnit(const N67Seams* s, uint32_t eax, int type, int a3, void* a4, int a5, int a6)
 {
     int* u;
