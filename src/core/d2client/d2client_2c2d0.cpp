@@ -1,10 +1,39 @@
+// 1.13c D2Client+0x2C2D0 (EAX item or 0, ESI unit; stack p1 value out, p2 flag out, p3, p4; ret 0x10). desc = 0xC640(ECX p4) (zero: 0);
+// *p1 = 0xCEC8(unit); item = EAX, else 0xCA0C(unit+0x60) when that is set; 0xC220(item) == 0x26 zeroes *p1 and *p2.
+// pct = (0xC1FC(unit, 0x4E) ? 0xC922(unit, item, p4, 0) : 0) + 0xC454(unit, 0x77, 0) + 0xCEAA(unit, (int16)desc[0], p3);
+// *p1 += *p1 * pct / 100 (32-bit product, C division); *p2 = 0, then 3 on 0xCEB0(unit), 1 on 0xCEBC(unit). Returns 1.
+#include <cstdint>
+#include <cstring>
+#include <emscripten.h>
+#include "d2client_callee.h"
+
+static inline int32_t pctAdd(int32_t v, int32_t pct) { return (int32_t)((uint32_t)v * (uint32_t)pct) / 100 + v; }
+
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2c_2c2d0(const D2cSvc& v, uint32_t item, uint32_t unit, int32_t* p1, int32_t* p2,
+                                                  uint32_t p3, uint32_t p4) {
+    if (!p4) return 0;
+    const uint32_t desc = d2c_call(v, 0xc640, 0, p4, 0, 0, 0);
+    if (!desc) return 0;
+    *p1 = (int32_t)d2c_call(v, 0xcec8, 0, 0, 0, 0, 0, unit);
+    if (!item) { uint32_t u60; memcpy(&u60, (const uint8_t*)(uintptr_t)unit + 0x60, 4); if (u60) item = d2c_call(v, 0xca0c, 0, 0, 0, 0, 0, u60); }
+    if (item && d2c_call(v, 0xc220, 0, 0, 0, 0, 0, item) == 0x26) { *p1 = 0; *p2 = 0; }
+    int32_t pct = 0;
+    if (d2c_call(v, 0xc1fc, 0, 0, 0, 0, 0, unit, 0x4e)) pct = (int32_t)d2c_call(v, 0xc922, 0, 0, 0, 0, 0, unit, item, p4, 0);
+    pct += (int32_t)d2c_call(v, 0xc454, 0, 0, 0, 0, 0, unit, 0x77, 0);
+    int16_t w; memcpy(&w, (const void*)(uintptr_t)desc, 2);
+    pct += (int32_t)d2c_call(v, 0xceaa, 0, 0, 0, 0, 0, unit, (uint32_t)(int32_t)w, p3);
+    *p1 = pctAdd(*p1, pct);
+    *p2 = 0;
+    if (d2c_call(v, 0xceb0, 0, 0, 0, 0, 0, unit)) *p2 = 3;
+    if (d2c_call(v, 0xcebc, 0, 0, 0, 0, 0, unit)) *p2 = 1;
+    return 1;
+}
+
+// The retail register-convention env port of the same function (main, fba4983815).
 // 1.13c D2Client+0x2C2D0
 // Damage/modifier percent scaler. Registers (disassembly 0x6FADC2D0): EAX = optional source unit (kept in EBX), ESI = the unit; stack p1..p4, ret 0x10.
 // p4 gates the whole function (and is the third argument of 0xC922); p1 receives the scaled value; p2 receives the 0/3/1 flag; p3 is forwarded to 0xCEAA. Every callee is a thunk with the
 // stack arguments listed (stdcall), the decompile's missing arguments restored from the disassembly.
-#include <emscripten.h>
-#include <cstdint>
-#include <cstring>
 
 struct D2c2c2d0Env {
     uint32_t (*cB640)();                                  // Ordinal_10858: a pointer to the mode word (read only, as int16)

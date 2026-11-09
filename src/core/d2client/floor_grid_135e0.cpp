@@ -37,13 +37,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_135e0(uint8_t* rec, int32_t colBa
     for (int32_t row = 0; row < 6; ++row) {
         for (int32_t col = 0; col < 6; ++col, rec += 0xC) {
             if (cornersOnly != 0 && !((col == 0 || col == 5) && (row == 0 || row == 5))) continue;
-            int32_t x = 0, y = 0;
-            env->project((colBase + col) << 16, (rowBase + row) << 16, height, &x, &y);
-            x += xadj;
+            int32_t* px = (int32_t*)(rec + 4);   // the projector writes x, y straight into the record; the x adjust is added in place
+            env->project((colBase + col) << 16, (rowBase + row) << 16, height, px, (int32_t*)(rec + 8));
+            *px += xadj;
             if (height != 0) {
                 rec[0] = b[0]; rec[1] = b[1]; rec[2] = b[3]; rec[3] = b[2];
             }
-            for (int i = 0; i < 4; ++i) { rec[4 + i] = (uint8_t)(x >> (8 * i)); rec[8 + i] = (uint8_t)(y >> (8 * i)); }
             if (height == 0) env->null_fill((colBase + col) * 8, (rowBase + row) * 8, rec, rec + 1, rec + 2, rec + 3);
         }
     }

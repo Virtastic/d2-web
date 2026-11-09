@@ -46,31 +46,6 @@ static uint32_t g_tickStamp;         // +0xFD418 DAT_6fbd3418
 static int32_t  g_level;             // +0xE3808 DAT_6fbc9808
 static int32_t  g_flag;              // +0xDD854 DAT_6fb8d854
 
-extern "C" void d2_client_a8630(uintptr_t node, const D2ClientBatchA7D50Env* env);
-
-// 1.13c D2Client+0xA7D50: unit (EDI) state transition; only for types 1/5 whose id resolves.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_client_a7d50(uintptr_t unit, const D2ClientBatchA7D50Env* env) {
-    if (unit == 0 || rd32(unit, 0) != 0) return;
-    int32_t type = rd32(unit, 0x10);
-    if (env->ord10331() == 0 || (type != 1 && type != 5)) return;
-    if (env->ord10327() != 0) d2_client_a8630(unit, env);
-    env->sub_197D0();
-    env->ord11103();
-    int32_t id = rd32(unit, 0x2c);
-    if (rd32(unit, 0x10) == 0x13) env->ord10770(id);
-    env->ord10498(id);
-    int32_t r = env->ord10057(env->ord10331());
-    uintptr_t arg = (uintptr_t)(((r != 0 ? 4u : 0u)) + 1u);
-    env->sub_A6210();
-    wr32(unit, 0xc4, (int32_t)(((uint32_t)rd32(unit, 0xc4) & 0xffffffbfu) | 2u));
-    if (env->ord11090() != 0) {
-        env->sub_6A220();
-        env->sub_2A590(arg, unit);
-        env->sub_24490(arg, 0);
-    }
-}
-
 // older port of D2Client+0xA82B0: walk the list, releasing each node's two resources, then clear the head.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_a82b0(const D2ClientBatchA7D50Env* env) {
@@ -150,34 +125,6 @@ EMSCRIPTEN_KEEPALIVE void d2_client_a85f0(uintptr_t obj, const D2ClientBatchA7D5
     if (rd32(obj, 0xc) == 2) env->fatal(400);
 }
 
-// 1.13c D2Client+0xA8630: esi=node; unlink from the singly linked list, release, count.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_client_a8630(uintptr_t node, const D2ClientBatchA7D50Env* env) {
-    if (node == 0) return;
-    uintptr_t prev = 0, cur = g_listHead;
-    for (;;) {
-        if (cur == 0) { env->fatal(0x17a); return; }
-        if (cur == node) break;
-        prev = cur;
-        cur = (uintptr_t)(uint32_t)rd32(cur, 0x28);
-    }
-    if (prev == 0) g_listHead = (uintptr_t)(uint32_t)rd32(cur, 0x28);
-    else wr32(prev, 0x28, rd32(cur, 0x28));
-    if (rd32(node, 0x30) != 0) env->ord10043(0x181, 0);
-    env->ord10043(0x183, 0);
-    g_listFreed++;
-}
-
-// 1.13c D2Client+0xA86C0: eax=obj; store three colour bytes at +0x25..+0x27.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_client_a86c0(uintptr_t obj, uint8_t a, uint8_t b, uint8_t c,
-                                          const D2ClientBatchA7D50Env* env) {
-    if (obj == 0) { env->fatal(0x167); return; }
-    *(uint8_t*)(obj + 0x25) = a;
-    *(uint8_t*)(obj + 0x26) = b;
-    *(uint8_t*)(obj + 0x27) = c;
-}
-
 // 1.13c D2Client+0xA8710: eax=obj; return obj+0x18 >> 3.
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_client_a8710(uintptr_t obj, const D2ClientBatchA7D50Env* env) {
@@ -193,45 +140,3 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_client_a8760(int32_t a, int32_t b) {
     return (uint32_t)(x * 0x3d7 + y * 0x197) >> 10;
 }
 
-// 1.13c D2Client+0xA8800: esi passes through. Pick state 0/1/2 and latch it with a 2001 ms debounce.
-extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_client_a8800(int32_t esi, const D2ClientBatchA7D50Env* env) {
-    int32_t st = 2;
-    bool ok = false;
-    if (env->ord10047() == 0) ok = true;
-    else if (g_flag != 0) { st = 1; ok = true; }
-    if (ok && g_level > 9) {
-        if (g_level > 0xc) {
-            if (g_level > 0xf) goto latch;
-            if (g_tickState > 0) return esi;
-        }
-        st = 1;
-        goto latch;
-    }
-    st = 0;
-latch:
-    uint32_t t = g_tickStamp;
-    int32_t s = g_tickState;
-    if (st != g_tickState) {
-        t = env->tickCount();
-        s = st;
-        if (t - g_tickStamp < 0x7d1) return esi;
-    }
-    g_tickState = s;
-    g_tickStamp = t;
-    return esi;
-}
-
-// 1.13c D2Client+0xA8880: probe the 0x30 x 0x30 window; mark cell dword0 = 1 where Ordinal_10482 hits.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_client_a8880(const D2ClientBatchA7D50Env* env) {
-    if (g_unitId == 0 || env->ord10331() == 0) return;
-    int32_t base = 0;
-    for (int32_t y = 0; base < 0x900; ++y, base += 0x30)
-        for (int32_t x = 0; x < 0x30; ++x) {
-            uint32_t o = 0;
-            uint32_t v = env->sub_1400(&o);
-            if (v == 0) v = env->ord10331();
-            if (env->ord10482(v, g_orgX + x, g_orgY + y, 0x22) != 0) g_cells[(base + x) * 2] = 1;
-        }
-}

@@ -130,15 +130,7 @@ int32_t sub_2BF40(Services& s,int32_t* unit,int32_t skillId){
  if(cur)s.rva(0xA5FB0);
  s.ord(10137,a,0x1001); s.ord(10748,a,0); s.rva(0xA3220); return 1;
 }
-// 1.13c D2Client+0x2C2D0   (eax/esi are caller registers: inEax, esi60)
-int32_t sub_2C2D0(Services& s,int32_t* out,int32_t inEax,int32_t esi60,int32_t gate,uint32_t* flagOut){
- if(!gate)return 0; int32_t desc=s.ord(10858); if(!desc)return 0;
- *out=s.ord(10621);
- if(inEax||(esi60&&(inEax=s.ord(10061,esi60)))) if(s.ord(11088,inEax)==0x26){*out=0; wr32((void*)(intptr_t)desc,0,0);}
- int32_t t=0; if(s.ord(10494))t=s.ord(10804);
- *out=(*out*(t+s.ord(10910)+s.ord(10653)))/100+*out;
- *flagOut=0; if(s.ord(10402))*flagOut=3; if(s.ord(11038))*flagOut=1; return 1;
-}
+// 1.13c D2Client+0x2C2D0: moved to d2client_2c2d0.cpp (EAX item, ESI unit and the four stack words as retail passes them).
 // 1.13c D2Client+0x2D680
 void sub_2D680(Services& s,int32_t unit60,int32_t p2,int32_t p4,int32_t* o1,int32_t* o2){
  if(unit60)s.ord(10061,unit60); *o1=0;*o2=0; s.rva(0x2C4F0,(int32_t)(intptr_t)o1,(int32_t)(intptr_t)o2,p4,p2);

@@ -1,33 +1,26 @@
-// D2Client+0xA8110: fixed sequence of table walks (A4DA0) and A8030 calls over D2Client tables; env-seam style.
+// 1.13c D2Client+0xA8110 (no args): fixed sequence of table walks 0xA4DA0 (stack table, EBX = per-unit callback RVA) and A8030 calls (stack table),
+// then two more walks when DAT_6fbcc394 (D2Client+0x11C394) is 0. Callback RVAs: 0x2B1E0, 0xA4D90, 0xA4D80, 0xA4E80.
 #include <cstdint>
 #include <emscripten.h>
-struct D2cA8110Env {
-    uint8_t* mem;                              // linear base for 32-bit retail addresses
-    void (*walk)(uint32_t table);              // D2Client+0xA4DA0 (its EBX callback is bound by the host; unverified)
-    void (*fn8030)(uint32_t table);            // D2Client+0xA8030 (unrecovered; convention unverified)
-    uint32_t flag_6fbcc394;                    // DAT 6fbcc394 (RVA 0xCC394 relative to image base 0x6FB00000 -> 0xCC394)
-};
-extern "C" {
-// 1.13c D2Client+0xA8110
-EMSCRIPTEN_KEEPALIVE void d2c_a8110(const D2cA8110Env* e) {
-    e->walk(0x6fbbac08);
-    e->fn8030(0x6fbba008);
-    e->fn8030(0x6fbb9e08);
-    e->walk(0x6fbba608);
-    e->walk(0x6fbba808);
-    e->walk(0x6fbbaa08);
-    e->walk(0x6fbbae08);
-    e->fn8030(0x6fbb9c08);
-    e->walk(0x6fbb9c08);
-    e->walk(0x6fbbae08);
-    e->walk(0x6fbba608);
-    e->walk(0x6fbba808);
-    e->walk(0x6fbb9c08);
-    e->walk(0x6fbbae08);
-    e->walk(0x6fbba608);
-    if (e->flag_6fbcc394 == 0) {
-        e->walk(0x6fbba608);
-        e->walk(0x6fbba808);
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a8110(uint32_t flag_11c394, void (*walk)(uint32_t table, uint32_t cb_rva), void (*fn8030)(uint32_t table)) {
+    const uint32_t B = 0x6FAB0000u;
+    walk(B + 0x10AC08, 0x2B1E0);
+    fn8030(B + 0x10A008);
+    fn8030(B + 0x109E08);
+    walk(B + 0x10A608, 0x2B1E0);
+    walk(B + 0x10A808, 0x2B1E0);
+    walk(B + 0x10AA08, 0x2B1E0);
+    walk(B + 0x10AE08, 0x2B1E0);
+    fn8030(B + 0x109C08);
+    walk(B + 0x109C08, 0xA4D90);
+    walk(B + 0x10AE08, 0xA4D90);
+    walk(B + 0x10A608, 0xA4D90);
+    walk(B + 0x10A808, 0xA4D90);
+    walk(B + 0x109C08, 0xA4D80);
+    walk(B + 0x10AE08, 0xA4D80);
+    walk(B + 0x10A608, 0xA4D80);
+    if (flag_11c394 == 0) {
+        walk(B + 0x10A608, 0xA4E80);
+        walk(B + 0x10A808, 0xA4E80);
     }
-}
 }

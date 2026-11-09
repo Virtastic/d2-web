@@ -196,52 +196,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_51E80(const D2cE51E80* e) {
     e->f51860(best);
 }
 
-// 1.13c D2Client+0x5D7A0  (param_1 = effect request block)
-// Builds a light/effect object for a visual slot; all Ordinal_100xx/FUN seams are injected.
-struct D2cE5D7A0 {
-    i32 (*f0ee70)(i32 id); i32* (*f0cc10)(i32 id); void (*f0ebc0)(i32 id, i32); u32* (*f0ce70)(u32* rq, u32 flags);
-    i32 (*ord10059)(); void (*ord10005)(); void (*ord10038)(); void (*ord10050)(); i32 (*ord10069)(i32);
-    void (*ord10026)(u32); void (*f0d1d0)(u32* obj); void (*f0db30)(i32 id, char* buf); i32 (*ord10037)();
-    i32 (*ord10039)(i32, uint8_t);
-};
-EMSCRIPTEN_KEEPALIVE u32* d2c_5D7A0(const D2cE5D7A0* e, uint8_t* tbl, i32 tblCnt, u32* rq) {
-    i32 id = (i32)rq[1];
-    uint8_t* rec = (tbl && id >= 0 && id < tblCnt) ? tbl + id * 0x8e : nullptr;
-    if (!(rq[0xe] & 1)) { id = e->f0ee70(id); rq[1] = (u32)id; }
-    i32* p = e->f0cc10((i32)rq[1]);
-    if (p) {
-        uint8_t* q = (uint8_t*)(intptr_t)p[2];
-        if (rd(q, 0x3d) == 0 && (u32)(rq[0xd] - rd(q, 0x34)) <= 1 && (uint8_t)q[0x3c] >= (uint8_t)rq[0xf]) return nullptr;
-    }
-    i32 id2 = (i32)rq[1];
-    uint8_t* r2 = (tbl && id2 >= 0 && id2 < tblCnt) ? tbl + id2 * 0x8e : nullptr;
-    wr(rec, 0x68, rd(rec, 100)); wr(rec, 100, id2);
-    if (!(r2[0x4f] || rd(r2, 0x86) == 2)) {
-        e->f0ebc0(id2, 0);
-        if (rd(r2, 0x86) != 2) return nullptr;
-    }
-    if (r2[0x81]) return nullptr;
-    u32 f = r2[0x50] != 0;
-    if (!f) { if (e->ord10059() == 1) f = 2; if (e->ord10059() == 2) f |= 6; }
-    u32* o = e->f0ce70(rq, f);
-    if (!o) return nullptr;
-    e->ord10005();
-    if (!r2[0x4f]) {
-        e->ord10038();
-        if (r2[0x80] == 1) e->ord10050();
-        if (!e->ord10069(rd(r2, 0x70))) return nullptr;
-    }
-    o[2] = (u32)(uintptr_t)rq;
-    if (f & 4) e->ord10026(r2[0x4b] ? 0x3f800000u : 0u);
-    o[6] = 0xffffffffu; o[7] = 0; o[3] = o[4] = o[5] = 0;
-    e->f0d1d0(o);
-    if (!r2[0x4f]) { if (!e->ord10037()) { o[2] = 0; return nullptr; } }
-    else {
-        char buf[80]; e->f0db30(id, buf);
-        if (!e->ord10039(rd(rq, 0x24), r2[0x3e])) { o[2] = 0; return nullptr; }
-    }
-    return o;
-}
+// 1.13c D2Client+0x5D7A0: moved to d2client_5d7a0.cpp (stdcall rq; the 0x5DB30 id is rq+4 after the remap, the D2Sound calls take o[0]).
 
 // 1.13c D2Client+0x63620 and 1.13c D2Client+0x636A0 (identical bodies: CRT stack-probe wrapper)
 EMSCRIPTEN_KEEPALIVE uint64_t d2c_63620(i32 g3710, void (*f9ff7)(), uint64_t (*facc4)()) { if (g3710) f9ff7(); return facc4(); }

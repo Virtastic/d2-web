@@ -78,19 +78,7 @@ void d2_client_90cb0(W* out, const W* fmt, const W* const* args) {
     for (int i = 0; i < n; i++) d2::client::sub_8E600((char16_t*)out, (uint32_t)i, slot[i]);
 }
 
-// 1.13c D2Client+0x90EB0 (171 B): draw a name clipped to 0xA0 pixels.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_90eb0(G* g, Host h) {
-    W buf[32] = {};
-    H(h, ORD(10184));
-    const W* s = S(H(h, 0xA5D90));
-    for (int i = 0; i < 32 && s[i]; i++) buf[i] = s[i];
-    buf[31] = 0;
-    W* p = &buf[31];
-    while ((int32_t)H(h, ORD(10028), P(buf)) > 0xa0 && p > buf) { --p; *p = 0; }
-    H(h, ORD(10150), 0xd6 - g->cb9a4, 0, 0);
-    H(h, ORD(10184));
-}
+// 1.13c D2Client+0x90EB0: moved to d2client_90eb0.cpp (the name id, font restore and draw position passed as retail does).
 
 // 1.13c D2Client+0x90F60: moved to d2client_90f60.cpp (register and stack arguments passed explicitly).
 
@@ -143,30 +131,7 @@ void d2_client_911a0(G* g, Host h) {
     if (matched) g->bc4c = (int32_t)(H(h, 0xFFFF0001) + 500);   // GetTickCount()
 }
 
-// 1.13c D2Client+0x91360 (389 B): out = ESI (hidden), param_1 text; append the title-coloured suffix.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_91360(G* g, Host h, W* out, const W* param_1) {
-    W tmp[64] = {}, line[256];
-    const W* sep = S(H(h, ORD(10003)));
-    wcpy(out, param_1);
-    if (g->bc34 == 4 && H(h, ORD(10202), g->bc38, 0x400000, 0xccc, P(INV))) {
-        memset(line, 0, sizeof line);
-        wcpy(line, S(H(h, ORD(10003))));
-        wcat(out, sep);
-        wcat(out, S(H(h, 0x6F5F0, 1)));
-    }
-    if (H(h, 0x46230, g->bc38, P(tmp))) {
-        if (tmp[0]) wcat(out, sep);
-        wcat(out, tmp);
-        return;
-    }
-    if (g->bc34 != 4) {
-        memset(line, 0, 64 * sizeof(W));
-        wcpy(line, S(H(h, ORD(10003))));
-        wcat(out, sep);
-        wcat(out, S(H(h, 0x6F5F0, 1)));
-    }
-}
+// 1.13c D2Client+0x91360: moved to d2client_91360.cpp (ESI out, stack text, EDI for the colour helper as retail passes them).
 
 // 1.13c D2Client+0x923F0 (77 B)
 extern "C" EMSCRIPTEN_KEEPALIVE
@@ -178,55 +143,9 @@ uint32_t d2_client_923f0(G* g, Host h) {
     return 0;
 }
 
-// Shared by 92440/92650: `a` is the tooltip text, finished and drawn.
-static void finish_text(G* g, Host h, W* a, W* b, W* o, uintptr_t rect, int32_t esi, bool is92650) {
-    H(h, 0x914F0, g->bc38, P(b));
-    wcat(a, b);
-    if (g->bc34 < 1 || g->bc34 > 9) wcpy(o, a);
-    else H(h, 0x91360, P(o), P(a));
-    H(h, ORD(10177), rect, P(o));
-    if (!is92650) { H(h, ORD(10085), g->e90eac < 1 ? g->e90eb4 : g->e90eac, 0, 0); return; }
-    if (g->e90eac != esi && g->e90eac - esi >= 0) H(h, ORD(10085), g->e90eac, 0, 0);
-    else H(h, ORD(10085), g->e90eb4 + esi, 0, 0);
-}
+// 1.13c D2Client+0x92440: moved to d2client_92440.cpp (registers and stack words as retail passes them).
 
-// 1.13c D2Client+0x92440 (528 B)
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_92440(G* g, Host h) {
-    static W a[1024], b[128], o[1024]; memset(a, 0, sizeof a);
-    const W* sep = S(H(h, ORD(10003)));
-    if (!H(h, ORD(10661), g->bc38)) return;
-    uint32_t id = g->bc38 ? ((const uint32_t*)(uintptr_t)g->bc38)[1] : 0xffffffff;
-    uintptr_t rec = H(h, ORD(10695), id);
-    if (!rec) fatal(h, 0xe61);
-    uint32_t rect[8] = {};
-    if (!H(h, ORD(10450), ((const uint32_t*)rec)[50], P(rect))) fatal(h, 0xe64);
-    wcpy(a, S(H(h, ORD(10003))));
-    wcpy(a, S(H(h, ORD(10003))));
-    wcat(a, sep);
-    wcat(a, S(H(h, ORD(10003))));
-    wcat(a, sep);
-    memset(b, 0, sizeof b); memset(o, 0, sizeof o);
-    finish_text(g, h, a, b, o, P(rect), 0, false);
-}
-
-// 1.13c D2Client+0x92650 (499 B); esi = hidden ESI.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_92650(G* g, Host h, int32_t esi) {
-    static W a[1024], b[128], o[1024], z[512]; memset(a, 0, sizeof a); memset(z, 0, sizeof z);
-    const W* sep = S(H(h, ORD(10003)));
-    if (!g->bc38 || H(h, ORD(11088), g->bc38) != 0x12) fatal(h, 0xcf1);
-    uintptr_t rec = H(h, ORD(10695), ((const uint32_t*)(uintptr_t)g->bc38)[1]);
-    if (!rec) fatal(h, 0xcf5);
-    H(h, 0x8D880, g->bc38);
-    if (g->bc34 == 0) {
-        wcat(a, S(H(h, ORD(10003)))); wcat(a, sep);
-        wcat(a, S(H(h, ORD(10003)))); wcat(a, sep);
-    }
-    memset(b, 0, sizeof b); memset(o, 0, sizeof o);
-    uint32_t rect[2] = {};
-    finish_text(g, h, a, b, o, P(rect), esi, true);
-}
+// 1.13c D2Client+0x92650: moved to d2client_92650.cpp (no hidden ESI: the y compare uses the text height 0xD3B4 returns).
 
 // 1.13c D2Client+0x92850 (106 B)
 extern "C" EMSCRIPTEN_KEEPALIVE

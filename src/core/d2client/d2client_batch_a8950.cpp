@@ -89,13 +89,15 @@ uintptr_t d2_client_a8d30(uintptr_t key, uintptr_t tab_b9a08, uintptr_t tab_ba60
     return lookup_54e20(R32(key + 4), tab, t);
 }
 
-// 1.13c D2Client+0xA8D70 (485 B): ECX = param_1; walk the list at head (DAT_6fbcbbec, next = +0x28).
-// tab_b9a08/tab_ba608 = hash tables (bucket = type*0x200 + (id&0x7f)*4, chain next = +0xE4).
-// ord10331 = unit->owner, ord10867/10750 = per-unit hooks, call1400 = FUN_6fab1400 (x4, no args).
+// 1.13c D2Client+0xA8D70 (485 B): ECX = param_1; walk the list at head (DAT_6fbcbbec, next = +0x28), rec.kind (+0xc) == 2 only.
+// tab_b9a08/tab_ba608 = hash tables (bucket = type*0x200 + (id&0x7f)*4, chain next = +0xE4). Per unit u found:
+// owner = 0xC1F0(u) (stdcall); kinds 2, 4, 5 read x/y from path = u+0x2c at +0xC/+0x10, others call 0xC3BE(path)/0xC2EC(path) (stdcall) when
+// path != 0 (else 0,0); r = rec.radius(+0x18) >> 3; 0x1400 (EAX = owner, EBX = x, EDI = y) is probed at (x+r,y) (x-r,y) (x,y+r) (x,y-r), the
+// first that returns param_1 clears rec+0x2c. owner == param_1 skips the unit. Fatal paths: unit missing/type 6 (0x591), type mismatch (0x5a).
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_a8d70(uint32_t param_1, uintptr_t head, uintptr_t tab_b9a08, uintptr_t tab_ba608,
-                     FatalFn fatal, uint32_t (*ord10331)(uintptr_t), void (*ord10867)(uint32_t),
-                     void (*ord10750)(uint32_t), uint32_t (*call1400)(void)) {
+                     FatalFn fatal, uint32_t (*owner_c1f0)(uintptr_t), uint32_t (*px_c3be)(uint32_t),
+                     uint32_t (*py_c2ec)(uint32_t), uint32_t (*room_1400)(uint32_t room, uint32_t x, uint32_t y)) {
     for (uintptr_t n = head; n != 0; n = (uintptr_t)R32(n + 0x28)) {
         if (R32(n + 0xc) != 2) continue;
         int32_t t = (int32_t)R32(n);
@@ -107,14 +109,24 @@ void d2_client_a8d70(uint32_t param_1, uintptr_t head, uintptr_t tab_b9a08, uint
             if (R32(u + 0xc) == id) break;
         if (u != 0 && (int32_t)R32(u) != t) { fatal(0x5a); return; }
         if (u == 0) { fatal(0x591); return; }
-        if (ord10331(u) == param_1) continue;
+        uint32_t owner = owner_c1f0(u);
+        if (owner == param_1) continue;
         int32_t k = (int32_t)R32(u);
-        if (k != 2 && (k < 4 || k > 5) && R32(u + 0x2c) != 0) ord10867(R32(u + 0x2c));
-        k = (int32_t)R32(u);
-        if (k != 2 && (k < 4 || k > 5) && R32(u + 0x2c) != 0) ord10750(R32(u + 0x2c));
-        if (call1400() != param_1 && call1400() != param_1 && call1400() != param_1 && call1400() != param_1)
-            continue;
-        W32(n + 0x2c, 0);
+        uint32_t path = R32(u + 0x2c), x, y;
+        if (k == 2 || (k >= 4 && k <= 5)) {
+            x = R32(path + 0xc);
+        } else {
+            x = path != 0 ? px_c3be(path) : 0;
+        }
+        if (k == 2 || (k >= 4 && k <= 5)) {
+            y = R32(path + 0x10);
+        } else {
+            y = path != 0 ? py_c2ec(path) : 0;
+        }
+        int32_t r = (int32_t)R32(n + 0x18) >> 3;
+        if (room_1400(owner, x + (uint32_t)r, y) == param_1 || room_1400(owner, x - (uint32_t)r, y) == param_1 ||
+            room_1400(owner, x, y + (uint32_t)r) == param_1 || room_1400(owner, x, y - (uint32_t)r) == param_1)
+            W32(n + 0x2c, 0);
     }
 }
 
@@ -122,7 +134,7 @@ void d2_client_a8d70(uint32_t param_1, uintptr_t head, uintptr_t tab_b9a08, uint
 // decompile drops; it starts at (rec+0x10 & ~7) - r and advances 8 per inner step (as in 0xA9860).
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_a8f60(uintptr_t rec, int32_t ox, int32_t oy, int32_t mx, int32_t my, FatalFn fatal,
-                     uint32_t (*f587b0)(uint32_t),
+                     uint32_t (*f587b0)(uint32_t dx, uint32_t dy),
                      void (*f58a40)(int32_t x, int32_t y, int32_t a, uint8_t r, uint8_t g, uint8_t b)) {
     int32_t r = (int32_t)R32(rec + 0x18);
     if (r <= 0 || r >= 0x100) return;
@@ -143,7 +155,8 @@ void d2_client_a8f60(uintptr_t rec, int32_t ox, int32_t oy, int32_t mx, int32_t 
         for (int32_t i = 0; i < n; i++, p += 4, x += 8) {
             int32_t cell = (int32_t)R32(p);
             if (cell < 0x10) {
-                uint32_t d = f587b0(ady);
+                int32_t dx = (int32_t)R32(rec + 0x10) - x;
+                uint32_t d = f587b0((uint32_t)(dx < 0 ? -dx : dx), ady);
                 int32_t q = (int32_t)(((int64_t)((uint64_t)amp << 16)) / (int64_t)r);
                 int32_t a = (((int32_t)(((uint32_t)(int32_t)R32(rec + 0x18) - d) * (uint32_t)q)) >> 16) *
                             (8 - (cell >> 1)) >> 3;
@@ -157,7 +170,7 @@ void d2_client_a8f60(uintptr_t rec, int32_t ox, int32_t oy, int32_t mx, int32_t 
 // 1.13c D2Client+0xA9860 (382 B): EAX = flag, ESI = light record, localunit = DAT_6fbcbbfc.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_a9860(int32_t flag, uintptr_t rec, int32_t ox, int32_t oy, int32_t mx, int32_t my,
-                     uintptr_t localunit, uint32_t (*f58760)(uint32_t),
+                     uintptr_t localunit, uint32_t (*f58760)(uint32_t dx, uint32_t dy),
                      void (*f58a40)(int32_t x, int32_t y, int32_t a, uint8_t r, uint8_t g, uint8_t b)) {
     int32_t r = (int32_t)R32(rec + 0x18);
     if (r <= 0 || r >= 0x100) return;
@@ -181,7 +194,8 @@ void d2_client_a9860(int32_t flag, uintptr_t rec, int32_t ox, int32_t oy, int32_
         uint32_t ady = (uint32_t)(dy < 0 ? -dy : dy);
         int32_t x = x0;
         for (int32_t i = 0; i < n; i++, x += 8) {
-            uint32_t d = f58760(ady);
+            int32_t dx = (int32_t)R32(rec + 0x10) - x;
+            uint32_t d = f58760((uint32_t)(dx < 0 ? -dx : dx), ady);
             int32_t q = (int32_t)(((int64_t)((uint64_t)amp << 16)) / (int64_t)r);
             int32_t a = ((int32_t)(((uint32_t)r - d) * (uint32_t)q)) >> 16;
             if (a > 0)

@@ -151,70 +151,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a6680(const D2ClientA5Env* e) {
     }
 }
 
-// 1.13c D2Client+0xA6F60 (90 B): EAX = amount, ECX = code, ESI = unit.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a6f60(U u, int32_t amt, int32_t code, const D2ClientA5Env* e) {
-    if (!u) return;
-    uint32_t k = 1;
-    if (amt < 1) { amt = 0; k = 2; }
-    e->fn_6b300(u, k, 0, amt, 0);
-    if (code == 0x97 || code == 0x98) e->fn_88a70(u, 0, 0, 0);
-}
 
-// 1.13c D2Client+0xA6FC0 (55 B).
-extern "C" EMSCRIPTEN_KEEPALIVE bool d2_client_a6fc0(U p, const D2ClientA5Env* e) {
-    U u = e->fn_51a80();
-    if (u && W(u, 0) == 2) {
-        U d = e->ord_10688(Lnk(u, 4));
-        if (*(int8_t*)(d + 0x167) < 0) return false;
-    }
-    return e->fn_51a80() == p;
-}
 
-// 1.13c D2Client+0xA7000 (178 B): free every unit in both tables, type_order sequence, via A6D60.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a7000(const D2ClientA5Env* e) {
-    for (int t = 0; t < 2; t++)
-        for (int k = 0; k < 6; k++) {
-            U* slots = (t ? g_tab_b : g_tab_a) + e->type_order[k] * 0x80;
-            for (int i = 0; i < 0x80; i++)
-                while (slots[i]) {
-                    U p = slots[i], n = Lnk(p, 0xe4);
-                    e->fn_a6d60(p);
-                    slots[i] = n;
-                }
-        }
-}
 
-// 1.13c D2Client+0xA70C0 (500 B): EAX = event id, ECX = unit.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a70c0(U u, int32_t ev, const D2ClientA5Env* e) {
-    if (ev < 0x162) {
-        if (ev > 0x15e) { e->fn_6b300(u, 4, 0, (u ? (int32_t)W(u, 4) : -1) - 0xb0, 0); return; }
-        switch (ev) {
-        case 0xf2: e->fn_6b300(u, 3, 0, 0, 0); return;
-        case 0x14d: e->fn_6b300(u, 2, 0, 0, 0); return;
-        case 0x154: e->fn_c7b00(); e->fn_c7e30(0, -0x20, -0x20); return;
-        case 0x155: e->fn_c7b00(); e->fn_c7e30(0, 0x20, -0x20); return;
-        case 0x156: e->fn_c7b00(); e->fn_c7e30(0, 0x20, 0x20); return;
-        case 0x157: e->fn_c7b00(); e->fn_c7e30(0, -0x20, 0x20); return;
-        }
-    } else if (ev < 0x20a) {
-        if (ev == 0x209) { e->fn_53320(); return; }
-        if (ev == 0x196) {
-            e->fn_c7b00(); e->fn_c7e30(-0x37, 0, 0);
-            if (!u) return;
-            U s = Lnk(u, 0x54);
-            U d = s ? Lnk(s, 0x30) : 0;
-            if (d) { W(d, 0x10) = 0; W(d, 0x14) = 0; W(d, 0x18) = 0x800; }
-            if (d) { W(d, 0x28) = 0; W(d, 0x2c) = 0; W(d, 0x30) = 0x32; }
-            if (d) W(d, 0) |= 0x20;
-        } else if (ev > 0x1a0 && ev < 0x1a3 && u) e->fn_6b300(u, 2, 0, 0, 0);
-    } else if (ev == 0x21f || ev == 0x2c0) e->fn_6b300(u, 3, 0, 0, 0);
-}
 
-// 1.13c D2Client+0xA7D00 (75 B): ESI = x offset, `dy` = stack local uStack_20 (y offset).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a7d00(int32_t dx, int32_t dy, const D2ClientA5Env* e) {
-    for (U n = e->ord_10476(); n; n = Lnk(n, 0xc))
-        if (W(n, 0x1c) & 1) {
-            e->ord_10561();
-            e->fn_a7bf0(W(n, 4), (int32_t)W(n, 8) + dx, (int32_t)W(n, 0x18) + dy, W(n, 0x14));
-        }
-}

@@ -149,33 +149,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_87560(D2cWarden* w, uint32_t 
     return 1;
 }
 
-// 1.13c D2Client+0x87840
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_87840(D2cWarden* w, const D2cWardenEnv* e) {
-    while (w->pend) {
-        if (w->cur) { e->release(w->cur); d2c_drop(w->cur, e); }
-        D2cWardenNode* n = w->pend;
-        w->cur = n;
-        w->pend = nullptr;
-        uint32_t seed = w->seed;
-        e->call_entry(n);                 // returns new iface into n+0xC
-        e->send4(n, &seed, 4);
-    }
-}
+// 1.13c D2Client+0x87840: moved to d2client_87840.cpp (the vtable and entry calls keyed by the pointers retail reads).
 
-// 1.13c D2Client+0x87940
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_87940(D2cWarden* w, const uint8_t* key16, const D2cWardenEnv* e,
-                                                         uint32_t (*slot_cc)(void*, void*), void (*slot_c8)(void*)) {
-    if (e->sigcheck() == 0) return d2_client_87560(w, 0x12b2, e);
-    char hex[33]; uint8_t tag[8];
-    for (int i = 0; i < 16; i++) snprintf(hex + i * 2, 3, "%02x", key16[i]);
-    e->ord501(tag, w->sig5, 5);
-    if (w->ctx && slot_cc(hex, tag)) {
-        uint32_t r = d2_client_87560(w, (uint32_t)(uintptr_t)tag, e);
-        slot_c8(w->ctx);
-        return r;
-    }
-    return 0;
-}
+// 1.13c D2Client+0x87940: moved to d2client_87940.cpp (the ctx+0xCC/+0xC8 calls and the 0x87560 registers retail passes).
 
 static bool d2c_scan(const D2cQNode* n, int32_t lo, int32_t hi) {   // exclusive bounds
     for (; n; n = n->next) {

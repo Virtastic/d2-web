@@ -1,25 +1,29 @@
-// 1.13c D2Client+0xA8030: walk 128 unit-list buckets (param_1[0..0x7f]); per unit call 0x2B1E0, then find the same-id unit in the
-// global hash (D2Client+0x109A08, [type*0x80 + (id&0x7f)], chain next = word 0x39) and dispatch by type.
-#include "client_host.h"
+// 1.13c D2Client+0xA8030 (stdcall, 1 stack arg = bucket array): for each of the 128 unit-list buckets walk the chain (next = unit+0xE4); per unit
+// call 0x2B1E0 (ECX = unit), find the same-id unit in the global hash (D2Client+0x109A08, [type*0x80 + (id & 0x7f)], chain next +0xE4, key +0xC) and
+// dispatch by type: type 1 calls 0x17F70 (EAX = hash unit), type 2 reads the data record 0xC226(unit[+4]) byte +0x1B4 (>= 0x13 is fatal) and, when
+// nonzero, calls the handler at D2Client+0xF54E8[s] with ECX = hash unit. A type mismatch is fatal. Returns 0, or 1 on the fatal paths (retail exits).
+#include <cstdint>
+#include <cstring>
 #include <emscripten.h>
-static uint32_t cl(D2cHost h, D2cCall c) { return h(&c); }
-// rd = read u32 at guest address; hash = the 0x80*N-entry head table; tbl = byte->handler RVA table (D2Client+0xF54E8, 19 entries).
-// Returns 0 normally, 1 for the fatal _exit(-1) paths (msg 0x5A type mismatch / 0x546 bad item state; Ordinal_10265/10024 text unverified).
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_a8030(D2cHost h, uint32_t (*rd)(uint32_t), uint32_t buckets, const uint32_t* hash, const uint32_t* tbl) {
+static uint32_t rd(uintptr_t a) { uint32_t v; std::memcpy(&v, (const void*)a, 4); return v; }
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_a8030(uintptr_t buckets, uintptr_t hash, uintptr_t tbl, void (*unit_2b1e0)(uintptr_t unit),
+                                                         void (*unit_17f70)(uintptr_t unit), uintptr_t (*data_c226)(uint32_t id),
+                                                         void (*handler)(uint32_t fn, uintptr_t unit)) {
     for (uint32_t i = 0; i < 0x80; i++) {
-        uint32_t u = rd(buckets + i * 4);
-        while (u) {
-            uint32_t next = rd(u + 0xE4), id = rd(u + 12), type = rd(u);
-            cl(h, { 0x2B1E0, u, 0, 0, 0, 0, { 0, 0, 0, 0 } });
-            for (uint32_t p = hash[type * 0x80 + (id & 0x7f)]; p; p = rd(p + 0xE4)) {
-                if (rd(p + 12) != id) continue;
-                if (rd(p) != type) return 1;
-                if (type == 1) { cl(h, { 0x17F70, 0, 0, 0, 0, 0, { 0, 0, 0, 0 } }); break; }
-                if (type != 2) break;
-                uint32_t d = cl(h, { 0x10688, rd(p + 4), 0, 0, 0, 0, { 0, 0, 0, 0 } }); // Ordinal_10688 (unverified id)
-                uint32_t s = rd(d + 0x1B4) & 0xFF;
-                if (s >= 0x13) return 1;
-                if (s) cl(h, { tbl[s], 0, 0, 0, 0, 0, { 0, 0, 0, 0 } });
+        for (uintptr_t u = rd(buckets + i * 4); u;) {
+            uintptr_t next = rd(u + 0xE4);
+            uint32_t id = rd(u + 0xC), type = rd(u);
+            unit_2b1e0(u);
+            for (uintptr_t p = rd(hash + (type * 0x80 + (id & 0x7f)) * 4); p; p = rd(p + 0xE4)) {
+                if (rd(p + 0xC) != id) continue;
+                uint32_t pt = rd(p);
+                if (pt != type) return 1;
+                if (pt == 1) unit_17f70(p);
+                else if (pt == 2) {
+                    uint8_t s = *(const uint8_t*)(data_c226(rd(p + 4)) + 0x1B4);
+                    if (s >= 0x13) return 1;
+                    if (s) handler(rd(tbl + s * 4), p);
+                }
                 break;
             }
             u = next;
