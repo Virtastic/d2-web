@@ -461,25 +461,3 @@ extern "C" U d2_fn_d2game_B8AE0(I p1, U p2, U p3, I p4)
     }
     return uVar1 & 0xffffff00u;
 }
-
-// 1.13c D2Game+0xBBC00 -- EBX unit and EDI game; the stack slot compared against the record is a local address.
-extern "C" void d2_fn_d2game_BBC00(I ebx, I edi)
-{
-    uint8_t local8[8] = {0};
-    Ord10141();
-    if (R32(edi, 0x10f4) == 0) return;
-    I piVar2 = R32(R32(edi, 0x10f4), 0);
-    if (piVar2 == 0) return;
-    while (S32(piVar2, 0) != 0x17) {
-        piVar2 = R32(piVar2, 0xf4);
-        if (piVar2 == 0) return;
-    }
-    I iVar1 = R32(piVar2, 0x18);
-    I lp = (I)local8;
-    if (((ebx == (I)R32(iVar1, 0x24) && lp == (I)R32(iVar1, 0x28)) ||
-         (ebx == (I)R32(iVar1, 0x2c) && lp == (I)R32(iVar1, 0x30)) ||
-         (ebx == (I)R32(iVar1, 0x34) && lp == (I)R32(iVar1, 0x38))) &&
-        D2GAME_36820(2) == 0) {
-        D2GAME_8EA80(edi, ebx, 7, S32(edi, 0xa8) + 10, 0, 0, 0);
-    }
-}
