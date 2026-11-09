@@ -56,6 +56,7 @@ behaviour differs from 1.10f.
 - D2Game+0x68D70 OBJECTS_OperateFunction06_TowerTome (QUESTS/ACT1/A1Q5.cpp): returns 0 on every path (1.10f returned 1 after activating the tome); validated against the vector.
 - D2Game+0x5CD50 OBJECTS_OperateFunction67_FrozenAnya (QUESTS/ACT5/A5Q3.cpp): returns 0 on every path (1.10f returned 1 when the quest is missing and at the end).
 - D2Game+0x56B10 (QUESTS/ACT5/A5Q3.cpp `ACT5Q3_QuestSeqHelper`): the quest-sequence tail that 0x5C690 ACT5Q3_SpawnDrehyaInTown calls is its own function in 1.13c; split out of the 1.10f body, same behaviour.
+- D2Game+0x5C690 (QUESTS/ACT5/A5Q3.cpp `ACT5Q3_SpawnDrehyaInTown`): the 1.13c order (object room and X/Y read before the already-spawned test, object lookup inlined) is in src/core/d2game/d2game_5c690.cpp; the vendored body stays 1.10f.
 - D2Game+0x5BF70 ACT5Q5_RewardPlayer (QUESTS/ACT5/A5Q5.cpp): the exp-versus-delta compare is unsigned (jb) in 1.13c.
 - D2Game+0xC6070 ACT2Q1_UnitIterate_SetPrimaryGoalDoneForPartyMembers: matches the 1.13c decompile; validated against the vector (in-room path).
 - `src/D2Game/GAME/Game.cpp` `GAME_UpdateGamesProgress` (`// 1.13c D2Game+0x2E1E0`): the elapsed-time compare against the target frame time is signed (retail casts both sides to int); 1.10f compared unsigned.

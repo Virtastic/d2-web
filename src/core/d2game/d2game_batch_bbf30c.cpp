@@ -971,7 +971,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BE640(uint8_t* game, uint8_t* unit, u
     return 0;
 }
 
-// 1.13c D2Game+0xBF990
+// Earlier reading of D2Game 0xBF990 (not proved); the 1.13c port is src/core/d2game/d2game_bf990.cpp
 // NPC sell/repair/identify of item `id` (hash +0x1720) to the NPC `npcId` (eax, hash +0x1320). Reply
 // 0xAAC90(code, stat word, player tag, unit, 0xE): 1 done, 9 bad state/clone failure, 0xB no gold slot.
 // mode: 0 sell (10744 type 0x16 or 0x12 stack route), 4 buy-back (0xF2C70), other = 0xF8970 route.

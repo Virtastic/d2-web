@@ -841,7 +841,7 @@ static int32_t __fastcall ACT5Q3_QuestSeqHelper(D2QuestDataStrc* pQuestData)
 	return pQuest->pfSeqFilter(pQuest);
 }
 
-// 1.13c D2Game+0x5C690
+// 1.10f body; the 1.13c port (D2Game 0x5C690) is src/core/d2game/d2game_5c690.cpp
 void __fastcall ACT5Q3_SpawnDrehyaInTown(D2QuestDataStrc* pQuestData, D2Act5Quest3Strc* pQuestDataEx)
 {
 	if (pQuestDataEx->bDrehyaInTownInitialized != 1)

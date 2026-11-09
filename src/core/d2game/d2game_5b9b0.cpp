@@ -1,105 +1,100 @@
-// src/core/d2game/d2game_5b9b0.cpp -- 1.13c D2Game+0x5B9B0, written from the 1.13c disassembly (the
-// decompile's unaff_* slots resolved against it). Seams are function pointers in retail argument order.
-#include <cstdint>
-#include <cstring>
-#include <emscripten.h>
-
-static inline uint8_t  rd8 (const void* p, uint32_t o) { return ((const uint8_t*)p)[o]; }
-static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
-static inline void*    rdp (const void* p, uint32_t o) { return (void*)(uintptr_t)rd32(p, o); }
-static inline void     wr8 (void* p, uint32_t o, uint8_t v) { ((uint8_t*)p)[o] = v; }
-static inline void     wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
-
-struct D2Game5b9b0Env {
-    int32_t  (*sub78260)(void* node, void* player);                         // ECX=node, EAX=player; slot index
-    void*    (*getRoom)(void* unit);                                        // Common #10331
-    void     (*nearRooms)(void* room, void*** rooms, uint32_t* count);      // Common #10383
-    int32_t  (*dist)(void* unit, void* other);                              // Common #10522
-    void     (*unitPos)(void* unit, void* pos);                             // Common #10141 (writes pos[0])
-    void*    (*sub21280)(void* room);                                       // EAX=room
-    void*    (*sub1D90)(int32_t x, int32_t y, void* game, void* h, int32_t a, int32_t b, int32_t c); // ECX=2, EDX=0xBD
-    void     (*sub54130)(void* h, int32_t* pos, int32_t two, int32_t flags, void** out, int32_t tries);
-    void     (*subAEA80)(void* game, void* s, int32_t seven, int32_t v, int32_t a, int32_t b, int32_t c); // ECX=game, EDX=s
-    void     (*setRoomState)(void* room, int32_t z);                        // Common #10346
-    void*    (*getClientData)(void* player);                                // Common #10920
-    uint32_t (*questGet)(void* q, int32_t quest, int32_t flag);             // Common #10174
-    void     (*questSet)(void* q, int32_t quest, int32_t flag);             // Common #10003
-    void     (*dispatch)(void* game, void* cb, void* a2);                   // 0xDFCC0: EAX=0, EBX=cb, EDI=game, stack a2
-    void *cb793f0, *cb79390, *cb7b180, *cb792f0;                            // the four callbacks, by RVA
+// 1.13c D2Game+0x5B9B0: act-5 quest (node type 0x20) per-player step: find the class-0x1B2 monster (mode 0xC) near the
+// player in the rooms around `unit`, drop object 0xBD at its feet and run the quest-state tail. stdcall (game, unit,
+// player), ret 0xC. Written from the 1.13c disassembly; not in D2MOO 1.10f.
+// Callees go through Env so the FN probe can record them in retail's call order.
+#ifndef D2GAME_5B9B0_CPP
+#define D2GAME_5B9B0_CPP
+#include "d2g_mem.h"
+namespace d2game_5b9b0 {
+using namespace d2g;
+struct Env {
+    I (*slot)(P node, P player);                   // 0x58260: ECX = node, EAX = player; player slot index
+    P (*room)(P unit);                             // thunk 0xA478 (stdcall 1)
+    void (*nearRooms)(P room, U* rooms, U* count); // thunk 0xA55C (stdcall 3): rooms = pointer to the room array
+    I (*dist)(P unit, P other);                    // thunk 0xAB86 (stdcall 2)
+    void (*coords)(P unit, I* xy);                 // thunk 0xA544 (stdcall 2): writes X, Y
+    P (*roomAt)(P room, I x, I y);                 // 0x1280: EAX = room, EBX = x, EDI = y
+    P (*alloc)(I type, I cls, I x, I y, P game, P room, I a, I b, I c); // 0xE1D90: ECX type, EDX class, stack 7
+    void (*freeSpot)(P room, I* xy, I two, I flags, U* out, I tries);   // 0x34130 (stdcall 6)
+    void (*events)(P game, P unit, I seven, I frame, I a, I b, I c);    // 0x8EA80: ECX game, EDX unit, stack 5
+    void (*roomState)(P room, I z);                // thunk 0xA51A (stdcall 2)
+    P (*client)(P player);                         // thunk 0xA4C0 (stdcall 1)
+    U (*qget)(P q, I quest, I flag);               // thunk 0xA568 (stdcall 3)
+    void (*qset)(P q, I quest, I flag);            // thunk 0xA57A (stdcall 3)
+    void (*dispatch)(P game, U cb, P arg);         // 0xDFCC0: EAX = 0, EBX = callback, EDI = game, stack arg
 };
-
-// 1.13c D2Game+0x5B9B0 -- ret 0xC. game=a1 (+0x10f4 node list, +0x6d difficulty), a2 = unit whose room is scanned, a3 = player.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_5b9b0(void* game, void* a2, void* a3, const D2Game5b9b0Env* e) {
-    void* head = rdp(game, 0x10f4);
+enum : U { CB_593F0 = 0x593F0, CB_59390 = 0x59390, CB_5B180 = 0x5B180, CB_592F0 = 0x592F0 };   // callback RVAs handed to 0xDFCC0
+// 1.13c D2Game+0x5B9B0
+inline void Step_113c(const Env& e, P game, P unit, P player) {
+    P head = pf(game, 0x10F4);
     if (!head) return;
-    uint8_t* node = (uint8_t*)rdp(head, 0);
+    P node = pf(head, 0);
+    for (; node; node = pf(node, 0xF4)) if (rd(node, 0) == 0x20) break;
     if (!node) return;
-    while (rd32(node, 0) != 0x20) { node = (uint8_t*)rdp(node, 0xf4); if (!node) return; }
-    uint8_t* data = (uint8_t*)rdp(node, 0x18);
-    int32_t idx = e->sub78260(node, a3);
+    P data = pf(node, 0x18);
+    const I idx = e.slot(node, player);
     if (idx < 0) return;
-    uint8_t* flag = data + idx + 0x10e;
-    if (*flag == 1) return;
-    int32_t pos[2];                                   // X (stack slot orig-8), Y (orig-4)
-    pos[0] = (int32_t)rd32(data, 0x8c + idx * 8) + 0xc;
-    pos[1] = (int32_t)rd32(data, 0x90 + idx * 8);
-    void* room = e->getRoom(a3);
-    void* r2 = e->getRoom(a2);
+    P flag = at(data, (U)idx + 0x10E);
+    if (rd8(flag, 0) == 1) return;
+    I xy[2] = { (I)rd(data, 0x8C + (U)idx * 8) + 0xC, (I)rd(data, 0x90 + (U)idx * 8) };
+    P room = e.room(player);
+    P r2 = e.room(unit);
     if (!r2) return;
-    void** rooms; uint32_t cnt;
-    e->nearRooms(r2, &rooms, &cnt);
+    U rooms = 0, cnt = 0;
+    e.nearRooms(r2, &rooms, &cnt);
     bool found = false;
-    for (uint32_t i = 0; i < cnt && cnt; i++) {
-        for (uint8_t* u = (uint8_t*)rdp(rooms[i], 0x74); u; u = (uint8_t*)rdp(u, 0xe8)) {
-            if (rd32(u, 0) == 1 && rd32(u, 4) == 0x1b2 && rd32(u, 0x10) == 0xc && e->dist(u, a3) < 0xf) {
-                room = e->getRoom(u);
-                e->unitPos(u, &pos[0]);
-                pos[0] += 2;
+    for (U i = 0; i < cnt; ++i) {
+        for (P u = pf(pf((P)(uintptr_t)rooms, i * 4), 0x74); u; u = pf(u, 0xE8)) {
+            if (rd(u, 0) == 1 && rd(u, 4) == 0x1B2 && rd(u, 0x10) == 0xC && e.dist(u, player) < 0xF) {
+                room = e.room(u);
+                e.coords(u, xy);
+                xy[0] += 2;
                 found = true;
-                break;                                // next room; later matches overwrite
+                break;                               // next room; a later match overwrites
             }
         }
     }
     if (!found) return;
-    *flag = 1;
-    void* h = e->sub21280(room);
-    void* gm = rdp(node, 4);
-    void* s = e->sub1D90(pos[0], pos[1], gm, h, 1, 1, 0);
-    if (!s) s = e->sub1D90(pos[0] - 2, pos[1], gm, h, 1, 1, 0);
-    if (!s) {
-        if (h) {
-            void* out = a3;                           // retail passes the a3 stack slot as the out cell
-            e->sub54130(h, pos, 2, 0x8000, &out, 0x64);
-            s = e->sub1D90(pos[0], pos[1], gm, out ? out : h, 1, 1, 0);
-        }
+    wr8(flag, 0, 1);
+    P h = e.roomAt(room, xy[0], xy[1]);
+    P gm = pf(node, 4);
+    P s = e.alloc(2, 0xBD, xy[0], xy[1], gm, h, 1, 1, 0);
+    if (!s) s = e.alloc(2, 0xBD, xy[0] - 2, xy[1], gm, h, 1, 1, 0);
+    if (!s && h) {
+        U out = W(h);                                 // retail reuses the player argument slot as the out cell, seeded with h
+        e.freeSpot(h, xy, 2, 0x8000, &out, 0x64);
+        s = e.alloc(2, 0xBD, xy[0], xy[1], gm, out ? (P)(uintptr_t)out : h, 1, 1, 0);
     }
     if (s) {
-        wr8(data, 0xf8 + idx, 1);
-        wr32(data, 0xec + idx * 4, rd32(s, 0xc));
-        e->subAEA80(gm, s, 7, (int32_t)rd32(gm, 0xa8) + 0x19, 0, 0, 0);
-        e->setRoomState(e->getRoom(s), 0);
+        wr8(data, 0xF8 + (U)idx, 1);
+        wr(data, 0xEC + (U)idx * 4, rd(s, 0xC));
+        e.events(gm, s, 7, (I)rd(gm, 0xA8) + 0x19, 0, 0, 0);
+        e.roomState(e.room(s), 0);
     }
-    uint8_t* cd = (uint8_t*)e->getClientData(a2);
-    void* q = rdp(cd, 0x10 + rd8(game, 0x6d) * 4);
-    int32_t ac = (int32_t)rd32(data, 0xac), a8 = (int32_t)rd32(data, 0xa8);
-    if ((int32_t)rd32(data, 0xa4) == a8 + ac && rd8(data, 0x86) && rd8(data, 0x87) && rd8(data, 0x88)) {
-        if (ac <= 0xb) { e->dispatch(game, e->cb79390, a2); return; }
-        wr8(node, 0x14, 0); wr8(node, 0xb, 3);
-        e->dispatch(gm, e->cb793f0, nullptr);
-        if (!e->questGet(q, 0x24, 0) && !e->questGet(q, 0x24, 1)) {
-            e->questSet(q, 0x24, 0xd);
-            e->questSet(q, 0x24, 1);
-            e->questSet(q, 0x24, ac == 0xf ? 5 : ac == 0xe ? 6 : 7);
+    P cd = e.client(unit);
+    P q = pf(cd, 0x10 + (U)rd8(game, 0x6D) * 4);
+    const I ac = (I)rd(data, 0xAC), a8 = (I)rd(data, 0xA8);
+    if ((I)rd(data, 0xA4) == a8 + ac && rd8(data, 0x86) && rd8(data, 0x87) && rd8(data, 0x88)) {
+        if (ac <= 0xB) { e.dispatch(game, CB_59390, unit); return; }
+        wr8(node, 0x14, 0); wr8(node, 0xB, 3);
+        e.dispatch(gm, CB_593F0, nullptr);
+        if (!e.qget(q, 0x24, 0) && !e.qget(q, 0x24, 1)) {
+            e.qset(q, 0x24, 0xD);
+            e.qset(q, 0x24, 1);
+            const I ac2 = (I)rd(data, 0xAC);
+            e.qset(q, 0x24, ac2 == 0xF ? 5 : ac2 == 0xE ? 6 : 7);
         }
-        e->dispatch(game, e->cb7b180, a2);
-        e->dispatch(game, e->cb79390, a2);
-        e->dispatch(game, e->cb792f0, a2);
+        e.dispatch(game, CB_5B180, unit);
+        e.dispatch(game, CB_59390, unit);
+        e.dispatch(game, CB_592F0, unit);
         return;
     }
-    e->questSet(q, 0x24, 4);
-    if (a8 < 5) {
-        wr8(node, 0x14, 0x20); wr8(node, 0xb, 2);
-        e->dispatch(gm, e->cb793f0, nullptr);
+    e.qset(q, 0x24, 4);
+    if ((I)rd(data, 0xA8) < 5) {
+        wr8(node, 0x14, 0x20); wr8(node, 0xB, 2);
+        e.dispatch(gm, CB_593F0, nullptr);
     }
     wr8(data, 0x84, 0);
 }
+}
+#endif
