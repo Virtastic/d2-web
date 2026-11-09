@@ -8965,9 +8965,16 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_drop_gold_packet(uint32_t amount, ui
 EMSCRIPTEN_KEEPALIVE int d2_session_command_use_belt(uint32_t slot) {
     const int32_t onMerc = (slot & 0x100) ? 1 : 0; slot &= 0xFF;
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory || slot >= 16) return 0;
-    D2UnitStrc* item = INVENTORY_GetItemFromBeltSlot(g_targetPlayer->pInventory, (int32_t)slot);
+    if (g_targetPlayer->dwAnimMode == PLRMODE_DEAD || INVENTORY_GetCursorItem(g_targetPlayer->pInventory)) return 0;   // the key handler refuses a dead hero; the use routine refuses a held item
+    D2UnitStrc* item = INVENTORY_GetItemFromBeltSlot(g_targetPlayer->pInventory, (int32_t)slot);   // the slot is the key column exactly, no fallback to a higher cell
     if (!item || item->dwAnimMode != IMODE_INBELT ||
         !INVENTORY_CompareWithItemsParentInventory(g_targetPlayer->pInventory, item)) return 0;
+    // canUseItem (D2Client+0x29920): the items.txt row must exist (a missing one is fatal in retail), a row with the
+    // unique (+0x129) or quest (+0x12A) byte set refuses, and the useable byte (+0x11D) must be 1.
+    D2ItemsTxt* itemRow = DATATBLS_GetItemsTxtRecord(item->dwClassId);
+    if (!itemRow || itemRow->nUnique == 1 || itemRow->nQuest == 1 || itemRow->nUseable != 1) return 0;
+    // D2Client+0x81CB0: refused while the item carries a stat list with flag 2, or the hero has state 0x36.
+    if (STATLIST_GetStatListFromUnitAndFlag(item, 2) || STATES_CheckState(g_targetPlayer, 0x36)) return 0;
     if (!sessionDispatchGate(0x26)) return 0;   // using a belt item is client packet 0x26
     int32_t error = 0;
     const int32_t id = item->dwUnitId;

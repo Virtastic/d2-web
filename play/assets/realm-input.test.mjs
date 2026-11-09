@@ -229,11 +229,34 @@ test("the server's talk answer opens the chat with 0x2F, or ends it with 0x30 fo
   assert.deepEqual(h.out, [[0x2f, 1, 0, 0, 0, 5, 0, 0, 0], [0x30, 7, 0, 0, 0, 6, 0, 0, 0]]);
 });
 
-test('a belt key uses the bottom item of its column', () => {
+test('a belt key uses the item in its own slot, not a higher one in the column', () => {
   const h = harness({ items: [{ id: 1, mode: 2, gridX: 4 }, { id: 2, mode: 2, gridX: 0 }, { id: 3, mode: 2, gridX: 1 }] });
   assert.ok(h.input.useBelt(0));
   assert.deepEqual(h.out, [[0x26, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]);
   assert.equal(h.input.useBelt(3), false);
+  const upper = harness({ items: [{ id: 1, mode: 2, gridX: 4 }] });
+  assert.equal(upper.input.useBelt(0), false);
+});
+
+test('a belt key does nothing while dead or with an item on the cursor', () => {
+  const items = [{ id: 2, mode: 2, gridX: 0 }];
+  assert.equal(harness({ items, playerMode: 17 }).input.useBelt(0), false);
+  assert.equal(harness({ items, cursorId: 9 }).input.useBelt(0), false);
+  assert.ok(harness({ items, playerMode: 1 }).input.useBelt(0));
+});
+
+test('a belt key stops when the scene reports the use routine refusing the item', () => {
+  const items = [{ id: 2, mode: 2, gridX: 0 }];
+  const h = harness({ items, beltRefused: (item) => item.id === 2 });
+  assert.equal(h.input.useBelt(0), false);
+  assert.deepEqual(h.out, []);
+  assert.ok(harness({ items, beltRefused: () => false }).input.useBelt(0));
+});
+
+test('a belt key with Shift down names the mercenary as the target', () => {
+  const h = harness({ items: [{ id: 2, mode: 2, gridX: 0 }] });
+  assert.ok(h.input.useBelt(0, true));
+  assert.deepEqual(h.out, [[0x26, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]]);
 });
 
 test('MonStats: the npc and interact columns name the people', () => {

@@ -148,7 +148,7 @@ import { createGameClock, GAME_STEP, STEP, MAX_CATCHUP_UPDATES, rafStarved } fro
 import { queueHeldPointerRepeat } from './assets/held-pointer-repeat.mjs';
 import { heldWorldAction, leftHandCommand } from './assets/world-click-dispatch.mjs';
 import { createDeathScreen, deathScreenShown, respawnAllowed } from './assets/death-screen.mjs';
-import { createNpcMenu, npcMenuChoiceOnRelease, npcMenuInputCoolingDown, npcMenuEntries, withTravelRow, withHireRow, deadHireling, resurrectPacket, talkEntries, menuReturnsAfterSpeech, entriesAfterSpeech } from './assets/npc-menu.mjs';
+import { createNpcMenu, hireSkillText, npcMenuChoiceOnRelease, npcMenuInputCoolingDown, npcMenuEntries, withTravelRow, withHireRow, deadHireling, resurrectPacket, talkEntries, menuReturnsAfterSpeech, entriesAfterSpeech } from './assets/npc-menu.mjs';
 import { npcSpeech, npcSpeechByName, talkSpeechId } from './assets/npc-topics.mjs';
 import { createWeatherRenderer } from './assets/weather-renderer.mjs';
 import { weatherWaterAnchors } from './assets/weather-water-anchors.mjs';
@@ -880,7 +880,9 @@ let cinematicsScreen = null, cinematicsError = '';
 let otherMultiplayerScreen = null, otherMultiplayerError = '';
 let bnetLoginScreen = null, bnetLoginError = '';
 let bnetLobbyScreen = null, bnetLobbyError = '';
-const joinLoading = createJoinLoading(); let joinLoadingArt = null;   // retail's lobby-to-game loading screen, up from the CREATE/JOIN click until the world is ready
+const joinLoadBarWasm = { width: (a, t, k) => Module.ccall('d2_client_loadbar_width', 'number', ['number', 'number', 'number'], [a, t, k]), chunks: (n) => Module.ccall('d2_client_loadbar_chunks', 'number', ['number'], [n]), finalWidth: (n) => Module.ccall('d2_client_loadbar_final_width', 'number', ['number'], [n]), walkCalls: (n) => Module.ccall('d2_client_loadbar_walk_calls', 'number', ['number'], [n]),
+  rects: (mode, w, h, sup, fill) => { const p = Module._malloc(72); const n = Module.ccall('d2_client_loadbar_rects', 'number', ['number', 'number', 'number', 'number', 'number', 'bigint'], [mode, w, h, sup, fill, BigInt(p)]); const r = Array.from(Module.HEAP32.subarray(p >> 2, (p >> 2) + n * 6)); Module._free(p); return r; } };
+const joinLoading = createJoinLoading({ wasm: joinLoadBarWasm }); let joinLoadingArt = null;   // retail's lobby-to-game loading screen, up from the CREATE/JOIN click until the world is ready
 // The connection attempt behind retail's connecting popup: { server, popup, bncs }.
 let bnetConnecting = null;
 const LAST_BNET_KEY = 'd2web.lastBnet';
@@ -3318,7 +3320,7 @@ function update(forceTick = false, live = false) {
         realmInput().step(command.x, command.y);
       } else if (command.type === COMMAND.INTERACT) {
         realmInput().interactNearest();
-      } else if (command.type === COMMAND.BELT) realmInput().useBelt(command.slot);
+      } else if (command.type === COMMAND.BELT) realmInput().useBelt(command.slot, Boolean(command.merc) && realmFlow?.expansion === true);
       else if (command.type === COMMAND.RESPAWN && respawnAllowed(snapshot?.mode)) realmInput().respawn();
       else if (command.type === COMMAND.SKILL) realmInput().hotkey(realmFlow?.protocol?.d2gsHotkeySelect?.(command.slot - 1));
     }
@@ -3457,7 +3459,7 @@ function update(forceTick = false, live = false) {
           held: Boolean(command.held), serial: ++lastSkillCommandSerial };
       } else if (command.type === COMMAND.BELT) {
         // Retail's belt keys: 1-4 drink/use the bottom item of that belt column, through the engine.
-        const result = session.useBelt(command.slot);
+        const result = respawnAllowed(snapshot?.mode) ? 0 : session.useBelt(command.slot | (command.merc ? 0x100 : 0));
         if (result) snapshot = session.snapshot();
         lastBeltCommand = { slot: command.slot, result };
         window.__d2Step19Trace?.record('belt-use', { source: 'key-command', slot: command.slot, result: Boolean(result) },
@@ -4270,7 +4272,7 @@ function realmInput() {
       const me = selectedPlayerSource();
       if (!realmSceneActive || !realmPlayerView?.active || !realmFlow?.d2gs?.isOpen || me.source === 'none' || !snapshot) return { ready: false };
       const camera = worldToScreen(cameraCentre().x, cameraCentre().y);
-      return { ready: true, player: { x: Math.round(me.x), y: Math.round(me.y) },
+      return { ready: true, player: { x: Math.round(me.x), y: Math.round(me.y) }, playerMode: snapshot?.mode, cursorId: realmWorldState?.cursorId ?? 0,
         monsters: realmSceneEvidence?.monsters ?? [], objects: snapshot.objects ?? [], items: snapshot.items ?? [],
         isNpc: (classId) => realmTables().monsters.isNpc(classId),
         hoverBox: (dx, dy) => inUnitHoverBox(dx, dy, true),
@@ -4639,7 +4641,7 @@ function drawFrame() {
   if (screen === SCREEN.BNET_LOBBY) {
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
     if (joinLoading.expired()) { joinLoading.fail(); bnetLobbyScreen?.fail({ noticeString: reasonString(REASON_DISCONNECTED, false), message: 'game ended' }); }
-    if (joinLoading.shown && (joinLoadingArt ??= (() => { try { return createJoinLoadingArt({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette }); } catch { return false; } })())) joinLoadingArt.draw(ctx, w, h, joinLoading.steps);
+    if (joinLoading.shown && (joinLoadingArt ??= (() => { try { return createJoinLoadingArt({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette }); } catch { return false; } })())) joinLoadingArt.draw(ctx, w, h, joinLoading.steps, joinLoading.bar());
     else if (bnetLobbyScreen) bnetLobbyScreen.draw(ctx, w, h);
     else { drawCentredMessage(ctx, hoverFont, bnetLobbyError || 'loading…', w, h); }
     hud.textContent = bnetLobbyError ? `battle.net lobby: ${bnetLobbyError}` : '';
@@ -6129,7 +6131,6 @@ function chooseNpcMenu(entry) {
 // D2GAME_NPC_BuildHirelingList (s85) answers 0x4F then one 0x4E {u16 name, u32 seed} per offer; each row's
 // Lvl / Life / Def / Cost is the engine's MONSTERS_HirelingInit for that offer (d2_session_hire_offer_info).
 // A click on a row sends 0x36 (s85), Cancel ends the interaction.
-const HIRE_DESC = [0, 3371, 3372, 11090, 11088, 11089, 3377, 3376, 3375];
 function openHireWindow(npcId) {
   Module.ccall('d2_session_command_npc_action_packet', 'number', ['number', 'number'], [npcId, 3]);
   const len = Module.ccall('d2_session_packet_stream_length', 'number', [], []);
@@ -6143,7 +6144,7 @@ function openHireWindow(npcId) {
       const mercName = view.getUint16(p + 1, true), seed = view.getUint32(p + 3, true);
       const at = Number(Module.ccall('d2_session_hire_offer_info', 'number', ['number', 'number'], [mercName, seed]));
       if (at) { const v = new Int32Array(Module.HEAPU8.buffer, at, 13);
-        offers.push({ mercName, seed, name: string(mercName), level: v[1], life: v[2], def: v[7], cost: v[5], skill: string(HIRE_DESC[v[12]] || 0) }); }
+        offers.push({ mercName, seed, name: string(mercName), level: v[1], life: v[2], def: v[7], cost: v[5], skill: hireSkillText(v[12], string) }); }
       p += 7; continue;
     }
     const sz = h === 0x4f ? 1 : h === 0x27 ? 40 : h === 0x28 ? 0x67 : h === 0x29 ? 0x61 : 0;
@@ -6333,11 +6334,19 @@ addEventListener('keydown', (e) => {
   // it asks the engine, whose recovered `sub_6FC46840` moves the equipment between the two weapon sets
   // and flips the active one -- so what the paperdoll and the skills show afterwards is the engine's
   // answer, in one place (F3).
-  if (configuredAction === 'Swap Weapons' && !e.repeat) { if (realmSceneActive) realmInput().swapWeapons(); else session?.swapWeapons?.(); e.preventDefault(); return; }
+  // The key handler and the weapon-set tab press share one routine: it plays the same click sound, then sends the swap; with an expansion-less game it does nothing.
+  if (configuredAction === 'Swap Weapons' && !e.repeat) {
+    if (!realmSceneActive || realmFlow?.expansion === true) {
+      unitSounds?.playRow(WEAPON_TAB_SOUND_ROW, { kind: 'ui', source: 'weapon-key' }).catch(() => {});
+      if (realmSceneActive) realmInput().swapWeapons(); else session?.swapWeapons?.();
+    }
+    e.preventDefault(); return;
+  }
   if (configuredAction === 'Skill Tree' && !e.repeat) { skillsVisible = !skillsVisible; e.preventDefault(); return; }
   const belt = /^Use Belt ([1-4])$/.exec(configuredAction || '');
   if (configuredAction === 'Show Belt' && !e.repeat) { beltPopup.toggleKey(); e.preventDefault(); return; }
-  if (belt && !e.repeat) { input.queue.push({ type: COMMAND.BELT, slot: Number(belt[1]) - 1 }); e.preventDefault(); return; }
+  // Retail's belt key handlers read Shift at the press (GetKeyState 0x10) and hand it to the use routine as its modifier (the mercenary).
+  if (belt && !e.repeat) { input.queue.push({ type: COMMAND.BELT, slot: Number(belt[1]) - 1, merc: e.shiftKey }); e.preventDefault(); return; }
   const skill = /^Skill ([1-8])$/.exec(configuredAction || '');
   if (skill && !e.repeat) { input.queue.push({ type: COMMAND.SKILL, slot: Number(skill[1]) }); e.preventDefault(); return; }
   // F3b/F218: these physical keys used to bypass Configure Controls in CommandInput. Once the

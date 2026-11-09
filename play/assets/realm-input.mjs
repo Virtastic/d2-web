@@ -69,7 +69,7 @@ export function createSendGate(transmit) {
   };
 }
 
-const MONSTER_DEATH = 0, MONSTER_DEAD = 12;
+const MONSTER_DEATH = 0, MONSTER_DEAD = 12, PLAYER_DEAD = 17;
 const near = (dx, dy, w, up, down) => Math.abs(dx) <= w && dy >= -up && dy <= down;
 // Objects whose use depends on what the cursor holds: the Compelling Orb wants the Khalim's Will flail,
 // the Hell Forge in its open state wants the Hellforge Hammer. Without it the click sends nothing.
@@ -242,12 +242,17 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
       flags();
       return emit(packets.npcChatStart(type, guid), 'npc-start');
     },
-    /** Belt key 1-4: the bottom item of that belt column. */
-    useBelt(column) {
+    /** Belt key 1-4: the item in belt slot `column` exactly (the key handler passes the column as the slot). Nothing happens
+     *  while the player is dead (mode 17), when the cell is empty, or while the cursor holds an item. The retail use routine
+     *  also refuses an item whose row is not a plain useable one (useable byte not 1, or the unique/quest byte set), an item
+     *  carrying a stat list with flag 2, and a hero in state 0x36: the scene's optional `beltRefused(item)` answers that
+     *  (true = refuse; absent = sent). The game menu (retail's panel flag) never gets here: the shell drains input first. */
+    useBelt(column, onMerc = false) {
       const s = open(); if (!s) return false;
-      const slot = s.items.filter((i) => i.mode === 2 && i.gridX % 4 === column)
-        .sort((a, b) => a.gridX - b.gridX)[0];
-      return slot ? emit(packets.useBeltItem(slot.id), 'belt') : false;
+      if (s.playerMode === PLAYER_DEAD || s.cursorId) return false;
+      const slot = s.items.find((i) => i.mode === 2 && i.gridX === column);
+      if (slot && s.beltRefused?.(slot)) return false;
+      return slot ? emit(packets.useBeltItem(slot.id, onMerc), 'belt') : false;
     },
     /** The skill popup / hotkey choice. */
     selectSkill: (skill, left, owner = 0xffffffff) => emit(packets.selectSkill(skill, left, owner), 'select-skill'),
