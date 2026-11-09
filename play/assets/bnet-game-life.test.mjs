@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGameLife, EXIT_TICKS, JOIN_TIMEOUT_MS, LEAVE_CANCEL_PACKET, LEAVE_WAIT_MS, LOADING_TIMEOUT_MS, SAVE_AND_EXIT_PACKET } from './bnet-game-life.mjs';
+import { createGameLife, EXIT_TICKS, JOIN_TIMEOUT_MS, LEAVE_CANCEL_PACKET, LEAVE_WAIT_CANCEL_PACKET, LEAVE_WAIT_MS, LOADING_TIMEOUT_MS, SAVE_AND_EXIT_PACKET } from './bnet-game-life.mjs';
 import { reasonString } from './d2gs-deny.mjs';
 
 const mk = (opts = {}) => { let t = 0; const log = { notice: [], left: [], sent: [] };
@@ -16,10 +16,20 @@ test('the explicit leave sends the trade CANCEL bytes 4F 02 00 at once and waits
   life.inGame();
   assert.deepEqual([...LEAVE_CANCEL_PACKET], [0x4f, 0x02, 0, 0, 0, 0, 0]);
   assert.equal(life.leaveGame(), true);
-  assert.equal(life.leaveGame(), false);
-  assert.deepEqual(log.sent, [[0x4f, 0x02, 0, 0, 0, 0, 0]]);
+  assert.equal(life.leaveGame(), true);
+  assert.deepEqual(log.sent, [[0x4f, 0x02, 0, 0, 0, 0, 0], [0x4f, 0x02, 0, 0, 0, 0, 0]]);
   assert.equal(life.leaving, true);
   assert.equal(life.exiting, false);
+});
+test('a second exit during the wait restarts the 30 s from its own stamp', () => {
+  const { life, log, at } = mk();
+  life.inGame(); at(1000); life.leaveGame();
+  at(20000); life.leaveGame();
+  at(1000 + LEAVE_WAIT_MS + 1); life.checkTimers();
+  assert.equal(log.left.length, 0);
+  at(20000 + LEAVE_WAIT_MS + 1); life.checkTimers();
+  assert.deepEqual(log.sent[2], [0x69]);
+  assert.deepEqual(log.left, [0]);
 });
 test('0x69 goes out only after 30 s, strictly more than 30000 ms, then the teardown runs once', () => {
   const { life, log, at } = mk();
@@ -107,4 +117,46 @@ test('a join that has not entered the game after 30 seconds fails with the timeo
   assert.equal(error.noticeString, reasonString(6, false));
   assert.equal(deadline.expired, true);
   deadline.cancel(); assert.ok(fake.cleared);
+});
+
+test('the wait cancel is 4F 07 with 0 padding, seven bytes', () => {
+  assert.deepEqual([...LEAVE_WAIT_CANCEL_PACKET], [0x4f, 0x07, 0, 0, 0, 0, 0]);
+});
+test('an item action with no wait armed goes ahead and sends nothing', () => {
+  const { life, log } = mk();
+  life.inGame();
+  assert.equal(life.itemAction(), true);
+  assert.deepEqual(log.sent, []);
+});
+test('an item action during the armed wait is refused, sends 4F 07 and cancels the 30 s teardown', () => {
+  const { life, log, at } = mk();
+  life.inGame(); at(1000); life.leaveGame();
+  at(1500);
+  assert.equal(life.itemAction(), false);
+  assert.deepEqual(log.sent, [[0x4f, 0x02, 0, 0, 0, 0, 0], [0x4f, 0x07, 0, 0, 0, 0, 0]]);
+  assert.equal(life.leaving, false);
+  at(1000 + LEAVE_WAIT_MS + 5000); life.checkTimers(); life.tick();
+  assert.equal(log.sent.length, 2);
+  assert.deepEqual(log.left, []);
+});
+test('after the cancel the menu exit re-arms the wait with a fresh 4F 02', () => {
+  const { life, log, at } = mk();
+  life.inGame(); at(0); life.leaveGame(); life.itemAction();
+  at(10); assert.equal(life.leaveGame(), true);
+  assert.deepEqual(log.sent[2], [0x4f, 0x02, 0, 0, 0, 0, 0]);
+  assert.equal(life.leaving, true);
+});
+test('an item action after the wait has expired tears down at once and sends no 4F 07', () => {
+  const { life, log, at } = mk();
+  life.inGame(); at(0); life.leaveGame();
+  at(LEAVE_WAIT_MS + 1);
+  assert.equal(life.itemAction(), false);
+  assert.deepEqual(log.sent, [[0x4f, 0x02, 0, 0, 0, 0, 0], [0x69]]);
+  assert.deepEqual(log.left, [0]);
+});
+test('an item action during a reason countdown is not a leave wait, so it goes ahead', () => {
+  const { life, log } = mk();
+  life.inGame(); life.fail(7);
+  assert.equal(life.itemAction(), true);
+  assert.deepEqual(log.sent, []);
 });

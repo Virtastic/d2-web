@@ -958,8 +958,10 @@ function ensureGameMenu() {
       else if (item === 'SAVE AND EXIT GAME' && realmSceneActive) {
         // A Battle.net game: the server holds the character. Retail returns to the lobby.
         gameMenu.close();
-        // Retail (0x59650): 4F 02 00 now, state 7; the life sends 0x69 after 30 s and then tears the game down. With no
-        // armed game life (an exit countdown is running) the teardown runs at once.
+        // Retail (0x59650): 4F 02 00 now, state 7; the life sends 0x69 after 30 s and then tears the game down. An exit
+        // during that wait sends the bytes again and restarts the wait; it does not tear down. Any non-zero exit state
+        // takes the same path. The exit state during a reason countdown is not yet known, so the teardown still runs
+        // at once there.
         if (!realmFlow?.d2gsLife?.leaveGame()) void leaveRealmGame();
       } else if (item === 'SAVE AND EXIT GAME') {
         // Keep the session and menu available if persistence fails; only leave once the store
@@ -4249,6 +4251,7 @@ function realmInput() {
   return (realmInputState ??= createRealmInput({
     transmit: (bytes) => realmFlow?.d2gs?.isOpen ? realmFlow.d2gs.send(bytes) : false,
     now: () => performance.now(),
+    leaveWait: { itemAction: () => realmFlow?.d2gsLife?.itemAction() ?? true },   // an item action cancels an armed leave wait
     onTalk: (guid) => realmNpc().talkSent(guid),
     questFlags: (flags) => { realmQuestWords = new Uint16Array(flags.slice().buffer); return realmFlow?.protocol?.d2gsClientSetQuestFlags?.(flags); },
     // The owner's walk is never echoed by the server: start the local route on the click, as single player does.

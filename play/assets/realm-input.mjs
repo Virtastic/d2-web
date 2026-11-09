@@ -93,9 +93,11 @@ const CODE_QF2 = 0x20326671, CODE_HFH = 0x20686668;
  *   castAt(x, y), castOnUnit(type, guid) -> the right-hand skill's local start
  */
 export function createRealmInput({ transmit, scene, now = () => 0, move = null, approachUnit = null, reach = null,
-  actionDone = null, castAt = null, castOnUnit = null, onTalk = null, questFlags = null }) {
+  actionDone = null, castAt = null, castOnUnit = null, onTalk = null, questFlags = null, leaveWait = null }) {
   const gate = createSendGate(transmit);
   const evidence = { attempts: 0, sent: 0, last: null };
+  // The inventory's item actions pass the leave wait's gate first (1.13c 0x923F0): an armed wait is cancelled and the action refused.
+  const itemGate = () => (leaveWait ? leaveWait.itemAction() : true);
   function emit(bytes, what) {
     evidence.attempts++;
     const sent = gate.send(bytes, now());
@@ -258,16 +260,16 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     addSkill: (skill) => (Number.isInteger(skill) && skill >= 0 && skill <= 0xffff ? emit(packets.addSkill(skill), 'add-skill') : false),
     /** The death screen's continue. */
     respawn: () => emit(packets.respawn(), 'respawn'),
-    useItem(guid) { const s = open(); return s ? emit(packets.useItem(guid, s.player.x, s.player.y), 'use-item') : false; },
+    useItem(guid) { const s = open(); return s && itemGate() ? emit(packets.useItem(guid, s.player.x, s.player.y), 'use-item') : false; },
     /** Inventory panel: lift a carried item (0x19) or a worn one (0x1C). */
-    lift: (guid) => emit(packets.fromGrid(guid), 'lift'),
-    unequip: (bodyLoc) => emit(packets.unequip(bodyLoc), 'unequip'),
+    lift: (guid) => itemGate() && emit(packets.fromGrid(guid), 'lift'),
+    unequip: (bodyLoc) => itemGate() && emit(packets.unequip(bodyLoc), 'unequip'),
     /** With an item on the cursor: into a grid cell (0x18), onto an empty body slot (0x1A), swapping a worn one (0x1D). */
-    putInGrid: (guid, x, y, page = INV_PAGE.INVENTORY) => emit(packets.toGrid(guid, x, y, page), 'to-grid'),
-    equip: (guid, bodyLoc) => emit(packets.equip(guid, bodyLoc), 'equip'),
-    swapGrid: (cursorGuid, itemGuid, x, y) => emit(packets.swapCursorBuffer(cursorGuid, itemGuid, x, y), 'swap-grid'),
-    swapBody: (guid, bodyLoc) => emit(packets.swapWithBody(guid, bodyLoc), 'swap-body'),
-    dropCursor: (guid) => emit(packets.dropCursor(guid), 'drop'),
+    putInGrid: (guid, x, y, page = INV_PAGE.INVENTORY) => itemGate() && emit(packets.toGrid(guid, x, y, page), 'to-grid'),
+    equip: (guid, bodyLoc) => itemGate() && emit(packets.equip(guid, bodyLoc), 'equip'),
+    swapGrid: (cursorGuid, itemGuid, x, y) => itemGate() && emit(packets.swapCursorBuffer(cursorGuid, itemGuid, x, y), 'swap-grid'),
+    swapBody: (guid, bodyLoc) => itemGate() && emit(packets.swapWithBody(guid, bodyLoc), 'swap-body'),
+    dropCursor: (guid) => itemGate() && emit(packets.dropCursor(guid), 'drop'),
     swapWeapons: () => emit(packets.swapWeapons(), 'swap-weapons'),
     /** After the server has opened a menu: the waypoint list and a town-portal choice. */
     waypoint: (guid, levelId) => emit(packets.waypoint(guid, levelId), 'waypoint'),

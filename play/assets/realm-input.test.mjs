@@ -250,3 +250,17 @@ test('a talk that goes out is reported to the NPC state', () => {
   assert.deepEqual(out, [[0x13, 1, 0, 0, 0, 78, 0, 0, 0]]);
   assert.deepEqual(talked, [78]);
 });
+
+test('an item action asks the leave wait first: refused actions send nothing, allowed ones go out', () => {
+  const out = []; let allow = false, asked = 0;
+  const input = createRealmInput({ transmit: (b) => out.push(Array.from(b)), scene: sceneOf(), now: () => 0,
+    leaveWait: { itemAction: () => { asked++; return allow; } } });
+  assert.equal(input.lift(7), false);
+  assert.equal(input.equip(7, 1), false);
+  assert.equal(input.dropCursor(7), false);
+  assert.deepEqual(out, []);
+  allow = true;
+  assert.ok(input.lift(7));
+  assert.equal(asked, 4);
+  assert.deepEqual(out, [Array.from(packets.fromGrid(7))]);
+});
