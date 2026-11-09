@@ -151,10 +151,26 @@ export function menuFramePieces(x1, y1, x2, y2) {
 }
 const GOLD = [0xc7, 0xb3, 0x77], BLUE = [0x69, 0x69, 0xff], RED = [0xff, 0x4d, 0x4d];
 
-/** A hire offer's header line; stat labels are string.tbl 3368 Lvl, 3366 Life, 3367 Def, 3369 Cost. */
+/** A hire offer's first line, built the way retail joins it: name, space, dash, space, then Lvl / Life / Def / Cost
+ *  (string.tbl 3368, 3366, 3367, 3369; each label cut to 20 chars) as `label`, colon, space, a 2-wide value,
+ *  two spaces between fields. The space, dash and colon are string.tbl 3995, 3996 and 3997. */
 export function hireOfferLine(o, string) {
   const t = (id, d) => string(id) || d;
-  return `${o.name} - ${t(3368, 'Lvl')}: ${String(o.level).padStart(2)}  ${t(3366, 'Life')}: ${String(o.life).padStart(2)}  ${t(3367, 'Def')}: ${String(o.def).padStart(2)}  ${t(3369, 'Cost')}: ${o.cost}`;
+  const sp = t(3995, ' '), dash = t(3996, '-'), colon = t(3997, ':');
+  const field = (id, d, v) => `${t(id, d).slice(0, 20)}${colon}${sp}${String(v).padStart(2)}`;
+  return [`${o.name}${sp}${dash}${sp}${field(3368, 'Lvl', o.level)}`, field(3366, 'Life', o.life), field(3367, 'Def', o.def), field(3369, 'Cost', o.cost)].join(sp + sp);
+}
+/** The skill line of a hire offer: the engine's description-id table, indexed by the offer's record field (0..8; anything else, and slot 0, has none). */
+export const HIRE_SKILL_STRINGS = [0, 3371, 3372, 11090, 11088, 11089, 3377, 3376, 3375];
+export function hireSkillText(index, string) {
+  const id = Number.isInteger(index) && index >= 0 && index < HIRE_SKILL_STRINGS.length ? HIRE_SKILL_STRINGS[index] : 0;
+  return id ? string(id) : '';
+}
+/** The hire window's box in a screen of the given size: 490 x 350, centred horizontally, and vertically about the middle of the
+ *  screen minus its 40 px bottom panel (so 85..435 at 800x600). The offers list sits 35 px inside it, 280 high. */
+export function hireWindowBox(width = 800, height = 600) {
+  const x1 = (width - 490) >> 1, y1 = ((height - 40) >> 1) - 195;
+  return { x1, y1, x2: x1 + 490, y2: y1 + 350, listY: ((height - 40) >> 1) - 160 };
 }
 export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, documentObject = globalThis.document }) {
   const palette = decodeDatPalette(read(NPC_MENU_ASSETS.palette));
@@ -241,7 +257,7 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
   // P7: the 'Hire which Mercenary?' window: a fixed 490x350
   // box at (155,85) -- the NPC menu's fill and frame rule -- a text-slider track on the right, a name line and a
   // skill line per offer (7 rows of 34 px show at once), the hover row in blue, a scroll thumb and the Cancel label.
-  const HW = { x1: 155, y1: 85, x2: 645, y2: 435, rows: 7, textX: 187, firstBottom: 145, pitch: 34, trackX: 627, cancelX: 377, cancelY: 421, headerY: 106 };
+  const HW = { ...hireWindowBox(), rows: 7, textX: 187, firstBottom: 145, pitch: 34, trackX: 627, cancelX: 377, cancelY: 421, headerY: 106 };
   let hire = null;
   const hireRow = (i) => ({ x: HW.x1 + 20, y: HW.firstBottom - 12 + i * HW.pitch, w: 440, h: HW.pitch });
   const layout = (feetX, feetY) => {
