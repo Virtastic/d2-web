@@ -1,6 +1,7 @@
 // BNClient.dll batch z23: BNGatewayAccess (BNetGW.cpp) rows and the CRT thunks. Transcribed from the
 // cached decompile of retail 1.13c. Retail's globals and callees are seams (z23_*); 32-bit links are
-// uint32_t. UpdateGatewaysFromIni (0x15260) is GUESSED in part: its decompile lost register arguments.
+// uint32_t. UpdateGatewaysFromIni (0x15260) is the version guard only here; the full parse is the recorded bnclient_15260
+// unit (src/core/bnclient/bnclient_15260.cpp), vectored through retail's own save and load.
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -216,14 +217,15 @@ extern "C" void z23_WriteDefaultGatewayListImpl(z23_Gw* g) {
     uint32_t buf = 0;
     uint8_t scratch[4];
     if (!z23_LoadFile("DATA\\GLOBAL\\gateways.txt", scratch, &buf, 0, 0)) z23_Fatal(0x1b8);
-    if (buf) z23_Log("");  // GUESSED: retail calls UpdateGatewaysFromIni(buffer); wired via the seam below
+    if (buf) z23_Log("");  // retail hands the loaded buffer to UpdateGatewaysFromIni; that call is the recorded unit, not this seam
 }
 
-// 1.13c BNClient+0x15260 (UpdateGatewaysFromIni): GUESSED/PARTIAL. Parse the "[Server List Version] VER"
+// 1.13c BNClient+0x15260 (UpdateGatewaysFromIni): only the guard is reproduced here. Parse the "[Server List Version] VER"
 // and, if newer than the loaded version, rebuild the list as ver\0 "00"\0 then per Server Gateways key N
-// the section's name, ZONE (default "0") and ENU strings; validate the double NUL and size, install,
-// PickClosestZone, SaveAndUnload, Load. The decompile lost the register arguments; only the guard is
-// reproduced here.
+// that gateway's name, ZONE (default "0") and ENU (default the name) strings, where a name with no section of its own is
+// dropped; validate the double NUL and size, install, PickClosestZone, SaveAndUnload (which overwrites "00" with the
+// two-digit selection and writes the list to the registry), Load (which reads it back). Recorded with retail's real
+// save, pick and load; the body is bnclient_15260.cpp.
 extern "C" void z23_UpdateGatewaysFromIni(z23_Gw* g, char* ini) {
     char* sec = z23_FindSection(g, ini, "Server List Version");
     if (!sec) z23_Fatal(0x236);
