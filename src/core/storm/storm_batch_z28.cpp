@@ -6,15 +6,15 @@ void z28_Storm_53C0(void* p);                 // Storm+0x53C0
 void z28_Storm_eh_vec_dtor(void* base, uint32_t size, uint32_t n, void (*dtor)(void*)); // Storm+0x605E
 static inline uint8_t* z28_obj(uint32_t* ebp) { return (uint8_t*)(uintptr_t)ebp[1]; }
 static void z28_vec(uint32_t* ebp, uint32_t off) { z28_Storm_eh_vec_dtor(z28_obj(ebp) + off, 0xc, 4, z28_Storm_53C0); }
-// 1.13c Storm+0x41A30
+// superseded: Storm+0x41A30 lives in storm_41a30.cpp
 void z28_Unwind_41A30() { z28_Storm_4C20(); }
-// 1.13c Storm+0x41A50
+// superseded: Storm+0x41A50 lives in storm_41a50.cpp
 void z28_Unwind_41A50(uint32_t* ebp) { z28_Storm_4B80((uint32_t*)(uintptr_t)ebp[1]); }
-// 1.13c Storm+0x41A5A
+// superseded: Storm+0x41A5A lives in storm_41a5a.cpp
 void z28_Unwind_41A5A(uint32_t* ebp) { z28_vec(ebp, 0x130); }
-// 1.13c Storm+0x41A72
+// superseded: Storm+0x41A72 lives in storm_41a72.cpp
 void z28_Unwind_41A72(uint32_t* ebp) { z28_vec(ebp, 0x160); }
-// 1.13c Storm+0x41A8A
+// superseded: Storm+0x41A8A lives in storm_41a8a.cpp
 void z28_Unwind_41A8A(uint32_t* ebp) { z28_vec(ebp, 400); }
 // superseded by the per-function port file for rva 41AA2
 void z28_Unwind_41AA2(uint32_t* ebp) { z28_Storm_53C0(z28_obj(ebp) + 0x1c0); }

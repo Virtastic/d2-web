@@ -13,12 +13,13 @@ inline uint32_t readCb(uint8_t* buf, uint32_t* size, void* user) {   // 0x11C70
     c[4] += n;
     return n;
 }
-inline void writeCb(uint8_t* buf, uint32_t* size, void* user) {      // 0x11C30
+inline uint32_t writeCb(uint8_t* buf, uint32_t* size, void* user) {      // 0x11C30
     uint32_t* c = (uint32_t*)user;
     uint32_t n = c[2] - c[1];
     if (*size < n) n = *size;
     std::memcpy((void*)(uintptr_t)(c[0] + c[1]), buf, n);
     c[1] += n;
+    return 0;   // the shared PkIo type returns a word; retail ignores it
 }
 inline uint32_t cb32(uint32_t (*f)(uint8_t*, uint32_t*, void*)) { return (uint32_t)(uintptr_t)f; }
 inline uint32_t cb32(void (*f)(uint8_t*, uint32_t*, void*)) { return (uint32_t)(uintptr_t)f; }

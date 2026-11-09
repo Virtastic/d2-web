@@ -22,7 +22,7 @@
 #include <Windows.h>
 
 // FUNCTION-mode capture: a probe sets this to log each Win32 import call as retail's IAT recorder does (slot rva, stack words).
-extern "C" void (*g_storm_imp_hook)(uint32_t slot, uint32_t w0, uint32_t w1, uint32_t w2) = nullptr;
+extern "C" uint32_t (*g_storm_imp_hook)(uint32_t slot, uint32_t w0, uint32_t w1, uint32_t w2) = nullptr;
 #define STORM_IMP(slot, a, b, c) do { if (g_storm_imp_hook) g_storm_imp_hook((slot), (uint32_t)(a), (uint32_t)(b), (uint32_t)(c)); } while (0)
 
 namespace {
@@ -242,11 +242,11 @@ HANDLE StormSub21350(HINSTANCE hinst, int* tmpl, HWND parent, void* dlgProc, LPA
 namespace {
 struct ImpScope {
     stormhk::Scope hk;
-    static void log(uint32_t slot, uint32_t w0, uint32_t w1, uint32_t w2) {
+    static uint32_t log(uint32_t slot, uint32_t w0, uint32_t w1, uint32_t w2) {
         stormhk::Scope* c = stormhk::Scope::cur();
         if (slot == 0x432cc) { w0 = c->r[0]; w1 = c->r[1]; }   // EndPaint is the tail jump: it gets the caller's own two words
         if (slot == 0x432fc) w1 = 0;                           // property-name pointer (hookmask'd in the descriptor)
-        c->e.h(slot, 0, 0, 0, 0, 0, w0, w1, w2);
+        return (uint32_t)c->e.h(slot, 0, 0, 0, 0, 0, w0, w1, w2);
     }
     explicit ImpScope(uint32_t* r) : hk(r, 0, 2, kSc) { g_storm_imp_hook = log; }
     ~ImpScope() { g_storm_imp_hook = nullptr; }

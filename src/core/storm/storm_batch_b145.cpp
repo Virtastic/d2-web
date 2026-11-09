@@ -22,7 +22,8 @@ static const char* g_str688c = "0FFh"; // DAT_6fc3688c (unverified text)
 static char g_decimalPoint = '.';      // DAT_6fc406b4
 static double g_pow10Tab[21 * 10];     // DAT_6fc42918
 static uint32_t g_lastError;           // DAT_6fc45388
-static int32_t g_purecall;             // _ptiddata->_purecall of the single wasm thread
+static uint8_t g_ptd[0x100];           // _tiddata of the single wasm thread (_purecall at +0x84)
+static uint8_t* StormGetPtd() { return g_ptd; }   // 0x76FA __getptd
 
 // hooks for unmapped callees
 void (*Storm_Hook_249E0)(uint32_t) = nullptr;          // FUN_6fc249e0
@@ -173,26 +174,32 @@ extern "C" void Storm_Sub3C8B1() {
   memcpy(g_fptrap, t, sizeof t);
 }
 
-// 1.13c Storm+0x3cdb8: --ptd->_purecall if > 0
-extern "C" void Storm_Sub3CDB8() { if (g_purecall > 0) g_purecall--; }
+// 1.13c Storm+0x3cdb8: --ptd->_purecall if > 0 (__getptd is called once for the test and once for the decrement)
+extern "C" void Storm_Sub3CDB8(uint8_t* (*getptd)() = StormGetPtd) {
+  if (*(int32_t*)(getptd() + 0x84) > 0) (*(int32_t*)(getptd() + 0x84))--;
+}
 
-// 1.13c Storm+0x3cf8c: C++ EH catch-epilogue fragment (unaff_EBP/ESI/EDI frame). Frame values passed explicitly.
-struct Storm3CF8CFrame {
-  uint32_t* edi4;        // *(EDI-4) destination
-  uint32_t saved38, saved40, saved44;  // EBP-0x38/-0x40/-0x44
-  int32_t* exc;          // ESI exception record (32-bit fields): [0]=code [4]=nparams [5]=magic [6]=obj
-  int32_t flag48, flag20;
+// 1.13c Storm+0x3cf8c: C++ EH catch-epilogue funclet (EBP = the enclosing frame, ESI = the exception record, EDI-4 = the destination). The
+// callees are seams: _FindAndUnlinkFrame 0x3C80B, __getptd 0x76FA, IsExceptionObjectToBeDestroyed 0x3C7EA, __abnormal_termination 0xC00E, ___DestructExceptionObject 0x3CDD3.
+struct Storm3CF8CEnv {
+  void (*unlink)(uint32_t frame);
+  uint8_t* (*getptd)();
+  int (*isDestroyed)(uint32_t obj);
+  int (*abnormal)();
+  void (*destruct)(int32_t* rec, int abn);
 };
-static uint32_t g_unexpected, g_translator;  // ptd->_unexpected / _translator
-void (*Storm_Hook_DestructExc)(int32_t*) = nullptr;  // __abnormal_termination + ___DestructExceptionObject
-int (*Storm_Hook_IsDestroyed)(int32_t) = nullptr;
-extern "C" void Storm_Sub3CF8C(Storm3CF8CFrame* f) {
-  *f->edi4 = f->saved38;
-  // _FindAndUnlinkFrame(EBP-0x3c) not modelled: no SEH frame chain on wasm
-  g_unexpected = f->saved40; g_translator = f->saved44;
-  int32_t* e = f->exc;
-  if (e[0] == -0x1f928c9d && e[4] == 3 && (e[5] == 0x19930520 || e[5] == 0x19930521) && f->flag48 == 0 && f->flag20 != 0) {
-    if (Storm_Hook_IsDestroyed && Storm_Hook_IsDestroyed(e[6]) && Storm_Hook_DestructExc) Storm_Hook_DestructExc(e);
+static uint32_t Storm3CF8CRd(const uint8_t* ebp, int off) { uint32_t v; memcpy(&v, ebp + off, 4); return v; }
+extern "C" void Storm_Sub3CF8C(const uint8_t* ebp, int32_t* esi, uint32_t* edi, const Storm3CF8CEnv* env) {
+  edi[-1] = Storm3CF8CRd(ebp, -0x38);
+  env->unlink(Storm3CF8CRd(ebp, -0x3c));
+  uint32_t v = Storm3CF8CRd(ebp, -0x40); memcpy(env->getptd() + 0x7c, &v, 4);
+  v = Storm3CF8CRd(ebp, -0x44); memcpy(env->getptd() + 0x80, &v, 4);
+  if (esi[0] == -0x1f928c9d && esi[4] == 3 && (esi[5] == 0x19930520 || esi[5] == 0x19930521) &&
+      Storm3CF8CRd(ebp, -0x48) == 0 && Storm3CF8CRd(ebp, -0x20) != 0) {
+    if (env->isDestroyed((uint32_t)esi[6]) != 0) {
+      int abn = env->abnormal();
+      env->destruct(esi, abn);
+    }
   }
 }
 

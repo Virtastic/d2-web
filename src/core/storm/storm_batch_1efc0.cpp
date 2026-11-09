@@ -36,6 +36,60 @@ extern "C" __attribute__((weak)) void Storm_Sub26D40(void);                     
 void Storm_Sub17FC0(void);
 uint32_t Storm_Sub27FC0(uint32_t* t, uint32_t seed);
 
+extern "C" void Storm_Sub16BD0(char* out, int32_t which);  // 0x16BD0 install dir (weak link stub in storm_e6bd_links.cpp)
+
+// kernel32 seams: the host file API of retail's world; ours never opens a retail archive. (weak link stubs in storm_e6bd_links.cpp)
+extern "C" {
+DWORD StormGetFileAttributes(const char* path);
+HANDLE StormCreateFile(const char* path, uint32_t access, uint32_t share, uint32_t disposition,
+                       uint32_t flags);
+DWORD StormSetFilePointer(HANDLE h, LONG distance, LONG* high, uint32_t method);
+DWORD StormGetFileSize(HANDLE h);
+int32_t StormReadFile(HANDLE h, void* buf, uint32_t len, DWORD* got);
+HANDLE StormCreateEvent(void);
+void StormWaitForSingleObject(HANDLE h, uint32_t ms);
+void StormCloseHandle(HANDLE h);
+}
+
+uint32_t* Storm_Sub4290(uint32_t* anchor, uint32_t, uint32_t);
+int32_t Storm_SubB960(void* p, const char* tag, int32_t line);
+void Storm_Sub179F0(int32_t h);
+void* Storm_Sub41D0(uint32_t* anchor, uint32_t, uint32_t);
+void* Storm_Sub40D0(uint32_t* anchor, uint32_t, uint32_t);
+uint32_t Storm_Sub2B080(uint8_t* dst, const uint32_t* src, uint32_t n);
+char* Storm_Sub2B2D0(const char* s, int32_t c);
+int32_t Storm_Sub16AC0(void* archive, void* name);
+uint32_t Storm_Sub15ED0(const char* name, uint32_t type);
+void Storm_Sub19560(void);
+int32_t Storm_Sub18E80(uint32_t pos, void* buf, uint32_t len);
+uint32_t Storm_Sub12C80(void* dst, const void* src, uint32_t n);
+void Storm_Sub16E20(int32_t* rec);
+void Storm_Sub1F590(uint32_t err, uint32_t* name, int32_t off, void*, uint32_t, uint32_t);
+uint32_t Storm_CryptTable(uint32_t index);
+int32_t Storm_Sub16750(void);
+void Storm_Sub16D70(uint32_t* state, void* table, uint32_t size, uint32_t* name);
+void Storm_Sub15F30(uint32_t key, uint32_t* table);
+void Storm_Sub15E50(uint32_t count);
+void Storm_Sub16CB0(uint32_t* rec);
+void Storm_Sub19F60(uint8_t* rec, void* blockTable, int32_t count);
+void Storm_Sub3E20(uint32_t rec);
+void Storm_Sub181F0(uint8_t* rec);
+int32_t Storm_Sub19DF0(uint32_t magic, int32_t* size);
+uint32_t* Storm_Sub4310(uint32_t* anchor, uint32_t, uint32_t);
+int32_t Storm_ProviderCreate(void* iface, void* desc, void** out, uint32_t);
+void Storm_ProviderPlay(void* iface, uint32_t);
+void Storm_ProviderSetVolume(void* iface, uint32_t v);
+void Storm_ProviderSetPan(void* iface, uint32_t v);
+const uint8_t* Storm_ScdTemplate(uint32_t offset);
+uint8_t Storm_Byte369C0(uint32_t i);
+const uint8_t* Storm_Ptr36938(void);
+uint32_t Storm_Dword3692C(void);
+uint8_t Storm_Byte36930(void);
+void Storm_Sub2AE00(uint8_t* dst, const uint8_t* table, uint32_t n);
+void Storm_Sub37E80(uint32_t* state, uint32_t flag, uint32_t* out);
+
+void* Storm_Sub6460(const void* s, const char* find);  // 0x6460 strstr
+
 namespace {
 
 int32_t g_lastError = 0;            // 0x6FC45388  last Storm error, mirrored to SetLastError
@@ -54,10 +108,7 @@ uint32_t g_43148 = 0;               // 0x6FC43148  config case 5
 void StormSetLastError(uint32_t e) { g_lastError = (int32_t)e; }
 
 // ---- unmapped internals, retail argument order (seams) ----------------------------------------
-uint32_t* Storm_Sub4290(uint32_t* anchor, uint32_t, uint32_t);            // 0x4290 pool alloc
 extern "C" void Storm_Sub4040(uint32_t o);                                  // 0x4040 pool free (C linkage: storm_4040.cpp)
-int32_t Storm_SubB960(void* p, const char* tag, int32_t line);             // 0xB960 operator delete
-void Storm_Sub179F0(int32_t h);                                            // 0x179F0 stream close
 
 // Host event handle: a no-op wake in ours, as the sound thread does not exist.
 void StormSetEvent(void* h) { (void)h; }
@@ -81,35 +132,11 @@ HANDLE kInvalidHandle() { return (HANDLE)(intptr_t)-1; }
 constexpr const char* kSFileCpp = "..\\3rdParty\\STORM\\SOURCE\\SFILE.CPP";
 
 // ---- SFile internals, retail argument order (seams) -------------------------------------------
-void* Storm_Sub41D0(uint32_t* anchor, uint32_t, uint32_t);                 // 0x41D0 alloc open-file
-void* Storm_Sub40D0(uint32_t* anchor, uint32_t, uint32_t);                 // 0x40D0 alloc archive
 extern "C" void* Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, uint32_t flags); // 0x1C580 alloc
-void Storm_Sub16BD0(char* out, int32_t which);                             // 0x16BD0 install dir
-uint32_t Storm_Sub2B080(uint8_t* dst, const uint32_t* src, uint32_t n);    // 0x2B080 strncpy max
-char* Storm_Sub2B2D0(const char* s, int32_t c);                            // 0x2B2D0 strchr
-void* Storm_Sub6460(const void* s, const char* find);                      // 0x6460 strstr
-int32_t Storm_Sub16AC0(void* archive, void* name);                         // 0x16AC0 find file
-uint32_t Storm_Sub15ED0(const char* name, uint32_t type);                  // 0x15ED0 MPQ hash
-void Storm_Sub19560(void);                                                 // 0x19560 stream helper
-int32_t Storm_Sub18E80(uint32_t pos, void* buf, uint32_t len);             // 0x18E80 pread
 uint32_t* Storm_Sub17A70(uint32_t pos, intptr_t buf, uint32_t len, uint32_t, uint32_t, uint32_t,
                          uint32_t chunk, uint32_t, uint32_t prio, uint32_t event, uint32_t,
                          uint32_t last, uint32_t);                         // 0x17A70 async read
-uint32_t Storm_Sub12C80(void* dst, const void* src, uint32_t n);           // 0x12C80 memcpy
-void Storm_Sub16E20(int32_t* rec);                                         // 0x16E20 close record
-void Storm_Sub1F590(uint32_t err, uint32_t* name, int32_t off, void*, uint32_t, uint32_t); // 0x1F590
-uint32_t Storm_CryptTable(uint32_t index);                                 // DAT_6FC41600 entry
 
-// kernel32 seams: the host file API of retail's world; ours never opens a retail archive.
-DWORD StormGetFileAttributes(const char* path);
-HANDLE StormCreateFile(const char* path, uint32_t access, uint32_t share, uint32_t disposition,
-                       uint32_t flags);
-DWORD StormSetFilePointer(HANDLE h, LONG distance, LONG* high, uint32_t method);
-DWORD StormGetFileSize(HANDLE h);
-int32_t StormReadFile(HANDLE h, void* buf, uint32_t len, DWORD* got);
-HANDLE StormCreateEvent(void);
-void StormWaitForSingleObject(HANDLE h, uint32_t ms);
-void StormCloseHandle(HANDLE h);
 
 // 1.13c Storm+0x281A0
 extern "C"
@@ -599,21 +626,7 @@ uint32_t g_43130 = 0;               // 0x6FC43130  archive-open mode flags
 uint32_t g_43114 = 0;               // 0x6FC43114  sound buffer size
 uint32_t g_43128 = 0;               // 0x6FC43128  sound-read buffer
 
-int32_t Storm_Sub16750(void);                                              // 0x16750 archive mode
-void Storm_Sub16D70(uint32_t* state, void* table, uint32_t size, uint32_t* name); // 0x16D70 decrypt
-void Storm_Sub15F30(uint32_t key, uint32_t* table);                        // 0x15F30 table init
-void Storm_Sub15E50(uint32_t count);                                       // 0x15E50 count init
-void Storm_Sub16CB0(uint32_t* rec);                                        // 0x16CB0 teardown
-void Storm_Sub19F60(uint8_t* rec, void* blockTable, int32_t count);        // 0x19F60 post-open
-void Storm_Sub3E20(uint32_t rec);                                             // 0x3E20 free archive
-void Storm_Sub181F0(uint8_t* rec);                                         // 0x181F0 release buffer
-int32_t Storm_Sub19DF0(uint32_t magic, int32_t* size);                     // 0x19DF0 find chunk
-uint32_t* Storm_Sub4310(uint32_t* anchor, uint32_t, uint32_t);             // 0x4310 alloc stream
 // provider interface vtable slots (retail +0x0C/+0x34/+0x3C/+0x40)
-int32_t Storm_ProviderCreate(void* iface, void* desc, void** out, uint32_t);
-void Storm_ProviderPlay(void* iface, uint32_t);
-void Storm_ProviderSetVolume(void* iface, uint32_t v);
-void Storm_ProviderSetPan(void* iface, uint32_t v);
 
 // 1.13c Storm+0x2A0B0: SFileOpenArchive -- the port is storm_2a0b0.cpp; this binds it to the module words, the kernel32 calls and the callees.
 struct Storm2A0B0Env {
@@ -836,13 +849,6 @@ uint32_t Storm_Sub2A650(uint8_t* param_1, uint32_t param_2, uint32_t param_3, ui
 // The two scratch strings sit at Ghidra's frame offsets -0x42 and -0x20 and overlap at -0x32 (the
 // kernel buffer's first two bytes, unused), so the transcription uses one arena with those exact
 // offsets. The .rdata tables are retail content and stay seams.
-const uint8_t* Storm_ScdTemplate(uint32_t offset);                         // "SCDDDDDD" table
-uint8_t Storm_Byte369C0(uint32_t i);                                       // 0x6FC369C0 byte table
-const uint8_t* Storm_Ptr36938(void);                                       // 0x6FC36938 transform
-uint32_t Storm_Dword3692C(void);                                           // 0x6FC3692C prefix
-uint8_t Storm_Byte36930(void);                                             // 0x6FC36930 prefix
-void Storm_Sub2AE00(uint8_t* dst, const uint8_t* table, uint32_t n);       // 0x2AE00 transform
-void Storm_Sub37E80(uint32_t* state, uint32_t flag, uint32_t* out);        // 0x37E80, EAX = state
 
 // 1.13c Storm+0x37ED0: format string id param_1 into param_3 (capacity param_3), using param_2 as
 // the destination; param_4 is the hidden 0x37E80 state register (0 when the caller has none).

@@ -154,13 +154,13 @@ int z22_ctrlfp(void) { return (int16_t)z22_fpu_cw(); }
 void z22_41652(void) {}
 
 // SEH unwind funclets: frame pointer slots passed explicitly (retail reads EBP-0x10 / EBP+4).
-// 1.13c Storm+0x41990
+// superseded: Storm+0x41990 lives in storm_41990.cpp
 void z22_unwind_41990(uint32_t* ebp) { z22_unlink_4b80((void*)(uintptr_t)ebp[-4]); }
-// 1.13c Storm+0x419B8
+// superseded: Storm+0x419B8 lives in storm_419b8.cpp
 void z22_unwind_419b8(uint32_t* ebp) { z22_unlink_4b80((void*)(uintptr_t)ebp[-4]); }
-// 1.13c Storm+0x419D0
+// superseded: Storm+0x419D0 lives in storm_419d0.cpp
 void z22_unwind_419d0() { z22_dtor_4c20(); }
-// 1.13c Storm+0x419DB
+// superseded: Storm+0x419DB lives in storm_419db.cpp
 void z22_unwind_419db() { z22_dtor_4c20(); }
-// 1.13c Storm+0x419F0
+// superseded: Storm+0x419F0 lives in storm_419f0.cpp
 void z22_unwind_419f0(uint32_t* ebp) { z22_unlink_4b80((void*)(uintptr_t)ebp[1]); }

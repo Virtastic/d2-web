@@ -22,8 +22,8 @@ struct StormBatch382c0Env {
     void     (*f_1090)(void* block);                              // 0x1090, pre-free of a surface
     void     (*f_b960)(void* p, const char* file, int32_t line);  // 0x0B960 debug free
     void*    (*f_c580)(uint32_t size, const char* file, int32_t line, uint32_t type); // 0x0C580
-    void     (*f_37e80)(void* self, uint32_t* param_7);           // 0x37E80
-    uint32_t (*f_1360)(uint32_t format);                          // 0x1360 blitter select
+    void     (*f_37e80)(uint32_t* param_8, uint32_t* param_7);    // 0x37E80 (EAX = &param_8, EDX = &param_7)
+    uint32_t (*f_1360)(uint32_t width, uint32_t format);          // 0x1360 blitter select (EAX = width, EDI = 0x6FC4587C, stack word = format)
     uint32_t (*f_387f0)(int32_t blitter, void* desc);             // 0x387F0 blitter (row skipped)
     // The width-specialised fast path: retail indexes the jump table at 0x6FC28390 with width>>2
     // after FUN_6fbf1350(0x6FC4587C); the table is unrecovered, so the body is this one seam.
@@ -229,8 +229,8 @@ uint32_t Storm_Sub382C0(void* self, uint32_t param_1, uint32_t param_2, uint32_t
         return env->f_fastblit(self, param_1, param_2, param_3, param_4, param_5, param_6,
                                param_7, param_8);
     }
-    if (param_8 != 0xcc0020 && param_8 != 0xf00021) env->f_37e80(self, &param_7);
-    int32_t blitter = (int32_t)env->f_1360(param_8);
+    if (param_8 != 0xcc0020 && param_8 != 0xf00021) env->f_37e80(&param_8, &param_7);
+    int32_t blitter = (int32_t)env->f_1360(param_3, param_8);
     BlitDesc d;
     d.flags = 0x40;
     d.zero = 0;

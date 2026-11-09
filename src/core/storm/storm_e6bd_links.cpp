@@ -51,4 +51,52 @@ WEAK void Storm_Sub20C90(uint32_t*, uint32_t, uint32_t, uint32_t, float*, uint32
 WEAK uint32_t* Storm_Sub2690(uint32_t, uint32_t) { return nullptr; }
 WEAK void Storm_SubF2E0(void*, void*, void*, void*, void*, void*) {}
 WEAK void Storm_Sub12F40(uint32_t, int8_t, uint32_t*, uint32_t) {}
+// kernel32 seams of storm_batch_1efc0.cpp: ours never opens a retail archive.
+WEAK uint32_t StormGetFileAttributes(const char*) { return 0xFFFFFFFFu; }
+WEAK void* StormCreateFile(const char*, uint32_t, uint32_t, uint32_t, uint32_t) { return (void*)(intptr_t)-1; }
+WEAK uint32_t StormSetFilePointer(void*, int32_t, int32_t*, uint32_t) { return 0xFFFFFFFFu; }
+WEAK uint32_t StormGetFileSize(void*) { return 0xFFFFFFFFu; }
+WEAK int32_t StormReadFile(void*, void*, uint32_t, uint32_t*) { return 0; }
+WEAK void* StormCreateEvent(void) { return nullptr; }
+WEAK void StormWaitForSingleObject(void*, uint32_t) {}
+WEAK void StormCloseHandle(void*) {}
+WEAK uint32_t g_storm_imp_w3;   // fourth stack word of CreateRectRgn / CombineRgn (storm_walker probe)
+}
+
+// Retail seams of storm_batch_1efc0.cpp that no port defines yet (C++ linkage, like their declarations); a real port replaces them.
+__attribute__((weak)) uint32_t* Storm_Sub4290(uint32_t* anchor, uint32_t, uint32_t) { return {}; }
+__attribute__((weak)) int32_t Storm_SubB960(void* p, const char* tag, int32_t line) { return {}; }
+__attribute__((weak)) void Storm_Sub179F0(int32_t h) {}
+__attribute__((weak)) void* Storm_Sub40D0(uint32_t* anchor, uint32_t, uint32_t) { return {}; }
+__attribute__((weak)) uint32_t Storm_Sub2B080(uint8_t* dst, const uint32_t* src, uint32_t n) { return {}; }
+__attribute__((weak)) char* Storm_Sub2B2D0(const char* s, int32_t c) { return {}; }
+__attribute__((weak)) int32_t Storm_Sub16AC0(void* archive, void* name) { return {}; }
+__attribute__((weak)) void Storm_Sub19560(void) {}
+__attribute__((weak)) int32_t Storm_Sub18E80(uint32_t pos, void* buf, uint32_t len) { return {}; }
+__attribute__((weak)) uint32_t Storm_Sub12C80(void* dst, const void* src, uint32_t n) { return {}; }
+__attribute__((weak)) void Storm_Sub16E20(int32_t* rec) {}
+__attribute__((weak)) uint32_t Storm_CryptTable(uint32_t index) { return {}; }
+__attribute__((weak)) int32_t Storm_Sub16750(void) { return {}; }
+__attribute__((weak)) void Storm_Sub15F30(uint32_t key, uint32_t* table) {}
+__attribute__((weak)) void Storm_Sub15E50(uint32_t count) {}
+__attribute__((weak)) void Storm_Sub16CB0(uint32_t* rec) {}
+__attribute__((weak)) void Storm_Sub19F60(uint8_t* rec, void* blockTable, int32_t count) {}
+__attribute__((weak)) void Storm_Sub181F0(uint8_t* rec) {}
+__attribute__((weak)) int32_t Storm_Sub19DF0(uint32_t magic, int32_t* size) { return {}; }
+__attribute__((weak)) int32_t Storm_ProviderCreate(void* iface, void* desc, void** out, uint32_t) { return {}; }
+__attribute__((weak)) void Storm_ProviderPlay(void* iface, uint32_t) {}
+__attribute__((weak)) void Storm_ProviderSetVolume(void* iface, uint32_t v) {}
+__attribute__((weak)) void Storm_ProviderSetPan(void* iface, uint32_t v) {}
+__attribute__((weak)) const uint8_t* Storm_ScdTemplate(uint32_t offset) { return {}; }
+__attribute__((weak)) uint8_t Storm_Byte369C0(uint32_t i) { return {}; }
+__attribute__((weak)) const uint8_t* Storm_Ptr36938(void) { return {}; }
+__attribute__((weak)) uint32_t Storm_Dword3692C(void) { return {}; }
+__attribute__((weak)) uint8_t Storm_Byte36930(void) { return {}; }
+__attribute__((weak)) void Storm_Sub2AE00(uint8_t* dst, const uint8_t* table, uint32_t n) {}
+__attribute__((weak)) void* Storm_Sub6460(const void*, const char*) { return {}; }
+__attribute__((weak)) void Storm_Sub37E80(uint32_t*, uint32_t, uint32_t*) {}   // 0x37E80 with EAX = state; the port in storm_batch_36d40.cpp takes (code, out)
+// Walker FN entry points whose ports do not exist yet (rows 0x1CF00 / 0x1D2E0 differ until they do); 0x1D6B0 links through the same probe file.
+extern "C" {
+WEAK void storm_1cf00_fnrun(int32_t*, void*, int32_t, uint32_t, int, void*, uint32_t*) {}
+WEAK void storm_1d2e0_fnrun(uintptr_t, uintptr_t, uintptr_t, uint32_t*) {}
 }
