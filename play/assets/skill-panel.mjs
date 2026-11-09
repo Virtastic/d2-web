@@ -17,7 +17,7 @@ import { createFont, decodeFontTbl } from './frontend.mjs';
 import { TOOLTIP_FRAME, drawTooltipFrame } from './vendor-panel.mjs';
 import { PANEL_CLOSE_ART, panelCloseFrame, panelCloseLayout } from './panel-close.mjs';
 
-export const SESSION_SKILL_BYTES = 26;   // D2SessionSkill: thirteen uint16 (manaLine/manaCost are V19's)
+export const SESSION_SKILL_BYTES = 30;   // D2SessionSkill: thirteen uint16 (manaLine/manaCost are V19's), then level (with bonuses) and the signed bonus
 
 // Retail names the tree background per class: skltree_<letter>_back.dc6. The letters follow
 // CharStats.txt's class order, which is also the engine's class index. All seven are distinct
@@ -144,7 +144,8 @@ export function parseClassSkills(bytes, count) {
       baseLevel: v.getUint16(o + 10, true), iconCel: v.getUint16(o + 12, true),
       nameStr: v.getUint16(o + 14, true), descStr: v.getUint16(o + 16, true),
       manaStr: v.getUint16(o + 18, true), canLearn: v.getUint16(o + 20, true) !== 0,
-      manaLine: v.getUint16(o + 22, true) !== 0, manaCost: v.getUint16(o + 24, true) });
+      manaLine: v.getUint16(o + 22, true) !== 0, manaCost: v.getUint16(o + 24, true),
+      level: v.getUint16(o + 26, true), bonus: v.getInt16(o + 28, true) });
   }
   return out;
 }
@@ -175,7 +176,8 @@ export function buildSkillPlate(hovered, state, compact = false) {
   // Retail's learned-skill plate (skilltree-hover-bash5-r20) has NO Required Level line, only the spacer: drawn for an unlearned skill.
   if (!hovered.baseLevel) plateLines.push({ kind: 'required', text: key('skilldesc3') + hovered.requiredLevel });
   blank();
-  const level = hovered.baseLevel || 1;
+  const shownLevel = hovered.level ?? hovered.baseLevel;
+  const level = shownLevel || 1;
   let d = state.skillDesc ? state.skillDesc(hovered.id, level) : [];
   // SkillDesc's line types this client formats, each measured on a retail frame: 2 = "A +calc B",
   // 4 = "A +calc", 12 = "A calc seconds", 52 = "A calc B"; a zero value is not drawn (Frenzy's dsc2line2).
@@ -213,9 +215,9 @@ export function buildSkillPlate(hovered, state, compact = false) {
     if (compact) plateLines.push(...dsc2);
     plateLines.push(...stats(0, 6, cost, omitZeroMana, dl));
   };
-  levelBlock(hovered.baseLevel ? key('StrSkill2') + hovered.baseLevel : key('StrSkill17'), level, hovered.manaCost, compact);
+  levelBlock(shownLevel ? key('StrSkill2') + shownLevel : key('StrSkill17'), level, hovered.manaCost, compact);
   // The skill-select popup's plate is the Current block only: no Next Level, no synergy (v9b-popup-iconhover-r29, Stun 1).
-  if (hovered.baseLevel && state.skillMana && !compact) { blank(); levelBlock(key('StrSkill1'), level + 1, state.skillMana(hovered.id, level + 1), true); }
+  if (shownLevel && state.skillMana && !compact) { blank(); levelBlock(key('StrSkill1'), level + 1, state.skillMana(hovered.id, level + 1), true); }
   // The synergy block: type 40 header ("%s Receives Bonuses From:" with the skill's name) and
   // type 63 lines "Name: +calc% text", in table order.
   const syn = d.slice(10, 17).filter((e) => e.type === 63).map((e) => ({ kind: 'syn', text: `${line(e.a)}: +${e.calcA}% ${line(e.b)}` }));
@@ -236,7 +238,10 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
     let a = perAct.get(act);
     if (!a) {
       const palette = decodeDatPalette(read(actPath(act, 'pal.dat')));
-      a = { palette, font: createFont({ dc6: fontDc6, tbl: fontTbl, palette, documentObject }),
+      const pl2 = read(actPath(act, 'pal.pl2')), tints = new Map();
+      // The level text's colour shift (D2Client+0x78820): 3 for a positive skill bonus, 1 for a negative one.
+      const tint = (shift) => { if (!tints.has(shift)) tints.set(shift, createFont({ dc6: fontDc6, tbl: fontTbl, palette: textColourPalette(pl2, palette, shift), documentObject })); return tints.get(shift); };
+      a = { palette, tint, font: createFont({ dc6: fontDc6, tbl: fontTbl, palette, documentObject }),
         grey: textColourPalette(read(actPath(act, 'pal.pl2')), palette, 5), icons: new Map(), greyIcons: new Map() };
       perAct.set(act, a);
     }
@@ -356,9 +361,11 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
         const available = skillPointOverlay.isCandidate(skill);
         // A skill the player can learn now draws coloured, as a learned one does (retail's
         // skilltree-points capture: only the learnable Bash is extra=0, the rest grey).
+        const shown = skill.level ?? skill.baseLevel;
         // With points to spend an icon that cannot take one (level, prerequisite, maximum level) is
         // colour 5, learned or not; with none, only the unlearned are (retail's skill-tree icon draw).
-        const grey = (state.skillPoints ?? 0) > 0 ? !available : !(skill.baseLevel > 0);
+        // "Learned" is the level with bonuses, so an item-granted level draws coloured as a learned one does.
+        const grey = (state.skillPoints ?? 0) > 0 ? !available : !(shown > 0);
         const sheet = grey ? greyFor(state.playerClass ?? 0, act) : icons;
         // The held icon is the cel after its resting one.
         const pressed = state.pressedSkill === skill.id && Boolean(sheet[skill.iconCel + 1]);
@@ -370,7 +377,9 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
         // The skill's level in Font16 anchored at the icon's right edge, 12 rows below its bottom
         // (retail's act-V tree, skilltree-act5: '2' at 532,134 for the icon at 484..531 x 75..122).
         // retail's base level is drawn 4 px left of the icon's right edge (measured on the two-digit levels of charpanel-skilltree tick 21; one-digit unverified)
-        if (skill.baseLevel > 0) { const dx = r.x + r.w - 4, dy = r.y + r.h - 1 + 12; font.drawAnchored(ctx, String(skill.baseLevel), dx, dy); digits.push({ text: String(skill.baseLevel), x: dx, y: dy, iconCel: skill.iconCel }); }
+        // The text is the level WITH bonuses (SKILLS_GetSkillLevel(.., TRUE)), blue when the bonus is positive and red when negative.
+        if (shown > 0) { const dx = r.x + r.w - 4, dy = r.y + r.h - 1 + 12, shift = skill.bonus > 0 ? 3 : skill.bonus < 0 ? 1 : 0;
+          (shift ? forAct(act).tint(shift) : font).drawAnchored(ctx, String(shown), dx, dy); digits.push({ text: String(shown), x: dx, y: dy, iconCel: skill.iconCel, shift }); }
         // Identity, not coverage: the cel DRAWN is named (its sheet and its SkillDesc iconCel), so a
         // row can compare the blit against retail's own draw list rather than counting icons.
         drawn.push({ id: skill.id, x: r.x, y: r.y, baseLevel: skill.baseLevel, available,

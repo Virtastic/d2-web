@@ -113,7 +113,7 @@ export function createRealmHud({ experience, waypoints, skills }, { levelName = 
      * the + shows only where the server will accept; the server still decides. A point cost the table gives as a
      * formula cannot be worked out here, so such a skill is not offered. No mana line is drawn.
      */
-    classSkills(playerClass, levels) {
+    classSkills(playerClass, levels, bonuses) {
       if (!levels || levels.size === 0) return null;
       const s = (id) => stats.get(id) ?? 0, level = s(STAT.level);
       return skills.classSkills(playerClass).map((row) => {
@@ -123,7 +123,7 @@ export function createRealmHud({ experience, waypoints, skills }, { levelName = 
           && (row.reqStr ?? 0) <= s(STAT.strength) && (row.reqDex ?? 0) <= s(STAT.dexterity)
           && (row.reqInt ?? 0) <= s(STAT.energy) && (row.reqVit ?? 0) <= s(STAT.vitality)
           && baseLevel < (row.maxLevel ?? 20) && !row.costFormula && s(STAT.skillPoints) >= 1;
-        return { ...row, baseLevel, canLearn, manaLine: false, manaCost: 0 };
+        return { ...row, baseLevel, level: baseLevel, bonus: bonuses?.get(row.id) ?? 0, canLearn, manaLine: false, manaCost: 0 };
       });
     },
     /** The waypoint menu the server opened (consumed once), or null. */

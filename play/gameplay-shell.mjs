@@ -4372,8 +4372,9 @@ function refreshRealmView() {
     world: realmWorldState });
   if (next) snapshot = next;
   const levels = new Map();
-  for (const k of (realmPlayerView?.active ? readSkillChoices() : [])) levels.set(k.id, k.level);
-  realmReads = realmFrameReads(resources, realmWorldState, realmWorldState ? realmTables() : null, next?.playerClass ?? 0, realmHud(), levels, (realmFlow?.protocol?.d2gsHotkeys?.() ?? null)?.slice(0, 8) ?? null);
+  const bonuses = new Map();
+  for (const k of (realmPlayerView?.active ? readSkillChoices() : [])) { levels.set(k.id, k.level); bonuses.set(k.id, k.bonus ?? 0); }
+  realmReads = realmFrameReads(resources, realmWorldState, realmWorldState ? realmTables() : null, next?.playerClass ?? 0, realmHud(), levels, (realmFlow?.protocol?.d2gsHotkeys?.() ?? null)?.slice(0, 8) ?? null, bonuses);
   // A panel the server has sent nothing for stays closed; the waypoint menu opens when the server says so.
   if (!realmReads.advancement) characterVisible = false;
   if (!realmReads.classSkills) skillsVisible = false;

@@ -43,7 +43,7 @@ export function realmViewSnapshot({ base: given, resources, monsters, missiles, 
 //   advancement:     the server's level, experience and attributes (assets/realm-hud-state.mjs); null, so the experience bar
 //                    and the character and skill panels stay empty, until the server has sent its level.
 //   runToggle / hotkeys / belt: nothing is worn, bound or held yet (a hotkey slot of -1 is unbound, as the engine answers).
-export function realmFrameReads(resources, world = null, tables = null, playerClass = 0, hud = null, skillLevels = null, hotkeys = null) {
+export function realmFrameReads(resources, world = null, tables = null, playerClass = 0, hud = null, skillLevels = null, hotkeys = null, skillBonuses = null) {
   const whole = (v) => (v ?? 0) >> 8;
   const screen = new Array(15).fill(0);
   screen[4] = whole(resources?.stamina); screen[5] = whole(resources?.staminaMax);
@@ -52,7 +52,7 @@ export function realmFrameReads(resources, world = null, tables = null, playerCl
   const advancement = hud?.advancement(playerClass) ?? null;
   const reads = { characterScreen: resources ? (hud ? hud.characterSlots(playerClass, screen) && screen : screen.slice(0, 11)) : null, advancement,
     attributeTotals: hud?.attributeTotals() ?? null, questWords: hud?.questWords ?? null,
-    classSkills: hud?.classSkills(playerClass, skillLevels) ?? null, waypointTable: hud?.waypointTable() ?? null,
+    classSkills: hud?.classSkills(playerClass, skillLevels, skillBonuses) ?? null, waypointTable: hud?.waypointTable() ?? null,
     runToggle: false, hotkeys: Array.from({ length: 8 }, (_, i) => ({ skill: hotkeys?.[i]?.skill ?? -1, left: Boolean(hotkeys?.[i]?.left) })), beltIndex: 2, beltHudBoxes: null, beltBoxCount: 0 };
   if (!world || !tables) return reads;
   // The panels' geometry is Inventory.txt / Belts.txt read through the shell's asset reader, in the numeric

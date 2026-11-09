@@ -42,7 +42,7 @@ export function parseSkillChoices(bytes, count) {
   for (let i = 0; i < count; i++) {
     const o = i * SESSION_SKILL_CHOICE_BYTES, flags = v.getUint8(o + 6);
     out.push({ id: v.getUint16(o, true), listRow: v.getInt8(o + 2), charClass: v.getInt8(o + 3), iconCel: v.getUint16(o + 4, true),
-      passive: Boolean(flags & 1), leftSkill: Boolean(flags & 2), usable: !(flags & 4), townBlocked: Boolean(flags & 8), aura: Boolean(flags & 16), level: v.getUint8(o + 7) });
+      passive: Boolean(flags & 1), leftSkill: Boolean(flags & 2), usable: !(flags & 4), townBlocked: Boolean(flags & 8), aura: Boolean(flags & 16), bonus: flags & 32 ? 1 : flags & 64 ? -1 : 0, level: v.getUint8(o + 7) });
   }
   return out;
 }
