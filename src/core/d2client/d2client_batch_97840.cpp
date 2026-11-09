@@ -141,25 +141,36 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_97cd0(const D2cClientEnv* e) 
     return 0;
 }
 
-// 1.13c D2Client+0x9AE80: HUD frame (five cel draws then the sub-widgets). Draw order and offsets are
-// from the decompile; the shared ctx (frame @0, cellfile @0x34, 0x48 B) is a guess from overlapped stack args.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9ae80(const D2cClientEnv* e) {
-    if (g_cl_ready == 0) return;
-    uint32_t u = d2_client_97cd0(e);
+// The cells 9AE80 reads: ready 0x119854, panel origin 0x11B9A0 / 0x11B9A4, hud cel 0x11BED4, hud alt 0x11BEF0, y offset 0xDBC4C.
+struct D2c9ae80Cells { uint32_t ready, x, y, cel, alt; int32_t yoff; };
+
+// 1.13c D2Client+0x9AE80: HUD frame. Five draws (ord 10041, stdcall: cel struct, x, y, -1, 5, 0) share one zeroed 0x48-byte
+// stack struct (frame index @0, hud cel @0x34, which the 0xBEAF0 result replaces before the fifth draw); then the sub-widgets.
+// `unit97cd0` is the 0x97CD0 call (EAX = unit, 0 leaves the function).
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9ae80_seam(const D2cClientEnv* e, const D2c9ae80Cells* c, uint32_t (*unit97cd0)()) {
+    if (c->ready == 0) return;
+    uint32_t u = unit97cd0();
     if (u == 0) return;
     e->sub_408c0();
     uint32_t ctx[18] = {0};
-    ctx[13] = g_hud_cel;
-    int32_t y0 = (int32_t)g_hud_y - 0xE0 + g_ui_yoff, y1 = (int32_t)g_hud_y - 0x30 + g_ui_yoff;
-    ctx[0] = 0; e->draw(ctx, (int32_t)g_hud_x,         y0, -1, 5, 0);
-    ctx[0] = 1; e->draw(ctx, (int32_t)g_hud_x + 0x100, y0, -1, 5, 0);
-    ctx[0] = 2; e->draw(ctx, (int32_t)g_hud_x,         y1, -1, 5, 0);
-    ctx[0] = 3; e->draw(ctx, (int32_t)g_hud_x + 0x100, y1, -1, 5, 0);
-    (void)e->sub_6eaf0();
-    ctx[0] = (g_hud_alt != 0) + 10;
-    e->draw(ctx, (int32_t)g_hud_x + 0x110, (int32_t)g_hud_y - 0x3F + g_ui_yoff, -1, 5, 0);
-    e->sub_40eb0(); e->sub_3c8b0(); e->sub_3ea20(); e->sub_3b2f0(u); e->sub_452a0(); e->sub_3e8e0();
+    ctx[13] = c->cel;
+    const int32_t x = (int32_t)c->x, y = (int32_t)c->y, yo = c->yoff;
+    ctx[0] = 0; e->draw(ctx, x,         y + yo - 0xE0, -1, 5, 0);
+    ctx[0] = 1; e->draw(ctx, x + 0x100, y + yo - 0xE0, -1, 5, 0);
+    ctx[0] = 2; e->draw(ctx, x,         y + yo - 0x30, -1, 5, 0);
+    ctx[0] = 3; e->draw(ctx, x + 0x100, y + yo - 0x30, -1, 5, 0);
+    ctx[13] = e->sub_6eaf0();
+    ctx[0] = (c->alt != 0) + 10;
+    e->draw(ctx, x + 0x110, y + yo - 0x3F, -1, 5, 0);
+    e->sub_40eb0(u); e->sub_3c8b0(); e->sub_3ea20(); e->sub_3b2f0(u); e->sub_452a0(u); e->sub_3e8e0(u);
     e->sub_43450(u, 0);
+}
+
+static const D2cClientEnv* g_9ae80_env;
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9ae80(const D2cClientEnv* e) {
+    const D2c9ae80Cells c = { g_cl_ready, g_hud_x, g_hud_y, g_hud_cel, g_hud_alt, g_ui_yoff };
+    g_9ae80_env = e;
+    d2_client_9ae80_seam(e, &c, [] { return d2_client_97cd0(g_9ae80_env); });
 }
 
 // 1.13c D2Client+0x9CAD0: object/unit type id -> retail VA of its table (0 when unlisted)
