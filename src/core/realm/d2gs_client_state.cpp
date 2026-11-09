@@ -1155,7 +1155,8 @@ static void pkt_place(uint32_t x, uintptr_t unitBits, uint32_t y, uint32_t radiu
         // position, nothing happens. Otherwise two blocked-target tests run, the first on the unit's own two
         // record words and the second on the adjusted target; a hit on either keeps the path. With no hit the
         // target dispatch runs: a local player sends its own position back, another player takes a walk command,
-        // any other unit takes a path command.
+        // any other unit takes a path command. Captured: a near target is not always kept (with a small radius
+        // the check reaches both blocked-target tests and then the dispatch).
         // GUESS: the blocked-target test is a sprite-cell query this realm layer does not hold, so every near
         // target is treated as blocked here (keeps the path). Blocker: that sprite query, which needs the sprite
         // data this layer does not load; a fixture with the sprite data pinned settles it.
@@ -1174,10 +1175,11 @@ static void pkt_place(uint32_t x, uintptr_t unitBits, uint32_t y, uint32_t radiu
     if (isPlayer) {
         // Retail's walk dispatch for another player: for unit modes 2, 3 and 6 it first refreshes the path from
         // the unit's current path record (an absent record is fatal in retail), and it issues the walk command
-        // whenever the target's y is nonzero, whatever the mode. Here the refresh is a detach and attach at the
-        // target keeping the facing.
+        // whenever the target's y is nonzero, whatever the mode. Captured: for modes 2/3/6 the walk/run is
+        // re-issued through the state-packet handler with an all-zero packet (one type for mode 3, another for
+        // modes 2 and 6). Here the refresh is a detach and attach at the target keeping the facing.
         // GUESS: the walk command's effect (its move-kind dispatch and the path helpers it calls) is not ported,
-        // so the re-issue is not modelled. Blocker: that dispatch has no capture fixture yet.
+        // so the re-issue is not modelled.
         player->view.x = x;
         player->view.y = y;
         ensure_player_motion(*player, true);
