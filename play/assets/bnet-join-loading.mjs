@@ -1,12 +1,11 @@
 // The screen retail shows between the Battle.net lobby and the game: ui\Loading\loadingscreen.dc6 on
 // black, from the CREATE GAME / JOIN GAME click until the world is ready. The cel drawn is retail's
 // loading frame: the frame index, clamped to the last frame of the DC6, and the index goes up by one per
-// step. A step is one call of that frame with 1, made by the room pump on its gated passes (all but one
-// pass in 32). step() is that call. Until the engine reports its pump passes, the shell steps once per
-// update tick while the join runs (GUESS: retail's walk calls the frame once per list entry but the first of
-// every 32; step(rooms) takes that count from the engine, step() with no count is the one-per-tick placeholder).
+// step. A step is one call of that frame with 1, made by the room walk that runs synchronously on the
+// load-complete packet (its gate is set only inside that walk; all entries but the first of every 32 step). step(rooms) takes
+// the entry count from the engine; step() with no count is the one-per-tick placeholder until the engine reports the walk.
 // The bar under the cel (game modes 6-9 only; a realm join is mode 3, so the shell draws none) is retail's: outline, black well, and a fill whose width the
-// character-file upload moves in 250 ms sweeps. The rule is in the engine (d2_client_loadbar_*); this file
+// character-file upload moves in 250 ms sweeps. Draw mode 5 is a plain store of the colour and mode 1 the 50% blend table (read from the DirectDraw driver; the other drivers are not read). The rule is in the engine (d2_client_loadbar_*); this file
 // only holds the clock. A realm join runs no upload (the character stays server-side).
 // JOIN_LOADING_TIMEOUT_MS is a browser guard counted from the join click. Retail's own load timer (0x435D0)
 // gives up a load after the same 180000 ms from a start tick it keeps itself; the two start points are not yet
