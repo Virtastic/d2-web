@@ -350,3 +350,13 @@ void sub_56330(Env& e, uint8_t* unit, char16_t* dst, W arg) {
  for (int i = 0; i < 2; ++i) e.call(U_Strcat, {(W)dst, e.call(10003, {0xf9e})});
 }
 }  // namespace d2client_n86
+
+// C entry point for the probe: the seam calls go through one C callback.
+extern "C" void d2c_56330(int64_t (*cb)(uint32_t, const int64_t*, int), uint8_t* unit, char16_t* dst, uint32_t arg) {
+ struct CbEnv : d2client_n86::Env {
+  int64_t (*f)(uint32_t, const int64_t*, int);
+  d2client_n86::W call(uint32_t id, std::initializer_list<d2client_n86::W> a) override { return f(id, a.begin(), (int)a.size()); }
+ } e;
+ e.f = cb;
+ d2client_n86::sub_56330(e, unit, dst, arg);
+}

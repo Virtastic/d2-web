@@ -12,7 +12,7 @@ constexpr uint32_t G(uint32_t rva) { return kBase + rva; }
 }
 
 extern "C" void d2c_ae420(uint32_t pkt, const cl::Env& e) {
-    // retail's frame (esp after the prologue): +0x00 name (9 bytes; ghidra -0x98), +0x3C rect bytes (16), +0x4C bit reader, +0x60 the item spec (7 dwords)
+    // retail's frame (esp after the prologue): +0x30 name (9 bytes zeroed; the copy loop runs on past it into the rect at +0x3C and the reader at +0x4C), +0x3C rect bytes (16), +0x4C bit reader, +0x60 the item spec (7 dwords)
     alignas(4) volatile uint8_t fr[0x80] = {};
     const auto A = [&](uint32_t o) { return (uint32_t)(uintptr_t)(fr + o); };
     const uint32_t br = A(0x4C);
@@ -41,10 +41,10 @@ extern "C" void d2c_ae420(uint32_t pkt, const cl::Env& e) {
         if (U(1)) flags |= 0x10;
         if (U(1)) flags |= 0x40;
         if (flags & 2) w26 = e.H(0xBFAA, br, 0x10);
-        for (uint32_t i = 0; i < 9; ++i) fr[i] = 0;
-        name = A(0);
+        for (uint32_t i = 0; i < 9; ++i) fr[0x30 + i] = 0;
+        name = A(0x30);
         uint32_t i = 0;
-        for (uint8_t ch; (ch = (uint8_t)U(8)) != 0;) if (i < 0x4C) fr[i++] = ch;   // retail writes on without a bound
+        for (uint8_t ch; (ch = (uint8_t)U(8)) != 0;) if (i < 0x50) fr[0x30 + i++] = ch;   // retail writes on without a bound
         w14 = U(0x10) & 0xFF;   // retail: movzx si, al (the upper half of ESI is left over from the name pointer)
         if (U(1)) x = U(0x20);
     }
