@@ -5131,6 +5131,7 @@ function drawFrame() {
       // The close control's held state: down arms it and draws buysellbtn 11, up fires the close
       // (native FUN_6FB296F0 / FUN_6FB28FC0, proven through the shared widget below).
       closePressed: gameUiButtonGesture.token === 'panel-close:skills',
+      pressedSkill: gameUiButtonGesture.token?.startsWith('skill-tree:') ? Number(gameUiButtonGesture.token.slice(11)) : null,
       // SkillDesc's wStrName/wStrLong/wStrMana are .tbl indices, so the hover plate's name,
       // description and mana line are retail's own strings, not a table this client keeps.
       line: langIdx, skillDesc: skillDescSnap, skillMana: skillManaSnap } : null, panelShown(skillsVisible));

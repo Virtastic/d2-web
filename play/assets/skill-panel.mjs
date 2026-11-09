@@ -356,8 +356,14 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
         const available = skillPointOverlay.isCandidate(skill);
         // A skill the player can learn now draws coloured, as a learned one does (retail's
         // skilltree-points capture: only the learnable Bash is extra=0, the rest grey).
-        const sheet = skill.baseLevel > 0 || available ? icons : greyFor(state.playerClass ?? 0, act);
-        const icon = sheet[skill.iconCel];
+        // With points to spend an icon that cannot take one (level, prerequisite, maximum level) is
+        // colour 5, learned or not; with none, only the unlearned are (retail's skill-tree icon draw).
+        const grey = (state.skillPoints ?? 0) > 0 ? !available : !(skill.baseLevel > 0);
+        const sheet = grey ? greyFor(state.playerClass ?? 0, act) : icons;
+        // The held icon is the cel after its resting one.
+        const pressed = state.pressedSkill === skill.id && Boolean(sheet[skill.iconCel + 1]);
+        const frame = skill.iconCel + (pressed ? 1 : 0);
+        const icon = sheet[frame];
         if (icon) ctx.drawImage(icon, r.x, r.y);
         else missingIcons.push({ id: skill.id, iconCel: skill.iconCel });
         // No "+" over a learnable icon: retail's skilltree-points frame (one unspent point, Bash learnable) has no level.dc6 over the tree (V20 struck).
@@ -368,7 +374,7 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
         // Identity, not coverage: the cel DRAWN is named (its sheet and its SkillDesc iconCel), so a
         // row can compare the blit against retail's own draw list rather than counting icons.
         drawn.push({ id: skill.id, x: r.x, y: r.y, baseLevel: skill.baseLevel, available,
-          iconCel: skill.iconCel, sheet: iconPath, frame: skill.iconCel, w: r.w, h: r.h, grey: !(skill.baseLevel > 0 || available) });
+          iconCel: skill.iconCel, sheet: iconPath, frame, w: r.w, h: r.h, grey, pressed });
       }
       // skilltree.go assigns a close x per class and open tab; do not flatten it
       // to the right-hand button merely because that happens to fit one page. panelCloseLayout
