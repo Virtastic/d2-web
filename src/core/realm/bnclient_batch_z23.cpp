@@ -177,7 +177,7 @@ extern "C" void z23_LoadImpl(z23_Gw* g) {
     if (g->list) return;
     g->count = 0; g->selected = 0; g->realms = 0; g->list = 0; g->listLen = 0; g->version = 0; g->loaded = 0;
     uint32_t sz = 0;
-    if (!z23_LoadFile("Data\\Global\\Realms.bin", &g->realms, &sz, 0, 0)) z23_Fatal(0x17a);  // GUESSED out arg
+    if (!z23_LoadFile("Data\\Global\\Realms.bin", &g->realms, &sz, 0, 0)) z23_Fatal(0x17a);  // out arg = this+0x20: traced on the real SFileLoadFile call (returns 1)
     g->override_ = 0;
     z23_GetGatewayList(g, "Override Battle.net gateways");
     if (!g->list) z23_GetGatewayList(g, "Diablo II Battle.net gateways");
