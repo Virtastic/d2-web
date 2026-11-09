@@ -38,31 +38,16 @@ static uint16_t g_str_buf[0x100];     // +0x11CC38 (Unicode string)
 static uint32_t g_hud_x, g_hud_y, g_hud_cel, g_hud_alt;  // +0x11B9A0 / +0x11B9A4 / +0x11BED4 / +0x11BEF0
 static int32_t  g_ui_yoff;            // +0x0DBC4C DAT_6fb8bc4c
 
-struct D2cClientEnv {
-    void (*sub_97770)();                                 // 0x97770
-    void (*ord10065)(uint32_t);                          // D2Gfx/Win ordinal 10065
-    void (*ord10043)(uint32_t, uint32_t);                // free(line, zero): 0x7A hud handle at 0x97840 (node-less, see free10043)
-    uint32_t (*ord10227)();                              // client-ready query
-    uint32_t (*ord10265)(uint32_t);                      // string table lookup
-    void (*ord10024)(const void*, uint32_t);             // fatal message
-    void (*exit_)(int);                                  // _exit(-1)
-    uint32_t (*ord10048)();                              // panel owner
-    void (*ord10006)();
-    void (*sub_72790)(uint32_t, uint32_t, uint32_t);     // 0x72790
-    void (*sub_47b20)();                                 // 0x47B20 (listed callee, not reached on read path)
-    void (*sub_f7b20)();                                 // FUN_6faf7b20
-    uint32_t (*sub_55440)();                             // 0x55440
-    void (*sub_eccc0)(uint32_t, const void*);            // open notify
-    void (*sub_ecc60)(uint32_t, const void*);            // close notify
-    void (*sub_3bbf0)();                                 // 0x3BBF0 (97CD0 close only)
-    void (*sub_3a4d0)(int32_t, int32_t, int32_t);        // 0x3A4D0 layout
-    void (*draw)(const uint32_t* ctx, int32_t x, int32_t y, int32_t color, int32_t mode, int32_t pal);  // ord 10041
-    void (*sub_408c0)();  void (*sub_40eb0)();  void (*sub_3c8b0)();  void (*sub_3ea20)();
-    void (*sub_3b2f0)(uint32_t);  void (*sub_452a0)();  void (*sub_3e8e0)();
-    void (*sub_43450)(uint32_t, uint32_t);  uint32_t (*sub_6eaf0)();
-    // Fog ordinal 10043 as retail calls it: ecx = allocation, edx = source file (RVA), stack = line, zero.
-    void (*free10043)(uint32_t allocation, uint32_t file_rva, uint32_t line, uint32_t zero);
-};
+#include "d2client_batch_97840_env.h"
+
+// Probe state accessor: the module globals by RVA (nullptr for an RVA not held here).
+extern "C" uint32_t* d2_client_97840_g(uint32_t rva) {
+    switch (rva) {
+    case 0x11BC34: return &g_hud_state;
+    case 0x11BC78: return &g_hud_handle;
+    default: return nullptr;
+    }
+}
 
 // 1.13c D2Client+0x97840
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_97840(const D2cClientEnv* e) {
@@ -70,7 +55,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_97840(const D2cClientEnv* e) {
     uint32_t h = g_hud_handle;
     if (h != 0) {
         e->ord10065(h);
-        e->ord10043(0x7A, 0);
+        e->free10043(h, 0xD6AB0, 0x7A, 0);
         g_hud_handle = 0;
     }
 }

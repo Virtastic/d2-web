@@ -27,8 +27,9 @@ struct D2ClientB74Close {
     uint32_t* e78; uint32_t* c34; uint32_t* ad94; uint32_t* cc434; uint32_t* d349c; uint32_t* d3498;
     uint32_t d5d0; uint32_t panel[9]; // DAT_6fbaadb0,addc,ade4,ade8,adec,adf0,adf4,adf8,ae00 in that order
     uint32_t ada8;
-    void (*f1f4a0)(); void (*ecc60)(int32_t, int32_t); void (*eccc0)(int32_t, int32_t);
-    int32_t (*ord_10048)(); void (*ord_10227)(); void (*fatal)(int32_t);
+    // Retail: ecc60/eccc0 take the notify code in EAX (2, 4, 5) and the string Ordinal_10048(&image string) on the stack.
+    void (*f1f4a0)(); void (*ecc60)(int32_t code, int32_t str); void (*eccc0)(int32_t code, int32_t str);
+    int32_t (*ord_10048)(uint32_t image_addr); void (*ord_10227)(); void (*fatal)(int32_t);
 };
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_987f0(const D2ClientB74Close* c) {
     uint32_t old = *c->ad94;
@@ -45,11 +46,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_987f0(const D2ClientB74Close* 
         *c->cc434 = 1;
         if (*c->d349c == 0) {
             *c->d349c = 1;
-            if (*c->d3498) { c->ecc60(c->ord_10048(), 0); *c->d3498 = 0; } // GUESS: arg2 is the &DAT_6fba51ec string id
-            c->eccc0(c->ord_10048(), 0);                                   // GUESS: arg2 is &DAT_6fba51bc
+            if (*c->d3498) { c->ecc60(2, c->ord_10048(0x6FBA51ECu)); *c->d3498 = 0; }
+            c->eccc0(4, c->ord_10048(0x6FBA51BCu));
         }
     }
-    if (c->ada8) c->eccc0(c->ord_10048(), 0);                              // GUESS: arg2 is &DAT_6fb80780
+    if (c->ada8) c->eccc0(5, c->ord_10048(0x6FB80780u));
     return 1;
 }
 
