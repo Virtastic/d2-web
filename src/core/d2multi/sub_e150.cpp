@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0x0E150 stub: the multiplayer (gateway/MCP) screen --
+// Call-site stub (the ported body is d2multi_0e150.cpp, d2multi_e150): the multiplayer (gateway/MCP) screen --
 // one-shot setup, run, teardown; returns 1. The context pointer arrives in EAX (see the spec).
 //
 // Stub: it exists so the row has a symbol while the real body is written; it does NOT meet the
