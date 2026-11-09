@@ -929,6 +929,9 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
       return call('d2_realm_client_set_quest_flags', 'number', ['bigint', 'number'], [BigInt(P), bytes.length]);
     },
     // The stats of a hire offer (S2C 0x4E: name id, seed) for the selected player, or null: { level, life, def, cost, id, exp }.
+    // GUESS, the hire roll: the seed and the difficulty are taken as the server sends them. Whether retail rolls the
+    // stats client-side from the same seed, and with which difficulty, is not recovered.
+    // capture: d2client/5c7f0 -- the hire roll for one (name id, seed, difficulty) and the stats it returns; no descriptor yet.
     d2gsClientHireStats: (mercName, seed, expansion) => {
       const at = Number(P);
       if (!call('d2_realm_client_hire_stats', 'number', ['number', 'number', 'number', 'bigint'], [mercName, seed, expansion ? 1 : 0, BigInt(P)])) return null;

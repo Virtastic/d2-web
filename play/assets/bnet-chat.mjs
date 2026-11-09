@@ -50,7 +50,7 @@ export function chatLine({ event, username, text }) {
 // Owns the open BNCS transport and its reader. `onEvent` sees every parsed event first (true: handled);
 // `onLine` gets each displayable line it left.
 export function createBnetChat({ transport, reader, character, realm = '', expansion = true, channel = 'Diablo II', onLine = () => {}, onEvent = () => false, onGames = () => {}, onChannels = () => {}, onClose = () => {},
-  keepAliveMs = 30000, timers = globalThis }) {
+  keepAliveMs = 180000, timers = globalThis }) {
   let entered = false, wantJoin = false, joined = false, closed = false, current = '', wantFlags;
   const send = (bytes) => transport.send(bytes);
   const handle = ({ id, body }) => {

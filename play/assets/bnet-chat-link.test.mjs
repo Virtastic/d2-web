@@ -97,13 +97,13 @@ test('closing the link during a redial drops the new socket and starts no sessio
 test('keep-alive: SID_NULL on the interval, ping echoed, a closed socket ends it and reports', async (t) => {
   t.mock.timers.enable({ apis: ['setInterval'] });
   const s = socket(); let closed = 0;
-  const chat = createBnetChat({ transport: s.transport, reader: s.reader, character: 'Ama', keepAliveMs: 30000, onClose: () => closed++ });
-  t.mock.timers.tick(30000); t.mock.timers.tick(30000);
+  const chat = createBnetChat({ transport: s.transport, reader: s.reader, character: 'Ama', keepAliveMs: 180000, onClose: () => closed++ });
+  t.mock.timers.tick(180000); t.mock.timers.tick(180000);
   assert.deepEqual(s.sent, [NULL, NULL]);
   s.push(bncsPacket(0x25, [7, 0, 0, 0])); await tick();
   assert.equal(s.sent.at(-1), 'ff25080007000000');
   s.transport.isOpen = true; s.kill(); await tick(); assert.equal(closed, 1);
-  t.mock.timers.tick(30000); assert.equal(s.sent.length, 3); assert.equal(chat.open, false);
+  t.mock.timers.tick(180000); assert.equal(s.sent.length, 3); assert.equal(chat.open, false);
   chat.close();
 });
 
