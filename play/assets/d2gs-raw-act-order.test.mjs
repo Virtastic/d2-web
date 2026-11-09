@@ -7,7 +7,7 @@ import { d2gsJoin } from './realm-client.mjs';
 const SIZE = { 0x00: 1, 0x01: 8, 0x02: 1, 0x03: 12, 0x0b: 6, 0x59: 26, 0x07: 6 };
 const FIRST = [0x01, 0x00, 0x04, 0x00, 0x10, 0x00, 0x01, 0x00, 0x00, 0x02];
 
-function run(chunks) {
+function run(chunks, needReveal = false) {
   let onData = () => {};
   const sent = [], fedStreams = [];
   const transport = {
@@ -19,7 +19,7 @@ function run(chunks) {
     },
   };
   const opcodesOf = (b) => { const out = []; for (let at = 0; at < b.length; at += SIZE[b[at]]) out.push(b[at]); return out; };
-  let actSeen = false;
+  let actSeen = false, revealSeen = false;
   const protocol = {
     greetingParse: (b) => (b[0] === 0xaf ? (2 << 8) | b[1] : -1),
     d2gsGamelogon: () => { const g = new Uint8Array(37); g[0] = 0x68; return g; },
@@ -29,8 +29,8 @@ function run(chunks) {
     d2gsClientPlayerReset: () => {}, d2gsClientSetDifficulty: () => {},
     d2gsClientPlayerFeed: (b) => {
       fedStreams.push(opcodesOf(b));
-      actSeen = false;
-      for (const op of opcodesOf(b)) { if (op === 0x03) actSeen = true; if (op === 0x59 && !actSeen) return -3; }
+      actSeen = false; revealSeen = false;
+      for (const op of opcodesOf(b)) { if (op === 0x03) actSeen = true; if (op === 0x07) revealSeen = true; if (op === 0x59 && (!actSeen || (needReveal && !revealSeen))) return -3; }
       return 1;
     },
     d2gsClientPlayerState: () => ({ active: true, guid: 1 }),
@@ -46,10 +46,10 @@ const act = [0x03, 0, 1, 2, 3, 4, 5, 0, 0, 0, 0, 0];
 const reveal = [0x07, 0, 0, 0, 0, 1];
 
 test('a player assigned before the act is fed to the engine after the act', async () => {
-  const { game, fedStreams } = await run([[...assign, ...handshake, ...act, ...reveal]]);
+  const { game, fedStreams } = await run([[...assign, ...handshake, ...act, 0x02]]);
   assert.deepEqual(fedStreams.at(-1), [0x01, 0x00, 0x02, 0x03, 0x59, 0x0b]);
   assert.equal(game.playerState.guid, 1);
-  assert.equal((await game.readFrame())[0], 0x07, 'the packets after the handshake stay for the receive loop, without the act');
+  assert.equal((await game.readFrame())[0], 0x02, 'the packets after the handshake stay for the receive loop, without the act');
 });
 
 test('the join waits for an act that arrives in a later read', async () => {
@@ -57,4 +57,16 @@ test('the join waits for an act that arrives in a later read', async () => {
   assert.deepEqual(fedStreams[0], [0x01, 0x00, 0x02, 0x59, 0x0b], 'refused without the act');
   assert.deepEqual(fedStreams.at(-1), [0x01, 0x00, 0x02, 0x03, 0x59, 0x0b]);
   assert.equal(game.playerAssignment.name, 'Hero');
+});
+
+test('the room reveals of the burst are fed before the player so its room is active', async () => {
+  const { game, fedStreams } = await run([[...assign, ...handshake, ...act, ...reveal, ...reveal, 0x02]], true);
+  assert.deepEqual(fedStreams.at(-1), [0x01, 0x00, 0x02, 0x03, 0x07, 0x07, 0x59, 0x0b]);
+  assert.equal((await game.readFrame())[0], 0x02, 'only what follows the handshake is left for the receive loop');
+});
+
+test('the join waits for a reveal that arrives in a later read', async () => {
+  const { fedStreams } = await run([[...assign, ...handshake, ...act], reveal, [0x02]], true);
+  assert.deepEqual(fedStreams[0], [0x01, 0x00, 0x02, 0x03, 0x59, 0x0b], 'refused without a reveal');
+  assert.deepEqual(fedStreams.at(-1), [0x01, 0x00, 0x02, 0x03, 0x07, 0x59, 0x0b]);
 });

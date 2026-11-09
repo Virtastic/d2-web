@@ -606,10 +606,23 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
     // still refuses (the act or its rooms are not all here yet) read on and try again instead of failing a join
     // that would then retry against a spent ticket.
     if (raw && handshakeEnd >= 0) {
+      // The act, then every room reveal (0x07) of the burst, go ahead of the player: the player's room must be
+      // active when the engine places it, and the stock server sends the reveals after the assignment.
       const act = findPacket(response, protocol, 0x03);
-      const move = act && act.at > assignOffset;
-      const cut = (from, to) => [...response.subarray(from, to)].filter((_, i) => !move || from + i < act.at || from + i >= act.at + act.size);
-      fed = Uint8Array.from(move ? [...response.subarray(0, assignOffset), ...response.subarray(act.at, act.at + act.size), ...cut(assignOffset, handshakeEnd)] : response.subarray(0, handshakeEnd));
+      const early = [];
+      if (act && act.at > assignOffset) {
+        early.push(act);
+        for (let at = 0; at < response.length;) {
+          const size = protocol.d2gsPacketSize(response.subarray(at));
+          if (size <= 0) break;
+          if (at > assignOffset && at > act.at && response[at] === 0x07) early.push({ at, size });
+          at += size;
+        }
+      }
+      const taken = (i) => early.some((p) => i >= p.at && i < p.at + p.size);
+      const cut = (from, to) => [...response.subarray(from, to)].filter((_, i) => !taken(from + i));
+      const lead = early.flatMap((p) => [...response.subarray(p.at, p.at + p.size)]);
+      fed = Uint8Array.from(early.length ? [...response.subarray(0, assignOffset), ...lead, ...cut(assignOffset, handshakeEnd)] : response.subarray(0, handshakeEnd));
       tail = Uint8Array.from(cut(handshakeEnd, response.length));
       applied = protocol.d2gsClientPlayerFeed(fed);
       if (applied < 1) { handshakeEnd = -1; applied = 0; fed = null; }   // the engine resets itself on a refusal
