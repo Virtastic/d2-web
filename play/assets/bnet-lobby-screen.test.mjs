@@ -75,6 +75,14 @@ test('every create and join result raises the notice the retail switch picks, an
   assert.deepEqual([join(0x7d, { ladder: true }), join(0x7d, { ladder: false })], ['s10929', 's10930']);
 });
 
+test('a refused character logon raises Player Not Found or the expired-character notice with the name', () => {
+  const str = (i) => ({ 5133: 'Player Not Found', 11145: "The character '%s' has not been used enough and has expired." })[i] ?? '';
+  const err = (r) => ({ mcpStage: 'charlogon', mcpResult: r, message: 'rejected' });
+  assert.equal(gameErrorText(err(0x46), str, { name: 'Ama' }), 'Player Not Found');
+  assert.equal(gameErrorText(err(0x7b), str, { name: 'Ama' }), "The character 'Ama' has not been used enough and has expired.");
+  assert.equal(gameErrorText(err(0x01), str, { name: 'Ama' }), 'rejected');
+});
+
 test('lobby -> CREATE -> typed game -> Enter creates it with the form', async () => {
   const calls = [];
   const s = screen({ name: 'Ama', charClass: 0, level: 3 }, { onCreateGame: async (g) => { calls.push(g); } });

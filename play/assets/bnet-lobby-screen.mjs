@@ -240,9 +240,18 @@ const joinStringFor = (result, character) => {
 };
 // A game that ended under the player (D2GS socket closed): D2Lang 5357, the disconnect notice.
 export const GAME_DISCONNECTED = 5357;
+// A refused character logon: 0x46 is "Player Not Found", 0x7b the expired-character notice naming the character (a
+// server that retires characters unused for a set time sends it). Any other result raises no notice of its own.
+export const CHARLOGON_NOT_FOUND = 5133, CHARLOGON_EXPIRED = 11145;
+function charlogonText(result, string, character) {
+  if (result === 0x46) return string(CHARLOGON_NOT_FOUND);
+  if (result === 0x7b) return string(CHARLOGON_EXPIRED).replace('%s', character?.name ?? '');
+  return '';
+}
 export function gameErrorText(error, string, character = null) {
   if (error?.noticeString) return string(error.noticeString) || String(error.message);
   const stage = error?.mcpStage;
+  if (stage === 'charlogon') return charlogonText(error.mcpResult, string, character) || String(error.message);
   if (stage !== 'create' && stage !== 'join') return String(error?.message ?? error);
   const id = stage === 'create' ? (MCP_RESULT_STRINGS.create[error.mcpResult] ?? CREATE_FAILED)
     : (joinStringFor(error.mcpResult, character) ?? JOIN_FAILED);

@@ -203,7 +203,7 @@ export async function mcpCreateAndJoin(transport, protocol, { realmReply, charac
     send(0x07, protocol.mcpCharlogon(selected.name));
     const charlogon = await readMcpFrame(reader, timeoutMs); received.push(charlogon.op);
     if (charlogon.op !== 0x07) throw new Error(`expected MCP CHARLOGON reply 0x07, got 0x${charlogon.op.toString(16)}`);
-    if (charlogon.body.length < 4 || u32(charlogon.body, 0) !== 0) throw new Error('MCP CHARLOGON was rejected');
+    if (charlogon.body.length < 4 || u32(charlogon.body, 0) !== 0) throw charlogonRefusal(charlogon.body);
     if (session) session.characterLoggedOn = selected.name;
   }
 
@@ -281,11 +281,14 @@ export async function mcpReturnToLobby(transport, protocol, { realmReply, charac
   transport.send(protocol.mcpFrame(0x07, protocol.mcpCharlogon(found.name)));
   const reply = await readMcpFrame(roster.session.reader, timeoutMs);
   if (reply.op !== 0x07) throw new Error(`expected MCP CHARLOGON reply 0x07, got 0x${reply.op.toString(16)}`);
-  if (reply.body.length < 4 || u32(reply.body, 0) !== 0) throw new Error('MCP CHARLOGON was rejected');
+  if (reply.body.length < 4 || u32(reply.body, 0) !== 0) throw charlogonRefusal(reply.body);
   roster.session.characterLoggedOn = found.name;
   return roster;
 }
 
+// A refused MCP_CHARLOGON carries the realm's result, so the lobby can raise the notice that result has (gameErrorText).
+const charlogonRefusal = (body) => Object.assign(new Error('MCP CHARLOGON was rejected'),
+  { mcpStage: 'charlogon', mcpResult: body.length < 4 ? -1 : u32(body, 0) });
 const u32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
 
 /** MCP CHARCREATE (0x02): class, flags, name. On success the new character joins the session's roster. */
