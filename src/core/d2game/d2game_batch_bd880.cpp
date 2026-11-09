@@ -234,64 +234,83 @@ void d2_fn_d2game_C1890(uint32_t game, uint32_t id, uint32_t client, const D2Gam
     if (n) env->subC1510(game, client); else env->badPacketTail(client);
 }
 
-// 1.13c D2Game+0xBF2E0 -- Ghidra's unaff_EBP is the 0x8F5C0 result, unaff_retaddr is BEE30's EDI, unaff_ESI the
-// running failure count (caller-initialised).
+// 1.13c D2Game+0xBF2E0 -- stdcall (game, p2, unit, tbl), ret 0x10; from the disassembly (the decompile's parameter and local names are wrong:
+// the item-code table is tbl+0xC, the fixed-code list tbl+0x14, the 0x8F5C0 record A is looked up by the unit's id, and the roll 0x1780 takes
+// EAX = max+1, ECX = rng, EDI = min). Seams are the callees; the probe records them with the capture's hook recorder.
+struct D2GameBF2E0Seams {
+    void*    (*at)(uint32_t guest);
+    void     (*fatal)(uint32_t line);
+    uint32_t (*tick)();                                                  // GetTickCount (call [IAT])
+    uint32_t (*sub8F5C0)(uint32_t game, uint32_t unitId, uint32_t* out); // EAX = out slot, ECX = game, ESI = unit id (-1 for a null unit)
+    uint32_t (*a42a)(uint32_t p2, uint32_t a, uint32_t b);               // Ordinal 10973: 3 stack words
+    uint32_t (*subBCB20)(uint32_t unit, uint32_t game);                  // EAX = unit, ECX = game
+    uint32_t (*aa42)(uint32_t key, uint32_t* out);                       // Ordinal 10450: record for an item code, id written through out
+    uint32_t (*roll)(uint32_t rng, uint32_t lo, uint32_t hiPlus1, uint32_t lvl); // 0x1780: EAX = hi+1, ECX = rng, EDI = lo (EBP = lvl, logged by REGS Y)
+    uint32_t (*ac16)(uint32_t id);                                       // Ordinal 10349
+    uint32_t (*bee30)(uint32_t game, uint32_t code, uint32_t unit, uint32_t one, uint32_t q, uint32_t lvl, uint32_t x); // EAX = game, ECX = code, 5 stack words
+    uint32_t (*aa06)(uint32_t item, uint32_t z);                         // Ordinal 10463
+    void     (*a472)(uint32_t item, uint32_t ev, uint32_t v);            // Ordinal 10887
+};
+
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2game_BF2E0(uint32_t game, uint32_t p2, uint32_t p3, uint32_t p4, uint32_t edi, int32_t fail,
-                        const D2GameBatchBD880Env* env)
+void d2_fn_d2game_BF2E0(uint32_t G, uint32_t p2, uint32_t U, uint32_t T, const D2GameBF2E0Seams* s)
 {
-    (void)p3;
-    uint32_t rngBase = R32(env, game, 0x1d24), rng = rngBase + 8;
-    auto next = [&]() { uint32_t lo = R32(env, rng, 0); uint64_t v = (uint64_t)lo * 0x6ac690c5u + R32(env, rngBase, 0xc);
-                        W32(env, rng, 0, (uint32_t)v); W32(env, rng, 4, (uint32_t)(v >> 32)); return (uint32_t)v; };
-    W32(env, p4, 8, env->tick());
-    uint32_t A = env->sub8F5C0(game);
-    if (!A) env->fatal(0x2c4);
-    env->o10973(p2, 0xc, 0);
-    int32_t lvl = (int32_t)env->subBCB20(game);
-    uint32_t out[2], tmp[2];
-    uint32_t t1 = R32(env, game, 0xc), t2 = R32(env, A, 0x2c);
-    int32_t n = (int32_t)R32(env, A, 0x30);
-    for (int32_t i = 0; i < n; i++) {
-        uint32_t off = i * 12;
-        uint32_t rec = env->o10450(R32(env, t1, off + 4), out);
-        if ((int32_t)R8(env, rec, 0xfd) > lvl) continue;
-        uint32_t cnt = lvl < 0x19 ? env->sub21780(rng) : 0;
-        if (R16(env, rec, 0xf6) < 100 || 99 < R16(env, out[1], 0x78)) {
-            for (uint32_t k = 0; k < cnt; k++) {
-                uint32_t r = next() % 100, q = 2;
-                if (lvl < 5) { if (r > 0x5a) q = 1; }
-                else if (lvl < 10) { if (r > 0x55) q = 3; }
-                else if (r > 0x4a) q = 3;
-                if (!d2_fn_d2game_BEE30(R32(env, t2, off + 4), 1, 1, q, game, edi, env)) fail++;
-                if (fail > 0x20) return;
-            }
-            env->o10450(R32(env, t1, off + 4), tmp);
-            if (env->o10349(cnt) == 1 && (int32_t)R8(env, t1, off + 8) <= lvl) {
-                int32_t m = 1;
-                if (lvl > 0x18) m = (int32_t)env->sub21780(rng) + 1;
-                uint32_t lo = R8(env, t2, off + 2);
-                int32_t hi = (int32_t)R8(env, t2, off + 3) + m;
-                if ((int32_t)lo < hi) {
-                    uint32_t d = hi - lo, v = next();
-                    d = (d & (d - 1)) == 0 ? ((d - 1) & v) : v % d;
-                    lo += d;
-                }
-                for (; lo; lo--)
-                    if (!d2_fn_d2game_BEE30(R32(env, t2, off + 4), 1, 1, 4, game, edi, env)) fail++;
-            }
+    auto rd32 = [&](uint32_t a) { uint32_t v; memcpy(&v, s->at(a), 4); return v; };
+    auto rd16 = [&](uint32_t a) { uint16_t v; memcpy(&v, s->at(a), 2); return (uint32_t)v; };
+    auto rd8 = [&](uint32_t a) { return (uint32_t)*(const uint8_t*)s->at(a); };
+    auto wr32 = [&](uint32_t a, uint32_t v) { memcpy(s->at(a), &v, 4); };
+    const uint32_t rng = rd32(G + 0x1d24) + 8;
+    auto next = [&]() { uint64_t v = (uint64_t)rd32(rng) * 0x6ac690c5u + rd32(rng + 4); wr32(rng, (uint32_t)v); wr32(rng + 4, (uint32_t)(v >> 32)); return (uint32_t)v; };
+    wr32(T + 8, s->tick());
+    int32_t fail = 0;
+    uint32_t slot = 0;
+    const uint32_t A = s->sub8F5C0(G, U ? rd32(U + 4) : 0xffffffffu, &slot);
+    if (!A) { s->fatal(0x2c4); return; }
+    const uint32_t X = s->a42a(p2, 0xc, 0);
+    const int32_t lvl = (int32_t)s->subBCB20(U, G);
+    uint32_t off = 0;
+    for (int32_t i = 0; i < (int32_t)rd32(A + 0x30); i++, off += 12) {
+        uint32_t id;
+        const uint32_t rec = s->aa42(rd32(rd32(T + 0xc) + off + 4), &id);
+        if ((int32_t)rd8(rec + 0xfd) > lvl) continue;
+        uint32_t cnt = 0;
+        if (lvl < 0x19) { const uint32_t row = rd32(A + 0x2c) + off; cnt = s->roll(rng, rd8(row), rd8(row + 1) + 1, (uint32_t)lvl); }
+        if (!(rd16(rec + 0xf6) < 100) && rd16(G + 0x78) < 100) continue;
+        for (uint32_t k = 0; k < cnt; k++) {
+            const uint32_t r = next() % 100;
+            uint32_t q = 2;
+            if (lvl < 5) { if (r > 0x5a) q = 1; }
+            else if (lvl < 10) { if (r > 0x55) q = 3; }
+            else if (r >= 0x4b) q = 3;
+            if (!s->bee30(G, rd32(rd32(A + 0x2c) + off + 4), U, 1, q, (uint32_t)lvl, X)) fail++;
+            if (fail > 0x20) return;
         }
+        uint32_t id2;
+        s->aa42(rd32(rd32(T + 0xc) + off + 4), &id2);
+        if (s->ac16(id2) != 1) continue;
+        if ((int32_t)rd8(rd32(T + 0xc) + off + 8) > lvl) continue;
+        uint32_t m = 1;
+        if (lvl >= 0x19) m = s->roll(rng, 1, 3, (uint32_t)lvl) + 1;
+        const uint32_t row = rd32(A + 0x2c) + off, lo = rd8(row + 2);
+        const int32_t hi = (int32_t)(rd8(row + 3) + m);
+        uint32_t v = lo;
+        if (hi > (int32_t)lo) {
+            const uint32_t d = (uint32_t)hi - lo, nx = next();
+            v = ((d & (d - 1)) == 0 ? ((d - 1) & nx) : nx % d) + lo;
+        }
+        for (; v; v--)
+            if (!s->bee30(G, rd32(rd32(A + 0x2c) + off + 4), U, 1, 4, (uint32_t)lvl, X)) fail++;
     }
-    int32_t cnt2 = (int32_t)R32(env, A, 0x38);
-    for (int32_t j = 0; j < cnt2; j++) {
-        uint32_t u = d2_fn_d2game_BEE30(R32(env, R32(env, A, 0x34), j * 4), 1, 1, 2, game, edi, env);
-        if (!u) fail++;
+    for (int32_t j = 0; j < (int32_t)rd32(A + 0x38); j++) {
+        const uint32_t item = s->bee30(G, rd32(rd32(A + 0x34) + j * 4), U, 1, 2, (uint32_t)lvl, X);
+        if (!item) fail++;
         else {
-            uint32_t rec = env->o10450(R32(env, R32(env, game, 0x14), j * 4), tmp);
-            uint32_t k = R32(env, rec, 0x80);
-            if (k == 0x20767163 || k == 0x20767161) env->o10887(u, 0x46, env->o10463(u, 0));
+            uint32_t id3;
+            const uint32_t rec = s->aa42(rd32(rd32(T + 0x14) + j * 4), &id3);
+            const uint32_t k = rd32(rec + 0x80);
+            if (k == 0x20767163 || k == 0x20767161) s->a472(item, 0x46, s->aa06(item, 0));
         }
-        if (fail >= 0x21) break;
+        if (fail > 0x20) break;
     }
 }
 

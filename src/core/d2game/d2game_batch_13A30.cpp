@@ -196,7 +196,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E73C0(void* game, void* unit, 
     if (!rd32(t, 8)) d2game_fatal(0x82C);
     uint32_t state = (env->ordinal10174(quest, 0x11, 0xD) == 1) ? 4 : 5;
     wr8(node, 0xC, (uint8_t)state);
-    env->traceState(u, state);
+    if (env->traceGlobal) env->traceState(u, state);   // retail: wsprintfA into a stack buffer, then 0xCBE70 only when DAT_6fd31c20 != 0
     env->invokeCallback(0, env->cbAfterState, 0, u);
 }
 

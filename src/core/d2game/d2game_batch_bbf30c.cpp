@@ -1,7 +1,7 @@
 // src/core/d2game/d2game_batch_bbf30c.cpp -- fifteen 1.13c D2Game.dll functions transcribed from the
 // cached Ghidra decompiles (build-wasm/ghidra-d2game/decomp/0x<RVA>.c). Base 0x6FC20000.
 //
-// Rows: C8990 C9CB0 CAB30 CC370 CF810 D1830 D2AB0 D2F00 D4E80 D01D0 D60D0 C1030 C1510 BE640 BF990.
+// Rows: C8990 C9CB0 CAB30 CC370 CF810 D1830 D2AB0 D2F00 D4E80 D60D0 C1030 BE640 BF990.
 // Retail module state is modelled as opaque host records read by their retail byte offsets (32-bit
 // pointer fields, as in the other batches). Callees that are not implemented in src/ are seams on
 // D2GameBbf30cEnv: `o<N>` is D2Common/Fog ordinal N, `f<RVA>` is D2Game+0x<RVA>; each call passes the
@@ -678,108 +678,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_D4E80(uint8_t* self, uint8_t* game, u
     return 0;
 }
 
-// 1.13c D2Game+0xD01D0
-// Merc/pet command dispatcher; op (EAX) 0..5. game=ECX, flag=EDX, unit=param_3, id=param_4. The
-// decompile's stack0/return-address reads in case 4 are one out slot (0xD6E30 / 0xD7160 result) and
-// case 2's unaff_EBP is `ebpArg`. Default and failed lookups return 1; 3 means "leave open".
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_D01D0(uint32_t op, uint8_t* game, uint32_t flag, uint8_t* unit, uint32_t id, uint32_t ebpArg, const D2GameBbf30cEnv* env)
-{
-    switch (op) {
-    case 0: {
-        uint8_t* t = PN(Q(fE03A0, game, id));
-        if (t != nullptr) {
-            uint32_t d = (uint32_t)Q(o10407, unit, t);
-            if (d < 0x33) {
-                if (d > 8) { Q(fCE120); return 0; }
-                if (rd32(t, 0x10) == 0x11 && Q(f70D60, unit, game) == 0 && Q(f70D60, t, game) == 0) {
-                    Q(f79910, game, t); return 0;
-                }
-                Q(f70D90); return 0;
-            }
-        }
-        break;
-    }
-    case 1: {
-        uint8_t* t = PN(Q(fE03A0, game, id));
-        if (t != nullptr) {
-            int32_t d = (int32_t)Q(o10407, unit, t);
-            if (d < 0x33) {
-                uint8_t* r = PN(Q(f1220));
-                if (r != nullptr && (rd32(env->bitMasks, 4) & rd8(r, 0xD)) != 0 && (rd32(env->bitMasks, 0) & rd8(r, 0xD)) != 0) {
-                    Q(o10159, rd32(t, 0x2C));
-                    if (rd32(t, 0) == 1 && P(t, 0x14) != nullptr && P(P(t, 0x14), 0x28) != nullptr)
-                        wr32(P(P(t, 0x14), 0x28), 0x14, 0x28);
-                    uint8_t* s = P(t, 0xDC);
-                    while (s != nullptr) {
-                        uint8_t c = rd8(s, 0);
-                        s = P(s, 0x24);
-                        if (c == 2) Q(f8E6F0);
-                    }
-                    Q(f8EA80, game, t, 2, rd32(game, 0xA8) + 1, 0, 0, 0);
-                }
-                if (d > 6) {
-                    if (d > 8) return 0;
-                    Q(fCE120); return 0;
-                }
-                if (Q(f37680) == 0) {
-                    Q(o10159, rd32(unit, 0x2C));
-                    Q(f487A0, game, d, Q1(f1370));
-                }
-                return 0;
-            }
-        }
-        break;
-    }
-    case 2: {
-        uint8_t* t = PN(Q(fE03A0, game, id));
-        if (t != nullptr) {
-            if (Q(o10688, rd32(t, 4)) == 0) die(env, 0x290);
-            if (rd32(t, 0x10) > 7) return 3;
-            if ((int32_t)Q(o10407, unit, t) < 0x33) {
-                if (Q(o10594, unit, t) == 0 || Q(o10324, unit, t, 0x804) != 0) Q(fCE120);
-                else {
-                    Q(o10159, rd32(unit, 0x2C));
-                    if (Q(f6A720, unit, game, ebpArg) == 0) return 3;
-                }
-                return 0;
-            }
-        }
-        break;
-    }
-    case 4: {
-        uint8_t* t = PN(Q(fE03A0, game, id));
-        if (t != nullptr && rd32(t, 0x10) == 3) {
-            int32_t d = (int32_t)Q(o10407, unit, t);
-            if (d < 0x33) {
-                uint32_t slot = 0;
-                if (d < 5 && Q(o10324, unit, t, 0x804) == 0) {
-                    if (flag == 0) Q(fD6E30, &slot, game, unit, &slot);
-                    else Q(fD7160, slot, &slot);
-                    if (slot != 0) return 3;
-                }
-                else Q(fCE120);
-                return 0;
-            }
-        }
-        break;
-    }
-    case 5: {
-        uint8_t* t = PN(Q(fE03A0, game, id));
-        if (t != nullptr) {
-            int32_t d = (int32_t)Q(o10407, unit, t);
-            if (d < 0x33) {
-                if (d > 4) { Q(fCE120); return 0; }
-                Q(fE1C00, game);
-                return 0;
-            }
-        }
-        break;
-    }
-    }
-    return 1;
-}
-
 // 1.13c D2Game+0xD60D0
 // Moves item `id` from the ground (game item hash +0x1720) into the player's inventory block
 // (self+0x60) for mode `mode`; modes 0xB/0xC skip the 10244 test. eax = item id, ebp = `skipPd`
@@ -897,91 +795,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C1030(uint8_t* self, uint8_t* unit, uint3
         } while ((int32_t)lo <= (int32_t)hi);
     }
     Q(fBD160, id);
-}
-
-// 1.13c D2Game+0xC1510
-// Reward-claim packet handler (caller 0xC1890). self = player record, unit = player unit, pkt = the
-// requested entry key (low 16 bits are the slot, +4 its kind), loSlot/hiSlot = the slot range. The
-// decompile stores most arguments in stack slots; they are named from their uses. Error replies are
-// 0xAAC90(code, stat-0xE packet word, player tag, unit, 0xE) with code 9/0xC/0xF; the stack packet
-// of 0xAA3E0 (reached at the bottom and on the 0x203/0x96 early denials) is an unrecovered stack
-// block, passed here as a zero block of 0x28 bytes (MISMATCH risk: its contents are not shown).
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C1510(uint8_t* self, uint8_t* unit, uint8_t* pkt, int32_t loSlot, int32_t hiSlot, const D2GameBbf30cEnv* env)
-{
-    uint8_t sendBuf[0x28];
-    std::memset(sendBuf, 0, sizeof sendBuf);
-    Q(o10973, unit, 0xC, 0);
-    int32_t kind = (int32_t)Q(fBCB20, self);
-    Q(o10920, unit);
-    bool toSend = false;
-    bool deny = false;
-    if (pkt != nullptr) {
-        if (rd32(pkt, 4) == 0x203) {
-            uint8_t* pd = PN(Q(o10920, unit));
-            if (Q(o10174, rd32(pd, 0x10 + rd8(self, 0x6D) * 4), 0x24, 0) == 0) deny = true;
-        }
-        if (!deny && rd32(pkt, 4) == 0x96 && kind < 8) {
-            uint8_t* pd = PN(Q(o10920, unit));
-            if (Q(o10174, rd32(pd, 0x10 + rd8(self, 0x6D) * 4), 2, 0) == 0) deny = true;
-        }
-    }
-    if (deny) {
-        if (isPlayerUnit(unit)) Q(o10920, unit);
-        Q(o10973, unit, 0xE, 0);
-        Q(f8A3E0, sendBuf, 0xF);
-        return;
-    }
-    uint8_t* blk = PN(Q(f8F5C0, self));
-    if (blk != nullptr) {
-        Q(fBC7D0, self);
-        int32_t slotNo = (int32_t)((uintptr_t)pkt & 0xFFFF);
-        if (loSlot <= slotNo && slotNo <= hiSlot) {
-            uint8_t* ps = P(blk, 0x10) + (slotNo - loSlot) * 0x10;
-            auto errTag = [&]() -> uintptr_t {
-                return isPlayerUnit(unit) ? rd32(PN(Q(o10920, unit)), 0x9C) : 0;
-            };
-            if (rd16(ps, 0) != (uint16_t)(uintptr_t)pkt || rd32(ps, 8) != 0) {
-                uintptr_t tag = errTag();
-                uintptr_t w = Q(o10973, unit, 0xE, 0, 0xFFFFFFFFu, 0);
-                Q(f8AC90, 9, w, tag, unit, 0xE);
-                return;
-            }
-            uint8_t auStack[0x28];
-            std::memset(auStack, 0, sizeof auStack);
-            uintptr_t k = Q(o10988, rd16(ps, 0) | (rd16(ps, 2) << 16));
-            if (Q(o10458, rd32(ps, 4), k, rd8(self, 0x6D), auStack) == 0) return;
-            if (Q(fBCC60) != 0) {
-                uint8_t* it = PN(Q(fEDDB0, 1, unit));
-                if (it == nullptr) it = PN(Q(fEDDB0, 1, unit));
-                if (it == nullptr) {
-                    uintptr_t tag = errTag();
-                    uintptr_t w = Q(o10973, unit, 0xE, 0, 0xFFFFFFFFu, 0);
-                    Q(f8AC90, 0xF, w, tag, unit, 0xE);
-                    return;
-                }
-                wr16(ps, 8, 1);
-                wr16(ps, 10, 0);
-                Q(f48FC0, self, unit, it, 0xFFFF, ps, 0);
-                Q(f48390, Q1(f1370));
-                Q(fBD330, self, isPlayerUnit(unit) ? rd32(PN(Q1(o10920, unit)), 0x9C) : 0);
-                uint32_t iid = it == nullptr ? 0xFFFFFFFFu : rd32(it, 0xC);
-                uintptr_t tag = errTag();
-                uintptr_t w = Q(o10973, unit, 0xE, 0, iid, 0);
-                Q(f8AC90, 5, w, tag, unit, 0xE);
-                Q(fBD160, auStack);
-                return;
-            }
-            uintptr_t tag = errTag();
-            uintptr_t w = Q(o10973, unit, 0xE, 0, 0xFFFFFFFFu, 0);
-            Q(f8AC90, 0xC, w, tag, unit, 0xE);
-            return;
-        }
-    }
-    (void)toSend;
-    if (isPlayerUnit(unit)) Q(o10920, unit);
-    Q(o10973, unit, 0xE, 0);
-    Q(f8A3E0, sendBuf, 0xF);
 }
 
 // Builds the 15-byte 0x2A reply the decompile assembles in stack slots (0xAA3E0 sink): byte 0 is the

@@ -50,7 +50,7 @@ static void postTargetCmd(const D2Game77dEnv* env, uint32_t game, uint32_t unit,
 
 // 1.13c D2Game+0x826B0
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_826b0(const D2Game77dEnv* env, uint32_t game, uint32_t unit,
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_826b0_batch(const D2Game77dEnv* env, uint32_t game, uint32_t unit,
                                              uint32_t task) {
     const uint32_t flag = rd32(task, 0x18);
     const uint32_t row = rd32(task, 0x1C);
@@ -143,7 +143,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_7f780(const D2Game77dEnv* env, uint32_t g
 
 // 1.13c D2Game+0x89430
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_89430(const D2Game77dEnv* env, uint32_t game, uint32_t unit,
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_89430_batch(const D2Game77dEnv* env, uint32_t game, uint32_t unit,
                                              uint32_t task) {
     const uint32_t flag = rd32(task, 0x18);
     const uint32_t row = rd32(task, 0x1C);
@@ -579,7 +579,7 @@ EMSCRIPTEN_KEEPALIVE void d2game_83fe0_port(const D2Game77dEnv* env, uint32_t ga
 // argument (the value returned when nothing qualifies). Search buffer: dword 3 and dword 5 are the two
 // candidate results, dwords 1, 4 and 6 start at 0x7FFFFFFF.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_84720(const D2Game77dEnv* env, uint32_t game, uint32_t unit,
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_84720_batch(const D2Game77dEnv* env, uint32_t game, uint32_t unit,
                                                  uint32_t row, uint32_t deflt) {
     uint32_t buf[10] = {0};
     buf[1] = 0x7FFFFFFFu;
@@ -860,7 +860,7 @@ EMSCRIPTEN_KEEPALIVE void d2game_89c30_port(const D2Game77dEnv* env, uint32_t ga
         }
     }
 
-    uint32_t buf[4] = {0, 0x79, 0, (uint32_t)rdS16(row, 0x62 + d * 2)};  // dword 2 unset in retail
+    uint32_t buf[4] = {0, 0x79, (uint32_t)rdS16(row, 0x62 + d * 2), 0};  // dword 3 is stack residue in retail (the mov at +0x38 follows the callback push)
     env->subB17B0m(1, (uint32_t)(uintptr_t)buf, game, unit, 0x7B860);
 
     bool hold = false;  // the 0xAA0EA tail

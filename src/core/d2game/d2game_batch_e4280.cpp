@@ -175,22 +175,6 @@ void D2GAME_EAB60(i32 game)
     o10346(o10331(it), 0);
 }
 
-// 1.13c D2Game+0xEAF80 (eax = unit, type 0 player)
-void D2GAME_EAF80(i32 unit)
-{
-    if (unit == 0 || rd(unit, 0) != 0) return;
-    i32 idx = rd(unit, 4);
-    if (idx < 0 || idx >= sdt(0xbc8)) return;
-    i32 row = idx * 0xc4 + sdt(0xbc4);
-    if (row == 0) return;
-    if ((u32)rb(row, 0x30) != (u32)o10587()) { o10551(); o10551(); o10158(); }
-    o10587();
-    r_EAE20();
-    if ((u32)rb(row, 0x31) != (u32)o10587()) { o10551(); o10551(); o10158(); }
-    o10587();
-    r_EAD10();
-}
-
 // 1.13c D2Game+0xEF4B0 (seven arguments packed into a record; the record sink is FUN_6fd0ef10)
 void D2GAME_EF4B0(i32 p1, i32 p2, i32 p3, i32 p4, i32 p5, i32 p6, i16 p7)
 {

@@ -52,4 +52,6 @@ struct D2GameBatchB87Env {
     void     (*ordinal10996)(uint32_t a, uint32_t b, void* item, uint32_t c,
                              uint32_t d, uint32_t e);                        // #10996 item update
     uint32_t (*ordinal11027)(void* unit);                                    // #11027 unit word
+    // DAT_6fd31c20 (D2Game+0x111C20): when nonzero 0xE73C0 also calls the trace function 0xCBE70. Last member: probes that declare a prefix never read it.
+    uint32_t traceGlobal;
 };

@@ -498,29 +498,6 @@ P D2GAME_ED960(P param_1, P src, P pvStack_28, u32 uStack_2c, u16 uStack_22, i16
     return 0;
 }
 
-// 1.13c D2Game+0xEF570 (__fastcall: ecx unused, edx = record).
-void D2GAME_EF570(P unused, P param_2)
-{
-    (void)unused;
-    P piStack_30 = param_2;
-    o10331();
-    i32 iVar1 = rd(param_2, 0);
-    if (iVar1 != 2 && ((iVar1 < 4 || 5 < iVar1) && rd(param_2, 0x2C) != 0)) o10867(rd(param_2, 0x2C));
-    iVar1 = rd(param_2, 0);
-    if (iVar1 != 2 && (iVar1 < 4 || 5 < iVar1)) {
-        if (rd(param_2, 0x2C) == 0) {
-            P slot = 0;
-            r_EEF10(AD(slot));
-            return;
-        }
-        o10750(rd(param_2, 0x2C));
-        r_EEF10(AD(piStack_30));
-        return;
-    }
-    P slot = 0;
-    r_EEF10(AD(slot));
-}
-
 // 1.13c D2Game+0xF0090 (in_EAX = unit, unaff_EDI = unit being compared, unaff_retaddr = return value to store).
 void D2GAME_F0090(P in_EAX, P unaff_EDI, P unaff_retaddr)
 {

@@ -51,7 +51,7 @@ struct D2Game77Env {
 
 // 1.13c D2Game+0x79910
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_79910(const D2Game77Env* env, uint32_t thisUnit, uint32_t eaxUnit,
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_79910_batch(const D2Game77Env* env, uint32_t thisUnit, uint32_t eaxUnit,
                                              uint32_t param1) {
     if (env->ordinal10494() == 0) return;
     if (env->sub77E70(eaxUnit, thisUnit) == 0) return;

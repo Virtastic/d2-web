@@ -18,9 +18,10 @@ struct D2GameBatchE4900Env {
     void      (*subE34D0)(uintptr_t unit);                                    // 0xE34D0
     void      (*sub354F0)(uintptr_t unit, uintptr_t game);                    // 0x354F0
     void      (*sub8EA80)(uintptr_t game, uintptr_t unit, uint32_t one, uint32_t frame, uint32_t a, uint32_t b, uint32_t c); // 0x8EA80
-    void      (*sub33AF0)(uintptr_t node);                                    // 0x33AF0
+    void      (*sub33AF0)(uintptr_t node, uint32_t cb, uint32_t ebx);         // 0x33AF0: stack (cb, node), EBX
     uintptr_t (*alloc)(const char* file, uint32_t line, uint32_t zero);       // Ordinal_10045
     uint32_t fn54C0, lab5540, lab5450, dat1FE38, lab3030, lab3000;            // retail addresses stored by E6660
+    uint32_t cbE57D0;                                                         // retail address of the 0xE57D0 callback (E6760)
 };
 #define O(n, a, b, c) env->ord(n, (uintptr_t)(a), (uintptr_t)(b), (uintptr_t)(c))
 
@@ -171,7 +172,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E6660(uintptr_t q, const D2Gam
     wr32(q, 0xec, (uint32_t)env->lab3000);
 }
 
-// 1.13c D2Game+0xE6760   game = in_EAX, param2 = unit (or 0)
+// 1.13c D2Game+0xE6760   (callback + EBX=2 passed to 0x33AF0 as retail does)  game = in_EAX, param2 = unit (or 0)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E6760(uint32_t p1, uintptr_t unit, uintptr_t game, const D2GameBatchE4900Env* env)
 {
     (void)p1;
@@ -181,6 +182,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E6760(uint32_t p1, uintptr_t u
     if (rd8(d, 0xc) == 0 && rd8(d, 0xd) == 0) {
         wr8(d, 0xd, 1);
         wr32(d, 0x10, unit ? rd32(unit, 0xc) : 0xffffffffu);
-        env->sub33AF0(n);
+        env->sub33AF0(n, env->cbE57D0, 2);
     }
 }

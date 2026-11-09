@@ -57,7 +57,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DD450(uint32_t game, uint32_t 
     }
     uint32_t seed = att + 0x20;
     if ((R<uint32_t>(e, rec) & 1) == 0) {
-        uint32_t r = e->subDC530(R<uint32_t>(e, rec + 0xc), 0, att, 1, 0, 0, R<uint32_t>(e, rec + 8), scale);
+        uint32_t r = e->subDC530(R<uint32_t>(e, rec + 0xc), 0, att, 1, 0, 0, R<uint32_t>(e, rec + 8),
+                                  (a6 & ~0xffu) | scale);   // 0x6FCFD512: the whole a6 dword is pushed, only its low byte forced to 0x80
         W<uint32_t>(e, rec + 8, r);
         bool dbl = false;
         if (a5 == 0) {

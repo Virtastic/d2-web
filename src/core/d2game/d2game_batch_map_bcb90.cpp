@@ -214,22 +214,6 @@ void D2GAME_E9EA0(P in_EAX)
     }
 }
 
-// 1.13c D2Game+0xEAF80 (in_EAX = player unit; the Ordinal_10551/10587 arguments are not recovered)
-void D2GAME_EAF80(P in_EAX)
-{
-    if (in_EAX == 0 || rd(in_EAX, 0) != 0) return;
-    i32 idx = rd(in_EAX, 4);
-    if (idx < 0 || idx >= rd(sdtBase(), 0xBC8)) return;
-    P ent = (P)(idx * 0xC4 + rd(sdtBase(), 0xBC4));
-    if (ent == 0) return;
-    if (rb(ent, 0x30) != (u32)o10587()) { o10551(); o10551(); o10158(); }
-    o10587();
-    r_EAE20();
-    if (rb(ent, 0x31) != (u32)o10587()) { o10551(); o10551(); o10158(); }
-    o10587();
-    r_EAD10();
-}
-
 // 1.13c D2Game+0xEF4B0 (ecx = param_1, edx = param_2, stack = param_3..param_7)
 void D2GAME_EF4B0(u32 param_1, u32 param_2, i32 param_3, u32 param_4, u32 param_5, u32 param_6, u16 param_7)
 {

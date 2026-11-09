@@ -80,33 +80,7 @@ X void d2_fn_d2game_EAB10(uint32_t p1, uint32_t p2, uintptr_t p3, E env)
     C(0x6F930, p3, env->h((uintptr_t)b), 0, 0, 0, 0, 0);
 }
 
-// EAD10 / EAE20 (eax=count, esi=unit); callers EAF80. ponytail: Ordinal_10551/10973/10887 args not in decompile.
-// 1.13c D2Game+0xEAD10
-X void d2_fn_d2game_EAD10(int32_t eax, uintptr_t esi, uintptr_t sgptDataTables, E env)
-{
-    if (!eax || !esi) return;
-    int32_t i = (int32_t)rd32(esi, 4);
-    uintptr_t dt = P(rd32(sgptDataTables, 0));
-    if (i < 0 || i >= (int32_t)rd32(dt, 0xbc8) || !(i * 0xc4 + rd32(dt, 0xbc4))) return;
-    O(10551, 0, 0, 0, 0, 0); O(10551, 0, 0, 0, 0, 0); O(10551, 0, 0, 0, 0, 0);
-    if (eax > 0) O(10551, 0, 0, 0, 0, 0);
-    if ((int32_t)O(10973, 0, 0, 0, 0, 0) < (int32_t)O(10973, 0, 0, 0, 0, 0)) O(10887, 0, 0, 0, 0, 0);
-    O(10551, 0, 0, 0, 0, 0);
-    if (eax > 0) O(10551, 0, 0, 0, 0, 0);
-    if ((int32_t)O(10973, 0, 0, 0, 0, 0) < (int32_t)O(10973, 0, 0, 0, 0, 0)) O(10887, 0, 0, 0, 0, 0);
-}
-// 1.13c D2Game+0xEAE20
-X void d2_fn_d2game_EAE20(int32_t eax, uintptr_t esi, uintptr_t sgptDataTables, E env)
-{
-    if (!eax || !esi) return;
-    int32_t i = (int32_t)rd32(esi, 4);
-    uintptr_t dt = P(rd32(sgptDataTables, 0));
-    if (i < 0 || i >= (int32_t)rd32(dt, 0xbc8) || !(i * 0xc4 + rd32(dt, 0xbc4))) return;
-    O(10551, 0, 0, 0, 0, 0); O(10551, 0, 0, 0, 0, 0);
-    if (eax > 0) O(10551, 0, 0, 0, 0, 0);
-    O(10551, 0, 0, 0, 0, 0);
-    if ((int32_t)O(10973, 0, 0, 0, 0, 0) < (int32_t)O(10973, 0, 0, 0, 0, 0)) O(10887, 0, 0, 0, 0, 0);
-}
+// 0xEAD10 and 0xEAE20: d2game_ead10.cpp and d2game_eae20.cpp (retail stack order of the stat thunks).
 
 // 1.13c D2Game+0xEDF20  (esi, edi, stack retaddr-slot value passed through)
 X void d2_fn_d2game_EDF20(uintptr_t esi, uintptr_t edi, uintptr_t stk, E env)

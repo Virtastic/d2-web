@@ -36,7 +36,7 @@ function run(chunks, needReveal = false) {
     d2gsClientPlayerState: () => ({ active: true, guid: 1 }),
     d2gsPlayerReassign: () => null,
   };
-  const joining = d2gsJoin(transport, protocol, { logonDelayMs: 0, character: 'Hero', charClass: 5, gameToken: 1, gameHash: 1 });
+  const joining = d2gsJoin(transport, protocol, { character: 'Hero', charClass: 5, gameToken: 1, gameHash: 1 });
   queueMicrotask(() => onData(Uint8Array.from([0xaf, 0x00])));
   return joining.then((game) => ({ game, sent, fedStreams }));
 }

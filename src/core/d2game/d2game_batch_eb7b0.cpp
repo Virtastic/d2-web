@@ -175,27 +175,7 @@ static int32_t IronGolemSection(void* pGame, void* pPlayer, uint8_t** ppSection,
     return 0;
 }
 
-// ---- 0xEC1E0: pet item section ('fj') ----------------------------------------------------------
-// pGame arrived in EAX, pPlayer in ECX; the marker is written before the pet lookup and there is no
-// bounds check in front of it (the 1.10f caller had one).
-static int32_t PetSection(void* pGame, void* pPlayer, uint8_t** ppSection,
-                          const uint8_t* pEnd, const D2GameBatchEEnv* env)
-{
-    uint8_t* cur = *ppSection;
-    if (rd32(pGame, 0x70) != 0) {
-        wr16(cur, 0x00, 0x666A);                               // 'fj'
-        cur += 2;
-        void* pet = env->getPet(pGame, pPlayer, 7 /* PETTYPE_HIREABLE */, 1);
-        if (pet != nullptr) {
-            const int32_t n = env->writeItemsEx(cur, rdptr(pet, 0x60), pGame, pet,
-                                                (uint32_t)(pEnd - cur));
-            if (n < 0) return 5;
-            cur += n;
-        }
-        *ppSection = cur;
-    }
-    return 0;
-}
+// ---- 0xEC1E0: moved to d2game_ec1e0.cpp (register and stack order of retail) ----
 
 // ---- 0xEC260: PLRSAVE2_WriteCorpsesSection ('MJ') ----------------------------------------------
 // The 1.13c decompile has six removed-unreachable-block warnings: the arms that write the marker and
@@ -302,15 +282,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ec020(uint32_t* r)
     r[4] = (uint32_t)IronGolemSection((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1],
                                       (uint8_t**)(uintptr_t)r[2], (const uint8_t*)(uintptr_t)r[3],
                                       (int32_t)r[5], &g_batchEEnv);
-}
-
-// 1.13c D2Game+0xEC1E0
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ec1e0(uint32_t* r)
-{
-    r[4] = (uint32_t)PetSection((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1],
-                                (uint8_t**)(uintptr_t)r[2], (const uint8_t*)(uintptr_t)r[3],
-                                &g_batchEEnv);
 }
 
 // 1.13c D2Game+0xEC260

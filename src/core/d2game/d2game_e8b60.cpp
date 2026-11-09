@@ -1,109 +1,64 @@
-// src/core/d2game/d2game_e8b60.cpp -- 1.13c D2Game+0xE8B60, the a3q4 quest event callback (q+0xcc slot).
-// Transcribed from the cached decompile + disassembly (the decompile lost the register inputs).
-// Same Env/seam conventions as d2game_batch_e6850.cpp: structs are 32-bit images, pointers via env->h/p,
-// env->ord = D2Common ordinal, env->call(rva, logical args...) = D2Game+rva with the register inputs
-// listed per call below given in this order.
-#include <cstdint>
-#include <cstring>
+// 1.13c D2Game+0xE8B60: a3q4 quest event callback (the q+0xcc slot). ECX = q (quest record), EDX = msg (event block).
+// msg: +0 unit, +8 arg, +0xC game, +0x14 event, +0x18 sub-event. Register inputs of each callee are in the comments (retail order).
 #include <emscripten.h>
-
-static inline uint32_t rd32(uintptr_t p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
-static inline void     wr32(uintptr_t p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
-static inline uint8_t  rd8(uintptr_t p, uint32_t o) { return ((const uint8_t*)p)[o]; }
-static inline void     wr8(uintptr_t p, uint32_t o, uint8_t v) { ((uint8_t*)p)[o] = v; }
-static inline uint16_t rd16(uintptr_t p, uint32_t o) { uint16_t v; std::memcpy(&v, (const uint8_t*)p + o, 2); return v; }
-
-struct D2GameE8B60Env {
-    uintptr_t (*ord)(uint32_t n, uintptr_t a, uintptr_t b, uintptr_t c, uintptr_t d, uintptr_t e);
-    uintptr_t (*call)(uint32_t rva, uintptr_t a, uintptr_t b, uintptr_t c, uintptr_t d, uintptr_t e, uintptr_t f, uintptr_t g);
-    uint32_t  (*addr)(uint32_t rva);
-    uint32_t  (*h)(uintptr_t host);
-    uintptr_t (*p)(uint32_t handle);
-    uintptr_t (*isBadCodePtr)(uint32_t handle);
-    void      (*exit)(int code);
-    uintptr_t (*callQ)(uint32_t handle, uintptr_t q);   // __thiscall-like: ecx = q
-};
-#define O(n, a, b, c) env->ord(n, (uintptr_t)(a), (uintptr_t)(b), (uintptr_t)(c), 0, 0)
-#define C(rva, a, b, c, d) env->call(rva, (uintptr_t)(a), (uintptr_t)(b), (uintptr_t)(c), (uintptr_t)(d), 0, 0, 0)
-#define A(rva) env->addr(rva)
-
-// 1.13c D2Game+0xE8B60   (q = ecx, msg = edx)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E8B60(uintptr_t q, uintptr_t msg, const D2GameE8B60Env* env)
+#include "d2game_s3a_env.h"
+using namespace s3a;
+// 1.13c D2Game+0xE8B60
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E8B60(uintptr_t q, uintptr_t msg, const D2GameS3aEnv* env)
 {
-    const uint16_t ev = rd16(msg, 0x14), sub = rd16(msg, 0x18);
-    const uint32_t unit = rd32(msg, 0), game = rd32(msg, 0xc);
-    uintptr_t pl = O(10920, game, 0, 0);
-    uintptr_t u = unit ? env->p(unit) : 0;
-    const uint32_t id = rd32(pl, 0x10 + rd8(u, 0x6d) * 4);
-    uintptr_t d = env->p(rd32(q, 0x18));
-    const uint32_t cb = A(0xE6BD0);
-    if (O(10174, id, 0x14, 0) == 1) return;
-
-    auto q55eb0 = [&](uint32_t n) { C(0x35EB0, n, q, 0, 0); };              // eax=n esi=q
-    auto q55910 = [&](uint32_t a) { C(0x35910, a, game, unit, 0); };         // eax=a ecx=game stack=unit
-    auto q6b90  = [&]() { C(0xE6B90, game, unit, 0, 0); };                   // eax=game esi=unit
-    auto q566a0 = [&](uint32_t tag) { C(0x366A0, tag, unit, game, 0); };     // eax=tag ecx=unit esi=game
-    auto q56470 = [&](uint32_t tag) { return C(0x36470, tag, game, unit, 0); };// ecx=tag edx=game stack=(unit,2,1) eax=0
-
+    const uint16_t sub = rd16(msg, 0x18), ev = rd16(msg, 0x14);
+    const uint32_t unit = rd32(msg, 0), game = rd32(msg, 0xc), qh = env->h(q);
+    const uint32_t pl = (uint32_t)cl(env, 0xA4C0, 0, 0, 0, 0, 0, { game });
+    const uint32_t id = rd32(env->p(pl), 0x10 + rd8(env->p(unit), 0x6d) * 4);
+    const uint32_t cb = env->addr(0xE6BD0);
+    auto st = [&](uint32_t n) { return (uint32_t)cl(env, 0xA568, 0, 0, 0, 0, 0, { id, 0x14, n }); };
+    auto set = [&](uint32_t n) { cl(env, 0xA57A, 0, 0, 0, 0, 0, { id, 0x14, n }); };
+    if (st(0) == 1) return;
+    const uintptr_t d = env->p(rd32(q, 0x18));
+    auto e5eb0 = [&](uint32_t n) { cl(env, 0x35EB0, n, 0, 0, 0, qh); };                              // EAX = n, ESI = q
+    auto e6b90 = [&]() { cl(env, 0xE6B90, game, 0, 0, 0, unit); };                                   // EAX = game, ESI = unit
+    auto e5910 = [&]() { cl(env, 0x35910, rd32(msg, 8), game, 0, 0, 0, { unit }); };                 // EAX = arg, ECX = game
+    auto e66a0 = [&](uint32_t tag) { cl(env, 0x366A0, tag, unit, 0, 0, game); };                     // EAX = tag, ECX = unit, ESI = game
+    auto e6470 = [&](uint32_t tag) { return cl(env, 0x36470, 0, tag, game, 0, 0, { unit, 2, 1 }); }; // ECX = tag, EDX = game
+    auto e660 = [&](uint32_t tag) { return (uint32_t)cl(env, 0xE660, game, 0, 0, unit, 0, { tag }); }; // EAX = game, EBX = unit
     if (ev == 0xf5) {
         if (sub == 0x20f) {
-            O(10003, id, 0x14, 2);
-            if (rd8(q, 0xc) == 1) { q55eb0(2); wr8(d, 9, 1); wr32(q, 0xa8, cb); }
-            q55910(rd32(msg, 8));
-            wr32(d, 0x18, 2);
-            q6b90();
+            set(2);
+            if (rd8(q, 0xc) == 1) { e5eb0(2); wr8(d, 9, 1); wr32(q, 0xa8, cb); }
+            e5910(); wr32(d, 0x18, 2); e6b90();
         } else if (sub == 0x213) {
-            O(10003, id, 0x14, 4);
-            wr8(d, 10, 1);
-            q55910(rd32(msg, 8));
-            wr32(d, 0x18, 4);
-            q6b90();
+            set(4); wr8(d, 10, 1); e5910(); wr32(d, 0x18, 4); e6b90();
         }
     } else if (ev == 0xfe) {
         if (sub == 0x216) {
-            if (!C(0xE660, 0x20343367, game, unit, 0)) return;
-            if (O(10174, id, 0x14, 1) != 0 || O(10174, id, 0x14, 0) != 0) return;
-            q566a0(0x20343367);
+            if (!e660(0x20343367)) return;
+            if (st(1) != 0 || st(0) != 0) return;
+            e66a0(0x20343367);
             wr32(d, 0x10, rd32(d, 0x10) - 1);
-            if (rd8(q, 9) != 0 && rd8(q, 0xc) != 4) q55eb0(4);
-            O(10003, id, 0x14, 1);
-            wr8(d, 8, 1);
-            wr32(q, 0xa8, cb);
-            wr32(d, 0x18, 1);
-            q6b90();
-        } else if (sub == 0x21a && O(10174, id, 0x14, 0) == 0) {
-            if (O(10174, id, 0x14, 1) != 0) {
-                O(10593, id, 0x14, 1);
-                O(10003, id, 0x14, 0);
-                O(10003, id, 0x14, 0xd);
-                O(10495, id, rd32(q, 0xe0), 0);
-                O(10003, id, 0x14, 5);
-                if (rd8(q, 9) != 0) q55eb0(5);
-                q56470(0x207a7978);                                           // eax=0, (unit,2,1)
-                C(0x34C00, game, unit, 0, 0);                                 // eax=game stack=unit
-                C(0x33880, q + 0x1c, game ? rd32(env->p(game), 0xc) : (uint32_t)-1, 0, 0); // eax=&q[0x1c] esi=game id
+            if (rd8(q, 9) != 0 && rd8(q, 0xc) != 4) e5eb0(4);
+            set(1); wr8(d, 8, 1); wr32(q, 0xa8, cb); wr32(d, 0x18, 1); e6b90();
+        } else if (sub == 0x21a && st(0) == 0) {
+            if (st(1) != 0) {
+                cl(env, 0xA586, 0, 0, 0, 0, 0, { id, 0x14, 1 });
+                set(0); set(0xd);
+                cl(env, 0xA574, 0, 0, 0, 0, 0, { id, rd32(q, 0xe0) });
+                set(5);
+                if (rd8(q, 9) != 0) e5eb0(5);
+                e6470(0x207a7978);
+                cl(env, 0x34C00, game, 0, 0, 0, 0, { unit });
+                cl(env, 0x33880, qh + 0x1c, 0, 0, 0, game ? rd32(env->p(game), 0xc) : 0xffffffffu);   // EAX = &q[0x1c], ESI = game id
             }
-            if (O(10174, id, 0x14, 0xd) != 0) {
-                C(0x33920, 0x14, 0xd, unit, 0);                               // eax=unit stack=(0x14,0xd)
-                uint32_t fp = rd32(q, 0xf0);
-                if (env->isBadCodePtr(fp)) {
-                    uintptr_t r = O(10265, 0x221, 0, 0);
-                    O(10024, A(0xF9FF9), r, 0);
-                    env->exit(-1);
-                }
-                env->callQ(fp, q);
+            if (st(0xd) != 0) {
+                cl(env, 0x33920, unit, 0, 0, 0, 0, { 0x14, 0xd });
+                // IsBadCodePtr(q[0xf0]) is a host import; a bad pointer is the fatal-exit path and is not ported
+                cl(env, rd32(q, 0xf0) - env->addr(0), 0, qh, 0, 0, 0);
             }
         }
     } else if (ev == 0x108 && sub == 0x211) {
-        if (!C(0xE660, 0x2034336a, game, unit, 0)) return;
+        if (!e660(0x2034336a)) return;
         wr32(q, 0xa8, cb);
-        q566a0(0x2034336a);
+        e66a0(0x2034336a);
         wr32(d, 0x10, rd32(d, 0x10) - 1);
-        if (q56470(0x20343367)) {
-            wr32(d, 0x10, rd32(d, 0x10) + 1);
-            q55eb0(3);
-            wr8(d, 0xb, 1);
-            wr32(q, 0xa8, cb);
-        }
+        if (e6470(0x20343367)) { wr32(d, 0x10, rd32(d, 0x10) + 1); e5eb0(3); wr8(d, 0xb, 1); wr32(q, 0xa8, cb); }
     }
 }

@@ -213,7 +213,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_6b200(uint32_t ecxSelf, uint32_t esiUnit,
 // handle at unit+0x60 participates: 0x778A0, then Ordinal_11139(handle, 4) and (handle, 5) each add
 // the unit through 0x78DD0, then 0x77B20.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_79100(uint32_t eaxUnit, uint32_t param1,
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_79100_batch(uint32_t eaxUnit, uint32_t param1,
                                              const D2GameBatchD40F0Env* env)
 {
     if (eaxUnit == 0 || rd32((void*)(uintptr_t)eaxUnit, 0) != 0) return;

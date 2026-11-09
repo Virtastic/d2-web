@@ -446,11 +446,6 @@ export async function bncsChangeEmail(transport, protocol, { account, oldEmail, 
  * Returns the challenge the server issued, the realm list it advertised, and the LOGONREALMEX
  * handoff (the MCP ticket) -- the read offsets the server cannot check for us.
  */
-// The server may push SETEMAIL (0x59) or a keepalive between our request and its reply; retail takes them as they come, so a
-// reply read skips them.
-const readBncsReply = async (reader, timeoutMs) => {
-  for (;;) { const frame = await readBncsFrame(reader, timeoutMs); if (frame.id !== 0x59 && frame.id !== 0x00) return frame; }
-};
 export async function bncsLogin(transport, protocol, { account, password, realm = 'd2-web', product = 'D2XP', auth = null, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
   const reader = makeReader(transport);
   const sent = [], received = [];
@@ -459,7 +454,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
   transport.send(protocol.bncsSelector());                       // single 0x01 protocol selector
   send(0x50, protocol.bncsAuthInfo(product));
 
-  const authInfo = await readBncsReply(reader, timeoutMs); received.push(authInfo.id);
+  const authInfo = await readBncsFrame(reader, timeoutMs); received.push(authInfo.id);
   if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
   const serverToken = u32(authInfo.body, 4);
   const mpqEnd = authInfo.body.indexOf(0, 20);
@@ -470,7 +465,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
   // come from the server's revision formula over the configured files, the key blocks from `auth`.
   const { body: authCheckBody, clientToken } = protocol.bncsAuthCheck({ serverToken, mpq: new TextDecoder().decode(mpq), challenge, product, auth });
   send(0x51, authCheckBody);
-  const authCheck = await readBncsReply(reader, timeoutMs); received.push(authCheck.id);
+  const authCheck = await readBncsFrame(reader, timeoutMs); received.push(authCheck.id);
   if (authCheck.id !== 0x51) throw new Error(`expected AUTH_CHECK reply 0x51, got 0x${authCheck.id.toString(16)}`);
   const versionResult = u32(authCheck.body, 0);
   if (versionResult !== 0) {
@@ -487,7 +482,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
 
   // BNClient+0xC9E0 tokens the logon with GetTickCount; +0xBFD0 with its own counter (1, 2, ...).
   send(0x3a, protocol.bncsLogon({ clientToken: protocol.tickCount(), serverToken, account, password }));
-  const logon = await readBncsReply(reader, timeoutMs); received.push(logon.id);
+  const logon = await readBncsFrame(reader, timeoutMs); received.push(logon.id);
   if (logon.id !== 0x3a) throw new Error(`expected LOGONRESPONSE2 reply 0x3a, got 0x${logon.id.toString(16)}`);
   const logonResult = u32(logon.body, 0);
   if (logonResult !== 0) {
@@ -500,7 +495,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
   }
 
   send(0x40, protocol.bncsQueryRealms());                         // QUERYREALMS2, empty body
-  const realms = await readBncsReply(reader, timeoutMs); received.push(realms.id);
+  const realms = await readBncsFrame(reader, timeoutMs); received.push(realms.id);
   if (realms.id !== 0x40) throw new Error(`expected QUERYREALMS2 reply 0x40, got 0x${realms.id.toString(16)}`);
   const count = u32(realms.body, 4);
   const realmList = [];
@@ -515,7 +510,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
   }
 
   send(0x3e, protocol.bncsRealmEx({ clientToken: protocol.realmToken(), serverToken, realm, password }));
-  const realmEx = await readBncsReply(reader, timeoutMs); received.push(realmEx.id);
+  const realmEx = await readBncsFrame(reader, timeoutMs); received.push(realmEx.id);
   if (realmEx.id !== 0x3e) throw new Error(`expected LOGONREALMEX reply 0x3e, got 0x${realmEx.id.toString(16)}`);
   // MCPStatus is 0 or 1 on success: the engine's own server sends 1, a stock Battle.net realm sends 0,
   // and a failure sets the high bit (0x80000001...). Either way a real hand-off carries a non-zero IP.
@@ -544,7 +539,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
  * which arrives Huffman-compressed and length-framed. The engine's 1.13c packet table frames the
  * decoded stream; this routine waits until a complete player assignment is available.
  */
-export async function d2gsJoin(transport, protocol, { character, charClass, gameToken, gameHash, difficulty = 0, expansion = false, timeoutMs = CONNECT_TIMEOUT_MS, logonDelayMs = 1500 } = {}) {
+export async function d2gsJoin(transport, protocol, { character, charClass, gameToken, gameHash, difficulty = 0, expansion = false, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
   const reader = makeReader(transport);
   // The greeting's size is decided by its first two bytes (`AF 00`/`AF 01` are 2 bytes, `AF 81`
   // carries a 128-byte inline table), so read the flag pair first and then the whole thing.
@@ -555,9 +550,6 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
   await reader.want(greetingSize, timeoutMs);
   reader.skip(greetingSize);
 
-  // The game server admits a logon only once the character has loaded from the character database, which
-  // follows the connection by a moment; a logon sent on the greeting is dropped and the socket closed.
-  if (logonDelayMs > 0) await new Promise((r) => setTimeout(r, logonDelayMs));
   const gamelogon = protocol.d2gsGamelogon({ character, charClass, gameToken, gameHash });
   transport.send(gamelogon);
 

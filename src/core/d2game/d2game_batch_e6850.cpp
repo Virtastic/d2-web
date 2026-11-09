@@ -22,6 +22,8 @@ struct D2GameBatchE6850Env {
     uint32_t  (*h)(uintptr_t host);      // host pointer -> image handle
     uintptr_t (*p)(uint32_t handle);     // image handle -> host pointer
     void      (*exit)(int code);         // _exit
+    void      (*iter)(uint32_t cbRva, uint32_t edi, uint32_t s0);   // 0xDFCC0: EAX = 0, EBX = callback D2Game+cbRva, EDI = edi, one stack word
+    uintptr_t (*callN)(uint32_t rva, uintptr_t a, uintptr_t c, uintptr_t d, uintptr_t b, uintptr_t s, const uint32_t* stack6);   // six stack words
 };
 #define O(n, a, b, c, d, e) env->ord(n, (uintptr_t)(a), (uintptr_t)(b), (uintptr_t)(c), (uintptr_t)(d), (uintptr_t)(e))
 #define C(rva, a, b, c, d, e, f, g) env->call(rva, (uintptr_t)(a), (uintptr_t)(b), (uintptr_t)(c), (uintptr_t)(d), (uintptr_t)(e), (uintptr_t)(f), (uintptr_t)(g))
@@ -79,7 +81,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_E6B90(uintptr_t unit, cons
 // quest-record init: zero 0xf dwords at +0xa0, then caller-specific fields.
 static void zero0xa0(uintptr_t q) { std::memset((void*)(q + 0xa0), 0, 0x3c); }
 
-// 1.13c D2Game+0xE7CE0   (a3q2)
+// 1.13c D2Game+0xE7CE0   (a3q2; ECX = quest record, [q+4] = game)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E7CE0(uintptr_t q, const D2GameBatchE6850Env* env)
 {
     zero0xa0(q);
@@ -93,22 +95,23 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E7CE0(uintptr_t q, const D2Gam
     wr32(q, 0x10, 0xf);
     wr32(q, 0xcc, A(0xE7940)); wr32(q, 0xac, A(0xE7A10)); wr32(q, 0xd4, A(0xE49E0));
     wr32(q, 200, A(0xE2EF0)); wr32(q, 0xb0, A(0xE6190));
-    uintptr_t d = O(10045, "..\\Source\\D2Game/Quests/a3q2.cpp", 0x39b, 0, 0, 0);
+    // Fog alloc thunk 0xA2E6: ECX = pool (game+0x1c), EDX = 0xB0 bytes, stack (file string 0x1AF6C, 0x39B, 0)
+    uintptr_t d = C(0xA2E6, 0, rd32(P(rd32(q, 4)), 0x1c), 0xb0, 0, 0, A(0x1AF6C), 0x39b);
     wr32(q, 0x18, env->h(d));
     std::memset((void*)d, 0, 0x2c * 4);
     wr32(d, 8, 0);
     wr16(d, 0xac, 0);
 }
 
-// 1.13c D2Game+0xE8310   (ctx: [0]=game [2]=a [5]=b [6]=c)
-// ponytail: Ghidra shows FUN_6fd0ef10 called on an unstored stack slot (stack0xffffffcc); a zeroed 0x34-byte
-// block is passed here -- resolve with a FUNCTION-mode trace when this row is vectored.
+// 1.13c D2Game+0xE8310   (ECX = ctx: [0]=game [2]=a [5]=b [6]=c)
+// The request block for 0xEEF10 is ten dwords on retail's stack (ECX = &block; the last dword is a 16-bit zero), 0xEF650 takes
+// ECX = 0x129, EDX = 1 and six stack words (game, a, b, c, 3, 0); the 0xA568 thunk (Ordinal_10174) takes (id, 0x16, 0xd).
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E8310(uintptr_t ctx, const D2GameBatchE6850Env* env)
 {
     uintptr_t game = P(rd32(ctx, 0));
     uintptr_t qs = P(rd32(game, 0x10f4));
-    if (rd32(qs, 8) == 0) fatal(env, 0);
-    if (O(10174, rd32(qs, 0xc), 0x16, 0, 0, 0) != 0) return;
+    if (rd32(qs, 8) == 0) fatal(env, 0x82c);
+    if (O(10174, rd32(qs, 0xc), 0x16, 0xd, 0, 0) != 0) return;
     uintptr_t st = findQuestState(game, 0x14, env);
     if (!st) return; // retail dereferences null here
     uintptr_t rec = P(rd32(st, 0x18));
@@ -122,17 +125,19 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E8310(uintptr_t ctx, const D2G
             }
         }
     }
-    uint32_t blk[13] = {0};
-    uintptr_t u = C(0xEEF10, (uintptr_t)blk, 0, 0, 0, 0, 0, 0);
+    uint32_t blk[10] = { rd32(ctx, 0), rd32(ctx, 8), 0, 0x129, 1, 0, rd32(ctx, 20), rd32(ctx, 24), 0xffffffffu, 0 };
+    uintptr_t u = C(0xEEF10, 0, env->h((uintptr_t)blk), 0, 0, 0, 0, 0);
     if (!u) {
-        u = C(0xEF650, 0x129, 1, rd32(ctx, 0), rd32(ctx, 8), rd32(ctx, 20), rd32(ctx, 24), 3 /* + trailing 0 */);
+        const uint32_t st6[6] = { rd32(ctx, 0), rd32(ctx, 8), rd32(ctx, 20), rd32(ctx, 24), 3, 0 };
+        u = env->callN(0xEF650, 0, 0x129, 1, 0, 0, st6);
         if (!u) { wr8(rec, 0x20, 0); return; }
     }
     wr8(rec, 0x20, 1);
     wr32(rec, 0x2c, rd32(u, 0xc));
     if (rd32(rec, 0x24) && rd32(P(rd32(rec, 0x24)), 4) && rd8(rec, 0x30) == 0) {
-        C(0x20DE0, 0, 0, 0, 0, 0, 0, 0);
-        O(10171, 0, 0, 0, 0, 0);
+        uint32_t slot = env->h(rec + 0x24);
+        uintptr_t r = C(0x20DE0, 0, slot, 0, 0, 0, 0, 0);   // ECX = &rec[0x24]
+        C(0xA562, 0, slot, r, 0, 0, 0, 0);                  // thunk: ECX = &rec[0x24], EDX = result
         wr8(rec, 0x30, 1);
     }
 }
@@ -143,10 +148,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E84A0(uintptr_t ctx, const D2G
     uintptr_t game = P(rd32(ctx, 0));
     uintptr_t st = findQuestState(game, 0x13, env);
     uintptr_t rec = P(rd32(st, 0x18));
-    if (rd8(rec, 0xc)) O(11090, rd32(ctx, 4), 2, 0, 0, 0);
+    if (rd8(rec, 0xc)) C(0xA4A2, 0, 0, 0, 0, 0, rd32(ctx, 4), 2);   // thunk 0xA4A2 (Ordinal_11090): stack (unit, 2)
     if (rd8(rec, 0x28) == 0) {
         uint32_t s[10] = { rd32(ctx, 0), rd32(ctx, 8), 0, 0x16e, 1, 0, rd32(ctx, 20), rd32(ctx, 24), 0xffffffffu, 0 };
-        uintptr_t u = C(0xEEF10, (uintptr_t)s, 0, 0, 0, 0, 0, 0);
+        uintptr_t u = C(0xEEF10, 0, env->h((uintptr_t)s), 0, 0, 0, 0, 0);   // ECX = request block (retail: block on the stack, 2-byte last word)
         if (u) {
             wr32(u, 0xc4, rd32(u, 0xc4) | 0x20000);
             wr32(rec, 0x2c, rd32(u, 0xc));
@@ -159,7 +164,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E84A0(uintptr_t ctx, const D2G
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E87E0(uintptr_t self, uintptr_t unit, const D2GameBatchE6850Env* env)
 {
     static const uint32_t tags[5] = { 0x20796571, 0x20726871, 0x20726271, 0x20316671, 0x20326671 };
-    auto sweep = [&]() { for (uint32_t t : tags) if (C(0xE660, t, 0, 0, 0, 0, 0, 0)) C(0x365E0, unit, self, 0, 0, 0, 0, 0); };
+    auto sweep = [&]() { for (uint32_t t : tags) if (C(0xE660, unit, 0, 0, 0, 0, t, 0)) C(0x365E0, 0, unit, 0, 0, 0, self, rd32(unit, 0x60)); };   // E660: EAX = unit, stack tag; 365E0: ECX = unit, stack (self, unit[0x60])
     uintptr_t pl = O(10920, unit, 0, 0, 0, 0);
     uint32_t id = rd32(pl, 0x10 + rd8(self, 0x6d) * 4);
     if (O(10174, id, 0x12, 0, 0, 0) == 1) { sweep(); return; }
@@ -168,11 +173,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E87E0(uintptr_t self, uintptr_
     if ((char)O(10459, O(10826, u, 0, 0, 0, 0), 0, 0, 0, 0) != 2) return;
     O(10003, id, 0x12, 0, 0, 0);
     O(10003, id, 0x12, 0xd, 0, 0);
-    if (C(0x70D60, unit, self, 0, 0, 0, 0, 0) == 0) sweep();
+    if (C(0x70D60, 0, unit, 0, 0, 0, self, 0) == 0) sweep();   // ECX = unit, stack (self)
     if (O(10174, id, 0x15, 4, 0, 0) != 0 && O(10174, id, 0x15, 0, 0, 0) == 0) O(10003, id, 0x15, 0, 0, 0);
 }
 
-// 1.13c D2Game+0xE92D0   (a3q4)
+// 1.13c D2Game+0xE92D0   (a3q4; ECX = quest record, [q+4] = game)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E92D0(uintptr_t q, const D2GameBatchE6850Env* env)
 {
     zero0xa0(q);
@@ -185,13 +190,14 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E92D0(uintptr_t q, const D2Gam
     wr32(q, 0x10, 0x10);
     wr32(q, 0xb0, A(0xE7640)); wr32(q, 0xcc, A(0xE8B60)); wr32(q, 0xac, A(0xE3E00));
     wr32(q, 0xd4, A(0xE3B40)); wr32(q, 200, A(0xE3B30)); wr32(q, 0xd8, A(0xE6A60)); wr32(q, 0xc4, A(0xE6B20));
-    uintptr_t d = O(10045, "..\\Source\\D2Game/Quests/a3q4.cpp", 0x340, 0, 0, 0);
+    // Fog alloc thunk 0xA2E6: ECX = pool (game+0x1c), EDX = 0x1C bytes, stack (file string 0x1AEF8, 0x340, 0)
+    uintptr_t d = C(0xA2E6, 0, rd32(P(rd32(q, 4)), 0x1c), 0x1c, 0, 0, A(0x1AEF8), 0x340);
     wr32(q, 0x18, env->h(d));
     std::memset((void*)d, 0, 7 * 4);
     wr8(d, 12, 1); wr8(d, 1, 1);
 }
 
-// 1.13c D2Game+0xE93C0   (a3q1)
+// 1.13c D2Game+0xE93C0   (a3q1; ECX = quest record, [q+4] = game)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E93C0(uintptr_t q, const D2GameBatchE6850Env* env)
 {
     zero0xa0(q);
@@ -201,7 +207,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E93C0(uintptr_t q, const D2Gam
     wr8(q, 13, 4);
     wr32(q, 0xe8, A(0xE6E00)); wr32(q, 0xec, A(0xE53F0)); wr32(q, 0xf0, A(0xE2F00));
     wr32(q, 0x10, 0x13);
-    uintptr_t d = O(10045, "..\\Source\\D2Game/Quests/a3q1.cpp", 0x3ad, 0, 0, 0);
+    // Fog alloc thunk 0xA2E6: ECX = pool (game+0x1c), EDX = 0xA0 bytes, stack (file string 0x1AFA0, 0x3AD, 0)
+    uintptr_t d = C(0xA2E6, 0, rd32(P(rd32(q, 4)), 0x1c), 0xa0, 0, 0, A(0x1AFA0), 0x3ad);
     wr32(q, 0x18, env->h(d));
     wr32(q, 0xb0, A(0xE7AF0)); wr32(q, 0xb4, A(0xE7A40)); wr32(q, 0xa0, A(0xE5270));
     wr32(q, 0xcc, A(0xE8FE0)); wr32(q, 0xac, A(0xE7BE0)); wr32(q, 0xd4, A(0xE50C0));
@@ -211,7 +218,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E93C0(uintptr_t q, const D2Gam
 }
 
 // 1.13c D2Game+0xE9960   (self in ECX/stack, unit in EDI)
-// ponytail: Ordinal_10331/11090/10408 take register args Ghidra did not name; unit (EDI) is passed.
+// Retail: unit in EDI, self = stack word 0 (ret 4); thunks 0xA478 (unit), 0xA538 (n, unit), 0xA4A2 (unit, 1|2), 0xA550 (unit).
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E9960(uintptr_t self, uintptr_t unit, const D2GameBatchE6850Env* env)
 {
     uintptr_t rec = P(rd32(self, 0x18));
@@ -220,15 +227,15 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E9960(uintptr_t self, uintptr_
         if (unit) { mode = rd32(unit, 0x10); if (mode == 2) return; }
         uintptr_t pl = O(10331, unit, 0, 0, 0, 0);
         for (uintptr_t n = rd32(pl, 0x74) ? P(rd32(pl, 0x74)) : 0; n; n = rd32(n, 0xe8) ? P(rd32(n, 0xe8)) : 0) {
-            if (rd32(n, 0) == 0 && (uint32_t)O(10407, n, 0, 0, 0, 0) < 0x12) {
-                if (mode == 0) { wr32(rec, 0x10, 2); O(11090, unit, 2, 0, 0, 0); }
+            if (rd32(n, 0) == 0 && (uint32_t)O(10407, n, unit, 0, 0, 0) < 0x12   /* thunk 0xA538: stack (n, unit) */) {
+                if (mode == 0) { wr32(rec, 0x10, 2); O(11090, unit, 1, 0, 0, 0); }
                 else if (mode == 1) { wr32(rec, 0x10, 2); O(11090, unit, 2, 0, 0, 0); O(10408, unit, 0, 0, 0, 0); }
                 break;
             }
         }
     }
     uintptr_t game = P(rd32(self, 4));
-    C(0x8EA80, game, unit, 7, rd32(game, 0xa8) + 0x18, 0, 0, 0);
+    C(0x8EA80, 0, rd32(self, 4), unit, 0, 0, 7, rd32(game, 0xa8) + 0x18);   // ECX = game, EDX = unit, stack (7, game[0xa8]+0x18, 0, 0, 0)
 }
 
 // 1.13c D2Game+0xE9F60   (ctx: [0]=game [1]=unit [4]=skill)
@@ -245,14 +252,14 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_E9F60(uintptr_t ctx, const
     uintptr_t n = rd32(game, 0x1520 + (key & 0x7f) * 4) ? P(rd32(game, 0x1520 + (key & 0x7f) * 4)) : 0;
     while (n && rd32(n, 0xc) != key) n = rd32(n, 0xe4) ? P(rd32(n, 0xe4)) : 0;
     if (!n) return 0;
-    O(11090, unit, 1, 0, 0, 0);
-    uintptr_t sk = O(10688, rd32(ctx, 16), 0, 0, 0, 0);
-    C(0x8EA80, game, unit, 1, (rd32(sk, 0xdc) >> 8) + rd32(game, 0xa8), 0, 0, 0);
+    O(11090, rd32(ctx, 4), 1, 0, 0, 0);                         // thunk 0xA4A2 (unit, 1)
+    uintptr_t sk = O(10688, rd32(ctx, 16), 0, 0, 0, 0);          // thunk 0xA520 (skill id)
+    C(0x8EA80, 0, rd32(ctx, 0), rd32(ctx, 4), 0, 0, 1, (rd32(sk, 0xdc) >> 8) + rd32(game, 0xa8));   // ECX = game, EDX = unit
     wr32(rec, 8, 2);
-    C(0x8EA80, game, unit, 7, rd32(game, 0xa8) + 0x1e, 0, 0, 0);
+    C(0x8EA80, 0, rd32(ctx, 0), rd32(ctx, 4), 0, 0, 7, rd32(game, 0xa8) + 0x1e);
     uintptr_t qs = P(rd32(P(rd32(st, 4)), 0x10f4));
     wr8(qs, 0x20, 9);
-    C(0xDFCC0, qs, 0, 0, 0, 0, 0, 0);
+    env->iter(0x359C0, rd32(st, 4), 0);   // 0xDFCC0 with EDI = game
     return 0;
 }
 

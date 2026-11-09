@@ -5752,7 +5752,7 @@ D2UnitStrc* __fastcall sub_6FC4B430(D2GameStrc* pGame, D2UnitStrc* pUnit, D2Unit
 }
 
 //D2Game.0x6FC4B520
-// 1.13c D2Game+0xD3450
+// 1.13c form (D2Game 0xD3450): src/core/d2game/d2g_d3450.cpp
 void __fastcall sub_6FC4B520(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem, int32_t nValue)
 {
     STATLIST_AddUnitStat(pItem, STAT_QUANTITY, nValue, 0);

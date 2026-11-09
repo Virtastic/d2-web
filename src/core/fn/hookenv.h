@@ -28,6 +28,24 @@ struct HookEnv {
         uint32_t* e = L + 1 + L[0]++ * 10; e[0] = rva | 0x20000000u; e[1] = isStk(edi) ? 0xB3000000u : edi;
         for (int i = 2; i < 10; i++) e[i] = 0;
     }
+    // REGS `X`: stack words 4.. of the call (n words from w, at most 9), one record (rva|0x50000000, w4..w12) straight after h(); words past n record 0.
+    void x(uint32_t rva, const uint32_t* w, uint32_t n) {
+        if (L[0] >= cap) abort();
+        uint32_t* e = L + 1 + L[0]++ * 10; e[0] = rva | 0x50000000u;
+        for (uint32_t j = 0; j < 9; j++) { uint32_t v = j < n ? w[j] : 0; e[1 + j] = isStk(v) ? 0xB3000000u : v; }
+    }
+    // REGS `Y`: the callee-saved inputs EBP and EDI at hook entry, one record (rva|0x60000000, ebp, edi, 0...) straight after h() (and after j()).
+    void y(uint32_t rva, uint32_t ebp, uint32_t edi) {
+        if (L[0] >= cap) abort();
+        uint32_t* e = L + 1 + L[0]++ * 10; e[0] = rva | 0x60000000u; e[1] = isStk(ebp) ? 0xB3000000u : ebp; e[2] = isStk(edi) ? 0xB3000000u : edi;
+        for (int j = 3; j < 10; j++) e[j] = 0;
+    }
+    // descriptor `tick N [N2...] log`: one GetTickCount call, logged where retail calls it (record 0xF7000000, value). Returns v.
+    uint32_t tick(uint32_t v) {
+        if (L[0] >= cap) abort();
+        uint32_t* e = L + 1 + L[0]++ * 10; e[0] = 0xF7000000u; e[1] = v; for (int j = 2; j < 10; j++) e[j] = 0;
+        return v;
+    }
     uint32_t* L; const uint32_t* sc;
     uint32_t rawRva[8]; int nraw = 0;   // descriptor `hooknostk RVA` (the capture does not stack-tag that hook's record)
     void noStk(uint32_t rva) { if (nraw < 8) rawRva[nraw++] = rva; }

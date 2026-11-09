@@ -81,7 +81,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2game_port_37f20(void* pDefender, void* pAttacker,
 // type record the pet type id at record+0x0A is handed to 0x96EA0. The table pointer and record
 // count are re-read every iteration, as retail does (0x96EA0 may reallocate player data).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_96f40(void* pGame, const D2GameBatch37F20Env* env)
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_96f40_batch(void* pGame, const D2GameBatch37F20Env* env)
 {
     int32_t i = 0;
     int32_t n = (int32_t)rd32(env->pDataTables, 0xBF0);

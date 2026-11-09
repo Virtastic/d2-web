@@ -98,7 +98,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DE0C0(uint32_t att, uint32_t g
         W<int32_t>(e, rec + 8, cur < v ? cur : v);
     }
     e->subDBA40(rec, att, game, tgt);
-    if (attType == 1 && (R<uint32_t>(e, rec + 4) & 1)) e->sub268E0(game, tgt, 0, 3);
+    if (tgtType == 1 && (R<uint32_t>(e, rec + 4) & 1)) e->sub268E0(game, tgt, 0, 3);   // 0x6FCFE21D: [esp+0x24] = target type
     e->subDB570(att, R<uint32_t>(e, rec + 0x48));
     int32_t d = R<int32_t>(e, rec + 0x4c);
     if (d > 0) {
@@ -138,7 +138,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DE0C0(uint32_t att, uint32_t g
         e->sub37030(att, game, 0xa, tgt, rec);
         e->sub37030(tgt, game, 9, att, rec);
     }
-    (void)tgtType;
 }
 
 // 1.13c D2Game+0xDEA00 : stack (game, unit, item), ret 0xc.

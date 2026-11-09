@@ -52,7 +52,7 @@ void (*g_terminate)(void) = nullptr;
 // 1.13c D2Game+0xF65CA
 int _ValidateExecute(const void* fn) { return g_badCode ? g_badCode(fn) == 0 : 1; }
 
-// 1.13c D2Game+0xF6524
+// 1.13c D2Game 0xF6524 host form; the retail-shaped port is src/core/d2game/d2g_f6524.cpp
 int sub_F6524(int* ep)
 {
     int* rec = (int*)(intptr_t)*ep;

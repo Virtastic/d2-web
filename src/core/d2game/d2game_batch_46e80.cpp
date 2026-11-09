@@ -96,67 +96,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DF9C0(int32_t param1, void* param2)
     wr32(param2, (uint32_t)(0x90 + param1 * 4), (uint32_t)v);
 }
 
-// Stamp loop over at most in_EAX nodes: ordinal 10331(param_1) first, then per node subEEF10 fills the
-// frame query; a non-null type-1 node has its +0x28 record's +0x2C set to the caller's stack value at
-// retaddr+0xC, +0x30 to 1 and +0x28 to ESI (unaff_ESI), followed by sub20CF0. The return is 0 when
-// param_1 is null, else 1 as soon as any node was seen. in_EAX, ESI and the caller's retaddr+0xC are
-// explicit here.
-// 1.13c D2Game+0xEF7D0
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_EF7D0(void* param1, int32_t eaxCount, uint32_t esiValue,
-                                                 uint32_t stackArg0xC,
-                                                 const D2GameBatch46E80Env* env)
-{
-    if (param1 == nullptr) return 0;
-
-    env->ordinal10331(param1);
-    int32_t result = 0;                    // retail's uStack_34; unset when the loop never runs
-    int32_t query = 0;                     // the 0xFFFFFFD4 frame slot passed to subEEF10
-    for (; eaxCount > 0; --eaxCount) {
-        void* node = env->subEEF10(&query);
-        if (node != nullptr) {
-            result = 1;
-            if (rd32(node, 0) == 1) {
-                void* rec = rdptr(node, 0x14);
-                const uint32_t link = rec != nullptr ? rd32(rec, 0x28) : 0;
-                if (link != 0) {           // retail writes through a null link unchecked
-                    wr32(link, 0x2C, stackArg0xC);
-                    wr32(link, 0x30, 1);
-                    wr32(link, 0x28, esiValue);
-                }
-            }
-            env->sub20CF0();
-        }
-    }
-    return (uint32_t)result;
-}
-
-// Flag-setting sibling: one subEEF10 query; for a non-null type-1 node, its +0x28 record's +0x08 byte
-// gets bit 1 when the stack argument at +0x10 is non-zero, always bit 0, and +0x2C = node[3], +0x30 =
-// 1, +0x28 = ESI. in_stack_00000010 and unaff_ESI are explicit.
-// 1.13c D2Game+0xEF8B0
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_EF8B0(uint32_t esiValue, int32_t stack10,
-                                             const D2GameBatch46E80Env* env)
-{
-    int32_t query = 0;                     // the 0xFFFFFFD8 frame slot
-    void* node = env->subEEF10(&query);
-    if (node == nullptr) return;
-
-    const uint32_t id = rd32(node, 0xC);
-    if (rd32(node, 0) != 1) return;
-
-    void* rec = rdptr(node, 0x14);
-    const uint32_t link = rec != nullptr ? rd32(rec, 0x28) : 0;
-    if (link == 0) return;                 // retail writes through a null link unchecked
-    uint8_t flags = rd8((const void*)(uintptr_t)link, 8);
-    if (stack10 != 0) flags |= 2;
-    flags |= 1;
-    ((uint8_t*)(uintptr_t)link)[8] = flags;
-    wr32(link, 0x2C, id);
-    wr32(link, 0x30, 1);
-    wr32(link, 0x28, esiValue);
-}
+// 0xEF7D0 and 0xEF8B0 moved to src/core/d2game/d2game_ef7d0.cpp and d2game_ef8b0.cpp.
 
 // 0x21490 (callback dispatch) moved to src/core/d2game/d2game_21490.cpp.
 

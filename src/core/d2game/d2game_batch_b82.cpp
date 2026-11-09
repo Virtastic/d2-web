@@ -101,7 +101,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2game_8b3d0_send(const void* src, void (*s
 }
 
 // 1.13c D2Game+0x98250  (EAX = unit)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_98250(const uint8_t* game, uintptr_t unit, const D2GameB82Env* e)
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_98250_batch(const uint8_t* game, uintptr_t unit, const D2GameB82Env* e)
 {
     uintptr_t pd = e->ord10920(unit);
     const uint8_t* p1 = rdp((void*)pd, 0x44);

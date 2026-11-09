@@ -249,7 +249,7 @@ EMSCRIPTEN_KEEPALIVE void d2game_f3410_impl(uint32_t ebxUnit, uint32_t client,
 // ESI = unit, EDI = the record filled by 0x778A0. Applies each side's skill through 0x6FCC2100
 // when the skill exists, differs from the current one, and its use state is neither 2 nor 7.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_77b20(uint32_t esiUnit, uint32_t ediRec,
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_77b20_batch(uint32_t esiUnit, uint32_t ediRec,
                                              const D2GameBatch8DB00Env* env)
 {
     const void* rec = (void*)(uintptr_t)ediRec;
