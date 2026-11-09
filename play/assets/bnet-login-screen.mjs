@@ -259,6 +259,13 @@ export function wrapSpaces(text, width, measure) {
     for (const word of piece.split(' ')) {
       const next = line === null ? word : `${line} ${word}`;
       if (line !== null && line !== '' && measure(next) > width) { lines.push(line); line = word; } else line = next;
+      // D2Win+0x99F0 cuts at the last space seen, and with none (one word wider than the box, a URL) at the character
+      // before the prefix reaches the width; the rest goes through the same rule again.
+      while (line.length > 1 && measure(line) > width) {
+        let k = 1;
+        while (k < line.length - 1 && measure(line.slice(0, k + 1)) < width) k++;
+        lines.push(line.slice(0, k)); line = line.slice(k);
+      }
     }
     if (line) lines.push(line);
   }
