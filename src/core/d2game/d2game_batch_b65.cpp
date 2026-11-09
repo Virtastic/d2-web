@@ -140,8 +140,17 @@ void D2GAME_D1E10(I ebx, uint32_t* esi, I p1)
     esi[0x13] = w;
 }
 
-// 1.13c D2Game+0xD2540  (hidden: EAX=slot sel)
-void D2GAME_D2540(uint32_t eax, I p1)
+// 1.13c D2Game+0xD2540  (hidden: EAX=slot sel; stack game, ret 4). The callees ride in an env of seams so the replay records their calls.
+struct D2GameD2540Env {
+    I (*find)(I id, I slot);                      // #10455
+    void (*place)(I id, I item, I slot);          // #10655
+    void (*setFlag)(I item, I flag, I on);        // #10977
+    I (*check)(I item, I a, I line, const char* file);   // #10202
+    void (*notify)(I game, I on);                 // #10201 (retail passes the game pointer, the stack argument)
+    void (*add)(I id, I item);                    // #10050
+    void (*done)(I id, I slot);                   // #10267
+};
+extern "C" void d2_fn_d2game_D2540(uint32_t eax, I p1, const D2GameD2540Env* e)
 {
     uint32_t u2 = eax & 3;
     I u1 = (I)U32(p1, 0x60);
@@ -149,16 +158,16 @@ void D2GAME_D2540(uint32_t eax, I p1)
     if (u2 == 0) u2 = 0; else if (2 < u2) u2 = 3;
     uint32_t u5 = u2;
     do {
-        I it = Ord10455(u1, u2);
+        I it = e->find(u1, u2);
         if (it != 0) {
             if (n != k) {
-                Ord10655(u1, it, u5);
-                Ord10977(it, 0x400, 1);
-                Ord10977(it, 1, 1);
-                if (Ord10202(it, 0x4000, 0x1314, kItemMode) != 0) Ord10977(it, 0x4000, 0);
-                Ord10201(it, 1);
-                Ord10050(u1, it);
-                Ord10267(u1, u2);
+                e->place(u1, it, u5);
+                e->setFlag(it, 0x400, 1);
+                e->setFlag(it, 1, 1);
+                if (e->check(it, 0x4000, 0x1314, kItemMode) != 0) e->setFlag(it, 0x4000, 0);
+                e->notify(p1, 1);
+                e->add(u1, it);
+                e->done(u1, u2);
             }
             n++;
             u5 += 4;
@@ -166,6 +175,18 @@ void D2GAME_D2540(uint32_t eax, I p1)
         k++;
         u2 += 4;
     } while (k < 4);
+}
+void D2GAME_D2540(uint32_t eax, I p1)
+{
+    D2GameD2540Env e{};
+    e.find = [](I a, I b) { return Ord10455(a, b); };
+    e.place = [](I a, I b, I c) { Ord10655(a, b, c); };
+    e.setFlag = [](I a, I b, I c) { Ord10977(a, b, c); };
+    e.check = [](I a, I b, I c, const char* d) { return Ord10202(a, b, c, d); };
+    e.notify = [](I a, I b) { Ord10201(a, b); };
+    e.add = [](I a, I b) { Ord10050(a, b); };
+    e.done = [](I a, I b) { Ord10267(a, b); };
+    d2_fn_d2game_D2540(eax, p1, &e);
 }
 
 // 1.13c D2Game+0xDAB90  (fastcall; hidden: EAX=attacker, EBX=target, EDI=0x70-byte src)

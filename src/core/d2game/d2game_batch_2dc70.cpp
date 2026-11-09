@@ -235,6 +235,8 @@ EMSCRIPTEN_KEEPALIVE void d2_game_4a780(uint32_t clientId, int32_t sentTick, int
 
 // FN-probe accessor: the module's client table and its init flag (0x6FD307B8 / 0x6FD31C18).
 extern "C" void d2_game_4a780_state(void*** list, uint32_t** init) { *list = g_clientList; *init = &g_clientListInitialized; }
+// FN-probe accessor: the module's game GUID table (0x6FD30C08) for the CAD60 / 2ABD0 vectors.
+extern "C" int32_t* d2_game_cad60_guids(void) { return g_gameGuids; }
 
 // CCmd 0x68 reject: the five-byte 0xB4 packet lives in d2game_8c4b0.cpp (retail passes the payload dword in EAX; this caller leaves it 0).
 void D2Game_8C4B0_PacketSendB4(void (*)(uint32_t, uint32_t, const void*, uint32_t), uint32_t, uint32_t);
