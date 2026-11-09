@@ -909,7 +909,7 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
         x: record[4] | (record[5] << 8), y: record[6] | (record[7] << 8),
         unitType: record[8], value: record[9] };
     },
-    d2gsClientPlayerReset: () => { weaponSet = 0; return call('d2_realm_client_player_reset', null, [], []); },
+    d2gsClientPlayerReset: () => { weaponSet = 0; hotkeys.forEach((_, i) => { hotkeys[i] = { skill: -1, left: false, owner: 0xffffffff }; }); return call('d2_realm_client_player_reset', null, [], []); },
     // Server 0x97 (1 byte): flips the weapon-set flag when the game is an expansion game. The flag starts at 0.
     d2gsApplyWeaponSwitch: (packet, expansion) => {
       if (!(packet instanceof Uint8Array) || packet.length < 1 || packet[0] !== 0x97) throw new RangeError('not a D2GS weapon-set packet');
