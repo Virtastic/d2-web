@@ -83,7 +83,7 @@ struct Fn93450{
  void (*s42440)();                               // +0x42440
 };
 static P ptr(U v){return reinterpret_cast<P>(static_cast<uintptr_t>(v));}
-// 1.13c D2CLIENT+0x93450
+// earlier seam sketch of the item tooltip builder; the port is src/core/d2client/d2client_93450.cpp
 void sub_93450(P arg1,I arg2,const G93450&g,const Fn93450&f){
  static W b60[0x400],ba60[0x400],b860[0x100],b1460[0x100],b2060[0x100],b1260[0x100],b3e60[0x400],b3060[0x400],
   b4660[0x1000],b3860[0x200],b2260[0x100],b1e60[0x100],b2660[0x100],b2a60[0x100],b2e60[0x100],b2860[0x100],
