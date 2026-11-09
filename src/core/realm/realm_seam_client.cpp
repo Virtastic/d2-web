@@ -5,9 +5,12 @@
 //
 // Confirmed: the rect fields (nPosX/nPosY/nWidth/nHeight, written by DRLG_SetLevelPositionAndSize)
 // and the picked file (pPreset->nDirection, written by DRLG_InitLevel / GenerateLevel).
-// GUESS: the seam edge geometry is the single-player derivation (monspawn_check.cpp
-// d2_session_seam_edges); the retail D2Client decompile of its automap seam path is not yet
-// cross-checked against it.
+// Seam edges: the near-room links (ppRoomsNear) are the DRLG's own data, but the segment geometry
+// below is NOT a retail routine. The retail client has no function that builds level-seam edges:
+// its automap reveal walks the hero room's near list and skips every room whose level differs from
+// the hero's, so cross-level rooms never reach any geometry code. The segments are this project's
+// own presentation helper (shared-boundary of adjacent rooms of two levels), identical to the
+// single-player derivation; nothing in the retail decompile can confirm or correct them.
 
 #include <algorithm>
 #include <cstdint>

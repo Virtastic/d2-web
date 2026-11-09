@@ -38,6 +38,9 @@ export const packets = Object.freeze({
   npcChatStart: (type, guid) => unit(0x2f, type, guid),             // 9
   npcChatEnd: (type, guid) => unit(0x30, type, guid),               // 9
   npcAction: (action, npcGuid, itemGuid = 0) => make(0x38, le32(action), le32(npcGuid), le32(itemGuid)), // 13
+  addStat: (stat, count = 1) => make(0x3a, le16((stat & 255) | (((count - 1) & 255) << 8))),   // 3
+  addSkill: (skill) => make(0x3b, le16(skill)),                     // 3
+  respawn: () => make(0x41),                                        // 1
   selectSkill: (skill, left, ownerGuid = 0xffffffff) => make(0x3c, le32(((left ? 0x80000000 : 0) | (skill & 0x7fff)) >>> 0), le32(ownerGuid)), // 9
   enterPortal: (portalGuid, levelId) => make(0x45, le32(portalGuid), le32(levelId)),    // 9
   waypoint: (waypointGuid, levelId) => make(0x49, le32(waypointGuid), le32(levelId)),   // 9
@@ -68,17 +71,29 @@ export function createSendGate(transmit) {
 
 const MONSTER_DEATH = 0, MONSTER_DEAD = 12;
 const near = (dx, dy, w, up, down) => Math.abs(dx) <= w && dy >= -up && dy <= down;
+// Objects whose use depends on what the cursor holds: the Compelling Orb wants the Khalim's Will flail,
+// the Hell Forge in its open state wants the Hellforge Hammer. Without it the click sends nothing.
+const COMPELLING_ORB = 404, HELL_FORGE = 376;
+const CODE_QF2 = 0x20326671, CODE_HFH = 0x20686668;
 
 /**
  * Turn the player's input into packets.
  *   transmit(bytes)      -> false when the connection is closed
  *   scene()              -> { ready, player:{x,y}, monsters:[{guid,classId,mode,x,y,anchorX,anchorY,drawn}], objects, items,
  *                             isNpc(classId), hoverBox(dx,dy), toScreen(wx,wy) -> {x,y} in pointer space, pointerWorld(px,py),
- *                             run, selected:{left,right}, cursorId }
- *   move(x, y, run)      -> starts the local player's own route. The game server sends the walk/run
- *                           broadcast only to the OTHER clients, so the owner moves on its click, as retail's does.
+ *                             run, selected:{left,right}, cursorId, cursorCode() -> the held item's 4-byte code }
+ * The engine hooks below each answer the local player's own prediction of an action: 1 accepted, 0 refused
+ * (the packet is not sent, as the client sends only what it could start itself), -1 or absent unknown (sent).
+ *   move(x, y, run)               -> starts the local route to a spot. The game server sends the walk/run
+ *                                    broadcast only to the OTHER clients, so the owner moves on its click.
+ *   approachUnit(type, guid, run) -> starts the local route to a unit (falls back to move() to its spot)
+ *   reach(type, guid)             -> true when the unit is close enough to use (falls back to a tile distance)
+ *   actionDone()                  -> true once the local player has finished its current action: a waiting
+ *                                    interaction then re-checks its reach and re-approaches if short
+ *   castAt(x, y), castOnUnit(type, guid) -> the right-hand skill's local start
  */
-export function createRealmInput({ transmit, scene, now = () => 0, move = null }) {
+export function createRealmInput({ transmit, scene, now = () => 0, move = null, approachUnit = null, reach = null,
+  actionDone = null, castAt = null, castOnUnit = null, onTalk = null, questFlags = null }) {
   const gate = createSendGate(transmit);
   const evidence = { attempts: 0, sent: 0, last: null };
   function emit(bytes, what) {
@@ -104,58 +119,89 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null }
     return { kind: 'ground' };
   }
   const clamp16 = (v) => Math.max(0, Math.min(0xffff, v | 0));
-  // Five tiles each way is inside the server's talk range (fewer than 9 by its size-aware distance) from every side.
-  const talkRange = (s, u) => Math.max(Math.abs(u.x - s.player.x), Math.abs(u.y - s.player.y)) <= 5;
-  let pendingTalk = null;
-  function approach(u, run) { evidence.localMove = move ? move(clamp16(u.x), clamp16(u.y), Boolean(run)) : null; }
+  // Without the engine's reach test: five tiles each way is inside the server's talk range (fewer than 9 by
+  // its size-aware distance) from every side; an item or object is used from two tiles.
+  const inReach = (s, type, u) => {
+    if (reach) { const r = reach(type, idOf(type, u)); if (r != null && r !== -1) return Boolean(r); }
+    const d = Math.max(Math.abs(u.x - s.player.x), Math.abs(u.y - s.player.y));
+    return d <= (type === UNIT.MONSTER ? 5 : 2);
+  };
+  const idOf = (type, u) => (type === UNIT.MONSTER ? u.guid : u.id);
+  const find = (s, type, guid) => (type === UNIT.MONSTER ? s.monsters.find((m) => m.guid === guid && m.mode !== MONSTER_DEATH && m.mode !== MONSTER_DEAD)
+    : type === UNIT.OBJECT ? s.objects.find((o) => o.id === guid) : type === UNIT.ITEM ? s.items.find((i) => i.id === guid && i.mode === 3) : null);
+  // The local start comes first: the client sends an action only when its own player could start it.
+  const predicted = (result) => { evidence.localMove = result; return result !== 0; };
+  const startRoute = (x, y, run) => predicted(move ? move(x, y, Boolean(run)) : null);
+
+  // The interaction waiting on the walk: the click stores it, and it is used on arrival, never on the click.
+  let pending = null;
+  // Returns null when the local start refused the route (nothing sent, nothing waits), else whether it went out.
+  function approach(s, type, u) {
+    const run = Boolean(s.run), guid = idOf(type, u);
+    if (!predicted(approachUnit ? approachUnit(type, guid, run) : move ? move(clamp16(u.x), clamp16(u.y), run) : null)) return null;
+    return emit(run ? packets.runToUnit(type, guid) : packets.walkToUnit(type, guid), 'approach');
+  }
+  // The packet that uses a unit once the player has reached it.
+  function use(s, type, u) {
+    const guid = idOf(type, u);
+    if (type === UNIT.ITEM) return emit(packets.pickUp(UNIT.ITEM, guid), 'pickup');
+    if (type === UNIT.MONSTER) {
+      const sent = emit(packets.interact(UNIT.MONSTER, guid), 'talk');
+      if (sent && onTalk) onTalk(guid);
+      return sent;
+    }
+    if (u.selectable !== false && u.mode === 0 && u.classId === COMPELLING_ORB && (s.cursorCode?.() >>> 0) !== CODE_QF2) return false;
+    if (u.selectable !== false && u.mode === 2 && u.classId === HELL_FORGE && (s.cursorCode?.() >>> 0) !== CODE_HFH) return false;
+    return emit(packets.interact(UNIT.OBJECT, guid), 'object');
+  }
+  // In reach, use it now; otherwise walk to it and keep it waiting.
+  function arrive(s, reapproach) {
+    const u = find(s, pending.type, pending.guid);
+    if (!u) { pending = null; return null; }
+    if (inReach(s, pending.type, u)) { const { type } = pending; pending = null; return use(s, type, u); }
+    if (!reapproach) return null;
+    const sent = approach(s, pending.type, u);
+    if (sent === null) { pending = null; return false; }
+    return sent;
+  }
+  function interactWith(s, type, u) {
+    pending = { type, guid: idOf(type, u) };
+    return arrive(s, true);
+  }
 
   return {
     evidence,
+    get pending() { return pending ? { ...pending } : null; },
     pick: (px, py) => { const s = open(); return s ? pick(s, px, py) : null; },
     /** The left button on the world: act on what is under it, otherwise walk or run there. */
     leftClick(px, py, { held = false } = {}) {
       const s = open(); if (!s) return null;
       const hit = pick(s, px, py);
       const world = s.pointerWorld(px, py);
-      if (hit.kind === 'monster') pendingTalk = null;
+      if (hit.kind === 'monster') pending = null;
       if (hit.kind === 'monster') return emit(packets.leftSkillOnUnit(UNIT.MONSTER, hit.unit.guid, held), 'left-skill-unit') && hit;
       if (held && hit.kind !== 'ground') return hit;               // a held button does not repeat a pickup or a talk
-      pendingTalk = null;
-      if (hit.kind === 'npc') {
-        // The server starts a talk only from fewer than 9 tiles and ignores one from farther: a far
-        // person is approached first (run/walk to the unit) and the talk goes out on arrival (tick()).
-        if (talkRange(s, hit.unit)) return emit(packets.interact(UNIT.MONSTER, hit.unit.guid), 'talk') && hit;
-        if (!emit(s.run ? packets.runToUnit(UNIT.MONSTER, hit.unit.guid) : packets.walkToUnit(UNIT.MONSTER, hit.unit.guid), 'approach')) return false;
-        pendingTalk = hit.unit.guid;
-        approach(hit.unit, s.run);
-        return hit;
-      }
-      // Items and objects: the server walks the player there itself, but tells only the other clients.
-      if (hit.kind === 'item') { if (!emit(packets.pickUp(UNIT.ITEM, hit.unit.id), 'pickup')) return false; approach(hit.unit, s.run); return hit; }
-      if (hit.kind === 'object') { if (!emit(packets.interact(UNIT.OBJECT, hit.unit.id), 'object')) return false; approach(hit.unit, s.run); return hit; }
+      pending = null;
+      const type = hit.kind === 'npc' ? UNIT.MONSTER : hit.kind === 'item' ? UNIT.ITEM : hit.kind === 'object' ? UNIT.OBJECT : null;
+      if (type != null) return interactWith(s, type, hit.unit) === false ? false : hit;
       const x = clamp16(world.x), y = clamp16(world.y);
-      if (!emit(s.run ? packets.runTo(x, y) : packets.walkTo(x, y), s.run ? 'run' : 'walk')) return false;
-      evidence.localMove = move ? move(x, y, Boolean(s.run)) : null;
-      return hit;
+      if (!startRoute(x, y, s.run)) return false;
+      return emit(s.run ? packets.runTo(x, y) : packets.walkTo(x, y), s.run ? 'run' : 'walk') && hit;
     },
-    /** Once per frame: a talk waiting on the approach goes out once the person is in range. */
+    /** Once per frame: an interaction waiting on the walk is used once the unit is in reach. */
     tick() {
-      if (pendingTalk == null) return null;
+      if (!pending) return null;
       const s = open(); if (!s) return null;
-      const u = s.monsters.find((m) => m.guid === pendingTalk);
-      if (!u || u.mode === MONSTER_DEATH || u.mode === MONSTER_DEAD) { pendingTalk = null; return null; }
-      if (!talkRange(s, u)) return null;
-      pendingTalk = null;
-      return emit(packets.interact(UNIT.MONSTER, u.guid), 'talk');
+      if (actionDone && !actionDone()) return null;
+      return arrive(s, Boolean(actionDone));
     },
     /** Arrow keys: walk (or run) a step offset from where the player stands. */
     step(dx, dy) {
       const s = open(); if (!s) return null;
-      pendingTalk = null;
+      pending = null;
       const x = clamp16(s.player.x + dx), y = clamp16(s.player.y + dy);
-      if (!emit(s.run ? packets.runTo(x, y) : packets.walkTo(x, y), s.run ? 'run' : 'walk')) return false;
-      evidence.localMove = move ? move(x, y, Boolean(s.run)) : null;
-      return true;
+      if (!startRoute(x, y, s.run)) return false;
+      return emit(s.run ? packets.runTo(x, y) : packets.walkTo(x, y), s.run ? 'run' : 'walk');
     },
     /** The interact key: talk to the nearest person, else operate the nearest object, within 7 tiles. */
     interactNearest() {
@@ -163,24 +209,36 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null }
       const d = (u) => Math.max(Math.abs(u.x - s.player.x), Math.abs(u.y - s.player.y));
       const npc = s.monsters.filter((m) => s.isNpc(m.classId) && m.mode !== MONSTER_DEATH && m.mode !== MONSTER_DEAD && d(m) <= 7)
         .sort((a, b) => d(a) - d(b) || a.guid - b.guid)[0];
-      if (npc) {
-        pendingTalk = null;
-        if (talkRange(s, npc)) return emit(packets.interact(UNIT.MONSTER, npc.guid), 'talk');
-        if (!emit(s.run ? packets.runToUnit(UNIT.MONSTER, npc.guid) : packets.walkToUnit(UNIT.MONSTER, npc.guid), 'approach')) return false;
-        pendingTalk = npc.guid; approach(npc, s.run); return true;
-      }
+      if (npc) return interactWith(s, UNIT.MONSTER, npc) !== false;
       const object = s.objects.filter((o) => o.selectable !== false && d(o) <= 7).sort((a, b) => d(a) - d(b) || a.id - b.id)[0];
       if (!object) return false;
-      if (!emit(packets.interact(UNIT.OBJECT, object.id), 'object')) return false;
-      approach(object, s.run); return true;
+      return interactWith(s, UNIT.OBJECT, object) !== false;
     },
     /** The right button on the world: the right-hand skill at the unit under it, otherwise at the ground. */
     rightClick(px, py, { held = false } = {}) {
       const s = open(); if (!s) return null;
       const hit = pick(s, px, py);
-      if (hit.kind === 'monster' || hit.kind === 'npc') return emit(packets.rightSkillOnUnit(UNIT.MONSTER, hit.unit.guid, held), 'right-skill-unit') && hit;
-      const world = s.pointerWorld(px, py);
-      return emit(packets.rightSkillAt(clamp16(world.x), clamp16(world.y), held), 'right-skill-ground') && hit;
+      if (hit.kind === 'monster' || hit.kind === 'npc') {
+        if (!predicted(castOnUnit ? castOnUnit(UNIT.MONSTER, hit.unit.guid) : null)) return false;
+        return emit(packets.rightSkillOnUnit(UNIT.MONSTER, hit.unit.guid, held), 'right-skill-unit') && hit;
+      }
+      const world = s.pointerWorld(px, py), x = clamp16(world.x), y = clamp16(world.y);
+      if (!predicted(castAt ? castAt(x, y) : null)) return false;
+      return emit(packets.rightSkillAt(x, y, held), 'right-skill-ground') && hit;
+    },
+    /**
+     * The server's answer to a talk (its 0x28 packet: type, guid, and a third field): the client opens the
+     * conversation with 0x2F for that unit, or, when it no longer knows the unit, ends it with 0x30.
+     */
+    npcInteraction(bytes) {
+      const type = bytes[1], guid = (bytes[2] | (bytes[3] << 8) | (bytes[4] << 16) | (bytes[5] << 24)) >>> 0, third = bytes[6];
+      // The 96 quest-flag bytes at +7 replace the client's quest record: always for type 6, otherwise only when the unit is known.
+      const flags = () => { if (questFlags && bytes.length >= 103) questFlags(bytes.subarray(7, 103)); };
+      if (type === 6) { flags(); return null; }
+      const s = open();
+      if (!s || !find(s, type, guid)) { pending = null; return emit(make(0x30, le32(third), le32(guid)), 'npc-end'); }
+      flags();
+      return emit(packets.npcChatStart(type, guid), 'npc-start');
     },
     /** Belt key 1-4: the bottom item of that belt column. */
     useBelt(column) {
@@ -190,7 +248,16 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null }
       return slot ? emit(packets.useBeltItem(slot.id), 'belt') : false;
     },
     /** The skill popup / hotkey choice. */
-    selectSkill: (skill, left) => emit(packets.selectSkill(skill, left), 'select-skill'),
+    selectSkill: (skill, left, owner = 0xffffffff) => emit(packets.selectSkill(skill, left, owner), 'select-skill'),
+    /** An F-key's select-skill packet, composed from the server's hotkey table (d2gsHotkeySelect); null when the key is unbound. */
+    hotkey: (bytes) => (bytes ? emit(bytes, 'hotkey-select') : false),
+    /** The character screen's +: `count` points (1..100) into a stat, one packet; the server spends them or refuses. */
+    addStat: (stat, count = 1) => (Number.isInteger(stat) && stat >= 0 && stat < 16 && count >= 1 && count <= 100
+      ? emit(packets.addStat(stat, count), 'add-stat') : false),
+    /** The skill tree's +: one point into a skill. */
+    addSkill: (skill) => (Number.isInteger(skill) && skill >= 0 && skill <= 0xffff ? emit(packets.addSkill(skill), 'add-skill') : false),
+    /** The death screen's continue. */
+    respawn: () => emit(packets.respawn(), 'respawn'),
     useItem(guid) { const s = open(); return s ? emit(packets.useItem(guid, s.player.x, s.player.y), 'use-item') : false; },
     /** Inventory panel: lift a carried item (0x19) or a worn one (0x1C). */
     lift: (guid) => emit(packets.fromGrid(guid), 'lift'),

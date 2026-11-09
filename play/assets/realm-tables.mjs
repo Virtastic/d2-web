@@ -52,8 +52,16 @@ export function createItemTable(read) {
 /** Objects.txt: class id (its Id column) -> the two-letter art token. */
 /** Levels.txt: the Rain byte of a level (the one the single-player engine's weather reads), by level id. */
 export function createLevelTable(read) {
-  let rain = null;
+  let rain = null, types = null;
   return {
+    /** Levels.txt LevelType: the level type the automap's AutoMap.txt rows are chosen by; -1 for an unknown level. */
+    levelType(levelId) {
+      if (!types) {
+        types = new Map();
+        for (const row of rows(read('data\\global\\excel\\levels.txt'))) if (row.id !== '') types.set(num(row.id, -1), num(row.leveltype, -1));
+      }
+      return types.has(levelId) ? types.get(levelId) : -1;
+    },
     rain(levelId) {
       if (!rain) {
         rain = new Map();

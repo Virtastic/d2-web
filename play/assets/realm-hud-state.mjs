@@ -3,6 +3,8 @@
 // Every answer is null until the server has sent the data behind it, so a panel with nothing to show
 // stays closed instead of drawing a value nobody sent.
 //
+//   0x19                 gold added to the player's carried gold (byte)
+//   0x1a / 0x1b          experience added (byte / word); 0x1c sets experience (dword)
 //   0x1d / 0x1e / 0x1f   a stat of the player (byte / word / dword value)
 //   0x20                 a stat of a unit (taken for the player's own guid)
 //   0x29                 the player's quest record (96 bytes = 48 words)
@@ -12,7 +14,7 @@
 // d2gsSelectedSkills); this module shapes them with Skills.txt into the tree's records.
 
 export const STAT = Object.freeze({ strength: 0, energy: 1, dexterity: 2, vitality: 3, statPoints: 4, skillPoints: 5,
-  level: 12, experience: 13, attackRating: 19, minDamage: 21, maxDamage: 22, defense: 31,
+  level: 12, experience: 13, gold: 14, stashGold: 15, attackRating: 19, minDamage: 21, maxDamage: 22, defense: 31,
   fireRes: 39, lightRes: 41, coldRes: 43, poisonRes: 45 });
 
 const u16 = (p, at) => p[at] | (p[at + 1] << 8);
@@ -45,6 +47,10 @@ export function createRealmHud({ experience, waypoints, skills }, { levelName = 
   function handle(p) {
     switch (p[0]) {
       case 0x03: menu = null; break;
+      case 0x19: if (p.length >= 2) stats.set(STAT.gold, ((stats.get(STAT.gold) ?? 0) + p[1]) >>> 0); break;
+      case 0x1a: if (p.length >= 2) stats.set(STAT.experience, ((stats.get(STAT.experience) ?? 0) + p[1]) >>> 0); break;
+      case 0x1b: if (p.length >= 3) stats.set(STAT.experience, ((stats.get(STAT.experience) ?? 0) + u16(p, 1)) >>> 0); break;
+      case 0x1c: if (p.length >= 5) stats.set(STAT.experience, u32(p, 1)); break;
       case 0x1d: stats.set(p[1], p[2]); break;
       case 0x1e: stats.set(p[1], u16(p, 2)); break;
       case 0x1f: stats.set(p[1], u32(p, 2)); break;
@@ -101,14 +107,24 @@ export function createRealmHud({ experience, waypoints, skills }, { levelName = 
     /** The player's 48 quest words, or null until the server has sent the record. */
     get questWords() { return quests ? Uint16Array.from(quests) : null; },
     /**
-     * The class skill tree: Skills.txt rows of the class with the level the server sent (`levels`: skill id -> level,
-     * from the wasm client's skill list). Null before the server has sent any skill. Learning is the server's
-     * decision, so `canLearn` stays false and no mana line is drawn.
+     * The class skill tree: Skills.txt rows of the class with the level the server sent (`levels`: a map from skill id
+     * to level, from the wasm client's skill list). Null before the server has sent any skill. `canLearn` is the
+     * conjunction the server's 0x3B handler tests (in game, level, prerequisites, attributes, the level cap, points) so
+     * the + shows only where the server will accept; the server still decides. A point cost the table gives as a
+     * formula cannot be worked out here, so such a skill is not offered. No mana line is drawn.
      */
     classSkills(playerClass, levels) {
       if (!levels || levels.size === 0) return null;
-      return skills.classSkills(playerClass).map((row) => ({ ...row, baseLevel: levels.get(row.id) ?? 0,
-        canLearn: false, manaLine: false, manaCost: 0 }));
+      const s = (id) => stats.get(id) ?? 0, level = s(STAT.level);
+      return skills.classSkills(playerClass).map((row) => {
+        const baseLevel = levels.get(row.id) ?? 0;
+        const canLearn = Boolean(row.inGame) && row.requiredLevel + baseLevel <= level
+          && (row.reqSkills ?? []).every((id) => (levels.get(id) ?? 0) > 0)
+          && (row.reqStr ?? 0) <= s(STAT.strength) && (row.reqDex ?? 0) <= s(STAT.dexterity)
+          && (row.reqInt ?? 0) <= s(STAT.energy) && (row.reqVit ?? 0) <= s(STAT.vitality)
+          && baseLevel < (row.maxLevel ?? 20) && !row.costFormula && s(STAT.skillPoints) >= 1;
+        return { ...row, baseLevel, canLearn, manaLine: false, manaCost: 0 };
+      });
     },
     /** The waypoint menu the server opened (consumed once), or null. */
     takeMenu() { const m = menu; menu = null; return m ? { id: m.id } : null; },

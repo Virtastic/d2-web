@@ -161,6 +161,8 @@ wasm-build/*
 !wasm-build/version-engine.sh
 test/*
 !test/input-touch-name.test.mjs
+!test/realm-world.test.mjs
+!test/realm-hud-state.test.mjs
 !test/door-finger.test.mjs
 !test/upload-modal.test.mjs
 !test/input-touch-coverage.test.mjs
@@ -315,6 +317,7 @@ test/fixtures/bnet-tos-*.txt
 !test/realm-player-reassign-fade.test.mjs
 !test/realm-protodef.test.mjs
 !test/realm-selected-skills.test.mjs
+!test/realm-hotkeys.test.mjs
 !test/render-cache.test.mjs
 !test/render-wire.test.mjs
 !test/render-worker-hud.test.mjs

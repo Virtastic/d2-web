@@ -59,12 +59,14 @@ const SKILL_CLASS_CODE = ['ama', 'sor', 'nec', 'pal', 'bar', 'dru', 'ass'];
  * strings. `langIndex(key)` is the string table's key to .tbl index (d2_lang_index).
  */
 export function createSkillTable(read, langIndex) {
-  let descs = null, skills = null;
+  let descs = null, skills = null, ids = null;
   function load() {
     if (skills) return;
     descs = new Map();
     for (const row of rows(read('data\\global\\excel\\skilldesc.txt'))) if (row.skilldesc) descs.set(row.skilldesc, row);
-    skills = rows(read('data\\global\\excel\\skills.txt')).filter((row) => row.id !== '' && row.skilldesc && descs.has(row.skilldesc));
+    const all = rows(read('data\\global\\excel\\skills.txt')).filter((row) => row.id !== '');
+    ids = new Map(all.map((row) => [row.skill.toLowerCase(), num(row.id)]));
+    skills = all.filter((row) => row.skilldesc && descs.has(row.skilldesc));
   }
   return {
     classSkills(playerClass) {
@@ -76,7 +78,12 @@ export function createSkillTable(read, langIndex) {
         if (page < 1 || page > 3) continue;
         out.push({ id: num(row.id), page, row: num(d.skillrow), column: num(d.skillcolumn), requiredLevel: num(row.reqlevel, 1),
           iconCel: num(d.iconcel), nameStr: langIndex(d['str name']) & 0xffff, descStr: langIndex(d['str long']) & 0xffff,
-          manaStr: langIndex(d['str mana']) & 0xffff });
+          manaStr: langIndex(d['str mana']) & 0xffff,
+          // What the server's 0x3B handler tests before it spends a point (Skills.txt): the skill is in game, the
+          // prerequisite skills (by id), the attributes, the level cap (0 means 20) and the points one level costs.
+          inGame: num(row.ingame) === 1, reqSkills: [row.reqskill1, row.reqskill2, row.reqskill3].filter((n) => n && ids.has(n.toLowerCase())).map((n) => ids.get(n.toLowerCase())),
+          reqStr: num(row.reqstr), reqDex: num(row.reqdex), reqInt: num(row.reqint), reqVit: num(row.reqvit),
+          maxLevel: num(row.maxlvl) > 0 ? num(row.maxlvl) : 20, costFormula: row.skpoints !== '' });
       }
       return out;
     },

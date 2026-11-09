@@ -13,6 +13,9 @@ const ITEM_FLAG = Object.freeze({ IDENTIFIED: 0x10, SOCKETED: 0x800, EAR: 0x1000
   ETHEREAL: 0x400000, LOW_QUALITY: 0x2000000 });
 const MODE = Object.freeze({ STORED: 0, EQUIP: 1, BELT: 2, GROUND: 3, CURSOR: 4, DROPPING: 5, SOCKETED: 6 });
 const ACTION = Object.freeze({ FROM_CONTAINER: 5, UNEQUIP: 8, FROM_SHOP: 12, FROM_BELT: 15, AUTO_UNEQUIP: 17, IN_SOCKET: 19, TO_SHOP: 11 });
+// The actions each item packet's handler accepts; any other action is a fatal error in retail's handler, so it changes nothing here.
+const ACTIONS_9C = new Set([0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 15, 16, 18]);
+const ACTIONS_9D = new Set([5, 6, 7, 8, 9, 17, 19, 20, 21, 22, 23]);
 const GOLD_STAT = 14, STASH_GOLD_STAT = 15;
 const GOLD_CODE = 0x20646c67;   // 'gld '
 const NO_PAGE = 255;
@@ -89,6 +92,7 @@ export function createRealmWorld({ items: itemTable, objects: objectTable }) {
     const owner = withOwner ? u32(packet, 9) : null;
     const decoded = decodeItemHeader(packet.subarray(withOwner ? 13 : 8));
     received++;
+    if (!(withOwner ? ACTIONS_9D : ACTIONS_9C).has(action)) return;
     if (action === ACTION.TO_SHOP || action === ACTION.FROM_SHOP || action === ACTION.IN_SOCKET) return;
     if (!decoded) { removeItem(guid); return; }
     if (decoded.mode === MODE.SOCKETED) { removeItem(guid); return; }

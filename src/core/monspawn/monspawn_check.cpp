@@ -10909,11 +10909,9 @@ EMSCRIPTEN_KEEPALIVE int d2_session_period_of_day() {
     return ENVIRONMENT_GetPeriodOfDayFromAct(g_game->pAct[g_currentAct], 0);
 }
 
-EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_session_lightmap(int ambientOverride, int occludeUnits) {
-    D2SessionLightmap& m = g_sessionLightmap; memset(&m, 0, sizeof m); g_lightOffMapUnresolved = 0; g_lightOffMapUnresolvedPlayer = 0;
-    updateSessionMonsterLights();
-    if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pDynamicPath || !g_lastLevel) return &m;
-    const D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
+static void lightWindowAndPlayer(D2UnitStrc* player, D2DrlgActStrc* act, int ambientOverride, int occludeUnits) {
+    D2SessionLightmap& m = g_sessionLightmap;
+    const D2DynamicPathStrc* path = player->pDynamicPath;
     m.originX = (int)path->tGameCoords.wPosX - 24; m.originY = (int)path->tGameCoords.wPosY - 24;
     // The map's base is the LEVEL's own Levels.txt Intensity where the level defines one, and the act's
     // day/night environment ONLY for an OUTDOOR level where it defines none (0). An INDOOR level that
@@ -10935,7 +10933,7 @@ EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_session_lightmap(int ambientOve
         && levelId < sgptDataTables->nLevelsTxtRecordCount && sgptDataTables->pLevelsTxt[levelId].nIsInside;
     m.ambient = ambientOverride >= 0 ? ambientOverride
         : (levelIntensity ? levelIntensity
-            : (indoors ? 0 : ENVIRONMENT_GetIntensityFromAct(g_game->pAct[g_currentAct])));
+            : (indoors ? 0 : ENVIRONMENT_GetIntensityFromAct(act)));
     memset(m.intensity, m.ambient > 255 ? 255 : m.ambient, sizeof m.intensity);
     for (int gy = 0; gy < 48; gy++) for (int gx = 0; gx < 48; gx++) {
         D2ActiveRoomStrc* room = COLLISION_GetRoomBySubTileCoordinates(path->pRoom, m.originX + gx, m.originY + gy);
@@ -10948,13 +10946,21 @@ EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_session_lightmap(int ambientOve
     // capture characters land on it exactly: the ungeared Oracle Barbarian reads 104 (13, stat 0) in
     // every Act I-III/V scene, and the level-27 bootstrap character reads 144 (18, the clamp, stat 7).
     // The act is not a variable in it (s880 reads each character's own stat). 
-    const int playerLight = 13 + STATLIST_UnitGetStatValue(g_targetPlayer, STAT_ITEM_LIGHTRADIUS, 0);
+    const int playerLight = 13 + STATLIST_UnitGetStatValue(player, STAT_ITEM_LIGHTRADIUS, 0);
     // Retail clamps a non-positive radius to 0 before the setter; a light penalty deep enough to reach
     // it would otherwise put a negative radius in the source list this dump exposes.
     const int playerRadius = (playerLight > 18 ? 18 : (playerLight < 0 ? 0 : playerLight)) * 8;
     lightAddSource(px, py, playerRadius, 255, occludeUnits != 0, true, path->pRoom, path->pRoom);
-    m.source[0] = { 0, (int32_t)g_targetPlayer->dwClassId, px, py, playerRadius };
-    m.sourceGuid[0] = g_targetPlayer->dwUnitId; m.sources = 1;
+    m.source[0] = { 0, (int32_t)player->dwClassId, px, py, playerRadius };
+    m.sourceGuid[0] = player->dwUnitId; m.sources = 1;
+}
+
+EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_session_lightmap(int ambientOverride, int occludeUnits) {
+    D2SessionLightmap& m = g_sessionLightmap; memset(&m, 0, sizeof m); g_lightOffMapUnresolved = 0; g_lightOffMapUnresolvedPlayer = 0;
+    updateSessionMonsterLights();
+    if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pDynamicPath || !g_lastLevel) return &m;
+    const D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
+    lightWindowAndPlayer(g_targetPlayer, g_game->pAct[g_currentAct], ambientOverride, occludeUnits);
     for (D2DrlgLevelStrc* level = g_lastLevel->pDrlg ? g_lastLevel->pDrlg->pLevel : nullptr; level; level = level->pNextLevel)
         for (D2DrlgRoomStrc* roomEx = level->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
             if (!roomEx->pRoom) continue;
@@ -10993,6 +10999,49 @@ EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_session_lightmap(int ambientOve
                 m.sources++;
             }
         }
+    return &m;
+}
+
+// The same light map for a client that holds its own units (the online client): the caller supplies the
+// player and the other sources; the window, ambient, occlusion and falloff are the session's own.
+// A monster entry (unit set) takes its position and radius from the unit the way the session does
+// (max of MonStats2 Light and its item light, at most 18, the terminal SplEndDeath unlink); an object
+// entry carries its position and Objects.txt Lit radius and the room it stands in.
+struct D2ClientLightIn { D2UnitStrc* unit; int32_t type, classId, x, y, radius; uint32_t guid; D2ActiveRoomStrc* room; };
+extern "C" EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_client_lightmap_compose(D2UnitStrc* player, D2DrlgActStrc* act, const D2ClientLightIn* in, int n,
+        int ambientOverride, int occludeUnits) {
+    D2SessionLightmap& m = g_sessionLightmap; memset(&m, 0, sizeof m); g_lightOffMapUnresolved = 0; g_lightOffMapUnresolvedPlayer = 0;
+    if (!player || !player->pDynamicPath || !act) return &m;
+    const D2DynamicPathStrc* path = player->pDynamicPath;
+    lightWindowAndPlayer(player, act, ambientOverride, occludeUnits);
+    for (int i = 0; i < n; ++i) {
+        int radius = in[i].radius, x = in[i].x, y = in[i].y;
+        D2UnitStrc* unit = in[i].unit;
+        if (unit) {
+            if (unit->dwUnitType != UNIT_MONSTER || !unit->pDynamicPath) continue;
+            D2MonStatsTxt* stats = DATATBLS_GetMonStatsTxtRecord((int)unit->dwClassId);
+            if (stats && d2::monspawn::terminalDeathUnlinksLight(unit->dwAnimMode, (uint8_t)stats->nSplEndDeath,
+                    d2::monspawn::clientAnimationAtEnd(unit->pAnimSeq != nullptr, (int32_t)unit->dwFrameCountPrecise,
+                        (int32_t)unit->nSeqCurrentFramePrecise, unit->wAnimSpeed))) continue;
+            const D2MonStats2Txt* mon2 = UNITS_GetMonStats2TxtRecordFromMonsterId((int)unit->dwClassId);
+            int light = mon2 ? (int)mon2->nLight : 0;
+            const int itemLight = (int)MONSTERS_GetMaximalLightRadius(unit);
+            if (itemLight > light) light = itemLight;
+            radius = light > 0 ? (light > 18 ? 18 : light) : 0;
+            x = (int)(unit->pDynamicPath->tGameCoords.dwPrecisionX >> 13) + 4;
+            y = (int)(unit->pDynamicPath->tGameCoords.dwPrecisionY >> 13) + 4;
+        }
+        if (radius <= 0) continue;
+        const int r = (radius > 18 ? 18 : radius) * 8;
+        const bool object = in[i].type == UNIT_OBJECT;
+        D2ActiveRoomStrc* room = unit && unit->pDynamicPath->pRoom ? unit->pDynamicPath->pRoom : (in[i].room ? in[i].room : path->pRoom);
+        lightAddSource(x, y, r, 255, object || occludeUnits != 0, !object, room, path->pRoom);
+        if (m.sources < 64) {
+            m.source[m.sources] = { in[i].type, in[i].classId, x, y, r };
+            m.sourceGuid[m.sources] = in[i].guid;
+        }
+        m.sources++;
+    }
     return &m;
 }
 

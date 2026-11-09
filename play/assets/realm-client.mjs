@@ -23,6 +23,13 @@ import { parseSessionSnapshot } from '../gameplay-model.mjs';
 // tristramd, d2-clientless and the diablo2-protocol schemas; this file re-uses the same references
 // and the engine exports s113-s125 already prove byte-for-byte.
 
+// Reply waits, from the client libraries' own loops. Battle.net: each logon step waits for its reply
+// flag for 45 s (error 0x11 on expiry). Realm: the startup reply wait is a 10 ms poll bounded at 60 s.
+// Every other realm reply is awaited by the screen's event pump with no deadline of its own (the shell
+// cancels it), so CONNECT_TIMEOUT_MS is only a transport guard for those and the game-server join, not
+// a retail value.
+export const BNCS_REPLY_MS = 45000;
+export const MCP_STARTUP_MS = 60000;
 const CONNECT_TIMEOUT_MS = 8000;
 
 const cat = (a, b) => (a.length ? Uint8Array.from([...a, ...b]) : (b instanceof Uint8Array ? b : Uint8Array.from(b)));
@@ -105,6 +112,10 @@ async function readMcpFrame(reader, timeoutMs) {
   }
 }
 
+// Retail has no idle keep-alive on the realm socket: the message of the day is asked once at lobby entry,
+// and the only periodic realm traffic is the game-list refresh every 15 s on the game list. This timer
+// exists for the WebSocket proxies in front of the realm (they drop a silent socket after about 100 s),
+// so its period is a transport choice, not a retail value.
 const MCP_MOTD = 0x12, MCP_KEEPALIVE_MS = 30000;
 // D2Multi's pump gives a create or join 30 s from the Please Wait popup; then it raises 5141 (Join Failed) and returns to the lobby.
 const GAME_REPLY_MS = 30000;
@@ -161,7 +172,7 @@ function decodeMcpCharacters(body) {
  * the engine exports, as with BNCS and D2GS; this function owns only the sequence and read offsets.
  */
 export async function mcpCreateAndJoin(transport, protocol, { realmReply, character, gameName, gamePassword = '',
-  difficulty = 0, maxPlayers = 8, description = '', characterCount = 8, session = null, join = false, timeoutMs = CONNECT_TIMEOUT_MS, gameReplyMs = GAME_REPLY_MS } = {}) {
+  difficulty = 0, maxPlayers = 8, description = '', characterCount = 8, session = null, join = false, timeoutMs = CONNECT_TIMEOUT_MS, startupMs = MCP_STARTUP_MS, gameReplyMs = GAME_REPLY_MS } = {}) {
   if (!Array.isArray(realmReply) && !(realmReply instanceof Uint8Array)) throw new Error('MCP requires the BNCS realm handoff bytes');
   if (!character || !gameName) throw new Error('MCP requires a character and game name');
   const reader = session?.reader || makeReader(transport), sent = [], received = session ? [...session.received] : [];
@@ -175,7 +186,7 @@ export async function mcpCreateAndJoin(transport, protocol, { realmReply, charac
   } else {
     transport.send(protocol.mcpSelector());
     send(0x01, protocol.mcpStartup(realmReply));
-    const startup = await readMcpFrame(reader, timeoutMs); received.push(startup.op);
+    const startup = await readMcpFrame(reader, startupMs); received.push(startup.op);
     if (startup.op !== 0x01) throw new Error(`expected MCP STARTUP reply 0x01, got 0x${startup.op.toString(16)}`);
     if (startup.body.length < 4 || u32(startup.body, 0) !== 0) throw new Error('MCP STARTUP was rejected');
     send(0x19, protocol.mcpCharlist(characterCount));
@@ -239,13 +250,13 @@ function titleCaseGameText(value) {
 }
 
 /** Open the MCP login leg far enough to populate the character picker. */
-export async function mcpListCharacters(transport, protocol, { realmReply, characterCount = 8, timeoutMs = CONNECT_TIMEOUT_MS, keepAliveMs = MCP_KEEPALIVE_MS } = {}) {
+export async function mcpListCharacters(transport, protocol, { realmReply, characterCount = 8, timeoutMs = CONNECT_TIMEOUT_MS, startupMs = MCP_STARTUP_MS, keepAliveMs = MCP_KEEPALIVE_MS } = {}) {
   if (!Array.isArray(realmReply) && !(realmReply instanceof Uint8Array)) throw new Error('MCP requires the BNCS realm handoff bytes');
   const reader = makeReader(transport), received = [];
   const send = (op, body) => transport.send(protocol.mcpFrame(op, body));
   transport.send(protocol.mcpSelector());
   send(0x01, protocol.mcpStartup(realmReply));
-  const startup = await readMcpFrame(reader, timeoutMs); received.push(startup.op);
+  const startup = await readMcpFrame(reader, startupMs); received.push(startup.op);
   if (startup.op !== 0x01 || startup.body.length < 4 || u32(startup.body, 0) !== 0) throw new Error('MCP STARTUP was rejected');
   send(0x19, protocol.mcpCharlist(characterCount));
   const reply = await readMcpFrame(reader, timeoutMs); received.push(reply.op);
@@ -263,8 +274,8 @@ export async function mcpListCharacters(transport, protocol, { realmReply, chara
  * gave (the realm accepts the same session on every STARTUP), the character list, then MCP_CHARLOGON
  * for the character that left the game. Returns the list plus a session that create and join reuse.
  */
-export async function mcpReturnToLobby(transport, protocol, { realmReply, character, timeoutMs = CONNECT_TIMEOUT_MS, keepAliveMs = MCP_KEEPALIVE_MS } = {}) {
-  const roster = await mcpListCharacters(transport, protocol, { realmReply, timeoutMs, keepAliveMs });
+export async function mcpReturnToLobby(transport, protocol, { realmReply, character, timeoutMs = CONNECT_TIMEOUT_MS, startupMs = MCP_STARTUP_MS, keepAliveMs = MCP_KEEPALIVE_MS } = {}) {
+  const roster = await mcpListCharacters(transport, protocol, { realmReply, timeoutMs, startupMs, keepAliveMs });
   const found = roster.characters.find((c) => c.name.toLowerCase() === String(character).toLowerCase());
   if (!found) { clearInterval(roster.session.keepAlive); throw new Error(`character "${character}" is not in the MCP character list`); }
   transport.send(protocol.mcpFrame(0x07, protocol.mcpCharlogon(found.name)));
@@ -393,7 +404,7 @@ async function bncsPrelude(transport, protocol, reader, { product, auth, timeout
 }
 
 /** SID_CREATEACCOUNT (0x3d): the password hash then the account name. Resolves on success. */
-export async function bncsCreateAccount(transport, protocol, { account, password, product = 'D2XP', auth = null, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+export async function bncsCreateAccount(transport, protocol, { account, password, product = 'D2XP', auth = null, timeoutMs = BNCS_REPLY_MS } = {}) {
   const reader = makeReader(transport);
   const authInfo = await bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs });
   const enc = new TextEncoder();
@@ -421,7 +432,7 @@ const joinBytes = (...parts) => { const out = new Uint8Array(parts.reduce((n, p)
  * The old proof is the LOGONRESPONSE2 proof (the tokens and double hash the engine builds), the new hash the
  * single hash of the lowercased new password. Resolves to the reply's u32: 1 = changed, anything else is refused (D2Launch's pump tests the reply against 1).
  */
-export async function bncsChangePassword(transport, protocol, { account, password, newPassword, product = 'D2XP', auth = null, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+export async function bncsChangePassword(transport, protocol, { account, password, newPassword, product = 'D2XP', auth = null, timeoutMs = BNCS_REPLY_MS } = {}) {
   const reader = makeReader(transport);
   const authInfo = await bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs });
   const logon = Uint8Array.from(protocol.bncsLogon({ clientToken: protocol.tickCount(), serverToken: u32(authInfo.body, 4), account, password }));
@@ -433,7 +444,7 @@ export async function bncsChangePassword(transport, protocol, { account, passwor
 }
 
 /** SID_RESETPASSWORD (0x5A): { STRING account, STRING email }. Battle.net sends no reply. */
-export async function bncsResetPassword(transport, protocol, { account, email, product = 'D2XP', auth = null, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+export async function bncsResetPassword(transport, protocol, { account, email, product = 'D2XP', auth = null, timeoutMs = BNCS_REPLY_MS } = {}) {
   if (!account || !email) throw new Error('retail sends no reset request without an account and an email');
   const reader = makeReader(transport);
   const authInfo = await bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs });
@@ -441,7 +452,7 @@ export async function bncsResetPassword(transport, protocol, { account, email, p
 }
 
 /** SID_CHANGEEMAIL (0x5B): { STRING account, STRING old email, STRING new email }. No reply. */
-export async function bncsChangeEmail(transport, protocol, { account, oldEmail, newEmail, product = 'D2XP', auth = null, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+export async function bncsChangeEmail(transport, protocol, { account, oldEmail, newEmail, product = 'D2XP', auth = null, timeoutMs = BNCS_REPLY_MS } = {}) {
   if (!account || !oldEmail || !newEmail) throw new Error('retail sends no email change without an account and both emails');
   const reader = makeReader(transport);
   const authInfo = await bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs });
@@ -453,7 +464,7 @@ export async function bncsChangeEmail(transport, protocol, { account, oldEmail, 
  * Returns the challenge the server issued, the realm list it advertised, and the LOGONREALMEX
  * handoff (the MCP ticket) -- the read offsets the server cannot check for us.
  */
-export async function bncsLogin(transport, protocol, { account, password, realm = 'd2-web', product = 'D2XP', auth = null, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+export async function bncsLogin(transport, protocol, { account, password, realm = 'd2-web', product = 'D2XP', auth = null, timeoutMs = BNCS_REPLY_MS } = {}) {
   const reader = makeReader(transport);
   const sent = [], received = [];
   const send = (id, body) => { const frame = protocol.bncsFrame(id, body); sent.push({ id, bytes: frame.length }); transport.send(frame); };
@@ -782,6 +793,8 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
   const u32at = (p) => { const b = Module.HEAPU8, o = Number(p); return (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0; };
   const put32 = (p, v) => { const b = Module.HEAPU8, o = Number(p); b[o] = v & 0xff; b[o + 1] = (v >>> 8) & 0xff; b[o + 2] = (v >>> 16) & 0xff; b[o + 3] = (v >>> 24) & 0xff; };
   const call = (n, rt, a, v) => Module.ccall(n, rt, a, v);
+  let weaponSet = 0;
+  const hotkeys = Array.from({ length: 16 }, () => ({ skill: -1, left: false, owner: 0xffffffff }));
   const rd = (p, n) => Array.from(Module.HEAPU8.subarray(Number(p), Number(p) + n));
   const str = (bytes) => String.fromCharCode(...bytes.filter((b) => b !== 0));
   // The unit's path position at 16.16 precision, so an online unit glides between subtiles as it
@@ -896,8 +909,37 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
         x: record[4] | (record[5] << 8), y: record[6] | (record[7] << 8),
         unitType: record[8], value: record[9] };
     },
-    d2gsClientPlayerReset: () => call('d2_realm_client_player_reset', null, [], []),
+    d2gsClientPlayerReset: () => { weaponSet = 0; return call('d2_realm_client_player_reset', null, [], []); },
+    // Server 0x97 (1 byte): flips the weapon-set flag when the game is an expansion game. The flag starts at 0.
+    d2gsApplyWeaponSwitch: (packet, expansion) => {
+      if (!(packet instanceof Uint8Array) || packet.length < 1 || packet[0] !== 0x97) throw new RangeError('not a D2GS weapon-set packet');
+      if (!expansion) return false;
+      weaponSet = weaponSet ? 0 : 1;
+      return true;
+    },
+    d2gsWeaponSet: () => weaponSet,
+    // Which weapon boxes show their empty-arm silhouettes and two-hander ghosts for the selected player's worn arms (-1 = no player).
+    d2gsClientWeaponHands: () => call('d2_realm_client_weapon_hands', 'number', [], []),
     d2gsClientSetDifficulty: (difficulty) => call('d2_realm_client_set_difficulty', null, ['number'], [difficulty]),
+    // Retail transaction price (-1 when unknown): an owned item by guid, or a shop stock item's bitstream.
+    // The player's 96 quest-flag bytes from a server 0x28 (read by the vendor price rule).
+    d2gsClientSetQuestFlags: (bytes) => {
+      if (!(bytes instanceof Uint8Array) || bytes.length !== 96) throw new RangeError('quest flags are 96 bytes');
+      Module.HEAPU8.set(bytes, Number(P));
+      return call('d2_realm_client_set_quest_flags', 'number', ['bigint', 'number'], [BigInt(P), bytes.length]);
+    },
+    // The stats of a hire offer (S2C 0x4E: name id, seed) for the selected player, or null: { level, life, def, cost, id, exp }.
+    d2gsClientHireStats: (mercName, seed, expansion) => {
+      const at = Number(P);
+      if (!call('d2_realm_client_hire_stats', 'number', ['number', 'number', 'number', 'bigint'], [mercName, seed, expansion ? 1 : 0, BigInt(P)])) return null;
+      const w = new Int32Array(Module.HEAPU8.buffer, at, 6);
+      return { level: w[0], life: w[1], def: w[2], cost: w[3], id: w[4], exp: w[5] };
+    },
+    d2gsClientItemPrice: (itemGuid, vendorId, transType) => call('d2_realm_client_item_price', 'number', ['number', 'number', 'number'], [itemGuid, vendorId, transType]),
+    d2gsClientStockPrice: (bits, vendorId, transType) => {
+      Module.HEAPU8.set(bits, Number(P));
+      return call('d2_realm_client_stock_price', 'number', ['bigint', 'number', 'number', 'number'], [BigInt(P), bits.length, vendorId, transType]);
+    },
     d2gsClientPlayerFeed: (bytes) => {
       Module.HEAPU8.set(bytes, Number(P));
       return call('d2_realm_client_player_feed', 'number', ['bigint', 'number'], [BigInt(P), bytes.length]);
@@ -1091,6 +1133,38 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
       const n = call('d2_realm_d2gs_select_skill', 'number', ['number','number','number','bigint'], [skill,left?1:0,owner>>>0,BigInt(T)]);
       if (n !== 9) throw new Error(`D2GS skill selection composer returned ${n} bytes`);
       return Uint8Array.from(rd(T,n));
+    },
+    // Server hotkey table (0x7B, 8 bytes: op, slot, u16 skill|0x8000 left, u32 owner GUID): sixteen slots,
+    // skill -1 = unbound, as the client's three parallel tables hold them.  Skill ids above `maxSkill`
+    // (the game info's skill count) store -1.  Nothing but the server fills it.
+    d2gsApplyHotkey: (packet, maxSkill = host.maxSkill ?? 0xfff) => {
+      if (!(packet instanceof Uint8Array) || packet.length < 8 || packet[0] !== 0x7b) throw new RangeError('not a D2GS hotkey packet');
+      const slot = packet[1];
+      if (slot >= hotkeys.length) return false;
+      const word = packet[2] | (packet[3] << 8), skill = word & 0xfff;
+      hotkeys[slot] = { skill: skill > maxSkill ? -1 : skill, left: (word & 0x8000) !== 0,
+        owner: (packet[4] | (packet[5] << 8) | (packet[6] << 16) | (packet[7] << 24)) >>> 0 };
+      return true;
+    },
+    d2gsHotkeys: () => hotkeys.map((h) => ({ ...h })),
+    /** F-key press: the select-skill packet for that slot (hand and owner from the table), or null when unbound. */
+    d2gsHotkeySelect: (slot) => {
+      const h = hotkeys[slot];
+      if (!h || h.skill < 0) return null;
+      return protocol.d2gsSelectSkill(h.skill, h.left, h.owner);
+    },
+    // Local assign of one hotkey slot, the 1.13c assign path's table write: the slot takes the skill, hand
+    // and owner; any other slot already holding that same skill and owner is cleared. No packet is sent.
+    // The skill is bound-checked against maxSkill as d2gsApplyHotkey does. Unbound skill stores -1.
+    d2gsSetHotkey: (slot, skill, left, owner = 0xffffffff, maxSkill = host.maxSkill ?? 0xfff) => {
+      if (!Number.isInteger(slot) || slot < 0 || slot >= hotkeys.length) throw new RangeError('hotkey slot out of range');
+      if (!Number.isInteger(skill) || skill < -1 || skill > 0xfff) throw new RangeError('invalid hotkey skill');
+      if (typeof left !== 'boolean') throw new RangeError('hotkey hand must be a boolean');
+      const bound = skill < 0 || skill > maxSkill ? -1 : skill;
+      const own = owner >>> 0;
+      if (bound >= 0) hotkeys.forEach((h, i) => { if (i !== slot && h.skill === bound && h.owner === own) hotkeys[i] = { skill: -1, left: false, owner: 0xffffffff }; });
+      hotkeys[slot] = { skill: bound, left, owner: own };
+      return true;
     },
     d2gsMoveTo: (opcode, x, y) => {
       if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x > 0xffff || y > 0xffff)

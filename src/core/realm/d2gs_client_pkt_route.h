@@ -50,11 +50,15 @@ inline MonsterAction monsterAction(uint32_t code) {
     }
 }
 
-// D2Client+0x2A1B0's tolerance for a monster: radius selector s1 == 1 -> 10, s1 == 2 -> 0, else
-// by mode: 3..5 -> 5, 6..0xB -> 7, anything else 15.
-inline int monsterPlaceRadius(uint32_t mode, uint32_t s1) {
+// D2Client+0x2A1B0's tolerance. Selector 1 gives 10 and selector 2 gives 0 for every unit.
+// Otherwise the local player gets 3 / 7 / 5 (mode 1 / mode 3 / any other) plus
+// ((a global dword + 0x32) >> 7), a monster is by mode (3..5 gives 5, 6..0xB gives 7, else 15),
+// and every other unit gets 15. The mode table is the monster's only: a remote player is 15.
+inline int placeRadius(bool isMonster, bool isLocalPlayer, uint32_t mode, uint32_t s1, uint32_t localTerm) {
     if (s1 == 1) return 10;
     if (s1 == 2) return 0;
+    if (isLocalPlayer) return static_cast<int>(((localTerm + 0x32u) >> 7) + (mode == 1 ? 3u : mode == 3 ? 7u : 5u));
+    if (!isMonster) return 15;
     if (mode >= 3 && mode <= 5) return 5;
     if (mode >= 6 && mode <= 0xb) return 7;
     return 15;

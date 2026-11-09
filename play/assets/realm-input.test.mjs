@@ -77,21 +77,41 @@ test('left on a monster is the left skill on that unit; on a person, a talk; rig
   assert.equal(h.out[0][0], 1);                                   // a corpse is not a target
 });
 
-// The server never echoes the owner's own walk, so the click itself must start the local route.
-test('a ground click starts the local player route after the packet leaves, never otherwise', () => {
-  const moves = [];
-  const make = (extra, transmit = () => true) => createRealmInput({ transmit, scene: sceneOf(extra), now: () => 0,
-    move: (x, y, run) => { moves.push([x, y, run]); return 1; } });
+// The server never echoes the owner's own walk, so the click itself must start the local route -- and, as
+// in retail, the local start comes first and the packet goes out only when the player could start it.
+test('a ground click starts the local route first and sends only what the player could start', () => {
+  const moves = [], order = [];
+  let answer = 1;
+  const make = (extra, transmit = (b) => { order.push(`send:${b[0]}`); return true; }) => createRealmInput({ transmit, scene: sceneOf(extra), now: () => 0,
+    move: (x, y, run) => { moves.push([x, y, run]); order.push('move'); return answer; } });
   make().leftClick(200, 120);
   make({ run: true }).leftClick(200, 120);
   assert.deepEqual(moves, [[100, 120, false], [100, 120, true]]);
-  moves.length = 0;
-  make({}, () => false).leftClick(200, 120);                       // connection closed: nothing moves
+  assert.deepEqual(order, ['move', 'send:1', 'move', 'send:3']);
+  moves.length = 0; order.length = 0;
   make({ monsters: [{ guid: 77, classId: 5, mode: 1, x: 101, y: 101, anchorX: 200, anchorY: 120, drawn: true }] }).leftClick(200, 120);
-  assert.deepEqual(moves, []);
-  const input = make(); input.leftClick(200, 120); input.leftClick(200, 120);  // the gate drops the repeat
-  assert.equal(moves.length, 1);
+  assert.deepEqual(moves, []);                                     // a monster is a skill, not a walk
+  answer = 0;                                                      // the local start refuses the route: nothing is sent
+  order.length = 0; assert.equal(make().leftClick(200, 120), false); assert.equal(make().step(1, 0), false);
+  assert.deepEqual(order, ['move', 'move']);
+  answer = -1;                                                     // no engine answer: sent as before
+  order.length = 0; make().leftClick(200, 120); assert.deepEqual(order, ['move', 'send:1']);
+  answer = 1;
+  const input = make(); input.leftClick(200, 120); input.leftClick(200, 120);  // the gate drops the repeat packet only
+  assert.equal(order.filter((o) => o === 'send:1').length, 2);
   assert.equal(input.evidence.localMove, 1);
+});
+
+test('the right skill is started locally first; a refused cast sends nothing', () => {
+  const calls = [];
+  const make = (extra, result) => { const out = []; return { out, input: createRealmInput({ transmit: (b) => out.push(Array.from(b)), scene: sceneOf(extra), now: () => 0,
+    castAt: (x, y) => { calls.push(['at', x, y]); return result; }, castOnUnit: (t, g) => { calls.push(['unit', t, g]); return result; } }) }; };
+  const mon = { guid: 77, classId: 5, mode: 1, x: 101, y: 101, anchorX: 200, anchorY: 120, drawn: true };
+  let h = make({}, 1); h.input.rightClick(200, 120); assert.deepEqual(h.out, [[0x0c, 100, 0, 120, 0]]);
+  h = make({ monsters: [mon] }, 1); h.input.rightClick(200, 120); assert.deepEqual(h.out, [[0x0d, 1, 0, 0, 0, 77, 0, 0, 0]]);
+  h = make({}, 0); assert.equal(h.input.rightClick(200, 120), false); assert.deepEqual(h.out, []);
+  h = make({ monsters: [mon] }, 0); assert.equal(h.input.rightClick(200, 120), false); assert.deepEqual(h.out, []);
+  assert.deepEqual(calls, [['at', 100, 120], ['unit', 1, 77], ['at', 100, 120], ['unit', 1, 77]]);
 });
 
 // The server ignores a talk from 9 or more tiles; a far person is approached and talked to on arrival.
@@ -147,11 +167,66 @@ test('the realm shell wires the local route to the engine export', async () => {
   assert.match(link, /_d2_realm_client_local_move[,\s]/);
 });
 
-test('ground items are picked up and objects interacted with by guid', () => {
-  let h = harness({ items: [{ id: 9, mode: 3, x: 100, y: 120 }] }); h.input.leftClick(200, 120);
+// A click on a far item or object walks to the unit; the pickup or the use goes out only on arrival.
+test('ground items and objects are walked to by guid and used only on arrival', () => {
+  for (const [extra, type, id, use] of [
+    [{ items: [{ id: 9, mode: 3, x: 100, y: 120 }] }, 4, 9, [0x16, 4, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0]],
+    [{ objects: [{ id: 12, x: 100, y: 120, selectable: true }] }, 2, 12, [0x13, 2, 0, 0, 0, 12, 0, 0, 0]]]) {
+    let scene = sceneOf(extra)(); const out = [];
+    const input = createRealmInput({ transmit: (b) => out.push(Array.from(b)), scene: () => scene, now: () => 0 });
+    input.leftClick(200, 120);
+    assert.deepEqual(out, [[0x02, type, 0, 0, 0, id, 0, 0, 0]]);
+    assert.deepEqual(input.pending, { type, guid: id });
+    input.tick(); assert.equal(out.length, 1);                    // still walking
+    scene = { ...scene, player: { x: 100, y: 119 } };
+    input.tick(); assert.deepEqual(out.at(-1), use);
+    assert.equal(input.pending, null);
+  }
+  const h = harness({ items: [{ id: 9, mode: 3, x: 100, y: 101 }] }); h.input.leftClick(200, 101);  // in reach: at once
   assert.deepEqual(h.out, [[0x16, 4, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0]]);
-  h = harness({ objects: [{ id: 12, x: 100, y: 120, selectable: true }] }); h.input.leftClick(200, 120);
-  assert.deepEqual(h.out, [[0x13, 2, 0, 0, 0, 12, 0, 0, 0]]);
+});
+
+test('the engine answers reach, the approach and the end of the walk when it can', () => {
+  let done = false, inReach = false; const out = [], approaches = [];
+  const input = createRealmInput({ transmit: (b) => out.push(Array.from(b)), now: () => 0,
+    scene: sceneOf({ objects: [{ id: 12, x: 100, y: 120 }] }),
+    approachUnit: (t, g, run) => { approaches.push([t, g, run]); return 1; }, reach: () => (inReach ? 1 : 0), actionDone: () => done });
+  input.leftClick(200, 120);
+  assert.deepEqual(approaches, [[2, 12, false]]);
+  input.tick(); assert.equal(out.length, 1);                      // the walk is not over
+  done = true; input.tick();                                       // over, still short: walk again
+  assert.deepEqual(approaches.length, 2); assert.equal(out.length, 1);  // the gate drops the equal 0x02
+  inReach = true; input.tick(); assert.deepEqual(out.at(-1), [0x13, 2, 0, 0, 0, 12, 0, 0, 0]);
+  const refused = createRealmInput({ transmit: (b) => out.push(Array.from(b)), now: () => 0,
+    scene: sceneOf({ objects: [{ id: 12, x: 100, y: 120 }] }), approachUnit: () => 0 });
+  out.length = 0; assert.equal(refused.leftClick(200, 120), false);
+  assert.deepEqual(out, []); assert.equal(refused.pending, null);
+});
+
+test('the Compelling Orb and the open Hell Forge are used only with their quest item on the cursor', () => {
+  const run = (object, code) => { const h = harness({ objects: [{ x: 100, y: 101, selectable: true, ...object }], cursorCode: () => code });
+    h.input.leftClick(200, 101); return h.out; };
+  assert.deepEqual(run({ id: 3, classId: 404, mode: 0 }, 0), []);
+  assert.deepEqual(run({ id: 3, classId: 404, mode: 0 }, 0x20326671), [[0x13, 2, 0, 0, 0, 3, 0, 0, 0]]);
+  assert.deepEqual(run({ id: 4, classId: 376, mode: 2 }, 0), []);
+  assert.deepEqual(run({ id: 4, classId: 376, mode: 2 }, 0x20686668), [[0x13, 2, 0, 0, 0, 4, 0, 0, 0]]);
+  assert.deepEqual(run({ id: 4, classId: 376, mode: 0 }, 0), [[0x13, 2, 0, 0, 0, 4, 0, 0, 0]]);
+});
+
+test('a repeated talk is dropped only by the send gate: the same packet inside 200 ms', () => {
+  let t = 0; const out = [];
+  const input = createRealmInput({ transmit: (b) => out.push(Array.from(b)), now: () => t,
+    scene: sceneOf({ monsters: [{ guid: 5, classId: 99, mode: 1, x: 101, y: 100 }] }) });
+  input.interactNearest(); t = 300; input.interactNearest(); t = 350; input.interactNearest();
+  assert.equal(out.length, 2);
+});
+
+test("the server's talk answer opens the chat with 0x2F, or ends it with 0x30 for a unit the client lost", () => {
+  const h = harness({ monsters: [{ guid: 5, classId: 99, mode: 1, x: 101, y: 100 }] });
+  h.input.npcInteraction([0x28, 1, 5, 0, 0, 0, 7]);
+  h.input.npcInteraction([0x28, 1, 6, 0, 0, 0, 7]);
+  assert.equal(h.input.npcInteraction([0x28, 6, 5, 0, 0, 0, 7]), null);
+  assert.deepEqual(h.out, [[0x2f, 1, 0, 0, 0, 5, 0, 0, 0], [0x30, 7, 0, 0, 0, 6, 0, 0, 0]]);
 });
 
 test('a belt key uses the bottom item of its column', () => {
@@ -165,4 +240,13 @@ test('MonStats: the npc and interact columns name the people', () => {
   const text = 'id\tnpc\tinteract\nskeleton\t\t\ncharsi\t1\t1\n';
   const t = createMonsterTable(() => new TextEncoder().encode(text));
   assert.equal(t.isNpc(0), false); assert.equal(t.isNpc(1), true); assert.equal(t.isNpc(9), false);
+});
+
+test('a talk that goes out is reported to the NPC state', () => {
+  const talked = [], out = [];
+  const input = createRealmInput({ transmit: (b) => out.push(Array.from(b)), now: () => 0, onTalk: (g) => talked.push(g),
+    scene: sceneOf({ monsters: [{ guid: 78, classId: 99, mode: 1, x: 101, y: 101, anchorX: 200, anchorY: 120, drawn: true }] }) });
+  input.leftClick(200, 120);
+  assert.deepEqual(out, [[0x13, 1, 0, 0, 0, 78, 0, 0, 0]]);
+  assert.deepEqual(talked, [78]);
 });

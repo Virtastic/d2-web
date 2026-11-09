@@ -34,6 +34,8 @@ const GUID = 0x01020304;
 const u32le = (v) => [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255];
 function itemPacket(guid, action, spec, owner = null) {
   const body = itemBits(spec);
+  const nine = [0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 15, 16, 18];
+  if (owner === null && !nine.includes(action)) owner = GUID;   // retail routes these actions through the owned-item packet
   const head = owner === null ? [0x9c, action, 0, 0, ...u32le(guid)] : [0x9d, action, 0, 0, ...u32le(guid), 0, ...u32le(owner)];
   return Uint8Array.from([...head, ...body]);
 }
@@ -90,7 +92,7 @@ test('a second item at a body location replaces the first; the weapon class foll
   assert.equal(w.weaponClassOf(), 'hth');
   feed(w, itemPacket(10, 0, { mode: 1, bodyLoc: 4, code: 'hax' }));
   assert.equal(w.weaponClassOf(), '1hs');
-  feed(w, itemPacket(11, 9, { mode: 1, bodyLoc: 4, code: 'gax' }));
+  feed(w, itemPacket(11, 4, { mode: 1, bodyLoc: 4, code: 'gax' }));
   assert.deepEqual(w.itemViews().map((i) => i.id), [11]);
   assert.equal(w.weaponClassOf(), '2ht');
   feed(w, itemPacket(11, 8, { mode: 1, bodyLoc: 4, code: 'gax' }));
@@ -106,7 +108,7 @@ test('belt record follows the worn belt; no belt is record 2', () => {
 
 test("other players' worn items are kept apart from the player's own", () => {
   const w = createRealmWorld(tables()); w.setOwner(GUID);
-  feed(w, itemPacket(20, 0, { mode: 1, bodyLoc: 4, code: 'gax' }, 777), itemPacket(21, 0, { mode: 1, bodyLoc: 1, code: 'cap' }, GUID));
+  feed(w, itemPacket(20, 9, { mode: 1, bodyLoc: 4, code: 'gax' }, 777), itemPacket(21, 9, { mode: 1, bodyLoc: 1, code: 'cap' }, GUID));
   assert.deepEqual(w.itemViews().map((i) => i.id), [21]);
   assert.deepEqual(w.wornBy(777).map((i) => i.id), [20]);
   assert.equal(w.weaponClassOf(777), '2ht');
