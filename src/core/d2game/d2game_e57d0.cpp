@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include "d2game_h16.h"
 namespace h16 {
-static const int32_t kRing[8][2] = { {-3, -3}, {-3, 0}, {-3, 3}, {0, -3}, {0, 3}, {3, -3}, {3, 0}, {3, 3} };   // D2Game+0x1028D0
+static const int32_t kRing[8][2] = { {-3, -3}, {-3, 0}, {-3, 3}, {0, -3}, {0, 3}, {3, -3}, {3, 0}, {-3, 3} };   // D2Game+0x1028D0
 uint32_t e57d0(const Env& e, uint32_t game, uint32_t node)
 {
     uint32_t d = rd32(node, 0x18);

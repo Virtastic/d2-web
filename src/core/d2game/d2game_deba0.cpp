@@ -20,6 +20,7 @@ uint32_t d2game_deba0_port(uint32_t eax, uint32_t ebx, uint32_t game, const D2Ga
     }
     if (!ebx || rd(ebx, 0) != 0) return eax;
     const uint32_t holder = rd(ebx, 0x60);
+    eax = holder;                                        // retail assigns EAX = holder inside the condition chain
     if (!holder) return eax;
     const int32_t n = (int32_t)e->weightCount;
     uint32_t slot[7] = {0}, total = 0;
