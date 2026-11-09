@@ -49,6 +49,7 @@ extern "C" uint16_t fog_sub_1e7d0(int32_t enable, uint8_t* q, uint8_t* dst, uint
 
 // 1.13c Fog+0x17E00  forwards to Storm#289 with the last two stack args swapped.
 static void (*g_storm289)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) = nullptr;
+extern "C" void fog_sub_17e00_seams(void (*f)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t)) { g_storm289 = f; }
 extern "C" void fog_sub_17e00(uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e, uint32_t f, uint32_t g) {  // 1.13c Fog+0x17E00
     if (g_storm289) g_storm289(a, b, c, d, e, g, f);
 }

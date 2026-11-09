@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 
+extern "C" int fog_sptype(uint32_t lo, uint32_t hi);  // 1.13c Fog+0xAD0C (fog_batch_z5.cpp)
 namespace {
 // ---- seams (retail callees / globals not in this batch) ----
 void (*seam_CallMemberFunction1_z17)(uint32_t obj, uint32_t fn);          // Fog+0x3DEB
@@ -11,8 +12,9 @@ uint32_t (*seam_NLG_Notify1_z17)(uint32_t);                                // Fo
 void (*seam_inconsistency_z17)();                                          // Fog+0x79C3
 void (*seam_FindHandler_z17)(void*, void*, void*, void*, void*, uint8_t, int, void*); // Fog+0x230FE
 void (*seam_FrameUnwindToState_z17)(int frame, void* disp, int funcInfo, int state);  // Fog+0x22B67
-int  (*seam_sptype_z17)(uint32_t lo, uint32_t hi);                         // Fog+0xAD0C
-double (*seam_frnd_z17)(double);                                           // Fog+0xACD1
+double frnd_default_z17(double x) { return __builtin_nearbyint(x); }      // __frnd: fistp-style, nearest-even
+int  (*seam_sptype_z17)(uint32_t lo, uint32_t hi) = fog_sptype;            // Fog+0xAD0C
+double (*seam_frnd_z17)(double) = frnd_default_z17;                        // Fog+0xACD1
 void (*seam_terminate_z17)();                                              // Fog+0x24792
 int  (*seam_ValidateExecute_z17)(uint32_t fn);                             // Fog+0x798E
 uint32_t g_unhandledFilter_z17;                                            // Fog+0x56EE0 (DAT_6ffa6ee0)
@@ -104,35 +106,37 @@ extern "C" int d_inttype_z17(double x) {
   return 0;
 }
 
-// 1.13c Fog+0x2458A  __powhlp (x = lo/hi dwords, y = param_3)
+// 1.13c Fog+0x2458A  __powhlp (x = lo/hi dwords, y = param_3); special-value pow, *out on the handled
+// paths, returns 1 on a domain error. Constants: 0x29050 = 0.0, 0x29040 = 1.0, 0x2EBC0 = +inf,
+// 0x2EBC8 = -nan (0xFFF8...), 0x2EBE0 = -0.0. Same bytes as Storm+0x3ECBA.
 extern "C" uint32_t powhlp_z17(int lo, int hi, double y, double* out) {
   uint64_t xb = ((uint64_t)(uint32_t)hi << 32) | (uint32_t)lo; double x; memcpy(&x, &xb, 8);
-  uint32_t ylo, yhi; uint64_t yb; memcpy(&yb, &y, 8); ylo = (uint32_t)yb; yhi = (uint32_t)(yb >> 32);
-  uint32_t ret = 0; double r = kInf;
+  uint64_t yb; memcpy(&yb, &y, 8); uint32_t ylo = (uint32_t)yb, yhi = (uint32_t)(yb >> 32);
+  const uint64_t nanBits = 0xFFF8000000000000ull; double kNan; memcpy(&kNan, &nanBits, 8);
+  double res = kInf;
   if (x < kZero) x = -x;
-  if (yhi == 0x7ff00000 && ylo == 0) {  // y == +inf
-    if (kOne < x) goto done;
-    if (kOne <= x) { ret = 1; r = kOne; goto done; }
-    r = 0.0; goto done;
+  if (yhi == 0x7ff00000u && ylo == 0) {      // y == +inf
+    if (kOne < x) { *out = res; return 0; }
+    if (x < kOne) { *out = 0.0; return 0; }   // ordered less only; x == 1 or NaN is the domain-error row
+    *out = kNan; return 1;
   }
   if (y == -__builtin_huge_val()) {
-    if (kOne < x) { r = 0.0; goto done; }
-    if (x < kOne) goto done;
-    ret = 1; r = kOne; goto done;
+    if (kOne < x) { *out = 0.0; return 0; }
+    if (x < kOne) { *out = res; return 0; }
+    *out = kNan; return 1;
   }
   if (hi != 0x7ff00000) {
     if (hi != -0x100000 || lo != 0) return 0;
     int t = d_inttype_z17(y);
-    if (y <= kZero) r = (kZero <= y) ? 1.0 : (t != 1 ? 0.0 : kNegZeroish);
-    else r = (t == 1) ? -kInf : kInf;
-    goto done;
+    // `test ah,41 / jne` taken unless y > 0 (ordered); `test ah,5 / jp` unless y < 0: a NaN y gives 1.0
+    if (kZero < y) res = (t == 1) ? -kInf : kInf;
+    else res = (y < kZero) ? (t == 1 ? kNegZeroish : 0.0) : 1.0;
+    *out = res; return 0;
   }
   if (lo != 0) return 0;
-  if (kZero < y) goto done;
-  r = (kZero <= y) ? 1.0 : 0.0;
-done:
-  *out = r;
-  return ret;
+  if (kZero < y) { *out = res; return 0; }
+  *out = (y < kZero) ? 0.0 : 1.0;           // unordered (NaN y) takes the jp to fld1
+  return 0;
 }
 
 // 1.13c Fog+0x246EC  __CxxUnhandledExceptionFilter

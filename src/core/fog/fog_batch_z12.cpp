@@ -106,7 +106,7 @@ void shift_z12(char* str, int n) {
 // 1.13c Fog+0x0B5D7 __cftoe2. in = _strflt {sign@0, decpt@4, ?@8, mantissa ptr@12} (EAX), buf (EBX).
 struct StrFlt_z12 { int32_t sign, decpt, flag; const char* mant; };
 void cftoe2_z12(char* buf, StrFlt_z12* in, int ndigit, int caps, char shiftFlag, char decimalPoint) {
-    if (shiftFlag) shift_z12(buf, 1);
+    if (shiftFlag) shift_z12(buf + (in->sign == 0x2d), ndigit > 0);  // __shift(EAX = buf + neg, EDI = ndigit > 0)
     if (in->sign == 0x2d) *buf++ = '-';
     char* p = buf;
     if (ndigit > 0) { p = buf + 1; *buf = *p; *p = decimalPoint; }
