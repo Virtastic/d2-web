@@ -1,6 +1,6 @@
 // src/core/d2game/d2game_batch_b64.cpp -- twelve UNMAPPED 1.13c D2Game.dll rows reimplemented from the
 // cached decompiles (build-wasm/ghidra-d2game/decomp/0x<RVA>.c), in RVA order:
-//   0xBD040 0xBE2A0 0xC39B0 0xC8FD0 0xCB1F0 0xCB690 0xCBA20 0xCBF50 0xCE040 0xCE0D0 0xCE120 0xCE150
+//   0xBD040 (0xBE2A0 moved to d2game_be2a0.cpp) 0xC39B0 0xC8FD0 0xCB1F0 0xCB690 0xCBA20 0xCBF50 0xCE040 0xCE0D0 0xCE120 0xCE150
 // Base 0x6FC20000. Batch lane: implementation + marker only, no spec, no vector.
 //
 // Register-only inputs (EAX/EBX/EBP/ESI/EDI, caller-frame words) are explicit leading/extra params, commented
@@ -109,76 +109,6 @@ uint32_t d2game_bd040(uint32_t game, uint32_t classId, int32_t level, uint32_t s
             return out10;
     }
     return stackWord8;
-}
-
-// 1.13c D2Game+0xBE2A0 (thiscall this=room/owner; param_1=game(arg); EAX=unit list head, EBX=drop ratio record,
-// EBP=replacement param, piStack1c=room arg of the spawn call)
-void d2game_be2a0(uint32_t self, uint32_t param1, uint32_t listHead, uint32_t ratioRec, uint32_t ebp, uint32_t roomArg) {
-    uint32_t tbl = g_b->o10041();
-    if (!tbl || !g_b->o10237(rd8(param1, 0x6d))) return;
-    uint32_t codeA = g_b->datF80, codeB = g_b->datF7C;
-    if (!codeA) g_b->o10450(0x206e6972, &codeA);
-    if (!codeB) g_b->o10450(0x20756d61, &codeB);
-    int32_t chanceBase = 0;
-    uint32_t blk = g_b->o10045("..\\Source\\D2Game\\UNIT\\SUNITNPC.CPP", 0xd94);
-    if (!blk) return;
-    wr32(blk, 0, g_b->o10387(rd32(param1, 0x1c), 0));
-    wr32(blk, 4, self ? rd32(self, 0xc) : 0xffffffffu);
-    wr32(blk, 8, rd32(listHead, 8));
-    wr32(listHead, 8, blk);
-    int32_t lvl = (int32_t)g_b->o10973(self, 0xc, 0);
-    uint32_t seed = rd32(param1, 0x1d24);
-    uint64_t* sp = (uint64_t*)(uintptr_t)(seed + 8);
-    int32_t n = 0;
-    for (;;) {
-        uint64_t s = (uint64_t)(uint32_t)*sp * 0x6ac690c5ull + rd32(seed, 0xc);
-        *sp = s;
-        int32_t idx = lvl - 5 + (int32_t)((s & 0xffffffff) % 10);
-        if (idx < 6) idx = 5; else if (idx > 0x62) idx = 99;
-        uint32_t cnt = rd32(tbl, 8 + idx * 4), pick;
-        if ((int32_t)cnt < 1) pick = 0;
-        else if ((cnt & (cnt - 1)) == 0) { s = (s & 0xffffffff) * 0x6ac690c5ull + (s >> 32); *sp = s; pick = (cnt - 1) & (uint32_t)s; }
-        else { s = (s & 0xffffffff) * 0x6ac690c5ull + (s >> 32); *sp = s; pick = (uint32_t)((s & 0xffffffff) % cnt); }
-        uint32_t id = rd32(rd32(tbl, 4), pick * 4);
-        if (rd32(param1, 0x70) == 0) {
-            uint32_t rec = g_b->o10695(id);
-            if (!rec) return;
-            if (rd16(rec, 0xf6) >= 100) goto next;
-        }
-        {
-            if (n < 2) id = n ? codeB : codeA;
-            uint32_t cls = d2game_bd040(param1, id, 0, 0, 0, 0, 0, 0);   // retail forwards the live register state; callers pin it
-            int32_t q = 4;
-            uint32_t pa = ebp;
-            if (chanceBase > 0) {
-                s = (uint64_t)(uint32_t)*sp * 0x6ac690c5ull + rd32(seed, 0xc);
-                *sp = s;
-                int32_t roll = (int32_t)((s & 0xffffffff) % 100000);
-                pa = ebp;
-                if (roll < chanceBase) q = roll < (int32_t)rd32(ratioRec, 0x4c) ? 7 : ((int32_t)(rd32(ratioRec, 0x48) + rd32(ratioRec, 0x4c)) <= roll) + 5;
-            }
-            n++;
-            uint32_t u = g_b->spawn31980(1, 0, roomArg, cls, pa, 4, q, 0, 0, 0);
-            if (u) {
-                g_b->o10012(u, 0);
-                if (g_b->o10087(u)) {
-                    if (g_b->o10711(u) && g_b->o10048(u)) g_b->o10887(u, 0x46, g_b->o10463(u), 0);
-                    g_b->f2380(0, u);
-                    if (!g_b->o10202(u, 0x100, 0xba, "..\\Source\\D2Game\\UNIT\\SUNITNPC.CPP")) {
-                        int32_t v = (int32_t)g_b->o11116(u);
-                        if (v > 0) g_b->o10887(u, 0x48, v, 0);
-                    } else g_b->f5690(pa);
-                }
-                g_b->o10977(u, 0x10, 0);
-                int32_t t = rd32(u, 0);
-                uint32_t p = rd32(u, 0x2c);
-                if (t != 2 && (t < 4 || t > 5) && p) { g_b->o10750(p); g_b->o10867(p); }
-                if (g_b->f76a0(pa, roomArg, rd32(u, 0xc)) == 0) { g_b->f2ee70(); return; }
-            }
-        }
-    next:
-        if (n > 0xd) return;
-    }
 }
 
 // 1.13c D2Game+0xC39B0 (fastcall ecx=param_1)
