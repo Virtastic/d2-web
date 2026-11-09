@@ -17,9 +17,9 @@ struct H {
     void (*fc2790)(U ecx, U edx, U s0);       // 0xC2790 (ECX = window, EDX = 1, stack 0)
     void (*f47b20)(U edi);                    // 0x47B20 (EDI = npc guid)
     U (*fa5440)(U eax);                       // 0xA5440 (EAX = player unit)
-    U (*od0b4)(U s0);                         // thunk 0xD0B4 (stack: sound name)
-    void (*f3cc60)(U eax, U s0);              // 0x3CC60 (EAX = channel, stack = 0xD0B4 result)
-    void (*f3ccc0)(U eax, U s0);              // 0x3CCC0 (EAX = channel, stack = 0xD0B4 result)
+    U (*od0b4)();                             // thunk 0xD0B4 (no arguments; returns the sound object)
+    void (*f3cc60)(U eax, U s0, U s1);        // 0x3CC60 (EAX = count, stack = 0xD0B4 result, then the name-table address; ret 8)
+    void (*f3ccc0)(U eax, U s0, U s1);        // 0x3CCC0 (same shape as 0x3CC60)
     void (*f911a0)();                         // 0x911A0 shop initialiser
     void (*fbfa10)(U edi);                    // 0xBFA10 (EDI = 0x6FB805E0)
     void (*f492f0)();                         // 0x492F0
@@ -31,8 +31,8 @@ struct H {
 static void sounds(const H& h) {  // shared by both open paths (0x6FAFB077 / 0x6FAFB110)
     if (h.rd32(0x6FBD349C) != 0) return;
     h.wr32(0x6FBD349C, 1);
-    if (h.rd32(0x6FBD3498) != 0) { h.f3cc60(2, h.od0b4(0x6FBA51EC)); h.wr32(0x6FBD3498, 0); }
-    h.f3ccc0(4, h.od0b4(0x6FBA51BC));
+    if (h.rd32(0x6FBD3498) != 0) { h.f3cc60(2, h.od0b4(), 0x6FBA51EC); h.wr32(0x6FBD3498, 0); }
+    h.f3ccc0(4, h.od0b4(), 0x6FBA51BC);
 }
 static void layout(const H& h, U mode) {
     h.wr32(0x6FBCC418, 0); h.wr32(0x6FBCC414, mode);
@@ -84,9 +84,9 @@ U sub_4AEE0(const H& h) {
             sounds(h);
             h.f911a0();
             h.fbfa10(0x6FB805E0);
-            h.f3ccc0(8, h.od0b4(0x6FB8BC60));
+            h.f3ccc0(8, h.od0b4(), 0x6FB8BC60);
         } else if (now == 0) {
-            h.f3cc60(8, h.od0b4(0x6FB8BC60));
+            h.f3cc60(8, h.od0b4(), 0x6FB8BC60);
             h.f492f0();
             h.wr32(0x6FBCC434, 1);
             sounds(h);

@@ -1,6 +1,6 @@
 // 1.13c D2Client+0x3FC20 -- automap debug overlay for one room. stdcall(room), ret 4.
 // Pass 1: the room's 0x30-byte preset slots (D2Common room query thunk 0xCB0E: array + count out) are mapped from tile to
-// screen space; a slot with a unit, kind != 0xF and (flags & 0x1C000) == 0x4000 gets a marker (0xEF590) and its label.
+// screen space; a slot with a unit, kind != 0xF and (flags & 0x1C000) == 0x4000 gets a marker (0x3F590) and its label.
 // Pass 2 (only when the room is the player's): each node of the room's rectangle list (thunk 0xCE8C, next at +0x2C) is
 // mapped corner by corner and outlined; the player's own room also gets four tick marks. Every import is an env seam.
 #include <emscripten.h>
@@ -13,7 +13,7 @@ struct D2Client3fc20Env {
     void (*roomRect)(uint32_t room, int32_t* rect);                 // thunk 0xC5B0 (stdcall 2): 6+ dword rect, [4] [5] = tile origin
     void (*tileToScreen)(int32_t* x, int32_t* y);                   // thunk 0xC2F8 (stdcall 2)
     uint32_t (*presetFlags)(uint32_t id);                           // thunk 0xC17E (stdcall 1)
-    void (*marker)(int32_t x, int32_t y, int32_t color);            // 0xEF590 (EAX = x, stack y, color; ret 8)
+    void (*marker)(int32_t x, int32_t y, int32_t color);            // 0x3F590 (EAX = x, stack y, color; ret 8)
     void (*label)(int32_t x, int32_t y, uint32_t fmt, uint32_t v);  // thunk 0xD174 (cdecl 4)
     uint32_t (*unitRoom)(uint32_t unit);                            // thunk 0xC1F0 (stdcall 1)
     uint32_t (*roomRects)(uint32_t room);                           // thunk 0xCE8C (stdcall 1): first rect node

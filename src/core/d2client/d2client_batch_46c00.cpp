@@ -22,6 +22,7 @@ static D2Client46c00Env e_;
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_46c00_set_env(const D2Client46c00Env* e) { e_ = *e; }
 
 typedef uintptr_t U;
+#include "d2client_47500.h"
 static const uint32_t IB = 0x6FAB0000;
 #define A(a) e_.g((uint32_t)((a) - IB))
 #define D32(a) (*(volatile uint32_t*)A(a))
@@ -165,40 +166,19 @@ EMSCRIPTEN_KEEPALIVE void d2c_471f0() {
     }
 }
 
-// 1.13c D2Client+0x47500
+// env-seam adapter for the typed port in d2client_47500.cpp (1.13c D2Client+0x47500); F() = (rva, eax, ecx, stack words...)
 EMSCRIPTEN_KEEPALIVE void d2c_47500() {
-    if (D32(0x6fbc9757)) fatal(0x151b);
-    D8(0x6fbc9663) = 4;
-    U box = (U)F(0xA3E40, D32(0x6fbcb828), D32(0x6fbcb824), A(0x6faf61d0), 0, 0, 1, 1, 0, 0);
-    D32(0x6fbc9757) = (uint32_t)box;
-    if (!box) fatal(0x529);
-    W32(box + 0x5c, 1);
-    uint32_t mode = D32(0x6fbc9729);
-    if (mode < 1 || mode > 5) fatal(0x1550);
-    static const uint32_t ids[5] = {0xd14, 0xd13, 0xd17, 0xd16, 0xd18};   // jump table 0x6faf77f4
-    F(0xA36F0, box, (U)O(10003, ids[mode - 1]), 0x15, 0, 1, 0, 0);
-    if (mode != 5) {
-        U p = unitById(D32(0x6fbd22fd));
-        if (!p) return;
-        if (R32(p) != 4) fatal(0x5a);
-        uint16_t t[384] = {0};
-        F(0x914F0, p, (U)t, 0xbf);   // (unit, buf, 0xbf) all stack
-        int n = 0; while (t[n]) n++;
-        for (int i = 0; i < n; i++) if (t[i] == 10) { t[i] = 0; break; }
-        F(0xA36F0, box, (U)t, 0xf, 0, 1, A(0x6faf7480));
-        D16(0x6fbd230d) = 0;
-        uint32_t v = 0;   // 0x46230: EAX = &out, ECX = unit, stack (ebp = 0, buf 0x6fbd230d, 0x28); wsprintf reads the OUT slot, not the return
-        F(0x46230, (U)&v, p, 0, A(0x6fbd230d), 0x28);
-        char a[12]; uint16_t w[10] = {0};
-        snprintf(a, sizeof a, "%d", (int)v);
-        for (int i = 0; i < 9 && a[i]; i++) w[i] = (uint8_t)a[i];
-        uint16_t* d = (uint16_t*)A(0x6fbd230d);
-        int i = 0; do d[i] = w[i]; while (w[i++]);
-        F(0xA36F0, box, (U)O(10003, 0xd12), 0xf, 0, 1, A(0x6faf7480));
-        F(0xA36F0, box, (U)d, 0xf, 0, 1, A(0x6faf7480));
-    }
-    F(0xA36F0, box, (U)O(10003, 0xd10), 0xf, 0, 1, A(0x6faf7480), 1);
-    F(0xA36F0, box, (U)O(10003, 0xd11), 0xf, 0, 1, A(0x6faf61d0), 1);
+    struct S { static const char16_t* str(void*, uint32_t id) { return (const char16_t*)(U)O(10003, id); }
+        static uint32_t menu(void*, const uint32_t w[11]) { return (uint32_t)F(0xA3E40, 0, 0, w[0], w[1], w[2], w[3], w[4], w[5], w[6]); }
+        static void line(void*, uint32_t col, uint32_t m, const uint32_t w[6]) { F(0xA36F0, col, m, w[0], w[1], w[2], w[3], w[4], w[5]); }
+        static void name(void*, uint32_t u, char16_t* b, uint32_t n) { F(0x914F0, 0, 0, u, (U)b, n); }
+        static void cost(void*, uint32_t* o, uint32_t u, uint32_t c, char16_t* b, uint32_t n) { F(0x46230, (U)o, u, c, (U)b, n); }
+        static void die(void*, uint32_t code) { fatal(code); } };
+    d2client_47500::Env en = { nullptr, S::str, S::menu, S::line, S::name, S::cost, S::die };
+    d2client_47500::State st = { D32(0x6fbc9757), D32(0x6fbc9663), D32(0x6fbc9729), D32(0x6fbcb824), D32(0x6fbcb828), D32(0x6fbd22fd),
+        (char16_t*)A(0x6fbd230d), (const uint32_t*)A(0x6fbbae08) };
+    d2client_47500::sub_47500(en, st);
+    D32(0x6fbc9757) = st.box; D32(0x6fbc9663) = st.g9663;
 }
 
 // (env-seam copy; verified body: dialog_47810_4b420.cpp)
