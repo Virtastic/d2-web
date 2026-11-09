@@ -100,7 +100,7 @@ bool terminal(D2UnitStrc* unit, D2UnitStrc* owner, bool wall, D2UnitStrc* target
     return true;
 }
 
-// 1.13c D2Client+0xB30F0: origin (x, y) (the owner's position for flags 0x820, the request's point for flag 1), target
+// Follows client missile creation (see d2client_b30f0.cpp): origin (x, y) (the owner's position for flags 0x820, the request's point for flag 1), target
 // point (tx, ty) (flag 0x20; the origin otherwise).
 void create(D2UnitStrc* owner, int32_t missileId, int32_t skillId, int32_t level, int32_t x, int32_t y, int32_t tx, int32_t ty, int32_t activateBack) {
     const D2MissilesTxt* txt = DATATBLS_GetMissilesTxtRecord(missileId);

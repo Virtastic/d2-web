@@ -12,7 +12,7 @@ struct AE420G { const uint8_t* player; uint32_t listHead; const uint8_t* dataTab
 static uint32_t H(D2cHost h, uint32_t rva, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0, uint32_t d = 0) {
     D2cCall k = {}; k.rva = rva; k.s[0] = a; k.s[1] = b; k.s[2] = c; k.s[3] = d; return h(&k);
 }
-// 1.13c D2Client+0xAE420 (1093 B; no static callers -- packet dispatch table): parse the item-drop/extended-item packet
+// Earlier reading of D2Client 0xAE420, superseded by d2client_ae420.cpp (1093 B; no static callers -- packet dispatch table): parse the item-drop/extended-item packet
 // pkt (bytes: +1 id32, +5 u16, +7 u16, +9 u16, +0xB owner-mode, +0xC len, +0xD bitstream), build the item spec, call
 // FUN_6fb57780 (A7780 create), link/flag the unit and read the property list. Bitstream field order below is
 // the decompiler's call order; stack-aliased locals (spec words 0..6) are UNVERIFIED.

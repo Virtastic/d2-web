@@ -117,7 +117,7 @@ void sub_958A0(Env& e, Globals& g, Unit* panelUnit, int32_t panelKind, const Are
  }
  (void)own;
 }
-// 1.13c D2Client+0x96690  (ECX=panel unit, EDX=cursor owner)
+// GUESS for D2Client 0x96690, superseded by d2client_96690.cpp (ECX=panel unit, EDX=cursor owner)
 uint32_t sub_96690(Env& e, Globals& g, Unit* panelUnit, Unit* owner, int32_t heldItemId, Unit* held, Unit* cursor, uint32_t cmd, Unit* target) {
  uint32_t r = 0;
  if (g.cursorMode == 6) {

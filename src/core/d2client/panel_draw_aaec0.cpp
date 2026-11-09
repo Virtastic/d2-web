@@ -3,7 +3,7 @@
 #include <emscripten.h>
 #include "client_host.h"
 
-// 1.13c D2Client+0xAAEC0 (1707 B, caller 0xC39E0): bottom-panel / mini-panel button-bar draw.
+// Earlier host-seam reading of the trade panel draw, superseded by d2client_aaec0.cpp (1707 B, caller 0xC39E0): bottom-panel / mini-panel button-bar draw.
 // Every callee goes through the host seam in retail call order. Imports are rva = 0x100000|ordinal; the ordinal
 // numbers are UNVERIFIED (read from the decompile, not matched against an import table). 10041 = draw cel
 // (s[0]=frame, s[1]=x, s[2]=y, s[3]=-1, s[4]=5, s[5]=0 -> s[3] holds 4 words, rest in ecx/edx); the cel struct

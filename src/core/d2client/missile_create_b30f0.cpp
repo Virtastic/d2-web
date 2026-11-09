@@ -31,7 +31,7 @@ extern "C" void d2client_msl_set_env(const MslCreateEnv* e) { g_msl = *e; }
 
 static inline uint32_t rd32(const void* p, int o) { uint32_t v; memcpy(&v, (const uint8_t*)p + o, 4); return v; }
 
-// 1.13c D2Client+0xB30F0  (param_1 = missile-create request; fields: +0 flags, +4 creator, +8 anchor,
+// Earlier reading of D2Client 0xB30F0, superseded by d2client_b30f0.cpp  (param_1 = missile-create request; fields: +0 flags, +4 creator, +8 anchor,
 // +0xC target, +0x10 missile id, +0x14/+0x18 x/y, +0x1C/+0x20 dx/dy, +0x24 .., +0x28 range, +0x30 level, +0x34 ..)
 // Computes range/speed/position from the missiles.txt row (stride 0x1A4), creates the unit, wires it.
 // Returns the new missile unit or 0. Post-create tail is delegated to env (ponytail: not decomposed here).

@@ -18,7 +18,7 @@ struct A7780G {
 static uint32_t H(D2cHost h, uint32_t rva, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0, uint32_t d = 0) {
     D2cCall k = {}; k.rva = rva; k.s[0] = a; k.s[1] = b; k.s[2] = c; k.s[3] = d; return h(&k);
 }
-// 1.13c D2Client+0xA7780 (1123 B; callers 0xAE420/0x1E070/0xA7BF0/0x181A0): create (or re-use) a client item unit
+// Earlier reading of D2Client 0xA7780, superseded by d2client_a7780.cpp (1123 B; callers 0xAE420/0x1E070/0xA7BF0/0x181A0): create (or re-use) a client item unit
 // from a received item-spec p (p[0]=id p[1]=txtIdx p[2]=seed p[4]/p[5]=flags/colour, bytes 0..8 copied to data+0x1C).
 // chainWalk(): ordinal 10265/10024/_exit fatal-error paths are folded into return -1 (UNVERIFIED mapping).
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_a7780(uint32_t* p, uint16_t a2, uint16_t a3, int32_t a4,
