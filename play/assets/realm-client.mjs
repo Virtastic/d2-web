@@ -48,6 +48,7 @@ function makeReader(transport) {
   transport.onData((d) => { buf = cat(buf, d); pump(); });
   transport.onClose(() => { closed = true; pump(); });
   return {
+    echo: (bytes) => transport.send(bytes),
     want: (n, ms = CONNECT_TIMEOUT_MS) => new Promise((resolve, reject) => {
       const w = { n, resolve, reject, t: null };
       if (ms !== null) w.t = setTimeout(() => { const i = waiters.indexOf(w); if (i >= 0) waiters.splice(i, 1); reject(Object.assign(new Error(`timed out after ${buf.length}/${n} bytes`), { timedOut: true })); }, ms);
@@ -68,15 +69,23 @@ function makeReader(transport) {
   };
 }
 
-/** One BNCS frame: `[0xFF][id][len u16 LE]` + body. */
+/**
+ * One BNCS frame: `[0xFF][id][len u16 LE]` + body. A server may send SID_PING (0x25, a 4-byte cookie)
+ * at any time, and Battle.net servers send it right after the selector, before the AUTH_INFO reply;
+ * it is never an answer to a call, so it is echoed back as the protocol asks and skipped.
+ */
 async function readBncsFrame(reader, timeoutMs) {
-  const head = await reader.want(4, timeoutMs);
-  if (head[0] !== 0xff) throw new Error(`reply is not a 0xFF BNCS frame (first byte 0x${head[0].toString(16)})`);
-  const total = head[2] | (head[3] << 8);
-  if (total < 4) throw new Error(`BNCS frame length ${total} is shorter than its header`);
-  const frame = await reader.want(total, timeoutMs);
-  reader.skip(total);
-  return { id: frame[1], body: frame.subarray(4) };
+  for (;;) {
+    const head = await reader.want(4, timeoutMs);
+    if (head[0] !== 0xff) throw new Error(`reply is not a 0xFF BNCS frame (first byte 0x${head[0].toString(16)})`);
+    const total = head[2] | (head[3] << 8);
+    if (total < 4) throw new Error(`BNCS frame length ${total} is shorter than its header`);
+    const frame = await reader.want(total, timeoutMs);
+    const copy = Uint8Array.from(frame);
+    reader.skip(total);
+    if (copy[1] === 0x25) { if (reader.echo) reader.echo(copy); continue; }
+    return { id: copy[1], body: copy.subarray(4) };
+  }
 }
 
 /** One MCP frame: `[total:u16 LE][op:u8][body]`; total includes its own 3-byte header. */
