@@ -74,6 +74,10 @@ W void d2game_a5ff4_sae6f0(int pNode);
 W void d2game_a5ff4_saea80(int pGame, int pUnit, int a, int b, int c, int d, int e);
 W void d2game_a5ff4_s41490(void* pIn, void* pOut);
 W int  d2game_a5ff4_s473c0(int a, int pUnit, int nSkill);
+W int  d2game_a5ff4_s473c0g(int pGame, int pUnit, int nSkill, int a2);
+W u32  d2game_a5ff4_sde5a0(int m, int pUnit, int pGame, int o);
+W void d2game_a5ff4_s77240(int pUnit, int n);
+W void d2game_a5ff4_sddde0(int pUnit, int cl, const u32* pEvent, int pGame, int m);
 W void d2game_a5ff4_s97240(int pUnit);
 W int  d2game_a5ff4_sbee50(int a, void* pOut, int pUnit, int b, int nSkill, int c);
 W void d2game_a5ff4_sefb80(int pThis, int pGame, int pRoom, int pUnit, int a, int b);
@@ -376,26 +380,31 @@ extern "C" int d2game_a5ff4_fn_b36a0(int param_1, int param_2)
     return 0;
 }
 
-// 1.13c D2Game+0xB41B0   __fastcall(ecx = pGame, edx = pUnit, nSkill); ebx = first arg of 473C0,
-// ebp = client arg of FE5A0/DDDE0, retaddr_arg = second arg of Ordinal_10653.
-extern "C" int d2game_a5ff4_fn_b41b0(int param_1, int param_2, int param_3, int ebx, int ebp, int retaddr_arg)
+// 1.13c D2Game+0xB41B0   __fastcall(ecx = pGame, edx = pUnit, nSkill, a2); ret 8
+extern "C" int d2game_a5ff4_fn_b41b0(int param_1, int param_2, int param_3, int param_4)
 {
     int rec = skill_rec(param_3);
     if (rec == 0) return 0;
     d2game_a5ff4_se07a0(param_1);
     int m = d2game_a5ff4_ord10392(rd(param_2, 0x2C));
     if (m == param_2 || m == 0) return 0;
-    if (rd(param_2, 0) == 0) return d2game_a5ff4_s473c0(ebx, param_2, param_3);
-    u32 f = d2game_a5ff4_sfe5a0(ebp, d2game_a5ff4_ord10653(param_2, retaddr_arg, param_3, 0), param_2);
+    if (rd(param_2, 0) == 0) return d2game_a5ff4_s473c0g(param_1, param_2, param_3, param_4);
+    u32 D[0x1c];
+    memset(D, 0, sizeof D);
+    int o = d2game_a5ff4_ord10653(param_2, param_3, param_4, 0);
+    u32 f = d2game_a5ff4_sde5a0(m, param_2, param_1, o);
+    D[1] = f & 0xFFFF;
     if (f & 1) {
-        // rec+0x134, when non-zero, was stored into a local of the zeroed event block (dead store)
-        d2game_a5ff4_s97240(param_2);
+        D[1] = (f | (u32)(*(unsigned short*)(intptr_t)(rec + 0x12E))) & 0xFFFF;
+        D[0] |= (u32)rd(rec, 0x130);
+        if (rd(rec, 0x134) != 0) D[0x18] = (u32)rd(rec, 0x134);
+        d2game_a5ff4_s77240(param_2, 8);
     }
-    d2game_a5ff4_sdddde0(0x80, ebp, m);
+    d2game_a5ff4_sddde0(param_2, 0x80, D, param_1, m);
     return 1;
 }
 
-// 1.13c D2Game+0xB4410   __fastcall(ecx = pGame, edx = pUnit, nSkill, param_4)
+// 1.13c D2Game+0xB4410   __fastcall(ecx = pGame, edx = pUnit, nSkill, param_4); ret 8
 extern "C" int d2game_a5ff4_fn_b4410(int param_1, int param_2, int param_3, int param_4)
 {
     if (skill_rec(param_3) == 0) return 0;

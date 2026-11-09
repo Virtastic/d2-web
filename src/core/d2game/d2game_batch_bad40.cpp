@@ -59,52 +59,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_BAF20(void* game, uint32_t uni
     wr32(st, 0x14, rd32(st, 0x14) + 1);
 }
 
-// 1.13c D2Game+0xBB6A0  (stack arg = quest record, ESI = unit)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_BB6A0(uint8_t* rec, int32_t* unit, const D2GameBatchBad40Env* e)
-{
-    uint8_t* st = (uint8_t*)(uintptr_t)rd32(rec, 0x18);
-    if (st[4]) e->ord(11090, 0, 0, 0);
-    if (!st[3]) return;
-    int32_t arg = 0x32;
-    int32_t hits = 0;
-    const uint32_t cnt = rd32(st, 0x14);
-    auto rollOff = [&](uint32_t off, uint8_t* g) -> int32_t {
-        uint8_t* sd = (uint8_t*)(uintptr_t)rd32(g, 0x10f4);
-        if (!sd) e->fatal(0x1fb);
-        uint64_t s; std::memcpy(&s, sd + 0x18, 8);
-        s = (uint64_t)(uint32_t)s * 0x6ac690c5ull + rd32(sd, 0x1c);
-        std::memcpy(sd + 0x18, &s, 8);
-        return (int32_t)rd32(e->strTable, (uint32_t)(s & 0xffffffff) % 7 * 4 + off);
-    };
-    uint8_t* game = (uint8_t*)(uintptr_t)rd32(rec, 4);
-    for (uint32_t i = 0; (int32_t)i < (int32_t)cnt; i++) {
-        uint32_t off;
-        switch (rd32(st, 8)) {
-        case 1: off = 0xbc; break;
-        case 2: case 3: off = 0xa0; break;
-        case 4: off = 0x84; break;
-        default: return;
-        }
-        unit[0x2e] = rollOff(off, game);
-        if (e->sub31A70((uint32_t)(uintptr_t)unit, 2, &arg, 0, 0xffffffff, 0)) hits++;
-    }
-    if (!hits) return;
-    int32_t left = (int32_t)rd32(st, 8) - 1;
-    wr32(st, 8, (uint32_t)left);
-    if (left >= 1) {
-        e->sub8EA80((uint32_t)(uintptr_t)game, (uint32_t)(uintptr_t)unit, 7, rd32(game, 0xa8) + 0x14, 0, 0, 0);
-        return;
-    }
-    st[3] = 0;
-    if (!rd32(game, 0x70)) return;
-    uint32_t base = 0;
-    if (game[0x6d] == 1) base = 0x2c; else if (game[0x6d] == 2) base = 0x58;
-    uint8_t* sd = (uint8_t*)(uintptr_t)rd32(game, 0x10f4);
-    if (!sd) e->fatal(0x1fb);
-    uint32_t r = e->seedRoll21180(sd + 0x18);
-    unit[0x2e] = (int32_t)rd32(e->strTable, base + r * 4);
-    e->sub31A70((uint32_t)(uintptr_t)unit, 2, &arg, 0, 0xffffffff, 0);
-}
+// 1.13c D2Game+0xBB6A0 lives in d2game_bb6a0.cpp (register and stack argument order read from the assembly).
 
 // 1.13c D2Game+0xBBCE0  (ECX = game, EDX = unit)
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BBCE0(uint8_t* game, int32_t* unit, const D2GameBatchBad40Env* e)

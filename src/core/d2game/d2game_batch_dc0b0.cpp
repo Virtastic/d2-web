@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <emscripten.h>
+#include "../fn/hookenv.h"
 
 struct D2GameBatchDC0B0Env {
     void*    (*at)(uint32_t guest);
@@ -145,4 +146,26 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_DC530(int32_t eaxAdd, int3
     int32_t v = (int32_t)r;
     if (v <= 0x100000) return (uint32_t)((int32_t)((uint32_t)v * sc) / 128);
     return (uint32_t)((v / 128) * (int32_t)sc);
+}
+
+// 1.13c D2Game+0xDC530 replay entry: r[0]=eax add, r[1]=ecx max, r[2]=edx unit, r[3]=a1, r[4]=result, r[5]=a2, r[6]=a3, r[7]=a4, r[8]=a5,
+// r[9]=log, r[10]=sc. Each callee answers from the recorded hook list.
+static HookEnv* g_dc530e;
+static void*    dc530_at(uint32_t a) { return (void*)(uintptr_t)a; }
+static uint32_t dc530_372c0(uint32_t u) { return g_dc530e->h(0x372C0, 0, 0, 0, 0, 0, u); }
+static int32_t  dc530_a7c0(uint32_t u, uint32_t v) { return (int32_t)g_dc530e->h(0xA7C0, 0, 0, 0, 0, 0, u, v); }
+static int32_t  dc530_a42a(uint32_t u, uint32_t st, uint32_t l) { return (int32_t)g_dc530e->h(0xA42A, 0, 0, 0, 0, 0, u, st, l); }
+static int32_t  dc530_a802(uint32_t u, uint32_t st, uint32_t l) { return (int32_t)g_dc530e->h(0xA802, 0, 0, 0, 0, 0, u, st, l); }
+static int32_t  dc530_a82c(uint32_t w) { return (int32_t)g_dc530e->h(0xA82C, 0, 0, 0, 0, 0, w); }
+static int32_t  dc530_a7d2(uint32_t w) { return (int32_t)g_dc530e->h(0xA7D2, 0, 0, 0, 0, 0, w); }
+static int32_t  dc530_a80e(uint32_t u, uint32_t w, uint32_t a, uint32_t b) { return (int32_t)g_dc530e->h(0xA80E, 0, 0, 0, 0, 0, u, w, a, b); }
+static uint32_t dc530_bed0(uint32_t a, uint32_t c, uint32_t d, uint32_t u, uint32_t mn, uint32_t a3) { return g_dc530e->h(0xDBED0, a, c, d, 0, 0, u, mn, a3); }
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_dc530(uint32_t* r)
+{
+    HookEnv he((uint32_t*)(uintptr_t)r[9], (const uint32_t*)(uintptr_t)r[10]); g_dc530e = &he;
+    Env_DC env{};
+    env.at = dc530_at; env.sub372C0 = dc530_372c0; env.o10051 = dc530_a7c0; env.o10973 = dc530_a42a; env.o10910 = dc530_a802;
+    env.o10213 = dc530_a82c; env.o10120 = dc530_a7d2; env.o10804 = dc530_a80e; env.subDBED0 = dc530_bed0;
+    r[4] = d2_fn_d2game_DC530((int32_t)r[0], (int32_t)r[1], r[2], r[3], r[5], (int32_t)r[6], r[7], r[8], &env);
 }

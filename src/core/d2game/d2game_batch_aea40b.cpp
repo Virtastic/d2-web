@@ -334,43 +334,40 @@ extern "C" U d2_fn_d2game_B1820(U unit, U game, U param_2, U param_3, U *param_4
 }
 
 // ---------------------------------------------------------------------------------------------------
-// 1.13c D2Game+0xB3D60 -- FUN_6fcd3d60(uint param_1, int *param_2, int param_3); unaff_EDI is the
-// caller's list pointer, unaff_retaddr the return-address slot passed to FUN_6fcfe0c0's frame.
-// The 0x70-byte local block (uStack_70 at +0, local_74 at +4, zeroed from +4) is inferred from the
-// decompile's stores; see MISMATCH notes in the spec once it lands.
-extern "C" U d2_fn_d2game_B3D60(U param_1, I param_2, I param_3, I edi, I retaddr)
+// 1.13c D2Game+0xB3D60 -- __fastcall(ecx = pGame, edx = pUnit, nSkill, a2); ret 8.
+// The skill row's event block D (0x1C dwords, zeroed) is built here and handed to 9F210 / DE0C0 / DCF20 by pointer. Every callee is a
+// typed weak seam (b3d60_<name>, 32-bit retail words) so the replay records the exact register and stack arguments.
+#define S3(n, ...) extern "C" __attribute__((weak)) uint32_t b3d60_##n(__VA_ARGS__)
+S3(e07a0, uint32_t unit, uint32_t game);            // EAX = unit, ECX = game
+S3(o10392, uint32_t path);
+S3(o10510, uint32_t unit, uint32_t skill, uint32_t a2, uint32_t one);
+S3(f9f210, uint32_t skill, uint32_t unit, uint32_t pEvent, uint32_t a2);   // EAX = skill, EDI = unit, stack event, a2
+S3(fde0c0, uint32_t m, uint32_t game, uint32_t unit, uint32_t one, uint32_t pEvent);   // EAX = m, stack game, unit, 1, event
+S3(o10973, uint32_t unit, uint32_t stat, uint32_t layer);
+S3(fdcf20, uint32_t m, uint32_t game, uint32_t unit, uint32_t pEvent);     // EAX = m, stack game, unit, event
+S3(o10689, uint32_t unit, uint32_t stat, uint32_t value);
+// retail reads the table block as ds:[0xF829C] -> a cell -> the tables: two loads
+static inline uintptr_t DT3() { return (uintptr_t)R32(R32(sgptDataTables_exref, 0), 0); }
+extern "C" U d2_fn_d2game_B3D60(U game, I unit, I skill, I a2)
 {
-    if (param_3 < 0 || param_3 >= (I)S32(DTB(), 0xba0)) return 0;
-    I iVar4 = param_3 * 0x23c + (I)R32(DTB(), 0xb98);
-    if (iVar4 == 0) return 0;
-
-    if (param_2 != 0) R32(param_2, 0xc4) |= 0x40;
-    I unitSave = (I)param_2;   // uStack_84 is written then overwritten in the decompile
-    (void)unitSave;
-    D2GAME_E07A0(param_1);
-    I piVar2 = Ord10392();     // uStack_84 = param_2[0xb] is read by Ord10392 in the decompile
-    if (piVar2 == param_2 || piVar2 == 0) return 1;
-
-    uint8_t blk[0x70];
-    for (int i = 0; i < 0x70; i++) blk[i] = 0;
-    uint16_t *uStack_70 = (uint16_t *)&blk[0];
-    uint32_t *local_74 = (uint32_t *)&blk[4];
-    *local_74 = param_1;
-    *uStack_70 = (uint16_t)(*uStack_70 | 1 | U16(iVar4, 0x12e));
-    *local_74 = *local_74 | R32(iVar4, 0x130);
-    if (R32(iVar4, 0x134) != 0) { /* iStack_14 = R32(iVar4, 0x134) in the decompile */ }
-    U uStack_8c = 1;
-    I iStack_90 = param_3;
-    I uStack_50 = Ord10510(param_2, retaddr);
-    D2GAME_9F210();
-    D2GAME_DE0C0(edi, param_2, 1, (I)&blk[0]);
-    I iVar3 = Ord10973(piVar2, 6, 0);
-    if (iVar3 == 0) uStack_8c |= 2;
-    D2GAME_DCF20(edi, param_2, (I)&iStack_90);
-    short sVar1 = S16(iVar4, 0x4e);
-    if (0 < sVar1 && (int)sVar1 <= (int)S32(DTB(), 0xbc0)) {
-        Ord10689(piVar2, (I)sVar1, 0);
-    }
-    (void)uStack_50;
+    if (skill < 0 || skill >= (I)S32(DT3(), 0xba0)) return 0;
+    uintptr_t rec = (uintptr_t)skill * 0x23c + R32(DT3(), 0xb98);
+    if (rec == 0) return 0;
+    if (unit != 0) R32(unit, 0xc4) |= 0x40;
+    b3d60_e07a0((U)unit, game);
+    U m = b3d60_o10392(R32(unit, 0x2c));
+    if (m == (U)unit || m == 0) return 1;
+    U D[0x1c];
+    for (int i = 0; i < 0x1c; i++) D[i] = 0;
+    D[1] = 1 | U16(rec, 0x12e);
+    D[0] |= R32(rec, 0x130);
+    if (R32(rec, 0x134) != 0) D[0x18] = R32(rec, 0x134);
+    D[13] = b3d60_o10510((U)unit, (U)skill, (U)a2, 1);
+    b3d60_f9f210((U)skill, (U)unit, (U)(uintptr_t)D, (U)a2);
+    b3d60_fde0c0(m, game, (U)unit, 1, (U)(uintptr_t)D);
+    if (b3d60_o10973(m, 6, 0) == 0) D[1] |= 2;
+    b3d60_fdcf20(m, game, (U)unit, (U)(uintptr_t)D);
+    int16_t w = S16(rec, 0x4e);
+    if (0 < w && (int)w <= S32(DT3(), 0xbc0)) b3d60_o10689(m, (U)w, 0);
     return 1;
 }

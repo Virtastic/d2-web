@@ -63,48 +63,66 @@ extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B4520(u32 game, void* unit, i32
     return 1;
 }
 
-// 1.13c D2Game+0xB46B0  (__fastcall; param_2 = unit; ESI is the 3rd arg to 0xE19C0)
-extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B46B0(u32 ecx, void* unit, u32 esi, const D2GameBatchB4520Env* env)
+// 1.13c D2Game+0xB46B0  (__fastcall ECX = game, EDX = unit; ret 8, the two stack words unused). #10983/#10764 read the unit's room; #10331(unit)
+// feeds 0x1280 (EAX = that result, EBX = the #10983 result, EDI = the #10764 result), whose result is the room handed to 0xE19C0 (EAX = #10764
+// result, ECX = #10983 result, EDX = room; stack game, unit, 0, 0). 0xE03A0 takes EAX = node+0x30, ECX = node+0x28, EDX = node+0x2c.
+extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B46B0(u32 game, void* unit, const D2GameBatchB4520Env* env)
 {
     u32 U_ = U((uintptr_t)unit);
     u32 room = rd32(unit, 0x2c);
     u32 v = ORD(10983, room, 0, 0, 0);
-    ORD(10764, room, 0, 0, 0);
-    i32 r = ORD(10331, U_, 0, 0, 0);
-    i32 z = SUB(0x1280, 0, 0, 0, 0, 0, 0, 0);
+    u32 w = ORD(10764, room, 0, 0, 0);
+    u32 r = ORD(10331, U_, 0, 0, 0);
+    u32 z = SUB(0x1280, r, v, w, 0, 0, 0, 0);
     if (z == 0 && rd32(unit, 0) == 1 && rd32(unit, 0x14)) {
         u32 p = rd32((const void*)(uintptr_t)rd32(unit, 0x14), 0x28);
         if (p && rd32((const void*)(uintptr_t)p, 0x28)) {
-            i32 q = SUB(0xE03A0, rd32((const void*)(uintptr_t)p, 0x28), rd32((const void*)(uintptr_t)p, 0x2c), 0, 0, 0, 0, 0);
-            if (q) r = ORD(10331, U(q), 0, 0, 0);
+            u32 q = SUB(0xE03A0, rd32((const void*)(uintptr_t)p, 0x30), rd32((const void*)(uintptr_t)p, 0x28), rd32((const void*)(uintptr_t)p, 0x2c), 0, 0, 0, 0);
+            if (q) z = ORD(10331, q, 0, 0, 0);
         }
     }
-    if (!SUB(0xE19C0, v, U(r), esi, U_, 0, 0, 0)) return 0;
+    if (!SUB(0xE19C0, w, v, z, game, U_, 0, 0)) return 0;
     ORD(10158, U_, 0, 0, 0);
     wr32(unit, 0xc8, rd32(unit, 0xc8) | 0x10000);
     return 1;
 }
 
-// 1.13c D2Game+0xB4870  (ESI = unit)
-extern "C" EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_B4870(void* unit, const D2GameBatchB4520Env* env)
+// 1.13c D2Game+0xB4870  (ESI = unit; stack: game, ret 4). A room-less unit, or a room for which #10203 answers 0, returns 0. #10266(#10788(room)) picks a byte of the
+// 8-entry table {a,8,16,14,12,10,e,c}; #10740 takes the dword of the stack table with that byte in place and writes the step pair (dx, dy). #10630(ECX = unit,
+// EDX = 0xAD) is a plain-ret fastcall: the `push 1` before it stays on the stack and is the third word of #10306(unit, result, 1) (ret 0xC). Types 2, 4 and 5 read the
+// room's +0xC / +0x10; the others ask #10867 / #10750. 0x1280 (EAX = #10331(unit), EBX = x, EDI = y) has its result dropped. The 0x17-dword request goes to
+// 0x6F930 (ECX = game, EDX = request): {0x21, unit, 0, 0x8F, x, y, 0, x + 2 dx, y + 2 dy, 0, 3, 0xAD, #10306 result}.
+extern "C" EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_B4870(void* unit, u32 game, const D2GameBatchB4520Env* env)
 {
     u32 room = rd32(unit, 0x2c);
     if (!room) return nullptr;
     if (!ORD(10203, room, 0, 0, 0)) return nullptr;
-    ORD(10788, 0, 0, 0, 0);
-    u32 b = U(ORD(10266, 0, 0, 0, 0)) & 0xff;
-    // ponytail: the 0x10740 first arg is a stack-resident per-class byte table indexed by b
-    ORD(10740, b, U((uintptr_t)&room), 0, 0);
-    ORD(10630, 1, 0, 0, 0);
-    ORD(10306, 0, 0, 0, 0);
+    const u32 un = U((uintptr_t)unit);
+    u32 k = U(ORD(10788, room, 0, 0, 0));
+    u32 b = U(ORD(10266, k, 0, 0, 0)) & 0xff;
+    static const uint8_t tab[8] = { 0xa, 8, 0x16, 0x14, 0x12, 0x10, 0xe, 0xc };
+    // ponytail: an index past the table reads stack residue in retail; the vectors keep it below 8
+    u32 w0 = (b < 8 ? tab[b] : 0u) | 0x08u << 8 | 0x16u << 16 | 0x14u << 24;
+    i32 dxy[2] = { 0, 0 };
+    ORD(10740, w0, U((uintptr_t)&dxy[0]), U((uintptr_t)&dxy[1]), 0);
+    u32 r6 = U(ORD(10630, un, 0xad, 0, 0));
+    u32 r3 = U(ORD(10306, un, r6, 1, 0));
     i32 t = (i32)rd32(unit, 0);
-    if (t != 2 && (t < 4 || t > 5) && rd32(unit, 0x2c)) ORD(10867, rd32(unit, 0x2c), 0, 0, 0);
-    t = (i32)rd32(unit, 0);
-    if (t != 2 && (t < 4 || t > 5) && rd32(unit, 0x2c)) ORD(10750, rd32(unit, 0x2c), 0, 0, 0);
-    ORD(10331, 0, 0, 0, 0);
-    SUB(0x1280, 0, 0, 0, 0, 0, 0, 0);
-    Desc d{}; d.w[0] = 0x21;
-    return (void*)(uintptr_t)SUB(0x6F930, 0, U((uintptr_t)&d), 0, 0, 0, 0, 0);
+    u32 ex, ey;
+    if (t == 2 || (t >= 4 && t <= 5)) { u32 rm = rd32(unit, 0x2c); ex = rd32((const void*)(uintptr_t)rm, 0xc); ey = rd32((const void*)(uintptr_t)rm, 0x10); }
+    else {
+        u32 rm = rd32(unit, 0x2c);
+        ex = rm ? U(ORD(10867, rm, 0, 0, 0)) : 0;
+        ey = rm ? U(ORD(10750, rm, 0, 0, 0)) : 0;
+    }
+    u32 x = ex + U(dxy[0]), y = ey + U(dxy[1]);
+    u32 uc = U(ORD(10331, un, 0, 0, 0));
+    SUB(0x1280, uc, x, y, 0, 0, 0, 0);
+    Desc d{};
+    d.w[0] = 0x21; d.w[1] = un; d.w[3] = 0x8f; d.w[4] = x; d.w[5] = y;
+    d.w[7] = x + 2 * U(dxy[0]); d.w[8] = y + 2 * U(dxy[1]);
+    d.w[10] = 3; d.w[11] = 0xad; d.w[12] = r3;
+    return (void*)(uintptr_t)SUB(0x6F930, game, U((uintptr_t)&d), 0, 0, 0, 0, 0);
 }
 
 // Missile direction step used by B4DE0: (dx,dy) -> (x step, y step), the ladder of the 1.13c body.

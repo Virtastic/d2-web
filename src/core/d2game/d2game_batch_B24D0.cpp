@@ -25,6 +25,7 @@
 #include <cstring>
 #include <unistd.h>
 #include <emscripten.h>
+#include "../fn/hookenv.h"
 
 static inline uint8_t  rd8 (const void* p, uint32_t o) { return ((const uint8_t*)p)[o]; }
 static inline uint16_t rd16(const void* p, uint32_t o) { uint16_t v; std::memcpy(&v, (const uint8_t*)p + o, 2); return v; }
@@ -311,13 +312,23 @@ EMSCRIPTEN_KEEPALIVE void d2game_8af10_send(void* record, void* client, void (*s
     d2game_8AF10_113c(record, client, env);
 }
 
-// 1.13c D2Game+0xDC030 (r[0]=pGame, r[1]=pAttacker EBX, r[2]=nAttackerLevel EDI,
-// r[3]=nDefenderLevel, r[6]=nDefenderExperience EAX, r[4]=result)
+// 1.13c D2Game+0xDC030 replay entry: regs eax=defender exp, ebx=attacker, edi=attacker level;
+// r[0]=eax r[1]=ebx r[2]=edi r[3]=pGame r[4]=result r[5]=defender level r[6]=log r[7]=sc.
+static HookEnv* g_dc030e;
+static int32_t  dc030_a48a(int32_t c) { return (int32_t)g_dc030e->h(0xA48A, 0, 0, 0, 0, 0, (uint32_t)c); }
+static uint32_t dc030_aa40(int32_t dl, uint32_t ex, int32_t al) { return g_dc030e->h(0xDAA40, (uint32_t)al, (uint32_t)dl, ex); }
+static uint32_t dc030_a9e0(uint32_t v, int32_t al) { return g_dc030e->h(0xDA9E0, v, 0, 0, 0, 0, (uint32_t)al); }
+static int32_t  dc030_a42a(void* u, uint32_t st, int32_t l) { return (int32_t)g_dc030e->h(0xA42A, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u, st, (uint32_t)l); }
+static int32_t  dc030_14d0(int32_t dv, uint32_t v, int32_t pc) { return (int32_t)g_dc030e->h(0x14D0, (uint32_t)pc, (uint32_t)dv, v); }
+static uint32_t dc030_b6b0(void* at, void* g, int32_t al, uint32_t v) { return g_dc030e->h(0xDB6B0, (uint32_t)(uintptr_t)at, 0, 0, 0, 0, (uint32_t)(uintptr_t)g, (uint32_t)al, v); }
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_dc030(uint32_t* r)
 {
-    r[4] = d2game_DC030_113c(r[6], (void*)(uintptr_t)r[1], (int32_t)r[2],
-                             (void*)(uintptr_t)r[0], (int32_t)r[3], batchEnv(r));
+    HookEnv e((uint32_t*)(uintptr_t)r[6], (const uint32_t*)(uintptr_t)r[7]); g_dc030e = &e;
+    D2GameBatchB74Env env{};
+    env.ord10066 = dc030_a48a; env.fnDAA40 = dc030_aa40; env.fnDA9E0 = dc030_a9e0;
+    env.ord10973 = dc030_a42a; env.fn14D0 = dc030_14d0; env.fnDB6B0 = dc030_b6b0;
+    r[4] = d2game_DC030_113c(r[0], (void*)(uintptr_t)r[1], (int32_t)r[2], (void*)(uintptr_t)r[3], (int32_t)r[5], env);
 }
 
 // 1.13c D2Game+0xDE8F0 (r[0]=pGame, r[1]=pAttacker EAX, r[2]=pDefender, r[3]=nAttackerLevel,

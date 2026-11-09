@@ -290,42 +290,7 @@ extern "C" i32 D2GAME_711D0(i32 in_eax, i32 arg, const D2Game711D0Env* e)
     return count;
 }
 
-// 1.13c D2Game+0xBAFF0  EAX=in_eax (pointer to {game, ?, unit}); Ordinal args hidden in regs.
-void D2GAME_BAFF0(i32* in_eax, i32 arg)
-{
-    i32 pos[2] = {0, 0};
-    Ordinal_10141(in_eax[2], P(pos));
-    pos[1] += 5;
-    Ordinal_10331(in_eax[2]);
-    i32 iVar2 = (i32)Ordinal_10331();
-    i32 res = (i32)FUN_6fc54130(iVar2, in_eax[2], P(pos), 2);
-    if (!res) return;
-    i32 g = *in_eax;
-    i32* m = (i32*)Ordinal_11153(W(g, 0x1c), 2);
-    if (!m) return;
-    m[0] = 2; m[1] = 0x236; m[2] = W(g, 0x1c); m[0x20] = g;
-    m[0x32] = W(g, 0x70) == 0 ? (m[0x32] & 0xfdffffff) : (m[0x32] | 0x2000000);
-    m[0x32] |= 0x4000000;
-    i32 u = (i32)Ordinal_10826();
-    uint8_t c = (uint8_t)Ordinal_10459();
-    *(uint8_t*)(m + 6) = c;
-    m[7] = W(g, 0xbc + c * 4);
-    m[0x1d] = 0;
-    FUN_6fd00110();
-    m[0x31] |= 0x10; m[0x34] = 0xb;
-    i32 gen = W(g, 0x98) + 1; if (gen == -1) gen = 1;
-    W(g, 0x98) = gen;
-    i32* z = (i32*)Ordinal_10045("..\\Source\\D2Game\\UNIT\\SUnit.cpp", 0x265, 0);
-    m[5] = (i32)(intptr_t)z;
-    for (int i = 0; i < 0xe; i++) z[i] = 0;
-    *(i32*)(intptr_t)m[5] = (i32)Ordinal_10688(0x236);
-    m[4] = 1;
-    Ordinal_10445(P(m));
-    FUN_6fc4f300();
-    FUN_6fd00f40(res, P(m), u, g);
-    *(uint8_t*)(intptr_t)(arg + 0x44) = 0; *(uint8_t*)(intptr_t)(arg + 0x45) = 1;   // stack arg (ret 4)
-    m[0x31] |= 0x3000000;
-}
+// 1.13c D2Game+0xBAFF0 lives in d2game_baff0.cpp (seam-based, for the replay).
 
 static i32 b63_bc_common(i32* p, i32 dx, i32 dy, i32 ox, i32 oy)
 {

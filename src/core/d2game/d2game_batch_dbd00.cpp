@@ -22,66 +22,84 @@ static void dbd00Fatal(const D2GameBatchDBD00Env* e, uint32_t size)
     std::exit(-1);
 }
 
-// 1.13c D2Game+0xDBD00  thiscall(this, param_1), EAX = pointer to an offset cell.
-// GUESS: DB3C0 and 14D0 take stack/register args the decompile does not show; DB3C0 called with none.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_DBD00(uint32_t thisp, int32_t param1, uint32_t eax, const D2GameBatchDBD00Env* e)
+// 1.13c D2Game+0xDBD00: ECX = this (record: cells base at +0x18, flat absorb values at +0x1C+idx*4), EAX = element
+// descriptor ([0] byte offset of the cell, [0x18] absorb index), stack p1 (ret 4). The register callees take their
+// operands as retail does: 0xDB3C0 (EBX = descriptor, EDI = this), 0x14D0 (EAX = 100 - resist, ECX = 100, EDX = value),
+// 0xDAD00 (EAX = value, ECX = this, EBX = descriptor).
+struct D2GameDBD00Env {
+    int32_t (*subDB3C0)(uint32_t desc, uint32_t self);
+    int32_t (*sub14D0)(int32_t pct, int32_t scale, int32_t v);
+    int32_t (*subDAD00)(int32_t v, uint32_t self, uint32_t desc);
+};
+int32_t d2game_DBD00_113c(uint32_t self, uint32_t desc, int32_t p1, const D2GameDBD00Env& e)
 {
-    uint32_t cell = rd32(thisp, 0x18) + rd32(eax, 0);
+    const uint32_t cell = rd32(self, 0x18) + rd32(desc, 0);
     int32_t v = (int32_t)rd32(cell, 0);
     if (v < 1) { wr32(cell, 0, 0); return 0; }
-    int32_t f = e->subDB3C0();
-    if (param1 == 0) v -= (int32_t)rd32(thisp, rd32(eax, 0x18) * 4 + 0x1c);
-    else if (0 < f) f = 0;
-    if (0 < v && f != 0) v = e->sub14D0(100, v);
-    if (param1 == 0) v = e->subDAD00(thisp);
+    int32_t f = e.subDB3C0(desc, self);
+    if (p1 != 0) { if (f > 0) f = 0; }
+    else v -= (int32_t)rd32(self, rd32(desc, 0x18) * 4 + 0x1c);
+    if (v > 0 && f != 0) {
+        if (f >= 100) f = 100;
+        v = e.sub14D0(100 - f, 100, v);
+    }
+    if (p1 == 0) v = e.subDAD00(v, self, desc);
     wr32(cell, 0, (uint32_t)v);
     return v;
 }
 
-// Shared body of 0xDC940 (skill 0x73) and 0xDCAB0 (skill 2); the two functions are identical otherwise.
-// GUESS: the comments reads iRam0000007f / uRam00000073 (null-address artefacts); taken as the game
-// (iVar2) and the skill constant, per the surrounding calls.
-static void dbd00Aura(uint32_t thisp, uint32_t p1, uint32_t unit, int32_t p3, int32_t p4, uint32_t skill,
-                      const D2GameBatchDBD00Env* e)
+// 1.13c D2Game+0xDC940 / 0xDCAB0: stdcall(this, unit, magnitude, duration) ret 0x10, identical but for the
+// state id (0x73 / 2). this+0x80 = game (+0xA8 frame, +0x1C timer pool); unit+0 type, +0xDC event chain (type
+// byte at +0, next at +0x24). Every callee is stdcall on the stack except 0x8E6F0 (EAX = event, EDI = game) and
+// 0x8EA80 (ECX = game, EDX = unit, five stack words). A null `this` ends the process in retail (not reproduced).
+struct D2GameAuraEnv {
+    uint32_t (*subA5D4)(uint32_t unit, uint32_t state);
+    void     (*sub8E6F0)(uint32_t event, uint32_t game);
+    void     (*sub8EA80)(uint32_t game, uint32_t unit, uint32_t type, uint32_t frame, uint32_t a, uint32_t b, uint32_t c);
+    void     (*subA3CA)(uint32_t unit, uint32_t state, uint32_t one);
+    uint32_t (*subA6A0)(uint32_t pool, uint32_t two, uint32_t endFrame, uint32_t w0, uint32_t w1);
+    void     (*subA76C)(uint32_t h, uint32_t stat, int32_t val, uint32_t zero);
+    void     (*subA5B6)(uint32_t h, uint32_t state);
+    void     (*subA75A)(uint32_t h, uint32_t fn);
+    void     (*subA60A)(uint32_t unit, uint32_t h, uint32_t one);
+    int32_t  (*subA712)(uint32_t h, uint32_t stat, uint32_t zero);
+    void     (*subA7C6)(uint32_t h, uint32_t endFrame);
+    void     (*subA6E2)(uint32_t h, uint32_t stat, int32_t val, uint32_t zero);
+    uint32_t callback;      // the 0x9F7A0-style callback word handed to 0xA75A (retail: absolute address of 0xBF7A0)
+};
+static void d2game_auraBody(uint32_t self, uint32_t unit, int32_t mag, int32_t dur, uint32_t state, const D2GameAuraEnv& e)
 {
-    if (!(0 < p4 && 0 < p3)) return;
-    int32_t kind = e->ordinal10871(unit);
-    if (thisp == 0) dbd00Fatal(e, 0xa2a);
-    uint32_t game = rd32(thisp, 0x80);
-    if (unit && rd32(unit, 0) == 1) {
-        for (uint32_t n = rd32(unit, 0x37 * 4); n;) {
-            uint8_t t = rd8(n, 0);
-            n = rd32(n, 0x24);
-            if (t == 3) { e->sub8E6F0(); p3 = (int32_t)p1; }
+    if (dur <= 0) return;
+    if (mag <= 0) return;
+    uint32_t timer = e.subA5D4(unit, state);
+    const uint32_t game = rd32(self, 0x80);
+    if (unit != 0 && rd32(unit, 0) == 1) {
+        uint32_t ev = rd32(unit, 0xdc);
+        while (ev != 0) {
+            const uint32_t next = rd32(ev, 0x24);
+            if (rd8(ev, 0) == 3) e.sub8E6F0(ev, game);
+            ev = next;
         }
-        e->sub8EA80(game, unit, 3, rd32(game, 0xa8) + 1, 0, 0, 0);
+        e.sub8EA80(game, unit, 3, rd32(game, 0xa8) + 1, 0, 0, 0);
     }
-    uint32_t frame = rd32(game, 0xa8) + unit;
-    if (kind == 0) {
-        e->ordinal10945(unit, skill, 1);
-        uint32_t h = e->ordinal11013(rd32(game, 0x1c), 2, frame, skill);
-        e->sub8EA80(game, unit, 0xc, frame, 0, 0, 0);
-        e->ordinal10261(h, 0x4a, -p3, 0);
-        e->ordinal10785(h, skill);
-        e->ordinal10911(h, e->subBF7A0);
-        e->ordinal10807(unit, h, 1);
+    const uint32_t endFrame = rd32(game, 0xa8) + (uint32_t)dur;
+    if (timer == 0) {
+        e.subA3CA(unit, state, 1);
+        const uint32_t h = e.subA6A0(rd32(game, 0x1c), 2, endFrame, rd32(self, 0), rd32(self, 0xc));
+        e.sub8EA80(game, unit, 0xc, endFrame, 0, 0, 0);
+        e.subA76C(h, 0x4a, -mag, 0);
+        e.subA5B6(h, state);
+        e.subA75A(h, e.callback);
+        e.subA60A(unit, h, 1);
         return;
     }
-    int32_t cur = e->ordinal10680(kind, 0x4a, 0);
-    if (-p3 == cur || -cur < p3) {
-        e->ordinal11043(game, frame);
-        e->sub8EA80(game, unit, 0xc, frame, 0, 0, 0);
-        e->ordinal10188(unit, 0x4a, -p3, 0);
-    }
+    if (-e.subA712(timer, 0x4a, 0) > mag) return;
+    e.subA7C6(timer, endFrame);
+    e.sub8EA80(game, unit, 0xc, endFrame, 0, 0, 0);
+    e.subA6E2(timer, 0x4a, -mag, 0);
 }
-
-// 1.13c D2Game+0xDC940  thiscall(this, p1, unit, p3, p4)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DC940(uint32_t thisp, uint32_t p1, uint32_t unit, int32_t p3, int32_t p4, const D2GameBatchDBD00Env* e)
-{ dbd00Aura(thisp, p1, unit, p3, p4, 0x73, e); }
-
-// 1.13c D2Game+0xDCAB0  thiscall(this, p1, unit, p3, p4)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DCAB0(uint32_t thisp, uint32_t p1, uint32_t unit, int32_t p3, int32_t p4, const D2GameBatchDBD00Env* e)
-{ dbd00Aura(thisp, p1, unit, p3, p4, 2, e); }
+void d2game_DC940_113c(uint32_t self, uint32_t unit, int32_t mag, int32_t dur, const D2GameAuraEnv& e) { d2game_auraBody(self, unit, mag, dur, 0x73, e); }
+void d2game_DCAB0_113c(uint32_t self, uint32_t unit, int32_t mag, int32_t dur, const D2GameAuraEnv& e) { d2game_auraBody(self, unit, mag, dur, 2, e); }
 
 // 1.13c D2Game+0xDEBA0  EAX = unit A, EBX = unit B (rng seed at B+0x20/+0x24). Weighted pick over
 // weightTable; the LCG is seed = lo*0x6AC690C5 + hi, written back as a 64-bit pair, low 32 bits used.

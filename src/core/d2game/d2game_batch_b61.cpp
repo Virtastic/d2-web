@@ -30,6 +30,8 @@ struct D2GameB61Env {
     void*    sgptDataTables;                                          // sgptDataTables_exref target
     // 0xBAE40 quest callback table (retail addresses, 32-bit)
     uint32_t cb9560, cb94d0, cba550, cbabf0, cba100, cba5e0, cb9320, cb8ae0, cb8a70, data6118;
+    // 0xBAE40: Fog #10045 with its register arguments (ECX = the game's pool word at +0x1C, EDX = size), then the stack (file, line, 0)
+    void*    (*allocP)(uint32_t pool, uint32_t size, const char* file, uint32_t line, uint32_t zero);
 };
 
 // 1.13c D2Game+0x9D3B0
@@ -95,7 +97,7 @@ uint32_t d2_port_d2game_b9b00(uint8_t* param_1, int32_t* param_2, const D2GameB6
 // +0xA0, sets flags/state bytes, installs the callback table, allocates the 0x1C-byte state (a4q1.cpp
 // line 0x2A0) and zeroes it.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2game_bae40(uint8_t* param_1, const D2GameB61Env* env)
+void d2_fn_d2game_BAE40(uint8_t* param_1, const D2GameB61Env* env)
 {
     std::memset(param_1 + 0xA0, 0, 0xF * 4);
     param_1[10] = 1;
@@ -112,7 +114,8 @@ void d2_fn_d2game_bae40(uint8_t* param_1, const D2GameB61Env* env)
     param_1[0xD] = 4;
     b61_w32(param_1 + 0xE8, 0);
     b61_w32(param_1 + 0xEC, env->cb8ae0);
-    uint8_t* st = (uint8_t*)env->alloc("..\\Source\\D2Game/Quests/a4q1.cpp", 0x2A0, 0);
+    const uint8_t* game = (const uint8_t*)(uintptr_t)b61_u32(param_1 + 4);
+    uint8_t* st = (uint8_t*)env->allocP(b61_u32(game + 0x1C), 0x1C, "..\\Source\\D2Game/Quests/a4q1.cpp", 0x2A0, 0);
     b61_w32(param_1 + 0x18, (uint32_t)(uintptr_t)st);
     b61_w32(param_1 + 0xF0, env->cb8a70);
     b61_w32(param_1 + 0x10, 0x18);

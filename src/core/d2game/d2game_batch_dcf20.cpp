@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstring>
 #include <emscripten.h>
+#include "../fn/hookenv.h"
 
 struct D2GameBatchDCF20Env {
     void*    (*at)(uint32_t guest);
@@ -157,8 +158,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DCF20(uint32_t unit, uint32_t 
     } else if (!(fl & 0x4000)) {
         if (!(fl & 1)) return;
         if (R<int32_t>(e, rec + 0x4c) < 1) return;
-        uint8_t bl = (uint8_t)e->o10973(unit, 0x160, 0);
-        uint8_t al = (uint8_t)e->sub77060((uint32_t)bl);
+        int32_t s160 = e->o10973(unit, 0x160, 0);
+        uint8_t bl = (uint8_t)s160;
+        uint8_t al = (uint8_t)e->sub77060((uint32_t)s160);
         int32_t d = (int32_t)bl - (int32_t)al;
         if (d < 0) d = -d;
         if (d < 5) return;
@@ -170,4 +172,50 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DCF20(uint32_t unit, uint32_t 
     W<uint32_t>(e, unit + 0xc4, R<uint32_t>(e, unit + 0xc4) | 0x8000);
     e->subAF710(unit, 0x13);
     e->sub268E0(a1, unit, 0, 4);
+}
+
+// 1.13c D2Game+0xDCF20 replay entry: r[0]=unit (EAX), r[1]=a1, r[2]=a2, r[3]=a3 (hit record); the pinned global 0xF8BE0 is the first blob (r[14]),
+// the hook log and answer list are blobs 8 and 9 (r[30], r[32]).
+static HookEnv* g_dcf;
+#define DCFH(...) g_dcf->h(__VA_ARGS__)
+static void*    dcf_at(uint32_t a) { return (void*)(uintptr_t)a; }
+static uint32_t dcf_a478(uint32_t u) { return DCFH(0xA478, 0, 0, 0, 0, 0, u); }
+static int32_t  dcf_a808(uint32_t v) { return (int32_t)DCFH(0xA808, 0, 0, 0, 0, 0, v); }
+static uint32_t dcf_1220(uint32_t a) { return DCFH(0x1220, a); }
+static uint32_t dcf_a660(uint32_t rec) { return DCFH(0xDA660, 0, 0, 0, 0, rec); }
+static int32_t  dcf_a68e(uint32_t u, uint32_t v) { return (int32_t)DCFH(0xA68E, 0, 0, 0, 0, 0, u, v); }
+static void     dcf_a3ca(uint32_t u, uint32_t a, uint32_t b) { DCFH(0xA3CA, 0, 0, 0, 0, 0, u, a, b); }
+static uint32_t dcf_1560(uint32_t a, uint32_t d) { return DCFH(0x1560, a, 0, d); }
+static void     dcf_771d0(uint32_t rec, uint32_t u) { DCFH(0x771D0, 0, 0, 0, rec, u); }
+static void     dcf_deee0(uint32_t a1, uint32_t u, uint32_t a2, uint32_t one) { DCFH(0xDEEE0, 0, a1, u, 0, 0, a2, one); }
+static void     dcf_75070(uint32_t* l, uint32_t code) { DCFH(0x75070, 0, 0, 0, 0, (uint32_t)(uintptr_t)l, code); }
+static void     dcf_75e10(uint32_t a1, uint32_t* l, uint32_t one) { DCFH(0x75E10, 0, 0, 0, 0, 0, a1, (uint32_t)(uintptr_t)l, one); }
+static void     dcf_af710(uint32_t u, uint32_t code) { DCFH(0xAF710, u, 0, 0, 0, 0, code); }
+static int32_t  dcf_a5d4(uint32_t u, uint32_t v) { return (int32_t)DCFH(0xA5D4, 0, 0, 0, 0, 0, u, v); }
+static int32_t  dcf_b910(uint32_t u, uint32_t rec, uint32_t v) { return (int32_t)DCFH(0xDB910, 0, 0, 0, 0, 0, u, rec, v); }
+static void     dcf_68e0(uint32_t a1, uint32_t u, uint32_t a, uint32_t b) { DCFH(0x268E0, 0, a1, u, 0, 0, a, b); }
+static void     dcf_a4de(uint32_t u) { DCFH(0xA4DE, 0, 0, 0, 0, 0, u); }
+static int32_t  dcf_a42a(uint32_t u, uint32_t st, uint32_t l) { return (int32_t)DCFH(0xA42A, 0, 0, 0, 0, 0, u, st, l); }
+static uint32_t dcf_7060(uint32_t a) { return DCFH(0x77060, a); }
+static uint32_t dcf_a712(uint32_t a, uint32_t b, uint32_t c) { return DCFH(0xA712, 0, 0, 0, 0, 0, a, b, c); }
+static uint32_t dcf_a3f4(uint32_t u, uint32_t v) { return DCFH(0xA3F4, 0, u, v); }
+static uint32_t dcf_a79c(uint32_t v) { return DCFH(0xA79C, 0, 0, 0, 0, 0, v); }
+static void     dcf_a78a(uint32_t v, uint32_t f) { DCFH(0xA78A, 0, 0, 0, 0, 0, v, f); }
+static void     dcf_8430(uint32_t a1, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t f) { DCFH(0x78430, a1, 0, 0, 0, 0, a, b, c, d, f); }
+static void     dcf_8550(uint32_t a1, uint32_t u, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t f) { DCFH(0x78550, 0, a1, u, 0, 0, a, b, c, d, f); }
+static uint32_t dcf_1420(uint32_t a) { return DCFH(0x1420, a); }
+static void     dcf_ffd0(uint32_t code, uint32_t u) { DCFH(0xDFFD0, 0, 0, 0, 0, u, code, u); }
+static void     dcf_a472(uint32_t u, uint32_t st, int32_t v, uint32_t l) { DCFH(0xA472, 0, 0, 0, 0, 0, u, st, (uint32_t)v, l); }
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_dcf20(uint32_t* r)
+{
+    HookEnv he((uint32_t*)(uintptr_t)r[14 + 2 * 8], (const uint32_t*)(uintptr_t)r[14 + 2 * 9]); g_dcf = &he;
+    Env_DCF e{};
+    e.at = dcf_at; e.o10331 = dcf_a478; e.o10057 = dcf_a808; e.sub1220 = dcf_1220; e.bitMasksSlot = r[14]; e.subDA660 = dcf_a660;
+    e.o10494 = dcf_a68e; e.o10945 = dcf_a3ca; e.sub1560 = dcf_1560; e.sub771D0 = dcf_771d0; e.subDEEE0 = dcf_deee0; e.sub75070 = dcf_75070;
+    e.sub75E10 = dcf_75e10; e.subAF710 = dcf_af710; e.o10871 = dcf_a5d4; e.subDB910 = dcf_b910; e.sub268E0 = dcf_68e0; e.o10158 = dcf_a4de;
+    e.o10973 = dcf_a42a; e.sub77060 = dcf_7060; e.o10680 = dcf_a712; e.o10630 = dcf_a3f4; e.o10397 = dcf_a79c; e.o10137 = dcf_a78a;
+    e.sub78430 = dcf_8430; e.sub78550 = dcf_8550; e.sub1420 = dcf_1420; e.subDFFD0 = dcf_ffd0; e.o10887 = dcf_a472;
+    d2_fn_d2game_DCF20(r[0], r[1], r[2], r[3], &e);
+    r[4] = 0;
 }
