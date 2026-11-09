@@ -69,6 +69,7 @@
 #include <Units/Missile.h>
 #include "../realm/client_fireball_hit.h"
 #include "monster_light_terminal.h"
+#include "monster_light_den.h"
 #include "light_occlusion_policy.h"
 #include "plugy_stash_grid.h"
 #include "path_attempt_trace.h"
@@ -11003,6 +11004,11 @@ EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_session_lightmap(int ambientOve
 }
 
 #include "d2client_light_in.h"
+// The Den of Evil quest byte (retail g_QuestAvail[1]) that 0x4C150 reads. The online client does not decode
+// its source yet, so it stays 0 until the setter is fed; with 0 the override never applies.
+static uint8_t g_denOfEvilQuestAvail = 0;
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_lightmap_set_den_quest_avail(int avail) { g_denOfEvilQuestAvail = avail ? 1 : 0; }
+
 // The same light map for a client that holds its own units (the online client): the caller supplies the
 // player and the other sources; the window, ambient, occlusion and falloff are the session's own.
 // A monster entry (unit set) takes its position and radius from the unit the way the session does
@@ -11024,10 +11030,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_client_lightmap_comp
                     d2::monspawn::clientAnimationAtEnd(unit->pAnimSeq != nullptr, (int32_t)unit->dwFrameCountPrecise,
                         (int32_t)unit->nSeqCurrentFramePrecise, unit->wAnimSpeed))) continue;
             const D2MonStats2Txt* mon2 = UNITS_GetMonStats2TxtRecordFromMonsterId((int)unit->dwClassId);
-            int light = mon2 ? (int)mon2->nLight : 0;
             const int itemLight = (int)MONSTERS_GetMaximalLightRadius(unit);
-            if (itemLight > light) light = itemLight;
-            radius = light > 0 ? (light > 18 ? 18 : light) : 0;
+            // 0x4C150: the Den of Evil override reads the unit's own room level and MonStats nAlign.
+            const D2ActiveRoomStrc* unitRoom = unit->pDynamicPath->pRoom;
+            const int32_t levelId = unitRoom && unitRoom->pDrlgRoom && unitRoom->pDrlgRoom->pLevel ? unitRoom->pDrlgRoom->pLevel->nLevelId : -1;
+            const bool den = stats && d2::monspawn::denOfEvilLightOverride(levelId, g_denOfEvilQuestAvail != 0, unit->dwFlags, stats->nAlign);
+            radius = d2::monspawn::monsterLightRadius(den, mon2 ? (int)mon2->nLight : 0, itemLight);
             x = (int)(unit->pDynamicPath->tGameCoords.dwPrecisionX >> 13) + 4;
             y = (int)(unit->pDynamicPath->tGameCoords.dwPrecisionY >> 13) + 4;
         }
