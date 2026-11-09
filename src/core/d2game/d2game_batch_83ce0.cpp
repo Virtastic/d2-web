@@ -8,10 +8,10 @@
 
 // 1.13c D2Game+0x83CE0 (Brute): ported from the retail listing in d2game_83ce0.cpp (1.13c rolls differ from the D2MOO 1.10f AITHINK_Fn007_Brute).
 
-// 1.13c D2Game+0x851E0 (SkeletonMage)
+// D2Game 0x851E0 (superseded: the 1.13c port is d2game_851e0.cpp) (SkeletonMage)
 extern "C" void d2game_851e0(D2GameStrc* g, D2UnitStrc* u, D2AiTickParamStrc* p) { AITHINK_Fn064_SkeletonMage(g, u, p); }
 
-// 1.13c D2Game+0x85B60 (Mephisto)
+// D2Game 0x85B60 (Mephisto; superseded: the 1.13c port is d2game_85b60.cpp)
 extern "C" void d2game_85b60(D2GameStrc* g, D2UnitStrc* u, D2AiTickParamStrc* p) { AITHINK_Fn050_Mephisto(g, u, p); }
 
 // D2Game+0x87A60 (SandMaggotQueen): the retail-shaped port is d2game_87a60.cpp

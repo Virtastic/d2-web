@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x86900: monster AI melee/ranged attack-choice step (ecx = game, edx = unit-ish param_2, stack = AI arg block).
+// D2Game 0x86900 (superseded: the 1.13c port is d2game_86900.cpp): monster AI melee/ranged attack-choice step (ecx = game, edx = unit-ish param_2, stack = AI arg block).
 // Plain transcription of the cached decompile; callees by address.
 #include <cstdint>
 #include <cstdlib>
@@ -13,7 +13,7 @@ EXT(Ordinal_11103); EXT(Ordinal_11027); EXT(FUN_6fcd1bc0); EXT(FUN_6fc21180); EX
 EXT(FUN_6fd12380); EXT(FUN_6fd126b0); EXT(FUN_6fd12d80); EXT(FUN_6fd12220); EXT(FUN_6fd122c0); EXT(FUN_6fd12540);
 extern u32* gdwBitMasks_exref;
 
-// 1.13c D2Game+0x86900
+// D2Game 0x86900 (superseded: the 1.13c port is d2game_86900.cpp)
 extern "C" void b86900_sub_86900(i32 p1, i32* p2, i32* p3) {
   i32 st = p3[7], dist = p3[5], flag = p3[6], target = p3[2], ai = p3[0];
   i32 m = S(st, 0x6e + *(uint8_t*)((intptr_t)p1 + 0x6d) * 2);

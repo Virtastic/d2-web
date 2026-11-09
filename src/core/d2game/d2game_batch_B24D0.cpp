@@ -334,7 +334,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_dc030(uint32_t* r)
 // 1.13c D2Game+0xDE8F0 (r[0]=pGame, r[1]=pAttacker EAX, r[2]=pDefender, r[3]=nAttackerLevel,
 // r[6]=nDefenderLevel, r[7]=nDefenderExperience)
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_de8f0(uint32_t* r)
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_de8f0_old(uint32_t* r)
 {
     d2game_DE8F0_113c((void*)(uintptr_t)r[1], (void*)(uintptr_t)r[0], (void*)(uintptr_t)r[2],
                       (int32_t)r[3], (int32_t)r[6], r[7], batchEnv(r));

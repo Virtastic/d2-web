@@ -20,7 +20,7 @@ typedef D2GameBatchD9BF0Env Env_D9;
 // 1.13c D2Game+0xD9BF0 -- use an inventory item (potion / scroll / tome / key) from the cursor-less item table.
 // eax = item id, ecx = unit, edx = game; stack: a1, a2 (forwarded to AD0F0), outFlag (set 0, then 1 on bad item).
 extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2_fn_d2game_D9BF0(uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t a1, uint32_t a2, uint32_t outFlag, const Env_D9* e)
+uint32_t d2_fn_d2game_D9BF0_old(uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t a1, uint32_t a2, uint32_t outFlag, const Env_D9* e)
 {
     const uint32_t itemId = eax, unit = ecx, game = edx;
     if (game == 0) e->fatal(0x105b);

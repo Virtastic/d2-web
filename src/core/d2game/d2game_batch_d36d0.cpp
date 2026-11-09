@@ -395,7 +395,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d6bc0(uint32_t eaxUnit, uint32
 // Body-location move (merge of D5C30's tail for the swap-in case). this = player, param_1 = game,
 // param_2 = body loc (byte), param_3 = flag, param_4 = out error; reg: EAX = unit id. Only slot
 // kinds 5 -> 4 and 4 -> 5 are accepted; Ordinal_10946 must return 2.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d8020(uint32_t player, uint32_t game, uint32_t param2, int32_t param3, uint32_t* outErr, uint32_t eaxId, E)
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d8020_old(uint32_t player, uint32_t game, uint32_t param2, int32_t param3, uint32_t* outErr, uint32_t eaxId, E)
 {
     if (game == 0) FATAL(0xb7c);
     if (player == 0) FATAL(0xb7d);
@@ -454,7 +454,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d8020(uint32_t player, uin
 // 1.13c D2Game+0xD8600
 // Swap an item to the belt/slot: this = player, param_1 = game, param_2 = slot (byte, <= 10),
 // param_3 = flag, param_4 = out error; reg: EAX = unit id. Ordinal_10946 must return 5.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d8600(uint32_t player, uint32_t game, uint8_t slot, uint32_t param3, uint32_t* outErr, uint32_t eaxId, E)
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d8600_old(uint32_t player, uint32_t game, uint8_t slot, uint32_t param3, uint32_t* outErr, uint32_t eaxId, E)
 {
     if (game == 0) FATAL(0xca8);
     if (player == 0) FATAL(0xca9);

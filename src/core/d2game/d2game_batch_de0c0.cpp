@@ -141,7 +141,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DE0C0(uint32_t att, uint32_t g
 }
 
 // 1.13c D2Game+0xDEA00 : stack (game, unit, item), ret 0xc.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DEA00(uint32_t game, uint32_t unit, uint32_t item, const Env_DE* e) {
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DEA00_old(uint32_t game, uint32_t unit, uint32_t item, const Env_DE* e) {
     if (!unit || !item) return;
     uint32_t t = R<uint32_t>(e, unit);
     if (t != 0 && t != 1) return;
