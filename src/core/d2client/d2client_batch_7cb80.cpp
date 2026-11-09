@@ -403,7 +403,7 @@ void sub_7DFB0(void* thisp, uint8_t* m) {
     sub_7D850(out, m[2]);
 }
 
-// 1.13c D2Client+0x7E930
+// playerMode_exit: faithful form (EAX to 0x486A0) is d2client_7e930.cpp
 void sub_7E930() {
     if (!g.f3aca) e.fn7cef0(); else e.fn486a0();
     if (g.d5d4) g.ad50 = e.tick() + 100;
