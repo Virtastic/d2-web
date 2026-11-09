@@ -1151,9 +1151,14 @@ static void pkt_place(uint32_t x, uintptr_t unitBits, uint32_t y, uint32_t radiu
     const int radius = d2::realm::placeRadius(unit->dwUnitType == UNIT_MONSTER, isLocal, unit->dwAnimMode, radiusSel, 0);
     const int curX = PATH_GetXPosition(unit->pDynamicPath), curY = PATH_GetYPosition(unit->pDynamicPath);
     if (std::abs(curX - static_cast<int>(x)) <= radius && std::abs(curY - static_cast<int>(y)) <= radius) {
-        // GUESS: the client re-places a near target when both coordinates differ from the unit's and
-        // neither blocked-target test blocks it; those tests (collision and path calls) are not ported,
-        // so a near target keeps the path. A capture with the collision inputs pinned settles it.
+        // Retail rule for a target inside the arrival radius: if the target shares a coordinate with the unit's
+        // position, nothing happens. Otherwise two blocked-target tests run, the first on the unit's own two
+        // record words and the second on the adjusted target; a hit on either keeps the path. With no hit the
+        // target dispatch runs: a local player sends its own position back, another player takes a walk command,
+        // any other unit takes a path command.
+        // GUESS: the blocked-target test is a sprite-cell query this realm layer does not hold, so every near
+        // target is treated as blocked here (keeps the path). Blocker: that sprite query, which needs the sprite
+        // data this layer does not load; a fixture with the sprite data pinned settles it.
         return;
     }
     // Retail requires a room at the target.
@@ -1167,9 +1172,12 @@ static void pkt_place(uint32_t x, uintptr_t unitBits, uint32_t y, uint32_t radiu
         return;
     }
     if (isPlayer) {
-        // GUESS: retail refreshes the path through the D2Common position setter and, for modes
-        // 2/3/6, re-issues the walk/run command; here the setter is a detach and attach at the
-        // target keeping the facing, and the re-issue is not modelled.
+        // Retail's walk dispatch for another player: for unit modes 2, 3 and 6 it first refreshes the path from
+        // the unit's current path record (an absent record is fatal in retail), and it issues the walk command
+        // whenever the target's y is nonzero, whatever the mode. Here the refresh is a detach and attach at the
+        // target keeping the facing.
+        // GUESS: the walk command's effect (its move-kind dispatch and the path helpers it calls) is not ported,
+        // so the re-issue is not modelled. Blocker: that dispatch has no capture fixture yet.
         player->view.x = x;
         player->view.y = y;
         ensure_player_motion(*player, true);
@@ -2091,16 +2099,23 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_local_move_to_unit(int type, uint32_t g
         static_cast<uint16_t>(PATH_GetYPosition(target->pDynamicPath))) > 0 ? 1 : 0;
 }
 
-// Whether the selected player is close enough to use a unit, by the size-aware distance the
-// client's click handler tests: a monster within 2 when its monstats row has the interact bit, else
-// within 5; a player within 4.
-// GUESS (item: collision relation test): the click handler also runs a relation test between the two
-// units. Retail's test is D2Common 0x326C0, gated by the flag from D2Common 0x319A0; neither is ported
-// (0x326C0 is outside D2Client), so a blocked-but-near unit reads as reachable.
-// Capture request: D2Common 0x326C0 over unit pairs (monster/player) with the 0x319A0 flag pinned.
-// GUESS (item: objects): retail tests objects with D2Common 10594 and 10324 (0x804) on their CUnits. The
-// realm keeps no CUnit for objects, items or tiles, so they stay -1 here.
-// Capture request: object legality for type 2 with the object's CUnit state pinned.
+// Whether the selected player can use a unit now. Retail: D2Client 0x29E80 (port d2c_29e80) returns
+// "walk first" as true, so a unit is usable now when that is false. For a monster, player, item or
+// tile the test is !D2Common 0x326C0(player, target, moving) with moving = D2Common 0x319A0 (#10793,
+// IsInMovingMode of the target). 0x326C0 passes when the distance is under 1, or when the distance is
+// within size(player) + 1 + moving and D2Common 0x814A0 finds nothing blocking on mask 0x804; a
+// tentacle monster (base 0x102 or 0x105) also passes within size(player) + 8.
+// GUESS (relation test): the limits below (2 with the monstats interact bit, 5 for other monsters, 4 for
+// players) are not that formula: they read the target's monstats, not size(player), and skip the
+// 0x814A0 collision and the tentacle case. Nothing here is retail-exact yet.
+// capture: d2common/326c0 <player-to-monster and player-to-player pairs, moving flag 0 and 1 pinned,
+// size(player) from 0x325C0 pinned, 0x814A0 result recorded>.
+// GUESS (objects, items, tiles): retail's 0x29E80 has no melee test for type 2. An object is usable now
+// only when D2Common 0x31000 (#10594, footprint reach) is nonzero and D2Common 0x319C0 (#10324, mask
+// 0x804) is zero. Items and tiles take the melee rule above. The realm keeps no CUnit for them, so they
+// stay -1 and the JS falls back to its tile distance; that fallback is not retail for items or tiles.
+// capture: d2client/29e80 <object targets (type 2) with footprint and 0x804 collision pinned; item and
+// tile targets with the melee inputs pinned>.
 // -1 for a unit the client keeps no CUnit for (objects and ground items) or no local player.
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_can_interact(int type, uint32_t guid) {
     if (g_selectedPlayer < 0 || size_t(g_selectedPlayer) >= g_players.size()) return -1;
@@ -2117,13 +2132,16 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_can_interact(int type, uint32_t guid) {
     return D2Common_10399(unit, target) <= limit ? 1 : 0;
 }
 
-// GUESS (item: pending-action words): retail tracks the pending action in D2Client globals
-// DAT_6fbcc2f4 and DAT_6fbcc2f8 (0xC2F4 / 0xC2F8), written by the action functions and read here; that
-// state machine is not ported and the neutral/dead anim mode is used instead.
-// Capture request: the 0xC2F4 / 0xC2F8 words across a walk, a cast and a stop, with the functions that
-// write them named in the spec.
 // 1 once the selected player has ended the action it was walking or casting (back in a
 // neutral mode, or dead); 0 while that action still runs; -1 with no local unit.
+// GUESS (pending-action words): retail keeps the pending action in two D2Client words. 0x11C2F4 is the
+// pending target record: 0x51860 sets it to the clicked unit (or 0 to cancel) and records its type at
+// 0x11964C and its guid at 0x119638; 0x51AE0 and 0x51D10 clear it when the path resolves. 0x11C2F8 is a
+// busy latch: the refusal paths 0x2AE30, 0x2AEA0 and 0x2AFB0 set it (and clear 0x11C2F4), and 0x51860,
+// 0x51E80, 0x51AE0, 0x51D10 do nothing while it is set. Here "done" is the anim mode, which is not that
+// state machine; the realm does not read or write either word.
+// capture: d2client/51ae0 <a walk to a monster, a stop, and a cast; 0x11C2F4 and 0x11C2F8 and the two
+// pending-record words recorded per frame>.
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_local_action_done() {
     if (g_selectedPlayer < 0 || size_t(g_selectedPlayer) >= g_players.size()) return -1;
     auto* unit = g_players[g_selectedPlayer].motionUnit;
@@ -2296,12 +2314,17 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_skill_value(uint32_t guid, int i
 // 0x1B add a byte or word to experience (stat 13); 0x1C sets experience to the dword; 0x1D..0x1F set the
 // stat named by byte 1 to a byte, word or dword at byte 2. All act on the current player. 0x20 sets a
 // stat on the player unit whose GUID it names. Values are in the stat's wire units.
-// A missing hero is fatal in retail 0xAEDF0 (the client logs and exits); here no selected player record for
-// 0x19..0x1F is a negative return, which ends the stream. A record whose motion unit is still detached is not
-// fatal: the packet is dropped there. Differs from retail: the stat-change event that follows each 0x19..0x1F
-// set (+0xAEB10, called with the stat id and new value) is not called. Its effects are UI and inventory refreshes: stats 0 and 2 refresh the
-// character screen, stat 6 at a nonzero value in mode 0x11 refreshes the unit's mode, stat 12 (level)
-// re-checks equipped items and, for the hero, the skill and character screens. None changes core state.
+// Retail effect of a missing hero: the stat packet logs a fixed message and exits the client, so nothing is
+// written and no stat-change event runs. Here a missing selected record is a negative return, which rejects the
+// stream and clears the realm state (the nearest equivalent). Open difference: retail keys this on the hero
+// unit being null; here a selected record with a null motion unit is dropped (0) instead.
+// A record whose motion unit is still detached is not fatal: the packet is dropped there.
+// Differs from retail: the stat-change event that follows each 0x19..0x1F set (stat id and new value) is not run
+// here. Its effects are client-side only and never write the stat list: stats 0 and 2 re-check the equipped
+// items; stat 12 (level) re-checks the owner's equipped items and, for the hero, its inventory and equipped items
+// again; hit points at a nonzero value on a dead unit run two dead-unit callees. The browser runs them through
+// d2_client_stat_update_actions (play/assets/stat-update-watch.mjs), which the test
+// test/d2client-aeb10-stat-update.test.mjs pins to the 1.13c switch.
 static int apply_player_stat(const uint8_t* packet, int length) {
     const auto read = [](const uint8_t* p, int n) {
         uint32_t value = 0;
@@ -2765,10 +2788,10 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_owned_item_readback_by_guid(uint32_t ow
 // (d2_client_lightmap_compose), fed from the units this client holds -- the selected player, its monsters'
 // CUnits and its objects (Objects.txt Lit<mode> is a diameter, position in subtiles *8 + 4).
 // Objects settled: the radius (nLit[mode] >> 1) and position are the rule the session lightmap uses
-// (monspawn_check.cpp, measured against retail's light captures). GUESS, monsters: the online path derives a
-// monster's radius from its own unit in the compose step, while the session takes a recorded per-monster radius.
-// capture: session -- one shared frame's monster light records (radius, x, y) from the session lightmap set
-// beside the online lightmap's compose input for the same monsters; no descriptor yet.
+// (monspawn_check.cpp, measured against retail's light captures). Monsters take the light setter's rule in the
+// compose step (max of MonStats2 nLight and the item light, at most 18; on Den of Evil a radius of 3 while the
+// Den quest flag is set). GUESS: the Den quest flag has no online source yet; it reads 0 until
+// d2_client_lightmap_set_den_quest_avail is fed.
 // Returns the session lightmap record (same layout as d2_session_lightmap), or null without a player/act.
 EMSCRIPTEN_KEEPALIVE const void* d2_realm_client_lightmap(int ambientOverride, int occludeUnits) {
     D2DrlgActStrc* act = d2_drlg_client_act();
