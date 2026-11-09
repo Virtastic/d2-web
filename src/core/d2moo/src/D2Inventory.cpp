@@ -3338,7 +3338,7 @@ BOOL __fastcall INVENTORY_CanItemBePlacedInTradeInventory(D2InventoryStrc* pTrad
 	return TRUE;
 }
 
-// 1.13c D2Common+0x21C50 (#10762)
+// #10762: the 1.13c body at the image layout is D2Common_21C50_CanItemsBeTraded
 //D2Common.0x6FD921D0 (#10302)
 BOOL __stdcall INVENTORY_CanItemsBeTraded(void* pMemPool, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, D2TradeStates* pTradeState)
 {	
