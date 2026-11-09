@@ -88,33 +88,7 @@ EMSCRIPTEN_KEEPALIVE i32 d2c_5b760(const D2cRecEnv* e, void (*f5ADD0)(i32), cons
     return 1;
 }
 
-// 1.13c D2Client+0x5B930
-struct D2cB930Env {
-    D2cRecEnv r;
-    void (*f5B530)(i32 off, i32 y);
-    u32 (*getTick)();
-    void (*fatal)();                       // Ordinal_10265(0x5a)/Ordinal_10024 then _exit(-1)
-    const void* const* bucket;             // DAT_6fbba808[128]
-    i32 *g_c28c, *g_c290, *g_c294;
-    i32 g_c298; u32 g_c2a0;
-};
-EMSCRIPTEN_KEEPALIVE i32 d2c_5b930(const D2cB930Env* e, const void* arg, i32* off, i32* y, i32* toggle) {
-    u32 rec[18] = {0}, key;
-    rec[13] = (u32)e->r.f5B120(nullptr, arg, &key);
-    if (!rec[13]) return 0;
-    e->r.f5B5A0(*off, (i32)key, *off);
-    for (const void* p = e->bucket[key & 0x7f]; p; p = (const void*)(intptr_t)rd(p, 0xe4))
-        if ((u32)rd(p, 0xc) == key) { if (rd(p, 0) != 1) e->fatal(); break; }
-    e->f5B530(*off, *y);
-    if (*toggle == 0) { *toggle = 10; *y += 10; } else { *y -= *toggle; *toggle = 0; }
-    *e->g_c28c = *off; *e->g_c290 = *y;
-    i32 mode;
-    if (e->g_c298 == 0 || e->g_c2a0 == 0 || e->getTick() - e->g_c2a0 < 700) mode = *e->g_c294 ? 7 : 1;
-    else { mode = 7; *e->g_c294 = 1; }
-    e->r.ord10041(rec, *off, 0x3c, -1, mode, 0);
-    *off += 0x38;
-    return 1;
-}
+// D2Client 5B930: moved to d2client_5b930.cpp (register and stack shape as retail calls it).
 
 // 1.13c D2Client+0x5DC70  (returns float bits, no float in tree; eax = slot index; k = constants 0x6fb87544..54: [0]=44,[1]=48,[2]=4c,[3]=50,[4]=54)
 EMSCRIPTEN_KEEPALIVE int32_t d2c_5dc70(const uint8_t* tbl, i32 cnt, i32 idx, const int32_t* k) {

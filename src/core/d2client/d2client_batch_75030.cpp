@@ -29,18 +29,7 @@ void d2_client_75030(int32_t x_eax, int32_t panel_x_bca0, int32_t panel_y_b9a4, 
     ord10041(s, panel_x_bca0 + 0x10b, x_eax - panel_y_b9a4, -1, 5, 0);
 }
 
-// 1.13c D2Client+0x750B0 (245 B): four Ordinal_10041 calls (kinds 0..3) at x=panel / panel+0x100, two rows.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_750b0(int32_t panel_x_b9a0, int32_t panel_y_b9a4, int32_t off_bc4c, uint32_t col_bfdc,
-                     void (*ord10041)(int32_t*, int32_t, int32_t, int32_t, int32_t, int32_t)) {
-    (void)col_bfdc;
-    int32_t y0 = panel_y_b9a4 - 0xe0 + off_bc4c, y1 = panel_y_b9a4 - 0x30 + off_bc4c;
-    int32_t k0[18] = {0}, k1 = 1, k2 = 2, k3 = 3;
-    ord10041(k0, panel_x_b9a0, y0, -1, 5, 0);
-    ord10041(&k1, panel_x_b9a0 + 0x100, y0, -1, 5, 0);
-    ord10041(&k2, panel_x_b9a0, y1, -1, 5, 0);
-    ord10041(&k3, panel_x_b9a0 + 0x100, y1, -1, 5, 0);
-}
+// D2Client 750B0 moved to d2client_750b0.cpp (one frame block for all four calls, cel word = g11BFDC).
 
 // 1.13c D2Client+0x75220 (328 B), stdcall(a0, a1, a2, a3): a0/a1 = string ids (a1 looked up only when its low word is nonzero), a2 is the x offset (read after a push, so [esp+0x1B0] is a2 there),
 // a3 is the two-line flag (zero: top 0x2a height 0xf; nonzero: top 0x23 height 0x1e). Retail looks the ids up with

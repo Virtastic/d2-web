@@ -92,21 +92,7 @@ void sub_1AB20(const uint8_t*fr,I a,I b,const Fn1AB20&f){
   if(f.o10407(tgt,pl)>4){f.s7c0(rd(fr,0x18));f.s2d50(0x13,a,b);*f.g9828=*f.g97ec+500;return;}
   tail9f(pl,a,b,f); *f.g9828=*f.g97ec+500; return;
  default: common(); return;}}
-// 1.13c D2CLIENT+0x2B380 (EAX = path; stack param_1 unused, param_2 is stored in uStack_10c; the d810 second
-// argument is the caller's return slot `retslot`). Same frame as 0x2B420: uStack_10c(4) | acStack_108(4) | local_104[260];
-// the root is appended at the first NUL found scanning from acStack_108, and acStack_108 is #10006's last argument.
-struct Fn2B380{ const char*(*o10070)(); const char*(*o10016)(const char*); void*(*d810)(const char*,uint32_t*); void (*o10006)(void*,void**,const char*,U,U,char*);};
-const char* sub_2B380(const char*name,U param2,const uint8_t acStack_108_initial[4],uint32_t*retslot,const Fn2B380&f){
- struct{U uStack_10c; char acStack_108[4]; char local_104[260];} fr;
- std::memcpy(fr.acStack_108,acStack_108_initial,4);
- size_t i=0; for(;i+1<sizeof fr.local_104&&name[i];++i)fr.local_104[i]=name[i]; fr.local_104[i]=0;
- fr.uStack_10c=param2;
- const char*root=f.o10070();
- char*d=reinterpret_cast<char*>(&fr.uStack_10c)+3; do{++d;}while(*d);
- for(size_t k=0;;++k){d[k]=root[k]; if(!root[k])break;}
- const char*file=f.o10016(reinterpret_cast<char*>(&fr.uStack_10c)+4);
- void*h=f.d810(file,retslot); void*z=nullptr; const char*src="..\\Source\\D2Client\\CORE\\ARCHIVE.CPP";
- f.o10006(h,&z,src,0x6b,0xFFFFFFFFu,fr.acStack_108); return src;}
+// D2Client 2B380: moved to d2client_2b380.cpp (EAX path, stdcall outSize/rootArg).
 static void wcat(char16_t*d,const char16_t*s){while(*d)++d;while((*d++=*s++));}
 // 1.13c D2CLIENT+0x2CE10
 struct Fn2CE10{ const char16_t*(*str)(I);};

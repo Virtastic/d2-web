@@ -53,54 +53,18 @@ void sub_527A0(const Host& H,P e,P gbbfc){ sendMsg(H,e,gbbfc,0x15b); }
 // ---- shared by 6A3D0/6A550/6A6B0/6AC60: find-or-load the unit's cel block list node
 struct Gfx{ I key; I mode; P (*findList)(void); };
 static P findNode(P head,I a,I b,bool two){ for(P n=head;n;n=*(P*)((uint8_t*)n+16)){ if(rd(n,0)==U(a)&&(!two||rd(n,4)==U(b))) return n; } return nullptr; }
-static I keyOf(const Host& H,P unit){
+[[maybe_unused]] static I keyOf(const Host& H,P unit){
  if(unit&&((rd(unit,0xc8)>>3)&1)&&H.opi(10866,0,0,0)){ P o=(P)(intptr_t)H.opi(0x560D0,0,0,0); if(o) return ri(o,0x60); }
  return unit?ri(unit,0x60):0;
 }
-static P ensureNode(const Host& H,P unit,I mode,P* listHead){
+[[maybe_unused]] static P ensureNode(const Host& H,P unit,I mode,P* listHead){
  P d=H.ptr(unit,0x54); if(!d){H.fatal(0x3ac);return nullptr;}
  I k=I(H.opi(0x1AF0,0,0,0));
  for(P n=H.ptr(d,0x28);n;n=H.ptr(n,16)) if(ri(n,0)==k&&ri(n,4)==mode) {*listHead=n;return n;}
  H.op(0x6A2F0,(P)(intptr_t)mode,unit,0);
  return H.ptr(d,0x28);
 }
-// 1.13c D2Client+0x6A3D0 : is the frame's box on screen at offset dx
-// ponytail: decompile shows stack-address operands (local_4); modelled as 0.
-// 1.13c D2Client+0x6A3D0
-bool sub_6A3D0(const Host& H,P unit,I dx,I scrW,I scrH){
- I key=keyOf(H,unit);
- I mode=I(H.opi(10431,0,0,0));
- P hd; ensureNode(H,unit,mode,&hd);
- H.op(10175,0,0,0); H.op(10350,0,0,0);
- P d=unit?H.ptr(unit,0x54):nullptr; if(!d) return false;
- P n=H.ptr(d,0x28); while(n&&ri(n,0)!=key) n=H.ptr(n,16);
- if(!n) return false;
- P f=H.ptr(H.ptr(n,8),0x14); if(!f) return false;
- if(!((ri(f,8)+dx)-(ri(f,0x14)-ri(f,0x10))/2<scrW-1)) return false;
- if(!(ri(f,0xc)+dx>=0)) return false;
- if(!(ri(f,0x14)>=0)) return false;
- return ri(f,0x10)<scrH-1;
-}
-// 1.13c D2Client+0x6A550 : point (x=param_3 ->px, y=unit[1]) inside the -1 node frame box
-// ponytail: stack0xffffffec / &param_3 operands modelled as 0 offsets.
-// 1.13c D2Client+0x6A550
-I sub_6A550(const Host& H,P unit,I px){
- I key=keyOf(H,unit);
- I mode=I(H.opi(10431,0,0,0));
- P hd; ensureNode(H,unit,mode,&hd);
- I y=ri(unit,4);
- H.op(10175,0,0,0); H.op(10350,0,0,0);
- P d=H.ptr(unit,0x54); if(!d) return 0;
- for(P n=H.ptr(d,0x28);n;n=H.ptr(n,16)) if(ri(n,0)==-1){
-  P f=H.ptr(H.ptr(n,8),0x14); if(!f) return 0;
-  if(px<ri(f,8)-0x10+key) return 0;
-  if(ri(f,0xc)+0x10+key<=px) return 0;
-  if(y<ri(f,0x10)) return 0;
-  if(ri(f,0x14)<=y) return 0;
-  return 1;
- }
- return 0;
-}
+// D2Client 6A3D0 / 6A550 moved to d2client_6a3d0.cpp / d2client_6a550.cpp (rewritten from the disassembly: stack args dx, dy, centre / ox, oy, px, py).
 // 1.13c D2Client+0x6A6B0 : build draw request from the mode-0 node (record emitted via callees)
 // ponytail: tail (10005/10002/10069 writes) delegated wholesale to op 0x6A6B0; only the lookup is native.
 // 1.13c D2Client+0x6A6B0
