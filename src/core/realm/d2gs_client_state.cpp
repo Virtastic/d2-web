@@ -3020,6 +3020,9 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_realm_client_skill_choices(uint32_t guid, D2Rea
             (inTown && !(txt->dwFlags[0] & SKFLAG_INTOWN) ? 8 : 0) |
             (useState == SKILLUSTATE_AURA ? 16 : 0);   // bit 16 = aura, drawn with colour shift 4 (D2Client+0x3DA60)
         row.level = static_cast<uint8_t>(SKILLS_GetSkillLevel(unit, skill, TRUE));
+        // bits 32/64: the bonus is positive / negative (the tree's level text is blue / red, D2Client+0x78820).
+        const int bonus = SKILLS_GetBonusSkillLevelFromSkillId(unit, row.id);
+        row.flags |= (bonus > 0 ? 32 : 0) | (bonus < 0 ? 64 : 0);
     }
     return n;
 }

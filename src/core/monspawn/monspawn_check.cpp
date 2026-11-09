@@ -8566,8 +8566,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_add_stat(uint32_t statId, uint32_t c
 // learned (retail's frame reads "First Level" then "Mana Cost: 2" for Bash and "Mana Cost: 12.5" for
 // Whirlwind, both unlearned), the skill's own level otherwise. A negative cost (Magic Arrow's falls
 // with level) is reported as 0.
-struct D2SessionSkill { uint16_t id, page, row, column, requiredLevel, baseLevel, iconCel, nameStr, descStr, manaStr, canLearn, manaLine, manaCost; };
-static_assert(sizeof(D2SessionSkill) == 26, "D2SessionSkill is 26 bytes");
+struct D2SessionSkill { uint16_t id, page, row, column, requiredLevel, baseLevel, iconCel, nameStr, descStr, manaStr, canLearn, manaLine, manaCost; uint16_t level; int16_t bonus; };
+static_assert(sizeof(D2SessionSkill) == 30, "D2SessionSkill is 30 bytes");
 
 // D2Game.0x6FC86EF0's precondition, in its own order and out of its own tables: class skill,
 // required skills (prerequisites), required attributes, the skill's maximum level (wMaxLvl, 20 when
@@ -8607,11 +8607,17 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_class_skills(D2SessionSkill* out, uint3
         D2SkillStrc* known = SKILLS_GetHighestLevelSkillFromUnitAndId(g_targetPlayer, id);
         const int level = known ? SKILLS_GetSkillLevel(g_targetPlayer, known, FALSE) : 0;
         row.baseLevel = (uint16_t)(level > 0 ? level : 0);
+        // The tree draws the skill's level WITH bonuses (D2Client+0x78C50 passes SKILLS_GetSkillLevel(.., TRUE) to
+        // the icon draw 0x78820) and tints it by the sign of the bonus (D2Common #11146); both only for a skill
+        // the unit holds, so a bonus never lights a skill with no record.
+        const int total = known ? SKILLS_GetSkillLevel(g_targetPlayer, known, TRUE) : 0;
+        row.level = (uint16_t)(total > 0 ? total : 0);
+        row.bonus = (int16_t)SKILLS_GetBonusSkillLevelFromSkillId(g_targetPlayer, id);
         // The tooltip's mana line (V19): does SkillDesc's own line table carry a 1 somewhere, and what
         // does the skill cost at the level the tooltip describes (level 1 when it is not learned)?
         bool manaLine = false;
         for (int i = 0; i < 17 && !manaLine; ++i) manaLine = desc->nDescLine[i] == 1 || desc->nDescLine[i] == 5;
-        int cost = SKILLS_GetManaCosts(id, level > 0 ? level : 1);
+        int cost = SKILLS_GetManaCosts(id, total > 0 ? total : 1);
         if (cost < 0) cost = 0;
         if (cost < (int)skill->wMinMana << 8) cost = (int)skill->wMinMana << 8;  // display clamp, as d2_session_skill_mana
         row.manaLine = manaLine ? 1 : 0;
