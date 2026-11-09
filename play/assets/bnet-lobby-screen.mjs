@@ -488,11 +488,9 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     void run(() => onCreateGame({ gameName: form.name, gamePassword: form.password, description: form.description, maxPlayers,
       difficulty: form.difficulty, levelDifference: form.levelLimit && form.levelDifference !== '' ? Number(form.levelDifference) : 0xff }));
   };
-  // A join of a game the list shows carries that row's difficulty and description (`listing`), so the session keeps it.
   const joinGame = () => {
     if (busy || !form.name) return;
-    const row = games.find((g) => g.name === form.name);
-    joining = true; void run(() => onJoinGame({ gameName: form.name, gamePassword: form.password, ...(row ? { listing: { difficulty: row.difficulty, description: row.description } } : {}) }));
+    joining = true; void run(() => onJoinGame({ gameName: form.name, gamePassword: form.password }));
   };
   const step = (key, delta, lo, hi) => { const n = Number(form[key]) || 0; form[key] = String(Math.min(hi, Math.max(lo, n + delta))); };
 

@@ -113,7 +113,6 @@ import { createBnetLobbyScreen } from './assets/bnet-lobby-screen.mjs';
 import { createLobbyFigure } from './assets/lobby-figure.mjs';
 import { createBnetChat } from './assets/bnet-chat.mjs';
 import { parseGameList, filterGames } from './assets/bnet-gamelist.mjs';
-import { createSessionGames } from './assets/bnet-session-games.mjs';
 import { createChatLink } from './assets/bnet-chat-link.mjs';
 import { returnToLobby } from './assets/realm-lobby-return.mjs';
 import { createBnetConnectingPopup, createBnetConnectFailureNotice } from './assets/bnet-connecting.mjs';
@@ -1861,15 +1860,13 @@ function lobbyChatUser(name) {
     onLine: (line) => { if (realmSceneActive) { messageLines.push(line); postedAt = performance.now(); } else bnetLobbyScreen?.chatLine(line); render(); },
     onChannels: (list) => { bnetLobbyScreen?.setChannels(list); render(); },
     // SID_GETADVLISTEX's reply, kept by retail's own filter (names only), under this session's games.
-    onGames: (body) => { if (!realmFlow) return; sessionGamesOf(realmFlow).setRealm(parseGameList(body)); pushLobbyGames(name); render(); } };
+    onGames: (body) => { if (!realmFlow) return; realmFlow.games = parseGameList(body); pushLobbyGames(name); render(); } };
 }
-// The session's games (bnet-session-games.mjs) live on the realm flow, so a new login starts with none.
-function sessionGamesOf(flow) { return flow.sessionGames ??= createSessionGames(); }
-// The join panel's rows: the realm's last reply and this session's games, under the character's own filter.
+// The join panel's rows: the realm's last reply, under the character's own filter.
 function pushLobbyGames(name) {
   const c = lobbyCharacter(name);
   if (!c || !bnetLobbyScreen || !realmFlow) return;
-  bnetLobbyScreen.setGames(filterGames(sessionGamesOf(realmFlow).list(), c));
+  bnetLobbyScreen.setGames(filterGames(realmFlow.games ?? [], c));
 }
 function lobbyCharacter(name) {
   const c = realmCharacters.find((x) => x.name.toLowerCase() === String(name).toLowerCase());
@@ -1907,7 +1904,7 @@ function enterBnetLobby(name) {
     figure: createLobbyFigure({ read: lobbyRead, decodeDatPalette, componentToken: (i) => { if (!componentTablesReady) componentTablesReady = Boolean(Module.ccall('d2_drlg_init', 'number', [], [])); return Module._d2_component_token ? Module.ccall('d2_component_token', 'string', ['number'], [i]) : ''; } }).figure,
     character: lobbyCharacter(c.name),
     onRefreshGames: () => { pushLobbyGames(c.name); const link = startLobbyChat(c.name) && realmFlow?.chatLink; if (link?.session?.open) link.session.games(); else void link?.ensure(lobbyChatUser(c.name)).then((s) => s?.games()); },
-    onCreateGame: (game) => play({ ...game, listing: { difficulty: (game.difficulty ?? 0) + (lobbyCharacter(c.name)?.hardcore ? 3 : 0), description: game.description ?? '' } }),
+    onCreateGame: (game) => play(game),
     onJoinGame: (game) => play({ ...game, join: true }),
     // The BNCS chat socket the login left open: ENTERCHAT now (retail names the character on OK), the
     // channel join when ENTER CHAT is pressed, lines in and out through the lobby's chat log.
@@ -2108,7 +2105,7 @@ async function authenticateConfiguredRealm({ account, password }) {
     if (!keepRealmSession) { try { protocol?.free(); } catch { /* engine gone */ } }
   }
 }
-async function createAndJoinConfiguredGame({ character, gameName, gamePassword, difficulty = 0, maxPlayers = 8, description = '', join = false, listing = null }) {
+async function createAndJoinConfiguredGame({ character, gameName, gamePassword, difficulty = 0, maxPlayers = 8, description = '', join = false }) {
   const { server, realmReply } = realmFlow || {};
   const started = { server: { region: server?.region, host: server?.host } };
   realmTransport = { state: 'joining', ...started, result: null, error: '' };
@@ -2121,8 +2118,6 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
       difficulty, maxPlayers, description, join, session: realmFlow.mcpSession });
     mcp.close(); mcp = null;
     realmFlow.mcp = null; realmFlow.mcpSession = null;
-    // The game is known to the realm now: this session lists it (a join only when the row it came from had its details).
-    if (listing) sessionGamesOf(realmFlow).remember({ name: joined.game.name, password: Boolean(gamePassword), difficulty: listing.difficulty, description: listing.description });
     // The game server occasionally drops the first socket before the greeting completes; the ticket is
     // still valid, so reconnect and send the same logon again.
     // Retail ends a join that has not entered the game after 30 seconds with the timeout notice.
@@ -2158,7 +2153,7 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
       d2gs: { greeting: game.greeting, opcodes: game.opcodes, bytes: game.bytes, playerAssignment: game.playerAssignment,
         remotePlayerState: game.playerState, worldState: game.worldState,
         socketOpen: true, keepalivesSent: 0, postJoinFrames: 0 },
-      note: 'The D2GS socket remains open and sends five-second keep-alives. Client terrain is built from LoadAct plus each MapReveal room; remote monsters, objects, movement prediction and actions are not synchronized.' }, error: '' };
+      note: 'The D2GS socket remains open and sends five-second keep-alives. Client terrain is built from LoadAct plus each MapReveal room; the receive loop below applies the realm's unit, movement and item packets as they arrive.' }, error: '' };
     void syncRealmScene();
     const keepAlive = startD2gsKeepAlive(d2gs, protocol, { onSent: (count, tick) => {
       if (realmTransport.state !== 'session-open') return;

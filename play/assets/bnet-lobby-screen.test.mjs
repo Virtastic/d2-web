@@ -103,7 +103,7 @@ test('a click on a game row fills the name box, enables JOIN and joins that game
   s.press(440, 392, 800, 600); assert.equal(s.selectedGame(), null, 'a click below the last game clears the pick');
   s.pinClock(60000, 0); s.press(440, 229, 800, 600); assert.equal(s.selectedGame().name, 'game3');
   s.activate('field-password'); s.typeKey('KeyP', 'p'); s.activate('join-game'); await tick();
-  assert.deepEqual(joins, [{ gameName: 'game3', gamePassword: 'p', listing: { difficulty: 0, description: 'text 3' } }]);
+  assert.deepEqual(joins, [{ gameName: 'game3', gamePassword: 'p' }]);
 });
 
 test('a dead hardcore character cannot open CREATE or JOIN', () => {
@@ -185,7 +185,7 @@ test('the same row twice within 500 ms joins; a slower second click only selects
   s.press(440, 229, 800, 600); s.pinClock(t += 600, 0); s.press(440, 229, 800, 600); await tick();
   assert.deepEqual(joins, [], 'too slow');
   s.pinClock(t += 300, 0); s.press(440, 229, 800, 600); await tick();
-  assert.deepEqual(joins, [{ gameName: 'game0', gamePassword: '', listing: { difficulty: 0, description: 'text 0' } }]);
+  assert.deepEqual(joins, [{ gameName: 'game0', gamePassword: '' }]);
 });
 
 test('the list scrollbar: arrows step a row, the track pages, a grabbed thumb follows the pointer, release lets go', () => {
@@ -222,13 +222,13 @@ test('a join of a listed name carries that row\'s difficulty and description, a 
   s.setGames([{ name: 'Cows', password: false, difficulty: 3, description: 'cow level' }]);
   s.press(440, 229, 800, 600); s.typeKey('Enter');
   await tick();
-  assert.deepEqual(joins[0], { gameName: 'Cows', gamePassword: '', listing: { difficulty: 3, description: 'cow level' } });
+  assert.deepEqual(joins[0], { gameName: 'Cows', gamePassword: '' });
   const typed = screen({ name: 'Ama', charClass: 0 }, { onJoinGame: async (g) => { joins.push(g); throw Object.assign(new Error('x'), { sessionLost: true }); } });
   typed.activate('join');
   typed.setGames([{ name: 'Cows', difficulty: 3, description: '' }]);
   typed.typeKey('KeyC', 'c'); typed.typeKey('Enter');
   await tick();
-  assert.equal('listing' in joins[1], false, 'a typed name the list does not show is not remembered');
+  assert.deepEqual(joins[1], { gameName: 'c', gamePassword: '' });
 });
 
 test('CREATE clamps a typed player count as retail does: 0 is 1, 9 and up is 8', async () => {
