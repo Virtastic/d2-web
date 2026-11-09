@@ -39,7 +39,7 @@ function harness() {
 
 test('an AF 00 game server stream is read unframed and the join answers 0x02 with 0x6B', async () => {
   const h = harness();
-  const joining = d2gsJoin(h.transport, h.protocol, { character: 'Hero', charClass: 1, gameToken: 0xa3, gameHash: 19 });
+  const joining = d2gsJoin(h.transport, h.protocol, { logonDelayMs: 0, character: 'Hero', charClass: 1, gameToken: 0xa3, gameHash: 19 });
   h.push([0xaf, 0x00]);
   const game = await joining;
   assert.equal(game.greeting.mode, 0);
@@ -51,7 +51,7 @@ test('an AF 00 game server stream is read unframed and the join answers 0x02 wit
 
 test('a stream that is not a D2GS greeting is rejected', async () => {
   const h = harness();
-  const joining = d2gsJoin(h.transport, h.protocol, { character: 'Hero', charClass: 1, gameToken: 1, gameHash: 1 });
+  const joining = d2gsJoin(h.transport, h.protocol, { logonDelayMs: 0, character: 'Hero', charClass: 1, gameToken: 1, gameHash: 1 });
   h.push([0x01, 0x00]);
   await assert.rejects(joining, /not a D2GS greeting/);
 });

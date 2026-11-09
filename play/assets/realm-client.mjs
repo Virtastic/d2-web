@@ -544,7 +544,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
  * which arrives Huffman-compressed and length-framed. The engine's 1.13c packet table frames the
  * decoded stream; this routine waits until a complete player assignment is available.
  */
-export async function d2gsJoin(transport, protocol, { character, charClass, gameToken, gameHash, difficulty = 0, expansion = false, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+export async function d2gsJoin(transport, protocol, { character, charClass, gameToken, gameHash, difficulty = 0, expansion = false, timeoutMs = CONNECT_TIMEOUT_MS, logonDelayMs = 1500 } = {}) {
   const reader = makeReader(transport);
   // The greeting's size is decided by its first two bytes (`AF 00`/`AF 01` are 2 bytes, `AF 81`
   // carries a 128-byte inline table), so read the flag pair first and then the whole thing.
@@ -555,6 +555,9 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
   await reader.want(greetingSize, timeoutMs);
   reader.skip(greetingSize);
 
+  // The game server admits a logon only once the character has loaded from the character database, which
+  // follows the connection by a moment; a logon sent on the greeting is dropped and the socket closed.
+  if (logonDelayMs > 0) await new Promise((r) => setTimeout(r, logonDelayMs));
   const gamelogon = protocol.d2gsGamelogon({ character, charClass, gameToken, gameHash });
   transport.send(gamelogon);
 
