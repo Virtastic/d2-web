@@ -501,7 +501,9 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
 
   // BNClient+0xC9E0 tokens the logon with GetTickCount; +0xBFD0 with its own counter (1, 2, ...).
   send(0x3a, protocol.bncsLogon({ clientToken: protocol.tickCount(), serverToken, account, password }));
-  const logon = await readBncsFrame(reader, timeoutMs); received.push(logon.id);
+  let logon = await readBncsFrame(reader, timeoutMs); received.push(logon.id);
+  // PvPGN prompts an account with no email address (SID_SETEMAIL 0x59) ahead of the logon result; it asks for nothing here.
+  while (logon.id === 0x59) { logon = await readBncsFrame(reader, timeoutMs); received.push(logon.id); }
   if (logon.id !== 0x3a) throw new Error(`expected LOGONRESPONSE2 reply 0x3a, got 0x${logon.id.toString(16)}`);
   const logonResult = u32(logon.body, 0);
   if (logonResult !== 0) {

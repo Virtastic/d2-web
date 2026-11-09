@@ -19,7 +19,7 @@ test('a second bncsLogin on the same transport skips the selector and auth, and 
       sent.push({ id: buf[1] });
       if (buf[1] === 0x50) push(fr(0x50, [...u32(0), ...u32(7), ...Buffer.alloc(8), ...Buffer.from('ver.mpq\0f\0')]));
       if (buf[1] === 0x51) push(fr(0x51, [...u32(0), 0]));
-      if (buf[1] === 0x3a) { logons++; push(fr(0x3a, u32(logons === 1 ? 1 : 0))); }   // first: no such account
+      if (buf[1] === 0x3a) { logons++; if (logons === 2) push(fr(0x59, [])); push(fr(0x3a, u32(logons === 1 ? 1 : 0))); }   // the second logon is preceded by a SETEMAIL prompt   // first: no such account
       if (buf[1] === 0x40) push(fr(0x40, [...u32(0), ...u32(0)]));
       if (buf[1] === 0x3e) push(fr(0x3e, [...u32(0), ...u32(1), ...u32(0), ...u32(0), 10, 0, 0, 1, 0x18, 0xe0, 0, 0, ...Buffer.alloc(48)]));
       return true;
