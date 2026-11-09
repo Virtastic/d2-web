@@ -21,6 +21,7 @@
 [![Reddit](https://img.shields.io/badge/Reddit-r%2Fvirtastic-FF4500?logo=reddit&logoColor=white)](https://www.reddit.com/r/virtastic)
 ![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-blue)
 ![Platform: Chrome desktop](https://img.shields.io/badge/browser-Chrome%20%2F%20Chromium-brightgreen)
+![Verified: 79.9%](https://img.shields.io/badge/verified-79.9%25-brightgreen)
 
 An unofficial reimplementation of the Diablo II: Lord of Destruction **1.13c** engine, compiled to
 **WebAssembly** and played in the browser. No game data is included: you bring your own legally
