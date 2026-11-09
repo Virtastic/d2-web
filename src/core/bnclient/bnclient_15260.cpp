@@ -28,7 +28,7 @@ struct Bn15260Env {
     uint32_t (*sstrLen)(uint32_t s);                                        // Storm #506, thunk 0x8042
     uint32_t (*sstrCopy)(uint32_t dst, uint32_t src, uint32_t max);         // Storm #501, thunk 0x804E
     void (*pickClosestZone)(uint32_t self, int32_t gmt);                   // 0x15130 thiscall
-    void (*load)(uint32_t self);                                            // 0x155D0 stdcall
+    uint32_t (*load)(uint32_t self);                                            // 0x155D0 stdcall
     uint32_t (*callerRet)(uint32_t line);                                   // Fog #10265, thunk 0x80E4
     void (*halt)(uint32_t msg, uint32_t ret);                               // Fog #10024, thunk 0x80DE
     void (*exit)(int32_t code);                                             // _exit 0x1569
@@ -124,6 +124,5 @@ extern "C" uint32_t bnclient_15260_UpdateGatewaysFromIni(uint32_t self, uint32_t
     wr32(self + 0x14, (uint32_t)size);
     e.pickClosestZone(self, gmt);
     e.saveAndUnload(self);
-    e.load(self);
-    return 0;
+    return e.load(self);   // the ret leaves Load's EAX: the selection read back, or this+0x10 when Load auto-picked
 }
