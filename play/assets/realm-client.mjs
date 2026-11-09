@@ -117,7 +117,7 @@ async function readMcpFrame(reader, timeoutMs) {
 // exists for the WebSocket proxies in front of the realm (they drop a silent socket after about 100 s),
 // so its period is a transport choice, not a retail value.
 const MCP_MOTD = 0x12, MCP_KEEPALIVE_MS = 30000;
-// D2Multi's pump gives a create or join 30 s from the Please Wait popup; then it raises 5141 (Join Failed) and returns to the lobby.
+// D2Multi's reply pump (1.13c D2Multi+0xDAE0, GetTickCount against DAT_6fa09f2c) gives a create or join 30 s from the Please Wait popup, then clears the wait and returns to the lobby.
 const GAME_REPLY_MS = 30000;
 /**
  * An idle MCP socket is dropped by the proxies in front of the realm (about 100 s with no traffic), and

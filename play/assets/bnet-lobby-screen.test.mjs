@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBnetLobbyScreen, characterInfoLines, difficultiesAllowed, gameErrorText, BNET_LOBBY_LAYOUT } from './bnet-lobby-screen.mjs';
+import { createBnetLobbyScreen, characterInfoLines, difficultiesAllowed, gameErrorText, bandNameStyle, BNET_LOBBY_LAYOUT } from './bnet-lobby-screen.mjs';
 
 // No canvas in node: a context that swallows every call, and one-pixel art for every file.
 globalThis.ImageData ??= class { constructor(data, w, h) { Object.assign(this, { data, width: w, height: h }); } };
@@ -20,6 +20,19 @@ test('character box lines follow D2Multi: name, Level N Class, last difficulty c
     [{ text: 'Ama', colour: 1 }, { text: 'Level 7 Amazon', colour: 0 }, { text: 'Last Difficulty Setting Completed:', colour: 0 }, { text: 'None', colour: 0 }]);
   assert.equal(characterInfoLines({ name: 'N', charClass: 2, level: 1, expansion: true, progression: 15 }, (i) => strings[i])[3].text, 'Hell');
   assert.equal(characterInfoLines({ name: 'N', charClass: 2, progression: 4 }, (i) => strings[i])[3].text, 'Normal');
+});
+
+test('band names: a plain name is colour 1 with any event flag or a hardcore statstring, else 0', () => {
+  assert.equal(bandNameStyle(0, false).colour, 0);
+  assert.equal(bandNameStyle(0, true).colour, 1, 'statstring 0x04 alone');
+  for (const fl of [0x02, 0x10, 0x20, 0x40, 0x80, 0x100, 0x200, 0x400, 0x800]) assert.deepEqual(bandNameStyle(fl, false), { star: false, colour: 1 }, `event 0x${fl.toString(16)}`);
+});
+
+test('band names: operator 0x02 takes no star; 0x01 and 0x08 draw the star twice (6 at -1,-1, then 3); 0x04, 0x1000, 0x100000 a colour-0 star', () => {
+  assert.deepEqual(bandNameStyle(0x02, false), { star: false, colour: 1 });
+  assert.deepEqual(bandNameStyle(0x01, false), { star: true, layers: [[6, -1, -1], [3, 0, 0]] });
+  assert.deepEqual(bandNameStyle(0x08, true), { star: true, layers: [[6, -1, -1], [3, 0, 0]] });
+  for (const fl of [0x04, 0x1000, 0x100000]) assert.deepEqual(bandNameStyle(fl, false), { star: true, layers: [[0, 0, 0]] }, `event 0x${fl.toString(16)}`);
 });
 
 test('difficulty gating: Nightmare after 4 (classic) / 5 (expansion), Hell after 8 / 10', () => {
