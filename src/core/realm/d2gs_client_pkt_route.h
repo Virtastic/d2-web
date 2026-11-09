@@ -50,7 +50,7 @@ inline MonsterAction monsterAction(uint32_t code) {
     }
 }
 
-// D2Client+0x2A1B0's tolerance. Selector 1 gives 10 and selector 2 gives 0 for every unit.
+// The placement tolerance. Selector 1 gives 10 and selector 2 gives 0 for every unit.
 // Otherwise the local player gets 3 / 7 / 5 (mode 1 / mode 3 / any other) plus
 // ((a global dword + 0x32) >> 7), a monster is by mode (3..5 gives 5, 6..0xB gives 7, else 15),
 // and every other unit gets 15. The mode table is the monster's only: a remote player is 15.
@@ -64,11 +64,14 @@ inline int placeRadius(bool isMonster, bool isLocalPlayer, uint32_t mode, uint32
     return 15;
 }
 
-// D2Client+0x2A1B0's early returns: a zero coordinate, unit flag 0x10000, a player in mode 0 or
-// 0x11, a monster in mode 0 or 0xC.
-inline bool placeIgnored(bool isPlayer, uint32_t mode, uint32_t flags, uint32_t x, uint32_t y) {
+// The placement early returns: a zero coordinate or unit flag 0x10000 for any unit; then, by unit
+// type only, a player (type 0) in mode 0 or 0x11 and a monster (type 1) in mode 0 or 0xC. Every other
+// unit type (objects, missiles, items) is not returned on by its mode.
+inline bool placeIgnored(uint32_t unitType, uint32_t mode, uint32_t flags, uint32_t x, uint32_t y) {
     if (!x || !y || (flags & 0x10000u)) return true;
-    return isPlayer ? (mode == 0 || mode == 0x11) : (mode == 0 || mode == 0xc);
+    if (unitType == 0) return mode == 0 || mode == 0x11;
+    if (unitType == 1) return mode == 0 || mode == 0xc;
+    return false;
 }
 
 // The 0x4DC70 GETHIT arm's life value: the request's hit byte & 0x7F, plus one above 1.

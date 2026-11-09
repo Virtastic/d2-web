@@ -11002,12 +11002,12 @@ EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_session_lightmap(int ambientOve
     return &m;
 }
 
+#include "d2client_light_in.h"
 // The same light map for a client that holds its own units (the online client): the caller supplies the
 // player and the other sources; the window, ambient, occlusion and falloff are the session's own.
 // A monster entry (unit set) takes its position and radius from the unit the way the session does
 // (max of MonStats2 Light and its item light, at most 18, the terminal SplEndDeath unlink); an object
 // entry carries its position and Objects.txt Lit radius and the room it stands in.
-struct D2ClientLightIn { D2UnitStrc* unit; int32_t type, classId, x, y, radius; uint32_t guid; D2ActiveRoomStrc* room; };
 extern "C" EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_client_lightmap_compose(D2UnitStrc* player, D2DrlgActStrc* act, const D2ClientLightIn* in, int n,
         int ambientOverride, int occludeUnits) {
     D2SessionLightmap& m = g_sessionLightmap; memset(&m, 0, sizeof m); g_lightOffMapUnresolved = 0; g_lightOffMapUnresolvedPlayer = 0;

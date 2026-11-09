@@ -135,7 +135,8 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
 
   // The interaction waiting on the walk: the click stores it, and it is used on arrival, never on the click.
   let pending = null;
-  // Returns null when the local start refused the route (nothing sent, nothing waits), else whether it went out.
+  // Returns null when the local start refused the route (nothing sent), else whether it went out. A refused
+  // route still leaves the interaction waiting: 2AA40 stores the pending action whether or not it sent.
   function approach(s, type, u) {
     const run = Boolean(s.run), guid = idOf(type, u);
     if (!predicted(approachUnit ? approachUnit(type, guid, run) : move ? move(clamp16(u.x), clamp16(u.y), run) : null)) return null;
@@ -161,8 +162,7 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     if (inReach(s, pending.type, u)) { const { type } = pending; pending = null; return use(s, type, u); }
     if (!reapproach) return null;
     const sent = approach(s, pending.type, u);
-    if (sent === null) { pending = null; return false; }
-    return sent;
+    return sent === null ? false : sent;
   }
   function interactWith(s, type, u) {
     pending = { type, guid: idOf(type, u) };

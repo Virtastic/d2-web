@@ -200,7 +200,7 @@ test('the engine answers reach, the approach and the end of the walk when it can
   const refused = createRealmInput({ transmit: (b) => out.push(Array.from(b)), now: () => 0,
     scene: sceneOf({ objects: [{ id: 12, x: 100, y: 120 }] }), approachUnit: () => 0 });
   out.length = 0; assert.equal(refused.leftClick(200, 120), false);
-  assert.deepEqual(out, []); assert.equal(refused.pending, null);
+  assert.deepEqual(out, []); assert.deepEqual(refused.pending, { type: 2, guid: 12 });  // 2AA40 keeps the action waiting
 });
 
 test('the Compelling Orb and the open Hell Forge are used only with their quest item on the cursor', () => {
