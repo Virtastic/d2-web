@@ -1095,8 +1095,13 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
 export async function readD2gsFrame(reader, protocol, timeoutMs = CONNECT_TIMEOUT_MS) {
   await reader.want(2, timeoutMs);
   if (reader.cancelled) throw new Error('D2GS reader cancelled');
+  // 0 means the buffer does not hold a whole frame yet (a frame can arrive split across socket messages).
   let size = protocol.d2gsFrameSize(reader.buffered());
-  if (!size) throw new Error('D2GS frame header present but the frame size is 0');
+  while (!size) {
+    await reader.want(reader.buffered().length + 1, timeoutMs);
+    if (reader.cancelled) throw new Error('D2GS reader cancelled');
+    size = protocol.d2gsFrameSize(reader.buffered());
+  }
   const frame = await reader.want(size, timeoutMs);
   if (reader.cancelled) throw new Error('D2GS reader cancelled');
   reader.skip(size);
