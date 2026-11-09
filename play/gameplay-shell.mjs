@@ -3289,7 +3289,8 @@ function update(forceTick = false, live = false) {
   if (screen === SCREEN.CINEMATICS) { ensureCinematicsScreen(); cinematicsScreen?.step(); return; }
   if (screen === SCREEN.OTHER_MULTIPLAYER) { ensureOtherMultiplayerScreen(); otherMultiplayerScreen?.step(); return; }
   if (screen === SCREEN.BNET_LOGIN) { bnetLoginScreen?.step(); return; }
-  if (screen === SCREEN.BNET_LOBBY) { bnetLobbyScreen?.step(); return; }
+  // The join's loading frame steps from this update tick while the join runs (joinLoading.step is a no-op otherwise).
+  if (screen === SCREEN.BNET_LOBBY) { bnetLobbyScreen?.step(); joinLoading.step(); return; }
   if (screen === SCREEN.SELECT) { ensureCharSelect(); charSelect?.step(); return; }
   if (screen === SCREEN.CREATE) { ensureCharCreate(); charCreate?.step(); return; }
   // "is the game's data mounted" has ONE answer, `window.__d2Entry.retail`, decided by
@@ -4638,7 +4639,7 @@ function drawFrame() {
   if (screen === SCREEN.BNET_LOBBY) {
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
     if (joinLoading.expired()) { joinLoading.fail(); bnetLobbyScreen?.fail({ noticeString: reasonString(REASON_DISCONNECTED, false), message: 'game ended' }); }
-    if (joinLoading.shown && (joinLoadingArt ??= (() => { try { return createJoinLoadingArt({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette }); } catch { return false; } })())) joinLoadingArt.draw(ctx, w, h, joinLoading.progress());
+    if (joinLoading.shown && (joinLoadingArt ??= (() => { try { return createJoinLoadingArt({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette }); } catch { return false; } })())) joinLoadingArt.draw(ctx, w, h, joinLoading.steps);
     else if (bnetLobbyScreen) bnetLobbyScreen.draw(ctx, w, h);
     else { drawCentredMessage(ctx, hoverFont, bnetLobbyError || 'loading…', w, h); }
     hud.textContent = bnetLobbyError ? `battle.net lobby: ${bnetLobbyError}` : '';

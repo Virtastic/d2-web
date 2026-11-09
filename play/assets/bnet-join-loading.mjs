@@ -1,29 +1,30 @@
 // The screen retail shows between the Battle.net lobby and the game: ui\Loading\loadingscreen.dc6 on
-// black, from the CREATE GAME / JOIN GAME click until the world is ready. Its frame is the progress:
-// it climbs toward the last-but-one frame while the join runs and reaches the last when the world is
-// up. The state is deterministic (clock passed in); the shell draws it and hands over to the game.
-// The 180000 ms bound is retail's: D2Client's own timer (0x435D0) gives up a load after the same 180000 ms,
-// counted from a start tick it keeps itself. This browser copy counts from the join click, so the two start
-// points are not yet shown to be the same tick, and retail's exit reason for that path is not recovered.
-// GUESS, the progress curve: retail's frame is a counter that the load loop (D2Client 0x6D010) steps through
-// 0xC1760(1) on every pass but each 32nd, clamped to the last frame. The browser's time curve stands in until
-// the per-join step count is captured: capture: d2client/c1760 -- count the 0xC1760(1) calls one join makes
-// and the frame each leaves on screen; no descriptor yet.
+// black, from the CREATE GAME / JOIN GAME click until the world is ready. The cel drawn is retail's
+// loading frame: the frame index, clamped to the last frame of the DC6, and the index goes up by one per
+// step. A step is one call of that frame with 1, made by the room pump on its gated passes (all but one
+// pass in 32). step() is that call. Until the engine reports its pump passes, the shell steps once per
+// update tick while the join runs.
+// JOIN_LOADING_TIMEOUT_MS is a browser guard counted from the join click. Retail's own load timer (0x435D0)
+// gives up a load after the same 180000 ms from a start tick it keeps itself; the two start points are not yet
+// shown to be the same tick, and retail's exit reason for that path is not recovered.
 export const JOIN_LOADING_TIMEOUT_MS = 180000;
 const ART = 'data\\global\\ui\\Loading\\loadingscreen.dc6', PALETTE = 'data\\global\\palette\\Loading\\pal.dat';
 
 export function createJoinLoading({ now = () => performance.now() } = {}) {
-  let state = 'idle', t0 = 0;
+  let state = 'idle', t0 = 0, steps = 0;
   return {
     get state() { return state; },
     get shown() { return state === 'loading'; },
-    start() { state = 'loading'; t0 = now(); },
+    // the loading frame's index before the clamp: the cel loader resets it to 0
+    get steps() { return steps; },
+    start() { state = 'loading'; t0 = now(); steps = 0; },
     // The world is ready (LoadAct, LoadComplete, MapReveal): the game scene takes over.
     ready() { if (state !== 'loading') return false; state = 'idle'; return true; },
     // The join failed or the wait ran out: the lobby shows again (its own failure notice).
     fail() { if (state !== 'loading') return false; state = 'idle'; return true; },
     expired() { return state === 'loading' && now() - t0 >= JOIN_LOADING_TIMEOUT_MS; },
-    progress() { return state === 'loading' ? 1 - Math.exp(-(now() - t0) / 6000) : 0; },
+    // one call of retail's loading frame with 1 (the frame index goes up); a no-op outside the loading screen
+    step() { if (state === 'loading') steps++; },
   };
 }
 
@@ -38,9 +39,10 @@ export function createJoinLoadingArt({ read, decodeDc6, decodeDatPalette, docume
     return c;
   });
   return {
-    draw(ctx, w, h, progress) {
+    // steps: the loading frame's index before the clamp (joinLoading.steps); the cel is the clamped frame
+    draw(ctx, w, h, steps) {
       ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
-      const i = Math.min(frames.length - 1, Math.floor(progress * frames.length));
+      const i = Math.min(frames.length - 1, Math.max(0, Math.floor(steps)));
       const s = Math.min(w / 800, h / 600);
       if (frames[i]) ctx.drawImage(frames[i], Math.round((w - 800 * s) / 2 + 272 * s), Math.round((h - 600 * s) / 2 + 172 * s), 256 * s, 256 * s);
     },

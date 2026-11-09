@@ -6,7 +6,7 @@ test('click -> loading shown -> world ready -> game scene', () => {
   let t = 0; const l = createJoinLoading({ now: () => t });
   assert.equal(l.shown, false);
   l.start(); assert.equal(l.shown, true);
-  t = 5000; assert.ok(l.progress() > 0 && l.progress() < 1);
+  assert.equal(l.steps, 0); l.step(); l.step(); assert.equal(l.steps, 2);
   assert.equal(l.ready(), true); assert.equal(l.shown, false);
   assert.equal(l.ready(), false);
 });
