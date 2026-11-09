@@ -280,3 +280,16 @@ extern "C" void d2_client_5d080(void* table, const uint8_t* recs, int32_t count,
  s.r=recs; s.n=count; s.c=&c;
  d2client_batch_5b120::reapSlots(s,(d2client_batch_5b120::SoundSlot*)table);
 }
+// 1.13c D2Client+0x5CE70 FN seam: table = DAT 0x1175C0 (16 slots); busy = D2BE (10044), stop = D30C (10032), release = D336 (10006), each taking the slot handle.
+struct d2c5ce70_calls { bool (*busy)(uint32_t handle); uint32_t (*stop)(uint32_t handle); void (*release)(uint32_t handle); };
+extern "C" uint32_t d2_client_5ce70(void* table, const uint8_t* rec, uint32_t cls, const d2c5ce70_calls& c) {
+ struct S : d2client_batch_5b120::SoundSvc { const d2c5ce70_calls* c;
+  uint32_t stopHandle(uint32_t h) override{ return c->stop(h); }
+  void release(d2client_batch_5b120::SoundSlot& s) override{ c->release(s.handle); }
+  bool busy(d2client_batch_5b120::SoundSlot& s) override{ return c->busy(s.handle); }
+  bool stillPlaying(d2client_batch_5b120::SoundSlot&) override{ return false; }
+  const uint8_t* soundRec(int32_t) override{ return nullptr; } } s;
+ s.c = &c;
+ d2client_batch_5b120::SoundSlot* r = d2client_batch_5b120::slotAcquire(s, (d2client_batch_5b120::SoundSlot*)table, rec, cls);
+ return r ? (uint32_t)(uintptr_t)r : 0;
+}

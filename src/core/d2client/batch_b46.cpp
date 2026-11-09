@@ -56,9 +56,24 @@ EMSCRIPTEN_KEEPALIVE i32 d2c_5b6c0(const D2cRecEnv* e, const void* arg, i32* off
     return rec_common(e, arg, off, y, toggle);
 }
 
-// 1.13c D2Client+0x5B890  (body identical to 0x5B6C0)
-EMSCRIPTEN_KEEPALIVE i32 d2c_5b890(const D2cRecEnv* e, const void* arg, i32* off, i32* toggle, i32* y) {
-    return rec_common(e, arg, off, y, toggle);
+// 1.13c D2Client+0x5B890  (ebx = class, edx = unit, esi = &y, stack = &x, &toggle). Same shape as 0x5B6C0, but the class (EBX) reaches
+// all three callees (0x5B120 EAX, 0x5B5A0 EAX, 0x5AF10 EAX), so it gets its own env.
+struct D2c5b890Env {
+    i32 (*f5B120)(i32 cls, const void* unit, u32* out);   // D2Client+0x5B120: EAX=cls, ECX=0, EDX=unit, stack &out
+    void (*f5B5A0)(i32 cls, i32 x, i32 key);              // D2Client+0x5B5A0: EAX=cls, ECX=x, EDX=key, stack x
+    void (*f5AF10)(i32 cls, i32 x, i32 y);                // D2Client+0x5AF10: EAX=cls, stack x, y
+    void (*ord10041)(const u32* rec, i32 x, i32 len, i32 m1, i32 mode, i32 z);
+};
+EMSCRIPTEN_KEEPALIVE i32 d2c_5b890(const D2c5b890Env* e, i32 cls, const void* unit, i32* x, i32* toggle, i32* y) {
+    u32 rec[18] = {0}, key = 0;
+    rec[13] = (u32)e->f5B120(cls, unit, &key);
+    if (!rec[13]) return 0;
+    e->f5B5A0(cls, *x, (i32)key);
+    e->f5AF10(cls, *x, *y);
+    if (*toggle == 0) { *toggle = 10; *y += 10; } else { *y -= *toggle; *toggle = 0; }
+    e->ord10041(rec, *x, 0x3c, -1, 1, 0);
+    *x += 0x38;
+    return 1;
 }
 
 // 1.13c D2Client+0x5B760  (eax=unit, ebx=kind; head = list head DAT_6fbcc4d4)

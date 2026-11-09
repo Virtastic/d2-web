@@ -13,15 +13,15 @@ struct Env {
  P (*f4d850)(P); P (*f4d630)(P, int32_t); bool (*f4dc60)(int32_t, int32_t, int32_t);
  void (*win2Unicode)(P, P, int32_t); void (*personalize)(P, P, P, int32_t, int32_t); void (*ustrcpy)(P, P);
  uint32_t (*o10009)(); P (*o10003)(); void (*o10070)(int32_t, int32_t, int32_t, int32_t);
- int32_t (*o10651)(); int32_t (*o11142)(P); uint32_t (*o11080)(); uint32_t (*o11168)(P);
- int32_t (*o10012)(uint32_t, uint32_t); void (*o10023)(uint32_t, uint32_t, int32_t); int32_t (*o10013)();
+ int32_t (*o10651)(P); int32_t (*o11142)(P); uint32_t (*o11080)(P); uint32_t (*o11168)(P);
+ int32_t (*o10012)(uint32_t, uint32_t); void (*o10023)(uint32_t, uint32_t, int32_t, int32_t*, int32_t*); int32_t (*o10013)();
  uint32_t (*o10265)(uint32_t); void (*o10024)(P, uint32_t); void (*exit_)(int32_t);
  P (*f55d90)(); int32_t (*f70590)(); void (*f54da0)(P s0, P ebx);   // 0xA4DA0: one stack word (ret 4) and EBX
  void (*f6e860)(); void (*f0f090)(); void (*f31750)(); void (*f6e020)();
  uint32_t (*getTick)(); void (*o10065)(uint32_t); int32_t (*o10043)(int32_t, int32_t);
  P (*o10331)(P, uint32_t); int32_t (*o10031)(); int32_t (*o10494)(P, int32_t); int32_t (*o10871)(P, int32_t);
- P (*f12b0)(); int32_t (*o10973)(P, int32_t, int32_t); void (*f1b190)(P, int32_t, int32_t, int32_t);
- void (*f4b00)(); int32_t (*o10085)(int32_t, int32_t, int32_t, int32_t);
+ P (*f12b0)(int32_t); int32_t (*o10973)(P, int32_t, int32_t); void (*f1b190)(P, int32_t, int32_t, int32_t);
+ void (*f07c0)(P, int32_t); void (*f4b00)(); int32_t (*o10085)(int32_t, int32_t, int32_t, int32_t);
  void (*f71580)(); uint8_t (*o10190)(int32_t, int32_t, int32_t); void (*o10014)(int32_t, int32_t, int32_t, int32_t, uint32_t, int32_t);
  int32_t (*o10086)(uint32_t); void (*o10041)(const int32_t*, int32_t, int32_t, uint32_t, int32_t, int32_t); void (*o10040)();
  P (*fdb420)(const char*, int32_t);

@@ -74,8 +74,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_5d600(D2cRes5d* s, const D2cR
     if (mode == 1 || mode == 2) {
         if ((mode == 1 ? e->ord10056() : e->ord10046()) == 0) return 0;
     }
-    d2_client_5d180(s, e);
-    if (!d2_client_5d540(s, e, mode)) return 0;
+    if (e->fn5d180) e->fn5d180(); else d2_client_5d180(s, e);
+    if (!(e->fn5d540 ? e->fn5d540(mode) : d2_client_5d540(s, e, mode))) return 0;
     if (e->ord10059() != mode) e->ord10066();
     return 1;
 }

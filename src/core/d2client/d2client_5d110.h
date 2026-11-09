@@ -39,6 +39,8 @@ struct D2cRes5dEnv {
     uint32_t (*ord10826)(uint32_t);
     uint32_t (*ord10014)(uint32_t);
     void     (*fn5cf90)(void);
+    void     (*fn5d180)(void);           // optional seam: 0x5D180 as a hooked callee of 0x5D600 (null = the port above)
+    uint32_t (*fn5d540)(int32_t mode);   // optional seam: 0x5D540 as a hooked callee of 0x5D600 (null = the port above)
     void     (*fn5cd10)(void);
     int      (*ord10044)(void);          // Ordinal_10044 gate used by 0x5CC10
     void     (*fatal)(uint32_t code);    // Ordinal 10265+10024+_exit(-1); no return

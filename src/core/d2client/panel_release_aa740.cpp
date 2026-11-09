@@ -1,11 +1,11 @@
 // 1.13c D2Client+0xAA740  panel_release: left-button release on the panel. Stdcall, one stack word (event*), ret 4.
 // Gate 0x63710 (nonzero: return its eax, nothing written). Raw x > W or y > H-0x31: FCDBC = 0, FCDBD = -1, return
-// without BBE84. Otherwise px = x - [11B9A0], py = y + [11B9A4].
+// without BE84. Otherwise px = x - [11B9A0], py = y + [11B9A4].
 //   FCDBC != 0 (box press): AA310(px, py); if 0 -> done. Else target clear, slide, AA380, done.
-//   FCDBC == 0: FCDBD == -1 -> done. Else AA240(px, py): mismatch -> done. Match: BBE84, packet 0x14910 (al 0x49),
-//   FCDD5 = 1, AA380, FCDBC = 0, FCDBD = -1, target clear, slide, sound 0x8B7, BBE84.
-//   done: FCDBC = 0, FCDBD = -1, BBE84.
-// Returns the eax of the last BBE84; 0 on the outside path (no BBE84).
+//   FCDBC == 0: FCDBD == -1 -> done. Else AA240(px, py): mismatch -> done. Match: BE84, packet 0x14910 (al 0x49),
+//   FCDD5 = 1, AA380, FCDBC = 0, FCDBD = -1, target clear, slide, sound 0x8B7, BE84.
+//   done: FCDBC = 0, FCDBD = -1, BE84.
+// Returns the eax of the last BE84; 0 on the outside path (no BE84).
 #include <cstdint>
 #include <cstring>
 #include <emscripten.h>

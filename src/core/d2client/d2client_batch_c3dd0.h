@@ -29,4 +29,5 @@ struct Env {
 };
 uint32_t sub_88D90(const Env& e);
 uint32_t sub_C4960(const Env& e, P a);
+uint32_t sub_C4370(const Env& e, P a, int32_t cls, uint32_t retaddr);
 } // namespace d2client_batch_c3dd0

@@ -40,58 +40,6 @@ U sub_19030(I*self,P arg,const Fn19030&f){
  if(h){ if(!f.sub18f90(arg))return 0;
   I old=*self; I n=f.o10601(h,"..\\Source\\D2Client\\UNIT\\Player.cpp",0x32c); *self=n; if(n!=old)self[1]=-1;}
  return 1;}
-struct Fn1AB20{
- I (*dataFlag)(I); void (*o10159)(P); U (*s1660)(P); U (*s1630)(P); void (*s48a0)(I,I,U,U); void (*s6c0)();
- I (*o10407)(P,P); I (*o10324)(P,P,I); I (*o10594)(P,P); I (*o10494)(U,I); void (*o10688)(I);
- I (*s9f30)(); P (*s55b40)(I,I); void (*s750)(I,P); void (*s7c0)(U); void (*s2d50)(I,I,I);
- void (*s230)(); I (*s8ac0)(I,I); void (*s010)(P,U,P); P (*unitPtr)(U); U now,*g97ec,*g9828,*g3e4,dhandle;};
-static void clr15(P u){ if(u&&rd(u,0)==0&&rd(u,0x14)){P x=reinterpret_cast<P>(static_cast<uintptr_t>(rd(u,0x14)));for(U o=0x150;o<=0x15c;o+=4)wr(x,o,0);}}
-static bool tail9f(P pl,I a,I b,const Fn1AB20&f){ // shared "reset hover" tail
- I ok=f.s9f30(); if(!ok)return false;
- P p=(a==4)?f.s55b40(b,4):nullptr; if(p&&rd(p,0)==4&&!((rd(p,0xc4)>>1)&1))return false;
- f.s750(2,pl); clr15(pl); return true;}
-// 1.13c D2CLIENT+0x1AB20
-void sub_1AB20(const uint8_t*fr,I a,I b,const Fn1AB20&f){
- P tgt=reinterpret_cast<P>(static_cast<uintptr_t>(rd(fr,8)));
- P pl=reinterpret_cast<P>(static_cast<uintptr_t>(rd(fr,4)));
- U kind=tgt?rd(tgt,0):99;
- auto common=[&](){
-  if(tgt&&rd(tgt,0)==1){I i=I(rd(tgt,4));int v=f.dataFlag(i);
-   if(v>=0&&(v&1)&&(v&2)){ if(rd(tgt,0x2c))f.o10159(reinterpret_cast<P>(static_cast<uintptr_t>(rd(tgt,0x2c))));
-    P t2=reinterpret_cast<P>(static_cast<uintptr_t>(rd(fr,8)));
-    f.s48a0(t2?I(rd(t2,0)):6,t2?I(rd(t2,0xc)):-1,f.s1630(t2),f.s1660(t2));
-    t2=reinterpret_cast<P>(static_cast<uintptr_t>(rd(fr,8)));
-    if(t2&&rd(t2,0)==1&&rd(t2,0x14)){uint8_t*q=reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(rd(t2,0x14)))+0x28;*q|=1;}
-    f.s6c0();}}
-  if(f.o10407(tgt,pl)<=b){ tail9f(pl,a,b,f); return;}
-  f.s7c0(rd(fr,0x18)); f.s2d50(0x13,a,b);};
- switch(kind){
- case 0:
-  if(f.o10407(tgt,pl)<5&&!f.o10324(pl,tgt,0x804)){tail9f(pl,a,b,f);return;}
-  f.s7c0(rd(fr,0x18)); f.s2d50(0x13,a,b); return;
- case 1: f.s230(); common(); return;
- case 2: case 4:{
-  if(fr[0]&8)return;
-  bool ok=true;
-  if(kind==2){ f.o10688(tgt?I(rd(tgt,4)):-1);
-   if(tgt&&rd(tgt,4)==0x3b&&f.o10494(f.dhandle,0x66))ok=false;
-   if(f.o10594(pl,tgt)&&!f.o10324(pl,tgt,0x804)){
-    if(!ok)return; I g=f.s9f30(); if(!g){*f.g3e4=1;return;}
-    P p=(a==4)?f.s55b40(b,4):nullptr; if(p&&rd(p,0)==4&&!((rd(p,0xc4)>>1)&1)){*f.g3e4=1;return;}
-    f.s750(2,pl); clr15(pl); *f.g3e4=1; return;}
-  } else if(f.o10407(tgt,pl)<5&&!f.o10324(pl,tgt,0x804)){
-   I g=f.s9f30(); if(!g){*f.g3e4=1;return;}
-   P p=(a==4)?f.s55b40(b,4):nullptr; if(p&&rd(p,0)==4&&!((rd(p,0xc4)>>1)&1)){*f.g3e4=1;return;}
-   f.s750(2,pl); clr15(pl); *f.g3e4=1; return;}
-  if(f.s8ac0(a,b))return;
-  if(kind==2){f.s1660(tgt);f.s010(reinterpret_cast<P>(static_cast<uintptr_t>(f.s1630(tgt))),rd(fr,0x14),pl);if(!ok)return;}
-  else f.s7c0(rd(fr,0x18));
-  f.s2d50(0x13,a,b); *f.g3e4=1; return;}
- case 5:
-  if(*f.g97ec<*f.g9828)return;
-  if(f.o10407(tgt,pl)>4){f.s7c0(rd(fr,0x18));f.s2d50(0x13,a,b);*f.g9828=*f.g97ec+500;return;}
-  tail9f(pl,a,b,f); *f.g9828=*f.g97ec+500; return;
- default: common(); return;}}
 // D2Client 2B380: moved to d2client_2b380.cpp (EAX path, stdcall outSize/rootArg).
 static void wcat(char16_t*d,const char16_t*s){while(*d)++d;while((*d++=*s++));}
 // 1.13c D2CLIENT+0x2CE10

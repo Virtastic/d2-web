@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstring>
 #include <emscripten.h>
+#include "cl_env.h"
 
 typedef uintptr_t W;
 struct D2c84750Env {
@@ -68,4 +69,75 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_84750(const D2c84750Env* e, const
     e->sendMouseMove(C(10048), 0, (W)e->mouseX | (W)e->mouseY << 16);   // SendMessageA(WM_MOUSEMOVE, 0, MAKELONG(DAT_6fbcb828, DAT_6fbcb824))
     C(V(0x6fb31aa0), A(u));   // esi = item
     if (e->hoverOn && !e->hoverBusy && rd<int32_t>(u, 0xC) == e->hoverId) C(V(0x6faf7ab0));
+}
+
+// ---- register-exact port (cl::Env seam, one record per retail call) ----
+// 1.13c D2Client+0x84750 -- item packet "update or re-create in place". EAX = packet (no stack arguments): byte +2 length, id dword +4,
+// payload from +8 decoded by 0xCA90 into a stack block (+4 word, +6 word, +8 byte, +0xC dword, +0x10 dword whose low byte 0xFF means
+// "no refresh"). player = *(D2Client+0x11BBFC), read without a null check. The client item hash (D2Client+0x10AE08, chain +0xE4, id +0xC,
+// type +0) is walked for the id (a hit whose type is not 4 is fatal).
+//  hit, 0xCA3C(block dword +0xC, 1) == 0: in-place update -- 0x82820 (EAX = byte +8, ESI = item, EDI = 0; words +4, +6, 0), 0xCA24 with
+//    the block byte +0x10 in the low byte of an uninitialised stack word, 0xCA42(item, -1, 0), 0xCA42(item, dword +0xC, 1).
+//  hit, nonzero: when 0xC6D0(inventory, item) holds it, the item drops to the floor -- 0xC92E(item) byte into the residue word, 0xC8A4(player,
+//    that word, D2Client+0x119854), 0x1660/0x1630 (ECX = item), 0xC9FA(Item.cpp, 0x456, inventory, x, y, the 0xC8A4 result, 1, the word),
+//    0x8BBF0, 0xCA0C(inventory) for player type 0, 0xC1A8(item, 0x100, 0x96, Item.cpp) == 0 -> 0xC544(player, item); in every case it
+//    is unhashed (0xA6EF0: ECX = the hash, EDX = id & 0x7F; id, 4) and re-made by 0x835C0 (EBX = 0; packet, block, 0, 0), null returns.
+//  miss: 0x835C0 (EBX = 0; packet, block, 0, 1), unchecked.
+// Then unless the low byte of block +0x10 is 0xFF: 0x82660 (EAX = dword at block +4, ECX = item; dword at block +6, dword +0x10, player),
+// 0xCA30 -> 0x81FF0 (ESI = item, EDI = player, one zero word), WM_MOUSEMOVE to the 0xD0B4 window (lParam = word 0x11B824 << 16 |
+// word 0x11B828, IAT 0xCF118), 0x81AA0 (ESI = item, EDI as the path left it) and 0x47AB0 when the hover state (0x11978E != 0, byte
+// 0x119781 == 0) names the item's id (-1 for no item) at 0x119786.
+// hash/ui/hov: where retail's D2Client+0x10AE08, +0x11B820 and +0x119780 live.
+extern "C" void d2c_84750(uint32_t pkt, uint32_t hash, uint32_t ui, uint32_t hov, const cl::Env& e) {
+    constexpr uint32_t kItemCpp = 0xB2000000u | 0xD4964u;     // "..\\Source\\D2Client\\UNIT\\Item.cpp"
+    uint32_t buf[6] = {};
+    const uint32_t bp = (uint32_t)(uintptr_t)buf;
+    const uint8_t* b = (const uint8_t*)buf;
+    e.H(0xca90, pkt + 8, e.R8(pkt + 2) - 8, 0, bp);
+    const uint32_t id = e.R(pkt + 4);
+    const uint32_t pl = e.self;
+    uint32_t node = 0;
+    for (uint32_t n = e.R(hash + (id & 0x7f) * 4); n; n = e.R(n + 0xe4))
+        if (e.R(n + 0xc) == id) { if (e.R(n) != 4) return; node = n; break; }   // fatal 0x5A in retail
+    uint32_t it, edi = pkt;
+    if (node) {
+        if (e.H(0xca3c, buf[3], 1)) {
+            if (e.H(0xc6d0, e.R(pl + 0x60), node)) {
+                const uint32_t w = e.H(0xc92e, node) & 0xff;   // upper bytes: stack residue (masked in the vector)
+                const uint32_t q = e.H(0xc8a4, pl, w, e.R(hov + 0xd4));   // 0x119854
+                const uint32_t y = e.H(0x1660, 0, 0, 0, 0, 0, 0, node);
+                const uint32_t x = e.H(0x1630, 0, 0, 0, 0, 0, 0, node);
+                const uint32_t inv = e.R(pl + 0x60);
+                e.H(0xc9fa, kItemCpp, 0x456, inv, x, y);
+                const uint32_t blk[8] = { 0, 0x456, inv, x, y, q, 1, 0 };   // the eight stack words; 0 (module string) and 7 (residue) masked
+                if (e.blk) e.blk(e.ctx, 0xc9fa, (uint32_t)(uintptr_t)blk, 8);
+                e.H(0x8bbf0);
+                if (e.R(pl) == 0) e.H(0xca0c, e.R(pl + 0x60));
+                if (!e.H(0xc1a8, node, 0x100, 0x96, kItemCpp)) e.H(0xc544, pl, node);
+            }
+            e.H(0xa6ef0, id, 4, 0, 0, 0, 0, 0xB2000000u | 0x10AE08u, id & 0x7f);
+            it = e.H(0x835c0, pkt, bp, 0, 0);
+            if (!it) return;
+        } else {
+            e.H(0x82820, buf[1] & 0xffff, buf[1] >> 16, 0, 0, 0, b[8], 0, 0, 0, node);
+            e.Edj(0x82820, 0);
+            e.H(0xca24, node, b[0x10]);                        // upper bytes: stack residue (masked in the vector)
+            e.H(0xca42, node, 0xffffffffu, 0);
+            e.H(0xca42, node, buf[3], 1);
+            it = node; edi = 0;
+        }
+    } else {
+        it = e.H(0x835c0, pkt, bp, 0, 1);
+    }
+    if (b[0x10] == 0xff) return;
+    uint32_t w6; __builtin_memcpy(&w6, b + 6, 4);
+    e.H(0x82660, w6, buf[4], pl, 0, 0, buf[1], it);
+    if (e.H(0xca30, it, pl)) { e.H(0x81ff0, 0, 0, 0, 0, 0, 0, 0, 0, 0, it); e.Edj(0x81ff0, pl); edi = pl; }
+    const uint32_t lp = (e.R(ui + 4) & 0xffff) << 16 | (e.R(ui + 8) & 0xffff);   // 0x11B824, 0x11B828
+    const uint32_t hw = e.H(0xd0b4);
+    e.H(0xcf118, hw, 0x200, 0, lp);
+    e.H(0x81aa0, 0, 0, 0, 0, 0, 0, 0, 0, 0, it);
+    e.Edj(0x81aa0, edi);
+    const uint32_t iid = it ? e.R(it + 0xc) : 0xffffffffu;
+    if (e.R(hov + 0xe) && !e.R8(hov + 1) && iid == e.R(hov + 6)) e.H(0x47ab0);
 }

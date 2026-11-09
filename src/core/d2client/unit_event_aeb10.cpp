@@ -9,11 +9,11 @@ EMSCRIPTEN_KEEPALIVE void d2c_aeb10(const D2cAEB10Env* e, void* self, int32_t ev
     switch (ev) {
     case 0: case 2: e->f32FE0(self); return;
     case 6:
-        if (p1 != 0 && *(int32_t*)((char*)self + 0x10) == 0x11) { e->f2A6C0(); e->fA6210(); }
+        if (p1 != 0 && *(int32_t*)((char*)self + 0x10) == 0x11) { e->f2A6C0(self); e->fA6210(self); }
         return;
     case 0xc:
-        e->fAE3F0(self);
-        if (self == e->curUnit) { e->fAC970(); e->f32FE0(self); }
+        e->fAE3F0(e->curUnit);
+        if (self == e->curUnit) { e->fAC970(self); e->f32FE0(self); }
     }
 }
 }

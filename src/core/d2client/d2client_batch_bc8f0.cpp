@@ -63,7 +63,7 @@ uint32_t sub_BCB30(const Env& e, P ev) {
  }
  return 0;
 }
-// 1.13c D2Client+0xBCB90  (param_1 = unit, ebx = value)
+// superseded by d2client_bcb90.cpp (D2Client BCB90)  (param_1 = unit, ebx = value)
 int32_t sub_BCB90(const Env& e, P u, int32_t ebx) {
  if (!u) return 0;
  uint32_t c = e.rd32(gCharSel) & 0xff;

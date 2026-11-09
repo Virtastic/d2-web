@@ -117,7 +117,7 @@ void runQueue(Env& e,uintptr_t unit,uint16_t tag){
  q->count=0;
 }
 
-// 1.13c D2Client+0xABD40  (unit in EDI)
+// D2Client+0xABD40: own file d2client_abd40.cpp (unit in EDI)
 void freeQueue(Env& e,uintptr_t unit){
  if(!unit) e.fatal(0x8a5);
  if(rdp(unit+0xd8)){
@@ -161,17 +161,17 @@ static void unpack(Env& e,const uint8_t* src,int32_t len,uint8_t* d,const F* f,i
  e.bitInit(src,len);
  for(int i=0;i<n;i++){ uint32_t v=e.bitRead(f[i].bits); if(f[i].w==1) d[f[i].off]=(uint8_t)v; else { uint16_t w=(uint16_t)v; std::memcpy(d+f[i].off,&w,2); } }
 }
-// 1.13c D2Client+0xAC140  (dst in ESI; src buffer is a register arg)
+// D2Client+0xAC140: own file d2client_ac140.cpp (dst in ESI; src buffer in EAX)
 void unpack9(Env& e,const uint8_t* src,uint8_t* d){
  static const F f[]={{0,1,8},{1,2,15},{3,2,16},{5,2,16},{7,1,8},{8,1,8}};
  unpack(e,src,9,d,f,6);
 }
-// 1.13c D2Client+0xAC1B0
+// D2Client+0xAC1B0: own file d2client_ac1b0.cpp
 void unpack13(Env& e,const uint8_t* src,uint8_t* d){
  static const F f[]={{0,1,8},{1,2,15},{3,2,15},{5,2,15},{7,2,16},{9,2,16},{0xb,1,8},{0xc,1,8}};
  unpack(e,src,13,d,f,8);
 }
-// 1.13c D2Client+0xAC240
+// D2Client+0xAC240: own file d2client_ac240.cpp
 void unpack15(Env& e,const uint8_t* src,uint8_t* d){
  static const F f[]={{0,1,8},{1,2,15},{3,2,15},{5,2,15},{7,1,7},{8,1,7},{9,2,16},{0xb,2,16},{0xd,1,8},{0xe,1,8}};
  unpack(e,src,15,d,f,10);

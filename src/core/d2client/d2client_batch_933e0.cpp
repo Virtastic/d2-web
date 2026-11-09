@@ -45,7 +45,7 @@ struct Env {   // imported calls
 static inline int32_t clampNeg0(int32_t v) { return v < 0 ? 0 : v; }
 
 // 1.13c D2Client+0x933E0: ported in d2client_933e0.cpp (string ids 0xF9E/0x2B48, the item global and 0x56330's args).
-// 1.13c D2Client+0x945D0  (args GUESS: EAX=area, item or null, x, y, flags)
+// old guess of D2Client 0x945D0 (superseded by d2client_cells.cpp)  (args GUESS: EAX=area, item or null, x, y, flags)
 void sub_945D0(Env& e, Globals& g, const Area* A, Unit* item, void* inv, int32_t x, int32_t y, uint32_t flag) {
  uint32_t cx = uint32_t(x - A->left) / A->cellW, cy = uint32_t(y - A->top) / A->cellH;
  if (!item) {
@@ -70,7 +70,7 @@ void sub_945D0(Env& e, Globals& g, const Area* A, Unit* item, void* inv, int32_t
  if (h == A->h) cy = A->h >> 1;
  g.hcellY = cy; g.hcellX = cx; g.g_BCC28 = 1; g.hover = nullptr; g.hoverPrev = nullptr;
 }
-// 1.13c D2Client+0x94820  (this=item; EAX=area; outputs cell x,y)
+// old guess of D2Client 0x94820 (superseded by d2client_cells.cpp)  (this=item; EAX=area; outputs cell x,y)
 bool sub_94820(Env& e, const Area* A, Unit* item, int32_t x, int32_t y, uint32_t* ox, uint32_t* oy) {
  if (!item) e.fatal(0);
  uint32_t cx = uint32_t(x - A->left) / A->cellW, cy = uint32_t(y - A->top) / A->cellH;
@@ -83,7 +83,7 @@ bool sub_94820(Env& e, const Area* A, Unit* item, int32_t x, int32_t y, uint32_t
  if (h > 1) { int32_t t = int32_t(*oy) - (h >> 1); *oy = t < 0 ? 0 : t; }
  return true;
 }
-// 1.13c D2Client+0x94970
+// old guess of D2Client 0x94970 (superseded by d2client_cells.cpp)
 void sub_94970(Env& e, Globals& g, const Area* A, void* inv, Unit* (*lookupSel)(void*), const uint8_t* selTab, int32_t selCount) {
  if (!e.canSend()) return;
  e.refresh();
@@ -96,7 +96,7 @@ void sub_94970(Env& e, Globals& g, const Area* A, void* inv, Unit* (*lookupSel)(
  // GUESS: tail (unit lookup by 0xBC971D, kind==1 check, rect test on mouse vs 0xBB3B4..C0, then
  // sub_945D0(unit+0x60,null,mouseX,mouseY,panelId); g_90EA4=0) needs unit-table env; unit wiring left to caller.
 }
-// 1.13c D2Client+0x95140
+// old guess of D2Client 0x95140 (superseded by d2client_cells.cpp)
 void sub_95140(Env& e, Unit* item, const Area* A, int32_t bx, int32_t by) {
  if (!e.heldCount(item)) return;
  for (int32_t n = 0;; ++n) {

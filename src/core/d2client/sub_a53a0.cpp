@@ -3,12 +3,12 @@
 #include <emscripten.h>
 struct D2cA53A0Env {
     void (*fatal)(uint32_t line);        // Ordinal_10265(0x96c) -> Ordinal_10024(str 0x7359f RVA) -> _exit(-1)
-    void (*a4da0)(uint32_t table_rva);   // D2Client+0xA4DA0
+    void (*a4da0)(uint32_t table_rva, uint32_t ebx);   // D2Client+0xA4DA0 (stdcall 1, EBX = the object, which it calls)
 };
 extern "C" {
 // 1.13c D2Client+0xA53A0 (callers 0x1E1D2, 0x1E160)
 EMSCRIPTEN_KEEPALIVE void d2c_a53a0(uint32_t eax, const D2cA53A0Env* e) {
     if (!eax) { e->fatal(0x96c); return; }
-    e->a4da0(0x10A808);  // 0x6FBBA808 - 0x6FAB0000
+    e->a4da0(0x10A808, eax);   // EBX = EAX at entry (retail 0x6FB553A1)  // 0x6FBBA808 - 0x6FAB0000
 }
 }

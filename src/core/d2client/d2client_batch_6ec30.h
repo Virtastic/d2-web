@@ -40,4 +40,3 @@ struct D2ClientBatch6EC30Env {
 extern "C" void d2c_af980(D2ClientBatch6EC30Env* e, uintptr_t p);
 extern "C" void d2c_af9b0(D2ClientBatch6EC30Env* e, uintptr_t p);
 extern "C" uint32_t d2c_afc10(D2ClientBatch6EC30Env* e);
-extern "C" void d2c_aeca0(D2ClientBatch6EC30Env* e, uint16_t v);

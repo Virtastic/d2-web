@@ -1,28 +1,32 @@
-// 1.13c D2Client+0xC7290 -- mapping lane, decompile derived; not yet vectored.
-// Seam: imported calls go through D2cHost with call.rva = D2Common/D2Gfx ordinal (ordinal-to-DLL unverified), in retail order.
-// `self` is the implicit EAX arg: self[0]=kind, self[0xb]=unit ptr. D2cHost for FUN_6fb57e20/6fb76060 uses their RVAs.
+// 1.13c D2Client+0xC7290: EAX = unit. Read off the disassembly: every callee is stdcall;
+// the 10123/10331 thunks pop one word each, so the words pushed ahead of them are the trailing arguments of 11073.
+// Callees go through D2cHost in retail's order with retail's stack words (s[]) and registers (eax for 0xA7E20).
 #include <cstdint>
 #include <emscripten.h>
 #include "client_host.h"
 typedef uint32_t u32;
-static u32 ord(D2cHost h, u32 o, u32 a = 0) { D2cCall c = {}; c.rva = o; c.eax = a; return h(&c); }
+static u32 rd(u32 a) { return *(const u32*)(uintptr_t)a; }
+static u32 call(D2cHost h, u32 rva, u32 s0, u32 s1 = 0, u32 s2 = 0, u32 s3 = 0, u32 s4 = 0, u32 eax = 0) {
+    D2cCall c = {}; c.rva = rva; c.eax = eax; c.s[0] = s0; c.s[1] = s1; c.s[2] = s2; c.s[3] = s3; c.s4 = s4; return h(&c);
+}
+// 0x1630 / 0x1660 inlined by retail here: kinds 2, 4, 5 read the unit's +0xC / +0x10, the rest ask D2Common
+static u32 coord(D2cHost h, u32 self, u32 off, u32 thunk) {
+    u32 kind = rd(self), u = rd(self + 0x2c);
+    if (kind == 2 || (kind > 3 && kind <= 5)) return rd(u + off);
+    return u ? call(h, thunk, u) : 0;
+}
 extern "C" {
 // 1.13c D2Client+0xC7290
-EMSCRIPTEN_KEEPALIVE void d2c_c7290(D2cHost h, u32* self, u32* unit /*= self[0xb] deref'd as u32[]*/) {
-    u32 kind = self[0];
-    // retail: cmp (-(kind!=1) & 0xffffff80) + 0x100 -> 0x80 if kind!=1 else 0x100
-    u32 want = (kind != 1) ? 0x80u : 0x100u;
-    if (ord(h, 10259, self[0xb]) == want) return;
-    u32 r = ord(h, 10511), x, y;
-    bool direct = (kind == 2) || (kind > 3 && kind < 6);
-    if (r == 0) x = direct ? unit[0xc / 4] : (self[0xb] == 0 ? 0 : ord(h, 10867, self[0xb]));
-    else x = ord(h, 10980, r);
-    if (r == 0) y = direct ? unit[0x10 / 4] : (self[0xb] == 0 ? 0 : ord(h, 10750, self[0xb]));
-    else y = ord(h, 10649, r);
-    ord(h, 10123);
-    u32 t = ord(h, 10331);
-    ord(h, 11073, t);
-    D2cCall c = {}; c.rva = 0x57E20; c.eax = x; c.edx = y; c.s[0] = 0; h(&c);  // FUN_6fb57e20(x,y,0): reg convention unverified
-    c = {}; c.rva = 0x76060; h(&c);
+EMSCRIPTEN_KEEPALIVE void d2c_c7290(D2cHost h, u32 self) {
+    u32 want = rd(self) != 1 ? 0x80u : 0x100u;                    // dec/neg/sbb/and 0xFFFFFF80/add 0x100
+    if (call(h, 0xCD24, rd(self + 0x2c)) == want) return;          // D2Common#10259
+    u32 r = call(h, 0xC310, self);                                 // #10511
+    u32 x = r ? call(h, 0xCB68, r) : coord(h, self, 0xc, 0xC3BE);  // #10980 / #10867
+    u32 y = r ? call(h, 0xCB6E, r) : coord(h, self, 0x10, 0xC2EC); // #10649 / #10750
+    u32 m = call(h, 0xCD30, self);                                 // #10123 (pops self; `want` stays on the stack)
+    u32 room = call(h, 0xC1F0, self);                              // #10331 (pops self; x, y, m stay)
+    call(h, 0xCB98, room, x, y, m, want);                          // #11073, ret 0x14
+    call(h, 0xA7E20, x, y, 0, 0, 0, self);                         // EAX = unit, ret 0xC
+    call(h, 0xC6060, y);
 }
 }

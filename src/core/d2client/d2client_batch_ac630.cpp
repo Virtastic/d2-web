@@ -45,7 +45,7 @@ void sub_AC630(Env& e, uint8_t* self, const uint8_t* src, U n) {
 }
 // 1.13c D2Client+0xAC750  (copies 26 bytes: 13 wchar, then call with 0)
 void sub_AC750(Env& e, const uint16_t* s) { uint16_t t[14]; std::memcpy(t, s, 26); e.fn5dd0(0, t); }
-// 1.13c D2Client+0xAC800
+// D2Client+0xAC800: own file d2client_ac800.cpp
 void sub_AC800(Env& e, const uint8_t* pk) {
   if (pk[0xb]) return;
   Node* n = e.find(0, rd32(pk, 3)); if (!n) return;

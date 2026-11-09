@@ -23,7 +23,7 @@ struct D2ClientA4b60Env {
     uintptr_t (*o10633)(uintptr_t a);
     void      (*o10345)(uintptr_t a);
     void      (*o10184)(uintptr_t a);
-    void      (*o10704)();
+    void      (*o10704)(uintptr_t a);                   // 0xC502 (stdcall 1, handed the unit)
     uint32_t  (*a4a90)(uintptr_t unit, uintptr_t arg);  // 0xA4A90
     void      (*a4da0)(uint32_t table_rva);             // 0xA4DA0
     // Globals (RVA): heads 0x10A608 / 0x10A808 (2 x 0x80 uintptr_t), cur unit ptr 0x11BBFC,

@@ -13,10 +13,10 @@
 namespace {
 uint32_t g_actions;
 void equip(void*) { g_actions |= 1u; }        // D2Client+0x82FE0
-void dead_a() { g_actions |= 8u; }             // D2Client+0x2A6C0
-void dead_b() { g_actions |= 8u; }             // D2Client+0xA6210
+void dead_a(void*) { g_actions |= 8u; }             // D2Client+0x2A6C0
+void dead_b(void*) { g_actions |= 8u; }             // D2Client+0xA6210
 void owner(void*) { g_actions |= 2u; }         // D2Client+0xAE3F0
-void inventory() { g_actions |= 4u; }          // D2Client+0xAC970
+void inventory(void*) { g_actions |= 4u; }          // D2Client+0xAC970
 }
 
 extern "C" {

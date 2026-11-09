@@ -10,82 +10,9 @@ static P rowAt(const Env& e, int32_t i) {
  return (i < 0 || (int32_t)e.rd32(e.dataTables + 0xb6c) <= i) ? 0 : e.rd32(e.dataTables + 0xb64) + (P)i * 0x1a4;
 }
 static P unitRow(const Env& e, P u) { return u ? rowAt(e, (int32_t)e.rd32(u + 4)) : 0; }
-static P clsRow(const Env& e, int32_t c) {
- return (c < 0 || (int32_t)e.rd32(e.dataTables + 0xba0) <= c) ? 0 : e.rd32(e.dataTables + 0xb98) + (P)c * 0x23c;
-}
-// 1.13c D2Client+0xBBC10
-void sub_BBC10(const Env& e, P u) {
- P r = unitRow(e, u);
- if (!r || s16(e, r + 0x1e) < 0) { e.f61720(); return; }
- if (s16(e, r + 0x1e) < s16(e, r + 0x20)) e.f1380(u + 0x20);
- int32_t cls = (int32_t)e.o10240(u);
- P q = clsRow(e, cls);
- if (q) {
-  P p = e.f560d0();
-  uint32_t m = e.o11029(u);
-  e.o10786(p, e.rd32(q + 0x138), cls, m, nullptr);
-  int32_t aux = 0;
-  int32_t v = e.o10786(p, e.rd32(q + 0x13c), cls, m, &aux);
-  if (v != 0 && aux > 0) {
-   if (e.f68df0((uint32_t)aux)) e.f62e00();
-   e.f617c0(u);
-   return;
-  }
- }
- e.f61720();
-}
-// 1.13c D2Client+0xBBD40
-void sub_BBD40(const Env& e, P u) {
- P r = unitRow(e, u);
- if (!r || s16(e, r + 0x1e) < 0) { e.f61720(); return; }
- if (s16(e, r + 0x1e) < s16(e, r + 0x20)) e.f1380(u + 0x20);
- int32_t m = (int32_t)e.o11029(u);
- int32_t d = (int32_t)e.rd32(r + 0x60); if (d < 1) d = 1;
- int32_t n = 2; if (m / d > 1) n = m / d;
- if (e.f68df0(e.rd32(r + 0x58) + (uint32_t)n)) e.f62e00();
- e.f617c0(u);
-}
 // 1.13c D2Client+0xBBE00
 void sub_BBE00(const Env& e, P u) {
  if (unitRow(e, u)) e.f69470();
- e.f617c0(u);
-}
-// 1.13c D2Client+0xBBE60
-void sub_BBE60(const Env& e, P u) {
- if (e.o10203(e.rd32(u + 0x2c))) {
-  int32_t cls = (int32_t)e.rd32(u + 4);
-  P r = rowAt(e, cls);
-  if (r && s16(e, r + 0x1e) >= 0) {
-   uint32_t m = e.o11029(u);
-   e.o10231(u, e.f560d0(), e.rd32(r + 0x84), (uint32_t)cls, m);
-   e.f69650(s16(e, r + 0x1e));
-  }
- }
- e.f617c0(u);
-}
-// 1.13c D2Client+0xBBF30
-uint32_t sub_BBF30(const Env& e, P u, uint32_t a2) {
- P r = unitRow(e, u);
- if (r && s16(e, r + 0x2c) >= 0) {
-  if (a2) return 0;
-  uint32_t m = e.o11029(u);
-  e.fb210(e.rd32(r + 0x6c), s16(e, r + 0x2c), e.o10240(u), u, m, u);
- }
- return 1;
-}
-// 1.13c D2Client+0xBC210  (ctx = unaff_EBX)
-void sub_BC210(const Env& e, P ctx, P u) {
- P r = unitRow(e, u);
- if (!r) { e.f61720(); return; }
- if (!e.f560d0()) { e.f617c0(u); return; }
- int32_t f = (int32_t)e.o10985(u);
- int32_t a = s16(e, r + 0x1e);
- if (a > 0 && f > 10) e.f6b5b0(ctx, u, a, (uint32_t)f, e.f60000(r));
- int32_t d = (int32_t)e.rd32(r + 0x58); if (d < 1) d = 1;
- if (s16(e, r + 0x20) > 0 && f % d == 0) e.f682b0(ctx, s16(e, r + 0x20), 0x14);
- int32_t w = (int32_t)e.rd32(r + 0x5c);
- if (w > 0 && f == 0x5a) { int32_t v = ((w / 3) * 25000) / 0x19; e.f39f00(8, v, v); }
- if (s16(e, r + 0x22) > 0 && f > 0x73 && f < 0x13b) e.f6b570();
  e.f617c0(u);
 }
 // 1.13c D2Client+0xBC3E0  (out = unaff_EBX, str = unaff_EDI, UTF-16 buffer)

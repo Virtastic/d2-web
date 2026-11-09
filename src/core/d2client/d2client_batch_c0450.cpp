@@ -66,26 +66,27 @@ void sub_C1340(const Env& e) {
  P u = e.rd32(0x6fbba808 + (id & 0x7f) * 4);
  if (!u) return;
  while (e.rd32(u + 0xc) != id) { u = e.rd32(u + 0xe4); if (!u) return; }
- if (e.rd32(u) != 1) { uint32_t c = e.o10265(0); e.o10024(e.str_c8359f, c); e.exit_(-1); return; }
+ if (e.rd32(u) != 1) { uint32_t c = e.o10265(0x5a); e.o10024(e.str_c8359f, c); e.exit_(-1); return; }   // _exit does not return in retail
  if (e.o10013() == 0) {
   int32_t a = (int32_t)e.rd32(0x6fbc9960) - (int32_t)e.rd32(0x6fbcc418);
-  e.wr32(0x6fb8bc54, (uint32_t)(e.o10651() - a));
+  e.wr32(0x6fb8bc54, (uint32_t)(e.o10651(u) - a));
   int32_t b = (int32_t)e.rd32(0x6fbc995c) - 8;
   e.wr32(0x6fb8bc58, (uint32_t)(e.o11142(u) - b));
-  sub_C07C0(e, 1); return;
+  e.f07c0(u, 1); return;
  }
- uint32_t u3 = e.o11080(), u4 = e.o11168(u);
+ uint32_t u3 = e.o11080(u), u4 = e.o11168(u);
  if (e.o10012(u3, u4) == 0) return;
- e.o10023(u3, u4, 0);
- // ponytail: decompile's stack-pointer arithmetic (ppiStack_2c/auStack_4) is a Ghidra stack artifact; base is the
- // pre-adjust local address, taken as 0 here -- vector must pin it before this row VERIFIES.
- int32_t base = 0, w = (int32_t)e.rd32(0x6fb8bc48), adj = 0;
+ // the two out-words of 0xD084 are the caller's locals ([esp+0xc] = x, [esp+0x10] = y)
+ int32_t xy[2] = {0, 0};
+ e.o10023(u3, u4, 0, &xy[0], &xy[1]);
+ int32_t w = (int32_t)e.rd32(0x6fb8bc48);
  uint32_t mode = e.rd32(0x6fbcc414);
- if (mode == 1) adj = -((w + ((w >> 31) & 3)) >> 2);
- else if (mode == 2) adj = (w + ((w >> 31) & 3)) >> 2;
- e.wr32(0x6fb8bc58, 0);
- e.wr32(0x6fb8bc54, (uint32_t)(base + adj));
- sub_C07C0(e, 1);
+ int32_t adj = (w + ((w >> 31) & 3)) >> 2;
+ if (mode == 1) xy[0] += -adj;
+ else if (mode == 2) xy[0] += adj;
+ e.wr32(0x6fb8bc54, (uint32_t)xy[0]);
+ e.wr32(0x6fb8bc58, (uint32_t)(xy[1] + 0x10));
+ e.f07c0(u, 1);
 }
 // 1.13c D2Client+0xC14F0
 void sub_C14F0(const Env& e) {
@@ -123,7 +124,7 @@ void sub_C1610(const Env& e, P ecx) {
  for (int32_t i = 0; i < (int16_t)e.rd16(dt + 0x170); i++) {
   int32_t s = (int16_t)e.rd16(e.rd32(dt + 0x16c) + i * 2);
   if (e.o10494(pl, s) && e.o10871(pl, s)) {
-   P r = e.f12b0();
+   P r = e.f12b0(s);
    if (r && (e.rd8(e.bitMasks10) & e.rd8(r + 0x10)) && (int16_t)e.rd16(r + 0xe) > 0 &&
        (int16_t)e.rd16(r + 0xe) < (int32_t)e.rd32(e.rd32(e.dataTables) + 0xbc0)) {
     int16_t k = (int16_t)e.rd16(r + 0x18);
@@ -193,7 +194,7 @@ void sub_C1A20(const Env& e) {
 static void fatalExit(const Env& e) { uint32_t c = e.o10265(0x139b); e.o10024(e.str_c8359f, c); e.exit_(-1); }
 static void freeHandle(const Env& e, P a) {
  uint32_t h = e.rd32(a);
- if (h) { e.o10065(h); e.o10043(0x7a, 0); e.wr32(a, 0); }
+ if (h) { e.o10065(h); e.freeFile(h, 0x6fb86ab0, 0x7a, 0); e.wr32(a, 0); }   // thunk 0xBF86: ecx = block, edx = file name, stack 0x7a, 0
 }
 // 1.13c D2Client+0xC2D10
 void sub_C2D10(const Env& e) {

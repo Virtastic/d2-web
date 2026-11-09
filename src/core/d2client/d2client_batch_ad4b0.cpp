@@ -47,13 +47,13 @@ void sub_ADEF0(Env& e,uintptr_t p){ uint8_t l[12]={0}; std::memcpy(l,(const void
 void sub_AE080(Env& e,const uint8_t* src){
  uint8_t l[0xFC]; std::memcpy(l,src,sizeof l);
  switch(l[1]){
- case 0: e.f34BB0(); return; case 1: e.f34AF0(); return; case 2: e.f34990(); return;
- case 3: e.f36810(l); return; case 4: e.f34750(); return;
+ case 0: e.f34BB0(l); return; case 1: e.f34AF0(l); return; case 2: e.f34990(l); return;
+ case 3: e.f36810(l); return; case 4: e.f34750(l); return;
  case 5: case 6: case 7: case 8: case 9: case 0x11: case 0x13: case 0x14: case 0x15: case 0x16: case 0x17:
   e.fatal(0xf6d); return;
- case 10: e.f32320(); return; case 0xb: case 0xc: e.f34080(); return;
- case 0xd: e.f35AA0(); return; case 0xe: e.f33AD0(); return;
- case 0xf: e.f32C60(l); return; case 0x10: e.f32E10(); return; case 0x12: e.f339E0(); return;
+ case 10: e.f32320(l); return; case 0xb: case 0xc: e.f34080(l); return;
+ case 0xd: e.f35AA0(l); return; case 0xe: e.f33AD0(l); return;
+ case 0xf: e.f32C60(l); return; case 0x10: e.f32E10(l); return; case 0x12: e.f339E0(l); return;
  }
 }
 
@@ -71,17 +71,21 @@ void sub_AE3F0(Env& e,uintptr_t unit){ if(unit) lookupAndFree(e,r32(unit+12),r32
 // 1.13c D2Client+0xAEBA0
 void sub_AEBA0(Env& e,uintptr_t p){ e.f21D60(rdp(p+8),r32(p+4),r16(p+2)); }
 
-// 1.13c D2Client+0xAEBE0  (GUESS: decompiler garbled the ordinal-10887 args and local_f source)
-void sub_AEBE0(Env& e){
- uint16_t lf=e.f5C1B0();
+// 1.13c D2Client+0xAEBE0 (ECX = packet; checked against the disassembly: the 16-byte local is filled by D2Client+0xAC1B0)
+void sub_AEBE0(Env& e,const uint8_t* pkt){
+ uint8_t l[16]={0};
+ e.fAC1B0(pkt,l);
  uintptr_t o=rdp((uintptr_t)e.ga(0x11BBFC));
  if(!o) return;
- uint32_t v=(uint32_t)lf<<8;
- e.o10887(o,6,v,0);
- e.o10887(o&0xff,8,0,0);
- e.o10887(o,10,0,0);
- uint16_t u=(uint16_t)((o>>24)&0xff); if(u>0x80) u-=0x100;
- e.f1A1B0(o,0,(uint16_t)(u+(uint16_t)((o&0xff)*0x100)));
- if(lf!=0 && r32(o+0x10)==0x11){ e.f6A6C0(); e.f56210(); }
+ const uint32_t life=(uint32_t)r16((uintptr_t)l+1)<<8;
+ e.o10887(o,6,life,0);
+ e.o10887(o,8,(uint32_t)r16((uintptr_t)l+3)<<8,0);
+ e.o10887(o,10,(uint32_t)r16((uintptr_t)l+5)<<8,0);
+ uint32_t dx=l[11],dy=l[12];
+ if(dx>0x80) dx-=0x100;
+ if(dy>0x80) dy-=0x100;
+ const uint32_t d9=r32((uintptr_t)l+9),d7=r32((uintptr_t)l+7);
+ e.f2A1B0(d9,0,(uint16_t)(d7+dx),(uint16_t)(dy+d9));
+ if(life!=0 && r32(o+0x10)==0x11){ e.f6A6C0(o); e.f56210(o); }
 }
 } // namespace

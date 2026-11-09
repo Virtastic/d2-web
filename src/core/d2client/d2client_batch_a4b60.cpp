@@ -148,5 +148,5 @@ void d2_client_a59e0(uintptr_t esi, uint8_t bl, uint8_t param_1, const D2ClientA
     if (!r) return;
     if (param_1 == 2) e->o10345(r);
     else if (bl == 2) e->o10184(r);
-    e->o10704();
+    e->o10704(esi);   // retail tail-jumps to 0xC502 with the unit as its stack word
 }

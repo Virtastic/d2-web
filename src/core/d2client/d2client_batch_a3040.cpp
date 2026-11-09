@@ -1,24 +1,8 @@
 // Batch D2Client 0xA3040..0xA4B00. Decompile-derived; unresolved callees are seams (unverified).
 // Register-passed args (EAX/ESI/EDI) are made explicit parameters. Pointers are uintptr_t.
 #include <cstdint>
+#include "d2client_batch_a3040_seams.h"
 namespace d2client_batch_a3040 {
-struct Seams {
- virtual ~Seams()=default;
- virtual void fatal(int32_t msg)=0;                       // Ordinal_10265 + 10024 + _exit(-1)
- virtual void sa750(uint32_t kind, uintptr_t p, int32_t* rec)=0; // FUN_6fada750(0x16,..)
- virtual uintptr_t ord10511(uintptr_t)=0; virtual int32_t ord10494(uintptr_t,int32_t)=0;
- virtual uint32_t ord10397(uintptr_t)=0; virtual int32_t ord10601(uintptr_t,int32_t line)=0;
- virtual int32_t skillsCount()=0; virtual uintptr_t skillsRow(int32_t idx)=0; // sgptDataTables+0xb98/0xba0, stride 0x23c
- virtual void sb4c0()=0; virtual void sb6450()=0; virtual void sb7290()=0;
- virtual uintptr_t ord11013(int32_t,int32_t,int32_t,uint32_t,uint32_t)=0;
- virtual void ord10911(uintptr_t,void(*)(uint32_t))=0; virtual void ord10807()=0;
- virtual void ord10184()=0; virtual int32_t ord10028(int32_t row)=0;
- virtual uintptr_t alloc(int32_t size)=0;                 // Ordinal_10042
- virtual void freeMem(uintptr_t)=0;                       // Ordinal_10043
- virtual uintptr_t ord10048()=0; virtual void sc60(uintptr_t,uintptr_t)=0; virtual bool s2090()=0;
- virtual uintptr_t ord10460(uintptr_t)=0; virtual uintptr_t ord10464(uintptr_t)=0; virtual uintptr_t ord11147(uintptr_t)=0;
- virtual bool s98c0(uint32_t,int32_t)=0;
-};
 template<class T> static T& at(uintptr_t b, uint32_t o) { return *(T*)(b + o); }
 // 1.13c D2Client+0xA3040   (eax = optional {kind @0, .. @0xc})
 uint32_t sub_A3040(Seams& s, uintptr_t param_1, const uint32_t* e) {
@@ -26,7 +10,7 @@ uint32_t sub_A3040(Seams& s, uintptr_t param_1, const uint32_t* e) {
  // layout: local_1c[3], local_10, local_c, local_8, local_4
  r[3] = e ? (int32_t)e[3] : -1; if (e) r[2] = (int32_t)e[0];
  r[4] = 1; r[5] = 0; r[6] = 0;
- s.sa750(0x16, param_1, r);
+ s.sa750(0x16, param_1, r, 1);
  return 1;
 }
 // 1.13c D2Client+0xA3160
@@ -43,22 +27,22 @@ void sub_A3160(Seams& s, uint32_t param_1) {
 void sub_A3220(Seams& s, const uint32_t* e, void(*cb)(uint32_t)) {
  uint32_t a = e ? e[0] : 6, b = e ? e[3] : 0xffffffffu;
  uintptr_t h = s.ord11013(0, 6, 0x32, a, b);
- if (h) { s.ord10911(h, cb); s.ord10807(); }
+ if (h) { s.ord10911(h, cb); s.ord10807((uintptr_t)e, h, 1); }
 }
 // 1.13c D2Client+0xA32D0   (eax = idx, edi = menu)
 void sub_A32D0(Seams& s, int32_t idx, uintptr_t m) {
- s.ord10184();
+ uint32_t prev = s.ord10184(1);
  uintptr_t it = m + (uintptr_t)idx * 0x110;
- s.ord10184();
- int32_t w = s.ord10028(idx), mw = at<int32_t>(m, 0x34);
+ s.ord10184(at<uint32_t>(it, 0x168));
+ int32_t w = s.ord10028(it + 0x68), mw = at<int32_t>(m, 0x34);
  at<int32_t>(it, 0x160) = w;
  at<int32_t>(it, 0x15c) = mw <= w ? 0 : ((mw - w) + 1) / 2 + 1;
- s.ord10184();
+ s.ord10184(prev);
 }
 // 1.13c D2Client+0xA3340   (eax = menu)
 void sub_A3340(Seams& s, uintptr_t m, uint32_t v) { if (!m) s.fatal(0x529); at<uint32_t>(m, 0x5c) = v; }
-// 1.13c D2Client+0xA3370   (param_1 = menu, esi = idx)
-void sub_A3370(Seams& s, uintptr_t m, int32_t idx) {
+// 1.13c D2Client+0xA3370   (ecx = menu, esi = idx, plain ret)
+void sub_A3370(Seams& s, uintptr_t m, int32_t idx) { // ecx = menu, esi = idx
  if (!m) s.fatal(0x4f2);
  if (idx >= at<int32_t>(m, 0x50)) s.fatal(0x4f8);
  if (idx == -1) { at<int32_t>(m, 0x44) = -1; return; }
@@ -66,7 +50,7 @@ void sub_A3370(Seams& s, uintptr_t m, int32_t idx) {
   if (i == idx) { if (at<int32_t>(m, 0x174 + i * 0x110)) { at<int32_t>(m, 0x44) = idx; return; } s.fatal(0x51a); }
  s.fatal(0x51e);
 }
-// 1.13c D2Client+0xA3400   (esi = menu, edi = value): push node on list @0xb08
+// 1.13c D2Client+0xA3400   (esi = menu, stack word 0 = value; edi is only saved): push node on list @0xb08
 void sub_A3400(Seams& s, uintptr_t m, uint32_t v) {
  if (!m) s.fatal(0x358);
  uint32_t old = at<uint32_t>(m, 0xb08);
@@ -79,15 +63,15 @@ void sub_A3400(Seams& s, uintptr_t m, uint32_t v) {
 void sub_A3580(Seams& s, uintptr_t m, int32_t scrW, int32_t scrH) {
  int32_t h = 0, w = 0, nul = 0, n = at<int32_t>(m, 0x50);
  if (!at<int32_t>(m, 0x58)) s.fatal(0x5aa);
- s.ord10184();
+ uint32_t prev = s.ord10184(1);
  for (int32_t i = 0; i < n; ++i) {
-  int32_t t = s.ord10028(i); if (w < t) w = t;
+  int32_t t = s.ord10028(m + 0x68 + (uintptr_t)i * 0x110); if (w < t) w = t;
   int32_t* p = &at<int32_t>(m, 0x174 + i * 0x110);
   if (!*p) ++nul;
   h += p[-7];
  }
  w += 0x14; h += 0xf;
- s.ord10184();
+ s.ord10184(prev);
  int32_t x = at<int32_t>(m, 0x24) - w / 2;
  at<int32_t>(m, 0x2c) = x;
  int32_t c = at<int32_t>(m, 0x14) == 0 ? h / 3 : nul * 0x15;

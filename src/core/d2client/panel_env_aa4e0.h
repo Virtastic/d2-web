@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <cstring>
 
-struct D2cPanelCall { uint32_t rva, eax, ecx, edx, ebx, esi, edi; uint32_t s[4]; };
+struct D2cPanelCall { uint32_t rva, eax, ecx, edx, ebx, esi, edi; uint32_t s[4]; uint32_t ebp; };
 typedef uint32_t (*D2cPanelHost)(D2cPanelCall*);
 
 struct D2cPanelGlobals {
@@ -25,6 +25,7 @@ struct D2cPanelGlobals {
     const int32_t* aad90;     // [0x6FBAAD90] RVA 0xFAD90
     const int32_t* dd5d0;     // [0x6FB8D5D0] RVA 0xDD5D0  dword: must be 0x26 (checked before target writes)
     const int32_t* cb828;     // [0x6FBCB828] RVA 0x11B828
+    const int32_t* cb824;     // [0x6FBCB824] RVA 0x11B824  EDI of the 0x161B0 call (cursor y)
     int32_t* cc418;           // [0x6FBCC418] RVA 0x11C418
     int32_t* cc414;           // [0x6FBCC414] RVA 0x11C414
     const int32_t* f9e14;     // [0x6FBA9E14] RVA 0xF9E14
@@ -38,7 +39,7 @@ struct D2cPanelEnv {
 };
 
 // Event record passed as the single stack argument. x and y are read as unsigned words (movzx).
-// The handled path writes the dwords at +0x18 (1) and +0x1C (0) before BBE84.
+// The handled path writes the dwords at +0x18 (1) and +0x1C (0) before BE84.
 struct D2cPanelEvent {
     uint8_t pad0[0x0C];
     uint16_t x;      // +0x0C
@@ -56,7 +57,7 @@ static_assert(offsetof(D2cPanelEvent, f1c) == 0x1C, "event +0x1C");
 inline uint32_t panelCall(const D2cPanelEnv* e, uint32_t rva, uint32_t eax = 0, uint32_t ecx = 0, uint32_t edx = 0,
                           uint32_t ebx = 0, uint32_t esi = 0, uint32_t edi = 0,
                           uint32_t s0 = 0, uint32_t s1 = 0, uint32_t s2 = 0, uint32_t s3 = 0) {
-    D2cPanelCall c{rva, eax, ecx, edx, ebx, esi, edi, {s0, s1, s2, s3}};
+    D2cPanelCall c{rva, eax, ecx, edx, ebx, esi, edi, {s0, s1, s2, s3}, 0};
     return e->host(&c);
 }
 
@@ -91,14 +92,14 @@ inline bool panelSlide(const D2cPanelEnv* e) {
     return false;
 }
 
-// Target clear: 0xBBF8C, then the 0x26 check (assert path: 0xBBF92 / 0xBBF80 / 0x3664), FADD0 = 0, and when the
+// Target clear: 0xBF8C, then the 0x26 check (assert path: 0xBF92 / 0xBF80 / 0x3664), FADD0 = 0, and when the
 // previous target was set: 0xD0B4 log, 0x3CC60 (EAX = 5), 0xAA380 and 0xBE2E0.
 inline void panelClearTarget(const D2cPanelEnv* e, int32_t prev) {
     const D2cPanelGlobals& g = e->g;
-    panelCall(e, 0xBBF8C);
+    panelCall(e, 0xBF8C);
     if (*g.dd5d0 != 0x26) {
-        const uint32_t r = panelCall(e, 0xBBF92, 0, 0, 0, 0, 0, 0, 0x139B);
-        panelCall(e, 0xBBF80, 0, 0, 0, 0, 0, 0, 0x6FB8359F, r, 0x139B);
+        const uint32_t r = panelCall(e, 0xBF92, 0, 0, 0, 0, 0, 0, 0x139B);
+        panelCall(e, 0xBF80, 0, 0, 0, 0, 0, 0, 0x6FB8359F, r, 0x139B);
         panelCall(e, 0x3664, 0, 0, 0, 0, 0, 0, 0xFFFFFFFFu);
     }
     *g.target = 0;
@@ -110,9 +111,9 @@ inline void panelClearTarget(const D2cPanelEnv* e, int32_t prev) {
     }
 }
 
-// Event +0x18 / +0x1C and BBE84 (stdcall, one stack word = the event handle). Returns eax.
+// Event +0x18 / +0x1C and BE84 (stdcall, one stack word = the event handle). Returns eax.
 inline uint32_t panelBbe84(const D2cPanelEnv* e, D2cPanelEvent* ev, uint32_t evRef) {
     ev->f18 = 1;
     ev->f1c = 0;
-    return panelCall(e, 0xBBE84, 0, 0, 0, 0, 0, 0, evRef);
+    return panelCall(e, 0xBE84, 0, 0, 0, 0, 0, 0, evRef);
 }
