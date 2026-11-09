@@ -1115,6 +1115,12 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
       Module.HEAPU8.set(payload.slice(0, Math.min(payload.length, 4096)), Number(T));
       return call('d2_realm_d2gs_pong', 'number', ['bigint', 'bigint', 'number', 'number'], [BigInt(PING), BigInt(T), Math.min(payload.length, 4096), tick >>> 0]);
     },
+    // The pending position resync as the client packet {0x5F, x u16, y u16}, or null (realm-resync.mjs).
+    d2gsTakeResync: () => {
+      if (!Module._d2_realm_client_take_resync) return null;
+      if (!call('d2_realm_client_take_resync', 'number', ['bigint'], [BigInt(T)])) return null;
+      return rd(T, 5);
+    },
     d2gsSelectedSkills: () => {
       const p = Number(call('d2_realm_client_selected_skills', 'bigint', [], []));
       if (!p) throw new Error('engine returned no selected skill record');

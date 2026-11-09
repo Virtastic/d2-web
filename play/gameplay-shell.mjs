@@ -1,6 +1,7 @@
 import './assets/back-guard.mjs';   // Android Back (a pad's B) never leaves the game
 import { parseSessionTiles, readSessionTerrain, readSessionLightmap, worldToScreen, screenDeltaToWorld, UNIT_CENTRE_Y } from './assets/session-terrain.mjs';
 import { inventoryOwnsClick } from './assets/shop-click-owner.mjs';
+import { createRealmResync } from './assets/realm-resync.mjs';
 import { unitInView } from './assets/unit-view-cull.mjs';
 import { readSessionActiveNearFeed } from './assets/session-active-near-feed.mjs';
 import { createFrameSnapshots, fromSnapshot } from './frame-snapshot.mjs';
@@ -1732,6 +1733,15 @@ function sendGameLine(text) {
   }
   postedAt = performance.now();
 }
+// The resync throttle lives with one realm flow: a new session starts with an empty throttle.
+let realmResync = null, realmResyncFlow = null;
+function drainRealmResync() {
+  const protocol = realmFlow?.protocol;
+  if (!protocol?.d2gsTakeResync || !realmFlow?.d2gs?.isOpen) return;
+  if (realmResyncFlow !== realmFlow) { realmResyncFlow = realmFlow; realmResync = createRealmResync({ take: () => protocol.d2gsTakeResync(), send: (b) => realmFlow.d2gs.send(b) }); }
+  realmResync.drain();
+}
+
 function feedRealmPlayerFrame(bytes) {
   const protocol = realmFlow?.protocol;
   bytes = realmLoadOrder.filter(bytes, realmPlayerView?.active);
@@ -1739,6 +1749,7 @@ function feedRealmPlayerFrame(bytes) {
   const update = applyRealmPlayerFrame(protocol, bytes);
   if (update.state?.guid != null) { realmWorldData().setOwner(update.state.guid); realmHud().setOwner(update.state.guid); }   // before the feed: the first stat packets name the player by guid
   feedRealmWorld(bytes);
+  drainRealmResync();   // a far placement queued a position resync (retail D2Client 0x2A1B0): send it now
   routeRealmPackets(bytes, (b) => protocol.d2gsPacketSize(b), { npcInteraction: (p) => realmInput().npcInteraction(p), applyHotkey: (p) => protocol.d2gsApplyHotkey(p), applyWeaponSwitch: (p) => protocol.d2gsApplyWeaponSwitch(p, realmFlow?.expansion === true) });
   gameRoster.feed(bytes);
   if (update.state?.guid != null) gameRoster.myId = update.state.guid >>> 0;
