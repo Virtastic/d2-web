@@ -434,14 +434,14 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CC370(uint8_t* a, uint8_t* b, uint32_t x,
     Q(fCBDB0, pkt, x);
 }
 
-// Superseded by src/core/d2game/d2game_cf810.cpp (d2_fn_d2game_CF810); kept unmarked.
+// 1.13c D2Game+0xCF810
 // Spawns the pet/summon companion for player unit `unit` toward `other`: owner class bytes from 10459
 // must match; unit types other than 2/4/5 refresh the 0x2C-handle (10867 then 10750); a missing target
 // handle (10331) is fatal 0xE42, a class mismatch fatal 0xE5C. A new type-2 unit id 0x3B is created
 // from the owner template (SUnit.cpp:0x265, 0x38-byte extra block) and placed via 0xC22E0. Decompile
 // hidden arguments (10826/10459 owner reads) are given the unit they follow.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CF810_v0(uint32_t unusedGame, uint8_t* unit, uint8_t* other, const D2GameBbf30cEnv* env)
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CF810(uint32_t unusedGame, uint8_t* unit, uint8_t* other, const D2GameBbf30cEnv* env)
 {
     (void)unusedGame;
     uint8_t c1 = (uint8_t)Q(o10459, other);

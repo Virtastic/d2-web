@@ -91,7 +91,7 @@ void D2GAME_81F50_AiThink(D2GameStrc* g, D2UnitStrc* u, D2AiTickParamStrc* t)
     AITACTICS_WalkToTargetUnitWithFlags(g, u, t->pTarget, 7);
 }
 
-// D2Game 0x83550 (superseded: the 1.13c port is d2game_83550.cpp)  (BloodHawk-shaped)
+// 1.13c D2Game+0x83550  (BloodHawk-shaped)
 void D2GAME_83550_AiThink(D2GameStrc* g, D2UnitStrc* u, D2AiTickParamStrc* t)
 {
     D2AiControlStrc* ai = t->pAiControl;

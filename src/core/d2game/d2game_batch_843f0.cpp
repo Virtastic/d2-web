@@ -67,7 +67,7 @@ static void sendFlags(Env& e, P game, P unit, uint32_t type, uint32_t maskIdx, u
     e.SendPkt(game, &p);
 }
 
-// D2Game 0x843F0 (superseded: the 1.13c port is d2game_843f0.cpp)  (ECX = game, EDX = unit, stack = AI tick)
+// 1.13c D2Game+0x843F0  (ECX = game, EDX = unit, stack = AI tick)
 void sub_843F0(Env& e, P game, P unit, P aiTick)
 {
     P ctr = rd<P>(aiTick, 0), target = rd<P>(aiTick, 8), tbl = rd<P>(aiTick, 0x1c);
@@ -94,7 +94,7 @@ void sub_843F0(Env& e, P game, P unit, P aiTick)
     e.Attack6(game, unit, target, 2, 0, 0, 1, 7);
 }
 
-// D2Game 0x84800 (superseded: the 1.13c port is d2game_84800.cpp)
+// 1.13c D2Game+0x84800
 void sub_84800(Env& e, P game, P unit, P aiTick)
 {
     P target = rd<P>(aiTick, 8), tbl = rd<P>(aiTick, 0x1c);
@@ -153,7 +153,7 @@ void sub_864A0(Env& e, P game, P unit, P aiTick)
     e.Flee(game, tgt);
 }
 
-// D2Game 0x874A0 (superseded: the 1.13c port is d2game_874a0.cpp)  (ebx=distance bucket, retaddr slot=target; lost register args)
+// 1.13c D2Game+0x874A0  (ebx=distance bucket, retaddr slot=target; lost register args)
 void sub_874A0(Env& e, P game, P unit, P aiTick, int unaffEBX, P target)
 {
     int32_t w18 = rd<int32_t>(aiTick, 0x18);

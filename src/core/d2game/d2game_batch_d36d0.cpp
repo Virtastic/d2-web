@@ -390,3 +390,125 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d6bc0(uint32_t eaxUnit, uint32
     call(env->o10201);
     call(env->sub_DFFD0, 6, eaxUnit);
 }
+
+// 1.13c D2Game+0xD8020
+// Body-location move (merge of D5C30's tail for the swap-in case). this = player, param_1 = game,
+// param_2 = body loc (byte), param_3 = flag, param_4 = out error; reg: EAX = unit id. Only slot
+// kinds 5 -> 4 and 4 -> 5 are accepted; Ordinal_10946 must return 2.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d8020(uint32_t player, uint32_t game, uint32_t param2, int32_t param3, uint32_t* outErr, uint32_t eaxId, E)
+{
+    if (game == 0) FATAL(0xb7c);
+    if (player == 0) FATAL(0xb7d);
+    *outErr = 0;
+    call(env->sub_D29F0, player);
+    uint32_t it = rd32(H(game), 0x1720 + (eaxId & 0x7f) * 4);
+    while (it != 0 && rd32(H(it), 0xC) != eaxId) it = rd32(H(it), 0xE4);
+    if (it == 0) { *outErr = 1; return 0; }
+    if (rd32(H(it), 0) != 4) return 0;
+    if (rd32(H(it), 0x10) != 4) { *outErr = 1; return 0; }
+    uint8_t loc = (uint8_t)param2; uint32_t slot;
+    if (loc == 5) slot = 4; else if (loc == 4) slot = 5; else { *outErr = 1; return 0; }
+    uint32_t pd = rd32(H(player), 0x60);
+    uint32_t other = call(env->o11139, pd, slot);
+    if (other == 0) { *outErr = 1; return 0; }
+    call(env->o10605, player, pd, (uint32_t)(uintptr_t)&other, slot);
+    if (other == 0) { *outErr = 1; return 0; }
+    if (call(env->o10946, player, loc, it, param3) != 2) { *outErr = 1; return 0; }
+    call(env->sub_D46B0, game, 0);
+    if (param3 == 0 && call(env->o10244, it, player, 0, 0, 0, 0) == 0) {
+        call(env->sub_D47C0);
+        call(env->sub_DFFD0, 0x14, 0);
+        return 0;
+    }
+    uint32_t inv = call(env->o10061, pd);
+    if (inv) call(env->o11055, player, inv);
+    call(env->o10013, player, other);
+    call(env->o10694, pd, other);
+    uint32_t o2 = call(env->o10646, pd, other);
+    if (o2 == 0) FATAL(0xbc9);
+    if (other != o2) FATAL(0xbca);
+    call(env->o10608, pd, slot);
+    if (call(env->o11088, o2) == 0x13) call(env->sub_D7E30, game, player);
+    call(env->o10466, pd, other);
+    wr32(H(other), 0xC4, rd32(H(other), 0xC4) & 0xfffffffdu);
+    call(env->o11090, other, 4);
+    if (call(env->o11041, pd, it, param2) != 0) {
+        if (call(env->o10405, pd, it, 3) == 0) { *outErr = 1; return 0; }
+        call(env->o10058, it, param2);
+        call(env->o10138, pd, it);
+        call(env->sub_D47C0);
+        wr32(H(it), 0xC4, rd32(H(it), 0xC4) & 0xfffffffdu);
+        call(env->o11090, it, 1);
+        call(env->o10012, it, 0xff);
+        call(env->o10892, it, 0x10000, 1);   // third arg 1 (disasm 0x6FCF8299)
+        call(env->o10977, it, 1, 1);
+        if (call(env->o10202, it, 0x4000, 0xbe7)) call(env->o10977, it, 0x4000, 0);
+        call(env->o10050, pd, it);
+        call(env->sub_D28D0);
+        call(env->sub_D51A0, game, player, 0);
+    }
+    call(env->o10201, player, 1);
+    return 1;
+}
+
+// 1.13c D2Game+0xD8600
+// Swap an item to the belt/slot: this = player, param_1 = game, param_2 = slot (byte, <= 10),
+// param_3 = flag, param_4 = out error; reg: EAX = unit id. Ordinal_10946 must return 5.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d8600(uint32_t player, uint32_t game, uint8_t slot, uint32_t param3, uint32_t* outErr, uint32_t eaxId, E)
+{
+    if (game == 0) FATAL(0xca8);
+    if (player == 0) FATAL(0xca9);
+    if (slot > 10) return 0;
+    *outErr = 0;
+    call(env->sub_D29F0, player);
+    uint32_t it = rd32(H(game), 0x1720 + (eaxId & 0x7f) * 4);
+    while (it != 0 && rd32(H(it), 0xC) != eaxId) it = rd32(H(it), 0xE4);
+    if (it == 0) { *outErr = 0; return 0; }
+    if (rd32(H(it), 0) != 4) return 0;
+    if (rd32(H(it), 0x10) != 4) { *outErr = 0; return 0; }
+    if (call(env->o10946, player, slot, it, param3) != 5) { *outErr = 0; return 0; }
+    uint32_t pd = rd32(H(player), 0x60);
+    uint32_t inv = call(env->o10061, pd);
+    if (inv) call(env->o11055, player, inv);
+    uint32_t other = call(env->o11139, pd, slot);
+    call(env->o10605, player, pd, (uint32_t)(uintptr_t)&other, slot);   // writes through the same local as `other` (disasm 0x6FCF86F4..6FCF8704)
+    if (other == 0 || rd32(H(other), 0x10) != 1) { *outErr = 1; return 0; }
+    call(env->sub_D46B0, game, 0);
+    if (param3 == 0 && call(env->o10244, it, player, 0, 0, 0, 0) == 0) {
+        call(env->sub_D47C0);
+        call(env->sub_DFFD0, 0x14, 0);
+        return 0;
+    }
+    if (call(env->o11088, it) == 0x13) call(env->sub_D7E30, game, player);
+    call(env->o10013, player, other);
+    call(env->o10694, pd, other);
+    uint32_t o2 = call(env->o10646, pd, other);
+    if (o2 == 0) FATAL(0xcef);
+    if (other != o2) FATAL(0xcf0);
+    call(env->o10608, pd, slot);
+    call(env->o10466, pd, other);
+    wr32(H(other), 0xC4, rd32(H(other), 0xC4) & 0xfffffffdu);
+    call(env->o11090, other, 4);
+    call(env->o10977, other, 0x80, 1);
+    call(env->o10892, other, 0x20, 1);
+    call(env->o10977, other, 1, 1);
+    if (call(env->o10202, other, 0x4000, 0xcf8)) call(env->o10977, other, 0x4000, 0);
+    call(env->o10050, pd, other);
+    if (call(env->o11041, pd, it, slot) == 0) { *outErr = 1; return 0; }
+    if (call(env->o10405, pd, it, 3) == 0) { *outErr = 1; return 0; }
+    call(env->o10058, it, slot);
+    call(env->o10138, pd, it);
+    call(env->sub_D47C0);
+    wr32(H(it), 0xC4, rd32(H(it), 0xC4) & 0xfffffffdu);
+    call(env->o11090, it, 1);
+    call(env->o10012, it, 0xff);
+    call(env->o10977, it, 0x40, 1);
+    call(env->o10977, it, 1, 1);
+    call(env->o10892, it, 0x20, 1);
+    call(env->o10977, it, 1, 1);
+    if (call(env->o10202, it, 0x4000, 0xd13)) call(env->o10977, it, 0x4000, 0);
+    call(env->o10050, pd, it);
+    call(env->sub_D28D0);
+    call(env->sub_D51A0, game, player, 0);
+    return 1;
+}
