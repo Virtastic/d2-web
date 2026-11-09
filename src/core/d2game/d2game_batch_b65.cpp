@@ -189,22 +189,6 @@ void D2GAME_D2540(uint32_t eax, I p1)
     d2_fn_d2game_D2540(eax, p1, &e);
 }
 
-// 1.13c D2Game+0xDAB90  (fastcall; hidden: EAX=attacker, EBX=target, EDI=0x70-byte src)
-void D2GAME_DAB90(I p1, int* eax, I ebx, uint32_t* edi)
-{
-    if ((eax == nullptr || *eax != 2 || (eax[1] != 7 && eax[1] != 0xb)) && (*eax == 1 || *eax == 0)) {
-        uint32_t* n = (uint32_t*)Ord10045(kSUnitDmg, 0x7c8, 0);
-        n[0] = (uint32_t)p1;
-        n[1] = U32(ebx, 0);
-        n[2] = U32(ebx, 0xc);
-        n[3] = (uint32_t)eax[0];
-        n[4] = (uint32_t)eax[3];
-        for (int i = 0; i < 0x1c; i++) n[5 + i] = edi[i];
-        n[0x21] = U32(ebx, 0xac);
-        U32(ebx, 0xac) = (uint32_t)(uintptr_t)n;
-    }
-}
-
 // 1.13c D2Game+0xDC780  (hidden: EAX=unit-ish, ESI=attacker)
 void D2GAME_DC780(uint32_t* eax, int* esi, int p1)
 {
