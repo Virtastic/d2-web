@@ -1939,6 +1939,7 @@ function enterBnetLobby(name) {
     bnetLobbyScreen = createBnetLobbyScreen({ read: lobbyRead, decodeDc6, decodeDatPalette, string,
     figure: createLobbyFigure({ read: lobbyRead, decodeDatPalette, componentToken: (i) => { if (!componentTablesReady) componentTablesReady = Boolean(Module.ccall('d2_drlg_init', 'number', [], [])); return Module._d2_component_token ? Module.ccall('d2_component_token', 'string', ['number'], [i]) : ''; } }).figure,
     character: lobbyCharacter(c.name),
+    charTitle: (cls, prog, hc, ex) => Module.ccall('d2_lobby_char_title', 'string', ['number', 'number', 'number', 'number'], [cls, prog, hc ? 4 : 0, ex ? 0x20 : 0]),
     onRefreshGames: () => { pushLobbyGames(c.name); const link = startLobbyChat(c.name) && realmFlow?.chatLink; if (link?.session?.open) link.session.games(); else void link?.ensure(lobbyChatUser(c.name)).then((s) => s?.games()); },
     onCreateGame: (game) => play(game),
     onJoinGame: (game) => play({ ...game, join: true }),

@@ -7,7 +7,7 @@ import { HUD_LAYOUT } from './control-panel.mjs';
 test('lit level buttons sit where retail draws them', () => {
   const s = HUD_LAYOUT.levelButtons;
   for (const v of ['charpanel-points', 'skilltree-points']) {
-    const rows = readFileSync(new URL(`../../the retail captures${v}.txt`, import.meta.url), 'utf8').split('\n')
+    const rows = readFileSync(new URL(`../../vectors/drawlist/${v}.txt`, import.meta.url), 'utf8').split('\n')
       .filter((l) => /Panel\\Level\.dc6 frame=0 .* y=592 /i.test(l))
       .map((l) => Number(/ x=(\d+) /.exec(l)[1]));
     assert.deepEqual(rows, s.xs, v);

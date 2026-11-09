@@ -180,11 +180,14 @@ export const accountName = (n) => { const i = n.indexOf('*'); return i >= 0 && i
 // A channel user's name in the band (caption routine D2Win+0xD4D0). The portrait token comes from the event flags (operator 0x02
 // first, then 0x08, then 0x01, then 0x04, then 0x101000); the tokens for 0x08 and 0x01 (not with 0x02) draw colour 3 over a colour-6
 // shadow one pixel up AND one pixel left (the disassembly subtracts one from both the x and the y of the shadow call); every other
-// user, operators included, draws colour 1 when the statstring is hardcore, else 0. No event flag puts a star in the text: the
-// star is part of the account text the lobby stores for a user whose product is not Diablo II (see bandNameText).
+// user, operators included, draws colour 1 when the statstring is hardcore, else 0.
+// The star comes from the text, not from a flag test in the caption: the token routine (D2Multi+0xF340) returns early for a non-operator
+// user whose event flags hold 0x01, 0x04, 0x08, 0x1000 or 0x100000 (mask 0x10100d) and never reads the statstring, so the record keeps no
+// product tag and no hardcore bit; the caption then finds no Diablo II tag and draws the "*account" text (see bandNameText).
+export const bandReadsStatstring = (flags) => Boolean(flags & 2) || !(flags & 0x10100d);
 export function bandNameStyle(flags, hardcore) {
   if (!(flags & 2) && flags & 9) return { layers: [[6, -1, -1], [3, 0, 0]] };
-  return { layers: [[hardcore ? 1 : 0, 0, 0]] };
+  return { layers: [[hardcore && bandReadsStatstring(flags) ? 1 : 0, 0, 0]] };
 }
 // The band text. The name arrives as `Char*account`. The lobby stores two strings for the user: "*account" (the whole name when it
 // already starts with '*'; the whole name after the star only when the account part is empty) and the character name (the part before
@@ -196,14 +199,15 @@ export function bandNameText(name, product) {
   if (D2_PRODUCT_CODES.has(product)) return lead ? '' : displayName(name).slice(0, 16);
   return lead ? name.slice(0, 50) : `*${accountName(name)}`.slice(0, 50);
 }
-export function characterInfoLines(character, string) {
+// `title(class, progression, hardcore, expansion)` is the engine's title word (D2Multi 0xB300 via D2Win #10205); none given, no prefix.
+export function characterInfoLines(character, string, title = null) {
   const c = character ?? {};
   const progression = (c.progression ?? 0) & 0x1f;
   const done = Math.trunc(progression / (c.expansion ? 5 : 4));
   const S = BNET_LOBBY_STRINGS;
   const classId = CLASS_STRINGS[c.charClass] ?? 5383;
   return [
-    { text: String(c.name ?? ''), colour: c.hardcore ? 1 : 0 },
+    { text: `${title ? title(c.charClass | 0, progression, c.hardcore ? 1 : 0, c.expansion ? 1 : 0) : ''}${c.name ?? ''}`, colour: c.hardcore ? 1 : 0 },
     { text: `${string(S.level)} ${Math.max(1, c.level | 0)} ${string(classId)}`, colour: 0 },
     { text: string(S.lastDifficulty), colour: 0 },
     { text: string(done === 0 ? S.none : done === 1 ? S.normal : done === 2 ? S.nightmare : S.hell), colour: 0 },
@@ -260,7 +264,7 @@ export function portraitFrameAt(token, elapsedMs) {
 export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, string = () => '', character = {},
   now = () => performance.now(), registryDifficulty = 0, onCreateGame = async () => {}, onJoinGame = async () => {}, onRefreshGames = () => {},
   offline = false,
-  portraitFrame = null, auraFrame = null, figure = null, onQuit = () => {}, onEnterChat = () => {}, onSendChat = () => false, onJoinChannel = () => {}, onRefreshChannels = () => {}, onLadder = null, documentObject = globalThis.document }) {
+  charTitle = null, portraitFrame = null, auraFrame = null, figure = null, onQuit = () => {}, onEnterChat = () => {}, onSendChat = () => false, onJoinChannel = () => {}, onRefreshChannels = () => {}, onLadder = null, documentObject = globalThis.document }) {
   const A = BNET_LOBBY_ASSETS, L = BNET_LOBBY_LAYOUT, S = BNET_LOBBY_STRINGS;
   const palette = decodeDatPalette(read(FRONTEND.palette));
   const skyPalette = decodeDatPalette(read('data\\global\\palette\\Act1\\pal.dat')); // the lobby is drawn under the Act 1 palette; Sky turns the floor blue
@@ -764,7 +768,8 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     const tipCell = mode === 'chat' && !busy && !notice && !joining ? bandCell(pointer[0], pointer[1]) : -1;
     for (const i of order) {
       const fl = shown[i].flags ?? 0, nf = font(B.font), y = B.nameY[(chat.scroll + i) % 2], cx = B.x + 30 + B.cell * i;
-      const n = bandNameText(shown[i].name, parseStatstring(shown[i].stat).product), style = bandNameStyle(fl, info[i].hardcore);
+      const product = bandReadsStatstring(fl) ? parseStatstring(shown[i].stat).product : '', style = bandNameStyle(fl, info[i].hardcore);
+      const n = bandNameText(shown[i].name, product);
       const x = cx - Math.trunc(nf.measure(n) / 2);
       for (const [colour, dx, dy] of style.layers) font(B.font, colour).drawAnchored(sctx, n, x + dx, y + dy);
       // The hovered user's tooltip comes right after their name, before the names of the users drawn after them.
@@ -999,7 +1004,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     get busy() { return busy; },
     get evidence() {
       return { mode, panel, notice, busy, character: { name: character.name ?? '', charClass: character.charClass ?? null, level: character.level ?? null },
-        info: characterInfoLines(character, string).map((l) => l.text), difficulties: allowed,
+        info: characterInfoLines(character, string, charTitle).map((l) => l.text), difficulties: allowed,
         form: { ...form, password: undefined, passwordLength: form.password.length }, chat: chat.lines.map((l) => l.text),
         boxes: controls().map((b) => ({ id: b.id, ...box(b), disabled: disabled(b) })), cursor: pointer };
     },
@@ -1155,7 +1160,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
         drawCel(art('gem'), 0, L.gem.x, L.gem.y);
       } else {
         drawButton(L.enterChat); drawButton(L.help);
-        drawTextBox(L.charInfo, characterInfoLines(character, string));
+        drawTextBox(L.charInfo, characterInfoLines(character, string, charTitle));
         drawTextBox(L.newsTitle, [{ text: text('newsTitle'), colour: 3 }]);
       }
       drawLogos(0);

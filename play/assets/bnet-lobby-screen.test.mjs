@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBnetLobbyScreen, characterInfoLines, difficultiesAllowed, gameErrorText, bandNameStyle, bandNameText, BNET_LOBBY_LAYOUT } from './bnet-lobby-screen.mjs';
+import { createBnetLobbyScreen, characterInfoLines, difficultiesAllowed, gameErrorText, bandNameStyle, bandNameText, bandReadsStatstring, BNET_LOBBY_LAYOUT } from './bnet-lobby-screen.mjs';
 
 // No canvas in node: a context that swallows every call, and one-pixel art for every file.
 globalThis.ImageData ??= class { constructor(data, w, h) { Object.assign(this, { data, width: w, height: h }); } };
@@ -45,6 +45,9 @@ test('band text: the character name for Diablo II products, the star account tex
   assert.equal(bandNameText('Bob*', ''), '*Bob*', 'an empty account part shows the whole name');
   assert.equal(bandNameText('Bob', ''), '*Bob');
   assert.equal(bandNameText('*acct', 'RATS'), '*acct');
+  assert.equal(bandReadsStatstring(0), true); assert.equal(bandReadsStatstring(0x02 | 0x01), true);
+  for (const fl of [0x01, 0x04, 0x08, 0x1000, 0x100000]) assert.equal(bandReadsStatstring(fl), false, `event 0x${fl.toString(16)} skips the statstring`);
+  assert.deepEqual(bandNameStyle(0x04, true).layers, [[0, 0, 0]], 'no statstring read, no hardcore colour');
 });
 
 test('difficulty gating: Nightmare after 4 (classic) / 5 (expansion), Hell after 8 / 10', () => {
@@ -299,4 +302,10 @@ test('the user band paints the figure the statstring names, in the band cell, on
   assert.equal(seen.length, 1);
   const B = BNET_LOBBY_LAYOUT.band;
   assert.ok(drawn.some(([t, x, y]) => t === 'L' && x === B.x + 30 - 10 && y === B.portraitY - 50), 'the layer lands at the cell anchor plus its offsets');
+});
+
+test('character box name line takes the engine title word before the name', () => {
+  const t = (cls, prog, hc, ex) => `<${cls},${prog},${hc},${ex}>`;
+  assert.equal(characterInfoLines({ name: 'Ama', charClass: 0, level: 7, progression: 9, expansion: true, hardcore: true }, () => '', t)[0].text, '<0,9,1,1>Ama');
+  assert.equal(characterInfoLines({ name: 'Ama' }, () => '')[0].text, 'Ama');
 });
