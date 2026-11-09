@@ -2153,7 +2153,7 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
       d2gs: { greeting: game.greeting, opcodes: game.opcodes, bytes: game.bytes, playerAssignment: game.playerAssignment,
         remotePlayerState: game.playerState, worldState: game.worldState,
         socketOpen: true, keepalivesSent: 0, postJoinFrames: 0 },
-      note: 'The D2GS socket remains open and sends five-second keep-alives. Client terrain is built from LoadAct plus each MapReveal room; the receive loop below applies the realm's unit, movement and item packets as they arrive.' }, error: '' };
+      note: 'The D2GS socket remains open and sends five-second keep-alives. Client terrain is built from LoadAct plus each MapReveal room; the receive loop below applies the realm\'s unit, movement and item packets as they arrive.' }, error: '' };
     void syncRealmScene();
     const keepAlive = startD2gsKeepAlive(d2gs, protocol, { onSent: (count, tick) => {
       if (realmTransport.state !== 'session-open') return;
