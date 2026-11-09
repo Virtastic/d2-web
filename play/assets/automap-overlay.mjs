@@ -281,7 +281,18 @@ const tileReadSignature = (tiles) => {
   return h;
 };
 
-export function createAutomapOverlay({ read, Module, documentObject = globalThis.document }) {
+// Where the overlay reads the level's geometry. A single-player session answers from the engine; an
+// online game supplies its own source (assets/realm-world-automap.mjs) with the same five questions.
+export function engineAutomapSource(Module) {
+  return {
+    levelType: () => Module.ccall('d2_session_level_type', 'number', [], []),
+    rooms: (levelId) => levelRooms(Module, levelId),
+    levelRect: (levelId) => levelRect(Module, levelId),
+    pickedFile: (levelId) => pickedFileOf(Module, levelId),
+    seamEdges: (destinationLevel) => seamEdges(Module, destinationLevel),
+  };
+}
+export function createAutomapOverlay({ read, Module, documentObject = globalThis.document, source = engineAutomapSource(Module) }) {
   const rows = rowsFromTxt(read('data\\global\\excel\\automap.txt'));
   const recordIndex = createAutomapRecordIndex(rows);
   // The map is drawn through the CURRENT act's palette, as every in-game D2Gfx draw is: act 1's pal.dat
@@ -409,8 +420,8 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
       let live = new Set();
       if (tiles && tiles.length) {
         const pRooms = perfT0();
-        const levelType = Module.ccall('d2_session_level_type', 'number', [], []);
-        const rooms = levelRooms(Module, levelId);
+        const levelType = source.levelType();
+        const rooms = source.rooms(levelId);
         const hp = view?.camera || snapshot.player, heroRoom = rooms.find((r) => inRoom(r, Math.floor(hp.x), Math.floor(hp.y)));
         perfT('automap-rooms', pRooms);
         if (heroRoom && rv.hero !== `${heroRoom.x},${heroRoom.y}`) {
@@ -487,19 +498,19 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
       }
       // pExtras: the town picture, laid once when the level is generated (0x62760).
       if (!rv.pictures && TOWN_PICTURES[levelId]) {
-        const pic = townPictureCells(levelId, levelRect(Module, levelId), levelId === 40 ? pickedFileOf(Module, levelId) : null);
+        const pic = townPictureCells(levelId, source.levelRect(levelId), levelId === 40 ? source.pickedFile(levelId) : null);
         for (const c of pic?.cells || []) layer.set(`p:${levelId},${c.frame}`, { kind: 'picture', family: pic.family, frame: c.frame, requestedFrames: [c.frame],
           levelName: pic.family, tileName: 'picture', style: -1, startSequence: -1, endSequence: -1, orientation: -1, mainIndex: -1, subIndex: -1, layer: 4, world: null, map: [c.x, c.y] });
         if (pic) { rv.pictures = true; orderedCells.invalidate(layer); }
       }
       if (!visible) return (evidence = { open: false, drawn: [], unresolved: [], layout, error: null });
-      const levelType = Module.ccall('d2_session_level_type', 'number', [], []);
+      const levelType = source.levelType();
       const drawn = [], unresolved = [];
       const scale = layout.scale;   // 1/divisor: 0.1 for the full map (mode != 1), 0.05 for the mini map (mode 1)
       // These read-only DRLG surfaces are map geometry, not a JS reconstruction: the level's
       // placed rectangle gives the panel's extent, while seam segments identify adjacent areas.
-      const geometry = { levelRect: levelRect(Module, levelId), seams: (snapshot.warps || []).filter((w) => w.destinationLevel !== levelId)
-        .map((warp) => ({ destinationLevel: warp.destinationLevel, rect: levelRect(Module, warp.destinationLevel), edges: seamEdges(Module, warp.destinationLevel) })) };
+      const geometry = { levelRect: source.levelRect(levelId), seams: (snapshot.warps || []).filter((w) => w.destinationLevel !== levelId)
+        .map((warp) => ({ destinationLevel: warp.destinationLevel, rect: source.levelRect(warp.destinationLevel), edges: source.seamEdges(warp.destinationLevel) })) };
       // The map is centred on the hero's PRECISE position, at the screen point the world pass puts the hero
       // (w/2, h/2 + UNIT_CENTRE_Y = retail's 400,292 on 800x600, and the middle of a wide viewport).
       // THE MAP IS CENTRED ON THE HERO'S PRECISE POSITION at the screen point the world pass puts the hero

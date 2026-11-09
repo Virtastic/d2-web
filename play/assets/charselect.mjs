@@ -49,6 +49,7 @@ const DELETE_DIALOG = DELETE_LAYOUT;
 const HALF_BLACK = 'rgba(0, 0, 0, 0.5)';
 
 // Retail's placements (draw list anchors are bottom rows, inclusive; top = anchor - h + 1).
+export const CARD_LINE_COLOURS = Object.freeze({ name: 4, describe: 0, expansion: 2, ladder: 4 });
 const CARD = { x: 37, top: 86, w: 272, h: 93, colStep: 272, rowStep: 95, textX: 113, lines: [113, 127, 141, 155] };
 const TITLE = { anchor: 63, centre: 318 };   // centre: retail's 'Oracle' starts at x 253 (one sample)
 const BUTTONS = {
@@ -170,8 +171,10 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
   const colourFont = (dc6Path, tblPath, colour) => createFont({ dc6: decodeDc6(read(dc6Path)), tbl: decodeFontTbl(read(tblPath)),
     palette: colour ? textColourPalette(pl2, palette, colour) : palette, documentObject, path: dc6Path, drawAs: { op: 'celcolor', mode: 5 } });
   const titleFont = colourFont(SELECT_ASSETS.title, SELECT_ASSETS.titleTbl, 0);
-  const cardFonts = [4, 0, 2, 2].map((c) => colourFont(SELECT_ASSETS.card, SELECT_ASSETS.cardTbl, c));
-  // The ladder line reuses the create screen's "LADDER CHARACTER" label (string 10927). Its colour is unverified against retail.
+  // Card lines in the order retail appends them: name, class and level, then the expansion line (colour 2) and the ladder line (colour 4).
+  const cardFont = CARD_LINE_COLOURS;
+  const cardFonts = Object.fromEntries(Object.entries(cardFont).map(([k, c]) => [k, colourFont(SELECT_ASSETS.card, SELECT_ASSETS.cardTbl, c)]));
+  // The ladder line is string 10927 in text colour 4.
   const ladderCardText = () => (string && string(10927)) || 'LADDER CHARACTER';
 
   // The portrait (retail's draw list: the composite DCC at the card's (67,165), town-neutral 'TN',
@@ -476,7 +479,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       }
       for (let i = 0; i < list.length; i++) {
         const ch = list[i], box = cardBox(i), dx = box.x - CARD.x, dy = box.y - CARD.top;
-        [ch.name, describe(ch), ...(ch.expansion ? ['EXPANSION CHARACTER'] : []), ...(ch.ladder ? [ladderCardText()] : [])].forEach((text, n) => cardFonts[n].drawAnchored(g, text, CARD.textX + dx, CARD.lines[n] + dy));
+        [['name', ch.name], ['describe', describe(ch)], ...(ch.expansion ? [['expansion', 'EXPANSION CHARACTER']] : []), ...(ch.ladder ? [['ladder', ladderCardText()]] : [])].forEach(([kind, text], n) => cardFonts[kind].drawAnchored(g, text, CARD.textX + dx, CARD.lines[n] + dy));
         // The selected card's box, then its portrait on top of it: retail's call order is the three card
         // labels, charselectbox frame 0 and 1, then the nine portrait layers (the retail captures
         // select-oracle.txt records 84..139 that way). Two cels, not one -- frame 0 is 256 wide at x=37,

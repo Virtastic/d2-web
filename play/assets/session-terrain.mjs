@@ -307,9 +307,10 @@ export function readLevelTileFiles(Module, cap = 4096, exportName = 'd2_session_
  * the variable, the occlusion is. Setting it is a quality OPTION we do not model, so the measured arm
  * is the default and a caller that needs the other one passes it.
  */
-export function readSessionLightmap(Module, ambientOverride = -1, occludeUnits = 1) {
-  if (!Module._d2_session_lightmap) return null;
-  const p = Number(Module.ccall('d2_session_lightmap', 'number', ['number', 'number'], [ambientOverride, occludeUnits]));
+export function readSessionLightmap(Module, ambientOverride = -1, occludeUnits = 1, exportName = 'd2_session_lightmap') {
+  if (!Module['_' + exportName]) return null;
+  const p = Number(Module.ccall(exportName, 'number', ['number', 'number'], [ambientOverride, occludeUnits]));
+  if (!p) return null;
   const v = new DataView(Module.HEAPU8.buffer, p, 16 + 48 * 48 * 2);
   const ox = v.getInt32(0, true), oy = v.getInt32(4, true);
   const cells = Module.HEAPU8.slice(p + 16, p + 16 + 48 * 48), blocked = Module.HEAPU8.slice(p + 16 + 48 * 48, p + 16 + 48 * 48 * 2);

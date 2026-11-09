@@ -15,9 +15,10 @@ export const CHARACTER_CREATE_CHECKBOXES = Object.freeze({
     // low against that, which this corrects.
     Object.freeze({ key: 'expansion', x: 319, y: 525, labelX: 339, labelY: 524, initial: true, labelIndex: 11077 }),
     Object.freeze({ key: 'hardcore', x: 319, y: 545, labelX: 339, labelY: 544, initial: false, labelIndex: 5126 }),
-    // Battle.net only: the third box, one 20 px step down (same label column), unchecked at first. Its label is patchstring 927
-    // ("LADDER CHARACTER", string index 10927); a checked box sets the 0x40 ladder bit in the MCP CHARCREATE flags.
-    Object.freeze({ key: 'ladder', x: 319, y: 565, labelX: 339, labelY: 564, initial: false, labelIndex: 10927, realmOnly: true }),
+    // Battle.net only: the third box, one 20 px step down (same label column), checked at first: picking a class on the Battle.net screen sets the
+    // 0x40 ladder bit and checks the box, as it does for Expansion. Its label is patchstring 927 ("LADDER CHARACTER", string index 10927);
+    // a checked box sets the 0x40 ladder bit in the MCP CHARCREATE flags.
+    Object.freeze({ key: 'ladder', x: 319, y: 565, labelX: 339, labelY: 564, initial: true, labelIndex: 10927, realmOnly: true }),
   ]),
 });
 

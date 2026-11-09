@@ -116,14 +116,14 @@ test('no expiry text is drawn, and the LADDER box sits under HARDCORE', { skip: 
   assert.equal(l.filter((r) => /font8/i.test(r.path)).length, 0);
   const boxes = l.filter((r) => /clickbox/i.test(r.path));
   assert.equal(boxes.length, 3);
-  assert.equal(s.evidence.checkboxes.states.ladder, false);
+  assert.equal(s.evidence.checkboxes.states.ladder, true);
 });
 test('the LADDER box toggles and rides to the create callback', { skip: !rd }, () => {
   let created = null;
   const s = build({ onCreate: (c) => { created = c; } });
   s.chooseByKey('barbarian'); s.tick = 40; s.setName('Aelwyn');
   s.click(...s.targets(800, 600).checkboxes.ladder, 800, 600);
-  assert.equal(s.evidence.checkboxes.states.ladder, true);
+  assert.equal(s.evidence.checkboxes.states.ladder, false);
   s.submit();
-  assert.equal(created.checkboxes.ladder, true);
+  assert.equal(created.checkboxes.ladder, false);
 });

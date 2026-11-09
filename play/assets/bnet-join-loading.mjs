@@ -2,6 +2,9 @@
 // black, from the CREATE GAME / JOIN GAME click until the world is ready. Its frame is the progress:
 // it climbs toward the last-but-one frame while the join runs and reaches the last when the world is
 // up. The state is deterministic (clock passed in); the shell draws it and hands over to the game.
+// Neither number below is a retail value. Retail's loading screen has no timeout and no clock: its frame
+// advances once per 32 graphic-load steps (clamped to the last frame), so the real curve follows the
+// engine's load work. Until the engine reports that count, this browser guard and a time curve stand in.
 export const JOIN_LOADING_TIMEOUT_MS = 180000;
 const ART = 'data\\global\\ui\\Loading\\loadingscreen.dc6', PALETTE = 'data\\global\\palette\\Loading\\pal.dat';
 
