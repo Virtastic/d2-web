@@ -20,7 +20,7 @@ struct Env {
     void (*f3ccc0)(u32 eax, u32 s0, u32 s1);            // ret 8
     void (*f3cc60)(u32 eax, u32 s0, u32 s1);            // ret 8
 };
-// 1.13c D2Client+0xA5440 (EAX = unit, leaf): 1 when unit flag 0x10000 is set, or by type / mode (player 0 / 17, monster 0 / 12).
+// Helper (EAX = unit, leaf): 1 when unit flag 0x10000 is set, or by type / mode (player 0 / 17, monster 0 / 12).
 static u32 busy(const Env& e, u32 u) {
     if (e.rd32(u + 0xc4) & 0x10000) return 1;
     const u32 m = e.rd32(u + 0x10), t = e.rd32(u);
