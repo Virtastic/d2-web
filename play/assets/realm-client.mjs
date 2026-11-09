@@ -458,33 +458,45 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
   const sent = [], received = [];
   const send = (id, body) => { const frame = protocol.bncsFrame(id, body); sent.push({ id, bytes: frame.length }); transport.send(frame); };
 
-  transport.send(protocol.bncsSelector());                       // single 0x01 protocol selector
-  send(0x50, protocol.bncsAuthInfo(product));
+  // A refused logon keeps the connection (retail's does), and the next LOG IN goes straight to the logon:
+  // the selector and AUTH_INFO/AUTH_CHECK are once per connection, and a second 0x01 makes the server hang up.
+  let serverToken, clientToken, mpqName, challenge, versionResult;
+  if (transport.bncsAuth) {
+    ({ serverToken, clientToken, mpqName, challenge, versionResult } = transport.bncsAuth);
+  } else {
+    transport.send(protocol.bncsSelector());                       // single 0x01 protocol selector
+    send(0x50, protocol.bncsAuthInfo(product));
 
-  const authInfo = await readBncsFrame(reader, timeoutMs); received.push(authInfo.id);
-  if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
-  const serverToken = u32(authInfo.body, 4);
-  const mpqEnd = authInfo.body.indexOf(0, 20);
-  const mpq = authInfo.body.subarray(20, mpqEnd < 0 ? authInfo.body.length : mpqEnd);
-  const challenge = authInfo.body.subarray(mpqEnd + 1);
+    const authInfo = await readBncsFrame(reader, timeoutMs); received.push(authInfo.id);
+    if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
+    serverToken = u32(authInfo.body, 4);
+    const mpqEnd = authInfo.body.indexOf(0, 20);
+    const mpq = authInfo.body.subarray(20, mpqEnd < 0 ? authInfo.body.length : mpqEnd);
+    challenge = authInfo.body.subarray(mpqEnd + 1);
+    mpqName = new TextDecoder().decode(mpq);
 
-  // BNClient+0x12060: the token is its running seed (seed += tick + time); the version, hash and info
-  // come from the server's revision formula over the configured files, the key blocks from `auth`.
-  const { body: authCheckBody, clientToken } = protocol.bncsAuthCheck({ serverToken, mpq: new TextDecoder().decode(mpq), challenge, product, auth });
-  send(0x51, authCheckBody);
-  const authCheck = await readBncsFrame(reader, timeoutMs); received.push(authCheck.id);
-  if (authCheck.id !== 0x51) throw new Error(`expected AUTH_CHECK reply 0x51, got 0x${authCheck.id.toString(16)}`);
-  const versionResult = u32(authCheck.body, 0);
-  if (versionResult !== 0) {
-    // Bnclient+0x11330: the reply is a result and a C string (the key owner's name for 0x201); a body whose
-    // last byte is not NUL, or with a NUL before it, is not handled at all, so no refusal result is kept.
-    const error = new Error(`AUTH_CHECK rejected the version (result 0x${versionResult.toString(16)})`);
-    const info = authCheck.body.subarray(4);
-    if (authCheck.body.length >= 5 && info[info.length - 1] === 0 && !info.subarray(0, -1).includes(0)) {
-      error.authResult = versionResult;
-      error.authInfo = new TextDecoder().decode(info.subarray(0, -1));
+    // BNClient+0x12060: the token is its running seed (seed += tick + time); the version, hash and info
+    // come from the server's revision formula over the configured files, the key blocks from `auth`.
+    const checked = protocol.bncsAuthCheck({ serverToken, mpq: mpqName, challenge, product, auth });
+    const authCheckBody = checked.body;
+    clientToken = checked.clientToken;
+    send(0x51, authCheckBody);
+    const authCheck = await readBncsFrame(reader, timeoutMs); received.push(authCheck.id);
+    if (authCheck.id !== 0x51) throw new Error(`expected AUTH_CHECK reply 0x51, got 0x${authCheck.id.toString(16)}`);
+    versionResult = u32(authCheck.body, 0);
+    if (versionResult !== 0) {
+      // Bnclient+0x11330: the reply is a result and a C string (the key owner's name for 0x201); a body whose
+      // last byte is not NUL, or with a NUL before it, is not handled at all, so no refusal result is kept.
+      const error = new Error(`AUTH_CHECK rejected the version (result 0x${versionResult.toString(16)})`);
+      const info = authCheck.body.subarray(4);
+      if (authCheck.body.length >= 5 && info[info.length - 1] === 0 && !info.subarray(0, -1).includes(0)) {
+        error.authResult = versionResult;
+        error.authInfo = new TextDecoder().decode(info.subarray(0, -1));
+      }
+      throw error;
     }
-    throw error;
+
+    transport.bncsAuth = { serverToken, clientToken, mpqName, challenge, versionResult };
   }
 
   // BNClient+0xC9E0 tokens the logon with GetTickCount; +0xBFD0 with its own counter (1, 2, ...).
@@ -537,7 +549,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
     startup: [...cat(realmEx.body.subarray(0, 16), realmEx.body.subarray(24, 72))] };
 
   // `reader` stays attached to the open socket: retail keeps the BNCS chat connection for the session.
-  return { clientToken, serverToken, mpq: new TextDecoder().decode(mpq), challenge, versionResult, logonResult, realmList, handoff, sent, received, reader };
+  return { clientToken, serverToken, mpq: mpqName, challenge, versionResult, logonResult, realmList, handoff, sent, received, reader };
 }
 
 /**
