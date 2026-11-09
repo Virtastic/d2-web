@@ -89,7 +89,6 @@ HRSRC StormFindResourceA(HINSTANCE, const char*, const char*) { return nullptr; 
 HGLOBAL StormLoadResource(HINSTANCE, HRSRC) { return nullptr; }
 void* StormLockResource(HGLOBAL) { return nullptr; }
 HMODULE StormGetModuleHandleA(const char*) { return nullptr; }
-HMODULE StormLoadLibraryA(const char*) { return nullptr; }
 
 // ---- unmapped internal callees ----------------------------------------------------------------
 // 0x2BDD0 reads the "Patch"/"Patches" config key. The config is never populated in ours, so the
@@ -109,7 +108,6 @@ void StormSub169A0() {}                       // 0x169A0 SDlg init
 int32_t StormSub1220() { return 1; }          // host stub of SDlg class registration (the retail body is storm_sub_21220.cpp)
 void* StormSub1DF90(void*, int*, HWND, void*, LPARAM) { return nullptr; }  // 0x1DF90 dialog create
 void StormSub1D600() {}                       // 0x1D600 message pump
-uint32_t StormSub16AC0(void*, int32_t) { return 0xFFFFFFFFu; }  // 0x16AC0 find hash entry
 void StormSub4D60(void*) {}                   // 0x4D60 list unlink
 }  // namespace
 extern "C" int32_t Storm_Sub1B960(void* p, const char* tag, int32_t line);  // 0x1B960 SMemFree (storm_alloc_1b960.cpp)
