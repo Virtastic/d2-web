@@ -2319,8 +2319,8 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_skill_value(uint32_t guid, int i
 // Retail effect of a missing hero: the stat packet logs a fixed message and exits the client, so nothing is
 // written and no stat-change event runs. Here a missing selected record is a negative return, which rejects the
 // stream and clears the realm state (the nearest equivalent). Open difference: retail keys this on the hero
-// unit being null; here a selected record with a null motion unit is dropped (0) instead.
-// A record whose motion unit is still detached is not fatal: the packet is dropped there.
+// unit being null; a selected record with a null motion unit is the same condition (its unit is made when the
+// player is assigned) and is rejected the same way (-1). The 0x20 form on a GUID without a record is a no-op.
 // Differs from retail: the stat-change event that follows each 0x19..0x1F set (stat id and new value) is not run
 // here. Its effects are client-side only and never write the stat list: stats 0 and 2 re-check the equipped
 // items; stat 12 (level) re-checks the owner's equipped items and, for the hero, its inventory and equipped items
@@ -2346,7 +2346,7 @@ static int apply_player_stat(const uint8_t* packet, int length) {
         if (packet[0] < 0x19 || packet[0] > 0x1f || length != kSize[packet[0] - 0x19]) return -1;
         if (g_selectedPlayer < 0 || size_t(g_selectedPlayer) >= g_players.size()) return -1;
         unit = g_players[g_selectedPlayer].motionUnit;
-        if (!unit) return 0;
+        if (!unit) return -1;   // retail: a null hero is fatal, handled like a missing selected record
         switch (packet[0]) {
         case 0x19: stat = 14; value = STATLIST_UnitGetStatValue(unit, 14, 0) + read(packet + 1, 1); break;
         case 0x1a: stat = 13; value = STATLIST_UnitGetStatValue(unit, 13, 0) + read(packet + 1, 1); break;
