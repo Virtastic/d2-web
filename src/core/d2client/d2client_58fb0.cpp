@@ -6,7 +6,7 @@
 // Its screen point is the projected position (perspective flag from 0xD07E: 0xD09C/0xD084 with x,y out-locals and a +-W/4 shift
 // under side panel 1/2; flat: 0xC1D2/0xC1F6 minus the camera globals). Inside the panel-limited x range and [-8, H-0x10] in y the
 // name is built (0xBFEC0, EAX = unit), measured (0xD3B4: width through EDX, height through stack word 0), placed by 0x58DE0 (up to
-// 12 modes) and stored when it stays in range. The first label under the cursor (or the hovered unit from 0x1A80) takes mode 5
+// 12 modes) and stored when it stays in range. The first label under the cursor (or the hovered unit from 0x51A80) takes mode 5
 // with the palette byte from 0xD390; every other label is mode 1 with a colour from the quality (0xC19C), the grey rule and the
 // quest-item rule. Then every slot is drawn (0xD3AE); no hover clears the two hover globals and calls 0xD384(0,0,0).
 #include <cstdint>
@@ -25,7 +25,7 @@ extern "C" uint32_t d2c_58fb0(const cl::Env& e) {
     if (!player) return 0;
     const uint32_t room = e.H(0xC1F0, player);
     if (!room) return 0;
-    const uint32_t hoverUnit = e.H(0x1A80);
+    const uint32_t hoverUnit = e.H(0x51A80);
     const int32_t curX = (int32_t)e.R(G(kCurX)), curY = (int32_t)e.R(G(kCurY));
     volatile uint32_t list = 0, nrooms = 0;
     e.H(0xC3DC, room, P(&list), P(&nrooms));

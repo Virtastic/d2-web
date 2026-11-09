@@ -40,7 +40,7 @@ struct D2cSeam78FC0 {
     void (*exitp)(int32_t code);                           // 0x3664
     void (*beltUse)(uint32_t ediArg);                      // 0x47B20
     void (*click)(uint32_t ecx, uint32_t edx, uint32_t z); // 0xC2790 (stack 1)
-    uint32_t (*a5440)(uint32_t* edx);                      // 0xA5440 (EAX = player; EDX is live across the call: *edx is its value afterwards)
+    uint32_t (*a5440)(uint32_t* edx);                      // 0xA5440 (EAX = player; retail preserves EDX, so the toggle value survives a nonzero answer)
     uint32_t (*str)(uint32_t moduleRva);                   // 0xD0B4 (stdcall 1: a module string)
     void (*show)(uint32_t eax, uint32_t s);                // 0x3CCC0
     void (*hide)(uint32_t eax, uint32_t s);                // 0x3CC60

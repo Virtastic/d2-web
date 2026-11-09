@@ -332,7 +332,7 @@ void sub_7DE00() {
     e.fn7c380();
 }
 
-// 1.13c D2Client+0x7DFB0   (msg = chat/system message record: [1]=kind, [3]=u32 id, [7]=sub, [8]=name[16], [0x18]=text2)
+// alpha form of 0x7DFB0, superseded by d2client_7dfb0.cpp   (msg = chat/system message record: [1]=kind, [3]=u32 id, [7]=sub, [8]=name[16], [0x18]=text2)
 void sub_7DFB0(void* thisp, uint8_t* m) {
     U16 out[0x132] = {}, name[32] = {}, second[32] = {};
     char* nm = (char*)m + 8;

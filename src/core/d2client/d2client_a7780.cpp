@@ -57,7 +57,7 @@ extern "C" uint32_t d2c_a7780(uint32_t p, uint32_t rect, uint32_t src9, uint32_t
     if (uint32_t d = data()) w16(d + 0x16, e.R(d + 0x16) | (e.R(p + 0x10) & 0xFFFF));
     if (uint32_t d = data(); d && (e.R8(d + 0x16) & 2)) w16(d + 0x26, w26);
     if (uint32_t d = data()) e.W(d + 0x3C, e.R(p + 0x14));
-    const uint32_t name = e.H(0xD1EC, 0, 0, 0, 0, 0, 0, e.R(row + 6) & 0xFFFF);
+    const uint32_t name = e.H(0xD1EC, 0, 0, 0, 0, 0, 0, (e.R(p + 0x14) & 0xFFFF0000u) | (e.R(row + 6) & 0xFFFF));
     e.H(0xC22C, 0, 0, 0, 0, 0, 0, u, name);
     if (src9) {
         if (uint32_t d = data()) w16(d + 0x14, w14);
