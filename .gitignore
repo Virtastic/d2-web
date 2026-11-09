@@ -161,6 +161,7 @@ wasm-build/*
 !wasm-build/make_br.sh
 !wasm-build/version-engine.sh
 test/*
+!test/ws-bridge-char-guard.test.mjs
 !test/input-touch-name.test.mjs
 !test/realm-world.test.mjs
 !test/realm-hud-state.test.mjs

@@ -25,15 +25,21 @@
 //   --rate 30               new connections per client address per minute
 //   --idle 600              seconds without traffic in either direction before closing
 //   --handshake 10          seconds to complete the upgrade and the TCP connect
+//   --ping 20               seconds between WebSocket pings; a peer silent for 2.5 intervals is dropped, so
+//                           a vanished browser cannot keep its game connection (and the character) alive
+//   --grace 1.5             seconds a closed game connection still counts as holding its character
+//   --no-char-guard         forward create/join even for a character that is still in a game
 import http from 'node:http';
 import net from 'node:net';
 import crypto from 'node:crypto';
+import { createCharGuard } from './char-guard.mjs';
 
 const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
 export const DEFAULTS = Object.freeze({
   host: '127.0.0.1', trustProxy: false, origins: null,
   maxPerIp: 8, maxTotal: 512, maxMessage: 65536, ratePerMin: 30, idleSec: 600, handshakeSec: 10,
+  pingSec: 20, graceSec: 1.5, charGuard: true,
 });
 
 /** The RFC 6455 accept token: base64(sha1(key ++ GUID)). */
@@ -100,6 +106,7 @@ export function createWsBridge({ listen, targets, onLog = () => {}, ...overrides
   const perIp = new Map();      // address -> open sockets
   const recent = new Map();     // address -> connection timestamps within the last minute
   let total = 0;
+  const guard = cfg.charGuard ? createCharGuard({ graceMs: cfg.graceSec * 1000, onLog }) : null;
 
   const admit = (addr) => {
     if (total >= cfg.maxTotal) return 'server full';
@@ -146,24 +153,48 @@ export function createWsBridge({ listen, targets, onLog = () => {}, ...overrides
     const tcp = net.createConnection({ host: target.host, port: target.port });
     tcp.setNoDelay(true);
     let timers = [];
-    const closeBoth = () => { release(); timers.forEach(clearTimeout); timers = []; sock.destroy(); tcp.destroy(); };
+    const opened = Date.now();
+    const tap = guard && name === 'd2gs' ? guard.d2gsTap() : null;
+    const mcp = guard && name === 'mcp' ? guard.mcpTap() : null;
+    let lastRx = Date.now();
+    const closeBoth = (why = 'closed') => {
+      if (!released) onLog(`${why} ${addr} /${name} after ${((Date.now() - opened) / 1000).toFixed(1)}s`);
+      release(); tap?.close(); timers.forEach(clearTimeout); timers = []; sock.destroy(); tcp.destroy();
+    };
+    if (cfg.pingSec > 0) {
+      const ms = cfg.pingSec * 1000;
+      const live = setInterval(() => {
+        if (Date.now() - lastRx > ms * 2.5) { closeBoth('dead peer'); return; }
+        try { sock.write(encodeFrame(Buffer.alloc(0), 0x9)); } catch { closeBoth(); }
+      }, ms);
+      timers.push(live);
+    }
     let idle = null;
     const touch = () => { clearTimeout(idle); idle = setTimeout(() => { onLog(`idle close ${addr} /${name}`); closeBoth(); }, cfg.idleSec * 1000); timers.push(idle); };
     const connectTimer = setTimeout(() => { onLog(`connect timeout ${addr} /${name}`); closeBoth(); }, cfg.handshakeSec * 1000);
     timers.push(connectTimer);
     tcp.on('connect', () => { clearTimeout(connectTimer); touch(); onLog(`ws /${name} -> ${target.host}:${target.port} from ${addr}`); });
     tcp.on('data', (d) => {
-      touch();
+      touch(); mcp?.fromRealm(d);
       try { sock.write(encodeFrame(d)); } catch { closeBoth(); return; }
       // Backpressure: a browser that stops reading must not make the bridge buffer the realm's output.
       if (sock.writableLength > cfg.maxMessage * 16) { onLog(`slow reader ${addr} /${name}`); closeBoth(); }
     });
-    tcp.on('error', closeBoth); tcp.on('close', closeBoth);
+    tcp.on('error', () => closeBoth('realm error')); tcp.on('close', () => closeBoth('realm closed'));
 
+    // The one place client bytes reach the realm: the character guard may swap a doomed create/join
+    // for the realm's own failure reply; every other byte goes through unchanged.
+    const toRealm = (data) => {
+      tap?.fromClient(data);
+      if (!mcp) { tcp.write(data); return; }
+      const { forward, reply } = mcp.fromClient(data);
+      if (forward.length) tcp.write(forward);
+      if (reply) sock.write(encodeFrame(reply));
+    };
     const parse = makeWsParser(cfg.maxMessage);
     let fragment = null; // accumulate a fragmented message (browsers may split a large binary send)
     sock.on('data', (chunk) => {
-      touch();
+      touch(); lastRx = Date.now();
       let frames;
       try { frames = parse(chunk); } catch (e) { onLog(`bad frame from ${addr}: ${e.message}`); closeBoth(); return; }
       for (const f of frames) {
@@ -174,15 +205,15 @@ export function createWsBridge({ listen, targets, onLog = () => {}, ...overrides
           if (!fragment) { closeBoth(); return; }                             // continuation with nothing to continue
           fragment = Buffer.concat([fragment, f.data]);
           if (fragment.length > cfg.maxMessage) { onLog(`message too large from ${addr}`); closeBoth(); return; }
-          if (f.fin) { tcp.write(fragment); fragment = null; }
+          if (f.fin) { toRealm(fragment); fragment = null; }
           continue;
         }
         if (f.opcode === 0x1 || f.opcode === 0x2) {                             // text / binary
-          if (f.fin) tcp.write(f.data); else fragment = f.data;
+          if (f.fin) toRealm(f.data); else fragment = f.data;
         }
       }
     });
-    sock.on('error', closeBoth); sock.on('end', closeBoth); sock.on('close', closeBoth);
+    sock.on('error', () => closeBoth('browser error')); sock.on('end', () => closeBoth('browser ended')); sock.on('close', () => closeBoth('browser closed'));
   });
   server.listen(listen, cfg.host, () => onLog(`ws-bridge listening on ${cfg.host}:${server.address().port}`));
   return server;
@@ -195,7 +226,7 @@ function main(argv) {
   for (let i = 0; i < argv.length; i++) {
     if (!argv[i].startsWith('--')) continue;
     const k = argv[i].slice(2);
-    if (k === 'trust-proxy') opt[k] = '1'; else opt[k] = argv[++i];
+    if (k === 'trust-proxy' || k === 'no-char-guard') opt[k] = '1'; else opt[k] = argv[++i];
   }
   const listen = Number(opt.listen || 7900);
   const targets = {};
@@ -214,6 +245,9 @@ function main(argv) {
     ratePerMin: num('rate', DEFAULTS.ratePerMin),
     idleSec: num('idle', DEFAULTS.idleSec),
     handshakeSec: num('handshake', DEFAULTS.handshakeSec),
+    pingSec: num('ping', DEFAULTS.pingSec),
+    graceSec: num('grace', DEFAULTS.graceSec),
+    charGuard: !opt['no-char-guard'],
   });
 }
 
