@@ -96,11 +96,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2common_4f4c0_env(void* object,
     return 0;
 }
 
-// Adopt the existing native-layout decoder rather than applying x86 offsets to a
-// wasm64 D2UnitStrc. Version, gamble, header and socket-count inputs stay explicit.
+// The native-layout entry the play path calls. The image-layout decoder itself is
+// D2Common_2A600_DecodeItem in d2common_2a600.cpp.
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_2a600(D2UnitStrc* item,
     D2BitBufferStrc* buffer, int32_t checkHeader, int32_t gamble, int* socketedItems,
-    uint32_t version) { // 1.13c D2Common+0x2A600
+    uint32_t version) {
     return ITEMS_DecodeItemBitstreamComplete(item, buffer, checkHeader, gamble, socketedItems, version);
 }
 

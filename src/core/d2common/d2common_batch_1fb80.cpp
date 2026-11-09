@@ -156,7 +156,7 @@ D2UnitStrc* D2Common_1EDF0_GetEquippedItemByCode(D2InventoryStrc* pInventory, in
 	return nullptr;
 }
 
-// 1.13c D2Common+0x20320: the left-hand weapon, found by the inventory's left-item GUID in either
+// Native-layout twin of D2Common_20320_GetLeftHandWeaponImg (d2common_20320.cpp): the left-hand weapon, found by the inventory's left-item GUID in either
 // hand slot; the item must be a weapon (item type 0x2D) and carry that GUID.
 D2UnitStrc* D2Common_20320_GetLeftHandWeapon(D2InventoryStrc* pInventory)
 {
