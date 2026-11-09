@@ -78,6 +78,11 @@ struct D2GameCE5A0Env {
     void     (*ord10551)(void* pUnit, int32_t a, int32_t b, int32_t c);
     void     (*fnB010)();
     void     (*fnD31D0)(void* pUnit, void* pEax, int32_t retaddr);
+    // the register/stack arguments the retail callers of 0xD16B0 / 0xD17B0 pass (appended: the zero-argument seams above stay)
+    int16_t  (*u10257)(uint32_t unit, uint32_t idx);
+    int16_t  (*u11028)(uint32_t unit, uint32_t idx);
+    int16_t  (*u11098)(uint32_t unit);
+    int32_t  (*u10744)(uint32_t unit, uint32_t type);
 };
 
 // Shared tail of the four "bump 0x148 counter" handlers.
@@ -154,28 +159,28 @@ int d2game_CF5B0_113c(int32_t game, int32_t* unit, const uint8_t* pkt, int32_t i
     return r;
 }
 
-// 1.13c D2Game+0xD16B0
-bool d2game_D16B0_113c(const D2GameCE5A0Env* e)
+// 1.13c D2Game+0xD16B0 (EBX = first item, EDI = second item; each pass compares ord10257 / ord11028 at slot i of both)
+bool d2game_D16B0_113c(uint32_t ebx, uint32_t edi, const D2GameCE5A0Env* e)
 {
-    for (int i = 0; i < 3; i++) {
-        if (e->ord10257() != e->ord10257()) return false;
-        if (e->ord11028() != e->ord11028()) return false;
+    for (uint32_t i = 0; i < 3; i++) {
+        if (e->u10257(ebx, i) != e->u10257(edi, i)) return false;
+        if (e->u11028(ebx, i) != e->u11028(edi, i)) return false;
     }
-    return e->ord11098() == e->ord11098();
+    return e->u11098(ebx) == e->u11098(edi);
 }
 
-// 1.13c D2Game+0xD17B0
-uint32_t d2game_D17B0_113c(const D2GameCE5A0Env* e)
+// 1.13c D2Game+0xD17B0 (ESI = the unit)
+uint32_t d2game_D17B0_113c(uint32_t esi, const D2GameCE5A0Env* e)
 {
     uint32_t r = 0xffffffff;
-    if (e->ord10744() != 0) {
-        uint32_t id = (uint16_t)e->ord11028();
+    if (e->u10744(esi, 0x12) != 0) {
+        uint32_t id = (uint16_t)e->u11028(esi, 0);
         void* rec = e->ord11065(id);
         if (rec) return rd32(rec, 0xc);
         d2game_fatal(0xfa5);
     }
-    if (e->ord10744() != 0) {
-        void* rec = e->ord11065((uint16_t)e->ord11028());
+    if (e->u10744(esi, 0x16) != 0) {
+        void* rec = e->ord11065((uint16_t)e->u11028(esi, 0));
         if (!rec) d2game_fatal(0xfac);
         r = rd32(rec, 8);
     }
@@ -212,6 +217,7 @@ uint32_t d2game_D2070_113c(int32_t* unit, int32_t eax, const uint8_t* ebx, int32
     int32_t want = -1;
     if (unit && unit[0] == 4 && e->ord10106(unit) == 7) {
         int32_t k = e->ord10620(unit);
+        if (k >= 0) k = e->ord10620(unit);   // retail asks twice (sign test, then the index)
         if (k >= 0 && k < (int32_t)rd32(rdptr(e->dataTables, 0), 0xc28)) {
             const uint8_t* rec = (const uint8_t*)rdptr(rdptr(e->dataTables, 0), 0xc24) + (size_t)k * 0x14c;
             if (rec && (e->bitMask8 & rec[0x2c]) != 0) {
