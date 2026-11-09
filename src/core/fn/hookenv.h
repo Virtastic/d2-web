@@ -40,6 +40,11 @@ struct HookEnv {
         uint32_t* e = L + 1 + L[0]++ * 10; e[0] = rva | 0x60000000u; e[1] = isStk(ebp) ? 0xB3000000u : ebp; e[2] = isStk(edi) ? 0xB3000000u : edi;
         for (int j = 3; j < 10; j++) e[j] = 0;
     }
+    // descriptor `hookgl RVA GRVA`: the module dword at GRVA read at hook entry, one record (rva|0x70000000, value) straight after h() (and after y(), before j()).
+    void gl(uint32_t rva, uint32_t v) {
+        if (L[0] >= cap) abort();
+        uint32_t* e = L + 1 + L[0]++ * 10; e[0] = rva | 0x70000000u; e[1] = v; for (int j = 2; j < 10; j++) e[j] = 0;
+    }
     // descriptor `tick N [N2...] log`: one GetTickCount call, logged where retail calls it (record 0xF7000000, value). Returns v.
     uint32_t tick(uint32_t v) {
         if (L[0] >= cap) abort();
