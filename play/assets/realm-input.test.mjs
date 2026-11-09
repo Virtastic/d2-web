@@ -245,12 +245,28 @@ test('a belt key does nothing while dead or with an item on the cursor', () => {
   assert.ok(harness({ items, playerMode: 1 }).input.useBelt(0));
 });
 
-test('a belt key stops when the scene reports the use routine refusing the item', () => {
-  const items = [{ id: 2, mode: 2, gridX: 0 }];
-  const h = harness({ items, beltRefused: (item) => item.id === 2 });
+test('a belt key follows the use routine row test: useable 1, unique and quest not 1, a missing row refuses', () => {
+  const items = [{ id: 2, mode: 2, gridX: 0, classId: 7 }];
+  const rows = { 7: { useable: 1, unique: 0, quest: 0 } };
+  const go = (row) => harness({ items, itemRow: () => row }).input.useBelt(0);
+  assert.ok(go(rows[7]));
+  assert.equal(go({ useable: 0, unique: 0, quest: 0 }), false);
+  assert.equal(go({ useable: 1, unique: 1, quest: 0 }), false);
+  assert.equal(go({ useable: 1, unique: 0, quest: 1 }), false);
+  assert.equal(go({ useable: 1, unique: 0, quest: 2 }), true);
+  assert.equal(go(null), false);
+});
+
+test('a sent belt use locks that item for 12 frames (the flag-2 list of 0x81CE0), and state 0x36 refuses', () => {
+  let t = 0; const out = [];
+  const input = createRealmInput({ transmit: (b) => out.push(Array.from(b)), now: () => t,
+    scene: sceneOf({ items: [{ id: 2, mode: 2, gridX: 0 }, { id: 3, mode: 2, gridX: 1 }] }) });
+  assert.ok(input.useBelt(0));
+  t = 479; assert.equal(input.useBelt(0), false);
+  assert.ok(input.useBelt(1));                      // another item has no lock
+  t = 480; assert.ok(input.useBelt(0));
+  const h = harness({ items: [{ id: 2, mode: 2, gridX: 0 }], heroLocked: () => true });
   assert.equal(h.input.useBelt(0), false);
-  assert.deepEqual(h.out, []);
-  assert.ok(harness({ items, beltRefused: () => false }).input.useBelt(0));
 });
 
 test('a belt key with Shift down names the mercenary as the target', () => {

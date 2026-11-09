@@ -92,11 +92,16 @@ const CODE_QF2 = 0x20326671, CODE_HFH = 0x20686668;
  *                                    interaction then re-checks its reach and re-approaches if short
  *   castAt(x, y), castOnUnit(type, guid) -> the right-hand skill's local start
  */
+/** D2Client+0x29920 on an Items.txt row: true only for a plain useable row (useable byte 1, unique and quest bytes not 1). */
+export const canUseItemRow = (row) => row.useable === 1 && row.unique !== 1 && row.quest !== 1;
+/** The 0x81CE0 stat list: flag 2, a 12-frame timeout; the game runs 25 frames a second. */
+export const ACTION_LOCK_FRAMES = 12, GAME_FRAME_MS = 40;
 export function createRealmInput({ transmit, scene, now = () => 0, move = null, approachUnit = null, reach = null,
   actionDone = null, castAt = null, castOnUnit = null, onTalk = null, questFlags = null, leaveWait = null }) {
   const gate = createSendGate(transmit);
   const evidence = { attempts: 0, sent: 0, last: null };
   // The inventory's item actions pass the leave wait's gate first (1.13c 0x923F0): an armed wait is cancelled and the action refused.
+  const itemLocks = new Map();   // item guid -> tick the 12-frame action lock (0x81CE0) ends
   const itemGate = () => (leaveWait ? leaveWait.itemAction() : true);
   function emit(bytes, what) {
     evidence.attempts++;
@@ -244,15 +249,26 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     },
     /** Belt key 1-4: the item in belt slot `column` exactly (the key handler passes the column as the slot). Nothing happens
      *  while the player is dead (mode 17), when the cell is empty, or while the cursor holds an item. The retail use routine
-     *  also refuses an item whose row is not a plain useable one (useable byte not 1, or the unique/quest byte set), an item
-     *  carrying a stat list with flag 2, and a hero in state 0x36: the scene's optional `beltRefused(item)` answers that
-     *  (true = refuse; absent = sent). The game menu (retail's panel flag) never gets here: the shell drains input first. */
+     *  (D2Client+0x29990) then refuses, in order: an item row that is not a plain useable one (0x29920: Items.txt unique byte
+     *  +0x129 or quest byte +0x12A equal to 1 opens the reading panel instead, useable byte +0x11D not 1 plays the refusal
+     *  voice; the scene's `itemRow(classId)` answers, a missing row is fatal in retail), and an item still action-locked
+     *  (0x81CB0: a stat list with flag 2, STATLIST_NEWLENGTH, the 12-frame timer 0x81CE0 attaches after every sent
+     *  use; the lock below) or a hero in state 0x36 (the scene's optional `heroLocked()`). The game menu (flag 0xFADA4,
+     *  the Esc menu panel) never gets here: the shell drains input first. */
     useBelt(column, onMerc = false) {
       const s = open(); if (!s) return false;
       if (s.playerMode === PLAYER_DEAD || s.cursorId) return false;
       const slot = s.items.find((i) => i.mode === 2 && i.gridX === column);
-      if (slot && s.beltRefused?.(slot)) return false;
-      return slot ? emit(packets.useBeltItem(slot.id, onMerc), 'belt') : false;
+      if (!slot) return false;
+      if (s.itemRow) {
+        const row = s.itemRow(slot.classId);
+        if (!row || !canUseItemRow(row)) return false;
+      }
+      const t = now();
+      if ((itemLocks.get(slot.id) ?? -1) > t || s.heroLocked?.()) return false;
+      const sent = emit(packets.useBeltItem(slot.id, onMerc), 'belt');
+      if (sent) itemLocks.set(slot.id, t + ACTION_LOCK_FRAMES * GAME_FRAME_MS);   // 0x81CE0 after the 0x26 went out
+      return sent;
     },
     /** The skill popup / hotkey choice. */
     selectSkill: (skill, left, owner = 0xffffffff) => emit(packets.selectSkill(skill, left, owner), 'select-skill'),

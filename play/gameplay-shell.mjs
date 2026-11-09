@@ -3459,7 +3459,7 @@ function update(forceTick = false, live = false) {
           held: Boolean(command.held), serial: ++lastSkillCommandSerial };
       } else if (command.type === COMMAND.BELT) {
         // Retail's belt keys: 1-4 drink/use the bottom item of that belt column, through the engine.
-        const result = respawnAllowed(snapshot?.mode) ? 0 : session.useBelt(command.slot | (command.merc ? 0x100 : 0));
+        const result = deathScreenShown(snapshot?.mode) ? 0 : session.useBelt(command.slot | (command.merc ? 0x100 : 0));
         if (result) snapshot = session.snapshot();
         lastBeltCommand = { slot: command.slot, result };
         window.__d2Step19Trace?.record('belt-use', { source: 'key-command', slot: command.slot, result: Boolean(result) },
@@ -4275,6 +4275,7 @@ function realmInput() {
       return { ready: true, player: { x: Math.round(me.x), y: Math.round(me.y) }, playerMode: snapshot?.mode, cursorId: realmWorldState?.cursorId ?? 0,
         monsters: realmSceneEvidence?.monsters ?? [], objects: snapshot.objects ?? [], items: snapshot.items ?? [],
         isNpc: (classId) => realmTables().monsters.isNpc(classId),
+        itemRow: (classId) => realmTables().items.byClass(classId),
         hoverBox: (dx, dy) => inUnitHoverBox(dx, dy, true),
         toScreen: (x, y) => { const p = worldToScreen(x, y); return { x: p.x - camera.x + viewCX(), y: p.y - camera.y + (canvas.height / 2 + UNIT_CENTRE_Y) }; },
         pointerWorld: pointerWorldAt, run: readRunToggle(),

@@ -38,7 +38,9 @@ export function createItemTable(read) {
           minAc: num(row.minac), maxAc: num(row.maxac), minDam: num(row.mindam), maxDam: num(row.maxdam),
           minDam2: num(row['2handmindam']), maxDam2: num(row['2handmaxdam']), minMis: num(row.minmisdam), maxMis: num(row.maxmisdam),
           durability: num(row.durability), noDurability: row.nodurability === '1', stackable: row.stackable === '1',
-          speed: num(row.speed) };
+          speed: num(row.speed),
+          // The bytes D2Client+0x29920 reads (Items.txt useable, unique, quest columns; an empty cell is 0).
+          useable: num(row.useable), unique: num(row.unique), quest: num(row.quest) };
         byClass.push(entry); byCode.set(fourcc(row.code), entry);
       }
     }
