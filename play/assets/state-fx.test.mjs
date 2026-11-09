@@ -51,3 +51,8 @@ console.log('state-fx ok');
 { let s = 0; const f = (t) => inner.update((id) => id === 17, 'r', t, () => s).map((e) => e.age)[0];
   assert.deepEqual([f(500), f(501)], [1, 2]); s = 1;
   assert.deepEqual([f(502), f(503)], [1, 2], 'restart at the re-set tick'); }
+// A monster class with a client-started loop (Mephisto, class 242) exports it from its first tick; another class does not.
+{ const f = createStateFx((p) => ({ 'data\\global\\excel\\Overlay.txt': enc('overlay\tFilename\tFrames\tPreDraw\tAnimRate\tTrans\n' + Array.from({ length: 122 }, () => '\t\t\t\t\t').join('\n') + '\nmephisto\tMephistoOverlay\t26\t0\t16\t3\n'), 'data\\global\\excel\\states.txt': enc('state\tid\toverlay1\n') })[p]);
+  assert.deepEqual(f.update(() => false, '1:9', 10, undefined, [], 242).map((e) => [e.file, e.trans, e.age]), [['MephistoOverlay', 3, 1]]);
+  assert.deepEqual(f.update(() => false, '1:9', 11, undefined, [], 242).map((e) => e.age), [2]);
+  assert.deepEqual(f.update(() => false, '1:8', 10, undefined, [], 1), []); }

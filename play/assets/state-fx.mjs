@@ -18,6 +18,7 @@ export function createStateFx(read) {
   // 2A590 (1.13c D2Client+0x2A590): a monster's hit class high nibble picks the Overlay.txt row its 6B300 node plays once
   const HIT_ROW = { 0x10: 0x36, 0x20: 0x51, 0x30: 0x24, 0x40: 0x01, 0x70: 0x93, 0x80: 0x15, 0x90: 0x71 };
   const rowName = (r) => new TextDecoder('latin1').decode(read('data\\global\\excel\\Overlay.txt')).split(/\r?\n/)[r + 1]?.split('\t')[0];
+  const CLASS_LOOP = { 242: 0x7A, 704: 0x7A, 543: 0x113 };   // monster class -> Overlay.txt row of its type-3 loop node
   return {
     /** Harness only: an array that update() appends retail-format OV node records to (null in play). */
     ov: null,
@@ -31,10 +32,10 @@ export function createStateFx(read) {
       u.once.push(fx(name, { start: t, name }));
     },
     /** has(stateId) -> bool for the unit `key`; t = engine tick (the hero's own counter when omitted). Returns {kind:'overlay',file,frames,trans,predraw,age} for each live state graphic. */
-    update(has, key = 'hero', t, seq, active) {
+    update(has, key = 'hero', t, seq, active, cls) {
       if (t === undefined) t = ++heroTick;
       let u = units.get(key);
-      if (!u) units.set(key, u = { had: new Set(), once: [], seq: new Map(), t0: new Map() });
+      if (!u) units.set(key, u = { had: new Set(), once: [], seq: new Map(), t0: new Map(), born: t });
       const out = [], tag = `${t} OV ${key === 'hero' ? '0:1' : key}`;
       // `active` (the ids the unit holds now, when the caller has them) narrows the walk to the states that can change anything:
       // one held now or one held last tick. Every other row has on === had and draws nothing, in States.txt order either way.
@@ -53,6 +54,9 @@ export function createStateFx(read) {
         if (on) { const q = seq ? seq(id) : 0; if (u.seq.has(id) && u.seq.get(id) !== q) u.t0.set(id, t); u.seq.set(id, q); }
         if (on) for (const k of ['overlay1', 'overlay2', 'overlay3', 'overlay4']) { const e = fx(s[k]); if (e) { const n = t - (u.t0.get(id) ?? 0); out.push({ ...e, age: (Math.floor(n * e.rate / 256) + 1) % e.frames }); this.ov?.push(`${tag} ${node(8, s[k], n % 51, (n * e.rate) % (e.frames << 8))}`); } }
       }
+      // the monster class's own loop (the per-class client init, D2Client+0xA70C0, starts a type-3 node at creation): Mephisto's aura
+      const cn = CLASS_LOOP[cls] !== undefined ? rowName(CLASS_LOOP[cls]) : null, ce = cn && fx(cn);
+      if (ce) { const n = t - u.born; out.push({ ...ce, age: (Math.floor(n * ce.rate / 256) + 1) % ce.frames }); this.ov?.push(`${tag} ${node(3, cn, 1, n * ce.rate)}`); }
       for (const e of u.once) if (t > e.start) this.ov?.push(`${tag} ${(t - e.start - 1) * e.rate / 256 < e.frames ? node(2, e.name, 1, (t - e.start - 1) * e.rate) : node(2, e.name, 0, e.frames * 256)}`);   // the last record is the node's end (live 0, pos = frames)
       u.once = u.once.filter((e) => (t - e.start - 1) * e.rate / 256 < e.frames);
       return out.concat(u.once.filter((e) => t > e.start && Math.floor((t - e.start - 1) * e.rate / 256) + 1 < e.frames).map((e) => ({ ...e, age: Math.floor((t - e.start - 1) * e.rate / 256) + 1 })));   // retail's first frame is the tick after the create (OV pos 0)
