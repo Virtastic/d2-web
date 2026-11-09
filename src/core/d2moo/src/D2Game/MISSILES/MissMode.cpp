@@ -4623,8 +4623,6 @@ void __fastcall MISSMODE_SrvDmg13_BlessedHammerEx(D2GameStrc* pGame, D2UnitStrc*
 
 // Prior art: D2MOO MoltenBoulder damage callback; retail uses the flag helper.
 // 1.13c D2Game+0x39A40 (checked against decompile, no delta)
-D2SrvDmg14Seam g_d2SrvDmg14;
-// 1.13c D2Game+0x39A40: fastcall ECX = pGame, EDX = pMissile, stack = pUnit, pDamage (ret 8); the roll is RollLimited(&missile seed, 100)
 void __fastcall MISSMODE_SrvDmg14_MoltenBoulder(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit, D2DamageStrc* pDamage)
 {
     if (!pMissile || pMissile->dwUnitType != UNIT_MISSILE)
@@ -4644,8 +4642,7 @@ void __fastcall MISSMODE_SrvDmg14_MoltenBoulder(D2GameStrc* pGame, D2UnitStrc* p
     }
     else if (pUnit->dwUnitType == UNIT_MONSTER)
     {
-        auto flag = [](int32_t nId, int32_t nFlag) { return g_d2SrvDmg14.flag ? g_d2SrvDmg14.flag(nId, nFlag) : (uint32_t)MONSTERREGION_CheckMonStats2Flag(nId, nFlag); };
-        const bool bSmall = flag(pUnit->dwClassId, 10) != 0;
+        const bool bSmall = MONSTERREGION_CheckMonStats2Flag(pUnit->dwClassId, 10) != 0;
         if (nParam < 1)
         {
             if (!bSmall) return;
@@ -4653,17 +4650,17 @@ void __fastcall MISSMODE_SrvDmg14_MoltenBoulder(D2GameStrc* pGame, D2UnitStrc* p
         else if (nParam == 1)
         {
             if (bSmall) nMultiplier = 2;
-            else if (flag(pUnit->dwClassId, 11)) return;
+            else if (MONSTERREGION_CheckMonStats2Flag(pUnit->dwClassId, 11)) return;
         }
         else
         {
             if (bSmall) nMultiplier = 3;
-            else if (!flag(pUnit->dwClassId, 11)) nMultiplier = 2;
+            else if (!MONSTERREGION_CheckMonStats2Flag(pUnit->dwClassId, 11)) nMultiplier = 2;
         }
     }
     else return;
     const int32_t nChance = int32_t(uint32_t(pRecord->dwDmgParam[1]) * nMultiplier);
-    if (nChance > 0 && int32_t(g_d2SrvDmg14.roll ? g_d2SrvDmg14.roll(&pMissile->pSeed, 100) : ITEMS_RollLimitedRandomNumber(&pMissile->pSeed, 100)) < nChance)
+    if (nChance > 0 && int32_t(ITEMS_RollLimitedRandomNumber(&pMissile->pSeed, 100)) < nChance)
     {
         pDamage->wResultFlags |= 8u;
     }
