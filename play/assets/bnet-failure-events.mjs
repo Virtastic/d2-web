@@ -15,7 +15,7 @@ export const BNET_FAILURE_EVENTS = {
   3: row(AUTH_TITLE, 5186, 2, { detail: 5194 }), 7: row(AUTH_TITLE, 10912, 2, { detail: 5194 }),
   4: row(AUTH_TITLE, 5199, 1), 8: row(AUTH_TITLE, 10913, 1),
   5: row(AUTH_TITLE, 5202, 1), 9: row(AUTH_TITLE, 5202, 1),
-  6: row(AUTH_TITLE, 5200, 1, { detail: 5201, owner: true }), 10: row(AUTH_TITLE, 10914, 1, { detail: 5201, owner: true }),
+  6: row(AUTH_TITLE, 5200, 2, { detail: 5201, owner: true }), 10: row(AUTH_TITLE, 10914, 2, { detail: 5201, owner: true }),
   11: row(AUTH_TITLE, 5356, 1),
   12: row(AUTH_TITLE, 5189, 2, { detail: 5190 }),
   13: row(5244, 5208, 1, { disconnect: false, handler: 'login' }),
@@ -59,8 +59,10 @@ export function failureParts(event, { string, account = '', text = '', counter =
   let body = e.serverText ? String(text ?? '') : s(e.body);
   if (event === 14 && counter.refuse(account) >= 2) body = s(e.repeatBody);
   const lines = [body];
-  if (e.owner && text) lines.push(String(text));
-  return { title: s(e.title), main: lines.join('\n'), detail: e.detail ? s(e.detail) : null, kind: e.kind, disconnect: e.disconnect, handler: e.handler };
+  const owner = e.owner && text ? String(text) : '';
+  // The large popup (kind 2) draws the owner as its own centred line below the body; the small box runs it on.
+  if (owner && e.kind !== 2) lines.push(owner);
+  return { owner: e.kind === 2 ? owner : '', title: s(e.title), main: lines.join('\n'), detail: e.detail ? s(e.detail) : null, kind: e.kind, disconnect: e.disconnect, handler: e.handler };
 }
 // The box for an event, as one body (the main text, then the detail line).
 export function failureBox(event, opts = {}) {

@@ -41,3 +41,16 @@ test('bncsChangePassword passes AUTH_CHECK before its own packet', async () => {
   await bncsChangePassword(transport, protocol, { account: 'ama', password: 'pw', newPassword: 'pw2', timeoutMs: 500 }).catch(() => {});
   assert.deepEqual(ids.slice(0, 2), [0x50, 0x51]);
 });
+
+test('a version or key reply that never comes raises the timeout event, a closed link the generic one', async () => {
+  const { loginErrorMessage } = await import('./bnet-login-screen.mjs');
+  const string = (i) => `s${i}`;
+  const silent = (reply) => { const r = rig(); const send = r.transport.send; r.transport.send = (b) => (b[1] === reply ? true : send(b)); return r; };
+  for (const stalled of [0x50, 0x51]) {
+    const { transport, protocol } = silent(stalled);
+    const error = await bncsCreateAccount(transport, protocol, { account: 'ama', password: 'pw', timeoutMs: 20 }).then(() => null, (e) => e);
+    assert.equal(error?.failureEvent, 0x11, `stalled ${stalled.toString(16)}`);
+    assert.deepEqual(loginErrorMessage(error, 'ama', string), { title: 's5248', body: 's5354' });
+  }
+  assert.deepEqual(loginErrorMessage(new Error('transport closed after 0/4 bytes'), 'ama', string), { title: 's5248', body: 's5347' });
+});

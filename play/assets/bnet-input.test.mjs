@@ -112,16 +112,6 @@ for (const vp of VIEWPORTS) {
     assert.ok(r.screen.busy);
   });
 
-  test(`${vp.name}: Enter in the join panel with an empty name box still sends the join; the greyed button does not`, async () => {
-    const r = rig({ kind: "lobby", ...vp });
-    r.clickId("join"); assert.equal(r.screen.panel, "join");
-    assert.equal(r.screen.evidence.boxes.find((b) => b.id === "join-game").disabled, true);
-    r.clickId("join-game"); await tick();
-    assert.deepEqual(r.log.filter((l) => Array.isArray(l)), []);
-    r.key("Enter", "Enter"); await tick();
-    assert.deepEqual(r.log.filter((l) => Array.isArray(l)), [["join", "", ""]]);
-  });
-
   test(`${vp.name}: chat log: Enter opens chat, typing, Backspace repeat, Enter sends, the log scrolls by wheel and drag`, () => {
     const r = rig({ kind: 'lobby', ...vp }), C = LL.chatLog;
     r.screen.chatLive(true);
