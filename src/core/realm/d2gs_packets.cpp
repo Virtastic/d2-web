@@ -109,7 +109,7 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_player_in_game(uint32_t unitId, uint8_t p
 // GAMELOGON (0x68), 37 bytes -- D2GSPacketClt0x68, packed and raw (d2-clientless session.zig).
 // The hash and token identify the game the realm assigned (they come straight out of the MCP
 // JOINGAME reply); the two constants are the expansion/version pair the engine checks before it
-// will admit anyone. 1.13c D2Client+0x13A50 builds +12 as 0x2185EDD6 + (expansion ? 0xCBD7DE7A : 0),
+// will admit anyone. 1.13c D2Client+0x14A50 builds +12 as 0x2185EDD6 + (expansion ? 0xCBD7DE7A : 0),
 // i.e. 0xED5DCC50 for LoD, and takes `verByte` from the BNClient interface (+0x5C returns 0x0D). The
 // character name is a 16-byte null-padded field, truncated if longer.
 EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_gamelogon(uint32_t gameHash, uint16_t gameToken, uint8_t charClass, uint32_t verByte, const char* character, uint8_t* out) {

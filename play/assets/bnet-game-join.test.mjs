@@ -73,3 +73,17 @@ test('a join the realm never answers fails as Join Failed (5141) in the lobby, n
   assert.equal(error.mcpStage, 'join');
   assert.equal(gameErrorText(error, (id) => `S${id}`), 'S5141');
 });
+
+test('a JOINGAME reply with another request id is ignored and the id counter skips 0 (D2MCPClient 0x64D0)', async () => {
+  let onData; const sent = [];
+  const transport = { onData: (f) => { onData = f; }, onClose: () => {}, send: (b) => { sent.push(b); } };
+  const protocol = { mcpFrame: (op, body) => Uint8Array.from([0, 0, op]), mcpJoinGame: ({ requestId }) => [requestId & 255] };
+  const session = { transport, protocol, joined: false, list: { characters: [{ name: 'Hero' }] }, characterLoggedOn: 'Hero', received: [], nextRequestId: 0xffff };
+  const reply = (id) => { const f = new Uint8Array(3 + 18); f[0] = f.length; f[2] = 4; f[3] = id & 255; f[4] = id >> 8; f.set([1, 2, 3, 4], 9); return f; };
+  const run = mcpCreateAndJoin(transport, protocol, { realmReply: [1], character: 'Hero', gameName: 'x', session, join: true });
+  await new Promise((r) => setTimeout(r, 5));
+  onData(reply(7)); await new Promise((r) => setTimeout(r, 5)); onData(reply(0xffff));
+  const out = await run;
+  assert.equal(out.ticket.ip, '1.2.3.4');
+  assert.equal(session.nextRequestId, 1);
+});
