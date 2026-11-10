@@ -536,9 +536,11 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     // With none listed only the first entry of the realm's raw reply is compared: a match joins, a hidden first entry (the character's filter), listed or not,
     // shows the Invalid Game Name popup, a different name returns silently, and no reply entry at all shows the popup.
     const name = titleCase(form.name);
-    if (rawFirstHidden) { notice = { body: string(S.invalidGameName) }; return; }
+    // The table is searched first, so a typed name that is listed joins even when the reply's first entry is hidden; every other name falls through to the hidden first entry's popup.
+    const listed = name !== '' && games.some((g) => g.name === name);
+    if (rawFirstHidden && !listed) { notice = { body: string(S.invalidGameName) }; return; }
     if (games.length) {
-      if (name === '' || !games.some((g) => g.name === name)) { if (typeof onRefreshGames !== 'function') notice = { body: string(S.invalidGameName) }; return; }
+      if (!listed) { if (typeof onRefreshGames !== 'function') notice = { body: string(S.invalidGameName) }; return; }
     } else if (typeof onRefreshGames !== 'function' || !rawFirst) { notice = { body: string(S.invalidGameName) }; return; }
     else if (name === '' || name !== rawFirst.name) return;
     joining = true; void run(() => onJoinGame({ gameName: name, gamePassword: form.password }));

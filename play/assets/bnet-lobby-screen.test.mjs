@@ -376,3 +376,13 @@ test('JOIN: the open request is throttled to one per 5 s and the list starts emp
   s.activate('create'); s.pinClock(105000); s.activate('join');
   assert.equal(asked, 2);
 });
+
+test('the Please Wait popup of a create or join in flight has a Cancel that does nothing', async () => {
+  let release; const calls = [];
+  const s = screen({ name: 'Ama', charClass: 0, level: 3 }, { onCreateGame: (g) => { calls.push(g); return new Promise((r) => { release = r; }); } });
+  s.activate('create'); for (const k of 'abc') s.typeKey(`Key${k}`, k); s.typeKey('Enter');
+  assert.equal(calls.length, 1);
+  s.activate('busy-cancel');
+  assert.equal(calls.length, 1); assert.equal(s.evidence.notice, null);
+  release(); await tick();
+});

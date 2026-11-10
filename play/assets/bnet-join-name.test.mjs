@@ -71,3 +71,16 @@ test('empty table: an empty name is silent', async () => {
 test('a hidden hardcore first entry gives the popup and no join, with or without a filled table', async () => {
   for (const table of [true, false]) assert.deepEqual(await run('hc normal', { table, hcFirst: true }), { joins: [], notice: POPUP }, String(table));
 });
+
+test('a hidden first entry only raises the popup when the typed name is not in the table', async () => {
+  assert.deepEqual(await run('cows', { hcFirst: true }), { joins: ['Cows'], notice: null });
+  for (const t of ['zzz', '', 'NM Mephisto']) assert.deepEqual(await run(t, { hcFirst: true }), { joins: [], notice: POPUP }, t);
+  assert.deepEqual(await run('cows', { table: false, hcFirst: true }), { joins: [], notice: POPUP });
+});
+test('double-clicking a row joins through the title-cased name box: a name not in title case cannot be joined', async () => {
+  for (const [y, want] of [[220 + 19 + 5, ['Cows']], [220 + 38 + 5, []], [220 + 57 + 5, []]]) {
+    const { s, joins } = make([]); s.setGames(ALL, ALL, false); s.pinClock(60000, 0);
+    s.press(440, y, 800, 600); s.press(440, y, 800, 600); await tick();
+    assert.deepEqual(joins, want, String(y));
+  }
+});
