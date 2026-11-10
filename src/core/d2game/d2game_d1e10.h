@@ -6,13 +6,13 @@
 #include <cstdint>
 
 template <class Ord10086, class Ord10867, class Ord10750, class Ord10193>
-static inline void d2game_d1e10_body(intptr_t ebx, uint32_t* esi, intptr_t p1, Ord10086 o10086, Ord10867 o10867, Ord10750 o10750, Ord10193 o10193)
+static inline uint32_t d2game_d1e10_body(intptr_t ebx, uint32_t* esi, intptr_t p1, intptr_t p2, Ord10086 o10086, Ord10867 o10867, Ord10750 o10750, Ord10193 o10193)
 {
     for (int i = 0; i < 0x21; i++) esi[i] = 0;
     esi[2] = (uint32_t)p1;
     esi[3] = (uint32_t)o10086(ebx);
     *(uint16_t*)((uint8_t*)esi + 0x2a) = *(uint16_t*)(p1 + 0x78);
-    esi[5] = (uint32_t)p1;
+    esi[5] = (uint32_t)p2;   // the second stack argument (retail reads [esp+0x10] after the #10086 call pops its word)
     esi[6] = 4;
     int t = (int)*(uint32_t*)(ebx + 0);
     uint32_t v;
@@ -30,4 +30,5 @@ static inline void d2game_d1e10_body(intptr_t ebx, uint32_t* esi, intptr_t p1, O
     uint32_t w = (uint32_t)o10193(ebx);
     esi[0x10] = 2;
     esi[0x13] = w;
+    return w;   // retail returns the last callee's EAX
 }

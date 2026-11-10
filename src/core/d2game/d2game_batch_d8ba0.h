@@ -37,7 +37,7 @@ struct D2GameBatchD8baEnv {
     int32_t (*sub214D0)(int32_t a, int32_t b);                     // 0x214D0
     uint32_t (*sub21620)(int32_t skill, uint32_t id);                              // 0x21620
     int32_t (*ord10064_1)(void* a);
-    int32_t (*sub42A80)(int32_t v);                                // 0xF44B0 / 0x42A80 flag test
+    int32_t (*sub42A80)(void* unit, int32_t v);                                // 0xF44B0 / 0x42A80 flag test
     int64_t (*alldiv)(int64_t n, int64_t d);
 };
 extern const D2GameBatchD8baEnv* d2game_d8ba_env;

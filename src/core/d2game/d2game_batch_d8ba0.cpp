@@ -19,70 +19,76 @@ static inline const void* d8_ptr(const void* p, uint32_t o) { const void* v; std
 
 [[noreturn]] static void d8_fatal(uint32_t) { _exit(-1); }  // Fog #10265 -> #10024 -> _exit(-1)
 
-#include "d2game_batch_d8ba0_env.h"
+#include "d2game_batch_d8ba0.h"
 const D2GameBatchD8baEnv* d2game_d8ba_env = nullptr; // unbound until a probe sets it
 #define E (*d2game_d8ba_env)
 
-// 1.13c D2Game+0xD8BA0 -- thiscall(this=ecx unit id, game=param_1, unit=param_2, flag=param_3);
-// in_EAX = int* out (set 0 then 1), unaff_EBX = game2 (GUESS: second game/context record).
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2game_d8ba0(uint32_t thisId, const void* game, void* unit,
-                                                     int32_t param3, int32_t* outEax, void* ebx) {
+// 1.13c D2Game+0xD8BA0 -- EAX = int* out (set 0, then 1 when the node is missing or not yet usable), ECX = unit id,
+// stack: game, unit, a2, a3, a4 (ret 0x14). Walks game+0x1720 (hash of 0x7f chains, next at +0xE4) for the node with
+// the id, runs the use checks and the 0xAD0F0 gate, then queues the follow-up (0xD17B0 result) on the unit.
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2game_d8ba0(int32_t* outEax, uint32_t thisId, const void* game, void* unit,
+                                                     uint32_t a2, uint32_t a3, int32_t a4) {
     if (!game) d8_fatal(0x1326);
     if (!unit) d8_fatal(0x1327);
     *outEax = 0;
     E.sub29F0(unit);
     uint8_t* node = (uint8_t*)d8_ptr(game, 0x1720 + (thisId & 0x7f) * 4);
-    for (;; node = (uint8_t*)d8_ptr(node, 0x39 * 4)) {
+    for (;; node = (uint8_t*)d8_ptr(node, 0xe4)) {
         if (!node) { *outEax = 1; return 0; }
         if (d8_rd32(node, 12) == thisId) break;
     }
     if (d8_rd32(node, 0) != 4) return 0;
-    if (E.ord11017(d8_rds32(unit, 0x18 * 4)) != 0) return 0;
-    if (d8_rds32(node, 16) != 2 || !E.ord10478(node)) { *outEax = 1; return 0; }
-    if (E.sub70D60(unit, ebx) != 0) return 0;
-    bool goTail = true;
-    if (param3 != 0 && d8_rd32(unit, 0) == 0 && d8_rd32(ebx, 0x70) != 0) {
+    if (E.ord11017(d8_rds32(unit, 0x60)) != 0) return 0;
+    if (d8_rd32(node, 0x10) != 2 || !E.ord10478(node)) { *outEax = 1; return 0; }
+    if (E.sub70D60(unit, (void*)game) != 0) return 0;
+    void* target = unit;
+    if (a4 != 0 && d8_rd32(unit, 0) == 0 && d8_rd32(game, 0x70) != 0) {
         if (!E.hasSkill(node, 0x4c) && !E.hasSkill(node, 0x51) && !E.hasSkill(node, 0x50)) return 0;
         uint8_t* p = (uint8_t*)E.ord10920(unit);
-        if (p && d8_rds32(d8_ptr(E.dataTables, 0), 0xbf0) >= 8 && d8_ptr(p, 0x44) &&
-            d8_ptr(d8_ptr(p, 0x44), 0)) {
-            const uint8_t* q = (const uint8_t*)d8_ptr(d8_ptr(d8_ptr(p, 0x44), 0), 0x54);
-            // ponytail: the retail hash walk result is unused; only the 0x14 link chain matters.
+        if (p && d8_rds32(d8_ptr(E.dataTables, 0), 0xbf0) > 7 && d8_ptr(p, 0x44)) {
+            const uint8_t* q = (const uint8_t*)d8_ptr(d8_ptr(p, 0x44), 0);
+            q = (const uint8_t*)d8_ptr(q, 0x54);
             while (q && (d8_rd8(q, 0) & 1)) q = (const uint8_t*)d8_ptr(q, 0x14);
-            (void)goTail;
+            if (q) {
+                uint32_t id = d8_rd32(q, 4);
+                const uint8_t* m = (const uint8_t*)d8_ptr(game, 0x1320 + (id & 0x7f) * 4);
+                while (m && d8_rd32(m, 0xc) != id) m = (const uint8_t*)d8_ptr(m, 0xe4);
+                if (m) target = (void*)m;
+            }
         }
     }
-    if (!E.subAD0F0()) return 0;
-    E.sub21100(node);
+    if (!E.subAD0F0((void*)game, node, a2, a3, node, target)) return 0;
+    uint32_t r21100 = E.sub21100(node);
     int32_t c = E.sub17B0();
     if (c != -1) {
-        void* h = E.ord10708(-1);
+        void* h = E.ord10708(unit, (uint32_t)c, -1);
         if (h) {
             int32_t n = E.ord10353(h) - 1;
-            if (n < 1) { if (E.ord10507(unit) == h) E.sub2100(unit, 0, nullptr, -1); n = 0; }
+            if (n < 1) { if (E.ord10507(unit) == h) E.sub2100(unit, 0, 0, -1); n = 0; }
             E.ord10252(h, n);
-            uint32_t id = d8_rd32(unit, 12);
-            if (d8_rd32(unit, 0) == 0) E.ord10920(unit);
-            E.sub8D570(c, id, (int8_t)n);
+            uint32_t id = d8_rd32(unit, 12), ty = d8_rd32(unit, 0), esiV = 0;
+            if (ty == 0) esiV = d8_rd32(E.ord10920(unit), 0x9c);
+            E.sub8D570(ty, (uint32_t)c, id, esiV, (uint32_t)n);
         }
     }
     E.sub29F0(unit);
-    E.sub3950();
-    E.sub2540(unit);
+    E.sub3950(node, unit, (void*)game);
+    E.sub2540(r21100, unit);
     return 1;
 }
 
-// 1.13c D2Game+0xD8DE0 -- in_EAX = unit* (may be null), unaff_EBP = first 0x8D570 arg on the player path.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2game_d8de0(void* unit, int32_t ebp) {
-    void* h = E.ord10708(0);  // GUESS: no stack arg shown
+// 1.13c D2Game+0xD8DE0 -- EAX = unit (may be 0), stack: the index (ret 4). Drops one use of the handle 0xA3D0 finds
+// for (unit, index), then reports through 0x8D570.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2game_d8de0(void* unit, uint32_t idx) {
+    void* h = E.ord10708(unit, idx, -1);
     if (!h) d8_fatal(0xfc5);
     int32_t n = E.ord10353(h) - 1;
-    if (n < 1) { if (E.ord10507(unit) == h) E.sub2100(unit, 0, nullptr, -1); n = 0; }
+    if (n < 1) { if (E.ord10507(unit) == h) E.sub2100(unit, 0, 0, -1); n = 0; }
     E.ord10252(h, n);
-    if (!unit) { E.sub8D570(-1, 0xffffffffu, (int8_t)n); return; }
-    uint32_t id = d8_rd32(unit, 12);
-    if (d8_rd32(unit, 0) == 0) { E.ord10920(unit); E.sub8D570(ebp, id, (int8_t)n); return; }
-    E.sub8D570(-1, id, (int8_t)n);
+    if (!unit) { E.sub8D570(6, idx, 0xffffffffu, 0, (uint32_t)n); return; }
+    uint32_t ty = d8_rd32(unit, 0), id = d8_rd32(unit, 12);
+    if (ty == 0) { void* p = E.ord10920(unit); E.sub8D570(0, idx, id, d8_rd32(p, 0x9c), (uint32_t)n); return; }
+    E.sub8D570(ty, idx, id, 0, (uint32_t)n);
 }
 
 // 1.13c D2Game+0xDA7B0 -- unaff_ESI = ctx record (+0xc unit, +0x18 stat block).
@@ -114,8 +120,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2game_da8c0(void* edi, void* ebx, void* un
 
 // 1.13c D2Game+0xDAC10 -- in_EAX = ctx (+4 skill row, +8 attacker, +0xc defender).
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2game_dac10(const void* ctx) {
-    void* a = (void*)d8_ptr(ctx, 8);
-    void* d = (void*)d8_ptr(ctx, 0xc);
+    auto P = [&](uint32_t o) { return (void*)(uintptr_t)d8_rd32(ctx, o); };   // ctx holds 32-bit guest pointers, not wasm64 words
+    void* a = P(8);
+    void* d = P(0xc);
     if (a && d && a != d) {
         if (d8_rd32(d, 0) == 0) {
             if (d8_rd32(a, 0) != 0 && !E.isMonsterLike(a) &&
@@ -125,11 +132,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2game_dac10(const void* ctx) {
         }
         if (E.isMonsterLike(d) && E.isMonsterLike(a)) return 0x19;
         if (E.isMonsterLike(a) && E.unitTest10064(0, d)) {
-            const void* sk = d8_ptr(ctx, 4);
+            const void* sk = P(4);
             return sk ? d8_rds32(sk, 0x38) : 100;
         }
         if (E.unitTest10278(a) && d && d8_rds32(d, 0xc4) < 0)
-            return (E.isMonsterLike(d) ? 0 : 0xffffff38) + 400;  // 400 or 400-200
+            return (E.isMonsterLike(d) ? 0xffffff38 : 0) + 400;  // 200 for a monster-like defender, else 400
     }
     return 100;
 }
@@ -142,10 +149,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2game_dad70(const int32_t* eax, void* unit
     if (i < 0 || i >= d8_rds32(dt, 0xa80)) return;
     const uint8_t* row = (const uint8_t*)d8_ptr(dt, 0xa78) + (size_t)i * 0x1a8;
     if (!row || (int16_t)d8_rd16(row, 0x1c) <= 0) return;
+    int32_t skill = (int16_t)d8_rd16(row, 0x1c);
     uint8_t buf[1024];
     int32_t n = E.stat10702(unit, 0xb4, buf, 0x80);
     for (int32_t k = 0; k < n; k++)
-        if (E.sub21620(d8_rd16(buf, k * 8)))
+        if (E.sub21620(skill, d8_rd16(buf, k * 8)))
             d8_wr32(acc, 0xc, d8_rds32(acc, 0xc) + d8_rds32(buf, k * 8 + 4));
 }
 

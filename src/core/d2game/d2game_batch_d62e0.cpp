@@ -371,20 +371,7 @@ struct D2GameBatchD8310Env {
     void     (*sub78C0)(uint32_t game, uint32_t unit, uint32_t item, uint32_t edi); // 0x78C0 (FUN_6fcf78c0)
 };
 
-struct D2GameBatchD8440Env {
-    void*    (*at)(uint32_t guest);
-    void     (*fatal)(uint32_t line);
-    uint32_t (*o10695)(uint32_t classId);                            // returns the item-type record
-    uint32_t (*o10450)(uint32_t v, uint32_t* out2);
-    void     (*sub1E10)(uint32_t game);                              // 0x1E10
-    void     (*sub39B0)(uint32_t unit);                              // 0x39B0
-    uint32_t (*sub31490)(uint32_t game, void* buf);                  // 0x31490
-    uint32_t (*sub211D0)(uint64_t* seed);                            // 0x11D0
-    void     (*o10887)(uint32_t item, uint32_t kind, uint32_t v, uint32_t z);
-    void     (*o10012)(uint32_t item, uint32_t v);
-    uint32_t (*sub76A0)(uint32_t game, uint32_t unit, uint32_t id);  // 0x76A0 (ours: D76A0 above)
-    void     (*sub8310)(uint32_t game, uint32_t unit, uint32_t eax);  // 0x8310 (D8310 above)
-};
+#include "d2game_batch_d8440_env.h"
 
 // 1.13c D2Game+0xD8310 -- drop a placed item back from the unit's cursor slot (ItemMode 0x834/0x835/0x85F).
 // p1 = game, p2 = unit, eax = item id (the caller leaves the id in EAX), edi = the caller's flag, passed on.
@@ -413,37 +400,35 @@ void d2_fn_d2game_D8310(uint32_t p1, uint32_t p2, uint32_t eax, uint32_t edi, co
 }
 
 // 1.13c D2Game+0xD8440 -- place an item-type record into a unit (ItemMode 0x161A..0x162E, 0x1623, 0x1628).
-// p1 = game, p2 = unit (out cell), item = in_EAX (the item unit), the record and buffer are the decompile's locals.
+// EAX = item; stack word 0 = game, word 1 = unit (ret 8). EBP = unit, EDI = game in the body; the callee seams take retail's registers.
 extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2_fn_d2game_D8440(uint32_t p1, uint32_t p2, uint32_t item, const D2GameBatchD8440Env* e)
+uint32_t d2_fn_d2game_D8440(uint32_t item, uint32_t game, uint32_t unit, const D2GameBatchD8440Env* e)
 {
-    if (p1 == 0) e->fatal(0x161a);
-    if (p2 == 0) e->fatal(0x161b);
+    if (game == 0) e->fatal(0x161a);
+    if (unit == 0) e->fatal(0x161b);
     if (item == 0) e->fatal(0x161c);
     if (R32(e, item, 0) != 4) e->fatal(0x161d);
     uint32_t rec = e->o10695(R32(e, item, 4));
     if (rec == 0) e->fatal(0x1623);
     if (*(uint8_t*)e->at(rec + 0x139) == 0) return 0;
-    uint32_t local8[2] = {0, 0};
-    if (e->o10450(R32(e, rec, 200), local8) == 0) e->fatal(0x1628);
+    uint32_t out[2] = {0, 0};
+    if (e->o10450(R32(e, rec, 200), out) == 0) e->fatal(0x1628);
     if (R32(e, item, 0x10) != 0) return 0;
-    e->sub1E10(p1);
-    e->sub39B0(p2);
-    uint8_t buf[112];
-    uint32_t slot = e->sub31490(p1, buf);
+    uint32_t buf[0x21] = {0};
+    e->sub1E10(game, out[0], buf);
+    e->sub39B0(item, unit, game);
+    uint32_t slot = e->sub31490(game, buf, 0);
     if (slot == 0) e->fatal(0x162e);
-    uint32_t v;
-    if (*(uint8_t*)e->at(rec + 0x13a) == 0 || *(uint8_t*)e->at(rec + 0x13b) == 0) {
-        v = 0;
-    } else {
-        uint64_t seed = 0;
-        v = (uint32_t)e->sub211D0(&seed) + *(uint8_t*)e->at(rec + 0x13a);
-    }
+    uint32_t lo = *(uint8_t*)e->at(rec + 0x13a), hi = *(uint8_t*)e->at(rec + 0x13b);
+    uint32_t v = 0;
+    if (lo != 0 && hi != 0) v = e->sub211D0(unit + 0x20, hi - lo) + lo;
     e->o10887(slot, 0x46, v, 0);
     e->o10012(slot, 0);
     uint32_t id = R32(e, slot, 0xC);
-    if (e->sub76A0(p1, p2, id) == 0) {
-        if (e->sub76A0(p1, p2, id) == 0) e->sub8310(p1, p2, 0);
+    uint32_t a1[8] = {game, unit, id, buf[7], buf[8], 0, 1, 0};   // stack words are the block dwords 7 and 8 (esp+0x34, +0x38 from the 0x84 block at +0x14)
+    if (e->sub76A0(0x163c, a1) == 0) {
+        uint32_t a2[8] = {game, unit, id, 0, 0, 1, 1, 0};
+        if (e->sub76A0(0x163e, a2) == 0) e->sub8310(id, game, unit);
     }
     return 1;
 }

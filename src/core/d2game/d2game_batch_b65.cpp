@@ -114,13 +114,13 @@ uint32_t D2GAME_D1720(uint32_t in)
 // 1.13c D2Game+0xD1C00 moved to src/core/d2game/d2game_d1c00.cpp
 
 // 1.13c D2Game+0xD1E10  (hidden: EBX=src unit, ESI=out 0x84-byte struct)
-void D2GAME_D1E10(I ebx, uint32_t* esi, I p1)
+void D2GAME_D1E10(I ebx, uint32_t* esi, I p1, I p2)
 {
     for (int i = 0; i < 0x21; i++) esi[i] = 0;
     esi[2] = (uint32_t)p1;
     esi[3] = (uint32_t)Ord10086();
     *(uint16_t*)((uint8_t*)esi + 0x2a) = *(uint16_t*)(p1 + 0x78);
-    esi[5] = (uint32_t)p1;
+    esi[5] = (uint32_t)p2;
     esi[6] = 4;
     int t = (int)U32(ebx, 0);
     uint32_t v;
