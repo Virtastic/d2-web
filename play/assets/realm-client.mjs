@@ -212,14 +212,16 @@ export async function mcpCreateAndJoin(transport, protocol, { realmReply, charac
   // MCP_CREATEGAME and then joins the game it made. The create form's difficulty is the radio index
   // shifted into the request's flags (D2Multi's CREATE GAME callback, `shl 0xc`); D2GS takes the index.
   let gameToken = null;
-  const startedAt = Date.now();
   // Retail D2MCPClient 0x6540 / 0x64D0 drop a reply whose request id is not the pending one and keep waiting, and the
   // id counter skips 0. D2Multi's 30 s limit (0xDAE0) is checked only while the JOIN is pending, from the popup start.
   const nextId = () => { const id = requestState.nextRequestId; requestState.nextRequestId = (id + 1) & 0xffff || 1; return id; };
+  // D2Multi's pump has no clock on a pending CREATE, but a server that never answers must not hang the player
+  // for good, so the create wait is bounded too (same limit, counted from its own start).
   const gameReply = async (op, id, ms) => {
+    const startedAt = Date.now(), stage = op === 3 ? 'create' : 'join';
     for (;;) {
-      const frame = await readMcpFrame(reader, ms === null ? null : Math.max(1, ms - (Date.now() - startedAt))).catch((error) => {
-        throw error?.timedOut ? Object.assign(error, { mcpStage: 'join', mcpResult: -1 }) : error;
+      const frame = await readMcpFrame(reader, Math.max(1, ms - (Date.now() - startedAt))).catch((error) => {
+        throw error?.timedOut ? Object.assign(error, { mcpStage: stage, mcpResult: -1 }) : error;
       });
       received.push(frame.op);
       if (frame.op !== op) throw new Error(`expected MCP ${op === 3 ? 'CREATEGAME' : 'JOINGAME'} reply 0x0${op}, got 0x${frame.op.toString(16)}`);
@@ -230,7 +232,7 @@ export async function mcpCreateAndJoin(transport, protocol, { realmReply, charac
     const createId = nextId();
     send(0x03, protocol.mcpCreateGame({ requestId: createId, difficulty: (difficulty & 3) << 12, maxPlayers, levelDifference,
       name: titleCaseGameText(gameName), password: titleCaseGameText(gamePassword), description }));
-    const created = await gameReply(0x03, createId, null);
+    const created = await gameReply(0x03, createId, gameReplyMs);
     if (created.body.length < 10) throw new Error('MCP CREATEGAME reply is truncated');
     const result = u32(created.body, 6);
     if (result !== 0) throw Object.assign(new Error(`MCP CREATEGAME was rejected (0x${result.toString(16)})`), { mcpStage: 'create', mcpResult: result });
@@ -929,7 +931,7 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
         return { body: rd(O, n), clientToken: u32at(SEED) };
       } finally { Module._free(F); Module._free(Z); }
     },
-    bncsLogon: ({ clientToken, serverToken, account, password }) => { const n = call('d2_realm_client_bncs_logon', 'number', ['number', 'number', 'string', 'string', 'bigint'], [clientToken, serverToken, account, password, BigInt(T)]); const b = rd(T, n); /* retail D2Client+0x14A50: +12 is 0x2185EDD6 for a classic game, +0xCBD7DE7A more for LoD */ if (!expansion) b.splice(12, 4, 0xD6, 0xED, 0x85, 0x21); return b; },
+    bncsLogon: ({ clientToken, serverToken, account, password }) => { const n = call('d2_realm_client_bncs_logon', 'number', ['number', 'number', 'string', 'string', 'bigint'], [clientToken, serverToken, account, password, BigInt(T)]); return rd(T, n); },
     bncsQueryRealms: () => { const n = call('d2_realm_client_bncs_query_realms', 'number', ['bigint'], [BigInt(T)]); if (n < 0) throw new Error('QUERYREALMS2 composer failed'); return rd(T, n); },
     // D2Launch passes the literal realm password "password" to BNClient+0x0BFD0 (slot +0x44), never the account's.
     bncsRealmEx: ({ clientToken, serverToken, realm }) => { const n = call('d2_realm_client_bncs_logon_realm', 'number', ['number', 'number', 'string', 'string', 'bigint'], [clientToken, serverToken, realm, 'password', BigInt(T)]); return rd(T, n); },
@@ -1158,7 +1160,13 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
       return parseRealmMissileSoundEvents(Module.HEAPU8.subarray(T, T + count * 24), count);
     },
     d2gsClientMotionTick: () => call('d2_realm_client_motion_tick', 'number', [], []),
-    d2gsGamelogon: ({ character, charClass, gameToken, gameHash, expansion = true }) => { const n = call('d2_realm_d2gs_gamelogon', 'number', ['number', 'number', 'number', 'number', 'string', 'bigint'], [gameHash, gameToken, charClass, 0x0d, character, BigInt(T)]); return rd(T, n); },
+    d2gsGamelogon: ({ character, charClass, gameToken, gameHash, expansion = true }) => {
+      const n = call('d2_realm_d2gs_gamelogon', 'number', ['number', 'number', 'number', 'number', 'string', 'bigint'], [gameHash, gameToken, charClass, 0x0d, character, BigInt(T)]);
+      const b = rd(T, n);
+      // Retail D2Client+0x14A50: the version dword at +12 is 0x2185EDD6, plus 0xCBD7DE7A for an expansion game (the export writes the LoD sum).
+      if (!expansion) b.splice(12, 4, 0xD6, 0xED, 0x85, 0x21);
+      return b;
+    },
     // D2Client+0x14B00: [6D][tick][avg rtt >> 1][module word * 0xB640DE41]; null while the 5 s gate holds.
     d2gsPing: (tick) => {
       const offset = call('d2_realm_d2gs_ping_module', 'number', ['bigint', 'bigint'], [BigInt(PING), BigInt(PN)]);
