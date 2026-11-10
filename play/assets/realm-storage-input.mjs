@@ -24,7 +24,8 @@ export function realmStorageClick(ctx, x, y, { button = 0, shift = false } = {})
     if (!cell) return true;
     const d = decideGridPlace(items, page, cell.x, cell.y, held());
     if (d.action === 'swap') ri.swapGrid(cursorId, d.item.id, cell.x, cell.y);
-    else if (d.action !== 'refuse') ri.putInGrid(cursorId, cell.x, cell.y, page);
+    else if (d.action === 'put') ri.putInGrid(cursorId, cell.x, cell.y, page);
+    else if (d.action !== 'refuse') ri.combine(d.action, cursorId, d.item.id);
     return true;
   };
   const trade = ctx.trade;
@@ -76,7 +77,8 @@ export function realmInventoryClick(ctx, x, y, button = 0) {
   else if (cell) {
     const d = decideGridPlace(snapshot.items, 0, cell.x, cell.y, held);
     if (d.action === 'swap') ri.swapGrid(cursorId, d.item.id, cell.x, cell.y);
-    else if (d.action !== 'refuse') ri.putInGrid(cursorId, cell.x, cell.y);
+    else if (d.action === 'put') ri.putInGrid(cursorId, cell.x, cell.y);
+    else if (d.action !== 'refuse') ri.combine(d.action, cursorId, d.item.id);
   }
   return true;
 }

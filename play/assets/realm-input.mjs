@@ -34,6 +34,11 @@ export const packets = Object.freeze({
   unequip: (bodyLoc) => make(0x1c, le16(bodyLoc)),                  // 3
   swapWithBody: (guid, bodyLoc) => make(0x1d, le32(guid), le32(bodyLoc)),   // 9
   swapCursorBuffer: (cursorGuid, itemGuid, x, y) => make(0x1f, le32(cursorGuid), le32(itemGuid), le32(x), le32(y)), // 17
+  stackItems: (cursorGuid, itemGuid) => make(0x21, le32(cursorGuid), le32(itemGuid)),   // 9
+  unstackItem: (guid) => make(0x22, le32(guid)),                    // 5
+  socketItem: (cursorGuid, itemGuid) => make(0x28, le32(cursorGuid), le32(itemGuid)),   // 9
+  scrollToBook: (scrollGuid, bookGuid) => make(0x29, le32(scrollGuid), le32(bookGuid)), // 9
+  itemToCube: (itemGuid, cubeGuid) => make(0x2a, le32(itemGuid), le32(cubeGuid)),       // 9
   useItem: (guid, x, y) => make(0x20, le32(guid), le32(x), le32(y)),        // 13
   useBeltItem: (guid, onMerc = false) => make(0x26, le32(guid), le32(onMerc ? 1 : 0), le32(0)), // 13
   npcChatStart: (type, guid) => unit(0x2f, type, guid),             // 9
@@ -378,6 +383,10 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     putInGrid: (guid, x, y, page = INV_PAGE.INVENTORY) => itemGate() && emit(packets.toGrid(guid, x, y, page), 'to-grid'),
     equip: (guid, bodyLoc) => itemGate() && emit(packets.equip(guid, bodyLoc), 'equip'),
     swapGrid: (cursorGuid, itemGuid, x, y) => itemGate() && emit(packets.swapCursorBuffer(cursorGuid, itemGuid, x, y), 'swap-grid'),
+    /** With an item held, dropped on one carried item it combines with: stack (0x21), socket (0x28), scroll into tome (0x29), item into the cube (0x2A); shift+click on a stack takes one off (0x22). */
+    combine: (action, cursorGuid, itemGuid) => { const b = { stack: packets.stackItems, socket: packets.socketItem, scroll: packets.scrollToBook, cube: packets.itemToCube }[action];
+      return Boolean(b) && itemGate() && emit(b(cursorGuid, itemGuid), `combine-${action}`); },
+    unstack: (guid) => itemGate() && emit(packets.unstackItem(guid), 'unstack'),
     swapBody: (guid, bodyLoc) => itemGate() && emit(packets.swapWithBody(guid, bodyLoc), 'swap-body'),
     dropCursor: (guid) => itemGate() && emit(packets.dropCursor(guid), 'drop'),
     swapWeapons: () => emit(packets.swapWeapons(), 'swap-weapons'),

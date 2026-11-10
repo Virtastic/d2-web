@@ -5,7 +5,7 @@ import { createMonsterTable } from './realm-tables.mjs';
 
 // The 1.13c client packet lengths (src/core/realm/d2gs_session.cpp kCsSize113c).
 const SIZE = { 0x01: 5, 0x02: 9, 0x03: 5, 0x04: 9, 0x05: 5, 0x06: 9, 0x08: 5, 0x09: 9, 0x0c: 5, 0x0d: 9, 0x0f: 5, 0x10: 9,
-  0x13: 9, 0x16: 13, 0x17: 5, 0x18: 17, 0x19: 5, 0x1a: 9, 0x1b: 9, 0x1c: 3, 0x1d: 9, 0x1f: 17, 0x20: 13, 0x26: 13,
+  0x13: 9, 0x16: 13, 0x17: 5, 0x18: 17, 0x19: 5, 0x1a: 9, 0x1b: 9, 0x1c: 3, 0x1d: 9, 0x1f: 17, 0x20: 13, 0x21: 9, 0x22: 5, 0x28: 9, 0x29: 9, 0x2a: 9, 0x26: 13,
   0x2f: 9, 0x30: 9, 0x38: 13, 0x3c: 9, 0x45: 9, 0x49: 9, 0x51: 9, 0x60: 1 };
 
 test('every builder emits its opcode at the table length', () => {
@@ -14,7 +14,7 @@ test('every builder emits its opcode at the table length', () => {
     packets.rightSkillAt(1, 2), packets.rightSkillOnUnit(1, 3), packets.rightSkillAt(1, 2, true), packets.rightSkillOnUnit(1, 3, true),
     packets.interact(2, 7), packets.pickUp(4, 9), packets.dropCursor(5), packets.toGrid(5, 1, 2, 0), packets.fromGrid(5),
     packets.equip(5, 4), packets.swapOneForTwoHanded(5, 4), packets.unequip(4), packets.swapWithBody(5, 4),
-    packets.swapCursorBuffer(1, 2, 3, 4), packets.useItem(5, 10, 11), packets.useBeltItem(5), packets.npcChatStart(1, 5),
+    packets.swapCursorBuffer(1, 2, 3, 4), packets.stackItems(1, 2), packets.unstackItem(1), packets.socketItem(1, 2), packets.scrollToBook(1, 2), packets.itemToCube(1, 2), packets.useItem(5, 10, 11), packets.useBeltItem(5), packets.npcChatStart(1, 5),
     packets.npcChatEnd(1, 5), packets.npcAction(1, 2, 3), packets.selectSkill(36, false), packets.bindHotkey(2, 36, true), packets.enterPortal(1, 2),
     packets.waypoint(1, 2), packets.swapWeapons()];
   for (const p of made) assert.equal(p.length, SIZE[p[0]], `opcode 0x${p[0].toString(16)}`);
@@ -24,6 +24,8 @@ test('field layout is little-endian as the server reads it', () => {
   assert.deepEqual([...packets.walkTo(0x1234, 0x5678)], [1, 0x34, 0x12, 0x78, 0x56]);
   assert.deepEqual([...packets.interact(UNIT.MONSTER, 0x01020304)], [0x13, 1, 0, 0, 0, 4, 3, 2, 1]);
   assert.deepEqual([...packets.pickUp(UNIT.ITEM, 7)], [0x16, 4, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual([...packets.stackItems(7, 0x01020304)], [0x21, 7, 0, 0, 0, 4, 3, 2, 1]);
+  assert.deepEqual([...packets.itemToCube(5, 6)], [0x2a, 5, 0, 0, 0, 6, 0, 0, 0]);
   assert.deepEqual([...packets.selectSkill(54, true)], [0x3c, 54, 0, 0, 0x80, 255, 255, 255, 255]);
   assert.deepEqual([...packets.selectSkill(54, false)], [0x3c, 54, 0, 0, 0, 255, 255, 255, 255]);
 });

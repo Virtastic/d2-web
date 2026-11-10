@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { realmStorageClick } from './realm-storage-input.mjs';
 const calls = [];
-const ri = { lift: (g) => calls.push(['lift', g]), swapGrid: (...a) => calls.push(['swap', ...a]), putInGrid: (...a) => calls.push(['put', ...a]) };
+const ri = { lift: (g) => calls.push(['lift', g]), swapGrid: (...a) => calls.push(['swap', ...a]), putInGrid: (...a) => calls.push(['put', ...a]), combine: (...a) => calls.push(['combine', ...a]) };
 const renderer = (over = {}) => ({ contains: () => true, itemAt: () => null, cellAt: () => ({ x: 2, y: 3 }), transmuteAt: () => false, ...over });
 const ctx = (over = {}) => ({ width: 800, height: 600, items: [], cursorId: 0, input: ri, send: (b) => calls.push(['send', ...b]),
   inventory: { visible: true, renderer: renderer() }, stash: { open: false }, cube: { open: false }, snapshot: {}, ...over });
@@ -32,4 +32,11 @@ test('the trade screen: my grid lifts and puts on page 2, the rest of the panel 
   calls.length = 0;
   realmStorageClick(ctx({ trade: { ...trade({ contains: () => false }) }, inventory: { visible: false } }), 1, 1);
   assert.deepEqual(calls, []);
+});
+test('a held gem dropped on a socketed stash item sends the socket combine', () => {
+  calls.length = 0;
+  realmStorageClick(ctx({ cursorId: 9, items: [{ id: 9, typeCode: 'gemr', invWidth: 1, invHeight: 1 },
+    { id: 4, typeCode: 'swor', socketed: true, mode: 0, invPage: 4, gridX: 2, gridY: 3, invWidth: 1, invHeight: 2 }],
+    stash: { open: true, layout: {}, renderer: renderer() } }), 1, 1);
+  assert.deepEqual(calls, [['combine', 'socket', 9, 4]]);
 });

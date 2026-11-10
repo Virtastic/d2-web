@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { overlappedItems, decideGridPlace } from './grid-place.mjs';
+import { overlappedItems, decideGridPlace, combineAction } from './grid-place.mjs';
 
 const it = (id, gridX, gridY, invWidth, invHeight, invPage = 0, mode = 0) => ({ id, gridX, gridY, invWidth, invHeight, invPage, mode });
 const held = { id: 99, invWidth: 2, invHeight: 3, classId: 7 };
@@ -27,3 +27,19 @@ test('a cube is never swapped out through the cube page', () => {
   assert.equal(decideGridPlace(cube, 3, 0, 0, { id: 99, invWidth: 1, invHeight: 1, code: 'xyz' }).action, 'swap');
 });
 test('control: a wrong expectation fails', () => assert.throws(() => assert.equal(decideGridPlace(items, 0, 0, 0, held).action, 'put')));
+
+const mk = (id, extra) => ({ id, gridX: 0, gridY: 0, invWidth: 1, invHeight: 1, invPage: 0, mode: 0, ...extra });
+test('a drop on one item it combines with sends the combine, not a swap', () => {
+  const at = (target, h, page = 0) => decideGridPlace([{ ...target, invPage: page }], page, 0, 0, h);
+  assert.equal(at(mk(1, { classId: 5, stackable: true }), mk(9, { classId: 5, stackable: true })).action, 'stack');
+  assert.equal(at(mk(1, { classId: 5, stackable: true }), mk(9, { classId: 6, stackable: true })).action, 'swap');
+  assert.equal(at(mk(1, { typeCode: 'swor', socketed: true }), mk(9, { typeCode: 'gemr' })).action, 'socket');
+  assert.equal(at(mk(1, { typeCode: 'swor', itemFlags: 0x800 }), mk(9, { typeCode: 'rune' })).action, 'socket');
+  assert.equal(at(mk(1, { typeCode: 'swor' }), mk(9, { typeCode: 'gemr' })).action, 'swap');
+  assert.equal(at(mk(1, { typeCode: 'book' }), mk(9, { typeCode: 'scro' })).action, 'scroll');
+  assert.equal(at(mk(1, { itemCode: 'box' }), mk(9, { itemCode: 'isc' })).action, 'cube');
+  assert.equal(at(mk(1, { itemCode: 'box' }), mk(9, { itemCode: 'isc' }), 3).action, 'swap');   // the cube's own grid: no nesting
+  assert.equal(at(mk(1, { itemCode: 'box' }), mk(9, { itemCode: 'box' })).action, 'swap');
+  assert.equal(at(mk(1, { itemCode: 'box' }), mk(9, { itemCode: 'isc' }), 3).item.id, 1);
+  assert.equal(combineAction(mk(1, {}), mk(1, {}), 0), null);
+});

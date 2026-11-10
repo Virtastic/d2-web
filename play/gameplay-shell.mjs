@@ -6031,6 +6031,13 @@ function itemCommand(name, ...args) {
     v.setUint8(0, 0x1F); v.setUint32(1, args[0] >>> 0, true); v.setUint32(5, args[1] >>> 0, true); v.setUint32(9, args[2] >>> 0, true); v.setUint32(13, args[3] >>> 0, true);
     try { result = Module.ccall('d2_session_client_packet', 'number', ['bigint', 'number'], [BigInt(p), 17]); } finally { Module._free(p); }
   }
+  // 0x21 stack, 0x28 socket, 0x29 scroll into tome, 0x2A item into the cube: {first guid, second guid}, the server's handlers.
+  else if (name === 'combine') {
+    const op = { stack: 0x21, socket: 0x28, scroll: 0x29, cube: 0x2A }[args[0]];
+    const p = Module._malloc(9), v = new DataView(Module.HEAPU8.buffer, Number(p), 9);
+    v.setUint8(0, op); v.setUint32(1, args[1] >>> 0, true); v.setUint32(5, args[2] >>> 0, true);
+    try { result = Module.ccall('d2_session_client_packet', 'number', ['bigint', 'number'], [BigInt(p), 9]); } finally { Module._free(p); }
+  }
   else if (name === 'equip') result = Module.ccall('d2_session_command_equip_packet', 'number', ['number', 'number'], [args[0], args[1]]);   // 0x1A
   else if (name === 'swap') result = Module.ccall('d2_session_command_cursor_item_packet', 'number', ['number', 'number', 'number'], [0x1D, args[0], args[1]]);   // 0x1D
   else if (name === 'drop') result = Module.ccall('d2_session_command_cursor_item_packet', 'number', ['number', 'number', 'number'], [0x17, args[0], 0]);   // 0x17
@@ -6039,7 +6046,7 @@ function itemCommand(name, ...args) {
     try { result = Module.ccall('d2_session_client_packet', 'number', ['bigint', 'number'], [BigInt(p), 3]); } finally { Module._free(p); }
   }
   // Equipment changes affect the hero-dependent requirement and attack-speed lines on cached items.
-  if (name === 'equip' || name === 'swap' || name === 'unequip') propCache.clear();
+  if (name === 'equip' || name === 'swap' || name === 'unequip' || name === 'combine') propCache.clear();
   lastItemCommand = { name, args, result, cursor: Module.ccall('d2_session_cursor_item', 'number', [], []) };
   snapshot = session.snapshot();
   return result;
@@ -6068,7 +6075,8 @@ function gridDrop(cursorId, page, cell) {
   const d = decideGridPlace(snapshot.items, page, cell.x, cell.y, held);
   if (d.action === 'refuse') return d;
   if (d.action === 'swap') itemCommand('swapGrid', cursorId, d.item.id, cell.x, cell.y);
-  else itemCommand('put', cursorId, cell.x, cell.y, page);
+  else if (d.action === 'put') itemCommand('put', cursorId, cell.x, cell.y, page);
+  else itemCommand('combine', d.action, cursorId, d.item.id);
   return d;
 }
 function readCubeLayout() {

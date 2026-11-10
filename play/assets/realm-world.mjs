@@ -194,7 +194,8 @@ export function createRealmWorld({ items: itemTable, heldItems = null }) {
       gridX: ground ? 0 : item.x, gridY: ground ? 0 : item.y,
       invPage: ground ? NO_PAGE : item.page,   // the item's own page: a belt or worn item has none, as the engine's item says
       bodyLoc: item.mode === MODE.EQUIP ? item.bodyLoc : 0, invWidth: e.invWidth, invHeight: e.invHeight, twoHanded: Boolean(e.twoHanded),
-      goldAmount: item.goldAmount, sockets: undefined, tick };
+      goldAmount: item.goldAmount, sockets: undefined, tick,
+      itemCode: e.code, typeCode: e.type, stackable: Boolean(e.stackable), socketed: Boolean(item.flags & 0x800) };
   }
 
   return {
