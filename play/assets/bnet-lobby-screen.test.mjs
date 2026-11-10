@@ -267,7 +267,7 @@ test('a join of a listed name carries that row\'s difficulty and description, a 
   assert.deepEqual(joins[1], { gameName: 'c', gamePassword: '' });
 });
 
-test('CREATE clamps a typed player count as retail does: 0 is 1, 9 and up is 8', async () => {
+test('CREATE clamps a typed player count as the change callback does: each keystroke, 0 is 1, 9 and up is 8', async () => {
   const sent = [];
   for (const typed of ['0', '00', '9', '50', '3']) {
     const s = screen({ name: 'Ama', charClass: 0, level: 3 }, { onCreateGame: async (g) => { sent.push(g.maxPlayers); } });
@@ -276,7 +276,8 @@ test('CREATE clamps a typed player count as retail does: 0 is 1, 9 and up is 8',
     s.typeKey('Backspace'); s.typeKey(`Digit${typed[0]}`, typed[0]); for (const k of typed.slice(1)) s.typeKey(`Digit${k}`, k);
     s.typeKey('Enter'); await tick();
   }
-  assert.deepEqual(sent, [1, 1, 8, 8, 3]);
+  // '00' is '1' after the first key, then '10' clamps to 8.
+  assert.deepEqual(sent, [1, 8, 8, 8, 3]);
 });
 
 
@@ -316,4 +317,55 @@ test('character box name line takes the engine title word before the name', () =
   const t = (cls, prog, hc, ex) => `<${cls},${prog},${hc},${ex}>`;
   assert.equal(characterInfoLines({ name: 'Ama', charClass: 0, level: 7, progression: 9, expansion: true, hardcore: true }, () => '', t)[0].text, '<0,9,1,1>Ama');
   assert.equal(characterInfoLines({ name: 'Ama' }, () => '')[0].text, 'Ama');
+});
+
+test('edit boxes hold limit - 1 characters (D2Win+0x15450): 15 name, 15 password, 31 description, 2 digits, 199 chat, 31 channel', () => {
+  const s = screen({ name: 'Ama', charClass: 0, level: 1 });
+  const type = (n, ch = 'a') => { for (let i = 0; i < n; i++) s.typeKey('KeyA', ch); };
+  s.activate('create'); type(20);
+  assert.equal(s.evidence.form.name.length, 15);
+  s.activate('field-password'); type(20); assert.equal(s.evidence.form.passwordLength, 15);
+  s.activate('field-description'); type(40); assert.equal(s.evidence.form.description.length, 31);
+  s.activate('field-maxPlayers'); s.typeKey('Backspace', ''); type(5, '1'); assert.equal(s.evidence.form.maxPlayers, '8'); // the players box clamps to retail's 1..8
+  s.activate('create'); s.activate('enter-chat');
+  s.activate('channel'); type(40); assert.equal(s.evidence.form.channel.length, 31);
+  s.activate('channel');
+  s.activate('field-chat'); type(300);
+  assert.equal(s.editValue().length, 199);
+});
+
+const createSent = async (keys, setup = () => {}) => {
+  const sent = [];
+  const s = screen({ name: 'Ama', charClass: 0, level: 3 }, { onCreateGame: async (g) => { sent.push(g); } });
+  s.activate('create'); setup(s);
+  for (const k of keys) s.typeKey(k.length === 1 ? 'Key' + k : k, k.length === 1 ? k : undefined);
+  s.typeKey('Enter'); await tick();
+  return sent[0];
+};
+
+test('CREATE: the name takes only letters, digits, space and \' - _, and holds 15 characters', async () => {
+  const s = screen({ name: 'Ama', charClass: 0, level: 3 }, {});
+  s.activate('create');
+  const g = await createSent([...'a!b@c d-e_f\'g1234567890'].map((c) => c));
+  assert.equal(g.gameName, "abc d-e_f'g1234");
+  assert.equal(g.gameName.length, 15);
+});
+
+test('CREATE: an empty players box sends 0 and the level byte is 0xff unless the box is on', async () => {
+  const g = await createSent(['a', 'Tab', 'Tab', 'Tab', 'Backspace']);
+  assert.equal(g.maxPlayers, 0);
+  assert.equal(g.levelDifference, 0xff);
+});
+
+test('JOIN: the open request is throttled to one per 5 s and the list starts empty', () => {
+  let asked = 0;
+  const s = screen({ name: 'Ama', charClass: 0 }, { onRefreshGames: () => { asked++; } });
+  s.pinClock(100000);
+  s.activate('join');
+  assert.equal(asked, 1);
+  s.setGames([{ name: 'Cows', difficulty: 0, description: '' }]);
+  s.activate('create'); s.pinClock(103000); s.activate('join');
+  assert.equal(asked, 1);
+  s.activate('create'); s.pinClock(105000); s.activate('join');
+  assert.equal(asked, 2);
 });

@@ -91,8 +91,9 @@ for (const vp of VIEWPORTS) {
 
   test(`${vp.name}: the game list, a row click, the wheel is ignored, a scrollbar drag, JOIN GAME`, async () => {
     const r = rig({ kind: "lobby", ...vp }), J = LL.joinGame.list;
-    r.screen.setGames(Array.from({ length: 20 }, (_, i) => ({ name: `game${i}`, description: `d${i}` })));
     r.clickId("join"); assert.equal(r.screen.panel, "join"); assert.equal(r.log.filter((l) => l === "refresh").length, 1);
+    // The open rebuilds the list empty; the realm's reply fills it.
+    r.screen.setGames(Array.from({ length: 20 }, (_, i) => ({ name: `game${i}`, description: `d${i}` })));
     const row = (i) => [J.x + 10, J.y - J.h + i * J.pitch + 3];
     r.click(...row(2)); assert.equal(r.screen.selectedGame().name, "game2");
     // Retail ignores the wheel in the join list.
@@ -264,7 +265,7 @@ test('a join that loses the session drops to the login screen with its box; OK, 
   const f = flow({ hooks: { join: async (g, { login, state, lobbyGone }) => {
     state.cur = { kind: 'login', screen: login }; lobbyGone(); login.reset(); login.fail(new Error('lost')); throw Object.assign(new Error('lost'), { sessionLost: true }); } } });
   f.enterLobby(); const old = f.lobby;
-  old.setGames([{ name: 'g1' }]); old.activate('join');
+  old.activate('join'); old.setGames([{ name: 'g1' }]);
   const key = (code, k = '') => f.input.key({ code, key: k, preventDefault() {} });
   const row = LL.joinGame.list; f.states.press(1, old, row.x + 5, row.y - row.h + 3, 800, 600, 0); f.states.release(1, old, row.x + 5, row.y - row.h + 3, 800, 600, 0);
   assert.equal(old.selectedGame().name, 'g1');

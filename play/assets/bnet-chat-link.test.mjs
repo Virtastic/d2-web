@@ -122,3 +122,18 @@ test('a channel picked in the CHANNEL panel is a forced join; the list can be as
   assert.equal(r.link.channels(), true);
   assert.equal(r.socks[0].sent.at(-1), 'ff0b080050583244');
 });
+
+test('QUIT leaves chat with FF 10 04 00 on the open socket; coming back enters chat and rejoins', async () => {
+  const s = socket(); const link = createChatLink({ dial: async () => { throw new Error('no dial'); }, createChat: createBnetChat });
+  link.attach({ transport: s.transport, reader: s.reader }, { character: 'Ama', realm: 'R', keepAliveMs: 0 });
+  s.push(enterReply()); s.push(channelEvent('Diablo II')); await tick();
+  const before = s.sent.length;
+  link.leave();
+  assert.equal(s.sent[before], 'ff100400');
+  assert.equal(s.transport.isOpen, true);
+  link.resume(); await tick();
+  assert.equal(s.sent[before + 1] !== undefined, true);
+  assert.equal(link.session.entered, false);
+  s.push(enterReply()); await tick();
+  assert.equal(s.sent.some((x, i) => i > before + 1 && x.startsWith('ff0c')), true);
+});

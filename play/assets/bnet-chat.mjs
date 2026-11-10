@@ -89,6 +89,8 @@ export function createBnetChat({ transport, reader, character, realm = '', expan
     // SID_GETADVLISTEX: the reply reaches `onGames` as the raw body.
     games() { return closed ? false : send(getGamesPacket()) !== false; },
     say(text) { return closed ? false : send(chatCommandPacket(text)) !== false; },
+    // SID_LEAVECHAT (FF 10 04 00), what the lobby's QUIT sends; the socket stays open, chat must be entered again.
+    leave() { if (closed) return false; entered = false; joined = false; wantJoin = false; return send(bncsPacket(0x10)) !== false; },
     close() { closed = true; stopTimer(); try { reader.cancel(); } catch { /* done */ } try { transport.close(); } catch { /* done */ } },
   };
 }

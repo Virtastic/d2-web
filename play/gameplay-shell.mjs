@@ -1932,7 +1932,7 @@ function startLobbyChat(name) {
       onState: (on) => { if (realmFlow === flow) flow.chatSession = flow.chatLink?.session ?? null; bnetLobbyScreen?.chatLive(on); },
       onFail: (error) => { bnetLobbyScreen?.chatLine({ text: `Chat connection lost: ${error?.message ?? error}`, colour: 1 }); render(); } });
     flow.chatLink.attach(flow.chat, lobbyChatUser(name));
-  } else if (flow.chatLink.session?.open) bnetLobbyScreen?.chatLive(true);
+  } else if (flow.chatLink.session?.open) { flow.chatLink.resume(); bnetLobbyScreen?.chatLive(true); }
   else void flow.chatLink.ensure(lobbyChatUser(name));   // the socket died while away: dial, enter chat, rejoin the channel
   return flow.chatLink.session;
 }
@@ -1966,7 +1966,7 @@ function enterBnetLobby(name) {
     onJoinChannel: (channel) => { startLobbyChat(c.name); realmFlow?.chatLink?.join(channel); },
     onRefreshChannels: () => { realmFlow?.chatLink?.channels(); },
     onLadder: async (kind) => { const flow = realmFlow; if (!flow?.mcpSession) throw transportFailure('the Battle.net connection is not open'); const { fetchLadder } = await import('./assets/realm-ladder.mjs'); return fetchLadder(flow.mcpSession, kind); },
-    onQuit: () => enterRealmCharacterSelect(realmCharacters) }); }
+    onQuit: () => { try { realmFlow?.chatLink?.leave(); } catch { /* socket gone */ } enterRealmCharacterSelect(realmCharacters); } }); }
   catch (error) { bnetLobbyScreen = null; bnetLobbyError = String(error); }
   screen = SCREEN.BNET_LOBBY;
   startLobbyChat(c.name);

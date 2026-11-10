@@ -77,7 +77,7 @@ export const BNET_LOBBY_LAYOUT = {
   help: button('help', 146, 480, 120, 20, 'topButton', 0, 'help'),
   charInfo: { x: 143, y: 588, w: 230, h: 87, font: 'formal10', pitch: 19 },
   chatLog: { x: 28, y: 410, w: 354, h: 298, font: 'formal10', pitch: 19, scrollbar: { x: 400, bottom: 389, top: 85 } },
-  chatEdit: { x: 28, y: 450, w: 335, h: 32, font: 'formal10', limit: 255 },
+  chatEdit: { x: 28, y: 450, w: 335, h: 32, font: 'formal10', limit: 200 },
   newsTitle: { x: 28, y: 138, w: 354, h: 60, font: 'formal10', centred: true },
   gem: { x: 398, y: 474 },
   // The user band (D2Multi+0xF750): eleven 60-wide cells from x=40, portrait at y=571, name under it alternating 577 / 592.
@@ -127,7 +127,7 @@ export const BNET_LOBBY_LAYOUT = {
   channelPanel: {
     title: { x: 496, y: 114, w: 200, h: 22, font: 'font30', centred: true, text: 'channelsTitle' },
     labels: [{ x: 427, y: 135, w: 150, h: 12, text: 'channelName' }, { x: 427, y: 187, w: 150, h: 12, text: 'channelsTitle' }],
-    edit: { id: 'channel', x: 432, y: 162, w: 158, h: 20, limit: 31 },
+    edit: { id: 'channel', x: 432, y: 162, w: 158, h: 20, limit: 32 },
     list: { x: 432, firstBaseline: 212, pitch: 19, rows: 10, font: 'formal10', colour: 4, selColour: 0, area: { x: 432, top: 197, w: 321, h: 200 }, scrollbar: { x: 753, bottom: 392, top: 205, height: 197, page: 9 } },
     ok: button('channel-ok', 671, 433, 96, 32, 'cancelButton', 0, 'ok'),
     cancel: button('panel-cancel', 433, 433, 96, 32, 'cancelButton', 0, 'cancel'),
@@ -348,14 +348,14 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   // replyTo: the last whisperer (/r); notify: /d2notify. Retail's notify flag starts clear (its only writer is /d2notify).
   const chat = { lines: [], input: '', live: false, channel: '', users: [], scroll: 0, picked: null, enable: { whisper: false, squelch: false, unsquelch: false }, replyTo: '', notify: false, history: [], recall: -1 };
   const headerText = () => (chat.channel ? `${chat.channel} (${chat.users.length})` : '');
-  const form = { name: '', password: '', description: '', maxPlayers: '4', levelDifference: '', levelLimit: false, difficulty: 0, focus: 'name', channel: '' };
+  const form = { name: '', password: '', description: '', maxPlayers: '4', levelDifference: '4', levelLimit: false, difficulty: 0, focus: 'name', channel: '' };
   let created = now(), pinned = null;
   const clock = () => (pinned === null ? now() : pinned);
 
   const openCreate = () => {
     panel = 'create';
     const d = Math.min(2, Math.max(0, registryDifficulty | 0));
-    Object.assign(form, { name: '', password: '', description: '', maxPlayers: '4', levelDifference: '', levelLimit: false,
+    Object.assign(form, { name: '', password: '', description: '', maxPlayers: '4', levelDifference: '4', levelLimit: false,
       difficulty: allowed[d] ? d : 0, focus: 'name' });
   };
   // The join panel asks the realm for its games once when it opens (JOIN's callback). Retail's idle loop adds a free-running 15 s timer that is only
@@ -372,7 +372,10 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   // The scrollbar control: the thumb grabbed, which arrow shows pressed, and whether the mouse button is still down.
   const bar = { grab: false, up: false, down: false, held: false };
   let joining = false;
-  const openJoin = () => { panel = 'join'; Object.assign(form, { name: '', password: '', focus: 'name' }); selected = -1; listFirst = 0; desc = ''; refreshGames(); };
+  let openStamp = -Infinity;
+  const openJoin = () => { panel = 'join'; Object.assign(form, { name: '', password: '', focus: 'name' }); selected = -1; listFirst = 0; desc = '';
+  // D2Multi 0x148F0 builds the panel's list empty and asks the realm for games only when 5 s have passed since the last open (the stamp moves only then, and starts at 0).
+  games = []; if (clock() - openStamp >= 5000) { openStamp = clock(); refreshGames(); } };
   // HELP, CHANNEL and LADDER: panels of their own. HELP's list keeps its place while the panel is shut; CHANNEL's list is what the chat
   // connection last reported (`setChannels`), its name edit starts on the channel in.
   let helpFirst = 0, channels = [], chanFirst = 0;
@@ -520,16 +523,19 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   };
   const createGame = () => {
     if (busy || !form.name) return;
-    // The players box is clamped as D2Multi 0x13AF0 does: below 1 is 1, above 8 is 8 (an empty box is left alone and means a full game).
-    const maxPlayers = form.maxPlayers === '' ? 8 : Math.min(8, Math.max(1, Number(form.maxPlayers)));
+    // D2Multi 0x142C0 sends atol(text) & 0xff for both boxes (an empty box is 0); the level byte is 0xff with the checkbox off.
+    const maxPlayers = (Number(form.maxPlayers) || 0) & 0xff;
     void run(() => onCreateGame({ gameName: form.name, gamePassword: form.password, description: form.description, maxPlayers,
-      difficulty: form.difficulty, levelDifference: form.levelLimit && form.levelDifference !== '' ? Number(form.levelDifference) : 0xff }));
+      difficulty: form.difficulty, levelDifference: form.levelLimit ? (Number(form.levelDifference) || 0) & 0xff : 0xff }));
   };
   const joinGame = () => {
     if (busy || !form.name) return;
     joining = true; void run(() => onJoinGame({ gameName: form.name, gamePassword: form.password }));
   };
-  const step = (key, delta, lo, hi) => { const n = Number(form[key]) || 0; form[key] = String(Math.min(hi, Math.max(lo, n + delta))); };
+  // The arrows apply D2Multi's exact rules (0x13200 / 0x131A0 / 0x13140 / 0x130E0): a step only when it stays inside the range, no clamp otherwise.
+  const step = (key, delta, lo, hi) => { const n = Number(form[key]) || 0; const m = n + delta; form[key] = String(m >= lo && m <= hi ? m : n); };
+  // The change callback (0x13AF0): a non-empty players box is clamped at once, below 1 to 1 and 9 or more to 8.
+  const clampPlayers = () => { if (form.maxPlayers !== '') { const n = Number(form.maxPlayers) || 0; form.maxPlayers = String(n < 1 ? 1 : n >= 9 ? 8 : n); } };
 
   const scrollUsers = (delta) => {
     const n = chat.users.length, v = L.band.visible;
@@ -980,9 +986,11 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   const dragBar = (b, sy) => b.set(Math.min(b.max, Math.max(0, Math.round((sy - b.S.top - 10) * b.max / (b.S.bottom - 20 - b.S.top)))));
 
   const typeInto = (key, value, limit, digits) => {
-    if (form[key].length >= limit) return;
+    if (form[key].length >= limit - 1) return;   // D2Win's edit box refuses a character at strlen >= limit - 1 (D2Win+0x15450), so a limit of 16 holds 15
     if (digits && !/[0-9]/.test(value)) return;
+    if (key === 'name' && (panel === 'create' || panel === 'join') && !/[0-9A-Za-z '_-]/.test(value)) return;
     form[key] += value;
+    if (key === 'maxPlayers') clampPlayers();
   };
 
   return {
@@ -1068,7 +1076,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
         // Every edit's Enter callback is the panel's OK (D2Multi+0x142C0 create, +0x14100 join).
         if (enter) { if (panel === 'create') createGame(); else if (panel === 'channel') joinChannel(); else if (panel === 'join') joinGame(); return true; }
         const e = edits.find((x) => x.id === form.focus); if (!e) return false;
-        if (code === 'Backspace') { form[e.id] = form[e.id].slice(0, -1); return true; }
+        if (code === 'Backspace') { form[e.id] = form[e.id].slice(0, -1); if (e.id === 'maxPlayers') clampPlayers(); return true; }
         if (!key || key.length !== 1 || key < ' ' || key > '~') return false;
         typeInto(e.id, key, e.limit, e.digits);
         return true;
@@ -1080,7 +1088,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
       if (code === 'Tab') { if (chat.history.length) { chat.recall = (chat.recall + 1) % chat.history.length; chat.input = chat.history[chat.recall]; } reeval(); return true; }
       if (code === 'Backspace') { chat.input = chat.input.slice(0, -1); reeval(); return true; }
       if (!key || key.length !== 1 || key < ' ') return false;
-      if (chat.input.length < L.chatEdit.limit) chat.input += key;
+      if (chat.input.length < L.chatEdit.limit - 1) chat.input += key;
       reeval();
       return true;
     },
