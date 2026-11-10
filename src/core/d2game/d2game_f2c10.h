@@ -26,6 +26,6 @@ template <class E> void Run(E& e, uint32_t a, uint32_t b, uint32_t game, uint32_
         e.wr8(ai + 0x20, dd >= 0x4E ? 0x4D : dd);
     }
     const uint32_t w[6] = { 0, 0xF, nx, ny, 1, run ? 4u : 0u };
-    e.h(0xF2540, 0, game, b, 0, 0, w[0], w[1], w[2], w[3], w[4], w[5]);
+    e.h(0xF2540, 0, 0, 0, 0, 0, w[0], w[1], w[2], w[3], w[4], w[5]);
 }
 }
