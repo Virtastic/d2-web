@@ -100,3 +100,12 @@ extern "C" {
 WEAK void storm_1cf00_fnrun(int32_t*, void*, int32_t, uint32_t, int, void*, uint32_t*) {}
 WEAK void storm_1d2e0_fnrun(uintptr_t, uintptr_t, uintptr_t, uint32_t*) {}
 }
+__attribute__((weak)) void* Storm_Sub41D0(uint32_t*, uint32_t, uint32_t) { return nullptr; }   // 1efc0 seam shape (anchor, 0, 0); the port in storm_batch_b51.cpp takes (own, p2, p3, edi)
+__attribute__((weak)) uint32_t Storm_Sub15ED0(const char*, uint32_t) { return 0; }   // 1efc0 name-hash seam (name, type); only the (int32_t) component seam exists in storm_batch_1cf00.cpp
+// 1efc0 seam shapes whose ports exist under another signature (or not at all); a real port of the same shape replaces them.
+__attribute__((weak)) uint32_t* Storm_Sub4310(uint32_t*, uint32_t, uint32_t) { return nullptr; }   // the port in storm_batch_b51.cpp takes (own, p2, p3, edi)
+__attribute__((weak)) void Storm_Sub16D70(uint32_t*, void*, uint32_t, uint32_t*) {}   // only the () provider scan exists in storm_batch_44.cpp
+__attribute__((weak)) void Storm_Sub1F590(uint32_t, uint32_t*, int32_t, void*, uint32_t, uint32_t) {}   // error report; the storm_batch_b54b.cpp copy is file-local
+__attribute__((weak)) void Storm_Sub26D70(int32_t*, uint32_t*, uint32_t, uint32_t*) {}   // storm_batch_b144b.cpp seam, not yet ported
+__attribute__((weak)) uint32_t* Storm_Sub17A70(uint32_t, intptr_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t,
+                                              uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) { return nullptr; }   // 0x17A70 async read, not yet ported

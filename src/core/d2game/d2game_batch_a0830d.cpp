@@ -46,7 +46,7 @@ EXT(Ordinal_10828); EXT(Ordinal_10839); EXT(Ordinal_10871); EXTA(Ordinal_10910);
 #define Ordinal_10871 (a0830d_env::Ordinal_10871)
 #define Ordinal_10910 (a0830d_env::Ordinal_10910)
 #define Ordinal_10911 (a0830d_env::Ordinal_10911)
-EXT(Ordinal_10920); EXT(Ordinal_10945); EXT(Ordinal_10973); EXT(Ordinal_10978); EXT(Ordinal_11013);
+EXTA(Ordinal_10920); EXT(Ordinal_10945); EXTA(Ordinal_10973); EXT(Ordinal_10978); EXT(Ordinal_11013);
 #define Ordinal_10920 (a0830d_env::Ordinal_10920)
 #define Ordinal_10945 (a0830d_env::Ordinal_10945)
 #define Ordinal_10973 (a0830d_env::Ordinal_10973)

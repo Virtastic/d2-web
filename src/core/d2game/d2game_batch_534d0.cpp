@@ -1,18 +1,19 @@
 // Batch: D2Game+0x534D0, +0x78DD0. Raw-offset transcriptions of the cached 1.13c decompile.
-// Ordinals are declared opaquely; register inputs (EAX/EBX) are explicit parameters.
+// Ordinals are declared opaquely and weak (a strong reference here would override the weak ones other files declare
+// for the same symbol and fail the link whenever a probe makes this code live); register inputs (EAX/EBX) are explicit parameters.
 #include <cstdint>
 #include <initializer_list>
 #include <unistd.h>
 
 extern "C" {
-intptr_t Ordinal_10920(void*);
-void Ordinal_11042(void*, uint32_t, uint32_t);
-void Ordinal_11072(void*, uint32_t, uint32_t);
-int32_t Ordinal_10048(void); intptr_t Ordinal_10711(...); intptr_t Ordinal_10910(intptr_t,intptr_t,intptr_t); intptr_t Ordinal_10973(...);
-intptr_t Ordinal_10887(...); intptr_t Ordinal_10744(...); intptr_t Ordinal_10516(...); intptr_t Ordinal_10202(...);
-intptr_t Ordinal_10905(...); intptr_t Ordinal_11088(intptr_t); intptr_t Ordinal_10417(...); intptr_t Ordinal_11054(...);
-intptr_t Ordinal_11090(...); intptr_t Ordinal_10892(...); int Ordinal_10010(int, uint32_t, int);
-int Ordinal_11139(int, uint32_t);
+__attribute__((weak)) intptr_t Ordinal_10920(void*);
+__attribute__((weak)) void Ordinal_11042(void*, uint32_t, uint32_t);
+__attribute__((weak)) void Ordinal_11072(void*, uint32_t, uint32_t);
+__attribute__((weak)) int32_t Ordinal_10048(void); __attribute__((weak)) intptr_t Ordinal_10711(...); __attribute__((weak)) intptr_t Ordinal_10910(intptr_t,intptr_t,intptr_t); __attribute__((weak)) intptr_t Ordinal_10973(...);
+__attribute__((weak)) intptr_t Ordinal_10887(...); __attribute__((weak)) intptr_t Ordinal_10744(...); __attribute__((weak)) intptr_t Ordinal_10516(...); __attribute__((weak)) intptr_t Ordinal_10202(...);
+__attribute__((weak)) intptr_t Ordinal_10905(...); __attribute__((weak)) intptr_t Ordinal_11088(intptr_t); __attribute__((weak)) intptr_t Ordinal_10417(...); __attribute__((weak)) intptr_t Ordinal_11054(...);
+__attribute__((weak)) intptr_t Ordinal_11090(...); __attribute__((weak)) intptr_t Ordinal_10892(...); __attribute__((weak)) int Ordinal_10010(int, uint32_t, int);
+__attribute__((weak)) int Ordinal_11139(int, uint32_t);
 }
 void D2GAME_8970_Unk(int ebx, int* p, uint32_t eax, int one, uint32_t* out);
 int D2GAME_D57F0_Unk(uint32_t eax, uint32_t v);

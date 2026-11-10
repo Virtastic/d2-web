@@ -20,7 +20,7 @@ extern "C" uint32_t* Storm_Sub5040(uint32_t, int32_t param_2, uint32_t param_3, 
 uint32_t Storm_Sub4EF0(uint32_t, uint32_t p2, uint32_t p3, uint32_t edi);
 extern "C" void Storm_ListLink4390(uint32_t* eax, uint8_t* this_, uint8_t* node_arg, int32_t mode);   // 0x4390 (storm_batch_1000.cpp)
 void Storm_Sub4D60(uint8_t* node);
-void Storm_Sub10E30(uint8_t* conn, const uint8_t* pkt);
+extern "C" void Storm_Sub10E30(uint8_t* conn, const uint8_t* pkt);   // C linkage, as defined in storm_batch_109c0.cpp
 extern "C" uint32_t Storm_Sub10D20(const void* const* parts, const uint8_t* data, uint32_t length, uint32_t count);
 extern "C" void Storm_Sub10CB0(void);
 int32_t* Storm_Sub12690(void);

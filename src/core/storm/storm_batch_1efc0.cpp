@@ -90,6 +90,11 @@ void Storm_Sub37E80(uint32_t* state, uint32_t flag, uint32_t* out);
 
 void* Storm_Sub6460(const void* s, const char* find);  // 0x6460 strstr
 
+// Declared at file scope (not in the anonymous namespace below) so it binds to the port or its link stub.
+uint32_t* Storm_Sub17A70(uint32_t pos, intptr_t buf, uint32_t len, uint32_t, uint32_t, uint32_t,
+                         uint32_t chunk, uint32_t, uint32_t prio, uint32_t event, uint32_t,
+                         uint32_t last, uint32_t);                         // 0x17A70 async read
+
 namespace {
 
 int32_t g_lastError = 0;            // 0x6FC45388  last Storm error, mirrored to SetLastError
@@ -133,9 +138,6 @@ constexpr const char* kSFileCpp = "..\\3rdParty\\STORM\\SOURCE\\SFILE.CPP";
 
 // ---- SFile internals, retail argument order (seams) -------------------------------------------
 extern "C" void* Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, uint32_t flags); // 0x1C580 alloc
-uint32_t* Storm_Sub17A70(uint32_t pos, intptr_t buf, uint32_t len, uint32_t, uint32_t, uint32_t,
-                         uint32_t chunk, uint32_t, uint32_t prio, uint32_t event, uint32_t,
-                         uint32_t last, uint32_t);                         // 0x17A70 async read
 
 
 // 1.13c Storm+0x281A0
