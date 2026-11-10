@@ -3207,8 +3207,8 @@ function advanceRealmClientUnits(forced) {
     }
   }
   if (ticks) {
-    if (combatSounds && snapshot) { const f = realmCombatSoundFrame(snapshot, realmMonsterViews, selectedPlayerSource(), readSelectedSkills()[castHand], realmFlow.protocol.d2gsClientUnitHitClass); combatSounds.update(f.entities, f.frame); }
     { const fx = realmFlow.protocol.d2gsClientTakeUnitFx?.(), me = selectedPlayerSource()?.guid; if (fx) realmUnitFx?.step(fx.events, fx.tick, (e) => e.unitType === 0 && e.unitGuid === me); } // the selected player's own start sounds stay with the combat cues above
+    if (combatSounds && snapshot) { const f = realmCombatSoundFrame(snapshot, realmMonsterViews, selectedPlayerSource(), readSelectedSkills()[castHand], realmFlow.protocol.d2gsClientUnitHitClass, realmUnitFx?.hitOf); combatSounds.update(f.entities, f.frame); }
     for (const event of realmFlow.protocol.d2gsClientTakeMissileSounds?.() ?? [])
       unitSounds?.playRow(event.soundRow, event).catch((error) => console.warn('Missile impact sound', error));
     realmPlayerRosterView = realmFlow.protocol.d2gsClientPlayers?.() ?? realmPlayerRosterView;
@@ -4864,7 +4864,7 @@ function ensureRealmChrome() {
   build('objects', () => { objectRenderer ??= createObjectRenderer(assetReader, document, { shadow: true, mayLoad: mayLoadSprite }); });
   build('items', () => { itemRenderer ??= createItemRenderer(assetReader); });
   // The effects the engine's skill start and hit rules queue for the units of a joined game.
-  build('unit fx', () => { overlayRenderer ??= createMissileRenderer(assetReader, document, (f) => f, 'overlays'); realmUnitFx ??= createRealmUnitFx(assetReader, (row, event) => unitSounds?.playRow(row, event).catch((error) => console.warn('Skill sound', error))); });
+  build('unit fx', () => { overlayRenderer ??= createMissileRenderer(assetReader, document, (f) => f, 'overlays'); realmUnitFx ??= createRealmUnitFx(assetReader, (row, event) => unitSounds?.playRow(row, event).catch((error) => console.warn('Skill sound', error)), (e) => unitSounds?.play({ unitType: e.unitType, unitId: e.unitGuid, classId: e.classId, soundEvent: e.soundEvent, updateUnitType: -1, updateUnitId: e.unitGuid, nativeSelectedRow: 0 }, selectedPlayerSource()?.guid)?.catch?.((error) => console.warn('Unit sound', error))); });
   realmChromeError = failed.join('; ');
 }
 

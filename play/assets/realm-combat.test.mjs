@@ -172,3 +172,25 @@ test('a struck unit sounds the impact its hit class names', (t) => {
   // Without the engine's answer the frame is as before: no hit class, no impact.
   assert.equal(frameOf(3).entities[0].lastHitClass, undefined);
 });
+
+test('a monster with unit life: the plate fills by hit points over the maximum, and a reported hit marks the sound frame', () => {
+  const monsters = [{ guid: 77, classId: 5, mode: 1, x: 101, y: 101, anchorX: 200, anchorY: 120, drawn: true }];
+  const input = createRealmInput({ transmit: () => true, now: () => 0, scene: () => ({ ready: true, player: { x: 100, y: 100 }, monsters, objects: [], items: [],
+    isNpc: () => false, hoverBox: (dx, dy) => Math.abs(dx) < 10 && Math.abs(dy) < 20, toScreen: (x, y) => ({ x: x * 2, y }), pointerWorld: (px, py) => ({ x: px / 2, y: py }) }) });
+  const units = createRealmUnits({ rowOf: () => ({ killable: true, align: 0, named: true }), unitInfo: () => ({ enemy: true, enemyIfHostile: true, rosterGuid: 0xFFFFFFFF, name: '' }) });
+  const name = () => ({ stringIndex: 1005, label: 'Zombie' });
+  // An assigned life byte of 0x55 is 0x5500 of 0x8000: a fill of 0x55 of 128, not 85 percent.
+  const life = (view) => units.hoverTarget(input.pick(200, 120), [{ guid: 77, mode: 1, typeFlags: 0, ...view }], name).life;
+  assert.equal(life({ hpPct: 0x55, hp: 0x5500, hpMax: 0x8000 }), 0x55);
+  assert.equal(life({ hpPct: 0x55, hp: 0x4100, hpMax: 0x8000 }), 0x41);   // a hit record lowered the unit's life
+  assert.equal(life({ hpPct: 50 }), 64);                                    // no unit life yet: the life byte
+  // The sound frame: the monster carries its unit's hit points and, on the tick of the hit, the hit mark.
+  const snapshot = { entities: [{ type: 1, id: 77, classId: 5, mode: 1 }, { type: 1, id: 78, classId: 5, mode: 1 }, { type: 0, id: 2, classId: 1, mode: 1 }] };
+  const views = [{ guid: 77, typeFlags: 8, hp: 0x4100, hpMax: 0x8000 }, { guid: 78, typeFlags: 0 }];
+  const hits = new Map([['1:77', 0x31], ['0:9', 0]]);
+  const { entities } = realmCombatSoundFrame(snapshot, views, { source: 'realm', guid: 9, classId: 3, renderState: { mode: 1, framePrecise: 0 } }, 0,
+    (type, id) => (type === 1 && id === 77 ? 0x31 : 0), (type, id) => hits.get(`${type}:${id}`));
+  assert.deepEqual(entities.map((e) => [e.type, e.id, e.hp, e.lastHitClass, e.hitPacket === true]),
+    [[1, 77, 0x4100, 0x31, true], [1, 78, undefined, 0, false], [0, 2, undefined, 0, false], [0, 9, undefined, 0, true]]);
+  assert.equal(entities[0].typeFlags, 8);
+});

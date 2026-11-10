@@ -55,6 +55,8 @@
 #include <DataTbls/OverlayTbls.h>
 #include "d2gs_client_monster_death_clock.h"
 #include "d2gs_client_pkt_route.h"
+#include "d2gs_client_combat.h"
+#include "d2gs_client_unit_fx.h"
 #include "d2gs_client_quests.h"
 #include "d2gs_client_warps.h"
 #include "d2gs_client_state_stats.h"
@@ -642,6 +644,15 @@ static void destroy_player_motion(D2RealmClientPlayerEntry& player);
 
 static void refresh_monster_motion_view(D2RealmClientMonster& monster);
 
+// An assigned monster's life is the record's byte against a fixed maximum (1.13c D2Client+0xAE420).
+// The local player's own hireling keeps the life its own records set.
+static bool is_own_hireling(uint32_t guid);
+static void apply_assigned_life(D2UnitStrc* unit, uint32_t lifeByte) {
+    if (!unit || !unit->pStatListEx || is_own_hireling(unit->dwUnitId)) return;
+    STATLIST_SetUnitStat(unit, 7, static_cast<int>(d2::realm::kAssignedMaxLife), 0);
+    STATLIST_SetUnitStat(unit, 6, static_cast<int>(d2::realm::assignedLife(static_cast<uint8_t>(lifeByte))), 0);
+}
+
 static bool create_monster_motion(D2RealmClientMonster& monster) {
     D2MonStatsTxt* stats = DATATBLS_GetMonStatsTxtRecord(static_cast<int>(monster.view.classId));
     if (!stats) return false;
@@ -663,6 +674,7 @@ static bool create_monster_motion(D2RealmClientMonster& monster) {
             STATLIST_AllocStatListEx(unit, 0, nullptr, nullptr);
         // the monster's base walk speed, as D2Game's monster init sets it (Monster.cpp STAT_VELOCITYPERCENT 75); the client unit needs it to walk at the server's pace
         STATLIST_SetUnitStat(unit, STAT_VELOCITYPERCENT, 75, 0);
+        apply_assigned_life(unit, monster.view.hpPct);
         if (!d2_realm_client_unit_resources_init(unit)) {
             d2_realm_client_unit_resources_destroy(unit);
             UNITS_FreeUnit(unit);
@@ -957,6 +969,7 @@ static bool apply_monster_assign(const uint8_t* packet, int length) {
             if (existing.motionUnit) d2_realm_client_unit_set_mode(existing.motionUnit, monster.view.mode);
             refresh_monster_motion_view(existing);
             existing.view.hpPct = monster.view.hpPct;
+            apply_assigned_life(existing.motionUnit, monster.view.hpPct);
             if (monster.hasStats) {
                 existing.stats = std::move(monster.stats);
                 existing.hasStats = true;
@@ -1346,7 +1359,8 @@ static int apply_player_life_action(D2UnitStrc* unit, uint32_t selector, int x, 
     }
     return 1;
 }
-static void emit_hit_overlay(D2UnitStrc* unit);
+static void emit_hit_overlay(D2UnitStrc* unit, bool struckNow = false);
+static void record_unit_hit(D2UnitStrc* unit);
 
 static int pkt_player_action(D2UnitStrc* unit, uint32_t code, const uint32_t* l) {
     if (code >= 7 && code <= 9) {
@@ -1365,6 +1379,11 @@ static int pkt_player_action(D2UnitStrc* unit, uint32_t code, const uint32_t* l)
         const uint32_t previous = unit->dwAnimMode;
         if (d2_realm_client_unit_set_mode(unit, PLRMODE_GETHIT) <= 0) return 0;
         if (previous != unit->dwAnimMode) emit_hit_overlay(unit);
+        return 1;
+    }
+    if (code == d2::realm::kHitAction) {
+        unit->dwLastHitClass = d2::realm::playerHitClass(pkt_word(l, 2));
+        record_unit_hit(unit);
         return 1;
     }
     return 0;
@@ -1406,6 +1425,13 @@ static int pkt_monster_action(D2RealmClientMonster& monster, uint32_t code, cons
         if (hit && (pkt_get_stat(bits, 6, 0) >> 8) != hit) pkt_set_stat(bits, 6, hit << 8, 0);
         unit->dwLastHitClass = pkt_word(l, 6);
         return pkt_monster_mode(monster, code, MONMODE_GETHIT);
+    }
+    case MonsterAction::Hit: {
+        const auto hit = d2::realm::monsterHit(pkt_word(l, 0), pkt_word(l, 1));
+        if (hit.setLife) pkt_set_stat(reinterpret_cast<uintptr_t>(unit), 6, hit.life << 8, 0);
+        unit->dwLastHitClass = hit.hitClass;
+        record_unit_hit(unit);
+        return 1;
     }
     case MonsterAction::Death: {
         // A monster whose death spawns its minion is replaced by the spawn, not played out here.
@@ -1885,20 +1911,15 @@ struct RealmMissileSoundEvent { uint32_t version, tick, missileId, classId, even
 static_assert(sizeof(RealmMissileSoundEvent) == 24);
 static std::vector<RealmMissileSoundEvent> g_clientMissileSoundEvents;
 
-// What a unit's skill start or hit plays, for the page to sound and draw: kind 2 is a one-shot
-// Overlay row on the unit; kinds 1, 3 and 4 are a sound row due `delay` ticks after `tick` (the
-// skill's start sound, the weapon's swing, the class's own start sound). `skill` is the skill
-// id that caused it, or 0xFFFFFFFF for a hit.
-struct RealmUnitFxEvent { uint32_t version, tick, kind, unitType, unitGuid, row, delay, skill; };
-static_assert(sizeof(RealmUnitFxEvent) == 32);
-static std::vector<RealmUnitFxEvent> g_unitFxEvents;
+// What a unit's skill start, hit or server record plays, for the page to sound and draw: the one
+// queue of d2gs_client_unit_fx.h (its kinds are listed there).
+static d2::realm::UnitFxQueue g_unitFxEvents;
 // The one-shot overlays still running, so a start can tell that a unit already carries a row.
 struct LiveUnitOverlay { uint32_t unitType, unitGuid, row, endTick; };
 static std::vector<LiveUnitOverlay> g_unitOverlays;
 
 static void record_unit_fx(uint32_t kind, D2UnitStrc* unit, uint32_t row, uint32_t delay, uint32_t skill) {
-    if (g_unitFxEvents.size() == 256) g_unitFxEvents.erase(g_unitFxEvents.begin());
-    g_unitFxEvents.push_back({1, g_clientMissileTick, kind, static_cast<uint32_t>(unit->dwUnitType),
+    g_unitFxEvents.push({1, g_clientMissileTick, kind, static_cast<uint32_t>(unit->dwUnitType),
         unit->dwUnitId, row, delay, skill});
 }
 
@@ -1921,28 +1942,46 @@ static void start_unit_overlay(D2UnitStrc* unit, int row, uint32_t skill) {
 }
 
 // A unit that has just entered death, get hit or knockback plays the overlay its last hit class
-// names (1.13c D2Client+0x2A590).
-static void emit_hit_overlay(D2UnitStrc* unit) {
+// names (1.13c D2Client+0x2A590). The hit action names the knockback mode itself whatever the
+// unit is doing (`struckNow`).
+static void emit_hit_overlay(D2UnitStrc* unit, bool struckNow) {
     if (!unit) return;
     const uint32_t mode = unit->dwAnimMode;
-    const bool struck = unit->dwUnitType == UNIT_PLAYER
+    const bool struck = struckNow || (unit->dwUnitType == UNIT_PLAYER
         ? mode == PLRMODE_DEATH || mode == PLRMODE_GETHIT || mode == PLRMODE_KNOCKBACK
         : unit->dwUnitType == UNIT_MONSTER &&
-            (mode == MONMODE_DEATH || mode == MONMODE_GETHIT || mode == MONMODE_KNOCKBACK);
+            (mode == MONMODE_DEATH || mode == MONMODE_GETHIT || mode == MONMODE_KNOCKBACK));
     if (!struck) return;
     const int row = d2::realm::hitOverlayRow(unit->dwLastHitClass);
     if (row <= 0 || row >= sgptDataTables->nOverlayTxtRecordCount) return;
-    start_unit_overlay(unit, row, 0xffffffffu);
+    start_unit_overlay(unit, row, d2::realm::kUnitFxSkillHit);
+}
+
+// The hit action (0x13) of the unit request: the unit keeps its mode, plays its hit class's
+// overlay and is reported struck so the page sounds the impact.
+// NOT PORTED: the monster's blood splatter (+0x4C500), its flag bit from the life byte's top bit
+// and the player's placement at the record's two bytes.
+static void record_unit_hit(D2UnitStrc* unit) {
+    emit_hit_overlay(unit, true);
+    record_unit_fx(d2::realm::kUnitFxHit, unit, unit->dwLastHitClass, 0, d2::realm::kUnitFxSkillHit);
 }
 
 // Consumes the queued unit effects, eight words each:
 // {version, tick, kind, unitType, unitGuid, row, delay, skill}.
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_take_unit_fx(int32_t* out, int cap) {
-    if (!out || cap <= 0) return 0;
-    const int count = std::min(cap, static_cast<int>(g_unitFxEvents.size()));
-    for (int i = 0; i < count; ++i) std::memcpy(out + i * 8, &g_unitFxEvents[static_cast<size_t>(i)], 32);
-    g_unitFxEvents.erase(g_unitFxEvents.begin(), g_unitFxEvents.begin() + count);
-    return count;
+    return g_unitFxEvents.take(out, cap);
+}
+
+// A unit's life, maximum life (both in 1/256) and last hit class into out[0..2]; 0 when the
+// client holds no such unit.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_unit_life(int type, uint32_t guid, uint32_t* out) {
+    if (!out || (type != UNIT_PLAYER && type != UNIT_MONSTER)) return 0;
+    auto* unit = find_realm_client_unit(static_cast<uint8_t>(type), guid);
+    if (!unit || !unit->pStatListEx) return 0;
+    out[0] = static_cast<uint32_t>(STATLIST_UnitGetStatValue(unit, 6, 0));
+    out[1] = static_cast<uint32_t>(STATLIST_UnitGetStatValue(unit, 7, 0));
+    out[2] = unit->dwLastHitClass;
+    return 1;
 }
 
 EMSCRIPTEN_KEEPALIVE uint32_t d2_realm_client_unit_fx_tick() { return g_clientMissileTick; }
@@ -2977,6 +3016,14 @@ static d2::realm::GameInfo g_gameInfo;
 static d2::realm::NpcAlertState g_npcAlerts;
 static d2::realm::PetState g_pets;
 
+// GUESS: the assignment's hireling test (D2Common ordinal 11104) is read as "a hireling"; the
+// pet list's own kind and owner decide here.
+static bool is_own_hireling(uint32_t guid) {
+    for (const auto& pet : g_pets.pets)
+        if (pet.guid == guid) return pet.kind == d2::realm::kPetKindHireling && pet.owner == g_player.guid;
+    return false;
+}
+
 static void clear_game_packet_state() {
     g_gameInfo = {};
     g_npcAlerts = {};
@@ -3285,6 +3332,28 @@ static int pkt_unit_request(const uint8_t* packet, int size) {
 }
 static int pkt_select_player(const uint8_t* packet, int size) { return select_player(packet, size) < 0 ? -2 : 0; }
 static int pkt_monster_assign(const uint8_t* packet, int size) { return apply_monster_assign(packet, size) ? 1 : -4; }
+// 0x11: a one-shot overlay on a unit (1.13c D2Client+0xADAA0); two rows play a sound row as well.
+static int pkt_unit_overlay(const uint8_t* packet, int size) {
+    d2::realm::UnitWordPacket p{};
+    if (!d2::realm::decodeUnitWordPacket(0x11, packet, size, &p)) return -2;
+    D2UnitStrc* unit = find_realm_client_unit(p.unitType, p.guid);
+    if (!sgptDataTables || !d2::realm::unitOverlayAccepted(unit != nullptr, p.value,
+            sgptDataTables->nOverlayTxtRecordCount)) return 0;
+    start_unit_overlay(unit, p.value, d2::realm::kUnitFxSkillRecord);
+    const int sound = d2::realm::unitOverlaySound(p.value);
+    if (sound >= 0) record_unit_fx(d2::realm::kUnitFxSound, unit, static_cast<uint32_t>(sound), 0,
+        d2::realm::kUnitFxSkillRecord);
+    return 1;
+}
+// 0x2C: a unit's sound event (1.13c D2Client+0xAD740); the page resolves the event to a sound.
+static int pkt_unit_sound(const uint8_t* packet, int size) {
+    d2::realm::UnitWordPacket p{};
+    if (!d2::realm::decodeUnitWordPacket(0x2c, packet, size, &p)) return -2;
+    D2UnitStrc* unit = find_realm_client_unit(p.unitType, p.guid);
+    if (!unit) return 0;
+    record_unit_fx(d2::realm::kUnitFxUnitSound, unit, p.value, 0, unit->dwClassId);
+    return 1;
+}
 // 0x4D on an object is the object's own packet; on any other unit it starts a skill at a spot.
 static int pkt_skill_start_at(const uint8_t* packet, int size) {
     const int result = packet[1] == UNIT_OBJECT ? apply_object_packet(packet, size) : apply_skill_start_packet(packet, size);
@@ -3314,6 +3383,7 @@ static const RealmPacketHandler kRealmPacketHandlers[] = {
     { 0xaf560, pkt_or<apply_unit_queue_packet, -2> },           // 0x0e
     { 0xaf510, pkt_unit_request },                              // 0x0f
     { 0xaf4c0, pkt_unit_request },                              // 0x10
+    { 0xadaa0, pkt_unit_overlay },                              // 0x11
     { 0xaf640, pkt_or<reassign_player, -2> },                   // 0x15
     { 0xaf240, pkt_or<apply_unit_queue_packet, -2> },           // 0x17
     { 0xaeca0, pkt_or<apply_life_mana, -2> },                   // 0x18
@@ -3325,6 +3395,7 @@ static const RealmPacketHandler kRealmPacketHandlers[] = {
     { 0xaf9f0, pkt_game_chat },                                 // 0x26
     { 0xafa70, apply_game_state_packet },                       // 0x28
     { 0xac330, pkt_quest_game_record },                         // 0x29
+    { 0xad740, pkt_unit_sound },                                // 0x2c
     { 0xaf1d0, pkt_or<apply_skill_start_packet, -2> },          // 0x4c
     { 0xaf160, pkt_skill_start_at },                            // 0x4d
     { 0xadf40, pkt_object_assign },                             // 0x51

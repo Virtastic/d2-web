@@ -55,3 +55,13 @@ test('without a hero read, or before the server sends a level, the screen is the
   const noScreen = realmFrameReads(res, null, null, 1, hud(12), null, null, null, { screen: null, stat: () => 9 });
   assert.equal(noScreen.characterScreen[0], 5);
 });
+
+test('a monster entity carries its unit hit points when the client unit holds them', () => {
+  const snap = (monsters) => realmViewSnapshot({ base: null, resources: {}, monsters, missiles: [], players: [], level: 2, actor: () => null, frame: 0 }).entities;
+  const mon = (extra, mode = 1) => ({ guid: 3, classId: 5, mode, x: 1, y: 2, direction: 0, hpPct: 0x55, ...extra });
+  const [held, grazed, corpse, byte] = snap([mon({ hp: 0x5500, hpMax: 0x8000 }), mon({ hp: 0, hpMax: 0x8000 }), mon({ hp: 0x100, hpMax: 0x8000 }, 12), mon({})]);
+  assert.deepEqual([held.hp, held.hpMax], [0x5500, 0x8000]);
+  assert.deepEqual([grazed.hp, grazed.hpMax], [1, 0x8000]);     // alive by its mode: never zero
+  assert.deepEqual([corpse.hp, corpse.hpMax], [0, 0x8000]);
+  assert.deepEqual([byte.hp, byte.hpMax], [0x55, 100]);         // no unit life: the life byte, as before
+});

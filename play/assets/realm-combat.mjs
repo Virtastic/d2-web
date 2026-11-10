@@ -76,7 +76,8 @@ export function createRealmUnits({ rowOf, unitInfo = () => null, hostilePlayer =
       if (cls.plate === 'npc') return { ...base, npc: true, x: unit.x, y: unit.y, preciseX: unit.preciseX, preciseY: unit.preciseY };
       const typeFlags = info?.typeFlags ?? view?.typeFlags;
       return { ...base, colour: monsterNameColour(typeFlags, unit.classId), ...(info && (info.typeFlags & UNIQUE_OR_MINION) ? { line: info.line } : {}),
-        x: unit.x, y: unit.y, life: hoverLife({ type: 1, mode: view?.mode ?? unit.mode, hpPct: view?.hpPct }) };
+        x: unit.x, y: unit.y, life: hoverLife(view?.hpMax > 0 ? { type: 1, mode: view.mode ?? unit.mode, hp: view.hp, maxHp: view.hpMax }
+          : { type: 1, mode: view?.mode ?? unit.mode, hpPct: view?.hpPct }) };
     },
     /** The pointer's context over that pick, as the local game's cursor reads it. */
     cursorContext(hit) {
@@ -96,15 +97,19 @@ export function createRealmUnits({ rowOf, unitInfo = () => null, hostilePlayer =
  *   hero        : the selected player's render source ({ source, guid, classId, renderState }); it is not an entity of the snapshot
  *   castSkillId : the selected skill of the hand that last issued a command
  *   hitClassOf  : (type, guid) => the hit class the server last struck the unit with (0 none); it picks the impact sounds
- * The server sends a life byte, never hit points, so no entity carries hp: the trigger then keys on modes alone.
+ *   hitOf       : (type, guid) => the hit class of a hit the server reported for the unit this tick (undefined none)
+ * A monster carries the hit points its client unit holds (its assign and hit records set them) and the mark of a
+ * hit taken this tick, so the trigger plays the hit as it does in a local game; a unit with no life from the server
+ * carries none and the trigger keys on its modes alone.
  */
-export function realmCombatSoundFrame(snapshot, views, hero, castSkillId, hitClassOf) {
-  const flags = new Map((views ?? []).map((m) => [m.guid, m.typeFlags]));
+export function realmCombatSoundFrame(snapshot, views, hero, castSkillId, hitClassOf, hitOf) {
+  const byGuid = new Map((views ?? []).map((m) => [m.guid, m]));
+  const struck = (type, id) => (hitOf?.(type, id) !== undefined ? { hitPacket: true } : null);
   const entities = (snapshot?.entities ?? []).filter((e) => e.type === 0 || e.type === 1)
-    .map((e) => (e.type === 1 ? { ...e, hp: undefined, typeFlags: flags.get(e.id) ?? 0 } : { ...e, hp: undefined }))
-    .map((e) => (hitClassOf ? { ...e, lastHitClass: hitClassOf(e.type, e.id) } : e));
+    .map((e) => { const view = e.type === 1 ? byGuid.get(e.id) : null; return e.type === 1 ? { ...e, hp: view?.hpMax > 0 ? view.hp : undefined, typeFlags: view?.typeFlags ?? 0 } : { ...e, hp: undefined }; })
+    .map((e) => ({ ...e, ...(hitClassOf ? { lastHitClass: hitClassOf(e.type, e.id) } : null), ...struck(e.type, e.id) }));
   const mine = hero?.source === 'realm' && hero.renderState;
-  if (mine) entities.push({ type: 0, id: hero.guid, classId: hero.classId, mode: hero.renderState.mode, ...(hitClassOf ? { lastHitClass: hitClassOf(0, hero.guid) } : {}) });
+  if (mine) entities.push({ type: 0, id: hero.guid, classId: hero.classId, mode: hero.renderState.mode, ...(hitClassOf ? { lastHitClass: hitClassOf(0, hero.guid) } : {}), ...struck(0, hero.guid) });
   return { entities, frame: { ...snapshot, playerId: mine ? hero.guid : undefined,
     player: { ...snapshot?.player, castSkillId, framePrecise: mine ? hero.renderState.framePrecise : undefined } } };
 }

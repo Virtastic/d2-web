@@ -34,7 +34,8 @@ export function realmViewSnapshot({ base: given, resources, monsters, missiles, 
     // Dead is the unit's mode (death, dead), never its life share: the server rounds a nearly dead monster's life to 0%.
     const dead = m.mode === MONSTER_MODE_DEATH || m.mode === MONSTER_MODE_DEAD;
     entities.push({ kind: 'monster', type: 1, id: m.guid, classId: m.classId, mode: m.mode, x: m.x, y: m.y, dead,
-      hp: m.hpPct == null || dead ? 0 : Math.max(1, m.hpPct), hpMax: m.hpPct == null ? 0 : 100,
+      // The unit's own hit points against their maximum when the client unit holds them; else the life byte.
+      ...(m.hpMax > 0 ? { hp: dead ? 0 : Math.max(1, m.hp), hpMax: m.hpMax } : { hp: m.hpPct == null || dead ? 0 : Math.max(1, m.hpPct), hpMax: m.hpPct == null ? 0 : 100 }),
       hostile: cls?.hostile === true, npc: cls?.kind === 'npc', unitClass: cls?.kind ?? null, roomOrdinal: 0, direction: m.direction, animation: actor(m, frame), speechPending: marked.has(m.guid), ...precise(m) });
   }
   for (const p of players ?? []) {

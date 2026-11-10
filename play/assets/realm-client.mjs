@@ -1016,6 +1016,14 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
     if (!call('d2_realm_client_unit_precise', 'number', ['number', 'number', 'bigint'], [type, guid, BigInt(T)])) return null;
     return { preciseX: u32at(T) / 65536, preciseY: u32at(Number(T) + 4) / 65536 };
   };
+  // A unit's life as the server's records left it on the client's own unit: the hit points and their maximum
+  // (both in 1/256ths; a monster's maximum is the fixed 0x8000 its assignment sets) and the last hit class.
+  const withLife = (record, type) => {
+    if (!record || !Module._d2_realm_client_unit_life) return record;
+    if (call('d2_realm_client_unit_life', 'number', ['number', 'number', 'bigint'], [type, record.guid, BigInt(T)]))
+      Object.assign(record, { hp: u32at(T), hpMax: u32at(Number(T) + 4), lastHitClass: u32at(Number(T) + 8) });
+    return record;
+  };
   const withPrecise = (record, type) => {
     const precise = record ? unitPrecise(type, record.guid) : null;
     if (precise) Object.assign(record, precise);
@@ -1388,7 +1396,7 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
           animationFlags: view.getUint8(at + 99), modeEvents: eventsByGuid.get(view.getUint32(at + 8, true)) ?? [],
           x: view.getUint32(at + 100, true), y: view.getUint32(at + 104, true),
           hpPct: view.getUint32(at + 108, true), typeFlags: view.getUint32(at + 112, true) };
-      }).map((monster) => withPrecise(monster, 1));
+      }).map((monster) => withLife(withPrecise(monster, 1), 1));
     },
     // One unit's relation, pet entry, plate name and second line (realm-combat.mjs parseRealmUnitInfo); null when the engine holds no such unit.
     d2gsClientUnitInfo: (type, guid) => {

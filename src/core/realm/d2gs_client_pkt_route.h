@@ -39,7 +39,7 @@ inline PktRoute pktRoute(uint8_t opcode) {
 // carries out. Codes it does not carry out yet are Unhandled and leave the unit as it is.
 // AttackAt / AttackOn are the arms that aim at a spot or at a unit and then set the mode the
 // action table (monsterActionMode) gives the code: both attacks, block, cast and the four skills.
-enum class MonsterAction : uint8_t { Unhandled, Move, GetHit, Stop, Death, Dead, AttackAt, AttackOn };
+enum class MonsterAction : uint8_t { Unhandled, Move, GetHit, Stop, Death, Dead, AttackAt, AttackOn, Hit };
 
 inline MonsterAction monsterAction(uint32_t code) {
     switch (code) {
@@ -48,6 +48,7 @@ inline MonsterAction monsterAction(uint32_t code) {
     case 7: return MonsterAction::Stop;
     case 8: return MonsterAction::Death;
     case 9: return MonsterAction::Dead;
+    case 0x13: return MonsterAction::Hit;   // struck in place: no mode change
     case 4: case 0xb: case 0xc: case 0xe: case 0x11: case 0x1a: case 0x1c: return MonsterAction::AttackAt;
     case 5: case 0xa: case 0xd: case 0xf: case 0x10: case 0x1b: case 0x1d: return MonsterAction::AttackOn;
     default: return MonsterAction::Unhandled;

@@ -59,3 +59,20 @@ test('an overlay is added after the overlays the frame already carries', () => {
   fx.apply(s);
   assert.deepEqual(s.entities[0].stateOverlays.map((o) => o.file), ['aura', 'cast_a']);
 });
+
+test('a hit marks its unit for the step it arrives in and a unit sound event goes to the unit sound player', () => {
+  const rows = [], sounds = [], fx = createRealmUnitFx(read, (row) => rows.push(row), (e) => sounds.push(e));
+  // kind 5: a monster struck with hit class 0x31; kind 6: player 2 (class 4) sounds event 0x13.
+  const events = parseRealmUnitFx(join(record(30, 5, 1, 9, 0x31, 0, 0xffffffff), record(30, 6, 0, 2, 0x13, 0, 4)), 2);
+  assert.deepEqual(events.map((e) => e.kind), [5, 6]);
+  fx.step(events, 30);
+  assert.equal(fx.hitOf(1, 9), 0x31);
+  assert.equal(fx.hitOf(0, 9), undefined);
+  assert.deepEqual(sounds, [{ unitType: 0, unitGuid: 2, classId: 4, soundEvent: 0x13 }]);
+  assert.deepEqual(rows, []);                       // neither is a sound row
+  assert.deepEqual(fx.apply({ entities: [{ type: 1, id: 9 }] }, 2), []);   // nor an overlay
+  fx.step([], 31);
+  assert.equal(fx.hitOf(1, 9), undefined);          // the mark lasts one step
+  assert.equal(sounds.length, 1);
+  assert.throws(() => parseRealmUnitFx(record(1, 7, 0, 0, 0, 0, 0), 1), /invalid unit effect/);
+});
