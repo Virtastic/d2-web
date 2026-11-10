@@ -39,6 +39,7 @@
 #include "../d2client/inv_weapon_hands.h"
 #include "../d2client/character_screen.h"
 #include "../d2client/realm_skill_start.h"
+#include "../d2client/realm_skill_do.h"
 #include "d2gs_client_motion.h"
 #include "d2gs_client_player_speed.h"
 #include "d2gs_client_player_skills.h"
@@ -1223,6 +1224,14 @@ static D2UnitStrc* find_realm_client_unit(uint8_t unitType, uint32_t guid) {
             if (monster.view.guid == guid) return monster.motionUnit;
     } else if (unitType == UNIT_OBJECT) {
         return d2gs_client_object_find(guid);
+    } else if (unitType == UNIT_ITEM) {
+        // A ground item: the client holds it in its ground mode with the record's cell; the room is
+        // the active one over that cell now, so the reach test and the walk read a placed unit.
+        D2UnitStrc* item = d2_realm_client_owned_item_find(guid);
+        if (!item || !item->pStaticPath || (item->dwAnimMode != IMODE_ONGROUND && item->dwAnimMode != IMODE_DROPPING)) return nullptr;
+        const int x = item->pStaticPath->tGameCoords.nX, y = item->pStaticPath->tGameCoords.nY;
+        item->pStaticPath->pRoom = d2_drlg_client_active_room(x, y);
+        return item->pStaticPath->pRoom ? item : nullptr;
     }
     return nullptr;
 }
@@ -1995,7 +2004,9 @@ static bool is_client_launch_skill(int id) {
         (skill->dwFlags[0] & 2u)) return false; // bit 1 of the row's flags: a lobbed missile takes another path
     if (!d2client_realm_skill_start_ported(skill->wCltStFunc)) return false;
     auto* missile = DATATBLS_GetMissilesTxtRecord(skill->wCltMissile);
-    return missile && missile->wCltDoFunc == 1 && missile->nCollideType == 3 && missile->wCltHitFunc == 0;
+    // Hit function 1 (1.13c D2Client+0xBC1A0, Fire Ball's and Exploding Arrow's burst) is ported.
+    return missile && missile->wCltDoFunc == 1 && missile->nCollideType == 3 &&
+        (missile->wCltHitFunc == 0 || missile->wCltHitFunc == 1);
 }
 
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_projectile_supported(int skillId) {
@@ -2140,11 +2151,12 @@ static D2UnitStrc* create_client_missile(const D2MissileStrc* params, bool gener
     if (!txt || (txt->wCltDoFunc != 1 && !(general && txt->wCltDoFunc == 4))) return nullptr;
     if (general) {
     } else if (params->dwFlags == 0x201u) {
-        // 1.13c D2Client+0xB1420: Fire Ball spawns its hit children (265) and its
-        // Missiles.txt +0x16 ExplosionMissile through the same create path.
-        const auto* fireball = DATATBLS_GetMissilesTxtRecord(62);
-        if (params->nSkill != 62 || !fireball ||
-            (missileId != 265 && missileId != static_cast<int>(fireball->wExplosionMissile))) return nullptr;
+        // 1.13c D2Client+0xB1420: a missile with hit function 1 (Fire Ball, Exploding Arrow) spawns its
+        // hit children (265) and its Missiles.txt +0x16 ExplosionMissile through the same create path;
+        // the request's skill is that missile's class.
+        const auto* source = DATATBLS_GetMissilesTxtRecord(params->nSkill);
+        if (!source || source->wCltHitFunc != 1 ||
+            (missileId != 265 && missileId != static_cast<int>(source->wExplosionMissile))) return nullptr;
     } else {
         const auto* skill = DATATBLS_GetSkillsTxtRecord(params->nSkill);
         if (!skill || !is_client_launch_skill(params->nSkill) || skill->wCltMissile != missileId) return nullptr;
@@ -2243,6 +2255,17 @@ static D2UnitStrc* create_client_projectile(D2UnitStrc* owner, D2SkillStrc* skil
     return create_client_missile(&params);
 }
 
+// What the ported do functions call back into (d2client/realm_skill_do.h).
+static const RealmSkillDoHost& client_skill_do_host() {
+    static const RealmSkillDoHost host{
+        [](const D2MissileStrc* params) { return create_client_missile(params, true); },
+        [](D2UnitStrc* unit, int row, int skillId) {
+            record_unit_fx(d2::realm::kUnitFxSound, unit, static_cast<uint32_t>(row), 0, static_cast<uint32_t>(skillId));
+        },
+        [](int type, uint32_t guid) { return find_realm_client_unit(static_cast<uint8_t>(type), guid); },
+    };
+    return host;
+}
 struct RealmMissileCollision { D2UnitStrc* missile; D2UnitStrc* owner; uint32_t hitGuid = 0xffffffffu; };
 static int __fastcall ordinary_projectile_target(D2UnitStrc* target, void* context) {
     auto* collision = static_cast<RealmMissileCollision*>(context);
@@ -2296,7 +2319,7 @@ static bool create_fireball_hit_child(D2UnitStrc* source,
 // collided (or expired with AlwaysExplode) spawns Missiles.txt +0x16 at its own
 // position. Negative +0x16 (signed) means no explosion, as in the native guard.
 static void spawn_fireball_explosion(D2UnitStrc* missile) {
-    const auto* fireball = DATATBLS_GetMissilesTxtRecord(62);
+    const auto* fireball = DATATBLS_GetMissilesTxtRecord(missile->dwClassId);
     if (!fireball || static_cast<int16_t>(fireball->wExplosionMissile) < 0) return;
     D2UnitStrc* owner = nullptr;
     for (auto& player : g_players) if (MISSILE_CheckUnitIfOwner(missile, player.motionUnit)) {
@@ -2308,7 +2331,7 @@ static void spawn_fireball_explosion(D2UnitStrc* missile) {
     params.pOwner = owner;
     params.nMissile = fireball->wExplosionMissile;
     params.nX = UNITS_GetXPosition(missile); params.nY = UNITS_GetYPosition(missile);
-    params.nSkill = 62;
+    params.nSkill = static_cast<int>(missile->dwClassId);
     params.nSkillLevel = static_cast<int>(MISSILE_GetLevel(missile));
     params.nFrame = 0;
     auto* created = create_client_missile(&params);
@@ -2431,7 +2454,7 @@ static void advance_client_missiles() {
                 hitGuid != 0xffffffffu ? UNIT_MONSTER : 0xffffffffu, hitGuid);
             // Lifetime expiry runs the hit callback only with AlwaysExplode; Fire Ball has none (a retail recording expiry, no impact row).
             if (collided || (txt && txt->nAlwaysExplode)) record_client_missile_impact_sound(terminalEvent, unit, txt);
-            if (unit->dwClassId == 62 && (collided || (txt && txt->nAlwaysExplode)) && g_selectedPlayer >= 0 &&
+            if (txt && txt->wCltHitFunc == 1 && (collided || (txt && txt->nAlwaysExplode)) && g_selectedPlayer >= 0 &&
                 static_cast<size_t>(g_selectedPlayer) < g_players.size()) {
                 d2::realm::createFireballHitChildren(unit, g_players[g_selectedPlayer].motionUnit,
                     create_fireball_hit_child, nullptr);
@@ -2481,7 +2504,13 @@ static bool player_mode_ends_itself(uint32_t mode) {
 static bool advance_client_player_action(D2UnitStrc* unit) {
     if (!unit || unit->dwUnitType != UNIT_PLAYER || !player_mode_ends_itself(unit->dwAnimMode)) return false;
     auto* skill = UNITS_GetUsedSkill(unit);
-    if (!(unit->dwFlags & 0x40u) && unit->nActionFrame >= 1 && unit->nActionFrame <= 3) {
+    const int doFn = skill && skill->pSkillsTxt ? static_cast<int>(skill->pSkillsTxt->wCltDoFunc) : 0;
+    if (!(unit->dwFlags & 0x40u) && unit->nActionFrame >= 1 && unit->nActionFrame <= 3 &&
+            d2client_realm_skill_do_ported(doFn) && !(skill->dwFlags & 1u)) {
+        // 1.13c D2Client+0xA2C90: a row with a do function runs it; the function marks the do itself.
+        d2client_realm_skill_do(doFn, unit, skill->pSkillsTxt->nSkillId, SKILLS_GetSkillLevel(unit, skill, TRUE),
+            client_skill_do_host());
+    } else if (!(unit->dwFlags & 0x40u) && unit->nActionFrame >= 1 && unit->nActionFrame <= 3) {
         if (skill && skill->pSkillsTxt && !(skill->dwFlags & 1u) &&
                 (unit->dwAnimMode == PLRMODE_CAST ? is_client_launch_skill(skill->pSkillsTxt->nSkillId) :
                     (!is_natural_client_projectile(skill->pSkillsTxt->nSkillId) &&
@@ -3039,8 +3068,8 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_local_fire(int kind, int type, uint32_t
 // Objects: retail's test has no melee rule for an object. It is usable now only when the footprint
 // reach (D2Common #10594) is nonzero and the collision test between the two (D2Common #10324, mask
 // 0x804) is zero; the object table's operate-range column is not read.
-// GUESS (items, tiles): they take the melee rule above. The realm keeps no CUnit for them, so they
-// stay -1 and the page falls back to its tile distance; that fallback is not retail.
+// Items: a ground item the client holds takes the melee rule above (retail's 0x29E80 end branch);
+// one it holds no unit for, and tiles, stay -1 and the page falls back to its tile distance.
 // Settled by a function capture of +0x29E80 over item and tile targets with the melee inputs pinned.
 // -1 for a unit the client keeps no CUnit for (ground items, an object outside the active rooms) or no local player.
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_can_interact(int type, uint32_t guid) {
@@ -3053,7 +3082,7 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_can_interact(int type, uint32_t guid) {
         return UNITS_IsObjectInInteractRange(unit, object) &&
             !UNITS_TestCollisionBetweenInteractingUnits(unit, object, 0x804) ? 1 : 0;
     }
-    if (type != UNIT_MONSTER && type != UNIT_PLAYER) return -1;
+    if (type != UNIT_MONSTER && type != UNIT_PLAYER && type != UNIT_ITEM) return -1;
     auto* target = find_realm_client_unit(static_cast<uint8_t>(type), guid);
     if (!target || !target->pDynamicPath) return -1;
     return UNITS_IsInMeleeRange(unit, target, UNITS_IsInMovingMode(target)) ? 1 : 0;

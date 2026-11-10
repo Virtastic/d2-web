@@ -425,6 +425,8 @@ int d2_realm_client_item_packet(D2UnitStrc* hero, D2UnitStrc* owner,
         case ITEMACTION_ADDTOGROUND: case ITEMACTION_DROPTOGROUND: case ITEMACTION_ONGROUND: {
             // The unit is held with its ground mode; the ground picture is the screen's.
             D2UnitStrc* item = obtain(guid, record, bits, size);
+            // The record's coordinates are the ground cell; the room is bound when the unit is looked up.
+            if (item && item->pStaticPath) UNITS_InitializeStaticPath(item, nullptr, record.nX, record.nY);
             return item ? 1 : 0;
         }
         case ITEMACTION_GROUNDTOCURSOR: case ITEMACTION_TOCURSOR: {

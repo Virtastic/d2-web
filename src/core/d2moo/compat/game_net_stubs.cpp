@@ -256,10 +256,13 @@ void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
                     D2GAME_PACKETS_SendPacket0x07_6FC3D120(pClient, (uint8_t)DUNGEON_GetLevelIdFromRoom(nextRooms[i]), (uint16_t)coords.nTileXPos, (uint16_t)coords.nTileYPos);
                 }
                 DUNGEON_AddClientToRoom(nextRooms[i], pClient);
-                // The local game's client learns each monster of a room it enters (retail's room join does it for every unit).
-                if (g_sessionJoinUnits)
+                // The local game's client learns every unit of a room it enters but its own player, in the room's unit
+                // order (retail's LEVEL_AddClient unit loop: objects, items, missiles and players as well as monsters).
+                if (g_sessionJoinUnits) {
+                    D2UnitStrc* pOwn = CLIENTS_GetPlayerFromClient(pClient, 0);
                     for (D2UnitStrc* u = nextRooms[i]->pUnitFirst; u; u = u->pRoomNext)
-                        if (u->dwUnitType == UNIT_MONSTER) D2GAME_SUNITMSG_FirstFn_6FCC5520(pClient->pGame, u, pClient);
+                        if (u != pOwn) D2GAME_SUNITMSG_FirstFn_6FCC5520(pClient->pGame, u, pClient);
+                }
             }
         }
     }
@@ -503,7 +506,16 @@ void __fastcall D2GAME_PACKETS_SendPacket0x22_6FC3DBE0(D2ClientStrc* pClient, BY
     packet.bIsCorpse = pUnit && STATES_CheckState(pUnit, STATE_PLAYERBODY);
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }
-void D2GAME_PACKETS_SendPacket0x23_6FC3DC60(D2ClientStrc* pClient, BYTE nUnitType, int32_t nUnitGUID, BYTE a4, WORD a5, int32_t a6) {}
+// 1.13c D2Game+0x8D5F0 (SCmd.cpp 0x23): the selected skill of a unit, {header, type, guid, hand, skill, owner}, 13 bytes.
+// The client's own selection only changes when this arrives, so a stub here leaves the realm client on its default skill.
+void D2GAME_PACKETS_SendPacket0x23_6FC3DC60(D2ClientStrc* pClient, BYTE nUnitType, int32_t nUnitGUID, BYTE a4, WORD a5, int32_t a6) {
+    uint8_t packet[13] = { 0x23, nUnitType };
+    std::memcpy(packet + 2, &nUnitGUID, 4);
+    packet[6] = a4;
+    std::memcpy(packet + 7, &a5, 2);
+    std::memcpy(packet + 9, &a6, 4);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, packet, sizeof packet);
+}
 // 1.13c D2Game+0x3DDF0: variable-length chat/overhead message; byte 9 (name colour) is sent as built.
 void D2GAME_PACKETS_SendPacket0x26_ServerMessage_6FC3DDF0(D2ClientStrc* pClient, D2GSPacketSrv26* pMsg) {
     if (!pClient || !pMsg) return;

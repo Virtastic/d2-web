@@ -45,7 +45,6 @@ const uint8_t* d2_session_join_stream(uint32_t* length);
 uint32_t d2_session_join_load_length();
 int d2_session_client_spawned();
 int d2_session_client_rooms(uint8_t* out, int capacity);
-int d2_session_client_room_objects();
 uint32_t d2_session_game_seed();
 int d2_session_game_flags();
 }
@@ -114,7 +113,7 @@ bool sendPlayer() {
     const uint32_t load = d2_session_join_load_length();
     if (join && load <= burst) put(join + load, static_cast<int>(burst - load));
     g_server.phase = Phase::InGame;     // the sink forwards from here on
-    d2_session_client_room_objects();   // through the packet sink: each object of those rooms, before the updates that name them
+    // The room join already sent each unit of those rooms (objects included) into the kept join bytes above; no second pass.
     return true;
 }
 

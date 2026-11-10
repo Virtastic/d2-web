@@ -15,3 +15,10 @@ export function heldWorldAction(resolved) {
 export function leftHandCommand(leftSkillId) {
   return Number(leftSkillId) > 0 ? 'left-skill' : 'primary-attack';
 }
+
+/** A right click on open ground walks there when the right-hand skill is hand to hand (the skill plan's
+ *  answer 2), unless Stand Still is held. One rule for the joined game and the local one; the plan comes
+ *  from the engine in both, never from a skill id. */
+export function rightGroundWalks(plan, stand) {
+  return plan === 2 && !stand;
+}

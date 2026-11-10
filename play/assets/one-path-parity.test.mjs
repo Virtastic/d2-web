@@ -19,7 +19,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-export const FIELDS = ['world', 'player', 'life', 'monsters', 'players', 'missiles', 'objects', 'groundItems', 'ownedItems'];
+export const FIELDS = ['world', 'player', 'cast', 'life', 'monsters', 'players', 'missiles', 'objects', 'groundItems', 'ownedItems'];
 
 // Objects: the units a client holds (a room with a client) that the server sends; the engine also lists the rooms
 // no client is in, and the sound-only presets a client builds from its own level data (ids from 0x70000000), neither of which a packet carries.
@@ -40,6 +40,7 @@ export const SNAPSHOT_FIELDS = `(() => {
   const items = s.items ?? [], ground = (i) => Boolean(i.landed) || i.invPage === 0xff;
   return { world: ['act:' + s.act, 'level:' + s.level, 'difficulty:' + s.difficulty, 'class:' + s.playerClass],
     player: ['x:' + p.x, 'y:' + p.y, 'mode:' + s.mode, 'weapon:' + p.weaponClass],
+    cast: ['mode:' + s.mode, 'right:' + window.__d2Shell.selectedSkill],
     life: ['hp:' + p.hp, 'hpMax:' + p.hpMax, 'mana:' + p.mana, 'manaMax:' + p.manaMax],
     monsters: of(1).filter((r) => !held || held.has(Number(r.split(':')[0]))), players: of(0), missiles: of(3),
     objects: (s.objects ?? []).filter((o) => o.inClientRoom !== false && (o.id >>> 0) < 0x70000000).map(unit),
@@ -78,7 +79,11 @@ export function parityTable(direct, packets, fields = FIELDS, lag = {}) {
 export const formatTable = (table) => Object.entries(table).map(([f, v]) => `${f}: ${v.differing}/${v.total}`).join('\n');
 
 // The script both runs play, on the same map (seed 1; a new character's map is otherwise drawn at random): where the pointer goes on which tick (canvas pixels; button 0 left, 2 right).
-export const SCRIPT = { ticks: 120, clicks: [{ tick: 5, x: 560, y: 120, button: 0 }, { tick: 40, x: 120, y: 400, button: 0 }, { tick: 80, x: 470, y: 200, button: 2 }] };
+export const SCRIPT = { ticks: 170, query: '&class=1&level=2&skills=44:1,54:1',   // a sorceress with Ice Bolt and Teleport, in the Blood Moor (a town refuses Ice Bolt)
+  clicks: [{ tick: 5, x: 560, y: 120, button: 0 }, { tick: 40, x: 120, y: 400, button: 0 },
+    { tick: 75, x: 470, y: 200, button: 2 }, { tick: 95, x: 300, y: 250, button: 2 },    // right hand Ice Bolt, twice
+    { tick: 115, x: 520, y: 380, button: 2 }, { tick: 140, x: 200, y: 300, button: 2 }],   // right hand Teleport, twice
+  selects: [{ tick: 70, skill: 44, left: 0 }, { tick: 110, skill: 54, left: 0 }] };
 
 // Run in the page as one synchronous call, so the page's own frame loop cannot tick inside it. That loop does run
 // between the game coming up and this call, for as long as the wall clock allows (7 to 12 ticks measured), so the
@@ -95,6 +100,8 @@ export const PLAY_SCRIPT = `async (shell, script) => {
   if (at > ${START_TICK}) throw new Error('the game was at tick ' + at + ' before the script began, past its start tick ${START_TICK}');
   for (let n = ${START_TICK} - at; n > 0; n--) { shell.step(); await settle(); }
   for (let t = 0; t < script.ticks + (shell.fromPackets ? Math.max(...Object.values(${JSON.stringify(PACKET_LAG)})) : 0); t++) {
+    // The hand's skill is chosen through the page's own command: the engine at once, or the 0x3C packet whose 0x23 answer the client reads back.
+    for (const c of script.selects ?? []) if (c.tick === t) shell.selectSkill?.(c.skill, c.left ? 'left' : 'right');
     for (const c of script.clicks) if (c.tick === t) shell.input.pointer(c.x, c.y, c.button);
     shell.step(); await settle(); shell.refreshView?.();
     out.push(${SNAPSHOT_FIELDS});
@@ -145,12 +152,18 @@ test('the script starts on the same game tick however far the page had run befor
   // ticked the game since the last draw). The script starts on the same tick as the direct run above.
   const packetRun = (ranBefore) => {
     const game = { tick: ranBefore, x: 0 }; let drawn = { tick: ranBefore - 3 };
-    const shell = { input: { pointer: (x) => { game.x = x; } }, step: () => { game.tick++; },
+    const shell = { fromPackets: true, input: { pointer: (x) => { game.x = x; } }, step: () => { game.tick++; },
       refreshView: () => { drawn = { tick: game.tick, playerId: 1, player: { x: game.x, y: 0 }, entities: [{ id: 4, type: 1, classId: 147, mode: game.tick < 133 ? 1 : 2, x: 5, y: 5 }] }; },
       get snapshot() { return drawn; } };
     return new Function('window', `return (${PLAY_SCRIPT})(window.__d2Shell, ${JSON.stringify(SCRIPT)})`)({ __d2Shell: shell });
   };
-  for (const ranBefore of [7, 12, 60]) assert.deepEqual(packetRun(ranBefore), first, `packet frame, ${ranBefore} ticks before the script`);
+  // It plays the lag's frames more (PACKET_LAG), for a lagged field to be read on the frame it lands; the frames before them are the direct run's.
+  const lag = Math.max(...Object.values(PACKET_LAG));
+  for (const ranBefore of [7, 12, 60]) {
+    const frames = await packetRun(ranBefore);
+    assert.equal(frames.length, SCRIPT.ticks + lag, `packet frame, ${ranBefore} ticks before the script: its length`);
+    assert.deepEqual(frames.slice(0, SCRIPT.ticks), first, `packet frame, ${ranBefore} ticks before the script`);
+  }
 });
 
 // ---- the live run ----
@@ -227,18 +240,18 @@ test('a local game read from the engine and the same game read from its packets 
   try {
     const origin = `http://127.0.0.1:${port}`;
     for (let i = 0; i < 50; i++) { if (await fetch(origin + '/index.html').then((r) => r.ok, () => false)) break; await sleep(100); }
-    const direct = await play(origin, '', false);
+    const direct = await play(origin, SCRIPT.query, false);
     // The script is the same game again: a field that differs between two direct runs is not a parity field at all.
     // Every repeat is compared with the first run and the counts are summed (D2_ONE_PATH_CONTROL_RUNS repeats, 2 unless set).
     const control = Object.fromEntries(FIELDS.map((f) => [f, { differing: 0, total: 0 }]));
     let again = [];
     for (let i = 0; i < CONTROL_RUNS; i++) {
-      again = await play(origin, '', false);
+      again = await play(origin, SCRIPT.query, false);
       for (const [f, v] of Object.entries(parityTable(direct, again))) { control[f].differing += v.differing; control[f].total += v.total; }
     }
     // A packet run that never comes up shows nothing: every record of the direct run then differs, and the reason is printed.
     let joinFailure = '';
-    const packets = await play(origin, '&localrealm=1', true).catch((error) => { joinFailure = error.message; return []; });
+    const packets = await play(origin, SCRIPT.query + '&localrealm=1', true).catch((error) => { joinFailure = error.message; return []; });
     const table = parityTable(direct, packets, FIELDS, PACKET_LAG);
     if (process.env.D2_ONE_PATH_DUMP) writeFileSync(process.env.D2_ONE_PATH_DUMP, JSON.stringify({ direct, again, packets }));   // the runs themselves, to read a differing field
     console.log(`one-path parity, ${SCRIPT.ticks} ticks (field: differing/total)\n${formatTable(table)}\ncontrol, direct against ${CONTROL_RUNS} more direct\n${formatTable(control)}${joinFailure ? `\npacket run: ${joinFailure}` : ''}`);

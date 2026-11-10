@@ -10,6 +10,7 @@ int d2client_realm_a0ea0(D2UnitStrc* unit, int skillId, int level);   // start f
 int d2client_realm_a0e70(D2UnitStrc* unit, int skillId, int level);   // start function 2
 int d2client_realm_14f30(D2UnitStrc* unit, int skillId, int level);   // start function 11
 int d2client_realm_14f10(D2UnitStrc* unit, int skillId, int level);   // start function 12
+int d2client_realm_15500(D2UnitStrc* unit, int skillId, int level);   // start function 13
 int d2client_realm_57000(D2UnitStrc* unit, int skillId, int level);   // start function 39
 
 int d2client_realm_a0730(D2UnitStrc* unit, int skillId, int level);   // start function 4

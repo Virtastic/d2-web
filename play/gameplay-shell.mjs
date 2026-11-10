@@ -153,7 +153,7 @@ import { MODAL_POINTER_OWNER, modalPointerOwner } from './assets/modal-pointer-p
 import { heldPointerWorldAllowed } from './assets/held-pointer-world.mjs';
 import { createGameClock, GAME_STEP, STEP, MAX_CATCHUP_UPDATES, rafStarved } from './assets/game-clock.mjs';
 import { queueHeldPointerRepeat } from './assets/held-pointer-repeat.mjs';
-import { heldWorldAction, leftHandCommand } from './assets/world-click-dispatch.mjs';
+import { heldWorldAction, leftHandCommand, rightGroundWalks } from './assets/world-click-dispatch.mjs';
 import { createDeathScreen, deathScreenShown, respawnAllowed } from './assets/death-screen.mjs';
 import { createRealmGameUi } from './assets/realm-game-ui.mjs';
 import { realmHeroFlags, realmCorpseViews, createRealmDeath, heroIsDown, deathBlocksKey, markCharactersDead } from './assets/realm-death.mjs';
@@ -996,7 +996,7 @@ const AUTOSAVE_TICKS = 600;   // update() runs at the session's step rate; ~30s 
 const saveStore = createSaveStore();
 // The class the player chose on the creation screen. Null until they choose, in which case the
 // dev dropdown still decides -- that path is what `play=1` and the browser scenarios use.
-let chosenClass = null, chosenName = '';
+let chosenClass = new URLSearchParams(window.__d2Entry.search).get('class') === null ? null : Number(new URLSearchParams(window.__d2Entry.search).get('class')), chosenName = '';   // ?class= starts a new character as that class (the parity script's sorceress)
 const TERRAIN_ENABLED = new URLSearchParams(window.__d2Entry.search).get('terrain') !== '0';
 let inventoryVisible = new URLSearchParams(window.__d2Entry.search).get('inventory') === '1';
 let hirelingVisible = false;
@@ -1040,7 +1040,7 @@ function sessionAdapter() {
       },
       throwSkill(targetId) { return Module.ccall('d2_session_command_throw', 'number', ['number'], [targetId]); },
       kick(targetId) { return Module.ccall('d2_session_command_kick', 'number', ['number'], [targetId]); },
-      pickup(itemId) { return Module.ccall('d2_session_command_pickup', 'number', ['number'], [itemId]); },
+      pickup(itemId) { return Module.ccall('d2_session_client_pickup', 'number', ['number'], [itemId]); },
       drop(itemId) { return Module.ccall('d2_session_command_drop', 'number', ['number'], [itemId]); },
       useBelt(slot) {
         const result = Module.ccall('d2_session_command_use_belt', 'number', ['number'], [slot]);
@@ -1334,7 +1334,7 @@ async function bootstrapSession() {
     } else {
       // ?seed= pins the map the new character generates at the capture's own seed; without it the
       // game gets a fresh seed from the clock, as retail's game create does (assets/game-seed.mjs).
-      fixture = Object.freeze({ ...fixtures[0], seed: MAP_SEED_OVERRIDE != null ? MAP_SEED_OVERRIDE : gameInitSeed(clockInputs()) });
+      fixture = Object.freeze({ ...fixtures[0], ...(new URLSearchParams(window.__d2Entry.search).get('level') ? { level: Number(new URLSearchParams(window.__d2Entry.search).get('level')) } : {}), seed: MAP_SEED_OVERRIDE != null ? MAP_SEED_OVERRIDE : gameInitSeed(clockInputs()) });
       if (!api?.create(fixture, Number(classSelect.value))) throw new Error('d2_session_create failed');
       propCache.clear(); heroStatWatch = null;
       session = api; snapshot = api.snapshot(); clock.reset();   // a new game starts its own 25 Hz clock
@@ -1426,6 +1426,8 @@ async function bootstrapSession() {
     // exists rather than only after some later autosave the player never triggers.
     autosaveAt = 0; autosaveAct = snapshot.act; autosaveInFlight = false;
     if (chosenName) { if (!navigator.webdriver) await entryYield(); persistCurrentCharacter(); }
+    // ?skills=id:level,... gives the new character those skills before any join (the parity script's casts).
+    for (const grant of (new URLSearchParams(window.__d2Entry.search).get('skills') || '').split(',').filter(Boolean)) Module.ccall('d2_session_fixture_skill_level', 'number', ['number', 'number'], grant.split(':').map(Number));
     if (LOCAL_REALM) await enterLocalRealm();
   } catch (error) { sessionError = String(error?.stack || error); }
   finally { sessionEntering = false; }
@@ -3500,8 +3502,9 @@ function update(forceTick = false, live = false) {
         // Any other right-hand skill (Bash, Double Swing, ...) is the engine's selected right skill.
         const groundSkill = !targetId && command.secondary && skill > 2 && command.x != null;
         // The retail client's click dispatch: a hand-to-hand right skill on open ground walks to the spot, unless
-        // Stand Still is held. GUESS: Attack and Kick are the hand-to-hand skills told apart here; the others keep the engine's cast.
-        if (!targetId && command.secondary && skill <= 1 && command.x != null && !heldStandStillKeys.size) {
+        // Stand Still is held. The engine's skill plan says which skills are hand to hand (Bash walks like Attack does).
+        if (!targetId && command.secondary && command.x != null && Module._d2_session_right_ground_plan
+            && rightGroundWalks(Module.ccall('d2_session_right_ground_plan', 'number', [], []), heldStandStillKeys.size > 0)) {
           walkGoal = null;
           const moved = session.move(resolved.at.x, resolved.at.y);
           if (!moved) armWalk({ x: resolved.at.x, y: resolved.at.y, within: 2 });
@@ -7935,7 +7938,7 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
   // .ma0 the engine composed against the exact cells it was given.
   automapCells() { return automapOverlay?.savedCells?.() ?? []; },
   get skillSelectEvidence() { return skillSelectEvidence && JSON.parse(JSON.stringify({ ...skillSelectEvidence, error: skillSelectError })); },
-  get selectedSkill() { return Math.max(0, readSelectedSkills().right); }, get lastSkillCommand() { return lastSkillCommand && { ...lastSkillCommand }; },
+  selectSkill: (id, side) => selectSkill(id, side), get selectedSkill() { return Math.max(0, readSelectedSkills().right); }, get lastSkillCommand() { return lastSkillCommand && { ...lastSkillCommand }; },
   get lastBeltCommand() { return lastBeltCommand && { ...lastBeltCommand }; },
   get lastMoveCommand() { return lastMoveCommand && { ...lastMoveCommand }; },
   // Both hands, straight from the engine's own record: a row that proves `S` picked the RIGHT

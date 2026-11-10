@@ -1,3 +1,4 @@
+import { rightGroundWalks } from './world-click-dispatch.mjs';
 import { corpseLootable, deathSendAllowed } from './realm-death.mjs';
 // What the player's input sends in a joined Battle.net game. The same clicks and keys a local game
 // reads become the retail 1.13c D2GS client packets (layouts: D2MOO D2PacketDef.h / PlrMsg.cpp, and the
@@ -316,7 +317,7 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
       pending = null;
       const x = clamp16(world.x), y = clamp16(world.y);
       // A hand-to-hand right skill on open ground walks there, unless Stand Still is held.
-      if (!stand && plan(1, -1, 0) === 2) {
+      if (rightGroundWalks(plan(1, -1, 0), stand)) {
         if (!startRoute(x, y, s.run)) return false;
         return emit(s.run ? packets.runTo(x, y) : packets.walkTo(x, y), s.run ? 'run' : 'walk') && hit;
       }

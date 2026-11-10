@@ -1250,7 +1250,7 @@ FireballHitCounts createFireballHitChildren(D2UnitStrc* sourceFireball,
         D2UnitStrc* currentClientPlayer, FireballHitChildFactory factory, void* context) {
     FireballHitCounts empty{};
     if (!sourceFireball || sourceFireball->dwUnitType != UNIT_MISSILE ||
-        sourceFireball->dwClassId != 62 || !sourceFireball->pMissileData ||
+        !sourceFireball->pMissileData ||
         !sourceFireball->pDynamicPath || !currentClientPlayer ||
         currentClientPlayer->dwUnitType != UNIT_PLAYER || !currentClientPlayer->pDynamicPath || !factory) {
         return empty;
@@ -1258,7 +1258,10 @@ FireballHitCounts createFireballHitChildren(D2UnitStrc* sourceFireball,
 
     D2MissilesTxt* sourceTxt = DATATBLS_GetMissilesTxtRecord(sourceFireball->dwClassId);
     D2MissilesTxt* childTxt = DATATBLS_GetMissilesTxtRecord(265);
-    if (!sourceTxt || !childTxt || sourceTxt->wCltHitSubMissile[0] != 265) return empty;
+    // 1.13c D2Client+0xBC1A0 (hit function 1): any row with that hit function and a first hit
+    // sub-missile; the child is always class 265 whatever the row names.
+    if (!sourceTxt || !childTxt || sourceTxt->wCltHitFunc != 1 ||
+        static_cast<int16_t>(sourceTxt->wCltHitSubMissile[0]) < 0) return empty;
 
     D2DrlgActStrc* clientAct = d2_drlg_client_act();
     if (!clientAct) return empty;
@@ -7756,6 +7759,39 @@ static bool sessionPlayerInActionMode() {
     const uint32_t m = g_targetPlayer ? g_targetPlayer->dwAnimMode : 0;
     return m == PLRMODE_ATTACK1 || m == PLRMODE_ATTACK2 || m == PLRMODE_CAST || m == PLRMODE_THROW;
 }
+// A pickup the way retail's client makes it (D2Client 0x29E80 / 0x2AA40 / 0x2B090): out of melee reach the
+// client walks to the item (packet 0x02) and keeps the pickup waiting; each frame, before the units move,
+// it re-tests the reach and sends the pickup (0x16) once the item is in it. The server never walks for a
+// bare far 0x16. Here the "client" is this function and the per-frame step below.
+static uint32_t g_sessionClientPickup = 0;
+EMSCRIPTEN_KEEPALIVE int d2_session_command_pickup(uint32_t itemUnitId);
+static bool sessionClientPickupInReach(D2UnitStrc* item) {
+    return item && item->dwAnimMode == IMODE_ONGROUND && UNITS_GetRoom(item) && UNITS_GetRoom(g_targetPlayer) &&
+        UNITS_IsInMeleeRange(g_targetPlayer, item, UNITS_IsInMovingMode(item));
+}
+static void sessionClientPickupStep() {
+    if (!g_sessionClientPickup) return;
+    const uint32_t id = g_sessionClientPickup;
+    D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)id);
+    if (!item || item->dwAnimMode != IMODE_ONGROUND || !UNITS_GetRoom(item)) { g_sessionClientPickup = 0; return; }
+    const uint32_t mode = g_targetPlayer->dwAnimMode;
+    if (mode == PLRMODE_DEATH || mode == PLRMODE_DEAD) { g_sessionClientPickup = 0; return; }
+    if (!sessionClientPickupInReach(item)) return;
+    g_sessionClientPickup = 0;
+    d2_session_command_pickup(id);
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_client_pickup(uint32_t itemUnitId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory) return 0;
+    D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemUnitId);
+    if (!item || item->dwAnimMode != IMODE_ONGROUND || !UNITS_GetRoom(item)) return 0;
+    g_sessionClientPickup = 0;
+    if (sessionClientPickupInReach(item)) return d2_session_command_pickup(itemUnitId);
+    uint8_t walk[9] = { 0x02, UNIT_ITEM, 0, 0, 0 };
+    std::memcpy(walk + 5, &itemUnitId, 4);
+    if (d2_session_client_packet(walk, 9) < 0) return 0;
+    g_sessionClientPickup = itemUnitId;
+    return 2;
+}
 EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath || frames < 0) return 0;
     // a retail recording: server->client packets a tick queues (NPC quest-marker 0x8A) are the tick's own stream.
@@ -7766,6 +7802,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     struct StreamRefresh { ~StreamRefresh() { D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets); } } streamRefresh;
     g_sessionIdleRowsReady.swap(g_sessionIdleRows); g_sessionIdleRows.clear();   // a row drawn at a frame's end is the next tick's sound
     for (int i = 0; i < frames; ++i) {
+        sessionClientPickupStep();
         if (g_pendingRightSkill.set && !sessionPlayerInActionMode()) { const PendingRightSkill q = g_pendingRightSkill; g_pendingRightSkill.set = false; sessionCommandRightSkillAt(q.x, q.y, false); }
         // the client sees the previous frame's server state (a death this frame reaches it by packet next tick)
         { extern void d2client_unitseed_flush(); extern void d2_client_monster_order_face_flush(); d2client_unitseed_flush(); d2_client_monster_order_face_flush(); }   // the previous frame's unit adds and orders, in send order
@@ -8361,6 +8398,14 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_selected_skills() {
     g_sessionSelectedSkills[0] = l ? SKILLS_GetSkillIdFromSkill(l, __FILE__, __LINE__) : -1;
     g_sessionSelectedSkills[1] = r ? SKILLS_GetSkillIdFromSkill(r, __FILE__, __LINE__) : -1;
     return g_sessionSelectedSkills;
+}
+// What a right click on open ground does with the right-hand skill: 2 = the skill is hand to hand, so
+// the click walks there; 1 = the skill is used at the spot; -1 = no player or no right skill. The same
+// answer d2_realm_client_skill_plan gives a joined game (1.13c D2Client+0x1B7F0).
+EMSCRIPTEN_KEEPALIVE int32_t d2_session_right_ground_plan() {
+    D2SkillStrc* r = g_targetPlayer ? UNITS_GetRightSkill(g_targetPlayer) : nullptr;
+    if (!r) return -1;
+    return D2Common_11016(g_targetPlayer, r) == 1 ? 2 : 1;
 }
 // The skill bound to F<i+1> (-1 unbound): retail labels the right button 'F<n>' for each hotkey bound to its skill.
 EMSCRIPTEN_KEEPALIVE int32_t d2_session_hotkey_skill(int32_t i) {
