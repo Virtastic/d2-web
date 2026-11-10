@@ -46,7 +46,7 @@ export const BNET_LOBBY_STRINGS = {
   create: 5312, join: 5313, channel: 5314, ladder: 5315, quit: 5316, enterChat: 11126,
   newsTitle: 11123, level: 4057, lastDifficulty: 11124, none: 11125, normal: 5156, nightmare: 5155, hell: 5154,
   hardcore: 5016, levelN: 5017, accountName: 5224, deadHardcore: 5304, ok: 5102, cancel: 5103, pleaseWait: 5243,
-  createGame: 5150, joinGame: 5151, gameName: 5274, password: 5225, passwordOptional: 5256, descriptionOptional: 5257,
+  createGame: 5150, joinGame: 5151, gameName: 5274, invalidGameName: 5137, password: 5225, passwordOptional: 5256, descriptionOptional: 5257,
   maxPlayers: 5258, levelDifference: 5259, levels: 5260, gameListHeader: 5275,
   helpTitle: 5308, channelsTitle: 5263, channelName: 5262, ladderTitle: 5315,
   standardLadder: 5317, hardcoreLadder: 5318, expansionLadder: 10090, expansionHardcoreLadder: 10091,
@@ -362,7 +362,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   // looked at (and restarted) while the join panel is open: the first look after boot is always due, and a panel reopened within 15 s of the timer's last
   // firing waits out the rest of that period instead of restarting it.
   let timerAt = -Infinity;
-  const refreshGames = () => { onRefreshGames(); };
+  const refreshGames = () => { if (typeof onRefreshGames === 'function') onRefreshGames(); };
   // The list control's state: the row picked (an index into `games`, -1 none) and the first row on show.
   let selected = -1, listFirst = 0;
   // The description control beside the list holds the text of the last row picked; every click on the list, and every refresh, empties it first.
@@ -529,7 +529,11 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
       difficulty: form.difficulty, levelDifference: form.levelLimit ? (Number(form.levelDifference) || 0) & 0xff : 0xff }));
   };
   const joinGame = () => {
-    if (busy) return;   // the JOIN button is greyed with no name, but the Enter handler behind the edit only needs the box to exist: an empty name goes on to the join request
+    if (busy) return;
+    // The typed name must be one of the listed games to send the join. Nothing matching shows the Invalid Game Name popup when the list is empty
+    // (or has no list callback) and returns silently when the list holds games; an empty name never matches.
+    const want = form.name.toLowerCase(), found = form.name !== '' && games.some((g) => g.name.toLowerCase() === want);
+    if (!found) { if (!games.length || typeof onRefreshGames !== 'function') notice = { body: string(S.invalidGameName) }; return; }
     joining = true; void run(() => onJoinGame({ gameName: form.name, gamePassword: form.password }));
   };
   // The arrows apply D2Multi's exact rules (0x13200 / 0x131A0 / 0x13140 / 0x130E0): a step only when it stays inside the range, no clamp otherwise.
