@@ -42,6 +42,7 @@ export const packets = Object.freeze({
   addStat: (stat, count = 1) => make(0x3a, le16((stat & 255) | (((count - 1) & 255) << 8))),   // 3
   addSkill: (skill) => make(0x3b, le16(skill)),                     // 3
   respawn: () => make(0x41),                                        // 1
+  bindHotkey: (slot, skill, left, ownerGuid = 0xffffffff) => make(0x51, le32((((slot & 15) << 16) | (left ? 0x8000 : 0) | (skill & 0x7fff)) >>> 0), le32(ownerGuid)), // 9
   selectSkill: (skill, left, ownerGuid = 0xffffffff) => make(0x3c, le32(((left ? 0x80000000 : 0) | (skill & 0x7fff)) >>> 0), le32(ownerGuid)), // 9
   enterPortal: (portalGuid, levelId) => make(0x45, le32(portalGuid), le32(levelId)),    // 9
   waypoint: (waypointGuid, levelId) => make(0x49, le32(waypointGuid), le32(levelId)),   // 9
@@ -335,6 +336,9 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     },
     /** The skill popup / hotkey choice. */
     selectSkill: (skill, left, owner = 0xffffffff) => emit(packets.selectSkill(skill, left, owner), 'select-skill'),
+    /** The skill popup's F-key assign: slot (0-15) takes the skill in that hand; the server binds it (0x51). */
+    bindHotkey: (slot, skill, left, owner = 0xffffffff) => (Number.isInteger(slot) && slot >= 0 && slot < 16 && Number.isInteger(skill) && skill >= 0 && skill <= 0x7fff
+      ? emit(packets.bindHotkey(slot, skill, Boolean(left), owner), 'bind-hotkey') : false),
     /** An F-key's select-skill packet, composed from the server's hotkey table (d2gsHotkeySelect); null when the key is unbound. */
     hotkey: (bytes) => (bytes ? emit(bytes, 'hotkey-select') : false),
     /** The character screen's +: `count` points (1..100) into a stat, one packet; the server spends them or refuses. */

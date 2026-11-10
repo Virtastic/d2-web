@@ -10,7 +10,7 @@ export const enterChatPacket = (name, realm = '') => bncsPacket(0x0a, [...cstr(n
 // The body is the product dword: 'VD2D' for classic, 'PX2D' for Lord of Destruction.
 export const getChannelListPacket = (expansion = true) => bncsPacket(0x0b, expansion ? [0x50, 0x58, 0x32, 0x44] : [0x56, 0x44, 0x32, 0x44]);
 // flags 5: the first join of a Diablo II client, which lands in the product's own channel.
-export const joinChannelPacket = (channel, flags = 5) => bncsPacket(0x0c, [flags & 255, 0, 0, 0, ...cstr(channel)]);
+export const joinChannelPacket = (channel, flags = 5) => bncsPacket(0x0c, [flags & 255, (flags >>> 8) & 255, (flags >>> 16) & 255, (flags >>> 24) & 255, ...cstr(channel)]);
 // SID_GETCHANNELLIST's reply: channel names, each NUL-terminated, ended by an empty name.
 export function parseChannelList(body) {
   const out = []; let at = 0;

@@ -17,8 +17,12 @@ constexpr int32_t kOneCel = 0x100;
 enum : uint32_t { kNeutral = 0, kOperating = 1, kOpened = 2, kSpecial1 = 3, kSpecial2 = 4, kSpecial3 = 5 };
 
 // The object data with the client's overlay slots behind it (retail hangs overlays off the unit's draw data).
-struct ClientObjectData : D2ObjectDataStrc { int32_t overlay[3] = { -1, -1, -1 }; };
+// Each slot is one looping node on the unit's overlay list, all of the same kind; a slot is only where this
+// client remembers which Overlay row it put there. Putting a row on makes a fresh node (any node of that row
+// is taken off first), so its clock starts again; `age` is the frames since.
+struct ClientObjectData : D2ObjectDataStrc { int32_t overlay[3] = { -1, -1, -1 }; int32_t age[3] = { 0, 0, 0 }; };
 ClientObjectData* data_of(const D2UnitStrc* unit) { return static_cast<ClientObjectData*>(unit->pObjectData); }
+void set_overlay(D2UnitStrc* unit, int slot, int32_t row) { data_of(unit)->overlay[slot] = row; data_of(unit)->age[slot] = 0; }
 
 // The client's object table: 128 chains keyed by the low 7 bits of the unit id, linked through the unit.
 constexpr uint32_t kBuckets = 128;
@@ -58,8 +62,8 @@ void refresh_shrine_overlays(D2UnitStrc* unit) {
     if (!shrine || shrine->nCode >= kShrineKinds) return;   // retail stops the game on a kind past its table
     const ShrineKind& kind = kShrine[shrine->nCode];
     const bool idle = unit->dwAnimMode == 0;
-    if (kind.overlayA != -1) data_of(unit)->overlay[0] = idle ? kind.overlayA : -1;
-    if (kind.overlayB != -1) data_of(unit)->overlay[1] = idle ? kind.overlayB : -1;
+    if (kind.overlayA != -1) set_overlay(unit, 0, idle ? kind.overlayA : -1);
+    if (kind.overlayB != -1) set_overlay(unit, 1, idle ? kind.overlayB : -1);
 }
 void set_flag(D2UnitStrc* unit, uint32_t flag, bool on) {
     unit->dwFlags = on ? (unit->dwFlags | flag) : (unit->dwFlags & ~flag);
@@ -200,7 +204,7 @@ void d2gs_client_object_set_mode(D2UnitStrc* unit, uint32_t mode, uint8_t select
     } else {
         change_mode(unit, mode);
         if (txt->nOverlay && idle_overlay_class(unit->dwClassId) && unit->dwAnimMode == 0)
-            data_of(unit)->overlay[2] = kIdleClassOverlay;
+            set_overlay(unit, 2, kIdleClassOverlay);
         set_flag(unit, UNITFLAG_TARGETABLE, txt->nSelectable[mode] != 0);
         if (!txt->nHasCollision[mode]) unblock(unit);
         if (txt->nOrderFlag[mode] == 1) unit->dwFlags |= UNITFLAG_PREDRAW;
@@ -210,6 +214,8 @@ void d2gs_client_object_set_mode(D2UnitStrc* unit, uint32_t mode, uint8_t select
 
 void d2gs_client_object_step(D2UnitStrc* unit) {
     if (!unit) return;
+    for (int slot = 0; slot < 3; ++slot)
+        if (data_of(unit)->overlay[slot] != -1) ++data_of(unit)->age[slot];
     const D2ObjectsTxt* txt = txt_of(unit);
     const uint32_t mode = unit->dwAnimMode;
     const int32_t count = static_cast<int32_t>(txt->dwFrameCnt[mode]);
@@ -282,14 +288,47 @@ D2UnitStrc* d2gs_client_object_next(const D2UnitStrc* previous) {
     return nullptr;
 }
 
-// GUESS: the three slots are reported as overlay rows alike. The slots differ in how the client's overlay list
-// treats them (the 0x47 glow goes in its own slot); the list's draw is not ported, and nothing draws these yet.
-int d2gs_client_object_overlays(const D2UnitStrc* unit, int32_t out[3]) {
+// The slots are reported alike because the client makes all three the same way: a looping node of one kind on
+// the unit's one overlay list, differing only in the Overlay row.
+int d2gs_client_object_overlays(const D2UnitStrc* unit, int32_t out[3], int32_t ages[3]) {
     int n = 0;
     if (unit && out)
-        for (int32_t overlay : data_of(unit)->overlay)
-            if (overlay != -1) out[n++] = overlay;
+        for (int slot = 0; slot < 3; ++slot)
+            if (data_of(unit)->overlay[slot] != -1) {
+                if (ages) ages[n] = data_of(unit)->age[slot];
+                out[n++] = data_of(unit)->overlay[slot];
+            }
     return n;
+}
+
+void d2gs_client_object_view(const D2UnitStrc* unit, uint8_t out[kClientObjectViewBytes]) {
+    struct View {
+        uint32_t id, classId, token, mode;
+        int32_t x, y;
+        uint32_t framePrecise, frameCountPrecise, componentMask;
+        uint16_t animSpeed;
+        uint8_t direction, selectable, portalLevel, locked;
+        uint16_t inRoom;
+        int32_t overlayCount, overlay[3], overlayAge[3];
+    } view = {};
+    static_assert(sizeof(View) == kClientObjectViewBytes, "object view record");
+    const D2ObjectsTxt* txt = txt_of(unit);
+    const uint8_t interact = unit->pObjectData->InteractType;
+    view.id = unit->dwUnitId; view.classId = static_cast<uint32_t>(unit->dwClassId);
+    std::memcpy(&view.token, txt->szToken, 3);
+    view.mode = unit->dwAnimMode;
+    view.x = unit->pStaticPath->tGameCoords.nX; view.y = unit->pStaticPath->tGameCoords.nY;
+    view.framePrecise = static_cast<uint32_t>(unit->nSeqCurrentFramePrecise); view.frameCountPrecise = unit->dwFrameCountPrecise;
+    view.componentMask = 0xFFFFu;   // the art's own layer list decides what is drawn
+    view.animSpeed = static_cast<uint16_t>(unit->wAnimSpeed);
+    view.direction = txt->nOrientation;
+    view.selectable = (unit->dwFlags & UNITFLAG_TARGETABLE) != 0;
+    if (txt->nSubClass & (OBJSUBCLASS_TOWNPORTAL | OBJSUBCLASS_PORTAL)) view.portalLevel = interact;
+    view.locked = txt->nLockable && (interact & 0x80);
+    view.inRoom = unit->pStaticPath->pRoom != nullptr;
+    view.overlay[0] = view.overlay[1] = view.overlay[2] = -1;
+    view.overlayCount = d2gs_client_object_overlays(unit, view.overlay, view.overlayAge);
+    std::memcpy(out, &view, sizeof view);
 }
 
 int d2gs_client_object_effect_missiles(const D2UnitStrc* object, uint32_t effect, int playerLevel,
@@ -299,9 +338,8 @@ int d2gs_client_object_effect_missiles(const D2UnitStrc* object, uint32_t effect
     int level = playerLevel / 5;
     level = level < 1 ? 1 : level > 8 ? 8 : level;
     if (effect == kObjectEffectFire) {
-        // Four steps each way, alternating sides and growing by 5: 5, -10, 15, -20.
-        // GUESS: the two steps are handed on as the target as read, not added to the object's position; the
-        // missile creator's use of that pair (a point or a direction) is not ported. Porting it settles this.
+        // Four steps each way, alternating sides and growing by 5: 5, -10, 15, -20. Flags 3: the missile starts
+        // at x, y and the pair is a step the maker adds to that start, so the 16 aims are cells around the object.
         if (cap < 16) return 0;
         static const int kStep[4] = { 5, -10, 15, -20 };
         int n = 0;

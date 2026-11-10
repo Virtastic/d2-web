@@ -1,7 +1,7 @@
-// The data tables a joined Battle.net game reads for the items, objects and panels the D2GS server
-// describes by number: Weapons/Armor/Misc.txt (class id -> art and size), Objects.txt (class id ->
-// token), Inventory.txt and Belts.txt (panel geometry). Each reader takes `read(path)` -> bytes, the
-// MPQ asset reader the shell already holds, and parses the tab-separated file once on first use.
+// The data tables a joined Battle.net game reads for the items and panels the D2GS server describes by
+// number: Weapons/Armor/Misc.txt (class id to art and size), Inventory.txt and Belts.txt (panel geometry).
+// Objects are not here: the engine's object units carry their own table row. Each reader takes `read(path)`,
+// the MPQ asset reader the shell already holds, and parses the tab-separated file once on first use.
 
 function rows(bytes) {
   const lines = new TextDecoder('latin1').decode(bytes).replace(/\r/g, '').split('\n').filter((l) => l.length);
@@ -51,7 +51,6 @@ export function createItemTable(read) {
   };
 }
 
-/** Objects.txt: class id (its Id column) -> the two-letter art token. */
 /** Levels.txt: the Rain byte of a level (the one the single-player engine's weather reads), by level id. */
 export function createLevelTable(read) {
   let rain = null, types = null;
@@ -72,26 +71,6 @@ export function createLevelTable(read) {
       return rain.has(levelId) ? rain.get(levelId) : -1;
     },
   };
-}
-
-export function createObjectTable(read) {
-  let byClass = null;
-  function load() {
-    if (byClass) return byClass;
-    byClass = new Map();
-    for (const row of rows(read('data\\global\\excel\\objects.txt'))) {
-      const id = num(row.id, -1);
-      // The per-mode columns the client reads to present an object: which modes can be picked, each mode's
-      // run of cels (count, start cel, 8.8 step, whether it loops), and the facing the art is drawn in.
-      const modes = (column) => Array.from({ length: 8 }, (_, mode) => num(row[column + mode]));
-      if (id >= 0 && row.token) byClass.set(id, { classId: id, token: row.token, name: row.name,
-        selectable: modes('selectable'), frameCount: modes('framecnt'), frameDelta: modes('framedelta'), cycles: modes('cycleanim'),
-        start: modes('start'), orientation: num(row.orientation), subClass: num(row.subclass), lockable: num(row.lockable) !== 0,
-        isDoor: num(row.isdoor) !== 0 });
-    }
-    return byClass;
-  }
-  return { byClass(classId) { return load().get(classId) ?? null; } };
 }
 
 const PLAYER_CLASS_NAME = ['amazon', 'sorceress', 'necromancer', 'paladin', 'barbarian', 'druid', 'assassin'];
@@ -246,5 +225,13 @@ export function createSkillNameTable(read) {
   };
   return {
     nameKey(id) { load(); const desc = descs.get(skills.get(id)?.skilldesc); return desc?.['str name'] ?? ''; },
+    /** The skill's mana at a level in 1/256 units, as the hover plate reads it (D2Common 0x4EA00 with the plate's minmana floor); 0 for an unknown skill. */
+    manaCost(id, level) {
+      load();
+      const r = skills.get(id);
+      if (!r || !(level >= 1)) return 0;
+      const cost = (num(r.mana) + (level - 1) * num(r.lvlmana)) * 2 ** num(r.manashift);
+      return Math.max(0, cost, num(r.minmana) * 256);
+    },
   };
 }

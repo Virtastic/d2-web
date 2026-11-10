@@ -48,8 +48,11 @@ inline uint32_t gameInfoSaveFlags(const GameInfo& info) {
     return flags;
 }
 
-// ---- 0x8A / 0x28: the mark over an NPC that has something to say --------------------------------
-struct NpcAlert { uint32_t guid, classId; };
+// ---- 0x8A / 0x28: the mark over a unit that has something to say ---------------------------------
+// The handler looks the unit up by type and guid, whatever the type, and starts a looping overlay
+// (Overlay.txt row 0x48) on it. A monster's mark comes off with the 0x28 reply; any other unit keeps
+// it until the unit goes.
+struct NpcAlert { uint32_t guid, classId, type; };
 struct NpcAlertState {
     std::vector<NpcAlert> alerts;   // units carrying the mark
     uint32_t activeNpc = 0;         // the NPC whose menu is open
@@ -59,16 +62,20 @@ struct NpcAlertState {
 enum class NpcAlertResult { None, Marked, SoundOnly };
 
 constexpr uint32_t kNpcAlertSoundOnlyClass = 534;
+constexpr uint32_t kNpcAlertOverlayRow = 0x48;
+constexpr uint32_t kUnitFlagExNoOverlay = 1u << 18;   // the overlay start leaves a unit with this flag alone
 
-// 0x8A. `found` and `classId` are the unit lookup by packet[1] (type) and packet[2..5] (guid). A unit
-// that is not there gets nothing; class 534 only speaks; the NPC whose menu is open is not marked.
-inline NpcAlertResult npcAlertApply(NpcAlertState& state, const uint8_t* packet, int size, bool found, uint32_t classId) {
+// 0x8A. `found`, `classId` and `flagEx` are the unit lookup by packet[1] (type) and packet[2..5] (guid).
+// A unit that is not there gets nothing; class 534 only speaks; the NPC whose menu is open is not
+// marked; a mark already on the unit is restarted, never doubled.
+inline NpcAlertResult npcAlertApply(NpcAlertState& state, const uint8_t* packet, int size, bool found, uint32_t classId, uint32_t flagEx = 0) {
     if (!packet || size != 6 || packet[0] != 0x8a || !found) return NpcAlertResult::None;
     const uint32_t type = packet[1], guid = gamePktU32(packet + 2);
     if (classId == kNpcAlertSoundOnlyClass) return NpcAlertResult::SoundOnly;
     if (state.hasActiveNpc && type == 1 && guid == state.activeNpc) return NpcAlertResult::None;
-    for (const NpcAlert& alert : state.alerts) if (alert.guid == guid) return NpcAlertResult::Marked;
-    state.alerts.push_back({ guid, classId });
+    if (flagEx & kUnitFlagExNoOverlay) return NpcAlertResult::None;
+    for (const NpcAlert& alert : state.alerts) if (alert.guid == guid && alert.type == type) return NpcAlertResult::Marked;
+    state.alerts.push_back({ guid, classId, type });
     return NpcAlertResult::Marked;
 }
 
@@ -78,7 +85,7 @@ inline int npcInteractReplyApply(NpcAlertState& state, const uint8_t* packet, in
     if (!packet || size != 103 || packet[0] != 0x28 || packet[1] == 6 || !found || !isNpc) return 0;
     int removed = 0;
     for (size_t i = 0; i < state.alerts.size();) {
-        if (!isNpc(state.alerts[i].classId)) { ++i; continue; }
+        if (state.alerts[i].type != 1 || !isNpc(state.alerts[i].classId)) { ++i; continue; }
         state.alerts.erase(state.alerts.begin() + static_cast<long>(i));
         ++removed;
     }
@@ -86,9 +93,9 @@ inline int npcInteractReplyApply(NpcAlertState& state, const uint8_t* packet, in
 }
 
 // A unit leaving the client takes its mark with it.
-inline void npcAlertUnitRemoved(NpcAlertState& state, uint32_t guid) {
+inline void npcAlertUnitRemoved(NpcAlertState& state, uint32_t guid, uint32_t type = 1) {
     for (size_t i = 0; i < state.alerts.size(); ++i)
-        if (state.alerts[i].guid == guid) { state.alerts.erase(state.alerts.begin() + static_cast<long>(i)); return; }
+        if (state.alerts[i].guid == guid && state.alerts[i].type == type) { state.alerts.erase(state.alerts.begin() + static_cast<long>(i)); return; }
 }
 
 // ---- 0x81 / 0x7F / 0x9E..0xA2: the pet list and the hireling's stats ----------------------------

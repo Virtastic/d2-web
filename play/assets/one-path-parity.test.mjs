@@ -21,6 +21,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const FIELDS = ['world', 'player', 'life', 'monsters', 'players', 'missiles', 'objects', 'groundItems', 'ownedItems'];
 
+// Objects: the units a client holds (a room with a client) that the server sends; the engine also lists the rooms
+// no client is in, and the sound-only presets a client builds from its own level data (ids from 0x70000000), neither of which a packet carries.
 // Evaluated in the page: one tick's snapshot as { field: [record, ...] }, each record a string.
 export const SNAPSHOT_FIELDS = `(() => {
   const s = window.__d2Shell.snapshot ?? {}, p = s.player ?? {}, id = s.playerId >>> 0;
@@ -31,7 +33,7 @@ export const SNAPSHOT_FIELDS = `(() => {
     player: ['x:' + p.x, 'y:' + p.y, 'mode:' + s.mode, 'weapon:' + p.weaponClass],
     life: ['hp:' + p.hp, 'hpMax:' + p.hpMax, 'mana:' + p.mana, 'manaMax:' + p.manaMax],
     monsters: of(1), players: of(0), missiles: of(3),
-    objects: (s.objects ?? []).map(unit),
+    objects: (s.objects ?? []).filter((o) => o.inClientRoom !== false && (o.id >>> 0) < 0x70000000).map(unit),
     groundItems: items.filter(ground).map((i) => [i.id >>> 0, i.code ?? i.classId, i.x, i.y].join(':')),
     ownedItems: items.filter((i) => !ground(i)).map((i) => [i.id >>> 0, i.code ?? i.classId, i.invPage, i.bodyLoc, i.gridX, i.gridY].join(':')) };
 })()`;

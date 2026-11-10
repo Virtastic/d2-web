@@ -95,3 +95,11 @@ export function openLocalRealm(Module, protocol, { name = 'Local' } = {}) {
       evidence: () => (transport ? { ...transport.stats(), refused: transport.refused(), dropped: transport.dropped() } : null),
     } };
 }
+
+/**
+ * Leaving a local game: the in-process connection is released first (no lobby, no game server to wait on),
+ * then the single-player exit runs, which writes the character and returns to the character list.
+ */
+export async function exitLocalGame({ release, saveAndExit }) {
+  try { await release(); } finally { saveAndExit(); }
+}

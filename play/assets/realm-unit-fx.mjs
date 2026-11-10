@@ -22,10 +22,22 @@ export function parseRealmUnitFx(bytes, count) {
  *   play : (soundRow, event) => void
  *   unitSound : ({ unitType, unitGuid, classId, soundEvent }) => void, a unit sound event the server named
  */
+/** The Overlay.txt row the client starts on a unit the server marks (0x8A). */
+export const MARK_ROW = 0x48;
+
 export function createRealmUnitFx(read, play, unitSound) {
   const raw = new TextDecoder('latin1').decode(read('data\\global\\excel\\Overlay.txt')).split(/\r?\n/).map((l) => l.split('\t'));
   const head = raw[0], rows = raw.slice(1).map((c) => Object.fromEntries(head.map((k, i) => [k, c[i]])));
   const sounds = [], overlays = new Map(); // overlays: 'type:guid' to the list of { row, start, ... } still running
+  const marked = new Map(); // 'type:guid' to the tick the unit's speech mark was first seen
+  const markRow = rows[MARK_ROW], markFile = markRow?.Filename && markRow.Filename !== 'null' ? markRow.Filename : null;
+  // The mark loops until the unit loses it: the frame wraps where a one-shot overlay ends.
+  const markOf = (type, guid) => {
+    const start = marked.get(`${type}:${guid}`);
+    if (start === undefined || !markFile) return [];
+    const frames = Number(markRow.Frames) || 1, rate = overlayStep(markRow);
+    return [{ kind: 'overlay', overlay: MARK_ROW, file: markFile, frames, rate, trans: Number(markRow.Trans) || 0, predraw: markRow.PreDraw === '1', age: (Math.floor((now - start) * rate / 256) + 1) % frames }];
+  };
   let now = 0, hits = new Map(); // hits: 'type:guid' to the hit class of a hit taken in the last step
   const age = (o) => Math.floor((now - o.start) * o.rate / 256) + 1;
   const of = (type, guid) => (overlays.get(`${type}:${guid}`) ?? []).filter((o) => now >= o.start && age(o) < o.frames)
@@ -57,14 +69,20 @@ export function createRealmUnitFx(read, play, unitSound) {
     },
     /** The hit class of a hit the unit took in the last step; undefined when it took none. */
     hitOf: (type, guid) => hits.get(`${type}:${guid}`),
-    /** Puts each unit's running overlays on its entity of the frame; returns the selected player's own (he is not an entity). */
-    apply(snapshot, heroGuid) {
+    /**
+     * Puts each unit's running overlays on its entity of the frame; returns the selected player's own (he is not an entity).
+     * `marks` ([{ type, guid }], d2gsClientUnitMarks) are the units other than monsters carrying the speech mark.
+     */
+    apply(snapshot, heroGuid, marks = []) {
+      const live = new Set(marks.map((m) => `${m.type}:${m.guid}`));
+      for (const key of live) if (!marked.has(key)) marked.set(key, now);
+      for (const key of [...marked.keys()]) if (!live.has(key)) marked.delete(key);
       for (const e of snapshot?.entities ?? []) {
         if (e.type !== 0 && e.type !== 1) continue;
-        const fx = of(e.type, e.id);
+        const fx = [...of(e.type, e.id), ...markOf(e.type, e.id)];
         if (fx.length) e.stateOverlays = [...(e.stateOverlays ?? []), ...fx];
       }
-      return heroGuid === undefined ? [] : of(0, heroGuid);
+      return heroGuid === undefined ? [] : [...of(0, heroGuid), ...markOf(0, heroGuid)];
     },
   };
 }

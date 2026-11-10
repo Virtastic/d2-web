@@ -282,6 +282,15 @@ void d2_realm_client_owned_item_destroy(D2UnitStrc* item) {
     destroy_item(item);
 }
 
+// 0x42: the unit's cursor item is gone. 1 when it held one.
+int d2_realm_client_item_clear_cursor(D2UnitStrc* owner) {
+    if (!has_inventory(owner)) return 0;
+    D2UnitStrc* held = INVENTORY_GetCursorItem(owner->pInventory);
+    if (!held) return 0;
+    destroy_item(held);
+    return 1;
+}
+
 // Frees every item a unit holds (its grids, body, belt and cursor) before the unit itself goes.
 void d2_realm_client_items_forget_owner(D2UnitStrc* owner) {
     if (!has_inventory(owner)) return;
@@ -299,6 +308,9 @@ void d2_realm_client_items_forget_loose() {
         if (held.second->pItemData && !held.second->pItemData->pExtraData.pParentInv) loose.push_back(held.first);
     for (uint32_t guid : loose) release_item(find_item(guid));
 }
+
+// The item unit the client holds under this id, or null (the 0x3f and 0x7c packets name items by id).
+D2UnitStrc* d2_realm_client_owned_item_find(uint32_t guid) { return find_item(guid); }
 
 // A unit-removal record for an item: an item on the ground goes; one somebody holds is not touched.
 // GUESS: retail's removal handler for an item unit is not read; this is the rule the screen copy used.

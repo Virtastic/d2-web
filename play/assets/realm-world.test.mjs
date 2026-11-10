@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRealmWorld, decodeItemHeader, PAGE, parseRealmObjectUnits } from './realm-world.mjs';
-import { createItemTable, createObjectTable, createInventoryTable, createBeltTable } from './realm-tables.mjs';
+import { createRealmWorld, decodeItemHeader, PAGE } from './realm-world.mjs';
+import { createItemTable, createInventoryTable, createBeltTable } from './realm-tables.mjs';
 import { realmViewSnapshot, realmFrameReads } from './realm-client-view.mjs';
 
 const enc = (text) => new TextEncoder().encode(text);
@@ -14,7 +14,7 @@ const files = {
   'data\\global\\excel\\belts.txt': 'name\tnumboxes\tbox1left\tbox1right\tbox1top\tbox1bottom\tbox2left\tbox2right\tbox2top\tbox2bottom\nA\t4\t0\t10\t0\t10\t10\t20\t0\t10\nB\t4\t0\t10\t0\t10\t10\t20\t0\t10\nC\t0\n',
 };
 const read = (path) => { const f = files[path]; if (f === undefined) throw new Error(path); return enc(f); };
-const tables = () => ({ items: createItemTable(read), objects: createObjectTable(read) });
+const tables = () => ({ items: createItemTable(read) });
 const fourcc = (code) => { const c = code.padEnd(4, ' '); return (c.charCodeAt(0) | (c.charCodeAt(1) << 8) | (c.charCodeAt(2) << 16) | (c.charCodeAt(3) << 24)) >>> 0; };
 
 function bits() {
@@ -24,7 +24,7 @@ function bits() {
 }
 function itemBits({ mode, flags = 0, x = 0, y = 0, bodyLoc = 0, page = 0, code, quality = 2, gold }) {
   const b = bits().put(flags, 32).put(101, 10).put(mode, 3);
-  if (mode === 3 || mode === 5) b.put(x, 16).put(y, 16); else b.put(bodyLoc, 4).put(x, 4).put(y, 4).put(page + 1, 3);
+  if (mode === 3 || mode === 5) b.put(x, 16).put(y, 16); else b.put(bodyLoc, 4).put(x, 4).put(y, 4).put((mode === 0 ? page + 1 : 0) & 7, 3);   // only a stored item carries a page
   b.put(fourcc(code), 32);
   if (flags & 0x200000) { if (gold !== undefined) b.put(0, 1).put(gold, 12); }
   else b.put(0, 3).put(30, 7).put(quality, 4);
@@ -68,7 +68,7 @@ test('inventory, equipment, belt, cursor and ground items reach the views', () =
   assert.equal(w.ownItemCount, 5);
   assert.deepEqual([by[10].invPage, by[10].gridX, by[10].gridY, by[10].classId], [PAGE.INVENTORY, 2, 1, 1]);
   assert.deepEqual([by[11].mode, by[11].bodyLoc, by[11].classId], [1, 1, 3]);
-  assert.deepEqual([by[12].invPage, by[12].gridX], [PAGE.BELT, 1]);
+  assert.deepEqual([by[12].invPage, by[12].gridX], [PAGE.NONE, 1]);
   assert.equal(w.cursorId, 13);
   assert.deepEqual([by[14].landed, by[14].x, by[14].y, by[14].invPage], [true, 100, 200, 255]);
   assert.equal(by[14].flippyFile, 'flpax');
@@ -115,17 +115,14 @@ test("other players' worn items are kept apart from the player's own", () => {
   assert.equal(w.weaponClassOf(), 'hth');
 });
 
-test('objects: the views are the engine units, with the class naming the art', () => {
+test('objects: the scene takes the engine object records as they are, and the world keeps none', () => {
   const w = createRealmWorld(tables()); w.setOwner(GUID);
-  // Class 99 is not in the table. Whether an object can be picked is the unit's flag; its art layers are not masked;
-  // its facing is the class's.
-  const units = parseRealmObjectUnits(Int32Array.from([
-    900, 5, 0x1234, 0x5678, 1, 0x100, 0x300, 0x80, 2, 0, 0, -1, -1, -1,
-    901, 99, 1, 2, 1, 0, 0x100, 0x100, 3, 0, 0, -1, -1, -1]), 2);
-  const views = w.objectViews(units);
-  assert.deepEqual(views.map((o) => [o.id, o.classId, o.token, o.x, o.y, o.mode]), [[900, 5, 'CH', 0x1234, 0x5678, 1]]);
-  assert.deepEqual([views[0].selectable, views[0].componentMask, views[0].direction, views[0].framePrecise >> 8], [false, 0xFFFF, 3, 1]);
-  assert.equal(w.objectViews().length, 0);
+  feed(w, Uint8Array.from([0x51, 2, ...u32le(900), 5, 0, 0x34, 0x12, 0x78, 0x56, 1, 0, 0, 0, 0, 0]));
+  assert.equal(w.objectViews, undefined);
+  assert.equal(w.tickObjects, undefined);
+  const objects = [{ id: 900, classId: 5, token: 'CH', mode: 1 }];
+  const snapshot = realmViewSnapshot({ base: null, resources: null, monsters: [], missiles: [], players: [], level: 1, actor: () => null, frame: 0, world: w, objects });
+  assert.equal(snapshot.objects, objects);
 });
 
 test('ground items are removed by 0x0A; gold and stash gold from the stat packets', () => {
@@ -230,7 +227,7 @@ test('held items are the engine unit\'s: the packet copy supplies only the groun
   assert.deepEqual(views.map((i) => i.id), [21, 30, 20, 31, 32, 33]);   // a code the tables do not hold cannot be drawn
   const potion = views.find((i) => i.id === 20), belted = views.find((i) => i.id === 33), axe = views.find((i) => i.id === 32);
   assert.deepEqual([potion.invPage, potion.gridX, potion.gridY, potion.invFile], [PAGE.INVENTORY, 3, 1, 'invhp1']);
-  assert.deepEqual([belted.invPage, belted.gridX], [PAGE.BELT, 2]);
+  assert.deepEqual([belted.invPage, belted.gridX], [PAGE.NONE, 2]);
   assert.deepEqual([axe.bodyLoc, axe.itemFlags], [4, 0x4010]);
   assert.equal(w.cursorId, 30);
   assert.equal(w.beltRecord(), 0);
@@ -267,4 +264,27 @@ test('the stash and the cube take the 800x600 Inventory.txt rows, sixteen after 
   const reads = realmFrameReads(null, w, { inventory: inv, belt: createBeltTable(read), inventoryLayoutFromEngine: (g, c) => ({ g, c }), stashGeometry: (g) => g }, 0);
   assert.deepEqual([reads.stashLayout[0], reads.stashLayout[5]], [28, 8]);   // Big Bank Page 1 + 16: the eight-row stash
   assert.equal(reads.cubeLayout[0], 25);                                      // Transmogrify Box Page 1 + 16
+});
+
+test('0x42 takes the cursor item away from the local player only', () => {
+  const w = createRealmWorld(tables()); w.setOwner(GUID);
+  feed(w, itemPacket(13, 0, { mode: 4, code: 'hax' }));
+  feed(w, Uint8Array.from([0x42, 0, ...u32le(GUID + 1)]));
+  assert.equal(w.cursorId, 13);
+  feed(w, Uint8Array.from([0x42, 1, ...u32le(GUID)]));
+  assert.equal(w.cursorId, 13);
+  feed(w, Uint8Array.from([0x42, 0, ...u32le(GUID)]));
+  assert.equal(w.cursorId, 0); assert.equal(w.ownItemCount, 0);
+});
+
+test('0x3f marks the item the cursor is using and lets it go', () => {
+  const w = createRealmWorld(tables()); w.setOwner(GUID);
+  feed(w, itemPacket(10, 0, { mode: 0, x: 0, y: 0, page: 0, code: 'hp1' }));
+  feed(w, Uint8Array.from([0x3f, 0, ...u32le(99), 0xff, 0xff]));   // an item the page does not hold: nothing
+  assert.equal(w.useItem, null); assert.equal(w.takeInventoryAsks(), 0);
+  feed(w, Uint8Array.from([0x3f, 0, ...u32le(10), 0xff, 0xff]));
+  assert.deepEqual(w.useItem, { id: 10, kind: 0 });
+  assert.equal(w.takeInventoryAsks(), 1); assert.equal(w.takeInventoryAsks(), 0);
+  feed(w, Uint8Array.from([0x3f, 0xff, ...u32le(10), 0xff, 0xff]));
+  assert.equal(w.useItem, null);
 });

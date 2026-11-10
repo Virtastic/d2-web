@@ -5,7 +5,7 @@
 //   H x,y,mode,...   the reference client's own hero after that tick's update
 // The join burst goes through d2gsJoin exactly as a live connection's does, then every later packet goes to the
 // engine's client state and to the realm world one tick at a time, with the recorded movement requests applied
-// as the local player's own. The test fails on a packet the client cannot frame or its state refuses (REFUSED below lists the known one), and on any
+// as the local player's own. The test fails on a packet the client cannot frame or its state refuses, and on any
 // opcode no handler reads that is not already in IGNORED below (the list may only shrink); the
 // hero's first differing tick is reported per recording, and asserted with PLAY_STREAM_STRICT=1.
 //
@@ -19,7 +19,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { bindEngineProtocol, d2gsJoin } from './realm-client.mjs';
 import { createRealmWorld } from './realm-world.mjs';
-import { createItemTable, createObjectTable } from './realm-tables.mjs';
+import { createItemTable } from './realm-tables.mjs';
 import { routeRealmPackets } from './realm-packet-routes.mjs';
 import { hashString, decrypt, mpqTables } from './mpq-index.mjs';
 import { readMpqFile } from './mpq-read.mjs';
@@ -36,11 +36,18 @@ const skip = !existsSync(path.join(ENGINE, 'd2.js')) || !existsSync(path.join(EN
 
 // Server opcodes of the recordings that no handler of the client reads today, by the source of each consumer.
 // An opcode leaves this list when a handler for it lands; a new one may not join it silently.
-export const IGNORED = [0x00, 0x01, 0x02, 0x2c, 0x3f, 0x42, 0x47, 0x48, 0x5a, 0x5b, 0x5f, 0x60, 0x65, 0x74, 0x75, 0x76, 0x7c, 0x7e, 0x82, 0x8a, 0x8d, 0x8e, 0x8f, 0x96];
-// Packets the client state refuses today (it then drops everything it holds, so only the first refusal of a
-// recording is its own fault). The monster's move toward a unit is 21 bytes on the wire and in the size table;
-// the unit-packet route table expects 22.
-export const REFUSED = [{ op: 0x68, result: -4 }];
+// Every opcode of the recordings is read today: the game's flags, the cursor's use-item, the cleared cursor
+// item, the player's kept value, the used scroll or book and the act's animation data joined the handlers.
+// PLAY_STREAM_TRACE=from-to prints the hero of both sides on those ticks.
+const TRACE = process.env.PLAY_STREAM_TRACE ? process.env.PLAY_STREAM_TRACE.split('-').map(Number) : null;
+export const IGNORED = [];
+// Packets the client state refuses (it then drops everything it holds). None is expected.
+export const REFUSED = [];
+// The key words of the logon. The reference client's own logon composer writes version 0x0d and these two
+// words (the first is the expansion's); the recordings' driver wrote the logon itself, with version 0x0e and
+// 0xED5FCC50, so the recorded logon is compared without those five bytes.
+const EXPANSION_KEY = 0xED5DCC50, RECORDED_DRIVER_KEY = 0xED5FCC50;
+const logonFields = (text) => text.slice(0, 16) + text.slice(18, 24) + text.slice(32);
 
 const hex = (text) => Uint8Array.from(text.match(/../g) ?? [], (b) => parseInt(b, 16));
 const h2 = (v) => v.toString(16).padStart(2, '0');
@@ -115,7 +122,7 @@ async function worldTables() {
   const files = new Map();
   for (const n of ['objects.txt', 'weapons.txt', 'armor.txt', 'misc.txt']) { const key = 'data\\global\\excel\\' + n; files.set(key, await fetchFile(key)); }
   const read = (p) => { const f = files.get(p.toLowerCase()); if (!f) throw new Error('missing ' + p); return f; };
-  return { items: createItemTable(read), objects: createObjectTable(read) };
+  return { items: createItemTable(read) };
 }
 
 function parseRecording(file) {
@@ -131,7 +138,7 @@ function parseRecording(file) {
 export async function replay(records, { Module, protocol }, tables, named) {
   const sizeOf = (b) => protocol.d2gsPacketSize(b);
   const report = { server: 0, client: 0, ticks: 0, seen: new Map(), ignored: new Map(), refused: [], unframed: [], worldThrew: new Map(),
-    inputsApplied: new Map(), inputsNotApplied: new Map(), firstPosition: null, firstMode: null, positionDiffs: 0, modeDiffs: 0, compared: 0, heroAbsent: 0, track: [] };
+    events: new Map(), inputsApplied: new Map(), inputsNotApplied: new Map(), firstPosition: null, firstMode: null, positionDiffs: 0, modeDiffs: 0, compared: 0, heroAbsent: 0, track: [], trace: [] };
   const bump = (map, key) => map.set(key, (map.get(key) ?? 0) + 1);
   const world = createRealmWorld(tables);
 
@@ -160,7 +167,7 @@ export async function replay(records, { Module, protocol }, tables, named) {
   };
   const logonBytes = hex(logon.text), logonView = new DataView(logonBytes.buffer);
   const name = String.fromCharCode(...assign.subarray(6, 22)).replace(/\0.*$/, '');
-  const joining = d2gsJoin(transport, protocol, { character: name, charClass: assign[5], gameHash: logonView.getUint32(1, true), gameToken: logonView.getUint16(5, true), expansion: logonView.getUint32(12, true) === 0xED5DCC50, timeoutMs: 5000 });
+  const joining = d2gsJoin(transport, protocol, { character: name, charClass: assign[5], gameHash: logonView.getUint32(1, true), gameToken: logonView.getUint16(5, true), expansion: [EXPANSION_KEY, RECORDED_DRIVER_KEY].includes(logonView.getUint32(12, true)), timeoutMs: 5000 });
   queueMicrotask(() => onData(Uint8Array.of(0xaf, 0x00)));   // the recording is the decoded stream: the unframed dialect
   const game = await joining;
   report.join = { sent: sent.map((b) => h2(b[0])), bytes: game.bytes, logon: Buffer.from(sent[0]).toString('hex'), recordedLogon: logon.text };
@@ -170,6 +177,7 @@ export async function replay(records, { Module, protocol }, tables, named) {
     const op = packet[0];
     const result = protocol.d2gsClientPlayerFeed(packet);
     if (result < 0) report.refused.push({ tick, op, result, hex: Buffer.from(packet).toString('hex') });
+    for (const event of protocol.d2gsClientTakeSessionEvents()) bump(report.events, event.op);
     let jsRead = false;
     try { world.feed(packet, sizeOf); } catch (e) { bump(report.worldThrew, op); }
     try { jsRead = routeRealmPackets(packet, sizeOf, { npcInteraction: () => true, applyHotkey: () => true, applyWeaponSwitch: () => true }).length > 0; } catch { /* counted as unread */ }
@@ -209,10 +217,12 @@ export async function replay(records, { Module, protocol }, tables, named) {
     if (!ours?.active) { report.heroAbsent++; report.firstPosition ??= { tick: r.tick, retail: [x, y], ours: null }; report.firstMode ??= { tick: r.tick, retail: mode, ours: null }; continue; }
     report.compared++;
     const ourMode = ours.motion?.mode ?? ours.initialMode;
+    if (TRACE && r.tick >= TRACE[0] && r.tick <= TRACE[1]) report.trace.push(`${r.tick} retail ${x},${y} mode ${mode} ours ${ours.x},${ours.y} mode ${ourMode}`);
     if (ours.x !== x || ours.y !== y) { report.positionDiffs++; report.firstPosition ??= { tick: r.tick, retail: [x, y], ours: [ours.x, ours.y] }; }
     if (ourMode !== mode) { report.modeDiffs++; report.firstMode ??= { tick: r.tick, retail: mode, ours: ourMode }; }
   }
   // How far the hero trails the reference: the shift in ticks at which the fewest positions differ.
+  report.roster = protocol.d2gsClientRoster(); report.guid = guid; report.name = name;
   report.lag = [-2, -1, 0, 1, 2, 3, 4].map((k) => [k, report.track.filter((t, i) => { const o = report.track[i + k]; return !o || o[2] !== t[0] || o[3] !== t[1]; }).length]).sort((a, b) => a[1] - b[1])[0];
   return report;
 }
@@ -228,7 +238,8 @@ test('recorded play streams replay through the joined-game client', { skip }, as
     await t.test(file, async (t) => {
       const report = await replay(parseRecording(path.join(STREAMS, file)), engine, tables, named);
       t.diagnostic(`${file}: ${report.server} server packets, ${report.client} client packets, ${report.ticks} ticks`);
-      if (report.join.logon !== report.join.recordedLogon) t.diagnostic(`  logon differs: reference ${report.join.recordedLogon} ours ${report.join.logon}`);
+      if (logonFields(report.join.logon) !== logonFields(report.join.recordedLogon)) t.diagnostic(`  logon differs: reference ${report.join.recordedLogon} ours ${report.join.logon}`);
+      t.diagnostic(`  roster: ${report.roster.map((p) => `${p.name} level ${p.level}`).join(', ') || 'empty'}; session events: ${fmt(report.events)}`);
       t.diagnostic(`  ignored opcodes: ${fmt(report.ignored)}`);
       t.diagnostic(`  refused by the client state: ${report.refused.length ? report.refused.slice(0, 6).map((r) => `tick ${r.tick} ${h2(r.op)} -> ${r.result}`).join(', ') + (report.refused.length > 6 ? ` (+${report.refused.length - 6})` : '') : 'none'}`);
       t.diagnostic(`  world threw on: ${fmt(report.worldThrew)}`);
@@ -236,16 +247,19 @@ test('recorded play streams replay through the joined-game client', { skip }, as
       t.diagnostic(`  hero position: ${report.positionDiffs}/${report.compared} ticks differ, first ${report.firstPosition ? `tick ${report.firstPosition.tick} retail ${report.firstPosition.retail} ours ${report.firstPosition.ours}` : 'none'}`);
       t.diagnostic(`  hero position with ours read ${report.lag[0]} ticks later: ${report.lag[1]} ticks differ; hero absent on ${report.heroAbsent} ticks`);
       t.diagnostic(`  hero mode: ${report.modeDiffs}/${report.compared} ticks differ, first ${report.firstMode ? `tick ${report.firstMode.tick} retail ${report.firstMode.retail} ours ${report.firstMode.ours}` : 'none'}`);
+      for (const line of report.trace) t.diagnostic(`  ${line}`);
       for (const [op, n] of report.ignored) ignoredAll.set(op, (ignoredAll.get(op) ?? 0) + n);
       assert.deepEqual(report.join.sent, ['68', '6b'], 'the join sends the logon and the enter request');
       assert.deepEqual(report.unframed, [], 'every recorded packet has the size the client frames it with');
       const first = report.refused[0];
       assert.ok(!first || REFUSED.some((k) => k.op === first.op && k.result === first.result), `the client state refuses ${first && h2(first.op)} at tick ${first?.tick}, which is not a listed refusal`);
       assert.equal(report.worldThrew.size, 0, 'the realm world reads every packet without an error');
+      assert.ok(report.roster.some((p) => p.guid === report.guid && p.name === report.name), 'the roster holds the local player');
+      assert.equal(report.join.logon.slice(16, 18) + report.join.logon.slice(24, 32), '0d50cc5ded', 'the logon carries the client version and the expansion key');
       if (process.env.PLAY_STREAM_STRICT === '1') {
         assert.deepEqual(report.refused, [], 'the client state takes every packet of the stream');
         assert.equal(report.ignored.size, 0, 'no opcode is ignored');
-        assert.equal(report.join.logon, report.join.recordedLogon, 'the logon bytes equal the reference client\'s');
+        assert.equal(logonFields(report.join.logon), logonFields(report.join.recordedLogon), 'the logon bytes equal the reference client\'s');
         assert.equal(report.firstPosition, null, 'the hero is where the reference client had it on every tick');
         assert.equal(report.firstMode, null, 'the hero is in the reference client\'s mode on every tick');
       }

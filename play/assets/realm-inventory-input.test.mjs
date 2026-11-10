@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRealmWorld, PAGE } from './realm-world.mjs';
-import { createItemTable, createObjectTable, createInventoryTable, createBeltTable } from './realm-tables.mjs';
+import { createItemTable, createInventoryTable, createBeltTable } from './realm-tables.mjs';
 import { realmViewSnapshot, realmFrameReads } from './realm-client-view.mjs';
 import { createRealmInput } from './realm-input.mjs';
 import { realmInventoryClick } from './realm-storage-input.mjs';
@@ -25,7 +25,7 @@ const files = {
   'data\\global\\excel\\belts.txt': 'name\tnumboxes\tbox1left\tbox1right\tbox1top\tbox1bottom\tbox2left\tbox2right\tbox2top\tbox2bottom\nA\t4\t0\t10\t0\t10\t10\t20\t0\t10\nB\t4\t0\t10\t0\t10\t10\t20\t0\t10\nC\t0\n',
 };
 const read = (path) => { const f = files[path]; if (f === undefined) throw new Error(path); return enc(f); };
-const tables = () => ({ items: createItemTable(read), objects: createObjectTable(read), inventory: createInventoryTable(read), belt: createBeltTable(read),
+const tables = () => ({ items: createItemTable(read), inventory: createInventoryTable(read), belt: createBeltTable(read),
   inventoryLayoutFromEngine, stashGeometry: (g) => g });
 const fourcc = (code) => { const c = code.padEnd(4, ' '); return (c.charCodeAt(0) | (c.charCodeAt(1) << 8) | (c.charCodeAt(2) << 16) | (c.charCodeAt(3) << 24)) >>> 0; };
 
@@ -37,7 +37,7 @@ function bits() {
 // The item bitstream head: flags, version, mode, then the ground position or body location, cell and page, then the code.
 function itemBits({ mode, x = 0, y = 0, bodyLoc = 0, page = 0, code }) {
   const b = bits().put(0x10, 32).put(101, 10).put(mode, 3);
-  if (mode === 3 || mode === 5) b.put(x, 16).put(y, 16); else b.put(bodyLoc, 4).put(x, 4).put(y, 4).put(page + 1, 3);
+  if (mode === 3 || mode === 5) b.put(x, 16).put(y, 16); else b.put(bodyLoc, 4).put(x, 4).put(y, 4).put((mode === 0 ? page + 1 : 0) & 7, 3);   // only a stored item carries a page
   return b.put(fourcc(code), 32).put(0, 3).put(30, 7).put(2, 4).bytes();
 }
 const OWNER = 0x01020304;
@@ -96,7 +96,7 @@ test('the join stream fills the panel: carried, worn and belt items, gold, and t
   assert.deepEqual([by[10].mode, by[10].invPage, by[10].gridX, by[10].gridY, by[10].invFile, by[10].invWidth, by[10].invHeight], [0, PAGE.INVENTORY, 2, 0, 'invws', 1, 3]);
   assert.deepEqual([by[11].invPage, by[11].gridX, by[11].invFile], [PAGE.INVENTORY, 5, 'invax']);
   assert.deepEqual([by[12].mode, by[12].bodyLoc, by[12].invFile], [1, 1, 'invcap']);
-  assert.deepEqual([by[13].invPage, by[13].gridX], [PAGE.BELT, 1]);
+  assert.deepEqual([by[13].invPage, by[13].gridX], [PAGE.NONE, 1]);
   assert.deepEqual([g.world.gold, g.world.stashGold, g.world.cursorId], [4321, 70000, 0]);
   assert.deepEqual(g.layout.grid, { left: 419, top: 315, columns: 10, rows: 4, cellWidth: 29, cellHeight: 29 });
   assert.deepEqual(g.layout.slots, { 4: { left: 420, right: 476, top: 110, bottom: 220 }, 1: { left: 530, right: 588, top: 60, bottom: 118 }, 5: { left: 650, right: 706, top: 110, bottom: 220 } });

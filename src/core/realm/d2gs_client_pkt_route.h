@@ -25,7 +25,7 @@ inline PktRoute pktRoute(uint8_t opcode) {
     case 0x0f: return { PktHandler::AF510, 16, 2, true, false, 3 };
     case 0x10: return { PktHandler::AF4C0, 16, 2, true, true, 2 };
     case 0x67: return { PktHandler::AF460, 16, 1, false, false, 7 };
-    case 0x68: return { PktHandler::AF3F0, 21, 1, false, true, 7 };
+    case 0x68: return { PktHandler::AF3F0, 21, 1, false, true, 7 };   // 21 bytes, the size table's entry: the handler reads its last byte at index 20
     case 0x69: return { PktHandler::AF390, 12, 1, false, false, 7 };
     case 0x6a: return { PktHandler::AF340, 12, 1, false, true, 6 };
     case 0x6b: return { PktHandler::AF7C0, 16, 1, false, false, 7 };

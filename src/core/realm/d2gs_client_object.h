@@ -31,7 +31,16 @@ D2UnitStrc* d2gs_client_object_find(uint32_t guid);
 D2UnitStrc* d2gs_client_object_next(const D2UnitStrc* previous);
 
 // The overlays a shrine shows while idle (Overlay table rows; -1 for none). The count written, at most 3.
-int d2gs_client_object_overlays(const D2UnitStrc* unit, int32_t out[3]);
+// `ages`, when given, takes for each the frames since that overlay was put on (its loop's clock).
+int d2gs_client_object_overlays(const D2UnitStrc* unit, int32_t out[3], int32_t ages[3] = nullptr);
+
+// The unit as the scene reads it, one record of kClientObjectViewBytes: the 44-byte object presentation a
+// local game's objects are read in {id, class, token (the class's art name, up to 3 letters), mode, x, y,
+// 8.8 cel clock, 8.8 cel count, component mask (every layer), u16 8.8 step, u8 facing (the class's), u8 can
+// be picked, u8 a portal's destination level, u8 a locked chest, u16 stands in a revealed room}, then seven
+// int32: the overlay count, three Overlay rows (-1 unused) and the frames each has looped.
+constexpr int kClientObjectViewBytes = 72;
+void d2gs_client_object_view(const D2UnitStrc* unit, uint8_t out[kClientObjectViewBytes]);
 
 // What the client does when the server reports a player activating an object.
 enum D2gsClientObjectEffect : uint32_t {
@@ -49,7 +58,8 @@ struct D2gsClientObjectEvent {
 };
 // One missile of a fire, exploding or poison shrine, as the client's missile maker is asked for it: the
 // Missiles table row, the request flags, the origin (the object's cell), the target and the missile level.
-// A fire missile's target is a direction (flags 3); the others' is a cell (flags 0x520, the object as origin unit).
+// A fire missile's target is a step from its start (flags 3: start at x, y, target added to it); the others'
+// is a cell (flags 0x520: the object is the origin unit, the life is the flight time, the missile is thrown).
 struct D2gsClientObjectMissile { int32_t missile; uint32_t flags; int32_t x, y, targetX, targetY, level; };
 // The missiles an activation effect makes, in creation order; the count written (16 for fire, 6 for the
 // others, 0 for no missile effect or cap too small). `playerLevel` is the activating player's level stat.

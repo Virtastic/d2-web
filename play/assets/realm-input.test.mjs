@@ -6,7 +6,7 @@ import { createMonsterTable } from './realm-tables.mjs';
 // The 1.13c client packet lengths (src/core/realm/d2gs_session.cpp kCsSize113c).
 const SIZE = { 0x01: 5, 0x02: 9, 0x03: 5, 0x04: 9, 0x05: 5, 0x06: 9, 0x08: 5, 0x09: 9, 0x0c: 5, 0x0d: 9, 0x0f: 5, 0x10: 9,
   0x13: 9, 0x16: 13, 0x17: 5, 0x18: 17, 0x19: 5, 0x1a: 9, 0x1b: 9, 0x1c: 3, 0x1d: 9, 0x1f: 17, 0x20: 13, 0x26: 13,
-  0x2f: 9, 0x30: 9, 0x38: 13, 0x3c: 9, 0x45: 9, 0x49: 9, 0x60: 1 };
+  0x2f: 9, 0x30: 9, 0x38: 13, 0x3c: 9, 0x45: 9, 0x49: 9, 0x51: 9, 0x60: 1 };
 
 test('every builder emits its opcode at the table length', () => {
   const made = [packets.walkTo(1, 2), packets.walkToUnit(1, 3), packets.runTo(1, 2), packets.runToUnit(1, 3),
@@ -15,7 +15,7 @@ test('every builder emits its opcode at the table length', () => {
     packets.interact(2, 7), packets.pickUp(4, 9), packets.dropCursor(5), packets.toGrid(5, 1, 2, 0), packets.fromGrid(5),
     packets.equip(5, 4), packets.swapOneForTwoHanded(5, 4), packets.unequip(4), packets.swapWithBody(5, 4),
     packets.swapCursorBuffer(1, 2, 3, 4), packets.useItem(5, 10, 11), packets.useBeltItem(5), packets.npcChatStart(1, 5),
-    packets.npcChatEnd(1, 5), packets.npcAction(1, 2, 3), packets.selectSkill(36, false), packets.enterPortal(1, 2),
+    packets.npcChatEnd(1, 5), packets.npcAction(1, 2, 3), packets.selectSkill(36, false), packets.bindHotkey(2, 36, true), packets.enterPortal(1, 2),
     packets.waypoint(1, 2), packets.swapWeapons()];
   for (const p of made) assert.equal(p.length, SIZE[p[0]], `opcode 0x${p[0].toString(16)}`);
 });
@@ -397,4 +397,14 @@ test('Stand Still with the left button uses the left skill at the pointer and ne
   assert.equal(input.leftClick(200, 120, { stand: true }).kind, 'ground');
   input.leftClick(202, 120, { stand: true, held: true });
   assert.deepEqual(order, [[5, 100, 0, 120, 0], [8, 101, 0, 120, 0]]);
+});
+
+test('a hotkey assign is 0x51 with the slot above the skill word, the hand in bit 15 and the owner after', () => {
+  assert.deepEqual([...packets.bindHotkey(4, 54, true)], [0x51, 54, 0x80, 4, 0, 255, 255, 255, 255]);
+  assert.deepEqual([...packets.bindHotkey(0, 36, false, 7)], [0x51, 36, 0, 0, 0, 7, 0, 0, 0]);
+  const sent = [];
+  const input = createRealmInput({ transmit: (b) => sent.push(Array.from(b)), scene: { player: () => ({}) }, now: () => 0 });
+  assert.equal(input.bindHotkey(16, 36, false), false);
+  assert.equal(input.bindHotkey(1, -1, false), false);
+  assert.equal(sent.length, 0);
 });

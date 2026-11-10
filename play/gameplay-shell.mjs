@@ -23,6 +23,7 @@ import { createRealmInput } from './assets/realm-input.mjs';
 import { routeRealmPackets } from './assets/realm-packet-routes.mjs';
 import { realmStorageClick, realmInventoryClick as realmInventoryPanelClick } from './assets/realm-storage-input.mjs';
 import { routeSocialPackets } from './assets/realm-social-packets.mjs';
+import { createRealmSessionPresenter } from './assets/realm-session-events.mjs';
 import { itemPackets, BUTTON as ITEM_BUTTON } from './assets/realm-item-packets.mjs';
 import { createItemText } from './assets/realm-item-text.mjs';
 import { createRealmFrameFeed, selectPlayerRenderSource, realmCameraCentre, visibleRealmPlayers, realmScenePlayers, realmPlayerGate } from './assets/realm-player-state.mjs';
@@ -69,6 +70,7 @@ import { withinNativeWarpInteractionRange } from './assets/warp-interaction.mjs'
 import { decodeWalkProbe } from './assets/walk-command-trace.mjs';
 import { hudOrigin } from './assets/hud-origin.mjs';
 import { chromeGates } from './assets/scene-chrome.mjs';
+import { exitLocalGame } from './assets/realm-local.mjs';
 import { realmViewSnapshot, realmFrameReads, realmGameReads } from './assets/realm-client-view.mjs';
 import { createRealmHud, waypointTravelPacket, waypointActCompletion } from './assets/realm-hud-state.mjs';
 import { createExperienceTable, createWaypointTable, createSkillTable } from './assets/realm-hud-tables.mjs';
@@ -81,7 +83,7 @@ import { createLoadCompleteOrder, worldDownScreen } from './assets/realm-world-o
 import { createRealmAutomapSource, readClientRoomInfo, readClientLevelGeometry } from './assets/realm-world-automap.mjs';
 import { createRealmNpcUi } from './assets/realm-npc-ui.mjs';
 import { createRealmNpcScreen } from './assets/realm-npc-screen.mjs';
-import { createItemTable, createObjectTable, createLevelTable, createInventoryTable, createBeltTable, createMonsterTable,
+import { createItemTable, createLevelTable, createInventoryTable, createBeltTable, createMonsterTable,
   createItemTypeTable, createItemStatTable, createAffixTable, createCharStatsTable, createSkillNameTable } from './assets/realm-tables.mjs';
 import { panelSides as panelViewSides, viewCentreX } from './assets/panel-view-shift.mjs';
 import { createFreeResArt, barParts, halfParts, stoneTiles, drawParts } from './assets/wide-hud.mjs';
@@ -116,7 +118,7 @@ import { createScreenshotAction } from './assets/screenshot-action.mjs';
 import { sendCharacterPhrase } from './assets/chat-macros.mjs';
 import { gameChatPacket, isSayable, gameChatLine, gameChatBubble, routeGameLine } from './assets/bnet-game-chat.mjs';
 import { createRealmTrade, createTradeRenderers } from './assets/realm-trade.mjs';
-import { Roster, rosterEventLine, eventLineText } from './assets/bnet-roster.mjs';
+import { Roster } from './assets/bnet-roster.mjs';
 import { localSlash } from './assets/bnet-slash.mjs';
 import { createOtherMultiplayerScreen } from './assets/other-multiplayer.mjs';
 import { createBnetLoginScreen } from './assets/bnet-login-screen.mjs';
@@ -142,6 +144,7 @@ import { createSaveStore, CLASS_NAMES } from './assets/save-store.mjs';
 import { importCharacterFiles } from './assets/character-import.mjs';
 import { singlePlayerDestination, createCharacterEntryReader } from './assets/title-single-player-route.mjs';
 import { installUnloadAutosave } from './assets/unload-autosave.mjs';
+import { autosaveDue } from './assets/autosave-gate.mjs';
 import { destroyNativeSession, leaveNativeSession, noSessionNotice, replaceNativeSession } from './assets/session-lifecycle.mjs';
 import { createNpcPanel } from './assets/npc-panel.mjs';
 import { createGameMenu } from './assets/game-menu.mjs';
@@ -152,6 +155,7 @@ import { createGameClock, GAME_STEP, STEP, MAX_CATCHUP_UPDATES, rafStarved } fro
 import { queueHeldPointerRepeat } from './assets/held-pointer-repeat.mjs';
 import { heldWorldAction, leftHandCommand } from './assets/world-click-dispatch.mjs';
 import { createDeathScreen, deathScreenShown, respawnAllowed } from './assets/death-screen.mjs';
+import { createRealmGameUi } from './assets/realm-game-ui.mjs';
 import { realmHeroFlags, realmCorpseViews, createRealmDeath, heroIsDown, deathBlocksKey, markCharactersDead } from './assets/realm-death.mjs';
 import { createNpcMenu, hireSkillText, npcMenuChoiceOnRelease, npcMenuInputCoolingDown, npcMenuEntries, withTravelRow, withHireRow, deadHireling, resurrectPacket, talkEntries, menuReturnsAfterSpeech, entriesAfterSpeech } from './assets/npc-menu.mjs';
 import { npcSpeech, npcSpeechByName, talkSpeechId } from './assets/npc-topics.mjs';
@@ -1654,7 +1658,7 @@ function releaseRealmFlow({ closeTransports = true } = {}) {
   worldRightPointerHeld = false; heldRightPointerTicks = 0;
   realmInputState = null;
   worldPointerHeld = false;
-  if (realmSceneActive) { gameRoster.clear(); gameBubbles.clear(); partyLocal.clear(); partyVisible = false; gameSlash.replyTo = ""; realmSceneActive = false; realmAutomapOverlay = null; realmSceneTiles = []; realmSceneRevision = 0; realmSceneEvidence = null; terrain = null; snapshot = null; session = null; screen = SCREEN.TITLE; }
+  if (realmSceneActive) { gameRoster.clear(); gameBubbles.clear(); realmSessionPresenter.reset(); partyLocal.clear(); partyVisible = false; gameSlash.replyTo = ""; realmSceneActive = false; realmAutomapOverlay = null; realmSceneTiles = []; realmSceneRevision = 0; realmSceneEvidence = null; terrain = null; snapshot = null; session = null; screen = SCREEN.TITLE; }
   if (realmFlow === flow) realmFlow = null;
   Promise.resolve(flow.d2gsReceiver?.done).catch(() => {}).then(() => {
     // A trap in the reset leaves the engine instance dead; the lobby would look normal and every join would abort.
@@ -1707,13 +1711,30 @@ function feedRealmSocial(bytes) {
   return routeSocialPackets(bytes, (b) => protocol.d2gsPacketSize(b), {
     roster: (p) => gameRoster.feed(p),
     trade: (p) => realmTrade().feed(p, { cursorItem: Boolean(realmWorldState?.cursorId), busy: chat !== null || Boolean(npcMenu?.open) }),
-    event: (p) => { const line = eventLineText(rosterEventLine(p, langIdx, gameRoster, chosenName)); if (line) { messageLines.push(line); postedAt = performance.now(); } },
     chat: (chat) => {
       const line = gameChatLine(chat, langIdx);
       if (line) { messageLines.push(line); postedAt = performance.now(); if (chat.messageType === 2) gameSlash.replyTo = latin1(chat.name); }
       const bubble = gameChatBubble(chat);
       if (bubble) gameBubbles.set(`${bubble.unitType}:${bubble.unitGuid}`, { text: bubble.text, at: performance.now() });
     } });
+}
+// What the server's packets ask the page to show or play, after the engine applied them: the event lines it
+// composed go to the message log, a unit's sound to the unit sound player, a freed overhead text leaves the
+// bubbles and a townsperson's notice becomes a unit overlay -- each through what a local game uses.
+const realmSessionPresenter = createRealmSessionPresenter({
+  line: (line) => { messageLines.push(line); postedAt = performance.now(); },
+  unitSound: ({ type, id, sound }) => {
+    const classId = type === 0 ? (id === realmPlayerView?.guid ? (realmPlayerView?.classId ?? snapshot?.playerClass) : realmPlayerRosterView.find((p) => p.guid === id)?.classId) : realmMonsterViews.find((m) => m.guid === id)?.classId;
+    if (classId == null) return;
+    try { unitSounds?.play({ unitType: type, unitId: id, classId, soundEvent: sound, updateUnitType: type, updateUnitId: id }, realmPlayerView?.guid); } catch (error) { console.warn('realm unit sound', error); }
+  },
+  clearOverhead: (type, id) => { gameBubbles.delete(`${type}:${id}`); },
+  uiSound: (row) => { unitSounds?.playRow(row, { source: 'realm-event' }).catch(() => {}); },
+  openInventory: () => { inventoryVisible = true; },
+});
+function presentRealmSession() {
+  const events = realmFlow?.protocol?.d2gsClientTakeSessionEvents?.();
+  if (events?.length) realmSessionPresenter.present(events);
 }
 function feedRealmPlayerFrame(bytes) {
   const protocol = realmFlow?.protocol;
@@ -1727,6 +1748,7 @@ function feedRealmPlayerFrame(bytes) {
   if (update.state?.guid != null) gameRoster.myId = update.state.guid >>> 0;
   feedRealmSocial(bytes);
   realmPlayerView = update.state;
+  presentRealmSession();
   realmPlayerRosterView = update.players;
   realmPlayerReassignFade.observe(update.players, update.state, performance.now());
   realmMonsterViews = update.monsters;
@@ -3196,7 +3218,7 @@ function advanceRealmClientUnits(forced) {
     return 0;
   }
   let ticks = 0;
-  const tickClientUnits = () => { realmFlow.protocol.d2gsClientMotionTick(); for (const used of realmFlow.protocol.d2gsClientTakeObjectEvents()) if (used.soundRow) unitSounds?.playRow(used.soundRow, { source: 'object-use', unitId: used.playerId }).catch(() => {}); realmAnimationFrame++; realmAreaAudio.step(realmAreaLevel(realmPlayerView, realmWorldView), realmAnimationFrame); ambient?.tick(1).catch(() => {}); realmChromeTick(); };
+  const tickClientUnits = () => { realmFlow.protocol.d2gsClientMotionTick(); realmAnimationFrame++; for (const used of realmFlow.protocol.d2gsClientTakeObjectEvents()) if (used.soundRow) unitSounds?.playRow(used.soundRow, { source: 'object-use', unitId: used.playerId }).catch(() => {}); realmAreaAudio.step(realmAreaLevel(realmPlayerView, realmWorldView), realmAnimationFrame); ambient?.tick(1).catch(() => {}); realmChromeTick(); };
   if (forced) { realmGameClock = 0; tickClientUnits(); ticks = 1; }
   else {
     realmGameClock += STEP;
@@ -3258,17 +3280,21 @@ function drainUnitSounds() {
   { const la = Module.ccall('d2_client_take_local_action', 'number', [], []); if (la === 2) eventSounds?.localWalk(snapshot?.entities?.find((e) => e.id === snapshot.playerId && e.type === 0)?.classId); else if (la === 7) eventSounds?.localAttack(); }
   if (snapshot?.player) { const m = session.motion(); Object.assign(snapshot.player, { mode: snapshot.mode, explicitMove: Module._d2_client_explicit_move(), framePrecise: m.framePrecise, frameCountPrecise: m.frameCountPrecise }); } // D1: footstep reads mode+frame
   if (snapshot) snapshot.directHpLoss = Module._d2_session_shrine_hp_loss?.() === 1; // Storm shrine: hit points removed with no hit
-  combatSounds?.update(snapshot?.entities ?? [], snapshot);
+  // A game played through packets plays its sounds from the server's packets (the realm tick above); the engine's own
+  // unit-sound queue, cues and ambience would play every one a second time.
+  const enginePlays = !clientView().fromPackets;
+  if (enginePlays) combatSounds?.update(snapshot?.entities ?? [], snapshot);
   { const hero = snapshot?.entities?.find((e) => e.id === snapshot.playerId && e.type === 0); heroFx = skillFx && hero ? skillFx.update({ ...hero, hp: snapshot.player?.hp }, snapshot.player?.castSkillId, engineTicks) : [];
     if (stateFx && hero && hero.hitPacketClass !== undefined) stateFx.hit('hero', engineTicks, hero.hitPacketClass);   // 0x19830 case 0x13: a hit on a player plays its hit-class overlay (2A590's rows) at once
     if (stateFx && hero) heroFx = heroFx.concat(stateFx.update((id) => Module.ccall('d2_session_player_has_state', 'number', ['number'], [id]), undefined, engineTicks, (id) => Module.ccall('d2_session_state_set_seq', 'number', ['number', 'number', 'number'], [0, snapshot.playerId, id]))); }
   // Native client missiles (D2Client-side Fire Ball): the impact row at the native terminal tick.
   if (Module._d2_realm_client_take_missile_sounds) { const b = missileImpactBuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [32 * 24])); const k = Module.ccall('d2_realm_client_take_missile_sounds', 'number', ['bigint', 'number'], [BigInt(b), 32]); const w = new Int32Array(Module.HEAPU8.buffer.slice(b, b + k * 24)); for (let i = 0; i < k; i++) unitSounds.playRow(w[i * 6 + 5], { kind: 'missile-impact', missileId: w[i * 6 + 2] }).catch(() => {}); }
-  { let born = []; if (Module._d2_session_missile_births) { const cb = missileBirthBuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [8])); const bp = Number(Module.ccall('d2_session_missile_births', 'bigint', ['bigint'], [BigInt(cb)])), bn = Module.HEAP32[cb >> 2]; for (let i = 0; i < bn; i++) born.push([Module.HEAP32[(bp >> 2) + 2 * i], Module.HEAP32[(bp >> 2) + 2 * i + 1]]); }
+  if (enginePlays) { let born = []; if (Module._d2_session_missile_births) { const cb = missileBirthBuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [8])); const bp = Number(Module.ccall('d2_session_missile_births', 'bigint', ['bigint'], [BigInt(cb)])), bn = Module.HEAP32[cb >> 2]; for (let i = 0; i < bn; i++) born.push([Module.HEAP32[(bp >> 2) + 2 * i], Module.HEAP32[(bp >> 2) + 2 * i + 1]]); }
     missileSounds?.update(snapshot?.entities ?? [], engineTicks, born); }
   // D35: client-side event sounds (pickup, gold, drop, footstep) run every tick, not only on ticks the engine queued a sound.
   eventSounds?.update(snapshot, readAdvancement()?.level);
-  drainAmbientSounds();
+  drainAmbientSounds();   // the ambient module is fed by the engine or by the realm's area audio, never both
+  if (!enginePlays) return;
   const cap = 32; if (!soundBuf) soundBuf = Number(Module.ccall('malloc', 'bigint', ['number'], [cap * 28]));
   const n = Module.ccall('d2_session_take_sounds', 'number', ['bigint', 'number'], [BigInt(soundBuf), cap * 7]);
   if (!n) return;
@@ -3340,7 +3366,12 @@ function update(forceTick = false, live = false) {
         realmInput().interactNearest();
       } else if (command.type === COMMAND.BELT) realmInput().useBelt(command.slot, Boolean(command.merc) && realmFlow?.expansion === true);
       else if (command.type === COMMAND.RESPAWN) realmDeath().escape(snapshot?.mode);
-      else if (command.type === COMMAND.SKILL) realmInput().hotkey(realmFlow?.protocol?.d2gsHotkeySelect?.(command.slot - 1));
+      else if (command.type === COMMAND.SKILL) {
+        // With the skill popup open and the pointer on an icon the F-key assigns that skill (0x51, the server binds it, the table here follows); otherwise it selects.
+        const over = skillSelectRenderer?.open && skillSelectRenderer.hoverIcon, left = over?.side === 'left';
+        if (over && realmInput().bindHotkey(command.slot - 1, over.skill.id, left)) realmFlow?.protocol?.d2gsSetHotkey?.(command.slot - 1, over.skill.id, left);
+        else if (!over) realmInput().hotkey(realmFlow?.protocol?.d2gsHotkeySelect?.(command.slot - 1));
+      }
     }
     realmInput().tick();
     const trade = realmTrade();
@@ -3468,6 +3499,15 @@ function update(forceTick = false, live = false) {
         const skill = command.secondary ? Math.max(0, readSelectedSkills().right) : 0;
         // Any other right-hand skill (Bash, Double Swing, ...) is the engine's selected right skill.
         const groundSkill = !targetId && command.secondary && skill > 2 && command.x != null;
+        // The retail client's click dispatch: a hand-to-hand right skill on open ground walks to the spot, unless
+        // Stand Still is held. GUESS: Attack and Kick are the hand-to-hand skills told apart here; the others keep the engine's cast.
+        if (!targetId && command.secondary && skill <= 1 && command.x != null && !heldStandStillKeys.size) {
+          walkGoal = null;
+          const moved = session.move(resolved.at.x, resolved.at.y);
+          if (!moved) armWalk({ x: resolved.at.x, y: resolved.at.y, within: 2 });
+          if (precord) precord.result = `move (${resolved.at.x},${resolved.at.y}) -> ${moved}`;
+          continue;
+        }
         const result = targetId ? (skill === 2 ? session.throwSkill(targetId) : skill === 1 ? session.kick(targetId) : skill === 0 ? session.attack(targetId)
           : Module.ccall('d2_session_command_right_skill', 'number', ['number'], [targetId]))
           : groundSkill ? session.rightSkillAt(resolved.at.x, resolved.at.y, Boolean(command.held)) : 0;
@@ -3599,24 +3639,23 @@ function updateAfterAdvance(engineAdvanced, live = false) {
   // more than 0x4a ticks have passed (or nothing is playing yet), so the old song carries across the seam.
   if (session && Number.isInteger(snapshot?.level) && snapshot.level !== musicSeenLevel) { musicSeenLevel = snapshot.level; musicLevelTick = engineTicks; }
   // Ambient loop/events (Levels.SoundEnv -> SoundEnviron -> Sounds.txt); cycle = the engine period of day (dusk/night/dawn pick the night variants).
-  if (session && ambient && Number.isInteger(snapshot?.level)) {
+  if (session && !clientView().fromPackets && ambient && Number.isInteger(snapshot?.level)) {
     const cycle = ambientCycleOf(Module);
     if (snapshot.level !== ambientLevel) { const { day, night } = ambient.environment(snapshot.level); Module._d2_ambient_record(day.environmentId, night.ambienceId, day.ambienceId, night.eventId, day.eventId, day.eventDelay); Module._d2_ambient_area(day.environmentId); } // 1.13c 0x4F860 reads the SoundEnviron row of Levels.SoundEnv
     if (snapshot.level !== ambientLevel || cycle !== ambientCycle) { ambientLevel = snapshot.level; ambientCycle = cycle; ambient.sync(ambientLevel, cycle).catch((error) => { console.warn('Ambient sound', error); }); }
   }
-  if (session && actMusic && Number.isInteger(snapshot?.level) && levelMusicDue(snapshot.level, levelMusicSync.activeLevel, musicLevelTick, engineTicks)) {
+  if (session && !clientView().fromPackets && actMusic && Number.isInteger(snapshot?.level) && levelMusicDue(snapshot.level, levelMusicSync.activeLevel, musicLevelTick, engineTicks)) {
     syncAreaMusic(snapshot.level);
   }
   // Write the character periodically, and immediately on an act change -- the two moments retail
   // treats as worth persisting. Guarded against overlap: the store is async and a second save
   // starting before the first finished would race on the same key.
-  if (session && chosenName && !autosaveInFlight) {
-    autosaveAt++;
-    const actChanged = snapshot.act !== autosaveAct;
-    if (actChanged || autosaveAt >= AUTOSAVE_TICKS) {
-      autosaveAt = 0; autosaveAct = snapshot.act; autosaveInFlight = true;
-      persistCurrentCharacter().finally(() => { autosaveInFlight = false; });
-    }
+  // A game played through packets is written only once its join has finished (autosave-gate.mjs).
+  {
+    const due = autosaveDue({ session, named: Boolean(chosenName), inFlight: autosaveInFlight, fromPackets: clientView().fromPackets, joined: Boolean(realmFlow?.local && clientView().live),
+      ticks: autosaveAt, interval: AUTOSAVE_TICKS, actChanged: snapshot?.act !== autosaveAct });
+    autosaveAt = due.count;
+    if (due.due) { autosaveAt = 0; autosaveAct = snapshot.act; autosaveInFlight = true; persistCurrentCharacter().finally(() => { autosaveInFlight = false; }); }
   }
   status.title = [terrainError, musicError].filter(Boolean).join('\n');
   status.textContent = session
@@ -4226,7 +4265,7 @@ function realmHud() {
 function realmTables() {
   if (realmTableSet) return realmTableSet;
   const read = createMpqAssetReader(Module);
-  return (realmTableSet = { items: createItemTable(read), objects: createObjectTable(read), levels: createLevelTable(read), inventory: createInventoryTable(read),
+  return (realmTableSet = { items: createItemTable(read), levels: createLevelTable(read), inventory: createInventoryTable(read),
     belt: createBeltTable(read), monsters: createMonsterTable(read), types: createItemTypeTable(read), stats: createItemStatTable(read),
     affixes: createAffixTable(read), chars: createCharStatsTable(read), skills: createSkillNameTable(read), inventoryLayoutFromEngine, stashGeometry });
 }
@@ -4285,15 +4324,17 @@ function realmDeath() {
     markDead: () => { if (realmPlayerView?.name) realmDeadNames.add(String(realmPlayerView.name).toLowerCase()); realmCharacters = markCharactersDead(realmCharacters, realmDeadNames); },
     trade: () => realmFlow?.trade ?? null,
     send: (bytes) => { try { realmFlow?.d2gs?.send(Uint8Array.from(bytes)); } catch { /* socket already closed */ } },
-    close: (names) => {
-      const off = { inventory: () => { inventoryVisible = false; }, character: () => { characterVisible = false; }, skillTree: () => { skillsVisible = false; },
-        chat: () => { chat = null; }, gameMenu: () => { if (gameMenu?.open) gameMenu.close(); }, automap: () => { if (automapOverlay?.isOpen) automapOverlay.toggle(); },
-        quests: () => { questVisible = false; }, party: () => { partyVisible = false; }, messageLog: () => { messageVisible = false; },
-        stash: () => { stashOpen = false; closeStashGold(); }, cube: () => { cubeOpen = false; }, waypoint: () => { waypointMenu = null; },
-        help: () => { helpVisible = false; }, hireling: () => { hirelingVisible = false; } };
-      for (const name of names) off[name]?.();
-      realmInput().heroDied();
-    } }));
+    close: (names) => { closeRealmPanels(names); realmInput().heroDied(); } }));
+}
+// Shuts the named panels of a joined game: the hero's death and the server's game start (assets/realm-game-ui.mjs) both name some.
+const realmGameUi = createRealmGameUi();
+function closeRealmPanels(names) {
+  const off = { inventory: () => { inventoryVisible = false; }, character: () => { characterVisible = false; }, skillTree: () => { skillsVisible = false; },
+    chat: () => { chat = null; }, gameMenu: () => { if (gameMenu?.open) gameMenu.close(); }, automap: () => { if (automapOverlay?.isOpen) automapOverlay.toggle(); },
+    quests: () => { questVisible = false; }, party: () => { partyVisible = false; }, messageLog: () => { messageVisible = false; },
+    stash: () => { stashOpen = false; closeStashGold(); }, cube: () => { cubeOpen = false; }, waypoint: () => { waypointMenu = null; },
+    help: () => { helpVisible = false; }, hireling: () => { hirelingVisible = false; } };
+  for (const name of names) off[name]?.();
 }
 function realmInput() {
   return (realmInputState ??= createRealmInput({
@@ -4454,7 +4495,7 @@ const realmClientView = {
   advancement: () => realmReads?.advancement ?? null,
   questWords: () => realmReads?.questWords ?? new Uint16Array(48),
   waypointTable: () => realmReads?.waypointTable ?? { rows: () => [], tabs: [] },
-  skillMana: () => 0,
+  skillMana: (id, level) => realmTables().skills.manaCost(id, level),
   hoverTarget: () => realmUnits.hoverTarget(realmInput().pick(pointer.x, pointer.y), realmMonsterViews, (classId) => { const stringIndex = Module.ccall('d2_monster_name_str', 'number', ['number'], [classId]); return { stringIndex, label: stringIndex >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [stringIndex]) : '' }; }),
   pointerContext: () => realmUnits.cursorContext(realmInput().pick(pointer.x, pointer.y)),
   pointerItem: () => realmWorldState?.cursorId ?? 0,
@@ -4467,6 +4508,8 @@ const realmClientView = {
     saveAndExit() {
       // A Battle.net game: the server holds the character. Retail returns to the lobby.
       gameMenu.close();
+      // A local game has no lobby or game server to wait on: the character is written and the list comes back, as in single player.
+      if (realmFlow?.local) { void exitLocalGame({ release: () => releaseRealmFlow({ closeTransports: true }), saveAndExit: () => spClientView.commands.saveAndExit() }); return; }
       // Retail's exit row sends the window close, and the close handler sends 0x69 at once; the 4F 02 / 30 s wait belongs
       // to the trade window's cancel button. A reason countdown already running tears down at once.
       if (!realmFlow?.d2gsLife?.saveAndExit()) void leaveRealmGame();
@@ -4481,7 +4524,7 @@ const realmClientView = {
     addStat: (stat, points) => realmInput().addStat(stat, points),   // the server spends the points and sends the new stats
     addSkill: (id) => realmInput().addSkill(id),   // the server spends the point and sends the skill list
     button: (button, amount) => (realmFlow?.d2gs?.isOpen && realmFlow.d2gs.send(itemPackets.stashButton(button, amount)) !== false ? 1 : 0),
-    say(text) { if (realmFlow?.d2gs) sendGameLine(text); else spClientView.commands.say(text); },
+    say(text) { if (realmFlow?.d2gs && !realmFlow.local) sendGameLine(text); else spClientView.commands.say(text); },
     phraseSocket: () => (realmPlayerView?.active ? realmFlow?.d2gs : null),
     panelClick: (x, y, e) => realmTransport.state === 'session-open' && (realmStorageClickAt(x, y, e) || realmInventoryClick(x, y, e.button)),
   },
@@ -4539,11 +4582,12 @@ function refreshRealmView() {
     ownGuid: realmPlayerView ? selectedPlayerSource().guid : null, monsters: realmMonsterViews, string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) });
   const next = realmViewSnapshot({ base: protocol?.d2gsClientSnapshot?.() ?? null, resources, monsters: realmMonsterViews,
     missiles: realmMissileViews, players: realmOtherPlayers(), level: realmWorldView?.mapLevel, actor: realmMonsterAnimationActor, frame: realmAnimationFrame,
-    world: realmWorldState, classOf: realmUnits.classOf, objects: protocol?.d2gsClientObjects?.() ?? [], alerts: game.alerts,
+    world: realmWorldState, classOf: realmUnits.classOf, objects: protocol ? protocol.d2gsClientObjects() : [], alerts: game.alerts,
     warps: protocol?.d2gsClientWarps?.(), rooms: protocol?.d2gsClientRooms?.(), quests: protocol?.d2gsClientQuests?.(questVisible) });
-  if (next) snapshot = next;
+  if (next) { snapshot = next; realmSessionPresenter.applyOverlays(unitOverlayFx, Math.floor(performance.now() / 40), next.entities); }   // 25 frames a second
   realmDeath().observe(snapshot?.mode);
-  if (realmUnitFx) heroFx = realmUnitFx.apply(snapshot, selectedPlayerSource()?.guid);
+  realmGameUi.observe(game.ui, closeRealmPanels);
+  if (realmUnitFx) heroFx = realmUnitFx.apply(snapshot, selectedPlayerSource()?.guid, game.marks);
   const levels = new Map();
   const bonuses = new Map();
   for (const k of (realmPlayerView?.active ? readSkillChoices() : [])) { levels.set(k.id, k.level); bonuses.set(k.id, k.bonus ?? 0); }
@@ -4686,6 +4730,10 @@ function finishRealmSceneEvidence() {
   realmSceneEvidence.playerRenderError = playerRenderError;
 }
 // Speech bubbles over the players and monsters, the party panel and the area-change fade.
+// A unit's overlay effects on one side of its body (`pre`: the PreDraw ones, behind it).
+function drawUnitOverlays(c, sx, sy, list, pre, act) {
+  try { for (const f of list) if (!!f.predraw === pre) overlayRenderer?.draw(c, sx, sy, { classId: f.file }, 0, 0, f.age, f.trans === 3 ? 1 : 0, act); } catch { /* an effect that fails to draw is not fatal */ }
+}
 function drawRealmOverlays(w, h, proj) {
   const source = selectedPlayerSource();
   if (bubbleRenderer && gameBubbles.size) {
@@ -5083,7 +5131,7 @@ function drawFrame() {
       // composed plane (F198) while the npc-speech renderer recomputes its hash per draw.
       const pBody = perfT0();
       // The unit's overlays (its server hit overlay, its state loops and once-nodes: unit-overlay-fx / state-fx), PreDraw behind the body, else over it (as the worker's draw).
-      const drawOv = (pre) => { try { for (const f of [...(entity.stateOverlays ?? []), ...(entity.overlay ? [entity.overlay] : [])]) if (!!f.predraw === pre) overlayRenderer?.draw(c, sx, sy, { classId: f.file }, 0, 0, f.age, f.trans === 3 ? 1 : 0, snapshot.act); } catch { /* an effect that fails to draw is not fatal */ } };
+      const drawOv = (pre) => drawUnitOverlays(c, sx, sy, [...(entity.stateOverlays ?? []), ...(entity.overlay ? [entity.overlay] : [])], pre, snapshot.act);
       drawOv(true);
       const being = entity.animation ? monsterRenderer?.draw(c, sx, sy, entity.animation, snapshot.act, hovered?.kind === 'unit' && hovered.id === entity.id) : null;
       drawOv(false);
@@ -5125,7 +5173,11 @@ function drawFrame() {
     const [sx, sy] = projStatic(object.x, object.y);
     const isHovered = hovered?.kind === 'object' && hovered.id === object.id;
     sprites.push({ depth: sy, wx: object.x, wy: object.y, pass: 'object', u: [2, object.classId, object.mode], draw(c) {
+      // An object's own looping overlays (a shrine's glow), drawn as a unit's are: PreDraw behind the body, else over it.
+      const ov = (object.overlays ?? []).map((row, i) => stateFx?.loop(row, object.overlayAges?.[i] ?? 0)).filter(Boolean);
+      drawUnitOverlays(c, sx, sy, ov, true, snapshot.act);
       const drawn = objectRenderer?.draw(c, sx, sy, object, snapshot.act, isHovered);
+      drawUnitOverlays(c, sx, sy, ov, false, snapshot.act);
       if (drawn) objectDrawEvidence.push({ id: object.id, classId: object.classId, token: object.token,
         mode: drawn.mode, drawMode: isHovered ? 7 : 5, direction: drawn.direction, frame: drawn.frame,
         x: Math.round(sx), y: Math.round(sy), width: drawn.width, height: drawn.height,

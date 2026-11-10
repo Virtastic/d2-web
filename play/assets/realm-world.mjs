@@ -1,18 +1,19 @@
 // What a joined Battle.net game's D2GS server tells the client about the things the client state
-// (src/core/realm/d2gs_client_state.cpp) does not keep: the objects around the player, the items on the
-// ground, the player's own inventory, equipment, belt, stash, cube and cursor, the gold figures, and the
-// worn items of the other players. Fed the same decoded server packets the client state is fed, it shapes
-// them into the records the shared drawFrame reads in a local game (the item and object presentations,
-// assets/item-renderer.mjs and assets/object-renderer.mjs).
+// (src/core/realm/d2gs_client_state.cpp) does not keep: the items on the ground, the player's own inventory,
+// equipment, belt, stash, cube and cursor, the gold figures, and the worn items of the other players. Fed the
+// same decoded server packets the client state is fed, it shapes them into the records the shared drawFrame
+// reads in a local game (the item presentations, assets/item-renderer.mjs).
 //
 // The items a player HOLDS (grids, body, belt, cursor) are the engine's: the wasm client seats every item
 // record on the player's unit as retail does, and `heldItems` reads them back. This file's own item map then
 // supplies only what the unit read does not carry (the ground items, the raw bitstream a tooltip is decoded
 // from). Without `heldItems` (an engine build that lacks the read) the map answers alone, as before.
 //
-// Packet semantics are 1.13c's: 0x51 adds an object and 0x0E changes its state, 0x0A removes a unit,
-// 0x9C and 0x9D carry an item as its saved-item bitstream (the format ITEMS_DecodeItemFromBitstream reads
-// without the 'JM' header or the seed), 0x19 and 0x1D-0x1F, 0x20 carry the gold stats, 0x03 starts an act.
+// Objects are not here: the engine's object unit is their one model (assets/realm-objects.mjs reads it back).
+//
+// Packet semantics are 1.13c's: 0x0A removes a unit, 0x9C and 0x9D carry an item as its saved-item bitstream
+// (the format ITEMS_DecodeItemFromBitstream reads without the 'JM' header or the seed), 0x19 and 0x1D-0x1F,
+// 0x20 carry the gold stats, 0x03 starts an act.
 
 const ITEM_FLAG = Object.freeze({ IDENTIFIED: 0x10, SOCKETED: 0x800, EAR: 0x10000, COMPACT: 0x200000,
   ETHEREAL: 0x400000, LOW_QUALITY: 0x2000000 });
@@ -24,7 +25,7 @@ const ACTIONS_9D = new Set([5, 6, 7, 8, 9, 17, 19, 20, 21, 22, 23]);
 const GOLD_STAT = 14, STASH_GOLD_STAT = 15;
 const GOLD_CODE = 0x20646c67;   // 'gld '
 const NO_PAGE = 255;
-export const PAGE = Object.freeze({ INVENTORY: 0, CUBE: 3, STASH: 4, BELT: 5, NONE: NO_PAGE });
+export const PAGE = Object.freeze({ INVENTORY: 0, CUBE: 3, STASH: 4, NONE: NO_PAGE });
 
 /** LSB-first bit reader over a byte array (the save-format bitstream order). */
 export function bitReader(bytes) {
@@ -72,41 +73,16 @@ const u16 = (p, at) => p[at] | (p[at + 1] << 8);
 const u32 = (p, at) => (p[at] | (p[at + 1] << 8) | (p[at + 2] << 16) | (p[at + 3] << 24)) >>> 0;
 
 /**
- * `tables` is { items: createItemTable(read), objects: createObjectTable(read) } (assets/realm-tables.mjs).
+ * `tables` is { items: createItemTable(read) } (assets/realm-tables.mjs).
  * `heldItems(ownerGuid)` (optional) returns the engine's records of the items a player unit holds (0 = the
  * client's own player), or null when the engine cannot say: { guid, classId, code, mode, x, y, page, bodyLoc,
  * quality, flags }.
  */
-const SUBCLASS_PORTALS = 0x04 | 0x10;   // a town portal, a permanent portal
-
-/**
- * The engine's object units (d2_realm_client_object_units): 14 int32 words each, {id, class, x, y, mode, 8.8 cel clock,
- * 8.8 cel count, 8.8 step, flags (1 selectable, 2 in a revealed room), interact byte, overlay count, 3 overlay rows}.
- */
-export const OBJECT_UNIT_WORDS = 14;
-export function parseRealmObjectUnits(words, count) {
-  const units = [];
-  for (let i = 0; i < count; i++) {
-    const w = words.subarray(i * OBJECT_UNIT_WORDS, (i + 1) * OBJECT_UNIT_WORDS);
-    units.push({ id: w[0] >>> 0, classId: w[1], x: w[2], y: w[3], mode: w[4], clock: w[5], count: w[6], speed: w[7],
-      selectable: (w[8] & 1) !== 0, inRoom: (w[8] & 2) !== 0, interact: w[9], overlays: Array.from(w.subarray(11, 11 + w[10])) });
-  }
-  return units;
-}
-/** The engine's pending object activations (d2_realm_client_take_object_events): 6 int32 words each. */
-export function parseRealmObjectEvents(words, count) {
-  const events = [];
-  for (let i = 0; i < count; i++) {
-    if (words[i * 6] !== 1) throw new Error(`object event version ${words[i * 6]}`);
-    events.push({ objectId: words[i * 6 + 1] >>> 0, playerId: words[i * 6 + 2] >>> 0, shrine: words[i * 6 + 3], soundRow: words[i * 6 + 4], effect: words[i * 6 + 5] });
-  }
-  return events;
-}
-
-export function createRealmWorld({ items: itemTable, objects: objectTable, heldItems = null }) {
+export function createRealmWorld({ items: itemTable, heldItems = null }) {
   let ownGuid = null;
   const itemsByGuid = new Map();    // guid -> { ...decoded, id, owner: null (0x9C) | owner guid (0x9D) }
   let gold = 0, stashGold = 0, cursorId = 0, received = 0;
+  let useItem = null, inventoryAsks = 0;   // 0x3f: the item the cursor is using, and how often it asked for the inventory
   const uiEvents = [];              // 0x77 UpdateUi codes not yet taken (16 opens the stash, 17 closes it, 21 opens the cube)
 
   let revision = 0;                 // bumped by every feed and reset: the engine reads below are cached per revision
@@ -138,13 +114,14 @@ export function createRealmWorld({ items: itemTable, objects: objectTable, heldI
 
   function reset() {
     revision++; heldCache.clear();
-    itemsByGuid.clear(); uiEvents.length = 0; gold = 0; stashGold = 0; cursorId = 0; received = 0;
+    itemsByGuid.clear(); uiEvents.length = 0; gold = 0; stashGold = 0; cursorId = 0; received = 0; useItem = null; inventoryAsks = 0;
   }
   const isOwn = (item) => item.owner === null || item.owner === ownGuid;
 
   function removeItem(guid) {
     itemsByGuid.delete(guid);
     if (cursorId === guid) cursorId = 0;
+    if (useItem?.id === guid) useItem = null;
   }
 
   function applyItem(packet, withOwner) {
@@ -189,6 +166,15 @@ export function createRealmWorld({ items: itemTable, objects: objectTable, heldI
       case 0x1f: applyStat(p[1], u32(p, 2)); break;
       case 0x20: if (ownGuid !== null && u32(p, 1) === ownGuid) applyStat(p[5], u32(p, 6)); break;
       // A corpse was made (flag set): what its owner wore is on the corpse now, and the server sends no per-item removal.
+      // The cursor takes up or lets go of an item it is using (a scroll or key being aimed). Letting go (kind 0xff,
+      // word 0xffff) clears the item's targeting flag (4); taking up needs the item, sets the flag when the word
+      // is 0xffff and keeps the kind. Kinds 0 and 2 ask for the inventory to be open.
+      case 0x3f: if (p.length >= 8) { const kind = p[1], guid = u32(p, 2), word = u16(p, 6), held = itemsByGuid.get(guid);
+        if (kind === 0xff && word === 0xffff) { if (held) held.flags = (held.flags & ~4) >>> 0; useItem = null; }
+        else if (held) { if (word === 0xffff) held.flags = (held.flags | 4) >>> 0; useItem = { id: guid, kind }; if (kind === 0 || kind === 2) inventoryAsks++; }
+      } break;
+      // The local player's cursor item is gone.
+      case 0x42: if (p.length >= 6 && p[1] === 0 && ownGuid !== null && u32(p, 2) === ownGuid && cursorId) removeItem(cursorId); break;
       case 0x74: if (p.length >= 10 && p[1]) { const owner = u32(p, 2);
         itemsByGuid.forEach((item, guid) => { if (item.mode === MODE.EQUIP && (item.owner === owner || (owner === ownGuid && item.owner === null))) itemsByGuid.delete(guid); });
       } break;
@@ -206,7 +192,7 @@ export function createRealmWorld({ items: itemTable, objects: objectTable, heldI
       framePrecise: 0xff00, frameCountPrecise: 0xff00, landed: ground,
       flippyFile: e.flippyFile, invFile: e.invFile,
       gridX: ground ? 0 : item.x, gridY: ground ? 0 : item.y,
-      invPage: ground ? NO_PAGE : item.mode === MODE.BELT ? PAGE.BELT : item.page,
+      invPage: ground ? NO_PAGE : item.page,   // the item's own page: a belt or worn item has none, as the engine's item says
       bodyLoc: item.mode === MODE.EQUIP ? item.bodyLoc : 0, invWidth: e.invWidth, invHeight: e.invHeight, twoHanded: Boolean(e.twoHanded),
       goldAmount: item.goldAmount, sockets: undefined, tick };
   }
@@ -228,23 +214,6 @@ export function createRealmWorld({ items: itemTable, objects: objectTable, heldI
     itemViews() { return ownItems().map((item) => presentItem(item)); },
     /** The worn items of another player, as presentation records. */
     wornBy(guid) { return wornItems(guid >>> 0).map((item) => presentItem(item)); },
-    /**
-     * The scene's object records, shaped from the engine's object units (parseRealmObjectUnits). The engine owns every
-     * fact that changes (mode, cel clock, whether it can be picked, its room, its overlays); the class table adds
-     * only what names the art. The interact byte is a portal's destination level and a chest's lock bit.
-     */
-    objectViews(units = []) {
-      const views = [];
-      for (const o of units) {
-        const cls = objectTable.byClass(o.classId);
-        if (!cls) continue;
-        views.push({ id: o.id, classId: o.classId, token: cls.token, mode: o.mode, x: o.x, y: o.y,
-          framePrecise: o.clock, frameCountPrecise: o.count, componentMask: 0xFFFF, animSpeed: o.speed, direction: cls.orientation ?? 0,
-          selectable: o.selectable, overlays: o.overlays,
-          portalLevel: (cls.subClass & SUBCLASS_PORTALS) ? o.interact : 0, locked: Boolean(cls.lockable && (o.interact & 0x80)), inClientRoom: o.inRoom });
-      }
-      return views;
-    },
     /** The saved-item bitstream the server sent for an item (what its tooltip text is decoded from). */
     rawItem(guid) { return itemsByGuid.get(guid >>> 0)?.raw ?? null; },
     /** The 0x77 UpdateUi codes received since the last call. */
@@ -252,6 +221,8 @@ export function createRealmWorld({ items: itemTable, objects: objectTable, heldI
     get gold() { return gold; },
     get stashGold() { return stashGold; },
     get cursorId() { const mine = held(null); return mine ? (mine.find((item) => item.mode === MODE.CURSOR)?.id ?? 0) : cursorId; },
+    get useItem() { return useItem; },
+    takeInventoryAsks() { const n = inventoryAsks; inventoryAsks = 0; return n; },
     get itemPacketsSeen() { return received; },
     get ownItemCount() { return ownItems().length; },
     /** The Belts.txt row the worn belt names (its armor row's `belt` column), 2 with no belt. */

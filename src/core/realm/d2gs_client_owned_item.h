@@ -39,6 +39,8 @@ void d2_realm_client_items_forget_owner(D2UnitStrc* owner);
 void d2_realm_client_items_forget_loose();
 void d2_realm_client_items_reset();
 int d2_realm_client_item_remove(uint32_t guid);
+int d2_realm_client_item_clear_cursor(D2UnitStrc* owner);
+D2UnitStrc* d2_realm_client_owned_item_find(uint32_t guid);
 void d2_realm_client_items_set_expansion(int expansion);
 int d2_realm_client_unit_items(const D2UnitStrc* owner, uint32_t* out, int capacity);
 uint32_t d2_realm_client_unit_item_box_state(D2UnitStrc* owner, uint32_t guid);

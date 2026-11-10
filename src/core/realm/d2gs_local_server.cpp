@@ -35,6 +35,7 @@ int d2_session_command_npc_response_packet(uint32_t npcId, uint32_t messageId);
 int d2_session_command_npc_action_packet(uint32_t npcId, uint32_t action);
 int d2_session_command_waypoint(uint32_t waypointId, int32_t levelId);
 int d2_session_command_respawn();
+int d2_session_command_button(uint32_t button, int32_t gold);
 int d2_session_player_id();
 int d2_session_player_x();
 int d2_session_player_y();
@@ -42,6 +43,8 @@ int d2_session_player_act();
 void D2WEB_SetPacketSink(void (*sink)(const uint8_t*, uint32_t));
 const uint8_t* d2_session_join_stream(uint32_t* length);
 int d2_session_client_rooms(uint8_t* out, int capacity);
+int d2_session_client_room_objects();
+uint32_t d2_session_join_load_length();
 uint32_t d2_session_game_seed();
 int d2_session_game_flags();
 }
@@ -93,45 +96,25 @@ void refuse(uint8_t opcode, int result) {
     ++g_server.refusedCount;
 }
 
-// The town a LoadAct names for each act (Levels.txt ids of the five towns).
-uint16_t actTown(int act) {
-    static const uint16_t towns[5] = { 1, 40, 75, 103, 109 };
-    return act >= 0 && act < 5 ? towns[act] : 1;
-}
-
-// Game flags, then the two one-byte load markers the client answers with its enter-game byte.
+// The game's own join bytes, in the order it sent them when the player entered: the load part
+// (game flags and the two one-byte markers the client answers with its enter-game byte) ...
 void sendLoad() {
-    uint8_t flags[8] = { 0x01, g_server.difficulty, 0, 0, 0, 0, g_server.expansion, 0 };
-    put(flags, sizeof flags);
-    const uint8_t markers[2] = { 0x00, 0x02 };
-    put(markers, sizeof markers);
-}
-
-// The joining player's own unit, the handshake that selects it, and the act it stands in.
-bool sendPlayer() {
-    const int guid = d2_session_player_id();
-    if (guid < 0) return false;
-    uint8_t assign[26] = { 0x59 };
-    wr32(assign + 1, static_cast<uint32_t>(guid));
-    assign[5] = g_server.classId;
-    std::memcpy(assign + 6, g_server.name, 16);
-    wr16(assign + 22, static_cast<uint32_t>(d2_session_player_x()));
-    wr16(assign + 24, static_cast<uint32_t>(d2_session_player_y()));
-    put(assign, sizeof assign);
-    uint8_t handshake[6] = { 0x0B, 0x00 };
-    wr32(handshake + 2, static_cast<uint32_t>(guid));
-    put(handshake, sizeof handshake);
-    const int act = d2_session_player_act();
-    uint8_t loadAct[12] = { 0x03, static_cast<uint8_t>(act < 0 ? 0 : act) };
-    wr32(loadAct + 2, g_server.mapSeed);
-    wr16(loadAct + 6, actTown(act));
-    put(loadAct, sizeof loadAct);
-    // The rooms the game holds this client in, then the units the join walk sent when the player entered.
-    static uint8_t rooms[6 * 256];
-    put(rooms, d2_session_client_rooms(rooms, sizeof rooms));
     uint32_t burst = 0;
     const uint8_t* join = d2_session_join_stream(&burst);
-    if (join && burst) put(join, static_cast<int>(burst));
+    const uint32_t load = d2_session_join_load_length();
+    if (join && load <= burst) put(join, static_cast<int>(load));
+}
+
+// ... then the player's own unit, the unit it plays, the act, the rooms the join walk revealed and
+// the units in them.
+bool sendPlayer() {
+    if (d2_session_player_id() < 0) return false;
+    uint32_t burst = 0;
+    const uint8_t* join = d2_session_join_stream(&burst);
+    const uint32_t load = d2_session_join_load_length();
+    if (join && load <= burst) put(join + load, static_cast<int>(burst - load));
+    g_server.phase = Phase::InGame;     // the sink forwards from here on
+    d2_session_client_room_objects();   // through the packet sink: each object of those rooms, before the updates that name them
     return true;
 }
 
@@ -159,6 +142,7 @@ int dispatch(const uint8_t* p, int n) {
     case 0x3A: if (!need(3)) return -1; return d2_session_command_add_stat(p[1], static_cast<uint32_t>(p[2]) + 1);
     case 0x41: return d2_session_command_respawn();
     case 0x49: if (!need(9)) return -1; return d2_session_command_waypoint(rd32(p + 1), static_cast<int32_t>(rd32(p + 5)));
+    case 0x4F: if (!need(7)) return -1; return d2_session_command_button(rd16(p + 1), static_cast<int32_t>((static_cast<uint32_t>(rd16(p + 3)) << 16) | rd16(p + 5)));
     case 0x50: if (!need(9)) return -1; return d2_session_command_dropgold(rd32(p + 5));
     case 0x60: return d2_session_command_swap_weapons();
     default: return d2_session_client_packet(p, n);   // the recovered handlers the session links; -1 for the rest

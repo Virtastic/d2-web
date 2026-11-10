@@ -27,10 +27,11 @@ function rememberFailure(failures, key, limit) {
   while (failures.size > limit) failures.delete(failures.values().next().value);
 }
 
-export function parseObjectPresentations(bytes, count) {
+// `stride` is the bytes from one record to the next: a joined game's records carry more after these 44.
+export function parseObjectPresentations(bytes, count, stride = 44) {
   const view = bytes instanceof DataView ? bytes : new DataView(bytes.buffer, bytes.byteOffset || 0, bytes.byteLength);
-  if (!Number.isInteger(count) || count < 0 || view.byteLength < count * 44) throw new RangeError('truncated object presentation records');
-  return Array.from({ length: count }, (_, row) => { const at = row * 44; return {
+  if (!Number.isInteger(count) || count < 0 || view.byteLength < count * stride) throw new RangeError('truncated object presentation records');
+  return Array.from({ length: count }, (_, row) => { const at = row * stride; return {
     id: view.getUint32(at, true), classId: view.getUint32(at + 4, true), token: fourcc(view.getUint32(at + 8, true)),
     mode: view.getUint32(at + 12, true), x: view.getInt32(at + 16, true), y: view.getInt32(at + 20, true),
     framePrecise: view.getUint32(at + 24, true), frameCountPrecise: view.getUint32(at + 28, true),

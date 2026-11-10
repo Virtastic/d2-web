@@ -3,7 +3,7 @@ import { readD2gsDeny, d2gsDenyError } from './d2gs-deny.mjs';
 import { parseRealmMissiles } from './realm-missiles.mjs';
 import { parseRealmUnitInfo } from './realm-combat.mjs';
 import { parseRealmMissileSoundEvents } from './realm-missile-sounds.mjs';
-import { OBJECT_UNIT_WORDS, parseRealmObjectUnits, parseRealmObjectEvents } from './realm-world.mjs';
+import { OBJECT_UNIT_BYTES, parseRealmObjectUnits, parseRealmObjectEvents } from './realm-objects.mjs';
 import { parseRealmUnitFx } from './realm-unit-fx.mjs';
 import { parseSessionRooms, parseSessionSnapshot, parseSessionWarps } from '../gameplay-model.mjs';
 // The realm CLIENT half: it drives our protocol (BNCS/MCP/D2GS) over a byte-pipe transport.
@@ -1172,6 +1172,19 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
       const n = call('d2_realm_client_npc_alerts', 'number', ['bigint', 'number'], [BigInt(P), 256]);
       return Array.from(new Uint32Array(Module.HEAPU8.buffer, Number(P), n));
     },
+    // The units other than monsters carrying the same mark (0x8A names any unit, the player's own hero included): [{ type, guid }].
+    d2gsClientUnitMarks: () => {
+      if (!Module._d2_realm_client_unit_marks) return [];
+      const n = call('d2_realm_client_unit_marks', 'number', ['bigint', 'number'], [BigInt(P), 128]);
+      const w = new Uint32Array(Module.HEAPU8.buffer, Number(P), n * 2);
+      return Array.from({ length: n }, (_, i) => ({ type: w[i * 2], guid: w[i * 2 + 1] }));
+    },
+    // The panel flags the server's 0x01 left (by the client's panel number) and how many 0x01 arrived; null before the first.
+    d2gsClientGameUi: () => {
+      if (!Module._d2_realm_client_game_ui) return null;
+      const starts = call('d2_realm_client_game_ui', 'number', ['bigint'], [BigInt(P)]);
+      return starts ? { starts, panels: Array.from(new Uint32Array(Module.HEAPU8.buffer, Number(P) + 4, 38)) } : null;
+    },
     d2gsClientSetActiveNpc: (guid) => { if (Module._d2_realm_client_set_active_npc) call('d2_realm_client_set_active_npc', null, ['number', 'number'], [guid == null ? 0 : 1, guid ?? 0]); },
     // The pet list of the server's 0x81 (newest first) and a stat its 0x9E..0xA2 set on a pet unit (null when never sent).
     d2gsClientPets: () => {
@@ -1225,6 +1238,57 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
         message: Array.from(Module.HEAPU8.subarray(at + 56, at + 56 + messageLength)) };
     },
     d2gsClientGameChatCount: () => call('d2_realm_client_game_chat_count', 'number', [], []),
+    // The players of the game as the roster packets left them: 52-byte records.
+    d2gsClientRoster: () => {
+      if (!Module._d2_realm_client_roster) return [];
+      const n = call('d2_realm_client_roster_count', 'number', [], []), at = Number(call('d2_realm_client_roster', 'bigint', [], []));
+      const view = new DataView(Module.HEAPU8.buffer, at, n * 52), out = [];
+      for (let i = 0, o = 0; i < n; i++, o += 52) {
+        const name = Module.HEAPU8.subarray(at + o + 36, at + o + 52);
+        out.push({ guid: view.getUint32(o, true), classId: view.getUint32(o + 4, true), level: view.getUint32(o + 8, true), party: view.getUint32(o + 12, true),
+          relation: view.getUint32(o + 16, true), portalA: view.getUint32(o + 20, true), portalB: view.getUint32(o + 24, true), corpses: view.getUint32(o + 28, true),
+          kills: view.getInt32(o + 32, true), name: String.fromCharCode(...name.subarray(0, Math.max(0, name.indexOf(0)))) });
+      }
+      return out;
+    },
+    // Town portals: the destination area, the open flags and the owner's name, by object id.
+    d2gsClientPortals: () => {
+      if (!Module._d2_realm_client_portals) return [];
+      const n = call('d2_realm_client_portal_count', 'number', [], []), at = Number(call('d2_realm_client_portals', 'bigint', [], []));
+      const view = new DataView(Module.HEAPU8.buffer, at, n * 28), out = [];
+      for (let i = 0, o = 0; i < n; i++, o += 28) {
+        const name = Module.HEAPU8.subarray(at + o + 12, at + o + 28);
+        out.push({ guid: view.getUint32(o, true), flags: view.getUint32(o + 4, true), area: view.getUint32(o + 8, true), owner: String.fromCharCode(...name.subarray(0, Math.max(0, name.indexOf(0)))) });
+      }
+      return out;
+    },
+    // The one-time things the packets asked for since the last call (a message line, a unit's sound, an
+    // overlay, a cleared overhead text, a corpse tie, a worn-item recheck), oldest first; the queue is emptied.
+    d2gsClientTakeSessionEvents: () => {
+      if (!Module._d2_realm_client_session_events) return [];
+      const n = call('d2_realm_client_session_event_count', 'number', [], []);
+      if (!n) return [];
+      const at = Number(call('d2_realm_client_session_events', 'bigint', [], [])), view = new DataView(Module.HEAPU8.buffer, at, n * 52), out = [];
+      const text = (from) => { const b = Module.HEAPU8.subarray(from, from + 16); return String.fromCharCode(...b.subarray(0, Math.max(0, b.indexOf(0)))); };
+      for (let i = 0, o = 0; i < n; i++, o += 52) {
+        const event = { op: view.getUint32(o, true), a: view.getUint32(o + 4, true), b: view.getUint32(o + 8, true), c: view.getUint32(o + 12, true), d: view.getUint32(o + 16, true), name1: text(at + o + 20), name2: text(at + o + 36) };
+        // A message line carries its finished text, composed from the string table as the game composes it.
+        if (event.op === 0x5a && Module._d2_realm_client_session_event_text) event.text = call('d2_realm_client_session_event_text', 'string', ['number'], [i]);
+        out.push(event);
+      }
+      call('d2_realm_client_session_events_clear', null, [], []);
+      return out;
+    },
+    // What the game-wide packets left: the game's flags, the item the cursor is using, the cursor clears, the
+    // value kept on the player's data, the last item whose use ended and the act whose animation data is current.
+    d2gsClientGameSession: () => {
+      if (!Module._d2_realm_client_game_session) return null;
+      const at = Number(call('d2_realm_client_game_session', 'bigint', [], [])), v = new DataView(Module.HEAPU8.buffer, at, 84), u = (i) => v.getUint32(i * 4, true);
+      return { gameFlagsSeen: u(0), difficulty: u(1), gameFlags: u(2), expansion: u(3), ladder: u(4),
+        useItemSeen: u(5), useItemGuid: u(6), useItemKind: u(7), useCursorMode: u(8), useCursorPhase: u(9), useItemWord: u(10),
+        cursorClears: u(11), cursorCleared: u(12), heroDwordSeen: u(13), heroDword: u(14),
+        usedItemSeen: u(15), usedItemType: u(16), usedItemGuid: u(17), usedItemEnded: u(18), actDataSeen: u(19), actDataAct: u(20) };
+    },
     d2gsClientPlayerCount: () => call('d2_realm_client_player_count', 'number', [], []),
     d2gsClientPlayerAt: (index) => {
       const ptr = call('d2_realm_client_player_at', 'bigint', ['number'], [index]);
@@ -1417,12 +1481,14 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
       if (count < 0 || count > cap) throw new Error(`invalid client missile sound count ${count}`);
       return parseRealmMissileSoundEvents(Module.HEAPU8.subarray(T, T + count * 24), count);
     },
-    // The object units of the joined game, and the activations (a shrine used) not yet taken.
+    // The object units of the joined game, and the activations (a shrine used) not yet taken. The engine's units
+    // are the only model of an object, so an engine without the read-back is an error, never an empty scene.
     d2gsClientObjects: () => {
-      const cap = Math.floor(scratch / (OBJECT_UNIT_WORDS * 4));
+      if (typeof Module._d2_realm_client_object_units !== 'function') throw new Error('the engine does not export d2_realm_client_object_units');
+      const cap = Math.floor(scratch / OBJECT_UNIT_BYTES);
       const count = call('d2_realm_client_object_units', 'number', ['bigint', 'number'], [BigInt(O), cap]);
       if (count < 0 || count > cap) throw new Error(`invalid client object count ${count}`);
-      return parseRealmObjectUnits(new Int32Array(Module.HEAPU8.buffer.slice(Number(O), Number(O) + count * OBJECT_UNIT_WORDS * 4)), count);
+      return parseRealmObjectUnits(Module.HEAPU8.slice(Number(O), Number(O) + count * OBJECT_UNIT_BYTES), count);
     },
     d2gsClientTakeObjectEvents: () => {
       const count = call('d2_realm_client_take_object_events', 'number', ['bigint', 'number'], [BigInt(T), 64]);

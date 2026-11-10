@@ -10,30 +10,37 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { realmGameReads, realmViewSnapshot } from './realm-client-view.mjs';
 import { hirelingMercFrom } from './hireling-panel.mjs';
+import { createRealmGameUi } from './realm-game-ui.mjs';
+import { createRealmUnitFx, MARK_ROW } from './realm-unit-fx.mjs';
 
 const FIXTURE = String.raw`
 #include "d2gs_client_game_packets.h"
+#include "d2client_afa90.h"
 #include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <sstream>
 #include <string>
 using namespace d2::realm;
-struct Unit { uint32_t guid, classId; bool npc; };
+struct Unit { uint32_t guid, classId; bool npc; uint32_t type, flagEx; };
 static std::vector<Unit> g_units;
-static const Unit* unit(uint32_t guid) { for (auto& u : g_units) if (u.guid == guid) return &u; return nullptr; }
+static const Unit* unit(uint32_t guid, uint32_t type = 1) { for (auto& u : g_units) if (u.guid == guid && u.type == type) return &u; return nullptr; }
 static bool isNpc(uint32_t classId) { for (auto& u : g_units) if (u.classId == classId) return u.npc; return false; }
 int main() {
     GameInfo info; NpcAlertState alerts; PetState pets;
+    d2client_afa90::State ui; d2client_afa90::Env env; unsigned starts = 0;
     std::string line;
     while (std::getline(std::cin, line)) {
         std::istringstream in(line);
         std::string cmd; in >> cmd;
-        if (cmd == "unit") { Unit u{}; int npc = 0; in >> u.guid >> u.classId >> npc; u.npc = npc != 0; g_units.push_back(u); }
+        if (cmd == "unit") { Unit u{}; int npc = 0; uint32_t v = 0; in >> u.guid >> u.classId >> npc; u.npc = npc != 0; u.type = 1; if (in >> v) u.type = v; if (in >> v) u.flagEx = v; g_units.push_back(u); }
+        else if (cmd == "hero") { int present = 0, busy = 0; in >> present >> env.playerType >> busy; env.playerPresent = present != 0; env.playerBusy = busy != 0; }
+        else if (cmd == "pinned") { int v = 0; in >> v; env.miniPanelPinned = v != 0; }
+        else if (cmd == "open") { unsigned slot = 0; in >> slot; if (slot < 38) ui.panel[slot] = 1; }
         else if (cmd == "gone") {
-            uint32_t guid = 0; in >> guid;
-            for (size_t i = 0; i < g_units.size(); ++i) if (g_units[i].guid == guid) { g_units.erase(g_units.begin() + static_cast<long>(i)); break; }
-            npcAlertUnitRemoved(alerts, guid); petUnitRemoved(pets, guid);
+            uint32_t guid = 0, type = 1, v = 0; in >> guid; if (in >> v) type = v;
+            for (size_t i = 0; i < g_units.size(); ++i) if (g_units[i].guid == guid && g_units[i].type == type) { g_units.erase(g_units.begin() + static_cast<long>(i)); break; }
+            npcAlertUnitRemoved(alerts, guid, type); if (type == 1) petUnitRemoved(pets, guid);
         } else if (cmd == "active") { in >> alerts.hasActiveNpc >> alerts.activeNpc; }
         else if (cmd == "pkt") {
             std::vector<uint8_t> p; unsigned b = 0;
@@ -42,8 +49,10 @@ int main() {
             if (p.empty()) return 2;
             const uint8_t* d = p.data();
             switch (d[0]) {
-                case 0x01: gameInfoApply(info, d, size); break;
-                case 0x8a: { const Unit* u = size == 6 && d[1] == 1 ? unit(gamePktU32(d + 2)) : nullptr; npcAlertApply(alerts, d, size, u != nullptr, u ? u->classId : 0); break; }
+                case 0x01:   // as the engine applies it: the game facts, then the UI start state, which also drops the open NPC
+                    if (gameInfoApply(info, d, size)) { d2client_afa90::sub_AFA90(ui, d, size, env); alerts.hasActiveNpc = alerts.activeNpc = 0; ++starts; }
+                    break;
+                case 0x8a: { const Unit* u = size == 6 ? unit(gamePktU32(d + 2), d[1]) : nullptr; npcAlertApply(alerts, d, size, u != nullptr, u ? u->classId : 0, u ? u->flagEx : 0); break; }
                 case 0x28: npcInteractReplyApply(alerts, d, size, size == 103 && unit(gamePktU32(d + 2)) != nullptr, isNpc); break;
                 case 0x81: petAssignApply(pets, d, size); break;
                 case 0x7f: petLifeApply(pets, d, size, size == 10 && unit(gamePktU32(d + 4)) != nullptr); break;
@@ -56,8 +65,13 @@ int main() {
     else std::printf("{\"difficulty\":%u,\"gameFlags\":%u,\"expansion\":%s,\"ladder\":%s,\"flags\":%u}", info.difficulty, info.gameFlags,
         info.expansion ? "true" : "false", info.ladder ? "true" : "false", gameInfoSaveFlags(info));
     std::printf(",\"alerts\":[");
-    for (size_t i = 0; i < alerts.alerts.size(); ++i) std::printf("%s%u", i ? "," : "", alerts.alerts[i].guid);
-    std::printf("],\"pets\":[");
+    { int n = 0; for (auto& a : alerts.alerts) if (a.type == 1) std::printf("%s%u", n++ ? "," : "", a.guid); }
+    std::printf("],\"marks\":[");
+    { int n = 0; for (auto& a : alerts.alerts) if (a.type != 1) std::printf("%s{\"type\":%u,\"guid\":%u}", n++ ? "," : "", a.type, a.guid); }
+    std::printf("],\"activeNpc\":%s,\"ui\":", alerts.hasActiveNpc ? "true" : "false");
+    if (!starts) std::printf("null");
+    else { std::printf("{\"starts\":%u,\"panels\":[", starts); for (int i = 0; i < d2client_afa90::kPanelCount; ++i) std::printf("%s%u", i ? "," : "", ui.panel[i]); std::printf("]}"); }
+    std::printf(",\"pets\":[");
     for (size_t i = 0; i < pets.pets.size(); ++i) {
         const Pet& p = pets.pets[i];
         std::printf("%s{\"classId\":%u,\"kind\":%u,\"guid\":%u,\"owner\":%u,\"area\":%u,\"lifePct\":%u,\"seed\":%u,\"nameId\":%u,\"unitPresent\":%s}", i ? "," : "",
@@ -78,7 +92,7 @@ function client(t, script) {
     dir = mkdtempSync(join(tmpdir(), 'd2-game-packets-'));
     const source = join(dir, 'fixture.cpp');
     writeFileSync(source, FIXTURE);
-    const built = spawnSync('g++', ['-std=c++20', '-Wall', '-Wextra', '-Werror', '-I', resolve('src/core/realm'), source, '-o', join(dir, 'fixture')], { encoding: 'utf8' });
+    const built = spawnSync('g++', ['-std=c++20', '-Wall', '-Wextra', '-Werror', '-I', resolve('src/core/realm'), '-I', resolve('src/core/d2client'), source, resolve('src/core/d2client/d2client_afa90.cpp'), '-o', join(dir, 'fixture')], { encoding: 'utf8' });
     assert.equal(built.status, 0, built.stderr || built.stdout);
     binary = join(dir, 'fixture');
   }
@@ -88,7 +102,7 @@ function client(t, script) {
   // The protocol the shell reads the client state through (assets/realm-client.mjs), over the fixture's state.
   let active = null;
   return { state, get active() { return active; },
-    d2gsClientGameInfo: () => state.info, d2gsClientNpcAlerts: () => state.alerts, d2gsClientSetActiveNpc: (guid) => { active = guid; },
+    d2gsClientGameInfo: () => state.info, d2gsClientNpcAlerts: () => state.alerts, d2gsClientUnitMarks: () => state.marks, d2gsClientGameUi: () => state.ui, d2gsClientSetActiveNpc: (guid) => { active = guid; },
     d2gsClientPets: () => state.pets,
     d2gsClientPetStat: (guid, stat) => state.stats.find((s) => s[0] === guid && s[1] === stat)?.[2] ?? null };
 }
@@ -159,6 +173,106 @@ test('speech mark: a unit that leaves takes its mark with it', (t) => {
   const protocol = client(t, [...TOWN, wantsToTalk(10), wantsToTalk(12), 'gone 10']);
   if (!protocol) return;
   assert.deepEqual(pending(protocol, MONSTERS), [12]);
+});
+
+// ---- 0x8A on a unit that is not a monster: the receiving player's own hero ------------------------
+const HERO = 1, OTHER = 2;
+const PLAYERS = [`unit ${HERO} 1 0 0`, `unit ${OTHER} 4 0 0`];
+// Overlay.txt with the mark's row in place: eight frames at one frame a tick.
+const OVERLAY = ['Overlay\tFilename\tFrames\tPreDraw\tTrans\tAnimRate', ...Array.from({ length: MARK_ROW }, () => ''), 'mark\tmark_cel\t8\t0\t3\t16'].join('\r\n');
+const unitFx = () => createRealmUnitFx(() => new TextEncoder().encode(OVERLAY), () => {});
+
+test('unit mark: the server marking the player\'s own hero is kept, apart from the NPC marks', (t) => {
+  const protocol = client(t, [...TOWN, ...PLAYERS, wantsToTalk(HERO, 0), wantsToTalk(10)]);
+  if (!protocol) return;
+  const game = realmGameReads({ protocol });
+  assert.deepEqual(game.marks, [{ type: 0, guid: HERO }]);
+  assert.deepEqual(game.alerts, [10]);
+});
+
+test('unit mark: a player the client does not hold, a second packet for the same hero and a unit that takes no overlay add nothing', (t) => {
+  const protocol = client(t, [...PLAYERS, 'unit 3 2 0 0 262144', wantsToTalk(HERO, 0), wantsToTalk(HERO, 0), wantsToTalk(99, 0), wantsToTalk(3, 0),
+    wantsToTalk(HERO, 1), wantsToTalk(HERO), pkt(0x8a, 0, u32(OTHER), 0)]);
+  if (!protocol) return;
+  assert.deepEqual(protocol.state.marks, [{ type: 0, guid: HERO }]);
+  assert.deepEqual(protocol.state.alerts, []);
+});
+
+test('unit mark: a monster and a player sharing a guid are marked apart, and the talk reply leaves the player\'s mark', (t) => {
+  const script = [...TOWN, 'unit 10 0 0 0', wantsToTalk(10), wantsToTalk(10, 0)];
+  const before = client(t, script);
+  if (!before) return;
+  assert.deepEqual([before.state.alerts, before.state.marks], [[10], [{ type: 0, guid: 10 }]]);
+  const after = client(t, [...script, interactReply(1, 12)]);
+  assert.deepEqual([after.state.alerts, after.state.marks], [[], [{ type: 0, guid: 10 }]]);
+});
+
+test('unit mark: a player who leaves takes the mark along; the monster of the same guid leaving does not', (t) => {
+  const script = [...TOWN, 'unit 10 0 0 0', wantsToTalk(10, 0)];
+  assert.deepEqual(client(t, [...script, 'gone 10'])?.state.marks, [{ type: 0, guid: 10 }]);
+  assert.deepEqual(client(t, [...script, 'gone 10 0'])?.state.marks, []);
+});
+
+test('unit mark: the hero and another marked player draw the looping mark, which wraps instead of ending', (t) => {
+  const protocol = client(t, [...PLAYERS, wantsToTalk(HERO, 0), wantsToTalk(OTHER, 0)]);
+  if (!protocol) return;
+  const fx = unitFx(), marks = realmGameReads({ protocol }).marks;
+  const frame = (tick, m = marks) => { fx.step([], tick); const s = { entities: [{ type: 0, id: OTHER }, { type: 1, id: OTHER }, { type: 0, id: 7 }] }; return { hero: fx.apply(s, HERO, m), s }; };
+  let f = frame(100);
+  assert.deepEqual(f.hero, [{ kind: 'overlay', overlay: MARK_ROW, file: 'mark_cel', frames: 8, rate: 256, trans: 3, predraw: false, age: 1 }]);
+  assert.deepEqual(f.s.entities.map((e) => e.stateOverlays?.map((o) => o.file)), [['mark_cel'], undefined, undefined]);
+  assert.equal(frame(106).hero[0].age, 7);
+  assert.equal(frame(107).hero[0].age, 0);   // the eighth tick wraps
+  assert.equal(frame(116).hero[0].age, 1);
+  // The mark gone from the engine's list is gone from the frame; without marks nothing is drawn at all.
+  f = frame(117, [{ type: 0, guid: OTHER }]);
+  assert.deepEqual([f.hero, f.s.entities[0].stateOverlays.length], [[], 1]);
+  assert.deepEqual(frame(118, []).hero, []);
+  assert.deepEqual(fx.apply({ entities: [] }, HERO), []);
+});
+
+// ---- 0x01: the UI start state ---------------------------------------------------------------------
+const GAME_START = pkt(0x01, 0x00, 0x04, 0x00, 0x10, 0x00, 0x01, 0x00);
+const openSlots = (ui) => ui.panels.flatMap((v, i) => (v ? [i] : []));
+
+test('game start: every open panel closes and the game view, the mini panel and the help button come back', (t) => {
+  assert.equal(client(t, [])?.state.ui, null);
+  const protocol = client(t, ['open 1', 'open 2', 'open 9', 'open 21', 'open 25', 'open 37', GAME_START]);
+  if (!protocol) return;
+  assert.equal(protocol.state.ui.panels.length, 38);
+  assert.deepEqual(openSlots(protocol.state.ui), [0x00, 0x15, 0x22]);
+  assert.equal(protocol.state.ui.starts, 1);
+});
+
+test('game start: a stored mini panel choice skips its toggle, and a dying or non-player unit reopens nothing', (t) => {
+  assert.deepEqual(openSlots(client(t, ['pinned 1', GAME_START]).state.ui), [0x00, 0x22]);
+  assert.deepEqual(openSlots(client(t, ['hero 1 0 0', GAME_START]).state.ui), [0x00, 0x15, 0x22]);
+  assert.deepEqual(openSlots(client(t, ['hero 1 0 1', 'open 4', GAME_START]).state.ui), []);
+  assert.deepEqual(openSlots(client(t, ['hero 1 1 0', GAME_START]).state.ui), []);
+});
+
+test('game start: the open NPC is forgotten, so the server can mark it again; a malformed packet changes nothing', (t) => {
+  const protocol = client(t, [...TOWN, 'active 1 12', wantsToTalk(12), GAME_START, wantsToTalk(12)]);
+  if (!protocol) return;
+  assert.deepEqual([protocol.state.activeNpc, protocol.state.alerts], [false, [12]]);
+  const bad = client(t, ['open 1', 'active 1 12', pkt(0x01, 0x02, 0x00)]);
+  assert.deepEqual([bad.state.ui, bad.state.activeNpc], [null, true]);
+});
+
+test('game start: the page closes its panels once per game start, and only those the client closed', (t) => {
+  const first = client(t, [GAME_START]), second = client(t, [GAME_START, GAME_START]);
+  if (!first) return;
+  const ui = createRealmGameUi(), closed = [];
+  const close = (names) => closed.push(names);
+  assert.deepEqual(ui.observe(realmGameReads({ protocol: client(t, []) }).ui, close), []);   // nothing before the packet
+  const all = ['inventory', 'character', 'skillTree', 'chat', 'gameMenu', 'automap', 'quests', 'waypoint', 'party', 'messageLog', 'stash', 'cube', 'help', 'hireling'];
+  assert.deepEqual(ui.observe(realmGameReads({ protocol: first }).ui, close).sort(), [...all].sort());
+  assert.deepEqual(ui.observe(realmGameReads({ protocol: first }).ui, close), []);   // the same start again: panels the player opened since stay
+  assert.equal(ui.observe(realmGameReads({ protocol: second }).ui, close).length, all.length);   // the next game
+  assert.equal(closed.length, 2);
+  // A flag the client left set keeps its panel open.
+  const kept = { starts: 9, panels: second.state.ui.panels.map((v, i) => (i === 1 ? 1 : v)) };
+  assert.equal(ui.observe(kept, close).includes('inventory'), false);
 });
 
 const petAssign = (kind, classId, owner, guid, seed, nameId) => pkt(0x81, kind, u16(classId), u32(owner), u32(guid), u32(seed), u32(nameId));

@@ -319,10 +319,16 @@ export function readSessionLightmap(Module, ambientOverride = -1, occludeUnits =
   const guidsAt = sourcesAt + 64 * 20, gv = new DataView(Module.HEAPU8.buffer, guidsAt, 64 * 8), list = [], colours = [];
   for (let i = 0; i < Math.min(64, v.getInt32(12, true)); i++) {
     list.push([...([0, 4, 8, 12, 16].map((o) => sv.getInt32(i * 20 + o, true))), gv.getUint32(i * 4, true)]);
-    const rgb = gv.getUint32(64 * 4 + i * 4, true);   // an object source's Objects.txt light colour; 0 for any other source
+    const rgb = gv.getUint32(64 * 4 + i * 4, true);   // the source's light colour: Objects.txt's, MonStats2's, white for a player
     colours.push([rgb & 255, (rgb >> 8) & 255, (rgb >> 16) & 255]);
   }
+  // Each cell's light colour, blended in the engine as the sources were added (three bytes a cell), and the
+  // area's ambient colour the cells started from. The palette draw lights by level alone and does not read these.
+  const coloursAt = guidsAt + 64 * 8, ambientRgb = new DataView(Module.HEAPU8.buffer, coloursAt, 4).getUint32(0, true);
+  const cellColours = Module.HEAPU8.slice(coloursAt + 4, coloursAt + 4 + 48 * 48 * 3);
+  const colourAt = (x, y) => { const i = (Math.max(0, Math.min(47, y - oy)) * 48 + Math.max(0, Math.min(47, x - ox))) * 3; return [cellColours[i], cellColours[i + 1], cellColours[i + 2]]; };
   return { origin: [ox, oy], ambient: v.getInt32(8, true), sources: v.getInt32(12, true), list, colours, cells, blocked, at,
+    ambientColour: [ambientRgb & 255, (ambientRgb >> 8) & 255, (ambientRgb >> 16) & 255], cellColours, colourAt,
     grid: (a, b) => { const g = new Array(64); for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) g[j * 8 + i] = at(a - 1 + i, b - 1 + j); return g; } };
 }
 

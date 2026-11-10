@@ -49,7 +49,7 @@ export function realmViewSnapshot({ base: given, resources, monsters, missiles, 
       hostile: false, roomOrdinal: 0, direction: u.direction, missile: { mode: u.mode, direction: u.direction, framePrecise: u.framePrecise, trans: u.trans } });
   }
   const r = resources ?? {};
-  return { ...base, entities, objects: world?.objectViews(objects) ?? [], items: world?.itemViews() ?? [], warps: warps ?? [], rooms: rooms ?? [], quests: quests ?? null, units: [], town: TOWN_LEVELS.has(base.level),
+  return { ...base, entities, objects, items: world?.itemViews() ?? [], warps: warps ?? [], rooms: rooms ?? [], quests: quests ?? null, units: [], town: TOWN_LEVELS.has(base.level),
     player: { ...base.player, weaponClass: world?.weaponClassOf() ?? 'hth',
       hp: r.hp ?? base.player.hp, hpMax: r.hpMax ?? base.player.hpMax, mana: r.mana ?? 0, manaMax: r.manaMax ?? 0 } };
 }
@@ -117,7 +117,7 @@ export function realmFrameReads(resources, world = null, tables = null, playerCl
 const HIRELING = 7, MODE_DEATH = 0, MODE_DEAD = 12;
 export function realmGameReads({ protocol, world = null, tables = null, npcGuid = null, ownGuid = null, monsters = null, string = () => '' }) {
   const reads = {};
-  if (!protocol) return { alerts: [], reads };
+  if (!protocol) return { alerts: [], marks: [], ui: null, reads };
   protocol.d2gsClientSetActiveNpc?.(npcGuid);
   const alerts = protocol.d2gsClientNpcAlerts?.() ?? [];
   const info = protocol.d2gsClientGameInfo?.() ?? null;
@@ -134,5 +134,6 @@ export function realmGameReads({ protocol, world = null, tables = null, npcGuid 
     items: (guid) => (world?.wornBy(guid) ?? []).map((item) => ({ bodyLoc: item.bodyLoc, invFile: item.invFile, invWidth: item.invWidth || 1, invHeight: item.invHeight || 1, twoHanded: Boolean(item.twoHanded) })),
     slots: () => { const c = tables?.inventory.components('Hireling2') ?? tables?.inventory.components('Hireling'); return c ? hirelingSlots(c) : {}; },
   };
-  return { alerts, reads };
+  // `marks`: the other units carrying the mark, the own hero among them; `ui`: the panel flags of the last game start.
+  return { alerts, marks: protocol.d2gsClientUnitMarks?.() ?? [], ui: protocol.d2gsClientGameUi?.() ?? null, reads };
 }

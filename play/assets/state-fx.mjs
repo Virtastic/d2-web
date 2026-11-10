@@ -11,6 +11,7 @@ export function createStateFx(read) {
   // harness record of retail's OV node format: the Overlay.txt data-row index (blank rows kept), step, total
   const rowOf = new Map(new TextDecoder('latin1').decode(read('data\\global\\excel\\Overlay.txt')).split(/\r?\n/).slice(1).map((l, i) => [l.split('\t')[0], i]));
   const node = (type, name, live, pos) => `${type},${rowOf.get(name).toString(16)},${live.toString(16)},${pos.toString(16)},${overlayStep(overlays.get(name)).toString(16)},${((Number(overlays.get(name).Frames) || 1) << 8).toString(16)}`;
+  const nameOfRow = new Map([...rowOf].map(([name, i]) => [i, name]));   // first name wins is not needed: a row index has one name
   const rowsOfId = new Map();
   states.forEach((s, i) => { const id = Number(s.id); (rowsOfId.get(id) || rowsOfId.set(id, []).get(id)).push(i); });
   const units = new Map();   // unit key -> { had, once }
@@ -56,11 +57,13 @@ export function createStateFx(read) {
       }
       // the monster class's own loop (the per-class client init, D2Client+0xA70C0, starts a type-3 node at creation): Mephisto's aura
       const cn = CLASS_LOOP[cls] !== undefined ? rowName(CLASS_LOOP[cls]) : null, ce = cn && fx(cn);
-      if (ce) { const n = t - u.born; out.push({ ...ce, age: (Math.floor(n * ce.rate / 256) + 1) % ce.frames }); this.ov?.push(`${tag} ${node(3, cn, 1, n * ce.rate)}`); }
+      if (ce) { const n = t - u.born; out.push(this.loop(CLASS_LOOP[cls], n)); this.ov?.push(`${tag} ${node(3, cn, 1, n * ce.rate)}`); }
       for (const e of u.once) if (t > e.start) this.ov?.push(`${tag} ${(t - e.start - 1) * e.rate / 256 < e.frames ? node(2, e.name, 1, (t - e.start - 1) * e.rate) : node(2, e.name, 0, e.frames * 256)}`);   // the last record is the node's end (live 0, pos = frames)
       u.once = u.once.filter((e) => (t - e.start - 1) * e.rate / 256 < e.frames);
       return out.concat(u.once.filter((e) => t > e.start && Math.floor((t - e.start - 1) * e.rate / 256) + 1 < e.frames).map((e) => ({ ...e, age: Math.floor((t - e.start - 1) * e.rate / 256) + 1 })));   // retail's first frame is the tick after the create (OV pos 0)
     },
+    /** A unit's own looping overlay (the type-3 node a monster class or an object carries): Overlay.txt row `row`, `n` frames after it was put on. Null when the row has no art. */
+    loop(row, n) { const e = fx(nameOfRow.get(row)); return e && { ...e, age: (Math.floor(n * e.rate / 256) + 1) % e.frames }; },
     /** Forget every monster not in `keys` (one that left the view restarts its states when it returns). */
     retain(keys) { for (const k of units.keys()) if (k !== 'hero' && !keys.has(k)) units.delete(k); },
   };

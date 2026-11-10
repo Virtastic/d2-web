@@ -2,6 +2,7 @@
 // A joined game's object unit: the state it is made with, the server's mode changes, the client clock,
 // and the walk-collision footprint each of them leaves in the room.
 #include "d2gs_client_object.cpp"
+#include "client_missile_request.h"
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
@@ -202,6 +203,14 @@ int main() {
     // Back to idle (the shrine recharged): both return.
     const uint8_t idle6[12] = { 0x0e, 2, 0x20, 0, 0, 0, 3, 1, 0, 0, 0, 0 };
     assert(d2gs_client_object_packet(idle6, 12, player_by_id, &ev) == 1 && overlays(s6, 0x3B, 0x39) == 2 && targetable(s6));
+    {   // Each overlay loops on its own clock from the frame it was put on; putting it on again starts it over.
+        int32_t rows[3], ages[3] = { -1, -1, -1 };
+        assert(d2gs_client_object_overlays(s6, rows, ages) == 2 && ages[0] == 0 && ages[1] == 0);
+        d2gs_client_object_step(s6); d2gs_client_object_step(s6); d2gs_client_object_step(s6);
+        assert(d2gs_client_object_overlays(s6, rows, ages) == 2 && ages[0] == 3 && ages[1] == 3);
+        assert(d2gs_client_object_packet(idle6, 12, player_by_id, &ev) == 1);
+        assert(d2gs_client_object_overlays(s6, rows, ages) == 2 && rows[0] == 0x3B && ages[0] == 0 && ages[1] == 0);
+    }
 
     // The unit-action packet aimed at an object: its dword at 6 is the player. Kind 16 turns the name around.
     const uint8_t act16[17] = { 0x4d, 2, 0xA0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -250,6 +259,13 @@ int main() {
     D2gsClientObjectMissile m[16];
     assert(d2gs_client_object_effect_missiles(s6, kObjectEffectFire, 23, m, 16) == 16);
     assert(m[0].missile == 0x3E && m[0].flags == 3 && m[0].x == 100 && m[0].y == 200 && m[0].targetX == 5 && m[0].targetY == 5 && m[0].level == 4);
+    {   // The maker adds a fire missile's pair to its start: the 16 aims are cells around the shrine.
+        d2::realm::MissileStart start{};
+        const d2::realm::MissileRequestRow row{ 20, 0, 50, 0, 0, 0, 0, 0 };
+        d2::realm::MissileRequest request{}; request.flags = m[1].flags; request.x = m[1].x; request.y = m[1].y;
+        request.targetX = m[1].targetX; request.targetY = m[1].targetY; request.level = m[1].level;
+        assert(d2::realm::resolveMissileRequest(request, row, start) && start.targetX == 105 && start.targetY == 190);
+    }
     assert(m[1].targetX == 5 && m[1].targetY == -10 && m[4].targetX == -10 && m[4].targetY == 5 && m[15].targetX == -20 && m[15].targetY == -20);
     assert(d2gs_client_object_effect_missiles(s6, kObjectEffectExploding, 1, m, 16) == 6);
     assert(m[0].missile == 0x2D && m[0].flags == 0x520 && m[0].targetX == 94 && m[0].targetY == 206 && m[0].level == 1);

@@ -51,6 +51,12 @@ console.log('state-fx ok');
 { let s = 0; const f = (t) => inner.update((id) => id === 17, 'r', t, () => s).map((e) => e.age)[0];
   assert.deepEqual([f(500), f(501)], [1, 2]); s = 1;
   assert.deepEqual([f(502), f(503)], [1, 2], 'restart at the re-set tick'); }
+// A unit's own loop by Overlay.txt row (an object's shrine glow uses it): the art of that row, one frame on from the
+// frames it has run, wrapping at the row's frame count; a row with no art gives nothing.
+{ const a = fx.loop(0, 0), b = fx.loop(0, 1000);   // row 0 is `ring`: 4 frames
+  assert.ok(a && a.kind === 'overlay' && a.file === 'Ring' && a.predraw === true && a.age === 1);
+  assert.equal(b.age, (Math.floor(1000 * a.rate / 256) + 1) % 4);
+  assert.equal(fx.loop(99, 0), null); }
 // A monster class with a client-started loop (Mephisto, class 242) exports it from its first tick; another class does not.
 { const f = createStateFx((p) => ({ 'data\\global\\excel\\Overlay.txt': enc('overlay\tFilename\tFrames\tPreDraw\tAnimRate\tTrans\n' + Array.from({ length: 122 }, () => '\t\t\t\t\t').join('\n') + '\nmephisto\tMephistoOverlay\t26\t0\t16\t3\n'), 'data\\global\\excel\\states.txt': enc('state\tid\toverlay1\n') })[p]);
   assert.deepEqual(f.update(() => false, '1:9', 10, undefined, [], 242).map((e) => [e.file, e.trans, e.age]), [['MephistoOverlay', 3, 1]]);
