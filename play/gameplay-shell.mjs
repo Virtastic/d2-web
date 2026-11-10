@@ -2191,6 +2191,7 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
               difficulty: joined.game.difficulty });
           } catch (error) {
             try { d2gs.close(); } catch { /* socket already closed */ }
+            console.warn('game server join attempt failed', attempt, error?.message ?? String(error), 'logon sent:', error?.logonSent);
             // The ticket is single use: after the 0x68 logon went out only a fresh game can succeed.
             if (isEngineAbort(error)) engineDied(error);
             if (!canRetryJoin(error, { attempt, expired: deadline.expired })) throw error;
