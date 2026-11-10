@@ -180,7 +180,7 @@ extern "C" uint32_t d2_multi_sub_f340(const char* in, uint32_t flags, uint8_t* o
             for (int k = 0; k < 3; k++) { uint8_t b = z[6 + k]; o[0x94 + k] = b == 0xff ? 0 : b; }
             if (gen) return res;
         }
-        return tail();
+        // retail falls through to the unknown-id tail when the A field is empty
     }
     if (gen) { unk(); res = 7; }
     return tail();
