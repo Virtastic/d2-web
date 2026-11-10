@@ -115,7 +115,7 @@ test('JOIN sends name and password; Escape closes the panel, then quits', async 
   const joins = [];
   let quit = 0;
   const s = screen({ name: 'Ama', charClass: 0 }, { onJoinGame: async (g) => { joins.push(g); throw Object.assign(new Error('x'), { sessionLost: true }); }, onQuit: () => { quit++; } });
-  s.activate('join'); s.setGames([{ name: 'g' }]); s.typeKey('KeyG', 'g'); s.typeKey('Tab'); s.typeKey('KeyP', 'p');
+  s.activate('join'); s.typeKey('KeyG', 'g'); s.typeKey('Tab'); s.typeKey('KeyP', 'p');
   s.activate('join-game'); await tick();
   assert.deepEqual(joins, [{ gameName: 'g', gamePassword: 'p' }]);
   assert.equal(s.evidence.notice, null, 'a lost session leaves the notice to the login screen');
@@ -271,7 +271,7 @@ test('a join of a listed name carries that row\'s difficulty and description, a 
   typed.setGames([{ name: 'Cows', difficulty: 3, description: '' }]);
   typed.typeKey('KeyC', 'c'); typed.typeKey('Enter');
   await tick();
-  assert.equal(joins.length, 1, 'a typed name that is not a listed game sends no join');
+  assert.deepEqual(joins[1], { gameName: 'c', gamePassword: '' });
 });
 
 test('CREATE clamps a typed player count as the change callback does: each keystroke, 0 is 1, 9 and up is 8', async () => {

@@ -311,13 +311,15 @@ EMSCRIPTEN_KEEPALIVE void d2_realm_huffman_default_lengths(uint8_t* out) {
     for (int i = 0; i < 256; i++) out[i] = kEncodeLengths[i];
 }
 // Classify a D2GS `AF` greeting: -1 invalid, else (size << 8) | mode where mode is 0 uncompressed
-// (AF 00, unframed), 1 stock table (AF 01 and any other non-custom flag), 2 custom table (AF 81, a
-// 128-byte nibble table starting at the flag byte).  Mirrors parseGreeting @0x0052a988.
+// (AF 00, unframed, 2 bytes), 1 stock table (AF 01 and any other non-custom flag), 2 custom table (AF 81,
+// a 128-byte nibble table starting at the flag byte).  The retail packet-size rule for opcode 0xAF is
+// "flag 0 -> 2 bytes, else flag + 1 bytes", so the greeting is flag + 1 bytes long (AF 81 is 130).
 EMSCRIPTEN_KEEPALIVE int d2_realm_greeting_parse(const uint8_t* buf, int len) {
     if (len < 2 || buf[0] != 0xAF) return -1;
     if (buf[1] == 0x00) return (2 << 8) | 0;
-    if (buf[1] == 0x81) return len < 129 ? -1 : ((129 << 8) | 2);
-    return (2 << 8) | 1;
+    const int size = buf[1] + 1;
+    if (buf[1] == 0x81) return len < size ? -1 : ((size << 8) | 2);
+    return (size << 8) | 1;
 }
 // The size of the first complete D2GS frame in a receive buffer (bytes to consume, header
 // included), or 0 if the buffer does not hold a whole frame yet.  buf[0..return) is one framed

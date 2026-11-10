@@ -81,15 +81,13 @@ function makeReader(transport) {
  * at any time, and Battle.net servers send it right after the selector, before the AUTH_INFO reply;
  * it is never an answer to a call, so it is echoed back as the protocol asks and skipped.
  */
-async function readBncsFrame(reader, timeoutMs, packetWait = false) {
-  // Retail waits 45 s for the version, key and realm replies and raises failure event 0x11 when none comes; the logon reply has no such wait.
-  const want = async (n) => { try { return await reader.want(n, timeoutMs); } catch (error) { if (packetWait && error?.timedOut) error.failureEvent = 0x11; throw error; } };
+async function readBncsFrame(reader, timeoutMs) {
   for (;;) {
-    const head = await want(4);
+    const head = await reader.want(4, timeoutMs);
     if (head[0] !== 0xff) throw new Error(`reply is not a 0xFF BNCS frame (first byte 0x${head[0].toString(16)})`);
     const total = head[2] | (head[3] << 8);
     if (total < 4) throw new Error(`BNCS frame length ${total} is shorter than its header`);
-    const frame = await want(total);
+    const frame = await reader.want(total, timeoutMs);
     const copy = Uint8Array.from(frame);
     reader.skip(total);
     if (copy[1] === 0x25) { if (reader.echo) reader.echo(copy); continue; }
@@ -98,14 +96,17 @@ async function readBncsFrame(reader, timeoutMs, packetWait = false) {
 }
 
 /** One MCP frame: `[total:u16 LE][op:u8][body]`; total includes its own 3-byte header. */
-async function readMcpFrame(reader, timeoutMs) {
+// The realm client reads each frame into a 0x400-byte buffer (opcode and body, the 2-byte length excluded); a larger frame is
+// consumed and dropped without a dispatch, and the session carries on.
+export const MCP_RECV_BUFFER = 0x400;
+export async function readMcpFrame(reader, timeoutMs) {
   for (;;) {
     const head = await reader.want(3, timeoutMs);
     const total = head[0] | (head[1] << 8);
     if (total < 3) throw new Error(`MCP frame length ${total} is shorter than its header`);
-    if (total > 8192) throw new Error(`MCP frame length ${total} exceeds the client buffer`);
     const frame = await reader.want(total, timeoutMs);
     reader.skip(total);
+    if (total - 2 > MCP_RECV_BUFFER) continue;
     // The reply to an idle-time MOTD request (the lobby's keep-alive) is never an answer to a call.
     if (frame[2] === MCP_MOTD) continue;
     // Likewise the character-list reply to a keep-alive sent before the character is logged on.
@@ -411,14 +412,14 @@ export function bsha1(data) {
 async function bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs }) {
   transport.send(protocol.bncsSelector());
   transport.send(protocol.bncsFrame(0x50, protocol.bncsAuthInfo(product)));
-  const authInfo = await readBncsFrame(reader, timeoutMs, true);
+  const authInfo = await readBncsFrame(reader, timeoutMs);
   if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
   const mpqEnd = authInfo.body.indexOf(0, 20);
   const mpq = authInfo.body.subarray(20, mpqEnd < 0 ? authInfo.body.length : mpqEnd);
   const { body } = protocol.bncsAuthCheck({ serverToken: u32(authInfo.body, 4), mpq: new TextDecoder().decode(mpq),
     challenge: authInfo.body.subarray(mpqEnd + 1), product, auth });
   transport.send(protocol.bncsFrame(0x51, body));
-  const check = await readBncsFrame(reader, timeoutMs, true);
+  const check = await readBncsFrame(reader, timeoutMs);
   if (check.id !== 0x51) throw new Error(`expected AUTH_CHECK reply 0x51, got 0x${check.id.toString(16)}`);
   if (u32(check.body, 0) !== 0) throw new Error(`AUTH_CHECK rejected the version (result 0x${u32(check.body, 0).toString(16)})`);
   return authInfo;
@@ -499,7 +500,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
     transport.send(protocol.bncsSelector());                       // single 0x01 protocol selector
     send(0x50, protocol.bncsAuthInfo(product));
 
-    const authInfo = await readBncsFrame(reader, timeoutMs, true); received.push(authInfo.id);
+    const authInfo = await readBncsFrame(reader, timeoutMs); received.push(authInfo.id);
     if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
     serverToken = u32(authInfo.body, 4);
     const mpqEnd = authInfo.body.indexOf(0, 20);
@@ -513,7 +514,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
     const authCheckBody = checked.body;
     clientToken = checked.clientToken;
     send(0x51, authCheckBody);
-    const authCheck = await readBncsFrame(reader, timeoutMs, true); received.push(authCheck.id);
+    const authCheck = await readBncsFrame(reader, timeoutMs); received.push(authCheck.id);
     if (authCheck.id !== 0x51) throw new Error(`expected AUTH_CHECK reply 0x51, got 0x${authCheck.id.toString(16)}`);
     versionResult = u32(authCheck.body, 0);
     if (versionResult !== 0) {
@@ -548,7 +549,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
   }
 
   send(0x40, protocol.bncsQueryRealms());                         // QUERYREALMS2, empty body
-  const realms = await readBncsFrame(reader, timeoutMs, true); received.push(realms.id);
+  const realms = await readBncsFrame(reader, timeoutMs); received.push(realms.id);
   if (realms.id !== 0x40) throw new Error(`expected QUERYREALMS2 reply 0x40, got 0x${realms.id.toString(16)}`);
   const count = u32(realms.body, 4);
   const realmList = [];
@@ -563,7 +564,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
   }
 
   send(0x3e, protocol.bncsRealmEx({ clientToken: protocol.realmToken(), serverToken, realm, password }));
-  const realmEx = await readBncsFrame(reader, timeoutMs, true); received.push(realmEx.id);
+  const realmEx = await readBncsFrame(reader, timeoutMs); received.push(realmEx.id);
   if (realmEx.id !== 0x3e) throw new Error(`expected LOGONREALMEX reply 0x3e, got 0x${realmEx.id.toString(16)}`);
   // MCPStatus is 0 or 1 on success: the engine's own server sends 1, a stock Battle.net realm sends 0,
   // and a failure sets the high bit (0x80000001...). Either way a real hand-off carries a non-zero IP.

@@ -1,16 +1,13 @@
 // The life of a Battle.net game on the client: why it ends, how long the reason stays up, and the explicit leave.
 // Retail records the FIRST exit reason only, shows its text in the game for 600 game ticks (25 per second), then leaves.
 //
-// Save and Exit: the menu's exit row and the window's close both arrive as WM_CLOSE. The client's close handler sends the
-// Save and Exit byte (0x69) at once and swallows the message; no 4F packet goes out first and nothing waits. The socket is
-// closed only after that byte.
-//
-// The 4F 02 / 30 s wait is a different path: it is the trade window's CANCEL button (4F 02 00 ..., 7 bytes), which enters
-// state 7 and stamps GetTickCount. The game keeps running while the wait is armed. When GetTickCount() is more than
-// 30000 ms past the stamp (strictly greater), the poll sends 0x69 and runs the teardown.
-// Cancelling the wait: an item action while state 7 is armed sends 4F 07 (7 bytes), drops to state 3 and refuses the
-// action. The 30 s teardown then no longer fires. The expiry is checked at that poll too: an expired wait tears down
-// there instead of cancelling. Only the armed wait is cancelled; the reason countdown is not state 7.
+// Explicit leave (1.13c D2Client 0x59650 -> 0x59830 -> 0x14660): the menu's exit sends the trade-window CANCEL button
+// (4F 02 00 ..., 7 bytes), enters state 7 and stamps GetTickCount. The game keeps running and the server's traffic keeps
+// flowing while the wait is armed. When GetTickCount() is more than 30000 ms past the stamp (strictly greater), the client
+// sends 0x69 (Save and Exit) and runs the teardown. The socket is closed only after that byte.
+// Cancelling the wait (1.13c D2Client 0x923F0 -> 0x595C0): an item action while state 7 is armed sends 4F 07 (7 bytes),
+// drops to state 3 and refuses the action. The 30 s teardown then no longer fires. The expiry is checked at that poll too
+// (0x59830): an expired wait tears down there instead of cancelling. Only the armed wait is cancelled; the reason countdown is not state 7.
 import { REASON_TIMEOUT, REASON_DISCONNECTED, REASON_HOST_LEFT, reasonString, d2gsDenyReason } from './d2gs-deny.mjs';
 import { TRADE_BTN, tradeButtonPacket } from './bnet-game-trade.mjs';
 
@@ -64,19 +61,11 @@ export function createGameLife({ now = () => Date.now(), expansion = false, onNo
     inGame() { phase = 'ingame'; phaseAt = now(); },
     deny(wireCode) { const r = d2gsDenyReason(wireCode); return r === null ? false : fail(r); },
     fail,
-    // A dead connection is reason 7 only once the game has been entered; before that the join clock decides (reason 6).
-    connectionLost() { return phase === 'ingame' ? fail(REASON_DISCONNECTED) : false; },
+    connectionLost() { return fail(REASON_DISCONNECTED); },
     hostLeft() { return fail(REASON_HOST_LEFT); },
-    // The menu's Save and Exit (and the window's close): 0x69 goes out at once and the game is torn down. It does not
-    // wait and sends no 4F packet, even when a trade-cancel wait is armed. Returns false when the game is already
-    // leaving or a reason countdown is running, so the caller can tear down at once instead.
-    saveAndExit() {
-      if (exiting || left) return false;
-      left = true; onSend(SAVE_AND_EXIT_PACKET); onLeave(0);
-      return true;
-    },
-    // The trade window's CANCEL: 4F 02 00 goes out now and state 7 starts. A second press during the wait sends the bytes
-    // again and starts the 30 s over; it never tears down on its own. Returns false when a reason countdown is running.
+    // The menu's exit: 4F 02 00 goes out now and state 7 starts. An exit during the wait sends the bytes again and
+    // starts the 30 s over; it never tears down on its own. Returns false when a reason countdown is running, so the
+    // caller can tear down at once instead.
     leaveGame() {
       if (exiting || left) return false;
       leaving = true; leaveAt = now();
@@ -92,12 +81,14 @@ export function createGameLife({ now = () => Date.now(), expansion = false, onNo
       onSend(LEAVE_WAIT_CANCEL_PACKET);
       return false;
     },
-    // The page is closing, which retail sees as the window's close: 0x69 alone, once. Returns the packets to send; the
-    // teardown is the browser's.
+    // The page is closing: no wait is possible, so the packets go out back to back (4F first unless the menu's leave
+    // already sent it). Returns the packets to send, in order; the teardown is the browser's.
     unload() {
       if (exiting || left) return [];
-      left = true;
-      return [SAVE_AND_EXIT_PACKET];
+      const out = leaving ? [] : [LEAVE_CANCEL_PACKET];
+      leaving = true; left = true;
+      out.push(SAVE_AND_EXIT_PACKET);
+      return out;
     },
     // The per-frame timers: join timeout, loading timeout, and the state-7 wait.
     checkTimers() {
@@ -120,19 +111,6 @@ export function createGameLife({ now = () => Date.now(), expansion = false, onNo
     get remaining() { return remaining; },
     get phase() { return phase; },
   };
-}
-
-// The server's 0x05 (unload complete) starts the loading wait and its 0x04 (load complete) enters the game; the first
-// of either in a decoded frame, packet by packet, is returned as 'loading' or 'ingame'. Other packets are skipped.
-export function lifePhaseFromFrame(bytes, sizeOf) {
-  let seen = null;
-  for (let at = 0; at < bytes.length;) {
-    if (bytes[at] === 0x05) seen = 'loading'; else if (bytes[at] === 0x04) seen = 'ingame';
-    const n = sizeOf(bytes.subarray(at));
-    if (!(n > 0)) break;
-    at += n;
-  }
-  return seen;
 }
 
 // The page is closing (pagehide): send the unload packets synchronously on the game socket, then close it from this

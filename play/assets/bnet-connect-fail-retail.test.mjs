@@ -12,12 +12,11 @@ import { openRetail } from '../../tools/dcc-decode-bench.mjs';
 import { decodeDc6, decodeDatPalette } from './d2-formats.mjs';
 import { diffDrawLists, parseDrawListVector } from './drawlist.mjs';
 import { createBnetLoginScreen } from './bnet-login-screen.mjs';
-import { wrongPasswords } from './bnet-failure-events.mjs';
 import { createBnetConnectFailureNotice } from './bnet-connecting.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const vec = (name) => join(root, 'vectors', 'drawlist', `${name}.txt`);
-const NAMES = ['connect-fail', 'connect-fail-hover', 'connect-fail-press', 'connect-fail-menu', 'tos-fail-notice', 'tos-fail-menu', 'event-0d', 'event-01', 'event-04', 'event-03', 'event-07', 'event-0c', 'event-12', 'event-05', 'event-06', 'event-08', 'event-09', 'event-0a', 'event-0b', 'event-0e', 'event-0e-repeat', 'event-0f', 'event-11', 'event-1b'];
+const NAMES = ['connect-fail', 'connect-fail-hover', 'connect-fail-press', 'connect-fail-menu', 'tos-fail-notice', 'tos-fail-menu', 'event-0d', 'event-01', 'event-04', 'event-03', 'event-07', 'event-0c', 'event-12'];
 const have = NAMES.every((n) => existsSync(vec(`bnet-${n}`)));
 const rd = have ? openRetail() : null;
 
@@ -104,15 +103,6 @@ const EVENT_CASES = [
   ['event 0xC: a refused connection raises the large popup with the modem small print', 'bnet-event-0c', 0, { failureEvent: 12 }],
   ['event 0x12: an unrecognised logon result raises the wide popup', 'bnet-event-12', 0, { logonResult: 9 }],
   ['event 0xD: a logon refusal (unknown account) raises the small popup', 'bnet-event-0d', 240, { logonResult: 1 }],
-  ['event 5: a key for another product raises the small popup', 'bnet-event-05', 0, { authResult: 0x203 }],
-  ['event 6: a key in use raises the small popup with the owner named', 'bnet-event-06', 0, { authResult: 0x201, authInfo: 'Bob' }],
-  ['event 8: a disabled expansion key raises the small popup', 'bnet-event-08', 0, { authResult: 0x212 }],
-  ['event 9: an expansion key for another product raises the small popup', 'bnet-event-09', 0, { authResult: 0x213 }],
-  ['event 0xA: an expansion key in use raises the small popup with the owner named', 'bnet-event-0a', 0, { authResult: 0x211, authInfo: 'Bob' }],
-  ['event 0xB: raises the small popup', 'bnet-event-0b', 0, { failureEvent: 11 }],
-  ['event 0xF: a closed account raises the small popup', 'bnet-event-0f', 0, { logonResult: 3 }],
-  ['event 0x11: raises the small popup', 'bnet-event-11', 0, { failureEvent: 17 }],
-  ['event 0x1B: a logon refusal carries the server text', 'bnet-event-1b', 0, { logonResult: 6, logonReason: 'Account closed for testing' }],
 ];
 for (const [title, name, ms, reject] of EVENT_CASES) {
   test(title, { skip: !rd }, async () => {
@@ -121,13 +111,3 @@ for (const [title, name, ms, reject] of EVENT_CASES) {
     compare(name, s);
   });
 }
-
-// Event 0xE counts refusals per name: the first shows the password text, the same name again the repeat text.
-test('event 0xE: the first wrong password and the repeat for the same name', { skip: !rd }, async () => {
-  wrongPasswords.refuse('zz-reset');
-  for (const [name, ms] of [['bnet-event-0e', 0], ['bnet-event-0e-repeat', 0]]) {
-    const s = await failed('login', Object.assign(new Error('refused'), { logonResult: 2 }));
-    clock.ms = ms;
-    compare(name, s);
-  }
-});
