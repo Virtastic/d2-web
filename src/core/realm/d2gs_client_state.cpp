@@ -48,6 +48,7 @@
 #include "remote_unit_skill_start.h"
 #include "d2gs_client_monster_death_clock.h"
 #include "d2gs_client_pkt_route.h"
+#include "d2gs_client_state_stats.h"
 #include "../d2client/d2client_pkt_env.h"
 #include <D2Environment.h>
 #include "../d2client/d2client_unit_ports.h"
@@ -1065,12 +1066,6 @@ static int remove_player(const uint8_t* packet, int length) {
     return 0;
 }
 
-struct D2RealmClientStateStat {
-    uint16_t statId;
-    uint16_t layer;
-    int32_t value;
-};
-
 struct D2RealmClientStateUpdate {
     uint8_t state;
     std::vector<D2RealmClientStateStat> stats;
@@ -1594,24 +1589,9 @@ static int apply_state_packet(const uint8_t* packet, int length) {
     for (const auto& update : updates) {
         if (!sgptDataTables || update.state >= sgptDataTables->nStatesTxtRecordCount) continue;
         if (!apply_state_on(unit, update.state)) return -1;
-        // Native FUN_6FB22610 is called once per decoded stat entry. An immediate 0x1ff
-        // terminator therefore leaves no per-state list to allocate. Existing lists run a
-        // #10680 context helper, but the raw call sequence confirms the 32-bit wire value is still
-        // passed unchanged to #10188; STATLIST_SetStat expresses its set/replace behavior.
-        if (update.hasStats && !update.stats.empty()) {
-            D2StatListStrc* list = STATLIST_GetStatListFromUnitAndState(unit, update.state);
-            if (!list) {
-                list = STATLIST_AllocStatList(unit->pMemoryPool, STATLIST_MAGIC, 0,
-                    unit->dwUnitType, unit->dwUnitId);
-                if (!list) return -1;
-                STATLIST_SetState(list, update.state);
-                D2COMMON_10475_PostStatToStatList(unit, list, FALSE);
-                list = STATLIST_GetStatListFromUnitAndState(unit, update.state);
-            }
-            if (!list) return -1;
-            for (const auto& stat : update.stats)
-                STATLIST_SetStat(list, stat.statId, stat.value, stat.layer);
-        }
+        if (update.hasStats &&
+            !d2gs_client_apply_state_stats(unit, update.state, update.stats.data(), update.stats.size()))
+            return -1;
         applied++;
     }
     return applied;
