@@ -10,6 +10,7 @@ struct D2mEnv {
     uint32_t (*call)(void* ctx, uint32_t rva, uint32_t a, uint32_t c, uint32_t d, uint32_t b, uint32_t s,
                      uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3);
     void (*edi)(void* ctx, uint32_t rva, uint32_t v);   // a callee that takes EDI as an argument (descriptor REGS `J`): called right after call(), logs EDI
+    void (*blk)(void* ctx, uint32_t rva, const uint32_t* b, uint32_t n);   // a stack block handed to a callee (descriptor `hookblk`): logs n dwords, 9 per record
 };
 
 #define D2M_MOD(rva) (0xB2000000u | (uint32_t)(rva))

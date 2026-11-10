@@ -27,7 +27,7 @@ void d2multi_11f80(const D2mEnv& e, int32_t* g, const uint8_t* src, uint8_t* dst
     int32_t n = g[3];
     for (int32_t i = 0; i < n; i++) {
         const uint8_t* row = dst + i * 0x3b;
-        d2m_call(e, 0x7cbc, 0, cc0, d2m_ptr(row + 1));
+        d2m_call(e, 0x7cbc, 0, cc0, D2M_MOD(0x2a598u + (uint32_t)i * 0x3bu + 1));   // retail passes the module copy of the row name
         uint32_t item = d2m_call(e, 0x7c74, 0, cc0);
         if (show) {
             char buf[16];
