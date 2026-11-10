@@ -174,7 +174,7 @@ function decodeMcpCharacters(body) {
 export async function mcpCreateAndJoin(transport, protocol, { realmReply, character, gameName, gamePassword = '',
   difficulty = 0, maxPlayers = 8, levelDifference = 0xff, description = '', characterCount = 8, session = null, join = false, timeoutMs = CONNECT_TIMEOUT_MS, startupMs = MCP_STARTUP_MS, gameReplyMs = GAME_REPLY_MS } = {}) {
   if (!Array.isArray(realmReply) && !(realmReply instanceof Uint8Array)) throw new Error('MCP requires the BNCS realm handoff bytes');
-  if (!character || !gameName) throw new Error('MCP requires a character and game name');
+  if (!character || (!gameName && !join)) throw new Error('MCP requires a character and game name');
   const reader = session?.reader || makeReader(transport), sent = [], received = session ? [...session.received] : [];
   const send = (op, body) => {
     const frame = protocol.mcpFrame(op, body); sent.push({ op, bytes: frame.length }); transport.send(frame);
@@ -254,9 +254,15 @@ export async function mcpCreateAndJoin(transport, protocol, { realmReply, charac
 }
 
 const u16 = (b, o) => (b[o] | (b[o + 1] << 8)) >>> 0;
-function titleCaseGameText(value) {
-  return String(value).replace(/(^| )([A-Za-z])([A-Za-z]*)/g,
-    (_, space, first, rest) => space + first.toUpperCase() + rest.toLowerCase());
+// Spaces stay; the first other character of each word is upper-cased and every later one lower-cased (not trimmed).
+export function titleCaseGameText(value) {
+  let start = true;
+  return Array.from(String(value), (c) => {
+    if (c === ' ') { start = true; return c; }
+    const r = c.length > 1 || c > '\x7f' ? c : start ? c.toUpperCase() : c.toLowerCase();
+    start = false;
+    return r;
+  }).join('');
 }
 
 /** Open the MCP login leg far enough to populate the character picker. */

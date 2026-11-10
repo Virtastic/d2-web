@@ -529,7 +529,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
       difficulty: form.difficulty, levelDifference: form.levelLimit ? (Number(form.levelDifference) || 0) & 0xff : 0xff }));
   };
   const joinGame = () => {
-    if (busy || !form.name) return;
+    if (busy) return;   // the JOIN button is greyed with no name, but the Enter handler behind the edit only needs the box to exist: an empty name goes on to the join request
     joining = true; void run(() => onJoinGame({ gameName: form.name, gamePassword: form.password }));
   };
   // The arrows apply D2Multi's exact rules (0x13200 / 0x131A0 / 0x13140 / 0x130E0): a step only when it stays inside the range, no clamp otherwise.
