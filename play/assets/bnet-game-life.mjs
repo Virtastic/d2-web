@@ -61,7 +61,8 @@ export function createGameLife({ now = () => Date.now(), expansion = false, onNo
     inGame() { phase = 'ingame'; phaseAt = now(); },
     deny(wireCode) { const r = d2gsDenyReason(wireCode); return r === null ? false : fail(r); },
     fail,
-    connectionLost() { return fail(REASON_DISCONNECTED); },
+    // A dead connection is reason 7 only once the game has been entered; before that the join clock decides (reason 6).
+    connectionLost() { return phase === 'ingame' ? fail(REASON_DISCONNECTED) : false; },
     hostLeft() { return fail(REASON_HOST_LEFT); },
     // The menu's exit: 4F 02 00 goes out now and state 7 starts. An exit during the wait sends the bytes again and
     // starts the 30 s over; it never tears down on its own. Returns false when a reason countdown is running, so the
@@ -111,6 +112,19 @@ export function createGameLife({ now = () => Date.now(), expansion = false, onNo
     get remaining() { return remaining; },
     get phase() { return phase; },
   };
+}
+
+// The server's 0x05 (unload complete) starts the loading wait and its 0x04 (load complete) enters the game; the first
+// of either in a decoded frame, packet by packet, is returned as 'loading' or 'ingame'. Other packets are skipped.
+export function lifePhaseFromFrame(bytes, sizeOf) {
+  let seen = null;
+  for (let at = 0; at < bytes.length;) {
+    if (bytes[at] === 0x05) seen = 'loading'; else if (bytes[at] === 0x04) seen = 'ingame';
+    const n = sizeOf(bytes.subarray(at));
+    if (!(n > 0)) break;
+    at += n;
+  }
+  return seen;
 }
 
 // The page is closing (pagehide): send the unload packets synchronously on the game socket, then close it from this

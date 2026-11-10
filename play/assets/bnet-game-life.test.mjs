@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGameLife, flushUnloadLeave, EXIT_TICKS, JOIN_TIMEOUT_MS, LEAVE_CANCEL_PACKET, LEAVE_WAIT_CANCEL_PACKET, LEAVE_WAIT_MS, LOADING_TIMEOUT_MS, SAVE_AND_EXIT_PACKET } from './bnet-game-life.mjs';
+import { createGameLife, lifePhaseFromFrame, flushUnloadLeave, EXIT_TICKS, JOIN_TIMEOUT_MS, LEAVE_CANCEL_PACKET, LEAVE_WAIT_CANCEL_PACKET, LEAVE_WAIT_MS, LOADING_TIMEOUT_MS, SAVE_AND_EXIT_PACKET } from './bnet-game-life.mjs';
 import { reasonString } from './d2gs-deny.mjs';
 
 const mk = (opts = {}) => { let t = 0; const log = { notice: [], left: [], sent: [] };
@@ -200,4 +200,21 @@ test('pagehide with no game life, a dead socket or an exit countdown running sen
   const ws = fakeSocket();
   assert.deepEqual(flushUnloadLeave(b.life, ws), []);
   assert.deepEqual(ws.ev, []);
+});
+
+test('a dead connection is reason 7 only after the game was entered; before that the join clock gives reason 6', () => {
+  const a = mk(); assert.equal(a.life.connectionLost(), false); assert.equal(a.life.exiting, false);
+  a.at(JOIN_TIMEOUT_MS + 1); a.life.checkTimers(); assert.equal(a.life.reason, 6);
+  const b = mk(); b.life.inGame(); assert.equal(b.life.connectionLost(), true); assert.equal(b.life.reason, 7);
+});
+test('loading suspends the 30 s join clock and load complete ends it for good', () => {
+  const a = mk(); a.life.loading(); a.at(JOIN_TIMEOUT_MS * 4); a.life.checkTimers(); assert.equal(a.life.exiting, false);
+  a.life.inGame(); a.at(JOIN_TIMEOUT_MS * 20); a.life.checkTimers(); assert.equal(a.life.exiting, false);
+});
+test('0x05 starts loading, 0x04 enters the game, packet by packet', () => {
+  const size = (b) => ({ 0x05: 1, 0x04: 1, 0x01: 8 }[b[0]] ?? 0);
+  assert.equal(lifePhaseFromFrame(Uint8Array.of(0x05), size), 'loading');
+  assert.equal(lifePhaseFromFrame(Uint8Array.of(0x05, 0x04), size), 'ingame');
+  assert.equal(lifePhaseFromFrame(Uint8Array.of(0x01, 4, 4, 4, 4, 4, 4, 4, 0x05), size), 'loading');
+  assert.equal(lifePhaseFromFrame(Uint8Array.of(0x01, 4, 4, 4, 4, 4, 4, 4), size), null);
 });

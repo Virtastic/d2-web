@@ -199,7 +199,7 @@ import { fitSize } from './assets/fit-size.mjs';
 import { canvasPoint as pointOnCanvas } from './assets/canvas-point.mjs';
 import { createBnetInput } from './assets/bnet-input.mjs';
 import { findD2gsDeny, d2gsDenyError } from './assets/d2gs-deny.mjs';
-import { createGameLife, flushUnloadLeave, joinDeadline, TICK_MS } from './assets/bnet-game-life.mjs';
+import { createGameLife, flushUnloadLeave, joinDeadline, lifePhaseFromFrame, TICK_MS } from './assets/bnet-game-life.mjs';
 import { createJoinLoading, createJoinLoadingArt } from './assets/bnet-join-loading.mjs';
 import { reasonString, REASON_DISCONNECTED } from './assets/d2gs-deny.mjs';
 
@@ -2235,6 +2235,7 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
     const receiver = startD2gsReceiveLoop(game.readFrame, {
       onFrame: (frame, bytes) => {
         if (bytes[0] === 0x8f) keepAlive.pong(bytes);
+        { const phase = lifePhaseFromFrame(bytes, (b) => protocol.d2gsPacketSize(b)); if (phase === 'loading') life.loading(); else if (phase === 'ingame') life.inGame(); }
         if (realmTransport.state !== 'session-open') return;
         // A refusal mid-game (the server dropping or kicking the player) ends the game with that reason's notice.
         const denied = findD2gsDeny(bytes, (b) => protocol.d2gsPacketSize(b));
