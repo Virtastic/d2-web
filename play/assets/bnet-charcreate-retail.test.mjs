@@ -57,8 +57,7 @@ function frame(screen) {
   return identity(l);
 }
 function compare(name, ours, { fromPopup = false } = {}) {
-  // The captured screen prints the expiry block (Font8); the player does not want it, so it is not compared.
-  let retail = identity(parseDrawListVector(readFileSync(vec(name), 'utf8'))).filter((r) => !/font8/i.test(r.path));
+  let retail = identity(parseDrawListVector(readFileSync(vec(name), 'utf8')));
   if (fromPopup) {
     const first = (l) => l.findIndex((r) => /PopUpOK/i.test(r.path));
     retail = retail.slice(first(retail)); ours = ours.slice(first(ours));
@@ -110,10 +109,10 @@ test('OK on a Hardcore character raises the confirmation, CANCEL restarts and OK
   assert.equal(created?.name, 'Aelwyn'); assert.equal(created.checkboxes.hardcore, true);
 });
 
-test('no expiry text is drawn, and the LADDER box sits under HARDCORE', { skip: !rd }, () => {
+test('the expiry block is drawn in Font8 (six rows), and the LADDER box sits under HARDCORE', { skip: !rd }, () => {
   const s = build(); s.chooseByKey('barbarian'); s.tick = 40;
   const l = frame(s);
-  assert.equal(l.filter((r) => /font8/i.test(r.path)).length, 0);
+  assert.ok(l.filter((r) => /font8/i.test(r.path)).length > 0);
   const boxes = l.filter((r) => /clickbox/i.test(r.path));
   assert.equal(boxes.length, 3);
   assert.equal(s.evidence.checkboxes.states.ladder, true);

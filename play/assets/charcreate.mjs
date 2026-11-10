@@ -282,6 +282,8 @@ function selectOverlayAnimations(overlay, cls, base, read, decodeDc6, palette, d
 // The two boxes the screen raises over itself (retail's popup builder, drawn on the create screen's
 // own palette): a refusal's notice (PopUpOK2 and one OK) and the Hardcore confirmation (PopUpOKCancel
 // with CANCEL on the left and OK on the right). Both frames sit at x=268 with their bottom row at 350.
+export const REALM_EXPIRY = { x: 210, width: 430, firstBottom: 504, step: 12, lastBottom: 570, rules: [11143, 11144] };
+
 export const POPUP = {
   x: 268, anchorY: 350, labelDy: -9,
   notice: { art: 'data\\global\\ui\\FrontEnd\\PopUpOK2.dc6', ok: { x: 351, anchorY: 337 },
@@ -329,6 +331,13 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     documentObject, path: FONT16.font, drawAs: { op: 'celcolor', mode: 5, extra: 4 },
     onGlyph: (blit) => labelGlyphs.push(blit),
   });
+  // On the Battle.net (realm) create screen retail also prints the characters' expiry rules in Font8 (colour shift 1),
+  // left-aligned at x=210 in two boxes, under the heading.
+  const expiryFont = realm ? createFont({
+    dc6: decodeDc6(read('data\\local\\font\\latin\\font8.dc6')), tbl: decodeFontTbl(read('data\\local\\font\\latin\\font8.tbl')),
+    palette: textColourPalette(read(CREATE_ASSETS.palette.replace(/pal\.dat$/i, 'pal.pl2')), palette, 1),
+    documentObject, path: 'data\\local\\font\\latin\\font8.dc6', drawAs: { op: 'celcolor', mode: 5, extra: 1 },
+  }) : null;
   // OpenDiablo2's SelectHeroClass gives clickbox.dc6's fechar cels and these anchors.  The
   // labels use this screen's existing Units Font16, exactly as its other small labels do.
   const checkboxes = createCharacterCreateCheckboxes({ read, decodeDc6, palette, smallFont: goldLabelFont, string, documentObject, realm });
@@ -677,6 +686,11 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
 
       const centred = (text, x, y) => font.draw(ctx, text, x - font.measure(text) / 2, y);
       centred(heading, LAYOUT.heading.x, LAYOUT.heading.y);
+      if (expiryFont) {
+        const E = REALM_EXPIRY;
+        wrapSpaces(string(E.rules[0]) || '', E.width, (t) => expiryFont.measure(t)).forEach((line, i) => expiryFont.drawAnchored(ctx, line, E.x, E.firstBottom + i * E.step));
+        expiryFont.drawAnchored(ctx, string(E.rules[1]) || '', E.x, E.lastBottom);
+      }
       drawnDescription = null; drawnClassName = null; drawnName = null;
       if (chosen >= 0 || hovered >= 0) {
         const hero = heroes[chosen >= 0 ? chosen : hovered];

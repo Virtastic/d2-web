@@ -24,7 +24,7 @@ HookEnv* H;
 int32_t gPrio;
 uint32_t rdFlag() {
     uint32_t v = 0;
-    v = H->h(0xCE66, 0, 0, 0, 0, 0, 0xB2026FD0u, 0xB20278D0u, 0, (uint32_t)(uintptr_t)&v);   // the queued flag (hookw 0xce66 3 V)
+    H->h(0xCE66, 0, 0, 0, 0, 0, 0xB2026FD0u, 0xB20278D0u, 0, (uint32_t)(uintptr_t)&v);   // the queued flag (hookw 0xce66 3 V)
     return v;
 }
 void lg(const char* m) {
