@@ -209,7 +209,7 @@ static uint32_t g_d2cmp_value_6fe77248;          // 0x6FE77248: value 0xC280 rea
 // One span of the 0xFC20 edge pass: forward from edgeLo to edgeHi (capped at 0x29) and backward from
 // edgeHi to edgeLo (floored at 0x28), each copying through the offset row that starts at the span's
 // own table entry. offRow points at g_offsets[blockBase + lo].
-static void d2cmp_fc20_span(uint8_t* row, int32_t lo, int32_t hi, const int32_t* offRow) {
+static uint8_t* d2cmp_fc20_span(uint8_t* row, int32_t lo, int32_t hi, const int32_t* offRow) {
     uint8_t* p = row + lo;
     int32_t forwardEnd = hi > 0x28 ? 0x29 : hi;
     uint8_t* end = row + forwardEnd;
@@ -232,6 +232,7 @@ static void d2cmp_fc20_span(uint8_t* row, int32_t lo, int32_t hi, const int32_t*
             --off;
         } while (stop < p);
     }
+    return p; // retail leaves this pointer in EAX
 }
 
 // 1.13c D2CMP+0xFC20 (export #10031, 326 bytes): complete the 40-pixel borders of an 80x80 block.
@@ -241,12 +242,13 @@ static void d2cmp_fc20_span(uint8_t* row, int32_t lo, int32_t hi, const int32_t*
 // edgeLo to edgeHi (capped 0x29) and backward from edgeHi to edgeLo (floored 0x28).
 // 1.13c D2CMP+0xFC20
 extern "C"
-void d2cmp_fc20(uint8_t* image, int32_t stride) {
+uint8_t* d2cmp_fc20(uint8_t* image, int32_t stride) {
     uint8_t* row = image;
+    uint8_t* last = image;
     for (int32_t j = 0; j < 40; ++j) {
         const int32_t lo = g_d2cmp_edgeLo_6fe6fbc0[j];
         const int32_t hi = g_d2cmp_edgeHi_6fe6fd00[j];
-        d2cmp_fc20_span(row, lo, hi, &g_d2cmp_offsets_6fe6fe40[lo + 0x50 * j]);
+        (void)d2cmp_fc20_span(row, lo, hi, &g_d2cmp_offsets_6fe6fe40[lo + 0x50 * j]);
         row += stride;
     }
     row = image + 0x4F * (ptrdiff_t)stride;
@@ -254,9 +256,10 @@ void d2cmp_fc20(uint8_t* image, int32_t stride) {
         const int32_t t = 79 - j;
         const int32_t lo = g_d2cmp_edgeLo_6fe6fbc0[t];
         const int32_t hi = g_d2cmp_edgeHi_6fe6fd00[t];
-        d2cmp_fc20_span(row, lo, hi, &g_d2cmp_offsets_6fe6fe40[lo + 0x18B0 - 0x50 * j]);
+        last = d2cmp_fc20_span(row, lo, hi, &g_d2cmp_offsets_6fe6fe40[lo + 0x18B0 - 0x50 * j]);
         row -= stride;
     }
+    return last;
 }
 
 // 1.13c D2CMP+0xC280 (export #10032, 70 bytes): return 0x6FE77248 under the 0x6FE77270 critical
