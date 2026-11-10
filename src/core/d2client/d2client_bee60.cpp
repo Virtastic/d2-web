@@ -12,15 +12,14 @@
 #include <cstdint>
 #include "cl_env.h"
 namespace { constexpr uint32_t kMod = 0xB2000000u; }
-// Returns the stale EAX the retail epilogue leaves (the function is void): the type minus one on the rejected path, else the last call result with the low byte reloaded from [0x11C390].
-extern "C" uint32_t d2c_bee60_seam(const cl::Env& e) {
+extern "C" void d2c_bee60_seam(const cl::Env& e) {
     const uint32_t g = e.gl;
     uint32_t pl = e.R(g);
-    if (!pl) return 0;
+    if (!pl) return;
     if (!(e.R(pl + 0xc4) & 0x10000u)) {
         uint32_t t = e.R(pl), m = e.R(pl + 0x10);
         bool ok = t == 0 ? (m == 0 || m == 0x11) : t == 1 ? (m == 0 || m == 0xc) : false;
-        if (!ok) { e.W(g + 4, 0); return (t == 0 || t == 1) ? 0u : t - 1; }
+        if (!ok) { e.W(g + 4, 0); return; }
     }
     int32_t y = (int32_t)e.R(g + 0x14) / 2 - 0x5e;
     char lang[8] = {};
@@ -42,7 +41,6 @@ extern "C" uint32_t d2c_bee60_seam(const cl::Env& e) {
     }
     const uint32_t gi = e.R(g + 0x1c);
     bool line_ok = true;
-    uint32_t eax = 0;
     if (e.R8(gi + 0x1eb) & 4) {
         uint32_t s = e.H(0xd1ec, 0, 0, 0, 0, 0, 0, 0x13e8);
         e.H(0xceab8, 0, 0, 0, 0, 0, 0, pLine, s);
@@ -58,9 +56,8 @@ extern "C" uint32_t d2c_bee60_seam(const cl::Env& e) {
         e.H(0xd3a8, 0, 0, 0, 0, 0, 0, 2);
         int32_t wl = (int32_t)e.H(0xd35a, 0, 0, 0, 0, 0, 0, pLine);
         int32_t x = (int32_t)e.R(g + 0x18) / 2 - wl / 2;
-        eax = e.H(0xd37e, (uint32_t)y, 1, 1, 0, 0, 0, pLine, (uint32_t)x);
+        e.H(0xd37e, (uint32_t)y, 1, 1, 0, 0, 0, pLine, (uint32_t)x);
     }
-    eax = (eax & ~0xffu) | e.R8(g + 0x20);
     if (e.R8(g + 0x20) && !(e.R8(e.R(g + 0x1c) + 0x1eb) & 4)) {
         e.H(0xd3a8, 0, 0, 0, 0, 0, 0, 2);
         uint32_t s = e.H(0xd1ec, 0, 0, 0, 0, 0, 0, 0x13e7);
@@ -68,7 +65,6 @@ extern "C" uint32_t d2c_bee60_seam(const cl::Env& e) {
         int32_t x = (int32_t)e.R(g + 0x18) / 2 - wl / 2;
         y += 0x30;
         uint32_t s2 = e.H(0xd1ec, 0, 0, 0, 0, 0, 0, 0x13e7);
-        eax = e.H(0xd37e, (uint32_t)y, 1, 1, 0, 0, 0, s2, (uint32_t)x);
+        e.H(0xd37e, (uint32_t)y, 1, 1, 0, 0, 0, s2, (uint32_t)x);
     }
-    return eax;
 }
