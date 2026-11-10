@@ -264,6 +264,27 @@ test('the stash and the cube take the 800x600 Inventory.txt rows, sixteen after 
   const reads = realmFrameReads(null, w, { inventory: inv, belt: createBeltTable(read), inventoryLayoutFromEngine: (g, c) => ({ g, c }), stashGeometry: (g) => g }, 0);
   assert.deepEqual([reads.stashLayout[0], reads.stashLayout[5]], [28, 8]);   // Big Bank Page 1 + 16: the eight-row stash
   assert.equal(reads.cubeLayout[0], 25);                                      // Transmogrify Box Page 1 + 16
+test('0x42 takes the cursor item away from the local player only', () => {
+  const w = createRealmWorld(tables()); w.setOwner(GUID);
+  feed(w, itemPacket(13, 0, { mode: 4, code: 'hax' }));
+  feed(w, Uint8Array.from([0x42, 0, ...u32le(GUID + 1)]));
+  assert.equal(w.cursorId, 13);
+  feed(w, Uint8Array.from([0x42, 1, ...u32le(GUID)]));
+  assert.equal(w.cursorId, 13);
+  feed(w, Uint8Array.from([0x42, 0, ...u32le(GUID)]));
+  assert.equal(w.cursorId, 0); assert.equal(w.ownItemCount, 0);
+});
+
+test('0x3f marks the item the cursor is using and lets it go', () => {
+  const w = createRealmWorld(tables()); w.setOwner(GUID);
+  feed(w, itemPacket(10, 0, { mode: 0, x: 0, y: 0, page: 0, code: 'hp1' }));
+  feed(w, Uint8Array.from([0x3f, 0, ...u32le(99), 0xff, 0xff]));   // an item the page does not hold: nothing
+  assert.equal(w.useItem, null); assert.equal(w.takeInventoryAsks(), 0);
+  feed(w, Uint8Array.from([0x3f, 0, ...u32le(10), 0xff, 0xff]));
+  assert.deepEqual(w.useItem, { id: 10, kind: 0 });
+  assert.equal(w.takeInventoryAsks(), 1); assert.equal(w.takeInventoryAsks(), 0);
+  feed(w, Uint8Array.from([0x3f, 0xff, ...u32le(10), 0xff, 0xff]));
+  assert.equal(w.useItem, null);
 });
 
 test('0x42 takes the cursor item away from the local player only', () => {

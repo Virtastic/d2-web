@@ -31,6 +31,7 @@
 #include <DataTbls/SkillsIds.h>
 #include <Path/Path.h>
 #include <Path/PathMisc.h>
+#include <Path/Step.h>
 #include <Units/Units.h>
 #include <Units/Player.h>
 #include <Units/UnitRoom.h>
@@ -355,6 +356,7 @@ int g_pendingLength;
 D2RealmClientPlayerState g_player;
 std::vector<D2RealmClientPlayerEntry> g_players;
 int g_selectedPlayer = -1;
+static void g_localQueuedReset();
 D2RealmClientWorldState g_world;
 D2RealmGameChat g_gameChat{1, sizeof(D2RealmGameChat)};
 uint32_t g_gameChatCount;
@@ -446,6 +448,7 @@ void clear_players() {
     g_players.clear();
     d2_realm_client_items_reset();
     g_selectedPlayer = -1;
+    g_localQueuedReset();
     g_corpses.clear();
     clear_player();
 }
@@ -1467,7 +1470,10 @@ static int pkt_monster_action(D2RealmClientMonster& monster, uint32_t code, cons
             return 1;
         }
         const uint32_t fallback = d2_realm_client_motion_refusal_mode(unit->dwUnitType, unit->dwAnimMode);
-        if (fallback != unit->dwAnimMode) d2_realm_client_motion_set_mode(unit, fallback);
+        if (fallback != unit->dwAnimMode) {
+            PATH_RecacheRoomIfNeeded(unit->pDynamicPath);   // D2Client+0x4DC30 puts the unit on its sub-tile's centre first
+            d2_realm_client_motion_set_mode(unit, fallback);
+        }
         return 0;
     }
     case MonsterAction::GetHit: {
@@ -1506,13 +1512,17 @@ static int pkt_monster_action(D2RealmClientMonster& monster, uint32_t code, cons
         if (unit->pDynamicPath) {
             const int dx = std::abs(static_cast<int>(PATH_GetXPosition(unit->pDynamicPath)) - x);
             const int dy = std::abs(static_cast<int>(PATH_GetYPosition(unit->pDynamicPath)) - y);
-            if ((dx > 2 || dy > 2) && d2_realm_client_motion_set_target(unit, x, y) > 0) {
+            if ((dx >= 2 || dy >= 2) && d2_realm_client_motion_set_target(unit, x, y) > 0) {
                 d2_realm_client_motion_set_mode(unit, MONMODE_WALK);
                 return 1;
             }
         }
-        if (unit->dwAnimMode != MONMODE_DEAD && unit->dwAnimMode != MONMODE_DEATH)
+        // D2Client+0x4DC30: a monster in a mode other than neutral or dead is put on the centre of its
+        // sub-tile (D2Common 10770) and takes the neutral mode.
+        if (unit->dwAnimMode != MONMODE_DEAD && unit->dwAnimMode != MONMODE_DEATH) {
+            if (unit->pDynamicPath && unit->dwAnimMode != MONMODE_NEUTRAL) PATH_RecacheRoomIfNeeded(unit->pDynamicPath);
             d2_realm_client_unit_set_mode(unit, MONMODE_NEUTRAL);
+        }
         return 1;
     }
     case MonsterAction::AttackAt: {
@@ -2701,6 +2711,8 @@ static int local_skill_start(D2UnitStrc* unit, D2SkillStrc* skill, D2UnitStrc* t
     return client_skill_start(unit, start);
 }
 
+static bool local_action_gate_fwd(D2UnitStrc* unit);
+static void local_queue_clear_fwd();
 static D2SkillStrc* hand_skill(D2UnitStrc* unit, int hand) {
     return d2_realm_client_hand_skill(unit, hand, PlayerSkillOps{});
 }
@@ -2709,7 +2721,10 @@ static D2SkillStrc* hand_skill(D2UnitStrc* unit, int hand) {
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_local_skill_at(int hand, int x, int y) {
     auto* unit = selected_player_unit();
     if (!unit || x < 0 || y < 0 || x > 65535 || y > 65535) return 0;
-    return local_skill_start(unit, hand_skill(unit, hand), nullptr, x, y);
+    if (!local_action_gate_fwd(unit)) return 0;
+    const int started = local_skill_start(unit, hand_skill(unit, hand), nullptr, x, y);
+    local_queue_clear_fwd();   // +0x2A7C0 drops the waiting action once past the gate
+    return started;
 }
 
 // The left or right skill on a monster or player. 1 started, 0 refused (also a dying or dead
@@ -2720,8 +2735,11 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_local_skill_on_unit(int hand, int type,
     auto* target = find_realm_client_unit(static_cast<uint8_t>(type), guid);
     if (!target || target == unit || !target->pDynamicPath || !UNITS_GetRoom(target)) return refuse(9);
     if (type == UNIT_MONSTER && (target->dwAnimMode == MONMODE_DEATH || target->dwAnimMode == MONMODE_DEAD)) return refuse(10);
-    return local_skill_start(unit, hand_skill(unit, hand), target,
+    if (!local_action_gate_fwd(unit)) return refuse(3);
+    const int started = local_skill_start(unit, hand_skill(unit, hand), target,
         UNITS_GetXPosition(target), UNITS_GetYPosition(target));
+    local_queue_clear_fwd();
+    return started;
 }
 
 // What a click with a hand's skill does (1.13c D2Client+0x1B7F0 and, for a monster, +0x1B700).
@@ -2753,43 +2771,263 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_predict_right_cast_on_monster(ui
     return d2_realm_client_local_skill_on_unit(1, UNIT_MONSTER, guid);
 }
 
+// ---- The selected player's own actions on a unit (1.13c D2Client+0x2AA40, +0x2B090, +0x2A7C0) ----
+// A click on a unit that is out of reach walks or runs to it and keeps the action waiting; every
+// game frame the waiting action is re-tested and either the walk is planned again or the action
+// is started. Retail keeps the four words in the player's data (+0x150 fire, +0x154 kind, the
+// client packet's opcode, +0x158 target type, +0x15C target id).
+struct LocalQueuedAction { uint32_t fire = 0, kind = 0, type = 0, guid = 0; };
+static LocalQueuedAction g_localQueued;
+// The packets the engine's own steps send (opcode, target type, target id), for the page to put on
+// the wire. Retail's sender (+0x143E0) drops a packet equal to the last one sent within 200 ms
+// (50 ms for the skill opcodes 0x05..0x11).
+// GUESS (clock): the window is counted in game frames of 40 ms, not on the wall clock retail reads.
+struct LocalSend { uint32_t op, type, guid; };
+static std::vector<LocalSend> g_localSends;
+static LocalSend g_lastLocalSend{ 0xffffffffu, 0, 0 };
+static uint32_t g_lastLocalSendTick = 0;
+static uint32_t g_localSendView[3 * 16];
+
+static void local_send(uint32_t op, uint32_t type, uint32_t guid) {
+    const bool skill = op >= 0x05 && op <= 0x11 && op != 0x0b;
+    const uint32_t window = skill ? 2u : 5u;
+    if (g_lastLocalSend.op == op && g_lastLocalSend.type == type && g_lastLocalSend.guid == guid &&
+            g_clientMissileTick - g_lastLocalSendTick < window) return;
+    g_lastLocalSend = { op, type, guid };
+    g_lastLocalSendTick = g_clientMissileTick;
+    if (g_localSends.size() < 16) g_localSends.push_back(g_lastLocalSend);
+}
+
+// Fills (opcode, type, id) triples and empties the list; the count is returned.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_local_sends(uint32_t** out) {
+    int n = 0;
+    for (const auto& send : g_localSends) {
+        g_localSendView[n * 3] = send.op; g_localSendView[n * 3 + 1] = send.type; g_localSendView[n * 3 + 2] = send.guid;
+        ++n;
+    }
+    g_localSends.clear();
+    if (out) *out = g_localSendView;
+    return n;
+}
+EMSCRIPTEN_KEEPALIVE const uint32_t* d2_realm_client_local_send_view() { return g_localSendView; }
+// The waiting action's kind (0 none).
+EMSCRIPTEN_KEEPALIVE uint32_t d2_realm_client_local_queued_kind() { return g_localQueued.kind; }
+
+static void local_queue_clear() { g_localQueued = LocalQueuedAction{}; }
+namespace { void g_localQueuedReset() { local_queue_clear(); g_localSends.clear(); g_lastLocalSend = { 0xffffffffu, 0, 0 }; } }
+
+// The gate of every own action (+0x29F30): a used skill whose row lacks Interrupt refuses a new
+// action unless the unit stands in a neutral mode.
+static bool local_action_gate(D2UnitStrc* unit) {
+    auto* used = UNITS_GetUsedSkill(unit);
+    if (!used || !used->pSkillsTxt) return true;
+    if (used->pSkillsTxt->dwFlags[0] & static_cast<uint32_t>(SKILLSFLAG_INTERRUPT)) return true;
+    return unit->dwAnimMode == PLRMODE_NEUTRAL || unit->dwAnimMode == PLRMODE_TOWNNEUTRAL;
+}
+
+static bool local_action_gate_fwd(D2UnitStrc* unit) { return local_action_gate(unit); }
+static void local_queue_clear_fwd() { local_queue_clear(); }
+
+// Client actions 0 (walk to a unit) and 0x18 (run to a unit) of +0x19830: the previous action is
+// completed, the path returns to its previous type, the unit becomes the path's target (+0x2A070)
+// and the route is planned. A route takes the walk (town walk) or run mode; no unit or no route
+// leaves the player standing (+0x19710). 1 started, 0 not.
+static int local_move_to_unit_action(D2UnitStrc* unit, D2UnitStrc* target, bool run) {
+    D2ActiveRoomStrc* room = UNITS_GetRoom(unit);
+    if (!room) return 0;
+    complete_previous_action(unit);
+    PATH_ResetToPreviousType(unit->pDynamicPath);
+    const bool inTown = DUNGEON_IsRoomInTown(room) != FALSE;
+    PATH_SetTargetUnit(unit->pDynamicPath, target);
+    if (!target || D2Common_10142(unit->pDynamicPath, unit, FALSE) <= 0) {
+        client_stop_unit(unit);
+        return 0;
+    }
+    client_set_mode(unit, run ? PLRMODE_RUN : (inTown ? PLRMODE_TOWNWALK : PLRMODE_WALK));
+    return 1;
+}
+
+// "Walk to the unit first" (+0x2AA40): past the gate the walk or run to the unit starts and its
+// packet (0x02 walk, 0x04 run) goes out when it did; the action then waits, whether or not the
+// gate let the walk start.
+static int local_walk_first(D2UnitStrc* unit, uint32_t kind, uint32_t type, uint32_t guid, bool run) {
+    int started = 0;
+    if (local_action_gate(unit)) {
+        started = local_move_to_unit_action(unit, find_realm_client_unit(static_cast<uint8_t>(type), guid), run);
+        if (started) local_send(run ? 0x04 : 0x02, type, guid);
+    }
+    g_localQueued = { 1, kind, type, guid };
+    return started;
+}
+
+// Whether the player must walk before it can use the unit (+0x29E80): an object is in reach when
+// its footprint reach holds and nothing collides between the two; any other unit by the melee test
+// with the "target is moving" bonus.
+// NOT PORTED: a hand skill whose Skills row word at +0x2E is 0x13 takes its own test (+0x18880).
+static bool local_must_walk(D2UnitStrc* unit, D2UnitStrc* target) {
+    if (target->dwUnitType == UNIT_OBJECT)
+        return !(UNITS_IsObjectInInteractRange(unit, target) &&
+            !UNITS_TestCollisionBetweenInteractingUnits(unit, target, 0x804));
+    return !UNITS_IsInMeleeRange(unit, target, UNITS_IsInMovingMode(target));
+}
+
+// The hand of a skill opcode: 0x05..0x0B left, 0x0C..0x12 right, -1 otherwise.
+static int local_kind_hand(uint32_t kind) {
+    return kind >= 0x05 && kind <= 0x0b ? 0 : kind >= 0x0c && kind <= 0x12 ? 1 : -1;
+}
+
+// Client action 2 of +0x19830, the use of a unit (+0x2AC10): the previous action is completed and
+// the path returns to its previous type; a player target is faced; an object drops the path's
+// target unit and, when it can be attacked, is faced and struck with the Kick skill. 1 when the
+// unit is there.
+// GUESS (kick): retail names the skill through D2Common ordinal 10630, not read; the recordings
+// show the kick mode on such an object. Settled by decompiling that ordinal.
+// NOT PORTED: the two object classes 0x194 and 0x178 with their held-item tests, and the 200 ms
+// repeat guard of a monster target.
+static int local_interact_action(D2UnitStrc* unit, uint32_t type, uint32_t guid) {
+    complete_previous_action(unit);
+    PATH_ResetToPreviousType(unit->pDynamicPath);
+    D2UnitStrc* target = find_realm_client_unit(static_cast<uint8_t>(type), guid);
+    if (!target) return type == UNIT_ITEM || type == UNIT_TILE ? 1 : 0;
+    if (type == UNIT_PLAYER) {
+        UNITS_UpdateDirectionAndSpeed(unit, UNITS_GetXPosition(target), UNITS_GetYPosition(target));
+    } else if (type == UNIT_OBJECT) {
+        PATH_SetTargetUnit(unit->pDynamicPath, nullptr);
+        if (target->dwFlags & UNITFLAG_CANBEATTACKED) {
+            UNITS_UpdateDirectionAndSpeed(unit, UNITS_GetXPosition(target), UNITS_GetYPosition(target));
+            if (auto* kick = SKILLS_GetSkillById(unit, SKILL_KICK, -1)) {
+                ClientSkillStart start;
+                start.id = SKILL_KICK;
+                start.skill = kick;
+                start.target = target;
+                start.x = UNITS_GetXPosition(target);
+                start.y = UNITS_GetYPosition(target);
+                start.onUnit = true;
+                start.local = true;
+                client_skill_start(unit, start);
+            }
+        }
+    }
+    return 1;
+}
+
+// The start of an own action and its packet (+0x2A7C0): past the gate the local action runs, and
+// only an action that started is sent. The waiting action is dropped either way.
+static int local_fire(D2UnitStrc* unit, uint32_t kind, uint32_t type, uint32_t guid) {
+    if (!local_action_gate(unit)) return 0;
+    int started = 0;
+    const int hand = local_kind_hand(kind);
+    if (kind == 0x02 || kind == 0x04) {
+        started = local_move_to_unit_action(unit, find_realm_client_unit(static_cast<uint8_t>(type), guid), kind == 0x04);
+    } else if (kind == 0x13) {
+        started = local_interact_action(unit, type, guid);
+    } else if (hand >= 0) {
+        D2UnitStrc* target = find_realm_client_unit(static_cast<uint8_t>(type), guid);
+        if (target && target != unit && target->pDynamicPath && UNITS_GetRoom(target))
+            started = local_skill_start(unit, hand_skill(unit, hand), target,
+                UNITS_GetXPosition(target), UNITS_GetYPosition(target));
+        else client_stop_unit(unit);
+    }
+    if (started) local_send(kind, type, guid);
+    local_queue_clear();
+    return started;
+}
+
+// Once per game frame, before the units move (+0x2B090, called from the game loop +0x44B50): a
+// waiting action whose fire word is set is taken off the queue and its target looked up. A target
+// that is gone, or that cannot be used, ends it. Out of reach the walk starts again and the action
+// waits again (+0x2AA40); in reach the action starts (+0x2A7C0).
+//  - an object must be targetable;
+//  - a dying or dead monster is a target only for a hand skill that takes corpses.
+// GUESS (targetable): the targetable flag of a live monster or player is not kept by this client
+// and is taken as set. Settled by the unit flags of the assign packets.
+// GUESS (player corpse): a dead player is taken as usable; whether it may be looted is the page's
+// test (+0x2AFB0 is not ported).
+static void local_queue_step(D2UnitStrc* unit, bool run) {
+    if (!g_localQueued.fire) return;
+    const LocalQueuedAction q = g_localQueued;
+    local_queue_clear();
+    if (!q.kind) return;
+    if (unit->dwAnimMode == PLRMODE_DEATH || unit->dwAnimMode == PLRMODE_DEAD) return;
+    D2UnitStrc* target = find_realm_client_unit(static_cast<uint8_t>(q.type), q.guid);
+    if (!target || !UNITS_GetRoom(target)) return;
+    if (q.type == UNIT_OBJECT) {
+        if (!(target->dwFlags & UNITFLAG_TARGETABLE)) return;
+    } else if (q.type == UNIT_MONSTER && (target->dwAnimMode == MONMODE_DEATH || target->dwAnimMode == MONMODE_DEAD)) {
+        const int hand = local_kind_hand(q.kind);
+        auto* skill = hand >= 0 ? hand_skill(unit, hand) : nullptr;
+        if (!skill || !skill->pSkillsTxt ||
+            !(skill->pSkillsTxt->dwFlags[0] & static_cast<uint32_t>(SKILLSFLAG_TARGETCORPSE))) return;
+    }
+    if (local_must_walk(unit, target)) {
+        local_walk_first(unit, q.kind, q.type, q.guid, run);
+        return;
+    }
+    local_fire(unit, q.kind, q.type, q.guid);
+}
+
+// The run toggle the waiting action re-walks with (retail reads its two run words each time).
+static bool g_localRun = false;
+
 // The local player's ground click starts its own route at once. The game server never echoes the
 // owner's walk/run (0x0F/0x10 go only to the other clients; the owner is corrected by 0x15), so a
 // client that waits for the echo never moves. Same target/route branch as a remote 0x0F:
 // action 0x01 walk, 0x17 run. Returns 1 when a route started, 0 when refused or no local unit.
+// As +0x2A7C0 has it: the gate comes first, a ground click is ignored while the use of a unit
+// (kind 0x13) waits, and any other waiting action is dropped.
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_local_move(int x, int y, int run) {
     if (g_selectedPlayer < 0 || size_t(g_selectedPlayer) >= g_players.size()) return 0;
     auto* unit = g_players[g_selectedPlayer].motionUnit;
     if (!unit || !unit->pDynamicPath || !UNITS_GetRoom(unit)) return 0;
     if (unit->dwAnimMode == PLRMODE_DEATH || unit->dwAnimMode == PLRMODE_DEAD) return 0;
-    return d2_realm_client_motion_apply_player_move(unit, run ? 0x17 : 0x01, 0,
+    g_localRun = run != 0;
+    if (!local_action_gate(unit)) return 0;
+    if (g_localQueued.kind == 0x13) return 0;
+    complete_previous_action(unit);
+    PATH_ResetToPreviousType(unit->pDynamicPath);
+    const int started = d2_realm_client_motion_apply_player_move(unit, run ? 0x17 : 0x01, 0,
         static_cast<uint16_t>(x), static_cast<uint16_t>(y)) > 0 ? 1 : 0;
+    local_queue_clear();
+    return started;
 }
 
-// Retail's far branch of a click on a unit issues a walk-to-unit command and sends the interact
-// packet; the pursuit itself is not ported, so this routes to the unit's current position through the ground-walk path. A click on a unit starts the same route a ground click does, aimed at the unit's own
-// position (the server's walk-to-entity pursues the target; the local route only has to start
-// at once). 1 started, 0 refused, -1 when the unit is not one the client keeps a CUnit for.
-EMSCRIPTEN_KEEPALIVE int d2_realm_client_local_move_to_unit(int type, uint32_t guid, int run) {
-    if (g_selectedPlayer < 0 || size_t(g_selectedPlayer) >= g_players.size()) return -1;
-    auto* unit = g_players[g_selectedPlayer].motionUnit;
-    if (!unit || !unit->pDynamicPath || !UNITS_GetRoom(unit)) return -1;
-    if (type == UNIT_OBJECT) {
-        // GUESS: the route is aimed at the object's own cell, which its footprint may block; a refused plan
-        // reports "no client unit" so the walk request still goes out and the server's reply moves the hero.
-        // What settles it: the client's walk-to-unit pursuit for an object target.
-        D2UnitStrc* object = find_object_unit(guid);
-        if (!object || !UNITS_GetRoom(object)) return -1;
-        if (unit->dwAnimMode == PLRMODE_DEATH || unit->dwAnimMode == PLRMODE_DEAD) return 0;
-        return d2_realm_client_motion_apply_player_move(unit, run ? 0x17 : 0x01, 0,
-            static_cast<uint16_t>(UNITS_GetXPosition(object)), static_cast<uint16_t>(UNITS_GetYPosition(object))) > 0 ? 1 : -1;
-    }
-    auto* target = find_realm_client_unit(static_cast<uint8_t>(type), guid);
-    if (!target || !target->pDynamicPath) return -1;
+// A click on a unit that is out of reach: walk or run to it and keep the action `kind` (the
+// opcode of the packet that will use it: 0x13 use, 0x06 left skill, 0x0D right skill, ...)
+// waiting. The engine re-plans the walk and starts the action itself on later frames; what it
+// sends is read with d2_realm_client_local_sends. 1 the walk started, 0 it did not (the action
+// waits all the same), -1 when the unit is not one the client keeps a CUnit for (nothing waits).
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_local_act_on_unit(int kind, int type, uint32_t guid, int run) {
+    auto* unit = selected_player_unit();
+    if (!unit || kind <= 0 || kind > 0x13) return -1;
+    D2UnitStrc* target = find_realm_client_unit(static_cast<uint8_t>(type), guid);
+    if (!target || !UNITS_GetRoom(target)) return -1;
     if (unit->dwAnimMode == PLRMODE_DEATH || unit->dwAnimMode == PLRMODE_DEAD) return 0;
-    return d2_realm_client_motion_apply_player_move(unit, run ? 0x17 : 0x01, 0,
-        static_cast<uint16_t>(PATH_GetXPosition(target->pDynamicPath)),
-        static_cast<uint16_t>(PATH_GetYPosition(target->pDynamicPath))) > 0 ? 1 : 0;
+    g_localRun = run != 0;
+    return local_walk_first(unit, static_cast<uint32_t>(kind), static_cast<uint32_t>(type), guid, run != 0);
+}
+
+// The plain walk or run to a unit with nothing waiting (kinds 2 and 4 of +0x2A7C0), kept for
+// callers of the older entry. 1 started, 0 refused, -1 no client unit.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_local_move_to_unit(int type, uint32_t guid, int run) {
+    auto* unit = selected_player_unit();
+    if (!unit) return -1;
+    D2UnitStrc* target = find_realm_client_unit(static_cast<uint8_t>(type), guid);
+    if (!target || !UNITS_GetRoom(target)) return -1;
+    if (unit->dwAnimMode == PLRMODE_DEATH || unit->dwAnimMode == PLRMODE_DEAD) return 0;
+    g_localRun = run != 0;
+    if (!local_action_gate(unit)) return 0;
+    const int started = local_move_to_unit_action(unit, target, run != 0);
+    local_queue_clear();
+    return started;
+}
+
+// The use of a unit in reach, or the start of a hand's skill on it, by the packet's opcode
+// (+0x2A7C0). 1 started (the packet is in the send list), 0 refused.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_local_fire(int kind, int type, uint32_t guid) {
+    auto* unit = selected_player_unit();
+    if (!unit || kind <= 0 || kind > 0x13) return 0;
+    if (unit->dwAnimMode == PLRMODE_DEATH || unit->dwAnimMode == PLRMODE_DEAD) return 0;
+    return local_fire(unit, static_cast<uint32_t>(kind), static_cast<uint32_t>(type), guid);
 }
 
 // Whether the selected player can use a unit now. Retail's "walk first" test (1.13c
@@ -4712,25 +4950,44 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_motion_tick() {
     int moving = 0;
     if (D2DrlgActStrc* act = d2_drlg_client_act()) ENVIRONMENT_UpdatePeriodOfDay(act, selected_player_room());
     advance_client_missiles();
+    if (D2UnitStrc* own = selected_player_unit()) local_queue_step(own, g_localRun);
     for (size_t i = 0; i < g_players.size(); ++i) {
         auto& player = g_players[i];
         if (!player.motionUnit || !player.motionUnit->pDynamicPath) continue;
-        // The mode's update (D2Client+0x1C150): only a walking, running or knocked-back player is stepped, and a
-        // walk or run whose path has run out ends in the room's neutral mode in that same update.
-        // NOT PORTED: the owner's pending click (held on the player data) defers that end by a frame.
         D2UnitStrc* const unit = player.motionUnit;
-        const bool steps = unit_mode_move_kind(unit) == 1;
-        const bool walking = steps && unit->dwAnimMode != PLRMODE_KNOCKBACK;
-        const int result = advance_client_player_action(unit) ? 0 : d2_realm_client_motion_advance_unit(unit, steps);
-        if (walking && result == 0) {
-            UNITS_SetUsedSkill(unit, nullptr);
-            PATH_ResetToPreviousType(unit->pDynamicPath);
-            unit->dwFlags = (unit->dwFlags & ~0x40u) | 2u;
-            UNITS_ChangeAnimMode(unit, DUNGEON_IsRoomInTown(UNITS_GetRoom(unit)) ? PLRMODE_TOWNNEUTRAL : PLRMODE_NEUTRAL);
-        }
+        const uint32_t modeBefore = unit->dwAnimMode;
+        const bool walking = modeBefore == PLRMODE_WALK || modeBefore == PLRMODE_RUN || modeBefore == PLRMODE_TOWNWALK;
+        const bool own = static_cast<int>(i) == g_selectedPlayer;
+        // The handler steps the path only in a mode whose table row is a moving one; a standing unit keeps the
+        // points of a route its action interrupted and does not follow them.
+        const bool pathSteps = unit_mode_move_kind(unit) == 1;   // the mode's table row, knockback included
+        const int result = advance_client_player_action(unit) ? 0 : d2_realm_client_motion_advance_unit(unit, pathSteps);
         if (result > 0) moving++;
-        if (run_unit_queue(UNIT_PLAYER, player.view.guid) || result > 0)
-            refresh_player_motion_view(g_players[i], static_cast<int>(i) == g_selectedPlayer);
+        // The per-frame unit handler (0x1c150): a walking unit whose path has ended this frame stands where the
+        // path left it and takes the neutral mode of its room, flag 0x40 off and flag 2 on. The recordings show
+        // the same frame carrying both the last position and the neutral mode. The own player with an action
+        // waiting keeps its mode instead and only sets the action's fire word.
+        if (walking && result == 0 && unit->dwAnimMode == modeBefore) {
+            if (own && g_localQueued.kind) g_localQueued.fire = 1;
+            else {
+                unit->dwFlags = (unit->dwFlags & ~0x40u) | 2u;
+                D2ActiveRoomStrc* room = UNITS_GetRoom(unit);
+                UNITS_ChangeAnimMode(unit, room && DUNGEON_IsRoomInTown(room) ? PLRMODE_TOWNNEUTRAL : PLRMODE_NEUTRAL);
+            }
+        }
+        // The handler's last step for the own player still running (0x19d80): out of stamina the run becomes
+        // a walk, to the path's target unit when it has one, else to its target spot.
+        // GUESS (stamina): the handler's test is a unit stat 10 read through a D2Common thunk, taken as the
+        // stamina stat; it is applied only when the client holds a maximum for it.
+        if (own && unit->dwAnimMode == PLRMODE_RUN && STATLIST_UnitGetStatValue(unit, STAT_MAXSTAMINA, 0) > 0 &&
+                STATLIST_UnitGetStatValue(unit, STAT_STAMINA, 0) == 0) {
+            D2DynamicPathStrc* path = unit->pDynamicPath;
+            if (D2UnitStrc* target = PATH_GetTargetUnit(path)) local_move_to_unit_action(unit, target, false);
+            else d2_realm_client_motion_apply_player_move(unit, 0x01, 0, static_cast<uint16_t>(path->tTargetCoord.X),
+                static_cast<uint16_t>(path->tTargetCoord.Y));
+        }
+        if (run_unit_queue(UNIT_PLAYER, player.view.guid) || result > 0 || walking)
+            refresh_player_motion_view(player, static_cast<int>(i) == g_selectedPlayer);
     }
     for (D2UnitStrc* object = d2gs_client_object_next(nullptr); object; object = d2gs_client_object_next(object)) {
         const uint32_t mode = object->dwAnimMode;

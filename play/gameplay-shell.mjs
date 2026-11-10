@@ -4353,6 +4353,7 @@ function realmInput() {
     skillPlan: Module._d2_realm_client_skill_plan ? (hand, type, guid) => Module._d2_realm_client_skill_plan(hand, type, guid) : null,
     skillAt: Module._d2_realm_client_local_skill_at ? (hand, x, y) => Module._d2_realm_client_local_skill_at(hand, x, y) : null,
     skillOnUnit: Module._d2_realm_client_local_skill_on_unit ? (hand, type, guid) => Module._d2_realm_client_local_skill_on_unit(hand, type, guid) : null,
+    queueUnit: realmFlow?.protocol?.d2gsClientLocalActOnUnit ?? null, fireUnit: realmFlow?.protocol?.d2gsClientLocalFire ?? null, takeSends: realmFlow?.protocol?.d2gsClientLocalSends ?? null,
     scene: () => {
       const me = selectedPlayerSource();
       if (!realmSceneActive || !realmPlayerView?.active || !realmFlow?.d2gs?.isOpen || me.source === 'none' || !snapshot) return { ready: false };

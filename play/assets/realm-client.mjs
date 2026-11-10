@@ -1504,6 +1504,13 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
     },
     d2gsClientUnitHitClass: (type, guid) => call('d2_realm_client_unit_hit_class', 'number', ['number','number'], [type, guid >>> 0]) >>> 0,
     d2gsClientMotionTick: () => call('d2_realm_client_motion_tick', 'number', [], []),
+    // The own player's waiting action on a unit: the click, and the packets the engine's own steps want sent.
+    d2gsClientLocalActOnUnit: Module._d2_realm_client_local_act_on_unit ? (kind, type, guid, run) => call('d2_realm_client_local_act_on_unit', 'number', ['number','number','number','number'], [kind, type, guid >>> 0, run ? 1 : 0]) : null,
+    d2gsClientLocalFire: Module._d2_realm_client_local_fire ? (kind, type, guid) => call('d2_realm_client_local_fire', 'number', ['number','number','number'], [kind, type, guid >>> 0]) : null,
+    d2gsClientLocalSends: Module._d2_realm_client_local_sends ? () => {
+      const n = call('d2_realm_client_local_sends', 'number', ['bigint'], [0n]), at = Number(call('d2_realm_client_local_send_view', 'bigint', [], [])) >>> 2;
+      return Array.from({ length: n }, (_, i) => ({ op: Module.HEAPU32[at + i * 3], type: Module.HEAPU32[at + i * 3 + 1], guid: Module.HEAPU32[at + i * 3 + 2] }));
+    } : null,
     d2gsGamelogon: ({ character, charClass, gameToken, gameHash, expansion = true }) => {
       if (Module._d2_realm_client_items_set_expansion) Module._d2_realm_client_items_set_expansion(expansion ? 1 : 0);   // picks the Inventory.txt rows of the hero's grids
       const n = call('d2_realm_d2gs_gamelogon', 'number', ['number', 'number', 'number', 'number', 'string', 'bigint'], [gameHash, gameToken, charClass, 0x0d, character, BigInt(T)]);

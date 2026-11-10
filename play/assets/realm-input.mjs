@@ -106,7 +106,8 @@ export const canUseItemRow = (row) => row.useable === 1 && row.unique !== 1 && r
 /** The 0x81CE0 stat list: flag 2, a 12-frame timeout; the game runs 25 frames a second. */
 export const ACTION_LOCK_FRAMES = 12, GAME_FRAME_MS = 40;
 export function createRealmInput({ transmit, scene, now = () => 0, move = null, approachUnit = null, reach = null,
-  actionDone = null, skillPlan = null, skillAt = null, skillOnUnit = null, onTalk = null, questFlags = null, leaveWait = null }) {
+  actionDone = null, skillPlan = null, skillAt = null, skillOnUnit = null, onTalk = null, questFlags = null, leaveWait = null,
+  queueUnit = null, fireUnit = null, takeSends = null }) {
   const gate = createSendGate(transmit);
   const evidence = { attempts: 0, sent: 0, last: null };
   // The inventory's item actions pass the leave wait's gate first (1.13c 0x923F0): an armed wait is cancelled and the action refused.
@@ -195,12 +196,30 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
   // route still leaves the interaction waiting: 2AA40 stores the pending action whether or not it sent.
   function approach(s, type, u) {
     const run = Boolean(s.run), guid = idOf(type, u);
+    if (queueUnit && takeSends && pending) {
+      // The engine walks to the unit, plans the walk again each frame and starts the waiting action in reach.
+      const kind = pending.hand == null ? 0x13 : pending.hand ? 0x0d : 0x06;
+      const started = queueUnit(kind, type, guid, run);
+      if (started >= 0) { pending = null; evidence.localMove = started; return flush(s) ? true : started ? false : null; }
+    }
     if (!predicted(approachUnit ? approachUnit(type, guid, run) : move ? move(clamp16(u.x), clamp16(u.y), run) : null)) return null;
     return emit(run ? packets.runToUnit(type, guid) : packets.walkToUnit(type, guid), 'approach');
   }
+  // The engine's own packets: a walk it planned again, or the waiting action it started in reach.
+  function flush(s) {
+    let sent = false;
+    for (const { op, type, guid } of takeSends()) {
+      if (op === 0x02 || op === 0x04) sent = emit(op === 0x04 ? packets.runToUnit(type, guid) : packets.walkToUnit(type, guid), 'approach') || sent;
+      else if (op === 0x13) { const u = find(s, type, guid); if (u) sent = use(s, type, u, true) || sent; }
+      else if (op >= 0x05 && op <= 0x0b) sent = emit(packets.leftSkillOnUnit(type, guid, false), 'left-skill-unit') || sent;
+      else sent = emit(packets.rightSkillOnUnit(type, guid, false), 'right-skill-unit') || sent;
+    }
+    return sent;
+  }
   // The packet that uses a unit once the player has reached it.
-  function use(s, type, u) {
+  function use(s, type, u, started = false) {
     const guid = idOf(type, u);
+    if (!started && fireUnit && takeSends) { fireUnit(0x13, type, guid); takeSends(); }   // the engine's own start; the packet goes out below
     if (type === UNIT.ITEM) return emit(packets.pickUp(UNIT.ITEM, guid), 'pickup');
     if (type === UNIT.PLAYER) return emit(packets.interact(UNIT.PLAYER, guid), corpseOf(s, guid) ? 'corpse' : 'trade');   // a live player in town: the server answers with a trade request
     if (type === UNIT.TILE) return emit(packets.interact(UNIT.TILE, guid), 'warp');   // the server moves the player through the exit
@@ -259,6 +278,7 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     },
     /** Once per frame: an interaction waiting on the walk is used once the unit is in reach. */
     tick() {
+      if (takeSends) { const s = open(); if (s) flush(s); }
       if (!pending) return null;
       const s = open(); if (!s) return null;
       if (actionDone && !actionDone()) return null;

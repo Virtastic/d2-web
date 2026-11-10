@@ -52,23 +52,22 @@ const logonFields = (text) => text.slice(0, 16) + text.slice(18, 24) + text.slic
 const hex = (text) => Uint8Array.from(text.match(/../g) ?? [], (b) => parseInt(b, 16));
 const h2 = (v) => v.toString(16).padStart(2, '0');
 
-// The opcodes each consumer names, read from its source: the engine's packet handler table and route table, and the
-// modules the game shell hands the same bytes to.
+// The opcodes each consumer names, read from its source: the engine's packet table rows whose handler has a
+// body bound to it, and the modules the game shell hands the same bytes to.
 function namedOpcodes() {
   const named = new Map();   // opcode -> [consumer]
   const add = (op, who) => { if (!named.has(op)) named.set(op, []); if (!named.get(op).includes(who)) named.get(op).push(who); };
   const src = (rel) => { const f = path.join(ROOT, rel); return existsSync(f) ? readFileSync(f, 'utf8') : ''; };
   const state = src('src/core/realm/d2gs_client_state.cpp');
-  // One row of the handler table per packet the feed gives a body; the row's comment names its opcode or opcode range.
   const from = state.indexOf('kRealmPacketHandlers[] = {'), to = state.indexOf('};', from);
-  const feed = from >= 0 && to > from ? state.slice(from, to) : '';
-  for (const m of feed.matchAll(/\},\s*\/\/ 0x([0-9a-f]{2})(?:\.\.0x([0-9a-f]{2}))?/g))
-    for (let op = parseInt(m[1], 16); op <= parseInt(m[2] ?? m[1], 16); op++) add(op, 'engine');
-  for (const m of src('src/core/realm/d2gs_client_pkt_route.h').matchAll(/case 0x([0-9a-f]{2}): return \{ PktHandler/g)) add(parseInt(m[1], 16), 'engine');
+  const bound = new Set([...(from >= 0 ? state.slice(from, to) : '').matchAll(/\{ 0x([0-9a-f]+), \w/g)].map((m) => parseInt(m[1], 16)));
+  const table = src('src/core/d2client/server_packet_table.h');
+  const rows = [...table.slice(table.indexOf('kServerPacketTable[')).matchAll(/\{ 0x([0-9a-f]+),\s*-?\d+, 0x([0-9a-f]+) \}/g)];
+  rows.forEach((m, op) => { if (bound.has(parseInt(m[2], 16) || parseInt(m[1], 16))) add(op, 'engine'); });
   for (const mod of ['realm-world', 'realm-hud-state', 'realm-npc-state', 'realm-packet-routes', 'bnet-game-life'])
     for (const m of src(`play/assets/${mod}.mjs`).matchAll(/case 0x([0-9a-f]{2})\b|\[0\] === 0x([0-9a-f]{2})\b/g)) add(parseInt(m[1] ?? m[2], 16), mod);
   for (const op of [0x00, 0x01, 0x02, 0x0b, 0x59]) if (op === 0x0b || op === 0x59) add(op, 'join');
-  return { named, engineSource: feed.length > 0 };
+  return { named, engineSource: bound.size > 0 && rows.length === 0xaf };
 }
 
 async function loadEngine() {
@@ -138,7 +137,7 @@ function parseRecording(file) {
 export async function replay(records, { Module, protocol }, tables, named) {
   const sizeOf = (b) => protocol.d2gsPacketSize(b);
   const report = { server: 0, client: 0, ticks: 0, seen: new Map(), ignored: new Map(), refused: [], unframed: [], worldThrew: new Map(),
-    events: new Map(), inputsApplied: new Map(), inputsNotApplied: new Map(), firstPosition: null, firstMode: null, positionDiffs: 0, modeDiffs: 0, compared: 0, heroAbsent: 0, track: [], trace: [] };
+    events: new Map(), inputsApplied: new Map(), inputsNotApplied: new Map(), firstPosition: null, firstMode: null, positionDiffs: 0, modeDiffs: 0, unitPackets: 0, unitSent: 0, unitExtra: 0, unitExtraFirst: null, unitRefused: [], unitLate: [], compared: 0, heroAbsent: 0, track: [], trace: [] };
   const bump = (map, key) => map.set(key, (map.get(key) ?? 0) + 1);
   const world = createRealmWorld(tables);
 
@@ -198,18 +197,74 @@ export async function replay(records, { Module, protocol }, tables, named) {
 
   const move = (x, y, run) => Module.ccall('d2_realm_client_local_move', 'number', ['number', 'number', 'number'], [x, y, run]);
   const moveToUnit = (type, id, run) => Module.ccall('d2_realm_client_local_move_to_unit', 'number', ['number', 'number', 'number'], [type, id, run]);
-  for (const r of records.slice(burstEnd + 1)) {
+  // The use of a unit is the engine's own: a click out of reach makes it walk and keep the action waiting, and it
+  // re-plans the walk and starts the action itself on later frames. The recording holds the packets, not the
+  // click, so the waiting action of a first walk-to-unit packet is the opcode of the next packet on that unit.
+  // Every later packet on a unit is then expected from the engine on the same tick; one the engine did not
+  // send is applied from the recording, and counted.
+  const hasQueue = Boolean(Module._d2_realm_client_local_act_on_unit);
+  const actOnUnit = (kind, type, id, run) => Module.ccall('d2_realm_client_local_act_on_unit', 'number', ['number', 'number', 'number', 'number'], [kind, type, id, run]);
+  const fire = (kind, type, id) => Module.ccall('d2_realm_client_local_fire', 'number', ['number', 'number', 'number'], [kind, type, id]);
+  const queued = () => Module.ccall('d2_realm_client_local_queued_kind', 'number', [], []);
+  const takeSends = () => {
+    const n = Module._d2_realm_client_local_sends(0n);
+    const at = Number(Module._d2_realm_client_local_send_view()) >>> 2;
+    return Array.from({ length: n }, (_, i) => `${h2(Module.HEAPU32[at + i * 3])}:${Module.HEAPU32[at + i * 3 + 1]}:${Module.HEAPU32[at + i * 3 + 2]}`);
+  };
+  const UNIT_OPS = new Set([0x02, 0x04, 0x06, 0x07, 0x09, 0x0a, 0x0d, 0x0e, 0x10, 0x11, 0x13]);
+  const rest = records.slice(burstEnd + 1);
+  const waitingKind = (from, type, id) => {
+    for (let i = from + 1; i < rest.length; i++) {
+      const n = rest[i]; if (n.kind !== 'C') continue;
+      const q = hex(n.text), op = q[0];
+      if (op === 0x01 || op === 0x03) return 0;
+      if (!UNIT_OPS.has(op) || q.length !== 9) continue;
+      const w = new DataView(q.buffer);
+      if (w.getUint32(1, true) !== type || w.getUint32(5, true) !== id) return 0;
+      if (op !== 0x02 && op !== 0x04) return op;
+    }
+    return 0;
+  };
+  let expected = [];   // the unit packets of this tick the engine is to send itself
+  for (const [index, r] of rest.entries()) {
     if (r.kind === 'S') { count(r); const p = hex(r.text); if (sizeOf(p) !== p.length) report.unframed.push({ tick: r.tick, op: p[0] }); else feedOne(p, r.tick); continue; }
     if (r.kind === 'C') {
       report.client++;
       const p = hex(r.text), v = new DataView(p.buffer), op = p[0];
       if ((op === 0x01 || op === 0x03) && p.length === 5) { move(v.getUint16(1, true), v.getUint16(3, true), op === 0x03 ? 1 : 0); bump(report.inputsApplied, op); }
+      else if (hasQueue && UNIT_OPS.has(op) && p.length === 9) {
+        const type = v.getUint32(1, true), id = v.getUint32(5, true), key = `${h2(op)}:${type}:${id}`;
+        report.unitPackets++;
+        if (queued()) expected.push({ key, op, type, id });
+        else {
+          const kind = op === 0x02 || op === 0x04 ? waitingKind(index, type, id) : 0;
+          if (kind) actOnUnit(kind, type, id, op === 0x04 ? 1 : 0);
+          else if (op === 0x02 || op === 0x04) moveToUnit(type, id, op === 0x04 ? 1 : 0);
+          else fire(op, type, id);
+          const sends = takeSends();
+          if (sends.includes(key)) report.unitSent++; else report.unitRefused.push(`${r.tick} ${key}`);
+          report.unitExtra += sends.filter((k) => k !== key).length;
+        }
+        bump(report.inputsApplied, op);
+      }
       else if ((op === 0x02 || op === 0x04) && p.length === 9) { moveToUnit(v.getUint32(1, true), v.getUint32(5, true), op === 0x04 ? 1 : 0); bump(report.inputsApplied, op); }
       else bump(report.inputsNotApplied, op);
       continue;
     }
     if (r.tick < records[select].tick) continue;
     protocol.d2gsClientMotionTick();
+    if (hasQueue) {
+      const sends = takeSends();
+      for (const e of expected) {
+        const at = sends.indexOf(e.key);
+        if (at >= 0) { sends.splice(at, 1); report.unitSent++; continue; }
+        report.unitLate.push(`${r.tick} ${e.key}`);
+        if (e.op !== 0x02 && e.op !== 0x04) { fire(e.op, e.type, e.id); takeSends(); }
+      }
+      report.unitExtra += sends.length;
+      if (sends.length && report.unitExtraFirst == null) report.unitExtraFirst = `${r.tick} ${sends[0]}`;
+      expected = [];
+    }
     report.ticks++;
     const [x, y, mode] = r.text.split(',').map(Number);
     const ours = protocol.d2gsClientPlayerState();
@@ -217,7 +272,7 @@ export async function replay(records, { Module, protocol }, tables, named) {
     if (!ours?.active) { report.heroAbsent++; report.firstPosition ??= { tick: r.tick, retail: [x, y], ours: null }; report.firstMode ??= { tick: r.tick, retail: mode, ours: null }; continue; }
     report.compared++;
     const ourMode = ours.motion?.mode ?? ours.initialMode;
-    if (TRACE && r.tick >= TRACE[0] && r.tick <= TRACE[1]) report.trace.push(`${r.tick} retail ${x},${y} mode ${mode} ours ${ours.x},${ours.y} mode ${ourMode}`);
+    if (TRACE && r.tick >= TRACE[0] && r.tick <= TRACE[1]) report.trace.push(`${r.tick} retail ${x},${y} mode ${mode} ours ${ours.x},${ours.y} mode ${ourMode} frame ${ours.motion?.framePrecise}/${ours.motion?.frameCountPrecise} speed ${ours.motion?.animSpeed}`);
     if (ours.x !== x || ours.y !== y) { report.positionDiffs++; report.firstPosition ??= { tick: r.tick, retail: [x, y], ours: [ours.x, ours.y] }; }
     if (ourMode !== mode) { report.modeDiffs++; report.firstMode ??= { tick: r.tick, retail: mode, ours: ourMode }; }
   }
@@ -244,6 +299,7 @@ test('recorded play streams replay through the joined-game client', { skip }, as
       t.diagnostic(`  refused by the client state: ${report.refused.length ? report.refused.slice(0, 6).map((r) => `tick ${r.tick} ${h2(r.op)} -> ${r.result}`).join(', ') + (report.refused.length > 6 ? ` (+${report.refused.length - 6})` : '') : 'none'}`);
       t.diagnostic(`  world threw on: ${fmt(report.worldThrew)}`);
       t.diagnostic(`  inputs applied: ${fmt(report.inputsApplied)}; inputs with no local prediction: ${fmt(report.inputsNotApplied)}`);
+      t.diagnostic(`  packets on a unit: ${report.unitSent}/${report.unitPackets} sent by the engine on the recorded tick; refused on the click: ${report.unitRefused.join(', ') || 'none'}; not sent that tick: ${report.unitLate.join(', ') || 'none'}; sent but not recorded: ${report.unitExtra}${report.unitExtraFirst ? ` (first ${report.unitExtraFirst})` : ''}`);
       t.diagnostic(`  hero position: ${report.positionDiffs}/${report.compared} ticks differ, first ${report.firstPosition ? `tick ${report.firstPosition.tick} retail ${report.firstPosition.retail} ours ${report.firstPosition.ours}` : 'none'}`);
       t.diagnostic(`  hero position with ours read ${report.lag[0]} ticks later: ${report.lag[1]} ticks differ; hero absent on ${report.heroAbsent} ticks`);
       t.diagnostic(`  hero mode: ${report.modeDiffs}/${report.compared} ticks differ, first ${report.firstMode ? `tick ${report.firstMode.tick} retail ${report.firstMode.retail} ours ${report.firstMode.ours}` : 'none'}`);
