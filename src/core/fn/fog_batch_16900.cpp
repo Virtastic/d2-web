@@ -238,7 +238,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16b10(uint32_t* r)
 		reinterpret_cast<char*>(static_cast<uintptr_t>(r[8])))));
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16dd0(uint32_t* r)
+extern "C" __attribute__((weak)) EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16dd0(uint32_t* r)
 {
 	r[4] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(fog_safesock_connect(
 		reinterpret_cast<FogSockApi*>(static_cast<uintptr_t>(r[0])),
@@ -482,8 +482,9 @@ static char* fog_get_host_ip_address(FogSockApi* api, char* ipString)
 		{
 			// h_addr_list is the 4-byte pointer at +0x0C; entry 0 is a pointer to the address.
 			const uint32_t listPtr = *reinterpret_cast<const uint32_t*>(he + 0x0C);
-			if (listPtr)
-				addr = *reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(listPtr));
+			const uint32_t entry0 = listPtr ? *reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(listPtr)) : 0;
+			if (entry0)
+				addr = *reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(entry0));
 		}
 	}
 
