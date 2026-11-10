@@ -534,7 +534,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_168e0(uint32_t* r)
 	r[4] = 0;
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16a10(uint32_t* r)
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16a10_api(uint32_t* r)
 {
 	r[4] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(fog_get_host_ip_address(
 		reinterpret_cast<FogSockApi*>(static_cast<uintptr_t>(r[0])),
