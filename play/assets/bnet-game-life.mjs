@@ -107,3 +107,16 @@ export function createGameLife({ now = () => Date.now(), expansion = false, onNo
     get phase() { return phase; },
   };
 }
+
+// The page is closing (pagehide): send the unload packets synchronously on the game socket, then close it from this
+// side. WebSocket.close() queues the close frame behind the bytes already sent, so the bridge sees both and ends the
+// realm side with a FIN, which is the orderly close the game server saves the character on. Returns what was sent.
+export function flushUnloadLeave(life, transport) {
+  if (!life || !transport) return [];
+  const sent = [];
+  for (const bytes of life.unload()) {
+    try { if (transport.send(bytes) !== false) sent.push(bytes); } catch { /* socket already closed */ }
+  }
+  if (sent.length) { try { transport.close(); } catch { /* already closed */ } }
+  return sent;
+}

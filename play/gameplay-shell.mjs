@@ -199,7 +199,7 @@ import { fitSize } from './assets/fit-size.mjs';
 import { canvasPoint as pointOnCanvas } from './assets/canvas-point.mjs';
 import { createBnetInput } from './assets/bnet-input.mjs';
 import { findD2gsDeny, d2gsDenyError } from './assets/d2gs-deny.mjs';
-import { createGameLife, joinDeadline, TICK_MS } from './assets/bnet-game-life.mjs';
+import { createGameLife, flushUnloadLeave, joinDeadline, TICK_MS } from './assets/bnet-game-life.mjs';
 import { createJoinLoading, createJoinLoadingArt } from './assets/bnet-join-loading.mjs';
 import { reasonString, REASON_DISCONNECTED } from './assets/d2gs-deny.mjs';
 
@@ -8128,9 +8128,5 @@ installUnloadAutosave({ shouldSave: () => Boolean(session && chosenName), saveBy
 // Closing the tab inside a Battle.net game sends the same bytes as the explicit leave, back to back: 4F 02 00 (unless the
 // menu already sent it), then 0x69. Retail waits 30 s in state 7 first; a closing page cannot wait, so this is the
 // unavoidable divergence. The server frees the player at once instead of holding the dropped socket until it times out.
-window.addEventListener('pagehide', () => {
-  for (const bytes of realmFlow?.d2gsLife?.unload() ?? []) {
-    try { realmFlow.d2gs?.send(bytes); } catch { /* socket already closed */ }
-  }
-});
+window.addEventListener('pagehide', () => { flushUnloadLeave(realmFlow?.d2gsLife, realmFlow?.d2gs); });
 requestAnimationFrame(frame);

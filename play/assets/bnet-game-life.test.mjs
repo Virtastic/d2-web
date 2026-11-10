@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGameLife, EXIT_TICKS, JOIN_TIMEOUT_MS, LEAVE_CANCEL_PACKET, LEAVE_WAIT_CANCEL_PACKET, LEAVE_WAIT_MS, LOADING_TIMEOUT_MS, SAVE_AND_EXIT_PACKET } from './bnet-game-life.mjs';
+import { createGameLife, flushUnloadLeave, EXIT_TICKS, JOIN_TIMEOUT_MS, LEAVE_CANCEL_PACKET, LEAVE_WAIT_CANCEL_PACKET, LEAVE_WAIT_MS, LOADING_TIMEOUT_MS, SAVE_AND_EXIT_PACKET } from './bnet-game-life.mjs';
 import { reasonString } from './d2gs-deny.mjs';
 
 const mk = (opts = {}) => { let t = 0; const log = { notice: [], left: [], sent: [] };
@@ -159,4 +159,32 @@ test('an item action during a reason countdown is not a leave wait, so it goes a
   life.inGame(); life.fail(7);
   assert.equal(life.itemAction(), true);
   assert.deepEqual(log.sent, []);
+});
+
+const fakeSocket = (open = true) => { const ev = []; return { ev, send: (b) => { if (!open) return false; ev.push(['send', [...b]]); return true; }, close: () => ev.push(['close']) }; };
+test('pagehide in game: 4F 02 00, 0x69, then the socket close, in that order, synchronously', () => {
+  const { life } = mk(); life.inGame();
+  const ws = fakeSocket();
+  assert.equal(flushUnloadLeave(life, ws).length, 2);
+  assert.deepEqual(ws.ev, [['send', [0x4f, 0x02, 0, 0, 0, 0, 0]], ['send', [0x69]], ['close']]);
+});
+test('pagehide after the menu leave sends only 0x69 then closes; a second pagehide sends nothing', () => {
+  const { life } = mk(); life.inGame(); life.leaveGame();
+  const ws = fakeSocket();
+  flushUnloadLeave(life, ws);
+  assert.deepEqual(ws.ev, [['send', [0x69]], ['close']]);
+  const again = fakeSocket();
+  assert.deepEqual(flushUnloadLeave(life, again), []);
+  assert.deepEqual(again.ev, []);
+});
+test('pagehide with no game life, a dead socket or an exit countdown running sends and closes nothing extra', () => {
+  assert.deepEqual(flushUnloadLeave(null, fakeSocket()), []);
+  const { life } = mk(); life.inGame();
+  const dead = fakeSocket(false);
+  assert.deepEqual(flushUnloadLeave(life, dead), []);
+  assert.deepEqual(dead.ev, []);
+  const b = mk(); b.life.inGame(); b.life.fail(7);
+  const ws = fakeSocket();
+  assert.deepEqual(flushUnloadLeave(b.life, ws), []);
+  assert.deepEqual(ws.ev, []);
 });
