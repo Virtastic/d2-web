@@ -16,7 +16,7 @@ import { createBnetConnectFailureNotice } from './bnet-connecting.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const vec = (name) => join(root, 'vectors', 'drawlist', `${name}.txt`);
-const NAMES = ['connect-fail', 'connect-fail-hover', 'connect-fail-press', 'connect-fail-menu', 'tos-fail-notice', 'tos-fail-menu', 'event-0d', 'event-01', 'event-04'];
+const NAMES = ['connect-fail', 'connect-fail-hover', 'connect-fail-press', 'connect-fail-menu', 'tos-fail-notice', 'tos-fail-menu', 'event-0d', 'event-01', 'event-04', 'event-03', 'event-07', 'event-0c', 'event-12'];
 const have = NAMES.every((n) => existsSync(vec(`bnet-${n}`)));
 const rd = have ? openRetail() : null;
 
@@ -96,14 +96,18 @@ test('the main menu connect failure raises the same large popup, sized to its wr
 // typed name and password): 0x101 version (event 1, the large popup with its detail), 0x202 disabled (event 4, the
 // small popup), and a logon result 1 (event 0xD, the small popup). Each is compared as the first frame it shows.
 const EVENT_CASES = [
-  ['event 1: a refused version raises the large popup with its detail as small print', 'bnet-event-01', { authResult: 0x101 }],
-  ['event 4: a disabled key raises the small popup with the disabled text', 'bnet-event-04', { authResult: 0x202 }],
-  ['event 0xD: a logon refusal (unknown account) raises the small popup', 'bnet-event-0d', { logonResult: 1 }],
+  ['event 1: a refused version raises the large popup with its detail as small print', 'bnet-event-01', 240, { authResult: 0x101 }],
+  ['event 4: a disabled key raises the small popup with the disabled text', 'bnet-event-04', 240, { authResult: 0x202 }],
+  ['event 3: an invalid key raises the large popup with its detail as small print', 'bnet-event-03', 0, { authResult: 0x200 }],
+  ['event 7: an invalid expansion key raises the large popup with its detail as small print', 'bnet-event-07', 0, { authResult: 0x210 }],
+  ['event 0xC: a refused connection raises the large popup with the modem small print', 'bnet-event-0c', 0, { failureEvent: 12 }],
+  ['event 0x12: an unrecognised logon result raises the wide popup', 'bnet-event-12', 0, { logonResult: 9 }],
+  ['event 0xD: a logon refusal (unknown account) raises the small popup', 'bnet-event-0d', 240, { logonResult: 1 }],
 ];
-for (const [title, name, reject] of EVENT_CASES) {
+for (const [title, name, ms, reject] of EVENT_CASES) {
   test(title, { skip: !rd }, async () => {
     const s = await failed('login', Object.assign(new Error('refused'), reject));
-    clock.ms = 240; // the capture draws the logos at frame 6 on tick 2
+    clock.ms = ms; // events 1, 4 and 0xD draw the logos at frame 6 on tick 2, the later captures at frame 0
     compare(name, s);
   });
 }

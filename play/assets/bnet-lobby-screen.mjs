@@ -372,9 +372,9 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   // The scrollbar control: the thumb grabbed, which arrow shows pressed, and whether the mouse button is still down.
   const bar = { grab: false, up: false, down: false, held: false };
   let joining = false;
-  let openStamp = -Infinity;
+  let openStamp = 0;
   const openJoin = () => { panel = 'join'; Object.assign(form, { name: '', password: '', focus: 'name' }); selected = -1; listFirst = 0; desc = '';
-  // D2Multi 0x148F0 builds the panel's list empty and asks the realm for games only when 5 s have passed since the last open (the stamp moves only then, and starts at 0).
+  // D2Multi 0x148F0 builds the panel's list empty and asks the realm for games only when 5 s have passed since the last open (the stamp moves only then, and starts at 0, the zero-filled static, so an open under 5 s after the clock starts asks nothing).
   games = []; if (clock() - openStamp >= 5000) { openStamp = clock(); refreshGames(); } };
   // HELP, CHANNEL and LADDER: panels of their own. HELP's list keeps its place while the panel is shut; CHANNEL's list is what the chat
   // connection last reported (`setChannels`), its name edit starts on the channel in.

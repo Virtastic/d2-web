@@ -188,18 +188,25 @@ test('chat: typing and Enter go out through the chat socket; the server\'s lines
 test('join panel asks for the game list on open, then on retail\'s free-running 15 s idle timer while it stays open', () => {
   let asked = 0;
   const s = screen({ name: 'Ama', charClass: 0, level: 3 }, { onRefreshGames: () => { asked++; } });
-  s.pinClock(1000, 0); s.tick(); assert.equal(asked, 0, 'no panel, no request');
+  s.pinClock(6000, 0); s.tick(); assert.equal(asked, 0, 'no panel, no request');
   s.activate('join'); assert.equal(asked, 1, 'asked when it opens');
   s.tick(); assert.equal(asked, 2, 'the timer was never started: the first idle look is due at once');
-  s.pinClock(15999, 0); s.tick(); assert.equal(asked, 2);
-  s.pinClock(16000, 0); s.tick(); assert.equal(asked, 3, '15 s after the timer last fired');
-  s.pinClock(20000, 0); s.draw(ctx, 800, 600); assert.equal(asked, 3, 'draw ticks too, nothing due');
-  s.pinClock(31000, 0); s.draw(ctx, 800, 600); assert.equal(asked, 4, 'draw runs the due refresh');
-  s.activate('panel-cancel'); s.pinClock(60000, 0); s.tick(); assert.equal(asked, 4, 'closed: the timer is not looked at');
+  s.pinClock(20999, 0); s.tick(); assert.equal(asked, 2);
+  s.pinClock(21000, 0); s.tick(); assert.equal(asked, 3, '15 s after the timer last fired');
+  s.pinClock(25000, 0); s.draw(ctx, 800, 600); assert.equal(asked, 3, 'draw ticks too, nothing due');
+  s.pinClock(36000, 0); s.draw(ctx, 800, 600); assert.equal(asked, 4, 'draw runs the due refresh');
+  s.activate('panel-cancel'); s.pinClock(65000, 0); s.tick(); assert.equal(asked, 4, 'closed: the timer is not looked at');
   s.activate('join'); assert.equal(asked, 5, 'reopened: the open request');
   s.tick(); assert.equal(asked, 6, 'and the stale timer is due at once');
-  s.activate('panel-cancel'); s.pinClock(65000, 0); s.activate('join'); assert.equal(asked, 7); s.tick(); assert.equal(asked, 7, 'reopened 5 s after the last firing: it waits out the rest');
-  s.pinClock(75000, 0); s.tick(); assert.equal(asked, 8);
+  s.activate('panel-cancel'); s.pinClock(70000, 0); s.activate('join'); assert.equal(asked, 7); s.tick(); assert.equal(asked, 7, 'reopened 5 s after the last firing: it waits out the rest');
+  s.pinClock(80000, 0); s.tick(); assert.equal(asked, 8);
+});
+
+test('the join panel\'s open request waits for 5 s of clock: its stamp starts at 0, so a start-up open before that asks nothing', () => {
+  let asked = 0;
+  const s = screen({ name: 'Ama', charClass: 0 }, { onRefreshGames: () => { asked++; } });
+  s.pinClock(4999, 0); s.activate('join'); assert.equal(asked, 0, 'under 5 s since the clock started');
+  s.activate('panel-cancel'); s.pinClock(5000, 0); s.activate('join'); assert.equal(asked, 1, 'at 5 s the stamp is due');
 });
 
 const games = (n) => Array.from({ length: n }, (_, i) => ({ name: `game${i}`, description: `text ${i}` }));

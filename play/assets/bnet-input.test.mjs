@@ -15,7 +15,7 @@ const frame = { width: 10, height: 10, offsetX: 0, offsetY: 0, indices: new Uint
 const tbl = new Uint8Array(12 + 95 * 14); tbl.set([0x57, 0x6f, 0x6f, 0x21]); tbl[10] = 10;
 for (let c = 32; c < 127; c++) { const b = 12 + (c - 32) * 14; tbl[b] = c; tbl[b + 3] = 6; tbl[b + 4] = 10; }
 const common = { read: (p) => (p.endsWith('.tbl') ? tbl : new Uint8Array(1 << 22)), decodeDc6: () => ({ frames: Array(6).fill(frame) }),
-  decodeDatPalette: () => new Uint8Array(1024), now: () => 0 };
+  decodeDatPalette: () => new Uint8Array(1024), now: () => 60000 };
 const tick = () => new Promise((r) => setImmediate(r));
 
 function fakeDocument() {
