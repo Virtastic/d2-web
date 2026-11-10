@@ -81,7 +81,7 @@ export const BNET_AUTH_REFUSAL_STRINGS = {
 const AUTH_REFUSAL_KIND = { 0x101: 'version', 0x102: 'version', 0x200: 'invalid', 0x201: 'inUse', 0x202: 'disabled', 0x203: 'wrongProduct' };
 // A failure box as the message box draws it: kind 2 (the three-string box) is the large popup with its detail as small print.
 function boxMessage(box) {
-  return box.kind === 2 ? { title: box.title, body: box.main, big: true, detail: box.detail } : { title: box.title, body: box.detail === null ? box.main : `${box.main}\n${box.detail}` };
+  return box.kind === 2 ? { title: box.title, body: box.main, big: true, detail: box.detail, ...(box.owner ? { owner: box.owner } : {}) } : { title: box.title, body: box.detail === null ? box.main : `${box.main}\n${box.detail}` };
 }
 // The box for an AUTH_CHECK refusal, or null for a result retail has no key/version dialog for (0x100 is the
 // patch download path, whose dialog is not proven).
@@ -639,8 +639,10 @@ export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, strin
       const t = message.title || '';
       titleText.drawAnchored(sctx, t, G.line.x + Math.max(Math.trunc((G.title.width - titleText.measure(t)) / 2), 0), G.title.baseline);
       // The body wraps to the large popup's own text box: 477 wide less the 10 px inset each side, one line step apart.
-      for (const [i, line] of wrapSpaces(message.body, G.line.width, (t) => bodyText.measure(t)).entries())
-        bodyText.drawAnchored(sctx, line, G.line.x, G.line.baseline + i * L.box.body.step);
+      const bodyLines = wrapSpaces(message.body, G.line.width, (t) => bodyText.measure(t));
+      for (const [i, line] of bodyLines.entries()) bodyText.drawAnchored(sctx, line, G.line.x, G.line.baseline + i * L.box.body.step);
+      // The key owner's name: its own line, centred in the text box, 31 px under the last body line (one capture, two lines of body).
+      if (message.owner) bodyText.drawAnchored(sctx, message.owner, G.line.x + Math.trunc((G.line.width - bodyText.measure(message.owner)) / 2), G.line.baseline + (bodyLines.length - 1) * L.box.body.step + 31);
       for (const [i, line] of wrapSpaces(message.detail || '', G.small.width, (x) => smallText().measure(x)).entries())
         smallText().drawAnchored(sctx, line, G.small.x, G.small.baseline + i * G.small.step);
       return;
