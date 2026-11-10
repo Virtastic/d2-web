@@ -3041,6 +3041,10 @@ BOOL __stdcall UNITS_IsInMeleeRange(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, int 
 		if (pUnit2->dwUnitType == UNIT_MONSTER)
 		{
 			nClassId = MONSTERS_GetBaseIdFromMonsterId(pUnit2->dwClassId);
+			if (nClassId < 0 || nClassId >= sgptDataTables->nMonStatsTxtRecordCount)	// d2-web: retail clamps an out-of-table base id to -1 before the tentacle test
+			{
+				nClassId = -1;
+			}
 
 			if (nClassId == MONSTER_TENTACLE1 || nClassId == MONSTER_TENTACLEHEAD1)
 			{
