@@ -19,7 +19,7 @@
 import { composeTiled, createBlender, createFont, decodeFontTbl, recordTiled, textColourPalette,
   LABEL_TINT, FRONTEND, TITLE_COLUMNS } from './frontend.mjs';
 import { recordDc6, recordPrim } from './drawlist.mjs';
-import { wrongPasswords, failureBox } from './bnet-failure-events.mjs';
+import { wrongPasswords, failureBox, failureParts } from './bnet-failure-events.mjs';
 import { drawBg, present } from './widebg.mjs';
 
 const P = 'data\\global\\ui\\FrontEnd\\';
@@ -79,6 +79,10 @@ export const BNET_AUTH_REFUSAL_STRINGS = {
   wrongProduct: { title: 5247, body: [5202, 5202], detail: null },  // 0x203
 };
 const AUTH_REFUSAL_KIND = { 0x101: 'version', 0x102: 'version', 0x200: 'invalid', 0x201: 'inUse', 0x202: 'disabled', 0x203: 'wrongProduct' };
+// A failure box as the message box draws it: kind 2 (the three-string box) is the large popup with its detail as small print.
+function boxMessage(box) {
+  return box.kind === 2 ? { title: box.title, body: box.main, big: true, detail: box.detail } : { title: box.title, body: box.detail === null ? box.main : `${box.main}\n${box.detail}` };
+}
 // The box for an AUTH_CHECK refusal, or null for a result retail has no key/version dialog for (0x100 is the
 // patch download path, whose dialog is not proven).
 export function authRefusalMessage(error, string) {
@@ -88,8 +92,8 @@ export function authRefusalMessage(error, string) {
   if (!kind) return null;
   const expansion = (result & 0xf0) !== 0, x = expansion ? 1 : 0;
   const event = { version: 1, invalid: [3, 7], inUse: [6, 10], disabled: [4, 8], wrongProduct: [5, 9] }[kind];
-  const box = failureBox(Array.isArray(event) ? event[x] : event, { string, text: kind === 'inUse' ? error.authInfo : '' });
-  return { title: box.title, body: box.body };
+  const box = failureParts(Array.isArray(event) ? event[x] : event, { string, text: kind === 'inUse' ? error.authInfo : '' });
+  return boxMessage(box);
 }
 // Retail's failure event (the D2Launch+0xE510 table, bnet-failure-events.mjs) for a logon reply: result 1/2/3/6 are
 // events 0xD/0xE/0xF/0x1B, anything else the status-0x12 box.
@@ -98,8 +102,8 @@ const LOGON_EVENT = { 1: 13, 2: 14, 3: 15, 6: 27 };
 export function loginErrorMessage(error, account, string) {
   const refusal = authRefusalMessage(error, string);
   if (refusal) return refusal;
-  const box = failureBox(LOGON_EVENT[error?.logonResult] ?? 18, { string, account, text: error?.logonReason ?? '' });
-  return { title: box.title, body: box.body };
+  const box = failureParts(LOGON_EVENT[error?.logonResult] ?? 18, { string, account, text: error?.logonReason ?? '' });
+  return boxMessage(box);
 }
 // The create form's refusal for the reply to CREATEACCOUNT: events 0x13..0x1A, every other value the first.
 export function createRefusalMessage(result, string) {
@@ -188,7 +192,7 @@ export const BNET_LOGIN_LAYOUT = {
   // The connect failure popup (the large popup the front end raises for a dead connection): four PopUpLargest cels, OK a
   // MediumButtonBlank, a centred Font30 title, a Font24 line and the Font16 small print in colour 4 (captured).
   big: { cels: [[0, 158, 427], [1, 414, 427], [2, 158, 460], [3, 414, 460]], ok: { x: 335, anchorY: 450 }, x: 158, width: 484,
-    title: { baseline: 199, width: 458 }, line: { x: 172, baseline: 235 }, small: { x: 172, width: 456, baseline: 330, step: 14 } },
+    title: { baseline: 199, width: 457 }, line: { x: 172, baseline: 235 }, small: { x: 172, width: 456, baseline: 330, step: 14 } },
   // PLEASE READ (D2Launch+0x184D0): the TermsofUseBckg panel at (103, 332/526), OK (525, 513) and
   // CANCEL (133, 513), a centred Font42 title box at x=103 570 wide, top row 104, and three centred
   // FontFormal12 boxes at x=110 570 wide, tops 162/292/382, lines 22 rows apart.
@@ -627,6 +631,21 @@ export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, strin
   const drawMessage = () => {
     const B = L.box;
     dim();
+    // A kind-2 box (retail's three-string box, events 1, 3, 7 and 12) is the large popup with its small print, the same as the connect failure.
+    if (message.big) {
+      const G = L.big;
+      for (const [i, x, y] of G.cels) drawCel(bigPopup(), i, x, y);
+      drawButton({ id: 'ok', kind: 'medium', x: G.ok.x, anchorY: G.ok.anchorY });
+      const t = message.title || '';
+      titleText.drawAnchored(sctx, t, G.line.x + Math.max(Math.trunc((G.title.width - titleText.measure(t)) / 2), 0), G.title.baseline);
+      // The body wraps to the message text width (the box's body inset), 382 px, one line step apart (captured: 32 + 34 glyphs).
+      const bw = L.box.body.width - 2 * L.box.body.inset;
+      for (const [i, line] of wrapSpaces(message.body, bw, (t) => bodyText.measure(t)).entries())
+        bodyText.drawAnchored(sctx, line, G.line.x, G.line.baseline + i * L.box.body.step);
+      for (const [i, line] of wrapSpaces(message.detail || '', G.small.width, (x) => smallText().measure(x)).entries())
+        smallText().drawAnchored(sctx, line, G.small.x, G.small.baseline + i * G.small.step);
+      return;
+    }
     drawCels(popup, [0, 1], B.x, B.anchorY);
     drawButton({ id: 'ok', kind: 'medium', x: B.ok.x, anchorY: B.ok.anchorY });
     for (const [i, line] of wrapSpaces(message.title, B.title.width, (t) => titleText.measure(t)).entries())

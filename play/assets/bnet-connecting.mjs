@@ -185,7 +185,7 @@ export function createBnetConnectNotice({ read, decodeDc6, decodeDatPalette, str
 // the capture the login screen's same box was measured from (vectors/drawlist/bnet-connect-fail.txt). Its OK runs `onOk`.
 export const BNET_CONNECT_FAILURE_LAYOUT = {
   cels: [[0, 158, 427], [1, 414, 427], [2, 158, 460], [3, 414, 460]], ok: { x: 335, anchorY: 450, w: 128, h: 35, label: 5102 },
-  title: { baseline: 199, width: 458 }, line: { x: 172, baseline: 235 }, small: { x: 172, width: 456, baseline: 330, step: 14 },
+  title: { baseline: 199, width: 457 }, line: { x: 172, baseline: 235 }, small: { x: 172, width: 456, baseline: 330, step: 14 },
 };
 export function createBnetConnectFailureNotice({ read, decodeDc6, decodeDatPalette, string = () => '', title = 5248, body = 5189, detail = 5190,
   onOk = () => {}, documentObject = globalThis.document }) {

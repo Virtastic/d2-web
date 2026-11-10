@@ -16,7 +16,7 @@ import { createBnetConnectFailureNotice } from './bnet-connecting.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const vec = (name) => join(root, 'vectors', 'drawlist', `${name}.txt`);
-const NAMES = ['connect-fail', 'connect-fail-hover', 'connect-fail-press', 'connect-fail-menu', 'tos-fail-notice', 'tos-fail-menu'];
+const NAMES = ['connect-fail', 'connect-fail-hover', 'connect-fail-press', 'connect-fail-menu', 'tos-fail-notice', 'tos-fail-menu', 'event-0d', 'event-01', 'event-04'];
 const have = NAMES.every((n) => existsSync(vec(`bnet-${n}`)));
 const rd = have ? openRetail() : null;
 
@@ -34,11 +34,11 @@ const documentObject = { createElement: () => ({ width: 1, height: 1, getContext
 const transport = (m) => Object.assign(new Error(m), { transport: true });
 const tick = () => new Promise((r) => setTimeout(r, 0));
 const clock = { ms: 0 };
-async function failed(which) {
+async function failed(which, reject = transport('x')) {
   clock.ms = 0;
   const strings = stringTable(rd);
   const screen = createBnetLoginScreen({ read: rd, decodeDc6, decodeDatPalette, string: (i) => strings.get(i) ?? '', documentObject, region: 'test', now: () => clock.ms,
-    onTermsOfService: async () => { throw transport('x'); }, onAuthenticate: async () => { throw transport('x'); }, onExit: () => { screen.left = (screen.left ?? 0) + 1; } });
+    onTermsOfService: async () => { throw transport('x'); }, onAuthenticate: async () => { throw reject; }, onExit: () => { screen.left = (screen.left ?? 0) + 1; } });
   if (which === 'terms') { screen.activate('create'); await tick(); } else { screen.typeKey('KeyA', 'a'); screen.typeKey('Tab', 'Tab'); screen.typeKey('KeyP', 'p'); screen.activate('login'); await tick(); }
   return screen;
 }
@@ -91,3 +91,19 @@ test('the main menu connect failure raises the same large popup, sized to its wr
   assert.ok(diffDrawLists(retail, ours.slice(0, -1)).diffs > 0, 'the comparison cannot fail');
   assert.equal(d.diffs, 0);
 });
+
+// The failure events the login screen raises from its own reply (retail captured headless at tick 2, logo frame 6, the same
+// typed name and password): 0x101 version (event 1, the large popup with its detail), 0x202 disabled (event 4, the
+// small popup), and a logon result 1 (event 0xD, the small popup). Each is compared as the first frame it shows.
+const EVENT_CASES = [
+  ['event 1: a refused version raises the large popup with its detail as small print', 'bnet-event-01', { authResult: 0x101 }],
+  ['event 4: a disabled key raises the small popup with the disabled text', 'bnet-event-04', { authResult: 0x202 }],
+  ['event 0xD: a logon refusal (unknown account) raises the small popup', 'bnet-event-0d', { logonResult: 1 }],
+];
+for (const [title, name, reject] of EVENT_CASES) {
+  test(title, { skip: !rd }, async () => {
+    const s = await failed('login', Object.assign(new Error('refused'), reject));
+    clock.ms = 240; // the capture draws the logos at frame 6 on tick 2
+    compare(name, s);
+  });
+}

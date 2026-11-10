@@ -22,15 +22,20 @@ export const LEAVE_WAIT_CANCEL_PACKET = Uint8Array.of(0x4f, 0x07, 0, 0, 0, 0, 0)
 
 // The 30 s join timeout before the game exists: a game server that has not let the player in by then ends the join with
 // the timeout notice (exit reason 6), shown in the lobby. `expired` is true once it has fired.
-export function joinDeadline({ expansion = false, ms = JOIN_TIMEOUT_MS, timers = globalThis } = {}) {
+export function joinDeadline({ expansion = false, ms = JOIN_TIMEOUT_MS, timers = globalThis, now = () => Date.now() } = {}) {
+  // The clock starts when the client's game starts (before the game server is dialled) and the check is strict: it fires
+  // only once more than `ms` has passed, so a timer that wakes at exactly `ms` waits one more millisecond.
   let handle = null, expired = false;
+  const startedAt = now();
   const promise = new Promise((_, reject) => {
-    handle = timers.setTimeout(() => {
+    const fire = () => {
+      if (now() - startedAt <= ms) { handle = timers.setTimeout(fire, 1); return; }
       expired = true;
       const error = new Error('the game did not start in time');
       error.noticeString = reasonString(REASON_TIMEOUT, expansion);
       reject(error);
-    }, ms);
+    };
+    handle = timers.setTimeout(fire, ms);
   });
   promise.catch(() => {});   // a deadline nobody is racing any more is not an unhandled rejection
   return { promise, get expired() { return expired; }, cancel() { timers.clearTimeout(handle); } };

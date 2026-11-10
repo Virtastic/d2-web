@@ -109,14 +109,27 @@ test('an out-of-range reason becomes 9; a leave in progress blocks later reasons
 import { joinDeadline } from './bnet-game-life.mjs';
 test('a join that has not entered the game after 30 seconds fails with the timeout notice', async () => {
   const fake = { jobs: [], setTimeout(f, ms) { this.ms = ms; this.jobs.push(f); return 1; }, clearTimeout() { this.cleared = true; } };
-  const deadline = joinDeadline({ timers: fake });
+  let t = 0;
+  const deadline = joinDeadline({ timers: fake, now: () => t });
   assert.equal(fake.ms, 30000);
   assert.equal(deadline.expired, false);
-  fake.jobs[0]();
+  t = 30001; fake.jobs[0]();
   const error = await deadline.promise.catch((e) => e);
   assert.equal(error.noticeString, reasonString(6, false));
   assert.equal(deadline.expired, true);
   deadline.cancel(); assert.ok(fake.cleared);
+});
+
+test('the join deadline is strict: exactly 30000 ms does not fire, one more does', async () => {
+  let t = 5000;
+  const fake = { jobs: [], setTimeout(f, ms) { this.jobs.push([f, ms]); return this.jobs.length; }, clearTimeout() {} };
+  const deadline = joinDeadline({ timers: fake, now: () => t });
+  t += 30000; fake.jobs[0][0]();
+  assert.equal(deadline.expired, false);
+  assert.equal(fake.jobs[1][1], 1);
+  t += 1; fake.jobs[1][0]();
+  assert.equal(deadline.expired, true);
+  await deadline.promise.catch(() => {});
 });
 
 test('the wait cancel is 4F 07 with 0 padding, seven bytes', () => {

@@ -51,14 +51,19 @@ export function createWrongPasswordCounter() {
 // The one process-wide counter, like retail's global.
 export const wrongPasswords = createWrongPasswordCounter();
 
-// The box for an event: strings resolved through `string`. `account` feeds event 0xE's counter, `text` the server's
-// own text (events 6/10 owner name, 0x1B reason).
-export function failureBox(event, { string, account = '', text = '', counter = wrongPasswords } = {}) {
+// The parts of the box for an event: strings resolved through `string`. `account` feeds event 0xE's counter, `text` the server's
+// own text (events 6/10 owner name, 0x1B reason). `main` is the body (with the owner's name), `detail` the third line
+// (null when the event has none): kind 2 draws the detail as the large popup's small print.
+export function failureParts(event, { string, account = '', text = '', counter = wrongPasswords } = {}) {
   const e = failureEvent(event), s = (id) => string(id) || '';
   let body = e.serverText ? String(text ?? '') : s(e.body);
   if (event === 14 && counter.refuse(account) >= 2) body = s(e.repeatBody);
   const lines = [body];
   if (e.owner && text) lines.push(String(text));
-  if (e.detail) lines.push(s(e.detail));
-  return { title: s(e.title), body: lines.join('\n'), kind: e.kind, disconnect: e.disconnect, handler: e.handler };
+  return { title: s(e.title), main: lines.join('\n'), detail: e.detail ? s(e.detail) : null, kind: e.kind, disconnect: e.disconnect, handler: e.handler };
+}
+// The box for an event, as one body (the main text, then the detail line).
+export function failureBox(event, opts = {}) {
+  const p = failureParts(event, opts);
+  return { title: p.title, body: p.detail === null ? p.main : `${p.main}\n${p.detail}`, kind: p.kind, disconnect: p.disconnect, handler: p.handler };
 }

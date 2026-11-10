@@ -215,10 +215,10 @@ test('AUTH_CHECK refusals pick the key and version boxes Bnclient+0x11330 and D2
   const { loginErrorMessage } = await import('./bnet-login-screen.mjs');
   const string = (i) => `s${i}`;
   const m = (authResult, authInfo) => loginErrorMessage(Object.assign(new Error('x'), { authResult, authInfo }), 'Ama', string);
-  assert.deepEqual(m(0x101), { title: 's5245', body: 's5187\ns5188' });
-  assert.deepEqual(m(0x102), { title: 's5245', body: 's5187\ns5188' });
-  assert.deepEqual(m(0x200), { title: 's5247', body: 's5186\ns5194' });
-  assert.deepEqual(m(0x210), { title: 's5247', body: 's10912\ns5194' });
+  assert.deepEqual(m(0x101), { title: 's5245', body: 's5187', big: true, detail: 's5188' });
+  assert.deepEqual(m(0x102), { title: 's5245', body: 's5187', big: true, detail: 's5188' });
+  assert.deepEqual(m(0x200), { title: 's5247', body: 's5186', big: true, detail: 's5194' });
+  assert.deepEqual(m(0x210), { title: 's5247', body: 's10912', big: true, detail: 's5194' });
   assert.deepEqual(m(0x201, 'Bob'), { title: 's5247', body: 's5200\nBob\ns5201' });
   assert.deepEqual(m(0x211, 'Bob'), { title: 's5247', body: 's10914\nBob\ns5201' });
   assert.deepEqual(m(0x202), { title: 's5247', body: 's5199' });

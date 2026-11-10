@@ -121,7 +121,7 @@ test('each logon and create refusal shows the failure table box', async () => {
   const { loginErrorMessage, createRefusalMessage } = await import('./bnet-login-screen.mjs');
   assert.deepEqual(loginErrorMessage({ logonResult: 3 }, 'a', string), { title: 's5244', body: 's5209' });
   assert.deepEqual(loginErrorMessage({ logonResult: 6, logonReason: 'banned' }, 'a', string), { title: 's5244', body: 'banned' });
-  assert.deepEqual(loginErrorMessage({ authResult: 0x200 }, 'a', string), { title: 's5247', body: 's5186\ns5194' });
+  assert.deepEqual(loginErrorMessage({ authResult: 0x200 }, 'a', string), { title: 's5247', body: 's5186', big: true, detail: 's5194' });
   for (const [r, id] of [[1, 5231], [2, 5232], [3, 5233], [4, 5239], [5, 5234], [6, 5235], [7, 5236], [8, 5237], [9, 5231]])
     assert.deepEqual(createRefusalMessage(r, string), { title: 's5249', body: `s${id}` });
 });
