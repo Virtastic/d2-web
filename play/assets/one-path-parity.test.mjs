@@ -62,6 +62,22 @@ export const formatTable = (table) => Object.entries(table).map(([f, v]) => `${f
 // The script both runs play, on the same map (seed 1; a new character's map is otherwise drawn at random): where the pointer goes on which tick (canvas pixels; button 0 left, 2 right).
 export const SCRIPT = { ticks: 120, clicks: [{ tick: 5, x: 560, y: 120, button: 0 }, { tick: 40, x: 120, y: 400, button: 0 }, { tick: 80, x: 470, y: 200, button: 2 }] };
 
+// Run in the page as one synchronous call, so the page's own frame loop cannot tick inside it. That loop does run
+// between the game coming up and this call, for as long as the wall clock allows (7 to 12 ticks measured), so the
+// script first steps the game to a fixed tick: a monster that changes mode on tick 33 then does so on the same
+// script tick in every run. A frame read from packets carries no game tick and starts where it is.
+export const START_TICK = 100;
+export const PLAY_SCRIPT = `(shell, script) => {
+  const at = shell.snapshot?.tick, out = [];
+  if (at > ${START_TICK}) throw new Error('the game was at tick ' + at + ' before the script began, past its start tick ${START_TICK}');
+  for (let n = ${START_TICK} - at; n > 0; n--) shell.step();
+  for (let t = 0; t < script.ticks; t++) {
+    for (const c of script.clicks) if (c.tick === t) shell.input.pointer(c.x, c.y, c.button);
+    shell.step(); shell.refreshView?.();
+    out.push(${SNAPSHOT_FIELDS});
+  }
+  return out; }`;
+
 test('the field comparison counts what only one run holds, and a missing tick in full', () => {
   assert.deepEqual(diffField(['a', 'b'], ['a', 'b']), { differing: 0, total: 2 });
   assert.deepEqual(diffField(['a', 'b'], ['a', 'c']), { differing: 2, total: 3 });
@@ -83,6 +99,23 @@ test('the page read names every field of the table', () => {
   for (const f of FIELDS) assert.match(SNAPSHOT_FIELDS, new RegExp(`\\b${f}:`), f);
 });
 
+test('the script starts on the same game tick however far the page had run before it', () => {
+  // A stand-in game: one monster whose mode turns on game tick 133, a hero the pointer moves.
+  const run = (ranBefore) => {
+    const shell = { tick: ranBefore, x: 0, input: { pointer: (x) => { shell.x = x; } }, step: () => { shell.tick++; },
+      get snapshot() { return { tick: shell.tick, playerId: 1, player: { x: shell.x, y: 0 }, entities: [{ id: 4, type: 1, classId: 147, mode: shell.tick < 133 ? 1 : 2, x: 5, y: 5 }] }; } };
+    return new Function('window', `return (${PLAY_SCRIPT})(window.__d2Shell, ${JSON.stringify(SCRIPT)})`)({ __d2Shell: shell });
+  };
+  const first = run(7);
+  assert.equal(first.length, SCRIPT.ticks);
+  assert.equal(first.findIndex((t) => t.monsters[0] === '4:147:2:5:5'), 133 - START_TICK - 1);
+  for (const ranBefore of [8, 9, 12, START_TICK]) assert.deepEqual(run(ranBefore), first, `${ranBefore} ticks before the script`);
+  assert.throws(() => run(START_TICK + 1), /past its start tick/);
+  // A frame with no game tick is stepped the script's ticks and no more.
+  const steps = []; new Function('window', `return (${PLAY_SCRIPT})(window.__d2Shell, ${JSON.stringify(SCRIPT)})`)({ __d2Shell: { snapshot: {}, input: { pointer() {} }, step: () => steps.push(1) } });
+  assert.equal(steps.length, SCRIPT.ticks);
+});
+
 // ---- the live run ----
 const SITE = process.env.D2_ONE_PATH_SITE || join(ROOT, 'build-wasm', 'site');
 const CHROME = process.env.CHROME_BIN || ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'].find((p) => existsSync(p));
@@ -98,6 +131,7 @@ function unavailable() {
   if (!RETAIL) return 'no game data (D2_RETAIL_DIR)';
   return '';
 }
+const CONTROL_RUNS = Math.max(1, Number(process.env.D2_ONE_PATH_CONTROL_RUNS) || 2);
 const freePort = () => new Promise((done, fail) => { const s = createServer(); s.once('error', fail); s.listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => done(port)); }); });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -146,32 +180,31 @@ async function play(origin, query, packets) {
       if (!await page.evaluate('window.__d2Shell.fromPackets')) throw new Error(`the join through the in-process connection failed: ${await page.evaluate(JOIN_STATE)}`);
     }
     else assert.equal(await page.evaluate('window.__d2Shell.fromPackets'), false);
-    return await page.evaluate(`(() => { const script = ${JSON.stringify(SCRIPT)}, out = [], shell = window.__d2Shell;
-      for (let t = 0; t < script.ticks; t++) {
-        for (const c of script.clicks) if (c.tick === t) shell.input.pointer(c.x, c.y, c.button);
-        shell.step(); shell.refreshView?.();
-        out.push(${SNAPSHOT_FIELDS});
-      }
-      return out; })()`);
+    return await page.evaluate(`(${PLAY_SCRIPT})(window.__d2Shell, ${JSON.stringify(SCRIPT)})`);
   } finally { page.close(); }
 }
 
-test('a local game read from the engine and the same game read from its packets show the same frame', { skip: unavailable() || false, timeout: 600000 }, async () => {
+test('a local game read from the engine and the same game read from its packets show the same frame', { skip: unavailable() || false, timeout: 600000 + CONTROL_RUNS * 200000 }, async () => {
   const port = await freePort();
   const server = spawn(process.execPath, [join(ROOT, 'play', 'serve.mjs'), String(port), SITE], { stdio: 'ignore', env: { ...process.env, D2_RETAIL_DIR: RETAIL } });
   try {
     const origin = `http://127.0.0.1:${port}`;
     for (let i = 0; i < 50; i++) { if (await fetch(origin + '/index.html').then((r) => r.ok, () => false)) break; await sleep(100); }
     const direct = await play(origin, '', false);
-    const again = await play(origin, '', false);
-    // The script is the same game twice: a field that differs between two direct runs is not a parity field at all.
-    const control = parityTable(direct, again);
+    // The script is the same game again: a field that differs between two direct runs is not a parity field at all.
+    // Every repeat is compared with the first run and the counts are summed (D2_ONE_PATH_CONTROL_RUNS repeats, 2 unless set).
+    const control = Object.fromEntries(FIELDS.map((f) => [f, { differing: 0, total: 0 }]));
+    let again = [];
+    for (let i = 0; i < CONTROL_RUNS; i++) {
+      again = await play(origin, '', false);
+      for (const [f, v] of Object.entries(parityTable(direct, again))) { control[f].differing += v.differing; control[f].total += v.total; }
+    }
     // A packet run that never comes up shows nothing: every record of the direct run then differs, and the reason is printed.
     let joinFailure = '';
     const packets = await play(origin, '&localrealm=1', true).catch((error) => { joinFailure = error.message; return []; });
     const table = parityTable(direct, packets);
     if (process.env.D2_ONE_PATH_DUMP) writeFileSync(process.env.D2_ONE_PATH_DUMP, JSON.stringify({ direct, again, packets }));   // the runs themselves, to read a differing field
-    console.log(`one-path parity, ${SCRIPT.ticks} ticks (field: differing/total)\n${formatTable(table)}\ncontrol, direct against direct\n${formatTable(control)}${joinFailure ? `\npacket run: ${joinFailure}` : ''}`);
+    console.log(`one-path parity, ${SCRIPT.ticks} ticks (field: differing/total)\n${formatTable(table)}\ncontrol, direct against ${CONTROL_RUNS} more direct\n${formatTable(control)}${joinFailure ? `\npacket run: ${joinFailure}` : ''}`);
     for (const f of FIELDS) assert.equal(control[f].differing, 0, `${f} differs between two direct runs`);
     assert.ok(table.world.total > 0 && table.player.total > 0, 'the runs recorded nothing');
     if (process.env.D2_ONE_PATH_GATE === '1') assert.equal(joinFailure, '');
