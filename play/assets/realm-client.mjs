@@ -295,16 +295,25 @@ export async function mcpListCharacters(transport, protocol, { realmReply, chara
  * gave (the realm accepts the same session on every STARTUP), the character list, then MCP_CHARLOGON
  * for the character that left the game. Returns the list plus a session that create and join reuse.
  */
-export async function mcpReturnToLobby(transport, protocol, { realmReply, character, timeoutMs = CONNECT_TIMEOUT_MS, startupMs = MCP_STARTUP_MS, keepAliveMs = MCP_KEEPALIVE_MS } = {}) {
-  const roster = await mcpListCharacters(transport, protocol, { realmReply, timeoutMs, startupMs, keepAliveMs });
-  const found = roster.characters.find((c) => c.name.toLowerCase() === String(character).toLowerCase());
-  if (!found) { clearInterval(roster.session.keepAlive); throw new Error(`character "${character}" is not in the MCP character list`); }
+export async function mcpReturnToLobby(transport, protocol, { realmReply, character, characters = [], timeoutMs = CONNECT_TIMEOUT_MS, startupMs = MCP_STARTUP_MS, keepAliveMs = MCP_KEEPALIVE_MS } = {}) {
+  // Retail sends the selector, STARTUP and CHARLOGON only: no character-list request on the way back, so the roster is the one
+  // the lobby already holds.
+  if (!Array.isArray(realmReply) && !(realmReply instanceof Uint8Array)) throw new Error('MCP requires the BNCS realm handoff bytes');
+  const reader = makeReader(transport), received = [];
+  transport.send(protocol.mcpSelector());
+  transport.send(protocol.mcpFrame(0x01, protocol.mcpStartup(realmReply)));
+  const startup = await readMcpFrame(reader, startupMs); received.push(startup.op);
+  if (startup.op !== 0x01 || startup.body.length < 4 || u32(startup.body, 0) !== 0) throw new Error('MCP STARTUP was rejected');
+  const found = characters.find((c) => c.name.toLowerCase() === String(character).toLowerCase());
+  if (!found) throw new Error(`character "${character}" is not in the MCP character list`);
   transport.send(protocol.mcpFrame(0x07, protocol.mcpCharlogon(found.name)));
-  const reply = await readMcpFrame(roster.session.reader, timeoutMs);
+  const reply = await readMcpFrame(reader, timeoutMs); received.push(reply.op);
   if (reply.op !== 0x07) throw new Error(`expected MCP CHARLOGON reply 0x07, got 0x${reply.op.toString(16)}`);
   if (reply.body.length < 4 || u32(reply.body, 0) !== 0) throw charlogonRefusal(reply.body);
-  roster.session.characterLoggedOn = found.name;
-  return roster;
+  const list = { characters, total: characters.length, returned: characters.length };
+  const session = { reader, transport, protocol, list, nextRequestId: 2, characterLoggedOn: found.name, joined: false, received };
+  session.keepAlive = startMcpKeepAlive(session, keepAliveMs);
+  return { ...list, received, session };
 }
 
 // A refused MCP_CHARLOGON carries the realm's result, so the lobby can raise the notice that result has (gameErrorText).

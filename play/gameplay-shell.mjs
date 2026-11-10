@@ -1831,7 +1831,7 @@ async function leaveRealmGame() {
   try {
     await released;
     const rc = await import('./assets/realm-client.mjs');
-    const back = await returnToLobby({ flow: old, character: name,
+    const back = await returnToLobby({ flow: old, character: name, characters: realmCharacters,
       dialMcp: async (server) => { const t = rc.webSocketTransport(realmServiceUrl(server.ws, 'mcp')); await t.ready(); return t; },
       bindProtocol: () => rc.bindEngineProtocol(Module), mcpReturnToLobby: rc.mcpReturnToLobby });
     realmFlow = back.flow; realmCharacters = back.characters;
