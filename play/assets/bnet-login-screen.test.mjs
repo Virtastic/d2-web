@@ -226,3 +226,7 @@ test('AUTH_CHECK refusals pick the key and version boxes Bnclient+0x11330 and D2
   assert.deepEqual(m(0x203), { title: 's5247', body: 's5202' });
   assert.deepEqual(m(0x213), { title: 's5247', body: 's5202' });
 });
+
+test('the key owner line sits at the fixed baseline of its own text box, 50 px under the body line', () => {
+  assert.equal(L.big.owner.baseline, L.big.line.baseline + 50);
+});

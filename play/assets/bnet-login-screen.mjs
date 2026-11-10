@@ -192,7 +192,7 @@ export const BNET_LOGIN_LAYOUT = {
   // The connect failure popup (the large popup the front end raises for a dead connection): four PopUpLargest cels, OK a
   // MediumButtonBlank, a centred Font30 title, a Font24 line and the Font16 small print in colour 4 (captured).
   big: { cels: [[0, 158, 427], [1, 414, 427], [2, 158, 460], [3, 414, 460]], ok: { x: 335, anchorY: 450 }, x: 158, width: 484,
-    title: { baseline: 199, width: 457 }, line: { x: 172, baseline: 235, width: 457 }, small: { x: 172, width: 456, baseline: 330, step: 14 } },
+    title: { baseline: 199, width: 457 }, line: { x: 172, baseline: 235, width: 457 }, owner: { baseline: 285 }, small: { x: 172, width: 456, baseline: 330, step: 14 } },
   // PLEASE READ (D2Launch+0x184D0): the TermsofUseBckg panel at (103, 332/526), OK (525, 513) and
   // CANCEL (133, 513), a centred Font42 title box at x=103 570 wide, top row 104, and three centred
   // FontFormal12 boxes at x=110 570 wide, tops 162/292/382, lines 22 rows apart.
@@ -641,8 +641,8 @@ export function createBnetLoginScreen({ read, decodeDc6, decodeDatPalette, strin
       // The body wraps to the large popup's own text box: 477 wide less the 10 px inset each side, one line step apart.
       const bodyLines = wrapSpaces(message.body, G.line.width, (t) => bodyText.measure(t));
       for (const [i, line] of bodyLines.entries()) bodyText.drawAnchored(sctx, line, G.line.x, G.line.baseline + i * L.box.body.step);
-      // The key owner's name: its own line, centred in the text box, 31 px under the last body line (one capture, two lines of body).
-      if (message.owner) bodyText.drawAnchored(sctx, message.owner, G.line.x + Math.trunc((G.line.width - bodyText.measure(message.owner)) / 2), G.line.baseline + (bodyLines.length - 1) * L.box.body.step + 31);
+      // The key owner's name: its own centred text box (the next template under the body's 50 px box), so a fixed baseline whatever the body's line count.
+      if (message.owner) bodyText.drawAnchored(sctx, message.owner, G.line.x + Math.trunc((G.line.width - bodyText.measure(message.owner)) / 2), G.owner.baseline);
       for (const [i, line] of wrapSpaces(message.detail || '', G.small.width, (x) => smallText().measure(x)).entries())
         smallText().drawAnchored(sctx, line, G.small.x, G.small.baseline + i * G.small.step);
       return;
