@@ -28,6 +28,8 @@
 #include <D2States.h>
 #include <D2Items.h>
 #include "core/d2game/fn_rules.h"  // rules shared with the FN probes
+#include <OBJECTS/Objects.h>  // the portal owner for 0x82
+#include "core/d2game/scmd_encode.h"  // wire forms of the object, portal and item-flag packets
 #include <D2Inventory.h>
 #include <Units/Units.h>
 #include <PLAYER/PlayerList.h>
@@ -360,7 +362,9 @@ void __fastcall sub_6FC33670(D2GameStrc* pGame, D2ClientStrc* pClient) {
     seenClient[slot] = pClient; seenLevel[slot] = level;
     // D48: the walk runs every frame, as retail's does (its 0x0E/0x9C reach the session client); the level-up window only adds the stat-diff.
     if (clientRoom) {
-        if (levelUp) LEVEL_RemoveUnitsExceptClientPlayer(clientRoom, pClient);
+        // Every frame, as retail does: a unit freed this frame (a scroll merged into its tome, a closed portal) leaves
+        // only its room's delete list behind, and this 0x0A is the one packet that takes it off the client.
+        LEVEL_RemoveUnitsExceptClientPlayer(clientRoom, pClient);
         LEVEL_UpdateUnitsInAdjacentRooms(pGame, clientRoom, pClient);
     }
     if (levelUp) {
@@ -440,19 +444,10 @@ void __fastcall D2GAME_PACKETS_SendPacket0x15_6FC3D0D0(D2ClientStrc* pClient, ch
 // symbol has to exist now that the swap itself is reachable (d2_session_command_swap_weapons, F3):
 // wasm-ld drops an unreferenced function's calls, so sub_6FC46840 linked without this until then.
 void __fastcall D2GAME_PACKETS_SendPacket0x97_6FC3FB60(D2ClientStrc* pClient) {}
-void D2GAME_PACKETS_SendPacket0x03_6FC3C810(D2ClientStrc* pClient, char nHeader, char nAct, int32_t nInitSeed, int32_t nObjectSeed, int16_t nTownId) {}
 // 1.13c D2Game+0x8BF50: packet 0x07 {nX, nY, level}, 6 bytes (retail: EAX = x, ECX = y, stack client, level).
 void D2GAME_PACKETS_SendPacket0x07_6FC3D120(D2ClientStrc* pClient, uint8_t nAreaId, uint16_t nTileX, uint16_t nTileY) {
     D2GSPacketSrv07 packet{};
     packet.nHeader = 0x07; packet.nX = nTileX; packet.nY = nTileY; packet.nLevelId = nAreaId;
-    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
-}
-// a retail recording: LEVEL_RemoveClient's 0x08 (leave-room) seam; the headless client reads no packet stream for it.
-// Packet 0x08 {nX, nY, level}, 6 bytes: the room left the client's range. Sent to a connected client only.
-void D2GAME_PACKETS_SendPacket0x08_6FC3D160(D2ClientStrc* pClient, uint8_t nAreaId, uint16_t nTileX, uint16_t nTileY) {
-    if (!g_d2webPacketSink) return;
-    D2GSPacketSrv08 packet{};
-    packet.nHeader = 0x08; packet.nX = nTileX; packet.nY = nTileY; packet.nLevelId = nAreaId;
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }
 void D2GAME_PACKETS_SendPacket0x09_6FC3D1A0(D2ClientStrc* pClient, BYTE a2, BYTE a3, DWORD a4, BYTE a5, WORD a6, WORD a7) {}
@@ -477,8 +472,6 @@ void D2GAME_PACKETS_SendPacket0x0D_6FC3C920(D2ClientStrc* pClient, char nPacketI
 }
 // D18 skill probe: counts the unit-mode packets (0x0F coordinate, 0x10 unit target) a cast emits.
 extern "C" uint32_t g_d2webModePackets = 0;
-void D2GAME_PACKETS_SendPacket0x0F_6FC3CA00(D2ClientStrc* pClient, char nHeader, uint8_t bTOU, int32_t a4, char a5, int16_t a6, int16_t a7, char a8, int16_t a9, int16_t a10) { ++g_d2webModePackets; }
-void D2GAME_PACKETS_SendPacket0x10_6FC3C9A0(D2ClientStrc* pClient, char nHeader, char a3, int32_t a4, char a5, char a6, int32_t a7, int16_t a8, int16_t a9) { ++g_d2webModePackets; }
 // 1.13c D2Game+0x8D410 (SCmd.cpp 0x1D/0x1E/0x1F): one stat to the client, in the narrowest of byte (0x1D),
 // word (0x1E) and dword (0x1F) forms; byte arrays because D2PacketDef.h's stat struct is not the wire layout.
 void D2GAME_PACKETS_SendPacket0x1D_E_F_6FC3D480(D2ClientStrc* pClient, uint16_t nStatId, uint32_t nValue) {
@@ -559,17 +552,15 @@ void D2GAME_PACKETS_SendPacket0x3F_6FC3EDC0(D2ClientStrc* pClient, D2UnitStrc* p
     pk.nSkill = (uint16_t)a6;
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &pk, sizeof(pk));
 }
-void D2GAME_PACKETS_SendPacket0x42_6FC3EE40(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
-// Packet 0x51 {type, guid, class, x, y, mode, interact type}, 14 bytes: an object enters the client's view.
-// Sent to a connected client only.
+// 0x42: clears the unit's cursor item on the client.
+void D2GAME_PACKETS_SendPacket0x42_6FC3EE40(D2ClientStrc* pClient, D2UnitStrc* pUnit) {
+    uint8_t b[6];
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, scmd::encode42(b, pUnit != nullptr, pUnit ? pUnit->dwUnitType : 0, pUnit ? pUnit->dwUnitId : 0));
+}
+// 0x51: assigns an object (class, place, mode, interact type).
 void D2GAME_PACKETS_SendPacket0x51_6FC3D300(D2ClientStrc* pClient, char nHeader, uint8_t nUnitType, int32_t nUnitGUID, int16_t nObjectId, int16_t nX, int16_t nY, char a8, char a9) {
-    if (!g_d2webPacketSink) return;
-    D2GSPacketSrv51 packet{};
-    static_assert(sizeof(D2GSPacketSrv51) == 14, "0x51 is 14 bytes");
-    packet.nHeader = static_cast<uint8_t>(nHeader); packet.nUnitType = nUnitType; packet.dwUnitGUID = static_cast<uint32_t>(nUnitGUID);
-    packet.nObject = static_cast<uint16_t>(nObjectId); packet.nPosX = static_cast<uint16_t>(nX); packet.nPosY = static_cast<uint16_t>(nY);
-    packet.unk0x0C[0] = static_cast<uint8_t>(a8); packet.unk0x0C[1] = static_cast<uint8_t>(a9);
-    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+    uint8_t b[14];
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, scmd::encode51(b, (uint8_t)nHeader, nUnitType, (uint32_t)nUnitGUID, (uint16_t)nObjectId, (uint16_t)nX, (uint16_t)nY, (uint8_t)a8, (uint8_t)a9));
 }
 void D2GAME_PACKETS_SendPacket0x5A_6FC3DEC0(D2ClientStrc* pClient, D2GSPacketSrv5A* pPacket) {}
 void D2GAME_PACKETS_SendPacket0x61_6FC3F590(D2ClientStrc* pClient, BYTE unk) {
@@ -713,7 +704,15 @@ void __fastcall D2GAME_PACKETS_SendPacket0x81_6FC3E160(D2ClientStrc* pClient, ch
     packet.unk0x08 = (uint32_t)a4; packet.unk0x0C = (uint32_t)a7; packet.unk0x10 = (uint32_t)a8;
     if (pClient) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }
-void D2GAME_PACKETS_SendPacket0x82_6FC3F790(D2GameStrc* pGame, D2ClientStrc* pClient, int32_t nPortalGUID, int32_t nPortalOwnerGUID) {}
+// 0x82: names a town portal's owner and its paired portal.
+void D2GAME_PACKETS_SendPacket0x82_6FC3F790(D2GameStrc* pGame, D2ClientStrc* pClient, int32_t nPortalGUID, int32_t nPortalOwnerGUID) {
+    D2UnitStrc* pPortal = SUNIT_GetServerUnit(pGame, UNIT_OBJECT, nPortalGUID);
+    if (!pPortal) return;
+    D2UnitStrc* pPlayer = SUNIT_GetServerUnit(pGame, UNIT_PLAYER, OBJECTS_GetUnitIdFromTimerArg(pPortal));
+    if (!pPlayer) return;
+    uint8_t b[29];
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, scmd::encode82(b, pPlayer->dwUnitId, UNITS_GetPlayerData(pPlayer)->szName, (uint32_t)nPortalGUID, (uint32_t)nPortalOwnerGUID));
+}
 void D2GAME_PACKETS_SendPacket0x8D_6FC3F960(D2UnitStrc* pUnit, D2UnitStrc* a2) {}
 void D2GAME_PACKETS_SendPacket0x9B_6FC3FB30(D2ClientStrc* pClient, int16_t a2, int32_t a3) {}
 // 1.13c D2Game+0x8bc20: [hdr][stat u8][unitId u32][value u8/u16/u32]; 9E/9F/A0 by value width.
@@ -741,7 +740,11 @@ void D2GAME_PACKETS_SendPacket0xA0_A1_A2_6FC3D610(D2ClientStrc* pClient, D2UnitS
 }
 void D2GAME_PACKETS_SendPacket0xA3_6FC3D730(D2ClientStrc* pClient, BYTE a2, WORD a3, WORD a4, BYTE a5, int32_t a6, BYTE a7, int32_t a8, int32_t a9, int32_t a10) {}
 void D2GAME_PACKETS_SendPacket0xA4_6FC3FC00(D2ClientStrc* pClient, int16_t a2) {}
-void D2GAME_PACKETS_SendPacket0xA5_6FC3D7F0(D2ClientStrc* pClient, uint8_t a2, int32_t a3, uint16_t a4) {}
+// 0xA5: a unit and a skill.
+void D2GAME_PACKETS_SendPacket0xA5_6FC3D7F0(D2ClientStrc* pClient, uint8_t a2, int32_t a3, uint16_t a4) {
+    uint8_t b[8];
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, scmd::encodeA5(b, a2, (uint32_t)a3, a4));
+}
 void D2GAME_PACKETS_SendPacket0xAB_6FC3D7B0(D2ClientStrc* pClient, uint8_t nUnitType, int32_t dwUnitId, uint8_t nUnitLife) {}
 void D2GAME_PACKETS_SendPacketSize06_6FC3C850(D2ClientStrc* pClient, DWORD nHeader, DWORD dwUnitType, DWORD dwUnitId) {}
 void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, int32_t nPacketSize) {
@@ -832,7 +835,6 @@ void D2GAME_SendPacket0x50_6FC3F440(D2ClientStrc* pClient, D2GSPacketSrv50* pPac
 void __fastcall D2GAME_SendPacket0x4E_6FC3F410(D2ClientStrc* pClient, D2GSPacketSrv4E* pPacket) {
     if (pClient && pPacket) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof(*pPacket));
 }
-void D2GAME_SendPacket0x53_6FC3DF50(D2ClientStrc* pClient, D2GSPacketSrv53* pPacket) {}
 void __fastcall D2GAME_SendPacket0x58_6FC3F520(D2ClientStrc* pClient, D2GSPacketSrv58* pPacket) {
     if (pClient && pPacket) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof(*pPacket));
 }
@@ -988,26 +990,44 @@ void __fastcall D2GAME_PACKETS_SendPacket0xA9_StateOff_6FC3FC50(D2ClientStrc* a0
     uint8_t b[7] = { 0xA9, a1, 0, 0, 0, 0, (uint8_t)a3 }; memcpy(b + 2, &a2, 4);
     D2GAME_PACKETS_SendPacket_6FC3C710(a0, b, sizeof b);
 }
-void __fastcall D2GAME_SendP0x9C_ItemAction_AddOrRemoveFromShop_6FC3F260(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, char a3) {}
-void __fastcall D2GAME_SendP0x9C_ItemAction_AddQuantity_6FC3EAF0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
-void __fastcall D2GAME_SendP0x9C_ItemAction_GroundToCursor_6FC3E870(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
-void __fastcall D2GAME_SendP0x9C_ItemAction_SwapInBelt_6FC3EC00(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
-void __fastcall D2GAME_SendP0x9C_ItemAction_SwapInContainer_6FC3EB40(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
-void __fastcall D2GAME_SendP0x9C_ItemAction_ToCursor_6FC3EEA0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2) {}
-void __fastcall D2GAME_SendP0x9D_ItemAction_AutoUnequip_6FC3EE20(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
-void __fastcall D2GAME_SendP0x9D_ItemAction_IndirectlySwapBodyItem_6FC3EA70(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
-void __fastcall D2GAME_SendP0x9D_ItemAction_SwapBodyItem_6FC3EAB0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
-void __fastcall D2GAME_SendP0x9D_ItemAction_Unequip_6FC3EA90(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
-void __fastcall D2GAME_SendP0x9D_ItemAction_Unknown0x14_6FC3EEC0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
-void __fastcall D2GAME_SendP0x9D_ItemAction_Unknown0x16_6FC3F040(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
-void __fastcall D2GAME_SendP0x9D_ItemAction_UpdateStats_6FC3EFA0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
-void __fastcall D2GAME_SendP0x9D_ItemAction_WeaponSwitch_6FC3EAD0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
-void __fastcall sub_6FC3EFC0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, int a3, int a4) {}
+// The item-action senders the inventory code calls; each is 0x9C (the player's own item) or 0x9D (a unit's item) with its action.
+void __fastcall D2GAME_SendP0x9C_ItemAction_AddOrRemoveFromShop_6FC3F260(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, char a3) {
+    if (a3 == 56) {
+        const int32_t bGamble = ITEMS_IsMagSetRarUniCrfOrTmp(a2) && !ITEMS_CheckItemFlag(a2, IFLAG_IDENTIFIED, __LINE__, __FILE__);
+        D2GAME_SendPacket0x9C_6FC3E570(a0, a2, ITEMACTION_ADDTOSHOP, 0, bGamble);
+    } else if (a3 == 57) {  // the client reads the cell from the page field
+        const uint8_t nPage = ITEMS_GetInvPage(a2);
+        ITEMS_SetInvPage(a2, ITEMS_GetItemCell(a2));
+        D2GAME_SendPacket0x9C_6FC3E570(a0, a2, ITEMACTION_REMOVEFROMSHOP, 0, 0);
+        ITEMS_SetInvPage(a2, nPage);
+    }
+}
+void __fastcall D2GAME_SendP0x9C_ItemAction_AddQuantity_6FC3EAF0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9C_6FC3E570(a0, a2, ITEMACTION_ADDQUANTITY, a3, 0); }
+void __fastcall D2GAME_SendP0x9C_ItemAction_GroundToCursor_6FC3E870(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {
+    UNITS_SetXForStaticUnit(a2, 0);
+    UNITS_SetYForStaticUnit(a2, 0);
+    D2GAME_SendPacket0x9C_6FC3E570(a0, a2, ITEMACTION_GROUNDTOCURSOR, a3, 0);
+}
+void __fastcall D2GAME_SendP0x9C_ItemAction_SwapInBelt_6FC3EC00(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9C_6FC3E570(a0, a2, ITEMACTION_SWAPINBELT, a3, 0); }
+void __fastcall D2GAME_SendP0x9C_ItemAction_SwapInContainer_6FC3EB40(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9C_6FC3E570(a0, a2, ITEMACTION_SWAPINCONTAINER, a3, 0); }
+void __fastcall D2GAME_SendP0x9C_ItemAction_ToCursor_6FC3EEA0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2) { D2GAME_SendPacket0x9C_6FC3E570(a0, a2, ITEMACTION_TOCURSOR, 0, 0); }
+void __fastcall D2GAME_SendP0x9D_ItemAction_AutoUnequip_6FC3EE20(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9D_6FC3E6F0(a0, a1, a2, ITEMACTION_AUTOUNEQUIP, a3, 0); }
+void __fastcall D2GAME_SendP0x9D_ItemAction_IndirectlySwapBodyItem_6FC3EA70(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9D_6FC3E6F0(a0, a1, a2, ITEMACTION_INDIRECTLYSWAPBODYITEM, a3, 0); }
+void __fastcall D2GAME_SendP0x9D_ItemAction_SwapBodyItem_6FC3EAB0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9D_6FC3E6F0(a0, a1, a2, ITEMACTION_SWAPBODYITEM, a3, 0); }
+void __fastcall D2GAME_SendP0x9D_ItemAction_Unequip_6FC3EA90(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9D_6FC3E6F0(a0, a1, a2, ITEMACTION_UNEQUIP, a3, 0); }
+void __fastcall D2GAME_SendP0x9D_ItemAction_Unknown0x14_6FC3EEC0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9D_6FC3E6F0(a0, a1, a2, ITEMACTION_UNKNOWN0x14, a3, 0); }
+void __fastcall D2GAME_SendP0x9D_ItemAction_Unknown0x16_6FC3F040(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9D_6FC3E6F0(a0, a1, a2, ITEMACTION_UNKNOWN0x16, a3, 0); }
+void __fastcall D2GAME_SendP0x9D_ItemAction_UpdateStats_6FC3EFA0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9D_6FC3E6F0(a0, a1, a2, ITEMACTION_UPDATESTATS, a3, 0); }
+void __fastcall D2GAME_SendP0x9D_ItemAction_WeaponSwitch_6FC3EAD0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9D_6FC3E6F0(a0, a1, a2, ITEMACTION_WEAPONSWITCH, a3, 0); }
+// 0x7D: sets or clears one flag of a player's item.
+void __fastcall sub_6FC3EFC0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, int a3, int a4) {
+    uint8_t b[18];
+    D2GAME_PACKETS_SendPacket_6FC3C710(a0, b, scmd::encode7D(b, a1 != nullptr, a1 ? a1->dwUnitType : 0, a1 ? a1->dwUnitId : 0, a2 != nullptr, a2 ? a2->dwUnitId : 0, (uint32_t)a3, (uint32_t)a4));
+}
 void __fastcall sub_6FC3F4D0(D2ClientStrc* a0, int a1, char a2, short a3, short a4, short a5, short a6) {}
 // 1.13c D2Game+0x93C10 (D2MOO Clients.cpp): the arena-related client flag.
 uint32_t __fastcall sub_6FC33C10(D2ClientStrc* pClient) { return pClient ? (pClient->dwFlags & CLIENTFLAGEX_ARENA_RELATED) : 0; }
 void sub_6FC37B10(D2GameStrc* pGame) {}
-void sub_6FC3D1F0(D2ClientStrc* pClient, int32_t nUnitGUID, uint8_t nClassId, const char* szName, int16_t nX, int16_t nY) {}
 void sub_6FC3D830(D2ClientStrc* pClient, BYTE nHeader, int32_t nUnitGUID, WORD nStatId, int32_t nValue) {}
 void sub_6FC3E200(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
 // 1.13c D2Client+0x24A70 (reached from the 0x4D handler 0xAF160 via 0x24B90): the shrine state sound is the Sounds
@@ -1040,8 +1060,13 @@ void sub_6FC3F060(D2ClientStrc* pClient, uint8_t a2, int32_t a3, uint16_t a4, ui
 void sub_6FC3F0C0(D2ClientStrc* pClient, uint8_t a2, int32_t a3, uint8_t nUnitType, int32_t nUnitGUID, uint16_t a6, uint16_t a7, uint8_t a8, int32_t a9) {}
 void sub_6FC3F340(D2ClientStrc* pClient, BYTE nHeader, BYTE nUnitType, int32_t nUnitId, int32_t a5) {}
 void sub_6FC3F3F0(D2ClientStrc* pClient, D2GSPacketSrv2C* pPacket) { D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof *pPacket); }
-void sub_6FC3F550(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
-void sub_6FC3F610(D2ClientStrc* pClient, D2GSPacketSrv73* pPacket) {}
+// 0x60: a town portal's flags and destination level.
+void sub_6FC3F550(D2ClientStrc* pClient, D2UnitStrc* pUnit) {
+    uint8_t b[7];
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, scmd::encode60(b, UNITS_GetObjectPortalFlags(pUnit), pUnit->pObjectData->InteractType, pUnit->dwUnitId));
+}
+// 0x73: a missile the receiving client did not create itself.
+void sub_6FC3F610(D2ClientStrc* pClient, D2GSPacketSrv73* pPacket) { D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof(*pPacket)); }
 void sub_6FC3FAF0(D2ClientStrc* pClient, uint32_t a2, uint16_t a3) {}
 void sub_6FC3FC80(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
 // D2Game's game log (GAME_LogMessage writes the server's text log); nothing to write to here.

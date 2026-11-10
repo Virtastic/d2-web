@@ -152,7 +152,8 @@ void __fastcall sub_6FC81E10(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc*
     if (pUnit != CLIENTS_GetPlayerFromClient(pClient, 0))
     {
         D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
-        if (pTarget && CLIENTS_IsInUnitsRoom(pTarget, pClient))
+        // 1.13c D2Game+0xCE150: a unit whose target is itself takes the point form, not the unit form.
+        if (pTarget && pTarget != pUnit && CLIENTS_IsInUnitsRoom(pTarget, pClient))
         {
             D2GAME_PACKETS_SendPacket0x10_6FC3C9A0(pClient, 0x10, 0, pUnit->dwUnitId, (BYTE)stru_6FD30708[nAnimMode].field_8, pTarget->dwUnitType, pTarget->dwUnitId, CLIENTS_GetUnitX(pUnit), CLIENTS_GetUnitY(pUnit));
         }

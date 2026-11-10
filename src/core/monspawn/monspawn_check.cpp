@@ -94,6 +94,8 @@
 #include <GAME/Arena.h>
 #include <GAME/Level.h>
 #include <GAME/Clients.h>
+#include <GAME/SCmd.h> // the join sequence's packet senders
+void __fastcall D2GAME_SendPacket0x0B_ClientUnit(D2ClientStrc* pClient, D2UnitStrc* pUnit);
 #include <AI/AiGeneral.h>
 #include <MONSTER/MonsterUnique.h>
 #include <MONSTER/MonsterSpawn.h>   // D2GAME_SpawnMonster_6FC69F10
@@ -2523,6 +2525,10 @@ static void sessionKeepJoinBurst(uint32_t from) {
     uint32_t n = 0, k = 0; const uint8_t* stream = D2WEB_PacketStream(&n, &k);
     g_sessionJoinBurst.assign(stream + (from < n ? from : n), stream + n);
 }
+// How many leading bytes of the join are the load part (game flags and the two markers), sent when the
+// client logs on; the rest follows when it enters the game.
+static uint32_t g_sessionJoinLoadLength = 0;
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_join_load_length() { return g_sessionJoinLoadLength; }
 EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_join_stream(uint32_t* length) { if (length) *length = (uint32_t)g_sessionJoinBurst.size(); return g_sessionJoinBurst.data(); }
 // The rooms the game holds its client in, as the 6-byte room reveals {0x07, tile x, tile y, level} a joining
 // client is sent: the client's own room first, then the rest of its adjacent list. Returns the byte count.
@@ -2541,6 +2547,22 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_rooms(uint8_t* out, int capacity) {
     reveal(own);
     D2ActiveRoomStrc** adj = nullptr; int32_t nAdj = 0; DUNGEON_GetAdjacentRoomsListFromRoom(own, &adj, &nAdj);
     for (int32_t i = 0; i < nAdj; ++i) if (adj[i] && adj[i] != own) reveal(adj[i]);
+    return n;
+}
+// The objects of every room the game holds its client in, sent as the room join sends them (the unit loop of
+// 1.13c D2Game+0x9DC10): the session's own join ran before a client was connected, when the object sender is
+// silent. Objects only: their first-sight send writes no game state. Returns the count sent.
+EMSCRIPTEN_KEEPALIVE int d2_session_client_room_objects() {
+    if (!g_game || !g_targetClient || !g_targetClient->pRoom) return 0;
+    int n = 0;
+    // Every room the client holds, as the snapshot's own test counts them: a client in the room, or the 3x3 lattice
+    // around the start room (the client-side model of the rooms retail's server keeps the client in).
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel ? g_lastLevel->pFirstRoomEx : nullptr; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+        D2ActiveRoomStrc* r = roomEx->pRoom;
+        if (!r || !(clientHeldCount(r) > 0 || inStartLattice(roomEx))) continue;
+        for (D2UnitStrc* u = r->pUnitFirst; u; u = u->pRoomNext)
+            if (u->dwUnitType == UNIT_OBJECT && u->pObjectData && u->pObjectData->pObjectTxt) { D2GAME_SUNITMSG_FirstFn_6FCC5520(g_game, u, g_targetClient); ++n; }
+    }
     return n;
 }
 // The live game's map seed, and its difficulty in the low byte with the expansion flag above it
@@ -2591,6 +2613,22 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
     // clients (retail 0x6FCD0D57), so the aitrace replays (d2_aitarget_attach_at) register as the capture
     // does: retail's frame-15 probe read nNumClients 0 in the room beside the fixture (s232).
     if (g_fixtureOwnRoomOnly) { DUNGEON_AddClientToRoom(room, g_targetClient); g_targetClient->pRoom = room; }
+    // What a joining client is told before the rooms: the game's flags and the two load markers, its own unit,
+    // which unit it plays, then the act and its time of day. Kept with the join walk's bytes below.
+    if (D2DrlgActStrc* joinAct = g_game->pAct[g_targetClient->nAct]; joinAct && DUNGEON_GetEnvironmentFromAct(joinAct)) {
+        D2GAME_PACKETS_SendPacket0x01_6FC3C7C0(g_targetClient, 1, g_game);
+        D2GAME_PACKETS_SendHeaderOnlyPacket(g_targetClient, 0x00);
+        D2GAME_PACKETS_SendHeaderOnlyPacket(g_targetClient, 0x02);
+        g_sessionJoinLoadLength = sessionPacketStreamMark() - joinBurstFrom;
+        sub_6FC3D1F0(g_targetClient, player->dwUnitId, (uint8_t)player->dwClassId, g_targetClient->szName, (int16_t)CLIENTS_GetUnitX(player), (int16_t)CLIENTS_GetUnitY(player));
+        D2GAME_SendPacket0x0B_ClientUnit(g_targetClient, player);
+        LEVEL_SynchronizeDayNightCycleWithClient(g_game, g_targetClient);
+        // Then where the player stands in the new act: its room, and its position in it.
+        D2DrlgCoordsStrc joinRoom = {};
+        DUNGEON_GetRoomCoordinates(room, &joinRoom);
+        D2GAME_PACKETS_SendPacket0x07_6FC3D120(g_targetClient, DUNGEON_GetLevelIdFromRoom(room), (uint16_t)joinRoom.nTileXPos, (uint16_t)joinRoom.nTileYPos);
+        D2GAME_PACKETS_SendPacket0x15_6FC3D0D0(g_targetClient, 0x15u, 0, player->dwUnitId, CLIENTS_GetUnitX(player), CLIENTS_GetUnitY(player), 1);
+    } else g_sessionJoinLoadLength = 0;
     g_sessionJoinRooms.clear();
     if (g_fixtureOwnRoomOnly && g_sessionClientAdjCount) {   // a retail recording (feed 2): the adjacent rooms' client arrays only
         D2ActiveRoomStrc** adj = nullptr; int32_t nAdj = 0; DUNGEON_GetAdjacentRoomsListFromRoom(room, &adj, &nAdj);
@@ -5522,6 +5560,13 @@ EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_quest_record() {
         QUESTRECORD_CopyRecordToBuffer(UNITS_GetPlayerData(g_targetPlayer)->pQuestData[g_game->nDifficulty], g_sessionQuestRecord, sizeof g_sessionQuestRecord, 0);
     return g_sessionQuestRecord;
 }
+// What the server last told its client of the player's vitals: { life, mana, stamina } in whole points.
+EMSCRIPTEN_KEEPALIVE const uint32_t* d2_session_client_sent_vitals() {
+    static uint32_t out[3];
+    out[0] = out[1] = out[2] = 0;
+    if (g_targetClient) { out[0] = g_targetClient->clientPlayerData.nHitPoints; out[1] = g_targetClient->clientPlayerData.nManaPoints; out[2] = g_targetClient->clientPlayerData.nStaminaPoints; }
+    return out;
+}
 EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_packet_stream() { return D2WEB_PacketStream(nullptr, nullptr); }
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_packet_stream_length() { D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets); return g_sessionPacketStreamLength; }  // refreshed here: the tick (not a command) can send
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_packet_stream_packets() { return g_sessionPacketStreamPackets; }
@@ -6865,6 +6910,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_packet(const uint8_t* bytes, int len)
     case 0x1F: if (len != 17) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x1F_SwapCursorBufferItems_6FC857C0; break;
     case 0x25: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x25_SwitchBeltItem_6FC86040; break;   // cursor item <-> belt item
     case 0x58: handler = D2GAME_PACKETCALLBACK_Rcv0x58_QuestCompleted_6FC883B0; break;
+    case 0x51: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x51_BindHotkeyToSkill_6FC88290; break;   // F-key assign: slot in the high half of the word, hand bit 15, owner GUID
     // a retail recording session replay: 0x0D right skill on unit, 0x3B add skill point, 0x3C select skill (recovered handlers).
     case 0x0D: handler = D2GAME_PACKETCALLBACK_Rcv0x0D_RightSkillOnUnit_6FC83F80; break;
     case 0x3B: handler = D2GAME_PACKETCALLBACK_Rcv0x3B_AddSkillPoint_6FC86EF0; break;
@@ -6876,6 +6922,23 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_packet(const uint8_t* bytes, int len)
     // P7: "resurrection at the same vendor" was unmeasured with no way to reach the handler at all).
     case 0x62: if (len != 5) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x62_ResurrectMerc_6FC86C00; break;
     case 0x63: handler = D2GAME_PACKETCALLBACK_Rcv0x63_ShiftLeftClickItemToBelt_6FC88F80; break;
+    // What the packet client sends beyond the commands above: walk to a unit, the left hand's ground cast and held casts,
+    // the body-slot swaps, the NPC's buy/sell/repair/hire/gamble-identify, and the town portal choice. Each is the game's own
+    // handler on the client's bytes; sizes are the ones the client's packet builders write.
+    case 0x02: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x02_WalkToEntity_6FC82ED0; break;
+    case 0x04: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x04_RunToEntity_6FC830F0; break;
+    case 0x05: if (len != 5) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x05_ShiftLeftClickSkill_6FC832B0; break;
+    case 0x08: if (len != 5) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x08_ShiftLeftSkillHold_6FC83A10; break;
+    case 0x09: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x09_LeftSkillOnUnitHold_6FC83AC0; break;
+    case 0x10: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x10_RightSkillOnUnitHold_6FC84330; break;
+    case 0x1B: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x1B_Swap2HandedItem_6FC853C0; break;
+    case 0x1D: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x1D_SwapCursorItemWithBody_6FC85550; break;
+    case 0x32: if (len != 17) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x32_BuyItemFromNpcBuffer_6FC86AE0; break;
+    case 0x33: if (len != 17) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x33_SellItemToNpcBuffer_6FC86B30; break;
+    case 0x35: if (len != 17) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x35_Repair_6FC86B70; break;
+    case 0x36: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x36_HireMerc_6FC86BD0; break;
+    case 0x37: if (len != 5) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x37_IdentifyFromGamble_6FC86C30; break;
+    case 0x45: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x45_ChangeTpLocation_6FC87930; break;
     default: return -1;
     }
     if (!sessionDispatchGate(packet[0])) return -2;
@@ -7747,12 +7810,21 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             }
         }
         sub_6FC33670(g_game, g_targetClient);
+        // The per-client vitals update (1.13c D2Game+0x2BE20, which calls 0xCC030), run by retail's client flush every
+        // frame: forced once 20 frames have passed without one (10 when other packets are already queued).
+        if (g_targetPlayer && g_targetClient) {
+            uint32_t queued = 0; D2WEB_PacketStream(&queued, nullptr);
+            const int32_t since = g_targetClient->unk0x1B0;
+            if (sub_6FC82360(g_targetPlayer, g_targetPlayer, (queued && since >= 10) || since >= 20)) g_targetClient->unk0x1B0 = 0;
+        }
         // C3r: retail's own order (Game.cpp:1858-1870 kind 31) runs the queued-unit
         // flush right after the per-client update, every frame -- the capture found no special handling
         // around a 0x3B skill-point spend, just the next scheduled flush. Wired here, at the same point.
         if (d2_debug_trace_c3r) fprintf(stderr, "[c3r] pre-flush frame=%u skillpts=%d flags=%08x\n",
             g_game->dwGameFrame, STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_SKILLPTS, 0), g_targetPlayer->dwFlags);
         LEVEL_UpdateQueuedUnitsInAllActs(g_game);
+        // one-client path: retail frees each room's delete list right after the flush, so a removal is sent once.
+        LEVEL_FreeDrlgDeletes(g_game);
         if (d2_debug_trace_c3r) fprintf(stderr, "[c3r] post-flush frame=%u skillpts=%d flags=%08x\n",
             g_game->dwGameFrame, STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_SKILLPTS, 0), g_targetPlayer->dwFlags);
         // D2Client's per-frame DRLG streaming -- D2Common #10015 (0x6FD73F20) DRLGACTIVATE_Update,
@@ -10666,14 +10738,22 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_pop_log() {
 struct D2SessionLightSource { int32_t type, classId, x, y, radius; };
 // sourceColour: an object source's light colour, red | green << 8 | blue << 16 from its class's Red/Green/Blue
 // columns (the three bytes the client makes the object's light with, D2Client+0x24920). 0 for every other source.
-// Not yet ported: the per-cell blend of these colours into the light grid (D2Client+0xA8A40, on while the
-// client's colour-lighting switch is set, which it is by default) and the draw's use of a cell's colour; the
-// player's and monsters' light colours.
-struct D2SessionLightmap { int32_t originX, originY, ambient, sources; uint8_t intensity[48 * 48]; uint8_t blocked[48 * 48]; D2SessionLightSource source[64]; uint32_t sourceGuid[64]; uint32_t sourceColour[64]; };
+// Every cell also carries the colour of its light (`colour`, three bytes a cell): it starts as the area's
+// ambient colour and each source that adds light to the cell blends its own colour in by weight
+// (light_cell_blend.h; the client's colour-lighting switch is set by default). A player's light is white, a
+// monster's is its MonStats2 colour, an object's its Objects.txt colour. The colour arrays sit after the
+// fields the map had before, so a reader of the older layout is unaffected.
+// Not done: the ambient colour's three special areas (the Den of Evil, the River of Flame and the Chaos
+// Sanctuary take a colour of their own while their quest state holds) and a missile's light.
+#include "../d2client/light_cell_blend.h"
+struct D2SessionLightmap { int32_t originX, originY, ambient, sources; uint8_t intensity[48 * 48]; uint8_t blocked[48 * 48]; D2SessionLightSource source[64]; uint32_t sourceGuid[64]; uint32_t sourceColour[64]; uint32_t ambientColour; uint8_t colour[48 * 48 * 3]; };
 static D2SessionLightmap g_sessionLightmap;
 static uint32_t lightObjectColour(int type, int classId) {
     const D2ObjectsTxt* txt = type == UNIT_OBJECT ? DATATBLS_GetObjectsTxtRecord(classId) : nullptr;
-    return txt ? (uint32_t)txt->nRed | (uint32_t)txt->nGreen << 8 | (uint32_t)txt->nBlue << 16 : 0;
+    if (txt) return (uint32_t)txt->nRed | (uint32_t)txt->nGreen << 8 | (uint32_t)txt->nBlue << 16;
+    if (type == UNIT_PLAYER) return 0xFFFFFFu;
+    const D2MonStats2Txt* mon2 = type == UNIT_MONSTER ? UNITS_GetMonStats2TxtRecordFromMonsterId(classId) : nullptr;
+    return mon2 ? (uint32_t)mon2->nLight_R | (uint32_t)mon2->nLight_G << 8 | (uint32_t)mon2->nLight_B << 16 : 0;
 }
 static int lightOctagonal(int a, int b) { a = a < 0 ? -a : a; b = b < 0 ? -b : b; return b <= a ? (a * 0x3D7 + b * 0x197) >> 10 : (b * 0x3D7 + a * 0x197) >> 10; }
 // D2Client DRAW\LightMap.cpp's occlusion (1.13c D2Client+0xA9480 for units, +0xA9100/+0xA8F60 for
@@ -10809,7 +10889,7 @@ static void lightShadowStep(int x, int y, int row, int col, int px, int py) {
     else { const int f = (dx << 8) / dy; v = ((256 - f) * lightGet(row + sy, col) + f * lightGet(row + sy, col + sx)) >> 8; }
     lightG[(row << 6) + col] = v;
 }
-static void lightAddSource(int x, int y, int r, int intensity, bool occlude, bool offMapBlocks, D2ActiveRoomStrc* refRoom, D2ActiveRoomStrc* playerRoom) {
+static void lightAddSource(int x, int y, int r, int intensity, bool occlude, bool offMapBlocks, D2ActiveRoomStrc* refRoom, D2ActiveRoomStrc* playerRoom, uint32_t rgb) {
     D2SessionLightmap& m = g_sessionLightmap;
     if (r <= 0 || r >= 0x100) return;
     const int x0 = (x - (x & 7)) - r, y0 = (y - (y & 7)) - r, n = (r * 2 >> 3) + 1, r8 = r >> 3;
@@ -10880,7 +10960,10 @@ static void lightAddSource(int x, int y, int r, int intensity, bool occlude, boo
         if (amount <= 0) continue;
         const int gx = (cx >> 3) - m.originX, gy = (cy >> 3) - m.originY;
         if (gx < 0 || gy < 0 || gx >= 48 || gy >= 48) continue;
-        const int v = m.intensity[gy * 48 + gx] + amount; m.intensity[gy * 48 + gx] = (uint8_t)(v > 255 ? 255 : v);
+        uint8_t* c = &m.colour[(gy * 48 + gx) * 3];
+        const d2::client::LightCell lit = d2::client::lightCellBlend({ m.intensity[gy * 48 + gx], c[0], c[1], c[2] }, amount,
+            (uint8_t)rgb, (uint8_t)(rgb >> 8), (uint8_t)(rgb >> 16));
+        m.intensity[gy * 48 + gx] = lit.level; c[0] = lit.r; c[1] = lit.g; c[2] = lit.b;
     }
 }
 // ambientOverride >= 0 replaces the act's environment intensity (a row replaying a capture's time of
@@ -10949,6 +11032,11 @@ static void lightWindowAndPlayer(D2UnitStrc* player, D2DrlgActStrc* act, int amb
         : (levelIntensity ? levelIntensity
             : (indoors ? 0 : ENVIRONMENT_GetIntensityFromAct(act)));
     memset(m.intensity, m.ambient > 255 ? 255 : m.ambient, sizeof m.intensity);
+    // The ambient colour is the level's own (Levels.txt) where it names one, else the act's environment's.
+    uint8_t ambientRgb[3] = { levelDef ? levelDef->nRed : (uint8_t)0, levelDef ? levelDef->nGreen : (uint8_t)0, levelDef ? levelDef->nBlue : (uint8_t)0 };
+    if (!ambientRgb[0] && !ambientRgb[1] && !ambientRgb[2]) ENVIRONMENT_GetLightColorFromAct(act, &ambientRgb[0], &ambientRgb[1], &ambientRgb[2]);
+    m.ambientColour = (uint32_t)ambientRgb[0] | (uint32_t)ambientRgb[1] << 8 | (uint32_t)ambientRgb[2] << 16;
+    for (int i = 0; i < 48 * 48; i++) { m.colour[i * 3] = ambientRgb[0]; m.colour[i * 3 + 1] = ambientRgb[1]; m.colour[i * 3 + 2] = ambientRgb[2]; }
     for (int gy = 0; gy < 48; gy++) for (int gx = 0; gx < 48; gx++) {
         D2ActiveRoomStrc* room = COLLISION_GetRoomBySubTileCoordinates(path->pRoom, m.originX + gx, m.originY + gy);
         m.blocked[gy * 48 + gx] = room && COLLISION_CheckMask(room, m.originX + gx, m.originY + gy, COLLIDE_VISIBLE | COLLIDE_BLANK) ? 1 : 0;
@@ -10964,9 +11052,9 @@ static void lightWindowAndPlayer(D2UnitStrc* player, D2DrlgActStrc* act, int amb
     // Retail clamps a non-positive radius to 0 before the setter; a light penalty deep enough to reach
     // it would otherwise put a negative radius in the source list this dump exposes.
     const int playerRadius = (playerLight > 18 ? 18 : (playerLight < 0 ? 0 : playerLight)) * 8;
-    lightAddSource(px, py, playerRadius, 255, occludeUnits != 0, true, path->pRoom, path->pRoom);
+    lightAddSource(px, py, playerRadius, 255, occludeUnits != 0, true, path->pRoom, path->pRoom, 0xFFFFFFu);
     m.source[0] = { 0, (int32_t)player->dwClassId, px, py, playerRadius };
-    m.sourceGuid[0] = player->dwUnitId; m.sources = 1;
+    m.sourceGuid[0] = player->dwUnitId; m.sourceColour[0] = 0xFFFFFFu; m.sources = 1;
 }
 
 EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_session_lightmap(int ambientOverride, int occludeUnits) {
@@ -11005,7 +11093,8 @@ EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_session_lightmap(int ambientOve
                 // the source's, built from the collision around it, and a player-room anchor cannot
                 // reach an object's off-map cells when the player is several rooms away (the review's
                 // finding).
-                lightAddSource(x, y, r, 255, unit->dwUnitType == UNIT_OBJECT || occludeUnits != 0, unit->dwUnitType != UNIT_OBJECT, roomEx->pRoom, path->pRoom);
+                lightAddSource(x, y, r, 255, unit->dwUnitType == UNIT_OBJECT || occludeUnits != 0, unit->dwUnitType != UNIT_OBJECT, roomEx->pRoom, path->pRoom,
+                    lightObjectColour((int)unit->dwUnitType, (int)unit->dwClassId));
                 if (m.sources < 64) {
                     m.source[m.sources] = { (int32_t)unit->dwUnitType, (int32_t)unit->dwClassId, x, y, r };
                     m.sourceGuid[m.sources] = unit->dwUnitId;
@@ -11057,7 +11146,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_client_lightmap_comp
         const int r = (radius > 18 ? 18 : radius) * 8;
         const bool object = in[i].type == UNIT_OBJECT;
         D2ActiveRoomStrc* room = unit && unit->pDynamicPath->pRoom ? unit->pDynamicPath->pRoom : (in[i].room ? in[i].room : path->pRoom);
-        lightAddSource(x, y, r, 255, object || occludeUnits != 0, !object, room, path->pRoom);
+        lightAddSource(x, y, r, 255, object || occludeUnits != 0, !object, room, path->pRoom, lightObjectColour(in[i].type, in[i].classId));
         if (m.sources < 64) {
             m.source[m.sources] = { in[i].type, in[i].classId, x, y, r };
             m.sourceGuid[m.sources] = in[i].guid;
