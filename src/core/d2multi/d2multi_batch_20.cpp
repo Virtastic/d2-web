@@ -176,6 +176,12 @@ extern "C" uint32_t d2_multi_sub_f340(const char* in, uint32_t flags, uint8_t* o
             *(uint16_t*)(o + 0x8a) = f;
             *(uint32_t*)(o + 0xa0) = f >> 2 & 1; *(uint32_t*)(o + 0xa4) = f >> 3 & 1;
             *(uint32_t*)(o + 0xa8) = f >> 5 & 1; *(uint32_t*)(o + 0xac) = f >> 6 & 1;
+            // Generic only: with flag bits 2 and 3 both set the result is 9 for classes 0, 1, 6, 9 and 8 otherwise
+            // (retail's jump table); with either bit clear it is the class byte itself.
+            if (gen) {
+                if ((f >> 2 & 1) && (f >> 3 & 1)) { uint8_t c = o[0x86]; res = (c == 0 || c == 1 || c == 6 || c == 9) ? 9 : 8; }
+                else res = o[0x86];
+            }
             *(uint16_t*)(o + 0x8c) = Ordinal_10085(z + 4);
             for (int k = 0; k < 3; k++) { uint8_t b = z[6 + k]; o[0x94 + k] = b == 0xff ? 0 : b; }
             if (gen) return res;
