@@ -160,6 +160,7 @@ ci/*
 wasm-build/*
 !wasm-build/link-d2.sh
 !wasm-build/probe-skip.sh
+!wasm-build/obj-seed.sh
 !wasm-build/make_br.sh
 !wasm-build/version-engine.sh
 test/*
@@ -173,6 +174,7 @@ test/*
 !test/touch-panel-aim.test.mjs
 !test/cube-close.test.mjs
 !test/probe-skip.test.mjs
+!test/obj-seed.test.mjs
 !test/fn-probe-root.test.mjs
 !test/desktop-protocol.test.mjs
 !test/desktop-detect.test.mjs

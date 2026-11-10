@@ -48,7 +48,7 @@ export BUILDER_IMAGE="$TOOLCHAIN_ID"
 
 # Engine builds are rationed: every worktree queues on the same slot pool in the main checkout. The worktree artifact lock
 # also spans compilation, staging and cache publication; separate trees still build in parallel.
-# At most D2_MAX_BUILDS (default 8) heavy builds run at once; ci/build-slot.sh is the counting semaphore.
+# At most D2_MAX_BUILDS (default 6) heavy builds run at once; ci/build-slot.sh is the counting semaphore.
 # Each takes nproc/D2_MAX_BUILDS compile jobs (at least 4), so a full pool fills the cores without oversubscribing them.
 T0=$(date +%s)
 # An unchanged engine needs no link: a cached build for this tree's source key is staged instead
@@ -68,8 +68,16 @@ if [ -z "${D2_CXXFLAGS:-}" ] && [ "${D2_BUILD_FORCE:-0}" != 1 ]; then
   fi
 fi
 source "$SRC/ci/build-slot.sh"
-d2_build_slot_acquire "$LOCK_DIR"
-got=$D2_BUILD_SLOT; SLOTS="${D2_MAX_BUILDS:-2}"
+# Never wait for a slot while holding this tree's artifact lock: a queued build would otherwise block every other
+# build, stage and landing of the same tree for as long as the slots stay busy. Let go, wait, take it back.
+slot_waited=""
+# A freed slot goes to whichever waiter looks first, so merge and coverage builds look far more often than the rest.
+slot_poll=5; case "${D2_BUILD_ROLE:-}" in merge|coverage) slot_poll=0.3 ;; esac
+until D2_BUILD_SLOT_NOWAIT=1 d2_build_slot_acquire "$LOCK_DIR"; do
+  [ -n "$slot_waited" ] || echo "==> waiting for a build slot (artifact lock released meanwhile)"
+  slot_waited=1; flock -u 8; sleep "${D2_BUILD_SLOT_POLL:-$slot_poll}"; flock -x 8
+done
+got=$D2_BUILD_SLOT; SLOTS="${D2_MAX_BUILDS:-6}"
 JOBS="${D2_COMPILE_JOBS:-$(( $(nproc) / SLOTS > 4 ? $(nproc) / SLOTS : 4 ))}"
 echo "==> build slot $got of $SLOTS, $JOBS compile jobs"
 WAIT=$(( $(date +%s) - T0 ))
@@ -97,7 +105,13 @@ if [ "${D2_COMPILER_CACHE:-1}" = 1 ]; then
   mkdir -p "$LOCK_DIR/compiler-cache"
   CACHE_ARGS=(-v "$LOCK_DIR/compiler-cache:/d2-compiler-cache" -e D2_COMPILER_CACHE=1)
 fi
-MSYS_NO_PATHCONV=1 docker run --rm "${CACHE_ARGS[@]}" \
+# A worktree's empty object dir is seeded from the main checkout's objects (wasm-build/obj-seed.sh),
+# so its first build compiles only what it changed. D2_OBJ_SEED=0 disables.
+SEED_ARGS=()
+if [ "${D2_OBJ_SEED:-1}" = 1 ] && [ -d "$LOCK_DIR/obj" ] && [ ! "$LOCK_DIR" -ef build-wasm ]; then
+  SEED_ARGS=(-v "$LOCK_DIR/obj:/d2-obj-seed:ro")
+fi
+MSYS_NO_PATHCONV=1 docker run --rm "${CACHE_ARGS[@]}" "${SEED_ARGS[@]}" \
   -e D2_TOOLCHAIN_ID="$TOOLCHAIN_ID" -e D2_COMPILE_JOBS="$JOBS" -e HOME=/tmp -e D2_CXXFLAGS="${D2_CXXFLAGS:-}" -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" -e D2_QUARANTINE="${D2_QUARANTINE:-0}" -e D2_QUARANTINE_KEEP="${D2_QUARANTINE_KEEP:-}" \
   -v "$MOUNT:/build" -v "$MOUNT:$MOUNT:ro" "${PRIV_ARGS[@]}" "$TOOLCHAIN_ID" bash wasm-build/link-d2.sh
 

@@ -80,7 +80,10 @@ CXXFLAGS="-m64 -std=c++20 -O2 -pthread -fno-strict-aliasing -fwrapv ${D2_CXXFLAG
 # lines; a full rebuild is minutes, a one-file change is seconds). Each compile emits a depfile
 # and a content digest for the complete user-header closure. Content, rather than mtimes, matters:
 # GitHub checkout gives every source a fresh timestamp when restoring older cached objects.
-OBJDIR="$BUILD/obj/$(printf '%s\n' "$CXXFLAGS" "$TOOLCHAIN_KEY" | sha256sum | cut -c1-16)"; mkdir -p "$OBJDIR"
+# The dir is named by what a compile depends on: the flags, the compiler and the compile recipe (probe-skip.sh).
+# Not by this file: adding an export or changing the link line leaves every object valid.
+OBJDIR="$BUILD/obj/$(printf '%s\n' "$CXXFLAGS" "$TOOLCHAIN_KEY" "$(sha256sum < "$(dirname "$0")/probe-skip.sh")" | sha256sum | cut -c1-16)"; mkdir -p "$OBJDIR"
+. "$(dirname "$0")/obj-seed.sh"; d2_obj_seed "/d2-obj-seed/$(basename "$OBJDIR")" "$OBJDIR"
 dependency_digest() {
   # Read only the depfile's first rule; -MP appends header-only phony rules afterwards.
   awk 'NR == 1 { sub(/^[^:]*:/, "") }

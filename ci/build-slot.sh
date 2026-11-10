@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Counting semaphore for heavy engine builds: D2_MAX_BUILDS slots (default 2), one flock per slot file
+# Counting semaphore for heavy engine builds: D2_MAX_BUILDS slots (default 6), one flock per slot file
 # under the shared build-wasm directory. Source this and call `d2_build_slot_acquire <lock-dir>`; it
 # waits until a slot is free, holds it on fd 9 until the process exits (or fd 9 is closed) and sets
 # D2_BUILD_SLOT to the slot number. `D2_BUILD_SLOT_NOWAIT=1` returns 1 instead of waiting.
 # Merge builds try their slot first but never get extra ones: the cap is a hard cap.
 # The last slot is reserved for D2_BUILD_ROLE=merge or coverage (when the cap is above 1): other builds never take it, so a
-# queue of agent builds cannot starve a merge or the shared prove. Merge, coverage and prove builds may use any slot, the reserved one first.
+# queue of agent or prove builds cannot starve a merge. Merge and coverage builds may use any slot, the reserved one first.
+# Prove builds queue with the rest: most builds run as prove, so letting them into the reserved slot left it reserved for nobody.
 d2_build_slot_acquire() {
-  local dir=$1 max="${D2_MAX_BUILDS:-2}" i waited="" ids
-  case "$max" in ''|*[!0-9]*|0) max=2;; esac
+  local dir=$1 max="${D2_MAX_BUILDS:-6}" i waited="" ids
+  case "$max" in ''|*[!0-9]*|0) max=6;; esac
   mkdir -p "$dir"
   # D2_BUILD_ROLE=main (the build that lands main, from the main checkout) has its own slot outside the cap:
   # nothing else ever takes .build.lock.main, so landing main never queues behind agent, prove or merge builds.
@@ -16,7 +17,7 @@ d2_build_slot_acquire() {
     exec 9>"$dir/.build.lock.main"; flock 9; D2_BUILD_SLOT=main; export D2_BUILD_SLOT; return 0
   fi
   ids=$(seq 0 $((max - 1)))
-  if [ "${D2_BUILD_ROLE:-}" = merge ] || [ "${D2_BUILD_ROLE:-}" = coverage ] || [ "${D2_BUILD_ROLE:-}" = prove ]; then ids=$(seq $((max - 1)) -1 0)
+  if [ "${D2_BUILD_ROLE:-}" = merge ] || [ "${D2_BUILD_ROLE:-}" = coverage ]; then ids=$(seq $((max - 1)) -1 0)
   elif [ "$max" -gt 1 ]; then ids=$(seq 0 $((max - 2))); fi
   D2_BUILD_SLOT=""
   while [ -z "$D2_BUILD_SLOT" ]; do

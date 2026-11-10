@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # Sourced by link-d2.sh. Immutable Docker image ID includes clang, emcc, sysroot and config.
 # Direct invocations conservatively hash the installed upstream toolchain instead.
+# The key names the COMPILER, never the link script: an edit to the link line or the export list
+# must not throw away every compiled object, the StormLib build and the shared compiler cache.
+# What a compile depends on besides the compiler (its flags and its recipe) is hashed into the
+# object dir by link-d2.sh.
 d2_toolchain_key() {
   {
-    sha256sum "$ROOT/Dockerfile.builder64" "$ROOT/tools/compiler-cache.sh" "$ROOT/wasm-build/link-d2.sh"
+    sha256sum "$ROOT/Dockerfile.builder64" "$ROOT/tools/compiler-cache.sh"
     if [ -n "${D2_TOOLCHAIN_ID:-}" ]; then
       printf '%s\n' "$D2_TOOLCHAIN_ID"
     else
