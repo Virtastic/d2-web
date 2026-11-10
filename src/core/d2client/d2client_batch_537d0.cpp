@@ -98,13 +98,15 @@ static void shift53B20(Pal* d,const uint8_t* remap){
  }
 }
 // The palette-type row address is tested against 0 (not the table base), as retail does.
-static void run53B20(int32_t monId,Pal* d,const uint8_t* remap,const uint8_t* monStats,int32_t monCount,const uint8_t* palTypes,int32_t palCount){
- if(monId<0||monId>=monCount) return;
+// Returns EAX at exit, as retail leaves it: the id (out of range), the palette type (out of range), the row address (not type 2), 0 (shifted).
+static uint32_t run53B20(int32_t monId,Pal* d,const uint8_t* remap,const uint8_t* monStats,int32_t monCount,const uint8_t* palTypes,int32_t palCount){
+ if(monId<0||monId>=monCount) return (uint32_t)monId;
  int16_t t; std::memcpy(&t,monStats+(uint32_t)monId*0x1a8u+0x18,2);
- if(t<0||t>=palCount) return;
- const uint8_t* row=(const uint8_t*)(uintptr_t)(uint32_t)((uint32_t)(uintptr_t)palTypes+(uint32_t)t*0x134u);
- if(!row||row[0x11c]!=2) return;
+ if(t<0||t>=palCount) return (uint32_t)(int32_t)t;
+ const uint32_t row=(uint32_t)(uintptr_t)palTypes+(uint32_t)t*0x134u;
+ if(!row||((const uint8_t*)(uintptr_t)row)[0x11c]!=2) return row;
  shift53B20(d,remap);
+ return 0;
 }
 extern "C" void D2Client_53B20(int32_t monId,Pal* d,const uint8_t* remap,const uint8_t* monStats,int32_t monCount,const uint8_t* palTypes,int32_t palCount){
  run53B20(monId,d,remap,monStats,monCount,palTypes,palCount);
@@ -274,9 +276,9 @@ extern "C" int32_t d2c_539e0(void (*f10614)(uint32_t*,uint32_t),uint32_t* unit,u
 extern "C" uint32_t d2c_53a30(const uint8_t* tab,int32_t c2d4,int32_t c380,uint32_t c7808,const int32_t* u,int32_t (*f558e0)(const int32_t*),const uint8_t* (*f1260)(int32_t),void (*fatal)(int32_t)){
  return d2client_batch_537d0::run53A30(tab,c2d4,c380,c7808,u,f558e0,f1260,fatal);
 }
-extern "C" void d2c_53b20(int32_t monId,uint8_t* d,const uint8_t* remap,const uint8_t* dt){
+extern "C" uint32_t d2c_53b20(int32_t monId,uint8_t* d,const uint8_t* remap,const uint8_t* dt){
  auto w=[&](uint32_t o){ uint32_t v; std::memcpy(&v,dt+o,4); return v; };
- d2client_batch_537d0::run53B20(monId,(d2client_batch_537d0::Pal*)d,remap,(const uint8_t*)(uintptr_t)w(0xa78),(int32_t)w(0xa80),(const uint8_t*)(uintptr_t)w(0xa90),(int32_t)w(0xa98));
+ return d2client_batch_537d0::run53B20(monId,(d2client_batch_537d0::Pal*)d,remap,(const uint8_t*)(uintptr_t)w(0xa78),(int32_t)w(0xa80),(const uint8_t*)(uintptr_t)w(0xa90),(int32_t)w(0xa98));
 }
 extern "C" void d2c_54000(int32_t (*stat)(int32_t,int32_t),int32_t (*stat73)(int32_t),int32_t n,const int32_t* tab,int32_t* o){
  d2client_batch_537d0::run54000(stat,stat73,n,(const d2client_batch_537d0::G::Ent*)tab,o);

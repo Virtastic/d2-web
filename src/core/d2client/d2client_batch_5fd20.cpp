@@ -43,9 +43,22 @@ void sub_5FD20(Line& h, uint8_t mode, int32_t rightEdge, int32_t& lineY, bool& f
  h.fmt(buf, 300, f, g);
  tail(h, buf, rightEdge, lineY);
 }
+// UTF-8 widen as Unicode::toUnicode does: any invalid sequence empties the whole string; output cut to n-1 units.
+static void utf8W(W* d, const char* s, int n) {
+ int o = 0; d[0] = 0;
+ for (const uint8_t* p = (const uint8_t*)s; *p;) {
+  uint32_t c = *p;
+  if (c < 0x80) { p++; }
+  else if (c >= 0xC0 && c < 0xE0 && (p[1] ^ 0x80) < 0x40) { c = ((c & 0x1F) << 6) | (p[1] & 0x3F); p += 2; }
+  else if (c >= 0xE0 && c < 0xF0 && (p[1] ^ 0x80) < 0x40 && (p[2] ^ 0x80) < 0x40) { c = ((c & 0xF) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F); p += 3; }
+  else { d[0] = 0; return; }
+  if (o < n - 1) d[o++] = (W)c;
+ }
+ d[o] = 0;
+}
 // 1.13c D2Client+0x5FE10: the Ordinal_10013(300) string widened (Unicode::toUnicode, 300)
 void sub_5FE10(Line& h, int32_t rightEdge, int32_t& lineY) {
- W buf[300] = {}; toW(buf, h.narrow(300), 300);
+ W buf[300] = {}; utf8W(buf, h.narrow(300), 300);
  tail(h, buf, rightEdge, lineY);
 }
 // 1.13c D2Client+0x5FE90: obj = DAT_6fbcc378 (vtable +0x5c version, +0xb0 build char); showBuild = *(DAT_6fbcb980 + 0x21f) != 0
