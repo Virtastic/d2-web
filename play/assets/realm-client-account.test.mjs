@@ -54,3 +54,24 @@ test('a version or key reply that never comes raises the timeout event, a closed
   }
   assert.deepEqual(loginErrorMessage(new Error('transport closed after 0/4 bytes'), 'ama', string), { title: 's5248', body: 's5347' });
 });
+
+test('a link lost right after the AUTH_INFO reply raises event 0xB, not the generic one', async () => {
+  const { transport, protocol } = rig();
+  let close = () => {}; const onData = transport.onData, send = transport.send;
+  transport.onClose = (cb) => { close = cb; };
+  transport.send = (b) => { const ok = send(b); if (b[1] === 0x50) close(); return ok; };
+  void onData;
+  const error = await bncsCreateAccount(transport, protocol, { account: 'ama', password: 'pw', timeoutMs: 500 }).then(() => null, (e) => e);
+  assert.equal(error?.failureEvent, 0xb);
+});
+
+test('the 45 s reply wait is one deadline: a slow header and body together do not get it twice', async () => {
+  const { transport, protocol } = rig();
+  const send = transport.send; let feed = () => {};
+  transport.onData = (cb) => { feed = cb; };
+  transport.send = (b) => { if (b[1] === 0x50) { const f = frame(0x50, authInfoBody); feed(f.subarray(0, 4)); return true; } return send(b); };
+  const t = Date.now();
+  const error = await bncsCreateAccount(transport, protocol, { account: 'ama', password: 'pw', timeoutMs: 100 }).then(() => null, (e) => e);
+  assert.equal(error?.failureEvent, 0x11);
+  assert.ok(Date.now() - t < 180, `took ${Date.now() - t} ms`);
+});

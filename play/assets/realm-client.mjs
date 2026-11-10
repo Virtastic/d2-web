@@ -64,6 +64,7 @@ function makeReader(transport) {
     }),
     skip: (n) => { buf = buf.subarray(n); },
     buffered: () => buf,
+    get closed() { return closed; },
     get cancelled() { return cancelled; },
     cancel: () => {
       if (cancelled) return;
@@ -76,6 +77,12 @@ function makeReader(transport) {
   };
 }
 
+// BNClient+0xF430: once the 0x50 reply is in, a link already marked lost raises failure event 0xB (over any earlier event) and the
+// connect returns as done, so the version step is never sent.
+function linkLostAfterAuthInfo(reader) {
+  if (reader.closed) throw Object.assign(new Error('link lost after the AUTH_INFO reply'), { failureEvent: 0xb });
+}
+
 /**
  * One BNCS frame: `[0xFF][id][len u16 LE]` + body. A server may send SID_PING (0x25, a 4-byte cookie)
  * at any time, and Battle.net servers send it right after the selector, before the AUTH_INFO reply;
@@ -83,7 +90,11 @@ function makeReader(transport) {
  */
 async function readBncsFrame(reader, timeoutMs, packetWait = false) {
   // Retail waits 45 s for the version, key and realm replies and raises failure event 0x11 when none comes; the logon reply has no such wait.
-  const want = async (n) => { try { return await reader.want(n, timeoutMs); } catch (error) { if (packetWait && error?.timedOut) error.failureEvent = 0x11; throw error; } };
+  // One deadline for the whole wait (the reply flag is polled from the start, skipped pings and a split frame do not restart it) and a
+  // strict one: a reply at exactly the limit still counts, the wait ends only past it.
+  const started = Date.now();
+  const left = () => (packetWait && timeoutMs ? Math.max(0, timeoutMs - (Date.now() - started)) + 1 : timeoutMs);
+  const want = async (n) => { try { return await reader.want(n, left()); } catch (error) { if (packetWait && error?.timedOut) error.failureEvent = 0x11; throw error; } };
   for (;;) {
     const head = await want(4);
     if (head[0] !== 0xff) throw new Error(`reply is not a 0xFF BNCS frame (first byte 0x${head[0].toString(16)})`);
@@ -425,6 +436,7 @@ async function bncsPrelude(transport, protocol, reader, { product, auth, timeout
   transport.send(protocol.bncsFrame(0x50, protocol.bncsAuthInfo(product)));
   const authInfo = await readBncsFrame(reader, timeoutMs, true);
   if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
+  linkLostAfterAuthInfo(reader);
   const mpqEnd = authInfo.body.indexOf(0, 20);
   const mpq = authInfo.body.subarray(20, mpqEnd < 0 ? authInfo.body.length : mpqEnd);
   const { body } = protocol.bncsAuthCheck({ serverToken: u32(authInfo.body, 4), mpq: new TextDecoder().decode(mpq),
@@ -513,6 +525,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
 
     const authInfo = await readBncsFrame(reader, timeoutMs, true); received.push(authInfo.id);
     if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
+    linkLostAfterAuthInfo(reader);
     serverToken = u32(authInfo.body, 4);
     const mpqEnd = authInfo.body.indexOf(0, 20);
     const mpq = authInfo.body.subarray(20, mpqEnd < 0 ? authInfo.body.length : mpqEnd);
