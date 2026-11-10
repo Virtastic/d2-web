@@ -9,7 +9,7 @@ struct Svc {
  virtual ~Svc()=default;
  [[noreturn]] virtual void fatal(int32_t code)=0;           // Ordinal_10265(code)+Ordinal_10024 + _exit(-1)
  // 0x4D5B0
- virtual void* o10421()=0; virtual int32_t o10034()=0;
+ virtual void* o10421(uint8_t* u)=0; virtual int32_t o10034(uint8_t* u)=0;   // both stdcall(EDI)
  virtual void o10292(void*,int32_t,int32_t,int32_t*,int32_t*,int32_t*,int32_t*)=0;
  virtual void sub6A220()=0;                                 // D2Client+0x6A220
  // 0x4DA20

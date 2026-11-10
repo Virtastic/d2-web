@@ -11,13 +11,13 @@ typedef char16_t W;
 struct Regs { R eax = 0, ecx = 0, edx = 0, ebx = 0, esi = 0, edi = 0; };
 struct Ops {
     void* ctx;
-    const uint8_t* (*rec17F0)(void*, int16_t skill);               // 0x017F0, eax = skill id
+    const uint8_t* (*rec17F0)(void*, R skill);                     // 0x017F0, eax = skill id (the whole stack word)
     const uint8_t* (*rec1580)(void*, int16_t skill);               // 0x01580, eax = skill id
     R (*calc)(void*, R unit, R expr, R skill, R lvl);              // Ordinal_10435 (via 0xCEE0)
     R (*dmgMin)(void*, R unit, R skill, R lvl, R one);             // Ordinal_10567 (0xC85C)
     R (*dmgMax)(void*, R unit, R skill, R lvl, R one);             // Ordinal_10297 (0xC7F0)
     R (*sib)(void*, uint32_t rva, const Regs&, const R* stk, int n);
-    const W* (*lang)(void*, uint16_t id);                          // D2Lang #10003 (0xD1EC)
+    const W* (*lang)(void*, R id);                                 // D2Lang #10003 (0xD1EC), ecx = the whole register
     void (*strcat)(void*, W* dst, const W* src);
     void (*strcpy)(void*, W* dst, const W* src);
     int (*wsprintf)(void*, size_t cap, W* dst, const W* fmt, R a, R b); // 0x6fb7eab4
@@ -38,11 +38,11 @@ static void putRange(W* d, int32_t a, int32_t b) {   // "%d-%d"
     putInt(d, a); int n = 0; while (d[n]) n++; d[n++] = '-'; putInt(d + n, b);
 }
 struct Ctx {
-    const Ops& o; R a0; W* dst; R a2, a3, a4, a5, a7; R v4, v5; uint32_t B, D;
-    const W* L(uint32_t id) { return o.lang(o.ctx, (uint16_t)id); }
+    const Ops& o; R a0; W* dst; R a2, a3, a4, a5, a7; R v4, v5; R B, D;
+    const W* L(R id) { return o.lang(o.ctx, id); }
     void cat(W* d, const W* s) { o.strcat(o.ctx, d, s); }
-    void catL(uint32_t id) { cat(dst, L(id)); }
-    void catIf(uint32_t id) { if ((uint16_t)id != NONE) catL(id); }
+    void catL(R id) { cat(dst, L(id)); }
+    void catIf(R id) { if ((uint16_t)id != NONE) catL(id); }
     R sib(uint32_t rva, const Regs& r, std::initializer_list<R> s) {
         R t[8]; int n = 0; for (R x : s) t[n++] = x; return o.sib(o.ctx, rva, r, t, n);
     }
@@ -60,14 +60,16 @@ using namespace d2client_n103;
 // returns 1 on success, 0 otherwise
 uint32_t d2client_sub_316C0(const Ops& o, R a0, W* dst, const uint8_t* a2, R a3, R a4, R a5, R idx, R a7) {
     if (!a2) return 0;
-    const uint8_t* rec = o.rec17F0(o.ctx, (int16_t)a3);
+    const uint8_t* rec = o.rec17F0(o.ctx, a3);
     if (!rec) return 0;
     Ctx c{o, a0, dst, (R)a2, a3, a4, a5, a7, 0, 0, 0, 0};
     c.v4 = o.calc(o.ctx, a0, u32(rec, 0x98 + idx * 4), a3, a4);
     c.v5 = o.calc(o.ctx, a0, u32(rec, 0xdc + idx * 4), a3, a4);
-    c.B = (uint16_t)s16(rec, 0x54 + idx * 2);
-    c.D = (uint16_t)s16(rec, 0x76 + idx * 2);
-    const uint32_t B = c.B, D = c.D;
+    // B and D are 16-bit loads into BX and DI: the upper halves are what the registers held, idx's (EBX) and the
+    // record pointer's (EDI). Every use of D past a compare is the whole EDI (a push, or ECX for D2Lang), so D keeps it.
+    c.B = (idx & ~(R)0xffff) | (uint16_t)s16(rec, 0x54 + idx * 2);
+    c.D = ((R)rec & ~(R)0xffff) | (uint16_t)s16(rec, 0x76 + idx * 2);
+    const R B = c.B, D = c.D;
     const R v4 = c.v4, v5 = c.v5;
     const uint8_t sw = rec[0x42 + idx];
     Regs r;
@@ -95,7 +97,7 @@ uint32_t d2client_sub_316C0(const Ops& o, R a0, W* dst, const uint8_t* a2, R a3,
     case 0x16: r.esi = (R)(intptr_t)s16(rec, 0x3c); r.eax = a4; r.ecx = a0; c.sib(0x2EDD0, r, {(R)dst, (R)a2}); return 1;
     case 0x17: {
         const uint8_t* r2 = o.rec1580(o.ctx, s16(rec, 0x3c)); if (!r2) return 0;
-        R val = (R)(intptr_t)((int32_t)s16(r2, 0x98) * (int32_t)a4 + s16(r2, 0x96));
+        R val = (R)(int32_t)((uint32_t)(int32_t)s16(r2, 0x98) * (uint32_t)a4 + (uint32_t)(int32_t)s16(r2, 0x96));
         r.eax = 0; c.sib(0x2E060, r, {(R)dst, B, val}); return 1; }
     case 0x18: c.catIf(D); r.ebx = a3; r.edi = a4; c.sib(0x2EF80, r, {a0, (R)dst, (R)a2, B}); return 1;
     case 0x19:
@@ -109,12 +111,13 @@ uint32_t d2client_sub_316C0(const Ops& o, R a0, W* dst, const uint8_t* a2, R a3,
         r.eax = u32(r2, 0x38); c.sib(0x2F430, r, {(R)dst, 0x10ae}); return 1; }
     case 0x1d: {
         const uint8_t* r2 = o.rec1580(o.ctx, s16(rec, 0x3c)); if (!r2) return 0;
-        int32_t val = ((int32_t)s16(r2, 0x98) * ((int32_t)a4 - 1) + s16(r2, 0x96)) * 2 / 3;
+        const uint32_t x = (uint32_t)(int32_t)s16(r2, 0x98) * ((uint32_t)a4 - 1u) + (uint32_t)(int32_t)s16(r2, 0x96);
+        const int32_t val = (int32_t)(x << 1) / 3;   // imul by 0x55555556, truncation toward zero
         r.ebx = (R)dst; c.sib(0x2DBF0, r, {0x10b6, (R)(intptr_t)val, 0}); return 1; }
     case 0x1e: {
         const uint8_t* r2 = o.rec1580(o.ctx, s16(rec, 0x3c)); if (!r2) return 0;
         const uint8_t* r3 = o.rec1580(o.ctx, s16(r2, 0x18)); if (!r3) return 0;
-        R val = (R)(intptr_t)((int32_t)s16(r3, 0x98) * (int32_t)a4 + s16(r3, 0x96));
+        R val = (R)(int32_t)((uint32_t)(int32_t)s16(r3, 0x98) * (uint32_t)a4 + (uint32_t)(int32_t)s16(r3, 0x96));
         r.eax = 0; c.sib(0x2E060, r, {(R)dst, B, val}); return 1; }
     case 0x1f: {
         R val = c.sib(0x2E330, r, {});
@@ -133,7 +136,7 @@ uint32_t d2client_sub_316C0(const Ops& o, R a0, W* dst, const uint8_t* a2, R a3,
     case 0x28: case 0x2e:
         if (sw == 0x2e && v5 == 0) return 0;
         if ((uint16_t)B == NONE) return 0;
-        zero(buf256, 256); o.wsprintf(o.ctx, 0x100, buf256, c.L(B), (R)c.L(D), 0);
+        { zero(buf256, 256); const W* d = c.L(D); const W* f = c.L(B); o.wsprintf(o.ctx, 0x100, buf256, f, (R)d, 0); }
         c.colourTail(buf256); return 1;
     case 0x29: c.sib(0x2E770, r, {(R)dst, (R)a2, v4, v5}); return 1;
     case 0x2a: r.edi = (R)dst; c.sib(0x2CD20, r, {D, v4, v5, 1, 0}); return 1;
@@ -157,7 +160,7 @@ uint32_t d2client_sub_316C0(const Ops& o, R a0, W* dst, const uint8_t* a2, R a3,
     case 0x39: r.eax = 1; c.sib(0x2E060, r, {(R)dst, B, v4}); return 1;
     case 0x3a: r.eax = (R)dst; c.sib(0x2F600, r, {B, D, v4, v5, 1}); return 1;
     case 0x3e: r.eax = (R)dst; c.sib(0x2F600, r, {B, D, v4, v5, 0}); return 1;
-    case 0x3b: c.catIf(D); r.eax = B; c.sib(0x2D220, r, {(R)dst, v4, v5, (R)(uint16_t)s16(a2, 0x1dc)}); return 1;
+    case 0x3b: c.catIf(D); r.eax = B; c.sib(0x2D220, r, {(R)dst, v4, v5, (R)a2[0x1dc]}); return 1;
     case 0x3c: case 0x3d: {
         R x = v5 ? v5 : 10; r.ebx = v4; c.sib(0x2F870, r, {(R)dst, B, D, x, (R)(sw == 0x3c)}); return 1; }
     case 0x3f: r.edi = (R)dst; c.sib(0x2CE10, r, {B, D, v4, 1, 1}); return 1;
