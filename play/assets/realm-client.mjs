@@ -1,8 +1,11 @@
 import { parseMonsterAnimations } from './monster-renderer.mjs';
 import { readD2gsDeny, d2gsDenyError } from './d2gs-deny.mjs';
 import { parseRealmMissiles } from './realm-missiles.mjs';
+import { parseRealmUnitInfo } from './realm-combat.mjs';
 import { parseRealmMissileSoundEvents } from './realm-missile-sounds.mjs';
-import { parseSessionSnapshot } from '../gameplay-model.mjs';
+import { OBJECT_UNIT_WORDS, parseRealmObjectUnits, parseRealmObjectEvents } from './realm-world.mjs';
+import { parseRealmUnitFx } from './realm-unit-fx.mjs';
+import { parseSessionRooms, parseSessionSnapshot, parseSessionWarps } from '../gameplay-model.mjs';
 // The realm CLIENT half: it drives our protocol (BNCS/MCP/D2GS) over a byte-pipe transport.
 //
 // Everything here is ORCHESTRATION and PARSING. The message BODIES are composed by the engine's own
@@ -1149,6 +1152,32 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
       const w = new Int32Array(Module.HEAPU8.buffer, at, 6);
       return { level: w[0], life: w[1], def: w[2], cost: w[3], id: w[4], exp: w[5] };
     },
+    // The game flags of the server's 0x01, or null before it arrives. `flags` is in the layout a local game's client flags use.
+    d2gsClientGameInfo: () => {
+      if (!Module._d2_realm_client_game_info || !call('d2_realm_client_game_info', 'number', ['bigint'], [BigInt(P)])) return null;
+      const w = new Uint32Array(Module.HEAPU8.buffer, Number(P), 5);
+      return { difficulty: w[0], gameFlags: w[1], expansion: w[2] !== 0, ladder: w[3] !== 0, flags: w[4] };
+    },
+    // The guids of the NPCs carrying the speech mark (0x8A sets it, the 0x28 reply to a talk clears it).
+    d2gsClientNpcAlerts: () => {
+      if (!Module._d2_realm_client_npc_alerts) return [];
+      const n = call('d2_realm_client_npc_alerts', 'number', ['bigint', 'number'], [BigInt(P), 256]);
+      return Array.from(new Uint32Array(Module.HEAPU8.buffer, Number(P), n));
+    },
+    d2gsClientSetActiveNpc: (guid) => { if (Module._d2_realm_client_set_active_npc) call('d2_realm_client_set_active_npc', null, ['number', 'number'], [guid == null ? 0 : 1, guid ?? 0]); },
+    // The pet list of the server's 0x81 (newest first) and a stat its 0x9E..0xA2 set on a pet unit (null when never sent).
+    d2gsClientPets: () => {
+      if (!Module._d2_realm_client_pets) return [];
+      const n = call('d2_realm_client_pets', 'number', ['bigint', 'number'], [BigInt(P), 64]);
+      const w = new Uint32Array(Module.HEAPU8.buffer, Number(P), n * 9);
+      return Array.from({ length: n }, (_, i) => ({ classId: w[i * 9], kind: w[i * 9 + 1], guid: w[i * 9 + 2], owner: w[i * 9 + 3], area: w[i * 9 + 4],
+        lifePct: w[i * 9 + 5], seed: w[i * 9 + 6], nameId: w[i * 9 + 7], unitPresent: w[i * 9 + 8] !== 0 }));
+    },
+    d2gsClientPetStat: (guid, stat) => {
+      if (!Module._d2_realm_client_pet_stat) return null;
+      const v = call('d2_realm_client_pet_stat', 'number', ['number', 'number'], [guid, stat]);
+      return v === -2147483648 ? null : v;
+    },
     d2gsClientItemPrice: (itemGuid, vendorId, transType) => call('d2_realm_client_item_price', 'number', ['number', 'number', 'number'], [itemGuid, vendorId, transType]),
     d2gsClientStockPrice: (bits, vendorId, transType) => {
       Module.HEAPU8.set(bits, Number(P));
@@ -1227,6 +1256,30 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
       }
       return players;
     },
+    // The quest state the server's packets built, or null before any arrived: the player's record (0x28) and the
+    // game's (0x29) as 48 words each, the quest log's 41 state bytes (0x52, 0x5D), and the log button's state.
+    // `logOpen` tells the state-change rule whether the quest log is on screen.
+    d2gsClientQuests: (logOpen = false) => {
+      if (call('d2_realm_client_quests', 'number', ['bigint', 'number', 'number'], [BigInt(O), scratch, logOpen ? 1 : 0]) !== 260) return null;
+      const b = Module.HEAPU8.slice(Number(O), Number(O) + 260), have = b[0];
+      if (!have) return null;
+      const words = (at) => new Uint16Array(b.buffer.slice(at, at + 96));
+      const v = new DataView(b.buffer);
+      return { player: have & 1 ? words(4) : null, game: have & 2 ? words(100) : null, states: have & 4 ? b.slice(196, 237) : null,
+        button: b[1], questOneCount: v.getInt32(240, true), quest32Count: v.getInt32(244, true), selected: b.slice(248, 258) };
+    },
+    // The client's active rooms, in the single-player room record's shape (same parser as d2_session_rooms).
+    d2gsClientRooms: () => {
+      const count = call('d2_realm_client_rooms', 'number', ['bigint', 'number'], [BigInt(O), scratch]);
+      return parseSessionRooms(Module.HEAPU8.slice(Number(O), Number(O) + count * 36), count);
+    },
+    // The level exits the server assigned, in the single-player exit record's shape (same parser as
+    // d2_session_warps); `id` is the exit's tile-unit guid, the one a click on it names to the server.
+    d2gsClientWarps: () => {
+      const count = call('d2_realm_client_warps', 'number', ['bigint', 'number'], [BigInt(O), scratch]);
+      const b = Module.HEAPU8.slice(Number(O), Number(O) + count * 72), v = new DataView(b.buffer);
+      return parseSessionWarps(b.subarray(0, count * 68), count).map((warp, i) => ({ ...warp, id: v.getUint32(count * 68 + i * 4, true) }));
+    },
     // The bnet client's state in the single-player snapshot's shape (same parser as d2_session_snapshot).
     d2gsClientSnapshot: () => {
       const ptr = call('d2_realm_client_snapshot', 'bigint', [], []);
@@ -1262,6 +1315,22 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
         return sc;
       } finally { Module._free(p); }
     },
+    // The items a player's unit holds in the wasm client (0: the selected player): grids, body, belt and, first, the
+    // cursor item. Null when the engine build has no such read.
+    d2gsClientItems: (ownerGuid = 0) => {
+      if (!Module._d2_realm_client_items) return null;
+      const CAP = 512, p = Module._malloc(CAP * 48);
+      try {
+        const n = call('d2_realm_client_items', 'number', ['number', 'bigint', 'number'], [ownerGuid >>> 0, BigInt(p), CAP]);
+        const w = new Uint32Array(Module.HEAPU8.buffer.slice(Number(p), Number(p) + n * 48));
+        return Array.from({ length: n }, (_, i) => { const r = w.subarray(i * 12, i * 12 + 12);
+          return { guid: r[0], classId: r[1], code: r[2], mode: r[3], x: r[4], y: r[5], page: r[6], bodyLoc: r[7], quality: r[8],
+            flags: r[9], holder: r[10], fillers: r[11] & 0xff, applied: (r[11] & 0x100) !== 0 }; });
+      } finally { Module._free(p); }
+    },
+    // The item-box colour tests of a held item against the selected player (the bits of the local game's read); 0 = not found.
+    d2gsClientItemBoxState: (guid) => (Module._d2_realm_client_item_box_state
+      ? call('d2_realm_client_item_box_state', 'number', ['number'], [guid >>> 0]) >>> 0 : 0),
     // A stat of the selected player: the total (worn items and states included), or the character's own with `base`.
     d2gsClientHeroStat: (stat, layer = 0, base = false) => (Module._d2_realm_client_hero_stat
       ? call('d2_realm_client_hero_stat', 'number', ['number', 'number', 'number'], [stat, layer, base ? 1 : 0]) : 0),
@@ -1321,6 +1390,12 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
           hpPct: view.getUint32(at + 108, true), typeFlags: view.getUint32(at + 112, true) };
       }).map((monster) => withPrecise(monster, 1));
     },
+    // One unit's relation, pet entry, plate name and second line (realm-combat.mjs parseRealmUnitInfo); null when the engine holds no such unit.
+    d2gsClientUnitInfo: (type, guid) => {
+      if (!Module._d2_realm_client_unit_info) return null;
+      const ptr = Number(call('d2_realm_client_unit_info', 'bigint', ['number', 'number'], [type, guid >>> 0]));
+      return ptr ? parseRealmUnitInfo(Module.HEAPU8.slice(ptr, ptr + 468)) : null;
+    },
     d2gsClientMissiles: () => {
       const count = call('d2_realm_client_missile_count', 'number', [], []);
       if (!count) return [];
@@ -1334,8 +1409,29 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
       if (count < 0 || count > cap) throw new Error(`invalid client missile sound count ${count}`);
       return parseRealmMissileSoundEvents(Module.HEAPU8.subarray(T, T + count * 24), count);
     },
+    // The object units of the joined game, and the activations (a shrine used) not yet taken.
+    d2gsClientObjects: () => {
+      const cap = Math.floor(scratch / (OBJECT_UNIT_WORDS * 4));
+      const count = call('d2_realm_client_object_units', 'number', ['bigint', 'number'], [BigInt(O), cap]);
+      if (count < 0 || count > cap) throw new Error(`invalid client object count ${count}`);
+      return parseRealmObjectUnits(new Int32Array(Module.HEAPU8.buffer.slice(Number(O), Number(O) + count * OBJECT_UNIT_WORDS * 4)), count);
+    },
+    d2gsClientTakeObjectEvents: () => {
+      const count = call('d2_realm_client_take_object_events', 'number', ['bigint', 'number'], [BigInt(T), 64]);
+      if (count < 0 || count > 64) throw new Error(`invalid client object event count ${count}`);
+      return parseRealmObjectEvents(new Int32Array(Module.HEAPU8.buffer.slice(T, T + count * 24)), count);
+    },
+    // The unit effects the engine's skill start and hit rules queued, with the engine tick they are timed against.
+    d2gsClientTakeUnitFx: () => {
+      const cap = 96;
+      const count = call('d2_realm_client_take_unit_fx', 'number', ['bigint','number'], [BigInt(T),cap]);
+      if (count < 0 || count > cap) throw new Error(`invalid client unit effect count ${count}`);
+      return { tick: call('d2_realm_client_unit_fx_tick', 'number', [], []) >>> 0, events: parseRealmUnitFx(Module.HEAPU8.subarray(T, T + count * 32), count) };
+    },
+    d2gsClientUnitHitClass: (type, guid) => call('d2_realm_client_unit_hit_class', 'number', ['number','number'], [type, guid >>> 0]) >>> 0,
     d2gsClientMotionTick: () => call('d2_realm_client_motion_tick', 'number', [], []),
     d2gsGamelogon: ({ character, charClass, gameToken, gameHash, expansion = true }) => {
+      if (Module._d2_realm_client_items_set_expansion) Module._d2_realm_client_items_set_expansion(expansion ? 1 : 0);   // picks the Inventory.txt rows of the hero's grids
       const n = call('d2_realm_d2gs_gamelogon', 'number', ['number', 'number', 'number', 'number', 'string', 'bigint'], [gameHash, gameToken, charClass, 0x0d, character, BigInt(T)]);
       const b = rd(T, n);
       // Retail D2Client+0x14A50: the version dword at +12 is 0x2185EDD6, plus 0xCBD7DE7A for an expansion game (the export writes the LoD sum).

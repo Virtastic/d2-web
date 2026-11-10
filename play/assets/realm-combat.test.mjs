@@ -1,12 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRealmUnits, realmCombatSoundFrame } from './realm-combat.mjs';
-import { routeRealmPackets } from './realm-packet-routes.mjs';
+import { createRealmUnits, realmCombatSoundFrame, parseRealmUnitInfo } from './realm-combat.mjs';
 import { createMonsterTable } from './realm-tables.mjs';
 import { createRealmInput } from './realm-input.mjs';
 import { plateBoxes } from './hover-lifebar.mjs';
 import { readFileSync } from 'node:fs';
-import { createCombatSoundTrigger } from './combat-sound-trigger.mjs';
+import { createCombatSoundTrigger, hitSounds } from './combat-sound-trigger.mjs';
 import { realmViewSnapshot } from './realm-client-view.mjs';
 
 // The pointer over a drawn monster, through the realm input's own pick, to the plate the single-player label draws.
@@ -17,7 +16,8 @@ test('a hovered monster is named with the server life byte as the plate fill', (
   const input = createRealmInput({ transmit: () => true, now: () => 0, scene: () => ({ ready: true, player: { x: 100, y: 100 }, monsters, objects: [], items: [],
     isNpc: (c) => c === 99, hoverBox: (dx, dy) => Math.abs(dx) < 10 && Math.abs(dy) < 20, toScreen: (x, y) => ({ x: x * 2, y }), pointerWorld: (px, py) => ({ x: px / 2, y: py }) }) });
   const name = (classId) => ({ stringIndex: 1000 + classId, label: classId === 5 ? 'Zombie' : 'Akara' });
-  const realmHoverTarget = createRealmUnits({ rowOf: (c) => (c === 99 ? { npc: true, interact: true, killable: false, align: 1, named: true } : { killable: true, align: 0, named: true }) }).hoverTarget;
+  const realmHoverTarget = createRealmUnits({ rowOf: (c) => (c === 99 ? { npc: true, interact: true, killable: false, align: 1, named: true } : { killable: true, align: 0, named: true }),
+    unitInfo: (type, guid) => ({ enemy: guid !== 79, enemyIfHostile: guid !== 79, rosterGuid: 0xFFFFFFFF, name: '' }) }).hoverTarget;
   const views = [{ guid: 77, mode: 1, hpPct: 50, typeFlags: 0 }, { guid: 78, mode: 12, hpPct: 0, typeFlags: 0 }];
   const target = realmHoverTarget(input.pick(200, 120), views, name);
   assert.deepEqual(target, { kind: 'unit', id: 77, classId: 5, stringIndex: 1005, label: 'Zombie', unitClass: 'monster', colour: 0, x: 101, y: 101, life: 64 });
@@ -65,68 +65,110 @@ test('the realm sound frame carries no hit points and adds the hero only when th
   assert.equal(frame.player.castSkillId, 0);
 });
 
-// The town and the field of a joined game, sorted by the MonStats rows and the server's pet packets: what each
-// unit is, which plate and name colour it gets and which cursor the pointer takes over it. The monster records
-// are the engine's views of the server's monster assigns (class, type flags, life byte); the pet packet is bytes.
-test('a realm unit is sorted into person, enemy, hireling or pet, with its plate, colour and cursor', (t) => {
+// The engine's unit record as bytes, laid out as d2_realm_client_unit_info writes it.
+const unitRecord = (f) => { const b = new Uint8Array(468), v = new DataView(b.buffer), u = (at, x) => v.setUint32(at, x >>> 0, true);
+  u(0, 1); u(4, 468); u(8, 1); u(12, f.guid); u(16, f.selectable ?? f.enemy); u(20, f.enemy); u(24, f.enemyIfHostile ?? f.enemy); u(28, f.rosterGuid ?? 0xFFFFFFFF);
+  u(32, f.alignment ?? 0); u(36, f.petType ? 1 : 0); u(40, f.petType ?? 0); u(44, f.petOwner ?? 0); u(48, f.petDead ?? 0); u(52, f.petNameId ?? 0);
+  u(56, f.typeFlags ?? 0); u(60, f.superUnique ?? -1); u(64, f.nameSeed ?? 0); u(68, f.ownerGuid ?? 0); b.set(f.umods ?? [], 72);
+  b.set(new TextEncoder().encode(f.name ?? ''), 84); b.set(new TextEncoder().encode(f.line ?? ''), 212); return b; };
+
+test('the engine unit record parses field for field and rejects another layout', () => {
+  const info = parseRealmUnitInfo(unitRecord({ guid: 0x12345678, enemy: 0, enemyIfHostile: 1, rosterGuid: 9, alignment: 2, petType: 7, petOwner: 9, petDead: 1, petNameId: 0x421,
+    typeFlags: 0x0a, superUnique: 3, nameSeed: 0xdeadbeef, ownerGuid: 5, umods: [1, 5, 9], name: 'Bishibosh', line: 'Demon Fire Enchanted' }));
+  assert.deepEqual(info, { unitType: 1, guid: 0x12345678, selectable: false, enemy: false, enemyIfHostile: true, rosterGuid: 9, alignment: 2, isPet: true, petType: 7, petOwner: 9,
+    petDead: true, petNameId: 0x421, typeFlags: 0x0a, superUnique: 3, nameSeed: 0xdeadbeef, ownerGuid: 5, umods: [1, 5, 9, 0, 0, 0, 0, 0, 0], name: 'Bishibosh', line: 'Demon Fire Enchanted' });
+  assert.equal(parseRealmUnitInfo(unitRecord({ guid: 1, enemy: 1 })).superUnique, -1);
+  const wrong = unitRecord({ guid: 1, enemy: 1 }); wrong[0] = 2;
+  assert.throws(() => parseRealmUnitInfo(wrong), /invalid realm unit record/);
+  assert.throws(() => parseRealmUnitInfo(new Uint8Array(100)), /invalid realm unit record/);
+});
+
+// The town and the field of a joined game, sorted by the MonStats rows and the engine's unit records: what each
+// unit is, which plate, name and name colour it gets and which cursor the pointer takes over it. The records
+// here are bytes in the engine's layout; the engine fills them from the server's packets (its own test feeds those).
+test('a realm unit is sorted into person, enemy, hireling or pet, with its plate, name, colour and cursor', (t) => {
   const dir = new URL('../../retail/tables-1.13c/', import.meta.url);
   let table;
   try { const text = readFileSync(new URL('monstats.txt', dir)); table = createMonsterTable(() => text); table.row(0); } catch { t.skip('retail tables absent'); return; }
-  const ME = 1, OTHER = 2, hostilePlayers = new Set();
-  const units = createRealmUnits({ rowOf: table.row, hostilePlayer: (guid) => hostilePlayers.has(guid) });
-  // Akara 148, Charsi 154, Zombie 5 (plain, champion, unique), Fallen 19, the Rogue hireling 271, a Necromancer's skeleton 363, a Valkyrie 357.
+  const ME = 1, OTHER = 2, hostilePlayers = new Set(), NONE = 0xFFFFFFFF;
+  // Akara 148, Charsi 154, Zombie 5 (plain, champion, unique), Fallen 19 (minion), the Rogue hireling 271, a skeleton 363, a Valkyrie 357.
+  const records = new Map([
+    [10, { enemy: 0 }], [11, { enemy: 0 }], [20, { enemy: 1 }], [21, { enemy: 1, typeFlags: 0x04, name: 'Zombie Champion' }],
+    [22, { enemy: 1, typeFlags: 0x08, name: 'Gloom Maw the Hungry', line: 'Undead Extra Strong' }], [23, { enemy: 1, typeFlags: 0x10, line: 'Demon Minion' }],
+    [30, { enemy: 0 }], [31, { enemy: 0 }], [32, { enemy: 0 }]]);
+  const units = createRealmUnits({ rowOf: table.row, hostilePlayer: (guid) => hostilePlayers.has(guid),
+    unitInfo: (type, guid) => (type === 1 && records.has(guid) ? parseRealmUnitInfo(unitRecord({ guid, ...records.get(guid) })) : null) });
   const views = [[10, 148, 0, 100], [11, 154, 0, 100], [20, 5, 0, 50], [21, 5, 0x04, 100], [22, 5, 0x08, 100], [23, 19, 0x10, 25],
-    [30, 271, 0, 80], [31, 363, 0, 100], [32, 357, 0, 100]].map(([guid, classId, typeFlags, hpPct], i) =>
+    [30, 271, 0, 80], [31, 363, 0, 100], [32, 357, 0, 100], [33, 5, 0, 100]].map(([guid, classId, typeFlags, hpPct], i) =>
     ({ guid, classId, typeFlags, hpPct, mode: 1, x: 100 + i * 10, y: 100, anchorX: 100 + i * 50, anchorY: 120, drawn: true }));
-  const pet = (kind, classId, owner, guid) => { const p = new Uint8Array(20), v = new DataView(p.buffer);
-    p[0] = 0x81; p[1] = kind; v.setUint16(2, classId, true); v.setUint32(4, owner, true); v.setUint32(8, guid, true); return p; };
   const input = createRealmInput({ transmit: () => true, now: () => 0, scene: () => ({ ready: true, player: { x: 90, y: 100 }, monsters: views, objects: [], items: [],
     isNpc: table.isNpc, hoverBox: (dx, dy) => Math.abs(dx) < 10 && Math.abs(dy) < 20, toScreen: (x, y) => ({ x, y }), pointerWorld: (px, py) => ({ x: px, y: py }) }) });
   const name = (classId) => ({ stringIndex: classId, label: `name${classId}` });
   const at = (guid) => { const hit = input.pick(views.find((m) => m.guid === guid).anchorX, 120); assert.equal(hit.unit.guid, guid);
     const target = units.hoverTarget(hit, views, name), cls = units.classOf(hit.unit);
     return [cls.kind, cls.hostile, target.npc ? 'above' : 'top', target.colour ?? null, target.life ?? null, target.label, units.cursorContext(hit).kind]; };
+  const line = (guid) => units.hoverTarget(input.pick(views.find((m) => m.guid === guid).anchorX, 120), views, name).line;
 
   // Town people: the bare name above the head, no life bar, the talk cursor, never an enemy.
   assert.deepEqual(at(10), ['npc', false, 'above', null, null, 'name148', 'talk']);
   assert.deepEqual(at(11), ['npc', false, 'above', null, null, 'name154', 'talk']);
-  // Enemies: the top plate with the life byte as its fill, white, champion blue, unique gold; a minion is white.
+  // Enemies: the top plate with the life byte as its fill. A plain monster keeps its class name and type line;
+  // a champion and a unique take the engine's name, a unique and a minion the engine's line (an empty one too).
   assert.deepEqual(at(20), ['monster', true, 'top', 0, 64, 'name5', 'attack']);
-  assert.deepEqual(at(21), ['monster', true, 'top', 3, 128, 'name5', 'attack']);
-  assert.deepEqual(at(22), ['monster', true, 'top', 4, 128, 'name5', 'attack']);
+  assert.deepEqual(at(21), ['monster', true, 'top', 3, 128, 'Zombie Champion', 'attack']);
+  assert.deepEqual(at(22), ['monster', true, 'top', 4, 128, 'Gloom Maw the Hungry', 'attack']);
   assert.deepEqual(at(23), ['monster', true, 'top', 0, 32, 'name19', 'attack']);
-  // Before any pet packet the hireling and the summons are friendly by their rows: the monster plate, the hand.
+  assert.deepEqual([line(20), line(21), line(22), line(23)], [undefined, undefined, 'Undead Extra Strong', 'Demon Minion']);
+  records.set(23, { enemy: 1, typeFlags: 0x10 });
+  assert.equal(line(23), '');
+  // A monster the engine calls no enemy (its alignment matches the hero's) is friendly whatever its row says.
   assert.deepEqual(at(30), ['friendly', false, 'top', 0, 102, 'name271', 'hand']);
-  assert.deepEqual(at(31), ['friendly', false, 'top', 0, 128, 'name363', 'hand']);
+  records.set(20, { enemy: 0, alignment: 2 });
+  assert.deepEqual(at(20), ['friendly', false, 'top', 0, 64, 'name5', 'hand']);
+  // A unit the engine holds no record of is nobody's enemy.
+  assert.deepEqual(at(33), ['friendly', false, 'top', 0, 128, 'name5', 'hand']);
 
-  // The server lists my hireling, my skeleton and another player's Valkyrie; other packets in the same read pass by.
-  const sizes = { 0x81: 20, 0x8f: 33 }, stream = new Uint8Array(20 * 3 + 33);
-  stream.set(pet(7, 271, ME, 30), 0); stream[20] = 0x8f; stream.set(pet(4, 363, ME, 31), 53); stream.set(pet(2, 357, OTHER, 32), 73);
-  const done = routeRealmPackets(stream, (b) => sizes[b[0]], { applyPet: units.applyPet });
-  assert.deepEqual(done.map((d) => d.result), [{ guid: 30, kind: 7, owner: ME }, { guid: 31, kind: 4, owner: ME }, { guid: 32, kind: 2, owner: OTHER }]);
-  assert.deepEqual(at(30), ['hireling', false, 'top', 0, 102, 'name271', 'hand']);
+  // The engine lists my hireling (with its own name), my skeleton and another player's Valkyrie.
+  records.set(30, { enemy: 0, petType: 7, petOwner: ME, name: 'Aliza' });
+  records.set(31, { enemy: 0, petType: 4, petOwner: ME });
+  records.set(32, { enemy: 0, enemyIfHostile: 1, rosterGuid: OTHER, petType: 2, petOwner: OTHER });
+  assert.deepEqual(at(30), ['hireling', false, 'top', 0, 102, 'Aliza', 'hand']);
   assert.deepEqual(at(31), ['pet', false, 'top', 0, 128, 'name363', 'hand']);
   assert.deepEqual(units.classOf(views[8]), { kind: 'pet', owner: OTHER, hostile: false, plate: 'monster' });
-  // A pet takes its owner's side: the other player goes hostile, and so does the Valkyrie.
+  // A pet takes its owner's side: the other player goes hostile, and so does the Valkyrie. Mine stay mine.
   hostilePlayers.add(OTHER);
   assert.deepEqual(at(32), ['pet', true, 'top', 0, 128, 'name357', 'attack']);
   assert.equal(units.classOf(views[6]).hostile, false);
-  // A new hireling replaces the owner's old one; a summon does not.
-  units.applyPet(pet(7, 338, ME, 40));
-  assert.equal(units.classOf({ guid: 30, classId: 271 }).kind, 'friendly');
-  assert.equal(units.classOf({ guid: 40, classId: 338 }).kind, 'hireling');
-  assert.equal(units.classOf({ guid: 31, classId: 363 }).kind, 'pet');
-  assert.equal(units.applyPet(new Uint8Array([0x81, 7, 0])), null);
+  assert.equal(units.classOf(views[2]).hostile, false);
+  // A dismissed pet leaves the engine's list and is a plain unit again.
+  records.set(31, { enemy: 0 });
+  assert.equal(units.classOf(views[7]).kind, 'friendly');
 
   // The snapshot the renderer and the sound trigger read carries the same sorting; with no sorter nothing is an enemy.
-  const snap = (classOf) => realmViewSnapshot({ base: null, resources: null, monsters: views, missiles: [], players: [], level: 1, actor: () => null, frame: 0, classOf })
+  const snap = (classOf) => realmViewSnapshot({ base: null, resources: null, monsters: views.slice(0, 9), missiles: [], players: [], level: 1, actor: () => null, frame: 0, classOf })
     .entities.map((e) => [e.id, e.hostile, e.npc, e.unitClass]);
-  assert.deepEqual(snap(units.classOf), [[10, false, true, 'npc'], [11, false, true, 'npc'], [20, true, false, 'monster'], [21, true, false, 'monster'],
-    [22, true, false, 'monster'], [23, true, false, 'monster'], [30, false, false, 'friendly'], [31, false, false, 'pet'], [32, true, false, 'pet']]);
+  assert.deepEqual(snap(units.classOf), [[10, false, true, 'npc'], [11, false, true, 'npc'], [20, false, false, 'friendly'], [21, true, false, 'monster'],
+    [22, true, false, 'monster'], [23, true, false, 'monster'], [30, false, false, 'hireling'], [31, false, false, 'friendly'], [32, true, false, 'pet']]);
   assert.ok(snap(null).every(([, hostile, npc]) => hostile === false && npc === false));
   // Over an item, an object or bare ground the cursor is the hand.
   for (const kind of ['item', 'object', 'ground']) assert.deepEqual(units.cursorContext({ kind, unit: { guid: 1 } }), { kind: 'hand' });
   assert.deepEqual(units.cursorContext(null), { kind: 'hand' });
-  units.clear();
-  assert.equal(units.classOf(views[6]).kind, 'friendly');
+});
+
+test('a struck unit sounds the impact its hit class names', (t) => {
+  const dir = new URL('../../retail/tables-1.13c/', import.meta.url);
+  const read = (p) => readFileSync(new URL(p.split('\\').pop(), dir));
+  try { read('monstats.bin'); } catch { t.skip('retail tables absent'); return; }
+  const got = []; const trigger = createCombatSoundTrigger(read, (row, e) => got.push([e.kind, e.unitType, e.unitId, row]));
+  const frameOf = (mode, hitClassOf) => realmCombatSoundFrame({ entities: [{ type: 1, id: 7, classId: 5, mode }, { type: 3, id: 7, classId: 1, mode: 0 }] }, [{ guid: 7, typeFlags: 0 }], { source: 'realm', guid: 1, classId: 1, renderState: { mode: 1, framePrecise: 0 } }, 0, hitClassOf);
+  const asked = [];
+  const struck = frameOf(3, (type, id) => { asked.push([type, id]); return type === 1 ? 0x21 : 0; });
+  assert.deepEqual(asked, [[1, 7], [0, 1]]);
+  assert.deepEqual(struck.entities.map((e) => e.lastHitClass), [0x21, 0]);
+  { const f = frameOf(1, () => 0); trigger.update(f.entities, f.frame); }
+  trigger.update(struck.entities, struck.frame);
+  assert.deepEqual(got.filter((g) => g[0] === 'impact').map((g) => g.slice(1)), hitSounds(0x21, 1, 3).map((r) => [1, 7, r]));
+  assert.ok(hitSounds(0x21, 1, 3).length > 0);
+  // Without the engine's answer the frame is as before: no hit class, no impact.
+  assert.equal(frameOf(3).entities[0].lastHitClass, undefined);
 });

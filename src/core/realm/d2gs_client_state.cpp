@@ -37,10 +37,12 @@
 #include "../d2client/character_screen.h"
 #include "d2gs_client_motion.h"
 #include "d2gs_client_player_speed.h"
+#include "d2gs_client_player_skills.h"
 #include "d2gs_client_object.h"
 #include "d2gs_client_snapshot.h"
 #include "d2gs_client_target_relations.h"
 #include "d2gs_client_owned_item.h"
+#include "d2gs_client_game_packets.h"
 #include "d2gs_client_unit_resources.h"
 #include "client_fireball_hit.h"
 #include "client_missile_sound.h"
@@ -49,10 +51,15 @@
 #include "d2gs_client_player_stop.h"
 #include "d2gs_client_monster_death_events.h"
 #include "cast_target_relation.h"
-#include "remote_unit_skill_start.h"
+#include "client_skill_fx.h"
+#include <DataTbls/OverlayTbls.h>
 #include "d2gs_client_monster_death_clock.h"
 #include "d2gs_client_pkt_route.h"
+#include "d2gs_client_quests.h"
+#include "d2gs_client_warps.h"
 #include "d2gs_client_state_stats.h"
+#include "client_pets.h"
+#include "client_monster_name.h"
 #include "../d2client/d2client_pkt_env.h"
 #include <D2Environment.h>
 #include "../d2client/d2client_unit_ports.h"
@@ -343,7 +350,8 @@ static_assert(sizeof(D2RealmClientObjectView) == 28);
 std::vector<D2RealmClientObjectView> g_objects;
 // The client units of the assigned objects, found by guid. They are kept apart from the player and monster
 // lookup: an object's path is a static one, and that lookup's callers walk a dynamic path.
-std::vector<D2UnitStrc*> g_objectUnits;
+// Object activations (a shrine used by a player) not yet taken by the shell: the sound it plays at the player.
+std::vector<D2gsClientObjectEvent> g_objectEvents;
 std::vector<D2RealmClientMonsterView> g_monsterViews;
 std::vector<d2::realm::MonsterDeathModeEvent> g_monsterDeathModeEvents;
 std::vector<d2::realm::MonsterDeathModeEvent> g_monsterDeathModeEventView;
@@ -406,14 +414,7 @@ static d2::realm::CorpseRoster g_corpses;
 static void destroy_player_owned_items(D2UnitStrc* owner) {
     // Free item CUnits before the inventory/resource owner is released; INVENTORY_FreeInventory
     // only detaches items from the inventory.
-    if (!owner || !owner->pInventory || owner->pInventory->dwSignature != D2C_InventoryHeader) return;
-    D2UnitStrc* item = INVENTORY_GetFirstItem(owner->pInventory);
-    while (item) {
-        D2UnitStrc* next = INVENTORY_GetNextItem(item);
-        INVENTORY_RemoveItem(item);
-        d2_realm_client_owned_item_destroy(item);
-        item = next;
-    }
+    d2_realm_client_items_forget_owner(owner);
 }
 
 void clear_players() {
@@ -426,6 +427,7 @@ void clear_players() {
         player.motionUnit = nullptr;
     }
     g_players.clear();
+    d2_realm_client_items_reset();
     g_selectedPlayer = -1;
     g_corpses.clear();
     clear_player();
@@ -436,6 +438,11 @@ D2ActiveRoomStrc* selected_player_room() {
     if (g_selectedPlayer < 0 || static_cast<size_t>(g_selectedPlayer) >= g_players.size()) return nullptr;
     D2UnitStrc* unit = g_players[g_selectedPlayer].motionUnit;
     return unit && unit->pDynamicPath ? unit->pDynamicPath->pRoom : nullptr;
+}
+
+uint32_t selected_player_guid() {
+    if (g_selectedPlayer < 0 || static_cast<size_t>(g_selectedPlayer) >= g_players.size()) return 0xFFFFFFFFu;
+    return g_players[g_selectedPlayer].view.guid;
 }
 
 void store_selected_player() {
@@ -481,31 +488,21 @@ int d2_drlg_client_tile_count();
 D2DrlgActStrc* d2_drlg_client_act();
 D2ActiveRoomStrc* d2_drlg_client_active_room(int, int);
 int d2_drlg_client_room_freed_by_hide(int, int, int, int, int, int, int, void*);
-static D2UnitStrc* find_object_unit(uint32_t guid) {
-    for (D2UnitStrc* unit : g_objectUnits)
-        if (unit->dwUnitId == guid) return unit;
-    return nullptr;
-}
-static void destroy_object_unit(uint32_t guid) {
-    for (size_t i = 0; i < g_objectUnits.size(); ++i)
-        if (g_objectUnits[i]->dwUnitId == guid) {
-            d2gs_client_object_destroy(g_objectUnits[i]);
-            g_objectUnits.erase(g_objectUnits.begin() + i);
-            return;
-        }
-}
-// Every caller has ended the act first, so the rooms and their collision grids are already gone.
+// Object units live in the client's object table and on their room's unit list (d2gs_client_object.cpp).
+static D2UnitStrc* find_object_unit(uint32_t guid) { return d2gs_client_object_find(guid); }
+static void destroy_object_unit(uint32_t guid) { d2gs_client_object_destroy(d2gs_client_object_find(guid)); }
+// Every caller has ended the act first, so the rooms, their unit lists and collision grids are already gone.
 static void clear_objects() {
-    for (D2UnitStrc* unit : g_objectUnits) {
-        d2gs_client_object_unplace(unit);
+    while (D2UnitStrc* unit = d2gs_client_object_next(nullptr)) {
+        d2gs_client_object_unplace(unit, false);
         d2gs_client_object_destroy(unit);
     }
-    g_objectUnits.clear();
     g_objects.clear();
+    g_objectEvents.clear();
 }
 // An object assigned before its room was revealed takes the room, and its footprint, once it is there.
 static void place_unroomed_objects() {
-    for (D2UnitStrc* unit : g_objectUnits) {
+    for (D2UnitStrc* unit = d2gs_client_object_next(nullptr); unit; unit = d2gs_client_object_next(unit)) {
         if (UNITS_GetRoom(unit)) continue;
         const int x = UNITS_GetXPosition(unit), y = UNITS_GetYPosition(unit);
         if (D2ActiveRoomStrc* room = d2_drlg_client_active_room(x, y)) d2gs_client_object_place(unit, room, x, y);
@@ -743,8 +740,24 @@ static void destroy_player_motion(D2RealmClientPlayerEntry& player) {
 static void clear_client_missiles();
 static void destroy_all_player_motion() {
     clear_client_missiles();
-    for (auto& player : g_players) destroy_player_motion(player);
+    // The client's own player unit outlives an act change with everything it holds: the server does
+    // not send the hero's items or stats again. Only its place in the old act's rooms goes.
+    // GUESS: that the other players' units are freed here; the act-load handler's unit sweep is not read.
+    // Settled by the decompile of the unit-table clear the 0x03 handler calls.
+    for (size_t i = 0; i < g_players.size(); ++i) {
+        if (static_cast<int>(i) == g_selectedPlayer) detach_player_motion_path(g_players[i]);
+        else destroy_player_motion(g_players[i]);
+    }
+    d2_realm_client_items_forget_loose();
 }
+
+struct PlayerSkillOps {
+    bool hasList(D2UnitStrc* unit) const { return unit->pSkills != nullptr; }
+    bool allocList(D2UnitStrc* unit) const { return (unit->pSkills = SKILLS_AllocSkillList(nullptr)) != nullptr; }
+    void initList(D2UnitStrc* unit) const { SKILLS_InitSkillList(unit); }
+    D2SkillStrc* left(D2UnitStrc* unit) const { return UNITS_GetLeftSkill(unit); }
+    D2SkillStrc* right(D2UnitStrc* unit) const { return UNITS_GetRightSkill(unit); }
+};
 
 static bool ensure_player_unit(D2RealmClientPlayerEntry& player) {
     if (player.motionUnit) return true;
@@ -766,6 +779,9 @@ static bool ensure_player_unit(D2RealmClientPlayerEntry& player) {
     // The owner is never sent its own base velocity: the client sets it, as the server does for its unit.
     d2_realm_client_player_init_rates(player.motionUnit,
         [](D2UnitStrc* u, int32_t stat, int32_t value) { STATLIST_SetUnitStat(u, stat, value, 0); });
+    // The same init gives the unit its skill list (Attack, the class's base skills, Attack in both
+    // hands), so a hand can be read before, or without, the server's skill packets.
+    if (sgptDataTables) d2_realm_client_player_init_skills(player.motionUnit, PlayerSkillOps{});
     return true;
 }
 
@@ -975,7 +991,9 @@ static bool remove_monster(const uint8_t* packet, int length) {
     return true;
 }
 
+static void clear_game_packet_state();
 static int reject_stream(int error) {
+    clear_game_packet_state();
     clear_client_missiles();
     reset_monster_death_mode_events();
     destroy_all_monster_motion();
@@ -983,6 +1001,7 @@ static int reject_stream(int error) {
     d2_drlg_act_end();
     clear_world();
     g_monsters.clear();
+    d2::realm::clientPetsClear();
     g_monsterViews.clear();
     clear_objects();
     clear_game_chat();
@@ -991,8 +1010,15 @@ static int reject_stream(int error) {
 }
 
 static void clear_client_quest_record();
+// What the server's quest packets (0x28, 0x29, 0x52, 0x5D) and tile-unit packets (0x09) have built.
+static D2RealmClientQuests g_quests;
+static D2RealmClientWarps g_warps;
+
 EMSCRIPTEN_KEEPALIVE void d2_realm_client_player_reset() {
+    clear_game_packet_state();
     clear_client_quest_record();
+    d2_realm_client_quests_reset(g_quests);
+    g_warps.list.clear();
     clear_client_missiles();
     reset_monster_death_mode_events();
     destroy_all_monster_motion();
@@ -1000,6 +1026,7 @@ EMSCRIPTEN_KEEPALIVE void d2_realm_client_player_reset() {
     d2_drlg_act_end();
     clear_world();
     g_monsters.clear();
+    d2::realm::clientPetsClear();
     g_monsterViews.clear();
     clear_objects();
     clear_game_chat();
@@ -1125,6 +1152,8 @@ static D2UnitStrc* find_realm_client_unit(uint8_t unitType, uint32_t guid) {
     } else if (unitType == UNIT_MONSTER) {
         for (auto& monster : g_monsters)
             if (monster.view.guid == guid) return monster.motionUnit;
+    } else if (unitType == UNIT_OBJECT) {
+        return d2gs_client_object_find(guid);
     }
     return nullptr;
 }
@@ -1317,6 +1346,7 @@ static int apply_player_life_action(D2UnitStrc* unit, uint32_t selector, int x, 
     }
     return 1;
 }
+static void emit_hit_overlay(D2UnitStrc* unit);
 
 static int pkt_player_action(D2UnitStrc* unit, uint32_t code, const uint32_t* l) {
     if (code >= 7 && code <= 9) {
@@ -1332,7 +1362,10 @@ static int pkt_player_action(D2UnitStrc* unit, uint32_t code, const uint32_t* l)
     }
     if (code == 6) {
         unit->dwLastHitClass = pkt_word(l, 2);
-        return d2_realm_client_unit_set_mode(unit, PLRMODE_GETHIT) > 0 ? 1 : 0;
+        const uint32_t previous = unit->dwAnimMode;
+        if (d2_realm_client_unit_set_mode(unit, PLRMODE_GETHIT) <= 0) return 0;
+        if (previous != unit->dwAnimMode) emit_hit_overlay(unit);
+        return 1;
     }
     return 0;
 }
@@ -1341,6 +1374,7 @@ static int pkt_monster_mode(D2RealmClientMonster& monster, uint32_t code, uint32
     D2UnitStrc* const unit = monster.motionUnit;
     const uint32_t previousMode = unit->dwAnimMode;
     if (d2_realm_client_unit_set_mode(unit, mode) < 0) return 0;
+    if (previousMode != unit->dwAnimMode) emit_hit_overlay(unit);
     // The old 0x69/0x6A projection's event queue stays the view the page reads.
     if (g_pktOpcode != 0x69 && g_pktOpcode != 0x6a) return 1;
     if (!d2::realm::appendMonsterDeathModeEvent(g_monsterDeathModeEvents,
@@ -1403,6 +1437,31 @@ static int pkt_monster_action(D2RealmClientMonster& monster, uint32_t code, cons
         if (unit->dwAnimMode != MONMODE_DEAD && unit->dwAnimMode != MONMODE_DEATH)
             d2_realm_client_unit_set_mode(unit, MONMODE_NEUTRAL);
         return 1;
+    }
+    case MonsterAction::AttackAt: {
+        // Aim at the spot when it is set and is not the unit's own, then take the code's mode.
+        if (!unit->pDynamicPath) return 0;
+        PATH_ResetToPreviousType(unit->pDynamicPath);
+        UNITS_SetUsedSkill(unit, nullptr);
+        UNITS_SetTargetUnitForDynamicUnit(unit, nullptr);
+        const int x = static_cast<int>(pkt_word(l, 0)), y = static_cast<int>(pkt_word(l, 1));
+        if ((x || y) && (x != UNITS_GetXPosition(unit) || y != UNITS_GetYPosition(unit)))
+            UNITS_UpdateDirectionAndSpeed(unit, x, y);
+        unit->dwFlags &= ~0x40u;
+        return pkt_monster_mode(monster, code, static_cast<uint32_t>(d2::realm::monsterActionMode(code)));
+    }
+    case MonsterAction::AttackOn: {
+        // The target unit becomes the path's target and the monster faces it; an unknown target
+        // clears the relation and the mode is still set.
+        if (!unit->pDynamicPath) return 0;
+        PATH_ResetToPreviousType(unit->pDynamicPath);
+        UNITS_SetUsedSkill(unit, nullptr);
+        D2UnitStrc* target = find_realm_client_unit(static_cast<uint8_t>(pkt_word(l, 0)), pkt_word(l, 1));
+        if (target && (target == unit || !target->pDynamicPath)) target = nullptr;
+        UNITS_SetTargetUnitForDynamicUnit(unit, target);
+        if (target) UNITS_UpdateDirectionAndSpeed(unit, UNITS_GetXPosition(target), UNITS_GetYPosition(target));
+        unit->dwFlags &= ~0x40u;
+        return pkt_monster_mode(monster, code, static_cast<uint32_t>(d2::realm::monsterActionMode(code)));
     }
     case MonsterAction::Unhandled:
         break;
@@ -1484,6 +1543,60 @@ static int apply_retail_unit_packet(const uint8_t* packet, int length) {
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_object_count() { return static_cast<int>(g_objects.size()); }
 EMSCRIPTEN_KEEPALIVE const D2RealmClientObjectView* d2_realm_client_objects() { return g_objects.data(); }
 
+// The object units themselves, for the scene: one record of 14 words per unit, in the object table's order,
+// {id, class, x, y, mode, 8.8 cel clock, 8.8 cel count, 8.8 step, flags (1 selectable, 2 in a revealed room),
+// interact byte, overlay count, overlay rows x3 (-1 unused)}. Returns the count written.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_object_units(int32_t* out, int cap) {
+    int n = 0;
+    for (D2UnitStrc* unit = d2gs_client_object_next(nullptr); unit && out && n < cap; unit = d2gs_client_object_next(unit), ++n) {
+        int32_t* r = out + n * 14;
+        r[0] = static_cast<int32_t>(unit->dwUnitId); r[1] = unit->dwClassId;
+        r[2] = UNITS_GetXPosition(unit); r[3] = UNITS_GetYPosition(unit);
+        r[4] = static_cast<int32_t>(unit->dwAnimMode); r[5] = unit->nSeqCurrentFramePrecise;
+        r[6] = static_cast<int32_t>(unit->dwFrameCountPrecise); r[7] = unit->wAnimSpeed;
+        r[8] = ((unit->dwFlags & UNITFLAG_TARGETABLE) ? 1 : 0) | (UNITS_GetRoom(unit) ? 2 : 0);
+        r[9] = unit->pObjectData->InteractType;
+        r[11] = r[12] = r[13] = -1;
+        r[10] = d2gs_client_object_overlays(unit, r + 11);
+    }
+    return n;
+}
+// Takes the pending object activations: {version, object id, player id, shrine kind, sound row, effect} each.
+// The sound plays at the player. Effect 1 has turned the player's name around; 2..4 (the fire, exploding and
+// poison shrines' missiles) are reported and not made: the realm missile maker creates skill projectiles only.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_take_object_events(int32_t* out, int cap) {
+    if (!out || cap <= 0) return 0;
+    const int count = std::min(cap, static_cast<int>(g_objectEvents.size()));
+    for (int i = 0; i < count; ++i) {
+        const auto& event = g_objectEvents[static_cast<size_t>(i)];
+        int32_t* r = out + i * 6;
+        r[0] = 1; r[1] = static_cast<int32_t>(event.objectGuid); r[2] = static_cast<int32_t>(event.playerGuid);
+        r[3] = static_cast<int32_t>(event.shrine); r[4] = static_cast<int32_t>(event.sound); r[5] = static_cast<int32_t>(event.effect);
+    }
+    g_objectEvents.erase(g_objectEvents.begin(), g_objectEvents.begin() + count);
+    return count;
+}
+// 0x0E and 0x4D aimed at an object. The activating player is looked up among the players this client knows.
+static int apply_object_packet(const uint8_t* packet, int length) {
+    D2gsClientObjectEvent event = {};
+    const int result = d2gs_client_object_packet(packet, length,
+        [](uint32_t guid) -> D2UnitStrc* { return find_realm_client_unit(UNIT_PLAYER, guid); }, &event);
+    if (result == 1) {
+        uint32_t guid = 0;
+        std::memcpy(&guid, packet + 2, sizeof guid);
+        sync_object_view(d2gs_client_object_find(guid));
+    } else if (result == 2) {
+        // The player unit here carries no name of its own: the name the client shows is the player record's.
+        if (event.effect == kObjectEffectReverseName)
+            for (auto& player : g_players)
+                if (player.view.active && player.view.guid == event.playerGuid)
+                    d2gs_client_object_reverse_name(reinterpret_cast<char*>(player.view.name));
+        if (g_objectEvents.size() == 64) g_objectEvents.erase(g_objectEvents.begin());
+        g_objectEvents.push_back(event);
+    }
+    return result < 0 ? -1 : result ? 1 : 0;
+}
+
 // 0x51: D2Client+0xADF40 hands its fields to the creator (0xA75C0).
 static void object_create_cb(uint32_t kind, uint32_t guid, uint32_t classId, uint32_t x, uint32_t y,
         uint32_t, uint32_t mode, uint32_t interact) {
@@ -1492,7 +1605,6 @@ static void object_create_cb(uint32_t kind, uint32_t guid, uint32_t classId, uin
         if (D2UnitStrc* unit = d2gs_client_object_create(guid, classId, mode, static_cast<uint8_t>(interact))) {
             d2gs_client_object_place(unit, d2_drlg_client_active_room(static_cast<int>(x), static_cast<int>(y)),
                 static_cast<int>(x), static_cast<int>(y));
-            g_objectUnits.push_back(unit);
         }
     }
     for (auto& object : g_objects)
@@ -1508,22 +1620,27 @@ static void object_create_cb(uint32_t kind, uint32_t guid, uint32_t classId, uin
 static const uint8_t* g_removePacket = nullptr;
 static int g_removeLength = 0;
 static int g_removeResult = 0;
+static void game_packet_unit_removed(uint32_t guid);
 static void unit_remove_cb(uintptr_t, uint32_t, uint32_t guid, uint32_t type) {
     if (type == UNIT_PLAYER) {
         g_removeResult = remove_player(g_removePacket, g_removeLength) < 0 ? -2 : 0;
     } else if (type == UNIT_MONSTER) {
         if (!remove_monster(g_removePacket, g_removeLength)) g_removeResult = -4;
-        else g_removeResult = 1;
+        else { g_removeResult = 1; game_packet_unit_removed(guid); }
     } else if (type == UNIT_OBJECT) {
         destroy_object_unit(guid);
         g_objects.erase(std::remove_if(g_objects.begin(), g_objects.end(), [guid](const auto& object) {
             return object.guid == guid; }), g_objects.end());
+    } else if (type == UNIT_ITEM) {
+        g_removeResult = d2_realm_client_item_remove(guid);
+    } else if (type == UNIT_TILE) {
+        d2_realm_client_warps_remove(g_warps, guid);
     }
 }
 
 // 0x0E and 0x17: the unit-queue handlers (D2Client+0xAF560 / +0xAF240) resolve the named unit and hand
-// the request to the action dispatch. An object target takes its mode change (selector 3) on its own client
-// unit; the shrine activation (selector 0x15) is not applied.
+// the request to the action dispatch. An object target takes its mode change (selector 3) and its activation
+// (selector 0x15) on its own client unit.
 // The 0x17 handler reads the u16 at the address that the word at +8 names, and the same for the word at +10; the two
 // loaded u16s are the pair it passes on. So those words are client-memory addresses, not packet data: below 0x10000 the
 // read is unmapped and the client faults. No server sender of 0x17 is in the client's table of well-formed packets.
@@ -1536,15 +1653,7 @@ static int apply_unit_queue_packet(const uint8_t* packet, int length) {
     std::memcpy(&guid, packet + 2, sizeof guid);
     D2RealmClientMonster* monster = nullptr;
     D2UnitStrc* unit = nullptr;
-    if (packet[1] == UNIT_OBJECT) {
-        D2UnitStrc* object = find_object_unit(guid);
-        if (!object || !is0e || packet[6] != 3) return 0;
-        uint32_t mode = 0;
-        std::memcpy(&mode, packet + 8, sizeof mode);
-        d2gs_client_object_set_mode(object, mode, packet[7]);
-        sync_object_view(object);
-        return 1;
-    }
+    if (packet[1] == UNIT_OBJECT) return is0e ? apply_object_packet(packet, length) : 0;
     if (packet[1] == UNIT_MONSTER) {
         for (auto& candidate : g_monsters)
             if (candidate.view.guid == guid) { monster = &candidate; break; }
@@ -1598,32 +1707,24 @@ static int apply_player_stop(const uint8_t* packet, int length) {
     // Selector 6 first writes the record's third field into the unit's last-hit-class slot
     // (D2Client+0x19830: mov [ebx+0xB0], the zero-extended packet byte at +11), then sets the mode.
     unit->dwLastHitClass = stop.hitClass;
+    const uint32_t previous = unit->dwAnimMode;
     if (d2_realm_client_unit_set_mode(unit, static_cast<uint32_t>(mode)) < 0) return -1;
+    if (previous != unit->dwAnimMode) emit_hit_overlay(unit);
     return 1;
 }
 
-static D2UnitStrc* find_realm_client_owned_item(uint32_t guid) {
-    for (auto& player : g_players) {
-        D2UnitStrc* owner = player.motionUnit;
-        if (!owner || !owner->pInventory || owner->pInventory->dwSignature != D2C_InventoryHeader) continue;
-        for (D2UnitStrc* item = INVENTORY_GetFirstItem(owner->pInventory); item;
-                item = INVENTORY_GetNextItem(item)) {
-            if (item->dwUnitType == UNIT_ITEM && item->dwUnitId == guid) return item;
-        }
+// 0x9C and 0x9D: every item record goes to the one item runtime, which seats the item on the unit
+// the record names (the selected player's own unit for 0x9C).
+static int apply_item_record(const uint8_t* packet, int length) {
+    D2UnitStrc* hero = g_selectedPlayer >= 0 && size_t(g_selectedPlayer) < g_players.size()
+        ? g_players[g_selectedPlayer].motionUnit : nullptr;
+    D2UnitStrc* owner = nullptr;
+    if (packet[0] == 0x9d) {
+        D2RealmOwnedItemPacket owned{};
+        if (d2_realm_d2gs_parse_owned_item(packet, length, &owned) != length) return -1;
+        if (owned.ownerType == UNIT_PLAYER) owner = find_realm_client_unit(owned.ownerType, owned.ownerGuid);
     }
-    return nullptr;
-}
-
-static int apply_owned_item(const uint8_t* packet, int length) {
-    D2RealmOwnedItemPacket owned{};
-    if (d2_realm_d2gs_parse_owned_item(packet, length, &owned) != length) return -1;
-    if (owned.action != ITEMACTION_EQUIP && owned.action != ITEMACTION_UNEQUIP &&
-        owned.action != ITEMACTION_WEAPONSWITCH) return 0;
-    if (owned.ownerType != UNIT_PLAYER) return 0;
-    D2UnitStrc* owner = find_realm_client_unit(owned.ownerType, owned.ownerGuid);
-    if (!owner) return 0;
-    return d2_realm_client_owned_item_apply(owner, find_realm_client_owned_item(owned.itemGuid),
-        packet, length);
+    return d2_realm_client_item_packet(hero, owner, packet, length);
 }
 
 static bool read_state_stats(D2RealmBitReader& bits, std::vector<D2RealmClientStateStat>& stats) {
@@ -1783,6 +1884,75 @@ static uint32_t g_clientMissileTick = 0;
 struct RealmMissileSoundEvent { uint32_t version, tick, missileId, classId, event, soundRow; };
 static_assert(sizeof(RealmMissileSoundEvent) == 24);
 static std::vector<RealmMissileSoundEvent> g_clientMissileSoundEvents;
+
+// What a unit's skill start or hit plays, for the page to sound and draw: kind 2 is a one-shot
+// Overlay row on the unit; kinds 1, 3 and 4 are a sound row due `delay` ticks after `tick` (the
+// skill's start sound, the weapon's swing, the class's own start sound). `skill` is the skill
+// id that caused it, or 0xFFFFFFFF for a hit.
+struct RealmUnitFxEvent { uint32_t version, tick, kind, unitType, unitGuid, row, delay, skill; };
+static_assert(sizeof(RealmUnitFxEvent) == 32);
+static std::vector<RealmUnitFxEvent> g_unitFxEvents;
+// The one-shot overlays still running, so a start can tell that a unit already carries a row.
+struct LiveUnitOverlay { uint32_t unitType, unitGuid, row, endTick; };
+static std::vector<LiveUnitOverlay> g_unitOverlays;
+
+static void record_unit_fx(uint32_t kind, D2UnitStrc* unit, uint32_t row, uint32_t delay, uint32_t skill) {
+    if (g_unitFxEvents.size() == 256) g_unitFxEvents.erase(g_unitFxEvents.begin());
+    g_unitFxEvents.push_back({1, g_clientMissileTick, kind, static_cast<uint32_t>(unit->dwUnitType),
+        unit->dwUnitId, row, delay, skill});
+}
+
+static bool unit_carries_overlay(D2UnitStrc* unit, uint32_t row) {
+    g_unitOverlays.erase(std::remove_if(g_unitOverlays.begin(), g_unitOverlays.end(),
+        [](const LiveUnitOverlay& o) { return o.endTick <= g_clientMissileTick; }), g_unitOverlays.end());
+    return std::any_of(g_unitOverlays.begin(), g_unitOverlays.end(), [unit, row](const LiveUnitOverlay& o) {
+        return o.unitType == static_cast<uint32_t>(unit->dwUnitType) && o.unitGuid == unit->dwUnitId && o.row == row;
+    });
+}
+
+// A one-shot overlay on a unit (1.13c D2Client+0x6B300). The caller has bounds-checked the row.
+// NOT PORTED: the start's own bookkeeping for rows below 0x8C (+0x69660) is not read.
+static void start_unit_overlay(D2UnitStrc* unit, int row, uint32_t skill) {
+    auto* txt = DATATBLS_GetOverlayTxtRecord(row);
+    if (!txt) return;
+    record_unit_fx(2, unit, static_cast<uint32_t>(row), 0, skill);
+    g_unitOverlays.push_back({static_cast<uint32_t>(unit->dwUnitType), unit->dwUnitId, static_cast<uint32_t>(row),
+        d2::realm::overlayEndTick(g_clientMissileTick, txt->dwFrames, txt->dwAnimRate)});
+}
+
+// A unit that has just entered death, get hit or knockback plays the overlay its last hit class
+// names (1.13c D2Client+0x2A590).
+static void emit_hit_overlay(D2UnitStrc* unit) {
+    if (!unit) return;
+    const uint32_t mode = unit->dwAnimMode;
+    const bool struck = unit->dwUnitType == UNIT_PLAYER
+        ? mode == PLRMODE_DEATH || mode == PLRMODE_GETHIT || mode == PLRMODE_KNOCKBACK
+        : unit->dwUnitType == UNIT_MONSTER &&
+            (mode == MONMODE_DEATH || mode == MONMODE_GETHIT || mode == MONMODE_KNOCKBACK);
+    if (!struck) return;
+    const int row = d2::realm::hitOverlayRow(unit->dwLastHitClass);
+    if (row <= 0 || row >= sgptDataTables->nOverlayTxtRecordCount) return;
+    start_unit_overlay(unit, row, 0xffffffffu);
+}
+
+// Consumes the queued unit effects, eight words each:
+// {version, tick, kind, unitType, unitGuid, row, delay, skill}.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_take_unit_fx(int32_t* out, int cap) {
+    if (!out || cap <= 0) return 0;
+    const int count = std::min(cap, static_cast<int>(g_unitFxEvents.size()));
+    for (int i = 0; i < count; ++i) std::memcpy(out + i * 8, &g_unitFxEvents[static_cast<size_t>(i)], 32);
+    g_unitFxEvents.erase(g_unitFxEvents.begin(), g_unitFxEvents.begin() + count);
+    return count;
+}
+
+EMSCRIPTEN_KEEPALIVE uint32_t d2_realm_client_unit_fx_tick() { return g_clientMissileTick; }
+
+// The hit class a unit was last struck with (the server's hit records set it), or 0.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_realm_client_unit_hit_class(int type, uint32_t guid) {
+    if (type != UNIT_PLAYER && type != UNIT_MONSTER) return 0;
+    auto* unit = find_realm_client_unit(static_cast<uint8_t>(type), guid);
+    return unit ? unit->dwLastHitClass : 0;
+}
 static void record_client_missile_event(uint32_t event, D2UnitStrc* unit,
         uint32_t targetType = 0xffffffffu, uint32_t targetGuid = 0xffffffffu) {
     if (!unit) return;
@@ -1814,6 +1984,8 @@ static void clear_client_missiles() {
     for (const auto& entry : g_clientMissiles) { record_client_missile_event(5, entry.unit); free_client_missile(entry.unit); }
     g_clientMissiles.clear();
     g_clientMissileSoundEvents.clear();
+    g_unitFxEvents.clear();
+    g_unitOverlays.clear();
 }
 
 // Recovered table-driven ordinary flight and separate static impact265 descriptor.
@@ -2062,13 +2234,13 @@ static void advance_client_missiles() {
 // The client's per-frame player update (1.13c D2Client+0x1C150) reads a per-mode table of
 // (class, frame kind, end kind). These are the modes whose end kind is 2 or 3: get hit, both
 // attacks, block, cast, throw, kick and the four skill modes. Each ends itself when its frame
-// cycle ends; the client does not wait for the server. Sequence (18) has the same end kind but
-// its frames advance through the sequence tables, which this path does not drive.
+// cycle ends; the client does not wait for the server. Sequence (18) has the same end kind; its
+// frames advance through the sequence the used skill started.
 static bool player_mode_ends_itself(uint32_t mode) {
     switch (mode) {
     case PLRMODE_GETHIT: case PLRMODE_ATTACK1: case PLRMODE_ATTACK2: case PLRMODE_BLOCK:
     case PLRMODE_CAST: case PLRMODE_THROW: case PLRMODE_KICK: case PLRMODE_SPECIAL1:
-    case PLRMODE_SPECIAL2: case PLRMODE_SPECIAL3: case PLRMODE_SPECIAL4: return true;
+    case PLRMODE_SPECIAL2: case PLRMODE_SPECIAL3: case PLRMODE_SPECIAL4: case PLRMODE_SEQUENCE: return true;
     default: return false;
     }
 }
@@ -2089,7 +2261,8 @@ static bool advance_client_player_action(D2UnitStrc* unit) {
         }
         unit->dwFlags |= 0x40u; // Marked even when nothing was emitted.
     }
-    if (!unit->dwFrameCountPrecise) UNITS_SetAnimStartFrame(unit);
+    // A sequence is never restarted here: its count running out is its end.
+    if (!unit->dwFrameCountPrecise && unit->dwAnimMode != PLRMODE_SEQUENCE) UNITS_SetAnimStartFrame(unit);
     if (!UNITS_IsAtEndOfFrameCycle(unit)) UNITS_StopSequence(unit);
     if (UNITS_IsAtEndOfFrameCycle(unit)) {
         UNITS_SetUsedSkill(unit, nullptr);
@@ -2103,67 +2276,158 @@ static bool advance_client_player_action(D2UnitStrc* unit) {
     return true;
 }
 
-// A bounded natural Fire Bolt/Fireball start for a remote caster. The owning local client normally
-// starts its skill before sending; local prediction and client missiles are separate paths.
-static int apply_remote_projectile_start(const uint8_t* packet, int length) {
-    struct Ops {
-        bool isPlayerType(uint8_t type) const { return type == UNIT_PLAYER; }
-        bool isNaturalProjectile(uint32_t skill) const { return is_natural_client_projectile(skill & 0xffffu); }
-        D2UnitStrc* resolveRemoteCaster(uint32_t guid) const {
-            auto it = std::find_if(g_players.begin(), g_players.end(), [guid](const auto& player) {
-                return player.view.guid == guid;
-            });
-            if (it == g_players.end() || static_cast<int>(it - g_players.begin()) == g_selectedPlayer) return nullptr;
-            return it->motionUnit;
-        }
-        bool casterCanStart(D2UnitStrc* unit) const {
-            auto* room = unit ? UNITS_GetRoom(unit) : nullptr;
-            return unit && unit->pDynamicPath && room && !DUNGEON_IsRoomInTown(room);
-        }
-        D2UnitStrc* resolveMonster(uint8_t type, uint32_t guid) const {
-            // Bound retained relations to the monster lifetime cleanup implemented here.
-            if (type != UNIT_MONSTER) return nullptr;
-            auto* resolved = find_realm_client_unit(type, guid);
-            return resolved && UNITS_GetRoom(resolved) ? resolved : nullptr;
-        }
-        int x(D2UnitStrc* unit) const { return UNITS_GetXPosition(unit); }
-        int y(D2UnitStrc* unit) const { return UNITS_GetYPosition(unit); }
-        bool skillCanStart(D2UnitStrc*, const D2RealmPlayerCast& cast) const {
-            const int skillId = cast.opcode == 0x4d ? static_cast<int>(cast.skill & 0xffffu) : static_cast<int>(cast.skill);
-            auto* txt = DATATBLS_GetSkillsTxtRecord(skillId);
-            return txt && txt->wCltStFunc == 0 && txt->wCltDoFunc == 0 && txt->nAnim == PLRMODE_CAST;
-        }
-        bool prepareStart(D2UnitStrc* unit) const {
-            if (!unit->pSkills) unit->pSkills = SKILLS_AllocSkillList(nullptr);
-            if (!unit->pSkills) return false;
-            PATH_ResetToPreviousType(unit->pDynamicPath);
-            return true;
-        }
-        void setAim(D2UnitStrc* unit, int x, int y) const {
-            D2COMMON_10170_PathSetTargetPos(unit->pDynamicPath, x, y);
-        }
-        void setTarget(D2UnitStrc* unit, D2UnitStrc* target) const {
-            UNITS_SetTargetUnitForDynamicUnit(unit, target);
-        }
-        bool start(D2UnitStrc* unit, const D2RealmPlayerCast& cast,
-                D2UnitStrc*, int targetX, int targetY) const {
-            UNITS_UpdateDirectionAndSpeed(unit, targetX, targetY);
-            const int skillId = cast.opcode == 0x4d ? static_cast<int>(cast.skill & 0xffffu) : static_cast<int>(cast.skill);
-            D2SkillStrc* skill = nullptr;
-            if (cast.opcode == 0x4c) {
-                SKILLS_AssignSkill(unit, skillId, cast.skillLevel, FALSE, __FILE__, __LINE__);
-                skill = SKILLS_GetSkillById(unit, skillId, -1);
-            } else {
-                // 0x4D byte +10 is hand selection. The canonical 0x94 skill list owns level.
-                skill = unit->pSkills ? SKILLS_GetSkillById(unit, skillId, -1) : nullptr;
-            }
-            if (!skill) return false;
-            UNITS_SetUsedSkill(unit, skill);
-            unit->dwFlags &= ~0x40u;
-            return UNITS_ChangeAnimMode(unit, SKILLS_GetSkillModeFromUnit(unit, skill)) != 0;
-        }
-    };
-    return d2::realm::applyRemoteProjectileCastPacket<D2UnitStrc>(packet, length, Ops{});
+// The mode change of an action (1.13c D2Client+0x2A6C0): the "do" mark is cleared and, when the
+// mode really changes, the struck overlay is considered. The mode's own sound is the page's, keyed
+// on the mode change it reads back.
+static void client_set_mode(D2UnitStrc* unit, int mode) {
+    unit->dwFlags &= ~0x40u;
+    const uint32_t previous = unit->dwAnimMode;
+    if (unit->dwUnitType == UNIT_MONSTER) d2_realm_client_unit_set_mode(unit, static_cast<uint32_t>(mode));
+    else UNITS_ChangeAnimMode(unit, mode);
+    if (previous != unit->dwAnimMode) emit_hit_overlay(unit);
+}
+
+// An action that could not start leaves the unit standing (1.13c D2Client+0x19710 for a player,
+// the stop action for a monster). The dead stay as they are.
+static void client_stop_unit(D2UnitStrc* unit) {
+    unit->dwFlags &= ~0x40u;
+    if (unit->dwUnitType == UNIT_PLAYER) {
+        if (unit->dwAnimMode == PLRMODE_DEATH || unit->dwAnimMode == PLRMODE_DEAD) return;
+        auto* room = UNITS_GetRoom(unit);
+        client_set_mode(unit, room && DUNGEON_IsRoomInTown(room) ? PLRMODE_TOWNNEUTRAL : PLRMODE_NEUTRAL);
+    } else if (unit->dwUnitType == UNIT_MONSTER) {
+        if (unit->dwAnimMode != MONMODE_DEATH && unit->dwAnimMode != MONMODE_DEAD) client_set_mode(unit, MONMODE_NEUTRAL);
+    }
+}
+
+// The hit class of a unit's own swing: the weapon in a player's hand (0 unarmed), a monster's
+// own from its MonStats2 row.
+static uint32_t client_weapon_hit_class(D2UnitStrc* unit) {
+    if (unit->dwUnitType == UNIT_PLAYER) {
+        auto* weapon = unit->pInventory ? D2Common_10434(unit, FALSE) : nullptr;
+        return weapon ? ITEMS_GetHitClassFromItem(weapon) : 0;
+    }
+    if (unit->dwUnitType == UNIT_MONSTER) {
+        auto* stats2 = UNITS_GetMonStats2TxtRecordFromMonsterId(unit->dwClassId);
+        return stats2 ? stats2->nHitClass : 0;
+    }
+    return 0;
+}
+
+// The previous action is completed before a new one starts (1.13c D2Client+0x197D0): a used
+// skill that has not done its "do" yet does it now, and the used skill is dropped.
+// PARTIAL: the "do" is the client missile of a plain projectile skill only.
+static void complete_previous_action(D2UnitStrc* unit) {
+    auto* previous = UNITS_GetUsedSkill(unit);
+    if (!previous) return;
+    const int flags = SKILLS_GetFlags(previous);
+    if (unit->dwUnitType == UNIT_PLAYER &&
+            is_natural_client_projectile(SKILLS_GetSkillIdFromSkill(previous, __FILE__, __LINE__)) &&
+            unit->dwAnimMode == PLRMODE_CAST && ((flags & 1) || !(unit->dwFlags & 0x40u))) {
+        if (flags & 1) SKILLS_SetFlags(previous, flags | 2);
+        create_client_projectile(unit, previous);
+    }
+    UNITS_SetUsedSkill(unit, nullptr);
+}
+
+// One skill start for every unit: the selected player's own click, another player's and a
+// monster's from the server (1.13c D2Client+0xA22B0 at a spot, +0xA30C0 on a unit, both ending
+// in +0xA1CF0). The caller has completed the previous action and reset the path.
+struct ClientSkillStart {
+    int id = 0;
+    int level = 0;                 // the server's; unused for the selected player
+    D2SkillStrc* skill = nullptr;  // the selected player's own skill of the hand
+    D2UnitStrc* target = nullptr;
+    int x = 0, y = 0;
+    bool onUnit = false;
+    bool local = false;
+};
+// 1 started, 0 not.
+//  - aim: a spot becomes the path's target and the unit turns to it; a unit becomes the path's
+//    target unit and is faced. A start on a unit that is not there stops the unit;
+//  - a dead monster is a target only for a skill that takes corpses, when the skill searches
+//    for its enemy by position;
+//  - another unit's skill is assigned at the level the server sent and becomes its used skill;
+//  - in town a skill without the InTown flag drops the used skill and stops the unit;
+//  - the mode is the skill's own (a player's plain Attack takes Attack 1); a skill without a
+//    mode leaves a player or monster in mode 1. A Sequence mode starts the skill's sequence;
+//  - the start's sounds and overlay follow the Skills row (client_skill_fx.h).
+// GUESS (level clamp): retail clamps another unit's level through +0x17B0, not read; the server's
+// level is taken as sent. Settled by decompiling +0x17B0.
+// GUESS (use state): the use-state test (mana, charges, quantity) is applied to the selected
+// player only; this client does not hold other units' mana. Settled by a capture of +0xA1CF0 on
+// a remote unit with zero mana.
+// GUESS (repeat): the "already repeating" test that lets a Repeat skill keep its mode is taken as
+// failing, so the mode is always set. Settled by decompiling D2Common ordinal 10494's use here.
+// GUESS (second attack): retail's +0xA1260 picks Attack 2 for a player's plain Attack from the
+// weapons in hand and a 50% roll on the unit's seed; every swing here is Attack 1. Settled by a
+// function capture of +0xA1260 over one-handed, two-handed and dual-wield inventories.
+// NOT PORTED: the line-of-sight test of rows with a range class, the gate +0xA5B90, the
+// pre-aim call +0xA0660 and the 53 client start functions (the row's cltstfunc; each is taken as
+// succeeding, so a start that retail would refuse there still plays its sounds). The client
+// missile (+0xA0F60) is created at the action frame for plain projectile skills only.
+static int client_skill_start(D2UnitStrc* unit, const ClientSkillStart& s) {
+    if (!unit || !unit->pDynamicPath) return 0;
+    if (s.onUnit && !s.target) {
+        client_stop_unit(unit);
+        return 0;
+    }
+    if (!d2::realm::applyCastTargetRelation(s.onUnit ? 0x4c : 0x4d, s.target, s.x, s.y,
+            [unit](int tx, int ty) { D2COMMON_10170_PathSetTargetPos(unit->pDynamicPath, tx, ty); },
+            [unit](D2UnitStrc* relation) { UNITS_SetTargetUnitForDynamicUnit(unit, relation); })) return 0;
+    if (s.x != UNITS_GetXPosition(unit) || s.y != UNITS_GetYPosition(unit)) UNITS_UpdateDirectionAndSpeed(unit, s.x, s.y);
+
+    auto* txt = DATATBLS_GetSkillsTxtRecord(s.id);
+    if (!txt) return 0;
+    const uint32_t rowFlags = txt->dwFlags[0];
+    if (s.target && s.target->dwUnitType == UNIT_MONSTER && s.target->dwAnimMode == MONMODE_DEAD &&
+        (rowFlags & static_cast<uint32_t>(SKILLSFLAG_SEARCHENEMYXY)) &&
+        !(rowFlags & static_cast<uint32_t>(SKILLSFLAG_TARGETCORPSE))) return 0;
+
+    D2SkillStrc* skill = s.skill;
+    if (!s.local) {
+        if (!unit->pSkills) unit->pSkills = SKILLS_AllocSkillList(nullptr);
+        if (!unit->pSkills) return 0;
+        SKILLS_AssignSkill(unit, s.id, s.level, FALSE, __FILE__, __LINE__);
+        skill = SKILLS_GetSkillById(unit, s.id, -1);
+    }
+    if (!skill || !skill->pSkillsTxt) return 0;
+    if (s.local && SKILLS_GetUseState(unit, skill) != 0) return 0;
+    UNITS_SetUsedSkill(unit, skill);
+
+    auto* room = UNITS_GetRoom(unit);
+    if (!(rowFlags & static_cast<uint32_t>(SKILLSFLAG_INTOWN)) && room && DUNGEON_IsRoomInTown(room)) {
+        UNITS_SetUsedSkill(unit, nullptr);
+        client_stop_unit(unit);
+        return 0;
+    }
+
+    const bool isPlayer = unit->dwUnitType == UNIT_PLAYER;
+    const int mode = isPlayer && s.id == 0 ? PLRMODE_ATTACK1 : SKILLS_GetSkillModeFromUnit(unit, skill);
+    if (mode != 0 || isPlayer || unit->dwUnitType == UNIT_MONSTER) client_set_mode(unit, mode ? mode : 1);
+
+    d2::realm::SkillFxRow row;
+    row.stSoundDelay = (rowFlags & static_cast<uint32_t>(SKILLSFLAG_STSOUNDDELAY)) != 0;
+    row.weaponSound = (rowFlags & static_cast<uint32_t>(SKILLSFLAG_WEAPONSND)) != 0;
+    row.stSound = static_cast<int16_t>(txt->wStSound);
+    row.stSoundClass = static_cast<int16_t>(txt->nStSoundClass);
+    row.castOverlay = static_cast<int16_t>(txt->wCastOverlay);
+    row.itemCastSound = static_cast<int16_t>(txt->wItemCastSound);
+    row.itemCastOverlay = static_cast<int16_t>(txt->wItemCastOverlay);
+    row.charClass = static_cast<int8_t>(txt->nCharClass);
+    d2::realm::SkillFxUnit actor;
+    actor.isPlayer = isPlayer;
+    actor.classId = unit->dwClassId;
+    actor.hitClass = client_weapon_hit_class(unit);
+    actor.animSpeed = static_cast<uint32_t>(static_cast<int32_t>(unit->wAnimSpeed));
+    const auto plan = d2::realm::skillStartFx(row, actor, skill->nOwnerGUID != -1,
+        sgptDataTables->nOverlayTxtRecordCount);
+    for (int i = 0; i < plan.sounds; ++i)
+        record_unit_fx(static_cast<uint32_t>(plan.sound[i].kind), unit, static_cast<uint32_t>(plan.sound[i].row),
+            static_cast<uint32_t>(plan.sound[i].delay), static_cast<uint32_t>(s.id));
+    if (plan.overlay > 0 && !unit_carries_overlay(unit, static_cast<uint32_t>(plan.overlay)))
+        start_unit_overlay(unit, plan.overlay, static_cast<uint32_t>(s.id));
+    return 1;
 }
 
 static D2UnitStrc* selected_player_unit() {
@@ -2177,16 +2441,11 @@ static D2UnitStrc* selected_player_unit() {
 // either hand takes this path: at a spot (client action 0x15) or on a unit (0x16). 1 started, 0 refused.
 //  - gate (+0x29F30): a used skill whose row lacks Interrupt refuses a new action unless the
 //    unit stands in a neutral mode;
-//  - the previous action is completed first, then the skill's use state is checked;
-//  - in town a skill without the InTown flag drops the used skill and starts nothing (+0xA1CF0);
-//  - the mode is the skill's own (its row's anim, kept on the skill since it was added); the
-//    plain Attack of a player takes Attack 1.
-// GUESS (second attack): retail's +0xA1260 picks Attack 2 for the plain Attack from the weapons in
-// hand and a 50% roll on the unit's seed; that pick is not ported, so every swing is Attack 1.
-// Settled by a function capture of +0xA1260 over one-handed, two-handed and dual-wield inventories.
-// PARTIAL: the Skills row's client start function (cltstfunc table) is not run, so a skill's
-// start overlay and start sound do not play; a skill whose mode is Sequence (Zeal, Fury, Jab, ...)
-// is accepted and sent but shows no local animation.
+//  - the previous action is completed first, then the start is the one every unit takes
+//    (client_skill_start).
+// GUESS (order of the use-state test): it is made here before the unit is aimed, so a skill the
+// player cannot pay for leaves him as he is; retail makes it after the aim. Settled by a capture
+// of +0x19830 with action 0x15 and zero mana.
 static int local_skill_start(D2UnitStrc* unit, D2SkillStrc* skill, D2UnitStrc* target, int x, int y) {
     if (!unit || !skill || !skill->pSkillsTxt) return 0;
     if (unit->dwAnimMode == PLRMODE_DEATH || unit->dwAnimMode == PLRMODE_DEAD) return 0;
@@ -2194,34 +2453,22 @@ static int local_skill_start(D2UnitStrc* unit, D2SkillStrc* skill, D2UnitStrc* t
     auto* previous = UNITS_GetUsedSkill(unit);
     if (previous && previous->pSkillsTxt && !neutral &&
         !(previous->pSkillsTxt->dwFlags[0] & static_cast<uint32_t>(SKILLSFLAG_INTERRUPT))) return 0;
-    if (previous) {
-        const int flags = SKILLS_GetFlags(previous);
-        if (is_natural_client_projectile(SKILLS_GetSkillIdFromSkill(previous, __FILE__, __LINE__)) &&
-                unit->dwAnimMode == PLRMODE_CAST && ((flags & 1) || !(unit->dwFlags & 0x40u))) {
-            if (flags & 1) SKILLS_SetFlags(previous, flags | 2);
-            create_client_projectile(unit, previous);
-        }
-        UNITS_SetUsedSkill(unit, nullptr);
-    }
+    complete_previous_action(unit);
     if (SKILLS_GetUseState(unit, skill) != 0) return 0;
-    if (DUNGEON_IsRoomInTown(UNITS_GetRoom(unit)) &&
-        !(skill->pSkillsTxt->dwFlags[0] & static_cast<uint32_t>(SKILLSFLAG_INTOWN))) return 0;
-    const int skillId = SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__);
-    const int mode = skillId == 0 ? PLRMODE_ATTACK1 : SKILLS_GetSkillModeFromUnit(unit, skill);
-    if (mode == PLRMODE_SEQUENCE) return 1;
     PATH_ResetToPreviousType(unit->pDynamicPath);
-    if (!d2::realm::applyCastTargetRelation(target ? 0x4c : 0x4d, target, x, y,
-            [unit](int tx, int ty) { D2COMMON_10170_PathSetTargetPos(unit->pDynamicPath, tx, ty); },
-            [unit](D2UnitStrc* relation) { UNITS_SetTargetUnitForDynamicUnit(unit, relation); })) return 0;
-    UNITS_UpdateDirectionAndSpeed(unit, x, y);
-    UNITS_SetUsedSkill(unit, skill);
-    unit->dwFlags &= ~0x40u;
-    if (mode) UNITS_ChangeAnimMode(unit, mode);
-    return 1;
+    ClientSkillStart start;
+    start.id = SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__);
+    start.skill = skill;
+    start.target = target;
+    start.x = x;
+    start.y = y;
+    start.onUnit = target != nullptr;
+    start.local = true;
+    return client_skill_start(unit, start);
 }
 
 static D2SkillStrc* hand_skill(D2UnitStrc* unit, int hand) {
-    return hand ? UNITS_GetRightSkill(unit) : UNITS_GetLeftSkill(unit);
+    return d2_realm_client_hand_skill(unit, hand, PlayerSkillOps{});
 }
 
 // The left (hand 0) or right (hand 1) skill at a spot. 1 started, 0 refused.
@@ -2358,75 +2605,58 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_local_action_done() {
     }
 }
 
-// Apply the server's targeted-skill start to a remote player's canonical CUnit.
-static int apply_remote_unit_skill_start(const uint8_t* packet, int length) {
-    D2RealmPlayerCast cast{};
-    if (!d2_realm_d2gs_parse_player_cast(packet, length, &cast)) return -1;
-    struct Ops {
-        D2UnitStrc* resolvePlayer(uint32_t guid) const {
-            for (const auto& player : g_players)
-                if (player.view.guid == guid) return player.motionUnit;
-            return nullptr;
+// The server starts a skill on a unit: 0x4C on a target unit, 0x4D at a spot (1.13c
+// D2Client+0xAF1D0 and +0xAF160, client actions 0x16 and 0x15). A player and a monster both take
+// the start the selected player takes; the selected player has already started his own.
+// A dead caster is left alone (a safety of this port, not read from retail).
+// NOT PORTED: a monster whose skill mode is Sequence runs +0x4D5B0 first, not read.
+static int apply_skill_start_packet(const uint8_t* packet, int length) {
+    d2::realm::SkillStartRequest request;
+    if (!d2::realm::decodeSkillStart(packet, length, &request)) return -1;
+    ClientSkillStart start;
+    start.id = static_cast<int>(request.skill & 0xffffu);
+    start.level = request.level;
+    start.onUnit = request.onUnit;
+    start.x = request.x;
+    start.y = request.y;
+    if (request.onUnit) {
+        auto* target = find_realm_client_unit(request.targetType, request.targetGuid);
+        if (target && target->pDynamicPath && UNITS_GetRoom(target)) {
+            start.target = target;
+            start.x = UNITS_GetXPosition(target);
+            start.y = UNITS_GetYPosition(target);
         }
-        bool isRemotePlayer(D2UnitStrc* unit, uint32_t guid) const {
-            const auto it = std::find_if(g_players.begin(), g_players.end(), [guid, unit](const auto& player) {
-                return player.view.guid == guid && player.motionUnit == unit;
-            });
-            return it != g_players.end() && static_cast<int>(it - g_players.begin()) != g_selectedPlayer;
-        }
-        D2UnitStrc* resolveTarget(uint8_t type, uint32_t guid) const {
-            if (type == UNIT_PLAYER) {
-                for (const auto& player : g_players)
-                    if (player.view.guid == guid) return player.motionUnit;
-            } else if (type == UNIT_MONSTER) {
-                for (const auto& monster : g_monsters)
-                    if (monster.view.guid == guid) return monster.motionUnit;
-            }
-            return nullptr;
-        }
-        bool hasCanonicalIdentity(D2UnitStrc* unit, uint32_t guid, uint8_t type) const {
-            return unit && unit->dwUnitType == type && unit->dwUnitId == guid;
-        }
-        bool bothUnitsInActiveRooms(D2UnitStrc* caster, D2UnitStrc* target) const {
-            return UNITS_GetRoom(caster) && UNITS_GetRoom(target);
-        }
-        bool casterCanStart(D2UnitStrc* unit) const {
-            auto* room = UNITS_GetRoom(unit);
-            return unit->pDynamicPath && room && !DUNGEON_IsRoomInTown(room) &&
-                unit->dwAnimMode != PLRMODE_DEATH && unit->dwAnimMode != PLRMODE_DEAD;
-        }
-        bool skillSupported(uint32_t id) const {
-            auto* txt = DATATBLS_GetSkillsTxtRecord(static_cast<int>(id));
-            return is_natural_client_projectile(static_cast<int>(id)) && txt &&
-                txt->wCltStFunc == 0 && txt->wCltDoFunc == 0 && txt->nAnim == PLRMODE_CAST;
-        }
-        bool ensureSkillList(D2UnitStrc* unit) const {
-            if (!unit->pSkills) unit->pSkills = SKILLS_AllocSkillList(nullptr);
-            return unit->pSkills != nullptr;
-        }
-        void assignNaturalSkill(D2UnitStrc* unit, uint32_t id, uint8_t level) const {
-            SKILLS_AssignSkill(unit, static_cast<int>(id), level, FALSE, __FILE__, __LINE__);
-        }
-        D2SkillStrc* findSkill(D2UnitStrc* unit, uint32_t id) const {
-            return SKILLS_GetSkillById(unit, static_cast<int>(id), -1);
-        }
-        int x(D2UnitStrc* unit) const { return UNITS_GetXPosition(unit); }
-        int y(D2UnitStrc* unit) const { return UNITS_GetYPosition(unit); }
-        void resetPath(D2UnitStrc* unit) const { PATH_ResetToPreviousType(unit->pDynamicPath); }
-        void setPathTarget(D2UnitStrc* unit, int x, int y) const {
-            D2COMMON_10170_PathSetTargetPos(unit->pDynamicPath, x, y);
-        }
-        void updateFacing(D2UnitStrc* unit, int x, int y) const { UNITS_UpdateDirectionAndSpeed(unit, x, y); }
-        void setTargetUnit(D2UnitStrc* unit, D2UnitStrc* target) const {
-            UNITS_SetTargetUnitForDynamicUnit(unit, target);
-        }
-        void setUsedSkill(D2UnitStrc* unit, D2SkillStrc* skill) const { UNITS_SetUsedSkill(unit, skill); }
-        void clearCastEventFlag(D2UnitStrc* unit) const { unit->dwFlags &= ~0x40u; }
-        bool startSkillMode(D2UnitStrc* unit, D2SkillStrc* skill) const {
-            return UNITS_ChangeAnimMode(unit, SKILLS_GetSkillModeFromUnit(unit, skill)) != 0;
-        }
-    } ops;
-    return d2::realm::applyRemoteUnitSkillStart(cast, ops);
+    }
+    if (request.unitType == UNIT_PLAYER) {
+        const auto it = std::find_if(g_players.begin(), g_players.end(), [&request](const auto& player) {
+            return player.view.guid == request.guid;
+        });
+        if (it == g_players.end() || static_cast<int>(it - g_players.begin()) == g_selectedPlayer) return 0;
+        D2UnitStrc* unit = it->motionUnit;
+        if (!unit || !unit->pDynamicPath || !UNITS_GetRoom(unit)) return 0;
+        if (unit->dwAnimMode == PLRMODE_DEATH || unit->dwAnimMode == PLRMODE_DEAD) return 0;
+        if (start.target == unit) start.target = nullptr;
+        complete_previous_action(unit);
+        PATH_ResetToPreviousType(unit->pDynamicPath);
+        if (client_skill_start(unit, start)) return 1;
+        client_stop_unit(unit);
+        return 0;
+    }
+    if (request.unitType == UNIT_MONSTER) {
+        const auto it = std::find_if(g_monsters.begin(), g_monsters.end(), [&request](const auto& monster) {
+            return monster.view.guid == request.guid;
+        });
+        if (it == g_monsters.end()) return 0;
+        D2UnitStrc* unit = it->motionUnit;
+        if (!unit || !unit->pDynamicPath || !UNITS_GetRoom(unit)) return 0;
+        if (unit->dwAnimMode == MONMODE_DEATH || unit->dwAnimMode == MONMODE_DEAD) return 0;
+        if (start.target == unit) start.target = nullptr;
+        PATH_ResetToPreviousType(unit->pDynamicPath);
+        const int started = client_skill_start(unit, start);
+        refresh_monster_motion_view(*it);
+        return started;
+    }
+    return 0;
 }
 
 // Permanent native gate readback for selected cast failures; no state mutation.
@@ -2650,6 +2880,17 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_realm_client_belt_index() {
     return worn && worn->dwUnitType == UNIT_ITEM ? static_cast<uint32_t>(UNITS_GetBeltType(worn)) : 2;
 }
 
+// The items a player holds (guid 0: the selected player), 12 words each; see d2_realm_client_unit_items.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_items(uint32_t ownerGuid, uint32_t* out, int capacity) {
+    return d2_realm_client_unit_items(ownerGuid ? find_realm_client_unit(UNIT_PLAYER, ownerGuid)
+        : selected_player_unit(), out, capacity);
+}
+
+// The item-box colour tests of one held item against the selected player.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_realm_client_item_box_state(uint32_t guid) {
+    return d2_realm_client_unit_item_box_state(selected_player_unit(), guid);
+}
+
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_stat(uint32_t guid, int stat) {
     if (stat < 0 || stat > 255) return 0;
     for (auto& player : g_players) if (player.view.guid == guid && player.motionUnit)
@@ -2730,6 +2971,104 @@ static int apply_player_skills(const uint8_t* packet, int length) {
     return 0;
 }
 
+// Game flags (0x01), the NPC speech marks (0x8A, 0x28) and the pet list with the hireling's stats (0x81,
+// 0x7F, 0x9E..0xA2): the state lives in d2gs_client_game_packets.h, the unit lookups are done here.
+static d2::realm::GameInfo g_gameInfo;
+static d2::realm::NpcAlertState g_npcAlerts;
+static d2::realm::PetState g_pets;
+
+static void clear_game_packet_state() {
+    g_gameInfo = {};
+    g_npcAlerts = {};
+    g_pets = {};
+}
+
+static const D2RealmClientMonster* game_packet_monster(uint32_t guid) {
+    for (const auto& monster : g_monsters) if (monster.view.guid == guid) return &monster;
+    return nullptr;
+}
+
+static bool game_packet_class_is_npc(uint32_t classId) {
+    const D2MonStatsTxt* stats = DATATBLS_GetMonStatsTxtRecord(static_cast<int>(classId));
+    return stats && (stats->dwMonStatsFlags & MONSTATSFLAG_NPC);
+}
+
+static void game_packet_unit_removed(uint32_t guid) {
+    d2::realm::npcAlertUnitRemoved(g_npcAlerts, guid);
+    d2::realm::petUnitRemoved(g_pets, guid);
+}
+
+// Returns 1 when the packet changed client state, 0 when the retail handler would have left it alone.
+static int apply_game_state_packet(const uint8_t* packet, int size) {
+    using namespace d2::realm;
+    switch (packet[0]) {
+        case 0x01:
+            if (!gameInfoApply(g_gameInfo, packet, size)) return 0;
+            // The one difficulty the client keeps. The game has three; a byte naming none of them would
+            // send the next act load to tables that do not exist, so the kept one stands.
+            if (g_gameInfo.difficulty <= 2) g_clientDifficulty = g_gameInfo.difficulty;
+            return 1;
+        case 0x8a: {
+            // Only monsters carry the mark here; the other unit kinds are not drawn with one.
+            const D2RealmClientMonster* unit = size == 6 && packet[1] == UNIT_MONSTER ? game_packet_monster(gamePktU32(packet + 2)) : nullptr;
+            return npcAlertApply(g_npcAlerts, packet, size, unit != nullptr, unit ? unit->view.classId : 0) == NpcAlertResult::Marked;
+        }
+        case 0x28: {
+            bool found = false;
+            if (size == 103 && packet[1] == UNIT_MONSTER) found = game_packet_monster(gamePktU32(packet + 2)) != nullptr;
+            else if (size == 103 && packet[1] == UNIT_PLAYER) {
+                for (const auto& player : g_players) if (player.view.guid == gamePktU32(packet + 2)) found = true;
+            }
+            return npcInteractReplyApply(g_npcAlerts, packet, size, found, game_packet_class_is_npc) > 0;
+        }
+        case 0x81: return petAssignApply(g_pets, packet, size);
+        case 0x7f: return size == 10 && petLifeApply(g_pets, packet, size, game_packet_monster(gamePktU32(packet + 4)) != nullptr);
+        default: return size >= 7 && petStatApply(g_pets, packet, size, game_packet_monster(gamePktU32(packet + 2)) != nullptr);
+    }
+}
+
+// The game flags the server's 0x01 set. out[0..4] = difficulty, game flags, expansion, ladder, and the
+// same in the save-flag layout a local game's client flags use. Returns 0 until the packet has arrived.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_game_info(uint32_t* out) {
+    if (!out || !g_gameInfo.received) return 0;
+    out[0] = g_gameInfo.difficulty; out[1] = g_gameInfo.gameFlags; out[2] = g_gameInfo.expansion; out[3] = g_gameInfo.ladder;
+    out[4] = d2::realm::gameInfoSaveFlags(g_gameInfo);
+    return 1;
+}
+
+// The guids of the units carrying the speech mark. Returns the count written.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_npc_alerts(uint32_t* out, int cap) {
+    int n = 0;
+    for (const auto& alert : g_npcAlerts.alerts) { if (!out || n >= cap) break; out[n++] = alert.guid; }
+    return n;
+}
+
+// The NPC whose menu is open (active != 0) is not marked by a later 0x8A; closing the menu clears it.
+EMSCRIPTEN_KEEPALIVE void d2_realm_client_set_active_npc(int active, uint32_t guid) {
+    g_npcAlerts.hasActiveNpc = active ? 1u : 0u;
+    g_npcAlerts.activeNpc = active ? guid : 0u;
+}
+
+// The pet list, newest first: nine words per pet (class, kind, guid, owner, area, life percentage, seed,
+// name id, unit present). Returns the count written.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_pets(uint32_t* out, int cap) {
+    int n = 0;
+    for (const auto& pet : g_pets.pets) {
+        if (!out || n >= cap) break;
+        uint32_t* o = out + n++ * 9;
+        o[0] = pet.classId; o[1] = pet.kind; o[2] = pet.guid; o[3] = pet.owner; o[4] = pet.area; o[5] = pet.lifePct;
+        o[6] = pet.seed; o[7] = pet.nameId; o[8] = game_packet_monster(pet.guid) ? 1u : 0u;
+    }
+    return n;
+}
+
+// A stat the server set on a pet unit; INT32_MIN when it never sent one.
+EMSCRIPTEN_KEEPALIVE int32_t d2_realm_client_pet_stat(uint32_t guid, int32_t stat) {
+    int32_t value = 0;
+    return d2::realm::petStatGet(g_pets, guid, stat, &value) ? value : INT32_MIN;
+}
+
+
 // ---- Server packets --------------------------------------------------------------------------------------
 // Every packet reaches its handler the way the retail client's does: the D2Net size rule frames it, the
 // client's dispatch loop (d2c_ace20) looks its opcode up in the client's packet table, checks the size and
@@ -2754,10 +3093,27 @@ static int pkt_game_chat(const uint8_t* packet, int size) {
 }
 static int pkt_remove_unit(const uint8_t* packet, int size) {
     if (size != 6) return -2;
-    D2cRemoveEnv env{ &g_pktEnv, 0, 0, nullptr, unit_remove_cb };
+    // The handler keeps my own hireling when the server drops it from view: it finds it in the pet list.
+    d2::realm::clientPetImageHero(selected_player_guid());
+    D2cRemoveEnv env{ &g_pktEnv, d2::realm::kPetHeroRecord, d2::realm::clientPetImageRead(d2::realm::kPetHeadSlot),
+        [](uintptr_t address) { return d2::realm::clientPetImageRead(static_cast<uint32_t>(address)); }, unit_remove_cb };
     g_removePacket = packet; g_removeLength = size; g_removeResult = 0;
     d2c_aca40(&env, packet);
     return g_removeResult;
+}
+// 0x81 feeds two lists: the client's pet list, and the mercenary roster's own entry of the same packet.
+static int pkt_pet_assign(const uint8_t* packet, int size) {
+    if (!d2::realm::clientPetPacket81(packet, size)) return -2;
+    apply_game_state_packet(packet, size);
+    return 1;
+}
+// 0x09 assigns a unit by type, guid, class and position. The server sends it for tile units: the level exits.
+static int pkt_tile_assign(const uint8_t* packet, int size) { return d2_realm_client_warps_on_assign(g_warps, packet, size) < 0 ? -2 : 0; }
+static int pkt_quest_game_record(const uint8_t* packet, int size) { return d2_realm_client_quests_on_game_record(g_quests, packet, size) ? 0 : -2; }
+static int pkt_quest_log_states(const uint8_t* packet, int size) { return d2_realm_client_quests_on_log_states(g_quests, packet, size) ? 0 : -2; }
+static int pkt_quest_state(const uint8_t* packet, int size) { return d2_realm_client_quests_on_state(g_quests, packet, size) ? 0 : -2; }
+static int pkt_pet_owner(const uint8_t* packet, int size) {
+    return d2::realm::clientPetPacket7A(packet, size, selected_player_guid()) ? 1 : -2;
 }
 static int pkt_object_assign(const uint8_t* packet, int size) {
     if (size != 14) return -2;
@@ -2795,6 +3151,7 @@ static int pkt_load_act(const uint8_t* packet, int /*size*/) {
     g_monsters.clear();
     g_monsterViews.clear();
     clear_objects();
+    g_warps.list.clear();
     clear_monster_death_mode_events();
     store_selected_player();
     g_world.hasLoadAct = 1;
@@ -2902,7 +3259,7 @@ static int pkt_map_hide(const uint8_t* packet, int /*size*/) {
                 static_cast<int>(g_player.clientRoomTileX), static_cast<int>(g_player.clientRoomTileY), room))
             detach_player_motion_path(player);
     }
-    for (D2UnitStrc* unit : g_objectUnits) {
+    for (D2UnitStrc* unit = d2gs_client_object_next(nullptr); unit; unit = d2gs_client_object_next(unit)) {
         D2ActiveRoomStrc* room = UNITS_GetRoom(unit);
         if (room && d2_drlg_client_room_freed_by_hide(static_cast<int>(level), static_cast<int>(x),
                 static_cast<int>(y), hasPlayer, static_cast<int>(g_player.clientRoomLevel),
@@ -2913,6 +3270,8 @@ static int pkt_map_hide(const uint8_t* packet, int /*size*/) {
         hasPlayer, static_cast<int>(g_player.clientRoomLevel), static_cast<int>(g_player.clientRoomTileX), static_cast<int>(g_player.clientRoomTileY))) return -3;
     refresh_all_player_motion_rooms();
     for (auto& monster : g_monsters) create_monster_motion(monster);
+    // A tile unit leaves with its room.
+    d2_realm_client_warps_keep_in_rooms(g_warps, [](int wx, int wy) { return d2_drlg_client_active_room(wx, wy) != nullptr; });
     g_world.mapHideCount++;
     g_world.mapRevision++;
     g_world.hasMapReveal = d2_drlg_client_tile_count() > 0;
@@ -2926,6 +3285,11 @@ static int pkt_unit_request(const uint8_t* packet, int size) {
 }
 static int pkt_select_player(const uint8_t* packet, int size) { return select_player(packet, size) < 0 ? -2 : 0; }
 static int pkt_monster_assign(const uint8_t* packet, int size) { return apply_monster_assign(packet, size) ? 1 : -4; }
+// 0x4D on an object is the object's own packet; on any other unit it starts a skill at a spot.
+static int pkt_skill_start_at(const uint8_t* packet, int size) {
+    const int result = packet[1] == UNIT_OBJECT ? apply_object_packet(packet, size) : apply_skill_start_packet(packet, size);
+    return result < 0 ? -2 : result;
+}
 // A body whose refusal rejects the stream with one fixed code.
 extern "C++" {
 template <int (*Apply)(const uint8_t*, int), int Code>
@@ -2936,11 +3300,13 @@ static int pkt_or(const uint8_t* packet, int size) { const int result = Apply(pa
 // arrival handler. A queued body runs on arrival here; this client keeps no per-unit packet queue.
 struct RealmPacketHandler { uint32_t handler; RealmPacketBody body; };
 static const RealmPacketHandler kRealmPacketHandlers[] = {
+    { 0xafa90, apply_game_state_packet },                       // 0x01
     { 0xadb50, pkt_load_act },                                  // 0x03
     { 0xadfe0, pkt_load_complete },                             // 0x04
     { 0xacb70, pkt_unload_complete },                           // 0x05
     { 0xac440, pkt_map_reveal },                                // 0x07
     { 0xac3d0, pkt_map_hide },                                  // 0x08
+    { 0xadf70, pkt_tile_assign },                               // 0x09
     { 0xaca40, pkt_remove_unit },                               // 0x0a
     { 0xad6e0, pkt_select_player },                             // 0x0b
     { 0xaf5f0, pkt_unit_request },                              // 0x0c
@@ -2957,11 +3323,15 @@ static const RealmPacketHandler kRealmPacketHandlers[] = {
     { 0xac800, pkt_or<apply_player_skill_update, -2> },         // 0x22
     { 0xac780, pkt_or<apply_player_skills, -2> },               // 0x23
     { 0xaf9f0, pkt_game_chat },                                 // 0x26
-    { 0xaf1d0, pkt_or<apply_remote_unit_skill_start, -2> },     // 0x4c
-    { 0xaf160, pkt_or<apply_remote_projectile_start, -2> },     // 0x4d
+    { 0xafa70, apply_game_state_packet },                       // 0x28
+    { 0xac330, pkt_quest_game_record },                         // 0x29
+    { 0xaf1d0, pkt_or<apply_skill_start_packet, -2> },          // 0x4c
+    { 0xaf160, pkt_skill_start_at },                            // 0x4d
     { 0xadf40, pkt_object_assign },                             // 0x51
+    { 0xad520, pkt_quest_log_states },                          // 0x52
     { 0xae9c0, pkt_environment },                               // 0x53
     { 0xadf20, pkt_or<assign_player, -3> },                     // 0x59
+    { 0xaf8f0, pkt_quest_state },                               // 0x5d
     { 0xac090, pkt_quest_available },                           // 0x5e
     { 0xaf460, pkt_unit_request },                              // 0x67
     { 0xaf3f0, pkt_unit_request },                              // 0x68
@@ -2971,10 +3341,16 @@ static const RealmPacketHandler kRealmPacketHandlers[] = {
     { 0xaf750, pkt_unit_request },                              // 0x6c
     { 0xaf2b0, pkt_unit_request },                              // 0x6d
     { 0xadef0, pkt_or<apply_corpse_drop, -2> },                 // 0x74
+    { 0xac720, pkt_pet_owner },                                 // 0x7a
+    { 0xad820, apply_game_state_packet },                       // 0x7f
+    { 0xaeba0, pkt_pet_assign },                                // 0x81
+    { 0xadb30, apply_game_state_packet },                       // 0x8a
     { 0xad130, pkt_or<apply_corpse_assign, -2> },               // 0x8e
     { 0xac880, pkt_or<apply_player_skills, -2> },               // 0x94
     { 0xaebe0, pkt_or<apply_life_mana, -2> },                   // 0x95
-    { 0xae870, pkt_or<apply_owned_item, -4> },                  // 0x9d
+    { 0xae080, pkt_or<apply_item_record, -4> },                 // 0x9c
+    { 0xae870, pkt_or<apply_item_record, -4> },                 // 0x9d
+    { 0xaea40, apply_game_state_packet },                       // 0x9e..0xa2
     { 0xadeb0, pkt_or<apply_state_packet, -4> },                // 0xa7
     { 0xadd70, pkt_or<apply_state_packet, -4> },                // 0xa8
     { 0xadd30, pkt_or<apply_state_packet, -4> },                // 0xa9
@@ -3187,6 +3563,119 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_unit_state_stat(uint8_t unitType, uint3
     return list ? STATLIST_GetStatValue(list, statId, layer) : 0;
 }
 
+// What the client knows of one unit beyond its view: whether the hero may attack it, whose pet it is, and the
+// name and second line its plate shows. The attack answer is given three ways because the page holds the
+// roster: `selectable` where the hero stands with no player hostile, and the answer outside town with the
+// roster's relation toward `rosterGuid` friendly (`enemy`) and hostile (`enemyIfHostile`).
+struct D2RealmClientUnitInfo {
+    uint32_t version;
+    uint32_t size;
+    uint32_t unitType;
+    uint32_t guid;
+    uint32_t selectable;
+    uint32_t enemy;
+    uint32_t enemyIfHostile;
+    uint32_t rosterGuid;
+    int32_t alignment;
+    uint32_t isPet;
+    uint32_t petType;
+    uint32_t petOwner;
+    uint32_t petDead;
+    uint32_t petNameId;
+    uint32_t typeFlags;
+    int32_t superUnique;
+    uint32_t nameSeed;
+    uint32_t ownerGuid;
+    uint8_t umods[12];
+    char name[128];
+    char line[256];
+};
+static_assert(offsetof(D2RealmClientUnitInfo, umods) == 72);
+static_assert(offsetof(D2RealmClientUnitInfo, name) == 84);
+static_assert(offsetof(D2RealmClientUnitInfo, line) == 212);
+static_assert(sizeof(D2RealmClientUnitInfo) == 468);
+
+static uint32_t monstats2_flag(uint32_t classId, uint32_t bit) {
+    const D2MonStatsTxt* row = DATATBLS_GetMonStatsTxtRecord(static_cast<int>(classId));
+    if (!row || !sgptDataTables->pMonStats2Txt) return 0;
+    const int ex = static_cast<int16_t>(row->wMonStatsEx);
+    if (ex < 0 || ex >= sgptDataTables->nMonStats2TxtRecordCount) return 0;
+    return (sgptDataTables->pMonStats2Txt[ex].nFlags[(bit >> 3) & 3] >> (bit & 7)) & 1u;
+}
+
+EMSCRIPTEN_KEEPALIVE const D2RealmClientUnitInfo* d2_realm_client_unit_info(uint8_t unitType, uint32_t guid) {
+    static D2RealmClientUnitInfo info;
+    if (!sgptDataTables) return nullptr;
+    d2::realm::RelationUnit target{}, hero{};
+    D2UnitStrc* targetUnit = nullptr;
+    const D2RealmClientMonster* monster = nullptr;
+    if (unitType == UNIT_MONSTER) {
+        for (const auto& candidate : g_monsters) if (candidate.view.guid == guid) { monster = &candidate; break; }
+        if (!monster) return nullptr;
+        targetUnit = monster->motionUnit;
+        target = { true, UNIT_MONSTER, monster->view.classId, guid, monster->view.mode, targetUnit ? targetUnit->dwFlags : 0 };
+    } else if (unitType == UNIT_PLAYER) {
+        targetUnit = find_realm_client_unit(UNIT_PLAYER, guid);
+        if (!targetUnit) return nullptr;
+        target = { true, UNIT_PLAYER, static_cast<uint32_t>(targetUnit->dwClassId), guid, targetUnit->dwAnimMode, targetUnit->dwFlags };
+    } else return nullptr;
+    D2UnitStrc* heroUnit = nullptr;
+    if (g_selectedPlayer >= 0 && static_cast<size_t>(g_selectedPlayer) < g_players.size())
+        heroUnit = g_players[g_selectedPlayer].motionUnit;
+    if (heroUnit)
+        hero = { true, UNIT_PLAYER, static_cast<uint32_t>(heroUnit->dwClassId), selected_player_guid(), heroUnit->dwAnimMode, heroUnit->dwFlags };
+
+    info = {};
+    info.version = 1;
+    info.size = sizeof(info);
+    info.unitType = unitType;
+    info.guid = guid;
+    d2::realm::RelationFacts facts{};
+    facts.aligned = heroUnit && targetUnit && STATLIST_AreUnitsAligned(heroUnit, targetUnit);
+    facts.monStats2Flag = monstats2_flag;
+    D2ActiveRoomStrc* room = selected_player_room();
+    facts.inTown = room && DUNGEON_IsRoomInTown(room);
+    info.selectable = d2::realm::clientUnitRelation(target, hero, facts);
+    facts.inTown = false;
+    info.enemy = d2::realm::clientUnitRelation(target, hero, facts);
+    facts.rosterHostile = true;
+    info.enemyIfHostile = d2::realm::clientUnitRelation(target, hero, facts);
+    info.rosterGuid = d2::realm::clientRelationRosterGuid(target);
+    info.alignment = targetUnit ? STATLIST_GetUnitAlignment(targetUnit) : 0;
+    if (unitType != UNIT_MONSTER) return &info;
+
+    if (const d2::realm::ClientPet* pet = d2::realm::clientPetFind(guid)) {
+        info.isPet = 1;
+        info.petType = pet->type;
+        info.petOwner = pet->owner;
+        info.petDead = pet->dead;
+        info.petNameId = pet->nameId;
+    }
+    info.typeFlags = monster->view.typeFlags;
+    info.superUnique = monster->superUniqueIndex;
+    info.nameSeed = monster->nameId;
+    info.ownerGuid = monster->ownerGuid;
+    const size_t umodCount = std::min<size_t>(monster->nameBytes.size(), 9);
+    for (size_t i = 0; i < umodCount; ++i) info.umods[i] = monster->nameBytes[i];
+    D2UnitStrc classUnit{};
+    classUnit.dwUnitType = UNIT_MONSTER;
+    classUnit.dwClassId = static_cast<int>(monster->view.classId);
+    d2::realm::MonsterNameInput in{};
+    in.unit = &classUnit;
+    in.classId = monster->view.classId;
+    in.typeFlags = monster->view.typeFlags;
+    in.nameSeed = monster->nameId;
+    in.superUnique = monster->superUniqueIndex;
+    in.umods = info.umods;
+    in.umodCount = static_cast<uint32_t>(umodCount);
+    in.hirelingNameId = d2::realm::clientPetHirelingNameId(guid);
+    const std::string name = d2::realm::clientUtf8(d2::realm::clientMonsterName(in));
+    const std::string line = d2::realm::clientUtf8(d2::realm::clientMonsterEnchantLine(in));
+    std::strncpy(info.name, name.c_str(), sizeof(info.name) - 1);
+    std::strncpy(info.line, line.c_str(), sizeof(info.line) - 1);
+    return &info;
+}
+
 // Focused lifecycle readback for the canonical GUID roster; zero means no matching live CUnit.
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_unit_resources_readback(uint8_t unitType, uint32_t guid) {
     return d2_realm_client_unit_resources_status(find_realm_client_unit(unitType, guid));
@@ -3259,13 +3748,21 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_motion_tick() {
             refresh_player_motion_view(player, static_cast<int>(i) == g_selectedPlayer);
         }
     }
-    for (D2UnitStrc* object : g_objectUnits) {
+    for (D2UnitStrc* object = d2gs_client_object_next(nullptr); object; object = d2gs_client_object_next(object)) {
         const uint32_t mode = object->dwAnimMode;
         d2gs_client_object_step(object);
         if (object->dwAnimMode != mode) sync_object_view(object);
     }
     for (auto& monster : g_monsters) {
         if (!monster.motionUnit || !monster.motionUnit->pDynamicPath) continue;
+        // GUESS: a monster whose skill sequence has run out returns to neutral here; retail's
+        // per-mode monster update (not read) owns that end. Settled by decompiling the Sequence
+        // arm of the client's monster mode table.
+        if (monster.motionUnit->dwAnimMode == MONMODE_SEQUENCE && monster.motionUnit->pAnimSeq &&
+                UNITS_IsAtEndOfFrameCycle(monster.motionUnit)) {
+            UNITS_SetUsedSkill(monster.motionUnit, nullptr);
+            d2_realm_client_unit_set_mode(monster.motionUnit, MONMODE_NEUTRAL);
+        }
         monster.lastTickResult = d2_realm_client_motion_advance_unit(monster.motionUnit);
         if (monster.lastTickResult > 0) moving++;
         refresh_monster_motion_view(monster);
@@ -3585,7 +4082,82 @@ static void clear_client_quest_record() {
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_set_quest_flags(const uint8_t* bytes, int length) {
     if (!bytes || length != 96) return 0;
     QUESTRECORD_CopyBufferToRecord(client_quest_record(), const_cast<uint8_t*>(bytes), 96, FALSE);
+    d2_realm_client_quests_set_player(g_quests, bytes);
     return 1;
+}
+
+// The quest state the server's packets built (layout: d2_realm_client_quests_view). `logOpen` tells the
+// state-change rule whether the quest log is on screen.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_quests(uint8_t* out, int cap, int logOpen) {
+    g_quests.logOpen = logOpen ? 1 : 0;
+    return d2_realm_client_quests_view(g_quests, out, cap);
+}
+
+// A room's place in its level's room list: the ordinal a local game's room and exit records carry.
+static uint32_t client_room_ordinal(const D2DrlgRoomStrc* room) {
+    uint32_t ordinal = 0;
+    for (const D2DrlgRoomStrc* r = room && room->pLevel ? room->pLevel->pFirstRoomEx : nullptr; r; r = r->pDrlgRoomNext, ++ordinal)
+        if (r == room) return ordinal;
+    return UINT32_MAX;
+}
+
+// The client's active rooms: the rooms the server's map-add packets (0x07) put in sight, with their
+// neighbours, less those its map-remove packets (0x08) freed. One 36-byte record each, the local game's room
+// record: ordinal, level, subtile x, y, width, height, flags, 0, 0. Returns the count written.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_rooms(uint8_t* out, int cap) {
+    D2DrlgActStrc* act = d2_drlg_client_act();
+    if (!out || !act) return 0;
+    int count = 0;
+    for (D2ActiveRoomStrc* room = DUNGEON_GetRoomFromAct(act); room && (count + 1) * 36 <= cap; room = room->pRoomNext) {
+        const D2DrlgRoomStrc* drlgRoom = room->pDrlgRoom;
+        const uint32_t record[9] = { client_room_ordinal(drlgRoom),
+            drlgRoom && drlgRoom->pLevel ? static_cast<uint32_t>(drlgRoom->pLevel->nLevelId) : 0u,
+            static_cast<uint32_t>(room->tCoords.nSubtileX), static_cast<uint32_t>(room->tCoords.nSubtileY),
+            static_cast<uint32_t>(room->tCoords.nSubtileWidth), static_cast<uint32_t>(room->tCoords.nSubtileHeight),
+            room->dwFlags, 0u, 0u };
+        std::memcpy(out + count * 36, record, 36);
+        ++count;
+    }
+    return count;
+}
+
+// The level exits in the client's active rooms, one per tile unit the server assigned: a 68-byte record each,
+// the local game's exit record (slot, room, source level, destination level, LvlWarp id, enabled, direction,
+// x, y, select box x, y, dx, dy, exit walk x, y, offset x, y), then one uint32 guid per record. The room's own
+// warp tile of that LvlWarp id names the record and the destination level. Returns the count written.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_warps(uint8_t* out, int cap) {
+    if (!out) return 0;
+    std::vector<uint32_t> guids;
+    int count = 0;
+    for (const D2RealmClientWarp& warp : g_warps.list) {
+        if ((count + 1) * 72 > cap) break;
+        D2ActiveRoomStrc* active = d2_drlg_client_active_room(warp.x, warp.y);
+        const D2DrlgRoomStrc* room = active ? active->pDrlgRoom : nullptr;
+        if (!room || !room->pLevel) continue;
+        const D2LvlWarpTxt* txt = nullptr;
+        int32_t destination = 0;
+        for (const D2RoomTileStrc* tile = room->pRoomTiles; tile; tile = tile->pNext) {
+            if (!tile->pLvlWarpTxtRecord || tile->pLvlWarpTxtRecord->dwLevelId != warp.warpId) continue;
+            txt = tile->pLvlWarpTxtRecord;
+            if (tile->pDrlgRoom && tile->pDrlgRoom->pLevel) destination = tile->pDrlgRoom->pLevel->nLevelId;
+            break;
+        }
+        if (!txt) txt = DATATBLS_GetLvlWarpTxtRecordFromLevelIdAndDirection(static_cast<int>(warp.warpId), 'b');
+        int32_t record[17] = { count, static_cast<int32_t>(client_room_ordinal(room)), room->pLevel->nLevelId, destination,
+            static_cast<int32_t>(warp.warpId), 1, 0, warp.x, warp.y, 0, 0, 0, 0, 0, 0, 0, 0 };
+        if (txt) {
+            record[6] = static_cast<uint8_t>(txt->szDirection[0]);
+            record[9] = static_cast<int32_t>(txt->dwSelectX); record[10] = static_cast<int32_t>(txt->dwSelectY);
+            record[11] = static_cast<int32_t>(txt->dwSelectDX); record[12] = static_cast<int32_t>(txt->dwSelectDY);
+            record[13] = static_cast<int32_t>(txt->dwExitWalkX); record[14] = static_cast<int32_t>(txt->dwExitWalkY);
+            record[15] = static_cast<int32_t>(txt->dwOffsetX); record[16] = static_cast<int32_t>(txt->dwOffsetY);
+        }
+        std::memcpy(out + count * 68, record, 68);
+        guids.push_back(warp.guid);
+        ++count;
+    }
+    if (count) std::memcpy(out + count * 68, guids.data(), static_cast<size_t>(count) * 4);
+    return count;
 }
 
 // A hire offer's stats for the selected player: the hireling the 0x4E offer (name id, seed) rolls, through the same

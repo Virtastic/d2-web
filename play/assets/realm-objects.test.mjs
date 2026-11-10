@@ -1,7 +1,8 @@
-// A joined game's objects, end to end: the server's object packets go through the realm world, its records
-// through the object renderer, and a click on one through the realm input. The packets are the object part of
-// a recorded Rogue Encampment join (stash, waypoint, fire, torches and the camp's props); the classes of the
-// first outdoor areas and a town portal are appended in the same packet form.
+// A joined game's objects in the scene: the engine's object units (the server's object packets are applied there,
+// src/core/realm/d2gs_client_object.cpp and its host test) are shaped by the realm world into the records the
+// object renderer and the realm input read. The units are those of a recorded Rogue Encampment join (stash,
+// waypoint, fire, torches and the camp's props) as the engine reports them; the classes of the first outdoor
+// areas and a town portal are appended in the same form.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, openSync, readSync, openAsBlob } from 'node:fs';
@@ -9,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { hashString, decrypt, mpqTables } from './mpq-index.mjs';
 import { readMpqFile } from './mpq-read.mjs';
 import { createObjectRenderer } from './object-renderer.mjs';
-import { createRealmWorld } from './realm-world.mjs';
+import { readFileSync } from 'node:fs';
+import { createRealmWorld, parseRealmObjectUnits, parseRealmObjectEvents, OBJECT_UNIT_WORDS } from './realm-world.mjs';
 import { createItemTable, createObjectTable } from './realm-tables.mjs';
 import { createRealmInput } from './realm-input.mjs';
 
@@ -25,9 +27,6 @@ const SIZE = { 0x51: 14, 0x0e: 12, 0x0a: 6, 0x77: 2 };
 const hex = (text) => Uint8Array.from(text.match(/../g), (b) => parseInt(b, 16));
 const feed = (world, ...packets) => { for (const p of packets) world.feed(typeof p === 'string' ? hex(p) : Uint8Array.from(p), (b) => SIZE[b[0]]); };
 const u32 = (v) => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
-const add = (guid, classId, mode, interact = 0) => [0x51, 2, ...u32(guid), classId & 255, classId >> 8, 0x00, 0x10, 0x00, 0x10, mode, interact];
-const setMode = (guid, mode) => [0x0e, 2, ...u32(guid), 3, 0, ...u32(mode)];
-
 const archives = [];
 for (const name of ['patch_d2.mpq', 'd2exp.mpq', 'd2data.mpq']) {
   const archive = fileURLToPath(new URL('../../retail/D2/' + name, import.meta.url));
@@ -75,9 +74,29 @@ async function draw(object) {
 const world = () => createRealmWorld({ items: createItemTable(read), objects: createObjectTable(read) });
 const artOf = (list) => list.filter((r) => r.op === 'dcc').map((r) => r.path.toLowerCase().split('\\').pop());
 
-test('every object of a recorded camp join is recorded and drawn', { skip }, async () => {
-  const w = world(); feed(w, ...JOIN);
-  const views = w.objectViews();
+const objects = createObjectTable(read);
+// One engine unit record (14 words) as the engine makes it for a class in a mode: the mode's cel count, start cel
+// and step are the class's, it can be picked if the class says so for the mode, and it stands in a revealed room.
+const unit = (id, classId, mode, { x = 0x1000, y = 0x1000, interact = 0, clock, selectable, inRoom = true, overlays = [] } = {}) => {
+  const cls = objects.byClass(classId);
+  return [id, classId, x, y, mode, clock ?? (cls.start?.[mode] ?? 0) << 8, (cls.frameCount?.[mode] ?? 0) << 8, cls.frameDelta?.[mode] ?? 0,
+    ((selectable ?? Boolean(cls.selectable?.[mode])) ? 1 : 0) | (inRoom ? 2 : 0), interact, overlays.length, ...overlays, ...[-1, -1, -1].slice(overlays.length)];
+};
+const parse = (records) => parseRealmObjectUnits(Int32Array.from(records.flat()), records.length);
+// The join's units: each assign packet's fields, in the mode the last mode-change packet for it names.
+const joinUnits = () => {
+  const byId = new Map();
+  for (const text of JOIN) {
+    const p = hex(text), id = p[2];
+    if (p[0] === 0x51) byId.set(id, { classId: p[6] | (p[7] << 8), x: p[8] | (p[9] << 8), y: p[10] | (p[11] << 8), mode: p[12], interact: p[13] });
+    else byId.get(id).mode = p[8];
+  }
+  return parse([...byId].map(([id, o]) => unit(id, o.classId, o.mode, o)));
+};
+
+test('every object of a recorded camp join is drawn from its engine unit', { skip }, async () => {
+  const w = world();
+  const views = w.objectViews(joinUnits());
   assert.equal(views.length, 17);
   const stash = views.find((o) => o.id === STASH);
   assert.deepEqual([stash.classId, stash.token.toLowerCase(), stash.x, stash.y, stash.mode, stash.selectable, stash.componentMask],
@@ -101,6 +120,8 @@ test('every object of a recorded camp join is recorded and drawn', { skip }, asy
   for (const mode of ['nu', 'op', 'on']) assert.equal(await fetchFile(`data\\global\\objects\\TA\\cof\\TA${mode}hth.cof`), null);
   const waypoint = views.find((o) => o.id === WAYPOINT);
   assert.deepEqual([waypoint.classId, waypoint.mode, waypoint.selectable], [119, 2, true]);
+  const torch = views.find((o) => o.id === 0x08);
+  assert.deepEqual([torch.classId, torch.mode, torch.framePrecise, torch.frameCountPrecise, torch.animSpeed], [37, 2, 0, 20 << 8, 200]);
 });
 
 test('the classes of the first outdoor areas draw in the modes the server puts them in', { skip }, async () => {
@@ -108,8 +129,7 @@ test('the classes of the first outdoor areas draw in the modes the server puts t
   // barrel, chests, casket, shrine, doors, well, cairn stone: idle, operating, opened; a town portal opening and open
   for (const classId of [11, 5, 6, 1, 3, 2, 13, 14, 15, 130, 17]) for (const mode of [0, 1, 2]) cases.push([classId, mode]);
   cases.push([59, 1], [59, 2]);
-  for (const [classId, mode] of cases) feed(w, add(guid++, classId, mode, classId === 59 ? 1 : 0));
-  const views = w.objectViews();
+  const views = w.objectViews(parse(cases.map(([classId, mode]) => unit(guid++, classId, mode, { interact: classId === 59 ? 1 : 0 }))));
   assert.equal(views.length, cases.length);
   const failed = [];
   for (const view of views) if (!(await draw(view)).evidence) failed.push(`${view.classId}:${view.mode}`);
@@ -117,29 +137,38 @@ test('the classes of the first outdoor areas draw in the modes the server puts t
   assert.deepEqual(views.filter((o) => o.classId === 59).map((o) => o.portalLevel), [1, 1]);
 });
 
-test('an object animates on the client clock and an opened chest stops being selectable', { skip }, () => {
-  const w = world(); feed(w, ...JOIN, add(200, 5, 0, 0x80), add(201, 5, 0));
-  const fire = () => w.objectViews().find((o) => o.id === FIRE);
-  const before = fire(); assert.ok(before.frameCountPrecise > 256 && before.animSpeed > 0);
-  const seen = new Set();
-  for (let tick = 0; tick < 400; tick++) { w.tickObjects(); const f = fire(); assert.ok(f.framePrecise < f.frameCountPrecise); seen.add(f.framePrecise >>> 8); }
-  assert.equal(seen.size, before.frameCountPrecise >>> 8, 'the fire shows every cel of its loop');
-  const chest = (id) => w.objectViews().find((o) => o.id === id);
-  assert.deepEqual([chest(200).selectable, chest(200).locked, chest(201).locked], [true, true, false]);
-  feed(w, setMode(200, 2));                                  // the server opens it: one cel a mode, no run of cels
-  assert.deepEqual([chest(200).mode, chest(200).selectable], [2, false]);
-  feed(w, add(202, 11, 0)); const barrel = () => chest(202);
-  assert.equal(barrel().selectable, true);
-  feed(w, setMode(202, 1));                                  // a barrel breaks over its cels, then lies broken
-  w.tickObjects(); assert.deepEqual([barrel().mode, barrel().framePrecise > 0, barrel().selectable], [1, true, false]);
-  for (let tick = 0; tick < 100; tick++) w.tickObjects();
-  assert.deepEqual([barrel().mode, barrel().selectable], [2, false], 'the breaking cels run out into the broken mode');
+test('a view is the engine unit as it stands: its mode, cel clock, pick flag, room and overlays', { skip }, () => {
+  const w = world();
+  // A locked chest mid-way through opening and not pickable; an idle shrine with its two overlays; a torch whose
+  // room is not revealed; a unit of a class the tables do not know.
+  const words = Int32Array.from([
+    200, 5, 0x1234, 0x5678, 1, 0x180, 0x300, 0x80, 2, 0x80, 0, -1, -1, -1,
+    201, 2, 0x1000, 0x1001, 0, 0, 0x100, 0x100, 3, 6, 2, 0x3B, 0x39, -1,
+    202, 37, 0x1002, 0x1003, 2, 1400, 20 << 8, 200, 0, 0, 0, -1, -1, -1,
+    203, 0x7fff, 1, 2, 0, 0, 0x100, 0x100, 3, 0, 0, -1, -1, -1]);
+  assert.equal(words.length, 4 * OBJECT_UNIT_WORDS);
+  const views = w.objectViews(parseRealmObjectUnits(words, 4));
+  assert.deepEqual(views.map((o) => o.id), [200, 201, 202]);
+  const [chest, shrine, torch] = views;
+  assert.deepEqual([chest.x, chest.y, chest.mode, chest.framePrecise, chest.frameCountPrecise, chest.animSpeed, chest.selectable, chest.locked, chest.inClientRoom],
+    [0x1234, 0x5678, 1, 0x180, 0x300, 0x80, false, true, true]);
+  assert.deepEqual([shrine.selectable, shrine.overlays, shrine.portalLevel, shrine.locked], [true, [0x3B, 0x39], 0, false]);
+  assert.deepEqual([torch.framePrecise, torch.selectable, torch.inClientRoom, torch.overlays], [1400, false, false, []]);
+  // An id above 2^31 is unsigned.
+  assert.equal(parseRealmObjectUnits(Int32Array.from([-2, 5, 0, 0, 0, 0, 0x100, 0, 3, 0, 0, -1, -1, -1]), 1)[0].id, 0xFFFFFFFE);
+});
+
+test('an object activation carries the sound row and the player it plays at', () => {
+  const events = parseRealmObjectEvents(Int32Array.from([1, 0x20, 1, 6, 0xA68, 0, 1, 0xA0, 2, 16, 0xA76, 1]), 2);
+  assert.deepEqual(events, [{ objectId: 0x20, playerId: 1, shrine: 6, soundRow: 0xA68, effect: 0 },
+    { objectId: 0xA0, playerId: 2, shrine: 16, soundRow: 0xA76, effect: 1 }]);
+  assert.throws(() => parseRealmObjectEvents(Int32Array.from([2, 0, 0, 0, 0, 0]), 1));
 });
 
 test('a click on the stash walks to it, uses it on arrival, and the server reply opens the panel', { skip }, () => {
-  const w = world(); feed(w, ...JOIN);
+  const w = world(); const units = joinUnits();
   let player = { x: 0x0f92 + 30, y: 0x146d + 30 }; const out = [];
-  const scene = () => ({ ready: true, player, run: false, selected: { left: 0, right: 0 }, monsters: [], objects: w.objectViews(), items: [],
+  const scene = () => ({ ready: true, player, run: false, selected: { left: 0, right: 0 }, monsters: [], objects: w.objectViews(units), items: [],
     isNpc: () => false, hoverBox: () => false, toScreen: (x, y) => ({ x: x * 2, y }), pointerWorld: (px, py) => ({ x: px / 2, y: py }) });
   const input = createRealmInput({ transmit: (b) => out.push(Array.from(b)), scene, now: () => 0 });
   input.leftClick(0x0f92 * 2, 0x146d);
@@ -150,50 +179,21 @@ test('a click on the stash walks to it, uses it on arrival, and the server reply
   assert.deepEqual(out.at(-1), [0x13, 2, 0, 0, 0, STASH, 0, 0, 0]);
   feed(w, [0x77, 16]);
   assert.deepEqual(w.takeUiEvents(), [16]);
-  feed(w, [0x0a, 2, ...u32(STASH)]);
-  assert.equal(w.objectViews().some((o) => o.id === STASH), false);
 });
 
-const setState = (guid, mode, selectable, selector = 3) => [0x0e, 2, ...u32(guid), selector, selectable, ...u32(mode)];
-const TORCH = 0x08;   // a class-37 torch of the recorded join: assigned lit (mode 2), then sent mode 2 again
-
-test('a mode the object is already in keeps its clock, and only the mode-change selector is applied', { skip }, () => {
-  const w = world(); feed(w, ...JOIN);
-  const torch = () => w.objectViews().find((o) => o.id === TORCH);
-  assert.deepEqual([torch().classId, torch().mode, torch().framePrecise, torch().frameCountPrecise, torch().animSpeed], [37, 2, 0, 20 << 8, 200]);
-  for (let tick = 0; tick < 7; tick++) w.tickObjects();
-  assert.equal(torch().framePrecise, 1400);
-  feed(w, '0e0208000000030002000000');                       // the join's own repeat of the lit mode
-  assert.equal(torch().framePrecise, 1400, 'the loop goes on from where it was');
-  feed(w, setState(TORCH, 0, 0, 0x15));                      // another selector names no mode
-  assert.deepEqual([torch().mode, torch().framePrecise], [2, 1400]);
-  for (let tick = 0; tick < 19; tick++) w.tickObjects();
-  assert.equal(torch().framePrecise, 1400 + 19 * 200 - (20 << 8), 'the loop wraps by its own length');
-  feed(w, setState(TORCH, 0, 0));                            // put out: a new mode starts its own run
-  assert.deepEqual([torch().mode, torch().framePrecise, torch().frameCountPrecise], [0, 0, 256]);
-});
-
-test('a door the server opens or closes plays its transit cels and cannot be picked meanwhile', { skip }, () => {
-  const w = world(); feed(w, add(300, 25, 0), add(301, 13, 0), add(302, 75, 0));
-  const state = (id) => { const o = w.objectViews().find((v) => v.id === id); return [o.mode, o.framePrecise, o.selectable]; };
-  const run = (id) => { const seen = []; for (let tick = 0; tick < 5; tick++) { w.tickObjects(); seen.push(state(id)); } return seen; };
-  assert.deepEqual(state(300), [0, 0, true]);
-  feed(w, setState(300, 2, 1));                              // four opening cels, a cel a tick
-  assert.deepEqual(state(300), [1, 0, false]);
-  assert.deepEqual(run(300), [[1, 256, false], [1, 512, false], [1, 768, false], [2, 0, true], [2, 0, true]]);
-  feed(w, setState(300, 2, 0));                              // open already: only the selectable byte is taken
-  assert.deepEqual(state(300), [2, 0, false]);
-  feed(w, setState(300, 0, 1));                              // four closing cels, from the last back to the first
-  assert.deepEqual(state(300), [3, 768, false]);
-  assert.deepEqual(run(300), [[3, 512, false], [3, 256, false], [3, 0, false], [0, 0, true], [0, 0, true]]);
-  feed(w, setState(300, 4, 1));                              // any other change is immediate
-  assert.deepEqual(state(300), [4, 0, true]);
-  // A door with one cel a mode has no transit: it is open at once, and selectable as the packet says.
-  feed(w, setState(301, 2, 0));
-  assert.deepEqual(state(301), [2, 0, false]);
-  feed(w, setState(301, 0, 1));
-  assert.deepEqual(run(301).pop(), [0, 0, true]);
-  // The start cel of a door's new mode is written to the clock as it stands in the table, not as a whole cel.
-  feed(w, setState(302, 2, 1));
-  assert.deepEqual(state(302), [2, 1, true]);
+// The engine's object unit is the one source: the page keeps no object state of its own and steps no object clock.
+test('the page reads objects from the engine and keeps no copy of their state', () => {
+  const at = (name) => readFileSync(new URL(name, import.meta.url), 'utf8');
+  const worldSource = at('./realm-world.mjs'), shell = at('../gameplay-shell.mjs'), client = at('./realm-client.mjs'), link = at('../../wasm-build/link-d2.sh');
+  assert.doesNotMatch(worldSource, /case 0x51|case 0x0e|objectsByGuid|tickObjects/);
+  assert.doesNotMatch(shell, /tickObjects/);
+  assert.match(shell, /objects: protocol\?\.d2gsClientObjects\?\.\(\) \?\? \[\]/);
+  assert.match(shell, /d2gsClientTakeObjectEvents\(\)\) if \(used\.soundRow\) unitSounds\?\.playRow\(used\.soundRow/);
+  for (const name of ['d2_realm_client_object_units', 'd2_realm_client_take_object_events']) {
+    assert.ok(client.includes(`'${name}'`), name);
+    assert.ok(link.includes(`_${name},`), name);
+  }
+  const w = createRealmWorld({ items: { byCode: () => null }, objects: { byClass: () => ({ token: 'CH' }) } });
+  feed(w, '5102110000000b01920f6d140000', '0e0211000000030002000000');
+  assert.deepEqual(w.objectViews(), []);
 });

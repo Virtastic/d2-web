@@ -40,6 +40,10 @@
 static uint8_t g_d2webPacketStream[4096];
 static uint32_t g_d2webPacketStreamLength = 0;
 static uint32_t g_d2webPacketStreamPackets = 0;
+// A connected client's receiver: handed every packet at the moment the game sends it, so it sees
+// them all in emission order whatever resets or fills the bounded stream above. Unset by default.
+static void (*g_d2webPacketSink)(const uint8_t*, uint32_t) = nullptr;
+extern "C" void D2WEB_SetPacketSink(void (*sink)(const uint8_t*, uint32_t)) { g_d2webPacketSink = sink; }
 // Retail server->client 0x61 is "play movie <index>": payload byte 1 selects one of D2Client's own
 // film-name templates (id 1 d2intro%s.bik, 2 ACT02START, 3 ACT03START, 4 ACT04START, 5 ACT04END,
 // 6 D2X_INTRO, 7 D2X_OUT). The server records every 0x61 into this bounded queue -- the same
@@ -48,6 +52,7 @@ static uint32_t g_d2webPacketStreamPackets = 0;
 // through D2GAME_PACKETS_SendPacket_6FC3C710, which fills this.
 static uint8_t g_d2webMovieRequests[16];
 static uint32_t g_d2webMovieRequestCount = 0;
+extern "C" uint32_t d2net_local_send(const uint8_t* buf, uint32_t len);   // the local connection's send (src/core/d2net/d2net_local_63e0.cpp)
 extern "C" void D2WEB_ResetPacketStream() { g_d2webPacketStreamLength = 0; g_d2webPacketStreamPackets = 0; g_d2webMovieRequestCount = 0; }
 extern "C" const uint8_t* D2WEB_PacketStream(uint32_t* pLength, uint32_t* pPackets) {
     if (pLength) *pLength = g_d2webPacketStreamLength;
@@ -237,7 +242,18 @@ void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
     if (pClient->pRoom) DUNGEON_GetAdjacentRoomsListFromRoom(pClient->pRoom, &oldRooms, &oldCount);
     for (int32_t i = 0; i < nextCount; ++i) {
         int32_t j = 0; while (j < oldCount && nextRooms[i] != oldRooms[j]) ++j;
-        if (j >= oldCount) { if (lvl) LEVEL_AddClient(pClient->pGame, nextRooms[i], pClient); else DUNGEON_AddClientToRoom(nextRooms[i], pClient); }
+        if (j >= oldCount) {
+            if (lvl) LEVEL_AddClient(pClient->pGame, nextRooms[i], pClient);
+            else {
+                // A connected client is told of each room it enters range of; the room's membership is unchanged.
+                if (g_d2webPacketSink) {
+                    D2DrlgCoordsStrc coords = {};
+                    DUNGEON_GetRoomCoordinates(nextRooms[i], &coords);
+                    D2GAME_PACKETS_SendPacket0x07_6FC3D120(pClient, (uint8_t)DUNGEON_GetLevelIdFromRoom(nextRooms[i]), (uint16_t)coords.nTileXPos, (uint16_t)coords.nTileYPos);
+                }
+                DUNGEON_AddClientToRoom(nextRooms[i], pClient);
+            }
+        }
     }
     for (int32_t i = 0; i < oldCount; ++i) {
         int32_t j = 0; while (j < nextCount && oldRooms[i] != nextRooms[j]) ++j;
@@ -245,7 +261,17 @@ void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
         // g_fixtureOwnRoomOnly sessions attach the client to its own room only: skip rooms it was never added to.
         // a retail recording: a room that streamed into the adjacent list after the client joined never had it added.
         int32_t k = 0; while (k < oldRooms[i]->nNumClients && oldRooms[i]->ppClients[k] != pClient) ++k;
-        if (k < oldRooms[i]->nNumClients) { if (lvl) LEVEL_RemoveClient(pClient->pGame, oldRooms[i], pClient); else DUNGEON_RemoveClientFromRoom(oldRooms[i], pClient); }
+        if (k < oldRooms[i]->nNumClients) {
+            if (lvl) LEVEL_RemoveClient(pClient->pGame, oldRooms[i], pClient);
+            else {
+                if (g_d2webPacketSink) {
+                    D2DrlgCoordsStrc coords = {};
+                    DUNGEON_GetRoomCoordinates(oldRooms[i], &coords);
+                    D2GAME_PACKETS_SendPacket0x08_6FC3D160(pClient, (uint8_t)DUNGEON_GetLevelIdFromRoom(oldRooms[i]), (uint16_t)coords.nTileXPos, (uint16_t)coords.nTileYPos);
+                }
+                DUNGEON_RemoveClientFromRoom(oldRooms[i], pClient);
+            }
+        }
     }
     pClient->pRoom = pRoom;
     if (pRoom && pClient->pPlayer) UNITS_SetPlayerPortalFlags(pClient->pPlayer,
@@ -422,7 +448,13 @@ void D2GAME_PACKETS_SendPacket0x07_6FC3D120(D2ClientStrc* pClient, uint8_t nArea
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }
 // a retail recording: LEVEL_RemoveClient's 0x08 (leave-room) seam; the headless client reads no packet stream for it.
-void D2GAME_PACKETS_SendPacket0x08_6FC3D160(D2ClientStrc* pClient, uint8_t nAreaId, uint16_t nTileX, uint16_t nTileY) {}
+// Packet 0x08 {nX, nY, level}, 6 bytes: the room left the client's range. Sent to a connected client only.
+void D2GAME_PACKETS_SendPacket0x08_6FC3D160(D2ClientStrc* pClient, uint8_t nAreaId, uint16_t nTileX, uint16_t nTileY) {
+    if (!g_d2webPacketSink) return;
+    D2GSPacketSrv08 packet{};
+    packet.nHeader = 0x08; packet.nX = nTileX; packet.nY = nTileY; packet.nLevelId = nAreaId;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+}
 void D2GAME_PACKETS_SendPacket0x09_6FC3D1A0(D2ClientStrc* pClient, BYTE a2, BYTE a3, DWORD a4, BYTE a5, WORD a6, WORD a7) {}
 void D2GAME_PACKETS_SendPacket0x0A_RemoveObject_6FC3D3A0(D2ClientStrc* pClient, char alw0x0A, char nUnitType, int32_t nUnitId) {
     // 1.13c D2Game+0x8C3A0 (SCmd.cpp 0x0A): {header, type, guid}, 6 bytes; missiles are never announced.
@@ -528,7 +560,17 @@ void D2GAME_PACKETS_SendPacket0x3F_6FC3EDC0(D2ClientStrc* pClient, D2UnitStrc* p
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &pk, sizeof(pk));
 }
 void D2GAME_PACKETS_SendPacket0x42_6FC3EE40(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
-void D2GAME_PACKETS_SendPacket0x51_6FC3D300(D2ClientStrc* pClient, char nHeader, uint8_t nUnitType, int32_t nUnitGUID, int16_t nObjectId, int16_t nX, int16_t nY, char a8, char a9) {}
+// Packet 0x51 {type, guid, class, x, y, mode, interact type}, 14 bytes: an object enters the client's view.
+// Sent to a connected client only.
+void D2GAME_PACKETS_SendPacket0x51_6FC3D300(D2ClientStrc* pClient, char nHeader, uint8_t nUnitType, int32_t nUnitGUID, int16_t nObjectId, int16_t nX, int16_t nY, char a8, char a9) {
+    if (!g_d2webPacketSink) return;
+    D2GSPacketSrv51 packet{};
+    static_assert(sizeof(D2GSPacketSrv51) == 14, "0x51 is 14 bytes");
+    packet.nHeader = static_cast<uint8_t>(nHeader); packet.nUnitType = nUnitType; packet.dwUnitGUID = static_cast<uint32_t>(nUnitGUID);
+    packet.nObject = static_cast<uint16_t>(nObjectId); packet.nPosX = static_cast<uint16_t>(nX); packet.nPosY = static_cast<uint16_t>(nY);
+    packet.unk0x0C[0] = static_cast<uint8_t>(a8); packet.unk0x0C[1] = static_cast<uint8_t>(a9);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+}
 void D2GAME_PACKETS_SendPacket0x5A_6FC3DEC0(D2ClientStrc* pClient, D2GSPacketSrv5A* pPacket) {}
 void D2GAME_PACKETS_SendPacket0x61_6FC3F590(D2ClientStrc* pClient, BYTE unk) {
     D2GSPacketSrv61 packet = {}; packet.nHeader = 0x61; packet.unk0x001 = unk;
@@ -748,10 +790,15 @@ void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, in
         g_d2webMovieRequestCount < sizeof g_d2webMovieRequests) {
         g_d2webMovieRequests[g_d2webMovieRequestCount++] = static_cast<D2GSPacketSrv61*>(pPacket)->unk0x001;
     }
+    // The one client path: every packet goes to the local connection's lists (unbounded, emptied only
+    // by the client's takes). A no-op until a reader opens the connection; the bounded per-tick view
+    // below stays for the session rows.
+    if (pClient && pPacket && nPacketSize > 0) d2net_local_send(static_cast<const uint8_t*>(pPacket), (uint32_t)nPacketSize);
     if (pClient && pPacket && nPacketSize > 0 && g_d2webPacketStreamLength + (uint32_t)nPacketSize <= sizeof g_d2webPacketStream) {
         std::memcpy(g_d2webPacketStream + g_d2webPacketStreamLength, pPacket, (size_t)nPacketSize);
         g_d2webPacketStreamLength += (uint32_t)nPacketSize; ++g_d2webPacketStreamPackets;
     }
+    if (g_d2webPacketSink && pClient && pPacket && nPacketSize > 0) g_d2webPacketSink((const uint8_t*)pPacket, (uint32_t)nPacketSize);
 }
 int32_t D2GAME_SAVE_WriteFile_6FC8A500(D2GameStrc* pGame, D2UnitStrc* pPlayer, const char* szName, DWORD dwArg) { return {}; }
 // D2Game.0x6FC3F2F0: the player's quest record (96 bytes) behind a unit reference.

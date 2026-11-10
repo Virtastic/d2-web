@@ -36,7 +36,7 @@ test('the realm HUD binds no hotkey before the server binds one', () => {
   assert.ok(r.hotkeys.every((k) => k.skill === -1));
 });
 
-const belts = (counts) => ({ inventory: { playerRow: () => null, grid: () => null, components: () => null },
+const belts = (counts) => ({ inventory: { playerRow: () => null, grid: () => null, gridAt: () => null, components: () => null },
   belt: { boxes: (record) => Array.from({ length: counts[record] }, (_, i) => ({ left: 422 + (i % 4) * 31, right: 450 + (i % 4) * 31, top: 562 - (i >> 2) * 32, bottom: 590 - (i >> 2) * 32 })) } });
 test('the realm belt shows the HUD row closed and the same popup rows as a local game when open', () => {
   const world = (record) => ({ beltRecord: () => record });
@@ -50,7 +50,7 @@ test('the realm belt shows the HUD row closed and the same popup rows as a local
   assert.equal(none.beltShowntrue, none.beltShownfalse);
   const shell = readFileSync(new URL('../gameplay-shell.mjs', import.meta.url), 'utf8');
   const shown = shell.slice(shell.indexOf('function beltShownBoxes()'), shell.indexOf('function readAdvancement()'));
-  assert.ok(shown.includes('if (realmSceneActive) return realmReads'), 'the belt hover reads the realm boxes, not an absent engine session');
+  assert.ok(shown.includes('if (clientView().beltShown) return clientView().beltShown(beltPopup.open);'), 'the belt hover reads the realm boxes, not an absent engine session');
 });
 
 const base = { tick: 5, act: 1, level: 3, playerId: 7, player: { x: 10, y: 20, hp: 99, hpMax: 99 } };
@@ -107,7 +107,7 @@ test('the camera follows the realm player and the view size is the one a local g
 test('the joined game is drawn by the shared drawFrame, with no second drawing path', () => {
   const shell = readFileSync(new URL('../gameplay-shell.mjs', import.meta.url), 'utf8');
   assert.ok(!shell.includes('drawRealmFrame') && !shell.includes('drawRealmHud'));
-  assert.ok(shell.includes('if (realmSceneActive) refreshRealmView();'));
+  assert.ok(shell.includes('clientView().refresh();'));
   assert.ok(shell.includes('const clientView = () => (realmSceneActive ? realmClientView : spClientView);'));
   assert.ok(shell.includes('if (sceneChrome().pointerLayer)'));
 });
@@ -129,5 +129,5 @@ test('a joined game builds the object and ground item renderers', () => {
   const realmChrome = shell.slice(shell.indexOf('function ensureRealmChrome()'), shell.indexOf('async function syncRealmScene()'));
   assert.match(realmChrome, /objectRenderer \?\?= createObjectRenderer\(/);
   assert.match(realmChrome, /itemRenderer \?\?= createItemRenderer\(/);
-  assert.match(shell, /tickClientUnits = \(\) => \{[^\n]*realmWorldData\(\)\.tickObjects\(\)/, 'the joined game ticks its objects');
+  assert.match(shell, /tickClientUnits = \(\) => \{[^\n]*d2gsClientMotionTick\(\)/, 'the engine tick steps the joined game\'s objects');
 });

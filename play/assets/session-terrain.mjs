@@ -316,10 +316,13 @@ export function readSessionLightmap(Module, ambientOverride = -1, occludeUnits =
   const cells = Module.HEAPU8.slice(p + 16, p + 16 + 48 * 48), blocked = Module.HEAPU8.slice(p + 16 + 48 * 48, p + 16 + 48 * 48 * 2);
   const at = (x, y) => cells[Math.max(0, Math.min(47, y - oy)) * 48 + Math.max(0, Math.min(47, x - ox))];
   const sourcesAt = p + 16 + 48 * 48 * 2, sv = new DataView(Module.HEAPU8.buffer, sourcesAt, 64 * 20);
-  const guidsAt = sourcesAt + 64 * 20, gv = new DataView(Module.HEAPU8.buffer, guidsAt, 64 * 4), list = [];
-  for (let i = 0; i < Math.min(64, v.getInt32(12, true)); i++)
+  const guidsAt = sourcesAt + 64 * 20, gv = new DataView(Module.HEAPU8.buffer, guidsAt, 64 * 8), list = [], colours = [];
+  for (let i = 0; i < Math.min(64, v.getInt32(12, true)); i++) {
     list.push([...([0, 4, 8, 12, 16].map((o) => sv.getInt32(i * 20 + o, true))), gv.getUint32(i * 4, true)]);
-  return { origin: [ox, oy], ambient: v.getInt32(8, true), sources: v.getInt32(12, true), list, cells, blocked, at,
+    const rgb = gv.getUint32(64 * 4 + i * 4, true);   // an object source's Objects.txt light colour; 0 for any other source
+    colours.push([rgb & 255, (rgb >> 8) & 255, (rgb >> 16) & 255]);
+  }
+  return { origin: [ox, oy], ambient: v.getInt32(8, true), sources: v.getInt32(12, true), list, colours, cells, blocked, at,
     grid: (a, b) => { const g = new Array(64); for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) g[j * 8 + i] = at(a - 1 + i, b - 1 + j); return g; } };
 }
 

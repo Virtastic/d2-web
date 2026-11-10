@@ -126,6 +126,32 @@ export function serializedBodyLoc(bits) {
   return v;
 }
 
+/** Inventory.txt component rectangles (six numbers each, in the order rArm, torso, lArm, head), keyed by body location 4, 3, 5, 1. */
+export function hirelingSlots(c) {
+  const slots = {};
+  [4, 3, 5, 1].forEach((loc, k) => { slots[loc] = { left: c[k * 6], right: c[k * 6 + 1], top: c[k * 6 + 2], bottom: c[k * 6 + 3], w: c[k * 6 + 4], h: c[k * 6 + 5] }; });
+  return slots;
+}
+
+/**
+ * The mercenary the panel draws, or null (no merc unit: nothing is drawn). `src` supplies the unit's reads:
+ * stat(guid, n), items(guid) and slots(). A local game reads them from the engine; a joined game from the
+ * client state the server's packets built, and its pet entry carries the life percentage itself.
+ */
+export function hirelingMercFrom(src, roster, resistPenalty = 0) {
+  const pet = (roster || []).find((p) => p.unitPresent);
+  if (!pet || !src) return null;
+  const stat = (n) => src.stat(pet.guid, n);
+  const stats = {};
+  for (const n of [0, 2, 12, 13, 30, 39, 40, 41, 42, 43, 44, 45, 46]) stats[n] = stat(n);
+  const max = (stat(7) ?? 0) >> 8, life = stat(6) ?? 0;
+  // Retail's percentage is the client pet entry +0x1c: a joined game has it from the server; a local game takes it from the unit.
+  const pct = pet.lifePct ?? (max > 0 ? Math.trunc((life >> 8) * 100 / max) : 0);
+  const items = src.items(pet.guid), slots = src.slots();
+  return { name: pet.name || '', dead: Boolean(pet.flags & 1), stats, life: { pct, max }, resistPenalty,
+    slots, items: items.filter((i) => i.bodyLoc), twoHanded: items.some((i) => (i.bodyLoc === 4 || i.bodyLoc === 5) && i.twoHanded), inventory: true };
+}
+
 export function createHirelingPanelRenderer(read, documentObject = globalThis.document) {
   const chrome = createPanelChrome(read, documentObject);
   const fontData = Object.fromEntries([[FONT6, 'font6'], [FONT8, 'font8']].map(([id, n]) => [id,
@@ -158,23 +184,14 @@ export function createHirelingPanelRenderer(read, documentObject = globalThis.do
     }
     return icons.get(key);
   };
-  const view = (w, h) => { const scale = Math.min(1, w / 800, h / 600); return { scale, ox: (w - 800 * scale) / 2, oy: (h - 600 * scale) / 2 }; };
-  return {
-    panelRect() { return { left: HIRELING_ORIGIN.x, top: HIRELING_ORIGIN.y, width: 320, height: 432 }; },
-    /** The merc as +0x9AE80 reads it, or null (no merc unit: nothing is drawn). */
-    merc(Module, roster, difficulty = 0) {
-      const pet = (roster || []).find((p) => p.unitPresent);
-      if (!pet) return null;
-      const stat = (n) => { const v = Module.ccall('d2_session_unit_stat', 'number', ['number', 'number', 'number', 'number'], [1, pet.guid, n, 0]); return v === -2147483648 ? null : v; };
-      const stats = {};
-      for (const n of [0, 2, 12, 13, 30, 39, 40, 41, 42, 43, 44, 45, 46]) stats[n] = stat(n);
-      const max = (stat(7) ?? 0) >> 8, life = stat(6) ?? 0;
-      // ponytail: retail's percentage is the client pet entry +0x1c (D2Game's update); taken from the unit here.
-      const pct = max > 0 ? Math.trunc((life >> 8) * 100 / max) : 0;
+  // A local game's mercenary reads: the unit's stats, worn items and the hireling inventory record, from the engine.
+  const engineSource = (Module) => ({
+    stat(guid, n) { const v = Module.ccall('d2_session_unit_stat', 'number', ['number', 'number', 'number', 'number'], [1, guid, n, 0]); return v === -2147483648 ? null : v; },
+    items(guid) {
       const items = [];
       const countAt = Module._malloc(4);
       try {
-        const p = Number(Module.ccall('d2_session_inventory_items', 'number', ['number', 'number', 'bigint'], [1, pet.guid, BigInt(countAt)]));
+        const p = Number(Module.ccall('d2_session_inventory_items', 'number', ['number', 'number', 'bigint'], [1, guid, BigInt(countAt)]));
         const n = Module.HEAPU32[countAt >>> 2], txt = itemRows();
         for (let i = 0; p && i < n && i < 16; i++) {
           const o = p + i * 108, v = new DataView(Module.HEAPU8.buffer, o, 108), row = txt[v.getUint32(4, true)], q = v.getUint32(8, true);
@@ -183,16 +200,23 @@ export function createHirelingPanelRenderer(read, documentObject = globalThis.do
           items.push({ bodyLoc: serializedBodyLoc(Module.HEAPU8.subarray(o + 28, o + 108)), invFile, invWidth: Number(row.invwidth) || 1, invHeight: Number(row.invheight) || 1, twoHanded: row.weapon && row['2handed'] === '1' });
         }
       } finally { Module._free(countAt); }
-      const slots = {}, sp = Module._malloc(64 * 4);
+      return items;
+    },
+    slots() {
+      const sp = Module._malloc(64 * 4);
       try {
-        if (Module.ccall('d2_session_inventory_components', 'number', ['number', 'number', 'bigint', 'number'], [HIRELING_INVENTORY_RECORD, 1, BigInt(sp), 60])) {
-          const c = new Int32Array(Module.HEAPU8.buffer.slice(sp, sp + 240));
-          // Component order rArm, torso, lArm, head (Inventory.txt) -> body locations 4, 3, 5, 1.
-          [4, 3, 5, 1].forEach((loc, k) => { slots[loc] = { left: c[k * 6], right: c[k * 6 + 1], top: c[k * 6 + 2], bottom: c[k * 6 + 3], w: c[k * 6 + 4], h: c[k * 6 + 5] }; });
-        }
+        if (!Module.ccall('d2_session_inventory_components', 'number', ['number', 'number', 'bigint', 'number'], [HIRELING_INVENTORY_RECORD, 1, BigInt(sp), 60])) return {};
+        return hirelingSlots(new Int32Array(Module.HEAPU8.buffer.slice(sp, sp + 240)));
       } finally { Module._free(sp); }
-      return { name: pet.name || '', dead: Boolean(pet.flags & 1), stats, life: { pct, max }, resistPenalty: penalty(difficulty),
-        slots, items: items.filter((i) => i.bodyLoc), twoHanded: items.some((i) => (i.bodyLoc === 4 || i.bodyLoc === 5) && i.twoHanded), inventory: true };
+    },
+  });
+  const view = (w, h) => { const scale = Math.min(1, w / 800, h / 600); return { scale, ox: (w - 800 * scale) / 2, oy: (h - 600 * scale) / 2 }; };
+  return {
+    panelRect() { return { left: HIRELING_ORIGIN.x, top: HIRELING_ORIGIN.y, width: 320, height: 432 }; },
+    /** The merc as +0x9AE80 reads it, or null (no merc unit: nothing is drawn). */
+    // `source` is the engine Module of a local game, or the reads of a joined game (hirelingMercFrom).
+    merc(source, roster, difficulty = 0) {
+      return hirelingMercFrom(typeof source?.ccall === 'function' ? engineSource(source) : source, roster, penalty(difficulty));
     },
     draw(ctx, w, h, merc, { act = 1, string, closePressed = false } = {}) {
       const list = hirelingPanelDrawList(merc, { string, measure }, closePressed);

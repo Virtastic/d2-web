@@ -4,7 +4,8 @@
 // are painted by the stash panel's renderer from the items the server placed; this file adds the accept and
 // cancel marks, the names and gold figures, and routes presses. Every packet leaves through `send`.
 import { newTrade, applyTradePacket, tradeAnswer, tradeMouseDown, tradeMouseUp, tradeSetGold, tradeItemAction, tradeTick,
-  tradeMarks, tradeButtonAt, TRADE_STR, TRADE_STATE } from './bnet-game-trade.mjs';
+  tradeMarks, tradeButtonAt, tradeTip, tradeGoldOpen, tradeGoldClose, takeTradeEvents, TRADE_STR, TRADE_STATE } from './bnet-game-trade.mjs';
+import { resolveUnitSound } from './unit-sound-resolver.mjs';
 import { createStashPanelRenderer } from './stash-panel.mjs';
 import { createPanelChrome, CHROME_ART } from './panel-chrome.mjs';
 
@@ -17,9 +18,18 @@ export const TRADE_LAYOUT = Object.freeze({
   theirMark: [275, 202], accept: [223, 416], cancel: [275, 416],
   theirName: [25, 27], ownName: [25, 242], nameMax: 112, goldLabelCentre: 187, goldRight: 292, theirRow: 27, ownRow: 242,
 });
-// GUESS: the request box's line positions. The retail box is built at (320, 100) of the 640 layout by the client's
-// generic message-box code, whose line metrics are not ported; reading that builder settles the numbers.
-export const TRADE_BOX = Object.freeze({ centre: 400, first: 160, pitch: 24, height: 16 });
+// The request box is the client's generic menu box (the one a town NPC's menu uses), anchored at screen point
+// (320, 100) whatever the screen size: as wide as its widest line plus 20 and centred on the anchor, 15 px a line
+// plus 15, its top 21 above the anchor for the one line that is not a button. A half-black box sits behind it.
+// GUESS: the frame pieces round the box (the NPC menu's boxpieces) are not painted here, and the line under the
+// pointer is not turned blue; sharing the NPC menu's painter settles both.
+export const TRADE_BOX = Object.freeze({ centre: 320, anchor: 100, title: 21, pitch: 15, padX: 20, padY: 15 });
+/** The box for lines of the given Font16 widths: its rectangle and each line's text left edge and bottom row. */
+export function tradeBoxLayout(widths) {
+  const B = TRADE_BOX, w = Math.max(0, ...widths) + B.padX, x = B.centre - Math.trunc(w / 2), y = B.anchor - B.title;
+  return { x, y, w, h: widths.length * B.pitch + B.padY,
+    lines: widths.map((lw, i) => ({ x: x + (lw < w ? Math.trunc((w - lw + 1) / 2) + 1 : 0), y: y + B.pitch * (i + 1), w: lw })) };
+}
 
 /** The renderers the screen paints with: both grids and the shared chrome (buttons, Font16). */
 export function createTradeRenderers(read, documentObject = globalThis.document) {
@@ -43,17 +53,29 @@ export function tradePoint(px, py, width, height) {
 /**
  * `send(bytes)`, `now()`, `string(index)` the string table, `carried()` the gold the player carries,
  * `measure(text)` Font16 width (for the box's hit test), `onOpen()`/`onClose()` when the screen appears and goes,
- * `onLeave()` when an unanswered cancel ends the game.
+ * `onLeave()` when an unanswered cancel ends the game, `onSound(row, event)` a Sounds.txt row to play, and
+ * `classOf(who, guid)` the hero class (0..6) of 'own' or of the 'partner' unit, null when that unit is not in view.
  */
 export function createRealmTrade({ send, now = () => 0, string = () => '', carried = () => 0, measure = (s) => 8 * String(s).length,
-  onOpen = null, onClose = null, onLeave = null }) {
+  onOpen = null, onClose = null, onLeave = null, onSound = null, classOf = () => null }) {
   let t = newTrade();
   const flush = (out) => { for (const b of out) send(b); return out.length; };
+  // What the step asked to be heard. A hero's line is that hero's own voice row; a hero not in view says nothing.
+  const hear = () => {
+    for (const e of takeTradeEvents(t)) {
+      if (!onSound) continue;
+      if (e.sound != null) { onSound(e.sound, e); continue; }
+      const classId = classOf(e.who, e.guid);
+      const row = classId == null ? null : resolveUnitSound({ unitType: 0, classId, soundEvent: e.speech, isLocalPlayer: e.who === 'own' });
+      if (row != null) onSound(row, e);
+    }
+  };
   // The screen's edges, noticed after every step so the shell opens and closes the inventory with it.
   const step = (fn) => {
     const ui = t.ui, panel = t.panel, result = fn();
     if (!panel && t.panel && onOpen) onOpen();
     if (ui && !t.ui && onClose) onClose();
+    hear();
     return result;
   };
   const boxLines = () => {
@@ -61,11 +83,12 @@ export function createRealmTrade({ send, now = () => 0, string = () => '', carri
     const lines = t.box === 'asked'
       ? [{ text: string(TRADE_STR.ASKED) }, { text: string(TRADE_STR.ACCEPT), answer: true }, { text: string(TRADE_STR.CANCEL), answer: false }]
       : [{ text: string(TRADE_STR.ASKING) }, { text: string(TRADE_STR.CANCEL), answer: false }];
-    return lines.map((l, i) => { const w = measure(l.text); return { ...l, x: TRADE_BOX.centre - (w >> 1), y: TRADE_BOX.first + i * TRADE_BOX.pitch, w }; });
+    const box = tradeBoxLayout(lines.map((l) => measure(l.text)));
+    return lines.map((l, i) => ({ ...l, ...box.lines[i] }));
   };
   const boxAt = (px, py, width, height) => {
     const o = origin(width, height), x = (px - o.x) / o.scale, y = (py - o.y) / o.scale;
-    return boxLines().find((l) => 'answer' in l && x >= l.x && x < l.x + l.w && y > l.y - TRADE_BOX.height && y <= l.y) || null;
+    return boxLines().find((l) => 'answer' in l && x >= l.x && x < l.x + l.w && y > l.y - TRADE_BOX.pitch && y <= l.y) || null;
   };
   const inOwnGrid = (x, y) => { const g = t.ownGrid; return Boolean(g) && x >= g.x0 && x < g.x1 && y >= g.y0 && y < g.y1; };
 
@@ -75,7 +98,7 @@ export function createRealmTrade({ send, now = () => 0, string = () => '', carri
     get box() { return t.box; },
     reset() { step(() => { t = Object.assign(t, newTrade()); }); },
     /** A server trade packet (0x77, 0x78, 0x79). */
-    feed(bytes, env = {}) { return step(() => flush(applyTradePacket(t, bytes, env))); },
+    feed(bytes, env = {}) { return step(() => flush(applyTradePacket(t, bytes, { now: now(), ...env }))); },
     /** The lower grid's rectangle in canvas pixels of the 800x600 screen, from its Inventory.txt geometry. */
     setOwnGrid(g) { t.ownGrid = g ? { x0: g.gridLeft, y0: g.gridTop, x1: g.gridLeft + g.columns * g.boxW, y1: g.gridTop + g.rows * g.boxH } : null; },
     /** A press while a request box is up: its buttons answer, and the box swallows every press. */
@@ -91,11 +114,20 @@ export function createRealmTrade({ send, now = () => 0, string = () => '', carri
     press(px, py, width, height, { cursorItem = false } = {}) {
       if (!t.panel) return false;
       const p = tradePoint(px, py, width, height);
-      flush(tradeMouseDown(t, tradeButtonAt(p.x, p.y), { cursorItem }));
+      step(() => flush(tradeMouseDown(t, tradeButtonAt(p.x, p.y), { cursorItem })));
       return true;
     },
     /** The inventory's coin going down: it drops a held accept without telling the server (the gold box follows). */
-    goldPress() { if (t.panel) tradeMouseDown(t, 'gold'); },
+    goldPress() { if (t.panel) step(() => tradeMouseDown(t, 'gold')); },
+    /** The coin released: true when the gold box may open (opening it withdraws an accept). */
+    goldOpen(env = {}) { const r = tradeGoldOpen(t, env); flush(r.send); return r.open; },
+    /** The gold box closed without its OK. */
+    goldClosed() { tradeGoldClose(t); },
+    /** The hover text at a canvas point: { text, x, y, left: true } (the plate's left edge and anchor row on the 800x600 screen), or null. */
+    tip(px, py, width, height) {
+      const p = tradePoint(px, py, width, height), r = tradeTip(t, p.x, p.y);
+      return r ? { text: string(r.string), x: r.x + TRADE_ORIGIN.x, y: r.y + TRADE_ORIGIN.y, left: true } : null;
+    },
     /** The left button up anywhere while the panel is open. */
     release(px, py, width, height) {
       if (!t.panel) return false;
@@ -107,7 +139,7 @@ export function createRealmTrade({ send, now = () => 0, string = () => '', carri
     /** The inventory was closed (its close button, Escape): the trade is cancelled. */
     closed() { if (t.panel && t.state !== TRADE_STATE.WAIT) step(() => flush(tradeMouseUp(t, 'close', now()))); },
     /** The gold box's OK. */
-    setGold(amount) { return t.panel ? flush(tradeSetGold(t, amount, carried())) : 0; },
+    setGold(amount) { return t.panel ? step(() => flush(tradeSetGold(t, amount, carried()))) : 0; },
     /** The inventory's item gate: false refuses the action (a reply is awaited; the accept is withdrawn). */
     itemAction() {
       const r = step(() => tradeItemAction(t, now()));
@@ -154,12 +186,12 @@ export function createRealmTrade({ send, now = () => 0, string = () => '', carri
         evidence.marks = marks; evidence.gold = [t.ownGold, t.theirGold]; evidence.partner = t.partner;
       }
       if (t.box) {
-        const o = origin(width, height), lines = boxLines();
+        const o = origin(width, height), lines = boxLines(), box = tradeBoxLayout(lines.map((l) => chrome.measure(act, l.text)));
         ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.scale, o.scale);
-        const w = Math.max(...lines.map((l) => chrome.measure(act, l.text))) + 32, top = TRADE_BOX.first - TRADE_BOX.height - 10;
-        ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(TRADE_BOX.centre - (w >> 1), top, w, lines.length * TRADE_BOX.pitch + 12);
-        for (const l of lines) chrome.text(ctx, act, l.text, TRADE_BOX.centre - (chrome.measure(act, l.text) >> 1), l.y);
+        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(box.x, box.y, box.w, box.h);
+        lines.forEach((l, i) => chrome.text(ctx, act, l.text, box.lines[i].x, box.lines[i].y));
         ctx.restore();
+        evidence.box = [box.x, box.y, box.w, box.h];
         evidence.lines = lines.map((l) => l.text);
       }
       return evidence;

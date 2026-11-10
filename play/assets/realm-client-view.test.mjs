@@ -17,12 +17,14 @@ test('the town flag follows the level the server placed the hero in', () => {
   assert.equal(realmViewSnapshot({ base: null, resources: null, monsters: [], missiles: [], level: 0, actor, frame: 0 }).town, false);
 });
 
-test('a monster carries the life the server reported, as a share of 100', () => {
-  const mon = (hpPct) => ({ guid: 3, classId: 5, mode: 1, x: 1, y: 2, direction: 0, hpPct });
-  const [hurt, dead, unknown] = snap(2, [mon(40), mon(0), { ...mon(0), hpPct: undefined }]).entities;
-  assert.deepEqual([hurt.hp, hurt.hpMax], [40, 100]);
-  assert.deepEqual([dead.hp, dead.hpMax], [0, 100]);
-  assert.deepEqual([unknown.hp, unknown.hpMax], [0, 0]);
+test('a monster carries the life the server reported, as a share of 100; dead is its mode, not 0% life', () => {
+  const mon = (hpPct, mode = 1) => ({ guid: 3, classId: 5, mode, x: 1, y: 2, direction: 0, hpPct });
+  const [hurt, nearlyDead, dying, corpse, unknown] = snap(2, [mon(40), mon(0), mon(0, 0), mon(30, 12), { ...mon(0), hpPct: undefined }]).entities;
+  assert.deepEqual([hurt.hp, hurt.hpMax, hurt.dead], [40, 100, false]);
+  assert.deepEqual([nearlyDead.hp, nearlyDead.hpMax, nearlyDead.dead], [1, 100, false]);   // 0% and still standing: alive
+  assert.deepEqual([dying.hp, dying.dead], [0, true]);
+  assert.deepEqual([corpse.hp, corpse.dead], [0, true]);                                   // a corpse whose last life share was not 0
+  assert.deepEqual([unknown.hp, unknown.hpMax, unknown.dead], [0, 0, false]);
 });
 
 test('the character screen and attribute totals are the hero unit\'s once it is read', () => {

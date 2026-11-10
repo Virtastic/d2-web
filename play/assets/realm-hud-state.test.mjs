@@ -25,7 +25,6 @@ test('every answer is null before the server has sent its data', () => {
   assert.equal(h.advancement(0), null);
   assert.equal(h.attributeTotals(), null);
   assert.equal(h.characterSlots(0), null);
-  assert.equal(h.questWords, null);
   assert.equal(h.classSkills(0, new Map()), null);
   assert.equal(h.waypointTable(), null);
   assert.equal(h.takeMenu(), null);
@@ -68,16 +67,6 @@ test('the character screen reads the server\'s slots under the wasm client\'s st
   assert.equal(reads.characterScreen[5], 120);
   assert.equal(reads.characterScreen[11], 50);
   assert.equal(reads.characterScreen[14], 30);
-});
-
-test('0x29 gives the 48 quest words of the quest log', () => {
-  const h = hud();
-  const body = new Array(96).fill(0); body[2] = 0x81; body[3] = 0x10;   // word 1 = 0x1081
-  h.feed(pack([0x29], body), sizeOf);
-  const words = h.questWords;
-  assert.equal(words.length, 48);
-  assert.equal(words[1], 0x1081);
-  assert.equal(words[0], 0);
 });
 
 test('the skill tree lists the class\'s Skills.txt rows with the levels the server sent, none before it sent any', () => {
@@ -124,15 +113,15 @@ test('reset forgets everything', () => {
 
 test('the waypoint act tabs follow the server quest record: a tab click reaches the highest completed act and its row travels there', async () => {
   const { createWaypointMenuInput } = await import('./waypoint-menu-input.mjs');
-  const menu = createWaypointMenuInput(), h = hud();
+  const menu = createWaypointMenuInput();
   const tab = (act, done) => menu.hitTest(80 + 64 * (act - 1) + 4, 70, 800, 600, [], () => null, done, 1);   // inside tab zone `act`
   // No quest record yet: the record is zero, so every tab resolves to Act I (never a dead click).
-  assert.deepEqual(waypointActCompletion(h.questWords), [false, false, false, false]);
-  assert.deepEqual(tab(3, waypointActCompletion(h.questWords)), { action: 'tab', act: 1 });
+  const words = (record) => realmFrameReads(null, null, null, 0, null, null, null, null, null, record && { player: new Uint16Array(Uint8Array.from(record).buffer) }).questWords;
+  assert.deepEqual(waypointActCompletion(words(null)), [false, false, false, false]);
+  assert.deepEqual(tab(3, waypointActCompletion(words(null))), { action: 'tab', act: 1 });
   // Acts I and II completed (words 7 and 15, bit 0); Act IV's word alone does not skip Act III.
   const body = new Array(96).fill(0); body[14] = 1; body[30] = 1; body[56] = 1;
-  h.feed(pack([0x29], body), sizeOf);
-  const done = waypointActCompletion(h.questWords);
+  const done = waypointActCompletion(words(body));
   assert.deepEqual(done, [true, true, false, true]);
   assert.deepEqual(tab(2, done), { action: 'tab', act: 2 });
   assert.deepEqual(tab(3, done), { action: 'tab', act: 3 });

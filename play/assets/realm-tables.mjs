@@ -104,10 +104,18 @@ const COMPONENT_PREFIX = ['rarm', 'torso', 'larm', 'head', 'neck', 'rhand', 'lha
  * readers), and for the player's own row also the sixty equipment-slot numbers (ten slots of
  * left/right/top/bottom/width/height). `null` for a row the file does not have.
  */
+const INVENTORY_RECORDS_PER_RESOLUTION = 16;
 export function createInventoryTable(read) {
-  let table = null;
-  const load = () => (table ??= new Map(rows(read('data\\global\\excel\\inventory.txt')).map((r) => [r.class.toLowerCase(), r])));
+  let table = null, ordered = null;
+  const list = () => (ordered ??= rows(read('data\\global\\excel\\inventory.txt')));
+  const load = () => (table ??= new Map(list().map((r) => [r.class.toLowerCase(), r])));
   return {
+    // The twelve grid numbers of a row by its record number, as the engine reads a panel's row: the file holds
+    // each record twice, the 640x480 set and then the 800x600 set, so the row is `record + 16 * higherRes`.
+    gridAt(record, higherRes = 1) {
+      const row = list()[record + (higherRes ? INVENTORY_RECORDS_PER_RESOLUTION : 0)];
+      return row ? INVENTORY_COLUMNS.map((c) => num(row[c])) : null;
+    },
     grid(name) {
       const row = load().get(String(name).toLowerCase());
       return row ? INVENTORY_COLUMNS.map((c) => num(row[c])) : null;

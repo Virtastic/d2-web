@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRealmTrade, tradePoint, TRADE_BOX } from './realm-trade.mjs';
+import { createRealmTrade, tradePoint, tradeBoxLayout, TRADE_BOX } from './realm-trade.mjs';
 import { TRADE_STATE as S } from './bnet-game-trade.mjs';
 
 const ui = (action) => Uint8Array.of(0x77, action);
@@ -98,5 +98,79 @@ test('a release over my grid counts as an item put down', () => {
   t.release(120, 330, 800, 600);
   assert.deepEqual(h.take(), [[0x4f, 7, 0, 0, 0, 0, 0]]);
   assert.equal(t.state.latch, false);
-  assert.equal(TRADE_BOX.centre, 400);
+});
+
+test('the request box: centred on (320, 100), 20 wider than its widest line, 15 px a line', () => {
+  assert.deepEqual([TRADE_BOX.centre, TRADE_BOX.anchor], [320, 100]);
+  const box = tradeBoxLayout([112, 16, 48]);
+  assert.deepEqual([box.x, box.y, box.w, box.h], [254, 79, 132, 60]);
+  assert.deepEqual(box.lines, [{ x: 265, y: 94, w: 112 }, { x: 313, y: 109, w: 16 }, { x: 297, y: 124, w: 48 }]);
+  const odd = tradeBoxLayout([101, 7]);                                // odd widths round as the client's integer halves do
+  assert.deepEqual([odd.x, odd.w, odd.lines[1].x], [260, 121, 318]);
+  // The box does not move with the 640x480 layout: its buttons are hit at the same screen points.
+  const h = harness(), t = h.trade;
+  t.feed(ui(0));
+  const cancel = t.boxLines()[1];
+  assert.deepEqual([cancel.y, cancel.x], [109, 320 - 34 + Math.trunc((68 - 48 + 1) / 2) + 1]);   // 'asking to trade' is 15 chars of 8, 'cancel' 6
+  assert.equal(t.boxPress(cancel.x, cancel.y - 15, 800, 600), true);  // the row above the line is outside it
+  assert.equal(t.box, 'asking');
+  assert.equal(t.boxPress(cancel.x, cancel.y, 800, 600), true);
+  assert.deepEqual([t.box, h.take()], [null, [[0x4f, 2, 0, 0, 0, 0, 0]]]);
+});
+
+test('hover texts come from the string table, left-aligned at the screen points the client uses', () => {
+  const h = harness(), t = h.trade;
+  STR[4130] = 'cancel trade'; STR[4131] = 'accept trade';
+  assert.equal(t.tip(...at(239, 400)), null);
+  t.feed(ui(1)); t.answer(true); t.feed(ui(6));
+  assert.deepEqual(t.tip(...at(239, 400)), { text: 'accept trade', x: 267, y: 442, left: true });
+  assert.deepEqual(t.tip(...at(291, 400)), { text: 'cancel trade', x: 343, y: 442, left: true });
+  assert.deepEqual(t.tip(...at(291, 185)), { text: 'accept trade', x: 319, y: 227, left: true });
+  assert.equal(t.tip(...at(200, 300)), null);
+  assert.equal(t.goldOpen(), true);
+  assert.equal(t.tip(...at(239, 400)), null);
+  t.goldClosed();
+  assert.notEqual(t.tip(...at(239, 400)), null);
+});
+
+test('the gold box opening withdraws the accept on the wire; a second opening and a held item are refused', () => {
+  const h = harness(), t = h.trade;
+  assert.equal(t.goldOpen(), false);
+  t.feed(ui(1)); t.answer(true); t.feed(ui(6)); h.take();
+  assert.equal(t.goldOpen({ cursorItem: true }), false);
+  assert.deepEqual(h.take(), []);
+  assert.equal(t.goldOpen(), true);
+  assert.deepEqual(h.take(), [[0x4f, 7, 0, 0, 0, 0, 0]]);
+  assert.equal(t.goldOpen(), false);
+  t.setGold(123);
+  assert.deepEqual(h.take(), [[0x4f, 8, 0, 0, 0, 123, 0]]);
+  assert.equal(t.goldOpen(), true);
+});
+
+test('what is heard: screen sounds by row, and the no-room line in the voice of the hero short of room', () => {
+  const heard = [], sent = [];
+  const t = createRealmTrade({ send: (b) => sent.push(Array.from(b)), string: (i) => STR[i], onSound: (row) => heard.push(row),
+    classOf: (who, guid) => (who === 'own' ? 4 : guid === 7 ? 1 : null) });
+  t.feed(ui(1)); t.answer(true);
+  assert.deepEqual(heard.splice(0), [2]);
+  t.feed(ui(6));
+  const name = new Uint8Array(21); name[0] = 0x78; name[1] = 0x42; name[17] = 7;
+  t.feed(name);
+  t.feed(ui(9));
+  assert.deepEqual(heard.splice(0), [3012]);                           // the barbarian's own line
+  t.feed(ui(10));
+  assert.deepEqual(heard.splice(0), [3246]);                           // the sorceress partner's
+  name[17] = 8; t.feed(name); t.feed(ui(10));
+  assert.deepEqual(heard.splice(0), []);                               // a partner not in view says nothing
+  t.press(...at(239, 400));
+  assert.deepEqual(heard.splice(0), [4]);
+  assert.deepEqual([t.state.state, t.open], [S.OPEN, true]);
+});
+
+test('a request while the chat line or another box is up is refused with a bare cancel', () => {
+  const h = harness(), t = h.trade;
+  t.feed(ui(1), { busy: true });
+  assert.deepEqual([h.take(), t.box, t.state.state], [[[0x4f, 2, 0, 0, 0, 0, 0]], null, S.NONE]);
+  h.time = 1234; t.feed(ui(0)); t.feed(ui(1));                         // asked while asking: cancel, and the wait starts now
+  assert.deepEqual([h.take(), t.state.state, t.state.waitSince], [[[0x4f, 2, 0, 0, 0, 0, 0]], S.WAIT, 1234]);
 });

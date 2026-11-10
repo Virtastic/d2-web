@@ -48,7 +48,7 @@ test('a joined game asks only for what is missing and one failing builder leaves
 });
 
 test('a joined game reaches the skill speed bar, the area name, the entry banner and its own stats', () => {
-  assert.match(shell, /if \(\(session \|\| realmSceneActive\) && skillSelectRenderer\) skillSelectRenderer\.open = /);
+  assert.match(shell, /if \(clientView\(\)\.live && skillSelectRenderer\) skillSelectRenderer\.open = /);
   assert.match(shell, /if \(\(engine \|\| realmWorld\) && !clearScreen && automapOverlay\?\.isOpen\)/);
   assert.match(shell, /if \(\(engine \|\| realmWorld\) && entryBannerRenderer && entryBannerLevel > 0\)/);
   const view = fn('const realmClientView = {');

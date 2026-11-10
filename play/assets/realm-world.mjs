@@ -5,6 +5,11 @@
 // them into the records the shared drawFrame reads in a local game (the item and object presentations,
 // assets/item-renderer.mjs and assets/object-renderer.mjs).
 //
+// The items a player HOLDS (grids, body, belt, cursor) are the engine's: the wasm client seats every item
+// record on the player's unit as retail does, and `heldItems` reads them back. This file's own item map then
+// supplies only what the unit read does not carry (the ground items, the raw bitstream a tooltip is decoded
+// from). Without `heldItems` (an engine build that lacks the read) the map answers alone, as before.
+//
 // Packet semantics are 1.13c's: 0x51 adds an object and 0x0E changes its state, 0x0A removes a unit,
 // 0x9C and 0x9D carry an item as its saved-item bitstream (the format ITEMS_DecodeItemFromBitstream reads
 // without the 'JM' header or the seed), 0x19 and 0x1D-0x1F, 0x20 carry the gold stats, 0x03 starts an act.
@@ -68,82 +73,72 @@ const u32 = (p, at) => (p[at] | (p[at + 1] << 8) | (p[at + 2] << 16) | (p[at + 3
 
 /**
  * `tables` is { items: createItemTable(read), objects: createObjectTable(read) } (assets/realm-tables.mjs).
- * The state is plain data; every method answers from what the packets fed so far said.
+ * `heldItems(ownerGuid)` (optional) returns the engine's records of the items a player unit holds (0 = the
+ * client's own player), or null when the engine cannot say: { guid, classId, code, mode, x, y, page, bodyLoc,
+ * quality, flags }.
  */
 const SUBCLASS_PORTALS = 0x04 | 0x10;   // a town portal, a permanent portal
 
-export function createRealmWorld({ items: itemTable, objects: objectTable }) {
+/**
+ * The engine's object units (d2_realm_client_object_units): 14 int32 words each, {id, class, x, y, mode, 8.8 cel clock,
+ * 8.8 cel count, 8.8 step, flags (1 selectable, 2 in a revealed room), interact byte, overlay count, 3 overlay rows}.
+ */
+export const OBJECT_UNIT_WORDS = 14;
+export function parseRealmObjectUnits(words, count) {
+  const units = [];
+  for (let i = 0; i < count; i++) {
+    const w = words.subarray(i * OBJECT_UNIT_WORDS, (i + 1) * OBJECT_UNIT_WORDS);
+    units.push({ id: w[0] >>> 0, classId: w[1], x: w[2], y: w[3], mode: w[4], clock: w[5], count: w[6], speed: w[7],
+      selectable: (w[8] & 1) !== 0, inRoom: (w[8] & 2) !== 0, interact: w[9], overlays: Array.from(w.subarray(11, 11 + w[10])) });
+  }
+  return units;
+}
+/** The engine's pending object activations (d2_realm_client_take_object_events): 6 int32 words each. */
+export function parseRealmObjectEvents(words, count) {
+  const events = [];
+  for (let i = 0; i < count; i++) {
+    if (words[i * 6] !== 1) throw new Error(`object event version ${words[i * 6]}`);
+    events.push({ objectId: words[i * 6 + 1] >>> 0, playerId: words[i * 6 + 2] >>> 0, shrine: words[i * 6 + 3], soundRow: words[i * 6 + 4], effect: words[i * 6 + 5] });
+  }
+  return events;
+}
+
+export function createRealmWorld({ items: itemTable, objects: objectTable, heldItems = null }) {
   let ownGuid = null;
   const itemsByGuid = new Map();    // guid -> { ...decoded, id, owner: null (0x9C) | owner guid (0x9D) }
-  const objectsByGuid = new Map();
   let gold = 0, stashGold = 0, cursorId = 0, received = 0;
   const uiEvents = [];              // 0x77 UpdateUi codes not yet taken (16 opens the stash, 17 closes it, 21 opens the cube)
 
-  // An object's state is the client's own, kept by the rule of the engine's object unit (d2gs_client_object.cpp):
-  // a mode runs its cels from the class's start cel at the class's 8.8 step. A looping mode wraps to its start;
-  // any other holds its last cel, and the operating mode (1) then becomes the opened one (2) without a packet,
-  // keeping the operating mode's step. A mode the object is already in keeps its clock. A door the server opens
-  // (0 to 2) or closes (2 to 0) plays its transit mode (1, or 3 backwards) first, and cannot be picked meanwhile.
-  const count8 = (cls, mode) => (cls.frameCount?.[mode] ?? 0) << 8;
-  const startCel = (cls, mode) => cls.start?.[mode] ?? 0;
-  const pickable = (cls, mode) => Boolean(cls.selectable?.[mode]);
-  function enterMode(object, mode) {
-    const cls = object.cls;
-    object.mode = mode; object.count = count8(cls, mode); object.start = startCel(cls, mode) << 8;
-    object.clock = object.start; object.speed = cls.frameDelta?.[mode] ?? 0;
-    return object;
+  let revision = 0;                 // bumped by every feed and reset: the engine reads below are cached per revision
+  const heldCache = new Map();
+  // The engine's items of one player as this file's item shape, or null when the engine has no answer.
+  function held(owner) {
+    if (!heldItems) return null;
+    const key = owner === null || owner === ownGuid ? 0 : owner >>> 0;
+    const cached = heldCache.get(key);
+    if (cached && cached.revision === revision) return cached.items;
+    const records = heldItems(key);
+    const items = records ? records.flatMap((r) => {
+      const entry = itemTable.byCode(r.code);
+      return entry ? [{ id: r.guid, owner: key || ownGuid, classId: entry.classId, entry, code: r.code, mode: r.mode, x: r.x, y: r.y,
+        page: r.page, bodyLoc: r.bodyLoc, quality: r.quality, flags: r.flags, goldAmount: itemsByGuid.get(r.guid)?.goldAmount ?? -1 }] : [];
+    }) : null;
+    heldCache.set(key, { revision, items });
+    return items;
   }
-  const changeMode = (object, mode) => { if (object.mode !== mode) enterMode(object, mode); };
-  // The object-state packet: `selectable` is its byte 7, which only a door reads.
-  function setMode(object, mode, selectable) {
-    const cls = object.cls, current = object.mode;
-    if (mode > 7) return;
-    if (!cls.isDoor) { changeMode(object, mode); object.selectable = pickable(cls, mode); return; }
-    if (mode === 0 && current === 2 && count8(cls, 3) !== 256) { changeMode(object, 3); object.selectable = false; return; }
-    if (mode === 2 && current === 0 && count8(cls, 1) !== 256) {
-      changeMode(object, 1); object.selectable = false; object.clock = startCel(cls, 2); return;
-    }
-    object.selectable = selectable !== 0;
-    changeMode(object, mode);
-    object.clock = startCel(cls, mode);
+  const onGround = (item) => item.mode === MODE.GROUND || item.mode === MODE.DROPPING;
+  // The client's own items: what its unit holds plus what lies on the ground.
+  function ownItems() {
+    const mine = held(null);
+    const copy = [...itemsByGuid.values()].filter(isOwn);
+    return mine ? [...copy.filter(onGround), ...mine] : copy;
   }
-  function stepDoor(object) {
-    const cls = object.cls;
-    if (object.mode === 1) {
-      const last = count8(cls, 1) - 256;
-      if (object.clock !== last) { object.clock = Math.min(object.clock + object.speed, last); return; }
-    } else if (object.mode === 3) {
-      if (object.clock > 0) { object.clock = Math.max(object.clock - object.speed, 0); return; }
-    } else return;
-    object.mode = object.mode === 3 ? 0 : 2;
-    object.clock = startCel(cls, object.mode); object.selectable = pickable(cls, object.mode);
-  }
-  function stepObject(object) {
-    const cls = object.cls, mode = object.mode, count = count8(cls, mode);
-    if (count === 256) return;
-    const cycling = Boolean(cls.cycles?.[mode]), ladder = object.classId === 0xBD;
-    if (!cycling) {
-      if (cls.isDoor) { stepDoor(object); return; }
-      if (object.clock >= count - 256) {
-        if (ladder && (mode === 2 || mode === 3)) { object.mode = mode + 1; object.clock = startCel(cls, mode + 1) << 8; }
-        else if (mode === 1) { object.mode = 2; object.clock = startCel(cls, 2) << 8; object.selectable = pickable(cls, 2); }
-        return;
-      }
-    }
-    if (object.classId === 0x0C) {                       // this class runs its cels backwards
-      object.clock -= object.speed;
-      if (object.clock < 0) object.clock += count;
-    } else if (ladder && mode === 3) {
-      object.clock -= object.speed;
-      if (object.clock < 0) { object.mode = 4; object.clock = startCel(cls, 4) << 8; }
-    } else {
-      object.clock += object.speed;
-      if (object.clock >= count) object.clock = cycling ? (startCel(cls, mode) << 8) - count + object.clock : count - 256;
-    }
-  }
+  const wornItems = (owner) => held(owner)?.filter((item) => item.mode === MODE.EQUIP)
+    ?? [...itemsByGuid.values()].filter((item) => item.mode === MODE.EQUIP && (owner === null ? isOwn(item) : item.owner === (owner >>> 0)));
 
   function reset() {
-    itemsByGuid.clear(); objectsByGuid.clear(); uiEvents.length = 0; gold = 0; stashGold = 0; cursorId = 0; received = 0;
+    revision++; heldCache.clear();
+    itemsByGuid.clear(); uiEvents.length = 0; gold = 0; stashGold = 0; cursorId = 0; received = 0;
   }
   const isOwn = (item) => item.owner === null || item.owner === ownGuid;
 
@@ -185,20 +180,9 @@ export function createRealmWorld({ items: itemTable, objects: objectTable }) {
   function handle(p) {
     switch (p[0]) {
       case 0x03: itemsByGuid.forEach((item, guid) => { if (!isOwn(item) || item.mode === MODE.GROUND || item.mode === MODE.DROPPING) itemsByGuid.delete(guid); });
-        objectsByGuid.clear(); break;   // a new act: its objects and ground items arrive afresh
-      case 0x0a: if (p[1] === 2) objectsByGuid.delete(u32(p, 2));
-        else if (p[1] === 4) { const held = itemsByGuid.get(u32(p, 2)); if (held && (held.mode === MODE.GROUND || held.mode === MODE.DROPPING)) itemsByGuid.delete(u32(p, 2)); }
+        break;   // a new act: its ground items arrive afresh
+      case 0x0a: if (p[1] === 4) { const held = itemsByGuid.get(u32(p, 2)); if (held && (held.mode === MODE.GROUND || held.mode === MODE.DROPPING)) itemsByGuid.delete(u32(p, 2)); }
         break;
-      case 0x51: if (p[1] === 2) {
-        const classId = u16(p, 6), cls = objectTable.byClass(classId);
-        // Byte 13 is the object's interaction byte (a portal's destination level, a chest's lock bit), not whether
-        // it can be picked: that is the class's own per-mode column.
-        if (cls && p[12] < 8) objectsByGuid.set(u32(p, 2), enterMode({ id: u32(p, 2), classId, cls, token: cls.token, x: u16(p, 8), y: u16(p, 10), interact: p[13],
-          selectable: pickable(cls, p[12]) }, p[12]));
-        } break;
-      // Selector 3 is the mode change; the shrine activation (0x15) is not shown.
-      case 0x0e: if (p[1] === 2 && p[6] === 3) { const object = objectsByGuid.get(u32(p, 2));
-        if (object) setMode(object, u32(p, 8), p[7]); } break;
       case 0x19: gold = (gold + p[1]) >>> 0; break;
       case 0x1d: applyStat(p[1], p[2]); break;
       case 0x1e: applyStat(p[1], u16(p, 2)); break;
@@ -223,7 +207,7 @@ export function createRealmWorld({ items: itemTable, objects: objectTable }) {
       flippyFile: e.flippyFile, invFile: e.invFile,
       gridX: ground ? 0 : item.x, gridY: ground ? 0 : item.y,
       invPage: ground ? NO_PAGE : item.mode === MODE.BELT ? PAGE.BELT : item.page,
-      bodyLoc: item.mode === MODE.EQUIP ? item.bodyLoc : 0, invWidth: e.invWidth, invHeight: e.invHeight,
+      bodyLoc: item.mode === MODE.EQUIP ? item.bodyLoc : 0, invWidth: e.invWidth, invHeight: e.invHeight, twoHanded: Boolean(e.twoHanded),
       goldAmount: item.goldAmount, sockets: undefined, tick };
   }
 
@@ -232,6 +216,7 @@ export function createRealmWorld({ items: itemTable, objects: objectTable }) {
     setOwner(guid) { ownGuid = guid === null || guid === undefined ? null : guid >>> 0; },
     /** Apply every complete server packet of `bytes`; `sizeOf(subarray)` is the 1.13c packet-size reader. */
     feed(bytes, sizeOf) {
+      revision++;
       for (let at = 0; at < bytes.length;) {
         const n = sizeOf(bytes.subarray(at));
         if (!(n > 0) || at + n > bytes.length) break;
@@ -240,16 +225,25 @@ export function createRealmWorld({ items: itemTable, objects: objectTable }) {
       }
     },
     /** The player's own items (inventory, equipment, belt, stash, cube, cursor, ground) as presentation records. */
-    itemViews() { return [...itemsByGuid.values()].filter(isOwn).map((item) => presentItem(item)); },
+    itemViews() { return ownItems().map((item) => presentItem(item)); },
     /** The worn items of another player, as presentation records. */
-    wornBy(guid) { return [...itemsByGuid.values()].filter((item) => item.owner === (guid >>> 0) && item.mode === MODE.EQUIP).map((item) => presentItem(item)); },
-    /** One client tick of every object's animation. */
-    tickObjects() { for (const object of objectsByGuid.values()) stepObject(object); },
-    objectViews() {
-      return [...objectsByGuid.values()].map((o) => ({ id: o.id, classId: o.classId, token: o.token, mode: o.mode, x: o.x, y: o.y,
-        framePrecise: o.clock, frameCountPrecise: o.count, componentMask: 0xFFFF, animSpeed: o.speed, direction: o.cls.orientation ?? 0,
-        selectable: o.selectable,
-        portalLevel: (o.cls.subClass & SUBCLASS_PORTALS) ? o.interact : 0, locked: Boolean(o.cls.lockable && (o.interact & 0x80)), inClientRoom: true }));
+    wornBy(guid) { return wornItems(guid >>> 0).map((item) => presentItem(item)); },
+    /**
+     * The scene's object records, shaped from the engine's object units (parseRealmObjectUnits). The engine owns every
+     * fact that changes (mode, cel clock, whether it can be picked, its room, its overlays); the class table adds
+     * only what names the art. The interact byte is a portal's destination level and a chest's lock bit.
+     */
+    objectViews(units = []) {
+      const views = [];
+      for (const o of units) {
+        const cls = objectTable.byClass(o.classId);
+        if (!cls) continue;
+        views.push({ id: o.id, classId: o.classId, token: cls.token, mode: o.mode, x: o.x, y: o.y,
+          framePrecise: o.clock, frameCountPrecise: o.count, componentMask: 0xFFFF, animSpeed: o.speed, direction: cls.orientation ?? 0,
+          selectable: o.selectable, overlays: o.overlays,
+          portalLevel: (cls.subClass & SUBCLASS_PORTALS) ? o.interact : 0, locked: Boolean(cls.lockable && (o.interact & 0x80)), inClientRoom: o.inRoom });
+      }
+      return views;
     },
     /** The saved-item bitstream the server sent for an item (what its tooltip text is decoded from). */
     rawItem(guid) { return itemsByGuid.get(guid >>> 0)?.raw ?? null; },
@@ -257,18 +251,18 @@ export function createRealmWorld({ items: itemTable, objects: objectTable }) {
     takeUiEvents() { return uiEvents.splice(0); },
     get gold() { return gold; },
     get stashGold() { return stashGold; },
-    get cursorId() { return cursorId; },
+    get cursorId() { const mine = held(null); return mine ? (mine.find((item) => item.mode === MODE.CURSOR)?.id ?? 0) : cursorId; },
     get itemPacketsSeen() { return received; },
-    get ownItemCount() { let n = 0; for (const item of itemsByGuid.values()) if (isOwn(item)) n++; return n; },
+    get ownItemCount() { return ownItems().length; },
     /** The Belts.txt row the worn belt names (its armor row's `belt` column), 2 with no belt. */
     beltRecord() {
-      for (const item of itemsByGuid.values()) if (isOwn(item) && item.mode === MODE.EQUIP && item.bodyLoc === 8 && item.entry.belt >= 0) return item.entry.belt;
+      for (const item of wornItems(null)) if (item.bodyLoc === 8 && item.entry.belt >= 0) return item.entry.belt;
       return 2;
     },
     /** The weapon class animation takes (Weapons.txt wclass, the two-handed class for a two-hander) of an owner's hands. */
     weaponClassOf(owner = null) {
-      const worn = (loc) => [...itemsByGuid.values()].find((item) => item.mode === MODE.EQUIP && item.bodyLoc === loc &&
-        (owner === null ? isOwn(item) : item.owner === (owner >>> 0)) && item.entry.kind === 'weapons');
+      const all = wornItems(owner);
+      const worn = (loc) => all.find((item) => item.bodyLoc === loc && item.entry.kind === 'weapons');
       const weapon = worn(4) ?? worn(5);
       if (!weapon) return 'hth';
       const e = weapon.entry;

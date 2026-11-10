@@ -1,3 +1,4 @@
+import { corpseLootable, deathSendAllowed } from './realm-death.mjs';
 // What the player's input sends in a joined Battle.net game. The same clicks and keys a local game
 // reads become the retail 1.13c D2GS client packets (layouts: D2MOO D2PacketDef.h / PlrMsg.cpp, and the
 // size table in src/core/realm/d2gs_session.cpp); nothing here moves a unit. The server walks the
@@ -81,6 +82,7 @@ const CODE_QF2 = 0x20326671, CODE_HFH = 0x20686668;
  *   transmit(bytes)      -> false when the connection is closed
  *   scene()              -> { ready, player:{x,y}, monsters:[{guid,classId,mode,x,y,anchorX,anchorY,drawn}], objects, items,
  *                             players:[{guid,x,y,anchorX,anchorY,drawn}] (the other players), inTown,
+ *                             warps:[{id,x,y}] and warpAt(px,py) -> the level exit under the pointer (optional),
  *                             isNpc(classId), hoverBox(dx,dy), toScreen(wx,wy) -> {x,y} in pointer space, pointerWorld(px,py),
  *                             run, selected:{left,right}, cursorId, cursorCode() -> the held item's 4-byte code,
  *                             corpses:[{guid,owner,own,mode,x,y}], the player corpses the server has named (optional) }
@@ -111,6 +113,8 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
   const itemGate = () => (leaveWait ? leaveWait.itemAction() : true);
   function emit(bytes, what) {
     evidence.attempts++;
+    // Dead, the hero sends nothing but the restart (realm-death.mjs).
+    if (!deathSendAllowed(scene?.()?.playerMode, what)) { evidence.last = { what, opcode: bytes[0], sent: false, dead: true, packet: Array.from(bytes) }; return false; }
     const sent = gate.send(bytes, now());
     if (sent) evidence.sent++;
     evidence.last = { what, opcode: bytes[0], sent, packet: Array.from(bytes) };
@@ -128,15 +132,17 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     const other = (s.players || []).filter((p) => p.drawn && !lying.has(p.guid) && s.hoverBox(px - p.anchorX, py - p.anchorY)).sort((a, b) => d2(a) - d2(b))[0];
     if (other) return { kind: 'player', unit: other };
     const spot = (u) => { const p = s.toScreen(u.x, u.y); return near(px - p.x, py - p.y, 22, 40, 12); };
-    // GUESS (corpse selection): only the hero's own corpse is taken as a click target; whether the client also
-    // selects another player's corpse (the server refuses the loot without permission) is not read.
-    // capture: session <a click on another player's corpse, the outgoing packets recorded>.
-    const corpse = (s.corpses ?? []).filter((c) => c.own && c.mode === PLAYER_DEAD && spot(c)).sort((a, b) => d2(a) - d2(b))[0];
+    // A dead player unit is a target only when it is the hero's own corpse or its owner lets the hero loot it
+    // (1.13c D2Client 0x2AFB0; realm-death.mjs shapes the answer). Any other corpse is ground.
+    const corpse = (s.corpses ?? []).filter((c) => corpseLootable(c) && c.mode === PLAYER_DEAD && spot(c)).sort((a, b) => d2(a) - d2(b))[0];
     if (corpse) return { kind: 'corpse', unit: corpse };
     const item = s.items.filter((i) => i.mode === 3 && spot(i)).sort((a, b) => d2(a) - d2(b))[0];
     if (item) return { kind: 'item', unit: item };
     const object = s.objects.filter((o) => o.selectable !== false && spot(o)).sort((a, b) => d2(a) - d2(b))[0];
     if (object) return { kind: 'object', unit: object };
+    // A level exit is a tile unit: the scene's own hit test (the one a local game hovers with) names it.
+    const warp = s.warpAt?.(px, py);
+    if (warp && warp.id != null) return { kind: 'warp', unit: warp };
     return { kind: 'ground' };
   }
   const clamp16 = (v) => Math.max(0, Math.min(0xffff, v | 0));
@@ -146,14 +152,15 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     if (pending?.hand != null) return plan(pending.hand, type, idOf(type, u)) !== 0;
     if (reach) { const r = reach(type, idOf(type, u)); if (r != null && r !== -1) return Boolean(r); }
     const d = Math.max(Math.abs(u.x - s.player.x), Math.abs(u.y - s.player.y));
-    return d <= (type === UNIT.MONSTER || type === UNIT.PLAYER ? 5 : 2);
+    return d <= (type === UNIT.MONSTER || type === UNIT.PLAYER ? 5 : type === UNIT.TILE ? 4 : 2);
   };
   const idOf = (type, u) => (type === UNIT.MONSTER || type === UNIT.PLAYER ? u.guid : u.id);
   // A corpse is a player unit lying in mode DEAD; the server opens it only in that mode. Any other player unit is one of the other players.
   const corpseOf = (s, guid) => (s.corpses ?? []).find((c) => c.guid === guid) ?? null;
-  const find = (s, type, guid) => (type === UNIT.PLAYER ? ((s.corpses ?? []).find((c) => c.guid === guid && c.mode === PLAYER_DEAD) ?? (corpseOf(s, guid) ? null : (s.players || []).find((p) => p.guid === guid)))
+  const find = (s, type, guid) => (type === UNIT.PLAYER ? ((s.corpses ?? []).find((c) => c.guid === guid && c.mode === PLAYER_DEAD && corpseLootable(c)) ?? (corpseOf(s, guid) ? null : (s.players || []).find((p) => p.guid === guid)))
     : type === UNIT.MONSTER ? s.monsters.find((m) => m.guid === guid && m.mode !== MONSTER_DEATH && m.mode !== MONSTER_DEAD)
-    : type === UNIT.OBJECT ? s.objects.find((o) => o.id === guid) : type === UNIT.ITEM ? s.items.find((i) => i.id === guid && i.mode === 3) : null);
+    : type === UNIT.OBJECT ? s.objects.find((o) => o.id === guid) : type === UNIT.ITEM ? s.items.find((i) => i.id === guid && i.mode === 3)
+    : type === UNIT.TILE ? (s.warps ?? []).find((w) => w.id === guid) : null);
   // The local start comes first: the client sends an action only when its own player could start it.
   const predicted = (result) => { evidence.localMove = result; return result !== 0; };
   const startRoute = (x, y, run) => predicted(move ? move(x, y, Boolean(run)) : null);
@@ -195,6 +202,7 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     const guid = idOf(type, u);
     if (type === UNIT.ITEM) return emit(packets.pickUp(UNIT.ITEM, guid), 'pickup');
     if (type === UNIT.PLAYER) return emit(packets.interact(UNIT.PLAYER, guid), corpseOf(s, guid) ? 'corpse' : 'trade');   // a live player in town: the server answers with a trade request
+    if (type === UNIT.TILE) return emit(packets.interact(UNIT.TILE, guid), 'warp');   // the server moves the player through the exit
     if (type === UNIT.MONSTER) {
       const sent = emit(packets.interact(UNIT.MONSTER, guid), 'talk');
       if (sent && onTalk) onTalk(guid);
@@ -238,8 +246,10 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
       }
       if (held && hit.kind !== 'ground') return hit;               // a held button does not repeat a pickup or a talk
       pending = null;
-      // Another player: in town the click walks up and interacts (the trade request); elsewhere it is a walk to the spot.
-      const type = hit.kind === 'player' ? (s.inTown ? UNIT.PLAYER : null) : hit.kind === 'npc' ? UNIT.MONSTER : hit.kind === 'item' ? UNIT.ITEM : hit.kind === 'object' ? UNIT.OBJECT
+      // Another player: in town the click walks up and interacts (the trade request).
+      // GUESS: outside town the click is a walk to the spot and no request is sent; the client's click dispatch for
+      // a player unit settles whether it sends the interact anyway and leaves the refusal to the server.
+      const type = hit.kind === 'player' ? (s.inTown ? UNIT.PLAYER : null) : hit.kind === 'npc' ? UNIT.MONSTER : hit.kind === 'item' ? UNIT.ITEM : hit.kind === 'object' ? UNIT.OBJECT : hit.kind === 'warp' ? UNIT.TILE
         : hit.kind === 'corpse' ? UNIT.PLAYER : null;
       if (type != null) return interactWith(s, type, hit.unit) === false ? false : hit;
       const x = clamp16(world.x), y = clamp16(world.y);
@@ -334,6 +344,8 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     addSkill: (skill) => (Number.isInteger(skill) && skill >= 0 && skill <= 0xffff ? emit(packets.addSkill(skill), 'add-skill') : false),
     /** The death screen's continue. */
     respawn: () => emit(packets.respawn(), 'respawn'),
+    /** The hero fell: the interaction waiting on a walk is dropped (1.13c D2Client 0x16A0). */
+    heroDied() { pending = null; },
     useItem(guid) { const s = open(); return s && itemGate() ? emit(packets.useItem(guid, s.player.x, s.player.y), 'use-item') : false; },
     /** Inventory panel: lift a carried item (0x19) or a worn one (0x1C). */
     lift: (guid) => itemGate() && emit(packets.fromGrid(guid), 'lift'),

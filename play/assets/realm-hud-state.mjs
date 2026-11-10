@@ -7,7 +7,6 @@
 //   0x1a / 0x1b          experience added (byte / word); 0x1c sets experience (dword)
 //   0x1d / 0x1e / 0x1f   a stat of the player (byte / word / dword value)
 //   0x20                 a stat of a unit (taken for the player's own guid)
-//   0x29                 the player's quest record (96 bytes = 48 words)
 //   0x63                 the waypoint menu opens, with the waypoint flags of the current difficulty
 //   0x03                 a new act: an open waypoint menu is closed
 // Skills (the list, the levels, the selected hands) are the wasm client state's (d2gsSkillChoices,
@@ -46,11 +45,10 @@ export function waypointTravelPacket(objectId, levelId) {
 export function createRealmHud({ experience, waypoints, skills }, { levelName = (key) => key } = {}) {
   let ownGuid = null;
   const stats = new Map();
-  let quests = null;
   let menu = null;          // { id, flags: Uint8Array(5) } while the server's menu is open
   let flags = null;         // the last waypoint flags the server sent
 
-  function reset() { stats.clear(); quests = null; menu = null; flags = null; }
+  function reset() { stats.clear(); menu = null; flags = null; }
   const own = (guid) => ownGuid !== null && guid === ownGuid;
 
   function handle(p) {
@@ -64,7 +62,6 @@ export function createRealmHud({ experience, waypoints, skills }, { levelName = 
       case 0x1e: stats.set(p[1], u16(p, 2)); break;
       case 0x1f: stats.set(p[1], u32(p, 2)); break;
       case 0x20: if (p.length >= 10 && own(u32(p, 1))) stats.set(p[5], u32(p, 6)); break;
-      case 0x29: if (p.length >= 97) quests = new Uint16Array(48).map((_, i) => u16(p, 1 + i * 2)); break;
       case 0x63: if (p.length >= 21) {
         flags = Uint8Array.from(p.subarray(7, 12));
         menu = { id: u32(p, 1), flags };
@@ -114,7 +111,6 @@ export function createRealmHud({ experience, waypoints, skills }, { levelName = 
       return slots;
     },
     /** The player's 48 quest words, or null until the server has sent the record. */
-    get questWords() { return quests ? Uint16Array.from(quests) : null; },
     /**
      * The class skill tree: Skills.txt rows of the class with the level the server sent (`levels`: a map from skill id
      * to level, from the wasm client's skill list). Null before the server has sent any skill. `canLearn` is the

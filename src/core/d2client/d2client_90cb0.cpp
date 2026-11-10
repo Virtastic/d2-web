@@ -9,13 +9,11 @@ namespace {
 void wcpy(char16_t* d, const char16_t* s) { while ((*d = *s)) { d++; s++; } }
 const char16_t* wchr(const char16_t* s, char16_t c) { for (; *s; s++) if (*s == c) return s; return nullptr; }
 }
-extern "C" void d2c_90cb0(uint32_t out, uint32_t fmt, const uint32_t* va) {
-    if (!fmt) return;
+// The same fill on native pointers: n arguments, at most ten.
+void d2::client::formatSelectors(char16_t* const o, const char16_t* const f, const char16_t* const* args, int32_t n) {
+    if (!f) return;
     char16_t buf[2000] = {};
-    char16_t* const o = (char16_t*)(uintptr_t)out;
-    const char16_t* const f = (const char16_t*)(uintptr_t)fmt;
-    int32_t n = 0;
-    for (; va[n]; n++) wcpy(buf + n * 200, (const char16_t*)(uintptr_t)va[n]);
+    for (int32_t i = 0; i < n; i++) wcpy(buf + i * 200, args[i]);
     const char16_t* const colon = wchr(f, u':');
     if (!colon) wcpy(o, f);
     else {
@@ -39,4 +37,11 @@ extern "C" void d2c_90cb0(uint32_t out, uint32_t fmt, const uint32_t* va) {
         wcpy(o, colon + 1);
     }
     for (int32_t i = 0; i < n; i++) d2::client::sub_8E600(o, (uint32_t)i, buf + i * 200);
+}
+extern "C" void d2c_90cb0(uint32_t out, uint32_t fmt, const uint32_t* va) {
+    if (!fmt) return;
+    const char16_t* args[10] = {};
+    int32_t n = 0;
+    for (; va[n]; n++) args[n] = (const char16_t*)(uintptr_t)va[n];
+    d2::client::formatSelectors((char16_t*)(uintptr_t)out, (const char16_t*)(uintptr_t)fmt, args, n);
 }

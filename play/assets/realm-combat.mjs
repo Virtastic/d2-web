@@ -4,67 +4,78 @@
 import { hoverLife, monsterNameColour } from './hover-lifebar.mjs';
 
 /**
+ * One unit's record from the engine (d2_realm_client_unit_info), as the page reads it.
+ *   selectable / enemy / enemyIfHostile : whether the hero may attack the unit: where the hero stands, and
+ *       outside town with the roster's relation toward `rosterGuid` friendly and hostile
+ *   rosterGuid : the player whose relation decides it (the target player, or a pet's owner); 0xFFFFFFFF for none
+ *   isPet, petType (7 is the hireling), petOwner, petDead : the unit's pet list entry
+ *   name : the plate's name (a super unique's, a champion's, a unique's rolled name, a hireling's own)
+ *   line : the line under a unique's or a minion's name (its type and enchantments)
+ */
+export function parseRealmUnitInfo(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (bytes.length < 468 || view.getUint32(0, true) !== 1 || view.getUint32(4, true) !== 468) throw new Error('invalid realm unit record');
+  const u = (at) => view.getUint32(at, true), text = (at, n) => { const part = bytes.subarray(at, at + n), end = part.indexOf(0); return new TextDecoder().decode(part.subarray(0, end < 0 ? n : end)); };
+  return { unitType: u(8), guid: u(12), selectable: u(16) !== 0, enemy: u(20) !== 0, enemyIfHostile: u(24) !== 0, rosterGuid: u(28),
+    alignment: view.getInt32(32, true), isPet: u(36) !== 0, petType: u(40), petOwner: u(44), petDead: u(48) !== 0, petNameId: u(52),
+    typeFlags: u(56), superUnique: view.getInt32(60, true), nameSeed: u(64), ownerGuid: u(68), umods: Array.from(bytes.subarray(72, 81)),
+    name: text(84, 128), line: text(212, 256) };
+}
+
+/**
  * The units of a realm game as the client sorts them: who is a town person, an enemy, a hireling or a pet,
  * which name plate each gets and which cursor the pointer takes over it. One instance is the data source of
  * the snapshot's `hostile`/`npc`, the hover label and the cursor, so the three cannot disagree.
- *   rowOf(classId)      : the MonStats.txt row's { npc, interact, killable, align, named } (realm-tables.mjs)
- *   hostilePlayer(guid) : whether that player is hostile to ours (the roster's relation); absent, nobody is
+ *   rowOf(classId)        : the MonStats.txt row's { npc, interact, killable, named } (realm-tables.mjs)
+ *   unitInfo(type, guid)  : the engine's record of the unit (parseRealmUnitInfo), null when it holds none
+ *   hostilePlayer(guid)   : whether that player is hostile to ours (the roster's relation); absent, nobody is
  *
  * The rules, as the 1.13c client applies them:
  *   plate    a unit gets the monster plate (HUD top centre, life bar, type line) when its MonStats row is not
  *            `interact`, is `killable` and has a name; every other unit gets the bare name above its head.
  *   colour   a unique is gold and a champion blue (hover-lifebar.mjs monsterNameColour); nothing else colours a name.
- *   owner    the pet packet (0x81) lists a pet under its owner: byte 1 the pet kind (7 is the hireling, of which
- *            an owner has one), dword 4 the owner, dword 8 the pet. An owned unit takes its owner's side.
- *   hostile  GUESS: an unowned monster is an enemy when its MonStats `Align` is 0 (evil). The client asks the
- *            unit's alignment STAT, which the server can change (a converted or revived monster); the stat
- *            list of the monster assign is parsed by the engine but not handed to the page. Settled by
- *            exporting that stat (and the assign packet's own owner field) in the monster view.
+ *   owner    the pet packets (0x81, 0x7A) keep the engine's pet list: a listed unit is its owner's, and type 7
+ *            is the hireling. A pet takes its owner's side; my own pets are never targets.
+ *   hostile  the engine's attack-target test: a MonStats2 flag can force either answer, a player or a player's
+ *            pet follows the roster's hostile relation, and every other monster is an enemy unless its
+ *            alignment (a state the server sets, so a converted monster changes sides) matches the hero's.
+ *   name     the engine composes it from the monster assignment; the class name stands when it has none.
  *   cursor   the same three the local game draws: attack over an enemy, talk over a person, the hand otherwise.
  */
-const PET_HIRELING = 7;
-export function createRealmUnits({ rowOf, hostilePlayer = () => false }) {
-  const pets = new Map();   // pet guid: { owner, kind }
+const PET_HIRELING = 7, UNIQUE_OR_MINION = 0x18;
+export function createRealmUnits({ rowOf, unitInfo = () => null, hostilePlayer = () => false }) {
   const flag = (v) => v === true || v === 1 || v === '1';
-  function classOf(unit) {
-    const row = rowOf(unit.classId) ?? {}, pet = pets.get((unit.guid ?? unit.id) >>> 0) ?? null;
+  const infoOf = (unit) => unitInfo(1, (unit.guid ?? unit.id) >>> 0) ?? null;
+  function sort(unit, info) {
+    const row = rowOf(unit.classId) ?? {};
     const plate = !flag(row.interact) && flag(row.killable) && row.named !== false ? 'monster' : 'npc';
-    if (pet) return { kind: pet.kind === PET_HIRELING ? 'hireling' : 'pet', owner: pet.owner, hostile: Boolean(hostilePlayer(pet.owner)), plate };
-    if (flag(row.interact)) return { kind: 'npc', owner: 0, hostile: false, plate };
-    const hostile = Number(row.align || 0) === 0 && flag(row.killable);
+    const hostile = Boolean(info && (info.rosterGuid !== 0xFFFFFFFF && hostilePlayer(info.rosterGuid) ? info.enemyIfHostile : info.enemy));
+    if (info?.isPet) return { kind: info.petType === PET_HIRELING ? 'hireling' : 'pet', owner: info.petOwner, hostile, plate };
+    if (flag(row.interact)) return { kind: 'npc', owner: 0, hostile, plate };
     return { kind: hostile ? 'monster' : 'friendly', owner: 0, hostile, plate };
   }
+  const classOf = (unit) => sort(unit, infoOf(unit));
   return {
     classOf,
-    /** One 0x81 packet. A hireling replaces the owner's previous one. */
-    applyPet(packet) {
-      if (packet?.[0] !== 0x81 || packet.length < 12) return null;
-      const view = new DataView(packet.buffer, packet.byteOffset, packet.byteLength);
-      const entry = { kind: packet[1], owner: view.getUint32(4, true) }, guid = view.getUint32(8, true);
-      if (entry.kind === PET_HIRELING) for (const [g, p] of pets) if (p.kind === PET_HIRELING && p.owner === entry.owner) pets.delete(g);
-      pets.set(guid, entry);
-      return { guid, ...entry };
-    },
-    clear() { pets.clear(); },
     /**
      * The hover target of a realm frame, in the shape the single-player hover label and monster highlight read.
      *   hit    : the realm input's pick under the pointer ({ kind, unit }); a live monster or person is named here
      *   views  : the server's monster views (guid, hpPct: the life byte of its 0x0C/0x69 packets, typeFlags)
      *   nameOf : (classId) => { stringIndex, label } from the engine's string tables
      * The life is the plate's fill, 0..128, by the same rule the single-player plate uses. `npc: true` asks for
-     * the bare name above the unit.
-     * GUESS: the name is the class name. A unique, super unique or hireling carries its own name in the monster
-     * assign (name bytes and a name id), which the engine parses but does not hand to the page; so does the
-     * unique's enchantment line. Settled by exporting those fields in the monster view.
+     * the bare name above the unit. `line` is present for a unique or a minion only (it may be empty): it
+     * replaces the class's type line under the name.
      */
     hoverTarget(hit, views, nameOf) {
       if (hit?.kind !== 'monster' && hit?.kind !== 'npc') return null;
-      const unit = hit.unit, view = (views ?? []).find((m) => m.guid === unit.guid);
-      const { stringIndex = -1, label = '' } = nameOf(unit.classId) ?? {};
+      const unit = hit.unit, view = (views ?? []).find((m) => m.guid === unit.guid), info = infoOf(unit);
+      const { stringIndex = -1, label: className = '' } = nameOf(unit.classId) ?? {};
+      const label = info?.name || className;
       if (!label) return null;
-      const cls = classOf(unit), base = { kind: 'unit', id: unit.guid, classId: unit.classId, stringIndex, label, unitClass: cls.kind };
+      const cls = sort(unit, info), base = { kind: 'unit', id: unit.guid, classId: unit.classId, stringIndex, label, unitClass: cls.kind };
       if (cls.plate === 'npc') return { ...base, npc: true, x: unit.x, y: unit.y, preciseX: unit.preciseX, preciseY: unit.preciseY };
-      return { ...base, colour: monsterNameColour(view?.typeFlags, unit.classId),
+      const typeFlags = info?.typeFlags ?? view?.typeFlags;
+      return { ...base, colour: monsterNameColour(typeFlags, unit.classId), ...(info && (info.typeFlags & UNIQUE_OR_MINION) ? { line: info.line } : {}),
         x: unit.x, y: unit.y, life: hoverLife({ type: 1, mode: view?.mode ?? unit.mode, hpPct: view?.hpPct }) };
     },
     /** The pointer's context over that pick, as the local game's cursor reads it. */
@@ -84,14 +95,16 @@ export function createRealmUnits({ rowOf, hostilePlayer = () => false }) {
  *   views       : the server's monster views, for the champion/unique flags that pick a sound profile
  *   hero        : the selected player's render source ({ source, guid, classId, renderState }); it is not an entity of the snapshot
  *   castSkillId : the selected skill of the hand that last issued a command
+ *   hitClassOf  : (type, guid) => the hit class the server last struck the unit with (0 none); it picks the impact sounds
  * The server sends a life byte, never hit points, so no entity carries hp: the trigger then keys on modes alone.
  */
-export function realmCombatSoundFrame(snapshot, views, hero, castSkillId) {
+export function realmCombatSoundFrame(snapshot, views, hero, castSkillId, hitClassOf) {
   const flags = new Map((views ?? []).map((m) => [m.guid, m.typeFlags]));
   const entities = (snapshot?.entities ?? []).filter((e) => e.type === 0 || e.type === 1)
-    .map((e) => (e.type === 1 ? { ...e, hp: undefined, typeFlags: flags.get(e.id) ?? 0 } : { ...e, hp: undefined }));
+    .map((e) => (e.type === 1 ? { ...e, hp: undefined, typeFlags: flags.get(e.id) ?? 0 } : { ...e, hp: undefined }))
+    .map((e) => (hitClassOf ? { ...e, lastHitClass: hitClassOf(e.type, e.id) } : e));
   const mine = hero?.source === 'realm' && hero.renderState;
-  if (mine) entities.push({ type: 0, id: hero.guid, classId: hero.classId, mode: hero.renderState.mode });
+  if (mine) entities.push({ type: 0, id: hero.guid, classId: hero.classId, mode: hero.renderState.mode, ...(hitClassOf ? { lastHitClass: hitClassOf(0, hero.guid) } : {}) });
   return { entities, frame: { ...snapshot, playerId: mine ? hero.guid : undefined,
     player: { ...snapshot?.player, castSkillId, framePrecise: mine ? hero.renderState.framePrecise : undefined } } };
 }

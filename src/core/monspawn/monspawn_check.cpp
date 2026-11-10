@@ -2514,7 +2514,41 @@ static bool g_fixtureOwnRoomOnly = false;
 // a retail recording sets it: retail's monster b sits in a room only that join reaches, and AI scans client rooms only (D2Game+0xB0CE0).
 static bool g_sessionJoinLevelRooms = false;
 EMSCRIPTEN_KEEPALIVE void d2_session_client_join_level(int on) { g_sessionJoinLevelRooms = on != 0; }
+// What the join walk sent the client (room reveals, then the units in them) before the stream is cleared for
+// tick 1: a connected client is owed these bytes, a headless session never reads them.
+extern "C" const uint8_t* D2WEB_PacketStream(uint32_t* pLength, uint32_t* pPackets);
+static std::vector<uint8_t> g_sessionJoinBurst;
+static uint32_t sessionPacketStreamMark() { uint32_t n = 0, k = 0; D2WEB_PacketStream(&n, &k); return n; }
+static void sessionKeepJoinBurst(uint32_t from) {
+    uint32_t n = 0, k = 0; const uint8_t* stream = D2WEB_PacketStream(&n, &k);
+    g_sessionJoinBurst.assign(stream + (from < n ? from : n), stream + n);
+}
+EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_join_stream(uint32_t* length) { if (length) *length = (uint32_t)g_sessionJoinBurst.size(); return g_sessionJoinBurst.data(); }
+// The rooms the game holds its client in, as the 6-byte room reveals {0x07, tile x, tile y, level} a joining
+// client is sent: the client's own room first, then the rest of its adjacent list. Returns the byte count.
+EMSCRIPTEN_KEEPALIVE int d2_session_client_rooms(uint8_t* out, int capacity) {
+    if (!out || !g_targetClient || !g_targetClient->pRoom) return 0;
+    int n = 0;
+    const auto reveal = [&](D2ActiveRoomStrc* r) {
+        int k = 0; while (k < r->nNumClients && r->ppClients[k] != g_targetClient) ++k;
+        if (k >= r->nNumClients || n + 6 > capacity) return;
+        D2DrlgCoordsStrc c{}; DUNGEON_GetRoomCoordinates(r, &c);
+        out[n] = 0x07; out[n + 1] = (uint8_t)c.nTileXPos; out[n + 2] = (uint8_t)(c.nTileXPos >> 8);
+        out[n + 3] = (uint8_t)c.nTileYPos; out[n + 4] = (uint8_t)(c.nTileYPos >> 8); out[n + 5] = (uint8_t)DUNGEON_GetLevelIdFromRoom(r);
+        n += 6;
+    };
+    D2ActiveRoomStrc* own = g_targetClient->pRoom;
+    reveal(own);
+    D2ActiveRoomStrc** adj = nullptr; int32_t nAdj = 0; DUNGEON_GetAdjacentRoomsListFromRoom(own, &adj, &nAdj);
+    for (int32_t i = 0; i < nAdj; ++i) if (adj[i] && adj[i] != own) reveal(adj[i]);
+    return n;
+}
+// The live game's map seed, and its difficulty in the low byte with the expansion flag above it
+// and the player's class in the third byte: what a client joining this game is told. 0 with no game.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_game_seed() { return g_game ? g_game->dwInitSeed : 0; }
+EMSCRIPTEN_KEEPALIVE int d2_session_game_flags() { return g_game ? (int)(g_game->nDifficulty & 0xFF) | (g_game->bExpansion ? 0x100 : 0) | (g_targetPlayer ? (int)(g_targetPlayer->dwClassId & 0xFF) << 16 : 0) : 0; }
 static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStrc* anchor) {
+    const uint32_t joinBurstFrom = sessionPacketStreamMark();
     D2UnitStrc* player = SUNIT_AllocUnitData(UNIT_PLAYER, g_sessionPlayerClass, x, y, g_game, room, 1, PLRMODE_NEUTRAL, 0);
     if (!player) return 0;
     if (g_sessionSeedPlayer) SUNIT_InitSeed(player, &g_game->pGameSeed);
@@ -2569,7 +2603,7 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
             if (roomEx->pRoom && roomEx->pRoom != room) { DUNGEON_AddClientToRoom(roomEx->pRoom, g_targetClient); g_sessionJoinRooms.insert(roomEx->pRoom); }
     } else sub_6FC33020(g_targetClient, room);
     // D48: retail's join walk sends the room's units before the first recorded tick; do it now and drop the bytes so tick 1 starts clean.
-    { LEVEL_UpdateUnitsInAdjacentRooms(g_game, room, g_targetClient); D2WEB_ResetPacketStream(); }
+    { LEVEL_UpdateUnitsInAdjacentRooms(g_game, room, g_targetClient); sessionKeepJoinBurst(joinBurstFrom); D2WEB_ResetPacketStream(); }
     for (D2UnitStrc* u = room->pUnitFirst; u; u = u->pRoomNext) {
         if (u->dwUnitType != UNIT_MONSTER) continue;
         if (u->dwClassId == 155) g_sessionAiThinkAttachRoomHasWarriv = 1;
@@ -10630,8 +10664,17 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_pop_log() {
 // been recovered. Not yet ported: the per-room ambient override and torch flicker. (The +0x149xxx
 // addresses of an earlier change were wrong: the light code is at D2Client+0xA8000..0xAA000.)
 struct D2SessionLightSource { int32_t type, classId, x, y, radius; };
-struct D2SessionLightmap { int32_t originX, originY, ambient, sources; uint8_t intensity[48 * 48]; uint8_t blocked[48 * 48]; D2SessionLightSource source[64]; uint32_t sourceGuid[64]; };
+// sourceColour: an object source's light colour, red | green << 8 | blue << 16 from its class's Red/Green/Blue
+// columns (the three bytes the client makes the object's light with, D2Client+0x24920). 0 for every other source.
+// Not yet ported: the per-cell blend of these colours into the light grid (D2Client+0xA8A40, on while the
+// client's colour-lighting switch is set, which it is by default) and the draw's use of a cell's colour; the
+// player's and monsters' light colours.
+struct D2SessionLightmap { int32_t originX, originY, ambient, sources; uint8_t intensity[48 * 48]; uint8_t blocked[48 * 48]; D2SessionLightSource source[64]; uint32_t sourceGuid[64]; uint32_t sourceColour[64]; };
 static D2SessionLightmap g_sessionLightmap;
+static uint32_t lightObjectColour(int type, int classId) {
+    const D2ObjectsTxt* txt = type == UNIT_OBJECT ? DATATBLS_GetObjectsTxtRecord(classId) : nullptr;
+    return txt ? (uint32_t)txt->nRed | (uint32_t)txt->nGreen << 8 | (uint32_t)txt->nBlue << 16 : 0;
+}
 static int lightOctagonal(int a, int b) { a = a < 0 ? -a : a; b = b < 0 ? -b : b; return b <= a ? (a * 0x3D7 + b * 0x197) >> 10 : (b * 0x3D7 + a * 0x197) >> 10; }
 // D2Client DRAW\LightMap.cpp's occlusion (1.13c D2Client+0xA9480 for units, +0xA9100/+0xA8F60 for
 // objects, which cache the same pattern; an earlier change). Around the source's cell a 64x64 grid B holds
@@ -10966,6 +11009,7 @@ EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_session_lightmap(int ambientOve
                 if (m.sources < 64) {
                     m.source[m.sources] = { (int32_t)unit->dwUnitType, (int32_t)unit->dwClassId, x, y, r };
                     m.sourceGuid[m.sources] = unit->dwUnitId;
+                    m.sourceColour[m.sources] = lightObjectColour((int)unit->dwUnitType, (int)unit->dwClassId);
                 }
                 m.sources++;
             }
@@ -11017,6 +11061,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_client_lightmap_comp
         if (m.sources < 64) {
             m.source[m.sources] = { in[i].type, in[i].classId, x, y, r };
             m.sourceGuid[m.sources] = in[i].guid;
+            m.sourceColour[m.sources] = lightObjectColour(in[i].type, in[i].classId);
         }
         m.sources++;
     }

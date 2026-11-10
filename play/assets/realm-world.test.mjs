@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRealmWorld, decodeItemHeader, PAGE } from './realm-world.mjs';
+import { createRealmWorld, decodeItemHeader, PAGE, parseRealmObjectUnits } from './realm-world.mjs';
 import { createItemTable, createObjectTable, createInventoryTable, createBeltTable } from './realm-tables.mjs';
 import { realmViewSnapshot, realmFrameReads } from './realm-client-view.mjs';
 
@@ -115,26 +115,16 @@ test("other players' worn items are kept apart from the player's own", () => {
   assert.equal(w.weaponClassOf(), 'hth');
 });
 
-test('objects: 0x51 adds, 0x0E changes the state, 0x0A removes, a new act clears', () => {
+test('objects: the views are the engine units, with the class naming the art', () => {
   const w = createRealmWorld(tables()); w.setOwner(GUID);
-  const add = Uint8Array.from([0x51, 2, ...u32le(900), 5, 0, 0x34, 0x12, 0x78, 0x56, 1, 0, 0, 0, 0, 0]);
-  const add2 = Uint8Array.from([0x51, 2, ...u32le(901), 99, 0, 1, 0, 2, 0, 1, 0, 0, 0, 0, 0]);   // class 99 is not in the table
-  feed(w, add, add2);
-  assert.deepEqual(w.objectViews().map((o) => [o.id, o.classId, o.token, o.x, o.y, o.mode]), [[900, 5, 'CH', 0x1234, 0x5678, 1]]);
-  feed(w, Uint8Array.from([0x0e, 2, ...u32le(900), 1, 1, 2, 0, 0, 0, 0, 0]).subarray(0, 12));
-  feed(w, Uint8Array.from([0x0a, 2, ...u32le(900)]).subarray(0, 6));
-  assert.equal(w.objectViews().length, 0);
-  // Whether an object can be picked is its class's column for its mode, never a packet byte; its art layers are
-  // not masked; its facing is the class's.
-  feed(w, add); const view = () => w.objectViews()[0];
-  assert.deepEqual([view().mode, view().selectable, view().componentMask, view().direction], [1, false, 0xFFFF, 3]);
-  feed(w, Uint8Array.from([0x0e, 2, ...u32le(900), 3, 1, 0, 0, 0, 0]));
-  assert.deepEqual([view().mode, view().selectable], [0, true]);
-  // The opening mode (three cels, half a cel a tick) holds its last cel, then is the opened mode with no packet.
-  feed(w, Uint8Array.from([0x0e, 2, ...u32le(900), 3, 0, 1, 0, 0, 0]));
-  const cels = []; for (let tick = 0; tick < 6; tick++) { w.tickObjects(); cels.push([view().mode, view().framePrecise >> 8]); }
-  assert.deepEqual(cels, [[1, 0], [1, 1], [1, 1], [1, 2], [2, 4], [2, 4]]);
-  feed(w, Uint8Array.from([0x03, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
+  // Class 99 is not in the table. Whether an object can be picked is the unit's flag; its art layers are not masked;
+  // its facing is the class's.
+  const units = parseRealmObjectUnits(Int32Array.from([
+    900, 5, 0x1234, 0x5678, 1, 0x100, 0x300, 0x80, 2, 0, 0, -1, -1, -1,
+    901, 99, 1, 2, 1, 0, 0x100, 0x100, 3, 0, 0, -1, -1, -1]), 2);
+  const views = w.objectViews(units);
+  assert.deepEqual(views.map((o) => [o.id, o.classId, o.token, o.x, o.y, o.mode]), [[900, 5, 'CH', 0x1234, 0x5678, 1]]);
+  assert.deepEqual([views[0].selectable, views[0].componentMask, views[0].direction, views[0].framePrecise >> 8], [false, 0xFFFF, 3, 1]);
   assert.equal(w.objectViews().length, 0);
 });
 
@@ -215,4 +205,66 @@ test('a corpse made (0x74, flag set) takes what its owner wore; the pack stays',
   assert.deepEqual(w.wornBy(777).map((i) => i.id), [20]);
   feed(w, Uint8Array.from([0x74, 1, ...u32le(777), ...u32le(901)]));
   assert.deepEqual(w.wornBy(777), []);
+});
+
+// The engine's read of a player's unit: the records d2gsClientItems returns.
+const heldRecord = (guid, code, over = {}) => ({ guid, classId: 0, code: fourcc(code), mode: 0, x: 0, y: 0, page: 0, bodyLoc: 0, quality: 2, flags: 0x10, ...over });
+
+test('held items are the engine unit\'s: the packet copy supplies only the ground items and the raw bits', () => {
+  const calls = [];
+  let mine = [], theirs = [];
+  const w = createRealmWorld({ ...tables(), heldItems: (guid) => { calls.push(guid); return guid === 0 ? mine : guid === 0x55 ? theirs : []; } });
+  w.setOwner(GUID);
+  // The packets place a potion in the backpack and a pile of gold on the ground; the engine has not seated the potion.
+  feed(w, itemPacket(20, 4, { mode: 0, x: 3, y: 1, page: 0, code: 'hp1' }), itemPacket(21, 0, { mode: 3, x: 100, y: 200, code: 'gld', flags: 0x200000, gold: 55 }));
+  assert.deepEqual(w.itemViews().map((i) => i.id), [21]);
+  assert.equal(w.itemViews()[0].goldAmount, 55);
+  assert.equal(w.ownItemCount, 1);
+  assert.equal(calls.length, 1, 'one engine read serves every view until the next packets');
+  // Now the unit holds it, with a cursor item, a worn belt and a weapon; flags are the unit's (0x4000: requirements unmet).
+  mine = [heldRecord(30, 'cap', { mode: 4, page: 255 }), heldRecord(20, 'hp1', { x: 3, y: 1 }), heldRecord(31, 'lbl', { mode: 1, bodyLoc: 8, page: 255 }),
+    heldRecord(32, 'gax', { mode: 1, bodyLoc: 4, page: 255, flags: 0x4010 }), heldRecord(33, 'hp1', { mode: 2, x: 2, page: 255 }), heldRecord(34, 'zzz')];
+  theirs = [heldRecord(40, 'wsd', { mode: 1, bodyLoc: 4, page: 255 }), heldRecord(41, 'hp1')];
+  feed(w, Uint8Array.from([0x8a]));
+  const views = w.itemViews();
+  assert.deepEqual(views.map((i) => i.id), [21, 30, 20, 31, 32, 33]);   // a code the tables do not hold cannot be drawn
+  const potion = views.find((i) => i.id === 20), belted = views.find((i) => i.id === 33), axe = views.find((i) => i.id === 32);
+  assert.deepEqual([potion.invPage, potion.gridX, potion.gridY, potion.invFile], [PAGE.INVENTORY, 3, 1, 'invhp1']);
+  assert.deepEqual([belted.invPage, belted.gridX], [PAGE.BELT, 2]);
+  assert.deepEqual([axe.bodyLoc, axe.itemFlags], [4, 0x4010]);
+  assert.equal(w.cursorId, 30);
+  assert.equal(w.beltRecord(), 0);
+  assert.equal(w.weaponClassOf(), '2ht');
+  assert.equal(w.weaponClassOf(0x55), '1hs');
+  assert.deepEqual(w.wornBy(0x55).map((i) => i.id), [40]);
+  assert.ok(w.rawItem(20), 'the bitstream the tooltip decodes is still the packet\'s');
+  assert.deepEqual(calls, [0, 0, 0x55]);
+  // The engine drops the cursor item: the cursor is empty whatever the packet copy last saw.
+  mine = mine.slice(1);
+  feed(w, itemPacket(30, 1, { mode: 4, code: 'cap' }));
+  assert.equal(w.cursorId, 0);
+  w.reset();
+  mine = [];
+  assert.deepEqual(w.itemViews(), []);
+});
+
+test('without the engine read the packet copy answers, as an older engine build needs', () => {
+  const w = createRealmWorld({ ...tables(), heldItems: () => null }); w.setOwner(GUID);
+  feed(w, itemPacket(20, 4, { mode: 0, x: 3, y: 1, page: 0, code: 'hp1' }), itemPacket(22, 1, { mode: 4, code: 'cap' }));
+  assert.deepEqual(w.itemViews().map((i) => i.id), [20, 22]);
+  assert.equal(w.cursorId, 22);
+});
+
+test('the stash and the cube take the 800x600 Inventory.txt rows, sixteen after the 640x480 ones', () => {
+  const header = 'class\tinvleft\tinvright\tinvtop\tinvbottom\tgridx\tgridy\tgridleft\tgridright\tgridtop\tgridbottom\tgridboxwidth\tgridboxheight';
+  const row = (i) => [`row${i}`, i, i + 100, 0, 0, 6, i === 28 ? 8 : 4, 0, 0, 0, 0, 29, 29].join('\t');
+  const text = [header, ...Array.from({ length: 32 }, (_, i) => row(i)), ''].join('\n');
+  const inv = createInventoryTable((path) => (path.endsWith('inventory.txt') ? enc(text) : read(path)));
+  assert.deepEqual(inv.gridAt(12, 1).slice(0, 2), [28, 128]);
+  assert.deepEqual(inv.gridAt(12, 0).slice(0, 2), [12, 112]);
+  assert.equal(inv.gridAt(40, 1), null);
+  const w = createRealmWorld(tables());
+  const reads = realmFrameReads(null, w, { inventory: inv, belt: createBeltTable(read), inventoryLayoutFromEngine: (g, c) => ({ g, c }), stashGeometry: (g) => g }, 0);
+  assert.deepEqual([reads.stashLayout[0], reads.stashLayout[5]], [28, 8]);   // Big Bank Page 1 + 16: the eight-row stash
+  assert.equal(reads.cubeLayout[0], 25);                                      // Transmogrify Box Page 1 + 16
 });
