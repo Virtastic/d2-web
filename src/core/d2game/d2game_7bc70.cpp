@@ -53,7 +53,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_game_7bd50(const uint8_t* unit, cons
     if (e->ad4e(cand) != 0) return 0;
     const int32_t d = e->c1900(unit, cand);
     if (d > (int32_t)rd(acc, 0xc)) return 0;
-    if (e->c22a80(cand, 0xc) & 0xff) return 0;
+    if (e->c22a80(cand, 0xc)) return 0;
     wr(acc, 0, (uint32_t)(uintptr_t)cand);
     wr(acc, 4, rd(acc, 4) + 1);
     wr(acc, 8, (uint32_t)d);

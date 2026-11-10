@@ -81,12 +81,12 @@ static const D2GameBatchB74Env& batchEnv(const uint32_t* r) {
 // at +0x34. Asserts 0x4A when the unit has no player data.
 static void d2game_B24D0_113c(void* pGame, void* pUnit, const D2GameBatchB74Env& env)
 {
-    uint8_t* pArenaUnit = (uint8_t*)env.ord10045(rdptr(pGame, 0x1C), 8, 0x47);
+    uint8_t* pArenaUnit = (uint8_t*)env.ord10045((void*)(uintptr_t)rd32(pGame, 0x1C), 8, 0x47);
     wr32(pArenaUnit, 0x0, 0);
     wr32(pArenaUnit, 0x4, 0);
     void* pPlayerData = env.ord10920(pUnit);
     if (pPlayerData == nullptr) d2game_fatal(0x4A);
-    wrptr(pPlayerData, 0x34, pArenaUnit);
+    wr32(pPlayerData, 0x34, (uint32_t)(uintptr_t)pArenaUnit);   // a 4-byte slot at 1.13c's layout: a pointer-sized store clobbers +0x38
 }
 
 // 1.13c D2Game+0x967B0
