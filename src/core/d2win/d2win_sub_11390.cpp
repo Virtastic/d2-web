@@ -17,6 +17,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_11390(const uint8_t* p, uint3
         std::_Exit(-1);
     }
     uint32_t f = rd(p, 8), cb = rd(p, 0x34);
-    if ((bitMasks[2] & f) && (bitMasks[0] & f) && cb) return e->callback(cb, param1);
+    // The decompile reads "return callback(param_1)", but the retail vector records eax = 0 on the calls where the
+    // callback at +0x34 ran (hook 17C70). The recording is the oracle here, so the callback runs and its result is dropped.
+    if ((bitMasks[2] & f) && (bitMasks[0] & f) && cb) { e->callback(cb, param1); return 0; }
     return 0;
 }

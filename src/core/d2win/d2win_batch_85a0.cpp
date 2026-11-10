@@ -29,9 +29,12 @@ uint8_t d2win_g_6f922338[1];
 
 // 1.13c D2Win+0x12700 -- out1 = widest line, out2 = block height (of the implicit ECX text).
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2win_sub_12700(const uint16_t* text, int32_t* out1, int32_t* out2, const D2WinBatch85A0Env* env) {
+// Returns the block height in eax, as retail does (its last callee result is left in eax).
+extern "C" EMSCRIPTEN_KEEPALIVE
+int32_t d2win_sub_12700(const uint16_t* text, int32_t* out1, int32_t* out2, const D2WinBatch85A0Env* env) {
     *out1 = env->maxLineWidth(text);
     *out2 = env->textBlockHeight(text);
+    return *out2;
 }
 
 // 1.13c D2Win+0x14E70 -- widen the ANSI string (up to 0x100 units) and pass it to 0x14DF0.
