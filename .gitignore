@@ -143,6 +143,8 @@ tools/manifest_lock.py
 !tools/mksmoke.mjs
 !tools/mpq-fingerprint.mjs
 !tools/patch-shim.mjs
+!tools/realm-tests.sh
+!tools/realm-tests.mjs
 !tools/setup.mjs
 !tools/door-art.mjs
 !tools/mpq-node.mjs
