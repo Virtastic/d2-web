@@ -13,20 +13,20 @@ inline uint32_t P(const void* p) { return (uint32_t)(uintptr_t)p; }
 }
 // 1.13c D2Client+0x43A70
 extern "C" uint32_t d2c_43a70(uint32_t gA, uint32_t gB, uint32_t gC, uint32_t gD, uint32_t gE, uint32_t gF, const cl::Env& e) {
-    const uint32_t kStr = 0x6fb8357c;
+    const uint32_t kStr = 0xB2000000u | 0xD357C;
     if (!e.H(0xd0a2)) {
         if (!e.H(0xd0a8, 1, 0, 0, 0, 0, 0)) return 0;
         if (!e.R(gA + 4)) {
             char nm[16] = {}; char b1[0x100] = {}, b2[0x100] = {}, b3[0x100] = {};
-            e.H(0x3146, P(b1), 0x6fb841c4, kStr, P(nm));
+            e.H(0x3146, P(b1), 0xB2000000u | 0xD41C4, kStr, P(nm));
             e.W(gA + 4, e.H(0x2b420, 0, 0, 0, 0, 0, P(b1)));
-            e.H(0x3146, P(b2), 0x6fb86194, kStr, P(nm));
-            e.H(0x3146, P(b3), 0x6fb8617c, kStr, P(nm));
+            e.H(0x3146, P(b2), 0xB2000000u | 0xD6194, kStr, P(nm));
+            e.H(0x3146, P(b3), 0xB2000000u | 0xD617C, kStr, P(nm));
             e.H(0xd396, P(b2), P(b3));
         }
         if (!e.R(gA)) {
             char b1[0x100] = {};
-            e.H(0x3146, P(b1), 0x6fb86164, kStr);
+            e.H(0x3146, P(b1), 0xB2000000u | 0xD6164, kStr);
             e.W(gA, e.H(0x2b420, 0, 0, 0, 0, 0, P(b1)));
         }
         uint32_t b[18] = {};
@@ -73,13 +73,13 @@ extern "C" uint32_t d2c_43a70(uint32_t gA, uint32_t gB, uint32_t gC, uint32_t gD
     uint32_t s = e.R(gA + 4);
     if (s) {
         e.H(0xc18a, s);
-        e.H(0xbf86, 0x7a, 0, 0, 0, 0, 0, s, 0x6fb86ab0);
+        e.H(0xbf86, 0x7a, 0, 0, 0, 0, 0, s, 0xB2000000u | 0xD6AB0);
         e.W(gA + 4, 0);
     }
     s = e.R(gA);
     if (s) {
         e.H(0xc18a, s);
-        e.H(0xbf86, 0x7a, 0, 0, 0, 0, 0, s, 0x6fb86ab0);
+        e.H(0xbf86, 0x7a, 0, 0, 0, 0, 0, s, 0xB2000000u | 0xD6AB0);
         e.W(gA, 0);
     }
     e.W(gF, 0);

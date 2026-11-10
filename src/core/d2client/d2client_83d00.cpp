@@ -1,4 +1,4 @@
-// 1.13c D2Client+0x83D00 itemPkt_replace: EAX = decoded item buffer (b), stack arg = packet (pkt, ret 4). aux = address of the retail 0x109854 dword.
+// 1.13c D2Client+0x83D00 itemPkt_replace: EAX = decoded item buffer (b), stack arg = packet (pkt, ret 4). aux = address of the retail 0x119854 dword.
 #include "cl_env.h"
 extern "C" void d2c_83d00(uint32_t pkt, uint32_t b, uint32_t aux, const cl::Env& e) {
     const uint32_t path = 0xB2000000u | 0xD4964;
