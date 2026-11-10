@@ -1668,6 +1668,20 @@ function realmServiceUrl(base, service) {
   url.pathname = url.pathname.replace(/\/bncs\/?$/, `/${service}`);
   return url.href;
 }
+// The wasm engine trapped (RuntimeError: Aborted): nothing it owns can be called again. Drop the realm sockets and
+// reload the page, which is the only way back to a working login screen.
+let engineDeadSeen = false;
+let rcEngineMod = null;
+void import('./assets/realm-client.mjs').then((m) => { rcEngineMod = m; });
+function rcEngine() { return rcEngineMod ?? { callEngine: (fn) => { fn(); return true; }, isEngineAbort: () => false }; }
+function engineDied(error) {
+  if (engineDeadSeen) return;
+  engineDeadSeen = true;
+  console.error('engine aborted; reloading', error);
+  const flow = realmFlow;
+  for (const t of [flow?.chatLink, flow?.chatSession, flow?.chat?.transport, flow?.d2gs, flow?.mcp, flow?.bncs]) { try { t?.close(); } catch { /* already closed */ } }
+  setTimeout(() => location.reload(), 0);
+}
 function releaseRealmFlow({ closeTransports = true } = {}) {
   const flow = realmFlow;
   if (!flow) return Promise.resolve();
@@ -1704,7 +1718,8 @@ function releaseRealmFlow({ closeTransports = true } = {}) {
   if (realmSceneActive) { gameRoster.clear(); gameBubbles.clear(); partyLocal.clear(); partyVisible = false; gameSlash.replyTo = ""; realmSceneActive = false; realmAutomapOverlay = null; realmSceneTiles = []; realmSceneRevision = 0; realmSceneEvidence = null; terrain = null; snapshot = null; session = null; screen = SCREEN.TITLE; }
   if (realmFlow === flow) realmFlow = null;
   Promise.resolve(flow.d2gsReceiver?.done).catch(() => {}).then(() => {
-    try { flow.protocol?.d2gsClientPlayerReset?.(); } catch { /* realm state already reset */ }
+    // A trap in the reset leaves the engine instance dead; the lobby would look normal and every join would abort.
+    rcEngine().callEngine(() => flow.protocol?.d2gsClientPlayerReset?.(), { onDead: engineDied });
     try { flow.protocol?.free(); } catch { /* engine already gone */ }
     flow.protocol = null; flow.d2gs = null; flow.mcp = null;
     flow.d2gsReceiver = null; flow.d2gsKeepAlive = null;
@@ -1810,7 +1825,8 @@ async function leaveRealmGame() {
   const name = realmTransport.result?.character?.name;
   if (!old || !name) { leaveRealmLogin(); exitToTitle(); return; }
   realmTransport = { state: 'lobby', server: realmTransport.server, result: null, error: '' };
-  try { old.d2gs?.close(); } catch { /* already closed */ }
+  // The 0x69 is out (or the game failed): the game server saves and closes the socket itself; a stuck server is cut off after 3 s.
+  try { const rc = await import('./assets/realm-client.mjs'); await rc.closeAfterSave(old.d2gs); } catch { /* already closed */ }
   bnetLobbyScreen = null; bnetLobbyError = '';
   const released = releaseRealmFlow({ closeTransports: false });
   screen = SCREEN.BNET_LOBBY;   // release put the title up for a moment; the lobby is rebuilt below
@@ -2150,7 +2166,7 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
   const { server, realmReply } = realmFlow || {};
   const started = { server: { region: server?.region, host: server?.host } };
   realmTransport = { state: 'joining', ...started, result: null, error: '' };
-  const { webSocketTransport, mcpCreateAndJoin, d2gsJoin, startD2gsKeepAlive, startD2gsReceiveLoop } = await import('./assets/realm-client.mjs');
+  const { webSocketTransport, mcpCreateAndJoin, d2gsJoin, startD2gsKeepAlive, startD2gsReceiveLoop, canRetryJoin, isEngineAbort } = await import('./assets/realm-client.mjs');
   const protocol = realmFlow?.protocol;
   let mcp = realmFlow?.mcp, d2gs, keepD2gs = false, keepMcp = false;
   try {
@@ -2159,8 +2175,8 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
       difficulty, maxPlayers, description, join, session: realmFlow.mcpSession });
     mcp.close(); mcp = null;
     realmFlow.mcp = null; realmFlow.mcpSession = null;
-    // The game server occasionally drops the first socket before the greeting completes; the ticket is
-    // still valid, so reconnect and send the same logon again.
+    // The game server occasionally drops the first socket before the greeting completes; while the logon
+    // has not gone out the ticket is still valid, so reconnect and send it again (never after it went out).
     // Retail ends a join that has not entered the game after 30 seconds with the timeout notice.
     const deadline = joinDeadline({ expansion: !!((joined.character.flags ?? 0) & 0x20) });
     let game;
@@ -2175,7 +2191,9 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
               difficulty: joined.game.difficulty });
           } catch (error) {
             try { d2gs.close(); } catch { /* socket already closed */ }
-            if (attempt >= 2 || deadline.expired) throw error;
+            // The ticket is single use: after the 0x68 logon went out only a fresh game can succeed.
+            if (isEngineAbort(error)) engineDied(error);
+            if (!canRetryJoin(error, { attempt, expired: deadline.expired })) throw error;
           }
         }
       })()]);

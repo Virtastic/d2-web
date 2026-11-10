@@ -158,8 +158,14 @@ export function createWsBridge({ listen, targets, onLog = () => {}, ...overrides
     const mcp = guard && name === 'mcp' ? guard.mcpTap() : null;
     let lastRx = Date.now();
     const closeBoth = (why = 'closed') => {
+      // The realm side is ended with a FIN, not reset: the game server then sees an orderly close and finishes
+      // saving the character (a reset made it drop the connection with no save). A peer that never closes is cut off.
+      if (!tcp.destroyed && !tcp.writableEnded) {
+        try { tcp.end(); } catch { /* already gone */ }
+        const cut = setTimeout(() => tcp.destroy(), 2000); cut.unref?.(); tcp.once('close', () => clearTimeout(cut));
+      }
       if (!released) onLog(`${why} ${addr} /${name} after ${((Date.now() - opened) / 1000).toFixed(1)}s`);
-      release(); tap?.close(String(why).startsWith("realm")); timers.forEach(clearTimeout); timers = []; sock.destroy(); tcp.destroy();
+      release(); tap?.close(String(why).startsWith("realm")); timers.forEach(clearTimeout); timers = []; sock.destroy();
     };
     if (cfg.pingSec > 0) {
       const ms = cfg.pingSec * 1000;
@@ -175,6 +181,7 @@ export function createWsBridge({ listen, targets, onLog = () => {}, ...overrides
     timers.push(connectTimer);
     tcp.on('connect', () => { clearTimeout(connectTimer); touch(); onLog(`ws /${name} -> ${target.host}:${target.port} from ${addr}`); });
     tcp.on('data', (d) => {
+      if (released) return;                    // draining after our FIN: the browser is gone
       touch(); mcp?.fromRealm(d); tap?.fromRealm(d);
       try { sock.write(encodeFrame(d)); } catch { closeBoth(); return; }
       // Backpressure: a browser that stops reading must not make the bridge buffer the realm's output.

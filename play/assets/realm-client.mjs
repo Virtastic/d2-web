@@ -574,7 +574,54 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
  * which arrives Huffman-compressed and length-framed. The engine's 1.13c packet table frames the
  * decoded stream; this routine waits until a complete player assignment is available.
  */
-export async function d2gsJoin(transport, protocol, { character, charClass, gameToken, gameHash, difficulty = 0, expansion = false, timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+export async function d2gsJoin(transport, protocol, opts = {}) {
+  const sent = { logonSent: false };
+  try { return await d2gsJoinRun(transport, protocol, opts, sent); }
+  catch (error) { if (error && typeof error === 'object') error.logonSent = sent.logonSent; throw error; }
+}
+
+/** A wasm trap that ends the engine instance ("RuntimeError: Aborted(...)"): nothing in it can be called again. */
+export function isEngineAbort(error) {
+  const text = `${error?.name ?? ''} ${error?.message ?? error ?? ''}`;
+  return /\bAborted\(/.test(text) || (/RuntimeError/.test(text) && /abort|unreachable|out of bounds/i.test(text));
+}
+
+/** Call an engine function that may trap. Returns true when it ran; an abort is reported through onDead and
+ *  returns false, any other error is the caller's to ignore (it is rethrown only when `strict`). */
+export function callEngine(fn, { onDead = () => {}, strict = false } = {}) {
+  try { fn(); return true; }
+  catch (error) {
+    if (isEngineAbort(error)) { onDead(error); return false; }
+    if (strict) throw error;
+    return true;
+  }
+}
+
+/** Whether a failed game-server connect may be tried again. The game ticket is single use: once the 0x68 logon
+ *  has gone out the server has consumed it, so another attempt can only fail (or load the character twice). */
+export function canRetryJoin(error, { attempt = 0, maxRetries = 2, expired = false } = {}) {
+  if (expired || attempt >= maxRetries) return false;
+  if (isEngineAbort(error)) return false;
+  return error?.logonSent !== true;
+}
+
+/** Save and Exit teardown: the 0x69 byte is out, so let the game server finish saving and close the socket
+ *  itself. Resolves when the transport reports closed or after `ms`, then closes it from this side. */
+export function closeAfterSave(transport, { ms = 3000, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
+  return new Promise((resolve) => {
+    if (!transport || transport.isOpen === false) { resolve('closed'); return; }
+    let done = false;
+    const finish = (why) => {
+      if (done) return; done = true; clearTimer(timer);
+      try { transport.close(); } catch { /* already closed */ }
+      resolve(why);
+    };
+    const timer = setTimer(() => finish('timeout'), ms);
+    try { transport.onClose(() => finish('closed')); } catch { finish('timeout'); }
+  });
+}
+
+async function d2gsJoinRun(transport, protocol, { character, charClass, gameToken, gameHash, difficulty = 0, expansion = false, timeoutMs = CONNECT_TIMEOUT_MS } = {}, sent) {
   const reader = makeReader(transport);
   // The greeting's size is decided by its first two bytes (`AF 00`/`AF 01` are 2 bytes, `AF 81`
   // carries a 128-byte inline table), so read the flag pair first and then the whole thing.
@@ -586,7 +633,7 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
   reader.skip(greetingSize);
 
   const gamelogon = protocol.d2gsGamelogon({ character, charClass, gameToken, gameHash });
-  transport.send(gamelogon);
+  sent.logonSent = transport.send(gamelogon) !== false;   // a send on a closed socket never reached the server
 
   const decoded = [];
   let frameCount = 0, assignOffset = -1, handshakeEnd = -1, playerAssignment = null;

@@ -46,3 +46,14 @@ test('a browser abort before the answer is not a lock, and an answered load clea
   const f = g.d2gsTap(); f.fromClient(logon('Cy')); f.fromRealm(Buffer.from([1])); f.close(false); adv(1000);
   assert.deepEqual(session(g, 'cy').fromClient(join()).forward, join());
 });
+
+test('a graceful leave keeps the character held until the game connection really closes, then trails the unlock', () => {
+  const { g, adv } = mk(); const d = g.d2gsTap(); d.fromClient(logon('Bob')); d.fromRealm(Buffer.from([1]));
+  d.fromClient(Buffer.from([0x69]));            // Save and Exit: the connection stays open while the server saves
+  adv(2500);                                    // the browser's wait for the server's close
+  assert.equal(g.isHeld('bob'), true);
+  d.close(false);                               // the server closed it after saving
+  assert.equal(g.isHeld('bob'), true, 'still inside the unlock trail');
+  adv(1001);
+  assert.equal(g.isHeld('bob'), false);
+});
