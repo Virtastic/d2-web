@@ -2528,7 +2528,21 @@ static void sessionKeepJoinBurst(uint32_t from) {
 // How many leading bytes of the join are the load part (game flags and the two markers), sent when the
 // client logs on; the rest follows when it enters the game.
 static uint32_t g_sessionJoinLoadLength = 0;
+// One client path: a joining client is told every monster in the rooms around it (retail's LEVEL_AddClient sends each unit of an
+// adjacent room, the 0xAC assign first). Off for the headless sessions, whose join drops those bytes.
+extern "C" bool g_sessionJoinUnits = false;   // the local game's client is told each monster of every room it joins (sub_6FC33020)
+EMSCRIPTEN_KEEPALIVE void d2_session_join_units(int on) { g_sessionJoinUnits = on != 0; }
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_join_load_length() { return g_sessionJoinLoadLength; }
+// For the local game's join: the connected client's enter-game request marks its player spawned, and the
+// frame's client update then sends the "in game" marker once the room is ready. Returns 1 when marked.
+int32_t __fastcall D2GAME_UpdateSpawnedClient(D2GameStrc* pGame, D2ClientStrc* pClient);
+// The game's own frame count, alone: what the snapshot's frame word holds, without building a snapshot.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_game_frame() { return g_game ? g_game->dwGameFrame : 0; }
+EMSCRIPTEN_KEEPALIVE int d2_session_client_spawned() {
+    if (!g_game || !g_targetClient || !g_targetPlayer) return 0;
+    g_targetClient->dwClientState = CLIENTSTATE_PLAYER_SPAWNED;
+    return 1;
+}
 EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_join_stream(uint32_t* length) { if (length) *length = (uint32_t)g_sessionJoinBurst.size(); return g_sessionJoinBurst.data(); }
 // The rooms the game holds its client in, as the 6-byte room reveals {0x07, tile x, tile y, level} a joining
 // client is sent: the client's own room first, then the rest of its adjacent list. Returns the byte count.
@@ -2641,7 +2655,13 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
             if (roomEx->pRoom && roomEx->pRoom != room) { DUNGEON_AddClientToRoom(roomEx->pRoom, g_targetClient); g_sessionJoinRooms.insert(roomEx->pRoom); }
     } else sub_6FC33020(g_targetClient, room);
     // D48: retail's join walk sends the room's units before the first recorded tick; do it now and drop the bytes so tick 1 starts clean.
-    { LEVEL_UpdateUnitsInAdjacentRooms(g_game, room, g_targetClient); sessionKeepJoinBurst(joinBurstFrom); D2WEB_ResetPacketStream(); }
+    // One-client path: the join also sends the player's changed stats and vitals (retail's add-player-to-game does, before
+    // the room walk); they ride in the kept join bytes.
+    {
+        D2Common_10513(g_targetPlayer, g_targetPlayer, (void(__fastcall*)(D2UnitStrc*, int32_t, int32_t, D2UnitStrc*))D2GAME_UpdateAttribute_6FC822D0);
+        sub_6FC82360(g_targetPlayer, g_targetPlayer, 1);
+        LEVEL_UpdateUnitsInAdjacentRooms(g_game, room, g_targetClient); sessionKeepJoinBurst(joinBurstFrom); D2WEB_ResetPacketStream();
+    }
     for (D2UnitStrc* u = room->pUnitFirst; u; u = u->pRoomNext) {
         if (u->dwUnitType != UNIT_MONSTER) continue;
         if (u->dwClassId == 155) g_sessionAiThinkAttachRoomHasWarriv = 1;
@@ -5560,6 +5580,8 @@ EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_quest_record() {
         QUESTRECORD_CopyRecordToBuffer(UNITS_GetPlayerData(g_targetPlayer)->pQuestData[g_game->nDifficulty], g_sessionQuestRecord, sizeof g_sessionQuestRecord, 0);
     return g_sessionQuestRecord;
 }
+// The kept join bytes' length (d2_session_join_stream), for a caller that cannot pass a pointer.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_join_stream_length() { return (uint32_t)g_sessionJoinBurst.size(); }
 // What the server last told its client of the player's vitals: { life, mana, stamina } in whole points.
 EMSCRIPTEN_KEEPALIVE const uint32_t* d2_session_client_sent_vitals() {
     static uint32_t out[3];
@@ -5694,6 +5716,21 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_npc(uint32_t npcId) {
 //
 // Emitted beside D2SessionUnit rather than inside it: that record's 44-byte stride is hardcoded in
 // a dozen scenarios, and widening it to carry two bits would churn all of them.
+// Whether each unit stands in a room the client holds: one byte per unit in d2_session_units order. A client is only
+// ever told of units in its rooms (the room walk and the first-sight sends run over those), so a comparison of what
+// the client knows against the server's units is over these.
+EMSCRIPTEN_KEEPALIVE int d2_session_unit_client_rooms(uint8_t* out, int cap) {
+    if (!g_sessionLive || !g_game || !out || cap <= 0) return 0;
+    updateSessionSnapshot();
+    int written = 0;
+    for (const D2SessionUnit& unit : g_sessionUnits) {
+        if (written >= cap) break;
+        D2UnitStrc* u = SUNIT_GetServerUnit(g_game, (int32_t)unit.type, (int32_t)unit.id);
+        D2ActiveRoomStrc* room = u ? UNITS_GetRoom(u) : nullptr;
+        out[written++] = room && clientHeldCount(room) > 0 ? 1 : 0;
+    }
+    return written;
+}
 EMSCRIPTEN_KEEPALIVE int d2_session_unit_kinds(uint8_t* out, int cap) {
     if (!g_sessionLive || !g_game || !out || cap <= 0) return 0;
     updateSessionSnapshot();
@@ -7818,6 +7855,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             }
         }
         sub_6FC33670(g_game, g_targetClient);
+        D2GAME_UpdateSpawnedClient(g_game, g_targetClient);   // for the local game's join: the "in game" marker, where retail's client update sends it
         // The per-client vitals update (1.13c D2Game+0x2BE20, which calls 0xCC030), run by retail's client flush every
         // frame: forced once 20 frames have passed without one (10 when other packets are already queued).
         if (g_targetPlayer && g_targetClient) {
@@ -11263,6 +11301,9 @@ EMSCRIPTEN_KEEPALIVE int d2_session_level_tile_files(char* out, int cap) {
     }
     return written;
 }
+
+// The name the local game gave its player: the one its own join packets carry (the in-process join selects the same).
+EMSCRIPTEN_KEEPALIVE const char* d2_session_character_name() { return g_sessionCharName; }
 
 EMSCRIPTEN_KEEPALIVE int d2_session_set_character_name(const char* name) {
     if (!name) return 0;

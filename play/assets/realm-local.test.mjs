@@ -6,10 +6,10 @@ import assert from 'node:assert/strict';
 import { localGameTransport, openLocalRealm } from './realm-local.mjs';
 
 // A stand-in for the engine's local server exports: a byte queue the test fills, and a log of calls.
-function fakeEngine({ game = true } = {}) {
+function fakeEngine({ game = true, tickRead = true } = {}) {
   const heap = new Uint8Array(8192);
   const OUT = 4096;
-  let next = 16, queued = [], freed = 0;
+  let next = 16, queued = [], freed = 0, frame = 40, entered = false;
   const log = [], refused = [];
   const queue = (...bytes) => queued.push(...bytes);
   const fns = {
@@ -23,7 +23,7 @@ function fakeEngine({ game = true } = {}) {
       refused.push(bytes[0], -1);
       return 0;
     },
-    d2_local_d2gs_pump: () => { queue(0x04); return queued.length; },
+    d2_local_d2gs_pump: () => queued.length,   // the game queues everything itself, the in-game marker included
     d2_local_d2gs_out: () => { heap.set(queued, OUT); return OUT; },
     d2_local_d2gs_take: () => { const n = queued.length; queued = []; return n; },
     d2_local_d2gs_dropped: () => 0,
@@ -32,11 +32,13 @@ function fakeEngine({ game = true } = {}) {
       new Int32Array(heap.buffer, 2048, refused.length).set(refused);
       return 2048;
     },
-    d2_session_tick: (frames) => { log.push(`tick ${frames}`); queue(0x8f, ...Array(32).fill(1)); return 1; },
+    // The game's tick: its packets, and on the first tick after the join the in-game marker, sent by the game itself.
+    d2_session_tick: (frames) => { log.push(`tick ${frames}`); frame += frames; queue(0x8f, ...Array(32).fill(1)); if (!entered) { entered = true; queue(0x04); } return 1; },
+    d2_session_game_frame: () => frame,
     d2_session_game_flags: () => 0x010100,   // class 1, expansion, normal
   };
   return { log, freed: () => freed,
-    Module: { HEAPU8: heap, ccall: (name, _ret, _types, values) => fns[name](...values),
+    Module: { HEAPU8: heap, _d2_session_game_frame: tickRead ? () => frame : undefined, ccall: (name, _ret, _types, values) => fns[name](...values),
       _malloc: (size) => { const at = next; next += (size + 7) & ~7; return at; }, _free: () => { freed++; } } };
 }
 
@@ -66,7 +68,7 @@ test('the greeting, the replies and the tick output reach the client in order', 
   assert.equal(transport.send(Uint8Array.of(0x68, 9, 9)), true);
   assert.deepEqual(log[0], [0x68, 9, 9]);
   assert.deepEqual(got[1], [0x01, 0, 0, 0, 0, 0, 1, 0, 0x00, 0x02]);
-  assert.equal(transport.tick(2), 34);   // the tick's packet, then the pump's in-game marker
+  assert.equal(transport.tick(2), 34);   // the tick's packet, then the game's in-game marker; the pump adds nothing
   assert.equal(log[1], 'tick 2');
   assert.equal(got[2].length, 34);
   assert.equal(got[2][0], 0x8f);
@@ -103,6 +105,15 @@ test('closing tells the engine and the client once, and releases the scratch mem
   assert.deepEqual(transport.refused(), []);
 });
 
+test('the local realm flow joins under the name the game assigns its player', () => {
+  const { Module } = fakeEngine();
+  assert.equal(openLocalRealm(Module, {}).local.joined.character.name, 'PLAYER');   // an engine that cannot be asked: its default
+  Module._d2_session_character_name = () => 0;
+  const ccall = Module.ccall;
+  Module.ccall = (name, ...rest) => (name === 'd2_session_character_name' ? 'Sorka' : ccall(name, ...rest));
+  assert.equal(openLocalRealm(Module, {}).local.joined.character.name, 'Sorka');
+});
+
 test('the local realm flow describes the live session\'s character and opens one connection', () => {
   const { Module } = fakeEngine();
   const flow = openLocalRealm(Module, { tag: 'protocol' }, { name: 'Hero' });
@@ -112,4 +123,19 @@ test('the local realm flow describes the live session\'s character and opens one
   const transport = flow.local.connect();
   assert.equal(typeof transport.ready, 'function');
   assert.equal(flow.mcp, null);
+});
+
+test('the connected client is told the local game\'s own tick', async () => {
+  const { Module } = fakeEngine();
+  const flow = openLocalRealm(Module, {}, {});
+  assert.equal(flow.local.gameTick(), null);   // nothing connected yet
+  const transport = flow.local.connect();
+  await transport.ready();
+  assert.equal(flow.local.gameTick(), 40);
+  transport.tick(3);
+  assert.equal(flow.local.gameTick(), 43);
+  assert.equal(transport.pump(), 0);   // a pump with nothing sent delivers nothing: the marker went out once, with its tick
+  // An engine built before the read: no tick, and the frame keeps the client's own count.
+  const old = localGameTransport(fakeEngine({ tickRead: false }).Module);
+  assert.equal(old.gameTick(), null);
 });

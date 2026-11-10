@@ -66,6 +66,8 @@ export function localGameTransport(Module) {
       return Array.from({ length: n }, (_, i) => ({ opcode: rows[i * 2], result: rows[i * 2 + 1] }));
     },
     dropped: () => call('d2_local_d2gs_dropped', 'number', [], []),
+    /** The local game's own tick count (the tick word of a frame read from the engine); null from an engine without the read. */
+    gameTick: () => (!freed && Module._d2_session_game_frame ? call('d2_session_game_frame', 'number', [], []) >>> 0 : null),
     stats: () => ({ ...stats }),
     close: () => {
       if (!open) return;
@@ -82,7 +84,9 @@ export function localGameTransport(Module) {
  * realm session. The character is the live session's player; `connect()` opens the in-process
  * connection and `pump()` delivers what the game sent after a tick.
  */
-export function openLocalRealm(Module, protocol, { name = 'Local' } = {}) {
+export function openLocalRealm(Module, protocol, { name = null } = {}) {
+  // the game assigns the session's own character name; the engine's default when it cannot be asked
+  name ??= (Module._d2_session_character_name ? Module.ccall('d2_session_character_name', 'string', [], []) : '') || 'PLAYER';
   const flags = Module.ccall('d2_session_game_flags', 'number', [], []);
   const character = { name, charClass: (flags >> 16) & 0xff, flags: flags & 0x100 ? 0x20 : 0 };
   let transport = null;
@@ -91,6 +95,8 @@ export function openLocalRealm(Module, protocol, { name = 'Local' } = {}) {
       joined: { character, game: { difficulty: flags & 0xff }, ticket: { token: 0, hash: 0 } },
       connect: () => (transport = localGameTransport(Module)),
       pump: () => transport?.pump() ?? 0,
+      /** The game tick the connected client's frame belongs to: the local game's own count. */
+      gameTick: () => transport?.gameTick() ?? null,
       /** What crossed the connection and what the server did not take (the join's own evidence). */
       evidence: () => (transport ? { ...transport.stats(), refused: transport.refused(), dropped: transport.dropped() } : null),
     } };

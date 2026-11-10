@@ -231,6 +231,8 @@ void CLIENTS_SetExperienceLoss(D2ClientStrc* pClient, int32_t nExpLoss) {}
 // Recovered structural path from D2Game.0x6FC33020. Client room changes are also the DRLG
 // room-status and adjacent-room streaming boundary, rather than a pointer assignment.
 extern "C" bool g_sessionClientStaysInRoom;
+extern "C" bool g_sessionJoinUnits;
+void __fastcall D2GAME_SUNITMSG_FirstFn_6FCC5520(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient);
 void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
     // Recorded sessions (s39xx) run retail's LEVEL_AddClient/RemoveClient; the s08 aitrace fixture's capture hangs
     // the client with DUNGEON_AddClientToRoom and wakes monsters itself, so a second AI-event arm there fires early.
@@ -254,6 +256,10 @@ void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
                     D2GAME_PACKETS_SendPacket0x07_6FC3D120(pClient, (uint8_t)DUNGEON_GetLevelIdFromRoom(nextRooms[i]), (uint16_t)coords.nTileXPos, (uint16_t)coords.nTileYPos);
                 }
                 DUNGEON_AddClientToRoom(nextRooms[i], pClient);
+                // The local game's client learns each monster of a room it enters (retail's room join does it for every unit).
+                if (g_sessionJoinUnits)
+                    for (D2UnitStrc* u = nextRooms[i]->pUnitFirst; u; u = u->pRoomNext)
+                        if (u->dwUnitType == UNIT_MONSTER) D2GAME_SUNITMSG_FirstFn_6FCC5520(pClient->pGame, u, pClient);
             }
         }
     }
@@ -367,7 +373,9 @@ void __fastcall sub_6FC33670(D2GameStrc* pGame, D2ClientStrc* pClient) {
         LEVEL_RemoveUnitsExceptClientPlayer(clientRoom, pClient);
         LEVEL_UpdateUnitsInAdjacentRooms(pGame, clientRoom, pClient);
     }
-    if (levelUp) {
+    // One-client path: the changed-stat walk runs every frame, as retail's does; each changed stat is sent once (the
+    // per-unit flush that follows frees the changed list).
+    {
         D2Common_10513(player, player, (void(__fastcall*)(D2UnitStrc*, int32_t, int32_t, D2UnitStrc*))D2GAME_UpdateAttribute_6FC822D0);
     }
     ++pClient->unk0x1B0;
@@ -745,7 +753,12 @@ void D2GAME_PACKETS_SendPacket0xA5_6FC3D7F0(D2ClientStrc* pClient, uint8_t a2, i
     uint8_t b[8];
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, scmd::encodeA5(b, a2, (uint32_t)a3, a4));
 }
-void D2GAME_PACKETS_SendPacket0xAB_6FC3D7B0(D2ClientStrc* pClient, uint8_t nUnitType, int32_t dwUnitId, uint8_t nUnitLife) {}
+// Unit life (0xAB): real body, for the one-client path.
+void D2GAME_PACKETS_SendPacket0xAB_6FC3D7B0(D2ClientStrc* pClient, uint8_t nUnitType, int32_t dwUnitId, uint8_t nUnitLife) {
+    D2GSPacketSrvAB packet = {};
+    packet.nHeader = 0xAB; packet.nUnitType = nUnitType; packet.dwUnitGUID = (uint32_t)dwUnitId; packet.nLife = nUnitLife;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof(packet));
+}
 void D2GAME_PACKETS_SendPacketSize06_6FC3C850(D2ClientStrc* pClient, DWORD nHeader, DWORD dwUnitType, DWORD dwUnitId) {}
 void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, int32_t nPacketSize) {
     // The headless client has no socket, but packet 0x27 is the recovered durable boundary
@@ -956,17 +969,7 @@ void D2Game_10034_Return(int a1) {}
 // retail D2Game 0x29820 (NOT implemented, empty stub; unverified), 
 void GAME_ForEachIngameClient(D2GameStrc* pGame, GAME_ForEachIngameClientCallbackPtr pFn, void* pContext) {}
 D2CharStatsTxt* PLRSAVE2_GetCharStatsTxtRecord(int32_t nClass) { return UNITS_GetCharStatsTxtRecord(nClass); }
-void SCMD_Send0x75_PartyRosterUpdate(D2UnitStrc* pLocalPlayer, D2UnitStrc* pOtherPlayer) {
-    D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pLocalPlayer, __FILE__, __LINE__);
-    D2GSPacketSrv75 p = {};
-    p.nHeader = 0x75u;
-    p.nUnitGUID = pOtherPlayer ? pOtherPlayer->dwUnitId : (uint32_t)-1;
-    p.nPartyId = SUNIT_GetPartyId(pOtherPlayer);
-    p.nLevel = STATLIST_UnitGetStatValue(pOtherPlayer, STAT_LEVEL, 0);
-    p.nFlags = PLAYERLIST_GetFlags(pLocalPlayer, pOtherPlayer);
-    p.unk0x0B = sub_6FCBA9D0(pLocalPlayer, pOtherPlayer);
-    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &p, sizeof p);
-}
+// SCMD_Send0x75_PartyRosterUpdate lives in src/core/d2game/d2game_8d120_packet.cpp (moved out for the join burst).
 // D24: linked in by the retail room walk (LEVEL_UpdateUnitsInAdjacentRooms -> sub_6FC81650 -> SUnitMsg/InvMode); not part of the level-up window, so empty until their own rows (0x0C/0x0E/0x11/0xA7/0xA9/0x9C/0x9D).
 // 0x0C unit life update (9 bytes: header, unit type, guid, message, hit class, life%); a retail recording retail 0c0101000000 13 3d <pct>.
 void __fastcall D2GAME_PACKETS_SendPacket0x0C_6FC3C8A0(D2ClientStrc* a0, char a1, D2C_UnitTypes a2, int a3, char a4, char a5, char a6) {
@@ -1028,7 +1031,12 @@ void __fastcall sub_6FC3F4D0(D2ClientStrc* a0, int a1, char a2, short a3, short 
 // 1.13c D2Game+0x93C10 (D2MOO Clients.cpp): the arena-related client flag.
 uint32_t __fastcall sub_6FC33C10(D2ClientStrc* pClient) { return pClient ? (pClient->dwFlags & CLIENTFLAGEX_ARENA_RELATED) : 0; }
 void sub_6FC37B10(D2GameStrc* pGame) {}
-void sub_6FC3D830(D2ClientStrc* pClient, BYTE nHeader, int32_t nUnitGUID, WORD nStatId, int32_t nValue) {}
+// A stat of a unit other than the client's player (0x20): real body, for the one-client path.
+void sub_6FC3D830(D2ClientStrc* pClient, BYTE nHeader, int32_t nUnitGUID, WORD nStatId, int32_t nValue) {
+    D2GSPacketSrv20 packet = {};
+    packet.nHeader = nHeader; packet.dwUnitGUID = (uint32_t)nUnitGUID; packet.nStat = (PacketStatId)nStatId; packet.nValue = nValue;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof(packet));
+}
 void sub_6FC3E200(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
 // 1.13c D2Client+0x24A70 (reached from the 0x4D handler 0xAF160 via 0x24B90): the shrine state sound is the Sounds
 // row at D2Client+0xD2F70 + type*0x14, type = the packet's shrine code (a8), played on the operating player.
@@ -1067,8 +1075,12 @@ void sub_6FC3F550(D2ClientStrc* pClient, D2UnitStrc* pUnit) {
 }
 // 0x73: a missile the receiving client did not create itself.
 void sub_6FC3F610(D2ClientStrc* pClient, D2GSPacketSrv73* pPacket) { D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof(*pPacket)); }
-void sub_6FC3FAF0(D2ClientStrc* pClient, uint32_t a2, uint16_t a3) {}
-void sub_6FC3FC80(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
+// Minion-spawner class (0x98): real body. The monster-assign sender sub_6FC3FC80 lives in src/core/d2game/d2game_8ca20_unit.cpp.
+void sub_6FC3FAF0(D2ClientStrc* pClient, uint32_t a2, uint16_t a3) {
+    D2GSPacketSrv98 packet = {};
+    packet.nHeader = 0x98; packet.unk0x01 = a2; packet.unk0x05 = a3;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof(packet));
+}
 // D2Game's game log (GAME_LogMessage writes the server's text log); nothing to write to here.
 void GAME_LogMessage(int32_t, const char*, ...) {}
 // Classic end-of-game after Diablo's death (A4Q2 timer); the session never ends a game this way.

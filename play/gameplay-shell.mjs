@@ -1019,7 +1019,7 @@ function sessionAdapter() {
   if (window.Module?._d2_session_create && window.Module?._d2_session_snapshot) {
     return {
       // bare: no start kit, for a player a saved file is about to be applied to.
-      create(f, playerClass = 0, bare = false) { Module.ccall('d2_session_create_stream', 'number', ['number'], [0]); const made = Module.ccall(bare && Module._d2_session_create_class_bare ? 'd2_session_create_class_bare' : 'd2_session_create_class', 'number', ['number', 'number', 'number', 'number', 'number'], [f.seed, f.difficulty, f.act0, f.level, playerClass]); if (made) Module.ccall('d2_session_client_map_start', 'number'); return made; },
+      create(f, playerClass = 0, bare = false) { Module.ccall('d2_session_create_stream', 'number', ['number'], [0]); if (LOCAL_REALM) Module.ccall('d2_session_join_units', null, ['number'], [1]); const made = Module.ccall(bare && Module._d2_session_create_class_bare ? 'd2_session_create_class_bare' : 'd2_session_create_class', 'number', ['number', 'number', 'number', 'number', 'number'], [f.seed, f.difficulty, f.act0, f.level, playerClass]); if (made) Module.ccall('d2_session_client_map_start', 'number'); return made; },
       // Create the character FROM the file: the engine reads the header and everything -- class,
       // act, town level, map seed -- comes out of it (PLRSAVE2_ReadSaveHeader, client-parity C3e).
       // Returns 0, or the PLRSAVE2 error code that refused the file.
@@ -4584,7 +4584,7 @@ function refreshRealmView() {
   const next = realmViewSnapshot({ base: protocol?.d2gsClientSnapshot?.() ?? null, resources, monsters: realmMonsterViews,
     missiles: realmMissileViews, players: realmOtherPlayers(), level: realmWorldView?.mapLevel, actor: realmMonsterAnimationActor, frame: realmAnimationFrame,
     world: realmWorldState, classOf: realmUnits.classOf, objects: protocol ? protocol.d2gsClientObjects() : [], alerts: game.alerts,
-    warps: protocol?.d2gsClientWarps?.(), rooms: protocol?.d2gsClientRooms?.(), quests: protocol?.d2gsClientQuests?.(questVisible) });
+    warps: protocol?.d2gsClientWarps?.(), rooms: protocol?.d2gsClientRooms?.(), quests: protocol?.d2gsClientQuests?.(questVisible), tick: realmFlow?.local?.gameTick?.() ?? null });
   if (next) { snapshot = next; realmSessionPresenter.applyOverlays(unitOverlayFx, Math.floor(performance.now() / 40), next.entities); }   // 25 frames a second
   realmDeath().observe(snapshot?.mode);
   realmGameUi.observe(game.ui, closeRealmPanels);

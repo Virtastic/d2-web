@@ -23,9 +23,11 @@ const precise = (u) => (u.preciseX != null && u.preciseY != null ? { preciseX: u
 // it sent (0x28, 0x29, 0x52, 0x5D). Exits and rooms have the records of a local game; quests is null until one arrives.
 // `classOf(monster)` sorts a monster as the client does ({ kind, hostile }, assets/realm-combat.mjs createRealmUnits):
 // a town person is `npc`, and only an enemy is `hostile`. Without it nothing is known, so nothing is an enemy.
+// `tick` is the game's own tick when the client can know it (a local game's server is in the page); a remote
+// server sends none, and the frame then keeps the client's own count.
 // `alerts` are the guids of the NPCs the server marked as having something to say (realmGameReads): the
 // monster entity carries it as speechPending, the flag a local game's entity has.
-export function realmViewSnapshot({ base: given, resources, monsters, missiles, players, level, actor, frame, world = null, classOf = null, objects = [], alerts = null, warps = null, rooms = null, quests = null }) {
+export function realmViewSnapshot({ base: given, resources, monsters, missiles, players, level, actor, frame, world = null, classOf = null, objects = [], alerts = null, warps = null, rooms = null, quests = null, tick = null }) {
   const marked = new Set(alerts ?? []);
   const base = given ?? EMPTY;   // before the first PlayerAssign the snapshot is empty, as the single-player one is
   const entities = [];
@@ -49,7 +51,7 @@ export function realmViewSnapshot({ base: given, resources, monsters, missiles, 
       hostile: false, roomOrdinal: 0, direction: u.direction, missile: { mode: u.mode, direction: u.direction, framePrecise: u.framePrecise, trans: u.trans } });
   }
   const r = resources ?? {};
-  return { ...base, entities, objects, items: world?.itemViews() ?? [], warps: warps ?? [], rooms: rooms ?? [], quests: quests ?? null, units: [], town: TOWN_LEVELS.has(base.level),
+  return { ...base, tick: tick ?? base.tick, entities, objects, items: world?.itemViews() ?? [], warps: warps ?? [], rooms: rooms ?? [], quests: quests ?? null, units: [], town: TOWN_LEVELS.has(base.level),
     player: { ...base.player, weaponClass: world?.weaponClassOf() ?? 'hth',
       hp: r.hp ?? base.player.hp, hpMax: r.hpMax ?? base.player.hpMax, mana: r.mana ?? 0, manaMax: r.manaMax ?? 0 } };
 }

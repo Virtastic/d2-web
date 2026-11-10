@@ -1112,8 +1112,10 @@ static int assign_player(const uint8_t* packet, int length) {
     created.version = 5;
     created.size = sizeof(created);
     uint32_t level = 0, roomX = 0, roomY = 0, initSeed = 0;
-    if (!d2_drlg_client_player_context(assigned.x, assigned.y, 1,
-            &level, &roomX, &roomY, &initSeed)) return -1;
+    // The game sends the own unit before the act load, so no room can hold it yet: the constructor
+    // (1.13c D2Client+0xA7630) goes on without one, and a later reassignment resolves the room.
+    level = roomX = roomY = initSeed = 0;
+    d2_drlg_client_player_context(assigned.x, assigned.y, 1, &level, &roomX, &roomY, &initSeed);
     created.active = 1;
     created.guid = assigned.guid;
     created.x = assigned.x;

@@ -67,9 +67,11 @@ export const SCRIPT = { ticks: 120, clicks: [{ tick: 5, x: 560, y: 120, button: 
 // Run in the page as one synchronous call, so the page's own frame loop cannot tick inside it. That loop does run
 // between the game coming up and this call, for as long as the wall clock allows (7 to 12 ticks measured), so the
 // script first steps the game to a fixed tick: a monster that changes mode on tick 33 then does so on the same
-// script tick in every run. A frame read from packets carries no game tick and starts where it is.
+// script tick in every run. A frame read from packets carries the local game's own tick (the server is in the page),
+// re-read here because the page's loop may have ticked the game since it last drew.
 export const START_TICK = 100;
 export const PLAY_SCRIPT = `(shell, script) => {
+  shell.refreshView?.();
   const at = shell.snapshot?.tick, out = [];
   if (at > ${START_TICK}) throw new Error('the game was at tick ' + at + ' before the script began, past its start tick ${START_TICK}');
   for (let n = ${START_TICK} - at; n > 0; n--) shell.step();
@@ -116,6 +118,16 @@ test('the script starts on the same game tick however far the page had run befor
   // A frame with no game tick is stepped the script's ticks and no more.
   const steps = []; new Function('window', `return (${PLAY_SCRIPT})(window.__d2Shell, ${JSON.stringify(SCRIPT)})`)({ __d2Shell: { snapshot: {}, input: { pointer() {} }, step: () => steps.push(1) } });
   assert.equal(steps.length, SCRIPT.ticks);
+  // A frame read from packets: its tick is the game's, current only after the view is re-read (the page's loop
+  // ticked the game since the last draw). The script starts on the same tick as the direct run above.
+  const packetRun = (ranBefore) => {
+    const game = { tick: ranBefore, x: 0 }; let drawn = { tick: ranBefore - 3 };
+    const shell = { input: { pointer: (x) => { game.x = x; } }, step: () => { game.tick++; },
+      refreshView: () => { drawn = { tick: game.tick, playerId: 1, player: { x: game.x, y: 0 }, entities: [{ id: 4, type: 1, classId: 147, mode: game.tick < 133 ? 1 : 2, x: 5, y: 5 }] }; },
+      get snapshot() { return drawn; } };
+    return new Function('window', `return (${PLAY_SCRIPT})(window.__d2Shell, ${JSON.stringify(SCRIPT)})`)({ __d2Shell: shell });
+  };
+  for (const ranBefore of [7, 12, 60]) assert.deepEqual(packetRun(ranBefore), first, `packet frame, ${ranBefore} ticks before the script`);
 });
 
 // ---- the live run ----

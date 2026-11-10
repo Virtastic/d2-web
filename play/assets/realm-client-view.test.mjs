@@ -17,6 +17,15 @@ test('the town flag follows the level the server placed the hero in', () => {
   assert.equal(realmViewSnapshot({ base: null, resources: null, monsters: [], missiles: [], level: 0, actor, frame: 0 }).town, false);
 });
 
+test('the frame carries the game tick when the client is told it, and its own count otherwise', () => {
+  const at = (tick) => realmViewSnapshot({ base: base(1), resources: null, monsters: [], missiles: [], players: [], level: 1, actor, frame: 0, tick }).tick;
+  assert.equal(at(100), 100);
+  assert.equal(at(0), 0);
+  assert.equal(at(null), 1);
+  assert.equal(at(undefined), 1);
+});
+
+
 test('a monster carries the life the server reported, as a share of 100; dead is its mode, not 0% life', () => {
   const mon = (hpPct, mode = 1) => ({ guid: 3, classId: 5, mode, x: 1, y: 2, direction: 0, hpPct });
   const [hurt, nearlyDead, dying, corpse, unknown] = snap(2, [mon(40), mon(0), mon(0, 0), mon(30, 12), { ...mon(0), hpPct: undefined }]).entities;

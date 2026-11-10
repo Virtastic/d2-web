@@ -42,9 +42,10 @@ int d2_session_player_y();
 int d2_session_player_act();
 void D2WEB_SetPacketSink(void (*sink)(const uint8_t*, uint32_t));
 const uint8_t* d2_session_join_stream(uint32_t* length);
+uint32_t d2_session_join_load_length();
+int d2_session_client_spawned();
 int d2_session_client_rooms(uint8_t* out, int capacity);
 int d2_session_client_room_objects();
-uint32_t d2_session_join_load_length();
 uint32_t d2_session_game_seed();
 int d2_session_game_flags();
 }
@@ -58,7 +59,6 @@ enum class Phase : uint8_t { Closed, Greeted, Loaded, InGame };
 
 struct LocalServer {
     Phase phase;
-    bool enterSent;
     uint32_t mapSeed;
     uint8_t difficulty, expansion;
     uint8_t classId;
@@ -188,6 +188,7 @@ EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_client(const uint8_t* bytes, int length) 
     if (opcode == 0x6B) {           // enter game
         if (g_server.phase != Phase::Loaded || !sendPlayer()) { refuse(opcode, -3); return 0; }
         g_server.phase = Phase::InGame;
+        d2_session_client_spawned();   // the game's next client update sends the "in game" marker itself
         ++g_server.accepted;
         return 1;
     }
@@ -211,17 +212,9 @@ EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_client(const uint8_t* bytes, int length) 
     return 1;
 }
 
-// After the game advanced. The first call in game closes the join with the one-byte "in game"
-// marker, after the units that tick revealed. Returns the queued byte count.
-EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_pump() {
-    if (g_server.phase != Phase::InGame) return g_server.outLength;
-    if (!g_server.enterSent) {
-        const uint8_t entered[1] = { 0x04 };
-        put(entered, sizeof entered);
-        g_server.enterSent = true;
-    }
-    return g_server.outLength;
-}
+// After the game advanced. Everything the game sent, the join's closing "in game" marker included,
+// is already queued by the packet sink; this returns the queued byte count.
+EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_pump() { return g_server.outLength; }
 
 EMSCRIPTEN_KEEPALIVE const uint8_t* d2_local_d2gs_out() { return g_server.out; }
 // The queued server bytes' length; the queue is empty afterwards (read d2_local_d2gs_out first).
