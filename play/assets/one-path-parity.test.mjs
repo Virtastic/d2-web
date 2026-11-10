@@ -23,16 +23,25 @@ export const FIELDS = ['world', 'player', 'life', 'monsters', 'players', 'missil
 
 // Objects: the units a client holds (a room with a client) that the server sends; the engine also lists the rooms
 // no client is in, and the sound-only presets a client builds from its own level data (ids from 0x70000000), neither of which a packet carries.
+// Monsters likewise: a client is told only of the monsters in rooms it holds, so the engine's list is read through the
+// server's own room membership (d2_session_unit_client_rooms); the packet side lists what it was told.
 // Evaluated in the page: one tick's snapshot as { field: [record, ...] }, each record a string.
 export const SNAPSHOT_FIELDS = `(() => {
   const s = window.__d2Shell.snapshot ?? {}, p = s.player ?? {}, id = s.playerId >>> 0;
   const unit = (e) => [e.id >>> 0, e.classId, e.mode, e.x, e.y].join(':');
   const of = (type) => (s.entities ?? []).filter((e) => e.type === type && !(type === 0 && (e.id >>> 0) === id)).map(unit);
+  const M = window.Module, held = !window.__d2Shell.fromPackets && M?._d2_session_unit_client_rooms ? new Set() : null;
+  if (held) {
+    const n = M.ccall('d2_session_unit_count', 'number', [], []), up = Number(M.ccall('d2_session_units', 'number', [], [])) >> 2, flags = M._malloc(n + 1);
+    M.ccall('d2_session_unit_client_rooms', 'number', ['bigint', 'number'], [BigInt(flags), n]);
+    for (let i = 0; i < n; i++) if (M.HEAPU32[up + i * 11 + 1] === 1 && M.HEAPU8[flags + i]) held.add(M.HEAPU32[up + i * 11]);
+    M._free(flags);
+  }
   const items = s.items ?? [], ground = (i) => Boolean(i.landed) || i.invPage === 0xff;
   return { world: ['act:' + s.act, 'level:' + s.level, 'difficulty:' + s.difficulty, 'class:' + s.playerClass],
     player: ['x:' + p.x, 'y:' + p.y, 'mode:' + s.mode, 'weapon:' + p.weaponClass],
     life: ['hp:' + p.hp, 'hpMax:' + p.hpMax, 'mana:' + p.mana, 'manaMax:' + p.manaMax],
-    monsters: of(1), players: of(0), missiles: of(3),
+    monsters: of(1).filter((r) => !held || held.has(Number(r.split(':')[0]))), players: of(0), missiles: of(3),
     objects: (s.objects ?? []).filter((o) => o.inClientRoom !== false && (o.id >>> 0) < 0x70000000).map(unit),
     groundItems: items.filter(ground).map((i) => [i.id >>> 0, i.code ?? i.classId, i.x, i.y].join(':')),
     ownedItems: items.filter((i) => !ground(i)).map((i) => [i.id >>> 0, i.code ?? i.classId, i.invPage, i.bodyLoc, i.gridX, i.gridY].join(':')) };
@@ -47,12 +56,19 @@ export function diffField(a, b) {
   return { differing, total: new Set([...left, ...right]).size };
 }
 
-/** Two runs (arrays of per-tick field maps) to { field: { differing, total } }. A missing tick differs in full. */
-export function parityTable(direct, packets, fields = FIELDS) {
+// What the server sends on a tick reaches the client after that tick's step (the reader takes it on a promise hop), so the
+// client applies it on its next frame: a field the client only learns from packets is read one frame later. The hero is
+// walked by the client itself on the frame its input lands, so it is not.
+export const PACKET_LAG = { monsters: 1 };
+
+/** Two runs (arrays of per-tick field maps) to { field: { differing, total } }. A missing tick differs in full; a field
+ *  lagged by n compares the second run's tick t + n, and the second run then holds n frames more. */
+export function parityTable(direct, packets, fields = FIELDS, lag = {}) {
   const table = Object.fromEntries(fields.map((f) => [f, { differing: 0, total: 0 }]));
-  for (let t = 0; t < Math.max(direct.length, packets.length); t++) {
+  const extra = Math.max(0, ...fields.map((f) => lag[f] ?? 0));
+  for (let t = 0; t < Math.max(direct.length, packets.length - extra); t++) {
     for (const f of fields) {
-      const d = diffField(direct[t]?.[f], packets[t]?.[f]);
+      const d = diffField(direct[t]?.[f], packets[t + (lag[f] ?? 0)]?.[f]);
       table[f].differing += d.differing; table[f].total += d.total;
     }
   }
@@ -70,14 +86,17 @@ export const SCRIPT = { ticks: 120, clicks: [{ tick: 5, x: 560, y: 120, button: 
 // script tick in every run. A frame read from packets carries the local game's own tick (the server is in the page),
 // re-read here because the page's loop may have ticked the game since it last drew.
 export const START_TICK = 100;
-export const PLAY_SCRIPT = `(shell, script) => {
+export const PLAY_SCRIPT = `async (shell, script) => {
+  // A game read from packets takes each one on a promise hop after the connection delivers it: drain those hops (microtasks only, so
+  // the page's frame loop still cannot tick inside the script) after each step, or every packet waits until the script has ended.
   shell.refreshView?.();
-  const at = shell.snapshot?.tick, out = [];
+  const settle = async () => { for (let i = 0; i < 64; i++) await Promise.resolve(); };
+  const at = window.__d2?.session?.snapshot?.()?.tick ?? shell.snapshot?.tick, out = [];   // the game's own tick: a frame read from packets counts the client's frames, which start later than the local game it joined
   if (at > ${START_TICK}) throw new Error('the game was at tick ' + at + ' before the script began, past its start tick ${START_TICK}');
-  for (let n = ${START_TICK} - at; n > 0; n--) shell.step();
-  for (let t = 0; t < script.ticks; t++) {
+  for (let n = ${START_TICK} - at; n > 0; n--) { shell.step(); await settle(); }
+  for (let t = 0; t < script.ticks + (shell.fromPackets ? Math.max(...Object.values(${JSON.stringify(PACKET_LAG)})) : 0); t++) {
     for (const c of script.clicks) if (c.tick === t) shell.input.pointer(c.x, c.y, c.button);
-    shell.step(); shell.refreshView?.();
+    shell.step(); await settle(); shell.refreshView?.();
     out.push(${SNAPSHOT_FIELDS});
   }
   return out; }`;
@@ -97,26 +116,30 @@ test('the field comparison counts what only one run holds, and a missing tick in
   const short = parityTable([tick, tick], [tick], ['world', 'monsters']);
   assert.deepEqual(short.world, { differing: 1, total: 2 });
   assert.equal(formatTable(moved), 'world: 0/2\nmonsters: 2/3');
+  // A lagged field reads the second run one tick on: the same monster a tick late is equal, and the extra frame is not a missing tick.
+  const late = parityTable([tick, { ...tick, monsters: ['1:5:1:11:10'] }], [tick, tick, { ...tick, monsters: ['1:5:1:11:10'] }], ['world', 'monsters'], { monsters: 1 });
+  assert.deepEqual(late.monsters, { differing: 0, total: 2 });
+  assert.equal(late.world.differing, 0);
 });
 
 test('the page read names every field of the table', () => {
   for (const f of FIELDS) assert.match(SNAPSHOT_FIELDS, new RegExp(`\\b${f}:`), f);
 });
 
-test('the script starts on the same game tick however far the page had run before it', () => {
+test('the script starts on the same game tick however far the page had run before it', async () => {
   // A stand-in game: one monster whose mode turns on game tick 133, a hero the pointer moves.
-  const run = (ranBefore) => {
+  const run = async (ranBefore) => {
     const shell = { tick: ranBefore, x: 0, input: { pointer: (x) => { shell.x = x; } }, step: () => { shell.tick++; },
       get snapshot() { return { tick: shell.tick, playerId: 1, player: { x: shell.x, y: 0 }, entities: [{ id: 4, type: 1, classId: 147, mode: shell.tick < 133 ? 1 : 2, x: 5, y: 5 }] }; } };
     return new Function('window', `return (${PLAY_SCRIPT})(window.__d2Shell, ${JSON.stringify(SCRIPT)})`)({ __d2Shell: shell });
   };
-  const first = run(7);
+  const first = await run(7);
   assert.equal(first.length, SCRIPT.ticks);
   assert.equal(first.findIndex((t) => t.monsters[0] === '4:147:2:5:5'), 133 - START_TICK - 1);
-  for (const ranBefore of [8, 9, 12, START_TICK]) assert.deepEqual(run(ranBefore), first, `${ranBefore} ticks before the script`);
-  assert.throws(() => run(START_TICK + 1), /past its start tick/);
+  for (const ranBefore of [8, 9, 12, START_TICK]) assert.deepEqual(await run(ranBefore), first, `${ranBefore} ticks before the script`);
+  await assert.rejects(run(START_TICK + 1), /past its start tick/);
   // A frame with no game tick is stepped the script's ticks and no more.
-  const steps = []; new Function('window', `return (${PLAY_SCRIPT})(window.__d2Shell, ${JSON.stringify(SCRIPT)})`)({ __d2Shell: { snapshot: {}, input: { pointer() {} }, step: () => steps.push(1) } });
+  const steps = []; await new Function('window', `return (${PLAY_SCRIPT})(window.__d2Shell, ${JSON.stringify(SCRIPT)})`)({ __d2Shell: { snapshot: {}, input: { pointer() {} }, step: () => steps.push(1) } });
   assert.equal(steps.length, SCRIPT.ticks);
   // A frame read from packets: its tick is the game's, current only after the view is re-read (the page's loop
   // ticked the game since the last draw). The script starts on the same tick as the direct run above.
@@ -216,7 +239,7 @@ test('a local game read from the engine and the same game read from its packets 
     // A packet run that never comes up shows nothing: every record of the direct run then differs, and the reason is printed.
     let joinFailure = '';
     const packets = await play(origin, '&localrealm=1', true).catch((error) => { joinFailure = error.message; return []; });
-    const table = parityTable(direct, packets);
+    const table = parityTable(direct, packets, FIELDS, PACKET_LAG);
     if (process.env.D2_ONE_PATH_DUMP) writeFileSync(process.env.D2_ONE_PATH_DUMP, JSON.stringify({ direct, again, packets }));   // the runs themselves, to read a differing field
     console.log(`one-path parity, ${SCRIPT.ticks} ticks (field: differing/total)\n${formatTable(table)}\ncontrol, direct against ${CONTROL_RUNS} more direct\n${formatTable(control)}${joinFailure ? `\npacket run: ${joinFailure}` : ''}`);
     for (const f of FIELDS) assert.equal(control[f].differing, 0, `${f} differs between two direct runs`);
