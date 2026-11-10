@@ -144,16 +144,17 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_mcp_charlogon(const char* name, uint8_t
 }
 
 // MCP_CREATEGAME (0x03) through D2MCPClient+0x7330. The create-game form holds three 16-byte slots (name,
-// password, description), the u32 difficulty at +0x40, then the two constant request bytes (1, 0xFF) and the
-// player limit; longer strings are cut at 15 bytes like the dialog's edit fields.
-EMSCRIPTEN_KEEPALIVE int d2_realm_client_mcp_creategame(uint32_t requestId, uint32_t difficulty, uint32_t maxPlayers,
+// password, description), the u32 difficulty at +0x40, then the constant 1, the level difference (0xFF when the
+// level limit box is off) and the player limit; name and password are cut at 15 bytes, the description at 31,
+// like the dialog's edit fields.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_mcp_creategame(uint32_t requestId, uint32_t difficulty, uint32_t maxPlayers, uint32_t levelDifference,
                                                          const char* name, const char* password, const char* description, uint8_t* out) {
     alignas(4) uint8_t form[0x48] = {};
     sstrcopy((char*)form, name, 0x10);
     sstrcopy((char*)form + 0x10, password, 0x10);
-    sstrcopy((char*)form + 0x20, description, 0x10);
+    sstrcopy((char*)form + 0x20, description, 0x20);
     memcpy(form + 0x40, &difficulty, 4);
-    form[0x44] = 1; form[0x45] = 0xFF; form[0x46] = (uint8_t)maxPlayers;
+    form[0x44] = 1; form[0x45] = (uint8_t)levelDifference; form[0x46] = (uint8_t)maxPlayers;
     uint8_t frame[0x40];
     return (int)mcpBody(d2_mcp_req_7330(form, (uint16_t)requestId, frame), frame, out);
 }

@@ -2162,7 +2162,7 @@ async function authenticateConfiguredRealm({ account, password }) {
     if (!keepRealmSession) { try { protocol?.free(); } catch { /* engine gone */ } }
   }
 }
-async function createAndJoinConfiguredGame({ character, gameName, gamePassword, difficulty = 0, maxPlayers = 8, description = '', join = false }) {
+async function createAndJoinConfiguredGame({ character, gameName, gamePassword, difficulty = 0, maxPlayers = 8, levelDifference = 0xff, description = '', join = false }) {
   const { server, realmReply } = realmFlow || {};
   const started = { server: { region: server?.region, host: server?.host } };
   realmTransport = { state: 'joining', ...started, result: null, error: '' };
@@ -2172,7 +2172,7 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
   try {
     if (!realmReply || !protocol || !mcp) throw new Error('log in before selecting a character');
     const joined = await mcpCreateAndJoin(mcp, protocol, { realmReply, character, gameName, gamePassword,
-      difficulty, maxPlayers, description, join, session: realmFlow.mcpSession });
+      difficulty, maxPlayers, levelDifference, description, join, session: realmFlow.mcpSession });
     mcp.close(); mcp = null;
     realmFlow.mcp = null; realmFlow.mcpSession = null;
     // The game server occasionally drops the first socket before the greeting completes; while the logon

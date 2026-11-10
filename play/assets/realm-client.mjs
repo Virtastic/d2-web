@@ -172,7 +172,7 @@ function decodeMcpCharacters(body) {
  * the engine exports, as with BNCS and D2GS; this function owns only the sequence and read offsets.
  */
 export async function mcpCreateAndJoin(transport, protocol, { realmReply, character, gameName, gamePassword = '',
-  difficulty = 0, maxPlayers = 8, description = '', characterCount = 8, session = null, join = false, timeoutMs = CONNECT_TIMEOUT_MS, startupMs = MCP_STARTUP_MS, gameReplyMs = GAME_REPLY_MS } = {}) {
+  difficulty = 0, maxPlayers = 8, levelDifference = 0xff, description = '', characterCount = 8, session = null, join = false, timeoutMs = CONNECT_TIMEOUT_MS, startupMs = MCP_STARTUP_MS, gameReplyMs = GAME_REPLY_MS } = {}) {
   if (!Array.isArray(realmReply) && !(realmReply instanceof Uint8Array)) throw new Error('MCP requires the BNCS realm handoff bytes');
   if (!character || !gameName) throw new Error('MCP requires a character and game name');
   const reader = session?.reader || makeReader(transport), sent = [], received = session ? [...session.received] : [];
@@ -228,7 +228,7 @@ export async function mcpCreateAndJoin(transport, protocol, { realmReply, charac
   };
   if (!join) {
     const createId = nextId();
-    send(0x03, protocol.mcpCreateGame({ requestId: createId, difficulty: (difficulty & 3) << 12, maxPlayers,
+    send(0x03, protocol.mcpCreateGame({ requestId: createId, difficulty: (difficulty & 3) << 12, maxPlayers, levelDifference,
       name: titleCaseGameText(gameName), password: titleCaseGameText(gamePassword), description }));
     const created = await gameReply(0x03, createId, null);
     if (created.body.length < 10) throw new Error('MCP CREATEGAME reply is truncated');
@@ -939,7 +939,7 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
     // Retail always asks for eight characters; the count argument is kept for the call sites only.
     mcpCharlist: (_count) => { const n = call('d2_realm_client_mcp_charlist', 'number', ['bigint'], [BigInt(T)]); return rd(T, n); },
     mcpCharlogon: (name) => { const n = call('d2_realm_client_mcp_charlogon', 'number', ['string', 'bigint'], [name, BigInt(T)]); if (!n) throw new Error('MCP CHARLOGON composer rejected the name'); return rd(T, n); },
-    mcpCreateGame: ({ requestId, difficulty, maxPlayers, name, password, description }) => { const n = call('d2_realm_client_mcp_creategame', 'number', ['number', 'number', 'number', 'string', 'string', 'string', 'bigint'], [requestId, difficulty, maxPlayers, name, password, description, BigInt(T)]); if (!n) throw new Error('MCP CREATEGAME composer failed'); return rd(T, n); },
+    mcpCreateGame: ({ requestId, difficulty, maxPlayers, levelDifference = 0xff, name, password, description }) => { const n = call('d2_realm_client_mcp_creategame', 'number', ['number', 'number', 'number', 'number', 'string', 'string', 'string', 'bigint'], [requestId, difficulty, maxPlayers, levelDifference, name, password, description, BigInt(T)]); if (!n) throw new Error('MCP CREATEGAME composer failed'); return rd(T, n); },
     mcpJoinGame: ({ requestId, name, password }) => { const n = call('d2_realm_client_mcp_joingame', 'number', ['number', 'string', 'string', 'bigint'], [requestId, name, password, BigInt(T)]); if (!n) throw new Error('MCP JOINGAME composer failed'); return rd(T, n); },
     greetingParse: (bytes) => { Module.HEAPU8.set(bytes, Number(P)); return call('d2_realm_greeting_parse', 'number', ['bigint', 'number'], [BigInt(P), bytes.length]); },
     d2gsFrameSize: (bytes) => { Module.HEAPU8.set(bytes, Number(P)); return call('d2_realm_d2gs_frame_size', 'number', ['bigint', 'number'], [BigInt(P), bytes.length]); },

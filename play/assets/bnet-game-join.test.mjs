@@ -87,3 +87,23 @@ test('a JOINGAME reply with another request id is ignored and the id counter ski
   assert.equal(out.ticket.ip, '1.2.3.4');
   assert.equal(session.nextRequestId, 1);
 });
+
+test('the create request carries the level difference the lobby chose, 0xFF when the limit is off', async () => {
+  const seen = [];
+  const run = async (extra) => {
+    let onData = () => {};
+    const frame = (op, body) => Uint8Array.from([(body.length + 3) & 255, (body.length + 3) >> 8, op, ...body]);
+    const transport = { onData: (f) => { onData = f; }, onClose: () => {},
+      send: (bytes) => { const op = bytes[2], id = bytes[3] | (bytes[4] << 8);
+        if (op === 0x03) onData(frame(0x03, [id & 255, id >> 8, 6, 0, 0, 0, 0, 0, 0, 0]));
+        if (op === 0x04) onData(frame(0x04, [id & 255, id >> 8, 7, 0, 10, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0])); } };
+    const protocol = { mcpFrame: (op, body) => Uint8Array.from([0, 0, op, (body[0] ?? 0) & 255, (body[1] ?? 0) & 255]),
+      mcpCreateGame: (r) => { seen.push(r.levelDifference); return [r.requestId & 255, r.requestId >> 8]; },
+      mcpJoinGame: ({ requestId }) => [requestId & 255, requestId >> 8] };
+    const session = { transport, protocol, joined: false, list: { characters: [{ name: 'Hero' }] }, characterLoggedOn: 'Hero', received: [], nextRequestId: 2 };
+    await mcpCreateAndJoin(transport, protocol, { realmReply: [1], character: 'Hero', gameName: 'x', session, keepAliveMs: 0, ...extra });
+  };
+  await run({});
+  await run({ levelDifference: 5 });
+  assert.deepEqual(seen, [0xff, 5]);
+});
