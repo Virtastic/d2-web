@@ -81,7 +81,13 @@ export function createObjectTable(read) {
     byClass = new Map();
     for (const row of rows(read('data\\global\\excel\\objects.txt'))) {
       const id = num(row.id, -1);
-      if (id >= 0 && row.token) byClass.set(id, { classId: id, token: row.token, name: row.name });
+      // The per-mode columns the client reads to present an object: which modes can be picked, each mode's
+      // run of cels (count, start cel, 8.8 step, whether it loops), and the facing the art is drawn in.
+      const modes = (column) => Array.from({ length: 8 }, (_, mode) => num(row[column + mode]));
+      if (id >= 0 && row.token) byClass.set(id, { classId: id, token: row.token, name: row.name,
+        selectable: modes('selectable'), frameCount: modes('framecnt'), frameDelta: modes('framedelta'), cycles: modes('cycleanim'),
+        start: modes('start'), orientation: num(row.orientation), subClass: num(row.subclass), lockable: num(row.lockable) !== 0,
+        isDoor: num(row.isdoor) !== 0 });
     }
     return byClass;
   }

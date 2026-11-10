@@ -21,7 +21,7 @@ import { decodeDatPalette } from './assets/d2-formats.mjs';
 import { createPlayerRenderer, playerClassInfo } from './assets/unit-renderer.mjs';
 import { createRealmInput } from './assets/realm-input.mjs';
 import { routeRealmPackets } from './assets/realm-packet-routes.mjs';
-import { realmStorageClick } from './assets/realm-storage-input.mjs';
+import { realmStorageClick, realmInventoryClick as realmInventoryPanelClick } from './assets/realm-storage-input.mjs';
 import { itemPackets, BUTTON as ITEM_BUTTON } from './assets/realm-item-packets.mjs';
 import { createItemText } from './assets/realm-item-text.mjs';
 import { applyRealmPlayerFrame, selectPlayerRenderSource, realmCameraCentre, visibleRealmPlayers, realmScenePlayers, realmPlayerGate } from './assets/realm-player-state.mjs';
@@ -74,6 +74,7 @@ import { createExperienceTable, createWaypointTable, createSkillTable } from './
 import { createRealmWorld } from './assets/realm-world.mjs';
 import { createRealmNpc } from './assets/realm-npc-state.mjs';
 import { realmAreaLevel, createRealmAreaAudio } from './assets/realm-world-audio.mjs';
+import { realmLeftMelee, realmHoverTarget, realmCombatSoundFrame } from './assets/realm-combat.mjs';
 import { createLoadCompleteOrder } from './assets/realm-world-order.mjs';
 import { createRealmAutomapSource, readClientRoomInfo, readClientLevelGeometry } from './assets/realm-world-automap.mjs';
 import { createRealmNpcUi } from './assets/realm-npc-ui.mjs';
@@ -1404,12 +1405,8 @@ async function bootstrapSession() {
     skillPanelRenderer = createSkillPanelRenderer(createMpqAssetReader(Module), document, createSkillPointOverlay());
     if (!navigator.webdriver) await entryYield();
     try { questLogRenderer = createQuestLogRenderer(createMpqAssetReader(Module), document); messageLogRenderer = createMessageLogRenderer(createMpqAssetReader(Module), document); partyRenderer = createPartyPanelRenderer(createMpqAssetReader(Module), document); bubbleRenderer = createBubbleRenderer(createMpqAssetReader(Module), document); } catch (error) { sessionError = String(error); }
-    try { stashPanelRenderer = createStashPanelRenderer(createMpqAssetReader(Module), document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]),
-      stashGold: (limit) => (plugyStash.showShared && !limit) ? plugyGold : Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [limit]) : 0 }); } catch (error) { stashPanelError = String(error); }
-    try { cubePanelRenderer = createStashPanelRenderer(createMpqAssetReader(Module), document, { page: INVPAGE_CUBE, string: null,
-      transmute: Module.ccall('d2_lang_string', 'string', ['string'], ['Transmute']) || 'Transmute' }); } catch (error) { stashPanelError += ' cube: ' + error; }
+    buildStoragePanels();
     try { repairConfirmRenderer = createRepairConfirmRenderer({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, documentObject: document, string: (n) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [n]) }); } catch (error) { stashGoldError = String(error); }
-    try { stashGoldRenderer = createStashGoldRenderer(createMpqAssetReader(Module), document, { string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) }); } catch (error) { stashGoldError = String(error); }
     try { waypointPanelRenderer = createWaypointPanelRenderer(createMpqAssetReader(Module), document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) }); } catch (error) { waypointPanelError = String(error); }
     if (!navigator.webdriver) await entryYield();
     beltRenderer = createBeltRenderer(createMpqAssetReader(Module));
@@ -3201,7 +3198,7 @@ function advanceRealmClientUnits(forced) {
     return 0;
   }
   let ticks = 0;
-  const tickClientUnits = () => { realmFlow.protocol.d2gsClientMotionTick(); realmAnimationFrame++; realmAreaAudio.step(realmAreaLevel(realmPlayerView, realmWorldView), realmAnimationFrame); ambient?.tick(1).catch(() => {}); };
+  const tickClientUnits = () => { realmFlow.protocol.d2gsClientMotionTick(); realmWorldData().tickObjects(); realmAnimationFrame++; realmAreaAudio.step(realmAreaLevel(realmPlayerView, realmWorldView), realmAnimationFrame); ambient?.tick(1).catch(() => {}); };
   if (forced) { realmGameClock = 0; tickClientUnits(); ticks = 1; }
   else {
     realmGameClock += STEP;
@@ -3212,6 +3209,7 @@ function advanceRealmClientUnits(forced) {
     }
   }
   if (ticks) {
+    if (combatSounds && snapshot) { const f = realmCombatSoundFrame(snapshot, realmMonsterViews, selectedPlayerSource(), readSelectedSkills()[castHand]); combatSounds.update(f.entities, f.frame); }
     for (const event of realmFlow.protocol.d2gsClientTakeMissileSounds?.() ?? [])
       unitSounds?.playRow(event.soundRow, event).catch((error) => console.warn('Missile impact sound', error));
     realmPlayerRosterView = realmFlow.protocol.d2gsClientPlayers?.() ?? realmPlayerRosterView;
@@ -3334,8 +3332,8 @@ function update(forceTick = false, live = false) {
       if (command.type === COMMAND.PRIMARY && command.secondary && command.x != null) {
         castHand = 'right';
         realmInput().rightClick(command.x, command.y, { held: Boolean(command.held) });
-      } else if (command.type === COMMAND.MOVE && !command.directional && !heldStandStillKeys.size && command === pointerMoves.at(-1)) {
-        realmInput().leftClick(command.x, command.y, { held: Boolean(command.held) });
+      } else if (command.type === COMMAND.MOVE && !command.directional && command === pointerMoves.at(-1)) {
+        realmInput().leftClick(command.x, command.y, { held: Boolean(command.held), stand: heldStandStillKeys.size > 0 });
       } else if (command.type === COMMAND.MOVE && command.directional && !heldStandStillKeys.size) {
         realmInput().step(command.x, command.y);
       } else if (command.type === COMMAND.INTERACT) {
@@ -3891,6 +3889,7 @@ function sessionHp(id) {
 // PERF: hoverPick is this live frame's selection (reset by render()), reused by gameCursorContext.
 let hoverPrior = null, hoverPick = null;
 function hoverTarget() {
+  if (realmSceneActive && screen === SCREEN.GAME) return realmHoverTarget(realmInput().pick(pointer.x, pointer.y), realmMonsterViews, (classId) => { const stringIndex = Module.ccall('d2_monster_name_str', 'number', ['number'], [classId]); return { stringIndex, label: stringIndex >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [stringIndex]) : '' }; });
   if (!session || screen !== SCREEN.GAME) return null;
   const candidates = resolvePointerCandidates(pointer.x, pointer.y);
   const selected = selectPointerCandidate(candidates, { reference: snapshot.player, prior: hoverPrior });
@@ -4298,7 +4297,7 @@ function realmInput() {
         itemRow: (classId) => realmTables().items.byClass(classId),
         hoverBox: (dx, dy) => inUnitHoverBox(dx, dy, true),
         toScreen: (x, y) => { const p = worldToScreen(x, y); return { x: p.x - camera.x + viewCX(), y: p.y - camera.y + (canvas.height / 2 + UNIT_CENTRE_Y) }; },
-        pointerWorld: pointerWorldAt, run: readRunToggle(),
+        pointerWorld: pointerWorldAt, run: readRunToggle(), leftMelee: realmLeftMelee(readSelectedSkills().left, snapshot.player?.weaponClass),
         cursorCode: () => { const id = realmWorldState?.cursorId ?? 0;
           return id ? (realmWorldState.itemViews().find((i) => i.id === id)?.code ?? 0) : 0; } };
     },
@@ -4555,18 +4554,33 @@ function drawRealmOverlays(w, h, proj) {
     ctx.restore();
   }
 }
+// The stash, cube and stash gold panels: built when a local game starts, and by a joined game that had none before it.
+function buildStoragePanels() {
+  try { stashPanelRenderer = createStashPanelRenderer(createMpqAssetReader(Module), document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]),
+    stashGold: (limit) => (realmSceneActive && !limit) ? (realmWorldState?.stashGold ?? 0) : (plugyStash.showShared && !limit) ? plugyGold : Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [limit]) : 0 }); } catch (error) { stashPanelError = String(error); }
+  try { cubePanelRenderer = createStashPanelRenderer(createMpqAssetReader(Module), document, { page: INVPAGE_CUBE, string: null,
+    transmute: Module.ccall('d2_lang_string', 'string', ['string'], ['Transmute']) || 'Transmute' }); } catch (error) { stashPanelError += ' cube: ' + error; }
+  try { stashGoldRenderer = createStashGoldRenderer(createMpqAssetReader(Module), document, { string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) }); } catch (error) { stashGoldError = String(error); }
+}
 // The HUD, belt and pointer renderers are built when a local game starts; a realm game builds them here.
 function ensureRealmChrome() {
   const assetReader = createMpqAssetReader(Module);
   hoverFont ??= makeHoverFont();
   try { ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, undefined, soundFetched)); } catch (error) { musicError = String(error); }
   try { automapOverlay = realmAutomapOverlay ??= createAutomapOverlay({ read: assetReader, Module, source: createRealmAutomapSource({ tiles: () => realmSceneTiles, roomInfo: readClientRoomInfo(Module), geometry: readClientLevelGeometry(Module), levelType: (l) => realmTables().levels.levelType(l), currentLevel: () => snapshot?.level }) }); } catch (error) { realmSceneError = String(error); }
+  // The unit sound player and the combat cues a local game builds at its start; a realm game builds them here.
+  try { unitSounds ??= audioVolume.attach('sound', createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched)); combatSounds ??= createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), () => unitSounds.monsterSoundBusy()); } catch (error) { musicError = String(error); }
   controlPanelRenderer ??= createControlPanelRenderer(assetReader);
   beltRenderer ??= createBeltRenderer(assetReader);
   characterPanelRenderer ??= createCharacterPanelRenderer(assetReader);
+  inventoryPanelRenderer ??= createInventoryPanelRenderer(assetReader);   // a game joined with no local game before it has no panel yet
+  if (!stashPanelRenderer || !cubePanelRenderer || !stashGoldRenderer) buildStoragePanels();
   skillPanelRenderer ??= createSkillPanelRenderer(assetReader, document, createSkillPointOverlay());
   try { skillSelectRenderer ??= createSkillSelectRenderer(assetReader); } catch (error) { skillSelectError = String(error); }
   try { questLogRenderer ??= createQuestLogRenderer(assetReader, document); } catch (error) { realmSceneError = String(error); }
+  // The world's objects and ground items: a joined game draws them with the same renderers a local game builds.
+  objectRenderer ??= createObjectRenderer(assetReader, document, { shadow: true, mayLoad: mayLoadSprite });
+  itemRenderer ??= createItemRenderer(assetReader);
   try { waypointPanelRenderer ??= createWaypointPanelRenderer(assetReader, document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) }); } catch (error) { waypointPanelError = String(error); }
   if (!pointerLayer) {
     gameCursor ??= createGameCursor({ read: assetReader, decodeDc6, documentObject: document });
@@ -5705,29 +5719,9 @@ function itemCommand(name, ...args) {
 // The open inventory panel in a joined game: lift (0x19), unequip (0x1C), put in a cell (0x18) or swap with its item (0x1F),
 // equip (0x1A) or swap a worn item (0x1D), use a carried item on a right click (0x20); a click in the world with an item held drops it (0x17).
 function realmInventoryClick(x, y, button) {
-  const W = canvas.width, H = canvas.height, panel = inventoryPanelRenderer, ri = realmInput();
-  const cursorId = realmWorldState?.cursorId ?? 0;
-  if (!(inventoryVisible && panel?.contains(x, y, W, H))) {
-    if (button !== 0 || !cursorId || openPanelAt(x, y)) return false;
-    ri.dropCursor(cursorId); return true;
-  }
-  const slot = panel.slotAt(x, y, W, H, snapshot);
-  if (button === 0 && panel.weaponTabAt(x, y, W, H)) { unitSounds?.playRow(WEAPON_TAB_SOUND_ROW, { kind: 'ui', source: 'weapon-tab' }).catch(() => {}); ri.swapWeapons(); return true; }
-  if (button === 2) { const item = panel.itemAt(x, y, W, H, snapshot) || slot?.item; if (item && !cursorId) ri.useItem(item.id); return true; }
-  if (!cursorId) {
-    const item = panel.itemAt(x, y, W, H, snapshot);
-    if (item) ri.lift(item.id); else if (slot?.item) ri.unequip(slot.bodyLoc);
-    return true;
-  }
-  const held = snapshot.items.find((i) => i.id === cursorId) || { id: cursorId };
-  const cell = panel.cellAt(x, y, W, H, held);
-  if (slot) { if (slot.item) ri.swapBody(cursorId, slot.bodyLoc); else ri.equip(cursorId, slot.bodyLoc); }
-  else if (cell) {
-    const d = decideGridPlace(snapshot.items, 0, cell.x, cell.y, held);
-    if (d.action === 'swap') ri.swapGrid(cursorId, d.item.id, cell.x, cell.y);
-    else if (d.action !== 'refuse') ri.putInGrid(cursorId, cell.x, cell.y);
-  }
-  return true;
+  return realmInventoryPanelClick({ width: canvas.width, height: canvas.height, snapshot, cursorId: realmWorldState?.cursorId ?? 0, input: realmInput(),
+    visible: inventoryVisible, renderer: inventoryPanelRenderer, openPanelAt,
+    onWeaponTab: () => { unitSounds?.playRow(WEAPON_TAB_SOUND_ROW, { kind: 'ui', source: 'weapon-tab' }).catch(() => {}); } }, x, y, button);
 }
 // A joined game's stash and cube panels and shift+click to the belt (assets/realm-storage-input.mjs).
 function realmStorageClickAt(x, y, e) {

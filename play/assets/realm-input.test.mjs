@@ -303,3 +303,30 @@ test('an item action asks the leave wait first: refused actions send nothing, al
   assert.equal(asked, 4);
   assert.deepEqual(out, [Array.from(packets.fromGrid(7))]);
 });
+
+test('a hand-to-hand left click on a far monster starts the local walk to it, then sends the attack', () => {
+  const order = [], far = { guid: 77, classId: 5, mode: 1, x: 110, y: 104, anchorX: 200, anchorY: 120, drawn: true };
+  const make = (extra, hooks = {}) => createRealmInput({ transmit: (b) => order.push(Array.from(b)), scene: sceneOf({ monsters: [far], leftMelee: true, ...extra }), now: () => 0,
+    approachUnit: (type, guid, run) => { order.push(['approach', type, guid, run]); return 1; }, ...hooks });
+  make().leftClick(200, 120);
+  assert.deepEqual(order, [['approach', 1, 77, false], [6, 1, 0, 0, 0, 77, 0, 0, 0]]);
+  order.length = 0; make({ run: true }).leftClick(200, 120, { held: true });
+  assert.deepEqual(order, [['approach', 1, 77, true], [9, 1, 0, 0, 0, 77, 0, 0, 0]]);
+  // In arm's reach, with a ranged left skill, or with Stand Still held: the packet alone.
+  order.length = 0; make({ monsters: [{ ...far, x: 102, y: 101 }] }).leftClick(200, 120);
+  make({ leftMelee: false }).leftClick(200, 120);
+  make().leftClick(200, 120, { stand: true });
+  assert.deepEqual(order, [[6, 1, 0, 0, 0, 77, 0, 0, 0], [6, 1, 0, 0, 0, 77, 0, 0, 0], [6, 1, 0, 0, 0, 77, 0, 0, 0]]);
+  // Without the engine's walk-to-unit the ground route to the monster's tile starts instead; a refused route still attacks.
+  order.length = 0; make({}, { approachUnit: null, move: (x, y, run) => { order.push(['move', x, y, run]); return 0; } }).leftClick(200, 120);
+  assert.deepEqual(order, [['move', 110, 104, false], [6, 1, 0, 0, 0, 77, 0, 0, 0]]);
+});
+
+test('Stand Still with the left button uses the left skill at the pointer and never walks', () => {
+  const order = [];
+  const input = createRealmInput({ transmit: (b) => order.push(Array.from(b)), scene: sceneOf({ leftMelee: true }), now: () => 0,
+    move: () => { order.push('move'); return 1; } });
+  assert.equal(input.leftClick(200, 120, { stand: true }).kind, 'ground');
+  input.leftClick(202, 120, { stand: true, held: true });
+  assert.deepEqual(order, [[5, 100, 0, 120, 0], [8, 101, 0, 120, 0]]);
+});

@@ -121,3 +121,13 @@ test('other players join the entity list with the render state their unit is dra
   assert.deepEqual([e.kind, e.id, e.mode, e.direction, e.x, e.y], ['player', 77, 2, 5, 12, 22]);
   assert.equal(e.playerRender, renderState);
 });
+
+// A game joined straight from the title screen never runs the local game's setup, so the joined game must build
+// the object and ground item renderers itself: without them every object (the stash first) is silently not drawn.
+test('a joined game builds the object and ground item renderers', () => {
+  const shell = readFileSync(new URL('../gameplay-shell.mjs', import.meta.url), 'utf8');
+  const realmChrome = shell.slice(shell.indexOf('function ensureRealmChrome()'), shell.indexOf('async function syncRealmScene()'));
+  assert.match(realmChrome, /objectRenderer \?\?= createObjectRenderer\(/);
+  assert.match(realmChrome, /itemRenderer \?\?= createItemRenderer\(/);
+  assert.match(shell, /tickClientUnits = \(\) => \{[^\n]*realmWorldData\(\)\.tickObjects\(\)/, 'the joined game ticks its objects');
+});

@@ -3,10 +3,15 @@
 // DC6s' frame counts when the archives are present (the wide ladder buttons' held pair is frames 2 and 3 of widebuttonblank).
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseDrawListVector } from './drawlist.mjs';
 import { openRetail } from '../../tools/dcc-decode-bench.mjs';
 import { decodeDc6 as decodeRetailDc6 } from './d2-formats.mjs';
 import { createBnetLobbyScreen, BNET_LOBBY_LAYOUT as L, BNET_LOBBY_ASSETS as A } from './bnet-lobby-screen.mjs';
 
+const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 globalThis.ImageData ??= class { constructor(data, w, h) { Object.assign(this, { data, width: w, height: h }); } };
 const ctx = new Proxy({}, { get: (_, k) => (k === 'getImageData' ? () => ({ data: new Uint8ClampedArray(4) }) : () => {}), set: () => true });
 const documentObject = { createElement: () => ({ width: 0, height: 0, getContext: () => ctx }) };
@@ -90,3 +95,20 @@ test('the retail art holds the pressed frames the lobby draws', { skip: (() => {
     assert.ok(n > b.base + (b.art === 'wideButton' ? 3 : 1), `${b.id}: ${A[b.art]} has ${n} frames, base ${b.base}`);
   }
 });
+
+// The same looks against the retail captures (vectors/drawlist/bnet-press-*.txt, bnet-prechat-press-*.txt: the mouse held down on one button of the
+// headless front end, the draw list of the frame). Each vector holds the pressed button's own cel at the held frame (base + 1, a wide button base + 2 and + 3),
+// a dim button the idle frame; the retail test file (bnet-lobby-retail.test.mjs) proves the whole frame, label shift included, record for record.
+const PRESSED = [['press-quit', 'quit', true], ['press-send', 'send', true], ['press-whisper', 'whisper', true], ['press-squelch', 'squelch', true],
+  ['press-unsquelch', 'unsquelch', true], ['press-sq-whisper', 'whisper', true], ['press-emote', 'emote', true], ['press-help', 'chat-help', true],
+  ['press-channel', 'channel', true], ['press-ladder', 'ladder', true], ['press-dim-squelch', 'squelch', false], ['press-dim-unsquelch', 'unsquelch', false],
+  ['press-arrow1', 'arrow-1', true], ['press-arrow3', 'arrow-3', true], ['prechat-press-enter', 'enter-chat', true], ['prechat-press-help', 'help', true]];
+for (const [file, id, down] of PRESSED) {
+  const path = join(root, 'vectors', 'drawlist', `bnet-${file}.txt`);
+  test(`retail ${file}: ${id} draws ${down ? 'the held' : 'the idle'} cel`, { skip: !existsSync(path) }, () => {
+    const b = buttons.get(id); assert.ok(b, id);
+    const wide = b.art === 'wideButton', want = down ? (wide ? [b.base + 2, b.base + 3] : [b.base + 1]) : (wide ? [b.base, b.base + 1] : [b.base]);
+    const recs = parseDrawListVector(readFileSync(path, 'utf8')).filter((r) => r.op === 'cel');
+    assert.deepEqual(artOf(recs, b).map((r) => r.frame).sort(), want);
+  });
+}

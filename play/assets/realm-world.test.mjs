@@ -9,7 +9,7 @@ const files = {
   'data\\global\\excel\\weapons.txt': 'name\tcode\ttype\tflippyfile\tinvfile\tinvwidth\tinvheight\twclass\t2handedwclass\t2handed\nHand Axe\thax\taxe\tflpax\tinvax\t1\t3\t1hs\t\t0\nWar Sword\twsd\tswor\tflpws\tinvws\t1\t3\t1hs\t\t0\nGreat Axe\tgax\taxe\tflpga\tinvga\t2\t4\t2hs\t2ht\t1\n',
   'data\\global\\excel\\armor.txt': 'name\tcode\ttype\tflippyfile\tinvfile\tinvwidth\tinvheight\tbelt\nCap\tcap\thelm\tflpcap\tinvcap\t2\t2\t\nSash\tlbl\tbelt\tflplbl\tinvlbl\t2\t1\t0\n',
   'data\\global\\excel\\misc.txt': 'name\tcode\ttype\tflippyfile\tinvfile\tinvwidth\tinvheight\nGold\tgld\tgold\tflpgld\tinvgld\t1\t1\nHealing Potion\thp1\thpot\tflphp1\tinvhp1\t1\t1\n',
-  'data\\global\\excel\\objects.txt': 'Name\tId\tToken\nBarrel\t0\tBA\nChest\t5\tCH\n',
+  'data\\global\\excel\\objects.txt': 'Name\tId\tToken\tSelectable0\tSelectable1\tFrameCnt1\tFrameDelta1\tStart2\tOrientation\nBarrel\t0\tBA\t1\t0\t0\t0\t0\t0\nChest\t5\tCH\t1\t0\t3\t128\t4\t3\n',
   'data\\global\\excel\\inventory.txt': 'class\tinvleft\tinvright\tinvtop\tinvbottom\tgridx\tgridy\tgridleft\tgridright\tgridtop\tgridbottom\tgridboxwidth\tgridboxheight\trarmleft\nAmazon\t1\t2\t3\t4\t10\t4\t5\t6\t7\t8\t29\t29\t9\n',
   'data\\global\\excel\\belts.txt': 'name\tnumboxes\tbox1left\tbox1right\tbox1top\tbox1bottom\tbox2left\tbox2right\tbox2top\tbox2bottom\nA\t4\t0\t10\t0\t10\t10\t20\t0\t10\nB\t4\t0\t10\t0\t10\t10\t20\t0\t10\nC\t0\n',
 };
@@ -124,7 +124,17 @@ test('objects: 0x51 adds, 0x0E changes the state, 0x0A removes, a new act clears
   feed(w, Uint8Array.from([0x0e, 2, ...u32le(900), 1, 1, 2, 0, 0, 0, 0, 0]).subarray(0, 12));
   feed(w, Uint8Array.from([0x0a, 2, ...u32le(900)]).subarray(0, 6));
   assert.equal(w.objectViews().length, 0);
-  feed(w, add); feed(w, Uint8Array.from([0x03, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
+  // Whether an object can be picked is its class's column for its mode, never a packet byte; its art layers are
+  // not masked; its facing is the class's.
+  feed(w, add); const view = () => w.objectViews()[0];
+  assert.deepEqual([view().mode, view().selectable, view().componentMask, view().direction], [1, false, 0xFFFF, 3]);
+  feed(w, Uint8Array.from([0x0e, 2, ...u32le(900), 3, 1, 0, 0, 0, 0]));
+  assert.deepEqual([view().mode, view().selectable], [0, true]);
+  // The opening mode (three cels, half a cel a tick) holds its last cel, then is the opened mode with no packet.
+  feed(w, Uint8Array.from([0x0e, 2, ...u32le(900), 3, 0, 1, 0, 0, 0]));
+  const cels = []; for (let tick = 0; tick < 6; tick++) { w.tickObjects(); cels.push([view().mode, view().framePrecise >> 8]); }
+  assert.deepEqual(cels, [[1, 0], [1, 1], [1, 1], [1, 2], [2, 4], [2, 4]]);
+  feed(w, Uint8Array.from([0x03, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
   assert.equal(w.objectViews().length, 0);
 });
 

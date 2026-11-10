@@ -70,12 +70,36 @@ const u32 = (p, at) => (p[at] | (p[at + 1] << 8) | (p[at + 2] << 16) | (p[at + 3
  * `tables` is { items: createItemTable(read), objects: createObjectTable(read) } (assets/realm-tables.mjs).
  * The state is plain data; every method answers from what the packets fed so far said.
  */
+const SUBCLASS_PORTALS = 0x04 | 0x10;   // a town portal, a permanent portal
+
 export function createRealmWorld({ items: itemTable, objects: objectTable }) {
   let ownGuid = null;
   const itemsByGuid = new Map();    // guid -> { ...decoded, id, owner: null (0x9C) | owner guid (0x9D) }
   const objectsByGuid = new Map();
   let gold = 0, stashGold = 0, cursorId = 0, received = 0;
   const uiEvents = [];              // 0x77 UpdateUi codes not yet taken (16 opens the stash, 17 closes it, 21 opens the cube)
+
+  // An object's animation is the client's own: each mode runs its cels from the class's start cel at the class's
+  // 8.8 step. A looping mode wraps to its start; any other holds its last cel, and the operating mode (1) then
+  // becomes the opened one (2) without a packet. Doors always run.
+  function enterMode(object, mode) {
+    const cls = object.cls;
+    object.mode = mode; object.count = (cls.frameCount?.[mode] ?? 0) << 8; object.start = (cls.start?.[mode] ?? 0) << 8;
+    object.clock = object.start; object.speed = cls.frameDelta?.[mode] ?? 0;
+    return object;
+  }
+  function stepObject(object) {
+    const cls = object.cls, cycling = Boolean(cls.cycles?.[object.mode]);
+    if (!cls.isDoor && !cycling) {
+      if (object.count <= 256) return;
+      if (object.mode === 1 && object.clock >= object.count - 256) { enterMode(object, 2); return; }
+      object.clock += object.speed;
+      if (object.clock >= object.count) object.clock = object.count - 256;
+      return;
+    }
+    object.clock += object.speed;
+    if (object.count > 0 && object.clock >= object.count) object.clock = object.start - object.count + object.clock;
+  }
 
   function reset() {
     itemsByGuid.clear(); objectsByGuid.clear(); uiEvents.length = 0; gold = 0; stashGold = 0; cursorId = 0; received = 0;
@@ -126,10 +150,12 @@ export function createRealmWorld({ items: itemTable, objects: objectTable }) {
         break;
       case 0x51: if (p[1] === 2) {
         const classId = u16(p, 6), cls = objectTable.byClass(classId);
-        if (cls) objectsByGuid.set(u32(p, 2), { id: u32(p, 2), classId, token: cls.token, mode: p[12], x: u16(p, 8), y: u16(p, 10), selectable: p[13] !== 0 });
+        // Byte 13 is the object's interaction byte (a portal's destination level, a chest's lock bit), not whether
+        // it can be picked: that is the class's own per-mode column.
+        if (cls) objectsByGuid.set(u32(p, 2), enterMode({ id: u32(p, 2), classId, cls, token: cls.token, x: u16(p, 8), y: u16(p, 10), interact: p[13] }, p[12]));
         } break;
       case 0x0e: if (p[1] === 2) { const object = objectsByGuid.get(u32(p, 2));
-        if (object) { object.mode = u32(p, 8); object.selectable = p[7] !== 0; } } break;
+        if (object) enterMode(object, u32(p, 8)); } break;
       case 0x19: gold = (gold + p[1]) >>> 0; break;
       case 0x1d: applyStat(p[1], p[2]); break;
       case 0x1e: applyStat(p[1], u16(p, 2)); break;
@@ -170,10 +196,13 @@ export function createRealmWorld({ items: itemTable, objects: objectTable }) {
     itemViews() { return [...itemsByGuid.values()].filter(isOwn).map((item) => presentItem(item)); },
     /** The worn items of another player, as presentation records. */
     wornBy(guid) { return [...itemsByGuid.values()].filter((item) => item.owner === (guid >>> 0) && item.mode === MODE.EQUIP).map((item) => presentItem(item)); },
+    /** One client tick of every object's animation. */
+    tickObjects() { for (const object of objectsByGuid.values()) stepObject(object); },
     objectViews() {
       return [...objectsByGuid.values()].map((o) => ({ id: o.id, classId: o.classId, token: o.token, mode: o.mode, x: o.x, y: o.y,
-        framePrecise: 0, frameCountPrecise: 0, componentMask: 0, animSpeed: 0, direction: 0, selectable: o.selectable,
-        portalLevel: 0, locked: false, inClientRoom: true }));
+        framePrecise: o.clock, frameCountPrecise: o.count, componentMask: 0xFFFF, animSpeed: o.speed, direction: o.cls.orientation ?? 0,
+        selectable: Boolean(o.cls.selectable?.[o.mode]),
+        portalLevel: (o.cls.subClass & SUBCLASS_PORTALS) ? o.interact : 0, locked: Boolean(o.cls.lockable && (o.interact & 0x80)), inClientRoom: true }));
     },
     /** The saved-item bitstream the server sent for an item (what its tooltip text is decoded from). */
     rawItem(guid) { return itemsByGuid.get(guid >>> 0)?.raw ?? null; },

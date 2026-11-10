@@ -137,6 +137,8 @@ const slashFeed = (s, cmds, replyTo) => {
     const k = t - 13; if (k >= 0 && k < 3) s.chatEvent(ev(5, chat[k][0], chat[k][1]));
   }
 };
+const pickHi = (s) => { uiFeed(s); s.chatLive(true); click(s, 70, 540); s.hover(600, 300, 800, 600); typed(s, 'hi'); };
+const setChans = (s) => s.setChannels(['Diablo II Test Channel', 'The Void', 'Op Chat', 'Clan Recruit']);
 const STATES = {
   // Before ENTER CHAT: the character's details and the four lobby buttons.
   'prechat-t4': { tick: 4, file: 'prechat-t4', prechat: true, character: { name: 'Hero', level: 30, charClass: 3 }, known: 0, feed: () => {} },
@@ -204,6 +206,22 @@ const STATES = {
   'chat-scroll-past': { tick: 48, known: 0, feed: (s) => { STATES['chat-long'].feed(s); s.scrollChat?.(20); } },
   // Chat-event flags (SHOWUSER / TALK data[1]): 22 Paladins, each with its own flags word.
   // The band's user input: hovering a user (the tooltip), a click picks them (the ring, SQUELCH or UNSQUELCH enabled, WHISPER once there is text), a second click drops the pick and leaves the buttons as they were.
+  // The mouse held on each chat-lobby button (the `ui` capture's press scenario): the pressed cel and the label 2 px left and down; a dim button does not press.
+  // pickHi = Hero00 picked and "hi" typed (SEND, WHISPER, SQUELCH, EMOTE live); the squelched Hero03 picked is UNSQUELCH's.
+  'press-quit': { file: 'press-quit', tick: 20, known: 0, feed: (s) => { uiFeed(s); mouse(s, 'c', 730, 480); } },
+  'press-arrow1': { file: 'press-arrow1', tick: 24, known: 0, feed: (s) => { uiFeed(s); mouse(s, 'c', 763, 568); } },
+  'press-arrow3': { file: 'press-arrow3', tick: 28, known: 0, feed: (s) => { uiFeed(s); mouse(s, 'c', 763, 513); } },
+  'press-send': { file: 'press-send', tick: 22, known: 0, feed: (s) => { pickHi(s); mouse(s, 'c', 60, 460); } },
+  'press-whisper': { file: 'press-whisper', tick: 24, known: 0, feed: (s) => { pickHi(s); mouse(s, 'c', 147, 460); } },
+  'press-squelch': { file: 'press-squelch', tick: 26, known: 0, feed: (s) => { pickHi(s); mouse(s, 'c', 60, 480); } },
+  'press-emote': { file: 'press-emote', tick: 28, known: 0, feed: (s) => { pickHi(s); mouse(s, 'c', 227, 480); } },
+  'press-unsquelch': { file: 'press-unsquelch', tick: 22, known: 0, feed: (s) => { uiFeed(s); s.chatLive(true); click(s, 250, 540); s.hover(600, 300, 800, 600); typed(s, 'hi'); mouse(s, 'c', 140, 480); } },
+  'press-sq-whisper': { file: 'press-sq-whisper', tick: 24, known: 0, feed: (s) => { uiFeed(s); s.chatLive(true); click(s, 250, 540); s.hover(600, 300, 800, 600); typed(s, 'hi'); mouse(s, 'c', 147, 460); } },
+  'press-dim-unsquelch': { file: 'press-dim-unsquelch', tick: 30, known: 0, feed: (s) => { uiFeed(s); s.chatLive(true); mouse(s, 'c', 140, 480); } },
+  'press-dim-squelch': { file: 'press-dim-squelch', tick: 26, known: 0, feed: (s) => { uiFeed(s); s.chatLive(true); mouse(s, 'c', 60, 480); } },
+  'press-help': { file: 'press-help', tick: 22, known: 0, feed: (s) => { uiFeed(s); s.chatLive(true); setChans(s); mouse(s, 'c', 227, 460); } },
+  'press-channel': { file: 'press-channel', tick: 22, known: 0, feed: (s) => { uiFeed(s); s.chatLive(true); setChans(s); mouse(s, 'c', 575, 480); } },
+  'press-ladder': { file: 'press-ladder', tick: 22, known: 0, feed: (s) => { uiFeed(s); s.chatLive(true); setChans(s); mouse(s, 'c', 654, 480); } },
   'ui-hover': { tick: 20, known: 0, feed: (s) => { uiFeed(s); s.hover(70, 540, 800, 600); } },
   'ui-pick': { tick: 26, known: 0, feed: (s) => { uiFeed(s); click(s, 70, 540); s.hover(600, 300, 800, 600); } },
   'ui-pick-text': { tick: 31, known: 0, feed: (s) => { uiFeed(s); click(s, 70, 540); s.hover(600, 300, 800, 600); typed(s, 'hi'); } },
@@ -313,6 +331,13 @@ const STATES = {
 const chanNames31 = ['Diablo II Test Channel', ...Array.from({ length: 30 }, (_, i) => `Chan ${String(i + 1).padStart(2, '0')}`)];
 const chanOpen = (s) => { uiFeed(s); s.setChannels(chanNames31); click(s, 575, 480); };
 const bar = (s, x, y) => { s.hover(x, y, 800, 600); const t = s.press(x, y, 800, 600); s.release(t, x, y, 800, 600); };
+
+// Portrait arrival (CHAN=portrait; the capture's idle loop takes the queued events at 1, 1, 1, 2 per tick, so the band holds 0, 1, 2, 3, 5, 6, 7, 8, 10, 11 users at
+// ticks 0..9 and stays at 11): every frame from the empty band to the steady one.
+// The portrait phase is read from the vector (retail's start phase is not reproducible from the stream); what is compared is that the user is drawn,
+// from the tick it joins, with its token, layer count, mode and position, and the name and the rest of the screen.
+const ARRIVED = [0, 1, 2, 3, 5, 6, 7, 8, 10, 11];
+for (let t = 0; t <= 14; t++) STATES[`portrait-seq-t${String(t).padStart(2, '0')}`] = { tick: t, known: 0, feed: (s) => { s.chatEvent(ev(7, '', 'Diablo II Test Channel')); users(11).slice(0, ARRIVED[t] ?? 11).forEach((e) => s.chatEvent(e)); } };
 
 for (const [name, st] of Object.entries(STATES)) {
   const file = join(root, 'vectors', 'drawlist', `bnet-${st.file ?? name}.txt`);

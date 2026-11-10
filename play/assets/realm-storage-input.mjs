@@ -38,3 +38,37 @@ export function realmStorageClick(ctx, x, y, { button = 0, shift = false } = {})
   }
   return false;
 }
+
+/**
+ * The open inventory panel in a joined game, hit-tested by the same panel renderer a local game draws: lift a carried
+ * item (0x19) or take off a worn one (0x1C); with an item held, put it in a cell (0x18), swap it with the one item
+ * under it (0x1F), wear it (0x1A) or swap it with the worn one (0x1D); a right click uses a carried item (0x20); the
+ * weapon tab swaps sets (0x60). A left click outside every open panel with an item held drops it (0x17). The items
+ * move only when the server answers with its item packets.
+ * `ctx`: { width, height, snapshot, cursorId, input (createRealmInput), visible, renderer, openPanelAt(x, y), onWeaponTab() }.
+ * Returns true when the click was the panel's or dropped the held item.
+ */
+export function realmInventoryClick(ctx, x, y, button = 0) {
+  const { width: W, height: H, snapshot, cursorId, input: ri, renderer: panel } = ctx;
+  if (!(ctx.visible && panel?.contains(x, y, W, H))) {
+    if (button !== 0 || !cursorId || ctx.openPanelAt?.(x, y)) return false;
+    ri.dropCursor(cursorId); return true;
+  }
+  const slot = panel.slotAt(x, y, W, H, snapshot);
+  if (button === 0 && panel.weaponTabAt(x, y, W, H)) { ctx.onWeaponTab?.(); ri.swapWeapons(); return true; }
+  if (button === 2) { const item = panel.itemAt(x, y, W, H, snapshot) || slot?.item; if (item && !cursorId) ri.useItem(item.id); return true; }
+  if (!cursorId) {
+    const item = panel.itemAt(x, y, W, H, snapshot);
+    if (item) ri.lift(item.id); else if (slot?.item) ri.unequip(slot.bodyLoc);
+    return true;
+  }
+  const held = snapshot.items.find((i) => i.id === cursorId) || { id: cursorId };
+  const cell = panel.cellAt(x, y, W, H, held);
+  if (slot) { if (slot.item) ri.swapBody(cursorId, slot.bodyLoc); else ri.equip(cursorId, slot.bodyLoc); }
+  else if (cell) {
+    const d = decideGridPlace(snapshot.items, 0, cell.x, cell.y, held);
+    if (d.action === 'swap') ri.swapGrid(cursorId, d.item.id, cell.x, cell.y);
+    else if (d.action !== 'refuse') ri.putInGrid(cursorId, cell.x, cell.y);
+  }
+  return true;
+}

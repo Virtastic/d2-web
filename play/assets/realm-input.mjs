@@ -69,7 +69,7 @@ export function createSendGate(transmit) {
   };
 }
 
-const MONSTER_DEATH = 0, MONSTER_DEAD = 12, PLAYER_DEAD = 17;
+const MONSTER_DEATH = 0, MONSTER_DEAD = 12, PLAYER_DEAD = 17, MELEE_REACH = 2;
 const near = (dx, dy, w, up, down) => Math.abs(dx) <= w && dy >= -up && dy <= down;
 // Objects whose use depends on what the cursor holds: the Compelling Orb wants the Khalim's Will flail,
 // the Hell Forge in its open state wants the Hellforge Hammer. Without it the click sends nothing.
@@ -81,7 +81,7 @@ const CODE_QF2 = 0x20326671, CODE_HFH = 0x20686668;
  *   transmit(bytes)      -> false when the connection is closed
  *   scene()              -> { ready, player:{x,y}, monsters:[{guid,classId,mode,x,y,anchorX,anchorY,drawn}], objects, items,
  *                             isNpc(classId), hoverBox(dx,dy), toScreen(wx,wy) -> {x,y} in pointer space, pointerWorld(px,py),
- *                             run, selected:{left,right}, cursorId, cursorCode() -> the held item's 4-byte code }
+ *                             run, leftMelee (the left skill is a hand-to-hand attack), selected:{left,right}, cursorId, cursorCode() -> the held item's 4-byte code }
  * The engine hooks below each answer the local player's own prediction of an action: 1 accepted, 0 refused
  * (the packet is not sent, as the client sends only what it could start itself), -1 or absent unknown (sent).
  *   move(x, y, run)               -> starts the local route to a spot. The game server sends the walk/run
@@ -181,12 +181,27 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     get pending() { return pending ? { ...pending } : null; },
     pick: (px, py) => { const s = open(); return s ? pick(s, px, py) : null; },
     /** The left button on the world: act on what is under it, otherwise walk or run there. */
-    leftClick(px, py, { held = false } = {}) {
+    leftClick(px, py, { held = false, stand = false } = {}) {
       const s = open(); if (!s) return null;
       const hit = pick(s, px, py);
       const world = s.pointerWorld(px, py);
-      if (hit.kind === 'monster') pending = null;
-      if (hit.kind === 'monster') return emit(packets.leftSkillOnUnit(UNIT.MONSTER, hit.unit.guid, held), 'left-skill-unit') && hit;
+      if (hit.kind === 'monster') {
+        pending = null;
+        // The server pursues the target and never echoes the owner's walk, so a hand-to-hand attack out of
+        // arm's reach starts the local route to the monster with the packet. GUESS (melee reach): two tiles
+        // each way stands in for the engine's size-aware melee test; a ranged left skill never walks.
+        const far = Math.max(Math.abs(hit.unit.x - s.player.x), Math.abs(hit.unit.y - s.player.y)) > MELEE_REACH;
+        if (!stand && s.leftMelee && far) {
+          evidence.localMove = approachUnit ? approachUnit(UNIT.MONSTER, hit.unit.guid, Boolean(s.run))
+            : move ? move(clamp16(hit.unit.x), clamp16(hit.unit.y), Boolean(s.run)) : null;
+        }
+        return emit(packets.leftSkillOnUnit(UNIT.MONSTER, hit.unit.guid, held), 'left-skill-unit') && hit;
+      }
+      // Stand Still held: the left skill is used at the spot under the pointer and the player does not walk.
+      if (stand) {
+        pending = null;
+        return emit(packets.leftSkillAt(clamp16(world.x), clamp16(world.y), held), 'left-skill-ground') && hit;
+      }
       if (held && hit.kind !== 'ground') return hit;               // a held button does not repeat a pickup or a talk
       pending = null;
       const type = hit.kind === 'npc' ? UNIT.MONSTER : hit.kind === 'item' ? UNIT.ITEM : hit.kind === 'object' ? UNIT.OBJECT : null;
