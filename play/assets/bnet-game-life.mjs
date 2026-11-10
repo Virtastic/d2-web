@@ -134,7 +134,9 @@ export function createGameLife({ now = () => Date.now(), expansion = false, onNo
 // the process; 0x0B first does nothing and the next stat update halts.
 // Leaving: the menu exit sends 0x69 first and the socket closes after it; the join timeout and a dropped connection send no
 // 0x69, they only set the exit flag and the teardown closes the socket.
-// GUESS: how long after 0x59 the real server sends 0x0B (the measured order is from a hand-built join, not the server).
+// The stock server sends 0x0B itself, in the same handler and send buffer as 0x59, so the two arrive back to back with only
+// the character-load packets between them; 0x04 is sent by a later game tick once the player's room is active, and the wire
+// order is 01 00 02, then 59 ... 0B ..., then 03 (the act), then 04. A join stream therefore decides 'ingame' only at 04.
 export function lifePhaseFromFrame(bytes, sizeOf) {
   let seen = null;
   for (let at = 0; at < bytes.length;) {

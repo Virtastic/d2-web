@@ -245,3 +245,12 @@ test('0x05 starts loading, 0x04 enters the game, packet by packet', () => {
   assert.equal(lifePhaseFromFrame(Uint8Array.of(0x01, 4, 4, 4, 4, 4, 4, 4, 0x05), size), 'loading');
   assert.equal(lifePhaseFromFrame(Uint8Array.of(0x01, 4, 4, 4, 4, 4, 4, 4), size), null);
 });
+
+test('a stock join stream (01 00 02 59 0B 03, then 04 in a later frame) enters the game only at 04', () => {
+  const sz = { 0x00: 1, 0x01: 8, 0x02: 1, 0x03: 12, 0x04: 1, 0x0b: 6, 0x59: 26 };
+  const size = (b) => sz[b[0]];
+  const pkt = (op) => Uint8Array.from({ length: sz[op] }, (_, i) => (i === 0 ? op : 0));
+  const cat = (...ops) => Uint8Array.from(ops.flatMap((op) => [...pkt(op)]));
+  assert.equal(lifePhaseFromFrame(cat(0x01, 0x00, 0x02, 0x59, 0x0b, 0x03), size), null);
+  assert.equal(lifePhaseFromFrame(cat(0x04), size), 'ingame');
+});
