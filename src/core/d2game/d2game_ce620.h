@@ -15,7 +15,7 @@ struct D2GameCE620Env {
     uint32_t (*f_ab7a)(uint32_t unit, uint32_t skill);                  // thunk 0xAB7A (stdcall 2)
     uint32_t (*f_aac0)(uint32_t tgt);                                   // thunk 0xAAC0 (stdcall 1)
     uint32_t (*f_a754)(uint32_t unit, uint32_t tgt, uint32_t v);        // thunk 0xA754 (stdcall 3)
-    void (*f_98430)(uint32_t eax, uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4);   // EAX = game, 5 stack words
+    void (*f_78430)(uint32_t eax, uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4);   // EAX = game, 5 stack words
     uint32_t (*f_a49c)(uint32_t skill, uint32_t file, uint32_t line);   // thunk 0xA49C (stdcall 3): skill, PlrMsg.cpp (module data), 0x7A6
     void (*f_ce120)(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t esi, uint32_t s0);   // 0xCE120: EAX = game, EBX = type, ECX = unit, ESI = id
 };
