@@ -7,7 +7,7 @@
 // flag and v > 0: #CB50(h, 0), #CB7A(h, #1630), #CB8C(h, #1660), #C4410(EAX = unit, v, cls, r, 1). Returns 1.
 #include "cl_env.h"
 extern "C" uint32_t d2c_c50f0(uint32_t unit, const cl::Env& e) {
-    const uint32_t kStr = 0x6fb87048;
+    const uint32_t kStr = 0xB2000000u | 0xD7048;
     if (!unit || e.R(unit) != 1) return 0;
     uint32_t h = e.H(0xc838, 0, 0, 0, 0, 0, 0, unit, 0x126);
     if (!h) {
@@ -37,7 +37,7 @@ extern "C" uint32_t d2c_c50f0(uint32_t unit, const cl::Env& e) {
             uint32_t b = e.H(0x1660, 0, 0, 0, 0, 0, 0, unit);
             uint32_t a = e.H(0x1630, 0, 0, 0, 0, 0, 0, unit);
             e.Xs(1);
-            uint32_t rm = e.H(0xc1f0, unit, a, b, 0x6fb74290, 0);
+            uint32_t rm = e.H(0xc1f0, unit, a, b, 0xB2000000u | 0xC4290, 0);
             uint32_t w = e.H(0xc370, rm);
             if (w) e.H(0xb1420, 0, 0, 0, 0, 0, 0, w);
         }

@@ -105,7 +105,7 @@ struct PanelEnv {
  void (*f88a70)(uint32_t ebx, uint32_t a, uint32_t b, uint32_t c, uint32_t d);  // 0x88A70, ret 0x10
  void (*be84)(uint8_t* m);                         // thunk 0xBE84 (ret 4)
 };
-static const uint32_t kLogStr = 0x6FB80828;
+static const uint32_t kLogStr = 0xB2000000u | 0xD0828;
 static int32_t rd32s(const uint8_t* p) { int32_t v; std::memcpy(&v, p, 4); return v; }
 static void wr32s(uint8_t* p, int32_t v) { std::memcpy(p, &v, 4); }
 // target clear: prev = [AADD0]; 0xBF8C; mode must be 0x26 (else the assert path, which exits); [AADD0] = 0; log when prev != 0

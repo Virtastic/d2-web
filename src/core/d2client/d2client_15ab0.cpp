@@ -28,7 +28,7 @@ extern "C" uint32_t d2cl_15ab0(uint32_t owner, int32_t index, uint32_t ebx, uint
     const int32_t n = (int32_t)e.H(0xc316, owner, e.R(row + 0x138), 0, arg);
     uint32_t d[23] = {0};
     d[0] = 0x21; d[1] = owner; d[4] = (uint32_t)first; d[5] = tx; d[6] = ty; d[7] = bx; d[8] = by;
-    d[12] = arg; d[21] = 0x6fb23b60u;
+    d[12] = arg; d[21] = 0xB2000000u | 0x73B60;
     for (int32_t i = 0; i < n; ++i) {
         d[22] = (uint32_t)i;
         e.HB(0xb30f0, (uint32_t)(uintptr_t)d);

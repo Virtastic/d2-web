@@ -73,8 +73,8 @@ extern "C" void d2_client_c39e0(const ClientC39E0Env& e) {
         if (toggle) {
             int32_t cur = F(0x6fbaae04);
             if (!e.bbfc || (*e.bbfc == 0 && C(0x6fb55440) == 0)) { cur = (cur == 0); *e.ae04w = cur; }
-            if (!was) { if (cur) C(0x6faeccc0, e.ord(10048, 0, 0, 0), 0x6fb80924, 5); }
-            else if (!cur) { C(0x6fae58e0); C(0x6faecc60, e.ord(10048, 0, 0, 0), 0x6fb80924, 5); }
+            if (!was) { if (cur) C(0x6faeccc0, e.ord(10048, 0, 0, 0), 0xB2000000u | 0xD0924, 5); }
+            else if (!cur) { C(0x6fae58e0); C(0x6faecc60, e.ord(10048, 0, 0, 0), 0xB2000000u | 0xD0924, 5); }
         }
         C(0x6fae7c80);
     }

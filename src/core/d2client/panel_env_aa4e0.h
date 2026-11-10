@@ -104,7 +104,7 @@ inline void panelClearTarget(const D2cPanelEnv* e, int32_t prev) {
     }
     *g.target = 0;
     if (prev != 0) {
-        const uint32_t r = panelCall(e, 0xD0B4, 0, 0, 0, 0, 0, 0, 0x6FB80828);
+        const uint32_t r = panelCall(e, 0xD0B4, 0, 0, 0, 0, 0, 0, 0xB2000000u | 0xD0828);
         panelCall(e, 0x3CC60, 5, 0, 0, 0, 0, 0, r);
         panelCall(e, 0xAA380);
         panelCall(e, 0xBE2E0);

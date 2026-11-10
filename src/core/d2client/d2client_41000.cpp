@@ -12,7 +12,7 @@ extern "C" void d2c_41000(uint32_t edx, int32_t ebx, uint32_t a0, uint32_t a1, u
     uint32_t sp = (uint32_t)(uintptr_t)sd;
     e.H(0xc3b2, 0, 0, 0, 0, 0, 0, sp, edx);
     uint32_t q[23] = {};
-    q[0] = 3; q[1] = a0; q[4] = a1; q[5] = a2; q[6] = a3; q[11] = (uint32_t)ebx; q[12] = a4; q[21] = 0x6faf0130u;
+    q[0] = 3; q[1] = a0; q[4] = a1; q[5] = a2; q[6] = a3; q[11] = (uint32_t)ebx; q[12] = a4; q[21] = 0xB2000000u | 0x40130;
     for (uint32_t i = 0; (int32_t)i < 0x100; i += a5 * 4) {
         q[8] = e.R(e.gl + i);
         q[7] = e.R(e.gl + 0x100 + i);

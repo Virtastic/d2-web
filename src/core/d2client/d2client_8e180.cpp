@@ -21,5 +21,5 @@ void d2c_8e180(const D2Client8e180Env& e, uint16_t* out, uint32_t item) {
         t[k++] = (char)('0' + n % 10);
         int i = 0; w[i++] = '('; for (int j = 0; j < k; ++j) w[i++] = (uint16_t)t[j]; w[i++] = ')'; w[i] = 0;
         wcat(out, open); wcat(out, w); wcat(out, close);
-    }
+    } else if (eth) wcat(out, close);
 }
