@@ -133,11 +133,10 @@ namespace
 } // namespace
 
 // 1.13c Fog+0x1000: LogManager::AUMessage::operator delete(p).
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_fog_1000(uint32_t* r)
+extern "C" void fog_sub_1000(void* p, int32_t (*smemFree)(void*, const char*, int32_t, uint32_t))
 {
-	if (r[0] != 0)
-		d2_fog_smem_free((void*)(uintptr_t)r[0], "delete", -1, 0);
+	if (p != nullptr)
+		smemFree(p, "delete", -1, 0);
 }
 
 // 1.13c Fog+0x1030: DeleteCriticalSection(EAX) -- the register argument is r[0] here.
