@@ -960,11 +960,9 @@ function ensureGameMenu() {
       else if (item === 'SAVE AND EXIT GAME' && realmSceneActive) {
         // A Battle.net game: the server holds the character. Retail returns to the lobby.
         gameMenu.close();
-        // Retail (0x59650): 4F 02 00 now, state 7; the life sends 0x69 after 30 s and then tears the game down. An exit
-        // during that wait sends the bytes again and restarts the wait; it does not tear down. Any non-zero exit state
-        // takes the same path. The exit state during a reason countdown is not yet known, so the teardown still runs
-        // at once there.
-        if (!realmFlow?.d2gsLife?.leaveGame()) void leaveRealmGame();
+        // Retail's exit row sends the window close, and the close handler sends 0x69 at once; the 4F 02 / 30 s wait belongs
+        // to the trade window's cancel button. A reason countdown already running tears down at once.
+        if (!realmFlow?.d2gsLife?.saveAndExit()) void leaveRealmGame();
       } else if (item === 'SAVE AND EXIT GAME') {
         // Keep the session and menu available if persistence fails; only leave once the store
         // confirms the character has been written.
@@ -2225,7 +2223,7 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
     const exitLobbyNotice = {};
     const life = createGameLife({ expansion: !!((joined.character.flags ?? 0) & 0x20),
       onNotice: (id) => { if (id) { exitLobbyNotice.id = id; messageLines.push(Module.ccall('d2_lang_string_by_index', 'string', ['number'], [id])); postedAt = performance.now(); } },
-      // The life's packets (the explicit leave's 4F 02 00 and the 0x69 after its wait) go out on the live D2GS socket.
+      // The life's packets (the 0x69 of a Save and Exit, or a trade cancel's 4F 02 00 and the 0x69 after its wait) go out on the live D2GS socket.
       onSend: (bytes) => { try { realmFlow?.d2gs?.send(bytes); } catch { /* socket already closed */ } },
       onLeave: (reason) => { joinLoading.fail(); clearInterval(lifeTimer); keepAlive.stop(); receiver?.stop?.();
         // An explicit leave (reason 0) returns to the lobby with no notice; an exit reason shows its text there.

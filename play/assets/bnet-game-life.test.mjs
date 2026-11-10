@@ -57,13 +57,39 @@ test('a leave after an exit countdown has started is refused, so the menu tears 
   life.inGame(); life.fail(7);
   assert.equal(life.leaveGame(), false);
 });
-test('unload while in game sends 4F 02 00 then 0x69 back to back, with no wait', () => {
+test('unload while in game sends 0x69 alone, with no 4F packet and no wait', () => {
   const { life } = mk();
   life.inGame();
-  assert.deepEqual(life.unload().map((b) => [...b]), [[0x4f, 0x02, 0, 0, 0, 0, 0], [0x69]]);
+  assert.deepEqual(life.unload().map((b) => [...b]), [[0x69]]);
   assert.deepEqual(life.unload(), []);
 });
-test('unload after the menu leave sends only 0x69, and never twice', () => {
+test('Save and Exit sends 0x69 at once, tears down once with reason 0, and sends no 4F packet', () => {
+  const { life, log, at } = mk();
+  life.inGame(); at(5000);
+  assert.equal(life.saveAndExit(), true);
+  assert.deepEqual(log.sent, [[0x69]]);
+  assert.deepEqual(log.left, [0]);
+  assert.equal(life.leaving, false, 'no state 7 wait is armed');
+  at(5000 + LEAVE_WAIT_MS * 2); life.checkTimers(); life.tick();
+  assert.deepEqual(log.sent, [[0x69]]);
+  assert.deepEqual(log.left, [0]);
+  assert.equal(life.saveAndExit(), false, 'a second exit does nothing');
+  assert.deepEqual(life.unload(), []);
+});
+test('Save and Exit during an armed trade-cancel wait still sends 0x69 at once', () => {
+  const { life, log, at } = mk();
+  life.inGame(); at(0); life.leaveGame(); at(100);
+  assert.equal(life.saveAndExit(), true);
+  assert.deepEqual(log.sent, [[0x4f, 0x02, 0, 0, 0, 0, 0], [0x69]]);
+  assert.deepEqual(log.left, [0]);
+});
+test('Save and Exit during a reason countdown is refused, so the menu tears down at once', () => {
+  const { life, log } = mk();
+  life.inGame(); life.fail(7);
+  assert.equal(life.saveAndExit(), false);
+  assert.deepEqual(log.sent, []);
+});
+test('unload after the trade-cancel leave sends only 0x69, and never twice', () => {
   const { life } = mk();
   life.inGame(); life.leaveGame();
   assert.deepEqual(life.unload().map((b) => [...b]), [[0x69]]);
@@ -175,13 +201,13 @@ test('an item action during a reason countdown is not a leave wait, so it goes a
 });
 
 const fakeSocket = (open = true) => { const ev = []; return { ev, send: (b) => { if (!open) return false; ev.push(['send', [...b]]); return true; }, close: () => ev.push(['close']) }; };
-test('pagehide in game: 4F 02 00, 0x69, then the socket close, in that order, synchronously', () => {
+test('pagehide in game: 0x69 then the socket close, in that order, synchronously', () => {
   const { life } = mk(); life.inGame();
   const ws = fakeSocket();
-  assert.equal(flushUnloadLeave(life, ws).length, 2);
-  assert.deepEqual(ws.ev, [['send', [0x4f, 0x02, 0, 0, 0, 0, 0]], ['send', [0x69]], ['close']]);
+  assert.equal(flushUnloadLeave(life, ws).length, 1);
+  assert.deepEqual(ws.ev, [['send', [0x69]], ['close']]);
 });
-test('pagehide after the menu leave sends only 0x69 then closes; a second pagehide sends nothing', () => {
+test('pagehide after the trade-cancel leave sends only 0x69 then closes; a second pagehide sends nothing', () => {
   const { life } = mk(); life.inGame(); life.leaveGame();
   const ws = fakeSocket();
   flushUnloadLeave(life, ws);
