@@ -122,8 +122,16 @@ export function createGameLife({ now = () => Date.now(), expansion = false, onNo
   };
 }
 
-// The server's 0x05 (unload complete) starts the loading wait and its 0x04 (load complete) enters the game; the first
-// of either in a decoded frame, packet by packet, is returned as 'loading' or 'ingame'. Other packets are skipped.
+// The server's 0x05 (unload complete) starts the loading wait and its 0x04 (load complete) enters the game. Each packet
+// overwrites the flags the previous one set, so the LAST of either in a decoded frame decides; it is returned as 'loading'
+// or 'ingame'. Other packets are skipped: 0x59 (create the player unit), 0x0B (pick the local player from the unit table)
+// and 0x11 (set a unit's mode) never touch the entered / loading flags or the clocks.
+// Settled by the client's handlers: 0x04 sets entered, clears loading (and ends the process if no local player unit
+// exists yet, so a sane server sends 0x59 and 0x0B before it); 0x05 clears entered, sets loading and re-stamps the loading
+// clock, leaving the join clock alone. The join timeout (30 s) fires only while neither flag is set, the loading timeout
+// (3 minutes) only while loading is set, the lost-connection exit only once entered.
+// GUESS: how long after 0x59 the real server sends 0x0B, and whether 0x0B may arrive before 0x59 in the same frame; the
+// handlers do not constrain it (0x0B with an unknown unit id is a silent no-op).
 export function lifePhaseFromFrame(bytes, sizeOf) {
   let seen = null;
   for (let at = 0; at < bytes.length;) {

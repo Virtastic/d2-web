@@ -241,6 +241,7 @@ test('0x05 starts loading, 0x04 enters the game, packet by packet', () => {
   const size = (b) => ({ 0x05: 1, 0x04: 1, 0x01: 8 }[b[0]] ?? 0);
   assert.equal(lifePhaseFromFrame(Uint8Array.of(0x05), size), 'loading');
   assert.equal(lifePhaseFromFrame(Uint8Array.of(0x05, 0x04), size), 'ingame');
+  assert.equal(lifePhaseFromFrame(Uint8Array.of(0x04, 0x05), size), 'loading');   // the later packet overwrites the flags
   assert.equal(lifePhaseFromFrame(Uint8Array.of(0x01, 4, 4, 4, 4, 4, 4, 4, 0x05), size), 'loading');
   assert.equal(lifePhaseFromFrame(Uint8Array.of(0x01, 4, 4, 4, 4, 4, 4, 4), size), null);
 });
