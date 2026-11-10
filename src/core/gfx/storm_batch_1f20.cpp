@@ -488,7 +488,9 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_23e0(uint32_t* r) {
 // ---- b46-storm-0 batch: SEH wrappers, scalar-deleting dtors, fixed-array tails, id generator ----
 // Retail's SEH frames (ExceptionList push/pop) carry no behaviour of their own; they are omitted.
 extern "C" void storm_port_1660(uint32_t* r);
+extern "C" int32_t (*g_storm_free_hook)(void*, const char*, int32_t);   // storm_alloc_1b960.cpp
 
+static inline uint32_t GuestWordAt(const uint8_t* p, uint32_t off) { uint32_t v; std::memcpy(&v, p + off, 4); return v; }
 namespace {
 // 1.13c Storm+0x1C30: free source/rectf/foundparam storage, then unlink the element (0x1CF0).
 void StormElementDestroy(StormElement* e) {
@@ -503,21 +505,40 @@ void StormElementDestroy(StormElement* e) {
 extern "C" void* Storm_Sub1B20(void* self, uint8_t flags) {
     uint32_t r[5] = {(uint32_t)(uintptr_t)self, 0, 0, 0, 0};
     storm_port_1660(r);
-    if ((flags & 1) && self) StormFree(self);
+    if ((flags & 1) && self) {   // SMemFree(this, "delete", -1, 0): the FN probes log it through the hook
+        if (g_storm_free_hook) g_storm_free_hook(self, "delete", -1);
+        else StormFree(self);
+    }
     return self;
 }
 // 1.13c Storm+0x1B50: scalar-deleting dtor over 0x1990.
 extern "C" void* Storm_Sub1B50(void* self, uint8_t flags) {
     StormHashTableFoundationDestroy((StormHashTable*)self);
-    if ((flags & 1) && self) StormFree(self);
+    if ((flags & 1) && self) {   // SMemFree(this, "delete", -1, 0): the FN probes log it through the hook
+        if (g_storm_free_hook) g_storm_free_hook(self, "delete", -1);
+        else StormFree(self);
+    }
     return self;
 }
 // 1.13c Storm+0x1B80: TSList dtor (SEH wrapper over 0x22D0).
-extern "C" void Storm_Sub1B80(StormList* list) { StormListDestroy(list); }
+// The argument is retail's 32-bit list {linkoffset, term.prev, term.next}; the native StormList is wider on wasm64, so this works on the guest words.
+extern "C" void Storm_GuestUnlink(uint8_t* n);   // storm_batch_1000.cpp
+extern "C" void Storm_Sub1B80(void* list) {
+    uint8_t* l = (uint8_t*)list;
+    for (;;) {   // 0x2780: unlink the node at base+count while the count at +8 is positive
+        uint32_t base = GuestWordAt(l, 0), cnt = GuestWordAt(l, 8);
+        if ((int32_t)cnt < 1) break;
+        Storm_GuestUnlink((uint8_t*)(uintptr_t)(base + cnt));
+    }
+    Storm_GuestUnlink(l + 4);
+}
 // 1.13c Storm+0x1BC0: scalar-deleting dtor over 0x1A70.
 extern "C" void* Storm_Sub1BC0(void* self, uint8_t flags) {
     StormHashTableBaseDestroy((StormHashTable*)self);
-    if ((flags & 1) && self) StormFree(self);
+    if ((flags & 1) && self) {   // SMemFree(this, "delete", -1, 0): the FN probes log it through the hook
+        if (g_storm_free_hook) g_storm_free_hook(self, "delete", -1);
+        else StormFree(self);
+    }
     return self;
 }
 // 1.13c Storm+0x1BF0: TSGrowableArray<TSList> dtor (SEH wrapper over 0x2290).
