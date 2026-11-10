@@ -61,7 +61,7 @@ extern "C" void d2_port_d2common_6ccf0(HD2ARCHIVE archive)
 }
 
 // 1.13c D2Common+0x74400
-extern "C" void d2_fn_d2common_74400(HD2ARCHIVE archive)
+extern "C" void d2_ours_d2common_74400(HD2ARCHIVE archive)
 {
     DATATBLS_LoadLowQualityItemsTxt(archive);
 }

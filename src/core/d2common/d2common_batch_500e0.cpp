@@ -30,9 +30,18 @@ uint8_t* BodyLocGrid(uint32_t pInv)
     return P(W(inv, 0x14));
 }
 // 0x20320 / 0x20700 call 0x1E1B0 with the body-location size record (0x9D378): a grid whose size differs from it is no grid.
+// Read at the 32-bit image layout (entry stride 0x10, width +8, height +9, cells +0x0C): the native INVENTORY_GetGrid
+// reads the wasm64 struct offsets and never finds the grid of an image inventory. The two allocation paths of 0x1E1B0
+// (grid count below 1, or a null cell array) give a freshly zeroed grid, so no cell is returned there either.
 uint8_t* BodyLocGridChecked(uint32_t pInv)
 {
-    return (uint8_t*)INVENTORY_GetGrid((D2InventoryStrc*)(uintptr_t)pInv, INVGRID_BODYLOC, &gBodyLocInventoryGridInfo);
+    uint8_t* inv = P(pInv);
+    if (!inv || (int32_t)W(inv, 0x18) < 1) return nullptr;
+    uint8_t* grid = P(W(inv, 0x14));
+    if (!grid || !W(grid, 0x0C)) return nullptr;
+    const uint8_t* info = reinterpret_cast<const uint8_t*>(&gBodyLocInventoryGridInfo);
+    if (grid[8] != info[0] || grid[9] != info[1]) return nullptr;
+    return grid;
 }
 uint8_t* GridCell(uint8_t* grid, int n)
 {

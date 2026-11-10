@@ -39,7 +39,17 @@ struct D2CommonBatch233B0Env
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint8_t ITEMS_CanBeMagic_1_13c(uint32_t pItem)
 {
-	return ITEMS_CanBeMagic(reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pItem))) ? 1 : 0;
+	// Follows the decompile: no assert on a null items.txt row; every miss is 0.
+	const D2UnitStrc* pUnit = reinterpret_cast<const D2UnitStrc*>(static_cast<uintptr_t>(pItem));
+	if (!pUnit || pUnit->dwUnitType != UNIT_ITEM)
+		return 0;
+	const D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pUnit->dwClassId);
+	if (!pItemsTxtRecord)
+		return 0;
+	const int32_t nType = pItemsTxtRecord->wType[0];
+	if (nType < 0 || nType >= sgptDataTables->nItemTypesTxtRecordCount || !sgptDataTables->pItemTypesTxt)
+		return 0;
+	return sgptDataTables->pItemTypesTxt[nType].nMagic;
 }
 
 // 1.13c D2Common+0x24C30 (community name D2ItemSetFlags, but the body reads the item type's

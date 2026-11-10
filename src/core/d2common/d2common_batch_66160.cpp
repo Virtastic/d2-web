@@ -9,7 +9,7 @@ extern "C" {
 W void d2_fn_d2common_56a10(void* a);
 void d2_port_d2common_55400(HD2ARCHIVE a);
 W void d2_fn_d2common_77b70(void* a);
-W void d2_fn_d2common_74400(HD2ARCHIVE a);
+W void d2_ours_d2common_74400(HD2ARCHIVE a);
 W void d2_fn_d2common_72c50(void* a);
 W void d2_fn_d2common_69650(void* a);
 W void d2_fn_d2common_69190(void* a);
@@ -54,7 +54,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_66160(HD2ARCHIVE h, int32_t p2, int32_t
  DATATBLS_LoadGemsTxt(h);
  DATATBLS_LoadBooksTxt(h);
  DATATBLS_LoadQualityItemsTxt(h);
- d2_fn_d2common_74400(h);
+ d2_ours_d2common_74400(h);
  DATATBLS_LoadRunesTxt(h);
  DATATBLS_LoadItemRatioTxt(h);
  d2_fn_d2common_72c50(a);

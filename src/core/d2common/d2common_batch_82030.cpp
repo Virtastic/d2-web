@@ -141,7 +141,16 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_32330_GetStatPercent(D2UnitStrc
 // non-null UNIT_ITEM reaches the row; the type index is 0x230F0's (items.txt wType[0]) with the type
 // table bounds at +0xBF8/+0xBFC. The vendored 1.10f twin is ITEMS_CanBeRare, whose body is this one.
 extern "C" EMSCRIPTEN_KEEPALIVE uint8_t D2Common_23400_CanBeRare(D2UnitStrc* pItem) {  // 1.13c D2Common+0x23400 (#11036)
-	return ITEMS_CanBeRare(pItem) ? 1 : 0;
+	// Follows the decompile: no assert on a null items.txt row; every miss is 0.
+	if (!pItem || pItem->dwUnitType != UNIT_ITEM)
+		return 0;
+	const D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
+	if (!pItemsTxtRecord)
+		return 0;
+	const int32_t nType = pItemsTxtRecord->wType[0];
+	if (nType < 0 || nType >= sgptDataTables->nItemTypesTxtRecordCount || !sgptDataTables->pItemTypesTxt)
+		return 0;
+	return sgptDataTables->pItemTypesTxt[nType].nRare;
 }
 
 // 1.13c D2Common+0x34450 (#11039): set (nSet != 0) or clear a state bit in the unit's extended stat

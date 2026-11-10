@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 
 #include "D2Collision.h"
 #include "inv_place.h"
@@ -344,11 +345,45 @@ uint32_t D2Common_1EEE0_InventoryHasPotion(uint32_t pInventory, uint32_t pItem)
 // comparator at LAB_6fd8d040, copies the entries back into the nodes in list order, and frees
 // the scratch array.
 // Comparator at 0x3D040: 1 when the first u16 id is greater, -1 when smaller, 0 when equal.
-extern "C" void d2c_3cf30_legacy(uint32_t records, uint32_t count, int32_t (*compare)(uintptr_t, uintptr_t));
 static int32_t TextCompare_3D040(uintptr_t a, uintptr_t b)
 {
 	const uint16_t x = *reinterpret_cast<const uint16_t*>(a), y = *reinterpret_cast<const uint16_t*>(b);
 	return x > y ? 1 : (x < y ? -1 : 0);
+}
+
+// 1.13c D2Common+0x3CF30: 12-byte records (u16 id at +0, dword value at +4). Retail keeps a running
+// "carried" record: when compare(carried, moving) > 0 the carried record is parked at the moving slot
+// and the moving record is inserted into the sorted prefix, shifting larger records up one slot;
+// otherwise the moving record becomes the carried one. The carried record is never moved aside.
+static void Sort3CF30(uint8_t* recs, uint32_t count, int32_t (*compare)(uintptr_t, uintptr_t))
+{
+	if (count < 2)
+		return;
+	uint8_t carried[12], moving[12];
+	std::memcpy(carried, recs, 12);
+	for (uint32_t i = 1; i < count; ++i)
+	{
+		uint8_t* rec_i = recs + 12u * i;
+		std::memcpy(moving, rec_i, 12);
+		if (compare(reinterpret_cast<uintptr_t>(carried), reinterpret_cast<uintptr_t>(moving)) > 0)
+		{
+			std::memcpy(rec_i, carried, 12);
+			uint32_t p = i - 1;
+			while (p != 0)
+			{
+				uint8_t* rec_k = recs + 12u * (p - 1);
+				if (compare(reinterpret_cast<uintptr_t>(rec_k), reinterpret_cast<uintptr_t>(moving)) < 1)
+					break;
+				std::memcpy(recs + 12u * p, rec_k, 12);
+				--p;
+			}
+			std::memcpy(recs + 12u * p, moving, 12);
+		}
+		else
+		{
+			std::memcpy(carried, moving, 12);
+		}
+	}
 }
 
 // 1.13c D2Common+0x3D2B0
@@ -370,7 +405,7 @@ void D2Common_3D2B0_SortTextList(uint32_t pList)
 		*reinterpret_cast<uint16_t*>(out) = *reinterpret_cast<uint16_t*>(P(n));
 		W(out, 4) = W(P(n), 4);
 	}
-	d2c_3cf30_legacy(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(scratch)), count, TextCompare_3D040);
+	Sort3CF30(scratch, count, TextCompare_3D040);
 	out = scratch;
 	uint32_t n = W(list, 8);
 	for (uint32_t i = 0; i < count; ++i, out += 12)
