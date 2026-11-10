@@ -90,15 +90,7 @@ void drawLabel(Services& s,uint16_t* buf,int32_t b,int32_t c){
  while(s.textWidth(buf)>0x42){ *--e=0; }
  s.textWidth(buf); s.showText(buf,b,c,0); s.restoreFont();
 }
-// 1.13c D2Client+0x5ADD0
-void drawNumber(Services& s,int32_t n,uint16_t* out){
- char a[32]; snprintf(a,sizeof a,"%d",n);
- uint16_t w[32]={}; for(int i=0;a[i]&&i<31;i++) w[i]=(uint8_t)a[i];
- size_t len=0; while(w[len]) len++;
- uint16_t* e=w+len; s.saveFont();
- while(s.textWidth(w)>0x2e){ *--e=0; }
- s.showText(w,0x37,0,0); s.restoreFont(); (void)out;
-}
+// 1.13c D2Client+0x5ADD0 lives in d2client_5add0.cpp (over the header's Services)
 // 1.13c D2Client+0x5AEC0
 void drawAsciiLabel(Services& s,const char* a,int32_t b,int32_t c){
  uint16_t w[32]={}; for(int i=0;a[i]&&i<31;i++) w[i]=(uint8_t)a[i];

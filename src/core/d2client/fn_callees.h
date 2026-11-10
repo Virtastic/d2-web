@@ -14,6 +14,7 @@ struct FnCallees {
     virtual uint32_t* g(uint32_t rva) = 0;
     virtual void blk(uint32_t rva, const void* p, uint32_t n) { (void)rva; (void)p; (void)n; }   // hookblk: n dwords at p
     virtual void edi(uint32_t rva, uint32_t v) { (void)rva; (void)v; }                             // REGS J: EDI at the call
+    virtual uint32_t edxAfter(uint32_t d) { return d; }                                            // EDX after the last h(): the preserved input, unless a recorder thunk left its return value there
     virtual void ed(uint32_t v) { (void)v; }                                                       // EDI for the next h() (a callee's EDI out-pointer)
     // retail's fatal-message tail: Ordinal_10265(code) via 0xBF92, Ordinal_10024(file, msg) via 0xBF80, _exit(-1) via 0x3664
     [[noreturn]] void fatal(uint32_t code) {
