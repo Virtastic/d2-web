@@ -67,9 +67,20 @@ Env E{};
 }
 
 namespace d2client_ambient {
-uint32_t Fb[2] = {0x00b63052u, 0x50f180c0u};
-uint32_t* fallbackSeed() { return Fb; }
-void reset() { Fb[0] = 0x00b63052u; Fb[1] = 0x50f180c0u; E = Env{}; Now = 0; A.qn = 0; A.nextHandle = 1; A.vol = 0; A.nheld = 0; }
+// The client hero seed when the session has no client unit of its own: the local player's client init seed (its room's next roll
+// as the client builds it, D2Client+0xA7630; client_unit_seed.cpp) as {init, 666}, stepped 4 times. Retail's first 0x4F860 reads it
+// as the first roll of the player's room seed, stepped 4 times. The 4 draws before that call (one is 0x91E0's current-player roll)
+// are applied together here, not at the points where retail makes them.
+uint32_t Fb[2] = {0, 0}; bool FbSet = false;
+uint32_t* fallbackSeed(uint32_t (*playerInit)()) {
+    if (!FbSet && playerInit) {
+        Fb[0] = playerInit(); Fb[1] = 666;
+        for (int i = 0; i < 4; ++i) { const uint64_t v = uint64_t(Fb[0]) * 0x6ac690c5ull + Fb[1]; Fb[0] = uint32_t(v); Fb[1] = uint32_t(v >> 32); }
+        FbSet = true;
+    }
+    return Fb;
+}
+void reset() { Fb[0] = Fb[1] = 0; FbSet = false; E = Env{}; Now = 0; A.qn = 0; A.nextHandle = 1; A.vol = 0; A.nheld = 0; }
 void setArea(U key) { A.key = key; }
 // A sound-engine submit from another client handler (0x88A70): a one-shot, drained with the ambient pairs.
 void submit(int32_t row) { A.f88a70(U(row), 2); }

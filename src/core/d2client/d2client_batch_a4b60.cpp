@@ -100,41 +100,43 @@ extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_a5600(uintptr_t eax, const D2ClientA4b60Env* e) {
     uintptr_t a = e->rd_ptr(eax + 0x2c);
     if (!a) e->fatal(0x7f3);
-    e->o11090();
+    e->o11090(eax, 1);
     int32_t y = unit_y(e->cur, e), x = unit_x(e->cur, e);
     e->o10739(a, x, y, 0);
 }
 
 // 1.13c D2Client+0xA56C0 lives in d2client_a56c0.cpp (it also forwards ECX/EDX to the class handler).
 
-// 1.13c D2Client+0xA5720 (caller 0xA68E0): EAX = unit, stack param_1 = py, EBX = px, ESI = y bias,
-// EDI = rect struct (+0x1a0..+0x1ac). Hit test of (px,py) against the unit's transformed box.
+// 1.13c D2Client+0xA5720 (caller 0xA68E0, ret 4): EAX = unit, stack param_1 = py, EBX = px, EDI = rect struct
+// (+0x1a0..+0x1ac); ESI is only saved. x then y of the unit (inline pair), 11087(&x,&y), then the box
+// [rect.l + x, rect.t + y] sized rect.w / rect.h (signed compares) is tested against (px, py).
 extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t d2_client_a5720(uintptr_t eax, int32_t param_1, int32_t ebx, int32_t esi, uintptr_t edi,
                          const D2ClientA4b60Env* e) {
+    (void)esi;
     int32_t x = unit_x(eax, e), y = unit_y(eax, e);
     e->o11087(&x, &y);
-    int32_t l = (int32_t)e->rd32(edi + 0x1a0) + y;
-    int32_t t = (int32_t)e->rd32(edi + 0x1a4) + esi;
-    return l <= ebx && t <= param_1 && ebx <= (int32_t)e->rd32(edi + 0x1a8) + l &&
+    int32_t l = (int32_t)e->rd32(edi + 0x1a0) + x;
+    int32_t t = (int32_t)e->rd32(edi + 0x1a4) + y;
+    return ebx >= l && param_1 >= t && ebx <= (int32_t)e->rd32(edi + 0x1a8) + l &&
            param_1 <= (int32_t)e->rd32(edi + 0x1ac) + t;
 }
 
-// 1.13c D2Client+0xA57E0 (caller 0x51470): EAX = unit (kind must be 5, else assert), stack param_1,
-// EBX, ESI. r=10633(10331()); r ? box test against r+4..+0x10 : 0. The decompile's second axis uses
-// ESI as the base; the 11087 outputs land in dead stack slots, so the pre-transform y is compared.
+// 1.13c D2Client+0xA57E0 (caller 0x51470, ret 4): EAX = unit (kind must be 5, else assert 0x58b), stack param_1 = py,
+// EBX = px; ESI is only saved. r = 10633(10331(unit), unit); r == 0 gives 0. Unit x then y, 11087(&x,&y), then the box
+// [r+4 + x, r+8 + y] sized r+0xc / r+0x10 (signed compares) is tested against (px, py).
 extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t d2_client_a57e0(uintptr_t eax, int32_t param_1, int32_t ebx, int32_t esi,
                          const D2ClientA4b60Env* e) {
-    if (e->rd32(eax) != 5) e->fatal(0);
-    uintptr_t r = e->o10633(e->o10331(eax));
+    (void)esi;
+    if (e->rd32(eax) != 5) e->fatal(0x58b);
+    uintptr_t r = e->o10633(e->o10331(eax), eax);
     if (!r) return 0;
-    int32_t y = unit_y(eax, e), x = unit_x(eax, e);
-    int32_t ty = y, tx = x;
-    e->o11087(&tx, &ty);
-    int32_t l = (int32_t)e->rd32(r + 4) + y;
-    int32_t t = (int32_t)e->rd32(r + 8) + esi;
-    return l <= ebx && t <= param_1 && ebx <= (int32_t)e->rd32(r + 0xc) + l &&
+    int32_t x = unit_x(eax, e), y = unit_y(eax, e);
+    e->o11087(&x, &y);
+    int32_t l = (int32_t)e->rd32(r + 4) + x;
+    int32_t t = (int32_t)e->rd32(r + 8) + y;
+    return ebx >= l && param_1 >= t && ebx <= (int32_t)e->rd32(r + 0xc) + l &&
            param_1 <= (int32_t)e->rd32(r + 0x10) + t;
 }
 

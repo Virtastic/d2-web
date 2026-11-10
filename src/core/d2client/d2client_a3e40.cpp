@@ -1,4 +1,4 @@
-// 1.13c D2Client+0xA3E40 (497 B, 11 stack args a0..a10, ret 0x2C): open a dialog node. With 0x10ADA8 set, log 0x80780 through
+// 1.13c D2Client+0xA3E40 (497 B, 11 stack args a0..a10, ret 0x2C): open a dialog node. With 0xFADA8 set, log 0x80780 through
 // 0x3CC60 (EAX = 5, stack 0xD0B4(), text). Cursor state reset: 0xE0EA8..0xE0EBC = -1, 0xF46C4/C8 = 0x10, 0xE0EA0, 0x11BC28/2C/38/3C,
 // 0x11C3DC/E0/F8/FC, 0x11C2F8/F4 = 0. a2 == 0 returns 0. Else 0x11BC08 += 1; 0xBF7A (ECX = 0xB10, EDX = file, stack 0x3ED, 0)
 // allocates the node, cleared twice (the old head stored at +0xB0C between the passes is wiped); the node becomes head 0x11BC00

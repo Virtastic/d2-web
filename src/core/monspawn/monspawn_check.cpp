@@ -233,7 +233,7 @@ static constexpr size_t kSessionClientMapEventCapacity = 65536; // 1 MiB of diag
 static uint32_t g_sessionClientMapEventsDropped = 0;
 // The offline browser client owns an independent local-player CUnit seed stream. It must never
 // borrow g_targetPlayer->pSeed, which belongs to the D2Game/server unit.
-namespace d2client_ambient { void reset(); void tick(uint32_t* seed, uint32_t period, bool weatherLevel); uint32_t* fallbackSeed(); }
+namespace d2client_ambient { void reset(); void tick(uint32_t* seed, uint32_t period, bool weatherLevel); uint32_t* fallbackSeed(uint32_t (*playerInit)()); }
 extern "C" void d2_client_monster_idle_reset();   // 1.13c D2Client+0x237E0 monster branch state (unit_sound_trigger_237e0.cpp)
 extern "C" void d2_client_attack_roll_reset();   // 1.13c D2Client+0x242B0 attack-roll state (monster_face.cpp)
 namespace d2client_hurricane { void reset(); void tick(D2UnitStrc* u, uint32_t* seed); }
@@ -242,6 +242,13 @@ namespace d2client_clmissile { void reset(); void cast(int32_t skillId, int32_t 
 namespace d2client_nova { void reset(); void selectSkill(int32_t skillId); int32_t selectedSkill(); void cast(int32_t skillId, bool presentation); void tick(); }   // 1.13c D2Client+0x73CB0 (cltdofunc 25, Poison Nova), +0x73D70 (cltdofunc 29, Frozen Orb)
 namespace d2client_blizzard { void reset(); void cast(int32_t skillId, D2UnitStrc* target, int32_t tx, int32_t ty); void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)); }   // 1.13c D2Client+0xBBC10 (cltdofunc 13, Blizzard center)
 static D2UnitStrc* g_sessionClientPlayerUnit = nullptr;
+namespace d2client_unitseed { uint32_t init(uint32_t type, uint32_t id); }
+static uint32_t sessionClientPlayerInit() { return g_targetPlayer ? d2client_unitseed::init(UNIT_PLAYER, g_targetPlayer->dwUnitId) : 0; }
+// The client hero seed (+0x20): the client unit's own when the client map was mirrored, else the one derived from the local player's client init seed.
+static uint32_t* sessionClientHeroSeed() {
+    if (g_sessionClientPlayerUnit) return reinterpret_cast<uint32_t*>(&g_sessionClientPlayerUnit->pSeed);
+    return d2client_ambient::fallbackSeed(sessionClientPlayerInit);
+}
 static uint32_t g_sessionClientPlayerInitSeed = 0;
 // Session construction is class-selectable.  The older vector/AI attachment surface retains
 // Amazon (0) unless a browser session explicitly supplies one of the seven CharStats classes.
@@ -4318,7 +4325,7 @@ EMSCRIPTEN_KEEPALIVE const D2SeedStrc* d2_session_client_player_seed() {
 
 // 1.13c D2Client+0x89640 rand(n) on the client hero seed (+0x20/+0x24): v = lo*0x6AC690C5 + hi; a power of two masks, otherwise lo32 % n.
 extern "C" uint32_t d2_session_client_rand(uint32_t n) {
-    uint32_t* s = g_sessionClientPlayerUnit ? reinterpret_cast<uint32_t*>(&g_sessionClientPlayerUnit->pSeed) : d2client_ambient::fallbackSeed();
+    uint32_t* s = sessionClientHeroSeed();
     if (!n) return 0;
     const uint64_t v = uint64_t(s[0]) * 0x6ac690c5ull + s[1];
     s[0] = uint32_t(v); s[1] = uint32_t(v >> 32);
@@ -8089,7 +8096,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         }
         syncSessionClientMapFromPlayer();
         // 1.13c D2Client+0xC9BE0 / 0x72C20: the client sees the Hurricane state the server set this frame.
-        d2client_hurricane::tick(g_targetPlayer, g_sessionClientPlayerUnit ? reinterpret_cast<uint32_t*>(&g_sessionClientPlayerUnit->pSeed) : d2client_ambient::fallbackSeed());
+        d2client_hurricane::tick(g_targetPlayer, sessionClientHeroSeed());
         d2client_vine::tick(g_targetPlayer);   // 1.13c D2Client+0xC50F0 (cltactivefunc 89, state vine_beast)
         d2client_blizzard::tick(g_targetPlayer, [](int32_t type, uint32_t id) { return SUNIT_GetServerUnit(g_game, type, (int32_t)id); });
         d2client_nova::tick();   // 1.13c D2Client+0x73CB0 (cltdofunc 25, Poison Nova action frame)
@@ -8102,7 +8109,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         if (g_currentLevel >= 0) {
             // 1.13c D2Client+0x81340: the weather pass draws from the client hero seed. A session that never mirrored the client map has no
             // client unit: its seed is the one retail's first 0x4F860 call reads (a retail recording capture; the derivation is not recovered).
-            uint32_t* heroSeed = g_sessionClientPlayerUnit ? reinterpret_cast<uint32_t*>(&g_sessionClientPlayerUnit->pSeed) : d2client_ambient::fallbackSeed();
+            uint32_t* heroSeed = sessionClientHeroSeed();
             d2client::weather::Env env{};
             env.levelId = g_currentLevel; env.act = g_currentAct;
             env.weatherLevel = DATATBLS_GetRainFromLevelsTxt(g_currentLevel) != 0;

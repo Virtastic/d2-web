@@ -17,10 +17,10 @@ struct D2ClientA4b60Env {
     int32_t   (*o10750)(uintptr_t a);                   // unit y
     int32_t   (*o10867)(uintptr_t a);                   // unit x
     void      (*o10739)(uintptr_t a, int32_t x, int32_t y, uint32_t z);
-    void      (*o11090)();
+    void      (*o11090)(uintptr_t unit, uint32_t n);   // 0xC43C (stdcall 2)
     void      (*o11087)(int32_t* x, int32_t* y);
     uintptr_t (*o10331)(uintptr_t unit);                // 0xC1F0
-    uintptr_t (*o10633)(uintptr_t a);
+    uintptr_t (*o10633)(uintptr_t a, uintptr_t b);   // 0xC1E4 (stdcall 2: the 0xC1F0 result, the unit)
     void      (*o10345)(uintptr_t a);
     void      (*o10184)(uintptr_t a);
     void      (*o10704)(uintptr_t a);                   // 0xC502 (stdcall 1, handed the unit)
