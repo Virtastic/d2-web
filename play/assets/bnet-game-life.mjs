@@ -130,8 +130,11 @@ export function createGameLife({ now = () => Date.now(), expansion = false, onNo
 // exists yet, so a sane server sends 0x59 and 0x0B before it); 0x05 clears entered, sets loading and re-stamps the loading
 // clock, leaving the join clock alone. The join timeout (30 s) fires only while neither flag is set, the loading timeout
 // (3 minutes) only while loading is set, the lost-connection exit only once entered.
-// GUESS: how long after 0x59 the real server sends 0x0B, and whether 0x0B may arrive before 0x59 in the same frame; the
-// handlers do not constrain it (0x0B with an unknown unit id is a silent no-op).
+// Entry order, measured: 0x59 creates the unit, 0x0B makes it the local player, then 0x04 enters the game. 0x04 first ends
+// the process; 0x0B first does nothing and the next stat update halts.
+// Leaving: the menu exit sends 0x69 first and the socket closes after it; the join timeout and a dropped connection send no
+// 0x69, they only set the exit flag and the teardown closes the socket.
+// GUESS: how long after 0x59 the real server sends 0x0B (the measured order is from a hand-built join, not the server).
 export function lifePhaseFromFrame(bytes, sizeOf) {
   let seen = null;
   for (let at = 0; at < bytes.length;) {
