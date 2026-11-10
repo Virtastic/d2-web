@@ -16,7 +16,8 @@
 extern "C" void*   Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, uint32_t flags);   // SMemAlloc
 extern "C" int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);                        // SMemFree
 extern "C" void Storm_Sub4040(uint32_t o);                                               // request-record dtor (C linkage: storm_4040.cpp)
-void    Storm_Sub4D60(void* node);                                                      // list unlink
+void Storm_Sub4D60(uint8_t* node);                                                      // list unlink (storm_batch_b47.cpp)
+inline void Storm_Sub4D60(void* p) { Storm_Sub4D60((uint8_t*)p); }
 uint32_t Storm_Sub4250(void* listHead);                                                 // list next
 void    Storm_Sub2FB30(const char* type, const char* name);
 void    Storm_Sub1F590(uint32_t err, uint32_t* name, int32_t off, void*, uint32_t, uint32_t);
@@ -557,7 +558,7 @@ uint32_t Storm_Sub29200(void) {
 }
 
 // 1.13c Storm+0x2fab0: free all __AUHANDLER__ records and the chained blocks, drop the lock.
-uint32_t Storm_Sub2FAB0(void) {
+extern "C" uint32_t Storm_Sub2FAB0(void) {
     while ((int32_t)g_45960 > 0) {
         void* h = N(g_45960);
         uint32_t nx = *(uint32_t*)h;  // node[0] = successor; 4B80 makes it the new head

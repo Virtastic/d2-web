@@ -68,7 +68,7 @@ void D2Common_2EA30_SetObjectPortalFlags(D2UnitStrc* pUnit, uint8_t nPortalFlags
 // 1.13c D2Common+0x22C20 (#10119): items.txt byte at +0x129 (nUnique) for a UNIT_ITEM's class id.
 // Null unit is fatal 0x9CE, non-item fatal 0x9CF, missing record fatal 0x9D2; fatal here too.
 // Prior art D2MOO 1.10f ITEMS_GetUniqueColumnFromItemsTxt (Items.cpp, 0x6FD9AA70).
-uint8_t D2Common_22C20_ItemUniqueColumn(D2UnitStrc* pUnit)
+extern "C" uint8_t D2Common_22C20_ItemUniqueColumn(D2UnitStrc* pUnit)
 {
     if (!pUnit)
         d2_fatal(0x9CE);
