@@ -169,7 +169,7 @@ test('clicks that are not the panel\'s send nothing', () => {
 test('a game joined from the title screen builds the inventory, stash and cube panels', () => {
   const shell = readFileSync(new URL('../gameplay-shell.mjs', import.meta.url), 'utf8');
   const realmChrome = shell.slice(shell.indexOf('function ensureRealmChrome()'), shell.indexOf('async function syncRealmScene()'));
-  assert.match(realmChrome, /inventoryPanelRenderer \?\?= createInventoryPanelRenderer\(/);
+  assert.match(realmChrome, /buildChromePanels\(false, /);
   assert.match(realmChrome, /buildStoragePanels\(\)/);
   const click = shell.slice(shell.indexOf('function realmInventoryClick('), shell.indexOf('function realmStorageClickAt('));
   assert.match(click, /realmInventoryPanelClick\(\{[^}]*renderer: inventoryPanelRenderer/s, 'the shell routes the click through the panel it draws');

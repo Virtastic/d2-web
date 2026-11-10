@@ -17,6 +17,13 @@ namespace d2 {
 bool drlgLoadTables(MpqVfs& vfs, const LangTables&) {
     static bool loaded = false;
     if (loaded) return true;
+    // The loaders assert on a table no archive supplies. With no game data mounted (a headless host that has not
+    // mounted its archives yet) report failure instead, and leave the latch open so a later call can load them.
+    // GUESS: retail has no such state (its archives are opened before any table load); the first table the
+    // loaders require (ItemTypes) and the level table stand in for "the game data is here".
+    auto hasTable = [&vfs](const char* bin, const char* txt) { return vfs.has(bin) || vfs.has(txt); };
+    if (!hasTable("DATA\\GLOBAL\\EXCEL\\itemtypes.bin", "DATA\\GLOBAL\\EXCEL\\itemtypes.txt") ||
+        !hasTable("DATA\\GLOBAL\\EXCEL\\levels.bin", "DATA\\GLOBAL\\EXCEL\\levels.txt")) return false;
     loaded = true;
     g_drlgVfs = &vfs;
     sgptDataTables->bCompileTxt = FALSE;   // sgptDataTables is D2MOO's own global (DataTbls.cpp)

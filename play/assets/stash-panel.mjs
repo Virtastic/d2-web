@@ -74,9 +74,11 @@ const actPalette = (act) => `data\\global\\palette\\ACT${Math.min(5, Math.max(1,
 // The Transmute button's rect in game px: the cube grid's width, under the grid (the level-1 layout, declared not measured).
 export function transmuteRect(g) { return { x: g.gridLeft, y: g.gridTop + g.rows * g.boxH + 10, w: g.columns * g.boxW, h: 24 }; }
 
-export function createStashPanelRenderer(read, documentObject = globalThis.document, { string = null, stashGold = null, page = INVPAGE_STASH, transmute = null } = {}) {
+export function createStashPanelRenderer(read, documentObject = globalThis.document, { string = null, stashGold = null, page = INVPAGE_STASH, transmute = null, art = null, bare = false, close = true } = {}) {
+  // `art` replaces the panel art (the trade screen's), `bare` paints only the grid's items and boxes (a second grid
+  // on a panel another renderer drew), `close: false` leaves out the close button.
   const chrome = createPanelChrome(read, documentObject);
-  let dc6 = decodeDc6(read(page === INVPAGE_CUBE ? CUBE_ART : STASH_ART));
+  let dc6 = decodeDc6(read(art || (page === INVPAGE_CUBE ? CUBE_ART : STASH_ART)));
   const perAct = new Map();
   const plugy = { on: false, pageName: null };   // PY3: ?plugy=1 swaps the art for PlugY's TradeStash.dc6 and names the page
   const forAct = (act) => {
@@ -171,7 +173,8 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
       ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.scale, o.scale);
       // Panel art at the left-panel origin (see LEFT_PANEL_TOP).
       let composed = { width: 0, height: 0 };
-      if (frames.length === 4) {
+      if (bare) composed = null;
+      else if (frames.length === 4) {
         const [tl, tr, bl, br] = frames;
         ctx.drawImage(tl, geometry.left, geometry.top);
         ctx.drawImage(tr, geometry.left + tl.width, geometry.top);
@@ -224,9 +227,9 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
         ctx.strokeStyle = '#8a7a52'; ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
         chrome.text(ctx, act, transmute, b.x + 8, b.y + 18);
       }
-      chrome.cel(ctx, act, CHROME_ART.close, inventoryCloseFrame(closePressed), 352, 476);
+      if (close && !bare) chrome.cel(ctx, act, CHROME_ART.close, inventoryCloseFrame(closePressed), 352, 476);
       // The stash opens with the inventory; retail frames both after both panels, left then right.
-      chrome.border(ctx, act, BORDER_LEFT); chrome.border(ctx, act, BORDER_RIGHT);
+      if (!bare) { chrome.border(ctx, act, BORDER_LEFT); chrome.border(ctx, act, BORDER_RIGHT); }
       ctx.restore();
       return { page, anchor: [geometry.left, geometry.top], recordTop: geometry.recordTop, palette: actPalette(act), open: true, composed, frames: frames.length, grid: { columns: geometry.columns, rows: geometry.rows,
         left: geometry.gridLeft, top: geometry.gridTop, box: [geometry.boxW, geometry.boxH] }, drawn, boxes, sockets };

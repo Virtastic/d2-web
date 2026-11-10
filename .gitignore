@@ -429,3 +429,4 @@ reference/
 !test/pad-settings.test.mjs
 !test/pad-gold.test.mjs
 !test/pad-inventory.test.mjs
+!test/d2gs-join-feed-engine.test.mjs

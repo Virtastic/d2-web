@@ -26,7 +26,7 @@ test('a realm scene draws the skill buttons beside the orbs, so the bar has no g
   assert.equal(chromeGates({ engineLive: false, realmSceneActive: true, ...have, hasSkillSelect: {}, clearScreen: true }).skillSelect, false);
   const shell = readFileSync(new URL('../gameplay-shell.mjs', import.meta.url), 'utf8');
   const realmChrome = shell.slice(shell.indexOf('function ensureRealmChrome()'), shell.indexOf('async function syncRealmScene()'));
-  assert.match(realmChrome, /skillSelectRenderer \?\?= createSkillSelectRenderer\(/, 'the joined game builds the skill buttons');
+  assert.match(realmChrome, /buildChromeSkillSelect\(false, /, 'the joined game builds the skill buttons');
   assert.ok(shell.includes('if (sceneChrome().skillSelect) {'), 'the skill buttons draw on the shared gate, not on a local engine');
 });
 

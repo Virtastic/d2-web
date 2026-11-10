@@ -7,7 +7,7 @@ globalThis.ImageData ??= class { constructor(data, w, h) { Object.assign(this, {
 const ctx = new Proxy({}, { get: (_, k) => (k === 'getImageData' ? () => ({ data: new Uint8ClampedArray(4) }) : () => {}), set: () => true });
 const documentObject = { createElement: () => ({ width: 0, height: 0, getContext: () => ctx }) };
 const frame = { width: 1, height: 1, offsetX: 0, offsetY: 0, indices: new Uint8Array(1), opaque: new Uint8Array([1]) };
-const strings = { 4057: 'Level', 4011: 'Amazon', 4009: 'Necromancer', 11124: 'Last Difficulty Setting Completed:', 11125: 'None', 5156: 'Normal', 5155: 'Nightmare', 5154: 'Hell', 5138: 'A Game Already Exists With That Name' };
+const strings = { 11026: 'in line: ', 4057: 'Level', 4011: 'Amazon', 4009: 'Necromancer', 11124: 'Last Difficulty Setting Completed:', 11125: 'None', 5156: 'Normal', 5155: 'Nightmare', 5154: 'Hell', 5138: 'A Game Already Exists With That Name' };
 const screen = (character, hooks = {}) => createBnetLobbyScreen({ read: (path) => (path.endsWith('.tbl') ? tbl : new Uint8Array(1 << 22)), decodeDc6: () => ({ frames: [frame, frame, frame, frame, frame, { ...frame, width: 10 }] }),
   decodeDatPalette: () => new Uint8Array(1024), string: (i) => strings[i] ?? '', character, documentObject, now: () => 0, ...hooks });
 // A font table: the Woo! header, 10 rows high, every printable code point one 6-wide glyph.
@@ -377,12 +377,50 @@ test('JOIN: the open request is throttled to one per 5 s and the list starts emp
   assert.equal(asked, 2);
 });
 
-test('the Please Wait popup of a create or join in flight has a Cancel that does nothing', async () => {
-  let release; const calls = [];
-  const s = screen({ name: 'Ama', charClass: 0, level: 3 }, { onCreateGame: (g) => { calls.push(g); return new Promise((r) => { release = r; }); } });
+test('Cancel on the create wait withdraws the create and closes the panel without a notice; the join wait has no Cancel', async () => {
+  let fail; const calls = [], cancels = [];
+  const s = screen({ name: 'Ama', charClass: 0, level: 3 }, { onCreateGame: (g) => { calls.push(g); return new Promise((_, r) => { fail = r; }); },
+    onCancelCreate: () => { cancels.push(1); fail(Object.assign(new Error('cancelled'), { cancelled: true })); } });
   s.activate('create'); for (const k of 'abc') s.typeKey(`Key${k}`, k); s.typeKey('Enter');
-  assert.equal(calls.length, 1);
-  s.activate('busy-cancel');
-  assert.equal(calls.length, 1); assert.equal(s.evidence.notice, null);
-  release(); await tick();
+  assert.equal(calls.length, 1); assert.equal(s.evidence.creating, true);
+  assert.deepEqual(s.evidence.boxes.map((b) => b.id), ['busy-cancel']);
+  s.activate('busy-cancel'); await tick();
+  assert.equal(cancels.length, 1);
+  assert.equal(s.evidence.notice, null); assert.equal(s.busy, false); assert.equal(s.panel, null);
+
+  let joins = 0, cancelled = 0;
+  const j = screen({ name: 'Ama', charClass: 0, level: 3 }, { onJoinGame: () => { joins++; return new Promise(() => {}); }, onCancelCreate: () => { cancelled++; } });
+  j.activate('join'); j.setGames([{ name: 'Cows', difficulty: 0, description: '' }]);
+  for (const k of 'cows') j.typeKey(`Key${k}`, k); j.typeKey('Enter');
+  assert.equal(joins, 1);
+  j.activate('busy-cancel');
+  assert.equal(cancelled, 0); assert.equal(j.busy, true);
+});
+
+test('a queued create shows the place in line with a CANCEL that leaves the line', async () => {
+  let fail, cancels = 0;
+  const s = screen({ name: 'Ama', charClass: 0, level: 3 }, { onCreateGame: () => new Promise((_, r) => { fail = r; }),
+    onCancelCreate: () => { cancels++; fail(Object.assign(new Error('cancelled'), { cancelled: true })); } });
+  s.setQueue(4); assert.equal(s.queue, null, 'no create pending, no line');
+  s.activate('create'); for (const k of 'abc') s.typeKey(`Key${k}`, k); s.typeKey('Enter');
+  s.setQueue(12);
+  assert.equal(s.evidence.queue, `in line: 12 `);
+  assert.deepEqual(s.evidence.boxes.map((b) => b.id), ['queue-cancel']);
+  s.setQueue(3); assert.equal(s.queue, 3);
+  s.activate('queue-cancel'); await tick();
+  assert.equal(cancels, 1); assert.equal(s.queue, null); assert.equal(s.busy, false); assert.equal(s.evidence.notice, null);
+});
+
+test('on a closed realm a picked row asks for the game by name and shows the lines it is given', () => {
+  const asked = [];
+  const s = screen({ name: 'Ama', charClass: 0, level: 3 }, { onSelectGame: (n) => asked.push(n) });
+  s.pinClock(100000); s.activate('join');
+  s.setGames([{ name: 'Cows', description: 'from the list row' }, { name: 'Baal', description: '' }]);
+  const [x, y] = [440, 229];
+  s.press(x, y, 800, 600);
+  assert.deepEqual(asked, ['Cows']); assert.equal(s.evidence.gameInfo, null);
+  s.setGameInfo(['Elapsed Time: 0:01:01', '', 'Ama', 'Level 9 Amazon']);
+  assert.deepEqual(s.evidence.gameInfo, ['Elapsed Time: 0:01:01', '', 'Ama', 'Level 9 Amazon']);
+  s.setGames([{ name: 'Cows', description: '' }]);
+  assert.equal(s.evidence.gameInfo, null, 'a refresh empties the box');
 });

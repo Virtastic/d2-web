@@ -45,7 +45,7 @@ export const BNET_LOBBY_STRINGS = {
   send: 5305, whisper: 5306, squelch: 5307, help: 5308, emote: 5309, unsquelch: 5310,
   create: 5312, join: 5313, channel: 5314, ladder: 5315, quit: 5316, enterChat: 11126,
   newsTitle: 11123, level: 4057, lastDifficulty: 11124, none: 11125, normal: 5156, nightmare: 5155, hell: 5154,
-  hardcore: 5016, levelN: 5017, accountName: 5224, deadHardcore: 5304, ok: 5102, cancel: 5103, pleaseWait: 5243,
+  hardcore: 5016, levelN: 5017, accountName: 5224, deadHardcore: 5304, ok: 5102, cancel: 5103, pleaseWait: 5243, queueNote: 11023, queuePosition: 11026,
   createGame: 5150, joinGame: 5151, gameName: 5274, invalidGameName: 5137, password: 5225, passwordOptional: 5256, descriptionOptional: 5257,
   maxPlayers: 5258, levelDifference: 5259, levels: 5260, gameListHeader: 5275,
   helpTitle: 5308, channelsTitle: 5263, channelName: 5262, ladderTitle: 5315,
@@ -163,6 +163,10 @@ export const BNET_LOBBY_LAYOUT = {
   },
   // The join in flight (D2Multi 0x14100): the panel gone, the notice's popup frame with a CANCEL button and a centred Font24 `Please Wait` baseline 223.
   joining: { cancel: button('busy-cancel', 351, 337, 96, 32, 'cancelButton', 0, 'cancel'), text: { x: 400, y: 223, font: 'font24', string: 'pleaseWait' } },
+  // Waiting in the realm's line to create a game: the CREATE GAME title, a text box with the place in line, and a CANCEL that leaves the line.
+  queue: { title: { x: 496, y: 121, w: 200, h: 22, font: 'font30', centred: true, text: 'createGame' },
+    body: { x: 427, y: 234, w: 300, h: 100, font: 'font16' },
+    cancel: button('queue-cancel', 433, 433, 96, 32, 'cancelButton', 0, 'cancel') },
   // The notice (D2Multi+0x1A360..0x1A3F0): PopUpOK, its OK a CancelButtonBlank, a centred Font24 box inset 10/8.
   notice: { x: 268, y: 350, ok: button('notice-ok', 351, 337, 96, 32, 'cancelButton', 0, 'ok'),
     body: { x: 268, y: 320, w: 264, h: 120, insetX: 10, insetY: 8, font: 'font24', centred: true } },
@@ -274,6 +278,7 @@ export function portraitFrameAt(token, elapsedMs) {
 
 export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, string = () => '', character = {},
   now = () => performance.now(), registryDifficulty = 0, onCreateGame = async () => {}, onJoinGame = async () => {}, onRefreshGames = () => {},
+  onCancelCreate = () => {}, onSelectGame = null,
   offline = false,
   charTitle = null, portraitFrame = null, auraFrame = null, figure = null, onQuit = () => {}, onEnterChat = () => {}, onSendChat = () => false, onJoinChannel = () => {}, onRefreshChannels = () => {}, onLadder = null, documentObject = globalThis.document }) {
   const A = BNET_LOBBY_ASSETS, L = BNET_LOBBY_LAYOUT, S = BNET_LOBBY_STRINGS;
@@ -373,8 +378,13 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   // The scrollbar control: the thumb grabbed, which arrow shows pressed, and whether the mouse button is still down.
   const bar = { grab: false, up: false, down: false, held: false };
   let joining = false;
+  // A create in flight: the Please Wait popup over the create panel, whose Cancel (unlike the join's) withdraws the request; `queue` is the
+  // place in the realm's line once it has said there is one, and swaps the popup for the queue panel.
+  let creating = false, queue = null;
+  // A closed realm's text for the picked game (setGameInfo), a line per entry; null when the description comes with the list row.
+  let info = null;
   let openStamp = 0;
-  const openJoin = () => { panel = 'join'; Object.assign(form, { name: '', password: '', focus: 'name' }); selected = -1; listFirst = 0; desc = '';
+  const openJoin = () => { panel = 'join'; Object.assign(form, { name: '', password: '', focus: 'name' }); selected = -1; listFirst = 0; desc = ''; info = null;
   // D2Multi 0x148F0 builds the panel's list empty and asks the realm for games only when 5 s have passed since the last open (the stamp moves only then, and starts at 0, the zero-filled static, so an open under 5 s after the clock starts asks nothing).
   games = []; if (clock() - openStamp >= 5000) { openStamp = clock(); refreshGames(); } };
   // HELP, CHANNEL and LADDER: panels of their own. HELP's list keeps its place while the panel is shut; CHANNEL's list is what the chat
@@ -406,7 +416,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     return helpRows;
   };
 
-  const disabled = (b) => (busy && !joining && b.id !== 'busy-cancel') || ((b.id === 'create' || b.id === 'join') && deadHardcore) || (b.id === 'channel' && mode === 'lobby') ||
+  const disabled = (b) => (busy && !joining && b.id !== 'busy-cancel' && b.id !== 'queue-cancel') || ((b.id === 'create' || b.id === 'join') && deadHardcore) || (b.id === 'channel' && mode === 'lobby') ||
     (b.id.startsWith('difficulty-') && !allowed[Number(b.id.slice(11))]) || (b.id === 'join-game' && !form.name) || (b.id === 'channel-ok' && !form.channel.trim()) ||
     ((b.id === 'level-up' || b.id === 'level-down') && !form.levelLimit);
   const toggled = (b) => (b.id === 'level-box' && form.levelLimit) || (b.id === 'channel' && panel === 'channel') || (latch === b.id && panel === b.id) || (b.id === 'ladder' && panel === 'ladder') || (b.id === `difficulty-${form.difficulty}`);
@@ -414,6 +424,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   // The controls on show, in D2Multi's build order.
   const controls = () => {
     if (notice) return [L.notice.ok];
+    if (creating) return [queue === null ? L.joining.cancel : L.queue.cancel];
     const out = [];
     if (mode === 'chat') out.push(L.send, L.whisper, L.chatHelp, L.squelch, L.unsquelch, L.emote);
     out.push(L.create, L.channel, L.join, L.ladder, L.quit);
@@ -468,11 +479,13 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     return i < games.length ? i : -1;
   };
   // A row click (D2Multi 0x11E20): its game name goes into the name box, which loses the focus; the password box is left as typed.
-  const selectGame = (i) => { selected = i; form.name = games[i].name; form.focus = null; desc = games[i].description; };
+  const selectGame = (i) => { selected = i; form.name = games[i].name; form.focus = null; desc = games[i].description;
+    // On a closed realm the text beside the list is the realm's answer about the game, asked for by name.
+    if (typeof onSelectGame === 'function') { desc = ''; onSelectGame(games[i].name); } };
   // A press inside the list (D2Win 0x8C60 sets the row, D2Multi 0x14730 reacts): the description empties; below the last row the pick is
   // cleared and nothing else changes (the name box keeps its text); the same row twice within 500 ms joins that game, any other click selects.
   const pickRow = (row) => {
-    desc = '';
+    desc = ''; info = null;
     if (row < 0) { selected = -1; return; }
     selected = row;
     if (row === lastPick.row && clock() - lastPick.at <= 500) { joinGame(); return; }
@@ -520,12 +533,19 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     // On success the lobby stays busy: the game's first frames replace the screen.
     busy = true;
     try { await task(); }
-    catch (error) { busy = false; joining = false; if (!error?.sessionLost) notice = { body: gameErrorText(error, string, character) }; }
+    catch (error) {
+      busy = false; joining = false; creating = false; queue = null;
+      // A create the player cancelled closes its panel and says nothing.
+      if (error?.cancelled) { if (panel === 'create') closePanel(); }
+      else if (!error?.sessionLost) notice = { body: gameErrorText(error, string, character) };
+    }
   };
+  const cancelCreate = () => { if (creating) onCancelCreate(); };
   const createGame = () => {
     if (busy || !form.name) return;
     // D2Multi 0x142C0 sends atol(text) & 0xff for both boxes (an empty box is 0); the level byte is 0xff with the checkbox off.
     const maxPlayers = (Number(form.maxPlayers) || 0) & 0xff;
+    creating = true; queue = null;
     void run(() => onCreateGame({ gameName: form.name, gamePassword: form.password, description: form.description, maxPlayers,
       difficulty: form.difficulty, levelDifference: form.levelLimit ? (Number(form.levelDifference) || 0) & 0xff : 0xff }));
   };
@@ -574,6 +594,8 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     chat.picked = u.name; reeval();
   };
   const activate = (b) => {
+    // The create wait's Cancel and the queue panel's CANCEL both withdraw the create. The join wait's Cancel has no handler: it does nothing.
+    if (creating && (b.id === 'busy-cancel' || b.id === 'queue-cancel')) { cancelCreate(); return; }
     if (busy || disabled(b)) return;
     const id = b.id;
     if (id === 'notice-ok') { notice = null; return; }
@@ -882,9 +904,9 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     }
     games.slice(first, first + J.list.rows).forEach((g, i) => font(J.list.font, first + i === selected ? J.list.selectedColour : J.list.colour)
       .drawAnchored(sctx, g.name, J.list.x, J.list.firstBaseline + i * J.list.pitch));
-    if (desc) {
+    if (desc || info) {
       const D = J.list.desc, df = font(D.font, D.colour);
-      wrapSpaces(desc, D.w, (t) => df.measure(t)).slice(0, D.lines).forEach((line, i) =>
+      (info ? info.flatMap((l) => (l ? wrapSpaces(l, D.w, (t) => df.measure(t)) : [''])) : wrapSpaces(desc, D.w, (t) => df.measure(t))).slice(0, D.lines).forEach((line, i) =>
         df.drawAnchored(sctx, line, D.x + Math.max(Math.trunc((D.w - df.measure(line)) / 2), 0), D.firstBaseline + i * D.pitch));
     }
   };
@@ -956,6 +978,16 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     const f = font(J.text.font, 0), t = text(J.text.string);
     f.drawAnchored(sctx, t, J.text.x - Math.trunc((f.measure(t) + 2) / 2), J.text.y);
   };
+  // The place in line: the lead-in string, then the number in white.
+  const queueText = () => `${string(S.queuePosition)}${queue} `;
+  const drawQueue = () => {
+    const Q = L.queue;
+    drawTextBox(Q.title, [{ text: text(Q.title.text), colour: 4 }]);
+    // GUESS: the panel's text box is first set to the "You are in line" note and then to the place; whether the note stays above the place
+    // was not read (only the place is drawn). A retail frame of a queued create would settle it, and the box's font and colours with it.
+    drawTextBox(Q.body, [{ text: queueText(), colour: 4 }]);
+    drawButton(Q.cancel);
+  };
   const drawNotice = () => {
     const N = L.notice;
     sctx.save(); sctx.globalAlpha = 0x7f / 0xff; sctx.fillStyle = '#000'; sctx.fillRect(0, 0, 800, 600); sctx.restore();
@@ -1020,6 +1052,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
       const kept = selected >= 0 ? games[selected]?.name ?? null : null;
       const wasAtEnd = games.length > 9 && listFirst === games.length - 9;
       games = list.map((g) => ({ name: String(g.name ?? ''), password: !!g.password, difficulty: g.difficulty ?? 0, description: String(g.description ?? ''), status: g.status ?? 0 }));
+      info = null;
       const found = kept === null ? -1 : games.findIndex((g) => g.name === kept);
       if (found >= 0) selected = found;
       desc = '';
@@ -1028,13 +1061,18 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     },
     // The game list's scroll (D2Win 0x88A0, the call the scrollbar makes): the first row on show, only floored at 0.
     scrollGames(pos) { listFirst = Math.max(0, pos); },
+    // A closed realm's answer about the picked game: the lines of the box beside the list.
+    setGameInfo(lines) { info = lines && lines.length ? lines.map(String) : null; },
+    // The realm put the pending create in its line at `place` (it says so again each time the place changes).
+    setQueue(place) { if (creating) queue = place >>> 0; },
+    get queue() { return queue; },
     selectedGame() { return selected >= 0 && games[selected] ? { ...games[selected] } : null; },
     // Time-driven work: the join panel's refresh. draw() runs it too.
     tick() { if (panel === 'join' && clock() - timerAt >= GAME_REFRESH_MS) { timerAt = clock(); refreshGames(); } },
     get panel() { return panel; },
     get busy() { return busy; },
     get evidence() {
-      return { mode, panel, notice, busy, character: { name: character.name ?? '', charClass: character.charClass ?? null, level: character.level ?? null },
+      return { mode, panel, notice, busy, creating, queue: queue === null ? null : queueText(), gameInfo: info, character: { name: character.name ?? '', charClass: character.charClass ?? null, level: character.level ?? null },
         info: characterInfoLines(character, string, charTitle).map((l) => l.text), difficulties: allowed,
         form: { ...form, password: undefined, passwordLength: form.password.length }, chat: chat.lines.map((l) => l.text),
         boxes: controls().map((b) => ({ id: b.id, ...box(b), disabled: disabled(b) })), cursor: pointer };
@@ -1149,6 +1187,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
       if (inList(x, y, w, h)) { pickRow(listRow(x, y, w, h)); pressed = null; return 'list'; }
       if (inChanList(x, y, w, h)) { pickChannel(x, y, w, h); pressed = null; return 'list'; }
       if (joining) return null;
+      if (creating) { const c = hit(x, y, w, h); pressed = c ? c.id : null; return pressed; }
       if (mode === 'chat' && !busy && !notice) { const [sx, sy] = at(x, y, w, h), i = bandCell(sx, sy); if (i >= 0) { pressed = null; return `user:${chat.scroll + i}`; } }
       const b = hit(x, y, w, h); if (!b || disabled(b) || dim(b)) return null; 
       if (['create', 'join', 'channel', 'ladder'].includes(b.id)) {
@@ -1199,14 +1238,15 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
       if (deadHardcore && !panel) drawTextBox(L.serverBox, [{ text: text('deadHardcore') }]);
       drawLogos(1);
       if (mode !== 'chat') drawOwnPortrait();
-      if (panel === 'create') drawCreate();
+      if (creating && queue !== null) drawQueue();
+      else if (panel === 'create') drawCreate();
       else if (panel === 'join' && !joining) drawJoin();
       else if (panel === 'help') drawHelp();
       else if (panel === 'channel') drawChannel();
       else if (panel === 'ladder') drawLadder();
       else if (panel === 'ladder-list') drawLadderList();
       if (mode === 'chat') { drawBand(); for (const b of L.arrows) drawButton(b); }
-      if (joining) drawJoining();
+      if (joining || (creating && queue === null)) drawJoining();
       if (notice) drawNotice();
       const f = cursorDc6.frames[0];
       const left = pointer[0] + f.offsetX, top = pointer[1] - 1 + f.offsetY - f.height + 1;

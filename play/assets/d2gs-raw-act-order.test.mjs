@@ -7,7 +7,7 @@ import { d2gsJoin } from './realm-client.mjs';
 const SIZE = { 0x00: 1, 0x01: 8, 0x02: 1, 0x03: 12, 0x0b: 6, 0x59: 26, 0x07: 6 };
 const FIRST = [0x01, 0x00, 0x04, 0x00, 0x10, 0x00, 0x01, 0x00, 0x00, 0x02];
 
-function run(chunks, needReveal = false) {
+function run(chunks, needReveal = false, noData = false) {
   let onData = () => {};
   const sent = [], fedStreams = [];
   const transport = {
@@ -30,6 +30,7 @@ function run(chunks, needReveal = false) {
     d2gsClientPlayerFeed: (b) => {
       fedStreams.push(opcodesOf(b));
       actSeen = false; revealSeen = false;
+      if (noData && opcodesOf(b).includes(0x03)) return -5;
       for (const op of opcodesOf(b)) { if (op === 0x03) actSeen = true; if (op === 0x07) revealSeen = true; if (op === 0x59 && (!actSeen || (needReveal && !revealSeen))) return -3; }
       return 1;
     },
@@ -69,4 +70,8 @@ test('the join waits for a reveal that arrives in a later read', async () => {
   const { fedStreams } = await run([[...assign, ...handshake, ...act], reveal, [0x02]], true);
   assert.deepEqual(fedStreams[0], [0x01, 0x00, 0x02, 0x03, 0x59, 0x0b], 'refused without a reveal');
   assert.deepEqual(fedStreams.at(-1), [0x01, 0x00, 0x02, 0x03, 0x07, 0x59, 0x0b]);
+});
+
+test('an act the engine cannot build for want of game data fails the join at once instead of reading on', async () => {
+  await assert.rejects(run([[...assign, ...handshake, ...act, 0x02]], false, true), /game data archives/);
 });

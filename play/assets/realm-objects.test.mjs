@@ -153,3 +153,47 @@ test('a click on the stash walks to it, uses it on arrival, and the server reply
   feed(w, [0x0a, 2, ...u32(STASH)]);
   assert.equal(w.objectViews().some((o) => o.id === STASH), false);
 });
+
+const setState = (guid, mode, selectable, selector = 3) => [0x0e, 2, ...u32(guid), selector, selectable, ...u32(mode)];
+const TORCH = 0x08;   // a class-37 torch of the recorded join: assigned lit (mode 2), then sent mode 2 again
+
+test('a mode the object is already in keeps its clock, and only the mode-change selector is applied', { skip }, () => {
+  const w = world(); feed(w, ...JOIN);
+  const torch = () => w.objectViews().find((o) => o.id === TORCH);
+  assert.deepEqual([torch().classId, torch().mode, torch().framePrecise, torch().frameCountPrecise, torch().animSpeed], [37, 2, 0, 20 << 8, 200]);
+  for (let tick = 0; tick < 7; tick++) w.tickObjects();
+  assert.equal(torch().framePrecise, 1400);
+  feed(w, '0e0208000000030002000000');                       // the join's own repeat of the lit mode
+  assert.equal(torch().framePrecise, 1400, 'the loop goes on from where it was');
+  feed(w, setState(TORCH, 0, 0, 0x15));                      // another selector names no mode
+  assert.deepEqual([torch().mode, torch().framePrecise], [2, 1400]);
+  for (let tick = 0; tick < 19; tick++) w.tickObjects();
+  assert.equal(torch().framePrecise, 1400 + 19 * 200 - (20 << 8), 'the loop wraps by its own length');
+  feed(w, setState(TORCH, 0, 0));                            // put out: a new mode starts its own run
+  assert.deepEqual([torch().mode, torch().framePrecise, torch().frameCountPrecise], [0, 0, 256]);
+});
+
+test('a door the server opens or closes plays its transit cels and cannot be picked meanwhile', { skip }, () => {
+  const w = world(); feed(w, add(300, 25, 0), add(301, 13, 0), add(302, 75, 0));
+  const state = (id) => { const o = w.objectViews().find((v) => v.id === id); return [o.mode, o.framePrecise, o.selectable]; };
+  const run = (id) => { const seen = []; for (let tick = 0; tick < 5; tick++) { w.tickObjects(); seen.push(state(id)); } return seen; };
+  assert.deepEqual(state(300), [0, 0, true]);
+  feed(w, setState(300, 2, 1));                              // four opening cels, a cel a tick
+  assert.deepEqual(state(300), [1, 0, false]);
+  assert.deepEqual(run(300), [[1, 256, false], [1, 512, false], [1, 768, false], [2, 0, true], [2, 0, true]]);
+  feed(w, setState(300, 2, 0));                              // open already: only the selectable byte is taken
+  assert.deepEqual(state(300), [2, 0, false]);
+  feed(w, setState(300, 0, 1));                              // four closing cels, from the last back to the first
+  assert.deepEqual(state(300), [3, 768, false]);
+  assert.deepEqual(run(300), [[3, 512, false], [3, 256, false], [3, 0, false], [0, 0, true], [0, 0, true]]);
+  feed(w, setState(300, 4, 1));                              // any other change is immediate
+  assert.deepEqual(state(300), [4, 0, true]);
+  // A door with one cel a mode has no transit: it is open at once, and selectable as the packet says.
+  feed(w, setState(301, 2, 0));
+  assert.deepEqual(state(301), [2, 0, false]);
+  feed(w, setState(301, 0, 1));
+  assert.deepEqual(run(301).pop(), [0, 0, true]);
+  // The start cel of a door's new mode is written to the clock as it stands in the table, not as a whole cel.
+  feed(w, setState(302, 2, 1));
+  assert.deepEqual(state(302), [2, 1, true]);
+});

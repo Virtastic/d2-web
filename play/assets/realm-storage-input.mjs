@@ -3,13 +3,15 @@
 // it (0x1F) with the page of the grid (stash 4, cube 3), and the cube's Transmute button is 0x4F button 24.
 // A shift+click on a carried item sends it to the belt (0x63). Everything else (the server's answer, the new
 // item positions) comes back as item packets; nothing here moves an item locally.
+// The trade screen is the same routing on page 2 (the player's own offer); a press on the rest of that panel is
+// its buttons' (assets/realm-trade.mjs), and the partner's grid takes no press.
 import { itemPackets, BUTTON } from './realm-item-packets.mjs';
 import { INV_PAGE } from './realm-input.mjs';
 import { decideGridPlace } from './grid-place.mjs';
 
 /**
  * `ctx`: { width, height, items, cursorId, input (createRealmInput), send(bytes), inventory: {visible, renderer},
- * stash: {open, renderer, layout}, cube: {open, renderer, layout} }. Returns true when the click was the panels'.
+ * stash: {open, renderer, layout}, cube: {open, renderer, layout}, trade: {open, renderer, layout, press(x, y, {cursorItem})} }. Returns true when the click was the panels'.
  */
 export function realmStorageClick(ctx, x, y, { button = 0, shift = false } = {}) {
   if (button !== 0) return false;
@@ -25,6 +27,12 @@ export function realmStorageClick(ctx, x, y, { button = 0, shift = false } = {})
     else if (d.action !== 'refuse') ri.putInGrid(cursorId, cell.x, cell.y, page);
     return true;
   };
+  const trade = ctx.trade;
+  if (trade?.open && trade.renderer && trade.layout && trade.renderer.contains(x, y, W, H, trade.layout)) {
+    if (trade.renderer.cellAt(x, y, W, H, trade.layout, null)) return grid(trade, trade.layout, INV_PAGE.TRADE);
+    trade.press(x, y, { cursorItem: Boolean(cursorId) });
+    return true;
+  }
   const cube = ctx.cube;
   if (cube.open && ctx.inventory.visible && cube.renderer && cube.layout && cube.renderer.contains(x, y, W, H, cube.layout)) {
     if (cube.renderer.transmuteAt(x, y, W, H, cube.layout)) { ctx.send(itemPackets.button(BUTTON.TRANSMUTE)); return true; }

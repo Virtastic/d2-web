@@ -69,7 +69,7 @@ export function createSendGate(transmit) {
   };
 }
 
-const MONSTER_DEATH = 0, MONSTER_DEAD = 12, PLAYER_DEAD = 17, MELEE_REACH = 2;
+const MONSTER_DEATH = 0, MONSTER_DEAD = 12, PLAYER_DEAD = 17;
 const near = (dx, dy, w, up, down) => Math.abs(dx) <= w && dy >= -up && dy <= down;
 // Objects whose use depends on what the cursor holds: the Compelling Orb wants the Khalim's Will flail,
 // the Hell Forge in its open state wants the Hellforge Hammer. Without it the click sends nothing.
@@ -80,8 +80,10 @@ const CODE_QF2 = 0x20326671, CODE_HFH = 0x20686668;
  * Turn the player's input into packets.
  *   transmit(bytes)      -> false when the connection is closed
  *   scene()              -> { ready, player:{x,y}, monsters:[{guid,classId,mode,x,y,anchorX,anchorY,drawn}], objects, items,
+ *                             players:[{guid,x,y,anchorX,anchorY,drawn}] (the other players), inTown,
  *                             isNpc(classId), hoverBox(dx,dy), toScreen(wx,wy) -> {x,y} in pointer space, pointerWorld(px,py),
- *                             run, leftMelee (the left skill is a hand-to-hand attack), selected:{left,right}, cursorId, cursorCode() -> the held item's 4-byte code }
+ *                             run, selected:{left,right}, cursorId, cursorCode() -> the held item's 4-byte code,
+ *                             corpses:[{guid,owner,own,mode,x,y}], the player corpses the server has named (optional) }
  * The engine hooks below each answer the local player's own prediction of an action: 1 accepted, 0 refused
  * (the packet is not sent, as the client sends only what it could start itself), -1 or absent unknown (sent).
  *   move(x, y, run)               -> starts the local route to a spot. The game server sends the walk/run
@@ -90,14 +92,18 @@ const CODE_QF2 = 0x20326671, CODE_HFH = 0x20686668;
  *   reach(type, guid)             -> true when the unit is close enough to use (falls back to a tile distance)
  *   actionDone()                  -> true once the local player has finished its current action: a waiting
  *                                    interaction then re-checks its reach and re-approaches if short
- *   castAt(x, y), castOnUnit(type, guid) -> the right-hand skill's local start
+ *   skillPlan(hand, type, guid)   -> what a click with a hand's skill (0 left, 1 right) does. On a unit: 0 walk to
+ *                                    it first and use the skill on arrival, 1 use it now. On the ground
+ *                                    (type -1): 2 walk there instead (the right button with a hand-to-hand
+ *                                    skill), 1 use it at the spot.
+ *   skillAt(hand, x, y), skillOnUnit(hand, type, guid) -> the local start of a hand's skill
  */
 /** D2Client+0x29920 on an Items.txt row: true only for a plain useable row (useable byte 1, unique and quest bytes not 1). */
 export const canUseItemRow = (row) => row.useable === 1 && row.unique !== 1 && row.quest !== 1;
 /** The 0x81CE0 stat list: flag 2, a 12-frame timeout; the game runs 25 frames a second. */
 export const ACTION_LOCK_FRAMES = 12, GAME_FRAME_MS = 40;
 export function createRealmInput({ transmit, scene, now = () => 0, move = null, approachUnit = null, reach = null,
-  actionDone = null, castAt = null, castOnUnit = null, onTalk = null, questFlags = null, leaveWait = null }) {
+  actionDone = null, skillPlan = null, skillAt = null, skillOnUnit = null, onTalk = null, questFlags = null, leaveWait = null }) {
   const gate = createSendGate(transmit);
   const evidence = { attempts: 0, sent: 0, last: null };
   // The inventory's item actions pass the leave wait's gate first (1.13c 0x923F0): an armed wait is cancelled and the action refused.
@@ -112,13 +118,21 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
   }
   const open = () => { const s = scene(); return s?.ready ? s : null; };
 
-  // What is under the pointer, nearest the player first: a unit, then a ground item, then an object.
+  // What is under the pointer, nearest the player first: a unit, then another player, then a ground item, then an object.
   function pick(s, px, py) {
     const me = s.player, d2 = (u) => (u.x - me.x) ** 2 + (u.y - me.y) ** 2;
     const units = s.monsters.filter((m) => m.drawn && m.mode !== MONSTER_DEATH && m.mode !== MONSTER_DEAD &&
       s.hoverBox(px - m.anchorX, py - m.anchorY)).sort((a, b) => d2(a) - d2(b));
     if (units[0]) return s.isNpc(units[0].classId) ? { kind: 'npc', unit: units[0] } : { kind: 'monster', unit: units[0] };
+    const lying = new Set((s.corpses ?? []).map((c) => c.guid));   // a player unit the server named a corpse is picked as a corpse below
+    const other = (s.players || []).filter((p) => p.drawn && !lying.has(p.guid) && s.hoverBox(px - p.anchorX, py - p.anchorY)).sort((a, b) => d2(a) - d2(b))[0];
+    if (other) return { kind: 'player', unit: other };
     const spot = (u) => { const p = s.toScreen(u.x, u.y); return near(px - p.x, py - p.y, 22, 40, 12); };
+    // GUESS (corpse selection): only the hero's own corpse is taken as a click target; whether the client also
+    // selects another player's corpse (the server refuses the loot without permission) is not read.
+    // capture: session <a click on another player's corpse, the outgoing packets recorded>.
+    const corpse = (s.corpses ?? []).filter((c) => c.own && c.mode === PLAYER_DEAD && spot(c)).sort((a, b) => d2(a) - d2(b))[0];
+    if (corpse) return { kind: 'corpse', unit: corpse };
     const item = s.items.filter((i) => i.mode === 3 && spot(i)).sort((a, b) => d2(a) - d2(b))[0];
     if (item) return { kind: 'item', unit: item };
     const object = s.objects.filter((o) => o.selectable !== false && spot(o)).sort((a, b) => d2(a) - d2(b))[0];
@@ -129,16 +143,43 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
   // Without the engine's reach test: five tiles each way is inside the server's talk range (fewer than 9 by
   // its size-aware distance) from every side; an item or object is used from two tiles.
   const inReach = (s, type, u) => {
+    if (pending?.hand != null) return plan(pending.hand, type, idOf(type, u)) !== 0;
     if (reach) { const r = reach(type, idOf(type, u)); if (r != null && r !== -1) return Boolean(r); }
     const d = Math.max(Math.abs(u.x - s.player.x), Math.abs(u.y - s.player.y));
-    return d <= (type === UNIT.MONSTER ? 5 : 2);
+    return d <= (type === UNIT.MONSTER || type === UNIT.PLAYER ? 5 : 2);
   };
-  const idOf = (type, u) => (type === UNIT.MONSTER ? u.guid : u.id);
-  const find = (s, type, guid) => (type === UNIT.MONSTER ? s.monsters.find((m) => m.guid === guid && m.mode !== MONSTER_DEATH && m.mode !== MONSTER_DEAD)
+  const idOf = (type, u) => (type === UNIT.MONSTER || type === UNIT.PLAYER ? u.guid : u.id);
+  // A corpse is a player unit lying in mode DEAD; the server opens it only in that mode. Any other player unit is one of the other players.
+  const corpseOf = (s, guid) => (s.corpses ?? []).find((c) => c.guid === guid) ?? null;
+  const find = (s, type, guid) => (type === UNIT.PLAYER ? ((s.corpses ?? []).find((c) => c.guid === guid && c.mode === PLAYER_DEAD) ?? (corpseOf(s, guid) ? null : (s.players || []).find((p) => p.guid === guid)))
+    : type === UNIT.MONSTER ? s.monsters.find((m) => m.guid === guid && m.mode !== MONSTER_DEATH && m.mode !== MONSTER_DEAD)
     : type === UNIT.OBJECT ? s.objects.find((o) => o.id === guid) : type === UNIT.ITEM ? s.items.find((i) => i.id === guid && i.mode === 3) : null);
   // The local start comes first: the client sends an action only when its own player could start it.
   const predicted = (result) => { evidence.localMove = result; return result !== 0; };
   const startRoute = (x, y, run) => predicted(move ? move(x, y, Boolean(run)) : null);
+
+  // A hand's skill: started locally, then sent. Left is 0x05/0x06 (held 0x08/0x09), right 0x0C/0x0D (held 0x0F/0x10).
+  const plan = (hand, type, guid) => { const r = skillPlan ? skillPlan(hand, type, guid) : null; return r == null ? -1 : r; };
+  function skillOn(hand, guid, held) {
+    if (!predicted(skillOnUnit ? skillOnUnit(hand, UNIT.MONSTER, guid) : null)) return false;
+    return hand ? emit(packets.rightSkillOnUnit(UNIT.MONSTER, guid, held), 'right-skill-unit')
+      : emit(packets.leftSkillOnUnit(UNIT.MONSTER, guid, held), 'left-skill-unit');
+  }
+  function skillGround(hand, x, y, held) {
+    if (!predicted(skillAt ? skillAt(hand, x, y) : null)) return false;
+    return hand ? emit(packets.rightSkillAt(x, y, held), 'right-skill-ground') : emit(packets.leftSkillAt(x, y, held), 'left-skill-ground');
+  }
+  // A click with a hand's skill on a unit. A hand-to-hand skill out of melee range walks to the unit and is
+  // used on arrival (the waiting use is the plain packet, never the held one); with Stand Still it is used at
+  // the pointer instead. Anything else is used on the unit now.
+  function skillClick(s, hand, u, world, held, stand) {
+    pending = null;
+    if (plan(hand, UNIT.MONSTER, u.guid) !== 0) return skillOn(hand, u.guid, held);
+    if (stand) return skillGround(hand, clamp16(world.x), clamp16(world.y), held);
+    pending = { type: UNIT.MONSTER, guid: u.guid, hand };
+    const sent = approach(s, UNIT.MONSTER, u);
+    return sent === null ? false : sent;
+  }
 
   // The interaction waiting on the walk: the click stores it, and it is used on arrival, never on the click.
   let pending = null;
@@ -153,6 +194,7 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
   function use(s, type, u) {
     const guid = idOf(type, u);
     if (type === UNIT.ITEM) return emit(packets.pickUp(UNIT.ITEM, guid), 'pickup');
+    if (type === UNIT.PLAYER) return emit(packets.interact(UNIT.PLAYER, guid), corpseOf(s, guid) ? 'corpse' : 'trade');   // a live player in town: the server answers with a trade request
     if (type === UNIT.MONSTER) {
       const sent = emit(packets.interact(UNIT.MONSTER, guid), 'talk');
       if (sent && onTalk) onTalk(guid);
@@ -166,7 +208,10 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
   function arrive(s, reapproach) {
     const u = find(s, pending.type, pending.guid);
     if (!u) { pending = null; return null; }
-    if (inReach(s, pending.type, u)) { const { type } = pending; pending = null; return use(s, type, u); }
+    if (inReach(s, pending.type, u)) {
+      const { type, hand } = pending; pending = null;
+      return hand != null ? skillOn(hand, u.guid, false) : use(s, type, u);
+    }
     if (!reapproach) return null;
     const sent = approach(s, pending.type, u);
     return sent === null ? false : sent;
@@ -185,26 +230,17 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
       const s = open(); if (!s) return null;
       const hit = pick(s, px, py);
       const world = s.pointerWorld(px, py);
-      if (hit.kind === 'monster') {
-        pending = null;
-        // The server pursues the target and never echoes the owner's walk, so a hand-to-hand attack out of
-        // arm's reach starts the local route to the monster with the packet. GUESS (melee reach): two tiles
-        // each way stands in for the engine's size-aware melee test; a ranged left skill never walks.
-        const far = Math.max(Math.abs(hit.unit.x - s.player.x), Math.abs(hit.unit.y - s.player.y)) > MELEE_REACH;
-        if (!stand && s.leftMelee && far) {
-          evidence.localMove = approachUnit ? approachUnit(UNIT.MONSTER, hit.unit.guid, Boolean(s.run))
-            : move ? move(clamp16(hit.unit.x), clamp16(hit.unit.y), Boolean(s.run)) : null;
-        }
-        return emit(packets.leftSkillOnUnit(UNIT.MONSTER, hit.unit.guid, held), 'left-skill-unit') && hit;
-      }
+      if (hit.kind === 'monster') return skillClick(s, 0, hit.unit, world, held, stand) && hit;
       // Stand Still held: the left skill is used at the spot under the pointer and the player does not walk.
       if (stand) {
         pending = null;
-        return emit(packets.leftSkillAt(clamp16(world.x), clamp16(world.y), held), 'left-skill-ground') && hit;
+        return skillGround(0, clamp16(world.x), clamp16(world.y), held) && hit;
       }
       if (held && hit.kind !== 'ground') return hit;               // a held button does not repeat a pickup or a talk
       pending = null;
-      const type = hit.kind === 'npc' ? UNIT.MONSTER : hit.kind === 'item' ? UNIT.ITEM : hit.kind === 'object' ? UNIT.OBJECT : null;
+      // Another player: in town the click walks up and interacts (the trade request); elsewhere it is a walk to the spot.
+      const type = hit.kind === 'player' ? (s.inTown ? UNIT.PLAYER : null) : hit.kind === 'npc' ? UNIT.MONSTER : hit.kind === 'item' ? UNIT.ITEM : hit.kind === 'object' ? UNIT.OBJECT
+        : hit.kind === 'corpse' ? UNIT.PLAYER : null;
       if (type != null) return interactWith(s, type, hit.unit) === false ? false : hit;
       const x = clamp16(world.x), y = clamp16(world.y);
       if (!startRoute(x, y, s.run)) return false;
@@ -237,16 +273,18 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
       return interactWith(s, UNIT.OBJECT, object) !== false;
     },
     /** The right button on the world: the right-hand skill at the unit under it, otherwise at the ground. */
-    rightClick(px, py, { held = false } = {}) {
+    rightClick(px, py, { held = false, stand = false } = {}) {
       const s = open(); if (!s) return null;
-      const hit = pick(s, px, py);
-      if (hit.kind === 'monster' || hit.kind === 'npc') {
-        if (!predicted(castOnUnit ? castOnUnit(UNIT.MONSTER, hit.unit.guid) : null)) return false;
-        return emit(packets.rightSkillOnUnit(UNIT.MONSTER, hit.unit.guid, held), 'right-skill-unit') && hit;
+      const hit = pick(s, px, py), world = s.pointerWorld(px, py);
+      if (hit.kind === 'monster' || hit.kind === 'npc') return skillClick(s, 1, hit.unit, world, held, stand) && hit;
+      pending = null;
+      const x = clamp16(world.x), y = clamp16(world.y);
+      // A hand-to-hand right skill on open ground walks there, unless Stand Still is held.
+      if (!stand && plan(1, -1, 0) === 2) {
+        if (!startRoute(x, y, s.run)) return false;
+        return emit(s.run ? packets.runTo(x, y) : packets.walkTo(x, y), s.run ? 'run' : 'walk') && hit;
       }
-      const world = s.pointerWorld(px, py), x = clamp16(world.x), y = clamp16(world.y);
-      if (!predicted(castAt ? castAt(x, y) : null)) return false;
-      return emit(packets.rightSkillAt(x, y, held), 'right-skill-ground') && hit;
+      return skillGround(1, x, y, held) && hit;
     },
     /**
      * The server's answer to a talk (its 0x28 packet: type, guid, and a third field): the client opens the

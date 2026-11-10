@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRealmHud, waypointTravelPacket, STAT } from './realm-hud-state.mjs';
+import { createRealmHud, waypointTravelPacket, waypointActCompletion, STAT } from './realm-hud-state.mjs';
 import { createExperienceTable, createWaypointTable, createSkillTable } from './realm-hud-tables.mjs';
 import { realmFrameReads } from './realm-client-view.mjs';
 
@@ -120,4 +120,22 @@ test('reset forgets everything', () => {
   h.feed(pack(stat1(STAT.level, 5)), sizeOf);
   h.reset();
   assert.equal(h.advancement(0), null);
+});
+
+test('the waypoint act tabs follow the server quest record: a tab click reaches the highest completed act and its row travels there', async () => {
+  const { createWaypointMenuInput } = await import('./waypoint-menu-input.mjs');
+  const menu = createWaypointMenuInput(), h = hud();
+  const tab = (act, done) => menu.hitTest(80 + 64 * (act - 1) + 4, 70, 800, 600, [], () => null, done, 1);   // inside tab zone `act`
+  // No quest record yet: the record is zero, so every tab resolves to Act I (never a dead click).
+  assert.deepEqual(waypointActCompletion(h.questWords), [false, false, false, false]);
+  assert.deepEqual(tab(3, waypointActCompletion(h.questWords)), { action: 'tab', act: 1 });
+  // Acts I and II completed (words 7 and 15, bit 0); Act IV's word alone does not skip Act III.
+  const body = new Array(96).fill(0); body[14] = 1; body[30] = 1; body[56] = 1;
+  h.feed(pack([0x29], body), sizeOf);
+  const done = waypointActCompletion(h.questWords);
+  assert.deepEqual(done, [true, true, false, true]);
+  assert.deepEqual(tab(2, done), { action: 'tab', act: 2 });
+  assert.deepEqual(tab(3, done), { action: 'tab', act: 3 });
+  assert.deepEqual(tab(5, done), { action: 'tab', act: 3 });
+  assert.deepEqual(Array.from(waypointTravelPacket(0x21, 75)), [0x49, 0x21, 0, 0, 0, 75, 0, 0, 0]);
 });

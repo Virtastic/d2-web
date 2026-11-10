@@ -83,6 +83,14 @@ test('Save and Exit during an armed trade-cancel wait still sends 0x69 at once',
   assert.deepEqual(log.sent, [[0x4f, 0x02, 0, 0, 0, 0, 0], [0x69]]);
   assert.deepEqual(log.left, [0]);
 });
+test('after Save and Exit with the wait armed, nothing more is sent: no second 0x69 when the 30 s passes, no 4F 07 for an item action', () => {
+  const { life, log, at } = mk();
+  life.inGame(); at(0); life.leaveGame(); at(100); life.saveAndExit();
+  at(40000); life.checkTimers();
+  assert.equal(life.itemAction(), true);
+  assert.deepEqual(log.sent, [[0x4f, 0x02, 0, 0, 0, 0, 0], [0x69]]);
+  assert.deepEqual(log.left, [0]);
+});
 test('Save and Exit during a reason countdown is refused, so the menu tears down at once', () => {
   const { life, log } = mk();
   life.inGame(); life.fail(7);
@@ -253,4 +261,11 @@ test('a stock join stream (01 00 02 59 0B 03, then 04 in a later frame) enters t
   const cat = (...ops) => Uint8Array.from(ops.flatMap((op) => [...pkt(op)]));
   assert.equal(lifePhaseFromFrame(cat(0x01, 0x00, 0x02, 0x59, 0x0b, 0x03), size), null);
   assert.equal(lifePhaseFromFrame(cat(0x04), size), 'ingame');
+});
+test('the real server burst after 0x6B carries 0x59, 0x0B and 0x04 in one frame and enters the game', () => {
+  const size = (b) => ({ 0x59: 26, 0x0b: 6, 0x1d: 3, 0x04: 1, 0x48: 11 }[b[0]] ?? 0);
+  const pkt = (id, n) => { const a = new Uint8Array(n); a[0] = id; return a; };
+  const frame = Uint8Array.from([...pkt(0x59, 26), ...pkt(0x0b, 6), ...pkt(0x1d, 3), ...pkt(0x48, 11), ...pkt(0x04, 1), ...pkt(0x48, 11)]);
+  assert.equal(lifePhaseFromFrame(frame, size), 'ingame');
+  assert.equal(lifePhaseFromFrame(frame.subarray(0, 26 + 6 + 3 + 11), size), null);   // before 0x04 nothing is decided
 });

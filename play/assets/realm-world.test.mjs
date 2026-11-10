@@ -203,3 +203,16 @@ test('belt boxes come from the 800x600 row set, seven rows after the 640x480 one
   assert.equal(belt.boxes(0)[0].left, 423);
   assert.equal(belt.boxes(2, 0)[0].left, 343);
 });
+
+test('a corpse made (0x74, flag set) takes what its owner wore; the pack stays', () => {
+  const w = createRealmWorld(tables()); w.setOwner(GUID);
+  feed(w, itemPacket(21, 4, { mode: 1, bodyLoc: 1, code: 'cap' }), itemPacket(22, 4, { mode: 0, x: 1, y: 1, code: 'hax' }),
+    itemPacket(20, 9, { mode: 1, bodyLoc: 4, code: 'gax' }, 777));
+  feed(w, Uint8Array.from([0x74, 0, ...u32le(GUID), ...u32le(900)]));
+  assert.deepEqual(w.itemViews().map((i) => i.id).sort(), [21, 22]);
+  feed(w, Uint8Array.from([0x74, 1, ...u32le(GUID), ...u32le(900)]));
+  assert.deepEqual(w.itemViews().map((i) => i.id), [22]);
+  assert.deepEqual(w.wornBy(777).map((i) => i.id), [20]);
+  feed(w, Uint8Array.from([0x74, 1, ...u32le(777), ...u32le(901)]));
+  assert.deepEqual(w.wornBy(777), []);
+});

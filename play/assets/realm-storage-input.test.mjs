@@ -20,3 +20,16 @@ test('shift-click on a carried item sends it to the belt; other buttons are not 
   assert.deepEqual(calls, [['send', 0x63, 5, 0, 0, 0]]);
   assert.equal(realmStorageClick(ctx(), 1, 1, { button: 2 }), false);
 });
+test('the trade screen: my grid lifts and puts on page 2, the rest of the panel is its buttons', () => {
+  calls.length = 0;
+  const press = (x, y, held) => calls.push(['press', x, y, held]);
+  const trade = (over) => ({ open: true, layout: {}, press, renderer: renderer(over) });
+  assert.equal(realmStorageClick(ctx({ trade: trade({ itemAt: () => ({ id: 7 }) }) }), 1, 1), true);
+  assert.equal(realmStorageClick(ctx({ cursorId: 9, items: [{ id: 9, invWidth: 1, invHeight: 1 }], trade: trade() }), 1, 1), true);
+  assert.equal(realmStorageClick(ctx({ trade: trade({ cellAt: () => null }) }), 30, 40), true);
+  assert.equal(realmStorageClick(ctx({ cursorId: 9, trade: trade({ cellAt: () => null }) }), 30, 40), true);
+  assert.deepEqual(calls, [['lift', 7], ['put', 9, 2, 3, 2], ['press', 30, 40, { cursorItem: false }], ['press', 30, 40, { cursorItem: true }]]);
+  calls.length = 0;
+  realmStorageClick(ctx({ trade: { ...trade({ contains: () => false }) }, inventory: { visible: false } }), 1, 1);
+  assert.deepEqual(calls, []);
+});

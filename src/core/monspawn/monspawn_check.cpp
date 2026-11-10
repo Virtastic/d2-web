@@ -5,6 +5,7 @@
 // room-activation routine does (region tick, preset units, objects, random monsters) and hash the
 // units that hang off the rooms exactly as the retail capture tool does (D2VecMonUnit from `room` on).
 #include <emscripten.h>
+#include "../d2client/character_screen.h"
 #include "warp_interaction.h"
 #include "object_client_clock.h"
 #include <algorithm>
@@ -5522,53 +5523,9 @@ EMSCRIPTEN_KEEPALIVE int d2_session_fixture_resist_penalty() {
     return difficulty ? static_cast<int32_t>(difficulty->dwResistPenalty) : INT32_MIN;
 }
 EMSCRIPTEN_KEEPALIVE int d2_session_character_screen(int32_t* out) {
-    if (!out || !g_targetPlayer) return 0;
     D2UnitStrc* p = g_targetPlayer;
-    out[0] = UNITS_GetDefense(p); out[1] = UNITS_GetAttackRate(p);
-    const int str = STATLIST_UnitGetStatValue(p, STAT_STRENGTH, 0), dex = STATLIST_UnitGetStatValue(p, STAT_DEXTERITY, 0);
-    D2UnitStrc* w = p->pInventory ? INVENTORY_GetItemFromBodyLoc(p->pInventory, BODYLOC_RARM) : nullptr;
-    const int bonus = w ? str * ITEMS_GetStrengthBonus(w) / 100 + dex * ITEMS_GetDexBonus(w) / 100 : 0;
-    out[2] = STATLIST_GetMinDamageFromUnit(p, 0) * (100 + bonus) / 100; out[3] = STATLIST_GetMaxDamageFromUnit(p, 0) * (100 + bonus) / 100;
-    if (!w) {
-        // 1.13c D2Client+0x31220 unarmed branch: base (stat 21 + 1, stat 22 + 2), percent = stat 25 + strength
-        // (floored at -90), min = (stat 18 + pct + 100) * min / 100, max = (stat 17 + pct + 100) * max / 100; 0x30E30 then forces min >= 1, max >= min + 1.
-        int pct = STATLIST_UnitGetStatValue(p, STAT_DAMAGEPERCENT, 0) + str;
-        if (pct < -90) pct = -90;
-        out[2] = (STATLIST_UnitGetStatValue(p, STAT_ITEM_MINDAMAGE_PERCENT, 0) + pct + 100) * (STATLIST_UnitGetStatValue(p, STAT_MINDAMAGE, 0) + 1) / 100;
-        out[3] = (STATLIST_UnitGetStatValue(p, STAT_ITEM_MAXDAMAGE_PERCENT, 0) + pct + 100) * (STATLIST_UnitGetStatValue(p, STAT_MAXDAMAGE, 0) + 2) / 100;
-        if (out[3] > 0) { if (out[2] < 1) out[2] = 1; if (out[3] < out[2] + 1) out[3] = out[2] + 1; }
-    }
-    out[4] = STATLIST_UnitGetStatValue(p, STAT_STAMINA, 0) >> 8; out[5] = STATLIST_UnitGetStatValue(p, STAT_MAXSTAMINA, 0) >> 8;
-    const int ids[4] = { STAT_FIRERESIST, STAT_COLDRESIST, STAT_LIGHTRESIST, STAT_POISONRESIST };
-    const int maxIds[4] = { STAT_MAXFIRERESIST, STAT_MAXCOLDRESIST, STAT_MAXLIGHTRESIST, STAT_MAXPOISONRESIST };
-    for (int i = 0; i < 4; i++) {
-        int resistance = STATLIST_UnitGetStatValue(p, ids[i], 0);
-        // D2Client's character panel applies the difficulty penalty before its -100 floor
-        // and maximum-resistance ceiling. Lord of Destruction reads ResistPenalty from the
-        // active DifficultyLevels row; classic uses the original -20/-50 penalties.
-        if (p->pGame) {
-            if (p->pGame->bExpansion) {
-                if (D2DifficultyLevelsTxt* difficulty = DATATBLS_GetDifficultyLevelsTxtRecord(p->pGame->nDifficulty)) {
-                    resistance += static_cast<int32_t>(difficulty->dwResistPenalty);
-                }
-            } else if (p->pGame->nDifficulty == DIFFMODE_NIGHTMARE) {
-                resistance -= 20;
-            } else if (p->pGame->nDifficulty == DIFFMODE_HELL) {
-                resistance -= 50;
-            }
-        }
-        resistance = std::max(resistance, -100);
-        const int maximum = std::min(95, 75 + STATLIST_UnitGetStatValue(p, maxIds[i], 0));
-        out[6 + i] = std::min(resistance, maximum);
-    }
-    // out[10] the Next Level figure (the experience table's threshold for the next level, 500 at 1),
-    // out[11..16] life, max life, mana, max mana (whole points), class id.
-    const int level = STATLIST_UnitGetStatValue(p, STAT_LEVEL, 0);
-    out[10] = level < DATATBLS_GetMaxLevel((int)p->dwClassId) ? (int32_t)DATATBLS_GetLevelThreshold((int)p->dwClassId, (uint32_t)level) : 0;
-    out[11] = STATLIST_UnitGetStatValue(p, STAT_HITPOINTS, 0) >> 8; out[12] = STATLIST_UnitGetStatValue(p, STAT_MAXHP, 0) >> 8;
-    out[13] = STATLIST_UnitGetStatValue(p, STAT_MANA, 0) >> 8; out[14] = STATLIST_UnitGetStatValue(p, STAT_MAXMANA, 0) >> 8;
-    out[15] = (int32_t)p->dwClassId;
-    return 1;
+    return d2CharacterScreen(p, p && p->pGame ? (p->pGame->bExpansion ? 1 : 0) : -1,
+        p && p->pGame ? p->pGame->nDifficulty : 0, out);
 }
 // The character screen's stamina maximum is the BASE stat (retail panel: 1200 beside a current of 1560 while the
 // Increased Stamina passive's 30% is in the total; the HUD bar reads the total, out[5]).

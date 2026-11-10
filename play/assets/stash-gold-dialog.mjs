@@ -152,7 +152,7 @@ export function createStashGoldRenderer(read, documentObject = globalThis.docume
         // Retail's call order (the draw lists above): close, OK, amount + caret, spinners, prompt.
         if (buttonFrames[closeFrame]) { ctx.drawImage(buttonFrames[closeFrame], close.x, close.y); recordDc6(STASH_GOLD_ART.buttons, closeFrame, buttons.frames[closeFrame], close.x, close.y); }
         if (buttonFrames[okFrame]) { ctx.drawImage(buttonFrames[okFrame], ok.x, ok.y); recordDc6(STASH_GOLD_ART.buttons, okFrame, buttons.frames[okFrame], ok.x, ok.y); }
-        const actionKey = state.mode === 'withdraw' ? 'strBankGoldWithdraw' : state.mode === 'drop' ? 'strDropGoldHowMuch' : 'strBankGoldDeposit';
+        const actionKey = state.mode === 'trade' ? 'strTradeGoldHowMuch' : state.mode === 'withdraw' ? 'strBankGoldWithdraw' : state.mode === 'drop' ? 'strDropGoldHowMuch' : 'strBankGoldDeposit';
         const action = string(actionKey) || actionKey;
         const amount = String(Math.max(0, state.amount | 0));
         const value = Math.max(0, state.available | 0);

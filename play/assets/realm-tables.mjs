@@ -149,7 +149,14 @@ export function createBeltTable(read) {
 export function createMonsterTable(read) {
   let list = null;
   const load = () => (list ??= rows(read('data\\global\\excel\\monstats.txt')));
-  return { isNpc(classId) { const row = load()[classId]; return Boolean(row) && (row.npc === '1' || row.interact === '1'); } };
+  return {
+    isNpc(classId) { const row = load()[classId]; return Boolean(row) && (row.npc === '1' || row.interact === '1'); },
+    // The columns the client sorts a hovered unit by (assets/realm-combat.mjs createRealmUnits).
+    row(classId) {
+      const row = load()[classId];
+      return row ? { npc: row.npc === '1', interact: row.interact === '1', killable: row.killable === '1', align: num(row.align), named: Boolean(row.namestr) } : null;
+    },
+  };
 }
 
 /** ItemTypes.txt: whether a type code is, or descends from, another (the engine's ITEMS_CheckItemTypeId on the code). */

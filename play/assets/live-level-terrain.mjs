@@ -29,6 +29,19 @@ export function loadLiveLevelTerrain(Module, act0) {
   }
 }
 
+// A joined game's map revision moves on every room the server reveals or hides, and each one re-reads the
+// tile list. The terrain object holds the decoded libraries and tile bitmaps, keyed by file and coloured by
+// the act's palette, so one terrain serves every revision of an act: a fresh one per revision redecoded
+// every visible tile on the next draw. A new act (another palette) gets a new terrain.
+const realmTerrains = new WeakMap();   // owner (the engine module): { act0, terrain }
+export function realmTerrainFor(owner, act0, make) {
+  const held = realmTerrains.get(owner);
+  if (held && held.act0 === act0) return held.terrain;
+  const terrain = make();
+  realmTerrains.set(owner, { act0, terrain });
+  return terrain;
+}
+
 /** The client-mode DRLG tiles activated by D2GS 0x07 MapReveal packets. */
 export function loadRealmClientTerrain(Module, act0) {
   try {
@@ -45,6 +58,6 @@ export function loadRealmClientTerrain(Module, act0) {
     if (!files.length || !tiles.length) return { terrain: null, files, tiles, error: 'MapReveal has not activated drawable client rooms' };
     const palettePath = ACT_PALETTES[act0];
     if (!palettePath) throw new RangeError(`unsupported act ${act0 + 1}`);
-    return { terrain: createSessionTerrain({ read: createMpqAssetReader(Module), decodeDt1, decodeDatPalette, palettePath }), files, tiles, error: '' };
+    return { terrain: realmTerrainFor(Module, act0, () => createSessionTerrain({ read: createMpqAssetReader(Module), decodeDt1, decodeDatPalette, palettePath })), files, tiles, error: '' };
   } catch (error) { return { terrain: null, files: null, tiles: [], error: String(error) }; }
 }

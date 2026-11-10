@@ -36,6 +36,7 @@ extern "C" {
 int d2_realm_d2gs_parse_owned_item(const uint8_t* packet, int length, D2RealmOwnedItemPacket* out);
 int d2_realm_client_owned_item_apply(D2UnitStrc* owner, D2UnitStrc* existing,
     const uint8_t* packet, int length);
+int d2_realm_client_owned_item_reconcile(D2UnitStrc* owner);
 void d2_realm_client_owned_item_destroy(D2UnitStrc* item);
 int d2_realm_client_owned_item_readback(const D2UnitStrc* owner, int bodyLoc,
     D2RealmOwnedItemView* out);

@@ -27,3 +27,11 @@ export function createLoadCompleteOrder(sizeOf) {
     get held() { return held; },
   };
 }
+
+// Which screen stands in while the realm world is down. The server changes act with 0x05 (unload) and
+// 0x03 (load act) in one tick and sends 0x04 (load complete) only once the new rooms are out, so between
+// them the game is still live: the client shows its loading screen, never the title menu. Only a world
+// that is down with no act loading and no open game session falls back to the title.
+export function worldDownScreen({ sessionOpen = false, hasLoadAct = false } = {}) {
+  return sessionOpen && hasLoadAct ? 'loading' : 'title';
+}

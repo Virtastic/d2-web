@@ -79,26 +79,67 @@ export function createRealmWorld({ items: itemTable, objects: objectTable }) {
   let gold = 0, stashGold = 0, cursorId = 0, received = 0;
   const uiEvents = [];              // 0x77 UpdateUi codes not yet taken (16 opens the stash, 17 closes it, 21 opens the cube)
 
-  // An object's animation is the client's own: each mode runs its cels from the class's start cel at the class's
-  // 8.8 step. A looping mode wraps to its start; any other holds its last cel, and the operating mode (1) then
-  // becomes the opened one (2) without a packet. Doors always run.
+  // An object's state is the client's own, kept by the rule of the engine's object unit (d2gs_client_object.cpp):
+  // a mode runs its cels from the class's start cel at the class's 8.8 step. A looping mode wraps to its start;
+  // any other holds its last cel, and the operating mode (1) then becomes the opened one (2) without a packet,
+  // keeping the operating mode's step. A mode the object is already in keeps its clock. A door the server opens
+  // (0 to 2) or closes (2 to 0) plays its transit mode (1, or 3 backwards) first, and cannot be picked meanwhile.
+  const count8 = (cls, mode) => (cls.frameCount?.[mode] ?? 0) << 8;
+  const startCel = (cls, mode) => cls.start?.[mode] ?? 0;
+  const pickable = (cls, mode) => Boolean(cls.selectable?.[mode]);
   function enterMode(object, mode) {
     const cls = object.cls;
-    object.mode = mode; object.count = (cls.frameCount?.[mode] ?? 0) << 8; object.start = (cls.start?.[mode] ?? 0) << 8;
+    object.mode = mode; object.count = count8(cls, mode); object.start = startCel(cls, mode) << 8;
     object.clock = object.start; object.speed = cls.frameDelta?.[mode] ?? 0;
     return object;
   }
-  function stepObject(object) {
-    const cls = object.cls, cycling = Boolean(cls.cycles?.[object.mode]);
-    if (!cls.isDoor && !cycling) {
-      if (object.count <= 256) return;
-      if (object.mode === 1 && object.clock >= object.count - 256) { enterMode(object, 2); return; }
-      object.clock += object.speed;
-      if (object.clock >= object.count) object.clock = object.count - 256;
-      return;
+  const changeMode = (object, mode) => { if (object.mode !== mode) enterMode(object, mode); };
+  // The object-state packet: `selectable` is its byte 7, which only a door reads.
+  function setMode(object, mode, selectable) {
+    const cls = object.cls, current = object.mode;
+    if (mode > 7) return;
+    if (!cls.isDoor) { changeMode(object, mode); object.selectable = pickable(cls, mode); return; }
+    if (mode === 0 && current === 2 && count8(cls, 3) !== 256) { changeMode(object, 3); object.selectable = false; return; }
+    if (mode === 2 && current === 0 && count8(cls, 1) !== 256) {
+      changeMode(object, 1); object.selectable = false; object.clock = startCel(cls, 2); return;
     }
-    object.clock += object.speed;
-    if (object.count > 0 && object.clock >= object.count) object.clock = object.start - object.count + object.clock;
+    object.selectable = selectable !== 0;
+    changeMode(object, mode);
+    object.clock = startCel(cls, mode);
+  }
+  function stepDoor(object) {
+    const cls = object.cls;
+    if (object.mode === 1) {
+      const last = count8(cls, 1) - 256;
+      if (object.clock !== last) { object.clock = Math.min(object.clock + object.speed, last); return; }
+    } else if (object.mode === 3) {
+      if (object.clock > 0) { object.clock = Math.max(object.clock - object.speed, 0); return; }
+    } else return;
+    object.mode = object.mode === 3 ? 0 : 2;
+    object.clock = startCel(cls, object.mode); object.selectable = pickable(cls, object.mode);
+  }
+  function stepObject(object) {
+    const cls = object.cls, mode = object.mode, count = count8(cls, mode);
+    if (count === 256) return;
+    const cycling = Boolean(cls.cycles?.[mode]), ladder = object.classId === 0xBD;
+    if (!cycling) {
+      if (cls.isDoor) { stepDoor(object); return; }
+      if (object.clock >= count - 256) {
+        if (ladder && (mode === 2 || mode === 3)) { object.mode = mode + 1; object.clock = startCel(cls, mode + 1) << 8; }
+        else if (mode === 1) { object.mode = 2; object.clock = startCel(cls, 2) << 8; object.selectable = pickable(cls, 2); }
+        return;
+      }
+    }
+    if (object.classId === 0x0C) {                       // this class runs its cels backwards
+      object.clock -= object.speed;
+      if (object.clock < 0) object.clock += count;
+    } else if (ladder && mode === 3) {
+      object.clock -= object.speed;
+      if (object.clock < 0) { object.mode = 4; object.clock = startCel(cls, 4) << 8; }
+    } else {
+      object.clock += object.speed;
+      if (object.clock >= count) object.clock = cycling ? (startCel(cls, mode) << 8) - count + object.clock : count - 256;
+    }
   }
 
   function reset() {
@@ -152,15 +193,21 @@ export function createRealmWorld({ items: itemTable, objects: objectTable }) {
         const classId = u16(p, 6), cls = objectTable.byClass(classId);
         // Byte 13 is the object's interaction byte (a portal's destination level, a chest's lock bit), not whether
         // it can be picked: that is the class's own per-mode column.
-        if (cls) objectsByGuid.set(u32(p, 2), enterMode({ id: u32(p, 2), classId, cls, token: cls.token, x: u16(p, 8), y: u16(p, 10), interact: p[13] }, p[12]));
+        if (cls && p[12] < 8) objectsByGuid.set(u32(p, 2), enterMode({ id: u32(p, 2), classId, cls, token: cls.token, x: u16(p, 8), y: u16(p, 10), interact: p[13],
+          selectable: pickable(cls, p[12]) }, p[12]));
         } break;
-      case 0x0e: if (p[1] === 2) { const object = objectsByGuid.get(u32(p, 2));
-        if (object) enterMode(object, u32(p, 8)); } break;
+      // Selector 3 is the mode change; the shrine activation (0x15) is not shown.
+      case 0x0e: if (p[1] === 2 && p[6] === 3) { const object = objectsByGuid.get(u32(p, 2));
+        if (object) setMode(object, u32(p, 8), p[7]); } break;
       case 0x19: gold = (gold + p[1]) >>> 0; break;
       case 0x1d: applyStat(p[1], p[2]); break;
       case 0x1e: applyStat(p[1], u16(p, 2)); break;
       case 0x1f: applyStat(p[1], u32(p, 2)); break;
       case 0x20: if (ownGuid !== null && u32(p, 1) === ownGuid) applyStat(p[5], u32(p, 6)); break;
+      // A corpse was made (flag set): what its owner wore is on the corpse now, and the server sends no per-item removal.
+      case 0x74: if (p.length >= 10 && p[1]) { const owner = u32(p, 2);
+        itemsByGuid.forEach((item, guid) => { if (item.mode === MODE.EQUIP && (item.owner === owner || (owner === ownGuid && item.owner === null))) itemsByGuid.delete(guid); });
+      } break;
       case 0x77: if (p.length >= 2) uiEvents.push(p[1]); break;
       case 0x9c: if (p.length >= 8) applyItem(p, false); break;
       case 0x9d: if (p.length >= 13) applyItem(p, true); break;
@@ -201,7 +248,7 @@ export function createRealmWorld({ items: itemTable, objects: objectTable }) {
     objectViews() {
       return [...objectsByGuid.values()].map((o) => ({ id: o.id, classId: o.classId, token: o.token, mode: o.mode, x: o.x, y: o.y,
         framePrecise: o.clock, frameCountPrecise: o.count, componentMask: 0xFFFF, animSpeed: o.speed, direction: o.cls.orientation ?? 0,
-        selectable: Boolean(o.cls.selectable?.[o.mode]),
+        selectable: o.selectable,
         portalLevel: (o.cls.subClass & SUBCLASS_PORTALS) ? o.interact : 0, locked: Boolean(o.cls.lockable && (o.interact & 0x80)), inClientRoom: true }));
     },
     /** The saved-item bitstream the server sent for an item (what its tooltip text is decoded from). */

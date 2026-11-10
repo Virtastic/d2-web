@@ -1,9 +1,17 @@
 // The life of a Battle.net game on the client: why it ends, how long the reason stays up, and the explicit leave.
 // Retail records the FIRST exit reason only, shows its text in the game for 600 game ticks (25 per second), then leaves.
 //
-// Save and Exit: the menu's exit row and the window's close both arrive as WM_CLOSE. The client's close handler sends the
-// Save and Exit byte (0x69) at once and swallows the message; no 4F packet goes out first and nothing waits. The socket is
-// closed only after that byte.
+// Save and Exit: the menu's exit row and the window's close both arrive as WM_CLOSE. The client's close handler (0x439E0)
+// sends the Save and Exit byte (0x69) at once and swallows the message; no 4F packet goes out first and nothing waits. The
+// socket is closed only after that byte. Measured with the client's own frame pump running between the steps (game type 3,
+// vectors/d2client/gameleave-loop3.txt): the 0x69 goes out inside the handler; the next frame still runs its timers, so a
+// ping (0x6D) that comes due in that frame goes out AFTER the 0x69; that frame ends in the exit tail and the teardown closes
+// the socket. Exactly one frame passes between the request and the close. With the trade-cancel wait armed the exit sends
+// only the 0x69 (no second 4F, no 4F 07) and the frame order is the same (gameleave-loopwait3.txt).
+// Open Battle.net games (types 6 and 7) send the same 0x69 and then call the Battle.net screen's leave slot; the client sets
+// no exit flag itself, keeps running its frames (pings continue) and leaves the socket open until that screen ends the game
+// (gameleave-loop6/7.txt, same with the wait armed). Their close is not measurable headless; this module treats the 0x69 as
+// the end of the game for those too, which matches every byte measured.
 //
 // The 4F 02 / 30 s wait is a different path: it is the trade window's CANCEL button (4F 02 00 ..., 7 bytes), which enters
 // state 7 and stamps GetTickCount. The game keeps running while the wait is armed. When GetTickCount() is more than
@@ -132,11 +140,15 @@ export function createGameLife({ now = () => Date.now(), expansion = false, onNo
 // (3 minutes) only while loading is set, the lost-connection exit only once entered.
 // Entry order, measured: 0x59 creates the unit, 0x0B makes it the local player, then 0x04 enters the game. 0x04 first ends
 // the process; 0x0B first does nothing and the next stat update halts.
-// Leaving: the menu exit sends 0x69 first and the socket closes after it; the join timeout and a dropped connection send no
-// 0x69, they only set the exit flag and the teardown closes the socket.
+// Leaving: the menu exit sends 0x69 first and the socket closes after it (one frame later, measured); the join timeout and a
+// dropped connection send no 0x69, they only set the exit flag and the teardown closes the socket.
 // The stock server sends 0x0B itself, in the same handler and send buffer as 0x59, so the two arrive back to back with only
 // the character-load packets between them; 0x04 is sent by a later game tick once the player's room is active, and the wire
 // order is 01 00 02, then 59 ... 0B ..., then 03 (the act), then 04. A join stream therefore decides 'ingame' only at 04.
+// The real server (retail D2Game run headless, 40 ms frames) answers the join with 0x01 and 0x00, then 0x02 once the save is in,
+// and sends nothing else until the client's 0x6B. In the tick that 0x6B arrives it flushes the whole entry in one burst:
+// 0x59 first, 0x0B as the 9th packet after it (0 ticks later), the world, 0x04 as the 136th of 141, so a frame can carry
+// 0x59, 0x0B and 0x04 together and the last-of rule below reads it as 'ingame'. 0x0B waits on no further client packet.
 export function lifePhaseFromFrame(bytes, sizeOf) {
   let seen = null;
   for (let at = 0; at < bytes.length;) {

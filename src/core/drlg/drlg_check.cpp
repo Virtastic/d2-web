@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <vector>
 #include <D2Common.h>
+#include <D2DataTbls.h>
 #include <D2Dungeon.h>
 #include <D2Collision.h>
 #include <D2CMP.h>
@@ -213,9 +214,10 @@ extern "C" {
 // Loads the DRLG tables from the (already mounted) VFS. 1 on success.
 EMSCRIPTEN_KEEPALIVE int d2_drlg_init() {
     static int done = 0;
-    if (done) return done > 0;
-    done = d2::drlgLoadTables(d2::sharedVfs(), d2::sharedLang()) ? 1 : -1;
-    return done > 0;
+    if (done) return 1;
+    // A failed load is not latched: the tables load on the first call made after the archives are mounted.
+    done = d2::drlgLoadTables(d2::sharedVfs(), d2::sharedLang()) ? 1 : 0;
+    return done;
 }
 
 // The capture hands LoadAct D2Client's automap callbacks. DRLGPRESET_GenerateLevel branches on
@@ -308,8 +310,19 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_client_level_at(int playerX, int playerY) {
     return 0;
 }
 
+// A level id the server may name in a room packet: a row of the level table with a generator. DRLG_GetLevel
+// allocates an unknown id on demand and its allocator has no case for a row without one (row 0, the null level).
+// GUESS: retail's reveal and hide handlers (D2Client 0x07/0x08) pass the packet's level byte straight through
+// and do not survive such an id either; refusing the packet is ours. What would settle it: a retail client
+// fed a 0x08 naming level 0.
+static bool clientLevelKnown(int level) {
+    if (level <= 0 || !DATATBLS_GetLevelsTxtRecord(level)) return false;
+    const D2LevelDefBin* def = DATATBLS_GetLevelDefRecord(level);
+    return def && (def->dwDrlgType == DRLGTYPE_MAZE || def->dwDrlgType == DRLGTYPE_PRESET || def->dwDrlgType == DRLGTYPE_OUTDOOR);
+}
+
 EMSCRIPTEN_KEEPALIVE int d2_drlg_client_map_reveal(int level, int x, int y, int hasPlayer, int playerLevel, int playerX, int playerY) {
-    if (!g_act || level <= 0 || x < 0 || y < 0) { g_err = "invalid client MapReveal"; return 0; }
+    if (!g_act || !clientLevelKnown(level) || x < 0 || y < 0) { g_err = "invalid client MapReveal"; return 0; }
     D2DrlgLevelStrc* pLevel = DRLG_GetLevel(g_act->pDrlg, level);
     if (!pLevel) { g_err = "MapReveal level unavailable"; return 0; }
     D2ActiveRoomStrc* hint = clientRoomHint(playerLevel, hasPlayer, playerX, playerY);
@@ -322,7 +335,7 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_client_map_reveal(int level, int x, int y, int 
 }
 
 EMSCRIPTEN_KEEPALIVE int d2_drlg_client_map_hide(int level, int x, int y, int hasPlayer, int playerLevel, int playerX, int playerY) {
-    if (!g_act || level <= 0 || x < 0 || y < 0) { g_err = "invalid client MapHide"; return 0; }
+    if (!g_act || !clientLevelKnown(level) || x < 0 || y < 0) { g_err = "invalid client MapHide"; return 0; }
     D2DrlgLevelStrc* pLevel = DRLG_GetLevel(g_act->pDrlg, level);
     if (!pLevel) { g_err = "MapHide level unavailable"; return 0; }
     D2ActiveRoomStrc* hint = clientRoomHint(playerLevel, hasPlayer, playerX, playerY);
@@ -725,7 +738,7 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_client_room_freed_by_hide_at(int level, int hid
 }
 int d2_drlg_client_room_freed_by_hide(int level, int x, int y, int hasPlayer, int playerLevel,
         int playerX, int playerY, void* activeRoom) {
-    if (!g_act || !g_act->pDrlg || !activeRoom) return 0;
+    if (!g_act || !g_act->pDrlg || !activeRoom || !clientLevelKnown(level)) return 0;
     D2DrlgLevelStrc* pLevel = DRLG_GetLevel(g_act->pDrlg, level);
     D2ActiveRoomStrc* hint = clientRoomHint(playerLevel, hasPlayer, playerX, playerY);
     D2DrlgRoomStrc* root = pLevel ? DRLG_GetRoomExFromCoordinates(x, y, g_act->pDrlg,

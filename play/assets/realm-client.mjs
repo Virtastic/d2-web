@@ -88,7 +88,9 @@ function linkLostAfterAuthInfo(reader) {
  * at any time, and Battle.net servers send it right after the selector, before the AUTH_INFO reply;
  * it is never an answer to a call, so it is echoed back as the protocol asks and skipped.
  */
-async function readBncsFrame(reader, timeoutMs, packetWait = false) {
+// `wantId`: the client library files every frame by its id and a wait watches only its own reply's flag, so a frame with another
+// id (a keep-alive, a server notice, an optional-work or news packet) never ends or fails the wait; it is consumed and the wait goes on.
+async function readBncsFrame(reader, timeoutMs, packetWait = false, wantId = null) {
   // Retail waits 45 s for the version, key and realm replies and raises failure event 0x11 when none comes; the logon reply has no such wait.
   // One deadline for the whole wait (the reply flag is polled from the start, skipped pings and a split frame do not restart it) and a
   // strict one: a reply at exactly the limit still counts, the wait ends only past it.
@@ -96,14 +98,19 @@ async function readBncsFrame(reader, timeoutMs, packetWait = false) {
   const left = () => (packetWait && timeoutMs ? Math.max(0, timeoutMs - (Date.now() - started)) + 1 : timeoutMs);
   const want = async (n) => { try { return await reader.want(n, left()); } catch (error) { if (packetWait && error?.timedOut) error.failureEvent = 0x11; throw error; } };
   for (;;) {
+    // The client library's splitter starts every frame at the next 0xFF byte of what it has received: anything ahead of it is passed over, never an error.
+    const lead = await want(1);
+    if (lead[0] !== 0xff) { const at = reader.buffered().indexOf(0xff); reader.skip(at < 0 ? reader.buffered().length : at); continue; }
     const head = await want(4);
-    if (head[0] !== 0xff) throw new Error(`reply is not a 0xFF BNCS frame (first byte 0x${head[0].toString(16)})`);
     const total = head[2] | (head[3] << 8);
-    if (total < 4) throw new Error(`BNCS frame length ${total} is shorter than its header`);
+    // Retail steps on by the declared length whatever it is (and never moves again on a zero). A length under the header's own four bytes
+    // cannot hold a frame, so the marker is dropped and the scan for the next one goes on: a choice of ours where retail would stall or misread.
+    if (total < 4) { reader.skip(1); continue; }
     const frame = await want(total);
     const copy = Uint8Array.from(frame);
     reader.skip(total);
     if (copy[1] === 0x25) { if (reader.echo) reader.echo(copy); continue; }
+    if (wantId !== null && copy[1] !== wantId) continue;
     return { id: copy[1], body: copy.subarray(4) };
   }
 }
@@ -126,6 +133,124 @@ export async function readMcpFrame(reader, timeoutMs) {
     if (frame[2] === 0x19 && reader.keepAliveLists > 0) { reader.keepAliveLists--; continue; }
     return { op: frame[2], body: frame.subarray(3) };
   }
+}
+
+/** The realm list reply (0x40) body: `[unknown u32][count u32]` then per realm `[unknown u32][title\0][description\0]`. */
+export function parseRealmList(body) {
+  const count = body.length >= 8 ? u32(body, 4) : 0, list = [], dec = new TextDecoder();
+  let o = 8;
+  for (let i = 0; i < count; i++) {
+    o += 4;
+    const titleEnd = body.indexOf(0, o), descriptionEnd = titleEnd < 0 ? -1 : body.indexOf(0, titleEnd + 1);
+    if (descriptionEnd < 0) break;
+    list.push({ title: dec.decode(body.subarray(o, titleEnd)), description: dec.decode(body.subarray(titleEnd + 1, descriptionEnd)) });
+    o = descriptionEnd + 1;
+  }
+  return list;
+}
+/**
+ * The realm named in the realm logon (0x3e) is one the server just listed, by the title it gave; the configured name is only a fallback
+ * for a server that lists none. GUESS: with several realms listed retail's choice was not traced (the first is taken here); the caller
+ * of the client library's realm-logon routine in the launcher would settle it.
+ */
+export const realmLogonTitle = (realmList, configured) => realmList[0]?.title || configured;
+
+/**
+ * What the character-create screen says when the realm refuses the new character: result 0x14 is the name already in use, any other
+ * non-zero result the name rejected. `string(id)` reads the game's string table.
+ */
+export function charCreateRefusalText(result, name, string) {
+  return result === 0x14 ? string(11059).replace('%s', name) : `${string(5214)}${name}${string(5215)}`;
+}
+
+/**
+ * One reader for a realm session. The lobby has several things waiting on the realm socket at once (a create or join, a ladder, the
+ * game list that arrives a frame at a time and unasked-for queue notices), so the session's frames are read in one place: `onFrame`
+ * (the game list) sees each first and may take it, the rest go to whoever waits next, in order.
+ */
+function sessionInbox(session) {
+  if (session.inbox) return session.inbox;
+  session.reader ??= makeReader(session.transport);
+  const queue = [], waiters = [];
+  let failure = null, reading = false;
+  const drop = (w) => { const i = waiters.indexOf(w); if (i >= 0) waiters.splice(i, 1); clearTimeout(w.t); w.signal?.removeEventListener('abort', w.abort); };
+  session.inbox = {
+    next: (ms, signal = null) => new Promise((resolve, reject) => {
+      if (signal?.aborted) { reject(cancelledError()); return; }
+      if (queue.length) { resolve(queue.shift()); return; }
+      if (failure) { reject(failure); return; }
+      const w = { resolve, reject, t: null, signal, abort: () => { drop(w); reject(cancelledError()); } };
+      if (ms !== null && ms !== undefined) w.t = setTimeout(() => { drop(w); reject(Object.assign(new Error('timed out waiting for a realm reply'), { timedOut: true })); }, ms);
+      signal?.addEventListener('abort', w.abort, { once: true });
+      waiters.push(w); pump();
+    }),
+    listen: () => pump(),
+  };
+  // Frames are read only while someone wants them: a wait, or the listener.
+  async function pump() {
+    if (reading || failure) return;
+    reading = true;
+    try {
+      while (waiters.length || session.onFrame) {
+        const read = await readMcpFrame(session.reader, null), frame = { op: read.op, body: Uint8Array.from(read.body) };
+        let taken = false;
+        try { taken = session.onFrame?.(frame) === true; } catch { /* a listener's fault is not the socket's */ }
+        if (taken) continue;
+        const w = waiters[0];
+        if (w) { drop(w); w.resolve(frame); }
+        // With nobody waiting a frame is kept for the next wait (retail files each reply under its opcode until it is looked at); the oldest go first.
+        else { queue.push(frame); if (queue.length > 64) queue.shift(); }
+      }
+    } catch (error) { failure = error; for (const w of waiters.splice(0)) { clearTimeout(w.t); w.signal?.removeEventListener('abort', w.abort); w.reject(error); } }
+    reading = false;
+  }
+  return session.inbox;
+}
+const cancelledError = () => Object.assign(new Error('cancelled'), { cancelled: true });
+/**
+ * Wait for the reply with opcode `op`. The realm client files every frame under its own opcode and each wait watches only its own, so a
+ * frame with another opcode never ends or fails a wait: it is passed over, under the one deadline the wait started with.
+ */
+async function mcpReply(read, op, ms, received = null) {
+  const started = Date.now();
+  for (;;) {
+    const frame = await read(ms === null ? null : Math.max(1, ms - (Date.now() - started)));
+    received?.push(frame.op);
+    if (frame.op === op) return frame;
+  }
+}
+// Taken before the request is sent, so the session is being read by the time its answer can arrive.
+const sessionRead = (session) => { const inbox = sessionInbox(session); return (ms, signal) => inbox.next(ms, signal); };
+
+/** Route the session's game-list frames (and anything else `handler` returns true for) away from the reply waits. */
+export function mcpListen(session, handler) { session.onFrame = handler; if (handler) sessionInbox(session).listen(); }
+/** The session's request counter: create, join, list and info requests share it, and it never hands out 0. */
+export function mcpNextRequestId(session) { const id = session.nextRequestId; session.nextRequestId = (id + 1) & 0xffff || 1; return id; }
+/** Put one request on the session's realm socket. */
+export function mcpSend(session, op, body) { session.transport.send(session.protocol.mcpFrame(op, body)); }
+
+/**
+ * MCP CHARLOGON (0x07) for the character the player picked. Retail sends it when the character is chosen, before the lobby opens: the
+ * realm answers list, info, ladder and create requests only for a logged-on character. Asking again for the one already on is free.
+ */
+export function mcpLogonCharacter(session, name, { timeoutMs = CONNECT_TIMEOUT_MS } = {}) {
+  if (!session || session.joined) return Promise.reject(new Error('MCP character session is not reusable'));
+  const selected = session.list.characters.find((c) => c.name.toLowerCase() === String(name).toLowerCase());
+  if (!selected) return Promise.reject(new Error(`character "${name}" is not in the MCP character list`));
+  if (session.characterLoggedOn && session.characterLoggedOn.toLowerCase() === selected.name.toLowerCase()) return Promise.resolve(selected);
+  if (session.logon?.name === selected.name) return session.logon.promise;
+  const promise = (async () => {
+    try {
+      const read = sessionRead(session);
+      mcpSend(session, 0x07, session.protocol.mcpCharlogon(selected.name));
+      const reply = await mcpReply(read, 0x07, timeoutMs, session.received);
+      if (reply.body.length < 4 || u32(reply.body, 0) !== 0) throw charlogonRefusal(reply.body);
+      session.characterLoggedOn = selected.name;
+      return selected;
+    } finally { session.logon = null; }
+  })();
+  session.logon = { name: selected.name, promise };
+  return promise;
 }
 
 // Retail has no idle keep-alive on the realm socket: the message of the day is asked once at lobby entry,
@@ -188,10 +313,10 @@ function decodeMcpCharacters(body) {
  * the engine exports, as with BNCS and D2GS; this function owns only the sequence and read offsets.
  */
 export async function mcpCreateAndJoin(transport, protocol, { realmReply, character, gameName, gamePassword = '',
-  difficulty = 0, maxPlayers = 8, levelDifference = 0xff, description = '', characterCount = 8, session = null, join = false, timeoutMs = CONNECT_TIMEOUT_MS, startupMs = MCP_STARTUP_MS, gameReplyMs = GAME_REPLY_MS } = {}) {
+  difficulty = 0, maxPlayers = 8, levelDifference = 0xff, description = '', characterCount = 8, session = null, join = false, timeoutMs = CONNECT_TIMEOUT_MS, startupMs = MCP_STARTUP_MS, gameReplyMs = GAME_REPLY_MS, onQueue = () => {}, signal = null } = {}) {
   if (!Array.isArray(realmReply) && !(realmReply instanceof Uint8Array)) throw new Error('MCP requires the BNCS realm handoff bytes');
   if (!character || (!gameName && !join)) throw new Error('MCP requires a character and game name');
-  const reader = session?.reader || makeReader(transport), sent = [], received = session ? [...session.received] : [];
+  const sent = [], received = session ? [...session.received] : [];
   const send = (op, body) => {
     const frame = protocol.mcpFrame(op, body); sent.push({ op, bytes: frame.length }); transport.send(frame);
   };
@@ -199,28 +324,27 @@ export async function mcpCreateAndJoin(transport, protocol, { realmReply, charac
   if (session) {
     if (session.transport !== transport || session.protocol !== protocol || session.joined) throw new Error('MCP character session is not reusable');
     list = session.list;
-  } else {
+  }
+  let reader = null;
+  const read = session ? sessionRead(session) : (ms) => readMcpFrame(reader, ms);
+  if (!session) {
+    reader = makeReader(transport);
     transport.send(protocol.mcpSelector());
     send(0x01, protocol.mcpStartup(realmReply));
-    const startup = await readMcpFrame(reader, startupMs); received.push(startup.op);
-    if (startup.op !== 0x01) throw new Error(`expected MCP STARTUP reply 0x01, got 0x${startup.op.toString(16)}`);
+    const startup = await mcpReply(read, 0x01, startupMs, received);
     if (startup.body.length < 4 || u32(startup.body, 0) !== 0) throw new Error('MCP STARTUP was rejected');
     send(0x19, protocol.mcpCharlist(characterCount));
-    const listReply = await readMcpFrame(reader, timeoutMs); received.push(listReply.op);
-    if (listReply.op !== 0x19) throw new Error(`expected MCP CHARLIST2 reply 0x19, got 0x${listReply.op.toString(16)}`);
-    list = decodeMcpCharacters(listReply.body);
+    list = decodeMcpCharacters((await mcpReply(read, 0x19, timeoutMs, received)).body);
   }
   const selected = list.characters.find((c) => c.name.toLowerCase() === character.toLowerCase());
   if (!selected) throw new Error(`character "${character}" is not in the MCP character list`);
-  if (session?.characterLoggedOn && session.characterLoggedOn.toLowerCase() !== selected.name.toLowerCase())
-    throw new Error(`MCP session is already logged onto "${session.characterLoggedOn}"; log in again to change characters`);
 
-  if (!session?.characterLoggedOn) {
+  // The character is normally logged on already (the lobby does it on entry); a session that is on another character logs this one on.
+  if (session) { if ((session.characterLoggedOn || '').toLowerCase() !== selected.name.toLowerCase()) { sent.push({ op: 0x07 }); await mcpLogonCharacter(session, selected.name, { timeoutMs }); received.push(0x07); } }
+  else {
     send(0x07, protocol.mcpCharlogon(selected.name));
-    const charlogon = await readMcpFrame(reader, timeoutMs); received.push(charlogon.op);
-    if (charlogon.op !== 0x07) throw new Error(`expected MCP CHARLOGON reply 0x07, got 0x${charlogon.op.toString(16)}`);
+    const charlogon = await mcpReply(read, 0x07, timeoutMs, received);
     if (charlogon.body.length < 4 || u32(charlogon.body, 0) !== 0) throw charlogonRefusal(charlogon.body);
-    if (session) session.characterLoggedOn = selected.name;
   }
 
   const requestState = session || { nextRequestId: 2 };
@@ -230,17 +354,24 @@ export async function mcpCreateAndJoin(transport, protocol, { realmReply, charac
   let gameToken = null;
   // Retail D2MCPClient 0x6540 / 0x64D0 drop a reply whose request id is not the pending one and keep waiting, and the
   // id counter skips 0. D2Multi's 30 s limit (0xDAE0) is checked only while the JOIN is pending, from the popup start.
-  const nextId = () => { const id = requestState.nextRequestId; requestState.nextRequestId = (id + 1) & 0xffff || 1; return id; };
+  const nextId = () => mcpNextRequestId(requestState);
   // D2Multi's pump has no clock on a pending CREATE, but a server that never answers must not hang the player
   // for good, so the create wait is bounded too (same limit, counted from its own start).
   const gameReply = async (op, id, ms) => {
-    const startedAt = Date.now(), stage = op === 3 ? 'create' : 'join';
+    let startedAt = Date.now(); const stage = op === 3 ? 'create' : 'join';
     for (;;) {
-      const frame = await readMcpFrame(reader, Math.max(1, ms - (Date.now() - startedAt))).catch((error) => {
+      // Cancel on the create wait (the Please Wait popup's, or the queue panel's) sends the realm the one-byte cancel request and ends the wait
+      // with no notice. The join wait's Cancel has no handler in retail, so only a create can be cancelled.
+      const frame = await read(Math.max(1, ms - (Date.now() - startedAt)), op === 3 ? signal : null).catch((error) => {
+        if (error?.cancelled) send(0x13, []);
         throw error?.timedOut ? Object.assign(error, { mcpStage: stage, mcpResult: -1 }) : error;
       });
       received.push(frame.op);
-      if (frame.op !== op) throw new Error(`expected MCP ${op === 3 ? 'CREATEGAME' : 'JOINGAME'} reply 0x0${op}, got 0x${frame.op.toString(16)}`);
+      // The realm client files each reply by its opcode, so a reply to something else never ends this wait. A busy realm answers
+      // CREATEGAME with its queue notice first (opcode 0x14, the place in line) and the real reply when the game is made:
+      // the place is handed on and the wait starts over, since the realm has just shown it is alive.
+      if (frame.op === 0x14 && frame.body.length >= 4) { onQueue(u32(frame.body, 0)); startedAt = Date.now(); }
+      if (frame.op !== op) continue;
       if (frame.body.length >= 2 && u16(frame.body, 0) === id) return frame;
     }
   };
@@ -288,12 +419,11 @@ export async function mcpListCharacters(transport, protocol, { realmReply, chara
   const send = (op, body) => transport.send(protocol.mcpFrame(op, body));
   transport.send(protocol.mcpSelector());
   send(0x01, protocol.mcpStartup(realmReply));
-  const startup = await readMcpFrame(reader, startupMs); received.push(startup.op);
-  if (startup.op !== 0x01 || startup.body.length < 4 || u32(startup.body, 0) !== 0) throw new Error('MCP STARTUP was rejected');
+  const read = (ms) => readMcpFrame(reader, ms);
+  const startup = await mcpReply(read, 0x01, startupMs, received);
+  if (startup.body.length < 4 || u32(startup.body, 0) !== 0) throw new Error('MCP STARTUP was rejected');
   send(0x19, protocol.mcpCharlist(characterCount));
-  const reply = await readMcpFrame(reader, timeoutMs); received.push(reply.op);
-  if (reply.op !== 0x19) throw new Error(`expected MCP CHARLIST2 reply 0x19, got 0x${reply.op.toString(16)}`);
-  const list = decodeMcpCharacters(reply.body);
+  const list = decodeMcpCharacters((await mcpReply(read, 0x19, timeoutMs, received)).body);
   const session = { reader, transport, protocol, list, nextRequestId: 2,
     characterLoggedOn: false, joined: false,
     received: [...received] };
@@ -313,13 +443,13 @@ export async function mcpReturnToLobby(transport, protocol, { realmReply, charac
   const reader = makeReader(transport), received = [];
   transport.send(protocol.mcpSelector());
   transport.send(protocol.mcpFrame(0x01, protocol.mcpStartup(realmReply)));
-  const startup = await readMcpFrame(reader, startupMs); received.push(startup.op);
-  if (startup.op !== 0x01 || startup.body.length < 4 || u32(startup.body, 0) !== 0) throw new Error('MCP STARTUP was rejected');
+  const read = (ms) => readMcpFrame(reader, ms);
+  const startup = await mcpReply(read, 0x01, startupMs, received);
+  if (startup.body.length < 4 || u32(startup.body, 0) !== 0) throw new Error('MCP STARTUP was rejected');
   const found = characters.find((c) => c.name.toLowerCase() === String(character).toLowerCase());
   if (!found) throw new Error(`character "${character}" is not in the MCP character list`);
   transport.send(protocol.mcpFrame(0x07, protocol.mcpCharlogon(found.name)));
-  const reply = await readMcpFrame(reader, timeoutMs); received.push(reply.op);
-  if (reply.op !== 0x07) throw new Error(`expected MCP CHARLOGON reply 0x07, got 0x${reply.op.toString(16)}`);
+  const reply = await mcpReply(read, 0x07, timeoutMs, received);
   if (reply.body.length < 4 || u32(reply.body, 0) !== 0) throw charlogonRefusal(reply.body);
   const list = { characters, total: characters.length, returned: characters.length };
   const session = { reader, transport, protocol, list, nextRequestId: 2, characterLoggedOn: found.name, joined: false, received };
@@ -345,13 +475,9 @@ export async function mcpCreateCharacter(session, { name, charClass, expansion =
   body[0] = charClass & 0xff; body[4] = flags & 0xff; body[5] = flags >> 8;
   body.set(encoded, 6);
   session.transport.send(session.protocol.mcpFrame(0x02, body));
-  const reply = await readMcpFrame(session.reader, timeoutMs);
-  if (reply.op !== 0x02) throw new Error(`expected MCP CHARCREATE reply 0x02, got 0x${reply.op.toString(16)}`);
+  const reply = await mcpReply(sessionRead(session), 0x02, timeoutMs);
   const result = reply.body.length >= 4 ? u32(reply.body, 0) : 0;
-  if (result !== 0) {
-    const error = new Error(result === 0x14 ? 'That character name is already taken.' : 'That character name is not allowed.');
-    error.result = result; throw error;
-  }
+  if (result !== 0) throw Object.assign(new Error(`MCP CHARCREATE was refused (0x${result.toString(16)})`), { result });
   const character = { name, expiry: 0, charClass, level: 1, flags: flags & 0xff };
   session.list.characters.push(character); session.list.total++; session.list.returned++;
   return character;
@@ -364,7 +490,7 @@ export async function mcpLadderRequest(session, mode, { timeoutMs = CONNECT_TIME
   const { parseLadderReply, ladderRequestBody } = await import('./realm-ladder.mjs');
   session.transport.send(session.protocol.mcpFrame(MCP_LADDERDATA, ladderRequestBody(mode)));
   for (;;) {
-    const reply = await readMcpFrame(session.reader, timeoutMs);
+    const reply = await sessionInbox(session).next(timeoutMs);
     if (reply.op === MCP_LADDERDATA) return parseLadderReply(reply.body);
   }
 }
@@ -390,7 +516,7 @@ export async function mcpDeleteCharacter(session, name, { timeoutMs = CONNECT_TI
   if (!session || session.joined) throw new Error('MCP character session is not reusable');
   session.transport.send(session.protocol.mcpFrame(MCP_CHARDELETE, mcpCharDeleteBody(name)));
   for (;;) {
-    const reply = await readMcpFrame(session.reader, timeoutMs);
+    const reply = await sessionInbox(session).next(timeoutMs);
     if (reply.op !== MCP_CHARDELETE) continue;   // MOTD and friends can arrive in between
     const parsed = parseMcpCharDeleteReply(reply.body);
     if (!parsed) continue;
@@ -434,7 +560,7 @@ export function bsha1(data) {
 async function bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs }) {
   transport.send(protocol.bncsSelector());
   transport.send(protocol.bncsFrame(0x50, protocol.bncsAuthInfo(product)));
-  const authInfo = await readBncsFrame(reader, timeoutMs, true);
+  const authInfo = await readBncsFrame(reader, timeoutMs, true, 0x50);
   if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
   linkLostAfterAuthInfo(reader);
   const mpqEnd = authInfo.body.indexOf(0, 20);
@@ -442,7 +568,7 @@ async function bncsPrelude(transport, protocol, reader, { product, auth, timeout
   const { body } = protocol.bncsAuthCheck({ serverToken: u32(authInfo.body, 4), mpq: new TextDecoder().decode(mpq),
     challenge: authInfo.body.subarray(mpqEnd + 1), product, auth });
   transport.send(protocol.bncsFrame(0x51, body));
-  const check = await readBncsFrame(reader, timeoutMs, true);
+  const check = await readBncsFrame(reader, timeoutMs, true, 0x51);
   if (check.id !== 0x51) throw new Error(`expected AUTH_CHECK reply 0x51, got 0x${check.id.toString(16)}`);
   if (u32(check.body, 0) !== 0) throw new Error(`AUTH_CHECK rejected the version (result 0x${u32(check.body, 0).toString(16)})`);
   return authInfo;
@@ -458,7 +584,7 @@ export async function bncsCreateAccount(transport, protocol, { account, password
   const body = new Uint8Array(hash.length + name.length + 1);
   body.set(hash); body.set(name, hash.length);
   transport.send(protocol.bncsFrame(0x3d, body));
-  const reply = await readBncsFrame(reader, timeoutMs);
+  const reply = await readBncsFrame(reader, timeoutMs, false, 0x3d);
   if (reply.id !== 0x3d) throw new Error(`expected CREATEACCOUNT reply 0x3d, got 0x${reply.id.toString(16)}`);
   const result = u32(reply.body, 0);
   if (result !== 0) {
@@ -483,7 +609,7 @@ export async function bncsChangePassword(transport, protocol, { account, passwor
   const logon = Uint8Array.from(protocol.bncsLogon({ clientToken: protocol.tickCount(), serverToken: u32(authInfo.body, 4), account, password }));
   const newHash = bsha1(new TextEncoder().encode(newPassword.toLowerCase()));
   transport.send(protocol.bncsFrame(0x31, joinBytes(logon.subarray(0, 28), newHash, logon.subarray(28))));
-  const reply = await readBncsFrame(reader, timeoutMs);
+  const reply = await readBncsFrame(reader, timeoutMs, false, 0x31);
   if (reply.id !== 0x31) throw new Error(`expected CHANGEPASSWORD reply 0x31, got 0x${reply.id.toString(16)}`);
   return u32(reply.body, 0);
 }
@@ -523,7 +649,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
     transport.send(protocol.bncsSelector());                       // single 0x01 protocol selector
     send(0x50, protocol.bncsAuthInfo(product));
 
-    const authInfo = await readBncsFrame(reader, timeoutMs, true); received.push(authInfo.id);
+    const authInfo = await readBncsFrame(reader, timeoutMs, true, 0x50); received.push(authInfo.id);
     if (authInfo.id !== 0x50) throw new Error(`expected AUTH_INFO reply 0x50, got 0x${authInfo.id.toString(16)}`);
     linkLostAfterAuthInfo(reader);
     serverToken = u32(authInfo.body, 4);
@@ -538,7 +664,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
     const authCheckBody = checked.body;
     clientToken = checked.clientToken;
     send(0x51, authCheckBody);
-    const authCheck = await readBncsFrame(reader, timeoutMs, true); received.push(authCheck.id);
+    const authCheck = await readBncsFrame(reader, timeoutMs, true, 0x51); received.push(authCheck.id);
     if (authCheck.id !== 0x51) throw new Error(`expected AUTH_CHECK reply 0x51, got 0x${authCheck.id.toString(16)}`);
     versionResult = u32(authCheck.body, 0);
     if (versionResult !== 0) {
@@ -558,9 +684,8 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
 
   // BNClient+0xC9E0 tokens the logon with GetTickCount; +0xBFD0 with its own counter (1, 2, ...).
   send(0x3a, protocol.bncsLogon({ clientToken: protocol.tickCount(), serverToken, account, password }));
-  let logon = await readBncsFrame(reader, timeoutMs); received.push(logon.id);
-  // PvPGN prompts an account with no email address (SID_SETEMAIL 0x59) ahead of the logon result; it asks for nothing here.
-  while (logon.id === 0x59) { logon = await readBncsFrame(reader, timeoutMs); received.push(logon.id); }
+  // PvPGN prompts an account with no email address (SID_SETEMAIL 0x59) ahead of the logon result; like any other id it is passed over.
+  const logon = await readBncsFrame(reader, timeoutMs, false, 0x3a); received.push(logon.id);
   if (logon.id !== 0x3a) throw new Error(`expected LOGONRESPONSE2 reply 0x3a, got 0x${logon.id.toString(16)}`);
   const logonResult = u32(logon.body, 0);
   if (logonResult !== 0) {
@@ -573,22 +698,12 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
   }
 
   send(0x40, protocol.bncsQueryRealms());                         // QUERYREALMS2, empty body
-  const realms = await readBncsFrame(reader, timeoutMs, true); received.push(realms.id);
+  const realms = await readBncsFrame(reader, timeoutMs, true, 0x40); received.push(realms.id);
   if (realms.id !== 0x40) throw new Error(`expected QUERYREALMS2 reply 0x40, got 0x${realms.id.toString(16)}`);
-  const count = u32(realms.body, 4);
-  const realmList = [];
-  let o = 8;
-  for (let i = 0; i < count; i++) {
-    o += 4;                                                       // per-realm unknown(u32=1)
-    const titleEnd = realms.body.indexOf(0, o);
-    const descriptionEnd = realms.body.indexOf(0, titleEnd + 1);
-    realmList.push({ title: new TextDecoder().decode(realms.body.subarray(o, titleEnd)),
-      description: new TextDecoder().decode(realms.body.subarray(titleEnd + 1, descriptionEnd)) });
-    o = descriptionEnd + 1;
-  }
+  const realmList = parseRealmList(realms.body);
 
-  send(0x3e, protocol.bncsRealmEx({ clientToken: protocol.realmToken(), serverToken, realm, password }));
-  const realmEx = await readBncsFrame(reader, timeoutMs, true); received.push(realmEx.id);
+  send(0x3e, protocol.bncsRealmEx({ clientToken: protocol.realmToken(), serverToken, realm: realmLogonTitle(realmList, realm), password }));
+  const realmEx = await readBncsFrame(reader, timeoutMs, true, 0x3e); received.push(realmEx.id);
   if (realmEx.id !== 0x3e) throw new Error(`expected LOGONREALMEX reply 0x3e, got 0x${realmEx.id.toString(16)}`);
   // MCPStatus is 0 or 1 on success: the engine's own server sends 1, a stock Battle.net realm sends 0,
   // and a failure sets the high bit (0x80000001...). Either way a real hand-off carries a non-zero IP.
@@ -773,6 +888,7 @@ async function d2gsJoinRun(transport, protocol, { character, charClass, gameToke
       fed = Uint8Array.from(early.length ? [...response.subarray(0, assignOffset), ...lead, ...cut(assignOffset, handshakeEnd)] : response.subarray(0, handshakeEnd));
       tail = Uint8Array.from(cut(handshakeEnd, response.length));
       applied = protocol.d2gsClientPlayerFeed(fed);
+      if (applied === -5) throw new Error('D2GS join needs the game data archives mounted before the act can load');
       if (applied < 1) { handshakeEnd = -1; applied = 0; fed = null; }   // the engine resets itself on a refusal
     }
   }
@@ -1123,6 +1239,32 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
       const v = new Int32Array(Module.HEAPU8.buffer.slice(Number(ptr), Number(ptr) + 32));
       return v[0] === 1 && v[1] === 32 ? { hp: v[2], hpMax: v[3], mana: v[4], manaMax: v[5], stamina: v[6], staminaMax: v[7] } : null;
     },
+    // The corpses the server has named (0x8E): [{ owner, corpse }], both player-unit GUIDs.
+    d2gsClientCorpses: () => {
+      if (!Module._d2_realm_client_corpses) return [];
+      const ptr = Number(call('d2_realm_client_corpses', 'bigint', [], []));
+      if (!ptr) return [];
+      const head = new DataView(Module.HEAPU8.buffer, ptr, 8);
+      if (head.getUint32(0, true) !== 1) return [];
+      const count = head.getUint32(4, true), view = new DataView(Module.HEAPU8.buffer, ptr + 8, count * 8);
+      return Array.from({ length: count }, (_, i) => ({ owner: view.getUint32(i * 8, true), corpse: view.getUint32(i * 8 + 4, true) }));
+    },
+    // The selected player's character-screen numbers, computed in the wasm client from the hero unit's stat list
+    // (the worn items' lists merged in) by the function the single-player panel reads: 16 values in the
+    // d2_session_character_screen order, then [16] the base stamina maximum. Null before a player is selected.
+    d2gsClientCharacterScreen: (expansion) => {
+      if (!Module._d2_realm_client_character_screen) return null;
+      const p = Module._malloc(64);
+      try {
+        if (!call('d2_realm_client_character_screen', 'number', ['number', 'bigint'], [expansion ? 1 : 0, BigInt(p)])) return null;
+        const sc = Array.from(new Int32Array(Module.HEAPU8.buffer.slice(Number(p), Number(p) + 64)));
+        sc[16] = call('d2_realm_client_hero_stat', 'number', ['number', 'number', 'number'], [11, 0, 1]) >> 8;
+        return sc;
+      } finally { Module._free(p); }
+    },
+    // A stat of the selected player: the total (worn items and states included), or the character's own with `base`.
+    d2gsClientHeroStat: (stat, layer = 0, base = false) => (Module._d2_realm_client_hero_stat
+      ? call('d2_realm_client_hero_stat', 'number', ['number', 'number', 'number'], [stat, layer, base ? 1 : 0]) : 0),
     d2gsClientWorldState: () => {
       const ptr = call('d2_realm_client_world_state', 'bigint', [], []);
       if (!ptr) return null;

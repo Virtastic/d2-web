@@ -77,6 +77,28 @@ test('left on a monster is the left skill on that unit; on a person, a talk; rig
   assert.equal(h.out[0][0], 1);                                   // a corpse is not a target
 });
 
+test('another player is picked after monsters; in town a click asks for a trade, outside it walks', () => {
+  const other = { guid: 0x01020304, name: 'Bob', x: 101, y: 101, anchorX: 200, anchorY: 120, drawn: true };
+  let h = harness({ players: [other], inTown: true });
+  assert.deepEqual(h.input.pick(200, 120), { kind: 'player', unit: other });
+  h.input.leftClick(200, 120);
+  assert.deepEqual(h.out, [[0x13, 0, 0, 0, 0, 4, 3, 2, 1]]);
+  h = harness({ players: [other], inTown: false }); h.input.leftClick(200, 120);
+  assert.deepEqual(h.out, [[1, 100, 0, 120, 0]]);
+  h = harness({ players: [{ ...other, drawn: false }], inTown: true });
+  assert.equal(h.input.pick(200, 120).kind, 'ground');
+  const mon = { guid: 77, classId: 5, mode: 1, x: 101, y: 101, anchorX: 200, anchorY: 120, drawn: true };
+  h = harness({ players: [other], monsters: [mon], inTown: true });
+  assert.equal(h.input.pick(200, 120).kind, 'monster');
+  // A far player is walked to first and asked on arrival.
+  const far = { ...other, x: 130, y: 100, anchorX: 260, anchorY: 100 };
+  const scene = { players: [far], inTown: true, player: { x: 100, y: 100 } };
+  h = harness(scene); h.input.leftClick(260, 100);
+  assert.equal(h.out.some((p) => p[0] === 0x13), false);
+  scene.player = { x: 128, y: 100 }; h.input.tick();
+  assert.deepEqual(h.out.at(-1), [0x13, 0, 0, 0, 0, 4, 3, 2, 1]);
+});
+
 // The server never echoes the owner's own walk, so the click itself must start the local route -- and, as
 // in retail, the local start comes first and the packet goes out only when the player could start it.
 test('a ground click starts the local route first and sends only what the player could start', () => {
@@ -102,16 +124,23 @@ test('a ground click starts the local route first and sends only what the player
   assert.equal(input.evidence.localMove, 1);
 });
 
-test('the right skill is started locally first; a refused cast sends nothing', () => {
+test('either hand\'s skill is started locally first; a refused start sends nothing', () => {
   const calls = [];
   const make = (extra, result) => { const out = []; return { out, input: createRealmInput({ transmit: (b) => out.push(Array.from(b)), scene: sceneOf(extra), now: () => 0,
-    castAt: (x, y) => { calls.push(['at', x, y]); return result; }, castOnUnit: (t, g) => { calls.push(['unit', t, g]); return result; } }) }; };
+    skillAt: (h, x, y) => { calls.push(['at', h, x, y]); return result; }, skillOnUnit: (h, t, g) => { calls.push(['unit', h, t, g]); return result; } }) }; };
   const mon = { guid: 77, classId: 5, mode: 1, x: 101, y: 101, anchorX: 200, anchorY: 120, drawn: true };
   let h = make({}, 1); h.input.rightClick(200, 120); assert.deepEqual(h.out, [[0x0c, 100, 0, 120, 0]]);
   h = make({ monsters: [mon] }, 1); h.input.rightClick(200, 120); assert.deepEqual(h.out, [[0x0d, 1, 0, 0, 0, 77, 0, 0, 0]]);
   h = make({}, 0); assert.equal(h.input.rightClick(200, 120), false); assert.deepEqual(h.out, []);
   h = make({ monsters: [mon] }, 0); assert.equal(h.input.rightClick(200, 120), false); assert.deepEqual(h.out, []);
-  assert.deepEqual(calls, [['at', 100, 120], ['unit', 1, 77], ['at', 100, 120], ['unit', 1, 77]]);
+  h = make({ monsters: [mon] }, 1); h.input.leftClick(200, 120); assert.deepEqual(h.out, [[0x06, 1, 0, 0, 0, 77, 0, 0, 0]]);
+  h = make({ monsters: [mon] }, 0); assert.equal(h.input.leftClick(200, 120), false); assert.deepEqual(h.out, []);
+  h = make({}, 1); h.input.leftClick(200, 120, { stand: true }); assert.deepEqual(h.out, [[0x05, 100, 0, 120, 0]]);
+  h = make({}, 0); assert.equal(h.input.leftClick(200, 120, { stand: true }), false); assert.deepEqual(h.out, []);
+  h = make({ monsters: [mon] }, 1); h.input.rightClick(200, 120, { held: true }); h.input.leftClick(200, 120, { held: true });
+  assert.deepEqual(h.out, [[0x10, 1, 0, 0, 0, 77, 0, 0, 0], [0x09, 1, 0, 0, 0, 77, 0, 0, 0]]);
+  assert.deepEqual(calls, [['at', 1, 100, 120], ['unit', 1, 1, 77], ['at', 1, 100, 120], ['unit', 1, 1, 77], ['unit', 0, 1, 77], ['unit', 0, 1, 77],
+    ['at', 0, 100, 120], ['at', 0, 100, 120], ['unit', 1, 1, 77], ['unit', 0, 1, 77]]);
 });
 
 // The server ignores a talk from 9 or more tiles; a far person is approached and talked to on arrival.
@@ -165,6 +194,10 @@ test('the realm shell wires the local route to the engine export', async () => {
   assert.match(call, /move:[^\n]*d2_realm_client_local_move/);
   const link = await readFile(new URL('wasm-build/link-d2.sh', root), 'utf8');
   assert.match(link, /_d2_realm_client_local_move[,\s]/);
+  for (const [hook, name] of [['skillPlan', 'd2_realm_client_skill_plan'], ['skillAt', 'd2_realm_client_local_skill_at'], ['skillOnUnit', 'd2_realm_client_local_skill_on_unit']]) {
+    assert.match(call, new RegExp(`${hook}:[^\\n]*_${name}\\(hand`));
+    assert.match(link, new RegExp(`_${name}[,\\s]`));
+  }
 });
 
 // A click on a far item or object walks to the unit; the pickup or the use goes out only on arrival.
@@ -304,27 +337,62 @@ test('an item action asks the leave wait first: refused actions send nothing, al
   assert.deepEqual(out, [Array.from(packets.fromGrid(7))]);
 });
 
-test('a hand-to-hand left click on a far monster starts the local walk to it, then sends the attack', () => {
-  const order = [], far = { guid: 77, classId: 5, mode: 1, x: 110, y: 104, anchorX: 200, anchorY: 120, drawn: true };
-  const make = (extra, hooks = {}) => createRealmInput({ transmit: (b) => order.push(Array.from(b)), scene: sceneOf({ monsters: [far], leftMelee: true, ...extra }), now: () => 0,
-    approachUnit: (type, guid, run) => { order.push(['approach', type, guid, run]); return 1; }, ...hooks });
-  make().leftClick(200, 120);
-  assert.deepEqual(order, [['approach', 1, 77, false], [6, 1, 0, 0, 0, 77, 0, 0, 0]]);
-  order.length = 0; make({ run: true }).leftClick(200, 120, { held: true });
-  assert.deepEqual(order, [['approach', 1, 77, true], [9, 1, 0, 0, 0, 77, 0, 0, 0]]);
-  // In arm's reach, with a ranged left skill, or with Stand Still held: the packet alone.
-  order.length = 0; make({ monsters: [{ ...far, x: 102, y: 101 }] }).leftClick(200, 120);
-  make({ leftMelee: false }).leftClick(200, 120);
-  make().leftClick(200, 120, { stand: true });
-  assert.deepEqual(order, [[6, 1, 0, 0, 0, 77, 0, 0, 0], [6, 1, 0, 0, 0, 77, 0, 0, 0], [6, 1, 0, 0, 0, 77, 0, 0, 0]]);
-  // Without the engine's walk-to-unit the ground route to the monster's tile starts instead; a refused route still attacks.
-  order.length = 0; make({}, { approachUnit: null, move: (x, y, run) => { order.push(['move', x, y, run]); return 0; } }).leftClick(200, 120);
-  assert.deepEqual(order, [['move', 110, 104, false], [6, 1, 0, 0, 0, 77, 0, 0, 0]]);
+// plan 0: a hand-to-hand skill out of melee range. The click walks (0x02, or 0x04 running) and keeps the skill
+// waiting; once the walk has ended in range the skill starts locally and its plain packet goes out.
+test('a hand-to-hand skill on a far monster walks to it first and is used on arrival', () => {
+  const far = { guid: 77, classId: 5, mode: 1, x: 110, y: 104, anchorX: 200, anchorY: 120, drawn: true };
+  for (const [hand, click, opcode] of [[0, 'leftClick', 0x06], [1, 'rightClick', 0x0d]]) {
+    const order = []; let inRange = 0, done = false, start = 1, clock = 0;
+    const make = (extra) => createRealmInput({ transmit: (b) => order.push(Array.from(b)), scene: sceneOf({ monsters: [far], ...extra }), now: () => (clock += 1000),
+      approachUnit: (type, guid, run) => { order.push(['approach', type, guid, run]); return 1; }, actionDone: () => done,
+      skillPlan: (h, type, guid) => { assert.deepEqual([h, type, guid], [hand, 1, 77]); return inRange; },
+      skillOnUnit: (h, type, guid) => { order.push(['start', h, type, guid]); return start; },
+      skillAt: (h, x, y) => { order.push(['start-at', h, x, y]); return 1; } });
+    let input = make();
+    input[click](200, 120, { held: true });
+    assert.deepEqual(order, [['approach', 1, 77, false], [0x02, 1, 0, 0, 0, 77, 0, 0, 0]]);
+    assert.deepEqual(input.pending, { type: 1, guid: 77, hand });
+    input.tick(); assert.equal(order.length, 2);                          // still walking: nothing more
+    done = true; input.tick();                                           // stopped short: walk again
+    assert.deepEqual(order.slice(2), [['approach', 1, 77, false], [0x02, 1, 0, 0, 0, 77, 0, 0, 0]]);
+    inRange = 1; order.length = 0; input.tick();
+    assert.deepEqual(order, [['start', hand, 1, 77], [opcode, 1, 0, 0, 0, 77, 0, 0, 0]]);   // the plain packet, though the click was held
+    assert.equal(input.pending, null);
+    input.tick(); assert.equal(order.length, 2);
+    // Running: 0x04. A start refused on arrival sends nothing.
+    inRange = 0; done = false; order.length = 0; input = make({ run: true }); input[click](200, 120);
+    assert.deepEqual(order, [['approach', 1, 77, true], [0x04, 1, 0, 0, 0, 77, 0, 0, 0]]);
+    inRange = 1; done = true; start = 0; order.length = 0; input.tick();
+    assert.deepEqual(order, [['start', hand, 1, 77]]);
+    // Stand Still out of range: the skill at the pointer, no walk.
+    inRange = 0; start = 1; order.length = 0; make()[click](200, 120, { stand: true });
+    assert.deepEqual(order, [['start-at', hand, 100, 120], [hand ? 0x0c : 0x05, 100, 0, 120, 0]]);
+    // In range, or a ranged skill (plan 1): started and sent on the click.
+    inRange = 1; order.length = 0; make()[click](200, 120);
+    assert.deepEqual(order, [['start', hand, 1, 77], [opcode, 1, 0, 0, 0, 77, 0, 0, 0]]);
+  }
+});
+
+test('the right button with a hand-to-hand skill on open ground walks there; Stand Still uses the skill', () => {
+  const order = [];
+  const input = createRealmInput({ transmit: (b) => order.push(Array.from(b)), scene: sceneOf({}), now: () => 0,
+    move: (x, y, run) => { order.push(['move', x, y, run]); return 1; }, skillPlan: (h, type) => { assert.deepEqual([h, type], [1, -1]); return 2; },
+    skillAt: (h, x, y) => { order.push(['start-at', h, x, y]); return 1; } });
+  assert.equal(input.rightClick(200, 120).kind, 'ground');
+  input.rightClick(202, 120, { stand: true });
+  assert.deepEqual(order, [['move', 100, 120, false], [0x01, 100, 0, 120, 0], ['start-at', 1, 101, 120], [0x0c, 101, 0, 120, 0]]);
+});
+
+test('without the engine hooks a monster click sends the skill packet alone', () => {
+  const order = [], mon = { guid: 77, classId: 5, mode: 1, x: 110, y: 104, anchorX: 200, anchorY: 120, drawn: true };
+  const input = createRealmInput({ transmit: (b) => order.push(Array.from(b)), scene: sceneOf({ monsters: [mon] }), now: () => 0 });
+  input.leftClick(200, 120); input.rightClick(200, 120);
+  assert.deepEqual(order, [[0x06, 1, 0, 0, 0, 77, 0, 0, 0], [0x0d, 1, 0, 0, 0, 77, 0, 0, 0]]);
 });
 
 test('Stand Still with the left button uses the left skill at the pointer and never walks', () => {
   const order = [];
-  const input = createRealmInput({ transmit: (b) => order.push(Array.from(b)), scene: sceneOf({ leftMelee: true }), now: () => 0,
+  const input = createRealmInput({ transmit: (b) => order.push(Array.from(b)), scene: sceneOf({}), now: () => 0,
     move: () => { order.push('move'); return 1; } });
   assert.equal(input.leftClick(200, 120, { stand: true }).kind, 'ground');
   input.leftClick(202, 120, { stand: true, held: true });

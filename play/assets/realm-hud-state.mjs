@@ -21,6 +21,15 @@ const u16 = (p, at) => p[at] | (p[at + 1] << 8);
 const u32 = (p, at) => (p[at] | (p[at + 1] << 8) | (p[at + 2] << 16) | (p[at + 3] << 24)) >>> 0;
 const WAYPOINT_COUNT = 39;
 
+/**
+ * Which of Acts I-IV the hero has completed, for the waypoint menu's act tabs: bit 0 of the quest words
+ * 7, 15, 23 and 28 (each act's COMPLETED word). The client's quest record is zero until the server
+ * sends it, so no record reads as nothing completed.
+ */
+export function waypointActCompletion(questWords) {
+  return [7, 0x0f, 0x17, 0x1c].map((word) => ((questWords?.[word] ?? 0) & 1) === 1);
+}
+
 /** The 0x49 the client sends to travel through the open waypoint (level 0 closes the menu). */
 export function waypointTravelPacket(objectId, levelId) {
   const out = new Uint8Array(9);

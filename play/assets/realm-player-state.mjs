@@ -9,6 +9,34 @@ export function applyRealmPlayerFrame(protocol, bytes) {
     monsters: protocol.d2gsClientMonsters?.() ?? [] };
 }
 
+// The server's chunks arrive many to a game tick, and each used to re-read every player and monster record
+// from the engine although the 25 Hz unit tick re-reads the same records before anything is drawn. Every
+// chunk is still fed to the engine at once and in order; the records are read back at most once per
+// `maxAge` ms while the scene is live (`live`), and a chunk inside that window hands back the views the
+// caller already holds (`current`). Before the scene is live every chunk is read, as the join needs.
+export const REALM_READ_MAX_AGE_MS = 1000 / 25;
+export function createRealmFrameFeed({ now = () => performance.now(), maxAge = REALM_READ_MAX_AGE_MS } = {}) {
+  let readAt = -Infinity;
+  const stats = { chunks: 0, reads: 0 };
+  return {
+    stats,
+    reset() { readAt = -Infinity; },
+    feed(protocol, bytes, { live = false, current = null } = {}) {
+      stats.chunks++;
+      const at = now();
+      if (live && current && at - readAt < maxAge) {
+        if (!protocol?.d2gsClientPlayerFeed) throw new Error('D2GS player state adapter is unavailable');
+        const applied = protocol.d2gsClientPlayerFeed(bytes);
+        if (applied < 0) throw new Error(`D2GS player state stream rejected server data (${applied})`);
+        return { applied, read: false, state: current.state ?? null, players: current.players ?? [], monsters: current.monsters ?? [] };
+      }
+      const update = applyRealmPlayerFrame(protocol, bytes);
+      readAt = at; stats.reads++;
+      return { ...update, read: true };
+    },
+  };
+}
+
 // The camera follows the selected player's path position at 16.16 precision, as a local game's does; a
 // whole-subtile centre steps the world a subtile at a time under a walking hero. At rest both are x.5.
 export function realmCameraCentre(source) {
