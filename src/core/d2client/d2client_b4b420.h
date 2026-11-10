@@ -19,7 +19,7 @@ struct Seams { // all unverified: names from ordinals / sub_ addresses
  virtual int32_t ord11017(int32_t)=0; virtual void s62d0()=0;
  virtual int32_t ord10973(int32_t,int32_t,int32_t)=0;
  virtual int32_t ord10494()=0; virtual void* s1260()=0; virtual void* s1260i(int32_t idx){ (void)idx; return s1260(); } virtual void s630f0(uint32_t* buf)=0;
- virtual int32_t ord11085()=0; virtual uint8_t sc0b0(Unit*)=0;
+ virtual int32_t ord11085()=0; virtual uint32_t sc0b0(Unit*)=0;
 };
 struct State { // globals, RVAs of the D2Client image
  uint8_t g975f, g9781, g978e, g9753, g9729, g9737, g9786_dummy; uint32_t g9786, g9663; void* g975b; int32_t gbc34, gb834, gb828, gb824;

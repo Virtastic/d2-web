@@ -1,6 +1,7 @@
 // Batch D2Client 0x4B420..0x4C500. Decompile-derived; unresolved callees are seams (unverified).
 // Register-passed args (ESI/EAX/ECX) are made explicit parameters.
 #include "d2client_b4b420.h"
+#include <cstring>
 namespace d2client_batch_4b420 {
 // (seam copy; verified body: dialog_47810_4b420.cpp)
 void sub_4B420(Seams& s, State& g) {
@@ -87,7 +88,8 @@ void sub_4C3C0(Seams& s, const uint8_t* p) {
 // 1.13c D2Client+0x4C430   (esi = unit)
 bool sub_4C430(Seams& s, Unit* u) {
  if (!u || u->type != 1) return false;
- if (s.ord11085() != 0 && (u->type != 1 || !u->data || !(((uint8_t*)u->data)[0x16] & 8)))
+ uint32_t dp; std::memcpy(&dp, (const uint8_t*)u + 0x14, 4);   // retail layout: 32-bit pData at +0x14
+ if (s.ord11085() != 0 && (!dp || !(((const uint8_t*)(uintptr_t)dp)[0x16] & 8)))
   return !(s.sc0b0(u) != 0);
  return false;
 }
