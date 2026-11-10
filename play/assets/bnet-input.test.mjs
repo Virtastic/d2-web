@@ -93,22 +93,22 @@ for (const vp of VIEWPORTS) {
     const r = rig({ kind: "lobby", ...vp }), J = LL.joinGame.list;
     r.clickId("join"); assert.equal(r.screen.panel, "join"); assert.equal(r.log.filter((l) => l === "refresh").length, 1);
     // The open rebuilds the list empty; the realm's reply fills it.
-    r.screen.setGames(Array.from({ length: 20 }, (_, i) => ({ name: `game${i}`, description: `d${i}` })));
+    r.screen.setGames(Array.from({ length: 20 }, (_, i) => ({ name: `Game${i}`, description: `d${i}` })));
     const row = (i) => [J.x + 10, J.y - J.h + i * J.pitch + 3];
-    r.click(...row(2)); assert.equal(r.screen.selectedGame().name, "game2");
+    r.click(...row(2)); assert.equal(r.screen.selectedGame().name, "Game2");
     // Retail ignores the wheel in the join list.
     r.screen.draw(ctx, vp.w, vp.h);
     const e = { ...r.ev(...row(0)), deltaY: 100, deltaMode: 0 };
     assert.equal(r.input.wheel(e), false);
-    r.click(...row(0)); assert.equal(r.screen.selectedGame().name, "game0");
+    r.click(...row(0)); assert.equal(r.screen.selectedGame().name, "Game0");
     // The scrollbar is the screen's own press, drag and release.
     const S = J.scrollbar, x = S.x + 2;
     r.down(r.ev(x, S.top + 10)); r.screen.hover(...canvasPoint({ width: vp.w, height: vp.h, getBoundingClientRect: () => ({ left: vp.left ?? 0, top: vp.top ?? 0, width: vp.cssW ?? vp.w, height: vp.cssH ?? vp.h }) }, r.ev(x, S.bottom - 10)), vp.w, vp.h);
     r.up(r.ev(x, S.bottom - 10));
-    r.click(...row(0)); assert.equal(r.screen.selectedGame().name, `game${20 - J.rows}`);
-    r.click(...row(4)); assert.equal(r.screen.selectedGame().name, `game${24 - J.rows}`);
+    r.click(...row(0)); assert.equal(r.screen.selectedGame().name, `Game${20 - J.rows}`);
+    r.click(...row(4)); assert.equal(r.screen.selectedGame().name, `Game${24 - J.rows}`);
     r.clickId("field-password"); r.typeText("pw"); r.clickId("join-game"); await tick();
-    assert.deepEqual(r.log.filter((l) => Array.isArray(l)), [["join", `game${24 - J.rows}`, "pw"]]);
+    assert.deepEqual(r.log.filter((l) => Array.isArray(l)), [["join", `Game${24 - J.rows}`, "pw"]]);
     assert.ok(r.screen.busy);
   });
 
@@ -265,12 +265,12 @@ test('a join that loses the session drops to the login screen with its box; OK, 
   const f = flow({ hooks: { join: async (g, { login, state, lobbyGone }) => {
     state.cur = { kind: 'login', screen: login }; lobbyGone(); login.reset(); login.fail(new Error('lost')); throw Object.assign(new Error('lost'), { sessionLost: true }); } } });
   f.enterLobby(); const old = f.lobby;
-  old.activate('join'); old.setGames([{ name: 'g1' }]);
+  old.activate('join'); old.setGames([{ name: 'G1' }]);
   const key = (code, k = '') => f.input.key({ code, key: k, preventDefault() {} });
   const row = LL.joinGame.list; f.states.press(1, old, row.x + 5, row.y - row.h + 3, 800, 600, 0); f.states.release(1, old, row.x + 5, row.y - row.h + 3, 800, 600, 0);
-  assert.equal(old.selectedGame().name, 'g1');
+  assert.equal(old.selectedGame().name, 'G1');
   key('Enter', 'Enter'); await tick();
-  assert.deepEqual(f.log, [['join', 'g1']]); assert.equal(old.evidence.notice, null, 'a lost session shows no lobby notice'); assert.equal(old.busy, false);
+  assert.deepEqual(f.log, [['join', 'G1']]); assert.equal(old.evidence.notice, null, 'a lost session shows no lobby notice'); assert.equal(old.busy, false);
   assert.equal(f.state.cur.kind, 'login'); assert.ok(f.login.evidence.message, 'the login failure box is up');
   key('KeyX', 'x'); assert.equal(f.login.evidence.account, '', 'typing under the box goes nowhere');
   key('Enter', 'Enter'); assert.equal(f.login.evidence.message, null);

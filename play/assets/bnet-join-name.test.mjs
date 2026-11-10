@@ -18,11 +18,21 @@ const make = (games, hooks = {}) => {
   return { s, joins };
 };
 const type = (s, t) => { for (const c of t) s.typeKey(c === ' ' ? 'Space' : /\d/.test(c) ? `Digit${c}` : `Key${c.toUpperCase()}`, c); };
-const LISTED = [{ name: 'game1' }, { name: 'game2' }];
+const LISTED = [{ name: 'Game1' }, { name: 'Game2' }];
+const ALL = [{ name: 'Baal Runs 24-7' }, { name: 'Cows' }, { name: 'NM Mephisto', password: true }, { name: 'lower case' }, { name: 'Tristram' }];
+const HC = { name: 'HC Normal', difficulty: 3 };
+// A refreshed table lists every entry; a table not yet filled lists none but the raw reply still holds them.
+const run = async (typed, { table = true, hcFirst = false } = {}) => {
+  const raw = hcFirst ? [HC, ...ALL] : ALL;
+  const { s, joins } = make([]); s.setGames(table ? ALL : [], raw, hcFirst);
+  type(s, typed); s.typeKey('Enter'); await tick();
+  return { joins, notice: s.evidence.notice?.body ?? null };
+};
+const POPUP = 's5137';
 
 test('empty name, empty list: Enter sends nothing and shows the Invalid Game Name popup', async () => {
   const { s, joins } = make([]); s.typeKey('Enter'); await tick();
-  assert.deepEqual(joins, []); assert.equal(s.evidence.notice.body, 's5137');
+  assert.deepEqual(joins, []); assert.equal(s.evidence.notice.body, POPUP);
 });
 test('empty name, populated list: Enter sends nothing and shows no popup', async () => {
   const { s, joins } = make(LISTED); s.typeKey('Enter'); await tick();
@@ -30,17 +40,34 @@ test('empty name, populated list: Enter sends nothing and shows no popup', async
 });
 test('empty name, no list callback: Enter sends nothing and shows the popup', async () => {
   const { s, joins } = make([], { onRefreshGames: null }); s.typeKey('Enter'); await tick();
-  assert.deepEqual(joins, []); assert.equal(s.evidence.notice.body, 's5137');
+  assert.deepEqual(joins, []); assert.equal(s.evidence.notice.body, POPUP);
 });
-test('a name matching a listed game joins', async () => {
-  const { s, joins } = make(LISTED); type(s, 'game1'); s.typeKey('Enter'); await tick();
-  assert.deepEqual(joins, ['game1']); assert.equal(s.evidence.notice, null);
-});
-test('a name matching no game, empty list: no join, popup', async () => {
+test('a name matching no game, empty list and no reply: no join, popup', async () => {
   const { s, joins } = make([]); type(s, 'game1'); s.typeKey('Enter'); await tick();
-  assert.deepEqual(joins, []); assert.equal(s.evidence.notice.body, 's5137');
+  assert.deepEqual(joins, []); assert.equal(s.evidence.notice.body, POPUP);
 });
-test('a name matching no game, populated list: no join, no popup', async () => {
-  const { s, joins } = make(LISTED); type(s, 'game9'); s.typeKey('Enter'); await tick();
-  assert.deepEqual(joins, []); assert.equal(s.evidence.notice, null);
+test('refreshed table: first entry typed in lower case joins the title-cased name', async () => {
+  assert.deepEqual(await run('baal runs 24-7'), { joins: ['Baal Runs 24-7'], notice: null });
+});
+test('refreshed table: lower, same and upper case all join "Cows"', async () => {
+  for (const t of ['cows', 'Cows', 'COWS']) assert.deepEqual(await run(t), { joins: ['Cows'], notice: null }, t);
+});
+test('refreshed table: stored names not in title case cannot be joined by typing', async () => {
+  for (const t of ['NM Mephisto', 'lower case']) assert.deepEqual(await run(t), { joins: [], notice: null }, t);
+});
+test('refreshed table: an unknown name is silent', async () => {
+  assert.deepEqual(await run('zzz'), { joins: [], notice: null });
+});
+test('refreshed table: an empty name is silent', async () => {
+  assert.deepEqual(await run(''), { joins: [], notice: null });
+});
+test('empty table: only the first raw entry is compared', async () => {
+  assert.deepEqual(await run('baal runs 24-7', { table: false }), { joins: ['Baal Runs 24-7'], notice: null });
+  assert.deepEqual(await run('cows', { table: false }), { joins: [], notice: null });
+});
+test('empty table: an empty name is silent', async () => {
+  assert.deepEqual(await run('', { table: false }), { joins: [], notice: null });
+});
+test('a hidden hardcore first entry gives the popup and no join, with or without a filled table', async () => {
+  for (const table of [true, false]) assert.deepEqual(await run('hc normal', { table, hcFirst: true }), { joins: [], notice: POPUP }, String(table));
 });

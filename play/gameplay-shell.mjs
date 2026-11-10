@@ -1915,7 +1915,8 @@ function lobbyChatUser(name) {
 function pushLobbyGames(name) {
   const c = lobbyCharacter(name);
   if (!c || !bnetLobbyScreen || !realmFlow) return;
-  bnetLobbyScreen.setGames(filterGames(realmFlow.games ?? [], c));
+  const raw = realmFlow.games ?? [];
+  bnetLobbyScreen.setGames(filterGames(raw, c), raw, raw.length > 0 && filterGames(raw.slice(0, 1), c).length === 0);
 }
 function lobbyCharacter(name) {
   const c = realmCharacters.find((x) => x.name.toLowerCase() === String(name).toLowerCase());

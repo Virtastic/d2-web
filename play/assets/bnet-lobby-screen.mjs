@@ -232,6 +232,7 @@ export const MCP_RESULT_STRINGS = {
 const CREATE_FAILED = 5140, JOIN_FAILED = 5141;
 // 0x73 and 0x74 name the previous difficulty's boss, Diablo for a classic character and Baal for an expansion one; 0x7d
 // names the other kind of ladder than the character's own.
+const titleCase = (t) => t.replace(/[^ ]+/g, (w) => w[0].toUpperCase() + w.slice(1).toLowerCase());
 const joinStringFor = (result, character) => {
   const expansion = Boolean(character?.expansion), ladder = Boolean(character?.ladder);
   if (result === 0x73) return expansion ? 21794 : 5364;
@@ -339,7 +340,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   // 'lobby' (the first view after character select) or 'chat'; `panel` is null, 'create' or 'join'.
   let mode = 'lobby', panel = null, notice = null, busy = false;
   // The join panel's list: `{ name, password, difficulty, description }` per game, in the order the realm sent them (setGames).
-  let games = [];
+  let games = [], rawFirst = null, rawFirstHidden = false;
   // CREATE, JOIN, CHANNEL and LADDER latch pressed on a mouse press and open their panel then, not on release; a press on the one already
   // latched is swallowed, and any other panel unlatches it. `latch` is the id a press latched (a programmatic open leaves it null).
   let latch = null;
@@ -530,11 +531,17 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   };
   const joinGame = () => {
     if (busy) return;
-    // The typed name must be one of the listed games to send the join. Nothing matching shows the Invalid Game Name popup when the list is empty
-    // (or has no list callback) and returns silently when the list holds games; an empty name never matches.
-    const want = form.name.toLowerCase(), found = form.name !== '' && games.some((g) => g.name.toLowerCase() === want);
-    if (!found) { if (!games.length || typeof onRefreshGames !== 'function') notice = { body: string(S.invalidGameName) }; return; }
-    joining = true; void run(() => onJoinGame({ gameName: form.name, gamePassword: form.password }));
+    // The typed name is title-cased (first letter and any letter after a space upper, the rest lower) and then compared byte for byte, so a
+    // listed name that is not already in title case cannot be joined by typing. With rows listed, no match or an empty name returns silently.
+    // With none listed only the first entry of the realm's raw reply is compared: a match joins, a hidden first entry (the character's filter), listed or not,
+    // shows the Invalid Game Name popup, a different name returns silently, and no reply entry at all shows the popup.
+    const name = titleCase(form.name);
+    if (rawFirstHidden) { notice = { body: string(S.invalidGameName) }; return; }
+    if (games.length) {
+      if (name === '' || !games.some((g) => g.name === name)) { if (typeof onRefreshGames !== 'function') notice = { body: string(S.invalidGameName) }; return; }
+    } else if (typeof onRefreshGames !== 'function' || !rawFirst) { notice = { body: string(S.invalidGameName) }; return; }
+    else if (name === '' || name !== rawFirst.name) return;
+    joining = true; void run(() => onJoinGame({ gameName: name, gamePassword: form.password }));
   };
   // The arrows apply D2Multi's exact rules (0x13200 / 0x131A0 / 0x13140 / 0x130E0): a step only when it stays inside the range, no clamp otherwise.
   const step = (key, delta, lo, hi) => { const n = Number(form[key]) || 0; const m = n + delta; form[key] = String(m >= lo && m <= hi ? m : n); };
@@ -1004,7 +1011,8 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     ladderState() { return { panel, kind: ladder.kind, rows: ladder.rows }; },
     scrollHelp(pos) { helpFirst = Math.max(0, pos); },
     setChannels(list) { channels = list.map(String); chanFirst = 0; },
-    setGames(list) {
+    setGames(list, raw = null, firstHidden = false) {
+      rawFirst = raw?.[0] ?? null; rawFirstHidden = rawFirst !== null && firstHidden;
       // The refresh (D2Multi 0x11F80) rebuilds the list and empties the description. The pick is looked up again by its name: found, it follows
       // the game to its new row; gone, the same row number stays picked (now another game). The scroll position is kept only when a row was picked.
       const kept = selected >= 0 ? games[selected]?.name ?? null : null;

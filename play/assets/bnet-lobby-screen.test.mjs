@@ -115,9 +115,9 @@ test('JOIN sends name and password; Escape closes the panel, then quits', async 
   const joins = [];
   let quit = 0;
   const s = screen({ name: 'Ama', charClass: 0 }, { onJoinGame: async (g) => { joins.push(g); throw Object.assign(new Error('x'), { sessionLost: true }); }, onQuit: () => { quit++; } });
-  s.activate('join'); s.setGames([{ name: 'g' }]); s.typeKey('KeyG', 'g'); s.typeKey('Tab'); s.typeKey('KeyP', 'p');
+  s.activate('join'); s.setGames([{ name: 'G' }]); s.typeKey('KeyG', 'g'); s.typeKey('Tab'); s.typeKey('KeyP', 'p');
   s.activate('join-game'); await tick();
-  assert.deepEqual(joins, [{ gameName: 'g', gamePassword: 'p' }]);
+  assert.deepEqual(joins, [{ gameName: 'G', gamePassword: 'p' }]);
   assert.equal(s.evidence.notice, null, 'a lost session leaves the notice to the login screen');
   s.escape(); assert.equal(s.panel, null);
   s.escape(); assert.equal(quit, 1);
@@ -127,19 +127,19 @@ test('a click on a game row fills the name box, enables JOIN and joins that game
   const joins = [];
   const s = screen({ name: 'Ama', charClass: 0 }, { onJoinGame: async (g) => { joins.push(g); throw Object.assign(new Error('x'), { sessionLost: true }); } });
   s.activate('join');
-  s.setGames(Array.from({ length: 12 }, (_, i) => ({ name: `game${i}`, password: i === 2, description: `text ${i}` })));
+  s.setGames(Array.from({ length: 12 }, (_, i) => ({ name: `Game${i}`, password: i === 2, description: `text ${i}` })));
   assert.equal(s.evidence.boxes.find((b) => b.id === 'join-game').disabled, true, 'no name yet');
   assert.equal(s.press(440, 100, 800, 600), null, 'above the list: no row');
   assert.equal(s.press(440, 392 - 19 * 2 - 2, 800, 600) === 'list', true);
-  assert.equal(s.selectedGame().name, 'game6', 'row 6 from the top: (y - 220) / 19');
+  assert.equal(s.selectedGame().name, 'Game6', 'row 6 from the top: (y - 220) / 19');
   assert.equal(s.editValue(), null, 'the click moved the focus off the edit boxes');
   assert.equal(s.evidence.boxes.find((b) => b.id === 'join-game').disabled, false);
   s.scrollGames(3); s.press(440, 229, 800, 600);
-  assert.equal(s.selectedGame().name, 'game3', 'the first row on show counts');
+  assert.equal(s.selectedGame().name, 'Game3', 'the first row on show counts');
   s.press(440, 392, 800, 600); assert.equal(s.selectedGame(), null, 'a click below the last game clears the pick');
-  s.pinClock(60000, 0); s.press(440, 229, 800, 600); assert.equal(s.selectedGame().name, 'game3');
+  s.pinClock(60000, 0); s.press(440, 229, 800, 600); assert.equal(s.selectedGame().name, 'Game3');
   s.activate('field-password'); s.typeKey('KeyP', 'p'); s.activate('join-game'); await tick();
-  assert.deepEqual(joins, [{ gameName: 'game3', gamePassword: 'p' }]);
+  assert.deepEqual(joins, [{ gameName: 'Game3', gamePassword: 'p' }]);
 });
 
 test('a dead hardcore character cannot open CREATE or JOIN', () => {
@@ -209,16 +209,16 @@ test('the join panel\'s open request waits for 5 s of clock: its stamp starts at
   s.activate('panel-cancel'); s.pinClock(5000, 0); s.activate('join'); assert.equal(asked, 1, 'at 5 s the stamp is due');
 });
 
-const games = (n) => Array.from({ length: n }, (_, i) => ({ name: `game${i}`, description: `text ${i}` }));
+const games = (n) => Array.from({ length: n }, (_, i) => ({ name: `Game${i}`, description: `text ${i}` }));
 const pinned = (hooks) => { const s = screen({ name: 'Ama', charClass: 0 }, hooks); s.activate('join'); return s; };
 
 test('a refresh keeps the pick by name, or the same row number when the game is gone; the description empties', () => {
   const s = pinned(); s.setGames(games(12)); s.press(440, 248, 800, 600);
-  assert.equal(s.selectedGame().name, 'game1');
+  assert.equal(s.selectedGame().name, 'Game1');
   s.setGames([{ name: 'fresh', description: '' }, ...games(12)]);
-  assert.equal(s.selectedGame().name, 'game1', 'followed to its new row');
-  s.setGames(games(12).filter((g) => g.name !== 'game1'));
-  assert.equal(s.selectedGame().name, 'game3', 'same row number (2), another game');
+  assert.equal(s.selectedGame().name, 'Game1', 'followed to its new row');
+  s.setGames(games(12).filter((g) => g.name !== 'Game1'));
+  assert.equal(s.selectedGame().name, 'Game3', 'same row number (2), another game');
 });
 
 test('the same row twice within 500 ms joins; a slower second click only selects', async () => {
@@ -228,22 +228,22 @@ test('the same row twice within 500 ms joins; a slower second click only selects
   s.press(440, 229, 800, 600); s.pinClock(t += 600, 0); s.press(440, 229, 800, 600); await tick();
   assert.deepEqual(joins, [], 'too slow');
   s.pinClock(t += 300, 0); s.press(440, 229, 800, 600); await tick();
-  assert.deepEqual(joins, [{ gameName: 'game0', gamePassword: '' }]);
+  assert.deepEqual(joins, [{ gameName: 'Game0', gamePassword: '' }]);
 });
 
 test('the list scrollbar: arrows step a row, the track pages, a grabbed thumb follows the pointer, release lets go', () => {
   const s = pinned(); s.setGames(games(14));
   assert.equal(s.press(597, 392, 800, 600), 'scrollbar'); s.release('scrollbar', 597, 392, 800, 600);
-  s.press(440, 229, 800, 600); assert.equal(s.selectedGame().name, 'game1', 'one row down');
+  s.press(440, 229, 800, 600); assert.equal(s.selectedGame().name, 'Game1', 'one row down');
   s.press(597, 300, 800, 600); s.release('scrollbar', 597, 300, 800, 600);
-  s.press(440, 229, 800, 600); assert.equal(s.selectedGame().name, 'game5', 'clamped at the last position (14 - 9 rows)');
+  s.press(440, 229, 800, 600); assert.equal(s.selectedGame().name, 'Game5', 'clamped at the last position (14 - 9 rows)');
   s.press(597, 229, 800, 600); s.release('scrollbar', 597, 229, 800, 600);
-  s.press(440, 229, 800, 600); assert.equal(s.selectedGame().name, 'game4', 'one row up');
+  s.press(440, 229, 800, 600); assert.equal(s.selectedGame().name, 'Game4', 'one row up');
   const d = pinned(); d.setGames(games(14));
   assert.equal(d.press(597, 245, 800, 600), 'scrollbar'); d.hover(597, 400, 800, 600);
-  d.press(440, 229, 800, 600); assert.equal(d.selectedGame().name, 'game5', 'the grabbed thumb followed the pointer to the end');
+  d.press(440, 229, 800, 600); assert.equal(d.selectedGame().name, 'Game5', 'the grabbed thumb followed the pointer to the end');
   d.release('scrollbar', 597, 400, 800, 600); d.hover(597, 229, 800, 600); d.press(440, 229, 800, 600);
-  assert.equal(d.selectedGame().name, 'game5', 'after release the thumb no longer follows');
+  assert.equal(d.selectedGame().name, 'Game5', 'after release the thumb no longer follows');
 });
 
 test('no scrollbar press when every game fits', () => {
