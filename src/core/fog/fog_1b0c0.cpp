@@ -10,6 +10,9 @@ extern "C" void fog_sub_1ab60(uint8_t* n, uint8_t* l);
 struct Fog1b0c0Api {
     uint8_t* (*default_pool)();                       // 6FF9AF94
     void (*pool_error)(uint32_t key, uint8_t* pool);  // Fog+0x1AA80 (EAX = key, stack = pool)
+    void (*validate)(uint8_t* cs);                    // Fog+0x11690 (FogValidateCriticalSection on the class)
+    void (*enter)(uint8_t* cs);                       // EnterCriticalSection (class)
+    void (*leave)(uint8_t* cs);                       // LeaveCriticalSection (class)
 };
 
 namespace {
@@ -27,6 +30,8 @@ extern "C" void fog_sub_1b0c0(const Fog1b0c0Api* api, uint8_t* pool, const uint3
     uint8_t* cls = P(W(blk, 0x14));
     const int32_t idx = static_cast<int32_t>(key - W(blk, 0)) / static_cast<int32_t>(W(cls, 0x18));
     if (idx >= static_cast<int32_t>(W(cls, 0x1c))) { api->pool_error(key, pool); return; }
+    api->validate(cls);
+    api->enter(cls);
     uint32_t* word = reinterpret_cast<uint32_t*>(P(W(blk, 4)) + (idx >> 5) * 4);
     const uint32_t mask = 1u << (idx & 0x1f);
     if (*word & mask) {
@@ -34,4 +39,6 @@ extern "C" void fog_sub_1b0c0(const Fog1b0c0Api* api, uint8_t* pool, const uint3
         W(blk, 8) = W(blk, 8) - 1;
         fog_sub_1ab60(blk, cls);
     }
+    api->validate(cls);
+    api->leave(cls);
 }

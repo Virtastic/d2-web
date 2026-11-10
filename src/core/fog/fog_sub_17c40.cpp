@@ -8,7 +8,7 @@ typedef uint32_t (*attr_fn)(const char*);
 // 1.13c Fog+0x17C40
 extern "C" uint32_t fog_sub_17c40(const char* p, mkdir_fn CreateDirectoryA, u32_fn GetLastError, attr_fn GetFileAttributesA) {
     if (!p || !*p) return 0;
-    char buf[0x104];
+    char buf[0x104] = {};   // retail's stack local past the NUL reads back as zero in the capture
     for (const char* s = strchr(p + 1, '\\'); s; s = strchr(s + 1, '\\')) {
         uint32_t n = (uint32_t)(s - p);
         if (n >= 0x104) return 0;

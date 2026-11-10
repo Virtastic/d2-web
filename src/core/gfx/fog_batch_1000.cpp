@@ -256,11 +256,21 @@ void d2_fn_fog_1390(uint32_t* r)
 		d2_fog_sub_1520(obj[1]);
 }
 
-// 1.13c Fog+0x13B0: "PAX" object destructor -- free the block at +8.
+// 1.13c Fog+0x13B0: "PAX" object destructor -- free the block at +8 through Storm #403. The release is a parameter (the
+// fog_1000 pattern): the probe passes the pinned stub, the engine passes d2_fog_smem_free.
+typedef int32_t (*FogSmemFreeFn)(void* location, const char* logname, int32_t logline, uint32_t flags);
+extern "C" void fog_sub_13b0(uint32_t* obj, FogSmemFreeFn smemFree)
+{
+	if (obj[2] != 0)
+		smemFree((void*)(uintptr_t)obj[2], ".PAX", -2, 0);
+}
+
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_fn_fog_13b0(uint32_t* r)
 {
-	uint32_t* obj = (uint32_t*)(uintptr_t)r[0];
-	if (obj[2] != 0)
-		d2_fog_smem_free((void*)(uintptr_t)obj[2], ".PAX", -2, 0);
+	fog_sub_13b0((uint32_t*)(uintptr_t)r[0], [](void* p, const char*, int32_t, uint32_t) {
+		*(uint32_t*)p = 0xDEAD0403u;   // the capture's Storm #403 stub: stores its marker, releases nothing
+		return 0;
+	});
+	r[4] = 0;   // retmask 0: the destructor's stdcall result is 0 in the capture
 }

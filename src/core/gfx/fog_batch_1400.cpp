@@ -162,9 +162,11 @@ static void fog_handle_destroy(FogHandle* h) {
     if (h->array != nullptr) fog_array_remove_at(h->array, h->index);
 }
 
-// Fog+0x1750: release the element array (register argument in EAX). The pointer is not cleared.
-static void fog_array_free_items(FogArray* a) {
-    if (a->items != nullptr) std::free(a->items);
+// Fog+0x1750: release the element array (register argument in EAX) through Storm #403 (".PAX", -2, 0). The pointer is not cleared.
+// The release is a parameter so the probe can pass the capture's pinned stub (the fog_1000 pattern).
+typedef int32_t (*FogSmemFreeFn)(void* location, const char* logname, int32_t logline, uint32_t flags);
+static void fog_array_free_items(FogArray* a, FogSmemFreeFn smemFree) {
+    if (a->items != nullptr) smemFree(a->items, ".PAX", -2, 0);
 }
 
 // ---- MSVC 2003 locale helpers (+0x184D, 0x1915, 0x1937, 0x1A00) ---------------------------------
@@ -339,7 +341,11 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16b0(uint32_t* r) {
 
 // 1.13c Fog+0x1750
 EMSCRIPTEN_KEEPALIVE void d2_fn_fog_1750(uint32_t* r) {
-    fog_array_free_items(reinterpret_cast<FogArray*>(static_cast<uintptr_t>(r[0])));
+    fog_array_free_items(reinterpret_cast<FogArray*>(static_cast<uintptr_t>(r[0])), [](void* p, const char*, int32_t, uint32_t) {
+        *(uint32_t*)p = 0xDEAD0403u;   // the capture's Storm #403 stub: stores its marker, releases nothing
+        return 0;
+    });
+    r[4] = 0;   // retmask 0: the result is 0 in the capture
 }
 
 // 1.13c Fog+0x17D0 is ported in src/core/fog/fog_17d0.cpp.

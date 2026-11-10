@@ -1,7 +1,7 @@
 // src/core/fog/fog_sub_1ca70.cpp -- 1.13c Fog.dll ordinal 10056, reimplemented from
 // build-wasm/ghidra-fog/decomp/0x1CA70.c (alpha lane: NAMED, no spec, no vector).
-// Fog+0x17F60 (GetSavePath, ordinal 10115) and the two kernel32 disk-space calls it probes by name
-// are separate, unported rows: host seams here, injected so a probe can replay them.
+// Fog+0x17F60 (GetSavePath, ordinal 10115) and the kernel32 calls it makes (LoadLibraryA, GetProcAddress,
+// GetDiskFreeSpaceA) are separate, unported rows: host seams here, injected so a probe can replay them.
 #include <cstdint>
 
 namespace {
@@ -31,7 +31,14 @@ void noDiskFreeSpace(const char* root, uint32_t* sectorsPerCluster, uint32_t* by
     *totalClusters = 0;
 }
 
+// kernel32!LoadLibraryA("kernel32.dll"); the EX branch needs a module handle, the A branch is the fallback.
+void* noLoadLibrary(const char* name) {
+    (void)name;
+    return reinterpret_cast<void*>(1);
+}
+
 void (*g_getSavePath)(char*, uint32_t) = noSavePath;
+void* (*g_loadLibrary)(const char*) = noLoadLibrary;
 int (*g_getDiskFreeSpaceEx)(const char*, uint64_t*, uint64_t*, uint64_t*) = noDiskFreeSpaceEx;
 void (*g_getDiskFreeSpace)(const char*, uint32_t*, uint32_t*, uint32_t*, uint32_t*) = noDiskFreeSpace;
 
@@ -42,7 +49,9 @@ void (*g_getDiskFreeSpace)(const char*, uint32_t*, uint32_t*, uint32_t*, uint32_
 extern "C"
 void fog_sub_1ca70_seams(void (*savePath)(char*, uint32_t),
                          int (*diskFreeSpaceEx)(const char*, uint64_t*, uint64_t*, uint64_t*),
-                         void (*diskFreeSpace)(const char*, uint32_t*, uint32_t*, uint32_t*, uint32_t*)) {
+                         void (*diskFreeSpace)(const char*, uint32_t*, uint32_t*, uint32_t*, uint32_t*),
+                         void* (*loadLibrary)(const char*)) {
+    g_loadLibrary = loadLibrary ? loadLibrary : noLoadLibrary;
     g_getSavePath = savePath ? savePath : noSavePath;
     g_getDiskFreeSpaceEx = diskFreeSpaceEx ? diskFreeSpaceEx : noDiskFreeSpaceEx;
     g_getDiskFreeSpace = diskFreeSpace ? diskFreeSpace : noDiskFreeSpace;
@@ -61,7 +70,7 @@ uint64_t fog_sub_1ca70(void) {
     uint64_t freeToCaller = 0;
     uint64_t total = 0;
     uint64_t totalFree = 0;
-    if (g_getDiskFreeSpaceEx(path, &freeToCaller, &total, &totalFree))
+    if (g_loadLibrary("kernel32.dll") != nullptr && g_getDiskFreeSpaceEx(path, &freeToCaller, &total, &totalFree))
         return freeToCaller;
 
     for (uint32_t i = 0; i < 0x400; ++i) {
