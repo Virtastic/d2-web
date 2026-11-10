@@ -38,7 +38,7 @@ extern "C" uint32_t Storm_Sub13170(uint32_t now, uint8_t* s, const Snet13170Hook
       for (int i = 0; i < 4; i++) {
         if (i == 3) continue;
         int32_t n = at<int32_t>(s, 0x168 + 12 * i);
-        uint16_t lastAck = at<uint16_t>(s, 0x1de + 2 * i) - 1;
+        uint16_t lastAck = at<uint16_t>(s, 0x1d4 + 2 * i) - 1;   // retail puVar11[-5]: acked base at +0x1d4, not the current seq at +0x1de
         if (n <= 0) continue;
         uint8_t* nd = h.node(n); bool done = false;
         for (;;) {
