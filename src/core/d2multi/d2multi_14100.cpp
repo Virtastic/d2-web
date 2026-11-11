@@ -10,7 +10,7 @@
 // u2w = Unicode::unicode2Win; h = the dwords at DAT_6fa09ccc.. (0x10 bytes); cnt = DAT_6fa09dcc; tbl = the bytes at DAT_6f9fa598.
 uint32_t d2multi_14100(const D2mEnv& e, void (*u2w)(char*, const uint16_t*, int), const uint32_t* h, const int32_t* cnt, const uint8_t* tbl) {
     char bufA[256], bufB[256];
-    uint8_t rec[0x3c];
+    uint8_t rec[0x3c] = {};
     if (d2m_call(e, 0x7c62, 0, h[0]) == 0) return 0;
     uint32_t esi = d2m_call(e, 0x7c50, 0, h[2]);
     uint32_t edi = d2m_call(e, 0x7c50, 0, h[3]);
