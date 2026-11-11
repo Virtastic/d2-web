@@ -233,6 +233,18 @@ void CLIENTS_SetExperienceLoss(D2ClientStrc* pClient, int32_t nExpLoss) {}
 extern "C" bool g_sessionClientStaysInRoom;
 extern "C" bool g_sessionJoinUnits;
 void __fastcall D2GAME_SUNITMSG_FirstFn_6FCC5520(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient);
+// The local game's join walk (monspawn attachSessionPlayerAt) sets this for the length of the walk only, and only for a
+// client that is joined through the packet path: 0 no reveals (the direct path, every headless session), 1 every room of
+// the walk, 2 every room but the client's own (its reveal is sent first, separately), 3 as 2, and only rooms that hold an object.
+extern "C" int g_joinWalkRevealMode = 0;
+static bool joinWalkReveals(D2ActiveRoomStrc* pWalkRoom, D2ActiveRoomStrc* pOwnRoom) {
+    if (g_joinWalkRevealMode <= 0) return false;
+    if (g_joinWalkRevealMode == 1) return true;
+    if (pWalkRoom == pOwnRoom) return false;
+    if (g_joinWalkRevealMode == 2) return true;
+    for (D2UnitStrc* u = pWalkRoom->pUnitFirst; u; u = u->pRoomNext) if (u->dwUnitType == UNIT_OBJECT) return true;
+    return false;
+}
 void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
     // Recorded sessions (s39xx) run retail's LEVEL_AddClient/RemoveClient; the s08 aitrace fixture's capture hangs
     // the client with DUNGEON_AddClientToRoom and wakes monsters itself, so a second AI-event arm there fires early.
@@ -249,8 +261,11 @@ void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
         if (j >= oldCount) {
             if (lvl) LEVEL_AddClient(pClient->pGame, nextRooms[i], pClient);
             else {
-                // A connected client is told of each room it enters range of; the room's membership is unchanged.
-                if (g_d2webPacketSink) {
+                // A connected client is told of each room it enters range of; the room's membership is unchanged. The join
+                // walk runs before a sink is open: while it runs for the local game's client (g_joinWalkRevealMode, set only
+                // around that walk) the room reveal goes before the room's units, as in LEVEL_AddClient, so the client has a
+                // room for the objects that follow.
+                if (g_d2webPacketSink || joinWalkReveals(nextRooms[i], pRoom)) {
                     D2DrlgCoordsStrc coords = {};
                     DUNGEON_GetRoomCoordinates(nextRooms[i], &coords);
                     D2GAME_PACKETS_SendPacket0x07_6FC3D120(pClient, (uint8_t)DUNGEON_GetLevelIdFromRoom(nextRooms[i]), (uint16_t)coords.nTileXPos, (uint16_t)coords.nTileYPos);

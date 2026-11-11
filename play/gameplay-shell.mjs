@@ -1019,7 +1019,7 @@ function sessionAdapter() {
   if (window.Module?._d2_session_create && window.Module?._d2_session_snapshot) {
     return {
       // bare: no start kit, for a player a saved file is about to be applied to.
-      create(f, playerClass = 0, bare = false) { Module.ccall('d2_session_create_stream', 'number', ['number'], [0]); if (LOCAL_REALM) Module.ccall('d2_session_join_units', null, ['number'], [1]); const made = Module.ccall(bare && Module._d2_session_create_class_bare ? 'd2_session_create_class_bare' : 'd2_session_create_class', 'number', ['number', 'number', 'number', 'number', 'number'], [f.seed, f.difficulty, f.act0, f.level, playerClass]); if (made) Module.ccall('d2_session_client_map_start', 'number'); return made; },
+      create(f, playerClass = 0, bare = false) { Module.ccall('d2_session_create_stream', 'number', ['number'], [0]); Module.ccall('d2_session_join_units', null, ['number'], [LOCAL_REALM ? 1 : 0]); Module.ccall('d2_session_join_reveal', null, ['number'], [LOCAL_REALM ? JOIN_REVEAL : 0]); const made = Module.ccall(bare && Module._d2_session_create_class_bare ? 'd2_session_create_class_bare' : 'd2_session_create_class', 'number', ['number', 'number', 'number', 'number', 'number'], [f.seed, f.difficulty, f.act0, f.level, playerClass]); if (made) Module.ccall('d2_session_client_map_start', 'number'); return made; },
       // Create the character FROM the file: the engine reads the header and everything -- class,
       // act, town level, map seed -- comes out of it (PLRSAVE2_ReadSaveHeader, client-parity C3e).
       // Returns 0, or the PLRSAVE2 error code that refused the file.
@@ -2159,6 +2159,9 @@ async function authenticateConfiguredRealm({ account, password }) {
 // Default on: the local game is joined through the realm client path (?localrealm=0 opts out), over
 // the in-process connection (assets/realm-local.mjs) in place of the game-server socket.
 const LOCAL_REALM = new URLSearchParams(window.__d2Entry.search).get('localrealm') !== '0';
+// How the local game's join walk reveals rooms to the packet client before their units (?joinreveal=0..3; 0 as before). The
+// default 2 is retail's set: every adjacent room once (LEVEL_AddClient per room), the client's own room by the join's own reveal.
+const JOIN_REVEAL = Number(new URLSearchParams(window.__d2Entry.search).get('joinreveal') ?? 2) || 0;
 async function enterLocalRealm() {
   const [{ openLocalRealm }, { bindEngineProtocol }] = await Promise.all([import('./assets/realm-local.mjs'), import('./assets/realm-client.mjs')]);
   realmFlow = openLocalRealm(Module, bindEngineProtocol(Module));

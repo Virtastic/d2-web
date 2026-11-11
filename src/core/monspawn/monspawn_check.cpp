@@ -2548,6 +2548,10 @@ static uint32_t g_sessionJoinLoadLength = 0;
 // adjacent room, the 0xAC assign first). Off for the headless sessions, whose join drops those bytes.
 extern "C" bool g_sessionJoinUnits = false;   // the local game's client is told each monster of every room it joins (sub_6FC33020)
 EMSCRIPTEN_KEEPALIVE void d2_session_join_units(int on) { g_sessionJoinUnits = on != 0; }
+// How the join walk reveals rooms to the local game's client before their units (see sub_6FC33020); 0 is off.
+extern "C" int g_joinWalkRevealMode;
+static int g_sessionJoinRevealMode = 0;
+EMSCRIPTEN_KEEPALIVE void d2_session_join_reveal(int mode) { g_sessionJoinRevealMode = mode < 0 ? 0 : mode; }
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_join_load_length() { return g_sessionJoinLoadLength; }
 // For the local game's join: the connected client's enter-game request marks its player spawned, and the
 // frame's client update then sends the "in game" marker once the room is ready. Returns 1 when marked.
@@ -2682,7 +2686,11 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
     if (g_fixtureOwnRoomOnly && g_sessionJoinLevelRooms && g_lastLevel) {
         for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext)
             if (roomEx->pRoom && roomEx->pRoom != room) { DUNGEON_AddClientToRoom(roomEx->pRoom, g_targetClient); g_sessionJoinRooms.insert(roomEx->pRoom); }
-    } else sub_6FC33020(g_targetClient, room);
+    } else {
+        g_joinWalkRevealMode = g_sessionJoinUnits ? g_sessionJoinRevealMode : 0;   // the walk only: no flag outlives it
+        sub_6FC33020(g_targetClient, room);
+        g_joinWalkRevealMode = 0;
+    }
     // D48: retail's join walk sends the room's units before the first recorded tick; do it now and drop the bytes so tick 1 starts clean.
     // One-client path: the join also sends the player's changed stats and vitals (retail's add-player-to-game does, before
     // the room walk); they ride in the kept join bytes.

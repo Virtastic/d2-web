@@ -250,7 +250,7 @@ test('a local game read from the engine and the same game read from its packets 
     }
     // A packet run that never comes up shows nothing: every record of the direct run then differs, and the reason is printed.
     let joinFailure = '';
-    const packets = await play(origin, SCRIPT.query + '&localrealm=1', true).catch((error) => { joinFailure = error.message; return []; });
+    const packets = await play(origin, SCRIPT.query + '&localrealm=1' + (process.env.D2_ONE_PATH_PACKET_QUERY ?? ''), true).catch((error) => { joinFailure = error.message; return []; });
     const table = parityTable(direct, packets, FIELDS, PACKET_LAG);
     if (process.env.D2_ONE_PATH_DUMP) writeFileSync(process.env.D2_ONE_PATH_DUMP, JSON.stringify({ direct, again, packets }));   // the runs themselves, to read a differing field
     console.log(`one-path parity, ${SCRIPT.ticks} ticks (field: differing/total)\n${formatTable(table)}\ncontrol, direct against ${CONTROL_RUNS} more direct\n${formatTable(control)}${joinFailure ? `\npacket run: ${joinFailure}` : ''}`);
