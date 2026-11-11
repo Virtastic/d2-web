@@ -35,15 +35,15 @@ extern "C" EMSCRIPTEN_KEEPALIVE const uint32_t* d2_client_monster_footstep(int32
     return out;
 }
 // One monster unit through 0x23C00: the Sounds row to submit, or 0. mode gate (type 1 branch, 0x23C1D..0x23C70):
-// walk 2 / run 0xF; class 0xF also mode 1; class 0x6E only mode 8. Row = MonSounds Footstep + 24 when running
-// (terrain category 1: 0x226A0 not recovered). A record with FsCnt 0 never sounds (0x23CD2).
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_monster_footstep_row(int32_t classId, uint32_t mode, uint32_t cur, uint32_t total, uint32_t step, uint32_t now, uint32_t last) {
+// walk 2 / run 0xF; class 0xF also mode 1; class 0x6E only mode 8. Row (0x22FB0) = MonSounds Footstep + 4 * (floor - 1)
+// for floor class 2..6 (0x226A0, floor_class_live.cpp) + 24 when running. A record with FsCnt 0 never sounds (0x23CD2).
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_monster_footstep_row(int32_t classId, uint32_t mode, uint32_t cur, uint32_t total, uint32_t step, uint32_t now, uint32_t last, uint32_t floor) {
     bool gate = mode == 2 || mode == 0xF;
     if (classId == 0xF) gate = gate || mode == 1; else if (classId == 0x6E) gate = mode == 8;
     const D2MonSoundsTxt* r = gate ? DATATBLS_GetMonSoundsTxtRecordFromMonsterId(classId) : nullptr;
     if (!r || !r->dwFsCnt || !(r->dwFootstep || r->dwFootstepLayer) || !d2_client_footstep_due(cur, total, step, r->dwFsCnt, r->dwFsOff, now, last)) return 0;
     if (!r->dwFootstep) return r->dwFootstepLayer;   // a retail recording: a crow has only the layer row (hawk_wing_1, 1155), submitted on its own footfall (layer roll FsPrb 100 not modeled)
-    return r->dwFootstep + (mode == 0xF ? 24 : 0);
+    return r->dwFootstep + (floor >= 2 && floor <= 6 ? 4 * (floor - 1) : 0) + (mode == 0xF ? 24 : 0);
 }
 // The layer row rides on the same footfall: 1.13c 0x23DF2 submits row+0x58 (base 0) when rand(100) < row+0x64 (FsPrb).
 // Only FsPrb >= 100 is modelled: rand(100) < 100 always holds, so no seed is needed. Below 100 the roll reads the client
