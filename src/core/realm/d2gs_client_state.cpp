@@ -5115,8 +5115,11 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_motion_tick() {
         // GUESS: a monster whose skill sequence has run out returns to neutral here; retail's
         // per-mode monster update (not read) owns that end. Settled by decompiling the Sequence
         // arm of the client's monster mode table.
-        if (monster.motionUnit->dwAnimMode == MONMODE_SEQUENCE && monster.motionUnit->pAnimSeq &&
-                UNITS_IsAtEndOfFrameCycle(monster.motionUnit)) {
+        // A sequence-mode class with no MonSeq record has no frames (count 0): it ends at once, as retail's
+        // 0xAC mode-14 capture shows (mode 14 on arrival, neutral on the first tick), and the frame step's
+        // loop never runs on a zero count.
+        if (monster.motionUnit->dwAnimMode == MONMODE_SEQUENCE &&
+                (!monster.motionUnit->pAnimSeq || UNITS_IsAtEndOfFrameCycle(monster.motionUnit))) {
             UNITS_SetUsedSkill(monster.motionUnit, nullptr);
             d2_realm_client_unit_set_mode(monster.motionUnit, MONMODE_NEUTRAL);
         }

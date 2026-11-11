@@ -54,7 +54,7 @@ const h2 = (v) => v.toString(16).padStart(2, '0');
 
 // The opcodes each consumer names, read from its source: the engine's packet table rows whose handler has a
 // body bound to it, and the modules the game shell hands the same bytes to.
-function namedOpcodes() {
+export function namedOpcodes() {
   const named = new Map();   // opcode -> [consumer]
   const add = (op, who) => { if (!named.has(op)) named.set(op, []); if (!named.get(op).includes(who)) named.get(op).push(who); };
   const src = (rel) => { const f = path.join(ROOT, rel); return existsSync(f) ? readFileSync(f, 'utf8') : ''; };
@@ -70,7 +70,7 @@ function namedOpcodes() {
   return { named, engineSource: bound.size > 0 && rows.length === 0xaf };
 }
 
-async function loadEngine() {
+export async function loadEngine() {
   globalThis.window = globalThis;
   globalThis.document = { currentScript: { src: pathToFileURL(path.join(ENGINE, 'd2.js')).href }, createElement: () => ({ getContext: () => null, style: {} }), addEventListener() {}, body: { appendChild() {} } };
   // The build starts a worker pool before it reports ready; the replay runs on the main thread only.
@@ -96,7 +96,7 @@ async function loadEngine() {
 }
 
 // The item and object tables the realm world decodes with, read from the same archives.
-async function worldTables() {
+export async function worldTables() {
   const archives = [];
   for (const name of ARCHIVES) {
     const file = path.join(DATA, name), fd = openSync(file, 'r'), blob = await openAsBlob(file);
