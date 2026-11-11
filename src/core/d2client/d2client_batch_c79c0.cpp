@@ -1,23 +1,8 @@
 // D2Client 0xC79C0..0xC8710 batch: env-seam implementations from the decompile.
 // Unrecovered callees / imported ordinals are Env function pointers (names positional; register-arg guesses noted).
 #include <cstdint>
+#include "d2client_batch_c79c0.h"
 namespace d2client_batch_c79c0 {
-using P = uintptr_t;
-struct Env {
- uint32_t (*rd32)(P); void (*wr32)(P, uint32_t);
- P dataTables;                 // *sgptDataTables
- P bitMasks;                   // gdwBitMasks
- P (*o10876)(int32_t); P (*o10042)(uint32_t, uint32_t); void (*fatal)(uint32_t);
- void (*o10474)(P, P); void (*o10132)(P, P);
- P (*f560d0)(uint32_t); void (*f1a6b0)(); int32_t (*f77f60)(); int32_t (*f77f20)();
- void (*fada0b0)(); P (*o10392)(uint32_t); int32_t (*o11064)(uint32_t); int32_t (*o10202)(P, uint32_t, uint32_t, const char*);
- P (*o10331)(P); int32_t (*o11160)(P, uint32_t); int32_t (*o10511)(P); int32_t (*o10444)(P, uint32_t);
- uint32_t (*f1630)(P); uint32_t (*f1660)(P); void (*o10243)(int32_t, uint32_t); void (*o10554)(int32_t, uint32_t);
- uint32_t (*f1510)(P, uint32_t); bool (*fafc430)(); P (*f51340)(); P (*f1400)(); int32_t (*o10057)(P);
- P (*f1260)(P); P (*f630f0)(const uint32_t*); void (*f66bc0)(P, uint32_t); int32_t (*f55f70)();
- void (*f38a70)(P, int, int, int);
- uint32_t (*o10680)(uint32_t, const uint32_t*, uint32_t); uint32_t (*o10250)(uint32_t); void (*o10640)();
-};
 static P pathOf(const Env& e, P u) { if (!u) return 0; P p = e.rd32(u + 0x54); return p ? e.rd32(p + 0x30) : 0; }
 static P clsRow(const Env& e, int32_t c) {
  return (c < 0 || (int32_t)e.rd32(e.dataTables + 0xba0) <= c) ? 0 : e.rd32(e.dataTables + 0xb98) + (P)c * 0x23c;
@@ -39,7 +24,7 @@ uint32_t sub_C79C0(const Env& e, P u, int32_t want) {
 // 1.13c D2Client+0xC7B00  (u = EAX)
 void sub_C7B00(const Env& e, P u) {
  P p = pathOf(e, u);
- if (!p) { p = e.o10042(0x48, 0); if (!p) { e.fatal(0x4a); return; } }
+ if (!p) { p = e.o10042(0x48, 0, 0x4c); if (!p) { e.fatal(0x4a); return; } }
  for (int k = 0; k < 0x13; k++) e.wr32(p + k * 4, 0);
  if (u && e.rd32(u + 0x54)) e.wr32(e.rd32(u + 0x54) + 0x30, (uint32_t)p);
 }
@@ -121,18 +106,18 @@ void sub_C7FB0(const Env& e, P u) {
  }
 }
 // 1.13c D2Client+0xC8220  (a = ECX, b = EDX, io = ESI)
-uint32_t sub_C8220(const Env& e, uint32_t a, uint32_t b, P io) {
+uint32_t sub_C8220(const Env& e, uint32_t eaxIn, uint32_t a, uint32_t b, P io) {
  uint32_t S[14] = {0};
- S[1] = a; S[3] = b; S[4] = e.rd32(io);
+ S[0] = eaxIn; S[1] = a; S[3] = b; S[4] = e.rd32(io);
  uint32_t r = e.o10680(0xf, S, 0x38);
  if (r) return r;
- uint32_t r2 = e.o10250(4);
- if (r2 == 1) { e.wr32(io, S[5]); return e.o10640(), 0; }
- e.o10640();
+ uint32_t r2 = e.o10250(S, 4);
+ if (r2 == 1) { e.wr32(io, S[5]); return e.o10640(S), 0; }
+ e.o10640(S);
  return r2 ? r2 : 0xfffffffbu;
 }
 static P mobOf(const Env& e, P u) {
- e.fada0b0();
+ e.fada0b0(u);
  uint32_t id = e.rd32(u + 0x2c);
  if (!id) { e.fatal(0x946); return 0; }
  return e.o10392(id);
@@ -160,14 +145,17 @@ uint32_t sub_C8410(const Env& e, P u) {
 P sub_C84A0(const Env& e, P u) {
  P m = mobOf(e, u);
  if (!m || e.rd32(m) != 1) return 0;
- if (!e.f1510(0, 8) || !e.o10444(m, 0)) return 0;
+ if (!e.f1510(e.rd32(m + 4), 8) || !e.o10444(m, 0)) return 0;
  return e.fafc430() ? m : 0;
 }
 // 1.13c D2Client+0xC8510  (a = ECX, cls = EDX)
 uint32_t sub_C8510(const Env& e, P a, int32_t cls) {
  P r = clsRow(e, cls);
- if (!r || !e.o10331(a) || !e.f51340()) return 0;
- P t = e.f1400();
+ if (!r) return 0;
+ P h = e.o10331(a); if (!h) return 0;
+ uint32_t two[2] = {0, 0};
+ if (!e.f51340(two)) return 0;
+ P t = e.f1400(h);
  if (!t) return 0;
  if (!((e.rd32(e.bitMasks) & e.rd32(r + 5)) & 0xff) && e.o10057(t)) return 0;
  return 1;
@@ -178,14 +166,14 @@ bool sub_C8620(const Env& e, P u, uint32_t a, int32_t cls, uint32_t c) {
  if (!r) return false;
  P m = sub_C84A0(e, u);
  if (!m) return false;
- P x = e.f1260(m);
+ P x = e.f1260(e.rd32(m + 4));
  if (!x) return false;
  int32_t k = s16(e, r + 0xea);
  uint32_t ty = e.rd32(x + 0xc) & 0xff;
  if (ty == 1) k = s16(e, r + 0xec); else if (ty == 3) k = s16(e, r + 0xee);
  if (k < 0 || k >= (int32_t)e.rd32(e.dataTables + 0xb6c)) return false;
  uint32_t S[23] = {0};
- S[0] = 0x2000; S[1] = a; S[2] = (uint32_t)m; S[11] = (uint32_t)cls; S[12] = c; (void)k;
+ S[0] = 0x2000; S[1] = a; S[2] = (uint32_t)m; S[4] = (uint32_t)k; S[11] = (uint32_t)cls; S[12] = c;
  return e.f630f0(S) != 0;
 }
 // 1.13c D2Client+0xC8710  (sk = EAX, p1 = ECX, cls = EDX, p3/p4/p5 = stack)
@@ -196,7 +184,7 @@ uint32_t sub_C8710(const Env& e, int32_t sk, uint32_t p1, int32_t cls, P p3, uin
  int32_t k = s16(e, r + 0xea);
  int32_t nr = (int32_t)e.rd32(e.dataTables + 0xb6c);
  if (k < 0 || k >= nr) return 0;
- if (sk < 0 || sk >= (int32_t)e.rd32(e.dataTables + 0xa80) || !e.rd32(e.dataTables + 0xa78)) return 0;
+ if (sk < 0 || sk >= (int32_t)e.rd32(e.dataTables + 0xa80) || !(e.rd32(e.dataTables + 0xa78) + (P)sk * 0x1a8)) return 0;
  if (!p5 || !p1) return 0;
  if (p3) e.wr32(p3 + 0xc4, e.rd32(p3 + 0xc4) | 0x40);
  uint32_t S[23] = {0};
@@ -206,8 +194,8 @@ uint32_t sub_C8710(const Env& e, int32_t sk, uint32_t p1, int32_t cls, P p3, uin
  if (k2 > 0 && k2 < (int32_t)e.rd32(e.dataTables + 0xb6c)) { S[12] = 2; S[4] = (uint32_t)k2; e.f630f0(S); }
  if (q) {
   int32_t k1 = s16(e, r + 0xec);
-  if (k1 > 0 && k1 < (int32_t)e.rd32(e.dataTables + 0xb6c)) e.f66bc0(e.dataTables, 0);
-  if (!e.f55f70() && s16(e, r + 0x10a) > 0) e.f38a70(q, 0, 0, 0);
+  if (k1 > 0 && k1 < (int32_t)e.rd32(e.dataTables + 0xb6c)) e.f66bc0(q, 0, 0, 2);
+  if (!e.f55f70(p3) && s16(e, r + 0x10a) > 0) e.f38a70(q, 0, 0, 0, s16(e, r + 0x10a));
  }
  return 1;
 }

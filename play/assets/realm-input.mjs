@@ -93,7 +93,7 @@ const CODE_QF2 = 0x20326671, CODE_HFH = 0x20686668;
  * Turn the player's input into packets.
  *   transmit(bytes)      -> false when the connection is closed
  *   scene()              -> { ready, player:{x,y}, monsters:[{guid,classId,mode,x,y,anchorX,anchorY,drawn}], objects, items,
- *                             players:[{guid,x,y,anchorX,anchorY,drawn}] (the other players), inTown,
+ *                             players:[{guid,x,y,anchorX,anchorY,drawn}] (the other players),
  *                             warps:[{id,x,y}] and warpAt(px,py) -> the level exit under the pointer (optional),
  *                             isNpc(classId), hoverBox(dx,dy), toScreen(wx,wy) -> {x,y} in pointer space, pointerWorld(px,py),
  *                             run, selected:{left,right}, cursorId, cursorCode() -> the held item's 4-byte code,
@@ -286,10 +286,11 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
       }
       if (held && hit.kind !== 'ground') return hit;               // a held button does not repeat a pickup or a talk
       pending = null;
-      // Another player: in town the click walks up and interacts (the trade request).
-      // GUESS: outside town the click is a walk to the spot and no request is sent; the client's click dispatch for
-      // a player unit settles whether it sends the interact anyway and leaves the refusal to the server.
-      const type = hit.kind === 'player' ? (s.inTown ? UNIT.PLAYER : null) : hit.kind === 'npc' ? UNIT.MONSTER : hit.kind === 'item' ? UNIT.ITEM : hit.kind === 'object' ? UNIT.OBJECT : hit.kind === 'warp' ? UNIT.TILE
+      // Another player: the click walks up and interacts, in town or out of it. The client's click on a player unit
+      // (1.13c D2Client 0x1AB20, unit type 0) tests only the distance and the line to it, and the action it queues is
+      // gated on arrival (0x2AFB0) by the target's own state (down, or not targetable) -- never by the town. Whether
+      // the interact is honoured outside town is the server's answer.
+      const type = hit.kind === 'player' ? UNIT.PLAYER : hit.kind === 'npc' ? UNIT.MONSTER : hit.kind === 'item' ? UNIT.ITEM : hit.kind === 'object' ? UNIT.OBJECT : hit.kind === 'warp' ? UNIT.TILE
         : hit.kind === 'corpse' ? UNIT.PLAYER : null;
       if (type != null) return interactWith(s, type, hit.unit) === false ? false : hit;
       const x = clamp16(world.x), y = clamp16(world.y);

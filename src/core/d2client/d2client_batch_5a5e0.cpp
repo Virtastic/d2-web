@@ -61,22 +61,27 @@ void hirelingPopupInit(Services& s,State& st){
  st.hireFlag=0; s.setFlag(0x23,0,0);
  if(!s.regQuery("Diablo II","PopupHireling")) st.popupHireling=1;
 }
-// 1.13c D2Client+0x5AC70 is d2client_5ac70.cpp; the callers reach it through the label seam (ESI = buffer, stack a0 a1 a2)
-void drawLabel(Services& s,uint16_t* buf,int32_t a0,int32_t a1,int32_t a2){ s.label(buf,a0,a1,a2); }
-// 1.13c D2Client+0x5ADD0 lives in d2client_5add0.cpp (over the header's Services)
-// 1.13c D2Client+0x5AEC0
+// 1.13c D2Client+0x5AC70 (ESI = text buffer, 0x3E bytes into it is the end sentinel; stack a0 a1 a2)
+void drawLabel(Services& s,uint16_t* buf,int32_t a0,int32_t a1,int32_t a2){
+ uint32_t prev=s.fontSet(6); uint16_t* e=buf+0x1f;
+ while(s.textWidth(buf)>0x42){ *--e=0; }
+ int32_t w=s.textWidth(buf); int32_t x=(int32_t)((uint32_t)a0+(uint32_t)(0x16-w/2)); if(x<0) x=0;
+ s.showText(buf,x,a1,a2); s.fontSet(prev);
+}
+// retired, see d2client_5add0.cpp: D2Client 0x5ADD0.
+// 1.13c D2Client+0x5AEC0 (stack: string, a0, a1; ret 0xC)
 void drawAsciiLabel(Services& s,const char* a,int32_t b,int32_t c){
  uint16_t w[32]={}; for(int i=0;a[i]&&i<31;i++) w[i]=(uint8_t)a[i];
- drawLabel(s,w,b,c,0);
+ s.label(w,b,c,0);
 }
-// 1.13c D2Client+0x5AF10 (index in EAX; row stride 0xE0, name id at +0xC)
+// 1.13c D2Client+0x5AF10 (index in EAX; row stride 0xE0, name id at +0xC; stack a0 a1, ret 8)
 void drawHireableName(Services& s,State& st,int32_t idx,int32_t b,int32_t c,const uint8_t* rows,int32_t count){
  if(idx<0||idx>=count||!rows) return;
  int16_t id; std::memcpy(&id,rows+idx*0xe0+0xc,2);
  if(id==0||id==0x1506) return;
- const uint16_t* t=s.stringById(id); uint16_t w[64]={};
- for(int i=0;t&&t[i]&&i<63;i++) w[i]=t[i];
- drawLabel(s,w,b,c,0); (void)st;
+ const uint16_t* t=s.stringById(id); uint16_t w[32]={};
+ for(int i=0;t&&t[i]&&i<31;i++) w[i]=t[i];
+ s.label(w,b,c,0); (void)st;
 }
 // 1.13c D2Client+0x5AFA0
 void freeHireables(Services& s,State& st){

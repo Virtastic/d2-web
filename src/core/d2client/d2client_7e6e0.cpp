@@ -1,46 +1,44 @@
-// 1.13c D2Client+0x7E6E0: per-frame client-state tick. Globals/callees are passed in (each names its address).
-#include <cstdint>
-typedef int32_t i32; typedef uint32_t u32;
-struct D2c7e6e0State {            // D2Client globals (base 0x6FAB0000)
-    uint8_t g3a7c, g3aca, g3a80, g3a84, g3a88, g3a60, g3aff, g3448; // +0x113A7C,+0x113ACA,+0x113A80,+0x113A84,+0x113A88,+0x113A60,+0x113AFF,+0x123448
-    u32 gAad50;                   // 0x6fbaad50 resume tick
-    i32 g8d5d4;                   // 0x6fb8d5d4
-    i32 hasCb;                    // DAT_6fbcbf94 != 0
-};
-struct D2c7e6e0Hooks {
-    void (*f7cef0)(void);         // FUN_6fb2cef0
-    void (*f486a0)(void);         // FUN_6faf86a0
-    u32 (*tick)(void);            // GetTickCount
-    i32 (*cb)(u32 arg);           // *DAT_6fbcbf94(DAT_6fbc3aff)
-    void (*f3cc60)(void);         // Ordinal_10048 + FUN_6faecc60(ret,&DAT_6fb91388)
-    void (*f7bf40)(void);         // FUN_6fb2bf40
-    void (*ord10043)(void);       // Ordinal_10043(0x945,0)
-    void (*fatal)(void);          // Ordinal_10265(0x943); Ordinal_10024; _exit(-1)
-};
-extern "C" u32 d2c_7e6e0(D2c7e6e0State* s, const D2c7e6e0Hooks* h) {
-    u32 r = 0;
-    s->g3a7c = 1;
-    if (s->g3aca != 0 || s->g3a80 == 1) {
-        if (!s->hasCb) {
-            if (s->g3aca == 0) h->f7cef0(); else h->f486a0();
-            if (s->g8d5d4) s->gAad50 = h->tick() + 100;
-        } else {
-            h->f7cef0();
-            if (s->g8d5d4) s->gAad50 = h->tick() + 100;
-            if (h->cb(s->g3aff)) { s->g3aff = 0; return 1; }
-            if (s->g3aca) h->f486a0();
+// 1.13c D2Client+0x7E6E0 (340 B, no args, plain ret): panel_close_request. Returns 1 when the
+// close went through. Module globals by address (all dword reads, some unaligned): ga = window 0x113A60..0x113B03 (0x3A60 box,
+// 0x3A7C, 0x3A80, 0x3A84, 0x3A88, 0x3AC2 the 0x486A0 EAX, 0x3ACA, 0x3AFF the callback argument), gcb = 0x11BF94 (callback,
+// fastcall: ECX = 0x11BF98, EDX = 1, one stack word; logged at the RVA it points to), gd = 0xDD5D4, gt = 0xFAD50 (resume tick),
+// gq = 0x123448. now = GetTickCount.
+#include "cl_env.h"
+extern "C" uint32_t d2c_7e6e0(uint32_t ga, uint32_t gcb, uint32_t gd, uint32_t gt, uint32_t gq, uint32_t now, const cl::Env& e) {
+    const uint32_t kFile = 0xB20D4BDCu;
+    auto G = [&](uint32_t off) { return e.R(ga + off - 0x3a60); };
+    auto S = [&](uint32_t off, uint32_t v) { e.W(ga + off - 0x3a60, v); };
+    e.W(ga + 0x1c, 1);   // 0x113A7C
+    if (G(0x3aca) == 0 && G(0x3a80) != 1) {
+        uint32_t r = 0;
+        if (G(0x3a84) == 1) {
+            if (G(0x3a88) == 1) { S(0x3aff, 0); return 0; }
+            // G(0x3a60) == 0 is the fatal D2Lang 0x943 message and _exit(-1); the vectors keep the box set
+            e.H(0x7bf40);
+            e.H(0xbf86, 0x945, 0, 0, 0, 0, 0, G(0x3a60), kFile);
+            S(0x3a60, 0); S(0x3a84, 0); S(0x3a88, 0);
+            r = 1;
         }
-        s->g3aca = 0;
-        if (s->g3448 == 1) { s->g3448 = 0; h->f3cc60(); }
-        s->g3aff = 0;
-        return 1;
+        S(0x3aff, 0);
+        return r;
     }
-    if (s->g3a84 == 1) {
-        if (s->g3a88 == 1) { s->g3aff = 0; return 0; }
-        if (s->g3a60 == 0) { h->fatal(); return 0; }
-        h->f7bf40(); h->ord10043();
-        s->g3a60 = 0; s->g3a84 = 0; s->g3a88 = 0; r = 1;
+    if (const uint32_t fp = e.R(gcb)) {
+        e.H(0x7cef0);
+        if (e.R(gd)) e.W(gt, now + 0x64);
+        const uint32_t ok = e.H(fp - 0x6fab0000u, G(0x3aff), 0, 0, 0, 0, 0, e.R(gcb + 4), 1);
+        if (ok) { S(0x3aff, 0); return 1; }
+        if (G(0x3aca)) e.H(0x486a0, 0, 0, 0, 0, 0, G(0x3ac2));
+    } else {
+        if (G(0x3aca)) e.H(0x486a0, 0, 0, 0, 0, 0, G(0x3ac2));
+        else e.H(0x7cef0);
+        if (e.R(gd)) e.W(gt, now + 0x64);
     }
-    s->g3aff = 0;
-    return r;
+    S(0x3aca, 0);
+    if (e.R(gq) == 1) {
+        e.W(gq, 0);
+        const uint32_t v = e.H(0xd0b4);
+        e.H(0x3cc60, v, 0xB20E1388u, 0, 0, 0, 7);
+    }
+    S(0x3aff, 0);
+    return 1;
 }

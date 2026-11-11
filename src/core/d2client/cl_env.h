@@ -14,6 +14,7 @@ struct Env {
     uint32_t bm;                                         // gdwBitMasks      (D2Client slot 0xCEE50)
     uint32_t self = 0;                                   // playerSelf       (D2Client slot 0x11BBFC)
     uint32_t gl = 0;                                     // a pinned module-global array the row reads (per-row meaning; 0 in the retail wiring until pointed at the slot)
+    uint32_t gl2 = 0;                                    // a second pinned module-global block (0xA2C90: the skill-effect pair at 0x1197F8)
     void (*blk)(void* ctx, uint32_t rva, uint32_t p, uint32_t n) = nullptr;   // the capture's `C` block records: n dwords at p, after the call record
     void (*ed)(void* ctx, uint32_t edi) = nullptr;       // sets EDI for the next h() (a callee that fills an EDI out-pointer: `hookw RVA e V`)
     void Ed(uint32_t v) const { if (ed) ed(ctx, v); }

@@ -2681,20 +2681,20 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
     // clients (retail 0x6FCD0D57), so the aitrace replays (d2_aitarget_attach_at) register as the capture
     // does: retail's frame-15 probe read nNumClients 0 in the room beside the fixture (s232).
     if (g_fixtureOwnRoomOnly) { DUNGEON_AddClientToRoom(room, g_targetClient); g_targetClient->pRoom = room; }
-    // What a joining client is told before the rooms: the game's flags and the two load markers, its own unit,
-    // which unit it plays, then the act and its time of day. Kept with the join walk's bytes below.
+    // What a joining client is told before the rooms, in retail's order: the game's flags and the two load markers,
+    // the act and its time of day, the room it stands in, its own unit, which unit it plays, then its position.
+    // Kept with the join walk's bytes below.
     if (D2DrlgActStrc* joinAct = g_game->pAct[g_targetClient->nAct]; joinAct && DUNGEON_GetEnvironmentFromAct(joinAct)) {
         D2GAME_PACKETS_SendPacket0x01_6FC3C7C0(g_targetClient, 1, g_game);
         D2GAME_PACKETS_SendHeaderOnlyPacket(g_targetClient, 0x00);
         D2GAME_PACKETS_SendHeaderOnlyPacket(g_targetClient, 0x02);
         g_sessionJoinLoadLength = sessionPacketStreamMark() - joinBurstFrom;
-        sub_6FC3D1F0(g_targetClient, player->dwUnitId, (uint8_t)player->dwClassId, g_targetClient->szName, (int16_t)CLIENTS_GetUnitX(player), (int16_t)CLIENTS_GetUnitY(player));
-        D2GAME_SendPacket0x0B_ClientUnit(g_targetClient, player);
         LEVEL_SynchronizeDayNightCycleWithClient(g_game, g_targetClient);
-        // Then where the player stands in the new act: its room, and its position in it.
         D2DrlgCoordsStrc joinRoom = {};
         DUNGEON_GetRoomCoordinates(room, &joinRoom);
         D2GAME_PACKETS_SendPacket0x07_6FC3D120(g_targetClient, DUNGEON_GetLevelIdFromRoom(room), (uint16_t)joinRoom.nTileXPos, (uint16_t)joinRoom.nTileYPos);
+        D2GAME_SendPacket0x0B_ClientUnit(g_targetClient, player);
+        sub_6FC3D1F0(g_targetClient, player->dwUnitId, (uint8_t)player->dwClassId, g_targetClient->szName, (int16_t)CLIENTS_GetUnitX(player), (int16_t)CLIENTS_GetUnitY(player));
         D2GAME_PACKETS_SendPacket0x15_6FC3D0D0(g_targetClient, 0x15u, 0, player->dwUnitId, CLIENTS_GetUnitX(player), CLIENTS_GetUnitY(player), 1);
     } else g_sessionJoinLoadLength = 0;
     g_sessionJoinRooms.clear();

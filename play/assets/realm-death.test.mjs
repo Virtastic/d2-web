@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRealmInput } from './realm-input.mjs';
-import { realmHeroFlags, realmCorpseViews } from './realm-death.mjs';
+import { realmHeroFlags, realmCorpseViews, bindDeathRules } from './realm-death.mjs';
+import { DEATH_RULES } from '../../test/helpers/death-rules-double.mjs';
+
+bindDeathRules(DEATH_RULES);
 import { deathScreenShown, respawnAllowed } from './death-screen.mjs';
 
 const HERO = 0x01020304, CORPSE = 0x0a0b0c0d, OTHER = 0x55, OTHER_CORPSE = 0x66;
@@ -84,8 +87,9 @@ test('a corpse still falling is not opened', () => {
 import { Roster } from './bnet-roster.mjs';
 import { createGameLife, SAVE_AND_EXIT_PACKET } from './bnet-game-life.mjs';
 import { realmCharacterCard } from './realm-character-card.mjs';
-import { corpseLootable, closedOnDeath, panelsClosedOnDeath, DEATH_CLOSES, deathSendAllowed, deathBlocksKey, markCharactersDead,
+import { corpseLootable, closedOnDeath, panelsClosedOnDeath, deathSendAllowed, deathBlocksKey, markCharactersDead,
   createRealmDeath, heroIsDown, TRADE_CANCEL } from './realm-death.mjs';
+import { haveEngine, loadEngine } from '../../test/helpers/node-engine.mjs';
 
 // S 0x5B, a player joined: [size u16][id u32 @3][class @7][name 16 @8][level u16 @0x18][party u16 @0x1a]...
 const joined = (id, name) => { const b = new Uint8Array(0x23); b[0] = 0x5b; b[1] = 0x23; b.set(le(id), 3); b[7] = 1;
@@ -150,10 +154,15 @@ test('a click on another player\'s corpse: the packets with and without permissi
   assert.deepEqual(out.at(-1), [0x13, 0, 0, 0, 0, ...le(OTHER_CORPSE)]);
 });
 
-test('the panels the hero\'s death closes are the client\'s table', () => {
-  assert.equal(DEATH_CLOSES.length, 0x26);
-  assert.deepEqual(DEATH_CLOSES.map((v, i) => (v ? i : -1)).filter((i) => i >= 0),
-    [1, 2, 3, 4, 5, 9, 0x0b, 0x0c, 0x0d, 0x0f, 0x10, 0x12, 0x14, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21, 0x24, 0x25]);
+test('the engine\'s death rules are the ones the double answers with', { skip: haveEngine() ? false : 'needs the engine build' }, async () => {
+  const Module = await loadEngine();
+  if (typeof Module._d2_hero_is_down !== 'function') return assert.fail('engine build predates the death-rule exports');
+  for (let mode = 0; mode < 20; mode++) assert.equal(Module._d2_hero_is_down(0, mode, 0), DEATH_RULES._d2_hero_is_down(0, mode, 0), `mode ${mode}`);
+  assert.equal(Module._d2_hero_is_down(0, 5, 0x10000), 1);   // the dead flag answers whatever the mode
+  for (let panel = 0; panel < 0x27; panel++) assert.equal(Module._d2_death_closes_panel(panel), DEATH_RULES._d2_death_closes_panel(panel), `panel ${panel}`);
+});
+
+test('the panels the hero\'s death closes', () => {
   assert.ok(closedOnDeath(10));                       // forced, whatever the table holds
   assert.ok(!closedOnDeath(8) && !closedOnDeath(0x15));
   assert.deepEqual(panelsClosedOnDeath(), ['inventory', 'character', 'skillSelect', 'skillTree', 'chat', 'gameMenu', 'automap', 'shop', 'quests',

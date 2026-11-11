@@ -74,18 +74,6 @@ void sub_ACD70(Env& e, const uint8_t* pk) {
   e.g_bbd0 += pk[1];
   if (I(rd32(pk, 3)) == e.g_bbd0) { e.fnC530(); e.ord10043(0x71, 0); e.g_bbcc = nullptr; e.g_bbd0 = 0; }
 }
-// 1.13c D2Client+0xAD160
-void sub_AD160(Env& e, uint8_t* pk) {
-  U arg = rd32(pk, 1);  // guess: plain 32-bit value
-  U a = rd32(pk, 0x15), b = rd32(pk, 0x19);
-  Node* n = e.find(1, a);
-  if (n) { if (n->kind != 2) { e.fatal(0x5a); return; } e.ord501(n->data + 0x28, pk + 5, 0x10); }
-  if (b == 0xffffffffu) return;
-  n = e.find(1, b);
-  if (n) { if (n->kind != 2) { e.fatal(0x5a); return; } e.ord501(n->data + 0x28, pk + 5, 0x10); }
-  uint8_t* r = (uint8_t*)e.fn4d630(pk, arg);
-  if (r) { std::memcpy(r + 0x3c, &a, 4); std::memcpy(r + 0x40, &b, 4); }
-}
 // 1.13c D2Client+0xAD2A0
 void sub_AD2A0(Env& e, const uint8_t* pk) {
   U w = rd32(pk, 0); Node* n = e.findPlayerNode(rd32(pk, 4) << 16 | (w >> 16), 0, (w >> 8) & 0xff);

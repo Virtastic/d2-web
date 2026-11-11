@@ -1,4 +1,4 @@
-// src/core/d2client/d2client_batch_a5a30.cpp -- twelve UNMAPPED 1.13c D2Client.dll unit-table leaves
+// src/core/d2client/d2client_batch_a5a30.cpp -- 1.13c D2Client.dll unit-table leaves
 // (alpha lane), from build-wasm/ghidra-d2client/decomp/0x<RVA>.c. Unrecovered callees, ordinals and the
 // register-carried arguments (EAX/ESI/EBX in the decompile) are explicit parameters / env seams.
 // ponytail: retail unit/list links are 32-bit slots (+0xE4 next, +0x54 sub-ptr, node +0xC next); they are
@@ -7,21 +7,35 @@
 #include <cstddef>
 #include <emscripten.h>
 
-#include "d2client_batch_a5a30.h"
+typedef uintptr_t U;
 static inline uint32_t& W(U base, uint32_t off) { return *(uint32_t*)(base + off); }
 static inline U Lnk(U base, uint32_t off) { return (U)W(base, off); }
 
-// Unit hash tables: 6 unit types x 0x80 buckets, +0x10A608 (DAT_6fbba608) and +0x109A08 (DAT_6fbb9a08).
-static U g_tab_a[6 * 0x80];
-static U g_tab_b[6 * 0x80];
-static int32_t g_stamp;   // +0x123420 DAT_6fbd3420
-
-
-// 1.13c D2Client+0xA5A30 (45 B): ESI = unit, EDI/EBX = caller registers, stack word = ebp (ret 4). The three imports get (esi, edi, stack, ebx) / (esi, edi, stack, ebx) / (esi, edi).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a5a30(U unit, uint32_t edi, uint32_t ebx, uint32_t stk, const D2ClientA5Env* e) {
-    if (unit) W(unit, 0xc4) |= 0x22;
-    e->ord_10574(unit, edi, stk, ebx); e->ord_10032(unit, edi, stk, ebx); e->ord_10857(unit, edi);
-}
+struct D2ClientA5Env {
+    void (*fatal)(uint32_t code);                                  // Ordinal_10265+10024+_exit(-1)
+    void (*ord_10574)(); void (*ord_10032)(); void (*ord_10857)();
+    U (*fn_9d630)(uint32_t a, uint32_t b);                         // 0x9D630
+    U (*ord_10460)(U list); U (*ord_10464)(U node); uint32_t (*ord_10298)(U node);
+    uint32_t (*fn_a52a0)(U owner);                                 // 0xA52A0
+    void (*ord_10061)(U list); uint32_t (*ord_10202)(U unit, uint32_t, uint32_t, const char* file);
+    void (*ord_11127)(); uint32_t (*ord_10646)(U list, U unit);
+    void (*fn_a6ef0)(U row, uint32_t bucket, uint32_t id, uint32_t type);
+    uint32_t (*fn_1510)(uint32_t a, uint32_t b);                   // 0x1510
+    U (*ord_10688)(U p);
+    U (*fn_a4e20)(uint32_t id, U row, uint32_t type);
+    void (*fn_22b20)(U unit);
+    int32_t (*ord_11044)(U a, uint32_t b); U stamp_src;            // DAT_6fbcc3b8
+    void (*fn_25280)();
+    void (*fn_6b300)(U unit, uint32_t a, uint32_t b, int32_t c, uint32_t d);
+    void (*fn_88a70)(U unit, uint32_t a, uint32_t b, uint32_t c);
+    U (*fn_51a80)();
+    void (*fn_a6d60)(U unit);
+    void (*fn_c7b00)(); void (*fn_c7e30)(int32_t a, int32_t b, int32_t c);
+    void (*fn_53320)();
+    U (*ord_10476)(); void (*ord_10561)();
+    void (*fn_a7bf0)(uint32_t a, int32_t b, int32_t c, uint32_t d);
+    const uint32_t* type_order;                                    // DAT_6fb8412c, 6 entries
+};
 
 // 1.13c D2Client+0xA5B60 (37 B): EAX = rec, ECX = arg. 0xFFFF = none.
 extern "C" EMSCRIPTEN_KEEPALIVE uint16_t d2_client_a5b60(U rec, uint32_t arg, const D2ClientA5Env* e) {
@@ -32,44 +46,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint16_t d2_client_a5b60(U rec, uint32_t arg, co
     return 0xffff;
 }
 
-// 1.13c D2Client+0xA5C50 (309 B): EBX = owner, `flag` = stack arg.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a5c50(U owner, uint32_t flag, const D2ClientA5Env* e) {
-    if (!owner) { e->fatal(0xa80); return; }
-    U list = Lnk(owner, 0x60);
-    if (!list) return;
-    U cur = e->ord_10460(list);
-    while (cur) {
-        U next = e->ord_10464(cur);
-        uint32_t h = e->ord_10298(cur);
-        for (U p = g_tab_a[4 * 0x80 + (h & 0x7f)]; p; p = Lnk(p, 0xe4)) {
-            if (W(p, 12) != h) continue;
-            uint32_t code;
-            if (W(p, 0) != 4) code = 0x5a;
-            else if (!flag || e->fn_a52a0(owner) == 0) {
-                if (W(owner, 0) == 0) e->ord_10061(list);
-                if (!e->ord_10202(p, 0x100, 0x96, "..\\Source\\D2Client\\UNIT\\Item.cpp")) e->ord_11127();
-                if (e->ord_10646(list, p)) {
-                    e->fn_a6ef0((U)&g_tab_a[W(p, 0) * 0x80], W(p, 12) & 0x7f, W(p, 12), W(p, 0));
-                    break;
-                }
-                code = 0xa92;
-            } else {
-                if (e->ord_10646(list, p)) break;
-                code = 0xa96;
-            }
-            e->fatal(code); return;
-        }
-        cur = next;
-    }
-}
-
 // 1.13c D2Client+0xA6180 (124 B): EAX = unit.
 extern "C" EMSCRIPTEN_KEEPALIVE bool d2_client_a6180(U u, const D2ClientA5Env* e) {
     if (!u) return false;
     uint32_t v = W(u, 16);
     switch (W(u, 0)) {
     case 0: return v == 0x11;
-    case 1: return e->fn_1510(W(u, 4), 0x14) == 0 && v == 0xc;   // EAX = unit+4 dword (retail 0x6FB561C3), EDX = 0x14
+    case 1: return e->fn_1510(1, 0x14) == 0 && v == 0xc;
     case 2: {
         U d = e->ord_10688(Lnk(u, 4));
         uint8_t f = *(uint8_t*)(d + 0x1b7);
@@ -89,44 +72,158 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a6210(U u, const D2ClientA5Env* e
     W(u, 0xc4) = f | 4;
 }
 
-// 1.13c D2Client+0xA6500 (310 B): ESI = unit. 1 = inserted, 0 = already present. Retail probes twice;
-// the second hit (impossible single-threaded) is fatal.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_a6500(U u, const D2ClientA5Env* e) {
-    bool b = u && ((W(u, 0xc4) >> 0x15) & 1);
-    U* tab = b ? g_tab_b : g_tab_a;
-    uint32_t type = W(u, 0);
-    U row = (U)&tab[type * 0x80];
-    if (e->fn_a4e20(W(u, 12), row, type)) return 0;
-    if (e->fn_a4e20(W(u, 12), row, type)) { e->fatal(b ? 0x9c : 0xa5); return 0; }
-    e->fn_22b20(u);
-    b = ((W(u, 0xc4) >> 0x15) & 1) != 0;   // fad2b20 may flip the table flag; retail re-reads it
-    U* slots = (b ? g_tab_b : g_tab_a) + type * 0x80;
-    uint32_t bk = W(u, 12) & 0x7f;
-    U prev = 0, cur = slots[bk];
-    while (cur && W(u, 12) < W(cur, 12)) { prev = cur; cur = Lnk(cur, 0xe4); }
-    W(u, 0xe4) = (uint32_t)cur;   // ponytail: 32-bit link slot, see header
-    if (!prev) slots[bk] = u; else W(prev, 0xe4) = (uint32_t)u;
+
+// ---- the rows below follow retail's call sites (d2client_batch_a5a30.h; callees through FnCallees) ----
+#include "d2client_batch_a5a30.h"
+namespace d2client_batch_a5a30 {
+static const uint32_t kTabA = 0x10a608, kTabB = 0x109a08;           // 6 types x 0x80 buckets x 4 bytes
+static const uint32_t kTypeOrder[6] = {1, 0, 2, 3, 4, 5};          // .rdata 0xD412C..0xD4144
+static inline uint32_t W32(uint32_t p, uint32_t o) { return fnAt<uint32_t>(fnPtr(p), o); }
+
+// 1.13c D2Client+0xA5A30   (esi = unit, edi, ebx, stack p; ret 4)
+void sub_A5A30(FnCallees& s, uint32_t unit, uint32_t edi, uint32_t ebx, uint32_t p) {
+    if (unit) fnAt<uint32_t>(fnPtr(unit), 0xc4) |= 0x22;
+    s.h(0xc622, 0, 0, 0, 0, 0, unit, edi, p, ebx);
+    s.h(0xc67c, 0, 0, 0, 0, 0, unit, edi, p, ebx);
+    s.h(0xc6ac, 0, 0, 0, 0, 0, unit, edi);
+}
+// 1.13c D2Client+0xA5C50   (ebx = owner, stack flag; ret 4): settle the owner's item list against the type-4 bucket table
+void sub_A5C50(FnCallees& s, uint32_t owner, uint32_t flag) {
+    if (!owner) s.fatal(0xa80);
+    uint32_t list = W32(owner, 0x60);
+    if (!list) return;
+    for (uint32_t cur = s.h(0xc4f0, 0, 0, 0, 0, 0, list); cur;) {
+        uint32_t next = s.h(0xc568, 0, 0, 0, 0, 0, cur);
+        uint32_t id = s.h(0xc68e, 0, 0, 0, 0, 0, cur);
+        uint32_t p = s.gw(kTabA + 4 * 0x80 * 4 + (id & 0x7f) * 4);
+        while (p && W32(p, 0xc) != id) p = W32(p, 0xe4);
+        if (p) {
+            if (W32(p, 0) != 4) s.fatal(0x5a);
+            if (!flag || !s.h(0xa52a0, p, 0, 0, 0, 0, owner)) {
+                if (!W32(owner, 0)) s.h(0xca0c, 0, 0, 0, 0, 0, W32(owner, 0x60));
+                if (!s.h(0xc1a8, 0, 0, 0, 0, 0, p, 0x100, 0x96, s.mod(0xd4964))) s.h(0xc544, 0, 0, 0, 0, 0, owner, p);
+                if (!s.h(0xc6d0, 0, 0, 0, 0, 0, list, p)) s.fatal(0xa92);
+                uint32_t ty = W32(p, 0), pid = W32(p, 0xc);
+                s.h(0xa6ef0, 0, s.mod(kTabA + ty * 0x200), pid & 0x7f, 0, 0, pid, ty);
+            } else if (!s.h(0xc6d0, 0, 0, 0, 0, 0, list, p)) s.fatal(0xa96);
+        }
+        cur = next;
+    }
+}
+// 1.13c D2Client+0xA6500   (esi = unit): insert the unit in its bucket (descending id); 0 when already present
+uint32_t sub_A6500(FnCallees& s, uint32_t u) {
+    bool b = u && (W32(u, 0xc4) >> 0x15 & 1);
+    uint32_t tab = b ? kTabB : kTabA;
+    for (int k = 0; k < 2; k++) {
+        uint32_t id = W32(u, 0xc), ty = W32(u, 0);
+        if (s.h(0xa4e20, id & 0x7f, id, s.mod(tab + ty * 0x200), 0, 0, ty)) {
+            if (!k) return 0;
+            s.fatal(b ? 0x9c : 0xa5);
+        }
+    }
+    s.h(0x22b20, 1, u);
+    uint32_t id = W32(u, 0xc), ty = W32(u, 0);
+    uint32_t slot = ((W32(u, 0xc4) >> 0x15 & 1) ? kTabB : kTabA) + ty * 0x200 + (id & 0x7f) * 4;
+    uint32_t prev = 0, cur = s.gw(slot);
+    while (cur && W32(cur, 0xc) > id) { prev = cur; cur = W32(cur, 0xe4); }
+    fnAt<uint32_t>(fnPtr(u), 0xe4) = cur;
+    if (prev) fnAt<uint32_t>(fnPtr(prev), 0xe4) = u; else s.gw(slot) = u;
     return 1;
 }
-
-// 1.13c D2Client+0xA6680 (174 B): when the stamp changes, run 25280 over every type-2 unit in both tables.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a6680(const D2ClientA5Env* e) {
-    int32_t s = e->ord_11044(e->stamp_src, 0);
-    if (s == g_stamp) return;
-    g_stamp = s;
+// 1.13c D2Client+0xA6680: when the stamp of 0x11C3B8 moves (0x123420), run 0x25280 over every type-2 unit of both tables
+void sub_A6680(FnCallees& s) {
+    uint32_t v = s.h(0xc5fe, 0, 0, 0, 0, 0, s.gw(0x11c3b8), 0);
+    if (v == s.gw(0x123420)) return;
+    s.gw(0x123420) = v;
     for (int t = 0; t < 2; t++) {
-        U* slots = (t ? g_tab_b : g_tab_a) + 2 * 0x80;
-        for (int i = 0; i < 0x80; i++)
-            for (U p = slots[i]; p;) {
-                uint32_t ty = W(p, 0);
-                p = Lnk(p, 0xe4);
-                if (ty != 2) { e->fatal(t ? 0x896 : 0x88c); return; }
-                e->fn_25280();
+        uint32_t base = (t ? kTabB : kTabA) + 2 * 0x200;
+        for (uint32_t i = 0; i < 0x80; i++)
+            for (uint32_t p = s.gw(base + 4 * i); p;) {
+                uint32_t next = W32(p, 0xe4);
+                if (W32(p, 0) != 2) s.fatal(t ? 0x896 : 0x88c);
+                s.h(0x25280, 0, 0, 0, 0, p);
+                p = next;
             }
     }
 }
-
-
-
-
-
+// 1.13c D2Client+0xA6F60   (esi = unit, eax = n, ecx = kind)
+void sub_A6F60(FnCallees& s, uint32_t u, int32_t n, uint32_t kind) {
+    if (!u) return;
+    if (n > 0) s.h(0x6b300, kind, 0, 0, 0, 0, u, 1, 0, (uint32_t)n);
+    else s.h(0x6b300, kind, 0, 0, 0, 0, u, 2, 0, 0);
+    if (kind == 0x97) s.h(0x88a70, 0, 0, 0, 0x18c, 0, u);
+    else if (kind == 0x98) s.h(0x88a70, 0, 0, 0, 0x18d, 0, u);
+}
+// 1.13c D2Client+0xA6FC0   (stack x; ret 4): 1 when the hovered unit (0x51A80) is x, 0 for a flagged monster
+uint32_t sub_A6FC0(FnCallees& s, uint32_t x) {
+    uint32_t p = s.h(0x51a80);
+    if (p && W32(p, 0) == 2) {
+        uint32_t q = s.h(0xc226, 0, 0, 0, 0, 0, W32(p, 4));
+        if (fnAt<int8_t>(fnPtr(q), 0x167) < 0) return 0;
+    }
+    return s.h(0x51a80) == x;
+}
+// 1.13c D2Client+0xA7000: free every unit of both tables through 0xA6D60, types in the .rdata order
+void sub_A7000(FnCallees& s) {
+    for (int t = 0; t < 2; t++)
+        for (int k = 0; k < 6; k++)
+            for (uint32_t i = 0; i < 0x80; i++) {
+                uint32_t slot = (t ? kTabB : kTabA) + kTypeOrder[k] * 0x200 + 4 * i;
+                for (uint32_t p = s.gw(slot); p;) {
+                    uint32_t next = W32(p, 0xe4);
+                    s.h(0xa6d60, 0, 0, 0, 0, 0, p);
+                    s.gw(slot) = next;
+                    p = next;
+                }
+            }
+}
+// 1.13c D2Client+0xA70C0   (eax = event, ecx = unit)
+void sub_A70C0(FnCallees& s, int32_t ev, uint32_t u) {
+    if (ev > 0x161) {
+        if (ev > 0x209) {
+            if (ev == 0x21f) s.h(0x6b300, 0x113, 0, 0, 0, 0, u, 3);
+            else if (ev == 0x2c0) s.h(0x6b300, 0x7a, 0, 0, 0, 0, u, 3);
+            return;
+        }
+        if (ev == 0x209) { s.h(0x53320, u); return; }
+        if (ev == 0x196) {
+            s.h(0xc7b00, u);
+            s.h(0xc7e30, u, 0xffffffc9u, 0, 0, 0, 0);
+            if (!u) return;
+            uint32_t a = W32(u, 0x54), d = a ? W32(a, 0x30) : 0;
+            if (d) { fnAt<uint32_t>(fnPtr(d), 0x10) = 0; fnAt<uint32_t>(fnPtr(d), 0x14) = 0; fnAt<uint32_t>(fnPtr(d), 0x18) = 0x800; }
+            a = W32(u, 0x54); d = a ? W32(a, 0x30) : 0;
+            if (d) { fnAt<uint32_t>(fnPtr(d), 0x28) = 0; fnAt<uint32_t>(fnPtr(d), 0x2c) = 0; fnAt<uint32_t>(fnPtr(d), 0x30) = 0x32; }
+            a = W32(u, 0x54); d = a ? W32(a, 0x30) : 0;
+            if (d) fnAt<uint32_t>(fnPtr(d), 0) |= 0x20;
+            return;
+        }
+        if (ev > 0x1a0 && ev <= 0x1a2 && u) s.h(0x6b300, 0x10e, 0, 0, 0, 0, u, 2);
+        return;
+    }
+    if (ev >= 0x15f) {
+        uint32_t e = (u ? W32(u, 4) : 0xffffffffu) - 0xb3;
+        s.h(0x6b300, e, 0, 0, 0, 0, u, 4, 0, e + 3);
+        return;
+    }
+    static const int32_t dd[4] = {-0x20, 0x20, 0x20, -0x20}, d0[4] = {-0x20, -0x20, 0x20, 0x20};
+    switch (ev) {
+    case 0xf2: s.h(0x6b300, 0x7a, 0, 0, 0, 0, u, 3); break;
+    case 0x14d: s.h(0x6b300, 0xba, 0, 0, 0, 0, u, 2); break;
+    case 0x154: case 0x155: case 0x156: case 0x157:
+        s.h(0xc7b00, u);
+        s.h(0xc7e30, u, 0, (uint32_t)dd[ev - 0x154], 0, 0, (uint32_t)d0[ev - 0x154]);
+        break;
+    default: break;
+    }
+}
+// 1.13c D2Client+0xA7D00   (edi = view, also 0xC652's stack word: ret 4): draw every visible node of the 0xC652 list through 0xA7BF0, offset by 0xC5B0's origin
+void sub_A7D00(FnCallees& s, uint32_t edi) {
+    for (uint32_t n = s.h(0xc652, 0, 0, 0, 0, 0, edi); n; n = W32(n, 0xc)) {
+        if (!(W32(n, 0x1c) & 1)) continue;
+        int32_t o[2] = {0, 0};
+        s.h(0xc5b0, 0, 0, 0, 0, 0, edi, (uint32_t)(uintptr_t)o);
+        s.h(0xa7bf0, 0, W32(n, 4), W32(n, 8) + (uint32_t)o[0], 0, 0, W32(n, 0x18) + (uint32_t)o[1], W32(n, 0x14), W32(n, 0));
+    }
+}
+}

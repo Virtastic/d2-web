@@ -63,14 +63,16 @@ export const corpseLootable = (c) => (c.lootable ?? c.own) === true;
 // --- the hero's own death ---------------------------------------------------------------------------------------
 const LOOT = 1, DEAD_FLAG = 0x08;
 export const PLAYER_DEATH = 0, PLAYER_DEAD = 17;
-/** Falling or lying dead: the two player modes the client treats as dead (1.13c D2Client 0xA5440). */
-export const heroIsDown = (mode) => mode === PLAYER_DEATH || mode === PLAYER_DEAD;
-
-// The client's panel table, by panel number 0..0x25: 1 = closed when the hero dies (1.13c D2Client 0xBE350 called
-// with its first argument 1 from the hero's own "die" action; the bytes are the table that routine indexes, read
-// from the 1.13c image). Panel 10 is closed as well whatever the table says.
-export const DEATH_CLOSES = Object.freeze([0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1]);
-export const closedOnDeath = (panel) => panel === 10 || DEATH_CLOSES[panel] === 1;
+// Both rules are the engine's: _d2_hero_is_down is 1.13c D2Client 0xA5440 (the player modes the client treats as
+// dead), _d2_death_closes_panel is 0xBE350 run as the hero's own "die" action runs it (the client's panel table,
+// panel 10 forced). The page binds the engine once it is up; nothing here answers without it.
+let engine = null;
+export function bindDeathRules(Module) { engine = Module; }
+const rules = () => engine ?? globalThis.Module ?? (() => { throw new Error('death rules: engine not bound'); })();
+/** Falling or lying dead. */
+export const heroIsDown = (mode) => Number.isInteger(mode) && mode >= 0 && rules()._d2_hero_is_down(0, mode, 0) !== 0;
+/** A panel the hero's death closes (panel number 0..0x25). */
+export const closedOnDeath = (panel) => Number.isInteger(panel) && panel >= 0 && rules()._d2_death_closes_panel(panel) !== 0;
 // GUESS (panel numbers): which number is which panel is the community's numbering, not read from the client;
 // settled by reading each panel's draw routine from the toggle's switch. Only the numbers below are used.
 export const DEATH_PANEL = Object.freeze({ inventory: 1, character: 2, skillSelect: 3, skillTree: 4, chat: 5, npcMenu: 8, gameMenu: 9, automap: 10,

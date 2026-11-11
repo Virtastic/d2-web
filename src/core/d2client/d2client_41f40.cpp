@@ -1,5 +1,5 @@
 // 1.13c D2Client+0x41F40 -- login packet copy. ECX = packet. When the two bytes at +0x33 are not "0\0",
-// SStrCopy (Storm #501, stdcall: dest, src, 0x7FFFFFFF) copies that string to the buffer whose pointer is the dword at +F4320 (the callee gets the dword's value); then +0x1B to the pointer at +119940;
+// SStrCopy (Storm #501, stdcall: dest, src, 0x7FFFFFFF) copies that string to the global buffer at +F4320 (the callee gets the buffer address); then +0x1B to the buffer at +119940;
 // then dword +0x15 -> 11C394, word +0x19 -> 119880, dword +0x225 -> 119924. The copies go through the host seam (the destinations are module globals).
 #include <cstdint>
 #include <emscripten.h>

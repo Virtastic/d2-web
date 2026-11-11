@@ -6,7 +6,7 @@
 const CVT_ROWS = [0, 251, 262, 268, 274, 280, 286, 292]; // D2Client+0xF5538 pair table, first of each pair, by hit class
 const GAIT_BASE = [2768, 2720, 2720, 2768, 2816, 2720, 2720]; // Ama Sor Nec Pal Bar Dru Asn
 import { OBJECT_MODE_SOUNDS, OBJECT_SELECT_SOUNDS, SHARED_ROW_CLASSES } from './object-mode-sounds.mjs';
-export function createEventSounds(read, play, monsterStep = null, monsterLayer = null, monsterIdle = null, floorClass = null) {
+export function createEventSounds(read, play, monsterStep = null, monsterLayer = null, monsterIdle = null, floorClass = null, stepDue = null) {
   const rows = (p) => new TextDecoder('latin1').decode(read(p)).split(/\r?\n/).map((l) => l.split('\t'));
   // D2Client 0x226A0's level class: Levels.txt SoundEnv indexes the SoundEnviron table by row (record 0x58 bytes, "Material 1"
   // at +0x1C); a value outside 1..6, or no row, is 1. Read once, on the first footstep.
@@ -44,8 +44,10 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
   let itemLevel = null, itemsSeen = false, deadSeen = new Set();
   // A run a cast started (no explicit move command) keeps the client unit in run mode 3 (a retail recording retail F rows: step 0x97 over a 2048 cycle, footfalls
   // mod 1024, every one the run group, gaps 7,7,6,7); an explicit move flips it to walk/town-walk after the first tick (step 0xD5, the model above).
-  let STEP = 320, PER = 1536, MINT = 2, RUNG = 0; const circ = (a) => Math.min(a, PER - a);
-  const footDue = (c) => circ(c) < circ((c + STEP) % PER) && circ(c) < circ((c - STEP + PER) % PER);
+  // The due test itself is the engine's 0x23C00 check (stepDue = _d2_client_footstep_due: two footfalls a cycle, phase 0,
+  // the 2/3-period gap); without it the hero steps only on the armed first footfall.
+  let STEP = 320, PER = 1536, RUNG = 0;
+  const footDue = (c, ticks) => !!stepDue && stepDue(c, 2 * PER, STEP, 2, 0, ticks, 0) !== 0;
   return {
     /** D2Client 2A750's local action 2 (cast on the ground): 1C150 -> 23C00 plays the walk group's first footfall at once. */
     /** 2A750's local action 7 (cast on a unit): 24490 -> 242B0 plays the weapon-class row of the client unit; k is the hit class of its weapon, 1 with none. */
@@ -65,10 +67,10 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
       if (m && (m.mode === 2 || m.mode === 3 || m.mode === 6)) { // 6 = town walk (a retail recording: base row, no run footfall)
         // Retail (D2Client+0x23C00, traced against a retail recording): the run's first footfall plays the run group at once,
         // the rest follow the walk-step model above, all in the walk group.
-        if (stepT === -2) { stepT = -1; const field = m.mode === 3 && !p.explicitMove; [STEP, PER, MINT, RUNG] = field ? [151, 1024, 4, 24] : [320, 1536, 2, 0]; } // armed: retail submits one tick after the unit enters the mode
+        if (stepT === -2) { stepT = -1; const field = m.mode === 3 && !p.explicitMove; [STEP, PER, RUNG] = field ? [151, 1024, 24] : [320, 1536, 0]; } // armed: retail submits one tick after the unit enters the mode
         else if (stepT === -1) { foot(m.mode === 6 ? 0 : 24); stepT = 0; cur = m.mode === 6 ? 1527 : RUNG ? 0 : 1207; }
-        else { cur = (cur + STEP) % PER; if (++stepT >= MINT && footDue(cur)) { foot(RUNG); stepT = 0; } }
-      } else { if (stepT === -1) foot(24); else if (stepT >= 0) { cur = (cur + STEP) % PER; if (++stepT >= MINT && footDue(cur)) foot(RUNG); } stepT = -2; } // the exit tick still runs the callback in the old mode (a retail recording) // a one-tick run (a retail recording) still submits its armed footfall
+        else { cur = (cur + STEP) % PER; if (footDue(cur, ++stepT)) { foot(RUNG); stepT = 0; } }
+      } else { if (stepT === -1) foot(24); else if (stepT >= 0) { cur = (cur + STEP) % PER; if (footDue(cur, ++stepT)) foot(RUNG); } stepT = -2; } // the exit tick still runs the callback in the old mode (a retail recording) // a one-tick run (a retail recording) still submits its armed footfall
       ++tick;
       for (const e of monsterStep ? snapshot?.entities ?? [] : []) {
         let a = e.type === 1 && e.animation;

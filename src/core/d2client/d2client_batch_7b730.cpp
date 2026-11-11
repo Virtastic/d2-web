@@ -175,33 +175,7 @@ void d2_client_7c730(uint32_t* win_c3a70, uint32_t* obj_c3a74, void (*sub_a3d20)
 
 // retired, see d2client_7c770.cpp: D2Client 0x7C770.
 
-// 1.13c D2Client+0x7C8F0 (244 B): replace the message box [0x11C3A60]: free the old one, take string
-// Ordinal_10003, node = Ordinal_10042(0x659) with buffer Ordinal_10059(0xb4) + 0x7BF60, then on success
-// node[0x16]=1, [0x11C3A64]=tick+(len+0x19)*200, [0x11C3A88]=[0x11C3A84]=1,
-// [0x11C3A94]=100-(u16@+0x12>>2), [0x11C3A90]=0x140-(u16@+0x10>>1).
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_7c8f0(uint32_t* p_c3a60, uint32_t* t_c3a64, uint32_t* f_c3a88, uint32_t* f_c3a84,
-                     uint32_t* y_c3a94, uint32_t* x_c3a90,
-                     void (*sub_7b3d0)(void), void (*free_)(uint32_t, uint32_t), uint32_t (*o10003)(void),
-                     void (*lock)(void), uint32_t (*o10042)(uint32_t, uint32_t), uint32_t (*o10059)(uint32_t),
-                     void (*sub_7bf60)(void), uint32_t (*ulen)(uint32_t), uint32_t (*now)(void)) {
-    if (*p_c3a60) { sub_7b3d0(); free_(0x68a, 0); *p_c3a60 = 0; }
-    uint32_t s = o10003();
-    lock();
-    uint32_t node = o10042(0x659, 0);
-    W(node, 0) = o10059(0xb4);
-    sub_7bf60();
-    *p_c3a60 = node;
-    lock();
-    if (*p_c3a60) {
-        W(*p_c3a60, 0x16) = 1;
-        uint32_t n = ulen(s);
-        *t_c3a64 = (n + 0x19) * 200 + now();
-        *f_c3a88 = 1; *f_c3a84 = 1;
-        *y_c3a94 = 100 - (uint32_t)(*(uint16_t*)(uintptr_t)(*p_c3a60 + 0x12) >> 2);
-        *x_c3a90 = 0x140 - (uint32_t)(*(uint16_t*)(uintptr_t)(*p_c3a60 + 0x10) >> 1);
-    }
-}
+// retired, see d2client_7c8f0.cpp: D2Client 0x7C8F0.
 
 // 1.13c D2Client+0x7CA40 (306 B, __fastcall(ECX=param_1, EDX=param_2), EAX = point {x,y}): if
 // Ordinal_11067(param_1) < [0x11C3ACE] { Ordinal_10422(0,param_1); if param_2: [param_2+0xA4]=0 }. Build a

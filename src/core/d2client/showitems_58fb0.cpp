@@ -17,7 +17,7 @@ int32_t g_uiPin = -1;   // a recorded stream's pinned panel layout (the `uimode`
 int32_t g_n, g_minX, g_maxX, g_scrW, g_scrH, g_ui, g_curX, g_curY, g_hoverUnit;
 bool g_hoverDone;
 
-// 1.13c D2Client+0x58DE0: clamp the plate to the viewport, then slide it past the first earlier plate it overlaps.
+// Plate placement for the label pass (the game rule at D2Client 0x58DE0 is in d2client_batch_57a90.cpp): clamp the plate to the viewport, then slide it past the first earlier plate it overlaps.
 // Returns 0 when it moved (the caller tries the next mode), 1 when it is clear.
 int32_t place(int32_t& l, int32_t& t, int32_t& r, int32_t& b, int32_t mode) {
     const int32_t lim = g_scrH - 0x30;
@@ -43,7 +43,7 @@ int32_t place(int32_t& l, int32_t& t, int32_t& r, int32_t& b, int32_t mode) {
 }  // namespace
 
 extern "C" {
-// 1.13c D2Client+0x58FB0 (start): ui = the side-panel layout (0 none, 1 left panel, 2 right panel), hoverUnit = the ground
+// Label pass start (the game rule is d2client_58fb0.cpp): ui = the side-panel layout (0 none, 1 left panel, 2 right panel), hoverUnit = the ground
 // item the cursor picks (0 none), curX/curY the cursor. Returns 0 when the pass does not run: its caller (D2Client+0xC39E0)
 // skips it in UI mode 3.
 EMSCRIPTEN_KEEPALIVE int32_t d2_showitems_begin(int32_t scrW, int32_t scrH, int32_t ui, int32_t curX, int32_t curY, int32_t hoverUnit) {
@@ -56,7 +56,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_showitems_begin(int32_t scrW, int32_t scrH, int3
 }
 // Pin the panel layout the pass reads (D2Client global 0xBCC414), as a recorded stream's `uimode` event does; -1 unpins.
 EMSCRIPTEN_KEEPALIVE void d2_showitems_pin_ui(int32_t ui) { g_uiPin = ui; }
-// 1.13c D2Client+0x58FB0 (per unit). cx,y = the projected feet position, textW the Font16 width of the widest line,
+// Label pass, per unit. cx,y = the projected feet position, textW the Font16 width of the widest line,
 // lines the line count, quality the item quality, grey = socketed-or-ethereal condition met, gold = quest item that
 // is not Wirt's leg. Returns the slot index, or -1 when the plate is off screen / cannot be placed.
 EMSCRIPTEN_KEEPALIVE int32_t d2_showitems_add(int32_t unit, int32_t cx, int32_t y, int32_t textW, int32_t lines, int32_t quality, int32_t grey, int32_t gold) {

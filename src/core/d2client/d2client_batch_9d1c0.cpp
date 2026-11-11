@@ -142,28 +142,7 @@ void d2_client_9da70(uint32_t ecx, uint32_t unit_bbfc, Find4D630 sub_4d630, void
     if (s == -1) sub_4cf10(cur);
 }
 
-// 1.13c D2Client+0x9DB90 (150 B): 1 if some node of 11CBC14 has id (+0x10, != -1) found (as node id or in a
-// +0x38 chain key) at a node N whose +0x34 header is set, id != cur id, and an entry in the header's chain
-// (first word, next at +8) with key == cur id has flag 8 in [+4]; else 0.
-extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2_client_9db90(uint32_t head_bc14, uint32_t unit_bbfc) {
-    int32_t cur = unit_bbfc ? (int32_t)rd32(unit_bbfc + 0xc) : -1;
-    for (uint32_t a = head_bc14; a; a = rd32(a + 0x80)) {
-        int32_t id = (int32_t)rd32(a + 0x10);
-        if (id == -1) continue;
-        for (uint32_t b = head_bc14; b; b = rd32(b + 0x80)) {
-            bool hit = (int32_t)rd32(b + 0x10) == id;
-            for (uint32_t k = rd32(b + 0x38); !hit && k; k = rd32(k + 4)) hit = (int32_t)rd32(k) == id;
-            if (!hit) continue;
-            uint32_t hdr = rd32(b + 0x34);
-            if (hdr && id != cur)
-                for (uint32_t e = rd32(hdr); e; e = rd32(e + 8))
-                    if ((int32_t)rd32(e) == cur) { if (rd32(e + 4) & 8) return 1; break; }
-            break;
-        }
-    }
-    return 0;
-}
+// retired, see d2client_9db90.cpp: D2Client 0x9DB90.
 
 // 1.13c D2Client+0x9DC30 (41 B): rec = 9D630(ecx, id); 0 if null; 1 if EAX == rec[+0x10], else 4FD90(.., rec[+0x10], 1) != 0.
 extern "C" EMSCRIPTEN_KEEPALIVE

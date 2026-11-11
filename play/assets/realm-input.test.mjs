@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { packets, sendWindow, createSendGate, createRealmInput, UNIT } from './realm-input.mjs';
 import { createMonsterTable } from './realm-tables.mjs';
+import { bindDeathRules } from './realm-death.mjs';
+import { DEATH_RULES } from '../../test/helpers/death-rules-double.mjs';
+
+bindDeathRules(DEATH_RULES);
 
 // The 1.13c client packet lengths (src/core/realm/d2gs_session.cpp kCsSize113c).
 const SIZE = { 0x01: 5, 0x02: 9, 0x03: 5, 0x04: 9, 0x05: 5, 0x06: 9, 0x08: 5, 0x09: 9, 0x0c: 5, 0x0d: 9, 0x0f: 5, 0x10: 9,
@@ -79,14 +83,14 @@ test('left on a monster is the left skill on that unit; on a person, a talk; rig
   assert.equal(h.out[0][0], 1);                                   // a corpse is not a target
 });
 
-test('another player is picked after monsters; in town a click asks for a trade, outside it walks', () => {
+test('another player is picked after monsters; a click walks up and interacts, in town or out of it', () => {
   const other = { guid: 0x01020304, name: 'Bob', x: 101, y: 101, anchorX: 200, anchorY: 120, drawn: true };
   let h = harness({ players: [other], inTown: true });
   assert.deepEqual(h.input.pick(200, 120), { kind: 'player', unit: other });
   h.input.leftClick(200, 120);
   assert.deepEqual(h.out, [[0x13, 0, 0, 0, 0, 4, 3, 2, 1]]);
   h = harness({ players: [other], inTown: false }); h.input.leftClick(200, 120);
-  assert.deepEqual(h.out, [[1, 100, 0, 120, 0]]);
+  assert.deepEqual(h.out, [[0x13, 0, 0, 0, 0, 4, 3, 2, 1]]);   // no town test in the client's player click
   h = harness({ players: [{ ...other, drawn: false }], inTown: true });
   assert.equal(h.input.pick(200, 120).kind, 'ground');
   const mon = { guid: 77, classId: 5, mode: 1, x: 101, y: 101, anchorX: 200, anchorY: 120, drawn: true };
