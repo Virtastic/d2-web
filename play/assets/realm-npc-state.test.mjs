@@ -172,12 +172,26 @@ test('the hire request carries the hero unit id; trade and gamble carry 0', () =
   assert.deepEqual(hirer.sent[1], [0x38, 3, 0, 0, 0, GUID, 0, 0, 0, 4, 3, 2, 1]);
 });
 
-test('a boat row sends the travel 0x38 (action 0) for the clicked NPC and closes without 0x30', () => {
-  const r = fresh({ classId: 155, questDone: () => true });   // Warriv (Act I): Go East once Andariel is done
-  r.npc.handle(info(GUID, []));
-  const row = r.npc.view().entries.find((e) => e.stringId === 3382);
-  assert.ok(row);
-  assert.equal(r.npc.choose(row), true);
-  assert.deepEqual(r.sent.at(-1), [0x38, 0, 0, 0, 0, GUID, 0, 0, 0, 0, 0, 0, 0]);
-  assert.equal(r.npc.isOpen(), false);
+test('a travel row ends the chat (0x30) and then sends 0x38 {0, npc, destination level}', () => {
+  const cases = [[155, 3382, 40], [175, 3383, 1], [210, 3384, 75], [264, 3385, 40], [367, 22738, 109]];
+  for (const [classId, stringId, level] of cases) {
+    const r = fresh({ classId, questBit: () => true });
+    r.npc.handle(info(GUID, []));
+    const row = r.npc.view().entries.find((e) => e.stringId === stringId);
+    assert.ok(row, `class ${classId}`);
+    const before = r.sent.length;
+    assert.equal(r.npc.choose(row), true);
+    assert.deepEqual(r.sent.slice(before), [[0x30, 1, 0, 0, 0, GUID, 0, 0, 0], [0x38, 0, 0, 0, 0, GUID, 0, 0, 0, level, 0, 0, 0]]);
+    assert.equal(r.npc.isOpen(), false);
+  }
+});
+
+test('the travel row needs the exact quest bit, and Tyrael his expansion game', () => {
+  const words = new Set([6]);
+  const warriv = fresh({ classId: 155, questBit: (w) => words.has(w) });
+  warriv.npc.handle(info(GUID, []));
+  assert.ok(warriv.npc.view().entries.some((e) => e.stringId === 3382));
+  const tyrael = fresh({ classId: 367, questBit: () => true, expansion: () => false });
+  tyrael.npc.handle(info(GUID, []));
+  assert.equal(tyrael.npc.view().entries.some((e) => e.stringId === 22738), false);
 });

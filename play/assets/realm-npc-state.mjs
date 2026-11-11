@@ -6,7 +6,7 @@
 //   (0x38 trade, gamble or hire list; 0x34 identify; 0x62 resurrect), answered by S2C 0x9C stock and 0x2A result.
 // Hire: retail's menu build sends 0x38 {hire} (13 bytes: 0x38, action u32, NPC guid, the hero's unit id) when the
 // conversation opens, ahead of any speech, for the four mercenary hirers (not when the player picks Hire); the server answers 0x4F then one 0x4E per offer, which the hire window lists.
-import { npcMenuEntries, talkEntries, entriesAfterSpeech, withTravelRow, withHireRow, withResurrectRow } from './npc-menu.mjs';
+import { npcMenuEntries, talkEntries, entriesAfterSpeech, withTravelRow, withHireRow, withResurrectRow, TRAVEL_LEVEL } from './npc-menu.mjs';
 import { npcPackets, NPC_ACTION, SELL_MODE, parseNpcInfo, parseTransaction, parseShopItem, parseHireOffer, HIRE_LIST_HEAD } from './realm-npc-packets.mjs';
 import { decodeItemHeader } from './realm-world.mjs';
 import { packets, UNIT } from './realm-input.mjs';
@@ -26,10 +26,12 @@ export const chatEnd = (guid) => packets.npcChatEnd(UNIT.MONSTER, guid);
  * transactionCost(item, kind) is the displayed price, kind 'buy' | 'sell' | 'repair', or null while no engine
  * seam supplies it (the server charges its own price); hireStats(mercName, seed) is the offer's
  * { name, level, life, def, cost, skill } or null (the engine seam is MONSTERS_HirelingInit); playerGuid() is
- * the hero's unit id for the hire form of the 0x38 request (trade and gamble carry 0).
+ * the hero's unit id for the hire form of the 0x38 request (trade and gamble carry 0); questBit(word) is bit 0 of
+ * the hero's quest word and expansion() the game's expansion flag (the travel rows' conditions).
  */
 export function createRealmNpc({ send, classOf = () => -1, questDone = () => false, questName = () => '',
-  resurrectLabel = () => null, transactionCost = () => null, hireStats = () => null, playerGuid = () => 0xffffffff } = {}) {
+  resurrectLabel = () => null, transactionCost = () => null, hireStats = () => null, playerGuid = () => 0xffffffff,
+  questBit = () => false, expansion = () => true } = {}) {
   let npc = null;            // { guid, classId, messages, entries, speech, spoken, mode, offers }
   let stock = new Map();     // item guid -> { guid, bits, tab, x, y }
   let result = null;         // the last transaction outcome
@@ -42,7 +44,7 @@ export function createRealmNpc({ send, classOf = () => -1, questDone = () => fal
 
   function menuFor(classId) {
     const entries = npcMenuEntries(classId);
-    return entries ? withResurrectRow(withHireRow(withTravelRow(entries, classId, questDone), classId, questDone), classId, resurrectLabel()) : null;
+    return entries ? withResurrectRow(withHireRow(withTravelRow(entries, classId, questBit, expansion()), classId, questDone), classId, resurrectLabel()) : null;
   }
 
   /** The menu is shown; its hire request went out when the conversation opened. */
@@ -135,11 +137,14 @@ export function createRealmNpc({ send, classOf = () => -1, questDone = () => fal
         case 'resurrect': send(npcPackets.resurrectMerc(npc.guid)); close(true); return true;
         case 'identify': send(npcPackets.identifyAll(npc.guid)); close(true); return true;
         case 'cancel': close(true); return true;
-        // Warriv / Meshif's boat rows (Go East / Go West / Sail East / Sail West, 3382..3385): the travel 0x38 (action 0) for
-        // this NPC; the server moves the hero to the next act's town and the conversation ends with the level.
-        case 'other':
-          if (entry.stringId < 3382 || entry.stringId > 3385) return false;
-          send(npcPackets.request(0, npc.guid, 0)); close(false); return true;
+        // The travel rows (Warriv / Meshif 3382..3385, Tyrael 22738): retail's handlers end the chat first (0x48150 sends the
+        // 0x30) and then send 0x38 {0, npc, destination level}; the server moves the hero to that act's town.
+        case 'other': {
+          const level = TRAVEL_LEVEL[entry.stringId];
+          if (level === undefined) return false;
+          const guid = npc.guid;
+          close(true); send(npcPackets.request(0, guid, level)); return true;
+        }
         default: return false;   // the other rows are the shell's own
       }
     },

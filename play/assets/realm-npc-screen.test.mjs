@@ -67,6 +67,19 @@ test('speech: the first 100 ms of a line swallow the press, then it dismisses', 
   assert.deepEqual(calls.at(-1), ['dismiss']);
 });
 
+test('speech: Esc is the speech key (same 100 ms gate) and dismisses the line, never ending the conversation', () => {
+  clock.t = 2000;
+  const { screen, calls } = fakes({ ...menuView, mode: 'speech', speech: { stringId: 7 } });
+  screen.draw({}, 800, 600);
+  clock.t = 2099;
+  assert.equal(screen.escape(), true);
+  assert.deepEqual(calls.at(-1), ['speech.draw', 'line7']);
+  clock.t = 2100;
+  assert.equal(screen.escape(), true);
+  assert.deepEqual(calls.at(-1), ['dismiss']);
+  assert.equal(calls.some((c) => c[0] === 'end'), false);
+});
+
 test('menu: the menu opens over the NPC feet and a press on a row fires it on the matching release', () => {
   const { screen, calls } = fakes(menuView);
   screen.draw({}, 800, 600);

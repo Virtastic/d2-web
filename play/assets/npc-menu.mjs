@@ -5,8 +5,8 @@
 //   D2Structs.h -- dwNPCClassId, dwEntryAmount, wEntryId[4], pad, dwEntryFunc[4], 5 bytes), found by
 //   the string ids it holds. dwEntryAmount counts the Cancel every menu ends with (string 3400).
 //   The handlers the entries point at name what they do: 0x6FAFA2F0 talk, 0x6FAFAEE0 trade (also
-//   behind 3334 Trade/Repair), 0x6FAFABE0 gamble, 0x6FAF9440 hire, 0x6FAF8750 Cain's identify,
-//   0x6FAF87B0 Anya's (3385), 0x6FAF6AF0 the act 5 entry 4020.
+//   behind 3334 Trade/Repair), 0x6FAFABE0 gamble, 0x6FAF9440 hire, 0x6FAF8750 Warriv's Go West (3383),
+//   0x6FAF87B0 Meshif's Sail West (3385), 0x6FAF6AF0 the act 5 entry 4020.
 //
 // Layout from retail's own DRAW LIST (the retail captures: Warriv's
 // menu, his unit anchored at (304, 292)). Retail draws, in order:
@@ -74,15 +74,19 @@ export function talkEntries(messages, questName) {
   return [{ stringId: S_INTRO, action: 'intro' }, { stringId: S_GOSSIP, action: 'gossip' }, ...topics, { stringId: S_CANCEL, action: 'cancel' }];
 }
 /**
- * The boat row the table cannot hold: Warriv (Act I) offers Go East (3382) and Meshif (Act II) Sail East (3384) only once the act's
- * last quest (Andariel, Duriel) is done; Warriv (Act II, 3383) and Meshif (Act III, 3385) always carry theirs in the table.
- * `questDone(act, quest)` answers from the hero's quest words.
+ * The travel row the table cannot hold. D2Client 1.13c's menu open (0x4A4F0, through 0x45CC0) walks a quest-conditioned table
+ * (.data 0x6FBA2330): Warriv (Act I) gets Go East (3382) when bit 0 of quest word 6 (A1Q6) is set, Meshif (Act II) Sail East (3384)
+ * on word 14 (A2Q6), Tyrael (Act IV) his Harrogath row (22738) on word 28 (the Act IV completed word) in an expansion game only
+ * (0x49060 / 0x49030 / 0x49000). The test is the exact bit (Ordinal 10174). Warriv (Act II, 3383) and Meshif (Act III, 3385) carry
+ * theirs in the table. `questBit(word)` answers bit 0 of the hero's quest word.
  */
-export const TRAVEL_ROWS = { 155: [3382, 1, 6], 210: [3384, 2, 6] };
-export function withTravelRow(entries, classId, questDone) {
+export const TRAVEL_ROWS = { 155: { stringId: 3382, word: 6 }, 210: { stringId: 3384, word: 14 }, 367: { stringId: 22738, word: 28, expansion: true } };
+/** The level each travel row's handler puts in its 0x38 {0, npc, level}: 0x488D0 40, 0x48750 1, 0x48870 75, 0x487B0 40, 0x48810 109. */
+export const TRAVEL_LEVEL = { 3382: 40, 3383: 1, 3384: 75, 3385: 40, 22738: 109 };
+export function withTravelRow(entries, classId, questBit, expansion = true) {
   const row = TRAVEL_ROWS[classId];
-  if (!entries || !row || !questDone(row[1], row[2])) return entries;
-  return [...entries.slice(0, -1), { stringId: row[0], action: OTHER }, entries[entries.length - 1]];
+  if (!entries || !row || (row.expansion && !expansion) || !questBit(row.word)) return entries;
+  return [...entries.slice(0, -1), { stringId: row.stringId, action: OTHER }, entries[entries.length - 1]];
 }
 /**
  * Hire is a dynamic row for the two mercenary NPCs whose table record is Talk alone: Kashya lists it once Sisters' Burial Grounds (A1Q2)

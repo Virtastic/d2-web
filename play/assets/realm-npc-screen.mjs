@@ -173,8 +173,16 @@ export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor
     },
     /** Yes on the Buy box (Enter). Returns true when a confirm was open. */
     enter() { return confirmYes(); },
-    /** Esc closes the Buy box first, else the conversation (retail's cancel). */
-    escape() { if (confirm) { closeConfirm(); return true; } return ui.end(); },
+    /**
+     * Esc closes the Buy box first, else the conversation (retail's cancel). During a speech Esc is the speech window's key
+     * (D2Client 0x7E840): after the same 100 ms gate it dismisses the line, and the greeting's continuation (0x4B230) returns
+     * to the menu with no 0x30 for a key.
+     */
+    escape() {
+      if (confirm) { closeConfirm(); return true; }
+      if (current()?.mode === 'speech') { if (gate.pointerDown(0, now()) !== 'consumed') { gateKey = null; ui.dismissSpeech(); } return true; }
+      return ui.end();
+    },
     /** Called each frame: an NPC that left the scene ends its conversation. */
     checkScene(sceneMonsters) {
       const v = current();
