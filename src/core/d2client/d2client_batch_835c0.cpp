@@ -61,7 +61,8 @@ struct D2cItem83Env {
     void   (*o10445)(P);
     void   (*fn16950)(void);
     P      (*fn57360)(void);
-    int    (*o11145)(P u, const uint8_t* data, uint32_t esi, uint32_t a, uint32_t b, uint32_t n, const uint8_t* q);
+    int    (*o11145)(P u, const uint8_t* data, uint32_t len, uint32_t a, uint32_t b, uint32_t n, int32_t* fail); // fail: out flag, tested instead of the return
+    void   (*fn32820m)(uint32_t mode, uint32_t a, uint32_t b);   // the mode set, with the item mode in EAX (item creation)
     void   (*o10977)(P u, uint32_t a, uint32_t b);
     int    (*o10202)(P u, uint32_t a, uint32_t b, const char* file);
     // shared ordinals
@@ -116,12 +117,13 @@ static void setCur(D2cItem83* s, const D2cItem83Env* e, P owner, P item) {
     s->c858 = 0; s->c854 = 5; s->c864 = s->c834 ? 4 : 1;
 }
 
-// 1.13c D2Client+0x835C0 (pkt=EAX/param_1, init=param_2 or null, a=EBX&0xFFFF, b=low16 of param_1 reg, esi)
+// Item creation from a packet (pkt=EAX/param_1, init=param_2 or null, a=EBX&0xFFFF, b=low16 of arg 3, esi)
 extern "C" EMSCRIPTEN_KEEPALIVE P d2_client_835c0(D2cItem83* s, const D2cItem83Env* e, const uint8_t* pkt,
                                                    const uint8_t* init, uint32_t a, uint32_t b, uint32_t esi) {
     uint8_t buf[20];
     if (!init) { e->decode(pkt + 8, rd<uint8_t>(pkt, 2) - 8, 0, buf); init = buf; }
-    uint8_t q[4] = { rd<uint8_t>(init, 8) };
+    uint32_t mode = rd<uint8_t>(init, 8);
+    a &= 0xffff; b &= 0xffff;   // both words are zero-extended before use
     uint32_t v = rd<uint32_t>(init, 0), id = rd<uint32_t>(pkt, 4);
     P u = e->alloc11153(0, 4), r;
     if (!u) r = nullptr;
@@ -143,10 +145,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE P d2_client_835c0(D2cItem83* s, const D2cItem83E
             wr<uint32_t>(u, 0x28, (uint32_t)sd);
             e->o10614();
         }
-        e->o10445(u); e->fn32820(a, b); e->fn16950();
+        e->o10445(u); e->fn32820m(mode, a, b); e->fn16950();
         r = e->fn57360();
     }
-    if (e->o11145(r, init + 8, esi, 0, 0, 0x60, q) != 0) { e->hashRemove(id); return nullptr; }
+    int32_t fail = 0;
+    e->o11145(r, pkt + 8, rd<uint8_t>(pkt, 2) - 8, 0, 0, 0x60, &fail);
+    if (fail != 0) { e->hashRemove(id); return nullptr; }
     if (e->flagTest(rd<uint32_t>(init, 0xC), 2)) {
         e->o10977(r, 2, 0);
         if (esi && !e->o10202(r, 0x10, 0xd8, kItemCpp)) e->fn4940();
