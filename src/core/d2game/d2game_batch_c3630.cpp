@@ -108,43 +108,45 @@ void d2_fn_d2game_C3A80(uint32_t p1, uint32_t p2, uint32_t esi, uint32_t edi, co
     if (esi == 0) e->ordinal10593(u, 10, 4);
 }
 
-// 1.13c D2Game+0xC3BD0   thiscall; unaff_retaddr -> outA, unaff_EDI -> outB, puStack_c -> outC (byte stores)
+// 1.13c D2Game+0xC3BD0   thiscall (ecx self, edx game); stack: unused, unit, out byte pointer. Every result byte goes to that one pointer.
 extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t d2_fn_d2game_C3BD0(uint32_t self, uint32_t p1, uint32_t p2, uint32_t outA, uint32_t outB,
                             uint32_t outC, const D2GameBatchC3630Env* e)
 {
-    (void)p1;
+    (void)p1; (void)outB;
     if (e->ordinal10174(p2, 7, 0) == 0) { wr8(outA, 0, 0); return 1; }
     if (e->ordinal10174Reg() != 0 || e->ordinal10174(p2, 10, 1) != 0) {
         if (e->ordinal10174(p2, 0xe, 0) == 0) {
-            wr8(p2, 0, e->ordinal10174(p2, 10, 10) != 0 ? 5 : 6);
+            wr8(outA, 0, e->ordinal10174(p2, 10, 10) != 0 ? 5 : 6);
             return 1;
         }
-        wr8(p2, 0, (e->ordinal10174(p2, 10, 0xd) != 0 ? 2 : 0) + 0xb);
+        wr8(outA, 0, (e->ordinal10174(p2, 10, 0xd) != 0 ? 2 : 0) + 0xb);
         return 1;
     }
     wr8(outC, 0, 0);
-    uint32_t tr1 = e->sub2E660(0x20317274);
-    uint32_t msf = e->sub2E660(0x2066736d);   // used as a store address by the retail code
-    e->sub2E660(0x20786f62);
-    e->sub2E660(0x20706976);
-    uint32_t hst = e->sub2E660(0x20747368);
-    int32_t r3 = e->ordinal10174(p2, 10, 3);
-    if (p2 != 0 && tr1 != 0) {
-        if (e->ordinal10174(p2, 10, 6) == 0) { wr8(msf, 0, (r3 == 0) * 2 + 2); return 1; }
-        wr8(msf, 0, 3);
+    const uint32_t tr1 = e->sub2E660(0x20317274);
+    const uint32_t msf = e->sub2E660(0x2066736d);
+    const uint32_t box = e->sub2E660(0x20786f62);
+    const uint32_t vip = e->sub2E660(0x20706976);
+    const uint32_t hst = e->sub2E660(0x20747368);
+    const int32_t r3 = e->ordinal10174(p2, 10, 3);
+    if (msf != 0 && box != 0 && vip != 0) {
+        if (e->ordinal10174(p2, 10, 6) != 0) wr8(outC, 0, 3);
+        else wr8(outC, 0, (r3 == 0) * 2 + 2);
         return 1;
     }
     if (hst != 0) {
-        wr8(msf, 0, e->ordinal10174(p2, 10, 10) != 0 ? 5 : 6);
+        wr8(outC, 0, e->ordinal10174(p2, 10, 10) != 0 ? 5 : 6);
         return 1;
     }
-    uint32_t s = rd32(self, 0x18);
+    if (tr1 != 0 && e->ordinal10174(p2, 10, 3) == 0) { wr8(outC, 0, 1); return 1; }
+    const uint32_t s = rd32(self, 0x18);
     if ((rd8(s, 0x29) != 0 && rd32(s, 0x20) == 0) ||
         (rd32(s, 0x24) == 0 && (uint8_t)e->sub2120() != 0) ||
         (rd8(s, 0x28) != 0 && rd32(s, 0x18) == 0))
-        wr8(outB, 0, 9);
-    wr8(outB, 0, r3 != 0 ? 2 : 4);
+        wr8(outC, 0, 9);
+    if (r3 != 0) { wr8(outC, 0, 2); return 1; }
+    if (vip != 0 || msf != 0 || box != 0) wr8(outC, 0, 4);
     return 1;
 }
 

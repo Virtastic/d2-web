@@ -20,7 +20,7 @@ uint32_t GAME_2F0D0(const D2G2F0D0Seam& s, uint32_t game, uint32_t room, uint64_
     if (!rec) { c1(11, 0xBEC); return 1; }
     if (!c1(3, game)) return 0;
     for (uint32_t i = 0; i < 8; i++) {
-        const int32_t g = (int8_t)rd(rec, 0xE5 + i, 1);
+        const int32_t g = (uint8_t)rd(rec, 0xE5 + i, 1);
         uint32_t r = step() % 100;
         const uint32_t reg = rd(rd(game, 0x10F0, 4), 0x48 + 4 * c1(4, room), 4);
         const int32_t a = (int32_t)rd(reg, 8, 4), b = (int32_t)rd(reg, 4, 4);

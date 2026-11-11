@@ -117,7 +117,7 @@ extern "C" void d2game_1f600(uint32_t unit, uint32_t game, uint32_t tables, cons
     uint32_t out[2] = { 0, 0 };
     s->fA6D0(room, out);
     const uint32_t ty = s->fA56E(s->fA556(room)) & 0xff;
-    const uint32_t list = s->f1E960(out[0], game, ty, out[1], game);
+    const uint32_t list = s->f1E960(out[0], game, ty, out[1], 1);   // retail pushes the constant 1 (EBX is 1 on every monster path)
     w32(rec, 0x58, r32(list, 0xc));
     w32(list, 0xc, rec);
 }
