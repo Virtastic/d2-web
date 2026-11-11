@@ -3884,7 +3884,13 @@ function realmNpc() {
       return resurrectLabel(str(S_RESURRECT_FORMAT), o.nameId === 0x421 ? str(0x2b0d) : str(o.nameId), o.cost);
     },
     questBit: (word) => realmQuestWords !== null && (realmQuestWords[word] & 1) === 1, expansion: () => realmFlow?.expansion === true,
-    costOf: (item) => Math.max(0, realmFlow?.protocol?.d2gsClientStockPrice?.(item.bits, realmNpcState?.view()?.classId ?? -1, 0) ?? 0),
+    // The displayed price of a stocked item: the engine's price for the selected hero at this vendor (gamble rows use the gamble price).
+    transactionCost: (item, kind) => {
+      if (kind !== 'buy') return null;
+      const view = realmNpcState?.view();
+      const price = realmFlow?.protocol?.d2gsClientStockPrice?.(item.bits, view?.classId ?? -1, view?.mode === 'gamble' ? 2 : 0);
+      return price >= 0 ? price : null;
+    },
     // The hire request carries the hero's unit id (0xFFFFFFFF with no player), as the menu build writes it.
     playerGuid: () => (realmPlayerView ? selectedPlayerSource().guid >>> 0 : 0xffffffff),
     // A hire offer's stats from the engine's hireling roll; the name is the string the offer's name id indexes.

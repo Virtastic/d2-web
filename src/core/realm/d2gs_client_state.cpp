@@ -5771,6 +5771,8 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_stock_price(const uint8_t* bytes, int l
         return -1;
     }
     UNITS_InitializeStaticPath(item, nullptr, 0, 0);
+    // The decode writes the quantity and durability into the unit's stat list; without one they are dropped and a stack prices as one.
+    if (!item->pStatListEx) STATLIST_AllocStatListEx(item, 0, nullptr, nullptr);
 
     int socketedItems = 0;
     BOOL failed = FALSE;
