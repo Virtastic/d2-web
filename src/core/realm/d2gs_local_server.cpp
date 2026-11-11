@@ -193,9 +193,8 @@ EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_client(const uint8_t* bytes, int length) 
         ++g_server.accepted;
         return 1;
     }
-    if (opcode == 0x6D) {           // ping: the pong echoes its tick count
-        uint8_t pong[33] = { 0x8F };
-        if (length >= 5) std::memcpy(pong + 1, bytes + 1, 4);
+    if (opcode == 0x6D) {           // ping: retail's pong is 0x8F, 12 zero bytes, the server tick (u32 at 13), zeros; the ping's tick is not echoed
+        const uint8_t pong[33] = { 0x8F };
         put(pong, sizeof pong);
         ++g_server.accepted;
         return 1;

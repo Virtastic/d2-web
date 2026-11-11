@@ -38,6 +38,7 @@
 #include <Drlg/D2DrlgDrlg.h>
 #include "../d2client/inv_weapon_hands.h"
 #include "../d2client/character_screen.h"
+#include "client_refusal_sound.h"
 #include "client_unit_sound.h"
 #include "../d2client/price_line_46230.h"
 #include "../d2client/realm_skill_start.h"
@@ -2703,6 +2704,10 @@ struct ClientSkillStart {
 // Why the last local skill start was refused (0 = it started); numbered in source order.
 static int g_lastSkillRefusal = 0;
 static int refuse(int why) { g_lastSkillRefusal = why; return 0; }
+static int g_lastRefusedUseState = 0;   // the use state (SKILLS_GetUseState) behind the last refusal 4
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_last_refusal_sound() {
+    return d2::realm::refusalSoundEvent(g_lastSkillRefusal, g_lastRefusedUseState);
+}
 
 static int client_skill_start(D2UnitStrc* unit, const ClientSkillStart& s) {
     if (!unit || !unit->pDynamicPath) return refuse(1);
@@ -2730,7 +2735,10 @@ static int client_skill_start(D2UnitStrc* unit, const ClientSkillStart& s) {
         skill = SKILLS_GetSkillById(unit, s.id, -1);
     }
     if (!skill || !skill->pSkillsTxt) return 0;
-    if (s.local && SKILLS_GetUseState(unit, skill) != 0) return refuse(4);
+    if (s.local) {
+        const int useState = SKILLS_GetUseState(unit, skill);
+        if (useState != 0) { g_lastRefusedUseState = useState; return refuse(4); }
+    }
     UNITS_SetUsedSkill(unit, skill);
 
     auto* room = UNITS_GetRoom(unit);

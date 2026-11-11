@@ -20,6 +20,7 @@
 #include <OBJECTS/ObjMode.h>
 #include <UNIT/SUnit.h>
 #include <UNIT/SUnitProxy.h>
+#include "../../d2game/d2game_9d980_room_removals.h"
 #include <D2Environment.h>
 #include <D2Dungeon.h>
 #include <Units/UnitRoom.h>
@@ -292,6 +293,8 @@ void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
             if (lvl) LEVEL_RemoveClient(pClient->pGame, oldRooms[i], pClient);
             else {
                 if (g_d2webPacketSink) {
+                    // LEVEL_RemoveClient (D2Game+0x9D980) tells the client to drop the room's units before the 0x08.
+                    if (g_sessionJoinUnits) D2GAME_SendRoomUnitRemovals(oldRooms[i], pClient);
                     D2DrlgCoordsStrc coords = {};
                     DUNGEON_GetRoomCoordinates(oldRooms[i], &coords);
                     D2GAME_PACKETS_SendPacket0x08_6FC3D160(pClient, (uint8_t)DUNGEON_GetLevelIdFromRoom(oldRooms[i]), (uint16_t)coords.nTileXPos, (uint16_t)coords.nTileYPos);
