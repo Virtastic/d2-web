@@ -133,7 +133,7 @@ import { createChatLink } from './assets/bnet-chat-link.mjs';
 import { returnToLobby } from './assets/realm-lobby-return.mjs';
 import { createBnetConnectingPopup, createBnetConnectFailureNotice } from './assets/bnet-connecting.mjs';
 import { goldLabel } from './assets/gold-label.mjs';
-import { hoveredLabel, labelItemAt, nearestGroundItem, pickupNeedsWalk } from './item-pick.mjs';
+import { hoveredLabel, labelItemAt, nearestGroundItem } from './item-pick.mjs';
 import { createSpeechBox } from './assets/speech-box.mjs';
 import { nativeObjectSpeechAcknowledgement } from './assets/object-speech-ack.mjs';
 import { dispatchObjectSpeechPointer } from './assets/object-speech-input.mjs';
@@ -1033,7 +1033,8 @@ function sessionAdapter() {
       },
       // A walk leg leaves as the same 0x01 / 0x03 packet a click sends; the server answers with the move.
       move(x, y) { const p = snapshot?.player; return p && realmInput().step(x - p.x, y - p.y) ? 1 : 0; },
-      pickup(itemId) { return Module.ccall('d2_session_client_pickup', 'number', ['number'], [itemId]); },
+      // Ground item pickup is the 0x16 packet (walk to it, then pick up), the same one a left click sends.
+      pickup(itemId) { return realmInput().pickUp(itemId) ? 1 : 0; },
       useItem(itemId) {
         const result = Module.ccall('d2_session_command_use_item', 'number', ['number'], [itemId]);
         propCache.delete(itemId); return result;
@@ -2794,11 +2795,6 @@ function chebyshev(ax, ay, bx, by) { return Math.max(Math.abs(ax - bx), Math.abs
 // the SAME cell -- a second click on the same thing is the SAME intent, and the walk keeps its patience.
 // An arm elsewhere is a new intent and starts fresh. Only the counters carry (not the previous goal's
 // callbacks: an arm always brings its own). Everything that sets a walkGoal arms through here.
-function clickPickup(item) {
-  if (!pickupNeedsWalk(session.pickup(item.id))) return;
-  armWalk({ x: item.x, y: item.y, within: 2, onArrive: () => { session.pickup(item.id); } });
-}
-
 function armWalk(goal) {
   // A click-walk target is expressed in its source level's subtile grid. Carrying it through a
   // seam replays that old coordinate in the destination level and can walk straight back across

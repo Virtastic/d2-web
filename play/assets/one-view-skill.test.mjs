@@ -12,7 +12,7 @@ test('skills, belt, movement, stats and objects have no engine branch beside the
     'd2_session_command_cursor_item_packet', 'd2_session_command_insert_item_packet',
     'd2_session_command_item_to_cursor_packet', 'd2_session_command_equip_packet', 'd2_session_command_drop',
     'd2_session_command_add_stat', 'd2_session_command_add_skill', 'd2_session_command_button',
-    'd2_session_command_object', 'session.operate', 'session.swingLeftHand', 'gridToBelt(', 'beltToCursor(',
+    'd2_session_command_object', 'd2_session_client_pickup', 'clickPickup', 'session.operate', 'session.swingLeftHand', 'gridToBelt(', 'beltToCursor(',
   ])
     assert.equal(shell.replace(/\/\/.*$/gm, '').includes(gone), false, `${gone} is gone from the shell`);
   assert.match(shell, /clientView\(\)\.commands\.selectSkill\?\.\(id, side === 'left'\)/);
