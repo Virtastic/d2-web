@@ -131,18 +131,21 @@ uint32_t d2_client_8d430(uint32_t inv, int32_t id, uint32_t data_tables, uint32_
 
 // 1.13c D2Client+0x8D4F0 (269 B)
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_8d4f0(void* out, uint32_t unit, const void* suffix, int32_t flag, uint8_t* tmp /*>=24 B*/,
+void d2_client_8d4f0(void* out, uint32_t unit, uint8_t* tmp /*>=24 B*/,
                      uint32_t (*ord10003)(void), uint32_t (*ord10460)(uint32_t), uint32_t (*ord11147)(uint32_t),
                      int (*ord10744)(uint32_t, int), uint32_t (*ord10695)(uint32_t), uint32_t (*ord10806)(int),
                      uint32_t (*ord10464)(uint32_t), void (*ustrcat)(void*, const void*),
                      void (*toUnicode)(void*, const char*, int)) {
     uint32_t list = rd32(unit + 0x60);
     if (!list) return;
+    uint32_t head;
     int first = 0;
     uint8_t* seg = tmp;       // local_c, 12 B
     uint8_t* quote = tmp + 12;
     uint32_t sep = ord10003();
-    for (uint32_t n = ord10460(list); n; n = ord10464(n)) {
+    head = ord10460(list);
+    if (!head) return;
+    for (uint32_t n = head; n; n = ord10464(n)) {
         uint32_t u = ord11147(n);
         if (!u) break;
         if (ord10744(u, 0x4a)) {
@@ -158,8 +161,7 @@ void d2_client_8d4f0(void* out, uint32_t unit, const void* suffix, int32_t flag,
             }
         }
     }
-    (void)sep;
-    if (flag) { toUnicode(quote, "'", 5); ustrcat(out, quote); ustrcat(out, suffix); }
+    if (first) { toUnicode(quote, "'", 5); ustrcat(out, quote); ustrcat(out, (const void*)(uintptr_t)sep); }
 }
 
 // 1.13c D2Client+0x8D600 (536 B)
