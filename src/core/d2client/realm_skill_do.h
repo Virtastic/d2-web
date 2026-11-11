@@ -25,6 +25,8 @@ int d2client_realm_14f40(D2UnitStrc* unit, int skillId, int level, const RealmSk
 int d2client_realm_15da0(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 17
 int d2client_realm_15c40(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 18
 
+int d2client_realm_73cb0(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 25
+
 // Runs do function `fn`; 0 when the function did nothing (or `fn` is not ported).
 int d2client_realm_skill_do(int fn, D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host);
 // Whether the table's entry `fn` is ported here.

@@ -43,7 +43,7 @@ enum class MonsterAction : uint8_t { Unhandled, Move, GetHit, Stop, Death, Dead,
 
 inline MonsterAction monsterAction(uint32_t code) {
     switch (code) {
-    case 1: case 0x17: return MonsterAction::Move;
+    case 0: case 1: case 0x17: case 0x18: return MonsterAction::Move;
     case 6: return MonsterAction::GetHit;
     case 7: return MonsterAction::Stop;
     case 8: return MonsterAction::Death;

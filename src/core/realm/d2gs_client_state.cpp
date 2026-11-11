@@ -1486,7 +1486,7 @@ static int pkt_monster_action(D2RealmClientMonster& monster, uint32_t code, cons
         const int points = d2_realm_client_motion_set_target(unit, x, y);
         monster.lastPlanResult = points;
         if (points > 0) {
-            d2_realm_client_motion_set_mode(unit, code == 1 ? MONMODE_WALK : MONMODE_RUN);
+            d2_realm_client_motion_set_mode(unit, (code == 1 || code == 0) ? MONMODE_WALK : MONMODE_RUN);
             return 1;
         }
         const uint32_t fallback = d2_realm_client_motion_refusal_mode(unit->dwUnitType, unit->dwAnimMode);
@@ -2035,6 +2035,15 @@ struct RealmMissileEvent { uint32_t version,event,tick,id,classId,ownerGuid,skil
 static_assert(sizeof(RealmMissileEvent) == 36);
 static std::vector<RealmMissileEvent> g_clientMissileEvents;
 static uint32_t g_clientMissileTick = 0;
+// 1.13c D2Client+0xB1420: a missile with Missiles.txt NextHit puts state 0x56 on the unit it hits for
+// NextDelay frames; while it is held, no NextHit missile hits that unit again.
+struct ClientNextHit { uint32_t type, id, until; };
+static std::vector<ClientNextHit> g_clientNextHits;
+static bool client_next_hit_held(const D2UnitStrc* target) {
+    for (const auto& n : g_clientNextHits)
+        if (n.type == target->dwUnitType && n.id == target->dwUnitId && g_clientMissileTick < n.until) return true;
+    return false;
+}
 struct RealmMissileSoundEvent { uint32_t version, tick, missileId, classId, event, soundRow; };
 static_assert(sizeof(RealmMissileSoundEvent) == 24);
 static std::vector<RealmMissileSoundEvent> g_clientMissileSoundEvents;
@@ -2150,6 +2159,7 @@ static void free_client_missile(D2UnitStrc* unit) {
 static void clear_client_missiles() {
     for (const auto& entry : g_clientMissiles) { record_client_missile_event(5, entry.unit); free_client_missile(entry.unit); }
     g_clientMissiles.clear();
+    g_clientNextHits.clear();
     g_clientMissileSoundEvents.clear();
     g_unitFxEvents.clear();
     g_unitOverlays.clear();
@@ -2237,7 +2247,7 @@ static D2UnitStrc* create_client_missile(const D2MissileStrc* params, bool gener
     if (velocity) D2Common_10142(unit->pDynamicPath, unit, 0);
     if (txt->nInitSteps) unit->dwFlagEx |= 0x40000u;
     MISSILE_SetOwner(unit, owner);
-    PATH_SetAcceleration(unit->pDynamicPath, static_cast<int16_t>(txt->wAccel));
+    PATH_SetAcceleration(unit->pDynamicPath, txt->wAccel);
     PATH_SetMaxVelocity(unit->pDynamicPath, static_cast<int>(txt->nMaxVel) << 8);
     if (params->dwFlags & 0x400u) {
         // A thrown missile lives as long as its flight to the target takes.
@@ -2287,6 +2297,11 @@ static const RealmSkillDoHost& client_skill_do_host() {
 struct RealmMissileCollision { D2UnitStrc* missile; D2UnitStrc* owner; uint32_t hitGuid = 0xffffffffu; };
 static int __fastcall ordinary_projectile_target(D2UnitStrc* target, void* context) {
     auto* collision = static_cast<RealmMissileCollision*>(context);
+    // 0xB1000: a target carrying the NextHit state is not a hit for a NextHit missile.
+    if (target && collision->missile) {
+        const auto* mtxt = DATATBLS_GetMissilesTxtRecord(collision->missile->dwClassId);
+        if (mtxt && mtxt->nNextHit && client_next_hit_held(target)) return 0;
+    }
     // Bounded player->ordinary-monster relation branch. Player/PvP and pets require
     // the Client relation roster and are not approximated from engine damage rules.
     if (!target || target->dwUnitType != UNIT_MONSTER || !collision->owner ||
@@ -2465,6 +2480,22 @@ static void advance_client_missiles() {
                 if (target && !collided) record_client_missile_event(8, unit, target->dwUnitType, target->dwUnitId);
             }
             if (collided) hitGuid = context.hitGuid;
+            if (collided && hitGuid != 0xffffffffu) {
+                // 0xB1420 with a unit: at its own target point (10227) there is no hit; otherwise a NextHit
+                // missile holds the target for NextDelay frames, the hit plays, and a missile whose
+                // CollideKill is 0 is not freed. 0xB17C0 returns after a unit hit either way.
+                if (D2Common_10227(unit)) break;
+                if (txt->nNextHit) {
+                    g_clientNextHits.erase(std::remove_if(g_clientNextHits.begin(), g_clientNextHits.end(),
+                        [](const ClientNextHit& n) { return n.until <= g_clientMissileTick; }), g_clientNextHits.end());
+                    g_clientNextHits.push_back({UNIT_MONSTER, hitGuid, g_clientMissileTick + txt->nNextDelay});
+                }
+                if (!txt->nCollideKill) {
+                    record_client_missile_event(3, unit, UNIT_MONSTER, hitGuid);
+                    record_client_missile_impact_sound(3, unit, txt);
+                    break;
+                }
+            }
         }
         if (expired || collided) {
             const uint32_t terminalEvent = expired ? 4 : (hitGuid != 0xffffffffu ? 3 : 2);
@@ -2868,6 +2899,9 @@ namespace { void g_localQueuedReset() { local_queue_clear(); g_localSends.clear(
 // The gate of every own action (+0x29F30): a used skill whose row lacks Interrupt refuses a new
 // action unless the unit stands in a neutral mode.
 static bool local_action_gate(D2UnitStrc* unit) {
+    // A hit recovery runs its whole cycle: the server refuses any action sent during it, so the
+    // client must not predict one (it would leave the mode on the first click and cut the cycle).
+    if (unit->dwAnimMode == PLRMODE_GETHIT) return false;
     auto* used = UNITS_GetUsedSkill(unit);
     if (!used || !used->pSkillsTxt) return true;
     if (used->pSkillsTxt->dwFlags[0] & static_cast<uint32_t>(SKILLSFLAG_INTERRUPT)) return true;

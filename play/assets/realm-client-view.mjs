@@ -47,8 +47,8 @@ export function realmViewSnapshot({ base: given, resources, monsters, missiles, 
   }
   for (const u of missiles ?? []) {
     if (u.level !== level) continue;
-    entities.push({ kind: 'missile', type: 3, id: u.id, classId: u.classId, mode: u.mode, x: u.x, y: u.y, hp: 0, hpMax: 0,
-      hostile: false, roomOrdinal: 0, direction: u.direction, missile: { mode: u.mode, direction: u.direction, framePrecise: u.framePrecise, trans: u.trans } });
+    entities.push({ kind: 'missile', type: 3, id: u.id, classId: u.classId, mode: u.mode, x: Math.floor(u.x), y: Math.floor(u.y), hp: 0, hpMax: 0,   // the unit's whole position, as a monster's; the sub-tile one is preciseX
+      hostile: false, roomOrdinal: 0, direction: u.direction, ...precise(u), missile: { mode: u.mode, direction: u.direction, framePrecise: u.framePrecise, trans: u.trans } });
   }
   const r = resources ?? {};
   return { ...base, tick: tick ?? base.tick, entities, objects, items: world?.itemViews() ?? [], warps: warps ?? [], rooms: rooms ?? [], quests: quests ?? null, units: [], town: TOWN_LEVELS.has(base.level),
