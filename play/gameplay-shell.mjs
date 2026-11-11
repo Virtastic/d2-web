@@ -159,7 +159,7 @@ import { heldWorldAction, leftHandCommand, rightGroundWalks } from './assets/wor
 import { createDeathScreen, deathScreenShown, respawnAllowed } from './assets/death-screen.mjs';
 import { createRealmGameUi } from './assets/realm-game-ui.mjs';
 import { realmHeroFlags, realmCorpseViews, createRealmDeath, heroIsDown, deathBlocksKey, markCharactersDead } from './assets/realm-death.mjs';
-import { S_RESURRECT_FORMAT, resurrectLabel, createNpcMenu, hireSkillText, npcMenuChoiceOnRelease, npcMenuInputCoolingDown, npcMenuEntries, withTravelRow, withHireRow, deadHireling, resurrectPacket, talkEntries, menuReturnsAfterSpeech, entriesAfterSpeech, TRAVEL_LEVEL } from './assets/npc-menu.mjs';
+import { S_RESURRECT_FORMAT, resurrectLabel, createNpcMenu, hireSkillText, npcMenuChoiceOnRelease, npcMenuInputCoolingDown, npcMenuEntries, withTravelRow, withHireRow, deadHireling, resurrectPacket, talkEntries, menuReturnsAfterSpeech, entriesAfterSpeech, nextSpeechAfterTopic, TRAVEL_LEVEL } from './assets/npc-menu.mjs';
 import { npcSpeech, npcSpeechByName, talkSpeechId } from './assets/npc-topics.mjs';
 import { createWeatherRenderer } from './assets/weather-renderer.mjs';
 import { weatherWaterAnchors } from './assets/weather-water-anchors.mjs';
@@ -736,6 +736,12 @@ const repairConfirm = createTradeConfirm((id) => repairAtVendor(id),
   (id) => !Module._d2_session_item_needs_repair || Boolean(Module.ccall('d2_session_item_needs_repair', 'number', ['number'], [id >>> 0])), disarmVendorRepair,
   (id) => (npcState?.action === 2 ? gambleAtVendor : buyFromVendor)(id));
 const storeOfferClick = createStoreOfferClick((...a) => (Module._d2_client_store_offer_click ? Module.ccall('d2_client_store_offer_click', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'number'], a) : (a[0] === 0 && a[4] ? 2 : 0)));
+// The stash close button's hit test is the engine's; its layout follows the game's expansion flag
+// (the realm's character flags, else the session's client save flags, CLIENTSAVEFLAG_EXPANSION 0x20).
+const stashCloseHit = (...a) => (Module._d2_client_stash_close_hit ? Module.ccall('d2_client_stash_close_hit', 'number', ['number', 'number', 'number', 'number', 'number', 'number'], a) : 0);
+const stashCloseExpansion = () => (typeof realmFlow?.expansion === 'boolean' ? realmFlow.expansion
+  : !Module._d2_session_client_flags || (Module.ccall('d2_session_client_flags', 'number', [], []) & 0x20) !== 0);
+const stashCloseUnder = (x, y) => stashCloseAt(x, y, canvas.width, canvas.height, stashOpen, stashCloseHit, stashCloseExpansion());
 let stashGoldRenderer = null, stashGoldEvidence = null, stashGoldError = '', stashGoldDialog = null, stashGoldPress = null;
 const stashGoldSpinnerRepeat = createStashSpinnerRepeat();
 // The waypoint menu is open because the engine sent 0x63; waypointMenu holds that waypoint's unit id.
@@ -4428,7 +4434,7 @@ function realmInput() {
     skillOnUnit: Module._d2_realm_client_local_skill_on_unit ? (hand, type, guid) => Module._d2_realm_client_local_skill_on_unit(hand, type, guid) : null,
     refusalSound: Module._d2_realm_client_last_refusal_sound ? () => Module._d2_realm_client_last_refusal_sound() : null,
     onRefused: (event) => { const me = snapshot?.playerId; if (performance.now() - needSkillAt > 3000) { needSkillAt = performance.now(); unitSounds?.play({ unitType: 0, unitId: me, classId: snapshot.player?.renderIdentity?.classId, soundEvent: event }, me); } },   // once per 0x4B ticks (3 s)
-    queueUnit: realmFlow?.protocol?.d2gsClientLocalActOnUnit ?? null, fireUnit: realmFlow?.protocol?.d2gsClientLocalFire ?? null, takeSends: realmFlow?.protocol?.d2gsClientLocalSends ?? null,
+    queueUnit: realmFlow?.protocol?.d2gsClientLocalActOnUnit ?? null, clickPlayer: realmFlow?.protocol?.d2gsClientLocalClickPlayer ?? null, fireUnit: realmFlow?.protocol?.d2gsClientLocalFire ?? null, takeSends: realmFlow?.protocol?.d2gsClientLocalSends ?? null,
     scene: () => {
       const me = selectedPlayerSource();
       if (!realmSceneActive || !realmPlayerView?.active || !realmFlow?.d2gs?.isOpen || me.source === 'none' || !snapshot) return { ready: false };
@@ -6456,6 +6462,11 @@ function dismissSpeech() {
   // which is where a quest message does its work (Akara's A1Q1 reward is granted on message 76).
   // A `silent` speech (an intro/gossip line the engine's list does not hold) is never acked.
   if (npcState.spoken != null && !npcState.silent) { Module.ccall('d2_session_command_npc_response', 'number', ['number', 'number'], [npcState.npcId, npcState.spoken]); npcTopics.set(npcState.npcId, (npcTopics.get(npcState.npcId) || []).filter((m) => m.stringId !== npcState.spoken)); }
+  // Speech-end rule: after a Talk-topic speech the first message other than the one just spoken is spoken; the Talk box returns only when the list holds none.
+  if (npcState.topicSpeech && npcState.spoken != null) {
+    const nextId = nextSpeechAfterTopic(readDialogMessages(), npcState.spoken);
+    if (nextId != null) { npcState = { ...npcState, spoken: nextId, greeting: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [nextId]), silent: false, topicSpeech: false }; syncNpcDialogueVoice(npcState); return true; }
+  }
   // More messages queued (Drognan: the Tainted Sun thanks, then A2Q4's): the next one is shown, the interaction stays open.
   if (npcState.spoken != null && !npcState.silent && npcMsgSkip.npcId === npcState.npcId) { npcMsgSkip.n++; const next = readNpcState(); if (next?.spoken != null) { npcState = next; return true; } }
   // A first speech gives way to the NPC's menu, the interaction still open; otherwise Esc ends it.
@@ -6543,7 +6554,7 @@ function chooseNpcMenu(entry) {
     menuAfterSpeech = menuState;
     npcState = { ...(readNpcState() || { npcId, classId: menuState.classId, items: [], gold: 0 }), npcId, spoken: id,
       greeting: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [id]),
-      silent: !inList.some((m) => m.stringId === id), own: true };
+      silent: !inList.some((m) => m.stringId === id), own: true, topicSpeech: entry.action === 'topic' };
     syncNpcDialogueVoice(npcState);
     return;
   }
@@ -7063,7 +7074,7 @@ canvas.addEventListener('pointerdown', (e) => {
     try { canvas.setPointerCapture(e.pointerId); } catch {}
     render(); canvas.focus(); e.preventDefault(); return;
   }
-  if (e.button === 0 && stashCloseAt(x, y, canvas.width, canvas.height, stashOpen)) {
+  if (e.button === 0 && stashCloseUnder(x, y)) {
     stashClosePress = beginInventoryClosePress(e.pointerId, stashOpen, true);
     try { canvas.setPointerCapture(e.pointerId); } catch {}
     render(); canvas.focus(); e.preventDefault(); return;
@@ -7419,7 +7430,7 @@ globalThis.addEventListener('pointerup', (e) => {
   if (stashClosePress?.pointerId === e.pointerId) {
     const press = stashClosePress; stashClosePress = null;
     const [x, y] = canvasPoint(e);
-    if (finishInventoryClosePress(press, e.pointerId, e.button === 0, stashOpen, stashCloseAt(x, y, canvas.width, canvas.height, stashOpen)).activate)
+    if (finishInventoryClosePress(press, e.pointerId, e.button === 0, stashOpen, stashCloseUnder(x, y)).activate)
       closeStashFromInventory({ stashOpen, commandButton: (button, amount) => commandButton(button, amount), onAccepted: () => { stashOpen = false; inventoryVisible = false; closeStashGold(); } });
     render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
   }

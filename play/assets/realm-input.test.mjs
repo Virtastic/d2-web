@@ -83,26 +83,34 @@ test('left on a monster is the left skill on that unit; on a person, a talk; rig
   assert.equal(h.out[0][0], 1);                                   // a corpse is not a target
 });
 
-test('another player is picked after monsters; a click walks up and interacts, in town or out of it', () => {
+test('another player is picked after monsters; the click and its arrival are the engine\'s, the page sends what it started', () => {
   const other = { guid: 0x01020304, name: 'Bob', x: 101, y: 101, anchorX: 200, anchorY: 120, drawn: true };
   let h = harness({ players: [other], inTown: true });
   assert.deepEqual(h.input.pick(200, 120), { kind: 'player', unit: other });
-  h.input.leftClick(200, 120);
-  assert.deepEqual(h.out, [[0x13, 0, 0, 0, 0, 4, 3, 2, 1]]);
-  h = harness({ players: [other], inTown: false }); h.input.leftClick(200, 120);
-  assert.deepEqual(h.out, [[0x13, 0, 0, 0, 0, 4, 3, 2, 1]]);   // no town test in the client's player click
+  assert.equal(h.input.leftClick(200, 120), false);             // no engine click: nothing is decided here
+  assert.deepEqual(h.out, []);
   h = harness({ players: [{ ...other, drawn: false }], inTown: true });
   assert.equal(h.input.pick(200, 120).kind, 'ground');
   const mon = { guid: 77, classId: 5, mode: 1, x: 101, y: 101, anchorX: 200, anchorY: 120, drawn: true };
   h = harness({ players: [other], monsters: [mon], inTown: true });
   assert.equal(h.input.pick(200, 120).kind, 'monster');
-  // A far player is walked to first and asked on arrival.
-  const far = { ...other, x: 130, y: 100, anchorX: 260, anchorY: 100 };
-  const scene = { players: [far], inTown: true, player: { x: 100, y: 100 } };
-  h = harness(scene); h.input.leftClick(260, 100);
-  assert.equal(h.out.some((p) => p[0] === 0x13), false);
-  scene.player = { x: 128, y: 100 }; h.input.tick();
-  assert.deepEqual(h.out.at(-1), [0x13, 0, 0, 0, 0, 4, 3, 2, 1]);
+  // The engine answers the click: in reach the use (0x13), else the walk (0x02) with the use waiting for a later frame.
+  for (const inTown of [true, false]) {
+    const out = [], calls = []; let sends = [];
+    const input = createRealmInput({ transmit: (b) => out.push(Array.from(b)), scene: sceneOf({ players: [other], inTown }), now: () => 0,
+      clickPlayer: (guid, run) => { calls.push([guid, run]); sends = [{ op: 0x13, type: 0, guid }]; return 1; },
+      takeSends: () => { const s = sends; sends = []; return s; } });
+    assert.deepEqual(input.leftClick(200, 120), { kind: 'player', unit: other });
+    assert.deepEqual(calls, [[0x01020304, false]]);
+    assert.deepEqual(out, [[0x13, 0, 0, 0, 0, 4, 3, 2, 1]]);   // the town is not a test of the client's player click
+  }
+  const out = []; let sends = [];
+  const input = createRealmInput({ transmit: (b) => out.push(Array.from(b)), scene: sceneOf({ players: [other] }), now: () => 0,
+    clickPlayer: (guid) => { sends = [{ op: 0x02, type: 0, guid }]; return 1; }, takeSends: () => { const s = sends; sends = []; return s; } });
+  input.leftClick(200, 120);
+  assert.deepEqual(out, [[0x02, 0, 0, 0, 0, 4, 3, 2, 1]]);
+  sends = [{ op: 0x13, type: 0, guid: other.guid }]; input.tick();   // the engine's arrival started the use
+  assert.deepEqual(out.at(-1), [0x13, 0, 0, 0, 0, 4, 3, 2, 1]);
 });
 
 // The server never echoes the owner's own walk, so the click itself must start the local route -- and, as
