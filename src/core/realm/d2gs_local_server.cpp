@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <cstring>
 #include <emscripten.h>
+#include "../d2game/client_packet_lists.h"
 
 extern "C" {
 int d2_session_client_packet(const uint8_t* bytes, int len);
@@ -48,6 +49,11 @@ int d2_session_client_skills();
 int d2_session_client_rooms(uint8_t* out, int capacity);
 uint32_t d2_session_game_seed();
 int d2_session_game_flags();
+int d2_session_add_client(int slot, int classId, const char* name, void (*sink)(int, const uint8_t*, uint32_t));
+void d2_session_drop_client(int slot);
+int d2_session_client_enter(int slot);
+int d2_session_client_unit_id(int slot);
+int d2_session_client_packet_slot(int slot, const uint8_t* bytes, int len);
 }
 
 namespace {
@@ -71,18 +77,34 @@ struct LocalServer {
     uint8_t out[kOutCapacity];
 };
 LocalServer g_server;
+// Retail applies a client packet in the next server frame, not where it arrives: in-game packets wait here
+// until d2_local_d2gs_drain (the top of each d2_session_tick frame) reads them through 0x2E460.
+d2g_lists::List g_clientList;
+bool g_draining = false;
 
 uint16_t rd16(const uint8_t* p) { return static_cast<uint16_t>(p[0] | (p[1] << 8)); }
 uint32_t rd32(const uint8_t* p) { return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) | (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24); }
 void wr16(uint8_t* p, uint32_t v) { p[0] = static_cast<uint8_t>(v); p[1] = static_cast<uint8_t>(v >> 8); }
 void wr32(uint8_t* p, uint32_t v) { wr16(p, v); wr16(p + 2, v >> 16); }
 
-void put(const uint8_t* bytes, int length) {
+// Further connections to the same game (slots 1..3): each its own client in the game, its own queue.
+constexpr int kSlots = 4;
+LocalServer g_extra[kSlots];
+
+void putTo(LocalServer& s, const uint8_t* bytes, int length) {
     if (length <= 0) return;
-    if (length > kOutCapacity - g_server.outLength) { g_server.outDropped += length; return; }
-    std::memcpy(g_server.out + g_server.outLength, bytes, static_cast<size_t>(length));
-    g_server.outLength += length;
+    if (length > kOutCapacity - s.outLength) { s.outDropped += length; return; }
+    std::memcpy(s.out + s.outLength, bytes, static_cast<size_t>(length));
+    s.outLength += length;
 }
+void put(const uint8_t* bytes, int length) { putTo(g_server, bytes, length); }
+
+// Every packet the game sends a further connection's client, routed by that client (from its logon on: the
+// load part of the join is sent before it is in game).
+void onSlotPacket(int slot, const uint8_t* bytes, uint32_t length) {
+    if (slot >= 1 && slot < kSlots && g_extra[slot].phase != Phase::Closed) putTo(g_extra[slot], bytes, static_cast<int>(length));
+}
+LocalServer* slotServer(int slot) { return slot == 0 ? &g_server : slot > 0 && slot < kSlots ? &g_extra[slot] : nullptr; }
 
 // Every packet the game sends its client while the connection is in game, at the moment it is sent.
 void onGamePacket(const uint8_t* bytes, uint32_t length) {
@@ -159,6 +181,7 @@ extern "C" {
 EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_open() {
     std::memset(&g_server, 0, sizeof g_server);
     if (d2_session_player_id() < 0) return 0;
+    g_clientList.clear();
     g_server.phase = Phase::Greeted;
     g_server.mapSeed = d2_session_game_seed();
     g_server.difficulty = static_cast<uint8_t>(d2_session_game_flags());
@@ -169,7 +192,10 @@ EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_open() {
     return 1;
 }
 
-EMSCRIPTEN_KEEPALIVE void d2_local_d2gs_close() { g_server.phase = Phase::Closed; g_server.outLength = 0; D2WEB_SetPacketSink(nullptr); }
+EMSCRIPTEN_KEEPALIVE void d2_local_d2gs_close() {
+    g_server.phase = Phase::Closed; g_clientList.clear(); g_server.outLength = 0; D2WEB_SetPacketSink(nullptr);
+    for (int s = 1; s < kSlots; ++s) { g_extra[s].phase = Phase::Closed; g_extra[s].outLength = 0; d2_session_drop_client(s); }
+}
 
 // One client packet. Returns 1 when the server took it, 0 when it had no entry for it or the game
 // refused it (see d2_local_d2gs_refused), -1 when the connection is closed.
@@ -206,10 +232,20 @@ EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_client(const uint8_t* bytes, int length) 
         return 1;
     }
     if (g_server.phase != Phase::InGame) { refuse(opcode, -3); return 0; }
-    const int result = dispatch(bytes, length);
-    if (result < 0) { refuse(opcode, result); return 0; }
-    ++g_server.accepted;
+    if (length > d2g_lists::kCapacity || !g_clientList.append(bytes, length)) { refuse(opcode, -2); return 0; }
     return 1;
+}
+
+// The server frame's read of the client packet list (D2Game+0x2E460): every packet that arrived since the last
+// frame is applied now, in arrival order. A packet whose handler runs a nested frame leaves the rest for the next.
+EMSCRIPTEN_KEEPALIVE void d2_local_d2gs_drain() {
+    if (g_draining || g_server.phase == Phase::Closed) return;
+    g_draining = true;
+    d2g_lists::drainFrame(g_clientList, [](const uint8_t* p, int n) {
+        const int result = dispatch(p, n);
+        if (result < 0) refuse(p[0], result); else ++g_server.accepted;
+    });
+    g_draining = false;
 }
 
 // After the game advanced. Everything the game sent, the join's closing "in game" marker included,
@@ -223,5 +259,59 @@ EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_take() { const int n = g_server.outLength
 EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_dropped() { return g_server.outDropped; }
 // {opcode, result} per client packet the server did not take, oldest first.
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_local_d2gs_refused(int32_t* count) { if (count) *count = g_server.refusedCount; return g_server.refused; }
+
+// Several connections to the one local game. Slot 0 is the connection above (the session's own player);
+// slots 1..3 each join the same game as a further player once slot 0 is open. 1 when opened.
+EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_open_client(int slot) {
+    if (slot == 0) return d2_local_d2gs_open();
+    LocalServer* s = slotServer(slot);
+    if (!s || g_server.phase == Phase::Closed || s->phase != Phase::Closed) return 0;
+    std::memset(s, 0, sizeof *s);
+    s->phase = Phase::Greeted;
+    const uint8_t greeting[2] = { 0xAF, 0x00 };
+    putTo(*s, greeting, sizeof greeting);
+    return 1;
+}
+// One client packet on a slot, as d2_local_d2gs_client: the logon makes that client's player in the game,
+// enter-game joins it, and in-game packets go to the game's handlers on that player.
+EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_client_slot(int slot, const uint8_t* bytes, int length) {
+    if (slot == 0) return d2_local_d2gs_client(bytes, length);
+    LocalServer* s = slotServer(slot);
+    if (!s || s->phase == Phase::Closed || !bytes || length <= 0) return -1;
+    const uint8_t opcode = bytes[0];
+    const auto refuseOn = [&](int result) { if (s->refusedCount < kRefusedCapacity) { s->refused[s->refusedCount * 2] = opcode; s->refused[s->refusedCount * 2 + 1] = result; ++s->refusedCount; } return 0; };
+    if (opcode == 0x68) {
+        if (length < 37 || s->phase != Phase::Greeted) return refuseOn(-3);
+        s->classId = bytes[7];
+        std::memcpy(s->name, bytes + 21, 16);
+        s->name[15] = 0;
+        if (!d2_session_add_client(slot, s->classId, s->name, onSlotPacket)) return refuseOn(-3);
+        s->phase = Phase::Loaded;
+        ++s->accepted;
+        return 1;
+    }
+    if (opcode == 0x6B) {
+        if (s->phase != Phase::Loaded || !d2_session_client_enter(slot)) return refuseOn(-3);
+        s->phase = Phase::InGame;
+        ++s->accepted;
+        return 1;
+    }
+    if (opcode == 0x6D) {
+        uint8_t pong[33] = { 0x8F };
+        if (length >= 5) std::memcpy(pong + 1, bytes + 1, 4);
+        putTo(*s, pong, sizeof pong);
+        ++s->accepted;
+        return 1;
+    }
+    if (s->phase != Phase::InGame) return refuseOn(-3);
+    const int result = d2_session_client_packet_slot(slot, bytes, length);
+    if (result != 0) return refuseOn(result < 0 ? result : -2);
+    ++s->accepted;
+    return 1;
+}
+EMSCRIPTEN_KEEPALIVE const uint8_t* d2_local_d2gs_out_slot(int slot) { LocalServer* s = slotServer(slot); return s ? s->out : nullptr; }
+EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_take_slot(int slot) { LocalServer* s = slotServer(slot); if (!s) return 0; const int n = s->outLength; s->outLength = 0; return n; }
+// The unit id of the player a slot plays (-1 before its logon).
+EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_unit_id(int slot) { return slot == 0 ? d2_session_player_id() : d2_session_client_unit_id(slot); }
 
 }  // extern "C"

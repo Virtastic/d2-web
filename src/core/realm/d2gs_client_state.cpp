@@ -39,6 +39,7 @@
 #include "../d2client/inv_weapon_hands.h"
 #include "../d2client/character_screen.h"
 #include "client_refusal_sound.h"
+#include "skill_update_packet.h"
 #include "client_unit_sound.h"
 #include "../d2client/price_line_46230.h"
 #include "../d2client/realm_skill_start.h"
@@ -3282,24 +3283,34 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_predict_right_cast(int x, int y)
     return d2_realm_client_local_skill_at(1, x, y);
 }
 
-static int apply_player_skill_update(const uint8_t* packet, int length) {
-    if (length != 12) return -1;
-    if ((packet[0] == 0x21 && packet[1] != UNIT_PLAYER) || (packet[0] == 0x22 && packet[11])) return 0;
-    const uint32_t guid = uint32_t(packet[3]) | (uint32_t(packet[4]) << 8) |
-        (uint32_t(packet[5]) << 16) | (uint32_t(packet[6]) << 24);
-    const int id = packet[7] | (int(packet[8]) << 8);
-    D2UnitStrc* unit = nullptr;
-    for (auto& player : g_players) if (player.view.guid == guid) { unit = player.motionUnit; break; }
-    if (!unit) return 0;
-    if (packet[0] == 0x21) {
-        if (!DATATBLS_GetSkillsTxtRecord(id)) return 0;
-        SKILLS_AssignSkill(unit, id, packet[9], packet[2], __FILE__, __LINE__);
-    } else {
-        auto* skill = SKILLS_GetSkillById(unit, id, -1);
-        if (!skill) return 0;
-        SKILLS_SetQuantity(skill, packet[9]);
+struct SkillUpdateOps {
+    D2UnitStrc* resolveUnit(uint8_t type, uint32_t guid) const {
+        if (type == UNIT_MONSTER) {
+            for (auto& monster : g_monsters)
+                if (monster.view.guid == guid) return create_monster_motion(monster) ? monster.motionUnit : nullptr;
+            return nullptr;
+        }
+        if (type == UNIT_PLAYER) {
+            for (auto& player : g_players) if (player.view.guid == guid) return player.motionUnit;
+            return nullptr;
+        }
+        return find_realm_client_unit(type, guid);
     }
-    return 1;
+    bool knownSkill(int id) const { return DATATBLS_GetSkillsTxtRecord(id) != nullptr; }
+    void assign(D2UnitStrc* unit, int id, uint8_t level, uint8_t flags) const {
+        SKILLS_AssignSkill(unit, id, level, flags, __FILE__, __LINE__);
+    }
+    bool setQuantity(D2UnitStrc* unit, int id, uint8_t quantity) const {
+        auto* skill = SKILLS_GetSkillById(unit, id, -1);
+        if (!skill) return false;
+        SKILLS_SetQuantity(skill, quantity);
+        return true;
+    }
+};
+
+static int apply_player_skill_update(const uint8_t* packet, int length) {
+    SkillUpdateOps ops;
+    return d2::realm::applySkillUpdatePacket(packet, length, ops);
 }
 
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_skill_value(uint32_t guid, int id, int quantity) {

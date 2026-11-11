@@ -3,6 +3,7 @@
 // act/state/room accessors preserve their retail struct mutations; socket and packet calls remain
 // no-ops. Regenerate when a subsystem needs another real client-side behavior.
 #include <GAME/Level.h>
+#include <MONSTER/Monster.h>
 #include <GAME/Arena.h>
 #include <D2Common.h>
 #include <D2BitManip.h>
@@ -36,6 +37,7 @@
 #include <Units/Units.h>
 #include <PLAYER/PlayerList.h>
 #include <PLAYER/PlrMsg.h>
+#include <AI/AiGeneral.h>
 #include <cstring>
 
 // Every packet the headless server queues for the session client, in order, so a retail
@@ -48,6 +50,17 @@ static uint32_t g_d2webPacketStreamPackets = 0;
 // them all in emission order whatever resets or fills the bounded stream above. Unset by default.
 static void (*g_d2webPacketSink)(const uint8_t*, uint32_t) = nullptr;
 extern "C" void D2WEB_SetPacketSink(void (*sink)(const uint8_t*, uint32_t)) { g_d2webPacketSink = sink; }
+// Further clients in the same game (a second realm connection): retail's send takes the client, so a
+// packet addressed to one of these goes to that connection's receiver alone. The session's own client
+// (the one above) is never routed here and keeps every observation below.
+constexpr int kD2webRoutedClients = 4;
+static D2ClientStrc* g_d2webRoutedClient[kD2webRoutedClients] = {};
+static void (*g_d2webRoutedSink)(int, const uint8_t*, uint32_t) = nullptr;
+extern "C" void D2WEB_RouteClient(int slot, D2ClientStrc* pClient, void (*sink)(int, const uint8_t*, uint32_t)) {
+    if (slot < 0 || slot >= kD2webRoutedClients) return;
+    g_d2webRoutedClient[slot] = pClient;
+    if (sink) g_d2webRoutedSink = sink;
+}
 // Retail server->client 0x61 is "play movie <index>": payload byte 1 selects one of D2Client's own
 // film-name templates (id 1 d2intro%s.bik, 2 ACT02START, 3 ACT03START, 4 ACT04START, 5 ACT04END,
 // 6 D2X_INTRO, 7 D2X_OUT). The server records every 0x61 into this bounded queue -- the same
@@ -250,7 +263,9 @@ static bool joinWalkReveals(D2ActiveRoomStrc* pWalkRoom, D2ActiveRoomStrc* pOwnR
 void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
     // Recorded sessions (s39xx) run retail's LEVEL_AddClient/RemoveClient; the s08 aitrace fixture's capture hangs
     // the client with DUNGEON_AddClientToRoom and wakes monsters itself, so a second AI-event arm there fires early.
-    const bool lvl = g_sessionClientStaysInRoom;
+    // The local realm's joining client takes the same path: LEVEL_AddClient wakes a room's first-client monsters and
+    // sends the room's units in the room's order, as in the retail join (so this else branch needs no copy of either).
+    const bool lvl = g_sessionClientStaysInRoom || g_sessionJoinUnits;
     if (!pClient || !pClient->pGame || pClient->pRoom == pRoom) return;
     DUNGEON_ChangeClientRoom(pClient->pRoom, pRoom);
     D2Common_10077(pClient->pRoom, pRoom);
@@ -273,13 +288,6 @@ void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
                     D2GAME_PACKETS_SendPacket0x07_6FC3D120(pClient, (uint8_t)DUNGEON_GetLevelIdFromRoom(nextRooms[i]), (uint16_t)coords.nTileXPos, (uint16_t)coords.nTileYPos);
                 }
                 DUNGEON_AddClientToRoom(nextRooms[i], pClient);
-                // The local game's client learns every unit of a room it enters but its own player, in the room's unit
-                // order (retail's LEVEL_AddClient unit loop: objects, items, missiles and players as well as monsters).
-                if (g_sessionJoinUnits) {
-                    D2UnitStrc* pOwn = CLIENTS_GetPlayerFromClient(pClient, 0);
-                    for (D2UnitStrc* u = nextRooms[i]->pUnitFirst; u; u = u->pRoomNext)
-                        if (u != pOwn) D2GAME_SUNITMSG_FirstFn_6FCC5520(pClient->pGame, u, pClient);
-                }
             }
         }
     }
@@ -394,6 +402,27 @@ void __fastcall sub_6FC33670(D2GameStrc* pGame, D2ClientStrc* pClient) {
         // only its room's delete list behind, and this 0x0A is the one packet that takes it off the client.
         LEVEL_RemoveUnitsExceptClientPlayer(clientRoom, pClient);
         LEVEL_UpdateUnitsInAdjacentRooms(pGame, clientRoom, pClient);
+    }
+    // Rooms that stream into the client room's adjacent list after the join (the activation wave) are entered by the
+    // client without a room change, so sub_6FC33020 never saw them; the local game's client learns their units here,
+    // as sub_6FC33020 tells it a room it enters (every unit but its own player, in the room's unit order).
+    // Unit-only: retail's per-room send for such rooms is unresolved (the room-alloc act callback).
+    if (g_sessionJoinUnits && !g_sessionClientStaysInRoom && clientRoom) {
+        D2ActiveRoomStrc** adj = nullptr; int32_t adjCount = 0;
+        DUNGEON_GetAdjacentRoomsListFromRoom(clientRoom, &adj, &adjCount);
+        for (int32_t i = 0; i < adjCount; ++i) {
+            D2ActiveRoomStrc* r = adj[i];
+            int32_t k = 0; while (k < r->nNumClients && r->ppClients[k] != pClient) ++k;
+            if (k < r->nNumClients) continue;
+            if (g_d2webPacketSink) {
+                D2DrlgCoordsStrc coords = {};
+                DUNGEON_GetRoomCoordinates(r, &coords);
+                D2GAME_PACKETS_SendPacket0x07_6FC3D120(pClient, (uint8_t)DUNGEON_GetLevelIdFromRoom(r), (uint16_t)coords.nTileXPos, (uint16_t)coords.nTileYPos);
+            }
+            DUNGEON_AddClientToRoom(r, pClient);
+            for (D2UnitStrc* u = r->pUnitFirst; u; u = u->pRoomNext)
+                if (u != player) D2GAME_SUNITMSG_FirstFn_6FCC5520(pGame, u, pClient);
+        }
     }
     // One-client path: the changed-stat walk runs every frame, as retail's does; each changed stat is sent once (the
     // per-unit flush that follows frees the changed list).
@@ -511,6 +540,14 @@ void D2GAME_PACKETS_SendPacket0x1D_E_F_6FC3D480(D2ClientStrc* pClient, uint16_t 
     else if (nValue >= 0xFFu) { p[0] = 0x1E; std::memcpy(p + 2, &nValue, 2); n = 4; }
     else p[2] = (uint8_t)nValue;
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, p, (int32_t)n);
+}
+// 1.13c D2Game+0x8A980 (SCmd.cpp 0x7B): one hotkey slot, {header, slot, skill (low 12 bits) with the hand in bit 15, item guid}, 8 bytes.
+void __fastcall D2GAME_PACKETS_SendPacket0x7B_6FC3F720(D2ClientStrc* pClient, BYTE slot, int16_t nSkill, int32_t nHand, int32_t nItemGUID) {
+    uint8_t packet[8] = { 0x7B, slot };
+    const uint16_t word = (uint16_t)((nSkill & 0xFFF) | (nHand ? 0x8000 : 0));
+    std::memcpy(packet + 2, &word, 2);
+    std::memcpy(packet + 4, &nItemGUID, 4);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, packet, sizeof packet);
 }
 // 1.13c D2Game+0x8D5F0: a unit's skill level, {0x21, type, remove, guid, skill, level, bonus level, residue}, 12 bytes.
 // Without a client the sender is the player's own (retail resolves it from the player data; there is no minion fallback).
@@ -632,7 +669,7 @@ static uint8_t d2webPathTail(D2UnitStrc* pMonster, uint8_t* pathType, int16_t* v
     *maxDist = PATH_GetMaxDistance(pMonster->pDynamicPath);
     return 0;
 }
-static void d2webSend67(D2ClientStrc* pClient, uint8_t nHeader, int32_t guid, int8_t msg, int16_t x, int16_t y, int8_t life, int8_t hit, bool full) {
+static void d2webSend67(D2ClientStrc* pClient, uint8_t nHeader, int32_t guid, int8_t msg, int16_t x, int16_t y, int8_t life, int8_t hit, bool full, int8_t lifeByte = 0) {
     D2UnitStrc* pMonster = SUNIT_GetServerUnit(CLIENTS_GetGame(pClient), UNIT_MONSTER, guid);
     if (!pMonster) return;
     uint8_t path, maxDist; int16_t vel; d2webPathTail(pMonster, &path, &vel, &maxDist);
@@ -642,6 +679,7 @@ static void d2webSend67(D2ClientStrc* pClient, uint8_t nHeader, int32_t guid, in
     }
     uint8_t b[16] = {}; b[0] = nHeader; std::memcpy(b + 1, &guid, 4); b[5] = (uint8_t)msg; std::memcpy(b + 6, &x, 2); std::memcpy(b + 8, &y, 2);
     b[10] = (uint8_t)life; b[11] = full ? (uint8_t)hit : 0; b[12] = path; std::memcpy(b + 13, &vel, 2); b[15] = maxDist;
+    if (full) b[15] = (uint8_t)lifeByte;   // 0x8D860 writes its life argument here (a knockback's 0x67 ends with the monster's life byte)
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, sizeof b);
 }
 static void d2webSend68(D2ClientStrc* pClient, int32_t guid, int8_t msg, int8_t tType, int32_t tGuid, int8_t life, int8_t hit, int8_t maxDistArg, bool full) {
@@ -660,7 +698,7 @@ void D2GAME_PACKETS_SendPacket0x67_6FC3CBC0(D2ClientStrc* pClient, uint8_t nHead
     d2webSend67(pClient, nHeader, nUnitGUID, a4, nX, nY, a7, 0, false);
 }
 void D2GAME_PACKETS_SendPacket0x67_6FC3CDE0(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int16_t nX, int16_t nY, int8_t a7, int8_t a8, int8_t a9) {
-    (void)a8; d2webSend67(pClient, nHeader, nUnitGUID, a4, nX, nY, a7, a9, true);
+    d2webSend67(pClient, nHeader, nUnitGUID, a4, nX, nY, a7, a9, true, a8);
 }
 void D2GAME_PACKETS_SendPacket0x68_6FC3CA90(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int8_t a5, int32_t a6, int8_t a7) {
     (void)nHeader; d2webSend68(pClient, nUnitGUID, a4, a5, a6, a7, 0, 0, false);
@@ -807,6 +845,12 @@ void D2GAME_PACKETS_SendPacket0xAB_6FC3D7B0(D2ClientStrc* pClient, uint8_t nUnit
 }
 void D2GAME_PACKETS_SendPacketSize06_6FC3C850(D2ClientStrc* pClient, DWORD nHeader, DWORD dwUnitType, DWORD dwUnitId) {}
 void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, int32_t nPacketSize) {
+    if (pClient && pPacket && nPacketSize > 0)
+        for (int slot = 0; slot < kD2webRoutedClients; ++slot)
+            if (g_d2webRoutedClient[slot] == pClient) {
+                if (g_d2webRoutedSink) g_d2webRoutedSink(slot, static_cast<const uint8_t*>(pPacket), (uint32_t)nPacketSize);
+                return;
+            }
     // The headless client has no socket, but packet 0x27 is the recovered durable boundary
     // between quest callbacks and the client dialogue menu. Preserve its exact fixed-width
     // payload for pointer-free session observation; all other network sends remain no-ops.
@@ -1111,7 +1155,14 @@ void sub_6FC3F060(D2ClientStrc* pClient, uint8_t a2, int32_t a3, uint16_t a4, ui
     memcpy(b + 11, &a4, 2); memcpy(b + 13, &a5, 2); memcpy(b + 15, &a7, 2);
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, sizeof b);
 }
-void sub_6FC3F0C0(D2ClientStrc* pClient, uint8_t a2, int32_t a3, uint8_t nUnitType, int32_t nUnitGUID, uint16_t a6, uint16_t a7, uint8_t a8, int32_t a9) {}
+// Packet 0x4C, a unit's skill on a target unit (size 0x10): unit type, unit id, skill, skill level, target type,
+// target id, then the trailing word.
+void sub_6FC3F0C0(D2ClientStrc* pClient, uint8_t a2, int32_t a3, uint8_t nUnitType, int32_t nUnitGUID, uint16_t a6, uint16_t a7, uint8_t a8, int32_t a9) {
+    uint8_t b[16] = {0x4C, a2};
+    memcpy(b + 2, &a3, 4); memcpy(b + 6, &a6, 2); b[8] = a8; b[9] = nUnitType;
+    memcpy(b + 10, &nUnitGUID, 4); memcpy(b + 14, &a7, 2);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, sizeof b);
+}
 void sub_6FC3F340(D2ClientStrc* pClient, BYTE nHeader, BYTE nUnitType, int32_t nUnitId, int32_t a5) {}
 void sub_6FC3F3F0(D2ClientStrc* pClient, D2GSPacketSrv2C* pPacket) { D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof *pPacket); }
 // 0x60: a town portal's flags and destination level.
@@ -1131,6 +1182,32 @@ void sub_6FC3FAF0(D2ClientStrc* pClient, uint32_t a2, uint16_t a3) {
 void GAME_LogMessage(int32_t, const char*, ...) {}
 // Classic end-of-game after Diablo's death (A4Q2 timer); the session never ends a game this way.
 void __fastcall sub_6FC37FB0(D2GameStrc*, D2ClientStrc*) {}
-// D2Game+0xDF80: tells one client about another player (join packet and pets). The headless session has one
-// client, so the caller (which skips the joining client itself) never reaches it.
-void __fastcall sub_6FC3DF80(D2ClientStrc*, D2UnitStrc*, D2ClientStrc*) {}
+// 1.13c D2Game+0x8E170 (1.10f 0x6FC3DF80): 0x5B, one player's join record to a client -- unit id, class, name,
+// level, party id (0xFFFF unless the unit is a player in a party), then the described client's guild flags,
+// tag and name, the length patched in at +1. Retail then sends the player's pets (0x96920); a joining
+// character here has none, so that tail is not reached.
+void __fastcall sub_6FC3DF80(D2ClientStrc* pClient1, D2UnitStrc* pPlayer, D2ClientStrc* pClient2) {
+    if (!pClient1) return;
+    uint8_t pkt[0x122] = {};
+    pkt[0] = 0x5B;
+    const uint32_t id = pPlayer ? pPlayer->dwUnitId : 0xFFFFFFFFu;
+    std::memcpy(pkt + 3, &id, 4);
+    pkt[7] = pPlayer ? (uint8_t)pPlayer->dwClassId : 0xFF;
+    if (pPlayer && pPlayer->dwUnitType == UNIT_PLAYER && UNITS_GetPlayerData(pPlayer))
+        std::memcpy(pkt + 8, UNITS_GetPlayerData(pPlayer)->szName, 15);
+    uint16_t w = (uint16_t)STATLIST_UnitGetStatValue(pPlayer, STAT_LEVEL, 0);
+    std::memcpy(pkt + 0x18, &w, 2);
+    w = pPlayer && pPlayer->dwUnitType == UNIT_PLAYER ? (uint16_t)SUNIT_GetPartyId(pPlayer) : 0xFFFF;
+    std::memcpy(pkt + 0x1A, &w, 2);
+    const D2GuildInformationStrc* guild = pClient2 ? &pClient2->tGuildInfo : nullptr;
+    w = guild ? (uint16_t)guild->nGuildFlags : 0;
+    std::memcpy(pkt + 0x20, &w, 2);
+    const uint32_t tag = guild ? guild->szGuildTag : 0;
+    std::memcpy(pkt + 0x22, &tag, 4);
+    const size_t l1 = strnlen(reinterpret_cast<const char*>(pkt + 0x22), 4);
+    const size_t l2 = guild ? strnlen(guild->szGuildName, sizeof guild->szGuildName - 1) : 0;
+    if (l2) std::memcpy(pkt + 0x23 + l1, guild->szGuildName, l2);
+    const uint16_t len = (uint16_t)(l2 + l1 + 0x24);
+    std::memcpy(pkt + 1, &len, 2);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient1, pkt, len);
+}
