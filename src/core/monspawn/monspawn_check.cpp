@@ -2188,7 +2188,9 @@ static D2VecAiTargetUnit captureAiTarget(const D2UnitStrc* u, uint16_t room, uin
     return a;
 }
 
+static void sessionDropExtraClients();
 static void detachTargetFixture() {
+    sessionDropExtraClients();
     g_heldFor = nullptr;   // a retail recording: the held-monster set belongs to one hero
     // The unit stays in the world; its client does not, so nothing sent to every player
     // (0x81 pet assignments iterate the living players) reaches freed memory.
@@ -2582,6 +2584,12 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_spawned() {
 EMSCRIPTEN_KEEPALIVE int d2_session_client_skills() {
     if (!g_targetClient || !g_targetPlayer || !g_targetPlayer->pSkills) return 0;
     D2GAME_8B5A0_SendSkills(g_targetClient, g_targetPlayer);
+    // The hotkey slots (0x7B), the loop retail's ClientAddPlayerToGame runs before the selected skills (D2Game+0x4BE4B).
+    for (int i = 0; i < 16; ++i) {
+        const D2ClientKeySkillStrc& key = g_targetClient->HotkeySkills[i];
+        if (key.nSkill >= 0 && key.nSkill < sgptDataTables->nSkillsTxtRecordCount)
+            D2GAME_PACKETS_SendPacket0x7B_6FC3F720(g_targetClient, (BYTE)i, key.nSkill, (uint8_t)key.nHand, (int32_t)key.nItemGUID);
+    }
     for (int left = 1; left >= 0; --left) {
         D2SkillStrc* s = left ? UNITS_GetLeftSkill(g_targetPlayer) : UNITS_GetRightSkill(g_targetPlayer);
         if (s) D2GAME_PACKETS_SendPacket0x23_6FC3DC60(g_targetClient, UNIT_PLAYER, g_targetPlayer->dwUnitId, (uint8_t)left,
@@ -2718,6 +2726,119 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
         MONSTER_UpdateAiCallbackEvent(g_game, u);
     }
     g_targetPlayer = player; g_targetMonster = anchor; g_targetRoom = room; return 1;
+}
+
+// A further client joining the session's game (a second realm connection, slot 1..3): its own player unit
+// beside the session player and its own D2ClientStrc, whose packets the send routes to that connection by
+// pClient (D2WEB_RouteClient). The session player and its globals are untouched.
+extern "C" void D2WEB_RouteClient(int slot, D2ClientStrc* pClient, void (*sink)(int, const uint8_t*, uint32_t));
+struct SessionExtraClient { D2ClientStrc* client; D2UnitStrc* player; D2ActiveRoomStrc* room; };
+static SessionExtraClient g_sessionExtraClients[4];
+// With the session's own client (detachTargetFixture): the units stay, their clients and routes go. The room
+// rosters that held them are cleared there with the session client's.
+static void sessionDropExtraClient(int slot) {
+    {
+        SessionExtraClient& e = g_sessionExtraClients[slot];
+        if (!e.client) return;
+        D2WEB_RouteClient(slot, nullptr, nullptr);
+        // Every room of every loaded act that lists the client (e.room may already be freed, so it is not read).
+        for (int a = 0; g_game && a < 5; ++a)
+            for (D2ActiveRoomStrc* r = g_game->pAct[a] ? g_game->pAct[a]->pRoom : nullptr; r; r = r->pRoomNext)
+                for (int32_t k = 0; k < r->nNumClients; ++k)
+                    if (r->ppClients[k] == e.client) { DUNGEON_RemoveClientFromRoom(r, e.client); break; }
+        if (e.player && UNITS_GetPlayerData(e.player)) UNITS_GetPlayerData(e.player)->pClient = nullptr;
+        free(e.client);
+        e = {};
+    }
+}
+static void sessionDropExtraClients() { for (int slot = 1; slot < 4; ++slot) sessionDropExtraClient(slot); }
+// A closed connection: its client and route go, so the slot can log on again (the player unit stays in the world).
+EMSCRIPTEN_KEEPALIVE void d2_session_drop_client(int slot) { if (slot >= 1 && slot < 4) sessionDropExtraClient(slot); }
+static SessionExtraClient* sessionExtraClient(int slot) {
+    return slot >= 1 && slot < 4 && g_sessionExtraClients[slot].client && g_game ? &g_sessionExtraClients[slot] : nullptr;
+}
+// The game logon (0x68): the player is made beside the session player and the client is sent the load part of
+// the join (game flags, the two load markers), as attachSessionPlayerAt sends the session client.
+EMSCRIPTEN_KEEPALIVE int d2_session_add_client(int slot, int classId, const char* name, void (*sink)(int, const uint8_t*, uint32_t)) {
+    if (slot < 1 || slot >= 4 || g_sessionExtraClients[slot].client || !g_sessionLive || !g_game || !g_targetPlayer ||
+        !g_targetPlayer->pDynamicPath || classId < 0 || classId >= 7) return 0;
+    D2ActiveRoomStrc* home = UNITS_GetRoom(g_targetPlayer);
+    const int px = g_targetPlayer->pDynamicPath->tGameCoords.wPosX, py = g_targetPlayer->pDynamicPath->tGameCoords.wPosY;
+    D2ActiveRoomStrc* room = nullptr; int x = 0, y = 0;
+    for (int radius = 2; radius <= 8 && !room; radius++) for (int dy = -radius; dy <= radius && !room; dy++) for (int dx = -radius; dx <= radius && !room; dx++) {
+        if (abs(dx) != radius && abs(dy) != radius) continue;
+        D2ActiveRoomStrc* r = COLLISION_GetRoomBySubTileCoordinates(home, px + dx, py + dy);
+        if (r && !COLLISION_CheckMaskWithSize(r, px + dx, py + dy, 2, 0xFFFF)) { room = r; x = px + dx; y = py + dy; }
+    }
+    if (!room) return 0;
+    D2UnitStrc* player = SUNIT_AllocUnitData(UNIT_PLAYER, classId, x, y, g_game, room, 1, PLRMODE_NEUTRAL, 0);
+    if (!player) return 0;
+    if (g_sessionSeedPlayer) SUNIT_InitSeed(player, &g_game->pGameSeed);
+    STATLIST_SetUnitStat(player, STAT_HITPOINTS, 50 << 8, 0); STATLIST_SetUnitStat(player, STAT_MAXHP, 50 << 8, 0);
+    STATLIST_SetUnitStat(player, STAT_LEVEL, 1, 0); STATLIST_SetUnitStat(player, STAT_ATTACKRATE, 100, 0);
+    STATLIST_SetUnitStat(player, STAT_VELOCITYPERCENT, 100, 0); STATLIST_SetUnitStat(player, STAT_OTHER_ANIMRATE, 100, 0);
+    D2ClientStrc* client = (D2ClientStrc*)calloc(1, sizeof(D2ClientStrc));
+    if (!client) return 0;
+    client->pGame = g_game; client->pPlayer = player;
+    client->dwUnitType = UNIT_PLAYER; client->dwUnitGUID = player->dwUnitId;
+    client->nAct = (uint8_t)g_currentAct; client->nClassId = (uint8_t)classId;
+    CLIENTS_SetFlags(client, (int32_t)g_sessionClientSaveFlags);
+    if (name) { strncpy(client->szName, name, sizeof client->szName - 1); strncpy(UNITS_GetPlayerData(player)->szName, name, 15); }
+    for (int hk = 0; hk < 16; hk++) { client->HotkeySkills[hk].nSkill = (int16_t)-1; client->HotkeySkills[hk].nItemGUID = (uint32_t)-1; }
+    UNITS_GetPlayerData(player)->pClient = client;
+    g_sessionExtraClients[slot] = { client, player, room };
+    D2WEB_RouteClient(slot, client, sink);
+    D2GAME_PACKETS_SendPacket0x01_6FC3C7C0(client, 1, g_game);
+    D2GAME_PACKETS_SendHeaderOnlyPacket(client, 0x00);
+    D2GAME_PACKETS_SendHeaderOnlyPacket(client, 0x02);
+    return 1;
+}
+// Enter game (0x6B): the client's own unit, the act, its room and position, the join walk over the adjacent
+// rooms (which puts the client in their client lists, so the room's sends reach it), its stats, then the
+// 0x5B player records both ways with every other player in the game (retail 0x6FC369C0's loop) and its own.
+EMSCRIPTEN_KEEPALIVE int d2_session_client_enter(int slot) {
+    SessionExtraClient* e = sessionExtraClient(slot);
+    if (!e) return 0;
+    D2ClientStrc* client = e->client; D2UnitStrc* player = e->player; D2ActiveRoomStrc* room = e->room;
+    sub_6FC3D1F0(client, player->dwUnitId, (uint8_t)player->dwClassId, client->szName, (int16_t)CLIENTS_GetUnitX(player), (int16_t)CLIENTS_GetUnitY(player));
+    D2GAME_SendPacket0x0B_ClientUnit(client, player);
+    LEVEL_SynchronizeDayNightCycleWithClient(g_game, client);
+    D2DrlgCoordsStrc joinRoom = {};
+    DUNGEON_GetRoomCoordinates(room, &joinRoom);
+    D2GAME_PACKETS_SendPacket0x07_6FC3D120(client, DUNGEON_GetLevelIdFromRoom(room), (uint16_t)joinRoom.nTileXPos, (uint16_t)joinRoom.nTileYPos);
+    D2GAME_PACKETS_SendPacket0x15_6FC3D0D0(client, 0x15u, 0, player->dwUnitId, CLIENTS_GetUnitX(player), CLIENTS_GetUnitY(player), 1);
+    sub_6FC33020(client, room);
+    D2Common_10513(player, player, (void(__fastcall*)(D2UnitStrc*, int32_t, int32_t, D2UnitStrc*))D2GAME_UpdateAttribute_6FC822D0);
+    sub_6FC82360(player, player, 1);
+    LEVEL_UpdateUnitsInAdjacentRooms(g_game, room, client);
+    const auto meet = [&](D2ClientStrc* other, D2UnitStrc* otherPlayer) {
+        if (!other || !otherPlayer || other == client) return;
+        sub_6FC3DF80(client, otherPlayer, other);
+        sub_6FC3DF80(other, player, client);
+    };
+    meet(g_targetClient, g_targetPlayer);
+    for (int s = 1; s < 4; ++s) if (s != slot && sessionExtraClient(s)) meet(g_sessionExtraClients[s].client, g_sessionExtraClients[s].player);
+    sub_6FC3DF80(client, player, client);
+    return 1;
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_client_unit_id(int slot) {
+    const SessionExtraClient* e = sessionExtraClient(slot);
+    return e ? (int)e->player->dwUnitId : -1;
+}
+// One in-game packet from that client, through retail's own handler on its own player. -1 for a header
+// no handler is wired for.
+EMSCRIPTEN_KEEPALIVE int d2_session_client_packet_slot(int slot, const uint8_t* bytes, int len) {
+    SessionExtraClient* e = sessionExtraClient(slot);
+    if (!e || !bytes || len <= 0 || len > 512) return -1;
+    std::vector<uint8_t> packet(bytes, bytes + len);
+    int32_t (__fastcall* handler)(D2GameStrc*, D2UnitStrc*, void*, int32_t) = nullptr;
+    switch (packet[0]) {
+    case 0x01: if (len != 5) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x01_Walk_6FC82CB0; break;
+    case 0x03: if (len != 5) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x03_Run_6FC83090; break;
+    case 0x0C: if (len != 5) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x0C_RightSkill_6FC83EF0; break;
+    default: return -1;
+    }
+    return handler(g_game, e->player, packet.data(), len);
 }
 
 // d2_aitarget_attach_at: the capture's D2CAPTURE_AI_PLAYER_AT -- the fixture stands at (x,y), or the
@@ -7818,6 +7939,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_pickup(uint32_t itemUnitId) {
     g_sessionClientPickup = itemUnitId;
     return 2;
 }
+extern "C" __attribute__((weak)) void d2_local_d2gs_drain();
 EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath || frames < 0) return 0;
     // a retail recording: server->client packets a tick queues (NPC quest-marker 0x8A) are the tick's own stream.
@@ -7828,6 +7950,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     struct StreamRefresh { ~StreamRefresh() { D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets); } } streamRefresh;
     g_sessionIdleRowsReady.swap(g_sessionIdleRows); g_sessionIdleRows.clear();   // a row drawn at a frame's end is the next tick's sound
     for (int i = 0; i < frames; ++i) {
+        if (d2_local_d2gs_drain) d2_local_d2gs_drain();   // 1.13c D2Game+0x2E460: the frame starts by applying the client packets that arrived
         sessionClientPickupStep();
         if (g_pendingRightSkill.set && !sessionPlayerInActionMode()) { const PendingRightSkill q = g_pendingRightSkill; g_pendingRightSkill.set = false; sessionCommandRightSkillAt(q.x, q.y, false); }
         // the client sees the previous frame's server state (a death this frame reaches it by packet next tick)
@@ -7925,6 +8048,9 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             }
         }
         sub_6FC33670(g_game, g_targetClient);
+        // Retail runs the per-client update for every client in the game's list, before the queued-unit flush
+        // clears the rooms' update chains: a second connection's client sees the other players' mode changes.
+        for (int s = 1; s < 4; ++s) if (g_sessionExtraClients[s].client) sub_6FC33670(g_game, g_sessionExtraClients[s].client);
         D2GAME_UpdateSpawnedClient(g_game, g_targetClient);   // for the local game's join: the "in game" marker, where retail's client update sends it
         // The per-client vitals update (1.13c D2Game+0x2BE20, which calls 0xCC030), run by retail's client flush every
         // frame: forced once 20 frames have passed without one (10 when other packets are already queued).

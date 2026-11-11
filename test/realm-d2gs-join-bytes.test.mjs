@@ -38,3 +38,22 @@ test('retail join: one a8 per join (server-entry-bnet)', () => {
   const a8 = 'a800010000000b69acfc0f';
   assert.equal(stream.split(a8).length - 1, 1);
 });
+
+test('closing the local server drops every extra slot client and its route, so a slot can log on again', () => {
+  const src = readFileSync(resolve('src/core/realm/d2gs_local_server.cpp'), 'utf8');
+  const at = src.indexOf('void d2_local_d2gs_close');
+  const body = src.slice(at, src.indexOf('\n}', at));
+  assert.match(body, /d2_session_drop_client\(s\)/);
+  const mon = readFileSync(resolve('src/core/monspawn/monspawn_check.cpp'), 'utf8');
+  const drop = mon.slice(mon.indexOf('static void sessionDropExtraClient(int slot)'), mon.indexOf('static void sessionDropExtraClients() {'));
+  assert.match(drop, /D2WEB_RouteClient\(slot, nullptr, nullptr\)/);
+  assert.match(drop, /free\(e\.client\)/);
+});
+
+test('a dropped extra client is removed from every room of every act, not only the adjacent rooms', () => {
+  const mon = readFileSync(resolve('src/core/monspawn/monspawn_check.cpp'), 'utf8');
+  const drop = mon.slice(mon.indexOf('static void sessionDropExtraClient(int slot)'), mon.indexOf('static void sessionDropExtraClients() {'));
+  assert.match(drop, /pRoomNext/);
+  assert.ok(!/GetAdjacentRoomsListFromRoom/.test(drop));
+  assert.ok(!/e\.room/.test(drop.replace(/\/\/.*$/gm, '')), 'e.room may be freed');
+});
