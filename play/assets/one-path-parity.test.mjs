@@ -57,10 +57,9 @@ export function diffField(a, b) {
   return { differing, total: new Set([...left, ...right]).size };
 }
 
-// What the server sends on a tick reaches the client after that tick's step (the reader takes it on a promise hop), so the
-// client applies it on its next frame: a field the client only learns from packets is read one frame later. The hero is
-// walked by the client itself on the frame its input lands, so it is not.
-export const PACKET_LAG = { monsters: 1 };
+// What the server sends on a tick is flushed and dispatched to the client before the client's frame for that tick, as
+// single player's loop does, so no field is read later than the engine's own (a lagged field is compared at t + n).
+export const PACKET_LAG = {};
 
 /** Two runs (arrays of per-tick field maps) to { field: { differing, total } }. A missing tick differs in full; a field
  *  lagged by n compares the second run's tick t + n, and the second run then holds n frames more. */
@@ -99,7 +98,7 @@ export const PLAY_SCRIPT = `async (shell, script) => {
   const at = window.__d2?.session?.snapshot?.()?.tick ?? shell.snapshot?.tick, out = [];   // the game's own tick: a frame read from packets counts the client's frames, which start later than the local game it joined
   if (at > ${START_TICK}) throw new Error('the game was at tick ' + at + ' before the script began, past its start tick ${START_TICK}');
   for (let n = ${START_TICK} - at; n > 0; n--) { shell.step(); await settle(); }
-  for (let t = 0; t < script.ticks + (shell.fromPackets ? Math.max(...Object.values(${JSON.stringify(PACKET_LAG)})) : 0); t++) {
+  for (let t = 0; t < script.ticks + (shell.fromPackets ? Math.max(0, ...Object.values(${JSON.stringify(PACKET_LAG)})) : 0); t++) {
     // The hand's skill is chosen through the page's own command: the engine at once, or the 0x3C packet whose 0x23 answer the client reads back.
     for (const c of script.selects ?? []) if (c.tick === t) shell.selectSkill?.(c.skill, c.left ? 'left' : 'right');
     for (const c of script.clicks) if (c.tick === t) shell.input.pointer(c.x, c.y, c.button);
@@ -158,7 +157,7 @@ test('the script starts on the same game tick however far the page had run befor
     return new Function('window', `return (${PLAY_SCRIPT})(window.__d2Shell, ${JSON.stringify(SCRIPT)})`)({ __d2Shell: shell });
   };
   // It plays the lag's frames more (PACKET_LAG), for a lagged field to be read on the frame it lands; the frames before them are the direct run's.
-  const lag = Math.max(...Object.values(PACKET_LAG));
+  const lag = Math.max(0, ...Object.values(PACKET_LAG));
   for (const ranBefore of [7, 12, 60]) {
     const frames = await packetRun(ranBefore);
     assert.equal(frames.length, SCRIPT.ticks + lag, `packet frame, ${ranBefore} ticks before the script: its length`);
@@ -240,13 +239,13 @@ test('a local game read from the engine and the same game read from its packets 
   try {
     const origin = `http://127.0.0.1:${port}`;
     for (let i = 0; i < 50; i++) { if (await fetch(origin + '/index.html').then((r) => r.ok, () => false)) break; await sleep(100); }
-    const direct = await play(origin, SCRIPT.query, false);
+    const direct = await play(origin, SCRIPT.query + '&localrealm=0', false);
     // The script is the same game again: a field that differs between two direct runs is not a parity field at all.
     // Every repeat is compared with the first run and the counts are summed (D2_ONE_PATH_CONTROL_RUNS repeats, 2 unless set).
     const control = Object.fromEntries(FIELDS.map((f) => [f, { differing: 0, total: 0 }]));
     let again = [];
     for (let i = 0; i < CONTROL_RUNS; i++) {
-      again = await play(origin, SCRIPT.query, false);
+      again = await play(origin, SCRIPT.query + '&localrealm=0', false);
       for (const [f, v] of Object.entries(parityTable(direct, again))) { control[f].differing += v.differing; control[f].total += v.total; }
     }
     // A packet run that never comes up shows nothing: every record of the direct run then differs, and the reason is printed.

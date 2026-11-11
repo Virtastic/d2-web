@@ -919,10 +919,27 @@ async function d2gsJoinRun(transport, protocol, { character, charClass, gameToke
   const pending = tail.length ? [tail] : [];
   const readFrame = async () => pending.length ? pending.shift() : (raw ? readD2gsRawPackets : readD2gsFrame)(reader, protocol, null);
   readFrame.cancel = () => reader.cancel();
+  // The same stream read without waiting: the join's tail, then the complete packets already received, or null when there
+  // are none. The in-process game hands its client every packet of a server frame before the client's frame runs.
+  const readFrameNow = () => {
+    if (pending.length) return pending.shift();
+    if (!raw) return null;
+    const buf = reader.buffered();
+    let at = 0;
+    for (;;) {
+      const n = at < buf.length ? protocol.d2gsPacketSize(buf.subarray(at)) : 0;
+      if (n < 0) throw new Error('D2GS stream contains an invalid 1.13c server packet');
+      if (n === 0) break;
+      at += n;
+    }
+    if (!at) return null;
+    const out = buf.slice(0, at); reader.skip(at); return out;
+  };
   // D2GS remains a continuous stream after the entry burst; reuse this reader for later frames.
   // Keep the method non-enumerable so browser-harness evidence stays plain JSON data.
   Object.defineProperties(result, {
     readFrame: { value: readFrame },
+    readFrameNow: { value: readFrameNow },
   });
   return result;
 }
@@ -982,6 +999,28 @@ export function startD2gsReceiveLoop(readFrame, { onFrame = () => {}, onClose = 
     }
   })();
   return { stop() { if (!active) return; active = false; readFrame.cancel?.(); }, done, get active() { return active; }, get frames() { return frames; } };
+}
+
+/**
+ * The receive loop of a game whose server runs in the same process: every packet already received is dispatched when
+ * `drain()` is called, in arrival order, with no promise hop. Single player's main loop receives and dispatches what
+ * the server frame flushed before the client frame runs, all in one pass (D2Client+0x43920 inside +0x44B50).
+ */
+export function startD2gsSyncReceive(readFrameNow, transport, { onFrame = () => {}, onClose = () => {} } = {}) {
+  let active = true, frames = 0;
+  const fail = (error) => { if (!active) return; active = false; onClose(error); };
+  transport?.onClose?.(() => fail(new Error('D2GS transport closed')));
+  const drain = () => {
+    while (active) {
+      let payload;
+      try { payload = readFrameNow(); } catch (error) { fail(error); break; }
+      if (!payload) break;
+      frames++;
+      onFrame({ count: frames, byteLength: payload.length, prefix: Array.from(payload.subarray(0, 8)) }, payload);
+    }
+    return frames;
+  };
+  return { stop() { active = false; }, drain, done: Promise.resolve(), get active() { return active; }, get frames() { return frames; } };
 }
 
 /**

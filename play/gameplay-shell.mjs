@@ -1069,7 +1069,9 @@ function sessionAdapter() {
       tick(n) {
         worldDirty = true;   // the worker's tick does not pass through Module.ccall
         const result = W ? W.tick(n) : Module.ccall('d2_session_tick', 'number', ['number'], [n]);
-        realmFlow?.local?.pump();   // ?localrealm=1: what the tick sent goes to the in-process client
+        // Single player's loop (D2Client+0x44B50): the server frame, its flush to the client (D2Game 10024), then the client
+        // receives and dispatches all of it (D2Client+0x43920) before its own frame runs.
+        realmFlow?.local?.pump(); realmFlow?.d2gsReceiver?.drain?.();
         invalidateWornItemProps(); return result;
       },
       // The player's path position at the engine's own 16.16 precision (d2_session_player_coords),
@@ -2154,9 +2156,9 @@ async function authenticateConfiguredRealm({ account, password }) {
     if (!keepRealmSession) { try { protocol?.free(); } catch { /* engine gone */ } }
   }
 }
-// ?localrealm=1 (opt-in): the local game just created is joined through the realm client path, over
+// Default on: the local game is joined through the realm client path (?localrealm=0 opts out), over
 // the in-process connection (assets/realm-local.mjs) in place of the game-server socket.
-const LOCAL_REALM = new URLSearchParams(window.__d2Entry.search).get('localrealm') === '1';
+const LOCAL_REALM = new URLSearchParams(window.__d2Entry.search).get('localrealm') !== '0';
 async function enterLocalRealm() {
   const [{ openLocalRealm }, { bindEngineProtocol }] = await Promise.all([import('./assets/realm-local.mjs'), import('./assets/realm-client.mjs')]);
   realmFlow = openLocalRealm(Module, bindEngineProtocol(Module));
@@ -2170,7 +2172,7 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
   const { server, realmReply } = realmFlow || {};
   const started = { server: { region: server?.region, host: server?.host } };
   realmTransport = { state: 'joining', ...started, result: null, error: '' };
-  const { webSocketTransport, mcpCreateAndJoin, d2gsJoin, startD2gsKeepAlive, startD2gsReceiveLoop, canRetryJoin, isEngineAbort } = await import('./assets/realm-client.mjs');
+  const { webSocketTransport, mcpCreateAndJoin, d2gsJoin, startD2gsKeepAlive, startD2gsReceiveLoop, startD2gsSyncReceive, canRetryJoin, isEngineAbort } = await import('./assets/realm-client.mjs');
   const protocol = realmFlow?.protocol;
   let mcp = realmFlow?.mcp, d2gs, keepD2gs = false, keepMcp = false;
   try {
@@ -2238,7 +2240,8 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
         void leaveRealmGame().then(() => { if (reason) bnetLobbyScreen?.fail({ noticeString: exitLobbyNotice.id ?? 5357, message: 'game ended' }); render(); }); } });
     life.inGame();
     const lifeTimer = setInterval(() => { life.checkTimers(); life.tick(); }, TICK_MS);
-    const receiver = startD2gsReceiveLoop(game.readFrame, {
+    // The in-process game delivers each server frame's packets to the client before the client frame (session.tick); a socket is read as it arrives.
+    const receiver = (realmFlow.local && game.readFrameNow ? (handlers) => startD2gsSyncReceive(game.readFrameNow, d2gs, handlers) : (handlers) => startD2gsReceiveLoop(game.readFrame, handlers))({
       onFrame: (frame, bytes) => {
         if (bytes[0] === 0x8f) keepAlive.pong(bytes);
         { const phase = lifePhaseFromFrame(bytes, (b) => protocol.d2gsPacketSize(b)); if (phase === 'loading') life.loading(); else if (phase === 'ingame') life.inGame(); }
@@ -2266,6 +2269,7 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
       },
     });
     realmFlow.d2gsLife = life; realmFlow.d2gs = d2gs; realmFlow.d2gsKeepAlive = keepAlive; realmFlow.d2gsReceiver = receiver;
+    receiver.drain?.();   // the join's tail and what arrived since
     d2gs = null; keepD2gs = true;
     return `D2GS server session open for ${joined.character.name}; gameplay synchronization is still pending.`;
   } catch (error) {
@@ -3182,11 +3186,16 @@ function readNpcSpeechAlerts(count) {
 // Returns the number of game frames it advanced by: 1 when forced, else 0 or 1 (2 in a slow frame).
 // The caller needs the count, not just the side effect -- the walk controller's stall accounting is
 // per ENGINE frame and must not run on an update that left the engine where it was.
+let localClientFrames = 0;
 function advanceEngine(forced) {
   let n = 0;
-  if (forced) { clock.reset(); engineTicks++; session.tick(1); n = 1; }
+  // A local game read from packets: D2Client+0x44B50 runs the client frame (+0x44A80) only on a pass where the server ran
+  // one, after that frame's packets were dispatched (session.tick pumps and drains them).
+  const clientFrame = realmFlow?.local && clientView().fromPackets ? () => advanceRealmClientUnits(true) : () => 0;
+  localClientFrames = 0;
+  if (forced) { clock.reset(); engineTicks++; session.tick(1); localClientFrames += clientFrame(); n = 1; }
   else {
-    for (let k = clock.ticksForUpdate(); k > 0; k--) { engineTicks++; session.tick(1); n++; }
+    for (let k = clock.ticksForUpdate(); k > 0; k--) { engineTicks++; session.tick(1); localClientFrames += clientFrame(); n++; }
   }
   // s693: a change of LEVEL is an arrival, and retail draws the arriving level's EntryFile art for
   // 120 frames from it. Noticed here rather than in the render path, where it used to be: a scenario
@@ -3380,8 +3389,10 @@ function update(forceTick = false, live = false) {
     if (trade.open && !inventoryVisible) trade.closed();   // the inventory's close button and Escape cancel the trade
     trade.tick({ dead: snapshot?.mode === 0 || snapshot?.mode === 17, inTown: TOWN_LEVELS.includes(realmWorldView?.mapLevel) });
   }
-  // A game drawn from packets advances its client units here, whether the server is remote or the local engine below.
-  if (!session || clientView().fromPackets) {
+  // A game drawn from packets advances its client units here when its server is remote; with the local engine below, the
+  // client frame runs after each server frame and the dispatch of what it sent (advanceEngine), as single player's loop does.
+  const localServerFrames = Boolean(session && realmFlow?.local && clientView().fromPackets);
+  if (!session || (clientView().fromPackets && !localServerFrames)) {
     const advanced = advanceRealmClientUnits(forceTick);
     queueHeldPointerRepeat(input, worldPointerHeld, advanced, pointer.x, pointer.y, heldPointerCanRetargetWorld);
     queueHeldPointerRepeat(input, worldRightPointerHeld, advanced, pointer.x, pointer.y, heldPointerCanRetargetWorld, 2);
@@ -3577,6 +3588,10 @@ function update(forceTick = false, live = false) {
     if (session && ambient && Number.isInteger(preLevel) && preLevel !== ambientLevel) { const { day, night } = ambient.environment(preLevel); Module._d2_ambient_record(day.environmentId, night.ambienceId, day.ambienceId, night.eventId, day.eventId, day.eventDelay); Module._d2_ambient_area(day.environmentId); }
     try { engineAdvanced = advanceEngine(forceTick) > 0; }
     catch (error) { sessionError = String(error); session = null; }
+    if (localServerFrames) {
+      queueHeldPointerRepeat(input, worldPointerHeld, localClientFrames, pointer.x, pointer.y, heldPointerCanRetargetWorld);
+      queueHeldPointerRepeat(input, worldRightPointerHeld, localClientFrames, pointer.x, pointer.y, heldPointerCanRetargetWorld, 2);
+    }
   }
   updateAfterAdvance(engineAdvanced, live);
 }

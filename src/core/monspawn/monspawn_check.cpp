@@ -8470,12 +8470,14 @@ static int sessionCommandHandSkill(uint32_t targetUnitId, bool left) {
     g_sessionApproachKind = 0; g_sessionApproachTarget = 0;   // this command supersedes any pending approach walk
     // The same refusal reasons as the left click (d2_session_attack_reason), so a stalled right-hand
     // fight names why instead of showing the last left click's reason.
-    g_sessionAttackReason = (g_sessionAttack.state == 1 || g_sessionAttack.state == 2) ? ATTACK_BUSY : ATTACK_NO_SESSION;
+    // Busy only while the swing's end-of-animation event has not run: state 2 is the frame after it ran (the player is already back in
+    // neutral), and retail's 0x06/0x0C/0x0D handlers carry no lock at all (D2Game+0x53550), so a swing arriving on that frame starts.
+    g_sessionAttackReason = g_sessionAttack.state == 1 ? ATTACK_BUSY : ATTACK_NO_SESSION;
     g_rightSkillRefusal = 1;
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath ||
         g_targetPlayer->dwAnimMode == PLRMODE_DEAD || g_targetPlayer->dwAnimMode == PLRMODE_DEATH) return 0;
     g_rightSkillRefusal = 2;
-    if (g_sessionAttack.state == 1 || g_sessionAttack.state == 2) return 0;
+    if (g_sessionAttack.state == 1) return 0;
     D2UnitStrc* target = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)targetUnitId);
     D2SkillStrc* skill = left ? UNITS_GetLeftSkill(g_targetPlayer) : UNITS_GetRightSkill(g_targetPlayer);
     g_rightSkillRefusal = 3;
