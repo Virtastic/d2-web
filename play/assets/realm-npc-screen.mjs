@@ -33,7 +33,8 @@ const menuOffer = (o) => ({ mercName: o.mercName, name: o.name, level: o.level ?
  * offerClick (createStoreOfferClick: the engine's offer rule, optional).
  */
 export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor, speech, itemTable, text = () => '', anchor = () => null,
-  smith = () => false, now = () => 0, nameOf = () => '', itemNameOf = () => '', gold = () => null, offerClick = null }) {
+  smith = () => false, now = () => 0, nameOf = () => '', itemNameOf = () => '', gold = () => null, offerClick = null,
+  itemDetail = null, stashGold = () => -1 }) {
   const gate = createNpcSpeechClickGate();   // the per-speech 100 ms mouse-down gate
   const rule = offerClick ?? fallbackOfferClick(now);
   let gateKey = null;
@@ -43,6 +44,7 @@ export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor
   let pressedButton = null;  // the vendor button under the press, acted on release
   let hireKey = null;        // the hire window the offers were shown for: `${guid}:${count}`
   let confirm = null;        // the Buy box: { guid } for the offer the left press armed
+  let vendorState = null;    // what the vendor window was last drawn with (its overlay reads the same)
 
   const current = () => view();
 
@@ -95,6 +97,7 @@ export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor
     draw(ctx, w, h, { act = 1, pointer = null } = {}) {
       const v = current();
       if (!v || (v.mode !== 'trade' && v.mode !== 'gamble' && !(v.mode === 'hire' && v.refusal))) closeConfirm();
+      if (!v || (v.mode !== 'trade' && v.mode !== 'gamble')) vendorState = null;
       if (!v) { syncMenu(null); vendorOpenFor = null; if (hireKey !== null) { menu.closeHire(); hireKey = null; } return null; }
       if (v.mode === 'speech') {
         const key = `${v.guid}:${v.speech?.stringId}`;
@@ -116,7 +119,8 @@ export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor
       if (v.mode === 'trade' || v.mode === 'gamble') {
         if (v.refusal && !confirm) openRefusal(v);
         if (vendorOpenFor !== v.guid) { vendor.reset(vendorItemsFrom(v.stock, itemTable), smith(v.classId)); vendorOpenFor = v.guid; }
-        const r = vendor.draw(ctx, w, h, { items: vendorItemsFrom(v.stock, itemTable), classId: v.classId, act, pointer, pressedButton, sellMode: v.sellMode, repairMode: v.repairMode });
+        vendorState = { items: vendorItemsFrom(v.stock, itemTable, itemDetail), classId: v.classId, act, pointer, pressedButton, sellMode: v.sellMode, repairMode: v.repairMode, stashGold: stashGold() };
+        const r = vendor.draw(ctx, w, h, vendorState);
         if (confirm && buyConfirm) { const feet = anchor(v.guid); if (feet) buyConfirm.draw(ctx, feet.x, feet.y, act); }
         return r;
       }
@@ -128,6 +132,8 @@ export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor
       }
       return null;
     },
+    /** The shop's item tooltip and button hint, drawn after the inventory panel as the local window's are; null with no shop up. */
+    drawOverlay(ctx, w, h) { return vendorState ? vendor.drawOverlay(ctx, w, h, vendorState) : null; },
     /** A press at canvas point (x, y) with mouse button `button` (0 left, 2 right). Returns true when the screen took it. */
     pointerDown(x, y, w, h, button = 0) {
       const v = current();

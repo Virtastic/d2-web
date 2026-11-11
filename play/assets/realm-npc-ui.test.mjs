@@ -136,6 +136,15 @@ test('vendorItemsFrom reads grid, page and icon from the header and the item tab
   assert.equal(item.invHeight, 2);
 });
 
+test('vendorItemsFrom adds the detail seam: the offer carries its tooltip name and price like a local one', () => {
+  const bits = stockPacket(11, 0x77, 3).subarray(8);
+  const table = { byCode: (code) => (code === 0x20202020 ? { invFile: 'inv.dc6', invWidth: 1, invHeight: 2 } : null) };
+  const [item] = vendorItemsFrom([{ guid: 0x77, bits, tab: 3, x: 1, y: 2 }], table, (s) => ({ name: 'Potion', cost: s.guid }));
+  assert.equal(item.name, 'Potion');
+  assert.equal(item.cost, 0x77);
+  assert.equal(item.invFile, 'inv.dc6');
+});
+
 test('SELL_MODE values are the wire values the shell passes through', () => {
   assert.deepEqual(SELL_MODE, { STORED: 0, CURSOR: 4 });
 });

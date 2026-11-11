@@ -9,14 +9,14 @@ import { SELL_MODE } from './realm-npc-packets.mjs';
  * records. The grid size and the inventory icon come from the item table by the item's code; a stock entry
  * whose code is unknown is left out rather than drawn without an icon.
  */
-export function vendorItemsFrom(stock, itemTable) {
+export function vendorItemsFrom(stock, itemTable, detail = null) {
   const items = [];
   for (const s of stock || []) {
     const header = decodeItemHeader(s.bits);
     const entry = header ? itemTable?.byCode(header.code) : null;
     if (!entry) continue;
     items.push({ id: s.guid, guid: s.guid, code: header.code, quality: header.quality, invFile: entry.invFile,
-      invPage: s.tab, gridX: s.x, gridY: s.y, invWidth: entry.invWidth, invHeight: entry.invHeight });
+      invPage: s.tab, gridX: s.x, gridY: s.y, invWidth: entry.invWidth, invHeight: entry.invHeight, ...(detail ? detail(s) : null) });   // detail: the tooltip's name, price and property lines, as the local window's offers carry
   }
   return items;
 }

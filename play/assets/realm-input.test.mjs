@@ -420,3 +420,20 @@ test('a hotkey assign is 0x51 with the slot above the skill word, the hand in bi
   assert.equal(input.bindHotkey(1, -1, false), false);
   assert.equal(sent.length, 0);
 });
+
+test('belt lift, place and swap send the retail packets', () => {
+  const { out, input } = harness();
+  input.beltClick({ op: 'lift', a: 0x11223344 });
+  input.beltClick({ op: 'place', a: 5, b: 2 });
+  input.beltClick({ op: 'swap', a: 7, b: 9 });
+  assert.deepEqual(out, [[0x24, 0x44, 0x33, 0x22, 0x11], [0x23, 5, 0, 0, 0, 2, 0, 0, 0], [0x25, 7, 0, 0, 0, 9, 0, 0, 0]]);
+  assert.equal(input.beltClick({ op: 'nope' }), false);
+});
+
+test('drop gold is the 9-byte packet with the hero id, and nothing for zero', () => {
+  const { out, input } = harness();
+  assert.equal(input.dropGold(1, 0), false);
+  assert.equal(out.length, 0);
+  input.dropGold(0x01020304, 500);
+  assert.deepEqual(out, [[0x50, 4, 3, 2, 1, 0xf4, 1, 0, 0]]);
+});

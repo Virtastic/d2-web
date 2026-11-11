@@ -2925,6 +2925,11 @@ function beltPacket(op, a, b) {
   v.setUint8(0, op === 'place' ? 0x23 : 0x25); v.setUint32(1, a >>> 0, true); v.setUint32(5, b >>> 0, true);
   try { return Module.ccall('d2_session_client_packet', 'number', ['bigint', 'number'], [BigInt(p), n]); } finally { Module._free(p); }
 }
+// The belt click's actions as packets to the game server (0x24 lift, 0x23 place, 0x25 swap, 0x26 use): the bytes beltPacket hands the local engine.
+function realmBeltClick(act) {
+  if (act.op === 'use') return realmInput().useBelt(act.slot, Boolean(act.merc) && realmFlow?.expansion === true);
+  return realmInput().beltClick(act);
+}
 function beltToCursor(itemId) {
   const p = Module._malloc(5), v = new DataView(Module.HEAPU8.buffer, Number(p), 5);
   v.setUint8(0, 0x24); v.setUint32(1, itemId >>> 0, true);
@@ -4351,7 +4356,10 @@ function realmNpcScreen() {
     itemNameOf: (guid) => { const it = realmNpc().view()?.stock.find((x) => x.guid === guid); return it ? (realmItemTextFor().describe(it.bits)?.name ?? '') : ''; },
     anchor: realmNpcFeet, smith: (classId) => SMITH_CLASSES.has(classId), gold: () => realmWorldState?.gold ?? null,
     now: () => Math.trunc(performance.now()),
-    offerClick: Module._d2_client_store_offer_click ? storeOfferClick : null }));
+    offerClick: Module._d2_client_store_offer_click ? storeOfferClick : null,
+    // the same offer fields the local window's stock carries: tooltip text, price label and price, and the stash line
+    itemDetail: (s) => ({ ...(realmItemTextFor().describe(s.bits) ?? {}), cost: realmNpc().priceOf(s.guid) ?? 0, costLabel: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [3329]) }),
+    stashGold: () => clientView().stashBalance(0) }));
 }
 // The trade window the packet client holds open (null when none): the inventory click reads its sell/repair toggles.
 const realmShopView = () => (clientView().fromPackets && realmNpc().shopOpen() ? realmNpc().view() : null);
@@ -5486,6 +5494,7 @@ function drawFrame() {
   if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && panelData ? { ...snapshot, ...gridBoxHover(), deferTooltip: true, weaponSet: view.weaponSet(), weaponHands: view.weaponHands(), pointer, itemTip: (item) => (engine ? tipFields(item.id, item.code) : realmItemTip(item)), gold: snapOr('playerGold', () => view.playerGold()), inventoryGoldPressed: Boolean(inventoryGoldPress), inventoryClosePressed: Boolean(inventoryClosePress) } : snapshot, panelShown(inventoryVisible));
   // The shop's tooltip and button hint go over the inventory panel, as retail draws them last (vendor-panel.mjs drawOverlay).
   if (vendorState && npcPanelEvidence) Object.assign(npcPanelEvidence, vendorPanel.drawOverlay(ctx, w, h, vendorState));
+  if (view.npcOpen() && realmNpcScreenState) realmNpcScreenState.drawOverlay(ctx, w, h);   // a joined game's shop: the same tooltip and hint
   // O / the Hireling Screen binding: retail's left mercenary panel (play/assets/hireling-panel.mjs,
   // D2Client+0x9AE80). With no merc unit retail draws nothing, so the panel shuts itself.
   const mercSource = realmSceneActive ? realmReads?.hirelingSource : engine ? Module : null;   // a joined game's mercenary is the server's
@@ -6206,7 +6215,8 @@ function submitStashGold() {
   if (stashGoldDialog.mode === 'drop') {
     // D2Client+0xBFDF0: OK sends the 0x50 drop-gold packet (nothing for 0), then closes the dialog.
     const dropAmount = Math.max(0, Math.min(stashGoldDialog.available, stashGoldDialog.amount | 0));
-    const sent = dropAmount && session ? Module.ccall('d2_session_command_drop_gold_packet', 'number', ['number', 'bigint'], [dropAmount, 0n]) : 0;
+    const sent = !dropAmount ? 0 : session ? Module.ccall('d2_session_command_drop_gold_packet', 'number', ['number', 'bigint'], [dropAmount, 0n])
+      : realmInput().dropGold(selectedPlayerSource().guid, dropAmount) ? 1 : 0;   // a joined game: the same 9-byte 0x50
     if (session) snapshot = session.snapshot(); closeStashGold();
     return sent;
   }
@@ -6863,7 +6873,7 @@ canvas.addEventListener('pointermove', (e) => {
   if (bnetInput.move(e)) return;
   const [x, y] = canvasPoint(e);
   pointer.x = x; pointer.y = y;
-  if (session && !clearScreen) { const o = hudOrigin(canvas.width, canvas.height, 'bottom'), all = readBeltBoxes(); beltPopup.mouseMove(x - o.x, y - o.y, 800, 600, all, popupRows(readBeltIndex(), all?.length)); }
+  if (clientView().live && !clearScreen) { const o = hudOrigin(canvas.width, canvas.height, 'bottom'), all = clientView().fromPackets && !session ? realmReads?.beltBoxes ?? null : readBeltBoxes(); beltPopup.mouseMove(x - o.x, y - o.y, 800, 600, all, popupRows(clientView().fromPackets && !session ? realmReads?.beltIndex : readBeltIndex(), all?.length)); }
   if (controlsPanel?.open) controlsPanel.pointerMove(x, y, canvas.width, canvas.height, e.pointerId, e.buttons);
   if (worldPointerHeld && (e.buttons & 1) && heldPointerCanRetargetWorld(x, y)) {
     input.pointer(x, y, 0, true);
@@ -7117,11 +7127,11 @@ canvas.addEventListener('pointerdown', (e) => {
     const orb = orbAt(canvas.width, canvas.height, x, y);
     if (orb) { orbPins[orb] = !orbPins[orb]; render(); canvas.focus(); e.preventDefault(); return; }
   }
-  if (e.button === 0 && !clearScreen && dispatchSkillSelectHit(skillSelectRenderer, session, x, y, canvas.width, canvas.height, readSkillChoices(), selectSkill)) { canvas.focus(); e.preventDefault(); return; }
+  if (e.button === 0 && !clearScreen && dispatchSkillSelectHit(skillSelectRenderer, clientView().live, x, y, canvas.width, canvas.height, readSkillChoices(), selectSkill)) { canvas.focus(); e.preventDefault(); return; }
   // F162: the two gold coins open the two retail dialogs their own captures show. The stash panel's
   // coin (155,100) opens WITHDRAW; the inventory panel's coin beside the carried gold (484,469) opens
   // DEPOSIT. Each submit sends retail 0x4F with the dialog's own button (19 withdraw, 20 deposit).
-  if ((stashOpen || inventoryVisible) && stashGoldRenderer && (session || realmTrade().open)) {
+  if ((stashOpen || inventoryVisible) && stashGoldRenderer && (clientView().live || realmTrade().open)) {
     const hit = stashGoldRenderer.hitAt(x, y, canvas.width, canvas.height, stashOpen ? readStashLayout() : null, Boolean(stashGoldDialog));
     if (hit) {
       click.spent = 'stashGold';
@@ -7158,13 +7168,14 @@ canvas.addEventListener('pointerdown', (e) => {
   const beltItem = clearScreen ? null : snapshot.items.find((it) => it.mode === 2 && it.gridX === beltSlot) || null;
   if (beltSlot >= 0) {
     const act = beltClickAction({ button: e.button, shift: e.shiftKey, slot: beltSlot, beltItem,
-      cursorItem: Module.ccall('d2_session_cursor_item', 'number', [], []) || 0 });
+      cursorItem: clientView().cursorItem() || 0 });
     if (act) {
       let result = 0;
-      if (act.op === 'use') { result = session?.useBelt(act.slot | (act.merc ? 0x100 : 0)); }
+      if (clientView().fromPackets && !session) result = realmBeltClick(act);   // a joined game: the same click leaves as the retail belt packets
+      else if (act.op === 'use') { result = session?.useBelt(act.slot | (act.merc ? 0x100 : 0)); }
       else result = beltPacket(act.op, act.a, act.b);
       lastBeltCursor = { ...act, result };
-      snapshot = session.snapshot();
+      if (session) snapshot = session.snapshot();
       window.__d2Step19Trace?.record('belt-use', { source: 'pointer-click', slot: beltSlot, op: act.op, result: Boolean(result) },
         { step: window.__s000?.state?.step, mode: window.__s000?.mode, snapshot });
     }
@@ -8478,7 +8489,7 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
     }
     if (screen === SCREEN.GAME && questVisible && questLogRenderer && questEvidence && !clearScreen)
       out.quest = probe((x, y) => { const q = questLogRenderer.hit(x, y, w, h, questEvidence.tabs, questEvidence.act); return q ? (q.tab ? `tab${q.tab}` : q.quest ? `quest${q.quest}` : q.descr ? 'descr' : 'close') : null; });
-    if (screen === SCREEN.GAME && skillSelectRenderer && session) out.skillSelect = skillSelectRenderer.targets(w, h, readSkillChoices());
+    if (screen === SCREEN.GAME && skillSelectRenderer && clientView().live) out.skillSelect = skillSelectRenderer.targets(w, h, readSkillChoices());
     if (screen === SCREEN.GAME && characterVisible && characterPanelRenderer && session)
       out.character = probe((x, y) => characterPanelRenderer.buttonAt(x, y, w, h, readAdvancement()));
     if (screen === SCREEN.GAME && skillsVisible && skillPanelRenderer && session) {

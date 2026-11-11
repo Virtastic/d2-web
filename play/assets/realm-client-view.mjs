@@ -103,6 +103,7 @@ export function realmFrameReads(resources, world = null, tables = null, playerCl
   reads.beltIndex = record; reads.beltBoxCount = boxes.length; reads.beltHudBoxes = hudBoxes.length ? hudBoxes : null;
   // The popup shows the rows above the HUD row, as many as the single-player read opens for the same record.
   const rows = popupRows(record, boxes.length);
+  reads.beltBoxes = boxes.length ? boxes : null;   // every box of the record: the popup's hover walks them
   reads.beltShownfalse = reads.beltHudBoxes;
   reads.beltShowntrue = rows ? boxes.slice(0, 4 * (rows + 1)) : reads.beltHudBoxes;
   return reads;

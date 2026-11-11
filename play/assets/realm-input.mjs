@@ -53,6 +53,10 @@ export const packets = Object.freeze({
   enterPortal: (portalGuid, levelId) => make(0x45, le32(portalGuid), le32(levelId)),    // 9
   waypoint: (waypointGuid, levelId) => make(0x49, le32(waypointGuid), le32(levelId)),   // 9
   swapWeapons: () => make(0x60),                                    // 1
+  beltPlace: (itemGuid, slot) => make(0x23, le32(itemGuid), le32(slot)),    // 9
+  beltLift: (itemGuid) => make(0x24, le32(itemGuid)),               // 5
+  beltSwap: (cursorGuid, beltGuid) => make(0x25, le32(cursorGuid), le32(beltGuid)),   // 9
+  dropGold: (playerGuid, amount) => make(0x50, le32(playerGuid), le32(amount)),   // 9: D2Client 0x14910's [0x50][player guid][amount]
   filmEnd: () => make(0x48),                                        // 1
 });
 
@@ -411,6 +415,15 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     pickUp(guid) { const s = open(), u = s?.items.find((i) => i.id === guid && i.mode === 3); return Boolean(u) && itemGate() && interactWith(s, UNIT.ITEM, u) !== false; },
     dropCursor: (guid) => itemGate() && emit(packets.dropCursor(guid), 'drop'),
     swapWeapons: () => emit(packets.swapWeapons(), 'swap-weapons'),
+    /** The belt click's lift, place and swap (the same bytes the local engine is handed); `use` is useBelt. */
+    beltClick(act) {
+      if (act.op === 'lift') return emit(packets.beltLift(act.a), 'belt-lift');
+      if (act.op === 'place') return emit(packets.beltPlace(act.a, act.b), 'belt-place');
+      if (act.op === 'swap') return emit(packets.beltSwap(act.a, act.b), 'belt-swap');
+      return false;
+    },
+    /** The drop-gold box's OK: nothing for 0, else the 0x50 with the hero's unit id. */
+    dropGold: (playerGuid, amount) => (amount > 0 ? emit(packets.dropGold(playerGuid >>> 0, amount >>> 0), 'drop-gold') : false),
     /** The film the server asked for (0x61) is over or was not shown: the server's busy mark for the player is lifted (1.13c D2Client 0x899A0 ends with the 1-byte 0x48). */
     filmEnd: () => emit(packets.filmEnd(), 'film-end'),
     /** After the server has opened a menu: the waypoint list and a town-portal choice. */
