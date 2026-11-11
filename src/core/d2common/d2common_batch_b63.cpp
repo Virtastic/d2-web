@@ -36,7 +36,11 @@ void sub_45550() { std::abort(); }
 
 // 1.13c D2Common+0x7C0E0  (in_EAX = unit)
 void sub_7C0E0(void* unit) {
-    if (!sub_4A670 || !sub_AB50 || !sub_4A9B0 || !sub_C940 || !sub_2E1F0) return;
+    // Untouched only when this room would reach a callee that is not ported yet (kind 1 or 2, or no neighbours).
+    const int kind = I(unit, 0x48);
+    if (I(unit, 0x2c) == 0) return;
+    if (kind == 1 && (!sub_4A670 || !sub_4A9B0)) return;
+    if (kind == 2 && (!sub_AB50 || !sub_C940)) return;
     void* iVar1 = PT(PT(unit, 0x58), 0x1b4);
     if (I(unit, 0x2c) == 0) sub_45550();
     I(unit, 0x14) = I(unit, 4);

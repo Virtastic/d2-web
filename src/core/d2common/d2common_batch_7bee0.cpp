@@ -6,15 +6,14 @@
 struct D2Common7bc60Env;
 
 extern "C" {
-__attribute__((weak)) void d2_fn_d2common_68400();
 __attribute__((weak)) void d2_fn_d2common_bf70(uint8_t* u);
 __attribute__((weak)) void D2Common_7BC60_LinkTail(uint8_t* u, const D2Common7bc60Env* env);
 
-// 1.13c D2Common+0x7BEE0: unit u (ECX). Oddity kept: 0x68400 is called with no visible argument.
-EMSCRIPTEN_KEEPALIVE void D2Common_7BEE0_PostUpdate(uint8_t* u, const D2Common7bc60Env* env) {
+// 1.13c D2Common+0x7BEE0: unit u (ECX). 0x68400 takes the room in ESI (the decompile shows no argument): loadDT1 is that call.
+EMSCRIPTEN_KEEPALIVE void D2Common_7BEE0_PostUpdate(uint8_t* u, const D2Common7bc60Env* env, void (*loadDT1)(uint8_t* room)) {
     uint32_t flags, mode;
     std::memcpy(&flags, u + 0x28, 4);
-    if (!(flags & 0x1000000) && d2_fn_d2common_68400) d2_fn_d2common_68400();
+    if (!(flags & 0x1000000) && loadDT1) loadDT1(u);
     std::memcpy(&flags, u + 0x28, 4);  // retail re-reads after the call
     std::memcpy(&mode, u + 0x48, 4);
     if (mode == 2 && !(flags & 0x2000000) && d2_fn_d2common_bf70) d2_fn_d2common_bf70(u);

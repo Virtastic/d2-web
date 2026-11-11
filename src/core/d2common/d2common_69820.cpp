@@ -1,6 +1,6 @@
 // 1.13c D2Common+0x69820 (sub_69820): room-tile placement dispatcher. Retail layout: EAX = tile flag word (fl); stack = p1, room, kind, p4, p5, p6 (ret 0x18).
 // Every callee is injectable with its retail register layout (the Raw export takes the seam table; the probe binds hook recorders):
-//   0x68970 EAX=p1 ECX=room, stack 0, fl, p5, kind    0x69090 EAX=fl ECX=room, stack p4, p5, kind   0x691C0 EAX=fl, stack room, p4, p5, kind
+//   0x68970 EAX=p4 ECX=room, stack 0, fl, p5, kind    0x69090 EAX=fl ECX=room, stack p4, p5, kind   0x691C0 EAX=fl, stack room, p4, p5, kind
 //   0x68780 EAX=fl, stack room, 1, p4, p5, &out       0x695D0 EAX=type ECX=node, stack p1, room, out, fl, p4, p5
 //   0x9222 (Fog alloc) ECX=p1, EDX=12, stack "RoomTile.cpp", 0x37B, 0     0x68B90 EAX=fl ECX=room, stack kind
 //   0x69170 EAX=room ECX=node+4, stack p4, p5, fl, u  0x697C0 EBX=fl ESI=p5 EDI=p4, stack p1, room, kind
@@ -10,7 +10,7 @@
 
 struct D2Common69820Env
 {
-	void (*f68970)(uint32_t eaxP1, uintptr_t ecxRoom, uint32_t zero, uint32_t fl, int32_t p5, uint32_t kind);
+	void (*f68970)(uint32_t eaxP4, uintptr_t ecxRoom, uint32_t zero, uint32_t fl, int32_t p5, uint32_t kind);
 	void (*f69090)(uint32_t eaxFl, uintptr_t ecxRoom, int32_t p4, int32_t p5, uint32_t kind);
 	void (*f691c0)(uint32_t eaxFl, uintptr_t room, int32_t p4, int32_t p5, uint32_t kind);
 	uintptr_t (*f68780)(uint32_t eaxFl, uintptr_t room, uint32_t one, int32_t p4, int32_t p5, uint32_t* out);
@@ -44,7 +44,7 @@ extern "C" void D2Common_69820_Raw(uint32_t fl, uint32_t p1, uintptr_t room, uin
 		if (kind == 8 || kind == 9) {
 			const int32_t lvl = static_cast<int32_t>(w(w(room, 0x58), 0x1d0));
 			if (lvl < 0x6f || (lvl > 0x70 && lvl != 0x75)) {
-				env->f68970(p1, room, 0, fl, p5, kind);
+				env->f68970(static_cast<uint32_t>(p4), room, 0, fl, p5, kind);   // EAX is p4 (the stack word reloaded after the pushes), not the level id
 				return;
 			}
 		} else if (kind == 0xa || kind == 0xb) {

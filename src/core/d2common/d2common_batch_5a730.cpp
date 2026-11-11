@@ -85,20 +85,25 @@ extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_6C710_PrefixPath(const char* prefi
     }
 }
 
-// 1.13c D2Common+0x6CB50
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_6cb50(const D2LevelDefBin* records)
+// 1.13c D2Common+0x6CB50: the portal-level index list. The allocator is a seam so the replay can hook it.
+extern "C" void d2_seam_d2common_6cb50(const D2LevelDefBin* records, int count, int* nOut, int** listOut, void* (*alloc)(uint32_t size))
 {
-    sgptDataTables->nPortalLevels = 0;
-    for (int i = 0; i < sgptDataTables->nLevelsTxtRecordCount; ++i)
-        if (records[i].dwPortal) ++sgptDataTables->nPortalLevels;
-    if (sgptDataTables->nPortalLevels)
-        sgptDataTables->pPortalLevels = (int*)D2_CALLOC(uint32_t(sgptDataTables->nPortalLevels) * 4u);
+    *nOut = 0;
+    for (int i = 0; i < count; ++i)
+        if (records[i].dwPortal) ++*nOut;
+    if (*nOut)
+        *listOut = (int*)alloc(uint32_t(*nOut) * 4u);
     int next = 0;
-    for (int i = 0; i < sgptDataTables->nLevelsTxtRecordCount; ++i)
+    for (int i = 0; i < count; ++i)
         if (records[i].dwPortal) {
-            if (next >= sgptDataTables->nPortalLevels) std::exit(-1);
-            sgptDataTables->pPortalLevels[next++] = i;
+            if (next >= *nOut) std::exit(-1);
+            (*listOut)[next++] = i;
         }
+}
+extern "C" void d2_port_d2common_6cb50(const D2LevelDefBin* records)
+{
+    d2_seam_d2common_6cb50(records, sgptDataTables->nLevelsTxtRecordCount, &sgptDataTables->nPortalLevels, &sgptDataTables->pPortalLevels,
+        [](uint32_t size) -> void* { return D2_CALLOC(size); });
 }
 
 // 1.13c D2Common+0x710F0
