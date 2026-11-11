@@ -7,6 +7,8 @@
 //   0x81 (20 bytes)  pet assign          D2Client+0xAEBA0 -> +0x21D60
 //   0x7F (10 bytes)  pet life, kind 0    D2Client+0xAD820 -> +0x21950
 //   0x9E..0xA2       hireling stat       D2Client+0xAEA40
+//   0x9B (7 bytes)   mercenary resurrect offer  D2Client+0xAE1E0
+//   0x61 (2 bytes)   play a film         D2Client+0xAF940 -> +0x899A0
 #pragma once
 
 #include <cstdint>
@@ -193,6 +195,36 @@ inline void petUnitRemoved(PetState& state, uint32_t guid) {
     for (size_t i = 0; i < state.stats.size();) {
         if (state.stats[i].guid == guid) state.stats.erase(state.stats.begin() + static_cast<long>(i)); else ++i;
     }
+}
+
+// ---- 0x9B: the resurrect offer ----------------------------------------------------------------
+// D2Client+0xAE1E0 stores the word at +1 (the dead mercenary's name id, 0xFFFF for none) and the word at +3
+// (the price) in two globals. A name id of 0xFFFF clears the Resurrect row of every NPC menu (D2Client+0x4A060
+// with 0); any other value puts it in (the NPC menu build, D2Client+0x48B20, reads both globals).
+struct MercResurrect {
+    uint32_t nameId = 0xFFFF;   // packet[1..2]
+    uint32_t cost = 0;          // packet[3..4]
+};
+
+inline bool mercResurrectApply(MercResurrect& state, const uint8_t* packet, int size) {
+    if (!packet || size != 7 || packet[0] != 0x9B) return false;
+    state.nameId = gamePktU16(packet + 1);
+    state.cost = gamePktU16(packet + 3);
+    return true;
+}
+inline bool mercResurrectOffered(const MercResurrect& state) { return state.nameId != 0xFFFF; }
+
+// ---- 0x61: play a film ------------------------------------------------------------------------
+// D2Client+0xAF940 hands the byte at +1 to the film player (D2Client+0x899A0, movie_select.h). The indexes
+// received wait here, in arrival order, until the shell takes them.
+struct MovieQueue {
+    std::vector<uint32_t> indexes;
+};
+
+inline bool movieQueueApply(MovieQueue& state, const uint8_t* packet, int size) {
+    if (!packet || size != 2 || packet[0] != 0x61) return false;
+    state.indexes.push_back(packet[1]);
+    return true;
 }
 
 }  // namespace d2::realm

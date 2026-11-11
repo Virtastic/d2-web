@@ -6989,6 +6989,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_packet(const uint8_t* bytes, int len)
     // 0x1F {cursorGUID, gridItemGUID, x, y}: the held item goes to x,y and the stored one it overlapped comes onto the cursor (page 1/2 refused by the handler).
     case 0x1F: if (len != 17) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x1F_SwapCursorBufferItems_6FC857C0; break;
     case 0x25: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x25_SwitchBeltItem_6FC86040; break;   // cursor item <-> belt item
+    case 0x48: if (len != 1) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x48_TurnOffBusyState_6FC87E20; break;   // the client's film ended: lifts the player's busy mark the film's quest branch set
     case 0x58: handler = D2GAME_PACKETCALLBACK_Rcv0x58_QuestCompleted_6FC883B0; break;
     case 0x51: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x51_BindHotkeyToSkill_6FC88290; break;   // F-key assign: slot in the high half of the word, hand bit 15, owner GUID
     // a retail recording session replay: 0x0D right skill on unit, 0x3B add skill point, 0x3C select skill (recovered handlers).

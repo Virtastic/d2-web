@@ -94,9 +94,9 @@ test('cancel closes, gamble and identify and a dead mercenary pick their packets
   r.npc.handle(info(GUID, []));
   r.npc.choose({ action: 'identify' });
   assert.deepEqual(r.sent.slice(1).map((b) => b[0]), [0x34, 0x30]);
-  r = fresh({ classId: 198, deadMerc: () => true });   // Greiz: the menu build asks for the offers (0x38) even when the merc is dead
+  r = fresh({ classId: 198, resurrectLabel: () => 'Resurrect' });   // Greiz with a 0x9B offer: the Resurrect row sends 0x62, Hire does not
   r.npc.handle(info(GUID, []));
-  r.npc.choose({ action: 'hire' });
+  r.npc.choose({ action: 'resurrect' });
   assert.deepEqual(r.sent.slice(1).map((b) => b[0]), [0x38, 0x62, 0x30]);
   r = fresh({ classId: 198 });
   r.npc.handle(info(GUID, []));

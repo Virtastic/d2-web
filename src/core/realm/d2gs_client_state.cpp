@@ -1541,10 +1541,9 @@ static int pkt_monster_action_case(D2RealmClientMonster& monster, uint32_t code,
                 return 1;
             }
         }
-        // D2Client+0x4DC30: a monster in a mode other than neutral or dead is put on the centre of its
-        // sub-tile (D2Common 10770) and takes the neutral mode.
+        // The stop keeps the client's own fixed-point position (the retail trace shows the path dwords
+        // unchanged through the stop); a unit that stopped at path end already sits on 0x8000.
         if (unit->dwAnimMode != MONMODE_DEAD && unit->dwAnimMode != MONMODE_DEATH) {
-            if (unit->pDynamicPath && unit->dwAnimMode != MONMODE_NEUTRAL) PATH_RecacheRoomIfNeeded(unit->pDynamicPath);
             d2_realm_client_unit_set_mode(unit, MONMODE_NEUTRAL);
         }
         return 1;
@@ -3578,6 +3577,8 @@ static int apply_player_skills(const uint8_t* packet, int length) {
 static d2::realm::GameInfo g_gameInfo;
 static d2::realm::NpcAlertState g_npcAlerts;
 static d2::realm::PetState g_pets;
+static d2::realm::MercResurrect g_mercResurrect;
+static d2::realm::MovieQueue g_movieQueue;
 // The in-game UI as the game-start packet leaves it, and how many times one has arrived. The count
 // outlives a game: the page closes its panels when it moves.
 static d2client_afa90::State g_gameUi;
@@ -3597,6 +3598,8 @@ static void clear_game_packet_state() {
     g_npcAlerts = {};
     g_pets = {};
     g_gameUi = {};
+    g_mercResurrect = {};
+    g_movieQueue = {};
 }
 
 static const D2RealmClientMonster* game_packet_monster(uint32_t guid) {
@@ -3669,6 +3672,22 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_game_info(uint32_t* out) {
     out[0] = g_gameInfo.difficulty; out[1] = g_gameInfo.gameFlags; out[2] = g_gameInfo.expansion; out[3] = g_gameInfo.ladder;
     out[4] = d2::realm::gameInfoSaveFlags(g_gameInfo);
     return 1;
+}
+
+// The 0x9B offer: out[0] = the dead mercenary's name id (0xFFFF none), out[1] = the price.
+// Returns 1 when a Resurrect row is on offer, else 0.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_merc_resurrect(uint32_t* out) {
+    if (!out) return 0;
+    out[0] = g_mercResurrect.nameId; out[1] = g_mercResurrect.cost;
+    return d2::realm::mercResurrectOffered(g_mercResurrect) ? 1 : 0;
+}
+
+// The next film index the server's 0x61 queued, or -1 when none waits.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_take_movie() {
+    if (g_movieQueue.indexes.empty()) return -1;
+    const int index = static_cast<int>(g_movieQueue.indexes.front());
+    g_movieQueue.indexes.erase(g_movieQueue.indexes.begin());
+    return index;
 }
 
 // The guids of the units carrying the speech mark. Returns the count written.
@@ -4505,6 +4524,11 @@ static int pkt_act_data(const uint8_t*, int) {
     return 1;
 }
 // 0x8f (0xabf40): the pong. The eight dwords are kept; the round-trip time is the page's, which owns the clock.
+// 0x9B (0xae1e0): the dead mercenary's name id and the price of raising it.
+static int pkt_merc_resurrect(const uint8_t* packet, int size) { return d2::realm::mercResurrectApply(g_mercResurrect, packet, size); }
+// 0x61 (0xaf940): a film to play; the shell takes the indexes through d2_realm_client_take_movie.
+static int pkt_film(const uint8_t* packet, int size) { return d2::realm::movieQueueApply(g_movieQueue, packet, size); }
+
 static int pkt_pong(const uint8_t* packet, int) {
     for (int i = 0; i < 8; ++i) g_pong[i] = le32(packet + 1 + 4 * i);
     ++g_pongCount;
@@ -4619,6 +4643,8 @@ static const RealmPacketHandler kRealmPacketHandlers[] = {
     { 0xae080, pkt_or<apply_item_record, -4> },                 // 0x9c
     { 0xae870, pkt_or<apply_item_record, -4> },                 // 0x9d
     { 0xaea40, apply_game_state_packet },                       // 0x9e..0xa2
+    { 0xae1e0, pkt_merc_resurrect },                            // 0x9b
+    { 0xaf940, pkt_film },                                      // 0x61
     { 0xadeb0, pkt_or<apply_state_packet, -4> },                // 0xa7
     { 0xadd70, pkt_or<apply_state_packet, -4> },                // 0xa8
     { 0xadd30, pkt_or<apply_state_packet, -4> },                // 0xa9
@@ -5287,6 +5313,10 @@ struct D2RealmClientSkillChoice {
     uint8_t level;
 };
 static_assert(sizeof(D2RealmClientSkillChoice) == 8, "realm skill choice row is 8 bytes");
+// The skills table's row count, the bound the 0x7B hotkey handler compares a skill against (1.13c D2Client+0xAC6D0 reads it at sgptDataTables+0xBA0).
+EMSCRIPTEN_KEEPALIVE int32_t d2_realm_skill_count() {
+    return sgptDataTables ? sgptDataTables->nSkillsTxtRecordCount : 0xfff;   // no tables loaded: nothing to clamp against
+}
 EMSCRIPTEN_KEEPALIVE uint32_t d2_realm_client_skill_choices(uint32_t guid, D2RealmClientSkillChoice* out, uint32_t cap) {
     if (!out || !cap) return 0;
     auto player = std::find_if(g_players.begin(), g_players.end(), [guid](const auto& entry) {

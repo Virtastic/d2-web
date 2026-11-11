@@ -96,6 +96,21 @@ export function withHireRow(entries, classId, questDone) {
 }
 /** Picking Hire while the hero's mercenary is dead raises it (retail's resurrect, packet 0x62 {npc id}) instead of opening the offers. Pet flag bit 0 = dead. */
 export const deadHireling = (roster) => roster.find((h) => h && (h.flags & 1)) ?? null;
+/**
+ * The Resurrect row (string 0x1507, D2Client+0x4A060): while the server's 0x9B names a dead mercenary (name id not 0xFFFF) every
+ * mercenary NPC's menu lists it ahead of the Hire row, or ahead of Cancel when there is no Hire row. D2Client+0x48B20 builds its
+ * text as sprintf(string 0x58A8, the mercenary's name string, the price); `label` is that text, made by the caller.
+ */
+export const S_RESURRECT = 5383, S_RESURRECT_FORMAT = 22696;
+export const RESURRECT_CLASSES = [252, 198, 515, 367, 150];
+export function withResurrectRow(entries, classId, label) {
+  if (!entries || label === null || !RESURRECT_CLASSES.includes(classId) || entries.some((e) => e.action === 'resurrect')) return entries;
+  const row = { stringId: S_RESURRECT, action: 'resurrect', label };
+  const at = entries.findIndex((e) => e.action === HIRE);
+  return at >= 0 ? [...entries.slice(0, at), row, ...entries.slice(at)] : [...entries.slice(0, -1), row, entries[entries.length - 1]];
+}
+/** The 0x58A8 text: the format's two conversions take the name string and the price in order. */
+export const resurrectLabel = (format, name, cost) => format.replace('%s', name).replace('%d', String(cost));
 export const resurrectPacket = (npcId) => new Uint8Array([0x62, npcId & 255, (npcId >>> 8) & 255, (npcId >>> 16) & 255, (npcId >>> 24) & 255]);
 export function npcMenuEntries(classId) {
   const row = NPC_MENU_TABLE.find(([cls]) => cls === classId);

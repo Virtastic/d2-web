@@ -53,6 +53,7 @@ export const packets = Object.freeze({
   enterPortal: (portalGuid, levelId) => make(0x45, le32(portalGuid), le32(levelId)),    // 9
   waypoint: (waypointGuid, levelId) => make(0x49, le32(waypointGuid), le32(levelId)),   // 9
   swapWeapons: () => make(0x60),                                    // 1
+  filmEnd: () => make(0x48),                                        // 1
 });
 
 // D2Client+0x143E0: the one outgoing-packet gate.  A packet equal to the last one sent, inside its
@@ -391,6 +392,8 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     swapBody: (guid, bodyLoc) => itemGate() && emit(packets.swapWithBody(guid, bodyLoc), 'swap-body'),
     dropCursor: (guid) => itemGate() && emit(packets.dropCursor(guid), 'drop'),
     swapWeapons: () => emit(packets.swapWeapons(), 'swap-weapons'),
+    /** The film the server asked for (0x61) is over or was not shown: the server's busy mark for the player is lifted (1.13c D2Client 0x899A0 ends with the 1-byte 0x48). */
+    filmEnd: () => emit(packets.filmEnd(), 'film-end'),
     /** After the server has opened a menu: the waypoint list and a town-portal choice. */
     waypoint: (guid, levelId) => emit(packets.waypoint(guid, levelId), 'waypoint'),
     enterPortal: (guid, levelId) => emit(packets.enterPortal(guid, levelId), 'portal'),

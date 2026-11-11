@@ -1047,6 +1047,8 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
   let weaponSet = 0;
   const hotkeys = Array.from({ length: 16 }, () => ({ skill: -1, left: false, owner: 0xffffffff }));
   const rd = (p, n) => Array.from(Module.HEAPU8.subarray(Number(p), Number(p) + n));
+  // The skills table's row count; retail's 0x7B handler stores -1 for a skill above it. Without the export (a bare test module) nothing clamps.
+  const engineSkillCount = () => (typeof Module._d2_realm_skill_count === 'function' ? call('d2_realm_skill_count', 'number', [], []) : 0xfff);
   const str = (bytes) => String.fromCharCode(...bytes.filter((b) => b !== 0));
   // The unit's path position at 16.16 precision, so an online unit glides between subtiles as it
   // does offline instead of stepping a whole subtile at a time. Null before its room is active.
@@ -1205,6 +1207,14 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
       const w = new Uint32Array(Module.HEAPU8.buffer, Number(P), 5);
       return { difficulty: w[0], gameFlags: w[1], expansion: w[2] !== 0, ladder: w[3] !== 0, flags: w[4] };
     },
+    // The 0x9B offer to raise the dead mercenary, or null when none stands: { nameId, cost }.
+    d2gsClientMercResurrect: () => {
+      if (!Module._d2_realm_client_merc_resurrect || !call('d2_realm_client_merc_resurrect', 'number', ['bigint'], [BigInt(P)])) return null;
+      const w = new Uint32Array(Module.HEAPU8.buffer, Number(P), 2);
+      return { nameId: w[0], cost: w[1] };
+    },
+    // The next film index the server's 0x61 queued, or -1.
+    d2gsClientTakeMovie: () => (Module._d2_realm_client_take_movie ? call('d2_realm_client_take_movie', 'number', [], []) : -1),
     // The guids of the NPCs carrying the speech mark (0x8A sets it, the 0x28 reply to a talk clears it).
     d2gsClientNpcAlerts: () => {
       if (!Module._d2_realm_client_npc_alerts) return [];
@@ -1619,7 +1629,7 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
     // Server hotkey table (0x7B, 8 bytes: op, slot, u16 skill|0x8000 left, u32 owner GUID): sixteen slots,
     // skill -1 = unbound, as the client's three parallel tables hold them.  Skill ids above `maxSkill`
     // (the game info's skill count) store -1.  Nothing but the server fills it.
-    d2gsApplyHotkey: (packet, maxSkill = host.maxSkill ?? 0xfff) => {
+    d2gsApplyHotkey: (packet, maxSkill = host.maxSkill ?? engineSkillCount()) => {
       if (!(packet instanceof Uint8Array) || packet.length < 8 || packet[0] !== 0x7b) throw new RangeError('not a D2GS hotkey packet');
       const slot = packet[1];
       if (slot >= hotkeys.length) return false;
