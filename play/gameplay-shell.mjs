@@ -3346,7 +3346,15 @@ function update(forceTick = false, live = false) {
     return;
   }
   if (screen === SCREEN.CREDITS) { ensureCreditsScreen(); creditsTick++; return; }
-  if (screen === SCREEN.CINEMATICS) { ensureCinematicsScreen(); cinematicsScreen?.step(); return; }
+  if (screen === SCREEN.CINEMATICS) {
+    ensureCinematicsScreen(); cinematicsScreen?.step();
+    // An act's film plays from the client while the server thread keeps running: a local game read from packets keeps
+    // its server frames going (and the queued act-change burst delivered) under the film.
+    if (cinematicsReturnTo === SCREEN.GAME && session && realmFlow?.local && clientView().fromPackets) {
+      try { advanceEngine(forceTick); } catch (error) { sessionError = String(error); session = null; }
+    }
+    return;
+  }
   if (screen === SCREEN.OTHER_MULTIPLAYER) { ensureOtherMultiplayerScreen(); otherMultiplayerScreen?.step(); return; }
   if (screen === SCREEN.BNET_LOGIN) { bnetLoginScreen?.step(); return; }
   // The join's loading frame steps from this update tick while the join runs (joinLoading.step is a no-op otherwise).
@@ -7390,8 +7398,8 @@ canvas.addEventListener('pointerdown', (e) => {
   const pointerCandidates = !panelOwner && !hostileHit && e.button === 0 && session
     ? resolvePointerCandidates(x, y) : null;
   const pointerSelection = pointerCandidates ? selectPointerCandidate(pointerCandidates, { click: true, reference: snapshot.player }) : null;
-  const npcHit = !panelOwner && !hostileHit && e.button === 0 && session && pointerSelection?.kind === 'npc'
-    ? pointerSelection.target : null;
+  const npcHit = !panelOwner && !hostileHit && e.button === 0 && session && !clientView().fromPackets && pointerSelection?.kind === 'npc'
+    ? pointerSelection.target : null;   // over packets the click is the world path's 0x13 (realm-input), the server answers 0x28/0x2F
   // Left-clicking an OBJECT walks to it and operates it, as retail does. What happens next is the
   // engine's: the stash, for one, answers with 0x77 UPDATEUI_OPENSTASH (pollUiEvents).
   // Hover priority 0x6FBA2190: a UNIT_TILE scores 0, an object -6, so an exit under the cursor beats an object sharing its box.
@@ -8068,7 +8076,11 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
     return true;
   },
   get npcPanelEvidence() {
-    return { open: Boolean(npcState), error: npcPanelError,
+    // Over packets the open NPC is the packet client's (realm-npc-state), not the engine dialog's.
+    if (clientView().fromPackets) { const v = realmNpc().isOpen() ? realmNpc().view() : null;
+      return { open: Boolean(v), packets: true, npcId: v?.guid ?? 0, classId: v?.classId ?? -1, mode: v?.mode ?? '', shop: realmNpc().shopOpen(),
+        entries: (v?.entries ?? []).map((x) => x.action ?? x.label ?? ''), speech: v?.speech?.stringId ?? -1, items: v?.stock?.length ?? 0 }; }
+    return { open: Boolean(npcState), menuOpen: Boolean(npcMenu?.open), menuNpc: npcMenu?.state?.npcId ?? 0, speechPending: menuAfterSpeech !== null, error: npcPanelError,
       npcId: npcState?.npcId ?? 0, spoken: npcState?.spoken ?? 0, greeting: npcState?.greeting ?? '',
       items: npcState?.items?.length ?? 0,
       gold: npcState?.gold ?? -1,
@@ -8284,6 +8296,7 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
     } finally { Module._free(p); }
   },
   get corpseEvidence() { return corpseEvidence && { ...corpseEvidence }; }, get lastCorpseRecovery() { return lastCorpseRecovery && { ...lastCorpseRecovery }; },
+  get npcMenuTargets() { return npcMenu?.open ? npcMenu.targets() : null; },   // the open menu's rows as canvas points, for a real-click measurement
   get npcMenuEvidence() { return npcMenuEvidence ? { ...npcMenuEvidence, error: npcMenuError } : { error: npcMenuError }; },
   get deathScreenEvidence() { return deathScreenEvidence ? { ...deathScreenEvidence, error: deathScreenError } : { error: deathScreenError }; },
   get optionsEvidence() { return { open: !!gameMenu?.open && gameMenu.page === 'options' }; },
