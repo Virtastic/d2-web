@@ -337,6 +337,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_fog_1670(uint32_t* r) {
 // 1.13c Fog+0x16B0
 EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16b0(uint32_t* r) {
     fog_handle_destroy(reinterpret_cast<FogHandle*>(static_cast<uintptr_t>(r[0])));
+    r[4] = 0;   // void: the replay's negative control pre-fills the result slot
 }
 
 // 1.13c Fog+0x1750

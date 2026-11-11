@@ -254,6 +254,7 @@ void d2_fn_fog_1390(uint32_t* r)
 	obj[0] = (uint32_t)(uintptr_t)&g_fog_vtable_28388;
 	if (obj[1] != 0)
 		d2_fog_sub_1520(obj[1]);
+	r[4] = 0;   // void: the replay's negative control pre-fills the result slot
 }
 
 // 1.13c Fog+0x13B0: "PAX" object destructor -- free the block at +8 through Storm #403. The release is a parameter (the
