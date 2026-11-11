@@ -20,7 +20,7 @@ static void ee6f0(uintptr_t unit, uintptr_t tbl, const D2GameS3aEnv* env)
     const uint32_t uh = env->h(unit);
     const uint32_t id = rd32(unit, 4);
     const uint32_t game = rd32(unit, 0x80);
-    const uint32_t loc0 = (uint32_t)cl(env, 0xA42A, uh, 0, 0, 0, 0, { uh, 0xc, 0 });
+    const uint32_t loc0 = (uint32_t)cl(env, 0xA42A, 0, 0, 0, 0, 0, { uh, 0xc, 0 });
     uintptr_t e = tbl + (uintptr_t)id * 8;
     for (int k = 0; k < 4; k++, e += 0x18) {
         uint32_t loc1 = 0, loc[2];

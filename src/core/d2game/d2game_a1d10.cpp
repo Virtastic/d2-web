@@ -1,5 +1,5 @@
 // 1.13c D2Game+0xA1D10: A1D10 spawn-item-on-unit helper.
-// idx (stack arg1) in [0, dt+0xBA0); row = dt+0xB98 + idx*0x23C; bm[5] & row[4], short row+0x80 in [0, dt+0xC4); v = A3F4(edi unit, idx); v nonzero; cnt = A400(unit, v, 1) > 0. If bm[7] & row[5]: A19A0(unit; arg0, idx, cnt, 1, 0, 0), 9F3B0(idx, arg0; unit, cnt, 1). Else A3CA(unit, s, 1); it = A5D4(unit, s) or A6A0(unit[8] | 0, 0, 0, unit[0] | 6, unit[0xC] | -1); on an item A5B6(it, s), AE3E(it, arg0), AE50(it, cnt), A60A(unit, it, 1), A6E2(it, 0x15E, arg0, 0), A6E2(it, 0x15F, cnt, 0); then 9F3B0(idx, arg0; unit, cnt, 1).
+// idx (stack arg1) in [0, dt+0xBA0); row = dt+0xB98 + idx*0x23C; bm[5] & row[4], short row+0x80 in [0, dt+0xC4); v = A3F4(edi unit, idx); v nonzero; cnt = A400(unit, v, 1) > 0. If bm[7] & row[5]: A19A0(unit; arg0, idx, cnt, 1, 0, 0), 9F3B0(idx, arg0; unit, cnt, 1). Else A3CA(unit, s, 1); it = A5D4(unit, s) or A6A0(unit[8] | 0, 0, 0, unit[0] | 6, unit[0xC] | -1); on an item A5B6(it, s), AE3E(it, idx), AE50(it, cnt), A60A(unit, it, 1), A6E2(it, 0x15E, idx, 0), A6E2(it, 0x15F, cnt, 0); then 9F3B0(idx, arg0; unit, cnt, 1).
 #include "d2game_seam4e.h"
 extern "C" void d2g_a1d10(uint32_t unit, uint32_t arg0, int32_t idx, uint32_t dt, uint32_t bm, const D2Seam* e)
 {
@@ -26,10 +26,10 @@ extern "C" void d2g_a1d10(uint32_t unit, uint32_t arg0, int32_t idx, uint32_t dt
     }
     if (it) {
         e->call(0xA5B6, 0, 0, 0, 0, 0, it, (uint32_t)(int32_t)sh);
-        e->call(0xAE3E, 0, 0, 0, 0, 0, it, arg0);
+        e->call(0xAE3E, 0, 0, 0, 0, 0, it, (uint32_t)idx);   // retail reloads EBX from the idx stack word here, not arg0
         e->call(0xAE50, 0, 0, 0, 0, 0, it, (uint32_t)cnt);
         e->call(0xA60A, 0, 0, 0, 0, 0, unit, it, 1);
-        e->call(0xA6E2, 0, 0, 0, 0, 0, it, 0x15E, arg0, 0);
+        e->call(0xA6E2, 0, 0, 0, 0, 0, it, 0x15E, (uint32_t)idx, 0);
         e->call(0xA6E2, 0, 0, 0, 0, 0, it, 0x15F, (uint32_t)cnt, 0);
     }
     e->call(0x9F3B0, (uint32_t)idx, arg0, 0, 0, 0, unit, (uint32_t)cnt, 1);

@@ -30,7 +30,7 @@ extern "C" void d2g_a7c20(uint32_t game, uint32_t unit, uint32_t a0, const D2Sea
         const int32_t r = (int32_t)e->call(0x1180, 100, unit + 0x20);
         if (r < (int16_t)d2rd16(row + idx * 2 + 0x62)) {
             if (e->call(0xA4A10, unit, 0, 0, 0, 0, game, a0, 1)) return;
-            e->call(0xF2380, 0xE, unit, 0, game, 0, (uint32_t)(int32_t)(int16_t)d2rd16(row + 0x172), it3, 0, 0);
+            e->call(0xF2380, (it3 & ~0xFFu) | 0xE, unit, 0, game, 0, (uint32_t)(int32_t)(int16_t)d2rd16(row + 0x172), it3, 0, 0);
             return;
         }
     }
