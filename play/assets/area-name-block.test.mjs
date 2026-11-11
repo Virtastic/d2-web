@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { areaNameBlockLines, rightAlignedX } from './area-name-block.mjs';
 
+// These records are retail's: the parity harness draws `v 1.13` (build-version.mjs, entry.js).
+globalThis.__d2Entry = { versionLabel: 'retail' };
 // font16 advances of the four retail records (a3-forest-walkin, f5b-automap-town), from the header.
 const ADV = { 'Spider Forest': 100, 'Rogue Encampment': 141, 'v 1.13': 41, EXPANSION: 84 };
 const measure = (t) => ADV[t];

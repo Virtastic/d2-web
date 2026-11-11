@@ -52,6 +52,8 @@ for f in play/d2.js play/d2.wasm; do
   else echo "WARNING: $f.br does not decompress to $f -- NOT staged (a browser would have run the engine it holds, not this one). Rebuild it: bash wasm-build/make_br.sh" >&2; fi
 done
 cp -rL play/assets build-wasm/site/assets
+# The on-screen version label: electron/package.json's version, stamped into the STAGED build-version.mjs only.
+"${NODE_BIN:-node}" ci/stamp-version.mjs build-wasm/site/assets/build-version.mjs
 # BYO front door: D2_ASSETS=byo stages a site that hosts no base archives (the page reads site-config.json).
 if [ "${D2_ASSETS:-}" = "byo" ]; then echo '{"assets":"byo"}' > build-wasm/site/site-config.json; else cp play/site-config.json build-wasm/site/; fi
 # The 1.13c patch shim the BYO page mounts over the player's own patch (tools/patch-shim.mjs; never committed).

@@ -158,6 +158,7 @@ ci/*
 !ci/build.sh
 !ci/build-slot.sh
 !ci/stage.sh
+!ci/stamp-version.mjs
 wasm-build/*
 !wasm-build/link-d2.sh
 !wasm-build/probe-skip.sh

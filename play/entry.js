@@ -13,7 +13,9 @@
   // fill=1 lets a test run the full-screen view too: the screen-size rows measure its sizing on emulated devices.
   const fill = !test || /[?&]fill=1(?:&|$)/.test(location.search);
   const search = test || asPlayer ? location.search : '';
-  globalThis.__d2Entry = { retail: true, player: true, fill, parity: !fill, search, test, assets: '', ...(asPlayer ? { asPlayer } : {}) };
+  // The test runner draws retail's own `v 1.13` (the parity captures contain it); players and as=player get the release version.
+  const versionLabel = test && !asPlayer && !/[?&]version=release(?:&|$)/.test(location.search) ? 'retail' : 'release';
+  globalThis.__d2Entry = { retail: true, player: true, fill, parity: !fill, search, test, versionLabel, assets: '', ...(asPlayer ? { asPlayer } : {}) };
   if (typeof document !== 'undefined' && document.documentElement) {
     if (fill) document.documentElement.classList.add('fill');
     document.documentElement.classList.add('playing');

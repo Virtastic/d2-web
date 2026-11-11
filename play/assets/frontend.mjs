@@ -11,6 +11,7 @@
 // comes out monospaced and wrong.
 
 import { recordDc6 } from './drawlist.mjs';
+import { versionLabel } from './build-version.mjs';
 import { drawBg, present } from './widebg.mjs';
 import { isButtonHeldOverTarget } from './frontend-pointer-states.mjs';
 import { mixTable } from './mix-palette.mjs';
@@ -290,7 +291,8 @@ export const TITLE_LAYOUT = {
   'EXIT DIABLO II': { kind: 'wide', x: 264, y: 534, order: 6 },
 };
 // Retail's version label: Font16, colour 0, anchored at (79, 569) (title draw list).
-export const TITLE_VERSION = { text: 'v 1.13', x: 79, y: 569 };
+// The text is the build's label (build-version.mjs): `v 1.13` for the parity harness, `v <release>` shipped.
+export const TITLE_VERSION = { get text() { return versionLabel(); }, x: 79, y: 569 };
 // d2ui/button.go LabelColor greyAlpha100: button labels are the font's glyphs modulated by 0x64.
 export const LABEL_TINT = 0x64 / 0xff;
 

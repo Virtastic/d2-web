@@ -59,6 +59,7 @@
 // disassembly of the functions named.
 import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 import { decodeDatPalette, decodeDc6 } from './d2-formats.mjs';
+import { versionLabel } from './build-version.mjs';
 
 export const AREA_NAME_BLOCK = Object.freeze({
   font: 'data\\local\\font\\latin\\font16.dc6',
@@ -73,8 +74,9 @@ export const AREA_NAME_BLOCK = Object.freeze({
   // The line cursor DAT_6fbcc21c: 0x18 at the start of 0x62680, += 0x10 per line.
   top: 24,
   step: 16,
-  // 0x5FE90 formats `v %d.%02d` from the launcher's version getter: `v 1.13` for this build.
-  version: 'v 1.13',
+  // 0x5FE90 formats `v %d.%02d` from the launcher's version getter: `v 1.13` in retail. Shipped builds
+  // show the release version (build-version.mjs); the parity harness keeps `v 1.13`.
+  get version() { return versionLabel(); },
   // The eng .tbl texts the other line functions read through D2Lang (indexes in the header).
   strings: Object.freeze({ game: 'Game: ', password: 'Password: ', difficulty: 'Difficulty: %s',
     nightmare: 'Nightmare', hell: 'Hell', expansion: 'EXPANSION' }),
