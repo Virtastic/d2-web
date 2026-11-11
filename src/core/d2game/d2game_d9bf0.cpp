@@ -20,7 +20,7 @@ extern "C" uint32_t d2game_d9bf0(uint32_t id, uint32_t unit, uint32_t game, uint
     if (quiver && (int32_t)e->call(0xA42A, 0, 0, 0, 0, 0, it, 0x46, 0) <= 0) return 0;
     if (e->call(0x70D60, 0, unit, 0, 0, 0, game)) return 0;
     if (e->call(0xAD0F0, 0, 0, 0, 0, 0, game, it, a0, a1)) {
-        if (quiver) {
+        if (e->call(0xAA66, 0, 0, 0, 0, 0, it) == 0x12) {   // the type is read again after the use handler ran
             const uint32_t idx = e->call(0xD17B0, 0, 0, 0, 0, it);
             if (idx == 0xFFFFFFFFu) return 1;
             if ((int32_t)e->call(0xA42A, 0, 0, 0, 0, 0, it, 0x46, 0) <= 0) return 1;
