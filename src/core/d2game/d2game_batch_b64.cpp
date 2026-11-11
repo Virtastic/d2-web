@@ -87,28 +87,27 @@ static inline bool unitHasPath(int32_t t) { return t == 2 || (t > 3 && t < 6); }
 static uint32_t unitX(uint32_t u) { uint32_t p = rd32(u, 0x2c); return unitHasPath(rd32(u, 0)) ? rd32(p, 0xc) : p ? g_b->o10867(p) : 0; }
 static uint32_t unitY(uint32_t u) { uint32_t p = rd32(u, 0x2c); return unitHasPath(rd32(u, 0)) ? rd32(p, 0x10) : p ? g_b->o10750(p) : 0; }
 
-// 1.13c D2Game+0xBD040 (thiscall this=game; EAX=level, EBP=seed ptr, EDI=fallback, stack words factorA/factorB;
-// stackWord8 is the uninitialised-in-decompile fall-out value)
-uint32_t d2game_bd040(uint32_t game, uint32_t classId, int32_t level, uint32_t seedPtr, uint32_t fallback,
-                      int32_t factorA, int32_t factorB, uint32_t stackWord8) {
+// Monster-class pick (thiscall on the game; level in a register; stack args classId, factorA, factorB). Both table lookups write their own
+// out local (X for the first, Y for the second), and the random roll takes the game's seed slot plus 8 as its seed pointer.
+uint32_t d2game_bd040(uint32_t game, uint32_t classId, int32_t level, int32_t factorA, int32_t factorB) {
     if (rd32(game, 0x70) == 0) return classId;
     uint32_t rec = g_b->o10695(classId);
     if (rec == 0) return classId;
-    uint32_t seed = rd32(game, 0x1d24);
-    uint32_t out10 = rd32(rec, 0x8c);
-    uint32_t c = rd32(rec, 0x88);
+    const uint32_t seed = rd32(game, 0x1d24) + 8;
+    const uint32_t c2 = rd32(rec, 0x8c);
+    const uint32_t c = rd32(rec, 0x88);
     if (c == 0x20202020 || c == 0) return classId;
-    uint32_t r = g_b->o10450(c, &out10);
+    uint32_t X = 0, Y = 0;
+    uint32_t r = g_b->o10450(c, &X);
     int32_t v;
     if (r == 0 || (v = (level - rd8(r, 0xfd)) * factorA + 1) <= 0) return classId;
-    if ((int32_t)g_b->rand211D0(seedPtr) < v) return fallback;
-    c = rd32(rec, 0x8c);
-    if (c != 0x20202020 && c != 0) {
-        r = g_b->o10450(seed + 8, &out10);
-        if (r != 0 && (v = (level - rd8(r, 0xfd)) * factorB + 1) > 0 && (int32_t)g_b->rand211D0(seedPtr) < v)
-            return out10;
+    if ((int32_t)g_b->rand211D0(seed) < v) return X;
+    const uint32_t e = rd32(rec, 0x8c);
+    if (e != 0x20202020 && e != 0) {
+        r = g_b->o10450(c2, &Y);
+        if (r != 0 && (v = (level - rd8(r, 0xfd)) * factorB + 1) > 0 && (int32_t)g_b->rand211D0(seed) < v) return Y;
     }
-    return stackWord8;
+    return classId;
 }
 
 // 1.13c D2Game+0xC39B0 (fastcall ecx=param_1)
