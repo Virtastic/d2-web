@@ -651,6 +651,8 @@ int d2_realm_client_motion_apply_player_move(D2UnitStrc* unit, uint8_t action, u
     const uint32_t mode = action == 0x17 ? PLRMODE_RUN :
         (inTown ? PLRMODE_TOWNWALK : PLRMODE_WALK);
     const uint32_t refusalMode = inTown ? PLRMODE_TOWNNEUTRAL : PLRMODE_NEUTRAL;
+    // D2Game 1.13c +0x78610 resets the path to its previous type (and velocity) before it plans a walk or run.
+    PATH_ResetToPreviousType(unit->pDynamicPath);
     D2COMMON_10170_PathSetTargetPos(unit->pDynamicPath, targetX, targetY);
     if (D2Common_10142(unit->pDynamicPath, unit, FALSE) <= 0) {
         // The native failed-route branch goes through FUN_6FAC9710 with EAX=1/5. That helper
