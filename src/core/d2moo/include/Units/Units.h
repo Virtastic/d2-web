@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include "D2CommonDefinitions.h"
 #include "Item.h"
 #include "Missile.h"
@@ -100,12 +101,16 @@ enum D2C_UnitAlignment {
 
 struct D2EventTimerStrc;
 
+// Retail's queued message: header byte at +4, payload from +8 (the writers and the flush read those byte offsets).
+// A 64-bit pNext in front would put the header at +8 on top of the payload, so the link sits after the payload.
 struct D2UnitPacketListStrc
 {
-	D2UnitPacketListStrc* pNext;
-	uint8_t nHeader;
-	//uint8_t nData[255];
+	uint32_t nReserved;			//0x00
+	uint8_t nHeader;			//0x04
+	uint8_t nData[43];			//0x05
+	D2UnitPacketListStrc* pNext;	//0x30
 };
+static_assert(offsetof(D2UnitPacketListStrc, pNext) == 0x30, "queued message payload ends at 0x30");
 
 struct D2UnitStrc
 {
