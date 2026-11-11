@@ -7,7 +7,7 @@ import { readSessionActiveNearFeed } from './assets/session-active-near-feed.mjs
 import { createFrameSnapshots, fromSnapshot } from './frame-snapshot.mjs';
 import { perfSync, perfEnabled, perfT0, perfT, perfSample, perfCountFrame, perfReset, perfReport, perfFrameStart, perfFrameTop } from './assets/frame-perf.mjs';
 import { gameInitSeed, clockInputs } from './assets/game-seed.mjs';
-import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, groundItemsUnderPointerAt, hostileUnitHoverHit, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeObjectHoverContains, nativeHoverSpecialGate, selectPointerCandidate, selectPrimaryTarget, selectHoverUnit, viewportToWorld } from './gameplay-model.mjs';
+import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, groundItemsUnderPointerAt, hostileUnitHoverHit, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeObjectHoverContains, nativeHoverSpecialGate, clickUnitOrItem, selectPointerCandidate, selectPrimaryTarget, selectHoverUnit, viewportToWorld } from './gameplay-model.mjs';
 import { altSync } from './item-pick.mjs';
 import { createMpqAssetReader } from './assets/mpq-assets.mjs';
 import { itemTables, itemSizer } from './assets/d2-item-size.mjs';
@@ -3482,7 +3482,7 @@ function update(forceTick = false, live = false) {
           // A live monster under the pointer comes before a ground item at its feet: a fight drops
           // loot where the pack stands, and every click on the next monster picked up (or walked to)
           // the drop instead -- s000d logged 400 'busy' rounds on a monster no click ever attacked.
-          // (F14: retail's hover order is not recovered; units before items is observed behaviour.)
+          // Retail's click acts on the hover-selected unit, and the hover walk ranks a monster (0) above an item (-4).
           const underTarget = resolved.unitId;
           const underItem = resolved.item;
           if (record) record.aim = { world: [tx, ty], unitId: underTarget || 0, itemId: underItem?.id ?? 0 };
@@ -3914,19 +3914,9 @@ function resolvePointerCandidates(x, y) {
   return candidates;
 }
 
-// WHAT THE CLICK ACTS ON (F14). Retail's own hit test is still not recovered, so this is the
-// observed rule, and the observed rule is about what the cursor is OVER. A ground item occupies its
-// own cell, and the cursor is on that cell only at distance 0; a unit's sprite is far wider than its
-// anchor, so a unit keeps the click anywhere inside the 2-subtile tolerance it always had. The form
-// this replaces gave the UNIT the click from anywhere inside that 2-SUBTILE DISC -- wider than an
-// item's own cell -- so a click on an item's own projected pixel was stolen by a monster 1-2
-// subtiles away: MEASURED in s000d-act4 step 19, the Hellforge Hammer's own pixel resolved to
-// `{unitId, itemId: 0}` every round, packet 0x16 was never sent and the item could not be taken
-// (harness-out/s000d-act4/step19-run5-click-stolen-live.log). So the ONE case that changed is the
-// cursor standing on a ground item's own cell with a live hostile merely near it: that click is the
-// item's. A hostile ON that cell still wins (distance 0 for both is the tie the unit wins -- F14's
-// measured monster-on-the-item case), and everywhere else the unit-first order is untouched. This
-// decides every act's loot click, not only act IV's.
+// WHAT THE CLICK ACTS ON (F14). The left click acts on the hover selection (clickUnitOrItem): a
+// hostile whose sprite box holds the cursor outranks a ground item, unless hover already holds that
+// item. A monster merely near an item (box off the cursor) is not hovered, so the item keeps the click.
 // Demo defect 89: the left button acts on the unit hover names (D2Client FUN_6FB01E80 keeps the previous hover target
 // while its validator accepts it, else the type-priority / player-distance walk). The click used to re-pick through
 // selectRetailPickTarget (world distance from the cursor's ground point), so a click on a monster whose plate was
@@ -3958,8 +3948,7 @@ function resolvePointerTarget(x, y) {
   const drawn = new Set(hostileNear ? [] : groundItemsUnderPointer(x, y));
   const ground = nearestGroundItem(snapshot.items, at, drawn);
   const unit = unitId ? (snapshot.entities || []).find((entity) => entity.id === unitId && entity.type === 1) : null;
-  if (unit && ground?.distance === 0 && distance2(unit) > 0) return { at, unitId: 0, item: ground.item };
-  return { at, unitId, item: unit ? null : (ground?.item ?? null) };
+  return { at, ...clickUnitOrItem(unit ? unitId : 0, ground?.item, hoverPrior) };
 }
 
 // Single-player: the client's hp% byte (D2Game 0x0C/0x69) is (life>>8)*100/(maxlife>>8) of the server unit (stats 6, 7).
@@ -4461,15 +4450,15 @@ function drawRealmTrade(w, h, hover) {
   } catch (error) { tradeEvidence = { error: String(error) }; }
 }
 // The name over another player under the pointer.
-// GUESS: the plate's height above the feet (the monster plate's rule with a fixed 80); the client's own number for
-// a player unit is not read yet, and its hover-text routine settles it.
+// The client's under-mouse routine queues a player's name 72 px (0x48) above the unit's screen point, where an
+// NPC's plate uses its MonStats2 pixHeight; the same deferred label drawer then lays out the box.
 function drawRealmPlayerPlate() {
   if (!hoverFont || !realmSceneActive) return null;
   const hit = realmInput().pick(pointer.x, pointer.y);
   if (hit?.kind !== 'player' || !hit.unit.name) return null;
   const text = hit.unit.name, boxWidth = hoverFont.measure(text) + 8;
   const left = Math.min(Math.max(hit.unit.anchorX - Math.trunc(boxWidth / 2), 0), Math.max(0, canvas.width - boxWidth));
-  const bottom = Math.min(Math.max(11, hit.unit.anchorY - 80 + 2), canvas.height - 5);
+  const bottom = Math.min(Math.max(11, hit.unit.anchorY - 0x48 + 2), canvas.height - 5);
   const box = { x: left, y: bottom - 16, width: boxWidth, height: 16 };
   paintHoverPlate(ctx, plateBoxes(box.x, box.y, box.width, box.height, 0), hoverPlatePalette, recordPrim);
   hoverFont.drawAnchored(ctx, text, left + 4, bottom - 3);
@@ -7363,8 +7352,8 @@ canvas.addEventListener('pointerdown', (e) => {
   // A hostile monster under the pointer is what a left click acts on, ahead of the tile or object
   // behind it: a Fallen standing on the Den of Evil's exit was clicked 400 times and every click
   // walked to the exit instead (s000a). Retail picks a UNIT under the cursor before a level-exit
-  // tile. TODO(client-parity F14): the exact hover order between overlapping units (D2Client's
-  // hover selection) is not recovered; monsters-first is the observed behaviour, not the code.
+  // tile. The click acts on the hover-selected unit; the hover walk's type priority (monster 0,
+  // item -4, object -6) puts a live monster ahead of what lies behind it.
   // Through pointerWorldAt, like hover and the skill paths: this used to round the world cell on its
   // own, without pointerWorldAt's half-subtile, so at a cell boundary the click tested a different cell
   // than hover had highlighted -- hostileHit could be null while a monster was plainly under the

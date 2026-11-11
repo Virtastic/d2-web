@@ -15,7 +15,9 @@
 //     invPage = the tab, gridX/gridY) -- retail's server places the stock, the client only shows it;
 //   * tab names: strBSArmor / strBSWeapons / strBSMisc; a tab with no stock is not drawn.
 // The opening tab is captured (openingTab below: smith -> Weapons, else Misc), not riiablo's guess.
-// TODO(client-parity P8d): buying is a left click on the item, which retail may bind differently.
+// Buying: a right press on an offer buys it at once (the inventory right-click handler sends the buy for
+// an item in the NPC grid); a left press with an empty cursor asks first, and a left press with an item
+// on the cursor over the grid sells that item. The shell binds both (vendor-offer-click.mjs).
 import { gridCelAt } from './item-cel-place.mjs';
 import { placeItemTip } from './item-tooltip.mjs';
 import { createFont, decodeFontTbl, FRONTEND, textColourPalette } from './frontend.mjs';

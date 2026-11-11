@@ -292,6 +292,15 @@ function candidatePickPriority(candidate, unitType) {
   return unitTypePickPriority(unitType);
 }
 
+// #10494(unit, 0x8f) is D2Common's unit-state test for state 143 ("attached"). An explicit probe
+// result wins; otherwise the snapshot's state set answers it; without either it stays unknown.
+const STATE_ATTACHED = 143;
+function candidateAttached(candidate) {
+  if (candidate?.ordinal10494_8f !== undefined) return candidate.ordinal10494_8f === true;
+  const states = candidate?.states ?? candidate?.target?.states;
+  return states instanceof Set ? states.has(STATE_ATTACHED) : undefined;
+}
+
 export function nativeHoverSpecialGate(candidate) {
   const type = candidateUnitType(candidate);
   if (type === 1) {
@@ -300,9 +309,10 @@ export function nativeHoverSpecialGate(candidate) {
     const priorityGate = result === undefined
       ? { status: 'unresolved', ordinal: 10648 }
       : { status: 'resolved', ordinal: 10648, priority: result ? -8 : unitTypePickPriority(1) };
-    const stateGate = candidate?.ordinal10494_8f === undefined
+    const attached = candidateAttached(candidate);
+    const stateGate = attached === undefined
       ? { status: 'unresolved', ordinal: 10494, argument: 0x8f }
-      : { status: candidate.ordinal10494_8f ? 'skip' : 'pass', ordinal: 10494, argument: 0x8f };
+      : { status: attached ? 'skip' : 'pass', ordinal: 10494, argument: 0x8f };
     return [priorityGate, stateGate];
   }
   if (type === 2) {
@@ -328,9 +338,10 @@ export function selectUnitTypePickCandidate(candidates, {
     const unitType = unitTypeOf(candidate);
     // FUN_6fb01e80 walks every unit list but skips type 3 (missile): a missile is never a hover target.
     if (unitType === 3) continue;
-    // The scan skips type 1 when #10494(unit, 0x8f) succeeds. Its meaning is not inferred from
-    // the ordinal; an unknown result leaves the browser-accepted candidate in this approximation.
-    if (unitType === 1 && candidate?.ordinal10494_8f === true) continue;
+    // Once a best candidate exists, the scan skips a type-1 unit in the attached state (143). The
+    // test sits inside the "a best already exists" branch, so an attached monster can still be the
+    // first candidate. An unknown state leaves the browser-accepted candidate in.
+    if (unitType === 1 && selected && candidateAttached(candidate) === true) continue;
     const priority = candidatePickPriority(candidate, unitType);
     const x = Number(candidate?.x ?? candidate?.target?.x);
     const y = Number(candidate?.y ?? candidate?.target?.y);
@@ -384,6 +395,16 @@ export function selectPointerCandidate(candidates, { click = false, reference = 
   if (winner) return { kind: winner.kind, target: winner.target };
   if (candidates.item) return { kind: 'item', target: candidates.item };
   return null;
+}
+
+// The left-click dispatcher acts on the hover-selected unit; it does not pick again. The hover walk
+// ranks a live monster (0) above an item (-4), so a hovered monster keeps the click even when an item
+// lies on the cursor's own cell. The ground item takes the click when no unit is hovered, or when hover
+// already holds that item: the walk keeps a stored selection while it still hit-tests, so a monster
+// stepping over a hovered item does not take it over.
+export function clickUnitOrItem(unitId, groundItem, prior = null) {
+  if (groundItem && prior?.kind === 'item' && prior.id === groundItem.id) return { unitId: 0, item: groundItem };
+  return unitId ? { unitId, item: null } : { unitId: 0, item: groundItem ?? null };
 }
 
 // Click on overlapping units follows the hover walk (D2Client 0x51E80): type priority, then squared

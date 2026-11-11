@@ -55,7 +55,7 @@ test('F14: equal signed priorities use squared path distance to the player and k
     'the standalone picker model follows the same path-distance branch');
 });
 
-test('F14: only explicit #10648 and #10494(0x8f) results affect type-1 candidates', () => {
+test('F14: #10648 and #10494(0x8f) results affect type-1 candidates in scan order', () => {
   const ordinary = { id: 1, type: 1, x: 0, y: 0 };
   const object = { id: 2, type: 2, x: 50, y: 0 };
   const forced = { ...ordinary, id: 3, ordinal10648: true };
@@ -77,8 +77,23 @@ test('F14: only explicit #10648 and #10494(0x8f) results affect type-1 candidate
     { status: 'unresolved', ordinal: 10648 },
     { status: 'skip', ordinal: 10494, argument: 0x8f },
   ]);
-  assert.equal(selectUnitTypePickCandidate([skipped, object]), object,
-    'a confirmed state-query result skips that scan candidate');
+  assert.equal(selectUnitTypePickCandidate([object, skipped]), object,
+    'an attached unit is skipped once a best candidate exists');
+  assert.equal(selectUnitTypePickCandidate([skipped, object]), skipped,
+    'the state test sits in the best-exists branch, so an attached unit can be the first best');
+  assert.equal(selectUnitTypePickCandidate([skipped]), skipped);
+});
+
+test('F14: the attached state (143) resolves from the snapshot state set', () => {
+  const object = { id: 31, type: 2, x: 50, y: 0 };
+  const attached = { id: 32, type: 1, x: 0, y: 0, states: new Set([143]) };
+  const free = { id: 33, type: 1, x: 0, y: 0, states: new Set([1]) };
+  assert.deepEqual(nativeHoverSpecialGate(attached)[1], { status: 'skip', ordinal: 10494, argument: 0x8f });
+  assert.deepEqual(nativeHoverSpecialGate(free)[1], { status: 'pass', ordinal: 10494, argument: 0x8f });
+  assert.equal(selectUnitTypePickCandidate([object, attached]), object);
+  assert.equal(selectUnitTypePickCandidate([object, free]), free);
+  assert.equal(selectUnitTypePickCandidate([object, { ...attached, ordinal10494_8f: false }]).id, 32,
+    'an explicit probe result wins over the state set');
 });
 
 test('F14: object #11020 stays explicitly unresolved while accepted object candidates use the table', () => {
@@ -123,6 +138,17 @@ test('F14: a click in a crowd ties by squared distance to the player like hover 
   const near = { id: 61, x: 1, y: 1, npc: true };
   assert.equal(selectPointerCandidate({ units: [far, near], itemsOnCell: [], objectsUnderPointer: [], itemOnCell: null }, { click: true, reference }).target.id, 61);
   assert.equal(selectPointerCandidate({ units: [near, far], itemsOnCell: [], objectsUnderPointer: [], itemOnCell: null }, { click: true, reference }).target.id, 61);
+});
+
+test('F14: the click acts on the hovered unit ahead of an item on the cursor cell', async () => {
+  const { clickUnitOrItem } = await import('../play/gameplay-model.mjs');
+  const item = { id: 70, type: 4 };
+  assert.deepEqual(clickUnitOrItem(9, item), { unitId: 9, item: null }, 'monster 0 outranks item -4');
+  assert.deepEqual(clickUnitOrItem(0, item), { unitId: 0, item });
+  assert.deepEqual(clickUnitOrItem(0, undefined), { unitId: 0, item: null });
+  assert.deepEqual(clickUnitOrItem(9, item, { kind: 'item', id: 70 }), { unitId: 0, item },
+    'a stored item selection that still hit-tests keeps the click');
+  assert.deepEqual(clickUnitOrItem(9, item, { kind: 'item', id: 71 }), { unitId: 9, item: null });
 });
 
 test('engine: click unit pick among box hits is nearest the player, not the cursor', async () => {
