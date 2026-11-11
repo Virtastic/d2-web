@@ -1131,8 +1131,10 @@ function sessionAdapter() {
         if (Module._d2_session_resources) {
           const rp = Number(Module.ccall('d2_session_resources', 'number', [], [])), rv = new DataView(Module.HEAPU8.buffer, rp, 24);
           if (rv.getUint32(0, true) === 1 && rv.getUint32(4, true) === 24) {
-            base.player.hp = rv.getInt32(8, true); base.player.hpMax = rv.getInt32(12, true);
-            base.player.mana = rv.getInt32(16, true); base.player.manaMax = rv.getInt32(20, true);
+            // The client's own life and mana are the whole points the server's 0x95 carries (shifted back up by 8), never the
+            // server unit's fraction, so the hero reads as retail's client reads it.
+            base.player.hp = rv.getInt32(8, true) & ~0xff; base.player.hpMax = rv.getInt32(12, true);
+            base.player.mana = rv.getInt32(16, true) & ~0xff; base.player.manaMax = rv.getInt32(20, true);
           }
         }
         if (!Module._d2_session_rooms || !Module._d2_session_units) return base;
