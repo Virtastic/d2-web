@@ -14,7 +14,7 @@ struct HookEnv {
         for (uint32_t o = 0; o < n; o += 9) {
             if (L[0] >= cap) abort();
             uint32_t* e = L + 1 + L[0]++ * 10; e[0] = rva | 0x40000000u;
-            for (uint32_t j = 0; j < 9; j++) { uint32_t v = o + j < n ? rd32(p + 4 * (o + j)) : 0; e[1 + j] = isStk(v) ? 0xB3000000u : v; }
+            for (uint32_t j = 0; j < 9; j++) { uint32_t v = o + j < n ? rd32(p + 4 * (o + j)) : 0; e[1 + j] = (!blkRawOf(rva) && isStk(v)) ? 0xB3000000u : v; }
         }
     }
     // REGS `Z`: the %s string behind a stack-pointer argument word i of a log-writer call: two records (0x10000000|i<<20|rva, 36 string bytes each, zero past the NUL)
@@ -53,6 +53,9 @@ struct HookEnv {
     }
     uint32_t* L; const uint32_t* sc;
     uint32_t rawRva[8]; int nraw = 0;   // descriptor `hooknostk RVA` (the capture does not stack-tag that hook's record)
+    uint32_t blkRaw[8]; int nblk = 0;   // descriptor `hookblknostk RVA` (that hook's hookblk records are logged raw)
+    bool blkRawOf(uint32_t rva) const { for (int q = 0; q < nblk; q++) if (blkRaw[q] == rva) return true; return false; }
+    void noStkBlk(uint32_t rva) { if (nblk < 8) blkRaw[nblk++] = rva; }
     void noStk(uint32_t rva) { if (nraw < 8) rawRva[nraw++] = rva; }
     uint32_t xs5 = 0, xs6 = 0;   // stack words 5 and 6 of the next h() (set by Env::Xs; cleared by h)
     uint32_t ediReg = 0;   // EDI at the next h(): a `hookw RVA e V...` write goes through it (key (0x15<<24)|rva); set by ed()
@@ -84,7 +87,7 @@ struct HookEnv {
             if (L[0] >= cap) abort();
             uint32_t* e = L + 1 + L[0]++ * 10;
             e[0] = rva | 0x40000000u;
-            for (uint32_t j = 0; j < 9; j++) { uint32_t i = o + j, v = i < n ? b[i] : 0; if (i < 32 && !(mask >> i & 1)) v = 0; e[1 + j] = isStk(v) ? 0xB3000000u : v; }
+            for (uint32_t j = 0; j < 9; j++) { uint32_t i = o + j, v = i < n ? b[i] : 0; if (i < 32 && !(mask >> i & 1)) v = 0; e[1 + j] = (!blkRawOf(rva) && isStk(v)) ? 0xB3000000u : v; }
         }
     }
     // REGS `D`: the 9 dwords at [EDI] at hook entry (the event record handed to 0x33CE0), one record (rva|0x40000000, d0..d8). `bytemask` bit i keeps byte i
