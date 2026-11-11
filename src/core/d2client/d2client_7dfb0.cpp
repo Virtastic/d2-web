@@ -103,7 +103,7 @@ extern "C" void d2c_7dfb0(uint32_t msg, const cl::Env& e) {
     case 0xF: c.spr(c.str(0xE43), e.R(msg + 3)); break;
     case 0x11: c.spr(c.str(0x2AFC), e.R(msg + 3)); break;
     case 0x12:
-        c.spr(c.str(0x2AFD));
+        c.spr(c.str(0x2AFD), P(&c));                       // 3 pushed args; the next stack word is the saved EBP (a caller stack address)
         if (e.R(G(0x11C3B8))) { const uint32_t r = e.H(0xA5480, 5, 0, 1); e.H(0xC556, e.R(G(0x11C3B8)), r); }
         e.W(G(0x10B9CC), e.H(kTick));
         e.W(G(0x10B9D0), 0xFA0); e.W(G(0x10B9D4), 0x2710); e.W(G(0x10B9D8), 0xFA0);

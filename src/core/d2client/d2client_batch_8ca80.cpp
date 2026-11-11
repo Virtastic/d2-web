@@ -168,7 +168,7 @@ void d2_client_8d600(uint32_t param_1, uint32_t item, uint32_t unit_bbfc, void* 
                      uint32_t (*ord10003)(void), uint32_t (*ord10428)(uint32_t, uint32_t, uint32_t),
                      uint32_t (*ord10540)(uint32_t, uint32_t), uint32_t (*ord10393)(uint32_t, uint32_t),
                      void (*ustrcpy)(void*, const void*), void (*ustrcat)(void*, const void*),
-                     void (*usprintf)(int, void*, const void*), void (*sprintf578)(char*, int, const char*, uint32_t),
+                     void (*usprintf)(int, void*, const void*, int32_t), void (*sprintf578)(char*, int, const char*, uint32_t),
                      void (*win2Unicode)(void*, const char*, int), void* tmp_u /*>=24 B*/, void* tmp_big /*>=0x400 B*/) {
     if (!param_1 || !item || !*(const uint8_t*)(uintptr_t)(item + 0xb4) || !unit_bbfc) return;
     if (*(const int16_t*)(uintptr_t)(item + 0xb6) == 0x1506) return;
@@ -193,9 +193,9 @@ void d2_client_8d600(uint32_t param_1, uint32_t item, uint32_t unit_bbfc, void* 
         break;
     case 4:
         v = ord10428(unit_bbfc, param_1, rd32(item + 0xa4));
-        usprintf(0x200, tmp_big, (const void*)(uintptr_t)ord10003());
+        usprintf(0x200, tmp_big, (const void*)(uintptr_t)ord10003(), (int32_t)v);
         ustrcat(out, tmp_big);
-        ustrcat(out, (const void*)(uintptr_t)a);
+        ustrcat(out, (const void*)(uintptr_t)b);       // retail: the second string (0xF9E) follows the formatted value
         return;
     default:
         return;
@@ -203,8 +203,8 @@ void d2_client_8d600(uint32_t param_1, uint32_t item, uint32_t unit_bbfc, void* 
     ustrcpy(out, (const void*)(uintptr_t)ord10003());
     sprintf578(num, 10, "%d", v);
     win2Unicode(tmp_u, num, 9);
+    ustrcat(out, (const void*)(uintptr_t)a);           // retail order: label, first string, number, second string
     ustrcat(out, tmp_u);
-    ustrcat(out, (const void*)(uintptr_t)a);
     ustrcat(out, (const void*)(uintptr_t)b);
 }
 

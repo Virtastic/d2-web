@@ -124,8 +124,8 @@ int32_t personalizedNameInPlace(Env& e,wc* out){
 
 // 1.13c D2Client+0x8E2F0
 void hoverItemPickup(Env& e){
- if((e.g(0xBCBC34)!=1 || e.g(0x8BC48)/2<=e.g(0xBCB828)) && e.g(0xBCB824)<e.g(0x8BC4C)-0x27){
-  if(e.g(0xBCB828)<e.g(0x8BC48)/2){ e.gset(0xBCBC68,0); return; }
+ if((e.g(0xBCBC34)!=1 || e.g(0xB8BC48)/2<=e.g(0xBCB828)) && e.g(0xBCB824)<e.g(0xB8BC4C)-0x27){
+  if(e.g(0xBCB828)<e.g(0xB8BC48)/2){ e.gset(0xBCBC68,0); return; }
   int32_t it=e.q(11017,0,0);
   if(it && e.g(0xBCBC2C)){
    if(!e.q(10217,it,e.g(0xBCBC68)) || !e.q(10244,it,e.g(0xBCBBFC))){ e.q(11139,0,0); e.q(0x8C2B0,it,0); }
@@ -134,24 +134,11 @@ void hoverItemPickup(Env& e){
  }
 }
 
-// 1.13c D2Client+0x8E440
-void cursorItemPlace(Env& e,int8_t mode,int32_t unit){
- if(mode==-1||!unit||!e.g(0xBCBC28)) return;
- e.q(10114,unit,0); int32_t x=e.g(0xB90EB8),y=e.g(0xB90EBC);
- if(x<0||y<0) return;
- int32_t pm=e.g(0xBCBC34);
- if((pm==1&&e.g(0x8BC48)/2>e.g(0xBCB828))||e.g(0xBCB824)>=e.g(0x8BC4C)-0x27) return;
- if(pm==0x13&&e.g(0x8BC48)/2>e.g(0xBCB828)) return;
- if(e.q(11148,0,0)){ e.q(0x8C600,x,y*4+1); return; }
- if(!e.q(10967,0,0) && (!y || e.q(10695,y,0)!=0x20786f62)){ e.q(0x8C600,x,y*4+0); return; }
- e.q(10114,y,0); e.q(0x8C600,e.q(0x1660,0,0),e.q(0x1630,0,0)*4+3);
-}
-
 // 1.13c D2Client+0x8E770
 void drawBeltPanelCaps(Env& e){
  if(!e.g(0xBC9854)||!e.g(0xBAAE14)) return;
  if(!e.g(0xBCBED8)){ e.gset(0xBCBED8,e.q(0xBF6C0,0,0)); if(!e.g(0xBCBED8)) return; }
- int32_t x=e.g(0xBCB9A0), y=e.g(0xBCB9A4)-0xe0+e.g(0x8BC4C), y2=e.g(0xBCB9A4)-0x30+e.g(0x8BC4C);
+ int32_t x=e.g(0xBCB9A0), y=e.g(0xBCB9A4)-0xe0+e.g(0xB8BC4C), y2=e.g(0xBCB9A4)-0x30+e.g(0xB8BC4C);
  e.draw(0,x,y,-1,5,0); e.draw(1,x+0x100,y,-1,5,0);
  e.draw(2,x,y2,-1,5,0); e.draw(3,x+0x100,y2,-1,5,0);
  e.q(10184,0,0); e.q(10150,0x82-e.g(0xBCB9A4),e.g(0xBCBEF4)); e.q(10184,0,0);

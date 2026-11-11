@@ -5,31 +5,8 @@
 #include <cstdio>
 #include <cstring>
 #include <initializer_list>
+#include "d2client_batch_5a5e0.h"
 namespace d2client_batch_5a5e0 {
-struct Services {
- virtual ~Services()=default;
- virtual uint32_t* cacheStats()=0;           // Ordinal_10073: 0x1C-dword stats block or null
- virtual void cacheReset()=0;                // Ordinal_10064
- virtual void tileStats(int32_t& a,int32_t& b,int32_t& c,int32_t& d)=0; // Ordinal_10074
- virtual void drawText(int32_t x,int32_t y,const char* s)=0; // Ordinal_10050 (already formatted)
- virtual uint32_t tick()=0; virtual uint32_t videoMode()=0;
- virtual void memStatus(uint32_t& tp,uint32_t& ap,uint32_t& tf,uint32_t& af)=0;
- virtual int32_t gfxMem()=0; virtual int32_t spriteCacheStat()=0; // Ordinal_10032(Ordinal_10058())
- virtual int32_t asyncFiles()=0; virtual int32_t celCacheStat()=0; // Ordinal_10082(Ordinal_10010())
- virtual int32_t textWidth(const uint16_t* s)=0;   // Ordinal_10028 (current font)
- virtual void showText(const uint16_t* s,int32_t a,int32_t b,int32_t c)=0; // Ordinal_10150
- virtual void saveFont()=0; virtual void restoreFont()=0;                 // Ordinal_10184 pair
- virtual void setFlag(int32_t,int32_t,int32_t)=0; // FUN_72790
- virtual bool regQuery(const char* app,const char* key)=0; // Ordinal_423 (null result => default)
- virtual const char* stringById(int32_t id)=0;     // Ordinal_10003 (ascii view)
- virtual void freeEntry(int32_t h)=0; virtual void freeBuf()=0;
-};
-struct State {
- uint32_t fpsLast{},fpsNow{},fpsAcc{},fpsSkipBase{},fpsEnable{},fpsFlag{},detail{};
- int32_t ping{},skip{},cacheHandles[7]{},*hireTable{},hireCount{},hireMax{};
- uint32_t popupHireling{},hireFlag{};
- int32_t* dataTables{};
-};
 static double kf(int32_t v){ double f=(double)v; if(v<0) f+=4294967296.0; return f*(1.0/1024.0); }
 static void emit(Services& s,int x,int y,const char* fmt,...) __attribute__((format(printf,4,5)));
 static void emit(Services& s,int x,int y,const char* fmt,...){
@@ -84,26 +61,22 @@ void hirelingPopupInit(Services& s,State& st){
  st.hireFlag=0; s.setFlag(0x23,0,0);
  if(!s.regQuery("Diablo II","PopupHireling")) st.popupHireling=1;
 }
-// 1.13c D2Client+0x5AC70 (ESI = text buffer, 0x3E bytes into it is the end sentinel)
-void drawLabel(Services& s,uint16_t* buf,int32_t b,int32_t c){
- s.saveFont(); uint16_t* e=buf+0x1f;
- while(s.textWidth(buf)>0x42){ *--e=0; }
- s.textWidth(buf); s.showText(buf,b,c,0); s.restoreFont();
-}
+// 1.13c D2Client+0x5AC70 is d2client_5ac70.cpp; the callers reach it through the label seam (ESI = buffer, stack a0 a1 a2)
+void drawLabel(Services& s,uint16_t* buf,int32_t a0,int32_t a1,int32_t a2){ s.label(buf,a0,a1,a2); }
 // 1.13c D2Client+0x5ADD0 lives in d2client_5add0.cpp (over the header's Services)
 // 1.13c D2Client+0x5AEC0
 void drawAsciiLabel(Services& s,const char* a,int32_t b,int32_t c){
  uint16_t w[32]={}; for(int i=0;a[i]&&i<31;i++) w[i]=(uint8_t)a[i];
- drawLabel(s,w,b,c);
+ drawLabel(s,w,b,c,0);
 }
 // 1.13c D2Client+0x5AF10 (index in EAX; row stride 0xE0, name id at +0xC)
 void drawHireableName(Services& s,State& st,int32_t idx,int32_t b,int32_t c,const uint8_t* rows,int32_t count){
  if(idx<0||idx>=count||!rows) return;
  int16_t id; std::memcpy(&id,rows+idx*0xe0+0xc,2);
  if(id==0||id==0x1506) return;
- const char* t=s.stringById(id); uint16_t w[32]={};
- for(int i=0;t&&t[i]&&i<31;i++) w[i]=(uint8_t)t[i];
- drawLabel(s,w,b,c); (void)st;
+ const uint16_t* t=s.stringById(id); uint16_t w[64]={};
+ for(int i=0;t&&t[i]&&i<63;i++) w[i]=t[i];
+ drawLabel(s,w,b,c,0); (void)st;
 }
 // 1.13c D2Client+0x5AFA0
 void freeHireables(Services& s,State& st){
