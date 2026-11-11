@@ -20,7 +20,7 @@ u32 c1de(u32 a) { L(0xc1de, 0, 0, a >= g_rm0 && a < g_rm0 + 0x1000 ? PR(a) : a, 
 void c3dc(u32 room, u32* arr, u32* cnt) { L(0xc3dc, 0, 0, room, 0xB3000000u, 0xB3000000u, 0); *arr = g_arr; *cnt = g_cnt; }
 u32 cc3a(u32 c) { L(0xcc3a, 0, c, 0, 0, 0, 0); u32 n = g_n++; bool a = n == 0 || (g_mode == 1 && n >= 2); return a ? g_la : g_lb; }
 u32 f62710(u32 a) { L(0x62710, a, 0, 0, 0, 0, 0); return g_ctx; }
-void f62580(u32 room, u32 z, u32 ctx, u32 ebx) { L(0x62580, 0, 0, PR(room), z, ctx, ebx); }
+void f62580(u32 room, u32 z, u32 ctx, u32 ebx) { L(0x62580, 0, 0, PR(room), z, ctx, 0); g_lg[1 + (g_lg[0] - 1) * 10 + 4] = ebx; }  // EBX goes in the register slot
 void fatal() {}
 }
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2client_62af0(u32* r) {

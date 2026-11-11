@@ -255,7 +255,7 @@ extern "C" uint32_t d2c_58C90_n99(uint32_t unit, int32_t idx, uint32_t p3) {
             W(unit + 0x20, (uint32_t)s); W(unit + 0x24, (uint32_t)(s >> 32));
             if ((uint32_t)s & 1) e = T;
         }
-        uint32_t stk[5] = { 0x85C78, (uint32_t)out[0], (uint32_t)out[1], (uint32_t)idx, p3 };
+        uint32_t stk[5] = { 0xD5C78, (uint32_t)out[0], (uint32_t)out[1], (uint32_t)idx, p3 };
         g99.callStk(0x58370, (uint32_t)e, unit, stk, 5);
     }
     return 1;
