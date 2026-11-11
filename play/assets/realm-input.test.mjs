@@ -442,6 +442,13 @@ test('belt lift, place and swap send the retail packets', () => {
   assert.equal(input.beltClick({ op: 'nope' }), false);
 });
 
+test('the identify cursor press is 0x27 [clicked item][armed item], and the cancel repeats the armed id (D2Client 0x95FE0/0xBEB90)', () => {
+  const { out, input } = harness();
+  input.useOnItem(0x01020304, 0x0a0b0c0d);
+  input.useOnItem(0x55, 0x55);
+  assert.deepEqual(out, [[0x27, 4, 3, 2, 1, 0x0d, 0x0c, 0x0b, 0x0a], [0x27, 0x55, 0, 0, 0, 0x55, 0, 0, 0]]);
+});
+
 test('drop gold is the 9-byte packet with the hero id, and nothing for zero', () => {
   const { out, input } = harness();
   assert.equal(input.dropGold(1, 0), false);

@@ -40,6 +40,7 @@ export const packets = Object.freeze({
   socketItem: (cursorGuid, itemGuid) => make(0x28, le32(cursorGuid), le32(itemGuid)),   // 9
   scrollToBook: (scrollGuid, bookGuid) => make(0x29, le32(scrollGuid), le32(bookGuid)), // 9
   itemToCube: (itemGuid, cubeGuid) => make(0x2a, le32(itemGuid), le32(cubeGuid)),       // 9
+  useOnItem: (targetGuid, useGuid) => make(0x27, le32(targetGuid), le32(useGuid)),      // 9: D2Client 0x95FE0 -> 0x14910 [0x27][clicked item][armed item]; D2GSPacketClt27
   useItem: (guid, x, y) => make(0x20, le32(guid), le32(x), le32(y)),        // 13
   useBeltItem: (guid, onMerc = false) => make(0x26, le32(guid), le32(onMerc ? 1 : 0), le32(0)), // 13
   npcChatStart: (type, guid) => unit(0x2f, type, guid),             // 9
@@ -418,6 +419,8 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     combine: (action, cursorGuid, itemGuid) => { const b = { stack: packets.stackItems, socket: packets.socketItem, scroll: packets.scrollToBook, cube: packets.itemToCube }[action];
       return Boolean(b) && itemGate() && emit(b(cursorGuid, itemGuid), `combine-${action}`); },
     unstack: (guid) => itemGate() && emit(packets.unstackItem(guid), 'unstack'),
+    /** The identify cursor's press on an item (0x27): the item under the click, then the armed scroll or tome; the same id twice cancels. */
+    useOnItem: (targetGuid, useGuid) => itemGate() && emit(packets.useOnItem(targetGuid, useGuid), 'use-on-item'),
     swapBody: (guid, bodyLoc) => itemGate() && emit(packets.swapWithBody(guid, bodyLoc), 'swap-body'),
     /** A click on a ground item by id: walk to it and pick it up (0x16) once in reach, as leftClick does for the item under the pointer. */
     pickUp(guid) { const s = open(), u = s?.items.find((i) => i.id === guid && i.mode === 3); return Boolean(u) && itemGate() && interactWith(s, UNIT.ITEM, u) !== false; },
