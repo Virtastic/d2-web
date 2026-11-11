@@ -27,6 +27,7 @@
 #include <D2QuestRecord.h>
 #include <D2States.h>
 #include <D2Items.h>
+#include <D2Skills.h>
 #include "core/d2game/fn_rules.h"  // rules shared with the FN probes
 #include <OBJECTS/Objects.h>  // the portal owner for 0x82
 #include "core/d2game/scmd_encode.h"  // wire forms of the object, portal and item-flag packets
@@ -508,7 +509,22 @@ void D2GAME_PACKETS_SendPacket0x1D_E_F_6FC3D480(D2ClientStrc* pClient, uint16_t 
     else p[2] = (uint8_t)nValue;
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, p, (int32_t)n);
 }
-void D2GAME_PACKETS_SendPacket0x21_UpdateSkills_6FC3DB50(D2ClientStrc* pClient, D2UnitStrc* pUnit, WORD nSkillId, BYTE nSkillLevel, BYTE a4) {}
+// 1.13c D2Game+0x8D5F0: a unit's skill level, {0x21, type, remove, guid, skill, level, bonus level, residue}, 12 bytes.
+// Without a client the sender is the player's own (retail resolves it from the player data; there is no minion fallback).
+// Spending a skill point reaches the client only through this packet.
+void D2GAME_PACKETS_SendPacket0x21_UpdateSkills_6FC3DB50(D2ClientStrc* pClient, D2UnitStrc* pUnit, WORD nSkillId, BYTE nSkillLevel, BYTE a4) {
+    if (!pUnit) return;
+    if (!pClient) {
+        if (pUnit->dwUnitType != UNIT_PLAYER) return;
+        pClient = SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__);
+        if (!pClient) return;
+    }
+    D2GSPacketSrv21 packet = {};
+    packet.nHeader = 0x21; packet.nUnitType = (uint8_t)pUnit->dwUnitType; packet.unk0x02 = a4;
+    packet.nUnitGUID = pUnit->dwUnitId; packet.nSkillId = nSkillId; packet.nSkillLevel = nSkillLevel;
+    packet.nBonusSkillLevel = (uint8_t)SKILLS_GetBonusSkillLevelFromSkillId(pUnit, nSkillId);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+}
 // D2Game.0x6FC3DBE0 (1.13c D2Game+0x8D570 = 0x6FCAD570): item skill quantity update; bytes 2 and 0xA are never
 // written by retail's composer (stack residue on the wire), zero here.  Byte 0xB is 1 only when
 // the unit exists and has STATE_PLAYERBODY (1.13c disassembly; D2MOO's 1.10f reading inverts it).
