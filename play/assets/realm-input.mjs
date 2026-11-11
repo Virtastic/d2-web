@@ -366,6 +366,14 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     /** The skill popup's F-key assign: slot (0-15) takes the skill in that hand; the server binds it (0x51). */
     bindHotkey: (slot, skill, left, owner = 0xffffffff) => (Number.isInteger(slot) && slot >= 0 && slot < 16 && Number.isInteger(skill) && skill >= 0 && skill <= 0x7fff
       ? emit(packets.bindHotkey(slot, skill, Boolean(left), owner), 'bind-hotkey') : false),
+    /** Retail's popup assign: unbind the slot's old binding, bind the new one, then clear every other slot holding the same skill and owner. `table` is the hotkey table before the assign. */
+    assignHotkey: (slot, skill, left, owner = 0xffffffff, table = []) => {
+      if (!Number.isInteger(slot) || slot < 0 || slot >= 16 || !Number.isInteger(skill) || skill < 0 || skill > 0x7fff) return false;
+      if (table[slot] && table[slot].skill >= 0) emit(packets.bindHotkey(slot, 0x7fff, true, 0xffffffff), 'unbind-hotkey');
+      const sent = emit(packets.bindHotkey(slot, skill, Boolean(left), owner), 'bind-hotkey');
+      for (let i = 0; i < 16; i++) if (i !== slot && table[i] && table[i].skill === skill && table[i].owner === (owner >>> 0)) emit(packets.bindHotkey(i, 0x7fff, true, 0xffffffff), 'unbind-hotkey');
+      return sent;
+    },
     /** An F-key's select-skill packet, composed from the server's hotkey table (d2gsHotkeySelect); null when the key is unbound. */
     hotkey: (bytes) => (bytes ? emit(bytes, 'hotkey-select') : false),
     /** The character screen's +: `count` points (1..100) into a stat, one packet; the server spends them or refuses. */

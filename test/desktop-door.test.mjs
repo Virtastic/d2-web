@@ -10,7 +10,7 @@ const node = () => {
   const e = {
     children: [], className: '', id: '', textContent: '', style: {}, width: 0, height: 0,
     classList: { add() {}, remove() {} }, setAttribute() {}, remove() {}, addEventListener() {}, removeEventListener() {},
-    getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }), getContext: () => ({}),
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }), getContext: () => new Proxy({}, { get: (t, k) => (k in t ? t[k] : () => {}), set: (t, k, v) => { t[k] = v; return true; } }),
     append(...c) { e.children.push(...c); }, appendChild(c) { e.children.push(c); return c; },
   };
   return e;

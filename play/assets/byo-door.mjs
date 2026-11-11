@@ -107,7 +107,7 @@ export function frontDoor({ onReady, hosted = false } = {}) {
     } catch { /* black */ }
   })();
   const cap = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(r, ms))]);
-  Promise.all([cap(staged, 10000), cap(backdrop, 10000)]).then(() => { shownAt = performance.now(); });   // a slow backdrop fades in on its own
+  Promise.all([cap(staged, 10000), cap(backdrop, 10000)]).then(() => { warm(); shownAt = performance.now(); });   // a slow backdrop fades in on its own
 
   // ---- text ----
   function measure(name, s) {
@@ -240,6 +240,19 @@ export function frontDoor({ onReady, hosted = false } = {}) {
   function layer(c, w, h) {
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
     const x = c.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, w, h); return x;
+  }
+  // The first time a full-window canvas is drawn as a source the browser sets its backing up: 35-120 ms for the
+  // backdrop on a real screen, paid by the first shown frame. Paid here instead, while the door is still black, and
+  // the backdrop is laid out now so the first shown frame finds bgKey current.
+  function warm() {
+    const dpr = devicePixelRatio || 1, W = Math.round(innerWidth * dpr), H = Math.round(innerHeight * dpr);
+    const s = Math.min(W / 460, H / 600), x = (W - 800 * s) / 2, y = (H - 600 * s) / 2;
+    if (back && bgKey !== `${W}x${H}`) {
+      const b = layer(bgC, W, H), kx = s / back.s, ky = s / back.sy; b.imageSmoothingEnabled = true; b.imageSmoothingQuality = 'high';
+      b.drawImage(back.img, x - back.ox * kx, y - back.oy * ky, back.w * kx, back.h * ky); bgKey = `${W}x${H}`;
+    }
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    g0.setTransform(1, 0, 0, 1, 0, 0); g0.globalAlpha = 0; g0.drawImage(bgC, 0, 0); g0.drawImage(ovC, 0, 0); g0.globalAlpha = 1;
   }
   function frame(t) {
     if (done) return;

@@ -197,11 +197,11 @@ export function bandNameStyle(flags, hardcore) {
 // The band text. The name arrives as `Char*account`. The lobby stores two strings for the user: "*account" (the whole name when it
 // already starts with '*'; the whole name after the star only when the account part is empty) and the character name (the part before
 // the '*', 16 characters at most, empty when the name starts with '*'). The caption draws the character name for the three Diablo II
-// products and the "*account" text for every other product. Ladder-title prefixes (the caption's control-mask title bits) are not modelled.
+// products and the "*account" text for every other product. Ladder-title prefixes (the caption's control-mask title bits) come in as `title`, the word for the user's class and statstring flags word (D2Multi 0xF750).
 const D2_PRODUCT_CODES = new Set(['VD2D', 'TS2D', 'PX2D']);
-export function bandNameText(name, product) {
+export function bandNameText(name, product, title = '') {
   const lead = name.startsWith('*');
-  if (D2_PRODUCT_CODES.has(product)) return lead ? '' : displayName(name).slice(0, 16);
+  if (D2_PRODUCT_CODES.has(product)) return title + (lead ? '' : displayName(name).slice(0, 16));
   return lead ? name.slice(0, 50) : `*${accountName(name)}`.slice(0, 50);
 }
 // `title(class, progression, hardcore, expansion)` is the engine's title word (D2Multi 0xB300 via D2Win #10205); none given, no prefix.
@@ -820,7 +820,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     for (const i of order) {
       const fl = shown[i].flags ?? 0, nf = font(B.font), y = B.nameY[(chat.scroll + i) % 2], cx = B.x + 30 + B.cell * i;
       const rec = recOf(shown[i]), style = bandNameStyle(fl, info[i].hardcore && rec.hardcore);
-      const n = bandNameText(shown[i].name, rec.tag);
+      const n = bandNameText(shown[i].name, rec.tag, charTitle && rec.cls >= 0 ? charTitle(rec.cls, rec.word >> 8 & 0x1f, Boolean(rec.word & 4), Boolean(rec.word & 0x20)) : '');
       const x = cx - Math.trunc(nf.measure(n) / 2);
       for (const [colour, dx, dy] of style.layers) font(B.font, colour).drawAnchored(sctx, n, x + dx, y + dy);
       // The hovered user's tooltip comes right after their name, before the names of the users drawn after them.

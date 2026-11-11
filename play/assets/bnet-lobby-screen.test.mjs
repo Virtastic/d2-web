@@ -41,6 +41,8 @@ test('band text: the character name for Diablo II products, the star account tex
     assert.equal(bandNameText('Bob', p), 'Bob');
     assert.equal(bandNameText('*acct', p), '', 'a leading star leaves the character name empty');
   }
+  assert.equal(bandNameText('Bob*acct', 'PX2D', 'Slayer '), 'Slayer Bob', 'a ladder title word goes in front of the character name');
+  assert.equal(bandNameText('Bob*acct', 'RATS', 'Slayer '), '*acct', 'other products take no title');
   assert.equal(bandNameText('Bob*acct', 'RATS'), '*acct');
   assert.equal(bandNameText('Bob*', ''), '*Bob*', 'an empty account part shows the whole name');
   assert.equal(bandNameText('Bob', ''), '*Bob');

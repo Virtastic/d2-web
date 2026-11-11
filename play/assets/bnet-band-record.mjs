@@ -25,7 +25,7 @@ const bytesOf = (stat) => (typeof stat === 'string' ? Uint8Array.from(stat, (c) 
 export function advanceBandRecord(prev, stat, flags) {
   const b = bytesOf(stat);
   let len = b.indexOf(0); if (len < 0) len = b.length;
-  const rec = { tag: prev?.tag ?? '', level: prev?.level ?? 0, realm: prev?.realm ?? '', hardcore: false, token: 7 };
+  const rec = { tag: prev?.tag ?? '', level: prev?.level ?? 0, realm: prev?.realm ?? '', hardcore: false, cls: -1, word: 0, token: 7 };
   const op = Boolean(flags & 2), plain = !op;
   if (op) rec.token = 0x13;
   else if (flags & 8) { rec.token = 0x14; return rec; }
@@ -38,7 +38,7 @@ export function advanceBandRecord(prev, stat, flags) {
   if (D2_TAGS.has(tag)) {
     if (!b[4]) { rec.tag = 'UNKN'; if (plain) rec.token = 0x18; return rec; }
     const p = parseStatstring(b);
-    if (p.equipment.length) { rec.level = p.level; rec.realm = p.realm; rec.hardcore = p.hardcore; return rec; }
+    if (p.equipment.length) { rec.level = p.level; rec.realm = p.realm; rec.hardcore = p.hardcore; rec.cls = p.classId; rec.word = p.flags; return rec; }
     if (plain) { rec.tag = 'UNKN'; rec.token = 7; }
     return rec;
   }

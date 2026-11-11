@@ -80,6 +80,7 @@ import { createRealmNpc } from './assets/realm-npc-state.mjs';
 import { realmAreaLevel, createRealmAreaAudio } from './assets/realm-world-audio.mjs';
 import { createRealmUnits, realmCombatSoundFrame } from './assets/realm-combat.mjs';
 import { createRealmUnitFx, playRealmUnitSound } from './assets/realm-unit-fx.mjs';
+import { createRealmEventSoundFeed } from './assets/realm-event-sounds.mjs';
 import { createLoadCompleteOrder, worldDownScreen } from './assets/realm-world-order.mjs';
 import { createRealmAutomapSource, readClientRoomInfo, readClientLevelGeometry } from './assets/realm-world-automap.mjs';
 import { createRealmNpcUi } from './assets/realm-npc-ui.mjs';
@@ -313,6 +314,7 @@ const realmAreaAudio = createRealmAreaAudio({
   get ambience() { return ambient ? { change: (level) => { const { day, night } = ambient.environment(level); Module._d2_ambient_record?.(day.environmentId, night.ambienceId, day.ambienceId, night.eventId, day.eventId, day.eventDelay); Module._d2_ambient_area?.(day.environmentId); }, sync: (level, cycle) => ambient.sync(level, cycle).catch((error) => { console.warn('Ambient sound', error); }) } : null; },
   cycle: () => ambientCycleOf(Module),
 });
+let realmEventFeed = null;   // a joined game's event sounds (pickup, gold, drop, footfall), fed from the packets' client state
 let session = null, gameLeft = false, bootstrapStarted = false, sessionEntering = false, sessionError = '', inventoryLayoutKey = '';
 let currentFixture = null, fixtures = [], actSelect = null;
 // A picked save starts in the town of the act its header says it is in (save-store nTown); retail's
@@ -1660,6 +1662,8 @@ function releaseRealmFlow({ closeTransports = true } = {}) {
   realmPlayerReassignFade.reset();
   realmWorldView = null;
   realmAreaAudio.reset();
+  realmEventFeed = null;
+  eventSounds?.resetObjects?.();
   realmLoadOrder.reset();
   realmWorldState?.reset(); realmNpcState = null;
   realmHudState?.reset();
@@ -3239,7 +3243,7 @@ function advanceRealmClientUnits(forced) {
     return 0;
   }
   let ticks = 0;
-  const tickClientUnits = () => { realmFlow.protocol.d2gsClientMotionTick(); realmAnimationFrame++; for (const used of realmFlow.protocol.d2gsClientTakeObjectEvents()) if (used.soundRow) unitSounds?.playRow(used.soundRow, { source: 'object-use', unitId: used.playerId }).catch(() => {}); realmAreaAudio.step(realmAreaLevel(realmPlayerView, realmWorldView), realmAnimationFrame); ambient?.tick(1).catch(() => {}); realmChromeTick(); };
+  const tickClientUnits = () => { realmFlow.protocol.d2gsClientMotionTick(); realmAnimationFrame++; for (const used of realmFlow.protocol.d2gsClientTakeObjectEvents()) if (used.soundRow) unitSounds?.playRow(used.soundRow, { source: 'object-use', unitId: used.playerId }).catch(() => {}); realmAreaAudio.step(realmAreaLevel(realmPlayerView, realmWorldView), realmAnimationFrame); ambient?.tick(1).catch(() => {}); realmChromeTick(); if (eventSounds && snapshot && !session) (realmEventFeed ??=createRealmEventSoundFeed(eventSounds)).tick(snapshot, readAdvancement()?.level, realmWorldState); };
   if (forced) { realmGameClock = 0; tickClientUnits(); ticks = 1; }
   else {
     realmGameClock += STEP;
@@ -3398,7 +3402,7 @@ function update(forceTick = false, live = false) {
       else if (command.type === COMMAND.SKILL) {
         // With the skill popup open and the pointer on an icon the F-key assigns that skill (0x51, the server binds it, the table here follows); otherwise it selects.
         const over = skillSelectRenderer?.open && skillSelectRenderer.hoverIcon, left = over?.side === 'left';
-        if (over && realmInput().bindHotkey(command.slot - 1, over.skill.id, left)) realmFlow?.protocol?.d2gsSetHotkey?.(command.slot - 1, over.skill.id, left);
+        if (over && realmInput().assignHotkey(command.slot - 1, over.skill.id, left, 0xffffffff, realmFlow?.protocol?.d2gsHotkeys?.() ?? [])) realmFlow?.protocol?.d2gsSetHotkey?.(command.slot - 1, over.skill.id, left);
         else if (!over) realmInput().hotkey(realmFlow?.protocol?.d2gsHotkeySelect?.(command.slot - 1));
       }
     }
@@ -4936,6 +4940,7 @@ function buildChromeSounds(fresh, read) {
   const assetReader = read;
   if (fresh || !uiClickSounds) { try { uiClickSounds = audioVolume.attach('sound', createUiClickSoundPlayer(assetReader, canvas)); } catch (error) { musicError = String(error); } }
   if (fresh || !(unitSounds && combatSounds && eventSounds && missileSounds && ambient)) {
+    realmEventFeed = null;
     try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), () => unitSounds.monsterSoundBusy(), Module._d2_client_attack_roll_take); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a)), (c) => Number(Module._d2_client_monster_footstep_layer(c)), Module._d2_session_monster_idle_take ? (id) => Number(Module._d2_session_monster_idle_take(id)) >>> 0 : null); missileSounds = createMissileSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error)), (id) => !Module._d2_session_missile_on_client || Module._d2_session_missile_on_client(id) !== 0, (id) => (Module._d2_session_client_unit_roll ? Number(Module._d2_session_client_unit_roll(id)) >>> 0 : 0), (id) => { const f = Module._d2_session_missile_bolt_seed, lo = f ? Number(f(id, 0)) >>> 0 : 0, hi = f ? Number(f(id, 1)) >>> 0 : 0; return lo || hi ? [lo, hi] : null; }); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; canvas.__d2MissileSound = missileSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, undefined, soundFetched)); } catch (error) { musicError = String(error); }
   }
 }
