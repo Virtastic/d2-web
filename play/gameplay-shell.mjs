@@ -157,7 +157,7 @@ import { heldWorldAction, leftHandCommand, rightGroundWalks } from './assets/wor
 import { createDeathScreen, deathScreenShown, respawnAllowed } from './assets/death-screen.mjs';
 import { createRealmGameUi } from './assets/realm-game-ui.mjs';
 import { realmHeroFlags, realmCorpseViews, createRealmDeath, heroIsDown, deathBlocksKey, markCharactersDead } from './assets/realm-death.mjs';
-import { createNpcMenu, hireSkillText, npcMenuChoiceOnRelease, npcMenuInputCoolingDown, npcMenuEntries, withTravelRow, withHireRow, deadHireling, resurrectPacket, talkEntries, menuReturnsAfterSpeech, entriesAfterSpeech } from './assets/npc-menu.mjs';
+import { S_RESURRECT_FORMAT, resurrectLabel, createNpcMenu, hireSkillText, npcMenuChoiceOnRelease, npcMenuInputCoolingDown, npcMenuEntries, withTravelRow, withHireRow, deadHireling, resurrectPacket, talkEntries, menuReturnsAfterSpeech, entriesAfterSpeech } from './assets/npc-menu.mjs';
 import { npcSpeech, npcSpeechByName, talkSpeechId } from './assets/npc-topics.mjs';
 import { createWeatherRenderer } from './assets/weather-renderer.mjs';
 import { weatherWaterAnchors } from './assets/weather-water-anchors.mjs';
@@ -1579,7 +1579,7 @@ function warmTowns(chars) {
 
 function ensureCinematicsScreen() {
   if (screen !== SCREEN.CINEMATICS || cinematicsScreen || cinematicsError || !window.__d2?.ready || window.__d2.error) return;
-  try { cinematicsScreen = createCinematicsScreen({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, onExit: () => { cinematicsScreen = null; const back = cinematicsReturnTo; cinematicsReturnTo = SCREEN.TITLE; if (back === SCREEN.GAME) screen = SCREEN.GAME; else exitToTitle(); },
+  try { cinematicsScreen = createCinematicsScreen({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, onExit: () => { cinematicsScreen = null; const back = cinematicsReturnTo; cinematicsReturnTo = SCREEN.TITLE; if (back === SCREEN.GAME) { screen = SCREEN.GAME; sendFilmEnd(); } else exitToTitle(); },
     string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) }); }
   catch (error) { cinematicsError = String(error); }
 }
@@ -1592,17 +1592,22 @@ function ensureCinematicsScreen() {
 let cinematicsReturnTo = SCREEN.TITLE;
 const inGameMovies = [];
 const inGameMoviesUnmapped = [];
+// Retail's film player (D2Client+0x899A0) ends every play, shown or not, with the one-byte 0x48 through the send gate
+// (D2Client+0x14A30); the server's handler lifts the player's busy mark that the film's quest branch set.
+function sendFilmEnd() { if (realmFlow?.d2gs?.isOpen) realmInput().filmEnd(); }
 function pollMovieRequest() {
-  if (!session || screen !== SCREEN.GAME || typeof Module === 'undefined' || !Module._d2_session_next_movie_request) return;
-  const index = Module._d2_session_next_movie_request();
+  if (screen !== SCREEN.GAME || typeof Module === 'undefined') return;
+  // A joined game reads the index the client's own 0x61 handler received; a local game the engine's queue.
+  const index = realmSceneActive ? (realmFlow?.protocol?.d2gsClientTakeMovie?.() ?? -1)
+    : (session && Module._d2_session_next_movie_request ? Module._d2_session_next_movie_request() : -1);
   if (index < 0) return;
   inGameMovies.push(index);
-  if (index < 1 || index > CINEMATICS.length) { inGameMoviesUnmapped.push(index); return; }   // row 0 is the promo film; the front end has no asset for it
+  if (index < 1 || index > CINEMATICS.length) { inGameMoviesUnmapped.push(index); sendFilmEnd(); return; }   // row 0 is the promo film; the front end has no asset for it
   cinematicsReturnTo = SCREEN.GAME;
   screen = SCREEN.CINEMATICS;
   ensureCinematicsScreen();
   if (!cinematicsScreen?.playIndex(index - 1)) {   // the screen's assets, not the film's: the transition still happened
-    cinematicsScreen = null; cinematicsReturnTo = SCREEN.TITLE; screen = SCREEN.GAME; inGameMoviesUnmapped.push(index);
+    cinematicsScreen = null; cinematicsReturnTo = SCREEN.TITLE; screen = SCREEN.GAME; inGameMoviesUnmapped.push(index); sendFilmEnd();
   }
 }
 
@@ -4306,6 +4311,13 @@ function realmNpc() {
     classOf: (guid) => realmSceneEvidence?.monsters?.find((m) => m.guid === guid)?.classId ?? -1,
     // The boat and Hire rows depend on the hero's quests, read from the quest flags the server sent with its NPC packet.
     questDone: (act, quest) => realmQuestWords !== null && questStatus(realmQuestWords, act, quest) === 'done',
+    // The Resurrect row is on offer while the server's 0x9B names a dead mercenary: sprintf(string 0x58A8, its name string, the price).
+    resurrectLabel: () => {
+      const o = realmFlow?.protocol?.d2gsClientMercResurrect?.();
+      if (!o) return null;
+      const str = (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]);
+      return resurrectLabel(str(S_RESURRECT_FORMAT), o.nameId === 0x421 ? str(0x2b0d) : str(o.nameId), o.cost);
+    },
     costOf: (item) => Math.max(0, realmFlow?.protocol?.d2gsClientStockPrice?.(item.bits, realmNpcState?.view()?.classId ?? -1, 0) ?? 0),
     // The hire request carries the hero's unit id (0xFFFFFFFF with no player), as the menu build writes it.
     playerGuid: () => (realmPlayerView ? selectedPlayerSource().guid >>> 0 : 0xffffffff),
@@ -6106,6 +6118,13 @@ function realmInventoryClick(x, y, button) {
 function realmStorageClickAt(x, y, e) {
   const trade = realmTrade();
   if (trade.box) return e.button === 0 ? trade.boxPress(x, y, canvas.width, canvas.height) : true;   // a request box takes every press
+  // PlugY's page and shared-gold buttons sit on the stash panel and are the shell's, not item packets: they get the click first
+  // (their page turn reaches the server's client as 0x0A removals and 0x9C puts, d2_session_stash_clear / _insert).
+  if (e.button === 0 && stashOpen && !trade.open && stashPanelRenderer) {
+    const g = snapOr('stashLayout', readStashLayout), cg = cubeOpen && inventoryVisible ? snapOr('cubeLayout', readCubeLayout) : null;
+    if (g && stashPanelRenderer.contains(x, y, canvas.width, canvas.height, g) && !(cg && cubePanelRenderer?.contains(x, y, canvas.width, canvas.height, cg))
+      && plugyStash.click(x, y, canvas.width, canvas.height, g, stashOpen, e.shiftKey)) return true;
+  }
   return realmStorageClick({ width: canvas.width, height: canvas.height, items: snapshot.items, snapshot, cursorId: realmWorldState?.cursorId ?? 0,
     input: realmInput(), send: (bytes) => realmFlow?.d2gs?.send(bytes),
     inventory: { visible: inventoryVisible, renderer: inventoryPanelRenderer },
