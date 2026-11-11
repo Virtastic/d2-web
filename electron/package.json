@@ -1,6 +1,6 @@
 {
   "name": "d2-web-desktop",
-  "version": "0.1.38",
+  "version": "0.1.100",
   "private": true,
   "description": "Desktop app for d2-web: a window onto the staged browser build",
   "author": "d2-web project",
