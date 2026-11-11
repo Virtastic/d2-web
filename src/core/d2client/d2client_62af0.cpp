@@ -1,6 +1,7 @@
-// 1.13c D2Client+0x62AF0 (313 B): per-frame near-room refresh. EBX = caller's context (re-read by 62580 as its fourth stack word), no other inputs.
+// Per-frame near-room refresh, no inputs (the caller's EBX is saved and restored, never read).
 // [C204] counts down; otherwise the player ([BBFC], fatal when 0) position C1D2/C1F6 is compared to the last refresh ([D346C], [D3468]); a move of >= 0x50 (octagonal metric)
-// refreshes: the player's room list (C1F0, C3DC) is filtered to rooms on the same level (CC3A(C1DE(room))[+8]) and each goes to 62580(room, 0, ctx_from_62710).
+// refreshes: the player's room list is filtered to rooms on the same level, and each room gets the refresh call with the level's context;
+// ctx stays in EBX across the loop, so EBX at each refresh call is ctx.
 #include <cstdint>
 typedef int32_t i32; typedef uint32_t u32;
 struct D2c62af0G { u32 c204, bbfc, d3460, d3464, d3468, d346c; };   // D3460..D346C are consecutive in the image
@@ -9,12 +10,12 @@ struct D2c62af0Env {
     void (*c3dc)(u32 room, u32* arr, u32* cnt);
     u32 (*cc3a)(u32 ecx);                // thiscall, returns a record pointer
     u32 (*f62710)(u32 eax);
-    void (*f62580)(u32 room, u32 zero, u32 ctx, u32 ebx);   // ret 0xC; ebx is the word above the three pushes
+    void (*f62580)(u32 room, u32 zero, u32 ctx);   // stdcall, ret 0xC
     void (*fatal)();                     // bf92(0x696), bf80(str, r), exit(-1)
 };
 static inline u32 r32(u32 a) { return *(const u32*)(uintptr_t)a; }
 // 1.13c D2Client+0x62AF0
-void d2c_62af0(D2c62af0G* g, u32 ebx, const D2c62af0Env* e) {
+void d2c_62af0(D2c62af0G* g, const D2c62af0Env* e) {
     if (g->c204) { g->c204--; return; }
     if (!g->bbfc) { e->fatal(); return; }
     u32 x = e->c1d2(g->bbfc); g->d3464 = x;
@@ -36,6 +37,6 @@ void d2c_62af0(D2c62af0G* g, u32 ebx, const D2c62af0Env* e) {
     u32 ctx = e->f62710(lvl);
     for (u32 i = 0; i < cnt; i++) {
         u32 rm = r32(arr + i * 4);
-        if (lvl == r32(e->cc3a(e->c1de(rm)) + 8)) e->f62580(rm, 0, ctx, ebx);
+        if (lvl == r32(e->cc3a(e->c1de(rm)) + 8)) e->f62580(rm, 0, ctx);
     }
 }

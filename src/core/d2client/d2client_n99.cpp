@@ -221,7 +221,7 @@ extern "C" uint32_t d2c_58A70_n99(uint32_t unit, int32_t idx, uint32_t p3) {
 
 // 1.13c D2CLIENT+0x58B80
 // fastcall(ecx=unit, edx=idx) + stack count (ret 4). The Ordinal_10786 result is the limit the thunk-10980 counter is compared against.
-// 51340: ebx=unit, edi=&X, stack=&Y. 58370: eax=sub, esi=unit, stack (0x85BE0 = table rva, X, Y, idx, count). 56DA0: esi=unit, stack rec.
+// Sub-calls: the unit-info lookup fills X and Y, the stack call takes the table offset then X, Y, idx and count, and the record is released last.
 extern "C" uint32_t d2c_58B80_n99(uint32_t unit, int32_t idx, int32_t count) {
     int32_t sub; uint32_t rec = n99_rec(idx, &sub, true); if (!rec) return 0;
     uint32_t h = ORD(10511, unit);
@@ -233,7 +233,7 @@ extern "C" uint32_t d2c_58B80_n99(uint32_t unit, int32_t idx, int32_t count) {
     int32_t out[2] = {0, 0};
     if (!CALL(0xA1340, unit, (uint32_t)(uintptr_t)out)) return 0;
     ORD(10739, R(unit + 0x2c), (uint32_t)out[0], (uint32_t)out[1], 0);
-    uint32_t stk[5] = { 0x85BE0, (uint32_t)out[0], (uint32_t)out[1], (uint32_t)idx, (uint32_t)count };
+    uint32_t stk[5] = { 0xD5BE0, (uint32_t)out[0], (uint32_t)out[1], (uint32_t)idx, (uint32_t)count };
     g99.callStk(0x58370, (uint32_t)sub, unit, stk, 5);
     CALL(0x56DA0, unit, rec);
     return 1;
