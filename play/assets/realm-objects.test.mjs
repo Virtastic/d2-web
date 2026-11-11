@@ -246,7 +246,7 @@ test('the page keeps no object model of its own and cannot read the engine silen
     assert.doesNotMatch(at(name), /objects\.txt|byClass|case 0x51|case 0x0e|new Map\(/i, name);
   assert.doesNotMatch(shell, /tickObjects|createObjectTable|objectViews|d2gsClientObjects\?\./);
   assert.match(shell, /objects: protocol \? protocol\.d2gsClientObjects\(\) : \[\]/);
-  assert.match(shell, /d2gsClientTakeObjectEvents\(\)\) if \(used\.soundRow\) unitSounds\?\.playRow\(used\.soundRow/);
+  assert.match(shell, /const uses = realmFlow\.protocol\.d2gsClientTakeObjectEvents\(\);[^}]*for \(const used of uses\) if \(used\.soundRow\) unitSounds\?\.playRow\(used\.soundRow/);
   for (const name of ['d2_realm_client_object_units', 'd2_realm_client_take_object_events']) {
     assert.ok(client.includes(`'${name}'`), name);
     assert.ok(link.includes(`_${name},`), name);
