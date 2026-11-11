@@ -20,7 +20,6 @@ import { wrapSpaces } from './bnet-login-screen.mjs';
 import { localSlash } from './bnet-slash.mjs';
 
 const B = 'data\\global\\ui\\BIGMENU\\';
-const WAITING_FLOOR_Y = 494;   // retail y where the Battle.net chat art's moss floor starts; the waiting room has none
 const F = 'data\\local\\font\\latin\\';
 export const BNET_LOBBY_ASSETS = {
   background: B + 'bnet.dc6', waitingBackground: B + 'waitingroombkgd.dc6',
@@ -304,7 +303,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   // The waiting room has no painted widescreen image of its own: it shares the Battle.net frame, so it borrows the chat screen's (bnet) outside the 800x600.
   const waitingBackground = () => {
     const w = { ...composeTiled(decodeDc6(read(A.waitingBackground)), skyPalette, TITLE_COLUMNS, documentObject), path: A.waitingBackground };
-    deriveWideBg(A.waitingBackground, A.background, w.canvas, { documentObject, blankBelow: WAITING_FLOOR_Y });
+    deriveWideBg(A.waitingBackground, A.background, w.canvas, { documentObject });
     return w;
   };
   const lobbyBg = () => (mode === 'chat' ? bg : (waitBg ??= waitingBackground()));
