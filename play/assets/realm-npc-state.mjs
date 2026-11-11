@@ -134,7 +134,12 @@ export function createRealmNpc({ send, classOf = () => -1, questDone = () => fal
           npc.mode = 'hire'; return true;
         case 'identify': send(npcPackets.identifyAll(npc.guid)); close(true); return true;
         case 'cancel': close(true); return true;
-        default: return false;   // travel and the other rows are the shell's own
+        // Warriv / Meshif's boat rows (Go East / Go West / Sail East / Sail West, 3382..3385): the travel 0x38 (action 0) for
+        // this NPC; the server moves the hero to the next act's town and the conversation ends with the level.
+        case 'other':
+          if (entry.stringId < 3382 || entry.stringId > 3385) return false;
+          send(npcPackets.request(0, npc.guid, 0)); close(false); return true;
+        default: return false;   // the other rows are the shell's own
       }
     },
     /** Esc, walking away, or the exit button. */

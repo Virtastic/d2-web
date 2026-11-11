@@ -78,7 +78,7 @@ import { createRealmWorld } from './assets/realm-world.mjs';
 import { createRealmNpc } from './assets/realm-npc-state.mjs';
 import { realmAreaLevel, createRealmAreaAudio } from './assets/realm-world-audio.mjs';
 import { createRealmUnits, realmCombatSoundFrame } from './assets/realm-combat.mjs';
-import { createRealmUnitFx } from './assets/realm-unit-fx.mjs';
+import { createRealmUnitFx, playRealmUnitSound } from './assets/realm-unit-fx.mjs';
 import { createLoadCompleteOrder, worldDownScreen } from './assets/realm-world-order.mjs';
 import { createRealmAutomapSource, readClientRoomInfo, readClientLevelGeometry } from './assets/realm-world-automap.mjs';
 import { createRealmNpcUi } from './assets/realm-npc-ui.mjs';
@@ -2351,7 +2351,7 @@ function tipFields(id, code) {
   return { name: (codeText === 'gld' || codeText === 'dlg') ? goldLabel(plain, Module.ccall('d2_session_unit_stat', 'number', ['number', 'number', 'number', 'number'], [4, id, 0x0E, 0])) : plain, baseName, quality: p.quality, flags: p.flags, props: p.lines, propColours: p.colours,
     costLabel: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [3329]),
     // D2Client+0x46230: an item you carry, with a vendor open, ends its tooltip with string 3331 + the engine's sell price.
-    sellLabel: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [3331]), sell: Module.ccall('d2_session_item_sell_value', 'number', ['number'], [id]) };
+    sellLabel: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [3331]), sell: realmShopView() ? (realmFlow?.protocol?.d2gsClientSellValue?.(id, realmShopView().classId) ?? -1) : Module.ccall('d2_session_item_sell_value', 'number', ['number'], [id]) };
 }
 
 // Return to the front end's MENU: what the CREDITS and CINEMATICS screens' own EXIT/CANCEL do, and
@@ -4237,7 +4237,7 @@ const langStr = (key) => seenLive('langStr', key, () => Module.ccall('d2_lang_st
 const langIdx = (i) => seenLive('langIdx', i, () => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]));
 const missileCelFile = (cls) => seenLive('missileCel', cls, () => Module._d2_missile_celfile ? Module.ccall('d2_missile_celfile', 'string', ['number'], [cls]) : '');
 const skillDescSnap = (id, level) => seenLive('skillDesc', `${id}:${level}`, () => readSkillDesc(id, level));
-const skillManaSnap = (id, level) => seenLive('skillMana', `${id}:${level}`, () => Module.ccall('d2_session_skill_mana', 'number', ['number', 'number'], [id, level]));
+const skillManaSnap = (id, level) => seenLive('skillMana', `${id}:${level}`, () => clientView().skillMana(id, level));   // the packet path prices from Skills.txt
 const skillStringsSnap = (id) => seenLive('skillStrings', id, () => readSkillStrings(id));
 function fillFrameSnapshot() {
   const ready = typeof Module !== 'undefined' && window.__d2?.ready;
@@ -4309,6 +4309,20 @@ function realmNpcScreen() {
     anchor: realmNpcFeet, smith: (classId) => SMITH_CLASSES.has(classId), gold: () => realmWorldState?.gold ?? null,
     now: () => Math.trunc(performance.now()),
     offerClick: Module._d2_client_store_offer_click ? storeOfferClick : null }));
+}
+// The trade window the packet client holds open (null when none): the inventory click reads its sell/repair toggles.
+const realmShopView = () => (clientView().fromPackets && realmNpc().shopOpen() ? realmNpc().view() : null);
+// A carried item clicked in sell or repair mode: the 0x33 with the displayed sell value, or the 0x35 with the item's mode
+// and durability when D2Client 0x45B40 says it needs repair; Sell mode drops after a sale as the local window's does.
+function realmCarriedClick(guid, view, act) {
+  const p = realmFlow?.protocol;
+  if (act === 'repair') {
+    const r = p?.d2gsClientRepairInfo?.(guid);
+    return r?.needs ? realmNpc().repair(guid, r.mode, r.durability) : false;
+  }
+  const sent = realmNpc().sell(guid, 0 /* SELL_MODE.STORED */, p?.d2gsClientSellValue?.(guid, view.classId) ?? 0);
+  if (sent && act === 'sell') realmNpc().setSellMode(false);
+  return sent;
 }
 function realmNpcFeet(guid) {
   const m = realmSceneEvidence?.monsters?.find((u) => u.guid === guid);
@@ -4503,7 +4517,7 @@ const realmClientView = {
   hoverTarget: () => realmUnits.hoverTarget(realmInput().pick(pointer.x, pointer.y), realmMonsterViews, (classId) => { const stringIndex = Module.ccall('d2_monster_name_str', 'number', ['number'], [classId]); return { stringIndex, label: stringIndex >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [stringIndex]) : '' }; }),
   pointerContext: () => realmUnits.cursorContext(realmInput().pick(pointer.x, pointer.y)),
   pointerItem: () => realmWorldState?.cursorId ?? 0,
-  stashBalance: (limit) => (limit ? spClientView.stashBalance(limit) : realmWorldState?.stashGold ?? 0),
+  stashBalance: (limit) => (limit ? spClientView.stashBalance(limit) : (plugyStash.showShared ? plugyGold : realmWorldState?.stashGold ?? 0)),   // the shared page shows PlugY's shared gold (its UC_SHARED_GOLD value, held by the sidecar)
   goldStat: (which) => (realmWorldState ? (which === STASH_GOLD.bank ? realmWorldState.stashGold : realmWorldState.gold) : 0),
   npcOpen: () => realmNpc().isOpen(),
   // The same commands as packets to the game server; the server's answer is what changes the client's state.
@@ -4916,7 +4930,7 @@ function ensureRealmChrome() {
   build('objects', () => { objectRenderer ??= createObjectRenderer(assetReader, document, { shadow: true, mayLoad: mayLoadSprite }); });
   build('items', () => { itemRenderer ??= createItemRenderer(assetReader); });
   // The effects the engine's skill start and hit rules queue for the units of a joined game.
-  build('unit fx', () => { overlayRenderer ??= createMissileRenderer(assetReader, document, (f) => f, 'overlays'); realmUnitFx ??= createRealmUnitFx(assetReader, (row, event) => unitSounds?.playRow(row, event).catch((error) => console.warn('Skill sound', error)), (e) => unitSounds?.play({ unitType: e.unitType, unitId: e.unitGuid, classId: e.classId, soundEvent: e.soundEvent, updateUnitType: -1, updateUnitId: e.unitGuid, nativeSelectedRow: 0 }, selectedPlayerSource()?.guid)?.catch?.((error) => console.warn('Unit sound', error))); });
+  build('unit fx', () => { overlayRenderer ??= createMissileRenderer(assetReader, document, (f) => f, 'overlays'); realmUnitFx ??= createRealmUnitFx(assetReader, (row, event) => unitSounds?.playRow(row, event).catch((error) => console.warn('Skill sound', error)), (e) => playRealmUnitSound(e, selectedPlayerSource()?.guid, unitSounds, () => eventSounds?.noteServerLevelUp())?.catch?.((error) => console.warn('Unit sound', error))); });
   realmChromeError = failed.join('; ');
 }
 
@@ -7219,10 +7233,12 @@ canvas.addEventListener('pointerdown', (e) => {
         const item = inventoryPanelRenderer.itemAt(x, y, W, H, snapshot), target = item || slot?.item;
         // Grid and body slots alike: identify cursor first, then the shop mode (Sell sells, Repair repairs), else the lift (D2Client +0x95FE0/+0x96AA0).
         const route = (...a) => Module._d2_client_inv_click_route ? Module.ccall('d2_client_inv_click_route', 'number', ['number', 'number', 'number', 'number', 'number', 'number'], a) : (a[3] ? 1 : 0);
-        const at = { itemId: target?.id, bodyLoc: item ? 0 : slot?.bodyLoc, mode: shopModeOf({ shopOpen: shopOpen(), sell: sellModeArmed(), repair: vendorRepairArmed() }), ctrl: e.ctrlKey, npcOpen: shopOpen() };
+        const rShop = realmShopView();   // a joined (or packet-path local) game's open trade window: its own sell/repair toggles
+        const at = { itemId: target?.id, bodyLoc: item ? 0 : slot?.bodyLoc, mode: shopModeOf(rShop ? { shopOpen: true, sell: rShop.sellMode, repair: rShop.repairMode } : { shopOpen: shopOpen(), sell: sellModeArmed(), repair: vendorRepairArmed() }), ctrl: e.ctrlKey, npcOpen: Boolean(rShop) || shopOpen() };
         let act = inventoryClickAction(route, { ...at, targeting: itemTargeting.armed });
         if (act === 'identify' && !itemTargeting.leftClick(target.id)) act = inventoryClickAction(route, at);
-        if (act === 'repair') { if (repairConfirm.request(target.id)) { const f = tipFields(target.id, itemStringKey(itemCode(target)));
+        if (rShop && (act === 'repair' || act === 'sell' || act === 'sell-direct')) { realmCarriedClick(target.id, rShop, act); click.spent = act === 'repair' ? 'vendorRepair' : 'vendorSell'; }
+        else if (act === 'repair') { if (repairConfirm.request(target.id)) { const f = tipFields(target.id, itemStringKey(itemCode(target)));
           repairConfirmRenderer?.show(npcState.npcId, [f.name, f.baseName].filter(Boolean).join('\n'), Module._d2_session_item_repair_cost ? Module.ccall('d2_session_item_repair_cost', 'number', ['number'], [target.id >>> 0]) : 0); } click.spent = 'vendorRepair'; }
         else if (act === 'sell' || act === 'sell-direct') { if (sellToVendor(target.id) && act === 'sell') resetSellMode(); click.spent = 'vendorSell'; }
         else if (act !== 'pickup') { /* identified, or nothing under the click */ }

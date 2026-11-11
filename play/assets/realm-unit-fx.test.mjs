@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRealmUnitFx, parseRealmUnitFx } from './realm-unit-fx.mjs';
+import { createRealmUnitFx, parseRealmUnitFx, playRealmUnitSound, SKILL_CREATE, SKILL_STATE } from './realm-unit-fx.mjs';
+import { resolveUnitSound } from './unit-sound-resolver.mjs';
 
 const OVERLAY = ['Overlay\tFilename\tFrames\tPreDraw\tTrans\tAnimRate', 'null\tnull\t1\t0\t0\t16', 'cast\tcast_a\t4\t0\t3\t16', '', 'hit\thit_b\t2\t1\t0\t8'].join('\r\n');
 const read = () => new TextEncoder().encode(OVERLAY);
@@ -68,11 +69,58 @@ test('a hit marks its unit for the step it arrives in and a unit sound event goe
   fx.step(events, 30);
   assert.equal(fx.hitOf(1, 9), 0x31);
   assert.equal(fx.hitOf(0, 9), undefined);
-  assert.deepEqual(sounds, [{ unitType: 0, unitGuid: 2, classId: 4, soundEvent: 0x13 }]);
+  assert.deepEqual(sounds, [{ unitType: 0, unitGuid: 2, classId: 4, soundEvent: 0x13, selectedRow: 0 }]);
   assert.deepEqual(rows, []);                       // neither is a sound row
   assert.deepEqual(fx.apply({ entities: [{ type: 1, id: 9 }] }, 2), []);   // nor an overlay
   fx.step([], 31);
   assert.equal(fx.hitOf(1, 9), undefined);          // the mark lasts one step
   assert.equal(sounds.length, 1);
   assert.throws(() => parseRealmUnitFx(record(1, 7, 0, 0, 0, 0, 0), 1), /invalid unit effect/);
+});
+
+// A fake unit sound player: the event it was handed and the row the resolver picks for it, as unit-sound-player
+// resolves before it plays (taunt and skill start rows come from nativeSelectedRow).
+const soundLog = () => {
+  const events = [];
+  return { events, play(e, localId) {
+    const row = resolveUnitSound({ unitType: e.unitType, classId: e.classId, soundEvent: e.soundEvent, isLocalPlayer: e.unitType === 0 && e.unitId === localId,
+      monsterTaunt: e.soundEvent === 0x10 ? e.nativeSelectedRow : 0, skillStartSoundRow: e.soundEvent === 0x0c ? e.nativeSelectedRow : 0 });
+    events.push({ unitType: e.unitType, unitId: e.unitId, soundEvent: e.soundEvent, row });
+    return Promise.resolve();
+  } };
+};
+
+test('a monster taunt the server sends plays the MonSounds row the client picked', () => {
+  const log = soundLog(), fx = createRealmUnitFx(read, () => {}, (e) => playRealmUnitSound(e, 2, log));
+  // kind 6: monster 9 (class 40) sounds event 0x10; the client's tables named Sounds row 600.
+  fx.step(parseRealmUnitFx(join(record(1, 6, 1, 9, 0x10, 600, 40), record(1, 6, 1, 10, 0x10, 0, 40)), 2), 1);
+  assert.deepEqual(log.events, [{ unitType: 1, unitId: 9, soundEvent: 0x10, row: 600 }, { unitType: 1, unitId: 10, soundEvent: 0x10, row: null }]);
+});
+
+test('a skill start the server sends plays the StSound row the client picked', () => {
+  const log = soundLog(), fx = createRealmUnitFx(read, () => {}, (e) => playRealmUnitSound(e, 2, log));
+  fx.step(parseRealmUnitFx(record(1, 6, 0, 2, 0x0c, 251, 1), 1), 1);
+  assert.deepEqual(log.events, [{ unitType: 0, unitId: 2, soundEvent: 0x0c, row: 251 }]);
+});
+
+test("the local hero's level-up event plays once and silences the level poll; another player's does not", () => {
+  const log = soundLog(); let noted = 0;
+  const fx = createRealmUnitFx(read, () => {}, (e) => playRealmUnitSound(e, 2, log, () => noted++));
+  fx.step(parseRealmUnitFx(join(record(1, 6, 0, 2, 2, 0, 1), record(1, 6, 0, 3, 2, 0, 1)), 2), 1);
+  assert.deepEqual(log.events.map((e) => [e.unitId, e.row]), [[2, 7], [3, 7]]);
+  assert.equal(noted, 1);
+});
+
+test('a monster the client makes plays its Init row once, at once, under its own source', () => {
+  const got = [], fx = createRealmUnitFx(read, (row, e) => got.push([row, e.unitType, e.unitId, e.kind]));
+  fx.step(parseRealmUnitFx(record(4, 1, 1, 9, 2574, 0, SKILL_CREATE), 1), 4);
+  fx.step([], 5);
+  assert.deepEqual(got, [[2574, 1, 9, 'monster-init']]);
+});
+
+test("a state's onsound plays on the unit, the selected player's too, which a skill start mute leaves alone", () => {
+  const got = [], fx = createRealmUnitFx(read, (row, e) => got.push([row, e.unitType, e.unitId, e.kind]));
+  const me = (e) => e.unitType === 0 && e.unitGuid === 2;
+  fx.step(parseRealmUnitFx(join(record(6, 1, 0, 2, 4020, 0, SKILL_STATE), record(6, 1, 0, 2, 251, 0, 36), record(6, 1, 1, 9, 4021, 0, SKILL_STATE)), 3), 6, me);
+  assert.deepEqual(got, [[4020, 0, 2, 'state-onsound'], [4021, 1, 9, 'state-onsound']]);
 });

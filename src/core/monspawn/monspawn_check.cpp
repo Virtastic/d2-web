@@ -6,6 +6,7 @@
 // units that hang off the rooms exactly as the retail capture tool does (D2VecMonUnit from `room` on).
 #include <emscripten.h>
 #include "../d2client/character_screen.h"
+#include "../d2client/price_line_46230.h"
 #include "warp_interaction.h"
 #include "object_client_clock.h"
 #include <algorithm>
@@ -55,6 +56,7 @@
 #include "session_path_room_probe.h"
 #include "object_interaction_gate.h"
 #include "object_interaction_packet.h"
+#include "../d2client/item_needs_repair.h"
 #include "object_interaction_pending.h"
 #include "hellforge_diagnostic.h"
 #include "monster_sound_profile.h"
@@ -69,6 +71,7 @@
 #include <Units/Units.h>
 #include <Units/Missile.h>
 #include "../realm/client_fireball_hit.h"
+#include "../realm/client_unit_sound.h"
 #include "monster_light_terminal.h"
 #include "monster_light_den.h"
 #include "light_occlusion_policy.h"
@@ -2230,6 +2233,9 @@ static D2GameStrc* makeGame(uint32_t seed, int difficulty) {
     return g;
 }
 
+// The skill-list packet (client_save_batch_d5740.cpp), for d2_session_client_skills.
+void D2GAME_8B5A0_SendSkills(D2ClientStrc* client, D2UnitStrc* unit);
+
 extern "C" {
 
 // Test-only object-population seed input lives in game_glue.cpp; reset it with the session fixture.
@@ -2551,6 +2557,19 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_game_frame() { return g_game ? g_game->
 EMSCRIPTEN_KEEPALIVE int d2_session_client_spawned() {
     if (!g_game || !g_targetClient || !g_targetPlayer) return 0;
     g_targetClient->dwClientState = CLIENTSTATE_PLAYER_SPAWNED;
+    return 1;
+}
+// For the local game's join: the skill list (0x94) and both hands' selection (0x23, left then right), as retail's
+// player load and ClientAddPlayerToGame send them. Sent live after the join bytes, so skills the session granted
+// after the player attached are in the list; without it the client drops every 0x23. Returns 1 when sent.
+EMSCRIPTEN_KEEPALIVE int d2_session_client_skills() {
+    if (!g_targetClient || !g_targetPlayer || !g_targetPlayer->pSkills) return 0;
+    D2GAME_8B5A0_SendSkills(g_targetClient, g_targetPlayer);
+    for (int left = 1; left >= 0; --left) {
+        D2SkillStrc* s = left ? UNITS_GetLeftSkill(g_targetPlayer) : UNITS_GetRightSkill(g_targetPlayer);
+        if (s) D2GAME_PACKETS_SendPacket0x23_6FC3DC60(g_targetClient, UNIT_PLAYER, g_targetPlayer->dwUnitId, (uint8_t)left,
+                   (uint16_t)SKILLS_GetSkillIdFromSkill(s, __FILE__, __LINE__), SKILLS_GetOwnerGUIDFromSkill(s));
+    }
     return 1;
 }
 EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_join_stream(uint32_t* length) { if (length) *length = (uint32_t)g_sessionJoinBurst.size(); return g_sessionJoinBurst.data(); }
@@ -6150,7 +6169,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_take_sounds(int32_t* out, int cap) {
                 (monster->nTypeFlag & (MONTYPEFLAG_UNIQUE | MONTYPEFLAG_MINION)) != 0, superProfile,
                 static_cast<int32_t>(stats->wUMonSound), static_cast<int32_t>(stats->wMonSound));
             D2MonSoundsTxt* sounds = profileId >= 0 ? DATATBLS_GetMonSoundsTxtRecordFromSoundId(profileId) : nullptr;
-            if (sounds && !sounds->dwInit && unit->dwAnimMode == 8 && sounds->dwSkill[0] && sounds->dwSkill[0] != 0xA84 && sounds->dwSkill[0] <= INT32_MAX && g_heldMonsters.count(unit->dwUnitId)) {
+            if (sounds && !sounds->dwInit && unit->dwAnimMode == 8 && d2::realm::clientMonsterSkill1SoundPlays(sounds->dwSkill[0]) && sounds->dwSkill[0] <= INT32_MAX && g_heldMonsters.count(unit->dwUnitId)) {
                 // 23170 with Init == 0 on a client-created unit in mode 8 (SK1): the 0x223D0 == 8 arm runs 0x22CA0 slot 8, which submits MonSounds Skill1 (+0x44).
                 g_monInitPlayed.insert(unit->dwUnitId);
                 out[n++] = (int32_t)unit->dwUnitType; out[n++] = (int32_t)unit->dwUnitId; out[n++] = unit->dwClassId;
@@ -6163,7 +6182,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_take_sounds(int32_t* out, int cap) {
             out[n++] = 0x100; out[n++] = -1; out[n++] = 0; out[n++] = (int32_t)sounds->dwInit;
             // 1.13c D2Client+0x24490 (mode 8 -> 0x22CA0 slot 8) runs on the same create as 0x23170's Init arm, so a unit
             // born in SK1 also plays its MonSounds Skill1 (a retail recording skill 94: golemfire 2574 Init, then 1077 spawnfire at the same tick).
-            if (unit->dwAnimMode == 8 && sounds->dwSkill[0] && sounds->dwSkill[0] != 0xA84 && sounds->dwSkill[0] <= INT32_MAX && g_heldMonsters.count(unit->dwUnitId) && n + 7 <= cap) {
+            if (unit->dwAnimMode == 8 && d2::realm::clientMonsterSkill1SoundPlays(sounds->dwSkill[0]) && sounds->dwSkill[0] <= INT32_MAX && g_heldMonsters.count(unit->dwUnitId) && n + 7 <= cap) {
                 out[n++] = (int32_t)unit->dwUnitType; out[n++] = (int32_t)unit->dwUnitId; out[n++] = unit->dwClassId;
                 out[n++] = 0x100; out[n++] = -1; out[n++] = 0; out[n++] = (int32_t)sounds->dwSkill[0];
             }
@@ -6502,19 +6521,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_gamble(uint32_t npcId, uint32
 // (D2Common #10607 with a zero out value) is not traced and is not applied.
 EMSCRIPTEN_KEEPALIVE int d2_session_item_needs_repair(uint32_t itemId) {
     if (!g_sessionLive || !g_game) return 0;
-    D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
-    if (!item) return 0;
-    // 1.13c D2Client+0x45B40 (d2client_45b40::sub_45B40 over the server unit): item type 4 and items
-    // ITEMS_IsRepairable refuses (unidentified, ethereal, no Repair flag) never need repair; then durability
-    // below max, a stackable below its max stack, or a charged skill with used charges.
-    if (ITEMS_GetItemType(item) == 4 || !ITEMS_IsRepairable(item)) return 0;
-    if (ITEMS_HasDurability(item)) {
-        const int32_t maxDur = STATLIST_GetMaxDurabilityFromUnit(item);
-        if (maxDur && STATLIST_UnitGetStatValue(item, STAT_DURABILITY, 0) < maxDur) return 1;
-    }
-    if (ITEMS_CheckIfStackable(item) && STATLIST_UnitGetStatValue(item, STAT_QUANTITY, 0) < ITEMS_GetTotalMaxStack(item)) return 1;
-    BOOL full = FALSE;
-    return ITEMS_HasUsedCharges(item, &full) && !full ? 1 : 0;
+    // 1.13c D2Client+0x45B40 over the server unit (the rule: d2client/item_needs_repair.h).
+    return d2client_item_needs_repair(SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId));
 }
 EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_repair(uint32_t npcId, uint32_t itemId) {
     memset(&g_sessionRepair, 0, sizeof g_sessionRepair);
@@ -6586,12 +6594,6 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_sell(uint32_t npcId, uint32_t
 }
 // 1.13c D2Client+0x46230: the amount of an inventory tooltip's "Sell value" line.
 // -1 = no line: no trade window open, the item is not carried, or D2Common ordinal 10705 (0x241D0) refuses it.
-struct SellLineCb {   // d2_client_46230's callees (src/core/d2client/price_line_46230.cpp), bound to the session
-    int32_t (*itemType)(void*); int32_t (*itemId)(uint32_t); bool (*vendor)(int32_t*); int32_t (*sellable)(void*);
-    int32_t (*cost)(void*, int32_t, int32_t); const uint16_t* (*str)(uint32_t); int32_t (*repairFlag)(); int32_t (*gambleOk)(void*);
-    int32_t (*b5b40)(void*); int32_t (*b5bd0)(void*); void (*done)(int32_t);
-};
-extern "C" int32_t d2_client_46230(int32_t*, void*, int32_t, uint16_t*, int32_t, int32_t, int32_t, const SellLineCb*);
 static D2UnitStrc* g_sellNpc;
 static int32_t sellCost(void* item, int32_t npcClass, int32_t type) {
     return ITEMS_GetTransactionCost(g_targetPlayer, (D2UnitStrc*)item, (D2C_Difficulties)g_game->nDifficulty,
@@ -6616,7 +6618,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_session_item_sell_value(uint32_t itemId) {
     D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
     if (!g_sellNpc || !item || !item->pItemData || !sessionNpcIsVendor(g_sellNpc) || ITEMS_IsInPlayersInventory(g_targetPlayer, item, 0) != 1 ||
         !sessionItemIsPlain(item)) return -1;
-    static const SellLineCb cb = {
+    static const D2ClientPriceLineCb cb = {
         [](void*) -> int32_t { return 0; }, [](uint32_t) -> int32_t { return 0; },
         [](int32_t* c) -> bool { *c = (int32_t)g_sellNpc->dwClassId; return true; }, [](void*) -> int32_t { return 1; },
         sellCost, [](uint32_t) -> const uint16_t* { static const uint16_t z[1] = { 0 }; return z; },
@@ -6634,7 +6636,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_session_item_repair_cost(uint32_t itemId) {
     g_sellNpc = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)g_sessionVendor.npcId);
     D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
     if (!g_sellNpc || !item || !item->pItemData || !sessionNpcIsVendor(g_sellNpc)) return -1;
-    static const SellLineCb cb = {
+    static const D2ClientPriceLineCb cb = {
         [](void*) -> int32_t { return 0; }, [](uint32_t) -> int32_t { return 0; },
         [](int32_t* c) -> bool { *c = (int32_t)g_sellNpc->dwClassId; return true; }, [](void*) -> int32_t { return 1; },
         sellCost, [](uint32_t) -> const uint16_t* { static const uint16_t z[1] = { 0 }; return z; },
@@ -9419,6 +9421,9 @@ EMSCRIPTEN_KEEPALIVE int d2_session_stash_clear() {
         if (!item || item->dwAnimMode != IMODE_STORED || ITEMS_GetInvPage(item) != INVPAGE_STASH) continue;
         D2GAME_ITEMS_UpdateTransferredProperties_6FC424E0(g_game, item, g_targetPlayer, 0, 1);
         if (!INVENTORY_RemoveItemFromInventory(inv, item)) return -2;
+        // The packet client drops the item as retail's server-side removal tells it (0x0A, D2GAME_RemoveItem's bSendPacket leg).
+        if (D2ClientStrc* client = SUNIT_GetClientFromPlayer(g_targetPlayer, __FILE__, __LINE__))
+            D2GAME_PACKETS_SendPacket0x0A_RemoveObject_6FCC5F80(item, client);
         SUNIT_RemoveUnit(g_game, item); ++removed;
     }
     updateSessionSnapshot();
@@ -9429,7 +9434,19 @@ EMSCRIPTEN_KEEPALIVE int d2_session_stash_clear() {
 EMSCRIPTEN_KEEPALIVE int d2_session_stash_insert(const uint8_t* bytes, int len) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !bytes || len < 4) return -1;
     std::vector<uint8_t> copy(bytes, bytes + len); int32_t consumed = 0;
+    std::vector<D2UnitStrc*> before;
+    if (g_targetPlayer->pInventory)
+        for (D2UnitStrc* i = INVENTORY_GetFirstItem(g_targetPlayer->pInventory); i; i = INVENTORY_GetNextItem(i)) before.push_back(i);
     const int r = PLRSAVE_ReadItems_6FC8B8A0(g_game, g_targetPlayer, copy.data(), 96, len, 0, &consumed);
+    // Each new stash item reaches the packet client as retail's put-in-container item action (0x9C, as InvMode does).
+    D2ClientStrc* client = g_targetPlayer->pInventory ? SUNIT_GetClientFromPlayer(g_targetPlayer, __FILE__, __LINE__) : nullptr;
+    if (client && r == 0)   // a failed read is not announced to the client
+        for (D2UnitStrc* i = INVENTORY_GetFirstItem(g_targetPlayer->pInventory); i; i = INVENTORY_GetNextItem(i)) {
+            D2UnitStrc* item = INVENTORY_UnitIsItem(i);
+            if (!item || std::find(before.begin(), before.end(), i) != before.end()) continue;
+            if (item->dwAnimMode != IMODE_STORED || ITEMS_GetInvPage(item) != INVPAGE_STASH) continue;
+            D2GAME_SendP0x9C_ItemAction_PutInContainer_6FC3E980(client, g_targetPlayer, item, 0);
+        }
     updateSessionSnapshot();
     return r;
 }

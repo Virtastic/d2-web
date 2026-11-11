@@ -5,7 +5,7 @@ import { overlayStep } from './skill-fx.mjs';
 // module only times them against the engine's tick and hands them to the frame's entities and the
 // sound players; it decides nothing.
 
-/** Engine records are {version, tick, kind, unitType, unitGuid, row, delay, skill}, eight u32s. Kind 2 is an overlay; 1, 3 and 4 are sounds (skill start or a record's own sound, weapon swing, class start); 5 is a hit (row: the hit class); 6 is a unit sound event (row: the event, skill: the unit's class). */
+/** Engine records are {version, tick, kind, unitType, unitGuid, row, delay, skill}, eight u32s. Kind 2 is an overlay; 1, 3 and 4 are sounds (skill start or a record's own sound, weapon swing, class start); 5 is a hit (row: the hit class); 6 is a unit sound event (row: the event, delay: the Sounds row a taunt or skill start names through the unit's tables or 0, skill: the unit's class). */
 export function parseRealmUnitFx(bytes, count) {
   const view = bytes instanceof DataView ? bytes : new DataView(bytes.buffer, bytes.byteOffset || 0, bytes.byteLength);
   if (!Number.isInteger(count) || count < 0 || view.byteLength < count * 32) throw new RangeError('truncated unit effect records');
@@ -20,8 +20,27 @@ export function parseRealmUnitFx(bytes, count) {
 /**
  *   read : the asset reader, for Overlay.txt (rows by data-row index, blank rows kept)
  *   play : (soundRow, event) => void
- *   unitSound : ({ unitType, unitGuid, classId, soundEvent }) => void, a unit sound event the server named
+ *   unitSound : ({ unitType, unitGuid, classId, soundEvent, selectedRow }) => void, a unit sound event the server named
  */
+/**
+ * Plays a unit sound event the server named (0x2C) through the unit sound player, as the engine path plays a drained
+ * one: the taunt or skill start row the client picked rides as `nativeSelectedRow`, and the local hero's own
+ * level-up event (2) is told to `levelUp` so the level poll does not sound it a second time.
+ */
+export function playRealmUnitSound(e, localGuid, unitSounds, levelUp) {
+  const played = unitSounds?.play({ unitType: e.unitType, unitId: e.unitGuid, classId: e.classId, soundEvent: e.soundEvent,
+    updateUnitType: -1, updateUnitId: e.unitGuid, nativeSelectedRow: e.selectedRow ?? 0 }, localGuid);
+  if (e.soundEvent === 2 && e.unitType === 0 && e.unitGuid === localGuid) levelUp?.();
+  return played;
+}
+
+/** The `skill` of a sound record a monster plays as the client makes it (its MonSounds Init or Skill1 row). */
+export const SKILL_CREATE = 0xfffffffd;
+/** The `skill` of a sound record a state plays as a state packet turns it on (its States.txt onsound). */
+export const SKILL_STATE = 0xfffffffc;
+// These two are no skill's start sound, so the shell's mute of the selected player's start sounds passes them.
+const SOUND_KINDS = { [SKILL_CREATE]: 'monster-init', [SKILL_STATE]: 'state-onsound' };
+
 /** The Overlay.txt row the client starts on a unit the server marks (0x8A). */
 export const MARK_ROW = 0x48;
 
@@ -49,8 +68,8 @@ export function createRealmUnitFx(read, play, unitSound) {
       hits = new Map();
       for (const e of events ?? []) {
         if (e.kind === 5) { hits.set(`${e.unitType}:${e.unitGuid}`, e.row); continue; }
-        if (e.kind === 6) { unitSound?.({ unitType: e.unitType, unitGuid: e.unitGuid, classId: e.skill, soundEvent: e.row }); continue; }
-        if (e.kind !== 2) { if (!mute?.(e)) sounds.push(e); continue; }
+        if (e.kind === 6) { unitSound?.({ unitType: e.unitType, unitGuid: e.unitGuid, classId: e.skill, soundEvent: e.row, selectedRow: e.delay }); continue; }
+        if (e.kind !== 2) { if (e.skill in SOUND_KINDS || !mute?.(e)) sounds.push(e); continue; }
         const row = rows[e.row], file = row?.Filename;
         if (!row || !file || file === 'null') continue;
         const key = `${e.unitType}:${e.unitGuid}`;
@@ -60,7 +79,7 @@ export function createRealmUnitFx(read, play, unitSound) {
         const e = sounds[i];
         if (e.tick + e.delay > now) { i++; continue; }
         sounds.splice(i, 1);
-        play(e.row, { unitType: e.unitType, unitId: e.unitGuid, kind: 'skillstart', skill: e.skill, baseRow: e.row });
+        play(e.row, { unitType: e.unitType, unitId: e.unitGuid, kind: SOUND_KINDS[e.skill] ?? 'skillstart', skill: e.skill, baseRow: e.row });
       }
       for (const [key, list] of overlays) {
         const live = list.filter((o) => age(o) < o.frames);

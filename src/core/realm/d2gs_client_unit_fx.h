@@ -4,9 +4,11 @@
 //               own sound, the weapon's swing, the class's start sound);
 // kind 2: a one-shot overlay row on the unit;
 // kind 5: the unit was struck (row = its hit class);
-// kind 6: a unit sound event (row = the event, skill = the unit's class id).
-// `skill` is the skill id that caused the effect, kSkillHit for a hit and kSkillRecord for an
-// effect a server record named directly.
+// kind 6: a unit sound event (row = the event, delay = the Sounds row a taunt or skill start
+// names through the unit's tables or 0, skill = the unit's class id).
+// `skill` is the skill id that caused the effect, kSkillHit for a hit, kSkillRecord for an
+// effect a server record named directly kSkillCreate for a monster's sound as the client makes it and kSkillState for a
+// state's onsound as a state packet turns it on.
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -16,7 +18,8 @@ namespace d2::realm {
 
 inline constexpr uint32_t kUnitFxSound = 1, kUnitFxOverlay = 2, kUnitFxSwing = 3, kUnitFxClassSound = 4,
     kUnitFxHit = 5, kUnitFxUnitSound = 6;
-inline constexpr uint32_t kUnitFxSkillHit = 0xffffffffu, kUnitFxSkillRecord = 0xfffffffeu;
+inline constexpr uint32_t kUnitFxSkillHit = 0xffffffffu, kUnitFxSkillRecord = 0xfffffffeu, kUnitFxSkillCreate = 0xfffffffdu,
+    kUnitFxSkillState = 0xfffffffcu;
 
 struct UnitFxEvent { uint32_t version, tick, kind, unitType, unitGuid, row, delay, skill; };
 static_assert(sizeof(UnitFxEvent) == 32);

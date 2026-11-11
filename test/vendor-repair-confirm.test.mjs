@@ -88,8 +88,8 @@ test('both repair commands read the 0x2A result and open the refusal box', () =>
 });
 
 test('needs-repair is the whole 0x45B40 rule: type 4, IsRepairable, durability, stackable, used charges', () => {
-  const src = readFileSync('src/core/monspawn/monspawn_check.cpp', 'utf8');
-  const body = src.slice(src.indexOf('int d2_session_item_needs_repair(')).slice(0, 1400);
+  const src = readFileSync('src/core/d2client/item_needs_repair.h', 'utf8');
+  const body = src.slice(src.indexOf('d2client_item_needs_repair(')).slice(0, 1400);
   assert.match(body, /ITEMS_GetItemType\(item\) == 4 \|\| !ITEMS_IsRepairable\(item\)/);
   assert.match(body, /ITEMS_HasDurability\(item\)/);
   assert.match(body, /ITEMS_CheckIfStackable\(item\)/);

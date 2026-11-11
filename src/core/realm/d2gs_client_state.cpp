@@ -38,6 +38,8 @@
 #include <Drlg/D2DrlgDrlg.h>
 #include "../d2client/inv_weapon_hands.h"
 #include "../d2client/character_screen.h"
+#include "client_unit_sound.h"
+#include "../d2client/price_line_46230.h"
 #include "../d2client/realm_skill_start.h"
 #include "../d2client/realm_skill_do.h"
 #include "d2gs_client_motion.h"
@@ -999,6 +1001,7 @@ static bool parse_monster_assign(const uint8_t* packet, int length, D2RealmClien
     return true;
 }
 
+static void record_unit_fx(uint32_t kind, D2UnitStrc* unit, uint32_t row, uint32_t delay, uint32_t skill);
 static bool apply_monster_assign(const uint8_t* packet, int length) {
     D2RealmClientMonster monster{};
     if (!parse_monster_assign(packet, length, monster)) return false;
@@ -1022,7 +1025,13 @@ static bool apply_monster_assign(const uint8_t* packet, int length) {
         }
     }
     g_monsters.push_back(std::move(monster));
-    create_monster_motion(g_monsters.back());
+    D2RealmClientMonster& made = g_monsters.back();
+    create_monster_motion(made);
+    // 1.13c D2Client+0x23170: the made monster's Init (or Skill1) sound, once.
+    if (made.motionUnit) {
+        const uint32_t row = d2::realm::clientMonsterCreateSoundRow(made.motionUnit, made.view.typeFlags, made.superUniqueIndex);
+        if (row) record_unit_fx(d2::realm::kUnitFxSound, made.motionUnit, row, 0, d2::realm::kUnitFxSkillCreate);
+    }
     return true;
 }
 
@@ -1907,6 +1916,13 @@ static bool apply_state_on(D2UnitStrc* unit, uint8_t state) {
     return true;
 }
 
+// 1.13c D2Client+0x73760, called by the 0xA7, 0xA8 and 0xAA handlers before the state is set: a state
+// the unit does not carry yet plays its onsound.
+static void record_state_on_sound(D2UnitStrc* unit, uint8_t state) {
+    const int32_t row = d2::realm::clientStateOnSoundRow(unit, state);
+    if (row >= 0) record_unit_fx(d2::realm::kUnitFxSound, unit, static_cast<uint32_t>(row), 0, d2::realm::kUnitFxSkillState);
+}
+
 static int apply_state_packet(const uint8_t* packet, int length) {
     if (!packet || length < 7) return -1;
     const uint8_t type = packet[1];
@@ -1923,6 +1939,7 @@ static int apply_state_packet(const uint8_t* packet, int length) {
         if (!unit->pStatListEx) STATLIST_AllocStatListEx(unit, 0, nullptr, nullptr);
         if (!unit->pStatListEx) return -1;
         if (packet[0] == 0xa7) {
+            record_state_on_sound(unit, state);
             STATES_ToggleState(unit, state, TRUE);
         } else {
             D2StatListStrc* stateList = STATLIST_GetStatListFromUnitAndState(unit, state);
@@ -1946,6 +1963,7 @@ static int apply_state_packet(const uint8_t* packet, int length) {
     int applied = 0;
     for (const auto& update : updates) {
         if (!sgptDataTables || update.state >= sgptDataTables->nStatesTxtRecordCount) continue;
+        record_state_on_sound(unit, update.state);
         if (!apply_state_on(unit, update.state)) return -1;
         if (update.hasStats &&
             !d2gs_client_apply_state_stats(unit, update.state, update.stats.data(), update.stats.size()))
@@ -3878,13 +3896,21 @@ static int pkt_unit_overlay(const uint8_t* packet, int size) {
         d2::realm::kUnitFxSkillRecord);
     return 1;
 }
-// 0x2C: a unit's sound event (1.13c D2Client+0xAD740); the page resolves the event to a sound.
+// 0x2C: a unit's sound event (1.13c D2Client+0xAD740); the page resolves the event to a sound. A taunt
+// or a skill start names its Sounds row through the unit's own tables (+0x23F20); that row rides in the
+// record's delay word (0 when there is none).
 static int pkt_unit_sound(const uint8_t* packet, int size) {
     d2::realm::UnitWordPacket p{};
     if (!d2::realm::decodeUnitWordPacket(0x2c, packet, size, &p)) return -2;
     D2UnitStrc* unit = find_realm_client_unit(p.unitType, p.guid);
     if (!unit) return 0;
-    record_unit_fx(d2::realm::kUnitFxUnitSound, unit, p.value, 0, unit->dwClassId);
+    uint32_t typeFlags = 0;
+    int32_t superUnique = -1;
+    if (p.unitType == UNIT_MONSTER)
+        for (const auto& monster : g_monsters)
+            if (monster.view.guid == p.guid) { typeFlags = monster.view.typeFlags; superUnique = monster.superUniqueIndex; break; }
+    record_unit_fx(d2::realm::kUnitFxUnitSound, unit, p.value,
+        d2::realm::clientUnitSoundRow(unit, p.value, typeFlags, superUnique), unit->dwClassId);
     return 1;
 }
 // 0x4D on an object is the object's own packet; on any other unit it starts a skill at a spot.
@@ -5480,6 +5506,39 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_item_price(uint32_t itemGuid, uint32_t 
         }
     }
     return -1;
+}
+
+// 1.13c D2Client+0x46230 on the packet client: the "Sell value" line of a carried item while the trade window of
+// NPC class `npcClass` is open, priced from the client's own hero unit, difficulty and quest record (the local
+// session's d2_session_item_sell_value prices the server unit with the same callees). -1 = no line.
+static D2UnitStrc* g_sellLinePlayer;
+static int32_t g_sellLineNpcClass;
+static int32_t sell_line_vendor(int32_t* c) { *c = g_sellLineNpcClass; return 1; }
+static int32_t sell_line_cost(void* it, int32_t npc, int32_t type) {
+    return realm_client_transaction_cost(g_sellLinePlayer, static_cast<D2UnitStrc*>(it), static_cast<uint32_t>(npc), static_cast<uint32_t>(type));
+}
+static int32_t sell_line_zero(void*) { return 0; }
+static int32_t sell_line_one(void*) { return 1; }
+static int32_t sell_line_id(uint32_t) { return 0; }
+static int32_t sell_line_flag() { return 0; }
+static const uint16_t* sell_line_str(uint32_t) { static const uint16_t z[1] = { 0 }; return z; }
+static void sell_line_done(int32_t) {}
+static bool sell_line_vendor_b(int32_t* c) { return sell_line_vendor(c) != 0; }
+EMSCRIPTEN_KEEPALIVE int32_t d2_realm_client_item_sell_value(uint32_t itemGuid, int32_t npcClass) {
+    D2UnitStrc* player = g_selectedPlayer >= 0 && size_t(g_selectedPlayer) < g_players.size() ? g_players[g_selectedPlayer].motionUnit : nullptr;
+    if (!player || !player->pInventory || npcClass < 0 || !DATATBLS_GetNpcTxtRecord(npcClass)) return -1;
+    D2UnitStrc* item = nullptr;
+    for (D2UnitStrc* i = INVENTORY_GetFirstItem(player->pInventory); i; i = INVENTORY_GetNextItem(i))
+        if (i->dwUnitType == UNIT_ITEM && i->dwUnitId == itemGuid) { item = i; break; }
+    if (!item || !item->pItemData) return -1;  // found by walking the player's item list, which is what the ownership test walks
+    // The plain-item gate of the session's sell line: no ear (flag 0x1000), no quest item, no type 0x27.
+    D2ItemsTxt* txt = DATATBLS_GetItemsTxtRecord(item->dwClassId);
+    if (!txt || (item->pItemData->dwItemFlags & 0x1000) || txt->nQuest || txt->wType[0] == 0x27) return -1;
+    g_sellLinePlayer = player; g_sellLineNpcClass = npcClass;
+    static const D2ClientPriceLineCb cb = { sell_line_zero, sell_line_id, sell_line_vendor_b, sell_line_one, sell_line_cost, sell_line_str,
+        sell_line_flag, sell_line_one, sell_line_one, sell_line_zero, sell_line_done };
+    int32_t amt = -1; uint16_t line[16];
+    return d2_client_46230(&amt, item, 1, line, 16, 0, 0, &cb) ? amt : -1;
 }
 
 // The price of a shop stock item (S2C 0x9C) for the selected player. The stock bits are the item bitstream

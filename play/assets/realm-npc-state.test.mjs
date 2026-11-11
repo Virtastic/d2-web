@@ -171,3 +171,13 @@ test('the hire request carries the hero unit id; trade and gamble carry 0', () =
   hirer.npc.handle(info(GUID, []));
   assert.deepEqual(hirer.sent[1], [0x38, 3, 0, 0, 0, GUID, 0, 0, 0, 4, 3, 2, 1]);
 });
+
+test('a boat row sends the travel 0x38 (action 0) for the clicked NPC and closes without 0x30', () => {
+  const r = fresh({ classId: 155, questDone: () => true });   // Warriv (Act I): Go East once Andariel is done
+  r.npc.handle(info(GUID, []));
+  const row = r.npc.view().entries.find((e) => e.stringId === 3382);
+  assert.ok(row);
+  assert.equal(r.npc.choose(row), true);
+  assert.deepEqual(r.sent.at(-1), [0x38, 0, 0, 0, 0, GUID, 0, 0, 0, 0, 0, 0, 0]);
+  assert.equal(r.npc.isOpen(), false);
+});

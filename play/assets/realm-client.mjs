@@ -1200,6 +1200,20 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
       return v === -2147483648 ? null : v;
     },
     d2gsClientItemPrice: (itemGuid, vendorId, transType) => call('d2_realm_client_item_price', 'number', ['number', 'number', 'number'], [itemGuid, vendorId, transType]),
+    // A carried item's sell line with NPC class `npcClass` trading (D2Client 0x46230), null for no line.
+    d2gsClientSellValue: (itemGuid, npcClass) => {
+      if (!Module._d2_realm_client_item_sell_value) return null;
+      const v = call('d2_realm_client_item_sell_value', 'number', ['number', 'number'], [itemGuid >>> 0, npcClass]);
+      return v < 0 ? null : v;
+    },
+    // A carried item's repair: needs (D2Client 0x45B40), and the mode and durability words the 0x35 carries; null when unknown.
+    d2gsClientRepairInfo: (itemGuid) => {
+      if (!Module._d2_realm_client_item_repair_field) return null;
+      const mode = call('d2_realm_client_item_repair_field', 'number', ['number', 'number'], [itemGuid >>> 0, 0]);
+      if (mode < 0) return null;
+      return { needs: call('d2_realm_client_item_needs_repair', 'number', ['number'], [itemGuid >>> 0]) !== 0, mode,
+        durability: call('d2_realm_client_item_repair_field', 'number', ['number', 'number'], [itemGuid >>> 0, 1]) };
+    },
     d2gsClientStockPrice: (bits, vendorId, transType) => {
       Module.HEAPU8.set(bits, Number(P));
       return call('d2_realm_client_stock_price', 'number', ['bigint', 'number', 'number', 'number'], [BigInt(P), bits.length, vendorId, transType]);

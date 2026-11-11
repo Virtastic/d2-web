@@ -1,4 +1,5 @@
 #include "d2gs_client_owned_item.h"
+#include "../d2client/item_needs_repair.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -311,6 +312,15 @@ void d2_realm_client_items_forget_loose() {
 
 // The item unit the client holds under this id, or null (the 0x3f and 0x7c packets name items by id).
 D2UnitStrc* d2_realm_client_owned_item_find(uint32_t guid) { return find_item(guid); }
+// 1.13c D2Client+0x45B40 over the client's own item unit: the repair confirm's test on the packet path.
+extern "C" EMSCRIPTEN_KEEPALIVE int d2_realm_client_item_needs_repair(uint32_t guid) { return d2client_item_needs_repair(find_item(guid)); }
+// The two item words retail D2Client+0x46EE0 writes into a single-item repair 0x35: field 0 the item's mode low
+// word, field 1 its durability (stat 0x48). -1 for an item the client does not hold.
+extern "C" EMSCRIPTEN_KEEPALIVE int d2_realm_client_item_repair_field(uint32_t guid, int field) {
+    D2UnitStrc* item = find_item(guid);
+    if (!item) return -1;
+    return field == 0 ? static_cast<int>(static_cast<uint16_t>(item->dwAnimMode)) : STATLIST_UnitGetStatValue(item, STAT_DURABILITY, 0);
+}
 
 // A unit-removal record for an item: an item on the ground goes; one somebody holds is not touched.
 // GUESS: retail's removal handler for an item unit is not read; this is the rule the screen copy used.
