@@ -1,6 +1,6 @@
 // 1.13c D2Game+0xF2C10: EAX = a (reference), EBX = b (mover), stack game, d, run (ret 0xC). Positions: unit types 2 and 4..5 read path+0xC / +0x10 (path = [unit+0x2C]), other types
 // ask thunk 0xA454 (x) / 0xA3B8 (y) for a non-null path (0 for none); read order b.x, b.y, a.x, a.y. sx / sy = -1 if a > b on that axis (unsigned), 1 if a < b, else 0; nx = bx + dd * sx,
-// ny = by + dd * sy with dd = d & 0xFF. dd > 5: b's AI data ([[b+0x14]+0x2C] for a type-1 b, else 0) byte +0x20 = min(dd, 0x4D). Then 0xF2540 (ECX = game, EDX = b; 0, 0xF, nx, ny, 1, run ? 4 : 0).
+// ny = by + dd * sy with dd = d & 0xFF. dd > 5: b's AI data ([[b+0x14]+0x2C] for a type-1 b, else 0) byte +0x20 = min(dd, 0x4D). Then 0xF2540 (ECX and EDX clear; stack 0, 0xF, nx, ny, 1, run ? 4 : 0).
 #pragma once
 #include <cstdint>
 namespace gf2c10 {
@@ -26,6 +26,6 @@ template <class E> void Run(E& e, uint32_t a, uint32_t b, uint32_t game, uint32_
         e.wr8(ai + 0x20, dd >= 0x4E ? 0x4D : dd);
     }
     const uint32_t w[6] = { 0, 0xF, nx, ny, 1, run ? 4u : 0u };
-    e.h(0xF2540, 0, 0, 0, 0, 0, w[0], w[1], w[2], w[3], w[4], w[5]);
+    e.h(0xF2540, 0, game, b, 0, 0, w[0], w[1], w[2], w[3], w[4], w[5]);
 }
 }
