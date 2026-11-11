@@ -11,6 +11,10 @@ struct RealmSkillDoHost {
     D2UnitStrc* (*createMissile)(const D2MissileStrc* params);    // 1.13c D2Client+0xB30F0
     void (*unitSound)(D2UnitStrc* unit, int soundRow, int skillId); // 1.13c D2Client+0x88A70
     D2UnitStrc* (*findUnit)(int unitType, uint32_t guid);           // 1.13c D2Client+0xA4E20
+    // Aura-filter bit 0x8000 of +0xA1620: whether `candidate` is an enemy of `origin`.
+    int (*hostile)(D2UnitStrc* candidate, D2UnitStrc* origin);
+    D2UnitStrc* (*missileOwner)(D2UnitStrc* missile);               // 1.13c D2Client+0xA60D0
+    void (*unitOverlay)(D2UnitStrc* unit, int row, int skillId);    // 1.13c D2Client+0x6B300
 };
 
 // 1.13c D2Client+0xA1340: the point the unit's path aims at (its target unit's position, else the
@@ -24,6 +28,8 @@ int d2client_realm_40550(D2UnitStrc* unit, int skillId);
 int d2client_realm_14f40(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 16
 int d2client_realm_15da0(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 17
 int d2client_realm_15c40(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 18
+int d2client_realm_15820(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 20
+int d2client_realm_14fd0(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 21
 
 int d2client_realm_73cb0(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 25
 

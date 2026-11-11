@@ -11,6 +11,7 @@ int d2client_realm_a0e70(D2UnitStrc* unit, int skillId, int level);   // start f
 int d2client_realm_14f30(D2UnitStrc* unit, int skillId, int level);   // start function 11
 int d2client_realm_14f10(D2UnitStrc* unit, int skillId, int level);   // start function 12
 int d2client_realm_15500(D2UnitStrc* unit, int skillId, int level);   // start function 13
+int d2client_realm_15350(D2UnitStrc* unit, int skillId, int level);   // start function 14
 int d2client_realm_57000(D2UnitStrc* unit, int skillId, int level);   // start function 39
 
 int d2client_realm_a0730(D2UnitStrc* unit, int skillId, int level);   // start function 4
@@ -22,6 +23,10 @@ int d2client_realm_569a0(D2UnitStrc* unit, int skillId, int level);   // start f
 int d2client_realm_56930(D2UnitStrc* unit, int skillId, int level);   // start function 40
 int d2client_realm_566e0(D2UnitStrc* unit, int skillId, int level);   // start function 41
 
+struct RealmSkillDoHost;
+// The client callbacks for the start functions that search (13, 14); set before a start runs.
+void d2client_realm_set_start_host(const RealmSkillDoHost* host);
+const RealmSkillDoHost* d2client_realm_start_host();
 // Runs start function `fn` (0, out of the table or not ported: nothing runs, 1). 0 = the start refused.
 int d2client_realm_skill_start(int fn, D2UnitStrc* unit, int skillId, int level);
 // Whether the table's entry `fn` is ported here.
