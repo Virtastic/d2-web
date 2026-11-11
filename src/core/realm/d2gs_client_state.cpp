@@ -2593,8 +2593,10 @@ static bool advance_client_player_action(D2UnitStrc* unit) {
     }
     // A sequence is never restarted here: its count running out is its end.
     if (!unit->dwFrameCountPrecise && unit->dwAnimMode != PLRMODE_SEQUENCE) UNITS_SetAnimStartFrame(unit);
+    // The end test comes before the advance (1.13c D2Client+0x1C150): the frame that reaches the end
+    // of the cycle is shown for its tick, and the unit leaves the mode on the next one.
     if (!UNITS_IsAtEndOfFrameCycle(unit)) UNITS_StopSequence(unit);
-    if (UNITS_IsAtEndOfFrameCycle(unit)) {
+    else {
         UNITS_SetUsedSkill(unit, nullptr);
         PATH_ResetToPreviousType(unit->pDynamicPath);
         unit->dwFlags = (unit->dwFlags & ~0x40u) | 2u;
