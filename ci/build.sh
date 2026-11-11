@@ -12,7 +12,7 @@ set -euo pipefail
 SRC="${SRC:-$(cd "$(dirname "$0")/.." && pwd)}"
 # Agents never build in their own worktree (one shared prove build covers every queued row): an
 # unroled build under .claude/worktrees/ is refused; batch-prove, merges and coverage set D2_BUILD_ROLE.
-case "$SRC" in */.claude/worktrees/*) [ "${D2_BUILD_ROLE:-}" != main ] || { echo "ci/build.sh: refused -- D2_BUILD_ROLE=main is only for the main checkout" >&2; exit 3; }; [ -n "${D2_BUILD_ROLE:-}" ] || { echo "ci/build.sh: refused -- agent worktree build; queue a prove: node tools/re/batch-prove.mjs --rows ... --item <id>" >&2; exit 3; };; esac
+case "$SRC" in */.claude/worktrees/*) [ "${D2_BUILD_ROLE:-}" != main ] || { echo "ci/build.sh: refused -- D2_BUILD_ROLE=main is only for the main checkout" >&2; exit 3; }; [ -n "${D2_BUILD_ROLE:-}" ] || { echo "ci/build.sh: refused -- agent worktree build; function rows queue a prove (node tools/re/batch-prove.mjs --rows ... --item <id>); session/defect/multiplayer work sets D2_BUILD_ROLE=session" >&2; exit 3; };; esac
 # One tag per recipe: worktrees on different Dockerfile versions never retag each other's image.
 IMAGE="${BUILDER_IMAGE:-d2-builder64:$(sha256sum "$SRC/Dockerfile.builder64" | cut -c1-12)}"
 cd "$SRC"
