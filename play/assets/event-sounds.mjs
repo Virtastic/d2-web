@@ -20,7 +20,7 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
   const seen = new Map(); // item id -> { ground, code, played }
   // The snapshot's code is dwCode, the 4 ASCII bytes little-endian ('hax ').
   const codeOf = (c) => (typeof c === 'string' ? c : String.fromCharCode(c & 255, (c >> 8) & 255, (c >> 16) & 255, (c >>> 24) & 255)).replace(/[ \0]+$/, '');
-  const lastStep = new Map(), lastFrame = new Map(); let tick = 1 << 20; // monster id -> client tick of its last footfall (unit +0x84)
+  const lastStep = new Map(), lastFrame = new Map(), rebase = new Map(); let tick = 1 << 20; // monster id -> client tick of its last footfall (unit +0x84)
   let level = 0, stepT = -2, cur = 0, serverLevelUps = 0, serverPickups = 0;
   // Retail's client-side player step for a run (fit to a retail recording/a retail recording/a retail recording Q rows): the walk step 320 over a 3072 cycle (213.33/2048, the exact 4.8-tick footfall period a retail recording gaps need; 213 drifted a tick per 24; D2Common 0x2FB10 walk base,
   // not the run base 101 the server unit carries) over a 2048 cycle; footfalls two per cycle by the 0x23C00 due rule (nearest of cur-step, cur, cur+step
@@ -53,14 +53,23 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
       } else { if (stepT === -1) play((GAIT_BASE[cls] ?? 2768) + 24, { kind: 'footstep', unitType: 0, classId: cls }); else if (stepT >= 0) { cur = (cur + STEP) % PER; if (++stepT >= MINT && footDue(cur)) play((GAIT_BASE[cls] ?? 2768) + RUNG, { kind: 'footstep', unitType: 0, classId: cls }); } stepT = -2; } // the exit tick still runs the callback in the old mode (a retail recording) // a one-tick run (a retail recording) still submits its armed footfall
       ++tick;
       for (const e of monsterStep ? snapshot?.entities ?? [] : []) {
-        const a = e.type === 1 && e.animation;
+        let a = e.type === 1 && e.animation;
         if (!a?.inClientRoom) continue;
-        const prev = lastFrame.get(e.id), moved = prev ? (e.preciseX - prev[3]) ** 2 + (e.preciseY - prev[4]) ** 2 : 0;
+        // A new path for a unit already walking (same mode, new step) restarts the client's walk cycle: retail's unit is idle for the arrival tick
+        // and steps from frame 0 after it (a retail recording, F records). The snapshot keeps counting, so measure frames from the frame it had then.
+        const prior = lastFrame.get(e.id);
+        let rebased = false;
+        if (prior && prior[0] === a.mode && a.mode === 2 && prior[7] !== a.animSpeed && prior[2] === tick - 1) { rebase.set(e.id, a.framePrecise - a.animSpeed); rebased = false; }
+        else if (!prior || prior[0] !== a.mode) rebase.delete(e.id);
+        const base = rebase.get(e.id), rawFrame = a.framePrecise;
+        if (base !== undefined && a.frameCountPrecise > 0) a = { ...a, framePrecise: (((rawFrame - base) % a.frameCountPrecise) + a.frameCountPrecise) % a.frameCountPrecise };
+        const prev = prior, moved = prev ? (e.preciseX - prev[3]) ** 2 + (e.preciseY - prev[4]) ** 2 : 0;
         lastFrame.set(e.id, [a.mode, a.framePrecise, tick, e.preciseX, e.preciseY, moved, a.frameCountPrecise, a.animSpeed]);   // retail runs 0x23C00 before the advance: its +0x44 is last tick's snapshot
         // Walk -> attack (a retail recording vs a retail recording): retail moves the unit, then runs 0x23C00, then the attack packet changes the mode. A walk that
         // arrives this tick (moved no more than its previous step) is mode 1 by the time 0x23C00 runs, so no footfall; a walk cut short while still
         // moving (moved more than the previous step) is still mode 2 there and steps.
         const cut = prev && prev[0] === 2 && (a.mode === 5 || a.mode === 6) && moved > prev[5];
+        if (rebased) continue;
         if (!prev || (prev[0] !== a.mode && !cut) || prev[2] !== tick - 1) continue;
         // A new path for a unit already walking (0x67/0x68 to the client) restarts its walk cycle at frame 0 in the tick it arrives: retail's 0x23C00
         // sees the restart (a retail recording: a raven re-pathed mid-walk skips the footfall its wrapped frame would have made), so no footfall that tick.

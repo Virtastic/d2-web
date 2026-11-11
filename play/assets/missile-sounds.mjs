@@ -32,6 +32,12 @@ export function createMissileSounds(read, play, onClient = () => true, cltRoll =
   // +0x28) is nonzero and has changed, i.e. on each bounce: frames 11 and 18 for the stock 2 / 50 / 10, so ticks +10 and +17.
   const boulderBounces = (n, damp, lob) => { const g = -0x1000, out = []; let z = 0, vz = Math.trunc(-Math.trunc(lob * lob * g / 2) / lob);
     for (let f = 1; f < 1000; ++f) { z += vz; vz += g; if ((z >> 11) <= 0) { vz = Math.trunc(-damp * vz / 100); z = 0; if (!n) break; --n; out.push(f); } } return out; };
+  // A missile only a monster skill fires is sounded on the tick the snapshot shows it, when the attack animation fires.
+  const monsterMissile = new Set(), playerMissile = new Set();
+  for (const k of skills) for (const f of ['srvmissile', 'srvmissilea', 'srvmissileb', 'srvmissilec', 'cltmissile', 'cltmissilea', 'cltmissileb', 'cltmissilec', 'cltmissiled']) if (k[f] && byName.has(k[f])) (k.charclass ? playerMissile : monsterMissile).add(Number(byName.get(k[f]).Id));
+  const stem = (n) => n.replace(/\d+$/, ''), playerStems = new Set([...playerMissile].map((id) => stem(rows.find((m) => Number(m.Id) === id).Missile))), monsterStems = new Set([...monsterMissile].map((id) => stem(rows.find((m) => Number(m.Id) === id).Missile)));   // shafire1 is the skill's, shafire2/3 its variants
+  for (const m of rows) if (monsterStems.has(stem(m.Missile)) && !playerStems.has(stem(m.Missile))) monsterMissile.add(Number(m.Id));
+  for (const id of playerMissile) monsterMissile.delete(id);
   const row = (name) => (name && idx.has(name) ? idx.get(name) : 0);
   // A piercing client missile (pCltDoFunc 1, ClientCol, NextHit: twister, teeth) sounds its HitSound on each unit it strikes and flies on;
   // tornado (pSrvDoFunc 27) is excluded: its damage is the do-func's pulse, not a collision, and retail plays no impact for it (skill 245).
@@ -77,7 +83,7 @@ export function createMissileSounds(read, play, onClient = () => true, cltRoll =
         if (cltPick.has(m0?.Missile)) { const e = entities.find((u) => u.kind === 'missile' && u.id === id), ks = [...makers.values()].filter((k) => !k.used && m0.Missile === k.m.CltSubMissile1 && k.x === e?.x && k.y === e?.y), k = ks.find((q) => q.first && !q.n) ?? ks.find((q) => !q.n) ?? ks.find((q) => q.moved) ?? ks[0];
           if (k) { k.used = true; k.n++; const r = rand(k.seed, 3), sub = byName.get(r === 0 ? k.m.CltSubMissile2 : r === 1 ? k.m.CltSubMissile3 : k.m.CltSubMissile1); if (Number(k.m.CltParam1) > 0) rand(k.seed, Number(k.m.CltParam1)); cltRoll(id);
             if (sub && row(sub.TravelSound)) play(row(sub.TravelSound), { ...ev, classId: Number(sub.Id) }); } }
-        else pend.push({ at: tick + 1, r, ev }); }
+        else if (monsterMissile.has(cls)) play(r, ev); else pend.push({ at: tick + 1, r, ev }); }
         // 577 armageddon control: the client makes its own rock (578) on the cast-packet tick, which sounds its travel; the rock's hit (range - 1 ticks later) makes the explosion, which sounds its own.
         if (cls === 577 && onClient(id)) { const k = byName.get('armageddonrock'), x = byName.get(k?.CltHitSubMissile1); if (row(k?.TravelSound)) play(row(k.TravelSound), { kind: 'missile-travel', unitId: id, classId: Number(k.Id) }); if (row(x?.TravelSound)) pend.push({ at: tick + Number(k.Range) - 1, r: row(x.TravelSound), ev: { kind: 'missile-travel', unitId: id, classId: Number(x.Id) } }); } }
       for (const [name, g] of runs) { const per = blasts.get(name), k = byName.get(name); for (; g.next <= tick; g.next += per) { if (g.next - g.last > per) { runs.delete(name); break; } if (g.next === tick && row(k.TravelSound)) play(row(k.TravelSound), { kind: 'missile-travel', unitId: g.id, classId: Number(k.Id) }); } }
@@ -90,7 +96,8 @@ export function createMissileSounds(read, play, onClient = () => true, cltRoll =
           if (b.pCltDoFunc === '47' && row(b.ProgSound)) for (const f of boulderBounces(Number(m.cHitPar1), Number(m.cHitPar2), Number(m.cHitPar3))) pend.push({ at: tick + f - 1, r: row(b.ProgSound), ev: { kind: 'missile-hit', unitId: id, classId: Number(b.Id) }, bounce: true }); const end = tick + Number(b.Range) - 2; for (const [n, k] of [[b.CltHitSubMissile1, 1], [b.CltHitSubMissile2, 10], [b.CltHitSubMissile3, 18]]) for (let i = 0; i < k; ++i) if (row(byName.get(n)?.TravelSound)) pend.push({ at: end, r: row(byName.get(n).TravelSound), ev: { kind: 'missile-hit', unitId: id, classId: Number(byName.get(n).Id) }, boulder: true }); } }
         if (cltBoulder.has(m?.Missile)) { for (const p of pend) if (p.boulder) p.at = Math.min(p.at, tick); pend = pend.filter((p) => !p.bounce || p.at <= tick); }
         const span = tick - born.get(id); born.delete(id);
-        if (r && (cls !== 62 || ownFb.has(id)) && !(m?.ClientCol === "1" && span >= Number(m.Range)) && (m?.pCltDoFunc !== '1' || castMissiles.has(m.Missile))) { const ev = { kind: 'missile-hit', unitId: id, classId: cls }; play(r, ev);
+        if (r && (cls !== 62 || ownFb.has(id)) && !(m?.ClientCol === "1" && span >= Number(m.Range)) && (m?.pCltDoFunc !== '1' || castMissiles.has(m.Missile) || monsterMissile.has(cls))) { const ev = { kind: 'missile-hit', unitId: id, classId: cls }; if (monsterMissile.has(cls)) pend.push({ at: tick + 3, r, ev }); else play(r, ev);   // a monster missile lands 3 ticks after the engine removes it; the flight is not modelled.
+
           const x = cls === 62 && ownFb.delete(id) && row(m.HitSound) && byName.get(m.ExplosionMissile); if (x && row(x.TravelSound)) play(row(x.TravelSound), { kind: 'missile-travel', unitId: id, classId: Number(x.Id) }); } // 62 fireball: the client's fireball sounds its hit, then its explosion missile (fireexplode) sounds its travel
       }
       for (const e of entities) if (e.kind !== 'missile' && e.hp !== undefined) { const k = `${e.type}:${e.id}`, ph = hpPrev.get(k); hpPrev.set(k, e.hp);
