@@ -7395,7 +7395,7 @@ canvas.addEventListener('pointerdown', (e) => {
   // Left-clicking an OBJECT walks to it and operates it, as retail does. What happens next is the
   // engine's: the stash, for one, answers with 0x77 UPDATEUI_OPENSTASH (pollUiEvents).
   // Hover priority 0x6FBA2190: a UNIT_TILE scores 0, an object -6, so an exit under the cursor beats an object sharing its box.
-  const warpHit = !panelOwner && !hostileHit && !npcHit && e.button === 0 && session ? warpUnderPointer(x, y) : null;
+  const warpHit = !panelOwner && !hostileHit && !npcHit && e.button === 0 && session && !clientView().fromPackets ? warpUnderPointer(x, y) : null;   // a game over packets sends the exit as the 0x13 interact packet (realm-input), the server moves the hero
   const objectHit = !panelOwner && !hostileHit && !npcHit && !warpHit && e.button === 0 && session && !stashOpen && pointerSelection?.kind === 'object'
     ? pointerSelection.target : null;
   // A same-act exit is the native UNIT_TILE target for packet 0x13. The engine handles approach
