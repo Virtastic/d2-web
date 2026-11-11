@@ -43,7 +43,7 @@ static void spawnInit(const D2GameBatchC7130Env* e, void* u, void* game, uint32_
 
 // 1.13c D2Game+0xC7130
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2game_c7130(void* ecx, void* quest, int32_t* edi, const D2GameBatchC7130Env* e)
+void d2_fn_d2game_C7130(void* ecx, void* quest, int32_t* edi, const D2GameBatchC7130Env* e)
 {
     uint8_t* d = (uint8_t*)e->ptr(r32(quest, 0x18));
     if (e->subC6A30(ecx)) { d[2] = 1; return; }
@@ -55,7 +55,7 @@ void d2_fn_d2game_c7130(void* ecx, void* quest, int32_t* edi, const D2GameBatchC
 
 // 1.13c D2Game+0xC71A0
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2game_c71a0(void* ecx, void* quest, void* param1, const D2GameBatchC7130Env* e)
+void d2_fn_d2game_C71A0(void* ecx, void* quest, void* param1, const D2GameBatchC7130Env* e)
 {
     uint8_t* d = (uint8_t*)e->ptr(r32(quest, 0x18));
     d[5] = 1;
@@ -76,7 +76,7 @@ void d2_fn_d2game_c71a0(void* ecx, void* quest, void* param1, const D2GameBatchC
 
 // 1.13c D2Game+0xC7250
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2game_c7250(void* esi, const D2GameBatchC7130Env* e)
+void d2_fn_d2game_C7250(void* esi, const D2GameBatchC7130Env* e)
 {
     uint8_t* d = (uint8_t*)e->ptr(r32(esi, 0x18));
     if (r8(esi, 0xc) == 0 && d[1] == 0) {
@@ -102,11 +102,11 @@ static void questInit(const D2GameBatchC7130Env* e, void* q, const uint32_t (&cb
 
 // 1.13c D2Game+0xC7480
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2game_c7480(void* q, const D2GameBatchC7130Env* e)
+void d2_fn_d2game_C7480(void* q, const D2GameBatchC7130Env* e)
 {
-    static const uint32_t cb[6] = {0x6fce37f0, 0x6fce6b30, 0x6fce73a0, 0x6fce3970, 0x6fce72c0, 0x6fd241f8};
+    const uint32_t cb[6] = {(e->modBase + 0xC37F0), (e->modBase + 0xC6B30), (e->modBase + 0xC73A0), (e->modBase + 0xC3970), (e->modBase + 0xC72C0), (e->modBase + 0x1041F8)};
     questInit(e, q, cb, "..\\Source\\D2Game/Quests/a2q3.cpp", 0x323, 0xb, 0xb, 4, 0x28);
-    w32(q, 0xec, 0x6fce2250); w32(q, 0xf0, 0x6fce21e0);
+    w32(q, 0xec, (e->modBase + 0xC2250)); w32(q, 0xf0, (e->modBase + 0xC21E0));
     uint8_t* p = (uint8_t*)e->ptr(r32(q, 0x18));
     w32(p, 8, 0); w16(p, 0x94, 0);
 }
@@ -115,30 +115,12 @@ void d2_fn_d2game_c7480(void* q, const D2GameBatchC7130Env* e)
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_fn_d2game_C9400(void* q, const D2GameBatchC7130Env* e)
 {
-    static const uint32_t cb[6] = {0x6fce4ea0, 0x6fce85a0, 0x6fce9190, 0x6fce3620, 0x6fce3320, 0x6fd246a8};
-    w32(q, 0xa8, 0x6fce5db0);
+    const uint32_t cb[6] = {(e->modBase + 0xC4EA0), (e->modBase + 0xC85A0), (e->modBase + 0xC9190), (e->modBase + 0xC3620), (e->modBase + 0xC3320), (e->modBase + 0x1046A8)};
+    w32(q, 0xa8, (e->modBase + 0xC5DB0));
     questInit(e, q, cb, "..\\Source\\D2Game/Quests/a2q4.cpp", 0x3dd, 0xc, 0xd, 5, 0x12);
-    w16(q, 0x9c, 0); w32(q, 0xec, 0x6fce2080); w32(q, 0xf0, 0x6fce69d0);
+    w16(q, 0x9c, 0); w32(q, 0xec, (e->modBase + 0xC2080)); w32(q, 0xf0, (e->modBase + 0xC69D0));
     uint8_t* p = (uint8_t*)e->ptr(r32(q, 0x18));
     p[0] = p[1] = p[2] = p[3] = 0; p[4] = 0;
-}
-
-// 1.13c D2Game+0xC8CD0
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2game_c8cd0(void* quest, const D2GameBatchC7130Env* e)
-{
-    uint8_t* d = (uint8_t*)e->ptr(r32(quest, 0x18));
-    e->ord10141();
-    if (d[0xe] || d[0x11]) return;
-    w16(d, 0x40, 0);
-    void* game = e->ptr(r32(quest, 4));
-    void* gctx = e->ptr(r32(game, 0x1c));
-    void* u = e->ord11153((uint32_t)(uintptr_t)gctx, 2);
-    if (!u) return;
-    spawnInit(e, u, game, 0x13e, 0);
-    e->sub0E0F40(u, game, d);
-    w32(u, 0xc4, r32(u, 0xc4) | 0x3000000);
-    w8(gctx, 0x11, 1); w32(gctx, 0x38, r32(u, 0xc));
 }
 
 // Seams of 0xC94E0, one per retail callee in call order (register and stack layout in the comments).
