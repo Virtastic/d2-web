@@ -97,13 +97,14 @@ test('production weather draw blends each ripple against its existing canvas und
   const renderer = createWeatherRenderer({ read, rippleOffset: () => ({ dx: 0, dy: 0 }) });
   renderer.setLevel(1, 0);
   const ctx = onePixelContext(underlay);
-  const blits = renderer.draw(ctx, 2, 64, 0, 0, 0, [{ x: 0, y: 0, sx: 0, sy: -24 }]);
+  const tile = { x: 0, y: 0, sx: 0, sy: -24 };
+  const blits = renderer.draw(ctx, 2, 64, 4, 0, 0, Array.from({ length: 40 }, () => tile));
 
-  // The renderer emits 42 far + 45 near cels at its initial full-rain cycle state. Reapply the
-  // exact PL2 table transform for every opaque cel at the single overlapping fixture pixel.
+  // The first spawn pass at full rain (limit 996/1000) over 40 water tiles. Reapply the exact PL2
+  // table transform for every opaque cel at the single overlapping fixture pixel.
+  assert.ok(blits.length > 0 && blits.length <= 40);
   let expected = underlay;
-  for (let i = 0; i < 42 + 45; i++) expected = (expected + step) & 0xff;
-  assert.equal(blits.length, 87);
+  for (let i = 0; i < blits.length; i++) expected = (expected + step) & 0xff;
   assert.deepEqual([...ctx.pixel], [expected, expected, expected, 255]);
   assert.notEqual(expected, 172, 'result must retain the prepainted underlay contribution');
 });
@@ -138,8 +139,8 @@ test('ripple submission uses native vertical anchor bounds before cel offsets', 
     const paintedRows = [];
     const ctx = { getImageData() { return { data: Uint8ClampedArray.of(0, 0, 0, 255) }; },
       putImageData(_image, _x, top) { painted++; paintedRows.push(top); } };
-    const blits = renderer.draw(ctx, 800, height, 0, 0, 0,
-      [{ x: 0, y: 0, sx: 0, sy: y - height / 2 + 8 }]);
+    const blits = renderer.draw(ctx, 800, height, 4, 0, 0,
+      Array.from({ length: 40 }, () => ({ x: 0, y: 0, sx: 0, sy: y - height / 2 + 8 })));
     assert.deepEqual(renderer.errors, []);
     assert.ok(paintedRows.every(top => top === y - 11), 'cel offsets follow the anchor gate');
     return { blits, painted, live: renderer.ripples };

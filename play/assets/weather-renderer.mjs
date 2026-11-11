@@ -48,23 +48,19 @@
 // continuously, which over-rains against retail's own dry captures; s561 counts it and F11b carries it
 // as the open half.
 import { createRippleRng } from './weather-ripple-offset.mjs';
+import { createRipplePool } from './weather-ripples.mjs';
 import { decodeDatPalette, decodeDc6 } from './d2-formats.mjs';
 import { createBlender } from './frontend.mjs';
 import { recordDc6, recordPrim } from './drawlist.mjs';
 import { createWeatherCycle } from './weather-cycle.mjs';
 import { plotRainLine } from './weather-line.mjs';
 
-/** The two layers retail's captured frames draw, with the particle count of the Rogue Encampment's own
- *  peak episode (walls14: 45 Rain3 + 42 Rain4 -- its tiles are `Act1\Town\Floor`/`Fence`/`Objects`;
- *  walls15 just after it is 42 + 46, walls17 as it dies is 16 + 11, and Act III's town3 inside the
- *  same kind of episode is 20 + 22 -- the count moves with the intensity, so the peak is the number we
- *  take).  Rain4 is the far layer, Rain3 the near one. */
-const LAYERS = [
-  { path: 'DATA\\GLOBAL\\UncompOverlays\\Rain4.dc6', particles: 42 },
-  { path: 'DATA\\GLOBAL\\UncompOverlays\\Rain3.dc6', particles: 45 },
+/** The two ripple cels (spawn, lifetime and density rules: weather-ripples.mjs). */
+const LAYERS = [   // the ripple's cel is chosen by the low bit of its third draw: 0 is Rain3, 1 is Rain4
+  { path: 'DATA\\GLOBAL\\UncompOverlays\\Rain3.dc6' },
+  { path: 'DATA\\GLOBAL\\UncompOverlays\\Rain4.dc6' },
 ];
 const FRAMES = 10;          // the growth animation's length, read off retail's own index range
-const TICKS_PER_FRAME = 2;  // measured above: 2169 and 2170 are the same animation step
 
 /** The vector writes a cel path lower case with no `data\` and no extension. */
 const MPQ_PATH = (path) => path.toLowerCase();
@@ -80,7 +76,8 @@ export function createWeatherRenderer({ read, rippleOffset }) {
   const cycle = createWeatherCycle(), clock = { tick: null };
   const parity = !globalThis.__d2Entry?.fill;
   let live = [];
-  const rippleRng = rippleOffset ? { offset: rippleOffset } : createRippleRng();
+  const rippleRng = createRippleRng();
+  let pool = null, poolTick = 0;
   const streaks = { drops: [], w: 0, h: 0, tick: null, camX: null, camY: null, seed: 0x2545f491 };
 
   /** Load the active act's palette for source cels and PL2-composited ripple output. */
@@ -150,13 +147,7 @@ export function createWeatherRenderer({ read, rippleOffset }) {
       let dc6 = null;
       try { dc6 = decodeDc6(read(MPQ_PATH(layer.path))); } catch (error) { errors.push(`${layer.path}: ${error}`); continue; }
       if (!dc6 || dc6.frames.length < FRAMES) { errors.push(`${layer.path}: ${dc6 ? dc6.frames.length : 0} frames, need ${FRAMES}`); continue; }
-      // One particle per (position, phase group).  Positions are the declared stand-in: a uniform
-      // spread over the 800x600 screen from a fixed seed, so two runs of a row draw the same frame.
-      let seed = 0x9e3779b9 ^ (layer.particles * 2654435761);
-      const next = (n) => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return (seed >>> 8) % n; };
-      const particles = [];
-      for (let i = 0; i < layer.particles; i++) particles.push({ seed: next(0x1000000), phase: 2 * (i % 5) });
-      layers.push({ ...layer, dc6, particles });
+      layers.push({ ...layer, dc6 });
     }
   };
 
@@ -236,50 +227,42 @@ export function createWeatherRenderer({ read, rippleOffset }) {
      */
     draw(ctx, width, height, tick, cx = 0, cy = 0, waterAnchors = []) {
       live = [];
-      if (!levelRain || cycle.intensity === 0 || !waterAnchors.length) return [];   // retail draws none while dry or without water
+      if (!levelRain) { pool = null; return []; }   // retail draws none while dry or without water
       prepare();
-      const step = Math.floor(Number(tick) / TICKS_PER_FRAME);
+      if (layers.length < LAYERS.length) return [];
+      const t = Math.floor(Number(tick));
+      if (!pool) { pool = createRipplePool(rippleRng, layers.map((l) => l.dc6.frames.length)); poolTick = t; }
+      // One animation step per game tick (a long gap outlives every ripple, so cap the replay).
+      if (t < poolTick) { pool.reset(t); poolTick = t; }
+      for (let n = Math.min(t - poolTick, 64); n > 0; n--) pool.tick();
+      poolTick = t;
+      const place = (anchor, rng) => {
+        const o = rippleOffset ? rippleOffset() : rng.offset();
+        return { wx: anchor.sx + o.dx + width / 2, wy: anchor.sy + o.dy + height / 2 - 8, waterCell: { x: anchor.x, y: anchor.y } };
+      };
+      pool.spawnPass(t, cycle.intensity, waterAnchors, place);
       const blits = [];
       const blend = blender();
       if (!blend) return [];
-      for (const layer of layers) {
-        for (const particle of layer.particles) {
-          const index = ((step + particle.phase) % FRAMES + FRAMES) % FRAMES;
-          // Particles live in WORLD (camera-origin) space: wx/wy = screen position + the camera's screen
-          // position when spawned; drawn at wx - cx, so they scroll with the ground (F11b).
-          if (particle.wx === undefined) {
-            const anchor = waterAnchors[particle.seed % waterAnchors.length];
-            particle.waterCell = { x: anchor.x, y: anchor.y };
-            { const o = rippleRng.offset(); particle.wx = anchor.sx + o.dx + width / 2; particle.wy = anchor.sy + o.dy + height / 2 - 8; }
-          }
-          if (particle.last === undefined) particle.last = index;
-          // The animation wrapped (9 -> 0): retail gives the particle a NEW position, and keeps it for
-          // the whole of the next pass -- the captured particles that did not wrap kept theirs exactly.
-          else if (index < particle.last) {
-            particle.seed = (Math.imul(particle.seed ^ step, 1664525) + 1013904223) >>> 0;
-            const anchor = waterAnchors[particle.seed % waterAnchors.length];
-            particle.waterCell = { x: anchor.x, y: anchor.y };
-            { const o = rippleRng.offset(); particle.wx = anchor.sx + o.dx + width / 2; particle.wy = anchor.sy + o.dy + height / 2 - 8; }
-          }
-          particle.x = particle.wx - cx; particle.y = particle.wy - cy;
-          particle.last = index;
-          // D2Client 1.13c FUN_6FB2FC70 gates the anchor before applying cel offsets.
-          // Both Perspective branches require 0 <= y < screenHeight - 47; candidate
-          // water-floor eligibility does not replace this later submission check.
-          if (particle.y < 0 || particle.y >= height - 47) continue;
-          const frame = layer.dc6.frames[index];
-          if (!frame || !blend) continue;
-          // Retail's anchor: a cel frame lands with its left edge at x + offsetX and its BOTTOM row at
-          // y + offsetY, so the particle's (x, y) is the anchor above the streak.
-          const left = particle.x + frame.offsetX;
-          const top = particle.y + frame.offsetY - frame.height + 1;
-          // Blend directly against the preexisting canvas. A source-over draw here would replace
-          // the terrain under opaque cel pixels before the PL2 lookup and blend the cel against itself.
-          blend(ctx, frame, left, top, 3);
-          const record = recordDc6(layer.path, index, frame, left, top, { op: 'cel', mode: 3, extra: 0 });
-          if (record && record.hash) blits.push(record);
-          live.push({ layer: layer.path, wx: particle.wx, wy: particle.wy, sx: particle.x, sy: particle.y, frame: index, waterCell: particle.waterCell });
-        }
+      for (const r of pool.slots) {
+        if (!r) continue;
+        const layer = layers[r.layer];
+        const x = r.wx - cx, y = r.wy - cy;
+        // D2Client 1.13c FUN_6FB2FC70 gates the anchor before applying cel offsets:
+        // 0 <= x < screenWidth and 0 <= y < screenHeight - 47.
+        if (x < 0 || x >= width || y < 0 || y >= height - 47) continue;
+        const frame = layer.dc6.frames[r.frame];
+        if (!frame) continue;
+        // Retail's anchor: a cel frame lands with its left edge at x + offsetX and its BOTTOM row at
+        // y + offsetY.
+        const left = x + frame.offsetX;
+        const top = y + frame.offsetY - frame.height + 1;
+        // Blend directly against the preexisting canvas (a source-over draw would replace the
+        // terrain under opaque cel pixels before the PL2 lookup).
+        blend(ctx, frame, left, top, 3);
+        const record = recordDc6(layer.path, r.frame, frame, left, top, { op: 'cel', mode: 3, extra: 0 });
+        if (record && record.hash) blits.push(record);
+        live.push({ layer: layer.path, wx: r.wx, wy: r.wy, sx: x, sy: y, frame: r.frame, waterCell: r.waterCell });
       }
       return blits;
     },
