@@ -1476,13 +1476,17 @@ static int pkt_monster_mode(D2RealmClientMonster& monster, uint32_t code, uint32
     return 1;
 }
 
-static int pkt_monster_action(D2RealmClientMonster& monster, uint32_t code, const uint32_t* l) {
+static int pkt_monster_action_case(D2RealmClientMonster& monster, uint32_t code, const uint32_t* l) {
     D2UnitStrc* const unit = monster.motionUnit;
     using d2::realm::MonsterAction;
     switch (d2::realm::monsterAction(code)) {
     case MonsterAction::Move: {
         int x = 0, y = 0;
         if (!unit->pDynamicPath || !pkt_target(l, &x, &y)) return 0;
+        // The move packet's path type is the path the server walks; the client paths with it too.
+        const int32_t pathType = static_cast<int32_t>(l[3]);
+        if (pathType > 0 && pathType < PATHTYPE_COUNT && pathType != PATHTYPE_KNOCKBACK_CLIENT)
+            PATH_SetType(unit->pDynamicPath, pathType);
         const int points = d2_realm_client_motion_set_target(unit, x, y);
         monster.lastPlanResult = points;
         if (points > 0) {
@@ -1574,6 +1578,24 @@ static int pkt_monster_action(D2RealmClientMonster& monster, uint32_t code, cons
         break;
     }
     return 0;
+}
+
+// After the action, a move or attack packet's velocity (the server's STAT_VELOCITYPERCENT total, which carries a
+// run's AI bonus) becomes the client unit's total, and the path velocity is recomputed from it.
+static int pkt_monster_action(D2RealmClientMonster& monster, uint32_t code, const uint32_t* l) {
+    const int result = pkt_monster_action_case(monster, code, l);
+    D2UnitStrc* const unit = monster.motionUnit;
+    const int32_t velocity = static_cast<int32_t>(l[4]);
+    if ((g_pktOpcode == 0x67 || g_pktOpcode == 0x68) && code != 0x13 && code != 0x15 && code != 0x16 &&
+            unit && velocity) {
+        const int32_t current = STATLIST_UnitGetStatValue(unit, STAT_VELOCITYPERCENT, 0);
+        if (current != velocity) {
+            STATLIST_SetUnitStat(unit, STAT_VELOCITYPERCENT,
+                STATLIST_GetUnitBaseStat(unit, STAT_VELOCITYPERCENT, 0) + velocity - current, 0);
+            UNITS_UpdateAnimRateAndVelocity(unit, __FILE__, __LINE__);
+        }
+    }
+    return result;
 }
 
 // 0x2A750: ECX = action code, EDX = unit, the request block on the stack.
