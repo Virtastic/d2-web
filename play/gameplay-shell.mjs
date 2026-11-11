@@ -4602,7 +4602,7 @@ const realmClientView = {
     button: (button, amount) => (realmFlow?.d2gs?.isOpen && realmFlow.d2gs.send(itemPackets.stashButton(button, amount)) !== false ? 1 : 0),
     say(text) { if (realmFlow?.d2gs && !realmFlow.local) sendGameLine(text); else spClientView.commands.say(text); },
     phraseSocket: () => (realmPlayerView?.active ? realmFlow?.d2gs : null),
-    panelClick: (x, y, e) => realmTransport.state === 'session-open' && (realmStorageClickAt(x, y, e) || realmInventoryClick(x, y, e.button)),
+    panelClick: (x, y, e) => realmTransport.state === 'session-open' && (realmStorageClickAt(x, y, e) || realmInventoryClick(x, y, e.button, e)),
   },
   // The server's game flags, once it has sent them; until then the ones the character list holds for this hero.
   hasClientFlags: true, clientFlags: () => realmReads?.clientFlags ?? realmHeroFlags(realmCharacters, realmPlayerView?.name), levelRain: () => (realmWorldView ? realmTables().levels.rain(realmWorldView.mapLevel) : -1),
@@ -6131,7 +6131,18 @@ function itemCommand(name, ...args) {
 // A held item dropped on grid `page` at cell (x, y): put (0x18), swap with the one item it overlaps (0x1F), or refused (two or more).
 // The open inventory panel in a joined game: lift (0x19), unequip (0x1C), put in a cell (0x18) or swap with its item (0x1F),
 // equip (0x1A) or swap a worn item (0x1D), use a carried item on a right click (0x20); a click in the world with an item held drops it (0x17).
-function realmInventoryClick(x, y, button) {
+function realmInventoryClick(x, y, button, e = {}) {
+  const cursor = realmWorldState?.cursorId ?? 0, onPanel = inventoryVisible && inventoryPanelRenderer?.contains(x, y, canvas.width, canvas.height);
+  // A left click on a carried or worn item while the trade window is in Sell or Repair mode sells or repairs it (D2Client +0x95FE0/+0x96AA0).
+  const rShop = button === 0 && !cursor && onPanel ? realmShopView() : null;
+  if (rShop) {
+    const item = inventoryPanelRenderer.itemAt(x, y, canvas.width, canvas.height, snapshot), slot = inventoryPanelRenderer.slotAt(x, y, canvas.width, canvas.height, snapshot), target = item || slot?.item;
+    const route = (...a) => Module._d2_client_inv_click_route ? Module.ccall('d2_client_inv_click_route', 'number', ['number', 'number', 'number', 'number', 'number', 'number'], a) : (a[3] ? 1 : 0);
+    const act = target ? inventoryClickAction(route, { itemId: target.id, bodyLoc: item ? 0 : slot?.bodyLoc, mode: shopModeOf({ shopOpen: true, sell: rShop.sellMode, repair: rShop.repairMode }), ctrl: Boolean(e.ctrlKey), npcOpen: true, targeting: false }) : null;
+    if (act === 'repair' || act === 'sell' || act === 'sell-direct') { realmCarriedClick(target.id, rShop, act); return true; }
+  }
+  // Retail's inventory client keeps a quest item on the cursor when the world is clicked (Items.txt quest column).
+  if (button === 0 && cursor && !onPanel && !openPanelAt(x, y) && realmTables().items.byClass(snapshot.items.find((i) => i.id === cursor)?.classId)?.quest) return true;
   return realmInventoryPanelClick({ width: canvas.width, height: canvas.height, snapshot, cursorId: realmWorldState?.cursorId ?? 0, input: realmInput(),
     visible: inventoryVisible, renderer: inventoryPanelRenderer, openPanelAt,
     onWeaponTab: () => { unitSounds?.playRow(WEAPON_TAB_SOUND_ROW, { kind: 'ui', source: 'weapon-tab' }).catch(() => {}); } }, x, y, button);
@@ -6215,9 +6226,8 @@ function submitStashGold() {
   if (stashGoldDialog.mode === 'drop') {
     // D2Client+0xBFDF0: OK sends the 0x50 drop-gold packet (nothing for 0), then closes the dialog.
     const dropAmount = Math.max(0, Math.min(stashGoldDialog.available, stashGoldDialog.amount | 0));
-    const sent = !dropAmount ? 0 : session ? Module.ccall('d2_session_command_drop_gold_packet', 'number', ['number', 'bigint'], [dropAmount, 0n])
-      : realmInput().dropGold(selectedPlayerSource().guid, dropAmount) ? 1 : 0;   // a joined game: the same 9-byte 0x50
-    if (session) snapshot = session.snapshot(); closeStashGold();
+    const sent = dropAmount && realmInput().dropGold(selectedPlayerSource().guid, dropAmount) ? 1 : 0;   // the 9-byte 0x50, in both modes
+    closeStashGold();
     return sent;
   }
   const button = stashGoldDialog.mode === 'withdraw' ? STASH_GOLD.withdraw : STASH_GOLD.deposit;
@@ -6225,7 +6235,7 @@ function submitStashGold() {
   const result = commandButton(button, amount);
   // Retail owns every consequence (including capacity refusal); reread it and
   // close this client dialog rather than locally adjusting either balance.
-  if (session) snapshot = session.snapshot(); closeStashGold();
+  closeStashGold();
   return result;
 }
 // The level exit under the pointer: retail hit-tests the warp's LvlWarp selection box in SCREEN space
@@ -6985,7 +6995,7 @@ canvas.addEventListener('pointerdown', (e) => {
     if (hit === 'yes') repairConfirm.yes(); else if (hit === 'no') repairConfirm.no();
     snapshot = session.snapshot(); render(); canvas.focus(); e.preventDefault(); return;
   }
-  if (modalOwner === MODAL_POINTER_OWNER.STASH_GOLD_DIALOG && stashGoldRenderer && (session || stashGoldDialog?.mode === 'trade')) {
+  if (modalOwner === MODAL_POINTER_OWNER.STASH_GOLD_DIALOG && stashGoldRenderer && (clientView().live || stashGoldDialog?.mode === 'trade')) {
     click.spent = 'stashGoldDialog';
     const hit = stashGoldRenderer.hitAt(x, y, canvas.width, canvas.height, readStashLayout(), true);
     if (e.button === 0 && hit && ['submit', 'close', 'increase', 'decrease'].includes(hit.action)) {
@@ -7255,105 +7265,8 @@ canvas.addEventListener('pointerdown', (e) => {
   if ((e.button === 0 || e.button === 2) && clientView().commands.panelClick(x, y, e)) {
     pointer.x = x; pointer.y = y; canvas.focus(); e.preventDefault(); return;
   }
-  if (session && e.button === 0 && inventoryOwnsClick(shopOpen(), inventoryVisible && !!inventoryPanelRenderer?.contains(x, y, canvas.width, canvas.height)) && inventoryPanelRenderer && Module._d2_session_cursor_item) { // D39: with a shop open the inventory panel still owns its clicks (equipped slots lift/swap, empty area is inert)
-    pointer.x = x; pointer.y = y;
-    const cursorId = Module.ccall('d2_session_cursor_item', 'number', [], []);
-    // The stash's grid (Inventory.txt BIG_BANK_PAGE_1, invPage 4) is the same inventory the item
-    // cursor works on -- D2Inventory keeps the basket as a page, so 0x19 lifts out of it and 0x18
-    // puts back into it with the page in the packet. The panel swallows its clicks: a click on it is
-    // never a walk, and one off the grid leaves the held item on the cursor.
-    const cubeGeometry = cubeOpen && inventoryVisible ? readCubeLayout() : null;
-    if (cubeGeometry && cubePanelRenderer && cubePanelRenderer.contains(x, y, canvas.width, canvas.height, cubeGeometry)) {
-      if (cubePanelRenderer.transmuteAt(x, y, canvas.width, canvas.height, cubeGeometry)) {
-        // The engine's own cube recipe pass (TRADEBTN_TRANSMUTE); the result lands on page 3.
-        lastItemCommand = { name: 'transmute', args: [], result: commandButton(24, 0), cursor: cursorId };
-        propCache.clear();
-      } else if (!cursorId) { const item = cubePanelRenderer.itemAt(x, y, canvas.width, canvas.height, cubeGeometry, snapshot.items); if (item) itemCommand('lift', item.id); }
-      else {
-        const held = snapshot.items.find((i) => i.id === cursorId) || { id: cursorId };
-        const cell = cubePanelRenderer.cellAt(x, y, canvas.width, canvas.height, cubeGeometry, held);
-        if (cell) gridDrop(cursorId, INVPAGE_CUBE, cell);
-      }
-      click.spent = 'cubePanel';
-      snapshot = session.snapshot(); canvas.focus(); e.preventDefault(); return;
-    }
-    const geometry = stashOpen ? readStashLayout() : null;
-    if (geometry && stashPanelRenderer && stashPanelRenderer.contains(x, y, canvas.width, canvas.height, geometry)) {
-      if (plugyStash.click(x, y, canvas.width, canvas.height, geometry, stashOpen, e.shiftKey)) { click.spent = 'stashPanel'; canvas.focus(); e.preventDefault(); return; }
-      if (!cursorId) { const item = stashPanelRenderer.itemAt(x, y, canvas.width, canvas.height, geometry, snapshot.items); if (item) itemCommand('lift', item.id); }
-      else {
-        const held = snapshot.items.find((i) => i.id === cursorId) || { id: cursorId };
-        const cell = stashPanelRenderer.cellAt(x, y, canvas.width, canvas.height, geometry, held);
-        if (cell) gridDrop(cursorId, INVPAGE_STASH, cell);
-      }
-      click.spent = 'stashPanel';
-      snapshot = session.snapshot(); canvas.focus(); e.preventDefault(); return;
-    }
-    if (inventoryVisible && inventoryPanelRenderer.contains(x, y, canvas.width, canvas.height)) {
-      const W = canvas.width, H = canvas.height, slot = inventoryPanelRenderer.slotAt(x, y, W, H, snapshot);
-      // D2Client +0x98DC0 -> +0x90F60: a press on either weapon-set tab plays cursor_pass and swaps sets through the same engine call as the key.
-      if (inventoryPanelRenderer.weaponTabAt(x, y, W, H)) {
-        unitSounds?.playRow(WEAPON_TAB_SOUND_ROW, { kind: 'ui', source: 'weapon-tab' }).catch(() => {});
-        session.swapWeapons?.(); click.spent = 'weaponTab';
-        snapshot = session.snapshot(); canvas.focus(); e.preventDefault(); return;
-      }
-      if (!cursorId) {
-        const item = inventoryPanelRenderer.itemAt(x, y, W, H, snapshot), target = item || slot?.item;
-        // Grid and body slots alike: identify cursor first, then the shop mode (Sell sells, Repair repairs), else the lift (D2Client +0x95FE0/+0x96AA0).
-        const route = (...a) => Module._d2_client_inv_click_route ? Module.ccall('d2_client_inv_click_route', 'number', ['number', 'number', 'number', 'number', 'number', 'number'], a) : (a[3] ? 1 : 0);
-        const rShop = realmShopView();   // a joined (or packet-path local) game's open trade window: its own sell/repair toggles
-        const at = { itemId: target?.id, bodyLoc: item ? 0 : slot?.bodyLoc, mode: shopModeOf(rShop ? { shopOpen: true, sell: rShop.sellMode, repair: rShop.repairMode } : { shopOpen: shopOpen(), sell: sellModeArmed(), repair: vendorRepairArmed() }), ctrl: e.ctrlKey, npcOpen: Boolean(rShop) || shopOpen() };
-        let act = inventoryClickAction(route, { ...at, targeting: itemTargeting.armed });
-        if (act === 'identify' && !itemTargeting.leftClick(target.id)) act = inventoryClickAction(route, at);
-        if (rShop && (act === 'repair' || act === 'sell' || act === 'sell-direct')) { realmCarriedClick(target.id, rShop, act); click.spent = act === 'repair' ? 'vendorRepair' : 'vendorSell'; }
-        else if (act === 'repair') { if (repairConfirm.request(target.id)) { const f = tipFields(target.id, itemStringKey(itemCode(target)));
-          repairConfirmRenderer?.show(npcState.npcId, [f.name, f.baseName].filter(Boolean).join('\n'), Module._d2_session_item_repair_cost ? Module.ccall('d2_session_item_repair_cost', 'number', ['number'], [target.id >>> 0]) : 0); } click.spent = 'vendorRepair'; }
-        else if (act === 'sell' || act === 'sell-direct') { if (sellToVendor(target.id) && act === 'sell') resetSellMode(); click.spent = 'vendorSell'; }
-        else if (act !== 'pickup') { /* identified, or nothing under the click */ }
-        else if (item && e.shiftKey && !npcState) lastGridToBelt = { itemId: item.id, result: gridToBelt(item.id) };
-        else if (item) itemCommand('lift', item.id);
-        else if (slot?.item) itemCommand('unequip', slot.bodyLoc);
-      } else {
-        const held = snapshot.items.find((i) => i.id === cursorId) || { id: cursorId };
-        const cell = inventoryPanelRenderer.cellAt(x, y, W, H, held);
-        if (slot) itemCommand(slot.item ? 'swap' : 'equip', cursorId, slot.bodyLoc);
-        else if (cell) gridDrop(cursorId, 0, cell);
-      }
-      if (click.spent !== 'vendorRepair' && click.spent !== 'vendorSell') click.spent = 'inventoryPanel';
-      snapshot = session.snapshot(); canvas.focus(); e.preventDefault(); return;
-    }
-    // Retail drops a held item only on a click in the world: an open panel takes its own clicks first
-    // and the item stays on the cursor. WHICH point is the panel's is `openPanelAt`'s answer and no
-    // other's -- the same rectangle the click routing tests before the world's own entities (M18), and
-    // the same one each panel's own `contains` test is handed. This path used to carry a SECOND
-    // rectangle of its own (a hand-rolled `py < 432` crossed with `px < 320` / `px >= 480`), and the
-    // two disagreed at every panel edge: over bands 80 game px wide and 61-70 game px tall it either
-    // dropped an item on a point the panel owned or kept it on the cursor over a point in the world.
-    // s435 measures each band on all four panels and pins both answers; the surviving control is that
-    // a point outside every panel is still a world drop.
-    //
-    // What that second rectangle also carried, and what is now a measured, declared consequence: its
-    // `npcState` term called the whole left 320x432 a panel whenever a conversation was up, including
-    // the speech box (237..562 x 7..129 -- in no panel's rectangle, and no region of OpenDiablo2's
-    // `isInActiveMenusRect`). With an item held, a click in the speech box is now a world drop like any
-    // other non-panel point, and because the drop spends the click the shell's own "a click while
-    // talking ends it" no longer runs on that point. Retail's answer there is not determinable without
-    // a capture of a held item over the box; the single rectangle is the smaller change and the
-    // direction the prior art gives, and s435 asserts the outcome so that instrument can move it.
-    if (cursorId && !shopOpen() && !openPanelAt(x, y)) {
-      // Retail's inventory client keeps quest items on the cursor when a player clicks the world.
-      // The packet handler's drop path has no guard; the observed refusal is driven by quest handling
-      // (F241 / F328). Use the engine's Items.txt verdict here, not a client-maintained item-code list.
-      // The held item follows the pointer on subsequent world clicks, just as retail's does.
-      const questItem = Module._d2_session_item_is_quest
-        ? Module.ccall('d2_session_item_is_quest', 'number', ['number'], [cursorId]) : -1;
-      if (questItem === 1) {
-        click.spent = 'cursorDropRefusedQuestItem';
-        canvas.focus(); e.preventDefault(); return;
-      }
-      click.spent = 'cursorDrop'; itemCommand('drop', cursorId); canvas.focus(); e.preventDefault(); return;
-    }
-  }
+  // A held item is dropped only on a click in the world (`openPanelAt` is the one rule for what a panel owns); a quest item stays on the cursor.
+  // That drop is realmInventoryClick's 0x17, so the same click does it in both modes.
   // An open NPC window takes the click before the world does, so buying does not also walk.
   if (npcState && npcPanel && !shopOpen()) {
     const item = npcPanel.itemAt(x, y, canvas.width, canvas.height,
@@ -7403,7 +7316,9 @@ canvas.addEventListener('pointerdown', (e) => {
   // all of those are tested above, or inside the `else` below before `panelOwner` is read, and they
   // still win. Only the world's own entity resolution is skipped.
   const panelOwner = openPanelAt(x, y);
-  const worldAt = e.button === 0 && session && !panelOwner ? pointerWorldAt(x, y) : null;
+  // The world click itself is the shell's input command, sent below as the retail packet by realmInput (walk, run, 0x13 on the unit
+  // under the pointer: NPC, object, exit, corpse, 0x16 on an item); this only records what lay under the pointer.
+  const worldAt = e.button === 0 && clientView().live && !panelOwner ? pointerWorldAt(x, y) : null;
   // Hover's winner rule (type priority, then player distance) decides between overlapping hostiles and NPCs.
   const hostileHit = worldAt ? hoveredHostileAt(x, y) : null;
   const itemHit = worldAt && !hostileHit ? groundItemUnderPointer(x, y) : null;
@@ -7412,110 +7327,7 @@ canvas.addEventListener('pointerdown', (e) => {
   // handlers below and the world path key off). Recorded here so "which handler spent it" and "what
   // was it aimed at" are answered from one reading.
   click.aim = worldAt ? { world: [worldAt.x, worldAt.y], hostile: hostileHit || 0, itemId: itemHit?.id ?? 0 } : null;
-  // The player's own corpse: clicking it walks over and takes the gear back (retail's interact with
-  // the body, the engine's recovered corpse handler).
-  const corpseHit = !panelOwner && !hostileHit && e.button === 0 && session ? (() => {
-    const cam = worldToScreen(cameraGrid().x, cameraGrid().y); let best = null, bestD = 36;
-    for (const u of snapshot.entities) if (u.kind === 'player' && u.id !== snapshot.playerId && u.mode === 17) {
-      // Corpse sprites use the unit projection and engine precise anchor. Comparing integer
-      // snapshot coordinates here can pick an adjacent body in a pile or while its path settles.
-      const pt = worldToScreen(...unitAnchor(u)), d = Math.hypot(pt.x - cam.x + viewCX() - x, pt.y - cam.y + (canvas.height / 2 + UNIT_CENTRE_Y) - y);
-      if (d < bestD) { best = u; bestD = d; } }
-    return best; })() : null;
-  if (corpseHit) {
-    click.spent = 'corpse'; click.walkTo = [corpseHit.x, corpseHit.y];
-    const recover = (stuck) => {
-      lastCorpseRecovery = { id: corpseHit.id, result: Module.ccall('d2_session_command_recover_corpse', 'number', ['number'], [corpseHit.id]), stuck };
-      propCache.clear();
-      snapshot = session.snapshot(); };
-    // A walk that stalls short of the body (a monster or the body's own footprint in the way) still
-    // asks: the engine's recovery decides, as it does for objects and exits.
-    // Already beside it (the body's own cell and the monsters' blocking can keep a walk from ever
-    // arriving or stalling -- s000a stood 3 subtiles from its second body, clicking): take it now.
-    const p0 = snapshot.player;
-    if (Math.max(Math.abs(corpseHit.x - p0.x), Math.abs(corpseHit.y - p0.y)) <= 4) { walkEvidence = { active: true, hops: 0, reason: 0 }; recover(false); canvas.focus(); e.preventDefault(); return; }
-    armWalk({ x: corpseHit.x, y: corpseHit.y, within: 2, onArrive: () => recover(false), onStuck: () => recover(true) });
-    canvas.focus(); e.preventDefault(); return;
-  }
-  const pointerCandidates = !panelOwner && !hostileHit && e.button === 0 && session
-    ? resolvePointerCandidates(x, y) : null;
-  const pointerSelection = pointerCandidates ? selectPointerCandidate(pointerCandidates, { click: true, reference: snapshot.player }) : null;
-  const npcHit = !panelOwner && !hostileHit && e.button === 0 && session && !clientView().fromPackets && pointerSelection?.kind === 'npc'
-    ? pointerSelection.target : null;   // over packets the click is the world path's 0x13 (realm-input), the server answers 0x28/0x2F
-  // Left-clicking an OBJECT walks to it and operates it, as retail does. What happens next is the
-  // engine's: the stash, for one, answers with 0x77 UPDATEUI_OPENSTASH (pollUiEvents).
-  // Hover priority 0x6FBA2190: a UNIT_TILE scores 0, an object -6, so an exit under the cursor beats an object sharing its box.
-  const warpHit = !panelOwner && !hostileHit && !npcHit && e.button === 0 && session && !clientView().fromPackets ? warpUnderPointer(x, y) : null;   // a game over packets sends the exit as the 0x13 interact packet (realm-input), the server moves the hero
-  const objectHit = !panelOwner && !hostileHit && !npcHit && !warpHit && e.button === 0 && session && !stashOpen && pointerSelection?.kind === 'object'
-    ? pointerSelection.target : null;
-  // A same-act exit is the native UNIT_TILE target for packet 0x13. The engine handles approach
-  // through 50 subtiles; farther clicks keep the shell's ordinary walk and retry that packet.
-  if (warpHit) {
-    click.spent = 'warp';
-    input.cancelPointerMoves();
-    worldPointerHeld = false;
-    walkGoal = null; walkMemory = null; walkMovePending = false; walkEvidence.active = false;
-    const interact = (stuck) => {
-      const outcome = runWarpInteraction({
-        warpHit, snapshot, motion, session,
-        invoke: (destination, warpId) => Module.ccall('d2_session_command_warp_interact', 'number', ['number', 'number'], [destination, warpId]),
-        onActChange: (act) => { if (TERRAIN_ENABLED) loadSessionTerrain(act - 1); },
-      });
-      lastWarpTaken = { destinationLevel: warpHit.destinationLevel, warpId: warpHit.warpId,
-        result: outcome.result, stuck, tooFar: outcome.tooFar, native: true };
-      snapshot = outcome.snapshot; motion = outcome.motion;
-      return outcome;
-    };
-    const takeLegacyWarp = (stuck) => {
-      if (stuck) {
-        const distance = Module.ccall('d2_session_warp_interaction_distance', 'number', ['number', 'number'], [warpHit.destinationLevel, warpHit.warpId]);
-        if (!withinNativeWarpInteractionRange(distance)) {
-          lastWarpTaken = { destinationLevel: warpHit.destinationLevel, warpId: warpHit.warpId, result: 0, stuck, nativeDistance: distance };
-          return;
-        }
-      }
-      const previousAct = snapshot.act;
-      const { inRange, result } = interactWithWarpTile(Module, warpHit.destinationLevel, warpHit.warpId);
-      lastWarpTaken = { destinationLevel: warpHit.destinationLevel, warpId: warpHit.warpId, result, stuck, inRange };
-      if (result) { snapshot = session.snapshot(); motion = session.motion();
-        if (TERRAIN_ENABLED && snapshot.act !== previousAct) loadSessionTerrain(snapshot.act - 1); }
-    };
-    const levelBefore = snapshot.level;
-    const first = interact(false);
-    // Result 1 with the level unchanged is the engine's Approach step (distance 5..50): its own walk can end
-    // short (a straight path through a blocked cell), so the shell's walk goal retries from where it stopped.
-    if (first.tooFar || (first.result === 1 && snapshot.level === levelBefore)) {
-      click.walkTo = [warpHit.x, warpHit.y];
-      armWalk(warpApproachGoal(warpHit, (stuck) => {
-        const retried = interact(stuck);
-        if (retried.legacy) takeLegacyWarp(stuck);
-      }));
-    } else if (first.legacy) {
-      // Cross-act exits keep main's existing LEVEL_WarpUnit transition path.
-      click.walkTo = [warpHit.x, warpHit.y];
-      armWalk({ x: warpHit.x, y: warpHit.y, within: 2,
-        onArrive: () => takeLegacyWarp(false), onStuck: () => takeLegacyWarp(true) });
-    }
-  } else if (npcHit) {
-    click.spent = 'npc'; click.walkTo = [npcHit.x, npcHit.y];
-    // F658: `npcId` is the signal walkStep's give-up branch keys on -- the click RESOLVED to an NPC, so
-    // the engine's own route may round a wall to her (a generic ground goal must not).
-    armWalk({ x: npcHit.x, y: npcHit.y, within: 4, npcId: npcHit.id, onArrive: () => talkToNpc(npcHit.id) });
-  } else if (objectHit) {
-    click.spent = 'object'; click.walkTo = [objectHit.x, objectHit.y];
-    // A fresh entity click replaces a previous ground-walk intent. Rapid click events may
-    // still be queued when the shell handles this one; draining one afterward would replace
-    // the object approach we are about to arm. Preserve held keyboard directions, cancel only
-    // queued pointer moves, and stop periodic retargets from an earlier held ground gesture.
-    input.cancelPointerMoves();
-    worldPointerHeld = false;
-    walkGoal = null; walkMemory = null; walkMovePending = false; walkEvidence.active = false;   // as the warp click: the stale ground walk would carry the hero off the server's approach
-    // Dispatch the same deferred object interaction request as the native client. The receiver
-    // owns range checks, movement setup, retries and operation callbacks.
-    session.objectClick(objectHit.id);
-    snapshot = session.snapshot();
-    pollObjectSpeech(); pollUiEvents();
-  } else {
+  {
     // A "+" on the character screen spends a point through retail's 0x3A handler. Re-read rather
     // than adjust a local copy: the engine decides what a point did, including refusing it.
     // The skill tree takes the click before the world does, so learning a skill does not also walk.
@@ -7821,13 +7633,8 @@ canvas.addEventListener('lostpointercapture', (e) => {
   worldPointerHeld = false;
   worldRightPointerHeld = false; heldRightPointerTicks = 0;
 });
-canvas.addEventListener('contextmenu', (e) => { if (session && inventoryVisible && inventoryPanelRenderer) {
-    const [x, y] = canvasPoint(e), item = inventoryPanelRenderer.itemAt(x, y, canvas.width, canvas.height, snapshot);
-    // Retail's right click on an inventory item USES it (0x20: a scroll is read, a potion drunk);
-    // it used to drop the item here, which retail never does.
-    if (itemTargeting.rightClick(item ? item.id : 0)) { snapshot = session.snapshot(); pollUiEvents(); render(); }
-  } else if (session && itemTargeting.armed) { itemTargeting.cancel(); snapshot = session.snapshot(); render(); }
-  e.preventDefault(); });
+// The right click on an inventory item (retail's 0x20 use) is the pointerdown's panelClick, a packet in both modes; here only the browser menu is suppressed.
+canvas.addEventListener('contextmenu', (e) => { e.preventDefault(); });
 window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, ...tipFields(id, code) }), input, warpAt: (x, y) => warpUnderPointer(x, y), npcAt: (x, y) => npcUnderPointer(x, y)?.id ?? 0, get snapshot() { return snapshot; },
   // The ramp this shell actually blits every finished frame through (C1d), so a row can assert the
   // transform that reaches the canvas is retail's own rather than re-deriving the constant.

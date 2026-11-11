@@ -46,7 +46,10 @@ test('the confirm no longer reuses the stash-gold amount box; Yes reaches the 0x
   assert.match(shell, /create(?:Repair|Trade)Confirm\((?:\(id\) => )?repairAtVendor\b/);
   const send = shell.slice(shell.indexOf('function repairAtVendor('));
   assert.match(send.slice(0, 400), /d2_session_command_vendor_repair'/);
-  assert.match(shell, /d2_session_item_repair_cost/);
+  // Both modes take the packet path: the click opens the Repair box with the price and sends 0x35 only on Yes.
+  const carried = shell.slice(shell.indexOf('function realmCarriedClick('));
+  assert.match(carried.slice(0, 800), /d2gsClientItemPrice\?\.\(guid, view\.classId, 3\)/);
+  assert.match(carried.slice(0, 800), /askRepair\(guid, name, cost < 0 \? 0 : cost, send\)/);
   const src = readFileSync('src/core/monspawn/monspawn_check.cpp', 'utf8');
   assert.match(src.slice(src.indexOf('int d2_session_command_vendor_repair(')).slice(0, 400), /packetHeader = 0x35/);
   // The amount is 0x46230 in the repair cursor state (uiState 4: transaction type 3).

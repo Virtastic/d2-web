@@ -174,3 +174,12 @@ test('a game joined from the title screen builds the inventory, stash and cube p
   const click = shell.slice(shell.indexOf('function realmInventoryClick('), shell.indexOf('function realmStorageClickAt('));
   assert.match(click, /realmInventoryPanelClick\(\{[^}]*renderer: inventoryPanelRenderer/s, 'the shell routes the click through the panel it draws');
 });
+
+test('the pointer press has one input path: no engine item, object, warp, NPC or corpse branch beside the packets', () => {
+  const shell = readFileSync(new URL('../gameplay-shell.mjs', import.meta.url), 'utf8');
+  const press = shell.slice(shell.indexOf("canvas.addEventListener('pointerdown'"), shell.indexOf("globalThis.addEventListener('pointerup'"));
+  for (const gone of ['session.objectClick', 'd2_session_command_recover_corpse', 'd2_session_command_warp_interact', "itemCommand('lift'", "itemCommand('drop'", 'talkToNpc(npcHit'])
+    assert.equal(press.includes(gone), false, `${gone} is not in the press handler`);
+  assert.match(press, /clientView\(\)\.commands\.panelClick\(x, y, e\)/);
+  assert.match(shell, /canvas\.addEventListener\('contextmenu', \(e\) => \{ e\.preventDefault\(\); \}\)/);
+});
