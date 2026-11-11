@@ -41,7 +41,7 @@ extern "C" void d2c_796f0(uint32_t P, const cl::Env& e) {
         return rec != 0;
     };
     const auto near = [&](uint32_t rec) {
-        const uint32_t r3 = (rec & ~0xffu) | e.R8(rec + 3);
+        const uint32_t r3 = e.R8(rec + 3);   // EAX above AL is the record pointer's residue: the capture logs AL only
         const int32_t a = (int32_t)e.H(0x77ca0, 0, 0, 0, 0, 0, r3);
         if (!(Y > a - 0x30 && Y < a)) return false;
         const uint32_t r4 = ((uint32_t)a & ~0xffu) | e.R8(rec + 4);

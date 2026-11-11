@@ -34,7 +34,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_23f20(D2cHost h, uint32_t ecx, ui
         uint32_t r = cl(h, { 0x22A70, edi, 0, 0, 0, 0, { 0, 0, 0, 0 } });
         ui(h, edi, r ? ld(h, r, 0x74) : 0); return; }
     case 17: cl(h, { 0x22C10, edi, 0, 0, 0, 0, { 0, 0, 0, 0 } }); return;
-    case 18: { uint32_t b = cl(h, { 0x9CCE0, edi, 0, 0, 0, 0, { 1, g[0], 0, 1 } });
+    case 18: { uint32_t b = cl(h, { 0x9CCE0, edi, 0, 0, 0, 0, { 1, 0, 0, 0 } });   // ret 4: one word; the 88A70 call reuses the four pushed under it
         cl(h, { 0x88A70, 0, 0, 0, b, 0, { g[0], 0, 1, 0 } }); return; }
     case 0x54: case 0x55: case 0x56: case 0x57: {
         static const uint16_t eq[4] = { 0x1207, 0x1204, 0x1205, 0x1206 }, ne[4] = { 0x1211, 0x1208, 0x120B, 0x120E };
