@@ -60,6 +60,7 @@ import { createQuestLogRenderer, createMessageLogRenderer, QUESTS_IN_ACT, ACT_BA
 import { createPartyPanelRenderer, partyRows, ownState, clickResult as partyClickResult } from './assets/party-panel.mjs';
 import { createBubbleRenderer } from './assets/game-bubbles.mjs';
 import { createQuestCloseGesture } from './assets/quest-close-gesture.mjs';
+import { createQuestPickGesture, questPickTarget, applyQuestPick } from './assets/quest-pick-gesture.mjs';
 import { createSkillPanelRenderer, parseClassSkills, SESSION_SKILL_BYTES } from './assets/skill-panel.mjs';
 import { createSkillPointOverlay } from './assets/skill-plus.mjs';
 import { createSkillSelectRenderer, parseSkillChoices, SESSION_SKILL_CHOICE_BYTES } from './assets/skill-select.mjs';
@@ -558,7 +559,7 @@ let skillPanelRenderer = null, skillPanelEvidence = null, classSkills = null;
 // tab and quest are showing. `messageLines` is the log's feed (nothing wired yet: V8c).
 let partyRenderer = null, bubbleRenderer = null, partyVisible = false, partyEvidence = null; const partyLocal = new Map(), TOWN_LEVELS = [1, 40, 75, 103, 109];
 let questLogRenderer = null, messageLogRenderer = null, questVisible = false, messageVisible = false, questAct = 0, questSelected = 0, questDescrOn = false, questEvidence = null, messageEvidence = null;
-const questCloseGesture = createQuestCloseGesture();
+const questCloseGesture = createQuestCloseGesture(), questPick = createQuestPickGesture();
 const characterPanelCloseGesture = createCharacterPanelCloseGesture();
 const messageLines = [];
 // Bounded: the log is drawn every frame and would otherwise grow for the whole session.
@@ -7016,9 +7017,8 @@ canvas.addEventListener('pointerdown', (e) => {
         render();
       }
     }
-    else if (hit?.descr) questDescrOn = !questDescrOn;   // the questlast description toggle (V8d)
     else if (hit?.tab) { questAct = hit.tab; questSelected = questFirst(words, questAct); }
-    else if (hit?.quest && questStatus(words, questAct, hit.quest) !== 'locked') questSelected = hit.quest;
+    else if (questPick.press(e.pointerId, questPickTarget(hit, (q) => questStatus(words, questAct, q)))) { try { canvas.setPointerCapture(e.pointerId); } catch {} }
     if (hit || openPanelAt(x, y) === 'quest') { click.spent = 'quest-log'; canvas.focus(); e.preventDefault(); return; }
   }
   if (e.button === 0 && screen === SCREEN.GAME && characterVisible && characterPanelCloseAt(x, y, canvas.width, canvas.height)) {
@@ -7694,6 +7694,12 @@ globalThis.addEventListener('pointerup', (e) => {
   if (e.button === 0) { worldPointerHeld = false; }
   if (e.button === 2) { worldRightPointerHeld = false; heldRightPointerTicks = 0; input.cancelHeldSecondary(); }
   if (e.__d2HelpPointerHandled) return;
+  if (questPick.pointerId === e.pointerId) {
+    const [x, y] = canvasPoint(e), words = readQuestWords();
+    const hit = questLogRenderer?.hit(x, y, canvas.width, canvas.height, questEvidence?.tabs ?? [], questEvidence?.act ?? questAct);
+    ({ selected: questSelected, descrOn: questDescrOn } = applyQuestPick(questPick.release(e.pointerId, questPickTarget(hit, (q) => questStatus(words, questAct, q))), questSelected, questDescrOn));
+    render(); return;
+  }
   if (questCloseGesture.pointerId === e.pointerId) {
     const [x, y] = canvasPoint(e);
     const hit = questLogRenderer?.hit(x, y, canvas.width, canvas.height, questEvidence?.tabs ?? [], questEvidence?.act ?? questAct);
@@ -7774,7 +7780,7 @@ canvas.addEventListener('pointercancel', (e) => {
   if (clearStashGoldPress(e.pointerId)) { render(); canvas.focus(); e.preventDefault(); return; }
   gameMenu?.pointerCancel(e.pointerId);
   if (cancelHelpClosePress(e.pointerId)) render();
-  if (questCloseGesture.cancel(e.pointerId)) render();
+  if (questCloseGesture.cancel(e.pointerId) | questPick.cancel(e.pointerId)) render();
   worldPointerHeld = false; worldRightPointerHeld = false; heldRightPointerTicks = 0;
   if (!frontendPointerStates.cancel(e.pointerId)) return;
   canvas.focus(); e.preventDefault();
@@ -7790,7 +7796,7 @@ canvas.addEventListener('lostpointercapture', (e) => {
   if (clearStashGoldPress(e.pointerId)) render();
   gameMenu?.pointerCancel(e.pointerId);
   if (cancelHelpClosePress(e.pointerId)) render();
-  if (questCloseGesture.cancel(e.pointerId)) render();
+  if (questCloseGesture.cancel(e.pointerId) | questPick.cancel(e.pointerId)) render();
   worldPointerHeld = false;
   worldRightPointerHeld = false; heldRightPointerTicks = 0;
 });
