@@ -27,6 +27,8 @@ static_assert(offsetof(D2StatStrc, nValue) == 0x04, "stat value");
 uint32_t D2Common_33C20_BitmaskHit(bool hasOwner, bool hasRec, int32_t recFlag,
 	const uint32_t* bits, const uint32_t* mask, int32_t nWords);
 
+extern "C" int32_t (*g_d2common_fn_38A80)(void*);
+
 namespace
 {
 	inline uint8_t* P(uint32_t a) { return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(a)); }
@@ -44,6 +46,9 @@ namespace
 		uint8_t* sl = StatListOf(u);
 		if (!sl)
 			return 0;
+		// A caller whose unit uses the original 32-bit stat layout supplies the stat reader; the typed list is the engine's own layout.
+		if (g_d2common_fn_38A80)
+			return g_d2common_fn_38A80(&sgptDataTables->pItemStatCostTxt[nStat]);
 		return STATLIST_GetTotalStat_6FDB63E0(
 			reinterpret_cast<D2StatListStrc*>(sl),
 			D2SLayerStatIdStrc::MakeFromStatId(static_cast<uint16_t>(nStat)).nPackedValue,
@@ -254,9 +259,18 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_32890_ScaledDefense(uint32_t pUnit, const
 		}
 	}
 
-	// 32-bit wrapping product, then a truncating /100 (the local_c < 1 magic in retail).
-	const int32_t nBonus = static_cast<int32_t>(static_cast<uint32_t>(nTotalB) *
-		static_cast<uint32_t>(nBase)) / 100;
+	// 32-bit wrapping product. A positive base divides by 100 with the usual magic; a base of zero
+	// or less takes the other path, which multiplies by the negated magic (0xAE147AE1) and does not
+	// add the dividend back, so it yields the product / 100 with its sign flipped.
+	const int32_t nProd = static_cast<int32_t>(static_cast<uint32_t>(nTotalB) * static_cast<uint32_t>(nBase));
+	int32_t nBonus;
+	if (nBase > 0)
+		nBonus = nProd / 100;
+	else
+	{
+		const int32_t nHi = static_cast<int32_t>((static_cast<int64_t>(nProd) * static_cast<int64_t>(static_cast<int32_t>(0xAE147AE1u))) >> 32) >> 5;
+		nBonus = nHi + static_cast<int32_t>(static_cast<uint32_t>(nHi) >> 31);
+	}
 	uint32_t nResult = static_cast<uint32_t>(nBase + nBonus);
 
 	uint32_t nPercent = 0;

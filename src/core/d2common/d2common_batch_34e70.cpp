@@ -4,6 +4,7 @@
 // UNMAPPED rows are env-seam function pointers (null until the environment installs them); fatal
 // paths (Fog message + _exit(-1)) are modelled as returns, as in the other d2common batch files.
 #include <cstddef>
+#include <cstring>
 #include <cstdint>
 
 #include <emscripten.h>
@@ -148,62 +149,93 @@ EMSCRIPTEN_KEEPALIVE void d2_port_d2common_37170(uint32_t pRecord)
 	Wr32(rec, 0x08, Rd32(rec, 0x28) * pTable[nIndex]);
 }
 
-// 1.13c D2Common+0x38940: store one value in a stat list's full stat array (the 1.13c split of
-// STATLIST_SetUnitStatNewValue). The list is the hidden this (EBX): +0x48 is the stat array, +0x10
-// the flags, +0x5C the value-change callback. The packed layer/stat id is looked up in the array
-// (0x382B0); a missing entry is only inserted when the new value is non-zero (0x38640). A zero value
-// for a row without nKeepZero removes the entry (0x381A0), otherwise the value is written and
-// bHasOpApplyingToItem raises STATLIST_PERMANENT (0x20000000) on the list. When the value changed,
-// the callback is set and the row carries the callback flag, the callback runs (unit, packed id,
-// old, new): 1.13c passes four arguments where 1.10f passed six.
-// TODO(spec): the decompile renders the callback-flag mask as byte 0xC of the external gdwBitMasks
-// array, i.e. dwItemStatFlags bit 0x08 (ITEMSTATCOSTFLAG_FCALLBACK) tested in flags byte +5.
+// Store one value in a stat list's full stat array. The list is the hidden this: the stat array
+// (pointer, u16 count, u16 capacity) sits at +0x48, the flags at +0x10, the value-change callback at
+// +0x5C. The packed layer/stat id is found by a signed binary search over the array; a missing entry
+// is only inserted when the new value is non-zero. A zero value for a row without the keep-zero flag
+// removes the entry, otherwise the value is written and a row with the item-op flag sets the
+// permanent bit on the list. When the value changed, the callback is set and the row's flag byte
+// carries bit 8, the callback runs (unit, packed id, old, new). The list is read in the original
+// 32-bit layout, so the array code is done here on raw offsets; growth and shrink of the array (the
+// allocator) are not reproduced and the array is expected to stay inside its capacity.
+namespace
+{
+	inline uint8_t* P38940(uint32_t a) { return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(a)); }
+	inline int32_t FindAt(const uint8_t* arr, int32_t nCount, int32_t nKey, bool bForInsert)
+	{
+		int32_t lo = 0, hi = nCount;
+		const uint8_t* base = P38940(*reinterpret_cast<const uint32_t*>(arr));
+		while (lo < hi)
+		{
+			const int32_t mid = (hi - lo) / 2 + lo;
+			const int32_t k = *reinterpret_cast<const int32_t*>(base + mid * 8);
+			if (k < nKey) lo = mid + 1;
+			else if (k <= nKey) return bForInsert ? -1 : mid;
+			else hi = mid;
+		}
+		return bForInsert ? lo : -1;
+	}
+}
+
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2common_38940_port(uint32_t pStatList, uint32_t nLayerStatId,
+EMSCRIPTEN_KEEPALIVE uint32_t d2common_38940_port(uint32_t pStatList, uint32_t nLayerStatId,
                                                 int32_t nNewValue, uint32_t pItemStatCost,
                                                 uint32_t pUnit)
 {
-	D2StatListExStrc* pStatListEx =
-	    reinterpret_cast<D2StatListExStrc*>(static_cast<uintptr_t>(pStatList));
-	const D2ItemStatCostTxt* pRow =
-	    reinterpret_cast<const D2ItemStatCostTxt*>(static_cast<uintptr_t>(pItemStatCost));
-	if (!pStatListEx || !pRow)
-		return;
+	uint8_t* sl = P38940(pStatList);
+	const uint8_t* row = P38940(pItemStatCost);
+	if (!sl || !row)
+		return 0;
 
-	D2StatsArrayStrc* pStatsArray = &pStatListEx->FullStats;
-	const int32_t nIndex = STATLIST_FindStatIndex_6FDB6300(
-	    pStatsArray, static_cast<D2SLayerStatIdStrc::PackedType>(nLayerStatId));
-	D2StatStrc* pStat = nIndex >= 0 ? &pStatsArray->pStat[nIndex] : nullptr;
+	uint8_t* arr = sl + 0x48;
+	int16_t& nCount = *reinterpret_cast<int16_t*>(arr + 4);
+	uint8_t* base = P38940(*reinterpret_cast<uint32_t*>(arr));
+	const int32_t nKey = static_cast<int32_t>(nLayerStatId);
 
+	int32_t nIndex = FindAt(arr, nCount, nKey, false);
+	uint8_t* pStat = nIndex >= 0 ? base + nIndex * 8 : nullptr;
 	if (!pStat)
 	{
 		if (nNewValue == 0)
-			return;
-		pStat = STATLIST_InsertStatOrFail_6FDB6970(
-		    pStatListEx->pMemPool, pStatsArray,
-		    static_cast<D2SLayerStatIdStrc::PackedType>(nLayerStatId));
-		if (!pStat)
-			return;
+			return 0xFFFFFFFFu;			// EAX is the failed search's -1
+		const int32_t nAt = FindAt(arr, nCount, nKey, true);
+		if (nAt < 0)
+			return 0;
+		if (nAt < nCount)
+			memmove(base + nAt * 8 + 8, base + nAt * 8, static_cast<size_t>(nCount - nAt) * 8);
+		pStat = base + nAt * 8;
+		*reinterpret_cast<uint32_t*>(pStat) = nLayerStatId;
+		*reinterpret_cast<int32_t*>(pStat + 4) = 0;
+		nCount = static_cast<int16_t>(nCount + 1);
 	}
 
-	const int32_t nPreviousValue = pStat->nValue;
-	if (nNewValue == 0 && pRow->nKeepZero == 0)
+	const int32_t nPreviousValue = *reinterpret_cast<int32_t*>(pStat + 4);
+	if (nNewValue == 0 && row[0x50] == 0)
 	{
-		STATLIST_RemoveStat_6FDB6A30(pStatListEx->pMemPool, pStatsArray, pStat);
+		const int32_t nAt = static_cast<int32_t>((pStat - base) >> 3);
+		if (nAt < nCount)
+		{
+			if (nAt < nCount - 1)
+				memmove(pStat, pStat + 8, static_cast<size_t>(nCount - nAt) * 8 - 8);
+			nCount = static_cast<int16_t>(nCount - 1);
+		}
 	}
 	else
 	{
-		pStat->nValue = nNewValue;
-		if (pRow->bHasOpApplyingToItem)
-			pStatListEx->dwFlags |= STATLIST_PERMANENT;
+		*reinterpret_cast<int32_t*>(pStat + 4) = nNewValue;
+		if (row[0x53] != 0)
+			*reinterpret_cast<uint32_t*>(sl + 0x10) |= 0x20000000u;
 	}
 
-	const uint8_t nRowFlagByte = reinterpret_cast<const uint8_t*>(pRow)[5];
-	if (nPreviousValue != nNewValue && pStatListEx->pfOnValueChanged &&
-	    (static_cast<uint8_t>(gdwBitMasks[3]) & nRowFlagByte) != 0)
+	// EAX at return: the row pointer when the value did not change, else the callback pointer, or the callback's result when it ran.
+	if (nPreviousValue == nNewValue)
+		return pItemStatCost;
+	const uint32_t pfCallback = *reinterpret_cast<uint32_t*>(sl + 0x5C);
+	if (pfCallback != 0 && (row[5] & 8) != 0)
 	{
-		using Callback4 = void (*)(uint32_t, uint32_t, int32_t, int32_t);
-		reinterpret_cast<Callback4>(pStatListEx->pfOnValueChanged)(
+		using Callback4 = uint32_t (*)(uint32_t, uint32_t, int32_t, int32_t);
+		return reinterpret_cast<Callback4>(static_cast<uintptr_t>(pfCallback))(
 		    pUnit, nLayerStatId, nPreviousValue, nNewValue);
 	}
+	return pfCallback;
 }
