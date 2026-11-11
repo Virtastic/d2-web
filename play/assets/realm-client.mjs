@@ -541,25 +541,33 @@ export async function mcpDeleteCharacter(session, name, { timeoutMs = CONNECT_TI
 
 const rol32 = (v, n) => ((v << n) | (v >>> (32 - n))) >>> 0;
 
-/** Battle.net's SHA-1 variant (the schedule rotates by one bit less): the account password hash. */
+/**
+ * Battle.net's SHA-1 variant (the schedule rotates by one bit less): the account password hash. Retail walks the input in
+ * 64-byte steps over a state that carries from step to step but never advances the input: every step hashes the first bytes
+ * again (the last one zero padded), and an empty input leaves the initial state. Callers bound the string to the 255 bytes
+ * retail's string copy keeps.
+ */
 export function bsha1(data) {
-  const block = new Uint8Array(64); block.set(data.subarray(0, 64));
-  const w = new Array(80);
-  for (let i = 0; i < 16; i++) w[i] = u32(block, i * 4);
-  for (let i = 16; i < 80; i++) w[i] = rol32(1, (w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]) & 0x1f);
-  const h = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0];
-  let [a, b, c, d, e] = h;
-  for (let i = 0; i < 80; i++) {
-    let f, k;
-    if (i < 20) { f = (b & c) | (~b & d); k = 0x5a827999; }
-    else if (i < 40) { f = b ^ c ^ d; k = 0x6ed9eba1; }
-    else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8f1bbcdc; }
-    else { f = b ^ c ^ d; k = 0xca62c1d6; }
-    const t = (rol32(a, 5) + (f >>> 0) + e + k + w[i]) >>> 0;
-    e = d; d = c; c = rol32(b, 30); b = a; a = t;
+  let h = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0];
+  for (let off = 0; off < data.length; off += 64) {
+    const block = new Uint8Array(64); block.set(data.subarray(0, Math.min(data.length - off, 64)));
+    const w = new Array(80);
+    for (let i = 0; i < 16; i++) w[i] = u32(block, i * 4);
+    for (let i = 16; i < 80; i++) w[i] = rol32(1, (w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]) & 0x1f);
+    let [a, b, c, d, e] = h;
+    for (let i = 0; i < 80; i++) {
+      let f, k;
+      if (i < 20) { f = (b & c) | (~b & d); k = 0x5a827999; }
+      else if (i < 40) { f = b ^ c ^ d; k = 0x6ed9eba1; }
+      else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8f1bbcdc; }
+      else { f = b ^ c ^ d; k = 0xca62c1d6; }
+      const t = (rol32(a, 5) + (f >>> 0) + e + k + w[i]) >>> 0;
+      e = d; d = c; c = rol32(b, 30); b = a; a = t;
+    }
+    h = [a, b, c, d, e].map((v, i) => (h[i] + v) >>> 0);
   }
   const out = new Uint8Array(20), dv = new DataView(out.buffer);
-  [a, b, c, d, e].forEach((v, i) => dv.setUint32(i * 4, (h[i] + v) >>> 0, true));
+  h.forEach((v, i) => dv.setUint32(i * 4, v, true));
   return out;
 }
 
@@ -590,8 +598,8 @@ export async function bncsCreateAccount(transport, protocol, { account, password
   const reader = makeReader(transport);
   const authInfo = await bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs });
   const enc = new TextEncoder();
-  const hash = bsha1(enc.encode(password.toLowerCase()));
-  const name = enc.encode(account);
+  const hash = bsha1(enc.encode(password.toLowerCase()).subarray(0, 255));
+  const name = enc.encode(account).subarray(0, 255);
   const body = new Uint8Array(hash.length + name.length + 1);
   body.set(hash); body.set(name, hash.length);
   transport.send(protocol.bncsFrame(0x3d, body));
@@ -618,7 +626,7 @@ export async function bncsChangePassword(transport, protocol, { account, passwor
   const reader = makeReader(transport);
   const authInfo = await bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs });
   const logon = Uint8Array.from(protocol.bncsLogon({ clientToken: protocol.tickCount(), serverToken: u32(authInfo.body, 4), account, password }));
-  const newHash = bsha1(new TextEncoder().encode(newPassword.toLowerCase()));
+  const newHash = bsha1(new TextEncoder().encode(newPassword.toLowerCase()).subarray(0, 255));
   transport.send(protocol.bncsFrame(0x31, joinBytes(logon.subarray(0, 28), newHash, logon.subarray(28))));
   const reply = await readBncsFrame(reader, timeoutMs, false, 0x31);
   if (reply.id !== 0x31) throw new Error(`expected CHANGEPASSWORD reply 0x31, got 0x${reply.id.toString(16)}`);
