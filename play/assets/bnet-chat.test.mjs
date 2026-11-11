@@ -16,6 +16,13 @@ test('composers: framing and bodies of ENTERCHAT, JOINCHANNEL, CHATCOMMAND', () 
   assert.equal(hex(chatCommandPacket('hi\nthere')), 'ff0e0d006869207468657265' + '00');
 });
 
+test('ENTERCHAT strings are cut at 255 bytes like the retail sender', () => {
+  const p = enterChatPacket('n'.repeat(300), 'r'.repeat(256));
+  assert.equal(p.length, 4 + 256 + 256);
+  assert.equal(p[4 + 255], 0);
+  assert.equal(p[p.length - 1], 0);
+});
+
 test('CHATEVENT parse and display lines', () => {
   const e = parseChatEvent(ev(5, 'Bob', 'hello'));
   assert.deepEqual([e.event, e.username, e.text], [5, 'Bob', 'hello']);

@@ -6,7 +6,9 @@ import { getGamesPacket, GAME_LIST_ID } from './bnet-gamelist.mjs';
 const enc = new TextEncoder(), dec = new TextDecoder();
 const cstr = (s) => [...enc.encode(String(s)), 0];
 export const bncsPacket = (id, body = []) => Uint8Array.from([0xff, id, (body.length + 4) & 0xff, (body.length + 4) >> 8, ...body]);
-export const enterChatPacket = (name, realm = '') => bncsPacket(0x0a, [...cstr(name), ...cstr(realm)]);
+// BNClient's ENTERCHAT sender (+0xC520) copies each string with a 0x100-byte limit: at most 255 bytes, then the NUL.
+const capped = (s) => [...enc.encode(String(s)).subarray(0, 255), 0];
+export const enterChatPacket = (name, realm = '') => bncsPacket(0x0a, [...capped(name), ...capped(realm)]);
 // The body is the product dword: 'VD2D' for classic, 'PX2D' for Lord of Destruction.
 export const getChannelListPacket = (expansion = true) => bncsPacket(0x0b, expansion ? [0x50, 0x58, 0x32, 0x44] : [0x56, 0x44, 0x32, 0x44]);
 // flags 5: the first join of a Diablo II client, which lands in the product's own channel.
