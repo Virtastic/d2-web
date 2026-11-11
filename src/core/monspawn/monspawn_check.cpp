@@ -2301,6 +2301,9 @@ EMSCRIPTEN_KEEPALIVE void d2_monspawn_set_sequence(const int32_t* ops, int32_t n
 EMSCRIPTEN_KEEPALIVE void d2_monspawn_set_create_order(const int32_t* lxy, int32_t n) { g_monsCreate.assign(lxy, lxy + 3 * (n > 0 ? n : 0)); }
 EMSCRIPTEN_KEEPALIVE void d2_monspawn_set_order(const int32_t* xy, int32_t n) { g_monsOrder.assign(xy, xy + 2 * (n > 0 ? n : 0)); }
 
+extern "C" bool g_sessionJoinUnits;   // defined below; the local game's client join (d2_session_join_units)
+static void updateSessionPendingRooms();
+static int g_sessionAttachAtX = -1, g_sessionAttachAtY = -1;   // >= 0 only around a fixture create at a given point
 static int g_sessionStartX = -1, g_sessionStartY = -1;   // F67: the town's start point, set by d2_monspawn_level
 // Retail's client holds the 3x3 rooms around the town's start room (a retail recording: 15 class-0x25 objects, all inside it), not the 7x7 status union.
 static int g_townSpawnX = -1, g_townSpawnY = -1;   // the town's act-start point of any session create (lazy or eager)
@@ -2390,9 +2393,13 @@ EMSCRIPTEN_KEEPALIVE int d2_monspawn_level(uint32_t seed, int difficulty, int ac
     // (DUNGEON_FindActSpawnLocationEx tile index 0, what LEVEL_ChangeAct uses); it builds the start
     // room FIRST so the wave follows from it, and `d2_aitarget_attach` stands the player there
     // instead of beside the first NPC of the room list. Levels with no session create are untouched.
+    // The local game's join (g_sessionJoinUnits): retail's town at the first frame holds only the 3x3 rooms around the
+    // act's start room. They are allocated in the sight-call order (centre, then the lattice), the player is placed at the
+    // start point at once, and the pending-rooms pass populates them last-allocated first (join-field: monster ids 1..0xb).
+    const bool sessionJoin = town && g_sessionJoinUnits && g_sessionCreating && g_townCentreX < 0 && g_sessionAttachAtX < 0;   // not a fixture create at a given point (the recorded sessions' create keeps its own room set)
     g_sessionStartX = g_sessionStartY = -1;
     g_townSpawnX = -1;
-    if (town && g_monspawnSessionCreate && g_sessionActivationWave) {
+    if (town && ((g_monspawnSessionCreate && g_sessionActivationWave) || sessionJoin)) {
         int sx = 0, sy = 0;
         if (DUNGEON_FindActSpawnLocationEx(pAct, levelId, 0, &sx, &sy, 1)) { g_sessionStartX = sx; g_sessionStartY = sy; }
     }
@@ -2410,8 +2417,9 @@ EMSCRIPTEN_KEEPALIVE int d2_monspawn_level(uint32_t seed, int difficulty, int ac
     // arrival T12a's own message and HANDOFF line 44 scope it to ("a save's own arrival"), and because the two rows
     // that assert the Rogue Encampment fixtures' order -- s161's shop and s973's merc follow -- fail when a
     // new-character create is reordered and pass when it is not.
+    std::vector<D2DrlgRoomStrc*> joinSeq;
     int orderX = g_townCentreX * 5, orderY = g_townCentreY * 5;
-    if (town && g_sessionCreating && g_townCentreX < 0 && (g_sessionLazy || g_sessionFromSave)) { int sx = 0, sy = 0; if (DUNGEON_FindActSpawnLocationEx(pAct, levelId, 0, &sx, &sy, 1)) { orderX = sx; orderY = sy; } else orderX = -1; }
+    if (town && g_sessionCreating && g_townCentreX < 0 && (g_sessionLazy || g_sessionFromSave || sessionJoin)) { int sx = 0, sy = 0; if (DUNGEON_FindActSpawnLocationEx(pAct, levelId, 0, &sx, &sy, 1)) { orderX = sx; orderY = sy; } else orderX = -1; }
     if (town && g_sessionCreating && orderX >= 0 && (g_sessionLazy || g_sessionStartX >= 0 || g_sessionFromSave || g_townCentreX >= 0)) {
         const int cx = orderX / 5, cy = orderY / 5;
         std::vector<D2DrlgRoomStrc*> seq;
@@ -2439,10 +2447,15 @@ EMSCRIPTEN_KEEPALIVE int d2_monspawn_level(uint32_t seed, int difficulty, int ac
                 for (auto& d : lat) for (auto& e : order)
                     if (e.first->nTileXPos == wc->nTileXPos + d[0] * wc->nTileWidth && e.first->nTileYPos == wc->nTileYPos + d[1] * wc->nTileHeight) { add(e.first); break; }
             }
+            if (sessionJoin) joinSeq = seq;
             std::vector<std::pair<D2DrlgRoomStrc*, uint16_t>> first;
             for (D2DrlgRoomStrc* r : seq) for (auto it = order.begin(); it != order.end(); ++it) if (it->first == r) { first.push_back(*it); order.erase(it); break; }
             first.insert(first.end(), order.begin(), order.end()); order.swap(first);
         }
+    }
+    if (sessionJoin && !joinSeq.empty()) {
+        for (D2DrlgRoomStrc* r : joinSeq) if (!r->pRoom) DUNGEON_SetClientIsInSight(pAct, levelId, r->nTileXPos, r->nTileYPos, nullptr);
+        updateSessionPendingRooms();
     }
     for (auto [pRoomEx, roomIdx] : order) {
         if (!g_monsSeq.empty()) runCreatesUntil(pRoomEx);
@@ -2455,7 +2468,7 @@ EMSCRIPTEN_KEEPALIVE int d2_monspawn_level(uint32_t seed, int difficulty, int ac
             g_sessionWarpPresets.push_back({ roomIdx, preset->nIndex,
                 pRoomEx->nTileXPos * 5 + preset->nXpos, pRoomEx->nTileYPos * 5 + preset->nYpos, sessionWarpTileDestination(pRoomEx, preset->nIndex) });
         }
-        if (!pRoomEx->pRoom && !(sessionWave && sessionLanding))
+        if (!pRoomEx->pRoom && !(sessionWave && sessionLanding) && !(sessionJoin && !joinSeq.empty()))
             DUNGEON_SetClientIsInSight(pAct, levelId, pRoomEx->nTileXPos, pRoomEx->nTileYPos, nullptr);
         D2ActiveRoomStrc* pRoom = pRoomEx->pRoom;
         if (!pRoom) continue;
@@ -2470,7 +2483,7 @@ EMSCRIPTEN_KEEPALIVE int d2_monspawn_level(uint32_t seed, int difficulty, int ac
 #ifdef D2_MONS_TRACE
         if (levelId == d2_trace_level) fprintf(stderr, "[room] %u [%d,%d] gameseed %u/%u objseed %u/%u roomseed %u\n", roomIdx, pRoom->tCoords.nSubtileX, pRoom->tCoords.nSubtileY, g_game->pGameSeed.nLowSeed, g_game->pGameSeed.nHighSeed, g_game->pObjectControl->pSeed.nLowSeed, g_game->pObjectControl->pSeed.nHighSeed, pRoom->pSeed.nLowSeed);
 #endif
-        sub_6FC385A0(g_game, pRoom);   // D2Game 1.13c 0x6FC4CB80 room activation (compat/game_glue.cpp)
+        if (!(sessionJoin && !joinSeq.empty())) sub_6FC385A0(g_game, pRoom);   // D2Game 1.13c 0x6FC4CB80 room activation (compat/game_glue.cpp); the join's pass ran above
         // The landing: the first room of the room-list order whose population put a monster in it
         // is the one `d2_aitarget_attach` will stand the fixture's player in. This is the room
         // reach of a create; every later room is the activation wave's to build (F64).
@@ -2716,7 +2729,6 @@ static bool g_sessionClientFeed = false;
 // on == 2 (a retail recording): retail's real client is in every adjacent room (0x07 for 79 rooms at tick 1) so pets and monsters scan them,
 // but its first-client wake events do not fire early; join the adjacent rooms' client arrays only (no events, no packets).
 EMSCRIPTEN_KEEPALIVE void d2_session_client_feed(int on) { g_sessionClientFeed = on == 1; g_sessionClientAdjCount = on == 2; }
-static int g_sessionAttachAtX = -1, g_sessionAttachAtY = -1;
 EMSCRIPTEN_KEEPALIVE int d2_aitarget_attach() {
     if (!g_game || !g_lastLevel || g_targetPlayer) return 0;
     if (g_attachAtX < 0 && g_sessionStartX >= 0) { g_attachAtX = g_sessionStartX; g_attachAtY = g_sessionStartY; g_sessionStartX = g_sessionStartY = -1; const int ok = d2_aitarget_attach(); g_attachAtX = g_attachAtY = -1; if (ok) return 1; }
@@ -3468,7 +3480,10 @@ static void placeSessionPlayerAtTownSpawn(int act, int levelId) {
     if (levelId != DUNGEON_GetTownLevelIdFromActNo(act)) return;
     int x = 0, y = 0;
     if (DUNGEON_FindActSpawnLocationEx(g_game->pAct[act], levelId, 0, &x, &y, UNITS_GetUnitSizeX(g_targetPlayer)))
+    {
+        if (g_sessionJoinUnits && UNITS_GetXPosition(g_targetPlayer) == x && UNITS_GetYPosition(g_targetPlayer) == y) return;   // the join already placed it here
         d2_session_fixture_place_player(x, y);
+    }
 }
 
 EMSCRIPTEN_KEEPALIVE int d2_session_create_class(uint32_t seed, int difficulty, int act, int levelId, int playerClass) {
