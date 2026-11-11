@@ -12,15 +12,7 @@ static inline void     wr8(void* p, uint32_t o, uint8_t v) { ((uint8_t*)p)[o] = 
 static inline uint16_t rd16(const void* p, uint32_t o) { uint16_t v; std::memcpy(&v, (const uint8_t*)p + o, 2); return v; }
 static inline void     wr16(void* p, uint32_t o, uint16_t v) { std::memcpy((uint8_t*)p + o, &v, 2); }
 
-struct D2GameBatchE2C40Env {
-    uint32_t (*d2common)(uint32_t ordinal, uint32_t a, uint32_t b, uint32_t c); // D2Common #ordinal, stdcall/fastcall args as listed
-    void*    (*sub33F30)(uint32_t id);              // FUN_6fc53f30(id) -> record with callback at +0xF0
-    int      (*isBadCodePtr)(const void* fn);       // kernel32 IsBadCodePtr
-    uint32_t (*callCb)(void* rec);                  // (*(rec+0xF0))()
-    void     (*fatal)(uint32_t line);               // Ordinal_10265(line); Ordinal_10024(msg,...); _exit(-1)
-    // ITEMS_FindQuestItem (0xE660): 4CC code; the unit is a live register not shown in the decompile.
-    int      (*findQuestItem)(uint32_t code);
-};
+#include "d2game_batch_e2c40.h"
 
 // Walk the unit's stat-list chain at game+0x10F4 for the node whose type (+0) == type; node+0x18 is its data.
 static void* findNode(const void* game, uint32_t type) {
@@ -48,7 +40,7 @@ static uint32_t dispatchCb(D2GameBatchE2C40Env& e, void* p, uint32_t line, bool 
         if (setMode && rd8(p, 0xc) == 0) wr8(p, 0xc, 1);
         return 1;
     }
-    void* rec = e.sub33F30(rd32(p, 0x10));
+    void* rec = e.sub33F30(rd32(p, 4), rd32(p, 0x10));
     if (!rec) return 0;
     if (e.isBadCodePtr(P(rd32(p, 0xf0)))) e.fatal(line);
     return e.callCb(rec); // retail: (*(rec[0x3c]))()
@@ -84,11 +76,10 @@ EMSCRIPTEN_KEEPALIVE void d2game_E3290(D2GameBatchE2C40Env& e, uint32_t* p) {
     e.d2common(11090, p[1], rd32(d, 0xc), 0);
 }
 
-// 1.13c D2Game+0xE34D0: three #10003 calls (no args visible, results discarded); game = in_EAX.
-// unit = param_1 (type must be 0) -> #10920(unit)->+0x9c; GUESS: the three #10003 calls are
-// side-effect-free in the decompile and are issued with no args.
-EMSCRIPTEN_KEEPALIVE void d2game_E34D0(D2GameBatchE2C40Env& e, const void* game, const uint32_t* unit) {
-    e.d2common(10003, 0, 0, 0); e.d2common(10003, 0, 0, 0); e.d2common(10003, 0, 0, 0);
+// 1.13c D2Game+0xE34D0: EAX = a unit handed to three #10003 calls (EAX, 0x16, 0xD / 0 / 0xB), ECX = unit
+// (type 0 selects #10920(unit) +0x9c as the info record, else null), stack word = game (byte +0x6d is the player slot). Ret 4.
+EMSCRIPTEN_KEEPALIVE void d2game_E34D0(D2GameBatchE2C40Env& e, uint32_t eax, const uint32_t* unit, const void* game) {
+    e.d2common(10003, eax, 0x16, 0xd); e.d2common(10003, eax, 0x16, 0); e.d2common(10003, eax, 0x16, 0xb);
     void* info = nullptr;
     if (unit && unit[0] == 0) info = P(rd32(P(e.d2common(10920, (uint32_t)(uintptr_t)unit, 0, 0)), 0x9c));
     uint32_t u2 = ((rd16(info, 10) & 0x20) | 0x80) >> 5;
