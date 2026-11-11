@@ -87,7 +87,7 @@ extern "C" void d2c_65760(uint32_t doLoop, uint32_t mode, const cl::Env& e, cons
             for (int32_t b = 0; b < (int32_t)rd(0xDD5D0); ++b) {
                 if (rd(ARR + 4 * (uint32_t)b) != 1) continue;
                 const uint32_t kd = e.R(rd(0xDD538 + 4 * (uint32_t)b) + 0x24);
-                if (kd > 4) { bail = true; break; }
+                if (kd != 0 && kd != 1 && kd != 4) { bail = true; break; }   // the switch default (2, 3, >4) jumps past the tail
                 if (kd == 1) { e.H(0xc2790, 0, 0, 0, 0, 0, 0, (uint32_t)b, 1); eax = rd(0x11BBFC); }
                 else if (kd == 4) {
                     if (rd(0x119721) != 0) { const uint32_t edi = rd(0x11971D); e.H(0x47b20); e.Edj(0x47b20, edi); eax = rd(0x11BBFC); }
