@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0x13DE0: no arguments. Reads the widget handles d04, d08, d1c, d20, d24, d3c, d40, d44 (g[0..7] in that order) and sets the
+// 1.13c D2MULTI+0x13DE0: no arguments. Reads the widget handles d04, d08, d1c, d20, d24, d3c, d40, d44 (g[0..7] in that order) and sets the
 // enabled/visible state of the controls for the mode Ordinal_10003(d40) reports: 7C20 (ECX = widget, EDX = 0/1), 7C14, then the two captions
 // GetStringByIndex(0x148B)/(0x148C) placed on d04/d08 through 7CE0(ECX = widget, EDX = text, 4 or 5, 0, 0); finishes by tail-calling 0x13AF0.
 #include "d2multi_env.h"
