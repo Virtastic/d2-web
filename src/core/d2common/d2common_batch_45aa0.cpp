@@ -71,15 +71,19 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_45aa0(
 
 // 1.13c D2Common+0x819C0: read the tile entry at a room coordinate. The input coordinates are
 // already in subtiles; the row-offset table is relative to room+0x38 and the selected cell is
-// relative to room+0x34. A flat grid (flag bit 0) uses its sole cell at +0x30. A missing grid
+// relative to room+0x34. A flat grid (flag bit 0) uses its sole cell pointer at +0x30, read through +0x28 like any other cell. A missing grid
 // follows retail's fatal 0x29C path; the staged function returns 0 after that modeled fatal.
 extern "C" uint32_t d2_fn_d2common_819c0_batch(int32_t nSubY, uint32_t pRoom, int32_t nSubX) { // 1.13c D2Common+0x819C0
 	const uint32_t pGrid = U(pRoom + 0x64);
 	if (pGrid == 0)
 		return 0;
 
+	uint32_t pTile;
 	if ((U(pGrid) & 1u) != 0)
-		return U(pGrid + 0x30);
+	{
+		pTile = U(pGrid + 0x30);   // the flat grid's one cell pointer; it too is read through +0x28 below
+		return pTile != 0 ? U(pTile + 0x28) : 0xFFFFFFFFu;
+	}
 
 	const uint32_t pRowOffsets = U(pGrid + 0x20);
 	const uint32_t pCells = U(pGrid + 0x1C);
@@ -88,7 +92,7 @@ extern "C" uint32_t d2_fn_d2common_819c0_batch(int32_t nSubY, uint32_t pRoom, in
 	const uint32_t nColumn = static_cast<uint32_t>(nRowStart)
 		- static_cast<uint32_t>(I(pRoom + 0x34))
 		+ static_cast<uint32_t>(nSubX);
-	const uint32_t pTile = U(pCells + nColumn * 4u);
+	pTile = U(pCells + nColumn * 4u);
 	return pTile != 0 ? U(pTile + 0x28) : 0xFFFFFFFFu;
 }
 
