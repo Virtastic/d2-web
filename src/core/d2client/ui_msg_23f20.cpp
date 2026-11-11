@@ -14,7 +14,7 @@ static void tail(D2cHost h, uint32_t edi, uint32_t id) {   // esi = ebx = id, ea
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_23f20(D2cHost h, uint32_t ecx, uint32_t edx, uint32_t p3, const uint32_t* g, uint32_t* w) {
     uint32_t idx = edx & 0xFF;
     w[3] = 0;
-    uint32_t edi = cl(h, { 0xA4E20, ecx & 0x7F, ecx, 0x6FBBA608u + (idx << 9), 0, 0, { idx, 0, 0, 0 } });
+    uint32_t edi = cl(h, { 0xA4E20, ecx & 0x7F, ecx, 0xB210A608u + (idx << 9), 0, 0, { idx, 0, 0, 0 } });
     if (!edi) return;
     uint32_t n = (p3 & 0xFFFF) - 10, id;
     if (n <= 0x53) switch (p3 & 0xFFFF) {

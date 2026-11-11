@@ -30,8 +30,9 @@ static int32_t x87Scale(int32_t a,int32_t span,int32_t delta){  // trunc(round53
 // 1.13c D2Client+0x26B20
 // stat is EAX: 6, 8 or 10; anything else returns 0.
 I sub_26B20(Env& e,I stat){
+ I cur=e.current();   // retail reads the current value (ord 10973) before it looks at the stat
  I n=stat==6?0:stat==8?1:stat==10?2:-1; if(n<0) return 0;
- I cur=e.current(), mx=e.max[n]();
+ I mx=e.max[n]();
  if(!mx) return 0;
  U f=e.frame; Slot& s=e.slot[n];
  if(f<2){s.prev=s.shown=cur;}
