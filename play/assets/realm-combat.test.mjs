@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRealmUnits, realmCombatSoundFrame, parseRealmUnitInfo } from './realm-combat.mjs';
+import { createRealmUnits, realmCombatSoundFrame, parseRealmUnitInfo, shrineDirectHpLoss } from './realm-combat.mjs';
 import { createMonsterTable } from './realm-tables.mjs';
 import { createRealmInput } from './realm-input.mjs';
 import { plateBoxes } from './hover-lifebar.mjs';
@@ -193,4 +193,15 @@ test('a monster with unit life: the plate fills by hit points over the maximum, 
   assert.deepEqual(entities.map((e) => [e.type, e.id, e.hp, e.lastHitClass, e.hitPacket === true]),
     [[1, 77, 0x4100, 0x31, true], [1, 78, undefined, 0, false], [0, 2, undefined, 0, false], [0, 9, undefined, 0, true]]);
   assert.equal(entities[0].typeFlags, 8);
+});
+
+test('the no-hit life loss of a shrine comes from the activations the client took, and reaches the sound frame', () => {
+  assert.equal(shrineDirectHpLoss([]), false);
+  assert.equal(shrineDirectHpLoss(undefined), false);
+  assert.equal(shrineDirectHpLoss([{ shrine: 0 }, { shrine: 23 }]), false);
+  assert.equal(shrineDirectHpLoss([{ shrine: 0 }, { shrine: 1 }]), true);
+  assert.equal(shrineDirectHpLoss([{ shrine: 22 }]), true);
+  const snapshot = { entities: [], directHpLoss: true };   // a stale engine value never leaks into a packet game's frame
+  assert.equal(realmCombatSoundFrame(snapshot, [], null, 0).frame.directHpLoss, false);
+  assert.equal(realmCombatSoundFrame(snapshot, [], null, 0, undefined, undefined, true).frame.directHpLoss, true);
 });

@@ -92,6 +92,8 @@ test('a carried item click sells in sell mode and repairs in repair mode, and no
   assert.equal(npc.view().sellMode, false);
   assert.equal(ui.carriedClick(0x31, npc.view()), true);
   assert.equal(ops(sent).at(-1), 0x35);
+  ui.endRepair();   // the declined Repair box ends Repair mode
+  assert.equal(npc.view().repairMode, false);
 });
 
 test('repairAll and exit are the release actions of their buttons', () => {

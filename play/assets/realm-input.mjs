@@ -107,6 +107,7 @@ const CODE_QF2 = 0x20326671, CODE_HFH = 0x20686668;
  *                                    (type -1): 2 walk there instead (the right button with a hand-to-hand
  *                                    skill), 1 use it at the spot.
  *   skillAt(hand, x, y), skillOnUnit(hand, type, guid) -> the local start of a hand's skill
+ *   refusalSound() -> the Sounds event the last refused start speaks (0 none); onRefused(event) plays it
  */
 /** D2Client+0x29920 on an Items.txt row: true only for a plain useable row (useable byte 1, unique and quest bytes not 1). */
 export const canUseItemRow = (row) => row.useable === 1 && row.unique !== 1 && row.quest !== 1;
@@ -114,7 +115,7 @@ export const canUseItemRow = (row) => row.useable === 1 && row.unique !== 1 && r
 export const ACTION_LOCK_FRAMES = 12, GAME_FRAME_MS = 40;
 export function createRealmInput({ transmit, scene, now = () => 0, move = null, approachUnit = null, reach = null,
   actionDone = null, skillPlan = null, skillAt = null, skillOnUnit = null, onTalk = null, questFlags = null, leaveWait = null,
-  queueUnit = null, fireUnit = null, takeSends = null }) {
+  queueUnit = null, fireUnit = null, takeSends = null, refusalSound = null, onRefused = null }) {
   const gate = createSendGate(transmit);
   const evidence = { attempts: 0, sent: 0, last: null };
   // The inventory's item actions pass the leave wait's gate first (1.13c 0x923F0): an armed wait is cancelled and the action refused.
@@ -176,13 +177,18 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
 
   // A hand's skill: started locally, then sent. Left is 0x05/0x06 (held 0x08/0x09), right 0x0C/0x0D (held 0x0F/0x10).
   const plan = (hand, type, guid) => { const r = skillPlan ? skillPlan(hand, type, guid) : null; return r == null ? -1 : r; };
+  // A right-hand cast the client's own start refused speaks the class's line (D2Client+0x18F90); the client answers, the shell plays.
+  const refused = (hand) => { if (hand === 1 && !held_) { const ev = refusalSound ? refusalSound() : 0; if (ev && onRefused) onRefused(ev); } return false; };
+  let held_ = false;
   function skillOn(hand, guid, held) {
-    if (!predicted(skillOnUnit ? skillOnUnit(hand, UNIT.MONSTER, guid) : null)) return false;
+    held_ = held;
+    if (!predicted(skillOnUnit ? skillOnUnit(hand, UNIT.MONSTER, guid) : null)) return refused(hand);
     return hand ? emit(packets.rightSkillOnUnit(UNIT.MONSTER, guid, held), 'right-skill-unit')
       : emit(packets.leftSkillOnUnit(UNIT.MONSTER, guid, held), 'left-skill-unit');
   }
   function skillGround(hand, x, y, held) {
-    if (!predicted(skillAt ? skillAt(hand, x, y) : null)) return false;
+    held_ = held;
+    if (!predicted(skillAt ? skillAt(hand, x, y) : null)) return refused(hand);
     return hand ? emit(packets.rightSkillAt(x, y, held), 'right-skill-ground') : emit(packets.leftSkillAt(x, y, held), 'left-skill-ground');
   }
   // A click with a hand's skill on a unit. A hand-to-hand skill out of melee range walks to the unit and is
@@ -209,7 +215,10 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
       const started = queueUnit(kind, type, guid, run);
       if (started >= 0) { pending = null; evidence.localMove = started; return flush(s) ? true : started ? false : null; }
     }
-    if (!predicted(approachUnit ? approachUnit(type, guid, run) : move ? move(clamp16(u.x), clamp16(u.y), run) : null)) return null;
+    // The client keeps no unit for a ground item, so the engine cannot plan a walk to it (-1): the walk is to the item's spot.
+    let started = approachUnit ? approachUnit(type, guid, run) : null;
+    if ((started === -1 || !approachUnit) && move) started = move(clamp16(u.x), clamp16(u.y), run);
+    if (!predicted(started)) return null;
     return emit(run ? packets.runToUnit(type, guid) : packets.walkToUnit(type, guid), 'approach');
   }
   // The engine's own packets: a walk it planned again, or the waiting action it started in reach.
@@ -398,6 +407,8 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
       return Boolean(b) && itemGate() && emit(b(cursorGuid, itemGuid), `combine-${action}`); },
     unstack: (guid) => itemGate() && emit(packets.unstackItem(guid), 'unstack'),
     swapBody: (guid, bodyLoc) => itemGate() && emit(packets.swapWithBody(guid, bodyLoc), 'swap-body'),
+    /** A click on a ground item by id: walk to it and pick it up (0x16) once in reach, as leftClick does for the item under the pointer. */
+    pickUp(guid) { const s = open(), u = s?.items.find((i) => i.id === guid && i.mode === 3); return Boolean(u) && itemGate() && interactWith(s, UNIT.ITEM, u) !== false; },
     dropCursor: (guid) => itemGate() && emit(packets.dropCursor(guid), 'drop'),
     swapWeapons: () => emit(packets.swapWeapons(), 'swap-weapons'),
     /** The film the server asked for (0x61) is over or was not shown: the server's busy mark for the player is lifted (1.13c D2Client 0x899A0 ends with the 1-byte 0x48). */

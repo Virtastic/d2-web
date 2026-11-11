@@ -382,7 +382,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   // place in the realm's line once it has said there is one, and swaps the popup for the queue panel.
   let creating = false, queue = null;
   // A closed realm's text for the picked game (setGameInfo), a line per entry; null when the description comes with the list row.
-  let info = null;
+  let info = null, infoColours = [];
   let openStamp = 0;
   const openJoin = () => { panel = 'join'; Object.assign(form, { name: '', password: '', focus: 'name' }); selected = -1; listFirst = 0; desc = ''; info = null;
   // D2Multi 0x148F0 builds the panel's list empty and asks the realm for games only when 5 s have passed since the last open (the stamp moves only then, and starts at 0, the zero-filled static, so an open under 5 s after the clock starts asks nothing).
@@ -906,8 +906,9 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
       .drawAnchored(sctx, g.name, J.list.x, J.list.firstBaseline + i * J.list.pitch));
     if (desc || info) {
       const D = J.list.desc, df = font(D.font, D.colour);
-      (info ? info.flatMap((l) => (l ? wrapSpaces(l, D.w, (t) => df.measure(t)) : [''])) : wrapSpaces(desc, D.w, (t) => df.measure(t))).slice(0, D.lines).forEach((line, i) =>
-        df.drawAnchored(sctx, line, D.x + Math.max(Math.trunc((D.w - df.measure(line)) / 2), 0), D.firstBaseline + i * D.pitch));
+      const shownLines = info ? info.flatMap((l, n) => (l ? wrapSpaces(l, D.w, (t) => df.measure(t)) : ['']).map((t) => ({ t, colour: infoColours[n] ?? D.colour })))
+        : wrapSpaces(desc, D.w, (t) => df.measure(t)).map((t) => ({ t, colour: D.colour }));
+      shownLines.slice(0, D.lines).forEach(({ t: line, colour }, i) => font(D.font, colour).drawAnchored(sctx, line, D.x + Math.max(Math.trunc((D.w - df.measure(line)) / 2), 0), D.firstBaseline + i * D.pitch));
     }
   };
   const drawHelp = () => {
@@ -983,9 +984,10 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   const drawQueue = () => {
     const Q = L.queue;
     drawTextBox(Q.title, [{ text: text(Q.title.text), colour: 4 }]);
-    // GUESS: the panel's text box is first set to the "You are in line" note and then to the place; whether the note stays above the place
-    // was not read (only the place is drawn). A retail frame of a queued create would settle it, and the box's font and colours with it.
-    drawTextBox(Q.body, [{ text: queueText(), colour: 4 }]);
+    // Retail's builder (D2Multi 0x11B70) puts note 11023 above the place line (11026, the colour prefix, "0", the number); the place
+    // line's prefix is colour 0 (the note is appended with colour 0 through D2Win 10167-style append, 0x11B70). The box's own font
+    // lives in descriptor data (0x6f9eb9b0) not decoded here: OPEN, capture request in the spec.
+    drawTextBox(Q.body, [{ text: string(S.queueNote), colour: 0 }, { text: queueText(), colour: 4 }]);
     drawButton(Q.cancel);
   };
   const drawNotice = () => {
@@ -1062,7 +1064,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     // The game list's scroll (D2Win 0x88A0, the call the scrollbar makes): the first row on show, only floored at 0.
     scrollGames(pos) { listFirst = Math.max(0, pos); },
     // A closed realm's answer about the picked game: the lines of the box beside the list.
-    setGameInfo(lines) { info = lines && lines.length ? lines.map(String) : null; },
+    setGameInfo(lines, colours = []) { info = lines && lines.length ? lines.map(String) : null; infoColours = info ? lines.map((_, i) => colours[i] ?? 4) : []; },
     // The realm put the pending create in its line at `place` (it says so again each time the place changes).
     setQueue(place) { if (creating) queue = place >>> 0; },
     get queue() { return queue; },
@@ -1116,6 +1118,8 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     chatLive(on) { chat.live = Boolean(on); },
     // The chat state a retail capture set directly (the reply target); tests only.
     get chatState() { return chat; },
+    // The game list reply with status 0xFFFFFFFF (D2Multi 0xDAE0 -> 0x11DA0, 0xCE70): the join panel is torn down and the notice D2Lang 11020 raised.
+    listRefused() { closePanel(); busy = false; notice = { body: string(11020) }; },
     fail(error) { notice = { body: gameErrorText(error, string, character) }; busy = false; },
     typeKey(code, key) {
       if (busy) return true;

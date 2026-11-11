@@ -5,7 +5,7 @@
 import { npcMenuChoiceOnRelease } from './npc-menu.mjs';
 import { vendorItemsFrom } from './realm-npc-ui.mjs';
 import { createNpcSpeechClickGate } from './npc-speech-click.mjs';
-import { BUY_TITLE_STRING, GOLD_STRING, YES_STRING, NO_STRING } from './vendor-repair-confirm.mjs';
+import { BUY_TITLE_STRING, REPAIR_TITLE_STRING, GOLD_STRING, YES_STRING, NO_STRING, CONTINUE_STRING } from './vendor-repair-confirm.mjs';
 
 /** The engine's offer rule when the caller injects none: left press confirms, right press buys 500 ms after a send. */
 function fallbackOfferClick(now) {
@@ -68,10 +68,24 @@ export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor
     confirm = null;
     if (buyConfirm?.open) buyConfirm.close();
   }
+  /** The Repair box (D2Client 0x47500 state 3): No, or a press outside it, ends Repair mode (0x461D0 then 0x8D300). */
+  function declineConfirm() {
+    const kind = confirm?.kind;
+    closeConfirm();
+    if (kind === 'repair') ui.endRepair?.();
+    else if (kind === 'refusal') ui.dismissRefusal?.();   // 0x53E40's outside-click is the box's own Continue handler (0x4AAF0)
+  }
+  /** D2Client 0x4B5D0 above 6: the reply's message in red over a selectable Continue, over the NPC. */
+  function openRefusal(v) {
+    confirm = { kind: 'refusal', guid: v.guid };
+    buyConfirm?.show(v.guid, 0, [text(v.refusal) || String(v.refusal)], [{ stringId: CONTINUE_STRING, action: 'continue' }], 1);
+  }
   function confirmYes() {
     if (!confirm) return false;
-    const guid = confirm.guid;
+    const { guid, kind, send } = confirm;
+    if (kind === 'refusal') { declineConfirm(); return true; }
     closeConfirm();
+    if (kind === 'repair') { send(); return true; }   // Yes sends the 0x35; the success reply re-arms Repair mode
     if (ui.buyAt(guid)) rule.sent();
     return true;
   }
@@ -80,7 +94,7 @@ export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor
     /** Draw whatever the NPC's current mode shows. Returns the speech box's verdict or null. */
     draw(ctx, w, h, { act = 1, pointer = null } = {}) {
       const v = current();
-      if (!v || (v.mode !== 'trade' && v.mode !== 'gamble')) closeConfirm();
+      if (!v || (v.mode !== 'trade' && v.mode !== 'gamble' && !(v.mode === 'hire' && v.refusal))) closeConfirm();
       if (!v) { syncMenu(null); vendorOpenFor = null; if (hireKey !== null) { menu.closeHire(); hireKey = null; } return null; }
       if (v.mode === 'speech') {
         const key = `${v.guid}:${v.speech?.stringId}`;
@@ -94,10 +108,13 @@ export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor
         const key = `${v.guid}:${v.offers.length}`;
         if (key !== hireKey) { menu.showHire(v.guid, v.offers.map(menuOffer), gold()); hireKey = key; }
         menu.drawHire(ctx, act, w, h);
+        if (v.refusal && !confirm) openRefusal(v);
+        if (confirm && buyConfirm) { const feet = anchor(v.guid); if (feet) buyConfirm.draw(ctx, feet.x, feet.y, act); }
         return null;
       }
       if (hireKey !== null) { menu.closeHire(); hireKey = null; }
       if (v.mode === 'trade' || v.mode === 'gamble') {
+        if (v.refusal && !confirm) openRefusal(v);
         if (vendorOpenFor !== v.guid) { vendor.reset(vendorItemsFrom(v.stock, itemTable), smith(v.classId)); vendorOpenFor = v.guid; }
         const r = vendor.draw(ctx, w, h, { items: vendorItemsFrom(v.stock, itemTable), classId: v.classId, act, pointer, pressedButton, sellMode: v.sellMode, repairMode: v.repairMode });
         if (confirm && buyConfirm) { const feet = anchor(v.guid); if (feet) buyConfirm.draw(ctx, feet.x, feet.y, act); }
@@ -117,6 +134,12 @@ export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor
       if (!v) return false;
       if (v.mode === 'speech') { if (gate.pointerDown(button, now()) === 'dismiss') { gateKey = null; ui.dismissSpeech(); } return true; }
       if (v.mode === 'hire') {
+        if (confirm) {   // 0x4B420's refusal box takes the press first
+          const c = buyConfirm?.entryAt(x, y);
+          if (c?.action === 'continue') return confirmYes();
+          if (buyConfirm?.outside(x, y)) declineConfirm();
+          return true;
+        }
         const hit = menu.hireAt(x, y, w, h);
         if (hit?.cancel) { ui.end(); return true; }
         if (hit?.row !== undefined) { const o = v.offers[hit.row]; if (o) ui.hire(o.mercName); }
@@ -125,8 +148,8 @@ export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor
       if (v.mode === 'trade' || v.mode === 'gamble') {
         if (confirm) {
           const hit = buyConfirm?.entryAt(x, y);
-          if (hit?.action === 'yes') return confirmYes();
-          if (hit?.action === 'no' || buyConfirm?.outside(x, y)) closeConfirm();
+          if (hit?.action === 'yes' || hit?.action === 'continue') return confirmYes();
+          if (hit?.action === 'no' || buyConfirm?.outside(x, y)) declineConfirm();
           return true;
         }
         if (vendor.contains(x, y, w, h)) {
@@ -179,10 +202,23 @@ export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor
      * to the menu with no 0x30 for a key.
      */
     escape() {
-      if (confirm) { closeConfirm(); return true; }
+      if (confirm) { declineConfirm(); return true; }
       if (current()?.mode === 'speech') { if (gate.pointerDown(0, now()) !== 'consumed') { gateKey = null; ui.dismissSpeech(); } return true; }
       return ui.end();
     },
+    /**
+     * A repair click that needs repair opens the Repair box over the NPC: 'Repair', the item's name, 'Gold:', the cost, Yes / No.
+     * Nothing is sent until Yes, which calls send(). False when the shop is not open or a box is already up.
+     */
+    askRepair(itemGuid, name, cost, send) {
+      const v = current();
+      if (!v || (v.mode !== 'trade' && v.mode !== 'gamble') || confirm) return false;
+      confirm = { kind: 'repair', guid: itemGuid, send };
+      buyConfirm?.show(v.guid, 0, [text(REPAIR_TITLE_STRING) || 'Repair', String(name ?? '').split('\n').filter(Boolean).at(-1) ?? '', text(GOLD_STRING) || 'Gold:', String(Math.trunc(cost) | 0)],
+        [{ stringId: YES_STRING, action: 'yes' }, { stringId: NO_STRING, action: 'no' }]);
+      return true;
+    },
+    get confirmOpen() { return confirm !== null; },
     /** Called each frame: an NPC that left the scene ends its conversation. */
     checkScene(sceneMonsters) {
       const v = current();

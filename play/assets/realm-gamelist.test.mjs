@@ -77,7 +77,8 @@ test('rows are gathered a frame at a time and shown when the closing frame arriv
 });
 
 test('a reply to an older list request is dropped, status -2 shows the list and status -1 empties it', () => {
-  const { list, shown } = fixture();
+  let refused = 0;
+  const { list, shown } = fixture({ onRefused: () => { refused++; } });
   list.request(); list.request();
   shown.length = 0;
   list.frame({ op: 0x05, body: listReply(2, 1, 1, 4, 'Old', '') });
@@ -87,15 +88,16 @@ test('a reply to an older list request is dropped, status -2 shows the list and 
   list.request(); shown.length = 0;
   list.frame({ op: 0x05, body: listReply(4, 1, 1, 4, 'Gone', '') });
   list.frame({ op: 0x05, body: listReply(4, 0, 0, 0xffffffff, '', '') });
-  assert.deepEqual(shown, [[]]);
+  assert.deepEqual(shown, []); // status -1 (0x32): the panel is left as it was, the refusal is reported (D2Multi 0xDAE0)
+  assert.equal(refused, 1);
 });
 
-test('a hardcore character asks with the hardcore flag, and a request left unanswered is shown empty by the next', () => {
+test('a hardcore character asks with the hardcore flag, and a request left unanswered keeps the rows on show', () => {
   const { list, sent, shown } = fixture({ hardcore: true });
   list.request();
   assert.deepEqual(sent[0], [0x05, 2, 0, 0x00, 0x08, 0, 0, 0]);
   list.request();
-  assert.deepEqual(shown, [[]]);
+  assert.deepEqual(shown, []);
 });
 
 test('names and descriptions are cut to the list entry sizes', () => {

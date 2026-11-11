@@ -66,6 +66,24 @@ test('trade opens at the menu click, buys with the item mode and the multi flag,
   assert.equal(npc.takeResult(), null);
 });
 
+test('a refusal opens the box only while a buy, sell or repair waits, and Continue ends sell and repair mode', () => {
+  const { npc } = fresh();
+  npc.handle(info(GUID, [])); npc.choose({ action: 'trade' }); npc.handle(stockPacket(11, 7, 1));
+  const reply = (r) => { const t = new Uint8Array(15); t[0] = 0x2a; t[2] = r; npc.handle(t); };
+  reply(12);                                              // nothing waiting (0xBC9663 != 5): 0x4BC80 does not call 0x4B5D0
+  assert.equal(npc.view().refusal, 0);
+  npc.setRepairMode(true); assert.ok(npc.repair(3));
+  reply(0); assert.equal(npc.view().refusal, 0);          // success: idle again
+  reply(12); assert.equal(npc.view().refusal, 0);         // a late refusal with nothing waiting
+  assert.ok(npc.repair(3)); reply(12);
+  assert.equal(npc.view().refusal, 3362);
+  assert.equal(npc.dismissRefusal(), true);
+  assert.equal(npc.view().refusal, 0); assert.equal(npc.view().repairMode, false);
+  assert.equal(npc.dismissRefusal(), false);
+  assert.ok(npc.sell(3)); reply(9); assert.equal(npc.view().refusal, 3361);
+  npc.end(); assert.equal(npc.view(), null);
+});
+
 test('sell, repair and repair-all go to the open shop only', () => {
   const { npc, sent } = fresh();
   assert.equal(npc.sell(3), false);
@@ -133,7 +151,7 @@ const offerPacket = (mercName, seed) => Uint8Array.of(0x4e, mercName & 255, merc
 test('hire offers: 0x4F restarts the list, each 0x4E appends one; unknown stats stay null, never 0', () => {
   const r = fresh({ classId: 198, hireStats: (m) => (m === 5 ? { name: 'Ahmad', level: 12, life: 40, def: 9, cost: 310, skill: 'Fire' } : null) });
   r.npc.handle(info(GUID, []));                       // the menu build: 0x38 is sent here
-  r.npc.handle(offerPacket(5, 0x1234)); r.npc.handle(offerPacket(9, 0x99));
+  r.npc.handle(offerPacket(5, 0x34)); r.npc.handle(offerPacket(9, 0x99));
   assert.deepEqual(r.npc.view().offers.map((o) => [o.mercName, o.name, o.level]), [[5, 'Ahmad', 12], [9, '', null]]);
   r.npc.handle(Uint8Array.of(0x4f, 0));                // a new head: the list starts again
   assert.equal(r.npc.view().offers.length, 0);
@@ -194,4 +212,41 @@ test('the travel row needs the exact quest bit, and Tyrael his expansion game', 
   const tyrael = fresh({ classId: 367, questBit: () => true, expansion: () => false });
   tyrael.npc.handle(info(GUID, []));
   assert.equal(tyrael.npc.view().entries.some((e) => e.stringId === 22738), false);
+});
+
+test('an object\'s 0x27 line opens no conversation: it is held once for the scroll box (D2Client 0x7DE50 type 2)', () => {
+  const { npc, sent } = fresh();
+  const p = info(0x34, [[0, 396]]); p[1] = 2;
+  npc.handle(p);
+  assert.equal(npc.isOpen(), false); assert.deepEqual(sent, []);
+  assert.deepEqual(npc.takeObjectSpeech(), { guid: 0x34, stringId: 396 });
+  assert.equal(npc.takeObjectSpeech(), null);
+  const other = info(0x34, [[3, 396]]); other[1] = 2; npc.handle(other);   // the menu-3 branch speaks nothing
+  assert.equal(npc.takeObjectSpeech(), null);
+  npc.objectSpeechDone(0xffffffff, 396);
+  assert.deepEqual(sent, [[0x31, 255, 255, 255, 255, 0x8c, 1, 0, 0]]);
+});
+
+test('a hire refusal raises the box and Continue ends the conversation (D2Client 0x4B420)', () => {
+  const hireReady = () => {
+    const r = fresh({ classId: 198 });
+    r.npc.handle(info(GUID, [])); r.npc.choose({ action: 'hire' }); r.npc.hire(3);
+    return r;
+  };
+  const reply = (r, c) => { const t = new Uint8Array(15); t[0] = 0x2a; t[2] = c; r.npc.handle(t); };
+  let r = hireReady();
+  reply(r, 8);                                       // table slot 1: 0xD1E
+  assert.equal(r.npc.isOpen(), true);
+  assert.equal(r.npc.view().refusal, 0xd1e);
+  assert.equal(r.sent.at(-1)[0] === 0x30, false);
+  assert.equal(r.npc.dismissRefusal(), true);
+  assert.equal(r.sent.at(-1)[0], 0x30);
+  assert.equal(r.npc.isOpen(), false);
+  r = hireReady(); reply(r, 2); assert.equal(r.npc.view().refusal, 0xd21);   // outside the table: 0xD21
+  r = hireReady(); reply(r, 20); assert.equal(r.npc.view().refusal, 0xd21);
+  r = hireReady(); reply(r, 16); assert.equal(r.npc.view().refusal, 0xd1d);
+  r = hireReady(); reply(r, 6); assert.equal(r.npc.isOpen(), false);         // 3, 5, 6 leave the box down
+  r = hireReady(); reply(r, 7); assert.equal(r.npc.view().refusal, 0xd1e);
+  r = fresh({ classId: 198 }); r.npc.handle(info(GUID, [])); r.npc.choose({ action: 'hire' });
+  reply(r, 8); assert.equal(r.npc.view().refusal, 0);                        // no hire waiting (0xBC9663 != 10)
 });

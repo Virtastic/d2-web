@@ -20,6 +20,7 @@ import vm from 'node:vm';
 import { bindEngineProtocol, d2gsJoin } from './realm-client.mjs';
 import { createRealmWorld } from './realm-world.mjs';
 import { createItemTable } from './realm-tables.mjs';
+import { blockedClicks, endDiffers } from './realm-blocked-click.mjs';
 import { routeRealmPackets } from './realm-packet-routes.mjs';
 import { hashString, decrypt, mpqTables } from './mpq-index.mjs';
 import { readMpqFile } from './mpq-read.mjs';
@@ -137,7 +138,7 @@ function parseRecording(file) {
 export async function replay(records, { Module, protocol }, tables, named) {
   const sizeOf = (b) => protocol.d2gsPacketSize(b);
   const report = { server: 0, client: 0, ticks: 0, seen: new Map(), ignored: new Map(), refused: [], unframed: [], worldThrew: new Map(),
-    events: new Map(), inputsApplied: new Map(), inputsNotApplied: new Map(), firstPosition: null, firstMode: null, positionDiffs: 0, modeDiffs: 0, unitPackets: 0, unitSent: 0, unitExtra: 0, unitExtraFirst: null, unitRefused: [], unitLate: [], compared: 0, heroAbsent: 0, track: [], trace: [] };
+    samples: new Map(), events: new Map(), inputsApplied: new Map(), inputsNotApplied: new Map(), firstPosition: null, firstMode: null, positionDiffs: 0, modeDiffs: 0, unitPackets: 0, unitSent: 0, unitExtra: 0, unitExtraFirst: null, unitRefused: [], unitLate: [], compared: 0, heroAbsent: 0, track: [], trace: [] };
   const bump = (map, key) => map.set(key, (map.get(key) ?? 0) + 1);
   const world = createRealmWorld(tables);
 
@@ -269,6 +270,7 @@ export async function replay(records, { Module, protocol }, tables, named) {
     const [x, y, mode] = r.text.split(',').map(Number);
     const ours = protocol.d2gsClientPlayerState();
     report.track.push([x, y, ours?.active ? ours.x : null, ours?.active ? ours.y : null]);
+    report.samples.set(r, report.track[report.track.length - 1]);
     if (!ours?.active) { report.heroAbsent++; report.firstPosition ??= { tick: r.tick, retail: [x, y], ours: null }; report.firstMode ??= { tick: r.tick, retail: mode, ours: null }; continue; }
     report.compared++;
     const ourMode = ours.motion?.mode ?? ours.initialMode;
@@ -291,7 +293,8 @@ test('recorded play streams replay through the joined-game client', { skip }, as
   const ignoredAll = new Map();
   for (const file of recordings) {
     await t.test(file, async (t) => {
-      const report = await replay(parseRecording(path.join(STREAMS, file)), engine, tables, named);
+      const records = parseRecording(path.join(STREAMS, file));
+      const report = await replay(records, engine, tables, named);
       t.diagnostic(`${file}: ${report.server} server packets, ${report.client} client packets, ${report.ticks} ticks`);
       if (logonFields(report.join.logon) !== logonFields(report.join.recordedLogon)) t.diagnostic(`  logon differs: reference ${report.join.recordedLogon} ours ${report.join.logon}`);
       t.diagnostic(`  roster: ${report.roster.map((p) => `${p.name} level ${p.level}`).join(', ') || 'empty'}; session events: ${fmt(report.events)}`);
@@ -303,6 +306,12 @@ test('recorded play streams replay through the joined-game client', { skip }, as
       t.diagnostic(`  hero position: ${report.positionDiffs}/${report.compared} ticks differ, first ${report.firstPosition ? `tick ${report.firstPosition.tick} retail ${report.firstPosition.retail} ours ${report.firstPosition.ours}` : 'none'}`);
       t.diagnostic(`  hero position with ours read ${report.lag[0]} ticks later: ${report.lag[1]} ticks differ; hero absent on ${report.heroAbsent} ticks`);
       t.diagnostic(`  hero mode: ${report.modeDiffs}/${report.compared} ticks differ, first ${report.firstMode ? `tick ${report.firstMode.tick} retail ${report.firstMode.retail} ours ${report.firstMode.ours}` : 'none'}`);
+      // A click on a blocked point: the reference client's walk ended short of it. Our client takes the same click through
+      // d2_realm_client_local_move (D2Client 0x2A7C0's order) and must walk the same cells and stop on the same one.
+      const blocked = blockedClicks(records);
+      const missed = blocked.map((c) => ({ c, bad: endDiffers(records, report.samples, c) })).filter((m) => m.bad.length);
+      t.diagnostic(`  blocked clicks: ${blocked.length}, ends that differ from retail's: ${missed.length}${missed.length ? ` (first click tick ${missed[0].c.tick}, ${missed[0].bad.length} ticks, first ${missed[0].bad[0]})` : ''}`);
+      report.blocked = { clicks: blocked.length, missed };
       for (const line of report.trace) t.diagnostic(`  ${line}`);
       for (const [op, n] of report.ignored) ignoredAll.set(op, (ignoredAll.get(op) ?? 0) + n);
       assert.deepEqual(report.join.sent, ['68', '6b'], 'the join sends the logon and the enter request');
@@ -316,6 +325,7 @@ test('recorded play streams replay through the joined-game client', { skip }, as
         assert.deepEqual(report.refused, [], 'the client state takes every packet of the stream');
         assert.equal(report.ignored.size, 0, 'no opcode is ignored');
         assert.equal(logonFields(report.join.logon), logonFields(report.join.recordedLogon), 'the logon bytes equal the reference client\'s');
+        assert.deepEqual(report.blocked.missed, [], 'a click on a blocked point ends where the reference client\'s walk ended');
         assert.equal(report.firstPosition, null, 'the hero is where the reference client had it on every tick');
         assert.equal(report.firstMode, null, 'the hero is in the reference client\'s mode on every tick');
       }

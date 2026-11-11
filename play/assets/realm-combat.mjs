@@ -102,7 +102,13 @@ export function createRealmUnits({ rowOf, unitInfo = () => null, hostilePlayer =
  * hit taken this tick, so the trigger plays the hit as it does in a local game; a unit with no life from the server
  * carries none and the trigger keys on its modes alone.
  */
-export function realmCombatSoundFrame(snapshot, views, hero, castSkillId, hitClassOf, hitOf) {
+/**
+ * Whether the activations the client took this frame include a shrine's (0x4D on an object, shrine code 1..22): the shrine
+ * effects (Storm, fire, exploding) remove hit points with no hit, so the life that drops in the same frame is no struck-unit
+ * cue. The activations are the client's own (d2gsClientTakeObjectEvents), not a read of the engine's shrine queue.
+ */
+export const shrineDirectHpLoss = (events) => (events ?? []).some((e) => e.shrine >= 1 && e.shrine <= 22);
+export function realmCombatSoundFrame(snapshot, views, hero, castSkillId, hitClassOf, hitOf, directHpLoss = false) {
   const byGuid = new Map((views ?? []).map((m) => [m.guid, m]));
   const struck = (type, id) => (hitOf?.(type, id) !== undefined ? { hitPacket: true } : null);
   const entities = (snapshot?.entities ?? []).filter((e) => e.type === 0 || e.type === 1)
@@ -110,6 +116,6 @@ export function realmCombatSoundFrame(snapshot, views, hero, castSkillId, hitCla
     .map((e) => ({ ...e, ...(hitClassOf ? { lastHitClass: hitClassOf(e.type, e.id) } : null), ...struck(e.type, e.id) }));
   const mine = hero?.source === 'realm' && hero.renderState;
   if (mine) entities.push({ type: 0, id: hero.guid, classId: hero.classId, mode: hero.renderState.mode, ...(hitClassOf ? { lastHitClass: hitClassOf(0, hero.guid) } : {}), ...struck(0, hero.guid) });
-  return { entities, frame: { ...snapshot, playerId: mine ? hero.guid : undefined,
+  return { entities, frame: { ...snapshot, directHpLoss, playerId: mine ? hero.guid : undefined,
     player: { ...snapshot?.player, castSkillId, framePrecise: mine ? hero.renderState.framePrecise : undefined } } };
 }

@@ -145,6 +145,16 @@ test('either hand\'s skill is started locally first; a refused start sends nothi
     ['at', 0, 100, 120], ['at', 0, 100, 120], ['unit', 1, 1, 77], ['unit', 0, 1, 77]]);
 });
 
+test('a refused right-hand start speaks the client\'s refusal line; left, held and started casts stay silent', () => {
+  const heard = []; let event = 0x15;
+  const make = (result) => { const out = []; return { out, input: createRealmInput({ transmit: (b) => out.push(Array.from(b)), scene: sceneOf({}), now: () => 0,
+    skillAt: () => result, skillOnUnit: () => result, refusalSound: () => event, onRefused: (e) => heard.push(e) }) }; };
+  let h = make(0); assert.equal(h.input.rightClick(200, 120), false); assert.deepEqual(h.out, []); assert.deepEqual(heard, [0x15]);
+  event = 0x13; h.input.rightClick(200, 120); assert.deepEqual(heard, [0x15, 0x13]);
+  h.input.rightClick(200, 120, { held: true }); h.input.leftClick(200, 120, { stand: true }); assert.equal(heard.length, 2);
+  h = make(1); h.input.rightClick(200, 120); assert.equal(heard.length, 2);
+});
+
 // The server ignores a talk from 9 or more tiles; a far person is approached and talked to on arrival.
 test('a far person is approached first and talked to once in range; items and objects walk there locally', () => {
   const moves = []; let scene = sceneOf({ monsters: [{ guid: 78, classId: 99, mode: 1, x: 120, y: 100, anchorX: 200, anchorY: 120, drawn: true }] })();

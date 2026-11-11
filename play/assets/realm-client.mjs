@@ -152,11 +152,19 @@ export function parseRealmList(body) {
   return list;
 }
 /**
- * The realm named in the realm logon (0x3e) is one the server just listed, by the title it gave; the configured name is only a fallback
- * for a server that lists none. GUESS: with several realms listed retail's choice was not traced (the first is taken here); the caller
- * of the client library's realm-logon routine in the launcher would settle it.
+ * The realm named in the realm logon (0x3e). Retail (D2Launch 0x4C430 / 0x4D5D0 set the name up, 0x5A320 sends it through the BNClient
+ * realm-logon routine) sorts the listed realms by title (a byte compare), then takes the saved "Preferred Realm" when a listed realm
+ * matches it ignoring case, else the current gateway's realm name when a listed realm matches that, else the first of the sorted list;
+ * the name sent is the saved string as stored, not the listed spelling. A list of none is a failure screen there and no logon; ours
+ * falls back to the configured name for a server that lists none (a deliberate difference).
  */
-export const realmLogonTitle = (realmList, configured) => realmList[0]?.title || configured;
+export function realmLogonTitle(realmList, configured, preferred = '') {
+  if (!realmList.length) return configured;
+  const listed = (name) => !!name && realmList.some((r) => r.title.toLowerCase() === name.toLowerCase());
+  if (listed(preferred)) return preferred;
+  if (listed(configured)) return configured;
+  return realmList.map((r) => r.title).sort((x, y) => (x < y ? -1 : x > y ? 1 : 0))[0];
+}
 
 /**
  * What the character-create screen says when the realm refuses the new character: result 0x14 is the name already in use, any other
@@ -638,7 +646,7 @@ export async function bncsChangeEmail(transport, protocol, { account, oldEmail, 
  * Returns the challenge the server issued, the realm list it advertised, and the LOGONREALMEX
  * handoff (the MCP ticket) -- the read offsets the server cannot check for us.
  */
-export async function bncsLogin(transport, protocol, { account, password, realm = 'd2-web', product = 'D2XP', auth = null, timeoutMs = BNCS_REPLY_MS } = {}) {
+export async function bncsLogin(transport, protocol, { account, password, realm = 'd2-web', preferredRealm = '', product = 'D2XP', auth = null, timeoutMs = BNCS_REPLY_MS } = {}) {
   const reader = makeReader(transport);
   const sent = [], received = [];
   const send = (id, body) => { const frame = protocol.bncsFrame(id, body); sent.push({ id, bytes: frame.length }); transport.send(frame); };
@@ -705,7 +713,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
   if (realms.id !== 0x40) throw new Error(`expected QUERYREALMS2 reply 0x40, got 0x${realms.id.toString(16)}`);
   const realmList = parseRealmList(realms.body);
 
-  send(0x3e, protocol.bncsRealmEx({ clientToken: protocol.realmToken(), serverToken, realm: realmLogonTitle(realmList, realm), password }));
+  send(0x3e, protocol.bncsRealmEx({ clientToken: protocol.realmToken(), serverToken, realm: realmLogonTitle(realmList, realm, preferredRealm), password }));
   const realmEx = await readBncsFrame(reader, timeoutMs, true, 0x3e); received.push(realmEx.id);
   if (realmEx.id !== 0x3e) throw new Error(`expected LOGONREALMEX reply 0x3e, got 0x${realmEx.id.toString(16)}`);
   // MCPStatus is 0 or 1 on success: the engine's own server sends 1, a stock Battle.net realm sends 0,

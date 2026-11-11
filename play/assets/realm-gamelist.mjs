@@ -65,23 +65,28 @@ const CLASS_NAMES = ['Amazon', 'Sorceress', 'Necromancer', 'Paladin', 'Barbarian
  * in the string tables): the description if any, the elapsed time, the level range when the game has one, the
  * player limit when it is under eight, then each character's name and `Level N Class`.
  */
-export function gameInfoLines(info) {
-  const lines = [], two = (n) => String(n).padStart(2, '0');
-  // GUESS: the blank line after the description and the one before the characters (two text-box appends whose
-  // arguments were not traced); a retail frame of the info box with a described, populated game would settle it.
-  if (info.description) lines.push(info.description, '');
-  lines.push(`Elapsed Time: ${Math.trunc(info.uptime / 3600)}:${two(Math.trunc((info.uptime % 3600) / 60))}:${two(info.uptime % 60)}`);
+export function gameInfoLines(info) { return gameInfoRows(info).map((r) => r.text); }
+/**
+ * The same lines with their colours: D2Multi 0x13280 appends every line through the default-colour appender (D2Win 0x97C0,
+ * colour 4) except each character's `Level N Class` line, which it appends through D2Win 0x9740 with colour 5.
+ */
+export function gameInfoRows(info) {
+  const rows = [], two = (n) => String(n).padStart(2, '0'), push = (text, colour = 4) => rows.push({ text, colour });
+  // The two blank lines are the empty-string appends D2Multi's info builder (0x13280) makes after the description and
+  // before the characters.
+  if (info.description) { push(info.description); push(''); }
+  push(`Elapsed Time: ${Math.trunc(info.uptime / 3600)}:${two(Math.trunc((info.uptime % 3600) / 60))}:${two(info.uptime % 60)}`);
   if (info.levelDifference < 100) {
-    lines.push(info.levelDifference === 0 ? `Level ${info.level}`
+    push(info.levelDifference === 0 ? `Level ${info.level}`
       : `Level ${Math.max(1, info.level - info.levelDifference)} to ${Math.min(99, info.level + info.levelDifference)}`);
   }
-  if (info.maxPlayers !== 0 && info.maxPlayers < 8) lines.push(`Up to ${info.maxPlayers} Players`);
-  lines.push('');
+  if (info.maxPlayers !== 0 && info.maxPlayers < 8) push(`Up to ${info.maxPlayers} Players`);
+  push('');
   for (const c of info.characters) {
     if (!c.name) continue;
-    lines.push(c.name, CLASS_NAMES[c.charClass] ? `Level ${c.level} ${CLASS_NAMES[c.charClass]}` : `Level ${c.level}`);
+    push(c.name); push(CLASS_NAMES[c.charClass] ? `Level ${c.level} ${CLASS_NAMES[c.charClass]}` : `Level ${c.level}`, 5);
   }
-  return lines;
+  return rows;
 }
 
 /**
@@ -89,17 +94,18 @@ export function gameInfoLines(info) {
  * request counter (shared with create and join). `frame({ op, body })` takes every realm frame and returns true
  * for the ones it used. `onGames(rows)` gets the list each time it is shown; `onInfo(lines)` a picked game's text.
  */
-export function createMcpGameList({ send, nextId, hardcore = false, onGames = () => {}, onInfo = () => {}, now = () => Date.now() }) {
-  let listId = -1, rows = [], open = false;
+export function createMcpGameList({ send, nextId, hardcore = false, onGames = () => {}, onInfo = () => {}, onRefused = () => {}, now = () => Date.now() }) {
+  let listId = -1, rows = [], shownRows = [], open = false, lastInfo = null;
   let pending = null, infoId = -1, infoTick = -Infinity;
-  const show = () => { open = false; onGames(rows.map((r) => ({ ...r }))); };
+  const show = () => { open = false; shownRows = rows; onGames(rows.map((r) => ({ ...r }))); };
   return {
     /** Ask for the list (the panel opening, and every 15 s while it is open). */
     request() {
-      // The realm this project is tested against answers an empty list with nothing at all, so a request that got
-      // no closing frame is closed here, by the next one. GUESS: retail keeps its rows until a reply says otherwise;
-      // a capture of a retail client against a realm that goes empty would settle which.
-      if (open) show();
+      // Retail's request resets only the staging table (D2Multi 0xDAE0 / D2MCPClient 0x63E0); the rows on show stay
+      // until a closing frame publishes the staged ones. PvPGN's d2cs sends no reply for an empty list
+      // (handle_d2cs.cpp), so an emptied realm leaves the last list up.
+      // Status 0xFFFFFFFF is not an empty list: retail (D2MCPClient 0x63E0 files it as code 0x32, D2Multi 0xDAE0 acts on it) tears the
+      // join panel down and raises a notice; only 0xFFFFFFFE (code 0x33) and a closing frame publish the staged rows.
       listId = nextId(); rows = []; open = true;
       send(MCP_GAMELIST, mcpGameListBody(listId, { hardcore }));
       return listId;
@@ -116,7 +122,7 @@ export function createMcpGameList({ send, nextId, hardcore = false, onGames = ()
       if (op === MCP_GAMELIST) {
         const r = parseMcpGameListReply(body);
         if (!r || r.requestId !== listId) return true;   // an answer to an older request is dropped
-        if (r.status === 0xffffffff) { rows = []; show(); }
+        if (r.status === 0xffffffff) { rows = []; shownRows = []; open = false; onRefused(); }
         else if (r.status === 0xfffffffe || r.end) show();
         // One row per game index (its low word): the name is cut to 15 bytes and the description to 31.
         else if (!rows.some((g) => (g.index & 0xffff) === (r.index & 0xffff)))
@@ -126,13 +132,15 @@ export function createMcpGameList({ send, nextId, hardcore = false, onGames = ()
       if (op === MCP_GAMEINFO) {
         const r = parseMcpGameInfoReply(body);
         if (!r || r.requestId !== infoId) return true;
-        // GUESS: a refused info request (status -1 or -2) leaves the box empty; the client's branch for those two
-        // results was not read.
-        if (r.status < 0xfffffffe) onInfo(gameInfoLines(r));
+        // A refused request (status -1 or -2) shows the previous record again with its header refreshed (D2Multi
+        // 0x13280 renders the kept record whatever the status); nothing is shown if there was none.
+        if (r.status < 0xfffffffe) lastInfo = r;
+        else if (lastInfo) lastInfo = { ...lastInfo, requestId: r.requestId, status: r.status };
+        if (lastInfo) { const rs = gameInfoRows(lastInfo); onInfo(rs.map((x) => x.text), rs.map((x) => x.colour)); }
         return true;
       }
       return false;
     },
-    get rows() { return rows.map((r) => ({ ...r })); },
+    get rows() { return shownRows.map((r) => ({ ...r })); },
   };
 }

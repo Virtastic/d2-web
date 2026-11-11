@@ -41,6 +41,10 @@ export function createRealmNpcUi({ npc }) {
     hire: (mercName) => npc.hire(mercName),
     /** The armed buy was dropped (the offer rule's disarm): the screen closes its confirm box. */
     disarm: () => true,
+    /** The Repair box was declined: Repair mode ends. */
+    endRepair: () => { npc.setRepairMode(false); return true; },
+    /** Continue on the refusal box (0x4AAF0): the box closes, the cursor modes end. */
+    dismissRefusal: () => npc.dismissRefusal(),
     /**
      * A carried item was clicked: sold when sell mode is armed, repaired when repair mode is armed. `info` is read
      * from the item: { mode, durability (stat 0x48), cost (the displayed price) }.

@@ -10,7 +10,7 @@ import { npcMenuEntries, talkEntries, entriesAfterSpeech, withTravelRow, withHir
 import { npcPackets, NPC_ACTION, SELL_MODE, parseNpcInfo, parseTransaction, parseShopItem, parseHireOffer, HIRE_LIST_HEAD } from './realm-npc-packets.mjs';
 import { decodeItemHeader } from './realm-world.mjs';
 import { packets, UNIT } from './realm-input.mjs';
-import { refusalString } from './vendor-repair-confirm.mjs';
+import { refusalString, hireRefusalString } from './vendor-repair-confirm.mjs';
 
 const MENU_SPEECH = 0;   // messages with this menu number are spoken at once; menu 2 are the Talk box's quest topics
 /** The hirers whose menu build sends the hire list request (0x48B20: classes 0x96, 0xC6, 0xFC, 0x203). */
@@ -35,11 +35,17 @@ export function createRealmNpc({ send, classOf = () => -1, questDone = () => fal
   let npc = null;            // { guid, classId, messages, entries, speech, spoken, mode, offers }
   let stock = new Map();     // item guid -> { guid, bits, tab, x, y }
   let result = null;         // the last transaction outcome
+  // D2Client 0xBC9663 == 5: a buy, sell or repair (0x46EE0's 0x32 / 0x33 / 0x35) is waiting for its 0x2A. 0x4BC80 hands the reply to
+  // 0x4B5D0 only then; with nothing waiting a reply above 6 opens no box.
+  let tradePending = false;
+  let hirePending = false;   // D2Client 0xBC9663 == 10: 0x46C00 sent the 0x36 and its 0x2A is due
+  let refusal = 0;           // the string id of the open refusal box (0x4B5D0's red message over Continue), 0 when none
   let sellMode = false, repairMode = false;
 
   function close(notify) {
+    hirePending = false;
     if (npc && notify) send(chatEnd(npc.guid));
-    npc = null; stock = new Map(); sellMode = false; repairMode = false;
+    npc = null; stock = new Map(); sellMode = false; repairMode = false; tradePending = false; refusal = 0;
   }
 
   function menuFor(classId) {
@@ -50,7 +56,16 @@ export function createRealmNpc({ send, classOf = () => -1, questDone = () => fal
   /** The menu is shown; its hire request went out when the conversation opened. */
   function openMenu() { npc.mode = 'menu'; }
 
+  // D2Client 0x7DE50 (the 0x27 handler's body), unit type 2: a quest object speaks through the scroll box (0x7D200) with the
+  // string id at +10; no conversation opens and nothing is sent. A line whose menu byte (+8) is 3 takes the other branch (0x7C8F0).
+  let objectLine = null;
+  function onObjectInfo(info) {
+    const m = info.messages[0];
+    if (m && m.menu !== 3) objectLine = { guid: info.guid, stringId: m.stringId };
+  }
+
   function onInfo(info) {
+    if (info.unitType === 2) { onObjectInfo(info); return; }
     const classId = classOf(info.guid);
     const messages = [...info.messages].sort((a, b) => a.stringId - b.stringId);
     const speech = messages.filter((m) => m.menu === MENU_SPEECH);
@@ -87,7 +102,21 @@ export function createRealmNpc({ send, classOf = () => -1, questDone = () => fal
     handle(p) {
       switch (p[0]) {
         case 0x27: { const info = parseNpcInfo(p); if (info) onInfo(info); break; }
-        case 0x2a: { const t = parseTransaction(p); if (t) { result = { ...t, refusal: refusalString(t.result) }; if (npc?.mode === 'hire' && t.result <= 6) close(true); } break; }
+        case 0x2a: {
+          const t = parseTransaction(p);
+          if (!t) break;
+          result = { ...t, refusal: refusalString(t.result) };
+          if (npc?.mode === 'hire' && hirePending) {
+            // D2Client 0x4B420 (0xBC9663 == 10): 3, 5, 6 and the success reply 0 end the conversation; 1, 2, 4 and above 6 raise the refusal box.
+            hirePending = false;
+            const h = t.result === 0 ? 0 : hireRefusalString(t.result);
+            if (h) refusal = h; else close(true);
+            break;
+          }
+          if (npc?.mode === 'hire' && t.result <= 6) close(true);
+          if (tradePending) { tradePending = false; if (npc && result.refusal > 0) refusal = result.refusal; }   // 0x4B5D0: above 6 the box; else back to idle (0xBC9663 = 3)
+          break;
+        }
         case 0x9c: { const item = parseShopItem(p); if (item) onShop(item); break; }
         case HIRE_LIST_HEAD: if (npc) npc.offers = []; break;
         case 0x4e: { const offer = parseHireOffer(p); if (offer && npc) onOffer(offer); break; }
@@ -101,11 +130,15 @@ export function createRealmNpc({ send, classOf = () => -1, questDone = () => fal
         api.handle(bytes.subarray(at, at + n)); at += n;
       }
     },
+    /** The object's line the last 0x27 delivered, once: { guid, stringId } or null. */
+    takeObjectSpeech() { const l = objectLine; objectLine = null; return l; },
+    /** The scroll's lifecycle ended (0x7D200 then 0x2CEF0): the server is told which line it was, with the guid the caller names. */
+    objectSpeechDone(guid, stringId) { send(npcPackets.messageDone(guid >>> 0, stringId)); return true; },
     /** What the shell draws: null when no NPC is open. */
     view() {
       if (!npc) return null;
       return { guid: npc.guid, classId: npc.classId, mode: npc.mode, entries: npc.entries, speech: npc.speech[npc.spoken] ?? null,
-        stock: [...stock.values()], offers: npc.offers, result, sellMode, repairMode };
+        stock: [...stock.values()], offers: npc.offers, result, sellMode, repairMode, refusal };
     },
     isOpen: () => npc !== null,
     shopOpen: () => npc !== null && (npc.mode === 'trade' || npc.mode === 'gamble'),
@@ -162,26 +195,33 @@ export function createRealmNpc({ send, classOf = () => -1, questDone = () => fal
       if (!item || !api.shopOpen()) return false;
       // With no price seam (unwired test or no player) the packet's cost field is 0.
       const cost = api.priceOf(itemGuid) ?? 0;
-      send(npcPackets.buy(npc.guid, itemGuid, item.mode ?? 0, cost, { gamble: npc.mode === 'gamble', multi })); return true;
+      send(npcPackets.buy(npc.guid, itemGuid, item.mode ?? 0, cost, { gamble: npc.mode === 'gamble', multi })); tradePending = true; return true;
     },
     /** Sell a carried item: `info` is { mode, cost } read from the item (its own mode, the displayed price). */
     sell(itemGuid, mode = SELL_MODE.STORED, cost = 0) {
       if (!api.shopOpen()) return false;
-      send(npcPackets.sell(npc.guid, itemGuid, mode, cost)); return true;
+      send(npcPackets.sell(npc.guid, itemGuid, mode, cost)); tradePending = true; return true;
     },
     /** Repair one carried item: its mode and durability stat go in the packet. */
     repair(itemGuid, mode = 0, durability = 0) {
-      if (!api.shopOpen()) return false; send(npcPackets.repair(npc.guid, itemGuid, mode, durability)); return true;
+      if (!api.shopOpen()) return false; send(npcPackets.repair(npc.guid, itemGuid, mode, durability)); tradePending = true; return true;
     },
-    repairAll() { if (!api.shopOpen()) return false; send(npcPackets.repairAll(npc.guid)); return true; },
+    repairAll() { if (!api.shopOpen()) return false; send(npcPackets.repairAll(npc.guid)); tradePending = true; return true; },
     hire(hirelingId) {
       if (!npc || npc.mode !== 'hire') return false;
-      send(npcPackets.hire(npc.guid, hirelingId)); return true;   // the conversation ends on the 0x2A result
+      send(npcPackets.hire(npc.guid, hirelingId)); hirePending = true; return true;   // the conversation ends on the 0x2A result
     },
     /** A gambled item is bought unidentified; this identifies it. */
     identifyGambled(itemGuid) { send(npcPackets.identifyGambled(itemGuid)); return true; },
     setSellMode(on) { sellMode = Boolean(on); if (on) repairMode = false; },
     setRepairMode(on) { repairMode = Boolean(on); if (on) sellMode = false; },
+    /** Continue on the refusal box (D2Client 0x4AAF0 then 0x8F630 / 0x8D300): the box closes and the cursor drops to mode 1, ending sell and repair mode. */
+    dismissRefusal() {
+      if (!refusal) return false;
+      refusal = 0; sellMode = false; repairMode = false;
+      if (npc?.mode === 'hire') close(true);   // the hire box's Continue is 0x4AAF0 -> 0x47B20: the conversation ends (0x30)
+      return true;
+    },
     takeResult() { const r = result; result = null; return r; },
   };
   return api;

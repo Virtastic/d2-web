@@ -25,6 +25,8 @@ export const CONTINUE_STRING = 3403;       // 0xd4b "Continue"
 // enough gold) is 3362 "You do not have enough gold for that.". The engine's d2_client_4b5d0_refusal_string is the
 // same table.
 export const REFUSAL_STRINGS = [0xd1e, 0xd1e, 0xd21, 0xd1c, 0xd20, 0xd22, 0xd21, 0xd21, 0xd23, 0xd1d];
+/** D2Client 0x4B420 (the hire window's reply): 3, 5 and 6 leave the box down; every other code opens it, the table for 7..16 and 0xD21 otherwise. */
+export const hireRefusalString = (code) => (code === 3 || code === 5 || code === 6 ? 0 : code >= 7 && code <= 16 ? REFUSAL_STRINGS[code - 7] : 0xd21);
 export const refusalString = (code) => (!(code > 6) ? 0 : code <= 16 ? REFUSAL_STRINGS[code - 7] : 0xd21);
 
 /**

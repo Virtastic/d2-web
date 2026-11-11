@@ -78,7 +78,7 @@ import { createExperienceTable, createWaypointTable, createSkillTable } from './
 import { createRealmWorld } from './assets/realm-world.mjs';
 import { createRealmNpc } from './assets/realm-npc-state.mjs';
 import { realmAreaLevel, createRealmAreaAudio } from './assets/realm-world-audio.mjs';
-import { createRealmUnits, realmCombatSoundFrame } from './assets/realm-combat.mjs';
+import { createRealmUnits, realmCombatSoundFrame, shrineDirectHpLoss } from './assets/realm-combat.mjs';
 import { createRealmUnitFx, playRealmUnitSound } from './assets/realm-unit-fx.mjs';
 import { createRealmEventSoundFeed } from './assets/realm-event-sounds.mjs';
 import { createLoadCompleteOrder, worldDownScreen } from './assets/realm-world-order.mjs';
@@ -1913,7 +1913,8 @@ function lobbyRealmGames(name) {
   const list = createMcpGameList({ send: (op, body) => rc.mcpSend(session, op, body), nextId: () => rc.mcpNextRequestId(session),
     hardcore: Boolean(lobbyCharacter(name)?.hardcore),
     onGames: (rows) => { if (!live()) return; bnetLobbyScreen?.setGames(rows, rows, false); render(); },
-    onInfo: (lines) => { if (!live()) return; bnetLobbyScreen?.setGameInfo(lines); render(); } });
+    onInfo: (lines, colours) => { if (!live()) return; bnetLobbyScreen?.setGameInfo(lines, colours); render(); },
+    onRefused: () => { if (!live()) return; bnetLobbyScreen?.listRefused(); render(); } });
   rc.mcpListen(session, (frame) => list.frame(frame));
   // A refused logon is reported by the create or join that needs it; the list simply stays empty.
   const ready = rc.mcpLogonCharacter(session, name).then(() => true, () => false);
@@ -3243,7 +3244,7 @@ function advanceRealmClientUnits(forced) {
     return 0;
   }
   let ticks = 0;
-  const tickClientUnits = () => { realmFlow.protocol.d2gsClientMotionTick(); realmAnimationFrame++; for (const used of realmFlow.protocol.d2gsClientTakeObjectEvents()) if (used.soundRow) unitSounds?.playRow(used.soundRow, { source: 'object-use', unitId: used.playerId }).catch(() => {}); realmAreaAudio.step(realmAreaLevel(realmPlayerView, realmWorldView), realmAnimationFrame); ambient?.tick(1).catch(() => {}); realmChromeTick(); if (eventSounds && snapshot && !session) (realmEventFeed ??=createRealmEventSoundFeed(eventSounds)).tick(snapshot, readAdvancement()?.level, realmWorldState); };
+  const tickClientUnits = () => { realmFlow.protocol.d2gsClientMotionTick(); realmAnimationFrame++; { const uses = realmFlow.protocol.d2gsClientTakeObjectEvents(); if (shrineDirectHpLoss(uses)) realmShrineUse = true; for (const used of uses) if (used.soundRow) unitSounds?.playRow(used.soundRow, { source: 'object-use', unitId: used.playerId }).catch(() => {}); } realmAreaAudio.step(realmAreaLevel(realmPlayerView, realmWorldView), realmAnimationFrame); ambient?.tick(1).catch(() => {}); realmChromeTick(); if (eventSounds && snapshot && !session) (realmEventFeed ??=createRealmEventSoundFeed(eventSounds)).tick(snapshot, readAdvancement()?.level, realmWorldState); };
   if (forced) { realmGameClock = 0; tickClientUnits(); ticks = 1; }
   else {
     realmGameClock += STEP;
@@ -3255,7 +3256,8 @@ function advanceRealmClientUnits(forced) {
   }
   if (ticks) {
     { const fx = realmFlow.protocol.d2gsClientTakeUnitFx?.(), me = selectedPlayerSource()?.guid; if (fx) realmUnitFx?.step(fx.events, fx.tick, (e) => e.unitType === 0 && e.unitGuid === me); } // the selected player's own start sounds stay with the combat cues above
-    if (combatSounds && snapshot) { const f = realmCombatSoundFrame(snapshot, realmMonsterViews, selectedPlayerSource(), readSelectedSkills()[castHand], realmFlow.protocol.d2gsClientUnitHitClass, realmUnitFx?.hitOf); combatSounds.update(f.entities, f.frame); }
+    if (combatSounds && snapshot) { const f = realmCombatSoundFrame(snapshot, realmMonsterViews, selectedPlayerSource(), readSelectedSkills()[castHand], realmFlow.protocol.d2gsClientUnitHitClass, realmUnitFx?.hitOf, realmShrineUse); combatSounds.update(f.entities, f.frame); }
+    realmShrineUse = false;
     for (const event of realmFlow.protocol.d2gsClientTakeMissileSounds?.() ?? [])
       unitSounds?.playRow(event.soundRow, event).catch((error) => console.warn('Missile impact sound', error));
     realmPlayerRosterView = realmFlow.protocol.d2gsClientPlayers?.() ?? realmPlayerRosterView;
@@ -3270,10 +3272,16 @@ function advanceRealmClientUnits(forced) {
 // S2: play what the engine attached to units this tick (d2_session_take_sounds), through the retail resolver.
 // F157: an OBJECT's quest message (packet 0x27 on an object, e.g. Anya's plea from her ice) is drawn as the speech box;
 // native 1.13c scroll responses use GUID -1 and the offered string ID for the known object-scroll IDs.
-let objectSpeech = null, objectMsgBuf = 0;
+let objectSpeech = null, objectMsgBuf = 0, realmShrineUse = false;   // a shrine activation the client took since the last combat-sound frame
 const objectSpeechClickGate = createNpcSpeechClickGate();
 function pollObjectSpeech() {
-  if (objectSpeech || !session || screen !== SCREEN.GAME || !Module._d2_session_take_object_message) return;
+  if (objectSpeech || !session || screen !== SCREEN.GAME) return;
+  if (clientView().fromPackets) {   // a game drawn from packets: the 0x27 the client received (D2Client 0x7DE50, unit type 2), not the engine's queue
+    const line = realmNpc().takeObjectSpeech();
+    if (line) { objectSpeech = { guid: line.guid, stringId: line.stringId, text: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [line.stringId]) }; objectSpeechClickGate.begin(performance.now()); }
+    return;
+  }
+  if (!Module._d2_session_take_object_message) return;
   if (!objectMsgBuf) objectMsgBuf = Number(Module.ccall('malloc', 'bigint', ['number'], [8]));
   if (!Module.ccall('d2_session_take_object_message', 'number', ['bigint'], [BigInt(objectMsgBuf)])) return;
   const v = new Int32Array(Module.HEAPU8.buffer.slice(objectMsgBuf, objectMsgBuf + 8));
@@ -3284,7 +3292,8 @@ function dismissObjectSpeech() {
   const m = objectSpeech; objectSpeech = null;
   objectSpeechClickGate.cancel();
   const acknowledgement = nativeObjectSpeechAcknowledgement(m);
-  if (acknowledgement) Module.ccall('d2_session_command_npc_response_packet', 'number', ['number', 'number'], [acknowledgement.guid, acknowledgement.stringId]);
+  if (acknowledgement && clientView().fromPackets) realmNpc().objectSpeechDone(acknowledgement.guid, acknowledgement.stringId);
+  else if (acknowledgement) Module.ccall('d2_session_command_npc_response_packet', 'number', ['number', 'number'], [acknowledgement.guid, acknowledgement.stringId]);
 }
 let missileBirthBuf = 0, castHand = 'right', needSkillAt = -1e9;
 // 1.13c D2Client+0x4F860 (the engine ticks it): its Sounds-row submits. Kind 0/1 are the area loop and the weather handle (the ambient loop plays them); kind 2 is a one-shot.
@@ -3304,7 +3313,7 @@ function drainUnitSounds() {
   if (snapshot?.player && Module._d2_session_cast_refused_seq) { snapshot.player.castRefusedSeq = Module._d2_session_cast_refused_seq(); snapshot.player.castRefusedSkill = Module._d2_session_cast_refused_skill(); }
   { const la = Module.ccall('d2_client_take_local_action', 'number', [], []); if (la === 2) eventSounds?.localWalk(snapshot?.entities?.find((e) => e.id === snapshot.playerId && e.type === 0)?.classId); else if (la === 7) eventSounds?.localAttack(); }
   if (snapshot?.player) { const m = session.motion(); Object.assign(snapshot.player, { mode: snapshot.mode, explicitMove: Module._d2_client_explicit_move(), framePrecise: m.framePrecise, frameCountPrecise: m.frameCountPrecise }); } // D1: footstep reads mode+frame
-  if (snapshot) snapshot.directHpLoss = Module._d2_session_shrine_hp_loss?.() === 1; // Storm shrine: hit points removed with no hit
+  if (snapshot && !clientView().fromPackets) snapshot.directHpLoss = Module._d2_session_shrine_hp_loss?.() === 1; // Storm shrine: hit points removed with no hit (a packet game reads the client's own shrine activations, realmShrineUse)
   // A game played through packets plays its sounds from the server's packets (the realm tick above); the engine's own
   // unit-sound queue, cues and ambience would play every one a second time.
   const enginePlays = !clientView().fromPackets;
@@ -4352,7 +4361,12 @@ function realmCarriedClick(guid, view, act) {
   const p = realmFlow?.protocol;
   if (act === 'repair') {
     const r = p?.d2gsClientRepairInfo?.(guid);
-    return r?.needs ? realmNpc().repair(guid, r.mode, r.durability) : false;
+    if (!r?.needs) return false;
+    // D2Client 0x47500 state 3: the click opens the Repair box over the NPC and sends the 0x35 only on Yes.
+    const send = () => realmNpc().repair(guid, r.mode, r.durability);
+    const cost = p.d2gsClientItemPrice?.(guid, view.classId, 3) ?? 0;
+    const name = realmItemTextFor().describe(realmWorldState?.rawItem(guid))?.name ?? '';
+    return realmNpcScreen()?.askRepair(guid, name, cost < 0 ? 0 : cost, send) ?? send();
   }
   const sent = realmNpc().sell(guid, 0 /* SELL_MODE.STORED */, p?.d2gsClientSellValue?.(guid, view.classId) ?? 0);
   if (sent && act === 'sell') realmNpc().setSellMode(false);
@@ -4404,6 +4418,8 @@ function realmInput() {
     skillPlan: Module._d2_realm_client_skill_plan ? (hand, type, guid) => Module._d2_realm_client_skill_plan(hand, type, guid) : null,
     skillAt: Module._d2_realm_client_local_skill_at ? (hand, x, y) => Module._d2_realm_client_local_skill_at(hand, x, y) : null,
     skillOnUnit: Module._d2_realm_client_local_skill_on_unit ? (hand, type, guid) => Module._d2_realm_client_local_skill_on_unit(hand, type, guid) : null,
+    refusalSound: Module._d2_realm_client_last_refusal_sound ? () => Module._d2_realm_client_last_refusal_sound() : null,
+    onRefused: (event) => { const me = snapshot?.playerId; if (performance.now() - needSkillAt > 3000) { needSkillAt = performance.now(); unitSounds?.play({ unitType: 0, unitId: me, classId: snapshot.player?.renderIdentity?.classId, soundEvent: event }, me); } },   // once per 0x4B ticks (3 s)
     queueUnit: realmFlow?.protocol?.d2gsClientLocalActOnUnit ?? null, fireUnit: realmFlow?.protocol?.d2gsClientLocalFire ?? null, takeSends: realmFlow?.protocol?.d2gsClientLocalSends ?? null,
     scene: () => {
       const me = selectedPlayerSource();

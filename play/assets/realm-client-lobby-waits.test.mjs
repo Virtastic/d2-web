@@ -125,7 +125,9 @@ test('the realm named in the realm logon is the title the server listed, the con
   const body = Uint8Array.from([0, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, ...Buffer.from('Olympus\0Realm for Europe\0'), 1, 0, 0, 0, ...Buffer.from('Asgard\0\0')]);
   const list = parseRealmList(body);
   assert.deepEqual(list, [{ title: 'Olympus', description: 'Realm for Europe' }, { title: 'Asgard', description: '' }]);
-  assert.equal(realmLogonTitle(list, 'configured'), 'Olympus');
+  assert.equal(realmLogonTitle(list, 'configured'), 'Asgard'); // none preferred or configured and listed: the byte-sorted first
+  assert.equal(realmLogonTitle(list, 'olympus'), 'olympus');
+  assert.equal(realmLogonTitle(list, 'configured', 'Olympus'), 'Olympus');
   assert.equal(realmLogonTitle(parseRealmList(Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0])), 'configured'), 'configured');
 });
 
