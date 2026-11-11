@@ -20,8 +20,8 @@ W void  sub_B6920(void*);
 W void* sub_7D9B0(void*, int32_t);
 W void* sub_7E5C0(int32_t, int32_t, void*, void*);
 W void  sub_CC090();
-W void  sub_B8400();
-W void  sub_5BF70(void*);
+W void  d2common_seam_68400(void* pRoom);   // 1.13c 0x68400 DRLGROOMTILE_LoadDT1FilesForRoom (d2common_7c270_callees.cpp)
+W void  d2common_seam_bf70(void* pRoom);    // 1.13c 0xBF70 DRLGPRESET_SpawnHardcodedPresetUnits (d2common_7c270_callees.cpp)
 W void  sub_7C0E0(void*);
 W int32_t sub_5D0A0(int32_t, void*, int32_t* out2);
 W int32_t sub_5D580(int32_t, int32_t, int32_t*, uint32_t*);
@@ -119,8 +119,8 @@ extern "C" void D2Common_7C300_Update(uint32_t nKey, uint32_t pRoom, uint32_t p1
 uint32_t sub_7C270(void* pUnitEAX)
 {
     uint32_t f = rd<uint32_t>(pUnitEAX, 0x28);
-    if (!(f & 0x1000000) && sub_B8400) sub_B8400();
-    if (!(rd<uint32_t>(pUnitEAX, 0x28) & 0x2000000) && rd<int32_t>(pUnitEAX, 0x48) == 2 && sub_5BF70) sub_5BF70(pUnitEAX);
+    if (!(f & 0x1000000)) d2common_seam_68400(pUnitEAX);
+    if (!(rd<uint32_t>(pUnitEAX, 0x28) & 0x2000000) && rd<int32_t>(pUnitEAX, 0x48) == 2) d2common_seam_bf70(pUnitEAX);
     if (!(rd<uint32_t>(pUnitEAX, 0x28) & 0x100000) && sub_7C0E0) sub_7C0E0(pUnitEAX);
     return rd<uint32_t>(pUnitEAX, 0x30);
 }
