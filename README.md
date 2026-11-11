@@ -1,6 +1,6 @@
 # d2-web
 
-**Play Diablo II: Lord of Destruction in your browser.** The 1.13c engine, reimplemented and compiled to WebAssembly, by [Virtastic](https://virtastic.app).
+**Play Diablo II: Lord of Destruction in your browser.** Built on the 1.13c engine, reimplemented and compiled to WebAssembly, with quality-of-life improvements shaped by the community, by [Virtastic](https://virtastic.app).
 
 <p align="center">
   <a href="https://diablo2.virtastic.app"><img src="docs/screenshots/act1.png" alt="A Barbarian on a path through the Blood Moor in Act 1, running in a browser tab at diablo2.virtastic.app" width="850"></a>
@@ -23,17 +23,32 @@
 ![Platform: Chrome desktop](https://img.shields.io/badge/browser-Chrome%20%2F%20Chromium-brightgreen)
 ![Verified: 85.6%](https://img.shields.io/badge/verified-85.6%25-brightgreen)
 
-An unofficial reimplementation of the Diablo II: Lord of Destruction **1.13c** engine, compiled to
+An unofficial game based on the Diablo II: Lord of Destruction **1.13c** engine, compiled to
 **WebAssembly** and played in the browser. No game data is included: you bring your own legally
 owned copy.
 
+1.13c is the foundation, not the finish line. On top of it we are making **quality-of-life
+updates and changes driven by what the community has complained about for years**, so the game
+plays the way players have asked for while keeping the feel of the original.
+
 > **Status: playable.** Create a character and play: towns, wilderness and dungeons, combat and
 > skills, items, vendors, waypoints and saves, in a browser tab with nothing to install. Some
-> details still differ from the original game. If you find one, please
+> details still differ from 1.13c. If you find one, please
 > [report it](https://github.com/Virtastic/d2-web/issues).
+
+## Quality of life and community requests
+
+The 1.13c game is the baseline every change starts from. From there, we take the long-standing
+pain points players raise and fix them, one at a time.
+
+- **Tell us what bothers you.** Open an [issue](https://github.com/Virtastic/d2-web/issues) or
+  post on [Discord](https://discord.gg/PzFfDkbSue). The most-requested fixes are worked first.
+- **Changes are deliberate.** Each one is a named change to a known 1.13c behaviour, listed in the
+  release notes, not an accidental drift from the original.
 
 ## Contents
 
+- [Quality of life and community requests](#quality-of-life-and-community-requests)
 - [Before you start](#before-you-start)
 - [Choose how to play](#choose-how-to-play)
 - [Option A: Play in your browser](#option-a-play-in-your-browser)
