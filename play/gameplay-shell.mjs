@@ -204,7 +204,6 @@ import { closeCubeFromPanel, cubeCloseAt } from './assets/cube-close.mjs';
 import { createFrontendPointerStates } from './assets/frontend-pointer-states.mjs';
 import { altHoverBox, hoverLife, monsterNameColour, plateBoxes, paintHoverPlate, groundLabelPlate, groundLabelColour } from './assets/hover-lifebar.mjs';
 import { weaponClassTokenForMode } from './assets/player-weapon-class.mjs';
-import { decideGridPlace } from './assets/grid-place.mjs';
 import { installWorkerGuard, workerMode } from './worker-guard.mjs';
 import { fitSize } from './assets/fit-size.mjs';
 import { canvasPoint as pointOnCanvas } from './assets/canvas-point.mjs';
@@ -825,11 +824,7 @@ function skillPlateState() {
 }
 // Retail's 0x3C through the engine; the right hand's choice is also what a right click casts.
 function selectSkill(id, side) {
-  const commands = clientView().commands;
-  if (commands.selectSkill) return commands.selectSkill(id, side === 'left');
-  if (realmTransport.state === 'session-open') return 0;   // a realm session with no game up selects nothing
-  const rc = Module.ccall('d2_session_command_select_skill', 'number', ['number', 'number'], [id, side === 'left' ? 1 : 0]);
-  return rc;
+  return clientView().commands.selectSkill?.(id, side === 'left') ?? 0;   // the 0x3C packet; with no game up nothing is selected
 }
 let actMusic = null, musicError = '', musicSeenLevel = -1, musicLevelTick = 0;
 const levelMusicSync = createLevelMusicSync((levelId) => actMusic.playLevel(levelId));
@@ -1036,20 +1031,9 @@ function sessionAdapter() {
           return loaded;
         } finally { Module._free(p); }
       },
-      move(x, y) { return Module.ccall('d2_session_command_move', 'number', ['number', 'number'], [x, y]); },
-      attack(targetId) { return Module.ccall('d2_session_command_primary_attack', 'number', ['number'], [targetId]); },
-      rightSkillAt(x, y, held = false) {
-        const name = held ? 'd2_session_command_right_skill_hold_at' : 'd2_session_command_right_skill_at';
-        return Module.ccall(name, 'number', ['number', 'number'], [x, y]);
-      },
-      throwSkill(targetId) { return Module.ccall('d2_session_command_throw', 'number', ['number'], [targetId]); },
-      kick(targetId) { return Module.ccall('d2_session_command_kick', 'number', ['number'], [targetId]); },
+      // A walk leg leaves as the same 0x01 / 0x03 packet a click sends; the server answers with the move.
+      move(x, y) { const p = snapshot?.player; return p && realmInput().step(x - p.x, y - p.y) ? 1 : 0; },
       pickup(itemId) { return Module.ccall('d2_session_client_pickup', 'number', ['number'], [itemId]); },
-      drop(itemId) { return Module.ccall('d2_session_command_drop', 'number', ['number'], [itemId]); },
-      useBelt(slot) {
-        const result = Module.ccall('d2_session_command_use_belt', 'number', ['number'], [slot]);
-        propCache.clear(); return result;
-      },
       useItem(itemId) {
         const result = Module.ccall('d2_session_command_use_item', 'number', ['number'], [itemId]);
         propCache.delete(itemId); return result;
@@ -1058,13 +1042,6 @@ function sessionAdapter() {
         const result = Module.ccall('d2_session_command_use_item_action', 'number', ['number', 'number'], [targetId, useId]);
         propCache.clear(); return result;
       },
-      swapWeapons() {
-        const changed = Module._d2_session_command_swap_weapons ? Module.ccall('d2_session_command_swap_weapons', 'number', [], []) : 0;
-        if (changed) propCache.clear();
-        return changed;
-      },
-      operate(objectId) { return Module.ccall('d2_session_command_object', 'number', ['number'], [objectId]); },
-      objectClick(objectId) { return Module.ccall('d2_session_command_object_packet', 'number', ['number'], [objectId]); },
       tick(n) {
         worldDirty = true;   // the worker's tick does not pass through Module.ccall
         const result = W ? W.tick(n) : Module.ccall('d2_session_tick', 'number', ['number'], [n]);
@@ -1422,7 +1399,7 @@ async function bootstrapSession() {
     }
     // A picked character is not applied to anything: createFromSave above already made it, sections
     // and all, in the act and at the map seed its own header names.
-    window.__d2.session = { fixture, snapshot: () => session.snapshot(), move: (x, y) => session.move(x, y), attack: (targetId) => session.attack(targetId), throwSkill: (targetId) => session.throwSkill(targetId), kick: (targetId) => session.kick(targetId), pickup: (itemId) => session.pickup(itemId), drop: (itemId) => session.drop(itemId), useBelt: (slot) => session.useBelt(slot), operate: (objectId) => session.operate(objectId),      tick: (n = 1) => session.tick(n) };
+    window.__d2.session = { fixture, snapshot: () => session.snapshot(), move: (x, y) => session.move(x, y), pickup: (itemId) => session.pickup(itemId), tick: (n = 1) => session.tick(n) };
     // A newly created character is written straight away, so it is in the list the moment it
     // exists rather than only after some later autosave the player never triggers.
     autosaveAt = 0; autosaveAct = snapshot.act; autosaveInFlight = false;
@@ -2758,36 +2735,11 @@ function syncNpcDialogueVoice(state) {
     if (generation === npcVoiceGeneration) console.warn('NPC voice', source.handle || source.file, error);
   });
 }
-let lastGridToBelt = null;
-function gridToBelt(itemId) {
-  const p = Module._malloc(5), v = new DataView(Module.HEAPU8.buffer, Number(p), 5);
-  v.setUint8(0, 0x63); v.setUint32(1, itemId >>> 0, true);
-  try { return Module.ccall('d2_session_client_packet', 'number', ['bigint', 'number'], [BigInt(p), 5]); } finally { Module._free(p); }
-}
-
-// M10: the reverse of gridToBelt -- retail's shift+click on a BELT box lifts that item onto the
-// cursor (0x24, D2GAME_PACKETCALLBACK_Rcv0x24_ItemFromBelt) instead of drinking it, the same
-// itemGUID packet shape as 0x63 above and 0x19's lift elsewhere in this file. 
-// M10: the engine's dispatch table (src/, out of this change's scope) has no case for 0x24 yet, so
-// this currently returns -1 unresolved; the packet shape and the shift-gated branch below are the
-// client's whole share of the row and are correct against retail regardless of when that lands.
 let lastBeltToCursor = null, lastBeltCursor = null;
-// 0x24 {item}, 0x23 {cursor item, slot}, 0x25 {cursor item, belt item}: one belt packet through the engine's dispatch.
-function beltPacket(op, a, b) {
-  if (op === 'lift') return beltToCursor(a);
-  const n = 9, p = Module._malloc(n), v = new DataView(Module.HEAPU8.buffer, Number(p), n);
-  v.setUint8(0, op === 'place' ? 0x23 : 0x25); v.setUint32(1, a >>> 0, true); v.setUint32(5, b >>> 0, true);
-  try { return Module.ccall('d2_session_client_packet', 'number', ['bigint', 'number'], [BigInt(p), n]); } finally { Module._free(p); }
-}
-// The belt click's actions as packets to the game server (0x24 lift, 0x23 place, 0x25 swap, 0x26 use): the bytes beltPacket hands the local engine.
+// The belt click's actions as packets to the game server (0x24 lift, 0x23 place, 0x25 swap, 0x26 use).
 function realmBeltClick(act) {
   if (act.op === 'use') return realmInput().useBelt(act.slot, Boolean(act.merc) && realmFlow?.expansion === true);
   return realmInput().beltClick(act);
-}
-function beltToCursor(itemId) {
-  const p = Module._malloc(5), v = new DataView(Module.HEAPU8.buffer, Number(p), 5);
-  v.setUint8(0, 0x24); v.setUint32(1, itemId >>> 0, true);
-  try { return Module.ccall('d2_session_client_packet', 'number', ['bigint', 'number'], [BigInt(p), 5]); } finally { Module._free(p); }
 }
 
 // An open shop is retail's vendor window (play/assets/vendor-panel.mjs), not the trade panel.
@@ -3224,162 +3176,7 @@ function update(forceTick = false, live = false) {
   }
   let engineAdvanced = false;
   if (session) {
-    // One left-hand action for both a fresh click and every held repeat: the selected left skill
-    // when it is not the plain Attack, else the primary attack. Returns the engine's result (1
-    // started, 2 walking into range, 0 refused).
-    const swingLeftHand = (unitId) => {
-      castHand = 'left';
-      const leftId = Math.max(0, readSelectedSkills().left);
-      const useLeft = leftHandCommand(leftId) === 'left-skill' && !!Module._d2_session_command_left_skill;
-      const result = useLeft
-        ? Module.ccall('d2_session_command_left_skill', 'number', ['number'], [unitId])
-        : session.attack(unitId);
-      lastSkillCommand = { skill: useLeft ? leftId : 0, targetId: unitId, result };
-      return result;
-    };
-    // A game drawn from packets has sent its commands above; the engine below only runs the server's tick.
-    for (const command of clientView().fromPackets ? [] : commands) {
-      if (command.type === COMMAND.MOVE) {
-        // Retail's Stand Still modifier prevents a ground move from being issued while the held
-        // action is down. Targeted attacks, item pickup and right-hand casts remain separate command
-        // types and continue through their normal engine paths.
-        if (heldStandStillKeys.size) {
-          if (realmTransport.state !== 'session-open') standStillSuppressedMoves++;
-          continue;
-        }
-        if (realmTransport.state === 'session-open') continue;
-        lastMoveCommand = { type: command.type, x: command.x, y: command.y, directional: !!command.directional, held: !!command.held };
-        if (command.directional) session.move(snapshot.player.x + command.x, snapshot.player.y + command.y);
-        else if (command.held) {
-          // Retail re-issues the left-button action while it is held: a unit under the pointer is
-          // struck again on every engine advance (repeated presses were held MOVEs that only
-          // walked, so a held button never re-attacked), and only bare ground walks.
-          const target = resolvePointerTarget(command.x, command.y);
-          // D26: the press already issued its one pickup (and its approach walk); a held repeat must not
-          // re-resolve to whichever cluster item is now under the pointer.
-          if (heldWorldAction(target) === 'pickup') continue;
-          walkGoal = null;
-          if (heldWorldAction(target) === 'strike') { swingLeftHand(target.unitId); continue; }
-          const { x: tx, y: ty } = target.at;
-          const moved = session.move(tx, ty);
-          if (!moved) armWalk({ x: tx, y: ty, within: 2 });
-        }
-        else {
-          // A ground click. A new click replaces any walk in progress, as in retail. Retail's walk
-          // command only routes a short leg (MOVE_NO_PATH beyond it -- s000 stalled in town on
-          // exactly that); a far click is routed in legs by the client, so a refused click hands
-          // the SAME goal to the hop walker the NPC walk already uses.
-          const resolved = resolvePointerTarget(command.x, command.y);
-          const { x: tx, y: ty } = resolved.at;
-          // The click record this command answers (see noteClick): what the ground click resolved to
-          // and what the shell did with it. A walk's leg is this one line: aimed at floor, resolved to
-          // a unit, spent as an attack, walked to the unit's own position -- or resolved to floor and
-          // walked to the aim point. Without it a leg that oscillates between two points cannot say
-          // which of its clicks were walks at all.
-          const record = claimClick(command.x, command.y);
-          walkGoal = null;
-          // Retail's LEFT click acts on what is under the cursor before it walks: an item is picked
-          // up, a hostile is attacked with the left-hand skill (normal attack). Only bare ground
-          // walks. (This shell sent every left click as a walk, so a monster could only be fought
-          // with the right button -- s000 clicked one 400 times and never swung.)
-          // A live monster under the pointer comes before a ground item at its feet: a fight drops
-          // loot where the pack stands, and every click on the next monster picked up (or walked to)
-          // the drop instead -- s000d logged 400 'busy' rounds on a monster no click ever attacked.
-          // Retail's click acts on the hover-selected unit, and the hover walk ranks a monster (0) above an item (-4).
-          const underTarget = resolved.unitId;
-          const underItem = resolved.item;
-          if (record) record.aim = { world: [tx, ty], unitId: underTarget || 0, itemId: underItem?.id ?? 0 };
-          if (underItem) { if (record) record.result = `pickup item ${underItem.id} at (${underItem.x},${underItem.y})`; clickPickup(underItem); continue; }
-          if (underTarget) {
-            // The left hand's chosen skill (V9b): anything but the plain Attack runs through the
-            // engine's own left skill; Attack keeps the primary path. Throw (2) must take the left
-            // skill too, or the swing starts SKILL_ATTACK's A1 instead of the throw's TH.
-            const result = swingLeftHand(underTarget);
-            // A monster out of reach (rooms away, or no path for the walk-into-range leg): retail
-            // walks the player toward it and attacks on arrival, as clicking an NPC walks and talks.
-            if (!result) {
-              const m = snapshot.entities.find((e) => e.id === underTarget && e.type === 1);   // ids are per unit type
-              if (m) armWalk({ x: m.x, y: m.y, within: 2, onArrive: () => { swingLeftHand(underTarget); } });
-              // The leg's aim was floor and it resolved to a unit: whatever the click's own aim point
-              // was, the walk now goes to the UNIT, not to it (F14's monsters-first rule). That is the
-              // one thing a leg that never closes on its plan can be doing.
-              if (record) { record.result = `attack unit ${underTarget} -> ${result}`; record.walkTo = m ? [m.x, m.y] : null; }
-            } else if (record) record.result = `attack unit ${underTarget} -> ${result}`;
-            continue;
-          }
-          const moved = session.move(tx, ty);
-          if (record) { record.result = `move (${tx},${ty}) -> ${moved}`; record.walkTo = moved ? null : [tx, ty];
-            // F671 discriminator: join this click's planner endpoint to the native wrapper packet,
-            // ordinal-10334 room result/path points and latest movement continuation snapshot.
-            // Read immediately; the fixed int32 ABI is explicitly versioned by compile-time offsets.
-            if (record.planner && Module._d2_session_walk_probe) {
-              const ptr = Module.ccall('d2_session_walk_probe', 'number', [], []);
-              record.walkProbe = decodeWalkProbe(new Int32Array(Module.HEAPU8.buffer, Number(ptr), 29));
-            }
-            // Read immediately after the command, which is what d2_session_move_reason describes. A
-            // refused move has TWO subjects -- the ground (3 NO_ROOM, 5 NO_PATH) and the player (6
-            // DISPATCH_REFUSED: dying, dead or uninterruptable, retail's own dispatcher test) -- and
-            // the walker's aim loop is only allowed to shorten its aim for the first kind.
-            if (!moved) record.reason = Module.ccall('d2_session_move_reason', 'number', [], []); }
-          if (!moved) armWalk({ x: tx, y: ty, within: 2 });
-        }
-      } else if (command.type === COMMAND.PRIMARY) {
-        castHand = command.secondary ? 'right' : 'left'; // the session path: the cast skill is the clicked hand's
-        const resolved = command.x == null ? null : resolvePointerTarget(command.x, command.y);
-        const targetId = command.x == null ? selectPrimaryTarget(snapshot, snapshot.player, Infinity) : resolved.unitId;
-        const ground = command.x == null ? null : resolved.item;
-        // A right click is a world click too, and until it claimed its record every one of them sat in
-        // the evidence as "unanswered" -- indistinguishable from a left click the shell never drained.
-        // The fight sends hundreds of them, so the bucket hid the answer it was meant to give.
-        const precord = command.x == null || command.held ? null : claimClick(command.x, command.y);
-        if (precord) precord.aim = { world: [resolved.at.x, resolved.at.y], unitId: targetId || 0, itemId: ground?.id ?? 0 };
-        if (ground) { if (precord) precord.result = `pickup item ${ground.id} at (${ground.x},${ground.y})`; if (!command.held) clickPickup(ground); continue; }
-        const skill = command.secondary ? Math.max(0, readSelectedSkills().right) : 0;
-        // Any other right-hand skill (Bash, Double Swing, ...) is the engine's selected right skill.
-        const groundSkill = !targetId && command.secondary && skill > 2 && command.x != null;
-        // The retail client's click dispatch: a hand-to-hand right skill on open ground walks to the spot, unless
-        // Stand Still is held. The engine's skill plan says which skills are hand to hand (Bash walks like Attack does).
-        if (!targetId && command.secondary && command.x != null && Module._d2_session_right_ground_plan
-            && rightGroundWalks(Module.ccall('d2_session_right_ground_plan', 'number', [], []), heldStandStillKeys.size > 0)) {
-          walkGoal = null;
-          const moved = session.move(resolved.at.x, resolved.at.y);
-          if (!moved) armWalk({ x: resolved.at.x, y: resolved.at.y, within: 2 });
-          if (precord) precord.result = `move (${resolved.at.x},${resolved.at.y}) -> ${moved}`;
-          continue;
-        }
-        const result = targetId ? (skill === 2 ? session.throwSkill(targetId) : skill === 1 ? session.kick(targetId) : skill === 0 ? session.attack(targetId)
-          : Module.ccall('d2_session_command_right_skill', 'number', ['number'], [targetId]))
-          : groundSkill ? session.rightSkillAt(resolved.at.x, resolved.at.y, Boolean(command.held)) : 0;
-        // 1.13c D2Client+0x18F90/0x18F40: a refused cast (use state 1 no mana, 2-4 quantity/disabled/shape) speaks the class's
-        // 0x15 / 0x13 line through 0x23200, once per 0x4B ticks (3 s). The engine's own use state is the gate.
-        if (command.secondary && !result && !command.held && (targetId || groundSkill)) { const st = Module.ccall('d2_session_right_skill_refusal', 'number', [], []) - 10;
-          if (st >= 1 && st <= 4 && performance.now() - needSkillAt > 3000) { needSkillAt = performance.now(); unitSounds?.play({ unitType: 0, unitId: snapshot.playerId, classId: snapshot.player.renderIdentity?.classId, soundEvent: st === 1 ? 0x15 : 0x13 }, snapshot.playerId); } }
-        if (precord) precord.result = groundSkill
-          ? `cast right skill ${skill} at (${resolved.at.x},${resolved.at.y}) -> ${result}`
-          : `attack unit ${targetId || 0} with skill ${skill} -> ${result}`;
-        lastSkillCommand = { skill, targetId, at: groundSkill ? [resolved.at.x, resolved.at.y] : null, result,
-          held: Boolean(command.held), serial: ++lastSkillCommandSerial };
-      } else if (command.type === COMMAND.BELT) {
-        // Retail's belt keys: 1-4 drink/use the bottom item of that belt column, through the engine.
-        const result = deathScreenShown(snapshot?.mode) ? 0 : session.useBelt(command.slot | (command.merc ? 0x100 : 0));
-        if (result) snapshot = session.snapshot();
-        lastBeltCommand = { slot: command.slot, result };
-        window.__d2Step19Trace?.record('belt-use', { source: 'key-command', slot: command.slot, result: Boolean(result) },
-          { step: window.__s000?.state?.step, mode: window.__s000?.mode, snapshot });
-      } else if (command.type === COMMAND.SKILL) {
-        // F1-F8 are the engine's hotkey table (V9b). With the skill popup open and the pointer on an icon the key ASSIGNS that
-        // skill (in the popup's hand) to the slot; otherwise it selects the slot's skill into its hand (retail's 0x3C). An
-        // unbound key does nothing (retail has no default F-key skills).
-        const slot = command.slot - 1, over = skillSelectRenderer?.open && skillSelectRenderer.hoverIcon;
-        if (over && Module._d2_session_hotkey_assign) Module.ccall('d2_session_hotkey_assign', 'number', ['number', 'number', 'number'], [slot, over.skill.id, over.side === 'left' ? 1 : 0]);
-        else {
-          const bound = Number(Module.ccall('d2_session_hotkey_skill', 'number', ['number'], [slot]));
-          if (bound >= 0) selectSkill(bound, Module.ccall('d2_session_hotkey_hand', 'number', ['number'], [slot]) ? 'left' : 'right');
-        }
-      } else if (command.type === COMMAND.CANCEL) {
-        // Retail's Esc does not touch the selected skills.
-      }
-    }
+    // The game's commands left above as the packets a joined game sends; the engine below only runs the server's tick.
 
     // 1.13c 0x4F860 has its SoundEnviron row before the level's first 0x5F020 tick: record it ahead of the advance (the post-advance block below sees it already set).
     // The level is read from the session itself: the cached snapshot is the previous step's, one level behind when a session is swapped in under the shell (a retail recording).
@@ -4292,11 +4089,9 @@ const spClientView = {
         await enterCharacterSelect();
       }).catch((error) => { gameMenuError = String(error); });
     },
-    swapWeapons: () => session?.swapWeapons?.(),
-    canSwapWeapons: () => true,
-    addStat: (stat, points) => Module.ccall('d2_session_command_add_stat', 'number', ['number', 'number'], [stat, points]),
-    addSkill: (id) => Module.ccall('d2_session_command_add_skill', 'number', ['number'], [id]),
-    button: (button, amount) => (session ? Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [button, amount]) : 0),
+    swapWeapons: () => 0,   // no game up: the realm view sends the 0x4E
+    canSwapWeapons: () => false,
+    addStat: () => 0, addSkill: () => 0, button: () => 0,   // no game up: the realm view sends the packets
     say(text) { messageLines.push(`ÿc4${chosenName || 'Player'}ÿc0: ${text}`); postedAt = performance.now(); },
     phraseSocket: () => null,
     panelClick: () => false,
@@ -5767,7 +5562,7 @@ function takeWaypoint(levelId) {
 // The stash grid is retail's own Inventory.txt record for a LoD character, via the engine.
 // The player's own inventory panel from Inventory.txt through the engine: the class's row
 // (UNITS_GetInventoryRecordId), 800x600, its grid and its ten equipment slots.
-let cursorItemEvidence = null, lastItemCommand = null;
+let cursorItemEvidence = null;
 const pointer = { x: 0, y: 0 };
 function readInventoryLayout() {
   if (!Module._d2_session_inventory_components) return null;
@@ -5804,41 +5599,6 @@ function readHirelingRoster() {
     });
   } finally { Module._free(countAt); }
 }
-// Retail's item-cursor packets, through the engine's recovered handlers. Each returns the handler's
-// result and is recorded in lastItemCommand.
-function itemCommand(name, ...args) {
-  let result;
-  if (name === 'lift') result = Module.ccall('d2_session_command_item_to_cursor_packet', 'number', ['number'], [args[0]]);             // 0x19
-  // 0x18 {itemGUID, x, y, invPage}: page 0 is the pack, 4 the LoD stash (the handler refuses page 4
-  // outside a town room), 3 the cube. The page is the caller's, never assumed.
-  else if (name === 'put') result = Module.ccall('d2_session_command_insert_item_packet', 'number', ['number', 'number', 'number', 'number'], [args[0], args[1], args[2], args[3] ?? 0]);
-  // 0x1F {cursorGUID, gridItemGUID, x, y}: put the cursor item at x,y and lift the one it overlaps (grid pages 0, 3, 4).
-  else if (name === 'swapGrid') {
-    const p = Module._malloc(17), v = new DataView(Module.HEAPU8.buffer, Number(p), 17);
-    v.setUint8(0, 0x1F); v.setUint32(1, args[0] >>> 0, true); v.setUint32(5, args[1] >>> 0, true); v.setUint32(9, args[2] >>> 0, true); v.setUint32(13, args[3] >>> 0, true);
-    try { result = Module.ccall('d2_session_client_packet', 'number', ['bigint', 'number'], [BigInt(p), 17]); } finally { Module._free(p); }
-  }
-  // 0x21 stack, 0x28 socket, 0x29 scroll into tome, 0x2A item into the cube: {first guid, second guid}, the server's handlers.
-  else if (name === 'combine') {
-    const op = { stack: 0x21, socket: 0x28, scroll: 0x29, cube: 0x2A }[args[0]];
-    const p = Module._malloc(9), v = new DataView(Module.HEAPU8.buffer, Number(p), 9);
-    v.setUint8(0, op); v.setUint32(1, args[1] >>> 0, true); v.setUint32(5, args[2] >>> 0, true);
-    try { result = Module.ccall('d2_session_client_packet', 'number', ['bigint', 'number'], [BigInt(p), 9]); } finally { Module._free(p); }
-  }
-  else if (name === 'equip') result = Module.ccall('d2_session_command_equip_packet', 'number', ['number', 'number'], [args[0], args[1]]);   // 0x1A
-  else if (name === 'swap') result = Module.ccall('d2_session_command_cursor_item_packet', 'number', ['number', 'number', 'number'], [0x1D, args[0], args[1]]);   // 0x1D
-  else if (name === 'drop') result = Module.ccall('d2_session_command_cursor_item_packet', 'number', ['number', 'number', 'number'], [0x17, args[0], 0]);   // 0x17
-  else if (name === 'unequip') {   // 0x1C {bodyLoc:u16}
-    const p = Module._malloc(3); Module.HEAPU8.set([0x1C, args[0] & 255, args[0] >> 8], Number(p));
-    try { result = Module.ccall('d2_session_client_packet', 'number', ['bigint', 'number'], [BigInt(p), 3]); } finally { Module._free(p); }
-  }
-  // Equipment changes affect the hero-dependent requirement and attack-speed lines on cached items.
-  if (name === 'equip' || name === 'swap' || name === 'unequip' || name === 'combine') propCache.clear();
-  lastItemCommand = { name, args, result, cursor: Module.ccall('d2_session_cursor_item', 'number', [], []) };
-  snapshot = session.snapshot();
-  return result;
-}
-// A held item dropped on grid `page` at cell (x, y): put (0x18), swap with the one item it overlaps (0x1F), or refused (two or more).
 // The open inventory panel in a joined game: lift (0x19), unequip (0x1C), put in a cell (0x18) or swap with its item (0x1F),
 // equip (0x1A) or swap a worn item (0x1D), use a carried item on a right click (0x20); a click in the world with an item held drops it (0x17).
 function realmInventoryClick(x, y, button, e = {}) {
@@ -5874,15 +5634,6 @@ function realmStorageClickAt(x, y, e) {
     stash: { open: stashOpen, renderer: stashPanelRenderer, layout: stashOpen ? snapOr('stashLayout', readStashLayout) : null },
     trade: { open: trade.open, renderer: tradeRenderers?.own, layout: realmReads?.tradeLayout?.own, press: (px, py, held) => trade.press(px, py, canvas.width, canvas.height, held) },
     cube: { open: cubeOpen, renderer: cubePanelRenderer, layout: cubeOpen ? snapOr('cubeLayout', readCubeLayout) : null } }, x, y, { button: e.button, shift: e.shiftKey });
-}
-function gridDrop(cursorId, page, cell) {
-  const held = snapshot.items.find((i) => i.id === cursorId) || { id: cursorId };
-  const d = decideGridPlace(snapshot.items, page, cell.x, cell.y, held);
-  if (d.action === 'refuse') return d;
-  if (d.action === 'swap') itemCommand('swapGrid', cursorId, d.item.id, cell.x, cell.y);
-  else if (d.action === 'put') itemCommand('put', cursorId, cell.x, cell.y, page);
-  else itemCommand('combine', d.action, cursorId, d.item.id);
-  return d;
 }
 function readCubeLayout() {
   if (cubeLayout) return cubeLayout;
@@ -6663,12 +6414,8 @@ canvas.addEventListener('pointerdown', (e) => {
     const act = beltClickAction({ button: e.button, shift: e.shiftKey, slot: beltSlot, beltItem,
       cursorItem: clientView().cursorItem() || 0 });
     if (act) {
-      let result = 0;
-      if (clientView().fromPackets && !session) result = realmBeltClick(act);   // a joined game: the same click leaves as the retail belt packets
-      else if (act.op === 'use') { result = session?.useBelt(act.slot | (act.merc ? 0x100 : 0)); }
-      else result = beltPacket(act.op, act.a, act.b);
+      const result = clientView().fromPackets ? realmBeltClick(act) : 0;   // the retail belt packets, in single player and on Battle.net alike
       lastBeltCursor = { ...act, result };
-      if (session) snapshot = session.snapshot();
       window.__d2Step19Trace?.record('belt-use', { source: 'pointer-click', slot: beltSlot, op: act.op, result: Boolean(result) },
         { step: window.__s000?.state?.step, mode: window.__s000?.mode, snapshot });
     }
@@ -7188,10 +6935,8 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
   get beltHudBoxes() { return readBeltHudBoxes(); },
   get wideFrameEvidence() { return wideFrameEvidence; },
   get freeRes() { return freeResArt ? { ready: freeResArt.ready, error: freeResArt.error } : null; },
-  get lastGridToBelt() { return lastGridToBelt; },
   get lastBeltToCursor() { return lastBeltToCursor; },
   get cursorItemEvidence() { return cursorItemEvidence && JSON.parse(JSON.stringify(cursorItemEvidence)); },
-  get lastItemCommand() { return lastItemCommand && { ...lastItemCommand }; },
   get inventoryLayout() { return inventoryPanelRenderer?.layout ? JSON.parse(JSON.stringify(inventoryPanelRenderer.layout)) : null; },
   // The inventory panel's own rectangle, in 800x600 screen pixels: the SAME rectangle its `contains`
   // hit test is handed, so an input layer that has to bound a finger's aim by the panel's chrome
