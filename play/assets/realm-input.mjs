@@ -49,7 +49,7 @@ export const packets = Object.freeze({
   addSkill: (skill) => make(0x3b, le16(skill)),                     // 3
   respawn: () => make(0x41),                                        // 1
   bindHotkey: (slot, skill, left, ownerGuid = 0xffffffff) => make(0x51, le32((((slot & 15) << 16) | (left ? 0x8000 : 0) | (skill & 0x7fff)) >>> 0), le32(ownerGuid)), // 9
-  selectSkill: (skill, left, ownerGuid = 0xffffffff) => make(0x3c, le32(((left ? 0x80000000 : 0) | (skill & 0x7fff)) >>> 0), le32(ownerGuid)), // 9
+  selectSkill: (skill, left, ownerGuid = 0xffffffff) => make(0x3c, le32(((left ? 0xffff8000 : 0) | (skill & 0x7fff)) >>> 0), le32(ownerGuid)), // 9 (the left flag is bit 15 of the short, sign-extended to a dword by movsx at 0x796F0)
   enterPortal: (portalGuid, levelId) => make(0x45, le32(portalGuid), le32(levelId)),    // 9
   waypoint: (waypointGuid, levelId) => make(0x49, le32(waypointGuid), le32(levelId)),   // 9
   swapWeapons: () => make(0x60),                                    // 1

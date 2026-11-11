@@ -22,6 +22,12 @@ test('skill select 0x3c, right hand: skill word then owner -1', () => {
   same(packets.selectSkill(5, false, 0xffffffff), '3c 05 00 00 00 ff ff ff ff');
 });
 
+// Retail sends the left-hand skill as the movsx word of a short whose bit 15 is the hand flag: ECX = 0xFFFF8005
+// (vectors/d2client/fn/14910.wire.bin, tuple 0x3C 0xFFFF8005 0xFFFFFFFF) gives 3c 05 80 ff ff ff ff ff ff.
+test('skill select 0x3c, left hand: sign-extended word 0xFFFF8005, owner -1', () => {
+  same(packets.selectSkill(5, true, 0xffffffff), '3c 05 80 ff ff ff ff ff ff');
+});
+
 test('drop gold 0x50: hero guid then amount 500', () => {
   same(packets.dropGold(0x01020304, 500), '50 04 03 02 01 f4 01 00 00');
 });

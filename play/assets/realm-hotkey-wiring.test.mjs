@@ -8,7 +8,7 @@ test('a realm skill selection carries the owner the server gave the hotkey', () 
   const out = [];
   const input = createRealmInput({ transmit: (b) => { out.push(Array.from(b)); return true; }, now: () => 0 });
   assert.equal(input.selectSkill(36, true, 0x12345678), true);
-  assert.deepEqual(out.at(-1), [0x3c, 36, 0, 0, 0x80, 0x78, 0x56, 0x34, 0x12]);
+  assert.deepEqual(out.at(-1), [0x3c, 36, 0x80, 0xff, 0xff, 0x78, 0x56, 0x34, 0x12]);
 });
 
 test('the realm hotkey view shows the server table, eight slots, unbound when absent', () => {

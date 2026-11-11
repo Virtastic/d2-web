@@ -30,7 +30,7 @@ test('field layout is little-endian as the server reads it', () => {
   assert.deepEqual([...packets.pickUp(UNIT.ITEM, 7)], [0x16, 4, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0]);
   assert.deepEqual([...packets.stackItems(7, 0x01020304)], [0x21, 7, 0, 0, 0, 4, 3, 2, 1]);
   assert.deepEqual([...packets.itemToCube(5, 6)], [0x2a, 5, 0, 0, 0, 6, 0, 0, 0]);
-  assert.deepEqual([...packets.selectSkill(54, true)], [0x3c, 54, 0, 0, 0x80, 255, 255, 255, 255]);
+  assert.deepEqual([...packets.selectSkill(54, true)], [0x3c, 54, 0x80, 255, 255, 255, 255, 255, 255]);
   assert.deepEqual([...packets.selectSkill(54, false)], [0x3c, 54, 0, 0, 0, 255, 255, 255, 255]);
 });
 
