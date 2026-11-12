@@ -7,7 +7,7 @@ import { readSessionActiveNearFeed } from './assets/session-active-near-feed.mjs
 import { createFrameSnapshots, fromSnapshot } from './frame-snapshot.mjs';
 import { perfSync, perfEnabled, perfT0, perfT, perfSample, perfCountFrame, perfReset, perfReport, perfFrameStart, perfFrameTop } from './assets/frame-perf.mjs';
 import { gameInitSeed, clockInputs } from './assets/game-seed.mjs';
-import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, groundItemsUnderPointerAt, hostileUnitHoverHit, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeObjectHoverContains, nativeHoverSpecialGate, clickUnitOrItem, selectPointerCandidate, selectPrimaryTarget, selectHoverUnit, setHoverPickBackend, viewportToWorld } from './gameplay-model.mjs';
+import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, groundItemsUnderPointerAt, hostileUnitHoverHit, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, hoverUnitValid, isPrimaryTargetEligible, nativeObjectHoverContains, nativeHoverSpecialGate, clickUnitOrItem, selectPointerCandidate, selectPrimaryTarget, selectHoverUnit, setHoverPickBackend, viewportToWorld } from './gameplay-model.mjs';
 import { altSync } from './item-pick.mjs';
 import { createHoverPickBackend } from './hover-pick-engine.mjs';
 import { createMpqAssetReader } from './assets/mpq-assets.mjs';
@@ -5879,14 +5879,13 @@ function unitsUnderPointer(px, py) {
   if (!session) return [];
   const hits = [];
   for (const entity of snapshot.entities) {
-    if (!(entity.hostile || entity.npc) || !unitBoxHit(entity, px, py)) continue;
+    if (!(entity.hostile || entity.npc) || !hoverUnitValid(entity) || !unitBoxHit(entity, px, py)) continue;
     const attackAccepted = isPrimaryTargetEligible(entity, (candidate) => unitBoxHit(candidate, px, py));
     if (!entity.npc && !attackAccepted) continue;
     const row = { ...entity, type: 1 };
     const state143 = nativeUnitState143(row);
     if (state143 !== undefined) row.ordinal10494_8f = state143;
-    // #10648 lowers type-1 mode 0/12 unit priority; native candidate eligibility and stored-target
-    // semantics remain open.
+    // #10648 lowers type-1 mode 0/12 unit priority; the stored target and the walk are the engine's 0x51E80.
     row.nativeHoverGate = nativeHoverSpecialGate(row);
     hits.push(row);
   }

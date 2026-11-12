@@ -428,6 +428,18 @@ export function selectHoverUnit(units, reference, stored = null) {
   return selectUnitTypePickCandidate(units, { reference, stored });
 }
 
+// D2Client 0xA68E0's unit test before the point test: a UNITFLAG_ISASYNC (0x200000)
+// unit is never hovered; otherwise UNITFLAG_TARGETABLE (0x2) admits it, or a type-1 unit in its death mode (0xA5440) with
+// UNITFLAG_CANBEATTACKED (0x4) while a corpse skill is on hand (0xA6070). A synthetic snapshot without flags stays eligible.
+export function hoverUnitValid(entity, corpseSkill = false) {
+  if (entity?.flags === undefined) return true;
+  const f = entity.flags >>> 0;
+  if (f & 0x200000) return false;
+  if (f & 2) return true;
+  const dead = (f & 0x10000) !== 0 || (entity.type === 1 && (entity.mode === 0 || entity.mode === 12));
+  return corpseSkill && entity.type === 1 && dead && (f & 4) !== 0;
+}
+
 export function isPrimaryTargetEligible(entity, accept = null) {
   if (!entity?.hostile || entity.hp <= 0 || (accept && !accept(entity))) return false;
   // A monster in MONMODE_DEATH (0) or DEAD (12) is a corpse even when its life reads above 0
