@@ -28,17 +28,14 @@ void Storm_Sub3AE00(char* dst, const char* src, uint32_t n) {
 }
 void Storm_Sub1D570() {}                                        // 0x1D570 idle step
 uint32_t Storm_Sub19200(void*) { return 0; }                               // 0x19200 I/O thread proc
-void* Storm_GetDesktopWindow() { return nullptr; }
-void* Storm_GetTopWindow(void*) { return nullptr; }
-void* Storm_GetNextSibling(void*) { return nullptr; }
-uint32_t Storm_WindowPid(void*) { return 0; }
-uint32_t Storm_CurrentPid() { return 0; }
-void Storm_InvalidateIntersect(void*, int32_t, int32_t, int32_t, int32_t) {}
-bool Storm_PeekMessage(void*, uint32_t*, uintptr_t*) { return false; }
-bool Storm_IsDialogMessage(void*, void*) { return false; }
-void Storm_TranslateDispatch(void*) {}
-void Storm_PostQuit(uintptr_t) {}
-void Storm_GetCursorPos(int32_t* x, int32_t* y) { *x = 0; *y = 0; }
+}  // namespace
+// user32 / kernel32 imports by retail IAT slot (the FN probe in src/core/fn/storm_walker.cpp records them); no hook answers 0.
+extern "C" uint32_t (*g_storm_imp_hook)(uint32_t slot, uint32_t w0, uint32_t w1, uint32_t w2);
+namespace {
+inline uint32_t Imp(uint32_t slot, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0) {
+    return g_storm_imp_hook ? g_storm_imp_hook(slot, a, b, c) : 0;
+}
+inline uint32_t P(const volatile void* p) { return (uint32_t)(uintptr_t)p; }
 void (*g_modFile)(char* buf, uint32_t n);
 uint32_t Storm_GetModuleFileName(char* buf, uint32_t n) {
     if (!g_modFile) return 0;
@@ -55,36 +52,57 @@ void Storm_Sub1CF00(void* hwnd, int32_t x, uint32_t y) {
     uint32_t y0 = y;
     while (hwnd == nullptr) {
         uint32_t oldY = (uint32_t)g_cursorY;
-        Storm_Sub1CF00(Storm_GetDesktopWindow(), g_cursorX, oldY);
+        Storm_Sub1CF00((void*)(uintptr_t)Imp(0x43320), g_cursorX, oldY);   // GetDesktopWindow
         g_cursorY = (int32_t)y0;
         g_cursorX = x;
-        hwnd = Storm_GetDesktopWindow();
+        hwnd = (void*)(uintptr_t)Imp(0x43320);
     }
-    if (Storm_WindowPid(hwnd) == Storm_CurrentPid())
-        Storm_InvalidateIntersect(hwnd, x, (int32_t)y0, g_cursorW + x, g_cursorH + (int32_t)y0);
-    for (void* c = Storm_GetTopWindow(hwnd); c != nullptr; c = Storm_GetNextSibling(c))
-        Storm_Sub1CF00(c, x, y0);
+    const uint32_t h = P(hwnd);
+    volatile uint32_t pid = 0;
+    Imp(0x43350, h, P(&pid));                                             // GetWindowThreadProcessId
+    if (pid == Imp(0x430f4)) {                                            // GetCurrentProcessId
+        volatile int32_t src[4] = {x, (int32_t)y0, g_cursorW + x, g_cursorH + (int32_t)y0};
+        volatile int32_t wr[4] = {0, 0, 0, 0};
+        volatile int32_t dst[4] = {0, 0, 0, 0};
+        Imp(0x432b0, h, P(wr));                                           // GetWindowRect
+        if (Imp(0x43304, P(dst), P(src), P(wr)) != 0) {                   // IntersectRect
+            Imp(0x432b4, h, P(dst));                                      // ScreenToClient (left, top)
+            Imp(0x432b4, h, P(dst + 2));                                  // ScreenToClient (right, bottom)
+            Imp(0x43308, h, P(dst), 0);                                   // InvalidateRect(h, &dst, FALSE)
+        }
+    }
+    for (uint32_t c = Imp(0x432a0, h); c != 0; c = Imp(0x43358, c, 2))   // GetTopWindow / GetWindow(GW_HWNDNEXT)
+        Storm_Sub1CF00((void*)(uintptr_t)c, x, y0);
 }
 
 // 1.13c Storm+0x1D600: one pump step; dlg is retail's implicit ESI. Returns 1 if a message was taken.
 uint32_t Storm_Sub1D600(void* dlg) {
-    alignas(8) unsigned char msg[48];
-    uint32_t message; uintptr_t wParam;
-    if (!Storm_PeekMessage(msg, &message, &wParam)) {
+    volatile uint32_t msg[7] = {0, 0, 0, 0, 0, 0, 0};   // MSG: hwnd, message, wParam, lParam, time, pt
+    if (Imp(0x43380, P(msg), 0, 0) == 0) {               // PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)
         Storm_Sub1D570();
-        int32_t cx, cy;
-        Storm_GetCursorPos(&cx, &cy);
-        if (g_cursorX >= 0 && g_cursorY >= 0 && (cx != g_cursorX || cy != g_cursorY))
-            Storm_Sub1CF00(nullptr, cx, (uint32_t)cy);
+        volatile int32_t pt[2] = {0, 0};
+        Imp(0x43324, P(pt));                             // GetCursorPos
+        if (g_cursorX >= 0 && g_cursorY >= 0 && (pt[0] != g_cursorX || pt[1] != g_cursorY))
+            Storm_Sub1CF00(nullptr, pt[0], (uint32_t)pt[1]);
         return 0;
     }
-    if (message != 0x12) {
-        if (dlg != nullptr && Storm_IsDialogMessage(dlg, msg)) return 1;
-        Storm_TranslateDispatch(msg);
+    if (msg[1] != 0x12) {                                // WM_QUIT
+        if (dlg != nullptr && Imp(0x432f0, P(dlg), P(msg)) != 0) return 1;   // IsDialogMessageA
+        Imp(0x4337c, P(msg));                            // TranslateMessage
+        Imp(0x4338c, P(msg));                            // DispatchMessageA
         return 1;
     }
-    Storm_PostQuit(wParam);
+    Imp(0x432a8, msg[2]);                                // PostQuitMessage(wParam)
     return 1;
+}
+
+// FN probe entry (src/core/fn/storm_walker.cpp): cur = the pinned cursor words (0x51A0C x, y, w, h) copied in and out;
+// pump 0 runs 0x1CF00(hwnd, x, y), pump 1 runs 0x1D600(dlg) and stores its result.
+extern "C" void storm_1cf00_fnrun(int32_t* cur, void* hwnd, int32_t x, uint32_t y, int pump, void* dlg, uint32_t* ret) {
+    g_cursorX = cur[0]; g_cursorY = cur[1]; g_cursorW = cur[2]; g_cursorH = cur[3];
+    if (pump) *ret = Storm_Sub1D600(dlg);
+    else Storm_Sub1CF00(hwnd, x, y);
+    cur[0] = g_cursorX; cur[1] = g_cursorY; cur[2] = g_cursorW; cur[3] = g_cursorH;
 }
 
 // 1.13c Storm+0x26860: base path = directory of the host exe (cut at the last '\'), then the

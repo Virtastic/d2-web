@@ -75,16 +75,16 @@ void StormSetBkColor(HDC h, uint32_t v) { STORM_IMP(0x43034, (uintptr_t)h, v, 0)
 void StormSetBkMode(HDC h, int v) { STORM_IMP(0x43028, (uintptr_t)h, v, 0); }
 HGDIOBJ StormGetStockObject(int v) { STORM_IMP(0x43090, v, 0, 0); return nullptr; }
 int StormGetClassNameA(HWND h, LPSTR out, int n) { STORM_IMP(0x432bc, (uintptr_t)h, 0, n); if (n > 0) out[0] = '\0'; return 0; }
-void StormPostMessageA(HWND, uint32_t, WPARAM, LPARAM) {}
+void StormPostMessageA(HWND h, uint32_t m, WPARAM w, LPARAM) { STORM_IMP(0x43334, (uintptr_t)h, m, w); }   // lParam: always 0 here
 HWND StormGetDesktopWindow() { return nullptr; }
 BOOL StormIsIconic(HWND) { return 0; }
 void StormEnableWindow(HWND, BOOL) {}
 void StormDestroyWindow(HWND) {}
-HWND StormGetDlgItem(HWND, int) { return nullptr; }
+HWND StormGetDlgItem(HWND h, int id) { return g_storm_imp_hook ? (HWND)(uintptr_t)g_storm_imp_hook(0x43318, (uint32_t)(uintptr_t)h, (uint32_t)id, 0) : nullptr; }
 BOOL StormGetClientRect(HWND, RECT* r) { std::memset(r, 0, sizeof(*r)); return 1; }
 BOOL StormGetWindowRect(HWND, RECT* r) { std::memset(r, 0, sizeof(*r)); return 1; }
 BOOL StormScreenToClient(HWND, POINT*) { return 1; }
-BOOL StormIsWindow(HWND) { return 1; }
+BOOL StormIsWindow(HWND h) { return g_storm_imp_hook ? (BOOL)g_storm_imp_hook(0x43370, (uint32_t)(uintptr_t)h, 0, 0) : 1; }
 HRSRC StormFindResourceA(HINSTANCE, const char*, const char*) { return nullptr; }
 HGLOBAL StormLoadResource(HINSTANCE, HRSRC) { return nullptr; }
 void* StormLockResource(HGLOBAL) { return nullptr; }
@@ -246,7 +246,7 @@ struct ImpScope {
         if (slot == 0x432fc) w1 = 0;                           // property-name pointer (hookmask'd in the descriptor)
         return (uint32_t)c->e.h(slot, 0, 0, 0, 0, 0, w0, w1, w2);
     }
-    explicit ImpScope(uint32_t* r) : hk(r, 0, 2, kSc) { g_storm_imp_hook = log; }
+    explicit ImpScope(uint32_t* r, int nb = 2, const uint32_t* sc = kSc) : hk(r, 0, nb, sc) { g_storm_imp_hook = log; }
     ~ImpScope() { g_storm_imp_hook = nullptr; }
     static constexpr uint32_t kSc[2] = {0, 0};
 };
@@ -279,9 +279,12 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1cb20(uint32_t* r) {
 
 // 1.13c Storm+0x1D570: fire every due timer in the 0x6FC459FC list; always returns 1.
 // Node: +0x04 next, +0x08 hwnd, +0x0C wparam, +0x10 interval, +0x14 callback, +0x18 last tick.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1d570(uint32_t* r) {
-    uint32_t now = GetTickCount();
+// The node callback goes through g_1d570Call (the FN probe records the capture's stubptr recorder there instead of calling it).
+static void Call1D570(uint32_t cb, uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
+    ((void (*)(uint32_t, uint32_t, uint32_t, uint32_t))(uintptr_t)cb)(a, b, c, d);
+}
+static void (*g_1d570Call)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) = Call1D570;
+static void Port1D570(uint32_t* r, uint32_t now) {
     uint32_t node = ((int32_t)g_459fc < 1) ? 0 : g_459fc;
     if ((int32_t)node < 1) {
         r[4] = 1;
@@ -295,8 +298,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1d570(uint32_t* r) {
             else wr32(node, 0x18, interval + rd32(node, 0x18));
             uint32_t cb = rd32(node, 0x14);
             if (cb != 0) {
-                auto fn = (void (*)(uint32_t, uint32_t, uint32_t, uint32_t))(uintptr_t)cb;
-                fn(rd32(node, 0x08), 0x113, rd32(node, 0x0C), now);
+                g_1d570Call(cb, rd32(node, 0x08), 0x113, rd32(node, 0x0C), now);
                 r[4] = 1;
                 return;
             }
@@ -308,6 +310,26 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1d570(uint32_t* r) {
             return;
         }
     }
+}
+
+// FN probe: blobs 0 lg, 1 gvar head (0x559FC), 2 n1, 3 n2; GetTickCount := 0xC0001000 (descriptor `tick`); n2+0x14 is the
+// descriptor's stubptr recorder 0xF30014 (reads back 0xB2F30014), logged with its four stack words instead of being called.
+static void Stub1D570(uint32_t cb, uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
+    if (cb == 0xB2F30014u) { stormhk::Scope::cur()->e.h(0xF30014, 0, 0, 0, 0, 0, a, b, c, d); return; }
+    Call1D570(cb, a, b, c, d);
+}
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1d570(uint32_t* r) {
+    ImpScope impScope(r);
+    uint32_t* head = (uint32_t*)(uintptr_t)r[16];
+    ((uint32_t*)(uintptr_t)r[20])[0x14 / 4] = 0xB2F30014u;
+    const uint32_t keep = g_459fc;
+    g_459fc = *head;
+    g_1d570Call = Stub1D570;
+    Port1D570(r, 0xC0001000u);
+    g_1d570Call = Call1D570;
+    *head = g_459fc;
+    g_459fc = keep;
 }
 
 // 1.13c Storm+0x1D460: remove every AUTIMERREC matching (param_1, param_2); 1 if any matched.
@@ -422,6 +444,12 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_17810(uint32_t* r) {
 // 1.13c Storm+0x1DA10: lay out the controls named by an id stream using 0x1D780's rectangles.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1da10(uint32_t* r) {
+    // blobs: 0 lg, 1 gvar last error (0x55388), 2 ids, 3 ex; GetDlgItem (0x43318) is a recorder answering 0
+    ImpScope impScope(r, 4);
+    uint32_t* err = (uint32_t*)(uintptr_t)r[16];
+    const int32_t keepErr = g_lastError;
+    g_lastError = (int32_t)*err;
+    struct Out { uint32_t* e; int32_t ke; ~Out() { *e = (uint32_t)g_lastError; g_lastError = ke; } } out{err, keepErr};
     HWND hwnd = (HWND)(uintptr_t)r[0];
     int32_t* ids = (int32_t*)(uintptr_t)r[1];
     uint32_t* rects = (uint32_t*)(uintptr_t)r[2];
@@ -494,6 +522,15 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1da10(uint32_t* r) {
 // 1.13c Storm+0x1D780: create/reuse the AUBITMAPREC for (hwnd, id) and copy a 32-byte name.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1d780(uint32_t* r) {
+    // blobs: 0 lg, 1 gvar head (0x55A08), 2 gvar last error (0x55388), 3 nm, 4 nd; IsWindow (0x43370) is a recorder answering 1
+    static const uint32_t sc[] = {0x43370, 1, 0, 0};
+    ImpScope impScope(r, 5, sc);
+    uint32_t* head = (uint32_t*)(uintptr_t)r[16];
+    uint32_t* err = (uint32_t*)(uintptr_t)r[18];
+    const uint32_t keepHead = g_45a08; const int32_t keepErr = g_lastError;
+    g_45a08 = *head; g_lastError = (int32_t)*err;
+    struct Out { uint32_t* h; uint32_t* e; uint32_t kh; int32_t ke;
+                 ~Out() { *h = g_45a08; *e = (uint32_t)g_lastError; g_45a08 = kh; g_lastError = ke; } } out{head, err, keepHead, keepErr};
     r[4] = StormSub1D780(r[0], r[1], (const uint8_t*)(uintptr_t)r[2], r[3], r[5], r[6],
                          (int32_t*)(uintptr_t)r[7], r[8], r[9], (int32_t)r[10]);
 }

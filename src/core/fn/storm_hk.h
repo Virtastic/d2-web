@@ -4,6 +4,7 @@
 // (the blocks are capture blobs). A block inside a blob is tagged 0xB1<blob><off>, as the capture does.
 #pragma once
 #include "hookenv.h"
+#include "fn_bloblen.h"
 #include <cstring>
 
 extern "C" int32_t (*g_storm_free_hook)(void*, const char*, int32_t);
@@ -41,7 +42,7 @@ struct Scope {
     }
     ~Scope() { cur() = nullptr; g_storm_free_hook = nullptr; g_storm_alloc_hook = nullptr; if (&g_storm_realloc_hook) g_storm_realloc_hook = nullptr; }
     uint32_t tr(uint32_t v) const {
-        for (int k = 0; k < nb; k++) { uint32_t b = r[14 + 2 * k]; if (v >= b && v < b + r[15 + 2 * k]) return 0xB1000000u | (uint32_t)(k << 16) | (v - b); }
+        for (int k = 0; k < nb; k++) { uint32_t b = r[14 + 2 * k]; if (v >= b && v - b < fnBlobLen(r, (uint32_t)k)) return 0xB1000000u | (uint32_t)(k << 16) | (v - b); }
         return v;
     }
     static int32_t freeHook(void* p, const char* f, int32_t line) {

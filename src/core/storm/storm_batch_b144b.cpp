@@ -53,8 +53,19 @@ extern "C" uint32_t* Storm_Sub1B1C0(StormPageEnv& e, uint32_t* head, bool errHoo
 namespace {
 
 intptr_t (*g_win32)(const char* api, const intptr_t* a, int n) = nullptr;
+// retail IAT slot of each import a probe records (Storm .rdata); 0 = not recorded
+uint32_t ImpSlot(const char* api) {
+    static const struct { const char* n; uint32_t s; } t[] = { { "GetTopWindow", 0x432a0 }, { "GetWindow", 0x43358 } };
+    for (const auto& e : t) if (!strcmp(api, e.n)) return e.s;
+    return 0;
+}
+}  // namespace
+extern "C" uint32_t (*g_storm_imp_hook)(uint32_t slot, uint32_t w0, uint32_t w1, uint32_t w2);   // storm_batch_16260.cpp
+namespace {
 template <class... A> intptr_t W(const char* api, A... a) {
-    intptr_t v[sizeof...(A) + 1] = {(intptr_t)a..., 0};
+    intptr_t v[sizeof...(A) + 3] = {(intptr_t)a..., 0};
+    if (g_storm_imp_hook)
+        if (uint32_t s = ImpSlot(api)) return (intptr_t)g_storm_imp_hook(s, (uint32_t)v[0], (uint32_t)v[1], (uint32_t)v[2]);
     return g_win32 ? g_win32(api, v, (int)sizeof...(A)) : 0;
 }
 inline uint8_t* N(uint32_t a) { return (uint8_t*)(uintptr_t)a; }
