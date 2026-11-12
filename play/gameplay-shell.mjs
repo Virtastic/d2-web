@@ -161,7 +161,7 @@ import { createDeathScreen, deathScreenShown, respawnAllowed } from './assets/de
 import { createRealmGameUi } from './assets/realm-game-ui.mjs';
 import { realmHeroFlags, realmCorpseViews, createRealmDeath, heroIsDown, deathBlocksKey, markCharactersDead } from './assets/realm-death.mjs';
 import { S_RESURRECT_FORMAT, resurrectLabel, createNpcMenu, hireSkillText, npcMenuChoiceOnRelease, npcMenuInputCoolingDown, npcMenuEntries, withTravelRow, withHireRow, deadHireling, resurrectPacket, talkEntries, menuReturnsAfterSpeech, entriesAfterSpeech, nextSpeechAfterTopic, TRAVEL_LEVEL } from './assets/npc-menu.mjs';
-import { npcSpeech, npcSpeechByName, talkSpeechId } from './assets/npc-topics.mjs';
+import { talkSpeechId } from './assets/npc-topics.mjs';
 import { createWeatherRenderer } from './assets/weather-renderer.mjs';
 import { weatherWaterAnchors } from './assets/weather-water-anchors.mjs';
 import { createSkillFx } from './assets/skill-fx.mjs';
@@ -1021,7 +1021,7 @@ function sessionAdapter() {
   if (window.Module?._d2_session_create && window.Module?._d2_session_snapshot) {
     return {
       // bare: no start kit, for a player a saved file is about to be applied to.
-      create(f, playerClass = 0, bare = false) { Module.ccall('d2_session_create_stream', 'number', ['number'], [0]); Module.ccall('d2_session_join_units', null, ['number'], [1]); Module.ccall('d2_session_join_reveal', null, ['number'], [JOIN_REVEAL]); const made = Module.ccall(bare && Module._d2_session_create_class_bare ? 'd2_session_create_class_bare' : 'd2_session_create_class', 'number', ['number', 'number', 'number', 'number', 'number'], [f.seed, f.difficulty, f.act0, f.level, playerClass]); if (made) Module.ccall('d2_session_client_map_start', 'number'); return made; },
+      create(f, playerClass = 0, bare = false) { Module.ccall('d2_session_create_stream', 'number', ['number'], [0]); Module.ccall('d2_session_join_units', null, ['number'], [1]); Module.ccall('d2_session_join_reveal', null, ['number'], [JOIN_REVEAL]); const made = Module.ccall(bare && Module._d2_session_create_class_bare ? 'd2_session_create_class_bare' : 'd2_session_create_class', 'number', ['number', 'number', 'number', 'number', 'number'], [f.seed, f.difficulty, f.act0, f.level, playerClass]); if (made) { Module.ccall('d2_session_client_map_start', 'number'); Module.ccall('d2_client_npc_speech_reset', null, []); } return made; },
       // Create the character FROM the file: the engine reads the header and everything -- class,
       // act, town level, map seed -- comes out of it (PLRSAVE2_ReadSaveHeader, client-parity C3e).
       // Returns 0, or the PLRSAVE2 error code that refused the file.
