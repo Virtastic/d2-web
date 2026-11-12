@@ -1,19 +1,31 @@
-// src/core/fn/storm_149e0.cpp -- 1.13c Storm+0x149e0 (wait until ids[] flags set in 6FC45178[16])
+// storm+0x149E0: FUNCTION-mode probe. r[0] = EBX (ids), r[1] = ESI (count), r[2] = any, r[3] = timeout; r[4] result.
+// Blobs: lg 0 (hooklog), ids 1. GetTickCount is pinned at 5 and Sleep is a no-op (descriptor iat lines); the three
+// pumps log one hook record each, as the capture's hooks do.
 #include <emscripten.h>
 #include <cstdint>
-namespace { uint32_t g_flags[16]; void (*g_pump[3])(); }  // pump = callees 124B0, 14250, 13170 (unported)
-// 1.13c Storm+0x149E0
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t Storm_Sub149E0(int32_t any, uint32_t timeout, const uint32_t* ids, uint32_t n) {
-  for (auto& f : g_flags) f = 0;
-  uint32_t t0 = (uint32_t)emscripten_get_now();
-  for (bool first = true;; first = false) {
-    if (!first) emscripten_sleep(10);
-    for (auto p : g_pump) if (p) p();
-    if (!n) return 1;
-    uint32_t hit = 0;
-    for (uint32_t i = 0; i < n; i++) if (ids[i] < 16 && g_flags[ids[i]]) hit++;
-    if (n <= hit) return 1;
-    if (hit && !any) return 1;
-    if (timeout != 0xffffffffu && timeout <= (uint32_t)emscripten_get_now() - t0) return 0;
-  }
+#include "storm_hk.h"
+
+struct Storm149E0Seams {
+    uint32_t (*tick)();
+    void (*sleep)(uint32_t ms);
+    void (*pump124b0)();
+    void (*pump14250)();
+    void (*pump13170)();
+};
+extern "C" uint32_t Storm_Sub149E0(const uint32_t* ids, uint32_t n, int32_t any, uint32_t timeout, const Storm149E0Seams& s);
+
+static stormhk::Scope* g_hk;
+static uint32_t Tick() { return 5; }
+static void Nap(uint32_t) {}
+static void P124b0() { g_hk->e.h(0x124B0, 0, 0, 0, 0, 0); }
+static void P14250() { g_hk->e.h(0x14250, 0, 0, 0, 0, 0); }
+static void P13170() { g_hk->e.h(0x13170, 0, 0, 0, 0, 0); }
+
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_storm_149e0(uint32_t* r) {
+    const uint32_t sc[] = { 0 };
+    stormhk::Scope hk(r, 0, 2, sc);
+    g_hk = &hk;
+    const Storm149E0Seams s{ Tick, Nap, P124b0, P14250, P13170 };
+    r[4] = Storm_Sub149E0((const uint32_t*)(uintptr_t)r[0], r[1], (int32_t)r[2], r[3], s);
+    g_hk = nullptr;
 }

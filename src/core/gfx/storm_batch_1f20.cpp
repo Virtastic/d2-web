@@ -572,18 +572,22 @@ extern "C" void Storm_Sub24B0(StormChunk* c) { StormChunkDestroy(c); }
 
 // 1.13c Storm+0x24F0: next unused 32-bit id: bump the counter (+0x48); on wrap set the wrapped
 // flag (+0x4c) and skip 0; once wrapped, skip ids still present in their bucket's chain.
-extern "C" uint32_t Storm_Sub24F0(StormHashTable* h) {
+// The table is in retail's 32-bit layout (EDX): buckets at +0x1C (12-byte lists {linkoffset, prev, next}), mask +0x24;
+// a node's next is the word at node + linkoffset + 4; a non-positive link ends the chain.
+extern "C" uint32_t Storm_Sub24F0(uint8_t* h) {
+    auto w = [](uintptr_t p) { uint32_t v; std::memcpy(&v, (const void*)p, 4); return v; };
+    const uintptr_t hp = (uintptr_t)h;
     for (;;) {
-        uint32_t id = (uint32_t)++h->field48;
-        if (id == 0) { h->field4c = 1; continue; }
-        if (h->field4c == 0) return id;
-        StormList* b = &h->buckets.data[h->bucketMask & id];
-        uintptr_t n = b->term.next;
-        if ((intptr_t)n < 1) n = 0;
+        const uint32_t id = w(hp + 0x48) + 1u;
+        std::memcpy(h + 0x48, &id, 4);
+        if (id == 0) { const uint32_t one = 1; std::memcpy(h + 0x4c, &one, 4); continue; }
+        if (w(hp + 0x4c) == 0) return id;
+        const uintptr_t b = (uintptr_t)w(hp + 0x1c) + (uintptr_t)(w(hp + 0x24) & id) * 12u;
+        int32_t n = (int32_t)w(b + 8);
         bool taken = false;
-        while ((intptr_t)n > 0) {
-            if (*(uint32_t*)n == id) { taken = true; break; }
-            n = *(uintptr_t*)(n + (uintptr_t)b->linkoffset + sizeof(uintptr_t));
+        while (n > 0) {
+            if (w((uintptr_t)(uint32_t)n) == id) { taken = true; break; }
+            n = (int32_t)w((uintptr_t)(uint32_t)(w(b) + (uint32_t)n) + 4);
         }
         if (!taken) return id;
     }

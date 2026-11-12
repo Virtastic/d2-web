@@ -43,10 +43,13 @@ struct CrtState {
     const char* ctryName;    // 0x6FC42768
     uint32_t ctryLen;        // 0x6FC42764
     int (*getLocale)(uint32_t lcid, uint32_t type, char* out, int n); // 0x6FC4276C
+    // FN-probe seams for the direct callees B441 / B62C of the enum callbacks (null: the ports themselves)
+    uint32_t (*b441)(uint32_t lcid) = nullptr;
+    uint32_t (*b62c)(uint32_t lcid, int strict) = nullptr;
 };
 
-// 0x6FC3487C: ten LCIDs excluded from the fallback choice
-const int16_t kExcluded[10] = {0x0409, 0x0809, 0x0C09, 0x1009, 0x1409, 0x1809, 0x1C09, 0x2009, 0x2409, 0x2809};
+// 0x6FC3487C: ten LCIDs excluded from the fallback choice (the .rdata words)
+const int16_t kExcluded[10] = {0x0C0C, 0x0C1A, 0x1007, 0x0436, 0x080C, 0x042D, 0x0403, 0x100C, 0x0810, 0x081D};
 
 // _LcidFromHexString (0x...B542): hex digits to value
 uint32_t LcidFromHex(const char* s) {
@@ -170,23 +173,57 @@ uint32_t storm_B441(int16_t lcid) {
     return 1;
 }
 
-// 1.13c Storm+0xB45F  (_crtGetLocaleInfoA; table = 0x6FC34260, 27 entries of 0x2C bytes)
-int storm_B45F(const Host& h, const uint8_t* table, uint32_t lcid, uint32_t type, char* out, int n) {
+// 0x6FC34260: the CRT's 27 built-in locales, 0x2C bytes each, sorted by LCID (the binary search below relies on it).
+// Fields in retail order: +0 lcid, +4 hex (type 1), +0xC language name ptr (0x1001), +0x10 language abbreviation (3),
+// +0x14 country name ptr (0x1002), +0x18 country abbreviation (7), +0x1C OEM code page (0xB), +0x24 ANSI code page (0x1004).
+struct LocaleEntry { uint32_t lcid; char hex[8]; const char* lang; char abbr[4]; const char* ctry; char cabbr[4]; char oem[8]; char ansi[8]; };
+const LocaleEntry kLocales[27] = {
+    {0x040a, "040a", "Spanish - Traditional Sort", "ESP", "Spain", "ESP", "850", "1252"},
+    {0x040b, "040b", "Finnish", "FIN", "Finland", "FIN", "850", "1252"},
+    {0x040c, "040c", "French", "FRA", "France", "FRA", "850", "1252"},
+    {0x040f, "040f", "Icelandic", "ISL", "Iceland", "ISL", "850", "1252"},
+    {0x041d, "041d", "Swedish", "SVE", "Sweden", "SWE", "850", "1252"},
+    {0x042d, "042d", "Basque", "EUQ", "Spain", "ESP", "850", "1252"},
+    {0x080a, "080a", "Spanish", "ESM", "Mexico", "MEX", "850", "1252"},
+    {0x080c, "080c", "French", "FRB", "Belgium", "BEL", "850", "1252"},
+    {0x0c07, "0c07", "German", "DEA", "Austria", "AUT", "850", "1252"},
+    {0x0c09, "0c09", "English", "ENA", "Australia", "AUS", "850", "1252"},
+    {0x0c0a, "0c0a", "Spanish - Modern Sort", "ESN", "Spain", "ESP", "850", "1252"},
+    {0x0c0c, "0c0c", "French", "FRC", "Canada", "CAN", "850", "1252"},
+    {0x100a, "100a", "Spanish", "ESG", "Guatemala", "GTM", "850", "1252"},
+    {0x100c, "100c", "French", "FRS", "Switzerland", "CHE", "850", "1252"},
+    {0x140a, "140a", "Spanish", "ESC", "Costa Rica", "CRI", "850", "1252"},
+    {0x140c, "140c", "French", "FRL", "Luxembourg", "LUX", "850", "1252"},
+    {0x180a, "180a", "Spanish", "ESA", "Panama", "PAN", "850", "1252"},
+    {0x1c09, "1c09", "English", "ENS", "South Africa", "ZAF", "437", "1252"},
+    {0x1c0a, "1c0a", "Spanish", "ESD", "Dominican Republic", "DOM", "850", "1252"},
+    {0x200a, "200a", "Spanish", "ESV", "Venezuela", "VEN", "850", "1252"},
+    {0x240a, "240a", "Spanish", "ESO", "Colombia", "COL", "850", "1252"},
+    {0x280a, "280a", "Spanish", "ESR", "Peru", "PER", "850", "1252"},
+    {0x2c0a, "2c0a", "Spanish", "ESS", "Argentina", "ARG", "850", "1252"},
+    {0x300a, "300a", "Spanish", "ESF", "Ecuador", "ECU", "850", "1252"},
+    {0x340a, "340a", "Spanish", "ESL", "Chile", "CHL", "850", "1252"},
+    {0x380a, "380a", "Spanish", "ESY", "Uruguay", "URY", "850", "1252"},
+    {0x3c0a, "3c0a", "Spanish", "ESZ", "Paraguay", "PRY", "850", "1252"},
+};
+
+// 1.13c Storm+0xB45F  (_crtGetLocaleInfoA over kLocales; any other lcid or type goes to GetLocaleInfoA)
+int storm_B45F(const Host& h, uint32_t lcid, uint32_t type, char* out, int n) {
     int lo = 0, hi = 0x1a;
     do {
         int m = (hi + lo) / 2;
-        const uint8_t* e = table + m * 0x2c;
-        uint32_t key; memcpy(&key, e, 4);
+        const LocaleEntry& e = kLocales[m];
+        const uint32_t key = e.lcid;
         if (lcid == key) {
             const char* src;
             switch (type) {
-            case 1: src = (const char*)e + 4; break;
-            case 3: src = (const char*)e + 0x10; break;
-            case 7: src = (const char*)e + 0x18; break;
-            case 0xb: src = (const char*)e + 0x1c; break;
-            case 0x1001: memcpy(&src, e + 0xc, sizeof src); break;
-            case 0x1002: memcpy(&src, e + 0x14, sizeof src); break;
-            case 0x1004: src = (const char*)e + 0x24; break;
+            case 1: src = e.hex; break;
+            case 3: src = e.abbr; break;
+            case 7: src = e.cabbr; break;
+            case 0xb: src = e.oem; break;
+            case 0x1001: src = e.lang; break;
+            case 0x1002: src = e.ctry; break;
+            case 0x1004: src = e.ansi; break;
             default: goto fallback;
             }
             if (src && n > 0) { strncpy(out, src, n - 1); out[n - 1] = 0; return 1; }
@@ -221,6 +258,9 @@ uint32_t storm_B62C(CrtState& g, uint32_t lcid, int strict) {
     return 1;
 }
 
+static inline uint32_t CallB441(const CrtState& g, uint32_t id) { return g.b441 ? g.b441(id) : storm_B441((int16_t)id); }
+static inline uint32_t CallB62C(CrtState& g, uint32_t id, int strict) { return g.b62c ? g.b62c(id, strict) : storm_B62C(g, id, strict); }
+
 // 1.13c Storm+0xB6A1  (full language+country locale enum callback; this=ECX)
 uint32_t storm_B6A1(CrtState& g, const char* hex) {
     char buf[120];
@@ -234,7 +274,7 @@ uint32_t storm_B6A1(CrtState& g, const char* hex) {
             if (g.ctryLen && strncasecmp(g.ctryName, buf, g.ctryLen) == 0) {
                 g.flags |= 2; g.lcidB = id;
                 if (strlen(g.ctryName) == g.ctryLen) g.lcidA = id;
-            } else if (!(g.flags & 1) && storm_B441((int16_t)id)) {
+            } else if (!(g.flags & 1) && CallB441(g, id)) {
                 g.flags |= 1; g.lcidB = id;
             }
         }
@@ -246,7 +286,7 @@ uint32_t storm_B6A1(CrtState& g, const char* hex) {
             g.flags |= 0x200;
             if (!g.flagCtry && g.ctryLen && strlen(g.ctryName) == g.ctryLen) strict = 1;
         } else if (!g.flagCtry && g.ctryLen && strncasecmp(g.ctryName, buf, g.ctryLen) == 0) strict = 0;
-        if (strict >= 0 ? storm_B62C(g, id, strict) != 0 : strcasecmp(g.ctryName, buf) == 0) {
+        if (strict >= 0 ? CallB62C(g, id, strict) != 0 : strcasecmp(g.ctryName, buf) == 0) {
             g.flags |= 0x100;
             if (!g.lcidA) g.lcidA = id;
         }
@@ -263,7 +303,7 @@ uint32_t storm_B8BF(CrtState& g, const char* hex) {
     if (strcasecmp(g.ctryName, buf) == 0) { if (g.flagCtry) goto hit; strict = 1; }
     else if (g.flagCtry || !g.ctryLen || strncasecmp(g.ctryName, buf, g.ctryLen) != 0) goto done;
     else strict = 0;
-    if (!storm_B62C(g, id, strict)) goto done;
+    if (!CallB62C(g, id, strict)) goto done;
 hit:
     g.flags |= 4; g.lcidA = id; g.lcidB = id;
 done:
@@ -311,8 +351,16 @@ void storm_C0AA(CrtState& g, const Host& h) {
 // FN-probe seam for B594 / B62C: st = the nine CRT locale-search words at 0x6FC4274C..0x6FC4276C (flags, lcidA, lcidB,
 // flagCtry, flagLang, langName, ctryLen, ctryName, getLocale); the pointer words are the caller's (the getLocale word is
 // replaced by cb). which 0 = B594(hex), 1 = B62C(lcid = (uintptr_t)hex, strict), 2 = B6A1(hex), 3 = B8BF(hex). Flags and lcids are written back.
+uint32_t storm_fn_locale_hk(int which, uint32_t* st, const char* hex, uint32_t strict, int (*cb)(uint32_t, uint32_t, char*, int),
+                            uint32_t (*b441)(uint32_t), uint32_t (*b62c)(uint32_t, int));
 uint32_t storm_fn_locale(int which, uint32_t* st, const char* hex, uint32_t strict, int (*cb)(uint32_t, uint32_t, char*, int)) {
+    return storm_fn_locale_hk(which, st, hex, strict, cb, nullptr, nullptr);
+}
+// The same with the direct callees B441 / B62C scripted (the descriptors that hook them).
+uint32_t storm_fn_locale_hk(int which, uint32_t* st, const char* hex, uint32_t strict, int (*cb)(uint32_t, uint32_t, char*, int),
+                            uint32_t (*b441)(uint32_t), uint32_t (*b62c)(uint32_t, int)) {
     CrtState g{};
+    g.b441 = b441; g.b62c = b62c;
     g.flags = st[0]; g.lcidA = st[1]; g.lcidB = st[2]; g.flagCtry = st[3]; g.flagLang = st[4];
     g.langName = (const char*)(uintptr_t)st[5]; g.ctryLen = st[6]; g.ctryName = (const char*)(uintptr_t)st[7];
     g.getLocale = cb;
@@ -330,7 +378,8 @@ extern "C" int storm_fn_b45f(uint32_t lcid, uint32_t type, char* out, int n, con
                              int (*cb)(uint32_t, uint32_t, char*, int)) {
     Host h{};
     h.getLocaleInfoA = cb;
-    return storm_B45F(h, table, lcid, type, out, n);
+    (void)table;   // the table is the port's own kLocales (retail .rdata, never pinned by the capture)
+    return storm_B45F(h, lcid, type, out, n);
 }
 
 // FUNCTION-mode entry for 0xAC37 with plain types: the globals by value in/out, the Win32 seams as callbacks.

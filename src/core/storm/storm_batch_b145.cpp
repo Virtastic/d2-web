@@ -17,8 +17,9 @@ static uint8_t g_opTab[64] = { 0x8b, 0x00, 0x89, 0x00, 0xc7, 0x00, 0x23, 0x00, 0
                                0x29, 0x00, 0x81, 0x05, 0xf7, 0x02, 0xf7, 0x02, 0xf7, 0x02, 0xc1, 0x01, 0xc1, 0x01, 0xc1, 0x01 };
 static uint32_t g_dat4535c;            // DAT_6fc4535c
 static const char kRegCh[] = "?wdstabc01";      // s_?wdstabc01
-static const char* g_opNames[16];      // PTR_s_move_6fc354f8 (mnemonic strings)
-static const char* g_str688c = "0FFh"; // DAT_6fc3688c (unverified text)
+static const char* g_opNames[16] = {   // PTR_s_move_6fc354f8: the eight mnemonics, each padded to five columns
+  "move ", "and  ", "or   ", "xor  ", "add  ", "sub  ", "not  ", "ror  " };
+static const char* g_str688c = "0FFh"; // DAT_6fc3688c
 static char g_decimalPoint = '.';      // DAT_6fc406b4
 static double g_pow10Tab[21 * 10];     // DAT_6fc42918
 static uint32_t g_lastError;           // DAT_6fc45388

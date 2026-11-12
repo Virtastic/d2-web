@@ -111,15 +111,15 @@ namespace {
 // exponent path does integer division first, so 0 or 1.
 int32_t Storm_Sub1000(int32_t base, int32_t exp) {
     uint32_t u = exp < 0 ? 0u - (uint32_t)exp : (uint32_t)exp;
-    int32_t acc = 1;
+    uint32_t acc = 1, b = (uint32_t)base;   // imul wraps mod 2^32
     for (;;) {
-        if (u & 1) acc *= base;
+        if (u & 1) acc *= b;
         u >>= 1;
         if (u == 0) break;
-        base *= base;
+        b *= b;
     }
-    if (exp < 0) return (int32_t)(1 / (int64_t)acc);
-    return acc;
+    if (exp < 0) return (int32_t)(1 / (int64_t)(int32_t)acc);
+    return (int32_t)acc;
 }
 
 // 0x1050: SMemFree(p, "delete", -1).
@@ -174,15 +174,14 @@ void Storm_Sub11A0(uint32_t* p) {
 // 0x1250: deleting-destructor thunk.
 void Storm_Sub1250(uint32_t* p) { Storm_Sub11A0(p); }
 
-// 0x1290: SMemAlloc(param_2+0x18, AUINST, -2, param_3|8), zero the two head words, then 0x4390 with
-// EAX = the allocation (still in EAX after SMemAlloc) and this = null.
-uint32_t* Storm_Sub1290(int32_t param_2, uint32_t param_3, uint32_t edi) {
-    uint32_t* p = Storm_Sub1C580((uint32_t)(param_2 + 0x18), kAuinst, -2, param_3 | 8);
-    if (p == nullptr) return nullptr;
-    p[0] = 0;
-    p[1] = 0;
-    if (edi != 0) Storm_Sub4390(p, nullptr, (uint8_t*)p, (int32_t)edi);
-    return p;
+// 0x1290: stdcall(list, extra, flags), EDI = mode: SMemAlloc(extra+0x18, AUINST, -2, flags|8), zero the
+// two head words, then (EDI != 0) 0x4390 with EAX = list ([esp+0x14]), ECX = 0, stack (block, EDI).
+// The body is the shared list-record constructor (src/core/storm/storm_14a0.cpp).
+}  // namespace
+extern "C" uint32_t* storm_list_record_new(int32_t* list, int32_t extra, uint32_t flags, int32_t mode, int32_t hdr, const char* tag);
+namespace {
+uint32_t* Storm_Sub1290(uint32_t* list, int32_t extra, uint32_t flags, uint32_t edi) {
+    return storm_list_record_new((int32_t*)list, extra, flags, (int32_t)edi, 0x18, kAuinst);
 }
 
 // 0x1360: per-index (param_1 >> 16 & 0xFF) debug-slot fetch from a CRITICAL_SECTION-backed cache.
@@ -246,7 +245,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void storm_port_1250(uint32_t* r) { Storm_Sub125
 
 // 1.13c Storm+0x1290 (sub_1290): r[0]=param_2, r[1]=param_3, r[2]=EDI (mode); r[4]=allocation or 0.
 extern "C" EMSCRIPTEN_KEEPALIVE void storm_port_1290(uint32_t* r) {
-    r[4] = (uint32_t)(uintptr_t)Storm_Sub1290((int32_t)r[0], r[1], r[2]);
+    r[4] = (uint32_t)(uintptr_t)Storm_Sub1290((uint32_t*)(uintptr_t)r[1], (int32_t)r[2], r[3], r[0]);   // r[] = (EDI, list, extra, flags)
 }
 
 // 1.13c Storm+0x1310 (sub_1310): clear the list whose head is at EBX+8; EBX is r[0].

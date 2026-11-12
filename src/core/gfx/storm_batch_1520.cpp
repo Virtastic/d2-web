@@ -54,7 +54,7 @@ void storm_sub_4b80(uint32_t* node) { storm_unlink(node); storm_unlink(node); }
 // 0x4390: insert `node` into the relative list whose anchor object is `list`; mode 1 links it as
 // the tail (tag = previous link address), any other mode links it after the head. Retail carries
 // the anchor in EAX and a default `this` in EAX+4 -- both are explicit here.
-void storm_link(uint32_t* list, uint32_t* node, uint32_t mode) {
+[[maybe_unused]] void storm_link(uint32_t* list, uint32_t* node, uint32_t mode) {
     storm_unlink(node);
     uint32_t* anchor = list + 1;
     if (mode != 1) {
@@ -257,32 +257,25 @@ EMSCRIPTEN_KEEPALIVE void storm_port_1520(uint32_t* r) {
 
 // 1.13c Storm+0x1560: allocate an AUBREAKCMD record of size+0xc, clear its two list dwords,
 // and insert it (third register argument = insert mode) into the caller's list.
+// SMemAlloc(size + 0xC, AUBREAKCMD, -2, flags | 8) through the shared constructor (src/core/storm/storm_14a0.cpp).
+// r[] = (EDI mode, list, size, flags), the FN descriptor order.
+extern "C" uint32_t* storm_list_record_new(int32_t* list, int32_t extra, uint32_t flags, int32_t mode, int32_t hdr, const char* tag);
+extern "C" uint32_t* Storm_Sub1560(uint32_t* list, uint32_t size, uint32_t flags, uint32_t mode) {
+    return storm_list_record_new((int32_t*)list, (int32_t)size, flags, (int32_t)mode, 0xc, "..\\AUBREAKCMD");
+}
 extern "C"
 EMSCRIPTEN_KEEPALIVE void storm_port_1560(uint32_t* r) {
-    uint32_t* p = (uint32_t*)storm_mem_alloc(r[1] + 0xc);
-    if (p != nullptr) {
-        p[0] = 0;
-        p[1] = 0;
-    }
-    if (r[3] != 0) storm_link((uint32_t*)(uintptr_t)r[0], p, r[3]);
-    r[4] = (uint32_t)(uintptr_t)p;
+    r[4] = (uint32_t)(uintptr_t)Storm_Sub1560((uint32_t*)(uintptr_t)r[1], r[2], r[3], r[0]);
 }
 
 // 1.13c Storm+0x15E0: the same constructor for an AUWNDREC record. `mode` is retail's EDI
 // (insert mode for 0x4390).
 extern "C" uint32_t* Storm_Sub15E0(uint32_t* list, uint32_t size, uint32_t flags, uint32_t mode) {
-    (void)flags;
-    uint32_t* p = (uint32_t*)storm_mem_alloc(size + 0xc);
-    if (p != nullptr) {
-        p[0] = 0;
-        p[1] = 0;
-    }
-    if (mode != 0) storm_link(list, p, mode);
-    return p;
+    return storm_list_record_new((int32_t*)list, (int32_t)size, flags, (int32_t)mode, 0xc, "..\\AUWNDREC");
 }
 extern "C"
 EMSCRIPTEN_KEEPALIVE void storm_port_15e0(uint32_t* r) {
-    r[4] = (uint32_t)(uintptr_t)Storm_Sub15E0((uint32_t*)(uintptr_t)r[0], r[1], 0, r[3]);
+    r[4] = (uint32_t)(uintptr_t)Storm_Sub15E0((uint32_t*)(uintptr_t)r[1], r[2], r[3], r[0]);
 }
 
 // 1.13c Storm+0x1660: destroy the critical section at +0x50, then the base object (0x1990).
