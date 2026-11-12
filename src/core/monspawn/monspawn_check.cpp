@@ -1208,7 +1208,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int d2_session_client_screen_switch_frame(int fr
 static void resetSessionClientMapMirror() {
     if (g_sessionClientPlayerUnit) UNITS_FreeUnit(g_sessionClientPlayerUnit);
     g_sessionClientPlayerUnit = nullptr;
-    d2client::weather::reset(); d2client_ambient::reset(); d2_client_monster_idle_reset(); sessionClientMonsterModeReset(); d2_client_attack_roll_reset(); g_sessionClientRoomsSeen.clear(); g_sessionClientFrame = 0; d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset();
+    d2client::weather::reset(); d2client_ambient::reset(); d2_client_monster_idle_reset(); sessionClientMonsterModeReset(); d2_client_attack_roll_reset(); g_sessionClientRoomsSeen.clear(); g_sessionClientFrame = 0; d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset(); { extern void d2_client_monster_hit_reset(); d2_client_monster_hit_reset(); }
     if (g_sessionClientActOwned) d2_drlg_act_end();
     g_sessionClientActOwned = false;
     g_sessionClientMapStarted = false;
@@ -8586,7 +8586,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             d2client_session_event_packets(sessionClientHeroSeed(), ev ? (uint32_t)ev->nCycleIndex : 0u, g_sessionClientFrame + 1);
         }
         sessionClientMonsterHitPass(g_sessionClientFrame + 1);
-        { extern void d2_client_monster_order_roll(); d2_client_monster_order_roll(); }
+        { extern void d2_client_monster_order_roll(); d2_client_monster_order_roll(); extern void d2_client_monster_hit_flush(); d2_client_monster_hit_flush(); }   // 1.13c D2Client+0x4C500 (blood)
         ++g_sessionClientFrame;
         sessionClientRoomPass();
         d2client_critter::tick(g_targetPlayer, g_sessionClientFrame);

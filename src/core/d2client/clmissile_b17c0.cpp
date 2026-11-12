@@ -10,6 +10,7 @@
 // 0xB92B0) drops a segment where it stands whenever its path entered a new subtile on the last step (D2Common #10203, path
 // flags & 8). The client target is the hovered unit even when it is dead (the server clears it and refuses the cast). Not
 // simulated: the 0x51410 caster gate and the town test (#10057), both pass in the recorded sessions.
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 #include <D2Collision.h>
@@ -27,6 +28,7 @@
 #include <Units/Units.h>
 
 namespace d2client_ambient { void submit(int32_t row); }
+namespace d2client_unitseed { uint32_t roll(const D2ActiveRoomStrc* r); }
 
 namespace d2client_clmissile {
 namespace {
@@ -52,7 +54,11 @@ bool nextHitHeld(D2UnitStrc* target) {
     return false;
 }
 
+std::vector<const D2UnitStrc*> foreign;   // missiles another unit owns (a monster's blood), not the local player
+bool isForeign(const D2UnitStrc* unit) { for (const D2UnitStrc* f : foreign) if (f == unit) return true; return false; }
+
 void freeMissile(D2UnitStrc* unit) {
+    for (size_t i = 0; i < foreign.size(); ++i) if (foreign[i] == unit) { foreign.erase(foreign.begin() + i); break; }
     if (unit->pDynamicPath) { PATH_FreeDynamicPath(nullptr, unit->pDynamicPath); unit->pDynamicPath = nullptr; }
     MISSILE_FreeMissileData(unit);
     UNITS_FreeUnit(unit);
@@ -222,17 +228,52 @@ bool update(D2UnitStrc* unit, D2UnitStrc* owner) {
                 if (hit && !targetDead(hit)) return !terminal(unit, owner, false, hit);
             }
         }
-        // The local owner's first frame catches up once (single player, the owner is the local player).
-        if (pass || MISSILE_GetRemainingFrames(unit) != 1 || !PATH_GetVelocity(path)) return true;
+        // The local player's missile catches up its first frame once (0xB17C0: the owner 0x560D0 is [0x11BBFC]).
+        if (pass || isForeign(unit) || MISSILE_GetRemainingFrames(unit) != 1 || !PATH_GetVelocity(path)) return true;
     }
     return true;
 }
+
+// 1.13c D2Client+0xB3060 (pCltDoFunc 2, the blood missiles): once the animation has ended the missile is flagged (+0xC4
+// bit 0x10000) and stops; while it stands on the view its frame count is held at 0x80 and it updates (0xB17C0), off the
+// view it ends (0xB1420). ponytail: the view test (#10651/#11142 against 0x1C9960 - 0x1CC418, 0x1C995C - 8 and the
+// 0x1A9E14 x 0x1A9E18 + 0x40 view) is read as on the view: the session has no camera, and the recorded sessions keep
+// their blood on screen to the end.
+bool bleedStep(D2UnitStrc* unit, D2UnitStrc* owner) {
+    static_assert(offsetof(D2UnitStrc, dwFlags) == 0xC4 + 18 * (sizeof(void*) - 4), "D2UnitStrc +0xC4");
+    if (UNITS_IsAtEndOfFrameCycle(unit)) {
+        unit->dwFlags |= 0x10000u;
+        PATH_SetVelocity(unit->pDynamicPath, 0, __FILE__, __LINE__);
+    }
+    MISSILE_SetCurrentFrame(unit, 0x80);
+    return update(unit, owner);
+}
+
+bool step(D2UnitStrc* unit, D2UnitStrc* owner) {
+    const D2MissilesTxt* txt = row(unit);
+    return txt && txt->wCltDoFunc == 2 ? bleedStep(unit, owner) : update(unit, owner);
+}
+}
+
+// 1.13c D2Client+0xB0450 (request flags 0x20, skill 0): a client missile from the source unit's position toward (tx, ty).
+// The unit creator (0x57BF0 -> 0xA7400) rolls the client room seed at the missile's position.
+void spawn(D2UnitStrc* source, int32_t missileId, int32_t level, int32_t tx, int32_t ty) {
+    const D2MissilesTxt* txt = DATATBLS_GetMissilesTxtRecord(missileId);
+    D2ActiveRoomStrc* room = source ? UNITS_GetRoom(source) : nullptr;
+    if (!txt || !room || !source->pDynamicPath) return;
+    const int32_t x = UNITS_GetXPosition(source), y = UNITS_GetYPosition(source);
+    if (D2ActiveRoomStrc* at = COLLISION_GetRoomBySubTileCoordinates(room, x, y)) room = at;
+    d2client_unitseed::roll(room);
+    std::vector<D2UnitStrc*>& list = inUpdate ? born : missiles;
+    const size_t before = list.size();
+    create(source, missileId, 0, level, x, y, tx, ty, txt->nActivate);
+    if (list.size() > before) foreign.push_back(list.back());
 }
 
 void reset() {
     for (D2UnitStrc* unit : missiles) freeMissile(unit);
     for (D2UnitStrc* unit : born) freeMissile(unit);
-    missiles.clear(); born.clear(); pending.clear(); nextHits.clear(); frame = 0; nextId = 1;
+    missiles.clear(); born.clear(); foreign.clear(); pending.clear(); nextHits.clear(); frame = 0; nextId = 1;
 }
 
 // The client's cast of skillId at a unit target (its path target) or a point; the action runs kActionDelay frames later.
@@ -246,7 +287,7 @@ void cast(int32_t skillId, int32_t level, D2UnitStrc* target, int32_t tx, int32_
 void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)) {
     ++frame;
     inUpdate = true;
-    for (size_t i = 0; i < missiles.size();) { if (update(missiles[i], owner)) ++i; else missiles.erase(missiles.begin() + i); }
+    for (size_t i = 0; i < missiles.size();) { if (step(missiles[i], owner)) ++i; else missiles.erase(missiles.begin() + i); }
     inUpdate = false;
     missiles.insert(missiles.end(), born.begin(), born.end()); born.clear();
     for (size_t i = 0; i < pending.size();) {

@@ -17,6 +17,8 @@
 #include "UNIT/SUnitMsg.h"
 #include "UNIT/SUnitProxy.h"
 
+extern "C" void d2_client_monster_hit_event(D2UnitStrc*, int32_t, uint32_t);   // src/core/d2client/d2client_4c500.cpp
+
 
 #pragma pack(push, 1)
 struct D2UnkMonMsgStrc
@@ -92,6 +94,7 @@ void __fastcall sub_6FC659E0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc*
                 nHpPct |= 0x80;
             }
 
+            d2_client_monster_hit_event(pUnit, 19, nHpPct);   // the client's life update (src/core/d2client/d2client_4c500.cpp)
             D2GAME_PACKETS_SendPacket0x0C_6FC3C8A0(pClient, 0xCu, UNIT_MONSTER, pUnit->dwUnitId, 19, pUnit->dwLastHitClass, nHpPct);
         }
     }
@@ -342,6 +345,7 @@ void __fastcall sub_6FC65C70(D2GameStrc* pGame, D2UnitStrc* pMonster, D2ClientSt
     }
     else
     {
+        if (nAnimMode == MONMODE_GETHIT) d2_client_monster_hit_event(pMonster, 6, nDirection);   // the client's get-hit order (src/core/d2client/d2client_4c500.cpp)
         if (nHeader == 0x68)
         {
             D2GAME_PACKETS_SendPacket0x6A_6FC3CEE0(pClient, 0x6Au, pMonster->dwUnitId, a4, v8, v9, nDirection);

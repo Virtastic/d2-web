@@ -11,6 +11,7 @@
 // ponytail: units that reach a room only after creation (a dropped item, a unit moving into a room before the
 // client sees it) are not counted where the client would count them; a live player is taken as the local
 // one (the sessions are single-player).
+#include <cstddef>
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
@@ -28,6 +29,8 @@ namespace {
 struct Seed { uint32_t lo, hi; };
 std::unordered_map<const D2ActiveRoomStrc*, Seed> g_room;
 std::unordered_map<uint64_t, uint32_t> g_unit;
+// the client monster's live seed (+0x20/+0x24) after its init rolls, per game (a session runs more than one)
+std::unordered_map<const D2GameStrc*, std::unordered_map<uint64_t, Seed>> g_seed;
 struct Pending { D2GameStrc* game; uint32_t type, id; };
 std::vector<Pending> g_pending;
 uint64_t key(uint32_t type, uint32_t id) { return uint64_t(type) << 32 | id; }
@@ -57,10 +60,12 @@ uint32_t next(Seed& s) { const uint64_t v = uint64_t(s.lo) * 0x6ac690c5ull + s.h
 // 0x161 40, 0x158/0x160/0x165 0. #10706 (D2Common+0x34BE0, PATH_SetDirection) sets it. ponytail: base id
 // 0x12D's start direction (+0x16C20) is not modelled; it keeps the server's.
 void monster_direction(D2UnitStrc* u, uint32_t init) {
+    Seed& s = g_seed[u->pGame][key(u->dwUnitType, u->dwUnitId)];
+    s = { init, 666 };
     const D2MonStatsTxt* ms = DATATBLS_GetMonStatsTxtRecord(u->dwClassId);
-    if (!ms || !u->pDynamicPath || (ms->dwMonStatsFlags & (1u << MONSTATSFLAGINDEX_NPC))) return;
-    Seed s = { init, 666 };
+    if (!ms || !u->pDynamicPath) return;
     if (u->dwFrameCountPrecise >= 1) next(s);
+    if (ms->dwMonStatsFlags & (1u << MONSTATSFLAGINDEX_NPC)) return;
     uint8_t dir = 0;
     const D2MonStats2Txt* ms2 = UNITS_GetMonStats2TxtRecordFromMonsterId(u->dwClassId);
     if (ms2 && (ms2->nModeFlags[0] & (1u << 2))) dir = uint8_t(next(s) & 0x3f);
@@ -111,6 +116,15 @@ void flush() {
 }
 // The client unit's init seed (+0x28); its seed is {init, 666}.
 uint32_t init(uint32_t type, uint32_t id) { flush(); auto it = g_unit.find(key(type, id)); return it == g_unit.end() ? 0 : it->second; }
+// The client monster's seed (+0x20/+0x24) as {lo, hi}; null when the client never created the unit.
+uint32_t* unit_seed(const D2GameStrc* game, uint32_t type, uint32_t id) {
+    static_assert(sizeof(Seed) == 8 && offsetof(Seed, hi) == 4, "Seed is {lo, hi}");
+    flush();
+    auto g = g_seed.find(game);
+    if (g == g_seed.end()) return nullptr;
+    auto it = g->second.find(key(type, id));
+    return it == g->second.end() ? nullptr : &it->second.lo;
+}
 }
 void d2client_unitseed_room(const D2ActiveRoomStrc* r, uint32_t lowSeed) { d2client_unitseed::room(r, lowSeed); }
 void d2client_unitseed_created(D2UnitStrc* u) { d2client_unitseed::created(u); }
