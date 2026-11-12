@@ -13,7 +13,7 @@ struct D2cSeam {
         return call(ctx, rva, w);
     }
     // The word retail has for a module address (a vtable or string at D2Client+rva): the binding picks the representation (the probe's
-    // is 0xB2000000|rva, the capture's tag for a module pointer); not a callee, never logged.
+    // is D2Client's preferred base plus rva, as in retail's memory); not a callee, never logged.
     uint64_t mod(uint32_t rva) const { return (*this)(0xC0000000u | rva); }
 };
 // The skills.txt / data-table words these ports read: sgptDataTables+0xB98 rows (stride 0x23C), +0xBA0 count, +0xC4 states,

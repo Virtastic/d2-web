@@ -48,8 +48,8 @@ void bind_66950(U*e,U(*getter)(),void(*pre)(U*,U),void(*fatal)(U)){
 
 // 1.13c D2Client+0x66B80  (ECX = o). vt* are the two vtable addresses; delChild calls (*child)->vt[0](1).
 void dtor_66b80(U*o,U vtMid,U vtBase,void(*delChild)(U)){ o[0]=vtMid; if(o[2]) delChild(o[2]); o[0]=vtBase; }
-// 1.13c D2Client+0x66C40
-void dtor_66c40(U*o,U vtMid,U vtBase){ o[0]=vtMid; o[0]=vtBase; }
+// 1.13c D2Client+0x66C40; returns o (left in EAX).
+U* dtor_66c40(U*o,U vtMid,U vtBase){ o[0]=vtMid; o[0]=vtBase; return o; }
 
 // List panel (`this` = obj). Layout: lines at +0x300e*i, text[6] at +8+0x800*k (0x3ff chars + NUL), tag at +0x300a,
 // count u16 @0x180748, selected @0x180738, first-visible @0x180730, visible-count @0x18074e.
