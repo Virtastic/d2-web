@@ -116,8 +116,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_fn_d2game_C9400(void* q, const D2GameBatchC7130Env* e)
 {
     const uint32_t cb[6] = {(e->modBase + 0xC4EA0), (e->modBase + 0xC85A0), (e->modBase + 0xC9190), (e->modBase + 0xC3620), (e->modBase + 0xC3320), (e->modBase + 0x1046A8)};
-    w32(q, 0xa8, (e->modBase + 0xC5DB0));
     questInit(e, q, cb, "..\\Source\\D2Game/Quests/a2q4.cpp", 0x3dd, 0xc, 0xd, 5, 0x12);
+    w32(q, 0xa8, (e->modBase + 0xC5DB0));   // after the 0xA0..0xDB clear, as retail stores it
     w16(q, 0x9c, 0); w32(q, 0xec, (e->modBase + 0xC2080)); w32(q, 0xf0, (e->modBase + 0xC69D0));
     uint8_t* p = (uint8_t*)e->ptr(r32(q, 0x18));
     p[0] = p[1] = p[2] = p[3] = 0; p[4] = 0;

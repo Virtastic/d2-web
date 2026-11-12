@@ -454,8 +454,8 @@ void TASK_QueueIncrement(uint32_t delta, uint32_t* rec, void* queue)
     const uint32_t value = rec[0] + delta;
     rec[0] = value;
     void* node = rdptr(queue, 8);
-    while (node != (void*)((uint8_t*)queue + 8) && !(rd32((uint8_t*)node - 0xC, 0) != value &&
-                                                      (int32_t)(rd32((uint8_t*)node - 0xC, 0) - value) > 0))
+    while (node != (void*)((uint8_t*)queue + 8) && rd32((uint8_t*)node - 0xC, 0) != value &&
+           (int32_t)(rd32((uint8_t*)node - 0xC, 0) - value) >= 0)
         node = rdptr(node, 0);
     if (node == nullptr) d2game_fatal(0x6C);
     uint32_t* link = rec + 3;

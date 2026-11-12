@@ -22,10 +22,10 @@ struct D2GameB82Env {
     int (*ord10601)(uintptr_t a, const char* file, uint32_t line);
     void (*fn_586F0)(void);
     void* (*fn_8F930)(uintptr_t game, void* args);
-    void (*fn_99100)(void* a);
-    void (*fn_98A90)(void);
-    void (*fn_99730)(void* a, void* b);
-    void (*fn_982F0)(void* a, void* b);
+    void (*fn_99100)(void* game, const void* player);   // 0x79100: EAX = player, one stack word game
+    void (*fn_98A90)(void* game);                       // 0x78A90: one stack word game
+    void (*fn_99730)(void* a, void* b, uint32_t c, uint32_t d, uint32_t e);   // ECX, EDX, three stack words
+    void (*fn_982F0)(void* a, void* b, uint32_t c, uint32_t d, uint32_t e);
     void (*fn_98550)(void* a, void* b, uint32_t c, uint32_t d, uint32_t e, uint32_t f, uint32_t g);
     void (*fn_8A3E0)(const void* buf, uint32_t n);
     void (*fn_97D10)(void* unit, const void* p);
@@ -42,7 +42,8 @@ static const uint8_t* findUnit(const uint8_t* game, uint32_t base, uint32_t id, 
     return nullptr;
 }
 
-// 1.13c D2Game+0x79850
+// 1.13c D2Game+0x79850 -- ECX = game, EDX = player, two stack words never read (ret 8). The mask is the low byte of
+// gdwBitMasks[2] ([gdwBitMasks + 8]).
 extern "C" void D2Game_79850_Named(void* p1, const uint8_t* p2, const D2GameB82Env* e)
 {
     int mode = 0;
@@ -64,9 +65,9 @@ extern "C" void D2Game_79850_Named(void* p1, const uint8_t* p2, const D2GameB82E
             }
         }
     }
-    if (call) { e->fn_99100(p1); e->fn_98A90(); }
-    if (mode == 0) e->fn_99730(p1, (void*)p2);
-    else if (mode != 0x13) e->fn_982F0(p1, (void*)p2);
+    if (call) { e->fn_99100(p1, p2); e->fn_98A90(p1); }
+    if (mode == 0) e->fn_99730(p1, (void*)p2, 0x11, 0, 0);
+    else if (mode != 0x13) e->fn_982F0(p1, (void*)p2, 1, 0, 0);
     else e->fn_98550(p1, (void*)p2, 0, 4, 0xffffffffu, 0, 0);
 }
 

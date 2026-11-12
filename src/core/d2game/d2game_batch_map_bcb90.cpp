@@ -96,7 +96,7 @@ void D2GAME_C6D20(P in_EAX, P param_1)
         P sub = rp(q, 0x18);
         bool z = rb(sub, 9) == 0;
         if (z) wb(sub, 9, 1);
-        r_354A0(AD(q), 0, 2, z);
+        r_354A0(q, 0, 2, z);       // ECX = the record itself
     } else if (b >= 3) {
         return;
     }

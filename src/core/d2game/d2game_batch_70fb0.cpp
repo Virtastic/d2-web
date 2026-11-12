@@ -158,18 +158,19 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_758D0(int* param1, void* eax, 
 // ---- 0x75A40 (NAMED, last) / 0x75C60 ---------------------------------------------------------------
 
 struct D2Game75c60Env {
-    int (*a10362)(); void* (*a10237)(uint8_t); uint32_t (*a10973)();
+    int (*a10362)(int32_t* unit, uint32_t s); void* (*a10237)(uint8_t); uint32_t (*a10973)(int32_t* unit, int a, int b);
     int32_t (*spawn)(void* game, int, int32_t* unit, int, int, int, int, int, int, int);
     void (*f75a40)(void* game, uint32_t tag, int32_t* unit);
 };
-// 1.13c-NAMED D2Game+0x75C60: EAX=unit, EBX=game. GUESS: a10362/a10973 register args hidden.
-extern "C" uint32_t D2Game_75C60_Named(int32_t* unit, void* game, const D2Game75c60Env* e) {
+// 1.13c D2Game+0x75C60 (disassembled): EAX = unit, EBX = game, one stack word s (ret 4). k = 0xACB8(unit, s);
+// the level is the 0xA7BA(game+0x6d) record's +0x10 plus one, or 0xA42A(unit, 0xc, 0) when unit+0xc4 bit 9 is set.
+extern "C" uint32_t D2Game_75C60_Named(int32_t* unit, void* game, uint32_t s, const D2Game75c60Env* e) {
     if (!unit) return 0;
-    int k = e->a10362();
+    int k = e->a10362(unit, s);
     if (k < 0) return 0;
     void* t = e->a10237(rd8(game, 0x6d));
     int lvl = (int)rd32(t, 0x10) + 1;
-    if ((unit[0x31] >> 9) & 1) lvl = (int)e->a10973();
+    if ((unit[0x31] >> 9) & 1) lvl = (int)e->a10973(unit, 0xc, 0);
     if (e->spawn(game, k, unit, 0, lvl, 0, 0, 0, 0, 1)) e->f75a40(game, (uint32_t)k, unit);
     return 1;
 }

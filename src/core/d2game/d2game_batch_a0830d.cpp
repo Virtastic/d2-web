@@ -1021,7 +1021,7 @@ int D2GAME_A8E80(int* unit, int* target, uint32_t a3, int a4, int* pt, int* ctx)
         if (Ordinal_10494(target, 0xb)) { W[7] = 0; W[8] = 0; }
         if (fireRes > lightRes) W[6] -= 10;
         if (fireRes < lightRes) W[6] += 10;
-        if (noLos) { W[5] = 0; W[6] = 0; }
+        if (!noLos) { W[5] = 0; W[6] = 0; }   // retail zeroes both when 10839 answers nonzero (ebx == 0 at 0xA922A)
         if (chaos) W[15] = 10;
         done = true;
     }
