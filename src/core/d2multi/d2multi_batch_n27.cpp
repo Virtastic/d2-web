@@ -5,7 +5,7 @@ extern int d2multi_ord423(const char* name, int, void* val) W;                  
 extern void d2multi_ord426(const char* app, const char* name, int, const char* app2) W; // write default
 extern void d2multi_ord578(void* val, int len, const void* tbl, const char* app) W;
 extern void d2multi_ord10185() W; extern void d2multi_ord10097() W;
-extern void d2multi_ord10060(int, int, int, int, int, int) W;
+extern void d2multi_ord10060(const int32_t* blk, uint32_t edx) W; // realm-client (MCP client) request export, register-passed: ECX = six-dword block, EDX = counter dword
 extern void d2multi_13DE0() W; extern void d2multi_13F20() W;
 extern const uint8_t DAT_6f9e74e8[] W;
 extern int32_t DAT_6fa09f20 W, DAT_6fa09dcc W, DAT_6fa09f18 W; extern uint8_t* DAT_6fa09f14 W;
@@ -31,6 +31,7 @@ void d2multi_14850(void) {
     int16_t s;
     do { s = DAT_6f9e9c34 + 1; DAT_6f9e9c34 = 0; } while (s == 0); // 16-bit counter, skips 0
     DAT_6f9e9c34 = s;
-    d2multi_ord10060(0, 0, 0, 0, 0, flag);
-    DAT_6fa09f18 = DAT_6f9e9c34;
+    int32_t blk[6] = { 0, 0, 0, 0, 0, flag };
+    d2multi_ord10060(blk, *(const uint32_t*)&DAT_6f9e9c34);
+    *(int16_t*)&DAT_6fa09f18 = DAT_6f9e9c34; // 16-bit store, the high half is left as it was
 }
