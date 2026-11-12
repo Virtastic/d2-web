@@ -2319,6 +2319,7 @@ extern "C" bool g_sessionJoinUnits;   // defined below; the local game's client 
 static void updateSessionPendingRooms();
 static int g_sessionAttachAtX = -1, g_sessionAttachAtY = -1;   // >= 0 only around a fixture create at a given point
 static int g_sessionStartX = -1, g_sessionStartY = -1;   // F67: the town's start point, set by d2_monspawn_level
+static int g_sessionJoinStartX = -1, g_sessionJoinStartY = -1;   // the start point the local game's join placed the player at
 // Retail's client holds the 3x3 rooms around the town's start room (a retail recording: 15 class-0x25 objects, all inside it), not the 7x7 status union.
 static int g_townSpawnX = -1, g_townSpawnY = -1;   // the town's act-start point of any session create (lazy or eager)
 static bool inLatticeAt(const D2DrlgRoomStrc* r, int cx, int cy) {
@@ -2413,9 +2414,16 @@ EMSCRIPTEN_KEEPALIVE int d2_monspawn_level(uint32_t seed, int difficulty, int ac
     const bool sessionJoin = town && g_sessionJoinUnits && g_sessionCreating && g_townCentreX < 0 && g_sessionAttachAtX < 0;   // not a fixture create at a given point (the recorded sessions' create keeps its own room set)
     g_sessionStartX = g_sessionStartY = -1;
     g_townSpawnX = -1;
+    // The join places a player, so its start point is searched at a player's size (D2Game's join passes
+    // UNITS_GetUnitSizeX of the player, which is 2 for every player): a point-sized search lands a subtile off.
+    const int startSize = sessionJoin ? 2 : 1;
+    g_sessionJoinStartX = g_sessionJoinStartY = -1;
     if (town && ((g_monspawnSessionCreate && g_sessionActivationWave) || sessionJoin)) {
         int sx = 0, sy = 0;
-        if (DUNGEON_FindActSpawnLocationEx(pAct, levelId, 0, &sx, &sy, 1)) { g_sessionStartX = sx; g_sessionStartY = sy; }
+        if (DUNGEON_FindActSpawnLocationEx(pAct, levelId, 0, &sx, &sy, startSize)) {
+            g_sessionStartX = sx; g_sessionStartY = sy;
+            if (sessionJoin) { g_sessionJoinStartX = sx; g_sessionJoinStartY = sy; }
+        }
     }
     // T12: retail builds a town in the ORDER its sight calls allocate rooms, and the order is what a room's
     // shared-edge cells see (a neighbour built already merges, one not yet built is rolled on THIS room's seed):
@@ -2585,7 +2593,10 @@ static uint32_t g_sessionJoinLoadLength = 0;
 // One client path: a joining client is told every monster in the rooms around it (retail's LEVEL_AddClient sends each unit of an
 // adjacent room, the 0xAC assign first). Off for the headless sessions, whose join drops those bytes.
 extern "C" bool g_sessionJoinUnits = false;   // the local game's client is told each monster of every room it joins (sub_6FC33020)
-EMSCRIPTEN_KEEPALIVE void d2_session_join_units(int on) { g_sessionJoinUnits = on != 0; }
+// The switch arms the NEXT create only: each create takes it and clears it, so a create made without it (a fixture's
+// own create after the shell's join) is a headless session, not a second join.
+static bool g_sessionJoinUnitsNext = false;
+EMSCRIPTEN_KEEPALIVE void d2_session_join_units(int on) { g_sessionJoinUnitsNext = on != 0; }
 // How the join walk reveals rooms to the local game's client before their units (see sub_6FC33020); 0 is off.
 extern "C" int g_joinWalkRevealMode;
 static int g_sessionJoinRevealMode = 0;
@@ -3578,7 +3589,13 @@ static void updateSessionSnapshot() {
 
 // First browser-facing lifetime API.  It deliberately builds on the same game, level and player
 // fixture used by the retail-diff scenarios, but keeps them alive across commands and ticks.
+// How many games have been made: the page's joined client compares it with the game it joined, so a game made under
+// it (a fixture create straight on the engine) is left and the new one joined.
+static uint32_t g_sessionCreates = 0;
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_creates() { return g_sessionCreates; }
 static int d2_session_create_for_class(uint32_t seed, int difficulty, int act, int levelId, int playerClass, bool startItems = true) {
+    ++g_sessionCreates;
+    g_sessionJoinUnits = g_sessionJoinUnitsNext; g_sessionJoinUnitsNext = false;
     if (difficulty < 0 || difficulty > 2 || act < 0 || act > 4 || levelId < 0 || playerClass < 0 || playerClass >= 7) return 0;
     g_sessionMonsterLights.clear();
     g_sessionPlayerClass = playerClass;
@@ -3698,12 +3715,12 @@ static void placeSessionPlayerAtTownSpawn(int act, int levelId) {
     if (!g_sessionLive || !g_game || !g_targetPlayer) return;
     if (act < 0 || act >= 5 || !g_game->pAct[act]) return;
     if (levelId != DUNGEON_GetTownLevelIdFromActNo(act)) return;
+    // The join already stood the player on the start point: a second search would see the player's own
+    // collision there and move it a subtile off.
+    if (g_sessionJoinUnits && g_sessionJoinStartX >= 0 && UNITS_GetXPosition(g_targetPlayer) == g_sessionJoinStartX && UNITS_GetYPosition(g_targetPlayer) == g_sessionJoinStartY) return;
     int x = 0, y = 0;
     if (DUNGEON_FindActSpawnLocationEx(g_game->pAct[act], levelId, 0, &x, &y, UNITS_GetUnitSizeX(g_targetPlayer)))
-    {
-        if (g_sessionJoinUnits && UNITS_GetXPosition(g_targetPlayer) == x && UNITS_GetYPosition(g_targetPlayer) == y) return;   // the join already placed it here
         d2_session_fixture_place_player(x, y);
-    }
 }
 
 EMSCRIPTEN_KEEPALIVE int d2_session_create_class(uint32_t seed, int difficulty, int act, int levelId, int playerClass) {
