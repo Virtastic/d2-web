@@ -550,7 +550,10 @@ bool d2_realm_client_motion_attach(D2UnitStrc* unit, int x, int y) {
     unit->nAct = act->nAct;
     unit->pDrlgAct = act;
     unit->dwFlags |= UNITFLAG_ISCLIENTUNIT;
-    PATH_AllocDynamicPath(nullptr, room, x, y, unit, FALSE);
+    // Every client path is made with the last argument 1 (D2Client+0x4D160 monsters, +0x191E0 players, +0xB0170
+    // into D2Common #11003, +0x36030): path flag 0x10, under which #10831 (+0xD820) neither gates a monster on the
+    // distance byte +0x94 (zero from the alloc; no client caller of #10022/#10311 sets it) nor counts it down.
+    PATH_AllocDynamicPath(nullptr, room, x, y, unit, TRUE);
     return unit->pDynamicPath != nullptr;
 }
 
@@ -755,6 +758,10 @@ static void refresh_monster_motion_view(D2RealmClientMonster& monster) {
     monster.view.reserved = (monster.motionUnit->pAnimSeq ? 0x01u : 0u) |
         (stats2 && (stats2->dwModeFlags & MONSTATS2MODEFLAG_DD) ? 0x02u : 0u) |
         (monster.motionUnit->pAnimSeq ? ((monster.motionUnit->dwSeqMode & 0xFu) << 4) : 0u);   // bits 4-7: the sequence's current mode (SQ draws as it)
+    // The life byte is the unit's own stat 6 (the byte << 8 against the fixed maximum): a death zeroes it, a
+    // stop or hit record with a zero byte leaves it.
+    if (monster.motionUnit->pStatListEx && !is_own_hireling(monster.view.guid))
+        monster.view.hpPct = static_cast<uint32_t>(STATLIST_UnitGetStatValue(monster.motionUnit, 6, 0)) >> 8;
     if (!monster.motionUnit->pDynamicPath) return;
     monster.view.x = static_cast<uint32_t>(PATH_GetXPosition(monster.motionUnit->pDynamicPath));
     monster.view.y = static_cast<uint32_t>(PATH_GetYPosition(monster.motionUnit->pDynamicPath));
@@ -1507,6 +1514,11 @@ static void path_drop_points_10159(D2DynamicPathStrc* path) {
 static int pkt_monster_action_case(D2RealmClientMonster& monster, uint32_t code, const uint32_t* l) {
     D2UnitStrc* const unit = monster.motionUnit;
     using d2::realm::MonsterAction;
+    // 1.13c D2Client+0x4DC70: every case but 0x13 sets the path-retry flag (D2Common #10054, +0x34EE0) before
+    // its work: on for the moves to a spot (0, 1, 0x17, 0x18), off for the rest. A neutral monster whose
+    // move was refused re-plans every second frame while it is on (D2Common #10340, the 0x4F4A0 update).
+    if (code != 0x13 && unit && unit->pDynamicPath)
+        D2COMMON_10212_PATH_SetMoveFlags(unit, code == 0 || code == 1 || code == 0x17 || code == 0x18);
     switch (d2::realm::monsterAction(code)) {
     case MonsterAction::Move: {
         int x = 0, y = 0;
@@ -1887,6 +1899,14 @@ static int apply_player_stop(const uint8_t* packet, int length) {
         D2UnitStrc* const player = find_realm_client_unit(stop.unitType, stop.guid);
         if (!player) return 0;
         return apply_player_life_action(player, stop.action, stop.x, stop.y, stop.hitClass) > 0 ? 1 : 0;
+    }
+    // D2Client+0x19830 cases 1 and 0x17: the record's spot becomes the path's target and a planned route
+    // walks (town walk in town) or runs; a refusal stands.
+    if (stop.unitType == UNIT_PLAYER && (stop.action == 1 || stop.action == 0x17)) {
+        D2UnitStrc* const player = find_realm_client_unit(stop.unitType, stop.guid);
+        if (!player) return 0;
+        return d2_realm_client_motion_apply_player_move(player, stop.action, 0,
+            static_cast<uint16_t>(stop.x), static_cast<uint16_t>(stop.y)) > 0 ? 1 : 0;
     }
     const int mode = d2::realm::playerStopModeFromAction(stop.action);
     if (mode < 0) return 0;
@@ -3594,6 +3614,15 @@ static int reassign_player(const uint8_t* packet, int length) {
     // 0x15 rebuilds/repositions the path even when the resolved room pointer is unchanged;
     // retaining a same-room route would let a later tick overwrite this server coordinate.
     if (!ensure_player_motion(entry, true)) return -3;
+    // The reassign's tail (1.13c D2Client+0xA7D50): a standing player in a room stands again in the room's
+    // kind of neutral, town (5) or field (1), with unit flag 0x40 cleared and 2 set.
+    if (D2UnitStrc* unit = entry.motionUnit; unit && unit->pDynamicPath &&
+            (unit->dwAnimMode == PLRMODE_NEUTRAL || unit->dwAnimMode == PLRMODE_TOWNNEUTRAL)) {
+        if (D2ActiveRoomStrc* room = UNITS_GetRoom(unit)) {
+            unit->dwFlags = (unit->dwFlags & ~0x40u) | 2u;
+            d2_realm_client_motion_set_mode(unit, DUNGEON_IsRoomInTown(room) ? PLRMODE_TOWNNEUTRAL : PLRMODE_NEUTRAL);
+        }
+    }
     if (selected) store_selected_player();
     return 1;
 }
@@ -5330,6 +5359,26 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_motion_tick() {
                 (!monster.motionUnit->pAnimSeq || UNITS_IsAtEndOfFrameCycle(monster.motionUnit))) {
             UNITS_SetUsedSkill(monster.motionUnit, nullptr);
             d2_realm_client_unit_set_mode(monster.motionUnit, MONMODE_NEUTRAL);
+        }
+        // D2Client+0x4F4A0's neutral branch: a monster standing (mode 1) and not held re-resolves its path's
+        // target unit (#11163 / #10336); a target gone ends the branch, else #10340 (+0x36650) counts the
+        // frame and, every second one with the retry flag on, re-plans a path not at its target and walks.
+        if (monster.motionUnit->dwAnimMode == MONMODE_NEUTRAL && !monster.npcHeld) {
+            D2UnitStrc* const unit = monster.motionUnit;
+            D2DynamicPathStrc* const path = unit->pDynamicPath;
+            bool retry = true;
+            if (path->pTargetUnit) {
+                D2UnitStrc* target = find_realm_client_unit(static_cast<uint8_t>(path->dwTargetType), path->dwTargetId);
+                path->pTargetUnit = target;
+                if (target) { path->dwTargetType = target->dwUnitType; path->dwTargetId = target->dwUnitId; }
+                retry = target != nullptr;
+            }
+            if (retry && !(unit->dwFlags & UNITFLAG_ISASYNC) && (unit->dwFlagEx & UNITFLAGEX_UNK_PATH_RELATED) &&
+                    ++path->unk0x38 > 1) {
+                path->unk0x38 = 0;
+                if (!D2Common_10227(unit) && D2Common_10236(unit, path->pTargetUnit != nullptr))
+                    d2_realm_client_motion_set_mode(unit, MONMODE_WALK);
+            }
         }
         // The mode's update (D2Client+0x4F4A0) steps a monster along its path only in a mode that moves.
         monster.lastTickResult = d2_realm_client_motion_advance_unit(monster.motionUnit, unit_mode_move_kind(monster.motionUnit) == 1);
