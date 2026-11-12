@@ -3268,6 +3268,9 @@ function update(forceTick = false, live = false) {
     if (localServerFrames) {
       queueHeldPointerRepeat(input, worldPointerHeld, localClientFrames, pointer.x, pointer.y, heldPointerCanRetargetWorld);
       queueHeldPointerRepeat(input, worldRightPointerHeld, localClientFrames, pointer.x, pointer.y, heldPointerCanRetargetWorld, 2);
+      // A scripted walk in a joined game picks its next leg once per client frame, from the client's own view of the
+      // hero, and sends it as the ground click's walk packet (session.move); the hero moves by the server's answer.
+      if (walkGoal && localClientFrames) { refreshRealmView(); walkStep(); }
     }
   }
   updateAfterAdvance(engineAdvanced, live);
@@ -7137,7 +7140,7 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
     return { clicks: clickDispatch.length, by, world, refusedBy, heroModes, last: clickDispatch.slice(-40).map((r) => ({ ...r })) };
   },
   setWalkPlannerContext(context) { walkPlannerContext = context ? structuredClone(context) : null; },
-  walkTo(x, y, within = 4) { armWalk({ x, y, within }); },
+  walkTo(x, y, within = 4) { if (clientView().fromPackets) clientView().refresh(); armWalk({ x, y, within }); },   // the goal's level is the view's current one
   // `minDistance` (subtiles, 0 = no floor): talk to the nearest NPC at least that far away. s136
   // proves the WALKER by talking to someone the hero has to walk to, and with the corrected Rogue
   // Encampment spawn the nearest NPC is 7 subtiles away -- a step, not a walk.
