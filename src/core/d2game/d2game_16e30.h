@@ -68,8 +68,8 @@ template <class E> void SpecialState13(E& e, uint32_t game, uint32_t unit, uint3
         cmd = Home(e, unit);
     }
     if (!e.rd32(cmd + 0xC) || !e.rd32(cmd + 0x10)) {
-        e.wr32(cmd + 0xC, e.h(0x1100, 0, unit));
-        e.wr32(cmd + 0x10, e.h(0x1130, 0, unit));
+        e.wr32(cmd + 0xC, UX(e, unit));
+        e.wr32(cmd + 0x10, UY(e, unit));
     }
     const uint32_t hx = e.rd32(cmd + 0xC), hy = e.rd32(cmd + 0x10);
     const uint32_t homeReg = e.h(0xAD66, 0, 0, 0, 0, 0, room, hx, hy);

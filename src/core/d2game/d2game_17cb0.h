@@ -63,7 +63,7 @@ template <class E> void Overseer(E& e, uint32_t game, uint32_t unit, uint32_t tp
     }
     uint32_t blk[6] = { 0x240, 0x190, 0x32, 0, 0, 0 };
     const uint32_t in[6] = { 0x240, 0x190, 0x32, 0, 0, 0 };
-    e.h(0xB17B0, 1, e.stk(blk), game, 0, 0, unit, 0x6FC35C40u);
+    e.h(0xB17B0, 1, e.stk(blk), game, 0, 0, unit, 0xB2000000u | 0x15C40);
     e.blk(0xB17B0, in, 6, 0x3F);   // retail logs the block at hook entry, before the hook's out-words land
     const uint32_t b3 = blk[3], b4 = blk[4], b5 = blk[5];
     if (e.rd16s(row + 0x172) >= 0 && b3 && (int32_t)Roll(e, unit) < w(0x5C)) {

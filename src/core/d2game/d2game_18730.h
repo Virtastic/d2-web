@@ -1,7 +1,7 @@
 // 1.13c D2Game+0x18730 (AITHINK_Fn115_SiegeBeast): ECX = pGame, EDX = pUnit, stack = pAiTickParam (ret 4; the result is residue).
 // Written from the 1.13c disassembly as a rule over E (see d2game_179a0.h). tp: +8 target, +0x14 range, +0x18 mode, +0x1C monstats row.
 // Owner: a unit with flag bit 10 of +0xC8 asks 0xE03A0 (ECX = game, EDX = unit +0x98, EAX = unit +0x94), else none. 0xA688(unit) != 0 ends the tick.
-// No owner and 0xA514(unit) == 0: 0xB17B0 (EAX = 1, ECX = &{residue, w56 * w56}, EDX = game, stack = unit, 0x6FC35B00); a hit goes to 0x158F0
+// No owner and 0xA514(unit) == 0: 0xB17B0 (EAX = 1, ECX = &{w56 * w56, residue}, EDX = game, stack = unit, the module callback +0x15B00); a hit goes to 0x158F0
 // (ESI = hit, stack = unit). The unit stays the actor afterwards (ESI is reloaded from the frame).
 // Mode != 0: skill >= 0 and roll < w62 casts 0xF2380 (EAX = skill byte +0x180, ECX = unit, EBX = game, stack = skill, 0, 0, 0); roll < w5C walks with
 // 0xF2220 (EAX = 4, EDI = ESI = unit, stack = game, target); else idle 0xF22C0 (EAX = game, ESI = unit, stack = w68).
@@ -27,9 +27,9 @@ template <class E> void SiegeBeast(E& e, uint32_t game, uint32_t unit, uint32_t 
     if (e.h(0xA688, 0, 0, 0, 0, 0, unit)) return;
     if (!owner && !e.h(0xA514, 0, 0, 0, 0, 0, unit)) {
         const int32_t v = e.rd16s(row + 0x56 + e.rd8(game + 0x6D) * 2);
-        uint32_t blk[2] = { 0, (uint32_t)(v * v) };
-        const uint32_t hit = e.h(0xB17B0, 1, e.stk(blk), game, 0, 0, unit, 0x6FC35B00u);
-        e.blk(0xB17B0, blk, 2, 0x2);
+        uint32_t blk[2] = { (uint32_t)(v * v), 0 };
+        const uint32_t hit = e.h(0xB17B0, 1, e.stk(blk), game, 0, 0, unit, 0xB2000000u | 0x15B00);
+        e.blk(0xB17B0, blk, 2, 0x1);
         if (hit) e.h(0x158F0, 0, 0, 0, 0, hit, unit);
     }
     const int32_t sk = e.rd16s(row + 0x170);
