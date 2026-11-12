@@ -895,6 +895,7 @@ int32_t __fastcall SKILLITEM_pSpell_Handler(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FD040B0
+// 1.13c D2Game+0xADFA0 (skill server do-function slot 113)
 int32_t __fastcall SKILLS_SrvDo113_Scroll_Book(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (!pUnit->pInventory)

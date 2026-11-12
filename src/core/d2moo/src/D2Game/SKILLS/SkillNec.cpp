@@ -556,6 +556,7 @@ void __fastcall sub_6FD0B9F0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
 }
 
 //D2Game.0x6FD0BB60
+// 1.13c D2Game+0x51C60 (skill server do-function slot 59)
 int32_t __fastcall SKILLS_SrvDo059_Attract(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1251,6 +1252,7 @@ int32_t __fastcall SKILLS_SrvDo031_RaiseSkeleton_Mage(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FD0CFC0
+// 1.13c D2Game+0x4F920 (skill server do-function slot 32)
 int32_t __fastcall SKILLS_SrvDo032_PoisonDagger(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (pUnit)
@@ -1420,6 +1422,7 @@ int32_t __fastcall SKILLS_SrvDo056_Golem(D2GameStrc* pGame, D2UnitStrc* pUnit, i
 }
 
 //D2Game.0x6FD0D7B0
+// 1.13c D2Game+0x51540 (skill server do-function slot 57)
 int32_t __fastcall SKILLS_SrvDo057_IronGolem(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2UnitStrc* pTargetUnit = SUNIT_GetTargetUnit(pGame, pUnit);
@@ -1625,6 +1628,7 @@ void __fastcall sub_6FD0DF40(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
 }
 
 //D2Game.0x6FD0E050
+// 1.13c D2Game+0x50FE0 (skill server do-function slot 60)
 int32_t __fastcall SKILLS_SrvDo060_BoneWall(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     int32_t nTargetX = 0;
@@ -1844,6 +1848,7 @@ int32_t __fastcall SKILLS_SrvDo062_BonePrison(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FD0E790
+// 1.13c D2Game+0x50190 (skill server do-function slot 63)
 int32_t __fastcall SKILLS_SrvDo063_PoisonExplosion(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);

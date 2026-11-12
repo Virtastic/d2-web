@@ -795,6 +795,7 @@ int32_t __fastcall SKILLS_SrvDo012_Strafe(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FCF47D0
+// 1.13c D2Game+0x4DAC0 (skill server do-function slot 13)
 int32_t __fastcall SKILLS_SrvDo013_Fend_Zeal_Fury(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     // TODO: v14, v16
@@ -870,6 +871,7 @@ int32_t __fastcall SKILLS_SrvDo013_Fend_Zeal_Fury(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FCF4A20
+// 1.13c D2Game+0x4CE10 (skill server do-function slot 14)
 int32_t __fastcall SKILLS_SrvDo014_LightningStrike(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     // TODO: v13
@@ -922,6 +924,7 @@ int32_t __fastcall SKILLS_SrvDo014_LightningStrike(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FCF4C50
+// 1.13c D2Game+0x4D8C0 (skill server do-function slot 15)
 int32_t __fastcall SKILLS_SrvDo015_Dopplezon(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);

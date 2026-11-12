@@ -406,6 +406,7 @@ int32_t __fastcall SKILLS_SrvDo019_Inferno_ArcticBlast(D2GameStrc* pGame, D2Unit
 }
 
 //D2Game.0x6FD162D0
+// 1.13c D2Game+0x430D0 (skill server do-function slot 20)
 int32_t __fastcall SKILLS_SrvDo020_StaticField(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -568,6 +569,7 @@ int32_t __fastcall SKILLS_SrvDo021_Telekinesis(D2GameStrc* pGame, D2UnitStrc* pU
 }
 
 //D2Game.0x6FD169A0
+// 1.13c D2Game+0x43AA0 (skill server do-function slot 22)
 int32_t __fastcall SKILLS_SrvDo022_NovaAttack(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (pUnit)
@@ -803,6 +805,7 @@ int32_t __fastcall SKILLS_SrvDo025_Enchant(D2GameStrc* pGame, D2UnitStrc* pUnit,
 }
 
 //D2Game.0x6FD17200
+// 1.13c D2Game+0x43720 (skill server do-function slot 26)
 int32_t __fastcall SKILLS_SrvDo026_ChainLightning(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1080,6 +1083,7 @@ int32_t __fastcall SKILLS_EventFunc24_EnergyShield(D2GameStrc* pGame, int32_t nE
 }
 
 //D2Game.0x6FD17C30
+// 1.13c D2Game+0x43D40 (skill server do-function slot 144)
 int32_t __fastcall SKILLS_SrvDo144_Hydra(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);

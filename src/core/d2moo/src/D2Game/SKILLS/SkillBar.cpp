@@ -163,6 +163,7 @@ int32_t __fastcall SKILLS_SrvSt33_FindPotion_GrimWard(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FCFAE90
+// 1.13c D2Game+0x27600 (skill server do-function slot 69)
 int32_t __fastcall SKILLS_SrvDo069_FindPotion(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     constexpr D2PotionCodeStrc gdwPotionsTable[15] = {
@@ -286,6 +287,7 @@ int32_t __fastcall SKILLS_ApplyWarcryStats(D2GameStrc* pGame, D2UnitStrc* a2, D2
 }
 
 //D2Game.0x6FCFB1D0
+// 1.13c D2Game+0x29720 (skill server do-function slot 68)
 int32_t __fastcall SKILLS_SrvDo068_BasicShout(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (pUnit)
@@ -439,6 +441,7 @@ int32_t __fastcall SKILLS_SrvSt34_FindItem(D2GameStrc* pGame, D2UnitStrc* pUnit,
 }
 
 //D2Game.0x6FCFB630
+// 1.13c D2Game+0x276D0 (skill server do-function slot 72)
 int32_t __fastcall SKILLS_SrvDo072_FindItem(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -491,6 +494,7 @@ int32_t __fastcall SKILLS_SrvDo072_FindItem(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FCFB7A0
+// 1.13c D2Game+0x27E30 (skill server do-function slot 74)
 int32_t __fastcall SKILLS_SrvDo074_DoubleThrow(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);

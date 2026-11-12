@@ -154,6 +154,7 @@ int32_t __fastcall SKILLS_SrvDo064_Sacrifice(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FD18650
+// 1.13c D2Game+0x99000 (skill server do-function slot 150)
 int32_t __fastcall SKILLS_SrvDo150_Smite(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -507,6 +508,7 @@ void __fastcall SKILLS_CurseStateCallback_BasicAura(D2UnitStrc* pUnit, int32_t n
 }
 
 //D2Game.0x6FD19020
+// 1.13c D2Game+0x9AF50 (skill server do-function slot 66)
 int32_t __fastcall SKILLS_SrvDo066_HolyFire_HolyShock_Sanctuary_Conviction(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -734,6 +736,7 @@ int32_t __fastcall SKILLS_SrvSt31_Charge(D2GameStrc* pGame, D2UnitStrc* pUnit, i
 }
 
 //D2Game.0x6FD19780
+// 1.13c D2Game+0x99D20 (skill server do-function slot 67)
 int32_t __fastcall SKILLS_SrvDo067_Charge(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     pUnit = pUnit;
@@ -1329,6 +1332,7 @@ int32_t __fastcall SKILLS_SrvDo080_FistOfTheHeavens(D2GameStrc* pGame, D2UnitStr
 }
 
 //D2Game.0x6FD1ABC0
+// 1.13c D2Game+0x9ABC0 (skill server do-function slot 81)
 int32_t __fastcall SKILLS_SrvDo081_HolyFreeze(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1507,6 +1511,7 @@ int32_t __fastcall SKILLS_ApplyRedemptionEffect(D2GameStrc* pGame, D2UnitStrc* p
 }
 
 //D2Game.0x6FD1B260
+// 1.13c D2Game+0x9A400 (skill server do-function slot 82)
 int32_t __fastcall SKILLS_SrvDo082_Redemption(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);

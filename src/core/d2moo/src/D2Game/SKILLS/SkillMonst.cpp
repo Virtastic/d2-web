@@ -222,6 +222,7 @@ int32_t __fastcall SKILLS_SrvSt45_MaggotDown(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FD06730
+// 1.13c D2Game+0xB3060 (skill server do-function slot 86)
 int32_t __fastcall SKILLS_SrvDo086_MaggotDown(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (!pUnit)
@@ -763,6 +764,7 @@ int32_t __fastcall SKILLS_SrvSt50_QuickStrike(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FD07970
+// 1.13c D2Game+0xB5600 (skill server do-function slot 92)
 int32_t __fastcall SKILLS_SrvDo092_QuickStrike(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -894,6 +896,7 @@ int32_t __fastcall SKILLS_SrvSt51_Submerge(D2GameStrc* pGame, D2UnitStrc* pUnit,
 }
 
 //D2Game.0x6FD07C70
+// 1.13c D2Game+0xB2E90 (skill server do-function slot 94)
 int32_t __fastcall SKILLS_SrvDo094_Submerge(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     int32_t pFrameNo; // [sp+Ch] [bp-8h]@1
@@ -1203,6 +1206,7 @@ int32_t __fastcall SKILLS_SrvDo152_DiabLight(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FD08680
+// 1.13c D2Game+0xB3770 (skill server do-function slot 96)
 int32_t __fastcall SKILLS_SrvDo096_ZakarumHeal_Bestow(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1626,6 +1630,7 @@ int32_t __fastcall SKILLS_SrvSt54_DiabRun(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FD09570
+// 1.13c D2Game+0xB3F10 (skill server do-function slot 103)
 int32_t __fastcall SKILLS_SrvDo103_DiabRun(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1834,6 +1839,7 @@ int32_t __fastcall SKILLS_SrvDo105_DesertTurret(D2GameStrc* pGame, D2UnitStrc* p
 }
 
 //D2Game.0x6FD09BF0
+// 1.13c D2Game+0xB4D30 (skill server do-function slot 106)
 int32_t __fastcall SKILLS_SrvDo106_ArcaneTower(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1901,6 +1907,7 @@ int32_t __fastcall SKILLS_SrvSt55_Mosquito(D2GameStrc* pGame, D2UnitStrc* pUnit,
 }
 
 //D2Game.0x6FD09DE0
+// 1.13c D2Game+0xB3B20 (skill server do-function slot 107)
 int32_t __fastcall SKILLS_SrvDo107_Mosquito(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1962,6 +1969,7 @@ int32_t __fastcall SKILLS_SrvDo107_Mosquito(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FD0A190
+// 1.13c D2Game+0xB5D40 (skill server do-function slot 108)
 int32_t __fastcall SKILLS_SrvDo108_RegurgitatorEat(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -2092,6 +2100,7 @@ int32_t __fastcall SKILLS_SrvSt25_64_DragonClaw_MonFrenzy(D2GameStrc* pGame, D2U
 }
 
 //D2Game.0x6FD0A530
+// 1.13c D2Game+0xB6790 (skill server do-function slot 109)
 int32_t __fastcall SKILLS_SrvDo109_MonFrenzy(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillStrc* pSkill = UNITS_GetUsedSkill(pUnit);
@@ -2127,6 +2136,7 @@ int32_t __fastcall SKILLS_SrvDo109_MonFrenzy(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FD0A5E0
+// 1.13c D2Game+0xB4C20 (skill server do-function slot 148)
 int32_t __fastcall SKILLS_SrvDo148_DoomKnightMissile(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -2169,6 +2179,7 @@ int32_t __fastcall SKILLS_SrvDo148_DoomKnightMissile(D2GameStrc* pGame, D2UnitSt
 }
 
 //D2Game.0x6FD0A720
+// 1.13c D2Game+0xB4B10 (skill server do-function slot 149)
 int32_t __fastcall SKILLS_SrvDo149_NecromageMissile(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {    
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -2211,6 +2222,7 @@ int32_t __fastcall SKILLS_SrvDo149_NecromageMissile(D2GameStrc* pGame, D2UnitStr
 }
 
 //D2Game.0x6FD0A860
+// 1.13c D2Game+0xB49F0 (skill server do-function slot 110)
 int32_t __fastcall SKILLS_SrvDo110_Hireable_RogueMissile(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);

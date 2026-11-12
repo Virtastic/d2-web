@@ -2223,6 +2223,7 @@ int32_t __fastcall SKILLS_SrvDo002_Kick_PowerStrike_MonIceSpear_Impale_Bash_Stun
 }
 
 //D2Game.0x6FD12670
+// 1.13c D2Game+0xA2EA0 (skill server do-function slot 4)
 int32_t __fastcall SKILLS_SrvDo004_Unsummon(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillStrc* pSkill = UNITS_GetUsedSkill(pUnit);

@@ -263,6 +263,7 @@ void __fastcall sub_6FCFE200(D2UnitStrc* pUnit, D2StatListStrc* pStatList, D2Ski
 }
 
 //D2Game.0x6FCFE330
+// 1.13c D2Game+0x46210 (skill server do-function slot 116)
 int32_t __fastcall SKILLS_SrvDo116_Wearwolf_Wearbear(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -388,6 +389,7 @@ int32_t __fastcall SKILLS_SrvDo117_Firestorm(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FCFE6A0
+// 1.13c D2Game+0x45600 (skill server do-function slot 118)
 int32_t __fastcall SKILLS_SrvDo118_Twister_Tornado(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -531,6 +533,7 @@ int32_t __fastcall SKILLS_SrvSt56_FeralRage_Maul(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FCFEA60
+// 1.13c D2Game+0x46000 (skill server do-function slot 120)
 int32_t __fastcall SKILLS_SrvDo120_FeralRage_Maul(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -730,6 +733,7 @@ int32_t __fastcall sub_6FCFEDD0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
 }
 
 //D2Game.0x6FCFEFD0
+// 1.13c D2Game+0x46A20 (skill server do-function slot 121)
 int32_t __fastcall SKILLS_SrvDo121_Rabies(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1293,6 +1297,7 @@ int32_t __fastcall sub_6FD00370(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nS
 }
 
 //D2Game.0x6FD004E0
+// 1.13c D2Game+0x0D680 (skill server do-function slot 125)
 int32_t __fastcall SKILLS_SrvDo125_WakeOfDestruction(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (!SKILLS_GetSkillsTxtRecord(nSkillId))
@@ -1673,6 +1678,7 @@ void __fastcall sub_6FD01010(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
 }
 
 //D2Game.0x6FD01170
+// 1.13c D2Game+0x0DBD0 (skill server do-function slot 129)
 int32_t __fastcall SKILLS_SrvDo129_ImpTeleport(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1722,6 +1728,7 @@ int32_t __fastcall SKILLS_SrvSt61_SelfResurrect(D2GameStrc* pGame, D2UnitStrc* p
 }
 
 //D2Game.0x6FD01360
+// 1.13c D2Game+0x0D7B0 (skill server do-function slot 130)
 int32_t __fastcall SKILLS_SrvDo130_VineAttack(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     constexpr int32_t xOffsets[] =
@@ -1777,6 +1784,7 @@ int32_t __fastcall SKILLS_SrvDo130_VineAttack(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FD014A0
+// 1.13c D2Game+0x0D9C0 (skill server do-function slot 131)
 int32_t __fastcall SKILLS_SrvDo131_OverseerWhip(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -2105,6 +2113,7 @@ int32_t __fastcall SKILLS_SrvDo135_MinionSpawner(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FD01F10
+// 1.13c D2Game+0x0C400 (skill server do-function slot 136)
 int32_t __fastcall SKILLS_SrvDo136_DeathMaul(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     int32_t nX = 0;
@@ -2154,6 +2163,7 @@ int32_t __fastcall SKILLS_SrvDo136_DeathMaul(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FD02070
+// 1.13c D2Game+0x0DD50 (skill server do-function slot 137)
 int32_t __fastcall SKILLS_SrvDo137_FenrisRage(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -2307,6 +2317,7 @@ int32_t __fastcall SKILLS_SrvSt63_Corpse_VineCycler(D2GameStrc* pGame, D2UnitStr
 }
 
 //D2Game.0x6FD025C0
+// 1.13c D2Game+0x0C170 (skill server do-function slot 147)
 int32_t __fastcall SKILLS_SrvDo147_Unused(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2UnitStrc* pOwner = SUNIT_GetOwner(pGame, pUnit);

@@ -585,6 +585,7 @@ int32_t __fastcall SKILLS_EvaluateProgressiveSkillCalc(D2UnitStrc* pUnit, int32_
 }
 
 //D2Game.0x6FCF6000
+// 1.13c D2Game+0x93340 (skill server do-function slot 38)
 int32_t __fastcall SKILLS_SrvDo038_FistsOfFire_BladesOfIce_ProgressiveFn2(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -2338,6 +2339,7 @@ int32_t __fastcall SKILLS_AuraCallback_MindBlast(D2AuraCallbackStrc* pAuraCallba
 }
 
 //D2Game.0x6FCFA350
+// 1.13c D2Game+0x957F0 (skill server do-function slot 51)
 int32_t __fastcall SKILLS_SrvDo051_MindBlast(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -2377,6 +2379,7 @@ int32_t __fastcall SKILLS_SrvDo051_MindBlast(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FCFA4F0
+// 1.13c D2Game+0x93680 (skill server do-function slot 52)
 int32_t __fastcall SKILLS_SrvDo052_DragonFlight(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -2489,6 +2492,7 @@ int32_t __fastcall SKILLS_SrvSt28_BladeShield(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FCFA880
+// 1.13c D2Game+0x92CF0 (skill server do-function slot 53)
 int32_t __fastcall SKILLS_SrvDo053_Unused(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -2582,6 +2586,7 @@ int32_t __fastcall SKILLS_SrvDo142_Unused(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FCFAB60
+// 1.13c D2Game+0x935F0 (skill server do-function slot 54)
 int32_t __fastcall SKILLS_SrvDo054_BladeShield(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
