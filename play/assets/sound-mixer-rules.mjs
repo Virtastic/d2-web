@@ -66,32 +66,5 @@ export function soundFadeLevel(from, to, startTick, endTick, tick) {
 
 /** Loop restarts the ended buffer only when the row has no Duration. */
 export const soundLoops = (row) => Boolean(row?.loop) && !(row?.duration > 0);
-
-/**
- * 0x5EE70: a row with Group Size > 1 plays one of its `groupSize` variants (row .. row+groupSize-1).
- * It avoids the last min(groupSize-1, 2) variants it played (one fewer, for groups of 2 or 3, when
- * rand(groupSize+1) is 0). `rand(n)` is the client hero-seed draw; `history` the row's last two picks.
- */
-export function pickSoundVariant(row, groupSize, history, rand) {
-  const g = groupSize | 0;
-  if (g <= 1) return row;
-  let avoid = Math.min(g - 1, 2);
-  if (g < 4 && rand(g + 1) === 0) avoid--;
-  for (;;) {
-    const cand = row + rand(g);
-    if (avoid < 1) return cand;
-    let i = 0;
-    while (i < avoid && history[i] !== cand) i++;
-    if (i >= avoid) return cand;
-  }
-}
-
-/** 0x89640 on a seed pair, for callers without the engine's client hero seed. */
-export function d2SeedRand(seed) {
-  return (n) => {
-    if (!n) return 0;
-    const v = BigInt(seed[0] >>> 0) * 0x6ac690c5n + BigInt(seed[1] >>> 0);
-    seed[0] = Number(v & 0xffffffffn); seed[1] = Number((v >> 32n) & 0xffffffffn);
-    return (n & (n - 1)) ? seed[0] % n : (n - 1) & seed[0];
-  };
-}
+// The group variant a row plays (0x5EE70, its pick history and the client hero seed) is the engine's:
+// src/core/d2client/sound_variant_5ee70.cpp, reached through d2_client_play_sound_variant / the sound queue.

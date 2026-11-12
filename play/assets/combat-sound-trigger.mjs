@@ -3,10 +3,11 @@
 // MonSounds profile 0x22A70 and its CvtMo substitutions), run by src/core/d2client/unit_mode_sound_play_24490.cpp. This
 // file decides only WHEN a unit enters a mode (the snapshot's mode changes, re-entries and damage ticks) and the sounds
 // 0x24490 does not cover: a player skill's stsound/dosound (0xA1CF0/0xA1B10/0x14F40, not ported), a monster's skill
-// stsound/dosound, the monster block cue and the shatter cue.
+// stsound/dosound, the monster block cue and the shatter cue. When a cue sounds is the engine's too: every cue goes to the
+// client sound list (src/core/d2client/play_sound_queue.cpp: 0x88A70 submit with its start offset, the 0x88DD0 pump with
+// its Defer/Stop Inst, busy and overlap rules, 0x5D7A0's group variant with its pick history on the client hero seed).
 const PLAYER_CAST = new Set([10, 13, 14, 15, 16, 18]); // SC, S1-S4, SEQUENCE (Lightning, Chain Lightning): the skill's Skills.txt `stsound` fires on entry
 const MON_HIT = new Set([3, 13]), PLAYER_HIT = new Set([4, 0x13]), PLAYER_ATTACK = new Set([7, 8]), MON_ACT = new Set([4, 5, 8, 9, 10, 11]);
-const MON_STAMP = new Set([0, 3, 12, 13]), PLAYER_STAMP = new Set([0, 4, 17, 0x13]); // struck and death modes
 // 0x24490 runs 0x23630 (impact pair, then the hit or death cue) on these modes
 const STRUCK = { 0: new Set([0, 4, 0x13]), 1: new Set([0, 3, 0xD]) };
 // #10862 for the hero's weapon: Weapons.txt `hit class` -> the index 0x242B0 reads the swing table (D2Client+0xF5538) with
@@ -18,19 +19,40 @@ export function blockSound(type, mode) { return (type === 1 && mode === 6) ? BLO
 const KIND = [null, 'impact', 'hit', 'death', 'attack', 'weapon', 'skill', 'swing', 'block', 'kick'];
 
 // The engine's 0x24490 for the trigger: { modeSounds(type, id, class, typeFlags, superUnique, mode, hitClass, cvt, flags, roll),
-// impactSounds(type, class, hitClass, mode) } -> [{ row, kind }] in 0x88A70's submit order. flags: 1 hero, 2 busy, 4 state 1, 8 state 146.
+// impactSounds(type, class, hitClass, mode) } -> [{ row, kind, delay }] in 0x88A70's submit order, delay = the submit's
+// start offset in ticks. flags: 1 hero, 2 busy, 4 state 1, 8 state 146. roll: -2 = the play path's 0x242B0 gate decides
+// (D2Client+0x11C4C4 and the queue's busy state) and takes the session's draw when it opens.
+// queue: the client sound list (src/core/d2client/play_sound_queue.cpp, 0x88A70 submit / 0x88DD0 pump / 0x5D7A0 start).
 export function combatSoundEngine(M) {
   if (!M?._d2_client_unit_mode_sounds) return null;
-  const rows = (n) => Array.from({ length: Number(n) >>> 0 }, (_, i) => { const v = Number(M._d2_client_unit_mode_sound_at(i)) >>> 0; return { row: v & 0xFFFF, kind: KIND[v >>> 16] ?? 'mode' }; });
+  const rows = (n) => Array.from({ length: Number(n) >>> 0 }, (_, i) => { const v = Number(M._d2_client_unit_mode_sound_at(i)) >>> 0; return { row: v & 0xFFFF, kind: KIND[v >>> 16] ?? 'mode', delay: M._d2_client_unit_mode_sound_delay_at ? Number(M._d2_client_unit_mode_sound_delay_at(i)) >>> 0 : 0 }; });
+  const at = (i, f) => Number(M._d2_client_play_sound_started(i, f));
+  const queue = M._d2_client_play_sound_pump ? {
+    submit: (row, unit, delay = 0, flags = 0) => Number(M._d2_client_play_sound_submit(row, unit >>> 0, delay >>> 0, flags, 0, 0)) | 0,
+    // one 0x88DD0 pass at sound tick `now`: the entries it started, { handle, asked, row (the variant), start }
+    pump: (now) => Array.from({ length: Number(M._d2_client_play_sound_pump(now >>> 0)) | 0 }, (_, i) => ({ handle: at(i, 0) | 0, asked: at(i, 1) | 0, row: at(i, 2) | 0, start: at(i, 3) >>> 0 })),
+    ended: (handle) => M._d2_client_play_sound_ended(handle),
+    state: (handle) => Number(M._d2_client_play_sound_state(handle)) | 0,
+    hero: (unit) => M._d2_client_play_sound_hero(unit >>> 0),
+    stamp: () => M._d2_client_unit_mode_sound_stamp(),
+    busy: () => Number(M._d2_client_play_sound_busy()) !== 0,
+    reset: (lo = 0, hi = 0, pinned = 0) => M._d2_client_play_sound_reset(lo >>> 0, hi >>> 0, pinned),
+  } : null;
   return {
     modeSounds: (...a) => rows(M._d2_client_unit_mode_sounds(...a)),
     impactSounds: (...a) => rows(M._d2_client_unit_impact_sounds(...a)),
+    queue,
   };
 }
+// The unit a queue entry is attached to: any nonzero key unique per (type, id); the hero's is handed to queue.hero.
+export const soundUnitKey = (type, id) => ((((id >>> 0) * 2) + (type & 1) + 2) % 0x100000000) >>> 0;
 
-// busy: optional () => bool, retail 0x87BD0: a monster-range sound (rows 0xB76..0x1230) is still playing.
-// roll: (monsterId) => the 0x242B0 draw the session made at the attack order's arrival, -1 when none.
-export function createCombatSoundTrigger(read, play, busy = () => false, roll = null, engine = null) {
+// engine: combatSoundEngine(Module). With its queue every cue is submitted to the client sound list with its start
+// offset; each update first runs the list's pump on the update's tick and plays what it started (`play(row, event)`,
+// event.variantRow = the variant started, event.queueHandle = the entry to report ended). Without it a cue plays at once.
+export function createCombatSoundTrigger(read, play, engine = null) {
+  const queue = engine?.queue ?? null, pending = new Map();
+  queue?.reset();   // the list and its clock start with this trigger's tick count
   const text = (p) => new TextDecoder('latin1').decode(read(p));
   const weapons = new Map(text('data\\global\\excel\\weapons.txt').split(/\r?\n/).map((l) => l.split('\t')).filter((c) => c.length > 40).map((c) => [c[3], c[40]]));
   const soundIndex = new Map(), skillSound = new Map();
@@ -50,30 +72,45 @@ export function createCombatSoundTrigger(read, play, busy = () => false, roll = 
       if (Number(c[fn]) === 16 && soundIndex.has(c[da])) doSound.set(Number(c[id]), soundIndex.get(c[da]));
       if (Number(c[fn]) > 0 && soundIndex.has(c[h.indexOf('dosound')])) monDoSound.set(Number(c[id]), soundIndex.get(c[h.indexOf('dosound')])); } }
   const dmgPrev = new Set(), prev = new Map(), hpPrev = new Map(), frames = new Map();
-  let refusedSeq, pendingRefused = 0, tick = 0, lastRoll = -99;
-  const fire = (row, e, kind) => { if (row > 0) play(row, { unitType: e.type, unitId: e.id, classId: e.classId, kind, mode: e.mode, baseRow: row }); };
+  let refusedSeq, pendingRefused = 0, tick = 0;
+  // 0x88A70: a cue is queued on its unit with its start offset (a Compound row may join a live entry: its first event stands)
+  const fire = (row, e, kind, delay = 0) => {
+    if (!(row > 0)) return;
+    const event = { unitType: e.type, unitId: e.id, classId: e.classId, kind, mode: e.mode, baseRow: row };
+    if (!queue) { play(row, event); return; }
+    const h = queue.submit(row, soundUnitKey(e.type, e.id), delay);
+    if (h && !pending.has(h)) pending.set(h, event);
+  };
+  // 0x88DD0 at this tick: play every entry of ours it started, its variant picked by 0x5D7A0 (another caller's entries
+  // are that caller's to play and end)
+  const pump = () => {
+    for (const s of queue.pump(tick)) {
+      const event = pending.get(s.handle); pending.delete(s.handle);
+      if (event) play(s.asked, { ...event, baseRow: s.asked, variantRow: s.row, queueHandle: s.handle });
+    }
+    for (const h of pending.keys()) if (queue.state(h) !== 0) pending.delete(h);   // refused at start (0x88DD0 drops it)
+  };
   const weaponHitClass = (player, items) => {
     const w = (items || []).find((i) => i.mode === 1 && (Number(i.id) >>> 0) === (Number(player?.primaryWeaponId) >>> 0));
     if (!w) return 0; // unarmed: retail's CVT (#10862) selector is 0 -> table[0] = 0, the 0x88A70 submit is rejected (a retail recording Q 0 at each swing); no fist swing sound
     const code = typeof w.code === 'string' ? w.code : String.fromCharCode(...[0, 8, 16, 24].map((s) => (Number(w.code) >>> s) & 255));
     return Math.max(1, HIT_CLASS.indexOf(weapons.get(code.replace(/\0/g, '').trim()) ?? ''));
   };
-  // one 0x24490 entry: the engine's rows, played in submit order
+  // one 0x24490 entry: the engine's rows, submitted in order with their start offsets. The busy test (0x87BD0), the 0x242B0
+  // gate on D2Client+0x11C4C4 and its stamps are the engine's (roll -2).
   const enter = (e, snapshot) => {
     if (!engine || (e.type === 0 && e.mode === 9)) return;
     const hero = e.type === 0 && e.id === snapshot?.playerId;
-    const flags = (hero ? 1 : 0) | (busy() ? 2 : 0) | (e.states?.has(1) ? 4 : 0) | (e.states?.has(146) ? 8 : 0);
+    const flags = (hero ? 1 : 0) | (e.states?.has(1) ? 4 : 0) | (e.states?.has(146) ? 8 : 0);
     const cvt = hero ? weaponHitClass(snapshot.player, snapshot?.items) : 0;
-    // 0x242B0's delay gate (D2Client+0x11C4C4, 15 ticks since the last struck/death/attack sound) and busy gate, on the play path's
-    // own entry tick: the session's draw is taken only when this entry would have drawn
-    const r = e.type === 1 && (e.mode === 4 || e.mode === 5) && roll && tick - lastRoll >= 15 && !busy() ? Number(roll(e.id)) | 0 : -1;
-    for (const s of engine.modeSounds(e.type, e.id >>> 0, e.classId | 0, e.typeFlags | 0, e.superUniqueId ?? -1, e.mode, (e.lastHitClass ?? 0) >>> 0, cvt, flags, r)) { fire(s.row, e, s.kind); if (s.kind === 'attack') lastRoll = tick; }
-    if ((e.type === 1 ? MON_STAMP : PLAYER_STAMP).has(e.mode)) lastRoll = tick; // 0x23630 stamps the clock on a struck or death entry
+    const r = e.type === 1 && (e.mode === 4 || e.mode === 5) ? -2 : -1;
+    for (const s of engine.modeSounds(e.type, e.id >>> 0, e.classId | 0, e.typeFlags | 0, e.superUniqueId ?? -1, e.mode, (e.lastHitClass ?? 0) >>> 0, cvt, flags, r)) fire(s.row, e, s.kind, s.delay);
   };
   return {
     /** Call once per engine tick with the snapshot's entities (+player/items for the hero's weapon). */
     update(entities, snapshot) {
       tick++;
+      if (queue) { if (snapshot?.playerId !== undefined) queue.hero(soundUnitKey(0, snapshot.playerId)); pump(); }
       { const q = snapshot?.player?.castRefusedSeq; if (q !== undefined) { if (pendingRefused) { const h = entities.find((x) => x.id === snapshot.playerId && x.type === 0); if (h) fire(skillSound.get(pendingRefused) ?? 0, h, 'cast'); pendingRefused = 0; } if (refusedSeq !== undefined && q !== refusedSeq) pendingRefused = snapshot.player.castRefusedSkill; refusedSeq = q; } } // a refused cast still plays the skill's stsound at entry (retail); one update late, as the mode-change cues drain
       const seen = new Set();
       for (const e00 of entities) {
@@ -100,9 +137,9 @@ export function createCombatSoundTrigger(read, play, busy = () => false, roll = 
         if (old === undefined || (old === e.mode && !restart)) continue; // a mode CHANGE only (or an attack mode re-entered); first sight is not an entry
         if ((e.type === 1 ? e.mode === 12 : e.mode === 17) && old === 0) continue; // DT -> DD (corpse settles): the death cue already fired on entering DT
         // A monster dying while frozen/shattered (States.txt shatter column: 1, 107, 184) shatters: impact_shatter replaces the hit impact and the death cue.
-        if (e.type === 1 && e.mode === 0 && (e.states?.has(1) || e.states?.has(107) || e.states?.has(184))) { play(385, { unitType: 1, unitId: e.id, classId: e.classId, kind: 'shatter', mode: e.mode, baseRow: 385 }); lastRoll = tick; continue; }
+        if (e.type === 1 && e.mode === 0 && (e.states?.has(1) || e.states?.has(107) || e.states?.has(184))) { fire(385, e, 'shatter'); queue?.stamp(); continue; }
         // a killing hit on a unit whose mode is no 0x23630 mode: the impact pair alone
-        if (dmg && engine && !STRUCK[e.type].has(e.mode)) for (const s of engine.impactSounds(e.type, e.classId | 0, (e.lastHitClass ?? 0) >>> 0, e.mode)) fire(s.row, e, s.kind);
+        if (dmg && engine && !STRUCK[e.type].has(e.mode)) for (const s of engine.impactSounds(e.type, e.classId | 0, (e.lastHitClass ?? 0) >>> 0, e.mode)) fire(s.row, e, s.kind, s.delay);
         if (blockSound(e.type, e.mode)) fire(blockSound(e.type, e.mode), e, 'block');
         if (e.type === 1) {
           // a hit landing as the unit enters its attack: the attack entry's cue still plays (retail ran 0x24490 at the mode change; the damage cue is separate)
@@ -118,5 +155,8 @@ export function createCombatSoundTrigger(read, play, busy = () => false, roll = 
       }
       for (const k of prev.keys()) if (!seen.has(k)) { hpPrev.delete(k); prev.delete(k); frames.delete(k); }
     },
+    /** Run the queue's pump on the following ticks (no entities) until every queued cue has started or been dropped. */
+    flush(limit = 512) { while (queue && pending.size && limit-- > 0) { tick++; pump(); } },
+    get tick() { return tick; },
   };
 }

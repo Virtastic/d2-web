@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { soundFalloffRadii, soundClientOffset, soundRangeSquared, soundInStartRange, soundBeyondCutoff, nativeSoundChannel,
-  soundFadeLevel, soundLoops, pickSoundVariant, d2SeedRand } from './sound-mixer-rules.mjs';
+  soundFadeLevel, soundLoops } from './sound-mixer-rules.mjs';
 import { soundRow, soundRowByHandle } from './unit-sound-resolver.mjs';
 
 const HEADER = 'Sound\tIndex\tFileName\tVolume\tGroup Size\tLoop\tFade In\tFade Out\tDefer Inst\tStop Inst\tDuration\tCompound\tReverb\tFalloff\tCache\tAsync Only\tPriority\tStream\tStereo\tTracking\tSolo\tMusic Vol\tBlock 1\tBlock 2\tBlock 3';
@@ -54,25 +54,6 @@ test('fades ramp linearly in mixer ticks; Loop only without a Duration', () => {
   assert.equal(soundLoops({ loop: true, duration: 0 }), true);
   assert.equal(soundLoops({ loop: true, duration: 25 }), false);
   assert.equal(soundLoops({ loop: false, duration: 0 }), false);
-});
-
-test('group variants avoid the last picks; the draw is the client seed', () => {
-  const script = (xs) => { const asked = []; return { asked, rand: (n) => { asked.push(n); return xs.shift(); } }; };
-  // Group of 4: avoid both history entries, no shortening roll.
-  let s = script([0, 1, 2]);
-  assert.equal(pickSoundVariant(100, 4, [100, 101], s.rand), 102);
-  assert.deepEqual(s.asked, [4, 4, 4]);
-  // Group of 2: rand(3) == 0 shortens the avoid list to nothing, so a repeat is allowed.
-  s = script([0, 0]);
-  assert.equal(pickSoundVariant(50, 2, [50, undefined], s.rand), 50);
-  assert.deepEqual(s.asked, [3, 2]);
-  s = script([1, 0, 1]);
-  assert.equal(pickSoundVariant(50, 2, [50, undefined], s.rand), 51);
-  assert.deepEqual(s.asked, [3, 2, 2]);
-  assert.equal(pickSoundVariant(7, 1, [], () => assert.fail('no draw for a single row')), 7);
-  const r = d2SeedRand([1, 0]);
-  assert.equal(r(16), 0x6ac690c5 & 15);
-  assert.equal(r(0), 0);
 });
 
 test('the resolver reads every Sounds.txt column and the loader group base', () => {

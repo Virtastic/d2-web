@@ -46,7 +46,9 @@ function rig(script = []) {
   }
   const bytes = wav(), asked = [];
   const read = (p) => { reads.push(p); return p === 'data\\global\\excel\\Sounds.txt' ? new TextEncoder().encode(TABLE) : bytes; };
-  const player = createUnitSoundPlayer(read, Ctx, null, null, { rand: (n) => { asked.push(n); return script.shift() ?? 0; } });
+  const ended = [];
+  const player = createUnitSoundPlayer(read, Ctx, null, null, { variant: (row) => { asked.push(row); return script.shift() ?? row; }, ended: (h) => ended.push(h) });
+  player.ended = ended;
   player.setVolume(1, { sound: 1, music: 1 });
   return { player, gains, sources, mergers, reads, asked };
 }
@@ -75,15 +77,21 @@ test('a stereo row is neither attenuated by the radial gain nor panned', async (
   assert.equal(r.mergers.length, 0);
 });
 
-test('a Group Size row plays the variant the client seed draws, avoiding the last picks', async () => {
-  const r = rig([2, 2, 3]);
+test('a Group Size row plays the variant the engine picks; a queued start brings its own', async () => {
+  const r = rig([3]);
   const a = await r.player.playRow(1);
   assert.equal(a.variantRow, 3);
   assert.equal(a.handle, 'step_3');
   assert.ok(r.reads.includes('data\\global\\sfx\\step_3.wav'));
-  const b = await r.player.playRow(1);
-  assert.equal(b.variantRow, 4, 'the repeat of variant 3 is redrawn');
-  assert.deepEqual(r.asked, [4, 4, 4]);
+  const b = await r.player.playRow(1, { variantRow: 4, queueHandle: 9 });
+  assert.equal(b.variantRow, 4, 'the queue started variant 4');
+  assert.equal(b.handle, 'step_4');
+  assert.deepEqual(r.asked, [1], 'the engine is asked only for the unqueued play');
+  r.sources.at(-1).onended();
+  assert.deepEqual(r.player.ended, [9], 'the ended source frees its queue entry');
+  const c = await r.player.playRow(7, { queueHandle: 11 });
+  assert.equal(c.silent, true);
+  assert.deepEqual(r.player.ended, [9, 11], 'a queued start that never sounds frees its entry at once');
 });
 
 test('Loop and Fade In: an attached looping row loops and ramps in over 12 ticks', async () => {

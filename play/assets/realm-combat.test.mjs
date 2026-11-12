@@ -41,7 +41,7 @@ test('a realm fight plays the monster attack, hit and death cues and the hero ca
   try { read('monstats.bin'); } catch { t.skip('retail tables absent'); return; }
   // the engine's 0x24490 stands in as a recorder: which unit entered which mode, and when; its rows are the engine's
   const entered = [], engine = { modeSounds: (type, id, cls, tf, su, mode) => { entered.push([type, id, cls, mode]); return mode === 4 ? [{ row: 2203, kind: 'attack' }] : []; }, impactSounds: () => [] };
-  const got = []; const trigger = createCombatSoundTrigger(read, (row, e) => got.push([e.kind, e.unitType, e.unitId, row]), undefined, null, engine);
+  const got = []; const trigger = createCombatSoundTrigger(read, (row, e) => got.push([e.kind, e.unitType, e.unitId, row]), engine);
   const hero = (mode) => ({ source: 'realm', guid: 1, classId: 1, renderState: { mode, framePrecise: 0 } });
   const tick = (monsterMode, heroMode, castSkill = 36) => {
     const views = [{ guid: 7, classId: 5, mode: monsterMode, x: 10, y: 10, direction: 0, typeFlags: 0, hpPct: 50 }];
@@ -165,7 +165,7 @@ test('a struck unit sounds the impact its hit class names', (t) => {
   const read = (p) => readFileSync(new URL(p.split('\\').pop(), dir));
   try { read('monstats.bin'); } catch { t.skip('retail tables absent'); return; }
   const entered = [], engine = { modeSounds: (type, id, cls, tf, su, mode, hit) => { entered.push([type, id, mode, hit]); return hit ? [{ row: 0x141, kind: 'impact' }, { row: 0x17B, kind: 'impact' }] : []; }, impactSounds: () => [] };
-  const got = []; const trigger = createCombatSoundTrigger(read, (row, e) => got.push([e.kind, e.unitType, e.unitId, row]), undefined, null, engine);
+  const got = []; const trigger = createCombatSoundTrigger(read, (row, e) => got.push([e.kind, e.unitType, e.unitId, row]), engine);
   const frameOf = (mode, hitClassOf) => realmCombatSoundFrame({ entities: [{ type: 1, id: 7, classId: 5, mode }, { type: 3, id: 7, classId: 1, mode: 0 }] }, [{ guid: 7, typeFlags: 0 }], { source: 'realm', guid: 1, classId: 1, renderState: { mode: 1, framePrecise: 0 } }, 0, hitClassOf);
   const asked = [];
   const struck = frameOf(3, (type, id) => { asked.push([type, id]); return type === 1 ? 0x21 : 0; });
@@ -220,7 +220,7 @@ test('one hit sounds once while a drawn frame owes several ticks: the monster cl
   const read = (p) => readFileSync(new URL(p.split('\\').pop(), dir));
   try { read('monstats.bin'); } catch { t.skip('retail tables absent'); return; }
   const entered = [], engine = { modeSounds: (type, id, cls, tf, su, mode) => { entered.push([type, id, mode]); return []; }, impactSounds: () => [] };
-  const trigger = createCombatSoundTrigger(read, () => {}, undefined, null, engine);
+  const trigger = createCombatSoundTrigger(read, () => {}, engine);
   const view = (mode, framePrecise) => [{ guid: 7, classId: 5, mode, framePrecise, frameCountPrecise: 2048, animationFlags: 0, x: 10, y: 10, direction: 0, typeFlags: 0, hpPct: 50 }];
   const snap = (views) => realmViewSnapshot({ base: null, resources: null, monsters: views, missiles: [], players: [], level: 2,
     actor: (m) => ({ mode: m.mode, framePrecise: m.framePrecise, frameCountPrecise: m.frameCountPrecise }), frame: 0 });

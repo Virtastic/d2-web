@@ -9,14 +9,18 @@
 //   0x22A70 profile                        d2_client_22a70 over a unit with the call's class / type flags / superunique
 //   0x1510(class, 0xD) MonStats2 CRITTER   MonStats(class).wMonStatsEx -> MonStats2 byte +4+(bit>>3), mask 1<<(bit&7)
 //   0xC1FC(unit, 1) / (unit, 0x92)         the unit's states 1 and 146, flags bits 2 and 3
-//   0x87BD0 busy                           flags bit 1 (a monster-range sound still playing: the sound engine's state)
+//   0x87BD0 busy                           flags bit 1, or the play path's queue (play_sound_queue.cpp) holding a
+//                                          playing row of the local voice range
 //   0x222C0 class profile                  D2Client+0xF7694: per class {hit row, death row}
 //   0x242B0 CVT (#10862)                   the hero's weapon hit-class index; table D2Client+0xF5538 (first dword of 14)
 //   0x242B0 LCG roll (monster)             the roll the session already drew at the order's arrival (monster_face.cpp,
 //                                          d2_client_attack_roll_take): replayed through the port's own gate and
-//                                          draw, seed {lo 0, hi r} so the draw is r; -1 = no draw happened (gate shut)
+//                                          draw, seed {lo 0, hi r} so the draw is r; -1 = no draw happened (gate shut);
+//                                          -2 = the play path's own gate on D2Client+0x11C4C4 and the queue's busy
+//                                          state decides, and the session's draw is taken only when it opens
+//   D2Client+0x11C4C4                      written here by 0x23630 and the attack submit, on the queue's clock
 //   0x220A0 unit +0x7C                     the session's per-unit sound tick (unit_sound_trigger_237e0.cpp)
-// The session's own client-frame passes write the stamps (+0x7C, D2Client+0x11C4C4); the play path only reads them.
+// The session's own client-frame passes write the unit's +0x7C stamp; the play path only reads it.
 #include <cstdint>
 #include <cstring>
 #include <cstddef>
@@ -41,6 +45,9 @@ struct D2c22CA0Env {
 extern "C" void d2c_22ca0(const D2c22CA0Env* e, uint32_t eax, uint32_t edi, uint8_t* mem);
 extern "C" uint32_t d2_client_monster_sfx_ticks(uint32_t id);
 extern "C" uint32_t d2_session_client_frame_now();
+extern "C" int32_t d2_client_play_sound_busy();
+extern "C" uint32_t d2_client_play_sound_now();
+extern "C" int32_t d2_client_play_sound_attack_roll(uint32_t id);
 
 static_assert(offsetof(D2MonStatsTxt, wMonStatsEx) == 0x18, "0x1510 reads MonStats +0x18");
 
@@ -57,12 +64,19 @@ enum Flag : uint32_t { F_HERO = 1, F_BUSY = 2, F_STATE1 = 4, F_STATE146 = 8 };
 struct Call { uint32_t type, id; int32_t cls; uint32_t typeFlags; int32_t superUnique; uint32_t hit, cvt, flags; int32_t roll; uint32_t mode; };
 Call g;
 D2UnitStrc g_unit; D2MonsterDataStrc g_md;
-uint32_t g_rows[16], g_n = 0, g_kind = 0, g_sub = 0, g_subCalls = 0, g_hitMode = 0, g_skillMode = 0;
-bool g_attackNext = false;
+uint32_t g_rows[16], g_off[16], g_n = 0, g_kind = 0, g_sub = 0, g_subCalls = 0, g_hitMode = 0, g_skillMode = 0;
+bool g_attackNext = false, g_dry = false, g_drew = false;
 uint8_t g_scratch[0x100];
+uint32_t g_stamp = 0xFFFFFC00u;   // D2Client+0x11C4C4: the tick of the last struck/death (0x23630) or attack (0x242B0) sound
 
 uint32_t unitAddr() { return (uint32_t)(uintptr_t)&g_unit; }
-void keep(uint32_t row, uint32_t kind) { if (row > 0 && row < 0x10000 && g_n < 16) g_rows[g_n++] = row | (kind << 16); }
+void keep(uint32_t row, uint32_t kind, uint32_t off = 0) {
+    if (g_dry || row == 0 || row >= 0x10000 || g_n >= 16) return;
+    g_off[g_n] = off; g_rows[g_n++] = row | (kind << 16);
+}
+// 0x87BD0: the flag the caller passes, or a local-range row still sounding in the play path's queue
+// (a monster attack whose draw was taken passed it at the draw: not busy)
+bool busy() { return !g_drew && ((g.flags & F_BUSY) || d2_client_play_sound_busy()); }
 
 uint32_t profile22a70Cb(uint32_t op, uint32_t arg) {
     switch (op) {
@@ -89,16 +103,19 @@ uint32_t monStats2Flag(int32_t cls, uint32_t bit) {
     return (1u << (bit & 7)) & r[4 + (bit >> 3)];
 }
 
-uintptr_t cb242b0(uint32_t op, uintptr_t a, uintptr_t, uintptr_t) {
+uintptr_t cb242b0(uint32_t op, uintptr_t a, uintptr_t, uintptr_t c) {
     switch (op) {
     case 0: return g.type;                 // TYPE
     case 1: return g.cvt;                  // CVT: #10862, the weapon's hit-class index
-    case 5: return 0;                      // SPEED: only the submit's start offset
-    case 6: {                              // SNDPLAY
+    // SPEED, 0x22220: (the swing table's second word * 256 + 0x80) / the unit's animation speed (+0x4C; the play path
+    // holds no animation rate for the call and takes the base 256)
+    case 5: return (kWeaponSwing[(g.cvt & 0xF) * 2 + 1] * 256u + 0x80u) / 256u;
+    case 6: {                              // SNDPLAY (a = row, c = start offset)
         const uint32_t kind = g.type == 0 ? K_SWING : (g_attackNext ? K_ATTACK : K_WEAPON);
-        g_attackNext = false; keep((uint32_t)a, kind); return a; }
+        if (kind == K_ATTACK && !g_dry) g_stamp = d2_client_play_sound_now();
+        g_attackNext = false; keep((uint32_t)a, kind, (uint32_t)c); return a; }
     case 7: return profile();              // PROFILE
-    case 8: return (g.flags & F_BUSY) ? 1 : 0;   // BUSY
+    case 8: return busy() ? 1 : 0;         // BUSY
     case 9: g_attackNext = true; return 0; // LIST: precedes the attack submit
     }
     return 0;                              // ERRSTR/ERRLOG/EXIT/STAMP/SETVAL: no row
@@ -112,32 +129,42 @@ uint32_t host(D2cCall* c) {
     case 0x22A70: return profile();
     case 0x1510:  return monStats2Flag((int32_t)c->eax, c->edx);
     case 0xC1FC:  return c->s[1] == 1 ? ((g.flags & F_STATE1) ? 1u : 0u) : c->s[1] == 0x92 ? ((g.flags & F_STATE146) ? 1u : 0u) : 0u;
-    case 0x87BD0: return (g.flags & F_BUSY) ? 1u : 0u;
+    case 0x87BD0: return busy() ? 1u : 0u;
     case 0x222C0: return c->eax < 7 ? (uint32_t)(uintptr_t)kClassProfile[c->eax] : 0u;
     case 0x88A70: {
         uint32_t kind = g_kind;
         if (g_sub == 0x23630) kind = g_subCalls++ < 2 ? K_IMPACT : g_hitMode ? K_HIT : K_DEATH;   // the first two are 0x227E0's pair
-        keep(c->ebx, kind);
+        keep(c->ebx, kind, c->s[1]);       // [esp+8]: the start offset
         return c->ebx;
     }
     case 0x23630: {
         const uint32_t m = c->s[0];
         g_sub = 0x23630; g_subCalls = 0; g_hitMode = (g.type == 1) ? (m == 3 || m == 0xD) : (m == 4 || m == 0x13);
-        uint32_t sfx = 0, out = 0;
-        d2_client_23630_rule(unitAddr(), g.hit, (int32_t)m, (g.flags & F_HERO) ? unitAddr() : 0, 0, &sfx, &out, host);
+        uint32_t sfx = 0;
+        d2_client_23630_rule(unitAddr(), g.hit, (int32_t)m, (g.flags & F_HERO) ? unitAddr() : 0, d2_client_play_sound_now(), &sfx, &g_stamp, host);
         g_sub = 0;
         return 0;
     }
     case 0x242B0: {
         D2C242B0Env e{};
-        e.tick = 0x10000; e.cvtTable = kWeaponSwing; e.animSpeed = 256;
-        if (g.type == 1 && g.roll >= 0) { e.lastTick = e.tick - 15; e.seedLo = 0; e.seedHi = (uint32_t)g.roll; }
+        const uint32_t now = d2_client_play_sound_now();
+        e.tick = now; e.cvtTable = kWeaponSwing; e.animSpeed = 256;
+        int32_t roll = g.roll;
+        if (g.type == 1 && roll == -2) {
+            // the play path's own 0x242B0 gate (15 ticks since D2Client+0x11C4C4, busy): a dry run on a marked seed
+            // {0, 1} tells whether this entry draws; only then is the session's draw for the order taken
+            D2C242B0Env d = e; d.lastTick = g_stamp; d.seedLo = 0; d.seedHi = 1;
+            g_dry = true; g_attackNext = false;
+            d2_client_242b0(&d, unitAddr(), c->eax, c->s[0], cb242b0);
+            g_dry = false;
+            roll = (d.seedLo != 0 || d.seedHi != 1) ? d2_client_play_sound_attack_roll(g.id) : -1;
+        }
+        if (g.type == 1 && roll >= 0) { e.lastTick = e.tick - 15; e.seedLo = 0; e.seedHi = (uint32_t)roll; }
         else e.lastTick = e.tick;          // no draw happened at the order: the 15-tick gate was shut
-        const uint32_t saveFlags = g.flags;
-        if (g.type == 1 && g.roll >= 0) g.flags &= ~F_BUSY;   // the draw happened, so the busy test passed then
+        g_drew = g.type == 1 && roll >= 0;  // the draw happened, so the busy test passed then
         g_attackNext = false;
         d2_client_242b0(&e, unitAddr(), c->eax, c->s[0], cb242b0);
-        g.flags = saveFlags;
+        g_drew = false;
         return 0;
     }
     case 0x22CA0: {
@@ -201,3 +228,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_unit_impact_sounds(uint32_t t
     return g_n;
 }
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_unit_mode_sound_at(uint32_t i) { return i < g_n ? g_rows[i] : 0; }
+// The start offset (ticks after the submit) 0x88A70 was handed with row i: MonSounds HitDelay / DeaDelay / Att delay,
+// the weapon cue's ((delay * 256 + 0x80) / speed), the player's 2 (struck) / 1 (death), 0x2EA/0x2EB's 0x6A/0xC1.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_unit_mode_sound_delay_at(uint32_t i) { return i < g_n ? g_off[i] : 0; }
+// D2Client+0x11C4C4 written outside 0x24490 (the play path's shatter cue stands in for the death entry's 0x23630).
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_unit_mode_sound_stamp() { g_stamp = d2_client_play_sound_now(); }
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_unit_mode_sound_reset() { g_stamp = 0xFFFFFC00u; }

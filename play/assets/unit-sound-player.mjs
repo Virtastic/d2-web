@@ -3,7 +3,7 @@ import { unlockOnGesture } from './audio-unlock.mjs';
 import { resolveUnitSound, soundRow, soundRowByHandle } from './unit-sound-resolver.mjs';
 import { sliderPercent } from './sound-channel-volume.mjs';
 import { nativeUnitSoundSpatial, unitSoundSourcePosition, nativeSoundPanBalance } from './unit-sound-spatial.mjs';
-import { soundClientOffset, soundInStartRange, soundBeyondCutoff, nativeSoundChannel, soundLoops, pickSoundVariant, d2SeedRand } from './sound-mixer-rules.mjs';
+import { soundClientOffset, soundInStartRange, soundBeyondCutoff, nativeSoundChannel, soundLoops } from './sound-mixer-rules.mjs';
 
 // S2: drained engine sound events (d2_session_take_sounds septets) -> resolver -> Sounds.txt file -> Web Audio.
 // The engine decides the event, D2Client's resolver picks the row, Sounds.txt names the WAV; nothing is invented.
@@ -12,7 +12,9 @@ const ROOTS = ['data\\global\\sfx\\', 'data\\local\\sfx\\']; // voices/speech li
 export const MIXER_TICK_SECONDS = 0.04;
 
 // `fetched(names)`, optional: resolves once the first of those archive paths that exists can be read without a network stall.
-// `options.rand(n)`, optional: the client hero-seed draw the group variant pick uses (default: the engine's export).
+// `options.variant(row)`, optional: the group variant a row played outside the engine's sound queue sounds (default: the
+// engine's 0x5EE70 export). `options.ended(handle)`, optional: a queued entry's source ended or never sounded (default:
+// the engine's queue export). A start the queue made (event.queueHandle) brings its variant (event.variantRow).
 export function createUnitSoundPlayer(read, AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext, gestureTarget = globalThis.window, fetched = null, options = {}) {
   if (typeof read !== 'function') throw new TypeError('retail asset reader is required');
   if (!AudioContextClass) throw new Error('Web Audio is unavailable');
@@ -25,13 +27,13 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
   const out = gain ?? context.destination;
   let volume = 1, sliders = { sound: 1, music: 1 };
   const activeSources = new Map();
-  let monsterPlaying = 0; // retail FUN_6fb37bd0(0): Sounds.txt rows 0xB76..0x1230 currently playing
   // The listener and unit positions of the last refresh; a source submitted between refreshes is placed against them.
   let lastSnapshot = null, lastListener = null;
-  const variantHistory = new Map(); // row -> its last two variant picks (record +0x64/+0x68)
-  const fallbackRand = d2SeedRand([1, 0]);
-  const rand = typeof options.rand === 'function' ? options.rand
-    : (n) => (typeof globalThis.Module?._d2_client_sound_rand === 'function' ? globalThis.Module._d2_client_sound_rand(n) >>> 0 : fallbackRand(n));
+  const variant = typeof options.variant === 'function' ? options.variant
+    : (row) => (typeof globalThis.Module?._d2_client_play_sound_variant === 'function' ? Number(globalThis.Module._d2_client_play_sound_variant(row)) | 0 : row);
+  const ended = typeof options.ended === 'function' ? options.ended
+    : (h) => globalThis.Module?._d2_client_play_sound_ended?.(h);
+  const release = (rec) => { if (rec.queueHandle && !rec.released) { rec.released = true; ended(rec.queueHandle); } };
   const sourceGainFor = (row, spatialGainByte = 255, offset = null) => {
     const master = sliderPercent(sliders.sound), music = sliderPercent(sliders.music);
     const channel = nativeSoundChannel(row ?? { volume: 255 }, master, music, offset);
@@ -134,15 +136,14 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
       rec.clientOffset = place?.offset ?? null;
       // 0x88DD0: a queued source starts only while it is inside its Falloff cutoff.
       if (!soundInStartRange(place?.offset, asked.falloff)) { rec.outOfRange = true; return rec; }
-      // 0x5D7A0 -> 0x5EE70: a row with a Group Size plays one of its variants, avoiding its last picks.
+      // 0x5D7A0 -> 0x5EE70: a row with a Group Size plays one of its variants, avoiding its last picks (the engine's
+      // pick; a queued start already made it).
       let r = asked;
-      if (asked.groupSize > 1) {
-        const history = variantHistory.get(row) ?? [];
-        const pick = pickSoundVariant(row, asked.groupSize, history, rand);
-        variantHistory.set(row, [pick, history[0]]);
+      const pick = Number.isInteger(rec.variantRow) ? rec.variantRow : asked.groupSize > 1 ? variant(row) : row;
+      if (pick !== row || asked.groupSize > 1) {
         rec.variantRow = pick;
-        const variant = soundRow(t, pick);
-        if (variant?.file) r = variant;
+        const v = soundRow(t, pick);
+        if (v?.file) r = v;
         rec.handle = r.handle;
       }
       context.resume().catch(() => {});
@@ -177,15 +178,16 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
           g.setValueAtTime(0, now); g.linearRampToValueAtTime(target, now + rec.fadeInSeconds);
         }
       }
-      const mon = row >= 0xB76 && row <= 0x1230;
-      source.onended = () => { source.disconnect(); disconnectSource(node); if (mon) monsterPlaying--; };
-      source.start(); started++; rec.started = true; if (mon) monsterPlaying++;
+      source.onended = () => { source.disconnect(); disconnectSource(node); release(rec); };
+      source.start(); started++; rec.started = true;
       // Duration: the tick stops a source once more than Duration ticks have passed since it started.
       if (r.duration > 0) {
         rec.durationSeconds = (r.duration + 1) * MIXER_TICK_SECONDS;
         try { source.stop?.(now + rec.durationSeconds); } catch {}
       }
     } catch (error) { rec.error = String(error); }
+    // a queued entry that never started (silent, out of range, failed) leaves the client sound list at once
+    finally { if (!rec.started) release(rec); }
     return rec;
   }
   /** One drained event {unitType, unitId, classId, soundEvent, updateUnitType, updateUnitId}; localId = the hero's unit id. */
@@ -274,7 +276,7 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
     } catch (error) { rec.error = String(error); finish(); }
     return rec;
   }
-  return { monsterSoundBusy: () => monsterPlaying > 0, play, playRow, playDialogue, stopDialogue, stopUnitSounds, whenDialogueDone: () => dialogueDone, updateSpatialGain, events, setVolume(v, nextSliders) { volume = Math.max(0, Math.min(1, Number(v) || 0)); if (nextSliders) sliders = { sound: nextSliders.sound, music: nextSliders.music }; else sliders = { sound: volume, music: 1 }; if (gain) gain.gain.value = volume; for (const [node, state] of activeSources) if (!state.stopping) node.gain.value = sourceGainFor(state.row, state.spatialGainByte, state.offset); },
+  return { play, playRow, playDialogue, stopDialogue, stopUnitSounds, whenDialogueDone: () => dialogueDone, updateSpatialGain, events, setVolume(v, nextSliders) { volume = Math.max(0, Math.min(1, Number(v) || 0)); if (nextSliders) sliders = { sound: nextSliders.sound, music: nextSliders.music }; else sliders = { sound: volume, music: 1 }; if (gain) gain.gain.value = volume; for (const [node, state] of activeSources) if (!state.stopping) node.gain.value = sourceGainFor(state.row, state.spatialGainByte, state.offset); },
     get volume() { return gain ? gain.gain.value : volume; },
     evidence: () => ({ started, dialogueActive: Boolean(dialogueSource), events: events.map((x) => ({ ...x })), state: context.state }), close: () => context.close?.() };
 }
