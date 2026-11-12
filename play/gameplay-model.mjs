@@ -326,11 +326,25 @@ export function nativeHoverSpecialGate(candidate) {
 
 // Compare already accepted browser hit candidates using the recovered cross-type score; greater values win.
 // Equal-priority candidates use D2Client's squared game-coordinate distance from the player when supplied.
+// The engine's D2Client 0x51E80 walk (hover_pick_51e80.cpp), installed by the shell; the JS walk below runs only without it.
+let hoverPickBackend = null;
+export function setHoverPickBackend(fn) { hoverPickBackend = typeof fn === 'function' ? fn : null; }
+
 export function selectUnitTypePickCandidate(candidates, {
   unitTypeOf = candidateUnitType,
   accepted = () => true,
   reference = null,
+  stored = null,
 } = {}) {
+  if (hoverPickBackend) {
+    const list = [];
+    for (const c of candidates ?? []) if (accepted(c)) list.push(c);
+    const rows = list.map((c) => ({ type: unitTypeOf(c), mode: c?.mode ?? c?.target?.mode, flags: c?.flags ?? c?.target?.flags,
+      x: Number(c?.x ?? c?.target?.x), y: Number(c?.y ?? c?.target?.y), attached: candidateAttached(c) === true,
+      classId: c?.classId ?? c?.target?.classId }));
+    const at = hoverPickBackend(rows, reference, stored ? list.indexOf(stored) : -1);
+    return at >= 0 ? list[at] : null;
+  }
   let selected = null, selectedPriority = -Infinity;
   let selectedDistance2 = Infinity;
   for (const candidate of candidates ?? []) {
@@ -391,7 +405,8 @@ export function selectPointerCandidate(candidates, { click = false, reference = 
   // D2Client FUN_6FB01E80 first asks FUN_6FB01A80 for the previous hover target and keeps it while
   // the validator still accepts it, so overlapping units/items/objects do not swap under the cursor.
   const sticky = prior && rows.find((r) => r.target?.id === prior.id && r.kind === prior.kind);
-  const winner = sticky || selectUnitTypePickCandidate(rows, { reference });
+  const winner = hoverPickBackend ? selectUnitTypePickCandidate(rows, { reference, stored: sticky })
+    : (sticky || selectUnitTypePickCandidate(rows, { reference }));
   if (winner) return { kind: winner.kind, target: winner.target };
   if (candidates.item) return { kind: 'item', target: candidates.item };
   return null;
@@ -409,8 +424,8 @@ export function clickUnitOrItem(unitId, groundItem, prior = null) {
 
 // Click on overlapping units follows the hover walk (D2Client 0x51E80): type priority, then squared
 // distance to the player, first seen on ties. Returns the winning unit (hostile or NPC) or null.
-export function selectHoverUnit(units, reference) {
-  return selectUnitTypePickCandidate(units, { reference });
+export function selectHoverUnit(units, reference, stored = null) {
+  return selectUnitTypePickCandidate(units, { reference, stored });
 }
 
 export function isPrimaryTargetEligible(entity, accept = null) {

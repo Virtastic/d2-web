@@ -131,3 +131,10 @@ export function drawObjectHoverLabel(ctx, target, font, projectStatic, recordPri
 export const STR_LOCKED_CHEST = 3262;
 export const objectNameFor = (object, name, lockedName) => (object.locked ? lockedName : name);
 export const objectPortalLabel = (name, levelName) => [name, levelName].filter(Boolean).join(' ');
+
+// Objects.txt row bytes the hover walk's door tests read: nIsDoor (+0x13A, UNITS_IsDoor #11020) and the orientation byte (+0x13C).
+export function objectDoorFields(Module, classId) {
+  const row = objectTableRow(Module, classId);
+  if (row < 0) return { isDoor: 0, orient: 0 };
+  return { isDoor: Module.HEAPU8[row + 0x13a] ? 1 : 0, orient: Module.HEAPU8[row + 0x13c] };
+}

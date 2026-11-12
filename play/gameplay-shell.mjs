@@ -7,8 +7,9 @@ import { readSessionActiveNearFeed } from './assets/session-active-near-feed.mjs
 import { createFrameSnapshots, fromSnapshot } from './frame-snapshot.mjs';
 import { perfSync, perfEnabled, perfT0, perfT, perfSample, perfCountFrame, perfReset, perfReport, perfFrameStart, perfFrameTop } from './assets/frame-perf.mjs';
 import { gameInitSeed, clockInputs } from './assets/game-seed.mjs';
-import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, groundItemsUnderPointerAt, hostileUnitHoverHit, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeObjectHoverContains, nativeHoverSpecialGate, clickUnitOrItem, selectPointerCandidate, selectPrimaryTarget, selectHoverUnit, viewportToWorld } from './gameplay-model.mjs';
+import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, groundItemsUnderPointerAt, hostileUnitHoverHit, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeObjectHoverContains, nativeHoverSpecialGate, clickUnitOrItem, selectPointerCandidate, selectPrimaryTarget, selectHoverUnit, setHoverPickBackend, viewportToWorld } from './gameplay-model.mjs';
 import { altSync } from './item-pick.mjs';
+import { createHoverPickBackend } from './hover-pick-engine.mjs';
 import { createMpqAssetReader } from './assets/mpq-assets.mjs';
 import { itemTables, itemSizer } from './assets/d2-item-size.mjs';
 import { createAreaPrefetch } from './assets/area-prefetch.mjs';
@@ -288,6 +289,7 @@ const frontendPointerControl = () => {
   return null;
 };
 let snapshot = normalizeSnapshot(null);
+let hoverPickEngine = null;
 // PERF: a live frame re-reads the snapshot only when the world may have changed: an engine tick, a
 // command, or an engine write (markWorldWrites). Set back to false by the read.
 let worldDirty = true;
@@ -3131,6 +3133,7 @@ function update(forceTick = false, live = false) {
   if (screen !== SCREEN.GAME) return;
   if (gameMenu?.open) { gameMenu.step(); controlsPanel?.step(); input.drain(); return; }   // single player pauses under the menu
   if (window.Module?.ccall && !Module.ccall.marksWorld) markWorldWrites();
+  if (window.Module?.ccall && !hoverPickEngine) setHoverPickBackend(hoverPickEngine = createHoverPickBackend(Module));
   const commands = input.drain();
   if (commands.length) worldDirty = true;
   if (realmTransport.state === 'session-open') {
@@ -3493,7 +3496,8 @@ function resolvePointerCandidates(x, y) {
 // drawn struck its neighbour (melee-click-target: 56 of 480 hovered-hostile clicks).
 function hoveredHostileAt(x, y) {
   const units = unitsUnderPointer(x, y);
-  const unit = (hoverPrior?.kind === 'unit' && units.find((u) => u.id === hoverPrior.id && u.hostile)) || selectHoverUnit(units, snapshot.player);
+  const prior = hoverPrior?.kind === 'unit' ? units.find((u) => u.id === hoverPrior.id && u.hostile) : null;
+  const unit = (!hoverPickEngine && prior) || selectHoverUnit(units, snapshot.player, prior);
   return unit?.hostile ? unit.id : 0;
 }
 function resolvePointerTarget(x, y) {
