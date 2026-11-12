@@ -3950,7 +3950,7 @@ function realmNpcScreen() {
     itemNameOf: (guid) => { const it = realmNpc().view()?.stock.find((x) => x.guid === guid); return it ? (realmItemTextFor().describe(it.bits)?.name ?? '') : ''; },
     anchor: realmNpcFeet, smith: (classId) => SMITH_CLASSES.has(classId), gold: () => realmWorldState?.gold ?? null,
     now: () => Math.trunc(performance.now()),
-    offerClick: Module._d2_client_store_offer_click ? storeOfferClick : null,
+    offerClick: Module._d2_client_store_offer_click ? storeOfferClick : null, cursorItem: () => clientView().cursorItem() || 0,
     // the same offer fields the local window's stock carries: tooltip text, price label and price, and the stash line
     itemDetail: (s) => ({ ...(realmItemTextFor().describe(s.bits) ?? {}), cost: realmNpc().priceOf(s.guid) ?? 0, costLabel: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [3329]) }),
     stashGold: () => clientView().stashBalance(0) }));

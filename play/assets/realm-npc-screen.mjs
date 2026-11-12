@@ -30,11 +30,11 @@ const menuOffer = (o) => ({ mercName: o.mercName, name: o.name, level: o.level ?
  * (createItemTable), text(stringId) (the string table), anchor(guid) (the NPC's screen feet {x, y} or null),
  * smith(classId) (the vendor's smith rule), nameOf(classId) (the NPC's name), itemNameOf(guid) (the stocked item's
  * name for the Buy box, '' while no name seam is wired), gold() (the hero's gold for the hire window, null if unknown),
- * offerClick (createStoreOfferClick: the engine's offer rule, optional).
+ * offerClick (createStoreOfferClick: the engine's offer rule, optional), cursorItem() (the item on the cursor, 0 if none).
  */
 export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor, speech, itemTable, text = () => '', anchor = () => null,
   smith = () => false, now = () => 0, nameOf = () => '', itemNameOf = () => '', gold = () => null, offerClick = null,
-  itemDetail = null, stashGold = () => -1 }) {
+  itemDetail = null, stashGold = () => -1, cursorItem = () => 0 }) {
   const gate = createNpcSpeechClickGate();   // the per-speech 100 ms mouse-down gate
   const rule = offerClick ?? fallbackOfferClick(now);
   let gateKey = null;
@@ -166,12 +166,13 @@ export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor
           const vendorButton = vendor.buttonAt(x, y, w, h, v.classId);
           if (vendorButton) { pressedButton = vendorButton; return true; }
           const item = vendor.itemAt(x, y, w, h, { items: vendorItemsFrom(v.stock, itemTable), classId: v.classId });
-          if (item) {
-            const action = rule.action({ button, mode: 1, offer: true });
-            if (action === 'confirm') openConfirm(v, item.guid);
-            else if (action === 'buy') { if (ui.buyAt(item.guid)) rule.sent(); }
-            else if (action === 'end') { closeConfirm(); ui.disarm(); }
-          }
+          // The rule reads the shop mode DAT_6fbcbc34 (1 open, 3 Sell armed, 4 Repair armed: the Sell / Repair button
+          // rows 0x8B9F0 / 0x8BA70 store it) and the cursor; a right press in mode 3 or 4 ends that mode with or
+          // without an offer under it (0x9C830 -> 0x8D300).
+          const action = rule.action({ button, mode: v.repairMode ? 4 : v.sellMode ? 3 : 1, cursorItem: cursorItem(), offer: Boolean(item) });
+          if (action === 'confirm' && item) openConfirm(v, item.guid);
+          else if (action === 'buy' && item) { if (ui.buyAt(item.guid)) rule.sent(); }
+          else if (action === 'end') { closeConfirm(); ui.disarm(); }
           return true;
         }
         return false;

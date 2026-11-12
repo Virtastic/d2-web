@@ -39,8 +39,8 @@ export function createRealmNpcUi({ npc }) {
     priceAt: (guid) => npc.priceOf(guid),
     /** A hire offer was chosen in the hire window: the 0x36 names the merc by its name id. */
     hire: (mercName) => npc.hire(mercName),
-    /** The armed buy was dropped (the offer rule's disarm): the screen closes its confirm box. */
-    disarm: () => true,
+    /** The offer rule's 'end' (D2Client 0x8D300): the shop mode returns to 1, so Sell and Repair are no longer armed. */
+    disarm: () => { npc.setSellMode(false); npc.setRepairMode(false); return true; },
     /** The Repair box was declined: Repair mode ends. */
     endRepair: () => { npc.setRepairMode(false); return true; },
     /** Continue on the refusal box (0x4AAF0): the box closes, the cursor modes end. */
