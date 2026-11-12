@@ -1,5 +1,6 @@
 // src/core/storm/storm_sub_1aa70.cpp -- 1.13c Storm+0x1AA70
 #include <cstdint>
+#include <cstring>
 // Heap block in-place resize. Page layout (retail 32-bit): +0x0C stamp, +0x18 bytes-in-use, +0x20 end,
 // +0x24 free-list count, +0x2C committed, +0x30 reserved. Block: u16 size +0, u8 pad +2, flags +3 (0x02 free, 0x10 busy-mark), u32 +4 stamp.
 struct StormResizeEnv {
@@ -10,6 +11,9 @@ struct StormResizeEnv {
   void (*split)(uint8_t* page, uint16_t* blk, int32_t* total, int32_t* pad); // 1A970
 };
 // 1.13c Storm+0x1AA70: blk = block header, oldReq/newReq = requested sizes. Returns 1 on success.
+// The page end (+0x20) is a retail 32-bit word; on wasm64 a heap address fits in 32 bits, so it is widened on read
+// and narrowed on write.
+static uint8_t* pageEnd(const uint8_t* pg) { uint32_t v; memcpy(&v, pg + 0x20, 4); return (uint8_t*)(uintptr_t)v; }
 extern "C" uint32_t Storm_Sub1AA70(StormResizeEnv& e, uint16_t* blk, int32_t oldReq, uint32_t newReq) {
   uint8_t* pg = e.page;
   // 1A6F0
@@ -29,7 +33,7 @@ extern "C" uint32_t Storm_Sub1AA70(StormResizeEnv& e, uint16_t* blk, int32_t old
     uint16_t* p = (uint16_t*)((uint8_t*)blk + cur);
     {
       do {
-        if ((uint8_t*)p == *(uint8_t**)(pg + 0x20)) break;
+        if ((uint8_t*)p == pageEnd(pg)) break;
         if ((((uint8_t*)p)[3] & 2) == 0) return 0;
         acc += *p; p = (uint16_t*)((uint8_t*)p + *p);
       } while (acc < need);
@@ -42,12 +46,12 @@ extern "C" uint32_t Storm_Sub1AA70(StormResizeEnv& e, uint16_t* blk, int32_t old
         if (*(uint32_t*)(pg + 0x30) < off) return 0;
         if (!e.commit(pg, off)) return 0;
       }
-      *(uint8_t**)(pg + 0x20) = endNew;
+      { uint32_t v = (uint32_t)(uintptr_t)endNew; memcpy(pg + 0x20, &v, 4); }
     }
     *blk = (uint16_t)(cur + use);
     e.split(pg, blk, &total, &pad);
     *blk = (uint16_t)total;
-    if (endNew != *(uint8_t**)(pg + 0x20)) {
+    if (endNew != pageEnd(pg)) {
       uint8_t b = endNew[3]; endNew[3] = b & 0xef;
       if ((b & 2) && *(uint32_t*)(pg + 0x24)) *(uint32_t*)(pg + 0x24) -= 1;
     }

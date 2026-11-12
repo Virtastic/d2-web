@@ -449,12 +449,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_20c0(uint32_t* r) {
     r[4] = 0;
 }
 
-// 1.13c Storm+0x2160: TSList::LinkNode(eax=list, ebx=node, [esp+4]=linktype, [esp+8]=existing)
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_2160(uint32_t* r) {
-    StormListLinkNode(P(StormList*, 0), (uintptr_t)r[1], (uint32_t)r[2], (uintptr_t)r[3]);
-    r[4] = 0;
-}
+// 1.13c Storm+0x2160: the FN probe is src/core/fn/storm_2160.cpp over the 32-bit port src/core/storm/storm_sub_2160.cpp.
 
 // 1.13c Storm+0x2210: NewNode(esi=location, [esp+4]=list, [esp+8]=extrabytes, [esp+12]=flags)
 extern "C"

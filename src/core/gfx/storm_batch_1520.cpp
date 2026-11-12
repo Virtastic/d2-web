@@ -135,7 +135,7 @@ void storm_sub_2290(uint32_t* obj) {
 void storm_call_vslot0(uint32_t* self, uint32_t record) { (void)self; (void)record; }
 void storm_sub_20c0(uint32_t* self, uint32_t param_1) {
     self[4] = 0;
-    storm_sub_2780(self);
+    storm_sub_2780(self + 1);   // retail: lea edi,[ebx+4]
     for (uint32_t i = 0; i < self[6]; ++i) {
         for (;;) {
             uint32_t base = *(uint32_t*)(uintptr_t)(self[7] + i * 0xc);
@@ -246,7 +246,7 @@ uintptr_t g_vtable_36b04;
 void storm_sub_1a70(uint32_t* p) {
     p[0] = (uint32_t)(uintptr_t)&g_vtable_36b04;
     storm_sub_20c0(p, 1);
-    storm_sub_2290(p);
+    storm_sub_2290(p + 5);      // retail: lea eax,[ebx+0x14]
     storm_sub_22d0(p + 1);
 }
 
@@ -441,6 +441,15 @@ EMSCRIPTEN_KEEPALIVE void storm_port_1a70(uint32_t* r) {
     r[4] = 0;
 }
 
+// 1.13c Storm+0x1BF0: stdcall wrapper (ret 4) -- destroy the explicit list array passed on the
+// stack through 0x2290 (EAX = the array): each 0xc-byte record via 0x1B80, then SMemFree the
+// record block with tag __AV__TSExplicitList(URGN(0,CC)).
+extern "C"
+EMSCRIPTEN_KEEPALIVE void storm_port_1bf0(uint32_t* r) {
+    storm_sub_2290((uint32_t*)(uintptr_t)r[0]);
+    r[4] = 0;
+}
+
 // 1.13c Storm+0x1AF0: reset the container: blank the table part (0x20C0 mode 1), clear +0x10
 // and +0x24, drain the explicit list (0x2290), then clear +0x14/+0x18/+0x1C.
 extern "C"
@@ -449,7 +458,7 @@ EMSCRIPTEN_KEEPALIVE void storm_port_1af0(uint32_t* r) {
     storm_sub_20c0(p, 1);
     p[4] = 0;
     p[9] = 0;
-    storm_sub_2290(p);
+    storm_sub_2290(p + 5);      // retail: lea eax,[ebx+0x14]
     p[5] = 0;
     p[6] = 0;
     p[7] = 0;

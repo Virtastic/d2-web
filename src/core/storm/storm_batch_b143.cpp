@@ -71,15 +71,18 @@ extern "C" void Storm_Sub1A6F0(uint32_t n, int32_t* big, int32_t* total, int32_t
 }
 
 // 1.13c Storm+0x1a770: rebuild free lists of page (EAX). Free-list heads at +0x38..+0x58 (9 u32 slots).
+// The page record and every block link are retail 32-bit words (+0x1C first block, +0x20 end, block +4 next free);
+// on wasm64 a heap address fits in 32 bits, so a word is widened with (uintptr_t) and stored back narrowed.
 extern "C" void Storm_Sub1A770(uint8_t* pg) {
+  auto word = [](const uint8_t* a) { uint32_t v; memcpy(&v, a, 4); return v; };
   uint32_t* tail[9];
   for (int i = 0; i < 9; i++) tail[i] = (uint32_t*)(pg + 0x38 + 4 * i);
-  uint16_t* end = *(uint16_t**)(pg + 0x20);
-  uint16_t* p = *(uint16_t**)(pg + 0x1c);
+  uint16_t* end = (uint16_t*)(uintptr_t)word(pg + 0x20);
+  uint16_t* p = (uint16_t*)(uintptr_t)word(pg + 0x1c);
   uint16_t* run = nullptr;
   auto push = [&](uint16_t* b) {
     uint32_t c = *b >> 5; if (c > 7) c = 8;
-    *tail[c] = (uint32_t)(uintptr_t)b;  // ponytail: retail 32-bit link; truncates on wasm64 heap addrs
+    *tail[c] = (uint32_t)(uintptr_t)b;
     tail[c] = (uint32_t*)(b + 2);
   };
   if (p != end) {

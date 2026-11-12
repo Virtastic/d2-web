@@ -9,18 +9,6 @@ extern void StormSub2780ListUnlinkAll(struct S2780List* list);
 struct S2780Link { uintptr_t prevlink, next; };
 struct S2780List { intptr_t linkoffset; S2780Link term; };
 
-// ---------------------------------------------------------------- 0x2DD0 hash-table grow
-static void n72_unlinkLink(S2780Link* l) {  // shared splice: l is a link at address l
-    uintptr_t prev = l->prevlink;
-    if (!prev) return;
-    uintptr_t next = l->next;
-    uintptr_t* target = (intptr_t)next < 0 ? (uintptr_t*)~next
-        : (uintptr_t*)((uintptr_t)l + (next - ((S2780Link*)prev)->next));
-    *target = prev;
-    ((S2780Link*)prev)->next = next;
-    l->prevlink = 0; l->next = 0;
-}
-
 // 0x2DD0 moved to storm_2dd0.cpp (32-bit word layout).
 
 // ---------------------------------------------------------------- 0x46D0 destructor
@@ -35,18 +23,32 @@ extern "C" void Storm_Sub46D0(const S46D0Env& e, uint8_t* self) {
 }
 
 // ---------------------------------------------------------------- Huffman node/tree (0x4810, 0x4980)
+// Retail is 32-bit: every node, link and cache word is a dword, so the structs below are dword-only
+// (a host pointer field would be 8 bytes under wasm64 and misread every following word).
 struct HuffNode {  // retail words: [0]prev [1]next [2]sym [3]weight [4]parent [5]child
-    uintptr_t prev, next;
+    uint32_t prev, next;
     uint32_t sym, weight;
-    HuffNode* parent;
-    HuffNode* child;
+    uint32_t parent, child;
 };
-struct HuffTree {
+static_assert(sizeof(HuffNode) == 0x18, "24-byte retail node");
+struct HuffTree {         // host view built by the probe: two addresses inside the retail tree block
     uint32_t* swaps;      // retail tree+4
     HuffNode* term;       // retail tree+0x3060: list terminator link
 };
 
-static void n72_unlinkNode(HuffNode* L) { n72_unlinkLink((S2780Link*)L); }
+static inline HuffNode* HN(uint32_t a) { return (HuffNode*)(uintptr_t)a; }
+static inline uint32_t HA(const void* p) { return (uint32_t)(uintptr_t)p; }
+
+// the shared unlink snippet over a {prev, next} dword link
+static void n72_unlinkNode(HuffNode* L) {
+    if (!L->prev) return;
+    uint32_t next = L->next;
+    uint32_t* t = (int32_t)next < 0 ? (uint32_t*)(uintptr_t)~next
+                                    : (uint32_t*)(uintptr_t)(next + HA(L) - HN(L->prev)->next);
+    *t = L->prev;
+    HN(L->prev)->next = next;
+    L->prev = 0; L->next = 0;
+}
 
 // 1.13c STORM+0x04810
 extern "C" void Storm_Sub4810(HuffTree* tree, HuffNode* a) {
@@ -56,83 +58,76 @@ extern "C" void Storm_Sub4810(HuffTree* tree, HuffNode* a) {
         HuffNode* p3; HuffNode* p4 = a;
         for (;;) {
             p3 = p4;
-            p4 = (HuffNode*)p3->next;
-            if (!((intptr_t)p4 > 0)) { p4 = nullptr; break; }
+            if ((int32_t)p3->next <= 0) { p4 = nullptr; break; }
+            p4 = HN(p3->next);
             if (w <= p4->weight) break;
         }
         if (p3 != a) {
             n72_unlinkNode(p3);
-            HuffNode* ap = (HuffNode*)a->prev;
-            p3->prev = (uintptr_t)ap;
+            HuffNode* ap = HN(a->prev);
+            p3->prev = HA(ap);
             p3->next = ap->next;
-            ap->next = (uintptr_t)p3;
-            a->prev = (uintptr_t)p3;
-            // unlink a (its prev is now p3)
-            {
-                uintptr_t next = a->next;
-                uintptr_t* t = (intptr_t)next < 0 ? (uintptr_t*)~next
-                    : (uintptr_t*)((uintptr_t)a + (next - p3->next));
-                *t = (uintptr_t)p3;
-                ((HuffNode*)a->prev)->next = a->next;
-                a->prev = 0; a->next = 0;
-            }
+            ap->next = HA(p3);
+            a->prev = HA(p3);
+            n72_unlinkNode(a);   // its prev is now p3 (never 0)
             HuffNode* at = p4 ? p4 : tree->term;
-            HuffNode* pp = (HuffNode*)at->prev;
-            a->prev = (uintptr_t)pp;
+            HuffNode* pp = HN(at->prev);
+            a->prev = HA(pp);
             a->next = pp->next;
-            pp->next = (uintptr_t)a;
-            at->prev = (uintptr_t)a;
-            HuffNode* oldSibChild = p3->parent->child;
-            if (a->parent->child == a) a->parent->child = p3;
-            if (oldSibChild == p3) p3->parent->child = a;
-            HuffNode* tp = a->parent; a->parent = p3->parent; p3->parent = tp;
+            pp->next = HA(a);
+            at->prev = HA(a);
+            uint32_t oldSibChild = HN(p3->parent)->child;
+            if (HN(a->parent)->child == HA(a)) HN(a->parent)->child = HA(p3);
+            if (oldSibChild == HA(p3)) HN(p3->parent)->child = HA(a);
+            uint32_t tp = a->parent; a->parent = p3->parent; p3->parent = tp;
             ++*tree->swaps;
         }
-        a = a->parent;
+        a = HN(a->parent);
     }
 }
 
-struct HuffBits { const uint8_t* p; uint32_t bits, cnt; };  // EAX reader: ptr, bit buffer, bit count
-struct HuffCache { uint32_t stamp, len; uintptr_t val; };    // tree+0x3474, 128 entries
+struct HuffBits { uint32_t p; uint32_t bits, cnt; };      // EAX reader: ptr, bit buffer, bit count (dwords)
+struct HuffCache { uint32_t stamp, len; uint32_t val; };  // tree+0x3474, 128 entries of 12 bytes
+static_assert(sizeof(HuffBits) == 12 && sizeof(HuffCache) == 12, "retail layouts");
 
 // 1.13c STORM+0x04980
 extern "C" uint32_t Storm_Sub4980(HuffTree* tree, HuffCache* cache, HuffBits* r) {
     if (r->cnt < 8) {
-        uint16_t w; memcpy(&w, r->p, 2);
+        uint16_t w; memcpy(&w, (const void*)(uintptr_t)r->p, 2);
         r->bits |= (uint32_t)w << (r->cnt & 31);
         r->cnt += 16; r->p += 2;
     }
     uint32_t bits = r->bits;
     HuffCache* ent = &cache[bits & 0x7f];
     bool miss = ent->stamp != *tree->swaps;
-    uintptr_t node;
+    uint32_t node;
     if (miss) {
-        HuffNode* last = (HuffNode*)tree->term->prev;
-        uintptr_t v = ((HuffNode*)last->prev)->next;
-        node = ((intptr_t)v < 1 ? 0 : v);
+        HuffNode* last = HN(tree->term->prev);
+        uint32_t v = HN(last->prev)->next;
+        node = ((int32_t)v < 1 ? 0 : v);
     } else {
         node = ent->val;
         if (ent->len < 8) {
             r->bits = bits >> (ent->len & 31);
             r->cnt -= ent->len;
-            return (uint32_t)ent->val;
+            return ent->val;
         }
         r->bits = bits >> 7;
         r->cnt -= 7;
     }
-    uint32_t depth = 0; uintptr_t at7 = 0;
+    uint32_t depth = 0; uint32_t at7 = 0;
     do {
         uint32_t cur = r->bits;
-        node = (uintptr_t)((HuffNode*)node)->child;
+        node = HN(node)->child;
         r->bits = cur >> 1;
         uint32_t c = r->cnt - 1;
         r->cnt = c;
-        if (c == 0) { memcpy(&r->bits, r->p, 4); r->p += 4; r->cnt = 32; }
-        if (cur & 1) node = ((HuffNode*)node)->next;
+        if (c == 0) { memcpy(&r->bits, (const void*)(uintptr_t)r->p, 4); r->p += 4; r->cnt = 32; }
+        if (cur & 1) node = HN(node)->next;
         depth++;
         if (depth == 7) at7 = node;
-    } while (((HuffNode*)node)->child != nullptr);
-    uint32_t sym = ((HuffNode*)node)->sym;
+    } while (HN(node)->child != 0);
+    uint32_t sym = HN(node)->sym;
     if (miss) {
         if (depth > 7) {
             ent->len = depth; ent->stamp = *tree->swaps; ent->val = at7;
