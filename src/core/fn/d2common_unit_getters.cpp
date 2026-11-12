@@ -16,10 +16,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30460(uint32_t* r) { r[4] = 
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30670(uint32_t* r) {   // 1.13c d2common+0x30670
     uint32_t* u = (uint32_t*)(uintptr_t)r[0];
     r[4] = r[0];   // retail's eax stays the unit pointer on the early return
-    if (u[0] != 0) return;
+    if (u[0] != 0) { r[4] &= 0; return; }   // retmask 0x0, as below
     uint32_t* pd = (uint32_t*)(uintptr_t)u[0x14 / 4];
     r[4] = u32(pA8(r[0]))[8 / 4];   // ... and is the left-skill pointer (0x30460's result) on the full path
     const uint32_t* sk = u32(u32(pA8(r[0]))[8 / 4]);
     pd[0x74 / 4] = (uint32_t)(int32_t)*(const int16_t*)(uintptr_t)sk[0];
     pd[0x7C / 4] = sk[0x34 / 4];
+    r[4] &= 0;   // the descriptor's retmask 0x0: the capture records eax masked to 0 (void function)
 }

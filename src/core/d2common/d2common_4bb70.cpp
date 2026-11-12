@@ -10,15 +10,18 @@ namespace
 	uint32_t Rd(uint32_t a) { uint32_t v; std::memcpy(&v, reinterpret_cast<const void*>(static_cast<uintptr_t>(a)), 4); return v; }
 }
 
-void D2Common_4BB70_ClearSubtileMask(uint32_t pRoom, uint32_t nMask, int32_t nY, int32_t nX, D2RoomCollisionFn pfnCollision)
+// The function is void; the return value is the EAX retail leaves at exit: 0 (no record or grid), the grid (no
+// cell array), or the cell's address.
+uint32_t D2Common_4BB70_ClearSubtileMask(uint32_t pRoom, uint32_t nMask, int32_t nY, int32_t nX, D2RoomCollisionFn pfnCollision)
 {
 	const uint32_t pRecord = pfnCollision(pRoom, nX, nY);
-	if (!pRecord) return;
+	if (!pRecord) return 0;
 	const uint32_t pGrid = Rd(pRecord + 0x20);
-	if (!pGrid) return;
+	if (!pGrid) return 0;
 	const uint32_t pCells = Rd(pGrid + 0x20);
-	if (!pCells) return;
+	if (!pCells) return pGrid;
 	const uint32_t nIndex = ((uint32_t)nY - Rd(pGrid + 4)) * Rd(pGrid + 8) - Rd(pGrid) + (uint32_t)nX;
 	uint16_t* pCell = reinterpret_cast<uint16_t*>(static_cast<uintptr_t>(pCells + nIndex * 2));
 	*pCell &= (uint16_t)~nMask;
+	return pCells + nIndex * 2;
 }

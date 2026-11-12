@@ -11,20 +11,24 @@ namespace
 	inline uint32_t& W(uint32_t a, int o) { return *reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(a) + o); }
 }
 
+// The function is void; the return value is the EAX retail leaves at exit: the data block when its bit 0 is set,
+// 0 when there is no block, no list or no match, else the neighbour count it last compared against.
 // 1.13c D2Common+0x80EE0
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2c_80ee0_old(uint32_t room, uint32_t from, uint32_t to, uint32_t p4)
+EMSCRIPTEN_KEEPALIVE uint32_t d2c_80ee0_old(uint32_t room, uint32_t from, uint32_t to, uint32_t p4)
 {
 	uint32_t data = W(room, 0x64);
-	if (!data || (*reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(data)) & 1)) return;
+	if (!data) return 0;
+	if (*reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(data)) & 1) return data;
 	bool hit = false;
 	for (uint32_t e = W(data, 0x30); e; e = W(e, 0x2C))
 		if (W(e, 0x28) == from) { hit = true; W(e, 0x28) = to; }
-	if (!hit) return;
-	for (int32_t i = 0; i < static_cast<int32_t>(W(room, 0x2C)); i++)
+	if (!hit) return 0;
+	for (int32_t i = 0; i <static_cast<int32_t>(W(room, 0x2C)); i++)
 	{
 		uint32_t n = W(W(room, 8), i * 4);
 		if (n != room && W(W(n, 0x58), 0x1D0) == W(W(room, 0x58), 0x1D0))
 			d2c_80ee0_old(n, from, to, p4);
 	}
+	return W(room, 0x2C);
 }
