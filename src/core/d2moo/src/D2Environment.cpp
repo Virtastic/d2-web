@@ -158,7 +158,8 @@ void __fastcall ENVIRONMENT_UpdateLightIntensity(D2DrlgEnvironmentStrc* pEnviron
 	}
 	else
 	{
-		double dAngle = (double)pEnvironment->nTicks / (double)pEnvironment->nTimeRate * M_PI / ENV_HALF_CIRCLE_DEGREES;
+		// 1.13c D2Common+0x376F0: ticks / rate, times the double 1/180, times pi as the float-rounded constant (0x400921FB60000000)
+		double dAngle = (double)pEnvironment->nTicks / (double)pEnvironment->nTimeRate * (1.0 / 180.0) * (double)(float)M_PI;
 
 		pEnvironment->fCos = float(-cos(dAngle));
 		pEnvironment->fSin = float(sin(dAngle));
@@ -186,16 +187,19 @@ void __fastcall ENVIRONMENT_UpdateLightIntensity(D2DrlgEnvironmentStrc* pEnviron
 
 
 
+// 1.13c D2Common+0x371C0: retail rounds the delta alone, truncating (next - this) * ratio + 0.5 toward zero, and adds it to
+// this channel in 8 bits; rounding the whole lerp differs whenever the delta is negative.
 static uint8_t LerpLightColor(uint8_t nThis, uint8_t nNext, double lerpRatio)
 {
-	return uint8_t(D2Lerp<double>(nThis,nNext,lerpRatio) + 0.5); // Round half up // NOLINT(bugprone-incorrect-roundings)
+	const int32_t nDelta = (int32_t)((double)((int32_t)nNext - (int32_t)nThis) * lerpRatio + 0.5); // NOLINT(bugprone-incorrect-roundings)
+	return uint8_t(nThis + nDelta);
 }
 
 //D2Common.0x6FD8DAC0
 void __fastcall ENVIRONMENT_UpdateLightColor(D2DrlgEnvironmentStrc* pEnvironment, int nAct)
 {
 	const int nCycleIndex = pEnvironment->nCycleIndex;
-	const int nNextCycleIndex = (nCycleIndex + 1) % NUM_ENVIRONMENT_CYCLES;
+	const int nNextCycleIndex = (nCycleIndex + 1 == NUM_ENVIRONMENT_CYCLES) ? 0 : nCycleIndex + 1; // 1.13c D2Common+0x371C0 wraps only at 6
 	const D2EnvironmentCycleStrc* pCurrEnvironmentCycle = ENVIRONMENT_GetCycle(nCycleIndex, nAct, pEnvironment->bEclipse);
 	const D2EnvironmentCycleStrc* pNextEnvironmentCycle = ENVIRONMENT_GetCycle(nNextCycleIndex, nAct, pEnvironment->bEclipse);
 	

@@ -36,6 +36,8 @@ behaviour differs from 1.10f.
 - D2Common+0x25810 ITEMS_CalculateAdditionalCostsForChargedSkills: the base multiplier is (req level / 6) * 2 + layer bits + 2; a large operand is divided by 1024 before the cost multiplier.
 - D2Common+0x25970 ITEMS_CalculateAdditionalCostsForItemSkill: for a large sell cost the multiplier is divided by 1024 (4096 for buy) before it scales the cost.
 - D2Common+0x28850 ITEMS_CalculateAdditionalCostsForBonusStats: for a large operand the cost times value is divided first, then multiplied by the row multiplier.
+- D2Common+0x371C0 ENVIRONMENT_UpdateLightColor: each channel adds trunc((next - this) * ratio + 0.5) to this channel in 8 bits (1.10f rounded the whole lerp, off by one on falling channels); the next cycle wraps to 0 only at 6.
+- D2Common+0x376F0 ENVIRONMENT_UpdateLightIntensity: the day angle is ticks / rate times the double 1/180 times pi rounded to float (retail's constants), not ticks / rate * pi / 180; the cos and sin words then match bit for bit.
 - D2Common+0x267F0 ITEMS_GetWeaponAttackSpeed: matches the 1.13c decompile; the public wrapper passes includeItemFasterAttackRate=TRUE and the Impl helper is unchanged; validated against the vector.
 - D2Game+0x64B60 ACT1Q3_PlayerOrPartyHasMalus: the party walk only runs for a player unit attached to a game (pGame set, unit type player).
 
