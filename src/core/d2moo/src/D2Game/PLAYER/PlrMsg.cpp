@@ -3542,11 +3542,13 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x4B_RequestEntityUpdate_6FC880F0(D2
         const uint32_t nUnitType = *(uint32_t*)((char*)pPacket + 1);
         if (nUnitType < 6)
         {
-            D2UnitStrc* pUnit = SUNIT_GetServerUnit(pGame, nUnitType, *(int32_t*)((char*)pPacket + 5));
-            if (pUnit && UNITFINDS_AreUnitsInNeighboredRooms(pUnit, pUnit))
+            // 1.13c: the neighbour test is between the requesting player and the target (the 1.10f body shadowed
+            // the player and compared the target with itself).
+            D2UnitStrc* pTarget = SUNIT_GetServerUnit(pGame, nUnitType, *(int32_t*)((char*)pPacket + 5));
+            if (pTarget && UNITFINDS_AreUnitsInNeighboredRooms(pUnit, pTarget))
             {
-                UNITROOM_RefreshUnit(pUnit);
-                pUnit->dwFlagEx |= UNITFLAGEX_TELEPORTED;
+                UNITROOM_RefreshUnit(pTarget);
+                pTarget->dwFlagEx |= UNITFLAGEX_TELEPORTED;
                 return 0;
             }
             
@@ -3843,40 +3845,9 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x5F_UpdatePlayerPos_6FC88530(D2Game
         return 0;
     }
 
-    CLIENTS_NotifyWarpAttempt(pGame, pUnit);
-
-    int32_t nDelay = 125;
-    if (CLIENTS_ShouldDelayWarpAttempt(pGame, pUnit) && !pGame->nGameType)
-    {
-        constexpr int32_t dword_6FD28F80[][2] =
-        {
-            { 50, 1500 },
-            { 25, 3000 },
-            { 25, 4500 },
-        };
-
-        int32_t nRand = ITEMS_RollRandomNumber(&pUnit->pSeed) % 100;
-        for (size_t i = 0; i < std::size(dword_6FD28F80); ++i)
-        {
-            const int32_t nProbability = dword_6FD28F80[i][0];
-            if (nRand < nProbability)
-            {
-                nDelay = dword_6FD28F80[i][1];
-                break;
-            }
-
-            nRand -= nProbability;
-        }
-    }
-
-    STATES_ToggleState(pUnit, STATE_SYNC_WARPED, 1);
-
-    D2StatListStrc* pStatList = STATLIST_AllocStatList(pGame->pMemoryPool, 2u, pGame->dwGameFrame + nDelay, pUnit->dwUnitType, pUnit->dwUnitId);
-    STATLIST_SetState(pStatList, STATE_SYNC_WARPED);
-    STATLIST_SetStatRemoveCallback(pStatList, MISSMODE_ToggleStateOff);
-    D2COMMON_10475_PostStatToStatList(pUnit, pStatList, 1);
-
-    EVENT_SetEvent(pGame, pUnit, EVENTTYPE_REMOVESTATE, pGame->dwGameFrame + nDelay, 0, 0);
+    // 1.13c D2Game+0xD0790 returns here once the warp succeeds (0x6FCF0857 jne to the epilogue): there is no
+    // warp-attempt bookkeeping, randomized delay or SYNC_WARPED stat list in this handler. The D2MOO tail
+    // (CLIENTS_NotifyWarpAttempt, CLIENTS_ShouldDelayWarpAttempt) has no 1.13c counterpart and is not carried.
     return 0;
 }
 

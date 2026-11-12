@@ -19,3 +19,26 @@ void D2Game_8CFB0_PartyBroadcast(void (*broadcast)(const void* packet, uint32_t 
     std::memcpy(b + 5, &party, 2);
     broadcast(b, edi);
 }
+
+// The engine entry (1.10f sub_6FC3F8F0, declared in GAME/SCmd.h): the same packet, broadcast through
+// SUNIT_IterateLivingPlayers (0xDFC10) with the 0x8C5F0 callback (sub_6FC3F930). EDI = pGame (the stack argument);
+// the party word's 0x9BEB0 lookup reads the unit's own game (+0x80), as PARTY_GetPartyIdForUnitOwner(unit->pGame, unit).
+#include <D2BasicTypes.h>
+#include <Units/Units.h>
+#include <GAME/SCmd.h>
+#include <UNIT/SUnit.h>
+#include <UNIT/Party.h>
+
+void __fastcall sub_6FC3F8F0(D2GameStrc* pGame, D2UnitStrc* pPlayer)
+{
+    uint8_t b[8] = { 0x8D };
+    const int32_t id = pPlayer ? (int32_t)pPlayer->dwUnitId : -1;
+    int16_t party = -1;
+    if (pPlayer && pPlayer->pGame && pPlayer->dwUnitType == UNIT_PLAYER)
+    {
+        party = PARTY_GetPartyIdForUnitOwner(pPlayer->pGame, pPlayer);
+    }
+    std::memcpy(b + 1, &id, 4);
+    std::memcpy(b + 5, &party, 2);
+    SUNIT_IterateLivingPlayers(pGame, sub_6FC3F930, b);
+}
