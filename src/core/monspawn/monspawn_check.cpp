@@ -8412,8 +8412,17 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         // spawn-time clock and #10853's mode rewrite would break them (s08-aitarget compares
         // `framePrecise` byte for byte). The single guard is the same zero-length one the player's
         // call needs: with `dwFrameCountPrecise` 0 the wrap has no period to wrap.
+        // The client steps every unit it holds, whichever level its room is in: a town NPC in a room of
+        // the town next to the hero's level keeps animating (the snapshot exports those units too).
+        // Own level first, then the act's others (the act's list holds the own level too: not stepped twice).
+        std::vector<D2DrlgLevelStrc*> animLevels;
         if (g_lastLevel) {
-            for (D2DrlgRoomStrc* animRoom = g_lastLevel->pFirstRoomEx; animRoom; animRoom = animRoom->pDrlgRoomNext) {
+            animLevels.push_back(g_lastLevel);
+            for (D2DrlgLevelStrc* l = g_lastLevel->pDrlg ? g_lastLevel->pDrlg->pLevel : nullptr; l; l = l->pNextLevel)
+                if (l != g_lastLevel) animLevels.push_back(l);
+        }
+        for (D2DrlgLevelStrc* animLevel : animLevels) {
+            for (D2DrlgRoomStrc* animRoom = animLevel->pFirstRoomEx; animRoom; animRoom = animRoom->pDrlgRoomNext) {
                 if (!animRoom->pRoom) continue;
                 for (D2UnitStrc* animUnit = animRoom->pRoom->pUnitFirst; animUnit; animUnit = animUnit->pRoomNext) {
                     if (animUnit == g_targetPlayer) continue;
