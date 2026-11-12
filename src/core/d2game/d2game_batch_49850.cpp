@@ -23,11 +23,12 @@ static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy
 static inline void wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
 static inline uint16_t rd16(const void* p, uint32_t o) { uint16_t v; std::memcpy(&v, (const uint8_t*)p + o, 2); return v; }
 static inline uint8_t rd8(const void* p, uint32_t o) { return ((const uint8_t*)p)[o]; }
-static inline void* rdptr(const void* p, uint32_t o) { void* v; std::memcpy(&v, (const uint8_t*)p + o, sizeof v); return v; }
+// Retail pointer slots are 32-bit words: a wasm64 void* read would take the next field as its high half (only FN probes call this file).
+static inline void* rdptr(const void* p, uint32_t o) { return (void*)(uintptr_t)rd32(p, o); }
 // retail-layout (32-bit) pointer fields: the client record keeps 4-byte links (the FN blobs carry them as the low 32 bits)
 static inline void* rp32(const void* p, uint32_t o) { return (void*)(uintptr_t)rd32(p, o); }
 static inline void wp32(void* p, uint32_t o, const void* v) { wr32(p, o, (uint32_t)(uintptr_t)v); }
-static inline void wrptr(void* p, uint32_t o, const void* v) { std::memcpy((uint8_t*)p + o, &v, sizeof v); }
+static inline void wrptr(void* p, uint32_t o, const void* v) { wr32(p, o, (uint32_t)(uintptr_t)v); }
 
 [[noreturn]] static void d2game_fatal(uint32_t) { _exit(-1); }
 

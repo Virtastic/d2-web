@@ -26,8 +26,9 @@ static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy
 static inline void wr8(void* p, uint32_t o, uint8_t v) { ((uint8_t*)p)[o] = v; }
 static inline void wr16(void* p, uint32_t o, uint16_t v) { std::memcpy((uint8_t*)p + o, &v, 2); }
 static inline void wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
-static inline void* rdptr(const void* p, uint32_t o) { void* v; std::memcpy(&v, (const uint8_t*)p + o, sizeof v); return v; }
-static inline void wrptr(void* p, uint32_t o, const void* v) { std::memcpy((uint8_t*)p + o, &v, sizeof v); }
+// Retail pointer slots are 32-bit words: a wasm64 void* read would take the next field as its high half.
+static inline void* rdptr(const void* p, uint32_t o) { return (void*)(uintptr_t)rd32(p, o); }
+static inline void wrptr(void* p, uint32_t o, const void* v) { wr32(p, o, (uint32_t)(uintptr_t)v); }
 
 [[noreturn]] static void d2game_fatal(uint32_t) { _exit(-1); }
 
