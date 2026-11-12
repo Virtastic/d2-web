@@ -8,7 +8,8 @@
 struct D2Cmp10270Env {
     uint32_t inl;                                                                         // DAT 0x77EFC
     // a specialised blitter at rva: registers at the call and its stack words (stdcall, it pops nst)
-    void (*blit)(uint32_t rva, uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t ebx, uint32_t esi, uint32_t edi, const uint32_t* st, uint32_t nst);
+    // returns the blitter's EAX, which retail leaves as this function's EAX
+    uint32_t (*blit)(uint32_t rva, uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t ebx, uint32_t esi, uint32_t edi, const uint32_t* st, uint32_t nst);
     void (*fatal)(uint32_t code);                                                         // Fog 10265 / 10024 / _exit(-1)
 };
 
@@ -17,12 +18,13 @@ static inline void wb(uint32_t a, uint8_t v) { *(uint8_t*)(uintptr_t)a = v; }
 static inline uint32_t rd(uint32_t a) { uint32_t v; __builtin_memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }
 
 // 1.13c D2CMP+0x10270
-void d2cmp_10270(uint32_t fr, uint32_t dst, int32_t x, int32_t lo, int32_t hi, uint32_t pitch, uint32_t skip, uint32_t h,
-                 uint32_t t1, uint32_t t2, uint32_t t3, const D2Cmp10270Env* e)
+// Returns the EAX retail leaves: the inline loop's row pointer after the last row (dst + h * pitch), else the blitter's EAX.
+uint32_t d2cmp_10270(uint32_t fr, uint32_t dst, int32_t x, int32_t lo, int32_t hi, uint32_t pitch, uint32_t skip, uint32_t h,
+                     uint32_t t1, uint32_t t2, uint32_t t3, const D2Cmp10270Env* e)
 {
     const uint32_t width = rd(fr + 4);
-    if (pitch < width) { e->fatal(0x5ea); return; }
-    if (skip + h > rd(fr + 8)) { e->fatal(0x5eb); return; }
+    if (pitch < width) { e->fatal(0x5ea); return 0; }
+    if (skip + h > rd(fr + 8)) { e->fatal(0x5eb); return 0; }
     uint32_t p = fr + 0x20;
     for (uint32_t n = skip; n; --n) {
         for (;;) {
@@ -69,7 +71,7 @@ void d2cmp_10270(uint32_t fr, uint32_t dst, int32_t x, int32_t lo, int32_t hi, u
             }
             dst = next; x = x0; next += pitch;
         } while (--h);
-        return;
+        return dst;
     }
     const bool inside = (!lo && !hi) || (lo <= x && (int32_t)(width + (uint32_t)x) < hi);
     // ESI/EDI per table combination; inside blitters take (h, pitch), the clipping ones (h, pitch, x, lo, hi)
@@ -84,13 +86,12 @@ void d2cmp_10270(uint32_t fr, uint32_t dst, int32_t x, int32_t lo, int32_t hi, u
         if (t3) { if (t2) { in = 0xedd0; out = 0xeb50; si = t2; } else { in = 0xea20; out = 0xe860; si = t3; } }
         else if (t2) { in = 0xe6b0; out = 0xe480; si = t2; }
         else {
-            if (inside) { const uint32_t st[2] = {h, pitch}; e->blit(0xfb50, p, p, dst, (uint32_t)lo, si = 0, 0, st, 2); return; }
+            if (inside) { const uint32_t st[2] = {h, pitch}; return e->blit(0xfb50, p, p, dst, (uint32_t)lo, si = 0, 0, st, 2); }
             const uint32_t st[6] = {p, dst, h, pitch, (uint32_t)lo, (uint32_t)hi};
-            e->blit(0xfaa0, (uint32_t)x, p, h, (uint32_t)lo, 0, 0, st, 6);
-            return;
+            return e->blit(0xfaa0, (uint32_t)x, p, h, (uint32_t)lo, 0, 0, st, 6);
         }
     }
-    if (inside) { const uint32_t st[2] = {h, pitch}; e->blit(in, dst, p, h, (uint32_t)lo, si, di, st, 2); return; }
+    if (inside) { const uint32_t st[2] = {h, pitch}; return e->blit(in, dst, p, h, (uint32_t)lo, si, di, st, 2); }
     const uint32_t st[5] = {h, pitch, (uint32_t)x, (uint32_t)lo, (uint32_t)hi};
-    e->blit(out, dst, p, h, (uint32_t)lo, si, di, st, 5);
+    return e->blit(out, dst, p, h, (uint32_t)lo, si, di, st, 5);
 }

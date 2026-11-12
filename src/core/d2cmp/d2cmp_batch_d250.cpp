@@ -129,10 +129,105 @@ size_t d2cmp_strlen(const char* s) { return strlen(s); }
 // 1.13c D2CMP+0x06263 __security_check_cookie: mismatch -> report_failure (abort)
 void d2cmp_security_check_cookie(uintptr_t v, uintptr_t cookie) { if (v != cookie) abort(); }
 
-// 1.13c D2CMP+0x18D38 _cftog: %g of *dbl into buf with `digits` significant digits; exponent < -4 or >= digits -> %e form (caps = upper E), else %f form; host snprintf replaces __fptostr/__cftoe2/__cftof2
+// _fltout2's STRFLT: sign ('-' or ' '), decpt (value = 0.mantissa * 10^decpt), mantissa digits
+struct D2CmpStrFlt { char sign; int32_t decpt; char man[24]; };
+
+// 1.13c D2CMP+0x19CDB _fltout2: the sign, decimal point and 17 significant digits of x. Retail converts through __dtold and
+// $I10_OUTPUT (80-bit scaling by its powers-of-ten table, trailing zeros dropped); the host's exact %.16e conversion supplies the
+// same 17 rounded digits here. Zero is mantissa "0" with decpt 0; infinities and NaNs are $I10_OUTPUT's "1#INF" / "1#IND" /
+// "1#QNAN" / "1#SNAN" with decpt 1.
+static void d2cmp_fltout2(double x, D2CmpStrFlt* f) {
+    uint64_t b; memcpy(&b, &x, 8);
+    f->sign = (b >> 63) ? '-' : ' ';
+    const uint64_t e = (b >> 52) & 0x7ff, m = b & 0xfffffffffffffull;
+    if (e == 0x7ff) {
+        f->decpt = 1;
+        strcpy(f->man, !m ? "1#INF" : ((b >> 63) && m == 0x8000000000000ull) ? "1#IND" : (m >> 51) ? "1#QNAN" : "1#SNAN");
+        return;
+    }
+    if (!e && !m) { f->decpt = 0; strcpy(f->man, "0"); return; }
+    char t[40]; snprintf(t, sizeof t, "%.16e", (b >> 63) ? -x : x);   // d.dddddddddddddddde[+-]xx
+    int32_t n = 0;
+    for (const char* q = t; *q && *q != 'e'; ++q) if (*q != '.') f->man[n++] = *q;
+    while (n > 1 && f->man[n - 1] == '0') --n;
+    f->man[n] = 0;
+    f->decpt = (int32_t)strtol(strchr(t, 'e') + 1, nullptr, 10) + 1;
+}
+
+// 1.13c D2CMP+0x18AFA _shift: move the string at s right by dist (with its terminator)
+static void d2cmp_shift(char* s, int32_t dist) { if (dist) memmove(s + dist, s, strlen(s) + 1); }
+
+// 1.13c D2CMP+0x19BAA _fptostr: '0' then `digits` mantissa digits (padded with '0'), rounded up on the next digit >= '5' with
+// the carry through nines; a carry into the leading '0' raises decpt and keeps it, otherwise the leading '0' is dropped
+static void d2cmp_fptostr(char* buf, int32_t digits, D2CmpStrFlt* f) {
+    char* p = buf; const char* m = f->man;
+    *p++ = '0';
+    while (digits > 0) { *p++ = *m ? *m++ : '0'; --digits; }
+    *p = 0;
+    if (digits >= 0 && *m >= '5') {
+        --p;
+        while (*p == '9') *p-- = '0';
+        *p += 1;
+    }
+    if (*buf == '1') f->decpt++;
+    else memmove(buf, buf + 1, strlen(buf + 1) + 1);
+}
+
+// 1.13c D2CMP+0x18B17 _cftoe2: d.ddd form with a three-digit exponent ("e+000", 'E' when caps); g_fmt keeps ndec digits in all
+static void d2cmp_cftoe2(char* buf, int32_t ndec, int32_t caps, const D2CmpStrFlt* f, int32_t g) {
+    if (g) d2cmp_shift(buf + (f->sign == '-'), ndec > 0);
+    char* p = buf;
+    if (f->sign == '-') *p++ = '-';
+    if (ndec > 0) { *p = p[1]; *++p = '.'; }
+    p = strcpy(p + ndec + (g == 0), "e+000");
+    if (caps) *p = 'E';
+    ++p;
+    if (f->man[0] != '0') {
+        int32_t x = f->decpt - 1;
+        if (x < 0) { x = -x; *p = '-'; }
+        ++p;
+        if (x >= 100) { *p += (char)(x / 100); x %= 100; }
+        ++p;
+        if (x >= 10) { *p += (char)(x / 10); x %= 10; }
+        ++p;
+        *p += (char)x;
+    }
+}
+
+// 1.13c D2CMP+0x18C35 _cftof2: ddd.ddd form from the _fptostr digits
+static void d2cmp_cftof2(char* buf, int32_t ndec, const D2CmpStrFlt* f, int32_t g) {
+    if (g && f->decpt - 1 == ndec) {
+        char* q = buf + (f->sign == '-') + f->decpt - 1;
+        q[0] = '0'; q[1] = 0;
+    }
+    char* p = buf;
+    if (f->sign == '-') *p++ = '-';
+    if (f->decpt <= 0) { d2cmp_shift(p, 1); *p++ = '0'; }
+    else p += f->decpt;
+    if (ndec > 0) {
+        d2cmp_shift(p, 1); *p++ = '.';
+        if (f->decpt < 0) {
+            int32_t n = -f->decpt;
+            if (!g && ndec < n) n = ndec;
+            d2cmp_shift(p, n);
+            memset(p, '0', (size_t)n);
+        }
+    }
+}
+
+// 1.13c D2CMP+0x18D38 _cftog: %g of *dbl into buf with `digits` significant digits; exponent < -4 or >= digits -> %e form
+// (caps = upper E), else %f form, a rounding carry dropping the extra digit
 void d2cmp_cftog(const double* dbl, char* buf, size_t digits, int caps) {
-    char f[8]; snprintf(f, sizeof f, caps ? "%%.*G" : "%%.*g");
-    snprintf(buf, digits + 16, f, (int)(digits ? digits - 1 : 0) + 1, *dbl);
+    const int32_t ndec = (int32_t)digits;
+    D2CmpStrFlt f;
+    d2cmp_fltout2(*dbl, &f);
+    const int32_t before = f.decpt - 1;
+    char* pb = buf + (f.sign == '-');
+    d2cmp_fptostr(pb, ndec, &f);
+    const int32_t mag = f.decpt - 1;
+    if (mag < -4 || mag >= ndec) { d2cmp_cftoe2(buf, ndec, caps, &f, 1); return; }
+    if (before < mag) { while (*pb++) {} pb[-2] = 0; }
+    d2cmp_cftof2(buf, ndec, &f, 1);
 }
 
 }
