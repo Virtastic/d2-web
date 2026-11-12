@@ -21,6 +21,7 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
   const context = new AudioContextClass(), buffers = new Map(), events = [];
   // Bounded: a long session would otherwise grow this log forever.
   events.push = function (...xs) { const n = Array.prototype.push.apply(this, xs); if (n > 512) this.splice(0, n - 512); return this.length; };
+  const starts = []; starts.push = events.push;
   // F235: the Sound slider drives every SFX player through one gain node (see audio-volume.mjs).
   const gain = typeof context.createGain === 'function' ? context.createGain() : null;
   if (gain) gain.connect(context.destination);
@@ -257,9 +258,17 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
     return playTableRow(row, rec);
   }
   /** Play a Sounds.txt row selected by a table-driven engine event, such as missile HitSound; {unitType, unitId} or {position} places it. */
+  /** A cue submitted to the client sound list (0x88A70): recorded now, whether or when the list starts it. */
+  function noteSubmit(row, event = {}) {
+    const rec = { ...event, kind: 'submit', row, handle: null, path: null, started: false, error: '' };
+    events.push(rec);
+    return rec;
+  }
   async function playRow(row, event = {}) {
     const rec = { ...event, kind: 'table-row', row, handle: null, path: null, started: false, error: '' };
-    events.push(rec);
+    // A start the client sound list brings (event.queueHandle) was recorded at its submit (noteSubmit), as retail's
+    // record is the 0x88A70 submit; its start goes to `starts`.
+    (event.queueHandle ? starts : events).push(rec);
     if (!Number.isInteger(row) || row < 0) { rec.error = `invalid Sounds.txt row ${row}`; return rec; }
     // A delayed submit (event.delay, in 25 Hz game ticks, as retail's submit offset) is recorded now and starts its audio later.
     if (event.delay > 0) { setTimeout(() => playTableRow(row, rec), event.delay * 40); return rec; }
@@ -371,7 +380,7 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
     } catch (error) { rec.error = String(error); finish(); }
     return rec;
   }
-  return { play, playRow, playDialogue, stopDialogue, stopUnitSounds, setWeatherLevel, whenDialogueDone: () => dialogueDone, updateSpatialGain, events, setVolume(v, nextSliders) { volume = Math.max(0, Math.min(1, Number(v) || 0)); if (nextSliders) sliders = { sound: nextSliders.sound, music: nextSliders.music }; else sliders = { sound: volume, music: 1 }; if (gain) gain.gain.value = volume; for (const [node, state] of activeSources) if (!state.stopping || state.fade) applyGain(node, state); },
+  return { play, playRow, noteSubmit, starts, playDialogue, stopDialogue, stopUnitSounds, setWeatherLevel, whenDialogueDone: () => dialogueDone, updateSpatialGain, events, setVolume(v, nextSliders) { volume = Math.max(0, Math.min(1, Number(v) || 0)); if (nextSliders) sliders = { sound: nextSliders.sound, music: nextSliders.music }; else sliders = { sound: volume, music: 1 }; if (gain) gain.gain.value = volume; for (const [node, state] of activeSources) if (!state.stopping || state.fade) applyGain(node, state); },
     get volume() { return gain ? gain.gain.value : volume; },
     evidence: () => ({ started, dialogueActive: Boolean(dialogueSource), events: events.map((x) => ({ ...x })), state: context.state }), close: () => context.close?.() };
 }

@@ -143,7 +143,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_play_sound_submit(int32_t row,
 }
 // One pump at sound clock `now`; returns how many entries started. Read each with d2_client_play_sound_started(i, f):
 // f 0 handle, 1 the row asked, 2 the row started (the group variant), 3 its start tick, 4 kind, 5 unit.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_play_sound_pump(uint32_t now) { pump88dd0(now); return g_nStarted; }
+// 0x5F020 runs 0x88DD0 on its clock (0x11C268), then steps the clock: a submit after this pump starts `off` ticks
+// after now + 1.
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_play_sound_pump(uint32_t now) { pump88dd0(now); g_now = now + 1; return g_nStarted; }
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_play_sound_started(int32_t i, int32_t f) {
     if (i < 0 || i >= g_nStarted) return 0;
     const auto& s = g_started[i];

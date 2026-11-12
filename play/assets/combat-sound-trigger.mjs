@@ -48,9 +48,10 @@ export function combatSoundEngine(M) {
 export const soundUnitKey = (type, id) => ((((id >>> 0) * 2) + (type & 1) + 2) % 0x100000000) >>> 0;
 
 // engine: combatSoundEngine(Module). With its queue every cue is submitted to the client sound list with its start
-// offset; each update first runs the list's pump on the update's tick and plays what it started (`play(row, event)`,
-// event.variantRow = the variant started, event.queueHandle = the entry to report ended). Without it a cue plays at once.
-export function createCombatSoundTrigger(read, play, engine = null) {
+// offset (`note(row, event)` records the submit); each update ends by running the list's pump on the update's tick and
+// plays what it started (`play(row, event)`, event.variantRow = the variant started, event.queueHandle = the entry to
+// report ended). Without it a cue plays at once.
+export function createCombatSoundTrigger(read, play, engine = null, note = null) {
   const queue = engine?.queue ?? null, pending = new Map();
   queue?.reset();   // the list and its clock start with this trigger's tick count
   const text = (p) => new TextDecoder('latin1').decode(read(p));
@@ -78,6 +79,7 @@ export function createCombatSoundTrigger(read, play, engine = null) {
     if (!(row > 0)) return;
     const event = { unitType: e.type, unitId: e.id, classId: e.classId, kind, mode: e.mode, baseRow: row };
     if (!queue) { play(row, event); return; }
+    note?.(row, event);
     const h = queue.submit(row, soundUnitKey(e.type, e.id), delay);
     if (h && !pending.has(h)) pending.set(h, event);
   };
@@ -110,7 +112,7 @@ export function createCombatSoundTrigger(read, play, engine = null) {
     /** Call once per engine tick with the snapshot's entities (+player/items for the hero's weapon). */
     update(entities, snapshot) {
       tick++;
-      if (queue) { if (snapshot?.playerId !== undefined) queue.hero(soundUnitKey(0, snapshot.playerId)); pump(); }
+      if (queue && snapshot?.playerId !== undefined) queue.hero(soundUnitKey(0, snapshot.playerId));
       { const q = snapshot?.player?.castRefusedSeq; if (q !== undefined) { if (pendingRefused) { const h = entities.find((x) => x.id === snapshot.playerId && x.type === 0); if (h) fire(skillSound.get(pendingRefused) ?? 0, h, 'cast'); pendingRefused = 0; } if (refusedSeq !== undefined && q !== refusedSeq) pendingRefused = snapshot.player.castRefusedSkill; refusedSeq = q; } } // a refused cast still plays the skill's stsound at entry (retail); one update late, as the mode-change cues drain
       const seen = new Set();
       for (const e00 of entities) {
@@ -154,6 +156,8 @@ export function createCombatSoundTrigger(read, play, engine = null) {
         }
       }
       for (const k of prev.keys()) if (!seen.has(k)) { hpPrev.delete(k); prev.delete(k); frames.delete(k); }
+      // the frame's 0x5F020 runs 0x88DD0 after the game update (0x44B50: 0x44A80, then 0x5F020): this tick's cues start this tick
+      if (queue) pump();
     },
     /** Run the queue's pump on the following ticks (no entities) until every queued cue has started or been dropped. */
     flush(limit = 512) { while (queue && pending.size && limit-- > 0) { tick++; pump(); } },

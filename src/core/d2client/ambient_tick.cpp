@@ -128,12 +128,13 @@ void tick(uint32_t* seed, U period, bool weatherLevel) {
 }
 
 extern "C" {
-// SoundEnviron.txt row `idx`, in the in-memory 0x58 layout: +4 night amb, +8 day amb, +0xC night event, +0x10 day event, +0x14 delay.
+// SoundEnviron.txt row `idx`, in the in-memory 0x58 layout 0x5DFD0 loads: +4 day amb, +8 night amb, +0xC day event,
+// +0x10 night event, +0x14 delay (0x4F860 takes +4/+0xC while #10396 is 1..3, else +8/+0x10).
 EMSCRIPTEN_KEEPALIVE void d2_ambient_area(int key) { d2client_ambient::setArea(U(key)); }
 EMSCRIPTEN_KEEPALIVE void d2_ambient_record(int idx, int nightAmb, int dayAmb, int nightEvt, int dayEvt, int delay) {
     if (idx < 0 || idx >= int(kMaxRec)) return;
     uint32_t* r = reinterpret_cast<uint32_t*>(A.tbl + idx * kRec);
-    r[1] = nightAmb; r[2] = dayAmb; r[3] = nightEvt; r[4] = dayEvt; r[5] = delay;
+    r[1] = dayAmb; r[2] = nightAmb; r[3] = dayEvt; r[4] = nightEvt; r[5] = delay;
     if (U(idx + 1) > A.nrec) A.nrec = idx + 1;
 }
 // DAT_6fbc97f8 as the unit pass reads it: the frame about to run (0x4F860 is called with it, then it advances).
