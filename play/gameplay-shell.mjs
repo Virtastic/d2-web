@@ -3189,7 +3189,7 @@ function update(forceTick = false, live = false) {
     // An act's film plays from the client while the server thread keeps running: a local game read from packets keeps
     // its server frames going (and the queued act-change burst delivered) under the film.
     if (cinematicsReturnTo === SCREEN.GAME && session && realmFlow?.local && clientView().fromPackets) {
-      try { advanceEngine(forceTick); } catch (error) { sessionError = String(error); session = null; }
+      try { advanceEngine(forceTick); } catch (error) { sessionError = String(error?.stack || error); session = null; }
     }
     return;
   }
@@ -3264,7 +3264,7 @@ function update(forceTick = false, live = false) {
     const preLevel = session && ambient ? (session.level ? session.level() : session.snapshot()?.level) : null;
     if (session && ambient && Number.isInteger(preLevel) && preLevel !== ambientLevel) { const { day, night } = ambient.environment(preLevel); Module._d2_ambient_record(day.environmentId, night.ambienceId, day.ambienceId, night.eventId, day.eventId, day.eventDelay); Module._d2_ambient_area(day.environmentId); }
     try { engineAdvanced = advanceEngine(forceTick) > 0; }
-    catch (error) { sessionError = String(error); session = null; }
+    catch (error) { sessionError = String(error?.stack || error); session = null; }
     if (localServerFrames) {
       queueHeldPointerRepeat(input, worldPointerHeld, localClientFrames, pointer.x, pointer.y, heldPointerCanRetargetWorld);
       queueHeldPointerRepeat(input, worldRightPointerHeld, localClientFrames, pointer.x, pointer.y, heldPointerCanRetargetWorld, 2);
@@ -3330,7 +3330,7 @@ function updateAfterAdvance(engineAdvanced, live = false) {
       perfT('snapshotRead', pRead);
       }
     }
-    catch (error) { sessionError = String(error); session = null; }
+    catch (error) { sessionError = String(error?.stack || error); session = null; }
   }
   // 1.13c FUN_6FAF5660: a level change stamps the tick; the new level's song is adopted only once
   // more than 0x4a ticks have passed (or nothing is playing yet), so the old song carries across the seam.
@@ -3623,6 +3623,13 @@ function sessionHp(id) {
 
 // PERF: hoverPick is this live frame's selection (reset by render()), reused by gameCursorContext.
 let hoverPrior = null, hoverPick = null;
+// A ground item's hover label. Retail's drop label is the item's NAME (magic/rare title included), not its
+// base code string; the shared engine builder is the same one the inventory box uses (d2_session_item_title).
+function groundItemHover(item) {
+  const code = itemCode(item), fields = tipFields(item.id, itemStringKey(code));
+  return { kind: 'item', id: item.id, classId: item.classId, code, label: fields.name, quality: fields.quality, flags: fields.flags, x: item.x, y: item.y };
+}
+
 function hoverTarget() {
   if (screen === SCREEN.GAME && clientView().hoverTarget) return clientView().hoverTarget();
   if (!session || screen !== SCREEN.GAME) return null;
@@ -3636,14 +3643,7 @@ function hoverTarget() {
     const label = stringIndex >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [stringIndex]) : '';
     return label ? { kind: 'unit', id: unit.id, classId: unit.classId, stringIndex, label, colour: monsterNameColour(realmMonsterViews.find((m) => m.guid === unit.id)?.typeFlags), x: unit.x, y: unit.y, life: hoverLife({ type: 1, mode: unit.mode, flags: unit.flags, hpPct: unit.hpPct ?? realmMonsterViews.find((m) => m.guid === unit.id)?.hpPct, ...sessionHp(unit.id) }) } : null;
   }
-  if (selected?.kind === 'item') {
-    const item = selected.target;
-    const code = itemCode(item);
-    // Retail's drop label is the item's NAME (magic/rare title included), not its base code string;
-    // the shared engine builder is the same one the inventory box uses (d2_session_item_title).
-    const fields = tipFields(item.id, itemStringKey(code));
-    return { kind: 'item', id: item.id, classId: item.classId, code, label: fields.name, quality: fields.quality, flags: fields.flags, x: item.x, y: item.y };
-  }
+  if (selected?.kind === 'item') return groundItemHover(selected.target);
   if (selected?.kind === 'npc') {
     const npc = selected.target;
     const npcIndex = Module.ccall('d2_monster_name_str', 'number', ['number'], [npc.classId]);
@@ -4225,7 +4225,7 @@ const realmClientView = {
   questWords: () => realmReads?.questWords ?? new Uint16Array(48),
   waypointTable: () => realmReads?.waypointTable ?? { rows: () => [], tabs: [] },
   skillMana: (id, level) => realmTables().skills.manaCost(id, level),
-  hoverTarget: () => realmUnits.hoverTarget(realmInput().pick(pointer.x, pointer.y), realmMonsterViews, (classId) => { const stringIndex = Module.ccall('d2_monster_name_str', 'number', ['number'], [classId]); return { stringIndex, label: stringIndex >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [stringIndex]) : '' }; }),
+  hoverTarget: (hit = realmInput().pick(pointer.x, pointer.y)) => hit?.kind === 'item' ? groundItemHover(hit.unit) : realmUnits.hoverTarget(hit, realmMonsterViews, (classId) => { const stringIndex = Module.ccall('d2_monster_name_str', 'number', ['number'], [classId]); return { stringIndex, label: stringIndex >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [stringIndex]) : '' }; }),
   pointerContext: () => realmUnits.cursorContext(realmInput().pick(pointer.x, pointer.y)),
   pointerItem: () => realmWorldState?.cursorId ?? 0,
   stashBalance: (limit) => (limit ? spClientView.stashBalance(limit) : (plugyStash.showShared ? plugyGold : realmWorldState?.stashGold ?? 0)),   // the shared page shows PlugY's shared gold (its UC_SHARED_GOLD value, held by the sidecar)
