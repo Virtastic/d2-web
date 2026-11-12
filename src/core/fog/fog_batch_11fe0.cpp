@@ -209,7 +209,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t fog_sub_121A0(void* linker, const char* 
         *p = static_cast<char>(fog_fold_byte(static_cast<uint8_t>(*p)));
     }
 
-    void* node = *reinterpret_cast<void**>(static_cast<uint8_t*>(linker) + 0xC);
+    // The tree links are 32-bit retail addresses (fog_sub_12020 stores them as dwords).
+    void* node = reinterpret_cast<void*>(static_cast<uintptr_t>(*reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(linker) + 0xC)));
     if (*static_cast<int32_t*>(linker) == 0) {
         if (node == nullptr) return -1;
     } else if (node == nullptr) {
@@ -225,9 +226,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t fog_sub_121A0(void* linker, const char* 
         const int32_t order = fog_key_compare(reinterpret_cast<const uint8_t*>(key), base);
         if (order == 0) return *reinterpret_cast<int32_t*>(base + 0x20);
         if (order < 0) {
-            node = *reinterpret_cast<void**>(base + 0x24);
+            node = reinterpret_cast<void*>(static_cast<uintptr_t>(*reinterpret_cast<uint32_t*>(base + 0x24)));
         } else {
-            node = *reinterpret_cast<void**>(base + 0x28);
+            node = reinterpret_cast<void*>(static_cast<uintptr_t>(*reinterpret_cast<uint32_t*>(base + 0x28)));
         }
     }
     return -1;

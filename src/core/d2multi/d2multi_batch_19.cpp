@@ -94,10 +94,14 @@ void d2_multi_sub_eb70(uint16_t* s) {
     }
 }
 
+// Storm #571 SStrChr (Storm+0x3B2D0): first match of c in s, null at the terminator. Held locally so this port does not depend on the
+// probe link's strchr seam (storm_z14_seam.cpp returns null there); identical to the real call.
+static char* sstrchr(const char* s, int32_t c) { if (!s) return nullptr; for (; *s; s++) if (*s == (char)c) return const_cast<char*>(s); return nullptr; }
+
 // 1.13c D2Multi+0xEC20
 void d2_multi_sub_ec20(char* src, char* dst) {
     if (*src != '*') {
-        char* e = Ordinal_571(nullptr, 0);
+        char* e = sstrchr(src, '*');
         if (e) { size_t n = e - src; memcpy(dst, src, n); dst[n] = 0; return; }
     }
     q_d2multi_batch_19_Ordinal_501();

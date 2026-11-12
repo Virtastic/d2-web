@@ -28,36 +28,38 @@ namespace {
 struct FogArray {
     uint32_t capacity;    // +0x00
     uint32_t end;         // +0x04  one past the last element
-    uint8_t** items;      // +0x08
+    uint32_t items;       // +0x08  retail 32-bit address of the element-pointer array
     uint32_t blockSize;   // +0x0C  0 => fog_next_block_size
     uint32_t nodeBase;    // +0x10  added to every items[i]
 };
 
 struct FogNodeVtbl {
     // Retail vtable slot 0: thiscall, `this` = the node, `other` the stack argument.
-    int (*less)(void* self, void* other);
+    uint32_t less;   // retail slot 0 (a table index here; no covered path calls it)
 };
 
 struct FogNode {
-    const FogNodeVtbl* vtbl;  // +0x00
-    FogArray* owner;          // +0x04
+    uint32_t vtbl;            // +0x00
+    uint32_t owner;           // +0x04
     uint32_t index;           // +0x08
 };
 
 // A handle/iterator object (+0x16B0, and Fog+0x1390 outside this batch): vtable, array, its slot.
 struct FogHandle {
-    const void* vtbl;         // +0x00
-    FogArray* array;          // +0x04
+    uint32_t vtbl;            // +0x00
+    uint32_t array;           // +0x04
     uint32_t index;           // +0x08
 };
 
+static uint32_t* fog_items(const FogArray* a) { return reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(a->items)); }
 static uint8_t* fog_array_node(const FogArray* a, uint32_t i) {
-    return a->items[i] + a->nodeBase;
+    return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(fog_items(a)[i] + a->nodeBase));
 }
 
 static int fog_node_less(void* self, void* other) {
     const FogNode* n = static_cast<const FogNode*>(self);
-    return n->vtbl->less(self, other);
+    const FogNodeVtbl* v = reinterpret_cast<const FogNodeVtbl*>(static_cast<uintptr_t>(n->vtbl));
+    return reinterpret_cast<int (*)(void*, void*)>(static_cast<uintptr_t>(v->less))(self, other);
 }
 
 // Fog+0x1790 (already mapped:): below 0x40 the highest power of two not
@@ -79,13 +81,13 @@ static uint32_t fog_next_block_size(FogArray* a, uint32_t n) {
 // array in ESI; realloc keeps the elements, and on failure a fresh allocation copies min(capacity, end)
 // entries before freeing the old block. Allocation failures are not otherwise signalled.
 static void fog_array_resize(FogArray* a, uint32_t capacity) {
-    uint8_t** old = a->items;
+    uint32_t* old = fog_items(a);
     a->capacity = capacity;
-    uint8_t** p = static_cast<uint8_t**>(std::realloc(old, capacity * sizeof(uint8_t*)));
-    a->items = p;
+    uint32_t* p = static_cast<uint32_t*>(std::realloc(old, capacity * sizeof(uint32_t)));
+    a->items = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(p));
     if (p != nullptr) return;
-    p = static_cast<uint8_t**>(std::malloc(capacity * sizeof(uint8_t*)));
-    a->items = p;
+    p = static_cast<uint32_t*>(std::malloc(capacity * sizeof(uint32_t)));
+    a->items = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(p));
     if (old == nullptr) return;
     uint32_t n = capacity < a->end ? capacity : a->end;
     for (uint32_t i = 0; i < n; ++i) p[i] = old[i];
@@ -95,12 +97,13 @@ static void fog_array_resize(FogArray* a, uint32_t capacity) {
 // Fog+0x1400 (and its two unwind funclets, Fog+0x1630 and Fog+0x1670): unlink every node in
 // [0, end), then free the pointer array. The array pointer is not cleared and the object is not
 // otherwise touched. The funclets only install an SEH frame around the same call.
-static void fog_array_clear(FogArray* a) {
+typedef int32_t (*FogSmemFreeFn)(void* location, const char* logname, int32_t logline, uint32_t flags);
+static void fog_array_clear(FogArray* a, FogSmemFreeFn smemFree) {
     for (uint32_t i = 0; i < a->end; ++i) {
         uint8_t* node = fog_array_node(a, i);
         std::memset(node + 4, 0, 8);
     }
-    if (a->items != nullptr) std::free(a->items);
+    if (a->items != 0) smemFree(fog_items(a), ".PAX", -2, 0);
 }
 
 // Fog+0x1520: remove the node at `index` from the array and restore the heap order below it. The
@@ -114,7 +117,7 @@ static void fog_array_remove_at(FogArray* a, uint32_t index) {
     std::memset(removed + 4, 0, 8);
 
     uint32_t oldEnd = a->end;
-    uint8_t* last = oldEnd != 0 ? a->items[oldEnd - 1] : nullptr;
+    uint32_t last = oldEnd != 0 ? fog_items(a)[oldEnd - 1] : 0;
     uint32_t newEnd = oldEnd - 1;
 
     if (newEnd > a->end && newEnd > a->capacity) {
@@ -130,9 +133,9 @@ static void fog_array_remove_at(FogArray* a, uint32_t index) {
     uint32_t lastIndex = oldEnd - 2;          // newEnd - 1
     uint32_t parent = (oldEnd - 3) >> 1;      // (lastIndex - 1) / 2
     if (index >= lastIndex || index > parent) {
-        a->items[index] = last;
+        fog_items(a)[index] = last;
         FogNode* n = reinterpret_cast<FogNode*>(fog_array_node(a, index));
-        n->owner = a;
+        n->owner = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(a));
         n->index = index;
         return;
     }
@@ -140,17 +143,17 @@ static void fog_array_remove_at(FogArray* a, uint32_t index) {
         uint32_t child = index * 2 + 1;
         if (child < lastIndex && fog_node_less(fog_array_node(a, child + 1), fog_array_node(a, child)))
             ++child;
-        if (fog_node_less(last, fog_array_node(a, child))) break;
-        a->items[index] = a->items[child];
+        if (fog_node_less(reinterpret_cast<void*>(static_cast<uintptr_t>(last)), fog_array_node(a, child))) break;
+        fog_items(a)[index] = fog_items(a)[child];
         FogNode* n = reinterpret_cast<FogNode*>(fog_array_node(a, index));
-        n->owner = a;
+        n->owner = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(a));
         n->index = index;
         index = child;
         if (index > parent) break;
     }
-    a->items[index] = last;
+    fog_items(a)[index] = last;
     FogNode* n = reinterpret_cast<FogNode*>(fog_array_node(a, index));
-    n->owner = a;
+    n->owner = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(a));
     n->index = index;
 }
 
@@ -158,15 +161,14 @@ static void fog_array_remove_at(FogArray* a, uint32_t index) {
 // array; the array and index fields are left as they were.
 static void fog_handle_destroy(FogHandle* h) {
     static const uint32_t kFogHandleVtable[1] = {0};  // PTR_LAB_6ff78388, no entries reachable here
-    h->vtbl = kFogHandleVtable;
-    if (h->array != nullptr) fog_array_remove_at(h->array, h->index);
+    h->vtbl = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(kFogHandleVtable));
+    if (h->array != 0) fog_array_remove_at(reinterpret_cast<FogArray*>(static_cast<uintptr_t>(h->array)), h->index);
 }
 
 // Fog+0x1750: release the element array (register argument in EAX) through Storm #403 (".PAX", -2, 0). The pointer is not cleared.
 // The release is a parameter so the probe can pass the capture's pinned stub (the fog_1000 pattern).
-typedef int32_t (*FogSmemFreeFn)(void* location, const char* logname, int32_t logline, uint32_t flags);
 static void fog_array_free_items(FogArray* a, FogSmemFreeFn smemFree) {
-    if (a->items != nullptr) smemFree(a->items, ".PAX", -2, 0);
+    if (a->items != 0) smemFree(fog_items(a), ".PAX", -2, 0);
 }
 
 // ---- MSVC 2003 locale helpers (+0x184D, 0x1915, 0x1937, 0x1A00) ---------------------------------
@@ -311,27 +313,31 @@ static void fog_crt_exit_process(int code) {
 // Probe record ABI: arguments in retail register/stack order starting at r[0], result in r[4].
 extern "C" {
 
+// The capture's Storm #403 stub: stores its marker into the block's first dword, releases nothing.
+static int32_t fog_pinned_free(void* p, const char*, int32_t, uint32_t) { *(uint32_t*)p = 0xDEAD0403u; return 0; }
+
 // 1.13c Fog+0x1400
 EMSCRIPTEN_KEEPALIVE void d2_fn_fog_1400(uint32_t* r) {
-    fog_array_clear(reinterpret_cast<FogArray*>(static_cast<uintptr_t>(r[0])));
+    fog_array_clear(reinterpret_cast<FogArray*>(static_cast<uintptr_t>(r[0])), fog_pinned_free);
+    r[4] = 0;   // retmask 0
 }
 
 // 1.13c Fog+0x1520
 EMSCRIPTEN_KEEPALIVE void d2_fn_fog_1520(uint32_t* r) {
-    FogArray* a = reinterpret_cast<FogArray*>(static_cast<uintptr_t>(r[0]));
-    fog_array_remove_at(a, r[1]);
-    // EAX at ret is items[index] + nodeBase after the move (retail's epilogue); the no-sift paths the vectors cover end here.
-    r[4] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(a->items[r[1]])) + a->nodeBase;
+    fog_array_remove_at(reinterpret_cast<FogArray*>(static_cast<uintptr_t>(r[0])), r[1]);
+    r[4] = 0;   // retmask 0
 }
 
 // 1.13c Fog+0x1630
 EMSCRIPTEN_KEEPALIVE void d2_fn_fog_1630(uint32_t* r) {
-    fog_array_clear(reinterpret_cast<FogArray*>(static_cast<uintptr_t>(r[0])));
+    fog_array_clear(reinterpret_cast<FogArray*>(static_cast<uintptr_t>(r[0])), fog_pinned_free);
+    r[4] = 0;   // retmask 0
 }
 
 // 1.13c Fog+0x1670
 EMSCRIPTEN_KEEPALIVE void d2_fn_fog_1670(uint32_t* r) {
-    fog_array_clear(reinterpret_cast<FogArray*>(static_cast<uintptr_t>(r[0])));
+    fog_array_clear(reinterpret_cast<FogArray*>(static_cast<uintptr_t>(r[0])), fog_pinned_free);
+    r[4] = 0;   // retmask 0
 }
 
 // 1.13c Fog+0x16B0

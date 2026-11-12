@@ -32,6 +32,10 @@ int wsprintfA(char*, const char*, ...);
 int __stricmp(const char* a, const char* b) { extern int Storm_stricmp_5C57(const char*, const char*); return Storm_stricmp_5C57(a, b); }
 }
 
+// Retail links are 4-byte guest words (+0x44 name list, +0xB0 player list): read and written as uint32, never as host pointers.
+static inline uint8_t* link_get(const uint8_t* n, int off) { uint32_t w; memcpy(&w, n + off, 4); return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(w)); }
+static inline void link_set(uint8_t* n, int off, const uint8_t* v) { uint32_t w = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(v)); memcpy(n + off, &w, 4); }
+
 // 1.13c D2Multi+0xED60
 void d2_multi_sub_ed60(uint16_t* dst, int32_t n) {
     uint16_t a[512] = {0}, num[8] = {0};
@@ -45,16 +49,20 @@ void d2_multi_sub_ed60(uint16_t* dst, int32_t n) {
     ustrcat(dst, a);
 }
 
+// Storm #571 SStrChr (Storm+0x3B2D0): first match of c in s, null at the terminator. Held locally so these two ports do not depend on the
+// probe link's strchr seam (storm_z14_seam.cpp returns null there); identical to the real call.
+static char* sstrchr(const char* s, int32_t c) { if (!s) return nullptr; for (; *s; s++) if (*s == (char)c) return const_cast<char*>(s); return nullptr; }
+
 // 1.13c D2Multi+0xEEA0
 extern "C" void d2_multi_sub_eea0(uint8_t* p1, char* out, const char* name) {
     *out = 0; *p1 = 0;
     if (*name == '*') { Ordinal_501(out, name, 0x7fffffff); return; }
-    char* a = Ordinal_571(name, 0x40);
-    char* b = Ordinal_571(name, '*');
-    if (a && b && a < b) { Ordinal_501(out, name, 0x7fffffff); char* s = Ordinal_571(out, 0x2a); *s = 0; return; }
-    for (uint8_t* n = DAT_6fa09ef8; n; n = *(uint8_t**)(n + 0x44)) {
+    char* a = sstrchr(name, 0x40);
+    char* b = sstrchr(name, '*');
+    if (a && b && a < b) { Ordinal_501(out, name, 0x7fffffff); char* s = sstrchr(out, 0x2a); *s = 0; return; }
+    for (uint8_t* n = DAT_6fa09ef8; n; n = link_get(n, 0x44)) {
         if (__stricmp((char*)n, name)) continue;
-        for (uint8_t* q = DAT_6fa09ef4; q; q = *(uint8_t**)(q + 0xb0)) {
+        for (uint8_t* q = DAT_6fa09ef4; q; q = link_get(q, 0xb0)) {
             if (__stricmp((char*)(q + 4), name)) continue;
             uint32_t m = Ordinal_10023(*(int32_t*)(q + 0x9c));
             if ((gdwBitMasks_exref[6] & m) || (gdwBitMasks_exref[7] & m))
@@ -64,7 +72,7 @@ extern "C" void d2_multi_sub_eea0(uint8_t* p1, char* out, const char* name) {
         Ordinal_501(out, (char*)n + 0x32, 0x7fffffff);
         break;
     }
-    char* star = Ordinal_571(name, '*');
+    char* star = sstrchr(name, '*');
     if (*name != '*' && star) { size_t k = star - name; memcpy(out, name, k); out[k] = 0; return; }
     Ordinal_501(out, name, 0x7fffffff);
 }
@@ -74,24 +82,24 @@ extern "C" void d2_multi_sub_eea0(uint8_t* p1, char* out, const char* name) {
 extern "C" void d2_multi_sub_f020(const char* name, const char* text) {
     uint8_t* prev = nullptr;
     uint8_t* n = DAT_6fa09ef8;
-    char* t = Ordinal_571(name, '*');
+    char* t = sstrchr(name, '*');
     const char* key = (t && t[1]) ? t + 1 : name;
-    for (; n; prev = n, n = *(uint8_t**)(n + 0x44)) {
-        char* s = Ordinal_571((char*)n, 0x2a);
+    for (; n; prev = n, n = link_get(n, 0x44)) {
+        char* s = sstrchr((char*)n, 0x2a);
         const char* k2 = (s && s[1]) ? s + 1 : (char*)n;
         if (strcmp(k2, key) == 0) { strcpy((char*)n + 0x32, text); return; }
     }
     if (DAT_6fa09efc >= 0x400) {
         uint8_t* head = DAT_6fa09ef8;
-        DAT_6fa09ef8 = *(uint8_t**)(head + 0x44);
+        DAT_6fa09ef8 = link_get(head, 0x44);
         Ordinal_10043(0x928, 0);   // retail: ECX = head, EDX = source-file string
         DAT_6fa09efc--;
     }
     uint8_t* nn = (uint8_t*)Ordinal_10042(0x92c, 0);   // retail: ECX = 0x48 bytes
     strcpy((char*)nn, name);
     strcpy((char*)nn + 0x32, text);
-    *(uint8_t**)(nn + 0x44) = 0;
-    if (prev) *(uint8_t**)(prev + 0x44) = nn; else DAT_6fa09ef8 = nn;
+    link_set(nn, 0x44, nullptr);
+    if (prev) link_set(prev, 0x44, nn); else DAT_6fa09ef8 = nn;
     DAT_6fa09efc++;
 }
 
@@ -104,9 +112,9 @@ extern "C" void d2_multi_sub_f170(int32_t* p) {
         uwin2Unicode(a, s, 0x32); b[0] = 0;
     } else {
         Ordinal_501(pre, s, 0x7fffffff);
-        char* st = Ordinal_571(s, 0x2a);
+        char* st = sstrchr(s, 0x2a);
         if (st) { size_t k = st - s; memcpy(pre, s, k); pre[k] = 0; }
-        char* t = Ordinal_571(s, 0x2a);
+        char* t = sstrchr(s, 0x2a);
         uwin2Unicode(e, (t && t[1]) ? t + 1 : s, 0x32);
         uwin2Unicode(a, "*", 0x32);
         ustrncat(a, e, 0x32);

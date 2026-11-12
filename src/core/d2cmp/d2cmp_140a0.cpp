@@ -102,8 +102,25 @@ uint8_t* d2cmp_140a0(const uint8_t* hdr, const uint8_t* data, uint32_t* total, v
                 s.pos = (int32_t)(bits & 31);
             }
         }
+        // 13220 reads and writes retail's raw layout (frame stride 0x2C, bottomUp at +0x28; box nframes at +0x1C), so it runs
+        // on a raw copy; the native DccFrame / DccBox (8-byte pointers) take its result. Reading the native box there read nframes
+        // at the wrong offset and skipped the whole frame walk.
+        uint8_t rawFrames[256 * 0x2C];
+        uint8_t rawBox[0x30];
+        memset(rawBox, 0, sizeof rawBox);
+        for (int32_t i = 0; i < nf; i++) {
+            uint8_t* rf = rawFrames + i * 0x2C;
+            const DccFrame* f = &frames[i];
+            memcpy(rf + 0x00, &f->var0, 4); memcpy(rf + 0x04, &f->w, 4); memcpy(rf + 0x08, &f->h, 4);
+            memcpy(rf + 0x0C, &f->xoff, 4); memcpy(rf + 0x10, &f->yoff, 4);
+            memcpy(rf + 0x28, &f->bottomUp, 4);
+        }
+        d2cmp_13220(lh, d, reinterpret_cast<DccFrame*>(rawFrames), reinterpret_cast<DccBox*>(rawBox), env->fatal);
         DccBox box;
-        d2cmp_13220(lh, d, frames, &box, env->fatal);
+        box.hdr = lh; box.frames = frames;
+        memcpy(&box.xmin, rawBox + 0x08, 4); memcpy(&box.ymin, rawBox + 0x0C, 4);
+        memcpy(&box.w, rawBox + 0x10, 4); memcpy(&box.h, rawBox + 0x14, 4);
+        memcpy(&box.dir, rawBox + 0x18, 4); memcpy(&box.nframes, rawBox + 0x1C, 4);
         d2cmp_14020(&box);
         memset(env->cells, 0, (size_t)box.cells * sizeof(DccCell));
         uint32_t eqSize = 0, encSize = 0, rawSize = 0;

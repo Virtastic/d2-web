@@ -143,7 +143,7 @@ extern "C" uint32_t d2cmp_e1d0(uint32_t* p, uint32_t p2, uint32_t p3, const D2Cm
     if (Y > 1 && X != 0) {
         bool skip = false;
         if (ent) {
-            const uint32_t s = *(uint32_t*)(*(uint8_t**)(ent + 0x20) + 0xb0);
+            const uint32_t s = *(uint32_t*)((uint8_t*)(uintptr_t)*(uint32_t*)(ent + 0x20) + 0xb0);   // +0x20 is a four-byte guest link
             if (!s) return 0;
             l1c = e->ord10092(s);
             if (l1c) skip = true;
@@ -157,7 +157,7 @@ extern "C" uint32_t d2cmp_e1d0(uint32_t* p, uint32_t p2, uint32_t p3, const D2Cm
         }
     }
     if (ent) {
-        uint8_t* t = *(uint8_t**)(ent + 0x20);
+        uint8_t* t = (uint8_t*)(uintptr_t)*(uint32_t*)(ent + 0x20);   // +0x20 is a four-byte guest link
         if (!t || (t[0x20] & 1) || !*(uint32_t*)(t + 0xb0)) return 0;
         if (p2) return e->ord10092(*(uint32_t*)(t + 0xb0)) != 0;
         e->fcae0(*(uint32_t*)(ent + 0x24), 0x67240u);

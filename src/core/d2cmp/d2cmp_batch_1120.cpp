@@ -19,8 +19,9 @@ static void unlink_link(uint32_t* lk) {
     uint32_t first = lk[0];
     if (!first) return;
     uint32_t prev = lk[1];
+    // Retail adds the relative offset in 32-bit int arithmetic (wraps); a negative offset must not widen to 64 bits.
     uint32_t* slot = ((int32_t)prev < 0) ? (uint32_t*)(uintptr_t)~prev
-                                         : (uint32_t*)((uintptr_t)lk + (prev - ((uint32_t*)(uintptr_t)first)[1]));
+                                         : (uint32_t*)(uintptr_t)(uint32_t)((uint32_t)(uintptr_t)lk + (prev - ((uint32_t*)(uintptr_t)first)[1]));
     *slot = first;
     ((uint32_t*)(uintptr_t)lk[0])[1] = lk[1];
     lk[0] = 0;

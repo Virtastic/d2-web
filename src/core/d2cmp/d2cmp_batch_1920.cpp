@@ -15,8 +15,9 @@ void d2cmp_1920(const D2CmpEnv1920* e, uint32_t* self) {
     uint32_t first = self[1];
     if (!first) return;
     uint32_t prev = self[2];
+    // Retail adds the relative offset in 32-bit int arithmetic (wraps); a negative offset must not widen to 64 bits.
     uint32_t* slot = ((int32_t)prev < 0) ? (uint32_t*)(uintptr_t)~prev
-                                         : (uint32_t*)((uintptr_t)(self + 1) + (prev - ((uint32_t*)(uintptr_t)first)[1]));
+                                         : (uint32_t*)(uintptr_t)(uint32_t)((uint32_t)(uintptr_t)(self + 1) + (prev - ((uint32_t*)(uintptr_t)first)[1]));
     *slot = first;
     ((uint32_t*)(uintptr_t)self[1])[1] = self[2];
     self[1] = 0;

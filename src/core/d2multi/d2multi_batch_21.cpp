@@ -115,6 +115,10 @@ int32_t d2_multi_sub_fc90(char* s, int32_t kind) {
     return 1;
 }
 
+// Storm #571 SStrChr (Storm+0x3B2D0): first match of c in s, null at the terminator. Held locally so this port does not depend on the
+// probe link's strchr seam (storm_z14_seam.cpp returns null there); identical to the real call.
+static char* sstrchr(const char* s, int32_t c) { if (!s) return nullptr; for (; *s; s++) if (*s == (char)c) return const_cast<char*>(s); return nullptr; }
+
 // 1.13c D2Multi+0x10000
 // ponytail: sprintf args beyond `who` are not shown by the decompiler; assumed (who, DAT_6fa09198-copy) -- low confidence.
 void d2_multi_sub_10000(char* who, const char* edi) {
@@ -125,8 +129,8 @@ void d2_multi_sub_10000(char* who, const char* edi) {
     bool same = false;
     if (*who) {
         if (*who == '*') {
-            char* p = Ordinal_571(); const char* a = (p && p[1]) ? p + 1 : mine;
-            char* q = Ordinal_571(who, '*'); const char* b = (q && q[1]) ? q + 1 : who;
+            char* p = sstrchr(edi, '*'); const char* a = (p && p[1]) ? p + 1 : mine;
+            char* q = sstrchr(who, '*'); const char* b = (q && q[1]) ? q + 1 : who;
             same = strcmp(b, a) == 0;
         }
         if (!same) { snprintf(buf, sizeof buf, "%s (*%s) whispers: %s", who, mine, tail); goto out; }

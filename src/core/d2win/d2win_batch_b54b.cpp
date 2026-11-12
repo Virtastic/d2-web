@@ -6,16 +6,18 @@
 #include <emscripten.h>
 
 // 1.13c D2Win+0x17a00 : append node to the singly linked list headed at DAT_6f9014a4 (next at +0x3c).
+// The head global and the links are retail 4-byte guest pointers (the blob addresses fit 32 bits), so every
+// link is a uint32 slot; a host-width store here would overrun the neighbouring retail field.
 extern "C" EMSCRIPTEN_KEEPALIVE
-int32_t d2win_sub_17a00(uint8_t** head, uint8_t* node) {
-    *(uint8_t**)(node + 0x3c) = nullptr;
+int32_t d2win_sub_17a00(uint32_t* head, uint8_t* node) {
+    *(uint32_t*)(node + 0x3c) = 0;
     if (*head) {
-        uint8_t* p = *head;
-        while (*(uint8_t**)(p + 0x3c)) p = *(uint8_t**)(p + 0x3c);
-        *(uint8_t**)(p + 0x3c) = node;
+        uint8_t* p = (uint8_t*)(uintptr_t)*head;
+        while (*(uint32_t*)(p + 0x3c)) p = (uint8_t*)(uintptr_t)*(uint32_t*)(p + 0x3c);
+        *(uint32_t*)(p + 0x3c) = (uint32_t)(uintptr_t)node;
         return 1;
     }
-    *head = node;
+    *head = (uint32_t)(uintptr_t)node;
     return 1;
 }
 

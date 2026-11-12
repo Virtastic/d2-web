@@ -11,16 +11,21 @@ struct FogBigFreeEnv {
 };
 
 extern "C" void fog_sub_1aa80(uint8_t* pool, void* user, const FogBigFreeEnv* e) {
-    void** hdr = reinterpret_cast<void**>(static_cast<uint8_t*>(user) - 4);  // retail: (int)hdr % 0x3ff
-    void** buckets = reinterpret_cast<void**>(pool + 0x7ac);   // retail idiv: the bucket index is the signed remainder
+    // Retail words are 32-bit: the bucket heads and the chain links are dword addresses.
+    const uint32_t hdr = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(user)) - 4;  // retail: (int)hdr % 0x3ff
+    uint32_t* buckets = reinterpret_cast<uint32_t*>(pool + 0x7ac);   // retail idiv: the bucket index is the signed remainder
+    const int32_t b = static_cast<int32_t>(hdr) % 0x3ff;
     e->lock(pool + 4);
-    void** prev = nullptr;
-    for (void** n = static_cast<void**>(buckets[(int32_t)reinterpret_cast<uintptr_t>(hdr) % 0x3ff]); n; prev = n, n = static_cast<void**>(*n)) {
+    uint32_t* prev = nullptr;
+    for (uint32_t n = buckets[b]; n; ) {
+        uint32_t* link = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(n));
         if (n == hdr) {
-            if (prev) *prev = *n; else buckets[(int32_t)reinterpret_cast<uintptr_t>(hdr) % 0x3ff] = static_cast<void**>(*n);
+            if (prev) *prev = *link; else buckets[b] = *link;
             break;
         }
+        prev = link;
+        n = *link;
     }
     e->unlock(pool + 4);
-    e->free_fn(hdr);
+    e->free_fn(reinterpret_cast<void*>(static_cast<uintptr_t>(hdr)));
 }
