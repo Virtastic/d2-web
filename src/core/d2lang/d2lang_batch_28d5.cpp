@@ -39,7 +39,7 @@ extern "C" d2lang_divrm d2_fn_d2lang_1b90(uint64_t num, uint64_t den)
 // D2Lang+0x03102 _calloc_crt/calloc: size overflow guard, 0 -> 1 byte, retry through the new-handler.
 // alloc() is HeapAlloc(HEAP_ZERO_MEMORY) plus the small-block heap (zeroed); newh is __callnewh, NULL when unset.
 struct d2lang_calloc_env { void* (*alloc)(uint32_t size); int (*newh)(uint32_t size); };
-extern "C" void* d2_fn_d2lang_3102(const d2lang_calloc_env* env, uint32_t count, uint32_t size)
+extern "C" void* d2lang_crt_calloc_env(const d2lang_calloc_env* env, uint32_t count, uint32_t size)
 {
 	if (count != 0 && size > 0xffffffe0u / count)
 		return nullptr;

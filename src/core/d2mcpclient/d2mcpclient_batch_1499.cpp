@@ -19,7 +19,7 @@ extern D2McpLockSlot g_lockTable[0x24];
 // holding a static lock (pointer set, flag == 1) is deleted only -- its storage is not heap.
 // 1.13c D2MCPClient+0x01499
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2mcpclient_1499(void) {
+EMSCRIPTEN_KEEPALIVE void d2_mcp_mtdeletelocks(void) {
     D2McpLockSlot* end = g_lockTable + 0x24;
     for (D2McpLockSlot* p = g_lockTable; p < end; ++p) {
         if (p->cs != 0 && p->init != 1) {
