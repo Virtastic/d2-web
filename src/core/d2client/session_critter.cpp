@@ -218,6 +218,9 @@ void tick(D2UnitStrc* player, uint32_t frame) {
 }
 void reset() { g_c.clear(); g_counter = 0; g_log += "RESET\n"; }
 }
+// 1.13c D2Common+0x3C870 (room teardown): every unit in the freed room, client units too, is taken out of it and its path room
+// cleared (0x668A0), so a critter there keeps ticking with no room, and 0x17E80/0x17500/0x2A040 return on that.
+void d2client_critter_room_freed(D2ActiveRoomStrc* room) { for (Critter& c : g_c) if (c.room == room) c.room = nullptr; }
 extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_session_critter_dump() {
     for (const Critter& c : g_c) {
         char b[128]; snprintf(b, sizeof b, "E id=%x mode=%u f44=%x delay=%d at=%d,%d\n", c.id, c.mode, c.f44, c.delay, c.x, c.y); g_log += b;

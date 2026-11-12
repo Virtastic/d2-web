@@ -897,8 +897,12 @@ int __stdcall D2Common_10081_GetTileCountFromRoom(D2ActiveRoomStrc* pRoom)
 
 //D2Common.0x6FD8CE40
 // 1.13c D2Common+0x3C870 (register-arg room teardown, inlined here)
+// The session's client critters (src/core/d2client/session_critter.cpp) live outside the room's unit list; retail's teardown
+// detaches every unit in the room, client units too, so they are told here. Weak: builds without the session have none.
+__attribute__((weak)) void d2client_critter_room_freed(D2ActiveRoomStrc* pRoom);
 void __fastcall DUNGEON_FreeRoom(void* pMemPool, D2ActiveRoomStrc* pRoom)
 {
+	if (d2client_critter_room_freed) d2client_critter_room_freed(pRoom);
 	for (D2UnitStrc* i = pRoom->pUnitFirst; i; i = pRoom->pUnitFirst)
 	{
 		if (!(i->dwFlags & UNITFLAG_ISCLIENTUNIT))
