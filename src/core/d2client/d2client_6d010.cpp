@@ -2,10 +2,10 @@
 #include "d2client_6d010.h"
 
 // 1.13c D2Client+0x6D010
-void d2c_6d010(const D2Client6d010Env& e, U arg) {
+uint32_t d2c_6d010(const D2Client6d010Env& e, U arg) {
     U edi = arg;
     const uint32_t h = e.fc1f0(e.self);
-    if (!h) return;
+    if (!h) return h;
     U arr = 0; uint32_t cnt = 0;
     e.fc3dc(h, &arr, &cnt);
     uint32_t ctr = 0;
@@ -14,7 +14,7 @@ void d2c_6d010(const D2Client6d010Env& e, U arg) {
             const uint32_t al = ctr & 0x1f; ctr++;
             if (al) e.fc1760(1);              // retail: test al,al; je skip
         }
-        if (!e.g04c() && e.fc11e() >= 0x1e) return;
+        if (!e.g04c()) { const uint32_t v = e.fc11e(); if (v >= 0x1e) return v; }
         U node = e.ldp(e.ldp(arr, i * 4u), 0x74);
         while (node) {
             uint32_t type = e.ld32(node, 0), idx = e.ld32(node, 4), aux = 0;
@@ -27,8 +27,9 @@ void d2c_6d010(const D2Client6d010Env& e, U arg) {
                 if (e.g054()) edi = 0;
                 e.f6c3b0(node, edi);
             }
-            if (!e.g04c() && e.fc11e() >= 0x1e) return;
+            if (!e.g04c()) { const uint32_t v = e.fc11e(); if (v >= 0x1e) return v; }
             node = e.ldp(node, 0xe8);
         }
     }
+    return cnt;                               // retail: eax = the count re-read at the loop test
 }

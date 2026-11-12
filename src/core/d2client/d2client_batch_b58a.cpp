@@ -66,17 +66,5 @@ EMSCRIPTEN_KEEPALIVE void d2c_72130(u8* unit, const u8* tbl, i32 cnt, i32 g_bbfc
     if (self && p) { p[0x25] = 0xff; p[0x26] = 0xff; p[0x27] = 0xff; }
 }
 
-// 1.13c D2Client+0x72530  (eax = unit dwords, param_1 = idx); mask28 = gdwBitMasks[0x1c]
-EMSCRIPTEN_KEEPALIVE void d2c_72530(const i32* unit, i32 idx, const u8* tbl, i32 cnt, u8 mask28,
-    void (*const* hooks)(), i32 (*ord10871)(), i32 (*ord10680)(i32, i32, i32), void (*f50840)(i32, i32, i32)) {
-    const u8* r = unit ? rec3c(tbl, cnt, idx) : nullptr;
-    if (!r) return;
-    if ((mask28 & r[0x14]) != 0 && ((unit[0] == 1 && unit[4] == 0xc) || (unit[0] == 0 && unit[4] == 0x11))) return;
-    int16_t s = rd16(r, 0x1a);
-    if (s >= 0 && s < 0x1f && hooks[s]) hooks[s]();
-    if (rd16(r, 0x30) >= 0) {
-        i32 u = ord10871();
-        if (u != 0) { i32 a = ord10680(u, 0x15e, 0), b = ord10680(u, 0x15f, 0); f50840(rd16(r, 0x30), a, b); }
-    }
-}
+// D2Client+0x72530 lives in its own file, d2client_72530.cpp.
 }

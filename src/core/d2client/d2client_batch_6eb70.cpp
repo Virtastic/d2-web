@@ -160,19 +160,4 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_6f260(const D2c6F260Env* e, const
     }
 }
 
-// 1.13c D2Client+0x6F3E0 (191 B, caller 0x70140): x=eax, y=stack; two chat segments, wrap right.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_6f3e0(D2cChatState* s, const uint16_t* name, int32_t x, int32_t y, D2cHost h) {
-    int32_t w1 = 0;
-    D2cCall wc = {}; wc.rva = 10028;
-    if (wlen(name) != 0) {
-        w1 = (int32_t)h(&wc);
-        if (s->rightEdge - 0x109 < w1 - 0x83 + x) { x = 0x83; y += 0xF; }
-        D2cCall d = {}; d.rva = 10150; d.ecx = (uint32_t)y; d.s[0] = 4; h(&d);
-    }
-    int32_t w2 = (int32_t)h(&wc);
-    if (wlen(s->msg2) != 0) {
-        if (s->rightEdge - 0x109 < x + w2 - 0x83 + w1) y += 0xF;
-        D2cCall d = {}; d.rva = 10150; d.ecx = (uint32_t)y; d.s[0] = 4; h(&d);
-    }
-    d2_client_6ef20(s, (uint32_t)y, 4, h);
-}
+// D2Client+0x6F3E0 is ported in d2client_6f3e0.cpp.

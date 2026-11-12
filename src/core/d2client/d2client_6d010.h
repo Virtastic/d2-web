@@ -19,5 +19,6 @@ struct D2Client6d010Env {
     void     (*f6c3f0)(U node, U arg);                            // 0x6C3F0 (EAX = node, stack arg)
     void     (*f6c3b0)(U node, U arg);                            // 0x6C3B0 (EAX = node, stack arg)
 };
-// 1.13c D2Client+0x6D010: EAX = arg.
-void d2c_6d010(const D2Client6d010Env& e, U arg);
+// 1.13c D2Client+0x6D010: EAX = arg. Returns the EAX retail leaves: 0 when 0xC1F0 gives 0, the
+// group count when the walk ends, and 0xC11E's value when the limit probe stops it.
+uint32_t d2c_6d010(const D2Client6d010Env& e, U arg);
