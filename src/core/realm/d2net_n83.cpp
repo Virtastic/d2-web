@@ -47,8 +47,10 @@ struct Reg { void* next; void* handler; ScopeEntry* table; int32_t trylevel; };
 
 // 1.13c D2Net+0x02D12 (unwind helper, eax = registration record, ebp = caller frame): saves the frame state
 // into the module globals 0xA41C (eax), 0xA420 ([ebp+8]) and 0xA424 (ebp). g points at the three dwords.
-extern "C" void local_unwind_restore_2d12(uint32_t* g, uint32_t eax, uint32_t ebp, uint32_t frameArg8) {
+// EAX is never written, so the caller gets the registration record back.
+extern "C" uint32_t local_unwind_restore_2d12(uint32_t* g, uint32_t eax, uint32_t ebp, uint32_t frameArg8) {
   g[1] = frameArg8; g[0] = eax; g[2] = ebp;
+  return eax;
 }
 
 // D2NET 0x02C7E (1.13c)
