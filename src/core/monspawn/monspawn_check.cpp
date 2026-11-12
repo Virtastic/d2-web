@@ -3861,6 +3861,62 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_run_probe(int32_t drain) {
     return probe;
 }
 
+// Would the walk command take (x, y) from where the player stands -- asked of the mover's own path
+// code, with nothing changed afterwards. d2_session_command_move's ground gates (the 50-subtile packet
+// range, the one-hop room resolve), then the walk start's path half exactly as
+// PLRMODE_StartXY_WalkRunKnockback runs it: D2COMMON_10170_PathSetTargetPos, sub_6FC7F600's
+// PATH_ResetToPreviousType and D2Common_10142(path, player, 0). The handler accepts a walk iff that
+// leaves dwPathPoints > 0, so reason here is MOVE_OK or MOVE_NO_PATH on the same rule. The dynamic path,
+// the unit seed the IDA* tie-break rolls, the refusal ring and the planner probe globals are restored,
+// so a planner may ask this for every candidate without moving the game. The footprint the path call
+// lifts and re-adds is net-neutral for a live player; a dead or dying one (whose footprint the call
+// would add without having lifted) answers MOVE_DISPATCH_REFUSED without calling it.
+// [0] reason, [1] path points, [2..3] last path point, [4..5] start.
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_path_plan(int x, int y) {
+    static int32_t plan[6];
+    memset(plan, 0, sizeof plan);
+    plan[0] = MOVE_NO_SESSION;
+    if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return plan;
+    D2UnitStrc* unit = g_targetPlayer;
+    D2DynamicPathStrc* path = unit->pDynamicPath;
+    plan[4] = path->tGameCoords.wPosX; plan[5] = path->tGameCoords.wPosY;
+    plan[0] = MOVE_OUT_OF_RANGE;
+    if (abs(x - plan[4]) > 50 || abs(y - plan[5]) > 50) return plan;
+    plan[0] = MOVE_NO_ROOM;
+    if (!COLLISION_GetRoomBySubTileCoordinates(path->pRoom, x, y)) return plan;
+    plan[0] = MOVE_DISPATCH_REFUSED;
+    if (unit->dwAnimMode == PLRMODE_DEAD || unit->dwAnimMode == PLRMODE_DEATH) return plan;
+    const D2DynamicPathStrc savedPath = *path;
+    const D2SeedStrc savedSeed = unit->pSeed;
+    static int32_t savedRefusals[64][12];
+    memcpy(savedRefusals, g_d2webPathRefusals, sizeof savedRefusals);
+    const uint32_t savedRefusalCount = g_d2webPathRefusalCount;
+    const int32_t savedProbe[8] = { g_d2webStraightTowardPoints, g_d2webStraightTowardEarlyReturn,
+        g_d2webStraightAStarGate, g_d2webStraightSquaredDist, g_d2webAStarNodesPopped,
+        g_d2webAStarAdvanced, g_d2webAStarExhausted, g_d2webAStarPathPoints };
+    const int32_t savedProbeActive = g_d2webWalkProbeActive;
+    g_d2webWalkProbeActive = 0;
+    D2COMMON_10170_PathSetTargetPos(path, x, y);
+    PATH_ResetToPreviousType(path);
+    D2Common_10142(path, unit, 0);
+    const int32_t points = (int32_t)path->dwPathPoints;
+    plan[0] = points > 0 ? MOVE_OK : MOVE_NO_PATH;
+    plan[1] = points;
+    if (points > 0 && points <= (int32_t)(sizeof path->PathPoints / sizeof path->PathPoints[0])) {
+        plan[2] = path->PathPoints[points - 1].X; plan[3] = path->PathPoints[points - 1].Y;
+    }
+    *path = savedPath;
+    unit->pSeed = savedSeed;
+    memcpy(g_d2webPathRefusals, savedRefusals, sizeof savedRefusals);
+    g_d2webPathRefusalCount = savedRefusalCount;
+    g_d2webStraightTowardPoints = savedProbe[0]; g_d2webStraightTowardEarlyReturn = savedProbe[1];
+    g_d2webStraightAStarGate = savedProbe[2]; g_d2webStraightSquaredDist = savedProbe[3];
+    g_d2webAStarNodesPopped = savedProbe[4]; g_d2webAStarAdvanced = savedProbe[5];
+    g_d2webAStarExhausted = savedProbe[6]; g_d2webAStarPathPoints = savedProbe[7];
+    g_d2webWalkProbeActive = savedProbeActive;
+    return plan;
+}
+
 extern "C" void d2_client_note_move_cmd(int32_t explicitMove);
 EMSCRIPTEN_KEEPALIVE int d2_session_command_move(int targetX, int targetY) {
     d2_client_note_move_cmd(1);
