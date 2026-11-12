@@ -10,7 +10,7 @@ const fn = (head) => { const a = shell.indexOf(head); assert.ok(a >= 0, head); r
 const built = (source) => [...new Set([...source.matchAll(/(?<![.\w])(\w+) (?:\?\?)?= (?:\w+ \?\?= )?(?:audioVolume\.attach\([^,]+, )?(?:create|make)\w+\(/g)].map((m) => m[1]))];
 const calls = (source) => [...new Set([...source.matchAll(/\b(buildChrome\w+|buildStoragePanels)\b/g)].map((m) => m[1]))];
 
-const local = fn('async function bootstrapSession('), joined = fn('function ensureRealmChrome()');
+const local = fn('async function enterSession('),joined = fn('function ensureRealmChrome()');
 // What a local game is known to build; a new renderer added inline to the local start fails the first test instead.
 const LOCAL = ['hoverFont', 'automapFont', 'gameCursor', 'pointerLayer', 'playerRenderer', 'missileRenderer', 'skillFx', 'stateFx', 'unitOverlayFx',
   'overlayRenderer', 'weatherRenderer', 'corpseRenderer', 'monsterRenderer', 'npcSpeechAlertRenderer', 'areaNameRenderer', 'entryBannerRenderer',

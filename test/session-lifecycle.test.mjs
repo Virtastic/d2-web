@@ -30,10 +30,12 @@ test('native session replacement works when renderer has not been initialized', 
 test('fixture reset and class switch callers use the replacement lifecycle', async () => {
   const fs = await import('node:fs/promises');
   const shell = await fs.readFile(new URL('../play/gameplay-shell.mjs', import.meta.url), 'utf8');
-  const lifecycleCalls = shell.match(/replaceNativeSession\(session, monsterRenderer,/g) ?? [];
-  assert.equal(lifecycleCalls.length, 2, 'fixture reset and class switch both replace through the lifecycle');
-  assert.match(shell, /function resetFixtureFromSelect\(\)[\s\S]*?replaceNativeSession\(session, monsterRenderer,/);
-  assert.match(shell, /classSelect\.addEventListener\('change',[\s\S]*?replaceNativeSession\(session, monsterRenderer,/);
+  // Both callers swap through one function, and that function is the only place the shell replaces a session.
+  const lifecycleCalls = shell.match(/replaceNativeSession\(/g) ?? [];
+  assert.equal(lifecycleCalls.length, 1, 'the shell replaces a session in one place');
+  assert.match(shell, /async function swapLocalSession\(create, [^\n]*\{\n  const api = session;[\s\S]*?replaceNativeSession\(api, monsterRenderer, create\)/);
+  assert.match(shell, /function resetFixtureFromSelect\(\)[\s\S]*?swapLocalSession\(\(\) => session\.create\(/);
+  assert.match(shell, /classSelect\.addEventListener\('change',[\s\S]*?swapLocalSession\(\(\) => session\.create\(/);
 
   for (const caller of ['fixture reset', 'class switch']) {
     const events = [];

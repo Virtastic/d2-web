@@ -895,6 +895,7 @@ export function installTouchInput({ documentObject = globalThis.document, window
   return { canvas, container, nameInput, key: touchKey,
     flush,   // the shell's update() calls this first: a finger whose landing window has closed presses now
     isShiftArmed: restDown,   // "a rest finger is down": the shift every other finger's event carries
+    aim,   // where a finger landing at a canvas point presses: the target it is beside, else the point itself
     tap: (x, y, opts = {}) => replay(x, y, { button: 0, pointerType: 'touch', pointerId: 9001, shiftKey: restDown(), ...opts }),
     longPress: (x, y, opts = {}) => replay(x, y, { button: 2, pointerType: 'touch', pointerId: 9001, ...opts }),
   };

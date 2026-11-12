@@ -1037,6 +1037,7 @@ function sessionAdapter() {
         const p = Module._malloc(bytes.length);
         try {
           Module.HEAPU8.set(bytes, Number(p));
+          Module.ccall('d2_session_join_units', null, ['number'], [1]);   // arms this create only, as create() does
           const loaded = Module.ccall('d2_session_create_from_save', 'number', ['bigint', 'number', 'number'], [BigInt(p), bytes.length, difficulty]);
           if (loaded === 0) Module.ccall('d2_session_client_map_start', 'number');
           return loaded;
@@ -1257,21 +1258,68 @@ function installFixtureSelect() {
   actSelect.addEventListener('change', resetFixtureFromSelect);
 }
 
+// A session swap (the World and class dropdowns) is a new game: the local realm client leaves the old one and
+// joins the new one, as every game entry does (bootstrapSession); kept joined to the old game, every input it
+// sends after the swap is refused. The old game is left and the new session made at once, as the swap always
+// was (`swapped` runs then); the join follows, with the frame loop held as it is for an entry. During an entry
+// the old game is left only once the entry's own join is done, so the swap never pulls the flow from under it.
+async function swapLocalSession(create, error, swapped = () => {}) {
+  const api = session;
+  if (!api) return false;
+  const entering = sessionEntryRunning, local = entering || Boolean(realmFlow?.local);
+  // Left, the old game's transport is closed: until the new join opens one, the shell draws and steers the new game
+  // itself, never through the old game's camera and packets (its input waits for that join).
+  const leave = () => {
+    const released = releaseRealmFlow(); session = api; screen = SCREEN.GAME;
+    realmTransport = { state: 'idle', server: null, result: null, error: '' };
+    return released;
+  };
+  const released = local && !entering ? leave() : null;
+  // No `create`: the new game is already made (rejoinReplacedGame); only the join changes.
+  if (create && !replaceNativeSession(api, monsterRenderer, create)) { sessionError = error; session = null; return false; }
+  if (!create) monsterRenderer?.resetSession?.();
+  snapshot = session.snapshot(); motion = session.motion();
+  swapped();
+  if (!local) return true;
+  sessionEntering = true;
+  try {
+    if (entering) { await sessionEntry.catch(() => {}); sessionEntering = true; await (realmFlow?.local ? leave() : null); }
+    else await released;
+    await enterLocalRealm();
+    snapshot = session.snapshot(); motion = session.motion();
+    return true;
+  } catch (e) { sessionError = String(e?.stack || e); return false; }
+  finally { sessionEntering = false; }
+}
+// The engine counts the games it makes; the local realm client joined the one current when its join began. A game
+// made under the shell (a fixture create called on the engine directly) is a new game like a swap's: it is joined.
+let joinedCreate = null;
+const sessionCreates = () => (typeof Module?._d2_session_creates === 'function' ? Module._d2_session_creates() >>> 0 : null);
+function rejoinReplacedGame() {
+  if (sessionEntering || sessionEntryRunning || !session || !realmFlow?.local || joinedCreate === null) return;
+  const made = sessionCreates();
+  if (made === null || made === joinedCreate) return;
+  joinedCreate = made;
+  void swapLocalSession(null, 'unable to join the new game');
+}
 function resetFixtureFromSelect() {
   if (!session || !actSelect) return;
   const fixture = fixtures[Number(actSelect.value)];
   if (!fixture) return;
-  if (!replaceNativeSession(session, monsterRenderer, () => session.create(fixture, Number(classSelect.value)))) {
-    sessionError = `unable to create Act ${fixture.act0 + 1} session`; session = null; return;
-  }
-  currentFixture = fixture;
-  snapshot = session.snapshot();
-  motion = session.motion();
-  syncAreaMusic(fixture.level, { force: true });
-  if (TERRAIN_ENABLED) loadSessionTerrain(fixture.act0);
+  void swapLocalSession(() => session.create(fixture, Number(classSelect.value)), `unable to create Act ${fixture.act0 + 1} session`, () => {
+    currentFixture = fixture;
+    syncAreaMusic(fixture.level, { force: true });
+    if (TERRAIN_ENABLED) loadSessionTerrain(fixture.act0);
+  });
 }
 
-async function bootstrapSession() {
+// The entry in flight: a session swap waits for it, so it never releases the flow the entry's join is still using.
+let sessionEntry = Promise.resolve(), sessionEntryRunning = false;
+function bootstrapSession() {
+  sessionEntryRunning = true;
+  return (sessionEntry = enterSession().finally(() => { sessionEntryRunning = false; }));
+}
+async function enterSession() {
   fitView();
   bootstrapStarted = true;
   // While the session is being entered the frame loop neither updates nor draws (the player build yields
@@ -1429,8 +1477,7 @@ classSelect.addEventListener('change', () => {
   if (!session) return;
   const fixture = currentFixture;
   if (!fixture) return;
-  if (!replaceNativeSession(session, monsterRenderer, () => session.create(fixture, Number(classSelect.value)))) { sessionError = 'unable to create character session'; session = null; return; }
-  snapshot = session.snapshot(); motion = session.motion(); playerRenderError = '';
+  void swapLocalSession(() => session.create(fixture, Number(classSelect.value)), 'unable to create character session').then((ok) => { if (ok) playerRenderError = ''; });
 });
 
 /**
@@ -2175,6 +2222,7 @@ const JOIN_REVEAL = Number(new URLSearchParams(window.__d2Entry.search).get('joi
 async function enterLocalRealm() {
   const [{ openLocalRealm }, { bindEngineProtocol }] = await Promise.all([import('./assets/realm-local.mjs'), import('./assets/realm-client.mjs')]);
   realmFlow = openLocalRealm(Module, bindEngineProtocol(Module));
+  joinedCreate = sessionCreates();
   // The join reads what the running game sends (the rooms and units a tick reveals, then the in-game marker); the
   // shell's own loop does not advance the game until it is up, so the game is advanced here, at its 25 Hz.
   const deliver = setInterval(() => { try { session?.tick(1); } catch { /* the join reports its own failure */ } }, 40);
@@ -3159,6 +3207,7 @@ function update(forceTick = false, live = false) {
   if (gameMenu?.open) { gameMenu.step(); controlsPanel?.step(); input.drain(); return; }   // single player pauses under the menu
   if (window.Module?.ccall && !Module.ccall.marksWorld) markWorldWrites();
   if (window.Module?.ccall && !hoverPickEngine) setHoverPickBackend(hoverPickEngine = createHoverPickBackend(Module));
+  rejoinReplacedGame();
   const commands = input.drain();
   if (commands.length) worldDirty = true;
   if (realmTransport.state === 'session-open') {
