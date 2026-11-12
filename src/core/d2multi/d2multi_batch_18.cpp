@@ -77,7 +77,7 @@ __attribute__((weak)) uint32_t d2m_ce70_t7ea8(int32_t);
 __attribute__((weak)) void d2m_ce70_t7c20(int32_t, int32_t);
 __attribute__((weak)) void d2m_ce70_be00(void);
 __attribute__((weak)) void d2m_ce70_acb0(int32_t, uint32_t);
-__attribute__((weak)) void d2m_ce70_c610(const void*, uint32_t);
+__attribute__((weak)) void d2m_ce70_c610(uint32_t, const void*);   // retail's stack order: the text, then the callback
 __attribute__((weak)) void d2m_e760_t7c14(int32_t, int32_t);
 extern int32_t DAT_6fa09138[], DAT_6fa0a094;
 }
@@ -94,7 +94,7 @@ extern "C" void d2_multi_sub_ce70(int32_t in_eax) {
     } else {
         DAT_6fa09f20 = 0;
         uint32_t t = d2m_ce70_t7ea8(0x2b0c);
-        if (d2m_ce70_c610) d2m_ce70_c610(LAB_6f9d8fc0, t); else d2_multi_sub_c610((int32_t)t);
+        if (d2m_ce70_c610) d2m_ce70_c610(t, LAB_6f9d8fc0); else d2_multi_sub_c610((int32_t)t);
         if (DAT_6fa09f88 != 0) d2m_ce70_t7c20(DAT_6fa09f88, 0);
     }
 }

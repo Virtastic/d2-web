@@ -7,7 +7,7 @@
 
 extern "C" {
 void*    Ordinal_10042(int, int);
-void     Ordinal_10043(int32_t, int32_t);
+void     D2M_Fog_Free(int32_t, int32_t);
 int32_t  Ordinal_10054(void);
 int32_t  Ordinal_10154(...);
 int32_t Ordinal_10179(void);
@@ -78,11 +78,11 @@ void d2_multi_sub_10aa0(void) {
         uint8_t* next = nx(n);
         Ordinal_10054();
         *(int32_t*)(n + 0x9c) = 0;
-        Ordinal_10043(0x814, 0);
+        D2M_Fog_Free(0x814, 0);
         n = next;
     }
     DAT_6fa09ef4 = 0;
-    for (uint8_t* n = DAT_6fa09ef8; n;) { n = *(uint8_t**)(n + 0x44); Ordinal_10043(0x81c, 0); }
+    for (uint8_t* n = DAT_6fa09ef8; n;) { n = *(uint8_t**)(n + 0x44); D2M_Fog_Free(0x81c, 0); }
     DAT_6fa09ef8 = 0; DAT_6fa09efc = 0; DAT_6fa09f00 = 0;
     update_count();
     DAT_6fa09f04 = 0;
@@ -105,7 +105,7 @@ void d2_multi_sub_10b70(const char* name) {
         if (DAT_6fa09f08 == n) d2_multi_sub_e860();
         Ordinal_10054();
         *(int32_t*)(n + 0x9c) = 0;
-        Ordinal_10043(0x7f0, 0);
+        D2M_Fog_Free(0x7f0, 0);
         break;
     }
     DAT_6fa09f00--;

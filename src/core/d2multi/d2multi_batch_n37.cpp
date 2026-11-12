@@ -24,7 +24,9 @@ void d2_multi_utf8ToUnicode(void* dst, const char* src, int32_t n);
 void d2_multi_unicode2Win(char* dst, const void* src, int32_t n);
 void d2_multi_toUtf(char* dst, const void* src, int32_t n);
 // host seams: registry read, date format
-int32_t d2_host_reg_query(const char* key, const char* val, uint8_t* out, uint32_t* size);
+// reg query: opens HKLM\key (0 on failure, *size untouched); once open, *size := cap, then the value query reads *size and
+// writes back what it reports even when it fails; returns 1 only when the query and the close both succeed
+int32_t d2_host_reg_query(const char* key, const char* val, uint8_t* out, uint32_t* size, uint32_t cap);
 int32_t d2_host_date_format(const void* filetime, char* out, int32_t n);
 extern int32_t DAT_6fa09f24, DAT_6fa09f2c, DAT_6fa09f38, DAT_6fa09f88;
 extern int32_t DAT_6fa0a0e0;
@@ -150,10 +152,7 @@ extern "C" void d2_multi_sub_8e70(uint8_t* s) {
 // 1.13c D2Multi+0x9000
 extern "C" bool d2_multi_sub_9000(const char* key, const char* val, uint8_t* out, uint32_t* size, uint32_t cap) {
     *size = 0;
-    uint32_t sz = cap;
-    if (!d2_host_reg_query(key, val, out, &sz)) return false;
-    *size = sz;
-    return true;
+    return d2_host_reg_query(key, val, out, size, cap) != 0;   // the query writes the caller's size word in place, as RegQueryValueExA does
 }
 
 // 1.13c D2Multi+0x90D0: releases each handle that is set, in decompile order: D2Win #10126 (thunk 0x7D40) with ECX = the handle,

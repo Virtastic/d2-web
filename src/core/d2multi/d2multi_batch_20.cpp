@@ -13,7 +13,7 @@ uint32_t Ordinal_10023(int32_t);
 int32_t  Ordinal_10132(uint8_t, uint32_t, uint32_t);
 void     Ordinal_10082(int32_t, void*, void*, void*, void*, uint16_t, int32_t);
 void*    Ordinal_10042(int32_t, int32_t);
-void     Ordinal_10043(int32_t, int32_t);
+void     D2M_Fog_Free(int32_t, int32_t);
 uint16_t Ordinal_10085(const void*);
 char*    Ordinal_571(const char*, int32_t);   // Storm SStrChr
 void Ordinal_501(char*, const char*, int32_t); // Storm SStrCopy
@@ -93,7 +93,7 @@ extern "C" uint32_t d2_multi_sub_f020(const char* name, const char* text) {   //
     if (DAT_6fa09efc >= 0x400) {
         uint8_t* head = DAT_6fa09ef8;
         DAT_6fa09ef8 = link_get(head, 0x44);
-        Ordinal_10043(0x928, 0);   // retail: ECX = head, EDX = source-file string
+        D2M_Fog_Free(0x928, 0);   // retail: ECX = head, EDX = source-file string
         DAT_6fa09efc--;
     }
     uint8_t* nn = (uint8_t*)Ordinal_10042(0x92c, 0);   // retail: ECX = 0x48 bytes
