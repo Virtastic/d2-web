@@ -41,15 +41,48 @@ extern "C" double fog_pow_23419(double x, int32_t ylo, uint32_t yhi) {  // 1.13c
 	return pow(x, y);
 }
 
-// table entry (k = loop level 1.., m = 1..7): 10^(+-m*8^(k-1)) as LDBL12; seam bytes win, else generated from powl.
+// table entry (k = loop level 1..5, m = 1..7): 10^(+-m*8^(k-1)) as LDBL12; seam bytes win, else generated exactly in integers.
+// The CRT table's rule: the 80-bit mantissa (guard limb + 64 bits) is 10^n rounded to nearest, and when the guard limb is 0x8000 or more the
+// upper 64 bits are rounded up as well (the caller's "unround" decrement undoes that before multiplying). Generated once per entry.
+static void pow10_gen(int neg, uint32_t e, uint8_t* out) {
+	static uint32_t P[448]; uint32_t n = 1; P[0] = 1;   // 10^e, little-endian 32-bit limbs (10^4096 < 2^13607)
+	for (uint32_t i = 0; i < e; i++) {
+		uint64_t c = 0;
+		for (uint32_t j = 0; j < n; j++) { uint64_t t = (uint64_t)P[j] * 10u + c; P[j] = (uint32_t)t; c = t >> 32; }
+		if (c) P[n++] = (uint32_t)c;
+	}
+	auto bit = [&](int32_t b) -> uint32_t { return b < 0 || (uint32_t)b >= n * 32 ? 0 : (P[b >> 5] >> (b & 31)) & 1; };
+	int32_t nb = (int32_t)(n * 32); while (!bit(nb - 1)) nb--;
+	unsigned __int128 q = 0; int32_t ex; int up;
+	if (!neg) {   // top 80 bits of 10^e, rounded on the rest
+		const int32_t s = nb - 80;
+		for (int32_t b = nb - 1; b >= s && b >= 0; b--) q = (q << 1) | bit(b);
+		if (s < 0) q <<= -s;
+		int sticky = 0; for (int32_t b = s - 2; b >= 0 && !sticky; b--) sticky = (int)bit(b);
+		const uint32_t half = s >= 1 ? bit(s - 1) : 0;
+		up = half && (sticky || (uint32_t)(q & 1));
+		ex = 0x3fff + 79 + s;
+	} else {      // q = floor(2^(nb+79) / 10^e): r starts at 2^(nb-1) < 10^e, one quotient bit per step
+		static uint32_t R[449]; memset(R, 0, sizeof R); R[(nb - 1) >> 5] = 1u << ((nb - 1) & 31);
+		auto geP = [&]() { for (int32_t j = (int32_t)n; j >= 0; j--) { const uint32_t pj = (uint32_t)j < n ? P[j] : 0; if (R[j] != pj) return R[j] > pj; } return true; };
+		auto subP = [&]() { uint64_t br = 0; for (uint32_t j = 0; j <= n; j++) { const uint64_t pj = j < n ? P[j] : 0; const uint64_t t = (uint64_t)R[j] - pj - br; R[j] = (uint32_t)t; br = (t >> 63) & 1; } };
+		auto shl = [&]() { for (int32_t j = (int32_t)n; j > 0; j--) R[j] = (R[j] << 1) | (R[j - 1] >> 31); R[0] <<= 1; };
+		for (int i = 0; i < 80; i++) { shl(); const int b = geP(); if (b) subP(); q = (q << 1) | (unsigned)b; }
+		shl();   // 2r against 10^e: more than half rounds up (an exact half cannot happen, 10^e is not a power of two)
+		up = geP();
+		ex = 0x3fff - nb;
+	}
+	const unsigned __int128 top = (unsigned __int128)1 << 80;
+	if (up && ++q == top) { q >>= 1; ex++; }
+	if ((uint16_t)q >= 0x8000) { q += 0x10000; if (q == top) { q >>= 1; ex++; } }
+	for (int i = 0; i < 10; i++) out[i] = (uint8_t)(q >> (8 * i));
+	const uint16_t se = (uint16_t)ex; memcpy(out + 10, &se, 2);
+}
 static void pow10_entry(int neg, int k, int m, uint8_t* out) {
 	if (fog_n76_pow10_tab[neg]) { memcpy(out, fog_n76_pow10_tab[neg] + 12 * (7 * k + m), 12); return; }
-	long e = m; for (int i = 1; i < k; i++) e *= 8;
-	if (neg) e = -e;
-	long double v = powl(10.0L, (long double)e); int e2; long double f = frexpl(v, &e2);
-	uint64_t mant = (uint64_t)(ldexpl(f, 64) + 0.5L); uint16_t se = (uint16_t)(e2 - 1 + 0x3fff);
-	if (!mant) { mant = 1ull << 63; se++; }  // rounded up past 2^64
-	memset(out, 0, 12); memcpy(out + 2, &mant, 8); memcpy(out + 10, &se, 2);
+	static uint8_t tab[2][6][8][12]; static uint8_t have[2][6][8];
+	if (!have[neg][k][m]) { uint32_t e = (uint32_t)m; for (int i = 1; i < k; i++) e *= 8; pow10_gen(neg, e, tab[neg][k][m]); have[neg][k][m] = 1; }
+	memcpy(out, tab[neg][k][m], 12);
 }
 
 // 1.13c FOG+0x0C99A -- LDBL12 multiply: a *= b, round-half-even into limbs 1..5
