@@ -237,6 +237,7 @@ static uint32_t g_sessionClientMapEventsDropped = 0;
 // The offline browser client owns an independent local-player CUnit seed stream. It must never
 // borrow g_targetPlayer->pSeed, which belongs to the D2Game/server unit.
 void d2client_sound_stage_feed(uint32_t soundEnv); void d2client_sound_stage_log();   // sound_pump.cpp (replay-armed)
+#include "../d2client/sound_unit_refs.h"
 namespace d2client_ambient { void reset(); void tick(uint32_t* seed, uint32_t period, bool weatherLevel); uint32_t* fallbackSeed(uint32_t (*playerInit)()); }
 extern "C" void d2_client_monster_idle_reset();   // 1.13c D2Client+0x237E0 monster branch state (unit_sound_trigger_237e0.cpp)
 extern "C" void d2_client_attack_roll_reset();   // 1.13c D2Client+0x242B0 attack-roll state (monster_face.cpp)
@@ -7873,6 +7874,21 @@ static std::unordered_map<uint32_t, uint32_t> g_sessionIdleRows, g_sessionIdleRo
 extern "C" void d2_client_monster_hit_stamp(uint32_t id, uint32_t frame);
 static std::unordered_map<uint32_t, uint32_t> g_sessionClientMonsterMode;
 static void sessionClientMonsterModeReset() { g_sessionClientMonsterMode.clear(); g_sessionIdleRows.clear(); g_sessionIdleRowsReady.clear(); }
+// 1.13c D2Client+0x22B20: the client units' sound references (replay only; nothing happens before the Sounds table is loaded).
+// The client's units are the held monsters and the objects of the rooms it holds (the sets d2_session_client_view prints).
+static void sessionClientSoundUnits() {
+    std::vector<D2SndUnit> v;
+    for (uint32_t id : g_heldMonsters) if (D2UnitStrc* u = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)id)) v.push_back({ 1u, id, (uint32_t)u->dwClassId, u });
+    for (D2DrlgLevelStrc* lv = g_lastLevel; lv; lv = lv->pNextLevel)
+        for (D2DrlgRoomStrc* ex = lv->pFirstRoomEx; ex; ex = ex->pDrlgRoomNext) {
+            D2ActiveRoomStrc* r = ex->pRoom; if (!r) continue;
+            // objects reach the client with every room of the hero room's near list, the diagonal ones too (the monsters' edge rule above is for monsters)
+            bool nearRoom = false; { D2ActiveRoomStrc* hr = g_targetPlayer ? UNITS_GetRoom(g_targetPlayer) : nullptr; if (hr && hr->pDrlgRoom) for (int32_t i = 0; i < hr->pDrlgRoom->nRoomsNear; ++i) if (hr->pDrlgRoom->ppRoomsNear[i] == r->pDrlgRoom) nearRoom = true; }
+            if (!nearRoom && !sessionClientHoldsRoom(r)) continue;
+            for (D2UnitStrc* u = r->pUnitFirst; u; u = u->pRoomNext) if (u->dwUnitType == UNIT_OBJECT) v.push_back({ 2u, (uint32_t)u->dwUnitId, (uint32_t)u->dwClassId, u });
+        }
+    d2client_sound_unit_sync(v.data(), (uint32_t)v.size());
+}
 static void sessionClientMonsterHitPass(uint32_t frame) {
     std::unordered_map<uint32_t, uint32_t> now;
     for (uint32_t id : g_heldMonsters) {
@@ -8310,6 +8326,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             env.cellW = g_sessionClientFrame >= 13 ? 800 : 640; env.cellH = g_sessionClientFrame >= 13 ? 600 : 480;
             // 1.13c D2Client+0x5F020 runs 0x4F860 first, before the frame's weather pass; same hero seed.
             { const D2LevelsTxt* lv = DATATBLS_GetLevelsTxtRecord(g_currentLevel); d2client_sound_stage_feed(lv ? (uint32_t)(lv->dwSoundEnv & 0xff) : 0); }
+            sessionClientSoundUnits();
             // D2Common #10396 follows the argument's +4 pointer and returns its first dword: the environment's cycle index (0 sunrise,
             // 1 morning, 2 noon, 3 afternoon, 4+ evening/night), so 1..3 is the day ambience row and every other value the night one.
             { const D2DrlgEnvironmentStrc* ev = DUNGEON_GetEnvironmentFromAct(g_game->pAct[g_currentAct]);
