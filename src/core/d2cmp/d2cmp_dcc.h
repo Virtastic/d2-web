@@ -70,6 +70,6 @@ void d2cmp_13220(const int32_t* hdr, int32_t dir, DccFrame* frames, DccBox* box,
 int32_t d2cmp_13300(DccIter* it, const DccBox* box);
 void d2cmp_14020(DccBox* box);
 int32_t d2cmp_13620(uint8_t* out, const DccFrame* f, const uint8_t* hdr, void (*log)(const char*));
-void d2cmp_13780(DccBits* code, DccBits* eq, const DccCell* prev, DccCell* cell, uint8_t** cursor);
+uintptr_t d2cmp_13780(DccBits* code, DccBits* eq, const DccCell* prev, DccCell* cell, uint8_t** cursor);
 void d2cmp_13b70(DccBits* code, const DccBox* box, DccCell* cells, DccBits* eq, DccBits* mask,
                  DccBits* enc, DccBits* raw, DccPixBuf* pb, int32_t* bitsUsed);

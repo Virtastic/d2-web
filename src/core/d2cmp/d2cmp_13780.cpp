@@ -10,22 +10,26 @@
 // destinations coincide), else clear the cell; the cursor does not move.
 // Otherwise: colour count from the 4-entry buffer (c1 == c0 -> 1 colour, c2 == c1 -> 2, else 4),
 // fill or read 0/1/2-bit indices per pixel, and advance the cursor by one entry (4 bytes).
-void d2cmp_13780(DccBits* code, DccBits* eq, const DccCell* prev, DccCell* cell, uint8_t** cursor) {
+// The return value is retail's leftover EAX at each exit (no caller reads it; the FN vector records it):
+// equal-cell copy: prev.dst when the destinations coincide, cell.dst when h <= 0, else cell.dst + h * stride;
+// equal-cell clear: cell.h; pixel fill: the cursor's address.
+uintptr_t d2cmp_13780(DccBits* code, DccBits* eq, const DccCell* prev, DccCell* cell, uint8_t** cursor) {
     if (eq != nullptr && prev->colors != nullptr && d2cmp_134d0(1, eq) != 0) {
         if (cell->w == prev->w && cell->h == prev->h) {
             const uint8_t* src = prev->dst;
-            if (cell->dst == src) return;
+            if (cell->dst == src) return (uintptr_t)prev->dst;
+            if (cell->h <= 0) return (uintptr_t)cell->dst;
             uint8_t tmp[28];
             uint8_t* t = tmp;
             for (int32_t n = cell->h; n > 0; n--) { memcpy(t, src, (size_t)(uint32_t)cell->w); t += 5; src += prev->stride; }
             uint8_t* d = cell->dst;
             t = tmp;
             for (int32_t y = 0; y < cell->h; y++) { memcpy(d, t, (size_t)(uint32_t)cell->w); t += 5; d += cell->stride; }
-            return;
+            return (uintptr_t)d;
         }
         uint8_t* d = cell->dst;
         for (int32_t y = 0; y < cell->h; y++) { memset(d, 0, (size_t)(uint32_t)cell->w); d += cell->stride; }
-        return;
+        return (uintptr_t)(uint32_t)cell->h;
     }
     uint8_t* d = cell->dst;
     int32_t bits = 0;
@@ -45,4 +49,5 @@ void d2cmp_13780(DccBits* code, DccBits* eq, const DccCell* prev, DccCell* cell,
         }
     }
     *cursor += 4;
+    return (uintptr_t)cursor;
 }

@@ -54,12 +54,12 @@ void d2_multi_sub_ed60(uint16_t* dst, int32_t n) {
 static char* sstrchr(const char* s, int32_t c) { if (!s) return nullptr; for (; *s; s++) if (*s == (char)c) return const_cast<char*>(s); return nullptr; }
 
 // 1.13c D2Multi+0xEEA0
-extern "C" void d2_multi_sub_eea0(uint8_t* p1, char* out, const char* name) {
+extern "C" uint32_t d2_multi_sub_eea0(uint8_t* p1, char* out, const char* name) {   // returns retail's leftover EAX
     *out = 0; *p1 = 0;
-    if (*name == '*') { Ordinal_501(out, name, 0x7fffffff); return; }
+    if (*name == '*') { Ordinal_501(out, name, 0x7fffffff); return (uint32_t)strlen(out); }
     char* a = sstrchr(name, 0x40);
     char* b = sstrchr(name, '*');
-    if (a && b && a < b) { Ordinal_501(out, name, 0x7fffffff); char* s = sstrchr(out, 0x2a); *s = 0; return; }
+    if (a && b && a < b) { Ordinal_501(out, name, 0x7fffffff); char* s = sstrchr(out, 0x2a); *s = 0; return (uint32_t)(uintptr_t)s; }
     for (uint8_t* n = DAT_6fa09ef8; n; n = link_get(n, 0x44)) {
         if (__stricmp((char*)n, name)) continue;
         for (uint8_t* q = DAT_6fa09ef4; q; q = link_get(q, 0xb0)) {
@@ -73,13 +73,14 @@ extern "C" void d2_multi_sub_eea0(uint8_t* p1, char* out, const char* name) {
         break;
     }
     char* star = sstrchr(name, '*');
-    if (*name != '*' && star) { size_t k = star - name; memcpy(out, name, k); out[k] = 0; return; }
+    if (*name != '*' && star) { size_t k = star - name; memcpy(out, name, k); out[k] = 0; return (uint32_t)k; }
     Ordinal_501(out, name, 0x7fffffff);
+    return (uint32_t)strlen(out);
 }
 
 // 1.13c D2Multi+0xF020: EBX = name, one stack word = text. Finds the list node whose key (the part after '*') equals the name's key and rewrites its text (+0x32);
 // otherwise appends a node (at most 0x400 nodes: the head is dropped first).
-extern "C" void d2_multi_sub_f020(const char* name, const char* text) {
+extern "C" uint32_t d2_multi_sub_f020(const char* name, const char* text) {   // returns retail's leftover EAX: past the copied text's NUL on a hit, else the new count
     uint8_t* prev = nullptr;
     uint8_t* n = DAT_6fa09ef8;
     char* t = sstrchr(name, '*');
@@ -87,7 +88,7 @@ extern "C" void d2_multi_sub_f020(const char* name, const char* text) {
     for (; n; prev = n, n = link_get(n, 0x44)) {
         char* s = sstrchr((char*)n, 0x2a);
         const char* k2 = (s && s[1]) ? s + 1 : (char*)n;
-        if (strcmp(k2, key) == 0) { strcpy((char*)n + 0x32, text); return; }
+        if (strcmp(k2, key) == 0) { strcpy((char*)n + 0x32, text); return (uint32_t)(uintptr_t)(text + strlen(text) + 1); }
     }
     if (DAT_6fa09efc >= 0x400) {
         uint8_t* head = DAT_6fa09ef8;
@@ -100,21 +101,24 @@ extern "C" void d2_multi_sub_f020(const char* name, const char* text) {
     strcpy((char*)nn + 0x32, text);
     link_set(nn, 0x44, nullptr);
     if (prev) link_set(prev, 0x44, nn); else DAT_6fa09ef8 = nn;
-    DAT_6fa09efc++;
+    return (uint32_t)++DAT_6fa09efc;
 }
+
+// Storm #571 SStrChr held locally (the probe link's strchr seam returns null); identical to the real call.
+static char* sstrchr_f170(const char* s, int32_t c) { if (!s) return nullptr; for (; *s; s++) if (*s == (char)c) return const_cast<char*>(s); return nullptr; }
 
 // 1.13c D2Multi+0xF170
 extern "C" void d2_multi_sub_f170(int32_t* p) {
     uint16_t a[102] = {0}, b[34] = {0}, c[102] = {0}, d[64] = {0}, e[100] = {0};   // a, b, c, d are retail's four buffers, e the key scratch
     char* s = (char*)(p + 1);
-    char pre[0x20] = {0};
+    char pre[0x50] = {0};
     if (*s == '*') {
         uwin2Unicode(a, s, 0x32); b[0] = 0;
     } else {
-        Ordinal_501(pre, s, 0x7fffffff);
-        char* st = sstrchr(s, 0x2a);
-        if (st) { size_t k = st - s; memcpy(pre, s, k); pre[k] = 0; }
-        char* t = sstrchr(s, 0x2a);
+        char* st = sstrchr_f170(s, 0x2a);
+        if (!st) Ordinal_501(pre, s, 0x7fffffff);
+        else { size_t k = st - s; memcpy(pre, s, k); pre[k] = 0; }
+        char* t = sstrchr_f170(s, 0x2a);
         uwin2Unicode(e, (t && t[1]) ? t + 1 : s, 0x32);
         uwin2Unicode(a, "*", 0x32);
         ustrncat(a, e, 0x32);

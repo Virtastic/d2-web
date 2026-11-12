@@ -90,11 +90,10 @@ void*    g_45810;                 // 0x6FC45810
 
 void StormSetLastError(uint32_t e) { g_lastError = (int32_t)e; }
 
-// (**(code **)(*obj + off))(obj, ...) -- retail calls the object's vtable slot. `off` is retail's byte offset into a
-// table of 32-bit entries, so the slot is off / 4; the host table holds one host function pointer per slot.
+// (**(code **)(*obj + off))(obj, ...) -- retail calls the object's vtable slot.
 template <typename Fn>
 Fn vcall(void* obj, uintptr_t off) {
-    return (Fn)(*(void***)obj)[off / 4];
+    return (Fn)(*(void***)obj)[off / 4];   // retail's byte offset names slot off/4 of a pointer-wide table
 }
 
 } // namespace

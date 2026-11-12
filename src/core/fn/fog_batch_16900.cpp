@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <cstdio>
+#include <cstring>
 #include "hookenv.h"
 
 namespace
@@ -338,28 +339,102 @@ static int32_t fog_safesock_send(FogSockApi* api, FSafeSock* s, const void* buf,
 	return 0;
 }
 
-// 0x17020: slot. 0x16FB0/0x16F00: slot, buffer, length.
+// Probe seams for the SOCKET_* rows (17020, 16fb0, 16f00, 16eb0, 16e90). The descriptors pass the slot in r[0] (ECX), not a FogSockApi*,
+// so each export builds its own api here. A seam logs as the capture's hook recorder does (HookEnv::h) and answers from the scripted
+// words of blob st (r[16]); Enter/Leave/Delete/CloseHandle/WaitForSingleObject are the descriptor's pinned `iat` stubs (no log).
+namespace
+{
+	void pvValidate(void* cs, uint32_t) { gHookEnv->h(0x11690, 0, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cs))); }
+	void pvCs(void*) {}
+	uint32_t pvWait(uint32_t, uint32_t) { return 0; }
+	int32_t pvCloseHandle(uint32_t) { return 1; }
+	uint32_t pvLastError() { return gHookEnv->h(0xCD3A); }
+	int32_t pvClosesocket(uint32_t s) { return static_cast<int32_t>(gHookEnv->h(0xCD82, 0, 0, 0, 0, 0, s)); }
+	int32_t pvSend(uint32_t s, const void* b, int32_t len, int32_t f)
+	{
+		return static_cast<int32_t>(gHookEnv->h(0xCD34, 0, 0, 0, 0, 0, s, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(b)),
+		                                        static_cast<uint32_t>(len), static_cast<uint32_t>(f)));
+	}
+	int32_t pvRecv(uint32_t s, void* b, int32_t len, int32_t f)
+	{
+		return static_cast<int32_t>(gHookEnv->h(0xCD5E, 0, 0, 0, 0, 0, s, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(b)),
+		                                        static_cast<uint32_t>(len), static_cast<uint32_t>(f)));
+	}
+	// the message literal sits at Fog+0x270FC; retail logs a module pointer as 0xB2000000|rva
+	void pvLogTimeout(const char*) { gHookEnv->h(0x19100, 0, 0, 0, 0, 0, 0xB20270FCu); }
+	// Fog+0x1B0C0 takes ECX = &slot and (file literal Fog+0x27130, line) on the stack
+	void pvRelease(FSafeSock** slot, uint32_t line)
+	{
+		gHookEnv->h(0x1B0C0, 0, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(slot)), 0, 0, 0, 0xB2027130u, line);
+	}
+
+	void pvApi(FogSockApi& api)
+	{
+		api = {};
+		api.wsagetlasterror = pvLastError;
+		api.closesocket_ = pvClosesocket;
+		api.send_ = pvSend;
+		api.recv_ = pvRecv;
+		api.releaseSlot = pvRelease;
+		api.validateCS = pvValidate;
+		api.enterCS = pvCs;
+		api.leaveCS = pvCs;
+		api.deleteCS = pvCs;
+		api.waitThread = pvWait;
+		api.closeHandle = pvCloseHandle;
+		api.logTimeout = pvLogTimeout;
+	}
+	uint32_t pvWord(uint32_t addr, uint32_t off)   // st word at an arbitrary byte offset (the 16fb0 descriptor packs the delivered words from st+7)
+	{
+		uint32_t v;
+		std::memcpy(&v, reinterpret_cast<const void*>(static_cast<uintptr_t>(addr + off)), 4);
+		return v;
+	}
+}
+
+// 0x17020: ECX = slot; st = closesocket, WSAGetLastError.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_17020(uint32_t* r)
 {
-	fog_safesock_destroy(reinterpret_cast<FogSockApi*>(static_cast<uintptr_t>(r[0])),
-	                     reinterpret_cast<FSafeSock*>(static_cast<uintptr_t>(r[1])));
+	const uint32_t sc[] = { 0xCD82u, pvWord(r[16], 0), 0xCD3Au, pvWord(r[16], 4), 0, 0 };
+	HookEnv e(reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(r[14])), sc);
+	gHookEnv = &e;
+	FogSockApi api;
+	pvApi(api);
+	fog_safesock_destroy(&api, reinterpret_cast<FSafeSock*>(static_cast<uintptr_t>(r[0])));
+	gHookEnv = nullptr;
 	r[4] = 0;
 }
 
+// 0x16FB0: ECX = slot, EDX = buffer, r[2] = length; st = recv, WSAGetLastError, then the two delivered dwords at st+7 and st+11.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16fb0(uint32_t* r)
 {
-	r[4] = static_cast<uint32_t>(fog_safesock_receive(
-		reinterpret_cast<FogSockApi*>(static_cast<uintptr_t>(r[0])),
-		reinterpret_cast<FSafeSock*>(static_cast<uintptr_t>(r[1])),
-		reinterpret_cast<void*>(static_cast<uintptr_t>(r[2])), static_cast<int32_t>(r[3])));
+	uint32_t sc[10] = { 0xCD5Eu, pvWord(r[16], 0), 0xCD3Au, pvWord(r[16], 4) };
+	int n = 4;
+	const uint32_t d0 = pvWord(r[16], 7), d1 = pvWord(r[16], 11);
+	if (d0)
+		sc[n++] = (2u << 24) | 0xCD5Eu, sc[n++] = d0;
+	if (d1)
+		sc[n++] = (2u << 24) | 0xCD5Eu, sc[n++] = d1;
+	HookEnv e(reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(r[14])), sc);
+	gHookEnv = &e;
+	FogSockApi api;
+	pvApi(api);
+	r[4] = static_cast<uint32_t>(fog_safesock_receive(&api, reinterpret_cast<FSafeSock*>(static_cast<uintptr_t>(r[0])),
+	                                                  reinterpret_cast<void*>(static_cast<uintptr_t>(r[1])), static_cast<int32_t>(r[2])));
+	gHookEnv = nullptr;
 }
 
+// 0x16F00: ECX = slot, EDX = buffer, r[2] = length; st = send, WSAGetLastError.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16f00(uint32_t* r)
 {
-	r[4] = static_cast<uint32_t>(fog_safesock_send(
-		reinterpret_cast<FogSockApi*>(static_cast<uintptr_t>(r[0])),
-		reinterpret_cast<FSafeSock*>(static_cast<uintptr_t>(r[1])),
-		reinterpret_cast<const void*>(static_cast<uintptr_t>(r[2])), static_cast<int32_t>(r[3])));
+	const uint32_t sc[] = { 0xCD34u, pvWord(r[16], 0), 0xCD3Au, pvWord(r[16], 4), 0, 0 };
+	HookEnv e(reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(r[14])), sc);
+	gHookEnv = &e;
+	FogSockApi api;
+	pvApi(api);
+	r[4] = static_cast<uint32_t>(fog_safesock_send(&api, reinterpret_cast<FSafeSock*>(static_cast<uintptr_t>(r[0])),
+	                                               reinterpret_cast<const void*>(static_cast<uintptr_t>(r[1])), static_cast<int32_t>(r[2])));
+	gHookEnv = nullptr;
 }
 
 namespace
@@ -476,20 +551,29 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16800(uint32_t* r)
 	r[4] = static_cast<uint32_t>(fog_safesock_select(&api, reinterpret_cast<FSafeSock*>(static_cast<uintptr_t>(r[0]))));
 }
 
-// 0x16E90: slot. 0x16EB0: slot, buffer, length.
-
+// 0x16EB0: ECX = slot, EDX = buffer, r[2] = length; st = send, WSAGetLastError, closesocket.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16eb0(uint32_t* r)
 {
-	r[4] = static_cast<uint32_t>(fog_safesock_send_no_lock(
-		reinterpret_cast<FogSockApi*>(static_cast<uintptr_t>(r[0])),
-		reinterpret_cast<FSafeSock*>(static_cast<uintptr_t>(r[1])),
-		reinterpret_cast<const void*>(static_cast<uintptr_t>(r[2])), static_cast<int32_t>(r[3])));
+	const uint32_t sc[] = { 0xCD34u, pvWord(r[16], 0), 0xCD3Au, pvWord(r[16], 4), 0xCD82u, pvWord(r[16], 8), 0, 0 };
+	HookEnv e(reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(r[14])), sc);
+	gHookEnv = &e;
+	FogSockApi api;
+	pvApi(api);
+	r[4] = static_cast<uint32_t>(fog_safesock_send_no_lock(&api, reinterpret_cast<FSafeSock*>(static_cast<uintptr_t>(r[0])),
+	                                                       reinterpret_cast<const void*>(static_cast<uintptr_t>(r[1])), static_cast<int32_t>(r[2])));
+	gHookEnv = nullptr;
 }
 
+// 0x16E90: ECX = slot.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16e90(uint32_t* r)
 {
-	fog_safesock_lock(reinterpret_cast<FogSockApi*>(static_cast<uintptr_t>(r[0])),
-	                  reinterpret_cast<FSafeSock*>(static_cast<uintptr_t>(r[1])));
+	const uint32_t sc[2] = { 0, 0 };
+	HookEnv e(reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(r[14])), sc);
+	gHookEnv = &e;
+	FogSockApi api;
+	pvApi(api);
+	fog_safesock_lock(&api, reinterpret_cast<FSafeSock*>(static_cast<uintptr_t>(r[0])));
+	gHookEnv = nullptr;
 	r[4] = 0;
 }
 
@@ -563,10 +647,16 @@ static char* fog_inet_ntoa(FogSockApi* api, uint32_t in, char* globalBuf)
 }
 
 // 0x168E0: slot. 0x16A10: 16-byte output string. 0x167E0: address, 16-byte module buffer.
+// 0x168E0: ECX = slot (r[0]); blob lg (r[14]) logs the kernel32 LeaveCriticalSection import (giat, IAT slot Fog+0x25014, one stack word).
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_168e0(uint32_t* r)
 {
-	fog_safesock_unlock(reinterpret_cast<FogSockApi*>(static_cast<uintptr_t>(r[0])),
-	                    reinterpret_cast<FSafeSock*>(static_cast<uintptr_t>(r[1])));
+	const uint32_t sc[2] = { 0, 0 };
+	HookEnv e(reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(r[14])), sc);
+	gHookEnv = &e;
+	FogSockApi api{};
+	api.leaveCS = [](void* cs) { gHookEnv->h(0x25014, 0, 0, 0, 0, 0, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cs))); };
+	fog_safesock_unlock(&api, reinterpret_cast<FSafeSock*>(static_cast<uintptr_t>(r[0])));
+	gHookEnv = nullptr;
 	r[4] = 0;
 }
 

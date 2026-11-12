@@ -132,7 +132,7 @@ static N42Host g_28960Host;
 extern "C" void storm_n42_28960_install(u32** lastErr) {
     g_28960Host.lock = probeNop; g_28960Host.unlock = probeNop; g_28960Host.setErr = probeSetErr;
     g_28960Host.initArchives = probeNop; g_28960Host.findArchiveList = probeFindNone; g_28960Host.buildPath = probeBuildPath;
-    g_28960Host.getAttr = probeAttrMissing; g_28960Host.strstr_ = [](const char* a, const char* b) { return strstr(a, b); };
+    g_28960Host.getAttr = probeAttrMissing; g_28960Host.strcpyN = probeCpy; g_28960Host.strstr_ = [](const char* a, const char* b) { return strstr(a, b); };
     G.h = &g_28960Host; G.archHead = 0; G.archList = 0; *lastErr = &G.lastErr;
 }
 

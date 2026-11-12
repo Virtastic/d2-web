@@ -160,8 +160,7 @@ static void fog_array_remove_at(FogArray* a, uint32_t index) {
 // Fog+0x16B0: destroy a handle object. Reinstall the vtable, then unlink its slot when it holds an
 // array; the array and index fields are left as they were.
 static void fog_handle_destroy(FogHandle* h) {
-    static const uint32_t kFogHandleVtable[1] = {0};  // PTR_LAB_6ff78388, no entries reachable here
-    h->vtbl = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(kFogHandleVtable));
+    h->vtbl = 0x6FF78388u;   // PTR_LAB_6ff78388: retail's +0 store, a 32-bit guest slot (no entry is called here)
     if (h->array != 0) fog_array_remove_at(reinterpret_cast<FogArray*>(static_cast<uintptr_t>(h->array)), h->index);
 }
 

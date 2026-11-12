@@ -39,9 +39,13 @@ void fog_unlock(int32_t index) {
 // Fog+0x2B5D (__thiscall ~type_info) is a separate, still-UNMAPPED row: store the vftable at +0,
 // take lock 0xE, free the name block at +4 through _free (0x1FAD) when non-null, release the lock
 // (0x2B9A). The scalar deleting destructor only needs the call; the row owns the body.
-// The vftable store is the part a record sees (retail's ??_7type_info@@6B@ at Fog+0x25398, the
-// preferred-base address 0x6FF75398); the name block at +4 is still the row's.
-void fog_type_info_dtor(void* self) { const uint32_t vt = 0x6FF75398u; std::memcpy(self, &vt, 4); }
+void fog_type_info_dtor(void* self) {
+    const uint32_t vt = 0x6FF75398u;   // type_info vftable (Fog+0x25398 at the preferred base): retail's +0 store, a 32-bit guest slot
+    std::memcpy(self, &vt, 4);
+    EnterCriticalSection((LPCRITICAL_SECTION)(g_fog_csTable + 0xE * 8));
+    // +4 name block through _free (0x1FAD) when non-null: not ported yet; a zeroed block never reaches it.
+    fog_unlock(0xE);
+}
 
 // Fog+0x68A0 (__unlock_file) body, inlined at the 0x2C54 tail. A FILE anywhere in the _iob window
 // 0x6FF7E340..0x6FF7E5A0 (both ends inclusive) releases CRT lock 0x10 + (stream - base) / 0x20;

@@ -1,7 +1,8 @@
-// src/core/d2ddraw/d2ddraw_5891.cpp -- 1.13c D2DDraw.dll _atol (statically linked CRT). Decompile-derived.
-// cdecl (s). Skips space-class bytes (ctype & 8, through __isctype_mt when mb_cur_max > 1; the locale is read once),
-// one optional sign, then decimal digits with 32-bit wraparound; '-' negates.
-#include "d2ddraw_crt.h"
+// src/core/crt/d2ddraw_5891.cpp -- 1.13c D2DDraw.dll _atol (the statically linked VS2003 CRT, not D2DDraw code: it sits
+// with the other CRT shims). Decompile-derived. cdecl (s). Skips space-class bytes (ctype & 8, through __isctype_mt when
+// mb_cur_max > 1; the locale is read once), one optional sign, then decimal digits with 32-bit wraparound; '-' negates.
+// Its retail callers are D2DDraw's own CRT; our WebGL2 back end never loads D2DDraw, so nothing on the play path calls it.
+#include "core/d2ddraw/d2ddraw_crt.h"
 
 // 1.13c D2DDraw+0x05891
 extern "C" int32_t d2ddraw_atol_5891(const D2DDrawCrtEnv* e, const char* s) {
