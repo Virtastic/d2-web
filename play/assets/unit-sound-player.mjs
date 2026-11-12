@@ -3,7 +3,7 @@ import { unlockOnGesture } from './audio-unlock.mjs';
 import { resolveUnitSound, soundRow, soundRowByHandle } from './unit-sound-resolver.mjs';
 import { sliderPercent } from './sound-channel-volume.mjs';
 import { nativeUnitSoundSpatial, unitSoundSourcePosition, nativeSoundPanBalance } from './unit-sound-spatial.mjs';
-import { soundClientOffset, soundInStartRange, soundBeyondCutoff, nativeSoundChannel, soundLoops } from './sound-mixer-rules.mjs';
+import { soundClientOffset, soundInStartRange, soundBeyondCutoff, nativeSoundChannel, soundLoops, soundFadeLevel } from './sound-mixer-rules.mjs';
 
 // S2: drained engine sound events (d2_session_take_sounds septets) -> resolver -> Sounds.txt file -> Web Audio.
 // The engine decides the event, D2Client's resolver picks the row, Sounds.txt names the WAV; nothing is invented.
@@ -34,9 +34,9 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
   const ended = typeof options.ended === 'function' ? options.ended
     : (h) => globalThis.Module?._d2_client_play_sound_ended?.(h);
   const release = (rec) => { if (rec.queueHandle && !rec.released) { rec.released = true; ended(rec.queueHandle); } };
-  const sourceGainFor = (row, spatialGainByte = 255, offset = null) => {
+  const sourceGainFor = (row, spatialGainByte = 255, offset = null, level = 255) => {
     const master = sliderPercent(sliders.sound), music = sliderPercent(sliders.music);
-    const channel = nativeSoundChannel(row ?? { volume: 255 }, master, music, offset);
+    const channel = nativeSoundChannel(row ?? { volume: 255 }, master, music, offset, level);
     const attenuated = Math.trunc(channel * spatialGainByte / 255);
     // The shared player node carries Master. This source node carries the remaining
     // factor so their product is exactly D2Sound's integer channel / 255 result.
@@ -49,11 +49,30 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
     const offset = position ? soundClientOffset(position, listener) : null;
     return offset ? { offset, spatial: nativeUnitSoundSpatial(position, listener) } : null;
   };
+  // The source's live level (entry +0x1C: 255 at submit) and its fade (0x88DD0 / 0x88230: from, to, start and end in
+  // mixer ticks, the level stepping once per tick by soundFadeLevel). The node holds the channel of each tick's level.
+  const fadeEnd = (f) => f.t0 + f.ticks * MIXER_TICK_SECONDS;
+  const levelNow = (state, now = context.currentTime ?? 0) => {
+    const f = state.fade;
+    if (!f) return state.level ?? 255;
+    return soundFadeLevel(f.from, f.to, 0, f.ticks, Math.max(0, Math.floor((now - f.t0) / MIXER_TICK_SECONDS)));
+  };
+  const applyGain = (node, state) => {
+    const g = node?.gain;
+    if (!g) return;
+    const now = context.currentTime ?? 0, f = state.fade;
+    const at = (level) => sourceGainFor(state.row, state.spatialGainByte, state.offset, level);
+    if (f && now >= fadeEnd(f)) { state.level = f.to; state.fade = null; }
+    if (!state.fade || typeof g.setValueAtTime !== 'function') { g.value = at(state.fade ? f.to : state.level ?? 255); return; }
+    g.cancelScheduledValues?.(now);
+    const k0 = Math.max(0, Math.floor((now - f.t0) / MIXER_TICK_SECONDS));
+    for (let k = k0; k <= f.ticks; k++) g.setValueAtTime(at(soundFadeLevel(f.from, f.to, 0, f.ticks, k)), Math.max(now, f.t0 + k * MIXER_TICK_SECONDS));
+  };
   const connectSource = (source, row, state = {}) => {
     const node = typeof context.createGain === 'function' ? context.createGain() : null;
     if (node) {
-      const full = { row, spatialGainByte: 255, offset: null, rec: null, panCode: null, ...state, source };
-      node.gain.value = sourceGainFor(row, full.spatialGainByte, full.offset);
+      const full = { row, spatialGainByte: 255, offset: null, rec: null, panCode: null, level: 255, fade: null, ...state, source };
+      applyGain(node, full);
       const balance = full.withBalance && typeof context.createChannelMerger === 'function' ? createBalance(node, full.rec, full.panCode ?? 128) : null;
       if (!balance) node.connect(out);
       source.connect(node);
@@ -97,14 +116,24 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
     const ticks = fade ? state.row.fadeOut : 0, now = context.currentTime ?? 0;
     state.rec.stopped = reason;
     state.rec.fadeOutSeconds = ticks * MIXER_TICK_SECONDS;
-    const g = node?.gain;
-    if (ticks > 0 && typeof g?.linearRampToValueAtTime === 'function') {
-      g.setValueAtTime?.(g.value, now);
-      g.linearRampToValueAtTime(0, now + ticks * MIXER_TICK_SECONDS);
+    if (ticks > 0 && typeof node?.gain?.setValueAtTime === 'function') {
+      // The fade starts from the level the source has this tick.
+      state.fade = { from: levelNow(state, now), to: 0, t0: now, ticks };
+      applyGain(node, state);
       try { state.source.stop?.(now + ticks * MIXER_TICK_SECONDS); } catch {}
     } else {
       try { state.source.stop?.(); } catch {}
     }
+  };
+  // 0x880E0 on a playing looping row (Duration 0) that left its cutoff: the entry goes back to the queue holding the
+  // play position (+0x41), and starts again from there with a 3-tick fade once it is inside its cutoff.
+  const parked = new Set();
+  const park = (node, state) => {
+    const now = context.currentTime ?? 0, length = state.source.buffer?.duration ?? 0;
+    const at = (state.resumeFrom ?? 0) + (now - (state.startedAt ?? now));
+    state.rec.parked = true;
+    stopSource(node, state, false, 'out-of-range');
+    parked.add({ rec: state.rec, resume: length > 0 ? at % length : 0, fadeTicks: 3 });
   };
   // A suspended context still schedules source.start(); it sounds once a gesture resumes it.
   unlockOnGesture(context, gestureTarget);
@@ -134,8 +163,38 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
       // A source attached to a unit (or given a position) is placed against the listener; one without sits on it.
       const place = placement(rec);
       rec.clientOffset = place?.offset ?? null;
-      // 0x88DD0: a queued source starts only while it is inside its Falloff cutoff.
-      if (!soundInStartRange(place?.offset, asked.falloff)) { rec.outOfRange = true; return rec; }
+      // 0x88DD0: a queued source starts only while it is inside its Falloff cutoff. Out of it, a one-shot is dropped
+      // and a looping row attached to a unit stays queued until its unit comes inside the cutoff.
+      if (!soundInStartRange(place?.offset, asked.falloff)) {
+        rec.outOfRange = true;
+        if (soundLoops(asked) && place && !rec.position && Number.isInteger(rec.unitType) && Number.isInteger(rec.unitId)) {
+          rec.parked = true;
+          parked.add({ rec, resume: 0, fadeTicks: 0 });
+        }
+        return rec;
+      }
+      await begin(rec, row, asked, t);
+    } catch (error) { rec.error = String(error); }
+    // a queued entry that never started (silent, out of range, deferred, failed) leaves the client sound list at once
+    finally { if (!rec.started && !rec.parked) release(rec); }
+    return rec;
+  }
+  // The start (0x88DD0 -> 0x5D7A0) of a queued entry inside its cutoff. `resume` = the play position a requeued loop
+  // kept; `fadeTicks` = its 3-tick restart fade (0 = the row's Fade In).
+  async function begin(rec, row, asked, t, resume = 0, fadeTicks = 0) {
+    {
+      const place = placement(rec);
+      rec.clientOffset = place?.offset ?? null;
+      // 0x88DD0 -> 0x87C30: a Defer Inst or Stop Inst row looks for the earliest-started playing source of its group
+      // (the loader's group base). Defer Inst then drops the new entry; Stop Inst stops that source at once and starts.
+      // A start the client sound list brings (rec.queueHandle) has made this test in the engine already.
+      if ((asked.deferInst || asked.stopInst) && !rec.queueHandle && !fadeTicks) {
+        let old = null;
+        for (const entry of activeSources)
+          if (!entry[1].stopping && entry[1].groupBase === asked.groupBase && (!old || entry[1].startedAt < old[1].startedAt)) old = entry;
+        if (old && !asked.stopInst) { rec.deferred = true; return; }
+        if (old) stopSource(old[0], old[1], false, 'stop-inst');
+      }
       // 0x5D7A0 -> 0x5EE70: a row with a Group Size plays one of its variants, avoiding its last picks (the engine's
       // pick; a queued start already made it).
       let r = asked;
@@ -162,33 +221,28 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
       if (panCode != null) rec.nativeSpatialPanCode = panCode;
       // Loop restarts the buffer (Duration 0). A looping source ends through its unit's stop request, so only a
       // source attached to a unit the listener can see loops here; one with nothing to stop it plays once.
-      const loops = soundLoops(r) && attached && Boolean(place);
+      const loops = soundLoops(r) && (rec.held === true || attached && Boolean(place));
       if (soundLoops(r) && !loops) rec.loopHeld = true;
       rec.looping = loops;
       source.loop = loops;
-      const node = connectSource(source, r, { rec, spatialGainByte: gainByte, offset: place?.offset ?? null, panCode,
-        withBalance: mono && (panCode != null || tracking), tracking, attached, mono, looping: loops });
       const now = context.currentTime ?? 0;
-      // Fade In: the level ramps from 0 to its target over the row's Fade In ticks.
-      if (r.fadeIn > 0) {
-        rec.fadeInSeconds = r.fadeIn * MIXER_TICK_SECONDS;
-        const g = node?.gain;
-        if (typeof g?.linearRampToValueAtTime === 'function') {
-          const target = g.value;
-          g.setValueAtTime(0, now); g.linearRampToValueAtTime(target, now + rec.fadeInSeconds);
-        }
-      }
-      source.onended = () => { source.disconnect(); disconnectSource(node); release(rec); };
-      source.start(); started++; rec.started = true;
+      // Fade In (entry +0x3F): the level steps from 0 to 255 over the row's Fade In ticks; a requeued loop restarts
+      // over 3 ticks instead.
+      const ticks = fadeTicks || r.fadeIn;
+      if (ticks > 0) rec.fadeInSeconds = ticks * MIXER_TICK_SECONDS;
+      if (fadeTicks) rec.resumedAt = resume;
+      const node = connectSource(source, r, { rec, spatialGainByte: gainByte, offset: place?.offset ?? null, panCode,
+        withBalance: mono && (panCode != null || tracking), tracking, attached, mono, looping: loops,
+        level: rec.level ?? 255, fade: ticks > 0 ? { from: 0, to: rec.level ?? 255, t0: now, ticks } : null, groupBase: asked.groupBase, startedAt: now, resumeFrom: resume });
+      source.onended = () => { source.disconnect(); disconnectSource(node); if (!rec.parked) release(rec); };
+      if (resume > 0) source.start(now, resume); else source.start();
+      started++; rec.started = true; rec.parked = false;
       // Duration: the tick stops a source once more than Duration ticks have passed since it started.
       if (r.duration > 0) {
         rec.durationSeconds = (r.duration + 1) * MIXER_TICK_SECONDS;
         try { source.stop?.(now + rec.durationSeconds); } catch {}
       }
-    } catch (error) { rec.error = String(error); }
-    // a queued entry that never started (silent, out of range, failed) leaves the client sound list at once
-    finally { if (!rec.started) release(rec); }
-    return rec;
+    }
   }
   /** One drained event {unitType, unitId, classId, soundEvent, updateUnitType, updateUnitId}; localId = the hero's unit id. */
   async function play(e, localId) {
@@ -235,8 +289,11 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
         continue;
       }
       if (!state.tracking) continue;
-      // Beyond the Falloff cutoff the tick stops the source at once.
-      if (soundBeyondCutoff(place.offset, state.row.falloff)) { stopSource(node, state, false, 'out-of-range'); continue; }
+      // Beyond the Falloff cutoff the tick stops the source at once; a looping one goes back to the queue.
+      if (soundBeyondCutoff(place.offset, state.row.falloff)) {
+        if (state.looping) park(node, state); else stopSource(node, state, false, 'out-of-range');
+        continue;
+      }
       state.offset = place.offset;
       state.rec.clientOffset = place.offset;
       if (state.mono) {
@@ -244,12 +301,50 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
         state.rec.nativeSpatialGainByte = place.spatial.gainByte;
         state.rec.appliedSpatialGainByte = place.spatial.gainByte;
       }
-      node.gain.value = sourceGainFor(state.row, state.spatialGainByte, state.offset);
+      applyGain(node, state);
       if (state.balance && state.mono && place.spatial.panCode !== state.rec.appliedSpatialPanCode) {
         state.rec.nativeSpatialPanCode = place.spatial.panCode;
         applyBalance(state.balance, state.rec, place.spatial.panCode);
       }
     }
+    // A queued loop starts (or resumes) once its unit is inside the cutoff; its unit gone, it leaves the queue.
+    if (!listener) return;
+    for (const entry of [...parked]) {
+      const { rec } = entry;
+      const place = placement(rec, snapshot, listener);
+      if (!place) { parked.delete(entry); rec.parked = false; rec.stopped = 'unit-freed'; release(rec); continue; }
+      const t = table(), asked = soundRow(t, rec.row);
+      if (!asked || !soundInStartRange(place.offset, asked.falloff)) continue;
+      parked.delete(entry);
+      rec.outOfRange = false;
+      begin(rec, rec.row, asked, t, entry.resume, entry.fadeTicks)
+        .catch((error) => { rec.error = String(error); })
+        .finally(() => { if (!rec.started) { rec.parked = false; release(rec); } });
+    }
+  }
+  // The weather sound (0x4F860's kind-1 handle): one held loop whose level the caller sets each tick. It starts
+  // with the row's Fade In to its first level (the mixer keeps its own ramp while a fade runs), follows each later
+  // level, and stops through the row's Fade Out when the level reaches 0 (0x88BF0).
+  let weather = null;
+  function setWeatherLevel(row, level) {
+    const l = Math.max(0, Math.min(255, level | 0));
+    if (!weather) {
+      if (l === 0 || !Number.isInteger(row)) return null;
+      weather = { kind: 'weather', row, level: l, held: true, handle: null, path: null, started: false, error: '' };
+      events.push(weather);
+      playTableRow(row, weather);
+      return weather;
+    }
+    const rec = weather;
+    rec.level = l;
+    for (const [node, state] of activeSources) {
+      if (state.rec !== rec || state.stopping) continue;
+      if (l === 0) { stopSource(node, state, true, 'weather-ended'); continue; }
+      if (state.fade) { if ((context.currentTime ?? 0) < fadeEnd(state.fade)) continue; state.fade = null; }
+      state.level = l; applyGain(node, state);
+    }
+    if (l === 0) weather = null;
+    return rec;
   }
   async function playDialogue(handle, fileOverride = null) {
     stopDialogue();
@@ -276,7 +371,7 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
     } catch (error) { rec.error = String(error); finish(); }
     return rec;
   }
-  return { play, playRow, playDialogue, stopDialogue, stopUnitSounds, whenDialogueDone: () => dialogueDone, updateSpatialGain, events, setVolume(v, nextSliders) { volume = Math.max(0, Math.min(1, Number(v) || 0)); if (nextSliders) sliders = { sound: nextSliders.sound, music: nextSliders.music }; else sliders = { sound: volume, music: 1 }; if (gain) gain.gain.value = volume; for (const [node, state] of activeSources) if (!state.stopping) node.gain.value = sourceGainFor(state.row, state.spatialGainByte, state.offset); },
+  return { play, playRow, playDialogue, stopDialogue, stopUnitSounds, setWeatherLevel, whenDialogueDone: () => dialogueDone, updateSpatialGain, events, setVolume(v, nextSliders) { volume = Math.max(0, Math.min(1, Number(v) || 0)); if (nextSliders) sliders = { sound: nextSliders.sound, music: nextSliders.music }; else sliders = { sound: volume, music: 1 }; if (gain) gain.gain.value = volume; for (const [node, state] of activeSources) if (!state.stopping || state.fade) applyGain(node, state); },
     get volume() { return gain ? gain.gain.value : volume; },
     evidence: () => ({ started, dialogueActive: Boolean(dialogueSource), events: events.map((x) => ({ ...x })), state: context.state }), close: () => context.close?.() };
 }

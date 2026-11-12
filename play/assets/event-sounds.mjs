@@ -1,8 +1,9 @@
 // Footstep, item pickup/drop, gold and level-up sounds. Retail routes all of them through the D2Client sound
 // queue (FUN_6FB38A70). Rows: Sounds.txt by name; footsteps by the class group base at D2Client+0xF7694 word +0x28
 //: base + 4*(floor-1) for floor class 2..6 [+24 run]. The floor class is the engine's (D2Client 0x226A0 over the
-// live room tiles, floorClass(unitType, id, fallback)); the fallback is the level's SoundEnviron "Material 1". Limits: no
-// 4-row variant is drawn (combat-sound-trigger.mjs).
+// live room tiles, floorClass(unitType, id, fallback)); the fallback is the level's SoundEnviron "Material 1". The row
+// handed on is the group's base; the player plays the variant the engine picks (Group Size). An object's sound is
+// attached to its object (type 2), so it is placed, attenuated and, when its row loops, held until the object goes.
 const GAIT_BASE = [2768, 2720, 2720, 2768, 2816, 2720, 2720]; // Ama Sor Nec Pal Bar Dru Asn
 import { OBJECT_MODE_SOUNDS, OBJECT_SELECT_SOUNDS, SHARED_ROW_CLASSES } from './object-mode-sounds.mjs';
 // modeSounds: the engine's 0x24490 (combatSoundEngine(Module).modeSounds in combat-sound-trigger.mjs), for the local attack's swing row.
@@ -137,10 +138,10 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
         const prev = objMode.get(o.id), row = OBJECT_MODE_SOUNDS[o.classId];
         // First sight (client rooms only): selector 0x224F0 -- record +0x20..+0x2C [first, slot, second, slot2]; slot == mode or 8 (any).
         const q = OBJECT_SELECT_SOUNDS[o.classId];
-        if (q && o.inClientRoom && !inRoom.has(o.id) && !selSeen.has(o.x + ',' + o.y)) { selSeen.add(o.x + ',' + o.y); const s = (q[0] && (q[1] === o.mode || q[1] === 8)) ? q[0] : (q[2] && (q[3] === o.mode || q[3] === 8)) ? q[2] : 0; if (s) play(s, { kind: 'object', id: o.id }); }
+        if (q && o.inClientRoom && !inRoom.has(o.id) && !selSeen.has(o.x + ',' + o.y)) { selSeen.add(o.x + ',' + o.y); const s = (q[0] && (q[1] === o.mode || q[1] === 8)) ? q[0] : (q[2] && (q[3] === o.mode || q[3] === 8)) ? q[2] : 0; if (s) play(s, { kind: 'object', id: o.id, unitType: 2, unitId: o.id }); }
         if (o.inClientRoom) inRoom.add(o.id); else { inRoom.delete(o.id); selSeen.delete(o.x + ',' + o.y); } // a room that loses its client frees the unit: regaining one is a first sight again
         if (!row || prev === o.mode || (prev === undefined && o.classId !== 0x3b)) continue;
-        if (row[o.mode] && !(SHARED_ROW_CLASSES.has(o.classId) && (prev ?? 0) > o.mode)) play(row[o.mode], { kind: 'object', id: o.id });
+        if (row[o.mode] && !(SHARED_ROW_CLASSES.has(o.classId) && (prev ?? 0) > o.mode)) play(row[o.mode], { kind: 'object', id: o.id, unitType: 2, unitId: o.id });
       }
       objMode.clear(); for (const [k, v] of nowObj) objMode.set(k, v);
       if (heroLevel > 0) { if (level && heroLevel > level) { if (serverLevelUps > 0) serverLevelUps--; else play(idx.get('cursor_level_up'), { kind: 'levelup' }); } level = heroLevel; }

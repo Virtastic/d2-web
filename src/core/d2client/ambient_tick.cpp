@@ -47,10 +47,15 @@ struct Amb final : Services {
         if (qn < 256) { q[qn * 2] = int32_t(row); q[qn * 2 + 1] = full ? 3 : int32_t(kind); ++qn; }   // 3 = recorded, rejected
         if (full) return 0;
         if (holdFor && kind == 2 && nheld < kPool) held[nheld++] = holdNow + holdFor;
+        if (kind == 1) { weatherHandle = nextHandle; vol = 0; }
         return nextHandle++;
     }
-    void f87ed0(U, U v) override { vol = int32_t(v); }
-    U f87f00(U) override { return U(vol); }
+    // 0x87ED0 / 0x87F00 set and read one entry's level (+0x1C). Only the weather handle's level is kept: the day/night
+    // swap's write to the area loop (level 0 before its cross-fade) is not the rain's. The mixer's own fade-in ramp
+    // over that level is the platform layer's.
+    U weatherHandle = 0;
+    void f87ed0(U h, U v) override { if (h == weatherHandle) vol = int32_t(v); }
+    U f87f00(U h) override { return h == weatherHandle ? U(vol) : 0; }
     void f88bf0(U) override {}
     void f88ba0(U, int32_t, int32_t, int32_t) override {}
     U rand(U n) override {   // 0x89640: LCG on the hero seed
@@ -99,7 +104,7 @@ uint32_t* fallbackSeed(uint32_t (*playerInit)()) {
     }
     return Fb;
 }
-void reset() { Fb[0] = Fb[1] = 0; FbSet = false; E = Env{}; Now = 0; A.qn = 0; A.nextHandle = 1; A.vol = 0; A.nheld = 0; A.lastKey = 0xffffffffu; A.keyMoved = false; }
+void reset() { Fb[0] = Fb[1] = 0; FbSet = false; E = Env{}; Now = 0; A.qn = 0; A.nextHandle = 1; A.vol = 0; A.weatherHandle = 0; A.nheld = 0; A.lastKey = 0xffffffffu; A.keyMoved = false; }
 void setArea(U key) { A.key = key; }
 // The sound pump's feed: the loaded SoundEnviron table (0x58-byte records) instead of the JavaScript-fed rows.
 void useEnvTable() {
@@ -133,6 +138,8 @@ EMSCRIPTEN_KEEPALIVE void d2_ambient_record(int idx, int nightAmb, int dayAmb, i
 }
 // DAT_6fbc97f8 as the unit pass reads it: the frame about to run (0x4F860 is called with it, then it advances).
 EMSCRIPTEN_KEEPALIVE uint32_t d2_ambient_now() { return Now; }
+// The weather sound's level (0..255) after the last 0x4F860 call: its handle's slewed level while it holds one, else 0.
+EMSCRIPTEN_KEEPALIVE int d2_ambient_weather_level() { return E.c318 && E.c318 == A.weatherHandle ? A.vol : 0; }
 // Drain the queued submits: pairs {Sounds row, kind} (kind 0 area loop, 1 weather handle, 2 one-shot). Returns the pair count.
 EMSCRIPTEN_KEEPALIVE int d2_ambient_take(int32_t* out, int cap) {
     int n = A.qn < cap ? A.qn : cap;

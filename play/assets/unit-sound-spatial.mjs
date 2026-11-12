@@ -30,7 +30,12 @@ export function unitSoundNativeSpatial(event, snapshot, listener) {
 
 export function unitSoundSourcePosition(event, snapshot) {
   if (!Number.isInteger(event?.unitType) || !Number.isInteger(event?.unitId)) return null;
-  const sourceUnit = snapshot?.entities?.find((entity) => entity.type === event.unitType && entity.id === (event.unitId >>> 0));
+  let sourceUnit = snapshot?.entities?.find((entity) => entity.type === event.unitType && entity.id === (event.unitId >>> 0));
+  // An object (type 2) the snapshot lists only among its objects: a client unit while its room has a client.
+  if (!sourceUnit && event.unitType === 2) {
+    const o = snapshot?.objects?.find((x) => x.id === (event.unitId >>> 0));
+    sourceUnit = o && o.inClientRoom !== false ? o : null;
+  }
   if (!sourceUnit) return null;
   const dynamic = event.unitType === 0 || event.unitType === 1 || event.unitType === 3;
   return dynamic && sourceUnit.preciseX != null && sourceUnit.preciseY != null

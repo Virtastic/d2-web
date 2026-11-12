@@ -16,6 +16,9 @@ const TABLE = [HEADER,
   line('mute', 7, { 3: 0 }),
   line('near', 8, { 13: 0, 19: 1 }),
   line('wide', 9, { 18: 1, 13: 1 }),
+  line('defer', 10, { 8: 1 }),
+  line('cut', 11, { 9: 1 }),
+  line('rain', 12, { 3: 200, 5: 1, 6: 12, 7: 12, 13: 1 }),
 ].join('\n');
 
 function wav() {
@@ -27,9 +30,9 @@ function wav() {
 }
 
 function rig(script = []) {
-  const gains = [], sources = [], mergers = [], reads = [];
+  const gains = [], sources = [], mergers = [], reads = [], clock = { now: 10 };
   class Ctx {
-    state = 'running'; destination = {}; currentTime = 10;
+    state = 'running'; destination = {}; get currentTime() { return clock.now; }
     createGain() {
       const ramps = [];
       const node = { ramps, connections: [], connect(to) { node.connections.push(to); }, disconnect() {},
@@ -40,7 +43,7 @@ function rig(script = []) {
     resume() { return Promise.resolve(); }
     decodeAudioData() { return Promise.resolve({ duration: 1 }); }
     createBufferSource() {
-      const s = { stops: [], connect() {}, disconnect() {}, start() { s.started = true; }, stop(t) { s.stops.push(t); } };
+      const s = { stops: [], connect() {}, disconnect() {}, start(...a) { s.started = true; s.startArgs = a; }, stop(t) { s.stops.push(t); } };
       sources.push(s); return s;
     }
   }
@@ -50,8 +53,9 @@ function rig(script = []) {
   const player = createUnitSoundPlayer(read, Ctx, null, null, { variant: (row) => { asked.push(row); return script.shift() ?? row; }, ended: (h) => ended.push(h) });
   player.ended = ended;
   player.setVolume(1, { sound: 1, music: 1 });
-  return { player, gains, sources, mergers, reads, asked };
+  return { player, gains, sources, mergers, reads, asked, clock };
 }
+const settle = () => new Promise((resolve) => setImmediate(resolve));
 const unitAt = (x, y = 0, id = 5) => ({ entities: [{ type: 1, id, preciseX: x, preciseY: y }] });
 const LISTENER = { x: 0, y: 0 };
 
@@ -101,8 +105,11 @@ test('Loop and Fade In: an attached looping row loops and ramps in over 12 ticks
   assert.equal(rec.looping, true);
   assert.equal(r.sources[0].loop, true);
   assert.equal(rec.fadeInSeconds, 12 * MIXER_TICK_SECONDS);
+  // The level steps once per mixer tick, 0 -> 255 over 12 ticks (integer ramp), each step a channel value.
   const node = r.gains.find((g) => g.ramps.length);
-  assert.deepEqual(node.ramps.map(([k, v, t]) => [k, k === 'set' ? v : 'target', Number(t.toFixed(6))]), [['set', 0, 10], ['ramp', 'target', 10.48]]);
+  const g = rec.appliedSpatialGainByte;
+  assert.deepEqual(node.ramps.map(([, , t]) => Number(t.toFixed(6))), Array.from({ length: 13 }, (_, k) => Number((10 + k * 0.04).toFixed(6))));
+  assert.deepEqual(node.ramps.map(([, v]) => Math.round(v * 255)), Array.from({ length: 13 }, (_, k) => Math.trunc(Math.trunc(255 * k / 12) * g / 255)));
   // Its unit freed: the loop stops through Fade Out.
   r.player.stopUnitSounds(1, 5);
   assert.equal(rec.stopped, 'unit-freed');
@@ -156,4 +163,79 @@ test('a Tracking source follows its unit and stops at once past its cutoff', asy
   assert.equal(rec.stopped, 'out-of-range');
   assert.equal(rec.fadeOutSeconds, 0);
   assert.deepEqual(r.sources[0].stops, [undefined]);
+});
+
+test('a looping Tracking source past its cutoff goes back to the queue and resumes from its place over 3 ticks', async () => {
+  const r = rig();
+  r.player.updateSpatialGain(unitAt(2), LISTENER);
+  const rec = await r.player.playRow(5, { unitType: 1, unitId: 5, queueHandle: 9 });
+  r.clock.now = 10.3;
+  r.player.updateSpatialGain(unitAt(40), LISTENER);
+  assert.equal(rec.stopped, 'out-of-range');
+  assert.deepEqual(r.sources[0].stops, [undefined]);
+  r.sources[0].onended();
+  assert.deepEqual(r.player.ended, [], 'the parked entry keeps its queue slot');
+  r.player.updateSpatialGain(unitAt(39), LISTENER);
+  await settle();
+  assert.equal(r.sources.length, 1, 'still beyond the cutoff: it waits');
+  r.clock.now = 11;
+  r.player.updateSpatialGain(unitAt(2), LISTENER);
+  await settle();
+  assert.equal(r.sources.length, 2);
+  assert.equal(r.sources[1].loop, true);
+  assert.deepEqual(r.sources[1].startArgs.map((v) => Number(v.toFixed(6))), [11, 0.3]);
+  assert.equal(rec.fadeInSeconds, 3 * MIXER_TICK_SECONDS);
+});
+
+test('a looping row submitted past its cutoff waits for its unit, and leaves when the unit is gone', async () => {
+  const r = rig();
+  r.player.updateSpatialGain(unitAt(40), LISTENER);
+  const rec = await r.player.playRow(5, { unitType: 1, unitId: 5, queueHandle: 4 });
+  assert.equal(rec.outOfRange, true);
+  assert.deepEqual(r.player.ended, []);
+  r.player.updateSpatialGain(unitAt(2), LISTENER);
+  await settle();
+  assert.equal(rec.started, true);
+  assert.equal(rec.fadeInSeconds, 12 * MIXER_TICK_SECONDS, 'a first start takes the row Fade In');
+  r.player.updateSpatialGain(unitAt(40), LISTENER);
+  const late = await r.player.playRow(5, { unitType: 1, unitId: 5, queueHandle: 8 });
+  assert.equal(late.outOfRange, true);
+  r.player.updateSpatialGain({ entities: [] }, LISTENER);
+  assert.ok(r.player.ended.includes(8), 'its unit freed, the waiting entry leaves the queue');
+});
+
+test('Defer Inst drops a start while its group plays; Stop Inst cuts the earliest one and starts', async () => {
+  const r = rig();
+  const a = await r.player.playRow(10);
+  const b = await r.player.playRow(10);
+  assert.equal(a.started, true);
+  assert.equal(b.deferred, true);
+  assert.equal(b.started, false);
+  const c = await r.player.playRow(11);
+  r.clock.now = 10.1;
+  const d = await r.player.playRow(11);
+  assert.equal(c.stopped, 'stop-inst');
+  assert.deepEqual(r.sources[1].stops, [undefined]);
+  assert.equal(d.started, true);
+  assert.equal(a.stopped, undefined, 'another group is untouched');
+});
+
+test('the weather loop fades in to its first level, follows later levels and fades out at 0', async () => {
+  const r = rig();
+  const rec = r.player.setWeatherLevel(12, 6);
+  await settle();
+  assert.equal(rec.started, true);
+  assert.equal(r.sources[0].loop, true, 'a held loop loops with no unit');
+  const node = r.gains.find((g) => g.ramps.length);
+  // Volume 200, level 0 to 6 over 12 ticks.
+  assert.deepEqual(node.ramps.map(([, v]) => Math.round(v * 255)), Array.from({ length: 13 }, (_, k) => Math.trunc(200 * Math.trunc(6 * k / 12) / 255)));
+  r.player.setWeatherLevel(12, 12);
+  assert.equal(node.gain.value, 1, 'inside the fade the ramp keeps going');
+  r.clock.now = 10.5;
+  r.player.setWeatherLevel(12, 12);
+  assert.equal(Math.round(node.gain.value * 255), Math.trunc(200 * 12 / 255));
+  r.player.setWeatherLevel(12, 0);
+  assert.equal(rec.stopped, 'weather-ended');
+  assert.equal(rec.fadeOutSeconds, 12 * MIXER_TICK_SECONDS);
+  assert.equal(r.player.setWeatherLevel(12, 0), null);
 });

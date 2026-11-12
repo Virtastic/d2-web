@@ -3116,8 +3116,11 @@ function drainAmbientSounds() {
   const b = ambBuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [64 * 8]));
   const n = Module.ccall('d2_ambient_take', 'number', ['bigint', 'number'], [BigInt(b), 64]);
   const v = new Int32Array(Module.HEAPU8.buffer.slice(b, b + n * 8));
-  for (let i = 0; i < n; i++) { if (v[i * 2 + 1] === 3) unitSounds.events.push({ row: v[i * 2], kind: 'table-row', source: 'ambient', rejected: true }); /* the mixer had no free record: submitted, nothing plays */ else if (v[i * 2 + 1] === 2) unitSounds.playRow(v[i * 2], { source: 'ambient' }).catch(() => {}); else unitSounds.events.push({ row: v[i * 2], kind: 'table-row', source: 'ambient', held: true }); }
+  for (let i = 0; i < n; i++) { if (v[i * 2 + 1] === 3) unitSounds.events.push({ row: v[i * 2], kind: 'table-row', source: 'ambient', rejected: true }); /* the mixer had no free record: submitted, nothing plays */ else if (v[i * 2 + 1] === 2) unitSounds.playRow(v[i * 2], { source: 'ambient' }).catch(() => {}); else if (v[i * 2 + 1] === 1) weatherRow = v[i * 2]; else unitSounds.events.push({ row: v[i * 2], kind: 'table-row', source: 'ambient', held: true }); }
+  // The weather handle (rain): the player holds its loop at the level the updater slews it to, and fades it out at 0.
+  if (weatherRow && Module._d2_ambient_weather_level) { const level = Module._d2_ambient_weather_level() | 0; unitSounds.setWeatherLevel(weatherRow, level); if (!level) weatherRow = 0; }
 }
+let weatherRow = 0;
 function drainUnitSounds() {
   pollObjectSpeech();
   if (!unitSounds || !session || screen !== SCREEN.GAME || !Module._d2_session_take_sounds) return;
