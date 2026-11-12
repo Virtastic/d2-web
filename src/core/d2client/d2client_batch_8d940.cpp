@@ -122,17 +122,7 @@ int32_t personalizedNameInPlace(Env& e,wc* out){
  e.personalize(res,tmp,0x200); ucpy(out,res); return 1;
 }
 
-// 1.13c D2Client+0x8E2F0
-void hoverItemPickup(Env& e){
- if((e.g(0xBCBC34)!=1 || e.g(0xB8BC48)/2<=e.g(0xBCB828)) && e.g(0xBCB824)<e.g(0xB8BC4C)-0x27){
-  if(e.g(0xBCB828)<e.g(0xB8BC48)/2){ e.gset(0xBCBC68,0); return; }
-  int32_t it=e.q(11017,0,0);
-  if(it && e.g(0xBCBC2C)){
-   if(!e.q(10217,it,e.g(0xBCBC68)) || !e.q(10244,it,e.g(0xBCBBFC))){ e.q(11139,0,0); e.q(0x8C2B0,it,0); }
-   e.q(0x8C5B0,0xBCBCA0+e.g(0xBCBC68)*5,0);
-  }
- }
-}
+// 1.13c D2Client+0x8E2F0: ported to d2client_8e2f0.cpp
 
 // 1.13c D2Client+0x8E770
 void drawBeltPanelCaps(Env& e){

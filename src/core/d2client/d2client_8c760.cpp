@@ -6,7 +6,7 @@
 extern "C" uint32_t d2cl_8c760(uint32_t out, uint32_t unit, uint32_t p, const cl::Env& e) {
     e.W(out, 0);
     if (!e.R(0x6FAB0000u + 0x119854u)) return 0;
-    const uint32_t F = 0xB2000000u | 0x8476Cu;
+    const uint32_t F = 0xB2000000u | 0xD476Cu;
     if (!e.H(0xc1a8, unit, 0x10, 0x301b, F)) return 0;
     if (e.H(0xc1a8, unit, 0x100, 0x301e, F)) return 0;
     uint32_t on = 0;

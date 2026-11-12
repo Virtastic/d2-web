@@ -146,49 +146,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2c_814f0(const D2cB69Env* e, uint32_t param) {   /
 
 // 1.13c D2Client+0x81750: ported to d2client_81750.cpp
 
-// 1.13c D2Client+0x8F430
-EMSCRIPTEN_KEEPALIVE void d2c_8f430(const D2cB69Env* e) {
-    uint8_t* b = e->b_bbb23c;
-    if (*e->g_9721 == 0) return;
-    int32_t* p = d2c_b69_find(e->tbl_ba808, (uint32_t)*e->g_971d);
-    if (!p) return;
-    if (*p != 1) { e->fatal(0x5a); return; }
-    enum { COMMON, NINE_A, OFF } k = COMMON;
-    if (*e->g_97a8 == 0) {
-        int32_t c = p[1];
-        if (c < 0xfd) {
-            if (c != 0xfc) switch (c) {
-                case 0x93: case 0x94: case 0xb1: case 199: case 0xca: break;
-                case 0x9a: case 0xb2: k = NINE_A; break;
-                default: k = OFF;
-            }
-        } else if (c < 0x196) {
-            if (c != 0x195) switch (c) {
-                case 0xfd: case 0x101: k = NINE_A; break;
-                case 0xfe: case 0xff: break;
-                default: k = OFF;
-            }
-        } else if (c == 0x1ff) k = NINE_A;
-        else if (c < 0x200 || c > 0x201) k = OFF;
-        if (k == OFF) { *e->g_911c8 = 0; return; }
-        if (k == NINE_A) {
-            *e->g_bc50 = 3; e->f3ba30(); e->f3b9f0(); e->f3ba70(); e->f3bab0();
-            *e->g_911c4 = 3; *e->g_911c8 = 4;
-            d2c_b69_put<int32_t>(b, 0x00, 0); d2c_b69_put<int32_t>(b, 0x14, 0);
-            d2c_b69_put<int32_t>(b, 0x28, 0); d2c_b69_put<int32_t>(b, 0x3c, 0);
-            return;
-        }
-        *e->g_bc50 = 3; e->f3ba30(); e->f3b9f0(); e->f3b9c0();
-    } else {
-        *e->g_bc50 = 1; e->f3ba30(); e->f3b9f0();
-        d2c_b69_put<uint16_t>(b, 0x2c, 0); d2c_b69_put<int32_t>(b, 0x2e, 1); d2c_b69_put<int32_t>(b, 0x34, 1);
-        d2c_b69_put<uint16_t>(b, 0x32, 0); d2c_b69_put<int32_t>(b, 0x24, 0);
-    }
-    d2c_b69_put<uint8_t>(b, 0x46, 10); d2c_b69_put<int32_t>(b, 0x42, 9); d2c_b69_put<uint16_t>(b, 0x40, 0x1030);
-    d2c_b69_put<int32_t>(b, 0x3c, 0); d2c_b69_put<int32_t>(b, 0x38, 1); d2c_b69_put<int32_t>(b, 0x28, 0);
-    d2c_b69_put<int32_t>(b, 0x14, 0); d2c_b69_put<int32_t>(b, 0x00, 0);
-    *e->g_911c8 = 4; *e->g_911c4 = 3;
-}
+// 1.13c D2Client+0x8F430: ported to d2client_8f430.cpp
 
 // 1.13c D2Client+0x86A40   (pkt: +1 u8 slot, +2 u32 unit id, +6 i16 flag)
 EMSCRIPTEN_KEEPALIVE void d2c_86a40(const D2cB69Env* e, const uint8_t* pkt) {
