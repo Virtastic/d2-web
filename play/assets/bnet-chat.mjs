@@ -19,7 +19,10 @@ export function parseChannelList(body) {
   while (at < body.length) { const end = body.indexOf(0, at); if (end < 0 || end === at) break; out.push(dec.decode(body.subarray(at, end))); at = end + 1; }
   return out;
 }
-export const chatCommandPacket = (text) => bncsPacket(0x0e, cstr(String(text).replace(/[\0\r\n]/g, ' ').slice(0, 255)));
+// CHATCOMMAND (+0xC400) sends the text as given, raw: a typed `/f l`, `/f a name` or `/f r name` is no different from
+// any other line (retail's slash dispatcher keeps only /r, /reply and /d2notify). The text is a C string, so it ends at
+// its first NUL. The 255-byte cap is the chat box's own limit, not a C400 check.
+export const chatCommandPacket = (text) => bncsPacket(0x0e, cstr(String(text).split('\0')[0].slice(0, 255)));
 
 const u32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
 export function parseChatEvent(body) {
@@ -52,7 +55,7 @@ export function chatLine({ event, username, text }) {
 // Owns the open BNCS transport and its reader. `onEvent` sees every parsed event first (true: handled);
 // `onLine` gets each displayable line it left.
 export function createBnetChat({ transport, reader, character, realm = '', expansion = true, channel = 'Diablo II', onLine = () => {}, onEvent = () => false, onGames = () => {}, onChannels = () => {}, onClose = () => {},
-  keepAliveMs = 180000, timers = globalThis }) {
+}) {
   let entered = false, wantJoin = false, joined = false, closed = false, current = '', wantFlags;
   const send = (bytes) => transport.send(bytes);
   const handle = ({ id, body }) => {
@@ -68,9 +71,7 @@ export function createBnetChat({ transport, reader, character, realm = '', expan
     }
   };
   const join = (name = channel, flags = wantFlags) => { send(joinChannelPacket(name, flags)); };
-  // BNCS SID_NULL: retail's idle keep-alive, so a proxy's idle timer never sees a silent socket.
-  const stopTimer = () => { if (ticker != null) { timers.clearInterval(ticker); ticker = null; } };
-  let ticker = keepAliveMs > 0 ? timers.setInterval(() => { if (closed) stopTimer(); else if (send(bncsPacket(0x00)) === false) { closed = true; stopTimer(); onClose(); } }, keepAliveMs) : null;
+  // SID_NULL is not sent here: the connection's keep-alive (realm-client's startBncsNull) owns it, since retail's pump does.
   (async () => {
     try {
       for (;;) {
@@ -80,7 +81,7 @@ export function createBnetChat({ transport, reader, character, realm = '', expan
         const frame = await reader.want(total, null); const body = frame.slice(4); const id = frame[1];
         reader.skip(total); handle({ id, body });
       }
-    } catch { closed = true; stopTimer(); onClose(); }
+    } catch { closed = true; onClose(); }
   })();
   return {
     get entered() { return entered; }, get joined() { return joined; }, get channel() { return current; }, get open() { return !closed && transport.isOpen; },
@@ -90,9 +91,10 @@ export function createBnetChat({ transport, reader, character, realm = '', expan
     join(name, flags) { wantFlags = flags; if (name) channel = name; if (entered) join(); else wantJoin = true; },
     // SID_GETADVLISTEX: the reply reaches `onGames` as the raw body.
     games() { return closed ? false : send(getGamesPacket()) !== false; },
-    say(text) { return closed ? false : send(chatCommandPacket(text)) !== false; },
+    // C400 returns false for an empty text (NULL or "") before EB00: nothing is sent. Blanks count as text.
+    say(text) { if (!text) return false; return closed ? false : send(chatCommandPacket(text)) !== false; },
     // SID_LEAVECHAT (FF 10 04 00), what the lobby's QUIT sends; the socket stays open, chat must be entered again.
     leave() { if (closed) return false; entered = false; joined = false; wantJoin = false; return send(bncsPacket(0x10)) !== false; },
-    close() { closed = true; stopTimer(); try { reader.cancel(); } catch { /* done */ } try { transport.close(); } catch { /* done */ } },
+    close() { closed = true; try { reader.cancel(); } catch { /* done */ } try { transport.close(); } catch { /* done */ } },
   };
 }

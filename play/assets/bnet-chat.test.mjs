@@ -13,7 +13,7 @@ test('composers: framing and bodies of ENTERCHAT, JOINCHANNEL, CHATCOMMAND', () 
   assert.equal(hex(getChannelListPacket()), 'ff0b080050583244');
   assert.equal(hex(getChannelListPacket(false)), 'ff0b080056443244');
   assert.equal(hex(joinChannelPacket('D')), 'ff0c0a000500000044' + '00');
-  assert.equal(hex(chatCommandPacket('hi\nthere')), 'ff0e0d006869207468657265' + '00');
+  assert.equal(hex(chatCommandPacket('hi\nthere')), 'ff0e0d006869' + '0a' + '7468657265' + '00');
 });
 
 test('ENTERCHAT strings are cut at 255 bytes like the retail sender', () => {

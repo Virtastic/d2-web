@@ -24,7 +24,7 @@ function socket() {
 }
 const enterReply = () => bncsPacket(0x0a, [...Buffer.from('Ama\0')]);
 const channelEvent = (name) => bncsPacket(0x0f, ev(7, '', name));
-const NULL = 'ff000400', ENTER = hex(bncsPacket(0x0a, [...Buffer.from('Ama\0R\0')]));
+const ENTER =hex(bncsPacket(0x0a, [...Buffer.from('Ama\0R\0')]));
 
 function rig({ failDials = 0 } = {}) {
   const socks = [], log = [], states = [], lines = []; let dials = 0, failed = 0;
@@ -94,24 +94,18 @@ test('closing the link during a redial drops the new socket and starts no sessio
   assert.equal(r.socks[1].transport.isOpen, false); assert.equal(await r.link.ensure(r.user), null);
 });
 
-test('keep-alive: SID_NULL on the interval, ping echoed, a closed socket ends it and reports', async (t) => {
-  t.mock.timers.enable({ apis: ['setInterval'] });
-  const s = socket(); let closed = 0;
-  const chat = createBnetChat({ transport: s.transport, reader: s.reader, character: 'Ama', keepAliveMs: 180000, onClose: () => closed++ });
-  t.mock.timers.tick(180000); t.mock.timers.tick(180000);
-  assert.deepEqual(s.sent, [NULL, NULL]);
+test('a server SID_PING is echoed with its cookie; chat sends no SID_NULL of its own', async () => {
+  const s = socket();
+  const chat = createBnetChat({ transport: s.transport, reader: s.reader, character: 'Ama' });
   s.push(bncsPacket(0x25, [7, 0, 0, 0])); await tick();
-  assert.equal(s.sent.at(-1), 'ff25080007000000');
-  s.transport.isOpen = true; s.kill(); await tick(); assert.equal(closed, 1);
-  t.mock.timers.tick(180000); assert.equal(s.sent.length, 3); assert.equal(chat.open, false);
+  assert.deepEqual(s.sent, ['ff25080007000000']);
   chat.close();
 });
 
-test('a keep-alive that finds the socket closed marks the chat dead', async (t) => {
-  t.mock.timers.enable({ apis: ['setInterval'] });
-  const s = socket(); let closed = 0;
-  const chat = createBnetChat({ transport: { ...s.transport, send: () => false, isOpen: true }, reader: s.reader, character: 'Ama', keepAliveMs: 1000, onClose: () => closed++ });
-  t.mock.timers.tick(1000); assert.equal(closed, 1); assert.equal(chat.open, false); assert.equal(chat.say('x'), false);
+test('a say on a socket that refuses the send reports false', async () => {
+  const s = socket();
+  const chat = createBnetChat({ transport: { ...s.transport, send: () => false }, reader: s.reader, character: 'Ama' });
+  assert.equal(chat.say('x'), false);
   chat.close();
 });
 
@@ -136,4 +130,24 @@ test('QUIT leaves chat with FF 10 04 00 on the open socket; coming back enters c
   assert.equal(link.session.entered, false);
   s.push(enterReply()); await tick();
   assert.equal(s.sent.some((x, i) => i > before + 1 && x.startsWith('ff0c')), true);
+});
+
+test('LEAVECHAT frames are FF 10 04 00 in order across QUIT, return, QUIT again; a QUIT on a dead socket sends nothing', async () => {
+  const s = socket();
+  const link = createChatLink({ dial: async () => { throw new Error('no dial'); }, createChat: (o) => createBnetChat({ ...o, keepAliveMs: 0 }) });
+  link.attach({ transport: s.transport, reader: s.reader }, { character: 'Ama', realm: 'R' });
+  s.push(enterReply()); s.push(channelEvent('Diablo II')); await tick();
+  const mark = s.sent.length;
+  link.leave(); // QUIT: the lobby leaves chat on the open socket
+  assert.equal(s.sent.at(-1), 'ff100400');
+  link.resume(); await tick(); // back in the lobby: chat entered again
+  s.push(enterReply()); await tick(); // the enter reply brings the channel join out
+  link.leave(); // second QUIT
+  const after = s.sent.slice(mark);
+  assert.deepEqual(after.map((x) => x.slice(0, 4)), ['ff10', 'ff0b', 'ff0a', 'ff0c', 'ff10']);
+  assert.equal(after[0], 'ff100400'); assert.equal(after.at(-1), 'ff100400');
+  const dead = s.sent.length;
+  s.kill(); await tick();
+  assert.equal(link.leave(), undefined); // no session is open: no frame
+  assert.equal(s.sent.length, dead);
 });
