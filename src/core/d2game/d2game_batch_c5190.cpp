@@ -16,7 +16,7 @@ static inline void*    rdptr(const void* p, uint32_t o) { void* v; std::memcpy(&
 static inline void     wr8 (void* p, uint32_t o, uint8_t v)  { ((uint8_t*)p)[o] = v; }
 static inline void     wr16(void* p, uint32_t o, uint16_t v) { std::memcpy((uint8_t*)p + o, &v, 2); }
 static inline void     wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
-static inline void     wrptr(void* p, uint32_t o, const void* v) { std::memcpy((uint8_t*)p + o, &v, sizeof v); }
+static inline void     wrptr(void* p, uint32_t o, const void* v) { const uint32_t w = (uint32_t)(uintptr_t)v; std::memcpy((uint8_t*)p + o, &w, 4); }   // retail's pointer fields are one dword
 
 struct D2GameBatchC5190Env {
     uint32_t (*ordinal10265)(uint32_t id);

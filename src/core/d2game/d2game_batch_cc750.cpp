@@ -10,7 +10,8 @@
 
 static inline uint8_t  c7rd8 (const void* p, uint32_t o) { return ((const uint8_t*)p)[o]; }
 static inline uint32_t c7rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
-static inline void*    c7rdp (const void* p, uint32_t o) { void* v; std::memcpy(&v, (const uint8_t*)p + o, sizeof v); return v; }
+// a retail pointer field is one 32-bit word, whatever the host pointer width
+static inline void*    c7rdp (const void* p, uint32_t o) { return (void*)(uintptr_t)c7rd32(p, o); }
 static inline void     c7wr16(void* p, uint32_t o, uint16_t v) { std::memcpy((uint8_t*)p + o, &v, 2); }
 static inline void     c7wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
 [[noreturn]] static void c7fatal() { _exit(-1); }
@@ -73,7 +74,7 @@ struct D2GameBatchCc75Env {
 };
 
 static void* c7chain(const void* base, uint32_t off, uint32_t id) {
-    void* n = c7rdp(base, off + (id & 0x7f) * sizeof(void*));
+    void* n = c7rdp(base, off + (id & 0x7f) * 4);
     while (n && c7rd32(n, 0xc) != id) n = c7rdp(n, 0xe4);
     return n;
 }
@@ -241,7 +242,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_CD790(void* thisp, uint32_
     uint32_t x3 = env->dAB4A(d);
     env->sub0xE07A0(unit, param_1, eax);
     uint32_t y = env->dA598(c7rdp(unit, 0x2c));
-    uint32_t s4 = (y == (uint32_t)(uintptr_t)unit) ? y : 0;
+    uint32_t s4 = (y == (uint32_t)(uintptr_t)unit) ? 0 : y;   // sete; dec; and: kept only when it is not the unit itself
     uint32_t x5 = env->dAAC6(d);
     uint32_t x6 = env->dAAD8(d);
     env->ord11164(d, 0x409);

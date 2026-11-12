@@ -233,8 +233,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CB950(void* unit, void* client
         w7 = (uint16_t)rd32(rec, 0xC);
         w9 = (uint16_t)rd32(rec, 0x10);
     } else {
-        w7 = rec ? (uint16_t)env->ordinal10867(rec) : 0;
+        // Retail takes the word at +9 (#10750) before the word at +7 (#10867).
         w9 = rec ? (uint16_t)env->ordinal10750(rec) : 0;
+        w7 = rec ? (uint16_t)env->ordinal10867(rec) : 0;
     }
     uint8_t buf[0xD];
     std::memset(buf, 0, sizeof buf);

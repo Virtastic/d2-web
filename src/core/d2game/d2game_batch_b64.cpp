@@ -196,6 +196,8 @@ void d2game_cba20(uint32_t ecx, uint32_t unit, uint32_t tblIdx, uint32_t ebp) {
     uint8_t pk[16] = {0};
     pk[0] = 0xf;
     uint32_t id = rd32(unit, 0xc);
+    // Retail order: Y (#10750), X (#10867), then #10764 and #10983 of the path.
+    uint16_t y = (uint16_t)unitY(unit), x = (uint16_t)unitX(unit);
     uint16_t w10764 = g_b->o10764(path), w10983 = g_b->o10983(path);
     std::memcpy(pk + 2, &id, 4);
     pk[6] = (uint8_t)g_b->tab_ce4(tblIdx);
@@ -203,7 +205,7 @@ void d2game_cba20(uint32_t ecx, uint32_t unit, uint32_t tblIdx, uint32_t ebp) {
     std::memcpy(pk + 9, &w10764, 2);
     (void)ebp;
     pk[11] = rd8(unit, 0xb0);
-    uint16_t x = (uint16_t)unitX(unit), y = (uint16_t)unitY(unit);   // retail: word at +12 = X (0xA454 / path +0xC), word at +14 = Y (0xA3B8 / path +0x10)
+    // retail: word at +12 = X (0xA454 / path +0xC), word at +14 = Y (0xA3B8 / path +0x10)
     std::memcpy(pk + 12, &x, 2);
     std::memcpy(pk + 14, &y, 2);
     g_b->fAA3E0(ecx, pk, 0x10);

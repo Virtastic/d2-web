@@ -61,16 +61,17 @@ struct D2GameAuraEnv {
     void     (*subA76C)(uint32_t h, uint32_t stat, int32_t val, uint32_t zero);
     void     (*subA5B6)(uint32_t h, uint32_t state);
     void     (*subA75A)(uint32_t h, uint32_t fn);
-    void     (*subA60A)(uint32_t unit, uint32_t h, uint32_t one);
+    uint32_t (*subA60A)(uint32_t unit, uint32_t h, uint32_t one);
     int32_t  (*subA712)(uint32_t h, uint32_t stat, uint32_t zero);
     void     (*subA7C6)(uint32_t h, uint32_t endFrame);
-    void     (*subA6E2)(uint32_t h, uint32_t stat, int32_t val, uint32_t zero);
-    uint32_t callback;      // the 0x9F7A0-style callback word handed to 0xA75A (retail: absolute address of 0xBF7A0)
+    uint32_t (*subA6E2)(uint32_t h, uint32_t stat, int32_t val, uint32_t zero);
+    uint32_t callback;      // the 0x9F7A0-style callback word handed to 0xA75A (retail pushes 0x6FCBF7A0, rva 0x9F7A0)
 };
-static void d2game_auraBody(uint32_t self, uint32_t unit, int32_t mag, int32_t dur, uint32_t state, const D2GameAuraEnv& e)
+// Returns the EAX retail leaves: the duration on the early exits, else the last callee's result (or -A712 when skipped).
+static uint32_t d2game_auraBody(uint32_t self, uint32_t unit, int32_t mag, int32_t dur, uint32_t state, const D2GameAuraEnv& e)
 {
-    if (dur <= 0) return;
-    if (mag <= 0) return;
+    if (dur <= 0) return (uint32_t)dur;
+    if (mag <= 0) return (uint32_t)dur;
     uint32_t timer = e.subA5D4(unit, state);
     const uint32_t game = rd32(self, 0x80);
     if (unit != 0 && rd32(unit, 0) == 1) {
@@ -90,16 +91,16 @@ static void d2game_auraBody(uint32_t self, uint32_t unit, int32_t mag, int32_t d
         e.subA76C(h, 0x4a, -mag, 0);
         e.subA5B6(h, state);
         e.subA75A(h, e.callback);
-        e.subA60A(unit, h, 1);
-        return;
+        return e.subA60A(unit, h, 1);
     }
-    if (-e.subA712(timer, 0x4a, 0) > mag) return;
+    const int32_t cur = -e.subA712(timer, 0x4a, 0);
+    if (cur > mag) return (uint32_t)cur;
     e.subA7C6(timer, endFrame);
     e.sub8EA80(game, unit, 0xc, endFrame, 0, 0, 0);
-    e.subA6E2(timer, 0x4a, -mag, 0);
+    return e.subA6E2(timer, 0x4a, -mag, 0);
 }
-void d2game_DC940_113c(uint32_t self, uint32_t unit, int32_t mag, int32_t dur, const D2GameAuraEnv& e) { d2game_auraBody(self, unit, mag, dur, 0x73, e); }
-void d2game_DCAB0_113c(uint32_t self, uint32_t unit, int32_t mag, int32_t dur, const D2GameAuraEnv& e) { d2game_auraBody(self, unit, mag, dur, 2, e); }
+uint32_t d2game_DC940_113c(uint32_t self, uint32_t unit, int32_t mag, int32_t dur, const D2GameAuraEnv& e) { return d2game_auraBody(self, unit, mag, dur, 0x73, e); }
+uint32_t d2game_DCAB0_113c(uint32_t self, uint32_t unit, int32_t mag, int32_t dur, const D2GameAuraEnv& e) { return d2game_auraBody(self, unit, mag, dur, 2, e); }
 
 // 1.13c D2Game+0xDEBA0  EAX = unit A, EBX = unit B (rng seed at B+0x20/+0x24). Weighted pick over
 // weightTable; the LCG is seed = lo*0x6AC690C5 + hi, written back as a 64-bit pair, low 32 bits used.

@@ -278,7 +278,8 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C8990(uint8_t* game, uint8_t* unit, uint3
                         wr32(rec, 0x1C, 0);
                         Q(fDFCC0, 0, 0);
                         if (rd8(rec, 0x1A) != 0) {
-                            Q(fF2540, game, unit, 0, 2, rd32(rec, 0x20), (uint8_t)rd32(rec, 0x24), 1);
+                            // Retail pushes the whole +0x24 dword (the callee reads its low byte).
+                            Q(fF2540, game, unit, 0, 2, rd32(rec, 0x20), rd32(rec, 0x24), 1);
                             wr8(rec, 0x13, 1);
                             wr8(rec, 0x12, 0);
                             *out1 = 0; *out2 = 0; return;
@@ -290,17 +291,17 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C8990(uint8_t* game, uint8_t* unit, uint3
                         if (Q(fB07B0) > 2) {
                             wr8(rec, 0x19, 1);
                             wr8(rec, 0x18, 0);
-                            Q(fF2540, game, unit, 0, 2, rd32(rec, 0x20), (uint8_t)rd32(rec, 0x24), 1);
+                            Q(fF2540, game, unit, 0, 2, rd32(rec, 0x20), rd32(rec, 0x24), 1);
                             *out2 = 0; return;
                         }
                         uint8_t* t = P(game, 0x1520 + (rd32(rec, 0x38) & 0x7F) * 4);
                         while (t != nullptr && rd32(t, 0xC) != rd32(rec, 0x38)) t = P(t, 0xE4);
                         if (t == nullptr) { *out1 = 0; *out2 = 1; return; }
                         uint32_t loc[2] = { 0, 0 };
-                        uint32_t pre[6] = { 0, 0, 0, 0, 0, 0 };
                         Q(o10141, t, loc);
+                        loc[0] += 4;   // retail adds 4 to the first word before the area tests and the hand-off
                         uintptr_t h = Q(o10331, t);
-                        if (Q(o10509, h, pre, 1, 0x3C01, 0) == 0 && Q(o10509, h, loc, 2, 0x3C01, 0) == 0
+                        if (Q(o10509, h, loc, 1, 0x3C01, 0) == 0 && Q(o10509, h, loc, 2, 0x3C01, 0) == 0
                             && Q(o10509, h, loc, 3, 0x3C01, 0) == 0) {
                             *out1 = 0; *out2 = 1; return;
                         }
@@ -526,12 +527,13 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CF810(uint32_t unusedGame, uint8_t* unit,
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_D1830(uint8_t* eax, uintptr_t ebx, const D2GameBbf30cEnv* env)
 {
-    int32_t r = (int32_t)Q(o10244);
-    if (r == 0 || Q(o11144) == 0) return r;
+    // retail pushes (ebx, unit, 0, 0, 0, 0) for 10244 and ebx for both 11144 calls
+    int32_t r = (int32_t)Q(o10244, ebx, (uintptr_t)eax, 0, 0, 0, 0);
+    if (r == 0 || Q(o11144, ebx) == 0) return r;
     uintptr_t blk = rd32(eax, 0x60);
     uintptr_t it = Q(o11139, blk, 4);
     if (it == ebx) it = Q(o11139, blk, 5);
-    if (it != 0 && Q(o10744, it, Q1(o11144)) != 0) return r;
+    if (it != 0 && Q(o10744, it, Q1(o11144, ebx)) != 0) return r;
     return 0;
 }
 

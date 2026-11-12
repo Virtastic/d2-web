@@ -46,7 +46,7 @@ static int32_t dcScale100(int32_t v, int32_t p) {
 }
 
 // 1.13c D2Game+0xDC0B0 : retail stack args (game, B, C, rec), ret 0x10.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DC0B0(uint32_t game, uint32_t B, uint32_t C, uint32_t rec, const Env_DC* e) {
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_DC0B0(uint32_t game, uint32_t B, uint32_t C, uint32_t rec, const Env_DC* e) {
     uint32_t ctx[10];
     ctx[0] = game;
     ctx[1] = e->o10237(R<uint8_t>(e, game + 0x6d));
@@ -92,15 +92,15 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DC0B0(uint32_t game, uint32_t 
     }
     uint32_t sum = R<uint32_t>(e, rec + 8) + R<uint32_t>(e, rec + 0x10) + R<uint32_t>(e, rec + 0x1c) +
                    R<uint32_t>(e, rec + 0x20) + R<uint32_t>(e, rec + 0x24) + R<uint32_t>(e, rec + 0x28);
-    if (ctx[4]) sum += R<uint32_t>(e, rec + 0x38);
     W<uint32_t>(e, rec + 0x4c, sum);
+    if (ctx[4]) W<uint32_t>(e, rec + 0x4c, sum + R<uint32_t>(e, rec + 0x38));
+    return sum;   // EAX keeps the sum before the +0x38 term
 }
 
 // 1.13c D2Game+0xDC530 : eax = base add (edi), ecx = max (ebx), edx = unit (esi); stack arg1 flag, arg2 weapon-or-flag,
 // arg3 min, arg4 unused, arg5 scale (low byte), ret 0x14.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_DC530(int32_t eaxAdd, int32_t ecxMax, uint32_t unit, uint32_t a1, uint32_t a2,
                                                            int32_t a3Min, uint32_t a4, uint32_t a5, const Env_DC* e) {
-    (void)a4;
     int32_t edi = eaxAdd, ebx = ecxMax, ebp = a3Min;
     uint32_t weapon = a2;
     if (a1) {
@@ -140,7 +140,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_DC530(int32_t eaxAdd, int3
         edi += e->o10973(unit, 0, 0);
     }
     if (edi <= -0x5a) edi = -0x5a;
-    uint32_t r = e->subDBED0((uint32_t)s11, (uint32_t)(s12 + edi), (uint32_t)ebx, unit, (uint32_t)ebp, (uint32_t)(s11 + edi));
+    // EAX for 0xDBED0 is the fourth stack word, passed through untouched; s11 only feeds the last stack word
+    uint32_t r = e->subDBED0(a4,(uint32_t)(s12 + edi), (uint32_t)ebx, unit, (uint32_t)ebp, (uint32_t)(s11 + edi));
     uint32_t sc = a5 & 0xff;
     if (sc == 0x80) return r;
     int32_t v = (int32_t)r;

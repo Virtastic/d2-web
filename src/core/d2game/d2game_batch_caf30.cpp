@@ -42,7 +42,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CAF30(const uint8_t* msg, const D2GameCaf
         if (env->updateFlag == 0) {
             if (C(0xCAD60, r16(p, 5), 0, A(p + 0x15), { r32(p, 8) }) != 0) {
                 C(0x8C4B0, ebx, 0, 0, {});   // EDX = the client id (carried in the eax slot)
-                C(0xA358, 0, 0, 0, { ebx, 0xB2000000u | 0x991AC, 0x148 });
+                C(0xA358, 0, 0, 0, { ebx, 0xB2000000u | 0xFB1AC, 0x148 });   // CCmd.cpp source-name string at module +0xFB1AC
             }
         }
         if (C(0x2A740, 0, 0, 0, { ebx, r16(p, 5), r8(p, 7), r32(p, 1), A(&l20), A(&l18), r8(p, 0x14), A(&l14), A(&l10), A(&l0c), A(&l58) }) == 0) return;
