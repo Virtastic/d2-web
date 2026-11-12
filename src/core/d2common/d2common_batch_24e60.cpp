@@ -119,7 +119,7 @@ extern "C" int32_t D2Common_302E0_UnitDataValue(uint32_t pUnit) {
 // +0x0C == 0 and +0x10 != 0: delay (+0x1D4) != 0 -> decrement; else if 0x2DDB0 (can-discard)
 // is 0 reset the delay to 10, otherwise free the level via 0x2DAF0 (DRLG_FreeLevel, bAlloc=1).
 // 1.13c D2Common+0x2E2C0
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2e2c0(uint32_t pDrlg) {
+extern "C" EMSCRIPTEN_KEEPALIVE void d2common_24e60_2e2c0(uint32_t pDrlg) {
 	if (!pDrlg) return;
 	const uint32_t pool = W(P(pDrlg), 0x478);
 	for (uint32_t p = W(P(pDrlg), 0x47C); p; p = W(P(p), 0x1AC)) {
