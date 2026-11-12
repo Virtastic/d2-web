@@ -34,8 +34,8 @@ uint32_t sub_C88A0(const Env& e, P a1, int32_t cls, uint32_t stackArg) {
  if (!o) return 0;
  uint32_t S[23] = {0};
  S[0] = 0x2001; S[1] = (uint32_t)a1; S[4] = (uint32_t)idx; S[11] = (uint32_t)cls; S[12] = stackArg;
- S[4] = (uint32_t)e.o10980(o);
- S[4] = (uint32_t)e.o10649(o);
+ S[5] = (uint32_t)e.o10980(o);   // retail: [esp+0x2C] with the next push already on the stack, S+0x14
+ S[6] = (uint32_t)e.o10649(o);   // S+0x18
  e.f630f0(S);
  e.o10243(o, 0); e.o10554(o, 0);
  return 1;

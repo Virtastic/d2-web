@@ -43,12 +43,15 @@ static Inner* inner(Unit* u){ return u->node? u->node->p30:nullptr; }
 struct PathRaw { int32_t c, y10; };
 static int32_t cy(Svc& s,Unit* u,const PathRaw* raw){ int t=u->type; if(t==2||(t>3&&t<6)) return raw->y10; return u->path? s.pathY(u):0; }
 static int32_t cx(Svc& s,Unit* u,const PathRaw* raw){ int t=u->type; if(t==2||(t>3&&t<6)) return raw->c;   return u->path? s.pathX(u):0; }
-// 1.13c D2Client+0x4CAD0  (eax = event)
-void sub_4CAD0(Svc& s,Unit* u,int32_t ev,const PathRaw* raw){
+// 1.13c D2Client+0x4CAD0  (eax = event). Each position is read y first, then x. The return is the EAX retail leaves: the
+// event for an unhandled one; after 0xC the inner record (0 with no node); after 0xE/0xA the inner record when it was
+// rewritten, else the node (0 with no node).
+static void* place(Svc& s,Unit* u,const PathRaw* raw,int32_t f){ int32_t y=cy(s,u,raw); int32_t x=cx(s,u,raw); return s.o10331(u,x,y,f); }
+uintptr_t sub_4CAD0(Svc& s,Unit* u,int32_t ev,const PathRaw* raw){
  if(ev==0xc){
   u->flags31&=0xfffffff1u;
-  s.o10870(s.o10331(u,cx(s,u,raw),cy(s,u,raw),0x1000));
-  s.o10870(s.o10331(u,cx(s,u,raw),cy(s,u,raw),0x100));
+  s.o10870(place(s,u,raw,0x1000));
+  s.o10870(place(s,u,raw,0x100));
   s.o10671(u,5); s.o11164(u->path,0);
   Inner* i=inner(u);
   if(!i||!i->f3c){
@@ -58,19 +61,22 @@ void sub_4CAD0(Svc& s,Unit* u,int32_t ev,const PathRaw* raw){
    if((i=inner(u))){ i->f10=0; i->f14=0; i->f18=0x1000; }
    if((i=inner(u))){ i->f30=0xa0; i->f28=0; i->f2c=0; }
   }
- } else if(ev==0xe||ev==10){
+  return (uintptr_t)inner(u);
+ }
+ if(ev==0xe||ev==10){
   u->flags31|=0xe;
-  s.o10468(s.o10331(u,cx(s,u,raw),cy(s,u,raw),0x1000));
-  s.o10468(s.o10331(u,cx(s,u,raw),cy(s,u,raw),0x100));
+  s.o10468(place(s,u,raw,0x1000));
+  s.o10468(place(s,u,raw,0x100));
   s.o10671(u,1); s.o11164(u->path,0x3c01);
   Inner* i=inner(u);
-  if(u->node&&i&&i->f3c){
-   i->flags=(i->flags&0xfffffffeu)|8;
-   if((i=inner(u))) i->flags&=0xffffffdfu;
-   if((i=inner(u))){ i->f10=0; i->f14=0; i->f18=(int32_t)0xffffc000; }
-   if((i=inner(u))){ i->f30=0; i->f28=0; i->f2c=0; }
-  }
+  if(!i||!i->f3c) return (uintptr_t)u->node;
+  i->flags=(i->flags&0xfffffffeu)|8;
+  if((i=inner(u))) i->flags&=0xffffffdfu;
+  if((i=inner(u))){ i->f10=0; i->f14=0; i->f18=(int32_t)0xffffc000; }
+  if((i=inner(u))){ i->f30=0; i->f28=0; i->f2c=0; }
+  return (uintptr_t)inner(u);
  }
+ return (uintptr_t)(uint32_t)ev;
 }
 // 1.13c D2Client+0x4CDD0  (esi = unit)
 void sub_4CDD0(Svc& s,G& g,Unit* u,const PathRaw* raw){

@@ -1,4 +1,4 @@
-// 1.13c D2Client+0xAB660: walks the node list headed by global 0x11AD70 (next link, a 32-bit word at node+0x1F48,
+// 1.13c D2Client+0xAB660: walks the node list headed by global 0xFCD70 (next link, a 32-bit word at node+0x1F48,
 // read before the call) and frees each node through Fog thunk 0xBF86 (ECX = node, EDX = source-file string,
 // stack (0x120, 0), callee pops). The thunk is injected; the list head is passed in.
 #include <cstdint>

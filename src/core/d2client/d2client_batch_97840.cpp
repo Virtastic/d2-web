@@ -17,8 +17,7 @@ static uint32_t g_hud_state;          // +0x11BC34 DAT_6fbcbc34 (0xE = pending t
 static uint32_t g_hud_handle;         // +0x11BC78 DAT_6fbcbc78
 static uint32_t g_item_head;          // +0x11BC14 DAT_6fbcbc14 (item chain, next at +0x80)
 static uint32_t g_group_head;         // +0x11BC1C DAT_6fbcbc1c (group chain: short id @0, items @4, next @8)
-// Panel-open array 0x6fbaad80, 0x26 words: aad84 = [1], aad90 = [4], aae10 = [0x1C], aae14 = [0x1D].
-// ponytail: stride-4 reading of DAT_6fbaad80 inferred from aad84/aad90/aae10/aae14 all falling in 0x26*4 bytes.
+// Panel-open array 0x6fbaad80, 0x26 words: aad84 = [1], aad90 = [4], aae10 = [0x24], aae14 = [0x25].
 static uint32_t g_panel_open[0x26];   // +0x0FAD80
 static uint32_t g_panel_count = 0x26; // +0x0DD5D0 DAT_6fb8d5d0
 static uint32_t g_panel_tbl[0x26];    // +0x0DD538 PTR_DAT_6fb8d538 (->struct, +0x90/+0x94 = mode word)
@@ -84,7 +83,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_97840(const D2cClientEnv* e) {
     }
 }
 
-// Tail + prelude common to both toggles. sw: index of the panel word being toggled (0x1D / 0x1C).
+// Tail + prelude common to both toggles. sw: index of the panel word being toggled (0x25 / 0x24).
 static bool panel_core(const D2cClientEnv* e, uint32_t sw, uint32_t modeoff, bool set_to_one,
                        uint32_t notify, uint32_t code, bool close_extra, bool gate_on_closed) {
     uint32_t old = g_panel_open[sw];
@@ -136,10 +135,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_97a70(uint32_t ecx, const uint16_
     g_str_bef4 = param3;
     if (e->ord10227() == 0 || g_cl_ready == 0) return;
     if (g_panel_count != 0x26) { fatal_exit(e, 0x139B); return; }
-    panel_core(e, 0x1D, 0x94, true, 0x6FB809C0u, 2, false, false);
+    panel_core(e, 0x25, 0x94, true, 0x6FB809C0u, 2, false, false);
 }
 
-// 1.13c D2Client+0x97CD0: returns the unit at the focus id (hash 0x6fbba808) or 0 after toggling panel 0x1C
+// 1.13c D2Client+0x97CD0: returns the unit at the focus id (hash 0x6fbba808) or 0 after toggling panel 0x24
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_97cd0(const D2cClientEnv* e) {
     if (g_focus != 0) {
         for (uint32_t n = g_unit_chain; n != 0; n = P32(n)[0x30 / 4]) {
@@ -158,7 +157,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_97cd0(const D2cClientEnv* e) 
     }
     if (e->ord10227() == 0 || g_cl_ready == 0) return 0;
     if (g_panel_count != 0x26) { fatal_exit(e, 0x139B); return 0; }
-    panel_core(e, 0x1C, 0x90, false, 0x6FB8099Cu, 3, true, true);
+    panel_core(e, 0x24, 0x90, false, 0x6FB8099Cu, 3, true, true);
     return 0;
 }
 
