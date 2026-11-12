@@ -752,29 +752,30 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_D60D0(uint8_t* self, uint8_t* game, u
 // Pending-reward refresh for player self (+0x70 = reward block). Walks the block's 16-byte slots
 // [lo..hi] of the 10427 record (+0x114/+0x116) and, for the first slot with +8 != 1 and +0xC == 1,
 // marks it pending (+8 = 1), creates the item through 0xDDDB0 (retrying twice) and attaches it with
-// 0x68FC0. Fatal 0xFA2 when 10427 fails. Finishes with 0xDD160(id).
+// 0x68FC0. Fatal 0xFA2 when 10427 fails. Finishes with 0xDD160(id). Returns the EAX retail leaves: 0 on the
+// empty-holder and failed-item exits, the matching node when the scan finds one, else 0xDD160's result.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C1030(uint8_t* self, uint8_t* unit, uint32_t id, const D2GameBbf30cEnv* env)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_C1030(uint8_t* self, uint8_t* unit, uint32_t id, const D2GameBbf30cEnv* env)
 {
     uint8_t* blk = PN(Q(f8F5C0, self));
-    if (blk == nullptr) return;
+    if (blk == nullptr) return 0;
     blk = P(blk, 0x10);
-    if (blk == nullptr) return;
+    if (blk == nullptr) return 0;
     bool scan = false;
     if (rd32(self, 0x70) == 0) scan = true;
     else {
-        if (Q(f96A40) != 0) { Q(fBD160, id); return; }
+        if (Q(f96A40) != 0) return (uint32_t)Q(fBD160, id);
         if (rd32(self, 0x70) == 0) scan = true;
     }
     if (scan) {
         uint8_t* pd = PN(Q(o10920, unit));
-        if (pd != nullptr && rd32(env->dataTables, 0xBF0) > 7 && P(pd, 0x44) != nullptr) {
+        if (pd != nullptr && (int32_t)rd32(env->dataTables, 0xBF0) > 7 && P(pd, 0x44) != nullptr) {   // a signed count (jle)
             uint8_t* head = P(P(pd, 0x44), 0) + 0x54;
             for (uint8_t* s = P(head, 0); s != nullptr; s = P(s, 0x14)) {
                 if ((rd8(s, 0) & 1) != 0) continue;
                 uint8_t* h = P(self, 0x1320 + (rd32(s, 4) & 0x7F) * 4);
                 while (h != nullptr) {
-                    if (rd32(h, 0xC) == rd32(s, 4)) return;
+                    if (rd32(h, 0xC) == rd32(s, 4)) return (uint32_t)(uintptr_t)h;
                     h = P(h, 0xE4);
                 }
                 break;
@@ -799,7 +800,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C1030(uint8_t* self, uint8_t* unit, uint3
                 uint8_t* item = PN(Q(fEDDB0, 1, unit));
                 if (item == nullptr) item = PN(Q(fEDDB0, 1, unit));
                 if (item == nullptr) item = PN(Q(fEDDB0, 1, unit));
-                if (item == nullptr) return;
+                if (item == nullptr) return 0;
                 Q(f48FC0, self, unit, item, 0xFFFF, slot, 0);
                 break;
             }
@@ -807,7 +808,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C1030(uint8_t* self, uint8_t* unit, uint3
             ++lo; ++k;
         } while ((int32_t)lo <= (int32_t)hi);
     }
-    Q(fBD160, id);
+    return (uint32_t)Q(fBD160, id);
 }
 
 // Builds the 15-byte 0x2A reply the decompile assembles in stack slots (0xAA3E0 sink): byte 0 is the

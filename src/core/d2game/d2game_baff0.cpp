@@ -19,7 +19,8 @@ static inline S o(U n, I a = 0, I b = 0) { return G->ord(n, (U)a, (U)b, 0, 0, 0,
 static inline U P(const void* p) { return (U)(uintptr_t)p; }
 
 // 1.13c D2Game+0xBAFF0 -- EAX = ctx {game, ?, unit}, stack = (the record whose bytes +0x44/+0x45 are set). ret 4.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_BAFF0(I ctx, I arg, const D2GameBaff0Env* env)
+// Returns the EAX retail leaves: 0x34130's result when no cell is found, 0 when the unit allocation fails, else the record.
+extern "C" EMSCRIPTEN_KEEPALIVE U d2_fn_d2game_BAFF0(I ctx, I arg, const D2GameBaff0Env* env)
 {
     G = env;
     const I unit = R32(ctx, 8);
@@ -28,13 +29,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_BAFF0(I ctx, I arg, const D2Ga
     w[3] += 5;
     w[0] = (U)o(10331, unit);
     // (room, &pos, 2, 0x400, &w0, 100): fills w0 with the found cell, 0 when nothing is free
-    G->sub(0x34130, (U)o(10331, unit), P(&w[3]), 2, 0x400, P(&w[0]), 100, 0, 0);   // stack words only
+    const U r34 = (U)G->sub(0x34130, (U)o(10331, unit), P(&w[3]), 2, 0x400, P(&w[0]), 100, 0, 0);   // stack words only
     const U found = w[0];
-    if (!found) return;
+    if (!found) return r34;
     const I game = R32(ctx, 0);
     w[1] = w[3]; w[2] = w[4];
     const I m = o(11153, R32(game, 0x1c), 2);
-    if (!m) return;
+    if (!m) return 0;
     R32(m, 0) = 2; R32(m, 4) = 0x236; R32(m, 8) = R32(game, 0x1c); R32(m, 0x80) = (U)game;
     U fl = R32(m, 0xc8);
     fl = R32(game, 0x70) ? (fl | 0x2000000) : (fl & 0xfdffffff);
@@ -51,7 +52,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_BAFF0(I ctx, I arg, const D2Ga
     if (gen == 0xffffffffu) gen = 1;
     R32(game, 0x98) = gen;
     // Fog #10045 (ECX = game[0x1C], EDX = 0x38, stack = (file, line, 0))
-    const I z = G->sub(0xA2E6, 0, R32(game, 0x1c), 0x38, 0x11B02C, 0x265, 0, 0, 0);
+    const I z = G->sub(0xA2E6, 0, R32(game, 0x1c), 0x38, 0xFB02C, 0x265, 0, 0, 0);
     R32(m, 0x14) = (U)z;
     for (int i = 0; i < 0xe; ++i) R32(z, i * 4) = 0;
     R32(R32(m, 0x14), 0) = (U)o(10688, 0x236);
@@ -61,4 +62,5 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_BAFF0(I ctx, I arg, const D2Ga
     G->sub(0xE0F40, w[0], w[2], (U)m, w[1], (U)game, 1, 0, 0);   // EAX = w0, ECX = w2, EDX = m, stack = (w1, game, 1)
     R8(arg, 0x44) = 0; R8(arg, 0x45) = 1;
     R32(m, 0xc4) |= 0x3000000;
+    return (U)arg;
 }

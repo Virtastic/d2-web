@@ -22,7 +22,7 @@ struct D2GameBatchAD860Env {
     uint32_t (*subB0A20)(void* ebx, void* unit);                           // 0xB0A20: EBX = the searching unit, stack word = the candidate
     uint32_t (*sub41260)(void* unit);                                       // 0x21260
     uint32_t (*subC21320)();                                                // 0x1320
-    uint32_t (*sub07A0)(uint32_t a);                                        // 0xE07A0
-    void     (*subDDDE0)(uint32_t a, void* b, void* c);                     // 0xDDDE0
+    uint32_t (*sub07A0)(uint32_t unit, uint32_t game);                      // 0xE07A0 (EAX = unit, ECX = game)
+    void     (*subDDDE0)(uint32_t ev, void* caster, void* blk, void* b, void* c); // 0xDDDE0 (CL = event, EAX = caster, EDI = block, stack b, c)
     uint32_t (*callPtr)(uint32_t fn, uint32_t a, uint32_t b);               // indirect call through a retail fn pointer
 };

@@ -37,7 +37,7 @@ static bool missileIdOk(const D2GameBatchB4520Env* e, const uint8_t* s) {
 struct Desc { u32 w[0x17]; };
 
 // 1.13c D2Game+0xB4520  (EAX = skill id, ESI = flags word; stack: game, unit, a2). The descriptor is 0x70 zero bytes: w[0] flags, w[1] = the
-// 0xDE5A0 result in its low word, w[2] = the 10786 count, w[0x18] = the row's +0x134 word when set. SUB(0x9F210/0xDDDE0/0xDE5A0) take their register inputs first.
+// 0xDE5A0 result in its low word, w[3] = the 10786 count, w[0x18] = the row's +0x134 word when set. SUB(0x9F210/0xDDDE0/0xDE5A0) take their register inputs first.
 extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B4520(u32 game, void* unit, i32 skillId, u32 esi, u32 a2, const D2GameBatchB4520Env* env)
 {
     const uint8_t* s = skillRec(env, skillId);
@@ -53,13 +53,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B4520(u32 game, void* unit, i32
         d[1] = (ax | w) & 0xffff;
         d[0] |= rd32(s, 0x130);
         if (rd32(s, 0x134)) d[0x18] = rd32(s, 0x134);
-        d[2] = U(ORD(10786, esi, rd32(s, 0x13c), U(skillId), a2));
+        d[3] = U(ORD(10786, esi, rd32(s, 0x13c), U(skillId), a2));   // the disassembly stores it at desc+0xC
         SUB(0x9F210, U(skillId), esi, U((uintptr_t)d), a2, 0, 0, 0);   // EAX = skill id, EDI = esi, stack desc, a2
     }
     SUB(0xDDDE0, esi, U((uintptr_t)d), game, un, 0, 0, 0);   // EAX = esi, CL = 0x80, EDI = desc, stack game, unit
     SUB(0xDED30, game, esi, un, 0, 0, 0, 0);
     i32 h = ORD(10511, esi, 0, 0, 0);
-    if (h) ORD(10243, U(h), (d[0] & 1) ? 1 : 0, 0, 0);
+    if (h) ORD(10243, U(h), (d[1] & 1) ? 1 : 0, 0, 0);   // retail tests [esp+0xC] after `pop edi`: desc+4, the 0xDE5A0 word
     return 1;
 }
 
@@ -91,7 +91,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B46B0(u32 game, void* unit, con
 // 8-entry table {a,8,16,14,12,10,e,c}; #10740 takes the dword of the stack table with that byte in place and writes the step pair (dx, dy). #10630(ECX = unit,
 // EDX = 0xAD) is a plain-ret fastcall: the `push 1` before it stays on the stack and is the third word of #10306(unit, result, 1) (ret 0xC). Types 2, 4 and 5 read the
 // room's +0xC / +0x10; the others ask #10867 / #10750. 0x1280 (EAX = #10331(unit), EBX = x, EDI = y) has its result dropped. The 0x17-dword request goes to
-// 0x6F930 (ECX = game, EDX = request): {0x21, unit, 0, 0x8F, x, y, 0, x + 2 dx, y + 2 dy, 0, 3, 0xAD, #10306 result}.
+// 0x6F930 (ECX = game, EDX = request): {0x21, unit, 0, 0, 0x8F, x, y, x + 2 dx, y + 2 dy, 0, 3, 0xAD, #10306 result}.
 extern "C" EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_B4870(void* unit, u32 game, const D2GameBatchB4520Env* env)
 {
     u32 room = rd32(unit, 0x2c);
@@ -119,7 +119,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_B4870(void* unit, u32 game, c
     u32 uc = U(ORD(10331, un, 0, 0, 0));
     SUB(0x1280, uc, x, y, 0, 0, 0, 0);
     Desc d{};
-    d.w[0] = 0x21; d.w[1] = un; d.w[3] = 0x8f; d.w[4] = x; d.w[5] = y;
+    d.w[0] = 0x21; d.w[1] = un; d.w[4] = 0x8f; d.w[5] = x; d.w[6] = y;   // the disassembly: +0x10, +0x14, +0x18
     d.w[7] = x + 2 * U(dxy[0]); d.w[8] = y + 2 * U(dxy[1]);
     d.w[10] = 3; d.w[11] = 0xad; d.w[12] = r3;
     return (void*)(uintptr_t)SUB(0x6F930, game, U((uintptr_t)&d), 0, 0, 0, 0, 0);

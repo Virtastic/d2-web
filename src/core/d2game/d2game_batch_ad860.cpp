@@ -188,27 +188,29 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_B3270(const void* p1, int32_t*
     esi[0x12] = 0x500;
 }
 
-// 1.13c D2Game+0xB35A0   ebp is Ghidra's unaff_EBP (stack word for the second #10786).
+// 1.13c D2Game+0xB35A0   ECX = game, EDX = unit, stack (idx, ebp): ebp is the second stack argument (last word of both #10786 calls).
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_B35A0(uint32_t p1, uint32_t* unit, int32_t idx, uint32_t ebp, const D2GameBatchAD860Env* env)
 {
     if (-1 < idx && idx < (int32_t)rd32(env->dt, 0xba0)) {
         uint32_t rec = idx * 0x23c + rd32(env->dt, 0xb98);
         if (rec) {
-            uint32_t iVar1 = O(10511, 0, 0, 0, 0, 0);
-            if (iVar1) {
-                env->sub07A0(p1);
+            // the disassembly: the state record of #10511(unit) is what the three setters write; the seed local (ECX of
+            // 0xA616 / 0xA628) is seeded with unit+0xC + target+0xC; both #10786 calls take (unit, column, idx, ebp).
+            uint32_t st = O(10511, unit, 0, 0, 0, 0);
+            if (st) {
+                env->sub07A0((uint32_t)(uintptr_t)unit, p1);
                 uint32_t* tgt = (uint32_t*)(uintptr_t)O(10392, unit[0xb], 0, 0, 0, 0);
                 if (tgt != unit && tgt) {
-                    O(10936, 0, 0, 0, 0, 0);
-                    O(10614, 0, 0, 0, 0, 0);
-                    uint32_t pair[2] = { rd32((void*)(uintptr_t)rec, 0x138), (uint32_t)idx };
-                    int32_t a = (int32_t)O(10786, unit, 0, 0, 0, 0);
-                    O(10786, unit, rd32((void*)(uintptr_t)rec, 0x13c), ebp, iVar1, 0);
-                    a += (int32_t)env->sub211D0(pair);
+                    uint32_t seed[2] = { 0, 0 };
+                    O(10936, seed, 0, 0, 0, 0);
+                    O(10614, seed, unit[3] + tgt[3], 0, 0, 0);
+                    int32_t lo = (int32_t)O(10786, unit, rd32((void*)(uintptr_t)rec, 0x138), idx, ebp, 0);
+                    O(10786, unit, rd32((void*)(uintptr_t)rec, 0x13c), idx, ebp, 0);
+                    int32_t a = lo + (int32_t)env->sub211D0(seed);   // ESI = hi - lo, the roll's range
                     if (a < 1) a = 1;
-                    O(10243, unit, a, 0, 0, 0);
-                    O(10554, unit, tgt[3], 0, 0, 0);
-                    O(10748, unit, tgt[0], 0, 0, 0);
+                    O(10243, st, a, 0, 0, 0);
+                    O(10554, st, tgt[3], 0, 0, 0);
+                    O(10748, st, tgt[0], 0, 0, 0);
                     return 1;
                 }
             }
@@ -220,11 +222,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_B35A0(uint32_t p1, uint32_
 // 1.13c D2Game+0xB3EB0
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_B3EB0(int32_t* p1, int32_t* p2, const D2GameBatchAD860Env* env)
 {
-    env->sub07A0((uint32_t)(uintptr_t)p1);
+    env->sub07A0((uint32_t)(uintptr_t)p2, (uint32_t)(uintptr_t)p1);
     int32_t* tgt = (int32_t*)(uintptr_t)O(10392, p2[0xb], 0, 0, 0, 0);
     if (tgt != p2 && tgt) {
         uint32_t buf[0x1c] = {0};
-        env->subDDDE0(0x80, p1, tgt); (void)buf;
+        env->subDDDE0(0x80, p2, buf, p1, tgt);
         return 1;
     }
     return 0;

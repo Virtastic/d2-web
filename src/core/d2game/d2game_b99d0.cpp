@@ -1,6 +1,6 @@
 // 1.13c D2Game+0xB99D0, injectable callees. Fastcall: ECX = quest record (+0x6D = difficulty byte), EDX = unit,
 // one unused stack word (ret 4). 0xA4C0 = D2Common 10920 (player data), 0xA568 = D2Common 10174 (quest flag),
-// 0x554F0 takes AL = 0x17, ECX = unit and the quest record on the stack.
+// 0x354F0 takes AL = 0x17, ECX = unit and the quest record on the stack.
 #include <cstdint>
 #include <cstring>
 struct GB99D0Env {
