@@ -2201,7 +2201,9 @@ static void detachTargetFixture() {
     if (g_targetRoom) { g_targetRoom->ppClients = nullptr; g_targetRoom->nNumClients = 0; g_targetRoom->nMaxClients = 0; }
     for (D2ActiveRoomStrc* r : g_sessionJoinRooms) { r->ppClients = nullptr; r->nNumClients = 0; r->nMaxClients = 0; }   // the level join's rosters too
     g_sessionJoinRooms.clear();
-    if (g_game && g_game->pClientList == g_targetClient) g_game->pClientList = nullptr;   // off the client list before it is freed
+    if (g_game && g_targetClient)   // the capture rig's join linked the client into the game's list
+        for (D2ClientStrc** pp = &g_game->pClientList; *pp; pp = &(*pp)->pNext)
+            if (*pp == g_targetClient) { *pp = g_targetClient->pNext; break; }
     free(g_targetClient); g_targetClient = nullptr; g_targetRoom = nullptr; g_targetPlayer = nullptr; g_targetMonster = nullptr;
     g_clientCastClockActive = false; g_clientCastFramePrecise = 0; g_clientCastAnimSpeed = 0;
     g_clientNeutralClockActive = false; g_clientNeutralFramePrecise = 0; g_clientNeutralAnimSpeed = 0;
@@ -2545,6 +2547,10 @@ EMSCRIPTEN_KEEPALIVE const D2VecAiUnit* d2_aispawn_units(int* count) { *count = 
 // below is what the AI oracle rows need, not what a player needs.
 bool g_sessionClientStaysInRoom = false; // read by sub_6FC33670
 static bool g_sessionClientAdjCount = false; // d2_session_client_feed(2), see below
+static bool g_sessionClientRig = false;      // d2_session_client_feed(3), see below
+// The session's client was joined by the capture rig's fed join (latched at the join, for the session's whole run): the
+// rig's frame re-rooms that client as retail's client update does (sub_6FC33670) and has no client flush (no vitals sync).
+extern "C" bool g_sessionRigJoined = false;
 static bool g_fixtureOwnRoomOnly = false;
 // The capture's D2CAPTURE_SESSION_CLIENT join (the retail capture tool/main.cpp "capture-client") lists the client in its own room and
 // then in every built room of the level through D2Common #10879 (0x3C460) directly -- no LEVEL_AddClient, so no unit sends.
@@ -2691,12 +2697,45 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
     // What a joining client is told before the rooms, in retail's order: the game's flags and the two load markers,
     // the act and its time of day, the room it stands in, its own unit, which unit it plays, then its position.
     // Kept with the join walk's bytes below.
+    const bool joinBurstRig = g_sessionClientRig;
+    g_sessionRigJoined = joinBurstRig;
+    g_sessionJoinLoadLength = 0;
     if (D2DrlgActStrc* joinAct = g_game->pAct[g_targetClient->nAct]; joinAct && DUNGEON_GetEnvironmentFromAct(joinAct)) {
         D2GAME_PACKETS_SendPacket0x01_6FC3C7C0(g_targetClient, 1, g_game);
         D2GAME_PACKETS_SendHeaderOnlyPacket(g_targetClient, 0x00);
         D2GAME_PACKETS_SendHeaderOnlyPacket(g_targetClient, 0x02);
         g_sessionJoinLoadLength = sessionPacketStreamMark() - joinBurstFrom;
         LEVEL_SynchronizeDayNightCycleWithClient(g_game, g_targetClient);
+    }
+    if (joinBurstRig && g_sessionJoinLoadLength) {
+        // The capture rig's fed join (D2CAPTURE_SESSION_CLIENT with _A2): the player's room, then every other built room of the
+        // level, each listing the client (no first-client wake, no units) and announced by its 0x07; then the client's unit
+        // (0x0B), the unit itself (SUNITMSG_SendUnitToClient, 1.13c D2Game+0x7B0A0), its position (0x15), and the 0xAC assign
+        // (D2Game+0x8CA20) of each monster within 40 subtiles of the start, in the level's room order.
+        auto joinRoomTo = [](D2ActiveRoomStrc* r) {
+            int32_t k = 0; while (k < r->nNumClients && r->ppClients[k] != g_targetClient) ++k;
+            if (k == r->nNumClients) DUNGEON_AddClientToRoom(r, g_targetClient);
+            D2DrlgCoordsStrc c = {}; DUNGEON_GetRoomCoordinates(r, &c);
+            D2GAME_PACKETS_SendPacket0x07_6FC3D120(g_targetClient, DUNGEON_GetLevelIdFromRoom(r), (uint16_t)c.nTileXPos, (uint16_t)c.nTileYPos);
+        };
+        // The rig puts its client at the head of the game's client list (+0x88) before the join, so what the game sends
+        // every in-game client (the arena scores 0x65, the join line 0x5A) reaches it; detachTargetFixture unlinks it.
+        g_targetClient->pNext = g_game->pClientList; g_game->pClientList = g_targetClient;
+        // The rig's client is a zero-filled block it never names (client+0x0D name, +0x1D account empty), so the join line
+        // 0x5A it is sent carries no names.
+        memset(g_targetClient->szName, 0, sizeof g_targetClient->szName);
+        joinRoomTo(room); g_targetClient->pRoom = room;
+        for (D2DrlgRoomStrc* roomEx = g_lastLevel ? g_lastLevel->pFirstRoomEx : nullptr; roomEx; roomEx = roomEx->pDrlgRoomNext)
+            if (roomEx->pRoom && roomEx->pRoom != room) joinRoomTo(roomEx->pRoom);
+        D2GAME_SendPacket0x0B_ClientUnit(g_targetClient, player);
+        D2GAME_SUNITMSG_FirstFn_6FCC5520(g_game, player, g_targetClient);
+        D2GAME_PACKETS_SendPacket0x15_6FC3D0D0(g_targetClient, 0x15u, 0, player->dwUnitId, CLIENTS_GetUnitX(player), CLIENTS_GetUnitY(player), 1);
+        const int x0 = player->pDynamicPath ? player->pDynamicPath->tGameCoords.wPosX : x, y0 = player->pDynamicPath ? player->pDynamicPath->tGameCoords.wPosY : y;
+        for (D2DrlgRoomStrc* roomEx = g_lastLevel ? g_lastLevel->pFirstRoomEx : nullptr; roomEx; roomEx = roomEx->pDrlgRoomNext)
+            for (D2UnitStrc* u = roomEx->pRoom ? roomEx->pRoom->pUnitFirst : nullptr; u; u = u->pRoomNext)
+                if (u->dwUnitType == UNIT_MONSTER && u->pDynamicPath && abs(u->pDynamicPath->tGameCoords.wPosX - x0) <= 40 && abs(u->pDynamicPath->tGameCoords.wPosY - y0) <= 40)
+                    sub_6FC3FC80(g_targetClient, u);
+    } else if (g_sessionJoinLoadLength) {
         D2DrlgCoordsStrc joinRoom = {};
         DUNGEON_GetRoomCoordinates(room, &joinRoom);
         D2GAME_PACKETS_SendPacket0x07_6FC3D120(g_targetClient, DUNGEON_GetLevelIdFromRoom(room), (uint16_t)joinRoom.nTileXPos, (uint16_t)joinRoom.nTileYPos);
@@ -2725,8 +2764,13 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
         D2GAME_SendPacket0x0B_ClientUnit(g_targetClient, player);
         D2GAME_PACKETS_SendPacket0x15_6FC3D0D0(g_targetClient, 0x15u, 0, player->dwUnitId, CLIENTS_GetUnitX(player), CLIENTS_GetUnitY(player), 1);
         }
-    } else g_sessionJoinLoadLength = 0;
+    }
     g_sessionJoinRooms.clear();
+    // The rig's listing of the other rooms of the level is a server roster entry only, like the level join below: retail's
+    // client holds just the units the sync sends, and detachTargetFixture clears those rosters.
+    if (joinBurstRig && g_sessionJoinLoadLength && g_lastLevel)
+        for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext)
+            if (roomEx->pRoom && roomEx->pRoom != room) g_sessionJoinRooms.insert(roomEx->pRoom);
     if (g_fixtureOwnRoomOnly && g_sessionClientAdjCount) {   // a retail recording (feed 2): the adjacent rooms' client arrays only
         D2ActiveRoomStrc** adj = nullptr; int32_t nAdj = 0; DUNGEON_GetAdjacentRoomsListFromRoom(room, &adj, &nAdj);
         for (int32_t i = 0; i < nAdj; ++i) if (adj[i] != room) DUNGEON_AddClientToRoom(adj[i], g_targetClient);
@@ -2736,7 +2780,7 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
     if (g_fixtureOwnRoomOnly && g_sessionJoinLevelRooms && g_lastLevel) {
         for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext)
             if (roomEx->pRoom && roomEx->pRoom != room) { if (!captureJoin) DUNGEON_AddClientToRoom(roomEx->pRoom, g_targetClient); g_sessionJoinRooms.insert(roomEx->pRoom); }
-    } else {
+    } else if (!joinBurstRig) {   // the rig's join above has placed the client already
         g_joinWalkRevealMode = g_sessionJoinUnits ? g_sessionJoinRevealMode : 0;   // the walk only: no flag outlives it
         sub_6FC33020(g_targetClient, room);
         g_joinWalkRevealMode = 0;
@@ -2748,7 +2792,8 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
         if (!captureJoin) {   // the capture-client join drops the fixture's queued stats and leaves the units to tick 1
             D2Common_10513(g_targetPlayer, g_targetPlayer, (void(__fastcall*)(D2UnitStrc*, int32_t, int32_t, D2UnitStrc*))D2GAME_UpdateAttribute_6FC822D0);
             sub_6FC82360(g_targetPlayer, g_targetPlayer, 1);
-            LEVEL_UpdateUnitsInAdjacentRooms(g_game, room, g_targetClient);
+            // The rig's client learns the rooms' units from the first tick's client update instead (sent once there).
+            if (!joinBurstRig) LEVEL_UpdateUnitsInAdjacentRooms(g_game, room, g_targetClient);
         }
         sessionKeepJoinBurst(joinBurstFrom); D2WEB_ResetPacketStream();
     }
@@ -2881,7 +2926,8 @@ static int g_attachAtX = -1, g_attachAtY = -1;
 static bool g_sessionClientFeed = false;
 // on == 2 (a retail recording): retail's real client is in every adjacent room (0x07 for 79 rooms at tick 1) so pets and monsters scan them,
 // but its first-client wake events do not fire early; join the adjacent rooms' client arrays only (no events, no packets).
-EMSCRIPTEN_KEEPALIVE void d2_session_client_feed(int on) { g_sessionClientFeed = on == 1; g_sessionClientAdjCount = on == 2; }
+// on == 3: the capture rig's fed join (D2CAPTURE_SESSION_CLIENT + _A2), reproduced packet for packet in attachSessionPlayerAt.
+EMSCRIPTEN_KEEPALIVE void d2_session_client_feed(int on) { g_sessionClientFeed = on == 1 || on == 3; g_sessionClientAdjCount = on == 2; g_sessionClientRig = on == 3; }
 EMSCRIPTEN_KEEPALIVE int d2_aitarget_attach() {
     if (!g_game || !g_lastLevel || g_targetPlayer) return 0;
     if (g_attachAtX < 0 && g_sessionStartX >= 0) { g_attachAtX = g_sessionStartX; g_attachAtY = g_sessionStartY; g_sessionStartX = g_sessionStartY = -1; const int ok = d2_aitarget_attach(); g_attachAtX = g_attachAtY = -1; if (ok) return 1; }
@@ -8219,7 +8265,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         D2GAME_UpdateSpawnedClient(g_game, g_targetClient);   // for the local game's join: the "in game" marker, where retail's client update sends it
         // The per-client vitals update (1.13c D2Game+0x2BE20, which calls 0xCC030), run by retail's client flush every
         // frame: forced once 20 frames have passed without one (10 when other packets are already queued).
-        if (g_targetPlayer && g_targetClient) {
+        // The capture rig's fed join (feed 3) runs the game frame without the client flush, so it never makes this call.
+        if (g_targetPlayer && g_targetClient && !g_sessionRigJoined) {
             uint32_t queued = 0; D2WEB_PacketStream(&queued, nullptr);
             const int32_t since = g_targetClient->unk0x1B0;
             if (sub_6FC82360(g_targetPlayer, g_targetPlayer, (queued && since >= 10) || since >= 20)) g_targetClient->unk0x1B0 = 0;
@@ -11986,6 +12033,7 @@ EMSCRIPTEN_KEEPALIVE void d2_session_destroy() {
     g_clientMonsterClock.clear(); d2_client_walk_reset(); // unit ids are reused by the next session
     g_clientObjectClock.clear();
     g_sessionMonsterLights.clear();
+    g_sessionRigJoined = false;
     resetSessionClientMapMirror();
     d2_monspawn_reset(); g_sessionLive = false; g_sessionMovePending = false;
     g_sessionAttackTarget = nullptr; g_sessionAttackSkill = nullptr;
