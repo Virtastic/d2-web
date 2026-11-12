@@ -16,9 +16,10 @@
 #include <Storm.h>
 #include <GAME/Clients.h>
 #include <GAME/Game.h>
-#include <PLAYER/PlayerList.h>
 #include <GAME/SCmd.h>
 #include <ITEMS/ItemMode.h>
+#include <PLAYER/PlayerList.h>
+#include <PLAYER/PlrMsg.h>
 
 extern "C" int32_t __fastcall D2GAME_UpdateSpawnedClient(D2GameStrc* pGame, D2ClientStrc* pClient)
 { // 1.13c D2Game+0x2D9B0 (state 3 and state 5 arms)

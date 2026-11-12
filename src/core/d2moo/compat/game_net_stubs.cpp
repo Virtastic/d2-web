@@ -247,6 +247,7 @@ void CLIENTS_SetExperienceLoss(D2ClientStrc* pClient, int32_t nExpLoss) {}
 // room-status and adjacent-room streaming boundary, rather than a pointer assignment.
 extern "C" bool g_sessionClientStaysInRoom;
 extern "C" bool g_sessionJoinUnits;
+extern "C" bool g_sessionRigJoined;   // the capture rig's fed join: its client is re-roomed through LEVEL_AddClient/RemoveClient
 void __fastcall D2GAME_SUNITMSG_FirstFn_6FCC5520(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient);
 // The local game's join walk (monspawn attachSessionPlayerAt) sets this for the length of the walk only, and only for a
 // client that is joined through the packet path: 0 no reveals (the direct path, every headless session), 1 every room of
@@ -267,7 +268,7 @@ void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
     // the client with DUNGEON_AddClientToRoom and wakes monsters itself, so a second AI-event arm there fires early.
     // The local realm's joining client takes the same path: LEVEL_AddClient wakes a room's first-client monsters and
     // sends the room's units in the room's order, as in the retail join (so this else branch needs no copy of either).
-    const bool lvl = g_sessionClientStaysInRoom || g_sessionJoinUnits;
+    const bool lvl = g_sessionClientStaysInRoom || g_sessionJoinUnits || g_sessionRigJoined;
     if (!pClient || !pClient->pGame || pClient->pRoom == pRoom) return;
     DUNGEON_ChangeClientRoom(pClient->pRoom, pRoom);
     D2Common_10077(pClient->pRoom, pRoom);
@@ -432,7 +433,7 @@ void __fastcall sub_6FC33670(D2GameStrc* pGame, D2ClientStrc* pClient) {
         D2Common_10513(player, player, (void(__fastcall*)(D2UnitStrc*, int32_t, int32_t, D2UnitStrc*))D2GAME_UpdateAttribute_6FC822D0);
     }
     ++pClient->unk0x1B0;
-    if (clientRoom != playerRoom && !g_sessionClientStaysInRoom) {
+    if (clientRoom != playerRoom && (!g_sessionClientStaysInRoom || g_sessionRigJoined)) {
         const int32_t oldLevel = clientRoom ? DUNGEON_GetLevelIdFromRoom(clientRoom) : 0;
         const int32_t newLevel = playerRoom ? DUNGEON_GetLevelIdFromRoom(playerRoom) : 0;
         if (oldLevel != newLevel) {
@@ -1078,8 +1079,13 @@ void __fastcall D2GAME_UpdateClientItem_6FC3E9D0(D2ClientStrc* pClient, D2UnitSt
 // is unreachable. There is no socket-backed peer to remove in the headless game.
 void __fastcall GAME_DisconnectClient(D2GameStrc*, D2ClientStrc*, D2C_SRV2CLT5A_TYPES) {}
 void D2Game_10034_Return(int a1) {}
-// retail D2Game 0x29820 (NOT implemented, empty stub; unverified), 
-void GAME_ForEachIngameClient(D2GameStrc* pGame, GAME_ForEachIngameClientCallbackPtr pFn, void* pContext) {}
+// 1.13c D2Game+0x29820: the game's client list (game+0x88, next at client+0x4A8), the callback for every client in
+// state 4 (in game). Reached from the 0x5A broadcast (0xCBDB0) of the client-entered update.
+void GAME_ForEachIngameClient(D2GameStrc* pGame, GAME_ForEachIngameClientCallbackPtr pFn, void* pContext) {
+    if (!pGame || !pFn) return;
+    for (D2ClientStrc* pClient = pGame->pClientList; pClient; pClient = pClient->pNext)
+        if (pClient->dwClientState == CLIENTSTATE_INGAME) pFn(pClient, pContext);
+}
 D2CharStatsTxt* PLRSAVE2_GetCharStatsTxtRecord(int32_t nClass) { return UNITS_GetCharStatsTxtRecord(nClass); }
 // SCMD_Send0x75_PartyRosterUpdate lives in src/core/d2game/d2game_8d120_packet.cpp (moved out for the join burst).
 // D24: linked in by the retail room walk (LEVEL_UpdateUnitsInAdjacentRooms -> sub_6FC81650 -> SUnitMsg/InvMode); not part of the level-up window, so empty until their own rows (0x0C/0x0E/0x11/0xA7/0xA9/0x9C/0x9D).
