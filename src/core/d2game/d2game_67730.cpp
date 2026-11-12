@@ -21,7 +21,7 @@ struct D2Game67730Env {
     uint32_t globalCBE70;                          // *(uint32_t*)0x6FD31C20
     void     (*subCBE70)(uint32_t edx, uint32_t s1, uint32_t s2);
     uint32_t strCBE70;                             // 0x6FD1BEAC
-    void     (*subDFCC0)(uint32_t eax, uint32_t ebx, uint32_t edi, uint32_t s1);
+    uint32_t (*subDFCC0)(uint32_t eax, uint32_t ebx, uint32_t edi, uint32_t s1);
     void     (*subDFFD0)(uint32_t esi, uint32_t s1, uint32_t s2);
     uint32_t (*a808)(uint32_t room);
     uint8_t  (*a56e)(uint32_t level);
@@ -40,15 +40,15 @@ static inline void wr32(uint32_t a, uint32_t v) { std::memcpy((void*)(uintptr_t)
 static inline uint8_t rd8(uint32_t a) { return *(const uint8_t*)(uintptr_t)a; }
 static inline void wr8(uint32_t a, uint8_t v) { *(uint8_t*)(uintptr_t)a = v; }
 
-// 1.13c D2Game+0x67730
-void D2Game_67730(uint32_t game, uint32_t player, const D2Game67730Env* env)
+// 1.13c D2Game+0x67730. No result of its own: EAX at exit is the quest node on the early exit, else what the last callback pass returned.
+uint32_t D2Game_67730(uint32_t game, uint32_t player, const D2Game67730Env* env)
 {
     const uint32_t list = rd32(game + 0x10f4);
     uint32_t node = list ? rd32(list) : 0;
     while (node != 0 && rd32(node) != 4) node = rd32(node + 0xf4);
-    if (node == 0) { env->fatal(0x68e); return; }
+    if (node == 0) { env->fatal(0x68e); return 0; }
     const uint32_t q = rd32(node + 0x18);
-    if (rd8(node + 9) == 0 || rd8(q + 0x50) == 1) return;
+    if (rd8(node + 9) == 0 || rd8(q + 0x50) == 1) return node;
     wr32(q + 0x54, 3);
     env->a4a2(player, 3);
     int32_t x = env->sub1100(player) + 3;
@@ -76,13 +76,13 @@ void D2Game_67730(uint32_t game, uint32_t player, const D2Game67730Env* env)
         const uint32_t marked = rd32(q + 0x74);
         lvl = marked;
         if (marked != 0 && rd8(q + 0x66) == 0) {
-            if (room == 0) { env->fatal(0xe42); return; }
+            if (room == 0) { env->fatal(0xe42); return 0; }
             if (env->a808(room) != 0) {
                 env->subDFFD0(marked, 0x18, marked);
             } else {
                 const uint8_t act = env->a56e(1);
                 lvl = env->a556(room);
-                if (env->a56e(lvl) != act) { env->fatal(0xe5c); return; }
+                if (env->a56e(lvl) != act) { env->fatal(0xe5c); return 0; }
                 x += 3; y += 3;
                 pt[0] = x; pt[1] = y;
                 if (env->ae98(room, (uint32_t)(uintptr_t)pt, (uint32_t)(uintptr_t)pt, 3, 0x3e01, 0xc01, 0) != 0) {
@@ -109,5 +109,5 @@ void D2Game_67730(uint32_t game, uint32_t player, const D2Game67730Env* env)
     env->subDFCC0(0, 0x6fc82960u, game, player);
     wr8(node + 0x14, 0);
     wr8(node + 0xb, 6);
-    env->subDFCC0(0, 0x6fc82a80u, rd32(node + 4), 0);
+    return env->subDFCC0(0, 0x6fc82a80u, rd32(node + 4), 0);
 }

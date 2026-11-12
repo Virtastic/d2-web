@@ -16,7 +16,7 @@ struct D2Game67730Env {
     uint32_t globalCBE70;
     void     (*subCBE70)(uint32_t edx, uint32_t s1, uint32_t s2);
     uint32_t strCBE70;
-    void     (*subDFCC0)(uint32_t eax, uint32_t ebx, uint32_t edi, uint32_t s1);
+    uint32_t (*subDFCC0)(uint32_t eax, uint32_t ebx, uint32_t edi, uint32_t s1);
     void     (*subDFFD0)(uint32_t esi, uint32_t s1, uint32_t s2);
     uint32_t (*a808)(uint32_t room);
     uint8_t  (*a56e)(uint32_t level);
@@ -29,7 +29,7 @@ struct D2Game67730Env {
     void     (*aec8)(uint32_t obj, uint32_t v);
     void     (*a51a)(uint32_t room, uint32_t v);
 };
-void D2Game_67730(uint32_t game, uint32_t player, const D2Game67730Env* env);
+uint32_t D2Game_67730(uint32_t game, uint32_t player, const D2Game67730Env* env);
 
 namespace {
 HookEnv* H;
@@ -44,9 +44,13 @@ uint32_t a478(uint32_t u) { return H->h(0xA478, 0, 0, 0, 0, 0, u); }
 uint32_t ef650(uint32_t c, uint32_t d, uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4, uint32_t s5, uint32_t s6) {
     return H->h(0xEF650, 0, c, d, 0, 0, s1, s2, s3, s4, s5, s6) ? gCain : 0;
 }
-void s34130(uint32_t room, uint32_t pt, uint32_t a3, uint32_t a4, uint32_t out, uint32_t a6) { H->h(0x34130, 0, 0, 0, 0, 0, room, pt, a3, a4, out, a6); H->blk(0x34130, pt, 2); }
-void sebe70(uint32_t edx, uint32_t s1, uint32_t s2) { H->h(0xEBE70, 0, 0, M(edx), 0, 0, s1, s2); }
-void sdfcc0(uint32_t eax, uint32_t ebx, uint32_t edi, uint32_t s1) { H->ed(edi); H->h(0xDFCC0, eax, 0, 0, M(ebx), 0, s1); H->edi(0xDFCC0, edi); }
+void s34130(uint32_t room, uint32_t pt, uint32_t a3, uint32_t a4, uint32_t out, uint32_t a6) {
+    // the capture logs the block as the callee received it, before the hook writes its answer through the same pointer
+    const uint32_t in[2] = { HookEnv::rd32(pt), HookEnv::rd32(pt + 4) };
+    H->h(0x34130, 0, 0, 0, 0, 0, room, pt, a3, a4, out, a6); H->blk(0x34130, in, 2);
+}
+void sebe70(uint32_t edx, uint32_t s1, uint32_t s2) { H->h(0xCBE70, 0, 0, M(edx), 0, 0, s1, s2); }
+uint32_t sdfcc0(uint32_t eax, uint32_t ebx, uint32_t edi, uint32_t s1) { H->ed(edi); const uint32_t v = H->h(0xDFCC0, eax, 0, 0, M(ebx), 0, s1); H->edi(0xDFCC0, edi); return v; }
 void sdffd0(uint32_t esi, uint32_t s1, uint32_t s2) { H->h(0xDFFD0, 0, 0, 0, 0, esi, s1, s2); }
 uint32_t a808(uint32_t r) { return H->h(0xA808, 0, 0, 0, 0, 0, r); }
 uint8_t a56e(uint32_t v) { return (uint8_t)H->h(0xA56E, 0, 0, 0, 0, 0, v); }
@@ -65,6 +69,5 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_67730(uint32_t* r) {
     H = &e; gCain = r[28];
     const D2Game67730Env env = { fatal, a4a2, s1100, s1130, a478, ef650, s34130, HookEnv::rd32(r[32]), sebe70, 0x6fd1beacu, sdfcc0, sdffd0, a808, a56e, a556, ae98,
                                  s1280, e1d90, a22e0, aee0, aec8, a51a };
-    r[4] = 0;
-    D2Game_67730(r[0], r[1], &env);
+    r[4] = D2Game_67730(r[0], r[1], &env);
 }
