@@ -237,6 +237,7 @@ uint32_t g_nTiles, g_nRooms, g_nUnits, g_roomNodes[kMaxRooms];
 // xMin/xMax/yMin/yMax box the 6A3D0 cull reads. has = 0: no COF staged (the walk then fakes the layer count and an empty box).
 struct { int32_t h[6]; uint32_t has; } g_unitCof[kMaxUnits];
 static uint8_t g_unitPal[kMaxUnits];   // d2_dg_stage_unit_palshift
+static uint32_t g_unitShift[kMaxUnits];   // d2_dg_stage_unit_shift: the client unit's +0x6C
 int32_t g_view[4], g_ox, g_oy; uint32_t g_now, g_skipUnits;
 uint32_t g_unitId[kMaxUnits];
 // The client unit fields the hit flash reads (unit +0x58 the counter, stat 6 the life; the client's maximum life is 0x80 << 8).
@@ -327,6 +328,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_stage_unit(uint32_t unit, int32_t type, int3
     g_units[g_nUnits] = {rec, (int32_t)unit, type, sx, sy, a6180, bit20, bit7, 0, 0};
     g_unitCof[g_nUnits].has = 0;
     g_unitPal[g_nUnits] = 0;
+    g_unitShift[g_nUnits] = 0;
     g_unitId[g_nUnits] = 0xffffffffu;
     return g_nUnits++;
 }
@@ -353,6 +355,8 @@ EMSCRIPTEN_KEEPALIVE void d2_dg_stage_unit_cof(uint32_t k, const uint8_t* hdr) {
 }
 // The staged monster k's class has a palette shift table (D2Client+0x53C30 loads Monsters\<token>\COF\palshift.dat into DAT_6fbc7804[class]).
 EMSCRIPTEN_KEEPALIVE void d2_dg_stage_unit_palshift(uint32_t k) { if (k < g_nUnits) g_unitPal[k] = 1; }
+// The staged unit k's colour shift index (unit +0x6C, D2Client+0x72130 sets it from the unit's states; 0 none).
+EMSCRIPTEN_KEEPALIVE void d2_dg_stage_unit_shift(uint32_t k, uint32_t v) { if (k < g_nUnits) g_unitShift[k] = v; }
 EMSCRIPTEN_KEEPALIVE void d2_dg_stage_room(int32_t r5c, int32_t r60, int32_t r64, int32_t r68, int32_t subX, int32_t subY,
                                            uint32_t nA, uint32_t a0, uint32_t nB, uint32_t b0, uint32_t nU, uint32_t u0) {
     if (g_nRooms < kMaxRooms) g_rooms[g_nRooms++] = {r5c, r60, r64, r68, subX, subY, nA, nB, nU, a0, b0, u0, -1};
@@ -498,7 +502,9 @@ static const D2c6C490Env kE6c490 = {
     // 6AEE0's 10013: opening (0x6fb1c5e3) ecx = 6A3D0's leftover, edx = 6C490's second argument (0); closing (0x6fb1cb01) ecx = the layer count, edx = the hidden flag.
     [](int32_t) {}, [](uint32_t, int32_t x, int32_t y, int32_t f) -> int32_t { return cull6a3d0(x, y, f); },
     [](uint32_t, uint32_t a, int32_t open, int32_t, int32_t, int32_t hid) { if (open) g_ledx = a; else { g_lecx = g_hhdr[0] & 0xff; g_ledx = (uint32_t)hid; } rec10013(); },
-    []() -> int32_t { return 0; }, [](uint32_t, int32_t) -> int32_t { return 0; }, []() -> uint32_t { return 0; },
+    // D2Gfx #10164 (called with unit+0x6C set): the colour shift table's row for index - 1, a pointer (its bytes are not read here).
+    []() -> int32_t { static uint8_t* t = nullptr; if (!t) t = (uint8_t*)calloc(0x100, 1); return (int32_t)(uintptr_t)t; },
+    [](uint32_t, int32_t) -> int32_t { return 0; }, []() -> uint32_t { return 0; },
     [](uint32_t, uint32_t, uint32_t*) -> uint32_t { return 2; }, []() -> uint32_t { return 1; }, [](uint32_t, uint32_t) -> uint32_t { return 1; }, []() -> uint32_t { return pal53a30(); },
     [](uint32_t) -> int32_t { return 0; }, [](uint32_t) -> uint32_t { return 0; }, nullptr, [](uint32_t) -> uint32_t { return 0; }, [](uint32_t) -> int32_t { return 0; }, []() -> uint32_t { return 0; },
     [](uint32_t, const uint32_t*) -> int32_t { return 1; }, [](uint32_t, uint32_t*) -> int32_t { return 0; }, [](uint32_t, uint32_t pal) -> uint32_t { return pal; }, [](int32_t) -> int32_t { return 0; },
@@ -574,6 +580,7 @@ static uint32_t stageUnit(uint32_t rec) {
     g_hk = k;
     if (k < g_nUnits) clientXY(g_units[k], &g_hpx, &g_hpy); else { g_hpx = (sx - sy) * 16; g_hpy = (sx + sy) * 8; }
     if (k < g_nUnits && g_unitCof[k].has) memcpy(g_hhdr, g_unitCof[k].h, sizeof g_hhdr); else g_hhdr[0] = g_hu[0] == 0 ? 8 : 1;
+    if (k < g_nUnits) g_hu[0x6c / 4] = g_unitShift[k];
     g_hu[0x54 / 4] = (uint32_t)(uintptr_t)g_hinfo; g_hinfo[0x28 / 4] = (uint32_t)(uintptr_t)g_hnode;
     g_hnode[0] = 1; g_hnode[1] = 2; g_hnode[2] = (uint32_t)(uintptr_t)g_hx; g_hx[0x14 / 4] = (uint32_t)(uintptr_t)g_hhdr;
     g_hself = g_hu[0] == 0 ? u : 0;

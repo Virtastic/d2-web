@@ -12080,17 +12080,89 @@ extern uint32_t d2_dg_feed_level(D2DrlgLevelStrc*, int, int, int, int, int, int,
 extern "C" void d2_dg_feed_unit(int, int, int, int, uint32_t, uint32_t);
 extern "C" void d2_dg_set_origin(int32_t, int32_t);
 extern "C" const char* d2_dg_walk_g();
+extern "C" void d2_dg_feed_unit_ex(int, uint32_t, int, int, int, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+extern "C" int d2_dg_feed_unit_cof(const char*);
+extern "C" void d2_dg_cru_reset();
+// The client view origin: the hero's client coordinates (PATH_UpdateClientCoords: the 16.16 position >> 11, X = (gx - gy) >> 1,
+// Y = (gx + gy) >> 2) less half the 640x480 screen.
+static void sessionViewOrigin(int32_t* vx, int32_t* vy) {
+    const D2DynamicPathStrc* hp = g_targetPlayer->pDynamicPath;
+    const int32_t gx = (int32_t)(hp->tGameCoords.dwPrecisionX >> 11), gy = (int32_t)(hp->tGameCoords.dwPrecisionY >> 11);
+    *vx = ((gx - gy) >> 1) - 320; *vy = ((gx + gy) >> 2) - 240;
+}
+// 1.13c D2Client+0x3F860's unit origin y (client Y - H/2 + 16): the ecx 8B110's first D2Gfx call is left with.
+EMSCRIPTEN_KEEPALIVE int32_t d2_session_view_y() {
+    if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return 0;
+    int32_t vx, vy; sessionViewOrigin(&vx, &vy); return vy + 16;
+}
+// The COF a client unit's current mode loads (D2Client+0x69410 for a monster; the player's and an object's from their tokens):
+// token, the mode's token, the weapon class.
+static bool sessionUnitCof(D2UnitStrc* u, uint32_t mode, char* out, size_t cap) {
+    auto tok = [](const char* s, int n, char* d) { int k = 0; for (; k < n && s[k] && s[k] != ' '; ++k) d[k] = (s[k] >= 'A' && s[k] <= 'Z') ? (char)(s[k] + 32) : s[k]; d[k] = 0; };
+    char t[8] = {}, w[8] = {}; const char* md = nullptr; const char* dir = nullptr;
+    if (u->dwUnitType == UNIT_PLAYER) {
+        static const char* kTok[] = {"am", "so", "ne", "pa", "ba", "dz", "as"};
+        static const char* kMode[] = {"dt","nu","wl","rn","gh","tn","tw","a1","a2","bl","sc","th","kk","s1","s2","s3","s4","dd","sq","kb"};
+        static const char* kW[] = {"hth","bow","1hs","1ht","stf","2hs","2ht","xbw","1js","1jt","1ss","1st","ht1","ht2"};
+        int wc = -1; COMPOSIT_GetWeaponClassId(u, u->pInventory, &wc, (int)mode, FALSE);
+        if (u->dwClassId >= 7 || mode >= 20 || wc < 0 || wc >= 14) return false;
+        strcpy(t, kTok[u->dwClassId]); md = kMode[mode]; strcpy(w, kW[wc]); dir = "chars";
+    } else if (u->dwUnitType == UNIT_MONSTER && u->pMonsterData && u->pMonsterData->pMonstatsTxt) {
+        static const char* kMode[] = {"dt","nu","wl","gh","a1","a2","bl","sc","s1","s2","s3","s4","dd","kb","sq","rn"};
+        if (mode >= 16) return false;
+        const uint32_t code = u->pMonsterData->pMonstatsTxt->dwCode; tok((const char*)&code, 4, t); md = kMode[mode];
+        const D2MonStats2Txt* m2 = UNITS_GetMonStats2TxtRecordFromMonsterId((int)u->dwClassId);
+        const int32_t bw = m2 ? m2->nBaseW : 0;
+        if (mode == 0 || mode == 12) strcpy(w, "hth"); else tok((const char*)&bw, 4, w);
+        dir = "monsters";
+    } else if (u->dwUnitType == UNIT_OBJECT && u->pObjectData && u->pObjectData->pObjectTxt) {
+        static const char* kMode[] = {"nu","op","on","s1","s2","s3","s4","s5"};
+        if (mode >= 8) return false;
+        tok(u->pObjectData->pObjectTxt->szToken, 3, t); md = kMode[mode]; strcpy(w, "hth"); dir = "objects";
+    }
+    if (!dir || !t[0] || !w[0]) return false;
+    snprintf(out, cap, "data\\global\\%s\\%s\\cof\\%s%s%s.cof", dir, t, t, md, w);
+    return true;
+}
+// 1.13c D2Client+0x72130: a unit's colour shift (+0x6C) is the colorshift of the first state, in States.txt order, holding the
+// strictly greatest colorpri among the states it carries; state 0 or none leaves 0. (Its 'h' shift on the local player under
+// D2Gfx #10077, and the local player's light colour, are not carried here.)
+extern "C" void d2_dg_feed_unit_shift(uint32_t);
+static uint32_t sessionColourShift(D2UnitStrc* u) {
+    int32_t best = -1; uint8_t pri = 0;
+    for (int32_t i = 0; i < sgptDataTables->nStatesTxtRecordCount; ++i)
+        if (STATES_CheckState(u, i) && sgptDataTables->pStatesTxt[i].nColorPri > pri) { best = i; pri = sgptDataTables->pStatesTxt[i].nColorPri; }
+    return best > 0 ? sgptDataTables->pStatesTxt[best].nColorShift : 0;
+}
+static D2GameStrc* g_walkGame;   // the game the client room lists were built for
 EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
     if (!g_sessionLive || !g_game || !g_lastLevel || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return "";
     auto fl = [](int32_t v) { return v >= 0 ? v / 160 : -((-v + 159) / 160); };
-    const D2DynamicPathStrc* hp = g_targetPlayer->pDynamicPath;
-    const int32_t hx = hp->tGameCoords.wPosX, hy = hp->tGameCoords.wPosY;
-    const int32_t vx = (hx - hy) * 16 - 320, vy = (hx + hy) * 8 - 240;
+    int32_t vx, vy; sessionViewOrigin(&vx, &vy);
+    const bool first = g_walkGame != g_game;
+    if (first) { d2_dg_cru_reset(); g_walkGame = g_game; }
+    // The client's units: the player, monsters and objects of the level's active rooms, each with its id, mode and fp16
+    // fraction (the client room lists, client_room_units.cpp), and the COF its mode loads. The first walk's units have
+    // +0xC8 bit7 still clear (retail's first shadow pass is the second frame).
     d2_dg_feed_unit(-1, 0, 0, 0, 0, 0);
-    d2_dg_feed_unit(0, (int)g_targetPlayer->dwClassId, hx, hy, 0, 0);
-    for (int b = 0; b < 128; ++b)
-        for (D2UnitStrc* u = g_game->pUnitList[GAME_RemapUnitTypeToListIndex(UNIT_MONSTER)][b]; u; u = u->pListNext)
-            if (u->pDynamicPath) d2_dg_feed_unit(1, (int)u->dwClassId, u->pDynamicPath->tGameCoords.wPosX, u->pDynamicPath->tGameCoords.wPosY, 0, 0);
+    char cof[96];
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+        D2ActiveRoomStrc* room = roomEx->pRoom;
+        if (!room || !(clientHeldCount(room) > 0 || inStartLattice(roomEx))) continue;   // only the rooms the client holds
+        for (D2UnitStrc* u = room->pUnitFirst; u; u = u->pRoomNext) {
+            uint32_t mode = u->dwAnimMode, fx = 0x8000, fy = 0x8000; int32_t x, y;
+            if (u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MONSTER) {
+                if (!u->pDynamicPath) continue;
+                x = u->pDynamicPath->tGameCoords.wPosX; y = u->pDynamicPath->tGameCoords.wPosY;
+                fx = u->pDynamicPath->tGameCoords.dwPrecisionX & 0xFFFF; fy = u->pDynamicPath->tGameCoords.dwPrecisionY & 0xFFFF;
+            } else if (u->dwUnitType == UNIT_OBJECT && u->pObjectData && u->pObjectData->pObjectTxt && u->pStaticPath) {
+                x = u->pStaticPath->tGameCoords.nX; y = u->pStaticPath->tGameCoords.nY; mode = clientObjectClock(u).shown;
+            } else continue;
+            d2_dg_feed_unit_ex((int)u->dwUnitType, u->dwUnitId, (int)u->dwClassId, x, y, mode, fx, fy, 0, first ? 1 : 0);
+            if (sessionUnitCof(u, mode, cof, sizeof cof)) d2_dg_feed_unit_cof(cof);
+            if (u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MONSTER) d2_dg_feed_unit_shift(sessionColourShift(u));
+        }
+    }
     // 7A0D0: columns = w/160 + 11, rows = h/80 + 12, side = columns + rows - 1; 7A9F0: origin = the view corner's tile less (3, columns)
     const int32_t cols = 640 / 160 + 11, side = cols + 480 / 80 + 12 - 1;
     d2_dg_set_origin(vx, vy);

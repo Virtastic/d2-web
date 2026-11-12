@@ -394,9 +394,10 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_drlg_client_room_status_cells(int levelId
 extern "C" uint32_t d2_dg_stage_unit(uint32_t, int32_t, int32_t, int32_t, uint32_t, uint32_t, uint32_t);
 extern "C" void d2_dg_stage_unit_cof(uint32_t, const uint8_t*);
 extern "C" void d2_dg_stage_unit_palshift(uint32_t);
+extern "C" void d2_dg_stage_unit_shift(uint32_t, uint32_t);
 extern "C" void d2_dg_stage_unit_frac(uint32_t, uint32_t, uint32_t);
 struct FeedUnit { int32_t type, cls, sx, sy; uint32_t flags, flagsEx; uint8_t cof[0x18]; bool hasCof;
-                  bool hasId; uint32_t id, mode, fx, fy; int32_t slot, rank, floor; bool palshift = false; };
+                  bool hasId; uint32_t id, mode, fx, fy; int32_t slot, rank, floor; bool palshift = false; uint32_t shift = 0; };
 static std::vector<FeedUnit> g_feedUnits;   // the caller's per-tick client units (JS has no game logic: raw fields only)
 static bool g_cruLive;                      // a unit with an id was fed: rooms walk the persistent client room lists
 EMSCRIPTEN_KEEPALIVE void d2_dg_feed_unit(int type, int cls, int sx, int sy, uint32_t flags, uint32_t flagsEx) {
@@ -428,6 +429,8 @@ EMSCRIPTEN_KEEPALIVE void d2_dg_cru_reset() { d2c_cru_reset(); d2_dg_hit_reset()
 EMSCRIPTEN_KEEPALIVE int d2_dg_unit_rank(int i) { return i >= 0 && i < (int)g_feedUnits.size() ? g_feedUnits[i].rank : -1; }
 EMSCRIPTEN_KEEPALIVE int d2_dg_unit_floor(int i) { return i >= 0 && i < (int)g_feedUnits.size() ? g_feedUnits[i].floor : 0; }
 // The last fed unit's COF: the .cof its mode and weapon class load (the cel chain's header: layer count, bounding box). 0 when the file is absent.
+// The last fed unit's colour shift (client unit +0x6C, D2Client+0x72130: the colorshift of its highest-colorpri state).
+EMSCRIPTEN_KEEPALIVE void d2_dg_feed_unit_shift(uint32_t v) { if (!g_feedUnits.empty()) g_feedUnits.back().shift = v; }
 EMSCRIPTEN_KEEPALIVE int d2_dg_feed_unit_cof(const char* path) {
     std::vector<uint8_t> f;
     if (g_feedUnits.empty() || !path || !d2::sharedVfs().read(path, f) || f.size() < 0x18) return 0;
@@ -489,6 +492,11 @@ uint32_t d2_dg_feed_level(D2DrlgLevelStrc* lv, int l, int t, int r, int b, int o
             if (!u.hasId) continue;
             D2ActiveRoomStrc* ar = g_act ? DUNGEON_FindRoomBySubtileCoordinates(g_act, u.sx, u.sy) : nullptr;
             D2DrlgRoomStrc* dr = ar ? ar->pDrlgRoom : nullptr;
+            // no client act room under it (the session walk passes the live game's level): the level's own room holding its tile
+            if (!dr) for (D2DrlgRoomStrc* r = lv ? lv->pFirstRoomEx : nullptr; r; r = r->pDrlgRoomNext) {
+                const int tx = u.sx / 5, ty = u.sy / 5;
+                if (tx >= r->nTileXPos && ty >= r->nTileYPos && tx < r->nTileXPos + r->nTileWidth && ty < r->nTileYPos + r->nTileHeight) { dr = r; break; }
+            }
             int32_t lid = dr && dr->pLevel ? dr->pLevel->nLevelId : -1;
             u.slot = d2c_cru_unit((uint32_t)u.type, u.id, u.cls, u.sx, u.sy, u.mode, u.fx, u.fy, u.flags, u.flagsEx,
                                   lid, dr ? dr->nTileXPos : 0, dr ? dr->nTileYPos : 0);
@@ -512,6 +520,7 @@ uint32_t d2_dg_feed_level(D2DrlgLevelStrc* lv, int l, int t, int r, int b, int o
                 uint32_t k = d2_dg_stage_unit((uint32_t)f->cls, f->type, f->sx, f->sy, (uint32_t)d2c_cru_a6180(s), (f->flags >> 20) & 1, (f->flagsEx & 1) ? 0 : 1);
                 if (f->hasCof) d2_dg_stage_unit_cof(k, f->cof);
                 if (f->palshift) d2_dg_stage_unit_palshift(k);
+                d2_dg_stage_unit_shift(k, f->shift);
                 d2_dg_stage_unit_frac(k, f->fx, f->fy);
                 d2_dg_stage_unit_id(k, f->id);
                 d2c_cru_set_aux(s, k);

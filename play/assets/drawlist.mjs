@@ -74,13 +74,19 @@ export function gFrame(Module, phase, gateEcx = 0) {
     gLines(Module.ccall('d2_client_frame_tail_g', 'string', ['number', 'number', 'number'], [first, tick, lead]));
     globalThis.__d2GHud = true;
   }
-  gLines(Module.ccall('d2_client_frame_g', 'string', Array(12).fill('number'), [phase, 1, 0, 1, 0xff, 0, 0, 0x164c0, 0x22, 0x1720, 8, gateEcx]));
+  // 8B110's leftover is 3F860's unit origin y (d2_session_view_y) when the session's own walk runs
+  const uoy = globalThis.__d2GEngineWalk && Module._d2_session_view_y ? Module._d2_session_view_y() : 0x164c0;
+  gLines(Module.ccall('d2_client_frame_g', 'string', Array(12).fill('number'), [phase, 1, 0, 1, 0xff, 0, 0, uoy, 0x22, 0x1720, 8, gateEcx]));
+  // The room walk (D2Client+0x8B110's 7A9F0 -> 9F270 -> 9EE90) follows phase 0, over the session's own level and units. Opt-in while
+  // replays that splice their own walk still run: with it on, the walk draws the units and the JS unit lines are not emitted.
+  globalThis.__d2GWalked = phase === 0 && !!globalThis.__d2GEngineWalk && !!Module._d2_session_room_walk_g;
+  if (globalThis.__d2GWalked) gLines(Module.ccall('d2_session_room_walk_g', 'string', ['number'], [0]));
   if (phase === 1 && Module._d2_client_frame_outer_g) gLines(Module.ccall('d2_client_frame_outer_g', 'string', ['number', 'number'], [tick === gFirstTick ? 1 : 0, tick]));
 }
 
 export function gUnit(u, wx, wy) {
   const g = globalThis.__d2G;
-  if (u && !globalThis.__d2GLoading && Array.isArray(g)) g.push(`${globalThis.__d2GTick ?? 0} G 10041 unit u=${u.map((v) => (v >>> 0).toString(16)).join(':')} at=${Math.round(wx)},${Math.round(wy)}`);
+  if (u && !globalThis.__d2GLoading && !globalThis.__d2GWalked && Array.isArray(g)) g.push(`${globalThis.__d2GTick ?? 0} G 10041 unit u=${u.map((v) => (v >>> 0).toString(16)).join(':')} at=${Math.round(wx)},${Math.round(wy)}`);
 }
 
 export function drawListActive() { return Array.isArray(globalThis.__d2DrawList); }
