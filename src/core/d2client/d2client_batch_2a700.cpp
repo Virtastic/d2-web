@@ -287,16 +287,17 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_2b420(
 // 1.13c D2Client+0x2C6A0 (236 B): ECX bonus, EDX range_mode, stack unicode target, ESI minimum, EAX maximum.
 // The K forms prefix the module string DAT_6fb86a30 (`plus_str`, bonus set) or DAT_6fb8359f (`plain_str`);
 // the plain form is the literal "+%d-%d" / "%d-%d". Strings are read from the module, so they are arguments.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_2c6a0(
+// The toUnicode result stays in EAX at the return: retail returns it (the target pointer).
+extern "C" EMSCRIPTEN_KEEPALIVE void* d2_client_2c6a0(
     int32_t bonus, int32_t range_mode, int32_t minimum, int32_t maximum, char* output,
-    void (*to_unicode)(void*,const char*,uint32_t), void* unicode_target,
+    void* (*to_unicode)(void*,const char*,uint32_t), void* unicode_target,
     const char* plus_str, const char* plain_str) {
     if (range_mode && minimum>9999)
         std::snprintf(output,32,"%s%dK-%dK",bonus?plus_str:plain_str,(minimum+500)/1000,(maximum+500)/1000);
     else if (range_mode && maximum>9999)
         std::snprintf(output,32,"%s%d-%dK",bonus?plus_str:plain_str,minimum,(maximum+500)/1000);
     else std::snprintf(output,32,bonus?"+%d-%d":"%d-%d",minimum,maximum);
-    to_unicode(unicode_target,output,0x20);
+    return to_unicode(unicode_target,output,0x20);
 }
 
 // 1.13c D2Client+0x2C790 (73 B): format a signed decimal range and convert the 32-byte buffer to

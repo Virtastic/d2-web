@@ -123,7 +123,8 @@ uint32_t sub_2E140(const Host& h, uintptr_t ecx, uintptr_t edx, int32_t p3, int3
 
 // 1.13c D2Client+0x2E190 (195 B). EAX=record (id int16 at +0, mode byte at +0x1dc), EBX=register arg, stack p1,outX,outY,kindOut (ret 0x10).
 // D2Common thunks 0xCEB6/0xCEC2/0xCECE take (p1, id, ebx, 1). Mode 5 scales both by CEB6 (>>8), then kindOut by mode, then *outX+=x, *outY+=y.
-void sub_2E190(const Host& h, Address eax, Address ebx, int32_t p1, Address outX, Address outY, Address kindOut) {
+// EAX at the return still holds y (retail adds it to *outY through EDX), so y is the result.
+int32_t sub_2E190(const Host& h, Address eax, Address ebx, int32_t p1, Address outX, Address outY, Address kindOut) {
     uint8_t mode = h.read<uint8_t>(eax + 0x1dc);
     uintptr_t id = (uintptr_t)(int32_t)h.read<int16_t>(eax);
     auto d2 = [&](uint32_t t) { return (int32_t)h.call(t, {(uintptr_t)p1, id, (uintptr_t)ebx, 1}); };
@@ -143,18 +144,23 @@ void sub_2E190(const Host& h, Address eax, Address ebx, int32_t p1, Address outX
     }
     h.write<int32_t>(outX, h.read<int32_t>(outX) + x);
     h.write<int32_t>(outY, h.read<int32_t>(outY) + y);
+    return y;
 }
 
-// 1.13c D2Client+0x2E2D0 (90 B), thiscall: when this+0x1dc==1 and #10973(global 0xBBFC, 0x149)!=0,
+// 1.13c D2Client+0x2E2D0 (90 B), thiscall: when this+0x1dc==1 and #10973(global 0x11BBFC, 0x149)!=0,
 // each of the two values grows by FUN +0x14A0(100, v) (percent of v).
-void sub_2E2D0(const Host& h, Address self, Address p1, Address ebx, Address player) {
-    if (!self || h.read<uint8_t>(self + 0x1dc) != 1) return;
+// EAX at the return: the player word on a failed gate (loaded before the test), 0 for a zero stat, else the new *EBX.
+uint32_t sub_2E2D0(const Host& h, Address self, Address p1, Address ebx, Address player) {
+    if (!self || h.read<uint8_t>(self + 0x1dc) != 1) return player;
     uintptr_t v = h.call(0xC1C6, {player, 0x149, 0});
-    if (!v) return;
+    if (!v) return 0;
+    uint32_t last = 0;
     for (Address p : {p1, ebx}) {
         int32_t x = h.read<int32_t>(p);
-        h.write<int32_t>(p, (int32_t)h.call(0x14A0, {v, 100, (uintptr_t)(uint32_t)x}) + x);
+        last = (uint32_t)((int32_t)h.call(0x14A0, {v, 100, (uintptr_t)(uint32_t)x}) + x);
+        h.write<uint32_t>(p, last);
     }
+    return last;
 }
 
 // 1.13c D2Client+0x2E350 (187 B, ret 8): stack unit, mode. Unit 0 returns 0. a = mode ? 0xC5BC(unit) : 0xC5CE(unit); b = 0xC640(ECX=a), 0 returns 0;

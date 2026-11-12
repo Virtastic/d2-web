@@ -11,17 +11,18 @@ struct D2Client277e0Env {
     uint32_t (*blocked)(uint32_t edi, uint32_t idx);                        // 0xCF28, stdcall 2
     uint32_t (*valid)(uint32_t cursor);                                     // 0xC850, stdcall 1
     uint32_t (*test)(uint32_t edi, uint32_t cursor, uint32_t idx, uint32_t* out);   // 0xCF2E, stdcall 4
-    void (*select)(uint32_t idx, uint32_t mode);                            // 0x26820: ESI = mode, stack = idx
+    uint32_t (*select)(uint32_t idx, uint32_t mode);                        // 0x26820: ESI = mode, stack = idx
 };
-// g[0] = 0xCC468 hover enable, g[1] = 0xA538C selected slot, g[2] = 0xA5384, g[3] = 0xB99C
-extern "C" void d2client_277e0_port(uint32_t edi, const uint32_t* g, const D2Client277e0Env* env) {
+// g[0] = hover enable (D2Client+0x11C468), g[1] = selected slot (+0xF538C), g[2] = +0xF5384, g[3] = +0x11B99C.
+// Returns EAX as retail leaves it: the zero cursor or zero gate it tested, the slot index on a range miss, else 0x26820's result.
+extern "C" uint32_t d2client_277e0_port(uint32_t edi, const uint32_t* g, const D2Client277e0Env* env) {
     const uint32_t cursor = env->cursor(edi);
-    if (!cursor || !g[0]) return;
+    if (!cursor || !g[0]) return 0;
     uint8_t info[0x10c];
     env->info(g[2], g[3], info);
     const int32_t idx = (int32_t)g[1];
-    if (idx < 0 || idx >= (int32_t)info[4]) return;
-    if (!env->blocked(edi, (uint32_t)idx) && env->valid(cursor)) { env->select((uint32_t)idx, 1); return; }
+    if (idx < 0 || idx >= (int32_t)info[4]) return (uint32_t)idx;
+    if (!env->blocked(edi, (uint32_t)idx) && env->valid(cursor)) return env->select((uint32_t)idx, 1);
     uint32_t out[1];
-    env->select((uint32_t)idx, env->test(edi, cursor, (uint32_t)idx, out) ? 3 : 0);
+    return env->select((uint32_t)idx, env->test(edi, cursor, (uint32_t)idx, out) ? 3 : 0);
 }
