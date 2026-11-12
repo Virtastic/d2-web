@@ -190,7 +190,7 @@ U sub_49090(){
 
 // 1.13c D2Client+0x492F0
 void sub_492F0(){
- uint8_t s=g.v9663;
+ int32_t s=(int32_t)g.v9663;  // the whole dword, signed (mov eax / cmp eax,3 jl / cmp eax,6 jg)
  if(s!=1){
   if(s>2&&s<7){h.f72790(0xc,1,0);h.f8150();h.f3ca20();h.f67c0();g.v9663=0;return;}
   if(s==7){h.f4fd70();h.f67c0();g.v9663=0;return;}
