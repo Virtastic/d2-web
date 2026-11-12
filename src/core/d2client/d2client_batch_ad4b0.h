@@ -6,7 +6,7 @@ struct Env {
  uint8_t* (*ga)(uint32_t rva);                    // address of D2Client global at RVA
  void (*fatal)(int32_t msgId);                    // Ordinal_10265 + Ordinal_10024 + _exit(-1)
  void (*f62E60)(uint32_t a);
- void (*f4C3C0)(uintptr_t pkt,const void* copy7);
+ uint32_t (*f4C3C0)(uintptr_t pkt,const void* copy7);
  void (*f7DFB0)(const void* copy40);
  uintptr_t (*f4D630)(uintptr_t pkt,uint32_t id);
  void (*f4DA70)(uint32_t v);
@@ -27,7 +27,7 @@ struct Env {
  void (*f6A6C0)(uintptr_t esi); void (*f56210)(uintptr_t esi);   // D2Client+0x2A6C0 (ESI = unit, EDI = 5) and +0xA6210 (ESI = unit)
 };
 void sub_AD4B0(Env& e,uint32_t a);
-void sub_AD4F0(Env& e,uintptr_t p);
+uint32_t sub_AD4F0(Env& e,uintptr_t p);
 void sub_ADEF0(Env& e,uintptr_t p);
 void sub_AEBE0(Env& e,const uint8_t* pkt);
 void sub_AECA0(Env& e,const uint8_t* pkt);   // d2client_aeca0.cpp

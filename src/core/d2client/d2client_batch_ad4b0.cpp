@@ -15,7 +15,7 @@ static uintptr_t row(Env& e,uint32_t t){ return (uintptr_t)e.ga(0xFBA608 + 0) + 
 void sub_AD4B0(Env& e,uint32_t a){ uint8_t l[16]={0}; std::memcpy(l,(const void*)(uintptr_t)a,15); e.f62E60((uint32_t)(uintptr_t)l); }   // ECX = packet: its 15 bytes copied to a stack local, EAX = &local
 
 // 1.13c D2Client+0xAD4F0
-void sub_AD4F0(Env& e,uintptr_t p){ uint8_t l[7]; std::memcpy(l,(const void*)p,7); e.f4C3C0(p,l); }
+uint32_t sub_AD4F0(Env& e,uintptr_t p){ uint8_t l[7]; std::memcpy(l,(const void*)p,7); return e.f4C3C0(p,l); }   // EAX is the callee's
 
 // 1.13c D2Client+0xAD6B0
 void sub_AD6B0(Env& e,uintptr_t p){ uint8_t l[40]; std::memcpy(l,(const void*)p,40); e.f7DFB0(l); }
