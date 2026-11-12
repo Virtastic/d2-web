@@ -37,7 +37,7 @@ fi
 echo "==> stage build-wasm/site"
 mkdir -p build-wasm/site
 find build-wasm/site -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-cp play/index.html play/manifest.webmanifest play/streamfs.js play/entry.js play/gameplay-model.mjs play/gameplay-shell.mjs play/item-pick.mjs play/worker-guard.mjs play/frame-pack.mjs play/frame-snapshot.mjs play/render-host.mjs play/render-wire.mjs play/render-worker.mjs play/render-worker-draws.mjs play/render-worker-hud.mjs play/serve.mjs play/br-check.mjs play/smoke.mpq play/smoke.json play/d2.js play/d2.wasm build-wasm/site/
+cp play/index.html play/manifest.webmanifest play/streamfs.js play/entry.js play/gameplay-model.mjs play/gameplay-shell.mjs play/hover-pick-engine.mjs play/item-pick.mjs play/worker-guard.mjs play/frame-pack.mjs play/frame-snapshot.mjs play/render-host.mjs play/render-wire.mjs play/render-worker.mjs play/render-worker-draws.mjs play/render-worker-hud.mjs play/serve.mjs play/br-check.mjs play/smoke.mpq play/smoke.json play/d2.js play/d2.wasm build-wasm/site/
 # A .br is staged only when it IS that file's brotli (play/br-check.mjs -- content, not mtime). Staging
 # a stale one puts one build's bytes behind the other build's e/<ver>/ URL, and nothing else catches it:
 # that URL is served immutable and the page boots without error -- on the engine the .br holds. Dropping
