@@ -232,7 +232,6 @@ struct D2GameD2D90Env {
 void d2game_D2D90_113c(void* pGame, void* pEaxUnit, void* pEsiUnit, uint32_t nEcx, uint32_t nFlag,
                        const D2GameD2D90Env& env)
 {
-    (void)nEcx;
     if (pGame == nullptr) d2game_fatal(0xF70);
     if (pEaxUnit == nullptr) d2game_fatal(0xF71);
 
@@ -246,8 +245,10 @@ void d2game_D2D90_113c(void* pGame, void* pEaxUnit, void* pEsiUnit, uint32_t nEc
     if (pEsiUnit != pResolved) d2game_fatal(0xF78);
 
     const uint8_t nByte = (uint8_t)env.ord10020(pEsiUnit);
-    const uint32_t uArg = env.ord10584(pEaxUnit, nByte, rd32(pGame, 0x70));
-    const uint32_t y = env.unitY(pEsiUnit, uArg, 0, nByte);            // 0x1130
+    // retail does `mov cl, al` and pushes ECX: the caller's upper ECX bytes ride along with the byte (0xA634 arg 2, 0x1130 arg 3)
+    const uint32_t nMerged = (nEcx & 0xFFFFFF00u) | nByte;
+    const uint32_t uArg = env.ord10584(pEaxUnit, nMerged, rd32(pGame, 0x70));
+    const uint32_t y = env.unitY(pEsiUnit, uArg, 0, nMerged);          // 0x1130
     const uint32_t x = env.unitX(pEsiUnit, y);                         // 0x1100 takes the 0x1130 result
     // 1.13c passes the caller's file/line text here; it is retail content and is not reproduced.
     env.ord10869("", 0xF7C, pItemRec, x, 0, 0, 0, 0);

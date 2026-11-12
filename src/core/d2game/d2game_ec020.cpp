@@ -12,6 +12,7 @@ extern "C" uint32_t d2g_ec020(uint32_t game, uint32_t player, uint32_t ppCursor,
     d2wr16(out, 0x666B);
     out += 2;
     const uint32_t golem = e->call(0x96A40, player, 0, 0, 1, 3);
+    e->edi(0x96A40, game);   // retail keeps the game in EDI across the call; the descriptor's J record logs it
     uint32_t item = 0, flag = 0;
     if (golem && d2rd32(golem + 4) == 0x123 && e->call(0xA3D0, 0, player, 0x5A, 0, 0, 0xFFFFFFFFu)) {
         const uint32_t inv = d2rd32(golem + 0x60);

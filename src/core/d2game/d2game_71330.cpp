@@ -23,7 +23,7 @@ static inline void send2(I u, uint8_t a, uint8_t b) { uint8_t p[2] = { a, b }; D
 static inline void send6(I u, uint8_t k) { uint8_t p[6] = { 0x79, k, 0, 0, 0, 0 }; D2GAME_8A3E0(clientOf(u), p, 6); }
 
 // 1.13c D2Game+0x71330 -- ECX = game, EDX = the requesting player unit, stack = the target unit record (or 0). ret 4.
-extern "C" void d2_fn_d2game_71330(I game, I unit, I target)
+extern "C" void d2game_legacy_71330(I game, I unit, I target)
 {
     const U id = R32(unit, 0x64);
     if (R8(unit, 0x6c) != 0 && R32(unit, 0x68) != 0) { send2(unit, 0x77, 0x0c); return; }

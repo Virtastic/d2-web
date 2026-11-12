@@ -204,8 +204,9 @@ uint32_t d2_fn_d2game_C94E0(void* game, void* quest, const D2GameC94E0Env* e)
                 if (d[0xc] != 0) e->a4a2(n, 2);
                 else {
                     e->a4a2(n, 1);
-                    e->a51a1(e->a478b(hit, 1));
-                    e->a51a2(room, 1);
+                    // the decompile's trailing ", 1" is not a pushed word: the recorded second stack word of both calls is 0
+                    e->a51a1(e->a478b(hit, 0));
+                    e->a51a2(room, 0);
                 }
                 break;
             }
