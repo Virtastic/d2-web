@@ -105,7 +105,9 @@ void shift_z12(char* str, int n) {
 // _strcpy-ish seam used by __cftoe2 (FUN_6ff58e70 = strcpy returning dest end? returns dest).
 // 1.13c Fog+0x0B5D7 __cftoe2. in = _strflt {sign@0, decpt@4, ?@8, mantissa ptr@12} (EAX), buf (EBX).
 struct StrFlt_z12 { int32_t sign, decpt, flag; const char* mant; };
-void cftoe2_z12(char* buf, StrFlt_z12* in, int ndigit, int caps, char shiftFlag, char decimalPoint) {
+// Returns buf (retail's closing `mov eax,ebx`).
+char* cftoe2_z12(char* buf, StrFlt_z12* in, int ndigit, int caps, char shiftFlag, char decimalPoint) {
+    char* const start = buf;
     if (shiftFlag) shift_z12(buf + (in->sign == 0x2d), ndigit > 0);  // __shift(EAX = buf + neg, EDI = ndigit > 0)
     if (in->sign == 0x2d) *buf++ = '-';
     char* p = buf;
@@ -120,6 +122,7 @@ void cftoe2_z12(char* buf, StrFlt_z12* in, int ndigit, int caps, char shiftFlag,
         if (v > 9) { e[3] += (char)(v / 10); v %= 10; }
         e[4] += (char)v;
     }
+    return start;
 }
 
 // 1.13c Fog+0x0B6F5 __cftof2. in as above (EAX); returns buf.
