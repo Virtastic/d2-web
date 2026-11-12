@@ -33,14 +33,14 @@ EMSCRIPTEN_KEEPALIVE i32 d2c_72080(i32 unit, i32 (*ord10787)(), i32 g_bbfc, i32 
 }
 
 // 1.13c D2Client+0x720B0  (eax = idx, ecx = param_1); tbl/cnt = sgptDataTables +0xbc/+0xc4
-EMSCRIPTEN_KEEPALIVE void d2c_720b0(i32 idx, i32 p1, const u8* tbl, i32 cnt, void (*const* hooks)(),
-    i32 (*ord10871)(i32), void (*f21440)(i32)) {
+EMSCRIPTEN_KEEPALIVE void d2c_720b0(i32 idx, i32 p1, const u8* tbl, i32 cnt, void (*const* hooks)(i32 ecx, i32 edx),
+    i32 (*ord10871)(i32, i32), void (*f21440)(i32)) {
     if (!p1 || idx < 0 || idx >= cnt) return;
     const u8* r = rec3c(tbl, cnt, idx);
     if (!r) return;
     int16_t s = rd16(r, 0x1c);
-    if (s >= 0 && s < 0x1e && hooks[s]) hooks[s]();
-    if (rd16(r, 0x30) >= 0 && ord10871(p1) != 0) f21440(idx);
+    if (s >= 0 && s < 0x1e && hooks[s]) hooks[s](p1, idx);
+    if (rd16(r, 0x30) >= 0 && ord10871(p1, idx) != 0) f21440(idx);
 }
 
 // 1.13c D2Client+0x72130

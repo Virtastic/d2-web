@@ -132,26 +132,54 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_2ac10(
 
 // 1.13c D2Client+0x2AE30 moved to d2client_2ae30.cpp (faithful register/stack form).
 
-// 1.13c D2Client+0x2AEA0 (245 B): validates action ids 5..0x12 against the corresponding resource
-// table, then requires 0x29E80 before queueing. A rejected action sets failure globals and returns 0.
+// 1.13c D2Client+0x2AEA0 (245 B): EAX = unit, ESI = unit id word, stack (ret 0xC) = action, p1, p2. Unit flag bit 16 (+0xC4) or an allowed type/mode
+// (type 0: mode 0/0x11, type 1: mode 0/0xC) go to the resource check; otherwise flag bit 1 alone decides. Actions 5..0xB resolve through 0xC5BC(esi),
+// 0xC..0x12 through 0xC5CE(esi); the id goes to 0xC42A (UnitMode.cpp:0x44F), a row of the 0x23C-stride table at sgptDataTables+0xB98 (count +0xBA0) must
+// exist and its byte +7 must intersect the first byte of gdwBitMasks. Then 0x29E80(EAX = action, ECX = esi): zero returns 1, else 0x2AA40(EAX = esi; action, p1, p2) and 0.
+// A refusal sets [0x11C2F4] = 0, [0x11C2F8] = 1 and returns 0.
+struct D2c2aea0Env {
+    uint32_t (*c5bc)(uint32_t esi);
+    uint32_t (*c5ce)(uint32_t esi);
+    int32_t (*c42a)(uint32_t id);                       // Ordinal_10601 (id, "..\\Source\\D2Client\\UNIT\\UnitMode.cpp", 0x44F)
+    const uint8_t* tbl;                                 // *sgptDataTables
+    const uint8_t* mask;                                // *gdwBitMasks
+    uint32_t (*c29e80)(uint32_t eax, uint32_t ecx);
+    void (*c2aa40)(uint32_t esi, uint32_t action, uint32_t p1, uint32_t p2);
+    uint32_t* g_c2f4;
+    uint32_t* g_c2f8;
+};
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_2aea0(
-    D2ClientBatch2a700Host host, D2ClientBatchUnit* unit, uint32_t action,
-    int32_t arg, uint32_t payload, uint32_t* result_flags,
-    int32_t (*resource_ok)(uint32_t), void (*enqueue)(uint32_t,uint32_t,int32_t,uint32_t)) {
-    bool mode_ok=false;
-    if (unit && !(unit->flags & 0x10000u)) {
-        if (unit->type==0) mode_ok=(unit->mode==0 || unit->mode==0x11);
-        else if (unit->type==1) mode_ok=(unit->mode==0 || unit->mode==0xC);
-        if (!mode_ok && !(unit->flags&2u)) goto rejected;
+    const uint8_t* unit, uint32_t esi, uint32_t action, uint32_t p1, uint32_t p2, const D2c2aea0Env* env) {
+    uint32_t flags; std::memcpy(&flags, unit + 0xC4, 4);
+    int32_t type, mode; std::memcpy(&type, unit, 4); std::memcpy(&mode, unit + 0x10, 4);
+    bool pass;
+    if (flags & 0x10000u) goto resource;
+    if (type == 0) { if (mode == 0 || mode == 0x11) goto resource; }
+    else if (type == 1 && (mode == 0 || mode == 0xC)) goto resource;
+    pass = ((flags >> 1) & 1u) != 0;
+    goto decided;
+resource: {
+        uint32_t id;
+        if (action >= 5 && action <= 0xB) id = env->c5bc(esi);
+        else if (action >= 0xC && action <= 0x12) id = env->c5ce(esi);
+        else id = 0;
+        if (id == 0) goto refuse;
+        int32_t idx = env->c42a(id);
+        if (idx < 0) goto refuse;
+        int32_t cnt; std::memcpy(&cnt, env->tbl + 0xBA0, 4);
+        if (idx >= cnt) goto refuse;
+        uint32_t rows; std::memcpy(&rows, env->tbl + 0xB98, 4);
+        const uint8_t* row = (const uint8_t*)(uintptr_t)(rows + (uint32_t)idx * 0x23Cu);
+        if (!row) goto refuse;
+        pass = (*env->mask & row[7]) != 0;
     }
-    if ((action>=5 && action<=0xB) || (action>=0xC && action<=0x12)) {
-        if (!resource_ok(action)) goto rejected;
-    } else goto rejected;
-    if (!invoke(host,0x29E80,unit?unit->id:0)) return 1;
-    enqueue(action,unit?unit->id:0,arg,payload);
+decided:
+    if (!pass) goto refuse;
+    if (!env->c29e80(action, esi)) return 1;
+    env->c2aa40(esi, action, p1, p2);
     return 0;
-rejected:
-    result_flags[0]=0; result_flags[1]=1;
+refuse:
+    *env->g_c2f4 = 0; *env->g_c2f8 = 1;
     return 0;
 }
 
