@@ -2021,19 +2021,32 @@ int __stdcall STATLIST_GetBaseStatsData(D2StatListStrc* pStatListEx, D2StatStrc*
 
 // 1.13c D2Common+0x3A330 (src/core/d2common/d2common_batch_31d20.cpp)
 void D2Common_3A330_AddStatLayer(D2StatListStrc* pStatList, int32_t nStatId, int32_t nDelta, uint16_t nLayer);
+uint32_t D2Common_3A330_AddStatLayerEax(D2StatListStrc* pStatList, int32_t nStatId, int32_t nDelta, uint16_t nLayer, uint32_t nEaxIn);
 
 //D2Common.0x6FDB8C50 (#10573)
 // 1.13c D2Common+0x3A600: every base entry of the source (raw stat id at +2, value at +4) is added
-// to the target through 3A330 as (list, stat id, value, the entry's layer word at +0).
+// to the target through 3A330 as (list, stat id, value, the entry's layer word at +0). The count is read as a signed
+// short. Void in retail; the Eax form returns what it leaves in EAX: the caller's EAX for a null target, the source
+// word for a null source, the signed count when the loop never runs, else the last 3A330 call's EAX (entered with the
+// entry's stat id in EAX).
+uint32_t STATLIST_MergeBaseStatsEax(D2StatListStrc* pTargetStatList, D2StatListStrc* pSourceStatlist, uint32_t nEaxIn)
+{
+	if (!pTargetStatList)
+		return nEaxIn;
+	if (!pSourceStatlist)
+		return 0;
+	const int32_t nCount = static_cast<int16_t>(pSourceStatlist->Stats.nStatCount);
+	uint32_t nEax = static_cast<uint32_t>(nCount);
+	for (D2StatStrc* i = pSourceStatlist->Stats.pStat; i < pSourceStatlist->Stats.pStat + nCount; ++i)
+	{
+		nEax = D2Common_3A330_AddStatLayerEax(pTargetStatList, i->nStat, i->nValue, i->nLayer, static_cast<uint16_t>(i->nStat));
+	}
+	return nEax;
+}
+
 void __stdcall STATLIST_MergeBaseStats(D2StatListStrc* pTargetStatList, D2StatListStrc* pSourceStatlist)
 {
-	if (pTargetStatList && pSourceStatlist)
-	{
-		for (D2StatStrc* i = pSourceStatlist->Stats.pStat; i < &pSourceStatlist->Stats.pStat[pSourceStatlist->Stats.nStatCount]; ++i)
-		{
-			D2Common_3A330_AddStatLayer(pTargetStatList, i->nStat, i->nValue, i->nLayer);
-		}
-	}
+	STATLIST_MergeBaseStatsEax(pTargetStatList, pSourceStatlist, 0);
 }
 
 //D2Common.0x6FDB8CA0 (#10477)
