@@ -457,6 +457,7 @@ void __fastcall sub_6FCC5FA0(D2UnitStrc* pUnit, D2ClientStrc* pClient)
 
 //D2Game.0x6FCC6080
 // 1.13c D2Game+0x7AC50
+extern "C" void d2_client_unit_event_packet(const D2UnitStrc* pUnit, int32_t nEvent);   // d2client/session_unit_sound.cpp (replay only)
 void __fastcall D2GAME_UpdateUnit_6FCC6080(D2UnitStrc* pPlayer, D2ClientStrc* pClient)
 {
     if (!pPlayer->pUpdateUnit || CLIENTS_GetPlayerFromClient(pClient, 0) == pPlayer->pUpdateUnit)
@@ -466,6 +467,7 @@ void __fastcall D2GAME_UpdateUnit_6FCC6080(D2UnitStrc* pPlayer, D2ClientStrc* pC
         packet2C.dwUnitGUID = pPlayer->dwUnitId;
         packet2C.nUnitType = pPlayer->dwUnitType;
         packet2C.nSoundEvent = pPlayer->nUpdateType;
+        d2_client_unit_event_packet(pPlayer, pPlayer->nUpdateType);   // the client's 0x2C handler reaches D2Client+0x23F20 with the event
         sub_6FC3F3F0(pClient, &packet2C);
     }
 }

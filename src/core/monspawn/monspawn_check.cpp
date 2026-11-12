@@ -2562,6 +2562,13 @@ static bool g_fixtureOwnRoomOnly = false;
 // a retail recording sets it: retail's monster b sits in a room only that join reaches, and AI scans client rooms only (D2Game+0xB0CE0).
 static bool g_sessionJoinLevelRooms = false;
 EMSCRIPTEN_KEEPALIVE void d2_session_client_join_level(int on) { g_sessionJoinLevelRooms = on != 0; }
+// The client frame draws (default, as play does): 1.13c D2Client+0x44230 runs after the slot pump each frame, and its weather
+// pass (0x81340) is what grows the rain intensity 0x4F860 reads. A headless rig with no render callback never runs it, so its
+// intensity stays 0 and 0x4F860 never opens the rain loop. 0 = that rig. 1 = a rig that draws: the weather pass runs and the
+// sound trace records the weather loop it opens. Unset: the weather pass runs and the trace leaves its loop out.
+static bool g_sessionClientDraws = true;
+extern "C" void d2client_sound_trace_weather(bool on);   // sound_pump.cpp
+EMSCRIPTEN_KEEPALIVE void d2_session_client_draws(int on) { g_sessionClientDraws = on != 0; d2client_sound_trace_weather(on != 0); }
 // What the join walk sent the client (room reveals, then the units in them) before the stream is cleared for
 // tick 1: a connected client is owed these bytes, a headless session never reads them.
 extern "C" const uint8_t* D2WEB_PacketStream(uint32_t* pLength, uint32_t* pPackets);
@@ -8083,9 +8090,12 @@ static void sessionClientMonsterFootsteps() {
     const D2LevelsTxt* lv = g_currentLevel >= 0 ? DATATBLS_GetLevelsTxtRecord(g_currentLevel) : nullptr;
     const int32_t fallback = lv ? d2client_session_level_material((uint32_t)(lv->dwSoundEnv & 0xff)) : 1;
     for (uint32_t id : ids)
-        if (D2UnitStrc* u = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)id))
+        if (D2UnitStrc* u = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)id)) {
+            // 0x4F4A0 runs the unit's idle sound (0x237E0) just before its footstep check (0x23C00)
+            if (auto it = g_sessionIdleRowsReady.find(id); it != g_sessionIdleRowsReady.end()) d2client_sound_unit_submit((int32_t)it->second);
             d2client_session_monster_footstep(id, (int32_t)u->dwClassId, u->dwAnimMode, (uint16_t)u->wAnimSpeed, (uint32_t)u->dwFrameCountPrecise,
                                               d2_session_floor_class(1, (int32_t)id, fallback), g_sessionClientFrame - 1);
+        }
 }
 // 1.13c D2Client+0x22B20: the client units' sound references (replay only; nothing happens before the Sounds table is loaded).
 // The client's units are the held monsters and the objects of the rooms it holds (the sets d2_session_client_view prints).
@@ -8536,6 +8546,10 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         d2client_nova::tick();   // 1.13c D2Client+0x73CB0 (cltdofunc 25, Poison Nova action frame)
         // The client frame's tail, after this frame's packets: the attack-sound rolls of the orders the
         // server sent this frame (0x4DC70 -> 0x242B0), the room pass (0x44A80 -> 0x440C0), then ambient and weather.
+        if (g_currentAct >= 0 && g_currentAct < 5 && g_game->pAct[g_currentAct]) {   // the packet dispatch's 0x2C unit events (0xAD740 -> 0x23F20)
+            const D2DrlgEnvironmentStrc* ev = DUNGEON_GetEnvironmentFromAct(g_game->pAct[g_currentAct]);
+            d2client_session_event_packets(sessionClientHeroSeed(), ev ? (uint32_t)ev->nCycleIndex : 0u, g_sessionClientFrame + 1);
+        }
         sessionClientMonsterHitPass(g_sessionClientFrame + 1);
         { extern void d2_client_monster_order_roll(); d2_client_monster_order_roll(); }
         ++g_sessionClientFrame;
@@ -8559,7 +8573,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             { const D2DrlgEnvironmentStrc* ev = DUNGEON_GetEnvironmentFromAct(g_game->pAct[g_currentAct]);
               d2client_ambient::tick(heroSeed, ev ? (uint32_t)ev->nCycleIndex : 0u, env.weatherLevel); }
             d2client_sound_stage_log();
-            d2client::weather::tick(*reinterpret_cast<d2client::weather::Seed*>(heroSeed), env);
+            if (g_sessionClientDraws) d2client::weather::tick(*reinterpret_cast<d2client::weather::Seed*>(heroSeed), env);
         }
         sessionClientMonsterIdlePass();
     }

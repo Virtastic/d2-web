@@ -4,11 +4,13 @@
 //   0x24490 (a unit entering a mode, bUseGiven = 1): d2_client_unit_mode_sounds, the proved dispatch with its host.
 //   0x237E0 object branch (each held object, each frame): the loop row of 0x224F0, the per-mode row of 0x22570.
 #include <cstdint>
+#include <cstring>
 #include <map>
 #include <set>
 #include <string>
 #include <vector>
 #include "sound_unit_refs.h"
+#include "d2client_5dfd0.h"
 #include "../d2moo/include/Units/Units.h"
 #include "../d2moo/include/Units/Monster.h"
 #include "../d2moo/include/D2States.h"
@@ -87,4 +89,48 @@ void d2client_session_player_packets() {
     std::vector<PlrPkt> q; q.swap(g_plr);
     for (const PlrPkt& p : q) d2client_session_unit_mode(p.u, p.mode, -1, true);
 }
-void d2client_session_unit_sound_reset() { g_obj.clear(); g_plr.clear(); }
+// A unit event packet 0x2C {type, id, event} as the server sends it (D2Game+0xCC6080 -> 0x3F3F0); the client's handler
+// (0xAD740 -> 0x23F20) runs under the next packet dispatch, d2client_session_event_packets.
+namespace { struct EvPkt { uint32_t type, id, cls, event; }; std::vector<EvPkt> g_ev; }
+extern "C" void d2_client_unit_event_packet(const D2UnitStrc* u, int32_t event) {
+    if (u && d2client_sound_armed()) g_ev.push_back({ uint32_t(u->dwUnitType), uint32_t(u->dwUnitId), uint32_t(u->dwClassId), uint32_t(event) & 0xFF });
+}
+struct D2c0x9cce0Env { uint8_t* (*f9cad0)(uint32_t eax); int32_t (*thunk_c7e4)(uint32_t arg); int32_t (*f5ee70)(int32_t v); };
+extern "C" int32_t d2c_port_9cce0(uint32_t eax, int32_t kind, uint8_t* player, uint32_t g11c3b8, uint32_t g1197f8, const D2c0x9cce0Env& e);
+extern "C" int32_t d2_client_5ee70(const uint8_t* recs, int32_t count, int32_t id, uint32_t (*rand)(uint32_t));
+extern "C" uint32_t d2_session_client_rand(uint32_t n);
+uint8_t* d2client_9cad0(uint32_t cls);
+void d2client_9cad0_reset();
+namespace {
+uint32_t g_evCycle;
+uint8_t g_evPlayer[0x28];
+uint32_t evRand(uint32_t n) {   // 1.13c D2Client+0x89640 on the copy's seed
+    if (!n) return 0;
+    uint32_t s[2]; memcpy(s, g_evPlayer + 0x20, 8);
+    const uint64_t v = uint64_t(s[0]) * 0x6ac690c5ull + s[1];
+    s[0] = uint32_t(v); s[1] = uint32_t(v >> 32); memcpy(g_evPlayer + 0x20, s, 8);
+    return (n & (n - 1)) ? uint32_t(v) % n : ((n - 1) & uint32_t(v));
+}
+}
+void d2client_session_event_packets(uint32_t* heroSeed, uint32_t cycle, uint32_t tick) {
+    std::vector<EvPkt> q; q.swap(g_ev);
+    for (const EvPkt& p : q) {
+        if (p.event != 0x12 || p.type != 1) continue;   // 0x23F20 case 0x12 (an NPC greeting); its other events are not wired here
+        // 0x23F20 case 0x12: 0x88A70(player, row = 0x9CCE0(kind 1) on the NPC, offset 0, 1, 0)
+        // 0x9CCE0 steps the player's seed (+0x20) itself and 0x5EE70 draws from it through 0x89640: one copy carries both,
+        // written back to the hero seed after.
+        memset(g_evPlayer, 0, sizeof g_evPlayer);
+        memcpy(g_evPlayer + 0x20, heroSeed, 8);
+        g_evCycle = cycle;
+        D2c0x9cce0Env e{};
+        e.f9cad0 = [](uint32_t cls) { return d2client_9cad0(cls); };
+        e.thunk_c7e4 = [](uint32_t) { return int32_t(g_evCycle); };   // Ordinal 10396: the act environment's cycle index
+        e.f5ee70 = [](int32_t v) {
+            if (!d2client_sounds::records()) d2client_sounds::load();
+            return d2_client_5ee70(d2client_sounds::records(), d2client_sounds::recordCount(), v, evRand); };
+        const int32_t row = d2c_port_9cce0(p.cls, 1, g_evPlayer, 0, tick, e);
+        memcpy(heroSeed, g_evPlayer + 0x20, 8);
+        d2client_sound_unit_submit_now(row, 1);
+    }
+}
+void d2client_session_unit_sound_reset() { g_obj.clear(); g_plr.clear(); g_ev.clear(); d2client_9cad0_reset(); }

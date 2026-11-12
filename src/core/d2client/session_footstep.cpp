@@ -15,7 +15,7 @@ extern "C" int32_t d2_client_footstep_due(uint32_t cur, uint32_t total, uint32_t
 // frame 0. The mode the client unit takes is the one the server path held on the previous frame (the client's own path is not
 // ported: the move starts and ends on the frame after the server's).
 namespace {
-struct ClientPlayer { uint32_t mode = 0, frame = 0, total = 0, step = 0, last = 0, serverMode = 0; bool seen = false; };
+struct ClientPlayer { uint32_t mode = 0, frame = 0, total = 0, step = 0, last = 0, serverMode = 0, entered = 0; bool seen = false; };
 ClientPlayer g_cp;
 // D2Client+0xF7694[class] +0x28: the class footstep group base (read from the 1.13c image).
 const uint32_t kClassGait[7] = { 2768, 2720, 2720, 2768, 2816, 2720, 2720 };
@@ -57,7 +57,9 @@ extern "C" void d2client_session_player_footstep(uint32_t serverMode, uint32_t c
     const uint32_t s = g_cp.serverMode; const bool seen = g_cp.seen;
     g_cp.serverMode = serverMode; g_cp.seen = true;
     if (!seen || !moving(s)) { g_cp.mode = 0; return; }
-    if (!moving(g_cp.mode)) { g_cp.mode = s; g_cp.frame = 0; rate(s, &g_cp.step, &g_cp.total); }
+    // A new moving mode (a walk/run toggle mid-move too) goes through D2Common #11090, which restarts the frame and the rate
+    // when the mode differs. Run in town, already turned into town walk by 0x19D80, is the same mode the server still holds.
+    if (!moving(g_cp.mode) || s != g_cp.entered) { g_cp.mode = s; g_cp.entered = s; g_cp.frame = 0; rate(s, &g_cp.step, &g_cp.total); }
     if (g_cp.step && g_cp.total && cls < 7 && d2_client_footstep_due(g_cp.frame, g_cp.total, g_cp.step, 2, 0, now, g_cp.last)) {   // 0x23C00, player: n 2, phase 0
         g_cp.last = now;
         const uint32_t f = floor >= 2 && floor <= 6 ? 4u * uint32_t(floor - 1) : 0u;
@@ -69,6 +71,7 @@ extern "C" void d2client_session_player_footstep(uint32_t serverMode, uint32_t c
 
 // The level's floor class fallback: SoundEnviron "Material 1" (0x58-byte records, +0x1C) of the given row; 1 without the table.
 extern "C" int32_t d2client_session_level_material(uint32_t soundEnv) {
+    soundEnv &= 0xff;   // 0x226A0 reads the row as a byte (level +0x21C), so the signed compare below never sees a negative index
     const uint8_t* e = d2client_sounds::envTable();
     if (!e || int32_t(soundEnv) >= d2client_sounds::envCount()) return 1;
     int32_t m; std::memcpy(&m, e + soundEnv * 0x58 + 0x1C, 4); return m;

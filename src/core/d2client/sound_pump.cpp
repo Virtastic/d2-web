@@ -131,11 +131,20 @@ void d2client_sound_stage_feed(uint32_t soundEnv) {
 }
 // Called after 0x4F860: its D2Sound calls, in the A-capture shape. An accepted area-loop submit (Sounds row R) is two #10034
 // records (the second carries the row as snd=R); a changed area key is #10059 (0x5CF90).
+// The weather loop is traced only when the session says its client frame draws (d2_session_client_draws(1)).
+static bool traceWeather = false;
+extern "C" void d2client_sound_trace_weather(bool on) { traceWeather = on; }
 void d2client_sound_stage_log() {
     if (!armed) return;
     curTick = ++ambTick;
     int32_t q[64 * 2]; const int n = d2_ambient_take(q, 64);
     for (int i = 0; i < n; ++i) {
+        if (q[i * 2 + 1] == 1) {   // the weather loop (0x88A70 with no unit): its allocation's #10034 only
+            if (!traceWeather) continue;
+            out += std::to_string(curTick) + " A 10034 0,0 snd=" + std::to_string(q[i * 2]) + "\n";
+            ++sndHandle;
+            continue;
+        }
         if (q[i * 2 + 1] != 0) continue;
         out += std::to_string(curTick) + " A 10034 0,0\n";
         out += std::to_string(curTick) + " A 10034 0,0 snd=" + std::to_string(q[i * 2]) + "\n";   // snd= is decimal in the capture (snd=70 is row 70)
@@ -155,7 +164,7 @@ namespace {
 // The queued unit submits through the 0x88A70 port. Its D2Sound calls: 0x87D80's #10034 on allocation, then #10034 with ECX =
 // entry+0x28 and EDX = the unit (pointers: printed 0), then 0x22390's #10034 (ECX = unit+0x78, EDX = the entry handle).
 // 0x87FE0 (an entry of the same compound group still live) finds none: the capture never shows a submit without its allocation.
-void flushUnitSubmits(uint32_t now) {
+void submitRows(uint32_t now, const std::vector<int32_t>& rows, int32_t p3) {
     D2cSndSubmitEnv E{};
     E.recs = sg.cc24c; E.count = sg.cc250; E.enabled = 1; E.now = (int32_t)now; E.player = 0;
     E.find87fe0 = [](int32_t, int32_t) -> uint8_t* { return nullptr; };
@@ -167,9 +176,19 @@ void flushUnitSubmits(uint32_t now) {
     E.pan88440 = [](int32_t, uint32_t) { return 0.0f; };
     E.ord10034 = [](uint32_t, uint32_t) { logA(10034, 0, 0); };
     E.fn22390 = [](uint32_t, int32_t h) { logA(10034, 0, (uint32_t)h); };
-    for (int32_t row : unitQ) { curTag = row; d2_client_88a70(&E, row, 1, 0, 0, 0); }
-    curTag = 0; unitQ.clear();
+    for (int32_t row : rows) { curTag = row; d2_client_88a70(&E, row, 1, 0, p3, 0); }
+    curTag = 0;
 }
+void flushUnitSubmits(uint32_t now) { submitRows(now, unitQ, 0); unitQ.clear(); }
+}
+bool d2client_sound_armed() { return armed; }
+// A unit sound a server packet's handler submits (0x23F20 under the packet dispatch, before 0x5F020): logged at once, ahead
+// of the frame's ambient records. p3 is 0x88A70's third stack word (entry +0x38).
+void d2client_sound_unit_submit_now(int32_t row, int32_t p3) {
+    if (!armed || row < 1) return;
+    initOnce();
+    curTick = ambTick + 1;
+    submitRows(curTick - 1, std::vector<int32_t>{ row }, p3);
 }
 extern "C" {
 EMSCRIPTEN_KEEPALIVE void d2_snd_trace_reset() { out.clear(); armed = true; unitQ.clear(); sndHandle = 0; }
