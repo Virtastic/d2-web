@@ -322,8 +322,9 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_stage_tile(uint32_t type, uint32_t flags, in
     g_tileInfo[g_nTiles] = {slack, roofH};
     return g_nTiles++;
 }
-EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_stage_unit(uint32_t unit, int32_t type, int32_t sx, int32_t sy, uint32_t a6180, uint32_t bit20, uint32_t bit7) {
-    if (g_nUnits >= kMaxUnits) return 0;
+// Returns the staged index, or -1 when the table is full (the caller then skips the unit's setters).
+EMSCRIPTEN_KEEPALIVE int32_t d2_dg_stage_unit(uint32_t unit, int32_t type, int32_t sx, int32_t sy, uint32_t a6180, uint32_t bit20, uint32_t bit7) {
+    if (g_nUnits >= kMaxUnits) return -1;
     uint32_t rec = kUnitRec + g_nUnits * 16;   // unit arg = classId; the node's unit pointer is the record (written in d2_dg_frame, after the arena reset)
     g_units[g_nUnits] = {rec, (int32_t)unit, type, sx, sy, a6180, bit20, bit7, 0, 0};
     g_unitCof[g_nUnits].has = 0;
@@ -430,14 +431,18 @@ extern "C" void d2c_666d0(D2cHost, int32_t, uint32_t, int32_t, uint32_t);
 extern "C" void d2c_728b0(D2cHost, uint32_t, uint32_t);
 extern "C" void d2c_72830(D2cHost, uint32_t, uint32_t);
 // D2Client+0x6C490 / +0x6CC00 are the env-seam ports (d2client_6c490.cpp, d2client_batch_6cc00.cpp).
-struct D2c6C490Env { uint32_t (*rd32)(uint32_t); int32_t (*ord10175)(uint32_t); void (*ord10350)(uint32_t, int32_t*); int32_t (*ord10013)(); int32_t (*ord10036)(); void (*ord10083)(int32_t);
-    int32_t (*f1a3d0)(uint32_t, int32_t, int32_t, int32_t); void (*f6aee0)(uint32_t, uint32_t, int32_t, int32_t, int32_t, int32_t); int32_t (*ord10164)(); int32_t (*ord10866)(uint32_t, int32_t); uint32_t (*f560d0)();
-    uint32_t (*ord10431)(uint32_t, uint32_t, uint32_t*); uint32_t (*f1af0)(); uint32_t (*f1a2f0)(uint32_t, uint32_t); uint32_t (*f3a30)(); int32_t (*f56fc0)(uint32_t); uint32_t (*ord10663)(uint32_t);
-    void (*f1dca0)(uint32_t, int32_t, int32_t, uint32_t, uint32_t*, int32_t*, int32_t*, uint32_t, int32_t); uint32_t (*ord10688)(uint32_t); int32_t (*ord10576)(uint32_t); uint32_t (*f1260)();
-    int32_t (*f1e2c0)(uint32_t, const uint32_t*); int32_t (*f1dfe0)(uint32_t, uint32_t*); uint32_t (*f1dee0)(uint32_t, uint32_t); int32_t (*f1d780)(int32_t); int32_t (*f1d690)();
-    void (*ord10016)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, int32_t, uint32_t); uint32_t (*ord11080)(uint32_t); uint32_t (*ord11168)(uint32_t);
-    void (*ord10041)(const uint32_t*, int32_t, int32_t, uint32_t, uint32_t, uint32_t); int32_t (*ord10494)(uint32_t, int32_t); void (*f166d0)(uint32_t); void (*fatal)(int32_t); };
-extern "C" int32_t d2c_6c490(const D2c6C490Env*, uint32_t, uint32_t, uint32_t, int32_t, int32_t, int32_t, int32_t, int32_t, uint32_t, int32_t, int32_t, uint32_t, uint32_t);
+typedef uint32_t u32_; typedef int32_t i32_;
+struct D2c6C490Env {
+    u32_ (*rd32)(u32_); u32_ (*rd8)(u32_); i32_ (*ord10175)(u32_); void (*ord10350)(u32_, u32_*, u32_*, u32_*); i32_ (*ord10013)(); i32_ (*ord10036)();
+    void (*ord10083)(i32_); i32_ (*f6a3d0)(u32_, i32_, i32_, i32_); void (*f6aee0)(u32_, u32_, i32_, i32_, i32_, i32_); void (*ord10569)(u32_, u32_*, u32_*);
+    u32_ (*ord10164)(u32_); i32_ (*ord10866)(u32_, i32_); u32_ (*f560d0)(u32_); u32_ (*ord10431)(u32_, u32_, u32_*, u32_, u32_); u32_ (*f1af0)(u32_);
+    u32_ (*f6a2f0)(u32_, u32_, u32_); u32_ (*f53a30)(u32_); u32_ (*fa6fc0)(u32_); u32_ (*ord10663)(u32_);
+    void (*f6dca0)(u32_, u32_, u32_, u32_, u32_*, u32_*, u32_*, u32_, i32_); u32_ (*ord10688)(u32_); i32_ (*ord10576)(u32_); u32_ (*f1260)(u32_);
+    i32_ (*f6e2c0)(u32_, u32_*, u32_*); i32_ (*f6dfe0)(u32_, u32_, u32_, u32_*); u32_ (*f6dee0)(u32_, u32_, u32_); i32_ (*f6d780)(u32_); u32_ (*f6d690)(u32_, u32_);
+    void (*ord10016)(const u32_*, u32_, u32_, u32_, u32_, i32_, u32_); u32_ (*ord11080)(u32_); u32_ (*ord11168)(u32_);
+    void (*ord10041)(const u32_*, i32_, i32_, u32_, u32_, u32_); i32_ (*ord10494)(u32_, i32_); void (*f666d0)(u32_, u32_, u32_); void (*fatal)(i32_); };
+// (env, EAX y base, unit, a1 = 6CC00's edx, x base, a3, a4 = the 6AEE0 gate, 9960, cc418, 995c, cc414, 8bc48, hero, a17c8, cc380, cc2d8)
+extern "C" int32_t d2c_6c490(const D2c6C490Env*, i32_, u32_, u32_, i32_, u32_, u32_, i32_, i32_, i32_, i32_, i32_, u32_, i32_, i32_, u32_);
 struct H6cc00 { uint32_t (*ord10013)(); uint32_t (*ord10175)(); void (*ord10350)(uint32_t, void*, void*, void*); uint8_t (*ord10663)(uint32_t); void (*ord10569)(uint32_t); uint32_t (*ord10164)();
     int (*ord11088)(uint32_t); uint32_t (*ord10973)(uint32_t, int, int); int (*ord10005)(void*, int, int); int (*ord10893)(int, uint32_t, void*, int);
     void (*ord10041)(uint32_t, int32_t, int32_t, uint32_t, uint32_t, int32_t); bool (*sub_54b90)(); void (*sub_1b700)(); int (*sub_6c490)(uint32_t); int (*sub_6e2c0)(uint32_t, void*);
@@ -448,7 +453,7 @@ extern "C" int d2_client_6cc00(uint32_t, uint32_t, const H6cc00*, uint32_t, int3
 // ecx/edx on 10013 are leftovers: edx is the one a 10069 left behind, read once; ecx after a 10069 is the renderer's (D2Gfx 0xBAF0 returns through its
 // interface slot +0xA4), which the capture reads as 0. 10041's edx is the y it drew at.
 static int32_t g_vx, g_vy;   // ctx+0x24/+0x28, the view origin (iso px)
-static uint32_t g_hu[0x80], g_hinfo[0x10], g_hnode[8], g_hx[8], g_hhdr[6];
+static uint32_t g_hu[0x80], g_hinfo[0x10], g_hnode[8], g_hx[8], g_hhdr[0x400];   // the header's first 24 bytes are the staged COF box; the rest reads 0 (6C490's component bytes)
 static int32_t g_hpx, g_hpy; static uint32_t g_hself;
 // 1.13c D2Client+0x3F860's unit origin (DAT_6fbc9960 / DAT_6fbc995c): the player's client X - W/2 and client Y - H/2 + 16 (640x480, no shake).
 static int32_t g_uox, g_uoy;
@@ -496,21 +501,27 @@ static uint32_t pal53a30() {
     return (uint32_t)(uintptr_t)(tab + 4 + 2 * 0x100);
 }
 static const D2c6C490Env kE6c490 = {
-    [](uint32_t a) { uint32_t v; memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }, [](uint32_t) -> int32_t { return 0; },
+    [](u32_ a) { u32_ v; memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }, [](u32_ a) -> u32_ { return *(const uint8_t*)(uintptr_t)a; },
+    // 10175: the unit's mode, 1 (the staged node's key); 10350 leaves the type/class read off the unit.
+    [](u32_) -> i32_ { return 1; }, [](u32_, u32_*, u32_*, u32_*) {},
     // 6C490's 10013 (0x6fb1c516): ecx = DAT_6fbc9960 (the unit origin x), edx from 10350 (reads 0); 10036 keeps them.
-    [](uint32_t, int32_t* xy) { xy[0] = g_hpx; xy[1] = g_hpy; }, []() -> int32_t { g_lecx = (uint32_t)g_uox; g_ledx = 0; return (int32_t)rec10013(); },
-    []() -> int32_t { gRec(10036, {}, g_lecx, g_ledx); return 0; },
-    // 6AEE0's 10013: opening (0x6fb1c5e3) ecx = 6A3D0's leftover, edx = 6C490's second argument (0); closing (0x6fb1cb01) ecx = the layer count, edx = the hidden flag.
-    [](int32_t) {}, [](uint32_t, int32_t x, int32_t y, int32_t f) -> int32_t { return cull6a3d0(x, y, f); },
-    [](uint32_t, uint32_t a, int32_t open, int32_t, int32_t, int32_t hid) { if (open) g_ledx = a; else { g_lecx = g_hhdr[0] & 0xff; g_ledx = (uint32_t)hid; } rec10013(); },
+    []() -> i32_ { g_lecx = (u32_)g_uox; g_ledx = 0; return (i32_)rec10013(); },
+    []() -> i32_ { gRec(10036, {}, g_lecx, g_ledx); return 0; },
+    // 6AEE0's 10013: opening (0x6fb1c5e3) ecx = 6A3D0's leftover, edx = 6C490's second argument; closing (0x6fb1cb01) ecx = the layer count, edx = the hidden flag.
+    [](i32_) {}, [](u32_, i32_ x, i32_ y, i32_ f) -> i32_ { return cull6a3d0(x, y, f); },
+    [](u32_, u32_ a, i32_ open, i32_, i32_, i32_ hid) { if (open) g_ledx = a; else { g_lecx = g_hhdr[0] & 0xff; g_ledx = (u32_)hid; } rec10013(); },
+    [](u32_, u32_*, u32_*) {},
     // D2Gfx #10164 (called with unit+0x6C set): the colour shift table's row for index - 1, a pointer (its bytes are not read here).
-    []() -> int32_t { static uint8_t* t = nullptr; if (!t) t = (uint8_t*)calloc(0x100, 1); return (int32_t)(uintptr_t)t; },
-    [](uint32_t, int32_t) -> int32_t { return 0; }, []() -> uint32_t { return 0; },
-    [](uint32_t, uint32_t, uint32_t*) -> uint32_t { return 2; }, []() -> uint32_t { return 1; }, [](uint32_t, uint32_t) -> uint32_t { return 1; }, []() -> uint32_t { return pal53a30(); },
-    [](uint32_t) -> int32_t { return 0; }, [](uint32_t) -> uint32_t { return 0; }, nullptr, [](uint32_t) -> uint32_t { return 0; }, [](uint32_t) -> int32_t { return 0; }, []() -> uint32_t { return 0; },
-    [](uint32_t, const uint32_t*) -> int32_t { return 1; }, [](uint32_t, uint32_t*) -> int32_t { return 0; }, [](uint32_t, uint32_t pal) -> uint32_t { return pal; }, [](int32_t) -> int32_t { return 0; },
-    []() -> int32_t { return 0; }, [](uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, int32_t, uint32_t) {}, [](uint32_t) -> uint32_t { return 0; }, [](uint32_t) -> uint32_t { return 0; },
-    [](const uint32_t*, int32_t x, int32_t y, uint32_t, uint32_t mode, uint32_t pal) { rec10041(x, y, mode, pal); }, [](uint32_t, int32_t) -> int32_t { return 0; }, [](uint32_t) {}, [](int32_t) {} };
+    [](u32_) -> u32_ { static uint8_t* t = nullptr; if (!t) t = (uint8_t*)calloc(0x100, 1); return (u32_)(uintptr_t)t; },
+    [](u32_, i32_) -> i32_ { return 0; }, [](u32_) -> u32_ { return 0; },
+    [](u32_, u32_, u32_*, u32_, u32_) -> u32_ { return 2; }, [](u32_) -> u32_ { return 1; }, [](u32_, u32_, u32_) -> u32_ { return 1; }, [](u32_) -> u32_ { return pal53a30(); },
+    [](u32_) -> u32_ { return 0; }, [](u32_) -> u32_ { return 0; }, [](u32_, u32_, u32_, u32_, u32_*, u32_*, u32_*, u32_, i32_) {},
+    // 10688: an object's record (type 2 only), its bytes read 0.
+    [](u32_) -> u32_ { static uint8_t* t = nullptr; if (!t) t = (uint8_t*)calloc(0x400, 1); return (u32_)(uintptr_t)t; },
+    [](u32_) -> i32_ { return 0; }, [](u32_) -> u32_ { return 0; },
+    [](u32_, u32_*, u32_*) -> i32_ { return 1; }, [](u32_, u32_, u32_, u32_*) -> i32_ { return 0; }, [](u32_, u32_, u32_ pal) -> u32_ { return pal; }, [](u32_) -> i32_ { return 0; },
+    [](u32_, u32_) -> u32_ { return 0; }, [](const u32_*, u32_, u32_, u32_, u32_, i32_, u32_) {}, [](u32_) -> u32_ { return 0; }, [](u32_) -> u32_ { return 0; },
+    [](const u32_*, i32_ x, i32_ y, u32_, u32_ mode, u32_ pal) { rec10041(x, y, mode, pal); }, [](u32_, i32_) -> i32_ { return 0; }, [](u32_, u32_, u32_) {}, [](i32_) {} };
 // 1.13c D2Client+0x6B700 (d2client_batch_6b700.cpp) draws a hit flash: per layer of the unit's COF one D2Gfx #10046 at the unit's place, in the colour
 // 0x68CF0 picks. Its host here: mode 0 (#10013 answers 0), the client XY, the 6A3D0 cull, the staged COF header as the layer record (byte 0 the layer
 // count), layers in order. Register leftovers (the retail captures): 0x6E670's 10013 per layer reads ecx/edx 0 after 0x6EA50, then 8/0 after each 10046;
@@ -559,7 +570,7 @@ static const H6cc00 kH6cc00 = {
     [](uint32_t) -> int { return 0; }, [](uint32_t, int, int) -> uint32_t { return 0; }, [](void*, int, int) -> int { return 1; }, [](int, uint32_t, void*, int) -> int { return 0; },
     [](uint32_t, int32_t x, int32_t y, uint32_t, uint32_t col, int32_t) { rec10041(x, y, col); }, gateA4b90,
     []() { d2_client_6b700((uint32_t)(uintptr_t)g_hu, &kH6b700, 0, 640, g_uoy, g_uox, 0); },
-    [](uint32_t u) -> int { return d2c_6c490(&kE6c490, u, 0, 0, g_uox, 0, g_uoy, 0, 640, g_hself, 0, 0, 0, 1); },
+    [](uint32_t u) -> int { return d2c_6c490(&kE6c490, g_hpy, u, g_p6cc00, g_hpx, 0, 1, g_uox, 0, g_uoy, 0, 640, g_hself, 0, 0, 0); },
     [](uint32_t, void* r) -> int { uint32_t* w = (uint32_t*)r; w[16] = 0; w[17] = (uint32_t)g_hpy; return 1; }, []() -> uint32_t { return g_hself; }, []() -> uint32_t { return 0; },
     [](uint32_t, uint32_t, int, int, int, int) {} };
 static uint32_t hostCall(D2cCall* c) {
@@ -580,7 +591,7 @@ static uint32_t stageUnit(uint32_t rec) {
     uint32_t k = (rec - kUnitRec) / 16;
     g_hk = k;
     if (k < g_nUnits) clientXY(g_units[k], &g_hpx, &g_hpy); else { g_hpx = (sx - sy) * 16; g_hpy = (sx + sy) * 8; }
-    if (k < g_nUnits && g_unitCof[k].has) memcpy(g_hhdr, g_unitCof[k].h, sizeof g_hhdr); else g_hhdr[0] = g_hu[0] == 0 ? 8 : 1;
+    if (k < g_nUnits && g_unitCof[k].has) memcpy(g_hhdr, g_unitCof[k].h, sizeof g_unitCof[k].h); else g_hhdr[0] = g_hu[0] == 0 ? 8 : 1;
     if (k < g_nUnits) g_hu[0x6c / 4] = g_unitShift[k];
     g_hu[0x54 / 4] = (uint32_t)(uintptr_t)g_hinfo; g_hinfo[0x28 / 4] = (uint32_t)(uintptr_t)g_hnode;
     g_hnode[0] = 1; g_hnode[1] = 2; g_hnode[2] = (uint32_t)(uintptr_t)g_hx; g_hx[0x14 / 4] = (uint32_t)(uintptr_t)g_hhdr;

@@ -391,7 +391,7 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_drlg_client_room_status_cells(int levelId
 
 // Feeder for the D2Client room walk (src/core/d2client/draw_grid_7a9f0.cpp): the client level's rooms in
 // pFirstRoomEx order, walls = list A, roofs = list B. Units are not staged (skipUnits stays the caller's).
-extern "C" uint32_t d2_dg_stage_unit(uint32_t, int32_t, int32_t, int32_t, uint32_t, uint32_t, uint32_t);
+extern "C" int32_t d2_dg_stage_unit(uint32_t, int32_t, int32_t, int32_t, uint32_t, uint32_t, uint32_t);
 extern "C" void d2_dg_stage_unit_cof(uint32_t, const uint8_t*);
 extern "C" void d2_dg_stage_unit_palshift(uint32_t);
 extern "C" void d2_dg_stage_unit_shift(uint32_t, uint32_t);
@@ -517,7 +517,9 @@ uint32_t d2_dg_feed_level(D2DrlgLevelStrc* lv, int l, int t, int r, int b, int o
                 const FeedUnit* f = nullptr;
                 for (const FeedUnit& u : g_feedUnits) if (u.slot == s) { f = &u; break; }
                 if (!f) continue;
-                uint32_t k = d2_dg_stage_unit((uint32_t)f->cls, f->type, f->sx, f->sy, (uint32_t)d2c_cru_a6180(s), (f->flags >> 20) & 1, (f->flagsEx & 1) ? 0 : 1);
+                const int32_t ks = d2_dg_stage_unit((uint32_t)f->cls, f->type, f->sx, f->sy, (uint32_t)d2c_cru_a6180(s), (f->flags >> 20) & 1, (f->flagsEx & 1) ? 0 : 1);
+                if (ks < 0) continue;   // the stage table is full
+                const uint32_t k = (uint32_t)ks;
                 if (f->hasCof) d2_dg_stage_unit_cof(k, f->cof);
                 if (f->palshift) d2_dg_stage_unit_palshift(k);
                 d2_dg_stage_unit_shift(k, f->shift);
@@ -533,7 +535,9 @@ uint32_t d2_dg_feed_level(D2DrlgLevelStrc* lv, int l, int t, int r, int b, int o
         for (const FeedUnit& u : g_feedUnits) {
             int tx = u.sx / 5, ty = u.sy / 5;
             if (tx < room->nTileXPos || ty < room->nTileYPos || tx >= room->nTileXPos + room->nTileWidth || ty >= room->nTileYPos + room->nTileHeight) continue;
-            uint32_t k = d2_dg_stage_unit((uint32_t)u.cls, u.type, u.sx, u.sy, 0, (u.flags >> 20) & 1, (u.flagsEx & 1) ? 0 : 1);   // flagsEx bit0: the unit +0xC8 bit7 (the shadow node) is clear
+            const int32_t ks = d2_dg_stage_unit((uint32_t)u.cls, u.type, u.sx, u.sy, 0, (u.flags >> 20) & 1, (u.flagsEx & 1) ? 0 : 1);   // flagsEx bit0: the unit +0xC8 bit7 (the shadow node) is clear
+            if (ks < 0) continue;   // the stage table is full
+            const uint32_t k = (uint32_t)ks;
             if (u.hasCof) d2_dg_stage_unit_cof(k, u.cof);
             if (u.palshift) d2_dg_stage_unit_palshift(k);
             d2_dg_stage_unit_frac(k, u.hasId ? u.fx : 0x8000, u.hasId ? u.fy : 0x8000);   // a plain feed carries no fraction: the subtile centre
