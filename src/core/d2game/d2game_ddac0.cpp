@@ -7,27 +7,26 @@
 // A null game with an A5D4 result, a zero divisor, and a non-type-1 unit after DAE20 are fatal (Fog 0xA2DA / 0xA2C2) and not modelled.
 #include "d2game_seam4e.h"
 // 1.13c D2Game+0xDDAC0
-extern "C" void d2game_ddac0(uint32_t unit, uint32_t game, uint32_t amount, const D2Seam* e)
+// Returns the EAX retail leaves (callers treat it as void): the unit on amount <= 0, else the tail callee's EAX.
+extern "C" uint32_t d2game_ddac0(uint32_t unit, uint32_t game, uint32_t amount, const D2Seam* e)
 {
-    if ((int32_t)amount <= 0) return;
+    if ((int32_t)amount <= 0) return unit;
     const uint32_t t = unit ? d2rd32(unit) : 6;
-    if (t == 0) { e->call(0xDC780, game, 0, 0, 0, 0, amount); return; }
+    if (t == 0) return e->call(0xDC780, game, 0, 0, 0, 0, amount);
     if (t == 1) {
-        if (e->call(0xA68E, 0, 0, 0, 0, 0, unit, 0x36)) return;
+        if (const uint32_t r = e->call(0xA68E, 0, 0, 0, 0, 0, unit, 0x36)) return r;
         const uint32_t k = e->call(0x1220, d2rd32(unit + 4), 0, 0, 0, 0, unit);
-        if (e->call(0xA580, 0, 0, 0, 0, 0, k) || e->call(0x22A80, unit, 0, 0, 0, 0, 8) || e->call(0xA7F6, 0, 0, 0, 0, 0, unit)) {
-            e->call(0xDC780, game, 0, 0, 0, 0, amount);
-            return;
-        }
+        if (e->call(0xA580, 0, 0, 0, 0, 0, k) || e->call(0x22A80, unit, 0, 0, 0, 0, 8) || e->call(0xA7F6, 0, 0, 0, 0, 0, unit))
+            return e->call(0xDC780, game, 0, 0, 0, 0, amount);
     }
     const uint32_t pile = e->call(0xA5D4, 0, 0, 0, 0, 0, unit, 1);
-    if (!game) return;
+    if (!game) return 0;   // fatal in retail, not modelled
     const uint32_t gd = d2rd32(game + 0x80);
-    if ((int32_t)e->call(0xDAE20, unit, 0, 0, 0, 0, gd) >= 0) return;
+    if (const uint32_t r = e->call(0xDAE20, unit, 0, 0, 0, 0, gd); (int32_t)r >= 0) return r;
     if (unit && d2rd32(unit) == 1) {
         const uint32_t rec = e->call(0xA7BA, 0, 0, 0, 0, 0, d2rd8(gd + 0x6D));
         const int32_t div = (int32_t)d2rd32(rec + 0x14);
-        if (!div) return;
+        if (!div) return 0;   // fatal in retail, not modelled
         amount = (uint32_t)((int32_t)amount / div);
     }
     uint32_t ebx = d2rd32(gd + 0xA8) + amount;
@@ -42,12 +41,12 @@ extern "C" void d2game_ddac0(uint32_t unit, uint32_t game, uint32_t amount, cons
         if ((int32_t)cur < (int32_t)ebx) e->call(0xA778, 0, 0, 0, 0, 0, pile, ebx);
         else ebx = cur;
     }
-    e->call(0x8EA80, 0, gd, unit, 0, 0, 0xC, ebx, 0, 0, 0);
-    if (!unit || d2rd32(unit) != 1) return;
+    const uint32_t r8 = e->call(0x8EA80, 0, gd, unit, 0, 0, 0xC, ebx, 0, 0, 0);
+    if (!unit || d2rd32(unit) != 1) return r8;   // fatal in retail, not modelled
     for (uint32_t n = d2rd32(unit + 0xDC); n;) {
         const uint32_t next = d2rd32(n + 0x24);
         if (d2rd8(n) == 2) { e->call(0x8E6F0, n); e->edi(0x8E6F0, gd); }
         n = next;
     }
-    e->call(0x8EA80, 0, gd, unit, 0, 0, 2, d2rd32(gd + 0xA8) + amount + 1, 0, 0, 0);
+    return e->call(0x8EA80, 0, gd, unit, 0, 0, 2, d2rd32(gd + 0xA8) + amount + 1, 0, 0, 0);
 }

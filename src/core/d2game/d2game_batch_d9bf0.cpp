@@ -153,35 +153,40 @@ void d2_fn_d2game_DAB00(uint32_t param_1, uint32_t eax, uint32_t ebx, const Env_
 
 // 1.13c D2Game+0xDAED0 -- append a nearby candidate unit to the list at param_3 (max 8). edx = candidate,
 // stack arg = list (+0 = reference unit, +4.. units, +0x24.. weights, +0x44 count, +0x48 weight sum).
+// EAX at return is the last value retail computed: the flag bit, the type less one, the mode, the reference's type or y,
+// the candidate's y, the squared distance, or the new count. A null candidate leaves the caller's EAX (`eaxIn`).
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2game_DAED0(uint32_t edx, uint32_t list, const Env_D9* e)
+uint32_t d2_fn_d2game_DAED0(uint32_t edx, uint32_t list, const Env_D9* e, uint32_t eaxIn)
 {
     const uint32_t cand = edx;
-    if (cand == 0) return;
-    if (R8(e, cand, 0xC6) & 1) return;
+    if (cand == 0) return eaxIn;
+    if (R8(e, cand, 0xC6) & 1) return 1;
     uint32_t t = R32(e, cand, 0);
     if (t == 0) {
         uint32_t m = R32(e, cand, 0x10);
-        if (m == 0 || m == 0x11) return;
+        if (m == 0 || m == 0x11) return m;
     } else {
-        if (t != 1) return;
+        if (t != 1) return t - 1;
         uint32_t m = R32(e, cand, 0x10);
-        if (m == 0 || m == 0xc) return;
+        if (m == 0 || m == 0xc) return m;
     }
     uint32_t ref = R32(e, list, 0);
     if (ref != 0) {
         uint32_t rt = R32(e, ref, 0), sub = R32(e, ref, 0x2c);
-        uint32_t rx, ry;
-        if (rt == 2 || (rt > 3 && rt < 6)) rx = R32(e, sub, 0xc);
+        uint32_t rx, ry, eax;
+        const bool direct = rt == 2 || ((int32_t)rt > 3 && (int32_t)rt < 6);
+        if (direct) rx = R32(e, sub, 0xc);
         else rx = sub ? e->o10867(sub) : 0;
-        if (rt == 2 || (rt > 3 && rt < 6)) ry = R32(e, sub, 0x10);
-        else ry = sub ? e->o10750(sub) : 0;
-        if (rx == 0) return;
+        if (direct) { ry = R32(e, sub, 0x10); eax = rt; }
+        else if (sub) { ry = e->o10750(sub); eax = ry; }
+        else { ry = 0; eax = rt; }
+        if (rx == 0) return eax;
         int32_t cx = e->sub1100(cand);
         int32_t cy = e->sub1130(cand);
-        if (cx == 0) return;
+        if (cx == 0) return (uint32_t)cy;
         int32_t dx = (int32_t)(rx - (uint32_t)cx), dy = (int32_t)(ry - (uint32_t)cy);
-        if ((uint32_t)(dy * dy + dx * dx) > 0x1900) return;
+        const uint32_t d2 = (uint32_t)(dy * dy + dx * dx);
+        if (d2 > 0x1900) return d2;
     }
     uint32_t n = R32(e, list, 0x44);
     if ((int32_t)n >= 8) e->fatal(0xf22);
@@ -190,6 +195,7 @@ void d2_fn_d2game_DAED0(uint32_t edx, uint32_t list, const Env_D9* e)
     n = R32(e, list, 0x44);
     W32(e, list, 0x48, R32(e, list, 0x48) + R32(e, list, 0x24 + n * 4));
     W32(e, list, 0x44, n + 1);
+    return n + 1;
 }
 
 // 1.13c D2Game+0xDB5E0 -- resolve a unit from a pointer pair. ebx = unit, stack: p1, p2.
@@ -244,21 +250,24 @@ uint32_t d2_fn_d2game_DB790(uint32_t eax, uint32_t ecx, uint32_t esi, uint32_t a
 // 1.13c D2Game+0xDBA40 -- apply a damage record's life/mana/stamina parts (dmg+0x38 / +0x3c / +8 / +0x40) to the
 // attacker's pools. eax = damage record, ecx = attacker, edx = game, stack = target unit.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2game_DBA40(uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t target, const Env_D9* e)
+uint32_t d2_fn_d2game_DBA40(uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t target, const Env_D9* e)
 {
+    // Returns the EAX retail leaves at each exit (the function is void in its callers).
     const uint32_t dmg = eax, attacker = ecx, game = edx;
-    if (R32(e, dmg, 0x38) == 0 && R32(e, dmg, 0x3c) == 0) return;
+    const uint32_t v38in = R32(e, dmg, 0x38);
+    if (v38in == 0 && R32(e, dmg, 0x3c) == 0) return 0;
     int32_t pct;
     if (attacker == 0 || R32(e, attacker, 0) != 1) {
         pct = 100;
     } else {
         uint32_t ai = R32(e, attacker, 0x14);
-        if (ai == 0) return;
+        if (ai == 0) return v38in;
         uint32_t y = R32(e, ai, 0);
-        if (y == 0) return;
+        if (y == 0) return v38in;
         pct = R8(e, y + (uint32_t)R8(e, game, 0x6d), 0xa0);
-        if (pct <= 0) return;
+        if (pct <= 0) return v38in;
     }
+    uint32_t rax = 0;   // EAX on the "ebx <= 0" exit
     W32(e, dmg, 0x38, R32(e, dmg, 0x38) << 6);
     W32(e, dmg, 0x3c, R32(e, dmg, 0x3c) << 6);
 
@@ -271,12 +280,13 @@ void d2_fn_d2game_DBA40(uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t targe
         uint32_t tt = R32(e, target, 0);
         if (tt == 0) {
             uint32_t tbl = e->o10237(R8(e, R32(e, target, 0x80), 0x6d));
+            rax = tbl;
             int32_t a = (int32_t)R32(e, tbl, 0x28);
-            if (a != 0) W32(e, dmg, 0x38, (uint32_t)((int32_t)R32(e, dmg, 0x38) / a));
+            if (a != 0) { rax = (uint32_t)((int32_t)R32(e, dmg, 0x38) / a); W32(e, dmg, 0x38, rax); }
             int32_t b = (int32_t)R32(e, tbl, 0x2c);
-            if (b != 0) W32(e, dmg, 0x3c, (uint32_t)((int32_t)R32(e, dmg, 0x3c) / b));
+            if (b != 0) { rax = (uint32_t)((int32_t)R32(e, dmg, 0x3c) / b); W32(e, dmg, 0x3c, rax); }
             common = true;
-        } else if (tt == 1 && e->o11104(target) != 0) {
+        } else if (tt == 1 && (rax = (uint32_t)e->o11104(target)) != 0) {
             common = true;
         } else {
             A = (int32_t)tt; B = (int32_t)R32(e, target, 4); C = (int32_t)R32(e, target, 0x10);
@@ -295,19 +305,21 @@ void d2_fn_d2game_DBA40(uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t targe
             if (y >= v8) y = v8;
             if (d40 < v10) v10 = d40;
             int32_t tot = x + y + v10;
-            if (tot == 0) return;
+            if (tot == 0) return (uint32_t)v10;
             if (pct != 100) tot = e->sub14D0((uint32_t)pct, (uint32_t)tot, 100);
-            int32_t room = e->o10913(target) - e->o10973(target, 6, 0);
+            int32_t mx = e->o10913(target);
+            int32_t cur = e->o10973(target, 6, 0);
+            int32_t room = mx - cur;
             if (tot >= room) tot = room;
-            if (tot <= 0) return;
+            if (tot <= 0) return (uint32_t)cur;
             e->o10551(target, 6, tot, 0);
-            e->o10689(target, 0x97, 0);
-            return;
+            return e->o10689(target, 0x97, 0);
         }
+        rax = 0;   // A
     }
     int32_t ebx = (int32_t)R32(e, dmg, 8);
     bool flag = false;
-    if (ebx <= 0) return;
+    if (ebx <= 0) return rax;
     if (R32(e, dmg, 0x3c) != 0) {
         int32_t r = e->sub14D0(R32(e, dmg, 0x3c), (uint32_t)ebx, 100);
         if (pct != 100) r = e->sub14D0((uint32_t)pct, (uint32_t)r, 100);
@@ -316,13 +328,13 @@ void d2_fn_d2game_DBA40(uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t targe
     }
     uint32_t v38 = R32(e, dmg, 0x38);
     if (v38 == 0) {
-        if (flag) e->o10689(target, 0x98, 0);
-        return;
+        if (flag) return e->o10689(target, 0x98, 0);
+        return 0;   // dmg+0x3c, tested zero
     }
     int32_t r = e->sub14D0(v38, (uint32_t)ebx, 100);
     if (pct != 100) r = e->sub14D0((uint32_t)pct, (uint32_t)r, 100);
     e->subDB570((uint32_t)norm(r));
-    if (!flag) { e->o10689(target, 0x97, 0); return; }
-    if (e->sub1180(2, target + 0x20) == 0) e->o10689(target, 0x97, 0);
-    else e->o10689(target, 0x98, 0);
+    if (!flag) return e->o10689(target, 0x97, 0);
+    if (e->sub1180(2, target + 0x20) == 0) return e->o10689(target, 0x97, 0);
+    return e->o10689(target, 0x98, 0);
 }

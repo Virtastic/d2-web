@@ -436,7 +436,8 @@ l170bf:
     return status;
 }
 
-void d2game_unwind_f78a0(void) {   // 1.13c D2Game+0xF78A0 (Unwind@6fd178a0)
+uint32_t d2game_unwind_f78a0(void) {   // 1.13c D2Game+0xF78A0 (Unwind@6fd178a0); EAX holds the stored dword
     d2game_DAT_6fd39fa4 &= 0xfffffffeu;
+    return d2game_DAT_6fd39fa4;
 }
 }

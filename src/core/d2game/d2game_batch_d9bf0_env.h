@@ -37,7 +37,7 @@ struct D2GameBatchD9BF0Env {
     int32_t  (*o11104)(uint32_t unit);
     void     (*o10350)(uint32_t unit, int32_t* pA, int32_t* pB, int32_t* pC, uint32_t file, uint32_t line);
     int32_t  (*o10913)(uint32_t unit);
-    void     (*o10689)(uint32_t unit, uint32_t ev, uint32_t z);
+    uint32_t (*o10689)(uint32_t unit, uint32_t ev, uint32_t z);   // its EAX is the tail return of DBA40
     uint32_t fileSUnitDmg;                                            // guest address of "..\\Source\\D2Game\\UNIT\\SUnitDmg.cpp"
     // D2Game internals named by RVA
     int32_t  (*sub1100)(uint32_t unitEcx);                            // 0x1100

@@ -14,8 +14,8 @@ struct D2GA7580Env {
     uint32_t (*a3f4)(uint32_t unit, uint32_t skill);                           // ECX unit, EDX skill: the node
     uint32_t (*ae1a)(uint32_t node);                                           // stdcall 1
     uint32_t (*a49c)(uint32_t node, uint32_t file, uint32_t line);             // stdcall 3
-    void (*f2420)(uint32_t unit, uint32_t delay, uint32_t id, uint32_t mode);  // ESI unit, stack delay, id, mode (ret 0xC)
-    void (*f22c0)(uint32_t game, uint32_t w);                                  // EAX game, stack w
+    uint32_t (*f2420)(uint32_t unit, uint32_t delay, uint32_t id, uint32_t mode);  // ESI unit, stack delay, id, mode (ret 0xC)
+    uint32_t (*f22c0)(uint32_t game, uint32_t w);                               // EAX game, stack w
     uint32_t (*s1180)(uint32_t limit, uint32_t seedPtr);                       // EAX limit, ECX &seed
     uint32_t (*f2d80)(uint32_t target, uint32_t game, uint32_t unit, uint32_t b, uint32_t one);   // EAX target, stack 4
     uint32_t (*a400)(uint32_t unit, uint32_t node, uint32_t one);              // stdcall 3
@@ -28,7 +28,7 @@ struct D2GA7580Env {
     uint32_t (*a478)(uint32_t unit);                                           // stdcall 1
     uint32_t (*f3d20)(uint32_t y, uint32_t cls, uint32_t x, uint32_t z);       // ECX y, EDX cls, stack x, 0
     uint32_t (*adfc)(uint32_t room, uint32_t cls);                             // stdcall 2
-    void (*f1b10)(uint32_t game, uint32_t unit, uint32_t mode);                // AL mode, stack game, unit
+    uint32_t (*f1b10)(uint32_t game, uint32_t unit, uint32_t mode);             // AL mode, stack game, unit
     void (*f2540)(uint32_t game, uint32_t unit, uint32_t t);                   // ECX game, EDX unit, stack t, 2, 0, 0, 1, 0
     uint32_t (*fnAddr)(uint32_t rva);
 };
@@ -40,7 +40,8 @@ static inline uint32_t a58step(uint32_t seed) {   // the unit seed step; returns
     std::memcpy((void*)(uintptr_t)seed, &s, 8);
     return (uint32_t)s;
 }
-extern "C" void d2g_a7580(const D2GA7580Env* ep, uint32_t game, uint32_t unit, uint32_t ctx) {
+// EAX at return: every exit is a tail of a callee, so the step returns that callee's EAX.
+extern "C" uint32_t d2g_a7580(const D2GA7580Env* ep, uint32_t game, uint32_t unit, uint32_t ctx) {
     const D2GA7580Env& e = *ep;
     const uint32_t row = a58rd(ctx + 0x1C), flag = a58rd(ctx + 0x18), target = a58rd(ctx + 8);
     const int32_t cur = (int32_t)a58rd(ctx + 0x14);
@@ -57,12 +58,10 @@ extern "C" void d2g_a7580(const D2GA7580Env* ep, uint32_t game, uint32_t unit, u
             if (m == 3 || m == 0x13) {
                 const uint32_t mode = e.ae1a(node);
                 const uint32_t id = e.a49c(node, file, 0x1537);
-                e.f2420(unit, (uint32_t)a58rd16s(row + 0x5C + cls * 2), id, mode);
-                return;
+                return e.f2420(unit, (uint32_t)a58rd16s(row + 0x5C + cls * 2), id, mode);
             }
         }
-        e.f22c0(game, 0x19);
-        return;
+        return e.f22c0(game, 0x19);
     }
     const uint32_t node0 = e.a3f4(unit, (uint32_t)sk0);
     if (node0 && flag) {
@@ -70,13 +69,12 @@ extern "C" void d2g_a7580(const D2GA7580Env* ep, uint32_t game, uint32_t unit, u
         if ((int32_t)rem < a58rd16s(row + 0x56 + cls * 2)) {
             const uint32_t mode = e.ae1a(node0);
             const uint32_t id = e.a49c(node0, file, 0x1544);
-            e.f2420(unit, (uint32_t)a58rd16s(row + 0x5C + cls * 2), id, mode);
-            return;
+            return e.f2420(unit, (uint32_t)a58rd16s(row + 0x5C + cls * 2), id, mode);
         }
     }
     if (cur < a58rd16s(row + 0x6E + cls * 2)) {
         const uint32_t rem = a58step(seed) % 100u;
-        if (rem < 0x28 && e.f2d80(target, game, unit, 5, 1)) return;
+        if (rem < 0x28) { const uint32_t v = e.f2d80(target, game, unit, 5, 1); if (v) return v; }
     }
     const int32_t sk1 = a58rd16s(row + 0x174);
     if (sk1 > 0) {
@@ -86,7 +84,7 @@ extern "C" void d2g_a7580(const D2GA7580Env* ep, uint32_t game, uint32_t unit, u
             if ((int32_t)rem < a58rd16s(row + 0x62 + cls * 2)) {
                 const uint32_t lvl = e.a400(unit, node1, 1);
                 const uint32_t r = e.be810(target, unit, lvl);
-                if (r && e.f2380(((uint32_t)sk1 & ~0xFFu) | a58rd8(row + 0x182), unit, game, (uint32_t)sk1, r, 0, 0)) return;
+                if (r) { const uint32_t v = e.f2380(((uint32_t)sk1 & ~0xFFu) | a58rd8(row + 0x182), unit, game, (uint32_t)sk1, r, 0, 0); if (v) return v; }
             }
         }
     }
@@ -108,8 +106,7 @@ extern "C" void d2g_a7580(const D2GA7580Env* ep, uint32_t game, uint32_t unit, u
                 uint32_t q[6] = { 0, 0x271, 0x32, 0, 0, 0 };
                 e.b17b0(1, q, game, unit, e.fnAddr(0x15C40u));
                 if (q[4] != 0) {
-                    e.f2380((q[4] & ~0xFFu) | a58rd8(row + 0x181), unit, game, (uint32_t)sk3, q[4], 0, 0);
-                    return;
+                    return e.f2380((q[4] & ~0xFFu) | a58rd8(row + 0x181), unit, game, (uint32_t)sk3, q[4], 0, 0);
                 }
                 const int32_t sk4 = a58rd16s(row + 0x178);
                 if (sk4 > 0) {
@@ -125,12 +122,10 @@ extern "C" void d2g_a7580(const D2GA7580Env* ep, uint32_t game, uint32_t unit, u
                         const uint32_t v = e.adfc(room, c2);
                         const uint32_t rec = a58rd(ctx);
                         std::memcpy((void*)(uintptr_t)(rec + 0x3C), &v, 4);
-                        e.f2380(((uint32_t)sk4 & ~0xFFu) | a58rd8(row + 0x184), unit, game, (uint32_t)sk4, target, 0, 0);
-                        return;
+                        return e.f2380(((uint32_t)sk4 & ~0xFFu) | a58rd8(row + 0x184), unit, game, (uint32_t)sk4, target, 0, 0);
                     }
                 }
-                e.f1b10(game, unit, 6);
-                return;
+                return e.f1b10(game, unit, 6);
             }
         }
         // second look at the sk2 skill (EAX = its node)
@@ -140,9 +135,8 @@ extern "C" void d2g_a7580(const D2GA7580Env* ep, uint32_t game, uint32_t unit, u
         }
     }
     if (sk2ok) {
-        e.f2380((eaxHold & ~0xFFu) | a58rd8(row + 0x183), unit, game, (uint32_t)sk2, target, 0, 0);
-        return;
+        return e.f2380((eaxHold & ~0xFFu) | a58rd8(row + 0x183), unit, game, (uint32_t)sk2, target, 0, 0);
     }
     if ((int32_t)(a58step(seed) % 100u) < 0x3C) e.f2540(game, unit, target);
-    e.f22c0(game, 5);
+    return e.f22c0(game, 5);
 }

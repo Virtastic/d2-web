@@ -30,8 +30,9 @@ static inline void* rdptr(const void* p, uint32_t o) { void* v; std::memcpy(&v, 
 // ItemMode.cpp constructor-time state fill: three ordinal-10973 reads go to +0x00/+0x04/+0x08; the
 // item from 10828 (or 10507) yields its handle and name into +0x06/+0x04 (or +0x05/+0x03), with
 // -1/0 when the handle is null. The decompile carries the context in ESI.
+// EAX at return: the owner's name (the last 10601 result), or 0 (the null owner) -- both what +0x0C receives.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_D1890(uint32_t* ctx, const void* unit, const D2GameBatchBd18Env* env)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_D1890(uint32_t* ctx, const void* unit, const D2GameBatchBd18Env* env)
 {
     static const char kItemModeFile[] = "..\\Source\\D2Game\\ITEMS\\ItemMode.cpp";
 
@@ -53,10 +54,11 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_D1890(uint32_t* ctx, const void* unit, co
     if (owner != nullptr) {
         ctx[5] = env->ordinal10304(owner);
         ctx[3] = env->ordinal10601(owner, kItemModeFile, 0x9EC);
-        return;
+        return ctx[3];
     }
     ctx[5] = 0xFFFFFFFFu;
     ctx[3] = 0;
+    return 0;
 }
 
 // 1.13c D2Game+0xD4FF0

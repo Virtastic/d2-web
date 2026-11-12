@@ -159,7 +159,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2game_dad70(const int32_t* eax, void* unit
 
 // 1.13c D2Game+0xDB1F0 -- EBX = attacker unit, EDI = target unit, stack = (int* accumulator, int* value) (ret 8).
 // Stat ids 0x73 (zero the value), 0x74 (percent cut, halved for some targets), 0x7b / 0x7c (flat adds).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2game_db1f0(void* attacker, int32_t* acc, int32_t* val, int32_t* edi) {
+// EAX at return: 0 without stat 0x7c, else the player test's result.
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2game_db1f0(void* attacker, int32_t* acc, int32_t* val, int32_t* edi) {
     if (E.statBase(attacker, 0x73, 0) && edi && edi[0] == 1 &&
         (edi[5] == 0 || (d8_rd8((void*)(intptr_t)edi[5], 0x16) & 10) == 0) &&
         !E.unitTest10064(0, edi) && !E.isMonsterLike(edi))
@@ -179,7 +180,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2game_db1f0(void* attacker, int32_t* acc, 
     int32_t s = E.statBase(attacker, 0x7b, 0);
     if (s && E.isPlayerLike(edi)) *acc += s;
     s = E.statBase(attacker, 0x7c, 0);
-    if (s && E.isPlayer(edi)) *acc += s;
+    if (!s) return 0;
+    const int32_t pl = E.isPlayer(edi);
+    if (pl) *acc += s;
+    return pl;
 }
 
 // 1.13c D2Game+0xDB3C0 -- unaff_EBX = row (+4,+8,+0xc stat ids), unaff_EDI = ctx (+0 mon rec, +4 int*, +8/+0xc units, +0x14 flag).

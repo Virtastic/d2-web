@@ -256,10 +256,11 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3d020(void* game, int32_t* u, int32_t* ctx
 }
 
 // 1.13c D2Game+0x3D450 -- five stack arguments (ret 0x14): game, unit, radius, request word 4, duration (0 = no word 19).
-EMSCRIPTEN_KEEPALIVE void d2_game_3d450(void* game, int32_t* u, int32_t radius, uint32_t a4, int32_t a5, const D2GameBatch3beEnv* e = &g3beDirect)
+// EAX at return: 0 when the unit has no room, else the radius (the loop bound retail reloads into EAX).
+EMSCRIPTEN_KEEPALIVE int32_t d2_game_3d450(void* game, int32_t* u, int32_t radius, uint32_t a4, int32_t a5, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     if (a5 < 0) a5 = 0;
-    if (!e->getRoom(u)) return;
+    if (!e->getRoom(u)) return 0;
     uint32_t req[23] = {};
     void* client = nullptr;
     if (u && isPlayerBit(u)) client = e->getClient(game, u[0x25], u[0x26]);
@@ -287,6 +288,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_3d450(void* game, int32_t* u, int32_t radius, 
             }
         }
     }
+    return radius;
 }
 
 // 1.13c D2Game+0x3E590 -- a null row (retail dereferences it) returns.
@@ -475,7 +477,7 @@ uint32_t D2Game_3E740_probe(void* game, int32_t* u, int32_t* t, const uint8_t* d
     e.fd2120 = [](void* tg, void* node, void* g, int32_t v) { g3mH->h(0xB2120, (uint32_t)(uintptr_t)node, (uint32_t)(uintptr_t)g, 0, 0, (uint32_t)(uintptr_t)tg, (uint32_t)v); };
     return d2_game_3e740(game, u, t, &e);
 }
-void D2Game_3D450_probe(void* game, int32_t* u, int32_t radius, uint32_t a4, int32_t a5, uint32_t* lg, const uint32_t* sc)
+int32_t D2Game_3D450_probe(void* game, int32_t* u, int32_t radius, uint32_t a4, int32_t a5, uint32_t* lg, const uint32_t* sc)
 {
     HookEnv h(lg, sc); g3mH = &h;
     D2GameBatch3beEnv e = g3beDirect; g3mCommon(e);
@@ -486,7 +488,7 @@ void D2Game_3D450_probe(void* game, int32_t* u, int32_t radius, uint32_t a4, int
         return (int32_t)g3mH->h(0xAEB0, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)r, g3mH->stk(a), g3mH->stk(b), (uint32_t)m); };
     e.roomAux = [](void* r) -> void* { return (void*)(uintptr_t)g3mH->h(0x1280, (uint32_t)(uintptr_t)r); };
     e.auxTest = [](void* a) -> int32_t { return (int32_t)g3mH->h(0xA808, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)a); };
-    d2_game_3d450(game, u, radius, a4, a5, &e);
+    return d2_game_3d450(game, u, radius, a4, a5, &e);
 }
 
 // function probe seam (src/core/fn/d2game_3f7d0.cpp): retail's callees are HookEnv recorders (E03A0, B26A, B0FC, B24C, ACE2, 463A0).
