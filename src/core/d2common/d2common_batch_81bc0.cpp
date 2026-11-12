@@ -3,6 +3,7 @@
 // only the fields the decompile touches (retail offsets in comments). Fatal paths ending in _exit(-1) return, as
 // elsewhere in src/core/d2common. Callees not yet ported are weak externs named by RVA.
 // ponytail: structs are minimal local views; replace with the typed engine structs when a row gets a vector.
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -132,24 +133,27 @@ void D2Common_3D810_Read3x3(const B81Grid* g, int row, int col, int32_t out[9])
     out[8] = at(row - 1, col + 1); out[7] = at(row, col + 1); out[6] = at(row + 1, col + 1);
 }
 
-struct B36Line { int32_t x, y; void* _2; void* _3; int32_t** end; };   // [0],[1],[4]->{x,y}
+// the line is a DRLG vertex (x, y, direction, flags); its end is the next vertex (pointer at +0x10, {x,y} first)
+struct B36Line { int32_t x, y; int32_t _8, _c; uint32_t end; };   // +0x10 is a 32-bit retail slot, as the caller's P32 walk reads it
+static_assert(offsetof(B36Line, end) == 0x10, "B36Line end at +0x10");
 struct B36Rect { int32_t x, y, w, h; };
 
 // 1.13c D2Common+0x36CD0: EAX = line, ESI = clip rect, stack (grid, value, sel, nThick), ret 0x10. Bresenham from the
 // line start (x,y) to *end, plotting an nThick-long run per step (perpendicular to the major axis); each cell inside the
 // rect is combined with `value` by table entry `sel` of 0x6FDEB244 (or and xor mov mov-if-zero and-not) at
-// grid.data[grid.rowOff[row] + col].
+// grid.data[grid.rowOff[y - rect.y] + (x - rect.x)] (the callback gets ECX = that cell, EDX = value).
 void D2Common_36CD0_PlotLine(const B36Line* l, const B36Rect* r, B81Grid* grid, int value, int sel, int nThick)
 {
     auto inRect = [](const B36Rect* r, int x, int y) { return r->x <= x && r->y <= y && x < r->w + r->x && y < r->h + r->y; };
     int x = l->x, y = l->y;
-    int dx = l->end[0][0] - x, dy = l->end[0][1] - y, sx = 1, sy = 1;
+    const int32_t* end = (const int32_t*)(uintptr_t)l->end;
+    int dx = end[0] - x, dy = end[1] - y, sx = 1, sy = 1;
     if (dx < 0) { dx = -dx; sx = -1; }
     if (dy < 0) { dy = -dy; sy = -1; }
     int err = 0;
     auto plot = [&](int px, int py) {
         if (!inRect(r, px, py)) return;
-        int32_t* c = &grid->data[grid->rowOff[py] + px];
+        int32_t* c = &grid->data[grid->rowOff[py - r->y] + (px - r->x)];   // the grid is addressed from the rect's origin
         const int32_t v = value;
         switch (sel) {
         case 0: *c |= v; break;
