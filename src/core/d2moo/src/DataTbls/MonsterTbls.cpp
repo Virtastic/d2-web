@@ -736,7 +736,8 @@ BOOL __stdcall DATATBLS_CalculateMonsterStatsByLevel(int nMonsterId, int nGameTy
 
 //D2Common.0x6FD689B0 (#10642)
 // 1.13c D2Common+0x53800
-void __stdcall DATATBLS_SetVelocityInMonStatsTxtRecord(int nMonsterId, short nVelocity)
+// Returns what retail leaves in EAX: the record's byte offset (id * 0x1A8) after a write, the id itself when it is out of range.
+int32_t __stdcall DATATBLS_SetVelocityInMonStatsTxtRecord(int nMonsterId, short nVelocity)
 {
 	D2MonStatsTxt* pMonStatsTxtRecord = NULL;
 
@@ -747,7 +748,9 @@ void __stdcall DATATBLS_SetVelocityInMonStatsTxtRecord(int nMonsterId, short nVe
 	if (pMonStatsTxtRecord)
 	{
 		pMonStatsTxtRecord->nVelocity = nVelocity;
+		return (int32_t)((uint32_t)nMonsterId * 0x1A8u);
 	}
+	return nMonsterId;
 }
 
 //D2Common.0x6FD68A00

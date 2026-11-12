@@ -24,20 +24,24 @@ bool borderClear(const uint8_t* info, int32_t px)
 }
 }
 
-extern "C" int D2Common_7EE50_raw(void* level, const D2c7EE50Env* e)
+// Returns what retail leaves in EAX: the level pointer (type 0x27), else the flag dword it reloads before the 0x400 test, or
+// 0x42A70's EAX (the grid-C cell base at info+0x04) when that stamp runs, or the placement callee's result when it runs.
+extern "C" uint32_t D2Common_7EE50_raw(void* level, const D2c7EE50Env* e)
 {
-    if ((int32_t)r32(level, 0x1d0) == 0x27) return 1;
+    if ((int32_t)r32(level, 0x1d0) == 0x27) return (uint32_t)(uintptr_t)level;
     uint8_t* info = (uint8_t*)(uintptr_t)r32(level, 0x14);
     const int32_t w = (int32_t)r32(info, 0x5c), h = (int32_t)r32(info, 0x60);
-    uint32_t f = r32(info, 0);
-    if ((f & 0x10) && borderClear(info, w / 2 - 1)) e->border(level);
-    if ((int8_t)f < 0) D2Common_42A70(level, 0, 0, 3, 1, 0);
-    if (f & 0x100) D2Common_42A70(level, w - 7, 0, 3, 2, 0);
-    if (f & 0x200) D2Common_42A70(level, 0, 1, 2, 1, 0);
-    if (f & 0x400) D2Common_42A70(level, 0, h - 6, 2, 1, 0);
+    if ((r32(info, 0) & 0x10) && borderClear(info, w / 2 - 1)) e->border(level);
+    if ((int8_t)r32(info, 0) < 0) D2Common_42A70(level, 0, 0, 3, 1, 0);
+    if (r32(info, 0) & 0x100) D2Common_42A70(level, w - 7, 0, 3, 2, 0);
+    if (r32(info, 0) & 0x200) D2Common_42A70(level, 0, 1, 2, 1, 0);
+    uint32_t eax = r32(info, 0);
+    if (eax & 0x400) { D2Common_42A70(level, 0, h - 6, 2, 1, 0); eax = r32(info, 4); }
     if (!(r32(info, 0) & 0x40)) {
-        if (!e->placeFixed(level)) return 0;   // retail: error string 0x1E5, exit(-1)
+        const int placed = e->placeFixed(level);
+        if (!placed) return 0;   // retail: error string 0x1E5, exit(-1)
         w32(info, 0, r32(info, 0) | 0x40);
+        eax = (uint32_t)placed;
     }
-    return 1;
+    return eax;
 }

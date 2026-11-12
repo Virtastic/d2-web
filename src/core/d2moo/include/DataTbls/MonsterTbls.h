@@ -691,7 +691,7 @@ void __fastcall DATATBLS_LoadMonStatsTxt(HD2ARCHIVE hArchive);
 //D2Common.0x6FD67BD0 (#11261)
 D2COMMON_DLL_DECL BOOL __stdcall DATATBLS_CalculateMonsterStatsByLevel(int nMonsterId, int nGameType, int nDifficulty, int nLevel, short nFlags, D2MonStatsInitStrc* pMonStatsInit);
 //D2Common.0x6FD689B0 (#10642)
-D2COMMON_DLL_DECL void __stdcall DATATBLS_SetVelocityInMonStatsTxtRecord(int nMonsterId, short nVelocity);
+D2COMMON_DLL_DECL int32_t __stdcall DATATBLS_SetVelocityInMonStatsTxtRecord(int nMonsterId, short nVelocity);
 //D2Common.0x6FD68A00
 void __stdcall DATATBLS_ResetGlobalDefaultUnicodeString();
 //D2Common.0x6FD68A10 (#10651)
