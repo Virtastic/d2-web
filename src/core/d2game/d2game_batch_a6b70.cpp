@@ -182,14 +182,18 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_A7290(uint32_t game, uint32_t 
 
 // 0xA8270 and 0xA8350 (byte-identical) are one file: d2game_a8270.h.
 
-// Skill-use dispatcher on the result of 0xC8E80 (target classification); each case either hands off to a
-// bound skill (cmd+7 row shorts at 0x170..0x17e), queues a move, or fails with an error code (0xD122C0).
-// Always clears state+0x14 on exit except the two paths noted. ECX = game.
+// Skill-use dispatcher on the result of 0xA8E80 (target classification); each case either hands off to a
+// bound skill (cmd+0x1c row shorts at 0x170..0x17e, cast byte at 0x180..0x187), queues a move, or fails with an
+// error code (0xF22C0). Clears state+0x14 on every exit except case 5's cast, which stores the kind there.
+// ECX = game, EDX = unit, one stack word cmd (ret 4). Returns EAX at the ret: the last callee's result, or the
+// state pointer on case 5's cast. Seam words follow the retail registers, then the stack words in push order:
+// 0xF2380 (AL cast byte, ECX unit; skill, target, 0, 0), 0xF2220 (EAX code, EDI unit; game, target),
+// 0xF2540 (ECX game, EDX unit; 0, 2, x, y; retail also pushes 1 and a last word, 0 or 4, the seam cannot carry),
+// 0xF26B0 (ECX unit; game, target, 4), 0xF1B10 (game, unit; AL 5), 0xB07B0 (EAX unit; x, y), 0x8E6F0 (EAX node, EDI game).
 // 1.13c D2Game+0xA9610
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_A9610(uint32_t game, uint32_t unit, uint32_t cmd, const Env* E)
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_A9610(uint32_t game, uint32_t unit, uint32_t cmd, const Env* E)
 {
-    uint32_t rowp = R(cmd, 0x1c), st = R(cmd, 0);
-    uint32_t node = 0;
+    const uint32_t rowp = R(cmd, 0x1c);
     auto findNode = [&]() -> uint32_t {
         if (!(unit && R(unit, 0) == 1 && R(unit, 0x14))) return 0;
         uint32_t ex = R(R(unit, 0x14), 0x28); if (!ex) return 0;
@@ -198,71 +202,96 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_A9610(uint32_t game, uint32_t 
         while (R(n, 8) != 10 && n != list) n = R(n, 0);
         return R(n, 8) == 10 ? n : 0;
     };
-    node = findNode();
-    uint8_t scratch[20] = {};   // 0x66b..: filled but only read by 0xC4610 through its frame
+    auto states = [&]() {   // each state node (+0xdc, next +0x24) of type 2 goes to 0x8E6F0
+        for (uint32_t n = R(unit, 0xdc); n;) { uint32_t nx = R(n, 0x24); if (R8(n, 0) == 2) C(E->sae6f0, n, game); n = nx; }
+    };
+    uint32_t node = findNode();
     if (!node) {
+        uint8_t scratch[20] = {};
         wr32(scratch, 8, 10);
         int32_t t = R(unit, 0);
-        wr32(scratch, 12, (t == 2 || (t > 3 && t < 6)) ? R(R(unit, 0x2c), 0xc) : (R(unit, 0x2c) ? C(E->o10867, R(unit, 0x2c)) : 0));
-        wr32(scratch, 16, (t == 2 || (t > 3 && t < 6)) ? R(R(unit, 0x2c), 0x10) : (R(unit, 0x2c) ? C(E->o10750, R(unit, 0x2c)) : 0));
+        const bool obj = t == 2 || (t > 3 && t < 6);
+        wr32(scratch, 12, obj ? R(R(unit, 0x2c), 0xc) : (R(unit, 0x2c) ? C(E->o10867, R(unit, 0x2c)) : 0));
+        wr32(scratch, 16, obj ? R(R(unit, 0x2c), 0x10) : (R(unit, 0x2c) ? C(E->o10750, R(unit, 0x2c)) : 0));
         C(E->s41290, unit, A(scratch));
+        node = findNode();   // retail walks the list again after 0x21290
     }
-    int32_t out20 = 0; uint8_t buf4[4] = {};
-    uint32_t tgt = C(E->sc4610, game, unit, A(&out20), A(buf4), node, E->cb3e10);
-    int32_t kind = C(E->sc8e80, unit, tgt, out20);
+    uint32_t out20 = 0, buf4 = 0;
+    const uint32_t tgt = C(E->sc4610, game, unit, A(&out20), A(&buf4), node, E->cb3e10);
+    const uint32_t st = R(cmd, 0);
+    const int32_t kind = C(E->sc8e80, unit, tgt, out20, buf4, node);
     if (kind != 5) {
         int32_t s = R16(rowp, 0x17e);
-        if (s > -1) { uint32_t r = skillRec(E, s); if (r && R16(r, 0x80) > -1 && C(E->o10494, unit, R16(r, 0x80)) == 0 && C(E->sd12380, unit)) { W(st, 0x14, 0); return; } }
+        if (s > -1) {
+            uint32_t r = skillRec(E, s);
+            if (r && R16(r, 0x80) > -1 && C(E->o10494, unit, R16(r, 0x80)) == 0) {
+                uint32_t v = C(E->sd12380, R8(rowp, 0x187), unit, s, tgt, 0, 0);
+                if (v) { W(st, 0x14, 0); return v; }
+            }
+        }
     }
-    int32_t err = 2;
+    uint32_t err = 2, v = 0;
+    auto cast = [&](uint32_t off, uint32_t b) -> int {   // 1 = cast done, 0 = the row is unset
+        int32_t s = R16(rowp, off);
+        if (s < 0) return 0;
+        v = C(E->sd12380, R8(rowp, b), unit, s, tgt, 0, 0); return 1;
+    };
     switch (kind) {
-    case 1: { uint32_t pb = plr(E, unit, 0x2c); W(pb, 0x1c, 0x14);
-        uint32_t y = C(E->s21130, tgt), x = C(E->s21100, tgt); C(E->sd12540, game, unit, 0, 2, x, (uint8_t)y, 1);
-        W(st, 0x14, 0); return; }
-    case 2: case 3: case 4: C(E->sd12220, game, tgt); W(st, 0x14, 0); return;
-    case 5:
-        if (R16(rowp, 0x170) < 0) break;
-        if (C(E->o10494, unit, 0xc) == 0) { C(E->sd12380, unit); W(st, 0x14, 0); return; }   // retail stores a stack word via EBX
-        C(E->o10945, unit, 0xc, 0); err = 2; goto fail;
-    case 6:  if (R16(rowp, 0x174) > -1) { C(E->sd12380, unit); W(st, 0x14, 0); return; } break;
-    case 7:  if (R16(rowp, 0x172) > -1) { C(E->sd12380, unit); W(st, 0x14, 0); return; } break;
-    case 8:  if (R16(rowp, 0x176) > -1) { C(E->sd12380, unit); W(st, 0x14, 0); return; } break;
-    case 9:  if (R16(rowp, 0x17c) > -1) { C(E->sd12380, unit); W(st, 0x14, 0); return; } break;
-    case 10: if (R16(rowp, 0x178) > -1) { C(E->sd12380, unit); W(st, 0x14, 0); return; } break;
-    case 13: if (R16(rowp, 0x17a) > -1) { C(E->sd12380, unit); W(st, 0x14, 0); return; } break;
-    case 12: C(E->sd126b0, unit, game, tgt, 4); W(st, 0x14, 0); return;
+    case 1: { W(plr(E, unit, 0x2c), 0x1c, 0x14);
+        uint32_t y = C(E->s21130, tgt), x = C(E->s21100, tgt);
+        v = C(E->sd12540, game, unit, 0, 2, x, y);   // then 1, 0
+        W(st, 0x14, 0); return v; }
+    case 2: v = C(E->sd12220, 4, unit, game, tgt); W(st, 0x14, 0); return v;
+    case 3: v = C(E->sd12220, 5, unit, game, tgt); W(st, 0x14, 0); return v;
+    case 4: v = C(E->sd12220, 0xb, unit, game, tgt); W(st, 0x14, 0); return v;
+    case 5: {
+        int32_t s = R16(rowp, 0x170);
+        if (s < 0) break;
+        if (C(E->o10494, unit, 0xc)) { C(E->o10945, unit, 0xc, 0); err = 2; goto fail; }
+        C(E->sd12380, R8(rowp, 0x180), unit, s, tgt, 0, 0);
+        W(st, 0x14, (uint32_t)kind); return st; }
+    case 6:  if (cast(0x174, 0x182)) { W(st, 0x14, 0); return v; } break;
+    case 7:  if (cast(0x172, 0x181)) { W(st, 0x14, 0); return v; } break;
+    case 8:  if (cast(0x176, 0x183)) { W(st, 0x14, 0); return v; } break;
+    case 9:  if (cast(0x17c, 0x186)) { W(st, 0x14, 0); return v; } break;
+    case 10: if (cast(0x178, 0x184)) { W(st, 0x14, 0); return v; } break;
+    case 13: if (cast(0x17a, 0x185)) { W(st, 0x14, 0); return v; } break;
+    case 12: v = C(E->sd126b0, unit, game, tgt, 4); W(st, 0x14, 0); return v;
     case 14: {
         uint32_t pb = plr(E, unit, 0x2c); W(pb, 0x1c, 0x32); *(uint8_t*)E->p(pb + 0x20) = 0x4d;
-        if (C(E->sd12540, game, unit, 0, 2, R(node, 0xc), (uint8_t)R(node, 0x10), 1)) goto done;
-        walkStates(E, unit);
+        v = C(E->sd12540, game, unit, 0, 2, R(node, 0xc), R(node, 0x10));   // then 1, 4
+        if (v) goto done;
+        states();
         int32_t ux = C(E->s21100, unit), uy = C(E->s21130, unit), nx = R(node, 0xc), ny = R(node, 0x10);
-        int32_t h = C(E->sd07b0);
-        int32_t sx = 0; int8_t sy = 0;
-        if (ux < nx) sx = -1; if (nx < ux) sx = 1; if (uy < ny) sy = -1; if (ny < uy) sy = 1;
+        int32_t h = C(E->sd07b0, unit, nx, ny);
+        int32_t sx = 0, sy = 0;
+        if (ux < nx) sx = -1; if (ux > nx) sx = 1; if (uy < ny) sy = -1; if (uy > ny) sy = 1;
         pb = plr(E, unit, 0x2c); W(pb, 0x1c, 0x32); *(uint8_t*)E->p(pb + 0x20) = 0x4d;
-        if (C(E->sd12540, game, unit, 0, 2, nx + (h >> 1) * sx, (int8_t)ny + (int8_t)(h >> 1) * sy, 1)) goto done;
-        walkStates(E, unit);
+        v = C(E->sd12540, game, unit, 0, 2, (uint32_t)(nx + (h >> 1) * sx), (uint32_t)(ny + (h >> 1) * sy));   // then 1, 4
+        if (v) goto done;
+        states();
         err = 2; goto fail; }
-    case 15:
-        if (tgt && R(tgt, 0) == 0) {
-            uint32_t id = C(E->s57440, tgt);
-            if (!game) fatal(E, 0x2d3);
-            for (uint32_t n = R(game, 0x1520 + (id & 0x7f) * 4); n; n = R(n, 0xe4))
-                if (R(n, 0xc) == id) {
-                    if (R16(rowp, 0x17c) > -1) { C(E->sd12380, unit); W(st, 0x14, 0); return; }
-                    err = 2; goto fail;
-                }
-            break;
-        }
-        err = 3; goto fail;
-    case 16: W(plr(E, unit, 0x2c), 0x1c, 0x14); C(E->sd11b10, game, unit); W(st, 0x14, 0); return;
+    case 15: {
+        if (!tgt || R(tgt, 0) != 0) { err = 3; goto fail; }
+        uint32_t id = C(E->s57440, tgt);
+        if (!game) fatal(E, 0x2d3);
+        for (uint32_t n = R(game, 0x1520 + (id & 0x7f) * 4); n; n = R(n, 0xe4))
+            if (R(n, 0xc) == id) {
+                int32_t s = R16(rowp, 0x17c);
+                if (s < 0) { err = 2; goto fail; }
+                v = C(E->sd12380, R8(rowp, 0x186), unit, s, 0, id, 2);
+                W(st, 0x14, 0); return v;
+            }
+        break; }
+    case 16: W(plr(E, unit, 0x2c), 0x1c, 0x14); v = C(E->sd11b10, game, unit, 5); W(st, 0x14, 0); return v;
     default: err = 0xc; if (R8(game, 0x6d) == 1) err = 8; else if (R8(game, 0x6d) == 2) err = 4; goto fail;
     }
     err = 2;
 fail:
-    C(E->sd122c0, err);
+    v = C(E->sd122c0, err);
 done:
     W(st, 0x14, 0);
+    return v;
 }
 
 // Targeted skill (unit/monster) pre-check and queue: resolves the target in the game unit hash, checks the

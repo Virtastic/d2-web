@@ -18,7 +18,7 @@ struct D2GameBatchAD860Env {
     void     (*subBEA30)(int32_t a, uint32_t b);                            // 0x9EA30
     void     (*subBF7A0)();                                                 // 0x9F7A0 (callback address)
     void     (*subAEA80)(uint32_t a, void* b, uint32_t c, uint32_t d, uint32_t e, uint32_t f, uint32_t g); // 0x8EA80
-    uint32_t (*subCE4D0)(uint32_t a, void* b, void* c);                     // 0xAE4D0
+    uint32_t (*subCE4D0)(uint32_t a, void* b, void* c, uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4); // 0xAE4D0 (ret 0x14)
     uint32_t (*subB0A20)(void* ebx, void* unit);                           // 0xB0A20: EBX = the searching unit, stack word = the candidate
     uint32_t (*sub41260)(void* unit);                                       // 0x21260
     uint32_t (*subC21320)();                                                // 0x1320

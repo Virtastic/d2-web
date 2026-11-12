@@ -65,41 +65,42 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_ADCE0(void* p1, uint32_t p
     return 0;
 }
 
-// 1.13c D2Game+0xAE4D0   edi is Ghidra's unaff_EDI (the record whose +0x9e..+0xa4 arrays are walked),
-// ebx is unaff_EBX (the Ordinal_10428 stack word).
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_AE4D0(void* p1, int32_t* unit, void* p3, void* edi, uint32_t ebx, const D2GameBatchAD860Env* env)
+// 1.13c D2Game+0xAE4D0   ecx = game, edx = unit, stack p3 (ret 0x14). Read from the instructions: the record the
+// first ordinal returns is the one whose +0x9e/+0xa4 arrays are walked, its +0xb0 word is the first 10428 call's third
+// argument, the duration adds that call's result, and the new state is created on the game's +0x1c with the skill id.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_AE4D0(void* p1, int32_t* unit, void* p3, const D2GameBatchAD860Env* env)
 {
     int32_t iVar1 = p3 ? (int32_t)rd32(p3, 4) : -1;
-    uint32_t rec = O(10695, 0, 0, 0, 0, 0);
+    uint32_t rec = O(10695, iVar1, 0, 0, 0, 0);
     if (!rec) return 0;
     const void* r = (const void*)(uintptr_t)rec;
     int32_t skill = rd16(r, 0x98);
     if (!(0 < skill && skill < (int32_t)rd32(env->dt, 0xc4))) return 0;
-    uint32_t owner = rd32(r, 0xb0);
-    if ((int32_t)O(10428, unit, p3, 0, 0, 0) <= 0) return 0;
+    const int32_t cnt = (int32_t)O(10428, unit, p3, rd32(r, 0xb0), 0, 0);
+    if (cnt <= 0) return 0;
     env->subBEA30(skill, 0);
     int32_t base = 0;
     uint32_t sk = O(10871, unit, skill, 0, 0, 0);
     if (sk) base = (int32_t)O(10959, sk, 0, 0, 0, 0) - (int32_t)rd32(p1, 0xa8);
-    uint32_t amt = rd32(p1, 0xa8) + base + iVar1;
+    uint32_t amt = rd32(p1, 0xa8) + base + cnt;
     if (!sk) {
         int32_t a, b;
         if (!unit) { b = -1; a = 6; } else { b = unit[3]; a = unit[0]; }
-        sk = O(11013, rd32((void*)(uintptr_t)owner, 0x1c), 2, 0, a, b);
+        sk = O(11013, rd32(p1, 0x1c), 2, 0, a, b);
         if (!sk) return 0;
-        O(10785, sk, unit, 0, 0, 0);
-        O(10945, unit, unit, 1, 0, 0);
+        O(10785, sk, skill, 0, 0, 0);
+        O(10945, unit, skill, 1, 0, 0);
         O(10911, sk, (uintptr_t)env->subBF7A0, 0, 0, 0);
         O(10807, unit, sk, 1, 0, 0);
     }
     if (amt) {
         O(11043, sk, amt, 0, 0, 0);
-        env->subAEA80(owner, unit, 0xc, amt, 0, 0, 0);
+        env->subAEA80((uint32_t)(uintptr_t)p1, unit, 0xc, amt, 0, 0, 0);
     }
     for (int i = 0; i < 3; i++) {
-        int32_t id = rd16(edi, 0x9e + 2 * i);
+        int32_t id = rd16(r, 0x9e + 2 * i);
         if (-1 < id && id < (int32_t)rd32(env->dt, 0xbd4) && env->sub210D0() != 0) {
-            int32_t v = (int32_t)O(10428, unit, ebx, rd32(edi, 0xa4 + 4 * i), 0, 0);
+            int32_t v = (int32_t)O(10428, unit, p3, rd32(r, 0xa4 + 4 * i), 0, 0);
             if (v != 0) {
                 O(10188, sk, id, v, 0, 0);
                 if (id == 0x1c && 0 < v) {
@@ -113,8 +114,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_AE4D0(void* p1, int32_t* u
     return 1;
 }
 
-// 1.13c D2Game+0xAF370   p1 is the ECX pass-through for 0xAE4D0 (Ghidra's iStack_8 slot).
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_AF370(uint32_t p1, int32_t* unit, void* p3, const D2GameBatchAD860Env* env)
+// 1.13c D2Game+0xAF370   p1 is the ECX pass-through for 0xAE4D0 (Ghidra's iStack_8 slot); all five stack words
+// (p3, s1..s4) are forwarded to it. The result is 1 when either state id is in range or 0xAE4D0 succeeded.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_AF370(uint32_t p1, int32_t* unit, void* p3, uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4, const D2GameBatchAD860Env* env)
 {
     uint32_t rec = O(10695, p3 ? rd32(p3, 4) : 0xffffffffu, 0, 0, 0, 0);
     if (!rec) return 0;
@@ -128,7 +130,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_AF370(uint32_t p1, int32_t
             ret = 1;
         }
     }
-    if (env->subCE4D0(p1, unit, p3)) ret = 1;
+    if (env->subCE4D0(p1, unit, p3, s1, s2, s3, s4)) ret = 1;
     return ret;
 }
 
