@@ -17,6 +17,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2c_728b0(D2cHost h, u32 eax, u32 ebx) {
     u32 rec = call(h, 0x40000000u | 0xFFFF0B98u, (u32)i);
     if (!rec) return;
     i32 t = (int16_t)(call(h, 0x40000000u | 0xFFFF002Eu, rec) & 0xFFFF);
-    if (t == 0x43) { if (call(h, 0x80000000u | 10397, p) & 1) call(h, 0x2B960, eax, ebx); }
-    else if (t == 0x4c) call(h, 0xC5E50, eax, ebx);
+    if (t == 0x43) { if (call(h, 0x80000000u | 10397, p) & 1) call(h, 0x2B960, eax, ebx, 1); }
+    else if (t == 0x4c) call(h, 0xC5E50, eax, ebx, ebx, 1);
 }

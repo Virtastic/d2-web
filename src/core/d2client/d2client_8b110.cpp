@@ -44,14 +44,14 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_8b110(U self, const D2Client8B110
     if (e->ord_10013()) {
         int32_t x = e->ord_11080(g->cbbfc), y = e->ord_11168(g->cbbfc);
         if (g->cbefc) {
-            int32_t a, b;
+            int32_t a = (int32_t)(g->cbf00 << 16), b = (int32_t)(g->b9dc << 16);   // the two locals, read back after the call
             e->ord_10474(&a, &b);
-            x += (int32_t)(g->cbf00 * 0x10000);
-            y += (int32_t)(g->b9dc * 0x10000);
+            x += a;
+            y += b;
         }
         e->ord_10057(x, y);
     }
-    if ((int32_t)g->cbef8 < (int32_t)g->c97f8) { *g->cbef8p = g->c97f8; e->fn_59e30(); }
+    if (g->cbef8 < g->c97f8) { *g->cbef8p = g->c97f8; e->fn_59e30(); }   // unsigned (cmp; jbe)
     e->fn_4edd0();
     uint32_t u = e->ord_10331(g->cbbfc);
     if (e->ord_10826(u) == 0x4a) e->fn_3ae00();

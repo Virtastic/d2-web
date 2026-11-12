@@ -5,9 +5,14 @@
 // table at D2Client+0xDD85C (8-byte stride, the dword at +0; e.gl is its pinned copy). Then unit[+0xC4] = (flags with bit 4 set when
 // gdwBitMasks[0x10] & row byte +4, else cleared; then & ~0xA | 0x20), written as two stores (the intermediate value is overwritten).
 #include "cl_env.h"
-extern "C" void d2c_b0170(const cl::Env& e, uint32_t u, uint32_t a0, uint32_t a1, uint32_t a2) {
-    const uint32_t row = e.UnitRow(u);
-    if (!row) return;
+// EAX on return (ret 0xC): 0 for a null unit (entered with EAX 0), the index itself when it is negative or not under the count,
+// 0 for a null row, else the flags word with bit 4 settled (the first of the two stores).
+extern "C" uint32_t d2c_b0170(const cl::Env& e, uint32_t u, uint32_t a0, uint32_t a1, uint32_t a2) {
+    if (!u) return 0;
+    const int32_t idx = (int32_t)e.R(u + 4);
+    if (idx < 0 || idx >= (int32_t)e.R(e.dt + 0xb6c)) return (uint32_t)idx;
+    const uint32_t row = e.R(e.dt + 0xb64) + (uint32_t)idx * 0x1a4;
+    if (!row) return 0;
     e.H(0xc424, u);
     e.H(0xc43c, u, e.R(row + 0x183) & 0xff);
     e.Xs(1);
@@ -19,4 +24,5 @@ extern "C" void d2c_b0170(const cl::Env& e, uint32_t u, uint32_t a0, uint32_t a1
     f = ((e.R(e.bm + 0x10) & e.R(row + 4) & 0xff) != 0) ? (f | 4u) : (f & ~4u);
     e.W(u + 0xc4, f);
     e.W(u + 0xc4, (f & ~0xAu) | 0x20u);
+    return f;
 }

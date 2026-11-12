@@ -57,23 +57,27 @@ int d2_client_724e0(uint32_t unit_eax) {
     return t == 0 ? mode == 0x12 : t == 1 ? mode == 0xe : 0;
 }
 
-// 1.13c D2Client+0x727F0
+// 1.13c D2Client+0x727F0: ctx arrives in EAX and goes to 69660 in EDI, the id in EDX; EAX at each
+// 69660 call is what the previous call left (the 10799 count first, then 69660's own return).
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_727f0(int32_t id, int32_t (*ord10799)(int32_t), void (*sub_69660)(int32_t)) {
+void d2_client_727f0(uint32_t ctx, int32_t id, int32_t (*ord10799)(int32_t),
+                     uint32_t (*sub_69660)(uint32_t edi, int32_t edx, uint32_t eax)) {
     if (id == -1) return;
     int32_t n = ord10799(id);
-    for (int32_t i = 0; i < n; ++i) sub_69660(i + id);
+    uint32_t eax = (uint32_t)n;
+    for (int32_t i = 0; i < n; ++i) eax = sub_69660(ctx, i + id, eax);
 }
 
 static void skill_tail(uint32_t unit, uint32_t ebx, uint32_t dt_b98, int32_t dt_ba0, int line,
                        int32_t (*ord10601)(uint32_t, const char*, int), uint32_t (*ord10397)(uint32_t),
-                       void (*sub_2b960)(uint32_t, uint32_t, uint32_t), void (*sub_75e50)(uint32_t, uint32_t), uint32_t in_eax) {
+                       void (*sub_2b960)(uint32_t, uint32_t, uint32_t), void (*sub_75e50)(uint32_t, uint32_t), uint32_t in_eax, uint32_t flag) {
     int32_t i = ord10601(unit, "..\\Source\\D2Client\\UNIT\\PlrSkills.cpp", line);
     if (i < 0 || i >= dt_ba0) return;
     uint32_t rec = dt_b98 + (uint32_t)i * 0x23c;
+    if (!rec) return;
     int16_t k = rs16(rec + 0x2e);
-    if (k == 0x43) { if (ord10397(unit) & 1) sub_2b960(in_eax, ebx, 0); }
-    else if (k == 0x4c) sub_75e50(ebx, 0);
+    if (k == 0x43) { if (ord10397(unit) & 1) sub_2b960(in_eax, ebx, flag); }
+    else if (k == 0x4c) sub_75e50(ebx, flag);
 }
 
 // 1.13c D2Client+0x72830 (line 0x4f)
@@ -83,17 +87,17 @@ void d2_client_72830(uint32_t in_eax, uint32_t ebx, uint32_t dt_b98, int32_t dt_
                      int32_t (*ord10601)(uint32_t, const char*, int), uint32_t (*ord10397)(uint32_t),
                      void (*sub_2b960)(uint32_t, uint32_t, uint32_t), void (*sub_75e50)(uint32_t, uint32_t)) {
     uint32_t u = ord10511(in_eax);
-    if (u && sub_724e0(in_eax)) skill_tail(u, ebx, dt_b98, dt_ba0, 0x4f, ord10601, ord10397, sub_2b960, sub_75e50, in_eax);
+    if (u && sub_724e0(in_eax)) skill_tail(u, ebx, dt_b98, dt_ba0, 0x4f, ord10601, ord10397, sub_2b960, sub_75e50, in_eax, 0);
 }
 
-// 1.13c D2Client+0x728B0 (line 0x26)
+// 1.13c D2Client+0x728B0 (line 0x26; 2B960 and 75E50 get a pushed 1 where 72830 pushes 0)
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_728b0(uint32_t in_eax, uint32_t ebx, uint32_t dt_b98, int32_t dt_ba0,
                      uint32_t (*ord10511)(uint32_t), int (*sub_724e0)(uint32_t),
                      int32_t (*ord10601)(uint32_t, const char*, int), uint32_t (*ord10397)(uint32_t),
                      void (*sub_2b960)(uint32_t, uint32_t, uint32_t), void (*sub_75e50)(uint32_t, uint32_t)) {
     uint32_t u = ord10511(in_eax);
-    if (u && sub_724e0(in_eax)) skill_tail(u, ebx, dt_b98, dt_ba0, 0x26, ord10601, ord10397, sub_2b960, sub_75e50, in_eax);
+    if (u && sub_724e0(in_eax)) skill_tail(u, ebx, dt_b98, dt_ba0, 0x26, ord10601, ord10397, sub_2b960, sub_75e50, in_eax, 1);
 }
 
 static inline int32_t cl(uint32_t rec, unsigned o) { int16_t v = rs16(rec + o); return v < 0 ? -1 : v; }

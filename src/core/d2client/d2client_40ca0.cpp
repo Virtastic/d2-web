@@ -25,7 +25,7 @@ extern "C" uint32_t d2c_40ca0(const D2cSkillTbl* t, const D2cSeam* s, uint8_t* u
     if (!w) return 0;
     (*s)(0xcb50, 0, 0, 0, 0, 0, w, 0);
     (*s)(0xc36a, 0, 0, 0, 0, 0, u, p, 1);
-    (*s)(0xc2bc, 0, 0, 0, 0, 0, p, 0x40190);
+    (*s)(0xc2bc, 0, 0, 0, 0, 0, p, 0xB2000000u | 0x40190);   // the D2Client+0x40190 handler as a module tag
     (*s)(0xc2f2, 0, 0, 0, 0, 0, p, 0xc);
     (*s)(0xc30a, 0, 0, 0, 0, 0, u, 0xc, 1);
     return 1;
