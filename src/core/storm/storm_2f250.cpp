@@ -5,10 +5,10 @@
 extern CRITICAL_SECTION g_stormErrLock;  // 0x6FC42FE0, defined in storm_serr.cpp
 
 extern "C" uint32_t Storm_SErrRegisterMessageSource_2F250(uint16_t id, uint32_t source) {
-    if (InterlockedIncrement((long volatile*)&g_stormLockInit) == 0)
+    if (__atomic_add_fetch(&g_stormLockInit, 1, __ATOMIC_SEQ_CST) == 0)
         InitializeCriticalSection(&g_stormErrLock);
     else
-        InterlockedDecrement((long volatile*)&g_stormLockInit);
+        __atomic_sub_fetch(&g_stormLockInit, 1, __ATOMIC_SEQ_CST);
     EnterCriticalSection(&g_stormErrLock);
     auto* n = new StormSrcNode{};
     n->id = id;

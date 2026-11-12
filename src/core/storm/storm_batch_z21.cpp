@@ -26,6 +26,9 @@ extern "C" int z21_fpclass(double x) {
   uint64_t b; memcpy(&b, &x, 8);
   uint32_t lo = (uint32_t)b, hi = (uint32_t)(b >> 32); bool neg = (b >> 63) != 0;
   if (((b >> 48) & 0x7ff0) == 0x7ff0) {
+    // retail loads the double with `fld QWORD` and stores it back with `fstp QWORD` before __sptype;
+    // an x87 load of a signalling NaN raises invalid and stores the quiet form (mantissa bit 51 set)
+    if (((hi >> 20) & 0x7ff) == 0x7ff && ((hi & 0xfffffu) != 0 || lo != 0) && !(hi & 0x80000u)) hi |= 0x80000u;
     int t = z22_sptype((int)lo, hi);
     if (t == 1) return 0x200;
     if (t == 2) return 4;

@@ -22,12 +22,12 @@ static const char* const kDefaultStrings[12] = {
 
 // 1.13c Storm+0x2F180
 extern "C" void Storm_SErrLock_2F180() {
-    if (InterlockedIncrement((long volatile*)&g_stormLockInit) == 0) {
+    if (__atomic_add_fetch(&g_stormLockInit, 1, __ATOMIC_SEQ_CST) == 0) {
         InitializeCriticalSection(&g_stormErrLock);
         EnterCriticalSection(&g_stormErrLock);
         return;
     }
-    InterlockedDecrement((long volatile*)&g_stormLockInit);
+    __atomic_sub_fetch(&g_stormLockInit, 1, __ATOMIC_SEQ_CST);
     EnterCriticalSection(&g_stormErrLock);
 }
 
@@ -55,10 +55,10 @@ extern "C" uint32_t Storm_SErrGetErrorStr_2F3F0(uint32_t msgId, char* buf, uint3
         if (SetLastError) SetLastError(0x57);   // weak in the wasm build: the Win32 copy is not observable there
         return 0;
     }
-    if (InterlockedIncrement((long volatile*)&g_stormLockInit) == 0)
+    if (__atomic_add_fetch(&g_stormLockInit, 1, __ATOMIC_SEQ_CST) == 0)
         InitializeCriticalSection(&g_stormErrLock);
     else
-        InterlockedDecrement((long volatile*)&g_stormLockInit);
+        __atomic_sub_fetch(&g_stormLockInit, 1, __ATOMIC_SEQ_CST);
     EnterCriticalSection(&g_stormErrLock);
     if (g_stormSrcInit == 0) {
         g_stormSrcInit = 1;

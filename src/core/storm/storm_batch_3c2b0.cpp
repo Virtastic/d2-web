@@ -220,10 +220,10 @@ void Storm_SErrSetLastError(uint32_t code) {
 // {u16 id; u16 pad; void* source at +4; node* next at +8}, push it on 0x6FC4537C. Always 1.
 extern "C"
 uint32_t Storm_SErrRegisterMessageSource(StormBatch3c2b0Env& e, uint16_t id, uint32_t source) {
-    if (InterlockedIncrement((long volatile*)&g_stormLockInit) == 0) {
+    if (__atomic_add_fetch(&g_stormLockInit, 1, __ATOMIC_SEQ_CST) == 0) {
         InitializeCriticalSection(&g_stormErrLock);
     } else {
-        InterlockedDecrement((long volatile*)&g_stormLockInit);
+        __atomic_sub_fetch(&g_stormLockInit, 1, __ATOMIC_SEQ_CST);
     }
     EnterCriticalSection(&g_stormErrLock);
     auto* node = (StormSrcNode*)e.heap_alloc(sizeof(StormSrcNode));
