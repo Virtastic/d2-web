@@ -1,10 +1,9 @@
-// 1.13c D2Client+0x73D70: ECX = unit, EDX = skill id, stack = arg (ret 4). Resolves the skill's missile through 0x40550, marks the unit
-// (flag 0x40 at +0xC4) and launches through 0xA15C0; the truth of that launch, 0 for a bad skill or missile id.
-#include "d2c_seam.h"
-extern "C" uint32_t d2c_73d70(const D2cSkillTbl* t, int32_t nMissiles, const D2cSeam* s, uint8_t* unit, int32_t id, uint32_t arg) {
-    if (!d2cSkillRec(*t, id)) return 0;
-    int32_t m = (int32_t)(*s)(0x40550, (uint64_t)(int64_t)id, 0, 0, 0, 0, (uintptr_t)unit);
-    if (m < 0 || m >= nMissiles) return 0;
-    if (unit) { uint32_t f; std::memcpy(&f, unit + 0xc4, 4); f |= 0x40u; std::memcpy(unit + 0xc4, &f, 4); }
-    return (uint32_t)(*s)(0xa15c0, (uintptr_t)unit, 0, 0, 0, 0, (uint64_t)(int64_t)m, (uint64_t)(int64_t)id, arg) != 0;
+// 1.13c D2Client+0x73D70 -- skill do: the owner-slot missile through the plain launch; succeeds when the launch does.
+#include "cl_skdo.h"
+extern "C" uint32_t d2c_73d70(uint32_t u, int32_t sk, uint32_t lvl, const cl::Env& e) {
+    if (!clsk::row(e, sk)) return 0;
+    const int32_t a = (int32_t)e.H(0x40550, u, 0, 0, 0, 0, (uint32_t)sk);
+    if (!clsk::mis(e, a)) return 0;
+    clsk::acted(e, u);
+    return clsk::launch3(e, u, a, sk, lvl) != 0;
 }
