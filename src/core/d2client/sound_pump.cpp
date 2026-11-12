@@ -145,7 +145,6 @@ void d2client_sound_stage_log() {
 }
 // A unit sound the client tick submitted (0x88A70, EBX = Sounds row, a unit argument): queued, run after the pump.
 void d2client_sound_unit_submit(int32_t row) { if (armed && row > 0) unitQ.push_back(row); }
-void d2client_sound_dbg(const std::string& s) { if (armed) out += std::to_string(curTick) + " A DBG " + s + "\n"; }
 struct D2cSndSubmitEnv {
     uint8_t* recs; int32_t count; int32_t enabled; int32_t now; uint32_t player;
     uint8_t* (*find87fe0)(int32_t, int32_t); uint8_t* (*alloc87d80)(void); void (*mkvec87f30)(float*, uint32_t, int32_t);

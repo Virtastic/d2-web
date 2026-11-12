@@ -8,7 +8,6 @@
 #include <set>
 #include <string>
 #include <vector>
-void d2client_sound_dbg(const std::string& s);
 #include "sound_unit_refs.h"
 #include "../d2moo/include/Units/Units.h"
 #include "../d2moo/include/Units/Monster.h"
@@ -29,7 +28,6 @@ void d2client_session_unit_mode(const D2UnitStrc* u, uint32_t mode, int32_t roll
     const uint32_t flags = (hero ? 1u : 0u) | (STATES_CheckState(m, 1) ? 4u : 0u) | (STATES_CheckState(m, 0x92) ? 8u : 0u);
     const uint32_t n = d2_client_unit_mode_sounds(u->dwUnitType, u->dwUnitId, (int32_t)u->dwClassId, typeFlags, su, mode,
                                                   u->dwLastHitClass, 0, flags, roll);
-    d2client_sound_dbg("mode t=" + std::to_string(u->dwUnitType) + " id=" + std::to_string(u->dwUnitId) + " cls=" + std::to_string(u->dwClassId) + " m=" + std::to_string(mode) + " roll=" + std::to_string(roll) + " hit=" + std::to_string(u->dwLastHitClass) + " n=" + std::to_string(n));
     for (uint32_t i = 0; i < n; ++i) d2client_sound_unit_submit((int32_t)(d2_client_unit_mode_sound_at(i) & 0xFFFF));
 }
 
@@ -65,7 +63,6 @@ std::map<uint32_t, Obj> g_obj;
 
 void d2client_session_objects(const D2SndUnit* u, uint32_t n) {
     std::map<uint32_t, Obj> next;
-    { std::string s; for (uint32_t i = 0; i < n; ++i) if (u[i].type == 2) s += " " + std::to_string(u[i].id) + ":" + std::to_string(u[i].cls) + ":" + std::to_string(u[i].unit ? u[i].unit->dwAnimMode : 99); d2client_sound_dbg("objs" + s); }
     for (uint32_t i = 0; i < n; ++i) {
         if (u[i].type != 2) continue;
         const uint32_t cls = u[i].cls, m = u[i].unit ? u[i].unit->dwAnimMode : 0;   // no unit: a client-only object, neutral

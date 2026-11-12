@@ -238,7 +238,6 @@ static uint32_t g_sessionClientMapEventsDropped = 0;
 // borrow g_targetPlayer->pSeed, which belongs to the D2Game/server unit.
 void d2client_sound_stage_feed(uint32_t soundEnv); void d2client_sound_stage_log();   // sound_pump.cpp (replay-armed)
 #include "../d2client/sound_unit_refs.h"
-void d2client_sound_dbg(const std::string& s);
 namespace d2client_ambient { void reset(); void tick(uint32_t* seed, uint32_t period, bool weatherLevel); uint32_t* fallbackSeed(uint32_t (*playerInit)()); }
 extern "C" void d2_client_monster_idle_reset();   // 1.13c D2Client+0x237E0 monster branch state (unit_sound_trigger_237e0.cpp)
 extern "C" void d2_client_attack_roll_reset();   // 1.13c D2Client+0x242B0 attack-roll state (monster_face.cpp)
@@ -7971,7 +7970,45 @@ static std::unordered_map<uint32_t, uint32_t> g_sessionIdleRows, g_sessionIdleRo
 // reaches the struck-unit sound, which stamps the unit before the frame's attack rolls.
 extern "C" void d2_client_monster_hit_stamp(uint32_t id, uint32_t frame);
 static std::unordered_map<uint32_t, uint32_t> g_sessionClientMonsterMode;
-static void sessionClientMonsterModeReset() { g_sessionClientMonsterMode.clear(); g_sessionIdleRows.clear(); g_sessionIdleRowsReady.clear(); d2client_session_unit_sound_reset(); }
+void d2client_session_footstep_reset(); int32_t d2client_session_level_material(uint32_t soundEnv);   // session_footstep.cpp (C linkage)
+void d2client_session_player_footstep(uint32_t serverMode, uint32_t cls, int32_t inTown, int32_t floor, uint32_t now, void (*rate)(uint32_t, uint32_t*, uint32_t*));
+extern "C" int32_t d2_session_floor_class(int32_t unitType, int32_t unitId, int32_t fallback);
+static void sessionClientMonsterModeReset() { g_sessionClientMonsterMode.clear(); g_sessionIdleRows.clear(); g_sessionIdleRowsReady.clear(); d2client_session_unit_sound_reset(); d2client_session_footstep_reset(); }
+// The client player unit's rate in `mode` (D2Common 0x33110 on the hero's own records): the velocity percent is the hero's less
+// the run bonus the server unit carries while it runs, plus the bonus the client unit posts itself when it enters run
+// (0x32E10: 100 * RunSpeed / WalkSpeed - 100). The hero's path, anim fields and record are put back untouched.
+static int32_t g_clientRateRunAdjust = 0;
+static int32_t clientRunBonus(int32_t cls) {
+    const D2CharStatsTxt* c = UNITS_GetCharStatsTxtRecord(cls);
+    return c && c->nWalkSpeed ? 100 * c->nRunSpeed / c->nWalkSpeed - 100 : 0;
+}
+static void clientPlayerRate(uint32_t mode, uint32_t* step, uint32_t* total) {
+    D2UnitStrc* u = g_targetPlayer;
+    *step = 0; *total = 0;
+    if (!u || !u->pDynamicPath) return;
+    const uint32_t savedMode = u->dwAnimMode, savedSeq = u->dwSeqSpeed, savedCount = u->dwFrameCountPrecise;
+    const int16_t savedSpeed = u->wAnimSpeed;
+    const D2AnimDataRecordStrc* const savedAnim = u->pAnimData;
+    D2DynamicPathStrc* const savedPath = u->pDynamicPath;
+    D2DynamicPathStrc pathCopy = *savedPath;
+    const bool serverRuns = savedMode == PLRMODE_RUN || savedMode == PLRMODE_KNOCKBACK;
+    g_clientRateRunAdjust = (mode == PLRMODE_RUN ? clientRunBonus((int32_t)u->dwClassId) : 0) - (serverRuns ? clientRunBonus((int32_t)u->dwClassId) : 0);
+    static const D2Common33110Env kEnv = [] { D2Common33110Env e = UNITS_AnimRateEnv(); static int (*base)(D2UnitStrc*, int, int) = e.stat;
+        e.stat = [](D2UnitStrc* p, int s, int l) -> int { return base(p, s, l) + (s == STAT_VELOCITYPERCENT ? g_clientRateRunAdjust : 0); }; return e; }();
+    u->pDynamicPath = &pathCopy; u->dwAnimMode = mode;
+    D2Common_33110_UpdateAnimRate(u, kEnv);
+    *step = (uint16_t)u->wAnimSpeed;
+    *total = u->pAnimData ? u->pAnimData->dwFrames << 8 : 0;
+    u->pDynamicPath = savedPath; u->dwAnimMode = savedMode; u->dwSeqSpeed = savedSeq; u->dwFrameCountPrecise = savedCount;
+    u->wAnimSpeed = savedSpeed; u->pAnimData = savedAnim;
+}
+static void sessionClientPlayerFootstep() {
+    if (!g_targetPlayer) return;
+    const D2LevelsTxt* lv = g_currentLevel >= 0 ? DATATBLS_GetLevelsTxtRecord(g_currentLevel) : nullptr;
+    const int32_t fallback = lv ? d2client_session_level_material((uint32_t)(lv->dwSoundEnv & 0xff)) : 1;
+    d2client_session_player_footstep(g_targetPlayer->dwAnimMode, g_targetPlayer->dwClassId, DUNGEON_IsTownLevelId(g_currentLevel) ? 1 : 0,
+                                     d2_session_floor_class(0, 0, fallback), g_sessionClientFrame - 1, clientPlayerRate);
+}
 // 1.13c D2Client+0x22B20: the client units' sound references (replay only; nothing happens before the Sounds table is loaded).
 // The client's units are the held monsters and the objects of the rooms it holds (the sets d2_session_client_view prints).
 static void sessionClientSoundUnits() {
@@ -7992,6 +8029,7 @@ static void sessionClientSoundUnits() {
         if (p.classId == OBJECT_INVISIBLE_RIVER_SOUND1 || p.classId == OBJECT_INVISIBLE_RIVER_SOUND2) o.push_back({ 2u, p.id, p.classId, nullptr });
     for (const D2SndUnit& s : v) o.push_back(s);
     d2client_session_objects(o.data(), (uint32_t)o.size());   // 1.13c D2Client+0x237E0 object branch
+    sessionClientPlayerFootstep();   // 0x2B1E0 -> 0x1C150 -> 0x23C00 on the local player's client unit
 }
 static void sessionClientMonsterHitPass(uint32_t frame) {
     std::unordered_map<uint32_t, uint32_t> now;
