@@ -43,9 +43,6 @@ extern "C" __attribute__((weak)) int32_t d2_fog_smem_free(void* location, const 
     std::free(location);
     return 1;
 }
-// Fog+0x1520: the "PAX" heap's block release (a separate 270-byte row, not ported). It walks a
-// handle table; the seam keeps only its observable entry/exit so 0x1390 stays callable.
-extern "C" __attribute__((weak)) void d2_fog_sub_1520(uint32_t block) { (void)block; }
 
 namespace
 {
@@ -64,10 +61,6 @@ namespace
 	};
 	static_assert(offsetof(FogList, link) == 4, "FogList sentinel at +4");
 	static_assert(sizeof(FogList) == 12, "FogList is three 32-bit words");
-
-	// Retail PTR_LAB_6ff78388 (RVA 0x28388), the vtable 0x1390 stores. A load-base-relative
-	// address, so the port stores its own symbol; the proof compares it minus the load base.
-	uint32_t g_fog_vtable_28388;
 
 	// 1.13c Fog+0x1310 (identical body to Storm+0x4C20): unlink one link pair.
 	void fog_link_unlink(FogLink* node)
@@ -246,16 +239,7 @@ void d2_fn_fog_1350(uint32_t* r)
 	r[4] = ((FogList*)(uintptr_t)r[0])->link.nPrev;   // EAX at ret: the last sentinel.prev read (<= 0)
 }
 
-// 1.13c Fog+0x1390: destructor -- store the vtable at +0, then release the block at +4.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_fog_1390(uint32_t* r)
-{
-	uint32_t* obj = (uint32_t*)(uintptr_t)r[0];
-	obj[0] = (uint32_t)(uintptr_t)&g_fog_vtable_28388;
-	if (obj[1] != 0)
-		d2_fog_sub_1520(obj[1]);
-	r[4] = 0;   // void: the replay's negative control pre-fills the result slot
-}
+// 1.13c Fog+0x1390 (the handle destructor, register twin of 0x16B0) lives beside 0x1520 in fog_batch_1400.cpp.
 
 // 1.13c Fog+0x13B0: "PAX" object destructor -- free the block at +8 through Storm #403. The release is a parameter (the
 // fog_1000 pattern): the probe passes the pinned stub, the engine passes d2_fog_smem_free.

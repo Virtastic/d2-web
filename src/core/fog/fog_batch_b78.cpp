@@ -51,7 +51,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void Fog_17B60(uint8_t* esi) {
   EnterCriticalSection(cs);
   int iVar1 = *(int*)(esi + 0x1c);
   while (iVar1 != 0) {
-    void* local = *(void**)(esi + 0x1c);
+    void* local = (void*)(uintptr_t)*(uint32_t*)(esi + 0x1c);   // the 4-byte list head, not an 8-byte host pointer
     iVar1 = *(int*)((uint8_t*)(intptr_t)iVar1 + 4);
     FUN_6ff6b0c0(&local);
     *(int*)(esi + 0x1c) = iVar1;

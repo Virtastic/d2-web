@@ -34,7 +34,8 @@ void strBlk(uint32_t rva, const char* s) {
 void* openAppend(const char* name, const char*) {
     gFile = H->h(0x2593, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)name, 0xB2027154u);
     strBlk(0x2593, name);
-    return gFile ? (void*)std::tmpfile() : nullptr;
+    static char fbuf[1024];   // a memory stream: the wasm build has no temp directory, so tmpfile() returns 0 and the write never happens
+    return gFile ? (void*)fmemopen(fbuf, sizeof fbuf, "wb") : nullptr;
 }
 void closeF(void* f) {
     H->h(0x2896, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)gRec, gN * 4 + 0x10, 1, gFile);

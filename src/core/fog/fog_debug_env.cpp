@@ -274,8 +274,8 @@ uint32_t fog_11160(const FogEnv* e, uint32_t ep, uint32_t* guard, uint32_t hookP
 static void fe_dbl(double d, uint32_t* lo, uint32_t* hi) { uint64_t u; memcpy(&u, &d, 8); *lo = (uint32_t)u; *hi = (uint32_t)(u >> 32); }
 void fog_113b0(const FogEnv* e, const uint32_t* glob) {
     auto log = [&](uint32_t n, uint32_t fmt, uint32_t a2 = 0, uint32_t a3 = 0, uint32_t a4 = 0, uint32_t a5 = 0, uint32_t a6 = 0, uint32_t a7 = 0) {
-        fe_wide(n, a6, a7);
-        fe_call(e, 0x19100, 0, 0, 0, 0, 0, fmt, a2, a3, a4, a5);
+        fe_wide(n, a7);   // words 0..5 are fmt, a2..a6; word 6 is a7
+        fe_call(e, 0x19100, 0, 0, 0, 0, 0, fmt, a2, a3, a4, a5, a6);
     };
     log(1, MOD | 0x28A14u);
     uint32_t st[4] = { 0, 0, 0, 0 };
@@ -320,7 +320,7 @@ void fog_113b0(const FogEnv* e, const uint32_t* glob) {
 // flag := 1, 0x1CB50, Storm's value lookup 0xCE66 ("Diablo II", "TraceUnfreedMemory", 0, &out; the out dword is stored at Fog+0x4AF74), the memory log 0x1AE90
 // (0, Fog+0x26BEC, 0x40000, 0x8000), SetUnhandledExceptionFilter (slot 0x250DC; the filter is Fog+0x11160), 0xFBC0, the self-check of the 32-entry bit mask table
 // Fog+0x26798 and its complement table Fog+0x26818 (a bad entry: 0xFC20, 0xCD8E, the 0x10F30 report with line 0x3B3 / 0x3B4, 0x184A0 and _exit(-1) at Fog+0x1BA9,
-// which does not return), then 0x102C0, 0x19530, the banner 0x113B0 when logToFile, _atexit of Fog+0x217E0 (0x2525), the callback word Fog+0x56E6C := EDX and
+// which does not return), then 0x102C0, 0x19530, the banner 0x113B0 when logToFile, _atexit of Fog+0x117E0 (0x2525), the callback word Fog+0x56E6C := EDX and
 // 0x164A0. Later calls only run the banner when logToFile is set. glob = the pinned words Fog+0x56E6C..0x56E7C (callback, guard, Win9x flag, init flag),
 // tu = Fog+0x4AF74, masks = the 64 table words (mask table, then the complement table).
 void fog_11860(const FogEnv* e, uint32_t progName, uint32_t cb, uint32_t version, uint32_t logToFile, uint32_t* glob, uint32_t* tu, const uint32_t* masks) {
@@ -360,7 +360,7 @@ void fog_11860(const FogEnv* e, uint32_t progName, uint32_t cb, uint32_t version
     fe_call(e, 0x102C0);
     fe_call(e, 0x19530);
     if (logToFile) fe_call(e, 0x113B0);
-    fe_call(e, 0x2525, 0, 0, 0, 0, 0, MOD | 0x217E0u);
+    fe_call(e, 0x2525, 0, 0, 0, 0, 0, MOD | 0x117E0u);
     glob[0] = cb;
     fe_call(e, 0x164A0);
 }

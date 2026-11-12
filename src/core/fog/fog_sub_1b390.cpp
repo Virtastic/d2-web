@@ -14,10 +14,10 @@ struct fog_1b390_api {
 uint32_t* fog_sub_1b390(const fog_1b390_api* a, uint8_t* alloc, uint8_t* pool) {  // 1.13c Fog+0x1B390
     int32_t& cnt = *(int32_t*)(alloc + 0x7a0);
     int32_t& cap = *(int32_t*)(alloc + 0x7a4);
-    void*& tab = *(void**)(alloc + 0x7a8);
+    uint32_t& tab = *(uint32_t*)(alloc + 0x7a8);   // a 32-bit word in retail's layout (the engine's pointers are 8 bytes)
     if (cap <= cnt) {
         cap += 0x20;
-        tab = a->realloc_(tab, (uint32_t)cap * 8);
+        tab = (uint32_t)(uintptr_t)a->realloc_((void*)(uintptr_t)tab, (uint32_t)cap * 8);
         if (!tab) a->fatal(0x2ff, "(1) Pool Blocks overflowed at %d");
     }
     uint32_t words = (*(uint32_t*)(pool + 0x1c) + 0x1f) >> 5;

@@ -4,6 +4,10 @@
 #include <cstdint>
 #include <cstddef>
 #include <cstdlib>
+// The Fog pool free stand-in forwards to an optional hook (the test recorders set it). Test builds carry an identical weak copy,
+// so whichever copy the linker keeps behaves the same; an empty stand-in here would win and silently drop the hook.
+namespace fogfreehook { inline void (*g)(void**) = nullptr; }
+extern "C" __attribute__((weak)) void FUN_6ff6b0c0(void** p) { if (fogfreehook::g) fogfreehook::g(p); }
 #define W __attribute__((weak))
 char* Storm_Sub3BB00_z14(char*, char, int);
 extern "C" {
@@ -30,7 +34,6 @@ W void FUN_6ff62020() {}
 W void* FUN_6ff520d7(void* p, size_t n) { return realloc(p, n); }  // CRT realloc stand-in (link fix)
 W uint32_t* FUN_6ff5e4e0(uint8_t*, uint32_t) { return nullptr; }  // roster lookup stand-in (link fix)
 W int Ordinal_3(int) { return 0; }  // Storm ordinal stand-in (link fix)
-W void FUN_6ff6b0c0(void**) {}
 W void Ordinal_111(void) {}
 W int Ordinal_19(int) { return 0; }
 W void FUN_6ff6ad20(const char*) {}

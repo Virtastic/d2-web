@@ -339,6 +339,12 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_fog_1670(uint32_t* r) {
     r[4] = 0;   // retmask 0
 }
 
+// 1.13c Fog+0x1390: the register twin of 0x16B0 (EAX = handle): vtable store, then 0x1520 on (ECX = array, EAX = index).
+EMSCRIPTEN_KEEPALIVE void d2_fn_fog_1390(uint32_t* r) {
+    fog_handle_destroy(reinterpret_cast<FogHandle*>(static_cast<uintptr_t>(r[0])));
+    r[4] = 0;   // void: the replay's negative control pre-fills the result slot
+}
+
 // 1.13c Fog+0x16B0
 EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16b0(uint32_t* r) {
     fog_handle_destroy(reinterpret_cast<FogHandle*>(static_cast<uintptr_t>(r[0])));

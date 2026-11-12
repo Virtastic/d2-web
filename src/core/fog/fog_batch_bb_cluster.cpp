@@ -149,16 +149,16 @@ void fog_bb_pq_destroy(const fog_bb_env* e, fog_bb_pq* q)
 }
 
 // 1.13c Fog+0x1D740
-struct fog_bb_ev { void* h; int a; int b; };
-void fog_bb_1d740(const fog_bb_env* e, uintptr_t* o)
+// The request and the event record are retail 32-bit words (a pointer field is one dword; the engine's own pointers are 8 bytes).
+void fog_bb_1d740(const fog_bb_env* e, uint32_t* o)
 {
     if (((uint8_t)o[0x12] & 1) == 0) {
-        fog_bb_ev* ev = (fog_bb_ev*)o[0xe];
-        if (ev) { e->reset_event(ev->h); ev->a = 1; ev->b = 0; o[0xe] = 0; }
-        if (o[0]) { e->release253((void*)o[0]); o[0] = 0; }
+        uint32_t* ev = (uint32_t*)(uintptr_t)o[0xe];
+        if (ev) { e->reset_event((void*)(uintptr_t)ev[0]); ev[1] = 1; ev[2] = 0; o[0xe] = 0; }
+        if (o[0]) { e->release253((void*)(uintptr_t)o[0]); o[0] = 0; }
         o[0x12] |= 1;
         if (o[0xc]) {
-            void* t = (void*)o[0xf]; e->free_ptr(&t);
+            void* t = (void*)(uintptr_t)o[0xf]; e->free_ptr(&t);
             o[0xf] = o[0xc]; o[0x10] = o[0xd];
             o[7] = o[8] = o[9] = o[10] = o[0xb] = o[0xc] = o[0xd] = 0;
         }
