@@ -27,6 +27,7 @@ struct Env {
  void (*f6A6C0)(uintptr_t esi); void (*f56210)(uintptr_t esi);   // D2Client+0x2A6C0 (ESI = unit, EDI = 5) and +0xA6210 (ESI = unit)
 };
 void sub_AD4B0(Env& e,uint32_t a);
+void sub_AD4F0(Env& e,uintptr_t p);
 void sub_ADEF0(Env& e,uintptr_t p);
 void sub_AEBE0(Env& e,const uint8_t* pkt);
 void sub_AECA0(Env& e,const uint8_t* pkt);   // d2client_aeca0.cpp

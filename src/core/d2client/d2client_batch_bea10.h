@@ -33,6 +33,7 @@ struct Env {
  void (*fatal)(uint32_t, const char*);
  void (*exitProc)(int32_t);  // CRT exit(-1) after a fatal message
 };
+bool sub_BEA10(const Env& e, int32_t* o);
 void sub_BEAF0(const Env& e);
 void sub_BEB90(const Env& e);
 void sub_BF990(const Env& e, P a);

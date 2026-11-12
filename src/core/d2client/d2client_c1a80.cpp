@@ -30,7 +30,8 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2c_c1a80(const D2cC1a80Env* e, D2cC1a80St* g, uin
     }
     bool gate = true;   // false: fall to the common loop at 0xC1B6B
     if (idx == 5 || idx == 9) {
-        if (g->bc08 && idx == 5 && !g->fade0) return 0;
+        // 0xFADE0 is the slot table's own entry 0x18 (0xFAD80 + 0x60), not a separate word: read it there.
+        if (g->bc08 && idx == 5 && !g->slot[0x18]) return 0;
         if (g->lim > e->tick()) return 0;
         if (idx == 9) {
             const uint32_t pl = g->player;

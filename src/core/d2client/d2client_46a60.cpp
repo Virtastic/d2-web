@@ -21,7 +21,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_46a60(uint32_t key, const uint32_
     if (*g97ac && *g97b0)
         for (uint32_t n = list; n; n = at(n)[1]) {
             uint32_t item = at(n)[0];
-            if (at(item)[2] == *g97b0) { D2cCall c = {}; c.rva = 0x88550; c.eax = n; c.ecx = item; host(&c); break; }
+            if (at(item)[2] == *g97b0) { D2cCall c = {}; c.rva = 0x88550; c.ecx = item; host(&c); break; }
         }
     *g97ac = 0; *g97b0 = 0;
 }
