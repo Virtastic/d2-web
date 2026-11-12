@@ -26,8 +26,9 @@ struct D2Client854e0Env {
     void     (*f6a220)(U mon);                              // 0x6A220: EAX, stack 0
     void     (*f81ff0)(U mon, U item, U ebx);               // 0x81FF0: EDI = mon, ESI = item, EBX, stack 0
     void     (*f82fe0)(U mon);                              // 0x82FE0
-    void     (*f81aa0)();
+    uint32_t (*f81aa0)();
     void     (*die)(uint32_t line);                         // 10265(line), 10024(str, r), _exit(-1); falls through if the host returns
 };
 // 1.13c D2Client+0x854E0: EAX = packet.
-void d2c_854e0(const D2Client854e0Env& e, U pkt);
+// Returns the EAX retail leaves on each exit.
+uint32_t d2c_854e0(const D2Client854e0Env& e, U pkt);

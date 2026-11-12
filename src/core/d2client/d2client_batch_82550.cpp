@@ -139,15 +139,7 @@ static void unlinkUnit(const D2cGlob82* g, const D2cEnv82* e, uint32_t id) {
 // ported to d2client_82c60.cpp
 
 // 1.13c D2Client+0x82E10   (ESI = pkt)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82e10(const D2cGlob82* g, const D2cEnv82* e, const uint8_t* esi) {
-    uint8_t loc[24];
-    e->ord(11105, P(esi + 8), rd<uint8_t>(esi, 2) - 8, 0, P(loc));
-    uint8_t* u = findUnit(g, e, rd<uint32_t>(esi, 4), 4);
-    if (!u) return;
-    int32_t m = rd<int32_t>(u, 0x10);
-    if (m == 2) e->fn(0x82a00, P(esi), P(loc), 0, 0);        // stdcall: EAX = pkt, [esp+4] = block
-    else if (m == 4) e->fn(0x82b20, P(esi), P(loc), 0, 0);   // stdcall: pkt, block
-}
+// ported to d2client_82e10.cpp
 
 // 1.13c D2Client+0x82F50   (EAX = pkt: +1 type byte, +2 id)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82f50(const D2cGlob82* g, const D2cEnv82* e, const uint8_t* eax,

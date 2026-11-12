@@ -11,7 +11,7 @@ struct D2Client84080Env {
     uint32_t g9663;                                         // dword at D2Client+0x119663
     uint32_t g9854;                                         // dword at D2Client+0x119854
     uint32_t* bc54;                                         // dword at D2Client+0x11BC54 (written)
-    void     (*f11105)(U src, uint32_t len, uint32_t z, uint8_t* out);        // thunk 0xCA90: 24-byte header out
+    uint32_t (*f11105)(U src, uint32_t len, uint32_t z, uint8_t* out);        // thunk 0xCA90: 24-byte header out
     uint32_t (*f10646)(U owner, U item);                    // thunk 0xC6D0
     uint32_t (*f10020)(U item);                             // thunk 0xC92E
     uint32_t (*f10584)(U mon, uint32_t a1, uint32_t a2);    // thunk 0xC8A4 (3 args, stdcall)
@@ -24,11 +24,11 @@ struct D2Client84080Env {
     void     (*f82980)(U item, uint32_t a, uint32_t b, uint32_t c, uint32_t d);  // 0x82980: EAX = item, EBX = 0
     U        (*f835c0)(U pkt, uint8_t* hdr, uint32_t a, uint32_t b);              // 0x835C0, EBX = 0
     void     (*f56ef0)(U tbl, uint32_t idx, uint32_t id, uint32_t type);          // 0xA6EF0: ECX = table, EDX = index
-    void     (*f47a70)(uint32_t id);
-    void     (*f81aa0)();
+    uint32_t (*f47a70)(uint32_t id);
+    uint32_t (*f81aa0)();
     void     (*f6e2b0)();
     void     (*f8bbf0)();
     uint32_t (*die)();                                      // 10265(0x5A), 10024(str, r), _exit(-1); returns EAX if the host returns
 };
-// 1.13c D2Client+0x84080: EDI = packet.
-void d2c_84080(const D2Client84080Env& e, U pkt);
+// 1.13c D2Client+0x84080: EDI = packet. Returns the EAX retail leaves on each exit.
+uint32_t d2c_84080(const D2Client84080Env& e, U pkt);
