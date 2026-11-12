@@ -155,7 +155,7 @@ import { MODAL_POINTER_OWNER, modalPointerOwner } from './assets/modal-pointer-p
 import { heldPointerWorldAllowed } from './assets/held-pointer-world.mjs';
 import { createGameClock, GAME_STEP, STEP, MAX_CATCHUP_UPDATES, rafStarved } from './assets/game-clock.mjs';
 import { queueHeldPointerRepeat } from './assets/held-pointer-repeat.mjs';
-import { heldWorldAction, leftHandCommand, rightGroundWalks } from './assets/world-click-dispatch.mjs';
+import { rightGroundWalks } from './assets/world-click-dispatch.mjs';
 import { createDeathScreen, deathScreenShown, respawnAllowed } from './assets/death-screen.mjs';
 import { createRealmGameUi } from './assets/realm-game-ui.mjs';
 import { realmHeroFlags, realmCorpseViews, createRealmDeath, heroIsDown, deathBlocksKey, markCharactersDead } from './assets/realm-death.mjs';
