@@ -6,10 +6,10 @@
 
 struct D2lAF00Seams {
     uint32_t (*o9b32)(uint32_t ecx);
-    void (*o996a)(uint32_t ecx);
+    uint32_t (*o996a)(uint32_t ecx);
     uint32_t (*o9b2c)();
     void (*o98f8)(uint32_t ecx, uint32_t edx, uint32_t s0);
-    void (*o9a30)(uint32_t s0, uint32_t s1); void (*o99d6)(uint32_t s0, uint32_t s1); void (*o99e8)(uint32_t s0, uint32_t s1);
+    void (*o9a30)(uint32_t s0, uint32_t s1); void (*o99d6)(uint32_t s0, uint32_t s1); uint32_t (*o99e8)(uint32_t s0, uint32_t s1);
     void (*o99be)(uint32_t ecx, uint32_t edx, uint32_t s0, uint32_t s1, uint32_t s2);
     const char* (*o9a18)(uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3);
     void (*ctor)(void* p);
@@ -22,7 +22,10 @@ struct D2lAF00Seams {
     void (*usprintf)(uint32_t n, void* buf, uint32_t fmt, uint32_t arg);
 };
 
-extern "C" void d2l_af00(const D2lAF00Seams* s, uint8_t* g, const uint32_t* inv, const uint32_t* bm) {
+// Returns the EAX retail leaves at its single `ret`: W(0x25EB8) on the busy-list exit; with no first node, 0 (that word) when the
+// layout word is 1, else 0x996A's answer when the scroll control exists, else the row count; after the walk, 0x25 when the last node
+// was a visible row (the column test reloads it) or 0x99E8's answer when it was hidden.
+extern "C" uint32_t d2l_af00(const D2lAF00Seams* s, uint8_t* g, const uint32_t* inv, const uint32_t* bm) {
     auto W = [&](uint32_t rva) -> uint32_t& { return *(uint32_t*)(g + (rva - 0x24DB0)); };
     auto U8 = [](uint32_t n, uint32_t o) -> uint32_t { return *(uint8_t*)(uintptr_t)(n + o); };
     auto U16 = [](uint32_t n, uint32_t o) -> uint32_t { return *(uint16_t*)(uintptr_t)(n + o); };
@@ -31,6 +34,7 @@ extern "C" void d2l_af00(const D2lAF00Seams* s, uint8_t* g, const uint32_t* inv,
     uint16_t w1[100], w2[100], w3[10];
     uint32_t tmeta;
     uint32_t node = W(0x25EC8), y = W(0x25710) - 13, x = 0x25, idx = 0, rel, i;
+    uint32_t eax = W(0x24DBC);
     if ((int32_t)W(0x24DBC) > 0) {
         i = 0;
         do {
@@ -38,16 +42,18 @@ extern "C" void d2l_af00(const D2lAF00Seams* s, uint8_t* g, const uint32_t* inv,
             uint32_t k = s->o9b2c() - 6;
             if (k <= 4 && k != 2) s->o98f8(W(0x25734 + i * 4), 0xFFFFFFFFu, k == 1 ? 0xFFFFFFF9u : 0xFFFFFFFEu);
             i++;
+            eax = W(0x24DBC);
         } while ((int32_t)i < (int32_t)W(0x24DBC));
     }
-    if (W(0x25EDC)) s->o996a(W(0x25EDC));
-    if (W(0x25AD4) == 1 && W(0x25EB8) != 0) return;
-    if (!node) return;
+    if (W(0x25EDC)) eax = s->o996a(W(0x25EDC));
+    if (W(0x25AD4) == 1) { eax = W(0x25EB8); if (eax != 0) return eax; }
+    if (!node) return eax;
     for (;;) {
         uint32_t base = W(0x25ED4), cnt = W(0x24DBC);
         if ((int32_t)idx < (int32_t)base || (int32_t)idx >= (int32_t)(base + cnt)) {
-            s->o99e8(U32(node, 0x338), 0);
+            eax = s->o99e8(U32(node, 0x338), 0);
         } else {
+            eax = 0x25;
             rel = idx - base;
             s->o9a30(U32(node, 0x338), x + 0x1E);
             s->o99d6(U32(node, 0x338), y);
@@ -95,4 +101,5 @@ extern "C" void d2l_af00(const D2lAF00Seams* s, uint8_t* g, const uint32_t* inv,
         idx++;
         if (!node) break;
     }
+    return eax;
 }

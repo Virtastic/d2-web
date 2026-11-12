@@ -5,15 +5,15 @@
 #include <cstring>
 
 struct D2lB600Seams {
-    uint32_t (*o980e)(); void (*faf00)();
+    uint32_t (*o980e)(); uint32_t (*faf00)();
     uint32_t (*o9b32)(uint32_t ecx);
     void (*toUtf)(void* dst, uint32_t src, uint32_t n);
     void (*o987a)(uint32_t ecx, uint32_t edx); void (*o996a)(uint32_t ecx);
     uint32_t (*o9b2c)();
     void (*o98f8)(uint32_t ecx, uint32_t edx, uint32_t s0);
-    void (*o9a30)(uint32_t s0, uint32_t s1); void (*o99d6)(uint32_t s0, uint32_t s1); void (*o99e8)(uint32_t s0, uint32_t s1);
+    void (*o9a30)(uint32_t s0, uint32_t s1); void (*o99d6)(uint32_t s0, uint32_t s1); uint32_t (*o99e8)(uint32_t s0, uint32_t s1);
     void (*o9a1e)(uint32_t s0, uint32_t s1, uint32_t s2);
-    void (*o99be)(uint32_t ecx, uint32_t edx, uint32_t s0, uint32_t s1, uint32_t s2);
+    uint32_t (*o99be)(uint32_t ecx, uint32_t edx, uint32_t s0, uint32_t s1, uint32_t s2);
     uint32_t (*o9820)(uint32_t id); void (*o97f6)(uint32_t fmtRva, uint32_t a, uint32_t b); void (*exit_)(uint32_t code);
     const char* (*o9a18)(uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3);
     void (*ctor)(void* p);
@@ -26,7 +26,10 @@ struct D2lB600Seams {
     void (*usprintf)(uint32_t n, void* buf, uint32_t fmt, uint32_t arg);
 };
 
-extern "C" void d2l_b600(const D2lB600Seams* s, uint8_t* g, const uint32_t* inv, const uint32_t* bm) {
+// Returns the EAX retail leaves at its `ret`: 0xAF00's on the alternate-layout path; W(0x25EB8) on the busy-list exit; with no first
+// node, the layout word (0 when it is 1); after the walk, from the last node: 0x99E8's answer when hidden, the last 0x99BE answer for a
+// row of type 1 or 2, and the advanced y for a row of type 0.
+extern "C" uint32_t d2l_b600(const D2lB600Seams* s, uint8_t* g, const uint32_t* inv, const uint32_t* bm) {
     auto W = [&](uint32_t rva) -> uint32_t& { return *(uint32_t*)(g + (rva - 0x24DB0)); };
     auto U8 = [](uint32_t n, uint32_t o) -> uint32_t { return *(uint8_t*)(uintptr_t)(n + o); };
     auto U16 = [](uint32_t n, uint32_t o) -> uint32_t { return *(uint16_t*)(uintptr_t)(n + o); };
@@ -35,8 +38,8 @@ extern "C" void d2l_b600(const D2lB600Seams* s, uint8_t* g, const uint32_t* inv,
     char bb[100];
     uint16_t w1[100], w2[100], w3[10];
     uint32_t tmeta;
-    uint32_t node, y, idx, rel, i;
-    if (s->o980e()) { s->faf00(); return; }
+    uint32_t node, y, idx, rel, i, eax;
+    if (s->o980e()) return s->faf00();
     node = W(0x25EC8);
     y = W(0x25710) - 13;
     idx = 0;
@@ -47,12 +50,13 @@ extern "C" void d2l_b600(const D2lB600Seams* s, uint8_t* g, const uint32_t* inv,
         if (s->o9b2c() == 7) s->o98f8(W(0x25734 + i * 4), 0xFFFFFFFFu, 0xFFFFFFFBu);
     }
     if (W(0x25EDC)) s->o996a(W(0x25EDC));
-    if (W(0x25AD4) == 1 && W(0x25EB8) != 0) return;
-    if (!node) return;
+    eax = W(0x25AD4);
+    if (eax == 1) { eax = W(0x25EB8); if (eax != 0) return eax; }
+    if (!node) return eax;
     for (;;) {
         uint32_t base = W(0x25ED4), cnt = W(0x24DBC);
         if ((int32_t)idx < (int32_t)base || (int32_t)idx >= (int32_t)(base + cnt)) {
-            s->o99e8(U32(node, 0x338), 0);
+            eax = s->o99e8(U32(node, 0x338), 0);
         } else {
             rel = idx - base;
             s->o9a30(U32(node, 0x338), 0x221);
@@ -65,10 +69,10 @@ extern "C" void d2l_b600(const D2lB600Seams* s, uint8_t* g, const uint32_t* inv,
                 s->o99be(ci, s->o9b32(0x1419), 1, 0, 0);
                 if (W(0x25AD4) == 1 && W(0x25EE4) != 0) {
                     s->o99be(ci, s->o9b32(0x1416), 0, 0, 0);
-                    s->o99be(ci, s->o9b32(0x1417), 0, 0, 0);
+                    eax = s->o99be(ci, s->o9b32(0x1417), 0, 0, 0);
                 } else {
                     s->o99be(ci, s->o9b32(0x1418), 0, 0, 0);
-                    s->o99be(ci, node + 0x100, 0, 0, 0);
+                    eax = s->o99be(ci, node + 0x100, 0, 0, 0);
                 }
                 y += 0x5D;
             } else {
@@ -78,11 +82,11 @@ extern "C" void d2l_b600(const D2lB600Seams* s, uint8_t* g, const uint32_t* inv,
                 s->o99e8(U32(node, 0x338), mask);
                 uint32_t ty = U32(node, 0x334);
                 if (ty == 2) {
-                    s->o99be(W(0x25734 + rel * 4), s->o9b32(0x2B3B), 1, 0, 0);
+                    eax = s->o99be(W(0x25734 + rel * 4), s->o9b32(0x2B3B), 1, 0, 0);
                     y += 0x5D;
                 } else if (ty != 0) {
                     uint32_t v = s->o9820(0x3C5); s->o97f6(0x1E256, v, 0x3C5); s->exit_(0xFFFFFFFFu);
-                    return;
+                    return 0;   // retail's _exit never returns (int3 follows the call)
                 } else {
                     for (i = 0; i < 100; i++) s->ctor(&w2[i]);
                     bb[0] = 0;
@@ -115,6 +119,7 @@ extern "C" void d2l_b600(const D2lB600Seams* s, uint8_t* g, const uint32_t* inv,
                         s->o99be(ci, (uint32_t)(uintptr_t)w1, flag, 0, 0);
                     }
                     y += 0x5D;
+                    eax = y;
                 }
             }
         }
@@ -122,4 +127,5 @@ extern "C" void d2l_b600(const D2lB600Seams* s, uint8_t* g, const uint32_t* inv,
         idx++;
         if (!node) break;
     }
+    return eax;
 }
