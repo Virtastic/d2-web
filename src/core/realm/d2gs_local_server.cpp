@@ -298,9 +298,8 @@ EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_client_slot(int slot, const uint8_t* byte
         ++s->accepted;
         return 1;
     }
-    if (opcode == 0x6D) {
-        uint8_t pong[33] = { 0x8F };
-        if (length >= 5) std::memcpy(pong + 1, bytes + 1, 4);
+    if (opcode == 0x6D) {           // ping: the same retail pong as the first client's, no echo of the ping's tick
+        const uint8_t pong[33] = { 0x8F };
         putTo(*s, pong, sizeof pong);
         ++s->accepted;
         return 1;

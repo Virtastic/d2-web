@@ -1132,10 +1132,11 @@ static int assign_player(const uint8_t* packet, int length) {
     created.version = 5;
     created.size = sizeof(created);
     uint32_t level = 0, roomX = 0, roomY = 0, initSeed = 0;
-    // The game sends the own unit before the act load, so no room can hold it yet: the constructor
-    // (1.13c D2Client+0xA7630) goes on without one, and a later reassignment resolves the room.
-    level = roomX = roomY = initSeed = 0;
-    d2_drlg_client_player_context(assigned.x, assigned.y, 1, &level, &roomX, &roomY, &initSeed);
+    // The constructor (1.13c D2Client+0xA7630) looks a positioned unit's room up in the loaded act
+    // (+0xA5A60) and ends the game when none holds it. Before the act load no room can hold it yet:
+    // the unit goes on without one and a later reassignment resolves the room.
+    if (!d2_drlg_client_player_context(assigned.x, assigned.y, 1, &level, &roomX, &roomY, &initSeed) &&
+        g_world.hasLoadAct) return -1;
     created.active = 1;
     created.guid = assigned.guid;
     created.x = assigned.x;
@@ -2039,6 +2040,13 @@ static uint32_t g_nextClientMissileId = 1;
 // (D2Client+0xA7BF0) and stored as the new unit's id. A session's earlier creations (tile/object/item units the test runner
 // does not model) have already advanced it; the caller pins the value it read, the next missile takes counter+1.
 EMSCRIPTEN_KEEPALIVE void d2_realm_client_unit_counter_set(uint32_t counter) { g_nextClientMissileId = counter + 1; }
+// The bump in D2Client+0xA7BF0: the counter goes up by one and a result of 0xFFFFFFFF wraps to 0, which is the id.
+static uint32_t take_client_unit_id() {
+    uint32_t id = g_nextClientMissileId;
+    if (id == 0xffffffffu) id = 0;
+    g_nextClientMissileId = id + 1;
+    return id;
+}
 
 static void clear_target_relations_to(D2UnitStrc* target) {
     if (!target) return;
@@ -2274,7 +2282,7 @@ static D2UnitStrc* create_client_missile(const D2MissileStrc* params, bool gener
     auto* unit = UNITS_AllocUnit(nullptr, UNIT_MISSILE);
     if (!unit) return nullptr;
     unit->dwClassId = missileId;
-    unit->dwUnitId = g_nextClientMissileId++;
+    unit->dwUnitId = take_client_unit_id();
     unit->dwAnimMode = txt->nCollideType; // Client 6FB601BE passes collision type to #11090.
     if (!d2_realm_client_motion_attach(unit, x, y)) { free_client_missile(unit); return nullptr; }
     uint32_t level = 0, roomX = 0, roomY = 0, initSeed = 0;

@@ -24,12 +24,15 @@ test('retail S 8F answers every C 6D: 33 bytes, zero bytes 1..12 and 17..32, the
   }
 });
 
-test('the local server answers 0x6D with 0x8F and zeros, no echo of the ping bytes', () => {
+test('the local server answers 0x6D with 0x8F and zeros on every connection, no echo of the ping bytes', () => {
   const src = readFileSync(resolve('src/core/realm/d2gs_local_server.cpp'), 'utf8');
-  const at = src.indexOf('opcode == 0x6D');
-  const body = src.slice(at, src.indexOf('return 1;', at));
-  assert.match(body, /pong\[33\] = \{ 0x8F \}/);
-  assert.ok(!/memcpy/.test(body), 'the pong does not copy the ping');
+  let seen = 0;
+  for (let at = src.indexOf('opcode == 0x6D'); at >= 0; at = src.indexOf('opcode == 0x6D', at + 1), ++seen) {
+    const body = src.slice(at, src.indexOf('return 1;', at));
+    assert.match(body, /pong\[33\] = \{ 0x8F \}/);
+    assert.ok(!/memcpy/.test(body), 'the pong does not copy the ping');
+  }
+  assert.ok(seen >= 2, 'the first client and every extra slot client answer pings');
 });
 
 test('retail join: one a8 per join (server-entry-bnet)', () => {
