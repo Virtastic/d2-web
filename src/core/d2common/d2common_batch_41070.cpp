@@ -54,34 +54,7 @@ void D2Common_3E000(D2DrlgLevelStrc* level) {
     DRLGOUTDOORS_SpawnAct1DirtPaths(level);
 }
 
-// 1.13c D2Common+0x7E8C0: EAX level; classify cliff runs only, no grid placement.
-void D2Common_7E8C0(D2DrlgLevelStrc* level) {
-    auto* out = level->pOutdoors;
-    auto* first = out->pVertex;
-    auto* vertex = first;
-    auto* previous = first;
-    for (auto* p = first->pNext; p != first; p = p->pNext) previous = p;
-    bool crossed = false;
-    do {
-        if ((vertex->nPosX < vertex->pNext->nPosX && vertex->nPosY < previous->nPosY && !(vertex->dwFlags & 1) && !(previous->dwFlags & 1)) ||
-            (vertex->pNext->nPosY < vertex->nPosY && vertex->nPosX < previous->nPosX && !(vertex->dwFlags & 1) && !(previous->dwFlags & 1))) {
-            auto* start = vertex;
-            D2DrlgVertexStrc* last = nullptr;
-            do {
-                if (vertex == first) crossed = true;
-                if (sub_6FD85350(vertex)) break;
-                if (sub_6FD85300(vertex)) last = vertex;
-                vertex = vertex->pNext;
-            } while (vertex != start);
-            if (last) {
-                for (auto* p = start; p != last; p = p->pNext) p->nDirection = 1;
-                last->nDirection = 1;
-                out->dwFlags |= 0x20;
-            }
-        }
-        previous = vertex; vertex = vertex->pNext;
-    } while (!crossed && vertex != first);
-}
+// 0x7E8C0 lives in d2common_7e8c0.cpp (retail 32-bit vertex layout).
 
 // 1.13c D2Common+0x7EE50: EAX level, ECX is an unused forwarded register argument.
 void D2Common_7EE50(D2DrlgLevelStrc* level) {

@@ -22,6 +22,9 @@
 
 //TODO: Find names
 
+extern "C" int32_t D2Common_4F0E0_PassiveState(int32_t nSkillId);   // 1.13c D2Common+0x4F0E0
+void D2Common_52480_RefreshSkill(D2UnitStrc* pUnit, int nSkillId);   // 1.13c D2Common+0x52480
+
 D2CalcCallbackInfoStrc off_6FDE5804[] =
 {
 	{ MISSILE_GetMinimum, 2 },
@@ -820,28 +823,15 @@ void __stdcall SKILLS_RemoveSkill(D2UnitStrc* pUnit, int nSkillId, const char* s
 //D2Common.0x6FDAFFF0
 void __fastcall D2COMMON_SKILLS_RemoveSkill_6FDAFFF0(D2UnitStrc* pUnit, int nSkillId, BOOL bDecrementAndCheckSkillLevel, const char* szFile, int nLine)
 {
-	if (!pUnit)
+	// 1.13c D2Common+0x528B0: a null unit, skill info or skill list returns silently (the 1.10f traces are gone).
+	if (!pUnit || !pUnit->pSkills || !pUnit->pSkills->pFirstSkill)
 	{
-		FOG_Trace("sSkillsRemoveSkill(): NULL unit  FILE:%s  LINE:%d", szFile, nLine);
-		return;
-	}
-	if (!pUnit->pSkills)
-	{
-		FOG_Trace("sSkillsRemoveSkill(): NULL skillinfo  (TYPE:%d  CLASS:%d)  FILE:%s  LINE:%d", pUnit->dwUnitType, pUnit->dwClassId, szFile, nLine);
-		return;
-	}
-	if (!pUnit->pSkills->pFirstSkill)
-	{
-		FOG_Trace("sSkillsRemoveSkill(): NULL skilllist  (TYPE:%d  CLASS:%d)  FILE:%s  LINE:%d", pUnit->dwUnitType, pUnit->dwClassId, szFile, nLine);
 		return;
 	}
 
-	if (D2SkillsTxt* pSkillsTxtRecord = DATATBLS_GetSkillsTxtRecord(nSkillId))
+	if (const int32_t nPassiveState = D2Common_4F0E0_PassiveState(nSkillId))
 	{
-		if (pSkillsTxtRecord->nPassiveState > 0)
-		{
-			STATES_ToggleState(pUnit, pSkillsTxtRecord->nPassiveState, 0);
-		}
+		STATES_ToggleState(pUnit, nPassiveState, 0);
 	}
 
 	if (const D2SkillStrc* pLeftSkill = pUnit->pSkills->pLeftSkill)
@@ -864,7 +854,7 @@ void __fastcall D2COMMON_SKILLS_RemoveSkill_6FDAFFF0(D2UnitStrc* pUnit, int nSki
 	{
 		if (nSkillId == pUsedSkill->pSkillsTxt->nSkillId && pUsedSkill->nOwnerGUID == D2UnitInvalidGUID)
 		{
-			SKILLS_SetUsedSkillInSkillList(pUnit->pSkills, nullptr);
+			pUnit->pSkills->pUsedSkill = nullptr;   // 1.13c stores the slot directly
 		}
 	}
 
@@ -894,7 +884,7 @@ void __fastcall D2COMMON_SKILLS_RemoveSkill_6FDAFFF0(D2UnitStrc* pUnit, int nSki
 		}
 	}
 
-	SKILLS_RefreshSkill(pUnit, nSkillId);
+	D2Common_52480_RefreshSkill(pUnit, nSkillId);   // 1.13c D2Common+0x52480
 }
 
 // 1.13c D2Common+0x4E300 (#10958)

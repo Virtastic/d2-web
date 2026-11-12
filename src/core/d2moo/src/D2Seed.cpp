@@ -12,9 +12,20 @@ void __stdcall SEED_Return()
 //D2Common.0x6FDAEA80 (#10920)
 // 1.13c D2Common+0x36760: three steps of the 0x19660D / 0x3C6EF35F LCG over (time32 + tick + arg), masked to 31 bits.
 // d2-web: the 1.10f single-step form is replaced; time is truncated to 32 bits as retail's time32 is.
+// Probe clock seam: when g_seedClockPinned is set, the test probe supplies
+// the time32 that retail reads through helper 0x265D and the tick count that GetTickCount returns. Unset, the
+// function reads the wall clock as before, so the game never sees the seam.
+extern "C" {
+	bool     g_seedClockPinned = false;
+	uint32_t g_seedPinTime32 = 0;
+	uint32_t g_seedPinTick = 0;
+}
+
 int __fastcall SEED_GetRandomValue(int nValue)
 {
-	uint32_t nState = (uint32_t)time(NULL) + (uint32_t)GetTickCount() + (uint32_t)nValue;
+	uint32_t nTime32 = g_seedClockPinned ? g_seedPinTime32 : (uint32_t)time(NULL);
+	uint32_t nTick = g_seedClockPinned ? g_seedPinTick : (uint32_t)GetTickCount();
+	uint32_t nState = nTime32 + nTick + (uint32_t)nValue;
 	nState = nState * 0x19660D + 0x3C6EF35F;
 	nState = nState * 0x19660D + 0x3C6EF35F;
 	nState = nState * 0x19660D + 0x3C6EF35F;

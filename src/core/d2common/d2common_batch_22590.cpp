@@ -82,7 +82,7 @@ EMSCRIPTEN_KEEPALIVE int32_t UNITS_GetTotalMaxStamina_39050(D2UnitStrc* pUnit)
 		return 0;
 	if (sgptDataTables->nItemStatCostTxtRecordCount <= 0xB)
 		return 0;
-	return STATLIST_GetTotalStat_6FDB63E0(STATLIST_StatListExCast(pUnit->pStatListEx),
+	return STATLIST_GetTotalStat_6FDB63E0(pUnit->pStatListEx,   // the list itself: 0x38A80 picks the full-stats array by the list's own flag
 		D2SLayerStatIdStrc::MakeFromStatId(0xB).nPackedValue,
 		&sgptDataTables->pItemStatCostTxt[0xB]);
 }

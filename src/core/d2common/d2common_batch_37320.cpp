@@ -94,7 +94,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t D2Common_24E10_GetItemAutoStack(uint32_t pUnit) {  
 // 1.13c D2Common+0x246A0: itemtypes.txt nStaffMods (+0x1F) of an item unit's item type. Anything
 // but a type-4 unit, an out-of-range item type or a missing row answers the retail default 7.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_246a0(uint32_t pUnit) {   // 1.13c D2Common+0x246A0
+EMSCRIPTEN_KEEPALIVE uint8_t D2Common_246A0_StaffMods(uint32_t pUnit) {   // the FN probe src/core/fn/d2common_246a0.cpp owns d2_fn_d2common_246a0 (r[] ABI)   // 1.13c D2Common+0x246A0
 	uint8_t* u = P(pUnit);
 	if (!u || U(u, 0x00) != 4) return 7;
 	const int32_t nItemType = static_cast<int32_t>(ITEMS_GetItemType(reinterpret_cast<D2UnitStrc*>(u)));

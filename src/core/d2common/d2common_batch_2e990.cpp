@@ -70,7 +70,7 @@ EMSCRIPTEN_KEEPALIVE int D2Common_390A0_GetUnitMaxManaTotal(D2UnitStrc* pUnit)
 		return 0;
 	}
 	return STATLIST_GetTotalStat_6FDB63E0(
-		STATLIST_StatListExCast(pUnit->pStatListEx),
+		pUnit->pStatListEx,   // the list itself: 0x38A80 picks the full-stats array by the list's own flag
 		D2SLayerStatIdStrc::MakeFromStatId(STAT_MAXMANA).nPackedValue,
 		&sgptDataTables->pItemStatCostTxt[9]);
 }

@@ -10,11 +10,14 @@ BOOL __stdcall WAYPOINTS_GetLevelIdFromWaypointNo(short nWaypointNo, int* pLevel
 {
 	*pLevelId = 0;
 
-	if (nWaypointNo < 255)
+	// 1.13c: the number is an unsigned 16-bit word (a negative short is >= 255 and answers 0 without a scan);
+	// the levels row is base +0xC58 + i * 0x220, read directly.
+	const uint16_t nWp = (uint16_t)nWaypointNo;
+	if (nWp < 255)
 	{
 		for (int i = 1; i < sgptDataTables->nLevelsTxtRecordCount; ++i)
 		{
-			if (DATATBLS_GetLevelsTxtRecord(i)->nWaypoint == nWaypointNo)
+			if (sgptDataTables->pLevelsTxt[i].nWaypoint == nWp)
 			{
 				*pLevelId = i;
 				return TRUE;

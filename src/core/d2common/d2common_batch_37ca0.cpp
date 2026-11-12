@@ -12,6 +12,7 @@
 #include <emscripten.h>
 
 #include "D2DataTbls.h"
+#include "D2StatList.h"
 #include "DataTbls/ItemsTbls.h"
 #include "Units/Units.h"
 #include "Units/Item.h"
@@ -353,9 +354,9 @@ EMSCRIPTEN_KEEPALIVE bool D2Common_26AD0_ItemAcceptable(int32_t* pUnit)
 	return false;
 }
 
-// 1.13c D2Common+0x26080 (#10366): op-stat record of the item's 0x5C field.
+// Engine-struct twin of the #10366 port in d2common_26080.cpp (retail layout): op-stat record of the item's 0x5C field.
 // Only a type-4 unit is valid (fatal 0xEA7/0xEA8). When unit[0x5C] is non-zero, itemstatcost has
-// more than 0xC2 records and its base is loaded, the answer is 0x38A80(record[0xC2]); otherwise 0.
+// more than 0xC2 records and its base is loaded, the answer is the statlist total of record[0xC2] (retail 0x38A80); otherwise 0.
 // Fatal paths return 0.
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t D2Common_26080_ItemOpStatTotal(int32_t* pUnit)
@@ -365,9 +366,14 @@ EMSCRIPTEN_KEEPALIVE int32_t D2Common_26080_ItemOpStatTotal(int32_t* pUnit)
 	if (pUnit[0] != 4)
 		return 0;
 
+	// 0x38A80 is the statlist total (the vendored STATLIST_GetTotalStat_6FDB63E0): the list in EBX and the
+	// packed key (stat 0xC2 << 16 | layer 0) in EDI are the arguments here, the 0xC2 record the third.
 	if (pUnit[0x17] != 0 && sgptDataTables && sgptDataTables->pItemStatCostTxt &&
-	    sgptDataTables->nItemStatCostTxtRecordCount > 0xC2 && g_d2common_fn_38A80)
-		return g_d2common_fn_38A80(&sgptDataTables->pItemStatCostTxt[0xC2]);
+	    sgptDataTables->nItemStatCostTxtRecordCount > 0xC2)
+		return STATLIST_GetTotalStat_6FDB63E0(
+			reinterpret_cast<D2StatListStrc*>(static_cast<uintptr_t>(static_cast<uint32_t>(pUnit[0x17]))),
+			D2SLayerStatIdStrc::MakeFromStatId(0xC2).nPackedValue,
+			&sgptDataTables->pItemStatCostTxt[0xC2]);
 
 	return 0;
 }

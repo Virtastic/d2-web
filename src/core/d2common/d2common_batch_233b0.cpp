@@ -143,7 +143,7 @@ void D2Common_7C170_ActivateUpdate(uint32_t pDrlg, uint32_t* G)
 
 // 1.13c D2Common+0x3B550: dword at unit+0x10. Null unit is retail fatal 0x31E.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3b550(uint32_t pUnit)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3B550_UnitDword10(uint32_t pUnit)   // the FN probe src/core/fn/d2common_3b550.cpp owns d2_fn_d2common_3b550 (r[] ABI)
 {
 	uint8_t* u = P(pUnit);
 	if (!u)

@@ -22,7 +22,7 @@ uint32_t D2Common_10049_GetUnitLevelStatScaled(D2UnitStrc* pUnit)
         return 0;
     }
     const int nValue = STATLIST_GetTotalStat_6FDB63E0(
-        STATLIST_StatListExCast(pUnit->pStatListEx), 0xC0000, &sgptDataTables->pItemStatCostTxt[12]);
+        pUnit->pStatListEx, 0xC0000, &sgptDataTables->pItemStatCostTxt[12]);   // the list itself: 0x38A80 picks the full-stats array by the list's own flag
     return (uint32_t)(nValue * 10000);
 }
 

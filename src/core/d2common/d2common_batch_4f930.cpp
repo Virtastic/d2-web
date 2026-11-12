@@ -65,7 +65,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_528b0_port(D2UnitStrc* pUnit, int32_t n
 // positive skill level. Stat 0x7E (element skill) is added when nEType is set, and stat 0x6B (single
 // skill) always. The skill is in EAX and the unit in ESI in retail; the vendored body is the same.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_4fcb0(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
+EMSCRIPTEN_KEEPALIVE int32_t D2Common_4FCB0_BonusSkillLevel(D2UnitStrc* pUnit, D2SkillStrc* pSkill)   // the FN probe src/core/fn/d2common_4fcb0.cpp owns d2_fn_d2common_4fcb0 (r[] ABI)
 {
 	return SKILLS_GetBonusSkillLevel(pUnit, pSkill);
 }

@@ -90,7 +90,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_37470_batch(uint32_t pOwner, uint32
 // nTicks / nTimeRate and is cached in nPrev when the jump exceeds 0x10. A null pOwner is fatal 0x547
 // in retail; we return 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_37660(uint32_t pOwner, int32_t nActNo)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_37660_EnvTick(uint32_t pOwner, int32_t nActNo)   // the FN probe src/core/fn/d2common_37660.cpp owns d2_fn_d2common_37660 (r[] ABI)
 {
 	uint8_t* owner = P(pOwner);
 	if (!owner)
