@@ -19,7 +19,7 @@ void d2c_b1fc0(const D2ClientB1fc0Env& e, U m) {
     const uint32_t ow = e.ld32(m, 0x2c);
     if (!ow) { e.tail(m); return; }
     const uint32_t id = e.f11018(m);
-    U o = e.ldp(e.tbl, (id & 0x7f) * (uint32_t)sizeof(U));
+    U o = e.ldp(e.tbl, (id & 0x7f) * 4u);   // retail chain heads are 32-bit words
     while (o && e.ld32(o, 0xc) != id) o = e.ldp(o, 0xe4);
     if (!o) { e.tail(m); return; }
     if (e.ld32(o, 0) != 3) e.die();
