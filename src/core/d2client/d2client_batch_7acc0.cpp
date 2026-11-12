@@ -54,28 +54,7 @@ extern "C" void d2_client_7aea0(void (*draw)(const Msg*, uint32_t)) {
     for (Msg* m = g_3ab0; m; m = m->next) draw(m, m->color);  // vtable+0x30 call; retail passes first 6 words
 }
 
-// 1.13c D2Client+0x7AF20
-extern "C" uint32_t d2_client_7af20(Rect* r, int32_t n) {
-    auto isect = [](const Rect& a, const Rect& b) { return a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b; };
-    if (n > 15) return 0;
-    if (n == 0) { g_rects[0] = *r; return 1; }
-    for (int i = 0; i < n; i++) {
-        if (!isect(g_rects[i], *r)) continue;
-        for (int32_t x = 0x32; x < 400; x += 0x32)
-            for (int32_t y = 0x23; y < 0x118; y += 0x23)
-                for (int k = 0; k < g_913fc; k++) {
-                    Rect c{r->l + g_913dc[k] * x, r->t + g_913dc[k] * y, 0, 0};
-                    c.r = c.l + 400; c.b = c.t + 0x118;
-                    if (c.l < 0 || c.r > g_screenW || c.t < 0 || c.b > g_screenH) continue;
-                    bool hit = false;
-                    for (int j = 0; j < n; j++) if (isect(g_rects[j], c)) hit = true;
-                    if (!hit) { g_rects[n] = c; *r = c; return 1; }
-                }
-        return 0;
-    }
-    g_rects[n] = *r;
-    return 1;
-}
+// D2Client 7AF20 moved to d2client_7af20.cpp.
 
 // 1.13c D2Client+0x7B120  (deep copy of a message node; returns the copy)
 extern "C" Msg* d2_client_7b120(const Msg* src) {

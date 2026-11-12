@@ -101,45 +101,7 @@ void d2_client_763c0(uint32_t player, uint32_t local_unit_11bbfc, int32_t org_x_
     ord10150(0x41 - org_y_9a4, x, 0);
 }
 
-// 1.13c D2Client+0x76790 (582 B): draws every party row (max 8) after the local player's.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_76790(uint32_t list_fd8, uint32_t player_list_c14, uint32_t local_unit_11bbfc,
-                     uint32_t (*sub_4d630)(uint32_t, int32_t), void (*ord10184)(void),
-                     void (*sub_5780)(uint32_t, int32_t, uint32_t, uint32_t), void (*sub_4ed0)(uint32_t, uint32_t),
-                     void (*sub_58c0)(uint32_t, uint32_t), void (*sub_54a0)(uint32_t, int32_t, uint32_t),
-                     void (*sub_761c0)(uint32_t), void (*sub_5690)(int32_t, uint32_t, int16_t)) {
-    uint32_t row = list_fd8;
-    int32_t y = 0x5a;
-    auto count = [&](int16_t pty) { int n = 0; for (uint32_t p = player_list_c14; p; p = rd32(p + 0x80)) if ((int16_t)rd16(p + 0x22) == pty) n++; return n; };
-    int16_t mine = -1;
-    if (player_list_c14) { int16_t t = (int16_t)rd16(player_list_c14 + 0x22); if (count(t) > 1) mine = t; }
-    uint32_t pl = player_list_c14 ? rd32(player_list_c14 + 0x80) : 0;
-    for (int i = 0; row && pl && i <= 7; i++) {
-        uint32_t mode = 0; bool same = false;
-        int16_t pt = (int16_t)rd16(pl + 0x22), sv;
-        int n = count(pt);
-        sv = (player_list_c14 && n >= 2) ? pt : (int16_t)-1;
-        if (player_list_c14 && n > 1 && pt != -1) {
-            if (mine == sv) { mode = 2; same = true; } else mode = 8;
-        }
-        if (local_unit_11bbfc) {
-            int32_t me = (int32_t)rd32(local_unit_11bbfc + 0xc);
-            uint32_t r = sub_4d630(0, (int32_t)rd32(pl + 0x10));
-            if (r && rd32(r + 0x34))
-                for (uint32_t q = rd32(rd32(r + 0x34)); q; q = rd32(q + 8))
-                    if ((int32_t)rd32(q) == me) { if (rd32(q + 4) & 8) mode = 1; break; }
-        }
-        ord10184();
-        sub_5780(row + 0xa0, y, mode, sv != -1);
-        sub_4ed0(rd32(row + 0xb9), mode);
-        sub_58c0(rd32(row + 0xbd), mode);
-        if (same && rd32(row + 0xc1)) sub_54a0(row, y, mode);
-        sub_761c0(row);
-        sub_5690(y, mine == sv, sv);
-        row = rd32(row + 0xcd); y += 0x26; pl = rd32(pl + 0x80);
-        ord10184();
-    }
-}
+// D2Client 76790 moved to d2client_76790.cpp.
 
 // 1.13c D2Client+0x769E0 (320 B) NAMED: lays out one party entry (5 button records, stride 32 B at +0),
 // entry in ESI, x_base EBX, unit in EAX (all guesses). Stores row y base at +0xc9, unit id at +0xc5.

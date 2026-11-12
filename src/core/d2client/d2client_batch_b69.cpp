@@ -129,7 +129,8 @@ EMSCRIPTEN_KEEPALIVE int32_t d2c_814f0(const D2cB69Env* e, uint32_t param) {   /
     int32_t ebx = 0;
     switch (st) {
     case 0x6d: case 0x6e: case 0x6f: case 0x70: *e->g_bf7c = 0; chance = 0x19; break;
-    case 0x78: case 0x79: case 0x75: *e->g_bf7c = 1; ebx = 1; chance = 0; break;
+    case 0x78: case 0x79: ebx = 1; *e->g_bf7c = 1; chance = 0; break;   // jump-table target 0x815BB
+    case 0x75: *e->g_bf7c = 1; chance = 0; break;                        // target 0x815BD: skips the EBX set
     }
     uint64_t s = (uint64_t)*(uint32_t*)seed * 0x6ac690c5u + (uint64_t)*(uint32_t*)(u + 0x24);
     *seed = s;

@@ -113,17 +113,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t d2c_6e670(const D2cB6E670Env* e, const uint8_t* uni
     return 0;
 }
 
-static void buysell(const D2cB65Env* e, const int32_t* flag, int32_t x, int32_t y) {
-    int32_t rec[18] = {};
-    if (!*e->g_6fbcb9c4) *e->g_6fbcb9c4 = e->fadb420(0);  // wsprintfA path string built first in original
-    rec[0] = (*flag != 0) + 10;
-    { char* s = *e->g_6fbcb9c4; __builtin_memcpy(rec + 11, &s, sizeof s); }  // ponytail: 32-bit slot in original
-    e->ord10041(rec, x, y, -1, 5, 0);
-}
-// 1.13c D2Client+0x76050
-EMSCRIPTEN_KEEPALIVE void d2c_76050(const D2cB65Env* e) {
-    buysell(e, e->g_6fbcbff4, *e->g_6fbcb9a0 + 0x116, 0x1a5 - *e->g_6fbcb9a4);
-}
+// D2Client 76050 moved to d2client_76050.cpp.
 // 1.13c D2Client+0x78240: the buy/sell button cell, drawn through D2Gfx#10041 (0xD096 thunk). The draw block is 18 dwords:
 // [0] = 10 + (flag != 0), [13] (+0x34) = the lazily loaded cell (0x2B420 loader, EAX = the path string), [16] = 0.
 // g925f0 = [0xE25F0] (set 1/2/3 by the column x -149/-220/-305), g925f4 = the table at 0xE25F4 (12-byte stride per class,

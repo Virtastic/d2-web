@@ -5,7 +5,7 @@ struct D2c80f60G {
     int32_t rainMode;     // +0x11BF78
     uint32_t angle;       // +0x113918
     float f38f4;          // +0x1138F4
-    int32_t tickDX, tickDY; // +0x10C408, +0x10C40C
+    int32_t tickDX, tickDY; // +0x11C408, +0x11C40C
     int32_t cellW;        // +0x0DBC48
     int32_t maxLive;      // +0x113934
     int32_t frame;        // +0x123440

@@ -17,7 +17,7 @@ struct D2Client7a9f0Env {
     uint32_t (*ord10867)(uint32_t path);                              // 0xC3BE
     uint32_t (*ord10750)(uint32_t path);                              // 0xC2EC
     uint32_t (*ord10916)(uint32_t room);                              // 0xCB14
-    void (*ord11152)(uint32_t ctx, uint32_t cb_rva, uint32_t* frame); // 0xCB1A (cb = D2Client+0x7A5D0)
+    uint32_t (*ord11152)(uint32_t room, uint32_t cb_rva, uint32_t* frame); // 0xCB1A (cb = D2Client+0x7A5D0); its EAX is the function's
     void (*fatal)(uint32_t line);                                     // Fog 10265 + 10024 + _exit(-1): the no-table and no-unit exits
 };
 
@@ -31,7 +31,7 @@ static uint32_t pos_of(uint32_t u, uint32_t off, uint32_t (*ord)(uint32_t)) {
 
 // 1.13c D2Client+0x7A9F0 (637 B)
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_7a9f0(uint32_t ctx, uint32_t skip, uint32_t* gl /*3b18 3b1c 3b20 3b24 3b28 3b2c 3b30*/, uint32_t unit,
+uint32_t d2_client_7a9f0(uint32_t ctx, uint32_t skip, uint32_t* gl /*3b18 3b1c 3b20 3b24 3b28 3b2c 3b30*/, uint32_t unit,
                      const D2Client7a9f0Env* env) {
     env->sub_7a0d0(ctx);
     int32_t big = env->ord10013();
@@ -44,7 +44,7 @@ void d2_client_7a9f0(uint32_t ctx, uint32_t skip, uint32_t* gl /*3b18 3b1c 3b20 
     wr32(ctx + 0xea9c, 0);
     wr32(ctx + 0x38, 0);
     uint32_t tab = rd32(ctx + 0xeaa8);
-    if (!tab) { env->fatal(0x33c); return; }
+    if (!tab) { env->fatal(0x33c); return 0; }   // retail never returns (_exit)
     for (uint32_t n = rd32(ctx + 0xeaac) * 9 & 0x3fffffff, p = tab; n; n--, p += 4) wr32(p, 0);
     int32_t ox, oy;
     env->ord10512(x, y, &ox, &oy);
@@ -58,12 +58,12 @@ void d2_client_7a9f0(uint32_t ctx, uint32_t skip, uint32_t* gl /*3b18 3b1c 3b20 
             wr32(e + 8, (uint32_t)ox + c);
             wr32(e + 0xc, (uint32_t)oy + r);
         }
-    if (!unit) { env->fatal(0x351); return; }
+    if (!unit) { env->fatal(0x351); return 0; }
     frame[5] = env->room1(unit);
     gl[0] = pos_of(unit, 0xc, env->ord10867) / 5;
     gl[2] = pos_of(unit, 0x10, env->ord10750) / 5;
     uint32_t py = pos_of(unit, 0x10, env->ord10750);
     uint32_t px = pos_of(unit, 0xc, env->ord10867);
     gl[1] = env->ord10916(env->room3(unit, px, py));
-    env->ord11152(ctx, 0x7A5D0, frame);
+    return env->ord11152(frame[5], 0x7A5D0, frame);   // retail pushes the player room (frame word 5), not ctx
 }

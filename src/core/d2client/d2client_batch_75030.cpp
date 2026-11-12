@@ -132,57 +132,7 @@ void d2_client_755d0(uint32_t head, uint32_t col_bfe0, int32_t px_b9a0, int32_t 
     ord10184(1);
 }
 
-// 1.13c D2Client+0x75690 (216 B): mode in EAX, x in ECX(this) (guesses). Mode 1 colours by param_1/param_2.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_75690(uint32_t mode_eax, int32_t this_x, int32_t param_1, int16_t param_2, int32_t panel_y_b9a4,
-                     const wch* (*ord10003)(uint32_t), int (*ord10028)(const wch*),
-                     void (*ord10150)(int, int, int), void (*ord10184)(void)) {
-    int32_t col = 0;
-    switch (mode_eax) {
-    case 0: case 2: case 3: case 4: break;
-    case 1:
-        if (param_2 == -1) return;
-        col = param_1 == 0 ? 8 : 2;
-        break;
-    default: ord10184(); return;
-    }
-    ord10003(0);
-    int32_t off = -2 - panel_y_b9a4;
-    ord10028(0);
-    ord10150(this_x + off, col, 0);
-}
-
-// 1.13c D2Client+0x75780 (300 B): ASCII name -> Unicode, truncated with "..." to width 0x88 (param_4==0) or 0x60.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_75780(const char* name, int32_t param_2, int32_t param_3, int32_t param_4, int32_t panel_y_b9a4,
-                     const Uni* U, int (*ord10028)(const wch*), void (*ord10150)(int, int, int)) {
-    wch b[196] = {0}, d[5] = {0};
-    U->toUnicode(b, name, 100);
-    int lim = param_4 ? 0x60 : 0x88;
-    if (ord10028(b) >= lim) {
-        int n = U->strlen(b);
-        while (ord10028(b) >= lim && n > 0) b[--n] = 0;  // ponytail: bound added
-        U->toUnicode(d, "...", 5);
-        U->strcat(b, d);
-    }
-    ord10150((param_2 - panel_y_b9a4) - 2, param_3, 0);
-}
-
-// 1.13c D2Client+0x758C0 (236 B): x in EAX (guess). Builds three strings + "%2u" of param_1, draws at y=param_2.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_758c0(int32_t x_eax, uint32_t param_1, int32_t param_2, int32_t panel_y_b9a4, const Uni* U,
-                     const wch* (*ord10003)(uint32_t), int (*wsprintfA)(char*, const char*, ...),
-                     void (*ord10150)(int, int, int)) {
-    wch b[200] = {0}, d[10] = {0};
-    char a[100];
-    U->strncpy(b, ord10003(0), 0x14);
-    U->strcat(b, ord10003(0));
-    U->strcat(b, ord10003(0));
-    wsprintfA(a, "%2u", param_1);
-    U->win2Unicode(d, a, 9);
-    U->strcat(b, d);
-    ord10150(x_eax - panel_y_b9a4, param_2, 0);
-}
+// D2Client 75690, 75780 and 758C0 moved to d2client_75690.cpp, d2client_75780.cpp and d2client_758c0.cpp (register inputs and returns from the disassembly).
 
 // 1.13c D2Client+0x75D30 (790 B): hover tooltips for the party panel: the local party badge (box
 // panel_x+0xe3..+0x118, y 0x18..0x23 minus panel_y) and each list entry button (+4/+8/+0x14/+0x18, next at +0xcd).
@@ -222,24 +172,4 @@ void d2_client_75d30(uint32_t btn_bfd8, uint32_t pl_bc14, int32_t mx_b828, int32
     }
 }
 
-// 1.13c D2Client+0x760F0 (207 B): ECX = unit id (guess). If the local unit exists and 0x9D850 returns a name,
-// draw it (width-limited by unicodenwidth: >=11 wide -> Ordinal_10184 first) at y=0x1f-panel_y.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_760f0(uint32_t unit_ecx, uint32_t local_bbfc, int32_t panel_y_b9a4, const Uni* U,
-                     const char* (*sub_9d850)(uint32_t), uint32_t (*unicodenwidth)(const char*, int),
-                     const wch* (*ord10042)(int, int), void (*ord10043)(int, int), int (*ord10028)(const wch*),
-                     void (*ord10150)(int, int, int), void (*ord10184)(void)) {
-    if (!local_bbfc) return;
-    const char* s = sub_9d850(unit_ecx);
-    if (!s) return;
-    int len = 0;
-    while (s[len]) len++;
-    uint32_t w = unicodenwidth(s, len);
-    if (w + 1 > 0xb) ord10184();
-    U->toUnicode((wch*)ord10042(0x211, 0), s, (int)w + 1);
-    int y = 0x1f - panel_y_b9a4;
-    ord10028(0);
-    ord10150(y, 0, 0);
-    ord10184();
-    ord10043(0x21a, 0);
-}
+// D2Client 760F0 moved to d2client_760f0.cpp.

@@ -67,16 +67,17 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_825b0(const D2cEnv82* e, uint8_t*
     e->ord(10138, v, 0, 0, 0);
 }
 
-// 1.13c D2Client+0x82610   (ESI = unit, EDI = flag)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82610(const D2cEnv82* e, uint8_t* esi, int32_t edi) {
+// 1.13c D2Client+0x82610   (ESI = unit, EDI = item, stack word a1 handed on in EAX; ret 4)
+// Every retail word is passed as retail pushes it; the file argument is the image address of the Item.cpp path (rva 0xD4964).
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82610(const D2cEnv82* e, uint8_t* esi, int32_t edi, uint32_t a1) {
     if (!esi || !edi) return;
     uint32_t h = rd<uint32_t>(esi, 0x60);
     if (!h) return;
-    e->ord(10694, h, 0, 0, 0);
-    if (rd<int32_t>(esi, 0) == 0) e->ord(10061, h, 0, 0, 0);
-    e->ord(10202, 0, 0, 0, 0);
-    e->ord(11127, 0, 0, 0, 0);
-    e->fn(0x69a90, P(esi), 0, 0, 0);
+    e->ord(10694, h, (uint32_t)edi, 0, 0);
+    if (rd<int32_t>(esi, 0) == 0) e->ord(10061, rd<uint32_t>(esi, 0x60), 0, 0, 0);
+    e->ord(10202, (uint32_t)edi, 0x100, 0x96, 0xB2000000u | 0xD4964u);
+    e->ord(11127, P(esi), (uint32_t)edi, 0, 0);
+    e->fn(0x69a90, a1, P(esi), 0, 0);   // EAX = a1, ECX = unit
 }
 
 // 1.13c D2Client+0x82660   (ECX = unit, EAX = x, stack: arg1 = y, arg2 = kind (bl), arg3 = owner (+0x60 = room/inv handle); ret 0xC)
@@ -128,50 +129,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82980(const D2cEnv82* e, uint16_t
     (void)p2;
 }
 
-// 1.13c D2Client+0x82A00   (EAX = pkt, param_1 = pkt2)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82a00(const D2cGlob82* g, const D2cEnv82* e, const uint8_t* eax,
-                                                    const uint8_t* p1) {
-    uint8_t* pl = g->player;
-    if (!pl) return;
-    uint8_t* u = findUnit(g, e, rd<uint32_t>(eax, 4), 4);
-    if (!u) return;
-    uint32_t h = rd<uint32_t>(pl, 0x60);
-    if (!h) { e->fatal(0x98d); return; }
-    U f = e->ord(10646, h, P(u), 0, 0);
-    if (!f) { e->fatal(0x98f); return; }
-    if (f != P(u)) { e->fatal(0x990); return; }
-    if (rd<int32_t>(pl, 0) == 0) e->ord(10061, rd<uint32_t>(pl, 0x60), 0, 0, 0);
-    if (!e->ord(10202, P(u), 0x100, 0x96, 0)) e->ord(11127, P(pl), P(u), 0, 0);
-    e->ord(10267, h, rd<uint16_t>(p1, 4), 0, 0);
-    e->fn(0x82980, 0, rd<uint8_t>(p1, 8), 0, 0);
-    e->ord(10466, h, P(u), 0, 0);
-    e->ord(11017, h, 0, 0, 0);
-    e->fn(0x162d0, 0, 0, 0, 0);
-    e->fn(0x81aa0, 0, 0, 0, 0);
-}
-
-// 1.13c D2Client+0x82B20   (param_1 = pkt, param_2 = pkt2)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82b20(const D2cGlob82* g, const D2cEnv82* e, const uint8_t* p1,
-                                                    const uint8_t* p2) {
-    uint8_t* pl = g->player;
-    if (!pl) { e->fatal(0x957); return; }
-    uint8_t* u = findUnit(g, e, rd<uint32_t>(p1, 4), 4);
-    if (!u) return;
-    uint32_t mode = rd<uint8_t>(p2, 0x10);
-    e->fn(0x82820, 0, 0, 0, 0);
-    e->ord(10012, P(u), mode, 0, 0);
-    uint32_t h = rd<uint32_t>(pl, 0x60);
-    if (!h) { e->fatal(0x963); return; }
-    e->ord(10882, P(u), rd<uint16_t>(p2, 4), 0, 0);
-    e->ord(11118, P(u), rd<uint16_t>(p2, 6), 0, 0);
-    if (e->ord(10744, P(u), 0xd, 0, 0)) e->fn(0x81ff0, 0, 0, 0, 0);
-    if (e->ord(10405, h, P(u), 2, 0)) {
-        U r = e->fn(0x1630, P(u), 0, 0, 0);
-        if (!e->ord(10655, h, P(u), r, 0)) { e->fatal(0x970); return; }
-    }
-    e->fn(0xbe2b0, 0, 0, 0, 0);
-    e->fn(0x81aa0, 0, 0, 0, 0);
-}
+// 1.13c D2Client+0x82A00 is in d2client_82a00.cpp; 1.13c D2Client+0x82B20 is in d2client_82b20.cpp.
 
 static void unlinkUnit(const D2cGlob82* g, const D2cEnv82* e, uint32_t id) {
     e->fn(0xa6ef0, P(g->unitHash), id & 0x7f, id, 4);   // FUN_6fb56ef0(hash, bucket, id, type)
