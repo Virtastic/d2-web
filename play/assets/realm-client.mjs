@@ -80,6 +80,45 @@ function makeReader(transport) {
   };
 }
 
+// BNClient+0xEC50 (the network pump): once a BNCS connection is open, a 180 s timer (cmp ecx,0x2bf20) sends SID_NULL
+// (FF 00 04 00 through the same send path as any frame) when no NULL has gone out for 180 s. The base is the pump's
+// start and moves only when a NULL is sent; chat, other outbound frames and inbound traffic do not reset it, and
+// a server's 0x00 is flagged but never answered (dispatch entry 0 is a bare `mov eax,1; ret`).
+export const BNCS_NULL_MS = 180000;
+export const BNCS_NULL_FRAME = Uint8Array.of(0xff, 0x00, 0x04, 0x00);
+const bncsNullStarted = new WeakSet();
+
+/**
+ * Starts the BNCS keep-alive for one connection: one timer per transport (a second call is a no-op). Fires
+ * when 180 s have passed since the base; sends SID_NULL and re-arms. Stops when the transport closes or a send
+ * is refused. Returns a function that stops it.
+ */
+export function startBncsNull(transport, { now = () => Date.now(), setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
+  if (bncsNullStarted.has(transport)) return () => {};
+  bncsNullStarted.add(transport);
+  let base = now(), timer = null, stopped = false;
+  const stop = () => { stopped = true; if (timer !== null) clearTimer(timer); timer = null; };
+  const arm = (delay) => { timer = setTimer(fire, delay); timer?.unref?.(); };
+  const fire = () => {
+    timer = null;
+    if (stopped) return;
+    if (transport.isOpen === false) return stop();
+    const elapsed = now() - base;
+    if (elapsed < BNCS_NULL_MS) return arm(BNCS_NULL_MS - elapsed);
+    base = now();
+    if (transport.send(BNCS_NULL_FRAME.slice()) === false) return stop();
+    arm(BNCS_NULL_MS);
+  };
+  arm(BNCS_NULL_MS);
+  return stop;
+}
+
+// The BNCS reader: the keep-alive runs for the connection's life, the frame reader is the same as the realm's.
+function bncsReader(transport) {
+  startBncsNull(transport);
+  return makeReader(transport);
+}
+
 // BNClient+0xF430: once the 0x50 reply is in, a link already marked lost raises failure event 0xB (over any earlier event) and the
 // connect returns as done, so the version step is never sent.
 function linkLostAfterAuthInfo(reader) {
@@ -595,7 +634,7 @@ async function bncsPrelude(transport, protocol, reader, { product, auth, timeout
 
 /** SID_CREATEACCOUNT (0x3d): the password hash then the account name. Resolves on success. */
 export async function bncsCreateAccount(transport, protocol, { account, password, product = 'D2XP', auth = null, timeoutMs = BNCS_REPLY_MS } = {}) {
-  const reader = makeReader(transport);
+  const reader = bncsReader(transport);
   const authInfo = await bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs });
   const enc = new TextEncoder();
   const hash = bsha1(enc.encode(password.toLowerCase()).subarray(0, 255));
@@ -623,7 +662,7 @@ const joinBytes = (...parts) => { const out = new Uint8Array(parts.reduce((n, p)
  * single hash of the lowercased new password. Resolves to the reply's u32: 1 = changed, anything else is refused (D2Launch's pump tests the reply against 1).
  */
 export async function bncsChangePassword(transport, protocol, { account, password, newPassword, product = 'D2XP', auth = null, timeoutMs = BNCS_REPLY_MS } = {}) {
-  const reader = makeReader(transport);
+  const reader = bncsReader(transport);
   const authInfo = await bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs });
   const logon = Uint8Array.from(protocol.bncsLogon({ clientToken: protocol.tickCount(), serverToken: u32(authInfo.body, 4), account, password }));
   const newHash = bsha1(new TextEncoder().encode(newPassword.toLowerCase()).subarray(0, 255));
@@ -636,7 +675,7 @@ export async function bncsChangePassword(transport, protocol, { account, passwor
 /** SID_RESETPASSWORD (0x5A): { STRING account, STRING email }. Battle.net sends no reply. */
 export async function bncsResetPassword(transport, protocol, { account, email, product = 'D2XP', auth = null, timeoutMs = BNCS_REPLY_MS } = {}) {
   if (!account || !email) throw new Error('retail sends no reset request without an account and an email');
-  const reader = makeReader(transport);
+  const reader = bncsReader(transport);
   const authInfo = await bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs });
   transport.send(protocol.bncsFrame(0x5a, joinBytes(cString(account), cString(email))));
 }
@@ -644,7 +683,7 @@ export async function bncsResetPassword(transport, protocol, { account, email, p
 /** SID_CHANGEEMAIL (0x5B): { STRING account, STRING old email, STRING new email }. No reply. */
 export async function bncsChangeEmail(transport, protocol, { account, oldEmail, newEmail, product = 'D2XP', auth = null, timeoutMs = BNCS_REPLY_MS } = {}) {
   if (!account || !oldEmail || !newEmail) throw new Error('retail sends no email change without an account and both emails');
-  const reader = makeReader(transport);
+  const reader = bncsReader(transport);
   const authInfo = await bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs });
   transport.send(protocol.bncsFrame(0x5b, joinBytes(cString(account), cString(oldEmail), cString(newEmail))));
 }
@@ -655,7 +694,7 @@ export async function bncsChangeEmail(transport, protocol, { account, oldEmail, 
  * handoff (the MCP ticket) -- the read offsets the server cannot check for us.
  */
 export async function bncsLogin(transport, protocol, { account, password, realm = 'd2-web', preferredRealm = '', product = 'D2XP', auth = null, timeoutMs = BNCS_REPLY_MS } = {}) {
-  const reader = makeReader(transport);
+  const reader = bncsReader(transport);
   const sent = [], received = [];
   const send = (id, body) => { const frame = protocol.bncsFrame(id, body); sent.push({ id, bytes: frame.length }); transport.send(frame); };
 

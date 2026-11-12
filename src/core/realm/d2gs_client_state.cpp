@@ -352,6 +352,9 @@ struct D2RealmClientMonster {
     D2UnitStrc* motionUnit = nullptr;
     int32_t lastPlanResult = 0;
     int32_t lastTickResult = 0;
+    // Retail's monster-data word +0x28 bit 0: an NPC the hero has clicked holds still (set by
+    // D2Client+0x1AB20, cleared by +0x47B20, read by +0x4DC70 and its tail).
+    bool npcHeld = false;
 };
 
 namespace {
@@ -1483,6 +1486,23 @@ static int pkt_monster_mode(D2RealmClientMonster& monster, uint32_t code, uint32
     return 1;
 }
 
+// 1.13c D2Client+0x4DC30: a monster in a mode under 0x10 other than death (0) and dead (0x0C) is
+// put on its sub-tile's centre and stands (mode 1). The placement is the one the Move arm's
+// refusal already takes.
+static void monster_stop_4dc30(D2UnitStrc* unit) {
+    const uint32_t mode = unit->dwAnimMode;
+    if (mode == 0 || mode >= 0x10 || mode == MONMODE_DEAD) return;
+    if (unit->pDynamicPath) PATH_RecacheRoomIfNeeded(unit->pDynamicPath);
+    d2_realm_client_motion_set_mode(unit, MONMODE_NEUTRAL);
+}
+
+// D2Common #10159 (1.13c +0x34CB0): the path's moving flag 0x20 and its point count are cleared.
+static void path_drop_points_10159(D2DynamicPathStrc* path) {
+    if (!path) return;
+    path->dwFlags &= ~0x20u;
+    path->dwPathPoints = 0;
+}
+
 static int pkt_monster_action_case(D2RealmClientMonster& monster, uint32_t code, const uint32_t* l) {
     D2UnitStrc* const unit = monster.motionUnit;
     using d2::realm::MonsterAction;
@@ -1490,6 +1510,8 @@ static int pkt_monster_action_case(D2RealmClientMonster& monster, uint32_t code,
     case MonsterAction::Move: {
         int x = 0, y = 0;
         if (!unit->pDynamicPath || !pkt_target(l, &x, &y)) return 0;
+        // +0x4DC70 cases 0/1/0x17/0x18: a held NPC (+0x1E40 with mask 1) takes +0x4DC30, never a walk.
+        if (monster.npcHeld) { monster_stop_4dc30(unit); return 0; }
         // The move packet's path type is the path the server walks; the client paths with it too.
         const int32_t pathType = static_cast<int32_t>(l[3]);
         if (pathType > 0 && pathType < PATHTYPE_COUNT && pathType != PATHTYPE_KNOCKBACK_CLIENT)
@@ -1600,6 +1622,11 @@ static int pkt_monster_action(D2RealmClientMonster& monster, uint32_t code, cons
                 STATLIST_GetUnitBaseStat(unit, STAT_VELOCITYPERCENT, 0) + velocity - current, 0);
             UNITS_UpdateAnimRateAndVelocity(unit, __FILE__, __LINE__);
         }
+    }
+    // +0x4DC70's tail: a held NPC that is not standing stands (+0x4DC30), and its path drops its points.
+    if (unit && monster.npcHeld) {
+        if (unit->dwAnimMode != MONMODE_NEUTRAL) monster_stop_4dc30(unit);
+        path_drop_points_10159(unit->pDynamicPath);
     }
     return result;
 }
@@ -2599,10 +2626,11 @@ static bool advance_client_player_action(D2UnitStrc* unit) {
     }
     // A sequence is never restarted here: its count running out is its end.
     if (!unit->dwFrameCountPrecise && unit->dwAnimMode != PLRMODE_SEQUENCE) UNITS_SetAnimStartFrame(unit);
-    // The end test comes before the advance (1.13c D2Client+0x1C150): the frame that reaches the end
-    // of the cycle is shown for its tick, and the unit leaves the mode on the next one.
+    // 1.13c D2Client+0x1C150: the frame step runs when the cycle has not ended (ordinal 10426 false, then
+    // 10853), and the end test (10426 again, the end kind 2 and 3 of the mode table) runs after it, so the
+    // tick whose step reaches the end of the cycle also leaves the mode.
     if (!UNITS_IsAtEndOfFrameCycle(unit)) UNITS_StopSequence(unit);
-    else {
+    if (UNITS_IsAtEndOfFrameCycle(unit)) {
         UNITS_SetUsedSkill(unit, nullptr);
         PATH_ResetToPreviousType(unit->pDynamicPath);
         unit->dwFlags = (unit->dwFlags & ~0x40u) | 2u;
@@ -4338,6 +4366,33 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_local_click_player(uint32_t guid, int r
     fn.cc70 = distance; fn.cf0a = collide; fn.s9f30 = gate; fn.s750 = use; fn.s7c0 = walk; fn.s2d50 = arm;
     d2client_1ab20::sub_1AB20(UNIT_PLAYER, reinterpret_cast<const uint8_t*>(frame), static_cast<int32_t>(guid), gl, fn);
     return g_started;
+}
+
+// A click on a monster, its NPC part (+0x1AB20 type 1, before the reach test): a monster whose MonStats
+// flags carry both npc and interact drops its path points (#10159), is announced to the server
+// (0x59 type, id, x, y, by +0x148A0), is held (monster data +0x28 |= 1) and stands (+0x2A6C0, mode 1).
+// 1 held, 0 not an NPC, -1 no such client monster. The use or walk that follows is the caller's.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_local_npc_hold(uint32_t guid) {
+    auto it = std::find_if(g_monsters.begin(), g_monsters.end(), [guid](const auto& m) { return m.view.guid == guid; });
+    if (it == g_monsters.end() || !it->motionUnit) return -1;
+    const D2MonStatsTxt* stats = DATATBLS_GetMonStatsTxtRecord(static_cast<int>(it->view.classId));
+    if (!stats || !(stats->dwMonStatsFlags & MONSTATSFLAG_NPC) || !(stats->dwMonStatsFlags & MONSTATSFLAG_INTERACT)) return 0;
+    D2UnitStrc* unit = it->motionUnit;
+    path_drop_points_10159(unit->pDynamicPath);
+    it->npcHeld = true;
+    client_set_mode(unit, MONMODE_NEUTRAL);
+    refresh_monster_motion_view(*it);
+    return 1;
+}
+
+// The NPC's release when its dialog closes (+0x47B20, the unit part): the hold is cleared and the NPC stands.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_local_npc_release(uint32_t guid) {
+    auto it = std::find_if(g_monsters.begin(), g_monsters.end(), [guid](const auto& m) { return m.view.guid == guid; });
+    if (it == g_monsters.end() || !it->motionUnit) return -1;
+    it->npcHeld = false;
+    client_set_mode(it->motionUnit, MONMODE_NEUTRAL);
+    refresh_monster_motion_view(*it);
+    return 1;
 }
 
 // The 0x5a line. The composer (0x7dfb0, with 0x7cfc0 for the party kinds) is run as retail runs it: every string

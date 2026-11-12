@@ -49,6 +49,8 @@ D2UnitStrc* decode_item(uint32_t guid, const uint8_t* bytes, int length) {
     auto* item = UNITS_AllocUnit(nullptr, UNIT_ITEM);
     if (!item) return nullptr;
     item->dwUnitId = guid;
+    // The decoder posts the item's magic properties (e.g. +skills) into this list.
+    STATLIST_AllocStatListEx(item, 0, nullptr, nullptr);
 
     ITEMS_AllocItemData(nullptr, item);
     if (!item->pItemData) {
@@ -278,6 +280,7 @@ void write_view(D2UnitStrc* item, uint32_t* out) {
 }
 
 extern "C" {
+
 
 void d2_realm_client_owned_item_destroy(D2UnitStrc* item) {
     destroy_item(item);
