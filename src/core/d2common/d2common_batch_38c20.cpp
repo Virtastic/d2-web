@@ -115,40 +115,42 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_22A70_ItemsTxtBit3(uint32_t pUnit)
 // 1.13c D2Common+0x35B00 (#10604, name in function list is wrong): two dwords derived from the unit's path velocity
 // when the unit is in moving mode and its path has points. out1 = (vx - vy) >> 1 and
 // out2 = (vy + vx) >> 2 after both velocities are shifted right by 11. Everything else writes 0/0.
+// Returns what retail leaves in EAX: pOutB when the unit is null or not moving, else pOutA.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void UNITS_GetVelocityIsoPair(uint32_t pUnit, int32_t* pOutA, int32_t* pOutB)
+EMSCRIPTEN_KEEPALIVE uint32_t UNITS_GetVelocityIsoPair(uint32_t pUnit, int32_t* pOutA, int32_t* pOutB)
 {
 	D2UnitStrc* unit = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit));
 	if (!unit || !UNITS_IsInMovingMode(unit))
 	{
 		*pOutA = 0;
 		*pOutB = 0;
-		return;
+		return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pOutB));
 	}
 	D2DynamicPathStrc* pPath = unit->pDynamicPath;
 	if (!pPath || pPath->dwPathPoints == 0)
 	{
 		*pOutA = 0;
 		*pOutB = 0;
-		return;
+		return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pOutA));
 	}
 	const int32_t nVX = pPath->tVelocityVector.nX >> 11;
 	const int32_t nVY = pPath->tVelocityVector.nY >> 11;
 	*pOutA = (nVX - nVY) >> 1;
 	*pOutB = (nVY + nVX) >> 2;
+	return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pOutA));
 }
 
 // 1.13c D2Common+0x4F390 (#10586): reseed a unit from the skill node whose skills.txt id matches
 // nSkillId and whose owner GUID is -1 (native skill). With nMode 0 the seed value is the path's
 // target Y * 3 plus target X; otherwise it is (unit type << 16) + unit id. The node's nPar1/nPar2
 // (at +0x18/+0x1C) are kept in step and the unit's seed becomes (value, 0x29A). A missing node is
-// fatal 0xA53 in retail; we return.
+// fatal 0xA53 in retail; we return. Returns the new low seed word, which retail leaves in EAX.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void UNITS_ReseedFromNativeSkill_4F390(uint32_t pUnit, int32_t nMode, int16_t nSkillId)
+EMSCRIPTEN_KEEPALIVE uint32_t UNITS_ReseedFromNativeSkill_4F390(uint32_t pUnit, int32_t nMode, int16_t nSkillId)
 {
 	D2UnitStrc* unit = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit));
 	if (!unit)
-		return;
+		return 0;
 
 	D2SkillStrc* pFound = nullptr;
 	if (unit->pSkills)
@@ -164,13 +166,13 @@ EMSCRIPTEN_KEEPALIVE void UNITS_ReseedFromNativeSkill_4F390(uint32_t pUnit, int3
 		}
 	}
 	if (!pFound)
-		return;
+		return 0;
 
 	int32_t nValue;
 	if (nMode == 0)
 	{
 		if (!unit->pDynamicPath)
-			return;
+			return 0;
 		nValue = unit->pDynamicPath->tTargetCoord.Y * 3 + unit->pDynamicPath->tTargetCoord.X;
 	}
 	else
@@ -187,12 +189,13 @@ EMSCRIPTEN_KEEPALIVE void UNITS_ReseedFromNativeSkill_4F390(uint32_t pUnit, int3
 		nPar1 = nValue;
 		unit->pSeed.nLowSeed = static_cast<uint32_t>(nOld + 7);
 		unit->pSeed.nHighSeed = 0x29A;
-		return;
+		return unit->pSeed.nLowSeed;
 	}
 	nPar2 = nValue;
 	nPar1 = nValue;
 	unit->pSeed.nLowSeed = static_cast<uint32_t>(nValue);
 	unit->pSeed.nHighSeed = 0x29A;
+	return unit->pSeed.nLowSeed;
 }
 
 // Retail .data tables read by 0x2CA10, indexed by quality class (0..3). Each base value is added to

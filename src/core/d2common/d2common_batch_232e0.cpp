@@ -429,17 +429,18 @@ struct D2Common81F20Env
 
 // 1.13c D2Common+0x81F20
 extern "C"
-EMSCRIPTEN_KEEPALIVE void GetGlobalEquipmentSlotLayout(int32_t nRow, int32_t nSub,
+EMSCRIPTEN_KEEPALIVE uint32_t GetGlobalEquipmentSlotLayout(int32_t nRow, int32_t nSub,
 	uint32_t* pOut, int32_t nIndex, const D2Common81F20Env* pEnv)
 {
 	if (!pEnv || !pEnv->pLayouts || !pOut)
-		return;
+		return 0;
 	const uint32_t nRecord = static_cast<uint32_t>(nSub) * 0x10 + static_cast<uint32_t>(nRow);
 	if (static_cast<uint32_t>(pEnv->nRecords) < nRecord)
-		return;
+		return 0;
 	const uint8_t* p = pEnv->pLayouts + nRecord * 0xF0 + (nIndex * 5 + 10) * 4;
 	for (int32_t i = 0; i < 5; ++i)
 		pOut[i] = W(const_cast<uint8_t*>(p), i * 4);
+	return pOut[4];   // retail leaves the fifth word (the last one copied) in EAX
 }
 
 // 1.13c D2Common+0x386E0 (#10702): collect up to nMax stats of itemstatcost id nStatId from the

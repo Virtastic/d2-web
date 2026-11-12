@@ -1732,27 +1732,44 @@ void __stdcall D2COMMON_10212_PATH_SetMoveFlags(D2UnitStrc* pUnit, BOOL bSet)
 //D2Common.0x6FDAA600 (#10213)
 //TODO: Find a name
 // 1.13c D2Common+0x36650
-void __stdcall D2Common_10213(D2UnitStrc* pUnit)
+// 1.13c: the counter at path+0x38 is compared signed; the return is the word retail leaves in EAX
+// (the async bit, the ex-flag bit, the path pointer, or the last callee's result). A null unit
+// leaves the caller's EAX: returned as nEntryEax.
+int32_t __stdcall D2Common_10213(D2UnitStrc* pUnit, int32_t nEntryEax)
 {
-	if (pUnit && !(pUnit->dwFlags & UNITFLAG_ISASYNC) && (pUnit->dwFlagEx & UNITFLAGEX_UNK_PATH_RELATED))
+	if (!pUnit)
 	{
-		D2DynamicPathStrc* pDynamicPath = pUnit->pDynamicPath;
-		D2_ASSERT(pDynamicPath);
-
-		++pDynamicPath->unk0x38;
-
-		if (pDynamicPath->unk0x38 > 1)
-		{
-			pDynamicPath->unk0x38 = 0;
-			if (!D2Common_10227(pUnit))
-			{
-				if (D2Common_10236(pUnit, pDynamicPath->pTargetUnit != nullptr))
-				{
-					UNITS_ChangeAnimMode(pUnit, 2);
-				}
-			}
-		}
+		return nEntryEax;
 	}
+	if (pUnit->dwFlags & UNITFLAG_ISASYNC)
+	{
+		return 1;
+	}
+	if (!(pUnit->dwFlagEx & UNITFLAGEX_UNK_PATH_RELATED))
+	{
+		return 0;
+	}
+	D2DynamicPathStrc* pDynamicPath = pUnit->pDynamicPath;
+	D2_ASSERT(pDynamicPath);
+
+	++pDynamicPath->unk0x38;
+
+	if (static_cast<int32_t>(pDynamicPath->unk0x38) <= 1)
+	{
+		return static_cast<int32_t>(reinterpret_cast<uintptr_t>(pDynamicPath));
+	}
+	pDynamicPath->unk0x38 = 0;
+	int32_t nResult = D2Common_10227(pUnit);
+	if (nResult)
+	{
+		return nResult;
+	}
+	nResult = D2Common_10236(pUnit, pDynamicPath->pTargetUnit != nullptr);
+	if (!nResult)
+	{
+		return 0;
+	}
+	return UNITS_ChangeAnimMode(pUnit, 2);
 }
 
 //D2Common.0x6FDAA6A0 (#10220)

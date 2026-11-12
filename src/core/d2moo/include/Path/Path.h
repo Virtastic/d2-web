@@ -429,7 +429,7 @@ D2COMMON_DLL_DECL void __stdcall PATH_SetUnitCollisionPattern(D2UnitStrc* pUnit,
 //D2Common.0x6FDAA5A0 (#10212)
 D2COMMON_DLL_DECL void __stdcall D2COMMON_10212_PATH_SetMoveFlags(D2UnitStrc* pUnit, BOOL bSet);
 //D2Common.0x6FDAA600 (#10213)
-D2COMMON_DLL_DECL void __stdcall D2Common_10213(D2UnitStrc* pUnit);
+D2COMMON_DLL_DECL int32_t __stdcall D2Common_10213(D2UnitStrc* pUnit, int32_t nEntryEax = 0);
 //D2Common.0x6FDAA6A0 (#10220)
 D2COMMON_DLL_DECL int __stdcall PATH_ComputeSquaredDistance(int nX1, int nY1, int nX2, int nY2);
 //D2Common.0x6FDAA6D0 (#10221)

@@ -3,8 +3,9 @@
 // (| 0x30000000 instead when the tile word of grid ctx[4] has (w & 0x1E0FF00) == 0x1E00000 or its sign bit set), then floods from the cell
 // with 0x817A0(ctx, x, y, -1).
 #include <cstdint>
-extern "C" void d2c_817a0_port(uint32_t ctx, int32_t x, int32_t y, int32_t dir);
-extern "C" void d2c_81bc0_port(uint32_t ctx)
+extern "C" uint32_t d2c_817a0_port(uint32_t ctx, int32_t x, int32_t y, int32_t dir);
+// Returns the room height (+0x40): retail keeps it in EAX for the outer loop test and leaves it there.
+extern "C" uint32_t d2c_81bc0_port(uint32_t ctx)
 {
 	auto W = [](uint32_t a, int o) -> uint32_t& { return *reinterpret_cast<uint32_t*>(uintptr_t(a) + o); };
 	auto cell = [&](uint32_t grid, int32_t x, int32_t y) -> uint32_t {
@@ -22,4 +23,5 @@ extern "C" void d2c_81bc0_port(uint32_t ctx)
 			if ((t & 0x1e0ff00) == 0x1e00000 || int32_t(t) < 0) W(ctx, 0x1c) = m | 0x30000000;
 			d2c_817a0_port(ctx, x, y, -1);
 		}
+	return uint32_t(h);
 }

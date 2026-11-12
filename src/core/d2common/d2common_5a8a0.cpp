@@ -36,7 +36,8 @@ inline int32_t Scale(int32_t v, const uint8_t* row, const uint8_t* base, int32_t
 }
 }
 
-extern "C" void D2Common_5A8A0_MonAnimSpeeds(int32_t nCount, const D2Common5A8A0Env* e) {   // 1.13c D2Common+0x5A8A0
+// Returns nCount: retail reloads the count argument into EAX for the loop test and leaves it there.
+extern "C" int32_t D2Common_5A8A0_MonAnimSpeeds(int32_t nCount, const D2Common5A8A0Env* e) {   // 1.13c D2Common+0x5A8A0
 	for (int32_t i = 0; i < nCount; ++i) {
 		uint8_t* row = e->rows + i * 0x1A8;
 		int32_t b = S16(row, 0x02);
@@ -45,6 +46,7 @@ extern "C" void D2Common_5A8A0_MonAnimSpeeds(int32_t nCount, const D2Common5A8A0
 		const int32_t r = i < 410 ? S16(e->rows + b * 0x1A8, 0x36) / 2 : Speed(e, b, 0x0F);
 		W16(row, 0x38, Scale(r, row, e->rows + b * 0x1A8, 0x34, b != i));
 	}
+	return nCount;
 }
 
 // Play path: the 1.10f animdata lookup builds and finds the same key (unit type monster, no unit, no inventory).

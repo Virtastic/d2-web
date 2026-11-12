@@ -85,17 +85,23 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_22B20_ItemDword(uint32_t nIndex) {   // 1
 // hi = mid on a smaller key, lo = mid + 1 on a larger one) and call cb(ECX = unit, EDX = the entry's word +2 or id >> 16, stack
 // entry dword +4 or 0, stack ctx; callee pops 8). Runs only if unit != 0 and (ctx != 0 or cb == 0).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2common_38850_port(uint32_t pUnit, uint32_t pContext, void (*pCallback)(uint32_t unit, uint32_t edx, uint32_t value, uint32_t ctx)) {   // 1.13c D2Common+0x38850
+// Returns what retail leaves in EAX: the unit on the early exits and a null list, the list's +0x10 flags word when the walk
+// does not run, else the sign-extended count reloaded after the last callback.
+EMSCRIPTEN_KEEPALIVE uint32_t d2common_38850_port(uint32_t pUnit, uint32_t pContext, void (*pCallback)(uint32_t unit, uint32_t edx, uint32_t value, uint32_t ctx)) {   // 1.13c D2Common+0x38850
 	if (!pUnit || (!pContext && pCallback))
-		return;
+		return pUnit;
 	const uint8_t* r = reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(pUnit) + 0x5C)));
-	if (!r || *reinterpret_cast<const int32_t*>(r + 0x10) >= 0)
-		return;
-	const int16_t n = *reinterpret_cast<const int16_t*>(r + 0x54);
+	if (!r)
+		return pUnit;
+	const int32_t nFlags = *reinterpret_cast<const int32_t*>(r + 0x10);
+	if (nFlags >= 0 || *reinterpret_cast<const int16_t*>(r + 0x54) <= 0)
+		return static_cast<uint32_t>(nFlags);
+	const volatile int16_t* pCount = reinterpret_cast<const volatile int16_t*>(r + 0x54);   // reloaded after every callback, as retail does
+	int32_t n = *pCount;
 	const uint32_t* ids = reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(r + 0x50)));
 	const uint8_t* arr = reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(r + 0x24)));
 	const int16_t cnt = *reinterpret_cast<const int16_t*>(r + 0x28);
-	for (int32_t i = 0; i < n; ++i) {
+	for (int32_t i = 0; i < n; ++i, n = *pCount) {
 		const int32_t id = static_cast<int32_t>(ids[i]);
 		int32_t lo = 0, hi = cnt, f = -1;
 		while (lo < hi) {
@@ -110,6 +116,7 @@ EMSCRIPTEN_KEEPALIVE void d2common_38850_port(uint32_t pUnit, uint32_t pContext,
 		else
 			pCallback(pUnit, *reinterpret_cast<const uint16_t*>(arr + f * 8 + 2), *reinterpret_cast<const uint32_t*>(arr + f * 8 + 4), pContext);
 	}
+	return static_cast<uint32_t>(n);
 }
 
 // 1.13c D2Common+0x132A0 GetGlobalBeltRecord: copies the 0x108-byte record at (nRow * 7 + nIndex) of

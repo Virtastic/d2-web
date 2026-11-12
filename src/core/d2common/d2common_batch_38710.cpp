@@ -56,12 +56,14 @@ void D2Common_1DAD0_VisitPathCells(void* unit, uint32_t mask, int context,
 }
 
 // 1.13c D2Common+0x3B760
-void D2Common_3B760_RoomBounds(const void* room, int32_t out[4]) {
-    if (!room) return; // retail asserts
+// Returns the out pointer, which retail leaves in EAX.
+int32_t* D2Common_3B760_RoomBounds(const void* room, int32_t out[4]) {
+    if (!room) return nullptr; // retail asserts
     out[1] = at<int32_t>(room, 0x50);
     out[3] = at<int32_t>(room, 0x58) + out[1];
     out[0] = at<int32_t>(room, 0x4c);
     out[2] = at<int32_t>(room, 0x54) + out[0];
+    return out;
 }
 
 // 1.13c D2Common+0x2FA20

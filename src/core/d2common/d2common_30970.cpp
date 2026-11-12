@@ -39,17 +39,17 @@ static void cpZero(uint32_t a, uint32_t n)
 }
 
 // 1.13c D2Common+0x30970
-extern "C" void d2common_30970_run(uint32_t owner, const D2Common30970Env* env)
+extern "C" uint32_t d2common_30970_run(uint32_t owner, const D2Common30970Env* env)
 {
 	if (owner == 0)
 	{
 		env->fatal(0xF4F);
-		return;
+		return 0;
 	}
 	if (cpRd(owner + 0x14) != 0)
 	{
 		env->fatal(0xF51);
-		return;
+		return 0;
 	}
 	const uint32_t rec = env->alloc(cpRd(owner + 8), 0x16C, 0x94644, 0xF52, 0);
 	cpWr(owner + 0x14, rec);
@@ -84,4 +84,5 @@ extern "C" void d2common_30970_run(uint32_t owner, const D2Common30970Env* env)
 	}
 	cpWr(cpRd(owner + 0x14) + 0x2C, static_cast<uint32_t>(mask));
 	cpWr(cpRd(owner + 0x14) + 0x4C, 0);
+	return cpRd(owner + 0x14);   // retail returns the record pointer (reloaded for the +0x4C store)
 }

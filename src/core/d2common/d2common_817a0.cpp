@@ -14,30 +14,37 @@ inline uint32_t& W(uint32_t a, int o) { return *reinterpret_cast<uint32_t*>(uint
 inline int32_t I(uint32_t a, int o) { return int32_t(W(a, o)); }
 inline uint32_t& Cell(uint32_t grid, int32_t x, int32_t y) { return W(W(grid, 0), (uint32_t(I(W(grid, 4), y * 4)) + uint32_t(x)) * 4); }
 }
-extern "C" void d2c_817a0_port(uint32_t ctx, int32_t x, int32_t y, int32_t dir)
+// EAX at return, as retail leaves it: the room pointer when x/y fall outside the room's left/top/right edge, room+0x40 plus
+// room+0x38 past the bottom edge, the visited cell index when the cell is already visited; otherwise the last value the
+// mask walk loaded (the class, the visited cell base, the dir word, or the last recursive call's EAX). The cell or-in
+// (0x36C10) leaves EAX alone.
+extern "C" uint32_t d2c_817a0_port(uint32_t ctx, int32_t x, int32_t y, int32_t dir)
 {
 	for (;;) {
 		uint32_t room = W(ctx, 0);
 		int32_t ny = I(room, 0x38) + y, nx = I(room, 0x34) + x;
-		if (nx < I(room, 0x34) || ny < I(room, 0x38)) return;
-		if (I(room, 0x3c) + I(room, 0x34) < nx) return;
-		if (I(room, 0x40) + I(room, 0x38) < ny) return;
-		if (Cell(W(ctx, 4), x, y) & 0x10000000) return;
+		if (nx < I(room, 0x34) || ny < I(room, 0x38)) return room;
+		if (I(room, 0x3c) + I(room, 0x34) < nx) return room;
+		if (I(room, 0x40) + I(room, 0x38) < ny) return W(room, 0x40) + W(room, 0x38);
+		uint32_t vis = W(ctx, 4), vidx = W(W(vis, 4), y * 4) + uint32_t(x);
+		if (W(W(vis, 0), vidx * 4) & 0x10000000) return vidx;
+		uint32_t eax = 0;
 		if (Cell(W(ctx, 0x14), x, y) == 0) {
-			Cell(W(ctx, 4), x, y) |= W(ctx, 0x1c);
-			for (int32_t i = 0; i < 4; i++) d2c_817a0_port(ctx, kStep[i * 2] + x, kStep[i * 2 + 1] + y, i);
-			return;
+			Cell(vis, x, y) |= W(ctx, 0x1c);
+			for (int32_t i = 0; i < 4; i++) eax = d2c_817a0_port(ctx, kStep[i * 2] + x, kStep[i * 2 + 1] + y, i);
+			return eax;
 		}
 		uint32_t g2 = W(ctx, 8);
 		int32_t t = 0;
 		if (g2 && W(g2, 0)) t = int32_t(Cell(g2, x, y));
+		eax = uint32_t(kTab[t]);
 		uint32_t m = uint32_t(kTab[21 + dir + kTab[t] * 5]);
-		if (m & 1) Cell(W(ctx, 4), x, y) |= W(ctx, 0x1c);
-		if ((m & 2) && dir != 2) d2c_817a0_port(ctx, x + 1, y, 0);
-		if ((m & 4) && dir != 3) d2c_817a0_port(ctx, x, y + 1, 1);
-		if ((m & 8) && dir != 0) d2c_817a0_port(ctx, x - 1, y, 2);
-		if ((m & 0x10) && dir != 1) d2c_817a0_port(ctx, x, y - 1, 3);
-		if (!(m & 0x20)) return;
+		if (m & 1) { Cell(vis, x, y) |= W(ctx, 0x1c); eax = W(vis, 0); }
+		if ((m & 2) && dir != 2) eax = d2c_817a0_port(ctx, x + 1, y, 0);
+		if ((m & 4) && dir != 3) eax = d2c_817a0_port(ctx, x, y + 1, 1);
+		if (m & 8) { eax = uint32_t(dir); if (dir != 0) eax = d2c_817a0_port(ctx, x - 1, y, 2); }
+		if ((m & 0x10) && dir != 1) eax = d2c_817a0_port(ctx, x, y - 1, 3);
+		if (!(m & 0x20)) return eax;
 		y += 1; dir = -1; x += 1;
 	}
 }

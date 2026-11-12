@@ -8,7 +8,8 @@ namespace {
 inline uint32_t& W(uint32_t a, int o) { return *reinterpret_cast<uint32_t*>(uintptr_t(a) + o); }
 inline int32_t I(uint32_t a, int o) { return int32_t(W(a, o)); }
 }
-extern "C" void d2c_814c0_port(uint32_t room, uint32_t grid)
+// Returns room+0x2C (the neighbour count), which retail reloads for the loop test and leaves in EAX.
+extern "C" uint32_t d2c_814c0_port(uint32_t room, uint32_t grid)
 {
 	uint32_t rd = W(room, 0x54);
 	for (uint32_t i = 0, o = 0; i < W(rd, 0x18); i++, o += 0x30) {
@@ -34,4 +35,5 @@ extern "C" void d2c_814c0_port(uint32_t room, uint32_t grid)
 			}
 		}
 	}
+	return W(room, 0x2c);
 }

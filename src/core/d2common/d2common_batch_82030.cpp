@@ -55,17 +55,18 @@ extern "C"
 // 1.13c D2Common+0x82030 (#11012): copy the 16-byte record at (nSecond * 16 + nFirst) of the global
 // inventory-position table into pOut. The index is unsigned; each record is 0xF0 bytes. A missing base
 // is fatal 0x7F and a missing/out-of-range record fatal 0x8C in retail (Fog message, then _exit); both
-// are modelled as a plain return.
-extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_82030_GetGlobalInventoryPosition(int32_t nFirst, int32_t nSecond, uint32_t* pOut) {  // 1.13c D2Common+0x82030 (#11012)
+// are modelled as a plain return of 0. Retail leaves the record's fourth word (the last one copied) in EAX.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_82030_GetGlobalInventoryPosition(int32_t nFirst, int32_t nSecond, uint32_t* pOut) {  // 1.13c D2Common+0x82030 (#11012)
 	const uint32_t nIndex = static_cast<uint32_t>(nSecond) * 0x10u + static_cast<uint32_t>(nFirst);
 	if (g_d2common_dat_6fdefa5c == 0 || pOut == nullptr)
-		return;                                     // retail fatal 0x7F
+		return 0;                                   // retail fatal 0x7F
 	if (nIndex > g_d2common_dat_6fdefa58)
-		return;                                     // retail fatal 0x8C
+		return 0;                                   // retail fatal 0x8C
 	const uint32_t pRecord = g_d2common_dat_6fdefa5c + nIndex * 0xF0u;
 	if (pRecord == 0)
-		return;                                     // retail fatal 0x8C
+		return 0;                                   // retail fatal 0x8C
 	std::memcpy(pOut, reinterpret_cast<const void*>(static_cast<uintptr_t>(pRecord)), 4 * sizeof(uint32_t));
+	return pOut[3];
 }
 
 // 1.13c D2Common+0x4FA30 (#11021): skill-requirement test.
