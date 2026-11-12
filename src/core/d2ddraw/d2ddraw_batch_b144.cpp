@@ -323,15 +323,17 @@ EMSCRIPTEN_KEEPALIVE char* b144_FUN_6f8c9950(const uint32_t* d, char* buf, int n
 }
 
 // 1.13c D2DDraw+0x99b7: _cftog -- `%g` of the double at d into buf.
-EMSCRIPTEN_KEEPALIVE void b144_FUN_6f8c99b7(const uint32_t* d, char* buf, int nd, int caps) {
+// Both tails leave buf in EAX.
+EMSCRIPTEN_KEEPALIVE char* b144_FUN_6f8c99b7(const uint32_t* d, char* buf, int nd, int caps) {
   STRFLT f; char tmp[24];
   FUN_6f8ca001(d[0], d[1], &f, tmp);
   int e0 = f.decpt - 1;
   __fptostr(buf + (f.sign == 0x2d), nd, &f);
   int e = f.decpt - 1;
-  if (e < -4 || nd <= e) { cftoe2(&f, buf, nd, caps, 1); return; }
+  if (e < -4 || nd <= e) { cftoe2(&f, buf, nd, caps, 1); return buf; }
   char* p = buf + (f.sign == 0x2d);
   if (e0 < e) { while (*p++) {} p[-2] = 0; }
   cftof2(&f, buf, nd, 1);
+  return buf;
 }
 }  // extern "C"
