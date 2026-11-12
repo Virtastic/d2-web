@@ -44,40 +44,57 @@ static void d2c_b69_panel_body(const D2cB69Env* e) {
 
 extern "C" {
 // 1.13c D2Client+0x81120   (hidden EAX input = mode, explicit here)
-EMSCRIPTEN_KEEPALIVE void d2c_81120(const D2cB69Env* e, int32_t mode) {
+// 0x80CA0 as a callee: its EAX when the env supplies the value-returning form, else 0.
+static uint32_t d2c_b69_80ca0(const D2cB69Env* e) {
+    if (e->f80ca0_eax) return e->f80ca0_eax();
+    e->f80ca0(); return 0;
+}
+// 0x81120 with the EAX it returns: the mode when the phase is not switched or for modes 0 and 3, 0x18D0's result for
+// mode 1, 0x80CA0's EAX for mode 2 (a tail jump).
+static uint32_t d2c_b69_81120(const D2cB69Env* e, int32_t mode) {
     uint8_t* u = *e->unit;
-    if (mode < 0 || mode >= 4) { e->fatal(0x12a); return; }
+    if (mode < 0 || mode >= 4) { e->fatal(0x12a); return (uint32_t)mode; }
     if ((*e->g_bf84 == 0 || mode == 0) && (*e->g_bf80 == 0 || mode == 2)) {
         *e->g_bf88 = mode;
-        if (!u) { e->fatal(0x137); return; }
+        if (!u) { e->fatal(0x137); return (uint32_t)mode; }
         switch (mode) {
-        case 0: *e->g_c3934 = 0; break;
-        case 1: e->f814f0(); *e->g_c3914 = (uint32_t)e->f18d0((uint64_t*)(u + 0x20), 0xE0, 0x20); break;
-        case 2: e->f80ca0(); break;
-        case 3: *e->g_bf6c = 0; break;
+        case 0: *e->g_c3934 = 0; return 0;
+        case 1: e->f814f0(); *e->g_c3914 = (uint32_t)e->f18d0((uint64_t*)(u + 0x20), 0xE0, 0x20); return *e->g_c3914;
+        case 2: return d2c_b69_80ca0(e);
+        case 3: *e->g_bf6c = 0; return 3;
         }
     }
+    return (uint32_t)mode;
 }
+EMSCRIPTEN_KEEPALIVE void d2c_81120(const D2cB69Env* e, int32_t mode) { d2c_b69_81120(e, mode); }
 
-// 1.13c D2Client+0x811F0
-EMSCRIPTEN_KEEPALIVE void d2c_811f0(const D2cB69Env* e, uint64_t* seed) {
+// 1.13c D2Client+0x811F0. Returns the EAX retail leaves: the phase quotient in phases 1 and 3, else the 0x81120 result
+// when the phase rolled over, else the 0xBF80 word; 0x80CA0's EAX on the fade-out switch; the 0xBF84 word otherwise.
+EMSCRIPTEN_KEEPALIVE uint32_t d2c_811f0(const D2cB69Env* e, uint64_t* seed) {
     uint8_t* u = *e->unit;
+    uint32_t eax = (uint32_t)*e->g_bf80;
     if (*e->g_bf80 == 0 || *e->g_bf88 == 2) {
         int32_t m = *e->g_bf88;
         if (*e->g_d343c == 0) {
             m = m + 1; if (m == 4) m = 0;
             *e->g_d3438 = e->f18d0(seed, e->tblEsi[m], e->tblEdi[m]);   // m is the new phase (asm reloads ESI/EDI by ebx)
             *e->g_d343c = *e->g_d3438;
-            d2c_81120(e, m);   // original reads its mode from EAX = m
+            eax = d2c_b69_81120(e, m);   // original reads its mode from EAX = m
         }
         *e->g_d343c -= 1;
-        if (m == 1) *e->g_c3934 = (uint32_t)(((uint64_t)((int64_t)(*e->g_d3438 - *e->g_d343c) * (int64_t)*e->g_c3914) & 0xffffffffu) / (uint64_t)(int64_t)*e->g_d3438);
-        else if (m == 3) *e->g_c3934 = (*e->g_c3914 * (uint32_t)*e->g_d343c) / (uint32_t)*e->g_d3438;
+        const uint32_t total = (uint32_t)*e->g_d3438, left = (uint32_t)*e->g_d343c;
+        if (m == 1) { eax = (uint32_t)((total - left) * *e->g_c3914) / total; *e->g_c3934 = eax; }
+        else if (m == 3) { eax = (uint32_t)(*e->g_c3914 * left) / total; *e->g_c3934 = eax; }
         *e->g_c38f4 = (float)(int32_t)*e->g_c3934 * *e->g_875b0;
-    } else if (*e->g_bf84 == 0) {
-        *e->g_bf88 = 2;
-        if (u) e->f80ca0(); else e->fatal(0x137);
+        return eax;
     }
+    eax = (uint32_t)*e->g_bf84;
+    if (eax == 0) {
+        *e->g_bf88 = 2;
+        if (!u) e->fatal(0x137);
+        return d2c_b69_80ca0(e);
+    }
+    return eax;
 }
 
 // 1.13c D2Client+0x81340

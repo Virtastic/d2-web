@@ -50,7 +50,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2_client_6d6d0(uint8_t* data, int32_t 
     if (!data) return nullptr;
     const uint32_t offset = (uint32_t(data[1]) * uint32_t(row) + 9u + uint32_t(column)) *
                             uint32_t(data[0]) + uint32_t(data[1]) + 0x1cu;
-    return data + offset;
+    return (uint8_t*)(uintptr_t)(uint32_t)((uint32_t)(uintptr_t)data + offset);
 }
 // 1.13c D2Client+0x9CE00
 extern "C" EMSCRIPTEN_KEEPALIVE char16_t* d2_client_9ce00(TextNode* head, int32_t key) {

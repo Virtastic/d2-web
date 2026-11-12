@@ -74,21 +74,23 @@ void d2_client_7b730(const Msg7B730* c, uint32_t* head_c3aa4, int32_t* count_c3a
 }
 
 // 1.13c D2Client+0x7B9C0 (118 B): push a fresh node (0x7B120) on the list at [0x11C3AB0]; at >= 0x80
-// entries drop the tail first (0x7B330) and unlink it.
+// entries drop the tail first (0x7B330) and unlink it. EAX at return: the free's EAX on the drop path, else the node
+// (the walk leaves the tail's null link in EAX only until the free call overwrites it).
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_7b9c0(uint32_t* head_c3ab0, uint16_t* count_c3ab4,   // count: the WORD at 0x113AB4 (cmp/dec/inc word ptr)
-                     uint32_t (*alloc_7b120)(void), void (*free_7b330)(void)) {
-    uint32_t node = alloc_7b120();
+uint32_t d2_client_7b9c0(uint32_t* head_c3ab0, uint16_t* count_c3ab4,   // count: the WORD at 0x113AB4 (cmp/dec/inc word ptr)
+                         uint32_t (*alloc_7b120)(void), uint32_t (*free_7b330)(uint32_t tail_edi)) {
+    uint32_t node = alloc_7b120(), eax = node;
     if (*count_c3ab4 >= 0x80 && *head_c3ab0 != 0) {
         uint32_t prev = 0, cur = *head_c3ab0;
         for (uint32_t nx = W(cur, 0x22); nx; nx = W(nx, 0x22)) { prev = cur; cur = nx; }
-        free_7b330();
+        eax = free_7b330(cur);
         if (prev) W(prev, 0x22) = 0;
         if (*count_c3ab4) (*count_c3ab4)--;
     }
     W(node, 0x22) = *head_c3ab0;
     (*count_c3ab4)++;
     *head_c3ab0 = node;
+    return eax;
 }
 
 // 1.13c D2Client+0x7BAD0 (104 B): node in ECX, point {x,y} in ESI. State 0 -> 1, state 3 -> return 1;

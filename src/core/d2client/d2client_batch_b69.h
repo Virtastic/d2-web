@@ -39,9 +39,10 @@ struct D2cB69Env {
     void (*feccc0)(uint32_t eax, int32_t, const void*); const void* g_805b0; void (*f3a4d0)(uint32_t eax, int32_t ecx, int32_t edx, uint32_t esi, int32_t stk); void (*f31aa0)(void* esi);
     const int32_t *g_9e18, *g_cc3c4;
     int32_t* (*f54e20)(uint32_t id, uint32_t* tbl, int32_t n);
+    uint32_t (*f80ca0_eax)();   // optional: 0x80CA0 returning its EAX (used in place of f80ca0 when set)
 };
 
 extern "C" {
 void d2c_81120(const D2cB69Env* e, int32_t mode);
-void d2c_811f0(const D2cB69Env* e, uint64_t* seed);
+uint32_t d2c_811f0(const D2cB69Env* e, uint64_t* seed);
 }

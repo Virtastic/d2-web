@@ -27,9 +27,10 @@ struct D2ClientListEnv {
 // 1.13c D2Client+0x67BF0
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_67bf0(const uint8_t* b) {
     uint32_t n = rd<uint16_t>(b, 0x180748);
-    int32_t acc = 0, i = 0;
-    int32_t first = rd<int32_t>(b, 0x180730), rowh = rd<int32_t>(b, 0x180766), pad = rd<int32_t>(b, 0x18076a);
-    int32_t lim = rd<int32_t>(b, 0x180714) - 0x14;
+    uint32_t acc = 0; int32_t i = 0;   // retail sums with add (wrapping 32-bit), compares signed
+    int32_t first = rd<int32_t>(b, 0x180730);
+    uint32_t rowh = rd<uint32_t>(b, 0x180766), pad = rd<uint32_t>(b, 0x18076a);
+    int32_t lim = (int32_t)(rd<uint32_t>(b, 0x180714) - 0x14u);
     for (; i < (int32_t)n; i++) {
         uint32_t p = 0x808 + (uint32_t)i * 0x300e; // psVar3
         if (first <= i) {
@@ -38,7 +39,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_67bf0(const uint8_t* b) {
                 if (rd<int16_t>(b, p + sh[k] * 2)) acc += rowh;
             acc += pad;
         }
-        if (lim < acc) return (i - first < 1) ? 1 : i - first; // retail: sub eax,ebx; eax = i-first when >= 1
+        if (lim < (int32_t)acc) {   // retail: sub eax,ebx; eax = i-first when >= 1, else 1
+            const int32_t d = (int32_t)((uint32_t)i - (uint32_t)first);
+            return d < 1 ? 1 : d;
+        }
     }
     return (int32_t)n; // full walk
 }
@@ -112,18 +116,20 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_684e0(uint8_t* b, const D2Clie
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_68560(uint8_t* b, const uint8_t* msg, const D2ClientListEnv* env) {
     int32_t y0 = rd<int32_t>(b, 0x18075e), y = rd<uint16_t>(msg, 0xe);
     int32_t n = rd<uint16_t>(b, 0x180748), vis = rd<int32_t>(b, 0x18074e);
-    if (!n || vis > n || y == y0 || y < y0) return 0;
+    // retail does the y tests in wrapping 32-bit arithmetic (sub/test, lea): y - y0 <= 0, y vs y0 + 0xd + t*0xc
+    auto wrap = [](uint32_t v) { return (int32_t)v; };
+    if (!n || vis > n || wrap((uint32_t)y - (uint32_t)y0) <= 0) return 0;
     int32_t t0 = rd<int32_t>(b, 0x180752), t1 = rd<int32_t>(b, 0x180756);
     if (t0 == t1) return 0;
     int32_t sel = rd<int32_t>(b, 0x180738);
-    if (y < y0 + 0xd + t0 * 0xc) {
-        int32_t v = sel - vis;
+    if (y < wrap((uint32_t)y0 + 0xdu + (uint32_t)t0 * 0xcu)) {
+        int32_t v = wrap((uint32_t)sel - (uint32_t)vis);
         sel = v < 1 ? 0 : v;
     } else {
-        if (y <= y0 + 0xd + t1 * 0xc) return 0;
-        sel += vis;
+        if (y <= wrap((uint32_t)y0 + 0xdu + (uint32_t)t1 * 0xcu)) return 0;
+        sel = wrap((uint32_t)sel + (uint32_t)vis);
         if (n <= sel) sel = n - 1;
-        if (n - sel < vis) sel = n < vis ? 0 : n - vis;
+        if (wrap((uint32_t)n - (uint32_t)sel) < vis) sel = n < vis ? 0 : wrap((uint32_t)n - (uint32_t)vis);
     }
     if (sel > 0x7f) { sel = n - 1; if (sel < 0) sel = 0; }
     wr<int32_t>(b, 0x180738, sel);
@@ -141,7 +147,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_68670(uint8_t* b, const uint8_
     if (rd<int32_t>(b, 0x180720) == 1) {
         wr<int32_t>(b, 0x180720, 0);
         int32_t x0 = rd<int32_t>(b, 0x18075a), y0 = rd<int32_t>(b, 0x18075e);
-        if (x0 < mx && mx < x0 + 0x10 && y0 - 0xc < my && my < y0) env->vcall_1c(b, msg);
+        // retail: add ecx,0x10 / lea ecx,[eax-0xc] wrap in 32 bits before the signed compares
+        if (x0 < mx && mx < (int32_t)((uint32_t)x0 + 0x10u) && (int32_t)((uint32_t)y0 - 0xcu) < my && my < y0) env->vcall_1c(b, msg);
     } else if (rd<int32_t>(b, 0x180724) == 1) {
         wr<int32_t>(b, 0x180724, 0);
         if (env->hit_673a0(b, msg) == 1) { env->vcall_20(b, msg); wr<int32_t>(b, 0x180734, -1); return 0; }
