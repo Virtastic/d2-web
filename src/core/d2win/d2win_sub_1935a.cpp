@@ -5,7 +5,9 @@
 #include <cstring>
 #include <emscripten.h>
 
-extern "C" void d2win_sub_19872(void* ld12, int32_t* consumed, const uint8_t* s, int, int, int, int);
+// The declaration matches the definition in d2win_sub_19872.cpp exactly: a mismatched one links to a trapping stub.
+extern "C" uint32_t d2win_sub_19872(uint8_t* out12, const uint8_t** endp, const uint8_t* s,
+                                    int32_t p4, int32_t p5, int32_t p6, int32_t allowExp);
 
 namespace {
 // round-to-nearest-even narrowing of the 80-bit value (plus the guard word) to IEEE single
@@ -35,8 +37,8 @@ uint32_t ld12tof(const uint8_t* ld) {
 
 extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_1935a(void* out, const uint8_t* str) {
     uint8_t ld12[12];
-    int32_t consumed;
-    d2win_sub_19872(ld12, &consumed, str, 0, 0, 0, 0);
+    const uint8_t* end;
+    d2win_sub_19872(ld12, &end, str, 0, 0, 0, 0);
     uint32_t f = ld12tof(ld12);
     memcpy(out, &f, 4);
 }

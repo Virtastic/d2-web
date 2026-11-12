@@ -20,7 +20,7 @@ extern "C" void d2cmp_cfc0(uint8_t* flags, int arg, uint8_t* spr, uint8_t* (*all
     for (uint32_t i = 0; i < n; i++) {
         uint8_t* f = p + (uintptr_t)base;
         if (*(uint32_t*)f != 0 || *(uint32_t*)(f + 4) > 0x100 || *(uint32_t*)(f + 8) > 0x100) fatal(0x5ae);
-        *(uint32_t**)(f + 0x18) = rec;
+        *(uint32_t*)(f + 0x18) = (uint32_t)(uintptr_t)rec;  // a 32-bit field: +0x1c is the frame's length
         p += 0x23 + *(uint32_t*)(f + 0x1c) + *(uint32_t*)(f + 0x14);
         rec += 11;
     }

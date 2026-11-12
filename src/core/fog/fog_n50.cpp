@@ -287,16 +287,39 @@ uint32_t fog_huff_build_1efd0(FogHuff* H, const uint8_t* L)
 }
 
 // 1.13c Fog+0x1C830
-struct FogCpuInfo { uint32_t family; const char* vendor; const char* versionStr;
-                    uint32_t eax, brand, mhz; };
-void fog_cpu_banner_1c830(const FogCpuInfo* c, void (*log)(void*, const char* fmt, const void* a, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t), void* u)
+// CPU banner. The family word is Fog+0x32F30 (3 = 386, 4 = 486, else the cpuid path); the callees are seams:
+// vendor id 0x1C5B0 (indexes the vendor-name table Fog+0x2F354), cpuid eax 0x1C020, brand byte 0x1C6E0,
+// the version-string writer 0x1C060 (EAX model, EDX brand; buffer, vendor id, family on the stack), MHz 0x1C740,
+// and the log 0x19100 (cdecl varargs: format, then the words retail pushes). Returns EAX as retail leaves it,
+// the last log call's result.
+struct FogCpuBannerHost {
+    void* u;
+    const uint16_t* family;
+    uint32_t (*vendor)(void*);
+    uint32_t (*cpuid)(void*);
+    uint32_t (*brand)(void*);
+    void (*version)(void*, uint32_t model, uint32_t brand, char* out, uint32_t vendor, uint32_t family);
+    uint32_t (*mhz)(void*);
+    uint32_t (*log)(void*, const char* fmt, int n, const uintptr_t* words);
+};
+static const char* const kFogCpuVendor[4] = { "Unknown", "Intel", "AMD", "Cyrix" };   // Fog+0x2F354
+uint32_t fog_cpu_banner_1c830(const FogCpuBannerHost* h)
 {
-    if (c->family == 3) { log(u, "Intel 386", nullptr, 0, 0, 0, 0, 0); return; }
-    if (c->family == 4) { log(u, "Intel 486", nullptr, 0, 0, 0, 0, 0); return; }
-    log(u, "Vendor:  %s", c->vendor, 0, 0, 0, 0, 0);
-    log(u, "Version: %s (Type %X, Family %X, Model %X, Stepping %X, Brand %X)", c->versionStr,
-        (c->eax >> 12) & 3, (c->eax >> 8) & 0xf, (c->eax >> 4) & 0xf, c->eax & 0xf, c->brand);
-    log(u, "Speed: Approx. %d MHz", nullptr, c->mhz, 0, 0, 0, 0);
+    const uint16_t fam = *h->family;
+    if (fam == 3) return h->log(h->u, "Intel 386", 0, nullptr);
+    if (fam == 4) return h->log(h->u, "Intel 486", 0, nullptr);
+    char buf[0x100];
+    const uint32_t vendor = h->vendor(h->u);
+    const uint32_t eax = h->cpuid(h->u);
+    const uint32_t type = (eax >> 12) & 3, family = (eax >> 8) & 0xf, model = (eax >> 4) & 0xf;
+    const uint32_t brand = h->brand(h->u) & 0xff;
+    h->version(h->u, model, brand, buf, vendor, family);
+    const uintptr_t v1[1] = { (uintptr_t)kFogCpuVendor[vendor & 3] };
+    h->log(h->u, "Vendor:  %s", 1, v1);
+    const uintptr_t v2[6] = { (uintptr_t)buf, type, family, model, eax & 0xf, brand };
+    h->log(h->u, "Version: %s (Type %X, Family %X, Model %X, Stepping %X, Brand %X)", 6, v2);
+    const uintptr_t v3[1] = { h->mhz(h->u) };
+    return h->log(h->u, "Speed: Approx. %d MHz", 1, v3);
 }
 
 // 1.13c Fog+0x3279  (CRT __crtLCMapStringA; OS and codepage conversion are seams)

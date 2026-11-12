@@ -303,6 +303,9 @@ __attribute__((weak)) uint16_t* ustrcat(uint16_t* d, const uint16_t* s) { return
 __attribute__((weak)) uint16_t* ustrncat(uint16_t* d, const uint16_t* s, int32_t n) { return (uint16_t*)Unicode::strncat((Unicode*)d, (const Unicode*)s, n); }
 __attribute__((weak)) void utoUnicode(uint16_t* d, const char* s, int32_t n) { Unicode::toUnicode((Unicode*)d, s, n); }
 __attribute__((weak)) void uwin2Unicode(uint16_t* d, const char* s, int32_t n) { Unicode::win2Unicode((Unicode*)d, s, n); }
+// The D2Win text-trim port (d2win_batch_b72.cpp) imports the two conversions under these names; left undefined they trapped.
+__attribute__((weak)) int32_t d2win_unicode2Win(char* d, const uint16_t* s, int32_t n) { Unicode::unicode2Win(d, (const Unicode*)s, n); return 0; }
+__attribute__((weak)) void d2win_win2Unicode(uint16_t* d, const char* s, int32_t n) { Unicode::win2Unicode((Unicode*)d, s, n); }
 }
 // D2Lang 0x8520 (1.13c) (ESI=wide str, stack=narrow set; caller Personalize): true when the wide string's last unit
 // equals any of the first 19 narrow chars. Custom register convention: NAMED, no vector.

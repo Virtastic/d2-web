@@ -130,8 +130,8 @@ struct FogCpEnv {
     const uint8_t* cpTable;   // 6ff7e9b0 : [0..15]=bit flags@+0 (4 bytes), table rows of 0x30 at +0x8, id at +0x8 (6ff7e9b8)
 };
 
-// 1.13c Fog+0x9286
-extern "C" void fog_sub_9286(const FogCpEnv* e, FogCpState* s) {
+// 1.13c Fog+0x9286. EAX on return is the 0x100 the last table loop left in its counter (both branches).
+extern "C" uint32_t fog_sub_9286(const FogCpEnv* e, FogCpState* s) {
     FogCpInfo ci;
     uint32_t i;
     if (e->getCPInfo(s->cp, &ci) == 1) {
@@ -155,6 +155,7 @@ extern "C" void fog_sub_9286(const FogCpEnv* e, FogCpState* s) {
             else s->casemap[i] = 0;
         }
     }
+    return i;
 }
 
 // 1.13c Fog+0x9421  (_setmbcp)

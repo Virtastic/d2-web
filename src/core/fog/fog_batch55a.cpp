@@ -9,7 +9,7 @@ struct fog_batch55a_Env {
     void (*leaveCs)(void* cs);
     uint32_t (*ord15)(uint16_t v);                 // Fog ordinal 15
     int (*sub_1E880)(uint32_t a, uint32_t b);      // unused (1E910 moved to fog_1e910.cpp)
-    void (*sha1Transform)(uint32_t* state);        // Fog+0x13520, buffer at state+5 words (ctx+0x1c)
+    void (*sha1Transform)(uint32_t* state, const uint8_t* block);   // Fog+0x13520: state on the stack, the 64-byte block in EAX
     const uint8_t* sha1Pad;                        // 64-byte padding table at Fog+0x7FFA0
     const int32_t* bitIndexTable;                  // 256 entries at Fog+0x77B50
 };
@@ -48,11 +48,11 @@ void fog_sub_139E0(uint8_t* ctx, const uint8_t* data, uint32_t len) {
         data -= idx;
         if (len < 0x40) { for (; idx < len; idx++) ctx[idx + 0x1c] = data[idx]; return; }
         for (; idx < 0x40; idx++) ctx[idx + 0x1c] = data[idx];
-        g_fog_batch55a_env.sha1Transform(st);
+        g_fog_batch55a_env.sha1Transform(st, ctx + 0x1c);   // the completed buffer
         data += 0x40; len -= 0x40; idx = 0;
     }
     while (len >= 0x40) {
-        g_fog_batch55a_env.sha1Transform(st);
+        g_fog_batch55a_env.sha1Transform(st, data);         // whole blocks straight from the caller's data
         data += 0x40; len -= 0x40;
     }
     for (; idx < len; idx++) ctx[idx + 0x1c] = data[idx];

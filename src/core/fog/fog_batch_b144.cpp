@@ -3,6 +3,7 @@
 // Module-internal callees and Win32 calls that the shim lacks are seams on FogB144Api. Retail
 // 32-bit addresses stay uint32_t. Register-passed arguments (ESI/EDI/EBX/AX in the decompile) are
 // recovered as explicit parameters; each is noted where it is a guess.
+#include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -46,6 +47,10 @@ HANDLE g_sw_wake, g_sw_done, g_sw_self, g_sw_victim;  // 0x6FFA6E5C, E60, E58, E
 }
 using namespace fogb144pub;
 
+// kernel32 CloseHandle. It is weak in the compat Windows.h; unlinked (no OS handle lives in wasm) it is null, and closing is then
+// what retail's call does to a handle it refuses: nothing.
+static void fogb144_close(HANDLE h) { if (&CloseHandle) CloseHandle(h); }
+
 static void fogb144_die(const FogB144Api* a, int line) {
     const uint32_t ip = a->capture_ip();
     a->ordinal116();
@@ -87,9 +92,9 @@ uint32_t fog_sub_15d50(const FogStackWalkApi* api) {
     DWORD w = g_w32->wait(g_sw_wake, 0xffffffff);
     for (;;) {
         if (w != 0) {
-            if (g_sw_wake) { CloseHandle(g_sw_wake); g_sw_wake = nullptr; }
-            if (g_sw_done) { CloseHandle(g_sw_done); g_sw_done = nullptr; }
-            if (g_sw_self) { CloseHandle(g_sw_self); g_sw_self = nullptr; }
+            if (g_sw_wake) { fogb144_close(g_sw_wake); g_sw_wake = nullptr; }
+            if (g_sw_done) { fogb144_close(g_sw_done); g_sw_done = nullptr; }
+            if (g_sw_self) { fogb144_close(g_sw_self); g_sw_self = nullptr; }
             return 0;
         }
         if (g_sw_victim == g_sw_self) break;
@@ -103,7 +108,7 @@ uint32_t fog_sub_15d50(const FogStackWalkApi* api) {
                 api->walk();
             g_w32->resume(g_sw_victim);
         }
-        CloseHandle(g_sw_victim);
+        fogb144_close(g_sw_victim);
         g_sw_victim = nullptr;
         g_w32->set_event(g_sw_done);
         w = g_w32->wait(g_sw_wake, 0xffffffff);
@@ -191,6 +196,13 @@ static void fogb144_computer(char* out64) {
     if (g_w32->computer_name(out64, &n) == 0) out64[0] = '\0';
 }
 static const char kRule[] = "---------------------------------------------------------------\n";
+// Retail's banner writes are three fprintf calls (Fog+0x26DB) each; the seam is that call (null: the CRT's vfprintf).
+namespace fogb144pub { int (*g_vfprintf)(FILE*, const char*, va_list); }
+static void fogb144_fprintf(FILE* f, const char* fmt, ...) {
+    va_list ap; va_start(ap, fmt);
+    if (g_vfprintf) g_vfprintf(f, fmt, ap); else vfprintf(f, fmt, ap);
+    va_end(ap);
+}
 
 // 1.13c Fog+0x182b0   (file arrives in ESI)
 // Realm-startup banner: rule, "<computer> Realm startup at Y-M-D h:m:s.ms" from the startup time
@@ -199,11 +211,11 @@ extern "C"
 void fog_sub_182b0(FILE* f) {
     char name[64];
     fogb144_computer(name);
-    fputs(kRule, f);
-    fprintf(f, "%s Realm startup at %04d-%02d-%02d %02d:%02d:%02d.%03u\n", name, g_startup.wYear,
-            g_startup.wMonth, g_startup.wDay, g_startup.wHour, g_startup.wMinute,
-            g_startup.wSecond, g_startup.wMilliseconds);
-    fputs(kRule, f);
+    fogb144_fprintf(f, kRule);
+    fogb144_fprintf(f, "%s Realm startup at %04d-%02d-%02d %02d:%02d:%02d.%03u\n", name, g_startup.wYear,
+                    g_startup.wMonth, g_startup.wDay, g_startup.wHour, g_startup.wMinute,
+                    g_startup.wSecond, g_startup.wMilliseconds);
+    fogb144_fprintf(f, kRule);
 }
 
 // 1.13c Fog+0x18340   (SYSTEMTIME in ESI, file in EDI)
@@ -212,9 +224,9 @@ extern "C"
 void fog_sub_18340(FILE* f, const uint16_t* st) {
     char name[64];
     fogb144_computer(name);
-    fputs(kRule, f);
-    fprintf(f, "%s %04d-%02d-%02d\n", name, st[0], st[1], st[3]);
-    fputs(kRule, f);
+    fogb144_fprintf(f, kRule);
+    fogb144_fprintf(f, "%s %04d-%02d-%02d\n", name, st[0], st[1], st[3]);
+    fogb144_fprintf(f, kRule);
 }
 
 // --- Fog+0x183A0 ------------------------------------------------------------------------------
@@ -289,7 +301,7 @@ extern "C"
 void fog_sub_18bb0(const FogMgrApi* api) {
     g_stop = 1;
     g_w32->wait(g_thread, 30000);
-    CloseHandle(g_thread);
+    fogb144_close(g_thread);
     EnterCriticalSection(&g_cs_a6e8c);
     while ((int32_t)g_list_head > 0) {
         const uint32_t n = g_list_head;

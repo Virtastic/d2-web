@@ -11,7 +11,7 @@ void FUN_6ff5fc20(void);
 void Ordinal_116(void);
 void FUN_6ff60f30(int, const char*, int, const char*);
 void FUN_6ff684a0(void);
-void FUN_6ff6ad20(const char*);
+void FUN_6ff6ad20(const char*, ...);
 void* FUN_6ff520d7(void*, size_t);
 void EnterCriticalSection(void*);
 void LeaveCriticalSection(void*);

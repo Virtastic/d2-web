@@ -36,7 +36,7 @@ W uint32_t* FUN_6ff5e4e0(uint8_t*, uint32_t) { return nullptr; }  // roster look
 W int Ordinal_3(int) { return 0; }  // Storm ordinal stand-in (link fix)
 W void Ordinal_111(void) {}
 W int Ordinal_19(int) { return 0; }
-W void FUN_6ff6ad20(const char*) {}
+W void FUN_6ff6ad20(const char*, ...) {}
 W void* FUN_6ff6cd10(int, const char*, int) { return nullptr; }
 W int FUN_6ff5ceb0(uint32_t) { return 0; }
 W void FUN_6ff5d230(void) {}

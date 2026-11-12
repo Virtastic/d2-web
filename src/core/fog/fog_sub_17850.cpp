@@ -12,7 +12,7 @@ constexpr uint32_t kFog17390 = 0x6ff67390u;
 // 1.13c Fog+0x17850
 extern "C" int fog_sub_17850(uint8_t* ctx, uint16_t port, const FogSockApi* w) {
     *(uint32_t*)(ctx + 0x884) = 1;
-    int s = w->socket_(2, 1, 6);  // 2,1,6 per stack setup (AF_INET, stream, tcp)
+    int s = w->socket_(2, 1, 0);  // AF_INET, SOCK_STREAM, protocol 0
     if (s == -1) return 0;
     *(int*)(ctx + 0xb90) = s;
     uint32_t one = 1;

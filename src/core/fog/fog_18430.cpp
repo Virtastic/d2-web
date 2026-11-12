@@ -8,16 +8,16 @@ struct Fog18430Api {
     uint32_t (*prog_dir)(char* buf, uint32_t cap);                          // Fog+0x143D0
     void (*pack)(char* dst, const char* src, uint32_t cap);                 // Storm ordinal 503
     void (*make_dirs)(char* path);                                          // Fog+0x17C40
-    void (*format)(char* dst, uint32_t cap, const char* fmt, const char* a, const char* b);  // Storm ordinal 578
+    uint32_t (*format)(char* dst, uint32_t cap, const char* fmt, const char* a, const char* b);  // Storm ordinal 578 (SStrPrintf)
 };
 
-// 1.13c Fog+0x18430 (stdcall, one argument)
-extern "C" void fog_log_name_18430(const Fog18430Api* api, char* logName /* DAT_6ff7f368, 0x104 bytes */, const char* name) {
+// 1.13c Fog+0x18430 (stdcall, one argument). EAX on return is SStrPrintf's count (the call is the last thing retail does).
+extern "C" uint32_t fog_log_name_18430(const Fog18430Api* api, char* logName /* DAT_6ff7f368, 0x104 bytes */, const char* name) {
     char dir[0x104];
     dir[0] = '\0';
     if (api->prog_dir(dir, 0x104) != 0) {
         api->pack(dir, "\\", 0x104);
         api->make_dirs(dir);
     }
-    api->format(logName, 0x104, "%s%s", dir, name);
+    return api->format(logName, 0x104, "%s%s", dir, name);
 }

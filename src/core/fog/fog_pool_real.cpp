@@ -27,6 +27,13 @@ EMSCRIPTEN_KEEPALIVE void FUN_6ff690a0(const char* ch, const char* fmt, ...) {
     va_end(ap);
 }
 
+// The ten log calls of 0x1AD20 go through this seam (null: the 0x190A0 logger). `arg` is the third word when the call has one.
+void (*fog_1ad20_log)(const char* ch, const char* fmt, const char* arg, int words) = nullptr;
+static void fog_1ad20_emit(const char* fmt, const char* arg, int words) {
+    if (fog_1ad20_log) { fog_1ad20_log(DAT_6ff768ec, fmt, arg, words); return; }
+    if (words == 3) FUN_6ff690a0(DAT_6ff768ec, fmt, arg); else FUN_6ff690a0(DAT_6ff768ec, fmt);
+}
+
 // 1.13c Fog+0x1AD20: out-of-memory report; vsprintf(fmt, ...) then the memory-status dump.
 EMSCRIPTEN_KEEPALIVE void FUN_6ff6ad20(const char* fmt, ...) {
     char msg[4092], num[32];
@@ -35,15 +42,15 @@ EMSCRIPTEN_KEEPALIVE void FUN_6ff6ad20(const char* fmt, ...) {
     va_end(ap);
     // host has no GlobalMemoryStatus: the six figures read 0 (diagnostic text only)
     struct { uint32_t dwTotalPhys, dwAvailPhys, dwTotalPageFile, dwAvailPageFile, dwTotalVirtual, dwAvailVirtual; } ms{};
-    FUN_6ff690a0(DAT_6ff768ec, "--------------------------------------------------------");
-    FUN_6ff690a0(DAT_6ff768ec, "ERROR: Out of memory!");
-    FUN_6ff690a0(DAT_6ff768ec, "%s", msg);
+    fog_1ad20_emit("--------------------------------------------------------", nullptr, 2);
+    fog_1ad20_emit("ERROR: Out of memory!", nullptr, 2);
+    fog_1ad20_emit("%s", msg, 3);
     const struct { const char* f; uint32_t v; } t[] = {
         {"total physical:     %s", (uint32_t)ms.dwTotalPhys}, {"available physical: %s", (uint32_t)ms.dwAvailPhys},
         {"total page:         %s", (uint32_t)ms.dwTotalPageFile}, {"available page:     %s", (uint32_t)ms.dwAvailPageFile},
         {"total virtual:      %s", (uint32_t)ms.dwTotalVirtual}, {"available virtual:  %s", (uint32_t)ms.dwAvailVirtual}};
-    for (auto& e : t) FUN_6ff690a0(DAT_6ff768ec, e.f, fog_sub_1f640(num, 0x20, e.v, 0));
-    FUN_6ff690a0(DAT_6ff768ec, "");
+    for (auto& e : t) fog_1ad20_emit(e.f, fog_sub_1f640(num, 0x20, e.v, 0), 3);
+    fog_1ad20_emit(DAT_6ff768ec, nullptr, 2);   // retail hands the empty string at 0x6FF768EC as the format too
 }
 
 // 1.13c Fog+0x1B190 (EAX=size, EBX=manager): malloc(size+4), chain into hash bucket p%0x3ff at mgr+0x7ac

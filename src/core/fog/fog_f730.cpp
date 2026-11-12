@@ -4,7 +4,8 @@
 // +0x14 (line 0x9F, gl0 dwords), +0x1C (0xA2, gl0 * 0x18 bytes, one critical section per 0x18), [9] = gl0, +0x20 (0xA9, gl0 dwords), +0x44 = gl2,
 // +0x40 (0xAF, gl2 dwords), [0x22C] = gl3, [0x22B] (0xB4, gl3 dwords), the fixed fields, the queue arrays [0x21C] / [0x21D] (lines 0xDA / 0xDE, nq dwords
 // zeroed), [0x21F] = nq. The platform probe (GetVersionExA, platform 2 and p4 == 0 sets [0] = 1) is pinned to a non-NT platform: [0] = 0. [0x21B] = mode;
-// a mode other than 1 / 2 runs the winsock start 0xCDA0(0x101, &data); success runs 0x17850(mode) (the [0] != 0 branch is unreachable here).
+// a mode other than 1 / 2 runs the winsock start 0xCDA0(0x101, &data); success runs 0x17850(p3) with EDI = the server (retail pushes the third
+// argument, [esp+0x3CC] at the call; the decompile's 17850(mode) is wrong) (the [0] != 0 branch is unreachable here).
 // InitializeCriticalSection writes nothing the vector can see and has no seam.
 #include <cstring>
 #include "fog_env.h"
@@ -15,7 +16,7 @@ static uint32_t f730_alloc(const FogEnv* e, uint32_t size, uint32_t line) {
 }
 extern "C" uint32_t fog_f730(const FogEnv* e, const uint32_t* gl, uint32_t mode, uint32_t nq, uint32_t p3, uint32_t p4, uint32_t p5, uint32_t p6,
                              uint32_t p7, uint32_t p8) {
-    (void)p3; (void)p4;
+    (void)p4;
     uint32_t s = f730_alloc(e, 0xc4c, 0x94);
     if (!s) return 0;
     auto W = [&](uint32_t i, uint32_t v) { fe_w32(s + i * 4, v); };
@@ -58,6 +59,6 @@ extern "C" uint32_t fog_f730(const FogEnv* e, const uint32_t* gl, uint32_t mode,
     W(0x21f, nq); W(0x21e, 0); W(0x223, 0);
     W(0, 0);
     W(0x21b, mode);
-    if (mode != 1 && mode != 2 && fe_call(e, 0xCDA0, 0, 0, 0, 0, 0, 0x101, 0xB3000000) == 0) fe_call(e, 0x17850, 0, 0, 0, 0, 0, mode);
+    if (mode != 1 && mode != 2 && fe_call(e, 0xCDA0, 0, 0, 0, 0, 0, 0x101, 0xB3000000) == 0) fe_call(e, 0x17850, 0, 0, 0, 0, 0, p3);
     return s;
 }

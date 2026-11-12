@@ -116,26 +116,28 @@ void fog_sub_1FA60(const FogDataArrayApi* api, void* block) {
 // A handle that was never initialised is an unrecoverable internal error at DataArrays.cpp:0x68
 // (capture IP, stack dump, fatal, abort, _exit(-1)); a live one resets index to -1, clears the
 // counter at +0x114 and the word at +0x10C, sets +0x118 = 0x8000, and zeroes the first word of
-// every count entries at stride.
+// every count entries at stride. EAX is the loop index on return: the count, or 0 when count <= 0.
 extern "C"
-void fog_sub_1FCD0(const FogDataArrayApi* api, FogDataArray* array) {
+uint32_t fog_sub_1FCD0(const FogDataArrayApi* api, FogDataArray* array) {
     if (array->init == 0) fog_dataarray_fatal(api, 0x68);
     array->index10 = 0xFFFFFFFFu;
     array->at114 = 0;
     array->at10c = 0;
     array->at118 = 0x8000;
-    for (int32_t i = 0; i < array->count; ++i) {
+    int32_t i = 0;
+    for (; i < array->count; ++i) {
         *reinterpret_cast<uint16_t*>(reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(array->data)) +
                                      static_cast<size_t>(array->stride) * static_cast<size_t>(i)) = 0;
     }
+    return static_cast<uint32_t>(i);
 }
 
 // 1.13c Fog+0x1FD70 (ordinal 10062)
 // Mark the handle initialised (+0x108 = 1) and tail-jump into the reset (+0x1FCD0).
 extern "C"
-void fog_sub_1FD70(const FogDataArrayApi* api, FogDataArray* array) {
+uint32_t fog_sub_1FD70(const FogDataArrayApi* api, FogDataArray* array) {
     array->init = 1;
-    fog_sub_1FCD0(api, array);
+    return fog_sub_1FCD0(api, array);
 }
 
 // 1.13c Fog+0x1FD80 (ordinal 10066)

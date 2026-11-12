@@ -18,7 +18,7 @@ int Ordinal_3(int);
 int Ordinal_19(int);
 void FUN_6ff60f30(int, const char*, int, const char*);
 void FUN_6ff684a0(void);
-void FUN_6ff6ad20(const char*);
+void FUN_6ff6ad20(const char*, ...);
 void* FUN_6ff520d7(void*, size_t);
 void* FUN_6ff6cd10(int, const char*, int);
 int FUN_6ff5ceb0(uint32_t);

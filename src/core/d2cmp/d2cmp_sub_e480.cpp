@@ -19,7 +19,7 @@ extern "C" void d2cmp_sub_e480(const int8_t* src, uint8_t* dst, const uint8_t* t
             int n = (int8_t)b;
             int s = clipL - x; if (s < 0) s = 0;
             int e = clipR - x; if (n < e) e = n;
-            for (int i = s; i < e; i++) dst[i] = tbl[src[i] + dst[i] * 256];
+            for (int i = s; i < e; i++) dst[i] = tbl[(uint8_t)src[i] + dst[i] * 256];   // the pixel byte is unsigned (movzx)
             x += n; src += n; dst += n;
         }
         dst = rowStart + stride;
