@@ -13,7 +13,8 @@ extern "C" uint32_t d2g_ecc90(uint32_t unit, uint32_t s0, uint32_t hp, uint32_t 
 
     // gold (stat 0xe) and stash gold (stat 0xf): out of [0, limit] -> 0
     int32_t v = (int32_t)e->call(0xA42A, 0, 0, 0, 0, 0, unit, 0xe, 0);
-    int32_t lim = (int32_t)e->call(0xA45A, 0, 0, 0, 0, 0, unit);   // retail reads the limit even for a negative amount
+    // the limit is only read when the amount is non-negative (retail's `-1 < v` guard short-circuits it)
+    int32_t lim = v >= 0 ? (int32_t)e->call(0xA45A, 0, 0, 0, 0, 0, unit) : 0;
     if (v < 0 || v > lim) {
         if (unit) {
             if (d2rd32(unit) == 0) e->call(0xA45A, 0, 0, 0, 0, 0, unit);   // the clamp path asks for the limit a second time (player units)
@@ -21,7 +22,7 @@ extern "C" uint32_t d2g_ecc90(uint32_t unit, uint32_t s0, uint32_t hp, uint32_t 
         }
     }
     v = (int32_t)e->call(0xA42A, 0, 0, 0, 0, 0, unit, 0xf, 0);
-    lim = (int32_t)e->call(0xA4A8, 0, 0, 0, 0, 0, unit);
+    lim = v >= 0 ? (int32_t)e->call(0xA4A8, 0, 0, 0, 0, 0, unit) : 0;
     if (v < 0 || v > lim) {
         if (unit) {
             if (d2rd32(unit) == 0) e->call(0xA4A8, 0, 0, 0, 0, 0, unit);
