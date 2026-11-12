@@ -1570,8 +1570,10 @@ static int pkt_monster_action_case(D2RealmClientMonster& monster, uint32_t code,
                 return 1;
             }
         }
-        // The stop keeps the client's own fixed-point position (the retail trace shows the path dwords
-        // unchanged through the stop); a unit that stopped at path end already sits on 0x8000.
+        // A stop within a tile of the client's position puts the unit on its sub-tile's centre (the
+        // D2Client+0x4DC30 tail) when it is in a live mode other than 0 and 0xC.
+        if (unit->pDynamicPath && unit->dwAnimMode > 0 && unit->dwAnimMode < 0x10 && unit->dwAnimMode != 0xC)
+            PATH_RecacheRoomIfNeeded(unit->pDynamicPath);
         if (unit->dwAnimMode != MONMODE_DEAD && unit->dwAnimMode != MONMODE_DEATH) {
             d2_realm_client_unit_set_mode(unit, MONMODE_NEUTRAL);
         }
