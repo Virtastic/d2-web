@@ -13,6 +13,7 @@
 #include "DataTbls/ItemsTbls.h"
 #include "Units/Item.h"
 #include "Units/Units.h"
+#include "Path/Path.h"
 
 static_assert(offsetof(D2ItemsTxt, dwBitField1) == 0xDC, "items.txt bitfield 1");
 static_assert(offsetof(D2ItemsTxt, nInvWidth) == 0x10F, "items.txt inventory width");
@@ -52,23 +53,24 @@ EMSCRIPTEN_KEEPALIVE void ITEMS_GetRealmData(uint32_t pUnit, uint32_t* pOut1C, u
 	*pOut20 = 0;
 }
 
-// 1.13c D2Common+0x2FED0 (#10574, D2SetEnabledStat): fills the block pointed to by unit+0x2C.
-// +0x00 = nValue, +0x0C = nCenter, +0x04 = (nCenter - nHalf) * 0x10, +0x1C = 0 (byte), +0x10 =
-// nHalf, +0x08 = (nCenter + nHalf) * 8. A null unit is fatal 0x866 in retail; we return.
+// 1.13c D2Common+0x2FED0 (#10574, D2SetEnabledStat): sets the unit's static path (unit+0x2C) to a
+// room and a game position: +0x00 room, +0x0C/+0x10 game X/Y, +0x04 client X = (X - Y) * 0x10,
+// +0x08 client Y = (X + Y) * 8, +0x1C direction byte = 0. Written by field: the wasm64 path holds an
+// 8-byte room pointer, so the retail dword offsets do not address it. A null unit is fatal 0x866 in
+// retail; we return.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void D2SetEnabledStat(uint32_t pUnit, uint32_t nValue, int32_t nCenter,
-                                                int32_t nHalf)
+EMSCRIPTEN_KEEPALIVE void D2SetEnabledStat(D2UnitStrc* unit, D2ActiveRoomStrc* pRoom, int32_t nX,
+                                                int32_t nY)
 {
-	D2UnitStrc* unit = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit));
 	if (!unit)
 		return;
-	uint8_t* block = reinterpret_cast<uint8_t*>(unit->pDynamicPath);
-	W(block, 0x00) = nValue;
-	W(block, 0x0C) = static_cast<uint32_t>(nCenter);
-	W(block, 0x04) = static_cast<uint32_t>((nCenter - nHalf) * 0x10);
-	*(block + 0x1C) = 0;
-	W(block, 0x10) = static_cast<uint32_t>(nHalf);
-	W(block, 0x08) = static_cast<uint32_t>((nCenter + nHalf) * 8);
+	D2StaticPathStrc* path = unit->pStaticPath;
+	path->pRoom = pRoom;
+	path->tGameCoords.nX = nX;
+	path->dwClientCoordX = (nX - nY) * 0x10;
+	path->nDirection = 0;
+	path->tGameCoords.nY = nY;
+	path->dwClientCoordY = (nX + nY) * 8;
 }
 
 // 1.13c D2Common+0x39050 (#10578): the unit's total stat 11 (max stamina, layer 0, packed
