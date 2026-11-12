@@ -44,6 +44,7 @@ namespace { uint32_t roll_room(const D2ActiveRoomStrc* r) {
     return uint32_t(s);
 } }
 uint32_t roll(const D2ActiveRoomStrc* r) { flush(); return roll_room(r); }
+bool known(const D2ActiveRoomStrc* r) { return r && g_room.count(r); }
 namespace {
 uint32_t next(Seed& s) { const uint64_t v = uint64_t(s.lo) * 0x6ac690c5ull + s.hi; s = { uint32_t(v), uint32_t(v >> 32) }; return uint32_t(v); }
 }

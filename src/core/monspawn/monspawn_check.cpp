@@ -238,6 +238,7 @@ static uint32_t g_sessionClientMapEventsDropped = 0;
 // borrow g_targetPlayer->pSeed, which belongs to the D2Game/server unit.
 void d2client_sound_stage_feed(uint32_t soundEnv); void d2client_sound_stage_log();   // sound_pump.cpp (replay-armed)
 #include "../d2client/sound_unit_refs.h"
+namespace d2client_critter { void room_seen(D2ActiveRoomStrc* room, int32_t levelId, uint32_t frame); void tick(D2UnitStrc* player, uint32_t frame); void reset(); }
 namespace d2client_ambient { void reset(); void tick(uint32_t* seed, uint32_t period, bool weatherLevel); uint32_t* fallbackSeed(uint32_t (*playerInit)()); }
 extern "C" void d2_client_monster_idle_reset();   // 1.13c D2Client+0x237E0 monster branch state (unit_sound_trigger_237e0.cpp)
 extern "C" void d2_client_attack_roll_reset();   // 1.13c D2Client+0x242B0 attack-roll state (monster_face.cpp)
@@ -8026,6 +8027,7 @@ static void sessionClientRoomPass() {
                 if (nr && nr->pLevel && nr->fRoomStatus == ROOMSTATUS_UNTILE && !activeLevels.count(nr->pLevel) && !nr->pRoom && !g_sessionClientRoomsSeen.count(nr)) { warpRoom = nr; break; }
             }
         if (!g_sessionClientRoomsSeen.insert(dr).second) continue;
+        d2client_critter::room_seen(room, dr->pLevel->nLevelId, g_sessionClientFrame);   // 1.13c D2Client+0x18370
         if (dr->pLevel->nLevelId == 8) sessionClientRoomSpots(dr, room);
     }
     if (warpRoom && g_sessionClientFrame >= 7 && g_sessionClientFrame % 7 == 0) {
@@ -8046,7 +8048,7 @@ void d2client_session_footstep_reset(); int32_t d2client_session_level_material(
 void d2client_session_player_footstep(uint32_t serverMode, uint32_t cls, int32_t inTown, int32_t floor, uint32_t now, void (*rate)(uint32_t, uint32_t*, uint32_t*));
 void d2client_session_monster_footstep(uint32_t id, int32_t cls, uint32_t serverMode, uint32_t step, uint32_t total, int32_t floor, uint32_t now);
 extern "C" int32_t d2_session_floor_class(int32_t unitType, int32_t unitId, int32_t fallback);
-static void sessionClientMonsterModeReset() { g_sessionClientMonsterMode.clear(); g_sessionIdleRows.clear(); g_sessionIdleRowsReady.clear(); d2client_session_unit_sound_reset(); d2client_session_footstep_reset(); }
+static void sessionClientMonsterModeReset() { g_sessionClientMonsterMode.clear(); g_sessionIdleRows.clear(); g_sessionIdleRowsReady.clear(); d2client_session_unit_sound_reset(); d2client_session_footstep_reset(); d2client_critter::reset(); }
 // The client player unit's rate in `mode` (D2Common 0x33110 on the hero's own records): the velocity percent is the hero's less
 // the run bonus the server unit carries while it runs, plus the bonus the client unit posts itself when it enters run
 // (0x32E10: 100 * RunSpeed / WalkSpeed - 100). The hero's path, anim fields and record are put back untouched.
@@ -8554,6 +8556,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         { extern void d2_client_monster_order_roll(); d2_client_monster_order_roll(); }
         ++g_sessionClientFrame;
         sessionClientRoomPass();
+        d2client_critter::tick(g_targetPlayer, g_sessionClientFrame);
         if (g_currentLevel >= 0) {
             // 1.13c D2Client+0x81340: the weather pass draws from the client hero seed. A session that never mirrored the client map has no
             // client unit: its seed is the one retail's first 0x4F860 call reads (a retail recording capture; the derivation is not recovered).
