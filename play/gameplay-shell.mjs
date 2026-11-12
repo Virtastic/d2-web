@@ -3216,7 +3216,10 @@ function update(forceTick = false, live = false) {
     for (const command of commands) {
       if (command.type === COMMAND.PRIMARY && command.secondary && command.x != null) {
         castHand = 'right';
-        realmInput().rightClick(command.x, command.y, { held: Boolean(command.held), stand: heldStandStillKeys.size > 0 });
+        const hit = realmInput().rightClick(command.x, command.y, { held: Boolean(command.held), stand: heldStandStillKeys.size > 0 });
+        // What the right click sent: the right hand's skill and the unit it was used on (0 for the ground).
+        if (hit) lastSkillCommand = { skill: Math.max(0, readSelectedSkills().right), targetId: hit.kind === 'monster' || hit.kind === 'npc' ? hit.unit.guid : 0,
+          result: 1, held: Boolean(command.held), serial: ++lastSkillCommandSerial };
       } else if (command.type === COMMAND.MOVE && !command.directional && command === pointerMoves.at(-1)) {
         lastMoveCommand = { type: command.type, x: command.x, y: command.y, directional: false, held: !!command.held };   // the pointer command this packet answers
         const hit = realmInput().leftClick(command.x, command.y, { held: Boolean(command.held), stand: heldStandStillKeys.size > 0 });
