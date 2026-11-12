@@ -57,7 +57,7 @@ import { createItemPropertyCache, itemPropsCacheable } from './assets/item-prope
 import { parseItemLines } from './assets/item-tooltip.mjs';
 import { createNpcNameLabelCache } from './assets/npc-name-label-cache.mjs';
 import { savedCharacterReadError, setFrontdoorError } from './assets/frontdoor-error.mjs';
-import { createQuestLogRenderer, createMessageLogRenderer, QUESTS_IN_ACT, ACT_BASE, ACT_DONE, questStatus, messageScrollMax, COMPLETING } from './assets/quest-log.mjs';
+import { createQuestLogRenderer, createMessageLogRenderer, QUESTS_IN_ACT, ACT_BASE, ACT_DONE, questStatus, questWord, messageScrollMax, COMPLETING } from './assets/quest-log.mjs';
 import { createPartyPanelRenderer, partyRows, ownState, clickResult as partyClickResult } from './assets/party-panel.mjs';
 import { createBubbleRenderer } from './assets/game-bubbles.mjs';
 import { createQuestCloseGesture } from './assets/quest-close-gesture.mjs';
@@ -590,7 +590,7 @@ const toggleQuest = () => { questVisible = !questVisible; if (questVisible) { ch
   // quest_log.go playQuestAnimations, which runs for the quests in QuestStatusCompleting.
   questAnim.clear(); const words = readQuestWords();
   for (let a = 1; a <= 5; a++) for (let q = 1; q <= QUESTS_IN_ACT[a - 1]; q++) { const key = `${a}q${q}`;
-    if ((words[ACT_BASE[a - 1] + q] & COMPLETING) && !questPlayed.has(key)) { questAnim.add(key); questPlayed.add(key); } } } };
+    if ((words[questWord(a, q)] & COMPLETING) && !questPlayed.has(key)) { questAnim.add(key); questPlayed.add(key); } } } };
 const toggleMessage = () => { messageVisible = !messageVisible; if (messageVisible) messageScroll = 0; };
 // The stash is open because the engine sent 0x77 UPDATEUI_OPENSTASH, and closed when retail's
 // TRADEBTN_CLOSESTASH was accepted -- never because of a click alone.
@@ -5108,7 +5108,7 @@ function drawFrame() {
   if (questLogRenderer && panelShown(questVisible) && view.live && !clearScreen) {
     const words = snapOr('questWords', readQuestWords), act = questAct || (questAct = snapshot.act || 1, questSelected = questFirst(words, questAct), questAct);
     questEvidence = questLogRenderer.draw(ctx, w, h, { act, tabs: questTabs(words, snapshot.act || 1), words, selected: questSelected, descrOn: questDescrOn,
-      pressed: questCloseGesture.pressed ? 'close' : null,
+      pressed: questCloseGesture.pressed ? 'close' : null, pressedQuest: typeof questPick.pressed === 'number' ? questPick.pressed : 0,
       anim: { quests: questAnim, tick: engineTicks - questOpenedAt },
       string: langStr }, true, snapshot.act || 1);
   }

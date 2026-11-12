@@ -28,8 +28,23 @@ export const QL = Object.freeze({ left: 80, top: 61, tabX: 85, tabPitch: 62, tab
 // treats a finished act as all its quests completed (every icon 24).
 export const ACT_BASE = [0, 8, 16, 24, 34];
 export const ACT_DONE = [7, 7, 7, 4, 0];   // the act's COMPLETED word offset from its base; 0 = Act V has none
+// The board shows icon a<act>q<q> in slot q; retail's quest table pairs each icon with a quest word.
+// Every act pairs icon q with word base+q except Act IV, whose Hellforge word (27) sits behind icon
+// a4q2 in the middle slot and the Diablo word (26) behind a4q3 on the right.
+export const questWord = (act, q) => ACT_BASE[act - 1] + (act === 4 && q > 1 ? 5 - q : q);
+// Each icon's place in the 27-entry icon table (a1q1 .. a5q6); questdone.dc6 holds one frame per entry.
+export const ICON_START = [0, 6, 12, 18, 21];
+export const QUEST_DONE_ART = MENU + 'questdone.dc6';
+/** The icon cel retail draws for a quest: a held press on a done quest swaps to questdone.dc6 at the
+ * quest's icon-table frame; a held press on a quest in progress draws frame 25; locked is never latched. */
+export const questIconCel = (act, q, status, pressed, animFrame = null) => {
+  if (animFrame != null) return { path: QUEST_ART.icon(act, q), frame: animFrame };
+  if (pressed && status === 'done') return { path: QUEST_DONE_ART, frame: ICON_START[act - 1] + q - 1 };
+  if (pressed && status === 'progress') return { path: QUEST_ART.icon(act, q), frame: 25 };
+  return { path: QUEST_ART.icon(act, q), frame: FRAME[status] };
+};
 export const questStatus = (words, act, q) => {
-  const base = ACT_BASE[act - 1], off = ACT_DONE[act - 1], w = words[base + q] | 0;
+  const base = ACT_BASE[act - 1], off = ACT_DONE[act - 1], w = words[questWord(act, q)] | 0;
   const done = (off ? words[base + off] & 1 : 0) || (w & 0x8001);
   return done ? 'done' : w ? 'progress' : 'locked';
 };
@@ -92,8 +107,8 @@ export function createQuestLogRenderer(read, documentObject = globalThis.documen
         const status = questStatus(s.words, s.act, q), [c, r] = SLOTS[s.act - 1][q - 1], on = s.selected === q;
         // A quest the engine reports COMPLETING plays frames 0..24 (s.anim is the open's own tick and the
         // set of quests retail would animate -- s836/s2172, which set only the done bits, animate nothing).
-        const frame = s.anim && s.anim.quests.has(`${s.act}q${q}`) ? QUEST_ANIM(s.anim.tick) : FRAME[status];
-        cel(QUEST_ART.icon(s.act, q), frame, QL.iconX + c * QL.iconPitch, QL.iconY + r * QL.rowPitch);
+        const icon = questIconCel(s.act, q, status, s.pressedQuest === q, s.anim && s.anim.quests.has(`${s.act}q${q}`) ? QUEST_ANIM(s.anim.tick) : null), frame = icon.frame;
+        cel(icon.path, frame, QL.iconX + c * QL.iconPitch, QL.iconY + r * QL.rowPitch);
         cel(QUEST_ART.sockets, on ? 1 : 0, QL.iconX + c * QL.iconPitch - 4, QL.iconY + r * QL.rowPitch + 5 - (on ? 1 : 0));
         statuses.push(status); iconFrames.push(frame);
       }
