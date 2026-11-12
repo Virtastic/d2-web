@@ -443,9 +443,10 @@ static uint32_t stageTiles(const D2DrlgTileDataStrc* t, int n, uint32_t& cnt) {
     }
     return first;
 }
-EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_feed(int level, int l, int t, int r, int b, int ox, int oy, int n, uint32_t now) {
+// The feed over a level the caller already holds (the session room walk passes the live game's level).
+uint32_t d2_dg_feed_level(D2DrlgLevelStrc* lv, int l, int t, int r, int b, int ox, int oy, int n, uint32_t now) {
     d2_dg_stage_reset();
-    D2DrlgLevelStrc* lv = g_act && g_act->pDrlg ? DRLG_GetLevel(g_act->pDrlg, level) : nullptr;
+    const int32_t level = lv ? (int32_t)lv->nLevelId : -1;
     if (g_cruLive) {
         // Each unit joins the room its position resolves to (the active room under its subtile); a unit the client no
         // longer holds leaves its room.
@@ -497,6 +498,9 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_feed(int level, int l, int t, int r, int b, 
     const uint32_t cells = d2_dg_frame(l, t, r, b, ox, oy, n, 0, now);
     if (g_cruLive) for (FeedUnit& u : g_feedUnits) if (u.hasId) u.rank = d2c_cru_rank(u.slot);
     return cells;
+}
+EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_feed(int level, int l, int t, int r, int b, int ox, int oy, int n, uint32_t now) {
+    return d2_dg_feed_level(g_act && g_act->pDrlg ? DRLG_GetLevel(g_act->pDrlg, level) : nullptr, l, t, r, b, ox, oy, n, now);
 }
 EMSCRIPTEN_KEEPALIVE const D2DrlgClientTile* d2_drlg_client_tiles() { return g_clientTiles.data(); }
 EMSCRIPTEN_KEEPALIVE int d2_drlg_client_tile_count() { return (int)g_clientTiles.size(); }

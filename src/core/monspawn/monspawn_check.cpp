@@ -11939,4 +11939,29 @@ EMSCRIPTEN_KEEPALIVE void d2_session_destroy() {
     updateSessionSnapshot();
 }
 
+// The client frame's room walk (D2Client+0x8B110 tail: 7A9F0 -> 9F270 -> 9EE90) over the live level: the rooms, tiles and units
+// the session holds, the view centred on the hero (hero at screen 320,240 less the 8 px 6C490 lifts a unit), drawn into the G
+// stream. Returns the D2Gfx call lines in retail's G format ("" when no world is live).
+extern uint32_t d2_dg_feed_level(D2DrlgLevelStrc*, int, int, int, int, int, int, int, uint32_t);
+extern "C" void d2_dg_feed_unit(int, int, int, int, uint32_t, uint32_t);
+extern "C" void d2_dg_set_origin(int32_t, int32_t);
+extern "C" const char* d2_dg_walk_g();
+EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
+    if (!g_sessionLive || !g_game || !g_lastLevel || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return "";
+    auto fl = [](int32_t v) { return v >= 0 ? v / 160 : -((-v + 159) / 160); };
+    const D2DynamicPathStrc* hp = g_targetPlayer->pDynamicPath;
+    const int32_t hx = hp->tGameCoords.wPosX, hy = hp->tGameCoords.wPosY;
+    const int32_t vx = (hx - hy) * 16 - 320, vy = (hx + hy) * 8 - 240;
+    d2_dg_feed_unit(-1, 0, 0, 0, 0, 0);
+    d2_dg_feed_unit(0, (int)g_targetPlayer->dwClassId, hx, hy, 0, 0);
+    for (int b = 0; b < 128; ++b)
+        for (D2UnitStrc* u = g_game->pUnitList[GAME_RemapUnitTypeToListIndex(UNIT_MONSTER)][b]; u; u = u->pListNext)
+            if (u->pDynamicPath) d2_dg_feed_unit(1, (int)u->dwClassId, u->pDynamicPath->tGameCoords.wPosX, u->pDynamicPath->tGameCoords.wPosY, 0, 0);
+    // 7A0D0: columns = w/160 + 11, rows = h/80 + 12, side = columns + rows - 1; 7A9F0: origin = the view corner's tile less (3, columns)
+    const int32_t cols = 640 / 160 + 11, side = cols + 480 / 80 + 12 - 1;
+    d2_dg_set_origin(vx, vy);
+    d2_dg_feed_level(g_lastLevel, vx, vy, vx + 640, vy + 480, fl(vx + 2 * vy) - 3, fl(2 * vy - vx) - cols, side, now);
+    return d2_dg_walk_g();
+}
+
 } // extern "C"
