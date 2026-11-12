@@ -20,7 +20,8 @@ PATS=(
   "queue-id|\\bOPEND2-[0-9]+\\b"
   "jargon|\\b(ledger|s39[0-9]{2}|coord-merge)\\b"
 )
-MSG_PATS=( "ai-trailer|^(Co-Authored-By|Claude-Session|Generated with)|claude\\.ai/code|@anthropic\\.com" "identity|@gmail\\.com" )
+MSG_PATS=( "ai-trailer|^(Co-Authored-By|Claude-Session|Generated with)|claude\\.ai/code|@anthropic\\.com" "identity|@gmail\\.com"
+  "re-address|\\b(D2[A-Za-z]+|Fog|Storm|BNClient|Bnclient)(\\.dll)?\\+0x[0-9A-Fa-f]+|\\b0x[0-9A-Fa-f]{5,}\\b" )
 
 if [ "$mode" = --msg ]; then
   body="$(grep -v '^#' "$rev")"
