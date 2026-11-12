@@ -3,14 +3,15 @@
 // 0x43100 calls (EAX = drlg, 1/2/3, 0x31F), then 0x86040: 0x42CE0 (ESI = drlg, x, -1, 0, 0xF) calls over two .rdata tile-base
 // words (0x9560C / 0x95618, indexed by type) as listed below. Steps with a register/stack convention of their own go through
 // call(rva, drlg); 0x43100 and 0x42CE0 are passed with their true arguments.
+// EAX on the way out: the level type itself when no branch runs (retail reloads it for the compares), else the last callee's result.
 #include <cstdint>
 #include <emscripten.h>
-typedef void (*D2C861A0Call)(uint32_t rva, uint32_t drlg);
-typedef void (*D2C43100Fn)(uint32_t drlg, int32_t a, int32_t b);
-typedef void (*D2C42CE0Fn)(uint32_t drlg, int32_t x, int32_t y, int32_t z, int32_t w);
+typedef uint32_t (*D2C861A0Call)(uint32_t rva, uint32_t drlg);
+typedef uint32_t (*D2C43100Fn)(uint32_t drlg, int32_t a, int32_t b);
+typedef uint32_t (*D2C42CE0Fn)(uint32_t drlg, int32_t x, int32_t y, int32_t z, int32_t w);
 static const int32_t kTbl9560C[3] = { 0x33C, 0x340, 0x340 };   // indexed by type - 0x68 (the third-group base)
 static const int32_t kTbl95618[3] = { 0x32C, 0x331, 0x337 };   // indexed by type - 0x68 (the first-group base)
-extern "C" void d2c_861a0_port(uint32_t drlg, D2C861A0Call call, D2C43100Fn f43100, D2C42CE0Fn f42ce0)
+extern "C" uint32_t d2c_861a0_port(uint32_t drlg, D2C861A0Call call, D2C43100Fn f43100, D2C42CE0Fn f42ce0)
 {
 	const uint32_t* t = reinterpret_cast<const uint32_t*>(uintptr_t(drlg) + 0x1D0);
 	if (*t == 0x6C) {
@@ -20,10 +21,10 @@ extern "C" void d2c_861a0_port(uint32_t drlg, D2C861A0Call call, D2C43100Fn f431
 		call(0x17180, drlg);
 	}
 	const int32_t ty = int32_t(*t);
-	if (ty < 0x68) return;
+	if (ty < 0x68) return uint32_t(ty);
 	if (ty > 0x6A) {
-		if (ty == 0x6C) call(0x85FD0, drlg);
-		return;
+		if (ty == 0x6C) return call(0x85FD0, drlg);
+		return uint32_t(ty);
 	}
 	call(0x86000, drlg);
 	f43100(drlg, 1, 0x31F);
@@ -38,5 +39,6 @@ extern "C" void d2c_861a0_port(uint32_t drlg, D2C861A0Call call, D2C43100Fn f431
 	for (int k = 0; k < 4; k++) f42ce0(drlg, b2 + 4, -1, 0, 0xF);
 	f42ce0(drlg, b1, -1, 0, 0xF);
 	for (int k = 1; k <= 2; k++) { f42ce0(drlg, b1 + k, -1, 0, 0xF); f42ce0(drlg, b1 + k, -1, 0, 0xF); }
-	for (int k = 0; k < 4; k++) f42ce0(drlg, b1 + 3, -1, 0, 0xF);
+	for (int k = 0; k < 3; k++) f42ce0(drlg, b1 + 3, -1, 0, 0xF);
+	return f42ce0(drlg, b1 + 3, -1, 0, 0xF);
 }

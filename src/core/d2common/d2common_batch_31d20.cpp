@@ -290,10 +290,13 @@ int32_t d2common_26db0_port(uint32_t pItem, uint32_t pUnit, int32_t nCheckStats,
 // then sub_6FDB6C10 (0x39F70) with a null unit; list flags < 0 and owner type 0 end with 0x38550.
 // All five callees are the vendored D2StatList.cpp functions, called directly.
 // 1.13c D2Common+0x3A330 core: the key is already packed ((statId << 16) + layer).
-uint32_t D2Common_3A330_AddStat(D2StatListStrc* pStatList, uint32_t nPackedStat, int32_t nDelta)
+// The function is void in retail; the value returned here is what it leaves in EAX: untouched (nEaxIn) on the two early
+// exits, else the list's flags word, which a negative value replaces with the owner-type word; an owner type of 0 goes on
+// to the 0x38550 call, whose own EAX is not modelled (the packed key it was handed is returned).
+uint32_t D2Common_3A330_AddStat(D2StatListStrc* pStatList, uint32_t nPackedStat, int32_t nDelta, uint32_t nEaxIn = 0)
 {
 	if (!pStatList || nDelta == 0)
-		return 0;
+		return nEaxIn;
 
 	D2StatsArrayStrc* pArray = &pStatList->Stats;
 	const int nIndex = STATLIST_FindStatIndex_6FDB6300(pArray, nPackedStat);
@@ -301,7 +304,7 @@ uint32_t D2Common_3A330_AddStat(D2StatListStrc* pStatList, uint32_t nPackedStat,
 	if (!pStat)
 		pStat = STATLIST_InsertStatOrFail_6FDB6970(pStatList->pMemPool, pArray, nPackedStat);
 	if (!pStat)
-		return 0;
+		return nEaxIn;
 
 	pStat->nValue = static_cast<int32_t>(static_cast<uint32_t>(pStat->nValue) + static_cast<uint32_t>(nDelta));
 	if (pStat->nValue == 0)
@@ -309,15 +312,24 @@ uint32_t D2Common_3A330_AddStat(D2StatListStrc* pStatList, uint32_t nPackedStat,
 
 	sub_6FDB6C10(static_cast<D2StatListExStrc*>(pStatList), nPackedStat, nDelta, nullptr);
 
-	if (static_cast<int32_t>(pStatList->dwFlags) < 0 && pStatList->dwOwnerType == 0)
-		STATLIST_InsertStatModOrFail_6FDB7690(pStatList, nPackedStat);
-	return 1;
+	if (static_cast<int32_t>(pStatList->dwFlags) >= 0)
+		return pStatList->dwFlags;
+	if (pStatList->dwOwnerType != 0)
+		return static_cast<uint32_t>(pStatList->dwOwnerType);
+	STATLIST_InsertStatModOrFail_6FDB7690(pStatList, nPackedStat);
+	return nPackedStat;
 }
 
 // The retail call shape of 0x3A330: stdcall(list, statId, delta, layer), the packed key (statId << 16) + layer built inside.
 void D2Common_3A330_AddStatLayer(D2StatListStrc* pStatList, int32_t nStatId, int32_t nDelta, uint16_t nLayer)
 {
 	D2Common_3A330_AddStat(pStatList, (static_cast<uint32_t>(nStatId) << 16) + nLayer, nDelta);
+}
+
+// The same call for a caller that reads EAX afterwards: nEaxIn is the caller's EAX at the call.
+uint32_t D2Common_3A330_AddStatLayerEax(D2StatListStrc* pStatList, int32_t nStatId, int32_t nDelta, uint16_t nLayer, uint32_t nEaxIn)
+{
+	return D2Common_3A330_AddStat(pStatList, (static_cast<uint32_t>(nStatId) << 16) + nLayer, nDelta, nEaxIn);
 }
 
 // 1.13c D2Common+0x30AC0 (#10246): the skills.txt record of skill nSkillId inside the unit's skill list.

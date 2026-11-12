@@ -220,9 +220,11 @@ EMSCRIPTEN_KEEPALIVE uint8_t D2Common_22380_ItemHitClass(uint32_t pUnit)
 // Player attack rating: 5 * dexterity + to-hit - 0x23. A null unit or one that is not a type-0 player
 // is retail's fatal 0x107F. The +0x5C stat list is only read when it exists: with at least 20
 // ItemStatCost rows the to-hit total (stat 19) is read, with at least 3 the dexterity total (stat 2).
-// The class id (+0x04) then adds charstats[].dwToHitFactor (+0x3C) when it is in range. The totals go
-// through the vendored STATLIST_GetTotalStat, the body of the 1.13c 0x38A80 (list in EBX, packed
-// layer-0 id = stat id << 16 in EDI, ItemStatCost row on the stack).
+// The class id (+0x04) then adds charstats[].dwToHitFactor (+0x3C) when it is in range. pUnit is the
+// retail-layout unit (its +0x5C list word is a retail address, not our widened struct); the totals go
+// through the 0x38A80 seam (retail: list in EBX, packed layer-0 id in EDI, ItemStatCost row on the
+// stack), which the host wires to the unit's own list.
+extern "C" int32_t (*g_d2common_fn_38A80)(void*);
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t D2Common_PlayerAttackRating(uint32_t pUnit)
 {
@@ -232,20 +234,11 @@ EMSCRIPTEN_KEEPALIVE int32_t D2Common_PlayerAttackRating(uint32_t pUnit)
 	const uint32_t pStatList = rd32(pUnit, 0x5C);
 	int32_t nToHit = 0;
 	int32_t nDexterity = 0;
-	if (pStatList != 0 && sgptDataTables->pItemStatCostTxt != nullptr) {
-		D2StatListStrc* pList = reinterpret_cast<D2StatListStrc*>(static_cast<uintptr_t>(pStatList));
-		if (sgptDataTables->nItemStatCostTxtRecordCount >= 20) {
-			nToHit = STATLIST_GetTotalStat_6FDB63E0(
-				pList,
-				D2SLayerStatIdStrc::MakeFromStatId(STAT_TOHIT).nPackedValue,
-				&sgptDataTables->pItemStatCostTxt[STAT_TOHIT]);
-		}
-		if (sgptDataTables->nItemStatCostTxtRecordCount >= 3) {
-			nDexterity = STATLIST_GetTotalStat_6FDB63E0(
-				pList,
-				D2SLayerStatIdStrc::MakeFromStatId(STAT_DEXTERITY).nPackedValue,
-				&sgptDataTables->pItemStatCostTxt[STAT_DEXTERITY]);
-		}
+	if (pStatList != 0 && sgptDataTables->pItemStatCostTxt != nullptr && g_d2common_fn_38A80) {
+		if (sgptDataTables->nItemStatCostTxtRecordCount >= 20)
+			nToHit = g_d2common_fn_38A80(&sgptDataTables->pItemStatCostTxt[STAT_TOHIT]);
+		if (sgptDataTables->nItemStatCostTxtRecordCount >= 3)
+			nDexterity = g_d2common_fn_38A80(&sgptDataTables->pItemStatCostTxt[STAT_DEXTERITY]);
 	}
 
 	int32_t nValue = nDexterity * 5 + nToHit - 0x23;
