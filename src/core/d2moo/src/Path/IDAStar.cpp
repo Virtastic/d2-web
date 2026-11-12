@@ -246,7 +246,8 @@ D2PathIDAStarNodeStrc* __fastcall PATH_IDAStar_VisitNodes(D2PathIDAStarContextSt
         {
             const int16_t nDistanceBetweenPoints = PATH_AStar_HeuristicForNeighbor(pCurrentNode->tCoord, tNeighborCoords);
             const int16_t nNewDistanceFromStart = nDistanceBetweenPoints + pCurrentNode->nBestDistanceFromStart;
-            if (*pNeighborBestDistanceToStart == 0 || (unsigned int)nNewDistanceFromStart >= *pNeighborBestDistanceToStart )
+            // A cell is re-entered only when unvisited or when its stored distance is not below the new one.
+            if (*pNeighborBestDistanceToStart == 0 || (unsigned int)*pNeighborBestDistanceToStart >= (unsigned int)nNewDistanceFromStart)
             {
                 *pNeighborBestDistanceToStart = nNewDistanceFromStart;
 
@@ -271,6 +272,8 @@ D2PathIDAStarNodeStrc* __fastcall PATH_IDAStar_VisitNodes(D2PathIDAStarContextSt
                     pCurrentNode->nHeuristicDistanceToTarget = nHeuristicDistanceToTarget;
                     pCurrentNode->nEvaluationsCount = 0;
                     pCurrentNode->pNeighborsSequence = dword_6FDD1BE0[(sub_6FDAB770(tNeighborCoords, pPathInfo->tTargetCoord) - pCurrentNode->pParent->nNextNeighborIndex) & 7];
+                    // The child's neighbour index starts from its parent's before the sequence step.
+                    pCurrentNode->nNextNeighborIndex = pCurrentNode->pParent->nNextNeighborIndex;
                     PATH_IDAStar_GetNextNeighborIndex(pCurrentNode, pContext);
 
                     if ((__int16)pCurrentNode->nHeuristicDistanceToTarget < pPathInfo->field_14)
