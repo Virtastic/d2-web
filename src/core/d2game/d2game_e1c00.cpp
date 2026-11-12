@@ -29,7 +29,8 @@ extern "C" void d2game_e1c00(uint32_t tile, uint32_t player, uint32_t game, cons
     if (!e->call(0xE19C0, y, x, warpRoom, 0, 0, game, player, 0, 0)) return;
     const uint32_t client = d2rd32(player) == 0 ? d2rd32(e->call(0xA4C0, 0, 0, 0, 0, 0, player) + 0x9C) : 0;
     const uint32_t nx = d2rd32(warpRec + 0x14) + x, ny = d2rd32(warpRec + 0x18) + y;
-    e->call(0x78550, 0, y, player, 0, 0, 0, 2, nx, ny, 0);
+    e->call(0x78550, 0, game, player, 0, 0, 0, 2, nx, ny, 0);   // 0x6FD01D44: ECX = the game argument, EDX = player
     const uint32_t flag = e->call(0xA718, 0, 0, 0, 0, 0, player) & 0xFF;
-    e->call(0x8C280, d2rd32(player), 0xD, d2rd32(player + 0xC), 0, 0, client, 1, nx, ny, 0, flag);
+    // CL = 0xD (the packet type) over the upper bytes of the game argument word, which retail reloads into ECX to push the flag byte.
+    e->call(0x8C280, d2rd32(player), (game & 0xFFFFFF00u) | 0xD, d2rd32(player + 0xC), 0, 0, client, 1, nx, ny, 0, flag);
 }

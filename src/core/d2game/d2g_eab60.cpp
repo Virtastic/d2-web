@@ -5,7 +5,7 @@
 extern "C" uint32_t d2g_eab60(uint32_t unit, uint32_t game, const D2Seam* e)
 {
     const uint32_t room = e->call(0xA478, 0, 0, 0, 0, 0, unit);
-    const uint32_t obj = e->call(0xA4F6, 0, 0, 0, 0, 0, room);
+    const uint32_t obj = e->call(0xA4F6, 0, 0, 0, 0, 0, room, 2, 0x182);   // 0x6FD0AB69: (room, 2, 0x182) pushed before the 0xA478 call
     if (!obj) {
         const uint32_t s = e->call(0xA2DA, 0, 0, 0, 0, 0, 0x8F);
         e->call(0xA2C2, 0, 0, 0, 0, 0, 0x6FD19FF9, s);   // then _exit(-1)

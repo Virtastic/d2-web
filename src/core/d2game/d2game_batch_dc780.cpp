@@ -12,9 +12,9 @@ struct D2GameDC780Env {
     uint32_t (*getTimer)(uint32_t unit, uint32_t tag);                              // 0xA5D4
     int32_t  (*resist)(uint32_t unit, uint32_t game);                               // 0xDAE20 (EAX = unit, stack game)
     uint32_t (*diffRow)(uint32_t diffByte);                                         // 0xA7BA
-    void     (*setState)(uint32_t unit, uint32_t state, uint32_t on);               // 0xA3CA
+    uint32_t (*setState)(uint32_t unit, uint32_t state, uint32_t on);               // 0xA3CA
     uint32_t (*newTimer)(uint32_t g1c, uint32_t kind, uint32_t end, uint32_t a, uint32_t b); // 0xA6A0
-    void     (*schedule)(uint32_t game, uint32_t unit, uint32_t ev, uint32_t end);  // 0x8EA80 (ECX = game, EDX = unit, stack ev end 0 0 0)
+    uint32_t (*schedule)(uint32_t game, uint32_t unit, uint32_t ev, uint32_t end);  // 0x8EA80 (ECX = game, EDX = unit, stack ev end 0 0 0)
     void     (*tagTimer)(uint32_t t, uint32_t tag);                                 // 0xA5B6
     void     (*setCallback)(uint32_t t, uint32_t cb);                               // 0xA75A
     void     (*attach)(uint32_t unit, uint32_t t, uint32_t on);                     // 0xA60A
@@ -24,7 +24,7 @@ struct D2GameDC780Env {
     void     (*setEnd)(uint32_t t, uint32_t end);                                   // 0xA778
     uint32_t (*classHook)(uint32_t cls, uint32_t v);                                // 0x213B0 (EAX = class, EDX = v)
     uint32_t (*skillFlag)(uint32_t unit, uint32_t v);                               // 0xA580
-    uint32_t (*classRow)(uint32_t cls);                                             // 0x21220
+    uint32_t (*classRow)(uint32_t cls);                                             // 0x1220 (EAX = class)
     uint32_t (*unitFlag)(uint32_t unit);                                            // 0xA7F6
     uint32_t cbDB4C0, strDB1B0EC, cbBF7A0;                                          // callback / string module addresses as recorded
 };
@@ -77,23 +77,25 @@ void d2game_DC780_113c(uint32_t rec, uint32_t unit, int32_t dur, const D2GameDC7
     e.setState(unit, 0x6b, 0);
 }
 
-void d2game_DCC20_113c(uint32_t rec, uint32_t unit, int32_t dur, const D2GameDC780Env& e) {
-    if (dur <= 0) return;
+// EAX on exit: the record on a non-positive duration, the roll's quotient (seed / 100) on the 90% skip, the 0xA580 or
+// 0x1220 result on their early outs, else the last callee's result (0xA3CA on a new timer, 0x8EA80 on an extended one).
+uint32_t d2game_DCC20_113c(uint32_t rec, uint32_t unit, int32_t dur, const D2GameDC780Env& e) {
+    if (dur <= 0) return rec;
     bool clampPlayer = false;
     if (unit && dcR(unit, 0) == 1) {
         uint32_t pd = dcR(unit, 0x14);
         if (pd && (*(uint8_t*)(uintptr_t)(pd + 0x16) & 8)) {
-            if (dcRoll(rec) < 0x5a) return;
+            if (dcRoll(rec) < 0x5a) return dcR(rec, 0x20) / 100;
         }
-        if (e.skillFlag(unit, 0) != 0) return;
+        if (const uint32_t f = e.skillFlag(unit, 0)) return f;
         uint32_t row = e.classRow(dcR(unit, 4));
         uint16_t w; memcpy(&w, (const void*)(uintptr_t)(row + 0x32), 2);
-        if (w == 0) return;
+        if (w == 0) return row;
         if (e.unitFlag(unit) != 0 && dur >= 0xd) { dur = 0xd; clampPlayer = true; }
     }
     if (!clampPlayer && dur > 0xfa) dur = 0xfa;
     uint32_t timer = e.getTimer(unit, 0x15);
-    if (!rec) { e.fatal(0xa2a); return; }
+    if (!rec) { e.fatal(0xa2a); return 0; }
     uint32_t game = dcR(rec, 0x80);
     uint32_t end = dcR(game, 0xa8) + (uint32_t)dur;
     if (timer == 0) {
@@ -102,11 +104,10 @@ void d2game_DCC20_113c(uint32_t rec, uint32_t unit, int32_t dur, const D2GameDC7
         e.tagTimer(t, 0x15);
         e.setCallback(t, e.cbBF7A0);
         e.attach(unit, t, 1);
-        e.setState(unit, 0x15, 1);
-        return;
+        return e.setState(unit, 0x15, 1);
     }
     e.setEnd(timer, end);
-    e.schedule(game, unit, 0xc, end);
+    return e.schedule(game, unit, 0xc, end);
 }
 
 // replay entries: r[0]=rec (EAX), r[1]=unit (ESI for 0xDC780, EDI for 0xDCC20), r[2]=duration, r[3]=log, r[4]=sc
@@ -114,9 +115,9 @@ static HookEnv* g_dcz;
 static uint32_t z_timer(uint32_t u, uint32_t t) { return g_dcz->h(0xA5D4, 0, 0, 0, 0, 0, u, t); }
 static int32_t  z_res(uint32_t u, uint32_t g) { return (int32_t)g_dcz->h(0xDAE20, u, 0, 0, 0, 0, g); }
 static uint32_t z_row(uint32_t d) { return g_dcz->h(0xA7BA, 0, 0, 0, 0, 0, d); }
-static void     z_state(uint32_t u, uint32_t s, uint32_t o) { g_dcz->h(0xA3CA, 0, 0, 0, 0, 0, u, s, o); }
+static uint32_t z_state(uint32_t u, uint32_t s, uint32_t o) { return g_dcz->h(0xA3CA, 0, 0, 0, 0, 0, u, s, o); }
 static uint32_t z_new(uint32_t a, uint32_t k, uint32_t e, uint32_t b, uint32_t c) { return g_dcz->h(0xA6A0, 0, 0, 0, 0, 0, a, k, e, b, c); }
-static void     z_sched(uint32_t g, uint32_t u, uint32_t ev, uint32_t e) { g_dcz->h(0x8EA80, 0, g, u, 0, 0, ev, e, 0, 0, 0); }
+static uint32_t z_sched(uint32_t g, uint32_t u, uint32_t ev, uint32_t e) { return g_dcz->h(0x8EA80, 0, g, u, 0, 0, ev, e, 0, 0, 0); }
 static void     z_tag(uint32_t t, uint32_t g) { g_dcz->h(0xA5B6, 0, 0, 0, 0, 0, t, g); }
 static void     z_cb(uint32_t t, uint32_t c) { g_dcz->h(0xA75A, 0, 0, 0, 0, 0, t, c); }
 static void     z_att(uint32_t u, uint32_t t, uint32_t o) { g_dcz->h(0xA60A, 0, 0, 0, 0, 0, u, t, o); }
@@ -126,7 +127,7 @@ static int32_t  z_tend(uint32_t t) { return (int32_t)g_dcz->h(0xA790, 0, 0, 0, 0
 static void     z_setend(uint32_t t, uint32_t e) { g_dcz->h(0xA778, 0, 0, 0, 0, 0, t, e); }
 static uint32_t z_chook(uint32_t c, uint32_t v) { return g_dcz->h(0x213B0, c, 0, v); }
 static uint32_t z_skill(uint32_t u, uint32_t v) { return g_dcz->h(0xA580, 0, 0, 0, 0, 0, v, u); }
-static uint32_t z_crow(uint32_t c) { return g_dcz->h(0x21220, c); }
+static uint32_t z_crow(uint32_t c) { return g_dcz->h(0x1220, c); }   // retail calls 0x6FC21220 = rva 0x1220
 static uint32_t z_uflag(uint32_t u) { return g_dcz->h(0xA7F6, 0, 0, 0, 0, 0, u); }
 static void     z_fatal(uint32_t) { abort(); }
 static D2GameDC780Env zenv() {
@@ -146,6 +147,5 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_dc780(uint32_t* r) {
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_dcc20(uint32_t* r) {
     HookEnv he((uint32_t*)(uintptr_t)r[3], (const uint32_t*)(uintptr_t)r[5]); g_dcz = &he;
     D2GameDC780Env e = zenv();
-    d2game_DCC20_113c(r[0], r[1], (int32_t)r[2], e);
-    r[4] = 0;
+    r[4] = d2game_DCC20_113c(r[0], r[1], (int32_t)r[2], e);
 }

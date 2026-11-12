@@ -60,6 +60,8 @@ uint32_t d2_fn_d2game_E2AB0(uint32_t p1, uint32_t p2, uint32_t p3, uint32_t p4, 
 
 // 1.13c D2Game+0xE4030 -- stat-record predicate for the 0x14 stat group. Kind 0xFE tests key 0x20343367, 0x108 tests
 // key 0x2034336A, 0xF5 tests both keys plus sbits 2 and 4. A pass returns 1 in the low byte.
+// p1 = ECX (record), p2 = EDX (kind), p3 = stack word 0 (the key test's EAX), p4 = stack word 1 (the stat owner: 0x6FD04033
+// loads ESI from [esp+0x14] after three pushes); stack word 2 is popped unread (ret 0xC).
 extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t d2_fn_d2game_E4030(uint32_t p1, uint32_t p2, uint32_t p3, uint32_t p4, const D2GamePredicatesEnv* e)
 {
