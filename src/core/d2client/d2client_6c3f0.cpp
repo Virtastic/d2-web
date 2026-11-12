@@ -1,6 +1,6 @@
 // 1.13c D2Client+0x6C3F0: runs 0x6C020 for every list entry a class's flag row selects. EAX = unit (also ESI and EDI inside), one stack word arg0 (ret 4).
 // D2Client+0x1B50 (ESI = unit) gives the class index (<0 or >= dt[0xA80] returns); int16 at dt[0xA78] + idx*0x1A8 + 0x18 is the row v (<0 or
-// >= dt[0xA98] returns); row = dt[0xA90] + v*0x134 (0 returns). e.gl = the list at +0xD28B0 (15 dwords, count at +0x3C); e.bm = *+0xCEE50, the bit-mask table.
+// >= dt[0xA98] returns); row = dt[0xA90] + v*0x134 (0 returns). e.gl = the list at +0xE28B0 (15 dwords, count at +0x3C = 0x6FB928EC); e.bm = *+0xCEE50, the bit-mask table.
 // An entry s runs when byte (bm + (s & 7) * 4) & row byte [0xF0 + (s >> 3)] is nonzero: 0x6C020 with ESI = s, EDI = unit, arg0 (the record logs EDI).
 #include "cl_env.h"
 extern "C" void d2cl_6c3f0(uint32_t unit, uint32_t arg0, const cl::Env& e) {   // 1.13c D2Client+0x6C3F0

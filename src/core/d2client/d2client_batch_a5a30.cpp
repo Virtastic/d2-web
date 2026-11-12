@@ -24,7 +24,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE bool d2_client_a6180(U u, const D2ClientA5Env* e
     uint32_t v = W(u, 16);
     switch (W(u, 0)) {
     case 0: return v == 0x11;
-    case 1: return e->fn_1510(1, 0x14) == 0 && v == 0xc;
+    case 1: return e->fn_1510(W(u, 4), 0x14) == 0 && v == 0xc;   // eax = unit+4 (mov eax,[eax+4])
     case 2: {
         U d = e->ord_10688(Lnk(u, 4));
         uint8_t f = *(uint8_t*)(d + 0x1b7);
