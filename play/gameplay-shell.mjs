@@ -3167,6 +3167,7 @@ function update(forceTick = false, live = false) {
         castHand = 'right';
         realmInput().rightClick(command.x, command.y, { held: Boolean(command.held), stand: heldStandStillKeys.size > 0 });
       } else if (command.type === COMMAND.MOVE && !command.directional && command === pointerMoves.at(-1)) {
+        lastMoveCommand = { type: command.type, x: command.x, y: command.y, directional: false, held: !!command.held };   // the pointer command this packet answers
         const hit = realmInput().leftClick(command.x, command.y, { held: Boolean(command.held), stand: heldStandStillKeys.size > 0 });
         // What the packet path resolved the click to (the unit it acted on and its cell), on the click's own record.
         const rec = clickDispatch.findLast((r) => r.spent === 'world' && r.button === 0 && r.hit === undefined);
