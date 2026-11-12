@@ -21,7 +21,7 @@ struct D2GameBatchBbf30Env {
     int32_t  (*o10826)(uint32_t x);                                   // Ordinal_10826: unit -> class id
     uint8_t  (*o10459)(uint32_t x);                                   // Ordinal_10459: class predicate
     uint32_t (*o10816)(uint32_t unit, int32_t a, int32_t b, uint32_t* o1, uint32_t* o2, int32_t c);
-    uint32_t (*o11049)(uint32_t x);                                   // Ordinal_11049
+    uint32_t (*o11049)(uint32_t x, uint32_t out, int32_t a, int32_t b, int32_t c);   // Ordinal_11049 (five stack words)
     void     (*o11090)(uint32_t unit, int32_t v);                     // Ordinal_11090: unit state
     uint32_t (*o10688)(uint32_t item);                                // Ordinal_10688: item -> record
     int32_t  (*o10494)();                                             // Ordinal_10494 (no arguments in the decompile)
@@ -214,10 +214,10 @@ void Quest12CompleteOnClass0x4A(const D2GameBatchBbf30Env* e, uint32_t owner, ui
     if (e->subDFA60() != -1) e->sub9C160(0x6FCE3480u);
 }
 
-// 1.13c D2Game+0xC7FB0 -- EAX = game, EBX = out block (three dwords written on success). Finds the first
-// type-0xd quest record; it must be active (+0x3c == 1). Asks the unit at game+0xc0 for a match and writes
-// the result to out[0..1] and to the unit's first dword.
-uint32_t QuestListFindType0D(const D2GameBatchBbf30Env* e, uint32_t game, uint32_t ebxOut) {
+// 1.13c D2Game+0xC7FB0 -- EAX = game, EBX = out block, one stack word p (ret 4). Finds the first type-0xd
+// quest record; it must be active (+0x3c == 1). #10816 on the unit at game+0xc0 fills two locals; #11049
+// (m, out, 3, 0xBE11, 7) then gives the result. On success the two locals go to out[0..1] and the result to *p.
+uint32_t QuestListFindType0D(const D2GameBatchBbf30Env* e, uint32_t game, uint32_t ebxOut, uint32_t p) {
     uint32_t head = R32(e, game, 0x10f4);
     if (head == 0) return 0;
     for (uint32_t rec = R32(e, head, 0); rec != 0; rec = R32(e, rec, 0xf4)) {
@@ -229,11 +229,11 @@ uint32_t QuestListFindType0D(const D2GameBatchBbf30Env* e, uint32_t game, uint32
         uint32_t m = e->o10816(unit, 0x28, 0xc, &l1, &l2, 3);
         if (m == 0) return 0;
         e->sub4CB80();
-        uint32_t v = e->o11049(m);
+        uint32_t v = e->o11049(m, ebxOut, 3, 0xbe11, 7);
         if (v == 0) return 0;
-        W32(e, ebxOut, 0, 3);
-        W32(e, ebxOut, 4, 0xbe11);
-        W32(e, unit, 0, v);
+        W32(e, ebxOut, 0, l1);
+        W32(e, ebxOut, 4, l2);
+        W32(e, p, 0, v);
         return 1;
     }
     return 0;

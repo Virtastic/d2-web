@@ -6,8 +6,6 @@
 #include <cstdint>
 #include "../d2cmp/d2cmp_dcc.h"
 
-extern "C" uint32_t d2cmp_134d0(int32_t n, DccBits* b);
-
 static uint32_t rd32(uint32_t addr, uint32_t off) { return *(const uint32_t*)(uintptr_t)(addr + off); }
 static void wr32(uint32_t addr, uint32_t off, uint32_t v) { *(uint32_t*)(uintptr_t)(addr + off) = v; }
 

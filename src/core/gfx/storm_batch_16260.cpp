@@ -529,29 +529,6 @@ extern "C" uint32_t Storm_Sub26CB0(uint32_t self) {
 // Capture-probe accessor: the default list node (module RVA 0x55980, two words) used when the argument is null.
 extern "C" uint32_t* Storm_26CB0_defaultNode() { return g_45980; }
 
-// 1.13c Storm+0x16260: run bnupdate from the "Patch"/"Patches" config entry.
-// Skeleton: the config lookup is absent in ours, so retail's own iVar4==0 branch is the outcome.
-// The Patch-list walk (file map, per-line delete/extract/execute, CreateProcessA) is not modelled.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_16260(uint32_t* r) {
-    if (r[0] == 0) {
-        g_lastError = 0x57;
-        StormSetLastError(0x57);
-        r[4] = 0;
-        return;
-    }
-    EnterCriticalSection(&g_lockDlg);
-    char patches[0x400];
-    patches[0] = '\0';
-    int32_t* handle = nullptr;
-    if (StormSub2BDD0("Patch", "Patches", 2, &handle, (uint8_t*)patches, 0x3FF) == 0) {
-        wr32((uintptr_t)r[0], 0, 0);
-        LeaveCriticalSection(&g_lockDlg);
-        r[4] = 0;
-        return;
-    }
-    LeaveCriticalSection(&g_lockDlg);
-    r[4] = 0;
-}
+// 1.13c Storm+0x16260 is ported as Storm_Sub16260 in src/core/storm/storm_n20_13a90.cpp; its probe is src/core/fn/storm_16260.cpp.
 
 // 1.13c Storm+0x27560 lives in src/core/storm/storm_27560.cpp (Storm_Sub27560 with its host-call seams).

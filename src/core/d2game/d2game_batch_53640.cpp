@@ -202,7 +202,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_EBDA0(void* pGame, void* pU
 // index passes the class skill count, and a nonzero byte assigns that level. Two client/skill
 // finalizers run afterwards, then the out pointer advances by nSkills bytes. 0x13 is
 // PLRSAVE2ERROR_BAD_SKILLS. Register-only arguments of the ordinals below are explicit in the seams.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_eca60(void* pGame, void* pUnit, uint8_t** ppSection, uint8_t* pEnd, uint32_t nVersion, int32_t nSkills, const D2GameBatch53640Env* env) {  // 1.13c D2Game+0xECA60
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_ECA60(void* pGame, void* pUnit, uint8_t** ppSection, uint8_t* pEnd, uint32_t nVersion, int32_t nSkills, const D2GameBatch53640Env* env) {  // 1.13c D2Game+0xECA60
     uint8_t* pSection = *ppSection;
     if (pEnd < pSection + 2 || rd16u(pSection, 0) != 0x6669) {
         return 0x13;
