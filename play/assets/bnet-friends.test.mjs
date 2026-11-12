@@ -2,7 +2,7 @@
 // text as an ordinary CHATCOMMAND (0x0E) line: BNClient +0xC400 frames the text, and D2Multi's slash dispatcher
 // (0xB090) keeps only /r, /reply and /d2notify, so `/f ...` goes to the server as typed. The server's answers arrive as
 // CHATEVENT (0x0F) lines. Retail's frame pump (BNClient +0xEA60) dispatches only ids below 0x5E, so 0x65-0x68 are skipped.
-// Byte expectations below are written out from the retail framing (FF id len16LE body, body = text + NUL).
+// The friends frames below are the bytes the original client put on the wire for these exact lines.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bncsPacket, chatCommandPacket, createBnetChat } from './bnet-chat.mjs';
@@ -21,13 +21,18 @@ function pair() {
   return { transport: { send: (b) => { sent.push(hex(b)); return true; }, isOpen: true, close() {} }, reader, sent, push };
 }
 
-test('friends commands are CHATCOMMAND frames with the text verbatim and a NUL', () => {
-  // body "/f l" + NUL = 5 bytes: len 9
-  assert.equal(hex(chatCommandPacket('/f l')), 'ff0e09002f66206c00');
-  // body "/f a Dunder" + NUL = 12 bytes: len 16
-  assert.equal(hex(chatCommandPacket('/f a Dunder')), 'ff0e1000' + '2f6620612044756e64657200');
-  // body "/f r Dunder" + NUL = 12 bytes: len 16
-  assert.equal(hex(chatCommandPacket('/f r Dunder')), 'ff0e1000' + '2f6620722044756e64657200');
+test('friends commands are CHATCOMMAND frames equal to the original client output', () => {
+  // the original client's frames, verbatim
+  const retail = {
+    '/f l': 'ff0e09002f66206c00',
+    '/f a Dunder': 'ff0e10002f6620612044756e64657200',
+    '/f r Dunder': 'ff0e10002f6620722044756e64657200',
+    '/friends list': 'ff0e12002f667269656e6473206c69737400',
+    '/F R Dunder': 'ff0e10002f4620522044756e64657200',
+    '/f a': 'ff0e09002f66206100',
+    '/f': 'ff0e07002f6600',
+  };
+  for (const [line, frame] of Object.entries(retail)) assert.equal(hex(chatCommandPacket(line)), frame, line);
 });
 
 test('the slash dispatcher does not take /f lines: they reach the server as typed', () => {
