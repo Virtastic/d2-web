@@ -148,9 +148,9 @@ uint32_t d2_client_61490(uint32_t unit, uint8_t* out, uint32_t local_unit_11bbfc
     return 0;
 }
 
-// 1.13c D2Client+0x62580 (218 B, ret 0xC): stack (room, a1, force, ctx). Retail: edi = cc4c(ecx=room); base = cc34(room, &cnt);
+// 1.13c D2Client+0x62580 (218 B, ret 0xC): stack (room, force, ctx). Retail: edi = cc4c(ecx=room); base = cc34(room, &cnt);
 // for each 0x30-byte record whose flags (+0x14) lack 8 and have 0x20000, or [11C200], or force: 61880(esi=record, ctx+8).
-// Then cb0e(esi, &cnt) with esi = a1 (room if the first count was 0), second loop passes ctx+0xC; then 61d00(esi, ctx+0x10).
+// Then cb0e(room, &cnt) (esi reloaded from the room argument), second loop passes ctx+0xC; then 61d00(room, ctx+0x10).
 struct D2c62580Env {
     uint32_t (*cc4c)(uint32_t room);
     uint32_t (*cc34)(uint32_t room, uint32_t* cnt);
@@ -159,28 +159,20 @@ struct D2c62580Env {
     void (*f61d00)(uint32_t esi, uint32_t edi, uint32_t arg);
 };
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2c_62580(uint32_t room, uint32_t a1, uint32_t force, uint32_t ctx, uint32_t c200, const D2c62580Env* e) {
-    uint32_t esi = room, cnt = 0;
+void d2c_62580(uint32_t room, uint32_t force, uint32_t ctx, uint32_t c200, const D2c62580Env* e) {
+    uint32_t cnt = 0;
     uint32_t edi = e->cc4c(room);
-    uint32_t base = e->cc34(esi, &cnt);
-    if (cnt > 0) {
-        uint32_t n = cnt;
-        for (uint32_t i = 0; i < n; i++) {
-            uint32_t f = rd32(base + 0x14 + i * 0x30);
-            if (!(f & 8) && ((f & 0x20000) || c200 || force)) e->f61880(base + i * 0x30, edi, ctx + 8);
-            esi = a1;
-        }
+    uint32_t base = e->cc34(room, &cnt);
+    for (uint32_t i = 0; i < cnt; i++) {
+        uint32_t f = rd32(base + 0x14 + i * 0x30);
+        if (!(f & 8) && ((f & 0x20000) || c200 || force)) e->f61880(base + i * 0x30, edi, ctx + 8);
     }
-    base = e->cb0e(esi, &cnt);
-    if (cnt > 0) {
-        uint32_t n = cnt;
-        for (uint32_t i = 0; i < n; i++) {
-            uint32_t f = rd32(base + 0x14 + i * 0x30);
-            if (!(f & 8) && ((f & 0x20000) || c200 || force)) e->f61880(base + i * 0x30, edi, ctx + 0xc);
-            esi = a1;
-        }
+    base = e->cb0e(room, &cnt);
+    for (uint32_t i = 0; i < cnt; i++) {
+        uint32_t f = rd32(base + 0x14 + i * 0x30);
+        if (!(f & 8) && ((f & 0x20000) || c200 || force)) e->f61880(base + i * 0x30, edi, ctx + 0xc);
     }
-    e->f61d00(esi, edi, ctx + 0x10);
+    e->f61d00(room, edi, ctx + 0x10);
 }
 
 // 1.13c D2Client+0x62710 (65 B) NAMED: key in EAX (GUESS). Find the list node with *node == key (next [+0x18])

@@ -34,6 +34,6 @@ extern "C" uint32_t d2c_59ac0(const cl::Env& e) {
     }
     const uint32_t m = e.H(0xbf92, code);
     e.H(0xbf80, 0xB20D359Fu, m);
-    e.H(0x3664, 0xffffffffu);
+    e.W(e.H(0x3664, 0xffffffffu) + 0x44, 0xffffffffu);
     return 1;
 }

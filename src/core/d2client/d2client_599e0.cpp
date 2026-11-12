@@ -1,8 +1,9 @@
 // 1.13c D2Client+0x599E0 -- creates the 0x140x100 box (callback 0x598A0, slot 0x1177F0) and its two labelled buttons (strings 0xFCB, 0xD48).
 // A pre-existing box (0x13D), a failed create (0x529), an empty slot after the buttons (0x4F2) or a negative window field +0x50 (0x4F8)
-// exits through 0xBF92/0xBF80/0x3664 (the hook returns); success sets window +0x44 = -1. gl+0 = DWORD slot 0x1177F0.
+// exits through 0xBF92/0xBF80/0x3664; a 0x3664 that returns falls into the success store, so +0x44 of whatever it left in EAX
+// becomes -1. Returns that EAX: the window on success, 0x3664's result on an error exit. gl+0 = DWORD slot 0x1177F0.
 #include "cl_env.h"
-extern "C" void d2c_599e0(const cl::Env& e) {
+extern "C" uint32_t d2c_599e0(const cl::Env& e) {
     uint32_t code;
     if (e.R(e.gl)) {
         code = 0x13d;
@@ -31,11 +32,13 @@ extern "C" void d2c_599e0(const cl::Env& e) {
                 code = 0x4f8;
             } else {
                 e.W(w2 + 0x44, 0xffffffffu);
-                return;
+                return w2;
             }
         }
     }
     const uint32_t m = e.H(0xbf92, code);
     e.H(0xbf80, 0xB20D359Fu, m);
-    e.H(0x3664, 0xffffffffu);
+    const uint32_t r = e.H(0x3664, 0xffffffffu);
+    e.W(r + 0x44, 0xffffffffu);
+    return r;
 }

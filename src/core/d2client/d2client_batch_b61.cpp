@@ -26,10 +26,11 @@ struct D2ClientB61State {
     uint32_t d_9854;      // +0x119854 DAT_6fbc9854
 };
 
-// 1.13c D2Client+0x62680
-void d2client_62680(D2ClientB61State* s, const D2ClientB61Env* e) {
-    if (s->d_c3b8 == 0 || s->d_bbfc == 0) return;
-    if (e->ord10331(s->d_bbfc) == 0) return;
+// 1.13c D2Client+0x62680 -- returns retail's EAX: 0 on the three early exits, else the restoring
+// Ordinal_10184 call's result (retail tail-jumps into it).
+uint32_t d2client_62680(D2ClientB61State* s, const D2ClientB61Env* e) {
+    if (s->d_c3b8 == 0 || s->d_bbfc == 0) return 0;
+    if (e->ord10331(s->d_bbfc) == 0) return 0;
     e->f0f9f0();
     e->f10c40();
     e->f12410();
@@ -42,5 +43,5 @@ void d2client_62680(D2ClientB61State* s, const D2ClientB61Env* e) {
     e->f0fd20();
     if (mode == 6 || mode == 8) e->f0fe10();
     if (s->d_9854 != 0) e->f0ff70();
-    e->ord10184(prev);
+    return e->ord10184(prev);
 }
