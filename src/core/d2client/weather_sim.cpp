@@ -350,10 +350,14 @@ void drawG(std::string& out, int32_t W, int32_t H, int32_t mode) {
     if (mode == 1) xmax = W - (W / 4) * 2;
     else if (mode == 2) xmin = (W / 4) * 2;
     auto in = [&](int32_t x, int32_t y) { return xmin <= x && x < xmax && 0 <= y && y < ymax; };
+    // The trace records a value only below 0x100000: a negative argument prints '*', a negative register 0.
     auto emit = [&](uint32_t ecx, uint32_t edx, int32_t x0, int32_t y0, int32_t x1, int32_t y1, const Particle& p) {
-        std::snprintf(b, sizeof b, "10010 %x,%x,%x,%x,%x,%x,%x,%x\n", ecx, edx, unsigned(x0), unsigned(y0), unsigned(x1),
-                      unsigned(y1), unsigned(p.colour), unsigned(p.alpha));
+        std::snprintf(b, sizeof b, "10010 %x,%x", ecx < 0x100000u ? ecx : 0u, edx < 0x100000u ? edx : 0u);
         out += b;
+        for (uint32_t v : {uint32_t(x0), uint32_t(y0), uint32_t(x1), uint32_t(y1), uint32_t(p.colour), uint32_t(p.alpha)}) {
+            if (v >= 0x100000u) out += ",*"; else { std::snprintf(b, sizeof b, ",%x", v); out += b; }
+        }
+        out += '\n';
     };
     for (int32_t i = 0; i <= g.maxIndex; ++i) {
         const Particle& p = g.pool[i];

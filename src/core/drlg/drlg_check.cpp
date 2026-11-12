@@ -25,6 +25,7 @@
 #include "drlg_room_snapshot.h"
 #include "../../../tools/vectorfmt/vectorfmt.h"
 #include "../../assets/mpqvfs.h"
+#include "../d2cmp/d2cmp_palstate.h"
 
 static D2DrlgActStrc* g_act = nullptr;
 static uint8_t g_actNo = 0;
@@ -392,9 +393,10 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_drlg_client_room_status_cells(int levelId
 // pFirstRoomEx order, walls = list A, roofs = list B. Units are not staged (skipUnits stays the caller's).
 extern "C" uint32_t d2_dg_stage_unit(uint32_t, int32_t, int32_t, int32_t, uint32_t, uint32_t, uint32_t);
 extern "C" void d2_dg_stage_unit_cof(uint32_t, const uint8_t*);
+extern "C" void d2_dg_stage_unit_palshift(uint32_t);
 extern "C" void d2_dg_stage_unit_frac(uint32_t, uint32_t, uint32_t);
 struct FeedUnit { int32_t type, cls, sx, sy; uint32_t flags, flagsEx; uint8_t cof[0x18]; bool hasCof;
-                  bool hasId; uint32_t id, mode, fx, fy; int32_t slot, rank, floor; };
+                  bool hasId; uint32_t id, mode, fx, fy; int32_t slot, rank, floor; bool palshift = false; };
 static std::vector<FeedUnit> g_feedUnits;   // the caller's per-tick client units (JS has no game logic: raw fields only)
 static bool g_cruLive;                      // a unit with an id was fed: rooms walk the persistent client room lists
 EMSCRIPTEN_KEEPALIVE void d2_dg_feed_unit(int type, int cls, int sx, int sy, uint32_t flags, uint32_t flagsEx) {
@@ -418,7 +420,9 @@ extern "C" void d2c_cru_set_aux(int32_t, uint32_t);
 extern "C" int32_t d2c_cru_rank(int32_t);
 extern "C" int32_t d2c_cru_a6180(int32_t);
 extern "C" void d2_dg_stage_room_list(int32_t);
-EMSCRIPTEN_KEEPALIVE void d2_dg_cru_reset() { d2c_cru_reset(); g_cruLive = false; }
+extern "C" void d2_dg_hit_reset();
+extern "C" void d2_dg_stage_unit_id(uint32_t, uint32_t);
+EMSCRIPTEN_KEEPALIVE void d2_dg_cru_reset() { d2c_cru_reset(); d2_dg_hit_reset(); g_cruLive = false; }
 // After d2_dg_feed: fed unit i's position in its room's unit list (0 = first drawn of its room, -1 = in no client room), and
 // whether D2Client 7A5D0 puts it on the floor list (A6180 or unit +0xC4 bit 20: drawn with the floor, before every wall).
 EMSCRIPTEN_KEEPALIVE int d2_dg_unit_rank(int i) { return i >= 0 && i < (int)g_feedUnits.size() ? g_feedUnits[i].rank : -1; }
@@ -428,7 +432,37 @@ EMSCRIPTEN_KEEPALIVE int d2_dg_feed_unit_cof(const char* path) {
     std::vector<uint8_t> f;
     if (g_feedUnits.empty() || !path || !d2::sharedVfs().read(path, f) || f.size() < 0x18) return 0;
     memcpy(g_feedUnits.back().cof, f.data(), 0x18); g_feedUnits.back().hasCof = true;
+    // a monster's class loads Data\Global\Monsters\<token>\COF\palshift.dat when present (D2Client+0x53C30, from the 0xAC handler)
+    if (g_feedUnits.back().type == 1) {
+        std::string p(path); size_t s = p.find_last_of('\\');
+        if (s != std::string::npos && d2::sharedVfs().read((p.substr(0, s + 1) + "palshift.dat").c_str(), f) && !f.empty()) g_feedUnits.back().palshift = true;
+    }
     return 1;
+}
+// An object class's objects.txt token (D2ObjectsTxt+0xC0, up to 3 chars, NUL-terminated): the name an object's COF path
+// is built from (data\global\objects\<token>\cof\<token><mode><weapon class>.cof). "" for a class outside the table.
+EMSCRIPTEN_KEEPALIVE const char* d2_dg_object_token(int cls) {
+    static char tok[4];
+    tok[0] = 0;
+    if (!d2_drlg_init() || cls < 0 || cls >= sgptDataTables->nObjectsTxtRecordCount) return tok;
+    memcpy(tok, DATATBLS_GetObjectsTxtRecord(cls)->szToken, 3); tok[3] = 0;
+    return tok;
+}
+static_assert(sizeof(D2MonStatsTxt) == 0x1A8, "the monstats row 1.13c D2Client+0x68CF0 indexes");
+// A monster class's monstats byte +0xD (D2Client+0x68CF0 tests bit 4 for the blue flash). 0 for a class outside the table.
+extern "C" EMSCRIPTEN_KEEPALIVE uint8_t d2_dg_monstats_0d(int32_t cls) {
+    const D2MonStatsTxt* m = d2_drlg_init() ? DATATBLS_GetMonStatsTxtRecord(cls) : nullptr;
+    return m ? reinterpret_cast<const uint8_t*>(m)[0xd] : 0;
+}
+// D2Win #10190 (D2Win+0xED70 -> D2CMP #10049, the nearest entry, d2cmp_sub_9d30) over the current act's palette: pal.dat holds B,G,R
+// triplets, the module palette R,G,B,0 entries.
+extern "C" EMSCRIPTEN_KEEPALIVE uint8_t d2_dg_pal_near(uint8_t r, uint8_t g, uint8_t b) {
+    char path[64]; std::snprintf(path, sizeof path, "DATA\\GLOBAL\\PALETTE\\ACT%d\\PAL.DAT", int(g_actNo) + 1);
+    std::vector<uint8_t> f;
+    if (!d2::sharedVfs().read(path, f) || f.size() < 0x300) return 0;
+    uint8_t pal[0x400];
+    for (int j = 0; j < 0x100; j++) { pal[j * 4] = f[j * 3 + 2]; pal[j * 4 + 1] = f[j * 3 + 1]; pal[j * 4 + 2] = f[j * 3]; pal[j * 4 + 3] = 0; }
+    return (uint8_t)d2cmp_sub_9d30(pal, 0x100, r, g, b);
 }
 extern "C" void d2_dg_stage_reset();
 extern "C" uint32_t d2_dg_stage_tile(uint32_t, uint32_t, int32_t, int32_t, int32_t, int32_t);
@@ -477,7 +511,9 @@ uint32_t d2_dg_feed_level(D2DrlgLevelStrc* lv, int l, int t, int r, int b, int o
                 if (!f) continue;
                 uint32_t k = d2_dg_stage_unit((uint32_t)f->cls, f->type, f->sx, f->sy, (uint32_t)d2c_cru_a6180(s), (f->flags >> 20) & 1, (f->flagsEx & 1) ? 0 : 1);
                 if (f->hasCof) d2_dg_stage_unit_cof(k, f->cof);
+                if (f->palshift) d2_dg_stage_unit_palshift(k);
                 d2_dg_stage_unit_frac(k, f->fx, f->fy);
+                d2_dg_stage_unit_id(k, f->id);
                 d2c_cru_set_aux(s, k);
                 if (!nU++) u0 = k;
             }
@@ -490,6 +526,7 @@ uint32_t d2_dg_feed_level(D2DrlgLevelStrc* lv, int l, int t, int r, int b, int o
             if (tx < room->nTileXPos || ty < room->nTileYPos || tx >= room->nTileXPos + room->nTileWidth || ty >= room->nTileYPos + room->nTileHeight) continue;
             uint32_t k = d2_dg_stage_unit((uint32_t)u.cls, u.type, u.sx, u.sy, 0, (u.flags >> 20) & 1, (u.flagsEx & 1) ? 0 : 1);   // flagsEx bit0: the unit +0xC8 bit7 (the shadow node) is clear
             if (u.hasCof) d2_dg_stage_unit_cof(k, u.cof);
+            if (u.palshift) d2_dg_stage_unit_palshift(k);
             d2_dg_stage_unit_frac(k, u.hasId ? u.fx : 0x8000, u.hasId ? u.fy : 0x8000);   // a plain feed carries no fraction: the subtile centre
             if (!nU++) u0 = k;
         }

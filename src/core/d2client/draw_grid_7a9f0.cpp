@@ -5,6 +5,7 @@
 #include <initializer_list>
 #include <cstdint>
 #include <cstring>
+#include <cstdlib>
 #include <emscripten.h>
 #include "client_host.h"
 
@@ -235,7 +236,18 @@ uint32_t g_nTiles, g_nRooms, g_nUnits, g_roomNodes[kMaxRooms];
 // The COF header each staged unit's cel chain ends in (unit+0x54 -> +0x28 node -> +8 -> +0x14): byte 0 the layer count, +8/+0xC/+0x10/+0x14 the
 // xMin/xMax/yMin/yMax box the 6A3D0 cull reads. has = 0: no COF staged (the walk then fakes the layer count and an empty box).
 struct { int32_t h[6]; uint32_t has; } g_unitCof[kMaxUnits];
+static uint8_t g_unitPal[kMaxUnits];   // d2_dg_stage_unit_palshift
 int32_t g_view[4], g_ox, g_oy; uint32_t g_now, g_skipUnits;
+uint32_t g_unitId[kMaxUnits];
+// The client unit fields the hit flash reads (unit +0x58 the counter, stat 6 the life; the client's maximum life is 0x80 << 8).
+struct HitState { uint32_t type, id, c58; int32_t life; };
+HitState g_hits[64]; uint32_t g_nHits;
+HitState* hitFind(uint32_t type, uint32_t id, bool add) {
+    for (uint32_t i = 0; i < g_nHits; i++) if (g_hits[i].type == type && g_hits[i].id == id) return &g_hits[i];
+    if (!add || g_nHits >= 64) return nullptr;
+    g_hits[g_nHits] = {type, id, 0, 0x8000};
+    return &g_hits[g_nHits++];
+}
 }
 static_assert(kStageTiles + kMaxTiles * 0x30 > 0, "stage lives after the cells in the arena");
 
@@ -314,8 +326,23 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_stage_unit(uint32_t unit, int32_t type, int3
     uint32_t rec = kUnitRec + g_nUnits * 16;   // unit arg = classId; the node's unit pointer is the record (written in d2_dg_frame, after the arena reset)
     g_units[g_nUnits] = {rec, (int32_t)unit, type, sx, sy, a6180, bit20, bit7, 0, 0};
     g_unitCof[g_nUnits].has = 0;
+    g_unitPal[g_nUnits] = 0;
+    g_unitId[g_nUnits] = 0xffffffffu;
     return g_nUnits++;
 }
+// The staged unit k's client id (the hit-flash table below is keyed by type and id).
+EMSCRIPTEN_KEEPALIVE void d2_dg_stage_unit_id(uint32_t k, uint32_t id) { if (k < g_nUnits) g_unitId[k] = id; }
+// A unit's hit as 1.13c D2Client+0x4DC70 applies it (packet 0x69 state 6, packet 0x0C animation 0x13): the life byte's low 7 bits v,
+// bumped by one above 1, become stat 6 = v << 8 when non-zero; then 0xA4B60 sets the flash counter (unit +0x58) to 3. Held per (type, id).
+EMSCRIPTEN_KEEPALIVE void d2_dg_unit_hit(uint32_t type, uint32_t id, uint32_t lifeByte) {
+    HitState* h = hitFind(type, id, true);
+    if (!h) return;
+    uint32_t v = lifeByte & 0x7f;
+    if (v > 1) v++;
+    if (v) h->life = (int32_t)(v << 8);
+    h->c58 = 3;
+}
+EMSCRIPTEN_KEEPALIVE void d2_dg_hit_reset() { g_nHits = 0; }
 // The staged unit k's fp16 position fraction (the client unit's path; a static unit ignores it).
 EMSCRIPTEN_KEEPALIVE void d2_dg_stage_unit_frac(uint32_t k, uint32_t fx, uint32_t fy) {
     if (k < g_nUnits) { g_units[k].fx = fx & 0xffff; g_units[k].fy = fy & 0xffff; }
@@ -324,6 +351,8 @@ EMSCRIPTEN_KEEPALIVE void d2_dg_stage_unit_frac(uint32_t k, uint32_t fx, uint32_
 EMSCRIPTEN_KEEPALIVE void d2_dg_stage_unit_cof(uint32_t k, const uint8_t* hdr) {
     if (k < g_nUnits && hdr) { memcpy(g_unitCof[k].h, hdr, sizeof g_unitCof[k].h); g_unitCof[k].has = 1; }
 }
+// The staged monster k's class has a palette shift table (D2Client+0x53C30 loads Monsters\<token>\COF\palshift.dat into DAT_6fbc7804[class]).
+EMSCRIPTEN_KEEPALIVE void d2_dg_stage_unit_palshift(uint32_t k) { if (k < g_nUnits) g_unitPal[k] = 1; }
 EMSCRIPTEN_KEEPALIVE void d2_dg_stage_room(int32_t r5c, int32_t r60, int32_t r64, int32_t r68, int32_t subX, int32_t subY,
                                            uint32_t nA, uint32_t a0, uint32_t nB, uint32_t b0, uint32_t nU, uint32_t u0) {
     if (g_nRooms < kMaxRooms) g_rooms[g_nRooms++] = {r5c, r60, r64, r68, subX, subY, nA, nB, nU, a0, b0, u0, -1};
@@ -450,7 +479,17 @@ static void lo10494(uint32_t type, uint32_t state) {
     if (type == 2 || type == 4) g_lecx = type; else if (type <= 3) { g_lecx = state & 0x1f; g_ledx = 0; }
 }
 static uint32_t g_p6cc00;   // 6CC00's edx argument (666D0's call)
-static void rec10041(int32_t x, int32_t y, uint32_t mode) { gRec(10041, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, mode, 0}, 0, y > 0 ? (uint32_t)y : 0); }
+static void rec10041(int32_t x, int32_t y, uint32_t mode, uint32_t pal = 0) { gRec(10041, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, mode, pal}, 0, y > 0 ? (uint32_t)y : 0); }
+// 1.13c D2Client+0x53A30: a monster (type 1) whose class loaded a palette shift table draws through the table's shift row
+// (unit+0x54)+0x38, which D2Client+0xA7780 sets to 2 for a plain monster (unit+0x4D below 8 gives +2): the row's address,
+// table + 4 + row * 0x100. Any other unit, or a class without a table, draws with no shift (0).
+static uint32_t g_hk;   // the staged unit stageUnit set up
+static uint32_t pal53a30() {
+    static uint8_t* tab = nullptr;
+    if (g_hu[0] != 1 || g_hk >= g_nUnits || !g_unitPal[g_hk]) return 0;
+    if (!tab) tab = (uint8_t*)calloc(0x1008, 1);
+    return (uint32_t)(uintptr_t)(tab + 4 + 2 * 0x100);
+}
 static const D2c6C490Env kE6c490 = {
     [](uint32_t a) { uint32_t v; memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }, [](uint32_t) -> int32_t { return 0; },
     // 6C490's 10013 (0x6fb1c516): ecx = DAT_6fbc9960 (the unit origin x), edx from 10350 (reads 0); 10036 keeps them.
@@ -460,16 +499,59 @@ static const D2c6C490Env kE6c490 = {
     [](int32_t) {}, [](uint32_t, int32_t x, int32_t y, int32_t f) -> int32_t { return cull6a3d0(x, y, f); },
     [](uint32_t, uint32_t a, int32_t open, int32_t, int32_t, int32_t hid) { if (open) g_ledx = a; else { g_lecx = g_hhdr[0] & 0xff; g_ledx = (uint32_t)hid; } rec10013(); },
     []() -> int32_t { return 0; }, [](uint32_t, int32_t) -> int32_t { return 0; }, []() -> uint32_t { return 0; },
-    [](uint32_t, uint32_t, uint32_t*) -> uint32_t { return 2; }, []() -> uint32_t { return 1; }, [](uint32_t, uint32_t) -> uint32_t { return 1; }, []() -> uint32_t { return 0; },
+    [](uint32_t, uint32_t, uint32_t*) -> uint32_t { return 2; }, []() -> uint32_t { return 1; }, [](uint32_t, uint32_t) -> uint32_t { return 1; }, []() -> uint32_t { return pal53a30(); },
     [](uint32_t) -> int32_t { return 0; }, [](uint32_t) -> uint32_t { return 0; }, nullptr, [](uint32_t) -> uint32_t { return 0; }, [](uint32_t) -> int32_t { return 0; }, []() -> uint32_t { return 0; },
-    [](uint32_t, const uint32_t*) -> int32_t { return 1; }, [](uint32_t, uint32_t*) -> int32_t { return 0; }, [](uint32_t, uint32_t) -> uint32_t { return 0; }, [](int32_t) -> int32_t { return 0; },
+    [](uint32_t, const uint32_t*) -> int32_t { return 1; }, [](uint32_t, uint32_t*) -> int32_t { return 0; }, [](uint32_t, uint32_t pal) -> uint32_t { return pal; }, [](int32_t) -> int32_t { return 0; },
     []() -> int32_t { return 0; }, [](uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, int32_t, uint32_t) {}, [](uint32_t) -> uint32_t { return 0; }, [](uint32_t) -> uint32_t { return 0; },
-    [](const uint32_t*, int32_t x, int32_t y, uint32_t, uint32_t mode, uint32_t) { rec10041(x, y, mode); }, [](uint32_t, int32_t) -> int32_t { return 0; }, [](uint32_t) {}, [](int32_t) {} };
+    [](const uint32_t*, int32_t x, int32_t y, uint32_t, uint32_t mode, uint32_t pal) { rec10041(x, y, mode, pal); }, [](uint32_t, int32_t) -> int32_t { return 0; }, [](uint32_t) {}, [](int32_t) {} };
+// 1.13c D2Client+0x6B700 (d2client_batch_6b700.cpp) draws a hit flash: per layer of the unit's COF one D2Gfx #10046 at the unit's place, in the colour
+// 0x68CF0 picks. Its host here: mode 0 (#10013 answers 0), the client XY, the 6A3D0 cull, the staged COF header as the layer record (byte 0 the layer
+// count), layers in order. Register leftovers (the retail captures): 0x6E670's 10013 per layer reads ecx/edx 0 after 0x6EA50, then 8/0 after each 10046;
+// 10046 itself carries ecx = x (mov ecx,[esp+0x10]) and edx = a stack pointer.
+struct H6b700 {
+    int32_t (*gfx10013)(); int32_t (*cm10651)(uint32_t); int32_t (*cm11142)(uint32_t); int32_t (*cm11168)(uint32_t, int32_t, int32_t*, int32_t*);
+    int32_t (*cm11080)(uint32_t, int32_t); void (*gfx10023)(int32_t); int32_t (*cm10175)(uint32_t); void (*cm10350)(uint32_t, int32_t*, int32_t*, int32_t*);
+    uint8_t (*cm10663)(uint32_t); void (*cm10569)(uint32_t, int32_t*, int32_t*); int32_t (*cm10866)(uint32_t, int32_t); int32_t (*cm10431)(uint32_t, int32_t, int32_t*, int32_t, int32_t);
+    void (*gfx10046)(const uint32_t*, int32_t, int32_t, uint8_t); uint32_t (*d560d0)(uint32_t); void (*d6a860)(uint32_t); int32_t (*d6a3d0)(uint32_t, int32_t, int32_t, int32_t);
+    uint8_t (*d18cf0)(); uint32_t (*d19910)(uint32_t, int32_t); uint32_t (*d1a2f0)(int32_t, int32_t, uint32_t); const uint8_t* (*d19090)(uint32_t, int32_t);
+    void (*d1dca0)(uint32_t, int32_t, int32_t, int32_t, int32_t*, int32_t*, int32_t*, uint8_t, int32_t); uint8_t* (*d1d6d0)(const uint8_t*, int32_t, int32_t);
+    int32_t (*d1ea50)(const uint8_t*, uint8_t*, int32_t*, int32_t, int32_t); int32_t (*d1e670)(uint32_t, uint8_t); int32_t (*d1e2c0)(uint32_t, uint32_t*, int32_t*); void (*fatal)(uint32_t); };
+extern "C" int32_t d2_client_6b700(uint32_t, const H6b700*, int32_t, int32_t, int32_t, int32_t, int32_t);
+struct D2c68cf0Env { uint8_t (*ord10190)(uint8_t, uint8_t, uint8_t); uint8_t (*monFlags0d)(int32_t); int32_t life, maxLife; };
+extern "C" uint8_t d2c_68cf0(uint32_t, int32_t, const D2c68cf0Env*);
+extern "C" uint8_t d2_dg_pal_near(uint8_t, uint8_t, uint8_t);   // D2Win #10190 over the act palette (drlg_check.cpp)
+extern "C" uint8_t d2_dg_monstats_0d(int32_t);                  // the monstats row's byte +0xD (drlg_check.cpp)
+static HitState* curHit() { return g_hk < g_nUnits && g_unitId[g_hk] != 0xffffffffu ? hitFind((uint32_t)g_units[g_hk].type, g_unitId[g_hk], false) : nullptr; }
+static uint8_t g_layerIdx[256];
+static const H6b700 kH6b700 = {
+    []() -> int32_t { return (int32_t)rec10013(); }, [](uint32_t) -> int32_t { return g_hpx; }, [](uint32_t) -> int32_t { return g_hpy; },
+    [](uint32_t, int32_t, int32_t*, int32_t*) -> int32_t { return 0; }, [](uint32_t, int32_t) -> int32_t { return 0; }, [](int32_t) {}, [](uint32_t) -> int32_t { return 0; },
+    [](uint32_t, int32_t*, int32_t*, int32_t*) {}, [](uint32_t) -> uint8_t { return 0; }, [](uint32_t, int32_t*, int32_t*) {}, [](uint32_t, int32_t) -> int32_t { return 0; },
+    [](uint32_t, int32_t, int32_t*, int32_t, int32_t) -> int32_t { return 0; },
+    [](const uint32_t*, int32_t x, int32_t y, uint8_t al) { gRec(10046, {0x100000u, (uint32_t)x, (uint32_t)y, al}, (uint32_t)x, 0x100000u); g_lecx = 8; g_ledx = 0; },
+    [](uint32_t) -> uint32_t { return 0; }, [](uint32_t) {}, [](uint32_t, int32_t x, int32_t y, int32_t f) -> int32_t { return cull6a3d0(x, y, f); },
+    []() -> uint8_t { const HitState* h = curHit(); const D2c68cf0Env e{d2_dg_pal_near, d2_dg_monstats_0d, h ? h->life : 0x8000, 0x8000};
+                      return d2c_68cf0(g_hu[0], (int32_t)g_hu[1], &e); },
+    [](uint32_t, int32_t) -> uint32_t { return 1; }, [](int32_t, int32_t, uint32_t) -> uint32_t { return 1; }, [](uint32_t, int32_t) -> const uint8_t* { return (const uint8_t*)g_hhdr; },
+    [](uint32_t, int32_t, int32_t, int32_t, int32_t*, int32_t*, int32_t*, uint8_t, int32_t) {},
+    [](const uint8_t*, int32_t, int32_t) -> uint8_t* { for (int i = 0; i < 256; i++) g_layerIdx[i] = (uint8_t)i; return g_layerIdx; },
+    [](const uint8_t*, uint8_t*, int32_t*, int32_t, int32_t) -> int32_t { g_lecx = 0; g_ledx = 0; return 1; },
+    [](uint32_t, uint8_t) -> int32_t { rec10013(); return 1; }, [](uint32_t, uint32_t*, int32_t*) -> int32_t { return 1; }, [](uint32_t) {} };
+// 1.13c D2Client+0xA4B90 (eax = unit): no flash pending (unit +0x58 == 0) answers false; otherwise the counter drops by one and the answer is
+// D2Common #10494(unit, 0x8F) == 0 (the state the client does not set: true). Its leftover is the state test's (ecx = 0xF, edx = 0).
+static bool gateA4b90() {
+    HitState* h = curHit();
+    if (!h || !h->c58) return false;
+    h->c58--;
+    lo10494(g_hu[0], 0x8f);
+    return true;
+}
 static const H6cc00 kH6cc00 = {
     // 6CC00's 10013 (0x6fb1cc0b): ecx = the unit (reads 0), edx = its edx argument.
     []() -> uint32_t { g_lecx = 0; g_ledx = g_p6cc00; return rec10013(); }, []() -> uint32_t { return 0; }, [](uint32_t, void*, void*, void*) {}, [](uint32_t) -> uint8_t { return 0; }, [](uint32_t) {}, []() -> uint32_t { return 0; },
     [](uint32_t) -> int { return 0; }, [](uint32_t, int, int) -> uint32_t { return 0; }, [](void*, int, int) -> int { return 1; }, [](int, uint32_t, void*, int) -> int { return 0; },
-    [](uint32_t, int32_t x, int32_t y, uint32_t, uint32_t col, int32_t) { rec10041(x, y, col); }, []() -> bool { return false; }, []() {},
+    [](uint32_t, int32_t x, int32_t y, uint32_t, uint32_t col, int32_t) { rec10041(x, y, col); }, gateA4b90,
+    []() { d2_client_6b700((uint32_t)(uintptr_t)g_hu, &kH6b700, 0, 640, g_uoy, g_uox, 0); },
     [](uint32_t u) -> int { return d2c_6c490(&kE6c490, u, 0, 0, g_uox, 0, g_uoy, 0, 640, g_hself, 0, 0, 0, 1); },
     [](uint32_t, void* r) -> int { uint32_t* w = (uint32_t*)r; w[16] = 0; w[17] = (uint32_t)g_hpy; return 1; }, []() -> uint32_t { return g_hself; }, []() -> uint32_t { return 0; },
     [](uint32_t, uint32_t, int, int, int, int) {} };
@@ -489,6 +571,7 @@ static uint32_t stageUnit(uint32_t rec) {
     uint32_t u = (uint32_t)(uintptr_t)g_hu;
     memset(g_hinfo, 0, sizeof g_hinfo); memset(g_hnode, 0, sizeof g_hnode); memset(g_hx, 0, sizeof g_hx); memset(g_hhdr, 0, sizeof g_hhdr);
     uint32_t k = (rec - kUnitRec) / 16;
+    g_hk = k;
     if (k < g_nUnits) clientXY(g_units[k], &g_hpx, &g_hpy); else { g_hpx = (sx - sy) * 16; g_hpy = (sx + sy) * 8; }
     if (k < g_nUnits && g_unitCof[k].has) memcpy(g_hhdr, g_unitCof[k].h, sizeof g_hhdr); else g_hhdr[0] = g_hu[0] == 0 ? 8 : 1;
     g_hu[0x54 / 4] = (uint32_t)(uintptr_t)g_hinfo; g_hinfo[0x28 / 4] = (uint32_t)(uintptr_t)g_hnode;

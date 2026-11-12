@@ -74,25 +74,29 @@ EMSCRIPTEN_KEEPALIVE i32 d2c_6c490(const D2c6C490Env* e, u32 unit, u32 cls, u32 
     if (!hdr) return 0;
     // ponytail: remaining component loop follows the spec; header bytes read through rd32 are byte-masked
     u32 count = e->rd32(hdr) & 0xff;
-    u32 pal = e->f3a30();
+    // [esp+0x20]: 0, or with unit+0x6C set D2Win's palette for it (0x6fb1c5f8); when still 0, 0x53A30's palette shift row (0x6fb1c6ec).
+    u32 pal = e->rd32(unit + 0x6c) ? (u32)e->ord10164() : 0;
+    if (!pal) pal = e->f3a30();
     for (u32 i = 0; i < count; i++) {
         u32 comp = e->rd32(unit + 0x100 + i) & 0xff;
         u32 rec[18] = {0};
         rec[0] = 0; ((uint8_t*)rec)[5] = (uint8_t)comp; rec[16] = (u32)e->f56fc0(unit); rec[13] = 0;
         if (comp == 0xe) { u32 o = e->f560d0(); if (o && (e->rd32(o) == 3 || e->ord10494(o, 0x8f))) e->f166d0(o); continue; }
-        u32 pk = unit;
-        if (comp == 0xf && e->f1260() && gcc380) pk = gcc2d8;
+        // per component [esp+0x14] = [esp+0x20]; component 0xF draws with 0, or DAT_6fbcc2d8 for a monster (0x6fb1c7fd)
+        u32 p = pal;
+        if (comp == 0xf) { p = 0; if (type == 1 && e->f1260() && gcc380) p = gcc2d8; }
         if (!e->f1e2c0(unit, rec)) continue;
         u32 mode = 5;
         i32 dm = e->f1dfe0(comp, &mode);
-        u32 p = pk;
+        // 0x6fb1c8a1: [esp+0x2c] (1 unless 0xCC16's state test clears it; unported) and (type != 0 or unit+0x6C != 0x6C): 0x6DEE0's item palette
+        if (type != 0 || e->rd32(unit + 0x6c) != 0x6c) p = e->f1dee0(comp, p);
         if (e->f1d780(1) == 0) {
             if (!over && !dm) mode = 5; else if (over && !dm) mode = 7;
             e->ord10041(rec, x, y, 0, mode, p);
         } else {
             e->ord10016(0, e->ord11080(unit), e->ord11168(unit), 0, mode, over, p);
         }
-        (void)g17c8; (void)type; (void)st; (void)pal;
+        (void)g17c8; (void)st;
     }
     if (xy[1]) e->f6aee0(unit, 0, 0, -1, -1, hid);   // 6C490 tail: the closing 6AEE0 call (b=0) after the component loop, guarded as the opening one
     if (hid) e->ord10083(xy[0]);

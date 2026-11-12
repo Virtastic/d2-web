@@ -1198,6 +1198,11 @@ static std::unordered_set<D2DrlgRoomStrc*> g_sessionClientRoomsSeen;   // D2Clie
 static void sessionClientMonsterModeReset();
 static uint32_t g_sessionClientFrame = 0;   // the client frames run since the session began (the frame tail counts them)
 extern "C" uint32_t d2_session_client_frame_now() { return g_sessionClientFrame; }
+// The client frame from which the recorded rig's screen (D2Client+0x8BC48/0x8BC4C) reads 800x600; before it, 640x480.
+// Rigs differ: some switch at their 13th frame, others hold 640x480 for the whole recording (every rain line they draw
+// stays inside 640x480). The replay names its rig; 0 = never switch.
+static uint32_t g_sessionScreenSwitchFrame = 13;
+extern "C" EMSCRIPTEN_KEEPALIVE int d2_session_client_screen_switch_frame(int frame) { g_sessionScreenSwitchFrame = frame > 0 ? (uint32_t)frame : 0xffffffffu; return 1; }
 
 static void resetSessionClientMapMirror() {
     if (g_sessionClientPlayerUnit) UNITS_FreeUnit(g_sessionClientPlayerUnit);
@@ -8516,7 +8521,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             env.weatherLevel = DATATBLS_GetRainFromLevelsTxt(g_currentLevel) != 0;
             // D2Client+0x8BC48/0x8BC4C as the headless retail rig holds them: 640x480 until its 13th client frame, then
             // 800x600 (the spawn bound range turns 513 then). Not the window: the rig has none.
-            env.cellW = g_sessionClientFrame >= 13 ? 800 : 640; env.cellH = g_sessionClientFrame >= 13 ? 600 : 480;
+            const bool wide = g_sessionClientFrame >= g_sessionScreenSwitchFrame;
+            env.cellW = wide ? 800 : 640; env.cellH = wide ? 600 : 480;
             // 1.13c D2Client+0x5F020 runs 0x4F860 first, before the frame's weather pass; same hero seed.
             { const D2LevelsTxt* lv = DATATBLS_GetLevelsTxtRecord(g_currentLevel); d2client_sound_stage_feed(lv ? (uint32_t)(lv->dwSoundEnv & 0xff) : 0); }
             sessionClientSoundUnits();
