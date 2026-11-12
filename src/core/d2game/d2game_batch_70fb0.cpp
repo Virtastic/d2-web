@@ -163,7 +163,7 @@ struct D2Game75c60Env {
     void (*f75a40)(void* game, uint32_t tag, int32_t* unit);
 };
 // 1.13c-NAMED D2Game+0x75C60: EAX=unit, EBX=game. GUESS: a10362/a10973 register args hidden.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_75c60(int32_t* unit, void* game, const D2Game75c60Env* e) {
+extern "C" uint32_t D2Game_75C60_Named(int32_t* unit, void* game, const D2Game75c60Env* e) {
     if (!unit) return 0;
     int k = e->a10362();
     if (k < 0) return 0;

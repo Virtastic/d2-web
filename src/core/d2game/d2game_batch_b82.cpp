@@ -43,7 +43,7 @@ static const uint8_t* findUnit(const uint8_t* game, uint32_t base, uint32_t id, 
 }
 
 // 1.13c D2Game+0x79850
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_79850(void* p1, const uint8_t* p2, const D2GameB82Env* e)
+extern "C" void D2Game_79850_Named(void* p1, const uint8_t* p2, const D2GameB82Env* e)
 {
     int mode = 0;
     bool call = false;
