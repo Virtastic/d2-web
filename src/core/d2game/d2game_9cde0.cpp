@@ -3,7 +3,7 @@
 // Gates: unit non-null; byte unit+0xC6 bit 0 clear; type 0 with id (+0x10) not 0 and not 0x11, or type 1 with id not 0 and not 0xC;
 // the skills row (*arg1) +8 has bit 0x20; then the 64-bit LCG at unit+0x20 steps once (lo*0x6AC690C5 + hi) and lo % 100 must be below 40.
 // The skill id (callee 0x18A0, EAX = unit) is range-checked against the data-table count at +0xA80 (else -1); callee 0x15D0 (EAX = class, EDX = 1)
-// gives a flag forced to 1 for ids 10, 0x159, 0x22D. A is the level word from #11027; the 0x47450 out-pointer (&B, &A) rewrites both. 0x1280 takes
+// gives a flag forced to 1 for ids 10, 0x159, 0x22D. A is the level word from #11027; the 0x47450 out-pointers (&B, &arg1) rewrite B and arg1. 0x1280 takes
 // EAX = p, EBX = B, EDI = arg1. Every callee is an Env function. Pointers are 32-bit words read by byte offset.
 #include <cstdint>
 #include <cstring>
@@ -56,7 +56,9 @@ extern "C" uint32_t d2g_9cde0(const D2G9CDE0Env* ep, uint32_t unit, uint32_t arg
     const uint32_t p = e.a478(unit);
     const uint32_t r30 = e.s1130(unit), r00 = e.s1100(unit);
     const uint32_t q = e.af28(p, r00, r30);
-    if (!e.s47450(arg0, p, q, (uint32_t)ebx, &B, &A, 0)) return 0;
+    // The second out-pointer is arg1's own stack slot (lea [esp+0x20] after one push = the caller's arg1), not A: 0x47450 rewrites arg1,
+    // which 0x1280 (EDI) and 0xF2380 then take; A (the 0xA718 level, a local) is left as it was.
+    if (!e.s47450(arg0, p, q, (uint32_t)ebx, &B, &arg1, 0)) return 0;
     const uint32_t o = e.s1280(p, B, arg1);
     if (!o) return 0;
     if (e.a808(o)) return 0;

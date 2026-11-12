@@ -1,7 +1,7 @@
 // 1.13c D2Game+0x91A30: stdcall (a0 = holder unit, a1 = owner unit, a2 = accumulator; ret 0xC).
 // The owner's stat 0x15E picks a row of the skills table (dt+0xB98, stride 0x23C, count dt+0xBA0), stat 0x15F its level, raised by 0xA400(a0, 0xA3F4(ecx = a0,
 // edx = row, 1)); a level above 0 and row word +0x54 (a state id below dt+0xBD4) read back as the state level through 0xA712(a1, state, 0); then 0x9F210
-// (eax = ebx = row, stack a2, level) runs. A row whose byte +0x1DC is 4 with state level 2 or 3 adds acc+0x30 / 0x21BC0(eax = row) to acc+0x34 (when it is nonzero);
+// (eax = ebx = row, stack a2, level) runs. A row whose byte +0x1DC is 4 with state level 2 or 3 adds acc+0x30 / row dword +0x14C (0x1BC0) to acc+0x34 (when it is nonzero);
 // either way acc+5 |= 0x40. dt = *sgptDataTables.
 #include "d2game_seam4e.h"
 extern "C" void d2game_91a30(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t dt, const D2Seam* e)
@@ -21,7 +21,8 @@ extern "C" void d2game_91a30(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t dt,
     if (lvl <= 0) return;
     e->call(0x9F210, (uint32_t)idx, 0, 0, (uint32_t)idx, 0, a2, (uint32_t)v);
     if (d2rd8(row + 0x1DC) == 4 && lvl > 1 && lvl < 4) {
-        const int32_t d = (int32_t)e->call(0x21BC0, (uint32_t)idx);
+        // 0x1BC0(eax = idx): the same row's dword +0x14C (0 for an index outside the table); a leaf, run in place, not a hook.
+        const int32_t d = (int32_t)d2rd32(row + 0x14C);
         if (d != 0) {
             const int32_t q = (int32_t)d2rd32(a2 + 0x30) / d;
             d2wr32(a2 + 0x34, d2rd32(a2 + 0x34) + (uint32_t)q);

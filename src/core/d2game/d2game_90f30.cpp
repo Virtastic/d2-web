@@ -14,12 +14,14 @@ struct D2Game90F30Env {
     void (*sub3CA)(uint32_t unit, uint32_t n, uint32_t zero);         // 0xA3CA
 };
 // 1.13c D2Game+0x90F30
-void d2game_port_90f30(uint32_t unit, uint32_t dt, uint32_t maskTab, const D2Game90F30Env* env)
+// Returns the EAX retail leaves: 0 when 0xAF88 is 0, the word count when it is not positive, else the spent loop counter (0).
+uint32_t d2game_port_90f30(uint32_t unit, uint32_t dt, uint32_t maskTab, const D2Game90F30Env* env)
 {
-    if (!env->subAF88(unit)) return;
+    if (!env->subAF88(unit)) return 0;
     const uint32_t src = env->subAFAC(unit);
     const int32_t bits = (int32_t)d2g8::r32(dt, 0xC4) + 0x1F;
     const int32_t nwords = (bits + (int32_t)(((uint32_t)(bits >> 31)) & 0x1F)) >> 5;
+    if (nwords <= 0) return (uint32_t)nwords;
     uint32_t buf[8] = {0};
     for (int32_t i = 0; i < nwords && i < 8; ++i) buf[i] = d2g8::r32(src, (uint32_t)i * 4);
     uint32_t base = 0;
@@ -38,4 +40,5 @@ void d2game_port_90f30(uint32_t unit, uint32_t dt, uint32_t maskTab, const D2Gam
             bit = env->bitScan(w);
         }
     }
+    return 0;
 }

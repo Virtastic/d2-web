@@ -20,8 +20,8 @@ extern "C" void d2game_92bb0(uint32_t idx, uint32_t a0, uint32_t a1, uint32_t a2
         e->blk(0x92360, q, 28);
     }
     q[24] = 1;
-    uint32_t cl = d2rd8(a3 + 0x1A5);
-    if (!cl) cl = 0x80;
-    e->call(0xDDDE0, a1, cl, 0, 0, 0, a0, a2);
+    // cl = byte a3+0x1A5, or 0x80 when it is 0: the hook logs EAX only (REGS aD), so the seam gets ECX as 0 like every unlogged register.
+    (void)a3;
+    e->call(0xDDDE0, a1, 0, 0, 0, 0, a0, a2);
     e->blk(0xDDDE0, q, 9);
 }

@@ -548,16 +548,16 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_972C0(uint32_t eaxList, uint32_t ebx,
     }
 }
 
-// 7-byte 0x9B message: byte 0 = 0x9B, bytes 1..4 = ECX, bytes 5..6 = AX (the disassembly stores both registers;
-// the decompile shows only the opcode byte). The client is the stack argument and goes to 0x8A3E0 in EAX.
+// 7-byte 0x9B message: byte 0 = 0x9B, bytes 1..2 = AX, bytes 3..6 = ECX (the disassembly stores AX at +5 and ECX at +0xB of
+// the frame, the buffer starting at +4; the decompile shows only the opcode byte). The client is the stack argument and goes to 0x8A3E0 in EAX.
 // 1.13c D2Game+0x8a690
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8A690(uint32_t ecx, uint32_t eax, const D2GameBatch1EF50Env* env)
 {
     uint8_t buf[7];
     buf[0] = 0x9B;
-    std::memcpy(buf + 1, &ecx, 4);
-    std::memcpy(buf + 5, &eax, 2);
+    std::memcpy(buf + 1, &eax, 2);   // AX at bytes 1-2, ECX at bytes 3-6
+    std::memcpy(buf + 3, &ecx, 4);
     env->sub8A3E0(buf, 7);
 }
 
