@@ -17,7 +17,7 @@ int d2client_realm_a2f60(D2UnitStrc* unit, int skillId, int level, const RealmSk
     D2UnitStrc* weapon = unit ? D2Common_10434(unit, 0) : nullptr;
     if (!weapon) return 0;
     const int missile = ITEMS_GetMissileType(weapon);
-    if (ITEMS_GetItemType(weapon) == 0x26) return 0;
+    if (ITEMS_GetItemType(weapon) == 0x26) return 1;   // the +0xB9A80 request returns 1, as the +0xA15C0 path does
     int x = 0, y = 0;   // +0xA15C0
     if (!d2client_realm_a1340(unit, host, &x, &y) || !x || !y) return 1;
     D2UnitStrc* owner = unit;  // +0xB0450
