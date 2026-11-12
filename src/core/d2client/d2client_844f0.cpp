@@ -35,7 +35,7 @@ extern "C" void d2c_844f0(uint32_t pkt, const cl::Env& e) {
         e.H(0xa6ef0, iid, 4, 0, 0, 0, 0, 0xB2000000u | 0x10AE08u, iid & 0x7f);
         if (unit != pl) return;
         if ((buf[4] & 0xff) == 1) e.H(0x88a70, 0, 0, 0, 0, 0, 0, 0, 0, 1);
-        else { e.W(e.gl + 516, 1); e.W(e.gl + 528, 1); e.W(e.gl + 520, 5); e.W(e.gl + 524, 1); }   // EBX = 1 here in retail
+        else { e.W(e.gl + 516, 0); e.W(e.gl + 528, 1); e.W(e.gl + 520, 5); e.W(e.gl + 524, 0); }   // retail literals: 0x11B834=0, 0x11B864=1, 0x11B854=5, 0x11B858=0
     } else {
         if (e.H(0xca3c, buf[3], 1)) {
             e.H(0xa6ef0, id, 4, 0, 0, 0, 0, 0xB2000000u | 0x10AE08u, id & 0x7f);

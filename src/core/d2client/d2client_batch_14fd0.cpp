@@ -63,13 +63,14 @@ EMSCRIPTEN_KEEPALIVE void d2c_45e50(E45E50* e, i32 v) {
 // 1.13c D2Client+0x45EF0
 struct E45EF0 { i32 g97b8, g97b4; i32* blk58; i32 g973b, g973f; uint8_t g9663;
   i32 (*o10939)(i32); void (*getTick)(); i32 (*f2b420)(i32);
-  void (*fmt)(const char*); i32 cel97c0, cel97c4; i32 g2305; uint8_t g22f8; i32 g2309; i32 g2301; };
+  void (*fmt)(char* out, const char* f); i32 cel97c0, cel97c4; i32 g2305; uint8_t g22f8; i32 g2309; i32 g2301; };
 EMSCRIPTEN_KEEPALIVE void d2c_45ef0(E45EF0* e) {
   e->g97b8 = 0; e->g97b4 = 0; e->getTick();
   for (i32 i = 0; i < 0x58; i++) e->blk58[i] = 0;
   e->g973b = e->o10939(0); e->g973f = e->o10939(0); e->g9663 = 0;
-  e->fmt("%s\\ui\\panel\\buysell"); e->cel97c0 = e->f2b420(0);
-  e->fmt("%s\\ui\\menu\\goldbtn"); e->cel97c4 = e->f2b420(0);
+  char path[0x104];   // sprintf's buffer: retail hands its address to the cel loader in EAX
+  e->fmt(path, "%s\\ui\\panel\\buysell"); e->cel97c0 = e->f2b420((i32)(uintptr_t)path);
+  e->fmt(path, "%s\\ui\\menu\\goldbtn"); e->cel97c4 = e->f2b420((i32)(uintptr_t)path);
   e->g2305 = 0; e->g22f8 = 0; e->g2309 = 0; e->g2301 = 0; }
 
 // 1.13c D2Client+0x45FB0
