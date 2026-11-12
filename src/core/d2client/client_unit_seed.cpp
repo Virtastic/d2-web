@@ -22,6 +22,8 @@
 #include "../d2moo/include/DataTbls/MonsterTbls.h"
 #include "../d2moo/include/D2Game/UNIT/SUnit.h"
 
+extern "C" D2ActiveRoomStrc* d2_drlg_client_active_room(int x, int y);   // drlg_check.cpp: the client act's room at (x,y), or null
+
 namespace {
 struct Seed { uint32_t lo, hi; };
 std::unordered_map<const D2ActiveRoomStrc*, Seed> g_room;
@@ -97,7 +99,12 @@ void flush() {
         // zombies keep their rolls after the player's (their start facings): the Blood Moor start's loose rock (object 174, no init
         // function) is taken as the one that does not roll. ponytail: the shrine beside it (81) fits every recording equally.
         if (u->dwUnitType == UNIT_OBJECT && u->dwClassId == 174) continue;
-        const uint32_t init = roll_room(UNITS_GetRoom(u));
+        // the client finds its own room at the unit's coordinates (+0xA5A60) and rolls that room's seed; the client act
+        // allocates its rooms apart from the server's, so a town room's client seed is not the server room's (a retail
+        // capture of the Rogue Encampment start cow rolls the client room's seed). The server room stands in only
+        // where the client act has no room there.
+        const D2ActiveRoomStrc* cr = d2_drlg_client_active_room(UNITS_GetXPosition(u), UNITS_GetYPosition(u));
+        const uint32_t init = roll_room(known(cr) ? cr : UNITS_GetRoom(u));
         g_unit[key(u->dwUnitType, u->dwUnitId)] = init;
         if (u->dwUnitType == UNIT_MONSTER) monster_direction(u, init);
     }
