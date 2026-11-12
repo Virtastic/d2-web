@@ -217,6 +217,15 @@ EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_client(const uint8_t* bytes, int length) 
         ++g_server.accepted;
         return 1;
     }
+    if (opcode == 0x6B && g_server.phase == Phase::InGame) {
+        // The game joined a new client on this connection (its load part 01 00 02 went out live) and the client answered
+        // the 0x02 with its enter request: that client spawns, its holdings follow, and its first update sends 0x04.
+        if (!d2_session_client_spawned()) { refuse(opcode, -3); return 0; }
+        d2_session_client_items();
+        d2_session_client_skills();
+        ++g_server.accepted;
+        return 1;
+    }
     if (opcode == 0x6B) {           // enter game
         if (g_server.phase != Phase::Loaded || !sendPlayer()) { refuse(opcode, -3); return 0; }
         g_server.phase = Phase::InGame;

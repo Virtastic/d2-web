@@ -912,6 +912,7 @@ let realmPlayerRosterView = [];
 const realmPlayerReassignFade = createRealmPlayerReassignFade();
 const realmFrameFeed = createRealmFrameFeed();   // one read of the engine's unit records per game tick, however many chunks arrive
 let realmWorldView = null;
+let realmReloading = false;
 let realmSceneActive = false, realmSceneError = '', realmSceneEvidence = null, realmSceneTiles = [], realmSceneRevision = 0;
 let realmMonsterViews = [];
 const realmUnits = createRealmUnits({ rowOf: (classId) => realmTables().monsters.row(classId), unitInfo: (type, guid) => realmFlow?.protocol?.d2gsClientUnitInfo?.(type, guid) ?? null, hostilePlayer: (guid) => (gameRoster.relation(gameRoster.myId, guid) & 8) !== 0 });   // who is a person, an enemy, a hireling or a pet
@@ -1704,6 +1705,7 @@ function releaseRealmFlow({ closeTransports = true } = {}) {
   worldRightPointerHeld = false; heldRightPointerTicks = 0;
   realmInputState = null;
   worldPointerHeld = false;
+  realmReloading = false;
   if (realmSceneActive) { gameRoster.clear(); gameBubbles.clear(); realmSessionPresenter.reset(); partyLocal.clear(); partyVisible = false; gameSlash.replyTo = ""; realmSceneActive = false; realmAutomapOverlay = null; realmSceneTiles = []; realmSceneRevision = 0; realmSceneEvidence = null; terrain = null; snapshot = null; session = null; screen = SCREEN.TITLE; }
   if (realmFlow === flow) realmFlow = null;
   Promise.resolve(flow.d2gsReceiver?.done).catch(() => {}).then(() => {
@@ -1790,7 +1792,7 @@ function feedRealmPlayerFrame(bytes) {
   if (update.state?.guid != null) { realmWorldData().setOwner(update.state.guid); realmHud().setOwner(update.state.guid); }   // before the feed: the first stat packets name the player by guid
   feedRealmWorld(bytes);
   drainRealmResync();   // a far placement queued a position resync (retail D2Client 0x2A1B0): send it now
-  routeRealmPackets(bytes, (b) => protocol.d2gsPacketSize(b), { npcInteraction: (p) => realmInput().npcInteraction(p), applyHotkey: (p) => protocol.d2gsApplyHotkey(p), applyWeaponSwitch: (p) => protocol.d2gsApplyWeaponSwitch(p, realmFlow?.expansion === true) });
+  routeRealmPackets(bytes, (b) => protocol.d2gsPacketSize(b), { loadSuccess: () => { try { realmFlow?.d2gs?.send(Uint8Array.of(0x6b)); } catch { /* socket already closed */ } }, npcInteraction: (p) => realmInput().npcInteraction(p), applyHotkey: (p) => protocol.d2gsApplyHotkey(p), applyWeaponSwitch: (p) => protocol.d2gsApplyWeaponSwitch(p, realmFlow?.expansion === true) });
   if (update.state?.guid != null) gameRoster.myId = update.state.guid >>> 0;
   feedRealmSocial(bytes);
   realmPlayerView = update.state;
@@ -1802,6 +1804,7 @@ function feedRealmPlayerFrame(bytes) {
   if (realmWorldView?.unloadCompleteEvent || !realmWorldView?.hasLoadAct ||
       (realmSceneActive && (!realmWorldView?.hasMapReveal || !realmWorldView?.loadCompleteEvent))) {
     monsterRenderer?.resetSession?.();
+    if (realmSceneActive) realmReloading = true;   // a scene that was up drops to a reload (not the first join)
     realmSceneActive = false; realmSceneTiles = []; realmSceneRevision = 0; realmSceneEvidence = null;
     terrain = null; terrainFiles = null; terrainStats = null;
     if (worldDownScreen({ sessionOpen: realmTransport.state === 'session-open', hasLoadAct: !!realmWorldView?.hasLoadAct }) === 'loading') { if (!joinLoading.shown) joinLoading.start(); screen = SCREEN.BNET_LOBBY; }   // an act change: the loading screen until 0x04
@@ -3196,7 +3199,15 @@ function update(forceTick = false, live = false) {
   if (screen === SCREEN.OTHER_MULTIPLAYER) { ensureOtherMultiplayerScreen(); otherMultiplayerScreen?.step(); return; }
   if (screen === SCREEN.BNET_LOGIN) { bnetLoginScreen?.step(); return; }
   // The join's loading frame steps from this update tick while the join runs (joinLoading.step is a no-op otherwise).
-  if (screen === SCREEN.BNET_LOBBY) { bnetLobbyScreen?.step(); joinLoading.step(); return; }
+  if (screen === SCREEN.BNET_LOBBY) {
+    bnetLobbyScreen?.step(); joinLoading.step();
+    // A local game's server runs its frames while its client loads a new act (single player's loop, D2Client+0x44B50,
+    // runs the server frame whatever the client draws): the "in game" marker that ends the load is one of them.
+    if (realmReloading && session && realmFlow?.local && realmTransport.state === 'session-open') {
+      try { advanceEngine(forceTick); } catch (error) { sessionError = String(error?.stack || error); session = null; }
+    }
+    return;
+  }
   if (screen === SCREEN.SELECT) { ensureCharSelect(); charSelect?.step(); return; }
   if (screen === SCREEN.CREATE) { ensureCharCreate(); charCreate?.step(); return; }
   // "is the game's data mounted" has ONE answer, `window.__d2Entry.retail`, decided by
@@ -3270,7 +3281,8 @@ function update(forceTick = false, live = false) {
       queueHeldPointerRepeat(input, worldRightPointerHeld, localClientFrames, pointer.x, pointer.y, heldPointerCanRetargetWorld, 2);
       // A scripted walk in a joined game picks its next leg once per client frame, from the client's own view of the
       // hero, and sends it as the ground click's walk packet (session.move); the hero moves by the server's answer.
-      if (walkGoal && localClientFrames) { refreshRealmView(); walkStep(); }
+      // Not on a frame whose packets dropped the scene to a load: the client takes no input until the act is up again.
+      if (walkGoal && localClientFrames && screen === SCREEN.GAME) { refreshRealmView(); walkStep(); }
     }
   }
   updateAfterAdvance(engineAdvanced, live);
@@ -3309,7 +3321,8 @@ function updateAfterAdvance(engineAdvanced, live = false) {
         // all, an unchanged position is expected, and counting it let walkIdle reach its 2-update
         // threshold and REPLACE THE ROUTE before the engine had walked the current leg (Codex review
         // of this branch, measured: a long click-walk stalls or takes different hops).
-        if (walkGoal && engineAdvanced) { holdWorld(false); walkStep(); holdWorld(true); }
+        // A joined game whose packets just dropped the scene to a load is not a local game: its walk waits for the act.
+        if (walkGoal && engineAdvanced && screen === SCREEN.GAME) { holdWorld(false); walkStep(); holdWorld(true); }
         // P7b: a timed Introduction/Gossip speech is ours (its line may not be in the engine's list): the engine's read must not replace it.
         kinds = readUnitKinds(snapshot.entities.length);
         alerts = readNpcSpeechAlerts(snapshot.entities.length);
@@ -4226,7 +4239,8 @@ const realmClientView = {
   waypointTable: () => realmReads?.waypointTable ?? { rows: () => [], tabs: [] },
   skillMana: (id, level) => realmTables().skills.manaCost(id, level),
   hoverTarget: (hit = realmInput().pick(pointer.x, pointer.y)) => hit?.kind === 'item' ? groundItemHover(hit.unit) : realmUnits.hoverTarget(hit, realmMonsterViews, (classId) => { const stringIndex = Module.ccall('d2_monster_name_str', 'number', ['number'], [classId]); return { stringIndex, label: stringIndex >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [stringIndex]) : '' }; }),
-  pointerContext: () => realmUnits.cursorContext(realmInput().pick(pointer.x, pointer.y)),
+  // a joined game's shop holds its own Repair and Sell modes; the mode's buysell cel wins over the unit under the pointer
+  pointerContext: () => { const shop = realmShopView(); return shop?.repairMode ? { kind: 'repair' } : shop?.sellMode ? { kind: 'sell' } : realmUnits.cursorContext(realmInput().pick(pointer.x, pointer.y)); },
   pointerItem: () => realmWorldState?.cursorId ?? 0,
   stashBalance: (limit) => (limit ? spClientView.stashBalance(limit) : (plugyStash.showShared ? plugyGold : realmWorldState?.stashGold ?? 0)),   // the shared page shows PlugY's shared gold (its UC_SHARED_GOLD value, held by the sidecar)
   goldStat: (which) => (realmWorldState ? (which === STASH_GOLD.bank ? realmWorldState.stashGold : realmWorldState.gold) : 0),
@@ -4659,7 +4673,7 @@ async function syncRealmScene() {
     realmSceneTiles = loaded.tiles;
     realmSceneRevision = realmWorldView.mapRevision;
     realmSceneError = '';
-    realmSceneActive = true;
+    realmSceneActive = true; realmReloading = false;
     refreshRealmView();
     motion = {};
     screen = SCREEN.GAME;
@@ -6047,6 +6061,8 @@ hudHelpPointer = bindHudHelpPointer(canvas, {
   changed: () => render(),
 });
 addEventListener('keydown', (e) => {
+  // A key event with no physical key position (an on-screen keyboard, a synthesized event) still names Escape by its key.
+  if (!e.code && e.key === 'Escape') Object.defineProperty(e, 'code', { value: 'Escape' });
   if (screen === SCREEN.SELECT && e.ctrlKey && e.code === 'KeyO' && !e.repeat) { e.preventDefault(); pickCharacterFile(); return; }
   // Escape skips a boot movie, exactly as a click does (retail aborts the logo films on a key too).
   if (screen === SCREEN.TITLE && bootMovieSpec(titlePhase) && e.code === 'Escape' && !e.repeat) { titleAdvance(); e.preventDefault(); return; }

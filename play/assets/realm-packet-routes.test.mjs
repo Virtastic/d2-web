@@ -71,6 +71,12 @@ test('a 0x97 reaches the weapon-set handler', () => {
   assert.deepEqual(seen, [0x97, 0x97]);
 });
 
+test('every 0x02 game load success reaches the load handler (it answers with the enter request)', () => {
+  const seen = [];
+  routeRealmPackets(Uint8Array.from([0x02, 0x01, 0x00, 0x02]), (b) => (b[0] === 0x02 ? 1 : b[0] === 0x01 ? 2 : 0), { loadSuccess: (p) => seen.push(p[0]) });
+  assert.deepEqual(seen, [0x02, 0x02]);
+});
+
 test('a 0x28 carries the 96 quest-flag bytes: kept for type 6 and for a known unit, dropped for an unknown one', () => {
   const kept = [];
   const sent = [];

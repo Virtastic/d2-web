@@ -2210,6 +2210,10 @@ static void detachTargetFixture() {
     if (g_game && g_targetClient)   // the capture rig's join linked the client into the game's list
         for (D2ClientStrc** pp = &g_game->pClientList; *pp; pp = &(*pp)->pNext)
             if (*pp == g_targetClient) { *pp = g_targetClient->pNext; break; }
+    // A client that entered through the protocol leaves like one (CLIENTS_RemoveClientFromGame, D2Game+0x4B7F0, removes
+    // its player): retail never keeps a clientless player, and the next client's entry walks every living player's client.
+    if (g_game && g_targetClient && g_targetPlayer && g_targetClient->dwClientState >= CLIENTSTATE_PLAYER_SPAWNED)
+        SUNIT_RemoveUnit(g_game, g_targetPlayer);
     free(g_targetClient); g_targetClient = nullptr; g_targetRoom = nullptr; g_targetPlayer = nullptr; g_targetMonster = nullptr;
     g_clientCastClockActive = false; g_clientCastFramePrecise = 0; g_clientCastAnimSpeed = 0;
     g_clientNeutralClockActive = false; g_clientNeutralFramePrecise = 0; g_clientNeutralAnimSpeed = 0;
@@ -2609,6 +2613,9 @@ int32_t __fastcall D2GAME_UpdateSpawnedClient(D2GameStrc* pGame, D2ClientStrc* p
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_game_frame() { return g_game ? g_game->dwGameFrame : 0; }
 EMSCRIPTEN_KEEPALIVE int d2_session_client_spawned() {
     if (!g_game || !g_targetClient || !g_targetPlayer) return 0;
+    // Only a client still joining (retail's act-init send sets the state once): an in-game client's repeated enter request
+    // is not a second join.
+    if (g_targetClient->dwClientState >= CLIENTSTATE_PLAYER_SPAWNED) return 0;
     g_targetClient->dwClientState = CLIENTSTATE_PLAYER_SPAWNED;
     return 1;
 }
