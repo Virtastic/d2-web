@@ -57,7 +57,8 @@ import { createItemPropertyCache, itemPropsCacheable } from './assets/item-prope
 import { parseItemLines } from './assets/item-tooltip.mjs';
 import { createNpcNameLabelCache } from './assets/npc-name-label-cache.mjs';
 import { savedCharacterReadError, setFrontdoorError } from './assets/frontdoor-error.mjs';
-import { createQuestLogRenderer, createMessageLogRenderer, QUESTS_IN_ACT, ACT_BASE, ACT_DONE, questStatus, questWord, messageScrollMax, COMPLETING } from './assets/quest-log.mjs';
+import { createQuestLogRenderer, createMessageLogRenderer, QUESTS_IN_ACT, ACT_BASE, ACT_DONE, questStatus, questWord, messageScrollMax, COMPLETING, MSG_LIST } from './assets/quest-log.mjs';
+import { createListPress } from './assets/list-press.mjs';
 import { createPartyPanelRenderer, partyRows, ownState, clickResult as partyClickResult } from './assets/party-panel.mjs';
 import { createBubbleRenderer } from './assets/game-bubbles.mjs';
 import { createQuestCloseGesture } from './assets/quest-close-gesture.mjs';
@@ -573,6 +574,8 @@ let chatEvidence = null, postedEvidence = null, postedAt = 0;   // V8c: bar/post
 const POSTED_MS = 10000;   // V8d: retail's posted-line duration, measured in F191 (posted-multi-caps: present 9.7 s, gone 10.2 s)
 let chat = null;   // V8c: the Enter chat bar's text while open (null = closed)
 let messageScroll = 0;   // V8d: the message log's scroll offset in lines (0 = newest line at the top)
+const messagePress = createListPress(MSG_LIST), scrollMessage = (d) => { messageScroll = Math.max(0, Math.min(messageScrollMax(messageLines.length), messageScroll + d)); };
+let messagePressPointer = null;   // the pointer holding a press on the log's list (list-press.mjs)
 let questOpenedAt = 0;   // V8d: the engine tick the quest log was opened on, for the completion animation
 // V8d: which quest icons play the completion animation this open (the engine's QFLAG_COMPLETEDNOW), and
 // which have already played it -- the client's stand-in for retail moving COMPLETEDNOW -> COMPLETEDBEFORE
@@ -5269,8 +5272,9 @@ function drawFrame() {
   messageEvidence = null;
   if (messageLogRenderer && messageVisible && !clearScreen) {
     const str = langStr;
-    messageEvidence = messageLogRenderer.draw(ctx, w, h, { title: str('strMsgLog'), close: str('strClose'), lines: messageLines, scroll: messageScroll }, true, snapshot.act || 1);
-  }
+    messageEvidence = messageLogRenderer.draw(ctx, w, h, { title: str('strMsgLog'), close: str('strClose'), lines: messageLines, scroll: messageScroll, arrows: messagePress.frames() }, true, snapshot.act || 1);
+    const held = messagePress.tick(...messageLogRenderer.toList(pointer.x, pointer.y, w, h)); if (held) scrollMessage(held.scroll);
+  } else if (messagePress.armed) { messagePress.cancel(); messagePressPointer = null; }
   if (messageLogRenderer && chat !== null && !clearScreen) {
     chatEvidence = messageLogRenderer.drawChatBar(ctx, w, h, chat, snapshot.act || 1);
   } else chatEvidence = null;
@@ -6295,8 +6299,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (e.__d2HelpPointerHandled) { click.spent = 'help-button'; canvas.focus(); e.preventDefault(); return; }
   if (e.button === 0 && screen === SCREEN.GAME && messageVisible && messageLogRenderer && !(controlPanelRenderer?.hitMiniButton(controlPanelEvidence, x, y, canvas.width, canvas.height) >= 0)) {
     if (messageLogRenderer.hitClose(x, y, canvas.width, canvas.height)) messageVisible = false;
-    else { const dir = messageLogRenderer.hitScroll(x, y, canvas.width, canvas.height);   // V8d: one arrow click scrolls ONE line
-      if (dir) messageScroll = Math.max(0, Math.min(messageScrollMax(messageLines.length), messageScroll + (dir === 'down' ? 1 : -1))); }
+    else if (messagePress.down(...messageLogRenderer.toList(x, y, canvas.width, canvas.height))) messagePressPointer = e.pointerId;   // scrolls on the release (list-press.mjs)
     click.spent = 'message-log'; canvas.focus(); e.preventDefault(); return;
   }
   if (e.button === 0 && screen === SCREEN.GAME && partyVisible && partyRenderer && partyEvidence) {
@@ -6600,6 +6603,12 @@ canvas.addEventListener('pointerdown', (e) => {
 globalThis.addEventListener('pointerup', (e) => {
   gameCursor?.noteInput();
   if (e.button === 0 && realmSceneActive && realmTrade().open) { const [tx, ty] = canvasPoint(e); realmTrade().release(tx, ty, canvas.width, canvas.height); }
+  if (messagePressPointer === e.pointerId) {
+    messagePressPointer = null;
+    const r = messageLogRenderer ? messagePress.up(...messageLogRenderer.toList(...canvasPoint(e), canvas.width, canvas.height)) : (messagePress.cancel(), null);
+    if (r?.scroll) scrollMessage(r.scroll);
+    render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
+  }
   if (cubeClosePress?.pointerId === e.pointerId) {
     const press = cubeClosePress; cubeClosePress = null;
     const [x, y] = canvasPoint(e);

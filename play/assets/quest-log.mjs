@@ -7,6 +7,7 @@ import { decodeDatPalette, decodeDc6 } from './d2-formats.mjs';
 import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 import { createPanelChrome, BORDER_LEFT } from './panel-chrome.mjs';
 import { questCloseFrame } from './quest-close-gesture.mjs';
+import { listGeometry, listArrowAt } from './list-press.mjs';
 
 const MENU = 'data\\global\\ui\\MENU\\';
 export const QUEST_ART = { bg: MENU + 'questbackground.dc6', tabs: MENU + 'expquesttabs.dc6', sockets: MENU + 'questsockets.dc6',
@@ -160,6 +161,9 @@ const BOX = MENU + 'boxpieces.dc6', SLID = MENU + 'textslid.dc6';
 export const MSG = Object.freeze({ x: 37, y: 90, pitch: 16, rows: 23, trackTop: 93, trackPitch: 12, trackCount: 31,
   thumbX: 766, thumbCels: 24, thumbTravel: 5, up: { x: 766, y: 81, w: 12, h: 13 }, down: { x: 766, y: 453, w: 12, h: 13 } });
 export const messageScrollMax = (total) => Math.max(0, total - MSG.rows);
+// 0x7C770 builds the log's list over the box (5,65) 780x400. That puts its arrows at x 767 with bottom rows
+// 81 and 453, which are the two arrow cels drawn above. The press zones are the list's own (list-press.mjs).
+export const MSG_LIST = Object.freeze(listGeometry(5, 0x41, 800 - 0x14, 600 - 200));
 const TOP = [3, 4, 5, 6, 7, 2], BOT = [20, 21, 16, 17, 18, 19], LEFT = [11, 12, 10], RIGHT = [13, 14, 15];
 export function messageLogPieces() {
   const out = [];
@@ -205,10 +209,11 @@ export function createMessageLogRenderer(read, documentObject = globalThis.docum
     hitClose(px, py, width, height) { const o = origin(width, height), x = (px - o.x) / o.scale, y = (py - o.y) / o.scale, r = this.closeRect; return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h; },
     /** Which scroll arrow a canvas point lands on: 'up' | 'down' | null (the two textslid buttons). */
     hitScroll(px, py, width, height) {
-      const o = origin(width, height), x = (px - o.x) / o.scale, y = (py - o.y) / o.scale;
-      const inBtn = (b) => x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h;
-      return inBtn(MSG.up) ? 'up' : inBtn(MSG.down) ? 'down' : null;
+      const o = origin(width, height);
+      return listArrowAt(MSG_LIST, (px - o.x) / o.scale, (py - o.y) / o.scale);
     },
+    /** A canvas point in the log list's 800x600 coordinates (for the list press). */
+    toList(px, py, width, height) { const o = origin(width, height); return [(px - o.x) / o.scale, (py - o.y) / o.scale]; },
     draw(ctx, width, height, s, open, act = 1) {
       if (!open) return null;
       const o = origin(width, height), blits = [], f = fontFor(act), lines = s.lines || [];
@@ -217,7 +222,8 @@ export function createMessageLogRenderer(read, documentObject = globalThis.docum
       ctx.fillStyle = `rgba(0,0,0,${DIM_ALPHA})`; ctx.fillRect(5, 30, 780, 470);          // retail: box 5 30 785 500, mode 1 (alpha)
       for (const [fr, x, y] of messageLogPieces()) { const r = chrome.cel(ctx, act, BOX, fr, x, y); if (r) blits.push(r); }
       const slid = (fr, x, y) => { const r = chrome.cel(ctx, act, SLID, fr, x, y); if (r) blits.push(r); };
-      slid(9, MSG.thumbX + 1, MSG.up.y); for (let y = MSG.trackTop; y < MSG.trackTop + MSG.trackPitch * MSG.trackCount; y += MSG.trackPitch) slid(13, 767, y); slid(8, 767, MSG.down.y);
+      const arrows = s.arrows || { up: 9, down: 8 };   // 0x67FD0: 11 / 10 while that arrow is latched
+      slid(arrows.up, MSG.thumbX + 1, MSG.up.y); for (let y = MSG.trackTop; y < MSG.trackTop + MSG.trackPitch * MSG.trackCount; y += MSG.trackPitch) slid(13, 767, y); slid(arrows.down, 767, MSG.down.y);
       // The scroll thumb, only when the feed overflows (retail draws none for an empty log: msglog.txt).
       const thumb = maxScroll ? MSG.trackTop + 1 + MSG.trackPitch * Math.floor(scroll * MSG.thumbTravel / maxScroll) : 0;
       if (maxScroll) { slid(16, MSG.thumbX, thumb); for (let i = 1; i < MSG.thumbCels - 1; i++) slid(14, MSG.thumbX, thumb + MSG.trackPitch * i); slid(15, MSG.thumbX, thumb + MSG.trackPitch * (MSG.thumbCels - 1)); }
@@ -228,7 +234,7 @@ export function createMessageLogRenderer(read, documentObject = globalThis.docum
       for (let i = 0; i < MSG.rows; i++) { const idx = lines.length - 1 - (scroll + i); if (idx < 0) break;
         drawChat(ctx, f, lines[idx], MSG.x, MSG.y + MSG.pitch * i); rows.push({ index: idx, y: MSG.y + MSG.pitch * i, text: lines[idx] }); }
       ctx.restore();
-      return { title: s.title, lines: lines.length, scroll, maxScroll, rows, thumb: maxScroll ? { y: thumb, cels: MSG.thumbCels } : null, blits, dim: DIM_ALPHA };
+      return { title: s.title, lines: lines.length, scroll, maxScroll, rows, arrows, thumb: maxScroll ? { y: thumb, cels: MSG.thumbCels } : null, blits, dim: DIM_ALPHA };
     },
   };
 }

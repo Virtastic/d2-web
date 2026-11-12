@@ -246,6 +246,11 @@ test('hire: the window lists the offers the state holds and a row hire names its
   assert.deepEqual(calls.find((c) => c[0] === 'hire.show'), ['hire.show', 1, 88, '?']);   // an unknown level is '?', not 0
   assert.deepEqual(calls.at(-1), ['hire.draw']);
   assert.equal(screen.pointerDown(50, 10, 800, 600, 0), true);
+  assert.equal(calls.some((c) => c[0] === 'hire'), false, 'the down only latches the row (0x679F0)');
+  assert.equal(screen.pointerUp(70, 10, 800, 600), true);
+  assert.equal(calls.some((c) => c[0] === 'hire'), false, 'a release off the row hires nothing (0x68670)');
+  screen.pointerDown(50, 10, 800, 600, 0);
+  assert.equal(screen.pointerUp(50, 10, 800, 600), true);
   assert.deepEqual(calls.at(-1), ['hire', 5]);
   assert.equal(screen.pointerDown(60, 10, 800, 600, 0), true);
   assert.deepEqual(calls.at(-1), ['end']);

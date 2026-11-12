@@ -56,7 +56,9 @@ export const SKILL_LAYOUT = Object.freeze({
   // Retail's draw list: icons at x 346 + 69 * SkillColumn, their
   // top rows per SkillRow below; the three tabs down the panel's right side, page 3 at the top.
   gridX: 346, columnWidth: 69, rowTops: [75, 143, 211, 279, 348, 416], iconSize: 48,
-  tabX: 630, tabWidth: 88, tabTops: { 3: 172, 2: 280, 1: 388 }, tabHeight: 100,
+  // The tab press zones are D2Client 0x796F0's at 800x600: x 632..720 inclusive, y 169..274 for page 3,
+  // 277..382 for page 2 and 385..550 for page 1. The gaps between them pick no tab.
+  tabX: 632, tabRight: 720, tabSpans: { 3: [169, 274], 2: [277, 382], 1: [385, 550] },
 });
 // The tab names per class, bottom (page 1) to top (page 3): OpenDiablo2's skilltree.go keys; each tab's
 // lines centred on x 677 around its middle row (retail: Warcries 222; Combat/Masteries 324-336;
@@ -125,6 +127,13 @@ export function formatManaCost(cost) {
 }
 
 /** Where the panel's 800x600 screen lands on a canvas of width x height: scaled down to fit, never up, centred. */
+/** The skill page tab under an 800x600 point (1..3), or 0. */
+export function skillTabAt(x, y) {
+  if (x < SKILL_LAYOUT.tabX || x > SKILL_LAYOUT.tabRight) return 0;
+  for (const t of [1, 2, 3]) { const [lo, hi] = SKILL_LAYOUT.tabSpans[t]; if (y >= lo && y <= hi) return t; }
+  return 0;
+}
+
 export function skillPanelOrigin(width, height) {
   const scale = Math.min(1, width / 800, height / 600);
   return { scale,
@@ -310,8 +319,7 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
       const o = origin(width, height);
       const x = (px - o.x) / o.scale, y = (py - o.y) / o.scale;
       // Tabs first: they sit above the grid and would otherwise be swallowed by it.
-      if (x >= SKILL_LAYOUT.tabX && x < SKILL_LAYOUT.tabX + SKILL_LAYOUT.tabWidth)
-        for (const t of [1, 2, 3]) { const top = SKILL_LAYOUT.tabTops[t]; if (y >= top && y < top + SKILL_LAYOUT.tabHeight) return { tab: t }; }
+      const t = skillTabAt(x, y); if (t) return { tab: t };
       for (const skill of state?.skills || []) {
         if (skill.page !== tab) continue;
         const r = cellRect(skill);

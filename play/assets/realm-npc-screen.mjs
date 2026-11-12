@@ -42,6 +42,7 @@ export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor
   let vendorOpenFor = null;  // the guid whose stock the vendor window was reset for
   let pressedEntry = null;   // the menu row under the press, fired on the matching release
   let pressedButton = null;  // the vendor button under the press, acted on release
+  let pressedHireRow = null; // the hire offer row under the press (-1: none), hired on the release over the same row
   let hireKey = null;        // the hire window the offers were shown for: `${guid}:${count}`
   let confirm = null;        // the Buy box: { guid } for the offer the left press armed
   let vendorState = null;    // what the vendor window was last drawn with (its overlay reads the same)
@@ -148,7 +149,8 @@ export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor
         }
         const hit = menu.hireAt(x, y, w, h);
         if (hit?.cancel) { ui.end(); return true; }
-        if (hit?.row !== undefined) { const o = v.offers[hit.row]; if (o) ui.hire(o.mercName); }
+        // The offers are a list (0x67F20): down latches the row and up hires only over the same row (0x679F0, 0x68670).
+        pressedHireRow = hit?.row ?? -1;
         return true;   // the window takes every press over it
       }
       if (v.mode === 'trade' || v.mode === 'gamble') {
@@ -186,6 +188,12 @@ export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor
     pointerUp(x, y, w, h) {
       const v = current();
       if (!v) return false;
+      if (pressedHireRow !== null) {
+        const row = pressedHireRow; pressedHireRow = null;
+        if (v.mode !== 'hire' || confirm || row < 0 || menu.hireAt(x, y, w, h)?.row !== row) return true;
+        const o = v.offers[row]; if (o) ui.hire(o.mercName);
+        return true;
+      }
       if (pressedButton) {
         const button = pressedButton; pressedButton = null;
         if (vendor.buttonAt(x, y, w, h, v.classId) === button) { ui.buttonRelease(button, v); return true; }
