@@ -3,6 +3,7 @@
 // (0x0E) carries a typed line, and CHATEVENT (0x0F) brings every line, join and leave back.
 // Frames are `FF id len16LE body`. Pure of the engine, so the bytes are testable in node.
 import { getGamesPacket, GAME_LIST_ID } from './bnet-gamelist.mjs';
+import { newsRequestPacket } from './bnet-news.mjs';
 const enc = new TextEncoder(), dec = new TextDecoder();
 const cstr = (s) => [...enc.encode(String(s)), 0];
 export const bncsPacket = (id, body = []) => Uint8Array.from([0xff, id, (body.length + 4) & 0xff, (body.length + 4) >> 8, ...body]);
@@ -25,7 +26,11 @@ export function parseChannelList(body) {
 export const chatCommandPacket = (text) => bncsPacket(0x0e, cstr(String(text).split('\0')[0].slice(0, 255)));
 
 const u32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
-export function parseChatEvent(body) {
+// BNClient+0xFEC0 queues at most 0x120 bytes of the event body (a longer one is cut there, not refused): fields past the cut are
+// not there for the front end.
+export const CHAT_EVENT_CAP = 0x120;
+export function parseChatEvent(whole) {
+  const body = whole.subarray(0, CHAT_EVENT_CAP);
   if (body.length < 26) return null;
   const nameEnd = body.indexOf(0, 24); if (nameEnd < 0) return null;
   const textEnd = body.indexOf(0, nameEnd + 1);
@@ -52,17 +57,23 @@ export function chatLine({ event, username, text }) {
   }
 }
 
+// ENTERCHAT's reply (BNClient+0x10CC0): the first string is the unique name the server gave the character; it is kept (0x100-byte
+// copy, so at most 255 bytes) and read back through slot 0x18 (+0x15770).
+export const parseEnterChat = (body) => { let e = body.indexOf(0); if (e < 0) e = body.length; return dec.decode(body.subarray(0, Math.min(e, 255))); };
+
 // Owns the open BNCS transport and its reader. `onEvent` sees every parsed event first (true: handled);
-// `onLine` gets each displayable line it left.
+// `onLine` gets each displayable line it left. `onNews` gets each SID_NEWS_INFO body, `onEntered` the ENTERCHAT unique name.
 export function createBnetChat({ transport, reader, character, realm = '', expansion = true, channel = 'Diablo II', onLine = () => {}, onEvent = () => false, onGames = () => {}, onChannels = () => {}, onClose = () => {},
+  onNews = () => {}, onEntered = () => {},
 }) {
-  let entered = false, wantJoin = false, joined = false, closed = false, current = '', wantFlags;
+  let entered = false, wantJoin = false, joined = false, closed = false, current = '', wantFlags, uniqueName = '';
   const send = (bytes) => transport.send(bytes);
   const handle = ({ id, body }) => {
     if (id === 0x25) send(bncsPacket(0x25, [...body.subarray(0, 4)]));
     else if (id === GAME_LIST_ID) onGames(body);
     else if (id === 0x0b) onChannels(parseChannelList(body));
-    else if (id === 0x0a) { entered = true; if (wantJoin) { wantJoin = false; join(); } }
+    else if (id === 0x46) onNews(body);
+    else if (id === 0x0a) { entered = true; uniqueName = parseEnterChat(body); onEntered(uniqueName); if (wantJoin) { wantJoin = false; join(); } }
     else if (id === 0x0f) {
       const e = parseChatEvent(body); if (!e) return;
       if (e.event === 0x07) { joined = true; current = e.text; }
@@ -85,6 +96,9 @@ export function createBnetChat({ transport, reader, character, realm = '', expan
   })();
   return {
     get entered() { return entered; }, get joined() { return joined; }, get channel() { return current; }, get open() { return !closed && transport.isOpen; },
+    get uniqueName() { return uniqueName; },
+    // SID_NEWS_INFO with the newest timestamp held: the reply reaches `onNews`.
+    news(newest = 0) { return closed ? false : send(newsRequestPacket(newest)) !== false; },
     // The CHANNEL panel's list: ask again, the reply reaches `onChannels`.
     channels() { return closed ? false : send(getChannelListPacket(expansion)) !== false; },
     enter() { send(getChannelListPacket(expansion)); send(enterChatPacket(character, realm)); },

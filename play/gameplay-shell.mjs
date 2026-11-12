@@ -131,6 +131,7 @@ import { createBnetChat } from './assets/bnet-chat.mjs';
 import { parseGameList, filterGames } from './assets/bnet-gamelist.mjs';
 import { createMcpGameList } from './assets/realm-gamelist.mjs';
 import { createChatLink } from './assets/bnet-chat-link.mjs';
+import { createNews, newsLines, createMotd } from './assets/bnet-news.mjs';
 import { returnToLobby } from './assets/realm-lobby-return.mjs';
 import { createBnetConnectingPopup, createBnetConnectFailureNotice } from './assets/bnet-connecting.mjs';
 import { goldLabel } from './assets/gold-label.mjs';
@@ -1868,6 +1869,8 @@ function lobbyChatUser(name) {
     onEvent: (e) => { const handled = bnetLobbyScreen?.chatEvent(e) ?? false; if (handled) render(); return handled; },
     onLine: (line) => { if (realmSceneActive) { messageLines.push(line); postedAt = performance.now(); } else bnetLobbyScreen?.chatLine(line); render(); },
     onChannels: (list) => { bnetLobbyScreen?.setChannels(list); render(); },
+    // SID_NEWS_INFO: merged into the session's news (BNClient keeps it across lobby entries), the box redrawn.
+    onNews: (body) => { const flow = realmFlow; if (!flow) return; flow.news ??= createNews(); const shown = flow.news.apply(body); if (shown) { bnetLobbyScreen?.setNews(newsLines(shown)); render(); } },
     // SID_GETADVLISTEX's reply, kept by retail's own filter (names only), under this session's games.
     onGames: (body) => { if (!realmFlow) return; realmFlow.games = parseGameList(body); pushLobbyGames(name); render(); } };
 }
@@ -1951,7 +1954,20 @@ function enterBnetLobby(name) {
     onQuit: () => { try { realmFlow?.chatLink?.leave(); } catch { /* socket gone */ } enterRealmCharacterSelect(realmCharacters); } }); }
   catch (error) { bnetLobbyScreen = null; bnetLobbyError = String(error); }
   screen = SCREEN.BNET_LOBBY;
-  startLobbyChat(c.name);
+  const chatSession = startLobbyChat(c.name);
+  // D2Multi+0xE150, the lobby's entry: outside chat, the held news is drawn and SID_NEWS_INFO asks for what is newer; on either
+  // lobby the realm's MOTD is asked for once the character is logged on, its parts joined into the server box.
+  if (realmFlow) {
+    realmFlow.news ??= createNews();
+    bnetLobbyScreen?.setNews(newsLines(realmFlow.news.shown()));
+    if (chatSession?.open && !chatSession.joined) chatSession.news(realmFlow.news.newest);
+    const flow = realmFlow, games = lobbyRealmGames(c.name);
+    void games?.ready.then((on) => {
+      if (!on || realmFlow !== flow || !flow.mcpSession || !rcEngineMod) return;
+      const motd = createMotd();
+      rcEngineMod.mcpRequestMotd(flow.mcpSession, (key, bytes) => { if (realmFlow !== flow) return; bnetLobbyScreen?.setMotd(motd.add(key, bytes)); render(); });
+    });
+  }
   render();
 }
 function ensureBnetLoginScreen(server) {

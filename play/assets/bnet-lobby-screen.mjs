@@ -353,6 +353,9 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   // replyTo: the last whisperer (/r); notify: /d2notify. Retail's notify flag starts clear (its only writer is /d2notify).
   const chat = { lines: [], input: '', live: false, channel: '', users: [], scroll: 0, picked: null, enable: { whisper: false, squelch: false, unsquelch: false }, replyTo: '', notify: false, history: [], recall: -1 };
   const headerText = () => (chat.channel ? `${chat.channel} (${chat.users.length})` : '');
+  // The pre-chat lobby's news lines (the chat log's box, D2Multi+0xC510's date / text / blank per entry) and the realm's MOTD
+  // (the server box, D2Multi+0x9D60).
+  let news = [], motd = '';
   const form = { name: '', password: '', description: '', maxPlayers: '4', levelDifference: '4', levelLimit: false, difficulty: 0, focus: 'name', channel: '' };
   let created = now(), pinned = null;
   const clock = () => (pinned === null ? now() : pinned);
@@ -1075,7 +1078,7 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     get evidence() {
       return { mode, panel, notice, busy, creating, queue: queue === null ? null : queueText(), gameInfo: info, character: { name: character.name ?? '', charClass: character.charClass ?? null, level: character.level ?? null },
         info: characterInfoLines(character, string, charTitle).map((l) => l.text), difficulties: allowed,
-        form: { ...form, password: undefined, passwordLength: form.password.length }, chat: chat.lines.map((l) => l.text),
+        form: { ...form, password: undefined, passwordLength: form.password.length }, chat: chat.lines.map((l) => l.text), news: news.map((l) => l.text), motd,
         boxes: controls().map((b) => ({ id: b.id, ...box(b), disabled: disabled(b) })), cursor: pointer };
     },
     // A failed create/join that kept the session: retail's notice over the lobby.
@@ -1115,6 +1118,9 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
     scrollChat(pos) { chat.first = Math.max(0, pos); },
     chatLine(line) { chat.first = null; chat.lines.push(line); if (chat.lines.length > 200) chat.lines.shift(); },
     chatLive(on) { chat.live = Boolean(on); },
+    // A news redraw (D2Multi+0xC490 clears the box, then each shown entry's lines) and the MOTD text.
+    setNews(lines) { news = lines.map((l) => ({ text: String(l.text), colour: l.colour ?? 0 })); },
+    setMotd(text) { motd = String(text ?? ''); },
     // The chat state a retail capture set directly (the reply target); tests only.
     get chatState() { return chat; },
     // The game list reply with status 0xFFFFFFFF (D2Multi 0xDAE0 -> 0x11DA0, 0xCE70): the join panel is torn down and the notice D2Lang 11020 raised.
@@ -1235,10 +1241,12 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
         drawButton(L.enterChat); drawButton(L.help);
         drawTextBox(L.charInfo, characterInfoLines(character, string, charTitle));
         drawTextBox(L.newsTitle, [{ text: text('newsTitle'), colour: 3 }]);
+        if (news.length) drawChatLog(L.chatLog, news, 0);
       }
       drawLogos(0);
       drawPanel('panel', L.panel.x, L.panel.y);
       if (deadHardcore && !panel) drawTextBox(L.serverBox, [{ text: text('deadHardcore') }]);
+      else if (motd && !panel) drawTextBox(L.serverBox, [{ text: motd }]);
       drawLogos(1);
       if (mode !== 'chat') drawOwnPortrait();
       if (creating && queue !== null) drawQueue();

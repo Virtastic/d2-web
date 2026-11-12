@@ -152,6 +152,9 @@ async function readBncsFrame(reader, timeoutMs, packetWait = false, wantId = nul
     const copy = Uint8Array.from(frame);
     reader.skip(total);
     if (copy[1] === 0x25) { if (reader.echo) reader.echo(copy); continue; }
+    // Bnclient+0x107C0: SID_SETEMAIL sets the email-request flag (read back through interface slot +0xB4, cleared only at connect);
+    // D2Launch+0xEAB0 tests it once the logon has passed and, when set, opens its email panel (+0x100C0) before the realm step.
+    if (copy[1] === 0x59) reader.emailRequested = true;
     if (wantId !== null && copy[1] !== wantId) continue;
     return { id: copy[1], body: copy.subarray(4) };
   }
@@ -169,8 +172,9 @@ export async function readMcpFrame(reader, timeoutMs) {
     const frame = await reader.want(total, timeoutMs);
     reader.skip(total);
     if (total - 2 > MCP_RECV_BUFFER) continue;
-    // The reply to an idle-time MOTD request (the lobby's keep-alive) is never an answer to a call.
-    if (frame[2] === MCP_MOTD) continue;
+    // A MOTD reply is never an answer to a call: D2MCPClient+0x5EE0 hands `[key][text]` (two bytes at least) to the lobby's
+    // registered callback (D2Multi+0x9E30) and returns.
+    if (frame[2] === MCP_MOTD) { if (total >= 4) try { reader.onMotd?.(frame[3], frame.subarray(4)); } catch { /* the lobby's fault is not the socket's */ } continue; }
     // Likewise the character-list reply to a keep-alive sent before the character is logged on.
     if (frame[2] === 0x19 && reader.keepAliveLists > 0) { reader.keepAliveLists--; continue; }
     return { op: frame[2], body: frame.subarray(3) };
@@ -180,6 +184,8 @@ export async function readMcpFrame(reader, timeoutMs) {
 /** The realm list reply (0x40) body: `[unknown u32][count u32]` then per realm `[unknown u32][title\0][description\0]`. */
 export function parseRealmList(body) {
   const count = body.length >= 8 ? u32(body, 4) : 0, list = [], dec = new TextDecoder();
+  // D2Launch+0x15B60: a count of 0x200 or more is fatal there (the realm-list buffer's bound).
+  if (count >= 0x200) throw new Error(`QUERYREALMS2 lists ${count} realms (0x200 or more)`);
   let o = 8;
   for (let i = 0; i < count; i++) {
     o += 4;
@@ -308,6 +314,14 @@ export function mcpLogonCharacter(session, name, { timeoutMs = CONNECT_TIMEOUT_M
 // exists for the WebSocket proxies in front of the realm (they drop a silent socket after about 100 s),
 // so its period is a transport choice, not a retail value.
 const MCP_MOTD = 0x12, MCP_KEEPALIVE_MS = 30000;
+/**
+ * The lobby entry's MOTD request (D2Multi+0xE150 registers +0x9E30 through D2MCPClient ordinal 10001, then sends MCP 0x12 with an
+ * empty body). Each reply part reaches `onMotd(key, textBytes)`; the frames are read while the inbox listens or a call waits.
+ */
+export function mcpRequestMotd(session, onMotd) {
+  session.reader.onMotd = onMotd;
+  mcpSend(session, MCP_MOTD, []);
+}
 // D2Multi's reply pump (1.13c D2Multi+0xDAE0, GetTickCount against DAT_6fa09f2c) gives a create or join 30 s from the Please Wait popup, then clears the wait and returns to the lobby.
 const GAME_REPLY_MS = 30000;
 /**
@@ -333,6 +347,8 @@ function startMcpKeepAlive(session, ms = MCP_KEEPALIVE_MS) {
 
 function decodeMcpCharacters(body) {
   if (body.length < 8) throw new Error(`MCP CHARLIST2 body is short (${body.length} bytes)`);
+  // D2MCPClient+0x65D0: each of the words at +0, +2, +4 and +6 (requested, the total's two halves, returned) must be under 0x100.
+  for (const at of [0, 2, 4, 6]) if ((body[at] | (body[at + 1] << 8)) >= 0x100) throw new Error(`MCP CHARLIST2 word at +${at} is 0x100 or more`);
   const total = u32(body, 2), returned = body[6] | (body[7] << 8);
   if (returned > total) throw new Error(`MCP CHARLIST2 returned ${returned} entries but declares ${total} total`);
   const characters = [];
@@ -628,7 +644,8 @@ async function bncsPrelude(transport, protocol, reader, { product, auth, timeout
   transport.send(protocol.bncsFrame(0x51, body));
   const check = await readBncsFrame(reader, timeoutMs, true, 0x51);
   if (check.id !== 0x51) throw new Error(`expected AUTH_CHECK reply 0x51, got 0x${check.id.toString(16)}`);
-  if (u32(check.body, 0) !== 0) throw new Error(`AUTH_CHECK rejected the version (result 0x${u32(check.body, 0).toString(16)})`);
+  // Bnclient+0x11330 passes the version on result & 0xFF0F == 0: the 0xF0 bits only pick the expansion's wording.
+  if ((u32(check.body, 0) & 0xff0f) !== 0) throw new Error(`AUTH_CHECK rejected the version (result 0x${u32(check.body, 0).toString(16)})`);
   return authInfo;
 }
 
@@ -725,7 +742,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
     const authCheck = await readBncsFrame(reader, timeoutMs, true, 0x51); received.push(authCheck.id);
     if (authCheck.id !== 0x51) throw new Error(`expected AUTH_CHECK reply 0x51, got 0x${authCheck.id.toString(16)}`);
     versionResult = u32(authCheck.body, 0);
-    if (versionResult !== 0) {
+    if ((versionResult & 0xff0f) !== 0) {   // Bnclient+0x11330 switches on result & 0xFF0F; the 0xF0 bits are the expansion pick
       // Bnclient+0x11330: the reply is a result and a C string (the key owner's name for 0x201); a body whose
       // last byte is not NUL, or with a NUL before it, is not handled at all, so no refusal result is kept.
       const error = new Error(`AUTH_CHECK rejected the version (result 0x${versionResult.toString(16)})`);
@@ -742,7 +759,8 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
 
   // BNClient+0xC9E0 tokens the logon with GetTickCount; +0xBFD0 with its own counter (1, 2, ...).
   send(0x3a, protocol.bncsLogon({ clientToken: protocol.tickCount(), serverToken, account, password }));
-  // PvPGN prompts an account with no email address (SID_SETEMAIL 0x59) ahead of the logon result; like any other id it is passed over.
+  // PvPGN prompts an account with no email address (SID_SETEMAIL 0x59) ahead of the logon result: the wait passes it over and the
+  // reader keeps retail's flag, which the caller reads as `emailRequested` (on the logon error too).
   const logon = await readBncsFrame(reader, timeoutMs, false, 0x3a); received.push(logon.id);
   if (logon.id !== 0x3a) throw new Error(`expected LOGONRESPONSE2 reply 0x3a, got 0x${logon.id.toString(16)}`);
   const logonResult = u32(logon.body, 0);
@@ -754,6 +772,9 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
     if (logonResult === 6) { const end = logon.body.indexOf(0, 4); error.logonReason = new TextDecoder().decode(logon.body.subarray(4, end < 0 ? logon.body.length : end)); }
     throw error;
   }
+  // D2Launch+0xEAB0 reads the flag right here, once the logon has passed.
+  const emailRequested = !!reader.emailRequested;
+  transport.bncsEmailRequested = emailRequested;
 
   send(0x40, protocol.bncsQueryRealms());                         // QUERYREALMS2, empty body
   const realms = await readBncsFrame(reader, timeoutMs, true, 0x40); received.push(realms.id);
@@ -781,7 +802,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
     startup: [...cat(realmEx.body.subarray(0, 16), realmEx.body.subarray(24, 72))] };
 
   // `reader` stays attached to the open socket: retail keeps the BNCS chat connection for the session.
-  return { clientToken, serverToken, mpq: mpqName, challenge, versionResult, logonResult, realmList, handoff, sent, received, reader };
+  return { clientToken, serverToken, mpq: mpqName, challenge, versionResult, logonResult, emailRequested, realmList, handoff, sent, received, reader };
 }
 
 /**

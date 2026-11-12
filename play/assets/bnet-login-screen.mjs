@@ -85,24 +85,31 @@ function boxMessage(box) {
 }
 // The box for an AUTH_CHECK refusal, or null for a result retail has no key/version dialog for (0x100 is the
 // patch download path, whose dialog is not proven).
-export function authRefusalMessage(error, string) {
+// The failure event an AUTH_CHECK refusal raises (Bnclient+0x11330 by result & 0xFF0F, the 0xF0 bits the expansion pick), or null.
+export function authRefusalEvent(error) {
   const result = Number(error?.authResult);
   if (!Number.isFinite(result)) return null;
   const kind = AUTH_REFUSAL_KIND[result & 0xff0f];
   if (!kind) return null;
-  const expansion = (result & 0xf0) !== 0, x = expansion ? 1 : 0;
+  const x = (result & 0xf0) !== 0 ? 1 : 0;
   const event = { version: 1, invalid: [3, 7], inUse: [6, 10], disabled: [4, 8], wrongProduct: [5, 9] }[kind];
-  const box = failureParts(Array.isArray(event) ? event[x] : event, { string, text: kind === 'inUse' ? error.authInfo : '' });
-  return boxMessage(box);
+  return Array.isArray(event) ? event[x] : event;
+}
+export function authRefusalMessage(error, string) {
+  const event = authRefusalEvent(error);
+  if (event === null) return null;
+  const kind = AUTH_REFUSAL_KIND[Number(error.authResult) & 0xff0f];
+  return boxMessage(failureParts(event, { string, text: kind === 'inUse' ? error.authInfo : '' }));
 }
 // Retail's failure event (the D2Launch+0xE510 table, bnet-failure-events.mjs) for a logon reply: result 1/2/3/6 are
 // events 0xD/0xE/0xF/0x1B, anything else the status-0x12 box; an error that names its event (`failureEvent`) raises that one.
 const LOGON_EVENT = { 1: 13, 2: 14, 3: 15, 6: 27 };
+export const logonFailureEvent = (error) => error?.failureEvent ?? LOGON_EVENT[error?.logonResult] ?? 18;
 // The box a failed logon raises: a refused version or key first, else the logon result's own text.
 export function loginErrorMessage(error, account, string) {
   const refusal = authRefusalMessage(error, string);
   if (refusal) return refusal;
-  const box = failureParts(error?.failureEvent ?? LOGON_EVENT[error?.logonResult] ?? 18, { string, account, text: error?.logonReason ?? '' });
+  const box = failureParts(logonFailureEvent(error), { string, account, text: error?.logonReason ?? '' });
   return boxMessage(box);
 }
 // The create form's refusal for the reply to CREATEACCOUNT: events 0x13..0x1A, every other value the first.
