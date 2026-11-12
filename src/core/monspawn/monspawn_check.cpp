@@ -2202,6 +2202,7 @@ static void detachTargetFixture() {
     if (g_targetRoom) { g_targetRoom->ppClients = nullptr; g_targetRoom->nNumClients = 0; g_targetRoom->nMaxClients = 0; }
     for (D2ActiveRoomStrc* r : g_sessionJoinRooms) { r->ppClients = nullptr; r->nNumClients = 0; r->nMaxClients = 0; }   // the level join's rosters too
     g_sessionJoinRooms.clear();
+    if (g_game && g_game->pClientList == g_targetClient) g_game->pClientList = nullptr;   // off the client list before it is freed
     free(g_targetClient); g_targetClient = nullptr; g_targetRoom = nullptr; g_targetPlayer = nullptr; g_targetMonster = nullptr;
     g_clientCastClockActive = false; g_clientCastFramePrecise = 0; g_clientCastAnimSpeed = 0;
     g_clientNeutralClockActive = false; g_clientNeutralFramePrecise = 0; g_clientNeutralAnimSpeed = 0;
@@ -2685,6 +2686,9 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
     // clients (retail 0x6FCD0D57), so the aitrace replays (d2_aitarget_attach_at) register as the capture
     // does: retail's frame-15 probe read nNumClients 0 in the room beside the fixture (s232).
     if (g_fixtureOwnRoomOnly) { DUNGEON_AddClientToRoom(room, g_targetClient); g_targetClient->pRoom = room; }
+    const bool captureJoin = g_fixtureOwnRoomOnly && g_sessionJoinLevelRooms && g_lastLevel;   // d2_session_client_join_level
+    if (captureJoin && !g_game->pClientList) g_game->pClientList = g_targetClient;   // a joined client is on the game's client list (the roster, scores and "joined" line walk it)
+    if (captureJoin) memset(g_targetClient->szName, 0, sizeof g_targetClient->szName);   // the recorded client joined without a name (its "joined" line carries none)
     // What a joining client is told before the rooms, in retail's order: the game's flags and the two load markers,
     // the act and its time of day, the room it stands in, its own unit, which unit it plays, then its position.
     // Kept with the join walk's bytes below.
@@ -2697,10 +2701,31 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
         D2DrlgCoordsStrc joinRoom = {};
         DUNGEON_GetRoomCoordinates(room, &joinRoom);
         D2GAME_PACKETS_SendPacket0x07_6FC3D120(g_targetClient, DUNGEON_GetLevelIdFromRoom(room), (uint16_t)joinRoom.nTileXPos, (uint16_t)joinRoom.nTileYPos);
+        if (captureJoin) {
+            // The recorded sessions' join (capture-client, GAME_SendActInit's body): every other built room of the level is
+            // listed and revealed in the level's room order, then 0x0B, the player's first send (D2Game 0x7B0A0: 0x59 and
+            // its state), 0x15, and the 0xAC assign of each monster within 40 subtiles. No unit sync: tick 1 sends the rooms' units.
+            for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+                D2ActiveRoomStrc* r = roomEx->pRoom;
+                if (!r || r == room) continue;
+                DUNGEON_AddClientToRoom(r, g_targetClient);
+                D2DrlgCoordsStrc c = {};
+                DUNGEON_GetRoomCoordinates(r, &c);
+                D2GAME_PACKETS_SendPacket0x07_6FC3D120(g_targetClient, DUNGEON_GetLevelIdFromRoom(r), (uint16_t)c.nTileXPos, (uint16_t)c.nTileYPos);
+            }
+            D2GAME_SendPacket0x0B_ClientUnit(g_targetClient, player);
+            D2GAME_SUNITMSG_FirstFn_6FCC5520(g_game, player, g_targetClient);
+            D2GAME_PACKETS_SendPacket0x15_6FC3D0D0(g_targetClient, 0x15u, 0, player->dwUnitId, CLIENTS_GetUnitX(player), CLIENTS_GetUnitY(player), 1);
+            for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext)
+                for (D2UnitStrc* u = roomEx->pRoom ? roomEx->pRoom->pUnitFirst : nullptr; u; u = u->pRoomNext)
+                    if (u->dwUnitType == UNIT_MONSTER && abs(UNITS_GetXPosition(u) - x) <= 40 && abs(UNITS_GetYPosition(u) - y) <= 40)
+                        sub_6FC3FC80(g_targetClient, u);
+        } else {
         // The unit is named (0x59) before it is selected (0x0B): the stock server's order, and the one the client's join scan reads.
         sub_6FC3D1F0(g_targetClient, player->dwUnitId, (uint8_t)player->dwClassId, g_targetClient->szName, (int16_t)CLIENTS_GetUnitX(player), (int16_t)CLIENTS_GetUnitY(player));
         D2GAME_SendPacket0x0B_ClientUnit(g_targetClient, player);
         D2GAME_PACKETS_SendPacket0x15_6FC3D0D0(g_targetClient, 0x15u, 0, player->dwUnitId, CLIENTS_GetUnitX(player), CLIENTS_GetUnitY(player), 1);
+        }
     } else g_sessionJoinLoadLength = 0;
     g_sessionJoinRooms.clear();
     if (g_fixtureOwnRoomOnly && g_sessionClientAdjCount) {   // a retail recording (feed 2): the adjacent rooms' client arrays only
@@ -2711,7 +2736,7 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
     // Retail's join walk (1.13c 0x4B1D0 -> LEVEL_AddClient 0x9DC10 on adjacent rooms) runs for a real client.
     if (g_fixtureOwnRoomOnly && g_sessionJoinLevelRooms && g_lastLevel) {
         for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext)
-            if (roomEx->pRoom && roomEx->pRoom != room) { DUNGEON_AddClientToRoom(roomEx->pRoom, g_targetClient); g_sessionJoinRooms.insert(roomEx->pRoom); }
+            if (roomEx->pRoom && roomEx->pRoom != room) { if (!captureJoin) DUNGEON_AddClientToRoom(roomEx->pRoom, g_targetClient); g_sessionJoinRooms.insert(roomEx->pRoom); }
     } else {
         g_joinWalkRevealMode = g_sessionJoinUnits ? g_sessionJoinRevealMode : 0;   // the walk only: no flag outlives it
         sub_6FC33020(g_targetClient, room);
@@ -2721,9 +2746,12 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
     // One-client path: the join also sends the player's changed stats and vitals (retail's add-player-to-game does, before
     // the room walk); they ride in the kept join bytes.
     {
-        D2Common_10513(g_targetPlayer, g_targetPlayer, (void(__fastcall*)(D2UnitStrc*, int32_t, int32_t, D2UnitStrc*))D2GAME_UpdateAttribute_6FC822D0);
-        sub_6FC82360(g_targetPlayer, g_targetPlayer, 1);
-        LEVEL_UpdateUnitsInAdjacentRooms(g_game, room, g_targetClient); sessionKeepJoinBurst(joinBurstFrom); D2WEB_ResetPacketStream();
+        if (!captureJoin) {   // the capture-client join drops the fixture's queued stats and leaves the units to tick 1
+            D2Common_10513(g_targetPlayer, g_targetPlayer, (void(__fastcall*)(D2UnitStrc*, int32_t, int32_t, D2UnitStrc*))D2GAME_UpdateAttribute_6FC822D0);
+            sub_6FC82360(g_targetPlayer, g_targetPlayer, 1);
+            LEVEL_UpdateUnitsInAdjacentRooms(g_game, room, g_targetClient);
+        }
+        sessionKeepJoinBurst(joinBurstFrom); D2WEB_ResetPacketStream();
     }
     for (D2UnitStrc* u = room->pUnitFirst; u; u = u->pRoomNext) {
         if (u->dwUnitType != UNIT_MONSTER) continue;

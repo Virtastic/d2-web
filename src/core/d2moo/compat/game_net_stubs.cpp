@@ -655,7 +655,10 @@ void D2GAME_PACKETS_SendPacket0x51_6FC3D300(D2ClientStrc* pClient, char nHeader,
     uint8_t b[14];
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, scmd::encode51(b, (uint8_t)nHeader, nUnitType, (uint32_t)nUnitGUID, (uint16_t)nObjectId, (uint16_t)nX, (uint16_t)nY, (uint8_t)a8, (uint8_t)a9));
 }
-void D2GAME_PACKETS_SendPacket0x5A_6FC3DEC0(D2ClientStrc* pClient, D2GSPacketSrv5A* pPacket) {}
+// 0x5A: an event line (the "joined the game" notice and kin), the 0x28-byte record sent as is.
+void D2GAME_PACKETS_SendPacket0x5A_6FC3DEC0(D2ClientStrc* pClient, D2GSPacketSrv5A* pPacket) {
+    if (pPacket) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof *pPacket);
+}
 void D2GAME_PACKETS_SendPacket0x61_6FC3F590(D2ClientStrc* pClient, BYTE unk) {
     D2GSPacketSrv61 packet = {}; packet.nHeader = 0x61; packet.unk0x001 = unk;
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
@@ -807,7 +810,15 @@ void D2GAME_PACKETS_SendPacket0x82_6FC3F790(D2GameStrc* pGame, D2ClientStrc* pCl
     uint8_t b[29];
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, scmd::encode82(b, pPlayer->dwUnitId, UNITS_GetPlayerData(pPlayer)->szName, (uint32_t)nPortalGUID, (uint32_t)nPortalOwnerGUID));
 }
-void D2GAME_PACKETS_SendPacket0x8D_6FC3F960(D2UnitStrc* pUnit, D2UnitStrc* a2) {}
+// 0x8D: {header, player id (-1 if none), party word}, 7 bytes, to pUnit's client (the join's living-player walk).
+void D2GAME_PACKETS_SendPacket0x8D_6FC3F960(D2UnitStrc* pUnit, D2UnitStrc* a2) {
+    uint8_t b[7] = { 0x8D };
+    const int32_t guid = a2 ? (int32_t)a2->dwUnitId : -1;
+    const int16_t party = SUNIT_GetPartyId(a2);
+    std::memcpy(b + 1, &guid, 4);
+    std::memcpy(b + 5, &party, 2);
+    D2GAME_PACKETS_SendPacket_6FC3C710(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), b, sizeof b);
+}
 void D2GAME_PACKETS_SendPacket0x9B_6FC3FB30(D2ClientStrc* pClient, int16_t a2, int32_t a3) {}
 // 1.13c D2Game+0x8bc20: [hdr][stat u8][unitId u32][value u8/u16/u32]; 9E/9F/A0 by value width.
 void D2GAME_PACKETS_SendPacket0x9E_9F_A0_6FC3D520(D2ClientStrc* pClient, D2UnitStrc* pUnit, uint16_t nStatId, uint32_t nValue) {
@@ -845,7 +856,12 @@ void D2GAME_PACKETS_SendPacket0xAB_6FC3D7B0(D2ClientStrc* pClient, uint8_t nUnit
     packet.nHeader = 0xAB; packet.nUnitType = nUnitType; packet.dwUnitGUID = (uint32_t)dwUnitId; packet.nLife = nUnitLife;
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof(packet));
 }
-void D2GAME_PACKETS_SendPacketSize06_6FC3C850(D2ClientStrc* pClient, DWORD nHeader, DWORD dwUnitType, DWORD dwUnitId) {}
+// {header, unit type, guid}, 6 bytes: the 0x76 a unit's first send ends with (1.13c D2Game+0x7ACB0 builds it the same way), 0x7C, 0x92.
+void D2GAME_PACKETS_SendPacketSize06_6FC3C850(D2ClientStrc* pClient, DWORD nHeader, DWORD dwUnitType, DWORD dwUnitId) {
+    uint8_t packet[6] = { (uint8_t)nHeader, (uint8_t)dwUnitType };
+    std::memcpy(packet + 2, &dwUnitId, 4);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, packet, sizeof packet);
+}
 void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, int32_t nPacketSize) {
     if (pClient && pPacket && nPacketSize > 0)
         for (int slot = 0; slot < kD2webRoutedClients; ++slot)
