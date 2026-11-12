@@ -17,7 +17,7 @@ struct D2ClientBtn66da0Env {
 
 // 1.13c D2Client+0x66DA0
 extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2_client_66da0(
-    uint32_t p2, uint8_t* o, uint32_t p4, int32_t idx, D2ClientBtn66da0Env* e) {
+    uint32_t p2, uint8_t* o, uint32_t a1, uint32_t a2, int32_t idx, D2ClientBtn66da0Env* e) {
     uint32_t* w = (uint32_t*)o;
     w[0] = e->vtblBase;
     w[0] = e->vtblBtn;
@@ -29,8 +29,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2_client_66da0(
     uint32_t f[0x12] = {};
     f[0] = fr; f[0xd] = e->cel;
     uint32_t r = e->ord10021(f);
-    w[2] = (uint32_t)(uintptr_t)o;
-    w[3] = p4; w[9] = 0;
+    w[2] = a1;                                     // stack word 2 (after o)
+    w[3] = a2; w[9] = 0;                           // stack word 3
     w[6] = e->ord10000(r);
     w[7] = e->ord10060(r);
     return o;

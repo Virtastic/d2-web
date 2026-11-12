@@ -1,6 +1,6 @@
 // 1.13c D2Client+0x3E5E0: item-cell draw with a charge/quantity label (the 3E490 sibling). EAX = x, ECX = mode; stack (ret 0x18) = a0, p (int16* item
 // id word), a2, a3, y, flag. 0x17F0(EAX = *p) = item record (none: return); cls = byte at record + 7. When the mouse (D2Client+0x11B828 x,
-// +0x11B824 y, signed) is inside [x, x+0x30] x [y-0x30, y] a mode other than 0 and 1 folds (4 becomes 1, every other value becomes 4). The 18-dword
+// +0x11B824 y, signed) is inside [x, x+0x30] x [y-0x30, y] a mode other than 0 and 1 folds (4 stays 4, every other value becomes 1: ((mode != 4) - 1 & 3) + 1). The 18-dword
 // request (word 0 = cls, word 13 = a0) goes to 0xD0E4(req, x, y, -1, 5, mode; EAX 0, ECX a0, EDX req, EBX x, ESI mode); then 0x3DCF0 (flag 0) or
 // 0x3E0C0 (EAX = y, ECX = x, p, a2). With a player ([*(D2Client+0x11BBFC)+0x60] = unit) a count replaces a3: p == 2: u = 0xCA0C(unit), needs
 // 0xC76C(u) and 0xC73C(u), count = 0xC1C6(u, 0x46, 0). p == 4: u = 0xCA0C(unit), v = 0xC262(unit, 4), w = 0xC262(unit, 5); v = w when u == v;
@@ -12,7 +12,7 @@ extern "C" void d2c_3e5e0(const cl::Env& e, uint32_t x, uint32_t mode, uint32_t 
     if (!rec) return;
     const uint32_t cls = e.R8(rec + 7);
     const int32_t my = (int32_t)e.R(e.gl), mx = (int32_t)e.R(e.gl + 4);
-    if (!(mx < (int32_t)x || mx > (int32_t)x + 0x30 || my < (int32_t)y - 0x30 || my > (int32_t)y) && mode != 0 && mode != 1) mode = mode == 4 ? 1 : 4;
+    if (!(mx < (int32_t)x || mx > (int32_t)x + 0x30 || my < (int32_t)y - 0x30 || my > (int32_t)y) && mode != 0 && mode != 1) mode = mode == 4 ? 4 : 1;
     uint32_t req[18] = {};
     req[0] = cls; req[13] = a0;
     const uint32_t rp = (uint32_t)(uintptr_t)req;
