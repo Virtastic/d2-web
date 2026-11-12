@@ -39,16 +39,21 @@ void sub_3F860(G& g,I (*ord10651)(P),I (*ord11142)(P),P unit){
  if(g.camOn){ g.originX+=g.camDX; g.originY+=g.camDY; }
 }
 
-// 1.13c D2Client+0x3F5F0 ; x=*EBX, y=*EDI, newx=ESI, newy=EBP
-void sub_3F5F0(const G& g,I* px,I* py,I newx,I newy,I (*ord10013)(void),void (*ord10474)(I*,I*)){
+// 1.13c D2Client+0x3F5F0 -- EBX = &x, EDI = &y, plain ret: a screen point to a world point. In perspective mode (the
+// no-argument mode test) y loses a fortieth of itself and x spreads about the half screen width by (40 - y/4) parts in that
+// half width; then the view origin is added (x less the panel shift) and the pair goes through the two-pointer transform.
+// Both cells take the transformed pair; EAX is the new x.
+I sub_3F5F0(const G& g,I* px,I* py,I (*ord10013)(void),void (*ord10474)(I*,I*)){
  I x=*px,y=*py;
  if(ord10013()){
   I hi=I((int64_t(y)*-0x66666667LL)>>32);
-  y+=(hi>>4)-(hi>>31);
-  x+=((0x28-((I((U(y>>31)&3u))+y)>>2))*(x-g.screenW/2))/(g.screenW/2);
+  y=I(U(y)+U((hi>>4)-(hi>>31)));
+  I half=g.screenW/2;
+  x=I(U(x)+U(I((0x28u-U(I((U(y>>31)&3u)+U(y))>>2))*(U(x)-U(half)))/half));
  }
- y+=g.originY; x+=g.originX-g.oy;
- ord10474(&x,&y); *px=newx; *py=newy;
+ y=I(U(y)+U(g.originY)); x=I(U(x)+U(g.originX)-U(g.oy));
+ ord10474(&x,&y); *px=x; *py=y;
+ return x;
 }
 
 // 1.13c D2Client+0x3F240 : C++ dtor (vtable reset + owned-object delete); host-side vtables.

@@ -194,16 +194,19 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_81ff0(D2cB8G* g, const D2cB8Env* 
     e->ord10202(); e->ord10164();
 }
 
-// 1.13c D2Client+0x82210
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_82210(D2cB8G* g, const D2cB8Env* e, uint8_t* u, int32_t p2, uint32_t p3, uint32_t esi) {
-    int32_t k = (p2 << (rd<uint32_t>(g->dt, 0xc6c) & 0x1f)) + (int32_t)(rd<uint32_t>(g->dt, 0xc70) & p3);
+// 1.13c D2Client+0x82210 -- ECX = unit, EDX = p2, two stack words (p3, p4); ret 8. Finds the unit's flag-0x40 stat list
+// that holds stat 0xCC under the key built from p2 and p3, and rewrites its low byte to p4 clamped to 0..the stored maximum
+// (the value's bits 8 and up, which must be 1..0xFF). With no such list on the unit it asks each inventory item's unit in
+// turn, with the same p2, p3 and p4.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_82210(D2cB8G* g, const D2cB8Env* e, uint8_t* u, int32_t p2, uint32_t p3, int32_t p4) {
+    int32_t k = (int32_t)(((uint32_t)p2 << (rd<uint32_t>(g->dt, 0xc6c) & 0x1f)) + (rd<uint32_t>(g->dt, 0xc70) & p3));
     uint8_t* it = e->ord10195(u, 0x40);
     int32_t r;
     for (;;) {
         if (!it) {
-            if (rd<int32_t>(u, 0x60)) {
+            if (rd<uint32_t>(u, 0x60)) {
                 for (uint8_t* c = e->ord10460(rd<uint32_t>(u, 0x60)); c; c = e->ord10464(c))
-                    if (d2_client_82210(g, e, e->ord11147(c), p2, esi, esi)) return 1;
+                    if (d2_client_82210(g, e, e->ord11147(c), p2, p3, p4)) return 1;
             }
             return 0;
         }
@@ -212,14 +215,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_82210(D2cB8G* g, const D2cB8E
         it = e->ord10900(it, 0x40);
     }
     int32_t v = r >> 8;
-    if (v < 1) return 0;
-    if (v < 0x100) {
-        int32_t s = ((int32_t)esi < 1) ? 0 : (int32_t)esi;
-        if (v <= s) s = v;
-        e->ord11037(it, 0xcc, v * 0x100 + (s & 0xff), k, u);
-        return 1;
-    }
-    return 0;
+    if (v < 1 || v > 0xff) return 0;
+    int32_t s = p4 < 1 ? 0 : p4;
+    if (s >= v) s = v;
+    e->ord11037(it, 0xcc, v * 0x100 + (s & 0xff), k, u);
+    return 1;
 }
 
 // 1.13c D2Client+0x82320
