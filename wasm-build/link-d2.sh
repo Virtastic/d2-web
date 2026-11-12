@@ -90,23 +90,22 @@ dependency_digest() {
        { more = ($0 ~ /\\$/); sub(/\\$/, ""); print; if (!more) exit }' "$1" |
     tr '\n' ' ' | xargs sha256sum | sha256sum | cut -d' ' -f1
 }
-OBJS=""
-STALE=()
-for f in $SRCS; do
-  o="$OBJDIR/$(echo "$f" | tr '/' '_' | sed 's/\.cpp$/.o/')"
-  d="$o.d"
-  digest="$o.inputs"
-  current=""
-  if [ -f "$o" ] && [ -f "$d" ] && [ -f "$digest" ]; then
+# stale_check "<src>|<obj>": print the pair when its object is missing or its inputs changed.
+stale_check() {
+  local o="${1##*|}" current=""
+  if [ -f "$o" ] && [ -f "$o.d" ] && [ -f "$o.inputs" ]; then
     # Paths in this project contain no whitespace. Strip Make continuations and the target,
     # then hash the contents of every dependency. A missing dependency also forces a rebuild.
-    current=$(dependency_digest "$d" 2>/dev/null || true)
+    current=$(dependency_digest "$o.d" 2>/dev/null || true)
   fi
-  if [ -z "$current" ] || [ "$current" != "$(cat "$digest" 2>/dev/null)" ]; then
-    STALE+=("$f|$o")
-  fi
-  OBJS="$OBJS $o"
-done
+  if [ -z "$current" ] || [ "$current" != "$(cat "$o.inputs" 2>/dev/null)" ]; then printf '%s\n' "$1"; fi
+}
+# The check hashes every source's header closure; with thousands of sources it runs in parallel
+# (one process at a time took longer than the compile it was guarding).
+PAIRS=$(printf '%s\n' $SRCS | awk -v d="$OBJDIR" '{ o = $0; gsub("/", "_", o); sub(/\.cpp$/, ".o", o); print $0 "|" d "/" o }')
+OBJS=$(printf '%s\n' "$PAIRS" | cut -d'|' -f2 | tr '\n' ' ')
+export -f stale_check dependency_digest
+mapfile -t STALE < <(printf '%s\n' "$PAIRS" | xargs -d '\n' -n 64 -P "$(nproc)" bash -c 'for p; do stale_check "$p"; done' _ | sort)
 # Stale objects compile in parallel (D2_COMPILE_JOBS,
 # default half the cores (two builds can run at once), at least 4. A failure stops the build.
 if [ "${#STALE[@]}" -gt 0 ]; then
