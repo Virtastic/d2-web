@@ -115,7 +115,7 @@ void PLAYERPETS_UpdatePetsIfPresent_113c(void* pGame, void* pUnit, const D2GameB
 {
     void* pPlayerData = env->getPlayerData(pUnit);             // D2Common #10920
     if (pPlayerData == nullptr) return;
-    if (env->petTypeTxtRecordCount() <= 7) return;             // sgptDataTables->nPetTypeTxtRecordCount
+    if (!(7 < (int32_t)env->petTypeTxtRecordCount())) return;  // sgptDataTables->nPetTypeTxtRecordCount; 1.13c compares signed
 
     void* pPets = rdptr(pPlayerData, 0x44);                    // pPlayerData->pPlayerPets
     if (pPets == nullptr) return;
@@ -151,10 +151,4 @@ EMSCRIPTEN_KEEPALIVE void d2_old_9d6f0(uint32_t* r)
     r[4] = 0;
 }
 
-// 1.13c D2Game+0xBFFA0
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_bffa0(uint32_t* r)
-{
-    PLAYERPETS_UpdatePetsIfPresent_113c((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1], &batchEnv(r));
-    r[4] = 0;
-}
+// The 0xBFFA0 entry point lives in the FN probe, which supplies the seams.

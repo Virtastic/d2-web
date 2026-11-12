@@ -6,6 +6,12 @@
 extern "C" void d2game_96920(uint32_t unit, uint32_t p, uint32_t dt, const D2Seam* e)
 {
     const uint32_t r = e->call(0xA4C0, 0, 0, 0, 0, 0, unit);
+    if (!unit) {   // fatal 0xA2A: retail exits the process here
+        const uint32_t s = e->call(0xA2DA, 0, 0, 0, 0, 0, 0xA2A);
+        e->call(0xA2C2, 0, 0, 0, 0, 0, 0, s);
+        e->call(0x2A3C, 0, 0, 0, 0, 0, 0xFFFFFFFFu);
+        return;
+    }
     const uint32_t G = d2rd32(unit + 0x80), edi = d2rd32(unit + 0xC);
     if (!r || !G) return;
     const uint32_t q = d2rd32(r + 0x44);

@@ -58,6 +58,9 @@ behaviour differs from 1.10f.
 - D2Game+0x56B10 (QUESTS/ACT5/A5Q3.cpp `ACT5Q3_QuestSeqHelper`): the quest-sequence tail that 0x5C690 ACT5Q3_SpawnDrehyaInTown calls is its own function in 1.13c; split out of the 1.10f body, same behaviour.
 - D2Game+0x5C690 (QUESTS/ACT5/A5Q3.cpp `ACT5Q3_SpawnDrehyaInTown`): the 1.13c order (object room and X/Y read before the already-spawned test, object lookup inlined) is in src/core/d2game/d2game_5c690.cpp; the vendored body stays 1.10f.
 - D2Game+0x5BF70 ACT5Q5_RewardPlayer (QUESTS/ACT5/A5Q5.cpp): the exp-versus-delta compare is unsigned (jb) in 1.13c.
+- D2Game+0x56B80 ACT5Q2_GetBarbsToBeRescued (QUESTS/ACT5/A5Q2.cpp): no delta; 1.13c takes the quest node in EAX (5 per unspawned group, plus spawned - freed - killed, clamped at 0).
+- D2Game+0xC1F90 ACT2Q4_IsGuardMoving (QUESTS/ACT2/A2Q4.cpp): no delta; 1.13c takes only the game in EAX and inlines the quest-chain walk to the first quest 11 node (the unit argument is unused).
+- D2Game+0x4B1D0 is CLIENTS_ChangeRoom (`sub_6FC33020` in compat/game_net_stubs.cpp, a name kept from the 1.10f source). Offset +0x33020 is not a function start: it lies inside 0x32DF0 OBJECTS_PopulateFn7_RogueOnStick.
 - Quest NPC message tables, checked entry by entry against the 1.13c data for every quest (test/quest-npc-message-tables.test.mjs): gpAct1Q3NpcMessages table 1 Charsi menu 0 -> 2; gpAct2Q1NpcMessages table 4 Jerhyn -> Warriv; gpAct3Q3NpcMessages table 0 Alkor -> Hratli; gpAct5Q4/Q5/Q6NpcMessages: the Nihlathak entries are Anya (MONSTER_DREHYA), whom the quest callbacks already ask for.
 - D2Game+0xC6070 ACT2Q1_UnitIterate_SetPrimaryGoalDoneForPartyMembers: matches the 1.13c decompile; validated against the vector (in-room path).
 - `src/D2Game/GAME/Game.cpp` `GAME_UpdateGamesProgress` (`// 1.13c D2Game+0x2E1E0`): the elapsed-time compare against the target frame time is signed (retail casts both sides to int); 1.10f compared unsigned.

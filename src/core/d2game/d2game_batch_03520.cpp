@@ -27,6 +27,7 @@ static inline void     wrptr(void* p, uint32_t o, const void* v) { std::memcpy((
 // ---- module state --------------------------------------------------------------------------------
 static int32_t g_gameSlots[1025];       // 0x6FD30C04: game id per slot (0 empty, -1 free); slot i+1 == 0x6FD30C08+4i
 static constexpr int kGameSlotCount = 1024;   // the sweep bound 0x6FD30C08..0x6FD31C08
+extern "C" int32_t* d2game_game_slot_table() { return g_gameSlots + 1; }   // FN probe seam: the 1024 slots from 0x6FD30C08
 static uint32_t g_gameListCount;        // 0x6FD31C24: game-list / server-time feature gate
 static uint8_t  g_callbackByte;         // 0x6FD31C30
 static void*    g_callbacks;            // 0x6FD31C3C: optional callback block, see D2GameCallbackBlock

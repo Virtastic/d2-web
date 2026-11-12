@@ -213,9 +213,26 @@ static void d2game_109B0_113c(int32_t* pParam1, void* pEsi, const D2GameBatchB64
 // with the unit's X/Y. #10012(esiUnit, 0xFF) despawns the item; for a player-owned unit the player
 // data field +0x9C is handed to 0x7A540 (item->mode update), followed by the living-player iteration
 // 0xDFC10 with callback 0xE7E0 and SUNIT_RemoveUnit(game, esiUnit).
-static void d2game_D2D90_113c(void* pGame, void* pEaxUnit, void* pEsiUnit,
-                              const D2GameBatchB64Env& env)
+// Seam table of the 0xD2D90 entry (the FN probe supplies it). The flag (second stack argument) gates
+// the 0x7A540 call; ECX is only saved and restored by the function. 0x1130/0x1100 are thiscall on
+// the item (ECX), 0x1100 taking the 0x1130 result; 0xA5E6 is handed only the first four arguments.
+struct D2GameD2D90Env {
+    void*    (*ord10646)(void* pA, void* pB);
+    uint32_t (*ord10020)(void* pUnit);
+    uint32_t (*ord10584)(void* pA, uint32_t b, uint32_t c);
+    uint32_t (*unitY)(void* pUnit, uint32_t a, uint32_t b, uint32_t c);
+    uint32_t (*unitX)(void* pUnit, uint32_t y);
+    void     (*ord10869)(const char* file, uint32_t line, void* pRec, uint32_t x, uint32_t y, uint32_t a, uint32_t b, uint32_t c);
+    void     (*ord10012)(void* pUnit, uint32_t n);
+    void*    (*ord10920p)(void* pUnit);
+    void     (*fn7a540)(void* pUnit, uint32_t value);
+    void     (*fnDFC10)(void* pUnit, void* pGame, uint32_t cb);
+    void     (*fnE20A0)(void* pGame, void* pUnit);
+};
+void d2game_D2D90_113c(void* pGame, void* pEaxUnit, void* pEsiUnit, uint32_t nEcx, uint32_t nFlag,
+                       const D2GameD2D90Env& env)
 {
+    (void)nEcx;
     if (pGame == nullptr) d2game_fatal(0xF70);
     if (pEaxUnit == nullptr) d2game_fatal(0xF71);
 
@@ -228,22 +245,21 @@ static void d2game_D2D90_113c(void* pGame, void* pEaxUnit, void* pEsiUnit,
     if (pResolved == nullptr) d2game_fatal(0xF77);
     if (pEsiUnit != pResolved) d2game_fatal(0xF78);
 
-    const uint8_t nByte = env.ord10020(pEsiUnit);
+    const uint8_t nByte = (uint8_t)env.ord10020(pEsiUnit);
     const uint32_t uArg = env.ord10584(pEaxUnit, nByte, rd32(pGame, 0x70));
-    const uint32_t y = env.unitY(pEsiUnit);                            // 0x1130
-    const uint32_t x = env.unitX(pEsiUnit);                            // 0x1100
+    const uint32_t y = env.unitY(pEsiUnit, uArg, 0, nByte);            // 0x1130
+    const uint32_t x = env.unitX(pEsiUnit, y);                         // 0x1100 takes the 0x1130 result
     // 1.13c passes the caller's file/line text here; it is retail content and is not reproduced.
-    env.ord10869("", 0xF7C, pItemRec, x, y, uArg, 0, nByte);
+    env.ord10869("", 0xF7C, pItemRec, x, 0, 0, 0, 0);
     env.ord10012(pEsiUnit, 0xFF);
 
-    // The disassembly tests the game argument here (always non-null after the 0xf70 assert); the
-    // value handed to 0x7A540 is the player-data field +0x9C for player units, else zero.
-    uint32_t nValue = 0;
-    if (rd32(pEaxUnit, 0x00) == 0) {
-        void* pPlayerData = env.ord10920p(pEaxUnit);
-        nValue = pPlayerData ? rd32(pPlayerData, 0x9C) : 0;
+    // The second stack argument gates the 0x7A540 call; the value is the player-data field +0x9C
+    // for player units, else zero (retail does not null-check the player data).
+    if (nFlag != 0) {
+        uint32_t nValue = 0;
+        if (rd32(pEaxUnit, 0x00) == 0) nValue = rd32(env.ord10920p(pEaxUnit), 0x9C);
+        env.fn7a540(pEsiUnit, nValue);
     }
-    env.fn7a540(pEsiUnit, nValue);
 
     env.fnDFC10(pEsiUnit, pGame, 0xE7E0);                              // EDI=game, EBX=callback RVA
     env.fnE20A0(pGame, pEsiUnit);
@@ -342,7 +358,7 @@ static uint32_t d2game_9FAE0_113c(void* pUnit, int32_t nMissileId, const D2GameB
 // bit 2 set yields a candidate position (5*(room coords + room->+0x8/+0xC) + 3); #10482 must accept
 // it, and the four (dx,dy) pairs around it must each fail #10573 with id 0x1C09. The first accepted
 // pair is written to outX/outY.
-static uint32_t d2game_EDF60_113c(void* pGame, uint32_t nModulus, uint32_t* pOutX, uint32_t* pOutY,
+[[maybe_unused]] static uint32_t d2game_EDF60_113c(void* pGame, uint32_t nModulus, uint32_t* pOutX, uint32_t* pOutY,
                                   const D2GameBatchB64Env& env)
 {
     if (env.ord10544() == 0) return 0;
@@ -406,14 +422,6 @@ EMSCRIPTEN_KEEPALIVE void d2_old_ca5b0(uint32_t* r)
     r[4] = 0;
 }
 
-// 1.13c D2Game+0xD2D90 (r[0]=game, r[1]=EAX unit, r[2]=ESI unit)
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d2d90(uint32_t* r)
-{
-    d2game_D2D90_113c((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1], (void*)(uintptr_t)r[2],
-                      batchEnv(r));
-    r[4] = 0;
-}
 
 // 1.13c D2Game+0x9F3B0 (r[0]=this, r[1]=param_1, r[2]=missile id, r[3]=EBX, r[6]=EBP, r[4]=result)
 extern "C"
@@ -430,10 +438,4 @@ EMSCRIPTEN_KEEPALIVE void d2_old_9fae0(uint32_t* r)
     r[4] = d2game_9FAE0_113c((void*)(uintptr_t)r[0], (int32_t)r[1], batchEnv(r));
 }
 
-// 1.13c D2Game+0xEDF60 (r[0]=game, r[1]=modulus, r[2]=out X, r[3]=out Y, r[4]=result)
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_edf60(uint32_t* r)
-{
-    r[4] = d2game_EDF60_113c((void*)(uintptr_t)r[0], r[1], (uint32_t*)(uintptr_t)r[2],
-                             (uint32_t*)(uintptr_t)r[3], batchEnv(r));
-}
+// The 0xEDF60 entry point is d2g_edf60 in d2game_edf60.cpp.

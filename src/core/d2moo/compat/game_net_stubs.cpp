@@ -260,6 +260,8 @@ static bool joinWalkReveals(D2ActiveRoomStrc* pWalkRoom, D2ActiveRoomStrc* pOwnR
     for (D2UnitStrc* u = pWalkRoom->pUnitFirst; u; u = u->pRoomNext) if (u->dwUnitType == UNIT_OBJECT) return true;
     return false;
 }
+// CLIENTS_ChangeRoom. The name is kept from the 1.10f source; the function is D2Game+0x4B1D0, proved on its own seam in
+// src/core/d2game/game_return_argument.cpp. Offset +0x33020 lies inside 0x32DF0.
 void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
     // Recorded sessions (s39xx) run retail's LEVEL_AddClient/RemoveClient; the s08 aitrace fixture's capture hangs
     // the client with DUNGEON_AddClientToRoom and wakes monsters itself, so a second AI-event arm there fires early.

@@ -16,15 +16,15 @@ extern "C" uint32_t d2game_ef6b0(uint32_t a0, uint32_t unit, uint32_t a2, uint32
     const uint32_t n = d2rd8(rec + 0x33);
     if (!n) fatal(0x4F0);
     uint32_t edi = e->call(0x11D0, 0, unit ? unit + 0x6C : 0, 0, 0, n);
-    const uint32_t mask = d2rd32(d2rd32(maskSlot)) & 0xFF;
+    const uint32_t mask = d2rd32(maskSlot) & 0xFF;   // [slot] read once: the slot value already points at the mask array
     int32_t cx = 0;
     uint32_t cnt = 0;
     for (;;) {
-        edi = (edi + 1 >= n) ? 0 : edi + 1;
+        edi = ((int32_t)(edi + 1) >= (int32_t)n) ? 0 : edi + 1;   // signed, as retail's inc/cmp/jl
         cx = (int16_t)d2rd16(rec + edi * 2 + 0x36);
         uint32_t r = 0;
         if (cx >= 0) {
-            const uint32_t dt = d2rd32(d2rd32(dtSlot));
+            const uint32_t dt = d2rd32(dtSlot);   // [slot] read once: the slot value points at sgptDataTables
             if (cx < (int32_t)d2rd32(dt + 0xA80)) r = d2rd32(dt + 0xA78) + (uint32_t)cx * 0x1A8;
         }
         if (d2rd8(r + 0xC) & mask) break;

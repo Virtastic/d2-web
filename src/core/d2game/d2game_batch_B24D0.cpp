@@ -94,7 +94,7 @@ static void d2game_B24D0_113c(void* pGame, void* pUnit, const D2GameBatchB74Env&
 // Asserts 0x171 without player data. The pet list is at player data +0x44; its array base is the
 // first pointer, entries are 12 bytes (D2PetDataStrc pointer / count / max), and the returned GUID
 // is the record's +0x04 dword. -1 when the list, the type range, the slot or the pet data is absent.
-static int32_t d2game_967B0_113c(void* pUnit, int32_t nPetType, const D2GameBatchB74Env& env)
+[[maybe_unused]] static int32_t d2game_967B0_113c(void* pUnit, int32_t nPetType, const D2GameBatchB74Env& env)
 {
     uint8_t* pPlayerData = (uint8_t*)env.ord10920(pUnit);
     if (pPlayerData == nullptr) d2game_fatal(0x171);
@@ -278,12 +278,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_b24d0(uint32_t* r)
     r[4] = 0;
 }
 
-// 1.13c D2Game+0x967B0 (r[0]=pUnit EAX, r[1]=nPetType ESI, r[4]=result)
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_967b0(uint32_t* r)
-{
-    r[4] = (uint32_t)d2game_967B0_113c((void*)(uintptr_t)r[0], (int32_t)r[1], batchEnv(r));
-}
+// The 0x967B0 entry point is d2game_967b0 in d2game_967b0.cpp; the FN probe supplies the seams.
 
 // Probe entry for 0x8B9B0 (EAX = attribute, client and packet fields on the stack); `send` takes the place of 0x8A3E0.
 extern "C"
@@ -295,12 +290,42 @@ EMSCRIPTEN_KEEPALIVE void d2game_8b9b0_send(void* client, uint8_t nPacketId, uin
     d2game_8B9B0_113c(client, nPacketId, nGuid, nValue, nAttribute, env);
 }
 
-// 1.13c D2Game+0xD29F0 (r[0]=pUnit)
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d29f0(uint32_t* r)
+// 1.13c D2Game+0xD29F0: the entry the FN probe drives, with its own seam table (same walk as
+// d2game_D29F0_113c above; the probe's seams take the place of the D2Common iteration, the
+// predicate, the stat write, the player-data lookup and the client send).
+struct D2GameD29F0Env {
+    void*   (*first)(void* pInventory);
+    void*   (*next)(void* pNode);
+    void*   (*nodeItem)(void* pNode);
+    int32_t (*check)(void* pItem, uint32_t a, uint32_t b, const void* pFile);
+    void    (*setStat)(void* pItem, uint32_t a, int32_t v);
+    void*   (*playerData)(void* pUnit);
+    void    (*send)(void* pClient, const void* pBuf, uint32_t nLen);
+};
+extern "C" void d2_fn_d2game_D29F0(void* pUnit, const D2GameD29F0Env* e)
 {
-    d2game_D29F0_113c((void*)(uintptr_t)r[0], batchEnv(r));
-    r[4] = 0;
+    if (pUnit == nullptr) return;
+    void* pInventory = rdptr(pUnit, 0x60);
+    if (pInventory == nullptr) return;
+    void* pNode = e->first(pInventory);
+    if (pNode == nullptr) return;
+    do {
+        uint8_t* pItem = (uint8_t*)e->nodeItem(pNode);
+        if (e->check(pItem, 4, 0x1D7, (const void*)(uintptr_t)0x6FD1B14C) != 0) {
+            e->setStat(pItem, 4, 0);
+            if (rd32(pUnit, 0x0) == 0) {
+                void* pClient = rdptr(e->playerData(pUnit), 0x9C);
+                uint8_t packet[8];
+                packet[0] = 0x3F;
+                packet[1] = 0xFF;
+                const uint32_t nGuid = pItem != nullptr ? rd32(pItem, 0xC) : 0;
+                std::memcpy(packet + 2, &nGuid, 4);
+                wr16(packet, 6, 0xFFFF);
+                e->send(pClient, packet, 8);
+            }
+        }
+        pNode = e->next(pNode);
+    } while (pNode != nullptr);
 }
 
 // Probe entry for 0x8AF10 (EAX = record, client on the stack); `send` takes the place of 0x8A3E0.

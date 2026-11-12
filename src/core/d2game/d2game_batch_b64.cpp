@@ -44,13 +44,13 @@ struct B64Env {
     uint32_t (*f76a0)(uint32_t p, uint32_t room, uint32_t id);
     void     (*f2ee70)();
     uint32_t (*fE660)(uint32_t code);
-    uint32_t (*fC1B60)();
-    uint32_t (*f1280)();
+    uint32_t (*fC1B60)(uint32_t game);
+    uint32_t (*f1280)(uint32_t room);
     void     (*f54130)(uint32_t room, uint32_t pos, uint32_t a, uint32_t b);
     uint32_t (*fEF10)(void* q);
     uint32_t (*fF650)(uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e, uint32_t f, uint32_t g, uint32_t h);
     void     (*f68410)(uint32_t game, uint32_t unit, uint32_t z);
-    void     (*f49820)();
+    void     (*f49820)(uint32_t game);
     void     (*fE20A0)(uint32_t game, uint32_t unit);
     void     (*o10024)(const char* s, uint32_t a);
     uint32_t (*o10265)(uint32_t n);
@@ -141,16 +141,16 @@ void d2game_c8fd0(uint32_t unit, uint32_t room, int32_t* pos) {
             if (rd32(n, 0) == 1 && rd32(n, 0x14)) list = rd32(rd32(n, 0x14), 0x30);
             for (uint32_t e = rd32(list, 0); e; e = rd32(e, 8))
                 if (rd32(e, 0) != 0) { g_b->f68410(game, n, 0); return; }
-            g_b->f49820();
+            g_b->f49820(game);
             g_b->fE20A0(game, n);
             wr8(d, 0xc, 0);
             break;
         }
     }
     if (rd8(d, 0xd) == 1) return;
-    pos[0] += (g_b->fC1B60() & 0xff) ? 0xf : -10;
+    pos[0] += (g_b->fC1B60(rd32(unit, 4)) & 0xff) ? 0xf : -10;
     pos[1] -= 3;
-    uint32_t c = g_b->f1280();
+    uint32_t c = g_b->f1280(room);
     g_b->f54130(room, (uint32_t)(uintptr_t)pos, 3, 0x100);
     struct { uint32_t game, a, b, c, d, e, f, g; uint16_t h; } q = {rd32(unit, 4), c, 0, 0xc9, 1, (uint32_t)pos[0], (uint32_t)pos[1], 0xffffffffu, 0};
     uint32_t u = g_b->fEF10(&q);

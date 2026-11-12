@@ -100,11 +100,14 @@ EMSCRIPTEN_KEEPALIVE void d2_game_4a9b0(void* pGame, uint32_t nClientId, uint8_t
     if (g_clientListInitialized == 0 || pGame == nullptr) return;
     if ((int32_t)rd32(pGame, 0x8C) >= 8) return;
 
-    void* client = env->allocPool(rdptr(pGame, 0x1C), 0x518, kClientsFile, 0x331, 0);   // Fog #10045
+    // Retail-layout records hold 32-bit pointers: every pointer field below is read and written as one dword
+    // (an 8-byte host store at +0x88 cleared nClients at +0x8C, and +0x4A8/+0x4AC/+0x4B0 overlapped).
+    auto p32 = [](const void* v) { return (uint32_t)(uintptr_t)v; };
+    void* client = env->allocPool((void*)(uintptr_t)rd32(pGame, 0x1C), 0x518, kClientsFile, 0x331, 0);   // Fog #10045
     std::memset(client, 0, 0x146 * 4);
     wr32(client, 0x00, nClientId);
     wr32(client, 0x3D8, (uint32_t)GetTickCount() + 180000);
-    wrptr(client, 0x1A8, pGame);
+    wr32(client, 0x1A8, p32(pGame));
     if (env->shouldTreatClassAsTemplateId(pGame) == 0) {     // 0xB2620
         wr8(client, 0x08, nClassIdOrCharTemplate);
     } else {
@@ -126,17 +129,17 @@ EMSCRIPTEN_KEEPALIVE void d2_game_4a9b0(void* pGame, uint32_t nClientId, uint8_t
         wr8 (client, 0x3DE + i * 8, 0);
         wr32(client, 0x3E0 + i * 8, 0xFFFFFFFF);
     }
-    wrptr(client, 0x4A8, rdptr(pGame, 0x88));
-    wrptr(pGame, 0x88, client);
+    wr32(client, 0x4A8, rd32(pGame, 0x88));
+    wr32(pGame, 0x88, p32(client));
 
     EnterCriticalSection(&g_clientListLock);
-    wrptr(client, 0x4AC, g_clientList[nClientId & 0xFF]);
+    wr32(client, 0x4AC, p32(g_clientList[nClientId & 0xFF]));
     g_clientList[nClientId & 0xFF] = client;
     LeaveCriticalSection(&g_clientListLock);
 
     const uint8_t bucket = (uint8_t)env->crc16(szClientName);  // Fog #10137
     EnterCriticalSection(&g_clientByNameLock);
-    wrptr(client, 0x4B0, g_clientListByName[bucket]);
+    wr32(client, 0x4B0, p32(g_clientListByName[bucket]));
     g_clientListByName[bucket] = client;
     LeaveCriticalSection(&g_clientByNameLock);
 

@@ -49,9 +49,9 @@ struct D2GameBatchCB720Env {
     // 0xDF780 returns the record whose +0xA8 word 0xCB720 subtracts.
     void*    (*funcDF780)(void);
     // Ordinal_10744, called four times by 0xD1AA0 with register-only arguments.
-    void*    (*ordinal10744)(void);
+    int32_t  (*ordinal10744)(void* unit, uint32_t type);
     // Ordinal_11028 returns the id 0xD1AA0 looks up.
-    uint16_t (*ordinal11028)(void);
+    uint16_t (*ordinal11028)(void* unit, uint32_t index);
     // Ordinal_11065(id).
     void*    (*ordinal11065)(uint16_t id);
     // 0xE03A0 interact-record lookup (0xE09D0 passes the stack argument and unit+0xA0).
@@ -263,17 +263,13 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_d1aa0(void* game, const D2GameBatchCB720En
 {
     if (game == nullptr) d2game_fatal(0x1ED);
 
-    void* probe = env->ordinal10744();
-    if (probe == nullptr) {
-        probe = env->ordinal10744();
-        if (probe == nullptr) return 0xFFFFFFFF;
-    }
+    if (env->ordinal10744(game, 0x16) == 0 && env->ordinal10744(game, 0x12) == 0) return 0xFFFFFFFF;
 
-    const uint16_t id = env->ordinal11028();
+    const uint16_t id = env->ordinal11028(game, 0);
     void* record = env->ordinal11065(id);
     if (record != nullptr) {
-        if (env->ordinal10744() != nullptr) return rd32(record, 8);
-        if (env->ordinal10744() != nullptr) return rd32(record, 0xC);
+        if (env->ordinal10744(game, 0x16) != 0) return rd32(record, 8);
+        if (env->ordinal10744(game, 0x12) != 0) return rd32(record, 0xC);
     }
     return 0xFFFFFFFF;
 }

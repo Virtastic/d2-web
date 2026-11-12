@@ -20,14 +20,14 @@ struct D2GameBatchCc75Env {
     void*    (*ord10331)(const void* u);
     void*    (*ord10826)(void* v);
     int8_t   (*ord10459)(void* v);
-    uint16_t (*ord10867)(const void* v);
-    uint16_t (*ord10750)(const void* v);
+    uint32_t (*ord10867)(const void* v);   // 1.13c reads the whole eax of these (CCFE0 pushes it unmasked)
+    uint32_t (*ord10750)(const void* v);
     int      (*ord10391)(const void* a, const void* b);
     void*    (*ord11017)(const void* a);
     uint8_t  (*ord11027)(const void* u);
     void*    (*sub0xE03A0)(void* game, uint32_t id);   // FUN_6fd003a0
     int      (*sub0x2E150)(const void* u);             // FUN_6fc2e150
-    uint32_t (*sub0xCB690)(uint16_t a, uint16_t b);    // FUN_6fceb690
+    uint32_t (*sub0xCB690)(uint32_t a, uint32_t b);    // FUN_6fceb690
     void     (*sub0x21420)();
     void     (*sub0x21290)(void* unit, void* stackBuf);
     void     (*sub0xDFFD0)(uint32_t a, uint32_t b);
@@ -153,8 +153,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_CCFE0(int mode, void* game
     int t = (int)c7rd32(o, 0);
     void* d = c7rdp(o, 0x2c);
     bool typed = t == 2 || (3 < t && t < 6);
-    uint16_t u3 = typed ? (uint16_t)c7rd32(d, 0xc) : (d ? env->ord10867(d) : 0);
-    if (typed) return env->sub0xCB690(u3, (uint16_t)c7rd32(d, 0x10));
+    // 1.13c: both words are pushed whole (esi = [d+0xc], push [d+0x10] or eax of 0xA3B8), not cut to 16 bits.
+    uint32_t u3 = typed ? c7rd32(d, 0xc) : (d ? env->ord10867(d) : 0);
+    if (typed) return env->sub0xCB690(u3, c7rd32(d, 0x10));
     return env->sub0xCB690(u3, d ? env->ord10750(d) : 0);
 }
 

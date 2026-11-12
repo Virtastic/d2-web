@@ -86,7 +86,7 @@ static const D2GameBatchEEnv g_batchEEnv{};
 
 
 // ---- 0xEB7B0: quest-record section ('!ooW', version 6, 298 bytes) -------------------------------
-static int32_t QuestSection(void* pPlayer, uint8_t** ppSection, const uint8_t* pEnd, const D2GameBatchEEnv* env)
+[[maybe_unused]] static int32_t QuestSection(void* pPlayer, uint8_t** ppSection, const uint8_t* pEnd, const D2GameBatchEEnv* env)
 {
     uint8_t* cur = *ppSection;
     if (pEnd < cur + 0x12A) return 1;
@@ -111,7 +111,7 @@ static int32_t QuestSection(void* pPlayer, uint8_t** ppSection, const uint8_t* p
 // 1.13c D2Game+0xEBC40
 // 1.13c writes the marker before resolving the class id (1.10f resolved it first) and leaves the
 // section cursor unadvanced on the BAD_CLASS return.
-static int32_t SkillSection(void* pPlayer, uint8_t** ppSection, const uint8_t* pEnd, const D2GameBatchEEnv* env)
+[[maybe_unused]] static int32_t SkillSection(void* pPlayer, uint8_t** ppSection, const uint8_t* pEnd, const D2GameBatchEEnv* env)
 {
     uint8_t* cur = *ppSection;
     if (pEnd < cur + env->highestClassSkillCount() + 2) return 1;
@@ -143,7 +143,7 @@ static int32_t SkillSection(void* pPlayer, uint8_t** ppSection, const uint8_t* p
 // ---- 0xEC020: PLRSAVE2_WriteIronGolemSection ('fk') --------------------------------------------
 // Retail advances by the serializer's length even when it reported failure; only the present flag is
 // cleared (same as the 1.10f body).
-static int32_t IronGolemSection(void* pGame, void* pPlayer, uint8_t** ppSection,
+[[maybe_unused]] static int32_t IronGolemSection(void* pGame, void* pPlayer, uint8_t** ppSection,
                                 const uint8_t* pEnd, int32_t a5, const D2GameBatchEEnv* env)
 {
     if (rd32(pGame, 0x70) == 0) return 0;                      // pGame->bExpansion
@@ -181,7 +181,7 @@ static int32_t IronGolemSection(void* pGame, void* pPlayer, uint8_t** ppSection,
 // The 1.13c decompile has six removed-unreachable-block warnings: the arms that write the marker and
 // serialize the corpse's items were dropped. They are reconstructed from the 1.10f prior art; the
 // per-item quest write loop is the visible 1.13c delta and sits where the decompile shows it.
-static int32_t CorpsesSection(void* pGame, void* pPlayer, uint8_t** ppSection,
+[[maybe_unused]] static int32_t CorpsesSection(void* pGame, void* pPlayer, uint8_t** ppSection,
                               const uint8_t* pEnd, const D2GameBatchEEnv* env)
 {
     void* inventory = rdptr(pPlayer, 0x60);
@@ -259,39 +259,8 @@ static void TimerWalkAndBranch(void* p1, void* unit, void* ppThing, const D2Game
 
 // ---- FN-path exports (r[0..3] args, r[4] result; argument 5 rides in r[5]) ----------------------
 
-// 1.13c D2Game+0xEB7B0
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_eb7b0(uint32_t* r)
-{
-    r[4] = (uint32_t)QuestSection((void*)(uintptr_t)r[0], (uint8_t**)(uintptr_t)r[1],
-                                  (const uint8_t*)(uintptr_t)r[2], &g_batchEEnv);
-}
-
-// 1.13c D2Game+0xEBC40
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ebc40(uint32_t* r)
-{
-    r[4] = (uint32_t)SkillSection((void*)(uintptr_t)r[0], (uint8_t**)(uintptr_t)r[1],
-                                  (const uint8_t*)(uintptr_t)r[2], &g_batchEEnv);
-}
-
-// 1.13c D2Game+0xEC020
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ec020(uint32_t* r)
-{
-    r[4] = (uint32_t)IronGolemSection((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1],
-                                      (uint8_t**)(uintptr_t)r[2], (const uint8_t*)(uintptr_t)r[3],
-                                      (int32_t)r[5], &g_batchEEnv);
-}
-
-// 1.13c D2Game+0xEC260
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ec260(uint32_t* r)
-{
-    r[4] = (uint32_t)CorpsesSection((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1],
-                                    (uint8_t**)(uintptr_t)r[2], (const uint8_t*)(uintptr_t)r[3],
-                                    &g_batchEEnv);
-}
+// The four section writers (quest, skill, iron golem, corpses) are the FN probes' d2g_* ports in d2game_eb7b0.cpp,
+// d2game_ebc40.cpp, d2game_ec020.cpp and d2game_ec260.cpp; the statics above are kept only as the older reference.
 
 // 1.13c D2Game+0x3E70
 extern "C"
