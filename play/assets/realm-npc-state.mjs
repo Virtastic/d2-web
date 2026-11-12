@@ -6,7 +6,7 @@
 //   (0x38 trade, gamble or hire list; 0x34 identify; 0x62 resurrect), answered by S2C 0x9C stock and 0x2A result.
 // Hire: retail's menu build sends 0x38 {hire} (13 bytes: 0x38, action u32, NPC guid, the hero's unit id) when the
 // conversation opens, ahead of any speech, for the four mercenary hirers (not when the player picks Hire); the server answers 0x4F then one 0x4E per offer, which the hire window lists.
-import { npcMenuEntries, talkEntries, entriesAfterSpeech, withTravelRow, withHireRow, withResurrectRow, TRAVEL_LEVEL } from './npc-menu.mjs';
+import { npcMenuEntries, talkEntries, nextSpeechAfterTopic,withTravelRow, withHireRow, withResurrectRow, TRAVEL_LEVEL } from './npc-menu.mjs';
 import { npcPackets, NPC_ACTION, SELL_MODE, parseNpcInfo, parseTransaction, parseShopItem, parseHireOffer, HIRE_LIST_HEAD } from './realm-npc-packets.mjs';
 import { decodeItemHeader } from './realm-world.mjs';
 import { packets, UNIT } from './realm-input.mjs';
@@ -146,6 +146,14 @@ export function createRealmNpc({ send, classOf = () => -1, questDone = () => fal
     dismissSpeech() {
       if (!npc || npc.mode !== 'speech') return false;
       const line = npc.speech[npc.spoken];
+      if (npc.afterTopic) {
+        // D2Client speech-end 0x46E60 after a Talk topic: speak the first list message other than the one just spoken
+        // (nothing is marked heard, no 0x31 leaves), else the Talk box returns.
+        const next = nextSpeechAfterTopic(npc.messages, line?.stringId);
+        if (next === null) { npc.afterTopic = false; npc.speech = []; npc.spoken = 0; npc.mode = 'talk'; }
+        else { npc.speech = [{ stringId: next }]; npc.spoken = 0; }
+        return true;
+      }
       if (line) send(npcPackets.messageDone(npc.guid, line.stringId));
       npc.spoken++;
       if (npc.spoken >= npc.speech.length) {
@@ -158,8 +166,8 @@ export function createRealmNpc({ send, classOf = () => -1, questDone = () => fal
       if (!npc || (npc.mode !== 'menu' && npc.mode !== 'talk')) return false;
       switch (entry.action) {
         case 'talk': npc.entries = talkEntries(npc.messages, questName); npc.mode = 'talk'; return true;
-        case 'topic': send(npcPackets.messageDone(npc.guid, entry.stringId));
-          npc.entries = entriesAfterSpeech(npc.entries, entry.stringId); return true;
+        case 'topic':   // the topic is spoken (0x473B0); the capture shows no 0x31 and the topic stays listed
+          npc.speech = [{ stringId: entry.stringId }]; npc.spoken = 0; npc.afterTopic = true; npc.mode = 'speech'; return true;
         case 'intro': case 'gossip': return true;   // the line is played by the shell; nothing goes to the server
         case 'trade': npc.mode = 'trade'; send(npcPackets.request(NPC_ACTION.TRADE, npc.guid, 0)); return true;
         case 'gamble': npc.mode = 'gamble'; send(npcPackets.request(NPC_ACTION.GAMBLE, npc.guid, 0)); return true;

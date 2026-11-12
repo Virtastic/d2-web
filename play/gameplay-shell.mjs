@@ -100,7 +100,7 @@ import { createUiClickSoundPlayer } from './assets/ui-click-sound.mjs';
 import { unitSoundNativeSpatial, unitSoundNativePanCode } from './assets/unit-sound-spatial.mjs';
 import { createUnitSoundPlayer } from './assets/unit-sound-player.mjs';
 import { createAmbientSound, ambientCycleOf } from './assets/ambient-sound.mjs';
-import { createCombatSoundTrigger } from './assets/combat-sound-trigger.mjs';
+import { createCombatSoundTrigger, combatSoundEngine } from './assets/combat-sound-trigger.mjs';
 import { createEventSounds } from './assets/event-sounds.mjs';
 import { createStatUpdateWatch, ITEM_RECHECK } from './assets/stat-update-watch.mjs';
 import { createMissileSounds } from './assets/missile-sounds.mjs';
@@ -212,6 +212,7 @@ import { findD2gsDeny, d2gsDenyError } from './assets/d2gs-deny.mjs';
 import { createGameLife, flushUnloadLeave, joinDeadline, lifePhaseFromFrame, TICK_MS } from './assets/bnet-game-life.mjs';
 import { createJoinLoading, createJoinLoadingArt } from './assets/bnet-join-loading.mjs';
 import { reasonString, REASON_DISCONNECTED } from './assets/d2gs-deny.mjs';
+import { orderUnitSprites } from './assets/unit-draw-order.mjs';
 
 const canvas = document.querySelector('#game');
 const screenshotAction = createScreenshotAction();
@@ -4514,7 +4515,7 @@ function buildChromeSounds(fresh, read) {
   if (fresh || !uiClickSounds) { try { uiClickSounds = audioVolume.attach('sound', createUiClickSoundPlayer(assetReader, canvas)); } catch (error) { musicError = String(error); } }
   if (fresh || !(unitSounds && combatSounds && eventSounds && missileSounds && ambient)) {
     realmEventFeed = null;
-    try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), () => unitSounds.monsterSoundBusy(), Module._d2_client_attack_roll_take); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a)), (c) => Number(Module._d2_client_monster_footstep_layer(c)), Module._d2_session_monster_idle_take ? (id) => Number(Module._d2_session_monster_idle_take(id)) >>> 0 : null, Module._d2_session_floor_class ? (type, id, fallback) => Number(Module._d2_session_floor_class(type, id, fallback)) : null, Module._d2_client_footstep_due); missileSounds = createMissileSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error)), (id) => !Module._d2_session_missile_on_client || Module._d2_session_missile_on_client(id) !== 0, (id) => (Module._d2_session_client_unit_roll ? Number(Module._d2_session_client_unit_roll(id)) >>> 0 : 0), (id) => { const f = Module._d2_session_missile_bolt_seed, lo = f ? Number(f(id, 0)) >>> 0 : 0, hi = f ? Number(f(id, 1)) >>> 0 : 0; return lo || hi ? [lo, hi] : null; }); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; canvas.__d2MissileSound = missileSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, undefined, soundFetched)); } catch (error) { musicError = String(error); }
+    try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), () => unitSounds.monsterSoundBusy(), Module._d2_client_attack_roll_take, combatSoundEngine(Module)); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a)), (c) => Number(Module._d2_client_monster_footstep_layer(c)), Module._d2_session_monster_idle_take ? (id) => Number(Module._d2_session_monster_idle_take(id)) >>> 0 : null, Module._d2_session_floor_class ? (type, id, fallback) => Number(Module._d2_session_floor_class(type, id, fallback)) : null, Module._d2_client_footstep_due, combatSoundEngine(Module)?.modeSounds); missileSounds = createMissileSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error)), (id) => !Module._d2_session_missile_on_client || Module._d2_session_missile_on_client(id) !== 0, (id) => (Module._d2_session_client_unit_roll ? Number(Module._d2_session_client_unit_roll(id)) >>> 0 : 0), (id) => { const f = Module._d2_session_missile_bolt_seed, lo = f ? Number(f(id, 0)) >>> 0 : 0, hi = f ? Number(f(id, 1)) >>> 0 : 0; return lo || hi ? [lo, hi] : null; }); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; canvas.__d2MissileSound = missileSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, undefined, soundFetched)); } catch (error) { musicError = String(error); }
   }
 }
 // The stash, cube and stash gold panels: built when a local game starts, and by a joined game that had none before it.
@@ -4705,7 +4706,7 @@ function drawFrame() {
       // F20: the engine's own record for this missile -- its 64-slot facing and its sequence clock --
       // beside the Missiles.txt CelFile. Native failed-cell resolution returns without replacement art.
       const missile = entity.missile || null;
-      sprites.push({ depth: sy, wx: entity.x, wy: entity.y, pass: 'missile', u: [3, entity.classId, entity.mode], draw(c) {
+      sprites.push({ depth: sy, wx: entity.x, wy: entity.y, id: entity.id, px: entity.preciseX, py: entity.preciseY, pass: 'missile', u: [3, entity.classId, entity.mode], draw(c) {
         // Retail's missile draw reads the CUnit's facing and sequence frame. Without that record we
         // cannot identify the requested frame or direction; scene tick/zero-facing guesses invent art.
         if (!missile) {
@@ -4726,7 +4727,7 @@ function drawFrame() {
     if (entity.kind === 'player' && entity.playerRender && entity.mode !== 8) {
       // Another player standing in the room: the player renderer draws it from the unit's mode, direction, frame and worn gear.
       if (!unitInView(sx, sy, w, h)) continue;
-      sprites.push({ depth: sy, wx: entity.x, wy: entity.y, u: [0, entity.classId, entity.mode], draw(c) {
+      sprites.push({ depth: sy, wx: entity.x, wy: entity.y, id: entity.id, px: entity.preciseX, py: entity.preciseY, u: [0, entity.classId, entity.mode], draw(c) {
         const r = entity.playerRender;
         let drawn = null, error = '';
         try {
@@ -4745,7 +4746,7 @@ function drawFrame() {
       // acts on (id/class/position/mode) and the anchor this blit was painted at -- the same point
       // the pointer path tests -- so a row can click the renderer's own anchor rather than
       // re-deriving the projection beside it and drifting from what was drawn.
-      sprites.push({ depth: sy, wx: entity.x, wy: entity.y, pass: 'player-corpse', u: [0, entity.classId, entity.mode], draw(c) {
+      sprites.push({ depth: sy, wx: entity.x, wy: entity.y, id: entity.id, px: entity.preciseX, py: entity.preciseY, pass: 'player-corpse', u: [0, entity.classId, entity.mode], draw(c) {
         const unit = { id: entity.id, classId: entity.classId, x: entity.x, y: entity.y, mode: entity.mode };
         const anchor = { x: Math.round(sx), y: Math.round(sy) };
         unit.direction = entity.direction;
@@ -4760,7 +4761,7 @@ function drawFrame() {
       continue;
     }
     if (!unitInView(sx, sy, w, h)) continue;   // off-screen: no decode, no draw (unit-view-cull.mjs)
-    sprites.push({ depth: sy, wx: entity.x, wy: entity.y, u: [1, entity.classId, entity.mode], draw(c) {
+    sprites.push({ depth: sy, wx: entity.x, wy: entity.y, id: entity.id, px: entity.preciseX, py: entity.preciseY, u: [1, entity.classId, entity.mode], draw(c) {
       // Draw the retail sprite for ANY unit that has an animation. This used to require
       // entity.hostile, which tied "has a body" to "is an enemy" -- so once town NPCs were
       // correctly marked non-hostile they stopped being drawn and Charsi became a dot.
@@ -4809,7 +4810,7 @@ function drawFrame() {
   for (const object of snapshot.objects) {
     const [sx, sy] = projStatic(object.x, object.y);
     const isHovered = hovered?.kind === 'object' && hovered.id === object.id;
-    sprites.push({ depth: sy, wx: object.x, wy: object.y, pass: 'object', u: [2, object.classId, object.mode], draw(c) {
+    sprites.push({ depth: sy, wx: object.x, wy: object.y, id: object.id, pass: 'object', u: [2, object.classId, object.mode], draw(c) {
       // An object's own looping overlays (a shrine's glow), drawn as a unit's are: PreDraw behind the body, else over it.
       const ov = (object.overlays ?? []).map((row, i) => stateFx?.loop(row, object.overlayAges?.[i] ?? 0)).filter(Boolean);
       drawUnitOverlays(c, sx, sy, ov, true, snapshot.act);
@@ -4826,11 +4827,12 @@ function drawFrame() {
     const [sx, sy] = projStatic(item.x, item.y);
     // The hovered ground item is drawn in retail's DrawMode 7, like a hovered object/unit (V5).
     const isHovered = hovered?.kind === 'item' && hovered.id === item.id;
-    sprites.push({ depth: sy, wx: item.x, wy: item.y, pass: 'item', dropping: item.mode === 5, u: [4, item.classId, 3], draw(c) { itemRenderer?.draw(c, sx, sy, item, isHovered); } });
+    sprites.push({ depth: sy, wx: item.x, wy: item.y, pass: 'item', id: item.id, mode: item.mode, u: [4, item.classId, 3], draw(c) { itemRenderer?.draw(c, sx, sy, item, isHovered); } });
   }
   const source = selectedPlayerSource();
   if (realmWorld) beginRealmSceneEvidence();
-  sprites.push({ depth: (h / 2 + UNIT_CENTRE_Y), wx: source.x, wy: source.y, pass: 'player', u: [0, source.classId, 0], draw: drawPlayer });
+  sprites.push({ depth: (h / 2 + UNIT_CENTRE_Y), wx: source.x, wy: source.y, id: snapshot?.playerId, pass: 'player', u: [0, source.classId, 0], draw: drawPlayer });
+  orderUnitSprites(Module, sprites, snapshot?.rooms);
 
   terrainStats = null;
   // The frame's own terrain read, handed to the automap: it fills its per-level cell layer from this

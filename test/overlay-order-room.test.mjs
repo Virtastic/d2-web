@@ -21,11 +21,11 @@ u.forEach((o) => { o.k = overlayKey(o); });
 assert.deepEqual(u.slice().sort(overlayCompare).map((o) => o.name), ['first', 'second']);
 console.log('ok overlay-order-unit-list');
 
-// D20: two units in one tile order by position, whichever was pushed last.
+// Two units in one tile order by their room-list rank (the engine's client room lists), whichever was pushed last.
 {
   const k = (o) => { o.k = overlayKey(o); return o; };
-  const p = (name, x, y) => k({ name, sprite: { wx: x, wy: y, pass: 'unit' }, depth: 0, ordinal: -1 });
-  const north = p('player', 1002, 2001), south = p('zombie', 1003, 2003);
+  const p = (name, x, y, rank) => k({ name, sprite: { wx: x, wy: y, pass: 'unit', rank }, depth: 0, ordinal: -1 });
+  const north = p('player', 1002, 2001, 0), south = p('zombie', 1003, 2003, 1);
   for (const list of [[north, south], [south, north]])
-    if (list.slice().sort(overlayCompare)[1].name !== 'zombie') throw new Error('D20: south unit must draw last');
+    if (list.slice().sort(overlayCompare)[1].name !== 'zombie') throw new Error('the higher rank must draw last');
 }

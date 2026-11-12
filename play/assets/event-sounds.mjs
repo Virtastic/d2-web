@@ -3,10 +3,10 @@
 //: base + 4*(floor-1) for floor class 2..6 [+24 run]. The floor class is the engine's (D2Client 0x226A0 over the
 // live room tiles, floorClass(unitType, id, fallback)); the fallback is the level's SoundEnviron "Material 1". Limits: no
 // 4-row variant is drawn (combat-sound-trigger.mjs).
-const CVT_ROWS = [0, 251, 262, 268, 274, 280, 286, 292]; // D2Client+0xF5538 pair table, first of each pair, by hit class
 const GAIT_BASE = [2768, 2720, 2720, 2768, 2816, 2720, 2720]; // Ama Sor Nec Pal Bar Dru Asn
 import { OBJECT_MODE_SOUNDS, OBJECT_SELECT_SOUNDS, SHARED_ROW_CLASSES } from './object-mode-sounds.mjs';
-export function createEventSounds(read, play, monsterStep = null, monsterLayer = null, monsterIdle = null, floorClass = null, stepDue = null) {
+// modeSounds: the engine's 0x24490 (combatSoundEngine(Module).modeSounds in combat-sound-trigger.mjs), for the local attack's swing row.
+export function createEventSounds(read, play, monsterStep = null, monsterLayer = null, monsterIdle = null, floorClass = null, stepDue = null, modeSounds = null) {
   const rows = (p) => new TextDecoder('latin1').decode(read(p)).split(/\r?\n/).map((l) => l.split('\t'));
   // D2Client 0x226A0's level class: Levels.txt SoundEnv indexes the SoundEnviron table by row (record 0x58 bytes, "Material 1"
   // at +0x1C); a value outside 1..6, or no row, is 1. Read once, on the first footstep.
@@ -51,7 +51,7 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
   return {
     /** D2Client 2A750's local action 2 (cast on the ground): 1C150 -> 23C00 plays the walk group's first footfall at once. */
     /** 2A750's local action 7 (cast on a unit): 24490 -> 242B0 plays the weapon-class row of the client unit; k is the hit class of its weapon, 1 with none. */
-    localAttack(k = 1) { const r = CVT_ROWS[k & 15] ?? 0; if (r > 0) play(r, { kind: 'weapon', unitType: 0, baseRow: r }); },
+    localAttack(k = 1) { for (const s of modeSounds?.(0, 0, 0, 0, -1, 7, 0, k & 15, 1, -1) ?? []) play(s.row, { kind: 'weapon', unitType: 0, baseRow: s.row }); },
     localWalk(cls) { play((GAIT_BASE[cls] ?? 2768) + floorOffset(0, 0), { kind: 'footstep', unitType: 0, classId: cls }); },
     /** The engine's own level-up event (soundEvent 2 -> row 7) was played; the level poll below must not repeat it. */
     /** A new session replaced the world: forget the objects seen in the old one (first sight is per session). */

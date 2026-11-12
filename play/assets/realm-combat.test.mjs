@@ -5,7 +5,7 @@ import { createMonsterTable } from './realm-tables.mjs';
 import { createRealmInput } from './realm-input.mjs';
 import { plateBoxes } from './hover-lifebar.mjs';
 import { readFileSync } from 'node:fs';
-import { createCombatSoundTrigger, hitSounds } from './combat-sound-trigger.mjs';
+import { createCombatSoundTrigger } from './combat-sound-trigger.mjs';
 import { realmViewSnapshot } from './realm-client-view.mjs';
 
 // The pointer over a drawn monster, through the realm input's own pick, to the plate the single-player label draws.
@@ -39,7 +39,9 @@ test('a realm fight plays the monster attack, hit and death cues and the hero ca
   const dir = new URL('../../retail/tables-1.13c/', import.meta.url);
   const read = (p) => readFileSync(new URL(p.split('\\').pop(), dir));
   try { read('monstats.bin'); } catch { t.skip('retail tables absent'); return; }
-  const got = []; const trigger = createCombatSoundTrigger(read, (row, e) => got.push([e.kind, e.unitType, e.unitId, row]));
+  // the engine's 0x24490 stands in as a recorder: which unit entered which mode, and when; its rows are the engine's
+  const entered = [], engine = { modeSounds: (type, id, cls, tf, su, mode) => { entered.push([type, id, cls, mode]); return mode === 4 ? [{ row: 2203, kind: 'attack' }] : []; }, impactSounds: () => [] };
+  const got = []; const trigger = createCombatSoundTrigger(read, (row, e) => got.push([e.kind, e.unitType, e.unitId, row]), undefined, null, engine);
   const hero = (mode) => ({ source: 'realm', guid: 1, classId: 1, renderState: { mode, framePrecise: 0 } });
   const tick = (monsterMode, heroMode, castSkill = 36) => {
     const views = [{ guid: 7, classId: 5, mode: monsterMode, x: 10, y: 10, direction: 0, typeFlags: 0, hpPct: 50 }];
@@ -48,10 +50,13 @@ test('a realm fight plays the monster attack, hit and death cues and the hero ca
     trigger.update(entities, frame);
   };
   // Zombie (class 5): neutral, attack, neutral, get hit, neutral, death, corpse. The hero stands (mode 1) throughout.
+  // Each mode change is one 0x24490 entry; the corpse settling (DT -> DD) is not.
   for (const mode of [1, 4, 1, 3, 1, 0, 12]) tick(mode, 1);
-  assert.deepEqual(got, [['attack', 1, 7, 2203], ['hit', 1, 7, 2209], ['death', 1, 7, 2215]]);
+  assert.deepEqual(entered, [[1, 7, 5, 4], [1, 7, 5, 1], [1, 7, 5, 3], [1, 7, 5, 1], [1, 7, 5, 0]]);
+  assert.deepEqual(got, [['attack', 1, 7, 2203]]);
   // The hero enters the cast mode (10) with Fire Bolt (36) selected: the skill's start sound, on the hero.
-  got.length = 0; tick(12, 10); tick(12, 1);
+  got.length = 0; entered.length = 0; tick(12, 10); tick(12, 1);
+  assert.deepEqual(entered, [[0, 1, 1, 10], [0, 1, 1, 1]]);
   assert.equal(got.length, 1);
   assert.deepEqual(got[0].slice(0, 3), ['cast', 0, 1]);
   assert.ok(got[0][3] > 0);
@@ -159,7 +164,8 @@ test('a struck unit sounds the impact its hit class names', (t) => {
   const dir = new URL('../../retail/tables-1.13c/', import.meta.url);
   const read = (p) => readFileSync(new URL(p.split('\\').pop(), dir));
   try { read('monstats.bin'); } catch { t.skip('retail tables absent'); return; }
-  const got = []; const trigger = createCombatSoundTrigger(read, (row, e) => got.push([e.kind, e.unitType, e.unitId, row]));
+  const entered = [], engine = { modeSounds: (type, id, cls, tf, su, mode, hit) => { entered.push([type, id, mode, hit]); return hit ? [{ row: 0x141, kind: 'impact' }, { row: 0x17B, kind: 'impact' }] : []; }, impactSounds: () => [] };
+  const got = []; const trigger = createCombatSoundTrigger(read, (row, e) => got.push([e.kind, e.unitType, e.unitId, row]), undefined, null, engine);
   const frameOf = (mode, hitClassOf) => realmCombatSoundFrame({ entities: [{ type: 1, id: 7, classId: 5, mode }, { type: 3, id: 7, classId: 1, mode: 0 }] }, [{ guid: 7, typeFlags: 0 }], { source: 'realm', guid: 1, classId: 1, renderState: { mode: 1, framePrecise: 0 } }, 0, hitClassOf);
   const asked = [];
   const struck = frameOf(3, (type, id) => { asked.push([type, id]); return type === 1 ? 0x21 : 0; });
@@ -167,8 +173,9 @@ test('a struck unit sounds the impact its hit class names', (t) => {
   assert.deepEqual(struck.entities.map((e) => e.lastHitClass), [0x21, 0]);
   { const f = frameOf(1, () => 0); trigger.update(f.entities, f.frame); }
   trigger.update(struck.entities, struck.frame);
-  assert.deepEqual(got.filter((g) => g[0] === 'impact').map((g) => g.slice(1)), hitSounds(0x21, 1, 3).map((r) => [1, 7, r]));
-  assert.ok(hitSounds(0x21, 1, 3).length > 0);
+  // the struck entry reaches the engine's 0x24490 with the hit class the frame carries, and its rows play on the unit
+  assert.deepEqual(entered.at(-1), [1, 7, 3, 0x21]);
+  assert.deepEqual(got.filter((g) => g[0] === 'impact').map((g) => g.slice(1)), [[1, 7, 0x141], [1, 7, 0x17B]]);
   // Without the engine's answer the frame is as before: no hit class, no impact.
   assert.equal(frameOf(3).entities[0].lastHitClass, undefined);
 });

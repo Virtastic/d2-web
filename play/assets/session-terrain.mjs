@@ -925,8 +925,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
      * key the wall tiles sort on.
      *
      * Order: NOT a screen-Y sort. Walls and sprites are keyed by overlayKey (tile row, tile column,
-     * wall before unit, arrival; and shadows/roofs are their own passes.
-     * Still approximate: retail's room-array order for units tied in one tile is not recovered.
+     * wall before unit, the unit's rank in its room's unit list; floor-list units first); shadows/roofs are their own passes.
      *
      * `afterFloors` runs between the floor pass and the wall pass, which is where retail draws its
      * weather: in the retail captures the frame's 96 floor draws are followed by the whole
@@ -1259,15 +1258,18 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   };
 }
 
-// Ground items (a retail recording, D7): a settled item (mode 3) is drawn with the corpses, before every wall and unit cel; a dropping one (mode 5, the flip) stands in its tile's cell list
-// NEWEST FIRST, so it precedes the tile's live monsters (wx+wy still orders those) but follows a dying monster (mode 0), which retail re-links when it dies. ponytail: insertion order not recovered; this is what the trace shows.
-// Units of one tile order by wx+wy (south-east draws later; D20: the player, pushed last, won every tie). ponytail: retail's room unit list order (pRoomNext +0xE8) is not recovered; this is the screen-depth approximation. Items tie on 0 (stable sort = snapshot order): FUN_6fb4ee90 walks a cell's unit list (cell+4, next @+0x10) in list order, not by screen Y.
-// Draw-list order key: tile row, tile column, then wall 0 < unit 1 within the tile (D2Client+0x9EE90: a cell's wall list, then its unit list) (ground items: see below), then arrival.
-// Retail draws every ground item in the shadow pass, before all walls and unit cels (pick-up-item.txt: item cel
-// at call 160, first wall 161, first unit cel 177, though two monsters' tiles precede the item's): class -1e9 first. Within a tile the cell's unit list is walked in list order, so items tie on 0 (stable sort = snapshot order), not on screen Y.
-export const overlayKey = (o) => o.sprite
-  ? (o.sprite.wx === undefined ? [1e9, 0, 0, o.depth] : ((o.sprite.pass === 'item' && !o.sprite.dropping) || (o.sprite.u?.[0] === 1 && o.sprite.u[2] === 12)) ? [-1e9, Math.floor(o.sprite.wy / 5), Math.floor(o.sprite.wx / 5), o.sprite.wx * 1e5 - o.sprite.wy] : [Math.floor(o.sprite.wy / 5), Math.floor(o.sprite.wx / 5), 1, o.sprite.pass === 'item' ? -1e9 : (o.sprite.u?.[0] === 1 && o.sprite.u[2] === 0) ? -2e9 : o.sprite.wx + o.sprite.wy])
-  : [o.tile.worldY, o.tile.worldX, 0, o.ordinal];
+// Draw-list order key: tile row, tile column, then wall 0 < unit 1 within the tile (a cell's wall list, then its unit list),
+// then the unit's place in its room's unit list (`rank`, from the engine's client room lists: unit-draw-order.mjs). A unit
+// the engine puts on the floor list (`floor`: corpses, settled items, draw-under objects) draws in the floor pass, before
+// every wall and unit cel. Both cell lists are appended in room-list order, so the room rank is the cell order. A sprite
+// with no rank ties on 0 (stable sort = arrival order).
+export const overlayKey = (o) => {
+  const s = o.sprite;
+  if (!s) return [o.tile.worldY, o.tile.worldX, 0, o.ordinal];
+  if (s.wx === undefined) return [1e9, 0, 0, o.depth];
+  const row = Math.floor(s.wy / 5), col = Math.floor(s.wx / 5), rank = s.rank >= 0 ? s.rank : 0;
+  return s.floor ? [-1e9, row, col, rank] : [row, col, 1, rank];
+};
 
 // The overlay pass's comparator over precomputed `.k` keys (tile row, column, wall-before-unit, arrival).
 export const overlayCompare = (a, b) => (a.k[0] - b.k[0]) || (a.k[1] - b.k[1]) || (a.k[2] - b.k[2]) || (a.k[3] - b.k[3]);

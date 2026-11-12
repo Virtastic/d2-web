@@ -250,3 +250,19 @@ test('a hire refusal raises the box and Continue ends the conversation (D2Client
   r = fresh({ classId: 198 }); r.npc.handle(info(GUID, [])); r.npc.choose({ action: 'hire' });
   reply(r, 8); assert.equal(r.npc.view().refusal, 0);                        // no hire waiting (0xBC9663 != 10)
 });
+
+// Recorded retail Talk flow: after a Talk topic each speech end speaks the first other listed message, sends no 0x31, and the Talk box returns only when none is left.
+test('Talk-topic speech ends ping-pong over the list with no 0x31', () => {
+  const { npc, sent } = fresh({ classId: KASHYA });
+  npc.handle(info(GUID, [[0, 0x0b], [0, 0x40]]));
+  npc.dismissSpeech(); npc.dismissSpeech();
+  assert.equal(npc.view().mode, 'menu');
+  npc.choose(npc.view().entries.find((e) => e.action === 'talk'));
+  const n = sent.length;
+  npc.choose({ action: 'topic', stringId: 0x41 });
+  const said = [npc.view().speech.stringId];
+  for (let i = 0; i < 3; i++) { npc.dismissSpeech(); said.push(npc.view().speech.stringId); }
+  assert.deepEqual(said, [0x41, 0x0b, 0x40, 0x0b]);
+  assert.equal(sent.length, n);
+  assert.equal(npc.view().mode, 'speech');
+});
