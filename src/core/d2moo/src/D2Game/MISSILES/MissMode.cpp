@@ -4314,7 +4314,8 @@ int32_t __fastcall MISSMODE_SrvHit58_BaalTauntLightningControl(D2GameStrc* pGame
 }
 
 //D2Game.0x6FC5E760
-// 1.13c D2Game+0x3DA60 (nParam clamp signed; function list name is from RVA order; body is the PantherPotGreen-style handler, owner via flag bit 10 + guid at +0x98 == SUNIT_GetOwner)
+// 1.13c D2Game+0x3D800 (missile-hit slot 59; +0x3DA60 is slot 25, PantherPotGreen). Not yet matched: retail returns 1 on every path and spawns
+// through 0x3D680 (the poison-cloud spawner) with the hit-par count, not through the PantherPotGreen spawner.
 int32_t __fastcall MISSMODE_SrvHit59_BaalTauntPoisonControl(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)

@@ -2955,12 +2955,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x38_EntityAction_6FC86CB0(D2GameStr
 // 1.13c D2Game+0xCB560 (client packet 0x39)
 int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x39_PurchaseLife_6FC86E50(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
-    if (nSize == 5)
-    {
-        D2GAME_NPC_PurchaseHeal_6FCCB280(pGame, pUnit, *(int32_t*)((char*)pPacket + 1));
-        return 0;
-    }
-
+    // 1.13c: the handler is a stub (mov eax, 3; ret 8); the purchase-heal packet is ignored.
     return 3;
 }
 
@@ -3330,41 +3325,8 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x44_StaffInOrifice_6FC87780(D2GameS
 // 1.13c D2Game+0xCB550 (client packet 0x45)
 int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x45_ChangeTpLocation_6FC87930(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
-    if (nSize != 9)
-    {
-        return 3;
-    }
-
-    D2GSPacketClt45* pPacket45 = (D2GSPacketClt45*)pPacket;
-
-    const int32_t nPortalGUID = pPacket45->nPortalGUID;
-    const uint16_t nLevelId = pPacket45->nLevelId;
-    D2UnitStrc* pPortal = SUNIT_GetServerUnit(pGame, UNIT_OBJECT, nPortalGUID);
-    if (pPortal)
-    {
-        if (pPortal->dwClassId != OBJECT_TOWN_PORTAL || nLevelId >= sgptDataTables->nLevelsTxtRecordCount || !nLevelId)
-        {
-            return 3;
-        }
-
-        if (UNITS_GetPlayerPortalFlags(pUnit) & DUNGEON_GetPortalFlagFromLevelId(nLevelId))
-        {
-            if (DRLG_GetActNoFromLevelId(DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(pUnit))) == DRLG_GetActNoFromLevelId(DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(pPortal))))
-            {
-                if (sub_6FC83C60(pUnit, CLIENTS_GetUnitX(pPortal), CLIENTS_GetUnitY(pPortal), 10))
-                {
-                    return 1;
-                }
-
-                sub_6FC79C30(pGame, 0, nPortalGUID, nLevelId);
-                return 0;
-            }
-        }
-
-        return 2;
-    }
-
-    return 1;
+    // 1.13c: the handler is a stub (mov eax, 3; ret 8); changing a town portal's destination is ignored.
+    return 3;
 }
 
 //D2Game.0x6FC87B00
