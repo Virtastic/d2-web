@@ -512,7 +512,16 @@ void D2GAME_PACKETS_SendPacket0x07_6FC3D120(D2ClientStrc* pClient, uint8_t nArea
     packet.nHeader = 0x07; packet.nX = nTileX; packet.nY = nTileY; packet.nLevelId = nAreaId;
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }
-void D2GAME_PACKETS_SendPacket0x09_6FC3D1A0(D2ClientStrc* pClient, BYTE a2, BYTE a3, DWORD a4, BYTE a5, WORD a6, WORD a7) {}
+// 1.13c D2Game+0x7B0A0 (SUNITMSG_SendUnitToClient, inlined in its default case): a tile unit (a level
+// exit) is announced as {header 9, type, guid, class byte, x, y}, 11 bytes.
+void D2GAME_PACKETS_SendPacket0x09_6FC3D1A0(D2ClientStrc* pClient, BYTE a2, BYTE a3, DWORD a4, BYTE a5, WORD a6, WORD a7) {
+    uint8_t packet[11] = { a2, a3 };
+    std::memcpy(packet + 2, &a4, 4);
+    packet[6] = a5;
+    std::memcpy(packet + 7, &a6, 2);
+    std::memcpy(packet + 9, &a7, 2);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, packet, sizeof packet);
+}
 void D2GAME_PACKETS_SendPacket0x0A_RemoveObject_6FC3D3A0(D2ClientStrc* pClient, char alw0x0A, char nUnitType, int32_t nUnitId) {
     // 1.13c D2Game+0x8C3A0 (SCmd.cpp 0x0A): {header, type, guid}, 6 bytes; missiles are never announced.
     if (nUnitType == UNIT_MISSILE) return;
