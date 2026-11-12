@@ -196,24 +196,34 @@ EMSCRIPTEN_KEEPALIVE void UNITS_ReseedFromNativeSkill_4F390(uint32_t pUnit, int3
 }
 
 // Retail .data tables read by 0x2CA10, indexed by quality class (0..3). Each base value is added to
-// a bounded random roll and the sum scaled by the record stride. They are filled by the module's
-// item-table loader; zero is the only value available until those rows are mapped.
+// a bounded random roll and the sum scaled by the record stride. They are compile-time constants of the
+// module (no loader or text file writes them), so they are carried here as constants, like the act tables
+// in d2common_batch_37ca0.cpp. Class 3 has a zero roll bound in every table.
 extern "C"
 {
-	uint32_t g_d2common_dat_6fded014[4] = {};
-	uint32_t g_d2common_dat_6fded024[4] = {};
-	uint32_t g_d2common_dat_6fded038[4] = {};
-	uint32_t g_d2common_dat_6fded048[4] = {};
-	uint32_t g_d2common_dat_6fded05c[4] = {};
-	uint32_t g_d2common_dat_6fded06c[4] = {};
-	uint32_t g_d2common_dat_6fded080[4] = {};
-	uint32_t g_d2common_dat_6fded090[4] = {};
-	uint32_t g_d2common_dat_6fded0a0[8] = {};
-	uint8_t g_d2common_dat_6fded0c0[0x60] = {};
-	uint8_t g_d2common_dat_6fded120[0x60] = {};
-	uint8_t g_d2common_dat_6fded180[0x90] = {};
-	uint8_t g_d2common_dat_6fded210[0xF0] = {};
-	uint8_t g_d2common_dat_6fded300[0x50] = {};
+	uint32_t g_d2common_dat_6fded014[4] = {0, 2, 4, 0};
+	uint32_t g_d2common_dat_6fded024[4] = {2, 2, 2, 0};
+	uint32_t g_d2common_dat_6fded038[4] = {0, 2, 4, 0};
+	uint32_t g_d2common_dat_6fded048[4] = {2, 2, 2, 0};
+	uint32_t g_d2common_dat_6fded05c[4] = {0, 2, 4, 0};
+	uint32_t g_d2common_dat_6fded06c[4] = {2, 2, 2, 0};
+	uint32_t g_d2common_dat_6fded080[4] = {0, 3, 6, 0};
+	uint32_t g_d2common_dat_6fded090[4] = {3, 3, 6, 0};
+	uint32_t g_d2common_dat_6fded0a0[8] = {150, 3, 300, 9, 600, 15, 0, 0};
+	// six 4-dword rows
+	int32_t g_d2common_dat_6fded0c0[24] = {0, 30, 0, 0, 0, 60, 100, 2, 0, 120, 0, 0, 1, 180, 110, 3, 0, 240, 0, 0, 1, 400, 170, 3};
+	// six 4-dword rows
+	int32_t g_d2common_dat_6fded120[24] = {0, 15, 0, 0, 1, 45, 80, 1, 0, 25, 0, 0, 1, 60, 90, 2, 0, 80, 0, 0, 1, 150, 125, 2};
+	// six 6-dword rows
+	int32_t g_d2common_dat_6fded180[36] = {0, 1, 1, 3, 0, 0, 1, 1, 2, 4, 75, 2, 0, 1, 2, 6, 0, 0,
+	                                       1, 1, 3, 8, 125, 2, 1, 1, 4, 10, 200, 4, 0, 1, 3, 8, 0, 0};
+	// twelve 5-dword rows
+	int32_t g_d2common_dat_6fded210[60] = {0, 0, 0, 0, 0, 1, 55, 2, 0, 3371, 2, 85, 2, 0, 3372,
+	                                       3, 0, 0, 0, 0, 4, 65, 1, 3, 3373, 5, 75, 1, 0, 3374,
+	                                       6, 0, 0, 2, 3375, 7, 50, 1, 2, 3376, 8, 0, 0, 2, 3377,
+	                                       9, 145, 1, 3, 3378, 10, 190, 2, 3, 3379, 11, 130, 1, 3, 3380};
+	// three 7-dword difficulty blocks (block 0 is never read: difficulty 0 skips the block)
+	int32_t g_d2common_dat_6fded300[21] = {0, 0, 0, 1, 1, 0, 1, 80, 40, 25, 2, 2, 3, 2, 120, 60, 40, 3, 3, 5, 3};
 }
 
 // 1.13c D2Common+0x2CA10 (#10606): fill an affix record from the quality class at pOut[0] (0..3)

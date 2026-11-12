@@ -115,14 +115,35 @@ extern "C" void D2Common_7C300_Update(uint32_t nKey, uint32_t pRoom, uint32_t p1
     if (cnt == 0) env->sub7C090(res, 1);
 }
 
-// 1.13c D2Common+0x7C270: register map EAX = pUnit.
+// The three callees of +0x7C270, passed in so the gate logic and the call arguments can be driven on their own.
+struct D2Common7C270Env {
+    void (*loadDt1)(void* pRoom);                   // 0x68400: room in ESI
+    void (*spawnPresets)(void* pRoom);              // 0x0BF70: room on the stack
+    void (*postInit)(void* pRoom, uint32_t nEcx);   // 0x7C0E0: EAX = room, ECX = room+0x58 -> +0x1B4 -> +0x478
+};
+
+// 1.13c D2Common+0x7C270: register map EAX = room. Each step is gated by its done flag in room+0x28, re-read after
+// the previous call; the spawn step also needs room+0x48 == 2. Returns room+0x30.
+uint32_t D2Common_7C270_With(void* pRoomEAX, const D2Common7C270Env* e)
+{
+    if (!(rd<uint32_t>(pRoomEAX, 0x28) & 0x1000000) && e->loadDt1) e->loadDt1(pRoomEAX);
+    if (!(rd<uint32_t>(pRoomEAX, 0x28) & 0x2000000) && rd<int32_t>(pRoomEAX, 0x48) == 2 && e->spawnPresets)
+        e->spawnPresets(pRoomEAX);
+    if (!(rd<uint32_t>(pRoomEAX, 0x28) & 0x100000)) {
+        const uint32_t nEcx = rd<uint32_t>(rdp(rdp(pRoomEAX, 0x58), 0x1B4), 0x478);
+        if (e->postInit) e->postInit(pRoomEAX, nEcx);
+    }
+    return rd<uint32_t>(pRoomEAX, 0x30);
+}
+
+static void Seam68400(void* r) { if (d2common_seam_68400) d2common_seam_68400(r); }
+static void SeamBF70(void* r) { if (d2common_seam_bf70) d2common_seam_bf70(r); }
+static void Seam7C0E0(void* r, uint32_t) { if (sub_7C0E0) sub_7C0E0(r); }
+
 uint32_t sub_7C270(void* pUnitEAX)
 {
-    uint32_t f = rd<uint32_t>(pUnitEAX, 0x28);
-    if (!(f & 0x1000000)) d2common_seam_68400(pUnitEAX);
-    if (!(rd<uint32_t>(pUnitEAX, 0x28) & 0x2000000) && rd<int32_t>(pUnitEAX, 0x48) == 2) d2common_seam_bf70(pUnitEAX);
-    if (!(rd<uint32_t>(pUnitEAX, 0x28) & 0x100000) && sub_7C0E0) sub_7C0E0(pUnitEAX);
-    return rd<uint32_t>(pUnitEAX, 0x30);
+    static const D2Common7C270Env kEnv{ Seam68400, SeamBF70, Seam7C0E0 };
+    return D2Common_7C270_With(pUnitEAX, &kEnv);
 }
 
 // 1.13c D2Common+0x0D8E0: register map EAX = pPath; stack param_1 = int32_t out[2], param_2 = uint32_t* out.

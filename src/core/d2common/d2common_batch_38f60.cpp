@@ -22,21 +22,9 @@ extern D2InventoryGridInfoStrc gBodyLocInventoryGridInfo;
 D2UnitStrc* D2Common_20320_GetLeftHandWeapon(D2InventoryStrc* pInventory);
 bool D2Common_22EC0_CheckWeaponClassByItemId(uint32_t nItemId, int32_t nWeapClass);
 BOOL D2Common_10217_ITEMS_CheckBodyLocation(D2UnitStrc* pItem, uint32_t nBodyLoc);
-
-extern "C"
-{
-	// 0x26DB0 (#10244): item requirement check, non-zero when the strength, dexterity and level
-	// requirements all pass. Its 13-argument FN surface (d2common_batch_31d20.cpp) is not directly
-	// callable from C++; the seam keeps the boolean 0x211D0 consumes. Unproven until installed.
-	int32_t (*g_d2common_fn_26DB0)(void* pItem, void* pUnit, int32_t nCheckStats) = nullptr;
-
-	// 0x20DB0 (200 bytes, still UNMAPPED): decides the shared-item outcome of a hand swap from
-	// the item being placed, the item at the requested body location, the item at the paired
-	// location, the unit and the paired location. Retail passes the third item in EAX; the seam
-	// names it last. The 1.10f twin is sub_6FD91D50 (D2Inventory.cpp), unproven as its 1.13c body.
-	int32_t (*g_d2common_fn_20DB0)(void* pItemAtOtherLoc, void* pItem, void* pUnit,
-		int32_t nOtherBodyLoc, void* pItemAtRequestBodyLoc) = nullptr;
-}
+// d2common_20db0.cpp: the hand-pair answer (retail EAX = the item at the requested location, named last here).
+int32_t D2Common_20DB0_HandPairAnswer(D2UnitStrc* pOther, D2UnitStrc* pIncoming, D2UnitStrc* pPlayer,
+	int32_t nOtherBodyLoc, D2UnitStrc* pAtLoc);
 
 // 1.13c D2Common+0x32EF0 (#10932): merge the dual-wield weapon stat lists into the unit. The
 // weapon 0x31B90 selects and the left-hand weapon decide which of the two hands is merged with
@@ -139,11 +127,9 @@ int32_t D2Common_203B0_HasWeaponClassEquipped(uint32_t pInventory, int32_t nWeap
 // 0x24C80 must accept the location and, unless the requirement check is skipped, 0x26DB0 must
 // pass. Body location 0 answers 0; the hand pairs (4/5 and 11/12) answer through 0x20DB0 with the
 // item at the paired location and the item already at the requested one; every other location
-// answers 5/1 with an item present or 3/0 without one.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_211d0(uint32_t pUnit, uint32_t nBodyLoc, uint32_t pItem, int32_t bDontCheckReqs) { // 1.13c D2Common+0x211D0
-	D2UnitStrc* pUn = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit));
-	D2UnitStrc* pInvItem = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pItem));
-
+// answers 5/1 with an item present or 3/0 without one. Retail is thiscall; ECX only passes through
+// to 0x24C80 and is not read. The 0x26DB0 requirement check is ITEMS_CheckRequirements.
+uint32_t D2Common_211D0_BodyLocAnswer(D2UnitStrc* pUn, uint32_t nBodyLoc, D2UnitStrc* pInvItem, int32_t bDontCheckReqs) { // 1.13c D2Common+0x211D0
 	if (!pUn)
 		return 0;
 
@@ -155,7 +141,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_211d0(uint32_t pUnit, ui
 	{
 		if (!D2Common_10217_ITEMS_CheckBodyLocation(pInvItem, nBodyLoc))
 			return 0;
-		if (!bDontCheckReqs && (!g_d2common_fn_26DB0 || !g_d2common_fn_26DB0(pInvItem, pUn, 1)))
+		if (!bDontCheckReqs && !ITEMS_CheckRequirements(pInvItem, pUn, TRUE, nullptr, nullptr, nullptr))
 			return 0;
 	}
 
@@ -171,13 +157,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_211d0(uint32_t pUnit, ui
 	{
 		const int nOtherBodyLoc = (nBodyLoc == BODYLOC_LARM) ? BODYLOC_RARM
 			: (nBodyLoc == BODYLOC_SWLARM) ? BODYLOC_SWRARM
-			: (nBodyLoc == BODYLOC_RARM) ? BODYLOC_LARM : BODYLOC_SWRARM;
+			: (nBodyLoc == BODYLOC_RARM) ? BODYLOC_LARM : BODYLOC_SWLARM;
 		D2UnitStrc* pItemAtLoc = INVENTORY_GetItemFromBodyLoc(pInventory, static_cast<int>(nBodyLoc));
 		D2UnitStrc* pItemOther = INVENTORY_GetItemFromBodyLoc(pInventory, nOtherBodyLoc);
 
-		if (!g_d2common_fn_20DB0)
-			return 0;
-		return static_cast<uint32_t>(g_d2common_fn_20DB0(pItemOther, pInvItem, pUn, nOtherBodyLoc, pItemAtLoc));
+		return static_cast<uint32_t>(D2Common_20DB0_HandPairAnswer(pItemOther, pInvItem, pUn, nOtherBodyLoc, pItemAtLoc));
 	}
 
 	default:

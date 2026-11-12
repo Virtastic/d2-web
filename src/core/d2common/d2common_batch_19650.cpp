@@ -66,14 +66,6 @@ extern "C" void d2_ours_d2common_74400(HD2ARCHIVE archive)
     DATATBLS_LoadLowQualityItemsTxt(archive);
 }
 
-// 1.13c D2Common+0x20DB0
-extern "C" int32_t d2_fn_d2common_20db0(D2UnitStrc* player, int32_t slot,
-    int32_t otherSlot, D2UnitStrc* incoming, D2UnitStrc* equipped,
-    D2UnitStrc* otherItem, int32_t unused)
-{
-    // Same eight-way inventory decision tree as the 1.10f map.
-    return sub_6FD91D50(player, slot, otherSlot, incoming, equipped, otherItem, unused);
-}
 
 // Native tile-library seams preserve wasm64 pointers; caller supplies the library
 // and the act byte that retail loads from its owning room context.
