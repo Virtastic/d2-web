@@ -10,12 +10,13 @@ struct G76B20Env {
     uint32_t (*owner)(uint32_t v);                                 // 0xA598
     void     (*f75e10)(uint32_t game, uint32_t* blk, uint32_t one);// 0x75E10 (ret 0xC)
     int32_t  (*ord10494)(uint32_t unit, uint32_t one);             // 0xA68E
-    int32_t  (*ffa90)(uint32_t unit);                              // 0xFFA90 (EAX = unit)
+    int32_t  (*isDead)(uint32_t unit);                             // 0xDFA90 (EAX = unit)
     const uint32_t* maskp;                                         // **(0xF8BE0)
-    void     (*cb)(uint32_t game, uint32_t unit, uint32_t a, uint32_t b); // PTR 0xFBC1C, null = none
+    uint32_t (*cb)(uint32_t game, uint32_t unit, uint32_t a, uint32_t b); // PTR 0xFBC1C, null = none
 };
-// 1.13c D2Game+0x76B20
-void g_76b20(uint32_t game, uint32_t unit, const G76B20Env& e)
+// 1.13c D2Game+0x76B20. Returns the EAX retail leaves: the dead test's 0 when the unit stays, the hook pointer's 0 when
+// there is no hook, else the hook's return.
+uint32_t g_76b20(uint32_t game, uint32_t unit, const G76B20Env& e)
 {
     e.ord11103(unit, 0);
     uint32_t blk[8] = {};
@@ -30,5 +31,6 @@ void g_76b20(uint32_t game, uint32_t unit, const G76B20Env& e)
     uint32_t o = e.owner(u2c);
     blk[2] = o == unit ? 0 : o;
     e.f75e10(game, blk, 1);
-    if ((e.ord10494(unit, 1) == 0 || e.ffa90(unit) != 0) && e.cb) e.cb(game, unit, 0, 0);
+    if (e.ord10494(unit, 1) != 0 && e.isDead(unit) == 0) return 0;
+    return e.cb ? e.cb(game, unit, 0, 0) : 0;
 }

@@ -24,8 +24,9 @@ bool slowType(uint32_t unit) {   // monster data +0x54 is 3 or 0x13
 }
 }
 
-// 1.13c D2Game+0x82990
-extern "C" EMSCRIPTEN_KEEPALIVE void d2game_82990_port(const D2Game77dEnv* e, const D2GameAiExt* x, const D2GameO2Ext* o,
+// 1.13c D2Game+0x82990. Every exit returns straight after a callee, so EAX is that callee's return; the callees whose seam
+// has no return value (0xF3000, 0xF2220, 0xF22C0, 0xF1B10, 0xF26B0) give 0.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2game_82990_port(const D2Game77dEnv* e, const D2GameAiExt* x, const D2GameO2Ext* o,
                                                        uint32_t game, uint32_t unit, uint32_t task) {
     const uint32_t ctl = rd32(task, 0), flag = rd32(task, 0x18), target = rd32(task, 8), row = rd32(task, 0x1c);
     const int32_t count = (int32_t)rd32(task, 0x14);
@@ -51,27 +52,26 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2game_82990_port(const D2Game77dEnv* e, co
                 wr32(ctl, 0x14, 0);
                 setMode(x, unit, 0xd, bonus);
                 x->subF3000(target, unit, game, 7);
-                return;
+                return 0;
             }
         } else if (roll100(unit) < 0x21) {
             approach((int32_t)roll(unit, 100) < rdS16(row, 0x68 + d));
-            return;
+            return 0;
         }
         if (count >= 0x18 && !slowType(unit)) {
             if ((int32_t)roll(unit, 100) < 0x21) e->subF26B0(0, unit, game, target, 4);
             o->subF22C0s(game, unit, 0x14);
-            return;
+            return 0;
         }
         setMode(x, unit, 2, bonus);
-        if (e->subF2D80(target, game, unit, 0xf, 1) != 0) return;
-        if (flag != 0) { approach((int32_t)roll(unit, 100) < rdS16(row, 0x68 + d)); return; }
+        if (const uint32_t r = e->subF2D80(target, game, unit, 0xf, 1)) return r;
+        if (flag != 0) { approach((int32_t)roll(unit, 100) < rdS16(row, 0x68 + d)); return 0; }
         e->subF1B10(5, game, unit);
-        return;
+        return 0;
     }
     if (flag == 0) {
         wr32(mdata(unit), 0x18, 0xd);
-        e->subF2540(game, unit, target, 2, 0, 0, 1, 7);
-        return;
+        return e->subF2540(game, unit, target, 2, 0, 0, 1, 7);
     }
     bool walk = false;
     if (slowType(unit)) {
@@ -86,14 +86,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2game_82990_port(const D2Game77dEnv* e, co
                 wr32(ctl, 0x1c, 0);
             }
             setMode(x, unit, 2, bonus);
-            e->subF2D80(target, game, unit, 0xf, 0);
-            return;
+            return e->subF2D80(target, game, unit, 0xf, 0);
         }
         if (rd32(ctl, 0x18) == 0) walk = true;
         else if ((int32_t)roll(unit, 100) < 0x14) {
             e->subF26B0(0, unit, game, target, 3);
             wr32(ctl, 0x18, 0);
-            return;
+            return 0;
         }
     }
     if (!walk && rd32(ctl, 0x18) != 0 && (int32_t)roll100(unit) >= rdS16(row, 0x62 + d)) {
@@ -102,8 +101,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2game_82990_port(const D2Game77dEnv* e, co
             wr32(ctl, 0x18, 0);
         }
         o->subF22C0s(game, unit, 0xf);
-        return;
+        return 0;
     }
     wr32(ctl, 0x18, 1);
     approach((int32_t)roll100(unit) < rdS16(row, 0x68 + d));
+    return 0;
 }

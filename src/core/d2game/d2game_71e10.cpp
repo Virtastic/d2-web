@@ -27,7 +27,9 @@ extern "C" uint32_t d2_fn_d2game_71E10(uint32_t B, uint32_t game, uint32_t offer
     };
     auto clientOf = [&](uint32_t u) -> uint32_t { return (u && R32(u, 0) == 0) ? R32(K(0xA4C0, 0, 0, 0, 0, 0, 0, u), 0x9c) : 0; };
     auto fail = [&]() -> uint32_t {
-        static const uint8_t m1[2] = { 0x77, 0x0a }, m2[2] = { 0x77, 0x09 };
+        // stack locals, as retail builds them (byte stores, so the optimiser cannot fold them into a read-only constant)
+        uint8_t m1[2], m2[2];
+        m1[0] = 0x77; m1[1] = 0x0a; m2[0] = 0x77; m2[1] = 0x09;
         o->send(o->ctx, clientOf(offer), m1, 2);
         o->send(o->ctx, clientOf(B), m2, 2);
         return 0;

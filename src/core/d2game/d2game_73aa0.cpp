@@ -10,7 +10,7 @@
 struct D2G73AA0Env {
     uint32_t (*getUnit)(uint32_t game, uint32_t type, uint32_t id);                  // 0xE03A0 (EAX type, ECX game, EDX id)
     uint32_t (*plrData)(uint32_t unit);                                              // 0xA4C0 (ord 10920)
-    void     (*event)(uint32_t game, uint32_t unit, uint32_t eax, uint32_t frame);   // 0x8EA80 (ECX game, EDX unit, 0xD, frame, 0, 0, 0; EAX at the call)
+    uint32_t (*event)(uint32_t game, uint32_t unit, uint32_t eax, uint32_t frame);   // 0x8EA80 (ECX game, EDX unit, 0xD, frame, 0, 0, 0; EAX at the call)
     void     (*detach)(uint32_t game, uint32_t unit);                                // 0x716D0
     void     (*freeTrade)(uint32_t unit);                                            // 0x700C0 (EAX unit)
     void     (*send77)(uint32_t client);                                             // 0x8B340 (AL 0xC, one stack word)
@@ -19,13 +19,15 @@ struct D2G73AA0Env {
 static inline uint32_t rd_73aa0(uint32_t a) { uint32_t v; std::memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }
 static inline void wr_73aa0(uint32_t a, uint32_t v) { std::memcpy((void*)(uintptr_t)a, &v, 4); }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void D2Game_73AA0(uint32_t game, uint32_t pl, const D2G73AA0Env* e)
+// Returns the EAX retail leaves: the player's kind word on the first exit, 0 when no target, the target's id word when the
+// target is not interacting back, else the last update event's return.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Game_73AA0(uint32_t game, uint32_t pl, const D2G73AA0Env* e)
 {
-    if ((uint8_t)rd_73aa0(pl + 0x6C) == 0 || rd_73aa0(pl + 0x68) != 0) return;
+    if ((uint8_t)rd_73aa0(pl + 0x6C) == 0 || rd_73aa0(pl + 0x68) != 0) return rd_73aa0(pl + 0x68);
     const uint32_t tg = e->getUnit(game, rd_73aa0(pl + 0x68), rd_73aa0(pl + 0x64));
-    if (!tg) return;
+    if (!tg) return 0;
     wr_73aa0(pl + 0x64, 0xFFFFFFFF); wr_73aa0(pl + 0x68, 6); *(uint8_t*)(uintptr_t)(pl + 0x6C) = 0;
-    if ((uint8_t)rd_73aa0(tg + 0x6C) == 0 || rd_73aa0(tg + 0x68) != 0 || rd_73aa0(tg + 0x64) != rd_73aa0(pl + 0xC)) return;
+    if ((uint8_t)rd_73aa0(tg + 0x6C) == 0 || rd_73aa0(tg + 0x68) != 0 || rd_73aa0(tg + 0x64) != rd_73aa0(pl + 0xC)) return rd_73aa0(tg + 0x64);
     wr_73aa0(e->plrData(pl) + 0x50, 9);
     e->event(game, pl, rd_73aa0(game + 0xA8) + 1, rd_73aa0(game + 0xA8) + 1);
     e->detach(game, pl);
@@ -36,5 +38,5 @@ extern "C" EMSCRIPTEN_KEEPALIVE void D2Game_73AA0(uint32_t game, uint32_t pl, co
     wr_73aa0(tg + 0x64, 0xFFFFFFFF); wr_73aa0(tg + 0x68, 6); *(uint8_t*)(uintptr_t)(tg + 0x6C) = 0;
     const uint32_t pd = e->plrData(tg);
     wr_73aa0(pd + 0x50, 9);
-    e->event(game, tg, pd, rd_73aa0(game + 0xA8) + 1);
+    return e->event(game, tg, pd, rd_73aa0(game + 0xA8) + 1);
 }
