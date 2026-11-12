@@ -39,7 +39,7 @@ D2NPCMessageTableStrc gpAct5Q4NpcMessages[] =
 		{
 			{ MONSTER_LARZUK, 20145, 0, 2, },
 			{ MONSTER_CAIN6, 20144, 0, 2, },
-			{ MONSTER_NIHLATHAK, 20143, 0, 2, },
+			{ MONSTER_DREHYA, 20143, 0, 2, }, // 1.13c: Anya's lines, not Nihlathak's (also the two below)
 			{ MONSTER_MALAH, 20146, 0, 2, },
 			{ MONSTER_QUAL_KEHK, 20147, 0, 2, },
 		},
@@ -49,7 +49,7 @@ D2NPCMessageTableStrc gpAct5Q4NpcMessages[] =
 		{
 			{ MONSTER_LARZUK, 20150, 0, 2, },
 			{ MONSTER_CAIN6, 20149, 0, 2, },
-			{ MONSTER_NIHLATHAK, 20148, 0, 0, },
+			{ MONSTER_DREHYA, 20148, 0, 0, },
 			{ MONSTER_MALAH, 20151, 0, 2, },
 			{ MONSTER_QUAL_KEHK, 20152, 0, 2, },
 		},
@@ -59,7 +59,7 @@ D2NPCMessageTableStrc gpAct5Q4NpcMessages[] =
 		{
 			{ MONSTER_LARZUK, 20150, 0, 2, },
 			{ MONSTER_CAIN6, 20149, 0, 2, },
-			{ MONSTER_NIHLATHAK, 20148, 0, 2, },
+			{ MONSTER_DREHYA, 20148, 0, 2, },
 			{ MONSTER_MALAH, 20151, 0, 2, },
 			{ MONSTER_QUAL_KEHK, 20152, 0, 2, },
 		},

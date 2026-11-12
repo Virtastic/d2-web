@@ -236,6 +236,7 @@ test/*
 !test/d2common-sub-23b70.test.mjs
 !test/d2game-eh3rn-native.test.mjs
 !test/d2game-malloc.test.mjs
+!test/quest-npc-message-tables.test.mjs
 !test/d2game-setenvp.test.mjs
 !test/d2win-button-frame.test.mjs
 !test/d2win-sub-a340.test.mjs

@@ -36,7 +36,7 @@ D2NPCMessageTableStrc gpAct5Q6NpcMessages[] =
 			{ MONSTER_CAIN6, 20170, 0, 2, },
 			{ MONSTER_MALAH, 20172, 0, 2, },
 			{ MONSTER_QUAL_KEHK, 20174, 0, 2, },
-			{ MONSTER_NIHLATHAK, 20173, 0, 2, },
+			{ MONSTER_DREHYA, 20173, 0, 2, }, // 1.13c: Anya's line, not Nihlathak's
 		},
 		5
 	},
@@ -67,7 +67,7 @@ D2NPCMessageTableStrc gpAct5Q6NpcMessages[] =
 			{ MONSTER_MALAH, 20179, 0, 2, },
 			{ MONSTER_TYRAEL3, 20175, 0, 2, },
 			{ MONSTER_QUAL_KEHK, 20180, 0, 2, },
-			{ MONSTER_NIHLATHAK, 20176, 0, 2, },
+			{ MONSTER_DREHYA, 20176, 0, 2, }, // 1.13c: Anya's line, not Nihlathak's
 		},
 		5
 	},

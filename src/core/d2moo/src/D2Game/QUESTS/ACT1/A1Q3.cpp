@@ -30,7 +30,7 @@ D2NPCMessageTableStrc gpAct1Q3NpcMessages[] =
 			{ MONSTER_AKARA, 148, 0, 2 },
 			{ MONSTER_KASHYA, 149, 0, 2 },
 			{ MONSTER_CAIN5, 147, 0, 2 },
-			{ MONSTER_CHARSI, 150, 0, 0 },
+			{ MONSTER_CHARSI, 150, 0, 2 }, // 1.13c D2Game+0x108EF8 table 1: Charsi's entry carries menu 2 like the others
 			{ MONSTER_GHEED, 151, 0, 2 },
 			{ MONSTER_WARRIV1, 153, 0, 2 },
 		},
