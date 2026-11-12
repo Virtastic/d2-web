@@ -94,8 +94,12 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
         // A new path for a unit already walking (0x67/0x68 to the client) restarts its walk cycle at frame 0 in the tick it arrives: retail's 0x23C00
         // sees the restart (a retail recording: a raven re-pathed mid-walk skips the footfall its wrapped frame would have made), so no footfall that tick.
         if (!cut && prev[0] === a.mode && a.frameCountPrecise > 0 && (prev[1] + a.animSpeed) % a.frameCountPrecise !== a.framePrecise && a.framePrecise === a.animSpeed % a.frameCountPrecise) continue;
+        // Footfalls belong to a unit that walks: a walk/run-mode unit whose position did not change since last tick
+        // (a town NPC held in its walk mode while it stands) makes no footstep. Retail's unit leaves the walk mode when it stops.
+        if (!cut && (a.mode === 2 || a.mode === 0xF) && moved === 0) continue;
         const row = monsterStep(a.classId, cut ? 2 : a.mode, prev[1], cut ? prev[6] : a.frameCountPrecise, cut ? prev[7] : a.animSpeed, tick, lastStep.get(e.id) ?? 0, floorClass ? floorClass(1, e.id, levelMaterial(stepLevel)) : 0);
-        if (row) { lastStep.set(e.id, tick); play(row, { kind: 'footstep', id: e.id, unitType: 1, classId: a.classId }); const layer = monsterLayer?.(a.classId); if (layer) play(layer, { kind: 'footstep', id: e.id, unitType: 1, classId: a.classId }); /* retail 0x88A70 submits the layer row on the same footfall (FsPrb 100) */ }
+        // unitId attaches the footfall to the monster so the player places it against the listener (Falloff, pan).
+        if (row) { lastStep.set(e.id, tick); play(row, { kind: 'footstep', id: e.id, unitId: e.id, unitType: 1, classId: a.classId }); const layer = monsterLayer?.(a.classId); if (layer) play(layer, { kind: 'footstep', id: e.id, unitId: e.id, unitType: 1, classId: a.classId }); /* retail 0x88A70 submits the layer row on the same footfall (FsPrb 100) */ }
       }
       // D2Client 0x4F4A0 -> 0x237E0 (the idle/neutral sound) per client monster, in the unit table's order (bucket id & 0x7F, newest first); mode is 0x223D0's.
       if (monsterIdle) for (const e of (snapshot?.entities ?? []).filter((x) => x.type === 1 && x.animation?.inClientRoom).sort((p, q) => (p.id & 127) - (q.id & 127) || q.id - p.id)) {

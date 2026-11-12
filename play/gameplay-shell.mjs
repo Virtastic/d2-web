@@ -3097,10 +3097,11 @@ function drainUnitSounds() {
     const event = { unitType: v[i * 7], unitId: v[i * 7 + 1], classId: v[i * 7 + 2], soundEvent: v[i * 7 + 3], updateUnitType: v[i * 7 + 4], updateUnitId: v[i * 7 + 5], nativeSelectedRow: v[i * 7 + 6] };
     if (event.soundEvent === 0x10) event.monsterTaunt = event.nativeSelectedRow;
     if (event.soundEvent === 0x0c) event.skillStartSoundRow = event.nativeSelectedRow;
-    if (event.soundEvent === 0x100) { unitSounds.playRow(event.nativeSelectedRow, { source: 'monster-init', unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x23170: MonSounds Init
-    if (event.soundEvent === 0x102) { unitSounds.playRow(event.nativeSelectedRow, { source: 'skill-dosound', unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0xA2C90: wDoSound
-    if (event.soundEvent === 0x103) { unitSounds.playRow(event.nativeSelectedRow, { source: 'shrine-state', unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x24A70: shrine state sound
-    if (event.soundEvent === 0x101) { unitSounds.playRow(event.nativeSelectedRow, { source: 'state-onsound', unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x73760: States.txt onsound on a new state set
+    // The unit type and id attach the source to its unit: the mixer places it against the listener (Falloff, pan).
+    if (event.soundEvent === 0x100) { unitSounds.playRow(event.nativeSelectedRow, { source: 'monster-init', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x23170: MonSounds Init
+    if (event.soundEvent === 0x102) { unitSounds.playRow(event.nativeSelectedRow, { source: 'skill-dosound', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0xA2C90: wDoSound
+    if (event.soundEvent === 0x103) { unitSounds.playRow(event.nativeSelectedRow, { source: 'shrine-state', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x24A70: shrine state sound
+    if (event.soundEvent === 0x101) { unitSounds.playRow(event.nativeSelectedRow, { source: 'state-onsound', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x73760: States.txt onsound on a new state set
     const spatial = unitSoundNativeSpatial(event, snapshot, listener);
     event.nativeSpatialGainByte = spatial?.gainByte ?? null;
     event.nativeSpatialPanCode = spatial?.panCode ?? unitSoundNativePanCode(event, snapshot, listener);
