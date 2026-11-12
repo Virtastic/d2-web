@@ -1550,6 +1550,7 @@ static int pkt_monster_action_case(D2RealmClientMonster& monster, uint32_t code,
         if (stats && stats->nSplEndDeath == 1 && minion >= 0 &&
             sgptDataTables && minion < sgptDataTables->nMonStatsTxtRecordCount) return 0;
         unit->dwLastHitClass = pkt_word(l, 6);
+        monster.view.hpPct = 0;
         pkt_set_stat(reinterpret_cast<uintptr_t>(unit), 6, 0, 0);
         return pkt_monster_mode(monster, code, MONMODE_DEATH);
     }
