@@ -31,7 +31,8 @@ extern "C" uint32_t d2c_54e10(uint32_t idx, uint32_t out, uint32_t unit, uint32_
     const auto ctor = [&](char16_t* p, uint32_t k) { for (uint32_t i = 0; i < k; ++i) e.H(0xceb00, 0, 0, 0, 0, 0, 0, P(p + i)); };
     const auto num = [&](int32_t v) { e.H(0xbea2, P(c48), 10, kFmtI, (uint32_t)v); e.H(0xceac4, 9, 0, 0, 0, 0, 0, P(w30), P(c48)); };
     const auto spf = [&](uint32_t sz, uint32_t dst, uint32_t fmt, uint32_t v0, uint32_t nx = 0, uint32_t x0 = 0, uint32_t x1 = 0, uint32_t x2 = 0) {
-        e.H(0xceab4, sz, dst, fmt, v0); const uint32_t xw[3] = { x0, x1, x2 }; e.Xw(0xceab4, xw, nx);
+        (void)nx; (void)x0; (void)x1; (void)x2;   // the varargs past the first are not in the capture's record (its recorder logs stack words 0..3 only)
+        e.H(0xceab4, sz, dst, fmt, v0);
     };
     int32_t v = (int32_t)e.H(0x546e0, unit, idx, 0, 0, 0, a3); e.Edj(0x546e0, rec);
     a3 = a2;   // 546E0 took the fourth stack word; every later read of [esp+0x268] is three pushes deeper, i.e. the third word

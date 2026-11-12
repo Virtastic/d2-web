@@ -79,50 +79,61 @@ EMSCRIPTEN_KEEPALIVE i32* d2c_51650(const D2cE51650* e, const uint8_t* in_EAX, c
 struct D2cE51860 {
     i32* (*f2c5c0)(); i32 (*f568e0)(i32* u, i32 a, i32 b, i32 c); i32 (*f55b40)(i32 id, i32 type);
     i32 (*ord10331)(i32 p, i32 q); void (*ord10742)(i32); void (*ord10880)(i32);
-    i32 (*f1230)(); i32 (*f1260)(); i32 (*ord11020)(); u32 (*tick)(); void (*f4940)(); void (*fatal)(i32 code);
+    i32 (*f1230)(); i32 (*f1260)(); i32 (*ord11020)(i32* u); u32 (*tick)(); u32 (*f4940)(); void (*fatal)(i32 code);
 };
 struct D2cG51860 { i32 busy, g3a68, *cur, lastType, lastId, hover[2]; uint8_t* g3afa; i32* g3afb; i32* flags; };
-// 1.13c D2Client+0x51860  (eax = in_EAX hover target unit or null)
-EMSCRIPTEN_KEEPALIVE void d2c_51860(const D2cE51860* e, D2cG51860* g, i32* in_EAX, const i32* bitmask) {
-    if (g->busy) return;
+// 1.13c D2Client+0x51860  (eax = in_EAX hover target unit or null). Returns the EAX retail leaves on each exit.
+EMSCRIPTEN_KEEPALIVE u32 d2c_51860(const D2cE51860* e, D2cG51860* g, i32* in_EAX, const i32* bitmask) {
+    if (g->busy) return (u32)g->busy;
     if (g->g3a68 && e->f2c5c0() == in_EAX) {
-        if (in_EAX) { *g->g3afb = in_EAX[3]; *g->g3afa = 1; } else *g->g3afa = 0;
-        return;
+        if (in_EAX) { *g->g3afb = in_EAX[3]; *g->g3afa = 1; return (u32)in_EAX[3]; }
+        *g->g3afa = 0; return 0;
     }
     bool same = false;
+    u32 eax = 0;
     *g->g3afa = 0;
     if (in_EAX) {
-        if (!e->f568e0(in_EAX, 0, 0, 0)) { e->fatal(0x4f); return; }
+        if (!e->f568e0(in_EAX, 0, 0, 0)) { e->fatal(0x4f); return 0; }
         if (!g->cur) goto tail;
         if (*in_EAX == g->lastType && in_EAX[3] == g->lastId) { same = true; goto tail; }
     }
-    if (g->cur && g->lastType == 5) {
+    if (!g->cur) eax = 0;
+    else if (g->lastType != 5) eax = (u32)g->lastType;
+    else {
         i32 p = e->f55b40(g->lastId, 5);
-        if (p) { e->ord10742(e->ord10331(p, rd((void*)(intptr_t)p, 4))); *g->flags |= 1; }
+        eax = 0;
+        if (p) { e->ord10742(e->ord10331(p, rd((void*)(intptr_t)p, 4))); *g->flags |= 1; eax = (u32)(uintptr_t)g->flags; }
     }
 tail:
-    if (!in_EAX) { g->cur = nullptr; return; }
+    if (!in_EAX) { g->cur = nullptr; return eax; }
     g->lastType = *in_EAX; g->lastId = in_EAX[3]; g->cur = (i32*)1;
     if (g->lastType == 1) {
-        if (!same) {
-            i32 id = in_EAX[1], a = e->f1230();
-            i32 b = a ? e->f1260() : 0;  // retail calls 0x1260 once, only when 0x1230 returned nonzero
-            if (a && b) {
-                if (!(bitmask[0] & rd((void*)(intptr_t)a, 0xd) & 0xff) && (rd((void*)(intptr_t)a, 0x4c) & 0xff) != 1 &&
-                    (rd((void*)(intptr_t)b, 5) & bitmask[1] & 0xff)) {
-                    g->hover[0] = id;
-                    if (!(rd((void*)(intptr_t)b, 6) & bitmask[1] & 0xff)) g->hover[1] = id;
-                }
+        if (same) return 0;
+        i32 id = in_EAX[1], a = e->f1230();
+        if (!a) return 0;
+        i32 b = e->f1260();  // retail calls 0x1260 once, only when 0x1230 returned nonzero
+        if (b) {
+            if (!(bitmask[0] & rd((void*)(intptr_t)a, 0xd) & 0xff) && (rd((void*)(intptr_t)a, 0x4c) & 0xff) != 1 &&
+                (rd((void*)(intptr_t)b, 5) & bitmask[1] & 0xff)) {
+                if (!(rd((void*)(intptr_t)b, 6) & bitmask[1] & 0xff)) g->hover[1] = id;
+                g->hover[0] = id;
             }
         }
-    } else if (g->lastType == 2) {
-        if (e->ord11020() && in_EAX[4] != 4) {
-            u32 t = e->tick();
-            if (t - (u32)in_EAX[0x35] > 500) { in_EAX[0x35] = (i32)t; e->f4940(); }
-        }
-    } else if (g->lastType == 5 && !same) {
-        e->ord10880(e->ord10331((i32)(intptr_t)in_EAX, in_EAX[1])); *g->flags |= 1;
+        return (u32)b;
     }
+    if (g->lastType == 2) {
+        i32 r = e->ord11020(in_EAX);
+        if (!r || in_EAX[4] == 4) return (u32)r;
+        u32 t = e->tick();
+        if (t - (u32)in_EAX[0x35] <= 500) return t;
+        in_EAX[0x35] = (i32)t; return e->f4940();
+    }
+    if (g->lastType == 5) {
+        if (same) return 0;
+        e->ord10880(e->ord10331((i32)(intptr_t)in_EAX, in_EAX[1])); *g->flags |= 1;
+        return (u32)(uintptr_t)g->flags;
+    }
+    return (u32)(g->lastType - 5);
 }
 
 // The click-target resolver (D2Client 51AE0) lives in d2client_51ae0.cpp (faithful port with injectable seams).

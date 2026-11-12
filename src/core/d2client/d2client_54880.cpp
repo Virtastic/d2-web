@@ -4,7 +4,8 @@
 // Global table rows 0x6FBA20D4 (stride 16, [+0] must be 2), count dword at 0x6FBA2128 (= table + 0x54).
 #include "d2c_wstr.h"
 struct D2c54880Env { uint32_t (*str)(uint32_t id); int32_t (*want)(uint32_t unit); int32_t (*stat)(uint32_t unit); };
-extern "C" void d2c_54880r(uint32_t unit, uint32_t dst, const uint8_t* rows, const uint8_t* gt, const D2c54880Env& e) {
+// EAX on return: the loop index at exit, which is the row count (0 when there are no rows).
+extern "C" uint32_t d2c_54880r(uint32_t unit, uint32_t dst, const uint8_t* rows, const uint8_t* gt, const D2c54880Env& e) {
     uint16_t tail[256] = {}, val[256] = {};
     const uint32_t sA = e.str(0xf9e), sB = e.str(0xf9b), sC = e.str(0xfa2);
     const int32_t want = e.want(unit);
@@ -27,4 +28,5 @@ extern "C" void d2c_54880r(uint32_t unit, uint32_t dst, const uint8_t* rows, con
         d2c::wcpy(T, t); d2c::wcat(T, sB); d2c::wcat(T, V); d2c::wcat(T, sA);
         d2c::wcat(dst, T);
     }
+    return n;
 }

@@ -32,8 +32,8 @@ struct Svc {
  virtual void o10150()=0; virtual void o10041(const Frame&,int32_t x,int32_t y,int32_t,int32_t,int32_t)=0;
  virtual void* o10021(const Frame&)=0; virtual void o10060(void*)=0;
  virtual void* f46150()=0; virtual void f38a70()=0; virtual void f16360()=0; virtual void o511(void*)=0;
- virtual int32_t o10587(Unit*,int32_t,int32_t)=0; virtual void o10227()=0; virtual void f72790(int32_t,int32_t,int32_t)=0;
- virtual void f7b20()=0; virtual int32_t f55440()=0;
+ virtual int32_t o10587(Unit*,int32_t,int32_t)=0; virtual void o10227()=0; virtual uint32_t f72790(int32_t,int32_t,int32_t)=0;
+ virtual void f7b20()=0; virtual int32_t f55440(Unit* eax)=0;
  virtual void* strLookup(int32_t id)=0; // Ordinal_10003 (ECX=id); its stack words stay for the next call
  virtual void textAt(void* str,int32_t x,int32_t y,int32_t a,int32_t b)=0; // Ordinal_10085 (ECX=str, EDX=x, stack y,a,b)
  virtual void fecc60(int32_t)=0; virtual void feccc0(int32_t)=0; virtual int32_t o10048()=0; virtual int32_t o10013()=0;
@@ -159,9 +159,10 @@ void sub_50750(Svc& s,G& g,Msg* m){
  if(saved!=2||!s.f46150()||g.c9663!=1){ m->f18=1; m->f1c=0; s.o511(m); }
 }
 // 1.13c D2Client+0x50E70
-void sub_50E70(Svc& s,G& g){
+// Returns the EAX retail leaves: aadac on the early exit; else the tail's last 10587 result, aad90, or 72790's EAX.
+uint32_t sub_50E70(Svc& s,G& g){
  Unit* o=g.cbbfc;
- if(g.aadac) return;
+ if(g.aadac) return (uint32_t)g.aadac;
  if(!g.aad98){
   int32_t r=s.o10587(o,4,0), snap=g.aad98;
   if(r&&!g.aad88){
@@ -173,7 +174,7 @@ void sub_50E70(Svc& s,G& g){
     case 4: if(g.c9721) s.f7b20(); break;
     default: bail=true; }
    if(!bail){
-    if(!g.cbbfc||(*(int32_t*)g.cbbfc==0&&!s.f55440())) g.aad98=1;
+    if(!g.cbbfc||(*(int32_t*)g.cbbfc==0&&!s.f55440(g.cbbfc))) g.aad98=1;
     if(snap==0){ if(g.aad98) s.feccc0(s.o10048()); } else if(!g.aad98) s.fecc60(s.o10048());
    }
   }
@@ -181,8 +182,15 @@ void sub_50E70(Svc& s,G& g){
   int32_t r=s.o10587(o,4,0), snap=g.aad98;
   if(!r){ s.o10227(); if(g.d5d0!=0x26) s.fatal(0x139b); g.aad98=0; if(snap) s.fecc60(s.o10048()); }
  }
- if(!g.aad9c){ if(s.o10587(o,5,0)>0&&!g.aad90) s.f72790(7,0,0); }
- else if(s.o10587(o,5,0)<1) s.f72790(7,1,0);
+ if(!g.aad9c){
+  int32_t r=s.o10587(o,5,0);
+  if(r<=0) return (uint32_t)r;
+  if(g.aad90) return (uint32_t)g.aad90;
+  return s.f72790(7,0,0);
+ }
+ int32_t r=s.o10587(o,5,0);
+ if(r>0) return (uint32_t)r;
+ return s.f72790(7,1,0);
 }
 // 1.13c D2Client+0x510F0  (param_1 = &x, ebx = &y)
 void sub_510F0(Svc& s,G& g,int32_t* x,int32_t* y){
