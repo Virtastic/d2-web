@@ -871,6 +871,8 @@ export function installTouchInput({ documentObject = globalThis.document, window
     if (show) placeNameBox(shell);
     if (show && nameInput.style.display === 'none') { nameInput.style.display = 'block'; prevValue = nameInput.value = ''; showTakenName(); }
     else if (!show && nameInput.style.display !== 'none') { nameInput.style.display = 'none'; nameInput.blur(); }
+    // The name can change with no event on the box (a hardware key, the screen clearing it): the box follows it.
+    if (show) showTakenName();
   }, 200);
   // Over the box the screen actually draws. On a phone the canvas takes the screen's shape, not 4:3,
   // and the 800x600 scene sits centred in it, so the stylesheet's 4:3 percentages would miss the box;

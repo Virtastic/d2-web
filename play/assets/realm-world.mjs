@@ -135,6 +135,9 @@ export function createRealmWorld({ items: itemTable, heldItems = null }) {
     if (decoded.mode === MODE.SOCKETED) { removeItem(guid); return; }
     const deleting = action === ACTION.FROM_CONTAINER || action === ACTION.UNEQUIP ||
       action === ACTION.FROM_BELT || action === ACTION.AUTO_UNEQUIP;
+    // A removal from an owner names an item in its inventory; one already on the ground is no longer there and is left
+    // alone (the client's handler checks the item's parent inventory first; d2gs_client_owned_item.cpp).
+    if (deleting && withOwner && itemsByGuid.has(guid) && onGround(itemsByGuid.get(guid))) return;
     if (deleting && decoded.mode !== MODE.CURSOR) { removeItem(guid); return; }
     const entry = itemTable.byCode(decoded.code);
     if (!entry) { removeItem(guid); return; }   // a code outside Weapons/Armor/Misc.txt cannot be drawn

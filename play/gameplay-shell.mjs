@@ -862,6 +862,8 @@ let lastBeltCommand = null;
 // click lands where a mouse click would has nothing else left to read once input.queue was made
 // internal-only.
 let lastMoveCommand = null;
+// The last shift+click to the belt (0x63): the item it named and whether the packet left.
+let lastGridToBelt = null;
 const PLAY_MODE = new URLSearchParams(window.__d2Entry.search).get('play') === '1';
 // Retail opens on a title screen, so that is what a plain visit gets. `play=1` keeps booting
 // straight into a session: every browser scenario drives the game directly and must not have to
@@ -4009,7 +4011,7 @@ function realmInput() {
   return (realmInputState ??= createRealmInput({
     transmit: (bytes) => realmFlow?.d2gs?.isOpen ? realmFlow.d2gs.send(bytes) : false,
     now: () => performance.now(),
-    leaveWait: { itemAction: () => realmTrade().itemAction() && (realmFlow?.d2gsLife?.itemAction() ?? true) },   // an item action cancels an armed leave wait
+    leaveWait: { itemAction: () => Boolean(realmFlow?.local) || (realmTrade().itemAction() && (realmFlow?.d2gsLife?.itemAction() ?? true)) },   // an item action cancels an armed leave wait; single player (game type 0) is never throttled (D2Client 0x923F0)
     onTalk: (guid) => realmNpc().talkSent(guid),
     questFlags: (flags) => { realmQuestWords = new Uint16Array(flags.slice().buffer); return realmFlow?.protocol?.d2gsClientSetQuestFlags?.(flags); },
     // The owner's walk is never echoed by the server: start the local route on the click, as single player does.
@@ -5666,7 +5668,9 @@ function realmStorageClickAt(x, y, e) {
       && plugyStash.click(x, y, canvas.width, canvas.height, g, stashOpen, e.shiftKey)) return true;
   }
   return realmStorageClick({ width: canvas.width, height: canvas.height, items: snapshot.items, snapshot, cursorId: realmWorldState?.cursorId ?? 0,
-    input: realmInput(), send: (bytes) => realmFlow?.d2gs?.send(bytes),
+    input: realmInput(), send: (bytes) => { const sent = realmFlow?.d2gs?.send(bytes);
+      if (bytes[0] === 0x63) lastGridToBelt = { itemId: (bytes[1] | bytes[2] << 8 | bytes[3] << 16 | bytes[4] << 24) >>> 0, sent: sent !== false };
+      return sent; },
     inventory: { visible: inventoryVisible, renderer: inventoryPanelRenderer },
     stash: { open: stashOpen, renderer: stashPanelRenderer, layout: stashOpen ? snapOr('stashLayout', readStashLayout) : null },
     trade: { open: trade.open, renderer: tradeRenderers?.own, layout: realmReads?.tradeLayout?.own, press: (px, py, held) => trade.press(px, py, canvas.width, canvas.height, held) },
@@ -7019,6 +7023,7 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
   selectSkill: (id, side) => selectSkill(id, side), get selectedSkill() { return Math.max(0, readSelectedSkills().right); }, get lastSkillCommand() { return lastSkillCommand && { ...lastSkillCommand }; },
   get lastBeltCommand() { return lastBeltCommand && { ...lastBeltCommand }; },
   get lastMoveCommand() { return lastMoveCommand && { ...lastMoveCommand }; },
+  get lastGridToBelt() { return lastGridToBelt && { ...lastGridToBelt }; }, set lastGridToBelt(v) { lastGridToBelt = v; },
   // Both hands, straight from the engine's own record: a row that proves `S` picked the RIGHT
   // selector has to be able to say the left hand did not move (F3c).
   get selectedSkills() { return readSelectedSkills(); },
