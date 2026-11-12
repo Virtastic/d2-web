@@ -34,8 +34,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_loading_pairs(const int32_
     for (int i = 0; i < nMons; ++i) visit(mons[i * 3]);   // the 0xAC assigns reach 0x6CB30 -> 0x6C3F0 once each, before the walk
     for (int s = 0; s < 8; ++s) {
         uint32_t e = 0, d = 0;
+        // the room's unit list (+0x74) is head-inserted: the walk meets the units in reverse assign order, the hero (assigned first) last
+        for (int i = nMons - 1; i >= 0; --i) if (inSlot(s, mons[i * 3 + 1], mons[i * 3 + 2])) { e = visit(mons[i * 3]); d = 3; }
         if (inSlot(s, heroX, heroY)) { e = 4; d = 8; }
-        else for (int i = 0; i < nMons; ++i) if (inSlot(s, mons[i * 3 + 1], mons[i * 3 + 2])) { e = visit(mons[i * 3]); d = 3; }
         char b[24]; std::snprintf(b, sizeof b, "%s%x:%x", s ? " " : "", e, d); g_out += b;
     }
     return g_out.c_str();

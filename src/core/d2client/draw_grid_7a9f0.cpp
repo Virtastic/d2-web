@@ -414,7 +414,7 @@ static void gRec(int ord, std::initializer_list<uint32_t> a, uint32_t ecx = 0, u
     g_gout += '\n';
 }
 struct D2ClientCellWalk9f270Env { uint32_t arg; void (*sub666d0)(uint32_t); uint32_t (*ord10013)(); void (*sub1ba90)(uint32_t);
-    void (*ord10069)(uint32_t, int32_t, int32_t, uint32_t, uint32_t); void (*sub9e970)(uint32_t, uint32_t, uint32_t); };
+    void (*ord10069)(uint32_t, int32_t, int32_t, uint32_t, uint32_t, uint32_t); void (*sub9e970)(uint32_t, uint32_t, uint32_t); };
 // D2Client+0x9E970 over the arena's cell+0x14 list (overlay_list_9e970.cpp). Draw tables are retail .data (counts read 0, as 9EE90), colours not carried.
 struct D2Client9E970Node; struct D2Client9E970Entry;
 struct D2Client9E970Env { uint32_t colorMask, tickGate; const uint32_t *perCelCount, *tabNormal, *tabAlt; uint32_t ctxX, ctxY, ctxOffX, ctxOffY;
@@ -617,7 +617,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
     g_uox = g_vx; g_uoy = g_vy + 16;
     for (uint32_t i = 0; i < g_nUnits; i++) if (g_units[i].type == 0) { int32_t X, Y; clientXY(g_units[i], &X, &Y); g_uox = X - 640 / 2; g_uoy = Y - 480 / 2 + 16; break; }
     D2ClientCellWalk9f270Env w{0, unit666d0, []() -> uint32_t { return rec10013(); }, unit6ba90,
-        [](uint32_t, int32_t x, int32_t y, uint32_t m, uint32_t arg) { g_ledx = x > 0 ? x : 0; g_lecx = 0; gRec(10069, {0x100000u, (uint32_t)x, (uint32_t)y, m, arg}, 0, g_ledx); }, [](uint32_t room, uint32_t mode, uint32_t) {
+        [](uint32_t, int32_t x, int32_t y, uint32_t m, uint32_t arg, uint32_t ecx) { g_ledx = x > 0 ? x : 0; g_lecx = 0; gRec(10069, {0x100000u, (uint32_t)x, (uint32_t)y, m, arg}, ecx, g_ledx); }, [](uint32_t room, uint32_t mode, uint32_t) {
             static const uint32_t z[1024] = {};
             D2Client9E970Env e{0, 0, z, z, z, 0, 0, 0, 0, []() -> uint32_t { gRec(10013, {}, 0, g_ledx); g_ledx = 0; return g_r13; }, []() -> uint32_t { return g_now; }, [](uint32_t) {},
                 [](uint32_t, uint8_t* o) -> uint32_t { o[0] = o[1] = o[2] = o[3] = 0; return 0; },
@@ -630,10 +630,11 @@ EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
     // (no tail 10013: the first 10013 is c124's 9E970 call)
     d2_client_9f270(g_arena, kCtx, &w);
     D2c9EE90Env e{gRd32, [](uint32_t a) -> uint8_t { return a < sizeof g_arena ? g_arena[a] : 0; }, [](uint32_t a, uint32_t v) { if (a < sizeof g_arena - 4) memcpy(g_arena + a, &v, 4); },
+        // each 10001/10058 returns with ecx = edx = 0 (the 10013 after one reads 0,0)
         [](uint32_t a, uint8_t v) { if (a < sizeof g_arena) g_arena[a] = v; }, []() -> int32_t { gRec(10013, {}); return g_r13; }, []() -> uint32_t { return g_now; },
         [](uint32_t) -> uint32_t { return 0; }, [](uint32_t, uint32_t) {}, [](int32_t) {}, [](uint32_t, uint8_t* r, uint8_t* g, uint8_t* b, uint8_t* a) { *r = *g = *b = *a = 0; },
-        [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g) -> int32_t { gRec(10001, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g}, y > 0 ? y : 0); return 1; },
-        [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g, uint32_t al) -> int32_t { gRec(10058, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g, al}, y > 0 ? y : 0); return 1; }, unit666d0};
+        [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g) -> int32_t { gRec(10001, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g}, y > 0 ? y : 0); g_lecx = g_ledx = 0; return 1; },
+        [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g, uint32_t al) -> int32_t { gRec(10058, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g, al}, y > 0 ? y : 0); g_lecx = g_ledx = 0; return 1; }, unit666d0};
     d2c_9ee90(&e, kCtx);
     gRec(10054, {});   // 1.13c D2Client+0x8B110 tail: Ordinal_10054() after the 4EE90 cell walk
     return g_gout.c_str();

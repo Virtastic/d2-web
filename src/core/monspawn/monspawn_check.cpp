@@ -12165,6 +12165,21 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_session_view_y() {
     if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return 0;
     int32_t vx, vy; sessionViewOrigin(&vx, &vy); return vy + 16;
 }
+// The edx 1.13c D2Client+0xA8880 leaves (A8800's 10047 reads it): its last D2Common #10482 call, at the light window's far corner
+// (hero subtile + 0x17 each way), asks for the room 0x1400 resolved there. D2Common 0x1330's fast path (the point inside that room) leaves
+// the room's subtile y + height; with no room there #10482 falls back to the hero room, whose near-list scan finds none and leaves the count.
+EMSCRIPTEN_KEEPALIVE int32_t d2_session_a8880_edx() {
+    if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pDynamicPath || !g_targetPlayer->pDynamicPath->pRoom) return 0;
+    const D2DynamicPathStrc* hp = g_targetPlayer->pDynamicPath;
+    const int32_t x = (int32_t)(hp->tGameCoords.dwPrecisionX >> 16) - 0x18 + 0x2f, y = (int32_t)(hp->tGameCoords.dwPrecisionY >> 16) - 0x18 + 0x2f;
+    auto in = [&](const D2ActiveRoomStrc* r) { return r && x >= r->tCoords.nSubtileX && x < r->tCoords.nSubtileX + r->tCoords.nSubtileWidth
+                                                      && y >= r->tCoords.nSubtileY && y < r->tCoords.nSubtileY + r->tCoords.nSubtileHeight; };
+    D2ActiveRoomStrc* hr = hp->pRoom; D2ActiveRoomStrc** list = nullptr; int n = 0;
+    DUNGEON_GetAdjacentRoomsListFromRoom(hr, &list, &n);
+    if (in(hr)) return hr->tCoords.nSubtileY + hr->tCoords.nSubtileHeight;
+    for (int i = 0; i < n; ++i) if (in(list[i])) return list[i]->tCoords.nSubtileY + list[i]->tCoords.nSubtileHeight;
+    return n;
+}
 // The COF a client unit's current mode loads (D2Client+0x69410 for a monster; the player's and an object's from their tokens):
 // token, the mode's token, the weapon class.
 static bool sessionUnitCof(D2UnitStrc* u, uint32_t mode, char* out, size_t cap) {

@@ -76,7 +76,9 @@ export function gFrame(Module, phase, gateEcx = 0) {
   }
   // 8B110's leftover is 3F860's unit origin y (d2_session_view_y) when the session's own walk runs
   const uoy = globalThis.__d2GEngineWalk && Module._d2_session_view_y ? Module._d2_session_view_y() : 0x164c0;
-  gLines(Module.ccall('d2_client_frame_g', 'string', Array(12).fill('number'), [phase, 1, 0, 1, 0xff, 0, 0, uoy, 0x22, 0x1720, 8, gateEcx]));
+  // A8800's edx is A8880's last D2Common #10482 leftover (d2_session_a8880_edx) when the session's own walk runs
+  const a88edx = globalThis.__d2GEngineWalk && Module._d2_session_a8880_edx ? Module._d2_session_a8880_edx() : 0x1720;
+  gLines(Module.ccall('d2_client_frame_g', 'string', Array(12).fill('number'), [phase, 1, 0, 1, 0xff, 0, 0, uoy, 0x22, a88edx, 8, gateEcx]));
   // The room walk (D2Client+0x8B110's 7A9F0 -> 9F270 -> 9EE90) follows phase 0, over the session's own level and units. Opt-in while
   // replays that splice their own walk still run: with it on, the walk draws the units and the JS unit lines are not emitted.
   globalThis.__d2GWalked = phase === 0 && !!globalThis.__d2GEngineWalk && !!Module._d2_session_room_walk_g;
