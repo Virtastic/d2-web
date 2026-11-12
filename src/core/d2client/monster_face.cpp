@@ -22,6 +22,7 @@
 #include "../d2moo/include/D2Game/UNIT/SUnit.h"
 #include "../d2moo/include/D2DataTbls.h"
 #include "../d2moo/include/Units/Monster.h"
+#include "sound_unit_refs.h"
 
 namespace { std::unordered_map<uint64_t, uint64_t> g_target; uint64_t key(uint32_t t, uint32_t id) { return uint64_t(t) << 32 | id; } }
 static void face(D2UnitStrc* unit, int32_t selector, int32_t x, int32_t y, D2UnitStrc* target) {
@@ -85,18 +86,23 @@ const D2MonSoundsTxt* monSounds(D2UnitStrc* u) {
 // 1.13c D2Client+0x24490 (monster branch, modes 4/5) -> D2Client+0x242B0 (the roll).
 void attackEntry(D2UnitStrc* u, int32_t mode) {
     if (u->dwUnitType != UNIT_MONSTER) return;
+    const int32_t mode0 = mode;
     const D2MonSoundsTxt* p = monSounds(u);
     if (!p) return;
     const uint8_t* b = reinterpret_cast<const uint8_t*>(p);
     for (int k = 0; k < 3; ++k)
         if (mode == b[0x7C + 8 * k] && *reinterpret_cast<const int32_t*>(b + 0x80 + 8 * k) < 0) mode = b[0x7D + 8 * k];
-    if (mode != 4 && mode != 5) return;
+    if (mode != 4 && mode != 5) {   // GetHit/knockback/death entries reach 0x24490 through the hit pass (monspawn_check.cpp), once
+        if (mode0 != 0 && mode0 != 3 && mode0 != 12 && mode0 != 13) d2client_session_unit_mode(u, uint32_t(mode0), -1, false);
+        return;
+    }
     const uint32_t* r = reinterpret_cast<const uint32_t*>(b);
     const uint32_t a = mode == 4 ? r[1] : r[7], chance = mode == 4 ? r[3] : r[9];
-    if (!a || (chance < 100 && g_frame - g_lastRoll < 15)) return;
+    if (!a || (chance < 100 && g_frame - g_lastRoll < 15)) { d2client_session_unit_mode(u, uint32_t(mode0), -1, false); return; }
     const int32_t v = int32_t(d2_session_client_rand(100));
     if (v < int32_t(chance)) { g_lastRoll = g_frame; d2_client_monster_sfx_stamp(u->dwUnitId, g_frame); }   // a played attack sound stamps the unit, which holds off its idle sound
     g_rolls.push_back({ u->dwUnitId, g_frame, v });
+    d2client_session_unit_mode(u, uint32_t(mode0), v, false);   // the same entry's 0x88A70 submits, the drawn value replayed
 }
 }
 // The struck-unit sound (a client mode change into GetHit/knockback or death): its normal path

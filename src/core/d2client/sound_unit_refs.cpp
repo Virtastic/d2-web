@@ -86,3 +86,8 @@ void d2client_sound_unit_sync(const D2SndUnit* u, uint32_t n) {
     }
 }
 void d2client_sound_unit_reset() { g_held.clear(); }
+// Slot `slot` (0..7) of the object class's D2Client+0xF6C58 array (0x22570's read), 0 when absent.
+int32_t d2client_object_slot_row(uint32_t cls, uint32_t slot) {
+    for (const Ent& e : kObj) if (e.cls == cls && e.slot == slot) return e.row;
+    return 0;
+}

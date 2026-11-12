@@ -62,8 +62,20 @@ export function gLoadingWalk(frame, monsters, pairs) {
 /** D2Client+0x44230's D2Gfx calls (`d2_client_frame_g`, src/core/d2client/frame_44230_g.cpp): phase 0 up to the room walk, phase 1 after it.
  *  The register leftovers (a D2Common thunk's ecx/edx) are not recoverable from the decompile and are the retail values: 8B110's 0x164c0,
  *  A8800's 0x22/0x1720, 14050's 8; the 2A9F0 10013 pair varies per tick and is left 0. */
+let gFirstTick = null;
 export function gFrame(Module, phase, gateEcx = 0) {
+  const tick = globalThis.__d2GTick ?? 0;
+  if (phase === 0) {
+    if (gateEcx) gFirstTick = tick;   // the shell passes the first frame's 10043 leftover only on the trace's first frame
+    globalThis.__d2GHud = !Module._d2_client_frame_tail_g;   // the frame tail (HUD included) comes from d2_client_frame_tail_g below
+  } else if (Module._d2_client_frame_tail_g) {
+    // 739E0's lead ecx: retail's 0xd22d-like first-frame value is host state (left 0), 0x221 on the second frame, 0 after
+    const first = tick === gFirstTick ? 1 : 0, lead = !first && tick === gFirstTick + 1 ? 0x221 : 0;
+    gLines(Module.ccall('d2_client_frame_tail_g', 'string', ['number', 'number', 'number'], [first, tick, lead]));
+    globalThis.__d2GHud = true;
+  }
   gLines(Module.ccall('d2_client_frame_g', 'string', Array(12).fill('number'), [phase, 1, 0, 1, 0xff, 0, 0, 0x164c0, 0x22, 0x1720, 8, gateEcx]));
+  if (phase === 1 && Module._d2_client_frame_outer_g) gLines(Module.ccall('d2_client_frame_outer_g', 'string', ['number', 'number'], [tick === gFirstTick ? 1 : 0, tick]));
 }
 
 export function gUnit(u, wx, wy) {
@@ -91,7 +103,7 @@ export function recordDc6(path, index, frame, left, top, { op = 'cel', mode = 5,
     mode, extra, w: frame.width, h: frame.height, hash: dc6FrameHash(frame),
   };
   if (Array.isArray(list)) list.push(record);
-  gCall(10041, 0, 0, 1 << 20, record.x, record.y, 1 << 20, mode, 0);   // DrawCelContext: cel*, x, y, palette*, mode, 0
+  if (globalThis.__d2GHud !== false) gCall(10041, 0, 0, 1 << 20, record.x, record.y, 1 << 20, mode, 0);   // DrawCelContext: cel*, x, y, palette*, mode, 0
   return record;
 }
 

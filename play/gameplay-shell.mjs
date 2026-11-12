@@ -586,6 +586,8 @@ const questTabs = (words, act) => { let top = act; for (let a = 1; a <= 5; a++) 
   return Array.from({ length: Math.min(5, top) }, (_, i) => i + 1); };
 const questFirst = (words, act) => { for (let q = 1; q <= QUESTS_IN_ACT[act - 1]; q++) if (questStatus(words, act, q) !== 'locked') return q; return 0; };
 const toggleQuest = () => { questVisible = !questVisible; if (questVisible) { characterVisible = hirelingVisible = false; questAct = 0; questOpenedAt = engineTicks; questDescrOn = false;
+  // A joined game's log asks the server for the hero's record as it opens (retail's 0x40); the answer refreshes the words read below.
+  if (realmFlow?.d2gs?.isOpen) realmInput().questLogOpened();
   // On open, the engine's own COMPLETING quests (QFLAG_COMPLETEDNOW) play once: OpenDiablo2's
   // quest_log.go playQuestAnimations, which runs for the quests in QuestStatusCompleting.
   questAnim.clear(); const words = readQuestWords();
@@ -3540,6 +3542,10 @@ function resolvePointerTarget(x, y) {
   const drawn = new Set(hostileNear ? [] : groundItemsUnderPointer(x, y));
   const ground = nearestGroundItem(snapshot.items, at, drawn);
   const unit = unitId ? (snapshot.entities || []).find((entity) => entity.id === unitId && entity.type === 1) : null;
+  // F14, measured in s000d-act4 step 19: a ground item occupies its own cell, and the cursor on that cell
+  // is the item's click even when a hostile stands 1-2 subtiles away (its sprite box is wider than its
+  // anchor). A hostile ON that cell still wins; everywhere else clickUnitOrItem's order stands.
+  if (unit && ground?.distance === 0 && distance2(unit) > 0) return { at, unitId: 0, item: ground.item };
   return { at, ...clickUnitOrItem(unit ? unitId : 0, ground?.item, hoverPrior) };
 }
 

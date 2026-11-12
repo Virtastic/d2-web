@@ -2,6 +2,7 @@
 // four-phase cycle, and every client hero-seed draw they make. Draw-for-draw port; see
 #pragma once
 #include <cstdint>
+#include <string>
 
 namespace d2client::weather {
 
@@ -23,5 +24,6 @@ void tick(Seed& seed, const Env& env);  // one 0x81340 pass (first call also run
 int32_t liveCount();                    // *(DAT_6FBCBF68 + 0x114)
 float intensity();                      // DAT_6FBC38F4
 int32_t target();                       // DAT_6FBC3934
+void drawG(std::string& out, int32_t W, int32_t H, int32_t mode);   // 0x805A0/0x7FE80: the rain draw as G lines
 
 } // namespace d2client::weather

@@ -4,6 +4,11 @@
 
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
+#include <string>
+#include <vector>
+
+#include "../tables/shared.h"
 
 float FOG_10083_Cos_LUT(int16_t i);   // Fog #10083 (0x6FABBFFE): 512-step circle
 float FOG_10084_Sin_LUT(int16_t i);   // Fog #10084 (0x6FABBFE6)
@@ -43,6 +48,8 @@ struct Particle {
     int32_t phase;     // +0x18
     int32_t landed;    // +0x1C
     int32_t splash;    // +0x20
+    uint8_t colour;    // +0x24 (0x80700: the rain colour table entry)
+    uint8_t alpha;     // +0x25
 };
 constexpr int kCap = 0x100;
 
@@ -59,6 +66,8 @@ struct State {
     int32_t d3438 = 0, d343c = 0, d3440 = 0;
     int32_t tabA[4] = {0, 0, 0, 0}, tabB[4] = {0, 0, 0, 0};
     bool setup = false;
+    bool weatherLevel = false;   // the last pass's Ordinal_10215 gate (0x805A0 reads it again before drawing)
+    uint8_t tab38d4[12] = {};    // D2Client+0x1138D4: rain colours (alpha 0x7F)
 };
 State g;
 
@@ -104,7 +113,10 @@ void spawn(Seed& s, const Env& e) {
         p.speed = 8 - ftol(double(f) * -28.0);
         p.frame = a * 7 / range + (g.bf7c ? 1 : 0);
     } else {
-        step(s);                                   // %12: colour-table index
+        // %12 indexes the colour table D2Common #11044(DAT_6FBCC3B8, 0) picks: 0 -> 0x1138D4 alpha 0x7F, 1/3 -> 0x1138A0,
+        // 2 -> 0x1138F8 (alpha 0xFF). These sessions run case 0 (every retail rain line carries 0x7F).
+        p.colour = g.tab38d4[step(s) % 12u];
+        p.alpha = 0x7f;
         p.frame = 4 - ftol(double(f) * -8.0);
         p.speed = 15 - ftol(double(f) * -15.0);
         p.splash = 3;
@@ -289,6 +301,22 @@ void setup(Seed& s, const Env& e) {
     if (e.act == 4) g.tabB[2] *= 3;
     g.tabA[0] = 0x1d4c; g.tabA[1] = 0xfa; g.tabA[2] = 3000; g.tabA[3] = 0x32;
     g.f38f4 = 0.0f;
+    // 0x1138D4[i] = D2Win #10190(c, c+0x19, c), c = 0x62 - i*0x50/12: the nearest index in the act's palette
+    // (pal.dat, B,G,R triplets; R = B here, so the channel order is moot).
+    std::vector<uint8_t> pal;
+    char path[64];
+    std::snprintf(path, sizeof path, "DATA\\GLOBAL\\PALETTE\\ACT%d\\PAL.DAT", int(e.act) + 1);
+    const bool ok = d2::sharedVfs().read(path, pal) && pal.size() >= 0x300;
+    for (int32_t i = 0; i < 12; ++i) {
+        const int32_t c = 0x62 - (i * 0x50) / 12, cg = c + 0x19;
+        uint32_t best = 0xFFFFFFFFu, idx = 0;
+        for (uint32_t j = 0; ok && j < 0x100; ++j) {
+            const int32_t b = pal[j * 3], gg = pal[j * 3 + 1], r = pal[j * 3 + 2];
+            const uint32_t d = uint32_t((r - c) * (r - c) + (gg - cg) * (gg - cg) + (b - c) * (b - c));
+            if (d < best) { best = d; idx = j; }
+        }
+        g.tab38d4[i] = uint8_t(idx);
+    }
 }
 
 } // namespace
@@ -300,10 +328,47 @@ float intensity() { return g.f38f4; }
 
 void tick(Seed& s, const Env& e) {
     if (!g.setup) { g.setup = true; setup(s, e); }
+    g.weatherLevel = e.weatherLevel;
     if (!e.weatherLevel) { g.f38f4 = 0.0f; return; }
     if (g.live != 0) update(s, e);
     phaseCycle(s, e);
     fill(s, e);
+}
+
+// 1.13c D2Client+0x805A0 -> 0x7FE80: the rain draw as its D2Gfx calls. 0x805A0 draws when the hero's level rains and
+// *(pool+0x114) != 0 (DAT_6FBCC2AC >= 10 takes the 0x7FE10 fill instead; not reached here). 0x7FE80 gates the pass on
+// Ordinal_10047 (ecx = the live count 0x805A0 left), clips x to [0, W) (DAT_6FBCC414 1/2 halve it) and y to [0, H-0x2F).
+// A falling drop is a line from (x, y) by (ftol(cos t*frame), ftol(sin t*frame)) cut at its landing row, a landed one a
+// point: Ordinal_10010(x0, y0, x1, y1, colour, alpha). The line path leaves ecx = colour, edx = x; the point path x, colour.
+void drawG(std::string& out, int32_t W, int32_t H, int32_t mode) {
+    if (!g.weatherLevel || g.live == 0) return;
+    char b[96];
+    std::snprintf(b, sizeof b, "10047 %x,0\n", unsigned(g.live));
+    out += b;
+    const int32_t ymax = H - 0x2f;
+    int32_t xmin = 0, xmax = W;
+    if (mode == 1) xmax = W - (W / 4) * 2;
+    else if (mode == 2) xmin = (W / 4) * 2;
+    auto in = [&](int32_t x, int32_t y) { return xmin <= x && x < xmax && 0 <= y && y < ymax; };
+    auto emit = [&](uint32_t ecx, uint32_t edx, int32_t x0, int32_t y0, int32_t x1, int32_t y1, const Particle& p) {
+        std::snprintf(b, sizeof b, "10010 %x,%x,%x,%x,%x,%x,%x,%x\n", ecx, edx, unsigned(x0), unsigned(y0), unsigned(x1),
+                      unsigned(y1), unsigned(p.colour), unsigned(p.alpha));
+        out += b;
+    };
+    for (int32_t i = 0; i <= g.maxIndex; ++i) {
+        const Particle& p = g.pool[i];
+        if (!p.active || g.bf78 != 0) continue;   // the snow pair (0x84988/0x84998 tables) is not reached by these sessions
+        if (p.landed == 0) {
+            int32_t dx = ftol(double(FOG_10083_Cos_LUT(int16_t(g.t3918))) * double(p.frame));
+            int32_t dy = ftol(double(FOG_10084_Sin_LUT(int16_t(g.t3918))) * double(p.frame));
+            const int32_t room = p.bound - p.y;
+            if (room < dy) { dx = (room * dx) / dy; dy = room; }
+            const int32_t x1 = p.x + dx, y1 = p.y + dy;
+            if (in(p.x, p.y) || in(x1, y1)) emit(p.colour, uint32_t(p.x), p.x, p.y, x1, y1, p);
+        } else if (in(p.x, p.y)) {
+            emit(uint32_t(p.x), p.colour, p.x, p.y, p.x, p.y, p);
+        }
+    }
 }
 
 } // namespace d2client::weather

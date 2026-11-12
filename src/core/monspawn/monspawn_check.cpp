@@ -238,6 +238,7 @@ static uint32_t g_sessionClientMapEventsDropped = 0;
 // borrow g_targetPlayer->pSeed, which belongs to the D2Game/server unit.
 void d2client_sound_stage_feed(uint32_t soundEnv); void d2client_sound_stage_log();   // sound_pump.cpp (replay-armed)
 #include "../d2client/sound_unit_refs.h"
+void d2client_sound_dbg(const std::string& s);
 namespace d2client_ambient { void reset(); void tick(uint32_t* seed, uint32_t period, bool weatherLevel); uint32_t* fallbackSeed(uint32_t (*playerInit)()); }
 extern "C" void d2_client_monster_idle_reset();   // 1.13c D2Client+0x237E0 monster branch state (unit_sound_trigger_237e0.cpp)
 extern "C" void d2_client_attack_roll_reset();   // 1.13c D2Client+0x242B0 attack-roll state (monster_face.cpp)
@@ -6824,6 +6825,17 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_session_item_is_quest(uint32_t itemId) {
 EMSCRIPTEN_KEEPALIVE const D2SessionVendorTransaction* d2_session_vendor_transaction() {
     return &g_sessionVendorTransaction;
 }
+// A level's monster-region counters, the inputs of A1Q1's "Den cleared" test: rooms activated (+0x04),
+// spawned (+0x2CC) and killed (+0x2D0) counts, and the level's populated-room count; -1 with no region.
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_monreg_counts(int32_t level) {
+    static int32_t out[4]; out[0] = out[1] = out[2] = out[3] = -1;
+    if (!g_sessionLive || !g_game) return out;
+    D2MonsterRegionStrc* reg = MONSTERREGION_GetMonsterRegionFromLevelId(g_game->pMonReg, level);
+    if (!reg) return out;
+    out[0] = reg->unk0x04; out[1] = (int32_t)reg->dwMonSpawnCount; out[2] = (int32_t)reg->dwMonKillCount;
+    out[3] = DUNGEON_GetNumberOfPopulatedRoomsInLevel(g_game->pAct[DRLG_GetActNoFromLevelId(level)], level);
+    return out;
+}
 EMSCRIPTEN_KEEPALIVE const D2SessionAct1Quest1* d2_session_act1q1() {
     memset(&g_sessionAct1Quest1, 0, sizeof g_sessionAct1Quest1);
     D2SessionAct1Quest1& out = g_sessionAct1Quest1;
@@ -7116,6 +7128,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_packet(const uint8_t* bytes, int len)
     case 0x25: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x25_SwitchBeltItem_6FC86040; break;   // cursor item <-> belt item
     case 0x48: if (len != 1) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x48_TurnOffBusyState_6FC87E20; break;   // the client's film ended: lifts the player's busy mark the film's quest branch set
     case 0x58: handler = D2GAME_PACKETCALLBACK_Rcv0x58_QuestCompleted_6FC883B0; break;
+    // The quest log opened (the client's 1-byte 0x40): the answer, the 0x28 kind 6 and the 0x52, is the packet stream after the call.
+    case 0x40: if (len != 1) return -1; D2WEB_ResetPacketStream(); handler = D2GAME_PACKETCALLBACK_Rcv0x40_RequestQuestData_6FC87460; break;
     case 0x51: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x51_BindHotkeyToSkill_6FC88290; break;   // F-key assign: slot in the high half of the word, hand bit 15, owner GUID
     // a retail recording session replay: 0x0D right skill on unit, 0x3B add skill point, 0x3C select skill (recovered handlers).
     case 0x0D: handler = D2GAME_PACKETCALLBACK_Rcv0x0D_RightSkillOnUnit_6FC83F80; break;
@@ -7873,7 +7887,7 @@ static std::unordered_map<uint32_t, uint32_t> g_sessionIdleRows, g_sessionIdleRo
 // reaches the struck-unit sound, which stamps the unit before the frame's attack rolls.
 extern "C" void d2_client_monster_hit_stamp(uint32_t id, uint32_t frame);
 static std::unordered_map<uint32_t, uint32_t> g_sessionClientMonsterMode;
-static void sessionClientMonsterModeReset() { g_sessionClientMonsterMode.clear(); g_sessionIdleRows.clear(); g_sessionIdleRowsReady.clear(); }
+static void sessionClientMonsterModeReset() { g_sessionClientMonsterMode.clear(); g_sessionIdleRows.clear(); g_sessionIdleRowsReady.clear(); d2client_session_unit_sound_reset(); }
 // 1.13c D2Client+0x22B20: the client units' sound references (replay only; nothing happens before the Sounds table is loaded).
 // The client's units are the held monsters and the objects of the rooms it holds (the sets d2_session_client_view prints).
 static void sessionClientSoundUnits() {
@@ -7888,6 +7902,12 @@ static void sessionClientSoundUnits() {
             for (D2UnitStrc* u = r->pUnitFirst; u; u = u->pRoomNext) if (u->dwUnitType == UNIT_OBJECT) v.push_back({ 2u, (uint32_t)u->dwUnitId, (uint32_t)u->dwClassId, u });
         }
     d2client_sound_unit_sync(v.data(), (uint32_t)v.size());
+    // the client-only river sound objects (client DRLG presets, no server unit: mode neutral) come first in the client's object table
+    std::vector<D2SndUnit> o;
+    for (const D2SessionObjectPresentation& p : g_sessionObjectPresentations)
+        if (p.classId == OBJECT_INVISIBLE_RIVER_SOUND1 || p.classId == OBJECT_INVISIBLE_RIVER_SOUND2) o.push_back({ 2u, p.id, p.classId, nullptr });
+    for (const D2SndUnit& s : v) o.push_back(s);
+    d2client_session_objects(o.data(), (uint32_t)o.size());   // 1.13c D2Client+0x237E0 object branch
 }
 static void sessionClientMonsterHitPass(uint32_t frame) {
     std::unordered_map<uint32_t, uint32_t> now;
@@ -7897,9 +7917,13 @@ static void sessionClientMonsterHitPass(uint32_t frame) {
         const uint32_t m = u->dwAnimMode;
         now[id] = m;
         auto it = g_sessionClientMonsterMode.find(id);
-        if (it != g_sessionClientMonsterMode.end() && it->second != m && (m == 3 || m == 13 || m == 0 || m == 12)) d2_client_monster_hit_stamp(id, frame);
+        if (it != g_sessionClientMonsterMode.end() && it->second != m && (m == 3 || m == 13 || m == 0 || m == 12)) {
+            d2_client_monster_hit_stamp(id, frame);
+            d2client_session_unit_mode(u, m, -1, false);   // 1.13c D2Client+0x24490: the struck/dying unit's sounds
+        }
     }
     g_sessionClientMonsterMode.swap(now);
+    d2client_session_player_packets();   // the hero's 0x0D mode packets (its hit sound: 0x22CA0 hero branch)
 }
 static void sessionClientMonsterIdlePass() {
     std::vector<uint32_t> ids(g_heldMonsters.begin(), g_heldMonsters.end());
@@ -10870,6 +10894,14 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_belt_boxes(int beltIndex, int higherRes
         out[1 + i * 4 + 3] = rect.nBottom;
     }
     return (uint32_t)boxes;
+}
+
+// Bit i set when belt slot i holds an item (D2Common #10301 INVENTORY_GetItemFromBeltSlot, what D2Client+0x28DC0 asks per slot).
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_session_belt_slot_mask() {
+    if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pInventory) return 0;
+    uint32_t m = 0;
+    for (int i = 0; i < 16; ++i) if (INVENTORY_GetItemFromBeltSlot(g_targetPlayer->pInventory, i)) m |= 1u << i;
+    return m;
 }
 
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_room_edge_flags(uint32_t roomOrdinal, uint32_t* out, uint32_t cap) {

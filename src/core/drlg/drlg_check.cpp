@@ -392,6 +392,7 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_drlg_client_room_status_cells(int levelId
 // pFirstRoomEx order, walls = list A, roofs = list B. Units are not staged (skipUnits stays the caller's).
 extern "C" uint32_t d2_dg_stage_unit(uint32_t, int32_t, int32_t, int32_t, uint32_t, uint32_t, uint32_t);
 extern "C" void d2_dg_stage_unit_cof(uint32_t, const uint8_t*);
+extern "C" void d2_dg_stage_unit_frac(uint32_t, uint32_t, uint32_t);
 struct FeedUnit { int32_t type, cls, sx, sy; uint32_t flags, flagsEx; uint8_t cof[0x18]; bool hasCof;
                   bool hasId; uint32_t id, mode, fx, fy; int32_t slot, rank, floor; };
 static std::vector<FeedUnit> g_feedUnits;   // the caller's per-tick client units (JS has no game logic: raw fields only)
@@ -475,6 +476,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_feed(int level, int l, int t, int r, int b, 
                 if (!f) continue;
                 uint32_t k = d2_dg_stage_unit((uint32_t)f->cls, f->type, f->sx, f->sy, (uint32_t)d2c_cru_a6180(s), (f->flags >> 20) & 1, (f->flagsEx & 1) ? 0 : 1);
                 if (f->hasCof) d2_dg_stage_unit_cof(k, f->cof);
+                d2_dg_stage_unit_frac(k, f->fx, f->fy);
                 d2c_cru_set_aux(s, k);
                 if (!nU++) u0 = k;
             }
@@ -487,6 +489,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_feed(int level, int l, int t, int r, int b, 
             if (tx < room->nTileXPos || ty < room->nTileYPos || tx >= room->nTileXPos + room->nTileWidth || ty >= room->nTileYPos + room->nTileHeight) continue;
             uint32_t k = d2_dg_stage_unit((uint32_t)u.cls, u.type, u.sx, u.sy, 0, (u.flags >> 20) & 1, (u.flagsEx & 1) ? 0 : 1);   // flagsEx bit0: the unit +0xC8 bit7 (the shadow node) is clear
             if (u.hasCof) d2_dg_stage_unit_cof(k, u.cof);
+            d2_dg_stage_unit_frac(k, u.hasId ? u.fx : 0x8000, u.hasId ? u.fy : 0x8000);   // a plain feed carries no fraction: the subtile centre
             if (!nU++) u0 = k;
         }
         d2_dg_stage_room(room->nTileXPos, room->nTileYPos, room->nTileWidth, room->nTileHeight, room->nTileXPos * 5, room->nTileYPos * 5, nA, a0, nB, b0, nU, u0);

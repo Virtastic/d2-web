@@ -39,11 +39,19 @@ uint32_t ordOf(uint32_t rva) {
     }
     return 0;
 }
+int32_t curTag = 0;   // the Sounds row the capture appends as " snd=R" to #10034 while 0x88A70 submits it
 void logA(uint32_t ord, uint32_t ecx, uint32_t edx) {
-    char b[64];
-    snprintf(b, sizeof b, "%u A %u %x,%x\n", curTick, ord, ecx >= 0x100000 ? 0u : ecx, edx >= 0x100000 ? 0u : edx);
+    char b[80];
+    snprintf(b, sizeof b, "%u A %u %x,%x", curTick, ord, ecx >= 0x100000 ? 0u : ecx, edx >= 0x100000 ? 0u : edx);
     out += b;
+    if (curTag > 0 && ord == 10034) out += " snd=" + std::to_string(curTag);
+    out += '\n';
 }
+// 0x88A70's entry pool (0x87D80: 200 slots of 0x59 bytes at D2Client+0x10F2F8) and the handle counter DAT_6fbcbf38 every
+// allocation advances (the chat queue's 0x7D850 and the ambient submits included). Each allocation is one #10034.
+uint32_t sndHandle = 0;
+uint8_t sndSlot[0x59];
+std::vector<int32_t> unitQ;   // rows the client tick submitted for a unit, replayed after 0x88DD0 (retail's unit pass follows the pump)
 // The Sounds.txt sweep's service seam (0x5ED90 -> 0x5EBC0): the file reads are the shared VFS, the D2Sound calls are logged.
 struct SweepSvc : d2client_batch_5ebc0::Svc {
     d2client_batch_5ebc0::G* g = nullptr;
@@ -131,11 +139,41 @@ void d2client_sound_stage_log() {
         if (q[i * 2 + 1] != 0) continue;
         out += std::to_string(curTick) + " A 10034 0,0\n";
         out += std::to_string(curTick) + " A 10034 0,0 snd=" + std::to_string(q[i * 2]) + "\n";   // snd= is decimal in the capture (snd=70 is row 70)
+        sndHandle += 2;   // both lines are 0x87D80 allocations
     }
     if (d2client_ambient::keyMoved()) logA(10059, 0, 0);
 }
+// A unit sound the client tick submitted (0x88A70, EBX = Sounds row, a unit argument): queued, run after the pump.
+void d2client_sound_unit_submit(int32_t row) { if (armed && row > 0) unitQ.push_back(row); }
+void d2client_sound_dbg(const std::string& s) { if (armed) out += std::to_string(curTick) + " A DBG " + s + "\n"; }
+struct D2cSndSubmitEnv {
+    uint8_t* recs; int32_t count; int32_t enabled; int32_t now; uint32_t player;
+    uint8_t* (*find87fe0)(int32_t, int32_t); uint8_t* (*alloc87d80)(void); void (*mkvec87f30)(float*, uint32_t, int32_t);
+    void (*set88350)(float*, uint8_t*); float (*pan88440)(int32_t, uint32_t); void (*ord10034)(uint32_t, uint32_t); void (*fn22390)(uint32_t, int32_t);
+};
+extern "C" int32_t d2_client_88a70(const D2cSndSubmitEnv* E, int32_t id, uint32_t unit, int32_t off, int32_t p3, int32_t p4);
+namespace {
+// The queued unit submits through the 0x88A70 port. Its D2Sound calls: 0x87D80's #10034 on allocation, then #10034 with ECX =
+// entry+0x28 and EDX = the unit (pointers: printed 0), then 0x22390's #10034 (ECX = unit+0x78, EDX = the entry handle).
+// 0x87FE0 (an entry of the same compound group still live) finds none: the capture never shows a submit without its allocation.
+void flushUnitSubmits(uint32_t now) {
+    D2cSndSubmitEnv E{};
+    E.recs = sg.cc24c; E.count = sg.cc250; E.enabled = 1; E.now = (int32_t)now; E.player = 0;
+    E.find87fe0 = [](int32_t, int32_t) -> uint8_t* { return nullptr; };
+    E.alloc87d80 = []() -> uint8_t* {
+        memset(sndSlot, 0, sizeof sndSlot); logA(10034, 0, 0);
+        const int32_t h = (int32_t)++sndHandle; memcpy(sndSlot + 8, &h, 4); return sndSlot; };
+    E.mkvec87f30 = [](float* v, uint32_t, int32_t) { v[0] = v[1] = v[2] = 0; };
+    E.set88350 = [](float*, uint8_t*) {};
+    E.pan88440 = [](int32_t, uint32_t) { return 0.0f; };
+    E.ord10034 = [](uint32_t, uint32_t) { logA(10034, 0, 0); };
+    E.fn22390 = [](uint32_t, int32_t h) { logA(10034, 0, (uint32_t)h); };
+    for (int32_t row : unitQ) { curTag = row; d2_client_88a70(&E, row, 1, 0, 0, 0); }
+    curTag = 0; unitQ.clear();
+}
+}
 extern "C" {
-EMSCRIPTEN_KEEPALIVE void d2_snd_trace_reset() { out.clear(); armed = true; }
+EMSCRIPTEN_KEEPALIVE void d2_snd_trace_reset() { out.clear(); armed = true; unitQ.clear(); sndHandle = 0; }
 EMSCRIPTEN_KEEPALIVE const char* d2_snd_trace_ptr() { return out.c_str(); }
 EMSCRIPTEN_KEEPALIVE uint32_t d2_snd_trace_len() { return (uint32_t)out.size(); }
 // one pump pass at session tick `tick` (>= 1); the sound "now" counter is tick - 1 (0 at the first pass)
@@ -153,8 +191,13 @@ EMSCRIPTEN_KEEPALIVE void d2_client_sound_pump(uint32_t tick) {
     const uint32_t gb[6] = { (uint32_t)(uintptr_t)blk0, (uint32_t)(uintptr_t)blk1, (uint32_t)(uintptr_t)blk2,
                              (uint32_t)(uintptr_t)blk3, (uint32_t)(uintptr_t)&fdiv, (uint32_t)(uintptr_t)&plbox };
     cl::Env e{}; e.h = hostH; e.rd = hostRd; e.wr = hostWr;
-    if (sg.cc24c) d2client_batch_5ebc0::sub_5ED90(sw, sg, (int32_t)now);   // 0x5ED90 sweep
-    curEdx = now;
+    // 0x5ED90 sweep. EDX reaching 0x88DD0's D2Sound calls is the sweep's leftover: `now` when it swept (it stores now
+    // into its last-sweep cell through EDX), else the distance `now - last sweep` its 25-tick gate computed.
+    const uint32_t since = now - (uint32_t)sg.cc26c;
+    const bool sweeps = now == 0 || since > 0x18;
+    if (sg.cc24c) d2client_batch_5ebc0::sub_5ED90(sw, sg, (int32_t)now);
+    curEdx = sweeps ? now : since;
     d2c_88dd0(now, gb, e);
+    flushUnitSubmits(now);
 }
 }

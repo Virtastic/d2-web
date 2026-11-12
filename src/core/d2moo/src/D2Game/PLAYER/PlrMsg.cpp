@@ -171,8 +171,10 @@ void __fastcall sub_6FC81F60(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc*
 }
 
 //D2Game.0x6FC82010
+extern "C" void d2_client_player_mode_packet(D2UnitStrc* pUnit, int32_t nAnimMode);   // d2client/session_unit_sound.cpp (replay only)
 void __fastcall sub_6FC82010(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient, int32_t nAnimMode)
 {
+    d2_client_player_mode_packet(pUnit, nAnimMode);   // the client's 0x0D handler reaches D2Client+0x24490 with the unit's new mode
     D2GAME_PACKETS_SendPacket0x0D_6FC3C920(pClient, 0x0D, 0, pUnit->dwUnitId, stru_6FD30708[nAnimMode].field_4, CLIENTS_GetUnitX(pUnit), CLIENTS_GetUnitY(pUnit), (BYTE)pUnit->dwLastHitClass, UNITS_GetCurrentLifePercentage(pUnit));
 }
 
