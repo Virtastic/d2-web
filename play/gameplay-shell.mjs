@@ -7157,6 +7157,13 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
     armWalk({ x: npc.x, y: npc.y, within: 4, npcId: npc.id, onArrive: () => realmInput().interactNearest() });
     return true;
   },
+  // Test hook: talk to one NPC by unit id, through the same walk-and-interact path as talkToNearestNpc.
+  talkTo(npcId) {
+    const npc = snapshot.entities.find((entity) => entity.type === 1 && entity.id === npcId);
+    if (!npc) return false;
+    armWalk({ x: npc.x, y: npc.y, within: 4, npcId: npc.id, onArrive: () => realmInput().interactNearest() });
+    return true;
+  },
   get npcPanelEvidence() {
     // Over packets the open NPC is the packet client's (realm-npc-state), not the engine dialog's.
     const v = realmNpc().isOpen() ? realmNpc().view() : null;
