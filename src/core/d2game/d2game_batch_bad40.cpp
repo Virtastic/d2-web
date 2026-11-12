@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstring>
 #include <emscripten.h>
+#include "d2game_regcall.h"
 
 static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
 static inline void     wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
@@ -111,18 +112,25 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_BC6B0(uint8_t* self, uint32
     }
 }
 
-// 1.13c D2Game+0xBCAA0  (EBX = game, param_1 = item)
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BCAA0(uint32_t item, uint8_t* ebx, const D2GameBatchBad40Env* e)
+// 1.13c D2Game+0xBCAA0 -- EAX = unit (may be null), EBX = game, one stack word = item; ret 4. Looks up the unit's record
+// (0x8F5C0: EAX = a stack out-word, ECX = game, ESI = the unit's class id or -1) and tells whether the item's code (#10802) is
+// one the record lists (pointer +0x34, count +0x38) or, with game byte +0x6D set, one of four fixed codes. The answer is AL:
+// retail leaves the code's upper three bytes in EAX (0 with no record).
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BCAA0(uint32_t unit, uint32_t game, uint32_t item, const D2GameRegCall* e)
 {
-    uint8_t* r = (uint8_t*)(uintptr_t)e->sub8F5C0((uint32_t)(uintptr_t)ebx);
-    uint32_t code = 0;
-    if (!r) return 0;
-    code = (uint32_t)e->ord(10802, item, 0, 0);
-    if (ebx[0x6d] && (code == 0x20347068 || code == 0x20357068 || code == 0x2034706d || code == 0x2035706d)) return 1;
-    int32_t n = (int32_t)rd32(r, 0x38);
-    const uint32_t* tbl = (const uint32_t*)(uintptr_t)rd32(r, 0x34);
-    for (int32_t i = 0; i < n; i++) if (code == tbl[i]) return 1;
-    return code & 0xffffff00;
+    using namespace d2grc;
+    uint32_t outWord = 0;
+    const uint32_t rec = e->call(0x8F5C0, (uint32_t)(uintptr_t)&outWord, game, 0, 0, unit ? r32(unit + 4) : 0xFFFFFFFFu, 0, nullptr, 0);
+    if (!rec) return 0;
+    const uint32_t code = stk(e, 0xA532, { item });
+    if (r8(game + 0x6D) != 0 && (code == 0x20347068 || code == 0x20357068 || code == 0x2034706d || code == 0x2035706d))
+        return (code & 0xFFFFFF00u) | 1;
+    const int32_t n = (int32_t)r32(rec + 0x38);
+    if (n > 0) {
+        const uint32_t tbl = r32(rec + 0x34);
+        for (int32_t i = 0; i < n; i++) if (code == r32(tbl + 4 * (uint32_t)i)) return (code & 0xFFFFFF00u) | 1;
+    }
+    return code & 0xFFFFFF00u;
 }
 
 // 1.13c D2Game+0xBCC60  (ESI = unit; ordinals take their operands in registers, see decompile)
@@ -152,17 +160,24 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BCC60(int32_t* unit, const
     return 1;
 }
 
-// 1.13c D2Game+0xBCE60  (ESI = unit, EDI = game)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_BCE60(int32_t* unit, uint8_t* edi, const D2GameBatchBad40Env* e)
+// 1.13c D2Game+0xBCE60 -- ESI = item, EDI = the owning unit, one stack word = flag; ret 4. Sets item flag 0x10 (#10977); with
+// the flag word set it marks the item (unit flags +0xC8 bit 4), sets item flag 1 as well for a type-4 unit that #10757 accepts
+// and whose inventory (+0x60) #10508 finds non-empty, then #10201(owner, 1) and #10050(owner inventory, item). EAX is the
+// flag word when it is 0, else what #10050 leaves.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BCE60(uint32_t item, uint32_t owner, uint32_t flag, const D2GameRegCall* e)
 {
-    e->ord(10977, 0, 0, 0);
-    if (unit) {
-        unit[0x32] |= 4;
-        if (*unit == 4 && e->ord(10757, 0, 0, 0) && unit[0x18] && e->ord(10508, (uint32_t)unit[0x18], 0, 0))
-            e->ord(10977, 0, 0, 0);
+    using namespace d2grc;
+    stk(e, 0xA65E, { item, 0x10, 1 });
+    if (!flag) return 0;
+    if (item) {
+        w32(item + 0xC8, r32(item + 0xC8) | 4);
+        if (r32(item) == 4 && stk(e, 0xA9EE, { item }) != 0) {
+            const uint32_t inv = r32(item + 0x60);
+            if (inv && stk(e, 0xA490, { inv }) != 0) stk(e, 0xA65E, { item, 1, 1 });
+        }
     }
-    e->ord(10201, 0, 0, 0);
-    e->ord(10050, rd32(edi, 0x60), 0, 0);
+    stk(e, 0xA9A6, { owner, 1 });
+    return stk(e, 0xA994, { r32(owner + 0x60), item });
 }
 
 // 1.13c D2Game+0xBD220  (param_1 = unit, param_2 = out zero, param_3 = out ptr; EDI = seed)
