@@ -1,5 +1,6 @@
 // src/core/d2game/d2game_batch_dcf20.cpp -- 1.13c D2Game.dll unit-hit dispatch (0xDCF20), transcribed from the cached Ghidra
 // decompile; register and stack inputs recovered from the retail disassembly. Base 0x6FC20000.
+// Retail is void in source but leaves EAX = the last callee's return or the last value it loaded on every exit; the port returns that word.
 #include <cstdint>
 #include <cstring>
 #include <emscripten.h>
@@ -13,165 +14,163 @@ struct D2GameBatchDCF20Env {
     uint32_t bitMasksSlot;                                     // guest address 0x6FD18BE0 (pointer to the bit-mask table)
     uint32_t (*subDA660)(uint32_t esiRec);
     int32_t  (*o10494)(uint32_t unit, uint32_t v);
-    void     (*o10945)(uint32_t unit, uint32_t a, uint32_t b);
+    uint32_t (*o10945)(uint32_t unit, uint32_t a, uint32_t b);
     uint32_t (*sub1560)(uint32_t eaxV, uint32_t edxV);
-    void     (*sub771D0)(uint32_t ebxRec, uint32_t esiUnit);
-    void     (*subDEEE0)(uint32_t ecxA1, uint32_t edxUnit, uint32_t a2, uint32_t one);
-    void     (*sub75070)(uint32_t* esiL, uint32_t code);
-    void     (*sub75E10)(uint32_t a1, uint32_t* L, uint32_t one);
-    void     (*subAF710)(uint32_t eaxUnit, uint32_t code);
+    uint32_t (*sub771D0)(uint32_t ebxRec, uint32_t esiUnit);
+    uint32_t (*subDEEE0)(uint32_t ecxA1, uint32_t edxUnit, uint32_t a2, uint32_t one);
+    uint32_t (*sub75070)(uint32_t* esiL, uint32_t code);
+    uint32_t (*sub75E10)(uint32_t a1, uint32_t* L, uint32_t one);
+    uint32_t (*subAF710)(uint32_t eaxUnit, uint32_t code);
     int32_t  (*o10871)(uint32_t unit, uint32_t v);
     int32_t  (*subDB910)(uint32_t unit, uint32_t rec, uint32_t v);
-    void     (*sub268E0)(uint32_t ecxA1, uint32_t edxUnit, uint32_t a, uint32_t b);
-    void     (*o10158)(uint32_t unit);
+    uint32_t (*sub268E0)(uint32_t ecxA1, uint32_t edxUnit, uint32_t a, uint32_t b);
+    uint32_t (*o10158)(uint32_t unit);
     int32_t  (*o10973)(uint32_t unit, uint32_t stat, uint32_t layer);
     uint32_t (*sub77060)(uint32_t eaxV);
     uint32_t (*o10680)(uint32_t a, uint32_t b, uint32_t c);
     uint32_t (*o10630)(uint32_t ecxUnit, uint32_t edxV);
     uint32_t (*o10397)(uint32_t v);
-    void     (*o10137)(uint32_t v, uint32_t f);
-    void     (*sub78430)(uint32_t eaxA1, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t f);
-    void     (*sub78550)(uint32_t ecxA1, uint32_t edxUnit, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t f);
+    uint32_t (*o10137)(uint32_t v, uint32_t f);
+    uint32_t (*sub78430)(uint32_t eaxA1, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t f);
+    uint32_t (*sub78550)(uint32_t ecxA1, uint32_t edxUnit, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t f);
     uint32_t (*sub1420)(uint32_t eaxV);
-    void     (*subDFFD0)(uint32_t code, uint32_t unit);
-    void     (*o10887)(uint32_t unit, uint32_t stat, int32_t v, uint32_t layer);
+    uint32_t (*subDFFD0)(uint32_t code, uint32_t unit);
+    uint32_t (*o10887)(uint32_t unit, uint32_t stat, int32_t v, uint32_t layer);
 };
 typedef D2GameBatchDCF20Env Env_DCF;
 
 template <class T> static inline T R(const Env_DCF* e, uint32_t a) { T v; memcpy(&v, e->at(a), sizeof(T)); return v; }
 template <class T> static inline void W(const Env_DCF* e, uint32_t a, T v) { memcpy(e->at(a), &v, sizeof(T)); }
 
-// 1.13c D2Game+0xDCF20 : eax = unit; stack a1 (game/room), a2 (point ptr or 0), a3 (hit record); ret 0xc.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DCF20(uint32_t unit, uint32_t a1, uint32_t a2, uint32_t rec, const Env_DCF* e) {
+// 1.13c D2Game+0xDCF20 : eax = unit; stack a1 (game/room), a2 (point ptr or 0), a3 (hit record); ret 0xc. Returns retail's EAX at exit.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_DCF20(uint32_t unit, uint32_t a1, uint32_t a2, uint32_t rec, const Env_DCF* e) {
     uint32_t L[8];
-    if (e->o10331(unit) != 0 && e->o10057(e->o10331(unit)) != 0) {
-        if (!a2 || R<uint32_t>(e, a2) != 1) return;
-        uint32_t r = e->sub1220(R<uint32_t>(e, a2 + 4));
-        if (!r) return;
-        uint32_t bm = R<uint32_t>(e, e->bitMasksSlot);
-        if ((R<uint8_t>(e, bm + 8) & R<uint8_t>(e, r + 0xd)) == 0) return;
+    uint32_t eax = e->o10331(unit);
+    if (eax != 0) {
+        eax = (uint32_t)e->o10057(e->o10331(unit));
+        if (eax != 0) {
+            if (!a2 || R<uint32_t>(e, a2) != 1) return eax;
+            uint32_t r = e->sub1220(R<uint32_t>(e, a2 + 4));
+            if (!r) return 0;
+            uint32_t bm = R<uint32_t>(e, e->bitMasksSlot);
+            eax = (r & 0xffffff00u) | R<uint8_t>(e, r + 0xd);
+            if ((R<uint8_t>(e, bm + 8) & R<uint8_t>(e, r + 0xd)) == 0) return eax;
+        }
     }
     uint32_t flags = R<uint8_t>(e, rec + 4);
     if (flags & 1) {
         if (R<uint8_t>(e, rec + 0x64) == 0 && (R<uint32_t>(e, rec + 0x60) & 0xf0) == 0) W<uint32_t>(e, rec + 0x60, e->subDA660(rec));
         W<uint32_t>(e, unit + 0xb0, R<uint32_t>(e, rec + 0x60));
     }
-    if (e->o10494(unit, 0x36) != 0) {
-        if (flags & 2) e->o10945(unit, 0x5c, 1);
-        return;
+    eax = (uint32_t)e->o10494(unit, 0x36);
+    if (eax != 0) {
+        if (flags & 2) return e->o10945(unit, 0x5c, 1);
+        return eax;
     }
     uint32_t type = unit ? R<uint32_t>(e, unit) : 6;
     if (type == 0) {
         uint32_t fl = R<uint16_t>(e, rec + 4);
         if ((fl & 0x80) || (fl & 0x100)) {
             int32_t cond = e->o10871(unit, (fl & 0x80) ? 0x41 : 0x42);
-            if (!cond) return;
+            if (!cond) return 0;
             uint32_t v = e->o10680((uint32_t)cond, 0x15e, 0);
             uint32_t esi = e->o10630(unit, v);
-            if (!esi) return;
+            if (!esi) return 0;
             e->o10137(esi, e->o10397(esi) | 4);
-            if (!a2) e->sub78430(a1, esi, 0xd, 6, 0xffffffffu, 0);
-            else     e->sub78430(a1, esi, 0xd, R<uint32_t>(e, a2), R<uint32_t>(e, a2 + 0xc), 0);
-            return;
+            if (!a2) return e->sub78430(a1, esi, 0xd, 6, 0xffffffffu, 0);
+            return e->sub78430(a1, esi, 0xd, R<uint32_t>(e, a2), R<uint32_t>(e, a2 + 0xc), 0);
         }
         if (fl & 0x200) {
             int32_t cond = e->o10871(unit, 0x44);
-            if (!cond) return;
+            if (!cond) return 0;
             uint32_t v = e->o10680((uint32_t)cond, 0x15e, 0);
-            if (!e->o10630(unit, v)) return;
+            if (!e->o10630(unit, v)) return 0;
             uint32_t r = e->sub1420(v);
-            if (!r) return;
-            if ((int16_t)R<uint16_t>(e, r + 0xfc) <= 0) return;
-            e->subDFFD0(0xc, unit);
-            return;
+            if (!r) return 0;
+            if ((int16_t)R<uint16_t>(e, r + 0xfc) <= 0) return r;
+            return e->subDFFD0(0xc, unit);
         }
         if (fl & 0x8010) {
-            if (fl & 0x4000) return;
+            if (fl & 0x4000) return fl;
             int32_t s5f = e->o10973(unit, 0x5f, 0);
             int32_t s66 = e->o10973(unit, 0x66, 0);
             int32_t cur = R<int32_t>(e, a1 + 0xa8);
-            if (cur - s5f <= ((s66 + ((s66 >> 31) & 7)) >> 3) + 0xf) return;
+            const int32_t lim = ((s66 + ((s66 >> 31) & 7)) >> 3) + 0xf;
+            if (cur - s5f <= lim) return (uint32_t)lim;
             e->sub78550(a1, unit, 0, 9, 0, 0, 0);
-            e->o10887(unit, 0x5f, R<int32_t>(e, a1 + 0xa8), 0);
-            return;
+            return e->o10887(unit, 0x5f, R<int32_t>(e, a1 + 0xa8), 0);
         }
         if (fl & 2) {
-            if (!unit) return;
             uint32_t m = R<uint32_t>(e, unit + 0x10);
-            if (m == 0 || m == 0x11) return;
-            if (!a2) e->sub78430(a1, 0, 0, 6, 0xffffffffu, 0);
-            else     e->sub78430(a1, 0, 0, R<uint32_t>(e, a2), R<uint32_t>(e, a2 + 0xc), 0);
-            return;
+            if (m == 0 || m == 0x11) return m;
+            if (!a2) return e->sub78430(a1, 0, 0, 6, 0xffffffffu, 0);
+            return e->sub78430(a1, 0, 0, R<uint32_t>(e, a2), R<uint32_t>(e, a2 + 0xc), 0);
         }
         if (fl & 8) {
-            if (!a2) e->sub78430(a1, 0, 0x13, 6, 0xffffffffu, 0);
-            else     e->sub78430(a1, 0, 0x13, R<uint32_t>(e, a2), R<uint32_t>(e, a2 + 0xc), 0);
-            return;
+            if (!a2) return e->sub78430(a1, 0, 0x13, 6, 0xffffffffu, 0);
+            return e->sub78430(a1, 0, 0x13, R<uint32_t>(e, a2), R<uint32_t>(e, a2 + 0xc), 0);
         }
         if (fl & 4) {
-            if (e->o10871(unit, 0x15) != 0 || e->subDB910(unit, rec, R<uint32_t>(e, rec + 0x60)) == 0) {
-                e->sub78550(a1, unit, 0, 4, R<uint32_t>(e, rec + 0x4c), 0, 0);
-                return;
-            }
+            if (e->o10871(unit, 0x15) != 0 || e->subDB910(unit, rec, R<uint32_t>(e, rec + 0x60)) == 0)
+                return e->sub78550(a1, unit, 0, 4, R<uint32_t>(e, rec + 0x4c), 0, 0);
         } else if (!(fl & 0x4000)) {
-            return;
+            return fl;
         }
-        e->o10158(unit);
-        if (unit) W<uint32_t>(e, unit + 0xc4, R<uint32_t>(e, unit + 0xc4) | 0x8000);
-        return;
+        eax = e->o10158(unit);
+        W<uint32_t>(e, unit + 0xc4, R<uint32_t>(e, unit + 0xc4) | 0x8000);
+        return eax;
     }
-    if (type != 1) return;
-    if (!unit) return;
+    if (type != 1) return type - 1;
     uint32_t mode = R<uint32_t>(e, unit + 0x10);
-    if (mode == 0 || mode == 0xc) return;
+    if (mode == 0 || mode == 0xc) return mode;
     uint32_t fl = R<uint16_t>(e, rec + 4);
-    if ((fl & 8) && e->sub1560(R<uint32_t>(e, unit + 4), 0xd) == 0) {
-        fl = (fl & 0xfff7) | 4;
-        W<uint16_t>(e, rec + 4, (uint16_t)fl);
+    if (fl & 8) {
+        if (e->sub1560(R<uint32_t>(e, unit + 4), 0xd) == 0) {
+            fl = (fl & 0xfff7) | 4;
+            W<uint16_t>(e, rec + 4, (uint16_t)fl);
+        }
     }
-    e->sub771D0(rec, unit);
+    eax = e->sub771D0(rec, unit);
     fl = R<uint16_t>(e, rec + 4);
-    if (fl & 2) { e->subDEEE0(a1, unit, a2, 1); return; }
+    eax = (eax & 0xffff0000u) | fl;
+    if (fl & 2) return e->subDEEE0(a1, unit, a2, 1);
     if (fl & 8) {
         e->sub75070(L, 0xd);
         L[2] = a2;
-        e->sub75E10(a1, L, 1);
-        return;
+        return e->sub75E10(a1, L, 1);
     }
     if (fl & 0x10) {
         uint32_t cls = R<uint32_t>(e, unit + 4);
         if (!(fl & 0x4000) && cls != 0xf3 && cls != 0x14d && cls != 0x2c1 && e->sub1560(cls, 6) != 0) {
             e->sub75070(L, 6);
-            e->sub75E10(a1, L, 1);
-            return;
+            return e->sub75E10(a1, L, 1);
         }
-        e->subAF710(unit, 0x13);
-        return;
+        return e->subAF710(unit, 0x13);
     }
     if (fl & 4) {
         if (e->o10871(unit, 0x15) != 0 || e->subDB910(unit, rec, R<uint32_t>(e, rec + 0x60)) == 0) {
             e->sub75070(L, 3);
             e->sub75E10(a1, L, 1);
-            e->sub268E0(a1, unit, 0, 4);
-            return;
+            return e->sub268E0(a1, unit, 0, 4);
         }
     } else if (!(fl & 0x4000)) {
-        if (!(fl & 1)) return;
-        if (R<int32_t>(e, rec + 0x4c) < 1) return;
+        if (!(fl & 1)) return eax;
+        const int32_t hp = R<int32_t>(e, rec + 0x4c);
+        if (hp < 1) return (uint32_t)hp;
         int32_t s160 = e->o10973(unit, 0x160, 0);
         uint8_t bl = (uint8_t)s160;
         uint8_t al = (uint8_t)e->sub77060((uint32_t)s160);
         int32_t d = (int32_t)bl - (int32_t)al;
         if (d < 0) d = -d;
-        if (d < 5) return;
-        e->o10158(unit);
+        if (d < 5) return (uint32_t)d;
+        eax = e->o10158(unit);
         W<uint32_t>(e, unit + 0xc4, R<uint32_t>(e, unit + 0xc4) | 0x8000);
-        return;
+        return eax;
     }
     e->o10158(unit);
     W<uint32_t>(e, unit + 0xc4, R<uint32_t>(e, unit + 0xc4) | 0x8000);
     e->subAF710(unit, 0x13);
-    e->sub268E0(a1, unit, 0, 4);
+    return e->sub268E0(a1, unit, 0, 4);
 }
 
 // 1.13c D2Game+0xDCF20 replay entry: r[0]=unit (EAX), r[1]=a1, r[2]=a2, r[3]=a3 (hit record); the pinned global 0xF8BE0 is the first blob (r[14]),
@@ -184,28 +183,28 @@ static int32_t  dcf_a808(uint32_t v) { return (int32_t)DCFH(0xA808, 0, 0, 0, 0, 
 static uint32_t dcf_1220(uint32_t a) { return DCFH(0x1220, a); }
 static uint32_t dcf_a660(uint32_t rec) { return DCFH(0xDA660, 0, 0, 0, 0, rec); }
 static int32_t  dcf_a68e(uint32_t u, uint32_t v) { return (int32_t)DCFH(0xA68E, 0, 0, 0, 0, 0, u, v); }
-static void     dcf_a3ca(uint32_t u, uint32_t a, uint32_t b) { DCFH(0xA3CA, 0, 0, 0, 0, 0, u, a, b); }
+static uint32_t dcf_a3ca(uint32_t u, uint32_t a, uint32_t b) { return DCFH(0xA3CA, 0, 0, 0, 0, 0, u, a, b); }
 static uint32_t dcf_1560(uint32_t a, uint32_t d) { return DCFH(0x1560, a, 0, d); }
-static void     dcf_771d0(uint32_t rec, uint32_t u) { DCFH(0x771D0, 0, 0, 0, rec, u); }
-static void     dcf_deee0(uint32_t a1, uint32_t u, uint32_t a2, uint32_t one) { DCFH(0xDEEE0, 0, a1, u, 0, 0, a2, one); }
-static void     dcf_75070(uint32_t* l, uint32_t code) { DCFH(0x75070, 0, 0, 0, 0, (uint32_t)(uintptr_t)l, code); }
-static void     dcf_75e10(uint32_t a1, uint32_t* l, uint32_t one) { DCFH(0x75E10, 0, 0, 0, 0, 0, a1, (uint32_t)(uintptr_t)l, one); }
-static void     dcf_af710(uint32_t u, uint32_t code) { DCFH(0xAF710, u, 0, 0, 0, 0, code); }
+static uint32_t dcf_771d0(uint32_t rec, uint32_t u) { return DCFH(0x771D0, 0, 0, 0, rec, u); }
+static uint32_t dcf_deee0(uint32_t a1, uint32_t u, uint32_t a2, uint32_t one) { return DCFH(0xDEEE0, 0, a1, u, 0, 0, a2, one); }
+static uint32_t dcf_75070(uint32_t* l, uint32_t code) { return DCFH(0x75070, 0, 0, 0, 0, (uint32_t)(uintptr_t)l, code); }
+static uint32_t dcf_75e10(uint32_t a1, uint32_t* l, uint32_t one) { return DCFH(0x75E10, 0, 0, 0, 0, 0, a1, (uint32_t)(uintptr_t)l, one); }
+static uint32_t dcf_af710(uint32_t u, uint32_t code) { return DCFH(0xAF710, u, 0, 0, 0, 0, code); }
 static int32_t  dcf_a5d4(uint32_t u, uint32_t v) { return (int32_t)DCFH(0xA5D4, 0, 0, 0, 0, 0, u, v); }
 static int32_t  dcf_b910(uint32_t u, uint32_t rec, uint32_t v) { return (int32_t)DCFH(0xDB910, 0, 0, 0, 0, 0, u, rec, v); }
-static void     dcf_68e0(uint32_t a1, uint32_t u, uint32_t a, uint32_t b) { DCFH(0x268E0, 0, a1, u, 0, 0, a, b); }
-static void     dcf_a4de(uint32_t u) { DCFH(0xA4DE, 0, 0, 0, 0, 0, u); }
+static uint32_t dcf_68e0(uint32_t a1, uint32_t u, uint32_t a, uint32_t b) { return DCFH(0x268E0, 0, a1, u, 0, 0, a, b); }
+static uint32_t dcf_a4de(uint32_t u) { return DCFH(0xA4DE, 0, 0, 0, 0, 0, u); }
 static int32_t  dcf_a42a(uint32_t u, uint32_t st, uint32_t l) { return (int32_t)DCFH(0xA42A, 0, 0, 0, 0, 0, u, st, l); }
 static uint32_t dcf_7060(uint32_t a) { return DCFH(0x77060, a); }
 static uint32_t dcf_a712(uint32_t a, uint32_t b, uint32_t c) { return DCFH(0xA712, 0, 0, 0, 0, 0, a, b, c); }
 static uint32_t dcf_a3f4(uint32_t u, uint32_t v) { return DCFH(0xA3F4, 0, u, v); }
 static uint32_t dcf_a79c(uint32_t v) { return DCFH(0xA79C, 0, 0, 0, 0, 0, v); }
-static void     dcf_a78a(uint32_t v, uint32_t f) { DCFH(0xA78A, 0, 0, 0, 0, 0, v, f); }
-static void     dcf_8430(uint32_t a1, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t f) { DCFH(0x78430, a1, 0, 0, 0, 0, a, b, c, d, f); }
-static void     dcf_8550(uint32_t a1, uint32_t u, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t f) { DCFH(0x78550, 0, a1, u, 0, 0, a, b, c, d, f); }
+static uint32_t dcf_a78a(uint32_t v, uint32_t f) { return DCFH(0xA78A, 0, 0, 0, 0, 0, v, f); }
+static uint32_t dcf_8430(uint32_t a1, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t f) { return DCFH(0x78430, a1, 0, 0, 0, 0, a, b, c, d, f); }
+static uint32_t dcf_8550(uint32_t a1, uint32_t u, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t f) { return DCFH(0x78550, 0, a1, u, 0, 0, a, b, c, d, f); }
 static uint32_t dcf_1420(uint32_t a) { return DCFH(0x1420, a); }
-static void     dcf_ffd0(uint32_t code, uint32_t u) { DCFH(0xDFFD0, 0, 0, 0, 0, u, code, u); }
-static void     dcf_a472(uint32_t u, uint32_t st, int32_t v, uint32_t l) { DCFH(0xA472, 0, 0, 0, 0, 0, u, st, (uint32_t)v, l); }
+static uint32_t dcf_ffd0(uint32_t code, uint32_t u) { return DCFH(0xDFFD0, 0, 0, 0, 0, u, code, u); }
+static uint32_t dcf_a472(uint32_t u, uint32_t st, int32_t v, uint32_t l) { return DCFH(0xA472, 0, 0, 0, 0, 0, u, st, (uint32_t)v, l); }
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_dcf20(uint32_t* r)
 {
@@ -216,6 +215,5 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_dcf20(uint32_t* r)
     e.sub75E10 = dcf_75e10; e.subAF710 = dcf_af710; e.o10871 = dcf_a5d4; e.subDB910 = dcf_b910; e.sub268E0 = dcf_68e0; e.o10158 = dcf_a4de;
     e.o10973 = dcf_a42a; e.sub77060 = dcf_7060; e.o10680 = dcf_a712; e.o10630 = dcf_a3f4; e.o10397 = dcf_a79c; e.o10137 = dcf_a78a;
     e.sub78430 = dcf_8430; e.sub78550 = dcf_8550; e.sub1420 = dcf_1420; e.subDFFD0 = dcf_ffd0; e.o10887 = dcf_a472;
-    d2_fn_d2game_DCF20(r[0], r[1], r[2], r[3], &e);
-    r[4] = 0;
+    r[4] = d2_fn_d2game_DCF20(r[0], r[1], r[2], r[3], &e);
 }

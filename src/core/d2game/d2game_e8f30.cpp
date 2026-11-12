@@ -8,7 +8,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_E8F30(uintptr_t game, uint
     uintptr_t rec = env->p(rd32(unit, 0x18));
     wr8(rec, 5, 0);
     if (rd8(rec, 0x18) != 1 || rd8(rec, 3) == 0 || rd8(rec, 2) != 0 || rd32(game, 0xc4) == 0) return 1;
-    uint32_t room = (uint32_t)cl(env, 0xA526, 0, 0, 0, 0, 0, { rd32(game, 0xc4), rd32(rec, 8), rd32(rec, 0xc) });
+    uint32_t room = (uint32_t)cl(env, 0xA526, rd32(game, 0xc4), 0, 0, 0, 0, { rd32(game, 0xc4), rd32(rec, 8), rd32(rec, 0xc) });   // EAX still holds the pushed act word
     if (!room) return 1;
     uint32_t list = 0, count = 0;
     cl(env, 0xA55C, 0, 0, 0, 0, 0, { room, env->h((uintptr_t)&list), env->h((uintptr_t)&count) });
