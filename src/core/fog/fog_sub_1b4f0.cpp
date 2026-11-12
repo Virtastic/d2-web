@@ -1,40 +1,41 @@
-// 1.13c Fog+0x1B4F0: pick the pool block to allocate from. Custom-register call (EBX=allocator, ESI=pool,
-// EAX=start bit for 1ABB0, arg=out block**). Callees are seams.
-// Every pool and block field is a 32-bit retail word (block links and the out slot are dword addresses), read here as uint32_t.
+// 1.13c Fog+0x1B4F0: pick the pool block to allocate from. Custom-register call (EBX=allocator, ESI=pool, one stack arg =
+// out block*, ret 4). The pool and its blocks are retail's 32-bit layout, read through their 32-bit guest address:
+// pool+0x1c = units per block, +0x28 = first block, +0x2c = current block; block +4 = bit map, +8 = used, +0xc = prev, +0x10 = next.
+// When the first block has room, 1ABB0 is called with EAX = the pool's units per block (the incoming EAX is overwritten by
+// `mov eax,[esi+0x1c]` before the compare) and ECX = the block's bit map. Callees are seams.
 #include <cstdint>
-
-// pool+0x1c = units per block, +0x28 = first block, +0x2c = current block (offsets as in decompile)
-// block: +0 data, +4 bits, +8 used, +0xc next, +0x10 prev
+#include <cstring>
 
 struct fog_1b4f0_api {
     uint32_t* (*newBlock)(void* alloc, void* pool);        // Fog+0x1B390
-    int (*findFree)(uint32_t start, uint32_t* bits);       // Fog+0x1ABB0 (<0 = none)
+    int (*findFree)(uint32_t units, uint32_t* bits);       // Fog+0x1ABB0 (<0 = none)
 };
 
-static inline uint32_t* w32(uint32_t addr) { return reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(addr)); }
-static inline uint32_t a32(const void* p) { return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(p)); }
+namespace {
+inline uint32_t rd32(uint32_t a) { uint32_t v; memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }
+inline void wr32(uint32_t a, uint32_t v) { memcpy((void*)(uintptr_t)a, &v, 4); }
+}
 
-int fog_sub_1b4f0(const fog_1b4f0_api* a, void* alloc, uint8_t* pool, uint32_t start, uint32_t** out) {
-    uint32_t* first = reinterpret_cast<uint32_t*>(pool + 0x28);
-    uint32_t* cur = reinterpret_cast<uint32_t*>(pool + 0x2c);
-    uint32_t* outw = reinterpret_cast<uint32_t*>(out);
-    const uint32_t b = *first;
+int fog_sub_1b4f0(const fog_1b4f0_api* a, void* alloc, uint8_t* pool, uint32_t /*eax: overwritten*/, uint32_t** out) {
+    const uint32_t p = (uint32_t)(uintptr_t)pool, o = (uint32_t)(uintptr_t)out;
+    const uint32_t b = rd32(p + 0x28);
     if (!b) {
-        uint32_t* n = a->newBlock(alloc, pool);
-        if (n) { *cur = a32(n); *first = a32(n); }
-        *outw = a32(n);
+        const uint32_t n = (uint32_t)(uintptr_t)a->newBlock(alloc, pool);
+        if (n) { wr32(p + 0x2c, n); wr32(p + 0x28, n); }
+        wr32(o, n);
         return 0;
     }
-    if (static_cast<int32_t>(w32(b)[2]) < *reinterpret_cast<int32_t*>(pool + 0x1c)) {
-        int r = a->findFree(start, w32(w32(b)[1]));
-        if (r >= 0) { *outw = b; return r; }
+    const uint32_t units = rd32(p + 0x1c);
+    if ((int32_t)rd32(b + 8) < (int32_t)units) {
+        const int r = a->findFree(units, (uint32_t*)(uintptr_t)rd32(b + 4));
+        if (r >= 0) { wr32(o, b); return r; }
     }
-    uint32_t* n = a->newBlock(alloc, pool);
+    const uint32_t n = (uint32_t)(uintptr_t)a->newBlock(alloc, pool);
     if (n) {
-        n[4] = *first;
-        w32(*first)[3] = a32(n);
-        *first = a32(n);
+        wr32(n + 0x10, rd32(p + 0x28));
+        wr32(rd32(p + 0x28) + 0xc, n);
+        wr32(p + 0x28, n);
     }
-    *outw = a32(n);
+    wr32(o, n);
     return 0;
 }

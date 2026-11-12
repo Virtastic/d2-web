@@ -8,11 +8,24 @@
 // is then compacted under the lock (EDX 0x6A6 / 0x6AB): client[0x2A] -= used and the rest moves to client+0xB0. Loops while srv[0xBC0] is set.
 #include <cstring>
 #include "fog_env.h"
+// the two range asserts: 0xFC20 (a value), 0xCD8E, the fatal report 0x10F30 (level 6, file 0x6FF768EC, line, fmt 0x6FF7850C, value),
+// 0x184A0, then the exit 0x1BA9(-1), which does not return.
+static void fe_fatal_ee60(const FogEnv* e, uint32_t line) {
+    uint32_t v = fe_call(e, 0xFC20, 0, 0, 0);
+    fe_call(e, 0xCD8E, 0, 0, 0);
+    fe_call(e, 0x10F30, 0, 0, 0, 0, 0, 6, 0x6FF768EC, line, 0x6FF7850C, v);
+    fe_call(e, 0x184A0, 0, 0, 0);
+    fe_call(e, 0x1BA9, 0, 0, 0, 0, 0, 0xFFFFFFFFu);
+}
 extern "C" void fog_ee60(const FogEnv* e, uint32_t srv, uint32_t client) {
     if (fe_r32(srv + 0xbc0) == 0) return;
-    uint32_t buf = client + 0xb0, cs = client + 0x2c;
+    uint32_t cs = client + 0x2c;
+    // retail's frame, low to high: slot, skip, used, the buffer pointer, key, len (then the saved registers). The callback gets
+    // &used, &skip, &slot, &key; a writer that fills several dwords through one of them lands in the next frame word as in retail
+    // (through &used it overwrites the buffer pointer, which the compaction reloads). 2 words of slack.
+    uint32_t fr[8] = {0, 0, 0, client + 0xb0, 0, 0, 0, 0};
+    uint32_t &slot = fr[0], &skip = fr[1], &used = fr[2], &buf = fr[3], &key = fr[4];
     for (;;) {
-        uint32_t used = 0, skip = 0, slot = 0, key = 0;
         fe_call(e, 0x11690, 0, cs, 0x619);
         fe_enter(e, cs);
         uint32_t size = fe_r32(client + 0xa8);
@@ -61,6 +74,10 @@ extern "C" void fog_ee60(const FogEnv* e, uint32_t srv, uint32_t client) {
             fe_w32(pkt + 0x5b8, e->now);
             fe_w32(pkt + 0x5bc, 0);
             fe_w32(pkt, fe_r32(client));
+            if ((int32_t)slot >= (int32_t)fe_r32(srv + 0x87c)) {   // fatal: line 0x69C
+                fe_fatal_ee60(e, 0x69c);
+                return;
+            }
             uint32_t pcs = srv + 0x854;
             fe_call(e, 0x11690, 0, pcs, 0x68b);
             fe_enter(e, pcs);
@@ -74,9 +91,15 @@ extern "C" void fog_ee60(const FogEnv* e, uint32_t srv, uint32_t client) {
         fe_enter(e, cs);
         uint32_t nsize = fe_r32(client + 0xa8) - used;
         fe_w32(client + 0xa8, nsize);
+        if ((int32_t)(nsize + used) > 0x5b4) {   // fatal: line 0x6A8
+            fe_fatal_ee60(e, 0x6a8);
+            return;
+        }
+        buf = client + 0xb0;
         memmove(fe_p(buf), fe_p(buf + used), nsize);
         fe_call(e, 0x11690, 0, cs, 0x6ab);
         fe_leave(e, cs);
+        skip = used = slot = key = 0;
         if (fe_r32(srv + 0xbc0) == 0) return;
     }
 }

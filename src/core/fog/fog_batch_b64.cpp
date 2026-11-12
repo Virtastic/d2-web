@@ -39,9 +39,12 @@ struct FogB64Env {
     void (*log)(uint32_t logaddr, const char* fmt);      // Fog+0x190A0 (varargs lost)
 };
 
-static uint32_t L(const FogB64Env* e, uint32_t a) { uint32_t v; memcpy(&v, e->mem + a, 4); return v; }
-static void S(const FogB64Env* e, uint32_t a, uint32_t v) { memcpy(e->mem + a, &v, 4); }
-static void Z(const FogB64Env* e, uint32_t a, uint32_t dwords) { memset(e->mem + a, 0, (size_t)dwords * 4); }
+// The base may sit below zero (a window addressed by retail address), so the guest address is added as an integer: an
+// inbounds pointer add lets the compiler fold a constant address into the load's unsigned offset, which never wraps.
+static uint8_t* at(const FogB64Env* e, uint32_t a) { return reinterpret_cast<uint8_t*>(reinterpret_cast<uintptr_t>(e->mem) + a); }
+static uint32_t L(const FogB64Env* e, uint32_t a) { uint32_t v; memcpy(&v, at(e, a), 4); return v; }
+static void S(const FogB64Env* e, uint32_t a, uint32_t v) { memcpy(at(e, a), &v, 4); }
+static void Z(const FogB64Env* e, uint32_t a, uint32_t dwords) { memset(at(e, a), 0, (size_t)dwords * 4); }
 static void lock(const FogB64Env* e, uint32_t cs) { e->lock_note(cs); e->enter(cs); }
 
 static void fatal_exit(const FogB64Env* e, int line) {
@@ -86,7 +89,7 @@ extern "C" uint32_t fog_sub_1ae90(const FogB64Env* e, uint32_t out, const char* 
     e->enter(P + 4);
     if (name != nullptr) {
         e->strcopy(0x6ff9c740 + (uint32_t)idx * 0x17cc, name, 0x20);
-        e->mem[0x6ff9c75f + (uint32_t)idx * 0x17cc] = 0;
+        *at(e, 0x6ff9c75f + (uint32_t)idx * 0x17cc) = 0;
     }
     int32_t n;
     if (size < 0x11) n = 0;

@@ -16,14 +16,23 @@ uint32_t g_fog_perf_accumulator_index;
 // 1.13c Fog+0x0FDB0 -- hidden inputs: module_base (HMODULE, ebp; the caller resolves 0 to the exe),
 // module_path (retail GetModuleFileNameA result, eax==0 means failure), out_section/out_offset
 // (stack). addr is `this`. Walks the PE section table; section is 1-based, offset is addr-RVA.
-// image points at the mapped module (module_base).
-void fog_fdb0_section_of(const uint8_t* image, uint32_t addr_rva, int module_path_ok,
+// image points at the mapped module (module_base). EAX is the path buffer size: every copy is Storm #501
+// SStrCopy(path, src, max) (at most max-1 chars, NUL-terminated; max 0 writes nothing), as retail's
+// `mov ebx,eax` ... `push ebx` feeds both the "*unknown*" copies and GetModuleFileNameA.
+static void fog_fdb0_sstrcopy(char* dst, const char* src, uint32_t max) {
+    if (!max) return;
+    size_t n = strlen(src);
+    if (n >= max) n = max - 1;
+    memcpy(dst, src, n);
+    dst[n] = 0;
+}
+void fog_fdb0_section_of(const uint8_t* image, uint32_t addr_rva, uint32_t max, int module_path_ok,
                          char* path, const char* module_path, int* out_section, int* out_offset) {
-    strcpy(path, "*unknown*");
-    *out_section = 0;
-    *out_offset = 0;
-    if (!module_path_ok) return;
-    strcpy(path, module_path);
+    fog_fdb0_sstrcopy(path, "*unknown*", max);
+    memset(out_section, 0, 4);
+    memset(out_offset, 0, 4);
+    if (!module_path_ok) { fog_fdb0_sstrcopy(path, "*unknown*", max); return; }
+    fog_fdb0_sstrcopy(path, module_path, max);
     if (!image) return;
     uint16_t mz; memcpy(&mz, image, 2);
     uint32_t lfanew; memcpy(&lfanew, image + 0x3C, 4);

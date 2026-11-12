@@ -30,3 +30,10 @@ extern "C" uint32_t* fog_sub_e4e0(const uint8_t* tbl, uint32_t key) {
     LeaveCriticalSection(cs);
     return n;
 }
+// 1.13c Fog+0x0E9F0 (ordinal 10173), retail layout: key 0 reads 0 with no lookup; otherwise the node fog_sub_e4e0
+// finds, its dword +0x20; a miss or a null table reads 0.
+extern "C" uint32_t fog_sub_e9f0(const uint8_t* tbl, uint32_t key) {
+    if (!key) return 0;
+    const uint32_t* n = fog_sub_e4e0(tbl, key);
+    return n ? n[8] : 0;
+}

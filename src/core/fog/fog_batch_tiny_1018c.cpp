@@ -12,6 +12,7 @@
 // UNMAPPED rows kept as seams carrying only the contract this file depends on.
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 #include <Windows.h>   // CRITICAL_SECTION, LeaveCriticalSection: host state, a no-op under wasm
 #include <emscripten.h>
@@ -38,7 +39,9 @@ void fog_unlock(int32_t index) {
 // Fog+0x2B5D (__thiscall ~type_info) is a separate, still-UNMAPPED row: store the vftable at +0,
 // take lock 0xE, free the name block at +4 through _free (0x1FAD) when non-null, release the lock
 // (0x2B9A). The scalar deleting destructor only needs the call; the row owns the body.
-void fog_type_info_dtor(void* self) { (void)self; }
+// The vftable store is the part a record sees (retail's ??_7type_info@@6B@ at Fog+0x25398, the
+// preferred-base address 0x6FF75398); the name block at +4 is still the row's.
+void fog_type_info_dtor(void* self) { const uint32_t vt = 0x6FF75398u; std::memcpy(self, &vt, 4); }
 
 // Fog+0x68A0 (__unlock_file) body, inlined at the 0x2C54 tail. A FILE anywhere in the _iob window
 // 0x6FF7E340..0x6FF7E5A0 (both ends inclusive) releases CRT lock 0x10 + (stream - base) / 0x20;
@@ -66,10 +69,16 @@ static_assert(offsetof(FogTiddataPrefix, nlgCode) == 0x74, "nlgCode at +0x74");
 // type_info::`scalar deleting destructor'(flags): run ~type_info(this) (0x2B5D), then, when bit 0
 // of the stack flags argument is set, hand the object to the operator-delete thunk (0x1000 ->
 // Ordinal_403(this, "delete", -1, 0)). The object pointer is the result either way.
-extern "C" EMSCRIPTEN_KEEPALIVE void* fog_sub_2BA3(void* self, uint32_t flags) {
+// The release is a parameter (the fog_13b0 pattern): the probe passes the capture's pinned #403 stub,
+// the engine entry passes d2_fog_smem_free.
+extern "C" void* fog_sub_2BA3_ex(void* self, uint32_t flags,
+                                 int32_t (*smemFree)(void*, const char*, int32_t, uint32_t)) {
     fog_type_info_dtor(self);
-    if ((flags & 1u) != 0) d2_fog_smem_free(self, "delete", -1, 0);
+    if ((flags & 1u) != 0 && self) smemFree(self, "delete", -1, 0);   // 0x1000 skips a null pointer
     return self;
+}
+extern "C" EMSCRIPTEN_KEEPALIVE void* fog_sub_2BA3(void* self, uint32_t flags) {
+    return fog_sub_2BA3_ex(self, flags, d2_fog_smem_free);
 }
 
 // 1.13c Fog+0x2C54

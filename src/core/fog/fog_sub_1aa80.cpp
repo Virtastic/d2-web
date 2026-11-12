@@ -1,8 +1,9 @@
-// 1.13c Fog+0x1AA80: large-block release. Unlinks the header at (user-4) from
-// its hash chain (pool+0x7ac, 0x3ff buckets, key = header % 0x3ff, link = first word) under the pool lock
-// (pool+4), then frees the header. Absent from the chain: still freed. Lock/free are seams.
+// 1.13c Fog+0x1AA80: large-block release (EAX = user pointer, stack word 0 = pool, ret 4). The header (user-4) is unlinked from its
+// hash chain (pool+0x7AC, 0x3FF buckets, bucket = the SIGNED remainder of the header address % 0x3FF, link = the node's first dword)
+// under the pool lock (pool+4), then freed whether it was found or not. The pool and the nodes are retail's 32-bit layout, read through
+// their 32-bit guest address (a link is a dword, never a host pointer). Lock/free are seams.
 #include <cstdint>
-#include <cstdlib>
+#include <cstring>
 
 struct FogBigFreeEnv {
     void (*lock)(uint8_t* cs);    // Fog+0x11690 note + EnterCriticalSection
@@ -10,22 +11,22 @@ struct FogBigFreeEnv {
     void (*free_fn)(void* p);     // _free (Fog+0x1FAD)
 };
 
+namespace {
+inline uint32_t rd32(uint32_t a) { uint32_t v; memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }
+inline void wr32(uint32_t a, uint32_t v) { memcpy((void*)(uintptr_t)a, &v, 4); }
+}
+
 extern "C" void fog_sub_1aa80(uint8_t* pool, void* user, const FogBigFreeEnv* e) {
-    // Retail words are 32-bit: the bucket heads and the chain links are dword addresses.
-    const uint32_t hdr = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(user)) - 4;  // retail: (int)hdr % 0x3ff
-    uint32_t* buckets = reinterpret_cast<uint32_t*>(pool + 0x7ac);   // retail idiv: the bucket index is the signed remainder
-    const int32_t b = static_cast<int32_t>(hdr) % 0x3ff;
+    const uint32_t hdr = (uint32_t)(uintptr_t)user - 4;
+    const uint32_t slot = (uint32_t)(uintptr_t)pool + 0x7ac + (uint32_t)(((int32_t)hdr % 0x3ff) * 4);   // idiv: signed remainder
     e->lock(pool + 4);
-    uint32_t* prev = nullptr;
-    for (uint32_t n = buckets[b]; n; ) {
-        uint32_t* link = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(n));
+    uint32_t prev = 0;
+    for (uint32_t n = rd32(slot); n; prev = n, n = rd32(n)) {
         if (n == hdr) {
-            if (prev) *prev = *link; else buckets[b] = *link;
+            if (prev) wr32(prev, rd32(n)); else wr32(slot, rd32(n));
             break;
         }
-        prev = link;
-        n = *link;
     }
     e->unlock(pool + 4);
-    e->free_fn(reinterpret_cast<void*>(static_cast<uintptr_t>(hdr)));
+    e->free_fn((void*)(uintptr_t)hdr);
 }

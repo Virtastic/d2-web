@@ -434,13 +434,49 @@ static void fog_safesock_lock(FogSockApi* api, FSafeSock* s)
 	api->enterCS(s->tCriticalSection);
 }
 
-// 0x16800/0x16E90: slot. 0x16EB0: slot, buffer, length.
+// 0x16800 probe: ECX = slot (r[0]); blobs lg (r[14], the hook
+// log), st (r[16]: the scripted select, WSAGetLastError, except-hit and read-hit answers), sl (r[18]).
+// Recorded: select thunk 0xCD70 (stack words 0, &read, 0, &except; the timeval block after it), WSAGetLastError
+// 0xCD3A, __WSAFDIsSet 0xCD88 (socket, &set; the set's first two words after it).
+namespace
+{
+	HookEnv* g16800Env;
+	const uint32_t* g16800St;
+	uint32_t g16800Fd;   // which __WSAFDIsSet call (0: except set, 1: read set)
+	int32_t p16800_select(int32_t nfds, void* rd, void* wr, void* ex, const void* tv)
+	{
+		g16800Env->h(0xCD70, 0, 0, 0, 0, 0, (uint32_t)nfds, g16800Env->stk(rd), (uint32_t)(uintptr_t)wr, g16800Env->stk(ex));
+		g16800Env->blk(0xCD70, static_cast<const uint32_t*>(tv), 2);
+		return (int32_t)g16800St[0];
+	}
+	uint32_t p16800_err()
+	{
+		g16800Env->h(0xCD3A);
+		return g16800St[1];
+	}
+	int32_t p16800_fdisset(uint32_t s, const void* set)
+	{
+		g16800Env->h(0xCD88, 0, 0, 0, 0, 0, s, g16800Env->stk(set));
+		g16800Env->blk(0xCD88, static_cast<const uint32_t*>(set), 2);
+		return (int32_t)g16800St[2 + (g16800Fd++ & 1)];
+	}
+}
+
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16800(uint32_t* r)
 {
-	r[4] = static_cast<uint32_t>(fog_safesock_select(
-		reinterpret_cast<FogSockApi*>(static_cast<uintptr_t>(r[0])),
-		reinterpret_cast<FSafeSock*>(static_cast<uintptr_t>(r[1]))));
+	static const uint32_t sc[2] = {0, 0};
+	HookEnv e(reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(r[14])), sc);
+	g16800Env = &e;
+	g16800St = reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(r[16]));
+	g16800Fd = 0;
+	FogSockApi api{};
+	api.select_ = p16800_select;
+	api.wsagetlasterror = p16800_err;
+	api.fdisset = p16800_fdisset;
+	r[4] = static_cast<uint32_t>(fog_safesock_select(&api, reinterpret_cast<FSafeSock*>(static_cast<uintptr_t>(r[0]))));
 }
+
+// 0x16E90: slot. 0x16EB0: slot, buffer, length.
 
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16eb0(uint32_t* r)
 {
