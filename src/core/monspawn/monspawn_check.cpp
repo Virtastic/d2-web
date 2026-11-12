@@ -2612,6 +2612,14 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_skills() {
     }
     return 1;
 }
+// For the local game's join: every item the player holds (worn 0x9D, pack and belt 0x9C), as the player unit's
+// first sight sends them (PLAYER_SynchronizeItemsToClient). Sent live after the join bytes, because the start kit and a
+// loaded save's items are placed after the join was kept. Returns 1 when sent.
+EMSCRIPTEN_KEEPALIVE int d2_session_client_items() {
+    if (!g_targetClient || !g_targetPlayer || !g_targetPlayer->pInventory) return 0;
+    PLAYER_SynchronizeItemsToClient(g_targetPlayer, g_targetClient);
+    return 1;
+}
 EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_join_stream(uint32_t* length) { if (length) *length = (uint32_t)g_sessionJoinBurst.size(); return g_sessionJoinBurst.data(); }
 // The rooms the game holds its client in, as the 6-byte room reveals {0x07, tile x, tile y, level} a joining
 // client is sent: the client's own room first, then the rest of its adjacent list. Returns the byte count.
@@ -7686,14 +7694,21 @@ static uint16_t sessionA1Q6PlayerFlags() {
     for (uint32_t bit = 0; bit < 16; ++bit) if (QUESTRECORD_GetQuestState(flags, QUESTSTATEFLAG_A1Q6, bit)) out |= (uint16_t)(1u << bit);
     return out;
 }
-static void sessionA1Q6Portals(uint8_t* count, uint32_t* firstId) {
+// The capture reads one level, Catacombs 4: its rooms in room-list order, each room's units in unit-list order.
+// The portal's town end (made in the Rogue Encampment by the same call) is another level's object and is not counted.
+static size_t sessionA1Q6Portals(uint8_t* count, uint32_t* firstId) {
     updateSessionWorld();
-    *count = 0;
-    for (const D2SessionObjectPresentation& object : g_sessionObjectPresentations) {
-        if (object.classId != 59) continue;
-        if (!*count) *firstId = object.id;
-        ++*count;
+    *count = 0; size_t objects = 0;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel ? g_lastLevel->pFirstRoomEx : nullptr; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+        for (D2UnitStrc* unit = roomEx->pRoom ? roomEx->pRoom->pUnitFirst : nullptr; unit; unit = unit->pRoomNext) {
+            if (unit->dwUnitType != UNIT_OBJECT) continue;
+            ++objects;
+            if (unit->dwClassId != 59) continue;
+            if (!*count) *firstId = unit->dwUnitId;
+            ++*count;
+        }
     }
+    return objects;
 }
 EMSCRIPTEN_KEEPALIVE int d2_session_fixture_a1q6_defect(int arm) {
     memset(&g_sessionA1Q6Defect, 0, sizeof g_sessionA1Q6Defect);
@@ -7720,8 +7735,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_fixture_a1q6_defect(int arm) {
     r.flagsAfterCycler = sessionA1Q6PlayerFlags();
     r.notIntroAfterCycler = quest->bNotIntro; r.activeAfterCycler = quest->bActive;
     uint8_t portals = 0; uint32_t portalId = 0;
-    sessionA1Q6Portals(&portals, &portalId);
-    const size_t objectsBefore = g_sessionObjectPresentations.size();
+    const size_t objectsBefore = sessionA1Q6Portals(&portals, &portalId);
     for (D2QuestChainStrc* n = andariel->pQuestEventList; n; n = n->pNext) { ++r.listLength; if (n->pQuestData == quest) r.andarielListed = 1; }
     D2Act1Quest6Strc* ex = static_cast<D2Act1Quest6Strc*>(quest->pQuestDataEx);
     QUESTS_ParseKill(g_game, andariel, g_targetPlayer);
@@ -7736,7 +7750,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_fixture_a1q6_defect(int arm) {
     }
     r.ticksFinal = (uint16_t)ex->nTimerInvocations; r.timerListNonEmptyFinal = control->pTimer != nullptr;
     r.flagsFinal = sessionA1Q6PlayerFlags();
-    r.objectsAdded = (uint8_t)(g_sessionObjectPresentations.size() - objectsBefore);
+    { uint8_t n = 0; uint32_t id = 0; r.objectsAdded = (uint8_t)(sessionA1Q6Portals(&n, &id) - objectsBefore); }
     r.hash = sessionHashBytes(D2VEC_FNV_INIT, &r, offsetof(D2SessionA1Q6Defect, hash));
     return 1;
 }
@@ -9546,6 +9560,19 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_use_item(uint32_t itemUnitId) {
     memcpy(packet + 1, &id, 4); memcpy(packet + 5, &x, 4); memcpy(packet + 9, &y, 4);
     if (!sessionDispatchGate(0x20)) return 0;
     const int32_t result = D2GAME_PACKETCALLBACK_Rcv0x20_UseGridItem_6FC85990(g_game, g_targetPlayer, packet, sizeof packet);
+    updateSessionSnapshot();
+    return result == 0 ? 1 : 0;
+}
+
+// A belt item used by its id: retail's 0x26 UseBeltItem {item, on merc, unused}, through its own handler (the item
+// must be in the belt of the player's inventory). 1 if the handler accepted.
+EMSCRIPTEN_KEEPALIVE int d2_session_command_use_belt_item(uint32_t itemUnitId, uint32_t onMerc) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory) return 0;
+    uint8_t packet[13] = { 0x26 };
+    const int32_t id = (int32_t)itemUnitId, merc = onMerc ? 1 : 0;
+    memcpy(packet + 1, &id, 4); memcpy(packet + 5, &merc, 4);
+    if (!sessionDispatchGate(0x26)) return 0;
+    const int32_t result = D2GAME_PACKETCALLBACK_Rcv0x26_UseBeltItem_6FC86150(g_game, g_targetPlayer, packet, sizeof packet);
     updateSessionSnapshot();
     return result == 0 ? 1 : 0;
 }
