@@ -3015,6 +3015,7 @@ function advanceRealmClientUnits(forced) {
     }
   }
   if (ticks) {
+    realmMonsterViews = realmFlow.protocol.d2gsClientMonsters?.() ?? realmMonsterViews; // read before the cues: the sound trigger takes each monster's mode and frame clock from it (realm-combat.mjs)
     { const fx = realmFlow.protocol.d2gsClientTakeUnitFx?.(), me = selectedPlayerSource()?.guid; if (fx) realmUnitFx?.step(fx.events, fx.tick, (e) => e.unitType === 0 && e.unitGuid === me); } // the selected player's own start sounds stay with the combat cues above
     if (combatSounds && snapshot) { const f = realmCombatSoundFrame(snapshot, realmMonsterViews, selectedPlayerSource(), readSelectedSkills()[castHand], realmFlow.protocol.d2gsClientUnitHitClass, realmUnitFx?.hitOf, realmShrineUse); combatSounds.update(f.entities, f.frame); }
     realmShrineUse = false;
@@ -3022,7 +3023,6 @@ function advanceRealmClientUnits(forced) {
       unitSounds?.playRow(event.soundRow, event).catch((error) => console.warn('Missile impact sound', error));
     realmPlayerRosterView = realmFlow.protocol.d2gsClientPlayers?.() ?? realmPlayerRosterView;
     realmPlayerView = realmFlow.protocol.d2gsClientPlayerState?.() ?? realmPlayerView;
-    realmMonsterViews = realmFlow.protocol.d2gsClientMonsters?.() ?? realmMonsterViews;
     realmMissileViews = realmFlow.protocol.d2gsClientMissiles?.() ?? realmMissileViews;
     realmPlayerReassignFade.observe(realmPlayerRosterView, realmPlayerView, performance.now());   // a reassignment fed since the last read
   }

@@ -269,6 +269,20 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     const sent = approach(s, pending.type, u);
     return sent === null ? false : sent;
   }
+  // The left button's target memory (1.13c D2Client): the press stores the unit it picked and locks it (0x448E0 ->
+  // 0x1BF20 kind 0 -> 0x51E30; a press on the ground stores nothing and leaves the hover free). While the lock holds,
+  // the hover walk does not run (0x51E80 returns at once), so every held frame (0x44880 -> 0x1BF20 kind 1) acts on the
+  // stored unit (0x51A80) wherever the pointer has gone, re-issuing the attack as the hero walks in (0x1BCC0). The
+  // stored unit going ineligible -- dying, dead, gone -- drops the lock (0x51A80) and the pointer picks again; the
+  // button's release drops it (0x44800), here the next press, which always comes before any held frame.
+  const LOCK_TYPE = { monster: UNIT.MONSTER, npc: UNIT.MONSTER, player: UNIT.PLAYER, corpse: UNIT.PLAYER, item: UNIT.ITEM, object: UNIT.OBJECT, warp: UNIT.TILE };
+  let lock = null;
+  function locked(s) {
+    if (!lock) return null;
+    const u = find(s, lock.type, lock.guid);
+    if (!u) { lock = null; return null; }
+    return { kind: lock.kind, unit: u };
+  }
   function interactWith(s, type, u) {
     pending = { type, guid: idOf(type, u) };
     return arrive(s, true);
@@ -280,8 +294,10 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     pick: (px, py) => { const s = open(); return s ? pick(s, px, py) : null; },
     /** The left button on the world: act on what is under it, otherwise walk or run there. */
     leftClick(px, py, { held = false, stand = false } = {}) {
+      if (!held) lock = null;
       const s = open(); if (!s) return null;
-      const hit = pick(s, px, py);
+      const hit = (held && locked(s)) || pick(s, px, py);
+      if (!held && LOCK_TYPE[hit.kind] != null) lock = { kind: hit.kind, type: LOCK_TYPE[hit.kind], guid: idOf(LOCK_TYPE[hit.kind], hit.unit) };
       const world = s.pointerWorld(px, py);
       if (hit.kind === 'monster') return skillClick(s, 0, hit.unit, world, held, stand) && hit;
       // Stand Still held: the left skill is used at the spot under the pointer and the player does not walk.
@@ -406,7 +422,9 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     /** The death screen's continue. */
     respawn: () => emit(packets.respawn(), 'respawn'),
     /** The hero fell: the interaction waiting on a walk is dropped (1.13c D2Client 0x16A0). */
-    heroDied() { pending = null; },
+    heroDied() { pending = null; lock = null; },
+    /** The left button's locked target (its unit type and id), or null. */
+    get lock() { return lock ? { type: lock.type, guid: lock.guid } : null; },
     useItem(guid) { const s = open(); return s && itemGate() ? emit(packets.useItem(guid, s.player.x, s.player.y), 'use-item') : false; },
     /** Inventory panel: lift a carried item (0x19) or a worn one (0x1C). */
     lift: (guid) => itemGate() && emit(packets.fromGrid(guid), 'lift'),

@@ -456,3 +456,54 @@ test('drop gold is the 9-byte packet with the hero id, and nothing for zero', ()
   input.dropGold(0x01020304, 500);
   assert.deepEqual(out, [[0x50, 4, 3, 2, 1, 0xf4, 1, 0, 0]]);
 });
+
+// Demo defect 7 / issue #2 "melee target misses": the left press locks the unit it picked, and every held frame
+// acts on that unit wherever the pointer has gone (1.13c D2Client 0x448E0 to 0x51E30, 0x44880 to 0x51A80, 0x51E80
+// idle while locked, 0x1BCC0 re-issuing). Walking in moves the camera; the pointer leaving the monster must not
+// turn the attack into a walk to the ground. Dying or dead drops the lock (0x51A80) and the pointer picks again.
+test('a held left press keeps its monster while the pointer leaves it, and drops it when the monster dies', () => {
+  const sent = [];
+  let monsters = [{ guid: 77, classId: 5, mode: 1, x: 110, y: 104, anchorX: 200, anchorY: 120, drawn: true }];
+  let t = 0;
+  const input = createRealmInput({ transmit: (b) => sent.push(Array.from(b)), scene: () => sceneOf({ monsters })(), now: () => (t += 1000),
+    approachUnit: () => 1, move: () => 1, skillPlan: () => 0, skillOnUnit: () => 1, skillAt: () => 1 });
+  input.leftClick(200, 120);
+  assert.deepEqual(input.lock, { type: UNIT.MONSTER, guid: 77 });
+  assert.deepEqual(sent.splice(0), [[0x02, 1, 0, 0, 0, 77, 0, 0, 0]]);
+  // The camera has followed the hero: the monster is drawn elsewhere and the pointer is over bare ground.
+  monsters = [{ ...monsters[0], anchorX: 320, anchorY: 60 }];
+  for (let f = 0; f < 10; f++) assert.equal(input.leftClick(200, 120, { held: true }).kind, 'monster');
+  assert.deepEqual(sent.splice(0), Array(10).fill([0x02, 1, 0, 0, 0, 77, 0, 0, 0]));
+  assert.deepEqual(input.pending, { type: 1, guid: 77, hand: 0 });
+  // A second monster now under the pointer is not taken while the lock holds.
+  monsters = [...monsters, { guid: 88, classId: 5, mode: 1, x: 100, y: 120, anchorX: 200, anchorY: 120, drawn: true }];
+  input.leftClick(200, 120, { held: true });
+  assert.deepEqual(sent.splice(0), [[0x02, 1, 0, 0, 0, 77, 0, 0, 0]]);
+  // The locked monster dies (mode 0 DEATH): the lock drops and the pointer picks the one under it, without locking it.
+  monsters = [{ ...monsters[0], mode: 0 }, monsters[1]];
+  input.leftClick(200, 120, { held: true });
+  assert.equal(input.lock, null);
+  assert.deepEqual(sent.splice(0), [[0x02, 1, 0, 0, 0, 88, 0, 0, 0]]);
+  // Nothing under the pointer and no lock: the held button walks to the ground.
+  monsters = [];
+  input.leftClick(200, 120, { held: true });
+  assert.deepEqual(sent.splice(0), [[0x01, 100, 0, 120, 0]]);
+});
+
+test('a press on the ground locks nothing: a held button sweeping over a monster attacks it; a new press locks it', () => {
+  const sent = [];
+  let monsters = [];
+  let t = 0;
+  const input = createRealmInput({ transmit: (b) => sent.push(Array.from(b)), scene: () => sceneOf({ monsters })(), now: () => (t += 1000),
+    approachUnit: () => 1, move: () => 1, skillPlan: () => 1, skillOnUnit: () => 1, skillAt: () => 1 });
+  input.leftClick(200, 120);
+  assert.equal(input.lock, null);
+  monsters = [{ guid: 5, classId: 5, mode: 1, x: 101, y: 101, anchorX: 200, anchorY: 120, drawn: true }];
+  input.leftClick(200, 120, { held: true });
+  assert.equal(input.lock, null);
+  assert.deepEqual(sent.splice(0), [[0x01, 100, 0, 120, 0], [0x09, 1, 0, 0, 0, 5, 0, 0, 0]]);
+  input.leftClick(200, 120);
+  assert.deepEqual(input.lock, { type: UNIT.MONSTER, guid: 5 });
+  input.heroDied();
+  assert.equal(input.lock, null);
+});

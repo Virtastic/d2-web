@@ -212,3 +212,22 @@ test('the no-hit life loss of a shrine comes from the activations the client too
   assert.equal(realmCombatSoundFrame(snapshot, [], null, 0).frame.directHpLoss, false);
   assert.equal(realmCombatSoundFrame(snapshot, [], null, 0, undefined, undefined, true).frame.directHpLoss, true);
 });
+
+// Issue #2: a drawn frame rebuilds the snapshot once, but it may owe several client ticks, and each tick runs the trigger. A
+// monster in get-hit whose frame clock the stale snapshot holds still read as struck again on every owed tick.
+test('one hit sounds once while a drawn frame owes several ticks: the monster clock comes from the client views', (t) => {
+  const dir = new URL('../../retail/tables-1.13c/', import.meta.url);
+  const read = (p) => readFileSync(new URL(p.split('\\').pop(), dir));
+  try { read('monstats.bin'); } catch { t.skip('retail tables absent'); return; }
+  const entered = [], engine = { modeSounds: (type, id, cls, tf, su, mode) => { entered.push([type, id, mode]); return []; }, impactSounds: () => [] };
+  const trigger = createCombatSoundTrigger(read, () => {}, undefined, null, engine);
+  const view = (mode, framePrecise) => [{ guid: 7, classId: 5, mode, framePrecise, frameCountPrecise: 2048, animationFlags: 0, x: 10, y: 10, direction: 0, typeFlags: 0, hpPct: 50 }];
+  const snap = (views) => realmViewSnapshot({ base: null, resources: null, monsters: views, missiles: [], players: [], level: 2,
+    actor: (m) => ({ mode: m.mode, framePrecise: m.framePrecise, frameCountPrecise: m.frameCountPrecise }), frame: 0 });
+  const tick = (snapshot, views) => { const { entities, frame } = realmCombatSoundFrame(snapshot, views, { source: 'none' }, 0); trigger.update(entities, frame); };
+  tick(snap(view(1, 0)), view(1, 0));
+  // The hit lands: the frame draws the unit entering get-hit, then owes five more ticks before the next draw.
+  const drawn = snap(view(3, 0));
+  for (let i = 0; i < 6; i++) tick(drawn, view(3, i * 256));
+  assert.deepEqual(entered, [[1, 7, 3]]);
+});

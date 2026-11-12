@@ -108,11 +108,21 @@ export function createRealmUnits({ rowOf, unitInfo = () => null, hostilePlayer =
  * cue. The activations are the client's own (d2gsClientTakeObjectEvents), not a read of the engine's shrine queue.
  */
 export const shrineDirectHpLoss = (events) => (events ?? []).some((e) => e.shrine >= 1 && e.shrine <= 22);
+// The monster's mode and animation clock as the client unit holds them at this tick (the views are read every client
+// tick), not as the draw snapshot last saw them: the snapshot is rebuilt once per drawn frame, and a frame that owes
+// several ticks would hand the trigger the same frame clock each time -- a unit in get-hit whose clock has not moved
+// reads as struck again (the trigger's re-entry rule), so one hit sounded once per owed tick (issue #2).
+function fresh(e, view) {
+  if (!view || view.framePrecise == null) return null;
+  const flags = view.animationFlags ?? 0;
+  return { mode: view.mode, animation: { ...e.animation, mode: view.mode, framePrecise: view.framePrecise, frameCountPrecise: view.frameCountPrecise,
+    hasAnimSequence: (flags & 0x01) !== 0, seqMode: flags >> 4 } };
+}
 export function realmCombatSoundFrame(snapshot, views, hero, castSkillId, hitClassOf, hitOf, directHpLoss = false) {
   const byGuid = new Map((views ?? []).map((m) => [m.guid, m]));
   const struck = (type, id) => (hitOf?.(type, id) !== undefined ? { hitPacket: true } : null);
   const entities = (snapshot?.entities ?? []).filter((e) => e.type === 0 || e.type === 1)
-    .map((e) => { const view = e.type === 1 ? byGuid.get(e.id) : null; return e.type === 1 ? { ...e, hp: view?.hpMax > 0 ? view.hp : undefined, typeFlags: view?.typeFlags ?? 0 } : { ...e, hp: undefined }; })
+    .map((e) => { const view = e.type === 1 ? byGuid.get(e.id) : null; return e.type === 1 ? { ...e, ...fresh(e, view), hp: view?.hpMax > 0 ? view.hp : undefined, typeFlags: view?.typeFlags ?? 0 } : { ...e, hp: undefined }; })
     .map((e) => ({ ...e, ...(hitClassOf ? { lastHitClass: hitClassOf(e.type, e.id) } : null), ...struck(e.type, e.id) }));
   const mine = hero?.source === 'realm' && hero.renderState;
   if (mine) entities.push({ type: 0, id: hero.guid, classId: hero.classId, mode: hero.renderState.mode, ...(hitClassOf ? { lastHitClass: hitClassOf(0, hero.guid) } : {}), ...struck(0, hero.guid) });
