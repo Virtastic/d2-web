@@ -1,7 +1,7 @@
 // 1.13c Storm+0x22420 -- adaptive-Huffman decode loop (Storm huffman decompressor).
 // The decompile's implicit-register state: ESI = bit reader, EBX/this = tree object (first dword = "static tree" flag).
 #include <cstdint>
-struct Storm22420Bits { const uint16_t* p; uint32_t bits; uint32_t cnt; };
+struct Storm22420Bits { uint32_t p; uint32_t bits; uint32_t cnt; };   // retail's reader layout: p is a 32-bit address
 struct Storm22420Env {
     void (*setup)(void* tree, uint8_t mode);       // Storm+0x21E40
     uint32_t (*readSym)(void* tree);               // Storm+0x4980
@@ -9,7 +9,7 @@ struct Storm22420Env {
     void (*adapt)(void* tree, uint32_t sym);       // Storm+0x4810 (EAX = the node slot tree[0xC1B + sym])
 };
 static uint32_t byte22420(Storm22420Bits& b) {
-    if (b.cnt < 9) { b.bits |= (uint32_t)*b.p++ << (b.cnt & 31); b.cnt += 16; }
+    if (b.cnt < 9) { b.bits |= (uint32_t)*(const uint16_t*)(uintptr_t)b.p << (b.cnt & 31); b.p += 2; b.cnt += 16; }
     uint32_t v = b.bits & 0xff; b.bits >>= 8; b.cnt -= 8; return v;
 }
 int32_t storm_sub_22420(const Storm22420Env& e, uint32_t* tree, Storm22420Bits& b, uint8_t* dst, int32_t cap) {
@@ -21,9 +21,9 @@ int32_t storm_sub_22420(const Storm22420Env& e, uint32_t* tree, Storm22420Bits& 
     for (;;) {
         uint32_t s = e.readSym(tree);
         if (s == 0x101) {
-            { const uint32_t sb = byte22420(b);
-            e.addSym(tree, sb);
-            if (*tree == 0) e.adapt(tree, sb); }
+            s = byte22420(b);              // the literal byte replaces the escape symbol: it is the byte written below
+            e.addSym(tree, s);
+            if (*tree == 0) e.adapt(tree, s);
         }
         if (s == 0x100) break;
         *out++ = (uint8_t)s;

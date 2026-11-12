@@ -146,3 +146,5 @@ extern "C" void storm_26860_fnrun(char* bp, void (*modFile)(char*, uint32_t)) {
     g_modFile = nullptr;
     memcpy(bp, g_basePath, sizeof g_basePath);
 }
+// The base-path buffer itself (module RVA 0x53000): the probe logs the module address where the call passes it.
+extern "C" const char* storm_26860_basepath() { return g_basePath; }
