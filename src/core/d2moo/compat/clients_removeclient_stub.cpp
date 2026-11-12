@@ -167,3 +167,17 @@ __attribute__((weak)) void __fastcall D2GAME_PACKETS_SendPacket0x8C_6FC3F8B0(D2U
 {
     __builtin_trap();
 }
+
+// The party-relations broadcast after a join (PartyScreen.cpp, Party.cpp). The packet-handler probes pull the
+// party screen into the prove link, which then failed on this missing definition and dropped every probe it took.
+__attribute__((weak)) void __fastcall sub_6FC3F8F0(D2GameStrc*, D2UnitStrc*)
+{
+    __builtin_trap();
+}
+
+// The relation-state packet between two players (PlayerList.cpp). A probe that pulls the player list into the
+// prove link failed on this missing definition and was dropped before it ran.
+__attribute__((weak)) void __fastcall sub_6FC3F840(D2GameStrc*, int32_t, int32_t, int16_t)
+{
+    __builtin_trap();
+}
