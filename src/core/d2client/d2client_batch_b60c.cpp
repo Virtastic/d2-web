@@ -24,13 +24,13 @@ EMSCRIPTEN_KEEPALIVE const uint8_t* d2c_87c30(const D2cNode60* list, const uint8
     return best;
 }
 
-// 1.13c D2Client+0x87D80  pool of 0x59-byte entries; ord10034 = tick/stamp call, seq = g_cbf38.
-EMSCRIPTEN_KEEPALIVE uint8_t* d2c_87d80(uint8_t* pool, const uint8_t* poolEnd, i32* seq, void (*ord10034)()) {
+// 1.13c D2Client+0x87D80  pool of 0x59-byte entries; ord10034 links the claimed slot into the list (EDX = slot), seq = g_cbf38.
+EMSCRIPTEN_KEEPALIVE uint8_t* d2c_87d80(uint8_t* pool, const uint8_t* poolEnd, i32* seq, void (*ord10034)(uint8_t* slot)) {
     for (uint8_t* p = pool; p < poolEnd; p += 0x59) {
         if (rd(p, 0) == 0) {
             memset(p, 0, 0x59);
             i32 one = 1; memcpy(p, &one, 4);
-            ord10034();
+            ord10034(p);
             i32 s = ++*seq; memcpy(p + 8, &s, 4);
             return p;
         }

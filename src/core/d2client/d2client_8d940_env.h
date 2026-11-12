@@ -12,6 +12,10 @@ struct Env {
  virtual void gset(int32_t what,int32_t v)=0;
  virtual void draw(int32_t a,int32_t b,int32_t c,int32_t d,int32_t e,int32_t f)=0; // Ordinal_10041/10150/10184
  virtual bool personalize(wc* out,const wc* in,int32_t n)=0; // Unicode::Personalize(.., lang)
+ // Ordinal_10041 as retail calls it: the cel block (n dwords on the caller's stack) and the five stack words after it
+ virtual void cel(const uint32_t*,int32_t,int32_t,int32_t,int32_t,int32_t,int32_t){ __builtin_trap(); }
+ // a register-passing import (ECX, EDX) with three stack words; answers its EAX
+ virtual int32_t qr(int32_t,uint32_t,uint32_t,int32_t,int32_t,int32_t){ __builtin_trap(); }
 };
 // FN-probe base: every seam traps unless the port under test overrides it.
 struct TrapEnv : Env {

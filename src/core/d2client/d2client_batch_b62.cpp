@@ -5,9 +5,10 @@ typedef int32_t i32; typedef uint32_t u32;
 
 // 1.13c D2Client+0x63000  (EAX = mode; DAT_6fbcc098 = narrow flag; DAT_6fb8bc48/4c = screen w/h)
 struct B62Menu { i32 x[8], y[8], a[8], flag[8], idx[8]; };   // DAT_6fbc54f0 / 5510 / 5530 / 5550 / 5570
-void d2c_63000(i32 mode, B62Menu* m, i32 narrow, i32 scrW, i32 scrH) {
+// Returns the EAX retail leaves: 0 for mode 0, else the loop counter at exit (the slot count).
+i32 d2c_63000(i32 mode, B62Menu* m, i32 narrow, i32 scrW, i32 scrH) {
     i32 n = narrow ? 7 : 8, extra = 0, extra2 = 0;
-    if (!mode) return;
+    if (!mode) return 0;
     i32 half = scrW / 2, x = half - (narrow ? 0x4a : 0x54), y = scrH - 0x32;
     if (mode == 1) x = half - 0xca;
     else if (mode == 3) { x = half + 0x39; if (!narrow) x = half + 0x23; }
@@ -22,6 +23,7 @@ void d2c_63000(i32 mode, B62Menu* m, i32 narrow, i32 scrW, i32 scrH) {
         }
         m->idx[i] = v;
     }
+    return n;
 }
 
 // 1.13c D2Client+0x644F0  (EAX = mode; mouseX=DAT_6fbcb828, mouseY=DAT_6fbcb824)

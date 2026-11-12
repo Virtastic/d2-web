@@ -22,23 +22,24 @@ struct D2ClientB74Env {
 };
 
 // 1.13c D2Client+0x987F0 -- state flags in `g` (retail globals DAT_6fbcbe78, 6fbcbc34, 6fbaad94, 6fbcc434,
-// 6fbd349c, 6fbd3498, 6fb8d5d0); returns 1 when the panel-close tail (FUN_6fb1f4a0 onward) ran.
+// 6fbd349c, 6fbd3498, 6fb8d5d0); the panel-close tail (FUN_6fb1f4a0 onward) runs when a panel was open.
 struct D2ClientB74Close {
     uint32_t* e78; uint32_t* c34; uint32_t* ad94; uint32_t* cc434; uint32_t* d349c; uint32_t* d3498;
     uint32_t d5d0; uint32_t panel[9]; // DAT_6fbaadb0,addc,ade4,ade8,adec,adf0,adf4,adf8,ae00 in that order
     uint32_t ada8;
     // Retail: ecc60/eccc0 take the notify code in EAX (2, 4, 5) and the string Ordinal_10048(&image string) on the stack.
-    void (*f1f4a0)(); void (*ecc60)(int32_t code, int32_t str); void (*eccc0)(int32_t code, int32_t str);
-    int32_t (*ord_10048)(uint32_t image_addr); void (*ord_10227)(); void (*fatal)(int32_t);
+    // The return is the EAX retail leaves: the client-ready answer when no panel was open, else 0 or the last notify's answer.
+    void (*f1f4a0)(); void (*ecc60)(int32_t code, int32_t str); int32_t (*eccc0)(int32_t code, int32_t str);
+    int32_t (*ord_10048)(uint32_t image_addr); int32_t (*ord_10227)(); void (*fatal)(int32_t);
 };
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_987f0(const D2ClientB74Close* c) {
     uint32_t old = *c->ad94;
     *c->e78 = 1;
     if (*c->c34 == 0xd) *c->c34 = 0xc;
-    c->ord_10227();
+    int32_t ready = c->ord_10227();
     if (c->d5d0 != 0x26) c->fatal(0x139b);
     *c->ad94 = 0;
-    if (!old) return 0;
+    if (!old) return ready;
     c->f1f4a0();
     bool idle = true;
     for (int i = 0; i < 9; i++) if (c->panel[i]) { idle = false; break; }
@@ -50,8 +51,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_987f0(const D2ClientB74Close* 
             c->eccc0(4, c->ord_10048(0x6FBA51BCu));
         }
     }
-    if (c->ada8) c->eccc0(5, c->ord_10048(0x6FB80780u));
-    return 1;
+    if (c->ada8) return c->eccc0(5, c->ord_10048(0x6FB80780u));
+    return 0;
 }
 
 // 1.13c D2Client+0x9CCE0 -- pick a sound/entry id from record 9CAD0(kind); b = player record (seed at +0x20/+0x24)

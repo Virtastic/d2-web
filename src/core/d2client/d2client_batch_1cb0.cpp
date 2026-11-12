@@ -72,14 +72,14 @@ void* d2_fn_d2client_1de0_dup(void* obj, uint32_t flags, const D2ClientBatch1cb0
 
 // 1.13c D2Client+0x01E80 (76 B): destructor -- DeleteCriticalSection at +0x50, then the 0x1FB0 body.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2client_1e80(void* obj, const D2ClientBatch1cb0Env* env) {
+void d2client_1cb0_1e80(void* obj, const D2ClientBatch1cb0Env* env) {
     DeleteCriticalSection((LPCRITICAL_SECTION)((uint8_t*)obj + 0x50));
     d2client_1cb0_1fb0(obj, env);
 }
 
 // 1.13c D2Client+0x001ED0 (55 B): destructor body 0x1FB0 only.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2client_1ed0(void* obj, const D2ClientBatch1cb0Env* env) {
+void d2client_1cb0_1ed0(void* obj, const D2ClientBatch1cb0Env* env) {
     d2client_1cb0_1fb0(obj, env);
 }
 

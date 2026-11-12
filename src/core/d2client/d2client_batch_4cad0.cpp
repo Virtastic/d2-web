@@ -79,13 +79,18 @@ uintptr_t sub_4CAD0(Svc& s,Unit* u,int32_t ev,const PathRaw* raw){
  return (uintptr_t)(uint32_t)ev;
 }
 // 1.13c D2Client+0x4CDD0  (esi = unit)
-void sub_4CDD0(Svc& s,G& g,Unit* u,const PathRaw* raw){
+// Returns retail's EAX: 0 when nothing spawned or the spawned unit has no node/inner, else the inner flags record.
+Inner* sub_4CDD0(Svc& s,G& g,Unit* u,const PathRaw* raw){
  uint64_t r=(uint64_t)u->seed[0]*0x6ac690c5ull+u->seed[1]; u->seed[0]=(uint32_t)r; u->seed[1]=(uint32_t)(r>>32);
  uint32_t k=(uint32_t)r%5; // 4CDD0 never sees k>4; retail's fatal(0x174) branch is dead
- Unit* n=s.spawn(u,(int32_t)g.table601c[k],cx(s,u,raw),cy(s,u,raw),0,1);
- if(n){ s.o10210(n); s.o10210(n); s.f77b00();
-  if(n->node&&n->node->p30) n->node->p30->flags|=0x10;
-  n->flagsC8|=0x40000; }
+ int32_t y=cy(s,u,raw), x=cx(s,u,raw); // retail reads y (Ordinal_10750) before x (Ordinal_10867)
+ Unit* n=s.spawn(u,(int32_t)g.table601c[k],x,y,0,1);
+ if(!n) return nullptr;
+ s.o10210(n); s.o10210(n); s.f77b00();
+ Inner* p=n->node?n->node->p30:nullptr;
+ if(p) p->flags|=0x10;
+ n->flagsC8|=0x40000;
+ return p;
 }
 // 1.13c D2Client+0x4CEC0  (eax = msg)
 void sub_4CEC0(Svc& s,G& g,Unit* u,int32_t msg,const PathRaw* raw){

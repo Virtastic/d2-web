@@ -125,13 +125,20 @@ int32_t personalizedNameInPlace(Env& e,wc* out){
 // 1.13c D2Client+0x8E2F0: ported to d2client_8e2f0.cpp
 
 // 1.13c D2Client+0x8E770
-void drawBeltPanelCaps(Env& e){
- if(!e.g(0xBC9854)||!e.g(0xBAAE14)) return;
- if(!e.g(0xBCBED8)){ e.gset(0xBCBED8,e.q(0xBF6C0,0,0)); if(!e.g(0xBCBED8)) return; }
- int32_t x=e.g(0xBCB9A0), y=e.g(0xBCB9A4)-0xe0+e.g(0xB8BC4C), y2=e.g(0xBCB9A4)-0x30+e.g(0xB8BC4C);
- e.draw(0,x,y,-1,5,0); e.draw(1,x+0x100,y,-1,5,0);
- e.draw(2,x,y2,-1,5,0); e.draw(3,x+0x100,y2,-1,5,0);
- e.q(10184,0,0); e.q(10150,0x82-e.g(0xBCB9A4),e.g(0xBCBEF4)); e.q(10184,0,0);
+// Returns the EAX retail leaves: 0 on the early exits, else the second Ordinal_10184 answer.
+int32_t drawBeltPanelCaps(Env& e){
+ if(!e.g(0xBC9854)||!e.g(0xBAAE14)) return 0;
+ if(!e.g(0xBCBED8)){ int32_t img=e.q(0xBF6C0,0,0); e.gset(0xBCBED8,img); if(!img) return 0; }
+ // the cel block: 18 zeroed dwords on retail's stack, word 0 the frame, word 13 the cached image
+ uint32_t blk[18]={}; blk[13]=(uint32_t)e.g(0xBCBED8);
+ for(int32_t f=0;f<4;f++){
+  blk[0]=(uint32_t)f;
+  int32_t x=e.g(0xBCB9A0)+(f&1?0x100:0), y=e.g(0xBCB9A4)+e.g(0xB8BC4C)-(f<2?0xe0:0x30);
+  e.cel(blk,14,x,y,-1,5,0);
+ }
+ int32_t prev=e.qr(10184,4,0,0,0,0);
+ e.qr(10150,0xBCCC38,(uint32_t)(e.g(0xBCB9A0)+0x50),0x82-e.g(0xBCB9A4),e.g(0xBCBEF4),0);
+ return e.qr(10184,(uint32_t)prev,0,0,0,0);
 }
 }
 // FN probe entry for 0x8DCC0 (src/core/fn/d2client_8dcc0.cpp): the D2Lang string getter is the only seam; Storm _snprintf and the

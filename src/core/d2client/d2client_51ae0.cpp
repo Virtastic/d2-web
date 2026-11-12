@@ -10,8 +10,8 @@ struct Env {
     uint32_t (*f55440)(uint32_t eax_unit);
     uint32_t (*f2c5c0)();
     uint32_t (*f55b40)(uint32_t ecx, uint32_t edx);
-    uint32_t (*o10331)(uint32_t p, uint32_t q);                  // thunk 0xC1F0 at this site: two stack words
-    void (*o10742)(uint32_t);                                    // thunk 0xCD0C
+    uint32_t (*o10331)(uint32_t p);                              // thunk 0xC1F0: D2Common 10331, stdcall, one word (ret 4)
+    void (*o10742)(uint32_t v, uint32_t q);                      // thunk 0xCD0C: D2Common 10742, stdcall, two words (ret 8); q = p+4, pushed before the 10331 call
     uint32_t (*f1630)(uint32_t ecx_unit); uint32_t (*f1660)(uint32_t ecx_unit);
     int32_t (*pathX)(uint32_t); int32_t (*pathY)(uint32_t);      // thunks 0xC3BE / 0xC2EC
     void (*f50b30)(uint32_t eax_player, uint32_t a1, uint32_t a2);
@@ -48,7 +48,7 @@ uint32_t sub_51AE0(const Env& e, G& g, const uint32_t* bm, uint32_t eax, uint32_
                     *g.g3afa = 0;
                     if (g.g2f4 != 0 && g.g964c == 5) {
                         const uint32_t p = e.f55b40(g.g9638, 5);
-                        if (p) { e.o10742(e.o10331(p, rd(p, 4))); *g.flags |= 1; }
+                        if (p) { const uint32_t q = rd(p, 4); e.o10742(e.o10331(p), q); *g.flags |= 1; }
                     }
                     g.g2f4 = 0;
                 } else *g.g3afa = 0;

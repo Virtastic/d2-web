@@ -195,11 +195,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE U d2_client_833f0(const D2cGlob82* g, const D2cE
             e->ord(10614, 0, 0, 0, 0);
         }
         e->ord(10445, P(u), 0, 0, 0);
-        e->fn(0x82820, hi, a3 & 0xffff, rd<uint8_t>(p1, 2) - 0xd, 0);
+        e->fn(0x82820, hi, a3 & 0xffff, local24, 0);   // EAX = the loc byte
         e->fn(0x66950, 0, 0, 0, 0);
         ret = e->fn(0xa7360, (U)u, 0, 0, 0);
     }
-    if (e->ord(11145, ret, P(p1 + 0xd), (U)esi, 0x60 /* + &local24 */)) {
+    uint32_t bad = 0;   // the callee's out word (stack words 3..5: 0, 0, 0x60; the seventh: &bad)
+    e->ord(11145, ret, P(p1 + 0xd), (U)(uint32_t)n, P(&bad));
+    if (bad) {
         unlinkUnit(g, e, rd<uint32_t>(p1, 4));
         return 0;
     }
@@ -207,6 +209,5 @@ extern "C" EMSCRIPTEN_KEEPALIVE U d2_client_833f0(const D2cGlob82* g, const D2cE
         e->ord(10977, ret, 2, 0, 0);
         if (esi && !e->ord(10202, ret, 0x10, 0xfe, 0)) e->fn(0x14940, rd<uint32_t>(p1, 4), 0, 0, 0);
     }
-    (void)local24;
     return ret;
 }
