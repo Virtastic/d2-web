@@ -55,34 +55,28 @@ struct FrameBoxGlobals {
 // 1.13c D2Client+0x664A0
 void frame_box_664A0(FrameBoxImports& I, const FrameBoxGlobals& g, const uint8_t* unit, int32_t x0, int32_t y0) {
   if (unit == nullptr) { I.fatal(0x61); return; }
+  (void)x0; (void)y0;   // EBX/ESI are saved and overwritten: the box is placed from the converted unit position
   int32_t lx = get16(unit, 0x8C);
   int32_t ly = get16(unit, 0x8E);
-  I.ord11087(&lx, &ly);
+  I.ord11087(&lx, &ly);   // converts in place; every edge re-reads both locals and the three globals
 
-  const int32_t d = g.g418 - g.g9960;   // (DAT_6FBCC418 - DAT_6FBC9960)
-  const int32_t e = g.g995c;            // DAT_6FBC995C
-  int32_t ebx = d + x0;
-  int32_t iv2 = (y0 - e) + 0x10;
-  int32_t iv4 = ebx + 0x10;
-  I.ord10010(ebx, (y0 - e) + 8, iv4, iv2, 0xff, 0xff);
+  // the four edge strokes: x = DAT_6FBCC418 - DAT_6FBC9960 + lx, y = ly - DAT_6FBC995C (32-bit wrap)
+  auto X = [&] { return (int32_t)((uint32_t)g.g418 - (uint32_t)g.g9960 + (uint32_t)lx); };
+  auto Y = [&] { return (int32_t)((uint32_t)ly - (uint32_t)g.g995c); };
+  auto A = [](int32_t v, int32_t k) { return (int32_t)((uint32_t)v + (uint32_t)k); };
+  int32_t x = X(), y = Y();
+  I.ord10010(x, A(y, 8), A(x, 0x10), A(y, 0x10), 0xff, 0xff);
+  x = X(); y = Y();
+  I.ord10010(x, A(y, 8), A(x, -0x10), A(y, 0x10), 0xff, 0xff);
+  x = X(); y = Y();
+  I.ord10010(A(x, -0x10), A(y, 0x10), x, A(y, 0x18), 0xff, 0xff);
+  x = X(); y = Y();
+  I.ord10010(A(x, 0x10), A(y, 0x10), x, A(y, 0x18), 0xff, 0xff);
 
-  iv2 = d + iv2;
-  int32_t iv3 = (iv4 - e) + 0x10;
-  int32_t iv5 = iv2 - 0x10;
-  I.ord10010(iv2, (iv4 - e) + 8, iv5, iv3, 0xff, 0xff);
-
-  iv3 = d + iv3;
-  iv2 = (iv5 - e) + 0x18;
-  I.ord10010(iv3 - 0x10, (iv5 - e) + 0x10, iv3, iv2, 0xff, 0xff);
-
-  iv2 = d + iv2;
-  I.ord10010(iv2 + 0x10, (iv3 - e) + 0x10, iv2, (iv3 - e) + 0x18, 0xff, 0xff);
-
-  iv4 = g.g9960 - g.g418;               // DAT_6FBC9960 - DAT_6FBCC418
-  iv2 = I.ord10651() - iv4;
-  iv3 = e - 8;
-  iv4 = I.ord11142() - iv3;
-  I.ord10014(iv2, iv4, iv2 + 4, iv4 + 4, 0xff, 5);
+  // the fill: ord10651(unit) - (DAT_6FBC9960 - DAT_6FBCC418), ord11142(unit) - (DAT_6FBC995C - 8)
+  int32_t fx = (int32_t)((uint32_t)I.ord10651() - ((uint32_t)g.g9960 - (uint32_t)g.g418));
+  int32_t fy = (int32_t)((uint32_t)I.ord11142() - ((uint32_t)g.g995c - 8u));
+  I.ord10014(fx, fy, A(fx, 4), A(fy, 4), 0xff, 5);
 }
 
 // ---------------------------------------------------------------------------------------------
