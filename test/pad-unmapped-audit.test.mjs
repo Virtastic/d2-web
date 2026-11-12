@@ -57,11 +57,10 @@ test('right stick in the world moves retail\'s pointer and A clicks there; the l
   settle();
 });
 
-test('skill buttons: X, Y, RB, RT are skills 2, 4, 5, 6; LT held banks them to 1, 3, 7, 8; LT alone does nothing', () => {
-  for (const [b, n] of [[B.X, 2], [B.Y, 4], [B.RB, 5], [B.RT, 6]]) { tap(b); assert.deepEqual(drain(), keyTaps(`F${n}`)); }
-  down(B.LT); drain();
-  for (const [b, n] of [[B.X, 1], [B.Y, 3], [B.RB, 7], [B.RT, 8]]) { tap(b); assert.deepEqual(drain(), keyTaps(`F${n}`)); }
-  up(B.LT); assert.deepEqual(drain(), []);
+test('skill buttons: in the world they cast from the skill sheet (none read here: nothing), and an LT tap swaps weapons', () => {
+  for (const b of [B.A, B.X, B.Y, B.LB, B.RB, B.RT]) { tap(b); assert.deepEqual(drain(), []); }
+  tap(B.LT); assert.deepEqual(drain(), keyTaps('KeyW'), 'a short LT tap with no skill is Swap Weapons');
+  down(B.LT); tap(B.X); up(B.LT); assert.deepEqual(drain(), [], 'LT with a skill button is the second set, never a swap');
   settle();
 });
 
@@ -69,20 +68,19 @@ test('belt/potion buttons: the d-pad is belt 1-4 clockwise from Up', () => {
   for (const [b, n] of [[B.UP, 1], [B.RIGHT, 2], [B.DOWN, 3], [B.LEFT, 4]]) { tap(b); assert.deepEqual(drain(), keyTaps(`Digit${n}`)); }
 });
 
-test('shoulders and sticks: RB is Shift on a click, LB holds Show Items, R3 swaps, L3 toggles run on a press', () => {
-  down(B.LB); assert.deepEqual(drain(), ['keydown:AltLeft']);
-  up(B.LB); assert.deepEqual(drain(), ['keyup:AltLeft']);
-  tap(B.R3); assert.deepEqual(drain(), keyTaps('KeyW'));
+test('sticks: L3 toggles run on a press; R3 with nothing in reach uses nothing', () => {
+  tap(B.R3); assert.deepEqual(drain(), []);
   down(B.L3); up(B.L3); assert.deepEqual(drain(), keyTaps('KeyR'), 'one L3 press toggles run');
   settle();
 });
 
-test('Start is Escape; Back tapped is the automap; Back held banks the panel keys and the tap then does nothing', () => {
-  tap(B.START); assert.deepEqual(drain(), keyTaps('Escape'));
-  tap(B.BACK); assert.deepEqual(drain(), keyTaps('Tab'));
-  down(B.BACK); tap(B.UP); tap(B.LEFT); tap(B.RIGHT); tap(B.DOWN);
-  assert.deepEqual(drain(), [...keyTaps('KeyI'), ...keyTaps('KeyC'), ...keyTaps('KeyT'), ...keyTaps('KeyQ')]);
-  up(B.BACK); assert.deepEqual(drain(), [], 'releasing a chord Back is not an automap tap');
+test('Start opens the panel list (d-pad steps, A opens, B closes); Back opens the skill wheel, never the automap', () => {
+  tap(B.START); assert.equal(globalThis.__d2PadSkills.uiMode, 'strip');
+  tap(B.DOWN); tap(B.A); assert.deepEqual(drain(), keyTaps('KeyI'), 'the second entry is the Inventory');
+  assert.equal(globalThis.__d2PadSkills.uiMode, 'none');
+  tap(B.START); tap(B.B); assert.deepEqual(drain(), []);
+  assert.equal(globalThis.__d2PadSkills.uiMode, 'none');
+  tap(B.BACK); assert.deepEqual(drain(), [], 'no Tab');
   settle();
 });
 
@@ -128,18 +126,19 @@ test('a disconnected pad stops all events and reports disconnected', () => {
   Object.defineProperty(globalThis, 'navigator', { value: { getGamepads: was }, configurable: true });
 });
 
-test('a pad reporting mapping "" (Retroid): Back toggles the automap, L3 toggles run, Start is only Escape', async () => {
+test('a pad reporting mapping "" (Retroid): L3 toggles run, Start and Back send no key of their own in the world', async () => {
   const { pickPad } = await import('../play/assets/pad-pick.mjs');
   const raw = { index: 0, id: 'Retroid Pocket Controller', mapping: '', connected: true, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false })) };
   assert.equal(pickPad([raw]), raw);
   drain();
-  tap(B.BACK); assert.deepEqual(drain(), keyTaps('Tab'));
   tap(B.L3); assert.deepEqual(drain(), keyTaps('KeyR'));
-  tap(B.START); assert.deepEqual(drain(), keyTaps('Escape'));
+  tap(B.START); tap(B.START); assert.deepEqual(drain(), []);
+  tap(B.BACK); assert.deepEqual(drain(), []);
 });
 
-test('R3 press swaps weapons once; holding it adds nothing (D2R opens an emote wheel there; the client has none, so it needs UI)', () => {
+test('an LT tap swaps weapons once; LT held past the tap time swaps nothing', () => {
   drain();
-  down(B.R3); for (let i = 0; i < 20; i++) wait(50); up(B.R3);
-  assert.deepEqual(drain(), keyTaps('KeyW'));
+  down(B.LT); for (let i = 0; i < 20; i++) wait(50); up(B.LT);
+  assert.deepEqual(drain(), []);
+  tap(B.LT); assert.deepEqual(drain(), keyTaps('KeyW'));
 });

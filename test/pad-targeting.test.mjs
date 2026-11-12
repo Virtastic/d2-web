@@ -44,12 +44,17 @@ test('cycling wraps through the ranked list', () => {
   assert.deepEqual([0, 1, 2, -1].map((n) => pickTarget(r, n).id), [2, 3, 2, 3]);
 });
 
-test('pad: A clicks the cone target, the right stick points at another, B with nothing casts ahead', async () => {
+test('pad: A (Attack) hits the cone target, the right stick points at another, RB with nothing casts ahead', async () => {
   const s = snap({ entities: [mon(2, 3, 0), mon(3, 6, 0)] });
-  await install({ screen: 'game', uiTargets: () => ({}), snapshot: s, project, controlCodeFor: () => null });
+  // A sheet seeded from the hands and one hotkey: RT the left skill, RB the right one, A the Attack hotkey.
+  const selected = { left: 96, right: 101 }, selects = [];
+  await install({ screen: 'game', uiTargets: () => ({}), snapshot: s, project, controlCodeFor: () => null,
+    selectedSkills: selected, selectSkill: (id, side) => { selects.push(`${id} ${side}`); selected[side] = id; },
+    padSkills: { name: 'Cone', choices: [{ id: 0, leftSkill: true }, { id: 96, leftSkill: true }, { id: 101 }], hotkeys: [{ skill: 0 }], inTown: false } });
   poll(); drain();
   tap(B.A);
   assert.deepEqual(drain(), ['pointermove:430.5,300.5', 'pointerdown:430.5,300.5', 'pointerup:430.5,300.5']);
+  assert.deepEqual(selects, ['0 left'], 'Attack goes into the left hand first');
   // The pointer starts at the last target clicked; two full-deflection polls move it 28 px right, to the second monster's
   // side, and A clicks at the pointer, not at the picker's target.
   pad.axes[2] = 1; poll(); poll(); pad.axes[2] = 0; poll();
@@ -60,6 +65,7 @@ test('pad: A clicks the cone target, the right stick points at another, B with n
   s.entities.length = 0; poll(); drain();
   tap(B.A);
   assert.deepEqual(drain(), [], 'A with nothing in reach is consumed');
-  tap(B.B);
-  assert.deepEqual(drain().filter((e) => e.startsWith('pointerdown')), ['pointerdown:400.5,460.5'], 'B casts at the ground ahead');
+  tap(B.RB);
+  assert.deepEqual(drain().filter((e) => e.startsWith('pointerdown')), ['pointerdown:400.5,460.5'], 'RB casts the right skill at the ground ahead');
+  assert.deepEqual(selects, ['0 left'], 'the right skill was already in its hand');
 });

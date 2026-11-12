@@ -7101,6 +7101,9 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
   // Both hands, straight from the engine's own record: a row that proves `S` picked the RIGHT
   // selector has to be able to say the left hand did not move (F3c).
   get selectedSkills() { return readSelectedSkills(); },
+  // The controller's skill buttons (pad-skill-play.mjs): the character, its skill choices, its F-key hotkeys and whether it stands in town.
+  get padSkills() { const view = clientView(); return { name: chosenName, choices: readSkillChoices(), hotkeys: Array.from({ length: 16 }, (_, i) => ({ skill: Number(view.hotkeySkill(i)), left: Boolean(view.hotkeyHand(i)) })), inTown: TOWN_LEVELS.includes(realmWorldView?.mapLevel ?? snapshot?.level),
+    skillName: (id) => { try { const i = readSkillStrings(id)?.name; return i ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) : ''; } catch { return ''; } } }; },
   // Retail's ClearScreen state (CfgClearScreen, `Space`). The row reads it to know which frame it is
   // looking at; what it ASSERTS is the frame itself.
   get clearScreen() { return clearScreen; },

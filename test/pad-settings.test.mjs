@@ -10,6 +10,8 @@ performance.now = () => t;
 const wait = (ms) => { t += ms; poll(); };
 const shell = { screen: 'game', uiTargets: () => ({}), snapshot: { player: { x: 0, y: 0, hpMax: 100 } }, project: () => [400, 300], controlCodeFor: () => null };
 await install(shell);
+// An open inventory: the old shoulder and Back banks still hold over panels; the world is the skill sheet's.
+const panelUp = () => ({ inventoryGrid: { i1: [500, 300] } });
 
 test('run toggle: one L3 press toggles once, on the press; holding does not repeat', () => {
   drain();
@@ -28,16 +30,16 @@ test('createRunToggle alone, no DOM', () => {
   assert.deepEqual([r.fire(true), r.fire(true), r.fire(false), r.fire(true)], [true, false, false, true]);
 });
 
-test('R3 swaps weapons; LB held shows items; the panel bank is Back held, and LB inside it is Clear Screen', () => {
+test('over a panel: LB held shows items; the panel bank is Back held, and LB inside it is Clear Screen', () => {
+  shell.uiTargets = panelUp;
   drain();
-  down(B.R3); up(B.R3);
-  assert.deepEqual(drain(), keyTaps('KeyW'));
   down(B.LB); up(B.LB);
   assert.deepEqual(drain(), ['keydown:AltLeft', 'keyup:AltLeft']);
   down(B.BACK); down(B.LB); up(B.LB); up(B.BACK);
   assert.deepEqual(drain(), keyTaps('Space'), 'no Alt, no automap');
   down(B.BACK); up(B.BACK);
   assert.deepEqual(drain(), keyTaps('Tab'), 'a lone Back tap is the automap, sent on release');
+  shell.uiTargets = () => ({});
 });
 
 test('adjustAxes: deadzone zeroes, sensitivity scales and clamps, swap exchanges the sticks', () => {
@@ -92,7 +94,8 @@ test('a stick under the stored deadzone does not walk; over it, it does; swapped
   pad.axes[0] = 0; poll();
 });
 
-test('latch setting: LB press toggles Alt on and off; a held LB does not; a chord with Back does not latch', () => {
+test('latch setting (over a panel): LB press toggles Alt on and off; a held LB does not; a chord with Back does not latch', () => {
+  shell.uiTargets = panelUp; poll();
   globalThis.__d2PadSettings.set({ latchItems: true, autoGold: false });
   drain();
   down(B.LB); up(B.LB);
@@ -106,4 +109,5 @@ test('latch setting: LB press toggles Alt on and off; a held LB does not; a chor
   assert.deepEqual(drain(), ['keydown:AltLeft']);
   up(B.LB);
   assert.deepEqual(drain(), ['keyup:AltLeft'], 'off again: hold behaviour');
+  shell.uiTargets = () => ({}); poll(); drain();
 });

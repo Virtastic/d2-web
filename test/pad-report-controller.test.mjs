@@ -27,12 +27,14 @@ test('the d-pad hat moves the belt: a direction is one belt press, and a hat tha
   assert.deepEqual(set(hat(0, 0)), []);
 });
 
-test('an analog trigger on axis 4: a light pull does nothing, a full pull holds LT (bank: X is skill 1)', () => {
+test('an analog trigger on axis 4: a light pull does nothing, a full-pull tap swaps weapons, a full pull with X is no swap', () => {
   assert.deepEqual(set([0, 0, 0, 0, 0.3, 0, 0, 0]), [], 'under half travel');
-  assert.deepEqual(set([0, 0, 0, 0, 0, 0, 0, 0]), []);
-  assert.deepEqual(set([0, 0, 0, 0, 1, 0, 0, 0]), [], 'a full pull holds LT; LT alone sends nothing');
+  assert.deepEqual(set([0, 0, 0, 0, 0, 0, 0, 0]), [], 'a light pull is no tap');
+  assert.deepEqual(set([0, 0, 0, 0, 1, 0, 0, 0]), [], 'a full pull holds LT; LT alone sends nothing yet');
+  assert.deepEqual(set([0, 0, 0, 0, 0, 0, 0, 0]), keyTaps('KeyW'), 'let go at once: Swap Weapons');
+  set([0, 0, 0, 0, 1, 0, 0, 0]);
   pad.buttons[2].pressed = true; poll();
-  assert.deepEqual(drain(), keyTaps('F1'), 'X with LT held is skill 1');
-  pad.buttons[2].pressed = false; poll(); drain();
-  assert.deepEqual(set([0, 0, 0, 0, 0, 0, 0, 0]), [], 'released');
+  pad.buttons[2].pressed = false; poll();
+  assert.deepEqual(set([0, 0, 0, 0, 0, 0, 0, 0]), [], 'X during the pull: the second skill set, never a swap');
+  drain();
 });

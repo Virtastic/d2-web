@@ -25,14 +25,14 @@ test('keyNameForCode names a rebound code or returns empty', () => {
   assert.deepEqual(['KeyJ', 'Digit7', 'F9', 'Space', 'Numpad5'].map(keyNameForCode), ['j', '7', 'F9', ' ', '']);
 });
 
-test('a rebound skill key presses its own key name; an unknown code presses nothing', () => {
+test('a rebound key (Swap Weapons, an LT tap) presses its own key name; an unknown code presses nothing', () => {
   poll(); drain();
   rebound = 'KeyJ';
-  down(B.X); up(B.X);
+  down(B.LT); up(B.LT);
   const ev = events();
   assert.deepEqual(ev, ['keydown:KeyJ:j', 'keyup:KeyJ:j']);
   rebound = 'Numpad5';
-  down(B.X); up(B.X);
+  down(B.LT); up(B.LT);
   assert.deepEqual(events(), []);
   rebound = null;
 });

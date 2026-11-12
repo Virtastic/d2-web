@@ -39,6 +39,9 @@ import { adjustedPad, createRunToggle, createSettings, createSettingsPanel } fro
 import { pickPad } from './pad-pick.mjs';
 import { createReportReader } from './pad-report.mjs';
 import { backAction, CHAT_ROWS, chatCellCode, padLayout, hintLine } from './pad-menus.mjs';
+import { makeSkillMapper } from './pad-skill-mapper.mjs';
+import { makeSkillPlay } from './pad-skill-play.mjs';
+import { createSkillOverlay } from './pad-skill-overlay.mjs';
 
 const POLL_MS = 50;          // setInterval, never requestAnimationFrame -- see header
 const MENU_REPEAT_FIRST_MS = 400; // menus and typed-field grids; item-grid panels keep makeRepeater's 300
@@ -58,7 +61,7 @@ const FN = {
   quest: ['Quest Log', 'KeyQ', 'q'], message: ['Message Log', 'KeyM', 'm'], hireling: ['Hireling Screen', 'KeyO', 'o'], help: ['Help Screen', 'KeyH', 'h'],
   swap: ['Swap Weapons', 'KeyW', 'w'], rightSkill: ['Skill Speed Bar', 'KeyS', 's'], showBelt: ['Show Belt', 'Backquote', '`'],
   chat: ['Chat', 'Enter', 'Enter'], clear: ['Clear Screen', 'Space', ' '], automap: ['Automap', 'Tab', 'Tab'], run: ['Toggle Run/Walk', 'KeyR', 'r'],
-  showItems: ['Show Items', 'AltLeft', 'Alt'],
+  showItems: ['Show Items', 'AltLeft', 'Alt'], party: ['Party Screen', 'KeyP', 'p'],
 };
 for (let n = 1; n <= 8; n++) FN[`skill${n}`] = [`Skill ${n}`, `F${n}`, `F${n}`];
 // D-pad direction to belt slot, clockwise from Up.
@@ -396,6 +399,31 @@ function start() {
     const shown = code === def ? keyName : keyNameForCode(code);
     if (shown) tapKey(code, shown);
   };
+  // The skill buttons (pad-skill-*.mjs) own the world: they reach the game only through these events.
+  const skillMapper = makeSkillMapper(), skillOverlay = createSkillOverlay(viewport, OVERLAY_FONT);
+  const skillPlay = makeSkillPlay({ io: {
+    selectSkill: (id, side) => globalThis.__d2Shell?.selectSkill?.(id, side),
+    pointer: (type, x, y, o) => pointer(canvas, type, x, y, { button: o.button, shiftKey: o.shiftKey }),
+    fnKey: (name) => (name === 'escape' ? tapKey('Escape', 'Escape') : fnKey(name)),
+    keyHold: (name, down) => { const [label, def, keyName] = FN[name]; const code = globalThis.__d2Shell?.controlCodeFor?.(label) ?? def; key(code, code === def ? keyName : keyNameForCode(code), down); },
+  } });
+  window.__d2PadSkills = skillPlay;
+  // One poll of the skill buttons: who is in reach, the character's skills, then the mapped actions.
+  function runSkills(shell, act, origin, field, pad) {
+    const lx = pad.axes[0] || 0, ly = pad.axes[1] || 0;
+    if (field && Math.hypot(lx, ly) > 0) state.aim = [lx, ly];
+    const snap = shell?.snapshot, open = skillPlay.uiMode !== 'none';
+    const ranked = field && snap?.player && shell.project ? rankTargets(snap, { aim: state.aim, project: shell.project }) : [];
+    const known = field || open ? shell?.padSkills || {} : {};
+    // With retail's pointer out (the right stick), A and B click where it is, so they cast nothing.
+    if (state.free) act = { ...act, slot: act.slot > 1 ? act.slot : -1, slotDown: act.slotDown.map((d, i) => d && i > 1) };
+    const [ax, ay] = state.aim || [0, 1], len = Math.hypot(ax, ay) || 1;
+    const host = { ...known, selected: shell?.selectedSkills || { left: -1, right: -1 }, dead: snap?.mode === 0 || snap?.mode === 17,
+      ranked, hero: origin, ahead: origin && stickTarget(origin, ax / len, ay / len) };
+    skillPlay.step(host, act, { field });
+    skillOverlay.render(skillPlay, skillPlay.wheelIds(host), known.skillName || (() => ''));
+    return ranked;
+  }
 
   // The name grid is up exactly while retail's own name box is: the create screen with a class chosen.
   // Everything about it is polled, so the shared shell file needs no hook (input-touch.mjs's issue 8 input
@@ -527,6 +555,9 @@ function start() {
     // for. Character creation's class list is now a panel too (G17); title, select, escape and NPC
     // menus were already covered by G16.
     const cursorMode = !fieldOpen && !panel && !worldMode;
+    // The skill buttons own the world, and their wheel and panel list wherever they are open.
+    const skillUi = skillPlay.uiMode, skillOwns = worldMode || skillUi !== 'none';
+    const skillAct = skillMapper(pad, { ui: skillUi, field: worldMode && skillUi === 'none', seconds: POLL_MS / 1000 });
 
     // Right stick: the pre-D2R free cursor, now only live where D2R has not specified a road yet (G1
     // as built before 2026-09-28 -- see ). Off in the world (D2R has no free cursor
@@ -577,14 +608,14 @@ function start() {
       const ltHeld = Boolean(pad.buttons[BUTTON.LT]?.pressed);
       // Select pressed while LT is held is the Skill Speed Bar; that press is then neither an automap tap nor the
       // backup bank, for as long as Select stays down.
-      if (rawEdge(pad, BUTTON.BACK) && ltHeld && inGame) { fnKey(LT_BANK[BUTTON.BACK]); state.backUsed = true; state.ltBankBack = true; }
-      const backHeld = Boolean(pad.buttons[BUTTON.BACK]?.pressed) && !state.ltBankBack;
+      if (rawEdge(pad, BUTTON.BACK) && ltHeld && inGame && !skillOwns) { fnKey(LT_BANK[BUTTON.BACK]); state.backUsed = true; state.ltBankBack = true; }
+      const backHeld = !skillOwns && Boolean(pad.buttons[BUTTON.BACK]?.pressed) && !state.ltBankBack;
       if (backHeld) {
         for (const button of Object.keys(MENU_BANK).map(Number)) {
           masked.add(button);
           if (rawEdge(pad, button)) { fnKey(MENU_BANK[button]); state.backUsed = true; }
         }
-      } else if (ltHeld) {
+      } else if (ltHeld && !skillOwns) {
         SKILL_BUTTONS.forEach((button) => masked.add(button));
         if (inGame) for (const button of DPAD_BANK) {
           masked.add(button);
@@ -594,16 +625,17 @@ function start() {
 
       // The right stick moves retail's own pointer anywhere in the game; A and B then click where it is. The left
       // stick (walking, or stepping a panel) or a d-pad step in a panel gives the pad back to the picker / the highlight.
-      const pointerStick = Math.hypot(pad.axes[2] || 0, pad.axes[3] || 0) > 0;
+      const pointerStick = skillUi === 'none' && Math.hypot(pad.axes[2] || 0, pad.axes[3] || 0) > 0;
       const leftStick = Math.hypot(pad.axes[0] || 0, pad.axes[1] || 0) > 0;
       const dpadStep = Boolean(panel) && [BUTTON.DPAD_UP, BUTTON.DPAD_DOWN, BUTTON.DPAD_LEFT, BUTTON.DPAD_RIGHT].some((b) => pad.buttons[b]?.pressed && !masked.has(b));
-      if (screenName !== 'game' || cursorMode) state.free = false;
+      if (screenName !== 'game' || cursorMode || skillUi !== 'none') state.free = false;
       else if (pointerStick) state.free = true;
       else if (state.free && (leftStick || dpadStep)) {
         state.free = false;
         if (panel) state.panelIndex = nearestIndex(panel, state.cursor.x, state.cursor.y);
       }
 
+      const skillRanked = skillOwns ? runSkills(shell, skillAct, origin, worldMode && skillUi === 'none', pad) : (skillPlay.releaseAll(), skillOverlay.hide(), []);
       if (state.free) {
         state.mode = 'pointer';
         state.worldTarget = null;
@@ -666,17 +698,11 @@ function start() {
           else click(canvas, cur.x, cur.y, { button: 2, shiftKey: state.shift });
         }
       } else if (worldMode) {
-        // D2R-style no-cursor targeting (G3): A/B dispatch a canvas click at the selected target's
-        // projected point through the shell's normal click path. This proves event routing only; it
-        // does not equate the controller's player-centered choice with F14 pointer-hover arbitration.
+        // D2R-style no-cursor targeting: the skill buttons above cast at the picked target through the
+        // shell's normal click path; this records the pick and keeps the opt-in gold pickup.
         state.mode = 'world';
         state.panelSig = null;
-        // The cone is centred on the left stick's last aim (screen space). The right stick no longer steps through
-        // the candidates: it is the pointer (above), which reaches any one of them directly.
-        const lx = pad.axes[0] || 0, ly = pad.axes[1] || 0;
-        if (Math.hypot(lx, ly) > 0) state.aim = [lx, ly];
-        const ranked = shell.snapshot?.player && shell.project ? rankTargets(shell.snapshot, { aim: state.aim, project: shell.project }) : [];
-        const picked = pickTarget(ranked, 0);
+        const picked = pickTarget(skillRanked, 0);
         const worldTarget = picked && { kind: picked.kind, id: picked.id, x: picked.x, y: picked.y, screen: picked.screen };
         state.worldTarget = worldTarget;
         // Opt-in: click a gold pile within reach, at most once per pile every 600 ms, never with an item held.
@@ -688,24 +714,8 @@ function start() {
             click(canvas, gx, gy, { button: 0 });
           }
         }
-        if (worldTarget) {
-          const [tx, ty] = worldTarget.screen;
-          state.cursor.x = tx; state.cursor.y = ty; placeCursor(); cursorEl.style.display = 'none';   // no white ring over the world target
-          const aEdge = edge(pad, BUTTON.A), bEdge = edge(pad, BUTTON.B);
-          if (aEdge) click(canvas, tx, ty, { button: 0, shiftKey: state.shift });
-          if (bEdge) click(canvas, tx, ty, { button: 2, shiftKey: state.shift });
-          holdWorld(ranked, aEdge, bEdge, worldTarget, null);
-        } else {
-          // Nothing in the cone: no target is shown. B casts the right-hand skill at the ground ahead
-          // (the aim, or straight down the screen) as a mouse user clicks empty ground; A has no
-          // left-hand ground attack to reach (see the hand-back note), so its edge is consumed so a
-          // target that appears on the NEXT poll does not fire on a stale press.
-          cursorEl.style.display = 'none';
-          edge(pad, BUTTON.A);
-          const bEdge = edge(pad, BUTTON.B), ahead = origin && stickTarget(origin, ...(state.aim || [0, 1]));
-          if (bEdge && ahead) click(canvas, ahead[0], ahead[1], { button: 2, shiftKey: state.shift });
-          holdWorld(ranked, false, bEdge, null, ahead);
-        }
+        if (worldTarget) { state.cursor.x = worldTarget.screen[0]; state.cursor.y = worldTarget.screen[1]; placeCursor(); }
+        cursorEl.style.display = 'none';   // no white ring over the world target
       } else {
         // The pre-D2R free cursor, for every screen the D2R research has not specified yet (title,
         // character select, the escape menu, the NPC menu).
@@ -718,12 +728,13 @@ function start() {
       if (state.mode !== 'world') { applyHold(holds.a.release(), 0); applyHold(holds.b.release(), 2); }
 
       // D-pad: the four belt slots, only while no snap panel has claimed the d-pad for navigation above.
-      if (!panel) {
+      if (!panel && skillUi === 'none') {
         for (const [button, name] of Object.entries(DPAD_BELT)) if (edge(pad, Number(button))) fnKey(name);
       }
       // X / Y / RT: skills 1-3; with LT held, 4-6 (the masked press is read raw below).
       const lt = Boolean(pad.buttons[BUTTON.LT]?.pressed) && !backHeld;
       SKILL_BUTTONS.forEach((button, i) => {
+        if (skillOwns) { rawEdge(pad, button); return; }
         if (button === BUTTON.RB && !worldMode && !skillPopup) return;
         if (button === BUTTON.RB && backHeld) return;
         if (lt ? rawEdge(pad, button) : edge(pad, button)) fnKey(`skill${(lt ? SKILL_LT : SKILL_NORMAL)[i]}`);
@@ -731,7 +742,7 @@ function start() {
       // L3: run/walk. R3: swap weapons (D2R's default). LB held: Show Items (down for as long as it is held).
       rawEdge(pad, BUTTON.L3);
       if (runToggle.fire(screenName === 'game' && Boolean(pad.buttons[BUTTON.L3]?.pressed) && !masked.has(BUTTON.L3), performance.now())) fnKey('run');
-      const lbDown = Boolean(pad.buttons[BUTTON.LB]?.pressed) && !backHeld;
+      const lbDown = !skillOwns && Boolean(pad.buttons[BUTTON.LB]?.pressed) && !backHeld;
       const latch = settings.get().latchItems;
       if (rawEdge(pad, BUTTON.LB) && lbDown && latch) state.itemsLatched = !state.itemsLatched;
       if (!latch) state.itemsLatched = false;
@@ -743,12 +754,13 @@ function start() {
         key(code, code === def ? keyName : '', r3);
       }
       // In a snap panel R3 is the belt fill above; the edge is still consumed so closing the panel cannot swap.
-      if (edge(pad, BUTTON.R3) && !panel) fnKey('swap');
+      if (edge(pad, BUTTON.R3) && !panel && !skillOwns) fnKey('swap');
     }
-    if (edge(pad, BUTTON.START)) { if (pad.buttons[BUTTON.BACK]?.pressed) { state.backUsed = true; settingsPanel.toggle(true); } else tapKey('Escape'); }
+    if (edge(pad, BUTTON.START)) { if (pad.buttons[BUTTON.BACK]?.pressed) { state.backUsed = true; settingsPanel.toggle(true); } else if (!skillOwns) tapKey('Escape'); }
     // Back is the automap when tapped; held, it is the panel bank's chord key, and releasing it then does nothing.
     const backNow = Boolean(pad.buttons[BUTTON.BACK]?.pressed);
     if (backNow && !state.backWas && !state.ltBankBack) state.backUsed = false;
+    if (backNow && skillOwns) state.backUsed = true;   // in the world Back is the skill wheel, never the automap
     if (!backNow && state.backWas && !state.backUsed) fnKey('automap');
     if (!backNow) state.ltBankBack = false;
     state.backWas = backNow;
