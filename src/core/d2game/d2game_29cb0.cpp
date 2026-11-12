@@ -20,8 +20,8 @@ struct D2Game29CB0Env {
 void D2GAME_ClientEvent_29CB0(const uint8_t* msg, const D2Game29CB0Env* e)
 {
     if (!e->tablePresent) return;
-    uint8_t f[0x290] = {};
-    auto A = [&](int n) { return f + (0x28c - n); };
+    uint8_t f[0x2a0] = {};   // from A(0x29c): the 16-byte notice packet sits below the reply buffer A(0x28c)
+    auto A = [&](int n) { return f + (0x29c - n); };
     auto cp = [&](int d, int s, int n = 4) { std::memmove(A(d), A(s), n); };
     auto r32 = [&](int n) { int32_t v; std::memcpy(&v, A(n), 4); return v; };
     auto w32 = [&](int n, int32_t v) { std::memcpy(A(n), &v, 4); };
@@ -29,41 +29,41 @@ void D2GAME_ClientEvent_29CB0(const uint8_t* msg, const D2Game29CB0Env* e)
     switch (msg[5]) {
     case 1: case 0xfd: {
         if (!e->slot30Present || !e->slot10) return;
-        e->slot30(f);
+        e->slot30(A(0x28c));
         *A(0x168) = msg[5];
         cp(0x167, 0x27c); cp(0x163, 0x278); cp(0x15f, 0x274); cp(0x15b, 0x270); cp(0x157, 0x26c);
         cp(0x153, 0x268); cp(0x14f, 0x264); cp(0x14b, 0x260); cp(0x147, 0x25c); cp(0x143, 0x258);
         e->strCopy(A(0x13f), A(0x254), 0x80);
-        cp(0xcb, 0x1e0);
-        int32_t a1dc = r32(0x1dc), a1d8 = r32(0x1d8), a1d0 = r32(0x1d0), a1cc = r32(0x1cc);
+        cp(0xbf, 0x1d4);
+        int32_t a1d0 = r32(0x1d0), a1cc = r32(0x1cc), a1c4 = r32(0x1c4), a1c0 = r32(0x1c0);
         int32_t cnt = *e->counter;
-        w32(0x69, a1dc); w32(0x65, a1d8); w32(0x61, a1d0 - cnt);
-        w32(0xc7, a1d8 + a1dc); cp(0xc3, 0x1d4); w32(0x5d, a1cc);
-        cp(0xbb, 0x1c8); cp(0xb7, 0x19c); w32(0xbf, a1cc + (a1d0 - cnt));
-        cp(0xb3, 0x198, 32);
-        cp(0x93, 0x178); cp(0x8f, 0x1c4); cp(0x8b, 0x1c0); cp(0x87, 0x1bc); cp(0x83, 0x1b8);
-        cp(0x7f, 0x1b4, 2); cp(0x7d, 0x1b2); cp(0x79, 0x1ae); cp(0x75, 0x1aa); cp(0x71, 0x1a6); cp(0x6d, 0x1a2);
-        std::memset(A(0x59), 0, 0x4a);  // 18 dwords + 1 word, ends at the packet tail (0x165 bytes from A(0x174))
-        e->send(2, id, A(0x174), *A(0x174) == 1 ? 0x165 : 0xbd);
+        w32(0x5d, a1d0); w32(0x59, a1cc); w32(0x55, a1c4 - cnt);
+        w32(0xbb, a1cc + a1d0); cp(0xb7, 0x1c8); w32(0x51, a1c0);
+        cp(0xaf, 0x1bc); cp(0xab, 0x190); w32(0xb3, a1c0 + (a1c4 - cnt));
+        cp(0xa7, 0x18c, 32);
+        cp(0x87, 0x16c); cp(0x83, 0x1b8); cp(0x7f, 0x1b4); cp(0x7b, 0x1b0); cp(0x77, 0x1ac);
+        cp(0x73, 0x1a8, 2); cp(0x71, 0x1a6); cp(0x6d, 0x1a2); cp(0x69, 0x19e); cp(0x65, 0x19a); cp(0x61, 0x196);
+        std::memset(A(0x4d), 0, 0x4a);  // 18 dwords + 1 word, ends at the packet tail (0x165 bytes from A(0x168))
+        e->send(2, id, A(0x168), *A(0x168) == 1 ? 0x165 : 0xbd);
         return;
     }
     case 0xfa:
         e->mode(id, A(0x28c));
-        *A(0x28c) = 0xfa;   // 1.13c D2Game+0x29CB0: the reply's first byte (mov [esp+0x18], imm8 before the send)
+        *A(0x29c) = 0xfa;   // 1.13c D2Game+0x29CB0: the sent packet is its own 16 bytes below the reply, only the type byte set
         __atomic_add_fetch(e->counter, 1, __ATOMIC_SEQ_CST);
-        e->send(2, id, A(0x28c), 0x10);
+        e->send(2, id, A(0x29c), 0x10);
         return;
     case 0xfb:
         e->mode(id, A(0x28c));
-        *A(0x28c) = 0xfb;   // 1.13c D2Game+0x29CB0: the reply's first byte (mov [esp+0x18], imm8 before the send)
-        e->send(2, id, A(0x28c), 0x10);
+        *A(0x29c) = 0xfb;   // 1.13c D2Game+0x29CB0: the sent packet is its own 16 bytes below the reply, only the type byte set
+        e->send(2, id, A(0x29c), 0x10);
         e->close(id);
         __atomic_sub_fetch(e->counter, 1, __ATOMIC_SEQ_CST);
         return;
     case 0xfc:
         e->mode(id, A(0x28c));
-        *A(0x28c) = 0xfc;   // 1.13c D2Game+0x29CB0: the reply's first byte (mov [esp+0x18], imm8 before the send)
-        e->send(2, id, A(0x28c), 0x10);
+        *A(0x29c) = 0xfc;   // 1.13c D2Game+0x29CB0: the sent packet is its own 16 bytes below the reply, only the type byte set
+        e->send(2, id, A(0x29c), 0x10);
         return;
     }
 }
