@@ -445,7 +445,8 @@ struct H6cc00 { uint32_t (*ord10013)(); uint32_t (*ord10175)(); void (*ord10350)
 extern "C" int d2_client_6cc00(uint32_t, uint32_t, const H6cc00*, uint32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t);
 // D2Client+0x666D0 for a staged unit node. The unit is a host struct: type @+0, class @+4, iso px from the stage (sx,sy subtiles), and the COF chain 6C490 walks is
 // ends in the unit's staged COF header (d2_dg_stage_unit_cof: layers and box; without one, 8 layers for the player, 1 otherwise, empty box). Callees not ported answer 0; 0x66620 answers 1.
-// ecx/edx on 10013 are leftovers: edx is the one a 10069 left behind, read once. 10041's edx is the y it drew at.
+// ecx/edx on 10013 are leftovers: edx is the one a 10069 left behind, read once; ecx after a 10069 is the renderer's (D2Gfx 0xBAF0 returns through its
+// interface slot +0xA4), which the capture reads as 0. 10041's edx is the y it drew at.
 static int32_t g_vx, g_vy;   // ctx+0x24/+0x28, the view origin (iso px)
 static uint32_t g_hu[0x80], g_hinfo[0x10], g_hnode[8], g_hx[8], g_hhdr[6];
 static int32_t g_hpx, g_hpy; static uint32_t g_hself;
@@ -605,7 +606,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
     g_uox = g_vx; g_uoy = g_vy + 16;
     for (uint32_t i = 0; i < g_nUnits; i++) if (g_units[i].type == 0) { int32_t X, Y; clientXY(g_units[i], &X, &Y); g_uox = X - 640 / 2; g_uoy = Y - 480 / 2 + 16; break; }
     D2ClientCellWalk9f270Env w{0, unit666d0, []() -> uint32_t { return rec10013(); }, unit6ba90,
-        [](uint32_t, int32_t x, int32_t y, uint32_t m, uint32_t arg) { g_ledx = x > 0 ? x : 0; gRec(10069, {0x100000u, (uint32_t)x, (uint32_t)y, m, arg}, 0, g_ledx); }, [](uint32_t room, uint32_t mode, uint32_t) {
+        [](uint32_t, int32_t x, int32_t y, uint32_t m, uint32_t arg) { g_ledx = x > 0 ? x : 0; g_lecx = 0; gRec(10069, {0x100000u, (uint32_t)x, (uint32_t)y, m, arg}, 0, g_ledx); }, [](uint32_t room, uint32_t mode, uint32_t) {
             static const uint32_t z[1024] = {};
             D2Client9E970Env e{0, 0, z, z, z, 0, 0, 0, 0, []() -> uint32_t { gRec(10013, {}, 0, g_ledx); g_ledx = 0; return g_r13; }, []() -> uint32_t { return g_now; }, [](uint32_t) {},
                 [](uint32_t, uint8_t* o) -> uint32_t { o[0] = o[1] = o[2] = o[3] = 0; return 0; },
