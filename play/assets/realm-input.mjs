@@ -59,6 +59,7 @@ export const packets = Object.freeze({
   beltSwap: (cursorGuid, beltGuid) => make(0x25, le32(cursorGuid), le32(beltGuid)),   // 9
   dropGold: (playerGuid, amount) => make(0x50, le32(playerGuid), le32(amount)),   // 9: D2Client 0x14910's [0x50][player guid][amount]
   filmEnd: () => make(0x48),                                        // 1
+  questLogRequest: () => make(0x40),                                // 1: D2Client 0x1E940's opening tick ends with 0x14A30(0x40)
 });
 
 // D2Client+0x143E0: the one outgoing-packet gate.  A packet equal to the last one sent, inside its
@@ -455,6 +456,9 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     dropGold: (playerGuid, amount) => (amount > 0 ? emit(packets.dropGold(playerGuid >>> 0, amount >>> 0), 'drop-gold') : false),
     /** The film the server asked for (0x61) is over or was not shown: the server's busy mark for the player is lifted (1.13c D2Client 0x899A0 ends with the 1-byte 0x48). */
     filmEnd: () => emit(packets.filmEnd(), 'film-end'),
+    /** The quest log opened: ask the server for the hero's quest record (its 0x40 handler answers with the 0x28 kind 6 and the 0x52
+     *  log states). Without it the client keeps the record of the last NPC talk, so a quest finished since reads as unfinished. */
+    questLogOpened: () => emit(packets.questLogRequest(), 'quest-log'),
     /** After the server has opened a menu: the waypoint list and a town-portal choice. */
     waypoint: (guid, levelId) => emit(packets.waypoint(guid, levelId), 'waypoint'),
     enterPortal: (guid, levelId) => emit(packets.enterPortal(guid, levelId), 'portal'),

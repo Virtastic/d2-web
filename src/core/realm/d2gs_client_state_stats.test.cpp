@@ -22,15 +22,25 @@ D2StatListStrc* __stdcall STATLIST_GetStatListFromUnitAndState(D2UnitStrc* u, in
     auto it = g_lists.find({u, s});
     return it == g_lists.end() ? nullptr : reinterpret_cast<D2StatListStrc*>(it->second);
 }
-D2StatListStrc* __stdcall STATLIST_AllocStatList(void*, uint32_t, uint32_t, int, D2UnitGUID) {
+// Retail's client allocates the state's list with flags 0 and posts it with full propagation (1).
+D2StatListStrc* __stdcall STATLIST_AllocStatList(void*, uint32_t flags, uint32_t, int, D2UnitGUID) {
+    assert(flags == 0);
     g_pending = new FakeList();
     return reinterpret_cast<D2StatListStrc*>(g_pending);
 }
 static int g_pendingState = -1;
 void __stdcall STATLIST_SetState(D2StatListStrc*, int s) { g_pendingState = s; }
-void __stdcall D2COMMON_10475_PostStatToStatList(D2UnitStrc* u, D2StatListStrc*, BOOL) {
+void __stdcall D2COMMON_10475_PostStatToStatList(D2UnitStrc* u, D2StatListStrc*, BOOL propagate) {
+    assert(propagate == TRUE);
     g_lists[{u, g_pendingState}] = g_pending;
 }
+// The anim-rate refresh a velocity stat triggers, and an ItemStatCost table with velocity flagged.
+static std::map<D2UnitStrc*, int> g_animRate;
+void __stdcall UNITS_UpdateAnimRateAndVelocity(D2UnitStrc* u, const char*, int) { ++g_animRate[u]; }
+static D2ItemStatCostTxt g_isc[STAT_VELOCITYPERCENT + 1];
+alignas(16) static uint8_t g_tablesMem[sizeof(D2DataTablesStrc)]; // raw: its constructor needs D2Lang
+static D2DataTablesStrc& g_tables = *reinterpret_cast<D2DataTablesStrc*>(g_tablesMem);
+D2DataTablesStrc* sgptDataTables = &g_tables;
 int __stdcall STATLIST_GetStatValue(D2StatListStrc* l, int id, uint16_t) {
     auto& m = reinterpret_cast<FakeList*>(l)->stats;
     auto it = m.find(id);
@@ -90,5 +100,15 @@ int main() {
     assert(g_allies[room] == 1);
     link(npc2, room); unlink(npc2); unlink(hero);
     assert(g_allies[room] == 0);
+
+    // A velocity stat (Vigor, Holy Freeze's slow) refreshes the unit's walk speed; alignment does not.
+    g_tables.pItemStatCostTxt = g_isc;
+    g_tables.nItemStatCostTxtRecordCount = STAT_VELOCITYPERCENT + 1;
+    g_isc[STAT_VELOCITYPERCENT].dwItemStatFlags = ITEMSTATCOSTFLAG_UPDATEANIMRATE;
+    const D2RealmClientStateStat slow{STAT_VELOCITYPERCENT, 0, -50};
+    assert(d2gs_client_apply_state_stats(hero, STATE_FREEZE, &slow, 1));
+    assert(g_animRate[hero] == 1);
+    assert(d2gs_client_apply_state_stats(npc, STATE_ALIGNMENT, &goodAlign, 1));
+    assert(g_animRate[npc] == 0);
     return 0;
 }
