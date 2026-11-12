@@ -245,7 +245,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_eca60(void* pGame, void* pU
 // skills, then writes hitpoints, mana, the three 100% rates and the next-experience threshold.
 // Finally a one-byte 0x97 packet goes out when the client's weapon switch is set. The 1.10f baseline
 // is the authority for the stat ids and the field offsets; the decompile fixes the order.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ecc90(void* pGame, void* pUnit, int32_t nHitpoints, int32_t nMana, int32_t nFirstSkillItem, const D2GameBatch53640Env* env) {  // 1.13c D2Game+0xECC90
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ECC90(void* pGame, void* pUnit, int32_t nHitpoints, int32_t nMana, int32_t nFirstSkillItem, const D2GameBatch53640Env* env) {  // 1.13c D2Game+0xECC90
     if (pUnit != nullptr && rd32u(pUnit, 0) == 0) {
         env->getPlayerData(pUnit);
     }

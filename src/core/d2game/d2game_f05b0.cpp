@@ -16,14 +16,15 @@ uint32_t rd32(uint32_t a) { uint32_t v; std::memcpy(&v, (const void*)(uintptr_t)
 uint32_t idOf(uint32_t u) { return u ? rd32(u + 0xC) : 0xFFFFFFFFu; }
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void D2Game_RelationSend(uint32_t a, uint32_t b, uint32_t game, const D2GameRelationSendEnv* e)
+// Returns EAX at exit as retail leaves it: the player data pointer when a == b (nothing overwrites it), else 0.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Game_RelationSend(uint32_t a, uint32_t b, uint32_t game, const D2GameRelationSendEnv* e)
 {
     const uint32_t pd = e->playerData(a);
     const uint32_t bid = idOf(b);
-    if (a == b) return;
+    if (a == b) return pd;
     uint32_t n = rd32(pd + 0x38);
     while (n && rd32(n) != bid) n = rd32(n + 0x10);
-    if (!n) return;
+    if (!n) return 0;
     uint8_t pkt[12] = {};
     const uint32_t aid = idOf(a);
     const uint16_t flags = (uint16_t)rd32(n + 4);
@@ -32,4 +33,5 @@ extern "C" EMSCRIPTEN_KEEPALIVE void D2Game_RelationSend(uint32_t a, uint32_t b,
     std::memcpy(pkt + 5, &bid, 4);
     std::memcpy(pkt + 9, &flags, 2);
     e->sendToAll(game, pkt);
+    return 0;
 }
