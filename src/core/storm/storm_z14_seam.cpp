@@ -1,11 +1,18 @@
 // Link seams for the z14 number/strans batch (callees not yet ported). The numeric ones below are reached by the string-to-double probes.
 #include <cstdint>
+#include "storm_batch_34d60.h"
 uint32_t z14_vtbl36848;
 // Last-error global and the strchr/strrchr pair for the z14 string helpers (their only definition; the probes reset and read it).
 uint32_t z14_lastErr;
 void z14_SetLastError(uint32_t) {}
-char* z14_Sub3B280(char*, char) { return nullptr; }
-char* z14_Sub3B2D0(char*, char) { return nullptr; }
+// Storm+0x3B280 / 0x3B2D0: the ported strrchr / strchr, their invalid-argument error landing in the same last-error global.
+static Storm34d60Env& z14_strEnv() {
+  static Storm34d60Env e{};
+  e.error = [](uint32_t c) { z14_lastErr = c; };
+  return e;
+}
+char* z14_Sub3B280(char* s, char c) { return Storm_Sub3B280(z14_strEnv(), s, c); }
+char* z14_Sub3B2D0(char* s, char c) { return Storm_Sub3B2D0(z14_strEnv(), s, c); }
 extern const uint32_t z14_tab35458[2] = {0, 0};
 // The string-to-double helpers' constants: 0.0, 0.0 and 2^32 (the unsigned-to-double correction), and the fraction-digit table
 // (21 places x 10 digits). Retail fills that table at start-up from an integer power whose negative exponents divide to 0, so every

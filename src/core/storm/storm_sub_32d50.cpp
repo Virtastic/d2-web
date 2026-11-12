@@ -14,6 +14,7 @@ struct Lzw {
     uint32_t *code, *key;          // the tables in use: the two SMemAlloc blocks (flag 8: zeroed) in Storm_Sub32D50
     uint32_t outn = 0;
     uint8_t buf[0x100 + 4] = {0};  // buf[0] = length, data from buf[1]
+    uint32_t codeAddr = 0;         // retail's 32-bit address of the code table (state +0x28), for the EAX a slot hit leaves
     Lzw() : cv(0x138b, 0), kv(0x138b, 0), code(cv.data()), key(kv.data()) {}
 };
 
@@ -40,20 +41,21 @@ void emit(Lzw& s, uint32_t c, uint8_t*& dst) {
     }
 }
 
-// 1.13c Storm+0x32AD0
-void addByte(Lzw& s, uint8_t*& dst, uint32_t b) {
-    if (s.first) { s.prefix = b; s.first = 0; return; }
+// 1.13c Storm+0x32AD0. Returns the EAX retail leaves: the byte, except a hit, which leaves the address of the first
+// probed code slot (a hit there) or the matched code (a hit further down the probe chain).
+uint32_t addByte(Lzw& s, uint8_t*& dst, uint32_t b) {
+    if (s.first) { s.prefix = b; s.first = 0; return b; }
     int32_t i = (int32_t)(b * 0x10 + s.prefix);
     if (i > 0x138a) i -= 0x138b;
     uint32_t k = (s.prefix << 8) | b;
     if (s.code[i]) {
-        if (s.key[i] == k) { s.prefix = s.code[i]; return; }
+        if (s.key[i] == k) { s.prefix = s.code[i]; return s.codeAddr + (uint32_t)i * 4; }
         int32_t step = i == 0 ? 1 : 0x138b - i;
         for (;;) {
             i -= step;
             if (i < 0) i += 0x138b;
             if (!s.code[i]) break;
-            if (s.key[i] == k) { s.prefix = s.code[i]; return; }
+            if (s.key[i] == k) { s.prefix = s.code[i]; return s.prefix; }
         }
     }
     emit(s, s.prefix, dst);
@@ -64,11 +66,12 @@ void addByte(Lzw& s, uint8_t*& dst, uint32_t b) {
         s.bits = s.minBits;
         s.mask = (1u << s.bits) - 1;
         s.prefix = b;
-        return;
+        return b;
     }
     s.code[i] = s.next++;
     s.key[i] = k;
     s.prefix = b;
+    return b;
 }
 }  // namespace
 
@@ -119,13 +122,17 @@ void storeLzw(const Lzw& s, uint32_t* st, bool tables) {
 }
 }  // namespace
 
-extern "C" void Storm_Sub327E0(uint32_t* st, uint32_t c, uint8_t** pdst) {
+// Both return the EAX retail leaves: 327E0 keeps the state pointer in EAX throughout; 32AD0 as addByte.
+extern "C" uint32_t* Storm_Sub327E0(uint32_t* st, uint32_t c, uint8_t** pdst) {
     Lzw s; loadLzw(s, st, false);
     uint8_t* d = *pdst; emit(s, c, d); *pdst = d;
     storeLzw(s, st, false);
+    return st;
 }
-extern "C" void Storm_Sub32AD0(uint32_t* st, uint8_t** pdst, uint32_t b) {
+extern "C" uint32_t Storm_Sub32AD0(uint32_t* st, uint8_t** pdst, uint32_t b) {
     Lzw s; loadLzw(s, st, true);
-    uint8_t* d = *pdst; addByte(s, d, b); *pdst = d;
+    s.codeAddr = st[10];
+    uint8_t* d = *pdst; uint32_t eax = addByte(s, d, b); *pdst = d;
     storeLzw(s, st, true);
+    return eax;
 }

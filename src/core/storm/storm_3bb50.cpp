@@ -7,7 +7,8 @@
 static double g_tab3bb50[20 * 10];
 extern "C" double* Storm_3BB50_Table() { return g_tab3bb50; }
 
-extern "C" void Storm_3BB50() {
+// Returns the EAX retail leaves: the store pointer, one past the table's last entry.
+extern "C" double* Storm_3BB50() {
     double* d = g_tab3bb50;
     for (int32_t e = -1; e > -0x15; e--)
         for (int32_t k = 0; k < 10; k++) {
@@ -21,4 +22,5 @@ extern "C" void Storm_3BB50() {
             int32_t q = e < 0 ? 1 / p : p;
             *d++ = (double)q * (double)k;
         }
+    return d;
 }

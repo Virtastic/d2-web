@@ -314,10 +314,11 @@ void storm_bnvec_sub_word(StormBnVec* v, uint32_t w, const StormBnVec* src) {
 // +0 cap, +4 size, +8 data pointer, +0xC grain, +0x10 base. Retail adds the base first, grows through
 // Storm+0x3C80 (the guest-word resize) when cap is short, zero-fills [size, idx] and stores size = idx + 1.
 extern "C" void Storm13c_3C80(uint32_t* a, uint32_t n);   // storm_3c80.cpp
-extern "C" void Storm_Port35C0(void* v, uint32_t rel) {
+// Returns the EAX retail leaves: the size when idx is already inside it, else 0 (the zero-fill's `xor eax,eax`).
+extern "C" uint32_t Storm_Port35C0(void* v, uint32_t rel) {
     uint32_t* a = (uint32_t*)v;
     uint32_t idx = a[4] + rel;
-    if (a[1] > idx) return;
+    if (a[1] > idx) return a[1];
     uint32_t n = idx + 1;
     if (a[0] < n) {
         // Storm+0x3C40 with EAX = n: grain from the count (power of two below 0x40, else 0x40 stored at +0xC)
@@ -336,4 +337,5 @@ extern "C" void Storm_Port35C0(void* v, uint32_t rel) {
     uint32_t cnt = idx - a[1] + 1;
     for (uint32_t k = 0; k < cnt; k++) d[a[1] + k] = 0;
     a[1] = n;
+    return 0;
 }

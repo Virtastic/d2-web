@@ -89,8 +89,9 @@ extern "C" void Storm_Sub35FC0(uint32_t* grp, const StormBatch18f90Env* env) {
     env->mem_free(grp, "delete", -1);
 }
 
-// 1.13c Storm+0x365E0: deep-copy bucket-group src (EBX) into dst.
-extern "C" void Storm_Sub365E0(uint32_t* dst, const uint32_t* src, const StormBatch18f90Env* env) {
+// 1.13c Storm+0x365E0: deep-copy bucket-group src (EBX) into dst. Returns the EAX retail leaves: the bucket count,
+// reloaded from src for the loop test.
+extern "C" uint32_t Storm_Sub365E0(uint32_t* dst, const uint32_t* src, const StormBatch18f90Env* env) {
     static const char* f = "..\\3rdParty\\STORM\\SOURCE\\SEVT.CPP";
     dst[1] = src[1];
     dst[2] = src[2];
@@ -105,4 +106,5 @@ extern "C" void Storm_Sub365E0(uint32_t* dst, const uint32_t* src, const StormBa
         }
         *slot = 0;
     }
+    return src[1];
 }
