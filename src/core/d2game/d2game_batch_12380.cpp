@@ -47,47 +47,8 @@ static inline const D2GameBatch12380Env* d2game12380_env(const uint32_t* r) { re
 
 [[noreturn]] static void d2game_fatal12380(uint32_t) { _exit(-1); }
 
-// 1.13c D2Game+0x19662 -- AiAcquireTargetAndAct_19662 (208 bytes). r[0]=ECX (unused), r[1]=EDX (param_2, a
-// uint32 pointer), r[2]=EDI (unit-owner game arg), r[3]=ESI (unit). Unit seed at unit+8 (uint64).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_19662(uint32_t* r) {
-    const D2GameBatch12380Env* e = d2game12380_env(r);
-    uint32_t unit = r[3];
-    uint32_t* param2 = (uint32_t*)(uintptr_t)r[1];
-    uint32_t game = r[2];
-    uint32_t target = callOrd(e, 10331, {unit});
-    uint32_t iVar4 = callOrd(e, 10057, {target});
-    r[4] = 0;
-    if (iVar4 == 0) {
-        uint32_t piVar5 = callRva(e, 0xB1C90, {unit, param2 ? *param2 : 0});
-        if (piVar5 != 0) {
-            if (param2 == nullptr) {
-                uint32_t uVar6 = callRva(e, 0x1180, {unit + 0x20});
-                if ((int32_t)uVar6 < 0x1e) {
-                    callRva(e, 0xF2540, {game, unit, piVar5, 2, 0, 0, 1});
-                    return;
-                }
-            } else {
-                uint32_t uVar6 = callRva(e, 0x1180, {unit + 0x20});
-                if ((int32_t)uVar6 < 0x50) {
-                    callRva(e, 0xF2220, {game, piVar5});
-                    return;
-                }
-            }
-            goto LAB_fallthrough;
-        }
-    }
-    {
-        uint64_t seed = (uint64_t)rd32((void*)(uintptr_t)unit, 0x20) * 0x6ac690c5ull + (uint64_t)rd32((void*)(uintptr_t)unit, 0x24);
-        wr64((void*)(uintptr_t)unit, 0x20, seed);
-        if ((uint32_t)((uint32_t)seed % 100) < 0x14) {
-            callRva(e, 0xF1B10, {game, unit});
-            return;
-        }
-    }
-LAB_fallthrough:
-    callRva(e, 0xF22C0, {10});
-    (void)d2game_fatal12380;
-}
+// D2Game+0x19662 (the AI think tail) is its own file: src/core/d2game/d2game_19662.cpp, probe src/core/fn/d2game_19662.cpp.
+static inline void d2game12380_keep() { (void)d2game_fatal12380; }
 
 // 1.13c D2Game+0x23440 -- SUNIT_SendStateUpdate_23440 (290 bytes). __fastcall: r[0]=ECX (game), r[1]=EDX
 // (unit pointer). Returns with no output; sends the state update through the seams.

@@ -18,8 +18,9 @@ static inline u16 rd16(i32 p, i32 o) { return *(u16*)(intptr_t)(p + o); }
 static inline void wr16(i32 p, i32 o, u16 v) { *(u16*)(intptr_t)(p + o) = v; }
 static inline void wr(i32 p, i32 o, i32 v) { *(i32*)(intptr_t)(p + o) = v; }
 
-// 1.13c D2Game+0x611B0 (LAB_6fc811b0). Registers: ECX = quest record, EDX = quest argument block.
-extern "C" void LAB_6fc811b0(i32 quest, i32 args)
+// 1.13c D2Game+0x611B0 (LAB_6fc811b0). Registers: ECX = quest record, EDX = quest argument block. Retail returns nothing; EAX is left
+// holding the second list's scan index (0 for an empty list, the count when pid is absent), which d2g_611b0 returns.
+extern "C" uint32_t d2g_611b0(i32 quest, i32 args)
 {
     // args->pPlayer (+0xC) ? pPlayer->dwUnitId (+0xC) : -1
     i32 pid = (rd(args, 0x0c) == 0) ? -1 : rd(rd(args, 0x0c), 0x0c);
@@ -43,13 +44,16 @@ extern "C" void LAB_6fc811b0(i32 quest, i32 args)
 
     // list at +0x00, count u16 at +0x30
     u16 m = rd16(info, 0x30);
+    u16 i = 0;
     if (m != 0) {
-        u16 i = 0;
         while (rd(info, i * 4) != pid) {
             ++i;
-            if (rd16(info, 0x30) <= i) return;
+            if (rd16(info, 0x30) <= i) return i;
         }
         if (i != m - 1) wr(info, i * 4, rd(info, -4 + m * 4));
         wr16(info, 0x30, (u16)(rd16(info, 0x30) - 1));
     }
+    return i;
 }
+
+extern "C" void LAB_6fc811b0(i32 quest, i32 args) { d2g_611b0(quest, args); }
