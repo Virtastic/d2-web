@@ -27,6 +27,8 @@ export function createChatLink({ dial, createChat, onState = () => {}, onRedial 
     join(name) { wantChat = true; session?.join(name || undefined, name ? 2 : undefined); },
     // The lobby's QUIT: chat is left on the open socket (retail keeps the connection for the character select).
     leave() { if (session?.open) session.leave(); },
+    // The realm game was sent for: advertise (create only), announce the join, leave chat.
+    enterGame(name, opts) { return session?.open ? session.enterGame(name, opts) : false; },
     // Back in the lobby on a socket that left chat: enter chat again and rejoin the last channel.
     resume() { if (!session?.open || session.entered) return; session.enter(); session.join(lastChannel || undefined, lastChannel ? 2 : undefined); },
     channels() { return session?.open ? session.channels() : false; },

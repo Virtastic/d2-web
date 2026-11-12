@@ -379,7 +379,7 @@ function decodeMcpCharacters(body) {
  * the engine exports, as with BNCS and D2GS; this function owns only the sequence and read offsets.
  */
 export async function mcpCreateAndJoin(transport, protocol, { realmReply, character, gameName, gamePassword = '',
-  difficulty = 0, maxPlayers = 8, levelDifference = 0xff, description = '', characterCount = 8, session = null, join = false, timeoutMs = CONNECT_TIMEOUT_MS, startupMs = MCP_STARTUP_MS, gameReplyMs = GAME_REPLY_MS, onQueue = () => {}, signal = null } = {}) {
+  difficulty = 0, maxPlayers = 8, levelDifference = 0xff, description = '', characterCount = 8, session = null, join = false, timeoutMs = CONNECT_TIMEOUT_MS, startupMs = MCP_STARTUP_MS, gameReplyMs = GAME_REPLY_MS, onQueue = () => {}, signal = null, onJoinSent = () => {} } = {}) {
   if (!Array.isArray(realmReply) && !(realmReply instanceof Uint8Array)) throw new Error('MCP requires the BNCS realm handoff bytes');
   if (!character || (!gameName && !join)) throw new Error('MCP requires a character and game name');
   const sent = [], received = session ? [...session.received] : [];
@@ -454,6 +454,8 @@ export async function mcpCreateAndJoin(transport, protocol, { realmReply, charac
 
   const joinId = nextId();
   send(0x04, protocol.mcpJoinGame({ requestId: joinId, name: titleCaseGameText(gameName), password: titleCaseGameText(gamePassword) }));
+  // A stock client's BNCS side (0x1C on a create, 0x22, 0x10) follows the MCP join request on the wire.
+  try { onJoinSent(titleCaseGameText(gameName), { created: !join }); } catch { /* the chat side never fails a join */ }
   const joined = await gameReply(0x04, joinId, gameReplyMs);
   if (joined.body.length < 18) throw new Error('MCP JOINGAME reply is truncated');
   // Retail (D2MCPClient 0x64D0): the join failed only when the IP dword is zero; the code is then the result dword, or 0x28 when that is zero too.

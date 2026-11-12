@@ -2184,7 +2184,8 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword, 
   try {
     if (!realmFlow?.local && (!realmReply || !protocol || !mcp)) throw new Error('log in before selecting a character');
     const joined = realmFlow.local?.joined ?? await mcpCreateAndJoin(mcp, protocol, { realmReply, character, gameName, gamePassword,
-      difficulty, maxPlayers, levelDifference, description, join, session: realmFlow.mcpSession, signal, onQueue });
+      difficulty, maxPlayers, levelDifference, description, join, session: realmFlow.mcpSession, signal, onQueue,
+      onJoinSent: (name, opts) => realmFlow?.chatLink?.enterGame(name, opts) });
     mcp?.close(); mcp = null;
     realmFlow.mcp = null; realmFlow.mcpSession = null;
     // The game server occasionally drops the first socket before the greeting completes; while the logon

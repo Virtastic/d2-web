@@ -23,6 +23,11 @@ export function parseChannelList(body) {
 // CHATCOMMAND (+0xC400) sends the text as given, raw: a typed `/f l`, `/f a name` or `/f r name` is no different from
 // any other line (retail's slash dispatcher keeps only /r, /reply and /d2notify). The text is a C string, so it ends at
 // its first NUL. The 255-byte cap is the chat box's own limit, not a C400 check.
+// SID_STARTADVEX3 (retail BNClient 0xC290): five zero dwords (state, uptime, game type, sub type, provider/ladder), then the game
+// name, password and description. Measured against a stock client: a created realm game goes out with the password and description empty.
+export const startAdvPacket = (name) => bncsPacket(0x1c, [...new Uint8Array(20), ...cstr(name), 0, 0]);
+// SID_NOTIFYJOIN: product dword, version dword (0x0D), game name, password (empty on the wire).
+export const notifyJoinPacket = (name, expansion = true) => bncsPacket(0x22, [...(expansion ? [0x50, 0x58, 0x32, 0x44] : [0x56, 0x44, 0x32, 0x44]), 0x0d, 0, 0, 0, ...cstr(name), 0]);
 export const chatCommandPacket = (text) => bncsPacket(0x0e, cstr(String(text).split('\0')[0].slice(0, 255)));
 
 const u32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
@@ -109,6 +114,14 @@ export function createBnetChat({ transport, reader, character, realm = '', expan
     say(text) { if (!text) return false; return closed ? false : send(chatCommandPacket(text)) !== false; },
     // SID_LEAVECHAT (FF 10 04 00), what the lobby's QUIT sends; the socket stays open, chat must be entered again.
     leave() { if (closed) return false; entered = false; joined = false; wantJoin = false; return send(bncsPacket(0x10)) !== false; },
+    // A realm game is entered: a created game is advertised (0x1C), the join is announced (0x22), and chat is left (0x10), the order and
+    // bytes of a stock client (relay recordings bnet-proof/live1, live2). A join of another's game sends no 0x1C.
+    enterGame(name, { created = false } = {}) {
+      if (closed) return false;
+      if (created) send(startAdvPacket(name));
+      send(notifyJoinPacket(name, expansion));
+      return this.leave();
+    },
     close() { closed = true; try { reader.cancel(); } catch { /* done */ } try { transport.close(); } catch { /* done */ } },
   };
 }
