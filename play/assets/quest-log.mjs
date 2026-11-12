@@ -32,6 +32,8 @@ export const ACT_DONE = [7, 7, 7, 4, 0];   // the act's COMPLETED word offset fr
 // Every act pairs icon q with word base+q except Act IV, whose Hellforge word (27) sits behind icon
 // a4q2 in the middle slot and the Diablo word (26) behind a4q3 on the right.
 export const questWord = (act, q) => ACT_BASE[act - 1] + (act === 4 && q > 1 ? 5 - q : q);
+// The title string (and its body, key + '1') belongs to the quest word, not to the slot.
+export const questTextKey = (act, q) => `qstsa${act}q${questWord(act, q) - ACT_BASE[act - 1]}`;
 // Each icon's place in the 27-entry icon table (a1q1 .. a5q6); questdone.dc6 holds one frame per entry.
 export const ICON_START = [0, 6, 12, 18, 21];
 export const QUEST_DONE_ART = MENU + 'questdone.dc6';
@@ -114,7 +116,8 @@ export function createQuestLogRenderer(read, documentObject = globalThis.documen
       }
       let text = null;
       if (s.selected && statuses[s.selected - 1] !== 'locked') {
-        const font = fontFor(A), key = `qstsa${s.act}q${s.selected}`, name = s.string(key);
+        // The title and body strings follow the quest word (Act IV's middle icon is word 27, qstsa4q3).
+        const font = fontFor(A), key = questTextKey(s.act, s.selected), name = s.string(key);
         // F256: retail's questlast toggle swaps the description BODY -- it does NOT latch the button's
         // frame (that was s814's falsified model). OFF shows the last-message string, ON the quest's own
         // body string; the not-done half is inferred (the F256 capture is a done quest). Evidence:
