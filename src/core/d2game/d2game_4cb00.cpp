@@ -13,7 +13,6 @@ extern "C" uint32_t d2game_4cb00(uint32_t game, uint32_t unit, uint32_t skill, u
     if (d2rd32(unit) == 1) e->call(0x77240,0,0,0,0,0,unit,8);
     const uint32_t ax = e->call(0xDE5A0, p, 0,0,0,0, game, x, 0) & 0xFFFF;
     st[1] = ax;
-    uint32_t ecx = lvl;
     if (ax & 1) {
         st[3] = e->call(0xAC9A,0,0,0,0,0,unit,d2rd32(row+0x138),skill,lvl);
         if ((uint8_t)d2rd8(row+0x1dc)) {
@@ -23,10 +22,9 @@ extern "C" uint32_t d2game_4cb00(uint32_t game, uint32_t unit, uint32_t skill, u
         }
         e->call(0x9F210, skill, 0,0,0,0, (uint32_t)(uintptr_t)st, lvl);
         e->blk(0x9F210, st, 28);
-        ecx = (uint32_t)(uintptr_t)st;
     }
     uint32_t bl = d2rd8(row+0x1a5); if (!bl) bl = 0x80;
-    e->call(0xDDDE0, unit, (ecx & ~0xffu) | bl, 0,0,0, game, p);
+    e->call(0xDDDE0, unit, bl, 0,0,0, game, p);   // the flag byte rides in CL only (mov cl,bl)
     e->call(0xDED30,0,0,0,0,0,game,unit,p);
     return 1;
 }

@@ -1,6 +1,6 @@
 // D2Game+0x396E0 (MISSMODE_SrvHit55_Baalnferno): fastcall (ecx unused, edx = P2 {+4 row index}, stack word 0 = P3 stat-list pointer, ret 4).
 // P3 null or *P3 != 0 returns 2. P2 null, an index outside [0, dt[0xB6C]) or a null row (row = dt[0xB64] + idx * 0x1A4) or row[0x4C] <= 0 returns 1
-// (dt = *sgptDataTables, the word at 0x6FD1829C). Else n = Ordinal 10973(P3, 8, 0) (thunk 0xA42A); n <= 0 returns 1. Else x = 0x214D0(eax = clamp(row[0x4C], 1, 100),
+// (dt = *sgptDataTables, the word at 0x6FD1829C). Else n = Ordinal 10973(P3, 8, 0) (thunk 0xA42A); n <= 0 returns 1. Else x = 0x14D0(eax = clamp(row[0x4C], 1, 100),
 // ecx = 100, edx = n), x = min(max(x, 1), n); Ordinal 10887(P3, 8, n - x, 0) (thunk 0xA472); returns 2.
 #include <cstdint>
 #include <cstring>
@@ -8,7 +8,7 @@
 
 struct D2Game396E0Env {
     int32_t (*getStat)(uint32_t list, uint32_t stat, uint32_t layer);              // Ordinal 10973
-    int32_t (*scale)(uint32_t pct, uint32_t hundred, uint32_t n);                  // 0x214D0 (eax, ecx, edx)
+    int32_t (*scale)(uint32_t pct, uint32_t hundred, uint32_t n);                  // 0x14D0 (eax, ecx, edx)
     void    (*setStat)(uint32_t list, uint32_t stat, int32_t value, uint32_t layer); // Ordinal 10887
     uint32_t dt;                                                                    // *sgptDataTables
 };

@@ -3,7 +3,7 @@
 // Life (flags & 2), mana (flags & 1) and stamina (no flag) are each raised by max * parm[1] >> 8 (32-bit unsigned multiply,
 // capped at max) when below max: set the stat, then the attribute update (0xCC2F0, EDX = stat, ECX = player). Then the poison
 // (2) and freeze (1) state lists are removed and freed, the npc-state removal (0xBC920, EBX = player) and the pet heal
-// (0x96AF0: stack player and &result, EDI = game, EBX = callback 0x89DE0) run. Returns the local result: 1 once any step acted.
+// (0x96AF0: stack player and &result, EDI = game, EBX = callback 0x69DE0) run. Returns the local result: 1 once any step acted.
 // The callees ride in Env so a probe records them.
 #include <cstdint>
 #include <cstring>

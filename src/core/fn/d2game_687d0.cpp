@@ -13,12 +13,13 @@ void D2Game_687D0(uint8_t* q, const D2Game687D0Env& e);
 namespace {
 HookEnv* H;
 uint32_t cb(uint32_t rva) { return 0xB2000000u | rva; }
-uint32_t alloc(uint32_t pool, uint32_t size, uint32_t line, uint32_t zero) { return H->h(0xA2E6, 0, pool, size, 0, 0, 0xB20FBF2Cu, line, zero); }
+uint32_t exBlob;   // the hook's `@ex` value: blob ex (index 2) is what the capture's allocator hands back
+uint32_t alloc(uint32_t pool, uint32_t size, uint32_t line, uint32_t zero) { H->h(0xA2E6, 0, pool, size, 0, 0, 0xB20FBF2Cu, line, zero); return exBlob; }
 }
 
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_687d0(uint32_t* r) {
     HookEnv e((uint32_t*)(uintptr_t)r[1], (const uint32_t*)(uintptr_t)r[2]);
-    H = &e;
+    H = &e; exBlob = r[14 + 2 * 2];
     const D2Game687D0Env env = { cb, alloc };
     D2Game_687D0((uint8_t*)(uintptr_t)r[0], env);
     r[4] = 0;
