@@ -10,8 +10,11 @@
 //            0x4DC30 puts a unit in modes 1..15 (not 12) back to 1; action 1: mode 2 when the walk path is made.
 // Ours: the client room seeds of client_unit_seed.cpp; the server rooms stand for the client's (same coordinates, collision, the
 // server's units for the client's copies of them).
-// ponytail: the client path (0x2A040) is not walked: a critter keeps its spot; a walk is taken as made when its end spot is free and
-// lasts until the animation's loop ends; mode 8 lasts one animation loop.
+//   0x2A040 (the walk path): #10286 sets the target, #10334 (D2Common+0x36230) builds a type 2 path (0x678B0: the straight line of
+//            0x67630/0x66C20, from the unit's velocity) and fails when its only point is the unit's own spot (0xD240 then zeroes
+//            the velocity, so every later path fails the same way until a mode 2/8 gives it one back).
+// ponytail: the path is not walked: a critter keeps its spot; a made walk lasts until the animation's loop ends; mode 8 lasts one
+// animation loop; the velocity is only zero or not (its value is not modelled).
 #include <cstdint>
 #include <cstdio>
 #include <string>
@@ -23,6 +26,8 @@
 #include "../d2moo/include/DataTbls/MonsterTbls.h"
 #include "../d2moo/include/DataTbls/AnimTbls.h"
 #include "../d2moo/include/Units/Units.h"
+#include "../d2moo/include/Path/Path.h"
+#include "../d2moo/include/Path/PathMisc.h"
 #include "sound_unit_refs.h"
 #include <emscripten.h>
 
@@ -38,6 +43,7 @@ struct Critter {
     uint32_t mode; int32_t delay; // +0x10, data +0x30
     uint32_t f44, f48, f4c, u7c;  // animation clock, length, rate; last 0x22CA0 sound frame
     uint32_t born;
+    int32_t vel;                  // path +0x7C
 };
 std::vector<Critter> g_c;
 uint32_t g_counter;               // D2Client+0xDE834
@@ -65,6 +71,7 @@ int32_t distance(const Critter& c, D2UnitStrc* u) {
 void setMode(Critter& c, uint32_t m, uint32_t frame) {
     if (c.mode == m) return;
     c.mode = m; c.f44 = 0; anim(c);
+    if (m == 2 || m == 8) c.vel = 0x100;
     char b[96]; snprintf(b, sizeof b, "%u C id=%x mode=%u\n", frame, c.id, m); g_log += b;
     const uint32_t n = d2_client_unit_mode_sounds(1, c.id, (int32_t)c.cls, 0, -1, m, 0, 0, 0, -1);
     for (uint32_t i = 0; i < n; ++i) {
@@ -76,12 +83,33 @@ void setMode(Critter& c, uint32_t m, uint32_t frame) {
 }
 // 0x4DC30
 void neutral(Critter& c, uint32_t frame) { if (c.mode < 0x10 && c.mode != 0 && c.mode != 0xC) setMode(c, 1, frame); }
+// 0x2A040 -> D2Common #10334 (0x36230), a type 2 path with no target unit: field_14 = 1 (0x35470); the unit's footprint is lifted
+// for the build (the critters have none here); 0x678B0 (D2MOO PATH_Toward) makes the points; 0xD240 steps past those at the unit's
+// own spot, and none left -> 0.
+bool path(Critter& c, int32_t tx, int32_t ty) {
+    if (!c.room || (tx == c.x && ty == c.y)) return false;
+    const int32_t dx = tx - c.x, dy = ty - c.y;
+    if (dx > 100 || dx < -100 || dy > 100 || dy < -100) return false;
+    D2UnitStrc u{}; u.dwUnitType = UNIT_MONSTER;
+    D2DynamicPathStrc p{};
+    p.pUnit = &u; p.pRoom = c.room; p.dwPathType = 2; p.dwVelocity = c.vel; p.nDistMax = 14;
+    p.tGameCoords.dwPrecisionX = PATH_ToFP16Center((uint16_t)c.x); p.tGameCoords.dwPrecisionY = PATH_ToFP16Center((uint16_t)c.y);
+    p.dwCollisionPattern = (uint32_t)D2Common_11281_CollisionPatternFromSize(nullptr, c.size); p.nMoveTestCollisionMask = 0x3C01;
+    D2PathInfoStrc i{};
+    i.tStartCoord.X = (uint16_t)c.x; i.tStartCoord.Y = (uint16_t)c.y; i.tTargetCoord.X = (uint16_t)tx; i.tTargetCoord.Y = (uint16_t)ty;
+    i.pStartRoom = c.room; i.field_14 = 1; i.nDistMax = p.nDistMax; i.nPathType = 2; i.nUnitSize = c.size;
+    i.nCollisionPattern = (int32_t)p.dwCollisionPattern; i.nCollisionMask = 0x3C01; i.pDynamicPath = &p;
+    p.dwPathPoints = PATH_Toward_6FDAA9F0(&i);
+    if (p.dwPathPoints <= 0) return false;
+    PATH_ComputeVelocityAndDirectionVectorsToNextPoint(&p, 1, 1);
+    c.vel = p.dwVelocity;
+    return p.dwCurrentPointIdx < p.dwPathPoints;
+}
 // 0x4DC70 through the six-word walk block {x, y, ...}: action 0xC (mode 8 first, then the path), 1 (mode 2 when a path is made)
 void walk(Critter& c, int32_t x, int32_t y, uint32_t action, uint32_t frame) {
     char b[96]; snprintf(b, sizeof b, "%u W id=%x a=%u to=%d,%d\n", frame, c.id, action, x, y); g_log += b;
-    if (action == 0xC) { setMode(c, 8, frame); return; }
-    D2ActiveRoomStrc* r = c.room;
-    if (r && !COLLISION_CheckMaskWithSize(r, x, y, c.size, 0x3C01)) setMode(c, 2, frame); else neutral(c, frame);
+    if (action == 0xC) { setMode(c, 8, frame); path(c, x, y); return; }
+    if (path(c, x, y)) setMode(c, 2, frame); else neutral(c, frame);
 }
 // 0x173E0
 void wander(Critter& c, uint32_t step, uint32_t action, uint32_t frame) {
@@ -149,7 +177,7 @@ void create(D2ActiveRoomStrc* room, int32_t cls, uint32_t frame) {
         if (++i >= 10) return;
     }
     if (++g_counter == 0xFFFFFFFFu) g_counter = 0;
-    Critter c{}; c.id = g_counter; c.cls = (uint32_t)cls; c.room = room; c.x = x; c.y = y; c.size = size; c.mode = 1; c.born = frame;
+    Critter c{}; c.id = g_counter; c.cls = (uint32_t)cls; c.room = room; c.x = x; c.y = y; c.size = size; c.mode = 1; c.born = frame; c.vel = 0x100;
     D2ActiveRoomStrc* at = DUNGEON_FindRoomBySubtileCoordinates(room->pAct, x, y);
     c.lo = d2client_unitseed::roll(at ? at : room); c.hi = 666;
     const uint32_t init = c.lo;
