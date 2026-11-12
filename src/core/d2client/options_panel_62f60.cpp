@@ -19,17 +19,23 @@ static void rel(const Imp&f,U*slot){ U h=*slot; if(h){ f.release(h); f.afterRel(
 void miniPanelFree_62f60(const Imp&f,U g1,U*h0,U*h1){ f.ini("Diablo II","Mini Panel",1,g1==0); rel(f,h0); rel(f,h1); }
 
 // 1.13c D2Client+0x63270  (EAX = tbl base; param_1 = &count). entry stride 0x550: +0x78 kind, +0x120 n, +0x424 handle, +0x420+... sub-handles at +0x120+0x420
-void entriesFree_63270(const Imp&f,I*cnt,B*tbl){
- if(!cnt){ f.fatal(0x5ba); return; }
- if(!tbl){ f.fatal(0x5bb); return; }
+// EAX at return: the table pointer when *count <= 0 (never reloaded), else the loop index after its last increment.
+// The fatal paths do not return in retail (exit).
+U entriesFree_63270(const Imp&f,I*cnt,B*tbl){
+ if(!cnt){ f.fatal(0x5ba); return 0; }
+ if(!tbl){ f.fatal(0x5bb); return 0; }
+ if(*cnt<=0) return (U)(uintptr_t)tbl;
  U*p=(U*)(tbl+0x120);
- for(I i=0;i<*cnt;i++,p+=0x154){
+ I i=0;
+ do{
   rel(f,&p[0x107]);
   if(p[-0x48]==1){
-   U n=*p; if(n==0||n>4){ f.fatal(0x5d8); return; }
+   U n=*p; if(n==0||n>4){ f.fatal(0x5d8); return 0; }
    for(U k=0;k<n;k++) rel(f,&p[0x108+k]);
   }
- }
+  i++; p+=0x154;
+ }while(i<*cnt);
+ return (U)i;
 }
 
 // 1.13c D2Client+0x63520  (ECX = obj). f5f970 = D2Client+0x5F970, called with EAX = the clamped fade value

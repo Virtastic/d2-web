@@ -224,17 +224,20 @@ uint32_t d2_client_62cf0(char* path_c0a8, uint32_t* lng_c1ac, uint32_t* accel_c0
 }
 
 // 1.13c D2Client+0x62E60 (110 B) NAMED: packet in EAX (GUESS; opcode byte then u16 at +1, u16 at +3).
-// Dispatch on u16 [pkt+1].
+// Dispatch on u16 [pkt+1]. EAX as retail leaves it: the callee's result on the call/tail-jump cases, 1 after case 0x17,
+// the u16 [pkt+3] on case 0x24; an unhandled opcode 1..0x24 leaves the byte map's default index 6, any other opcode op-1.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_62e60(uint32_t pkt, void (*c740)(uint32_t), void (*f5e50)(uint32_t), void (*f65f0)(void),
-                     void (*b2acc0)(uint32_t), void (*c4660)(void), uint32_t* f8c9c, uint32_t* c404, uint32_t* c3a4,
+uint32_t d2_client_62e60(uint32_t pkt, uint32_t (*c740)(uint32_t), uint32_t (*f5e50)(uint32_t), uint32_t (*f65f0)(void),
+                     uint32_t (*b2acc0)(uint32_t), uint32_t (*c4660)(void), uint32_t* f8c9c, uint32_t* c404, uint32_t* c3a4,
                      uint8_t* d339f, uint32_t* d33a5) {
-    switch ((uint16_t)rd16(pkt + 1)) {
-    case 1: c740(pkt); return;
-    case 2: f5e50((uint16_t)rd16(pkt + 3)); return;
-    case 3: case 6: f65f0(); return;
-    case 4: case 0xd: b2acc0(pkt); return;
-    case 0x17: c4660(); *f8c9c = 0; *c404 = 1; *c3a4 = 1; return;
-    case 0x24: *d339f = 1; *d33a5 = (uint16_t)rd16(pkt + 3); return;
+    const uint32_t op = (uint16_t)rd16(pkt + 1);
+    switch (op) {
+    case 1: return c740(pkt);
+    case 2: return f5e50((uint16_t)rd16(pkt + 3));
+    case 3: case 6: return f65f0();
+    case 4: case 0xd: return b2acc0(pkt);
+    case 0x17: c4660(); *f8c9c = 0; *c404 = 1; *c3a4 = 1; return 1;
+    case 0x24: *d339f = 1; *d33a5 = (uint16_t)rd16(pkt + 3); return *d33a5;
     }
+    return op - 1 <= 0x23 ? 6u : op - 1;
 }

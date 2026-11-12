@@ -35,12 +35,15 @@ extern "C" EMSCRIPTEN_KEEPALIVE void* d2_client_537a0(int32_t key, void* head_11
 
 // 1.13c D2Client+0x62C90
 // Platform import receives the actual native module handle, before both globals
-// are cleared. The return value of FreeLibrary is deliberately ignored.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_62c90(uint32_t* module_11c1ac, uint32_t* state_11c0a4,
+// are cleared. EAX is left as retail leaves it: FreeLibrary's result, or the
+// (zero) handle when there was none.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_62c90(uint32_t* module_11c1ac, uint32_t* state_11c0a4,
                                 int (*free_library)(uint32_t)) {
-    if (*module_11c1ac) free_library(*module_11c1ac);
+    uint32_t eax = *module_11c1ac;
+    if (eax) eax = (uint32_t)free_library(eax);
     *module_11c1ac = 0;
     *state_11c0a4 = 0;
+    return eax;
 }
 
 // 1.13c D2Client+0x72970

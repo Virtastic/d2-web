@@ -21,7 +21,8 @@ void cat(const cl::Env& e, uint32_t d, uint32_t s) { e.H(kStrcat, 0, 0, 0, 0, 0,
 inline uint32_t A(const volatile void* p) { return (uint32_t)(uintptr_t)p; }
 }  // namespace
 // 1.13c D2Client+0xC0850
-extern "C" void d2c_c0850(uint32_t P, const cl::Env& e) {
+// EAX at return: the restoring 0xD3A8's result, or the nonzero 0xC208 test on the early return.
+extern "C" uint32_t d2c_c0850(uint32_t P, const cl::Env& e) {
     volatile uint16_t buf[0x800];
     volatile uint16_t sm[2];
     volatile uint32_t ch;
@@ -53,8 +54,7 @@ extern "C" void d2c_c0850(uint32_t P, const cl::Env& e) {
             const uint32_t nm = e.H(0xA5D90, 0, 0, 0, 0, 0, P);
             e.H(0xD384, y, 0, 1, 0, 0, 0, nm, e.R(G(0xDBC54)));
         }
-        e.H(0xD3A8, 0, 0, 0, 0, 0, 0, oldFont);
-        return;
+        return e.H(0xD3A8, 0, 0, 0, 0, 0, 0, oldFont);
     }
     sub58();
     const uint32_t B = A(buf);
@@ -63,7 +63,7 @@ extern "C" void d2c_c0850(uint32_t P, const cl::Env& e) {
     cat(e, B, e.H(0xA5D90, 0, 0, 0, 0, 0, P));
     cat(e, B, str(e, 0xF9B));
     if (P && e.R(P + 0x10) == 0xC) {
-        if (e.H(0xC208, e.H(0xC1F0, P))) return;   // retail leaves the font switched
+        if (const uint32_t t = e.H(0xC208, e.H(0xC1F0, P))) return t;   // retail leaves the font switched, EAX = the test
         paren = 1;
         if (e.H(0xD1E6) == 0) {
             cat(e, B, str(e, 0x90B));
@@ -91,11 +91,11 @@ extern "C" void d2c_c0850(uint32_t P, const cl::Env& e) {
     case 0x2C4: case 0x2C3: case 0x2C2: case 0x2C1: case 0x2C5: case 0x2C0: m = 4; break;
     default: break;
     }
-    if (e.H(0xBEA10, 0, 0, 0, 0, 0, 0, A(rc)) == 0) { e.H(0xD3A8, 0, 0, 0, 0, 0, 0, oldFont); return; }
+    if (e.H(0xBEA10, 0, 0, 0, 0, 0, 0, A(rc)) == 0) return e.H(0xD3A8, 0, 0, 0, 0, 0, 0, oldFont);
     const int32_t wpx = (int32_t)e.H(0xD35A, 0, 0, 0, 0, 0, 0, B);
     const int32_t x = ((rc[0] + rc[2]) >> 1) - (wpx >> 1);
     e.H(0xD360, 0x20, m, 0, col, 0, 0, B, (uint32_t)x);
-    if (paren) { clr780(); e.H(0xD3A8, 0, 0, 0, 0, 0, 0, oldFont); return; }
+    if (paren) { clr780(); return e.H(0xD3A8, 0, 0, 0, 0, 0, 0, oldFont); }
     const uint32_t g = e.H(0x1230, 0, 0, 0, 0, 0, P ? e.R(P + 4) : 0xFFFFFFFFu);
     uint32_t sv = 0;
     if (e.H(0xC20E, P)) sv = 0x275E;
@@ -113,5 +113,5 @@ extern "C" void d2c_c0850(uint32_t P, const cl::Env& e) {
         }
     }
     e.H(0xBFCA0, P);
-    e.H(0xD3A8, 0, 0, 0, 0, 0, 0, oldFont);
+    return e.H(0xD3A8, 0, 0, 0, 0, 0, 0, oldFont);
 }

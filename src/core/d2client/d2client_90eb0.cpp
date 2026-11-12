@@ -6,7 +6,8 @@
 #include <emscripten.h>
 #include "d2client_callee.h"
 
-extern "C" EMSCRIPTEN_KEEPALIVE void d2c_90eb0(const D2cSvc& v, uint32_t id, int32_t g9a0, int32_t g9a4) {
+// EAX at return: the restoring 0xD3A8's result.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2c_90eb0(const D2cSvc& v, uint32_t id, int32_t g9a0, int32_t g9a4) {
     char16_t buf[32] = {};
     const uint32_t old = d2c_call(v, 0xd3a8, 0, 6, 0, 0, 0);
     const char16_t* s = (const char16_t*)(uintptr_t)d2c_call(v, 0xa5d90, id, 0, 0, 0, 0);
@@ -18,5 +19,5 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2c_90eb0(const D2cSvc& v, uint32_t id, int
     char16_t* p = &buf[31];
     while ((int32_t)d2c_call(v, 0xd35a, 0, b, 0, 0, 0) > 0xa0) *--p = 0;
     d2c_call(v, 0xd37e, 0, b, (uint32_t)(g9a0 + 0xf), 0, 0, (uint32_t)(0xd6 - g9a4), 0, 0);
-    d2c_call(v, 0xd3a8, 0, old, 0, 0, 0);
+    return d2c_call(v, 0xd3a8, 0, old, 0, 0, 0);
 }

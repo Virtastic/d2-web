@@ -25,19 +25,26 @@ void clearWords(const cl::Env& e) {
 }
 }  // namespace
 // 1.13c D2Client+0xC0D30
-extern "C" void d2c_c0d30(uint32_t P, const cl::Env& e) {
+// EAX at return, as retail leaves it: [0x11C414] on the first early return; 10522's result on the far tile; 0 when 10012
+// fails; the unit type for a type without a case (3, >5), an object with 0x119721/0x113A68 set or an item with 0xFADB4 set
+// (the real Unicode ctor leaves EAX alone); 3 when 0xC0390 kept mode 3; 0 for a null 0x1230 row, 0xC1F0, 0xC214 or 0xC1E4
+// result; the type-row pointer with its low byte replaced by the flags byte on the 0x80 skip; else the last callee's result.
+extern "C" uint32_t d2c_c0d30(uint32_t P, const cl::Env& e) {
     volatile int32_t L10 = 0, L14 = 0;
     volatile uint16_t b18[0x80];
     volatile char s118[0x80];
     volatile uint16_t b198[0x80];
     volatile uint16_t b298[0xC8];
     volatile uint16_t b428[0x100];
-    if (e.R(G(0x11C414)) == 3 || P == 0) return;
-    if (e.R(P) == 5 && (int32_t)e.H(0xC190, P, e.R(G(0x11BBFC))) > 100) return;
+    if (const uint32_t m = e.R(G(0x11C414)); m == 3 || P == 0) return m;
+    if (e.R(P) == 5) {
+        const uint32_t d = e.H(0xC190, P, e.R(G(0x11BBFC)));
+        if ((int32_t)d > 100) return d;
+    }
     uint32_t ecxv = 0;   // ECX at the switch (the only path that reaches a 16-bit ECX load reads its upper half)
     if (e.H(0xD07E)) {
         const uint32_t wx = e.H(0xC1AE, P), wy = e.H(0xC232, P);
-        if (e.H(0xD09C, wx, wy) == 0) return;
+        if (e.H(0xD09C, wx, wy) == 0) return 0;
         e.H(0xD084, wx, wy, 0, A(&L10), A(&L14));
         const int32_t v = (int32_t)e.R(G(0xDBC48)), q = (v + (int32_t)((uint32_t)(v >> 31) & 3u)) >> 2;
         const uint32_t m = e.R(G(0x11C414));
@@ -52,17 +59,17 @@ extern "C" void d2c_c0d30(uint32_t P, const cl::Env& e) {
         const uint32_t oy = e.R(G(0x11995C)) - 8;
         e.W(G(0xDBC58), e.H(0xC1F6, P) - oy);
     }
-    switch (e.R(P)) {
+    const uint32_t type = e.R(P);
+    switch (type) {
     case 0: {
         e.H(0xC0450, A(&L10), A(b18), 0x80, 0, 0, A(&L14), P);
-        e.H(0xD360, e.R(G(0xDBC58)) - 0x48, (uint32_t)L10, 1, (uint32_t)L14, 0, 0, A(b18), e.R(G(0xDBC54)));
-        return;
+        return e.H(0xD360, e.R(G(0xDBC58)) - 0x48, (uint32_t)L10, 1, (uint32_t)L14, 0, 0, A(b18), e.R(G(0xDBC54)));
     }
     case 1: {
         const uint32_t cls = e.R(P + 4);
         if (cls == 0x1A1 || cls == 0x1A2) {
             const uint32_t g = e.H(0x1230, 0, 0, 0, 0, 0, cls);
-            if (g == 0) { clearWords(e); return; }
+            if (g == 0) { clearWords(e); return 0; }
             const uint32_t s = str(e, (ecxv & 0xFFFF0000u) | (e.R(g + 6) & 0xFFFF));
             e.H(0xC22C, 0, 0, 0, 0, 0, 0, P, s);
         } else if (((e.R(P + 0xC4) >> 9) & 1) == 0) {
@@ -73,24 +80,23 @@ extern "C" void d2c_c0d30(uint32_t P, const cl::Env& e) {
                 const uint32_t ok = e.H(0xC0390, A(b18), A(&L14), 0, 0, 0, 0, P);
                 e.Ej(0xC0390, A(&L10));
                 if (ok) {
-                    if (L10 == 3) return;
-                    e.H(0xD360, e.R(G(0xDBC58)) - 0x48, (uint32_t)L10, 1, (uint32_t)L14, 0, 0, A(b18), e.R(G(0xDBC54)));
-                    return;
+                    if (L10 == 3) return 3;
+                    return e.H(0xD360, e.R(G(0xDBC58)) - 0x48, (uint32_t)L10, 1, (uint32_t)L14, 0, 0, A(b18), e.R(G(0xDBC54)));
                 }
             }
-            e.H(0xC0850, P);
-            return;
+            return e.H(0xC0850, P);
         }
-        e.H(0xC07C0, 0, 0, 0, 0, 0, P);
+        const uint32_t r = e.H(0xC07C0, 0, 0, 0, 0, 0, P);
         clearWords(e);
-        return;
+        return r;
     }
     case 2: {
-        if (e.R(G(0x119721)) != 0 || e.R(G(0x113A68)) != 0) return;
+        if (e.R(G(0x119721)) != 0 || e.R(G(0x113A68)) != 0) return type;
         const uint32_t nm = e.H(0xA5D90, 0, 0, 0, 0, 0, P);
         const uint32_t cls = e.R(P + 4);
         const uint32_t dy = e.H(0xC1B4, P);
-        const uint32_t fl = e.R8(e.H(0xC226, cls & 0xFFFF) + 0x167);
+        const uint32_t trow = e.H(0xC226, cls & 0xFFFF);
+        const uint32_t fl = e.R8(trow + 0x167);
         if (fl & 4) {
             const uint32_t d = e.R(P + 0x14);
             cpy(e, A(b198), e.H(0xBE240, 0, 0, 0, 0, 0, 0, 0, 0, 0, e.R8(d + 4)));
@@ -111,36 +117,30 @@ extern "C" void d2c_c0d30(uint32_t P, const cl::Env& e) {
                     cat(e, A(b198), A(b18));
                 }
             }
-            e.H(0xD384, e.R(G(0xDBC58)) + dy, 0, 1, 0, 0, 0, A(b198), e.R(G(0xDBC54)));
-            return;
+            return e.H(0xD384, e.R(G(0xDBC58)) + dy, 0, 1, 0, 0, 0, A(b198), e.R(G(0xDBC54)));
         }
-        if (fl & 0x80) return;
-        if ((fl & 0x40) == 0) {
-            e.H(0xD384, e.R(G(0xDBC58)) + dy, 0, 1, 0, 0, 0, nm, e.R(G(0xDBC54)));
-            return;
-        }
+        if (fl & 0x80) return (trow & 0xFFFFFF00u) | fl;   // `mov al, [eax+0x167]`
+        if ((fl & 0x40) == 0) return e.H(0xD384, e.R(G(0xDBC58)) + dy, 0, 1, 0, 0, 0, nm, e.R(G(0xDBC54)));
         const uint32_t nm2 = e.H(0xA5D90, 0, 0, 0, 0, 0, P);
         const uint32_t a = e.H(0xC1F0, P);
-        if (a == 0) return;
+        if (a == 0) return 0;
         const uint32_t t = e.H(0xC214, e.H(0xC1DE, a));
         cpy(e, A(b428), nm2);
         cat(e, A(b428), str(e, 0xF9B));
         cat(e, A(b428), str(e, 0xF9E));
         cat(e, A(b428), e.H(0xD1DA, 0, 0, 0, 0, 0, 0, t + 0xF5));
-        e.H(0xD384, e.R(G(0xDBC58)) + dy, 0, 1, 0, 0, 0, A(b428), e.R(G(0xDBC54)));
-        return;
+        return e.H(0xD384, e.R(G(0xDBC58)) + dy, 0, 1, 0, 0, 0, A(b428), e.R(G(0xDBC54)));
     }
     case 4:
-        if (e.R(G(0xFADB4)) != 0) return;
-        e.H(0xBFEC0, 0, 0, 0, 0, 0, P);
-        return;
+        if (e.R(G(0xFADB4)) != 0) return type;
+        return e.H(0xBFEC0, 0, 0, 0, 0, 0, P);
     case 5: {
         const uint32_t a = e.H(0xC1F0, P);
         const uint32_t t = e.H(0xC1A2, a, e.R(P + 4));
         const uint32_t s = e.H(0xC214, t);
-        if (s == 0) return;
+        if (s == 0) return 0;
         const uint32_t r = e.H(0xC1E4, a, P);
-        if (r == 0) return;
+        if (r == 0) return 0;
         const uint32_t x = (e.R(r + 0xC) >> 1) + e.R(r + 4) + e.R(G(0xDBC54));
         const uint32_t y = (e.R(r + 0x10) >> 1) + e.R(r + 8) + e.R(G(0xDBC58));
         uint32_t txt = s + 0x1BE;
@@ -148,16 +148,15 @@ extern "C" void d2c_c0d30(uint32_t P, const cl::Env& e) {
             if (e.R(G(0x11C0A0)) == 0) {   // fatal: Fog 10024(file, 10265(0x60)), exit(-1)
                 e.H(0xBF80, 0xB2000000u | 0xD359F, e.H(0xBF92, 0x60));
                 e.H(0x3664, 0xFFFFFFFFu);
-                return;
+                return 0;   // retail does not return (exit)
             }
             txt = str(e, e.R8(G(0x115591)) ? 0x13DE : 0x13DD);
         }
         b298[0] = 0;
         e.H(kStrncpy, 0xC7, 0, 0, 0, 0, 0, A(b298), txt);
-        e.H(0xD384, y, 0, 1, 0, 0, 0, A(b298), x);
-        return;
+        return e.H(0xD384, y, 0, 1, 0, 0, 0, A(b298), x);
     }
     default:
-        return;
+        return type;
     }
 }
