@@ -8,6 +8,7 @@
 #include "weather_sim.h"
 
 #include "sub_4f860.h"
+#include "d2client_5dfd0.h"
 
 namespace {
 using namespace d2client_4f860;
@@ -58,9 +59,27 @@ struct Amb final : Services {
         seed[0] = uint32_t(v); seed[1] = uint32_t(v >> 32);
         return (n & (n - 1)) ? U(uint32_t(v) % n) : ((n - 1) & U(v));
     }
-    void f5cf90(U) override {}
-    void f4f750() override {}
-    void f4f720(U) override {}
+    U lastKey = 0xffffffffu; bool keyMoved = false;
+    void f5cf90(U k) override { if (k != lastKey) { lastKey = k; keyMoved = true; } }   // 0x5CF90: D2Sound #10059 when the area key changed
+    // The Sounds table (sound pump / session replay) when loaded; the play path never loads it, so these are then no-ops.
+    // 0x5DE10 (ECX = index): zero +0x8A over the child run [+0x60, +0x60+byte(+0x3D)).
+    // 0x5DE90 (ECX = index, EBX = delta): add delta to +0x8A over the same run; a record with +0x8A 0 and delta -1 is a no-op.
+    static uint8_t* snd(int32_t i) { uint8_t* b = d2client_sounds::records(); return (b && i > 0 && i < d2client_sounds::recordCount()) ? b + size_t(i) * 0x8e : nullptr; }
+    static void bump(int32_t i, int32_t delta, bool zero) {
+        uint8_t* p = snd(i); if (!p) return;
+        int32_t first; memcpy(&first, p + 0x60, 4);
+        if (!zero) { int32_t c; memcpy(&c, p + 0x8a, 4); if (c == 0 && delta == -1) return; }
+        for (int32_t k = first; k < int32_t(p[0x3d]) + first; ++k) {
+            uint8_t* c = snd(k); if (!c) continue;
+            int32_t v = 0; if (!zero) { memcpy(&v, c + 0x8a, 4); v += delta; }
+            memcpy(c + 0x8a, &v, 4);
+        }
+    }
+    void f4f750() override { for (int32_t i = 0xaa0; i < 0xb3d; i += 4) bump(i, 0, true); }   // 0x4F750
+    void f4f720(U v) override {                                                                // 0x4F720 (EAX = v, EBX = +1)
+        int32_t a = int32_t(v) * 4 + 0xa9c;
+        for (int k = 0; k < 3; ++k, a += 0x30) { bump(a, 1, false); bump(a + 0x18, 1, false); }
+    }
 };
 Amb A;
 Env E{};
@@ -80,8 +99,16 @@ uint32_t* fallbackSeed(uint32_t (*playerInit)()) {
     }
     return Fb;
 }
-void reset() { Fb[0] = Fb[1] = 0; FbSet = false; E = Env{}; Now = 0; A.qn = 0; A.nextHandle = 1; A.vol = 0; A.nheld = 0; }
+void reset() { Fb[0] = Fb[1] = 0; FbSet = false; E = Env{}; Now = 0; A.qn = 0; A.nextHandle = 1; A.vol = 0; A.nheld = 0; A.lastKey = 0xffffffffu; A.keyMoved = false; }
 void setArea(U key) { A.key = key; }
+// The sound pump's feed: the loaded SoundEnviron table (0x58-byte records) instead of the JavaScript-fed rows.
+void useEnvTable() {
+    const uint8_t* e = d2client_sounds::envTable(); int32_t n = d2client_sounds::envCount();
+    if (!e) return;
+    if (n > int32_t(kMaxRec)) n = int32_t(kMaxRec);
+    memcpy(A.tbl, e, size_t(n) * kRec); A.nrec = U(n);
+}
+bool keyMoved() { const bool k = A.keyMoved; A.keyMoved = false; return k; }
 // A sound-engine submit from another client handler (0x88A70): a one-shot, drained with the ambient pairs.
 void submit(int32_t row) { A.f88a70(U(row), 2); }
 void releaseHeld() { A.nheld = 0; }

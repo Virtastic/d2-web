@@ -101,6 +101,8 @@ IdleCall* C(void* u) { return static_cast<IdleCall*>(u); }
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_monster_idle_reset() { g_idle.clear(); g_idleNow = g_idleLast = g_idleDelay = 0; }
 // 0x22070 / the inline stores beside DAT_6fbcc4c4 (0x23630 hit/death, 0x242B0 attack): a monster sound stamps the unit's +0x7C.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_monster_sfx_stamp(uint32_t id, uint32_t now) { g_idle[id].u7c = now; }
+// 0x220A0: the unit's +0x7C sound tick, as the session last stamped it.
+extern "C" uint32_t d2_client_monster_sfx_ticks(uint32_t id) { auto it = g_idle.find(id); return it == g_idle.end() ? 0 : it->second.u7c; }
 // One 0x4F4A0 -> 0x237E0 call for a client monster (class, 0x223D0 mode) at frame `now`; returns the Sounds row 0x88A70 submits, or 0.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_monster_idle(uint32_t id, int32_t cls, uint32_t mode, uint32_t now) {
     IdleCall c{cls, mode, 0, 0, &g_idle[id], DATATBLS_GetMonSoundsTxtRecordFromMonsterId(cls), 0};

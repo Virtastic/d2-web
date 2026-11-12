@@ -225,7 +225,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_dg_79c80(int32_t cell, int32_t px, int32_t py, i
 // ---- staged engine state for the room walk (flattened by the session feeder; arena offsets, 0x30-byte tile entries) ----
 namespace {
 struct StUnit { uint32_t unit; int32_t cls, type, sx, sy; uint32_t a6180, bit20, bit7; };
-struct StRoom { int32_t r5c, r60, r64, r68, subX, subY; uint32_t nA, nB, nU, a0, b0, u0; };
+struct StRoom { int32_t r5c, r60, r64, r68, subX, subY; uint32_t nA, nB, nU, a0, b0, u0; int32_t cru; };   // cru: the room's client unit list (client_room_units.cpp), -1 = staged order
 constexpr uint32_t kStageTiles = kCells + kMaxN * kMaxN * 0x24;
 constexpr uint32_t kMaxTiles = 4096, kMaxRooms = 256, kMaxUnits = 1024;
 uint8_t g_stage[kMaxTiles * 0x30];
@@ -240,6 +240,9 @@ int32_t g_view[4], g_ox, g_oy; uint32_t g_now, g_skipUnits;
 static_assert(kStageTiles + kMaxTiles * 0x30 > 0, "stage lives after the cells in the arena");
 
 // 1.13c D2Client+0x7A5D0 (room callback of D2Common #11152). Fed by staged rooms; Ordinal_10013 return taken as 0.
+extern "C" int32_t d2c_cru_first_sorted(int32_t);
+extern "C" int32_t d2c_cru_next(int32_t);
+extern "C" uint32_t d2c_cru_aux(int32_t);
 static bool d2c_7a5d0(uint32_t ri) {
     StRoom& r = g_rooms[ri];
     int32_t x0 = ((r.r5c - r.r60) - r.r68) * 0x50 - 0x50, y0 = (r.r60 + 2 + r.r5c) * 0x28;
@@ -275,8 +278,15 @@ static bool d2c_7a5d0(uint32_t ri) {
             }
         }
     }
-    if (!g_skipUnits) for (uint32_t k = 0; k < r.nU; k++) {
-        StUnit& u = g_units[r.u0 + k];
+    // #10667 (D2Common+0x3C640): the room's list, sorted by 664B0 on this call, walked by unit +0xE8. A room staged without
+    // a client list keeps its staged order.
+    int32_t s = -1, k = 0;
+    if (!g_skipUnits && r.cru >= 0) s = d2c_cru_first_sorted(r.cru);
+    if (!g_skipUnits) for (;;) {
+        uint32_t ui;
+        if (r.cru >= 0) { if (s < 0) break; ui = d2c_cru_aux(s); s = d2c_cru_next(s); if (ui >= g_nUnits) continue; }
+        else { if ((uint32_t)k >= r.nU) break; ui = r.u0 + (uint32_t)k++; }
+        StUnit& u = g_units[ui];
         auto fl = [](int32_t v) { return v >= 0 ? v / 160 : -((-v + 159) / 160); };
         int32_t px = (u.sx - u.sy) * 16, py = (u.sx + u.sy) * 8;
         int32_t tx = fl(px + 2 * py), ty = fl(2 * py - px) - 1;   // ty-1 as the tile passes (8B110 Z rows: every unit sits one row above the unit-spec reading)
@@ -312,8 +322,10 @@ EMSCRIPTEN_KEEPALIVE void d2_dg_stage_unit_cof(uint32_t k, const uint8_t* hdr) {
 }
 EMSCRIPTEN_KEEPALIVE void d2_dg_stage_room(int32_t r5c, int32_t r60, int32_t r64, int32_t r68, int32_t subX, int32_t subY,
                                            uint32_t nA, uint32_t a0, uint32_t nB, uint32_t b0, uint32_t nU, uint32_t u0) {
-    if (g_nRooms < kMaxRooms) g_rooms[g_nRooms++] = {r5c, r60, r64, r68, subX, subY, nA, nB, nU, a0, b0, u0};
+    if (g_nRooms < kMaxRooms) g_rooms[g_nRooms++] = {r5c, r60, r64, r68, subX, subY, nA, nB, nU, a0, b0, u0, -1};
 }
+// The last staged room walks client room list h (each unit's aux = its staged index) instead of its staged order.
+EMSCRIPTEN_KEEPALIVE void d2_dg_stage_room_list(int32_t h) { if (g_nRooms) g_rooms[g_nRooms - 1].cru = h; }
 // view = world rect (l,t,r,b), ox/oy = grid origin from #10512 on ctx+0x24/0x28 (a-3, b-ctx[0xEAB4]); n = grid side.
 EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_frame(int32_t l, int32_t t, int32_t r, int32_t b, int32_t ox, int32_t oy, int32_t n,
                                           uint32_t skipUnits, uint32_t now) {

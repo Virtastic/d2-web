@@ -392,11 +392,36 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_drlg_client_room_status_cells(int levelId
 // pFirstRoomEx order, walls = list A, roofs = list B. Units are not staged (skipUnits stays the caller's).
 extern "C" uint32_t d2_dg_stage_unit(uint32_t, int32_t, int32_t, int32_t, uint32_t, uint32_t, uint32_t);
 extern "C" void d2_dg_stage_unit_cof(uint32_t, const uint8_t*);
-struct FeedUnit { int32_t type, cls, sx, sy; uint32_t flags, flagsEx; uint8_t cof[0x18]; bool hasCof; };
+struct FeedUnit { int32_t type, cls, sx, sy; uint32_t flags, flagsEx; uint8_t cof[0x18]; bool hasCof;
+                  bool hasId; uint32_t id, mode, fx, fy; int32_t slot, rank, floor; };
 static std::vector<FeedUnit> g_feedUnits;   // the caller's per-tick client units (JS has no game logic: raw fields only)
+static bool g_cruLive;                      // a unit with an id was fed: rooms walk the persistent client room lists
 EMSCRIPTEN_KEEPALIVE void d2_dg_feed_unit(int type, int cls, int sx, int sy, uint32_t flags, uint32_t flagsEx) {
-    if (type < 0) g_feedUnits.clear(); else g_feedUnits.push_back({type, cls, sx, sy, flags, flagsEx, {}, false});
+    if (type < 0) g_feedUnits.clear(); else g_feedUnits.push_back({type, cls, sx, sy, flags, flagsEx, {}, false, false, 0, 0, 0, 0, -1, -1, 0});
 }
+// A client unit with its id and mode (the client room lists, client_room_units.cpp): fx/fy the fp16 fraction of a moving
+// unit's position (0x8000 = a placed unit's subtile centre). Fed in the order the client learnt of the units.
+EMSCRIPTEN_KEEPALIVE void d2_dg_feed_unit_ex(int type, uint32_t id, int cls, int sx, int sy, uint32_t mode, uint32_t fx, uint32_t fy,
+                                             uint32_t flags, uint32_t flagsEx) {
+    g_feedUnits.push_back({type, cls, sx, sy, flags, flagsEx, {}, false, true, id, mode, fx, fy, -1, -1, 0});
+    g_cruLive = true;
+}
+extern "C" void d2c_cru_reset();
+extern "C" void d2c_cru_begin();
+extern "C" void d2c_cru_end();
+extern "C" int32_t d2c_cru_unit(uint32_t, uint32_t, int32_t, int32_t, int32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, int32_t, int32_t, int32_t);
+extern "C" int32_t d2c_cru_room(int32_t, int32_t, int32_t);
+extern "C" int32_t d2c_cru_first(int32_t);
+extern "C" int32_t d2c_cru_next(int32_t);
+extern "C" void d2c_cru_set_aux(int32_t, uint32_t);
+extern "C" int32_t d2c_cru_rank(int32_t);
+extern "C" int32_t d2c_cru_a6180(int32_t);
+extern "C" void d2_dg_stage_room_list(int32_t);
+EMSCRIPTEN_KEEPALIVE void d2_dg_cru_reset() { d2c_cru_reset(); g_cruLive = false; }
+// After d2_dg_feed: fed unit i's position in its room's unit list (0 = first drawn of its room, -1 = in no client room), and
+// whether D2Client 7A5D0 puts it on the floor list (A6180 or unit +0xC4 bit 20: drawn with the floor, before every wall).
+EMSCRIPTEN_KEEPALIVE int d2_dg_unit_rank(int i) { return i >= 0 && i < (int)g_feedUnits.size() ? g_feedUnits[i].rank : -1; }
+EMSCRIPTEN_KEEPALIVE int d2_dg_unit_floor(int i) { return i >= 0 && i < (int)g_feedUnits.size() ? g_feedUnits[i].floor : 0; }
 // The last fed unit's COF: the .cof its mode and weapon class load (the cel chain's header: layer count, bounding box). 0 when the file is absent.
 EMSCRIPTEN_KEEPALIVE int d2_dg_feed_unit_cof(const char* path) {
     std::vector<uint8_t> f;
@@ -420,6 +445,21 @@ static uint32_t stageTiles(const D2DrlgTileDataStrc* t, int n, uint32_t& cnt) {
 EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_feed(int level, int l, int t, int r, int b, int ox, int oy, int n, uint32_t now) {
     d2_dg_stage_reset();
     D2DrlgLevelStrc* lv = g_act && g_act->pDrlg ? DRLG_GetLevel(g_act->pDrlg, level) : nullptr;
+    if (g_cruLive) {
+        // Each unit joins the room its position resolves to (the active room under its subtile); a unit the client no
+        // longer holds leaves its room.
+        d2c_cru_begin();
+        for (FeedUnit& u : g_feedUnits) {
+            if (!u.hasId) continue;
+            D2ActiveRoomStrc* ar = g_act ? DUNGEON_FindRoomBySubtileCoordinates(g_act, u.sx, u.sy) : nullptr;
+            D2DrlgRoomStrc* dr = ar ? ar->pDrlgRoom : nullptr;
+            int32_t lid = dr && dr->pLevel ? dr->pLevel->nLevelId : -1;
+            u.slot = d2c_cru_unit((uint32_t)u.type, u.id, u.cls, u.sx, u.sy, u.mode, u.fx, u.fy, u.flags, u.flagsEx,
+                                  lid, dr ? dr->nTileXPos : 0, dr ? dr->nTileYPos : 0);
+            u.floor = (d2c_cru_a6180(u.slot) || ((u.flags >> 20) & 1)) ? 1 : 0;
+        }
+        d2c_cru_end();
+    }
     for (D2DrlgRoomStrc* room = lv ? lv->pFirstRoomEx : nullptr; room; room = room->pDrlgRoomNext) {
         D2ActiveRoomStrc* a = room->pRoom;
         if (!a || !a->pRoomTiles) continue;
@@ -427,6 +467,21 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_feed(int level, int l, int t, int r, int b, 
         uint32_t a0 = stageTiles(a->pRoomTiles->pWallTiles, a->pRoomTiles->nWalls, nA), b0 = stageTiles(a->pRoomTiles->pRoofTiles, a->pRoomTiles->nRoofs, nB);
         // subX/subY = room origin in subtiles (5 per tile): unverified, no retail trace carries it.
         uint32_t u0 = 0, nU = 0;
+        if (g_cruLive) {
+            const int32_t h = d2c_cru_room(level, room->nTileXPos, room->nTileYPos);
+            for (int32_t s = d2c_cru_first(h); s >= 0; s = d2c_cru_next(s)) {
+                const FeedUnit* f = nullptr;
+                for (const FeedUnit& u : g_feedUnits) if (u.slot == s) { f = &u; break; }
+                if (!f) continue;
+                uint32_t k = d2_dg_stage_unit((uint32_t)f->cls, f->type, f->sx, f->sy, (uint32_t)d2c_cru_a6180(s), (f->flags >> 20) & 1, (f->flagsEx & 1) ? 0 : 1);
+                if (f->hasCof) d2_dg_stage_unit_cof(k, f->cof);
+                d2c_cru_set_aux(s, k);
+                if (!nU++) u0 = k;
+            }
+            d2_dg_stage_room(room->nTileXPos, room->nTileYPos, room->nTileWidth, room->nTileHeight, room->nTileXPos * 5, room->nTileYPos * 5, nA, a0, nB, b0, nU, u0);
+            d2_dg_stage_room_list(h);
+            continue;
+        }
         for (const FeedUnit& u : g_feedUnits) {
             int tx = u.sx / 5, ty = u.sy / 5;
             if (tx < room->nTileXPos || ty < room->nTileYPos || tx >= room->nTileXPos + room->nTileWidth || ty >= room->nTileYPos + room->nTileHeight) continue;
@@ -436,7 +491,9 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_feed(int level, int l, int t, int r, int b, 
         }
         d2_dg_stage_room(room->nTileXPos, room->nTileYPos, room->nTileWidth, room->nTileHeight, room->nTileXPos * 5, room->nTileYPos * 5, nA, a0, nB, b0, nU, u0);
     }
-    return d2_dg_frame(l, t, r, b, ox, oy, n, 0, now);
+    const uint32_t cells = d2_dg_frame(l, t, r, b, ox, oy, n, 0, now);
+    if (g_cruLive) for (FeedUnit& u : g_feedUnits) if (u.hasId) u.rank = d2c_cru_rank(u.slot);
+    return cells;
 }
 EMSCRIPTEN_KEEPALIVE const D2DrlgClientTile* d2_drlg_client_tiles() { return g_clientTiles.data(); }
 EMSCRIPTEN_KEEPALIVE int d2_drlg_client_tile_count() { return (int)g_clientTiles.size(); }

@@ -236,6 +236,7 @@ static constexpr size_t kSessionClientMapEventCapacity = 65536; // 1 MiB of diag
 static uint32_t g_sessionClientMapEventsDropped = 0;
 // The offline browser client owns an independent local-player CUnit seed stream. It must never
 // borrow g_targetPlayer->pSeed, which belongs to the D2Game/server unit.
+void d2client_sound_stage_feed(uint32_t soundEnv); void d2client_sound_stage_log();   // sound_pump.cpp (replay-armed)
 namespace d2client_ambient { void reset(); void tick(uint32_t* seed, uint32_t period, bool weatherLevel); uint32_t* fallbackSeed(uint32_t (*playerInit)()); }
 extern "C" void d2_client_monster_idle_reset();   // 1.13c D2Client+0x237E0 monster branch state (unit_sound_trigger_237e0.cpp)
 extern "C" void d2_client_attack_roll_reset();   // 1.13c D2Client+0x242B0 attack-roll state (monster_face.cpp)
@@ -1195,6 +1196,7 @@ static void syncSessionClientMapFromPlayer();
 static std::unordered_set<D2DrlgRoomStrc*> g_sessionClientRoomsSeen;   // D2Client+0x440C0's seen bit
 static void sessionClientMonsterModeReset();
 static uint32_t g_sessionClientFrame = 0;   // the client frames run since the session began (the frame tail counts them)
+extern "C" uint32_t d2_session_client_frame_now() { return g_sessionClientFrame; }
 
 static void resetSessionClientMapMirror() {
     if (g_sessionClientPlayerUnit) UNITS_FreeUnit(g_sessionClientPlayerUnit);
@@ -8307,7 +8309,12 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             // 800x600 (the spawn bound range turns 513 then). Not the window: the rig has none.
             env.cellW = g_sessionClientFrame >= 13 ? 800 : 640; env.cellH = g_sessionClientFrame >= 13 ? 600 : 480;
             // 1.13c D2Client+0x5F020 runs 0x4F860 first, before the frame's weather pass; same hero seed.
-            d2client_ambient::tick(heroSeed, (uint32_t)ENVIRONMENT_GetPeriodOfDayFromAct(g_game->pAct[g_currentAct], 0), env.weatherLevel);
+            { const D2LevelsTxt* lv = DATATBLS_GetLevelsTxtRecord(g_currentLevel); d2client_sound_stage_feed(lv ? (uint32_t)(lv->dwSoundEnv & 0xff) : 0); }
+            // D2Common #10396 follows the argument's +4 pointer and returns its first dword: the environment's cycle index (0 sunrise,
+            // 1 morning, 2 noon, 3 afternoon, 4+ evening/night), so 1..3 is the day ambience row and every other value the night one.
+            { const D2DrlgEnvironmentStrc* ev = DUNGEON_GetEnvironmentFromAct(g_game->pAct[g_currentAct]);
+              d2client_ambient::tick(heroSeed, ev ? (uint32_t)ev->nCycleIndex : 0u, env.weatherLevel); }
+            d2client_sound_stage_log();
             d2client::weather::tick(*reinterpret_cast<d2client::weather::Seed*>(heroSeed), env);
         }
         sessionClientMonsterIdlePass();
