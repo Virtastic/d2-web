@@ -4,7 +4,7 @@
 extern "C" {
 int32_t Ordinal_10009(void);            // game-mode query
 void*   Ordinal_10042(int32_t, int32_t); // Fog alloc(line, 0)
-void    Ordinal_10043(int32_t, int32_t); // Fog free
+void    D2M_Fog_Free(int32_t, int32_t); // Fog free
 void    Ordinal_10050(void*);            // release (per slot)
 void    Ordinal_10031(int32_t);          // reset(handle)
 void    Ordinal_10199(void);
@@ -38,7 +38,7 @@ int32_t d2_multi_sub_7ee0(int32_t p) {
 // 1.13c D2Multi+0x83E0
 void d2_multi_sub_83e0(void) {
     uint8_t* n = DAT_6fa0a0f0;
-    while (n) { n = *(uint8_t**)(n + 0x204); Ordinal_10043(0x1b75, 0); }
+    while (n) { n = *(uint8_t**)(n + 0x204); D2M_Fog_Free(0x1b75, 0); }
     DAT_6fa0a0f0 = 0;
 }
 

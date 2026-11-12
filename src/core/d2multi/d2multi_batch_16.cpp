@@ -5,7 +5,7 @@
 
 extern "C" {
 void    Ordinal_10106(void);
-void    Ordinal_10043(int32_t, int32_t);  // Fog free
+void    D2M_Fog_Free(int32_t, int32_t);  // Fog free
 int32_t Ordinal_10037(void);
 int32_t Ordinal_10098(const void*);       // load/open by name
 void    Ordinal_10147(void);
@@ -52,9 +52,9 @@ extern "C" void d2_multi_sub_b1f0(void) {
         if (n[2]) Ordinal_10106();
         if (n[0]) {
             d2_multi_sub_8c80(DAT_6fa0a0c8, 0);
-            if (n[0]) Ordinal_10043(0xc32, 0);
+            if (n[0]) D2M_Fog_Free(0xc32, 0);
         }
-        Ordinal_10043(0xc33, 0);
+        D2M_Fog_Free(0xc33, 0);
         Ordinal_10037();
     }
 }
