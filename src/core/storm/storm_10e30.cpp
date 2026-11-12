@@ -1,5 +1,5 @@
-// Storm+0x10E30 own-file port: queue one packet on a connection (register args conn EDI, pkt ESI, count EBX).
-// Register convention: conn (EDI), pkt (ESI), count (EBX, the count Storm+0x10D20 reads; retail inherits it from the caller).
+// Storm+0x10E30 own-file port: queue one packet on a connection (register args conn EDI, pkt ESI).
+// Register convention: conn (EDI), pkt (ESI); 0x10D20's part count (EBX) is always 1.
 #include <cstdint>
 #include <cstring>
 
@@ -12,7 +12,7 @@ extern "C" uint32_t Storm_Sub10D20(const void* const* parts, const uint8_t* data
 extern "C" void storm_port_10e30(uint32_t* r) {  // 1.13c Storm+0x10E30
     uint8_t* conn = (uint8_t*)(uintptr_t)r[0];
     const uint8_t* pkt = (const uint8_t*)(uintptr_t)r[1];
-    const uint32_t count = r[2];
+    const uint32_t count = 1;   // retail: push ebx; mov ebx, 1; call 0x10D20; pop ebx (the caller's EBX never reaches 0x10D20)
     const void* part = conn + 0x108;
     uint16_t len, word;
     std::memcpy(&len, pkt + 0x02, 2);

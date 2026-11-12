@@ -22,7 +22,7 @@ inline uint32_t tagRva(const char* s) {
         { "AV_TSHashObjectChunk_URGN_VH", 0x51B88 }, { "AV__TSExplicitList(URGN(0,CC))", 0x51BC0 },
         { "AUUSEREVENT", 0x51D8C }, { "AUCONNREC", 0x51DC0 }, { "AUPROVIDERINFO", 0x51DD8 },
         { "AUFILEREC", 0x51CC0 }, { "AUEVENTREC", 0x51CA8 }, { "AUREQUEST", 0x51CD8 }, { "AUARCHIVEREC", 0x51CF0 },
-        { "AUSTREAM", 0x515B8 }, { "SBLT.CPP", 0x469D8 }, { "SCOMP.CPP", 0x474A8 },
+        { "AUSTREAM", 0x515B8 }, { "SBLT.CPP", 0x469D8 }, { "SCOMP.CPP", 0x474A8 }, { "SGDI.CPP", 0x47998 },
     };
     for (const auto& e : t) {
         const char* p = strstr(s, e.k);

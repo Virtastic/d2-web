@@ -8,8 +8,11 @@ struct S46D0Env { void (*elemDtor)(uint8_t* e); void (*baseDtor)(uint8_t* self);
 extern "C" void Storm_Sub46D0(const S46D0Env& e, uint8_t* self);
 
 static HookEnv* gE;
-static uint32_t gBase;
-static uint32_t tg(uint32_t v) { return 0xB1000000u | (1u << 16) | (v - gBase); }   // a pointer into blob S (index 1)
+static const uint32_t* gR;
+static uint32_t tg(uint32_t v) {   // a pointer into blob S (1) or S2 (2, the holdout's block)
+    for (uint32_t k = 1; k <= 2; k++) { const uint32_t b = gR[14 + 2 * k]; if (v - b < 256u) return 0xB1000000u | (k << 16) | (v - b); }
+    return v;
+}
 static void elem46(uint8_t* el) { gE->h(0x44C0, 0, tg((uint32_t)(uintptr_t)el)); }
 static void base46(uint8_t* self) { gE->h(0x4B80, 0, 0, 0, 0, 0, tg((uint32_t)(uintptr_t)self)); }
 
@@ -17,8 +20,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_storm_46d0(uint32_t* r) {
     static const uint32_t sc[] = { 0, 0 };
     HookEnv e((uint32_t*)(uintptr_t)r[14], sc);
     gE = &e;
-    gBase = r[16];
+    gR = r;
     const S46D0Env env{ elem46, base46 };
     Storm_Sub46D0(env, (uint8_t*)(uintptr_t)r[0]);
-    r[4] = 0;
+    r[4] = 0;   // retail leaves EAX = the base teardown's return (the hooked 0x4B80 answers 0)
 }

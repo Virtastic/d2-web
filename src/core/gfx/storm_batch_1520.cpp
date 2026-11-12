@@ -214,31 +214,9 @@ void storm_sub_2080(uint32_t* self) {
     }
 }
 
-// 0x2020: base constructor. 0x2560 (not this batch) leaves the vtable plus the empty relative
-// lists at +0x0c, +0x28 and +0x38; those sentinels are modelled here (init pattern of 0x2BC0:
-// {0xDDDDDDDD, self, ~self}; 0x2D20 for the +0x38 one: {0x10, self, ~self}).
-void storm_sub_2020(uint32_t* p) {
-    p[1] = 0xc;
-    p[2] = (uint32_t)(uintptr_t)(p + 2);
-    p[3] = (uint32_t)~(uint32_t)(uintptr_t)(p + 2);
-    p[4] = p[5] = p[6] = p[7] = p[8] = 0;
-    p[9] = 3;
-    p[10] = 0xdddddddd;
-    p[11] = (uint32_t)(uintptr_t)(p + 11);
-    p[12] = (uint32_t)~(uint32_t)(uintptr_t)(p + 11);
-    p[13] = 0x10;
-    p[14] = 0x10;
-    p[15] = (uint32_t)(uintptr_t)(p + 15);
-    p[16] = (uint32_t)~(uint32_t)(uintptr_t)(p + 15);
-    p[0] = 0;
-    p[0x12] = (uint32_t)~((uint32_t)(uintptr_t)p) & 0x0fffffffu;
-    p[0x13] = 0;
-}
-
-// Retail vtables are image state (0x6FC36AD4/0x6FC36AE4/0x6FC36AF4/0x6FC36B04); ours are real
+// Retail vtables are image state (0x6FC36AD4/0x6FC36B04); ours are real
 // distinct objects so a stored slot is a valid pointer.
 uintptr_t g_vtable_36ad4;
-uintptr_t g_vtable_36af4;
 uintptr_t g_vtable_36b04;
 
 // 0x1A70: install the vtable (retail 0x6FC36B04), reset the table part (0x20C0 mode 1), drain
@@ -323,13 +301,15 @@ EMSCRIPTEN_KEEPALIVE void storm_port_16b0(uint32_t* r) {
     r[4] = 0;
 }
 
-// 1.13c Storm+0x1790: construct the base object, install the vtable (retail 0x6FC36AF4) and
-// initialise the critical section at +0x50; returns the object.
+// 1.13c Storm+0x1790: construct the base object (0x2020, the hash-table ctor in the guest word layout: it allocates
+// the 4-element list array), install the vtable (retail's image word 0x6FC36AF4) and initialise the critical
+// section at +0x50; returns the object.
+extern "C" uint32_t* Storm_Ctor2020(uint32_t* w);
 extern "C"
 EMSCRIPTEN_KEEPALIVE void storm_port_1790(uint32_t* r) {
     uint32_t* p = (uint32_t*)(uintptr_t)r[0];
-    storm_sub_2020(p);
-    p[0] = (uint32_t)(uintptr_t)&g_vtable_36af4;
+    Storm_Ctor2020(p);
+    p[0] = 0x6fc36af4u;
     InitializeCriticalSection((LPCRITICAL_SECTION)((uintptr_t)p + 0x50));
     r[4] = (uint32_t)(uintptr_t)p;
 }

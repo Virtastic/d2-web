@@ -23,10 +23,11 @@ void* Storm_Sub3080(void* src, void* dst);                                      
 
 namespace {
 inline uint32_t* w(void* p, uint32_t off) { return (uint32_t*)((uint8_t*)p + off); }
-const char kAurgn[] = "(AURGN)";   // retail s___AURGN___6fc41c3c
-const char kI[] = "(I)";           // retail s__I_6fc41c80
-const char kE[] = "(E)";           // retail s__E_6fc41c74
-const char kEvt[] = "(AUEVENTREC)";// retail s___AUEVENTREC___6fc41ca8
+// the tag names as retail spells them (Storm .data type-descriptor names)
+const char kAurgn[] = ".?AURGN@@";        // retail s___AURGN___6fc41c3c
+const char kI[] = ".I";                   // retail s__I_6fc41c80
+const char kE[] = ".E";                   // retail s__E_6fc41c74
+const char kEvt[] = ".?AUEVENTREC@@";     // retail s___AUEVENTREC___6fc41ca8
 }
 
 extern "C" void Storm_Sub2C60(uint32_t cap, uint32_t* self);

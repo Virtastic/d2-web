@@ -352,6 +352,8 @@ void Storm_Sub19C80_Pin(uint32_t display, uint32_t hwnd, uint32_t draw, int32_t 
     g_453e4 = (void*)(uintptr_t)display; g_453d8 = (void*)(uintptr_t)hwnd; g_45804 = (void*)(uintptr_t)draw;
     g_453e8 = nullptr; g_41a1c = bpp; g_41a20 = width; g_41a24 = height;
 }
+// the save-dialog flag 0x6FC453D4 (the FN probe pins it before the call and reads it back after)
+extern "C" int32_t* Storm_Sub19C80_DialogFlag() { return &g_453d4; }
 
 extern "C"
 uint32_t Storm_Sub19C80(uint32_t* param_1, const StormBatch382c0Env* env) {

@@ -235,6 +235,9 @@ int32_t Storm_Sub11F10(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d, uint3
     return Storm_Sub11F10Full(nullptr, scratch, a, b, c, d, e, f);
 }
 
+// the two module defaults 0x11F10 stores: 0 = the empty string (0x6FC36B65), 1 = the version buffer (0x6FC463F0)
+extern "C" uint32_t Storm_Sub11F10_Default(int32_t which) { return which ? A(g_463f0) : A(kEmpty); }
+
 // capture seams for 0x12F40: the pacing stamp 0x6FC4583C, the queued-bytes counter 0x6FC41AB8 and a pinned clock (0 = live)
 uint32_t g_tickPin;
 extern "C" void storm_snet_pin_pace(uint32_t stamp, uint32_t sent, uint32_t tick) { g_4583c = stamp; g_41ab8 = sent; g_tickPin = tick; }

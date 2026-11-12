@@ -2,8 +2,8 @@
 #include <cstdint>
 extern "C" {
 void sub_1B960(int* esi, const char* name, int n);  // Storm+0x1B960, ESI=arg (SMemFree)
-extern const char s__E_6fc41c74[] = "(E)";          // Storm .rdata @0x6FC41C74
-extern const char s__I_6fc41c80[] = "(I)";          // Storm .rdata @0x6FC41C80
+extern const char s__E_6fc41c74[] = ".E";           // Storm .data @0x6FC41C74
+extern const char s__I_6fc41c80[] = ".I";           // Storm .data @0x6FC41C80
 }
 
 // 1.13c Storm+0x03820: element dtor, frees the block at +8.
