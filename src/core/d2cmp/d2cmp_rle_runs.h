@@ -18,7 +18,7 @@ static inline uint32_t d2cmp_run_eq(const uint8_t* p, const uint8_t* end, uint8_
     uint32_t n = 0;
     for (;;) {
         if (*q != c) break;
-        if (n >= max) break;
+        if ((int32_t)n >= (int32_t)max) break;   // retail compares the count with max signed
         n++; q++;
         if (q >= end) break;
     }
