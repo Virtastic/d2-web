@@ -545,8 +545,12 @@ int d2_realm_client_item_packet(D2UnitStrc* hero, D2UnitStrc* owner,
     case ITEMACTION_UNKNOWN0x16: {
         // Equip is read from the handler. GUESS for 7, 9's swap-out half, 0x14, 0x15, 0x16 and 0x17:
         // their handlers are not read in full; the item is seated where its own record says it is
-        // (worn, on the cursor, in a grid or the belt). Settled by reading D2Client 0x861A0, 0x84300,
+        // (worn, on the cursor, in a grid or the belt). Settled by reading D2Client 0x84300,
         // 0x854E0, 0x84F00, 0x83790 and 0x85B30.
+        // 1.13c D2Client+0x861A0 (action 7) acts only on a hand slot (right or left, either weapon set), whose
+        // partner is the other hand; a record for any other body slot changes nothing.
+        if (action == ITEMACTION_INDIRECTLYSWAPBODYITEM && record.nBodyloc != BODYLOC_RARM && record.nBodyloc != BODYLOC_LARM &&
+            record.nBodyloc != BODYLOC_SWRARM && record.nBodyloc != BODYLOC_SWLARM) return 0;
         D2UnitStrc* item = obtain(guid, record, bits, size);
         if (!item) return 0;
         const int mode = record.nAnimMode;
