@@ -70,8 +70,7 @@ else echo "WARNING: no $DA_SRC/d2data.mpq -- the title screen draws plain until 
 # A vector moved or retired leaves a dangling link in a worktree; it is skipped, not fatal.
 [ -d vectors ] && find vectors/ -xtype l -printf "WARNING: skipping dangling vector link %p\n" -delete >&2
 # Not `cp -u`: a seeded site directory can be newer than a vector that was replaced since, and the stale copy stayed.
-# rsync recopies whenever size or mtime differ and stamps the source's mtime, so the next stage is a quick check.
-[ -d vectors ] && mkdir -p build-wasm/site/vectors && { if command -v rsync >/dev/null; then rsync -rLt vectors/ build-wasm/site/vectors/; else cp -rL vectors/. build-wasm/site/vectors/; fi; }
+[ -d vectors ] && mkdir -p build-wasm/site/vectors && cp -rL vectors/. build-wasm/site/vectors/
 # The widescreen HUD art: SGD2FreeRes's DC6 panels (the list play/assets/wide-hud.mjs names) and its licence,
 # tracked in play/freeres/. Never optional: without them the bottom bar draws only the 800 px centre panel, so
 # a missing file is a FATAL stage error (D2_FREERES_DIR overrides the source directory, for a test).
