@@ -28,7 +28,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Game_AD410(uint32_t kind, uint32_t a,
     if ((int32_t)((uint32_t)s % 100u) >= chance) return 0;
     int32_t lvl = e->getStat(a, 0xC, 0);
     if (lvl < 1) lvl = 1;
-    static const uint32_t arr[5] = { 9, 0x12, 0x1B, 0x24, 0x2D };
+    uint32_t arr[5] = { 9, 0x12, 0x1B, 0x24, 0x2D };   // a stack array, as retail builds it in its frame
+    __asm__ volatile("" : : "r"(arr) : "memory");
     int32_t dmg = e->calc(arr, lvl) + 0x28;
     uint32_t type; std::memcpy(&type, (void*)(uintptr_t)t, 4);
     bool halve = false;

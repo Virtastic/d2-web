@@ -40,13 +40,15 @@ static uint32_t dcRoll(uint32_t base) {
     return (uint32_t)p % 100;
 }
 
-void d2game_DC780_113c(uint32_t rec, uint32_t unit, int32_t dur, const D2GameDC780Env& e) {
-    if (dur <= 0) return;
+// Returns the EAX retail leaves: the record (EAX in) for a non-positive duration, 0 when the resist is 0, else the last
+// 0xA3CA (state 0x6B) call's.
+uint32_t d2game_DC780_113c(uint32_t rec, uint32_t unit, int32_t dur, const D2GameDC780Env& e) {
+    if (dur <= 0) return rec;
     uint32_t timer = e.getTimer(unit, 0xb);
-    if (!rec) { e.fatal(0xa2a); return; }
+    if (!rec) { e.fatal(0xa2a); return 0; }
     uint32_t game = dcR(rec, 0x80);
     int32_t res = e.resist(unit, game);
-    if (res == 0) return;
+    if (res == 0) return 0;
     if (unit && dcR(unit, 0) == 1 && res < 0) {
         uint32_t row = e.diffRow(*(uint8_t*)(uintptr_t)(game + 0x6d));
         int32_t d = (int32_t)dcR(row, 0x18);
@@ -70,11 +72,9 @@ void d2game_DC780_113c(uint32_t rec, uint32_t unit, int32_t dur, const D2GameDC7
         e.schedule(game, unit, 0xc, end);
     }
     uint32_t roll = dcRoll(unit);
-    if (roll < 20 && unit && dcR(unit, 0) == 1 && e.classHook(dcR(unit, 4), 0x13) == 0) {
-        e.setState(unit, 0x6b, 1);
-        return;
-    }
-    e.setState(unit, 0x6b, 0);
+    if (roll < 20 && unit && dcR(unit, 0) == 1 && e.classHook(dcR(unit, 4), 0x13) == 0)
+        return e.setState(unit, 0x6b, 1);
+    return e.setState(unit, 0x6b, 0);
 }
 
 // EAX on exit: the record on a non-positive duration, the roll's quotient (seed / 100) on the 90% skip, the 0xA580 or
@@ -125,7 +125,7 @@ static void     z_stat(uint32_t t, uint32_t s, uint32_t v, uint32_t l) { g_dcz->
 static void     z_fin(uint32_t u, uint32_t s, uint32_t l) { g_dcz->h(0xA59E, 0, 0, 0, 0, 0, u, s, l); }
 static int32_t  z_tend(uint32_t t) { return (int32_t)g_dcz->h(0xA790, 0, 0, 0, 0, 0, t); }
 static void     z_setend(uint32_t t, uint32_t e) { g_dcz->h(0xA778, 0, 0, 0, 0, 0, t, e); }
-static uint32_t z_chook(uint32_t c, uint32_t v) { return g_dcz->h(0x213B0, c, 0, v); }
+static uint32_t z_chook(uint32_t c, uint32_t v) { return g_dcz->h(0x13B0, c, 0, v); }   // retail calls 0x6FC213B0 (RVA 0x13B0)
 static uint32_t z_skill(uint32_t u, uint32_t v) { return g_dcz->h(0xA580, 0, 0, 0, 0, 0, v, u); }
 static uint32_t z_crow(uint32_t c) { return g_dcz->h(0x1220, c); }   // retail calls 0x6FC21220 = rva 0x1220
 static uint32_t z_uflag(uint32_t u) { return g_dcz->h(0xA7F6, 0, 0, 0, 0, 0, u); }
@@ -135,14 +135,13 @@ static D2GameDC780Env zenv() {
     e.fatal = z_fatal; e.getTimer = z_timer; e.resist = z_res; e.diffRow = z_row; e.setState = z_state; e.newTimer = z_new;
     e.schedule = z_sched; e.tagTimer = z_tag; e.setCallback = z_cb; e.attach = z_att; e.setStat = z_stat; e.finish = z_fin;
     e.timerEnd = z_tend; e.setEnd = z_setend; e.classHook = z_chook; e.skillFlag = z_skill; e.classRow = z_crow; e.unitFlag = z_uflag;
-    e.cbDB4C0 = 0xB2000000u | 0xDB4C0; e.strDB1B0EC = 0xB2000000u | 0xF90EC; e.cbBF7A0 = 0xB2000000u | 0x9F7A0;
+    e.cbDB4C0 = 0xB2000000u | 0xDB4C0; e.strDB1B0EC = 0xB2000000u | 0xFB0EC; e.cbBF7A0 = 0xB2000000u | 0x9F7A0;
     return e;
 }
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_dc780(uint32_t* r) {
     HookEnv he((uint32_t*)(uintptr_t)r[3], (const uint32_t*)(uintptr_t)r[5]); g_dcz = &he;
     D2GameDC780Env e = zenv();
-    d2game_DC780_113c(r[0], r[1], (int32_t)r[2], e);
-    r[4] = 0;
+    r[4] = d2game_DC780_113c(r[0], r[1], (int32_t)r[2], e);
 }
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_dcc20(uint32_t* r) {
     HookEnv he((uint32_t*)(uintptr_t)r[3], (const uint32_t*)(uintptr_t)r[5]); g_dcz = &he;
