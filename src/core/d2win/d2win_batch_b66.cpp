@@ -201,8 +201,10 @@ void d2win_12B40(int32_t idx, const D2Win12B40Env* e) {
 }
 
 // 1.13c D2Win+0x13ac0 -- edit-box scroll window [0x4c,0x50] recompute. ESI = edit widget (hidden).
+// Retail is void but leaves EAX at each exit: the caret width when the text fits, else whatever the walk that ended the
+// loop last held (a glyph advance, a width, an index; 0 when the start index ran down to 0). Returned here; callers ignore it.
 EMSCRIPTEN_KEEPALIVE
-void d2win_b66_13AC0(uint8_t* esi, const D2WinB66Env* e) {
+int32_t d2win_b66_13AC0(uint8_t* esi, const D2WinB66Env* e) {
     auto I = [&](int off) -> int32_t& { return *(int32_t*)(esi + off); };
     e->sub_2FE0(I(0x270));
     int32_t avail = I(0x14) - I(0x40) * 2;
@@ -214,49 +216,63 @@ void d2win_b66_13AC0(uint8_t* esi, const D2WinB66Env* e) {
     int32_t wText = e->textWidth(buf, u16len(buf));
     uint16_t us[2] = {'_', 0};
     int32_t wCur = e->textWidth(us, u16len(us));
+    int32_t eax = wCur;
     int32_t cursor = I(0x25c);
     if (cursor == len) wText += wCur;
-    if (wText <= avail) { I(0x50) = len - 1; I(0x4c) = 0; return; }
+    if (wText <= avail) { I(0x50) = len - 1; I(0x4c) = 0; return eax; }
     if (cursor == len) avail -= wCur;
     if (I(0x50) < cursor) {
         I(0x50) = cursor; I(0x4c) = cursor - 1;
-        int32_t s = cursor - 1;
-        while (s != 0) {
-            s = I(0x4c);
+        eax = cursor - 1;
+        while (eax != 0) {
+            int32_t s = I(0x4c);
+            eax = s;
             int32_t cnt = I(0x50) - s + 1, wsum = 0, k = 0;
             const uint16_t* q = buf + s;
             for (uint16_t ch = *q; ch && k < cnt; k++) {
-                if (ch != 10) wsum += e->glyph(ch)[3];
+                if (ch != 10) { eax = e->glyph(ch)[3]; wsum += eax; }
                 ch = *++q;
             }
             if (avail <= wsum) break;
-            s = --I(0x4c);
+            eax = --I(0x4c);
         }
         I(0x4c)++;
-        return;
+        return eax;
     }
     int32_t s = I(0x4c);
     if (cursor <= s + 1) {
         int32_t c = cursor - 1;
         c &= (c < 0) - 1;
         I(0x4c) = c; I(0x50) = c + 1;
+        eax = c + 1;
         // loop test uses the current end index
-        while (I(0x50) < len && e->textWidth(buf + I(0x4c), I(0x50) - I(0x4c) + 1) < avail) I(0x50)++;
+        while (eax < len) {
+            eax = e->textWidth(buf + I(0x4c), I(0x50) - I(0x4c) + 1);
+            if (eax >= avail) break;
+            eax = ++I(0x50);
+        }
         I(0x50)--;
-        return;
+        return eax;
     }
     if (avail <= e->textWidth(buf + s, u16len(buf + s))) {
         I(0x50) = s + 1;
-        while (I(0x50) < len && e->textWidth(buf + I(0x4c), I(0x50) - I(0x4c) + 1) < avail) I(0x50)++;
+        eax = s + 1;
+        while (eax < len) {
+            eax = e->textWidth(buf + I(0x4c), I(0x50) - I(0x4c) + 1);
+            if (eax >= avail) break;
+            eax = ++I(0x50);
+        }
         I(0x50)--;
-        return;
+        return eax;
     }
     I(0x50) = len - 1; I(0x4c) = len - 2;
-    s = len - 2;
-    while (s != 0) {
+    eax = len - 2;
+    while (eax != 0) {
         s = I(0x4c);
-        if (avail <= e->textWidth(buf + s, u16len(buf + s))) break;
-        s = --I(0x4c);
+        eax = e->textWidth(buf + s, u16len(buf + s));
+        if (avail <= eax) break;
+        eax = --I(0x4c);
     }
     I(0x4c)++;
+    return eax;
 }
