@@ -2,7 +2,7 @@
 // arg1 = a flag read only after the dispatch; retail overwrites the arg0 slot with [U+4] (the slot search compares that type, not the pointer).
 // Every global is a DWORD store (the decompile's byte stores are wrong): 0x119663 := 1, 0x119729 := 0, 0x119721 := 1; 0xF23E8 is a WORD compared with 0xFFFF.
 // Callees go through cl::Env::H with the registers and stack words of the call site (0x45CC0: EAX=[0xF23E4], ECX=&0xF2330, s0=type, s1=[0x11973B];
-// 0x88A70: EBX=the 0x9CCE0 result, s0..s3 = player,0,1,0; 0xC2790: ECX=index, EDX=EDI (1), s0=0; 0x47B20: EDI=[0x11971D]; 0x4A060: EAX=k, s0=[0xF23E8]!=0xFFFF).
+// 0x88A70: EBX=the 0x9CCE0 result, s0..s3 = player,0,1,0; 0xC2790: ECX=index, EDX=EDI (1), s0=0; 0x47B20: EDI=[0x11971D]; 0x4A060: EAX=k, s0=[0xF23E8]!=0xFFFF; 0xA5440: EAX=[0x11BBFC]).
 // Jump table 0x4A8A0 (state at [[0xDD538+4i]+0x20]): 0 next, 1 0xC2790, 4 0x47B20 when [0x119721], 2/3/above 4 the closing branch.
 // Packets go through fx.send (the 0x143E0 stack buffer, EBX = length): 0x30 + dword 1 + dword id (9 bytes), 0x4D + word type (3 bytes).
 #include <cstring>
@@ -79,7 +79,7 @@ extern "C" void d2c_4a4f0(uint32_t u, uint32_t a1, const cl::Env& e, const d2c4a
         return;
     }
     const uint32_t pl = rd(0x11BBFC);
-    if (pl == 0 || (e.R(pl) == 0 && e.H(0xa5440) == 0)) wr(0xFADA0, edi);
+    if (pl == 0 || (e.R(pl) == 0 && e.H(0xa5440, 0, 0, 0, 0, 0, pl) == 0)) wr(0xFADA0, edi);
     if (old && rd(0xFADA0) == 0) { e.H(0xbe2e0); e.H(0x492f0); }
     e.H(0x48b20);
     if (a1 != 0) return;

@@ -45,7 +45,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2h_4a8c0(D2cHost h, uint32_t arg, uint8_t*
         edx = fw.rd(0x6fbaada0);
     }
     if (pl == 0) { edx = (edx == 0); fw.wr(0x6fbaada0, edx); }
-    else if (ld((const void*)(uintptr_t)pl, 0) == 0 && hc(h, 0xa5440) == 0) { edx = (edx == 0); fw.wr(0x6fbaada0, edx); }
+    else if (ld((const void*)(uintptr_t)pl, 0) == 0 && hc(h, 0xa5440, pl) == 0) { edx = (edx == 0); fw.wr(0x6fbaada0, edx); }
     if (old != 0 && edx == 0) { hc(h, 0xbe2e0); hc(h, 0x492f0); }
     hc(h, 0x48930);
     uint32_t idx = hc(h, 0x45c00);
