@@ -106,19 +106,39 @@ extern "C" void d2_port_d2common_6cb50(const D2LevelDefBin* records)
         [](uint32_t size) -> void* { return D2_CALLOC(size); });
 }
 
-// 1.13c D2Common+0x710F0
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_710f0(HD2ARCHIVE archive, const char* name, const char* extension)
+// 1.13c D2Common+0x710F0: ECX = name, EAX = extension. Builds "DATA\GLOBAL\EXCEL\<name><ext>", opens it (Fog 10102),
+// on failure reports unless the last error is 2 (not found) and returns 0; a zero handle after a good open is fatal;
+// else closes it (Fog 10103) and returns 1. The file services are an env so the FN probe can answer them.
+struct D2Common710F0Env {
+    int32_t (*open)(void* ctx, const char* path, void** file);
+    uint32_t (*lastError)(void* ctx);
+    void (*report)(void* ctx, const char* path);
+    void (*close)(void* ctx, void* file);
+    void* ctx;
+};
+extern "C" int32_t d2common_710f0_run(const D2Common710F0Env* e, const char* name, const char* extension)
 {
     char path[260];
-    std::sprintf(path, "%s\\%s%s", "DATA\\GLOBAL\\EXCEL", name, extension);
-    HSFILE file = nullptr;
-    if (!ARCHIVE_OpenFile(archive, path, &file, TRUE)) {
-        if (ARCHIVE_GetLastError() != 2) FOG_Trace("Error opening file: %s", path);
+    std::snprintf(path, sizeof path, "%s\\%s%s", "DATA\\GLOBAL\\EXCEL", name, extension);
+    void* file = nullptr;
+    if (!e->open(e->ctx, path, &file)) {
+        if (e->lastError(e->ctx) != 2) e->report(e->ctx, path);
         return 0;
     }
     if (!file) std::exit(-1);  // retail: null handle after successful open is fatal
-    ARCHIVE_CloseFile(archive, file);
+    e->close(e->ctx, file);
     return 1;
+}
+
+extern "C" int32_t d2common_710f0_port(HD2ARCHIVE archive, const char* name, const char* extension)
+{
+    const D2Common710F0Env env{
+        [](void* a, const char* p, void** f) -> int32_t { return ARCHIVE_OpenFile((HD2ARCHIVE)a, p, (HSFILE*)f, TRUE) ? 1 : 0; },
+        [](void*) -> uint32_t { return (uint32_t)ARCHIVE_GetLastError(); },
+        [](void*, const char* p) { FOG_Trace("Error opening file: %s", p); },
+        [](void* a, void* f) { ARCHIVE_CloseFile((HD2ARCHIVE)a, (HSFILE)f); },
+        (void*)archive };
+    return d2common_710f0_run(&env, name, extension);
 }
 
 // 1.13c D2Common+0x1F980

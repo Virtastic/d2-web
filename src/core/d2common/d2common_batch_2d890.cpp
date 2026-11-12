@@ -91,7 +91,8 @@ uint32_t D2Common_81950_RoomTileCell(uint32_t pRoom, int32_t nX, int32_t nY)
 		return 0;
 	}
 
-	const uint8_t* pGrid = *reinterpret_cast<const uint8_t* const*>(pRoomBytes + 0x64);
+	// +0x64, grid +0x1C and grid +0x20 are 32-bit retail pointer words, not native pointers
+	const uint8_t* pGrid = reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(pRoomBytes + 0x64)));
 	if (!pGrid)
 	{
 		return 0;
@@ -104,8 +105,8 @@ uint32_t D2Common_81950_RoomTileCell(uint32_t pRoom, int32_t nX, int32_t nY)
 
 	const int32_t nOriginX = *reinterpret_cast<const int32_t*>(pRoomBytes + 0x34);
 	const int32_t nOriginY = *reinterpret_cast<const int32_t*>(pRoomBytes + 0x38);
-	const int32_t* pRowOffsets = *reinterpret_cast<const int32_t* const*>(pGrid + 0x20);
-	const int32_t* pCells = *reinterpret_cast<const int32_t* const*>(pGrid + 0x1C);
+	const int32_t* pRowOffsets = reinterpret_cast<const int32_t*>(static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(pGrid + 0x20)));
+	const int32_t* pCells = reinterpret_cast<const int32_t*>(static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(pGrid + 0x1C)));
 	const int32_t nColumn = pRowOffsets[nY / 5 - nOriginY] - nOriginX + nX / 5;
 
 	return *reinterpret_cast<const uint32_t*>(&pCells[nColumn]);
