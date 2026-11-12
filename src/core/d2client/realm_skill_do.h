@@ -25,6 +25,7 @@ D2UnitStrc* d2client_realm_a5f70(D2UnitStrc* unit, const RealmSkillDoHost& host)
 // 1.13c D2Client+0x40550: the client missile of a skill (cltmissilea; a progressive skill by its charges).
 int d2client_realm_40550(D2UnitStrc* unit, int skillId);
 
+int d2client_realm_a2f60(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 2
 int d2client_realm_14f40(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 16
 int d2client_realm_15da0(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 17
 int d2client_realm_15c40(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 18

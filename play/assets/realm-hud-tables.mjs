@@ -59,7 +59,9 @@ const SKILL_CLASS_CODE = ['ama', 'sor', 'nec', 'pal', 'bar', 'dru', 'ass'];
  * strings. `langIndex(key)` is the string table's key to .tbl index (d2_lang_index).
  */
 export function createSkillTable(read, langIndex) {
+  // The tables never change once read, so a class's rows are built once: the client view asks every frame.
   let descs = null, skills = null, ids = null;
+  const byClass = new Map();
   function load() {
     if (skills) return;
     descs = new Map();
@@ -70,6 +72,7 @@ export function createSkillTable(read, langIndex) {
   }
   return {
     classSkills(playerClass) {
+      if (byClass.has(playerClass)) return byClass.get(playerClass);
       load();
       const code = SKILL_CLASS_CODE[playerClass], out = [];
       for (const row of skills) {
@@ -85,6 +88,7 @@ export function createSkillTable(read, langIndex) {
           reqStr: num(row.reqstr), reqDex: num(row.reqdex), reqInt: num(row.reqint), reqVit: num(row.reqvit),
           maxLevel: num(row.maxlvl) > 0 ? num(row.maxlvl) : 20, costFormula: row.skpoints !== '' });
       }
+      byClass.set(playerClass, out);
       return out;
     },
   };

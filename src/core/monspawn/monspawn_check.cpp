@@ -2636,6 +2636,13 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_skills() {
 // loaded save's items are placed after the join was kept. Returns 1 when sent.
 EMSCRIPTEN_KEEPALIVE int d2_session_client_items() {
     if (!g_targetClient || !g_targetPlayer || !g_targetPlayer->pInventory) return 0;
+    // The starting stats are set after the join bytes were kept, so the client has not had them: send the
+    // attributes, the three maxima and the level in the order retail's join walk sends them (bnet-play-retail
+    // town-a: 1d00..1d03, 1e07, 1e09, 1e0b, 1d0c), then the point pools, experience and gold when a save holds any.
+    static const uint16_t kJoinStats[] = { STAT_STRENGTH, STAT_ENERGY, STAT_DEXTERITY, STAT_VITALITY, STAT_MAXHP, STAT_MAXMANA, STAT_MAXSTAMINA, STAT_LEVEL };
+    for (uint16_t st : kJoinStats) D2GAME_UpdateAttribute_6FC822D0(g_targetPlayer, st, (uint32_t)STATLIST_GetUnitBaseStat(g_targetPlayer, st, 0), g_targetPlayer);
+    static const uint16_t kSavedStats[] = { STAT_STATPTS, STAT_SKILLPTS, STAT_EXPERIENCE, STAT_GOLD, STAT_GOLDBANK };
+    for (uint16_t st : kSavedStats) if (const int32_t v = STATLIST_GetUnitBaseStat(g_targetPlayer, st, 0)) D2GAME_UpdateAttribute_6FC822D0(g_targetPlayer, st, (uint32_t)v, g_targetPlayer);
     PLAYER_SynchronizeItemsToClient(g_targetPlayer, g_targetClient);
     return 1;
 }
