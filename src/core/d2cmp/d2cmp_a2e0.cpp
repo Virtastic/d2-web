@@ -27,8 +27,18 @@ extern "C" uint32_t d2cmp_a2e0(const D2CmpPalEnv* env, const char* name, int32_t
     intptr_t h = env->open(name);
     if (h == -1) { env->debug("Unable to open "); env->debug(name); env->debug("\n"); return 0; }
     if (env->size(h) == 0x300) {
-        env->read(h, g_d2cmp_raw_6fe872e8, 0x300);
-        g_d2cmp_loaded_6fe88318 = 0;
+        // A full read converts the BGR triples to the 4-byte palette entries (alpha byte untouched), loaded = 1.
+        uint32_t got = env->read(h, g_d2cmp_raw_6fe872e8, 0x300);
+        if (got == 0x300) {
+            for (uint32_t i = 0; i < 0x100; ++i) {
+                g_d2cmp_pal_6fe87f18[i * 4 + 2] = g_d2cmp_raw_6fe872e8[i * 3];
+                g_d2cmp_pal_6fe87f18[i * 4 + 1] = g_d2cmp_raw_6fe872e8[i * 3 + 1];
+                g_d2cmp_pal_6fe87f18[i * 4] = g_d2cmp_raw_6fe872e8[i * 3 + 2];
+            }
+            g_d2cmp_loaded_6fe88318 = 1;
+        } else {
+            g_d2cmp_loaded_6fe88318 = 0;
+        }
         env->close(h);
         return g_d2cmp_loaded_6fe88318;
     }

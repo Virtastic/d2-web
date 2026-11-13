@@ -11,16 +11,19 @@ extern "C" uint32_t d2win_sub_19872(uint8_t* out12, const uint8_t** endp, const 
 
 namespace {
 // round-to-nearest-even narrowing of the 80-bit value (plus the guard word) to IEEE single
-uint32_t ld12tof(const uint8_t* ld) {
+uint32_t ld12tof(const uint8_t* ld, uint32_t* st) {
+    *st = 0;
     uint16_t g; uint64_t m; uint16_t se;
     memcpy(&g, ld, 2); memcpy(&m, ld + 2, 8); memcpy(&se, ld + 10, 2);
     uint32_t sign = (se & 0x8000u) ? 0x80000000u : 0u;
     int32_t e = (int32_t)(se & 0x7FFF) - 0x3FFF;
-    if ((se & 0x7FFF) == 0 || m == 0) return sign;
-    if ((se & 0x7FFF) == 0x7FFF) return sign | 0x7F800000u;
+    if ((se & 0x7FFF) == 0 && m == 0) return sign;
+    if ((se & 0x7FFF) == 0 || m == 0) { *st = 2; return sign; }
+    if ((se & 0x7FFF) == 0x7FFF) { *st = 1; return sign | 0x7F800000u; }
     int32_t be = e + 127;                       // biased single exponent
     int shift = 40;                             // 64-bit mantissa to 24 bits
     if (be <= 0) shift += 1 - be;               // denormal: shift further
+    if (be <= 0) *st = 2;                       // INTRNCVT_UNDERFLOW (denormal or zero result)
     if (shift > 64) return sign;
     uint64_t q = shift == 64 ? 0 : m >> shift;
     uint64_t rem = shift == 64 ? m : m & ((1ull << shift) - 1);
@@ -30,15 +33,17 @@ uint32_t ld12tof(const uint8_t* ld) {
     if (up) q++;
     if (be <= 0) return sign | (uint32_t)q;     // q may carry into the smallest normal
     if (q >> 24) { q >>= 1; be++; }
-    if (be >= 255) return sign | 0x7F800000u;
+    if (be >= 255) { *st = 1; return sign | 0x7F800000u; }   // INTRNCVT_OVERFLOW
     return sign | ((uint32_t)be << 23) | ((uint32_t)q & 0x7FFFFFu);
 }
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_1935a(void* out, const uint8_t* str) {
+// Returns the narrowing status (0 ok, 1 overflow, 2 underflow): retail leaves __ld12cvt's result in EAX.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_1935a(void* out, const uint8_t* str) {
     uint8_t ld12[12];
-    const uint8_t* end;
-    d2win_sub_19872(ld12, &end, str, 0, 0, 0, 0);
-    uint32_t f = ld12tof(ld12);
+    const uint8_t* consumed;   // the parser stores a native end pointer (8 bytes on wasm64)
+    d2win_sub_19872(ld12, &consumed, str, 0, 0, 0, 0);
+    uint32_t st; uint32_t f = ld12tof(ld12, &st);
     memcpy(out, &f, 4);
+    return st;
 }

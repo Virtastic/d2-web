@@ -24,7 +24,18 @@ CbNode* d2cmp_cb60(CbCache& c, CbNode* n, uint32_t alt, const CbHooks& h) {
         if (n->flags & 2) return nullptr;
         h.unlink(c, *n);
     } else {
-        n = h.pop(c, c.altHead ? alt : 0);
+        // Retail: an empty alternate queue or (both queues and alt == 0) takes the normal head inline; otherwise 0xBF40 picks.
+        n = c.normHead;
+        if (!c.altHead || (n && !alt)) {
+            if (!n || (n->flags & 2)) return nullptr;
+            CbNode* nx = n->next;
+            c.normHead = nx;
+            if (!nx) c.normTail = nullptr; else nx->prev = nullptr;
+            n->next = n->prev = nullptr;
+        } else {
+            // Both queues occupied and alt != 0: the alternate queue is taken when its head's stamp is older.
+            n = h.pop(c, n ? (uint32_t)(c.altHead->stamp < n->stamp) : alt);
+        }
         if (!n || (n->flags & 2)) return nullptr;
     }
     if (!c.lock) return nullptr;

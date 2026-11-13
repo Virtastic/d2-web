@@ -108,7 +108,7 @@ have:
         int a = e->alloc(1, (uint32_t)beg, (uint32_t)(end - beg), 0, cbOn ? cb : nullptr, -2,
                          "..\\Source\\D2CMP\\SRC\\SpriteCache.cpp", cbOn ? 0x3e3 : 0x3ef);
         *(int*)(spr + 0xb0) = a;
-        return a ? 0 : -1;
+        return a ? end - beg : -1;   // retail returns the frame span's byte length (the stack slot the decompiler read as 0)
     }
 }
 
