@@ -26,7 +26,8 @@ uint32_t fdc50(GE& e, uint32_t)
                 } else {
                     e.h(0x1c038, 0, e.stk(buf), n, 0, 0, 0x100);
                     const uint32_t f = e.h(0x9b32, 0, 0x2b89);
-                    e.h(0x1c04c, 0, 0, 0, 0, 0, 0x100, e.stk(buf), f, e.stk(buf));
+                    (void)f;
+                    e.h(0x1c04c);   // Unicode::sprintf(0x100, buf, fmt): cdecl variadic, the capture's `giat ... 0 -` records no stack words
                     e.h(0x15090, 0, 0, 0, 0, 0, e.stk(buf), 0xB200d5d0u, 1);
                 }
                 g_d2launch_25eac = 0;

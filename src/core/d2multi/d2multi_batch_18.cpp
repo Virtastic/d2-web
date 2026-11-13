@@ -19,7 +19,7 @@ uint32_t Ordinal_10023(int32_t);
 extern "C" void d2_multi_sub_be00(void);
 void    d2_multi_sub_c610(int32_t);
 extern "C" void d2_multi_sub_acb0(int32_t ebx, const void* text);
-void    d2_multi_sub_e150(void*);
+int32_t d2_multi_sub_e150(void*);
 extern uintptr_t DAT_6fa0917c;
 extern uint8_t* DAT_6fa09f14;
 extern int32_t DAT_6fa09f20, DAT_6fa0a0dc, DAT_6fa0a0d8, DAT_6fa09f88, DAT_6fa09f18;
