@@ -2625,6 +2625,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_spawned() {
 // after the player attached are in the list; without it the client drops every 0x23. Returns 1 when sent.
 EMSCRIPTEN_KEEPALIVE int d2_session_client_skills() {
     if (!g_targetClient || !g_targetPlayer || !g_targetPlayer->pSkills) return 0;
+    // The capture rig's fed join sends the client no skill list and no selection (its server stream carries no 0x94/0x23).
+    if (g_sessionRigJoined) return 0;
     D2GAME_8B5A0_SendSkills(g_targetClient, g_targetPlayer);
     // The hotkey slots (0x7B), the loop retail's ClientAddPlayerToGame runs before the selected skills (D2Game+0x4BE4B).
     for (int i = 0; i < 16; ++i) {
