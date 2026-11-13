@@ -29,6 +29,7 @@ struct Calls {
 void sub_45660(uint32_t now, G& g, Calls& c);
 }
 extern "C" void d2c_88dd0(uint32_t now, const uint32_t* gb, const cl::Env& e);
+extern "C" void d2c_5f020(int32_t g_c280, int32_t* g_c268, void (*f4f860)(), void (*f45660)(), void (*f5ed90)(int32_t), void (*f88dd0)(int32_t), void (*f5d080)(), void (*sleep0)());
 namespace {
 std::string out;
 uint32_t curTick, curEdx;
@@ -201,21 +202,28 @@ EMSCRIPTEN_KEEPALIVE void d2_client_sound_pump(uint32_t tick) {
     initOnce();
     uint32_t now = tick - 1;
     curTick = tick;
-    d2client_45660::G g{ &pl, &m[0], &m[1], &m[2], &m[3], &m[4], &m[5], &m[6], &m[7], &m[8], &m[9], &m[10], &m[11], &m[12], &m[13],
+    static d2client_45660::G g; static d2client_45660::Calls c; static uint32_t gb[6]; static cl::Env e; static uint32_t pumpNow;
+    g = { &pl, &m[0], &m[1], &m[2], &m[3], &m[4], &m[5], &m[6], &m[7], &m[8], &m[9], &m[10], &m[11], &m[12], &m[13],
         &tbl[0], &m[14], &m[15], &m[16], &tickv, &arr };
-    d2client_45660::Calls c{ one1, one1, zbuf, d270, zero0, nop0, nop5, zero1, nop1, zero1, zero0, zero1, zero1, nullptr, nop0 };
+    c = { one1, one1, zbuf, d270, zero0, nop0, nop5, zero1, nop1, zero1, zero0, zero1, zero1, nullptr, nop0 };
+    gb[0] = (uint32_t)(uintptr_t)blk0; gb[1] = (uint32_t)(uintptr_t)blk1; gb[2] = (uint32_t)(uintptr_t)blk2;
+    gb[3] = (uint32_t)(uintptr_t)blk3; gb[4] = (uint32_t)(uintptr_t)&fdiv; gb[5] = (uint32_t)(uintptr_t)&plbox;
+    e = {}; e.h = hostH; e.rd = hostRd; e.wr = hostWr;
+    pumpNow = now;
     curEdx = 0;
-    d2client_45660::sub_45660(now, g, c);
-    const uint32_t gb[6] = { (uint32_t)(uintptr_t)blk0, (uint32_t)(uintptr_t)blk1, (uint32_t)(uintptr_t)blk2,
-                             (uint32_t)(uintptr_t)blk3, (uint32_t)(uintptr_t)&fdiv, (uint32_t)(uintptr_t)&plbox };
-    cl::Env e{}; e.h = hostH; e.rd = hostRd; e.wr = hostWr;
-    // 0x5ED90 sweep. EDX reaching 0x88DD0's D2Sound calls is the sweep's leftover: `now` when it swept (it stores now
-    // into its last-sweep cell through EDX), else the distance `now - last sweep` its 25-tick gate computed.
-    const uint32_t since = now - (uint32_t)sg.cc26c;
-    const bool sweeps = now == 0 || since > 0x18;
-    if (sg.cc24c) d2client_batch_5ebc0::sub_5ED90(sw, sg, (int32_t)now);
-    curEdx = sweeps ? now : since;
-    d2c_88dd0(now, gb, e);
+    // 1.13c D2Client+0x5F020 (d2c_5f020: 0x4F860, 0x45660, 0x5ED90, 0x88DD0, 0x5D080, in that order). 0x4F860, 0x5D080 and the
+    // yield are not ported here (no-ops); the others are the ports this file drives.
+    int32_t clock = (int32_t)now;
+    d2c_5f020(1, &clock, [] {}, [] { d2client_45660::sub_45660(pumpNow, g, c); },
+        [](int32_t) {
+            // 0x5ED90 sweep. EDX reaching 0x88DD0's D2Sound calls is the sweep's leftover: `now` when it swept (it stores now
+            // into its last-sweep cell through EDX), else the distance `now - last sweep` its 25-tick gate computed.
+            const uint32_t since = pumpNow - (uint32_t)sg.cc26c;
+            const bool sweeps = pumpNow == 0 || since > 0x18;
+            if (sg.cc24c) d2client_batch_5ebc0::sub_5ED90(sw, sg, (int32_t)pumpNow);
+            curEdx = sweeps ? pumpNow : since;
+        },
+        [](int32_t) { d2c_88dd0(pumpNow, gb, e); }, [] {}, [] {});
     flushUnitSubmits(now);
 }
 }

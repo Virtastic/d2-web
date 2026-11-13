@@ -4116,6 +4116,7 @@ extern "C" void d2c_port_ae2b0(const uint8_t* blk, uint32_t (*f4e20)(uint32_t ke
 extern "C" void d2_client_ac140(const uint8_t* src, uint8_t* dst, const D2cBitReader* f);
 extern "C++" {
 #include "../d2client/sub_ad950.h"
+#include "../session/calltrace.h"
 }
 
 struct D2RealmRosterView {
@@ -5016,6 +5017,10 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_feed(const uint8_t* bytes, int l
     int offset = 0;
     int applied = 0;
     g_feedStall = 0;
+    // session call trace: retail's D2Client+0xACE20 takes the tick's whole buffer (EAX) and returns the last packet's size
+    const size_t ctAce = length ? D2CT_ENTER("D2Client", 0xACE20, "%x", static_cast<unsigned>(length)) : 0;
+    uint32_t ctLast = 0;
+    struct CtEnd { size_t h; const uint32_t& last; bool on; ~CtEnd() { if (on) D2CT_RET(h, "%x", last); } } ctEnd{ ctAce, ctLast, length != 0 };
     while (offset < g_pendingLength) {
         const uint8_t* packet = g_pending + offset;
         const uint32_t available = static_cast<uint32_t>(g_pendingLength - offset);
@@ -5036,6 +5041,7 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_feed(const uint8_t* bytes, int l
             if (dispatch.fatal) { g_feedStall = 0x300u | packet[0]; break; }
             applied += dispatch.applied;
         }
+        ctLast = size;
         offset += static_cast<int>(size);
     }
     const int remaining = g_pendingLength - offset;

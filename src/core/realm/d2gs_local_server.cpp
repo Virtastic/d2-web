@@ -13,6 +13,7 @@
 #include <cstring>
 #include <emscripten.h>
 #include "../d2game/client_packet_lists.h"
+#include "../session/calltrace.h"
 
 extern "C" {
 int d2_session_client_packet(const uint8_t* bytes, int len);
@@ -150,8 +151,16 @@ bool sendPlayer() {
 int dispatch(const uint8_t* p, int n) {
     const auto need = [&](int size) { return n >= size; };
     switch (p[0]) {
-    case 0x01: if (!need(5)) return -1; d2_session_toggle_run(0); return d2_session_command_move(rd16(p + 1), rd16(p + 3));
-    case 0x03: if (!need(5)) return -1; d2_session_toggle_run(1); return d2_session_command_move(rd16(p + 1), rd16(p + 3));
+    case 0x01: case 0x03: {
+        if (!need(5)) return -1;
+        // session call trace: the packet-table handler's entry (D2Game 0xCE0D0 for 01, 0xCE040 for 03), args as the capture's recorder writes them
+        uint32_t ph = 0x811c9dc5u; for (int i = 0; i < 5; ++i) { ph ^= p[i]; ph *= 16777619u; ph ^= 0; ph *= 16777619u; ph ^= 0; ph *= 16777619u; ph ^= 0; ph *= 16777619u; }
+        const size_t ct = D2CT_ENTER("D2Game", p[0] == 1 ? 0xCE0D0 : 0xCE040, "%02x,%x,%08x", p[0], 5, ph);
+        d2_session_toggle_run(p[0] == 3);
+        const int r = d2_session_command_move(rd16(p + 1), rd16(p + 3));
+        D2CT_RET(ct, "%x", r == 1 ? 0 : r);   // the packet table's handlers return 0 for handled; the local dispatcher's 1 is the same outcome
+        return r;
+    }
     case 0x06: case 0x07: if (!need(9)) return -1; return d2_session_command_left_skill(rd32(p + 5));
     case 0x0C: if (!need(5)) return -1; return d2_session_command_right_skill_at(rd16(p + 1), rd16(p + 3));
     case 0x0F: if (!need(5)) return -1; return d2_session_command_right_skill_hold_at(rd16(p + 1), rd16(p + 3));

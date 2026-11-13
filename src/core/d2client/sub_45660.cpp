@@ -1,6 +1,7 @@
 // Prior art used: none (D2MOO has no D2Client). Derived from the 1.13c x86 (the cached decompile loses the stack argument and the register arguments).
 #include <cstdint>
 #include <cstring>
+#include "../session/calltrace.h"
 namespace d2client_45660 {
 using U = uint32_t;
 // Globals are 32-bit words at module RVAs (+0x11c340 block: 340..374; 254..260 table; bbfc player; 97f8 frame tick; 75b8 array).
@@ -23,6 +24,7 @@ static inline U rd32(const uint8_t* p, U o) { U v; memcpy(&v, p + o, 4); return 
 static inline const uint8_t* ptr(U v) { return (const uint8_t*)(uintptr_t)v; }
 // 1.13c D2Client+0x45660  stdcall(now), ret 4
 void sub_45660(U now, G& g, Calls& c) {
+    D2CT_ENTER("D2Client", 0x45660, "");
     U pl = *g.player;
     if (!pl) return;
     U h = c.ord10331(pl); if (!h) return;

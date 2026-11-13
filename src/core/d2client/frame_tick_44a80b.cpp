@@ -4,9 +4,11 @@
 #include <emscripten.h>
 #include <cstdint>
 #include "client_host.h"
+#include "../session/calltrace.h"
 static uint32_t cl(D2cHost h, uint32_t rva, uint32_t a = 0, uint32_t b = 0, uint32_t eax = 0) { D2cCall c = { rva, eax, 0, 0, 0, 0, { a, b, 0, 0 } }; return h(&c); }
 // 1.13c D2Client+0x44A80
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_44a80(D2cHost h, uint32_t* g, const uint32_t* now) {
+    D2CT_ENTER("D2Client", 0x44A80, "");
     g[0] = now[0];
     cl(h, 0x440C0); cl(h, 0xA8110);
     cl(h, 0xCE74, g[4] ? cl(h, 0xC1F0, g[4]) : 0);

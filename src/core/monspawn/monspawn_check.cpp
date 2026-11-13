@@ -238,6 +238,7 @@ static uint32_t g_sessionClientMapEventsDropped = 0;
 // borrow g_targetPlayer->pSeed, which belongs to the D2Game/server unit.
 void d2client_sound_stage_feed(uint32_t soundEnv); void d2client_sound_stage_log();   // sound_pump.cpp (replay-armed)
 #include "../d2client/sound_unit_refs.h"
+#include "../session/calltrace.h"
 namespace d2client_critter { void room_seen(D2ActiveRoomStrc* room, int32_t levelId, uint32_t frame); void tick(D2UnitStrc* player, uint32_t frame); void reset(); }
 namespace d2client_ambient { void reset(); void tick(uint32_t* seed, uint32_t period, bool weatherLevel); uint32_t* fallbackSeed(uint32_t (*playerInit)()); }
 extern "C" void d2_client_monster_idle_reset();   // 1.13c D2Client+0x237E0 monster branch state (unit_sound_trigger_237e0.cpp)
@@ -3546,7 +3547,11 @@ EMSCRIPTEN_KEEPALIVE int d2_aiframe_advance(int frames) {
             if (D2DrlgActStrc* pAct = g_game->pAct[g_currentAct])
                 if (pAct->pEnvironment)
                     ENVIRONMENT_UpdatePeriodOfDay(pAct, g_targetPlayer ? UNITS_GetRoom(g_targetPlayer) : nullptr);
-        EVENT_IterateEvents(g_game);
+        {   // session call trace (calltrace.h): the recorder's 8F070 line is `<frame> -> <hero x>,<hero y>` (path position)
+            const size_t ct = D2CT_ENTER("D2Game", 0x8F070, "%x", g_game->dwGameFrame);
+            EVENT_IterateEvents(g_game);
+            D2CT_RET(ct, "%x,%x", g_targetPlayer->pDynamicPath->tGameCoords.wPosX, g_targetPlayer->pDynamicPath->tGameCoords.wPosY);
+        }
         // The retail game frame runs the quest timers every 20th frame (D2Game.0x6FC3xxxx game
         // loop: QUESTS_QuestUpdater when dwGameFrame % 20 == 0).
         if (!(g_game->dwGameFrame % 20)) QUESTS_QuestUpdater(g_game);

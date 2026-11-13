@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstring>
 #include <emscripten.h>
+#include "../session/calltrace.h"
 typedef int32_t i32; typedef uint32_t u32;
 static inline i32 rd(const void* p, u32 off) { i32 v; memcpy(&v, (const char*)p + off, 4); return v; }
 
@@ -149,6 +150,7 @@ EMSCRIPTEN_KEEPALIVE i32 d2c_5ee70(uint8_t* tbl, i32 cnt, i32 idx, uint8_t* rngo
 // 1.13c D2Client+0x5F020
 EMSCRIPTEN_KEEPALIVE void d2c_5f020(i32 g_c280, i32* g_c268, void (*f4f860)(), void (*f45660)(),
     void (*f5ed90)(i32), void (*f88dd0)(i32), void (*f5d080)(), void (*sleep0)()) {
+    D2CT_ENTER("D2Client", 0x5F020, "");
     if (!g_c280) return;
     f4f860(); f45660(); f5ed90(*g_c268); f88dd0(*g_c268); f5d080();
     (*g_c268)++; sleep0();
