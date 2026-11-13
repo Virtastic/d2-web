@@ -5,14 +5,16 @@
 
 extern "C" {
 // Net and lobby hooks no other engine file defines yet: weak no-op defaults so the full build links;
-// a real definition elsewhere replaces them.
-__attribute__((weak)) int32_t Ordinal_10140(int32_t, int32_t) { return 0; }
-__attribute__((weak)) void     Ordinal_10194(int32_t, uint32_t) {}
-__attribute__((weak)) void     Ordinal_10106(void) {}
+// a real definition elsewhere replaces them. A recorder sets g_d2m_win_hook to see the calls (thunk RVA, ECX, two stack words).
+uint32_t (*g_d2m_win_hook)(uint32_t, uint32_t, uint32_t, uint32_t) = nullptr;
+__attribute__((weak)) int32_t DAT_6fa09f04 = 0, DAT_6fa0a0c8 = 0, DAT_6fa0a0d4 = 0;
+static uint32_t winHook(uint32_t rva, uint32_t c, uint32_t s0, uint32_t s1) { return g_d2m_win_hook ? g_d2m_win_hook(rva, c, s0, s1) : 0; }
+__attribute__((weak)) int32_t Ordinal_10140(int32_t a, int32_t b) { return (int32_t)winHook(0x7d28, 0, (uint32_t)a, (uint32_t)b); }
+__attribute__((weak)) void     Ordinal_10194(int32_t a, uint32_t b) { winHook(0x7cfe, 0, (uint32_t)a, b); }
+__attribute__((weak)) void     Ordinal_10106(void) { winHook(0x7cb0, (uint32_t)DAT_6fa0a0c8, 0, 0); }
 __attribute__((weak)) void     Ordinal_10000(void) {}
 char*    Ordinal_571(const char* s = nullptr, int c = 0);
 extern uint8_t *DAT_6fa09ef4, *DAT_6fa09f08, *DAT_6fa09f14;
-__attribute__((weak)) int32_t DAT_6fa09f04 = 0, DAT_6fa0a0c8 = 0, DAT_6fa0a0d4 = 0;
 extern char DAT_6fa09198[];
 extern uint32_t gdwBitMasks_exref[], gdwInvBitMasks_exref[];   // D2Common's Fog tables: arrays of 32 dwords (1<<i, ~(1<<i))
 uint16_t* ustrcat(uint16_t*, const uint16_t*);            // Unicode::strcat

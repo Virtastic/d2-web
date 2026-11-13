@@ -55,8 +55,10 @@ EMSCRIPTEN_KEEPALIVE void FUN_6ff6ad20(const char* fmt, ...) {
 
 // 1.13c Fog+0x1B190 (EAX=size, EBX=manager): malloc(size+4), chain into hash bucket p%0x3ff at mgr+0x7ac
 // under the manager critical section (mgr+4); returns p+4.
+// The malloc goes through this seam when set (the FN replay serves it from a descriptor-owned arena); null = the host malloc.
+void* (*fog_1b190_malloc)(size_t) = nullptr;
 EMSCRIPTEN_KEEPALIVE uint32_t* FUN_6ff6b190(int32_t size, uint8_t* mgr) {
-    uint32_t* p = (uint32_t*)malloc((size_t)size + 4);
+    uint32_t* p = (uint32_t*)(fog_1b190_malloc ? fog_1b190_malloc((size_t)size + 4) : malloc((size_t)size + 4));
     if (!p) {
         FUN_6ff6ad20("(3) Pool Blocks overflowed at %d");
         FUN_6ff5fc20(); Ordinal_116();

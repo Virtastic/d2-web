@@ -6,6 +6,7 @@
 extern "C" {
 void    Ordinal_10106(void);
 void    D2M_Fog_Free(int32_t, int32_t);  // Fog free
+void    D2M_Fog_Free_P(const void*, int32_t, int32_t);  // Fog free with ECX = block
 int32_t Ordinal_10037(void);
 int32_t Ordinal_10098(const void*);       // load/open by name
 void    Ordinal_10147(void);
@@ -24,7 +25,7 @@ void    Ordinal_10022(int32_t);
 void    EnterCriticalSection(void*);
 void    LeaveCriticalSection(void*);
 int32_t* d2_multi_sub_8bd0(int32_t edi, int32_t esi, int32_t third);
-extern "C" void d2_multi_sub_8c80(int32_t, int32_t);
+extern "C" void d2_multi_sub_8c80_r(int32_t, int32_t, char*);
 void    d2_multi_sub_8d80(void);
 void    d2_multi_sub_8790(void);
 void    d2_multi_sub_aa60(int32_t, const void*);
@@ -51,10 +52,10 @@ extern "C" void d2_multi_sub_b1f0(void) {
         if (!n) break;
         if (n[2]) Ordinal_10106();
         if (n[0]) {
-            d2_multi_sub_8c80(DAT_6fa0a0c8, 0);
-            if (n[0]) D2M_Fog_Free(0xc32, 0);
+            d2_multi_sub_8c80_r(DAT_6fa0a0c8, 0, (char*)(uintptr_t)n[0]);   // EAX = the node text, flag 0
+            if (n[0]) D2M_Fog_Free_P((void*)(uintptr_t)n[0], 0xc32, 0);   // ECX = the text
         }
-        D2M_Fog_Free(0xc33, 0);
+        D2M_Fog_Free_P(n, 0xc33, 0);   // ECX = the node
         Ordinal_10037();
     }
 }
