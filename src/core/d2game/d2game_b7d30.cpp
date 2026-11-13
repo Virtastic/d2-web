@@ -42,7 +42,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2game_B7D30(I unit, I game, I cou
     if (flag) return 0;
     if (unit && ((R32(unit, 0xc8) >> 10) & 1) && G->sub(0xE03A0, (U)game, R32(unit, 0x98), R32(unit, 0x94), 0, 0, 0, 0, 0) != 0)
         if (G->sub(0xDFA90, 0, 0, 0, 0, 0, 0, 0, 0) == 0) return 0;
-    U cls = (S32(G->dt, 0xa80) > 0x23a) ? 0x23a : 0x23b, one = 1, outY = 0, outX = 0;
+    U cls = (S32(G->dt, 0xa80) > 0x23a) ? 0x23a : 0xFFFFFFFFu, one = 1, outY = 0, outX = 0;
     // (unit, &cls, &outY, &outX, &one, the game byte +0x6D, 0): the out slots are stack locals of the retail frame
     o(10751, unit, (U)(uintptr_t)&cls, (U)(uintptr_t)&outY, (U)(uintptr_t)&outX, (U)(uintptr_t)&one, R8(game, 0x6d), 0);
     G->sub(0xE07A0, (U)game, (U)unit, 0, 0, 0, 0, 0, 0);

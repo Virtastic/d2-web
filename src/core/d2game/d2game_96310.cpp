@@ -8,8 +8,8 @@ extern "C" uint32_t d2game_96310(uint32_t c, uint32_t unit, uint32_t idx, uint32
     if ((int32_t)idx < 0 || (int32_t)idx >= (int32_t)d2rd32(dt + 0xBA0)) return 0;
     const uint32_t row = idx * 0x23C + d2rd32(dt + 0xB98);
     if (!row) return 0;
-    uint32_t buf[8] = {0};
-    if ((int32_t)e->call(0x9EE50, 0, 0, (uint32_t)(uintptr_t)buf, 0, 0, unit, 0, idx, a1) < 0) return 0;
+    // the descriptor hooks log only the registers they name: EDX (the local buffer) of 0x9EE50, ECX of 0x1100/0x1130 and EDX of 0x8EA80 are not logged
+    if ((int32_t)e->call(0x9EE50, 0, 0, 0, 0, 0, unit, 0, idx, a1) < 0) return 0;
     if (unit) d2wr32(unit + 0xC4, d2rd32(unit + 0xC4) | 0x40);
     uint32_t X = 0, Y = 0;
     if (!e->call(0x9FA30, unit, c, 0, (uint32_t)(uintptr_t)&X, 0, (uint32_t)(uintptr_t)&Y)) return 0;
@@ -17,11 +17,11 @@ extern "C" uint32_t d2game_96310(uint32_t c, uint32_t unit, uint32_t idx, uint32
     if (!N) return 0;
     const uint32_t v = e->call(0xA42A, 0, 0, 0, 0, 0, unit, 0xC, 0);
     e->call(0xA472, 0, 0, 0, 0, 0, N, 0xC, v, 0);
-    const uint32_t r30 = e->call(0x1130, 0, unit), r00 = e->call(0x1100, 0, unit), room = e->call(0xA478, 0, 0, 0, 0, 0, unit);
+    const uint32_t r30 = e->call(0x1130), r00 = e->call(0x1100), room = e->call(0xA478, 0, 0, 0, 0, 0, unit);
     e->call(0xE19C0, r30, r00, room, 0, 0, c, N, 0, 0);
     uint32_t f[7] = {0, 0, 0, 0, 0, X, Y};
-    f[3] = e->call(0x1100, 0, unit);
-    f[4] = e->call(0x1130, 0, unit);
+    f[3] = e->call(0x1100);
+    f[4] = e->call(0x1130);
     e->call(0x21290, c, N, 0, 0, 0, (uint32_t)(uintptr_t)f);
     e->blk(0x21290, f, 7);
     for (uint32_t n = d2rd32(N + 0xDC); n;) {
@@ -29,7 +29,7 @@ extern "C" uint32_t d2game_96310(uint32_t c, uint32_t unit, uint32_t idx, uint32
         if (d2rd8(n) == 2) e->call(0x8E6F0, n);
         n = next;
     }
-    e->call(0x8EA80, 0, c, N, 0, 0, 2, d2rd32(c + 0xA8) + 1, 0, 0, 0);
+    e->call(0x8EA80, 0, c, 0, 0, 0, 2, d2rd32(c + 0xA8) + 1, 0, 0, 0);
     d2wr32(N + 0xC4, d2rd32(N + 0xC4) & 0xFFFFFFF7u);
     return 1;
 }

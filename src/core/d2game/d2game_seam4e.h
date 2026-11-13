@@ -14,6 +14,9 @@ struct D2Seam {
     // REGS `J`: EDI handed to the callee just called, logged as its own record straight after the call's
     void (*ej)(void* ctx, uint32_t rva, uint32_t edi) = nullptr;
     void edi(uint32_t rva, uint32_t v) const { if (ej) ej(ctx, rva, v); }
+    // REGS `X`: stack words 4.. of the call just made (n words from w), one record straight after the call's own
+    void (*xw)(void* ctx, uint32_t rva, const uint32_t* w, uint32_t n) = nullptr;
+    void x(uint32_t rva, const uint32_t* w, uint32_t n) const { if (xw) xw(ctx, rva, w, n); }
     // a retail code pointer the function was handed (fastcall: ECX, EDX, one stack word, ret 4): the probe runs its stand-in
     uint32_t (*cbk)(void* ctx, uint32_t fn, uint32_t c, uint32_t d, uint32_t s0) = nullptr;
     uint32_t callback(uint32_t fn, uint32_t c, uint32_t d, uint32_t s0) const { return cbk ? cbk(ctx, fn, c, d, s0) : 0; }

@@ -133,32 +133,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BCAA0(uint32_t unit, uint3
     return code & 0xFFFFFF00u;
 }
 
-// 1.13c D2Game+0xBCC60  (ESI = unit; ordinals take their operands in registers, see decompile)
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BCC60(int32_t* unit, const D2GameBatchBad40Env* e)
-{
-    int32_t a = e->ord(10973, 0, 0, 0);
-    int32_t b = e->ord(10973, 0, 0, 0);
-    if (b + a < 0) return 0;
-    if (a < 0) {
-        if (unit) {
-            int32_t c = e->ord(10973, 0, 0, 0);
-            if (c - a < 0) e->ord(10887, 0, 0, 0);
-            else if (*unit == 0 && e->ord(10049, 0, 0, 0) < c - a) e->ord(10887, 0, 0, 0);
-            else e->ord(10551, 0, 0, 0);
-        }
-        if (unit) {
-            int32_t c = e->ord(10973, 0, 0, 0);
-            if (c + a < 0 || (*unit == 0 && e->ord(11060, 0, 0, 0) < c + a)) { e->ord(10887, 0, 0, 0); return 1; }
-            e->ord(10551, 0, 0, 0);
-        }
-    } else if (unit) {
-        int32_t c = e->ord(10973, 0, 0, 0);
-        if (c >= 0 && (*unit != 0 || c <= e->ord(10049, 0, 0, 0))) { e->ord(10551, 0, 0, 0); return 1; }
-        e->ord(10887, 0, 0, 0);
-        return 1;
-    }
-    return 1;
-}
+// 1.13c D2Game+0xBCC60 lives in d2game_bcc60.cpp (the decompile missed its stack word).
 
 // 1.13c D2Game+0xBCE60 -- ESI = item, EDI = the owning unit, one stack word = flag; ret 4. Sets item flag 0x10 (#10977); with
 // the flag word set it marks the item (unit flags +0xC8 bit 4), sets item flag 1 as well for a type-4 unit that #10757 accepts

@@ -20,7 +20,7 @@ template <class E> uint32_t Do(E& e, uint32_t th, uint32_t ev)
     const uint32_t ev8 = e.rd32(ev + 8);
     const uint32_t c = e.h(0xA532, 0, 0, 0, 0, 0, ev8);
     q(2); q(3); q(4);
-    const bool f16 = q(5) == 0;
+    q(5);
     q(6);
     const bool f15 = q(7) == 0;
     auto it = [&](uint32_t code) { return e.h(0xE660, pl, 0, 0, game, 0, code) != 0; };
@@ -40,7 +40,7 @@ template <class E> uint32_t Do(E& e, uint32_t th, uint32_t ev)
         if (!B) return go(1);
         if (!C) return go(2);
         if (!D) return go(4);
-        return go(f16 ? 5 : 7);
+        return go(7);  // 1.13c: the byte tested here (bit 5 flag) is never stored, so state 7 always
     }
     if (c == 0x20796571) {
         if (!C) return go(2);

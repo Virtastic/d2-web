@@ -76,26 +76,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE bool d2_fn_d2game_B6D30(uint32_t unit, uint32_t 
     return e->sB08F0(rec, x, y) < 0x3fc;
 }
 
-// 1.13c D2Game+0xB75D0  returns the picked index. local_40[i-2] is weight i; weights 0/1 (local_40[-2],[-1])
-// are stack words Ghidra did not name and are taken as 0.
-extern "C" EMSCRIPTEN_KEEPALIVE int d2_fn_d2game_B75D0(uint32_t p1, uint32_t p2, int p3, const D2GameBatchB6D30Env* e)
-{
-    int32_t l[16] = {0};
-    l[2] = l[3] = l[4] = l[6] = 0x14; l[8] = 0x50; l[9] = 0x46;
-    int32_t base = e->r8(p1 + 0x6d) == 0 ? 0x7d : 100;
-    if (p3 < 2) { l[2] = 0x2d; l[10] = 0x19; }
-    l[0] = base + (100 - (int32_t)e->ord11027(p2));
-    e->ord10507(p2);
-    bool hit = e->sB6C90(p2) != 0;
-    if (!hit) { e->ord10828(p2); hit = e->sB6C90(p2) != 0; if (!hit && p2 == 0) goto tail; }
-    if (p2 != 0) { l[0xb] = 0x19; l[0] = 0; l[4] = 0; l[1] = 0x23; l[9] = 0x19; }
-    else { l[0xb] = 0x32; l[0xc] = 0x32; }
-tail:
-    if (p3 != 0) l[3] = 0x3c;
-    int32_t w[16] = {0};
-    for (int i = 2; i < 16; i++) w[i] = l[i - 2];
-    return pickWeighted(e, p2, w);
-}
+// 1.13c D2Game+0xB75D0 lives in d2game_b75d0.cpp (the decompile's three stack words and slot numbers were wrong).
 
 // 1.13c D2Game+0xB7750  The 16-entry weight table is built by the caller's frame (stack0xffffffb8); the
 // two #11027 calls and #10494(unit,0xb) feed it. The caller supplies the table, the seed unit is ESI.
