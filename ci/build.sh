@@ -13,6 +13,8 @@ SRC="${SRC:-$(cd "$(dirname "$0")/.." && pwd)}"
 # Agents never build in their own worktree (one shared prove build covers every queued row): an
 # unroled build under .claude/worktrees/ is refused; batch-prove, merges and coverage set D2_BUILD_ROLE.
 case "$SRC" in */.claude/worktrees/*) [ "${D2_BUILD_ROLE:-}" != main ] || { echo "ci/build.sh: refused -- D2_BUILD_ROLE=main is only for the main checkout" >&2; exit 3; }; [ -n "${D2_BUILD_ROLE:-}" ] || { echo "ci/build.sh: refused -- agent worktree build; function rows queue a prove (node tools/re/batch-prove.mjs --rows ... --item <id>); session/defect/multiplayer work sets D2_BUILD_ROLE=session" >&2; exit 3; };; esac
+# The session role is the call-trace producer build (src/core/session/calltrace.h): entry records exist only with -DD2_CALLTRACE, and a build with custom flags never publishes as a normal engine.
+[ "${D2_BUILD_ROLE:-}" != session ] || case " ${D2_CXXFLAGS:-} " in *" -DD2_CALLTRACE "*) ;; *) export D2_CXXFLAGS="${D2_CXXFLAGS:-} -DD2_CALLTRACE" ;; esac
 # One tag per recipe: worktrees on different Dockerfile versions never retag each other's image.
 IMAGE="${BUILDER_IMAGE:-d2-builder64:$(sha256sum "$SRC/Dockerfile.builder64" | cut -c1-12)}"
 cd "$SRC"
