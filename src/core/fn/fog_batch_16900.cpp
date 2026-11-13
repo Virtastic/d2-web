@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstring>
 #include "hookenv.h"
+#include "fn_tag.h"
 
 namespace
 {
@@ -77,6 +78,7 @@ namespace
 		uint32_t (*waitThread)(uint32_t handle, uint32_t ms);
 		int32_t (*closeHandle)(uint32_t handle);
 		void (*logTimeout)(const char* msg);                          // Fog+0x19100
+		void (*sstrcopy)(char* dest, const char* src, uint32_t max);  // Storm #501 (thunk Fog+0xCDDC); null = the built-in copy
 	};
 
 	// Storm #501 SStrCopy: copy at most max-1 bytes, always terminate.
@@ -119,7 +121,10 @@ static FSafeSock* fog_safesock_connect_ex(FogSockApi* api, const char* host, uin
 	}
 	for (size_t i = 0; i < sizeof(FSafeSock) / sizeof(uint32_t); ++i)
 		reinterpret_cast<uint32_t*>(s)[i] = 0;
-	SStrCopy(s->szName, name ? name : "", 0x40);
+	if (api->sstrcopy)
+		api->sstrcopy(s->szName, name, 0x40);
+	else
+		SStrCopy(s->szName, name ? name : "", 0x40);
 	api->initCS(s->tCriticalSection);
 
 	uint8_t wsaData[0x190];
@@ -228,16 +233,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16900(uint32_t* r)
 	gHookEnv = nullptr;
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16b10(uint32_t* r)
-{
-	r[4] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(fog_safesock_connect_ex(
-		reinterpret_cast<FogSockApi*>(static_cast<uintptr_t>(r[0])),
-		reinterpret_cast<const char*>(static_cast<uintptr_t>(r[1])), static_cast<uint16_t>(r[2]),
-		reinterpret_cast<uint32_t (*)(void*)>(static_cast<uintptr_t>(r[3])),
-		reinterpret_cast<void*>(static_cast<uintptr_t>(r[5])),
-		reinterpret_cast<const char*>(static_cast<uintptr_t>(r[6])), static_cast<int32_t>(r[7]),
-		reinterpret_cast<char*>(static_cast<uintptr_t>(r[8])))));
-}
 
 extern "C" __attribute__((weak)) EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16dd0(uint32_t* r)
 {
@@ -677,4 +672,59 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_167e0(uint32_t* r)
 	api.inet_ntoa_ = probeInetNtoa;
 	r[4] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(fog_inet_ntoa(&api, r[0], gBuf)));
 	gHookEnv = nullptr;
+}
+
+// 0x16B10 (descriptor fog-16b10.txt): ECX = host, EDX = port, stack proc, param, name, nonblocking flag (ret 0x10; they arrive as r[2], r[3], r[5], r[6]).
+// Blobs: lg r[14], hs r[16] (host string), nm r[18] (name), sl r[20] (the slot the allocator hands out), nt r[22] (the inet_ntoa string), st r[24] (scripted words:
+// WSAStartup, socket, htons, inet_addr (host), inet_addr (ip), connect, WSAGetLastError, getsockname), ip r[26] (gvar Fog+0x319C8). Every Winsock call and the
+// allocator/free are recorded hooks; Initialize/DeleteCriticalSection and CreateThread (0x44) are pinned `iat` stubs, so those seams log nothing.
+namespace
+{
+	uint32_t pcP(const void* p) { return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(p)); }
+	FSafeSock* pcAlloc(uint32_t) { return reinterpret_cast<FSafeSock*>(static_cast<uintptr_t>(gHookEnv->h(0x1B560, 0x78, 0, 0, 0, 0, 0xB2027130u, 0xC4))); }
+	void pcCopy(char* d, const char* s, uint32_t n) { gHookEnv->h(0xCDDC, 0, 0, 0, 0, 0, pcP(d), s ? pcP(s) : 0xB20268F8u, n); }
+	uint32_t pcStart(uint32_t v, void* d) { return gHookEnv->h(0xCDA0, 0, 0, 0, 0, 0, v, pcP(d)); }
+	uint32_t pcSocket(int32_t a, int32_t t, int32_t p) { return gHookEnv->h(0xCD52, 0, 0, 0, 0, 0, static_cast<uint32_t>(a), static_cast<uint32_t>(t), static_cast<uint32_t>(p)); }
+	int32_t pcOpt(uint32_t s, int32_t lv, int32_t nm, const void* v, int32_t) { return static_cast<int32_t>(gHookEnv->h(0xCD64, 0, 0, 0, 0, 0, s, static_cast<uint32_t>(lv), static_cast<uint32_t>(nm), pcP(v))); }
+	int32_t pcIoctl(uint32_t s, int32_t c, uint32_t* a) { return static_cast<int32_t>(gHookEnv->h(0xCD76, 0, 0, 0, 0, 0, s, static_cast<uint32_t>(c), pcP(a))); }
+	uint16_t pcHtons(uint16_t v) { return static_cast<uint16_t>(gHookEnv->h(0xCD6A, 0, 0, 0, 0, 0, v)); }
+	uint32_t pcIp;   // the gvar blob's address: retail logs the module global Fog+0x319C8 as 0xB2000000|rva
+	uint32_t pcInet(const char* c) { return gHookEnv->h(0xCD9A, 0, 0, 0, 0, 0, pcP(c) == pcIp ? 0xB20319C8u : pcP(c)); }
+	int32_t pcConnect(uint32_t s, const void* n, int32_t l) { return static_cast<int32_t>(gHookEnv->h(0xCDAC, 0, 0, 0, 0, 0, s, pcP(n), static_cast<uint32_t>(l))); }
+	int32_t pcSockName(uint32_t s, void* n, int32_t* l) { return static_cast<int32_t>(gHookEnv->h(0xCD94, 0, 0, 0, 0, 0, s, pcP(n), pcP(l))); }
+	char* pcNtoa(uint32_t in) { return reinterpret_cast<char*>(static_cast<uintptr_t>(gHookEnv->h(0xCDA6, 0, 0, 0, 0, 0, in))); }
+	uint32_t pcThread(uint32_t (*)(void*), void*, uint32_t*) { return 0x44; }
+	void pcNop(void*) {}
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_16b10(uint32_t* r)
+{
+	const uint32_t* st = reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(r[24]));
+	const uint32_t sc[] = { 0xCDA0u, st[0], 0xCD52u, st[1], 0xCD6Au, st[2], 0xCD9Au, st[3], 0xCD9Au, st[4], 0xCDACu, st[5], 0xCD3Au, st[6], 0xCD94u, st[7],
+	                        0x1B560u, r[20], 0xCDA6u, r[22], 0, 0 };
+	HookEnv e(reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(r[14])), sc);
+	gHookEnv = &e;
+	pcIp = r[26];
+	FogSockApi api;
+	pvApi(api);
+	api.allocSlot = pcAlloc;
+	api.sstrcopy = pcCopy;
+	api.initCS = pcNop;
+	api.wsastartup = pcStart;
+	api.socket_ = pcSocket;
+	api.setsockopt_ = pcOpt;
+	api.ioctlsocket_ = pcIoctl;
+	api.htons_ = pcHtons;
+	api.inet_addr_ = pcInet;
+	api.connect_ = pcConnect;
+	api.getsockname_ = pcSockName;
+	api.inet_ntoa_ = pcNtoa;
+	api.createThread = pcThread;
+	FSafeSock* s = fog_safesock_connect_ex(&api, reinterpret_cast<const char*>(static_cast<uintptr_t>(r[0])), static_cast<uint16_t>(r[1]),
+	                                       reinterpret_cast<uint32_t (*)(void*)>(static_cast<uintptr_t>(r[2])), reinterpret_cast<void*>(static_cast<uintptr_t>(r[3])),
+	                                       reinterpret_cast<const char*>(static_cast<uintptr_t>(r[5])), static_cast<int32_t>(r[6]),
+	                                       reinterpret_cast<char*>(static_cast<uintptr_t>(r[26])));
+	r[4] = s ? 0xB1030000u | (pcP(s) - r[20]) : 0;   // the slot is blob sl (k 3): the capture records a result inside a blob as 0xB1<blob><off>
+	gHookEnv = nullptr;
+	fnTagLog(r, 0, 7);
 }
