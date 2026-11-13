@@ -77,6 +77,9 @@ slot_waited=""
 slot_poll=5; case "${D2_BUILD_ROLE:-}" in merge|coverage) slot_poll=0.3 ;; esac
 until D2_BUILD_SLOT_NOWAIT=1 d2_build_slot_acquire "$LOCK_DIR"; do
   [ -n "$slot_waited" ] || echo "==> waiting for a build slot (artifact lock released meanwhile)"
+  [ -n "$slot_waited" ] || slot_since=$SECONDS
+  # A build that has waited 5 minutes polls as fast as a merge, so session builds are not starved by the fast pollers.
+  [ $(( SECONDS - slot_since )) -lt 300 ] || slot_poll=0.3
   slot_waited=1; flock -u 8; sleep "${D2_BUILD_SLOT_POLL:-$slot_poll}"; flock -x 8
 done
 got=$D2_BUILD_SLOT; SLOTS="${D2_MAX_BUILDS:-6}"
