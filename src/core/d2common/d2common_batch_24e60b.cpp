@@ -84,7 +84,7 @@ extern "C"
 	// 0x44CE0: eight per-difficulty level ids for a level definition.
 	int32_t* (*g_d2common_fn_44CE0)(uint32_t pDrlg, int32_t nLevelId) = nullptr;
 
-	EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2ddb0(uint32_t pLevel);
+	EMSCRIPTEN_KEEPALIVE int32_t d2_batch_d2common_2ddb0(uint32_t pLevel);
 }
 
 
@@ -96,7 +96,7 @@ extern "C"
 // coordinate list at +0x4C (each node's next at +0x04) and the allocation at +0x08 (also clearing
 // +0x2C), and returns 1.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2ddb0(uint32_t pLevelRaw)
+EMSCRIPTEN_KEEPALIVE int32_t d2_batch_d2common_2ddb0(uint32_t pLevelRaw)
 {
 	uint8_t* pLevel = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(pLevelRaw));
 	if (!pLevel || !g_d2common_fn_44CE0)

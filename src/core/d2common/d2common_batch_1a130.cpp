@@ -13,7 +13,7 @@ template<class T> T rd(const void* p, int o) { return *reinterpret_cast<const T*
 
 extern "C" {
 // 1.13c D2Common+0x2FAC0: select the normal or expansion level-monster list entry.
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2fac0(int32_t level, int32_t selector, int32_t difficulty,
+EMSCRIPTEN_KEEPALIVE int32_t d2_batch_d2common_2fac0(int32_t level, int32_t selector, int32_t difficulty,
  const int32_t* baseTable, const int32_t* normalTable, const int32_t* expansionTable)
 {
  if (selector == 0) return baseTable ? baseTable[level * 5] : 0;

@@ -82,7 +82,7 @@ struct D2Common39B30Env
 
 // 1.13c D2Common+0x39b30
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_39b30(uint32_t pUnit, int32_t nItemId,
+EMSCRIPTEN_KEEPALIVE int32_t d2_legacy_d2common_39b30(uint32_t pUnit, int32_t nItemId,
                                                   const D2Common39B30Env* pEnv)
 {
 	if (!pUnit)

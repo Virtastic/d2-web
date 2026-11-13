@@ -18,7 +18,7 @@ struct D2Common39380Env {
  int32_t (*base_stat)(uint32_t);
 };
 // 1.13c D2Common+0x39380: difference of a stat's total and base values.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_39380(uint32_t gate, int32_t stat,
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_legacy_d2common_39380(uint32_t gate, int32_t stat,
  const D2Common39380Env* e) {
  if (!gate || !e || !e->tables || stat < 0) return 0;
  auto t=p(e->tables); if (stat >= i32(t,0xbd4)) return 0;
@@ -39,7 +39,7 @@ struct D2Common39530Env {
  int32_t (*roll)(uint32_t,uint32_t,int32_t,uint32_t*,int32_t*,int32_t*); // +0x46330
  int32_t (*ratio)(int32_t,int32_t); // DATATBLS_ApplyRatio(100,value)
 };
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_39530(uint32_t, uint32_t, const D2Common39530Env*);
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_batch_d2common_39530(uint32_t, uint32_t, const D2Common39530Env*);
 namespace {
 int32_t stat_value(uint32_t list, uint16_t id, const D2Common39530Env* e) {
  if (!list || !e->stat_index) return 0;
@@ -50,7 +50,7 @@ int32_t stat_value(uint32_t list, uint16_t id, const D2Common39530Env* e) {
 int32_t ratio(int32_t v,const D2Common39530Env* e) { return e->ratio ? e->ratio(100,v) : v/100; }
 }
 // 1.13c D2Common+0x39530: apply up to sixteen itemstatcost op records to a base stat.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_39530(uint32_t ctx, uint32_t packed,
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_batch_d2common_39530(uint32_t ctx, uint32_t packed,
  const D2Common39530Env* e) {
  if (!ctx || !e || !e->tables) return 0;
  auto t=p(e->tables); uint32_t id=(packed>>16)&0xffff;
@@ -72,7 +72,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_39530(uint32_t ctx, uint3
     int32_t opbase=base;
     if ((type==1 || type==13) && i32(a,0)==4)
      opbase=e->monster_op ? e->monster_op(actor,id) : 0;
-    if (opbase && d2_fn_d2common_39530(ctx,next,e)) amount=ratio(opbase,e);
+    if (opbase && d2_batch_d2common_39530(ctx,next,e)) amount=ratio(opbase,e);
     break;
    }
    case 2: case 3: case 4: case 5: {
@@ -85,7 +85,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_39530(uint32_t ctx, uint3
     else value=e->unit_stat ? e->unit_stat(unit,source) : 0;
     value=sar(value,p(meta)[0x18]);
     if (value<=0) break;
-    int32_t derived=d2_fn_d2common_39530(ctx,next,e);
+    int32_t derived=d2_batch_d2common_39530(ctx,next,e);
     if ((type&1)==0) amount=sar(static_cast<int32_t>(static_cast<uint32_t>(derived)*value),op[3]);
     else if (derived) amount=ratio(base,e);
     break;
@@ -93,7 +93,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_39530(uint32_t ctx, uint3
    case 6: case 7: {
     if (!actor) break;
     uint32_t state=u32(p(actor),0x1c); if (!state) break;
-    int32_t derived=d2_fn_d2common_39530(ctx,next,e); if (!derived) break;
+    int32_t derived=d2_batch_d2common_39530(ctx,next,e); if (!derived) break;
     int32_t aux=0; uint32_t seed=e->seed ? e->seed(state,&aux) : 0;
     int32_t rolled=e->roll ? e->roll(static_cast<uint32_t>(derived),seed,aux,nullptr,nullptr,nullptr) : 0;
     amount=(type==7 ? ratio(result,e) : rolled);
@@ -102,7 +102,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_39530(uint32_t ctx, uint3
    case 8: case 9: {
     if (!actor || i32(p(actor),0)!=0 || !e->player_record) break;
     uint32_t player=e->player_record(); if (!player) break;
-    int32_t diff=d2_fn_d2common_39530(ctx,next,e)-stat_value(u32(c,0x24),source,e);
+    int32_t diff=d2_batch_d2common_39530(ctx,next,e)-stat_value(u32(c,0x24),source,e);
     uint8_t mult= type==8 ? p(player)[0x48] : p(player)[id==11?0x47:0x46];
     amount=static_cast<int32_t>(static_cast<uint32_t>(mult)*diff*0x40u);
     break;

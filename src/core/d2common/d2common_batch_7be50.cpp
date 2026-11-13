@@ -35,7 +35,7 @@ extern "C" void D2Common_7BE50_NormaliseStatus(intptr_t pRoom)
 }
 
 // 1.13c D2Common+0x29F30
-extern "C" void d2_fn_d2common_29f30(D2UnitStrc* item, int32_t stat)
+extern "C" void d2_batch_d2common_29f30(D2UnitStrc* item, int32_t stat)
 {
     // ESI holds item; the switch selector is preserved from the caller.
     ITEMS_SetDefenseOrDamage(item, stat);

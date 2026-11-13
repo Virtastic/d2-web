@@ -400,7 +400,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_39cc0(void)
 // id before 0xFFFF the code resolves the op row and calls 0x39530(unitData, id<<16) then
 // 0x38940(id<<16, value, opRow, unit).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_39b60(uint16_t* pUnit, uint32_t pParam)
+EMSCRIPTEN_KEEPALIVE void d2_legacy_d2common_39b60(uint16_t* pUnit, uint32_t pParam)
 {
 	uint8_t* unit = reinterpret_cast<uint8_t*>(pUnit);
 	uint8_t* param = P(pParam);

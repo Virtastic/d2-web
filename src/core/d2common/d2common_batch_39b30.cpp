@@ -73,7 +73,7 @@ EMSCRIPTEN_KEEPALIVE bool D2Common_24320_ItemClassBelow7(uint32_t nItemId)
 // 1.13c D2Common+0x391a0 (#10848): total of one itemstatcost stat on a stat list. Null list or an
 // out-of-range stat id answers 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_391a0(uint32_t pStatList, int32_t nStatId)
+EMSCRIPTEN_KEEPALIVE int32_t d2_legacy_d2common_391a0(uint32_t pStatList, int32_t nStatId)
 {
 	if (pStatList == 0 || nStatId < 0 || nStatId >= sgptDataTables->nItemStatCostTxtRecordCount ||
 	    !sgptDataTables->pItemStatCostTxt)

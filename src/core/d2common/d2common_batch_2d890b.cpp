@@ -59,6 +59,7 @@ int D2Common_26190_GetItemRequiredLevel(D2UnitStrc* pItem, D2UnitStrc* pPlayer)
 // STATLIST_GetTotalStatValue(stat list, nStatId, layer 0); the walk follows the item data extra-data
 // pNextItem chain (item data +0x64, i.e. embedded extra data +0x08) and stops at the first non-item
 // unit. A null stat argument and an out-of-range class id both yield 0. The output is zeroed first.
+extern "C" void D2Common_266E0_GetContainedItemsStatTotal(D2UnitStrc* pItem, int32_t nStatId, int32_t* pTotal);
 void D2Common_266E0_GetContainedItemsStatTotal(D2UnitStrc* pItem, int32_t nStatId, int32_t* pTotal)
 {
 	*pTotal = 0;

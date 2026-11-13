@@ -50,7 +50,7 @@ extern "C"
 // 1.13c D2Common+0x38DC0 (#10597): forwards to the stat getter 0x38B70 with its own second and
 // third arguments; the first argument is unused.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_38dc0(uint32_t nUnused, uint32_t pUnit, int32_t nStatId)
+EMSCRIPTEN_KEEPALIVE int32_t d2_legacy_d2common_38dc0(uint32_t nUnused, uint32_t pUnit, int32_t nStatId)
 {
 	(void)nUnused;
 	if (!g_d2common_fn_38B70)

@@ -13,6 +13,6 @@ uint32_t f13fd0(GE& e, uint32_t ea, uint32_t p, uint32_t a, uint32_t c)
         if (e.rd32(c + a * 4) != r[3] || e.rd32(c + 4 + a * 4) != r[4]) continue;
         e.wr32(out, e.rd32(out) | r[5]);
     }
-    return 0xB20954b8u;
+    return 0x6fde54b8u;
 }
 }

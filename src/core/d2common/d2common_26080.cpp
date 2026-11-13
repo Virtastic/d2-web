@@ -77,3 +77,6 @@ extern "C" int32_t D2Common_26080_OpStatTotal32(uint32_t unit, uint32_t dt)
 		return 0;
 	return StatTotal(list, 0x00C20000, rec);
 }
+
+// Shared with 0x266E0: the 0x38A80 total on a 32-bit-layout list.
+extern "C" int32_t D2Common_38A80_StatTotal32(uint32_t list, int32_t key, uint32_t rec) { return StatTotal(list, key, rec); }

@@ -11,7 +11,7 @@
 #include "DataTbls/ItemsTbls.h"
 #include "Drlg/D2DrlgDrlg.h"
 
-extern "C" int32_t d2_fn_d2common_2ddb0(uint32_t pLevel);
+extern "C" int32_t d2_batch_d2common_2ddb0(uint32_t pLevel);
 
 namespace
 {
@@ -98,7 +98,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_37e70_batch(uint32_t pUn
 
 // Build the set-item quality mask by walking inventory items and resolving their set records.
 // D2Common 0x23F90
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_23f90(uint32_t pUnit, uint32_t pItem, uint32_t nIncludeCurrent) {
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_legacy_d2common_23f90(uint32_t pUnit, uint32_t pItem, uint32_t nIncludeCurrent) {
 	return ITEMS_GetSetItemsMask(reinterpret_cast<D2UnitStrc*>(P(pUnit)), reinterpret_cast<D2UnitStrc*>(P(pItem)), nIncludeCurrent); // vendored D2MOO body, validated in the spec
 }
 
@@ -126,7 +126,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2common_24e60_2e2c0(uint32_t pDrlg) {
 		if (W(P(p), 0x0C) != 0 || W(P(p), 0x10) == 0) continue;
 		const uint32_t nDelay = W(P(p), 0x1D4);
 		if (nDelay) { W(P(p), 0x1D4, nDelay - 1); continue; }
-		if (d2_fn_d2common_2ddb0(p) == 0) W(P(p), 0x1D4, 10);
+		if (d2_batch_d2common_2ddb0(p) == 0) W(P(p), 0x1D4, 10);
 		else DRLG_FreeLevel(reinterpret_cast<void*>(static_cast<uintptr_t>(pool)), reinterpret_cast<D2DrlgLevelStrc*>(static_cast<uintptr_t>(p)), 1);
 	}
 }
