@@ -12290,8 +12290,9 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
             if ((g_walkOpt & 2) && u->dwUnitType == UNIT_MONSTER && !g_clientInitSeed.count(1ull << 32 | u->dwUnitId)) continue;
             if (u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MONSTER) {
                 if (!u->pDynamicPath) continue;
+                if (u->dwUnitType == UNIT_MONSTER && !g_heldMonsters.count(u->dwUnitId)) continue;   // a monster the server never announced to the client is not in its room lists
                 x = u->pDynamicPath->tGameCoords.wPosX; y = u->pDynamicPath->tGameCoords.wPosY;
-                fx = u->pDynamicPath->tGameCoords.dwPrecisionX & 0xFFFF; fy = u->pDynamicPath->tGameCoords.dwPrecisionY & 0xFFFF;
+                fx =u->pDynamicPath->tGameCoords.dwPrecisionX & 0xFFFF; fy = u->pDynamicPath->tGameCoords.dwPrecisionY & 0xFFFF;
             } else if (u->dwUnitType == UNIT_OBJECT && u->pObjectData && u->pObjectData->pObjectTxt && u->pStaticPath) {
                 x = u->pStaticPath->tGameCoords.nX; y = u->pStaticPath->tGameCoords.nY; mode = clientObjectClock(u).shown;
             } else continue;
