@@ -1,10 +1,20 @@
-// 1.13c D2Client+0x40130 -- table entry: reseeds a unit (seed block at +0x20) with EDX and restarts its path at mode
-// 10 with the unit's level capped at 0x4D. Without a unit EAX is left as it came in.
-#include "cl_tbl.h"
-extern "C" uint32_t d2c_40130(uint32_t eax, uint32_t u, uint32_t edx, const cl::Env& e) {
+// 1.13c D2Client+0x40130 -- ECX = unit, EDX = value. A null unit does nothing (EAX is left alone). Otherwise D2Common ordinal 10534 gives the unit's mode; a mode of 0x4E or more (signed) is replaced by 0x4D through ordinals 10558 and 10970 (unit, 0x4D). Then, with the path at unit +0x2C: ordinal 10614 (ECX = unit + 0x20, EDX = value), 10647 (path, 10), 10168 (path, mode), 10334 (path, unit, 0), whose result is returned.
+#include <cstdint>
+#include "../fn/d2game_gp.h"
+namespace d2cl {
+uint32_t f40130(GE& e, uint32_t eax, uint32_t u, uint32_t v)
+{
     if (!u) return eax;
-    const uint32_t n = clt::cappedLevel(e, u);
-    const uint32_t path = e.R(u + 0x2c);
-    e.H(0xc3b2, 0, 0, 0, 0, 0, 0, u + 0x20, edx);
-    return clt::pathCommit(e, path, u, n);
+    uint32_t m = e.h(0xC430, 0, 0, 0, 0, 0, u);
+    if ((int32_t)m >= 0x4e) {
+        m = 0x4d;
+        e.h(0xC4A2, 0, 0, 0, 0, 0, u, m);
+        e.h(0xC2C8, 0, 0, 0, 0, 0, u, m);
+    }
+    const uint32_t path = e.rd32(u + 0x2c);
+    e.h(0xC3B2, 0, u + 0x20, v);
+    e.h(0xC38E, 0, 0, 0, 0, 0, path, 0xa);
+    e.h(0xC3B8, 0, 0, 0, 0, 0, path, m);
+    return e.h(0xC376, 0, 0, 0, 0, 0, path, u, 0);
+}
 }

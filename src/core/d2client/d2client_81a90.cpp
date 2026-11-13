@@ -1,3 +1,9 @@
-// 1.13c D2Client+0x81A90 -- table entry: the three-word routine with (ECX, EDX, 0); its answer is returned.
-#include "cl_tbl.h"
-extern "C" uint32_t d2c_81a90(uint32_t ecx, uint32_t edx, const cl::Env& e) { return e.H(0xc30a, ecx, edx, 0); }
+// 1.13c D2Client+0x81A90 -- ECX, EDX and one stack argument (unused). Returns D2Common ordinal 10945 (ECX, EDX, 0).
+#include <cstdint>
+#include "../fn/d2game_gp.h"
+namespace d2cl {
+uint32_t f81a90(GE& e, uint32_t c, uint32_t d, uint32_t)
+{
+    return e.h(0xC30A, 0, 0, 0, 0, 0, c, d, 0);
+}
+}

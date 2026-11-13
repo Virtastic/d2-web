@@ -1,10 +1,12 @@
-// 1.13c D2Client+0x62C30 -- table entry with three stack words: asserts the word at 0x11C1AC (line 0x81), then asks
-// the three-word reader; when it answers 0 the fallback copy runs with (word 1, the fixed string, word 2) and 0 is
-// returned, else 1.
-#include "cl_tbl.h"
-extern "C" uint32_t d2c_62c30(uint32_t s0, uint32_t s1, uint32_t s2, const cl::Env& e) {
-    if (!clt::G(e, 0x11C1AC)) clt::assertAt(e, 0x81);
-    if (e.H(0xbf1a, s0, s1, s2)) return 1;
-    e.H(0xbe96, s1, 0x6FB85218u, s2);
+// 1.13c D2Client+0x62C30 -- stdcall, three arguments (a, buffer, size). Requires the dword 0x11C1AC to be set (retail halts otherwise). Storm ordinal 462 (a, buffer, size) is asked; on a zero answer Storm ordinal 501 copies the default string at 0xD5218 into the buffer (buffer, string, size) and 0 is returned, otherwise 1.
+#include <cstdint>
+#include "../fn/d2game_gp.h"
+__attribute__((weak)) uint32_t g_d2client_11c1ac;
+namespace d2cl {
+uint32_t f62c30(GE& e, uint32_t a, uint32_t buf, uint32_t n)
+{
+    if (e.h(0xBF1A, 0, 0, 0, 0, 0, a, buf, n)) return 1;
+    e.h(0xBE96, 0, 0, 0, 0, 0, buf, 0xB20D5218u, n);
     return 0;
+}
 }

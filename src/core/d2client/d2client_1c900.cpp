@@ -1,7 +1,10 @@
-// 1.13c D2Client+0x1C900 -- table entry: a unit of class 0x20F loses bit 1 of its flag word at +0xC4. EAX is left as
-// it came in.
-#include "cl_tbl.h"
-extern "C" uint32_t d2c_1c900(uint32_t eax, uint32_t u, const cl::Env& e) {
-    if (u && e.R(u + 4) == 0x20f) e.W(u + 0xc4, e.R(u + 0xc4) & ~2u);
+// 1.13c D2Client+0x1C900 -- ECX = unit (may be null). A unit whose class (+4) is 0x20F has bit 1 of its flags (+0xC4) cleared. EAX is left alone.
+#include <cstdint>
+#include "../fn/d2game_gp.h"
+namespace d2cl {
+uint32_t f1c900(GE& e, uint32_t eax, uint32_t u)
+{
+    if (u && e.rd32(u + 4) == 0x20f) e.wr32(u + 0xc4, e.rd32(u + 0xc4) & ~2u);
     return eax;
+}
 }

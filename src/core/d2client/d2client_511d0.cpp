@@ -1,6 +1,10 @@
-// 1.13c D2Client+0x511D0 -- table predicate: 1 for a unit of type 4 whose class passes the one-word check, else 0.
-#include "cl_tbl.h"
-extern "C" uint32_t d2c_511d0(uint32_t u, const cl::Env& e) {
-    if (!u || e.R(u) != 4) return 0;
-    return e.H(0xccee, e.R(u + 4)) ? 1 : 0;
+// 1.13c D2Client+0x511D0 -- ECX = unit (may be null). For a unit of type 4 (item) D2Common ordinal 11064 is asked with the unit's class (+4); returns 1 when it answers non-zero, 0 otherwise.
+#include <cstdint>
+#include "../fn/d2game_gp.h"
+namespace d2cl {
+uint32_t f511d0(GE& e, uint32_t u)
+{
+    if (!u || e.rd32(u) != 4) return 0;
+    return e.h(0xCCEE, 0, 0, 0, 0, 0, e.rd32(u + 4)) != 0;
+}
 }

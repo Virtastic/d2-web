@@ -1,7 +1,10 @@
-// 1.13c D2Client+0x42470 -- table entry with three unused stack words: two argument-free calls in a row; the second
-// one's answer is returned.
-#include "cl_tbl.h"
-extern "C" uint32_t d2c_42470(const cl::Env& e) {
-    e.H(0xd18c);
-    return e.H(0xd198);
+// 1.13c D2Client+0x42470 -- Three stack arguments (unused). Calls D2Gfx ordinal 10026 and then ordinal 10084, whose result is returned.
+#include <cstdint>
+#include "../fn/d2game_gp.h"
+namespace d2cl {
+uint32_t f42470(GE& e, uint32_t, uint32_t, uint32_t)
+{
+    e.h(0xD18C);
+    return e.h(0xD198);
+}
 }
