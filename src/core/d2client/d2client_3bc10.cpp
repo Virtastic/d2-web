@@ -55,7 +55,7 @@ extern "C" uint32_t d2c_3bc10(const cl::Env& e) {
         edx = G(e, 0xfad94);
     }
     eax = G(e, 0x11bbfc);
-    if (eax && e.R(eax) == 0) eax = e.H(0xa5440);
+    if (eax && e.R(eax) == 0) edx = e.H(0xa5440);   // the recorder thunk leaves EDX = the hook's return value
     eax = (edx == 0);
     S(e, 0xfad94, eax);
     if (old == 0) {

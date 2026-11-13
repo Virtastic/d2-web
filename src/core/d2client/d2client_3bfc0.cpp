@@ -44,6 +44,7 @@ extern "C" uint32_t d2c_3bfc0(const cl::Env& e) {
     if (eax) {
         if (e.R(eax) == 0) {
             eax = e.H(0xa5440);
+            edx = eax;   // the recorder thunk leaves EDX = the hook's return value
             if (eax == 0) { edx = (edx == 0); S(e, 0xfadd8, edx); }
         }
     } else {
