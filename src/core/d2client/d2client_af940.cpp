@@ -5,6 +5,6 @@ using namespace cl;
 extern "C" uint32_t d2c13_af940(uint32_t pk, const Env& e, const GEnv& g) {
     e.H(0x899a0, B(pk + 1));
     uint32_t loc = pk;
-    e.H(0xbe8a, g.M(0x83588), g.M(0x851dc), 0, Stk(&loc));
+    e.H(0xbe8a, g.M(0xd3588), g.M(0xd51dc), 0, Stk(&loc));
     return e.H(0x10df0, 0, 0, 0, 0, 0, 0, 0, 0, 0, loc == 1 ? 2 : 0);
 }
