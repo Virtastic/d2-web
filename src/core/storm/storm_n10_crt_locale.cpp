@@ -53,14 +53,14 @@ const int16_t kExcluded[10] = {0x0C0C, 0x0C1A, 0x1007, 0x0436, 0x080C, 0x042D, 0
 
 // _LcidFromHexString (0x...B542): hex digits to value
 uint32_t LcidFromHex(const char* s) {
+    // 1.13c Storm+0xB542 as retail: no digit validation; 'a'..'f' -0x27, 'A'..'F' -7, anything else raw (signed char), and
+    // every step folds -0x30 in through the 0x0FFFFFFD bias.
     uint32_t v = 0;
     for (; *s; s++) {
-        int c = (unsigned char)*s, d;
-        if (c >= '0' && c <= '9') d = c - '0';
-        else if (c >= 'a' && c <= 'f') d = c - 'a' + 10;
-        else if (c >= 'A' && c <= 'F') d = c - 'A' + 10;
-        else break;
-        v = v * 16 + d;
+        int8_t c = (int8_t)*s;
+        if (c < 'a' || c > 'f') { if (c > '@' && c < 'G') c = (int8_t)(c - 7); }
+        else c = (int8_t)(c - 0x27);
+        v = (v + 0x0FFFFFFDu) * 0x10u + (uint32_t)(int32_t)c;
     }
     return v;
 }

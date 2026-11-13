@@ -1,0 +1,13 @@
+// 1.13c Storm+0xA504 ___free_lc_time (MSVC 2003 CRT): frees the 43 dword slots (0x00-0x2A) of the time-locale block in retail's call
+// order (1-6, 0, 8-0xD, 7, 0xE-0x2A); a NULL block is a no-op. Retail's callee is _free (Storm+0x8333), which ignores NULL; it comes in as freeFn.
+#include <cstdint>
+
+extern "C" void Storm_FreeLcTimeA504(const uint32_t* block, void (*freeFn)(uint32_t)) {
+    if (!block) return;
+    static const uint8_t kOrder[43] = {
+        1, 2, 3, 4, 5, 6, 0, 8, 9, 0xA, 0xB, 0xC, 0xD, 7,
+        0xE, 0xF, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B,
+        0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A,
+    };
+    for (uint32_t i = 0; i < 43; ++i) freeFn(block[kOrder[i]]);
+}
