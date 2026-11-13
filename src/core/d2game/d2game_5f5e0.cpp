@@ -102,9 +102,9 @@ uint32_t f5f5e0(NE& e, uint32_t q, uint32_t a)
         if (!item) return item;
         uint8_t pkt[8] = { 0x5d, 0x21, 0x10, 0, 0, 0, 0, 0 };
     const uint32_t pl = e.rd32(a + 0xc);
-    const uint32_t cli = pl && !e.rd32(pl) ? e.rd32(e.imp(0xA4C0, pl) + 0x9c) : 0;
         const uint32_t rec = e.imp(0xA53E, e.rd32(item + 4));
         if (rec && (int16_t)NE::rd16(rec + 0x124) > 0) NE::wr16(e.stk(pkt) + 4, NE::rd16(rec + 0x124));
+        const uint32_t cli = pl && !e.rd32(pl) ? e.rd32(e.imp(0xA4C0, pl) + 0x9c) : 0;
         e.h(0x8ACD0, e.stk(pkt), 0, 0, 0, 0, cli);
         e.setf(buf, 0x25, 9);
         if (e.fl(buf, 0x25, 8)) { e.clrf(buf, 0x25, 1); e.setf(buf, 0x25, 0); }

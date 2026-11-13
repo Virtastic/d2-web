@@ -36,8 +36,8 @@ uint32_t f5c9e0(NE& e, uint32_t q, uint32_t a)
         e.setf(buf, fid, 0); e.clrf(buf, fid, 1); e.imp(0xA574, buf, fid);
         uint8_t pkt[8] = { 0x5d, 0x20, 2, 0, 0, 0, 0, 0 };
     const uint32_t pl = e.rd32(a + 0xc);
-    const uint32_t cli = pl && !e.rd32(pl) ? e.rd32(e.imp(0xA4C0, pl) + 0x9c) : 0;
         e.h(0x33880, q + 0x1c, 0, 0, 0, pl ? e.rd32(pl + 0xc) : 0xffffffffu);
+        const uint32_t cli = pl && !e.rd32(pl) ? e.rd32(e.imp(0xA4C0, pl) + 0x9c) : 0;
         e.h(0x8A3E0, cli, 0, 0, 0, 0, e.stk(pkt), 6);
     }
     return e.h(0x35910, e.rd32(a + 8), e.rd32(a + 0xc), 0, 0, 0, e.rd32(a));
