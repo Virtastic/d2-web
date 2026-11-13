@@ -21,7 +21,7 @@ struct NE : GE {
     uint32_t trace = 0;
     void say(uint32_t game, uint32_t n) {
         uint32_t buf[4] = {};
-        h(0xF8D58, 0, 0, 0, 0, 0, stk(buf), 0xB2000000u | 0xFCC2C, n);
+        (void)n;   // wsprintfA is an unhooked import in the descriptors: retail logs no record for it
         if (trace) h(0xCBE70, 0, 0, stk(buf), 0, 0, game, 4);
     }
     // the game's quest list: holder at game +0x10F4, node id +0, next +0xF4; 0 = absent
