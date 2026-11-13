@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x24250: skill 0x42 timer start. Fastcall ECX = game, EDX = unit, two stack words (the first is a gate, the second never read; ret 8).
+// 1.13c D2Game+0x24250: skill 0x42 timer start. Fastcall ECX = game, EDX = unit, two stack words (the second, [esp+8] at entry, is the gate; the first is never read; ret 8).
 // A zero gate does nothing. Otherwise the unit seed pair steps (lo*0x6AC690C5 + hi) and a low two bits of 0 end it. The count n = stat 0xC / 5 + 1
 // (at least 1) and the skill table's row 0x42 (dt+0xB98, 0x23C each; count dt+0xBA0 must exceed 0x42) give a level through 0xAC9A(unit, row[+0x64], 0x42, n),
 // clamped to 1..0x28, which goes in EAX to 0xA06F0(game, 3, unit, n, callback 0x24030).

@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x26520: skill 0x5A start. Fastcall ECX = game, EDX = unit, two stack words (the first is a gate, the second never read; ret 8).
+// 1.13c D2Game+0x26520: skill 0x5A start. Fastcall ECX = game, EDX = unit, two stack words (the second, [esp+8] at entry, is the gate; the first is never read; ret 8).
 // A zero gate does nothing. The strength starts at 1; a type-1 unit whose +0x14, +0x28 record resolves (0xE03A0 over +0x28/+0x2C/+0x30) to an owner
 // with a nonzero 0xA3F4(owner, 0x10C) takes (0xA400(owner, that, 1) / 2 + 1), capped at 0xF, and only when that is above 1. A unit with 0xA718(unit) above
 // 10 is back to 1. The call 0xA2800 takes EAX unit, EBX = 0xACFA(0x5A, 0), stack game, unit, 0x5A, 0, strength.

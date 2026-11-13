@@ -32,7 +32,7 @@ void fa4320(GE& e, uint32_t game, uint32_t unit, uint32_t ct)
     const uint32_t lst = e.rd32(er + 4);
     for (int32_t i = 0; i < (int32_t)e.h(0xA418, 0, 0, 0, 0, 0, lst); i++) {
         const uint32_t node = e.h(0xA442, 0, 0, 0, 0, 0, lst, (uint32_t)i);
-        if (e.h(0xA3D60, er, node, unit, 0, 0)) {   // retail tests the whole EAX (test eax,eax), not AL
+        if (e.h(0xA3D60, er, node, unit, 0, 0)) {   // retail tests the whole EAX (test eax,eax at +0x4416), not AL
             e.h(0xA3D0, 0, unit, node, 0, 0, 0xFFFFFFFFu);
             const uint32_t r = e.h(0xA3D00, 0, v, node, 0, 0, v);
             const uint32_t t[2] = {0xB20FB6B0u, 0xBFD};
