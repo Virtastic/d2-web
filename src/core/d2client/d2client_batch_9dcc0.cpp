@@ -127,7 +127,7 @@ struct D2c9eImg { uint8_t* base; uint32_t size; int32_t nLibs; };  // ESI object
 struct D2c9eEnv {
     void* (*getModule)(const char* name);
     void  (*freeLibrary)(void* h);
-    void  (*virtualFree)(void* p, size_t n, uint32_t type);
+    uint32_t (*virtualFree)(void* p, size_t n, uint32_t type);  // BOOL; 9E630 leaves it in EAX
     void* (*valloc)(size_t n);                          // VirtualAlloc(0,n,MEM_COMMIT,PAGE_READWRITE)
     void* (*loadLibrary)(const char* name);
     void* (*getProc)(void* h, const char* nameOrOrd);
@@ -136,17 +136,19 @@ struct D2c9eEnv {
 };
 
 // 1.13c D2Client+0x9E630
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9e630(const D2c9eEnv* e, D2c9eImg* im) {
+// EAX: 0 for a null base (the [esi] load), else VirtualFree's return (nothing after the call touches EAX).
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_9e630(const D2c9eEnv* e, D2c9eImg* im) {
     uint8_t* b = im->base;
-    if (!b) return;
+    if (!b) return 0;
     uint32_t imp = rd<uint32_t>(b, 0x1c);
     while (im->nLibs > 0) {
         int32_t i = im->nLibs--;
         e->freeLibrary(e->getModule((const char*)(b + rd<uint32_t>(b, imp + (i - 1) * 8))));
     }
-    e->virtualFree(b, 0, 0x8000);
+    const uint32_t r = e->virtualFree(b, 0, 0x8000);
     im->base = nullptr;
     im->size = 0;
+    return r;
 }
 
 // 1.13c D2Client+0x9E690  (this = packed image; returns true on success)
