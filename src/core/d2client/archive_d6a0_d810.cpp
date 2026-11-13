@@ -28,12 +28,12 @@ extern "C" void* d2_client_d810(const D2ClientFileServices& api, const char* pat
         return nullptr;
     }
     uint32_t sizeHigh;
-    const uint32_t size = d2_client_d610(file, &sizeHigh, &api);
+    const uint32_t size = api.sizeChecked(file, &sizeHigh, &api);
     void* buffer = api.allocate(size + uint32_t{0x320},
                                "..\\Source\\D2Hell\\SRC\\Archive.cpp", 0xCF, 0);
     // Retail returns directly here: it does not close the open file on OOM.
     if (!buffer) return nullptr;
-    d2_client_d520(file, size, buffer, &api);
+    api.readChecked(file, size, buffer, &api);
     if (!file) {
         api.fatal(0x49);
         std::abort(); // retain the nonreturning contract even with a bad binding

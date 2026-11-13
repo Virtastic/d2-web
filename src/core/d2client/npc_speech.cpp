@@ -60,9 +60,10 @@ int32_t introductionId(int32_t npcClass, int32_t playerClass) {   // 0x49130
     const Rec& r = kRecs[recordIndex(npcClass)];
     if (r.noIntro) return -1;
     int32_t idx = 0;
-    if (npcClass == 0x201) { if (playerClass == 4) idx = 15; }          // Malah: Barbarian
-    else if (npcClass == 0x202) { if (playerClass == 2) idx = 11; }     // Nihlathak: Necromancer
-    else if (npcClass == 0x203) { if (playerClass == 3) idx = 10; }     // Qual-Kehk: Paladin
+    // A special NPC whose hero-class test fails falls through to the class-variant test (D2Client 0x49130 jumps to +0x73).
+    if (npcClass == 0x201 && playerClass == 4) idx = 15;                // Malah: Barbarian
+    else if (npcClass == 0x202 && playerClass == 2) idx = 11;           // Nihlathak: Necromancer
+    else if (npcClass == 0x203 && playerClass == 3) idx = 10;           // Qual-Kehk: Paladin
     else if (r.count > 1 && playerClass == r.msgs[1].cls) idx = 1;      // class variant of the first line
     return speakId(r, idx);
 }

@@ -1,6 +1,12 @@
 #pragma once
 #include <cstdint>
+struct D2ClientFileServices;
+extern "C" {
+void d2_client_d520(void*, uint32_t, void*, const D2ClientFileServices*);
+uint32_t d2_client_d610(void*, uint32_t*, const D2ClientFileServices*);
+}
 // Native owner bindings. The read service is synchronous and is not Fog #10104.
+// sizeChecked/readChecked are D810's own callees (D2Client 0xD610 / 0xD520); they default to our ports.
 struct D2ClientFileServices {
     int (*readSynchronous)(void*, void*, uint32_t, uint32_t*);
     uint32_t (*size)(void*, uint32_t*);
@@ -11,6 +17,8 @@ struct D2ClientFileServices {
     uint32_t (*lastError)();
     void (*reportOpenError)(const char*, const char*);
     void* (*allocate)(uint32_t, const char*, uint32_t, uint32_t);
+    uint32_t (*sizeChecked)(void*, uint32_t*, const D2ClientFileServices*) = d2_client_d610;
+    void (*readChecked)(void*, uint32_t, void*, const D2ClientFileServices*) = d2_client_d520;
 };
 const D2ClientFileServices& d2_client_native_file_services();
 void* d2_client_load_archive(const char*, uint32_t*);
