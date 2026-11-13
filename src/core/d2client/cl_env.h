@@ -20,6 +20,8 @@ struct Env {
     void Ed(uint32_t v) const { if (ed) ed(ctx, v); }
     void (*edj)(void* ctx, uint32_t rva, uint32_t edi) = nullptr;   // REGS `J`: logs EDI as an argument of the callee just called
     void Edj(uint32_t rva, uint32_t v) const { if (edj) edj(ctx, rva, v); }
+    uint32_t (*tk)(void* ctx, uint32_t v) = nullptr;     // one GetTickCount call (`tick N log`: logged where retail calls it, returns v)
+    uint32_t Tick(uint32_t v) const { return tk ? tk(ctx, v) : v; }
     void (*xs)(void* ctx, uint32_t s5, uint32_t s6) = nullptr;      // stack words 5 and 6 of the NEXT h() (a callee with more than five stack words; the log keeps s0..s3)
     void Xs(uint32_t s5, uint32_t s6 = 0) const { if (xs) xs(ctx, s5, s6); }
     void (*xw)(void* ctx, uint32_t rva, const uint32_t* w, uint32_t n) = nullptr;   // logs n extra dwords after the call record of rva
