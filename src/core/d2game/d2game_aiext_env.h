@@ -12,6 +12,8 @@ struct D2GameAiExt {
     // Import thunks (stdcall): 0x2A514(unit) = Ordinal_10830; 0x2ACBE(classId, 0, 0) = Ordinal_10035.
     uint32_t (*th2A514)(uint32_t unit);
     uint32_t (*th2ACBE)(uint32_t classId, uint32_t z0, uint32_t z1);
+    // 0x2A83E(unit, id, 0) = Ordinal_10689 (stdcall).
+    void     (*th2A83E)(uint32_t unit, uint32_t id, uint32_t zero);
     // 0x1D30(ecx = index, ebx = value): plain ret; a data-table lookup.
     uint32_t (*sub1D30)(uint32_t index, uint32_t value);
     // 0x7C6E0(eax = target, ecx = unit, game, MonStats row), ret 8.
