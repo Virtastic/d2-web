@@ -20,7 +20,7 @@ extern "C" uint32_t d2game_4d040(uint32_t game, uint32_t unit, uint32_t skill, u
     if (m < 0 || m >= (int32_t)d2rd32(tab + 0xb6c)) return 0;
     uint32_t rq[23] = {};
     rq[0] = 0x21; rq[1] = unit; rq[4] = (uint32_t)m; rq[5] = px; rq[6] = py;
-    rq[7] = 2 * px - qx; rq[8] = 2 * py - qy; rq[11] = skill; rq[12] = lvl; rq[21] = 0x6fc61f50u;
+    rq[7] = 2 * px - qx; rq[8] = 2 * py - qy; rq[11] = skill; rq[12] = lvl; rq[21] = 0xB2000000u | 0x41F50u;  // the recorder tags a module code pointer 0xB2<rva>
     for (int32_t i = 0; i < v; i++) {
         rq[22] = (uint32_t)i;
         e->call(0x6F930, 0, game, (uint32_t)(uintptr_t)rq);

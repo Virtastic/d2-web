@@ -3547,11 +3547,13 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x4B_RequestEntityUpdate_6FC880F0(D2
         const uint32_t nUnitType = *(uint32_t*)((char*)pPacket + 1);
         if (nUnitType < 6)
         {
-            D2UnitStrc* pUnit = SUNIT_GetServerUnit(pGame, nUnitType, *(int32_t*)((char*)pPacket + 5));
-            if (pUnit && UNITFINDS_AreUnitsInNeighboredRooms(pUnit, pUnit))
+            // 1.13c: the neighbour test is between the requesting player and the target (the 1.10f body shadowed
+            // the player and compared the target with itself).
+            D2UnitStrc* pTarget = SUNIT_GetServerUnit(pGame, nUnitType, *(int32_t*)((char*)pPacket + 5));
+            if (pTarget && UNITFINDS_AreUnitsInNeighboredRooms(pUnit, pTarget))
             {
-                UNITROOM_RefreshUnit(pUnit);
-                pUnit->dwFlagEx |= UNITFLAGEX_TELEPORTED;
+                UNITROOM_RefreshUnit(pTarget);
+                pTarget->dwFlagEx |= UNITFLAGEX_TELEPORTED;
                 return 0;
             }
             

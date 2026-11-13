@@ -117,13 +117,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_game_41240(void* game, void* unit, c
 {
     void* rec = monsRow(e, unit);
     if (!rec) return 2;
-    e->refreshTarget(game);
+    e->refreshTarget(game, unit);
     void* near = e->o10392(rdptr(unit, 0x2C));
     if (near == unit) near = nullptr;
     void* tgt = hasTargetFlag(unit) ? e->getTarget(game, rd32(unit, 0x98)) : nullptr;
     if (!near) {
         if (!tgt) return e->tail(game);
-        e->refreshTarget(game);
+        e->refreshTarget(game, tgt);
         near = e->o10392(rdptr(tgt, 0x2C));
         if (near == tgt || !near) return e->tail(game);
     }
@@ -136,7 +136,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_game_41240(void* game, void* unit, c
         if (st < 1) st = 1;
         int32_t dx = tx > ux ? st : (tx < ux ? -st : 0);
         int32_t dy = ty > uy ? st : (ty < uy ? -st : 0);
-        e->o10286(rdptr(unit, 0x2C), (uint32_t)(e->unitX(unit) + dx), (uint32_t)(e->unitY(unit) + dy));
+        const uint32_t ny = (uint32_t)((int32_t)e->unitY(unit) + dy); // 1.13c reads Y before X for the new position
+        const uint32_t nx = (uint32_t)((int32_t)e->unitX(unit) + dx);
+        e->o10286(rdptr(unit, 0x2C), nx, ny);
         e->o10334(rdptr(unit, 0x2C), unit, 0);
     }
     return e->tail(game);

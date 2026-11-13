@@ -5,7 +5,7 @@ struct D2GameBatch3fEnv {
     uint32_t (*tail)(void* game);                          // 0x3F320, the common mode tail
     void*    (*getTarget)(void* game, uint32_t guid);      // 0xE03A0
     uint32_t (*targetBusy)(void);                          // 0xDFA90
-    void*    (*refreshTarget)(void* game);                 // 0xE07A0
+    void*    (*refreshTarget)(void* game, void* unit);     // 0xE07A0 (EAX = unit, ECX = game)
     uint32_t (*gameKey)(void* game);                       // 0xE0A20
     uint32_t (*unitX)(void* unit);                         // 0x1100 via 0x21100
     uint32_t (*unitY)(void* unit);                         // 0x1130 via 0x21130
