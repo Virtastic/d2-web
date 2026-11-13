@@ -3,8 +3,8 @@
 // Q+0x9c = the output points). Walks the line start->target (0x184C0, limit Q+0x91, or 0x28 when Q+0x58 is set and the byte is
 // smaller); each point that 0x4CE90 reports blocked goes to the walker search 0x18830, which splices a detour in the same
 // buffer; the points are finally thinned (0x18310) into Q+0x9c and their count returned. Fewer than three line points: 0.
-// Frame slots kept as in retail: the index lives at [esp+0x10] and the limit slot doubles as 0x18830's end pointer, so a
-// detour rewrites the limit that later iterations subtract the index from.
+// Frame slots as in retail: the index and the point count are two separate slots; 0x18830 receives &idx and &count, and the
+// loop reloads the (possibly rewritten) count after a detour. The limit slot is only read (limit - i).
 #include <cstdlib>
 #include "d2common_18c40.h"
 
@@ -19,13 +19,13 @@ extern "C" int32_t D2Common_18C40_BuildPath(uint32_t self, const D2CommonWalkEnv
     if (w(q, 0x58) != 0 && limit < 0x28) limit = 0x28;
     uint32_t arr[160] = {};
     int32_t idx = 0, dir = 0;
-    const int32_t n = D2Common_184C0_LineToPoints(start, w(self, 4), limit, &dir, reinterpret_cast<uint16_t*>(arr));
+    int32_t n = D2Common_184C0_LineToPoints(start, w(self, 4), limit, &dir, reinterpret_cast<uint16_t*>(arr));
     if (n <= 2) return 0;
     uint32_t last = start;
     int32_t i = 0;
     for (;;) {
         if (env->chk(room, uint16_t(arr[i]), uint16_t(arr[i] >> 16), pat, mask)) {
-            const int32_t rv = D2Common_18830_FindSubpathWithoutObstacles(self, last, arr, &idx, &limit, limit - i, dir, env);
+            const int32_t rv = D2Common_18830_FindSubpathWithoutObstacles(self, last, arr, &idx, &n, limit - i, dir, env);
             if (rv == 0)
                 return D2Common_18310_ThinPoints(arr, start, reinterpret_cast<uint32_t*>(uintptr_t(q + 0x9c)), idx);
             i = idx;
@@ -35,5 +35,6 @@ extern "C" int32_t D2Common_18C40_BuildPath(uint32_t self, const D2CommonWalkEnv
         idx = i;
         if (i >= n) break;
     }
+    if (n == 0) return 0;   // retail: test edi,edi / je -> the plain zero return
     return D2Common_18310_ThinPoints(arr, start, reinterpret_cast<uint32_t*>(uintptr_t(q + 0x9c)), n);
 }

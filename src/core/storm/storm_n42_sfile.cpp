@@ -2,25 +2,9 @@
 #include <cstdint>
 #include <cstring>
 typedef uint32_t u32;
-struct N42Host {
-    void (*lock)(); void (*unlock)(); void (*setErr)(u32);
-    void* (*alloc)(u32 n, const char* file, u32 line, u32 flags);
-    void (*free_)(void* p, const char* file, u32 line);
-    void (*strcpyN)(char* d, const char* s, u32 n); void (*strcatN)(char* d, const char* s, u32 n);
-    u32 (*strlen_)(const char* s); const char* (*strstr_)(const char* s, const char* t); const char* (*strchr_)(const char* s, char c);
-    u32 (*getAttr)(const char* p); void* (*createFile)(const char* p, u32 acc, u32 share, u32 disp, u32 flags);
-    u32 (*setFilePtr)(void* h, int32_t off, u32 mode); u32 (*readFile)(void* h, void* buf, u32 n);
-    void (*initArchives)(); void (*buildPath)(char* out, int mode); int (*findArchiveList)();
-    void* (*newFile)(void* list, int a, int b); void (*delFile)(void* f); void (*destroyFile)(void* f);
-    void (*hashInit)(void* tbl, void* mem, u32 n, void* name); u32 (*cryptSeed)(u32); void (*decrypt)(u32 key, void* d);
-    void (*setCount)(u32); int (*findBlock)(void* arch, u32 hash); void (*postOpen)(void* f, void* tbl, int* cnt);
-    void (*afterOpen)(); void (*regArchive)(); int (*fileOpenEx)(u32,u32*,u32,int*,int,int,int);
-    const char* (*lastSep)(const char*, char);
-    void (*drawLock)(); void (*palSnap)(); int (*lockSurf)(int,void*,int*,void**,int); void (*unlockSurf)(int,int);
-    void (*blit)(void*,void*,int,u32,u32,u32,void*,int,int,u32); int (*savePcx)(const char*,void*,void*,u32,u32,u32);
-    int (*saveDlg)(char* out260, void* hwnd); void (*surfSnap)();
-};
+#include "storm_n42_host.h"
 struct N42G {
+    u32 archInit;   // DAT_6fc53120: the archive-list init flag Storm_2A0B0 tests
     N42Host* h; int fileList; int archList; int archHead; u32 archFlags; u32 openMode; char dir[0x104];
     int cbA, cbB; u32 lastErr; void* a0; void* a1; int sd_ok, sd_hwnd, sd_pal, sd_bpp; u32 sd_w, sd_h; void* sd_dd; u32 sd_palBuf[1];
     int archListHead; u32 lastError2;
@@ -277,7 +261,7 @@ u32 Storm_2A0B0(const char* name, u32 prio, u32 flags, u32** out) {
     if (!out || !name || !*name) { G.lastErr = 0x57; h->setErr(0x57); if (out) *out = nullptr; return 0; }
     *out = nullptr;
     h->lock();
-    if (G.archList == 0) h->initArchives();
+    if (G.archInit == 0) h->initArchives();
     h->strcpyN(path, name, 0x104);
     if ((~(h->getAttr(path) >> 4) & 1) == 0) {
         if (*name == '\\' || h->strstr_(name, ":\\") || h->strstr_(name, "\\\\")) h->strcpyN(path, name, 0x104);
@@ -342,6 +326,14 @@ u32 Storm_2A0B0(const char* name, u32 prio, u32 flags, u32** out) {
     h->unlock();
     h->afterOpen();
     return 1;
+}
+
+// Capture-probe install for 0x2A0B0 (SFileOpenArchive core): the probe's seam table (logging what the retail hooks log) replaces the Win32 and
+// Storm-internal callees; the pinned module globals (init flag 0x53120, last error 0x55388, list words 0x5597C/0x55980/0x55984) are exposed
+// for the probe to copy in and out of its blobs.
+extern "C" void storm_n42_2a0b0_install(const N42Host* seams, u32** archInit, int** archList, int** archListHead, int** archHead, u32** lastErr) {
+    static N42Host s; s = *seams; G.h = &s;
+    *archInit = &G.archInit; *archList = &G.archList; *archListHead = &G.archListHead; *archHead = &G.archHead; *lastErr = &G.lastErr;
 }
 
 // 1.13c Storm+0x19C80

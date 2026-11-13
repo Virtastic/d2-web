@@ -581,10 +581,11 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_D2AB0(uint8_t* seed, uint8_t* block, 
 // check via 0xD2070 are as decompiled. The decompile's comma expression assigning unaff_retaddr to
 // the item pointer in the shield branch is a stack artifact and ignored.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_D2F00(uint8_t* item, uint8_t* edi, const D2GameBbf30cEnv* env)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_D2F00(uint8_t* game, uint8_t* item, uint8_t* edi, const D2GameBbf30cEnv* env)
 {
+    // ebp = game (stack arg 0), ebx = item (stack arg 1), edi = player; ret 8.
     uintptr_t inv = rd32(edi, 0x60);
-    uint8_t* inv2 = PN(Q(o10460, inv));
+    Q(o10460, inv);
     if (inv == 0) return 0;
     uint8_t* row = PN(Q(o10695, item == nullptr ? 0xFFFFFFFFu : rd32(item, 4)));
     if (row == nullptr) return 0;
@@ -600,7 +601,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_D2F00(uint8_t* item, uint8_t* edi, co
     uintptr_t a = 0, b = 0, c = 0;
     if (tag == 0x20737361u) {                       // "ass "
         uint8_t* pd = PN(Q(o10920));
-        a = rd32(pd, 0x10 + rd8(item, 0x6D) * 4); b = 9; c = 5; need = true;
+        a = rd32(pd, 0x10 + rd8(game, 0x6D) * 4); b = 9; c = 5; need = true;
     }
     else if (tag == 0x2034336Au) {                  // "j43 "
         if (Q(o10174, Q1(f1020), 0x14, 0) != 0) return 0;
@@ -636,10 +637,10 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_D2F00(uint8_t* item, uint8_t* edi, co
     uintptr_t it = Q(o10284, rd32(edi, 0x60));
     while (it != 0) {
         uint32_t id = (uint32_t)Q(o10155, it);
-        if (item == nullptr) die(env, 0x2D3);
-        for (uint8_t* n = P(item, 0x1120 + (id & 0x7F) * 4); n != nullptr; n = P(n, 0xE4)) {
+        if (game == nullptr) die(env, 0x2D3);
+        for (uint8_t* n = P(game, 0x1120 + (id & 0x7F) * 4); n != nullptr; n = P(n, 0xE4)) {
             if (rd32(n, 0xC) == id) {
-                if (rd32(n, 0x60) != 0 && Q(o10460, rd32(n, 0x60)) != 0 && Q(fD2070, inv2) != 0) return 0;
+                if (rd32(n, 0x60) != 0 && Q(o10460, rd32(n, 0x60)) != 0 && Q(fD2070, item) != 0) return 0;
                 break;
             }
         }
@@ -821,7 +822,7 @@ static void sendItemReply(const D2GameBbf30cEnv* env, uint8_t* unit, uint32_t it
 {
     uint8_t pkt[15];
     std::memset(pkt, 0, sizeof pkt);
-    pkt[0] = 0x2A;
+    pkt[0] = 0x2A; pkt[2] = 0x07;   // retail: byte 2 = 7 (bytes 3..6 are stack residue)
     if (isPlayerUnit(unit)) Q(o10920, unit);
     wr32(pkt, 7, itemId);
     wr32(pkt, 11, (uint32_t)Q(o10973, unit, 0xE, 0));
@@ -849,22 +850,22 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BE640(uint8_t* game, uint8_t* unit, u
     auto reply = [&](uint32_t code, uintptr_t word) {
         Q(f8AC90, code, word, playerTag(env, unit), unit, 0xE);
     };
-    auto reply0 = [&](uint32_t code) {
-        reply(code, Q(o10973, unit, 0xE, 0, 0xFFFFFFFFu, 0));
+    auto reply0 = [&](uint32_t code, uint32_t x = 0xFFFFFFFFu) {   // x: the stack word retail pushes under the reply (the id on the mode gates, -1 elsewhere)
+        reply(code, Q(o10973, unit, 0xE, 0, x, 0));
     };
     if (mode == 0) {
-        if (Q(fE150, npc) == 0) { reply0(7); return 1; }
+        if (Q(fE150, npc) == 0) { reply0(7, id); return 1; }
     }
     else if (mode == 2) {
-        if (Q(f8FAA0, game) == 0) { reply0(7); return 1; }
-        if (Q(fE150, npc) != 1) { reply0(7); return 1; }
+        if (Q(f8FAA0, game) == 0) { reply0(7, id); return 1; }
+        if (Q(fE150, npc) != 1) { reply0(7, id); return 1; }
     }
     uint32_t npcId = npc == nullptr ? 0xFFFFFFFFu : rd32(npc, 4);
     uint8_t cls = rd8(game, 0x6D);
     uint8_t* pd = PN(Q(o10920));
-    int32_t price = (int32_t)Q(o10107, unit, item, cls, rd32(pd, 0x10 + cls * 4), npcId, id & 0xFFFF);
+    int32_t price = (int32_t)Q(o10107, unit, item, cls, rd32(pd, 0x10 + cls * 4), npcId, (uint32_t)(uint16_t)mode);   // retail pushes the mode word here
     int32_t gold = (int32_t)Q(o10973, unit, 0xE, 0);
-    int32_t bank = (int32_t)Q(o10973);
+    int32_t bank = (int32_t)Q(o10973, unit, 0xF, 0);
     if (gold + bank < price) { reply0(0xC); return 0; }
 
     uintptr_t inv = rd32(unit, 0x60);
