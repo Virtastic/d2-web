@@ -46,6 +46,7 @@
 #include "../d2client/realm_skill_do.h"
 #include "d2gs_client_motion.h"
 #include "d2gs_client_player_speed.h"
+#include "../d2client/d2client_85990.h"
 #include "d2gs_client_player_skills.h"
 #include "d2gs_client_object.h"
 #include "d2gs_client_snapshot.h"
@@ -4802,7 +4803,8 @@ static int pkt_missile_ordered(const uint8_t* packet, int size) {
 }
 
 // 0x3e (0xae300): one stat of an item. Bit stream from +2: guid (variable width), a flag bit, the 9-bit stat id, the
-// value (variable width), and a selector for an 8 or 16 bit tail. The client's own copy of the item takes the value.
+// value (variable width), and a selector for an 8 or 16 bit tail. 0x85990 writes the value to the client's item only
+// when the flag bit is 1, and treats stats 0xcc and 0x46 specially (d2client_85990.cpp).
 static int pkt_item_stat(const uint8_t* packet, int length) {
     if (length < 3) return 0;
     D2RealmBitReader bits(packet + 2, length - 2);
@@ -4813,10 +4815,9 @@ static int pkt_item_stat(const uint8_t* packet, int length) {
         if (!bits.read(1, b)) return false;
         return bits.read(b ? 32 : 16, v);
     };
-    uint32_t guid = 0, flag = 0, statId = 0, value = 0;
-    if (!var(guid) || !bits.read(1, flag) || !bits.read(9, statId) || !var(value)) return 0;
-    D2UnitStrc* item = d2_realm_client_owned_item_find(guid);
-    if (item) STATLIST_SetUnitStat(item, static_cast<int>(statId), static_cast<int>(value), 0);
+    uint32_t guid = 0, flag = 0, statId = 0, value = 0, sel = 0, tail = 0;
+    if (!var(guid) || !bits.read(1, flag) || !bits.read(9, statId) || !var(value) || !bits.read(1, sel) || !bits.read(sel ? 16 : 8, tail)) return 0;
+    d2_client_item_stat_85990(session_hero(), d2_realm_client_owned_item_find(guid), static_cast<int32_t>(value), static_cast<char>(flag), static_cast<uint16_t>(tail), static_cast<int32_t>(statId));
     return 1;
 }
 
