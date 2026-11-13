@@ -97,9 +97,10 @@ void sub_3D8A0(State& s,int32_t p1,int32_t p2,int32_t p3,int32_t p4,int32_t p5){
  }
 }
 // 1.13c D2Client+0x3DA60
-uint32_t sub_3DA60(State& s,int32_t esi){
- int32_t r=s.api.ord10787();
- if(r==0){ if(esi!=(int32_t)(intptr_t)s.list_cbbfc || s.g_c985c<=s.g_c97f8) return 0; }
+uint32_t sub_3DA60(State& s,int32_t eax,int32_t esi){
+ int32_t r=s.api.ord10787(eax,esi);
+ // retail: esi against the 32-bit global at 0x11BBFC; 0x1197F8 < 0x11985C is an unsigned compare
+ if(r==0){ if((uint32_t)esi!=(uint32_t)(uintptr_t)s.list_cbbfc || !((uint32_t)s.g_c97f8<(uint32_t)s.g_c985c)) return 0; }
  else if(r==6) return 4;
  return 1;
 }

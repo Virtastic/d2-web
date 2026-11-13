@@ -13,7 +13,7 @@ struct Services {
  virtual void ord10043(int32_t,int32_t,int32_t)=0;
  virtual bool dbOn()=0;                       // DAT_6fbcc3b8 != 0
  virtual int32_t classCount()=0; virtual int32_t classToId(int32_t)=0;   // sgptDataTables +0xa80 / +0xa78 (+2 short)
- virtual int32_t ord10522()=0; virtual uint8_t ord10042(int32_t)=0; virtual uint32_t ord10266(uint8_t)=0;
+ virtual int32_t ord10522(void*,void*)=0; virtual uint8_t ord10042(int32_t)=0; virtual uint32_t ord10266(uint8_t)=0;
  virtual void ord10740(uint32_t,int32_t*,int32_t*)=0;
  virtual int32_t x(void*)=0; virtual int32_t y(void*)=0;
 };
@@ -33,9 +33,12 @@ uint8_t sub_4C990(Services& s, void* a, int32_t* b) {
  int32_t id=b[1]; if(id<0) return 0;
  if(id<s.classCount()){ id=s.classToId(id); }   // retail: id = (short)row[2] unconditionally (a -1 short fails the next range check)
  if(id<0||id>=s.classCount()||id!=0x12a) return 0;
- if(s.ord10522()>=2) return 0;
+ if(s.ord10522(a,b)>=2) return 0;
  uint8_t u=s.ord10042(b[0xb]); uint32_t k=s.ord10266(u);
- int32_t o[2]; s.ord10740(k&0xff,&o[0],&o[1]);   // decompile stack-garbled: out pair
+ // retail builds the 8-byte stack table {6,7,0,1,2,3,4,5} and indexes it with the low byte of the facing; an index of 8 or more reads
+ // neighbouring stack bytes (not modelled: 0)
+ static const uint8_t dirTab[8]={6,7,0,1,2,3,4,5};
+ int32_t o[2]; s.ord10740((k&0xff)<8?dirTab[k&0xff]:0,&o[0],&o[1]);   // out pair
  int32_t bx=s.x(b), by=s.y(b), ax=s.x(a);
  if(bx+o[0]*3==ax && by+o[1]*3==s.y(a)) return u;
  return 0;

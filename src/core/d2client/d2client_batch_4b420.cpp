@@ -77,13 +77,15 @@ uint32_t sub_4BFA0(Seams& s, const uint32_t* en, const uint32_t* e, const uint32
  return r ? (bitMasks[e[0] & 7] & r[0x104 + ((int32_t)e[0] >> 3)]) : 0;
 }
 // 1.13c D2Client+0x4C3C0   (param_2 = packet: u8 type, u32 id @1, u16 @5)
-void sub_4C3C0(Seams& s, const uint8_t* p) {
+uint32_t sub_4C3C0(Seams& s, const uint8_t* p) {   // returns eax: the unit's pData (0 when no unit)
  uint32_t id = p[1] | p[2] << 8 | p[3] << 16 | (uint32_t)p[4] << 24;
  Unit* u = s.findUnit(1, id);
- if (!u) return;
+ if (!u) return 0;
  if (u->type != 1) s.fatal(0x5a);
  uint16_t v = (uint16_t)(p[5] | p[6] << 8);
- if (u->data) *(uint32_t*)((uint8_t*)u->data + 0x40) = v == 0xffff ? 0xffffffffu : v;
+ uint32_t dp; std::memcpy(&dp, (const uint8_t*)u + 0x14, 4);   // retail layout: 32-bit pData at +0x14 (as in 4C430)
+ if (dp) { uint32_t w = v == 0xffff ? 0xffffffffu : v; std::memcpy((uint8_t*)(uintptr_t)dp + 0x40, &w, 4); }
+ return dp;
 }
 // 1.13c D2Client+0x4C430   (esi = unit)
 bool sub_4C430(Seams& s, Unit* u) {

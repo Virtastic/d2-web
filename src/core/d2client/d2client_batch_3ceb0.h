@@ -19,7 +19,8 @@ struct Services {
  virtual std::u16string label(void* ctx,int32_t)=0;
  virtual std::u16string str10003()=0; virtual void fab17f0()=0;
  virtual void draw10085(const std::u16string&,int32_t y,int32_t mode,int32_t)=0;
- virtual int32_t ord10787()=0; virtual int32_t ord10847(int32_t)=0; virtual uint32_t alloc6f6c0()=0;
+ virtual int32_t ord10787(int32_t,int32_t)=0;   // (eax, esi) at the 0xCB74 thunk: the skill use state
+ virtual int32_t ord10847(int32_t)=0; virtual uint32_t alloc6f6c0()=0;
  virtual std::u16string name10265(int32_t)=0; virtual void fatal(const std::u16string&)=0;
 };
 struct State {
@@ -38,5 +39,6 @@ void sub_3D080(State& s,int32_t eax,int32_t p1);
 void sub_3D180(State& s,int32_t p);
 void sub_3D320(State& s,const int16_t* p1,int32_t p2);
 void sub_3D470(State& s);
+uint32_t sub_3DA60(State& s,int32_t eax,int32_t esi);
 uint32_t sub_3DAA0(State& s,const int16_t* eax);
 }
