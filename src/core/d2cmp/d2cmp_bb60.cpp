@@ -14,7 +14,7 @@ void fbb60(GE& e, uint32_t node)
             e.h(0x28d0, 0, 0, 0, 0, 0, 0xffffffffu);
             return;
         }
-        e.h(0x280d, 0, p);
+        e.h(cb & 0x00ffffffu, 0, p);   // the callee is the slot's own target: its module offset keys the call
     }
     e.wr32(p + 0x54, 0);
     e.wr32(p + 0x5c, 0);
