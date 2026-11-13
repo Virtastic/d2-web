@@ -302,7 +302,7 @@ static bool d2c_7a5d0(uint32_t ri) {
         StUnit& u = g_units[ui];
         auto fl = [](int32_t v) { return v >= 0 ? v / 160 : -((-v + 159) / 160); };
         int32_t px = (u.sx - u.sy) * 16, py = (u.sx + u.sy) * 8;
-        int32_t tx = fl(px + 2 * py), ty = fl(2 * py - px) - 1;   // ty-1 as the tile passes (8B110 Z rows: every unit sits one row above the unit-spec reading)
+        int32_t tx = fl(px + 2 * py), ty = fl(2 * py - px);   // the unit loop subtracts the grid origin from the projected tile with no row bias
         if (!d2c_7a040(tx, ty, kSq)) continue;
         uint32_t cell = kCells + (uint32_t)(n * (ty - g_oy) + (tx - g_ox)) * 0x24;
         if (u.a6180 || u.bit20) d2c_7a260(cell, u.unit, u.sx, u.sy);
@@ -627,8 +627,8 @@ EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
             e.ctxX = gRd32(kCtx + 4); e.ctxY = gRd32(kCtx + 8); e.ctxOffX = gRd32(kCtx + 0x24); e.ctxOffY = gRd32(kCtx + 0x28);
             d2_client_9e970(e, (D2Client9E970Node*)(g_arena + gRd32(room + 0x14)), mode, [](uint32_t p) { return (D2Client9E970Node*)(g_arena + p); });
         }};
-    // (no tail 10013: the first 10013 is c124's 9E970 call)
-    d2_client_9f270(g_arena, kCtx, &w);
+    // 8B110 runs 9F270 only when the pool's flag word (ctx+0x38) holds gdwBitMasks[3] (set by 79C80); retail's first frame never calls it
+    if (rd(kSq) & 8) d2_client_9f270(g_arena, kCtx, &w);
     D2c9EE90Env e{gRd32, [](uint32_t a) -> uint8_t { return a < sizeof g_arena ? g_arena[a] : 0; }, [](uint32_t a, uint32_t v) { if (a < sizeof g_arena - 4) memcpy(g_arena + a, &v, 4); },
         // each 10001/10058 returns with ecx = edx = 0 (the 10013 after one reads 0,0)
         [](uint32_t a, uint8_t v) { if (a < sizeof g_arena) g_arena[a] = v; }, []() -> int32_t { gRec(10013, {}); return g_r13; }, []() -> uint32_t { return g_now; },
