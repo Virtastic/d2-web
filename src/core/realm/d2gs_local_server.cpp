@@ -161,7 +161,15 @@ int dispatch(const uint8_t* p, int n) {
         D2CT_RET(ct, "%x", r == 1 ? 0 : r);   // the packet table's handlers return 0 for handled; the local dispatcher's 1 is the same outcome
         return r;
     }
-    case 0x06: case 0x07: if (!need(9)) return -1; return d2_session_command_left_skill(rd32(p + 5));
+    case 0x06: case 0x07: {
+        if (!need(9)) return -1;
+        // session call trace: D2Game 0xCE9D0 (the 06 handler), arg hash as for 01/03 above over the 9 bytes
+        size_t ct = 0;
+        if (p[0] == 0x06) { uint32_t ph = 0x811c9dc5u; for (int i = 0; i < 9; ++i) { ph ^= p[i]; ph *= 16777619u; ph ^= 0; ph *= 16777619u; ph ^= 0; ph *= 16777619u; ph ^= 0; ph *= 16777619u; } ct = D2CT_ENTER("D2Game", 0xCE9D0, "%02x,%x,%08x", p[0], 9, ph); }
+        const int r = d2_session_command_left_skill(rd32(p + 5));
+        if (p[0] == 0x06) D2CT_RET(ct, "%x", r == 1 ? 0 : r);
+        return r;
+    }
     case 0x0C: if (!need(5)) return -1; return d2_session_command_right_skill_at(rd16(p + 1), rd16(p + 3));
     case 0x0F: if (!need(5)) return -1; return d2_session_command_right_skill_hold_at(rd16(p + 1), rd16(p + 3));
     case 0x13: if (!need(9)) return -1; return d2_session_command_interact_packet(rd32(p + 1), rd32(p + 5));
