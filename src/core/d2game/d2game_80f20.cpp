@@ -4,8 +4,8 @@
 // States: 0/2/3 not moving, 1 moving, 4 look for a formation, 5 baptism (slots 1-5), 6-12 ritual (slots 1-4). Void; EAX is residue.
 // Callees go through the seam: 0x1900 squared distance (EAX unit, EBX target), 0x1180 roll (EAX range, ECX = unit+0x20), 0x1100 / 0x1130
 // unit x / y (ECX), 0xB07B0 distance to a point, 0xF1B10 walk close (AL), 0xF2540 walk to target, 0xF2220 / 0xF21E0 / 0xF1FA0 mode and
-// coordinate moves, 0xF22C0 idle, 0xFFA90 is-dead, 0xA478 / 0xA454 / 0xA3B8 / 0xA502 / 0xA4F0 / 0xA4FC the room unit find, and
-// 0x2A6A0 / 0x2A6E2 / 0x2A7C6 / 0xAEA80 / 0x2A60A the magic-find stat list. The ritual and baptism offset tables are the stack
+// coordinate moves, 0xF22C0 idle, 0xDFA90 is-dead, 0xA478 / 0xA454 / 0xA3B8 / 0xA502 / 0xA4F0 / 0xA4FC the room unit find, and
+// 0xA6A0 / 0xA6E2 / 0xA7C6 / 0x8EA80 / 0xA60A the magic-find stat list. The ritual and baptism offset tables are the stack
 // constants the function builds on entry (1.13c keeps them as immediates, in the same order as the 1.10f statics).
 #include "d2game_seam4e.h"
 
