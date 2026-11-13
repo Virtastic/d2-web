@@ -12,10 +12,11 @@
 // retail's control flow and the stored observable is still produced.
 struct D2ClientTiny1019jEnv {
     int32_t (*tick)(void);        // 0x0C09A Fog.dll!#10055: millisecond clock (the 0x52D90 deadline base)
-    void    (*sound_10067)(void); // 0x0D27C D2sound.dll!#10067
-    void    (*sound_10011)(void); // 0x0D26A D2sound.dll!#10011
-    void    (*sound_10001)(void); // 0x0D270 D2sound.dll!#10001
+    int32_t (*sound_10067)(void); // 0x0D27C D2sound.dll!#10067 (EAX result feeds 0x636A0)
+    int32_t (*sound_10011)(void); // 0x0D26A D2sound.dll!#10011
+    int32_t (*sound_10001)(void); // 0x0D270 D2sound.dll!#10001
 };
+namespace d2client_lerp { uint64_t lerp636a0(uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t n); }
 
 // 0x17F0 (src/core/d2client/d2client_batch_1760.cpp) is the skills.txt -> skilldesc.txt lookup.
 extern "C" void* d2_client_skilldesc_for_skill(int32_t nSkillId);
@@ -52,7 +53,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_521a0(int32_t span, uint32_t* deadline, cons
 // the CRT's software x87 divide and produces the same quotient. Integer arithmetic below is exact:
 // every uint32 operand is exact in x87 and an exact .5 quotient has a finite binary representation.
 // 1.13c D2Client+0x636A0
-static uint64_t d2_client_636a0_body(const void* self, int32_t ecx, int32_t edx) {
+[[maybe_unused]] static uint64_t d2_client_636a0_body(const void* self, int32_t ecx, int32_t edx) {
     const uint32_t n = *reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(self) + 0x120);
     const uint64_t num = (uint64_t)(uint32_t)(n - 1) * (uint64_t)(uint32_t)(ecx - edx + 1);
     const uint64_t den = (uint32_t)(ecx - edx);
@@ -68,8 +69,8 @@ static uint64_t d2_client_636a0_body(const void* self, int32_t ecx, int32_t edx)
 // 0x636A0(object, 0x64, 0) at object + 0x124. Reached from the data table at 0x0E7130.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_64330(void* self, const D2ClientTiny1019jEnv* env) {
-    if (env && env->sound_10067) env->sound_10067();
-    const uint64_t v = d2_client_636a0_body(self, 0x64, 0);
+    const int32_t snd = (env && env->sound_10067) ? env->sound_10067() : 0;   // EAX of the sound call is 0x636A0's numerator base
+    const uint64_t v = d2client_lerp::lerp636a0((uint32_t)snd, 0x64, 0, *reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(self) + 0x120));
     *reinterpret_cast<int32_t*>(static_cast<uint8_t*>(self) + 0x124) = (int32_t)(uint32_t)v;
 }
 
@@ -78,8 +79,8 @@ EMSCRIPTEN_KEEPALIVE void d2_client_64330(void* self, const D2ClientTiny1019jEnv
 // object + 0x124. Reached from the data table at 0x0E6140.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_64400(void* self, const D2ClientTiny1019jEnv* env) {
-    if (env && env->sound_10011) env->sound_10011();
-    const uint64_t v = d2_client_636a0_body(self, 0x64, 0);
+    const int32_t snd = (env && env->sound_10011) ? env->sound_10011() : 0;
+    const uint64_t v = d2client_lerp::lerp636a0((uint32_t)snd, 0x64, 0, *reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(self) + 0x120));
     *reinterpret_cast<int32_t*>(static_cast<uint8_t*>(self) + 0x124) = (int32_t)(uint32_t)v;
 }
 
@@ -88,7 +89,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_64400(void* self, const D2ClientTiny1019jEnv
 // object + 0x124. Reached from the data table at 0x0E5BF0.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_64440(void* self, const D2ClientTiny1019jEnv* env) {
-    if (env && env->sound_10001) env->sound_10001();
-    const uint64_t v = d2_client_636a0_body(self, 0x64, 0);
+    const int32_t snd = (env && env->sound_10001) ? env->sound_10001() : 0;
+    const uint64_t v = d2client_lerp::lerp636a0((uint32_t)snd, 0x64, 0, *reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(self) + 0x120));
     *reinterpret_cast<int32_t*>(static_cast<uint8_t*>(self) + 0x124) = (int32_t)(uint32_t)v;
 }

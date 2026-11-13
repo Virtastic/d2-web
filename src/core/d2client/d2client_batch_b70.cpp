@@ -12,9 +12,9 @@ W extern int32_t DAT_6fbcbee0, DAT_6fbcb834, DAT_6fbcbeec, DAT_6fbbb408, DAT_6fb
 // callees
 W int32_t FUN_6fb13880(void);
 W int32_t FUN_6fb137b0(int32_t* edx_out);  // returns EAX, second result in EDX
-W void FUN_6fb13000(void);
-W void FUN_6fb13b20(void);
-W void FUN_6fb144f0(void);
+W void FUN_6fb13000(int32_t eax);  // register argument: EAX = mode
+W void FUN_6fb13b20(int32_t eax);
+W void FUN_6fb144f0(int32_t eax);
 W void Ordinal_10041(void* cel, int32_t x, int32_t y, int32_t color, int32_t mode, void* pal);
 W void Ordinal_511(void* msg);
 W int32_t Ordinal_11017(int32_t);
@@ -33,26 +33,27 @@ W void FUN_6faf8150(void);
 }
 
 // 1.13c D2Client+0x64990
-// Places the OK / OK+Cancel button cels of a dialog. The decompile's hidden EDX out-value of
-// FUN_6fb137b0 (second-button flag) is exposed as `second`.
+// Places the OK / OK+Cancel button cels of a dialog. Retail: `call 0x63880; mov edx,eax; call 0x637b0; test edx,edx`,
+// so `second` is 0x63880's EAX and `first` is 0x637b0's EAX (0x637b0 leaves EDX alone).
 extern "C" void d2client_FUN_6fb14990(void) {
-  int32_t second = 0;
-  FUN_6fb13880();
-  int32_t first = FUN_6fb137b0(&second);
+  int32_t unused_edx = 0;
+  const int32_t second = FUN_6fb13880();
+  int32_t first = FUN_6fb137b0(&unused_edx);
   int32_t cel[18] = {};
-  auto draw = [&](int32_t x) {
-    cel[17] = DAT_6fbcc080;
+  // cel is the 0x48-byte request at [esp+8]; the frame word [esp+0x3c] is cel[13]. mode rides EAX into 0x63000 / 0x644f0, 0x63b20 always gets 1
+  auto draw = [&](int32_t x, int32_t mode) {
+    cel[13] = DAT_6fbcc080;
     Ordinal_10041(cel, x, DAT_6fb8bc4c - 0x2f, -1, 5, 0);
-    FUN_6fb13000(); FUN_6fb13b20(); FUN_6fb144f0();
+    FUN_6fb13000(mode); FUN_6fb13b20(1); FUN_6fb144f0(mode);
     DAT_6fbcc090 = 0;
   };
   if (second == 0) {
-    if (first != 0) { draw(DAT_6fb8bc48 / 2 - 0xcd); return; }
-    draw((DAT_6fbcc098 == 0 ? DAT_6fb8bc48 / 2 - 0x54 : DAT_6fb8bc48 / 2 - 0x4a) - 3);
+    if (first != 0) { draw(DAT_6fb8bc48 / 2 - 0xcd, 1); return; }
+    draw((DAT_6fbcc098 == 0 ? DAT_6fb8bc48 / 2 - 0x54 : DAT_6fb8bc48 / 2 - 0x4a) - 3, 2);
     return;
   }
   if (first != 0) { DAT_6fbcc090 = 1; return; }
-  draw((DAT_6fbcc098 == 0 ? DAT_6fb8bc48 / 2 + 0x23 : DAT_6fb8bc48 / 2 + 0x38) - 2);
+  draw((DAT_6fbcc098 == 0 ? DAT_6fb8bc48 / 2 + 0x23 : DAT_6fb8bc48 / 2 + 0x38) - 2, 3);
 }
 
 // 1.13c D2Client+0x973C0
