@@ -14,5 +14,5 @@ extern "C" uint32_t d2c_52d00(uint32_t eax, const cl::Env& e) {
     spawn(e, pl, 0x120, x, y);
     const uint32_t row = misRow(e, 0x120);
     const uint32_t d = e.R(row + 0x38);
-    return e.H(0x52450, 4, 1, 0, 0, 0, d, 0, 0, (uint32_t)e.R16s(row + 0x96) - 2 * d);
+    return e.H(0x52450, 4, 1, 0, 0, 0, d, 2 * d, 0, (uint32_t)e.R16s(row + 0x96) - 2 * d);
 }
