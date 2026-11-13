@@ -5,7 +5,9 @@
 extern "C" uint32_t d2c_655c0(uint32_t msg, const cl::Env& e) {
     using namespace pa4;
     const uint32_t y = P16(e, msg + 0xe);
-    if (G(e, 0x11c068) && e.H(0x64080, 0, 0, 0, 0, 0, 0, 0, 0, y) == G(e, 0x11c058)) e.H(0x65180);
+    const uint32_t pend = G(e, 0x11c068);   // EAX stays the pending word into the hit test
+    // the hooks record only EBX and ESI (REGS `bs`), so EAX is not part of the call record
+    if (pend && e.H(0x64080, 0, 0, 0, 0, 0, 0, 0, 0, y, msg) == G(e, 0x11c058)) e.H(0x65180, 0, 0, 0, 0, 0, 0, 0, 0, y, msg);
     S(e, 0xf46c8, 0x10);
     S(e, 0xf46c4, 0x10);
     clearButtons(e);
