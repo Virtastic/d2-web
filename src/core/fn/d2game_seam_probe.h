@@ -16,7 +16,7 @@ struct SeamProbe {
     static void blkthunk(void* c, uint32_t rva, uint32_t p, uint32_t n) { ((SeamProbe*)c)->e.blk(rva, p, n); }
     static void ejthunk(void* c, uint32_t rva, uint32_t v) { ((SeamProbe*)c)->e.edi(rva, v); }
     static void xthunk(void* c, uint32_t rva, const uint32_t* w, uint32_t n) { ((SeamProbe*)c)->e.x(rva, w, n); }
-    D2Seam seam() { D2Seam s{ this, thunk }; s.bl = blkthunk; s.ej = ejthunk; s.xw = xthunk; return s; }
+    D2Seam seam() { D2Seam s{ this, thunk }; s.bl = blkthunk; s.ej = ejthunk; s.xl = xthunk; return s; }
 };
 
 // src/core/fn/d2game_seam_probe.h -- the recorder a D2Game FN probe binds to a port's D2GameSeam. It does what the
