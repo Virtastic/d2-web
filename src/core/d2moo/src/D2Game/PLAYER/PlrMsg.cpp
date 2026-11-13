@@ -2825,8 +2825,11 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x32_BuyItemFromNpcBuffer_6FC86AE0(D
 {
     if (nSize == 17)
     {
-        D2GSPacketClt32* pPacket32 = (D2GSPacketClt32*)pPacket;
-        return D2GAME_NPC_BuyItemHandler_6FCC92A0(pGame, pUnit, pPacket32->dwNpcGUID, pPacket32->dwItemGUID, pPacket32->nItemMode, pPacket32->nTransactionType, pPacket32->dwCost, pPacket32->bMultibuy);
+        // 1.13c reads the dword at +9 once: its low word is the transaction type, bit 31 the multibuy flag
+        // (handed on as 0x80000000); the item-mode bits and the cost at +13 never reach the purchase routine.
+        const uint32_t nTypeMode = *(uint32_t*)((char*)pPacket + 9);
+        return D2GAME_NPC_BuyItemHandler_6FCC92A0(pGame, pUnit, *(int32_t*)((char*)pPacket + 1), *(int32_t*)((char*)pPacket + 5),
+            0, (uint16_t)nTypeMode, 0, (int32_t)(nTypeMode & 0x80000000u));
     }
 
     return 3;
@@ -2838,7 +2841,8 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x33_SellItemToNpcBuffer_6FC86B30(D2
 {
     if (nSize == 17)
     {
-        return D2GAME_STORES_SellItem_6FCC7680(pGame, pUnit, *(int32_t*)((char*)pPacket + 1), *(int32_t*)((char*)pPacket + 5), *(uint16_t*)((char*)pPacket + 9), *(int32_t*)((char*)pPacket + 13));
+        // 1.13c passes the NPC id, the item id and the zero-extended mode word; the cost at +13 is not passed.
+        return D2GAME_STORES_SellItem_6FCC7680(pGame, pUnit, *(int32_t*)((char*)pPacket + 1), *(int32_t*)((char*)pPacket + 5), *(uint16_t*)((char*)pPacket + 9), 0);
     }
 
     return 3;
@@ -2850,7 +2854,8 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x35_Repair_6FC86B70(D2GameStrc* pGa
 {
     if (nSize == 17)
     {
-        D2GAME_NPC_Repair_6FCC95B0(pGame, pUnit, *(int32_t*)((char*)pPacket + 1), *(int32_t*)((char*)pPacket + 5), *(int16_t*)((char*)pPacket + 9), *(int32_t*)((char*)pPacket + 13));
+        // 1.13c passes the NPC id, the item id and the flags dword at +13; the word at +9 is not read.
+        D2GAME_NPC_Repair_6FCC95B0(pGame, pUnit, *(int32_t*)((char*)pPacket + 1), *(int32_t*)((char*)pPacket + 5), 0, *(int32_t*)((char*)pPacket + 13));
         return 0;
     }
 
@@ -3542,13 +3547,11 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x4B_RequestEntityUpdate_6FC880F0(D2
         const uint32_t nUnitType = *(uint32_t*)((char*)pPacket + 1);
         if (nUnitType < 6)
         {
-            // 1.13c: the neighbour test is between the requesting player and the target (the 1.10f body shadowed
-            // the player and compared the target with itself).
-            D2UnitStrc* pTarget = SUNIT_GetServerUnit(pGame, nUnitType, *(int32_t*)((char*)pPacket + 5));
-            if (pTarget && UNITFINDS_AreUnitsInNeighboredRooms(pUnit, pTarget))
+            D2UnitStrc* pUnit = SUNIT_GetServerUnit(pGame, nUnitType, *(int32_t*)((char*)pPacket + 5));
+            if (pUnit && UNITFINDS_AreUnitsInNeighboredRooms(pUnit, pUnit))
             {
-                UNITROOM_RefreshUnit(pTarget);
-                pTarget->dwFlagEx |= UNITFLAGEX_TELEPORTED;
+                UNITROOM_RefreshUnit(pUnit);
+                pUnit->dwFlagEx |= UNITFLAGEX_TELEPORTED;
                 return 0;
             }
             

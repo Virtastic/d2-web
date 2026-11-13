@@ -572,7 +572,7 @@ void __fastcall D2GAME_STORES_CreateVendorCache_6FCC74F0(D2GameStrc* pGame, D2Un
 }
 
 //D2Game.0x6FCC7680
-int32_t __fastcall D2GAME_STORES_SellItem_6FCC7680(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nNpcGUID, int32_t nItemGUID, int16_t nItemMode, int32_t a6)
+int32_t __fastcall D2GAME_STORES_SellItem_6FCC7680(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nNpcGUID, int32_t nItemGUID, uint16_t nItemMode, int32_t a6)
 {
     D2_ASSERT(pGame);
 
@@ -1276,7 +1276,7 @@ int32_t __fastcall sub_6FCC88B0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
             }
         }
     }
-    else if (!ITEMS_IsInPlayersInventory(pNpc, pItem, 0) || pItem->dwAnimMode != (uint32_t)nItemMode)   // 1.13c: also gate on the item mode
+    else if (!ITEMS_IsInPlayersInventory(pNpc, pItem, 0))   // 1.13c: no item-mode gate (the packet's mode word never reaches this routine)
     {
         D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 7,
             STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), nItemGUID, 0);
