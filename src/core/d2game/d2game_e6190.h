@@ -29,7 +29,7 @@ template <class E> uint32_t Do(E& e, uint32_t th, uint32_t ev)
     const bool B = it(0x20796571);
     const bool C = it(0x20726271);
     const bool D = it(0x20726871);
-    auto go = [&](uint32_t st) { return e.h(0xE4A50, th, 0, (ev8 & ~0xFFu) | st, 0, 0, ev); };
+    auto go = [&](uint32_t st) { return e.h(0xE4A50, th, 0, st, 0, 0, ev); };
     if (c == 0x20326671) {
         if (e.rd8(th + 0xB)) e.wr8(th + 0xB, 7);
         v = e.h(0xA568, 0, 0, 0, 0, 0, qf, 0xF, 0);
