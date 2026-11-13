@@ -9,7 +9,9 @@
 typedef intptr_t I;
 #define O(n) extern "C" __attribute__((weak)) I Ord##n(...)
 #define F(n) extern "C" __attribute__((weak)) I D2GAME_##n(...)
-O(10507); O(10587); O(10887); O(10747); O(10787); O(10858); O(10708); O(10952); O(10494);
+extern "C" __attribute__((weak)) I Ord10887(I u, I a, I b, I c);   // fixed, as d2game_b33b0.cpp declares it
+#define Ord10887(...) ((I (*)(...))&Ord10887)(__VA_ARGS__)   // the decompile passes three words here
+O(10507); O(10587); O(10747); O(10787); O(10858); O(10708); O(10952); O(10494);
 O(10002); O(10793); O(11138); O(10601); O(10543); O(11144); O(10744); O(10326); O(10364);
 O(10086); O(10867); O(10750); O(10193); O(10455); O(10655); O(10977); O(10202); O(10201);
 O(10050); O(10267); O(10045); O(10871); O(10265); O(10024); O(10237); O(10945); O(11013);
