@@ -1,4 +1,4 @@
-// 1.13c D2Client+0x6F040 -- message handler that marks the message handled with result 0. EAX is the message.
+// 1.13c D2Client+0x6F040 -- message handler that marks the message handled with result 0. The message is the stack argument (ret 4) and is returned in EAX.
 #include "cl_pa4.h"
 extern "C" uint32_t d2c_6f040(uint32_t msg, const cl::Env& e) {
     e.W(msg + 0x18, 1);

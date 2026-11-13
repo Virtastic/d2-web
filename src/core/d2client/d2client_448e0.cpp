@@ -15,6 +15,6 @@ extern "C" uint32_t d2c_448e0(uint32_t msg, const cl::Env& e) {
     if (G(e, 0x11c3e8)) fl = 8;
     if (G(e, 0x11c3ec)) fl |= 8;
     if (G(e, 0x11c3f0)) fl |= 4;
-    if (pl && e.R(pl) == 0) S(e, 0x11c3dc, e.H(0x2bf20, 0, P16(e, msg + 0xc), P16(e, msg + 0xe), fl));
+    if (pl && e.R(pl) == 0) S(e, 0x11c3dc, e.H(0x1bf20, 0, P16(e, msg + 0xc), P16(e, msg + 0xe), fl));
     return fin(e, msg);
 }

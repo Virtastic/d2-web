@@ -18,7 +18,7 @@ extern "C" uint32_t d2c_65c70(uint32_t, const cl::Env& e) {
         if (G(e, 0xFAD80 + 4 * (uint32_t)i) == 1) {
             const uint32_t t = e.R(G(e, 0xDD538 + 4 * (uint32_t)i) + 0x2C);
             if (t > 4 || t == 2 || t == 3) return t;
-            if (t == 1) e.H(0xc2790, 0, 0, 0, 0, 0, 0, (uint32_t)i, 1);
+            if (t == 1) e.H(0xc2790, 0, 0, 0, 0, 0, 0, (uint32_t)i, 1);   // stack 0, ECX = slot, EDX = 1
             else if (t == 4 && G(e, 0x119721)) {
                 e.H(0x47b20);
                 e.Edj(0x47b20, G(e, 0x11971D));
@@ -39,10 +39,10 @@ extern "C" uint32_t d2c_65c70(uint32_t, const cl::Env& e) {
     if (cur) return cur;
     if (e.H(0x42090) || e.H(0x420e0)) {
         const uint32_t r = e.H(0xd0b4, 0x6FB80774u);
-        e.H(0x3cc60, r, 0, 0, 0, 0, 1);
+        e.H(0x3cc60, r, 0x6FB80774u, 0, 0, 0, 1);
     }
     const uint32_t r = e.H(0xd0b4, 0x6FB806D8u);
-    e.H(0x3cc60, r, 0, 0, 0, 0, 0xD);
+    e.H(0x3cc60, r, 0x6FB806D8u, 0, 0, 0, 0xD);
     e.H(0x12dd0, 0);
     return e.H(0x11f80);
 }

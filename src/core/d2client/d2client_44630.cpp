@@ -12,6 +12,6 @@ extern "C" uint32_t d2c_44630(uint32_t msg, const cl::Env& e) {
     S(e, 0x11c2f8, 0);
     if (!on) return 0;
     const uint32_t pl = G(e, 0x11bbfc);
-    if (pl && e.R(pl) == 0) S(e, 0x11c3e0, e.H(0x2bf20, 5, P16(e, msg + 0xc), P16(e, msg + 0xe), P16(e, msg + 8)));
+    if (pl && e.R(pl) == 0) S(e, 0x11c3e0, e.H(0x1bf20, 5, P16(e, msg + 0xc), P16(e, msg + 0xe), P16(e, msg + 8)));
     return fin(e, msg);
 }

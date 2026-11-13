@@ -5,8 +5,9 @@
 extern "C" uint32_t d2c_439e0(uint32_t msg, const cl::Env& e) {
     using namespace pa4;
     S(e, 0x11c3e8, 0);
-    if (G(e, 0x11c3a4)) {
-        e.H(0xc0250);
+    const uint32_t busy = G(e, 0x11c3a4);
+    if (busy) {
+        e.H(0xc0250, 0, 0, 0, 0, 0, busy);   // EAX still holds the flag just tested
         S(e, 0xf2188, 0x13);
         S(e, 0xf218c, 0x13);
         e.W(msg + 0x18, 0);

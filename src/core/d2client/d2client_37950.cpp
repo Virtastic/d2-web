@@ -33,7 +33,7 @@ void toggle37950(const cl::Env& e, uint32_t& edx) {
     bool skip = false;
     if (pl) {
         if (e.R(pl) != 0) skip = true;
-        else if (e.H(0xa5440)) skip = true;
+        else { edx = e.H(0xa5440); if (edx) skip = true; }   // the recorder thunk leaves EDX = the hook's return value
     }
     if (!skip) { edx = (edx == 0); S(e, 0xfae04, edx); }
 }

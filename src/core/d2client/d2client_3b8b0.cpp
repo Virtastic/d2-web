@@ -48,6 +48,7 @@ extern "C" uint32_t d2c_3b8b0(const cl::Env& e) {
             if (e.R(eax) != 0) skip = true;
             else {
                 eax = e.H(0xa5440);
+                edx = eax;   // the recorder thunk leaves EDX = the hook's return value (the real callee clobbers it too)
                 if (eax) skip = true;
             }
         }

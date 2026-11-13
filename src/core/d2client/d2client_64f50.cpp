@@ -12,10 +12,12 @@ extern "C" uint32_t d2c_64f50(uint32_t msg, const cl::Env& e) {
             i = 0;
             S(e, 0x11c058, 0);
         }
-        const uint32_t row = G(e, 0x11c060) + (uint32_t)i * 0x550;
+        const uint32_t tab = G(e, 0x11c060);
+        const uint32_t row = tab + (uint32_t)i * 0x550;
         if (e.R(row) == 0xFFFFFFFFu) continue;
         const uint32_t fp = e.R(row + 0x110);
-        if (!fp || slot(e, fp)) break;
+        // call eax: EAX = the callback, ECX = the tab index, EDX = the record table
+        if (!fp || slot(e, fp, fp, (uint32_t)i, tab)) break;
     }
     e.H(0x88a70, 0, 0, 0, 0, 0, 0, 0, 0, 1);
     return fin(e, msg);
