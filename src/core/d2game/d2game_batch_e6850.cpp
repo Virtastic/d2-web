@@ -96,7 +96,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E7CE0(uintptr_t q, const D2Gam
     wr32(q, 0xcc, A(0xE7940)); wr32(q, 0xac, A(0xE7A10)); wr32(q, 0xd4, A(0xE49E0));
     wr32(q, 200, A(0xE2EF0)); wr32(q, 0xb0, A(0xE6190));
     // Fog alloc thunk 0xA2E6: ECX = pool (game+0x1c), EDX = 0xB0 bytes, stack (file string 0x1AF6C, 0x39B, 0)
-    uintptr_t d = C(0xA2E6, 0, rd32(P(rd32(q, 4)), 0x1c), 0xb0, 0, 0, A(0x1AF6C), 0x39b);
+    uintptr_t d = C(0xA2E6, 0, rd32(P(rd32(q, 4)), 0x1c), 0xb0, 0, 0, A(0xFAF6C), 0x39b);
     wr32(q, 0x18, env->h(d));
     std::memset((void*)d, 0, 0x2c * 4);
     wr32(d, 8, 0);
@@ -191,7 +191,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E92D0(uintptr_t q, const D2Gam
     wr32(q, 0xb0, A(0xE7640)); wr32(q, 0xcc, A(0xE8B60)); wr32(q, 0xac, A(0xE3E00));
     wr32(q, 0xd4, A(0xE3B40)); wr32(q, 200, A(0xE3B30)); wr32(q, 0xd8, A(0xE6A60)); wr32(q, 0xc4, A(0xE6B20));
     // Fog alloc thunk 0xA2E6: ECX = pool (game+0x1c), EDX = 0x1C bytes, stack (file string 0x1AEF8, 0x340, 0)
-    uintptr_t d = C(0xA2E6, 0, rd32(P(rd32(q, 4)), 0x1c), 0x1c, 0, 0, A(0x1AEF8), 0x340);
+    uintptr_t d = C(0xA2E6, 0, rd32(P(rd32(q, 4)), 0x1c), 0x1c, 0, 0, A(0xFAEF8), 0x340);
     wr32(q, 0x18, env->h(d));
     std::memset((void*)d, 0, 7 * 4);
     wr8(d, 12, 1); wr8(d, 1, 1);
@@ -208,7 +208,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E93C0(uintptr_t q, const D2Gam
     wr32(q, 0xe8, A(0xE6E00)); wr32(q, 0xec, A(0xE53F0)); wr32(q, 0xf0, A(0xE2F00));
     wr32(q, 0x10, 0x13);
     // Fog alloc thunk 0xA2E6: ECX = pool (game+0x1c), EDX = 0xA0 bytes, stack (file string 0x1AFA0, 0x3AD, 0)
-    uintptr_t d = C(0xA2E6, 0, rd32(P(rd32(q, 4)), 0x1c), 0xa0, 0, 0, A(0x1AFA0), 0x3ad);
+    uintptr_t d = C(0xA2E6, 0, rd32(P(rd32(q, 4)), 0x1c), 0xa0, 0, 0, A(0xFAFA0), 0x3ad);
     wr32(q, 0x18, env->h(d));
     wr32(q, 0xb0, A(0xE7AF0)); wr32(q, 0xb4, A(0xE7A40)); wr32(q, 0xa0, A(0xE5270));
     wr32(q, 0xcc, A(0xE8FE0)); wr32(q, 0xac, A(0xE7BE0)); wr32(q, 0xd4, A(0xE50C0));
