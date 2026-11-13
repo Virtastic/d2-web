@@ -24,10 +24,21 @@ static inline uintptr_t DT() { return (uintptr_t)R32(sgptDataTables_exref, 0); }
 static const char kDataTableOwner[] = "";
 
 O(10141); O(10174); O(10383); O(10392); O(10397); O(10436); O(10421); O(10034); O(10137); O(10153);
-O(10168); O(10243); O(10265); O(10024); O(10286); O(10331); O(10336); O(10441); O(10459); O(10494);
-O(10511); O(10554); O(10558); O(10565); O(10542); O(10585); O(10689); O(10717); O(10750); O(10764);
-O(10786); O(10826); O(10830); O(10832); O(10867); O(10920); O(10973); O(10983); O(11085); O(11103);
+O(10168); O(10243); O(10265); O(10024); O(10286); O(10336); O(10441); O(10459); O(10494);
+O(10511); O(10554); O(10558); O(10542); O(10585); O(10689); O(10717); O(10764);
+O(10786); O(10830); O(10832); O(10920); O(10983); O(11085); O(11103);
 O(11129); O(11154); O(10057); O(10970); O(10653);
+// These six carry fixed signatures in d2game_b33b0.cpp (wasm-ld allows one signature per symbol); the decompile's
+// call arities here vary, so the calls below go through a variadic view of the same symbol.
+#define W extern "C" __attribute__((weak))
+W I Ord10331(I unit); W I Ord10973(I u, I a, I b); W I Ord10826(I room); W I Ord10750(I own); W I Ord10867(I own);
+W I Ord10565(I rec, I x, I y, I pat);
+#undef W
+#define Ord10331(...) ((I (*)(...))&Ord10331)(__VA_ARGS__)
+#define Ord10826(...) ((I (*)(...))&Ord10826)(__VA_ARGS__)
+#define Ord10750(...) ((I (*)(...))&Ord10750)(__VA_ARGS__)
+#define Ord10867(...) ((I (*)(...))&Ord10867)(__VA_ARGS__)
+#define Ord10565(...) ((I (*)(...))&Ord10565)(__VA_ARGS__)
 
 __attribute__((weak, import_module("env"), import_name("D2GAME_E03A0"))) I aea40_E03A0(I, uint32_t);
 F(E07A0); F(9C9A0); F(22A80); F(21220); F(DFA90); F(AD5A); F(AE0B0); F(AEA80); F(AE6F0);

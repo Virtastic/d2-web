@@ -17,8 +17,11 @@ typedef uint32_t U;
 extern "C" __attribute__((weak)) char sgptDataTables_exref[];
 static inline uintptr_t DT() { return (uintptr_t)R32(sgptDataTables_exref, 0); }
 extern "C" __attribute__((weak)) void D2GAME_9F7A0();   // the stat-list callback handed to 10911
-O(10695); O(10428); O(10871); O(10959); O(10973); O(10551); O(11013); O(10785); O(10945); O(10911);
-O(10807); O(11043); O(10680); O(10188); O(10913); O(10887);
+// Fixed signatures, as d2game_b33b0.cpp declares them (one wasm signature per symbol).
+extern "C" __attribute__((weak)) I Ord10973(I u, I a, I b);
+extern "C" __attribute__((weak)) I Ord10887(I u, I a, I b, I c);
+O(10695); O(10428); O(10871); O(10959); O(10551); O(11013); O(10785); O(10945); O(10911);
+O(10807); O(11043); O(10680); O(10188); O(10913);
 F(8EA80); F(8E6F0); F(7A260); F(4EA30);
 
 // 1.13c D2Game+0xAEA40 -- ECX = game, EDX = unit, stack = (rec, four more dwords). ret 0x14.

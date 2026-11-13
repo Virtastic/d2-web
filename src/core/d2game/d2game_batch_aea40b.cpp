@@ -23,8 +23,11 @@ extern "C" __attribute__((weak)) char sgptDataTables_exref[];
 #define DTB() ((uintptr_t)R32(sgptDataTables_exref, 0))
 
 O(10328); O(10331); O(10392); O(10393); O(10428); O(10459); O(10540); O(10551); O(10585); O(10680);
-O(10695); O(10785); O(10807); O(10826); O(10830); O(10839); O(10871); O(10887); O(10911); O(10913);
-O(10916); O(10920); O(10945); O(10959); O(10973); O(11013); O(11043); O(10057); O(10188); O(10024);
+O(10695); O(10785); O(10807); O(10826); O(10830); O(10839); O(10871); O(10911); O(10913);
+extern "C" __attribute__((weak)) I Ord10887(I u, I a, I b, I c);   // fixed, as d2game_b33b0.cpp declares it
+#define Ord10887(...) ((I (*)(...))&Ord10887)(__VA_ARGS__)   // the decompile passes a fifth word here
+O(10916); O(10920); O(10945); O(10959); O(11013); O(11043); O(10057); O(10188); O(10024);
+extern "C" __attribute__((weak)) I Ord10973(I u, I a, I b);   // fixed, as d2game_b33b0.cpp declares it
 O(10265); O(10510); O(10689); O(10830);
 
 F(1100); F(1130); F(1180); F(11D0); F(1450); F(4EA30); F(7A260); F(8C3B0); F(8E6F0); F(8EA80);
