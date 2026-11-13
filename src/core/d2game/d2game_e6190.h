@@ -23,18 +23,21 @@ template <class E> uint32_t Do(E& e, uint32_t th, uint32_t ev)
     q(5);
     q(6);
     const bool f15 = q(7) == 0;
-    auto it = [&](uint32_t code) { return e.h(0xE660, pl, 0, 0, game, 0, code) != 0; };
+    uint32_t lastRet = 0;
+    auto it = [&](uint32_t code) { lastRet = e.h(0xE660, pl, 0, 0, game, 0, code); return lastRet != 0; };
     const bool A = it(0x20316671);
     it(0x20326671);
     const bool B = it(0x20796571);
     const bool C = it(0x20726271);
     const bool D = it(0x20726871);
-    auto go = [&](uint32_t st) { return e.h(0xE4A50, th, 0, st, 0, 0, ev); };
+    auto go0 = [&](uint32_t st) { return e.h(0xE4A50, th, 0, st, 0, 0, ev); };
+    // EDX = last 0xE660 result with its low byte replaced by the state (the 0x20326671 path passes the plain state)
+    auto go = [&](uint32_t st) { return go0((lastRet & ~0xFFu) | st); };
     if (c == 0x20326671) {
         if (e.rd8(th + 0xB)) e.wr8(th + 0xB, 7);
         v = e.h(0xA568, 0, 0, 0, 0, 0, qf, 0xF, 0);
         if (v) return v;
-        return go(f15 ? 5 : 6);
+        return go0(f15 ? 5 : 6);
     }
     if (c == 0x20316671) {
         if (!B) return go(1);
