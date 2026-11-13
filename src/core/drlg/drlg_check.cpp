@@ -480,6 +480,12 @@ static uint32_t stageTiles(const D2DrlgTileDataStrc* t, int n, uint32_t& cnt) {
     }
     return first;
 }
+// D2Common #11152 (D2Common+0x3B7D0) walks the player room's adjacent-room list, not the level: a caller that knows it sets the
+// rooms (in list order) before d2_dg_feed_level; none set = every room of the level.
+static std::vector<D2DrlgRoomStrc*> g_feedOnly; static bool g_feedOnlyOn = false;
+void d2_dg_feed_rooms_begin() { g_feedOnly.clear(); g_feedOnlyOn = true; }
+void d2_dg_feed_rooms_add(D2DrlgRoomStrc* r) { g_feedOnly.push_back(r); }
+void d2_dg_feed_rooms_end() { g_feedOnlyOn = false; }
 // The feed over a level the caller already holds (the session room walk passes the live game's level).
 uint32_t d2_dg_feed_level(D2DrlgLevelStrc* lv, int l, int t, int r, int b, int ox, int oy, int n, uint32_t now) {
     d2_dg_stage_reset();
@@ -504,7 +510,8 @@ uint32_t d2_dg_feed_level(D2DrlgLevelStrc* lv, int l, int t, int r, int b, int o
         }
         d2c_cru_end();
     }
-    for (D2DrlgRoomStrc* room = lv ? lv->pFirstRoomEx : nullptr; room; room = room->pDrlgRoomNext) {
+    size_t onlyI = 0;
+    for (D2DrlgRoomStrc* room = g_feedOnlyOn ? (g_feedOnly.empty() ? nullptr : g_feedOnly[0]) : (lv ? lv->pFirstRoomEx : nullptr); room; room = g_feedOnlyOn ? (++onlyI < g_feedOnly.size() ? g_feedOnly[onlyI] : nullptr) : room->pDrlgRoomNext) {
         D2ActiveRoomStrc* a = room->pRoom;
         if (!a || !a->pRoomTiles) continue;
         uint32_t nA, nB;

@@ -12172,6 +12172,7 @@ EMSCRIPTEN_KEEPALIVE void d2_session_destroy() {
 // the session holds, the view centred on the hero (hero at screen 320,240 less the 8 px 6C490 lifts a unit), drawn into the G
 // stream. Returns the D2Gfx call lines in retail's G format ("" when no world is live).
 extern uint32_t d2_dg_feed_level(D2DrlgLevelStrc*, int, int, int, int, int, int, int, uint32_t);
+extern void d2_dg_feed_rooms_begin(); extern void d2_dg_feed_rooms_add(D2DrlgRoomStrc*); extern void d2_dg_feed_rooms_end();
 extern "C" void d2_dg_feed_unit(int, int, int, int, uint32_t, uint32_t);
 extern "C" void d2_dg_set_origin(int32_t, int32_t);
 extern "C" const char* d2_dg_walk_g();
@@ -12245,6 +12246,23 @@ static uint32_t sessionColourShift(D2UnitStrc* u) {
     return best > 0 ? sgptDataTables->pStatesTxt[best].nColorShift : 0;
 }
 static D2GameStrc* g_walkGame;   // the game the client room lists were built for
+// A monster class's COF in a mode (the monster branch of sessionUnitCof, for a client critter that has no server unit).
+static bool sessionMonsterCof(int32_t cls, uint32_t mode, char* out, size_t cap) {
+    static const char* kMode[] = {"dt","nu","wl","gh","a1","a2","bl","sc","s1","s2","s3","s4","dd","kb","sq","rn"};
+    const D2MonStatsTxt* ms = DATATBLS_GetMonStatsTxtRecord(cls);
+    if (mode >= 16 || !ms) return false;
+    auto tok = [](const char* s, int n, char* d) { int k = 0; for (; k < n && s[k] && s[k] != ' '; ++k) d[k] = (s[k] >= 'A' && s[k] <= 'Z') ? (char)(s[k] + 32) : s[k]; d[k] = 0; };
+    char t[8] = {}, w[8] = {}; const uint32_t code = ms->dwCode; tok((const char*)&code, 4, t);
+    const D2MonStats2Txt* m2 = UNITS_GetMonStats2TxtRecordFromMonsterId(cls);
+    const int32_t bw = m2 ? m2->nBaseW : 0;
+    if (mode == 0 || mode == 12) strcpy(w, "hth"); else tok((const char*)&bw, 4, w);
+    if (!t[0] || !w[0]) return false;
+    snprintf(out, cap, "data\\global\\monsters\\%s\\cof\\%s%s%s.cof", t, t, kMode[mode], w);
+    return true;
+}
+extern "C" bool d2_session_critter_unit(uint32_t i, uint32_t* out);
+EMSCRIPTEN_KEEPALIVE int g_walkOpt = 0;   // off by default; bit0 critters, bit1 only the monsters the client was told of, bit2 critter COF
+EMSCRIPTEN_KEEPALIVE void d2_session_walk_opt(int v) { g_walkOpt = v; }
 EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
     if (!g_sessionLive || !g_game || !g_lastLevel || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return "";
     auto fl = [](int32_t v) { return v >= 0 ? v / 160 : -((-v + 159) / 160); };
@@ -12256,11 +12274,20 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
     // +0xC8 bit7 still clear (retail's first shadow pass is the second frame).
     d2_dg_feed_unit(-1, 0, 0, 0, 0, 0);
     char cof[96];
+    // The client's own critters (Levels.txt cmon, made at room activation 0x440C0 before any server unit is learnt): type 1 units
+    // the server never sent, in the client's room lists.
+    if (g_walkOpt & 1) for (uint32_t i = 0, c[5]; d2_session_critter_unit(i, c); ++i) {
+        d2_dg_feed_unit_ex(UNIT_MONSTER, c[0], (int)c[1], (int)c[2], (int)c[3], c[4], 0x8000, 0x8000, 0, first ? 1 : 0);
+        if ((g_walkOpt & 4) && sessionMonsterCof((int32_t)c[1], c[4], cof, sizeof cof)) d2_dg_feed_unit_cof(cof);
+        d2_dg_feed_unit_shift(0);
+    }
     for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
         D2ActiveRoomStrc* room = roomEx->pRoom;
         if (!room || !(clientHeldCount(room) > 0 || inStartLattice(roomEx))) continue;   // only the rooms the client holds
         for (D2UnitStrc* u = room->pUnitFirst; u; u = u->pRoomNext) {
             uint32_t mode = u->dwAnimMode, fx = 0x8000, fy = 0x8000; int32_t x, y;
+            // a monster the server never sent this client (outside the rooms its first-sight chain covers) has no client unit
+            if ((g_walkOpt & 2) && u->dwUnitType == UNIT_MONSTER && !g_clientInitSeed.count(1ull << 32 | u->dwUnitId)) continue;
             if (u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MONSTER) {
                 if (!u->pDynamicPath) continue;
                 x = u->pDynamicPath->tGameCoords.wPosX; y = u->pDynamicPath->tGameCoords.wPosY;
@@ -12276,7 +12303,15 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
     // 7A0D0: columns = w/160 + 11, rows = h/80 + 12, side = columns + rows - 1; 7A9F0: origin = the view corner's tile less (3, columns)
     const int32_t cols = 640 / 160 + 11, side = cols + 480 / 80 + 12 - 1;
     d2_dg_set_origin(vx, vy);
+    // 7A9F0 hands D2Common #11152 the player room; it walks that room's adjacent-room list (the rooms around the hero), not the level
+    d2_dg_feed_rooms_begin();
+    if (D2ActiveRoomStrc* pr = UNITS_GetRoom(g_targetPlayer)) {
+        D2ActiveRoomStrc** list = nullptr; int32_t cnt = 0;
+        DUNGEON_GetAdjacentRoomsListFromRoom(pr, &list, &cnt);
+        for (int32_t i = 0; i < cnt; ++i) if (list[i] && list[i]->pDrlgRoom) d2_dg_feed_rooms_add(list[i]->pDrlgRoom);
+    }
     d2_dg_feed_level(g_lastLevel, vx, vy, vx + 640, vy + 480, fl(vx + 2 * vy) - 3, fl(2 * vy - vx) - cols, side, now);
+    d2_dg_feed_rooms_end();
     return d2_dg_walk_g();
 }
 
