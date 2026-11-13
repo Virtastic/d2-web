@@ -847,11 +847,10 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BE640(uint8_t* game, uint8_t* unit, u
         sendItemReply(env, unit, id);
         return 1;
     }
-    auto reply = [&](uint32_t code, uintptr_t word) {
-        Q(f8AC90, code, word, playerTag(env, unit), unit, 0xE);
-    };
     auto reply0 = [&](uint32_t code, uint32_t x = 0xFFFFFFFFu) {   // x: the stack word retail pushes under the reply (the id on the mode gates, -1 elsewhere)
-        reply(code, Q(o10973, unit, 0xE, 0, x, 0));
+        uintptr_t tag = playerTag(env, unit);   // retail reads the player-data tag (10920) before the gold word
+        uintptr_t word = Q(o10973, unit, 0xE, 0, x, 0);
+        Q(f8AC90, code, word, tag, unit, 0xE);
     };
     if (mode == 0) {
         if (Q(fE150, npc) == 0) { reply0(7, id); return 1; }
@@ -904,8 +903,9 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BE640(uint8_t* game, uint8_t* unit, u
                     Q(o10973, existing, 0x46, 0);
                     Q(f8B010);
                     uint32_t eid = rd32(existing, 0xC);
+                    uintptr_t tag = playerTag(env, unit);
                     uintptr_t w = Q(o10973, unit, 0xE, 0, eid, 5);
-                    Q(f8AC90, 5, w, playerTag(env, unit), unit, 0xE);
+                    Q(f8AC90, 5, w, tag, unit, 0xE);
                     return 0;
                 }
                 reply0(0xC);
@@ -970,8 +970,9 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BE640(uint8_t* game, uint8_t* unit, u
             }
             Q(fBDD80, cur, 0, unit, id & 0xFFFF);
             Q(o10977, nu, 2, 1);
+            uintptr_t tag = playerTag(env, unit);
             uintptr_t w = Q(o10973, unit, 0xE, 0, rd32(nu, 0xC), 4);
-            Q(f8AC90, (uintptr_t)0, w, playerTag(env, unit), nu, 0xE);
+            Q(f8AC90, (uintptr_t)0, w, tag, nu, 0xE);
             sel = 1;
             cur = nullptr;
         }

@@ -15,9 +15,11 @@ template <class E> uint32_t Operate(E& e, uint32_t op)
     if (obj && e.rd32(obj + 0x10)) return 1;
     e.h(0xA4A2, 0, 0, 0, 0, 0, obj, 2);
     gobjop::ClearOperable(e, e.rd32(op + 4));
-    uint32_t pos[2] = { 0, 0 };
-    const uint32_t pp = (uint32_t)(uintptr_t)pos;
-    e.h(0xA544, 0, 0, 0, 0, 0, e.rd32(op + 4), pp);
+    // 1.13c: the position out pair for 0xA544 sits at frame -8 and the pair handed to 0x11A70 at -0xC, so they
+    // overlap by one word: 0x11A70 reads {residue, x}.
+    uint32_t loc[3] = { 0, 0, 0 };
+    const uint32_t pp = (uint32_t)(uintptr_t)loc;
+    e.h(0xA544, 0, 0, 0, 0, 0, e.rd32(op + 4), pp + 4);
     const uint32_t first = gobjop::Roll(e, e.rd32(op + 0xC)) % 20;
     const uint32_t odd = gobjop::Roll(e, e.rd32(op + 0xC)) & 1;
     uint32_t code;
@@ -25,7 +27,7 @@ template <class E> uint32_t Operate(E& e, uint32_t op)
     else code = odd ? 0x20637369u : 0x20637374u;
     e.wr32(e.rd32(op + 4) + 0xB8, code);
     e.h(0x11A70, 0, 0, 0, e.rd32(op), 0, e.rd32(op + 4), 2, pp, 0, 0xFFFFFFFFu, 0);
-    e.blk(0x11A70, pp, 2);
+    e.blk(0x11A70, loc, 2, 0x2);
     return 1;
 }
 }
