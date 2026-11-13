@@ -21,7 +21,7 @@ extern void d2multi_amsg_exit(int);
 // 1.13c D2Multi+0x5E6C
 void sub_5E6C(void) { d2multi_unlock(d2multi_k03_env, d2multi_k03_tbl, 0xd); }
 
-// 1.13c D2Multi+0x5E75
+// superseded port of D2Multi 0x5E75
 int ___initmbctable(void) {
     if (DAT_6fa0b4b4 == 0) { __setmbcp(-3); DAT_6fa0b4b4 = 1; }
     return 0;

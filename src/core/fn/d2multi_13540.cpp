@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0x13540 probe: r[0]=EAX name, r[1]=EDI source string, r[2]=a, r[3]=b (stack, ret 8). Blobs (r[14+2k]; k>=8 at r[30+2(k-8)]): k0 nm, k1 src, k2 vt (DAT_6fa0917c,
+// probe for D2Multi 0x13540: r[0]=EAX name, r[1]=EDI source string, r[2]=a, r[3]=b (stack, ret 8). Blobs (r[14+2k]; k>=8 at r[30+2(k-8)]): k0 nm, k1 src, k2 vt (DAT_6fa0917c,
 // +0x78 = the recorder callback at the unused RVA 0x1000), k3 hl (hook log), k4 gh (DAT_6fa09150..5c), k5 gw (DAT_6fa09d64.., 0x8c bytes), k6 g94 (DAT_6fa0a094),
 // k7 g118 (DAT_6fa09118), k8 g0d0 (DAT_6fa0a0d0), k9 p (what 7BA8 returns when cfg[0]), k10/11 tokA/tokB (what 1274 returns, cfg[1] of them), k12 cfg.
 #include "d2multi_probe.h"

@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0xCBD0 (stdcall, ret 8; EDI = name, EBX = password, stack: port, game-name string): join/connect start. The `_exit` branch in front of the
+// superseded port of D2Multi 0xCBD0 (stdcall, ret 8; EDI = name, EBX = password, stack: port, game-name string): join/connect start. The `_exit` branch in front of the
 // body tests a constant that is never zero, so it is not modelled. ctx = [39f14]. gv: +0 [39f20], +4 [3a0e0], +8 [3a0dc], +12 [39f88], +16 [19c34] (low u16),
 // +20 [39f18] (low u16), +24 the #10054 answer, +28 the #10003 answer (the last two are the probe's script, not globals).
 #include <cstring>

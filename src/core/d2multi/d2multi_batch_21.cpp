@@ -121,7 +121,7 @@ int32_t d2_multi_sub_fc90(char* s, int32_t kind) {
 // probe link's strchr seam (storm_z14_seam.cpp returns null there); identical to the real call.
 static char* sstrchr(const char* s, int32_t c) { if (!s) return nullptr; for (; *s; s++) if (*s == (char)c) return const_cast<char*>(s); return nullptr; }
 
-// 1.13c D2Multi+0x10000
+// superseded port of D2Multi 0x10000
 // ponytail: sprintf args beyond `who` are not shown by the decompiler; assumed (who, DAT_6fa09198-copy) -- low confidence.
 void d2_multi_sub_10000(char* who, const char* edi) {
     char buf[500];

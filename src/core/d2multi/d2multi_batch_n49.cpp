@@ -50,7 +50,7 @@ uint32_t d2multi_BC00(void) {
     return 1;
 }
 
-// 1.13c D2Multi+0x11A20
+// superseded port of D2Multi 0x11A20
 void d2multi_11A20(void) {
     void** p[] = {&DAT_6fa09cec,&DAT_6fa09cf0,&DAT_6fa09cf4,&DAT_6fa09cf8,&DAT_6fa09cfc,&DAT_6fa09d00,&DAT_6fa09d04,&DAT_6fa09d08,
         &DAT_6fa09d2c,&DAT_6fa09d30,&DAT_6fa09d34,&DAT_6fa09d38,&DAT_6fa09d3c,&DAT_6fa09d28,&DAT_6fa09d48,&DAT_6fa09d40,
@@ -61,7 +61,7 @@ void d2multi_11A20(void) {
     if (DAT_6fa0a0d0) q_d2multi_batch_n49_Ordinal_10053(DAT_6fa0a0d0);
 }
 
-// 1.13c D2Multi+0x11DA0
+// superseded port of D2Multi 0x11DA0
 void d2multi_11DA0(void) {
     void** p[] = {&DAT_6fa09cc8,&DAT_6fa09cd4,&DAT_6fa09cd8,&DAT_6fa09cc0,&DAT_6fa09cc4,&DAT_6fa09ccc,&DAT_6fa09cd0,
         &DAT_6fa09cdc,&DAT_6fa09ce0,&DAT_6fa09ce4,&DAT_6fa09ce8};
@@ -69,7 +69,7 @@ void d2multi_11DA0(void) {
     q_d2multi_batch_n49_Ordinal_10031(DAT_6fa09160);
 }
 
-// 1.13c D2Multi+0x11E20 (index passed in EAX)
+// superseded port of D2Multi 0x11E20 (index passed in EAX)
 void d2multi_11E20(int idx) {
     if (!DAT_6fa09cc4) return;
     int off = idx * 0x3b;
@@ -80,7 +80,7 @@ void d2multi_11E20(int idx) {
     q_d2multi_batch_n49_Ordinal_10185(len); q_d2multi_batch_n49_Ordinal_10053(nullptr);
 }
 
-// 1.13c D2Multi+0x11F80
+// superseded port of D2Multi 0x11F80
 void d2multi_11F80(void) {
     if (!DAT_6fa09cc0) return;
     char sel[256];
@@ -116,7 +116,7 @@ void d2multi_11F80(void) {
     Ordinal_10037();
 }
 
-// 1.13c D2Multi+0x12120 (source record in EDI)
+// superseded port of D2Multi 0x12120 (source record in EDI)
 void d2multi_12120(const uint8_t* src) {
     for (int i = 0; i < DAT_6fa09dcc; i++)
         if (*(int16_t*)(DAT_6f9ebf20 + i * 0x3b + 0x33) == *(const int16_t*)(src + 8)) return;
@@ -129,7 +129,7 @@ void d2multi_12120(const uint8_t* src) {
     DAT_6fa09dcc++;
 }
 
-// 1.13c D2Multi+0x13280 (game record in EBX)
+// superseded port of D2Multi 0x13280 (game record in EBX)
 void d2multi_13280(const uint8_t* g) {
     if (!DAT_6fa09cc4) return;
     char b[256];

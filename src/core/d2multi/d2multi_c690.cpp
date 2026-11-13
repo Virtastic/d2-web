@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0xC690: vtable slot +0x1c (0x7c0e stands for it in the capture), BE00, rebuild the four control slots, [39f20] := 0.
+// superseded port of D2Multi 0xC690: vtable slot +0x1c (0x7c0e stands for it in the capture), BE00, rebuild the four control slots, [39f20] := 0.
 // gv: +0 [39154], +4 [39150], +8 [39158], +12 [3915c], +16 [39f20] (out).
 #include "d2multi_env.h"
 

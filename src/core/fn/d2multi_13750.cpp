@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0x13750 probe: r[0]=str, r[1]=a, r[2]=b (stdcall, ret 0xC). Blobs (r[14+2k]): k0 str, k1 gs (DAT_6fa09f14), k2 vt (DAT_6fa0917c, +0x78 = the recorder
+// probe for D2Multi 0x13750: r[0]=str, r[1]=a, r[2]=b (stdcall, ret 0xC). Blobs (r[14+2k]): k0 str, k1 gs (DAT_6fa09f14), k2 vt (DAT_6fa0917c, +0x78 = the recorder
 // callback at the unused RVA 0x1000), k3 hl (hook log), k4 gh (DAT_6fa09150..5c), k5 gw (DAT_6fa09d78.., 0x78 bytes), k6 g94 (DAT_6fa0a094), k7 g118 (DAT_6fa09118),
 // k8 cap (the three caption dwords the 7C44 recorder writes into each of the three local buffers).
 #include "d2multi_probe.h"

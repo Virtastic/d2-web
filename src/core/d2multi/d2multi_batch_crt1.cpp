@@ -20,7 +20,7 @@ void* d2_multi___heap_alloc(size_t size) {
     return malloc(size ? size : 1);               // retail: HeapAlloc, size 0 -> 1
 }
 
-// 1.13c D2Multi+0x4D6B
+// superseded port of D2Multi 0x4D6B
 int32_t d2_multi____crtGetStringTypeA(void*, uint32_t infoType, const char* src, int32_t cch,
                                       uint16_t* out, int32_t, int32_t) {
     if (!src || !out || infoType != 1) return 0;  // CT_CTYPE1
@@ -79,6 +79,7 @@ void d2_multi_sub_5986(uint32_t eax, uint32_t ebp, uint32_t ebp8) {
     d2_multi_g5986[2] = ebp;
 }
 
+// 1.13c D2Multi+0x599E
 uint32_t d2_multi_sub_599E(int32_t cp) {
     switch (cp) { case 0x3a4: return 0x411; case 0x3a8: return 0x804; case 0x3b5: return 0x412; case 0x3b6: return 0x404; }
     return 0;

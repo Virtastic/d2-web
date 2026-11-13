@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0xB970 -- realm/character-list screen build. No arguments, no result (plain ret).
+// D2Multi 0xB970 -- realm/character-list screen build. No arguments, no result (plain ret).
 // Callees by thunk: 7CAA D2Win #10098 (stdcall, one word: the control template; returns the control), 7EA8 D2Lang #10003 (ECX = string id),
 // 7C56 #10020, 7C38 #10031, 7CC8 #10202, 7C98 #10170, 7C32 #10010, 7CBC #10167 (ECX = list control, EDX = name), 7C44 #10185, 7C26 #10053,
 // 7C80 #10021, 7CD4 #10037, 7C50 #10166 (returns a wide string or 0), 7C14 #10147. The name list is vtable [3917C]+0x20 (ECX = byte
@@ -16,6 +16,7 @@ static int32_t b970_strcmp(const uint8_t* a, const uint8_t* b) {        // the i
     }
 }
 
+// 1.13c D2Multi+0xB970
 extern "C" void d2multi_b970(const D2mEnv& e, void (*u2w)(char*, const uint16_t*, int), uint32_t* gv, uint8_t* ctx) {
     gv[0] = d2m_call(e, 0x7caa, 0, 0, 0, 0, 0, D2M_MOD(0x1a7b0));                    // 3A018
     gv[1] = d2m_call(e, 0x7caa, 0, 0, 0, 0, 0, D2M_MOD(0x1a7e0));                    // 3A01C

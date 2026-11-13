@@ -341,7 +341,7 @@ extern "C" void d2_multi_sub_b160(const void* filetime, char* out, int32_t n) {
     d2_multi_toUtf(out, wide, n);
 }
 
-// 1.13c D2Multi+0xB970
+// superseded port of D2Multi 0xB970
 void d2_multi_sub_b970(void) {
     DAT_6fa0a018 = n37_Ordinal_10098(DAT_6f9ea7b0);
     DAT_6fa0a01c = n37_Ordinal_10098(DAT_6f9ea7e0);

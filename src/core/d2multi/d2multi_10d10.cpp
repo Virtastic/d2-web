@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0x10D10 -- find-or-create a channel/user list node by name. stdcall, three stack words
+// D2Multi 0x10D10 -- find-or-create a channel/user list node by name. stdcall, three stack words
 // (name, a2, a3), ret 0xC; returns the node. gv = the pinned globals: [0] list head 39EF4 (next at +0xB0), [1] counter 39F00, [2] seeded flag 3A0FC.
 // A node whose name matches (a leading '*' skipped on both sides, by strchr: the text after the first '*') is refreshed by 10410
 // (ESI = node, EAX = a2, EDX = a3, stack = name) and returned. Otherwise Fog #10042 (7BE4) allocates 0xB4 bytes, zeroed; name to +4,
@@ -25,6 +25,7 @@ static int32_t m10d10_strcmp(const uint8_t* a, const uint8_t* b) {
 static inline uint32_t m10d10_rd32(uint32_t a) { uint32_t v; __builtin_memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }
 static inline void m10d10_wr32(uint32_t a, uint32_t v) { __builtin_memcpy((void*)(uintptr_t)a, &v, 4); }
 
+// 1.13c D2Multi+0x10D10
 extern "C" uint32_t d2multi_10d10(const D2mEnv& e, uint32_t* gv, uint32_t now, const uint8_t* name, uint32_t a2, uint32_t a3) {
     for (uint32_t n = gv[0]; n != 0; n = m10d10_rd32(n + 0xb0)) {
         if (m10d10_strcmp(m10d10_star((const uint8_t*)(uintptr_t)(n + 4)), m10d10_star(name)) == 0) {

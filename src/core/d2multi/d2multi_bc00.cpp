@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0xBC00 (stdcall, ret 4): open the URL from vtable [3917c]+0xa4 in the shell-registered .html handler. The formatted registry keys and the
+// superseded port of D2Multi 0xBC00 (stdcall, ret 4): open the URL from vtable [3917c]+0xa4 in the shell-registered .html handler. The formatted registry keys and the
 // handler command line live in stack buffers (invisible to the vector); GetDesktopWindow / SetForegroundWindow / CreateProcessA / CloseHandle are imports.
 // gv: +0 [39184], +4 URL present, +8/+12 the two registry-read answers, +16 the CreateProcessA result (+4..+16 are the probe's script, not globals).
 #include "d2multi_env.h"

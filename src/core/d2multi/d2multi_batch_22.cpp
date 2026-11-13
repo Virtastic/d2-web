@@ -45,7 +45,7 @@ static void update_count(void) {
     d2_multi_sub_fb40(b);
 }
 
-// 1.13c D2Multi+0x10410
+// superseded port of D2Multi 0x10410
 void d2_multi_sub_10410(int32_t p1, uint32_t flags, const char* name, uint8_t* o) {
     *(uint32_t*)(o + 0x90) = flags;
     uint32_t r = d2_multi_sub_f340((const char*)(intptr_t)p1, flags, o);
@@ -58,7 +58,7 @@ void d2_multi_sub_10410(int32_t p1, uint32_t flags, const char* name, uint8_t* o
     d2_multi_sub_f750();
 }
 
-// 1.13c D2Multi+0x104D0
+// superseded port of D2Multi 0x104D0
 void d2_multi_sub_104d0(int32_t, int32_t delta) {
     int32_t old = DAT_6fa09f04;
     if (DAT_6fa09f00 < 0xc) DAT_6fa09f04 = 0;
@@ -89,7 +89,7 @@ void d2_multi_sub_10aa0(void) {
     d2_multi_sub_104d0(0, 0);
 }
 
-// 1.13c D2Multi+0x10B70
+// superseded port of D2Multi 0x10B70
 void d2_multi_sub_10b70(const char* name) {
     uint8_t *prev = 0, *n = DAT_6fa09ef4;
     for (; n; prev = n, n = nx(n)) {
@@ -114,7 +114,7 @@ void d2_multi_sub_10b70(const char* name) {
     d2_multi_sub_f750();
 }
 
-// 1.13c D2Multi+0x10D10
+// superseded port of D2Multi 0x10D10
 uint8_t* d2_multi_sub_10d10(const char* name, int32_t, uint32_t flags) {
     for (uint8_t* n = DAT_6fa09ef4; n; n = *(uint8_t**)(n + 0xb0)) {
         if (same_name((const char*)(n + 4), name)) { d2_multi_sub_10410(0, flags, name, n); return n; }

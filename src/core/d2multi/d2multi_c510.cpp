@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0xC510 (fastcall: ECX = unix time, EDX = flag): formats the time as the local date text and queues three log lines. Returns 1.
+// superseded port of D2Multi 0xC510 (fastcall: ECX = unix time, EDX = flag): formats the time as the local date text and queues three log lines. Returns 1.
 // flag == 0 reports a D2Lang string and ends the process (_exit(-1)); the rule makes those calls and returns.
 #include "d2multi_env.h"
 

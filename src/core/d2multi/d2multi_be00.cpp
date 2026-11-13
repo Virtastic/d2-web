@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0xBE00: UI teardown. gv: +0 [39dc0], +4 [39160], +8 [39f20], +12 [39f88], +16 [3a03c]; gv is read and written back.
+// superseded port of D2Multi 0xBE00: UI teardown. gv: +0 [39dc0], +4 [39160], +8 [39f20], +12 [39f88], +16 [3a03c]; gv is read and written back.
 #include "d2multi_env.h"
 
 extern "C" void d2multi_be00(const D2mEnv& e, uint32_t* gv) {

@@ -30,7 +30,7 @@ char* d2multi_itoa(int value, char* dest, int radix) {
     return dest;
 }
 
-// 1.13c D2Multi+0x10C0  _atol (C locale: _SPACE is 9..13 and 32)
+// superseded port of D2Multi 0x10C0  _atol (C locale: _SPACE is 9..13 and 32)
 long d2multi_atol(const char* s) {
     auto sp = [](uint8_t c) { return c == 32 || (c >= 9 && c <= 13); };
     while (sp((uint8_t)*s)) ++s;
@@ -51,7 +51,7 @@ char* d2multi_strncpy(char* dest, const char* src, size_t count) {
     return dest;
 }
 
-// 1.13c D2Multi+0x1274  strtok: delimiter bitmap, token continues from the saved pointer
+// superseded port of D2Multi 0x1274  strtok: delimiter bitmap, token continues from the saved pointer
 uint8_t* d2multi_strtok(uint8_t* str, const uint8_t* delim) {
     uint8_t map[32] = {};
     uint8_t b;

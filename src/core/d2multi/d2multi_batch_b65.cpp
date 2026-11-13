@@ -6,7 +6,7 @@
 #include <cstdarg>
 #include <cstdio>
 
-// 1.13c D2Multi+0x1000  _sprintf: vsprintf into _Dest, returns chars written
+// superseded port of D2Multi 0x1000  _sprintf: vsprintf into _Dest, returns chars written
 int d2multi_b65_sprintf(char* dest, const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);

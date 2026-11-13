@@ -147,7 +147,7 @@ int d2_multi_sub_5b91(u32 cp) {
   return 0;
 }
 
-// 1.13c D2Multi+0x5D25
+// superseded port of D2Multi 0x5D25
 int d2_multi_setmbcp(int cp) {  // __setmbcp; the _lock(0xd) pair is dropped (single-threaded wasm)
   int ret = -1;
   g_setByUser = 0;

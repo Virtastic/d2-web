@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0x5D25 -- __setmbcp (MSVC 2003 CRT). cdecl (cp), SEH-framed; returns 0, -1 or 5B91's code.
+// D2Multi 0x5D25 -- __setmbcp (MSVC 2003 CRT). cdecl (cp), SEH-framed; returns 0, -1 or 5B91's code.
 // _lock(0xD) (32A6); 1BDDC := 0; cp -2/-3/-4 become GetOEMCP / GetACP / the locale ANSI code page 1BDB0 and set 1BDDC := 1. The current
 // code page (3A244) answers 0. Otherwise the 0x220-byte mbc info block (3A12C) is reused while its refcount word is 0, else malloc (4CD2);
 // __setmbcp_lk-style setup 5B91(cp) answering 0 snapshots the code page 3A244, 3A130, 3A128, the five words 3A250, the 0x101 ctype bytes
@@ -10,6 +10,7 @@
 static inline uint32_t m5d25_rd32(const uint8_t* p) { uint32_t v; __builtin_memcpy(&v, p, 4); return v; }
 static inline void m5d25_wr32(uint8_t* p, uint32_t v) { __builtin_memcpy(p, &v, 4); }
 
+// 1.13c D2Multi+0x5D25
 extern "C" int32_t d2multi_setmbcp_5d25(const D2mEnv& e, uint8_t* g, uint32_t* h, int32_t cp) {
     int32_t r = -1;
     d2m_call(e, 0x32a6, 0, 0, 0, 0, 0, 0xd);

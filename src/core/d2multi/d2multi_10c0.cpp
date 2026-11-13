@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0x10C0 _atol with its per-thread locale lookups as seams (ptd, locinfo refresh, __isctype_mt).
+// D2Multi 0x10C0 _atol with its per-thread locale lookups as seams (ptd, locinfo refresh, __isctype_mt).
 #include <cstdint>
 #include <cstring>
 
@@ -8,6 +8,7 @@ struct D2MultiAtolEnv {
 
 static inline uint32_t rd32(const uint8_t* p) { uint32_t v; std::memcpy(&v, p, 4); return v; }
 
+// 1.13c D2Multi+0x10C0
 extern "C" int32_t d2multi_atol_env(const uint8_t* s, const D2MultiAtolEnv* env) {
     uint8_t* ptd = env->getptd();
     uint8_t* loc = (uint8_t*)(uintptr_t)rd32(ptd + 0x64);

@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0xDAE0: the connect-screen poll (one call runs the message loop until a pass handles nothing). stdcall, one unused
+// D2Multi 0xDAE0: the connect-screen poll (one call runs the message loop until a pass handles nothing). stdcall, one unused
 // stack word. The loop pulls a message through the client function table's slot 0x24 (ECX = a stack record whose first dword is the
 // message type, EDX = a stack buffer), dispatches it, then steps the connect state machine in [39f20] (0 idle, 1 request sent,
 // 2 request answered, 3 connected-wait) on the answers of the D2Win/D2Lang/D2MCPClient thunks, and runs three timers (15 s, 15 s,
@@ -33,6 +33,7 @@ void fail(const D2mEnv& e, const M& g, uint32_t id, bool cb) {
 }
 }
 
+// 1.13c D2Multi+0xDAE0
 extern "C" uint32_t d2multi_dae0(const D2mEnv& e, const D2mDae0Mem& mem) {
     const M g{mem};
     uint32_t rect[8] = {};

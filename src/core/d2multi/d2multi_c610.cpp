@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0xC610 (stdcall, ret 8): BE00, rebuild the four control slots, load the sprite, record the callback; returns 1.
+// superseded port of D2Multi 0xC610 (stdcall, ret 8): BE00, rebuild the four control slots, load the sprite, record the callback; returns 1.
 // gv: +0 [39f88], +4 [39154], +8 [39150], +12 [39158], +16 [3915c], +20 [3a0d8] (out), +24 [3a0e0] (out).
 #include "d2multi_env.h"
 

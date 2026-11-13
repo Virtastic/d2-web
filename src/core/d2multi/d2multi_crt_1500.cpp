@@ -18,7 +18,7 @@ char* d2multi_strchr(const char* s, int c) {
     }
 }
 
-// 1.13c D2MULTI+0x01A36  _tolower (C locale)
+// superseded port of D2Multi 0x1A36  _tolower (C locale)
 int d2multi_tolower(int c) { return (c > 0x40 && c < 0x5b) ? c + 0x20 : c; }
 
 // 1.13c D2MULTI+0x014EB  __stricmp (C locale): difference of lowered bytes at first mismatch/NUL
@@ -31,10 +31,10 @@ int d2multi_stricmp(const char* a, const char* b) {
     return x - y;
 }
 
-// 1.13c D2MULTI+0x01A58  srand
+// superseded port of D2Multi 0x1A58  srand
 void d2multi_srand(uint32_t seed) { g_holdrand = seed; }
 
-// 1.13c D2MULTI+0x01A65  _rand: LCG 214013/2531011, bits 16..30
+// superseded port of D2Multi 0x1A65  _rand: LCG 214013/2531011, bits 16..30
 int d2multi_rand(void) {
     g_holdrand = g_holdrand * 0x343fd + 0x269ec3;
     return (g_holdrand >> 16) & 0x7fff;

@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0xE150: the multiplayer-screen run (the body of the screen entry 0xE730). Context in EAX (`ctx`); the same
+// D2Multi 0xE150: the multiplayer-screen run (the body of the screen entry 0xE730). Context in EAX (`ctx`); the same
 // object is also re-read through the module global [39f14] (`G`) at the points retail does. Every callee goes through the
 // D2mEnv seam (d2multi_env.h): the import thunks by their RVA, the sibling D2Multi functions by theirs, and the client
 // function table at ctx+0x221 (cached in [3917c]) through the slot word it holds (its low 24 bits name the callee).
@@ -23,6 +23,7 @@ struct M {
 uint32_t slot(uint32_t table, uint32_t off) { uint32_t v; memcpy(&v, (const void*)(uintptr_t)(table + off), 4); return v & 0xFFFFFFu; }
 }
 
+// 1.13c D2Multi+0xE150
 extern "C" uint32_t d2multi_e150(const D2mEnv& e, const D2mE150Mem& mem, uint8_t* ctx) {
     const M g{mem};
     uint32_t t = d2m_call(e, 0x7c02);                          // Fog #10227

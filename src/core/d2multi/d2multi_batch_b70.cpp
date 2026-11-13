@@ -64,7 +64,7 @@ void* d2multi_nh_malloc(size_t size, int nhFlag) {
 // 1.13c D2Multi+0x4CD2
 void* d2multi_malloc_wrap(size_t size) { return d2multi_nh_malloc(size, d2multi_DAT_6f9ebe38); }
 
-// 1.13c D2Multi+0x4CE4  (param_1 = locinfo: +4 codepage, +0x14 is-C-locale flag, +0x28 mb_cur_max)
+// superseded port of D2Multi 0x4CE4  (param_1 = locinfo: +4 codepage, +0x14 is-C-locale flag, +0x28 mb_cur_max)
 int d2multi_wctomb_mt(const char* loc, char* mb, uint16_t wc) {
     if (!mb) return 0;
     if (*(const int*)(loc + 0x14) == 0) {
@@ -79,7 +79,7 @@ int d2multi_wctomb_mt(const char* loc, char* mb, uint16_t wc) {
     return -1;
 }
 
-// 1.13c D2Multi+0x4D44  (ptd->_tfpecode holds the locinfo; PTR_DAT_6f9e90ac is the current global one)
+// superseded port of D2Multi 0x4D44  (ptd->_tfpecode holds the locinfo; PTR_DAT_6f9e90ac is the current global one)
 extern char* d2multi_PTR_DAT_6f9e90ac W;
 int d2multi_wctomb(char* mb, uint16_t wc) {
     char* li = *(char**)((char*)d2multi_getptd() + 0x8);  // ponytail: offset of _tfpecode unverified on wasm64
@@ -87,7 +87,7 @@ int d2multi_wctomb(char* mb, uint16_t wc) {
     return d2multi_wctomb_mt(li, mb, wc);
 }
 
-// 1.13c D2Multi+0x4F25  (order of frees is retail's: [1..6],[0],[8..0xd],[7],[0xe..0x2a])
+// superseded port of D2Multi 0x4F25  (order of frees is retail's: [1..6],[0],[8..0xd],[7],[0xe..0x2a])
 void d2multi_free_lc_time(void** p) {
     if (!p) return;
     static const int order[] = {1,2,3,4,5,6,0,8,9,10,11,12,13,7};

@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0x1000 -- _sprintf (MSVC 2003 CRT).
+// D2Multi 0x1000 -- _sprintf (MSVC 2003 CRT).
 // Builds a string FILE over dest (_ptr = _base = dest, _cnt = 0x7fffffff, _flag = 0x42), runs the shared formatter
 // (_output, 0x2334) over the argument words, then NUL-terminates when dest is non-null (--_cnt, '\0' at _ptr, or
 // __flsbuf(0) when _cnt went negative). Returns the formatter's count. The FILE's write_char is retail 0x22A6:
@@ -32,6 +32,7 @@ void file_string(d2multi_out_env* e, const char* p, int n) {  // 0x22FD
 
 // tmpl supplies the formatter's host callbacks (addr, wctomb, float hooks, mbctype, null strings, udivrem);
 // the port fills the stream, the count and the FILE sinks. dest is a retail 32-bit address (0 = count only).
+// 1.13c D2Multi+0x1000
 extern "C" int32_t d2multi_sprintf_1000(const d2multi_out_env* tmpl, uint32_t dest, const uint8_t* fmt, const uint32_t* va) {
     D2MultiStream32 f{};
     f.cnt = 0x7fffffff;
