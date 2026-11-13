@@ -37,6 +37,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_g(int32_t phase, int
    rec(10020, e8b, 0); rec(10008, e8b, 0); rec(10013, e8b, 0);
    rec(10047, a_ecx, a_edx);                                                        // A9E30 (frame counter advanced) -> A8800
    rec(10047, e14, 0); rec(10013, e14, 0);                                          // 14050 head
+   if (head31 && mode == 0) rec(10031, 0, 0);                                       // 14050: level DrawEdges byte set and view arg 0 -> D2Gfx resolution query (!= 2 here)
   }
   // 739E0's head 10031 follows the room walk: d2_client_frame_tail_g emits it (retail has one, after the walk)
  } else {

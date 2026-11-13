@@ -78,7 +78,7 @@ export function gFrame(Module, phase, gateEcx = 0) {
   const uoy = globalThis.__d2GEngineWalk && Module._d2_session_view_y ? Module._d2_session_view_y() : 0x164c0;
   // A8800's edx is A8880's last D2Common #10482 leftover (d2_session_a8880_edx) when the session's own walk runs
   const a88edx = globalThis.__d2GEngineWalk && Module._d2_session_a8880_edx ? Module._d2_session_a8880_edx() : 0x1720;
-  const f0 = (Module.ccall('d2_client_frame_g', 'string', Array(14).fill('number'), [phase, 1, 0, 1, 0xff, 0, 0, uoy, 0x22, a88edx, 8, gateEcx, Module._d2_session_level_rain && globalThis.__d2GEngineWalk ? Math.max(0, Module._d2_session_level_rain()) : 1, globalThis.__d2GEngineWalk ? 0 : 1]));   // (f0 is pushed after the walk runs, below) 81340 runs the weather frame (80160's 10013) only on a rain level
+  const f0 = (Module.ccall('d2_client_frame_g', 'string', Array(14).fill('number'), [phase, 1, 0, 1, 0xff, 0, 0, uoy, 0x22, a88edx, 8, gateEcx, Module._d2_session_level_rain && globalThis.__d2GEngineWalk ? Math.max(0, Module._d2_session_level_rain()) : 1, globalThis.__d2GEngineWalk && Module._d2_session_level_drawedges ? (Module._d2_session_level_drawedges() > 0 ? 1 : 0) : 0]));   // (f0 is pushed after the walk runs, below) 81340 runs the weather frame (80160's 10013) only on a rain level
   // The room walk (D2Client+0x8B110's 7A9F0 -> 9F270 -> 9EE90) follows phase 0, over the session's own level and units. Opt-in while
   // replays that splice their own walk still run: with it on, the walk draws the units and the JS unit lines are not emitted.
   globalThis.__d2GWalked = phase === 0 && !!globalThis.__d2GEngineWalk && !!Module._d2_session_room_walk_g;

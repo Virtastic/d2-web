@@ -12136,6 +12136,14 @@ EMSCRIPTEN_KEEPALIVE int d2_session_level_rain() {
     const int levelId = room ? DUNGEON_GetLevelIdFromRoom(room) : -1;
     return levelId < 0 ? -1 : (int)DATATBLS_GetRainFromLevelsTxt(levelId);
 }
+// Levels.txt `DrawEdges` of the player's level (the byte D2Client 0x14050 tests before its resolution query). -1 outside a session.
+EMSCRIPTEN_KEEPALIVE int d2_session_level_drawedges() {
+    if (!g_sessionLive || !g_targetPlayer) return -1;
+    D2ActiveRoomStrc* room = UNITS_GetRoom(g_targetPlayer);
+    const int levelId = room ? DUNGEON_GetLevelIdFromRoom(room) : -1;
+    if (levelId < 0 || levelId >= sgptDataTables->nLevelsTxtRecordCount) return -1;
+    return sgptDataTables->pLevelsTxt[levelId].nDrawEdges;
+}
 EMSCRIPTEN_KEEPALIVE const D2SessionWarp* d2_session_warps() {
     updateSessionSnapshot(); return g_sessionWarps.data();
 }
