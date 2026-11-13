@@ -282,13 +282,14 @@ EMSCRIPTEN_KEEPALIVE void d2_game_9bd00(void* game, uint16_t unitId, void** pNod
     const uint32_t mapHead = rd32(game, 0x1D2C);
     if (mapHead == 0) d2game_fatal(0xD2);
 
-    void* node = rdptr((void*)(uintptr_t)mapHead, 4);
-    while (node != nullptr) {
-        if (rd16(node, 0) == unitId) {
-            *pNode = node;
+    // retail 32-bit record layout: dword links (an 8-byte rdptr would run past a retail-layout node)
+    uint32_t node = rd32((void*)(uintptr_t)mapHead, 4);
+    while (node != 0) {
+        if (rd16((void*)(uintptr_t)node, 0) == unitId) {
+            *pNode = (void*)(uintptr_t)node;
             return;
         }
-        node = rdptr(node, 8);
+        node = rd32((void*)(uintptr_t)node, 8);
     }
     *pNode = nullptr;
 }

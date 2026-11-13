@@ -74,8 +74,9 @@ int32_t PARTY_GetNodeCount_113c(int16_t partyId, const D2GameBatch9Env* env)
     if (party == nullptr) return -1;
 
     int32_t count = 0;
-    for (void* node = rdptr(party, 0x04); node != nullptr; node = rdptr(node, 0x04)) {
-        ++count;                                        // pPartyNodes at +0x04, node pNext at +0x04
+    // retail 32-bit record layout: dword links (pPartyNodes at +0x04, node pNext at +0x04)
+    for (uint32_t node = rd32(party, 0x04); node != 0; node = rd32((const void*)(uintptr_t)node, 0x04)) {
+        ++count;
     }
     return count;
 }
