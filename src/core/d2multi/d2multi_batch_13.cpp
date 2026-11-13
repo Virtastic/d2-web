@@ -5,6 +5,7 @@ extern "C" {
 int32_t Ordinal_10009(void);            // game-mode query
 void*   Ordinal_10042(int32_t, int32_t); // Fog alloc(line, 0)
 void    D2M_Fog_Free(int32_t, int32_t); // Fog free
+void    D2M_Fog_Free_P(const void*, int32_t, int32_t); // Fog free with ECX = block
 void    Ordinal_10050(void*);            // release (per slot)
 void    Ordinal_10031(int32_t);          // reset(handle)
 void    Ordinal_10199(void);
@@ -38,7 +39,8 @@ int32_t d2_multi_sub_7ee0(int32_t p) {
 // 1.13c D2Multi+0x83E0
 void d2_multi_sub_83e0(void) {
     uint8_t* n = DAT_6fa0a0f0;
-    while (n) { n = *(uint8_t**)(n + 0x204); D2M_Fog_Free(0x1b75, 0); }
+    // retail's next is a 32-bit word at +0x204 (the record is 0x208 bytes; a 64-bit read ran past it)
+    while (n) { uint8_t* cur = n; n = (uint8_t*)(uintptr_t)*(uint32_t*)(n + 0x204); D2M_Fog_Free_P(cur, 0x1b75, 0); }   // retail: ECX = the record, EDX = module file string
     DAT_6fa0a0f0 = 0;
 }
 
