@@ -1006,6 +1006,7 @@ int32_t __fastcall D2GAME_SendItemSocketPackets_6FCAC890(D2ClientStrc* pClient, 
     } ops;
     return SendItemSocketPacketsRule(ops, pClient, pItem, dwFlag);
 }
+extern "C" void d2_client_item_ground_drop(const D2UnitStrc* item);   // d2client/session_unit_sound.cpp (replay only)
 // 1.13c D2Game+0x8D3D0: the 0x9C composer.  pClient->dwFlags bit 0 keeps the cached player,
 // else it is re-resolved through SUNIT_GetServerUnit (and cleared when the unit is gone).  A NULL
 // item is legal on the wire: nItemId becomes -1.  The 0x8C890 child loop runs after the send.
@@ -1034,6 +1035,7 @@ void __fastcall D2GAME_SendPacket0x9C_6FC3E570(D2ClientStrc* pClient, D2UnitStrc
     ITEMS_SetItemFlag(pItem, 0xFFFFFFFFu, 0);
     ITEMS_SetItemFlag(pItem, nOldItemFlags, 1);
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, (int32_t)nLength);
+    if (nAction == ITEMACTION_ADDTOGROUND && pItem && pItem->dwAnimMode == 3) d2_client_item_ground_drop(pItem);   // replay only: the client's 0x827C0 sounds
     D2GAME_SendItemSocketPackets_6FCAC890(pClient, pItem, dwFlag);
 }
 // 1.13c D2Game+0x8B0F0: the 0x9D composer (action code + owning unit + item bitstream).

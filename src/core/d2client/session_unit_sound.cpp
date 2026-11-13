@@ -134,3 +134,12 @@ void d2client_session_event_packets(uint32_t* heroSeed, uint32_t cycle, uint32_t
     }
 }
 void d2client_session_unit_sound_reset() { g_obj.clear(); g_plr.clear(); g_ev.clear(); d2client_9cad0_reset(); }
+// An item 0x9C action 0 (added to the ground, mode 3): the client's 0x84BB0 -> 0x827C0 plays the drop flippy (row 216), then the item's
+// own drop sound (Items wDropSound) when it has one.
+#include "../d2moo/include/DataTbls/ItemsTbls.h"
+extern "C" void d2_client_item_ground_drop(const D2UnitStrc* item) {
+    if (!item || !d2client_sound_armed()) return;
+    d2client_sound_unit_submit_now(216, 0);
+    const D2ItemsTxt* t = DATATBLS_GetItemsTxtRecord((int)item->dwClassId);
+    if (t && t->wDropSound > 0) d2client_sound_unit_submit_now(t->wDropSound, 0);
+}

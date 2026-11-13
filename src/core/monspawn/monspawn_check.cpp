@@ -8089,7 +8089,7 @@ static std::unordered_map<uint32_t, uint32_t> g_sessionIdleRows, g_sessionIdleRo
 extern "C" void d2_client_monster_hit_stamp(uint32_t id, uint32_t frame);
 static std::unordered_map<uint32_t, uint32_t> g_sessionClientMonsterMode;
 void d2client_session_footstep_reset(); int32_t d2client_session_level_material(uint32_t soundEnv);   // session_footstep.cpp (C linkage)
-void d2client_session_player_footstep(uint32_t serverMode, uint32_t cls, int32_t inTown, int32_t floor, uint32_t now, void (*rate)(uint32_t, uint32_t*, uint32_t*));
+void d2client_session_player_footstep(uint32_t serverMode, uint32_t cls, int32_t inTown, int32_t floor, uint32_t now, int32_t staminaZero, void (*rate)(uint32_t, uint32_t*, uint32_t*));
 void d2client_session_monster_footstep(uint32_t id, int32_t cls, uint32_t serverMode, uint32_t step, uint32_t total, int32_t floor, uint32_t now);
 extern "C" int32_t d2_session_floor_class(int32_t unitType, int32_t unitId, int32_t fallback);
 static void sessionClientMonsterModeReset() { g_sessionClientMonsterMode.clear(); g_sessionIdleRows.clear(); g_sessionIdleRowsReady.clear(); d2client_session_unit_sound_reset(); d2client_session_footstep_reset(); d2client_critter::reset(); }
@@ -8126,7 +8126,8 @@ static void sessionClientPlayerFootstep() {
     const D2LevelsTxt* lv = g_currentLevel >= 0 ? DATATBLS_GetLevelsTxtRecord(g_currentLevel) : nullptr;
     const int32_t fallback = lv ? d2client_session_level_material((uint32_t)(lv->dwSoundEnv & 0xff)) : 1;
     d2client_session_player_footstep(g_targetPlayer->dwAnimMode, g_targetPlayer->dwClassId, DUNGEON_IsTownLevelId(g_currentLevel) ? 1 : 0,
-                                     d2_session_floor_class(0, 0, fallback), g_sessionClientFrame - 1, clientPlayerRate);
+                                     d2_session_floor_class(0, 0, fallback), g_sessionClientFrame - 1,
+                                     g_targetClient && g_targetClient->clientPlayerData.nStaminaPoints == 0 ? 1 : 0, clientPlayerRate);   // the client's stat 10: what the server last sent
 }
 // The held monsters in the client unit table's order (bucket id & 0x7F, newest first), each through 0x4F4A0's frame advance
 // and footstep check on its own client unit (session_footstep.cpp).
@@ -8161,6 +8162,9 @@ static void sessionClientSoundUnits() {
     std::vector<D2SndUnit> o;
     for (const D2SessionObjectPresentation& p : g_sessionObjectPresentations)
         if (p.classId == OBJECT_INVISIBLE_RIVER_SOUND1 || p.classId == OBJECT_INVISIBLE_RIVER_SOUND2) o.push_back({ 2u, p.id, p.classId, nullptr });
+    // the room objects follow in the client table's walk: bucket id & 0x7F ascending, a chain newest first (as the monsters above)
+    std::reverse(v.begin(), v.end());
+    std::stable_sort(v.begin(), v.end(), [](const D2SndUnit& a, const D2SndUnit& b) { return (a.id & 127) < (b.id & 127); });
     for (const D2SndUnit& s : v) o.push_back(s);
     d2client_session_objects(o.data(), (uint32_t)o.size());   // 1.13c D2Client+0x237E0 object branch
     sessionClientPlayerFootstep();   // 0x2B1E0 -> 0x1C150 -> 0x23C00 on the local player's client unit

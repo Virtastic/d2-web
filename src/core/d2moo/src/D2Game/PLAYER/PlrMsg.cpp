@@ -108,8 +108,10 @@ constexpr D2UnkPlrMsgStrc stru_6FD30708[20] =
 
 
 //D2Game.0x6FC81C00
+extern "C" void d2_client_player_mode_packet(D2UnitStrc* pUnit, int32_t nAnimMode);   // d2client/session_unit_sound.cpp (replay only)
 void __fastcall sub_6FC81C00(D2UnitStrc* pUnit, D2ClientStrc* pClient)
 {
+    d2_client_player_mode_packet(pUnit, 0x13);   // the client's action 0x13 arm calls D2Client+0x24490 with mode 0x13
     D2GAME_PACKETS_SendPacket0x0D_6FC3C920(pClient, 0xDu, 0, pUnit->dwUnitId, 19, CLIENTS_GetUnitX(pUnit), CLIENTS_GetUnitY(pUnit), pUnit->dwLastHitClass, UNITS_GetCurrentLifePercentage(pUnit));
 }
 

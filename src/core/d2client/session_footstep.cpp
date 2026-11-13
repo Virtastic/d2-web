@@ -52,7 +52,7 @@ extern "C" void d2client_session_monster_footstep(uint32_t id, int32_t cls, uint
 
 // One client frame of the local player's unit. serverMode: the server unit's mode now (taken for the next frame); now: the client
 // tick counter D2Client+0x1197F8 (frame - 1); rate(mode) -> the client unit's step and length in that mode (D2Common 0x33110).
-extern "C" void d2client_session_player_footstep(uint32_t serverMode, uint32_t cls, int32_t inTown, int32_t floor, uint32_t now,
+extern "C" void d2client_session_player_footstep(uint32_t serverMode, uint32_t cls, int32_t inTown, int32_t floor, uint32_t now, int32_t staminaZero,
                                                  void (*rate)(uint32_t mode, uint32_t* step, uint32_t* total)) {
     const uint32_t s = g_cp.serverMode; const bool seen = g_cp.seen;
     g_cp.serverMode = serverMode; g_cp.seen = true;
@@ -65,7 +65,7 @@ extern "C" void d2client_session_player_footstep(uint32_t serverMode, uint32_t c
         const uint32_t f = floor >= 2 && floor <= 6 ? 4u * uint32_t(floor - 1) : 0u;
         d2client_sound_unit_submit(int32_t(kClassGait[cls] + f + (g_cp.mode == 3 ? 24u : 0u)));   // 0x22FB0
     }
-    if (g_cp.mode == 3 && inTown) { g_cp.mode = 6; g_cp.frame = 0; rate(6, &g_cp.step, &g_cp.total); return; }   // 0x19D80
+    if (g_cp.mode == 3 && (inTown || staminaZero)) { const uint32_t w = inTown ? 6u : 2u; g_cp.mode = w; g_cp.frame = 0; rate(w, &g_cp.step, &g_cp.total); return; }   // 0x19D80: stamina 0 turns run into walk, town or not
     if (g_cp.total) g_cp.frame = (g_cp.frame + g_cp.step) % g_cp.total;
 }
 

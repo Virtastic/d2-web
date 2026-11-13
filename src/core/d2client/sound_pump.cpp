@@ -146,6 +146,11 @@ void d2client_sound_stage_log() {
             ++sndHandle;
             continue;
         }
+        if (q[i * 2 + 1] == 2) {   // the random one-shot event (0x4F860's 0x4FB3B submit, no unit): its allocation's #10034 only
+            out += std::to_string(curTick) + " A 10034 0,0 snd=" + std::to_string(q[i * 2]) + "\n";
+            ++sndHandle;
+            continue;
+        }
         if (q[i * 2 + 1] != 0) continue;
         out += std::to_string(curTick) + " A 10034 0,0\n";
         out += std::to_string(curTick) + " A 10034 0,0 snd=" + std::to_string(q[i * 2]) + "\n";   // snd= is decimal in the capture (snd=70 is row 70)
