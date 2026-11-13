@@ -611,6 +611,9 @@ static void unit6ba90(uint32_t rec) {
 extern "C" void d2c_9ee90(const D2c9EE90Env*, uint32_t);
 static uint32_t gRd32(uint32_t a) { uint32_t v = 0; if (a < sizeof g_arena - 4) memcpy(&v, g_arena + a, 4); return v; }
 EMSCRIPTEN_KEEPALIVE void d2_dg_set_origin(int32_t x, int32_t y) { g_vx = x; g_vy = y; }
+// ctx+0x38 & gdwBitMasks[3] after the feed: the word that gates the cell walk, and the 8 in ecx of the frame's 10047/10013 pair
+// (retail: 8 on every frame that fed a floor/unit node, 0 on the first frame, whose grid holds walls only).
+EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_flag8() { return rd(kSq) & 8; }
 EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
     wr(kCtx + 0x24, (uint32_t)g_vx); wr(kCtx + 0x28, (uint32_t)g_vy);
     g_gout.clear(); g_ledx = 0;
