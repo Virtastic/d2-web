@@ -38,14 +38,39 @@ void rec(int ord, uint32_t ecx, uint32_t edx, std::initializer_list<uint32_t> a 
 void cel(uint32_t ecx, uint32_t edx, int32_t x, int32_t y) { rec(10041, ecx, edx, {P, uint32_t(x), uint32_t(y), P, 5, 0}); }
 }
 
-// first: the G trace's first frame (no rain yet; 805A0's place holds a 10045 whose source is not recovered, its leftovers
-// the retail values). tick: the trace tick (the frame counter the outer 10040 carries). lead: the ecx 739E0's head 10031 and
-// its 10043 inherit (the rain loop's last register; retail's own value on tick 2, 0x221, and 0 after).
-extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first, int32_t tick, uint32_t lead) {
+// The client clock the capture rig pins (D2Client's GetTickCount/timeGetTime/QPC/FileTime imports: each call returns ++clk, and
+// a tick start lifts clk to 40 * tick). D2Client+0x10EA0 sets the fade deadline = now + 500; 0x10EC0 draws D2Gfx 10045 over the
+// screen region with alpha (deadline - now) * 255 / 500 until it passes. The reads between the clock and the 10EC0 call are the
+// frame's own: the packet pump (0xACE20, one when packets ran), 44A89, 6C130's per-unit step (U), 44AC1, 8AFDA, then three per
+// room of the walk (7A385, 9E994 from the second frame, 9EEE) and 10ECF's; the first frame has the fixed loading sequence.
+namespace {
+uint32_t g_clk = 0, g_deadline = 0, g_frames = 0, g_lastReset = 0;
+}
+extern "C" uint32_t d2_session_walk_rooms();
+extern "C" uint32_t d2_session_walk_units();
+
+// first: the trace's first frame. tick: the trace tick. pump: 1 when the packet pump processed packets this tick.
+extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first, int32_t tick, uint32_t pump) {
     out.clear();
     const int32_t W = 640, H = 480;
-    if (first) rec(10045, lead, 0x6b, {0, 0, uint32_t(W), uint32_t(H - 0x2f), 0, 0x6b});
-    else d2client::weather::drawG(out, W, H, 0);
+    const uint32_t R = d2_session_walk_rooms(), U = d2_session_walk_units();
+    uint32_t now;
+    if (first) {
+        g_frames = g_lastReset = 0;
+        g_clk = 40 + 5; g_deadline = g_clk + 500;                // 10EA6 reads the clock after 4 loading-sequence reads
+        g_clk += 15 + U + 3 + 2 * R + 1; now = g_clk;
+    } else {
+        if (g_clk < uint32_t(tick) * 40) g_clk = uint32_t(tick) * 40;
+        g_clk += pump + 1 + U + 2 + 3 * R + 1; now = g_clk;
+    }
+    uint32_t lead = 0;
+    if (!first) d2client::weather::drawG(out, W, H, 0);          // 7FE80's rain (the first frame has none)
+    if (g_deadline && g_deadline >= now) {
+        lead = (g_deadline - now) * 255;
+        const uint32_t alpha = lead / 500;
+        rec(10045, lead, alpha, {0, 0, uint32_t(W), uint32_t(H - 0x2f), 0, alpha});
+    } else { lead = g_deadline; g_deadline = 0; }                // expired: 10EC0 clears the deadline, its compare leaves it in ecx
+    g_clk += 5;                                                  // 12FF8 x3, 7B92E, 5A9A9 after the draw
     rec(10031, lead, 0);                                         // 739E0 head
     rec(10078, 1, 1); rec(10031, 1, 1); rec(10031, 0, 1);        // 29250
     cel(H, 0, 0, H);                                             // 27290: the control panel's five cels along y = H
@@ -77,12 +102,16 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first
     return out.c_str();
 }
 
-// After 44230 returns: the outer loop's 10040 with its frame phase (1, 2, 3, then a host-time value retail reads off the
-// clock: not reproducible, 0 here); the first frame adds 10021(1) before it.
+// After 44230 returns: the outer loop's 10040. Its ecx is the frame counter 44B50 keeps (D2Client C980C: one per frame, cleared
+// when more than 1000 clock units have passed since the last clear, which hands the elapsed units over in the register instead:
+// the clock value the frame's last read returned, g_clk, less the last clear's). The first frame adds 10021(1) before it.
 extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_outer_g(int32_t first, int32_t tick) {
     out.clear();
     if (first) rec(10021, 1, 0, {0});
-    const int32_t c = (tick - 1) % 4;
-    rec(10040, c < 3 ? uint32_t(c + 1) : 0u, 0);
+    ++g_frames;
+    uint32_t ecx = g_frames;
+    if (g_clk - g_lastReset > 1000) { ecx = g_clk - g_lastReset; g_lastReset = g_clk; g_frames = 0; }
+    rec(10040, ecx, 0);
+    (void)tick;
     return out.c_str();
 }

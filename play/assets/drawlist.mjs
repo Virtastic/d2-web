@@ -70,8 +70,8 @@ export function gFrame(Module, phase, gateEcx = 0) {
     globalThis.__d2GHud = !Module._d2_client_frame_tail_g;   // the frame tail (HUD included) comes from d2_client_frame_tail_g below
   } else if (Module._d2_client_frame_tail_g) {
     // 739E0's lead ecx: retail's 0xd22d-like first-frame value is host state (left 0), 0x221 on the second frame, 0 after
-    const first = tick === gFirstTick ? 1 : 0, lead = !first && tick === gFirstTick + 1 ? 0x221 : 0;
-    gLines(Module.ccall('d2_client_frame_tail_g', 'string', ['number', 'number', 'number'], [first, tick, lead]));
+    const first = tick === gFirstTick ? 1 : 0;
+    gLines(Module.ccall('d2_client_frame_tail_g', 'string', ['number', 'number', 'number'], [first, tick, globalThis.__d2GPump ? 1 : 0]));
     globalThis.__d2GHud = true;
   }
   // 8B110's leftover is 3F860's unit origin y (d2_session_view_y) when the session's own walk runs

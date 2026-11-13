@@ -127,7 +127,10 @@ static bool d2c_79f20(uint32_t entry, int32_t subX, int32_t subY) {
 }
 
 // 1.13c D2Client+0x7A340: kind-1 node into cell+0x14 with the fade state machine; `now` = GetTickCount().
+static uint32_t g_n7a340;   // calls this walk made (each reads the clock once: the frame clock model)
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_n7a340() { return g_n7a340; }
 static void d2c_7a340(uint32_t cell, uint32_t entry, int32_t subX, int32_t subY, uint32_t now) {
+    ++g_n7a340;
     uint32_t t = rd(entry + 0x1C);
     if (t && t != 0xD && !(rd(entry + 0x14) & 4)) wr(cell, rd(cell) | 4);
     uint32_t node = d2c_node(kSq, 1, entry);
@@ -368,6 +371,7 @@ EMSCRIPTEN_KEEPALIVE void d2_dg_stage_room_list(int32_t h) { if (g_nRooms) g_roo
 EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_frame(int32_t l, int32_t t, int32_t r, int32_t b, int32_t ox, int32_t oy, int32_t n,
                                           uint32_t skipUnits, uint32_t now) {
     if (n < 1 || n > (int32_t)kMaxN) return 0;
+    g_n7a340 = 0;
     d2_dg_reset(n, ox, oy);
     g_view[0] = l; g_view[1] = t; g_view[2] = r; g_view[3] = b; g_ox = ox; g_oy = oy; g_skipUnits = skipUnits; g_now = now;
     for (uint32_t i = 0; i < g_nUnits; i++) { wr(g_units[i].unit, (uint32_t)g_units[i].type); wr(g_units[i].unit + 4, (uint32_t)g_units[i].cls); wr(g_units[i].unit + 8, (uint32_t)g_units[i].sx); wr(g_units[i].unit + 12, (uint32_t)g_units[i].sy); }

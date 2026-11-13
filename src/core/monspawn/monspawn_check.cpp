@@ -8244,6 +8244,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_pickup(uint32_t itemUnitId) {
     return 2;
 }
 extern "C" __attribute__((weak)) void d2_local_d2gs_drain();
+static void sessionViewOrigin(int32_t* vx, int32_t* vy);
 EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath || frames < 0) return 0;
     // a retail recording: server->client packets a tick queues (NPC quest-marker 0x8A) are the tick's own stream.
@@ -8621,6 +8622,13 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             d2client::weather::Env env{};
             env.levelId = g_currentLevel; env.act = g_currentAct;
             env.weatherLevel = DATATBLS_GetRainFromLevelsTxt(g_currentLevel) != 0;
+            {   // 1.13c D2Client+0x44230: DAT_6FBCC408/0C = the view origin less the previous frame's (kept only once a frame has set it)
+                static bool have = false; static int32_t px, py;
+                int32_t vx, vy; sessionViewOrigin(&vx, &vy);
+                if (g_sessionClientFrame <= 1) have = false;
+                if (have) { env.tickDx = vx - px; env.tickDy = vy - py; }
+                px = vx; py = vy; have = true;
+            }
             // D2Client+0x8BC48/0x8BC4C as the headless retail rig holds them: 640x480 until its 13th client frame, then
             // 800x600 (the spawn bound range turns 513 then). Not the window: the rig has none.
             const bool wide = g_sessionClientFrame >= g_sessionScreenSwitchFrame;
@@ -12277,7 +12285,12 @@ static bool sessionMonsterCof(int32_t cls, uint32_t mode, char* out, size_t cap)
 extern "C" bool d2_session_critter_unit(uint32_t i, uint32_t* out);
 EMSCRIPTEN_KEEPALIVE int g_walkOpt = 0;   // off by default; bit0 critters, bit1 only the monsters the client was told of, bit2 critter COF
 EMSCRIPTEN_KEEPALIVE void d2_session_walk_opt(int v) { g_walkOpt = v; }
+static uint32_t g_walkRooms, g_walkUnits;   // the walk's room count (7A385 clock reads) and client unit count (6C130 steps), for the frame clock model
+extern "C" uint32_t d2_dg_n7a340();
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_walk_rooms() { return d2_dg_n7a340(); }
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_walk_units() { return g_walkUnits; }
 EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
+    g_walkRooms = g_walkUnits = 0;
     if (!g_sessionLive || !g_game || !g_lastLevel || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return "";
     auto fl = [](int32_t v) { return v >= 0 ? v / 160 : -((-v + 159) / 160); };
     int32_t vx, vy; sessionViewOrigin(&vx, &vy);
@@ -12291,6 +12304,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
     // The client's own critters (Levels.txt cmon, made at room activation 0x440C0 before any server unit is learnt): type 1 units
     // the server never sent, in the client's room lists.
     if (g_walkOpt & 1) for (uint32_t i = 0, c[5]; d2_session_critter_unit(i, c); ++i) {
+        ++g_walkUnits;
         d2_dg_feed_unit_ex(UNIT_MONSTER, c[0], (int)c[1], (int)c[2], (int)c[3], c[4], 0x8000, 0x8000, 0, first ? 1 : 0);
         if ((g_walkOpt & 4) && sessionMonsterCof((int32_t)c[1], c[4], cof, sizeof cof)) d2_dg_feed_unit_cof(cof);
         d2_dg_feed_unit_shift(0);
@@ -12310,6 +12324,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
             } else if (u->dwUnitType == UNIT_OBJECT && u->pObjectData && u->pObjectData->pObjectTxt && u->pStaticPath) {
                 x = u->pStaticPath->tGameCoords.nX; y = u->pStaticPath->tGameCoords.nY; mode = clientObjectClock(u).shown;
             } else continue;
+            ++g_walkUnits;
             d2_dg_feed_unit_ex((int)u->dwUnitType, u->dwUnitId, (int)u->dwClassId, x, y, mode, fx, fy, 0, first ? 1 : 0);
             if (sessionUnitCof(u, mode, cof, sizeof cof)) d2_dg_feed_unit_cof(cof);
             if (u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MONSTER) d2_dg_feed_unit_shift(sessionColourShift(u));
@@ -12323,7 +12338,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
     if (D2ActiveRoomStrc* pr = UNITS_GetRoom(g_targetPlayer)) {
         D2ActiveRoomStrc** list = nullptr; int32_t cnt = 0;
         DUNGEON_GetAdjacentRoomsListFromRoom(pr, &list, &cnt);
-        for (int32_t i = 0; i < cnt; ++i) if (list[i] && list[i]->pDrlgRoom) d2_dg_feed_rooms_add(list[i]->pDrlgRoom);
+        for (int32_t i = 0; i < cnt; ++i) if (list[i] && list[i]->pDrlgRoom) { d2_dg_feed_rooms_add(list[i]->pDrlgRoom); ++g_walkRooms; }
     }
     d2_dg_feed_level(g_lastLevel, vx, vy, vx + 640, vy + 480, fl(vx + 2 * vy) - 3, fl(2 * vy - vx) - cols, side, now);
     d2_dg_feed_rooms_end();
