@@ -16,5 +16,6 @@ struct Ops {
 };
 // ecx=unit, edx=flag; stack rec, lvl, w2, w3, w4 (ret 0x14)
 void sub_35140(const Ops& o, P unit, U flag, const uint8_t* rec, I lvl, U w2, U w3, U w4);
+void sub_35070(const Ops& o, P unit, U flag, const uint8_t* rec, I lvl, U w2, U w3, U w4);
 void sub_35270(const Ops& o, P unit, U flag, const uint8_t* rec, I lvl, U w2, U w3, U w4);
 }

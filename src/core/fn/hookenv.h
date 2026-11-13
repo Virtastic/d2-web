@@ -162,9 +162,15 @@ struct HookEnv {
 // blob holds what retail's global would hold. A range is looked up by RVA, so a probe can address a word inside a larger pin (0x110C08+4*i).
 struct GlobalPins {
     struct R { uint32_t rva, len; uint8_t* p; };
-    R r[8]; int n = 0;
-    void add(uint32_t rva, uint32_t blobAddr, uint32_t len) { if (n >= 8) abort(); r[n++] = { rva, len, (uint8_t*)(uintptr_t)blobAddr }; }
-    uint8_t* at(uint32_t rva, uint32_t len = 4) const { for (int i = 0; i < n; i++) if (rva >= r[i].rva && rva + len <= r[i].rva + r[i].len) return r[i].p + (rva - r[i].rva); return nullptr; }
+    R r[16]; int n = 0;
+    void add(uint32_t rva, uint32_t blobAddr, uint32_t len) { if (n >= 16) abort(); r[n++] = { rva, len, (uint8_t*)(uintptr_t)blobAddr }; }
+    // the LAST pin covering a word answers (the capture stores the pins in order, so a later narrow pin overrides an earlier wide one)
+    uint8_t* at(uint32_t rva, uint32_t len = 4) const { for (int i = n - 1; i >= 0; i--) if (rva >= r[i].rva && rva + len <= r[i].rva + r[i].len) return r[i].p + (rva - r[i].rva); return nullptr; }
     uint32_t rd(uint32_t rva) const { uint8_t* q = at(rva); if (!q) abort(); uint32_t v; memcpy(&v, q, 4); return v; }
-    void wr(uint32_t rva, uint32_t v) const { uint8_t* q = at(rva); if (!q) abort(); memcpy(q, &v, 4); }
+    // pins may overlap (a word inside a larger pinned array is also pinned alone: one retail address, two recorded blobs): a store lands in every pin that covers it
+    void wr(uint32_t rva, uint32_t v) const {
+        bool any = false;
+        for (int i = 0; i < n; i++) if (rva >= r[i].rva && rva + 4 <= r[i].rva + r[i].len) { memcpy(r[i].p + (rva - r[i].rva), &v, 4); any = true; }
+        if (!any) abort();
+    }
 };

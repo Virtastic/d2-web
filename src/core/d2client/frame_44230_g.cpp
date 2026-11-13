@@ -25,11 +25,12 @@ void rec(int ord, uint32_t ecx, uint32_t edx, std::initializer_list<uint32_t> a 
 // then the leftovers: 2A9F0's 10013 ecx/edx, 8B110's ecx (10020/10008/10013), A8800's 10047 ecx/edx, 14050's ecx.
 // phase 1: after the walk: a46cc (>0: 10021(0) and decrement), then 10040. Returns the G lines.
 extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_g(int32_t phase, int32_t view_nonempty, int32_t mode, uint32_t class_218, uint32_t colour,
-                                                              uint32_t l_ecx, uint32_t l_edx, uint32_t e8b, uint32_t a_ecx, uint32_t a_edx, uint32_t e14, uint32_t gate_ecx) {
+                                                              uint32_t l_ecx, uint32_t l_edx, uint32_t e8b, uint32_t a_ecx, uint32_t a_edx, uint32_t e14, uint32_t gate_ecx, int32_t rain, int32_t head31) {
  out.clear();
  if (phase == 0) {
   rec(10043, gate_ecx, 0);                                                          // 44230: Ordinal_10043() == 0 -> draw
-  if (view_nonempty && mode != 3) { rec(10013, 0x12, 0x12); rec(10013, l_ecx, l_edx); }   // 3B0C0 -> 2A9F0 (2A0D0 then 10013)
+  if (view_nonempty && mode != 3) rec(10013, 0x12, 0x12);                           // 8B0C0 -> 7A9F0 (7A0D0, 10013)
+  if (view_nonempty && mode != 3 && rain) rec(10013, l_ecx, l_edx);                 // 81340 -> 80160 (its first act is 10013): only on a level with rain
   rec(10038, colour, colour, {colour, colour, colour});
   rec(10085, 0, 0, {class_218, 0, 0, 0});
   if (view_nonempty && mode != 3) {                                                 // 8B110

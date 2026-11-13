@@ -14,7 +14,8 @@ extern "C" uint32_t d2c_64ee0(uint32_t msg, const cl::Env& e) {
         const uint32_t row = G(e, 0x11c060) + (uint32_t)i * 0x550;
         if (e.R(row) == 0xFFFFFFFFu) continue;
         const uint32_t fp = e.R(row + 0x110);
-        if (!fp || slot(e, fp)) break;
+        // retail: `call eax` with EAX = the callback, ECX = the tab index, EDX = index * 0x550
+        if (!fp || slot(e, fp, fp, (uint32_t)i, (uint32_t)i * 0x550u)) break;
     }
     e.H(0x88a70, 0, 0, 0, 0, 0, 0, 0, 0, 1);
     return fin(e, msg);

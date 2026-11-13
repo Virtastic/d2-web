@@ -4369,7 +4369,7 @@ function clientMonsters() {   // the capture's join box (the retail capture tool
   const nr = Module.ccall('d2_session_hero_near_rooms', 'number', ['bigint'], [BigInt(rp)]);
   const pairs = Module.ccall('d2_client_loading_pairs', 'string', ['bigint', 'number', 'bigint', 'number', 'number', 'number'], [BigInt(mp), n, BigInt(rp), nr, H[hero + 4], H[hero + 5]]);
   Module._free(rp); Module._free(mp);
-  return { n, pairs: pairs.split(' ').map((t) => t.split(':').map((h) => parseInt(h, 16))) };
+  return { n, rooms: nr, pairs: pairs.split(' ').map((t) => t.split(':').map((h) => parseInt(h, 16))).slice(0, Math.max(0, nr - 1)) };   // the walk's list is the hero room's near list: nr entries, nr-1 C1760 calls (the first of each 32 is skipped)
 }
 // PERF: while the rAF loop is drawing (a visible player tab), a redraw asked for by an input handler or
 // timer is folded into the next frame instead of drawing the whole frame twice inside one vsync (a click
@@ -4388,7 +4388,7 @@ function render(now = false) {
   // First frame of a G trace: retail's loading screen (D2Client+0xC1760, 640x480, entry ecx/edx leftovers not modelled); else the frame's first call.
   const first = globalThis.__d2G?.length === 0 && Module._d2_client_loading_g;
   globalThis.__d2GLoading = !!first;   // retail's room walk draws no unit while D2Client+0xC1760's loading screen runs (gUnit is silent)
-  if (first) { const cm = clientMonsters(); gLoadingWalk((e, d, f) => Module.ccall('d2_client_loading_g', 'string', ['number','number','number','number','number','number'], [f, e, d, 640, 480, 0x7fffffff]), cm.n, cm.pairs); }
+  if (first) { const cm = clientMonsters(); gLoadingWalk((e, d, f) => Module.ccall('d2_client_loading_g', 'string', ['number','number','number','number','number','number'], [f, e, d, 640, 480, 0x7fffffff]), cm.n, cm.pairs, cm.rooms); }
   if (Array.isArray(globalThis.__d2G)) gFrame(Module, 0, first ? 0x273c : 0);   // D2Client+0x44230 up to the room walk
   setFrontdoorError(frontdoorError, !realmSceneActive && screen === SCREEN.SELECT ? charSelectError : '');
   // The frame-cost instrument (assets/frame-perf.mjs) is refreshed per frame and, while off, every
