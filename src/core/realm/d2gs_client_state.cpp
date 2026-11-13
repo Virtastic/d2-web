@@ -4801,6 +4801,25 @@ static int pkt_missile_ordered(const uint8_t* packet, int size) {
     return 1;
 }
 
+// 0x3e (0xae300): one stat of an item. Bit stream from +2: guid (variable width), a flag bit, the 9-bit stat id, the
+// value (variable width), and a selector for an 8 or 16 bit tail. The client's own copy of the item takes the value.
+static int pkt_item_stat(const uint8_t* packet, int length) {
+    if (length < 3) return 0;
+    D2RealmBitReader bits(packet + 2, length - 2);
+    auto var = [&](uint32_t& v) {
+        uint32_t b = 0;
+        if (!bits.read(1, b)) return false;
+        if (!b) return bits.read(8, v);
+        if (!bits.read(1, b)) return false;
+        return bits.read(b ? 32 : 16, v);
+    };
+    uint32_t guid = 0, flag = 0, statId = 0, value = 0;
+    if (!var(guid) || !bits.read(1, flag) || !bits.read(9, statId) || !var(value)) return 0;
+    D2UnitStrc* item = d2_realm_client_owned_item_find(guid);
+    if (item) STATLIST_SetUnitStat(item, static_cast<int>(statId), static_cast<int>(value), 0);
+    return 1;
+}
+
 static const RealmPacketHandler kRealmPacketHandlers[] = {
     { 0xafa90, pkt_both<apply_game_state_packet, pkt_game_flags> },   // 0x01
     { 0xadb50, pkt_load_act },                                  // 0x03
@@ -4876,6 +4895,7 @@ static const RealmPacketHandler kRealmPacketHandlers[] = {
     { 0xad780, pkt_roster_party },                              // 0x8d
     { 0xabf40, pkt_pong },                                      // 0x8f
     { 0xad950, pkt_walk_verify },                               // 0x96
+    { 0xae300, pkt_item_stat },                                 // 0x3e
     { 0xaf910, pkt_use_item_cursor },                           // 0x3f
     { 0xadb70, pkt_both<pkt_cursor_clear_hero, pkt_cursor_clear> },                              // 0x42
     { 0xaeee0, pkt_missile_ordered },                           // 0x73

@@ -6696,6 +6696,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_fixture_set_item_stat(uint32_t itemId, uint3
     D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
     if (!item) return 0;
     STATLIST_SetUnitStat(item, (int32_t)statId, value, 0);
+    // The server reports an item's stat change to its owner's client as the 0x3E item stat packet (Items.cpp durability loss does the same).
+    if (g_targetPlayer) D2GAME_PACKETS_SendPacket0x3E_6FC3EC20(SUNIT_GetClientFromPlayer(g_targetPlayer, __FILE__, __LINE__), item, 1, (int32_t)statId, (uint32_t)value, 0);
     updateSessionSnapshot();
     return STATLIST_UnitGetStatValue(item, (int32_t)statId, 0) == value ? 1 : 0;
 }
