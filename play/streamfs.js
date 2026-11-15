@@ -67,7 +67,7 @@
 
   // cache is a Map used as an LRU: insertion order IS the recency order (delete+set moves to end),
   // so eviction pops the first (oldest) key. No separate order array → O(1) hit path, no linear scan.
-  const S = { worker: null, ctrl: null, data: null, cache: new Map(), nextId: 1, urlSrcs: new Map(), mounts: new Map(), warming: new Set(), waiters: [] };
+  const S = { worker: null, ctrl: null, data: null, cache: new Map(), nextId: 1, urlSrcs: new Map(), blobs: new Map(), mounts: new Map(), warming: new Set(), waiters: [] };
 
   // d2-web divergence: MEASURED 2026-09-25 -- in Firefox 156 the worker+Atomics round trip below
   // never completes. The Range fetch's own headers resolve in milliseconds (confirmed by a
@@ -325,11 +325,19 @@
     }
     // d2-web divergence: Firefox's and WebKit's worker+Atomics round trip stalls (see
     // NEEDS_SYNC_XHR above, issue 9/issue 20) -- read URL sources with a direct synchronous XHR instead, no
-    // worker or spin needed.
-    if (NEEDS_SYNC_XHR && src.url) {
+    // worker or spin needed. A Blob source (the player's own files) stalls the same way: Firefox's worker
+    // never delivers the slice's bytes while this thread spins, so its first cold read timed out at 30 s.
+    // It is read here too, as a synchronous XHR of an object URL for just this chunk's slice.
+    const blob = NEEDS_SYNC_XHR && !src.url && S.blobs.get(src.id);
+    if (NEEDS_SYNC_XHR && (src.url || blob)) {
       const t0f = performance.now();
-      const chunk = fetchRangeSyncXHR(src, src.url, start, end);
-      ST.misses++; ST.stallMs += performance.now() - t0f; ST.bytes += chunk.length; noteMiss(t0f, src.url + '@' + start);
+      let chunk;
+      if (src.url) chunk = fetchRangeSyncXHR(src, src.url, start, end);
+      else {
+        const u = URL.createObjectURL(blob.slice(start, end));
+        try { chunk = fetchRangeSyncXHR(src, u, 0, end - start); } finally { URL.revokeObjectURL(u); }
+      }
+      ST.misses++; ST.stallMs += performance.now() - t0f; ST.bytes += chunk.length; noteMiss(t0f, (src.url || cacheKey) + '@' + start);
       S.cache.set(cacheKey, chunk);
       if (S.cache.size > LRU_MAX) { S.cache.delete(S.cache.keys().next().value); ST.evictions++; }
       return chunk;
@@ -572,6 +580,7 @@
       if (had && had.blob === blob) return had;
       const id = S.nextId++;
       S.worker.postMessage({ mountBlob: { id, blob } });
+      S.blobs.set(id, blob);
       const m = { src: { id }, abs: 'id' + id, size, blob };
       S.mounts.set(path, m);
       return m;
