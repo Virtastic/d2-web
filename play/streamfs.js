@@ -327,9 +327,11 @@
     // NEEDS_SYNC_XHR above, issue 9/issue 20) -- read URL sources with a direct synchronous XHR instead, no
     // worker or spin needed. A Blob source (the player's own files) stalls the same way: Firefox's worker
     // never delivers the slice's bytes while this thread spins, so its first cold read timed out at 30 s.
-    // It is read here too, as a synchronous XHR of an object URL for just this chunk's slice.
-    const blob = NEEDS_SYNC_XHR && !src.url && S.blobs.get(src.id);
-    if (NEEDS_SYNC_XHR && (src.url || blob)) {
+    // It is read here too, as a synchronous XHR of an object URL for just this chunk's slice -- in EVERY
+    // browser, not only the sniffed ones: Chromium derivatives that report a plain Chrome user agent
+    // (Brave) hit the same 30 s timeout on the worker path, and a local slice has no network to stall on.
+    const blob = !src.url && S.blobs.get(src.id);
+    if ((NEEDS_SYNC_XHR && src.url) || blob) {
       const t0f = performance.now();
       let chunk;
       if (src.url) chunk = fetchRangeSyncXHR(src, src.url, start, end);
