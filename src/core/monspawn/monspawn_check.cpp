@@ -1757,9 +1757,11 @@ static std::vector<uint32_t> g_heldNew;
 extern "C" uint32_t D2WEB_TakeMonsterAssigns();
 static uint32_t g_sessionTickAssigns = 0;
 // the D2Gfx calls those units' builds make, as the loading walk's: one 10043 (ecx/edx 1,1) per assign; taking them clears the count
+std::string d2client_npc_speech_take_g();   // d2client/npc_speech_start.cpp
 extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_session_client_assign_g() {
     static std::string out; out.clear();
     for (; g_sessionTickAssigns; --g_sessionTickAssigns) out += "10043 1,1\n";
+    out += d2client_npc_speech_take_g();
     return out.c_str();
 }
 static void sessionHeldStep() {

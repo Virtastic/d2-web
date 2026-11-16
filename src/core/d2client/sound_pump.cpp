@@ -170,7 +170,8 @@ namespace {
 // The queued unit submits through the 0x88A70 port. Its D2Sound calls: 0x87D80's #10034 on allocation, then #10034 with ECX =
 // entry+0x28 and EDX = the unit (pointers: printed 0), then 0x22390's #10034 (ECX = unit+0x78, EDX = the entry handle).
 // 0x87FE0 (an entry of the same compound group still live) finds none: the capture never shows a submit without its allocation.
-void submitRows(uint32_t now, const std::vector<int32_t>& rows, int32_t p3) {
+int32_t submitRows(uint32_t now, const std::vector<int32_t>& rows, int32_t p3, int32_t off = 0) {
+    int32_t h = 0;
     D2cSndSubmitEnv E{};
     E.recs = sg.cc24c; E.count = sg.cc250; E.enabled = 1; E.now = (int32_t)now; E.player = 0;
     E.find87fe0 = [](int32_t, int32_t) -> uint8_t* { return nullptr; };
@@ -182,8 +183,9 @@ void submitRows(uint32_t now, const std::vector<int32_t>& rows, int32_t p3) {
     E.pan88440 = [](int32_t, uint32_t) { return 0.0f; };
     E.ord10034 = [](uint32_t, uint32_t) { logA(10034, 0, 0); };
     E.fn22390 = [](uint32_t, int32_t h) { logA(10034, 0, (uint32_t)h); };
-    for (int32_t row : rows) { curTag = row; d2_client_88a70(&E, row, 1, 0, p3, 0); }
+    for (int32_t row : rows) { curTag = row; h = d2_client_88a70(&E, row, 1, off, p3, 0); }
     curTag = 0;
+    return h;
 }
 void flushUnitSubmits(uint32_t now) { submitRows(now, unitQ, 0); unitQ.clear(); }
 }
@@ -196,8 +198,16 @@ void d2client_sound_unit_submit_now(int32_t row, int32_t p3) {
     curTick = ambTick + 1;
     submitRows(curTick - 1, std::vector<int32_t>{ row }, p3);
 }
+// 0x7D3C0's NPC speech submit, 0x88A70(player, 5, 0, 0) under the packet dispatch: logged at once; the entry's handle back
+int32_t d2client_sound_speech_submit(int32_t row) {
+    if (!armed || row < 1) return 0;
+    initOnce();
+    curTick = ambTick + 1;
+    return submitRows(curTick - 1, std::vector<int32_t>{ row }, 0, 5);
+}
+void d2client_npc_speech_reset();   // npc_speech.cpp
 extern "C" {
-EMSCRIPTEN_KEEPALIVE void d2_snd_trace_reset() { out.clear(); armed = true; unitQ.clear(); sndHandle = 0; }
+EMSCRIPTEN_KEEPALIVE void d2_snd_trace_reset() { out.clear(); armed = true; unitQ.clear(); sndHandle = 0; d2client_npc_speech_reset(); }
 EMSCRIPTEN_KEEPALIVE const char* d2_snd_trace_ptr() { return out.c_str(); }
 EMSCRIPTEN_KEEPALIVE uint32_t d2_snd_trace_len() { return (uint32_t)out.size(); }
 // one pump pass at session tick `tick` (>= 1); the sound "now" counter is tick - 1 (0 at the first pass)
