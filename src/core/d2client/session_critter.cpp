@@ -58,6 +58,13 @@ struct Critter {
 std::vector<Critter> g_c;
 uint32_t g_counter = 1;           // D2Client+0xDE834
 std::string g_log;
+// The local player as the critters see it: the client's own unit (D2Client+0x11BBFC). Its path takes the server unit's move after
+// the client frame in which the server started it, from the server's spot then, and steps in lockstep from the next frame: on the
+// frame a move starts it still stands where the server unit stood before, after that it is where the server unit is. The client
+// path is not ported: the spot is the server unit's, held back on the frame its move starts.
+D2UnitStrc* g_hero = nullptr; D2CoordStrc g_heroAt{}, g_heroPrev{}; uint32_t g_heroMode = 0; bool g_heroSeen = false;
+bool walking(uint32_t m) { return m == 2 || m == 3 || m == 6; }
+void spot(D2UnitStrc* u, D2CoordStrc* p) { if (u && u == g_hero) *p = g_heroAt; else UNITS_GetCoords(u, p); }
 uint32_t lcg(uint32_t& lo, uint32_t& hi) { const uint64_t v = uint64_t(lo) * 0x6ac690c5ull + hi; lo = uint32_t(v); hi = uint32_t(v >> 32); return lo; }
 uint32_t lim(uint32_t lo, uint32_t n) { return (n & (n - 1)) ? lo % n : lo & (n - 1); }
 const D2MonStatsTxt* monStats(int32_t cls) { return cls >= 0 && cls < sgptDataTables->nMonStatsTxtRecordCount ? &sgptDataTables->pMonStatsTxt[cls] : nullptr; }
@@ -71,7 +78,7 @@ void anim(Critter& c) {
 }
 // #10522 (unit 1 = the critter)
 int32_t distance(const Critter& c, D2UnitStrc* u) {
-    D2CoordStrc p{}; UNITS_GetCoords(u, &p);
+    D2CoordStrc p{}; spot(u, &p);
     int32_t dx = p.nX - c.x, dy = p.nY - c.y; if (dx < 0) dx = -dx; if (dy < 0) dy = -dy;
     const int32_t s = c.size / -2 - UNITS_GetUnitSizeX(u) / 2;
     int32_t nx = s + dx, ny = s + dy; if (nx < 0) nx = 0; if (ny < 0) ny = 0;
@@ -157,7 +164,7 @@ void wander(Critter& c, uint32_t step, uint32_t action, uint32_t frame, int32_t 
 // critter's path footprint (#10259, path +0x4C: 0x17E80 sets 0xC01 on it first through #11056; a client monster's path otherwise
 // carries the path allocator's monster footprint 0x100, so only another monster's spot refuses it, never a wall)
 bool flee(Critter& c, D2UnitStrc* from, int32_t step, uint32_t action, uint32_t mask, uint32_t frame, int32_t pct = 0) {
-    D2CoordStrc p{}; UNITS_GetCoords(from, &p);
+    D2CoordStrc p{}; spot(from, &p);
     const uint32_t tx = (uint32_t)c.x, ty = (uint32_t)c.y, sx = (uint32_t)p.nX, sy = (uint32_t)p.nY;
     const int32_t dx = sx > tx ? -1 : sx < tx ? 1 : 0, dy = sy > ty ? -1 : sy < ty ? 1 : 0;
     if (!c.room || COLLISION_CheckMaskWithSize(c.room, c.x + dx, c.y + dy, 1, mask)) return false;
@@ -195,7 +202,7 @@ D2UnitStrc* corpse(Critter& c, D2UnitStrc* player) {
             else continue;
             const int32_t d = distance(c, u);
             if (d < 3 || d > 25 || !player) continue;
-            D2CoordStrc a{}, b{}; UNITS_GetCoords(u, &a); UNITS_GetCoords(player, &b);   // #10522(corpse, local player)
+            D2CoordStrc a{}, b{}; UNITS_GetCoords(u, &a); spot(player, &b);   // #10522(corpse, local player)
             int32_t dx = a.nX - b.nX, dy = a.nY - b.nY; if (dx < 0) dx = -dx; if (dy < 0) dy = -dy;
             const int32_t s = UNITS_GetUnitSizeX(u) / -2 - UNITS_GetUnitSizeX(player) / 2;
             int32_t nx = s + dx, ny = s + dy; if (nx < 0) nx = 0; if (ny < 0) ny = 0;
@@ -208,7 +215,7 @@ D2UnitStrc* corpse(Critter& c, D2UnitStrc* player) {
 void rat(Critter& c, D2UnitStrc* player, int32_t dist, uint32_t frame) {
     if (c.mode == 0xC || c.mode == 0) return;
     if (dist < 2 && player) {   // 0x16CB0: on the player's own subtile -> 0x17300 (action 8 at its spot). ponytail: not ported
-        D2CoordStrc p{}; UNITS_GetCoords(player, &p);
+        D2CoordStrc p{}; spot(player, &p);
         if (p.nX == c.x && p.nY == c.y) return;
     }
     if (c.mode != 1 || !c.room) return;
@@ -344,9 +351,15 @@ void preset_seen(D2ActiveRoomStrc* room, int32_t x, int32_t y) {
 }
 // 1.13c D2Client+0xA8030, the critters' part
 void tick(D2UnitStrc* player, uint32_t frame) {
+    g_hero = player;
+    if (player) {
+        D2CoordStrc now{}; UNITS_GetCoords(player, &now);
+        g_heroAt = g_heroSeen && walking(player->dwAnimMode) && !walking(g_heroMode) ? g_heroPrev : now;
+        g_heroPrev = now; g_heroMode = player->dwAnimMode; g_heroSeen = true;
+    }
     for (Critter& c : g_c) { step(c, frame); think(c, player, frame); }
 }
-void reset() { g_c.clear(); g_counter = 1; g_log += "RESET\n"; }   // the counter's image value is 1: the first client-only unit is id 2
+void reset() { g_c.clear(); g_counter = 1; g_hero = nullptr; g_heroSeen = false; g_log += "RESET\n"; }   // the counter's image value is 1: the first client-only unit is id 2
 }
 // 1.13c D2Common+0x3C870 (room teardown): every unit in the freed room, client units too, is taken out of it and its path room
 // cleared (0x668A0), so a critter there keeps ticking with no room, and 0x17E80/0x17500/0x2A040 return on that.
