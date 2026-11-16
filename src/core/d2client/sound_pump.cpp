@@ -59,7 +59,13 @@ struct SweepSvc : d2client_batch_5ebc0::Svc {
     d2client_batch_5ebc0::G* g = nullptr;
     int32_t idx = 0; std::vector<uint8_t> file; bool have = false;
     uint8_t* rec() { return g->cc24c + (size_t)idx * 0x8e; }
-    void f5da80(uint8_t*) override {}
+    void f5da80(uint8_t* r) override {              // 1.13c D2Client+0x5DA80: an async load is done; state 1 -> 2, then 0x5CD10
+        if (*(int32_t*)(r + 0x86) != 1) return;       // retail asserts and exits
+        idx = (int32_t)((r - g->cc24c) / 0x8e);
+        const int32_t h = idx + 1, n = (int32_t)file.size(), two = 2;   // Fog #10094 (buffer), #10095 (size)
+        memcpy(r + 0x6c, &h, 4); memcpy(r + 0x70, &n, 4); memcpy(r + 0x86, &two, 4);
+        f5cd10(); g->cc274--;
+    }
     void f5db30(int32_t i, char* o) override {   // 0x5DB30: DATA\GLOBAL|LOCAL \SFX|MUSIC \ filename
         idx = i; have = false; std::string p = (i >= 0xb76 && i <= 0x1230) ? "DATA\\LOCAL" : "DATA\\GLOBAL";
         p += (i >= 0x1231 && i <= 0x125a) ? "\\MUSIC\\" : "\\SFX\\";
@@ -85,10 +91,11 @@ struct SweepSvc : d2client_batch_5ebc0::Svc {
     void o10103() override {}
     int32_t o10016() override { return idx + 1; }
     // Fog #10091 (AsyncDataLoadFileEx) hands back a request for a file that opens; #10095 is its buffer size (the whole file).
-    // #10092 (AsyncDataTestLoaded) stays 0: the capture's async loads never complete (no 0x5DA80 10025 follows them).
+    // #10092 (AsyncDataTestLoaded): the shared VFS read is synchronous, so a request is done at its first poll, the outcome the
+    // capture rig fixes by waiting on the request at that poll.
     int32_t o10091() override { return have ? idx + 1 : 0; }
     int32_t o10095() override { return (int32_t)file.size(); }
-    int32_t o10092(int32_t) override { return 0; }
+    int32_t o10092(int32_t) override { return 1; }
     void f5ebc0(int32_t i, int32_t eax, int32_t p1) override { d2client_batch_5ebc0::sub_5EBC0(*this, *g, i, eax, p1); }
     void fatal302() override {}
     int32_t o10190(int, int, int) override { return 0; }
