@@ -12422,13 +12422,13 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
     const bool spotLos = spotHeroRoom && DRLG_GetLOSDrawFromLevelId(DUNGEON_GetLevelIdFromRoom(spotHeroRoom));
     D2CoordStrc spotHero{};
     if (spotLos) UNITS_GetCoords(g_targetPlayer, &spotHero);
-    if (g_walkOpt & 1) for (uint32_t i = 0, c[5]; d2_session_critter_unit(i, c); ++i) {
+    if (g_walkOpt & 1) for (uint32_t i = 0, c[7]; d2_session_critter_unit(i, c); ++i) {
         ++g_walkUnits;
         // a critter neither dead nor dying takes the monster arm of the test
         const D2MonStats2Txt* cm2 = UNITS_GetMonStats2TxtRecordFromMonsterId((int32_t)c[1]);
         const bool cBlocked = spotLos && c[4] != MONMODE_DEATH && c[4] != MONMODE_DEAD
                               && UNITS_TestCollision(spotHero.nX, spotHero.nY, UNITS_GetUnitSizeX(g_targetPlayer), (int)c[2], (int)c[3], cm2 ? (int8_t)cm2->nSizeX : 0, spotHeroRoom, 2);
-        d2_dg_feed_unit_ex(UNIT_MONSTER, c[0], (int)c[1], (int)c[2], (int)c[3], c[4], 0x8000, 0x8000, sessionShadowGate(UNIT_MONSTER, (int32_t)c[1], c[4], nullptr), (first ? 1u : 0u) | (cBlocked ? 2u : 0u));
+        d2_dg_feed_unit_ex(UNIT_MONSTER, c[0], (int)c[1], (int)c[2], (int)c[3], c[4], c[5], c[6], sessionShadowGate(UNIT_MONSTER, (int32_t)c[1], c[4], nullptr), (first ? 1u : 0u) | (cBlocked ? 2u : 0u));
         // D2Client+0x53A30 shifts by the class's palshift table, which only an 0xAC of that class loads: a critter's own class has none
         if ((g_walkOpt & 4) && sessionMonsterCof((int32_t)c[1], c[4], cof, sizeof cof) && d2_dg_feed_unit_cof(cof) && !g_heldClasses.count((int32_t)c[1])) d2_dg_feed_unit_palshift(0);
         d2_dg_feed_unit_shift(0);

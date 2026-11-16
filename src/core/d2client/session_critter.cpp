@@ -48,6 +48,7 @@ struct Critter {
     uint32_t f44, f48, f4c, u7c;  // animation clock, length, rate; last 0x22CA0 sound frame
     uint32_t born;
     int32_t vel;                  // path +0x7C
+    uint32_t fx = 0x8000, fy = 0x8000;   // the path position's fp16 fraction (a walk moves it off the subtile centre)
     struct Walk { D2UnitStrc u; D2DynamicPathStrc p; };
     std::shared_ptr<Walk> w;      // the client unit's own dynamic path, the one the per-frame step walks
 };
@@ -103,7 +104,8 @@ bool path(Critter& c, int32_t tx, int32_t ty) {
     D2UnitStrc u{}; u.dwUnitType = UNIT_MONSTER;
     D2DynamicPathStrc p{};
     p.pUnit = &u; p.pRoom = c.room; p.dwPathType = 2; p.dwVelocity = c.vel; p.nDistMax = 14;
-    p.tGameCoords.dwPrecisionX = PATH_ToFP16Center((uint16_t)c.x); p.tGameCoords.dwPrecisionY = PATH_ToFP16Center((uint16_t)c.y);
+    // the unit's own path position: a walk that ended keeps the fraction its last step left (a fresh critter is at the centre)
+    p.tGameCoords.dwPrecisionX = ((uint32_t)(uint16_t)c.x << 16) | c.fx; p.tGameCoords.dwPrecisionY = ((uint32_t)(uint16_t)c.y << 16) | c.fy;
     p.dwCollisionPattern = (uint32_t)D2Common_11281_CollisionPatternFromSize(nullptr, c.size); p.nMoveTestCollisionMask = 0x3C01;
     D2PathInfoStrc i{};
     i.tStartCoord.X = (uint16_t)c.x; i.tStartCoord.Y = (uint16_t)c.y; i.tTargetCoord.X = (uint16_t)tx; i.tTargetCoord.Y = (uint16_t)ty;
@@ -176,7 +178,10 @@ void step(Critter& c, uint32_t frame) {
     bool end = false;
     if (c.mode == 2) {
         end = !c.w || !D2Common_10226(&c.w->u, 1024);
-        if (c.w) { c.x = (int32_t)(c.w->p.tGameCoords.dwPrecisionX >> 16); c.y = (int32_t)(c.w->p.tGameCoords.dwPrecisionY >> 16); }
+        if (c.w) {
+            const uint32_t px = c.w->p.tGameCoords.dwPrecisionX, py = c.w->p.tGameCoords.dwPrecisionY;
+            c.x = (int32_t)(px >> 16); c.y = (int32_t)(py >> 16); c.fx = px & 0xFFFF; c.fy = py & 0xFFFF;
+        }
     }
     if (c.f48) {
         c.f44 += c.f4c;
@@ -254,10 +259,12 @@ void reset() { g_c.clear(); g_counter = 1; g_log += "RESET\n"; }   // the counte
 // cleared (0x668A0), so a critter there keeps ticking with no room, and 0x17E80/0x17500/0x2A040 return on that.
 void d2client_critter_room_freed(D2ActiveRoomStrc* room) { for (Critter& c : g_c) if (c.room == room) c.room = nullptr; }
 // The critters the client holds in a room, for the room walk's unit feed (D2Client+0x7A5D0 draws them like any client unit):
-// out = id, class, subtile x, subtile y, mode. False past the last (or for a critter whose room was freed).
+// out = id, class, subtile x, subtile y, mode, fp16 fraction x, y (the client coordinates #10132 draws from). False past the last
+// (or for a critter whose room was freed).
 extern "C" bool d2_session_critter_unit(uint32_t i, uint32_t* out) {
     if (i >= g_c.size() || !g_c[i].room) return false;
-    const Critter& c = g_c[i]; out[0] = c.id; out[1] = c.cls; out[2] = (uint32_t)c.x; out[3] = (uint32_t)c.y; out[4] = c.mode; return true;
+    const Critter& c = g_c[i]; out[0] = c.id; out[1] = c.cls; out[2] = (uint32_t)c.x; out[3] = (uint32_t)c.y; out[4] = c.mode;
+    out[5] = c.fx; out[6] = c.fy; return true;
 }
 // every critter the client made stays in its unit hash (its room freed or not): one 6C130 step each per frame
 extern "C" uint32_t d2_session_critter_count() { return (uint32_t)g_c.size(); }
