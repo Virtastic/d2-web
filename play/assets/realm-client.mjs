@@ -1547,6 +1547,14 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
     // The item-box colour tests of a held item against the selected player (the bits of the local game's read); 0 = not found.
     d2gsClientItemBoxState: (guid) => (Module._d2_realm_client_item_box_state
       ? call('d2_realm_client_item_box_state', 'number', ['number'], [guid >>> 0]) >>> 0 : 0),
+    // The inventory graphic a held item draws in the grids (its unique/set file or its own picture variant); null = not found.
+    d2gsClientItemInvFile: (guid) => {
+      if (!Module._d2_realm_client_item_inventory_file) return null;
+      const at = Number(call('d2_realm_client_item_inventory_file', 'bigint', ['number'], [guid >>> 0]));
+      if (!at) return null;
+      const end = Module.HEAPU8.indexOf(0, at);
+      return String.fromCharCode(...Module.HEAPU8.subarray(at, end));
+    },
     // A stat of the selected player: the total (worn items and states included), or the character's own with `base`.
     d2gsClientHeroStat: (stat, layer = 0, base = false) => (Module._d2_realm_client_hero_stat
       ? call('d2_realm_client_hero_stat', 'number', ['number', 'number', 'number'], [stat, layer, base ? 1 : 0]) : 0),

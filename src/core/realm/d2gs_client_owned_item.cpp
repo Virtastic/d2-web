@@ -1,5 +1,6 @@
 #include "d2gs_client_owned_item.h"
 #include "../d2client/item_needs_repair.h"
+#include "../d2client/item_inventory_file.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -645,6 +646,14 @@ uint32_t d2_realm_client_unit_item_box_state(D2UnitStrc* owner, uint32_t guid) {
     if (flagged(item, IFLAG_IDENTIFIED)) out |= 0x080;
     if (txt->nTransmogrify) out |= 0x100;
     return out;
+}
+
+// The inventory graphic a held item draws in the grids (its unique/set file or its own picture
+// variant, item_inventory_file.h); 0 when the client holds no item with that guid.
+EMSCRIPTEN_KEEPALIVE const char* d2_realm_client_item_inventory_file(uint32_t guid) {
+    D2UnitStrc* item = find_item(guid);
+    const D2ItemsTxt* txt = item ? DATATBLS_GetItemsTxtRecord(item->dwClassId) : nullptr;
+    return txt ? d2client_item_inventory_file(item, txt) : nullptr;
 }
 
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_owned_item_readback(const D2UnitStrc* owner,

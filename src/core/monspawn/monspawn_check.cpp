@@ -57,6 +57,7 @@
 #include "object_interaction_gate.h"
 #include "object_interaction_packet.h"
 #include "../d2client/item_needs_repair.h"
+#include "../d2client/item_inventory_file.h"
 #include "object_interaction_pending.h"
 #include "hellforge_diagnostic.h"
 #include "monster_sound_profile.h"
@@ -1175,14 +1176,8 @@ template <class P> static void clientDropFlip(const D2UnitStrc* item, P& out) {
 // does. No type carries BOTH a non-empty uniqueinvfile and a varinvgfx, so the two branches never
 // collide (checked over Items.txt/ItemTypes.txt); unique/set is tested first, matching the columns'
 // own meaning. This engine used to read szInvFile alone, which drew every unique helm/shield and every
-// ring/amulet/charm/jewel with the base art.
-static const char* sessionItemInventoryFile(D2UnitStrc* item, const D2ItemsTxt* txt) {
-    const int quality = ITEMS_GetItemQuality(item);
-    if (quality == ITEMQUAL_UNIQUE && txt->szUniqueInvFile[0]) return txt->szUniqueInvFile;
-    if (quality == ITEMQUAL_SET && txt->szSetInvFile[0]) return txt->szSetInvFile;
-    if (ITEMS_GetVarInvGfxCount(item)) return ITEMS_GetVarInvGfxString(item, ITEMS_GetVarGfxIndex(item));
-    return txt->szInvFile;
-}
+// ring/amulet/charm/jewel with the base art. The rule is shared with the online client (item_inventory_file.h).
+static const char* sessionItemInventoryFile(D2UnitStrc* item, const D2ItemsTxt* txt) { return d2client_item_inventory_file(item, txt); }
 
 // 1.13c D2Client+0x95140: the gates (identified, socketed flag, sockets > 0) and the
 // footprint placement; the gem in socket n is the n-th item of the item's own inventory.
