@@ -604,14 +604,16 @@ void D2GAME_PACKETS_SendPacket0x21_UpdateSkills_6FC3DB50(D2ClientStrc* pClient, 
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }
 // D2Game.0x6FC3DBE0 (1.13c D2Game+0x8D570 = 0x6FCAD570): item skill quantity update; bytes 2 and 0xA are never
-// written by retail's composer (stack residue on the wire), zero here.  Byte 0xB is 1 only when
+// written by retail's composer (stack residue on the wire), zero unless the caller pins them.  Byte 0xB is 1 only when
 // the unit exists and has STATE_PLAYERBODY (1.13c disassembly; D2MOO's 1.10f reading inverts it).
 extern "C" uint8_t g_d2webPacket22Pad = 0;   // byte 0x0A of packet 0x22: caller stack residue, set by the caller that pins it
+extern "C" uint8_t g_d2webPacket22Byte2 = 0; // byte 2 of packet 0x22: caller stack residue, set by the caller that pins it
 void __fastcall D2GAME_PACKETS_SendPacket0x22_6FC3DBE0(D2ClientStrc* pClient, BYTE nUnitType, int32_t nUnitGUID, int16_t nSkillId, char a5) {
     D2UnitStrc* pUnit = SUNIT_GetServerUnit(CLIENTS_GetGame(pClient), nUnitType, nUnitGUID);
     D2GSPacketSrv22 packet = {};
     packet.nHeader = 0x22; packet.nUnitType = nUnitType; packet.nUnitGUID = nUnitGUID;
     packet.nSkillId = nSkillId; packet.nQuantity = a5; packet.unk0x0A = g_d2webPacket22Pad;
+    packet.unk0x02 = g_d2webPacket22Byte2;
     packet.bIsCorpse = pUnit && STATES_CheckState(pUnit, STATE_PLAYERBODY);
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }

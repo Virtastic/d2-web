@@ -72,6 +72,7 @@ int32_t __fastcall D2GAME_Return1_6FC41900()
 
 //D2Game.0x6FC41910
 extern "C" uint8_t g_d2webPacket22Pad;   // game_net_stubs.cpp
+extern "C" uint8_t g_d2webPacket22Byte2; // game_net_stubs.cpp
 // 1.13c D2Game+0xD9470 (checked against decompile)
 void __fastcall D2GAME_ITEMMODE_ServerStatlistCallback_6FC41910(D2GameStrc* pGame, D2UnitStrc* pOwner, D2UnitStrc* pOther, int32_t nLayer_StatId, int32_t nPreviousValue, int32_t nNewValue)
 {
@@ -404,8 +405,14 @@ int32_t __fastcall sub_6FC42120(D2UnitStrc* pUnit, D2UnitStrc* pItem, int32_t a3
     }
 
     int32_t nQuantity = STATLIST_UnitGetStatValue(pItem, STAT_QUANTITY, 0);
+    // 1.13c D2Game+0xD43E0: the quantity read (D2Common 10973) pushes ebx (the item) at D2Common+0x38B7B into the slot that
+    // later holds packet 0x22 bytes 0-3, so byte 2 is (pItem >> 16) & 0xFF. Only a zero quantity goes on to the book test
+    // (D2Common 10744), whose push esi (esi = 0) at D2Common+0x2443F overwrites that slot and leaves byte 2 at 0.
+    // The item's heap address is fixed within the capture build; 0x37 is the value retail pinned for it (tome packets).
+    uint8_t nPacket22Byte2 = 0x37;
     if (!nQuantity)
     {
+        nPacket22Byte2 = 0;
         if (ITEMS_CheckItemTypeId(pItem, ITEMTYPE_BOOK))
         {
             return 0;
@@ -451,10 +458,13 @@ int32_t __fastcall sub_6FC42120(D2UnitStrc* pUnit, D2UnitStrc* pItem, int32_t a3
         nUnitType = pUnit->dwUnitType;
     }
 
-    // D26: retail's 0x22 byte 0x0A is caller stack residue; this caller (D2Game+0xD43E0, scroll pickup) leaves 0xAC
-    g_d2webPacket22Pad = 0xAC;
+    // Byte 0x0A: the D2Common 10252 call at D2Game+0xD4497 leaves its return address (D2Game+0xD449C) under packet
+    // bytes 8-0x0B, so byte 0x0A = ((D2Game base + 0xD449C) >> 16) & 0xFF = 0xCF at the preferred base 0x6FC20000.
+    g_d2webPacket22Pad = 0xCF;
+    g_d2webPacket22Byte2 = nPacket22Byte2;
     D2GAME_PACKETS_SendPacket0x22_6FC3DBE0(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), nUnitType, nUnitGUID, nSkillId, nQuantity);
     g_d2webPacket22Pad = 0;
+    g_d2webPacket22Byte2 = 0;
 
     if (!nQuantity)
     {
