@@ -107,7 +107,10 @@ extern "C" uint32_t d2_client_monster_sfx_ticks(uint32_t id) { auto it = g_idle.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_monster_idle(uint32_t id, int32_t cls, uint32_t mode, uint32_t now) {
     IdleCall c{cls, mode, 0, 0, &g_idle[id], DATATBLS_GetMonSoundsTxtRecordFromMonsterId(cls), 0};
     if (!d2_session_monster_idle_facts(id, &c.town, &c.near)) return 0;
-    g_idleNow = now;
+    // 0x44A80 runs the unit pass (0xA8110 -> 0x2B1E0 -> 0x4F4A0 -> here) before its DAT_6fbc97f8 += 1: the gate reads the
+    // count of the frames before this one, the render's 0x81340 after it this frame's (s2157-rain RN0 now=151, the gate's draw at 150).
+    // The +0x7C stamps (0x23630/0x242B0, same pass) hold the session's frame count: one less in that clock; 0 stays never stamped.
+    g_idleNow = now - 1;
     D2c237Env e{};
     e.mode223d0 = [](void* u) { return C(u)->mode; };
     e.type22430 = [](void*) { return int32_t(1); };
@@ -115,7 +118,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_monster_idle(uint32_t id, int
     e.monstatsCount = 0x7fffffff;
     e.monSound2a70 = [](void* u) { return reinterpret_cast<uint8_t*>(const_cast<D2MonSoundsTxt*>(C(u)->snd)); };
     e.has225d0 = [](void*, int32_t) { return int32_t(0); };   // ponytail: the unit's playing-sound list (+0x78) is not mirrored; NeuTime outlasts the row
-    e.get220a0 = [](void* u) { return C(u)->st->u7c; };
+    e.get220a0 = [](void* u) { return C(u)->st->u7c ? C(u)->st->u7c - 1 : 0u; };
     e.get22040 = [](void* u) { return C(u)->st->u80; };
     e.set22010 = [](void* u, uint32_t v) { C(u)->st->u80 = v; };
     e.ord10331 = [](void*) { return int32_t(1); };
