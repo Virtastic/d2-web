@@ -12638,6 +12638,15 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
                 // a ground item the client was sent (0x9C) is a unit of its room's list: the cell walk draws it through D2Client+0x6CC00's
                 // item path (6E2C0's type-4 arm), at its static path position
                 x = u->pStaticPath->tGameCoords.nX; y = u->pStaticPath->tGameCoords.nY;
+                // 1.13c D2Client+0x84BB0: an item the server drops to the ground (0x9C action 0, item flag 0x2000) is made in
+                // IMODE_DROPPING (D2Common #11090 mode 5); the item arm of the unit pass (D2Client+0x82EA0) steps its clock
+                // (#10759, speed 256 of 17 << 8) each frame until #10426 ends it, then lands it ONGROUND. Until then the cell
+                // walk's A6180 test (ONGROUND only) is false and the item sits in the sorted unit list. The server makes its copy
+                // ONGROUND, so the client mode is counted from the client frame the item is first walked on; the first walk's
+                // items already lie there.
+                static std::unordered_map<uint32_t, uint32_t> dropped; if (first) dropped.clear();
+                const uint32_t born = dropped.emplace(u->dwUnitId, first ? 0u : g_sessionClientFrame).first->second;
+                if (born && mode == IMODE_ONGROUND && g_sessionClientFrame - born < 16) mode = IMODE_DROPPING;
             } else continue;
             if (!unstepped) ++g_walkUnits;
             if (u->dwUnitType == UNIT_OBJECT) objs.push_back({u->dwUnitId, u->pObjectData->pObjectTxt->nClientFn == 14});
