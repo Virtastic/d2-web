@@ -80,7 +80,9 @@ EMSCRIPTEN_KEEPALIVE int32_t d2c_cru_unit(uint32_t type, uint32_t id, int32_t cl
                                           uint32_t fx, uint32_t fy, uint32_t flags, uint32_t flagsEx, int32_t level, int32_t rtx, int32_t rty) {
     int32_t s = -1, freeSlot = -1;
     for (uint32_t i = 0; i < kMaxUnits; i++) {
-        if (g_um[i].used && g_um[i].type == type && g_um[i].id == id) { s = (int32_t)i; break; }
+        // The class is part of the key: the client numbers its own critters from its own counter (D2Client+0xDE834, 0x181A0), so a
+        // critter and a server monster can carry one id and are still two units.
+        if (g_um[i].used && g_um[i].type == type && g_um[i].id == id && W(&g_unit[i], 0x04) == (uint32_t)cls) { s = (int32_t)i; break; }
         if (freeSlot < 0 && !g_um[i].used) freeSlot = (int32_t)i;
     }
     if (s < 0) {
