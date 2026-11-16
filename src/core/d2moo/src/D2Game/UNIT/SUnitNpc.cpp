@@ -849,7 +849,11 @@ int32_t __fastcall D2GAME_STORES_SellItem_6FCC7680(D2GameStrc* pGame, D2UnitStrc
     }
 
     ITEMS_HandleGoldTransaction(pGame, pPlayer, nTransactionCost);
-    D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 1, STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), nItemGUID, 3);
+    // 1.13c D2Game+0xBFF1E: a stored item's sale leaves the player unit and client struct address bytes in reply bytes
+    // 3..6 (EDI/EBX pushed by the gold read); the cursor and body paths reach the reply with other registers (zero here).
+    D2ClientStrc* pSellClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
+    D2GAME_SendPacket0x2A_Stack(pSellClient, 0x2Au, 1, STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), nItemGUID, 3,
+        nItemMode == IMODE_STORED ? D2GAME_SellReplyStackBytes(pPlayer, pSellClient) : 0);
     return 0;
 }
 

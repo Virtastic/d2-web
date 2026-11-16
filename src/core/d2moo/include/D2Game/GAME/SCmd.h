@@ -208,6 +208,9 @@ void __fastcall D2GAME_SendPacket0x2A_6FC3F3B0(D2ClientStrc* pClient, char a2, c
 // guid's top byte -- then EBX's low three bytes, EBX being 1 from the successful 0x6FCF76A0 call.
 void D2GAME_SendPacket0x2A_Stack(D2ClientStrc* pClient, char a2, char a3, int32_t a4, int32_t a5, char a6, uint32_t nStackBytes);
 inline uint32_t D2GAME_StoreBuyReplyStackBytes(uint32_t nItemGuid) { return (nItemGuid >> 24) | (1u << 8); }
+// The stored-item sell's success reply (D2Game+0xBFF1E): the player unit's top address byte, then the client struct's
+// low three (src/core/d2game/sell_reply_stack_bytes_bff1e.cpp).
+uint32_t D2GAME_SellReplyStackBytes(const void* pPlayer, const void* pClient);
 //D2Game.0x6FC3F3F0
 void __fastcall sub_6FC3F3F0(D2ClientStrc* pClient, D2GSPacketSrv2C* pPacket);
 //D2Game.0x6FC3F410
