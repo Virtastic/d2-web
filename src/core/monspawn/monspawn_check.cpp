@@ -11980,9 +11980,17 @@ static void lightWindowAndPlayer(D2UnitStrc* player, D2DrlgActStrc* act, int amb
     if (!ambientRgb[0] && !ambientRgb[1] && !ambientRgb[2]) ENVIRONMENT_GetLightColorFromAct(act, &ambientRgb[0], &ambientRgb[1], &ambientRgb[2]);
     m.ambientColour = (uint32_t)ambientRgb[0] | (uint32_t)ambientRgb[1] << 8 | (uint32_t)ambientRgb[2] << 16;
     for (int i = 0; i < 48 * 48; i++) { m.colour[i * 3] = ambientRgb[0]; m.colour[i * 3 + 1] = ambientRgb[1]; m.colour[i * 3 + 2] = ambientRgb[2]; }
-    for (int gy = 0; gy < 48; gy++) for (int gx = 0; gx < 48; gx++) {
-        D2ActiveRoomStrc* room = COLLISION_GetRoomBySubTileCoordinates(path->pRoom, m.originX + gx, m.originY + gy);
-        m.blocked[gy * 48 + gx] = room && COLLISION_CheckMask(room, m.originX + gx, m.originY + gy, COLLIDE_VISIBLE | COLLIDE_BLANK) ? 1 : 0;
+    // 1.13c D2Client+0xA8880: each cell's room is looked up from the PREVIOUS cell's room (its own
+    // rectangle or its near rooms), starting at the player's room; a cell no near room holds falls back
+    // to the player's room, whose collision lookup then reports it invalid, so it reads blocked.
+    memset(m.blocked, 0, sizeof m.blocked);
+    if (D2ActiveRoomStrc* playerRoom = path->pRoom) {
+        D2ActiveRoomStrc* room = playerRoom;
+        for (int gy = 0; gy < 48; gy++) for (int gx = 0; gx < 48; gx++) {
+            room = COLLISION_GetRoomBySubTileCoordinates(room, m.originX + gx, m.originY + gy);
+            if (!room) room = playerRoom;
+            if (COLLISION_CheckMask(room, m.originX + gx, m.originY + gy, COLLIDE_VISIBLE | COLLIDE_BLANK)) m.blocked[gy * 48 + gx] = 1;
+        }
     }
     const int px = (int)(path->tGameCoords.dwPrecisionX >> 13) + 4, py = (int)(path->tGameCoords.dwPrecisionY >> 13) + 4;
     // A player's light radius is a STAT, not the constant 13: D2Client recomputes a unit's light source
