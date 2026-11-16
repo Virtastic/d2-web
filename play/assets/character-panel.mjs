@@ -279,7 +279,7 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
         className: state?.className ?? '', name: state?.name ?? '',
         level: state?.level, experience: grouped(u32(state?.experience)), nextExperience: grouped(u32(sc.length > 10 ? sc[10] : state?.nextExperience)),
         strength: cell.strength.value, dexterity: cell.dexterity.value, defense: sc[0], vitality: cell.vitality.value,
-        stamina: sc[4], staminaMax: sc[16] ?? sc[5], life: sc.length > 11 ? sc[11] : state?.life, lifeMax: sc.length > 12 ? sc[12] : state?.lifeMax, energy: cell.energy.value,
+        stamina: sc[4], staminaMax: sc[5], life: sc.length > 11 ? sc[11] : state?.life, lifeMax: sc.length > 12 ? sc[12] : state?.lifeMax, energy: cell.energy.value,
         mana: sc.length > 13 ? sc[13] : state?.mana, manaMax: sc.length > 14 ? sc[14] : state?.manaMax,   // the *Max keys are the LEFT boxes
         fireRes: sc[6], coldRes: sc[7], lightRes: sc[8], poisonRes: sc[9],
       };
@@ -288,6 +288,8 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
       // after the skill rows, are total - base (readCharacterScreen).
       const above = (d) => (d == null ? 0 : d > 0 ? 3 : d < 0 ? 1 : 0), over = sc.length >= 27 ? sc.slice(-2) : [];
       cell.lifeMax = { c: above(over[0]) }; cell.manaMax = { c: above(over[1]) };
+      // max stamina (stat 11) the same way: its total (sc[5]) against its base (sc[16]); the Increased Stamina passive draws colour 3
+      cell.staminaMax = { c: sc[16] == null ? 0 : above(sc[5] - sc[16]) };
       // resistances: colour 1 below zero, colour 4 (gold) at the cap, which the screen's values are already clamped to (0xBCEA0, stats 39/41/43/45)
       state?.resMax?.forEach((m, i) => { const v = sc[6 + i], cap = Math.min(95, m + 75); cell[['fireRes', 'coldRes', 'lightRes', 'poisonRes'][i]] = { c: v >= cap ? 4 : v < 0 ? 1 : 0 }; });
       const face = facesFor(state?.act || 1);

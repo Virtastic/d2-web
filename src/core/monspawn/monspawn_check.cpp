@@ -6021,8 +6021,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_character_screen(int32_t* out) {
     return d2CharacterScreen(p, p && p->pGame ? (p->pGame->bExpansion ? 1 : 0) : -1,
         p && p->pGame ? p->pGame->nDifficulty : 0, out);
 }
-// The character screen's stamina maximum is the BASE stat (retail panel: 1200 beside a current of 1560 while the
-// Increased Stamina passive's 30% is in the total; the HUD bar reads the total, out[5]).
+// The character screen's maximum-stamina base: D2Client+0xBCEA0 draws the total (out[5]) in colour 3 when it exceeds
+// this base (retail: 1560 in colour 3, the Increased Stamina passive's 30% over a base of 1200), colour 1 below.
 EMSCRIPTEN_KEEPALIVE int d2_session_character_stamina_base() { return g_targetPlayer ? STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_MAXSTAMINA, 0) >> 8 : 0; }
 // Character panel colours: retail D2Client+0xBCEA0 draws max life / max mana (stats 7, 9) in colour 3 when the
 // total (D2Common ord 10973) exceeds the base (ord 10587), colour 1 when below; this is the base read.
