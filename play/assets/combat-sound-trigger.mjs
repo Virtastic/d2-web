@@ -152,7 +152,9 @@ export function createCombatSoundTrigger(read, play, engine = null, note = null)
         } else if (e.classId >= 0 && e.classId < 7) {
           if (PLAYER_CAST.has(e.mode)) { if (e.id === snapshot?.playerId) fire(skillSound.get(snapshot.player?.castSkillId) ?? 0, e, 'cast'); }
           else if (PLAYER_ATTACK.has(e.mode) && e.id === snapshot?.playerId) fire(doSound.get(snapshot.player?.castSkillId) ?? 0, e, 'dosound'); /* melee dispatch (Sacrifice, Smite): retail never enters the cast path (no 1A060/A1CF0 at the cast tick, no stsound: a retail recording pinned runs), so no stsound here */
-          enter(e, snapshot);
+          // The client's own unit is in its local action's mode (Attack, mode 7, played by the shell): the server's skill mode for the
+          // local player is never sent to its own client (D2Game 0x6FC81D20), so it reaches no 0x24490 (Dragon Talon's kick row 255).
+          if (!(e.id === snapshot?.playerId && snapshot.player?.localAction === 7)) enter(e, snapshot);
         }
       }
       for (const k of prev.keys()) if (!seen.has(k)) { hpPrev.delete(k); prev.delete(k); frames.delete(k); }
