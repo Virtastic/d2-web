@@ -51,6 +51,10 @@ static uint32_t g_d2webPacketStreamPackets = 0;
 // client builds one unit per assign it receives.
 static uint32_t g_d2webMonsterAssigns = 0;
 extern "C" uint32_t D2WEB_TakeMonsterAssigns() { const uint32_t n = g_d2webMonsterAssigns; g_d2webMonsterAssigns = 0; return n; }
+// The 0x9C records that seat an item in a container or the belt, counted the same way: the client's handler for each
+// ends by posting a mouse move to the game window.
+static uint32_t g_d2webItemSeats = 0;
+extern "C" uint32_t D2WEB_TakeItemSeats() { const uint32_t n = g_d2webItemSeats; g_d2webItemSeats = 0; return n; }
 // A connected client's receiver: handed every packet at the moment the game sends it, so it sees
 // them all in emission order whatever resets or fills the bounded stream above. Unset by default.
 static void (*g_d2webPacketSink)(const uint8_t*, uint32_t) = nullptr;
@@ -959,6 +963,8 @@ void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, in
     if (g_d2webPacketSink && pClient && pPacket && nPacketSize > 0) g_d2webPacketSink((const uint8_t*)pPacket, (uint32_t)nPacketSize);
     if (g_d2webSessionPacketTap && pClient && pPacket && nPacketSize > 0) g_d2webSessionPacketTap(pClient, (const uint8_t*)pPacket, (uint32_t)nPacketSize);
     if (pClient && pPacket && nPacketSize > 0 && *static_cast<const uint8_t*>(pPacket) == 0xAC) ++g_d2webMonsterAssigns;
+    // for the session client's draw list: a 0x9C that seats an item in a container (action 4) or the belt (0xE)
+    if (pClient && pPacket && nPacketSize > 1 && *static_cast<const uint8_t*>(pPacket) == 0x9C && (static_cast<const uint8_t*>(pPacket)[1] == 4 || static_cast<const uint8_t*>(pPacket)[1] == 0xE)) ++g_d2webItemSeats;
     if (g_d2webPacketRecord && pClient && pPacket && nPacketSize > 0)
         g_d2webPacketRecord->insert(g_d2webPacketRecord->end(), (const uint8_t*)pPacket, (const uint8_t*)pPacket + nPacketSize);
 }

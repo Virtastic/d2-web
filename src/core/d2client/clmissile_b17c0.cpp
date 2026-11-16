@@ -4,7 +4,8 @@
 // creation and their HitSound at a wall or unit collision (an expiry without AlwaysExplode is silent).
 // Session mode: the missiles move through the server act (the units they hit are the server's) without entering its room
 // lists. Not simulated: the pGfx terminal (no gfx), CltSrcTown (0 for the classes cast here), CltHitFunc (0), the
-// ExplosionMissile child (teethexplode: no sound, no collision) and the stat 0x57 velocity term.
+// ExplosionMissile child of a missile the session does not draw (teethexplode: no sound, no collision) and the stat 0x57
+// velocity term.
 // Fire Wall (skill 51): cltdofunc 26 0x74770 makes two makers (cltmissilea, firewallmaker) walking out both ways from the
 // target, perpendicular to the cast, and one segment (the maker's SubMissile1, firewall) on the target; each maker (pCltDoFunc 6
 // 0xB92B0) drops a segment where it stands whenever its path entered a new subtile on the last step (D2Common #10203, path
@@ -59,6 +60,7 @@ bool isForeign(const D2UnitStrc* unit) { for (const D2UnitStrc* f : foreign) if 
 std::vector<D2UnitStrc*> shown;      // a monster do's client missiles (0xA2C90), drawn by the session: the server has no copy the client sees
 bool quiet = false;                   // the caller sounds the TravelSound itself
 std::vector<int32_t> unitHits;            // a shown missile's HitSound: sounded through 0x88A70 in its own unit-pass slot, not the ambient queue
+uint32_t shownSteps = 0;                  // unit steps of shown missiles, for the session's frame clock
 
 void freeMissile(D2UnitStrc* unit) {
     for (size_t i = 0; i < foreign.size(); ++i) if (foreign[i] == unit) { foreign.erase(foreign.begin() + i); break; }
@@ -89,6 +91,34 @@ bool targetDead(const D2UnitStrc* unit) {
     return false;
 }
 
+bool isShownMissile(const D2UnitStrc* unit) { for (const D2UnitStrc* s : shown) if (s == unit) return true; return false; }
+void create(D2UnitStrc* owner, int32_t missileId, int32_t skillId, int32_t level, int32_t x, int32_t y, int32_t tx, int32_t ty, int32_t activateBack);
+
+// 1.13c D2Client+0xB1420's ExplosionMissile branch (after the HitSound) -> 0xB0450 with the dying missile as the source:
+// the Missiles.txt ExplosionMissile where the missile stands, level 0, owned by the missile's owner (none makes nothing),
+// facing as the missile did. It joins the unit lists behind the missile and takes its first step in the same pass.
+// Scope: the missiles the session draws (shown); the others' explosions have no record in the session's lists.
+void explode(D2UnitStrc* unit, D2UnitStrc* owner, const D2MissilesTxt* txt) {
+    const int32_t id = static_cast<int16_t>(txt->wExplosionMissile);
+    const D2MissilesTxt* childTxt = id >= 0 ? DATATBLS_GetMissilesTxtRecord(id) : nullptr;
+    if (!childTxt || !owner || !unit->pDynamicPath) return;
+    const int32_t x = UNITS_GetXPosition(unit), y = UNITS_GetYPosition(unit);
+    D2ActiveRoomStrc* room = unit->pDynamicPath->pRoom;
+    if (!room) return;
+    if (D2ActiveRoomStrc* at = COLLISION_GetRoomBySubTileCoordinates(room, x, y)) room = at;
+    d2client_unitseed::roll(room);   // the unit creator's roll (0x57BF0 -> 0xA7400)
+    const size_t before = missiles.size();
+    const bool wasQuiet = quiet, wasInUpdate = inUpdate;
+    quiet = true; inUpdate = false;   // into the stepped list itself: the pass reaches it this frame
+    create(owner, id, 0, 0, x, y, x, y, childTxt->nActivate);
+    quiet = wasQuiet; inUpdate = wasInUpdate;
+    if (missiles.size() <= before) return;
+    D2UnitStrc* child = missiles.back();
+    child->dwOwnerType = owner->dwUnitType; child->dwOwnerGUID = owner->dwUnitId;
+    if (child->pDynamicPath) PATH_SetDirection(child->pDynamicPath, PATH_GetDirection(unit->pDynamicPath));
+    foreign.push_back(child); shown.push_back(child);
+}
+
 // 1.13c D2Client+0xB1420. wall: the move test collided (param 1); target: the unit the sweep found. Returns true when the
 // missile is freed.
 bool terminal(D2UnitStrc* unit, D2UnitStrc* owner, bool wall, D2UnitStrc* target) {
@@ -108,6 +138,7 @@ bool terminal(D2UnitStrc* unit, D2UnitStrc* owner, bool wall, D2UnitStrc* target
             if (isShown) unitHits.push_back(static_cast<int16_t>(txt->wHitSound)); else d2client_ambient::submit(static_cast<int16_t>(txt->wHitSound));
         }
     }
+    if (play && isShownMissile(unit)) explode(unit, owner, txt);
     if (target && !txt->nCollideKill) return false;
     freeMissile(unit);
     return true;
@@ -304,8 +335,11 @@ void monsterDo(D2UnitStrc* source, int32_t missileId, int32_t skillId, int32_t l
 size_t shownCount() { return shown.size(); }
 D2UnitStrc* shownAt(size_t i) { return i < shown.size() ? shown[i] : nullptr; }
 std::vector<int32_t> takeUnitHits() { std::vector<int32_t> v; v.swap(unitHits); return v; }
+// The unit steps (0x6C130) the shown missiles took since the last call, a missile's last (freeing) step included.
+uint32_t takeShownSteps() { const uint32_t n = shownSteps; shownSteps = 0; return n; }
 
 void reset() {
+    shownSteps = 0;
     for (D2UnitStrc* unit : missiles) freeMissile(unit);
     for (D2UnitStrc* unit : born) freeMissile(unit);
     missiles.clear(); born.clear(); foreign.clear(); shown.clear(); unitHits.clear(); pending.clear(); nextHits.clear(); frame = 0; nextId = 1;
@@ -325,7 +359,7 @@ void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)) {
     for (size_t i = 0; i < missiles.size();) {
         D2UnitStrc* m = missiles[i];
         D2UnitStrc* o = owner;
-        for (const D2UnitStrc* s : shown) if (s == m) { o = find ? find(static_cast<int32_t>(m->dwOwnerType), m->dwOwnerGUID) : nullptr; break; }
+        if (isShownMissile(m)) { o = find ? find(static_cast<int32_t>(m->dwOwnerType), m->dwOwnerGUID) : nullptr; ++shownSteps; }
         if (step(m, o)) ++i; else missiles.erase(missiles.begin() + i);
     }
     inUpdate = false;

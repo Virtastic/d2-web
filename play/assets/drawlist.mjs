@@ -82,6 +82,8 @@ export function gFrame(Module, phase, gateEcx = 0) {
   // The room walk (D2Client+0x8B110's 7A9F0 -> 9F270 -> 9EE90) follows phase 0, over the session's own level and units. Opt-in while
   // replays that splice their own walk still run: with it on, the walk draws the units and the JS unit lines are not emitted.
   globalThis.__d2GWalked = phase === 0 && !!globalThis.__d2GEngineWalk && !!Module._d2_session_room_walk_g;
+  // the frame's unit pass runs before its draw: name the frame so the walk can run that pass's clock once its units are fed
+  if (globalThis.__d2GWalked && Module._d2_client_frame_clock_begin) Module.ccall('d2_client_frame_clock_begin', null, ['number', 'number'], [tick === gFirstTick ? 1 : 0, tick]);
   const walkTxt = globalThis.__d2GWalked ? Module.ccall('d2_session_room_walk_g', 'string', ['number'], [0]) : '';
   // 14050's 10047/10013 pair carries ecx 8 only when the feed set the mask-3 bit (d2_dg_flag8); a walls-only grid leaves 0
   gLines(globalThis.__d2GWalked && Module._d2_dg_flag8 && !Module._d2_dg_flag8() ? f0.replace(/(\n10047 )8,0(\n10013 )8,0/, '$10,0$20,0') : f0);

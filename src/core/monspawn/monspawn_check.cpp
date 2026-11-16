@@ -245,7 +245,7 @@ extern "C" void d2_client_monster_idle_reset();   // 1.13c D2Client+0x237E0 mons
 extern "C" void d2_client_attack_roll_reset();   // 1.13c D2Client+0x242B0 attack-roll state (monster_face.cpp)
 namespace d2client_hurricane { void reset(); void tick(D2UnitStrc* u, uint32_t* seed); }
 namespace d2client_vine { void reset(); void tick(D2UnitStrc* hero); }
-namespace d2client_clmissile { void monsterDo(D2UnitStrc* source, int32_t missileId, int32_t skillId, int32_t level, int32_t tx, int32_t ty); size_t shownCount(); D2UnitStrc* shownAt(size_t i); std::vector<int32_t> takeUnitHits(); void reset(); void cast(int32_t skillId, int32_t level, D2UnitStrc* target, int32_t tx, int32_t ty); void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)); }   // 1.13c D2Client+0x15DA0 (cltdofunc 17), +0xB17C0 / +0xB1420 (client missiles)
+namespace d2client_clmissile { void monsterDo(D2UnitStrc* source, int32_t missileId, int32_t skillId, int32_t level, int32_t tx, int32_t ty); size_t shownCount(); D2UnitStrc* shownAt(size_t i); std::vector<int32_t> takeUnitHits(); uint32_t takeShownSteps(); void reset(); void cast(int32_t skillId, int32_t level, D2UnitStrc* target, int32_t tx, int32_t ty); void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)); }   // 1.13c D2Client+0x15DA0 (cltdofunc 17), +0xB17C0 / +0xB1420 (client missiles)
 namespace d2client_nova { void reset(); void selectSkill(int32_t skillId); int32_t selectedSkill(); void cast(int32_t skillId, bool presentation); void tick(); }   // 1.13c D2Client+0x73CB0 (cltdofunc 25, Poison Nova), +0x73D70 (cltdofunc 29, Frozen Orb)
 namespace d2client_blizzard { void reset(); void cast(int32_t skillId, D2UnitStrc* target, int32_t tx, int32_t ty); void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)); }   // 1.13c D2Client+0xBBC10 (cltdofunc 13, Blizzard center)
 static D2UnitStrc* g_sessionClientPlayerUnit = nullptr;
@@ -1756,11 +1756,16 @@ static std::vector<uint32_t> g_heldNew;
 // the 0xAC assigns the server sent the client during the last tick: the client's 0xAC handler (0xA7780 -> 0x4D160) builds one unit per assign
 extern "C" uint32_t D2WEB_TakeMonsterAssigns();
 static uint32_t g_sessionTickAssigns = 0;
+extern "C" uint32_t D2WEB_TakeItemSeats();
+static uint32_t g_sessionTickSeats = 0;
 // the D2Gfx calls those units' builds make, as the loading walk's: one 10043 (ecx/edx 1,1) per assign; taking them clears the count
 std::string d2client_npc_speech_take_g();   // d2client/npc_speech_start.cpp
 extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_session_client_assign_g() {
     static std::string out; out.clear();
     for (; g_sessionTickAssigns; --g_sessionTickAssigns) out += "10043 1,1\n";
+    // a 0x9C that seats an item in a container or the belt: its handler (D2Client+0x83AD0, +0x84750) ends by asking D2Gfx
+    // for the game window (#10048) to post it a mouse move
+    for (; g_sessionTickSeats; --g_sessionTickSeats) out += "10048 0,0\n";
     out += d2client_npc_speech_take_g();
     return out.c_str();
 }
@@ -8368,6 +8373,43 @@ static void sessionClientMonsterFootsteps(bool newOnly = false) {
 }
 // 1.13c D2Client+0x22B20: the client units' sound references (replay only; nothing happens before the Sounds table is loaded).
 // The client's units are the held monsters and the objects of the rooms it holds (the sets d2_session_client_view prints).
+// frame clock: the unit pass (0xA8110) runs before the frame's sound, ambience and weather passes, which roll the same hero
+// seed. So an item's gleam rolls (0x82EA0 -> 0x6B300 kind 6: one below the overlay's length, one below 8 << 8, the second
+// kept as its position) are taken here, in the item table's order, on the frame the client's copy lands; the frame clock
+// (d2_session_gleam_roll) picks the position up when it makes the node.
+static std::unordered_map<uint32_t, uint32_t> g_itemDropped;   // item id -> the client frame its first walk saw it (0: the first walk)
+static std::unordered_map<uint32_t, uint32_t> g_gleamRolled;   // item id -> its rolled position, until the frame clock takes it
+static std::unordered_set<uint32_t> g_gleamDone;               // items whose rolls were taken
+static D2GameStrc* g_gleamGame = nullptr;
+extern "C" const uint8_t* d2_dg_overlay_row(int32_t row, uint32_t* dccFrames);   // drlg_check.cpp
+extern "C" uint32_t d2_session_client_rand(uint32_t n);
+extern "C" int d2_session_gleam_roll(uint32_t id, uint32_t* pos) {
+    const auto it = g_gleamRolled.find(id);
+    g_gleamDone.insert(id);   // an item the clock rolls for itself is not rolled again here
+    if (it == g_gleamRolled.end()) return 0;
+    *pos = it->second; g_gleamRolled.erase(it); return 1;
+}
+static void sessionClientItemGleams() {
+    if (g_gleamGame != g_game) { g_gleamRolled.clear(); g_gleamDone.clear(); g_gleamGame = g_game; }
+    uint32_t frames = 0;
+    if (!g_lastLevel || !d2_dg_overlay_row(0x46, &frames)) return;
+    std::vector<uint32_t> ground;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+        D2ActiveRoomStrc* room = roomEx->pRoom;
+        if (!room || !clientHolds(room, roomEx)) continue;
+        for (D2UnitStrc* u = room->pUnitFirst; u; u = u->pRoomNext) {
+            if (u->dwUnitType != UNIT_ITEM || !u->pStaticPath || u->dwAnimMode != IMODE_ONGROUND || g_gleamDone.count(u->dwUnitId)) continue;
+            // the client's own item mode, as the walk counts it: on the ground once its 16 drop frames have run
+            const auto it = g_itemDropped.find(u->dwUnitId);
+            if (it != g_itemDropped.end() && (!it->second || g_sessionClientFrame - it->second >= 16)) ground.push_back(u->dwUnitId);
+        }
+    }
+    std::sort(ground.begin(), ground.end(), [](uint32_t a, uint32_t b) { return (a & 127) != (b & 127) ? (a & 127) < (b & 127) : a > b; });
+    for (uint32_t id : ground) {
+        d2_session_client_rand(frames ? frames << 8 : 1);
+        g_gleamRolled[id] = d2_session_client_rand(8u << 8); g_gleamDone.insert(id);
+    }
+}
 static void sessionClientSoundUnits() {
     std::vector<D2SndUnit> v;
     for (uint32_t id : g_heldMonsters) if (D2UnitStrc* u = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)id)) v.push_back({ 1u, id, (uint32_t)u->dwClassId, u });
@@ -8486,8 +8528,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     // frame's weather pass draws from the hero seed, so the diff runs ahead of the frame's sound pass; a tick with no client frame diffs at its end.
     static bool heldStepped; heldStepped = false;
     struct HeldStep { ~HeldStep() { if (heldStepped) return; sessionHeldStep(); if (!g_heldNew.empty()) sessionClientMonsterFootsteps(true); } } heldStep;
-    struct StreamRefresh { ~StreamRefresh() { D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets); g_sessionTickAssigns = D2WEB_TakeMonsterAssigns(); } } streamRefresh;
-    D2WEB_TakeMonsterAssigns();   // assigns sent before the tick (the join's, which the loading walk draws) are not the tick's
+    struct StreamRefresh { ~StreamRefresh() { D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets); g_sessionTickAssigns = D2WEB_TakeMonsterAssigns(); g_sessionTickSeats = D2WEB_TakeItemSeats(); } } streamRefresh;
+    D2WEB_TakeMonsterAssigns(); D2WEB_TakeItemSeats();   // assigns sent before the tick (the join's, which the loading walk draws) are not the tick's
     g_sessionIdleRowsReady.swap(g_sessionIdleRows); g_sessionIdleRows.clear();   // a row drawn at a frame's end is the next tick's sound
     for (int i = 0; i < frames; ++i) {
         if (d2_local_d2gs_drain) d2_local_d2gs_drain();   // 1.13c D2Game+0x2E460: the frame starts by applying the client packets that arrived
@@ -8873,6 +8915,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             // 1.13c D2Client+0x5F020 runs 0x4F860 first, before the frame's weather pass; same hero seed.
             { const D2LevelsTxt* lv = DATATBLS_GetLevelsTxtRecord(g_currentLevel); d2client_sound_stage_feed(lv ? (uint32_t)(lv->dwSoundEnv & 0xff) : 0); }
             if (!heldStepped) { sessionHeldStep(); heldStepped = true; }
+            if (g_sessionClientDraws) sessionClientItemGleams();   // the unit pass's item steps: a landed item's gleam rolls the hero seed
             sessionClientSoundUnits();
             // D2Common #10396 follows the argument's +4 pointer and returns its first dword: the environment's cycle index (0 sunrise,
             // 1 morning, 2 noon, 3 afternoon, 4+ evening/night), so 1..3 is the day ambience row and every other value the night one.
@@ -12517,6 +12560,7 @@ static bool sessionUnitCof(D2UnitStrc* u, uint32_t mode, char* out, size_t cap) 
 // strictly greatest colorpri among the states it carries; state 0 or none leaves 0. (Its 'h' shift on the local player under
 // D2Gfx #10077, and the local player's light colour, are not carried here.)
 extern "C" void d2_dg_feed_unit_shift(uint32_t);
+extern "C" void d2_dg_feed_unit_ilvl(uint32_t);
 static uint32_t sessionColourShift(D2UnitStrc* u) {
     int32_t best = -1; uint8_t pri = 0;
     for (int32_t i = 0; i < sgptDataTables->nStatesTxtRecordCount; ++i)
@@ -12568,8 +12612,17 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_walk_fn14(uint32_t i, uint32_t* out) {
     if (i >= g_walkFn14.size()) return 0;
     out[0] = g_walkFn14[i].first; out[1] = g_walkFn14[i].second; return 1;
 }
+// frame clock: the ground items of the walk in the item table's order, as {unit id, units 0xA8110 steps before it} (the items
+// follow the objects; the client's own critters come after them). An item still dropping is not listed.
+static std::vector<std::pair<uint32_t, uint32_t>> g_walkItems;
+uint32_t d2_session_walk_item(uint32_t i, uint32_t* out) {
+    if (i >= g_walkItems.size()) return 0;
+    out[0] = g_walkItems[i].first; out[1] = g_walkItems[i].second; return 1;
+}
+extern "C" void d2_client_frame_clock_units();   // frame_tail_g.cpp: the frame's unit pass clock, run before the walk draws
 EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
-    g_walkRooms = g_walkUnits = 0; g_walkFn14.clear();
+    g_walkRooms = g_walkUnits = 0; g_walkFn14.clear(); g_walkItems.clear();
+    std::vector<std::pair<uint32_t, bool>> items; uint32_t critters = 0;   // for g_walkItems
     uint32_t nonObj = 0; std::vector<std::pair<uint32_t, bool>> objs;   // for g_walkFn14
     if (!g_sessionLive || !g_game || !g_lastLevel || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return "";
     auto fl = [](int32_t v) { return v >= 0 ? v / 160 : -((-v + 159) / 160); };
@@ -12591,7 +12644,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
     D2CoordStrc spotHero{};
     if (spotLos) UNITS_GetCoords(g_targetPlayer, &spotHero);
     auto feedCritters = [&]() { if (g_walkOpt & 1) for (uint32_t i = 0, c[7]; d2_session_critter_unit(i, c); ++i) {
-        ++g_walkUnits;
+        ++g_walkUnits; ++critters;
         // a critter neither dead nor dying takes the monster arm of the test
         const D2MonStats2Txt* cm2 = UNITS_GetMonStats2TxtRecordFromMonsterId((int32_t)c[1]);
         const bool cBlocked = spotLos && c[4] != MONMODE_DEATH && c[4] != MONMODE_DEAD
@@ -12604,7 +12657,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
     g_walkUnits += g_sessionTownUnits;   // the town the client built beside this level (sessionClientTownSeen)
     // Frame clock: a critter stays in D2Client's second unit hash after its room is freed, one 6C130 step each per frame. When the
     // walk does not feed the critters itself (bit0 clear), they are counted here. Then the client-only presets of every room seen.
-    if (!(g_walkOpt & 1)) g_walkUnits += d2_session_critter_count();
+    if (!(g_walkOpt & 1)) g_walkUnits += (critters = d2_session_critter_count());
     for (const auto& kv : g_sessionClientPresets) g_walkUnits += kv.second;   // the client-only presets of every room seen (first sight covers every room the client was sent, of any level)
     // frame clock: the missiles the client held at the last walk. D2Client+0x2B1E0 runs a unit's 6C130 step (its clock read) before
     // the type step (0xB1AF0 for a missile) in which the client's missile reaches its end; the unit leaves the frame after. So
@@ -12654,9 +12707,10 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
                 // walk's A6180 test (ONGROUND only) is false and the item sits in the sorted unit list. The server makes its copy
                 // ONGROUND, so the client mode is counted from the client frame the item is first walked on; the first walk's
                 // items already lie there.
-                static std::unordered_map<uint32_t, uint32_t> dropped; if (first) dropped.clear();
+                auto& dropped = g_itemDropped; if (first) dropped.clear();
                 const uint32_t born = dropped.emplace(u->dwUnitId, first ? 0u : g_sessionClientFrame).first->second;
                 if (born && mode == IMODE_ONGROUND && g_sessionClientFrame - born < 16) mode = IMODE_DROPPING;
+                items.push_back({u->dwUnitId, mode == IMODE_ONGROUND});
             } else continue;
             if (!unstepped) ++g_walkUnits;
             if (u->dwUnitType == UNIT_OBJECT) objs.push_back({u->dwUnitId, u->pObjectData->pObjectTxt->nClientFn == 14});
@@ -12702,6 +12756,14 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
                 d2_dg_feed_unit_anim(dir, frame, ovr);
             }
             if (u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MONSTER) d2_dg_feed_unit_shift(sessionColourShift(u));
+            // the item draw's edx: the item level its socket test read last. D2Common #10893 reaches that test (#11151) only on
+            // its default quality arm (not magic, set, rare or unique) and for an Items.txt row with hasinv; any other item
+            // leaves a pointer there, which the capture records as 0.
+            if (u->dwUnitType == UNIT_ITEM && u->pItemData) {
+                const uint32_t q = u->pItemData->dwQualityNo;
+                const D2ItemsTxt* it = DATATBLS_GetItemsTxtRecord(u->dwClassId);
+                d2_dg_feed_unit_ilvl(!(q >= 4 && q <= 7) && it && it->nHasInv ? u->pItemData->dwItemLevel : 0);
+            }
         }
     }
     for (uint32_t id : walkedMissiles)                   // ended on the server this tick: the client's copy steps once more, undrawn
@@ -12711,12 +12773,11 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
     // a held monster's client missiles (its do's cltmissile, D2Client+0xA2C90; its blood, 0x4C500): units of the client's room lists the server has no
     // copy of. +0xC8 bit 18 (InitSteps) is the client unit's own; a missile made this frame has not had its first 6C130 step.
     {
-        static std::unordered_map<uint32_t, uint32_t> seen, shownFrom; if (first) { seen.clear(); shownFrom.clear(); }
+        static std::unordered_map<uint32_t, uint32_t> shownFrom; if (first) shownFrom.clear();
+        g_walkUnits += d2client_clmissile::takeShownSteps();   // frame clock: every step a shown missile took, its freeing one and an explosion's first included
         for (size_t i = 0; i < d2client_clmissile::shownCount(); ++i) {
             D2UnitStrc* u = d2client_clmissile::shownAt(i);
             if (!u || !u->pDynamicPath) continue;
-            const uint32_t born = seen.emplace(u->dwUnitId, g_sessionClientFrame).first->second;
-            if (born != g_sessionClientFrame) ++g_walkUnits;
             const bool blocked = spotLos && UNITS_TestCollisionWithUnit(g_targetPlayer, u, 2) != 0;
             const uint32_t hidden = (u->dwFlagEx & 0x40000u) ? 0x40000u : 0u;
             if (!hidden) shownFrom.emplace(u->dwUnitId, g_sessionClientFrame);
@@ -12742,6 +12803,16 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
     std::stable_sort(objs.begin(), objs.end(), [](const auto& a, const auto& b) {
         return (a.first & 127) != (b.first & 127) ? (a.first & 127) < (b.first & 127) : a.first > b.first; });
     for (uint32_t i = 0; i < objs.size(); ++i) if (objs[i].second) g_walkFn14.push_back({objs[i].first, nonObj + i});
+    // the item table follows the object table in the unit pass, its buckets in the same order; the critters' table is last
+    std::stable_sort(items.begin(), items.end(), [](const auto& a, const auto& b) {
+        return (a.first & 127) != (b.first & 127) ? (a.first & 127) < (b.first & 127) : a.first > b.first; });
+    for (uint32_t i = 0; i < items.size(); ++i) if (items[i].second) g_walkItems.push_back({items[i].first, g_walkUnits - critters - (uint32_t)items.size() + i});
+    // frame clock: an item the hero took off the ground stays the client unit it was (0x9C seats it in the inventory or belt),
+    // so the unit pass still steps it once a frame
+    if (g_targetPlayer && g_targetPlayer->pInventory)
+        for (D2UnitStrc* item = INVENTORY_GetFirstItem(g_targetPlayer->pInventory); item; item = INVENTORY_GetNextItem(item))
+            if (g_itemDropped.count(item->dwUnitId)) ++g_walkUnits;
+    d2_client_frame_clock_units();
     // 7A0D0: columns = w/160 + 11, rows = h/80 + 12, side = columns + rows - 1; 7A9F0: origin = the view corner's tile less (3, columns)
     const int32_t cols = 640 / 160 + 11, side = cols + 480 / 80 + 12 - 1;
     d2_dg_set_origin(vx, vy);

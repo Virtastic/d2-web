@@ -250,6 +250,8 @@ static uint8_t g_unitPal[kMaxUnits];   // d2_dg_stage_unit_palshift
 struct UnitAnim { const uint8_t* cof; uint32_t size, dir, frame; uint8_t ovr[16]; };
 static UnitAnim g_unitAnim[kMaxUnits];
 static uint32_t g_unitShift[kMaxUnits];   // d2_dg_stage_unit_shift: the client unit's +0x6C
+static uint32_t g_unitIlvl[kMaxUnits];    // d2_dg_stage_unit_ilvl: an item's level (item data +0x2C)
+EMSCRIPTEN_KEEPALIVE void d2_dg_stage_unit_ilvl(uint32_t k, uint32_t v) { if (k < kMaxUnits) g_unitIlvl[k] = v; }
 static uint32_t g_unitC4[kMaxUnits];      // d2_dg_stage_unit_c4: the client unit's +0xC4 flags
 int32_t g_view[4], g_ox, g_oy; uint32_t g_now, g_skipUnits;
 uint32_t g_unitId[kMaxUnits];
@@ -356,7 +358,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_dg_stage_unit(uint32_t unit, int32_t type, int32
     g_unitCof[g_nUnits].has = 0;
     g_unitAnim[g_nUnits] = {};
     g_unitPal[g_nUnits] = 0;
-    g_unitShift[g_nUnits] = 0;
+    g_unitShift[g_nUnits] = 0; g_unitIlvl[g_nUnits] = 0;
     g_unitC4[g_nUnits] = 0;
     g_unitId[g_nUnits] = 0xffffffffu;
     return g_nUnits++;
@@ -379,6 +381,7 @@ static void ovFree(HitState& h) {
 }
 EMSCRIPTEN_KEEPALIVE void d2_dg_hit_reset() { for (uint32_t i = 0; i < g_nHits; i++) ovFree(g_hits[i]); g_nHits = 0; }
 extern "C" const uint8_t* d2_dg_overlay_row(int32_t row, uint32_t* dccFrames);   // drlg_check.cpp
+extern "C" int d2_client_item_gleam(uint32_t id, int32_t* dx, int32_t* dy, uint32_t* trans);   // frame_tail_g.cpp
 // 1.13c D2Client+0x6B300 for a play-once overlay (kind 2) on a unit: a zeroed 0xA8-byte node {+0 kind 2, +4 the Overlay.txt row, +8 live 1,
 // +0x14 step AnimRate << 4, +0x18 position 0, +0x1C length = the DCC's frames per direction << 8 (0x6E9C0; 1 when it does not load),
 // +0x20 OffsetX, +0x24 OffsetY + Height2 (D2Common #10172 answers 1 for a player), +0x28 LoopWaitTime, +0x34 PreDraw}, put at the head
@@ -591,8 +594,7 @@ static uint32_t rec10013() { gRec(10013, {}, g_lecx, g_ledx); return g_r13; }
 static void lo10494(uint32_t type, uint32_t state) {
     if (type == 2 || type == 4) g_lecx = type; else if (type <= 3) { g_lecx = state & 0x1f; g_ledx = 0; }
 }
-static uint32_t g_p6cc00;   // 6CC00's edx argument (666D0's call)
-// 10041's leftovers by 6C490 call site: 1 the plain layer (ecx the caller's argument, reads 0; edx y), 0 a COF-flagged layer (ecx y, edx x),
+static uint32_t g_p6cc00;   // 6CC00's edx argument (666D0's call)// 10041's leftovers by 6C490 call site: 1 the plain layer (ecx the caller's argument, reads 0; edx y), 0 a COF-flagged layer (ecx y, edx x),
 // 2 the remaining arms (ecx x, edx the layer record on the stack, reads 0).
 // edxCol: the missile branch of 6CC00 leaves the colour in edx at the call (ecx reads 0); 6CC00's other calls leave the y (site 1).
 extern "C" uint32_t g_d2c6c490Site;
@@ -730,15 +732,27 @@ static const H6cc00 kH6cc00 = {
     []() -> uint32_t { g_lecx = 0; g_ledx = g_p6cc00; return rec10013(); }, []() -> uint32_t { return 0; }, [](uint32_t, void*, void*, void*) {}, [](uint32_t) -> uint8_t { return 0; }, [](uint32_t) {}, []() -> uint32_t { return 0; },
     // D2CMP #10005: the fill that succeeds stores the frame's cel in the record (rec[13]), the word 6CC00 tests before 6AEE0
     [](uint32_t) -> int { return 0; }, [](uint32_t, int, int) -> uint32_t { return 0; }, [](void* r, int, int) -> int { ((uint32_t*)r)[13] = 1; return 1; }, [](int, uint32_t, void*, int) -> int { return 0; },
-    // the item draw (0x6fb1cfe0) follows D2Common #10893 (the item's transform palette), which leaves ecx and edx 0
+    // the item draw (0x6fb1cfe0) follows D2Common #10893 (the item's transform palette). On its default path (no transform) the
+    // last write to edx is the item level read (item data +0x2C, D2Common+0x23810) that ends its socket-count test #11151.
     [](uint32_t m, int32_t x, int32_t y, uint32_t, uint32_t col, int32_t pal) {
-        if (m) rec10041(x, y, col, (uint32_t)pal, 1, true); else gRec(10041, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, col, 0}, 0, 0); }, gateA4b90,
+        // the missile draw is 6CC00's last call (0x6fb1cf87): its colour mode stays in edx for the walk's next 10013
+        if (m) { rec10041(x, y, col, (uint32_t)pal, 1, true); g_lecx = 0; g_ledx = col; }
+        else gRec(10041, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, col, 0}, 0, g_hu[0] == 4 && g_hk < g_nUnits ? g_unitIlvl[g_hk] : 0); }, gateA4b90,
     []() { d2_client_6b700((uint32_t)(uintptr_t)g_hu, &kH6b700, 0, 640, g_uoy, g_uox, 0); },
     [](uint32_t u, int32_t dx, int32_t dy) -> int { return d2c_6c490(&kE6c490, g_hpy + dy, u, g_p6cc00, g_hpx + dx, 0, 1, g_uox, 0, g_uoy, 0, 640, g_hself, 0, 0, 0); },
     [](uint32_t, void* r) -> int { uint32_t* w = (uint32_t*)r; w[16] = 0; w[17] = (uint32_t)g_hpy; return 1; }, []() -> uint32_t { return g_hself; }, []() -> uint32_t { return d2_dg_missile_row((int32_t)g_hu[1]); },
     // 1.13c D2Client+0x6AEE0 as 6CC00 calls it after the draw: its opening D2Gfx 10013, then the unit's overlay list (gfx +0x2C),
-    // which a client item, missile or tile never carries, so the walk ends there.
-    [](uint32_t, uint32_t, int, int, int, int) { g_lecx = 0; g_ledx = 0; rec10013(); }, d2_dg_object_rec, [](int) {} };
+    // which a client missile or tile never carries. A ground item carries overlay 0x46 (its gleam), drawn while it is shown at
+    // the unit's draw position plus the row's offsets.
+    [](uint32_t, uint32_t, int, int, int, int) {
+        // the item draw leaves its item level in edx for the opening 10013; an overlay draw leaves its x
+        g_lecx = 0; g_ledx = g_hu[0] == 4 && g_hk < g_nUnits ? g_unitIlvl[g_hk] : 0; rec10013();
+        int32_t dx, dy; uint32_t trans;
+        if (g_hu[0] == 4 && g_hk < g_nUnits && g_unitId[g_hk] != 0xffffffffu && d2_client_item_gleam(g_unitId[g_hk], &dx, &dy, &trans)) {
+            rec10041(g_hpx - g_uox + dx, g_hpy - g_uoy + 8 + dy, trans, 0, 0);
+            g_ledx = (uint32_t)(g_hpx - g_uox + dx);
+        }
+    }, d2_dg_object_rec, [](int) {} };
 // 1.13c D2Client+0x66620, as 666D0 calls it for the staged unit: the visibility test. A pass sets unit +0xC8 bit7 and answers 1; a
 // fail (the feeder's line-of-sight result, stage bit 1) clears it and answers 0, and the unit is not drawn. A unit staged without an
 // id keeps the bit it was staged with.

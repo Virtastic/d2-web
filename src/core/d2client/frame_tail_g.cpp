@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <map>
 #include <string>
 #include <initializer_list>
@@ -50,7 +51,15 @@ namespace {
 uint32_t g_clk = 0, g_deadline = 0, g_frames = 0, g_lastReset = 0, g_rewalk = 0;
 uint32_t g_msgDeadline = 0;   // the game-message list's one entry (D2Client 0x113AA4/0x113AA8): 7D89B stamps the join message now + 10000; 0 once 7B730 drops it
 std::map<uint32_t, uint32_t> g_fn14;   // unit id -> a ClientFn 14 object's timer (unit+0xD4)
+// a ground item's overlay 0x46 node: shown (+8), position (+0x18), length (+0x1C), step (+0x14), LoopWaitTime (+0x28), last wrap (+0x30)
+struct Gleam { uint32_t vis, pos, len, rate, wait, last; };
+std::map<uint32_t, Gleam> g_gleam;     // item id -> its node
+int32_t g_begin = 0, g_beginFirst = 0, g_beginTick = 0;
 }
+extern "C" uint32_t d2_session_walk_item(uint32_t i, uint32_t* out);
+extern "C" uint32_t d2_session_client_rand(uint32_t n);
+extern "C" int d2_session_gleam_roll(uint32_t id, uint32_t* pos);   // monspawn_check.cpp: the rolls the frame step took for a landed item
+extern "C" const uint8_t* d2_dg_overlay_row(int32_t row, uint32_t* dccFrames);
 uint32_t& d2client_frame_clock() { return g_clk; }   // npc_speech_start.cpp: its reads advance the same clock
 void d2client_npc_speech_frame(uint32_t tick);       // npc_speech_start.cpp: 0x7EA90 -> 0x7E970, the speech window step
 extern "C" uint32_t d2_dg_n9e970();
@@ -63,14 +72,10 @@ extern "C" uint32_t d2_local_d2gs_frame_bytes();
 extern "C" int d2_session_hero_near_rooms(int32_t* out);
 
 // first: the trace's first frame. tick: the trace tick. pump: 1 when the packet pump processed packets this tick.
-extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first, int32_t tick, uint32_t pump) {
-    out.clear();
-    pump = d2_local_d2gs_frame_bytes() > 0;                      // the bytes this tick's receive held
-    const int32_t W = 640, H = 480;
+// The frame's clock up to the end of the unit pass (44A80's 0xA8110), which runs before the frame's draw.
+static void clockUnits(int32_t first, int32_t tick) {
+    const uint32_t pump = d2_local_d2gs_frame_bytes() > 0;       // the bytes this tick's receive held
     const uint32_t U = d2_session_walk_units();
-    // the walk's reads: 7A385 once per 7A340 call, 9E994 once per 9E970 call (none on a frame 9F270 does not run), 9EEEE once per
-    // 9EE90 cell that holds a list, and 13A00's head read when 8B110 runs the roof pass (the pool flag's gdwBitMasks[1])
-    const uint32_t walk = d2_session_walk_rooms() + d2_dg_n9e970() + d2_dg_n9ee90() + d2_dg_n13a00();
     // 6C130 per unit (6C16A), and for a ClientFn 14 object 253DC after its own; 253EE re-reads and rearms its timer when it ran out
     auto units = [&] {
         uint32_t done = 0, f[2];
@@ -79,11 +84,34 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first
             uint32_t& timer = g_fn14[f[0]];
             if (g_clk > timer) timer = ++g_clk + 500;
         }
+        // a ground item (0x82EA0, after its 6C130): ONGROUND without overlay 0x46 gets one (0x6B300 kind 6: hidden, its length
+        // the DCC's frames << 8, two rolls on the hero seed, the first below the length, the second below 8 << 8 the position).
+        // 6C130 kind 6: hidden, it reads the clock and shows once LoopWaitTime has passed since its last wrap; shown, it steps
+        // AnimRate << 4, and past its length wraps, hides and reads the clock as the wrap's time.
+        for (uint32_t i = 0; d2_session_walk_item(i, f); ++i) {
+            if (f[1] + 1 > done) { g_clk += f[1] + 1 - done; done = f[1] + 1; }
+            auto it = g_gleam.find(f[0]);
+            if (it == g_gleam.end()) {
+                uint32_t frames = 0; const uint8_t* r = d2_dg_overlay_row(0x46, &frames);
+                if (!r) continue;
+                auto w = [r](int o) { uint32_t v; std::memcpy(&v, r + o, 4); return v; };
+                Gleam g{}; g.len = frames ? frames << 8 : 1;
+                // the unit pass runs before the frame's sound and weather rolls: the session's frame step took the rolls there.
+                // An item it did not see land (one lying there at the first walk) rolls here.
+                if (!d2_session_gleam_roll(f[0], &g.pos)) { d2_session_client_rand(g.len); g.pos = d2_session_client_rand(8u << 8); }
+                g.rate = w(0x6c) << 4; g.wait = w(0x78);
+                g_gleam[f[0]] = g;
+                continue;
+            }
+            Gleam& g = it->second;
+            if (!g.vis) { if (++g_clk - g.last < g.wait) continue; g.vis = 1; }
+            g.pos += g.rate;
+            if ((int32_t)g.len <= (int32_t)g.pos) { g.pos -= g.len; g.vis = 0; g.last = ++g_clk; }
+        }
         g_clk += U - done;
     };
-    uint32_t now;
     if (first) {
-        g_frames = g_lastReset = 0; g_fn14.clear();
+        g_frames = g_lastReset = 0; g_fn14.clear(); g_gleam.clear();
         g_clk = 40 + 5; g_deadline = g_clk + 500;                // 10EA6 reads the clock after 4 loading-sequence reads
         // the loading walk 6D010 calls C1760(1) once per room of the hero room's near list but the first (ebp & 0x1f != 0),
         // and each call reads the clock once at C1788
@@ -92,10 +120,41 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first
         g_rewalk = g_clk + 3 + loads;                            // the loading walk's 6D206 read (AF711, the C1788 reads, 6D1DA before it)
         g_msgDeadline = g_clk + 4 + loads + 10000;               // 7D89B, the read after 6D206: the join message's expiry (+0x1E)
         g_clk += 7 + loads; units();                             // ... 7D89B, D2Win 12FF8 x2, then 44A89 and the unit steps
-        g_clk += 3 + walk + 1; now = g_clk;                      // 44AC1, C154D, 8AFDA, the walk, 10ECF
     } else {
         if (g_clk < uint32_t(tick) * 40) g_clk = uint32_t(tick) * 40;
-        g_clk += pump + 1; units(); ++g_clk;                     // 44A89, the unit steps, then 44AC1: the 600-unit room re-walk timer
+        g_clk += pump + 1; units();                              // 44A89, the unit steps
+    }
+}
+// The shell names the frame before its room walk; the walk, once it has fed its units, runs the frame's unit pass clock so
+// the draw sees this frame's overlay state. Without either the frame tail runs it.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_frame_clock_begin(int32_t first, int32_t tick) { g_begin = 1; g_beginFirst = first; g_beginTick = tick; }
+extern "C" void d2_client_frame_clock_units() { if (g_begin == 1) { clockUnits(g_beginFirst, g_beginTick); g_begin = 2; } }
+// A ground item's overlay 0x46 as 6AEE0 draws it: 1 with the row's offsets and Trans when it is shown and its frame is in range.
+extern "C" int d2_client_item_gleam(uint32_t id, int32_t* dx, int32_t* dy, uint32_t* trans) {
+    auto it = g_gleam.find(id);
+    if (it == g_gleam.end() || !it->second.vis || (int32_t)it->second.pos >> 8 >= (int32_t)it->second.len >> 8) return 0;
+    const uint8_t* r = d2_dg_overlay_row(0x46, nullptr);
+    if (!r || r[0x48]) return 0;                                 // PreDraw rows draw on the opening pass, which an item has none of
+    auto w = [r](int o) { int32_t v; std::memcpy(&v, r + o, 4); return v; };
+    *dx = w(0x54); *dy = w(0x58) + w(0x5c);                      // OffsetX; OffsetY + Height1 (D2Common #10172 answers 0 for an item)
+    *trans = r[0x7c];
+    return 1;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first, int32_t tick, uint32_t pump) {
+    out.clear();
+    pump = d2_local_d2gs_frame_bytes() > 0;                      // the bytes this tick's receive held
+    const int32_t W = 640, H = 480;
+    // the walk's reads: 7A385 once per 7A340 call, 9E994 once per 9E970 call (none on a frame 9F270 does not run), 9EEEE once per
+    // 9EE90 cell that holds a list, and 13A00's head read when 8B110 runs the roof pass (the pool flag's gdwBitMasks[1])
+    const uint32_t walk = d2_session_walk_rooms() + d2_dg_n9e970() + d2_dg_n9ee90() + d2_dg_n13a00();
+    if (g_begin != 2 || g_beginTick != tick) clockUnits(first, tick);
+    g_begin = 0;
+    uint32_t now;
+    if (first) {
+        g_clk += 3 + walk + 1; now = g_clk;                      // 44AC1, C154D, 8AFDA, the walk, 10ECF
+    } else {
+        ++g_clk;                                                 // 44AC1: the 600-unit room re-walk timer
         if (g_clk >= g_rewalk + 600) g_rewalk = ++g_clk;         // 44A80: 6D010 runs again and 44ADB re-reads the clock into DAT 0x11C03C
         g_clk += 1 + walk + (g_deadline ? 1 : 0); now = g_clk;   // 8AFDA, the walk; 10EC0 reads the clock only while a deadline is set
     }

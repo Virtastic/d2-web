@@ -397,10 +397,11 @@ extern "C" void d2_dg_stage_unit_cof(uint32_t, const uint8_t*);
 extern "C" void d2_dg_stage_unit_palshift(uint32_t);
 extern "C" void d2_dg_stage_unit_anim(uint32_t, const uint8_t*, uint32_t, uint32_t, uint32_t, const uint8_t*);
 extern "C" void d2_dg_stage_unit_shift(uint32_t, uint32_t);
+extern "C" void d2_dg_stage_unit_ilvl(uint32_t, uint32_t);
 extern "C" void d2_dg_stage_unit_c4(uint32_t, uint32_t);
 extern "C" void d2_dg_stage_unit_frac(uint32_t, uint32_t, uint32_t);
 struct FeedUnit { int32_t type, cls, sx, sy; uint32_t flags, flagsEx; uint8_t cof[0x18]; bool hasCof;
-                  bool hasId; uint32_t id, mode, fx, fy; int32_t slot, rank, floor; bool palshift = false; uint32_t shift = 0;
+                  bool hasId; uint32_t id, mode, fx, fy; int32_t slot, rank, floor; bool palshift = false; uint32_t shift = 0, ilvl = 0;
                   const std::vector<uint8_t>* full = nullptr; bool hasAnim = false; uint32_t dir = 0, frame = 0; uint8_t ovr[16] = {}; };
 static std::vector<FeedUnit> g_feedUnits;   // the caller's per-tick client units (JS has no game logic: raw fields only)
 static bool g_cruLive;                      // a unit with an id was fed: rooms walk the persistent client room lists
@@ -435,6 +436,8 @@ EMSCRIPTEN_KEEPALIVE int d2_dg_unit_floor(int i) { return i >= 0 && i < (int)g_f
 // The last fed unit's COF: the .cof its mode and weapon class load (the cel chain's header: layer count, bounding box). 0 when the file is absent.
 // The last fed unit's colour shift (client unit +0x6C, D2Client+0x72130: the colorshift of its highest-colorpri state).
 EMSCRIPTEN_KEEPALIVE void d2_dg_feed_unit_shift(uint32_t v) { if (!g_feedUnits.empty()) g_feedUnits.back().shift = v; }
+// The last fed item's level (item data +0x2C), which the item draw's D2Gfx #10041 carries in edx.
+EMSCRIPTEN_KEEPALIVE void d2_dg_feed_unit_ilvl(uint32_t v) { if (!g_feedUnits.empty()) g_feedUnits.back().ilvl = v; }
 // The last fed unit's class palshift table: set by d2_dg_feed_unit_cof when the file exists; 0 when the class was never loaded.
 EMSCRIPTEN_KEEPALIVE void d2_dg_feed_unit_palshift(int on) { if (!g_feedUnits.empty()) g_feedUnits.back().palshift = on != 0; }
 EMSCRIPTEN_KEEPALIVE int d2_dg_feed_unit_cof(const char* path) {
@@ -571,6 +574,7 @@ uint32_t d2_dg_feed_level(D2DrlgLevelStrc* lv, int l, int t, int r, int b, int o
                 if (f->hasCof && f->hasAnim && f->full) d2_dg_stage_unit_anim(k, f->full->data(), (uint32_t)f->full->size(), f->dir, f->frame, f->ovr);
                 if (f->palshift) d2_dg_stage_unit_palshift(k);
                 d2_dg_stage_unit_shift(k, f->shift);
+                d2_dg_stage_unit_ilvl(k, f->ilvl);
                 d2_dg_stage_unit_c4(k, f->flags);
                 d2_dg_stage_unit_frac(k, f->fx, f->fy);
                 d2_dg_stage_unit_id(k, f->id);
