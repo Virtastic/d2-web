@@ -58,6 +58,7 @@ extern "C" uint32_t d2_session_walk_fn14(uint32_t i, uint32_t* out);
 extern "C" uint32_t d2_session_walk_rooms();
 extern "C" uint32_t d2_session_walk_units();
 extern "C" uint32_t d2_local_d2gs_frame_bytes();
+extern "C" int d2_session_hero_near_rooms(int32_t* out);
 
 // first: the trace's first frame. tick: the trace tick. pump: 1 when the packet pump processed packets this tick.
 extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first, int32_t tick, uint32_t pump) {
@@ -82,9 +83,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first
     if (first) {
         g_frames = g_lastReset = 0; g_fn14.clear();
         g_clk = 40 + 5; g_deadline = g_clk + 500;                // 10EA6 reads the clock after 4 loading-sequence reads
-        g_rewalk = g_clk + 11;                                   // the loading walk's 6D206 read (AF711, 8 x C1788, 6D1DA before it)
-        g_msgDeadline = g_clk + 12 + 10000;                      // 7D89B, the read after 6D206: the join message's expiry (+0x1E)
-        g_clk += 15; units();                                    // ... 7D89B, D2Win 12FF8 x2, then 44A89 and the unit steps
+        // the loading walk 6D010 calls C1760(1) once per room of the hero room's near list but the first (ebp & 0x1f != 0),
+        // and each call reads the clock once at C1788
+        int32_t nearRooms[9 * 4]; const int32_t nr = d2_session_hero_near_rooms(nearRooms);
+        const uint32_t loads = nr > 1 ? uint32_t(nr - 1) : 0;
+        g_rewalk = g_clk + 3 + loads;                            // the loading walk's 6D206 read (AF711, the C1788 reads, 6D1DA before it)
+        g_msgDeadline = g_clk + 4 + loads + 10000;               // 7D89B, the read after 6D206: the join message's expiry (+0x1E)
+        g_clk += 7 + loads; units();                             // ... 7D89B, D2Win 12FF8 x2, then 44A89 and the unit steps
         g_clk += 3 + walk + 1; now = g_clk;                      // 44AC1, C154D, 8AFDA, the walk, 10ECF
     } else {
         if (g_clk < uint32_t(tick) * 40) g_clk = uint32_t(tick) * 40;
