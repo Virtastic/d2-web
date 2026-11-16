@@ -629,6 +629,20 @@ static void ovDraw(i32_ pass, i32_ hid) {
         if (((int32_t)n[6] >> 8) < ((int32_t)n[7] >> 8)) rec10041(X + (int32_t)n[8], Y + (int32_t)n[9], r[0x7c], 0, 0);
     }
 }
+// 1.13c D2Client+0x6AEE0's closing pass (pass 0) draws each overlay node with PreDraw 0 at the unit's place plus the row's offsets:
+// X = unit x - (G9960 - Gcc418) + Xoffset, Y = unit y - (G995c - 8) + Yoffset, 8 higher when hidden, mode = the row's Trans, through
+// #10041 with ecx = Y, edx = X left over. The one overlay the walk hosts is the NPC speech balloon (overlay 0x48) the 0x8A handler
+// (D2Client+0x47970, via 0x6B300) attaches to a monster; the engine's per-unit latch holds it from the packet on.
+extern "C" int D2WEB_NpcAlertActive(int32_t guid);
+extern "C" uint32_t D2COMMON_GetOverlayOffsetX(int32_t nOverlay);
+extern "C" uint32_t D2Common_82E40_OverlayOffsetY(int32_t nOverlayId);
+extern "C" uint8_t d2_fn_d2common_82E00(int32_t nOverlayId);
+static void overlays6aee0(i32_ hid) {
+    if (g_hk >= g_nUnits || g_units[g_hk].type != 1 || g_unitId[g_hk] == 0xffffffffu || !D2WEB_NpcAlertActive((int32_t)g_unitId[g_hk])) return;
+    const int32_t x = g_hpx - g_uox + (int32_t)D2COMMON_GetOverlayOffsetX(0x48);
+    const int32_t y = g_hpy - (g_uoy - 8) + (int32_t)D2Common_82E40_OverlayOffsetY(0x48) - (hid ? 8 : 0);
+    rec10041(x, y, d2_fn_d2common_82E00(0x48), 0, 0);
+}
 static const D2c6C490Env kE6c490 = {
     [](u32_ a) { u32_ v; memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }, [](u32_ a) -> u32_ { return *(const uint8_t*)(uintptr_t)a; },
     // 10175: the unit's mode, 1 (the staged node's key); 10350 leaves the type/class read off the unit.
@@ -638,7 +652,7 @@ static const D2c6C490Env kE6c490 = {
     []() -> i32_ { gRec(10036, {}, g_lecx, g_ledx); return 0; },
     // 6AEE0's 10013: opening (0x6fb1c5e3) ecx = 6A3D0's leftover, edx = 6C490's second argument; closing (0x6fb1cb01) ecx = the layer count, edx = the hidden flag.
     [](i32_) {}, [](u32_, i32_ x, i32_ y, i32_ f) -> i32_ { return cull6a3d0(x, y, f); },
-    [](u32_, u32_ a, i32_ open, i32_, i32_, i32_ hid) { if (open) g_ledx = a; else { g_lecx = g_hhdr[0] & 0xff; g_ledx = (u32_)hid; } rec10013(); ovDraw(open, hid); },
+    [](u32_, u32_ a, i32_ open, i32_, i32_, i32_ hid) { if (open) g_ledx = a; else { g_lecx = g_hhdr[0] & 0xff; g_ledx = (u32_)hid; } rec10013(); ovDraw(open, hid); if (!open) overlays6aee0(hid); },
     [](u32_, u32_* f, u32_*) { *f = g_hframe; },   // #10569: the frame (the count is not read)
     // D2Gfx #10164 (called with unit+0x6C set): the colour shift table's row for index - 1, a pointer (its bytes are not read here).
     [](u32_) -> u32_ { static uint8_t* t = nullptr; if (!t) t = (uint8_t*)calloc(0x100, 1); return (u32_)(uintptr_t)t; },
