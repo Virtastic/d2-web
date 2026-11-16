@@ -26,6 +26,7 @@
 #include <Path/PathMisc.h>
 #include <Path/Step.h>
 #include <Units/Missile.h>
+#include <Units/UnitRoom.h>
 #include <Units/Units.h>
 
 namespace d2client_ambient { void submit(int32_t row); }
@@ -65,6 +66,9 @@ uint32_t shownSteps = 0;                  // unit steps of shown missiles, for t
 void freeMissile(D2UnitStrc* unit) {
     for (size_t i = 0; i < foreign.size(); ++i) if (foreign[i] == unit) { foreign.erase(foreign.begin() + i); break; }
     for (size_t i = 0; i < shown.size(); ++i) if (shown[i] == unit) { shown.erase(shown.begin() + i); break; }
+    // A step across a room edge links the missile into that room's unit list and update queue (PATHMISC_SetRoom):
+    // unlink it before the unit is freed, as the client's unit free does.
+    if (unit->pDynamicPath && unit->pDynamicPath->pRoom) UNITROOM_RemoveUnitFromRoom(unit);
     if (unit->pDynamicPath) { PATH_FreeDynamicPath(nullptr, unit->pDynamicPath); unit->pDynamicPath = nullptr; }
     MISSILE_FreeMissileData(unit);
     UNITS_FreeUnit(unit);
