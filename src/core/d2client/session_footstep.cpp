@@ -69,11 +69,18 @@ extern "C" void d2client_session_monster_footstep(uint32_t id, int32_t cls, uint
 
 // One client frame of the local player's unit. serverMode: the server unit's mode now (taken for the next frame); now: the client
 // tick counter D2Client+0x1197F8 (frame - 1); rate(mode) -> the client unit's step and length in that mode (D2Common 0x33110).
-extern "C" void d2client_session_player_footstep(uint32_t serverMode, uint32_t cls, int32_t inTown, int32_t floor, uint32_t now, int32_t staminaZero,
+extern "C" void d2client_session_player_footstep(uint32_t serverMode, int32_t targetOnClient, uint32_t cls, int32_t inTown, int32_t floor, uint32_t now, int32_t staminaZero,
                                                  void (*rate)(uint32_t mode, uint32_t* step, uint32_t* total)) {
-    const uint32_t s = g_cp.serverMode; const bool seen = g_cp.seen;
+    uint32_t s = g_cp.serverMode; const bool seen = g_cp.seen;
     g_cp.serverMode = serverMode; g_cp.seen = true;
-    if (!seen || !moving(s)) { g_cp.mode = 0; return; }
+    // A skill mode the server puts on the player for the local command (attack, cast, kick, throw, special: 7-16) reaches the
+    // client unit only through the client's own action on its target; no server packet names the player. When the target is a
+    // unit the client does not hold (never announced), the client's walk has nothing to reach and goes on through the server's
+    // skill: the client mode setter 0x2A6C0 never runs on the player again and its walk keeps stepping. With the target held,
+    // the walk ends on the frame after the server's swing starts.
+    const bool skill = s >= 7 && s <= 16;
+    if (!seen || (!moving(s) && !(skill && !targetOnClient && moving(g_cp.mode)))) { g_cp.mode = 0; return; }
+    if (!moving(s)) s = g_cp.entered;
     // A new moving mode (a walk/run toggle mid-move too) goes through D2Common #11090, which restarts the frame and the rate
     // when the mode differs. Run in town, already turned into town walk by 0x19D80, is the same mode the server still holds.
     if (!moving(g_cp.mode) || s != g_cp.entered) { g_cp.mode = s; g_cp.entered = s; g_cp.frame = 0; rate(s, &g_cp.step, &g_cp.total); }

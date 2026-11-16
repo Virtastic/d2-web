@@ -8277,7 +8277,7 @@ static std::unordered_map<uint32_t, uint32_t> g_sessionClientMonsterMode;
 static std::vector<std::pair<uint32_t, uint32_t>> g_sessionClientMonsterHits;   // (id, mode) mode changes awaiting the unit pass
 static void sessionClientMonsterHitSounds(uint32_t id);
 void d2client_session_footstep_reset(); int32_t d2client_session_level_material(uint32_t soundEnv);   // session_footstep.cpp (C linkage)
-void d2client_session_player_footstep(uint32_t serverMode, uint32_t cls, int32_t inTown, int32_t floor, uint32_t now, int32_t staminaZero, void (*rate)(uint32_t, uint32_t*, uint32_t*));
+void d2client_session_player_footstep(uint32_t serverMode, int32_t targetOnClient, uint32_t cls, int32_t inTown, int32_t floor, uint32_t now, int32_t staminaZero, void (*rate)(uint32_t, uint32_t*, uint32_t*));
 void d2client_session_monster_footstep(uint32_t id, int32_t cls, uint32_t serverMode, uint32_t step, uint32_t total, int32_t floor, uint32_t now, const void* game);
 extern "C" int32_t d2_session_floor_class(int32_t unitType, int32_t unitId, int32_t fallback);
 static void sessionClientMonsterModeReset() { g_sessionClientMonsterMode.clear(); g_sessionClientMonsterHits.clear();g_sessionIdleRows.clear(); g_sessionIdleRowsReady.clear(); d2client_session_unit_sound_reset(); d2client_session_footstep_reset(); d2client_critter::reset(); }
@@ -8313,7 +8313,9 @@ static void sessionClientPlayerFootstep() {
     if (!g_targetPlayer) return;
     const D2LevelsTxt* lv = g_currentLevel >= 0 ? DATATBLS_GetLevelsTxtRecord(g_currentLevel) : nullptr;
     const int32_t fallback = lv ? d2client_session_level_material((uint32_t)(lv->dwSoundEnv & 0xff)) : 1;
-    d2client_session_player_footstep(g_targetPlayer->dwAnimMode, g_targetPlayer->dwClassId, DUNGEON_IsTownLevelId(g_currentLevel) ? 1 : 0,
+    const D2UnitStrc* target = PATH_GetTargetUnit(g_targetPlayer->pDynamicPath);   // the skill's target: a monster the client never held is not on the client
+    const int32_t targetOnClient = !target || target->dwUnitType != UNIT_MONSTER || g_heldMonsters.count(target->dwUnitId) ? 1 : 0;
+    d2client_session_player_footstep(g_targetPlayer->dwAnimMode, targetOnClient, g_targetPlayer->dwClassId, DUNGEON_IsTownLevelId(g_currentLevel) ? 1 : 0,
                                      d2_session_floor_class(0, 0, fallback), g_sessionClientFrame - 1,
                                      g_targetClient && g_targetClient->clientPlayerData.nStaminaPoints == 0 ? 1 : 0, clientPlayerRate);   // the client's stat 10: what the server last sent
 }
