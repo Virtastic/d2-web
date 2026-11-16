@@ -238,6 +238,7 @@ static uint32_t g_sessionClientMapEventsDropped = 0;
 // borrow g_targetPlayer->pSeed, which belongs to the D2Game/server unit.
 void d2client_sound_stage_feed(uint32_t soundEnv); void d2client_sound_stage_log();   // sound_pump.cpp (replay-armed)
 #include "../d2client/sound_unit_refs.h"
+#include "../d2client/monster_client_mode.h"
 #include "../session/calltrace.h"
 namespace d2client_critter { void room_seen(D2ActiveRoomStrc* room, int32_t levelId, uint32_t frame); void preset_seen(D2ActiveRoomStrc* room, int32_t x, int32_t y); void tick(D2UnitStrc* player, uint32_t frame); void reset(); }
 namespace d2client_ambient { void reset(); void tick(uint32_t* seed, uint32_t period, bool weatherLevel); uint32_t* fallbackSeed(uint32_t (*playerInit)()); }
@@ -686,8 +687,45 @@ static uint32_t g_sessionKills;
 static std::vector<D2SessionRoom> g_sessionRooms;
 static std::vector<D2SessionUnit> g_sessionUnits;
 static std::vector<D2SessionMonsterAnimation> g_sessionMonsterAnimations;
-struct ClientMonsterClock { uint32_t mode = 0; bool valid = false; bool seeded = false; int32_t clock = 0; };
+// `mode` is the client unit's; `local` when the client changed it on its own (an animation's end,
+// D2Client+0x4DA60) and the server has not sent it yet; `count`/`speed` are then the client unit's.
+struct ClientMonsterClock { uint32_t mode = 0; bool valid = false; bool seeded = false; int32_t clock = 0;
+    uint32_t serverMode = 0; bool local = false; int32_t count = 0; int16_t speed = 0; };
 static std::unordered_map<uint32_t, ClientMonsterClock> g_clientMonsterClock;
+static const ClientMonsterClock* clientMonsterClockShown(const D2UnitStrc* u) {
+    auto it = g_clientMonsterClock.find(u->dwUnitId);
+    if (it == g_clientMonsterClock.end() || !it->second.valid) return nullptr;
+    return it->second.local || it->second.mode == u->dwAnimMode ? &it->second : nullptr;
+}
+// 1.13c D2Client+0x4F4A0 for a monster in a skill mode without a sequence (src/core/d2client/monster_client_mode.h):
+// the mode row's clock rule on the client clock and, at its end, the client unit's own mode change (0x4DA60, then
+// D2Common #10595 = UNITS_SetAnimStartFrame for the new mode's frame, count and rate). False for a row whose end
+// rule reads the path step, which the plain clock keeps.
+static bool clientMonsterSkillEnd(D2UnitStrc* u, ClientMonsterClock& c) {
+    const D2MonStats2Txt* m2 = UNITS_GetMonStats2TxtRecordFromMonsterId((int)u->dwClassId);
+    if (!m2) return false;
+    const int32_t* r = d2c_monster_mode::row((int32_t)u->dwClassId, u->dwAnimMode, m2->nModeEnabledWhenMovingFlags, false);
+    d2c_monster_mode::Clock k{c.clock, (int32_t)u->dwFrameCountPrecise, (int16_t)u->wAnimSpeed};
+    uint32_t flags = 0;
+    const int end = d2c_monster_mode::step(k, r, u->dwAnimMode, flags);
+    if (end < 0) return false;
+    c.clock = k.frame;
+    if (!end) return true;
+    const D2MonStatsTxt* ms = DATATBLS_GetMonStatsTxtRecord((int)u->dwClassId);
+    const int32_t baseId = ms ? ms->nBaseId : (int32_t)u->dwClassId;
+    const D2MonStatsTxt* base = DATATBLS_GetMonStatsTxtRecord(baseId);
+    const int32_t next = d2c_monster_mode::endMode(u->dwAnimMode, baseId, base && base->nSplClientEnd,
+        (u->dwFlags & UNITFLAG_ISASYNC) != 0, (u->dwFlagEx & UNITFLAGEX_UNK_PATH_RELATED) != 0);
+    if (next < 0) return true;
+    // the client's unit is not this one (the server's): set the new mode up on it and put every field back
+    D2UnitStrc saved; std::memcpy(&saved, u, sizeof saved);
+    u->dwAnimMode = (uint32_t)next;
+    UNITS_SetAnimStartFrame(u);
+    c.mode = (uint32_t)next; c.local = c.mode != saved.dwAnimMode;
+    c.clock = u->nSeqCurrentFramePrecise; c.count = (int32_t)u->dwFrameCountPrecise; c.speed = u->wAnimSpeed;
+    std::memcpy(u, &saved, sizeof saved);
+    return true;
+}
 // 1.13c D2Client+0xA7780: every client unit created in a room advances that room's seed once; the low
 // 32 bits become its dwInitSeed. Keyed by unit id, rolled at first sight in snapshot (packet) order.
 static std::unordered_map<uint64_t, uint32_t> g_clientInitSeed;   // key: type<<32 | id (ids repeat across types)
@@ -2007,10 +2045,11 @@ static void updateSessionWorld() {
                 animation.id = unit->dwUnitId; animation.classId = unit->dwClassId;
                 animation.code = unit->pMonsterData->pMonstatsTxt ? unit->pMonsterData->pMonstatsTxt->dwCode : 0;
                 animation.mode = unit->dwAnimMode; animation.framePrecise = unit->nSeqCurrentFramePrecise;
-                { auto it = g_clientMonsterClock.find(unit->dwUnitId);
-                  if (it != g_clientMonsterClock.end() && it->second.valid && it->second.mode == unit->dwAnimMode)
-                      animation.framePrecise = it->second.clock; }
                 animation.frameCountPrecise = unit->dwFrameCountPrecise; animation.animSpeed = unit->wAnimSpeed;
+                if (const ClientMonsterClock* c = clientMonsterClockShown(unit)) {
+                    animation.framePrecise = c->clock;
+                    if (c->local) { animation.mode = c->mode; animation.frameCountPrecise = c->count; animation.animSpeed = c->speed; }
+                }
                 animation.direction = unit->pDynamicPath ? unit->pDynamicPath->nDirection : 0;
                 const D2MonStats2Txt* mon2 = UNITS_GetMonStats2TxtRecordFromMonsterId((int)unit->dwClassId);
                 animation.baseWeaponClass = mon2 ? static_cast<uint32_t>(mon2->nBaseW) : 0;
@@ -8803,7 +8842,13 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
                             auto& c = g_clientMonsterClock[animUnit->dwUnitId];
                             const bool walkOrder = d2_client_walk_tick(animUnit->dwUnitId) != 0;  // the server re-ordered the walk (retail sends 0x67): the client restarts it
                             bool freshRoll = false;
-                            if (c.mode != animUnit->dwAnimMode || !c.valid || walkOrder) {
+                            // a server mode the client unit already has (it changed there on its own) is no change: D2Common
+                            // #11090 restarts nothing for the mode a unit is in
+                            const bool serverChanged = !c.valid || c.serverMode != animUnit->dwAnimMode;
+                            c.serverMode = animUnit->dwAnimMode;
+                            if (c.local && serverChanged && c.mode == animUnit->dwAnimMode) c.local = false;
+                            if ((serverChanged && c.mode != animUnit->dwAnimMode) || !c.valid || walkOrder) {
+                                c.local = false;
                                 c.mode = animUnit->dwAnimMode; c.valid = true;
                                 c.clock = UNITS_GetFrameBonus(animUnit) << 8;
                                 if (!walkOrder && !c.seeded) {
@@ -8818,6 +8863,16 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
                             }
                             animUnit->nSeqCurrentFramePrecise = c.clock;
                             if (freshRoll) { animUnit->nSeqCurrentFramePrecise = serverClock; continue; }
+                            if (c.local) {   // the client unit's own mode: its rate, the plain clock
+                                d2c_monster_mode::Clock k{c.clock, c.count, c.speed};
+                                d2c_monster_mode::advance(k);
+                                c.clock = k.frame; animUnit->nSeqCurrentFramePrecise = serverClock;
+                                continue;
+                            }
+                            if (animUnit->dwAnimMode == MONMODE_SKILL1 && !animUnit->pAnimSeq && clientMonsterSkillEnd(animUnit, c)) {
+                                animUnit->nSeqCurrentFramePrecise = serverClock;
+                                continue;
+                            }
                         }
                         if (!d2_realm_client_apply_monster_death_terminal_clock(*animUnit,
                                 [](D2UnitStrc* u) { return UNITS_IsAtEndOfFrameCycle(u) != 0; })) UNITS_UpdateFrame(animUnit);
@@ -12708,6 +12763,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
                 if (u->dwUnitType == UNIT_MONSTER && !g_heldMonsters.count(u->dwUnitId)) continue;   // a monster the server never announced to the client is not in its room lists
                 x = u->pDynamicPath->tGameCoords.wPosX; y = u->pDynamicPath->tGameCoords.wPosY;
                 fx =u->pDynamicPath->tGameCoords.dwPrecisionX & 0xFFFF; fy = u->pDynamicPath->tGameCoords.dwPrecisionY & 0xFFFF;
+                if (u->dwUnitType == UNIT_MONSTER) if (const ClientMonsterClock* c = clientMonsterClockShown(u)) if (c->local) mode = c->mode;
             } else if (u->dwUnitType == UNIT_OBJECT && u->pObjectData && u->pObjectData->pObjectTxt && u->pStaticPath) {
                 x = u->pStaticPath->tGameCoords.nX; y = u->pStaticPath->tGameCoords.nY; mode = clientObjectClock(u).shown;
             } else if (u->dwUnitType == UNIT_MISSILE && u->pDynamicPath && d2_session_missile_on_client(u->dwUnitId)) {
@@ -12763,7 +12819,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
                                sessionShadowGate((int)u->dwUnitType, (int)u->dwClassId, mode, u->dwUnitType == UNIT_OBJECT ? u->pObjectData->pObjectTxt : nullptr),
                                (first || (u->dwUnitType == UNIT_MISSILE && g_sessionClientFrame <= drawn) ? 1u : 0u) | (losBlocked ? 2u : 0u) | hidden);
             // the COF is the one of the mode D2Common #10175 gives: a player or monster in a sequence draws its sequence mode
-            const uint32_t cofMode = (u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MONSTER) ? (uint32_t)UNITS_GetAnimOrSeqMode(u) : mode;
+            const uint32_t cofMode = (u->dwUnitType == UNIT_PLAYER || (u->dwUnitType == UNIT_MONSTER && mode == u->dwAnimMode)) ? (uint32_t)UNITS_GetAnimOrSeqMode(u) : mode;
             if (sessionUnitCof(u, cofMode, cof, sizeof cof) && d2_dg_feed_unit_cof(cof)) {
                 // the priority row's direction (#10663: path +0x64, a static path's +0x1C) and frame (#10569: unit +0x44 >> 8), and the
                 // draw mode a monster component's variant code gives when it is an item code whose record is Transparent (6E2C0's monster
@@ -12772,10 +12828,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
                 if (u->dwUnitType == UNIT_OBJECT) { dir = u->pStaticPath->nDirection; frame = (uint32_t)(clientObjectClock(u).clock >> 8); }
                 else {
                     dir = u->pDynamicPath->nDirection; int32_t fp = u->nSeqCurrentFramePrecise;
-                    if (u->dwUnitType == UNIT_MONSTER) {
-                        auto it = g_clientMonsterClock.find(u->dwUnitId);
-                        if (it != g_clientMonsterClock.end() && it->second.valid && it->second.mode == u->dwAnimMode) fp = it->second.clock;
-                    }
+                    if (u->dwUnitType == UNIT_MONSTER) if (const ClientMonsterClock* c = clientMonsterClockShown(u)) fp = c->clock;
                     frame = (uint32_t)(fp >> 8);
                 }
                 if (u->dwUnitType == UNIT_MONSTER && u->pMonsterData) {

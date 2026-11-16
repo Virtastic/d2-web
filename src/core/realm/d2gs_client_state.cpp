@@ -44,6 +44,7 @@
 #include "../d2client/price_line_46230.h"
 #include "../d2client/realm_skill_start.h"
 #include "../d2client/realm_skill_do.h"
+#include "../d2client/monster_client_mode.h"
 #include "d2gs_client_motion.h"
 #include "d2gs_client_player_speed.h"
 #include "../d2client/d2client_85990.h"
@@ -623,6 +624,31 @@ static int unit_mode_move_kind(const D2UnitStrc* unit) {
     return kMonster[mode];
 }
 
+// 1.13c D2Client+0x4F4A0 for a monster in a skill mode without a sequence (../d2client/monster_client_mode.h):
+// the mode row's clock rule and, at its end, the unit's own mode change (0x4DA60: 0x2A6C0, then D2Common
+// #10595). False for a row whose end rule reads the path step, which the plain clock keeps.
+static bool realm_client_monster_skill_end(D2UnitStrc* unit) {
+    if (unit->dwUnitType != UNIT_MONSTER || unit->dwAnimMode != MONMODE_SKILL1 || unit->pAnimSeq) return false;
+    const D2MonStats2Txt* m2 = UNITS_GetMonStats2TxtRecordFromMonsterId((int)unit->dwClassId);
+    if (!m2) return false;
+    const int32_t* r = d2c_monster_mode::row((int32_t)unit->dwClassId, unit->dwAnimMode, m2->nModeEnabledWhenMovingFlags, false);
+    d2c_monster_mode::Clock k{unit->nSeqCurrentFramePrecise, (int32_t)unit->dwFrameCountPrecise, (int16_t)unit->wAnimSpeed};
+    uint32_t flags = 0;
+    const int end = d2c_monster_mode::step(k, r, unit->dwAnimMode, flags);
+    if (end < 0) return false;
+    unit->nSeqCurrentFramePrecise = k.frame;
+    if (!end) return true;
+    const D2MonStatsTxt* ms = DATATBLS_GetMonStatsTxtRecord((int)unit->dwClassId);
+    const int32_t baseId = ms ? ms->nBaseId : (int32_t)unit->dwClassId;
+    const D2MonStatsTxt* base = DATATBLS_GetMonStatsTxtRecord(baseId);
+    const int32_t next = d2c_monster_mode::endMode(unit->dwAnimMode, baseId, base && base->nSplClientEnd,
+        (unit->dwFlags & UNITFLAG_ISASYNC) != 0, (unit->dwFlagEx & UNITFLAGEX_UNK_PATH_RELATED) != 0);
+    if (next < 0) return true;
+    d2_realm_client_unit_set_mode(unit, (uint32_t)next);
+    UNITS_SetAnimStartFrame(unit);
+    return true;
+}
+
 // One frame of a unit: the path step when `move` (its result: 0 when the path has run out), the animation
 // frame and the turn toward the facing asked for.
 int d2_realm_client_motion_advance_unit(D2UnitStrc* unit, bool move) {
@@ -630,7 +656,8 @@ int d2_realm_client_motion_advance_unit(D2UnitStrc* unit, bool move) {
     if (!unit->dwFrameCountPrecise) UNITS_SetAnimStartFrame(unit);
     const int moving = move ? D2Common_10226(unit, 1024) : 0;
     if (!d2_realm_client_apply_monster_death_terminal_clock(*unit,
-            [](D2UnitStrc* candidate) { return UNITS_IsAtEndOfFrameCycle(candidate) != 0; })) {
+            [](D2UnitStrc* candidate) { return UNITS_IsAtEndOfFrameCycle(candidate) != 0; }) &&
+            !realm_client_monster_skill_end(unit)) {
         UNITS_StopSequence(unit);
     }
     D2DynamicPathStrc* path = unit->pDynamicPath;

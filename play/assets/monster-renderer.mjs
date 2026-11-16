@@ -4,7 +4,6 @@ import { cofDirection, dccDirection, indexedToRgba } from './unit-renderer.mjs';
 import { createBlender } from './frontend.mjs';
 import { createUnitShadowRenderer } from './unit-shadow-renderer.mjs';
 import { highlightMap } from './unit-highlight.mjs';
-import { advanceIzualGhostS1Clock, resetIzualGhostS1Clock } from './izual-ghost-clock.mjs';
 import { createRenderCache } from './render-cache.mjs';
 
 const COMPONENT = ['HD','TR','LG','RA','LA','RH','LH','SH','S1','S2','S3','S4','S5','S6','S7','S8'];
@@ -224,7 +223,6 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
   // them across actors and redraws, with a finite budget for long sessions.
   const layerRasters = createRenderCache(layerRasterLimit, layerRasterByteLimit,
     (canvas) => canvas.width * canvas.height * 4);
-  const izualGhostClocks = new Map();
   const deadMonsterClocks = new Map();
   const shadows = shadow ? createUnitShadowRenderer(read) : null;
   const blenderFor = (act0) => { if (!blenders.has(act0)) { let b = null; try { b = createBlender(read(`data\\global\\palette\\${PALETTE[act0]}\\pal.pl2`), palettes.get(act0)); } catch {} blenders.set(act0, b); } return blenders.get(act0); };
@@ -293,13 +291,9 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
       if (warmQueue.length < 64) { warmQueue.push(actor); warmSchedule(); }
     },
     // Session teardown can reuse actor IDs; their client-local clocks belong to the old session.
-    resetSession() { resetIzualGhostS1Clock(izualGhostClocks); deadMonsterClocks.clear(); shown.clear(); warmSeen.clear(); warmQueue.length = 0; },
+    resetSession() { deadMonsterClocks.clear(); shown.clear(); warmSeen.clear(); warmQueue.length = 0; },
     // `highlight`: retail's DrawMode 7, the hovered unit (V5, unit-highlight.mjs) -- the cel's colours through the measured rule.
     draw(ctx, x, y, actor, act, highlight = false) {
-      // Izual's S1 uses its own CUnit clock; the server frame epoch is not a cel index.
-      const clock = advanceIzualGhostS1Clock(actor, izualGhostClocks.get(actor.id));
-      if (clock) izualGhostClocks.set(actor.id, clock);
-      else izualGhostClocks.delete(actor.id);
       // Attack COFs depend on BaseW. Keep decoded assets, rasters and failed loads
       // separate when the same token/components arrive with another class.
       const attackClass = actor.mode === 4 || actor.mode === 5 || actor.mode === 14 ? actor.baseWeaponClass ?? '' : '';
@@ -314,7 +308,7 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
       const deadClock = advanceMonsterDeadClock(actor, deadMonsterClocks.get(actor.id));
       if (deadClock) deadMonsterClocks.set(actor.id, deadClock);
       else deadMonsterClocks.delete(actor.id);
-      const framePrecise = deadClock?.framePrecise ?? clock?.framePrecise ?? actor.framePrecise;
+      const framePrecise = deadClock?.framePrecise ?? actor.framePrecise;
       const whole = framePrecise >>> 8;
       const frame = (whole >= count && actor.frameCountPrecise && framePrecise >= actor.frameCountPrecise ? count - 1 : whole % count) >>> 0;
       let composed;
