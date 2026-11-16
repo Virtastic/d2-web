@@ -109,8 +109,10 @@ extern "C" void d2_client_npc_speech_packet(const D2GSPacketSrv27* p27, uint32_t
     TEXT_SortTextNodeListByStringId(list);
     const int16_t w = TEXT_GetStringIdOfMenuType0Or2Node(list, 0);
     if (w == -1 || g_panelUp) { TEXT_FreeTextHeader(list); return; }
-    // 0x4B8A0: 966F = w, 0x7D3C0, 0x45D30 (played list), 0x45FF0, 0x14910 (a client packet: 0x143E0's clock read), 9661 = 1
+    // 0x4B8A0: the '/' client packet (0x143E0's clock read, 0x1441B), 966F = w, 0x7D3C0, 0x45D30 (played list), 0x45FF0,
+    // 0x14910 (a client packet: 0x143E0's clock read), 9661 = 1
     freeMenu(); g_menu = list; g_nPlayed = 0;
+    d2client_frame_clock() += 1;
     g_cur = w;
     open(w, 0);
     push(w);
