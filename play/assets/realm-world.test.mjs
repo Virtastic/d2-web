@@ -266,6 +266,22 @@ test('the stash and the cube take the 800x600 Inventory.txt rows, sixteen after 
   assert.equal(reads.cubeLayout[0], 25);                                      // Transmogrify Box Page 1 + 16
 });
 
+test('the "Expansion" divider is not a record: record 12 at 800x600 is Big Bank Page2, not Trophy Case Page2', () => {
+  // Inventory.txt's row order and the two 800x600 rows around the divider's shift (1.13c values).
+  const header = 'class\tinvleft\tinvright\tinvtop\tinvbottom\tgridx\tgridy\tgridleft\tgridright\tgridtop\tgridbottom\tgridboxwidth\tgridboxheight';
+  const names = ['Amazon', 'Sorceress', 'Necromancer', 'Paladin', 'Barbarian', 'Monster', 'Trade Page 1', 'Trade Page 2', 'Bank Page 1',
+    'Transmogrify Box Page 1', 'Guild Vault Page 1', 'Trophy Case Page 1', 'Expansion', 'Big Bank Page 1', 'Hireling', 'Druid', 'Assassin',
+    'Amazon2', 'Sorceress2', 'Necromancer2', 'Paladin2', 'Barbarian2', 'Monster2', 'Trade Page 1-2', 'Trade Page 2-2', 'Bank Page2',
+    'Transmogrify Box2', 'Guild Vault Page2', 'Trophy Case Page2', 'Big Bank Page2', 'Hireling2', 'Druid2', 'Assassin2'];
+  const known = { 'Transmogrify Box2': [80, 401, 280, 502, 3, 4, 198, 285, 199, 313, 29, 29], 'Trophy Case Page2': [80, 401, 280, 502, 10, 4, 96, 383, 259, 373, 29, 29],
+    'Big Bank Page2': [80, 401, 280, 502, 6, 8, 154, 324, 142, 373, 29, 29] };
+  const text = [header, ...names.map((n) => (n === 'Expansion' ? 'Expansion' : [n, ...(known[n] ?? Array(12).fill(1))].join('\t'))), ''].join('\n');
+  const inv = createInventoryTable((path) => (path.endsWith('inventory.txt') ? enc(text) : read(path)));
+  assert.deepEqual(inv.gridAt(12, 1), known['Big Bank Page2']);          // the 6x8 stash at (154,142)
+  assert.deepEqual(inv.gridAt(11, 1), known['Trophy Case Page2']);       // control: the 10x4 grid the shifted index drew
+  assert.deepEqual(inv.gridAt(9, 1), known['Transmogrify Box2']);
+});
+
 test('0x42 takes the cursor item away from the local player only', () => {
   const w = createRealmWorld(tables()); w.setOwner(GUID);
   feed(w, itemPacket(13, 0, { mode: 4, code: 'hax' }));

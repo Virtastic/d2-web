@@ -6,7 +6,10 @@
 function rows(bytes) {
   const lines = new TextDecoder('latin1').decode(bytes).replace(/\r/g, '').split('\n').filter((l) => l.length);
   const header = lines.shift().split('\t').map((name) => name.trim().toLowerCase());
-  return lines.map((line) => {
+  // Fog's txt reader drops a line whose first cell is "Expansion" (compared case-insensitively), so a
+  // table's records are numbered without the divider: Inventory.txt's BIG_BANK_PAGE_1 at 800x600 is
+  // the line after "Trophy Case Page2", and Belts.txt's 800x600 set starts after its divider.
+  return lines.filter((line) => line.split('\t', 1)[0].trim().toLowerCase() !== 'expansion').map((line) => {
     const values = line.split('\t'), row = {};
     for (let i = 0; i < header.length; i++) row[header[i]] = (values[i] ?? '').trim();
     return row;
