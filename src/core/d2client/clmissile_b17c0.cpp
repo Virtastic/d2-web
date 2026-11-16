@@ -56,9 +56,13 @@ bool nextHitHeld(D2UnitStrc* target) {
 
 std::vector<const D2UnitStrc*> foreign;   // missiles another unit owns (a monster's blood), not the local player
 bool isForeign(const D2UnitStrc* unit) { for (const D2UnitStrc* f : foreign) if (f == unit) return true; return false; }
+std::vector<D2UnitStrc*> shown;      // a monster do's client missiles (0xA2C90), drawn by the session: the server has no copy the client sees
+bool quiet = false;                   // the caller sounds the TravelSound itself
+std::vector<int32_t> unitHits;            // a shown missile's HitSound: sounded through 0x88A70 in its own unit-pass slot, not the ambient queue
 
 void freeMissile(D2UnitStrc* unit) {
     for (size_t i = 0; i < foreign.size(); ++i) if (foreign[i] == unit) { foreign.erase(foreign.begin() + i); break; }
+    for (size_t i = 0; i < shown.size(); ++i) if (shown[i] == unit) { shown.erase(shown.begin() + i); break; }
     if (unit->pDynamicPath) { PATH_FreeDynamicPath(nullptr, unit->pDynamicPath); unit->pDynamicPath = nullptr; }
     MISSILE_FreeMissileData(unit);
     UNITS_FreeUnit(unit);
@@ -99,7 +103,10 @@ bool terminal(D2UnitStrc* unit, D2UnitStrc* owner, bool wall, D2UnitStrc* target
     } else if (!wall && !txt->nAlwaysExplode) play = false;
     if (play) {
         if (txt->nNextHit && target) nextHits.push_back({static_cast<int32_t>(target->dwUnitType), target->dwUnitId, frame + txt->nNextDelay});
-        if (static_cast<int16_t>(txt->wHitSound) >= 0) d2client_ambient::submit(static_cast<int16_t>(txt->wHitSound));
+        if (static_cast<int16_t>(txt->wHitSound) >= 0) {
+            bool isShown = false; for (const D2UnitStrc* s : shown) if (s == unit) isShown = true;
+            if (isShown) unitHits.push_back(static_cast<int16_t>(txt->wHitSound)); else d2client_ambient::submit(static_cast<int16_t>(txt->wHitSound));
+        }
     }
     if (target && !txt->nCollideKill) return false;
     freeMissile(unit);
@@ -147,7 +154,7 @@ void create(D2UnitStrc* owner, int32_t missileId, int32_t skillId, int32_t level
     MISSILE_SetSkill(unit, skillId);
     MISSILE_SetLevel(unit, static_cast<uint16_t>(level));
     (inUpdate ? born : missiles).push_back(unit);
-    if (static_cast<int16_t>(txt->wTravelSound) >= 0) d2client_ambient::submit(static_cast<int16_t>(txt->wTravelSound));
+    if (!quiet && static_cast<int16_t>(txt->wTravelSound) >= 0) d2client_ambient::submit(static_cast<int16_t>(txt->wTravelSound));
 }
 
 // 1.13c D2Client+0x15DA0: N = calc1 missiles on a line through the target, perpendicular to the cast.
@@ -270,10 +277,35 @@ void spawn(D2UnitStrc* source, int32_t missileId, int32_t level, int32_t tx, int
     if (list.size() > before) foreign.push_back(list.back());
 }
 
+// 1.13c D2Client+0xA2C90 on a monster's client unit -> 0xA26B0 (request flags 0x21: from the unit's position, toward the
+// 0xA1340 point, the path's target unit else its target point; none makes nothing) -> 0xB30F0: the Skills.txt cltmissile at
+// the skill's level. The caller sounds its TravelSound in the monster's unit-pass slot.
+void monsterDo(D2UnitStrc* source, int32_t missileId, int32_t skillId, int32_t level, int32_t tx, int32_t ty) {
+    const D2MissilesTxt* txt = DATATBLS_GetMissilesTxtRecord(missileId);
+    D2ActiveRoomStrc* room = source ? UNITS_GetRoom(source) : nullptr;
+    if (!txt || !room || !source->pDynamicPath || !tx || !ty) return;
+    const int32_t x = UNITS_GetXPosition(source), y = UNITS_GetYPosition(source);
+    if (D2ActiveRoomStrc* at = COLLISION_GetRoomBySubTileCoordinates(room, x, y)) room = at;
+    d2client_unitseed::roll(room);
+    std::vector<D2UnitStrc*>& list = inUpdate ? born : missiles;
+    const size_t before = list.size();
+    quiet = true;
+    create(source, missileId, skillId, level, x, y, tx, ty, txt->nActivate);
+    quiet = false;
+    if (list.size() <= before) return;
+    D2UnitStrc* unit = list.back();
+    unit->dwOwnerType = source->dwUnitType; unit->dwOwnerGUID = source->dwUnitId;   // 0xB30F0's owner link: 0xB17C0 resolves it (0x560D0)
+    foreign.push_back(unit); shown.push_back(unit);
+}
+
+size_t shownCount() { return shown.size(); }
+D2UnitStrc* shownAt(size_t i) { return i < shown.size() ? shown[i] : nullptr; }
+std::vector<int32_t> takeUnitHits() { std::vector<int32_t> v; v.swap(unitHits); return v; }
+
 void reset() {
     for (D2UnitStrc* unit : missiles) freeMissile(unit);
     for (D2UnitStrc* unit : born) freeMissile(unit);
-    missiles.clear(); born.clear(); foreign.clear(); pending.clear(); nextHits.clear(); frame = 0; nextId = 1;
+    missiles.clear(); born.clear(); foreign.clear(); shown.clear(); unitHits.clear(); pending.clear(); nextHits.clear(); frame = 0; nextId = 1;
 }
 
 // The client's cast of skillId at a unit target (its path target) or a point; the action runs kActionDelay frames later.
@@ -287,7 +319,12 @@ void cast(int32_t skillId, int32_t level, D2UnitStrc* target, int32_t tx, int32_
 void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)) {
     ++frame;
     inUpdate = true;
-    for (size_t i = 0; i < missiles.size();) { if (step(missiles[i], owner)) ++i; else missiles.erase(missiles.begin() + i); }
+    for (size_t i = 0; i < missiles.size();) {
+        D2UnitStrc* m = missiles[i];
+        D2UnitStrc* o = owner;
+        for (const D2UnitStrc* s : shown) if (s == m) { o = find ? find(static_cast<int32_t>(m->dwOwnerType), m->dwOwnerGUID) : nullptr; break; }
+        if (step(m, o)) ++i; else missiles.erase(missiles.begin() + i);
+    }
     inUpdate = false;
     missiles.insert(missiles.end(), born.begin(), born.end()); born.clear();
     for (size_t i = 0; i < pending.size();) {

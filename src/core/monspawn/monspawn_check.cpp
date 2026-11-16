@@ -245,7 +245,7 @@ extern "C" void d2_client_monster_idle_reset();   // 1.13c D2Client+0x237E0 mons
 extern "C" void d2_client_attack_roll_reset();   // 1.13c D2Client+0x242B0 attack-roll state (monster_face.cpp)
 namespace d2client_hurricane { void reset(); void tick(D2UnitStrc* u, uint32_t* seed); }
 namespace d2client_vine { void reset(); void tick(D2UnitStrc* hero); }
-namespace d2client_clmissile { void reset(); void cast(int32_t skillId, int32_t level, D2UnitStrc* target, int32_t tx, int32_t ty); void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)); }   // 1.13c D2Client+0x15DA0 (cltdofunc 17), +0xB17C0 / +0xB1420 (client missiles)
+namespace d2client_clmissile { void monsterDo(D2UnitStrc* source, int32_t missileId, int32_t skillId, int32_t level, int32_t tx, int32_t ty); size_t shownCount(); D2UnitStrc* shownAt(size_t i); std::vector<int32_t> takeUnitHits(); void reset(); void cast(int32_t skillId, int32_t level, D2UnitStrc* target, int32_t tx, int32_t ty); void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)); }   // 1.13c D2Client+0x15DA0 (cltdofunc 17), +0xB17C0 / +0xB1420 (client missiles)
 namespace d2client_nova { void reset(); void selectSkill(int32_t skillId); int32_t selectedSkill(); void cast(int32_t skillId, bool presentation); void tick(); }   // 1.13c D2Client+0x73CB0 (cltdofunc 25, Poison Nova), +0x73D70 (cltdofunc 29, Frozen Orb)
 namespace d2client_blizzard { void reset(); void cast(int32_t skillId, D2UnitStrc* target, int32_t tx, int32_t ty); void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)); }   // 1.13c D2Client+0xBBC10 (cltdofunc 13, Blizzard center)
 static D2UnitStrc* g_sessionClientPlayerUnit = nullptr;
@@ -897,11 +897,11 @@ void D2WEB_ClientMissileTravelSound(int32_t nCltMissile) {
 }
 // 1.13c D2Client+0xA2C90 -> 0xA26B0 -> 0xB30F0: a monster's client do creates its Skills.txt cltmissile (no lob flag), and the new
 // client missile submits its Missiles.txt TravelSound (+0x12) through 0x88A70 at once, in the monster's slot of the unit pass.
-static std::unordered_map<uint32_t, std::vector<int32_t>> g_monCltMissileRows;
-void D2WEB_MonsterClientMissileDo(uint32_t nUnitId, int32_t nCltMissile) {
+struct MonCltMissile { int32_t missile, skill, level, tx, ty; };
+static std::unordered_map<uint32_t, std::vector<MonCltMissile>> g_monCltMissileRows;
+void D2WEB_MonsterClientMissileDo(uint32_t nUnitId, int32_t nCltMissile, int32_t nSkillId, int32_t nSkillLevel, int32_t nTargetX, int32_t nTargetY) {
     if (!g_sessionLive || nCltMissile <= 0 || nCltMissile >= sgptDataTables->nMissilesTxtRecordCount) return;
-    const D2MissilesTxt* m = DATATBLS_GetMissilesTxtRecord(nCltMissile);
-    if (m && m->wTravelSound > 0 && m->wTravelSound != 0xFFFF) g_monCltMissileRows[nUnitId].push_back(m->wTravelSound);
+    g_monCltMissileRows[nUnitId].push_back({nCltMissile, nSkillId, nSkillLevel, nTargetX, nTargetY});
 }
 static std::vector<std::array<int32_t, 7>> g_pendingSkillDo; // 1.13c D2Client+0xA2C90 wDoSound events, emitted one drain after the do
 // s2420 watches one unit so its scheduled timer can be paired with proof that the event dispatcher
@@ -8330,7 +8330,11 @@ static void sessionClientMonsterFootsteps(bool newOnly = false) {
             { extern void d2_client_monster_order_unit(uint32_t); d2_client_monster_order_unit(id); }   // 0x4F4A0 -> 0x4DC70: the unit's order (attack roll) first
             sessionClientMonsterHitSounds(id);
             if (auto it = g_monCltMissileRows.find(id); it != g_monCltMissileRows.end()) {
-                for (int32_t row : it->second) d2client_sound_unit_submit(row);
+                for (const MonCltMissile& c : it->second) {
+                    d2client_clmissile::monsterDo(u, c.missile, c.skill, c.level, c.tx, c.ty);
+                    const D2MissilesTxt* m = DATATBLS_GetMissilesTxtRecord(c.missile);
+                    if (m && m->wTravelSound > 0 && m->wTravelSound != 0xFFFF) d2client_sound_unit_submit(m->wTravelSound);
+                }
                 g_monCltMissileRows.erase(it);
             }
             // 0x4F4A0 runs the unit's idle sound (0x237E0) just before its footstep check (0x23C00)
@@ -8339,6 +8343,7 @@ static void sessionClientMonsterFootsteps(bool newOnly = false) {
                                               d2_session_floor_class(1, (int32_t)id, fallback), g_sessionClientFrame - 1, g_game);
         }
     if (!newOnly) g_monCltMissileRows.clear();   // a do of a unit the client does not hold makes no client missile
+    if (!newOnly) for (int32_t row : d2client_clmissile::takeUnitHits()) d2client_sound_unit_submit(row);   // the client missiles' hits, in their type-3 slots after the monsters
 }
 // 1.13c D2Client+0x22B20: the client units' sound references (replay only; nothing happens before the Sounds table is loaded).
 // The client's units are the held monsters and the objects of the rooms it holds (the sets d2_session_client_view prints).
@@ -10854,6 +10859,11 @@ EMSCRIPTEN_KEEPALIVE int d2_session_missile_animation_count() {
 extern "C" int d2_realm_client_player_count();
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_missile_on_client(uint32_t id) {
     D2UnitStrc* m = g_game ? SUNIT_GetServerUnit(g_game, UNIT_MISSILE, (int32_t)id) : nullptr;
+    if (m && m->dwOwnerType == UNIT_MONSTER && g_heldMonsters.count(m->dwOwnerGUID)) {
+        // a held monster's skill with a cltmissile and no lob flag: its client do (D2Client+0xA2C90) made the client's own missile
+        const D2SkillsTxt* t = DATATBLS_GetSkillsTxtRecord(MISSILE_GetSkill(m));
+        if (t && (int16_t)t->wCltMissile > 0 && !(t->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_LOB])) return 0;
+    }
     if (!m || !g_targetPlayer || m->dwOwnerType != UNIT_PLAYER || m->dwOwnerGUID != g_targetPlayer->dwUnitId) return 1;
     if ((m->dwClassId == 62 || m->dwClassId == 45 || m->dwClassId == 48) && MISSILE_GetSkill(m) == 0) return 0;   // the shrines' missiles (no skill): the client made its own at the use packet (D2Client+0x26060, 0x25F10, 0x25DC0)
     if (m->dwClassId == 62 && d2_realm_client_player_count() > 0) return 0;   // the realm client flies the player's own fireball and sounds it (d2_realm_client_take_missile_sounds)
@@ -12653,6 +12663,25 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
         }
     }
     feedCritters();
+    // a held monster's client missiles (its do's cltmissile, D2Client+0xA2C90): units of the client's room lists the server has no
+    // copy of. +0xC8 bit 18 (InitSteps) is the client unit's own; a missile made this frame has not had its first 6C130 step.
+    {
+        static std::unordered_map<uint32_t, uint32_t> seen, shownFrom; if (first) { seen.clear(); shownFrom.clear(); }
+        for (size_t i = 0; i < d2client_clmissile::shownCount(); ++i) {
+            D2UnitStrc* u = d2client_clmissile::shownAt(i);
+            if (!u || !u->pDynamicPath) continue;
+            const uint32_t born = seen.emplace(u->dwUnitId, g_sessionClientFrame).first->second;
+            if (born != g_sessionClientFrame) ++g_walkUnits;
+            const bool blocked = spotLos && UNITS_TestCollisionWithUnit(g_targetPlayer, u, 2) != 0;
+            const uint32_t hidden = (u->dwFlagEx & 0x40000u) ? 0x40000u : 0u;
+            if (!hidden) shownFrom.emplace(u->dwUnitId, g_sessionClientFrame);
+            const auto sf = shownFrom.find(u->dwUnitId);
+            const bool firstDraw = first || sf == shownFrom.end() || g_sessionClientFrame <= sf->second;
+            d2_dg_feed_unit_ex(UNIT_MISSILE, u->dwUnitId, (int)u->dwClassId, u->pDynamicPath->tGameCoords.wPosX, u->pDynamicPath->tGameCoords.wPosY,
+                               u->dwAnimMode, u->pDynamicPath->tGameCoords.dwPrecisionX & 0xFFFF, u->pDynamicPath->tGameCoords.dwPrecisionY & 0xFFFF,
+                               sessionShadowGate(UNIT_MISSILE, (int)u->dwClassId, u->dwAnimMode, nullptr), (firstDraw ? 1u : 0u) | (blocked ? 2u : 0u) | hidden);
+        }
+    }
     // the client-only light-spot missiles (class 0x11f, type 3) 0x53550 made: placed on their subtile centre, ids local to the client
     // A spot takes the missile arm of the visibility test, its X size Missiles.txt Size.
     const D2MissilesTxt* spotTxt = (int32_t)sgptDataTables->nMissilesTxtRecordCount > 0x11f ? DATATBLS_GetMissilesTxtRecord(0x11f) : nullptr;
