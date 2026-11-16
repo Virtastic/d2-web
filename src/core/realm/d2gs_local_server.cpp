@@ -48,6 +48,7 @@ int d2_session_player_y();
 int d2_session_player_act();
 void D2WEB_SetPacketSink(void (*sink)(const uint8_t*, uint32_t));
 extern bool g_sessionJoinUnits;
+extern int32_t g_sessionPacketHandlerRet;   // the packet-table handler's return (INT32_MIN: none entered), for its call-trace record
 const uint8_t* d2_session_join_stream(uint32_t* length);
 uint32_t d2_session_join_load_length();
 int d2_session_client_spawned();
@@ -218,6 +219,30 @@ int dispatch(const uint8_t* p, int n) {
     }
 }
 
+// One client packet through dispatch, with the session call trace's record of the packet-table handler it entered:
+// the handler's own RVA, the opcode, the packet size and the arg hash as for 01/03 above, then the handler's return.
+// No record when the table refused the packet before the handler (the player could not be interrupted) or the
+// session never reached it. Opcodes 01/03/06 write their records in dispatch.
+int dispatchTraced(const uint8_t* p, int n) {
+    g_sessionPacketHandlerRet = INT32_MIN;
+    const int r = dispatch(p, n);
+    uint32_t rva = 0;
+    switch (p[0]) {
+    case 0x13: rva = 0xD0910; break;   // InteractWithEntity
+    case 0x20: rva = 0xCF730; break;   // UseGridItem
+    case 0x32: rva = 0xCF220; break;   // BuyItemFromNpcBuffer
+    case 0x33: rva = 0xCF570; break;   // SellItemToNpcBuffer
+    case 0x38: rva = 0xCFB30; break;   // EntityAction
+    default: break;
+    }
+    if (rva && g_sessionPacketHandlerRet != INT32_MIN) {
+        uint32_t ph = 0x811c9dc5u; for (int i = 0; i < n; ++i) { ph ^= p[i]; ph *= 16777619u; ph ^= 0; ph *= 16777619u; ph ^= 0; ph *= 16777619u; ph ^= 0; ph *= 16777619u; }
+        const size_t ct = D2CT_ENTER("D2Game", rva, "%02x,%x,%08x", p[0], n, ph);
+        D2CT_RET(ct, "%x", static_cast<unsigned>(g_sessionPacketHandlerRet));
+    }
+    return r;
+}
+
 }  // namespace
 
 extern "C" {
@@ -297,7 +322,7 @@ EMSCRIPTEN_KEEPALIVE void d2_local_d2gs_drain() {
     if (g_draining || g_server.phase == Phase::Closed) return;
     g_draining = true;
     d2g_lists::drainFrame(g_clientList, [](const uint8_t* p, int n) {
-        const int result = dispatch(p, n);
+        const int result = dispatchTraced(p, n);
         if (result < 0) refuse(p[0], result); else ++g_server.accepted;
     });
     g_draining = false;

@@ -4051,6 +4051,9 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_astar_probe() {
 // session calls handlers directly, so every client-packet command asks this first; without it a dead
 // player spent stat points and drank potions, and stood dead at 3,194 hp (s000a).
 static int32_t g_sessionDispatchRefused = 0;
+// The return of the last packet-table handler a client packet entered, as the table sees it (INT32_MIN: none entered),
+// for the session call trace's handler records (realm/d2gs_local_server.cpp resets it before each packet).
+int32_t g_sessionPacketHandlerRet = INT32_MIN;
 static bool sessionDispatchGate(uint8_t header) {
     if (!g_game || !g_targetPlayer) return false;
     if (header == 0x14 || header == 0x15 || header == 0x3C || header == 0x43) return true;
@@ -5387,6 +5390,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_interact_packet(uint32_t unitType, u
     if (!sessionDispatchGate(0x13)) return -2;
     D2WEB_ResetPacketStream();   // a retail recording: the handler's own sends (a chest's 0x0E/0x9C) are readable before the tick that follows
     const int32_t rc = D2GAME_PACKETCALLBACK_Rcv0x13_InteractWithEntity_6FC84D70(g_game, g_targetPlayer, packet, sizeof packet);
+    g_sessionPacketHandlerRet = rc;
     D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets);
     updateSessionSnapshot();
     return rc;
@@ -5745,6 +5749,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_npc_action_packet(uint32_t npcId, ui
     const int32_t oldLevel = DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(g_targetPlayer));
     if (!sessionDispatchGate(0x38)) return -2;
     const int32_t result = D2GAME_PACKETCALLBACK_Rcv0x38_EntityAction_6FC86CB0(g_game, g_targetPlayer, &packet, sizeof packet);
+    g_sessionPacketHandlerRet = result;
     g_sessionVendor.action = action; g_sessionVendor.npcId = npcId;   // the transaction commands key on the open action
     D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets);
     // A caravan/travel action moved the player into another act's town: the session follows
@@ -7482,6 +7487,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_packet(const uint8_t* bytes, int len)
     }
     if (!sessionDispatchGate(packet[0])) return -2;
     const int32_t result = handler(g_game, g_targetPlayer, packet.data(), len);
+    g_sessionPacketHandlerRet = result;
     updateSessionSnapshot();
     return result;
 }
@@ -9882,6 +9888,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_use_item(uint32_t itemUnitId) {
     memcpy(packet + 1, &id, 4); memcpy(packet + 5, &x, 4); memcpy(packet + 9, &y, 4);
     if (!sessionDispatchGate(0x20)) return 0;
     const int32_t result = D2GAME_PACKETCALLBACK_Rcv0x20_UseGridItem_6FC85990(g_game, g_targetPlayer, packet, sizeof packet);
+    g_sessionPacketHandlerRet = result;
     updateSessionSnapshot();
     return result == 0 ? 1 : 0;
 }
