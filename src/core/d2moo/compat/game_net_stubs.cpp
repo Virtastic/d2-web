@@ -37,6 +37,7 @@
 #include <Units/Units.h>
 #include <PLAYER/PlayerList.h>
 #include <PLAYER/PlrMsg.h>
+#include <PLAYER/PlrModes.h>  // sub_6FC81650: the player updates CLIENTS_ChangeRoom sends on leaving the client room
 #include <AI/AiGeneral.h>
 #include <cstring>
 #include <vector>
@@ -338,6 +339,17 @@ void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
                 DUNGEON_RemoveClientFromRoom(oldRooms[i], pClient);
             }
             if (g_clientRoomChangeHook) g_clientRoomChangeHook(pClient, oldRooms[i], 0);
+        }
+        // Leaving the client's own room, retail (0x4B1D0 -> 0x788B0) sends the client's player its updates: a player
+        // teleported out of range this frame gets its 0x15 reassign here, as the room walk never reaches its new room.
+        if (oldRooms[i] == pClient->pRoom) {
+            D2UnitStrc* pUnit = nullptr;
+            if (pClient->dwFlags & CLIENTFLAGEX_PLAYER_UNIT_ALIVE) pUnit = pClient->pPlayer;
+            else if (pClient->pPlayer) {
+                pUnit = SUNIT_GetServerUnit(pClient->pGame, pClient->dwUnitType, pClient->dwUnitGUID);
+                if (!pUnit) pClient->pPlayer = nullptr;
+            }
+            sub_6FC81650(pClient->pGame, pUnit, pClient, 0);
         }
     }
     pClient->pRoom = pRoom;
