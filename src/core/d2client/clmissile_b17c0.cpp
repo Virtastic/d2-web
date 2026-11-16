@@ -274,7 +274,10 @@ void spawn(D2UnitStrc* source, int32_t missileId, int32_t level, int32_t tx, int
     std::vector<D2UnitStrc*>& list = inUpdate ? born : missiles;
     const size_t before = list.size();
     create(source, missileId, 0, level, x, y, tx, ty, txt->nActivate);
-    if (list.size() > before) foreign.push_back(list.back());
+    if (list.size() <= before) return;
+    D2UnitStrc* unit = list.back();
+    unit->dwOwnerType = source->dwUnitType; unit->dwOwnerGUID = source->dwUnitId;   // 0xB30F0's owner link (0x560D0)
+    foreign.push_back(unit); shown.push_back(unit);   // in the client's room lists; the server has no copy
 }
 
 // 1.13c D2Client+0xA2C90 on a monster's client unit -> 0xA26B0 (request flags 0x21: from the unit's position, toward the

@@ -12700,7 +12700,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
         if (!nowMissiles.count(id) && !SUNIT_GetServerUnit(g_game, UNIT_MISSILE, (int32_t)id)) ++g_walkUnits;
     walkedMissiles.swap(nowMissiles);
     feedCritters();
-    // a held monster's client missiles (its do's cltmissile, D2Client+0xA2C90): units of the client's room lists the server has no
+    // a held monster's client missiles (its do's cltmissile, D2Client+0xA2C90; its blood, 0x4C500): units of the client's room lists the server has no
     // copy of. +0xC8 bit 18 (InitSteps) is the client unit's own; a missile made this frame has not had its first 6C130 step.
     {
         static std::unordered_map<uint32_t, uint32_t> seen, shownFrom; if (first) { seen.clear(); shownFrom.clear(); }
@@ -12716,7 +12716,8 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
             const bool firstDraw = first || sf == shownFrom.end() || g_sessionClientFrame <= sf->second;
             d2_dg_feed_unit_ex(UNIT_MISSILE, u->dwUnitId, (int)u->dwClassId, u->pDynamicPath->tGameCoords.wPosX, u->pDynamicPath->tGameCoords.wPosY,
                                u->dwAnimMode, u->pDynamicPath->tGameCoords.dwPrecisionX & 0xFFFF, u->pDynamicPath->tGameCoords.dwPrecisionY & 0xFFFF,
-                               sessionShadowGate(UNIT_MISSILE, (int)u->dwClassId, u->dwAnimMode, nullptr), (firstDraw ? 1u : 0u) | (blocked ? 2u : 0u) | hidden);
+                               sessionShadowGate(UNIT_MISSILE, (int)u->dwClassId, u->dwAnimMode, nullptr) | (u->dwFlags & 0x10000u),   // +0xC4 bit 16: a stopped blood missile goes to the floor list (0xA6180)
+                               (firstDraw ? 1u : 0u) | (blocked ? 2u : 0u) | hidden);
         }
     }
     // the client-only light-spot missiles (class 0x11f, type 3) 0x53550 made: placed on their subtile centre, ids local to the client
