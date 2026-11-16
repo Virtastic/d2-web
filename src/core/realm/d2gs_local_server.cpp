@@ -101,7 +101,8 @@ void putTo(LocalServer& s, const uint8_t* bytes, int length) {
     std::memcpy(s.out + s.outLength, bytes, static_cast<size_t>(length));
     s.outLength += length;
 }
-void put(const uint8_t* bytes, int length) { putTo(g_server, bytes, length); }
+uint32_t g_putTotal;   // every byte the game ever sent the main client, dropped or queued: the client receives it on the frame of the tick that sent it
+void put(const uint8_t* bytes, int length) { if (length > 0) g_putTotal += uint32_t(length); putTo(g_server, bytes, length); }
 
 // Every packet the game sends a further connection's client, routed by that client (from its logon on: the
 // load part of the join is sent before it is in game).
@@ -285,10 +286,11 @@ EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_pump() { return g_server.outLength; }
 
 EMSCRIPTEN_KEEPALIVE const uint8_t* d2_local_d2gs_out() { return g_server.out; }
 // The queued server bytes' length; the queue is empty afterwards (read d2_local_d2gs_out first).
-static int g_lastTake;
-EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_take() { const int n = g_server.outLength; g_server.outLength = 0; g_lastTake = n; return n; }
-// What the client's latest receive held: D2Client's packet pump (0xACE20, one clock read) runs only on a frame that got bytes.
-int d2_local_d2gs_last_take() { return g_lastTake; }
+EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_take() { const int n = g_server.outLength; g_server.outLength = 0; return n; }
+// The bytes the game sent the client since the previous call: what the client's frame receives. D2Client's packet pump
+// (0xACE20, one clock read) runs only on a frame that got bytes, and it gets them on the frame of the tick that sent them,
+// however late the transport takes its queue.
+uint32_t d2_local_d2gs_frame_bytes() { static uint32_t seen; const uint32_t n = g_putTotal - seen; seen = g_putTotal; return n; }
 // Bytes lost on the way to the client since the connection opened (a consumer that never takes).
 EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_dropped() { return g_server.outDropped; }
 // {opcode, result} per client packet the server did not take, oldest first.

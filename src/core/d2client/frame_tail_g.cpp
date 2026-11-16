@@ -55,12 +55,12 @@ extern "C" uint32_t d2_dg_n9ee90();
 extern "C" uint32_t d2_session_walk_fn14(uint32_t i, uint32_t* out);
 extern "C" uint32_t d2_session_walk_rooms();
 extern "C" uint32_t d2_session_walk_units();
-extern "C" int d2_local_d2gs_last_take();
+extern "C" uint32_t d2_local_d2gs_frame_bytes();
 
 // first: the trace's first frame. tick: the trace tick. pump: 1 when the packet pump processed packets this tick.
 extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first, int32_t tick, uint32_t pump) {
     out.clear();
-    pump = d2_local_d2gs_last_take() > 0;                        // the bytes this tick's receive held
+    pump = d2_local_d2gs_frame_bytes() > 0;                      // the bytes this tick's receive held
     const int32_t W = 640, H = 480;
     const uint32_t U = d2_session_walk_units();
     // the walk's reads: 7A385 once per 7A340 call, 9E994 once per 9E970 call (none on a frame 9F270 does not run), 9EEEE once per
