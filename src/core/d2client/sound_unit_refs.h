@@ -8,6 +8,8 @@ int32_t d2client_object_slot_row(uint32_t cls, uint32_t slot);   // 0xF6C58[cls]
 void d2client_sound_unit_submit(int32_t row);                     // sound_pump.cpp: a unit's 0x88A70 submit (replay only)
 void d2client_sound_unit_submit_now(int32_t row, int32_t p3);     // sound_pump.cpp: a packet handler's submit, logged at once
 int32_t d2client_sound_speech_submit(int32_t row);                // sound_pump.cpp: 0x7D3C0's speech submit, the handle back
+int32_t d2client_sound_speech_submit_at(uint32_t tick, int32_t row);   // sound_pump.cpp: the same submit from the frame
+void d2client_sound_log_at(uint32_t tick, uint32_t ord, uint32_t ecx, uint32_t edx);   // sound_pump.cpp: a frame's own D2Sound call
 bool d2client_sound_armed();                                     // sound_pump.cpp: the A trace is armed (replay only)
 void d2client_session_event_packets(uint32_t* heroSeed, uint32_t cycle, uint32_t tick);   // the frame's 0x2C packets -> 0x23F20
 // session_unit_sound.cpp: the client's unit sound calls on the session units

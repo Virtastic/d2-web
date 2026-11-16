@@ -5,13 +5,19 @@
 // zero sound ends it) picks the spoken line, 0x88A70(player, 5, 0, 0) submits it and the handle lands
 // in DAT 0x113B0B; the first window of the game (DAT 0x123448) also reads the tick and registers the
 // window through D2Gfx 10048, whose edx is that handle.
-// Not modelled: the per-frame update and end 0x7EA90/0x7E970/0x7BB40 and the continuation 0x4B230.
+// The per-frame update 0x7EA90 -> 0x7E970 -> 0x7BB40 and the continuation 0x4B230 (next message 0x45FF0) follow below.
+// Not modelled: 0x7CEF0's own 10048 (its edx is a leftover register) and the scroll text's draw calls.
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 #include "../d2moo/include/D2Text.h"
 #include "../d2moo/include/D2PacketDef.h"
 #include "sound_unit_refs.h"
+
+extern "C" const char* d2_lang_string_by_index(int index);
+extern "C" int32_t d2_session_view_y();
+uint32_t& d2client_frame_clock();   // frame_tail_g.cpp: the rig clock the frame's reads advance
 
 namespace {
 struct Pair { int32_t sound; int16_t string; };
@@ -19,12 +25,78 @@ const Pair kSpeech[] = {
 #include "npc_speech_sounds.inc"   // 0xDF398, 864 {sound, string} pairs
     , {0, 0}
 };
-bool g_panelUp = false;
-bool g_registered = false;
+// the scroll struct *0x113A68 (0x7C690): +04 line count, +08 scroll position, +0C rate, +1A last clock, +1E first clock,
+// +22 per-repeat step, +26 repeat sum, +2A repeat count
+struct Scroll { int32_t count, pos, rate; uint32_t last, first, step, sum; uint16_t reps; };
+bool g_panelUp = false;     // DAT 0x113A68 != 0
+bool g_registered = false;  // DAT 0x123448
+int32_t g_handle = 0;       // DAT 0x113B0B
+Scroll g_s{};
+D2TextHeaderStrc* g_menu = nullptr;   // DAT 0x113B10, the NPC's menu text list
+bool g_talking = false;     // DAT 0x119661
+int16_t g_cur = -1;         // DAT 0x11966F
+int16_t g_played[9]; uint16_t g_nPlayed = 0;   // 0x119792, count 0x1197A6
 std::string g_pendingG;
+
+// 0x7BFB0: line 0 of the string is the scroll rate (atol); every further '\n'-ended run of up to 100 units is a line
+void parse(int16_t id, int32_t& count, int32_t& rate) {
+    const std::string s = d2_lang_string_by_index((uint16_t)id);
+    count = 0; rate = 8;
+    size_t i = 0, nl = s.find('\n');
+    rate = (int32_t)(int16_t)atol(s.substr(0, nl).c_str());
+    if (nl == std::string::npos) return;
+    i = nl + 1;
+    while (i < s.size()) {
+        size_t e = s.find('\n', i), end = e == std::string::npos ? s.size() : e;
+        uint32_t units = 0;
+        for (size_t k = i; k < end; ++k) units += ((uint8_t)s[k] & 0xC0) != 0x80;
+        count += (int32_t)(units / 100) + 1;
+        if (e == std::string::npos) break;
+        i = e + 1;
+    }
 }
 
-void d2client_npc_speech_reset() { g_panelUp = false; g_registered = false; g_pendingG.clear(); }
+// 0x7D3C0(npc, id). `tick` 0: under the packet dispatch; else the frame's tick.
+void open(int16_t w, uint32_t tick) {
+    uint32_t& clk = d2client_frame_clock();
+    if (g_panelUp) return;
+    g_panelUp = true;
+    clk += 3;                                    // 10184, then 0x7C690's two 10184
+    parse(w, g_s.count, g_s.rate);
+    g_s.pos = 0; g_s.last = g_s.first = g_s.step = g_s.sum = 0; g_s.reps = 0;
+    clk += 1;                                    // 10184
+    g_handle = 0;
+    for (const Pair* p = kSpeech; p->sound != 0; ++p)
+        if (p->string == w) { g_handle = tick ? d2client_sound_speech_submit_at(tick, p->sound) : d2client_sound_speech_submit(p->sound); break; }
+    if (!g_registered) {
+        g_registered = true;
+        clk += 1;                                // 7D5E3 GetTickCount
+        char b[32];
+        std::snprintf(b, sizeof b, "10048 0,%x\n", (unsigned)g_handle);
+        if (!tick) g_pendingG += b;
+    }
+}
+
+// 0x45FF0: the first menu string (10778) that is not `bx` and not yet played
+int16_t nextMessage(int16_t bx) {
+    if (!g_menu) return -1;
+    for (int i = 0;; ++i) {
+        const int16_t s = TEXT_GetStringIdOfMenuType0Or2Node(g_menu, i);
+        if (s == -1) return -1;
+        if (s == bx) continue;
+        bool played = false;
+        for (uint16_t k = 0; k < g_nPlayed; ++k) if (g_played[k] == s) { played = true; break; }
+        if (!played) return s;
+    }
+}
+void push(int16_t s) { if (g_nPlayed < 9) g_played[g_nPlayed++] = s; }
+void freeMenu() { if (g_menu) TEXT_FreeTextHeader(g_menu); g_menu = nullptr; }
+}
+
+void d2client_npc_speech_reset() {
+    g_panelUp = false; g_registered = false; g_pendingG.clear(); g_handle = 0; g_s = {};
+    freeMenu(); g_talking = false; g_cur = -1; g_nPlayed = 0;
+}
 
 std::string d2client_npc_speech_take_g() { std::string s; s.swap(g_pendingG); return s; }
 
@@ -36,16 +108,52 @@ extern "C" void d2_client_npc_speech_packet(const D2GSPacketSrv27* p27, uint32_t
     TEXT_CreateTextHeaderFromMessageList(list, &msgs);
     TEXT_SortTextNodeListByStringId(list);
     const int16_t w = TEXT_GetStringIdOfMenuType0Or2Node(list, 0);
-    TEXT_FreeTextHeader(list);
-    if (w == -1 || g_panelUp) return;
-    g_panelUp = true;
-    int32_t handle = 0;
-    for (const Pair* p = kSpeech; p->sound != 0; ++p)
-        if (p->string == w) { handle = d2client_sound_speech_submit(p->sound); break; }
-    if (!g_registered) {
-        g_registered = true;
-        char b[32];
-        std::snprintf(b, sizeof b, "10048 0,%x\n", (unsigned)handle);
-        g_pendingG += b;
+    if (w == -1 || g_panelUp) { TEXT_FreeTextHeader(list); return; }
+    // 0x4B8A0: 966F = w, 0x7D3C0, 0x45D30 (played list), 0x45FF0, 0x14910 (a client packet: 0x143E0's clock read), 9661 = 1
+    freeMenu(); g_menu = list; g_nPlayed = 0;
+    g_cur = w;
+    open(w, 0);
+    push(w);
+    d2client_frame_clock() += 1;
+    g_talking = true;
+}
+
+// 1.13c D2Client+0x7EA90's speech step (0x7E970 on *0x113A68), from the frame after the room walk. `tick` is the frame's tick.
+void d2client_npc_speech_frame(uint32_t tick) {
+    if (!g_panelUp) return;
+    uint32_t& clk = d2client_frame_clock();
+    // 0x7EA90's SetRect: the view bottom (client Y + H/2 for the 640x480 view) is the edx 10001 is called with
+    d2client_sound_log_at(tick, 10001, 0, (uint32_t)(d2_session_view_y() - 16 + 480));
+    g_handle = 0;                                // 0x884D0(h) (D2Sound 10054 returns 0), then h = 0
+    // 0x7BB40: 10184, timeGetTime, ... 10184
+    clk += 1;
+    const uint32_t now = ++clk;
+    if (g_s.first == 0) { g_s.last = g_s.first = now; }
+    else {
+        uint32_t extra = 0;
+        if (g_s.last == now) {
+            if (g_s.step == 0) ++g_s.reps; else extra = g_s.sum += g_s.step;
+        } else {
+            g_s.sum = 0;
+            if (g_s.step == 0 && g_s.reps != 0) g_s.step = (now - g_s.last) / g_s.reps;
+            g_s.last = now;
+        }
+        g_s.pos = (int32_t)((extra + ((now - g_s.first) >> 2)) * (uint32_t)g_s.rate);
     }
+    clk += 1;
+    const int32_t lines = g_s.count - 1 < 1 ? 1 : g_s.count - 1;
+    if (!((uint32_t)(lines * 0x12 + 0x70) < ((uint32_t)g_s.pos >> 10))) return;
+    // 0x7E970 on a 1: the struct is freed (0x7BF40), 0x7CEF0 clears 0x123448, then the callback 0x4B230(0)
+    g_panelUp = false; g_registered = false;
+    const int16_t next = nextMessage(g_cur);
+    if (g_talking && next != -1) {
+        open(next, tick);
+        push(next);
+        g_cur = next;
+        clk += 1;                                // the '1' client packet (0x143E0)
+        return;
+    }
+    g_talking = false;                           // 0x48150 -> 0x47B20: the close packet (0x143E0) and the menu list freed
+    clk += 1;
+    freeMenu();
 }

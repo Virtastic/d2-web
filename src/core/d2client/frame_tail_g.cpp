@@ -51,6 +51,8 @@ uint32_t g_clk = 0, g_deadline = 0, g_frames = 0, g_lastReset = 0, g_rewalk = 0;
 uint32_t g_msgDeadline = 0;   // the game-message list's one entry (D2Client 0x113AA4/0x113AA8): 7D89B stamps the join message now + 10000; 0 once 7B730 drops it
 std::map<uint32_t, uint32_t> g_fn14;   // unit id -> a ClientFn 14 object's timer (unit+0xD4)
 }
+uint32_t& d2client_frame_clock() { return g_clk; }   // npc_speech_start.cpp: its reads advance the same clock
+void d2client_npc_speech_frame(uint32_t tick);       // npc_speech_start.cpp: 0x7EA90 -> 0x7E970, the speech window step
 extern "C" uint32_t d2_dg_n9e970();
 extern "C" uint32_t d2_dg_n9ee90();
 extern "C" uint32_t d2_dg_n13a00();
@@ -105,6 +107,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first
         rec(10045, lead, alpha, {0, 0, uint32_t(W), uint32_t(H - 0x2f), 0, alpha});
     } else { lead = g_deadline ? g_deadline : ecx805; g_deadline = 0; }   // expired: 10EC0 clears the deadline, its compare leaves it in ecx; unset: 10EC0 returns at once and ecx is 805A0's
     g_clk += 1;                                                  // 29250's D2Win 12FF8
+    d2client_npc_speech_frame(uint32_t(tick));                   // 0x7E970: 10001, then 0x7BB40's three reads
     if (g_msgDeadline) {                                         // 7B730 returns at once on an empty message list; else 12FF8, 7B92E, 12FF8
         g_clk += 2;
         if (g_msgDeadline < g_clk) g_msgDeadline = 0;            // an entry whose +0x1E is below 7B92E's read is unlinked

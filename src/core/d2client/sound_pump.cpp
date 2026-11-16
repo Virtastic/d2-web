@@ -205,6 +205,19 @@ int32_t d2client_sound_speech_submit(int32_t row) {
     curTick = ambTick + 1;
     return submitRows(curTick - 1, std::vector<int32_t>{ row }, 0, 5);
 }
+// The same submit from the frame (0x4B230's 0x7D3C0 under 0x7E970, after the tick's pump): logged under the frame's tick
+int32_t d2client_sound_speech_submit_at(uint32_t tick, int32_t row) {
+    if (!armed || row < 1) return 0;
+    initOnce();
+    curTick = tick;
+    return submitRows(tick - 1, std::vector<int32_t>{ row }, 0, 5);
+}
+// A D2Sound call the frame makes itself (0x7E970's #10001 through the 0xD270 thunk), logged under the frame's tick
+void d2client_sound_log_at(uint32_t tick, uint32_t ord, uint32_t ecx, uint32_t edx) {
+    if (!armed) return;
+    curTick = tick;
+    logA(ord, ecx, edx);
+}
 void d2client_npc_speech_reset();   // npc_speech.cpp
 extern "C" {
 EMSCRIPTEN_KEEPALIVE void d2_snd_trace_reset() { out.clear(); armed = true; unitQ.clear(); sndHandle = 0; d2client_npc_speech_reset(); }
