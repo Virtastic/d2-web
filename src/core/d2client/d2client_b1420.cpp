@@ -101,7 +101,7 @@ extern "C" uint32_t d2_client_b1420(uint32_t self, uint32_t target, uint32_t for
     }
     if (target && !rd8(row + 0x186)) return 0;
     const int32_t trav = rd16s(row + 0x12);
-    if (trav >= 0 && call(h, 0x215D0, (uint32_t)trav, self, 0, 0, self)) call(h, 0x88C20, 0, self, 0, 0, self, self, 0);
+    if (trav >= 0 && call(h, 0x225D0, (uint32_t)trav, self, 0, 0, self)) call(h, 0x88C20, 0, self, 0, 0, self, self, 0);
     uint32_t eax = call(h, 0xC3D6, 0, 0, 0, 0, self, self);                                              // #10398
     if (eax) eax = call(h, 0xA85F0, 0, 0, 0, 0, self);
     if (flags & 1) {

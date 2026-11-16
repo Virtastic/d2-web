@@ -13,7 +13,7 @@ extern "C" void d2c_67fd0(uint32_t self, const cl::Env& e) {
     using clc::G;
     const int32_t x0 = (int32_t)e.R(self + kX0), y0 = (int32_t)e.R(self + kY0);
     uint32_t clip[4] = { (uint32_t)x0, (uint32_t)y0, e.R(self + kW) + (uint32_t)x0 - 1, e.R(self + kH) + (uint32_t)y0 - 1 };
-    e.H(0xbe4c0, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)clip);
+    e.H(0xbe4c0);   // EAX = the rect; the capture logs no register for 0xBE4C0 (`hook 0xbe4c0 0 -`), the rect is its block record
     if (e.blk) e.blk(e.ctx, 0xbe4c0, (uint32_t)(uintptr_t)clip, 4);
     const uint32_t saved = e.H(0xd3a8, 0, 0, 0, 0, 0, 0, e.R(self + kFont));
     uint32_t rec[18] = {};
