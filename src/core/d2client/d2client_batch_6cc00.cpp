@@ -33,7 +33,7 @@ struct H6cc00 {
 extern "C" EMSCRIPTEN_KEEPALIVE
 int d2_client_6cc00(uint32_t p, uint32_t param2, const H6cc00* h, uint32_t glob_bbfc, int32_t glob_c995c,
                     int32_t glob_c9960, int32_t glob_cc418, int32_t mode_cc414, int32_t half_8bc48,
-                    int32_t glob_cc2d8, int32_t glob_cc380, int32_t ebx /*GUESS: unaff_EBX*/) {
+                    int32_t glob_cc2d8, int32_t glob_cc380, int32_t ebx /*GUESS: unaff_EBX*/, uint32_t arg4) {
     uint32_t mode = h->ord10013();
     if (p && rd32(p) == 5) return 0;
     if (h->sub_54b90()) h->sub_1b700();
@@ -83,7 +83,8 @@ int d2_client_6cc00(uint32_t p, uint32_t param2, const H6cc00* h, uint32_t glob_
         int32_t pal = mode == 4 ? h->ord10893(0, p, &rec[16], 0) : 0;
         if (!pal) pal = (int32_t)rec[18];
         h->ord10041(0, x, y, a, col, pal);
-        if (rec[13]) h->sub_1aee0(p, a, 0, -1, -1, 0);
+        // 0x6fb1cfe5: the test is the fourth stack argument (esp+0x8c after the stdcall), which every 666D0 call pushes as 1 (0x2B960 and 0xC5E50 push 0)
+        if (arg4) h->sub_1aee0(p, a, 0, -1, -1, 0);
         return 1;
     }
     uint32_t c = h->sub_01580();

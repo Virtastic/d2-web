@@ -548,7 +548,7 @@ struct H6cc00 { uint32_t (*ord10013)(); uint32_t (*ord10175)(); void (*ord10350)
     void (*ord10041)(uint32_t, int32_t, int32_t, uint32_t, uint32_t, int32_t); bool (*sub_54b90)(); void (*sub_1b700)(); int (*sub_6c490)(uint32_t, int32_t, int32_t); int (*sub_6e2c0)(uint32_t, void*);
     uint32_t (*sub_01a80)(); uint32_t (*sub_01580)(); void (*sub_1aee0)(uint32_t, uint32_t, int, int, int, int); const uint8_t* (*ord10688)(uint32_t); void (*fatal)(int); };
 extern "C" const uint8_t* d2_dg_object_rec(uint32_t);   // the objects.txt row (drlg_check.cpp)
-extern "C" int d2_client_6cc00(uint32_t, uint32_t, const H6cc00*, uint32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t);
+extern "C" int d2_client_6cc00(uint32_t, uint32_t, const H6cc00*, uint32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, uint32_t);
 // D2Client+0x666D0 for a staged unit node. The unit is a host struct: type @+0, class @+4, iso px from the stage (sx,sy subtiles), and the COF chain 6C490 walks is
 // ends in the unit's staged COF header (d2_dg_stage_unit_cof: layers and box; without one, 8 layers for the player, 1 otherwise, empty box). Callees not ported answer 0; 0x66620 answers 1.
 // ecx/edx on 10013 are leftovers: edx is the one a 10069 left behind, read once; ecx after a 10069 is the renderer's (D2Gfx 0xBAF0 returns through its
@@ -556,7 +556,7 @@ extern "C" int d2_client_6cc00(uint32_t, uint32_t, const H6cc00*, uint32_t, int3
 static int32_t g_vx, g_vy;   // ctx+0x24/+0x28, the view origin (iso px)
 static uint32_t g_hu[0x80], g_hinfo[0x10], g_hnode[8], g_hx[8], g_hhdr[0x4000];   // the header's first 24 bytes are the staged COF box; the rest is the staged whole COF, or reads 0 (6C490's component bytes)
 static uint32_t g_hlen = sizeof g_hhdr, g_hdir, g_hframe;   // bytes of g_hhdr in use; the staged unit's direction and frame (0 without a whole COF)
-static const uint8_t* g_hovr;
+static const uint8_t* g_hovr; static bool g_hwhole;   // g_hwhole: g_hhdr holds the whole COF
 static int32_t g_hpx, g_hpy; static uint32_t g_hself;
 // 1.13c D2Client+0x3F860's unit origin (DAT_6fbc9960 / DAT_6fbc995c): the player's client X - W/2 and client Y - H/2 + 16 (640x480, no shake).
 static int32_t g_uox, g_uoy;
@@ -754,7 +754,8 @@ static uint32_t hostCall(D2cCall* c) {
     // 666D0's 10013 (0x6fb16750): a monster or object passed 10494(unit, 0x8f) and 10494(unit, 0x92); otherwise ecx is still the unit (reads 0).
     if (c->rva == (0x80000000u | 10013)) { uint32_t t = g_hu[0]; if (t == 1 || t == 2) lo10494(t, 0x92); else g_lecx = 0; return rec10013(); }
     if (c->rva == 0x6CC00) g_p6cc00 = c->s[1];
-    if (c->rva == 0x6CC00) return (uint32_t)d2_client_6cc00(c->s[0], c->s[1], &kH6cc00, g_hself, g_uoy, g_uox, 0, 0, 640, 0, 0, g_hpx);
+    // 6CC00's fourth stack argument is 1 at each of 666D0's three calls (0x6fb16845, 0x6fb168a2, 0x6fb1690e)
+    if (c->rva == 0x6CC00) return (uint32_t)d2_client_6cc00(c->s[0], c->s[1], &kH6cc00, g_hself, g_uoy, g_uox, 0, 0, 640, 0, 0, g_hpx, 1u);
     if (c->rva == 0x728B0) { d2c_728b0(hostCall, c->eax, c->ebx); return 0; }
     if (c->rva == 0x72830) { d2c_72830(hostCall, c->eax, c->ebx); return 0; }
     return c->rva == 0x66620 ? visible66620() : 0;
@@ -765,7 +766,7 @@ static uint32_t stageUnit(uint32_t rec) {
     // fake cel chain: unit+0x54 -> info; info+0x28 -> node {key 1, class 2, +8 -> x, +0x10 next 0}; x+0x14 -> hdr (layer count byte)
     uint32_t u = (uint32_t)(uintptr_t)g_hu;
     memset(g_hinfo, 0, sizeof g_hinfo); memset(g_hnode, 0, sizeof g_hnode); memset(g_hx, 0, sizeof g_hx); memset(g_hhdr, 0, g_hlen);
-    g_hlen = 0x1000; g_hdir = g_hframe = 0; g_hovr = nullptr;
+    g_hlen = 0x1000; g_hdir = g_hframe = 0; g_hovr = nullptr; g_hwhole = false;
     uint32_t k = (rec - kUnitRec) / 16;
     g_hk = k;
     if (k < g_nUnits) clientXY(g_units[k], &g_hpx, &g_hpy); else { g_hpx = (sx - sy) * 16; g_hpy = (sx + sy) * 8; }
@@ -776,7 +777,7 @@ static uint32_t stageUnit(uint32_t rec) {
     if (k < g_nUnits && g_unitCof[k].has && g_unitAnim[k].cof) {
         const UnitAnim& a = g_unitAnim[k]; const uint32_t h0 = a.cof[0], h1 = a.cof[1], h2 = a.cof[2];
         if (a.size >= 0x1c && a.size <= sizeof g_hhdr && a.size >= 0x1c + 9 * h0 + h1 + h0 * h1 * h2 && a.frame < h1) {
-            memcpy(g_hhdr, a.cof, a.size); g_hlen = a.size > 0x1000 ? a.size : 0x1000; g_hdir = a.dir; g_hframe = a.frame; g_hovr = a.ovr;
+            memcpy(g_hhdr, a.cof, a.size); g_hlen = a.size > 0x1000 ? a.size : 0x1000; g_hdir = a.dir; g_hframe = a.frame; g_hovr = a.ovr; g_hwhole = true;
         }
     }
     g_hu[0x54 / 4] = (uint32_t)(uintptr_t)g_hinfo; g_hinfo[0x28 / 4] = (uint32_t)(uintptr_t)g_hnode;
@@ -801,7 +802,21 @@ static void unit6ba90(uint32_t rec) {
     int32_t x = g_hpx - g_uox - 2, y = g_hpy - g_uoy + 8;   // 6BA90: (cc418 - 9960) - 2 + X, (Y - 995c) + 8
     if (!cull6a3d0(x, y, 1)) return;
     uint32_t n = g_hhdr[0] & 0xff;
-    for (uint32_t i = 0; i < n; i++) gRec(10011, {0x100000u, (uint32_t)x, (uint32_t)y}, (uint32_t)y, (uint32_t)x);
+    // Per priority entry of the direction/frame row, 0x6D740 finds the COF layer of that component and passes only on its shadow
+    // byte (layer record +1); without a whole COF staged every layer passes.
+    // The row is 6D6D0's: the 6DCA0 direction row (D2CMP #10020's power-of-two snap, row 0 otherwise) and the frame.
+    const uint8_t* c = (const uint8_t*)g_hhdr; const uint32_t h1 = c[1], h2 = c[2];
+    uint32_t dr = 0;
+    if (g_hdir <= 0x3f && h2 && !(h2 & (h2 - 1)) && h2 <= 64) { uint32_t s = 0; while ((h2 << s) < 64) s++; dr = ((g_hdir + ((1u << s) >> 1)) >> s) & (h2 - 1); }
+    const uint8_t* row = g_hwhole ? c + 0x1c + 9 * n + h1 + (dr * h1 + g_hframe) * n : nullptr;
+    for (uint32_t i = 0; i < n; i++) {
+        if (row) {
+            const uint8_t* l = c + 0x1c; uint32_t j = 0;
+            while (j < n && l[9 * j] != row[i]) j++;
+            if (j == n || !l[9 * j + 1]) continue;
+        }
+        gRec(10011, {0x100000u, (uint32_t)x, (uint32_t)y}, (uint32_t)y, (uint32_t)x);
+    }
     g_lecx = 0; g_ledx = n;   // the loop test (0x6fb1bee2): ecx = the COF (reads 0), edx = the layer count
 }
 extern "C" void d2c_9ee90(const D2c9EE90Env*, uint32_t);
