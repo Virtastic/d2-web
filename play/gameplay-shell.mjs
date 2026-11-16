@@ -57,6 +57,7 @@ import { createItemPropertyCache, itemPropsCacheable } from './assets/item-prope
 import { parseItemLines } from './assets/item-tooltip.mjs';
 import { createNpcNameLabelCache } from './assets/npc-name-label-cache.mjs';
 import { savedCharacterReadError, setFrontdoorError } from './assets/frontdoor-error.mjs';
+import { setOverlayFont, setOverlayText } from './assets/overlay-text.mjs';
 import { createQuestLogRenderer, createMessageLogRenderer, QUESTS_IN_ACT, ACT_BASE, ACT_DONE, questStatus, questWord, messageScrollMax, COMPLETING, MSG_LIST } from './assets/quest-log.mjs';
 import { createListPress } from './assets/list-press.mjs';
 import { createPartyPanelRenderer, partyRows, ownState, clickResult as partyClickResult } from './assets/party-panel.mjs';
@@ -435,6 +436,7 @@ const makeHoverFont = () => { const rd = createMpqAssetReader(Module);
     tbl: decodeFontTbl(rd('data\\local\\font\\latin\\font16.tbl')), palette: decodeDatPalette(rd(FRONTEND.palette)),
     documentObject: document, path: 'data\\local\\font\\latin\\font16.dc6', drawAs: { op: 'celcolor', mode: 5 } }); };
 let hoverFont = null, automapFont = null, groundLabelFont = () => hoverFont;
+setOverlayFont(() => (window.__d2?.ready ? (hoverFont = ensureFont(hoverFont, makeHoverFont)) : hoverFont));   // the DOM overlays' lettering (assets/overlay-text.mjs)
 // The palette the plate's rectangles are indexed in: the same pal.dat its glyphs are decoded with
 // (Units), whose entries 0 and 5 are the ones D2Win 0x133A0's plate rectangles name.
 let hoverPlatePalette = null;
@@ -3443,8 +3445,8 @@ function ensureFreeRes() {
   if (freeResArt || !window.__d2Entry?.fill || !window.__d2?.ready) return freeResArt;
   const loud = (art) => { if (art.ready) return; console.error('SGD2FreeRes art not loaded: ' + art.error);
     const d = document.createElement('div'); d.id = 'freeres-notice'; d.setAttribute('role', 'alert');
-    d.style.cssText = 'position:fixed;left:0;right:0;top:0;padding:6px 12px;background:#0b0c09;color:#c9ad68;border-bottom:1px solid #493d27;font:12px sans-serif;z-index:9';
-    d.textContent = 'Widescreen HUD art missing (' + art.error + '); the wide bar and panel filler are not drawn.'; document.body.append(d); };
+    d.style.cssText = 'position:fixed;left:0;right:0;top:0;padding:6px 12px;background:#0b0c09;color:#c9ad68;border-bottom:1px solid #493d27;font-size:16px;z-index:9';
+    setOverlayText(d, 'Widescreen HUD art missing (' + art.error + '); the wide bar and panel filler are not drawn.', { wrap: 780 }); document.body.append(d); };
   try { freeResArt = createFreeResArt(createMpqAssetReader(Module)); freeResArt.load().then(() => loud(freeResArt)); } catch (error) { freeResArt = { ready: false, error: String(error) }; loud(freeResArt); }
   return freeResArt;
 }
@@ -7487,6 +7489,9 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
   get otherMultiplayerEvidence() { return otherMultiplayerScreen ? otherMultiplayerScreen.evidence : { error: otherMultiplayerError || 'not built' }; },
   // F89: what the page's own realm client did when a configured region was committed.
   get localRealmEvidence() { return realmFlow?.local?.evidence() ?? null; },
+  // True from the moment a new game's snapshot is visible until its local join ended (or failed: sessionError). A script
+  // that drives the game waits for it to clear, or it races the join and runs in whichever view the join left it.
+  get sessionEntering() { return sessionEntering; },
   get fromPackets() { return clientView().fromPackets; },   // which source the frame is read from (the view selector's answer)
   get realmTransportEvidence() { return realmTransport; },
   get realmInputEvidence() { const e = realmInputState?.evidence; return e ? { ...e, last: e.last ? { ...e.last } : null } : null; },

@@ -1,5 +1,6 @@
 // Gamepad policy that is not a button map: the L3 run toggle's accident guard, and (below) the stick
 // settings. Pure functions and a small store, so a test drives them with a clock and no DOM.
+import { setOverlayText } from './overlay-text.mjs';
 
 /** L3 is D2R's Run/Walk toggle: one press (the rising edge) toggles, a hold does not repeat.
  *  fire(pressed, nowMs) is called every poll; it returns true on the poll that should send the key. */
@@ -76,16 +77,16 @@ const B = { A: 0, B: 1, START: 9, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
 const fmt = (row, v) => (row.bool ? (v ? 'On' : 'Off') : String(v));
 /** A text overlay for the settings. Back+Start opens it; d-pad up/down picks a row, left/right changes it,
  *  B or Start closes it. update(buttons) is called every poll and returns true while it owns the pad. */
-export function createSettingsPanel(viewport, settings, fontFamily = 'monospace') {
+export function createSettingsPanel(viewport, settings) {
   const el = document.createElement('div');
   Object.assign(el.style, { position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', display: 'none', padding: '12px 18px',
-    background: 'rgba(0,0,0,0.85)', color: '#c8b88a', border: '1px solid #6c5a2e', font: `16px ${fontFamily}`, whiteSpace: 'pre', zIndex: 30, pointerEvents: 'none' });
+    background: 'rgba(0,0,0,0.85)', color: '#c8b88a', border: '1px solid #6c5a2e', fontSize: '16px', whiteSpace: 'pre', zIndex: 30, pointerEvents: 'none' });
   viewport.appendChild(el);
   let open = false, row = 0;
   const was = {};
   const render = () => {
     const v = settings.get();
-    el.textContent = ['Controller settings', '', ...ROWS.map((r, i) => `${i === row ? '> ' : '  '}${r.label}: ${fmt(r, v[r.key])}`), '', 'Up/Down row   Left/Right change   B close'].join('\n');
+    setOverlayText(el, ['Controller settings', '', ...ROWS.map((r, i) => `${i === row ? '> ' : '  '}${r.label}: ${fmt(r, v[r.key])}`), '', 'Up/Down row   Left/Right change   B close'].join('\n'));
     el.style.display = open ? 'block' : 'none';
   };
   const api = {

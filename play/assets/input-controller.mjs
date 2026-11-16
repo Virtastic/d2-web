@@ -29,7 +29,7 @@
 // The client's two typed fields (the create screen's name box and the stash's gold amount box) are
 // worked with a grid: the d-pad moves the highlight, A types the highlighted cell.
 
-import { OVERLAY_FONT } from './input-touch.mjs';
+import { setOverlayText } from './overlay-text.mjs';
 import { click, pointer, key, tapKey, playerOnCanvas, stickTarget } from './input-common.mjs';
 import { rankTargets, pickTarget, goldInReach } from './pad-targeting.mjs';
 import { enhancePanelPoints, makeRepeater, nearestIndex, quickMovePlan, beltFillPlan, makeHold, equipHeld } from './pad-panels.mjs';
@@ -260,10 +260,10 @@ function makeGrid(viewport, id, rows, cols, box) {
     Object.assign(line.style, { display: 'flex', width: '100%' });
     Array.from(row).forEach((label, c) => {
       const cell = document.createElement('div');
-      cell.textContent = label;
+      setOverlayText(cell, label);
       Object.assign(cell.style, {
         width: `${100 / cols}%`, boxSizing: 'border-box', textAlign: 'center', lineHeight: '1.35',
-        fontFamily: OVERLAY_FONT, color: '#d8d8d8', background: 'rgba(0,0,0,0.65)',
+        color: '#d8d8d8', background: 'rgba(0,0,0,0.65)',
         border: '1px solid #4a4a4a', borderRadius: '2px', overflow: 'hidden',
       });
       line.appendChild(cell);
@@ -273,7 +273,7 @@ function makeGrid(viewport, id, rows, cols, box) {
     el.appendChild(line);
   });
   const hintEl = document.createElement('div');
-  Object.assign(hintEl.style, { fontFamily: OVERLAY_FONT, color: '#c8c8c8', background: 'rgba(0,0,0,0.65)', textAlign: 'center', fontSize: '11px' });
+  Object.assign(hintEl.style, { color: '#c8c8c8', background: 'rgba(0,0,0,0.65)', textAlign: 'center', fontSize: '11px' });
   el.appendChild(hintEl);
   viewport.appendChild(el);
   return { el, cells, labels, rows, index: 0, hidden: false, box, hintEl };
@@ -294,7 +294,7 @@ function start() {
   const reader = createReportReader();
   const runToggle = createRunToggle();
   const settings = createSettings(globalThis.localStorage);
-  const settingsPanel = createSettingsPanel(viewport, settings, OVERLAY_FONT);
+  const settingsPanel = createSettingsPanel(viewport, settings);
   window.__d2PadSettings = { get: settings.get, set: settings.set, panel: settingsPanel };
   const repeat = Object.fromEntries([BUTTON.DPAD_UP, BUTTON.DPAD_DOWN, BUTTON.DPAD_LEFT, BUTTON.DPAD_RIGHT].map((b) => [b, makeRepeater()]));
   const state = { connected: false, index: -1, cursor: { x: canvas.width / 2, y: canvas.height / 2 }, lastStickWalk: 0, wasPressed: {}, shift: false, showItems: false, aim: null, cycle: 0, cycleSig: '', cycleDir: 0,
@@ -400,7 +400,7 @@ function start() {
     if (shown) tapKey(code, shown);
   };
   // The skill buttons (pad-skill-*.mjs) own the world: they reach the game only through these events.
-  const skillMapper = makeSkillMapper(), skillOverlay = createSkillOverlay(viewport, OVERLAY_FONT);
+  const skillMapper = makeSkillMapper(), skillOverlay = createSkillOverlay(viewport);
   const skillPlay = makeSkillPlay({ io: {
     selectSkill: (id, side) => globalThis.__d2Shell?.selectSkill?.(id, side),
     pointer: (type, x, y, o) => pointer(canvas, type, x, y, { button: o.button, shiftKey: o.shiftKey }),
@@ -464,7 +464,7 @@ function start() {
       w: g.box.w * canvas.offsetWidth, h: g.box.h * canvas.offsetHeight };
     Object.assign(el.style, { display: 'block', left: `${Math.round(box.x)}px`, top: `${Math.round(box.y)}px`,
       width: `${Math.round(box.w)}px`, height: `${Math.round(box.h)}px`, fontSize: `${Math.max(9, Math.round(box.h / g.rows.length * 0.3))}px` });
-    g.hintEl.textContent = hintLine(state.layout, [[BUTTON.A, 'Select'], [BUTTON.B, 'Delete'], [BUTTON.Y, 'Hide']]);
+    setOverlayText(g.hintEl, hintLine(state.layout, [[BUTTON.A, 'Select'], [BUTTON.B, 'Delete'], [BUTTON.Y, 'Hide']]));
     cells.forEach((cell, i) => {
       const on = i === g.index;
       cell.style.background = on ? '#8a6a1a' : 'rgba(0,0,0,0.65)';

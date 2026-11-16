@@ -47,9 +47,6 @@ import { orbAimPoint } from './orb-readout.mjs';
 import { nearestPointAim, nearestControlAim, panelControlPoints } from './touch-panel-aim.mjs';
 import { panelSpec, panelOrigin, onPanelControl, panelControlAim as aimPanelControls } from './touch-panel-aim.mjs';
 
-// Overlay face: the game's serif, not the browser's monospace (no web font ships).
-export const OVERLAY_FONT = 'Palatino Linotype, Palatino, Georgia, serif';
-
 // The scripted seam's keys that the touch layer names by their key name (what a physical key sends).
 const KEY_NAMES = { KeyI: '', KeyC: '', KeyT: '', Escape: 'Escape' };
 
@@ -62,7 +59,9 @@ function injectStyle(documentObject) {
     '#touch-overlay .d2-touch-hit{pointer-events:none}' +
     '#touch-overlay.d2-touch-on .d2-touch-hit{pointer-events:auto}' +
     '#d2-touch-name{position:absolute;left:39.75%;top:82.2%;width:27.5%;height:5.2%;box-sizing:border-box;' +
-      'font:16px ' + OVERLAY_FONT + ';padding:2px 6px;background:#1a170f;color:#e8d9ab;border:1px solid #493d27;touch-action:none}';
+      // The box is only the phone keyboard's target and shows nothing of its own: the name the player reads is
+      // the one the screen draws under it in the game's font. 16px keeps iOS from zooming the page on focus.
+      'font-size:16px;margin:0;padding:0;background:transparent;color:transparent;caret-color:transparent;border:0;outline:0;touch-action:none}';
   documentObject.head.appendChild(style);
 }
 
