@@ -55,6 +55,10 @@ extern "C" uint32_t D2WEB_TakeMonsterAssigns() { const uint32_t n = g_d2webMonst
 // them all in emission order whatever resets or fills the bounded stream above. Unset by default.
 static void (*g_d2webPacketSink)(const uint8_t*, uint32_t) = nullptr;
 extern "C" void D2WEB_SetPacketSink(void (*sink)(const uint8_t*, uint32_t)) { g_d2webPacketSink = sink; }
+// A recorded session's client: handed each packet the game sends a client, with that client, in emission order, so the
+// session's client act takes its map packets before the frame that reads them. Unset by default.
+static void (*g_d2webSessionPacketTap)(const void*, const uint8_t*, uint32_t) = nullptr;
+extern "C" void D2WEB_SetSessionPacketTap(void (*tap)(const void*, const uint8_t*, uint32_t)) { g_d2webSessionPacketTap = tap; }
 // The local game's join keeps every byte its walk sends (the rooms, then each unit in them) for the client that connects
 // afterwards. The bounded stream above holds 4 KB: a join over a level seam overflows it, and every unit sent after the
 // overflow (the far rooms' objects and monsters) never reached that client. While set, each packet is appended here too.
@@ -948,6 +952,7 @@ void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, in
         g_d2webPacketStreamLength += (uint32_t)nPacketSize; ++g_d2webPacketStreamPackets;
     }
     if (g_d2webPacketSink && pClient && pPacket && nPacketSize > 0) g_d2webPacketSink((const uint8_t*)pPacket, (uint32_t)nPacketSize);
+    if (g_d2webSessionPacketTap && pClient && pPacket && nPacketSize > 0) g_d2webSessionPacketTap(pClient, (const uint8_t*)pPacket, (uint32_t)nPacketSize);
     if (pClient && pPacket && nPacketSize > 0 && *static_cast<const uint8_t*>(pPacket) == 0xAC) ++g_d2webMonsterAssigns;
     if (g_d2webPacketRecord && pClient && pPacket && nPacketSize > 0)
         g_d2webPacketRecord->insert(g_d2webPacketRecord->end(), (const uint8_t*)pPacket, (const uint8_t*)pPacket + nPacketSize);

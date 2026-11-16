@@ -1213,12 +1213,62 @@ static D2DrlgActStrc* g_sessionTownAct = nullptr; static uint32_t g_sessionTownU
 // its rooms once; the server act's copy of such a room, activated later, is the same client room and is not sighted again
 static std::set<uint64_t> g_sessionTownSighted;
 static uint64_t sessionRoomKey(const D2DrlgRoomStrc* dr) { return ((uint64_t)(uint32_t)dr->pLevel->nLevelId << 48) | ((uint64_t)(uint16_t)dr->nTileXPos << 16) | (uint16_t)dr->nTileYPos; }
+// The session client's act, built from the map packets the server sends it, in the order it sends them. The 0x03 handler
+// (D2Client+0x43F90) allocates a bClient act; each 0x07 handler (D2Client+0xAC440) is one DUNGEON_SetClientIsInSight on it and
+// each 0x08 one DUNGEON_UnsetClientIsInSight. The sighting's propagation (D2Common 7C300 -> 7C090 -> 7BFA0) creates the rooms,
+// and D2Common's AllocRoom puts each new room at the head of the act's list, so the list runs newest first. The packets are
+// applied as they are sent, which is before the client frame that walks the list (retail's client takes the frame's packets
+// before its frame tail). The hint argument (the hero's client room) narrows only the room lookup and is not passed.
+static D2DrlgActStrc* g_sessionMirrorAct = nullptr; static int g_sessionMirrorActNo = -1; static const void* g_sessionMirrorClient = nullptr;
+static bool g_sessionMirrorOpen = false;   // from a session's create (its client's join is sent there) to its destroy
+static std::vector<D2DrlgActStrc*> g_sessionMirrorRetired;   // an act a later 0x03 replaced: its rooms may still hold critters
+static std::unordered_set<D2ActiveRoomStrc*> g_sessionMirrorSeen;   // D2Client+0x440C0's seen bit, on the client's active room
+static std::unordered_set<D2DrlgRoomStrc*> g_sessionMirrorTownCounted;   // the town rooms whose client-only presets g_sessionTownUnits holds
+static void sessionMirrorAlloc(int actNo, uint32_t seed, int townLevel) {
+    static const AUTOMAPFN noMap = [](D2ActiveRoomStrc*) {};
+    static const TOWNAUTOMAPFN noTownMap = [](int32_t, int32_t, int32_t, int32_t) {};
+    if (g_sessionMirrorAct) g_sessionMirrorRetired.push_back(g_sessionMirrorAct);
+    g_sessionMirrorSeen.clear();
+    g_sessionMirrorAct = DUNGEON_AllocAct((uint8_t)actNo, seed, TRUE, nullptr, (uint8_t)g_gameDiff, nullptr, townLevel, noMap, noTownMap);
+    g_sessionMirrorActNo = g_sessionMirrorAct ? actNo : -1;
+}
+static void sessionMirrorPacket(const void* client, const uint8_t* p, uint32_t n) {
+    if (!g_sessionMirrorOpen || g_sessionClientActOwned || !p || !n) return;
+    if (p[0] != 0x03 && p[0] != 0x07 && p[0] != 0x08) return;
+    if (g_sessionMirrorClient && client != g_sessionMirrorClient) return;
+    g_sessionMirrorClient = client;
+    if (p[0] == 0x03) {
+        if (n < 8 || p[1] > 4) return;
+        if (g_sessionMirrorAct && g_sessionMirrorActNo == p[1]) return;
+        uint32_t seed; std::memcpy(&seed, p + 2, 4);
+        sessionMirrorAlloc(p[1], seed, int(p[6]) | (int(p[7]) << 8));
+        return;
+    }
+    if (n < 6) return;
+    uint16_t x, y; std::memcpy(&x, p + 1, 2); std::memcpy(&y, p + 3, 2);
+    const int level = p[5];
+    if (level <= 0 || !DATATBLS_GetLevelsTxtRecord(level)) return;
+    if (!g_sessionMirrorAct) {
+        if (g_currentAct < 0 || g_currentAct > 4) return;
+        sessionMirrorAlloc(g_currentAct, g_gameSeed, DUNGEON_GetTownLevelIdFromActNo((uint8_t)g_currentAct));
+        if (!g_sessionMirrorAct) return;
+    }
+    if (p[0] == 0x07) DUNGEON_SetClientIsInSight(g_sessionMirrorAct, level, x, y, nullptr);
+    else DUNGEON_UnsetClientIsInSight(g_sessionMirrorAct, level, x, y, nullptr);
+}
+extern "C" void D2WEB_SetSessionPacketTap(void (*tap)(const void*, const uint8_t*, uint32_t));
 static void resetSessionClientMapMirror() {
     if (g_sessionClientPlayerUnit) UNITS_FreeUnit(g_sessionClientPlayerUnit);
     g_sessionClientPlayerUnit = nullptr;
     d2client::weather::reset(); d2client_ambient::reset(); d2_client_monster_idle_reset(); sessionClientMonsterModeReset(); d2_client_attack_roll_reset(); g_sessionClientRoomsSeen.clear(); g_sessionReleasedRooms.clear(); g_clientSpotMissiles.clear(); g_sessionClientFrame = 0; d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset(); { extern void d2_client_monster_hit_reset(); d2_client_monster_hit_reset(); }
     if (g_sessionTownAct) { DUNGEON_FreeAct(g_sessionTownAct); g_sessionTownAct = nullptr; }   // after the critters that stand in it
     g_sessionTownUnits = 0; g_sessionTownBuilt = false; g_sessionTownSighted.clear();
+    g_sessionMirrorSeen.clear(); g_sessionMirrorTownCounted.clear();
+    for (D2DrlgActStrc* a : g_sessionMirrorRetired) DUNGEON_FreeAct(a);
+    g_sessionMirrorRetired.clear();
+    if (g_sessionMirrorAct) { DUNGEON_FreeAct(g_sessionMirrorAct); g_sessionMirrorAct = nullptr; }   // after the critters that stand in it
+    g_sessionMirrorActNo = -1; g_sessionMirrorClient = nullptr; g_sessionMirrorOpen = false;
+    D2WEB_SetSessionPacketTap(sessionMirrorPacket);
     if (g_sessionClientActOwned) d2_drlg_act_end();
     g_sessionClientActOwned = false;
     g_sessionClientMapStarted = false;
@@ -3662,7 +3712,7 @@ static int d2_session_create_for_class(uint32_t seed, int difficulty, int act, i
     if (difficulty < 0 || difficulty > 2 || act < 0 || act > 4 || levelId < 0 || playerClass < 0 || playerClass >= 7) return 0;
     g_sessionMonsterLights.clear();
     g_sessionPlayerClass = playerClass;
-    resetSessionClientMapMirror();
+    resetSessionClientMapMirror(); g_sessionMirrorOpen = true;
     d2_monspawn_reset(); g_sessionLive = false; g_sessionMovePending = false; g_d2ClientSoundObjects = 1;
     d2client_unitseed::tell_mode(true);   // the session's server announces monsters to its client (sessionHeldStep)
     g_sessionAiThinkWatchUnit = UINT32_MAX; g_sessionAiThinkWatchCount = 0; g_sessionAiThinkWatchLastFrame = -1;
@@ -8084,10 +8134,8 @@ extern "C" int d2_client_monster_turn_held(const D2UnitStrc* unit);
 // a Den of Evil room (level 8) gets 0x53550's light spots: up to 25 tries of a random subtile in the room
 // (#10561 room coords, two hero-seed draws), each free one (#10482 mask 5 clear) sent, until 3 are free.
 // The spots themselves (0xB30F0, a client-only unit) are not made here; only their draws are.
-// The session has no client Act: the client's rooms are the server Act's active rooms, plus the rooms of another
-// level the client's activation ring reaches through a warp (the server leaves those untiled). Retail's client builds
-// one of those per 7 frames from its 7th frame. Unbuilt here, their collision is
-// not held, so every spot in one reads as blocked (retail: 25 tries, 50 draws).
+// D2Client+0x53550 over a level-8 room the walk reaches: up to 25 tries for 3 free spots. A room without an active room holds
+// no collision, so every spot in one reads as blocked (25 tries, 50 draws).
 static void sessionClientRoomSpots(D2DrlgRoomStrc* room, D2ActiveRoomStrc* active) {
     D2DrlgCoordsStrc c{};
     if (active) DUNGEON_GetRoomCoordinates(active, &c);
@@ -8129,21 +8177,64 @@ static void sessionClientTownSeen(D2DrlgRoomStrc* seen, int32_t townLevel) {
         }
     }
 }
+// D2Client+0x440C0 over the session client's own act (sessionMirrorPacket): its room list from the head, so the newest room
+// first; each room whose seen bit is clear is marked and handled. The bit lives on the client's active room, so a room the
+// client freed and built again is new. The client act holds no units: a room the server also holds active stands in for the
+// client's (its collision carries the units the client was told of); a room only the client holds is its own.
+static void sessionClientMirrorPass() {
+    D2DrlgActStrc* server = g_game && g_currentAct >= 0 ? g_game->pAct[g_currentAct] : nullptr;
+    std::unordered_set<D2ActiveRoomStrc*> live;
+    for (D2ActiveRoomStrc* room = DUNGEON_GetRoomFromAct(g_sessionMirrorAct); room; room = room->pRoomNext) live.insert(room);
+    for (auto it = g_sessionMirrorSeen.begin(); it != g_sessionMirrorSeen.end();) it = live.count(*it) ? std::next(it) : g_sessionMirrorSeen.erase(it);
+    const int32_t townLevel = DUNGEON_GetTownLevelIdFromActNo((uint8_t)g_sessionMirrorActNo);
+    bool serverTown = false;
+    for (D2ActiveRoomStrc* room = server ? DUNGEON_GetRoomFromAct(server) : nullptr; room; room = room->pRoomNext)
+        if (room->pDrlgRoom && room->pDrlgRoom->pLevel && room->pDrlgRoom->pLevel->nLevelId == townLevel) serverTown = true;
+    auto serverRoom = [&](D2DrlgRoomStrc* dr) -> D2ActiveRoomStrc* {
+        for (D2ActiveRoomStrc* room = server ? DUNGEON_GetRoomFromAct(server) : nullptr; room; room = room->pRoomNext) {
+            const D2DrlgRoomStrc* s = room->pDrlgRoom;
+            if (s && s->pLevel && s->pLevel->nLevelId == dr->pLevel->nLevelId && s->nTileXPos == dr->nTileXPos && s->nTileYPos == dr->nTileYPos) return room;
+        }
+        return nullptr;
+    };
+    for (D2ActiveRoomStrc* room = DUNGEON_GetRoomFromAct(g_sessionMirrorAct); room; room = room->pRoomNext) {
+        D2DrlgRoomStrc* dr = room->pDrlgRoom;
+        if (!dr || !dr->pLevel) continue;
+        if (!g_sessionMirrorSeen.insert(room).second) continue;
+        D2ActiveRoomStrc* at = serverRoom(dr);
+        if (!at) at = room;
+        D2DrlgRoomStrc* atEx = at->pDrlgRoom;
+        const int32_t levelId = dr->pLevel->nLevelId;
+        d2client_critter::room_seen(at, levelId, g_sessionClientFrame);   // 1.13c D2Client+0x18370
+        for (D2PresetUnitStrc* p = atEx->pPresetUnits; p; p = p->pNext) if (p->bSpawned & 1) {
+            d2client_critter::preset_seen(at, at->tCoords.nSubtileX + p->nXpos, at->tCoords.nSubtileY + p->nYpos);   // 1.13c D2Client+0xA7D00
+            if (levelId == townLevel && !serverTown && at == room && p->nUnitType >= 1 && p->nUnitType <= 3 && !g_sessionMirrorTownCounted.count(dr)) ++g_sessionTownUnits;
+        }
+        if (levelId == townLevel && at == room) g_sessionMirrorTownCounted.insert(dr);
+        // the frame clock counts a seen room's client-only presets over the server level's rooms (d2_session_room_walk_g)
+        else if (at != room) g_sessionClientRoomsSeen.insert(atEx);
+        else if (D2DrlgLevelStrc* lv = server && server->pDrlg ? server->pDrlg->pLevel : nullptr; true) {
+            for (; lv && lv->nLevelId != levelId; lv = lv->pNextLevel) {}
+            for (D2DrlgRoomStrc* r = lv ? lv->pFirstRoomEx : nullptr; r; r = r->pDrlgRoomNext)
+                if (r->nTileXPos == dr->nTileXPos && r->nTileYPos == dr->nTileYPos) { g_sessionClientRoomsSeen.insert(r); break; }
+        }
+        if (levelId == 8) sessionClientRoomSpots(atEx, at);
+    }
+    // the frame tail (D2Client+0x44A80) after the walk: D2Common #10715 on the client act's DRLG (DRLGACTIVATE_Update: a client
+    // DRLG builds one out-of-sight room per 5 frames), and on every 13th frame #10007 (DUNGEON_UpdateAndFreeInactiveRooms)
+    if (g_sessionMirrorAct->pDrlg) DRLGACTIVATE_Update(g_sessionMirrorAct->pDrlg);
+    if (g_sessionClientFrame % 13 == 0) DUNGEON_UpdateAndFreeInactiveRooms(g_sessionMirrorAct);
+}
 static void sessionClientRoomPass() {
+    if (!g_sessionClientActOwned && g_sessionMirrorAct) { sessionClientMirrorPass(); return; }
     D2DrlgActStrc* act = g_sessionClientActOwned ? d2_drlg_client_act() : (g_game && g_currentAct >= 0 ? g_game->pAct[g_currentAct] : nullptr);
     if (!act) return;
-    D2DrlgRoomStrc* warpRoom = nullptr;
-    std::unordered_set<D2DrlgLevelStrc*> activeLevels;   // a level with an active room is reached by adjacency, not a warp
+    std::unordered_set<D2DrlgLevelStrc*> activeLevels;
     for (D2ActiveRoomStrc* room = DUNGEON_GetRoomFromAct(act); room; room = room->pRoomNext)
         if (room->pDrlgRoom) activeLevels.insert(room->pDrlgRoom->pLevel);
     for (D2ActiveRoomStrc* room = DUNGEON_GetRoomFromAct(act); room; room = room->pRoomNext) {
         D2DrlgRoomStrc* dr = room->pDrlgRoom;
         if (!dr || !dr->pLevel) continue;
-        if (!g_sessionClientActOwned && !warpRoom)
-            for (int q = 0; q < dr->nRoomsNear; ++q) {
-                D2DrlgRoomStrc* nr = dr->ppRoomsNear[q];
-                if (nr && nr->pLevel && nr->fRoomStatus == ROOMSTATUS_UNTILE && !activeLevels.count(nr->pLevel) && !nr->pRoom && !g_sessionClientRoomsSeen.count(nr)) { warpRoom = nr; break; }
-            }
         if (!g_sessionClientRoomsSeen.insert(dr).second) continue;
         if (!g_sessionClientActOwned && !g_sessionTownBuilt && !DRLG_IsTownLevel(dr->pLevel->nLevelId)) {
             const int32_t townLevel = DUNGEON_GetTownLevelIdFromActNo((uint8_t)g_currentAct);
@@ -8155,27 +8246,6 @@ static void sessionClientRoomPass() {
         d2client_critter::room_seen(room, dr->pLevel->nLevelId, g_sessionClientFrame);   // 1.13c D2Client+0x18370
         for (D2PresetUnitStrc* p = dr->pPresetUnits; p; p = p->pNext) if (p->bSpawned & 1) d2client_critter::preset_seen(room, room->tCoords.nSubtileX + p->nXpos, room->tCoords.nSubtileY + p->nYpos);   // 1.13c D2Client+0xA7D00
         if (dr->pLevel->nLevelId == 8) sessionClientRoomSpots(dr, room);
-    }
-    if (warpRoom && g_sessionClientFrame >= 7 && g_sessionClientFrame % 7 == 0) {
-        g_sessionClientRoomsSeen.insert(warpRoom);
-        // the client builds that room in its own act, so its collision is held there and the spots read it
-        D2ActiveRoomStrc* built = nullptr;
-        const int32_t levelId = warpRoom->pLevel->nLevelId;
-        if (levelId == 8) {
-            if (!g_sessionTownAct) {
-                static const AUTOMAPFN noMap = [](D2ActiveRoomStrc*) {};
-                static const TOWNAUTOMAPFN noTownMap = [](int32_t, int32_t, int32_t, int32_t) {};
-                g_sessionTownAct = DUNGEON_AllocAct((uint8_t)g_currentAct, g_gameSeed, TRUE, nullptr, (uint8_t)g_gameDiff, nullptr, DUNGEON_GetTownLevelIdFromActNo((uint8_t)g_currentAct), noMap, noTownMap);
-            }
-            if (g_sessionTownAct) {
-                DUNGEON_SetClientIsInSight(g_sessionTownAct, levelId, warpRoom->nTileXPos, warpRoom->nTileYPos, nullptr);
-                for (D2DrlgLevelStrc* lv = g_sessionTownAct->pDrlg ? g_sessionTownAct->pDrlg->pLevel : nullptr; lv && !built; lv = lv->pNextLevel)
-                    if (lv->nLevelId == levelId)
-                        for (D2DrlgRoomStrc* r = lv->pFirstRoomEx; r; r = r->pDrlgRoomNext)
-                            if (r->nTileXPos == warpRoom->nTileXPos && r->nTileYPos == warpRoom->nTileYPos) { built = r->pRoom; break; }
-            }
-            sessionClientRoomSpots(warpRoom, built);
-        }
     }
 }
 // The client frame's pass over the monsters it holds, in its unit table's order
@@ -8718,8 +8788,10 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         sessionClientMonsterHitPass(g_sessionClientFrame + 1);
         { extern void d2_client_monster_order_roll(); d2_client_monster_order_roll(); extern void d2_client_monster_hit_flush(uint32_t); d2_client_monster_hit_flush(g_sessionClientFrame + 1); }   // 1.13c D2Client+0x4C500 (blood)
         ++g_sessionClientFrame;
-        sessionClientRoomPass();
-        d2client_critter::tick(g_targetPlayer, g_sessionClientFrame);
+        // 1.13c D2Client+0x5F020 (the sound pump, its 0x4F860 ambient first) runs before the frame 0x44A80, whose 0x440C0 room pass
+        // draws the light spots from the same hero seed: the room pass follows the ambient tick.
+        auto roomPass = [] { sessionClientRoomPass(); d2client_critter::tick(g_targetPlayer, g_sessionClientFrame); };
+        if (g_currentLevel < 0) roomPass();
         if (g_currentLevel >= 0) {
             // 1.13c D2Client+0x81340: the weather pass draws from the client hero seed. A session that never mirrored the client map has no
             // client unit: its seed is the one retail's first 0x4F860 call reads (a retail recording capture; the derivation is not recovered).
@@ -8747,6 +8819,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             { const D2DrlgEnvironmentStrc* ev = DUNGEON_GetEnvironmentFromAct(g_game->pAct[g_currentAct]);
               d2client_ambient::tick(heroSeed, ev ? (uint32_t)ev->nCycleIndex : 0u, env.weatherLevel); }
             d2client_sound_stage_log();
+            roomPass();
             if (g_sessionClientDraws) d2client::weather::tick(*reinterpret_cast<d2client::weather::Seed*>(heroSeed), env);
         }
         { extern void d2_client_monster_order_unit(uint32_t); d2_client_monster_order_unit(~0u); }   // orders of units the unit pass did not reach
