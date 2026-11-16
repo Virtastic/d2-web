@@ -53,8 +53,9 @@ export function createMissileSounds(read, play, onClient = () => true, cltRoll =
     // Birth: D2Client spawns a server missile one tick after the snapshot shows it (the 0x0D cast packet reaches the client a tick late); the travel sound follows that spawn. a retail recording skills 44/48 went 391/398 -> 7/14.
     // A client missile (ClientCol) ends on its own collision on the engine missile's path and lands on the tick the engine's goes (a retail Fire Bolt recording: both end on one tick, the client's born two later).
     update(entities, tick = 0, born_ = []) {
-      // an engine missile made and gone inside one step never shows in a snapshot (a Thunder Storm bolt); the client still sounds its creation
-      for (const [id, cls] of born_) { const m = byId.get(cls), r = row(m?.TravelSound); if (r && m.pSrvDoFunc === '3' && !entities.some((e) => e.kind === 'missile' && e.id === id) && onClient(id)) play(r, { kind: 'missile-travel', unitId: id, classId: cls }); }
+      // an engine missile made and gone inside one step never shows in a snapshot (a Thunder Storm bolt); the client still sounds its creation.
+      // Not a blizzard shard: the server's shards never reach the client, which sounds its own (blizzard_bbc10.cpp)
+      for (const [id, cls] of born_) { const m = byId.get(cls), r = row(m?.TravelSound); if (r && m.pSrvDoFunc === '3' && !trailOwned.has(m.Missile) && !entities.some((e) => e.kind === 'missile' && e.id === id) && onClient(id)) play(r, { kind: 'missile-travel', unitId: id, classId: cls }); }
       for (const p of pend) if (p.at <= tick) play(p.r, p.ev);
       pend = pend.filter((p) => p.at > tick);
       const seen = new Map(), news = [];
