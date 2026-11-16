@@ -204,8 +204,16 @@ void rat(Critter& c, D2UnitStrc* player, int32_t dist, uint32_t frame) {
     if (lcg(c.lo, c.hi) % 100 < 0x4B) { c.delay = 0x1E; neutral(c, frame); return; }
     wander(c, 5, 1, frame);
 }
-// 0x17F70 (the class switch's jump table: 0x95/0x10C chicken, 0x97/0x10D/0x11B/0x153 rat, 0x116..0x11A nothing; the classes whose
-// AI is not ported here take the default, 0x17270)
+// 0x17E10 (the bat's, class 0x9F): idle only; within 5 of the player a 66% roll flies away from it 8 (else wanders 12), farther
+// it wanders 9
+void bat(Critter& c, D2UnitStrc* player, int32_t dist, uint32_t frame) {
+    if (c.mode != 1) return;
+    if ((uint32_t)dist >= 5) { wander(c, 9, 1, frame); return; }
+    if (lcg(c.lo, c.hi) % 100 < 0x42) { if (player) flee(c, player, 8, 1, 0x3C01, frame); return; }
+    wander(c, 0xC, 1, frame);
+}
+// 0x17F70 (the class switch's jump table: 0x95/0x10C chicken, 0x97/0x10D/0x11B/0x153 rat, 0x9F bat, 0x116..0x11A nothing; the
+// classes whose AI is not ported here take the default, 0x17270)
 void think(Critter& c, D2UnitStrc* player, uint32_t frame) {
     if (c.delay > 0) { --c.delay; return; }
     int32_t dist = 0x7fffffff; D2UnitStrc* tgt = nullptr;
@@ -214,6 +222,7 @@ void think(Critter& c, D2UnitStrc* player, uint32_t frame) {
     if (dist > 30) { c.delay = dist - 15 > 199 ? 200 : dist - 15; neutral(c, frame); return; }
     if (c.cls == 0x95 || c.cls == 0x10C) chicken(c, frame);
     else if (c.cls == 0x97 || c.cls == 0x10D || c.cls == 0x11B || c.cls == 0x153) rat(c, tgt, dist, frame);
+    else if (c.cls == 0x9F) bat(c, tgt, dist, frame);
     else if (c.cls >= 0x116 && c.cls <= 0x11A) return;
     else neutral(c, frame);
 }

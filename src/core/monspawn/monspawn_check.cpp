@@ -12531,15 +12531,16 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
     // until its first per-unit draw passes the visibility test, so its first shadow node comes one frame after that.
     d2_dg_feed_unit(-1, 0, 0, 0, 0, 0);
     char cof[96];
-    // The client's own critters (Levels.txt cmon, made at room activation 0x440C0 before any server unit is learnt): type 1 units
-    // the server never sent, in the client's room lists.
+    // The client's own critters (Levels.txt cmon, made at room activation 0x440C0): type 1 units the server never sent, in the
+    // client's room lists. 0x440C0 runs from the frame update 0x44A80, after the frame's packets have placed the server units, so a
+    // critter joins its room's list (a head insert) after them and is fed after the room units below.
     // The visibility test (D2Client+0x66620) runs on the hero and a unit: #10839(hero, unit, 2) is the hero-to-unit line test with the
     // two units' X sizes over the hero's room, when the hero's level draws by line of sight (Levels.txt LOSDraw).
     D2ActiveRoomStrc* spotHeroRoom = g_targetPlayer ? UNITS_GetRoom(g_targetPlayer) : nullptr;
     const bool spotLos = spotHeroRoom && DRLG_GetLOSDrawFromLevelId(DUNGEON_GetLevelIdFromRoom(spotHeroRoom));
     D2CoordStrc spotHero{};
     if (spotLos) UNITS_GetCoords(g_targetPlayer, &spotHero);
-    if (g_walkOpt & 1) for (uint32_t i = 0, c[7]; d2_session_critter_unit(i, c); ++i) {
+    auto feedCritters = [&]() { if (g_walkOpt & 1) for (uint32_t i = 0, c[7]; d2_session_critter_unit(i, c); ++i) {
         ++g_walkUnits;
         // a critter neither dead nor dying takes the monster arm of the test
         const D2MonStats2Txt* cm2 = UNITS_GetMonStats2TxtRecordFromMonsterId((int32_t)c[1]);
@@ -12549,7 +12550,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
         // D2Client+0x53A30 shifts by the class's palshift table, which only an 0xAC of that class loads: a critter's own class has none
         if ((g_walkOpt & 4) && sessionMonsterCof((int32_t)c[1], c[4], cof, sizeof cof) && d2_dg_feed_unit_cof(cof) && !g_heldClasses.count((int32_t)c[1])) d2_dg_feed_unit_palshift(0);
         d2_dg_feed_unit_shift(0);
-    }
+    } };
     g_walkUnits += g_sessionTownUnits;   // the town the client built beside this level (sessionClientTownSeen)
     // Frame clock: a critter stays in D2Client's second unit hash after its room is freed, one 6C130 step each per frame. When the
     // walk does not feed the critters itself (bit0 clear), they are counted here. Then the client-only presets of every room seen.
@@ -12638,6 +12639,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
             if (u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MONSTER) d2_dg_feed_unit_shift(sessionColourShift(u));
         }
     }
+    feedCritters();
     // the client-only light-spot missiles (class 0x11f, type 3) 0x53550 made: placed on their subtile centre, ids local to the client
     // A spot takes the missile arm of the visibility test, its X size Missiles.txt Size.
     const D2MissilesTxt* spotTxt = (int32_t)sgptDataTables->nMissilesTxtRecordCount > 0x11f ? DATATBLS_GetMissilesTxtRecord(0x11f) : nullptr;
