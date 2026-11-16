@@ -602,6 +602,7 @@ static void rec10041(int32_t x, int32_t y, uint32_t mode, uint32_t pal = 0, uint
     const uint32_t ecx = site == 1 ? 0 : site == 0 ? (uint32_t)y : (uint32_t)x;
     const uint32_t edx = edxCol ? mode : site == 1 ? (y > 0 ? (uint32_t)y : 0) : site == 0 ? (uint32_t)x : 0;
     gRec(10041, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, mode, pal}, ecx, edx);
+    g_lecx = ecx; g_ledx = edx;   // the capture's D2Gfx stub saves and restores every register: the call's ecx/edx are the next read's
 }
 extern "C" uint32_t d2_dg_missile_row(int32_t cls);   // drlg_check.cpp: the Missiles.txt row (client 0x1580)
 // 1.13c D2Client+0x53A30: a monster (type 1) whose class loaded a palette shift table draws through the table's shift row
@@ -737,7 +738,8 @@ static const H6cc00 kH6cc00 = {
     [](uint32_t m, int32_t x, int32_t y, uint32_t, uint32_t col, int32_t pal) {
         // the missile draw is 6CC00's last call (0x6fb1cf87): its colour mode stays in edx for the walk's next 10013
         if (m) { rec10041(x, y, col, (uint32_t)pal, 1, true); g_lecx = 0; g_ledx = col; }
-        else gRec(10041, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, col, 0}, 0, g_hu[0] == 4 && g_hk < g_nUnits ? g_unitIlvl[g_hk] : 0); }, gateA4b90,
+        else { const uint32_t edx = g_hu[0] == 4 && g_hk < g_nUnits ? g_unitIlvl[g_hk] : 0;   // the stub keeps the call's ecx/edx
+               gRec(10041, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, col, 0}, 0, edx); g_lecx = 0; g_ledx = edx; } }, gateA4b90,
     []() { d2_client_6b700((uint32_t)(uintptr_t)g_hu, &kH6b700, 0, 640, g_uoy, g_uox, 0); },
     [](uint32_t u, int32_t dx, int32_t dy) -> int { return d2c_6c490(&kE6c490, g_hpy + dy, u, g_p6cc00, g_hpx + dx, 0, 1, g_uox, 0, g_uoy, 0, 640, g_hself, 0, 0, 0); },
     [](uint32_t, void* r) -> int { uint32_t* w = (uint32_t*)r; w[16] = 0; w[17] = (uint32_t)g_hpy; return 1; }, []() -> uint32_t { return g_hself; }, []() -> uint32_t { return d2_dg_missile_row((int32_t)g_hu[1]); },
