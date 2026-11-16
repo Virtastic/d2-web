@@ -91,9 +91,21 @@ void d2client_session_player_packets() {
 }
 // A unit event packet 0x2C {type, id, event} as the server sends it (D2Game+0xCC6080 -> 0x3F3F0); the client's handler
 // (0xAD740 -> 0x23F20) runs under the next packet dispatch, d2client_session_event_packets.
-namespace { struct EvPkt { uint32_t type, id, cls, event; }; std::vector<EvPkt> g_ev; }
+namespace { struct EvPkt { uint32_t type, id, cls, event, mode; }; std::vector<EvPkt> g_ev; }
 extern "C" void d2_client_unit_event_packet(const D2UnitStrc* u, int32_t event) {
-    if (u && d2client_sound_armed()) g_ev.push_back({ uint32_t(u->dwUnitType), uint32_t(u->dwUnitId), uint32_t(u->dwClassId), uint32_t(event) & 0xFF });
+    if (u && d2client_sound_armed()) g_ev.push_back({ uint32_t(u->dwUnitType), uint32_t(u->dwUnitId), uint32_t(u->dwClassId), uint32_t(event) & 0xFF, uint32_t(u->dwAnimMode) });
+}
+namespace {
+// 1.13c D2Client+0x23200 (0x23F20's default case, a player unit): the events whose row is fixed, without the class table
+// (+0xF7694). The local player dead (client unit +0x10 == 0x11) plays nothing. 0x88A70(unit, 0, 0, 0) with EBX = the row.
+int32_t playerEventRow(uint32_t event, uint32_t mode) {
+    if (mode == 0x11) return 0;
+    switch (event) {
+    case 1: return 0xEB; case 2: return 7; case 3: return 0xA; case 4: return 0xB; case 5: return 0xC; case 6: return 0xD;
+    case 7: return 0x8B6; case 8: return 0x8B7; case 9: return 9; case 0xB: return 0xE4;
+    default: return 0;   // 0x13-0x53 read the class table; not wired here
+    }
+}
 }
 struct D2c0x9cce0Env { uint8_t* (*f9cad0)(uint32_t eax); int32_t (*thunk_c7e4)(uint32_t arg); int32_t (*f5ee70)(int32_t v); };
 extern "C" int32_t d2c_port_9cce0(uint32_t eax, int32_t kind, uint8_t* player, uint32_t g11c3b8, uint32_t g1197f8, const D2c0x9cce0Env& e);
@@ -115,6 +127,7 @@ uint32_t evRand(uint32_t n) {   // 1.13c D2Client+0x89640 on the copy's seed
 void d2client_session_event_packets(uint32_t* heroSeed, uint32_t cycle, uint32_t tick) {
     std::vector<EvPkt> q; q.swap(g_ev);
     for (const EvPkt& p : q) {
+        if (p.type == 0) { d2client_sound_unit_submit_now(playerEventRow(p.event, p.mode), 0); continue; }
         if (p.event != 0x12 || p.type != 1) continue;   // 0x23F20 case 0x12 (an NPC greeting); its other events are not wired here
         // 0x23F20 case 0x12: 0x88A70(player, row = 0x9CCE0(kind 1) on the NPC, offset 0, 1, 0)
         // 0x9CCE0 steps the player's seed (+0x20) itself and 0x5EE70 draws from it through 0x89640: one copy carries both,
