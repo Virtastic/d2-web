@@ -154,7 +154,8 @@ D2TileLibraryEntryStrc* __fastcall DRLGROOMTILE_GetTileCache(D2DrlgRoomStrc* pDr
 			}
 		}
 
-		if (g_d2webRollTraceEnabled)
+		extern int g_d2webTraceMute;
+		if (g_d2webRollTraceEnabled && !g_d2webTraceMute)
 		{
 			for (int32_t v : { pDrlgRoom->nTileXPos, pDrlgRoom->nTileYPos, (int32_t)nType, (int32_t)nStyle, (int32_t)nSequence, nEntries, nMax, nD2webLadder, (int32_t)D2CMP_10081_GetTileRarity(ppTileLibraryEntries[nId]), (int32_t)nD2webPrevLow })
 				g_d2webRollCalls.push_back(v);

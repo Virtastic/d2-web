@@ -1240,6 +1240,7 @@ static uint64_t sessionRoomKey(const D2DrlgRoomStrc* dr) { return ((uint64_t)(ui
 // and D2Common's AllocRoom puts each new room at the head of the act's list, so the list runs newest first. The packets are
 // applied as they are sent, which is before the client frame that walks the list (retail's client takes the frame's packets
 // before its frame tail). The hint argument (the hero's client room) narrows only the room lookup and is not passed.
+extern int g_d2webTraceMute;   // game_glue.cpp: the client act's room builds stay out of the server's room logs
 static D2DrlgActStrc* g_sessionMirrorAct = nullptr; static int g_sessionMirrorActNo = -1; static const void* g_sessionMirrorClient = nullptr;
 static bool g_sessionMirrorOpen = false;   // from a session's create (its client's join is sent there) to its destroy
 static std::vector<D2DrlgActStrc*> g_sessionMirrorRetired;   // an act a later 0x03 replaced: its rooms may still hold critters
@@ -1250,7 +1251,9 @@ static void sessionMirrorAlloc(int actNo, uint32_t seed, int townLevel) {
     static const TOWNAUTOMAPFN noTownMap = [](int32_t, int32_t, int32_t, int32_t) {};
     if (g_sessionMirrorAct) g_sessionMirrorRetired.push_back(g_sessionMirrorAct);
     g_sessionMirrorSeen.clear();
+    ++g_d2webTraceMute;
     g_sessionMirrorAct = DUNGEON_AllocAct((uint8_t)actNo, seed, TRUE, nullptr, (uint8_t)g_gameDiff, nullptr, townLevel, noMap, noTownMap);
+    --g_d2webTraceMute;
     g_sessionMirrorActNo = g_sessionMirrorAct ? actNo : -1;
 }
 static void sessionMirrorPacket(const void* client, const uint8_t* p, uint32_t n) {
@@ -1274,8 +1277,10 @@ static void sessionMirrorPacket(const void* client, const uint8_t* p, uint32_t n
         sessionMirrorAlloc(g_currentAct, g_gameSeed, DUNGEON_GetTownLevelIdFromActNo((uint8_t)g_currentAct));
         if (!g_sessionMirrorAct) return;
     }
+    ++g_d2webTraceMute;
     if (p[0] == 0x07) DUNGEON_SetClientIsInSight(g_sessionMirrorAct, level, x, y, nullptr);
     else DUNGEON_UnsetClientIsInSight(g_sessionMirrorAct, level, x, y, nullptr);
+    --g_d2webTraceMute;
 }
 extern "C" void D2WEB_SetSessionPacketTap(void (*tap)(const void*, const uint8_t*, uint32_t));
 extern "C" void d2_session_weather_drop();   // below: drops a weather pass left pending
@@ -8270,8 +8275,10 @@ static void sessionClientMirrorPass() {
     }
     // the frame tail (D2Client+0x44A80) after the walk: D2Common #10715 on the client act's DRLG (DRLGACTIVATE_Update: a client
     // DRLG builds one out-of-sight room per 5 frames), and on every 13th frame #10007 (DUNGEON_UpdateAndFreeInactiveRooms)
+    ++g_d2webTraceMute;
     if (g_sessionMirrorAct->pDrlg) DRLGACTIVATE_Update(g_sessionMirrorAct->pDrlg);
     if (g_sessionClientFrame % 13 == 0) DUNGEON_UpdateAndFreeInactiveRooms(g_sessionMirrorAct);
+    --g_d2webTraceMute;
 }
 static void sessionClientRoomPass() {
     if (!g_sessionClientActOwned && g_sessionMirrorAct) { sessionClientMirrorPass(); return; }

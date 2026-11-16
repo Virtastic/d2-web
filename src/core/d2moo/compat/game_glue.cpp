@@ -28,7 +28,10 @@ int32_t g_d2CreateLog[4 * 8192]; int32_t g_d2CreateCount = 0;
 // (d2_session_room_sequence) -- what a capture replays to settle a walk's population.
 int32_t g_d2SeqLog[4 * 16384]; int32_t g_d2SeqCount = 0;
 static void noteSeq(int op, int level, int x, int y) { if (g_d2SeqCount < 16384) { int32_t* e = &g_d2SeqLog[4 * g_d2SeqCount++]; e[0] = op; e[1] = level; e[2] = x; e[3] = y; } }
-void d2_note_room_create(int level, int x, int y, int seed) { noteSeq(0, level, x, y); if (g_d2CreateCount < 8192) { int32_t* e = &g_d2CreateLog[4 * g_d2CreateCount++]; e[0] = level; e[1] = x; e[2] = y; e[3] = seed; } }
+// Nonzero while the session client's own act builds rooms: those builds stay out of the create log, the sequence log
+// and the tile roll trace, which record the server's rooms.
+int g_d2webTraceMute = 0;
+void d2_note_room_create(int level, int x, int y, int seed) { if (g_d2webTraceMute) return; noteSeq(0, level, x, y); if (g_d2CreateCount < 8192) { int32_t* e = &g_d2CreateLog[4 * g_d2CreateCount++]; e[0] = level; e[1] = x; e[2] = y; e[3] = seed; } }
 // Opt-in object-population trace: 18 int32s per row, documented by d2_session_object_pop_trace.
 // A room without a class-125 object gets one row with object fields set to -1; multiple matches
 // produce one row per object, with the same room-boundary values repeated.
