@@ -84,7 +84,9 @@ extern "C" void d2_client_monster_hit_event(D2UnitStrc* unit, int32_t kind, uint
     if (unit && unit->pGame) g_events.push_back({ unit->pGame, unit->dwUnitType, unit->dwUnitId, kind, life });
 }
 // 1.13c D2Client+0x4DC70 cases 6 and 0x13 (their life and blood part), at the client frame's tail.
-extern "C" void d2_client_monster_hit_flush() {
+void d2client_session_unit_mode(const D2UnitStrc* u, uint32_t mode, int32_t roll, bool hero);   // session_unit_sound.cpp
+extern "C" void d2_client_monster_hit_stamp(uint32_t id, uint32_t frame);   // monster_face.cpp
+extern "C" void d2_client_monster_hit_flush(uint32_t frame) {
     std::vector<Event> q;
     q.swap(g_events);
     for (const Event& e : q) {
@@ -104,9 +106,9 @@ extern "C" void d2_client_monster_hit_flush() {
         } else {
             if (v) g_life[key(e.type, e.id)] = v;
             bleed(u, 1, u->dwAnimMode, 1);
-            // Retail then calls 0x24490(unit, 0xD, given) at 0x6fafe1c4, a monster's struck sound (0x23630). Not
-            // played yet: it waits on the client monster footstep matching retail's, which it would otherwise
-            // push out of step.
+            // then 0x24490(unit, 0xD, given) at 0x6fafe1c4: a monster's struck sound (0x23630), which stamps the unit
+            d2_client_monster_hit_stamp(e.id, frame);
+            d2client_session_unit_mode(u, 13, -1, false);
         }
     }
 }

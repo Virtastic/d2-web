@@ -28,9 +28,16 @@ bool moving(uint32_t m) { return m == 2 || m == 3 || m == 6; }
 namespace {
 struct ClientMonster { uint32_t mode = 1, cur = 0, total = 0, step = 0, last = 0, serverMode = 1; };
 std::unordered_map<uint32_t, ClientMonster> g_cm;
+std::unordered_map<uint32_t, bool> g_pathDone;   // units whose server walk/run path ended since their last client frame
 }
 
-extern "C" void d2client_session_footstep_reset() { g_cp = ClientPlayer{}; g_cm.clear(); }
+extern "C" void d2client_session_footstep_reset() { g_cp = ClientPlayer{}; g_cm.clear(); g_pathDone.clear(); }
+// The server's walk or run frame callback found its path at its end (#10342 false). The client's own copy of that path
+// (0x2A700, #10342 on the client unit) steps with the server's and ends on the same frame, at the last point or at the same
+// wall: 0x4DA60 then 0x2A6C0 put the client unit in neutral at frame 0, after the frame advance and before 0x23C00. A server
+// path stopped by another unit's footprint (collided mask 0x1000, COLLIDE_NO_PATH) does not stop the client's copy, which walks
+// on until the next path packet (in the retail captures every such stop keeps the client walking, every other one ends it).
+extern "C" void d2_client_monster_path_done(uint32_t id, uint16_t collided) { if (!(collided & 0x1000)) g_pathDone[id] = true; }
 
 extern "C" uint32_t d2_client_monster_footstep_row(int32_t classId, uint32_t mode, uint32_t cur, uint32_t total, uint32_t step, uint32_t now, uint32_t last, uint32_t floor);
 extern "C" const uint32_t* d2_client_monster_footstep(int32_t classId);   // [Footstep, Layer, FsCnt, FsOff, FsPrb]
@@ -44,10 +51,11 @@ extern "C" void d2client_session_monster_footstep(uint32_t id, int32_t cls, uint
     ClientMonster& c = g_cm[id];
     // a unit the client creates in neutral starts on the frame its init rolled (0x4D160: +0x44 = roll % +0x48), not on 0
     if (fresh && serverMode == 1 && total) { c.cur = d2client_unitseed_start_frame(game, id) % total; c.step = step; c.total = total; }
-    const uint32_t mode = serverMode == 1 ? 1u : c.serverMode;
+    const bool done = g_pathDone.erase(id) && (c.mode == 2 || c.mode == 15);   // the client unit's walk or run reached its path's end
+    const uint32_t mode = serverMode == 1 || done ? 1u : c.serverMode;
     c.serverMode = serverMode;
     if (mode != c.mode) { c.mode = mode; c.cur = 0; c.step = step; c.total = total; }
-    if (c.total) c.cur = (c.cur + c.step) % c.total;
+    if (c.total && !done) c.cur = (c.cur + c.step) % c.total;
     const uint32_t row = d2_client_monster_footstep_row(cls, c.mode, c.cur, c.total, c.step, now, c.last, uint32_t(floor));
     if (!row) return;
     c.last = now;

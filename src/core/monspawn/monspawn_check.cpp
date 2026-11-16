@@ -8701,7 +8701,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             d2client_session_event_packets(sessionClientHeroSeed(), ev ? (uint32_t)ev->nCycleIndex : 0u, g_sessionClientFrame + 1);
         }
         sessionClientMonsterHitPass(g_sessionClientFrame + 1);
-        { extern void d2_client_monster_order_roll(); d2_client_monster_order_roll(); extern void d2_client_monster_hit_flush(); d2_client_monster_hit_flush(); }   // 1.13c D2Client+0x4C500 (blood)
+        { extern void d2_client_monster_order_roll(); d2_client_monster_order_roll(); extern void d2_client_monster_hit_flush(uint32_t); d2_client_monster_hit_flush(g_sessionClientFrame + 1); }   // 1.13c D2Client+0x4C500 (blood)
         ++g_sessionClientFrame;
         sessionClientRoomPass();
         d2client_critter::tick(g_targetPlayer, g_sessionClientFrame);

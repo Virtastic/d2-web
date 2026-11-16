@@ -1166,6 +1166,8 @@ int32_t __fastcall sub_6FC64450(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
 }
 
 //D2Game.0x6FC64480
+// the client unit's own copy of the path ends on the same frame unless another unit stopped this one: d2client/session_footstep.cpp
+extern "C" void d2_client_monster_path_done(uint32_t nUnitId, uint16_t nCollidedWithMask);
 int32_t __fastcall sub_6FC64480(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (STATES_CheckState(pUnit, STATE_BLAZE))
@@ -1180,6 +1182,7 @@ int32_t __fastcall sub_6FC64480(D2GameStrc* pGame, D2UnitStrc* pUnit)
 
     if (sub_6FCBC930(pGame, pUnit) == 2)
     {
+        d2_client_monster_path_done(pUnit->dwUnitId, pUnit->pDynamicPath ? pUnit->pDynamicPath->nCollidedWithMask : 0);
         sub_6FC63680(pGame, pUnit);
         return 2;
     }
@@ -1204,6 +1207,7 @@ int32_t __fastcall sub_6FC64510(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (sub_6FCBC930(pGame, pUnit) == 2)
     {
+        d2_client_monster_path_done(pUnit->dwUnitId, pUnit->pDynamicPath ? pUnit->pDynamicPath->nCollidedWithMask : 0);
         sub_6FC63680(pGame, pUnit);
         return 2;
     }
