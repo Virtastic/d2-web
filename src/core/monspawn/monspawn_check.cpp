@@ -1208,12 +1208,16 @@ static uint32_t g_sessionScreenSwitchFrame = 0xffffffffu;
 extern "C" EMSCRIPTEN_KEEPALIVE int d2_session_client_screen_switch_frame(int frame) { g_sessionScreenSwitchFrame = frame > 0 ? (uint32_t)frame : 0xffffffffu; return 1; }
 
 static D2DrlgActStrc* g_sessionTownAct = nullptr; static uint32_t g_sessionTownUnits = 0; static bool g_sessionTownBuilt = false;   // sessionClientTownSeen: the client's town, its client-only presets
+// the town rooms sessionClientTownSeen sighted, by level and tile position: the client has one act, so 0x440C0 sights each of
+// its rooms once; the server act's copy of such a room, activated later, is the same client room and is not sighted again
+static std::set<uint64_t> g_sessionTownSighted;
+static uint64_t sessionRoomKey(const D2DrlgRoomStrc* dr) { return ((uint64_t)(uint32_t)dr->pLevel->nLevelId << 48) | ((uint64_t)(uint16_t)dr->nTileXPos << 16) | (uint16_t)dr->nTileYPos; }
 static void resetSessionClientMapMirror() {
     if (g_sessionClientPlayerUnit) UNITS_FreeUnit(g_sessionClientPlayerUnit);
     g_sessionClientPlayerUnit = nullptr;
     d2client::weather::reset(); d2client_ambient::reset(); d2_client_monster_idle_reset(); sessionClientMonsterModeReset(); d2_client_attack_roll_reset(); g_sessionClientRoomsSeen.clear(); g_clientSpotMissiles.clear(); g_sessionClientFrame = 0; d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset(); { extern void d2_client_monster_hit_reset(); d2_client_monster_hit_reset(); }
     if (g_sessionTownAct) { DUNGEON_FreeAct(g_sessionTownAct); g_sessionTownAct = nullptr; }   // after the critters that stand in it
-    g_sessionTownUnits = 0; g_sessionTownBuilt = false;
+    g_sessionTownUnits = 0; g_sessionTownBuilt = false; g_sessionTownSighted.clear();
     if (g_sessionClientActOwned) d2_drlg_act_end();
     g_sessionClientActOwned = false;
     g_sessionClientMapStarted = false;
@@ -8102,6 +8106,7 @@ static void sessionClientTownSeen(D2DrlgRoomStrc* seen, int32_t townLevel) {
     for (D2ActiveRoomStrc* room = DUNGEON_GetRoomFromAct(g_sessionTownAct); room; room = room->pRoomNext) {
         D2DrlgRoomStrc* dr = room->pDrlgRoom;
         if (!dr || !dr->pLevel || dr->pLevel->nLevelId != townLevel) continue;
+        g_sessionTownSighted.insert(sessionRoomKey(dr));
         d2client_critter::room_seen(room, townLevel, g_sessionClientFrame);
         for (D2PresetUnitStrc* p = dr->pPresetUnits; p; p = p->pNext) if (p->bSpawned & 1) {
             d2client_critter::preset_seen(room, room->tCoords.nSubtileX + p->nXpos, room->tCoords.nSubtileY + p->nYpos);
@@ -8131,6 +8136,7 @@ static void sessionClientRoomPass() {
             for (D2DrlgLevelStrc* lv : activeLevels) if (lv && lv->nLevelId == townLevel) townActive = true;
             if (!townActive) sessionClientTownSeen(dr, townLevel);
         }
+        if (g_sessionTownSighted.count(sessionRoomKey(dr))) continue;   // sighted already through the client's town
         d2client_critter::room_seen(room, dr->pLevel->nLevelId, g_sessionClientFrame);   // 1.13c D2Client+0x18370
         for (D2PresetUnitStrc* p = dr->pPresetUnits; p; p = p->pNext) if (p->bSpawned & 1) d2client_critter::preset_seen(room, room->tCoords.nSubtileX + p->nXpos, room->tCoords.nSubtileY + p->nYpos);   // 1.13c D2Client+0xA7D00
         if (dr->pLevel->nLevelId == 8) sessionClientRoomSpots(dr, room);
