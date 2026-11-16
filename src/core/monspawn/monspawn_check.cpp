@@ -1659,6 +1659,17 @@ static bool sessionClientHoldsRoom(D2ActiveRoomStrc* room) {
 // a retail recording: which monsters retail's client holds. The capture's join announces the monsters within 40 subtiles (box) of the start (0xAC, D2CAPTURE_SESSION_RADIUS);
 // afterwards 0x4B1D0 diffs the hero room's near list: units of a room that enters it reach the client (0x9DC10 -> 0x7B0A0), those of a room that leaves it are removed.
 static std::set<uint32_t> g_heldMonsters, g_heldSeen; static std::set<D2DrlgRoomStrc*> g_heldNear; static D2UnitStrc* g_heldFor = nullptr; static int g_heldX0, g_heldY0;
+// the monsters the last near-list diff added: the client builds each from its 0xAC on that frame (0xA7780 -> 0x4D160)
+static std::vector<uint32_t> g_heldNew;
+// the 0xAC assigns the server sent the client during the last tick: the client's 0xAC handler (0xA7780 -> 0x4D160) builds one unit per assign
+extern "C" uint32_t D2WEB_TakeMonsterAssigns();
+static uint32_t g_sessionTickAssigns = 0;
+// the D2Gfx calls those units' builds make, as the loading walk's: one 10043 (ecx/edx 1,1) per assign; taking them clears the count
+extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_session_client_assign_g() {
+    static std::string out; out.clear();
+    for (; g_sessionTickAssigns; --g_sessionTickAssigns) out += "10043 1,1\n";
+    return out.c_str();
+}
 static void sessionHeldStep() {
     D2ActiveRoomStrc* here = g_targetPlayer ? UNITS_GetRoom(g_targetPlayer) : nullptr;
     if (!here || !here->pDrlgRoom) return;
@@ -1666,6 +1677,8 @@ static void sessionHeldStep() {
     for (int32_t i = 0; i < h->nRoomsNear; ++i) if (h->ppRoomsNear[i] && h->ppRoomsNear[i]->pRoom) cur.insert(h->ppRoomsNear[i]);   // an inactive room is not announced yet
     const bool first = g_heldFor != g_targetPlayer;
     if (first) { g_heldMonsters.clear(); g_heldSeen.clear(); g_heldNear.clear(); g_heldFor = g_targetPlayer; D2CoordStrc c = {}; UNITS_GetCoords(g_targetPlayer, &c); g_heldX0 = c.nX; g_heldY0 = c.nY; }
+    const std::set<uint32_t> before = g_heldMonsters;
+    struct NewIds { const std::set<uint32_t>& b; bool first; ~NewIds() { g_heldNew.clear(); if (!first) for (uint32_t id : g_heldMonsters) if (!b.count(id)) g_heldNew.push_back(id); } } newIds{ before, first };
     auto each = [](D2DrlgRoomStrc* r, auto f) { if (r->pRoom) for (D2UnitStrc* u = r->pRoom->pUnitFirst; u; u = u->pRoomNext) if (u->dwUnitType == UNIT_MONSTER) f(u); };
     for (D2DrlgRoomStrc* r : cur) if (!g_heldNear.count(r)) each(r, [&](D2UnitStrc* u) { D2CoordStrc c = {}; UNITS_GetCoords(u, &c); if ((!first || (abs(c.nX - g_heldX0) <= 40 && abs(c.nY - g_heldY0) <= 40)) && g_heldMonsters.insert(u->dwUnitId).second) d2client_unitseed::told(u); });
     for (D2DrlgRoomStrc* r : g_heldNear) if (!cur.count(r)) each(r, [&](D2UnitStrc* u) { g_heldMonsters.erase(u->dwUnitId); });
@@ -8128,7 +8141,7 @@ extern "C" void d2_client_monster_hit_stamp(uint32_t id, uint32_t frame);
 static std::unordered_map<uint32_t, uint32_t> g_sessionClientMonsterMode;
 void d2client_session_footstep_reset(); int32_t d2client_session_level_material(uint32_t soundEnv);   // session_footstep.cpp (C linkage)
 void d2client_session_player_footstep(uint32_t serverMode, uint32_t cls, int32_t inTown, int32_t floor, uint32_t now, int32_t staminaZero, void (*rate)(uint32_t, uint32_t*, uint32_t*));
-void d2client_session_monster_footstep(uint32_t id, int32_t cls, uint32_t serverMode, uint32_t step, uint32_t total, int32_t floor, uint32_t now);
+void d2client_session_monster_footstep(uint32_t id, int32_t cls, uint32_t serverMode, uint32_t step, uint32_t total, int32_t floor, uint32_t now, const void* game);
 extern "C" int32_t d2_session_floor_class(int32_t unitType, int32_t unitId, int32_t fallback);
 static void sessionClientMonsterModeReset() { g_sessionClientMonsterMode.clear(); g_sessionIdleRows.clear(); g_sessionIdleRowsReady.clear(); d2client_session_unit_sound_reset(); d2client_session_footstep_reset(); d2client_critter::reset(); }
 // The client player unit's rate in `mode` (D2Common 0x33110 on the hero's own records): the velocity percent is the hero's less
@@ -8169,8 +8182,9 @@ static void sessionClientPlayerFootstep() {
 }
 // The held monsters in the client unit table's order (bucket id & 0x7F, newest first), each through 0x4F4A0's frame advance
 // and footstep check on its own client unit (session_footstep.cpp).
-static void sessionClientMonsterFootsteps() {
+static void sessionClientMonsterFootsteps(bool newOnly = false) {
     std::vector<uint32_t> ids(g_heldMonsters.begin(), g_heldMonsters.end());
+    if (newOnly) ids = g_heldNew;   // a unit the frame's packets created runs its first client frame on that frame
     std::sort(ids.begin(), ids.end(), [](uint32_t a, uint32_t b) { return (a & 127) != (b & 127) ? (a & 127) < (b & 127) : a > b; });
     const D2LevelsTxt* lv = g_currentLevel >= 0 ? DATATBLS_GetLevelsTxtRecord(g_currentLevel) : nullptr;
     const int32_t fallback = lv ? d2client_session_level_material((uint32_t)(lv->dwSoundEnv & 0xff)) : 1;
@@ -8180,7 +8194,7 @@ static void sessionClientMonsterFootsteps() {
             // 0x4F4A0 runs the unit's idle sound (0x237E0) just before its footstep check (0x23C00)
             if (auto it = g_sessionIdleRowsReady.find(id); it != g_sessionIdleRowsReady.end()) d2client_sound_unit_submit((int32_t)it->second);
             d2client_session_monster_footstep(id, (int32_t)u->dwClassId, u->dwAnimMode, (uint16_t)u->wAnimSpeed, (uint32_t)u->dwFrameCountPrecise,
-                                              d2_session_floor_class(1, (int32_t)id, fallback), g_sessionClientFrame - 1);
+                                              d2_session_floor_class(1, (int32_t)id, fallback), g_sessionClientFrame - 1, g_game);
         }
 }
 // 1.13c D2Client+0x22B20: the client units' sound references (replay only; nothing happens before the Sounds table is loaded).
@@ -8290,8 +8304,12 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     D2WEB_ResetPacketStream(); D2WEB_ResetHitPackets();
     struct InTick { InTick() { g_sessionInTick = true; } ~InTick() { g_sessionInTick = false; } } inTick;
     if (g_heldFor != g_targetPlayer) sessionHeldStep();   // a retail recording: the start set, before the first move
-    struct HeldStep { ~HeldStep() { sessionHeldStep(); } } heldStep;   // the tick's near-list diff
-    struct StreamRefresh { ~StreamRefresh() { D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets); } } streamRefresh;
+    // the tick's near-list diff. Retail's unit pass (D2Client+0x2B2AA -> 0x4F6DA -> 0x23DF7) rolls a newly held monster's footstep layer before the same
+    // frame's weather pass draws from the hero seed, so the diff runs ahead of the frame's sound pass; a tick with no client frame diffs at its end.
+    static bool heldStepped; heldStepped = false;
+    struct HeldStep { ~HeldStep() { if (heldStepped) return; sessionHeldStep(); if (!g_heldNew.empty()) sessionClientMonsterFootsteps(true); } } heldStep;
+    struct StreamRefresh { ~StreamRefresh() { D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets); g_sessionTickAssigns = D2WEB_TakeMonsterAssigns(); } } streamRefresh;
+    D2WEB_TakeMonsterAssigns();   // assigns sent before the tick (the join's, which the loading walk draws) are not the tick's
     g_sessionIdleRowsReady.swap(g_sessionIdleRows); g_sessionIdleRows.clear();   // a row drawn at a frame's end is the next tick's sound
     for (int i = 0; i < frames; ++i) {
         if (d2_local_d2gs_drain) d2_local_d2gs_drain();   // 1.13c D2Game+0x2E460: the frame starts by applying the client packets that arrived
@@ -8674,6 +8692,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             env.cellW = wide ? 800 : 640; env.cellH = wide ? 600 : 480;
             // 1.13c D2Client+0x5F020 runs 0x4F860 first, before the frame's weather pass; same hero seed.
             { const D2LevelsTxt* lv = DATATBLS_GetLevelsTxtRecord(g_currentLevel); d2client_sound_stage_feed(lv ? (uint32_t)(lv->dwSoundEnv & 0xff) : 0); }
+            if (!heldStepped) { sessionHeldStep(); heldStepped = true; }
             sessionClientSoundUnits();
             // D2Common #10396 follows the argument's +4 pointer and returns its first dword: the environment's cycle index (0 sunrise,
             // 1 morning, 2 noon, 3 afternoon, 4+ evening/night), so 1..3 is the day ambience row and every other value the night one.

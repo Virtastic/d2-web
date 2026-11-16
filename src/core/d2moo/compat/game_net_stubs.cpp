@@ -46,6 +46,10 @@
 static uint8_t g_d2webPacketStream[4096];
 static uint32_t g_d2webPacketStreamLength = 0;
 static uint32_t g_d2webPacketStreamPackets = 0;
+// The 0xAC monster assigns sent to the client since the caller last took the count (unbounded, unlike the stream): the
+// client builds one unit per assign it receives.
+static uint32_t g_d2webMonsterAssigns = 0;
+extern "C" uint32_t D2WEB_TakeMonsterAssigns() { const uint32_t n = g_d2webMonsterAssigns; g_d2webMonsterAssigns = 0; return n; }
 // A connected client's receiver: handed every packet at the moment the game sends it, so it sees
 // them all in emission order whatever resets or fills the bounded stream above. Unset by default.
 static void (*g_d2webPacketSink)(const uint8_t*, uint32_t) = nullptr;
@@ -933,6 +937,7 @@ void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, in
         g_d2webPacketStreamLength += (uint32_t)nPacketSize; ++g_d2webPacketStreamPackets;
     }
     if (g_d2webPacketSink && pClient && pPacket && nPacketSize > 0) g_d2webPacketSink((const uint8_t*)pPacket, (uint32_t)nPacketSize);
+    if (pClient && pPacket && nPacketSize > 0 && *static_cast<const uint8_t*>(pPacket) == 0xAC) ++g_d2webMonsterAssigns;
 }
 int32_t D2GAME_SAVE_WriteFile_6FC8A500(D2GameStrc* pGame, D2UnitStrc* pPlayer, const char* szName, DWORD dwArg) { return {}; }
 // D2Game.0x6FC3F2F0: the player's quest record (96 bytes) behind a unit reference.

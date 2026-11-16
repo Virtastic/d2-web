@@ -4401,6 +4401,7 @@ function render(now = false) {
   const first = globalThis.__d2G?.length === 0 && Module._d2_client_loading_g;
   globalThis.__d2GLoading = !!first;   // retail's room walk draws no unit while D2Client+0xC1760's loading screen runs (gUnit is silent)
   if (first) { const cm = clientMonsters(); gLoadingWalk((e, d, f) => Module.ccall('d2_client_loading_g', 'string', ['number','number','number','number','number','number'], [f, e, d, 640, 480, 0x7fffffff]), cm.n, cm.pairs, cm.rooms); }
+  else if (Array.isArray(globalThis.__d2G) && Module._d2_session_client_assign_g) gLines(Module.ccall('d2_session_client_assign_g', 'string', [], []));   // the draws of the tick's 0xAC assigns (engine)
   if (Array.isArray(globalThis.__d2G)) gFrame(Module, 0, first ? 0x273c : 0);   // D2Client+0x44230 up to the room walk
   setFrontdoorError(frontdoorError, !realmSceneActive && screen === SCREEN.SELECT ? charSelectError : '');
   // The frame-cost instrument (assets/frame-perf.mjs) is refreshed per frame and, while off, every

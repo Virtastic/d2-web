@@ -31,6 +31,8 @@ std::unordered_map<const D2ActiveRoomStrc*, Seed> g_room;
 std::unordered_map<uint64_t, uint32_t> g_unit;
 // the client monster's live seed (+0x20/+0x24) after its init rolls, per game (a session runs more than one)
 std::unordered_map<const D2GameStrc*, std::unordered_map<uint64_t, Seed>> g_seed;
+// the start frame (+0x44) the client monster's init rolled (0x4D38F: roll % +0x48), per game as the seeds
+std::unordered_map<const D2GameStrc*, std::unordered_map<uint64_t, uint32_t>> g_start;
 struct Pending { D2GameStrc* game; uint32_t type, id; bool told; };
 std::vector<Pending> g_pending;
 // A session tracks which monsters the server announces to the client (0xAC: those of the rooms near the hero). Only an
@@ -68,7 +70,7 @@ void monster_direction(D2UnitStrc* u, uint32_t init) {
     s = { init, 666 };
     const D2MonStatsTxt* ms = DATATBLS_GetMonStatsTxtRecord(u->dwClassId);
     if (!ms || !u->pDynamicPath) return;
-    if (u->dwFrameCountPrecise >= 1) next(s);
+    if (u->dwFrameCountPrecise >= 1) g_start[u->pGame][key(u->dwUnitType, u->dwUnitId)] = next(s) % uint32_t(u->dwFrameCountPrecise);
     if (ms->dwMonStatsFlags & (1u << MONSTATSFLAGINDEX_NPC)) return;
     uint8_t dir = 0;
     const D2MonStats2Txt* ms2 = UNITS_GetMonStats2TxtRecordFromMonsterId(u->dwClassId);
@@ -144,3 +146,11 @@ void d2client_unitseed_created(D2UnitStrc* u) { d2client_unitseed::created(u); }
 extern "C" void d2client_unitseed_flush() { d2client_unitseed::flush(); }
 void d2client_unitseed_tell_mode(bool on) { d2client_unitseed::tell_mode(on); }
 void d2client_unitseed_told(D2UnitStrc* u) { d2client_unitseed::told(u); }
+// The start frame a client monster's init rolled; 0 when it rolled none.
+extern "C" uint32_t d2client_unitseed_start_frame(const void* game, uint32_t id) {
+    d2client_unitseed::flush();
+    auto g = g_start.find(static_cast<const D2GameStrc*>(game));
+    if (g == g_start.end()) return 0;
+    auto it = g->second.find(key(UNIT_MONSTER, id));
+    return it == g->second.end() ? 0 : it->second;
+}

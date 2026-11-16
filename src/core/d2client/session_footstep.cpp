@@ -33,12 +33,17 @@ std::unordered_map<uint32_t, ClientMonster> g_cm;
 extern "C" void d2client_session_footstep_reset() { g_cp = ClientPlayer{}; g_cm.clear(); }
 
 extern "C" uint32_t d2_client_monster_footstep_row(int32_t classId, uint32_t mode, uint32_t cur, uint32_t total, uint32_t step, uint32_t now, uint32_t last, uint32_t floor);
-extern "C" uint32_t d2_client_monster_footstep_layer(int32_t classId);
+extern "C" const uint32_t* d2_client_monster_footstep(int32_t classId);   // [Footstep, Layer, FsCnt, FsOff, FsPrb]
+extern "C" uint32_t d2client_unitseed_start_frame(const void* game, uint32_t id);
+namespace d2client_playsnd { uint32_t seedRand(uint32_t n); }   // 0x89640 on the client hero seed
 // One client frame of a held monster (0x4F4A0): 0x4F2C0's frame advance (0xA3000) then 0x23C00, so the first frame in a mode is
 // checked at cur == step. serverMode/step/total: the server unit's mode, +0x4C and +0x48 now; now: the client tick (frame - 1).
 extern "C" void d2client_session_monster_footstep(uint32_t id, int32_t cls, uint32_t serverMode, uint32_t step, uint32_t total,
-                                                  int32_t floor, uint32_t now) {
+                                                  int32_t floor, uint32_t now, const void* game) {
+    const bool fresh = !g_cm.count(id);
     ClientMonster& c = g_cm[id];
+    // a unit the client creates in neutral starts on the frame its init rolled (0x4D160: +0x44 = roll % +0x48), not on 0
+    if (fresh && serverMode == 1 && total) { c.cur = d2client_unitseed_start_frame(game, id) % total; c.step = step; c.total = total; }
     const uint32_t mode = serverMode == 1 ? 1u : c.serverMode;
     c.serverMode = serverMode;
     if (mode != c.mode) { c.mode = mode; c.cur = 0; c.step = step; c.total = total; }
@@ -46,8 +51,12 @@ extern "C" void d2client_session_monster_footstep(uint32_t id, int32_t cls, uint
     const uint32_t row = d2_client_monster_footstep_row(cls, c.mode, c.cur, c.total, c.step, now, c.last, uint32_t(floor));
     if (!row) return;
     c.last = now;
-    d2client_sound_unit_submit(int32_t(row));
-    if (const uint32_t layer = d2_client_monster_footstep_layer(cls)) d2client_sound_unit_submit(int32_t(layer));
+    // 0x23D9B submits 0x22FB0's row (none for a record without Footstep); then a record with a layer row (+0x58) draws
+    // rand(100) on the hero seed (0x89640) whatever FsPrb (+0x64) is, and submits the layer when the draw is below it.
+    const uint32_t* ms = d2_client_monster_footstep(cls);
+    if (!ms) return;
+    if (ms[0]) d2client_sound_unit_submit(int32_t(row));
+    if (ms[1] && d2client_playsnd::seedRand(100) < ms[4]) d2client_sound_unit_submit(int32_t(ms[1]));
 }
 
 // One client frame of the local player's unit. serverMode: the server unit's mode now (taken for the next frame); now: the client
