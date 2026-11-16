@@ -46,7 +46,7 @@ int FOG_GetLinkIndex(void* p, uint32_t dwCode, BOOL) {
     Linker* l = (Linker*)p; auto it = l->byCode.find(dwCode); return it == l->byCode.end() ? -1 : it->second;
 }
 int FOG_GetRowFromTxt(void* p, char* szText, int) {
-    if (!p || !szText || !*szText) return -1;
+    if (!p || !szText) return -1;   // 1.13c Fog #10217 walks its tree for the empty key like any other (uniques row 401 is "")
     Linker* l = (Linker*)p; auto it = l->byName.find(lower(szText)); return it == l->byName.end() ? -1 : it->second;
 }
 char* FOG_10255(void* p, int nId, int) {
@@ -54,8 +54,15 @@ char* FOG_10255(void* p, int nId, int) {
     if (!l || nId < 0 || nId >= (int)l->names.size()) { static char none[1] = {}; return none; }
     return (char*)l->names[nId].c_str();
 }
+// 1.13c Fog+0x11E40 (#10214): a code linker's entry as text, its four code bytes with every space turned into NUL
+// ("bow " -> "bow"), then a NUL. Returns 1, or 0 for an index out of range.
 int FOG_GetStringFromLinkIndex(void* p, int nIndex, char* szString) {
-    const char* s = FOG_10255(p, nIndex, 0); strcpy(szString, s); return (int)strlen(s);
+    Linker* l = (Linker*)p;
+    if (!l || nIndex < 0 || nIndex >= (int)l->names.size()) return 0;
+    const std::string& s = l->names[nIndex];
+    for (size_t i = 0; i < 4; ++i) { const char c = i < s.size() ? s[i] : '\0'; szString[i] = c == ' ' ? '\0' : c; }
+    szString[4] = '\0';
+    return 1;
 }
 
 // A table is either a compiled .bin (4-byte record count, then the records) or the tab-separated .txt
