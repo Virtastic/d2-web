@@ -2233,8 +2233,13 @@ async function enterLocalRealm() {
   realmFlow = openLocalRealm(Module, bindEngineProtocol(Module));
   joinedCreate = sessionCreates();
   // The join reads what the running game sends (the rooms and units a tick reveals, then the in-game marker); the
-  // shell's own loop does not advance the game until it is up, so the game is advanced here, at its 25 Hz.
-  const deliver = setInterval(() => { try { session?.tick(1); } catch { /* the join reports its own failure */ } }, 40);
+  // shell's own loop does not advance the game until it is up, so the game is advanced here, at its 25 Hz. Only once the
+  // connection is open: a frame run before it sends its packets to no client while the server records them as sent (the
+  // hero's life goes out once, on the first frame, and is not sent again while it is unchanged).
+  const deliver = setInterval(() => {
+    if (!realmFlow?.local?.isOpen()) return;
+    try { session?.tick(1); } catch { /* the join reports its own failure */ }
+  }, 40);
   try { await createAndJoinConfiguredGame({ character: realmFlow.local.joined.character.name }); }
   finally { clearInterval(deliver); }
 }

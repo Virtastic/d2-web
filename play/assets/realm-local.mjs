@@ -95,6 +95,8 @@ export function openLocalRealm(Module, protocol, { name = null } = {}) {
       joined: { character, game: { difficulty: flags & 0xff }, ticket: { token: 0, hash: 0 } },
       connect: () => (transport = localGameTransport(Module)),
       pump: () => transport?.pump() ?? 0,
+      /** Whether the connection is open: what the game sends before then reaches no client. */
+      isOpen: () => transport?.isOpen === true,
       /** The game tick the connected client's frame belongs to: the local game's own count. */
       gameTick: () => transport?.gameTick() ?? null,
       /** What crossed the connection and what the server did not take (the join's own evidence). */

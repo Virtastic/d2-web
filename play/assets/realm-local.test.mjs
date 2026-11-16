@@ -125,6 +125,18 @@ test('the local realm flow describes the live session\'s character and opens one
   assert.equal(flow.mcp, null);
 });
 
+test('the local realm flow says whether its connection is open, so the join advances the game only after it is', async () => {
+  const { Module } = fakeEngine();
+  const flow = openLocalRealm(Module, {}, {});
+  assert.equal(flow.local.isOpen(), false);   // nothing connected
+  const transport = flow.local.connect();
+  assert.equal(flow.local.isOpen(), false);   // connected, not yet open
+  await transport.ready();
+  assert.equal(flow.local.isOpen(), true);
+  transport.close();
+  assert.equal(flow.local.isOpen(), false);
+});
+
 test('the connected client is told the local game\'s own tick', async () => {
   const { Module } = fakeEngine();
   const flow = openLocalRealm(Module, {}, {});
