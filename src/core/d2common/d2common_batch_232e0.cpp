@@ -314,35 +314,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_50090_UnitStateHit(uint32_t pUnit,
 	return (pfn51470 && pfn51470(pUnit, 7) != 0) ? 1 : 0;
 }
 
-// 1.13c D2Common+0x66410 (#10681): unlink the unit from its room's list (room+0x1C head, next at
-// unit+0xE0). A missing room with a non-null unit+0xE0 is fatal in retail and yields no unlink here.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void D2Common_66410_UnlinkUnitFromRoom(uint32_t pUnit)
-{
-	uint8_t* u = P(pUnit);
-	if (!u)
-		return;
-	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(reinterpret_cast<D2UnitStrc*>(u));
-	uint8_t* r = reinterpret_cast<uint8_t*>(pRoom);
-	if (!r)
-		return;
-	uint32_t nCur = W(r, 0x1C);
-	uint32_t nPrev = 0;
-	while (nCur && nCur != pUnit)
-	{
-		nPrev = nCur;
-		nCur = W(P(nCur), 0xE0);
-		if (!nCur)
-			return;
-	}
-	if (!nCur)
-		return;
-	if (!nPrev)
-		W(r, 0x1C) = W(P(nCur), 0xE0);
-	else
-		W(P(nPrev), 0xE0) = W(P(nCur), 0xE0);
-	W(P(nCur), 0xE0) = 0;
-}
+// D2Common+0x66410 moved to d2common_66410.cpp.
 
 // 1.13c D2Common+0x46920 (#10684): roll an item's file index from the table at DAT_6fdeefa4 (count
 // DAT_6fdeefa0) with the item's seed (item data +4, LCG 0x6AC690C5), store it at item data +0x28,
