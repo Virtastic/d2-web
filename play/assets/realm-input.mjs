@@ -224,7 +224,9 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
       // The engine walks to the unit, plans the walk again each frame and starts the waiting action in reach.
       const kind = pending.hand == null ? 0x13 : pending.hand ? 0x0d : 0x06;
       const started = queueUnit(kind, type, guid, run);
-      if (started >= 0) { pending = null; evidence.localMove = started; return flush(s) ? true : started ? false : null; }
+      // A started walk is the click spent on the unit even when the send gate (+0x143E0) drops its packet as the
+      // repeat of the last one inside its window: the engine walks all the same, only the wire stays quiet.
+      if (started >= 0) { pending = null; evidence.localMove = started; return flush(s) || started ? true : null; }
     }
     // The client keeps no unit for a ground item, so the engine cannot plan a walk to it (-1): the walk is to the item's spot.
     let started = approachUnit ? approachUnit(type, guid, run) : null;

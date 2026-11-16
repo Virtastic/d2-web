@@ -39,6 +39,7 @@
 #include <PLAYER/PlrMsg.h>
 #include <AI/AiGeneral.h>
 #include <cstring>
+#include <vector>
 
 // Every packet the headless server queues for the session client, in order, so a retail
 // capture's client packet-data block (the retail capture tool reads it back from D2ClientStrc+0x1BC)
@@ -54,6 +55,11 @@ extern "C" uint32_t D2WEB_TakeMonsterAssigns() { const uint32_t n = g_d2webMonst
 // them all in emission order whatever resets or fills the bounded stream above. Unset by default.
 static void (*g_d2webPacketSink)(const uint8_t*, uint32_t) = nullptr;
 extern "C" void D2WEB_SetPacketSink(void (*sink)(const uint8_t*, uint32_t)) { g_d2webPacketSink = sink; }
+// The local game's join keeps every byte its walk sends (the rooms, then each unit in them) for the client that connects
+// afterwards. The bounded stream above holds 4 KB: a join over a level seam overflows it, and every unit sent after the
+// overflow (the far rooms' objects and monsters) never reached that client. While set, each packet is appended here too.
+static std::vector<uint8_t>* g_d2webPacketRecord = nullptr;
+extern "C" void D2WEB_RecordPackets(std::vector<uint8_t>* pOut) { g_d2webPacketRecord = pOut; }
 // Further clients in the same game (a second realm connection): retail's send takes the client, so a
 // packet addressed to one of these goes to that connection's receiver alone. The session's own client
 // (the one above) is never routed here and keeps every observation below.
@@ -938,6 +944,8 @@ void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, in
     }
     if (g_d2webPacketSink && pClient && pPacket && nPacketSize > 0) g_d2webPacketSink((const uint8_t*)pPacket, (uint32_t)nPacketSize);
     if (pClient && pPacket && nPacketSize > 0 && *static_cast<const uint8_t*>(pPacket) == 0xAC) ++g_d2webMonsterAssigns;
+    if (g_d2webPacketRecord && pClient && pPacket && nPacketSize > 0)
+        g_d2webPacketRecord->insert(g_d2webPacketRecord->end(), (const uint8_t*)pPacket, (const uint8_t*)pPacket + nPacketSize);
 }
 int32_t D2GAME_SAVE_WriteFile_6FC8A500(D2GameStrc* pGame, D2UnitStrc* pPlayer, const char* szName, DWORD dwArg) { return {}; }
 // D2Game.0x6FC3F2F0: the player's quest record (96 bytes) behind a unit reference.

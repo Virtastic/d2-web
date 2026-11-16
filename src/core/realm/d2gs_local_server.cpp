@@ -11,6 +11,7 @@
 // not use the connection is untouched.
 #include <cstdint>
 #include <cstring>
+#include <vector>
 #include <emscripten.h>
 #include "../d2game/client_packet_lists.h"
 #include "../session/calltrace.h"
@@ -45,6 +46,7 @@ int d2_session_player_x();
 int d2_session_player_y();
 int d2_session_player_act();
 void D2WEB_SetPacketSink(void (*sink)(const uint8_t*, uint32_t));
+extern bool g_sessionJoinUnits;
 const uint8_t* d2_session_join_stream(uint32_t* length);
 uint32_t d2_session_join_load_length();
 int d2_session_client_spawned();
@@ -111,9 +113,13 @@ void onSlotPacket(int slot, const uint8_t* bytes, uint32_t length) {
 }
 LocalServer* slotServer(int slot) { return slot == 0 ? &g_server : slot > 0 && slot < kSlots ? &g_extra[slot] : nullptr; }
 
+// What the game sends its client while the connection is still logging on (the game runs on meanwhile: a unit coming
+// into one of its rooms); it follows the join walk's bytes when the client enters.
+std::vector<uint8_t> g_joinLate;
 // Every packet the game sends its client while the connection is in game, at the moment it is sent.
 void onGamePacket(const uint8_t* bytes, uint32_t length) {
     if (g_server.phase == Phase::InGame) put(bytes, static_cast<int>(length));
+    else if (g_server.phase != Phase::Closed) g_joinLate.insert(g_joinLate.end(), bytes, bytes + length);
 }
 
 void refuse(uint8_t opcode, int result) {
@@ -140,7 +146,12 @@ bool sendPlayer() {
     const uint8_t* join = d2_session_join_stream(&burst);
     const uint32_t load = d2_session_join_load_length();
     if (join && load <= burst) put(join + load, static_cast<int>(burst - load));
+    put(g_joinLate.data(), static_cast<int>(g_joinLate.size()));   // what the game sent it while it connected
+    g_joinLate.clear();
     g_server.phase = Phase::InGame;     // the sink forwards from here on
+    // From here the game has a client: a game made headless (a fixture's create straight on the engine) that this
+    // connection joins tells it each unit of every room it enters from now on, as retail's LEVEL_AddClient does.
+    g_sessionJoinUnits = true;
     d2_session_client_items();          // every item the player holds, as its unit's first sight sends them
     d2_session_client_skills();         // skill list and both hands' selection, through the sink
     // The room join already sent each unit of those rooms (objects included) into the kept join bytes above; no second pass.
@@ -204,7 +215,7 @@ extern "C" {
 EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_open() {
     std::memset(&g_server, 0, sizeof g_server);
     if (d2_session_player_id() < 0) return 0;
-    g_clientList.clear();
+    g_clientList.clear(); g_joinLate.clear();
     g_server.phase = Phase::Greeted;
     g_server.mapSeed = d2_session_game_seed();
     g_server.difficulty = static_cast<uint8_t>(d2_session_game_flags());
@@ -216,7 +227,7 @@ EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_open() {
 }
 
 EMSCRIPTEN_KEEPALIVE void d2_local_d2gs_close() {
-    g_server.phase = Phase::Closed; g_clientList.clear(); g_server.outLength = 0; D2WEB_SetPacketSink(nullptr);
+    g_server.phase = Phase::Closed; g_clientList.clear(); g_joinLate.clear(); g_server.outLength = 0; D2WEB_SetPacketSink(nullptr);
     for (int s = 1; s < kSlots; ++s) { g_extra[s].phase = Phase::Closed; g_extra[s].outLength = 0; d2_session_drop_client(s); }
 }
 

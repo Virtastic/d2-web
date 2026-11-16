@@ -2601,15 +2601,13 @@ EMSCRIPTEN_KEEPALIVE void d2_session_client_join_level(int on) { g_sessionJoinLe
 static bool g_sessionClientDraws = true;
 extern "C" void d2client_sound_trace_weather(bool on);   // sound_pump.cpp
 EMSCRIPTEN_KEEPALIVE void d2_session_client_draws(int on) { g_sessionClientDraws = on != 0; d2client_sound_trace_weather(on != 0); }
-// What the join walk sent the client (room reveals, then the units in them) before the stream is cleared for
-// tick 1: a connected client is owed these bytes, a headless session never reads them.
-extern "C" const uint8_t* D2WEB_PacketStream(uint32_t* pLength, uint32_t* pPackets);
+// What the join walk sent the client (room reveals, then the units in them): a connected client is owed these bytes, a
+// headless session never reads them. Recorded whole, not cut from the bounded per-tick stream: a join walk over a level
+// seam sends more than that stream holds, and the units past its end (the far rooms' objects and monsters) were never
+// sent to the client at all.
+extern "C" void D2WEB_RecordPackets(std::vector<uint8_t>* pOut);
 static std::vector<uint8_t> g_sessionJoinBurst;
-static uint32_t sessionPacketStreamMark() { uint32_t n = 0, k = 0; D2WEB_PacketStream(&n, &k); return n; }
-static void sessionKeepJoinBurst(uint32_t from) {
-    uint32_t n = 0, k = 0; const uint8_t* stream = D2WEB_PacketStream(&n, &k);
-    g_sessionJoinBurst.assign(stream + (from < n ? from : n), stream + n);
-}
+static void sessionRecordJoinBurst() { g_sessionJoinBurst.clear(); D2WEB_RecordPackets(&g_sessionJoinBurst); }
 // How many leading bytes of the join are the load part (game flags and the two markers), sent when the
 // client logs on; the rest follows when it enters the game.
 static uint32_t g_sessionJoinLoadLength = 0;
@@ -2719,9 +2717,9 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_room_objects() {
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_game_seed() { return g_game ? g_game->dwInitSeed : 0; }
 EMSCRIPTEN_KEEPALIVE int d2_session_game_flags() { return g_game ? (int)(g_game->nDifficulty & 0xFF) | (g_game->bExpansion ? 0x100 : 0) | (g_targetPlayer ? (int)(g_targetPlayer->dwClassId & 0xFF) << 16 : 0) : 0; }
 static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStrc* anchor) {
-    const uint32_t joinBurstFrom = sessionPacketStreamMark();
     D2UnitStrc* player = SUNIT_AllocUnitData(UNIT_PLAYER, g_sessionPlayerClass, x, y, g_game, room, 1, PLRMODE_NEUTRAL, 0);
     if (!player) return 0;
+    sessionRecordJoinBurst();
     if (g_sessionSeedPlayer) SUNIT_InitSeed(player, &g_game->pGameSeed);
     STATLIST_SetUnitStat(player, STAT_HITPOINTS, 50 << 8, 0); STATLIST_SetUnitStat(player, STAT_MAXHP, 50 << 8, 0);
     STATLIST_SetUnitStat(player, STAT_LEVEL, 1, 0); STATLIST_SetUnitStat(player, STAT_ATTACKRATE, 100, 0);
@@ -2775,7 +2773,7 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
         D2GAME_PACKETS_SendPacket0x01_6FC3C7C0(g_targetClient, 1, g_game);
         D2GAME_PACKETS_SendHeaderOnlyPacket(g_targetClient, 0x00);
         D2GAME_PACKETS_SendHeaderOnlyPacket(g_targetClient, 0x02);
-        g_sessionJoinLoadLength = sessionPacketStreamMark() - joinBurstFrom;
+        g_sessionJoinLoadLength = (uint32_t)g_sessionJoinBurst.size();
         LEVEL_SynchronizeDayNightCycleWithClient(g_game, g_targetClient);
     }
     if (joinBurstRig && g_sessionJoinLoadLength) {
@@ -2866,7 +2864,8 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
             // The rig's client learns the rooms' units from the first tick's client update instead (sent once there).
             if (!joinBurstRig) LEVEL_UpdateUnitsInAdjacentRooms(g_game, room, g_targetClient);
         }
-        sessionKeepJoinBurst(joinBurstFrom); D2WEB_ResetPacketStream();
+        D2WEB_RecordPackets(nullptr);   // the walk is over; what the game sends the client from here goes out live
+        D2WEB_ResetPacketStream();
     }
     for (D2UnitStrc* u = room->pUnitFirst; u; u = u->pRoomNext) {
         if (u->dwUnitType != UNIT_MONSTER) continue;
