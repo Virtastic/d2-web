@@ -348,7 +348,7 @@ const MAP_SEED_OVERRIDE = (() => {
 let terrain = null, terrainFiles = null, terrainStats = null, terrainError = '', terrainLevel = -1, terrainAct = -1;
 let playerRenderer = null, playerRenderError = '', motion = {};
 const monsterHitMode = new Map();   // monster 'type:id' -> its mode last frame (2A590's mode edge)
-let corpseRenderer = null, corpseEvidence = null, lastCorpseRecovery = null, missileRenderer = null, missileEvidence = [], skillFx = null, stateFx = null, unitOverlayFx = null, overlayRenderer = null, heroFx = [], realmUnitFx = null;
+let corpseRenderer = null, corpseEvidence = null, lastCorpseRecovery = null, pendingCorpseRecovery = null, missileRenderer = null, missileEvidence = [], skillFx = null, stateFx = null, unitOverlayFx = null, overlayRenderer = null, heroFx = [], realmUnitFx = null;
 // Retail's weather (client-parity F11b): the rain, and the identity of every rain blit it drew this
 // frame -- `{ rain, blits }`, the record shape retail's own draw lists use.
 let wireWeather, weatherRenderer = null, weatherEvidence = { rain: -1, blits: [] };
@@ -3252,7 +3252,8 @@ function update(forceTick = false, live = false) {
         const [px, py] = !command.held && rec && rec.at[0] === command.x && rec.at[1] === command.y ? rec.point : [command.x, command.y];
         const hit = realmInput().leftClick(px, py, { held: Boolean(command.held), stand: heldStandStillKeys.size > 0 });
         // What the packet path resolved the click to (the unit it acted on and its cell), on the click's own record.
-        if (rec) { rec.hit = hit?.kind ?? null; if (hit?.unit) rec.walkTo = [hit.unit.x, hit.unit.y]; }
+        if (rec) { rec.hit = hit?.kind ?? null; if (hit?.unit) { rec.walkTo = [hit.unit.x, hit.unit.y]; if (rec.aim) rec.aim.unitId = hit.unit.guid ?? 0; } }
+        if (hit?.kind === 'corpse') pendingCorpseRecovery = hit.unit.guid;
       } else if (command.type === COMMAND.MOVE && command.directional && !heldStandStillKeys.size) {
         realmInput().step(command.x, command.y);
       } else if (command.type === COMMAND.INTERACT) {
@@ -3267,6 +3268,10 @@ function update(forceTick = false, live = false) {
       }
     }
     realmInput().tick();
+    // A clicked corpse is recovered when the server releases it (S 0x8E flag 0 drops its pair, realm-death.mjs).
+    if (pendingCorpseRecovery != null && !(realmFlow?.protocol?.d2gsClientCorpses?.() ?? []).some((p) => p.corpse === pendingCorpseRecovery)) {
+      lastCorpseRecovery = { id: pendingCorpseRecovery, result: 1 }; pendingCorpseRecovery = null;
+    }
     const trade = realmTrade();
     if (trade.open && !inventoryVisible) trade.closed();   // the inventory's close button and Escape cancel the trade
     trade.tick({ dead: snapshot?.mode === 0 || snapshot?.mode === 17, inTown: TOWN_LEVELS.includes(realmWorldView?.mapLevel) });
