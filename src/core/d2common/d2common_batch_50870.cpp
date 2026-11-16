@@ -113,56 +113,7 @@ extern "C" bool D2Common_50AF0_ItemLevelGate(uint32_t pUnit, uint32_t pItem,
     return getStat && required <= getStat(pItem, 8);
 }
 
-// 1.13c D2Common+0x50F00: check two equipped weapons against the item's
-// requirements, excluding an existing hand item for kinds 4 and 5.
-extern "C" bool D2Common_50F00_EquipmentRequirements(uint32_t pOwner, uint32_t pItem,
-    uint32_t right, uint32_t left, uint32_t (*slotItem)(uint32_t, uint32_t),
-    uint32_t (*equipped)(uint32_t),
-    bool (*requirements)(uint32_t, uint32_t, uint32_t))
-{
-    U8* item = ptr(pItem);
-    if (!item) return false;
-    U8* rec = ptr(u32(item, 0));
-    if (!rec) return false;
-    if (i16(rec, 0x24) < 1 && i16(rec, 0x18) < 1) return true;
-    U8* owner = ptr(pOwner);
-    if (!owner || !u32(owner, 0x60)) return false;
-    // Retail resolves each hand slot independently before checking whether
-    // the candidate replaces one of the equipped items.
-    if (slotItem) {
-        right = slotItem(u32(owner, 0x60), 0);
-        left = slotItem(u32(owner, 0x60), 1);
-    }
-    int16_t kind = i16(rec, 0);
-    if ((kind == 4 || kind == 5) && equipped) {
-        uint32_t current = equipped(u32(owner, 0x60));
-        if (current == right) right = 0;
-        else if (current == left) left = 0;
-    }
-    if (!requirements) return false;
-    // Retail repeats the first call if it fails, then checks the reverse order.
-    if (requirements(right, left, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(rec))) ||
-        requirements(right, left, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(rec))))
-        return requirements(left, right, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(rec)));
-    return false;
-}
-
-// 1.13c D2Common+0x52210: mana cost gate for the fixed skill 0x79.
-extern "C" bool D2Common_52210_ManaCostGate(uint32_t pSkill, uint32_t pUnit,
-    int32_t skillCount, bool stat79Available, uint32_t manaLimit, int32_t qualityBonus,
-    int32_t (*cost)(uint32_t, uint32_t, int32_t, uint32_t))
-{
-    U8* unit = ptr(pUnit);
-    if (!unit || i32(unit, 0) != 0 || skillCount <= 0x79 || !stat79Available || !pSkill) return true;
-    U8* skill = ptr(pSkill);
-    U8* rec = ptr(u32(skill, 0));
-    if (!rec) return true;
-    int32_t n = i32(skill, 0x28);
-    if (i32(skill, 0x34) == -1) n += qualityBonus;
-    uint32_t level = n > 0 ? static_cast<uint32_t>(n) : 0;
-    if (static_cast<int32_t>(level) >= static_cast<int32_t>(manaLimit)) level = manaLimit;
-    return !cost || cost(pUnit, u32(rec, 0x190), i16(rec, 0), level) < 1;
-}
+// D2Common+0x50F00 and +0x52210 moved to d2common_50f00.cpp and d2common_52210.cpp.
 
 // 1.13c D2Common+0x222B0: byte 0x143 of the indexed 0x1A8-byte record.
 extern "C" uint8_t D2Common_222B0_RecordFlag(uint32_t pUnit, const U8* table,
@@ -234,4 +185,10 @@ extern "C" int32_t D2Common_39CE0_ResolveStatDependencies(uint32_t pOwner, uint3
         }
     }
     return value;
+}
+
+// Fog's bit-mask table as the D2Game batches read it (d2game_batch_452c0b.cpp): a weak zero placeholder until it is linked,
+// kept from the dropped D2Common+0x52340 batch copy.
+extern "C" {
+__attribute__((weak)) uint32_t gdwBitMasks_exref[32];
 }

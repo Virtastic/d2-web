@@ -29,27 +29,7 @@ namespace
 	inline uint32_t& W(uint8_t* b, int o) { return *reinterpret_cast<uint32_t*>(b + o); }
 }
 
-// 1.13c D2Common+0x663B0 (#10127): empty a room's update list.
-// The list head is room+0x1C. Every linked unit stores its chain-next at +0xE0 and clears the
-// UNITFLAG_ISLINKREFRESHMSG bit (0x2000) of its flags dword at +0xC4. Retail fatals 0x2AD on a
-// null room; we return. List entries are 32-bit image addresses.
-void D2Common_663B0_ClearRoomUpdateList(uint32_t pRoom)
-{
-	uint8_t* room = P(pRoom);
-	if (!room)
-		return;
-
-	uint32_t unitAddress = W(room, 0x1C);
-	while (unitAddress != 0)
-	{
-		uint8_t* unit = P(unitAddress);
-		const uint32_t next = W(unit, 0xE0);
-		W(unit, 0xE0) = 0;
-		W(unit, 0xC4) &= 0xFFFFDFFFu;
-		unitAddress = next;
-	}
-	W(room, 0x1C) = 0;
-}
+// D2Common+0x663B0 moved to d2common_663b0.cpp.
 
 // 1.13c D2Common+0x1EC30 (#10145): count belt items of one item-data type. stdcall(inventory, nItemType).
 // The inventory must carry magic 0x1020304 at +0x00. Grid 0 comes from 0x1E1B0 with the global

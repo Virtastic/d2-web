@@ -41,20 +41,7 @@ extern "C" void d2_batch_d2common_29f30(D2UnitStrc* item, int32_t stat)
     ITEMS_SetDefenseOrDamage(item, stat);
 }
 
-// 1.13c D2Common+0x67F50
-// EAX is room, EDI is the caller's pool. Fog 10046 takes pool in ECX,
-// allocation in EDX, then file/line/flags on the stack. This helper does not
-// reset pointers/counters or free links/grid (the larger D2MOO helper does).
-extern "C" void d2_fn_d2common_67f50(D2DrlgRoomStrc* room, void* pool,
-    void (*freePool)(void*, void*, const char*, int, int) = FOG_FreePool)
-{
-    if (auto* grid = room->pTileGrid) {
-        constexpr auto file = "..\\Source\\D2Common\\DRLG\\RoomTile.cpp";
-        if (grid->pTiles.pWallTiles) freePool(pool, grid->pTiles.pWallTiles, file, 0x592, 0);
-        if (grid->pTiles.pFloorTiles) freePool(pool, grid->pTiles.pFloorTiles, file, 0x593, 0);
-        if (grid->pTiles.pRoofTiles) freePool(pool, grid->pTiles.pRoofTiles, file, 0x594, 0);
-    }
-}
+// D2Common+0x67F50 moved to d2common_67f50.cpp.
 
 
 
