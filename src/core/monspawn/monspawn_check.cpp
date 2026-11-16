@@ -12596,6 +12596,11 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
     // walk does not feed the critters itself (bit0 clear), they are counted here. Then the client-only presets of every room seen.
     if (!(g_walkOpt & 1)) g_walkUnits += d2_session_critter_count();
     for (const auto& kv : g_sessionClientPresets) g_walkUnits += kv.second;   // the client-only presets of every room seen (first sight covers every room the client was sent, of any level)
+    // frame clock: the missiles the client held at the last walk. D2Client+0x2B1E0 runs a unit's 6C130 step (its clock read) before
+    // the type step (0xB1AF0 for a missile) in which the client's missile reaches its end; the unit leaves the frame after. So
+    // the client's copy of a missile the server freed in this tick's step still takes its 6C130 step this frame.
+    static std::set<uint32_t> walkedMissiles; std::set<uint32_t> nowMissiles;
+    if (first) walkedMissiles.clear();
     for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
         D2ActiveRoomStrc* room = roomEx->pRoom;
         if (!room || !clientHolds(room, roomEx)) continue;   // only the rooms the client holds
@@ -12622,6 +12627,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
                 // frame clock: D2Client+0xA8110 steps the missile lists before the players' and monsters', so a client missile one of
                 // their steps makes this frame (an action frame's client missile) gets its first 6C130 step on the next frame
                 unstepped = born == g_sessionClientFrame;
+                nowMissiles.insert(u->dwUnitId);
                 // Hidden, it is still a unit of its room's list (made there by D2Common+0x66900, sorted by 664B0 with the rest):
                 // fed with +0xC8 bit 18 so the walk keeps its list place and draws nothing for it.
                 if (mt && mt->nInitSteps && g_sessionClientFrame - born < (uint32_t)mt->nInitSteps + 2) hidden = 0x40000;
@@ -12679,6 +12685,9 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
             if (u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MONSTER) d2_dg_feed_unit_shift(sessionColourShift(u));
         }
     }
+    for (uint32_t id : walkedMissiles)                   // ended on the server this tick: the client's copy steps once more, undrawn
+        if (!nowMissiles.count(id) && !SUNIT_GetServerUnit(g_game, UNIT_MISSILE, (int32_t)id)) ++g_walkUnits;
+    walkedMissiles.swap(nowMissiles);
     feedCritters();
     // a held monster's client missiles (its do's cltmissile, D2Client+0xA2C90): units of the client's room lists the server has no
     // copy of. +0xC8 bit 18 (InitSteps) is the client unit's own; a missile made this frame has not had its first 6C130 step.
