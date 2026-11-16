@@ -1326,7 +1326,7 @@ extern "C" void d2_session_weather_drop();   // below: drops a weather pass left
 static void resetSessionClientMapMirror() {
     if (g_sessionClientPlayerUnit) UNITS_FreeUnit(g_sessionClientPlayerUnit);
     g_sessionClientPlayerUnit = nullptr;
-    d2client::weather::reset(); d2_session_weather_drop(); d2client_ambient::reset(); d2_client_monster_idle_reset(); sessionClientMonsterModeReset(); d2_client_attack_roll_reset(); g_sessionClientRoomsSeen.clear(); g_sessionClientPresets.clear(); g_sessionReleasedRooms.clear(); g_clientSpotMissiles.clear(); g_sessionClientFrame = 0; d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset(); { extern void d2_client_monster_hit_reset(); d2_client_monster_hit_reset(); }
+    d2client::weather::reset(); d2_session_weather_drop(); d2client_ambient::reset(); d2_client_monster_idle_reset(); sessionClientMonsterModeReset(); d2_client_attack_roll_reset(); g_sessionClientRoomsSeen.clear(); g_sessionClientPresets.clear(); g_sessionReleasedRooms.clear(); g_clientSpotMissiles.clear(); g_sessionClientFrame = 0; d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset(); { extern void d2_client_monster_hit_reset(); d2_client_monster_hit_reset(); } { extern void d2client_unitseed_reset(); d2client_unitseed_reset(); }
     if (g_sessionTownAct) { DUNGEON_FreeAct(g_sessionTownAct); g_sessionTownAct = nullptr; }   // after the critters that stand in it
     g_sessionTownUnits = 0; g_sessionTownBuilt = false; g_sessionTownSighted.clear();
     g_sessionMirrorSeen.clear(); g_sessionMirrorTownCounted.clear();
@@ -3805,6 +3805,7 @@ static int d2_session_create_for_class(uint32_t seed, int difficulty, int act, i
     g_sessionMonsterLights.clear();
     g_sessionPlayerClass = playerClass;
     resetSessionClientMapMirror(); g_sessionMirrorOpen = true;
+    g_heldFor = nullptr;   // the new game's client holds no units yet (its player can reuse the last one's address)
     d2_monspawn_reset(); g_sessionLive = false; g_sessionMovePending = false; g_d2ClientSoundObjects = 1;
     d2client_unitseed::tell_mode(true);   // the session's server announces monsters to its client (sessionHeldStep)
     g_sessionAiThinkWatchUnit = UINT32_MAX; g_sessionAiThinkWatchCount = 0; g_sessionAiThinkWatchLastFrame = -1;

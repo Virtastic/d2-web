@@ -55,8 +55,20 @@ namespace { uint32_t roll_room(const D2ActiveRoomStrc* r) {
     it->second = { uint32_t(s), uint32_t(s >> 32) };
     return uint32_t(s);
 } }
-uint32_t roll(const D2ActiveRoomStrc* r) { flush(); return roll_room(r); }
 bool known(const D2ActiveRoomStrc* r) { return r && g_room.count(r); }
+// The client has only its own act: a server room passed for a client unit's creation stands for the client room at the
+// same place (both acts are built from one DRLG, so a room starts at the same subtile in each). The server room stays
+// only where the client act has no room there, as for the unit adds (flush).
+uint32_t roll(const D2ActiveRoomStrc* r) {
+    flush();
+    const D2ActiveRoomStrc* cr = r ? d2_drlg_client_active_room(r->tCoords.nSubtileX, r->tCoords.nSubtileY) : nullptr;
+    return roll_room(known(cr) ? cr : r);
+}
+// A new session's client starts with no units: the last game's monster seeds, start frames and unflushed adds are dropped
+// (its game pointer can be reused, which would hand the new game's monsters the old ones' seeds). Room seeds stay keyed by
+// address and restart when DUNGEON_AllocRoom hands an address out again. The init seeds by (type, id) are kept: the hero
+// seed reads the player's (sessionClientPlayerInit) before this game's adds are read, and an emptied table gives it 0.
+void reset() { g_seed.clear(); g_start.clear(); g_pending.clear(); }
 namespace {
 uint32_t next(Seed& s) { const uint64_t v = uint64_t(s.lo) * 0x6ac690c5ull + s.hi; s = { uint32_t(v), uint32_t(v >> 32) }; return uint32_t(v); }
 }
@@ -145,6 +157,7 @@ uint32_t* unit_seed(const D2GameStrc* game, uint32_t type, uint32_t id) {
 void d2client_unitseed_room(const D2ActiveRoomStrc* r, uint32_t lowSeed) { d2client_unitseed::room(r, lowSeed); }
 void d2client_unitseed_created(D2UnitStrc* u) { d2client_unitseed::created(u); }
 extern "C" void d2client_unitseed_flush() { d2client_unitseed::flush(); }
+void d2client_unitseed_reset() { d2client_unitseed::reset(); }
 void d2client_unitseed_tell_mode(bool on) { d2client_unitseed::tell_mode(on); }
 void d2client_unitseed_told(D2UnitStrc* u) { d2client_unitseed::told(u); }
 // The start frame a client monster's init rolled; 0 when it rolled none.
