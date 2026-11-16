@@ -53,10 +53,3 @@ extern "C" void D2Common_29F30_ItemDefenseOrDamage(uintptr_t item, uint32_t stat
     default: return;
     }
 }
-
-// Live path: the callees run for real on the carried graph, which is the vendored routine on the same records.
-#include "D2Items.h"
-extern "C" void D2Common_29F30_ItemDefenseOrDamageLive(D2UnitStrc* item, int32_t stat)
-{
-    ITEMS_SetDefenseOrDamage(item, stat);
-}

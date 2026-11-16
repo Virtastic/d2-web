@@ -15,5 +15,5 @@ struct D2Common29F30Env {
     void      (*setStat)(uintptr_t item, int32_t stat, int32_t v);   // 0x8A740 (layer 0)
 };
 extern "C" void D2Common_29F30_ItemDefenseOrDamage(uintptr_t item, uint32_t stat, const D2Common29F30Env* e);
-// Live-graph path: the real callees on a carried unit graph (the vendored routine).
+// Env over the engine tables and stat code (play path, d2common_29f30_env.cpp).
 extern "C" void D2Common_29F30_ItemDefenseOrDamageLive(D2UnitStrc* item, int32_t stat);

@@ -34,13 +34,7 @@ extern "C" void D2Common_7BE50_NormaliseStatus(intptr_t pRoom)
     r[0x44] = s;
 }
 
-// 1.13c D2Common+0x29F30
-extern "C" void d2_batch_d2common_29f30(D2UnitStrc* item, int32_t stat)
-{
-    // ESI holds item; the switch selector is preserved from the caller.
-    ITEMS_SetDefenseOrDamage(item, stat);
-}
-
+// D2Common+0x29F30 is d2common_29f30.cpp; the play path reaches it through d2common_29f30_env.cpp.
 // D2Common+0x67F50 moved to d2common_67f50.cpp.
 
 
