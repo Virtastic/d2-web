@@ -340,11 +340,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_85b30(const D2cItmEnv* e, const u
     if (!C(11041, inv, A(it), slot)) return;
     if (slot != 4 && slot != 5) { tail(e, A(u)); C(F_DONE, 0, 0, 0, 0); C(F_REFRESH, 0, 0, 0, 0); return; }
     C(10138, inv, A(it), 0, 0);
-    C(F_POST, 0, 0, 0, 0);
+    C(F_POST, A(u), 0, 0, 0);       // EAX = player, DL = 0
     C(F_UI1, 0, 0, 0, 0);
     tail(e, A(u));
-    C(F_UI2, 0, 0, 0, 0);
-    C(F_UI3, 0, 0, 0, 0);
+    C(F_UI2, A(it), slot, 0, 0);    // EAX = item, BL = slot
+    C(F_UI3, A(u), 0, 0, 0);        // EAX = player, push 0
     C(F_DONE, 0, 0, 0, 0);
     C(F_REFRESH, 0, 0, 0, 0);
 }
@@ -384,28 +384,32 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_85cf0(const D2cItmEnv* e, const u
 }
 
 // 1.13c D2Client+0x85ED0 (packet in EAX)
+// The 24-byte header (D2cItemHdr) is the stack local at L+8; the record local at L+0 is what 10605 gets the address of
+// and later holds the item the tail works on; the local-player test compares the unit with the 0x11BBFC player
+// read before the unit lookup (not with 10646's result).
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_85ed0(const D2cItmEnv* e, const uint8_t* p) {
-    D2cHdr h; memset(&h, 0, sizeof h);
-    C(11105, 0, 0, A(&h), 0);
+    D2cItemHdr h; memset(&h, 0, sizeof h);
+    C(11105, A(p + 0xd), W(p[2]) - 0xd, 0, A(&h));
+    uint8_t* pl = e->player;
     uint8_t* u = (uint8_t*)C(F_UNPACK_PLAYER, rd<uint32_t>(p, 9), p[8], 0, 0);
     if (!u) return;
     W inv = rd<uint32_t>(u, 0x60);
-    if (!inv) FATAL(0);
-    W rec = C(11139, inv, 0, 0, 0);
+    if (!inv) FATAL(0x65c);
+    W rec = C(11139, inv, h.slot, 0, 0);
     if (!rec) return;
     C(F_PRE, A(u), 0, 0, 0);
     C(10694, inv, rec, 0, 0);
     C(F_PRE2, A(u), 0, 0, 0);
-    C(10605, A(u), inv, A(&h), h.slot);
+    C(10605, A(u), inv, A(&rec), h.slot);
     W old = C(10646, inv, rec, 0, 0);
-    C(10608, inv, 0, 0, 0);
-    C(10600, 1, 1, 0, 0);
-    C(10061, inv, 0, 0, 0);
+    C(10608, inv, h.slot, 0, 0);
+    C(10600, A(u), old, 1, 1);
+    if (rd<int32_t>(u, 0) == 0) C(10061, rd<uint32_t>(u, 0x60), 0, 0, 0);
     if (!C(10202, old, 0x100, 0x96, A(e->file))) C(11127, A(u), old, 0, 0);
     C(F_UNREF, A(u), 0, 0, 0);
-    C(F_UI3, 0, 0, 0, 0);
+    C(F_UI3, A(u), 0, 0, 0);
     uint32_t id = rd<uint32_t>(p, 4);
-    if (A(u) != old) {
+    if (u != pl) {
         bool bad;
         uint8_t* n = findItem(e, id, bad);
         if (!n) return;
@@ -413,25 +417,24 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_85ed0(const D2cItmEnv* e, const u
         C(F_CHAIN, 0x6fbbae08, id & 0x7f, id, 4);
         return;
     }
-    C(V(0x6faf7cd0), rd<uint32_t>(u, 0xC), 0, 0, 0);
+    C(V(0x6faf7cd0), rec ? rd<uint32_t>((const uint8_t*)rec, 0xC) : 0xffffffffu, 0, 0, 0);
     C(F_SELECT, 0, 0, 0, 0);
     if (h.slot == 4) e->v5c[0] = 0; else if (h.slot == 5) e->v5c[2] = 0;
-    if (C(10197, h.b, 0x20, 0, 0)) { C(F_CHAIN, 0x6fbbae08, id & 0x7f, id, 4); return; }
-    uint8_t* it = u;
-    if (!C(10197, h.a, 1, 0, 0)) C(V(0x6fb32980), 0, h.act, 0, 0);
+    if (C(10197, h.flags, 0x20, 0, 0)) { C(F_CHAIN, 0x6fbbae08, id & 0x7f, id, 4); return; }
+    if (!C(10197, h.flags, 1, 0, 0)) C(V(0x6fb32980), rec, h.act, 0, rd<uint32_t>((const uint8_t*)&h, 0x10));   // EAX = record, stack (0, act, 0, header dword +0x10)
     else {
         C(F_CHAIN, 0x6fbbae08, id & 0x7f, id, 4);
-        it = (uint8_t*)C(F_MAKE, A(p), A(&h), 0, 0);
-        if (!it) FATAL(0x67e);
+        rec = C(F_MAKE, A(p), A(&h), 0, 0);
+        if (!rec) FATAL(0x67e);
     }
-    C(10058, A(it), 0, 0, 0);
-    C(10466, inv, 0, 0, 0);
+    C(10058, rec, 0, 0, 0);
+    C(10466, inv, rec, 0, 0);
     C(11017, inv, 0, 0, 0);
     C(F_KILL, 0, 0, 0, 0);
     tail(e, A(u));
-    if (it) {
+    if (rec) {
         C(F_REFRESH, 0, 0, 0, 0);
-        if (C(10202, A(it), 0x4000, 0x69c, A(e->file))) C(10977, inv, 0x4000, 0, 0);
+        if (C(10202, rec, 0x4000, 0x69c, A(e->file))) C(10977, rec, 0x4000, 0, 0);
     }
 }
 

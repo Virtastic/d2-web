@@ -28,7 +28,7 @@ struct L { U16* v; L* next; };              // ord10059 wrapped-line list: [0]=l
 
 struct G {
     uint32_t h3b10, f3a68, f3a60, f3a70, f3aca, cc2fc, d5d4, ad50, bbfc_set;
-    uint8_t  f3b0b;
+    uint32_t f3b0b;                  // +0x113B0B dword (7D200 stores 38a70's result there; 7CB80 clears all 4 bytes)
     void*    obj3a74;                // object with vtable (dtor at slot 0, slot 0x3C call)
     Q        q[3];                   // 3aa4 / 3aaa / 3ab0
     uint32_t b03, b07;               // +0x113B03 tick stamp, +0x113B07 frame

@@ -172,33 +172,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_81f60(D2cB8G* g, const D2cB8E
     return (r != 2 && r != 7);
 }
 
-// 1.13c D2Client+0x81FF0
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_81ff0(D2cB8G* g, const D2cB8Env* e, const uint8_t* unit, const uint32_t* a) {
-    (void)g;
-    if (!a) return;
-    int32_t uid = unit ? rd<int32_t>(unit, 4) : -1;
-    auto chk = [&](uint32_t c0, uint32_t c1, uint32_t c2) {
-        if (a[0] != 4) e->fatal(c0);
-        uint8_t* t = e->ord10695(uid);
-        if (!t) e->fatal(c1);
-        if (!e->ord10806(rd<uint32_t>(t, 0xf0))) e->fatal(c2);
-        e->ord10519();
-    };
-    if (e->ord10744() == 0) {
-        if (e->ord10744() == 0) e->ord10600();
-        else { chk(0x3a, 0x3c, 0x3e); e->ord10996a(5); }
-    } else { chk(0x30, 0x32, 0x34); e->ord10996b(2, 0); }
-    if (e->ord10202() != 0) return;
-    if (a[0] == 0) {
-        uint32_t o = e->ord10061(a[0x18]);
-        if (e->ord10747() != 0) {
-            if (o && (uint32_t)(uintptr_t)unit != o) e->ord10744();
-            e->ord10202(); e->ord10164();
-            return;
-        }
-    }
-    e->ord10202(); e->ord10164();
-}
+// 1.13c D2Client+0x81FF0: ported to d2client_81ff0.cpp
 
 // 1.13c D2Client+0x82210 -- ECX = unit, EDX = p2, two stack words (p3, p4); ret 8. Finds the unit's flag-0x40 stat list
 // that holds stat 0xCC under the key built from p2 and p3, and rewrites its low byte to p4 clamped to 0..the stored maximum
@@ -228,24 +202,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_82210(D2cB8G* g, const D2cB8E
     return 1;
 }
 
-// 1.13c D2Client+0x82320
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82320(D2cB8G* g, const D2cB8Env* e, const uint8_t* pkt) {
-    uint32_t key = rd<uint32_t>(pkt, 4);
-    uint8_t* n = rd<uint8_t*>(g->hashA, (key & 0x7f) * sizeof(uint8_t*));
-    while (n) {
-        if (rd<uint32_t>(n, 0xc) == key) { if (rd<int32_t>(n, 0) != 4) e->fatal(0x5a); break; }
-        n = rd<uint8_t*>(n, 0xe4);
-    }
-    int32_t ok;
-    e->ord11145(n, (uint8_t*)pkt + 8, pkt[2] - 8, 0, 0, 0x60, &ok);
-    if (ok) { e->fn56ef0(g->hashA, key & 0x7f, key, 4); return; }
-    if (!g->player) e->fatal(0x7b3);
-    uint32_t l = rd<uint32_t>(g->player, 0x60);
-    if (!l) e->fatal(0x7b6);
-    uint32_t h = e->ord10838(n, 8);
-    if (e->ord10197(h) == 0) { e->ord10466(l, 0); e->ord11017(l); e->fn62d0(); }
-    if (e->ord11017(l) != 0) e->fn31aa0();
-}
+// 1.13c D2Client+0x82320: ported to d2client_82320.cpp
 
 // 1.13c D2Client+0x82410
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82410(D2cB8G* g, const D2cB8Env* e, const uint8_t* s) {

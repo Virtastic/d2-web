@@ -53,13 +53,15 @@ void d2_client_8ad30(int32_t n_eax, int32_t* h_beae8, Node* head_cbf30,
     if (tgt != 0 && *h_beae8 == 0) {
         *h_beae8 = sub88a70(0, 0, 0, 0);
         if (*h_beae8 == 0) return;
-        sub87ed0(0, *h_beae8, 0);  // ECX/EDX hidden; guessed
-        h = *h_beae8;
+        sub87ed0(0, *h_beae8, 0);  // EDX = the new handle, ECX whatever 0x88A70 left (not an input)
+        h = *h_beae8;              // 0x87ED0 never writes EDX: the walk below runs on the new handle
     }
     if (h == 0) return;
     int32_t cur = 0;
-    for (Node* p = head_cbf30; p; p = p->next)
-        if ((int32_t)p->obj[2] == h) { obj = (int32_t)(intptr_t)p->obj; cur = (int32_t)p->obj[7]; goto found; }
+    for (Node* p = head_cbf30; p; p = p->next) {   // ECX holds each visited entry: a miss leaves the last one for the callee
+        obj = (int32_t)(intptr_t)p->obj;
+        if ((int32_t)p->obj[2] == h) { cur = (int32_t)p->obj[7]; goto found; }
+    }
 found:
     if (tgt == cur) return;
     int32_t nx = cur < tgt ? (cur + 6 <= tgt ? cur + 6 : tgt) : (tgt <= cur - 6 ? cur - 6 : tgt);

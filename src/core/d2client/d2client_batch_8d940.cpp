@@ -40,50 +40,7 @@ void tooltipRequirement(Env& e,const Imp8d940& f,int32_t player,int32_t unit,con
  ucat(out,e.str(0xd88)); num(b,"%i",hi,n); ucat(out,c0); ucat(out,n); ucat(out,c1);
 }
 
-// 1.13c D2Client+0x14A0  ( EAX = a, EDX = b, ECX = c): a*b/c with the D2 overflow guards.
-static int32_t ratio(int32_t a,int32_t b,int32_t c){
- if(!c) return 0;
- if(b>0x100000){ if(c<=(b>>4)) return (b/c)*a; return (int32_t)(((int64_t)b*a)/c); }
- if(a>0x10000){ if(c<=(a>>4)) return (a/c)*b; return (int32_t)(((int64_t)b*a)/c); }
- return (b*a)/c;
-}
-// 1.13c D2Client+0x8DAD0  (EAX = item; stdcall unit, statMin, statMax, outMin, outMax, outFlag; ret 0x18).
-// *outMin = 1 and *outMax = 2 up front; nothing else when unit or item is null. The item is re-parented for the read:
-// r = #11160(DAT_6fbcbc38, &slot); owner = r if r and r != unit; #10164(owner,item,1); read min/max by #10973; then
-// #11127(owner,item) when r was null, else #10164(owner,item,slot). *outFlag = 1 when the #10587 base values exceed
-// the current ones; max = max(max,min). Stat 0x110 (when the stat table has > 0x110 rows) adds
-// #10449(stat, #11044(owner[0x1c],&k), k, 0,0,0) to max; stat 0x111 (> 0x111 rows) adds ratio(v, max, 100).
-struct Imp8dad0 {
- int32_t(*o11160)(int32_t,int32_t*); void(*o10164)(int32_t,int32_t,int32_t); void(*o11127)(int32_t,int32_t);
- int32_t(*o10587)(int32_t,int32_t,int32_t); int32_t(*o11044)(int32_t,int32_t*);
- int32_t(*o10449)(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
- int32_t(*statRows)(); int32_t(*statBase)(); int32_t(*rd32)(int32_t);   // sgptDataTables +0xbd4 / +0xbcc
-};
-void damageRange(Env& e,const Imp8dad0& f,int32_t gBC38,int32_t item,int32_t unit,int32_t sMin,int32_t sMax,
-                 int32_t* outMin,int32_t* outMax,int32_t* outFlag){
- *outMin=1; *outMax=2;
- if(!unit||!item) return;
- int32_t slot=0;
- int32_t r=f.o11160(gBC38,&slot);
- int32_t owner=(r && r!=unit)?r:unit;
- f.o10164(owner,item,1);
- int32_t lo=e.q(10973,item,sMin), hi=e.q(10973,item,sMax);
- if(!r) f.o11127(owner,item); else f.o10164(owner,item,slot);
- int32_t bLo=f.o10587(item,sMin,0), bHi=f.o10587(item,sMax,0);
- if(bLo<lo || bHi<hi) *outFlag=1;
- if(hi<=lo) hi=lo;
- int32_t st=e.q(10973,item,0x110);
- if(st && f.statRows()>0x110 && f.statBase()+0x15840 && f.rd32(owner+0x1c)){
-  int32_t k=0; int32_t t=f.o11044(f.rd32(owner+0x1c),&k);
-  int32_t v=f.o10449(st,t,0,0,0,0); hi+=v; if(v) *outFlag=1;
- }
- st=e.q(10973,item,0x111);
- if(st && f.statRows()>0x111 && f.statBase()+0x15984 && f.rd32(owner+0x1c)){
-  int32_t k=0; int32_t t=f.o11044(f.rd32(owner+0x1c),&k);
-  int32_t v=f.o10449(st,t,0,0,0,0); hi+=ratio(v,hi,100); if(v) *outFlag=1;
- }
- *outMin=lo; *outMax=hi;
-}
+// 1.13c D2Client+0x8DAD0: ported to d2client_8dad0.cpp
 
 // 1.13c D2Client+0x8DCC0  (EDI = out; stdcall data, add; ret 8): label 0xd83, value data u16 +0x10c + add; empty if < 1.
 void tooltipField10c(Env& e,const uint8_t* data,int32_t add,wc* out){

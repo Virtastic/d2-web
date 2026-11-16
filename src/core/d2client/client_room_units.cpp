@@ -58,6 +58,10 @@ int32_t roomFind(int32_t level, int32_t tx, int32_t ty, bool make) {
     g_rm[freeSlot] = {1, level, tx, ty};
     return freeSlot;
 }
+// The lists have one writer per frame. The room walk's feed (d2c_cru_begin .. d2c_cru_end) is the client's own unit set; a
+// d2c_cru_frame_begin .. d2c_cru_frame_end pass that follows it in the same frame only reads the lists the walk left (its
+// slots, ranks and floor flags) and adds no sort pass: 7A5D0's #10667 call is the one 664B0 pass a room gets per frame.
+bool g_walkFed, g_frameReads;
 }  // namespace
 
 extern "C" {
@@ -65,6 +69,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_cru_reset() {
     memset(g_unit, 0, sizeof g_unit); memset(g_path, 0, sizeof g_path); memset(g_room, 0, sizeof g_room);
     memset(g_um, 0, sizeof g_um); memset(g_rm, 0, sizeof g_rm);
     for (auto& m : g_um) m.room = -1;
+    g_walkFed = g_frameReads = false;
 }
 // A frame's unit set begins: every unit not set again before d2c_cru_end leaves its room (the client freed it).
 EMSCRIPTEN_KEEPALIVE void d2c_cru_begin() { for (auto& m : g_um) m.seen = 0; }
@@ -102,6 +107,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2c_cru_unit(uint32_t type, uint32_t id, int32_t cl
 // End of the frame's unit set: units not seen leave their room and free their slot.
 EMSCRIPTEN_KEEPALIVE void d2c_cru_end() {
     for (uint32_t i = 0; i < kMaxUnits; i++) if (g_um[i].used && !g_um[i].seen) { unlink((int32_t)i); g_um[i].used = 0; }
+    g_walkFed = true;
 }
 EMSCRIPTEN_KEEPALIVE int32_t d2c_cru_room(int32_t level, int32_t tx, int32_t ty) { return roomFind(level, tx, ty, false); }
 
@@ -109,12 +115,19 @@ EMSCRIPTEN_KEEPALIVE int32_t d2c_cru_room(int32_t level, int32_t tx, int32_t ty)
 // placed in the room its subtile falls in without the caller choosing one.
 struct RoomRect { int32_t level, x, y, w, h; };
 static RoomRect g_rect[kMaxRooms]; static uint32_t g_rectN;
-EMSCRIPTEN_KEEPALIVE void d2c_cru_frame_begin() { g_rectN = 0; d2c_cru_begin(); }
+EMSCRIPTEN_KEEPALIVE void d2c_cru_frame_begin() {
+    g_rectN = 0; g_frameReads = g_walkFed; g_walkFed = false;
+    if (!g_frameReads) d2c_cru_begin();
+}
 EMSCRIPTEN_KEEPALIVE void d2c_cru_room_rect(int32_t level, int32_t sx, int32_t sy, int32_t w, int32_t h) {
     if (g_rectN < kMaxRooms) g_rect[g_rectN++] = {level, sx, sy, w, h};
 }
 EMSCRIPTEN_KEEPALIVE int32_t d2c_cru_unit_at(uint32_t type, uint32_t id, int32_t cls, int32_t x, int32_t y, uint32_t mode,
                                              uint32_t fx, uint32_t fy, uint32_t flags, uint32_t flagsEx) {
+    if (g_frameReads) {   // the walk fed this frame: the unit's slot as the walk left it, -1 when the client does not hold it
+        for (uint32_t i = 0; i < kMaxUnits; i++) if (g_um[i].used && g_um[i].type == type && g_um[i].id == id) return (int32_t)i;
+        return -1;
+    }
     int32_t level = -1, rx = 0, ry = 0;
     for (uint32_t i = 0; i < g_rectN; i++) {
         const RoomRect& r = g_rect[i];
@@ -127,7 +140,12 @@ EMSCRIPTEN_KEEPALIVE int32_t d2c_cru_unit_at(uint32_t type, uint32_t id, int32_t
 // A room the frame's room walk already sorted (d2c_cru_first_sorted) keeps that one pass: retail sorts a room once per frame.
 static bool g_walkSorted[kMaxRooms];
 EMSCRIPTEN_KEEPALIVE void d2c_cru_frame_end() {
-    d2c_cru_end();
+    if (g_frameReads) {   // the walk fed and sorted this frame's lists: this pass only read them
+        g_frameReads = false;
+        for (uint32_t r = 0; r < kMaxRooms; r++) g_walkSorted[r] = false;
+        return;
+    }
+    d2c_cru_end(); g_walkFed = false;
     for (uint32_t r = 0; r < kMaxRooms; r++) {
         if (g_rm[r].used && W(&g_room[r], 0x74) && !g_walkSorted[r]) d2common_sub_664b0(A(&g_room[r]));
         g_walkSorted[r] = false;
