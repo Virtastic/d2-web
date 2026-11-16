@@ -5443,6 +5443,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_object(uint32_t objectId) {
     return commandAccepted;
 }
 
+static void updateSessionNpcInteraction(uint32_t npcId);
 // D15: the client's raw 0x13 {type, guid}: retail's handler walks the player to an out-of-range unit
 // and operates it on arrival (d2_session_command_object only operates in range).
 EMSCRIPTEN_KEEPALIVE int d2_session_command_interact_packet(uint32_t unitType, uint32_t guid) {
@@ -5453,6 +5454,15 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_interact_packet(uint32_t unitType, u
     const int32_t rc = D2GAME_PACKETCALLBACK_Rcv0x13_InteractWithEntity_6FC84D70(g_game, g_targetPlayer, packet, sizeof packet);
     g_sessionPacketHandlerRet = rc;
     D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets);
+    // A click on an NPC now arrives here (not d2_session_command_npc), so the NPC-interaction evidence names
+    // this packet's target and whether the server took it up, as the command path's evidence did.
+    if (unitType == UNIT_MONSTER) {
+        int32_t type = -1, interactGuid = -1;
+        g_sessionNpcInteraction.commandTarget = guid;
+        g_sessionNpcInteraction.result = SUNIT_GetInteractInfo(g_targetPlayer, &type, &interactGuid) &&
+            type == UNIT_MONSTER && interactGuid == (int32_t)guid ? 1u : 0u;
+        updateSessionNpcInteraction(guid);
+    }
     updateSessionSnapshot();
     return rc;
 }
