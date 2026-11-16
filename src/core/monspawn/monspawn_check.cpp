@@ -1198,6 +1198,7 @@ static void syncSessionLevelFromPlayer() {
 static void syncSessionClientMapFromPlayer();
 static std::vector<std::pair<int32_t, int32_t>> g_clientSpotMissiles;   // the client-only missiles 0x53550's spots made, in creation order
 static std::unordered_set<D2DrlgRoomStrc*> g_sessionClientRoomsSeen;   // D2Client+0x440C0's seen bit
+static std::unordered_set<const D2DrlgRoomStrc*> g_sessionReleasedRooms;   // rooms the server took the client out of (clientHolds)
 static void sessionClientMonsterModeReset();
 static uint32_t g_sessionClientFrame = 0;   // the client frames run since the session began (the frame tail counts them)
 extern "C" uint32_t d2_session_client_frame_now() { return g_sessionClientFrame; }
@@ -1215,7 +1216,7 @@ static uint64_t sessionRoomKey(const D2DrlgRoomStrc* dr) { return ((uint64_t)(ui
 static void resetSessionClientMapMirror() {
     if (g_sessionClientPlayerUnit) UNITS_FreeUnit(g_sessionClientPlayerUnit);
     g_sessionClientPlayerUnit = nullptr;
-    d2client::weather::reset(); d2client_ambient::reset(); d2_client_monster_idle_reset(); sessionClientMonsterModeReset(); d2_client_attack_roll_reset(); g_sessionClientRoomsSeen.clear(); g_clientSpotMissiles.clear(); g_sessionClientFrame = 0; d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset(); { extern void d2_client_monster_hit_reset(); d2_client_monster_hit_reset(); }
+    d2client::weather::reset(); d2client_ambient::reset(); d2_client_monster_idle_reset(); sessionClientMonsterModeReset(); d2_client_attack_roll_reset(); g_sessionClientRoomsSeen.clear(); g_sessionReleasedRooms.clear(); g_clientSpotMissiles.clear(); g_sessionClientFrame = 0; d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset(); { extern void d2_client_monster_hit_reset(); d2_client_monster_hit_reset(); }
     if (g_sessionTownAct) { DUNGEON_FreeAct(g_sessionTownAct); g_sessionTownAct = nullptr; }   // after the critters that stand in it
     g_sessionTownUnits = 0; g_sessionTownBuilt = false; g_sessionTownSighted.clear();
     if (g_sessionClientActOwned) d2_drlg_act_end();
@@ -1649,6 +1650,20 @@ static bool inStartLattice(const D2DrlgRoomStrc* r);
 // the client-hold tests below do not count that entry.
 static std::set<D2ActiveRoomStrc*> g_sessionJoinRooms;
 static int32_t clientHeldCount(D2ActiveRoomStrc* room) { return room->nNumClients - (g_sessionJoinRooms.count(room) ? 1 : 0); }
+// Rooms the server took the client out of (LEVEL_RemoveClient, 1.13c D2Game+0x9D980: a 0x0A for each of the room's non-missile
+// units, then the 0x08; D2Client+0xACA40 deletes each unit). The start lattice no longer holds such a room's units until the
+// server adds the client to it again.
+static bool clientHolds(D2ActiveRoomStrc* room, const D2DrlgRoomStrc* roomEx) {
+    return clientHeldCount(room) > 0 || (inStartLattice(roomEx) && !g_sessionReleasedRooms.count(roomEx));
+}
+extern "C" void (*g_clientRoomChangeHook)(D2ClientStrc*, D2ActiveRoomStrc*, int);
+static const bool g_clientRoomChangeHookSet = [] {
+    g_clientRoomChangeHook = [](D2ClientStrc* c, D2ActiveRoomStrc* r, int added) {
+        if (c != g_targetClient || !r || !r->pDrlgRoom) return;
+        if (added) g_sessionReleasedRooms.erase(r->pDrlgRoom); else g_sessionReleasedRooms.insert(r->pDrlgRoom);
+    };
+    return true;
+}();
 
 // Client-side table: retail's client holds every room near its own room even where the headless server attached the own room only (a retail recording).
 static bool sessionClientHoldsRoom(D2ActiveRoomStrc* room) {
@@ -1824,7 +1839,7 @@ static void updateSessionWorld() {
                 // The client's own mode (the shown one) picks the Selectable column, as retail's hover does: a portal
                 // the server leaves in OP is ON on the client once its opening cels run out.
                 object.selectable = object.mode < 8 ? txt->nSelectable[object.mode] : 0;
-                object.inClientRoom = (clientHeldCount(room) > 0 || inStartLattice(roomEx));
+                object.inClientRoom = clientHolds(room, roomEx);
                 object.locked = txt->nLockable && (unit->pObjectData->InteractType & 0x80);
                 if (txt->nSubClass & (OBJSUBCLASS_TOWNPORTAL | OBJSUBCLASS_PORTAL)) object.portalLevel = unit->pObjectData->InteractType;
                 // The COF names the layers an object draws; the table's piece flags are not consulted
@@ -2712,7 +2727,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_room_objects() {
     // around the start room (the client-side model of the rooms retail's server keeps the client in).
     for (D2DrlgRoomStrc* roomEx = g_lastLevel ? g_lastLevel->pFirstRoomEx : nullptr; roomEx; roomEx = roomEx->pDrlgRoomNext) {
         D2ActiveRoomStrc* r = roomEx->pRoom;
-        if (!r || !(clientHeldCount(r) > 0 || inStartLattice(roomEx))) continue;
+        if (!r || !clientHolds(r, roomEx)) continue;
         for (D2UnitStrc* u = r->pUnitFirst; u; u = u->pRoomNext)
             if (u->dwUnitType == UNIT_OBJECT && u->pObjectData && u->pObjectData->pObjectTxt) { D2GAME_SUNITMSG_FirstFn_6FCC5520(g_game, u, g_targetClient); ++n; }
     }
@@ -12451,7 +12466,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
         // table of missiles, objects and monsters only: a preset of another type (a type 5 tile) is made but never stepped.
         if (g_sessionClientRoomsSeen.count(roomEx)) for (D2PresetUnitStrc* p = roomEx->pPresetUnits; p; p = p->pNext)
             if ((p->bSpawned & 1) && p->nUnitType >= 1 && p->nUnitType <= 3) ++g_walkUnits;
-        if (!room || !(clientHeldCount(room) > 0 || inStartLattice(roomEx))) continue;   // only the rooms the client holds
+        if (!room || !clientHolds(room, roomEx)) continue;   // only the rooms the client holds
         for (D2UnitStrc* u = room->pUnitFirst; u; u = u->pRoomNext) {
             uint32_t mode = u->dwAnimMode, fx = 0x8000, fy = 0x8000, drawn = 0, hidden = 0; int32_t x, y;
             if (u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MONSTER) {

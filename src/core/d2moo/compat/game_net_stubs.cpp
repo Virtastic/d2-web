@@ -271,6 +271,9 @@ static bool joinWalkReveals(D2ActiveRoomStrc* pWalkRoom, D2ActiveRoomStrc* pOwnR
     for (D2UnitStrc* u = pWalkRoom->pUnitFirst; u; u = u->pRoomNext) if (u->dwUnitType == UNIT_OBJECT) return true;
     return false;
 }
+// Told of each room a client is added to (1) or taken out of (0) here; the session's client model keeps the rooms whose units
+// the server's removal told the client to drop.
+extern "C" void (*g_clientRoomChangeHook)(D2ClientStrc*, D2ActiveRoomStrc*, int) = nullptr;
 // CLIENTS_ChangeRoom. The name is kept from the 1.10f source; the function is D2Game+0x4B1D0, proved on its own seam in
 // src/core/d2game/game_return_argument.cpp. Offset +0x33020 lies inside 0x32DF0.
 void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
@@ -302,6 +305,7 @@ void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
                 }
                 DUNGEON_AddClientToRoom(nextRooms[i], pClient);
             }
+            if (g_clientRoomChangeHook) g_clientRoomChangeHook(pClient, nextRooms[i], 1);
         }
     }
     for (int32_t i = 0; i < oldCount; ++i) {
@@ -322,6 +326,7 @@ void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
                 }
                 DUNGEON_RemoveClientFromRoom(oldRooms[i], pClient);
             }
+            if (g_clientRoomChangeHook) g_clientRoomChangeHook(pClient, oldRooms[i], 0);
         }
     }
     pClient->pRoom = pRoom;

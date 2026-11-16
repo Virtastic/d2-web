@@ -53,6 +53,7 @@ std::map<uint32_t, uint32_t> g_fn14;   // unit id -> a ClientFn 14 object's time
 }
 extern "C" uint32_t d2_dg_n9e970();
 extern "C" uint32_t d2_dg_n9ee90();
+extern "C" uint32_t d2_dg_n13a00();
 extern "C" uint32_t d2_session_walk_fn14(uint32_t i, uint32_t* out);
 extern "C" uint32_t d2_session_walk_rooms();
 extern "C" uint32_t d2_session_walk_units();
@@ -65,8 +66,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first
     const int32_t W = 640, H = 480;
     const uint32_t U = d2_session_walk_units();
     // the walk's reads: 7A385 once per 7A340 call, 9E994 once per 9E970 call (none on a frame 9F270 does not run), 9EEEE once per
-    // 9EE90 cell that holds a list
-    const uint32_t walk = d2_session_walk_rooms() + d2_dg_n9e970() + d2_dg_n9ee90();
+    // 9EE90 cell that holds a list, and 13A00's head read when 8B110 runs the roof pass (the pool flag's gdwBitMasks[1])
+    const uint32_t walk = d2_session_walk_rooms() + d2_dg_n9e970() + d2_dg_n9ee90() + d2_dg_n13a00();
     // 6C130 per unit (6C16A), and for a ClientFn 14 object 253DC after its own; 253EE re-reads and rearms its timer when it ran out
     auto units = [&] {
         uint32_t done = 0, f[2];

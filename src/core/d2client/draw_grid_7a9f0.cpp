@@ -132,6 +132,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_n7a340() { return g_n7a340; }
 static uint32_t g_n9e970, g_n9ee90;   // 9E970 calls (9E994 reads the clock once each) and 9EE90 cells holding a list (9EEEE, once each)
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_n9e970() { return g_n9e970; }
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_n9ee90() { return g_n9ee90; }
+static uint32_t g_n13a00;   // 13A00 runs (its head reads GetTickCount once, for the roof fade)
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_n13a00() { return g_n13a00; }
 static void d2c_7a340(uint32_t cell, uint32_t entry, int32_t subX, int32_t subY, uint32_t now) {
     ++g_n7a340;
     uint32_t t = rd(entry + 0x1C);
@@ -720,7 +722,7 @@ EMSCRIPTEN_KEEPALIVE void d2_dg_set_origin(int32_t x, int32_t y) { g_vx = x; g_v
 EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_flag8() { return rd(kSq) & 8; }
 EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
     wr(kCtx + 0x24, (uint32_t)g_vx); wr(kCtx + 0x28, (uint32_t)g_vy);
-    g_gout.clear(); g_ledx = 0; g_n9e970 = g_n9ee90 = 0;
+    g_gout.clear(); g_ledx = 0; g_n9e970 = g_n9ee90 = g_n13a00 = 0;
     g_uox = g_vx; g_uoy = g_vy + 16;
     for (uint32_t i = 0; i < g_nUnits; i++) if (g_units[i].type == 0) { int32_t X, Y; clientXY(g_units[i], &X, &Y); g_uox = X - 640 / 2; g_uoy = Y - 480 / 2 + 16; break; }
     D2ClientCellWalk9f270Env w{0, unit666d0, []() -> uint32_t { return rec10013(); }, unit6ba90,
@@ -753,7 +755,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
     // the walk's leftover ecx; edx is the gdwBitMasks pointer the roof test loads (0x6fb3b288, reads 0). After 13A00 it
     // carries that pass's exit: ecx = the ctx (reads 0), edx = its last layer's mask word, layer 4 << 14 (0x6fac3a7c,
     // reloaded at 0x6fac3c23).
-    if (rd(kSq) & 2) { rec10013(); gRec(10047, {}); gRec(10054, {}, 0, 4u << 14); }
+    if (rd(kSq) & 2) { ++g_n13a00; rec10013(); gRec(10047, {}); gRec(10054, {}, 0, 4u << 14); }
     else gRec(10054, {}, g_lecx, 0);
     return g_gout.c_str();
 }
