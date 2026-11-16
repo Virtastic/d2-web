@@ -15,12 +15,16 @@ export const MIXER_TICK_SECONDS = 0.04;
 // `options.variant(row)`, optional: the group variant a row played outside the engine's sound queue sounds (default: the
 // engine's 0x5EE70 export). `options.ended(handle)`, optional: a queued entry's source ended or never sounded (default:
 // the engine's queue export). A start the queue made (event.queueHandle) brings its variant (event.variantRow).
+const DROPPED = Object.freeze({ dropped: true });
 export function createUnitSoundPlayer(read, AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext, gestureTarget = globalThis.window, fetched = null, options = {}) {
   if (typeof read !== 'function') throw new TypeError('retail asset reader is required');
   if (!AudioContextClass) throw new Error('Web Audio is unavailable');
   const context = new AudioContextClass(), buffers = new Map(), events = [];
-  // Bounded: a long session would otherwise grow this log forever.
-  events.push = function (...xs) { const n = Array.prototype.push.apply(this, xs); if (n > 512) this.splice(0, n - 512); return this.length; };
+  // Bounded: a long session would otherwise grow this log forever. The evidence below keeps absolute positions (a
+  // dropped record reads as DROPPED), so a reader that notes events.length and later slices from it still sees every
+  // record pushed since, once the tail has started to drop its head.
+  let eventsDropped = 0;
+  events.push = function (...xs) { const n = Array.prototype.push.apply(this, xs); if (n > 512) { this.splice(0, n - 512); if (this === events) eventsDropped += n - 512; } return this.length; };
   const starts = []; starts.push = events.push;
   // F235: the Sound slider drives every SFX player through one gain node (see audio-volume.mjs).
   const gain = typeof context.createGain === 'function' ? context.createGain() : null;
@@ -382,5 +386,5 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
   }
   return { play, playRow, noteSubmit, starts, playDialogue, stopDialogue, stopUnitSounds, setWeatherLevel, whenDialogueDone: () => dialogueDone, updateSpatialGain, events, setVolume(v, nextSliders) { volume = Math.max(0, Math.min(1, Number(v) || 0)); if (nextSliders) sliders = { sound: nextSliders.sound, music: nextSliders.music }; else sliders = { sound: volume, music: 1 }; if (gain) gain.gain.value = volume; for (const [node, state] of activeSources) if (!state.stopping || state.fade) applyGain(node, state); },
     get volume() { return gain ? gain.gain.value : volume; },
-    evidence: () => ({ started, dialogueActive: Boolean(dialogueSource), events: events.map((x) => ({ ...x })), state: context.state }), close: () => context.close?.() };
+    evidence: () => ({ started, dialogueActive: Boolean(dialogueSource), events: Array.from({ length: eventsDropped + events.length }, (_, i) => i < eventsDropped ? DROPPED : { ...events[i - eventsDropped] }), state: context.state }), close: () => context.close?.() };
 }
