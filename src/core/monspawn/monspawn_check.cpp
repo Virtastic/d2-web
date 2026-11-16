@@ -8329,8 +8329,6 @@ static void sessionClientMonsterFootsteps(bool newOnly = false) {
     const int32_t fallback = lv ? d2client_session_level_material((uint32_t)(lv->dwSoundEnv & 0xff)) : 1;
     for (uint32_t id : ids)
         if (D2UnitStrc* u = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)id)) {
-            { extern void d2_client_monster_order_unit(uint32_t); d2_client_monster_order_unit(id); }   // 0x4F4A0 -> 0x4DC70: the unit's order (attack roll) first
-            sessionClientMonsterHitSounds(id);
             if (auto it = g_monCltMissileRows.find(id); it != g_monCltMissileRows.end()) {
                 for (const MonCltMissile& c : it->second) {
                     d2client_clmissile::monsterDo(u, c.missile, c.skill, c.level, c.tx, c.ty);
@@ -8343,6 +8341,10 @@ static void sessionClientMonsterFootsteps(bool newOnly = false) {
             if (auto it = g_sessionIdleRowsReady.find(id); it != g_sessionIdleRowsReady.end()) d2client_sound_unit_submit((int32_t)it->second);
             d2client_session_monster_footstep(id, (int32_t)u->dwClassId, u->dwAnimMode, (uint16_t)u->wAnimSpeed, (uint32_t)u->dwFrameCountPrecise,
                                               d2_session_floor_class(1, (int32_t)id, fallback), g_sessionClientFrame - 1, g_game);
+            // 0x4F4A0 -> 0x4DC70: the unit's order (the attack roll) after its footstep check: the 0x23C00 call sees the
+            // mode the unit held before the order
+            { extern void d2_client_monster_order_unit(uint32_t); d2_client_monster_order_unit(id); }
+            sessionClientMonsterHitSounds(id);
         }
     if (!newOnly) g_monCltMissileRows.clear();   // a do of a unit the client does not hold makes no client missile
     if (!newOnly) for (int32_t row : d2client_clmissile::takeUnitHits()) d2client_sound_unit_submit(row);   // the client missiles' hits, in their type-3 slots after the monsters
