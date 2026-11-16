@@ -4,6 +4,8 @@ struct D2UnitStrc;
 struct D2SndUnit { uint32_t type, id, cls; const D2UnitStrc* unit; };
 void d2client_sound_unit_sync(const D2SndUnit* u, uint32_t n);   // sound_unit_refs.cpp (1.13c D2Client+0x22B20)
 void d2client_sound_unit_reset();
+void d2client_sound_unit_insert_critter(uint32_t cls);           // 0x22B20 for a client-only monster entering the hash
+void d2client_sound_unit_apply_critters();                       // sound_pump.cpp, after the frame's sweep
 int32_t d2client_object_slot_row(uint32_t cls, uint32_t slot);   // 0xF6C58[cls][slot]
 void d2client_sound_unit_submit(int32_t row);                     // sound_pump.cpp: a unit's 0x88A70 submit (replay only)
 void d2client_sound_unit_submit_now(int32_t row, int32_t p3);     // sound_pump.cpp: a packet handler's submit, logged at once

@@ -85,7 +85,20 @@ void d2client_sound_unit_sync(const D2SndUnit* u, uint32_t n) {
         g_held[k] = std::move(r);
     }
 }
-void d2client_sound_unit_reset() { g_held.clear(); }
+static std::vector<uint32_t> g_critterRefs;
+void d2client_sound_unit_reset() { g_held.clear(); g_critterRefs.clear(); }
+// A client-only monster (a critter: 0xA7780 calls 0xA7360, whose 0xA6500 hash insert runs 0x22B20). It is no superunique and
+// carries no unique flag, so 0x22A70 names the MonSounds row of its class; it never leaves the hash, so it never gives them back.
+// The room pass (0x44A80) that makes it runs after the frame's 0x5F020 sweep, while the session runs its pump after the whole frame:
+// the references wait for the pump's sweep to pass, so the next frame's sweep is the first to see them, as in retail.
+void d2client_sound_unit_insert_critter(uint32_t cls) { g_critterRefs.push_back(cls); }
+void d2client_sound_unit_apply_critters() {
+    if (d2client_sounds::records())
+        for (uint32_t cls : g_critterRefs)
+            if (const D2MonSoundsTxt* p = DATATBLS_GetMonSoundsTxtRecordFromMonsterId((int32_t)cls))
+                for (uint32_t v : { p->dwAttack1, p->dwWeapon1, p->dwHitSound, p->dwDeathSound, p->dwFlee, p->dwFootstepLayer }) bump((int32_t)v, 1);
+    g_critterRefs.clear();
+}
 // Slot `slot` (0..7) of the object class's D2Client+0xF6C58 array (0x22570's read), 0 when absent.
 int32_t d2client_object_slot_row(uint32_t cls, uint32_t slot) {
     for (const Ent& e : kObj) if (e.cls == cls && e.slot == slot) return e.row;

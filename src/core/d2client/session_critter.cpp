@@ -154,7 +154,8 @@ void wander(Critter& c, uint32_t step, uint32_t action, uint32_t frame, int32_t 
     walk(c, c.x + dx, c.y + dy, action, frame, pct);
 }
 // 0x17500(unit, step, action, extra): away from the unit, when the next spot that way is free for size 1 under the mask of the
-// critter's path (0x17E80 sets 0xC01 on it first; a client monster's path otherwise carries the monster default 0x3C01)
+// critter's path footprint (#10259, path +0x4C: 0x17E80 sets 0xC01 on it first through #11056; a client monster's path otherwise
+// carries the path allocator's monster footprint 0x100, so only another monster's spot refuses it, never a wall)
 bool flee(Critter& c, D2UnitStrc* from, int32_t step, uint32_t action, uint32_t mask, uint32_t frame, int32_t pct = 0) {
     D2CoordStrc p{}; UNITS_GetCoords(from, &p);
     const uint32_t tx = (uint32_t)c.x, ty = (uint32_t)c.y, sx = (uint32_t)p.nX, sy = (uint32_t)p.nY;
@@ -211,7 +212,7 @@ void rat(Critter& c, D2UnitStrc* player, int32_t dist, uint32_t frame) {
         if (p.nX == c.x && p.nY == c.y) return;
     }
     if (c.mode != 1 || !c.room) return;
-    if (dist < 4) { flee(c, player, 6, 1, 0x3C01, frame); return; }
+    if (dist < 4) { flee(c, player, 6, 1, 0x100, frame); return; }
     D2UnitStrc* a = dist > 7 ? corpse(c, player) : nullptr;
     if (a && c.state == 0) {   // 0x176A0: walk to the corpse (action 0 on its type and id, percent 6); ponytail: the walk path to its spot
         D2CoordStrc p{}; UNITS_GetCoords(a, &p);
@@ -226,7 +227,7 @@ void rat(Critter& c, D2UnitStrc* player, int32_t dist, uint32_t frame) {
 void bat(Critter& c, D2UnitStrc* player, int32_t dist, uint32_t frame) {
     if (c.mode != 1) return;
     if ((uint32_t)dist >= 5) { wander(c, 9, 1, frame); return; }
-    if (lcg(c.lo, c.hi) % 100 < 0x42) { if (player) flee(c, player, 8, 1, 0x3C01, frame, 0x1E); return; }
+    if (lcg(c.lo, c.hi) % 100 < 0x42) { if (player) flee(c, player, 8, 1, 0x100, frame, 0x1E); return; }
     wander(c, 0xC, 1, frame, 0x1E);
 }
 // 0x17F70 (the class switch's jump table: 0x95/0x10C chicken, 0x97/0x10D/0x11B/0x153 rat, 0x9F bat, 0x116..0x11A nothing; the
@@ -305,6 +306,7 @@ void create(D2ActiveRoomStrc* room, int32_t cls, uint32_t frame) {
     char b[160]; snprintf(b, sizeof b, "%u N id=%x cls=%x at=%d,%d size=%d init=%08x f44=%x f48=%x f4c=%x vel=%d\n", frame, c.id, c.cls, x, y, size, init,
                           c.f44, c.f48, c.f4c, m->nVelocity); g_log += b;
     g_c.push_back(c);
+    d2client_sound_unit_insert_critter(c.cls);   // 0xA7360's hash insert (0xA6500 -> 0x22B20)
 }
 }
 

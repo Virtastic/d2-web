@@ -13,6 +13,7 @@
 #include "cl_env.h"
 #include "d2client_5dfd0.h"
 #include "d2client_batch_5ebc0.h"
+#include "sound_unit_refs.h"
 #include "../tables/shared.h"
 namespace d2client_batch_5ebc0 { void sub_5ED90(Svc& s, G& g, int32_t now); }
 namespace d2client_45660 {
@@ -258,6 +259,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_sound_pump(uint32_t tick) {
             const uint32_t since = pumpNow - (uint32_t)sg.cc26c;
             const bool sweeps = pumpNow == 0 || since > 0x18;
             if (sg.cc24c) d2client_batch_5ebc0::sub_5ED90(sw, sg, (int32_t)pumpNow);
+            d2client_sound_unit_apply_critters();   // this frame's critters (its room pass follows the sweep in retail)
             curEdx = sweeps ? pumpNow : since;
         },
         [](int32_t) { d2c_88dd0(pumpNow, gb, e); }, [] {}, [] {});
