@@ -22,10 +22,11 @@ test('skill select 0x3c, right hand: skill word then owner -1', () => {
   same(packets.selectSkill(5, false, 0xffffffff), '3c 05 00 00 00 ff ff ff ff');
 });
 
-// Retail sends the left-hand skill as the movsx word of a short whose bit 15 is the hand flag: ECX = 0xFFFF8005
-// (vectors/d2client/fn/14910.wire.bin, tuple 0x3C 0xFFFF8005 0xFFFFFFFF) gives 3c 05 80 ff ff ff ff ff ff.
-test('skill select 0x3c, left hand: sign-extended word 0xFFFF8005, owner -1', () => {
-  same(packets.selectSkill(5, true, 0xffffffff), '3c 05 80 ff ff ff ff ff ff');
+// The client's skill popup and F-key senders build the left-hand word as 0x80000000 + skill id (neg/sbb/and
+// 0x80000000/add), and the server's handler reads hand = word >> 31, id = word & 0x7fffffff, refusing an id past the
+// skill table; 14910.wire.bin's 0x3C rows prove only that the serializer writes ECX as given.
+test('skill select 0x3c, left hand: bit 31 over the skill id, owner -1', () => {
+  same(packets.selectSkill(5, true, 0xffffffff), '3c 05 00 00 80 ff ff ff ff');
 });
 
 // Skill-hotkey bind 0x51: retail's D2Client 0x14910 with AL=0x51, ECX = ((slot&15)<<16)|(left?0x8000:0)|(skill&0x7FFF), EDX = owner.
