@@ -5062,14 +5062,17 @@ function drawFrame() {
       const lines = (fields.baseName ? `${fields.baseName}\n${fields.name}` : String(fields.name)).split('\n'), colour0 = groundLabelColour(fields.quality, fields.flags);
       const [worldX, foot] = projStatic(item.x, item.y);
       const textW = Math.max(...lines.map((line) => groundLabelFont(colour0).measure(line)));
-      const slot = Module._d2_showitems_add(item.id, Math.round(worldX), Math.round(foot - 20), textW, lines.length, fields.quality | 0, colour0 === 5 ? 1 : 0, 0);
+      const slot = Module._d2_showitems_add(item.id, Math.round(worldX), Math.round(foot - 16), textW, lines.length, fields.quality | 0, colour0 === 5 ? 1 : 0, 0);
       if (slot < 0) continue;
       const g = (f) => Module._d2_showitems_slot(slot, f), hot = g(4) === 5;
-      const box = { x: g(0), y: g(1), width: g(2) - g(0), height: g(3) - g(1) + 4 }, colour = hot ? 0 : colour0, labelFont = groundLabelFont(colour), glyphs = [];
+      // The pass's y is retail's flat y - 16 - (camY - 8), 16 above the walk's foot; its D2Win draw (ordinal 10013) fills the
+      // text block's height above bottom = y + 2, held under the screen bottom - 31, the text 3 pixels up from that bottom.
+      const boxH = g(3) - g(1) + 4, boxB = Math.min(Math.max(g(3) + 2, boxH), canvas.height - 31);
+      const box = { x: g(0), y: boxB - boxH, width: g(2) - g(0), height: boxH },colour = hot ? 0 : colour0, labelFont = groundLabelFont(colour), glyphs = [];
       if (hot) paintHoverPlate(ctx, altHoverBox(box, hoverPlatePalette), hoverPlatePalette, recordPrim);
       else { ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(box.x, box.y, box.width, box.height); ctx.restore(); }
       lines.forEach((line, i) => { if (hoverGlyphPainting) labelFont.drawAnchored(ctx, line, box.x + 4, box.y + 16 * i + 13, (glyph) => glyphs.push(glyph)); });
-      showItemsEvidence.push({ id: item.id, code, label: lines.join('\n'), box, glyphs });
+      showItemsEvidence.push({ id: item.id, code, label: lines.join('\n'), box, drawY: g(3), glyphs });   // drawY: the y the draw call is handed
     }
   }
   hoverEvidence = clearScreen ? null : drawHoverLabel(ctx,
