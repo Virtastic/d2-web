@@ -7333,6 +7333,15 @@ EMSCRIPTEN_KEEPALIVE int d2_session_fixture_stand_near_object(uint32_t objectId)
     if (!g_sessionLive || !g_game) return 0;
     return standNearUnit(SUNIT_GetServerUnit(g_game, UNIT_OBJECT, (int32_t)objectId));
 }
+// Fixture: operate a door where it stands -- the door operate function called directly with no player and no
+// tick, so opening a door neither moves the player nor activates a room.
+EMSCRIPTEN_KEEPALIVE int d2_session_fixture_operate_door(uint32_t objectId) {
+    if (!g_sessionLive || !g_game) return 0;
+    D2UnitStrc* o = SUNIT_GetServerUnit(g_game, UNIT_OBJECT, (int32_t)objectId);
+    if (!o) return 0;
+    D2ObjOperateFnStrc op = { g_game, o, nullptr, g_game->pObjectControl, (int32_t)o->dwClassId };
+    return OBJECTS_OperateFunction08_Door(&op, 0);
+}
 EMSCRIPTEN_KEEPALIVE int d2_session_fixture_stand_near_unit(uint32_t unitType, uint32_t unitId) {
     if (!g_sessionLive || !g_game) return 0;
     return standNearUnit(SUNIT_GetServerUnit(g_game, (int32_t)unitType, (int32_t)unitId));
