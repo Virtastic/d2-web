@@ -2158,23 +2158,17 @@ async function createConfiguredRealmAccount({ account, password }) {
   await next.ready().catch(() => { throw transportFailure('the Battle.net connection could not open'); });
   realmFlow.bncs = next;
 }
-// An account request (change password, new password, change email): a connection of its own, closed after.
+// An account request (change password, new password, change email) goes over the connection the connect opened, which stays
+// up for the LOG IN after it: retail's account screens and its login share the one Bnclient connection.
 async function withRealmRequest(run) {
   const server = realmFlow?.server;
   if (!server?.ws) throw new Error('selected region has no browser WebSocket transport');
   const realm = await import('./assets/realm-client.mjs');
-  try { realmFlow.bncs?.close(); } catch { /* socket already closed */ }
-  realmFlow.bncs = null;
-  const bncs = realm.webSocketTransport(realmServiceUrl(server.ws, 'bncs'));
-  let protocol;
-  try {
-    await bncs.ready();
-    protocol = realm.bindEngineProtocol(Module);
-    return await run(realm, bncs, protocol, await realmAuthConfig(server.auth));
-  } finally {
-    try { bncs.close(); } catch { /* socket already closed */ }
-    try { protocol?.free(); } catch { /* engine gone */ }
-  }
+  const bncs = realmFlow.bncs;
+  if (!bncs?.isOpen) throw transportFailure('the Battle.net connection was lost');
+  const protocol = realm.bindEngineProtocol(Module);
+  try { return await run(realm, bncs, protocol, await realmAuthConfig(server.auth)); }
+  finally { try { protocol.free(); } catch { /* engine gone */ } }
 }
 async function authenticateConfiguredRealm({ account, password }) {
   const server = realmFlow?.server;

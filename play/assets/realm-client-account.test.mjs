@@ -42,6 +42,18 @@ test('bncsChangePassword passes AUTH_CHECK before its own packet', async () => {
   assert.deepEqual(ids.slice(0, 2), [0x50, 0x51]);
 });
 
+// The account screens and the login share the connection the connect opened (retail has one Bnclient connection): the
+// version check runs once on it, and a request after it, or the LOG IN after a request, goes straight to its own packet.
+test('an account request then another on the same connection checks the version once', async () => {
+  const { ids, transport, protocol } = rig([1, 0, 0, 0]);
+  protocol.bncsLogon = () => new Uint8Array(48); protocol.tickCount = () => 1;
+  await bncsChangePassword(transport, protocol, { account: 'ama', password: 'pw', newPassword: 'pw2', timeoutMs: 500 });
+  await bncsChangePassword(transport, protocol, { account: 'ama', password: 'pw2', newPassword: 'pw3', timeoutMs: 500 });
+  assert.deepEqual(ids, [0x50, 0x51, 0x31, 0x31]);
+  assert.equal(transport.bncsAuth.clientToken, 1);
+  assert.equal(transport.bncsAuth.serverToken, 0);
+});
+
 test('a version or key reply that never comes raises the timeout event, a closed link the generic one', async () => {
   const { loginErrorMessage } = await import('./bnet-login-screen.mjs');
   const string = (i) => `s${i}`;

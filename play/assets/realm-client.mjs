@@ -631,9 +631,11 @@ export function bsha1(data) {
 /**
  * The version check every account request makes before its own packet (Battle.net refuses SID_CREATEACCOUNT,
  * SID_CHANGEPASSWORD and the rest until AUTH_CHECK has passed): selector, AUTH_INFO, AUTH_CHECK.
- * Resolves to the AUTH_INFO reply.
+ * Resolves to the AUTH_INFO reply. Once per connection, as for the login: a request on a connection that already passed
+ * it goes straight to its own packet, and a later LOG IN on the same connection skips it too (transport.bncsAuth).
  */
 async function bncsPrelude(transport, protocol, reader, { product, auth, timeoutMs }) {
+  if (transport.bncsAuth?.authInfo) return transport.bncsAuth.authInfo;
   transport.send(protocol.bncsSelector());
   transport.send(protocol.bncsFrame(0x50, protocol.bncsAuthInfo(product)));
   const authInfo = await readBncsFrame(reader, timeoutMs, true, 0x50);
@@ -641,13 +643,14 @@ async function bncsPrelude(transport, protocol, reader, { product, auth, timeout
   linkLostAfterAuthInfo(reader);
   const mpqEnd = authInfo.body.indexOf(0, 20);
   const mpq = authInfo.body.subarray(20, mpqEnd < 0 ? authInfo.body.length : mpqEnd);
-  const { body } = protocol.bncsAuthCheck({ serverToken: u32(authInfo.body, 4), mpq: new TextDecoder().decode(mpq),
-    challenge: authInfo.body.subarray(mpqEnd + 1), product, auth });
+  const mpqName = new TextDecoder().decode(mpq), challenge = authInfo.body.subarray(mpqEnd + 1), serverToken = u32(authInfo.body, 4);
+  const { body, clientToken } = protocol.bncsAuthCheck({ serverToken, mpq: mpqName, challenge, product, auth });
   transport.send(protocol.bncsFrame(0x51, body));
   const check = await readBncsFrame(reader, timeoutMs, true, 0x51);
   if (check.id !== 0x51) throw new Error(`expected AUTH_CHECK reply 0x51, got 0x${check.id.toString(16)}`);
   // Bnclient+0x11330 passes the version on result & 0xFF0F == 0: the 0xF0 bits only pick the expansion's wording.
   if ((u32(check.body, 0) & 0xff0f) !== 0) throw new Error(`AUTH_CHECK rejected the version (result 0x${u32(check.body, 0).toString(16)})`);
+  transport.bncsAuth = { serverToken, clientToken, mpqName, challenge, versionResult: u32(check.body, 0), authInfo };
   return authInfo;
 }
 
@@ -756,7 +759,7 @@ export async function bncsLogin(transport, protocol, { account, password, realm 
       throw error;
     }
 
-    transport.bncsAuth = { serverToken, clientToken, mpqName, challenge, versionResult };
+    transport.bncsAuth = { serverToken, clientToken, mpqName, challenge, versionResult, authInfo };
   }
 
   // BNClient+0xC9E0 tokens the logon with GetTickCount; +0xBFD0 with its own counter (1, 2, ...).
