@@ -1377,7 +1377,9 @@ async function enterSession() {
     } else {
       // ?seed= pins the map the new character generates at the capture's own seed; without it the
       // game gets a fresh seed from the clock, as retail's game create does (assets/game-seed.mjs).
-      fixture = Object.freeze({ ...fixtures[0], ...(new URLSearchParams(window.__d2Entry.search).get('level') ? { level: Number(new URLSearchParams(window.__d2Entry.search).get('level')) } : {}), seed: MAP_SEED_OVERRIDE != null ? MAP_SEED_OVERRIDE : gameInitSeed(clockInputs()) });
+      // ?level= starts in that level's own act (each act's levels follow its town's id), never in the first fixture's act.
+      const startLevel = Number(new URLSearchParams(window.__d2Entry.search).get('level')) || 0;
+      fixture = Object.freeze({ ...fixtures[0], ...(startLevel ? { level: startLevel, act0: TOWN_LEVELS.filter((t) => t <= startLevel).length - 1 } : {}), seed: MAP_SEED_OVERRIDE != null ? MAP_SEED_OVERRIDE : gameInitSeed(clockInputs()) });
       if (!api?.create(fixture, Number(classSelect.value))) throw new Error('d2_session_create failed');
       propCache.clear(); heroStatWatch = null;
       session = api; snapshot = api.snapshot(); clock.reset();   // a new game starts its own 25 Hz clock
