@@ -25,6 +25,7 @@ int d2_session_command_right_skill_at(int32_t x, int32_t y);
 int d2_session_command_right_skill_hold_at(int32_t x, int32_t y);
 int d2_session_command_interact_packet(uint32_t unitType, uint32_t guid);
 int d2_session_command_pickup(uint32_t itemUnitId);
+extern int g_sessionPickupHandlerRet;   // the 0x16 handler's return (-1: not entered), for its call-trace record
 int d2_session_command_cursor_item_packet(uint32_t opcode, uint32_t itemId, uint32_t arg);
 int d2_session_command_insert_item_packet(uint32_t itemId, uint32_t x, uint32_t y, uint32_t page);
 int d2_session_command_item_to_cursor_packet(uint32_t itemId);
@@ -185,7 +186,18 @@ int dispatch(const uint8_t* p, int n) {
     case 0x0C: if (!need(5)) return -1; return d2_session_command_right_skill_at(rd16(p + 1), rd16(p + 3));
     case 0x0F: if (!need(5)) return -1; return d2_session_command_right_skill_hold_at(rd16(p + 1), rd16(p + 3));
     case 0x13: if (!need(9)) return -1; return d2_session_command_interact_packet(rd32(p + 1), rd32(p + 5));
-    case 0x16: if (!need(13)) return -1; return d2_session_command_pickup(rd32(p + 5));
+    case 0x16: {
+        if (!need(13)) return -1;
+        const int r = d2_session_command_pickup(rd32(p + 5));
+        // session call trace: D2Game 0xD08B0 (the 16 handler), arg hash as for 01/03 above over the 13 bytes, written
+        // only when the packet table entered the handler
+        if (g_sessionPickupHandlerRet >= 0) {
+            uint32_t ph = 0x811c9dc5u; for (int i = 0; i < 13; ++i) { ph ^= p[i]; ph *= 16777619u; ph ^= 0; ph *= 16777619u; ph ^= 0; ph *= 16777619u; ph ^= 0; ph *= 16777619u; }
+            const size_t ct = D2CT_ENTER("D2Game", 0xD08B0, "%02x,%x,%08x", p[0], 13, ph);
+            D2CT_RET(ct, "%x", static_cast<unsigned>(g_sessionPickupHandlerRet));
+        }
+        return r;
+    }
     case 0x17: if (!need(5)) return -1; return d2_session_command_cursor_item_packet(0x17, rd32(p + 1), 0);
     case 0x18: if (!need(17)) return -1; return d2_session_command_insert_item_packet(rd32(p + 1), rd32(p + 5), rd32(p + 9), rd32(p + 13));
     case 0x19: if (!need(5)) return -1; return d2_session_command_item_to_cursor_packet(rd32(p + 1));

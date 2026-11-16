@@ -9731,14 +9731,19 @@ EMSCRIPTEN_KEEPALIVE int d2_session_d57_record(uint32_t itemId, int phase, char*
         UNITS_GetRoom(item) ? 1 : 0, item->dwFlags & 0x1401, hs);
 }
 
+// The 0x16 handler's return as the packet table sees it, for the session call trace (realm/d2gs_local_server.cpp):
+// -1 when the handler was not entered, 1 when it found no ground item, else the interact call's return.
+int g_sessionPickupHandlerRet = -1;
 EMSCRIPTEN_KEEPALIVE int d2_session_command_pickup(uint32_t itemUnitId) {
+    g_sessionPickupHandlerRet = -1;
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory) return 0;
     D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemUnitId);
-    if (!item || item->dwAnimMode != IMODE_ONGROUND || !UNITS_GetRoom(item)) return 0;
+    if (!item || item->dwAnimMode != IMODE_ONGROUND || !UNITS_GetRoom(item)) { g_sessionPickupHandlerRet = 1; return 0; }
     if (!sessionDispatchGate(0x16)) return 0;   // a ground pickup is client packet 0x16
     g_sessionItemState.commandTarget = itemUnitId;
     D2WEB_ResetPacketStream();   // D26: publish what the pickup queued (the 0x22 sound) to d2_session_packet_stream, as the 0x13 command does
     g_d57PickupRet = sub_6FC828D0(g_targetPlayer, UNIT_ITEM, (int32_t)itemUnitId, 0, g_game);
+    g_sessionPickupHandlerRet = g_d57PickupRet;
     D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets);
     // D57: a stack merge frees the ground item (the unit is gone); do not read it again
     if (!SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemUnitId)) {
