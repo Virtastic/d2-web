@@ -70,6 +70,7 @@ static void face(D2UnitStrc* unit, int32_t selector, int32_t x, int32_t y, D2Uni
 extern "C" uint32_t d2_session_client_rand(uint32_t n);
 extern "C" void d2_client_monster_sfx_stamp(uint32_t id, uint32_t now);
 extern "C" uint32_t d2_session_client_frame_now();
+extern "C" int d2_session_monster_held(uint32_t id);
 namespace {
 uint32_t g_frame = 0, g_lastRoll = 0;
 struct Roll { uint32_t id, frame; int32_t r; };
@@ -146,6 +147,7 @@ extern "C" void d2_client_monster_order_unit(uint32_t id) {
     for (Order& o : g_orders) {
         if (o.rolled || (id != ~0u && (o.type != 1u || o.id != id))) continue;
         o.rolled = true;
+        if (o.type == 1u && !d2_session_monster_held(o.id)) continue;   // 0x2A750 finds no client unit for a monster the server never announced (no 0xAC): the order does nothing
         if (D2UnitStrc* u = SUNIT_GetServerUnit(o.game, int32_t(o.type), int32_t(o.id))) attackEntry(u, o.mode);
     }
 }
