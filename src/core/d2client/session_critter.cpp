@@ -102,7 +102,13 @@ void setMode(Critter& c, uint32_t m, uint32_t frame) {
     }
 }
 // 0x4DC30
-void neutral(Critter& c, uint32_t frame) { if (c.mode < 0x10 && c.mode != 0 && c.mode != 0xC) setMode(c, 1, frame); }
+void neutral(Critter& c, uint32_t frame) {
+    if (!(c.mode < 0x10 && c.mode != 0 && c.mode != 0xC)) return;
+    // the path's position goes to the centre of its subtile before the mode changes (the path's flags stay)
+    c.fx = c.fy = 0x8000;
+    if (c.w) { c.w->p.tGameCoords.dwPrecisionX = ((uint32_t)(uint16_t)c.x << 16) | 0x8000; c.w->p.tGameCoords.dwPrecisionY = ((uint32_t)(uint16_t)c.y << 16) | 0x8000; }
+    setMode(c, 1, frame);
+}
 // 0x2A040 -> D2Common #10334 (0x36230), a type 2 path with no target unit: field_14 = 1 (0x35470); the unit's footprint is lifted
 // for the build (the critters have none here); 0x678B0 (D2MOO PATH_Toward) makes the points; 0xD240 steps past those at the unit's
 // own spot, and none left -> 0.
