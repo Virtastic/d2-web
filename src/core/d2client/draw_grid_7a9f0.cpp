@@ -371,6 +371,14 @@ EMSCRIPTEN_KEEPALIVE void d2_dg_unit_hit(uint32_t type, uint32_t id, uint32_t li
     h->c58 = 3;
 }
 EMSCRIPTEN_KEEPALIVE void d2_dg_hit_reset() { g_nHits = 0; }
+// A server packet as the client receives it: the two that reach 0x4DC70's flash cases (0x69 {id u32, state u8, x u16, y u16,
+// life u8} in state 6 -> case 6; 0x0C {type u8, id u32, animation u16, life u8} with animation 0x13 -> case 0x13), each ending
+// in 0xA4B60, apply as d2_dg_unit_hit.
+EMSCRIPTEN_KEEPALIVE void d2_dg_server_packet(const uint8_t* p, uint32_t n) {
+    auto u32 = [p](int o) { return (uint32_t)p[o] | (uint32_t)p[o + 1] << 8 | (uint32_t)p[o + 2] << 16 | (uint32_t)p[o + 3] << 24; };
+    if (n >= 11 && p[0] == 0x69 && p[5] == 6) d2_dg_unit_hit(1, u32(1), p[10]);   // a monster
+    else if (n >= 9 && p[0] == 0x0C && (p[6] | p[7] << 8) == 0x13) d2_dg_unit_hit(p[1], u32(2), p[8]);
+}
 // The staged unit k's fp16 position fraction (the client unit's path; a static unit ignores it).
 EMSCRIPTEN_KEEPALIVE void d2_dg_stage_unit_frac(uint32_t k, uint32_t fx, uint32_t fy) {
     if (k < g_nUnits) { g_units[k].fx = fx & 0xffff; g_units[k].fy = fy & 0xffff; }
