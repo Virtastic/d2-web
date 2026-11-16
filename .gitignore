@@ -154,6 +154,7 @@ tools/manifest_lock.py
 !tools/vectorfmt
 !tools/leak-check.sh
 !tools/land-fold.mjs
+!tools/port-reserve.mjs
 !tools/hooks
 ci/*
 !ci/build.sh
@@ -185,6 +186,7 @@ test/*
 !test/desktop-door.test.mjs
 !test/build-key-lock.test.mjs
 !test/land-fold.test.mjs
+!test/port-reserve.test.mjs
 !test/link-check.test.mjs
 !test/public-includes.test.mjs
 !test/engine-key-untracked.test.mjs
