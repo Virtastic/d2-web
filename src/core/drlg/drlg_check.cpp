@@ -435,6 +435,8 @@ EMSCRIPTEN_KEEPALIVE int d2_dg_unit_floor(int i) { return i >= 0 && i < (int)g_f
 // The last fed unit's COF: the .cof its mode and weapon class load (the cel chain's header: layer count, bounding box). 0 when the file is absent.
 // The last fed unit's colour shift (client unit +0x6C, D2Client+0x72130: the colorshift of its highest-colorpri state).
 EMSCRIPTEN_KEEPALIVE void d2_dg_feed_unit_shift(uint32_t v) { if (!g_feedUnits.empty()) g_feedUnits.back().shift = v; }
+// The last fed unit's class palshift table: set by d2_dg_feed_unit_cof when the file exists; 0 when the class was never loaded.
+EMSCRIPTEN_KEEPALIVE void d2_dg_feed_unit_palshift(int on) { if (!g_feedUnits.empty()) g_feedUnits.back().palshift = on != 0; }
 EMSCRIPTEN_KEEPALIVE int d2_dg_feed_unit_cof(const char* path) {
     std::vector<uint8_t> f;
     if (g_feedUnits.empty() || !path || !d2::sharedVfs().read(path, f) || f.size() < 0x18) return 0;

@@ -1659,6 +1659,8 @@ static bool sessionClientHoldsRoom(D2ActiveRoomStrc* room) {
 // a retail recording: which monsters retail's client holds. The capture's join announces the monsters within 40 subtiles (box) of the start (0xAC, D2CAPTURE_SESSION_RADIUS);
 // afterwards 0x4B1D0 diffs the hero room's near list: units of a room that enters it reach the client (0x9DC10 -> 0x7B0A0), those of a room that leaves it are removed.
 static std::set<uint32_t> g_heldMonsters, g_heldSeen; static std::set<D2DrlgRoomStrc*> g_heldNear; static D2UnitStrc* g_heldFor = nullptr; static int g_heldX0, g_heldY0;
+// the monster classes an 0xAC has built a unit of this game: the handler (0xAE420 -> 0x53C30) loads the class's palshift.dat table once, kept by class
+static std::set<int32_t> g_heldClasses;
 // the monsters the last near-list diff added: the client builds each from its 0xAC on that frame (0xA7780 -> 0x4D160)
 static std::vector<uint32_t> g_heldNew;
 // the 0xAC assigns the server sent the client during the last tick: the client's 0xAC handler (0xA7780 -> 0x4D160) builds one unit per assign
@@ -1676,15 +1678,15 @@ static void sessionHeldStep() {
     D2DrlgRoomStrc* h = here->pDrlgRoom; std::set<D2DrlgRoomStrc*> cur;
     for (int32_t i = 0; i < h->nRoomsNear; ++i) if (h->ppRoomsNear[i] && h->ppRoomsNear[i]->pRoom) cur.insert(h->ppRoomsNear[i]);   // an inactive room is not announced yet
     const bool first = g_heldFor != g_targetPlayer;
-    if (first) { g_heldMonsters.clear(); g_heldSeen.clear(); g_heldNear.clear(); g_heldFor = g_targetPlayer; D2CoordStrc c = {}; UNITS_GetCoords(g_targetPlayer, &c); g_heldX0 = c.nX; g_heldY0 = c.nY; }
+    if (first) { g_heldMonsters.clear(); g_heldClasses.clear(); g_heldSeen.clear(); g_heldNear.clear(); g_heldFor = g_targetPlayer; D2CoordStrc c = {}; UNITS_GetCoords(g_targetPlayer, &c); g_heldX0 = c.nX; g_heldY0 = c.nY; }
     const std::set<uint32_t> before = g_heldMonsters;
     struct NewIds { const std::set<uint32_t>& b; bool first; ~NewIds() { g_heldNew.clear(); if (!first) for (uint32_t id : g_heldMonsters) if (!b.count(id)) g_heldNew.push_back(id); } } newIds{ before, first };
     auto each = [](D2DrlgRoomStrc* r, auto f) { if (r->pRoom) for (D2UnitStrc* u = r->pRoom->pUnitFirst; u; u = u->pRoomNext) if (u->dwUnitType == UNIT_MONSTER) f(u); };
-    for (D2DrlgRoomStrc* r : cur) if (!g_heldNear.count(r)) each(r, [&](D2UnitStrc* u) { D2CoordStrc c = {}; UNITS_GetCoords(u, &c); if ((!first || (abs(c.nX - g_heldX0) <= 40 && abs(c.nY - g_heldY0) <= 40)) && g_heldMonsters.insert(u->dwUnitId).second) d2client_unitseed::told(u); });
+    for (D2DrlgRoomStrc* r : cur) if (!g_heldNear.count(r)) each(r, [&](D2UnitStrc* u) { D2CoordStrc c = {}; UNITS_GetCoords(u, &c); if ((!first || (abs(c.nX - g_heldX0) <= 40 && abs(c.nY - g_heldY0) <= 40)) && g_heldMonsters.insert(u->dwUnitId).second) { g_heldClasses.insert((int32_t)u->dwClassId); d2client_unitseed::told(u); } });
     for (D2DrlgRoomStrc* r : g_heldNear) if (!cur.count(r)) each(r, [&](D2UnitStrc* u) { g_heldMonsters.erase(u->dwUnitId); });
     // A monster that appears in a room the client already holds (a summoned golem) is announced to it with a 0xAC: held from that tick.
     // One that walks in from a room outside the near list is not new: retail sends it no 0xAC (a retail recording: Fallen walking in, 0x67/0x6D only), so the client never holds it.
-    for (D2DrlgRoomStrc* r : cur) each(r, [&](D2UnitStrc* u) { if (g_heldSeen.insert(u->dwUnitId).second && g_heldNear.count(r) && g_heldMonsters.insert(u->dwUnitId).second) d2client_unitseed::told(u); });
+    for (D2DrlgRoomStrc* r : cur) each(r, [&](D2UnitStrc* u) { if (g_heldSeen.insert(u->dwUnitId).second && g_heldNear.count(r) && g_heldMonsters.insert(u->dwUnitId).second) { g_heldClasses.insert((int32_t)u->dwClassId); d2client_unitseed::told(u); } });
     for (D2DrlgRoomStrc* r = h->pLevel ? h->pLevel->pFirstRoomEx : nullptr; r; r = r->pDrlgRoomNext) if (!cur.count(r)) each(r, [&](D2UnitStrc* u) { g_heldSeen.insert(u->dwUnitId); });
     g_heldNear = cur;
 }
@@ -12284,6 +12286,7 @@ extern "C" void d2_dg_set_origin(int32_t, int32_t);
 extern "C" const char* d2_dg_walk_g();
 extern "C" void d2_dg_feed_unit_ex(int, uint32_t, int, int, int, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 extern "C" int d2_dg_feed_unit_cof(const char*);
+extern "C" void d2_dg_feed_unit_palshift(int);
 extern "C" void d2_dg_feed_unit_anim(uint32_t, uint32_t, const uint8_t*);
 extern "C" void d2_dg_cru_reset();
 extern "C" void d2_dg_walked_reset();
@@ -12382,7 +12385,9 @@ static bool sessionMonsterCof(int32_t cls, uint32_t mode, char* out, size_t cap)
 extern "C" bool d2_session_critter_unit(uint32_t i, uint32_t* out);
 extern "C" uint32_t d2_session_critter_count();
 extern "C" int d2_session_monster_held(uint32_t id) { return g_heldMonsters.count(id) ? 1 : 0; }
-EMSCRIPTEN_KEEPALIVE int g_walkOpt = 3;   // every session's client makes its rooms' critters; bit0 critters, bit1 only the monsters the client was told of, bit2 critter COF
+// bit0 critters, bit1 only the monsters the client was told of, bit2 critter COF. Every session's client makes its rooms' critters, and
+// each critter's COF box goes to the 6A3D0 cull: a bat (B9, box y -163..-130) standing near the screen's top edge is drawn by nothing.
+EMSCRIPTEN_KEEPALIVE int g_walkOpt = 7;
 EMSCRIPTEN_KEEPALIVE void d2_session_walk_opt(int v) { g_walkOpt = v; }
 static uint32_t g_walkRooms, g_walkUnits;   // the walk's room count (7A385 clock reads) and client unit count (6C130 steps), for the frame clock model
 extern "C" uint32_t d2_dg_n7a340();
@@ -12424,7 +12429,8 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
         const bool cBlocked = spotLos && c[4] != MONMODE_DEATH && c[4] != MONMODE_DEAD
                               && UNITS_TestCollision(spotHero.nX, spotHero.nY, UNITS_GetUnitSizeX(g_targetPlayer), (int)c[2], (int)c[3], cm2 ? (int8_t)cm2->nSizeX : 0, spotHeroRoom, 2);
         d2_dg_feed_unit_ex(UNIT_MONSTER, c[0], (int)c[1], (int)c[2], (int)c[3], c[4], 0x8000, 0x8000, sessionShadowGate(UNIT_MONSTER, (int32_t)c[1], c[4], nullptr), (first ? 1u : 0u) | (cBlocked ? 2u : 0u));
-        if ((g_walkOpt & 4) && sessionMonsterCof((int32_t)c[1], c[4], cof, sizeof cof)) d2_dg_feed_unit_cof(cof);
+        // D2Client+0x53A30 shifts by the class's palshift table, which only an 0xAC of that class loads: a critter's own class has none
+        if ((g_walkOpt & 4) && sessionMonsterCof((int32_t)c[1], c[4], cof, sizeof cof) && d2_dg_feed_unit_cof(cof) && !g_heldClasses.count((int32_t)c[1])) d2_dg_feed_unit_palshift(0);
         d2_dg_feed_unit_shift(0);
     }
     g_walkUnits += g_sessionTownUnits;   // the town the client built beside this level (sessionClientTownSeen)
