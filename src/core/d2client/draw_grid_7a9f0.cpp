@@ -728,14 +728,17 @@ static bool gateA4b90() {
 static const H6cc00 kH6cc00 = {
     // 6CC00's 10013 (0x6fb1cc0b): ecx = the unit (reads 0), edx = its edx argument.
     []() -> uint32_t { g_lecx = 0; g_ledx = g_p6cc00; return rec10013(); }, []() -> uint32_t { return 0; }, [](uint32_t, void*, void*, void*) {}, [](uint32_t) -> uint8_t { return 0; }, [](uint32_t) {}, []() -> uint32_t { return 0; },
-    [](uint32_t) -> int { return 0; }, [](uint32_t, int, int) -> uint32_t { return 0; }, [](void*, int, int) -> int { return 1; }, [](int, uint32_t, void*, int) -> int { return 0; },
+    // D2CMP #10005: the fill that succeeds stores the frame's cel in the record (rec[13]), the word 6CC00 tests before 6AEE0
+    [](uint32_t) -> int { return 0; }, [](uint32_t, int, int) -> uint32_t { return 0; }, [](void* r, int, int) -> int { ((uint32_t*)r)[13] = 1; return 1; }, [](int, uint32_t, void*, int) -> int { return 0; },
     // the item draw (0x6fb1cfe0) follows D2Common #10893 (the item's transform palette), which leaves ecx and edx 0
     [](uint32_t m, int32_t x, int32_t y, uint32_t, uint32_t col, int32_t pal) {
         if (m) rec10041(x, y, col, (uint32_t)pal, 1, true); else gRec(10041, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, col, 0}, 0, 0); }, gateA4b90,
     []() { d2_client_6b700((uint32_t)(uintptr_t)g_hu, &kH6b700, 0, 640, g_uoy, g_uox, 0); },
     [](uint32_t u, int32_t dx, int32_t dy) -> int { return d2c_6c490(&kE6c490, g_hpy + dy, u, g_p6cc00, g_hpx + dx, 0, 1, g_uox, 0, g_uoy, 0, 640, g_hself, 0, 0, 0); },
     [](uint32_t, void* r) -> int { uint32_t* w = (uint32_t*)r; w[16] = 0; w[17] = (uint32_t)g_hpy; return 1; }, []() -> uint32_t { return g_hself; }, []() -> uint32_t { return d2_dg_missile_row((int32_t)g_hu[1]); },
-    [](uint32_t, uint32_t, int, int, int, int) {}, d2_dg_object_rec, [](int) {} };
+    // 1.13c D2Client+0x6AEE0 as 6CC00 calls it after the draw: its opening D2Gfx 10013, then the unit's overlay list (gfx +0x2C),
+    // which a client item, missile or tile never carries, so the walk ends there.
+    [](uint32_t, uint32_t, int, int, int, int) { g_lecx = 0; g_ledx = 0; rec10013(); }, d2_dg_object_rec, [](int) {} };
 // 1.13c D2Client+0x66620, as 666D0 calls it for the staged unit: the visibility test. A pass sets unit +0xC8 bit7 and answers 1; a
 // fail (the feeder's line-of-sight result, stage bit 1) clears it and answers 0, and the unit is not drawn. A unit staged without an
 // id keeps the bit it was staged with.
