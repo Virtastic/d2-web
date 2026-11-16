@@ -79,7 +79,11 @@ struct HookEnv {
     static void wr32(uint32_t a, uint32_t v) { memcpy((void*)(uintptr_t)a, &v, 4); }
     static bool badCodePtr(uint32_t p) { return p == 0; }
     static uint32_t handlerRva(uint32_t p) { return p & 0xFFFFFF; }   // table words are recorded as 0xB2000000|rva
-    static bool isStk(uint32_t a) { return a >= (uint32_t)emscripten_stack_get_end() && a < (uint32_t)emscripten_stack_get_base(); }
+    // A pointer into the LIVE stack, [current stack pointer, base), as the capture tags [StackLimit, StackBase) (the stack the thread
+    // has touched). The whole reserved range [end, base) also tagged plain data words (packet and seed words) that happen to fall in
+    // this build's stack segment, which moves with layout (d2client AD2F0, d2game 13A30/2A740/B36A0 passed or failed by build).
+    // The replay puts the stack pointer back at the base before each probe (fn_stack.cpp): the live range is the probe's own frames.
+    static bool isStk(uint32_t a) { return a >= (uint32_t)emscripten_stack_get_current() && a < (uint32_t)emscripten_stack_get_base(); }
     uint32_t stk(const void* p) const { return (uint32_t)(uintptr_t)p; }   // a local's address: only the log tags it (0xB3000000)
     // hookblk: log n dwords of a stack block the callee was handed, 9 per record (rva|0x40000000); a clear MASK bit (word < 32) records 0
     void blk(uint32_t rva, const uint32_t* b, uint32_t n, uint32_t mask = ~0u) {
