@@ -8135,7 +8135,24 @@ static void sessionClientRoomPass() {
     }
     if (warpRoom && g_sessionClientFrame >= 7 && g_sessionClientFrame % 7 == 0) {
         g_sessionClientRoomsSeen.insert(warpRoom);
-        if (warpRoom->pLevel->nLevelId == 8) sessionClientRoomSpots(warpRoom, nullptr);
+        // the client builds that room in its own act, so its collision is held there and the spots read it
+        D2ActiveRoomStrc* built = nullptr;
+        const int32_t levelId = warpRoom->pLevel->nLevelId;
+        if (levelId == 8) {
+            if (!g_sessionTownAct) {
+                static const AUTOMAPFN noMap = [](D2ActiveRoomStrc*) {};
+                static const TOWNAUTOMAPFN noTownMap = [](int32_t, int32_t, int32_t, int32_t) {};
+                g_sessionTownAct = DUNGEON_AllocAct((uint8_t)g_currentAct, g_gameSeed, TRUE, nullptr, (uint8_t)g_gameDiff, nullptr, DUNGEON_GetTownLevelIdFromActNo((uint8_t)g_currentAct), noMap, noTownMap);
+            }
+            if (g_sessionTownAct) {
+                DUNGEON_SetClientIsInSight(g_sessionTownAct, levelId, warpRoom->nTileXPos, warpRoom->nTileYPos, nullptr);
+                for (D2DrlgLevelStrc* lv = g_sessionTownAct->pDrlg ? g_sessionTownAct->pDrlg->pLevel : nullptr; lv && !built; lv = lv->pNextLevel)
+                    if (lv->nLevelId == levelId)
+                        for (D2DrlgRoomStrc* r = lv->pFirstRoomEx; r; r = r->pDrlgRoomNext)
+                            if (r->nTileXPos == warpRoom->nTileXPos && r->nTileYPos == warpRoom->nTileYPos) { built = r->pRoom; break; }
+            }
+            sessionClientRoomSpots(warpRoom, built);
+        }
     }
 }
 // The client frame's pass over the monsters it holds, in its unit table's order
@@ -12501,6 +12518,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
     const D2MissilesTxt* spotTxt = (int32_t)sgptDataTables->nMissilesTxtRecordCount > 0x11f ? DATATBLS_GetMissilesTxtRecord(0x11f) : nullptr;
     for (size_t i = 0; i < g_clientSpotMissiles.size(); ++i) {
         const int32_t sx = g_clientSpotMissiles[i].first, sy = g_clientSpotMissiles[i].second;
+        ++g_walkUnits;   // frame clock: a client missile, one 6C130 step per frame
         const bool blocked = spotLos && UNITS_TestCollision(spotHero.nX, spotHero.nY, UNITS_GetUnitSizeX(g_targetPlayer),
                                                             sx, sy, spotTxt ? spotTxt->nSize : 0, spotHeroRoom, 2);
         d2_dg_feed_unit_ex(UNIT_MISSILE, 0x7F000000u + (uint32_t)i, 0x11f, sx, sy, 0, 0x8000, 0x8000, sessionShadowGate(UNIT_MISSILE, 0x11f, 0, nullptr), (first ? 1u : 0u) | (blocked ? 2u : 0u));
