@@ -7452,6 +7452,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_packet(const uint8_t* bytes, int len)
     int32_t (__fastcall* handler)(D2GameStrc*, D2UnitStrc*, void*, int32_t) = nullptr;
     switch (packet[0]) {
     case 0x1C: handler = D2GAME_PACKETCALLBACK_Rcv0x1C_RemoveBodyItem_6FC854B0; break;
+    // 0x16 {unit type, guid, flag}: the ground pickup with the client's own flag (1 lifts the item onto the cursor).
+    case 0x16: if (len != 13) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x16_PickItemOnGround_6FC84DB0; break;
     // Cain's Identify Items: 0x34 {int32 npcGUID} (D2GAME_NPC_IdentifyAllItems) -- every unidentified item at once.
     // 0x2F {u8 unitType... } InitEntityChat: the client's "I am talking to this NPC" after the greeting; it takes the
     // interaction from 0 to 1 (sub_6FC61AB0), which D2GAME 0x19/0x1A item lifts need while a vendor is open.
