@@ -13,8 +13,12 @@
 //   0x2A040 (the walk path): #10286 sets the target, #10334 (D2Common+0x36230) builds a type 2 path (0x678B0: the straight line of
 //            0x67630/0x66C20, from the unit's velocity) and fails when its only point is the unit's own spot (0xD240 then zeroes
 //            the velocity, so every later path fails the same way until a mode 2/8 gives it one back).
-// ponytail: the path is not walked: a critter keeps its spot; a made walk lasts until the animation's loop ends; mode 8 lasts one
-// animation loop; the velocity is only zero or not (its value is not modelled).
+//   0x2B1E0 -> 0x4F4A0 (the per-frame step): the mode's record (D2Client+0xF21A8, via 0x4BFF0) says whether the mode walks its
+//            path and when it ends. Mode 2 walks (0x2A700: #10342 at rate 1024) and ends when the path is done; mode 8 does not
+//            walk and ends at the animation loop's end. The walk velocity is MonStats Velocity << 8 at the stat VELOCITYPERCENT the
+//            client monster init (0x4D160) sets to 75 (#10819 on the mode change).
+// ponytail: the animation rate of the walking modes is the AnimData one (not MonStats WalkAnimSpeed at 75%).
+#include <memory>
 #include <cstdint>
 #include <cstdio>
 #include <string>
@@ -44,6 +48,8 @@ struct Critter {
     uint32_t f44, f48, f4c, u7c;  // animation clock, length, rate; last 0x22CA0 sound frame
     uint32_t born;
     int32_t vel;                  // path +0x7C
+    struct Walk { D2UnitStrc u; D2DynamicPathStrc p; };
+    std::shared_ptr<Walk> w;      // the client unit's own dynamic path, the one the per-frame step walks
 };
 std::vector<Critter> g_c;
 uint32_t g_counter = 1;           // D2Client+0xDE834
@@ -71,7 +77,11 @@ int32_t distance(const Critter& c, D2UnitStrc* u) {
 void setMode(Critter& c, uint32_t m, uint32_t frame) {
     if (c.mode == m) return;
     c.mode = m; c.f44 = 0; anim(c);
-    if (m == 2 || m == 8) c.vel = 0x100;
+    if (m == 2 || m == 8) {   // #10819: base velocity at VELOCITYPERCENT 75 (no faster-run/walk on a client critter)
+        const D2MonStatsTxt* ms = monStats((int32_t)c.cls);
+        c.vel = ms ? (int32_t)((((uint32_t)ms->nVelocity << 8) * 75u) / 100u) : 0;
+        if (c.w) c.w->p.dwVelocity = c.vel;
+    }
     char b[96]; snprintf(b, sizeof b, "%u C id=%x mode=%u\n", frame, c.id, m); g_log += b;
     const uint32_t n = d2_client_unit_mode_sounds(1, c.id, (int32_t)c.cls, 0, -1, m, 0, 0, 0, -1);
     for (uint32_t i = 0; i < n; ++i) {
@@ -103,7 +113,12 @@ bool path(Critter& c, int32_t tx, int32_t ty) {
     if (p.dwPathPoints <= 0) return false;
     PATH_ComputeVelocityAndDirectionVectorsToNextPoint(&p, 1, 1);
     c.vel = p.dwVelocity;
-    return p.dwCurrentPointIdx < p.dwPathPoints;
+    if (p.dwCurrentPointIdx >= p.dwPathPoints) return false;
+    // the made path is the unit's: base flags 0x10, 0x20 while it has points to walk
+    if (!c.w) c.w = std::make_shared<Critter::Walk>();
+    c.w->p = p; c.w->p.pUnit = &c.w->u; c.w->p.dwFlags = 0x30;
+    c.w->u = D2UnitStrc{}; c.w->u.dwUnitType = UNIT_MONSTER; c.w->u.dwClassId = c.cls; c.w->u.pDynamicPath = &c.w->p;
+    return true;
 }
 // 0x4DC70 through the six-word walk block {x, y, ...}: action 0xC (mode 8 first, then the path), 1 (mode 2 when a path is made)
 void walk(Critter& c, int32_t x, int32_t y, uint32_t action, uint32_t frame) {
@@ -155,13 +170,19 @@ void think(Critter& c, D2UnitStrc* player, uint32_t frame) {
     if (c.cls == 0x95 || c.cls == 0x10C) chicken(c, frame);
     else neutral(c, frame);
 }
-// 0x2B1E0 (the clock only): a loop's end returns modes 2 and 8 to neutral (0x4DA60)
+// 0x2B1E0 -> 0x4F4A0: mode 2 first walks its path (0x2A700 -> #10342(unit, 1024); FALSE = the path is done) and ends when it is
+// done; then the animation clock (0x4EE40), whose loop end ends mode 8. The end is neutral (0x4DA60).
 void step(Critter& c, uint32_t frame) {
-    if (!c.f48) return;
-    c.f44 += c.f4c;
-    if (c.f44 < c.f48) return;
-    c.f44 -= c.f48;
-    if (c.mode == 2 || c.mode == 8) setMode(c, 1, frame);
+    bool end = false;
+    if (c.mode == 2) {
+        end = !c.w || !D2Common_10226(&c.w->u, 1024);
+        if (c.w) { c.x = (int32_t)(c.w->p.tGameCoords.dwPrecisionX >> 16); c.y = (int32_t)(c.w->p.tGameCoords.dwPrecisionY >> 16); }
+    }
+    if (c.f48) {
+        c.f44 += c.f4c;
+        if (c.f44 >= c.f48) { c.f44 -= c.f48; if (c.mode == 8) end = true; }
+    }
+    if (end && (c.mode == 2 || c.mode == 8)) setMode(c, 1, frame);
 }
 // 0x181A0 + 0xA7780 + 0x4D160
 void create(D2ActiveRoomStrc* room, int32_t cls, uint32_t frame) {
@@ -177,7 +198,8 @@ void create(D2ActiveRoomStrc* room, int32_t cls, uint32_t frame) {
         if (++i >= 10) return;
     }
     if (++g_counter == 0xFFFFFFFFu) g_counter = 0;
-    Critter c{}; c.id = g_counter; c.cls = (uint32_t)cls; c.room = room; c.x = x; c.y = y; c.size = size; c.mode = 1; c.born = frame; c.vel = 0x100;
+    Critter c{}; c.id = g_counter; c.cls = (uint32_t)cls; c.room = room; c.x = x; c.y = y; c.size = size; c.mode = 1; c.born = frame;
+    c.vel = (int32_t)((uint32_t)m->nVelocity << 8);   // the path's base velocity until a walking mode applies the percent
     D2ActiveRoomStrc* at = DUNGEON_FindRoomBySubtileCoordinates(room->pAct, x, y);
     c.lo = d2client_unitseed::roll(at ? at : room); c.hi = 666;
     const uint32_t init = c.lo;
