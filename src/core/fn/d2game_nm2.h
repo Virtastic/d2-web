@@ -19,9 +19,10 @@ struct NE : GE {
     // the state-change trace: the import wsprintfA(stack buffer, "changing state to %d\n", n) through its slot 0xF8D58, then, when the
     // module's trace switch (0x111C20) is on, the text goes to 0xCBE70 (EDX = buffer, game, 4). The switch is off in the shipped module.
     uint32_t trace = 0;
+    bool wsrec = true;   // false: the descriptor hooks no wsprintfA slot, so the capture runs it for real and records nothing
     void say(uint32_t game, uint32_t n) {
         uint32_t buf[4] = {};
-        imp(0xF8D58, stk(buf), 0xB2000000u | 0xFCC2C, n);   // wsprintfA(buf, "changing state to %d\n", n): the capture records the call
+        if (wsrec) imp(0xF8D58, stk(buf), 0xB2000000u | 0xFCC2C, n);   // wsprintfA(buf, "changing state to %d\n", n): the capture records the call
         if (trace) h(0xCBE70, 0, 0, stk(buf), 0, 0, game, 4);
     }
     // the game's quest list: holder at game +0x10F4, node id +0, next +0xF4; 0 = absent

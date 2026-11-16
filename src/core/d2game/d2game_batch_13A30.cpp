@@ -23,7 +23,8 @@ static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy
 static inline void wr8 (void* p, uint32_t o, uint8_t v)  { ((uint8_t*)p)[o] = v; }
 static inline void wr16(void* p, uint32_t o, uint16_t v) { std::memcpy((uint8_t*)p + o, &v, 2); }
 static inline void wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
-static inline void* rdptr(const void* p, uint32_t o) { void* v; std::memcpy(&v, (const uint8_t*)p + o, sizeof v); return v; }
+// a retail pointer field is a dword: read four bytes, not a host-width pointer
+static inline void* rdptr(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return (void*)(uintptr_t)v; }
 
 [[noreturn]] static void d2game_fatal(uint32_t) { _exit(-1); }
 
