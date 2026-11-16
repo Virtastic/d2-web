@@ -12310,6 +12310,17 @@ static uint32_t sessionColourShift(D2UnitStrc* u) {
     return best > 0 ? sgptDataTables->pStatesTxt[best].nColorShift : 0;
 }
 static D2GameStrc* g_walkGame;   // the game the client room lists were built for
+// The client unit's +0xC4 bit5 (UNITFLAG_DRAWSHADOW), the shadow step's first gate (D2Client+0x6BA90): a missile, item or warp
+// always carries it, a player never; a monster carries it when its MonStats2.txt Shadow flag is clear (D2Client+0x4D160); an
+// object when Objects.txt BlocksLight for its mode is 0 (D2Client+0x25490, +0x259F0).
+static uint32_t sessionShadowGate(int32_t type, int32_t cls, uint32_t mode, const D2ObjectsTxt* obj) {
+    switch (type) {
+    case UNIT_MONSTER: { const D2MonStats2Txt* m2 = UNITS_GetMonStats2TxtRecordFromMonsterId(cls); return m2 && !(m2->dwFlags & MONSTATS2FLAG_SHADOW) ? 0x20u : 0u; }
+    case UNIT_OBJECT: return obj && mode < 8 && obj->nBlocksLight[mode] == 0 ? 0x20u : 0u;
+    case UNIT_MISSILE: case UNIT_ITEM: case UNIT_TILE: return 0x20u;
+    default: return 0u;
+    }
+}
 // A monster class's COF in a mode (the monster branch of sessionUnitCof, for a client critter that has no server unit).
 static bool sessionMonsterCof(int32_t cls, uint32_t mode, char* out, size_t cap) {
     static const char* kMode[] = {"dt","nu","wl","gh","a1","a2","bl","sc","s1","s2","s3","s4","dd","kb","sq","rn"};
@@ -12356,9 +12367,19 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
     char cof[96];
     // The client's own critters (Levels.txt cmon, made at room activation 0x440C0 before any server unit is learnt): type 1 units
     // the server never sent, in the client's room lists.
+    // The visibility test (D2Client+0x66620) runs on the hero and a unit: #10839(hero, unit, 2) is the hero-to-unit line test with the
+    // two units' X sizes over the hero's room, when the hero's level draws by line of sight (Levels.txt LOSDraw).
+    D2ActiveRoomStrc* spotHeroRoom = g_targetPlayer ? UNITS_GetRoom(g_targetPlayer) : nullptr;
+    const bool spotLos = spotHeroRoom && DRLG_GetLOSDrawFromLevelId(DUNGEON_GetLevelIdFromRoom(spotHeroRoom));
+    D2CoordStrc spotHero{};
+    if (spotLos) UNITS_GetCoords(g_targetPlayer, &spotHero);
     if (g_walkOpt & 1) for (uint32_t i = 0, c[5]; d2_session_critter_unit(i, c); ++i) {
         ++g_walkUnits;
-        d2_dg_feed_unit_ex(UNIT_MONSTER, c[0], (int)c[1], (int)c[2], (int)c[3], c[4], 0x8000, 0x8000, 0, first ? 1 : 0);
+        // a critter neither dead nor dying takes the monster arm of the test
+        const D2MonStats2Txt* cm2 = UNITS_GetMonStats2TxtRecordFromMonsterId((int32_t)c[1]);
+        const bool cBlocked = spotLos && c[4] != MONMODE_DEATH && c[4] != MONMODE_DEAD
+                              && UNITS_TestCollision(spotHero.nX, spotHero.nY, UNITS_GetUnitSizeX(g_targetPlayer), (int)c[2], (int)c[3], cm2 ? (int8_t)cm2->nSizeX : 0, spotHeroRoom, 2);
+        d2_dg_feed_unit_ex(UNIT_MONSTER, c[0], (int)c[1], (int)c[2], (int)c[3], c[4], 0x8000, 0x8000, sessionShadowGate(UNIT_MONSTER, (int32_t)c[1], c[4], nullptr), (first ? 1u : 0u) | (cBlocked ? 2u : 0u));
         if ((g_walkOpt & 4) && sessionMonsterCof((int32_t)c[1], c[4], cof, sizeof cof)) d2_dg_feed_unit_cof(cof);
         d2_dg_feed_unit_shift(0);
     }
@@ -12405,15 +12426,19 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
             ++g_walkUnits;
             if (u->dwUnitType == UNIT_OBJECT) objs.push_back({u->dwUnitId, u->pObjectData->pObjectTxt->nClientFn == 14});
             // The per-unit draw's visibility test (it sets unit +0xC8 bit7 on a pass, clears it on a fail): another player or a
-            // monster, neither dead nor dying, fails when the hero's level draws by line of sight (Levels.txt LOSDraw) and the
-            // line from the hero to it is blocked for mask 2. Every other unit passes.
+            // monster, neither dead nor dying, and every missile and item, fails when the hero's level draws by line of sight
+            // (Levels.txt LOSDraw) and the line from the hero to it is blocked for mask 2. Objects pass.
             bool losBlocked = false;
-            if (g_targetPlayer && u != g_targetPlayer && ((u->dwUnitType == UNIT_PLAYER && u->dwAnimMode != PLRMODE_DEATH && u->dwAnimMode != PLRMODE_DEAD) || (u->dwUnitType == UNIT_MONSTER && u->dwAnimMode != MONMODE_DEATH && u->dwAnimMode != MONMODE_DEAD))) {
+            if (g_targetPlayer && u != g_targetPlayer && ((u->dwUnitType == UNIT_PLAYER && u->dwAnimMode != PLRMODE_DEATH && u->dwAnimMode != PLRMODE_DEAD) || (u->dwUnitType == UNIT_MONSTER && u->dwAnimMode != MONMODE_DEATH && u->dwAnimMode != MONMODE_DEAD)
+                                                       || u->dwUnitType == UNIT_MISSILE || u->dwUnitType == UNIT_ITEM)) {
                 D2ActiveRoomStrc* heroRoom = UNITS_GetRoom(g_targetPlayer);
                 if (heroRoom && DRLG_GetLOSDrawFromLevelId(DUNGEON_GetLevelIdFromRoom(heroRoom))) losBlocked = UNITS_TestCollisionWithUnit(g_targetPlayer, u, 2) != 0;
             }
-            // the first walk's units have +0xC8 bit7 still clear, as has a missile until the walk after its first drawn frame
-            d2_dg_feed_unit_ex((int)u->dwUnitType, u->dwUnitId, (int)u->dwClassId, x, y, mode, fx, fy, 0, (first || (u->dwUnitType == UNIT_MISSILE && g_sessionClientFrame <= drawn) ? 1u : 0u) | (losBlocked ? 2u : 0u) | hidden);
+            // the first walk's units have +0xC8 bit7 still clear, as has a missile until the walk after its first drawn frame;
+            // unit +0xC4 bit5 ends the unit's shadow node at the shadow step's first gate (draw_grid_7a9f0.cpp unit6ba90)
+            d2_dg_feed_unit_ex((int)u->dwUnitType, u->dwUnitId, (int)u->dwClassId, x, y, mode, fx, fy,
+                               sessionShadowGate((int)u->dwUnitType, (int)u->dwClassId, mode, u->dwUnitType == UNIT_OBJECT ? u->pObjectData->pObjectTxt : nullptr),
+                               (first || (u->dwUnitType == UNIT_MISSILE && g_sessionClientFrame <= drawn) ? 1u : 0u) | (losBlocked ? 2u : 0u) | hidden);
             // the COF is the one of the mode D2Common #10175 gives: a player or monster in a sequence draws its sequence mode
             const uint32_t cofMode = (u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MONSTER) ? (uint32_t)UNITS_GetAnimOrSeqMode(u) : mode;
             if (sessionUnitCof(u, cofMode, cof, sizeof cof) && d2_dg_feed_unit_cof(cof)) {
@@ -12445,12 +12470,14 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
         }
     }
     // the client-only light-spot missiles (class 0x11f, type 3) 0x53550 made: placed on their subtile centre, ids local to the client
-    // Off until the spots land where retail's do: our 27 level-8 rooms reach the pass in the server act's list order, retail's client
-    // list has (tile 1500,1024) tenth where ours has it second-from-last, so every later room draws different hero-seed values and
-    // the spots (and the 12 vs 7 class-0x11f draws at tick 1) differ. Fed, the G count rose 21287 -> 23044.
-    static const bool kFeedClientSpots = false;
-    for (size_t i = 0; kFeedClientSpots && i < g_clientSpotMissiles.size(); ++i)
-        d2_dg_feed_unit_ex(UNIT_MISSILE, 0x7F000000u + (uint32_t)i, 0x11f, g_clientSpotMissiles[i].first, g_clientSpotMissiles[i].second, 0, 0x8000, 0x8000, 0, first ? 1 : 0);
+    // A spot takes the missile arm of the visibility test, its X size Missiles.txt Size.
+    const D2MissilesTxt* spotTxt = (int32_t)sgptDataTables->nMissilesTxtRecordCount > 0x11f ? DATATBLS_GetMissilesTxtRecord(0x11f) : nullptr;
+    for (size_t i = 0; i < g_clientSpotMissiles.size(); ++i) {
+        const int32_t sx = g_clientSpotMissiles[i].first, sy = g_clientSpotMissiles[i].second;
+        const bool blocked = spotLos && UNITS_TestCollision(spotHero.nX, spotHero.nY, UNITS_GetUnitSizeX(g_targetPlayer),
+                                                            sx, sy, spotTxt ? spotTxt->nSize : 0, spotHeroRoom, 2);
+        d2_dg_feed_unit_ex(UNIT_MISSILE, 0x7F000000u + (uint32_t)i, 0x11f, sx, sy, 0, 0x8000, 0x8000, sessionShadowGate(UNIT_MISSILE, 0x11f, 0, nullptr), (first ? 1u : 0u) | (blocked ? 2u : 0u));
+    }
     nonObj = g_walkUnits - (uint32_t)objs.size();
     std::stable_sort(objs.begin(), objs.end(), [](const auto& a, const auto& b) {
         return (a.first & 127) != (b.first & 127) ? (a.first & 127) < (b.first & 127) : a.first > b.first; });

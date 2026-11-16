@@ -248,6 +248,7 @@ static uint8_t g_unitPal[kMaxUnits];   // d2_dg_stage_unit_palshift
 struct UnitAnim { const uint8_t* cof; uint32_t size, dir, frame; uint8_t ovr[16]; };
 static UnitAnim g_unitAnim[kMaxUnits];
 static uint32_t g_unitShift[kMaxUnits];   // d2_dg_stage_unit_shift: the client unit's +0x6C
+static uint32_t g_unitC4[kMaxUnits];      // d2_dg_stage_unit_c4: the client unit's +0xC4 flags
 int32_t g_view[4], g_ox, g_oy; uint32_t g_now, g_skipUnits;
 uint32_t g_unitId[kMaxUnits];
 constexpr uint32_t kMaxWalked = 4096; uint64_t g_walked[kMaxWalked]; uint32_t g_nWalked;   // type << 32 | id of every client unit whose +0xC8 bit7 is set
@@ -353,6 +354,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_dg_stage_unit(uint32_t unit, int32_t type, int32
     g_unitAnim[g_nUnits] = {};
     g_unitPal[g_nUnits] = 0;
     g_unitShift[g_nUnits] = 0;
+    g_unitC4[g_nUnits] = 0;
     g_unitId[g_nUnits] = 0xffffffffu;
     return g_nUnits++;
 }
@@ -387,6 +389,8 @@ EMSCRIPTEN_KEEPALIVE void d2_dg_stage_unit_anim(uint32_t k, const uint8_t* cof, 
 EMSCRIPTEN_KEEPALIVE void d2_dg_stage_unit_palshift(uint32_t k) { if (k < g_nUnits) g_unitPal[k] = 1; }
 // The staged unit k's colour shift index (unit +0x6C, D2Client+0x72130 sets it from the unit's states; 0 none).
 EMSCRIPTEN_KEEPALIVE void d2_dg_stage_unit_shift(uint32_t k, uint32_t v) { if (k < g_nUnits) g_unitShift[k] = v; }
+// The staged unit k's flags (unit +0xC4; bit5 ends its shadow node at 6BA90's first gate).
+EMSCRIPTEN_KEEPALIVE void d2_dg_stage_unit_c4(uint32_t k, uint32_t v) { if (k < g_nUnits) g_unitC4[k] = v; }
 EMSCRIPTEN_KEEPALIVE void d2_dg_stage_room(int32_t r5c, int32_t r60, int32_t r64, int32_t r68, int32_t subX, int32_t subY,
                                            uint32_t nA, uint32_t a0, uint32_t nB, uint32_t b0, uint32_t nU, uint32_t u0) {
     if (g_nRooms < kMaxRooms) g_rooms[g_nRooms++] = {r5c, r60, r64, r68, subX, subY, nA, nB, nU, a0, b0, u0, -1};
@@ -665,6 +669,7 @@ static uint32_t stageUnit(uint32_t rec) {
     if (k < g_nUnits) clientXY(g_units[k], &g_hpx, &g_hpy); else { g_hpx = (sx - sy) * 16; g_hpy = (sx + sy) * 8; }
     if (k < g_nUnits && g_unitCof[k].has) memcpy(g_hhdr, g_unitCof[k].h, sizeof g_unitCof[k].h); else g_hhdr[0] = g_hu[0] == 0 ? 8 : 1;
     if (k < g_nUnits) g_hu[0x6c / 4] = g_unitShift[k];
+    if (k < g_nUnits) g_hu[0xc4 / 4] = g_unitC4[k];
     // the whole COF when it holds the priority row the unit's direction and frame pick: header 0x1C, 9 bytes a layer, the frame keys, then layers * frames * directions
     if (k < g_nUnits && g_unitCof[k].has && g_unitAnim[k].cof) {
         const UnitAnim& a = g_unitAnim[k]; const uint32_t h0 = a.cof[0], h1 = a.cof[1], h2 = a.cof[2];
@@ -679,11 +684,13 @@ static uint32_t stageUnit(uint32_t rec) {
 }
 static void unit666d0(uint32_t rec) { uint32_t u = stageUnit(rec); d2c_666d0(hostCall, 0, u, 2, 0); }
 // 1.13c D2Client+0x6BA90 (the flag-2 node, named "1BA90" in the walk env by mistake): 10036 (returns 0), the 10013 read, then per layer 10011 at the 6C490 position minus 2 (the 6A3D0 cull, flag 1).
+// Its first gate (0x6fb1baa0) leaves with no call when unit +0xC4 bit5 is set; a type above 2 that passes goes to 6AA30 (its own
+// 10013 read, then the shadow cel's 10011): a client missile, item and warp always carry bit5 (retail's shadow node of a light
+// spot, class 0x11f, records the cell walk's 10013 and nothing after it), as do a monster without the MonStats2 Shadow flag and an
+// object whose mode does not block light (monspawn_check.cpp sessionShadowGate).
 static void unit6ba90(uint32_t rec) {
     stageUnit(rec);
-    // The step leaves at once when the unit's +0xC4 bit5 is set (0x6fb1bab5). The client's missile init (D2Client+0xB0170) sets that
-    // bit on every missile, so a missile's shadow node reads only the walk's own 10013.
-    if (g_hu[0] == 3) return;
+    if (g_hu[0xc4 / 4] & 0x20) return;
     lo10494(g_hu[0], 0x92);   // 10494(unit, 0x92) at 0x6fb1bac1
     // Any other unit type above 2 leaves through 0x6AA30 and returns: 10494(unit, 0x92) again, 10175, 10350, then its one 10013 read.
     // Its 6A3D0 cull finds no COF header on the gfx node and fails, so no 10011 follows.
@@ -727,6 +734,11 @@ EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
         [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g) -> int32_t { gRec(10001, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g}, y > 0 ? y : 0); g_lecx = g_ledx = 0; return 1; },
         [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g, uint32_t al) -> int32_t { gRec(10058, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g, al}, y > 0 ? y : 0); g_lecx = g_ledx = 0; return 1; }, unit666d0};
     d2c_9ee90(&e, kCtx);
+    // 1.13c D2Client+0x13A00, run by 8B110 when a roof node set the pool's mask bit 1 (79D30): 10013, 10047, then the roof
+    // lists (cell+0x1C) layer by layer 1..4; a node whose tile is hidden or pitch black (0x408) is skipped, the rest are
+    // clipped against the ctx rect (+0x14..+0x20) and drawn by 10076. Only the head is emitted: this ctx carries no clip
+    // rect, no roof cel and no fade timer, so the roof draws themselves are not modelled (the recordings hold no 10076).
+    if (rd(kSq) & 2) { rec10013(); gRec(10047, {}); }
     gRec(10054, {});   // 1.13c D2Client+0x8B110 tail: Ordinal_10054() after the 4EE90 cell walk
     return g_gout.c_str();
 }

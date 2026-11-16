@@ -397,6 +397,7 @@ extern "C" void d2_dg_stage_unit_cof(uint32_t, const uint8_t*);
 extern "C" void d2_dg_stage_unit_palshift(uint32_t);
 extern "C" void d2_dg_stage_unit_anim(uint32_t, const uint8_t*, uint32_t, uint32_t, uint32_t, const uint8_t*);
 extern "C" void d2_dg_stage_unit_shift(uint32_t, uint32_t);
+extern "C" void d2_dg_stage_unit_c4(uint32_t, uint32_t);
 extern "C" void d2_dg_stage_unit_frac(uint32_t, uint32_t, uint32_t);
 struct FeedUnit { int32_t type, cls, sx, sy; uint32_t flags, flagsEx; uint8_t cof[0x18]; bool hasCof;
                   bool hasId; uint32_t id, mode, fx, fy; int32_t slot, rank, floor; bool palshift = false; uint32_t shift = 0;
@@ -557,6 +558,7 @@ uint32_t d2_dg_feed_level(D2DrlgLevelStrc* lv, int l, int t, int r, int b, int o
                 if (f->hasCof && f->hasAnim && f->full) d2_dg_stage_unit_anim(k, f->full->data(), (uint32_t)f->full->size(), f->dir, f->frame, f->ovr);
                 if (f->palshift) d2_dg_stage_unit_palshift(k);
                 d2_dg_stage_unit_shift(k, f->shift);
+                d2_dg_stage_unit_c4(k, f->flags);
                 d2_dg_stage_unit_frac(k, f->fx, f->fy);
                 d2_dg_stage_unit_id(k, f->id);
                 d2c_cru_set_aux(s, k);
