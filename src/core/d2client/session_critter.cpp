@@ -82,8 +82,9 @@ int32_t distance(const Critter& c, D2UnitStrc* u) {
 void rate(Critter& c) {
     const D2MonStatsTxt* ms = monStats((int32_t)c.cls);
     if (!ms) return;
-    c.f4c = (uint32_t)(c.pct * (int32_t)ms->nWalkAnimSpeed / 100);
-    c.vel = (int32_t)((((uint32_t)ms->nVelocity << 8) * (uint32_t)c.pct) / 100u);
+    const int32_t pct = c.pct < 25 ? 25 : c.pct;   // the percent's floor is 25
+    c.f4c = (uint32_t)(pct * (int32_t)ms->nWalkAnimSpeed / 100);
+    c.vel = (int32_t)((((uint32_t)ms->nVelocity << 8) * (uint32_t)pct) / 100u);
     if (c.w) c.w->p.dwVelocity = c.vel;
 }
 // 0x2A6C0 -> #11090: a new mode resets the clock and reaches 0x24490
@@ -206,9 +207,9 @@ void rat(Critter& c, D2UnitStrc* player, int32_t dist, uint32_t frame) {
     if (c.mode != 1 || !c.room) return;
     if (dist < 4) { flee(c, player, 6, 1, 0x3C01, frame); return; }
     D2UnitStrc* a = dist > 7 ? corpse(c, player) : nullptr;
-    if (a && c.state == 0) {   // 0x176A0: walk to the corpse (action 0 on its type and id); ponytail: the walk path to its spot
+    if (a && c.state == 0) {   // 0x176A0: walk to the corpse (action 0 on its type and id, percent 6); ponytail: the walk path to its spot
         D2CoordStrc p{}; UNITS_GetCoords(a, &p);
-        walk(c, p.nX, p.nY, 1, frame); c.state = 1; return;
+        walk(c, p.nX, p.nY, 1, frame, 6); c.state = 1; return;
     }
     if (c.state != 0) { if (lcg(c.lo, c.hi) % 100 < 20) c.state = 0; c.delay = 0x20; neutral(c, frame); return; }
     if (lcg(c.lo, c.hi) % 100 < 0x4B) { c.delay = 0x1E; neutral(c, frame); return; }
