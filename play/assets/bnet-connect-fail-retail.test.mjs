@@ -78,12 +78,14 @@ test('terms that cannot be fetched raise the disconnect notice, OK leaves for th
   assert.ok(s.release(token, 400, 330, 800, 600)); assert.equal(s.left, 1);
 });
 
-test('the main menu connect failure raises the same large popup, sized to its wrapped text, as retail draws', { skip: !rd }, () => {
+// A dial that fails is Bnclient error 0xC, which D2Launch+0xEE10 raises as event 0xC: "Unable to Connect" (5247), not the
+// default row's title.
+test('the main menu connect failure raises retail\'s Unable to Connect popup (event 0xC), sized to its wrapped text', { skip: !rd }, () => {
   const strings = stringTable(rd);
   const n = createBnetConnectFailureNotice({ read: rd, decodeDc6, decodeDatPalette, string: (i) => strings.get(i) ?? '', documentObject });
   globalThis.__d2DrawList = [];
   try { n.draw(ctx); } finally { var l = globalThis.__d2DrawList; delete globalThis.__d2DrawList; }
-  const all = identity(parseDrawListVector(readFileSync(vec('bnet-connect-fail'), 'utf8')));
+  const all = identity(parseDrawListVector(readFileSync(vec('bnet-event-0c'), 'utf8')));
   const retail = all.slice(all.findIndex((r) => /PopUpLargest/i.test(r.path)));
   const ours = identity(l);
   const d = diffDrawLists(retail, ours);

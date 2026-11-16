@@ -11,7 +11,10 @@
 //   - the status, a centred Font24 text box (222, 360, 340x70, inset 10/8): Bnclient+0x80's code 0..6
 //     names strings 5171..5177, any other code leaves the box empty;
 //   - the dots, a centred FontFormal12 colour-4 box (222, 370, 340x20, inset 10/4): "%.*s" of twenty
-//     dots, ((GetTickCount - opened) / 1000) % 20 + 1 of them.
+//     dots, ((GetTickCount - opened) / 250) % 20 + 1 of them (+0xF800 divides by 250: mul 0x10624DD3, shr 4).
+// The status is read once as the popup is built (+0xFC40 calls +0xF800 before Bnclient's connect thread
+// starts, so the first frame is code 0) and then every frame: the thread moves it to 1 (gateway query,
+// Bnclient+0xF240), 2 (connecting, +0xF430), 3 and 4 (AUTH_INFO, AUTH_CHECK).
 // A D2Win text box draws its first line one font line height below its top, inset included.
 import { createBlender, createFont, decodeFontTbl, textColourPalette, LABEL_TINT, FRONTEND } from './frontend.mjs';
 import { recordDc6, recordPrim } from './drawlist.mjs';
@@ -70,8 +73,8 @@ export function createBnetConnectingPopup({ read, decodeDc6, decodeDatPalette, s
   const statusFont = boxFont(A.statusFont, A.statusFontTbl, 0);
   const dotsFont = boxFont(A.dotsFont, A.dotsFontTbl, L.dots.colour);
 
-  // D2Launch+0xFC40 takes GetTickCount for the dots and starts on code 0's text.
-  let opened = now(), code = 0, pressed = false;
+  // D2Launch+0xFC40 takes GetTickCount for the dots and starts on code 0's text; the connection's stage shows from the next frame.
+  let opened = now(), code = 0, stage = 0, drawn = false, pressed = false;
 
   const drawCel = (ctx, c, index, x, anchorY) => {
     const f = c.dc6.frames[index]; if (!f) return 0;
@@ -93,9 +96,10 @@ export function createBnetConnectingPopup({ read, decodeDc6, decodeDatPalette, s
   return {
     get evidence() { return { code, status: statusText(), dots: this.dots() }; },
     // Bnclient+0x80's connection stage, as D2Launch+0xF800 reads it each frame.
-    setStatus(next) { code = next; },
-    clock(ms) { opened = 0; now = () => ms; },
-    dots() { return (Math.trunc(Math.max(0, now() - opened) / 1000) % 20) + 1; },
+    setStatus(next) { stage = next; if (drawn) code = next; },
+    // Poses the popup's first frame at `ms` after it opened (retail's tick 0: the status read before the connect began).
+    clock(ms) { opened = 0; now = () => ms; code = 0; drawn = false; },
+    dots() { return (Math.trunc(Math.max(0, now() - opened) / 250) % 20) + 1; },
     draw(ctx) {
       let x = L.popup.x;
       for (const i of [0, 1]) x += drawCel(ctx, popup, i, x, L.popup.anchorY);
@@ -107,6 +111,7 @@ export function createBnetConnectingPopup({ read, decodeDc6, decodeDatPalette, s
       drawBox(ctx, titleFont, string(S.title) || '', L.title);
       drawBox(ctx, statusFont, statusText(), L.status);
       drawBox(ctx, dotsFont, '.'.repeat(this.dots()), L.dots);
+      drawn = true; code = stage;
     },
     // Scene coordinates (800x600). The popup is modal: only CANCEL answers.
     press(sx, sy) { pressed = inCancel(sx, sy); return pressed ? 'cancel' : null; },
@@ -115,6 +120,22 @@ export function createBnetConnectingPopup({ read, decodeDc6, decodeDatPalette, s
     key(code) { if (code === 'Escape') { onCancel(); return true; } return false; },
     targets() { const c = L.cancel; return { CANCEL: [c.x + c.w / 2, c.anchorY - c.h / 2] }; },
   };
+}
+
+// Bnclient's dial (+0xF430): stage 2 ("Connecting to the fastest server") while the socket opens, and no answer after 62
+// one-second selects (the 0x3c counter) fails the connect with error 0xC. Resolves with the transport, or throws an error
+// carrying `event: 12` after closing it.
+export const BNET_DIAL_TIMEOUT_MS = 62_000;
+export async function dialBnet(transport, { popup = null, timeoutMs = BNET_DIAL_TIMEOUT_MS,
+  setTimer = globalThis.setTimeout, clearTimer = globalThis.clearTimeout } = {}) {
+  popup?.setStatus(2);
+  let timer;
+  const timeout = new Promise((_, reject) => { timer = setTimer(() => reject(new Error('Battle.net did not answer')), timeoutMs); });
+  try { await Promise.race([transport.ready(), timeout]); return transport; }
+  catch (error) {
+    try { transport.close(); } catch { /* socket already closed */ }
+    throw Object.assign(error instanceof Error ? error : new Error(String(error)), { event: 12 });
+  } finally { clearTimer(timer); }
 }
 
 // D2Launch+0x15090's notice, raised over the menu when the connection fails (D2Launch+0xE510 event 0 with string 5189): the
@@ -179,15 +200,16 @@ export function createBnetConnectNotice({ read, decodeDc6, decodeDatPalette, str
   };
 }
 
-// The status-2 failure box (D2Launch+0xE510 default row: title 5248, body 5189, small print 5190), raised over the main menu when the
-// dial fails. It is the large popup, not the small PopUpOK: D2Gfx dims the surface, four PopUpLargest cels, a MediumButtonBlank OK,
+// The status-2 failure box raised over the main menu when the dial fails. Bnclient's connect thread (+0xF9B0) sets error 0xC when
+// no server answered (or the gateway could not be resolved); D2Launch+0xEE10 reads it (Bnclient+0x28, +0xFBD0) and raises
+// +0xE510 event 0xC: title 5247 ("Unable to Connect"), body 5189, small print 5190 (vectors/drawlist/bnet-event-0c.txt). It is the large popup, not the small PopUpOK: D2Gfx dims the surface, four PopUpLargest cels, a MediumButtonBlank OK,
 // a centred Font30 title, the Font24 body on one line and the Font16 small print in colour 4 wrapped to its own box. The geometry is
 // the capture the login screen's same box was measured from (vectors/drawlist/bnet-connect-fail.txt). Its OK runs `onOk`.
 export const BNET_CONNECT_FAILURE_LAYOUT = {
   cels: [[0, 158, 427], [1, 414, 427], [2, 158, 460], [3, 414, 460]], ok: { x: 335, anchorY: 450, w: 128, h: 35, label: 5102 },
   title: { baseline: 199, width: 457 }, line: { x: 172, baseline: 235 }, small: { x: 172, width: 456, baseline: 330, step: 14 },
 };
-export function createBnetConnectFailureNotice({ read, decodeDc6, decodeDatPalette, string = () => '', title = 5248, body = 5189, detail = 5190,
+export function createBnetConnectFailureNotice({ read, decodeDc6, decodeDatPalette, string = () => '', title = 5247, body = 5189, detail = 5190,
   onOk = () => {}, documentObject = globalThis.document }) {
   const palette = decodeDatPalette(read(FRONTEND.palette));
   const skyPalette = decodeDatPalette(read(FRONTEND.backgroundPalette));

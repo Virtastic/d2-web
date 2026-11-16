@@ -135,7 +135,7 @@ import { createMcpGameList } from './assets/realm-gamelist.mjs';
 import { createChatLink } from './assets/bnet-chat-link.mjs';
 import { createNews, newsLines, createMotd } from './assets/bnet-news.mjs';
 import { returnToLobby } from './assets/realm-lobby-return.mjs';
-import { createBnetConnectingPopup, createBnetConnectFailureNotice } from './assets/bnet-connecting.mjs';
+import { createBnetConnectingPopup, createBnetConnectFailureNotice, dialBnet } from './assets/bnet-connecting.mjs';
 import { goldLabel } from './assets/gold-label.mjs';
 import { hoveredLabel, labelItemAt, nearestGroundItem } from './item-pick.mjs';
 import { createSpeechBox } from './assets/speech-box.mjs';
@@ -2075,7 +2075,7 @@ function connectConfiguredRealm(server) {
       if (bnetConnecting !== attempt) return;
       // One dial, as retail's connect (D2Launch+0xEE10) makes one: a failed dial is the notice below, with no quiet redial.
       attempt.bncs = webSocketTransport(realmServiceUrl(server.ws, 'bncs'));
-      await attempt.bncs.ready();
+      await dialBnet(attempt.bncs, { popup });
       if (bnetConnecting !== attempt) { attempt.bncs.close(); return; }
       bnetConnecting = null; titleScreen?.setOverlay(null);
       showConfiguredRealmLogin(server, attempt.bncs);
@@ -2084,7 +2084,7 @@ function connectConfiguredRealm(server) {
       try { attempt.bncs?.close(); } catch { /* socket already closed */ }
       bnetConnecting = null;
       realmTransport = { state: 'failed', server: { region: server?.region, host: server?.host }, result: null, error: String(error) };
-      // Retail closes the Connecting popup and raises its own notice (5189); the notice's OK leaves the menu as retail's does (D2Launch+0x17DF0).
+      // Retail closes the Connecting popup and raises "Unable to Connect" (event 0xC: 5247, 5189); the notice's OK leaves the menu as retail's does (D2Launch+0x17DF0).
       titleScreen?.setOverlay(createBnetConnectFailureNotice({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, string: lang,
         onOk: () => { titleScreen?.setOverlay(null); if (realmTransport.state === 'failed') realmTransport = { state: 'idle', server: null, result: null, error: '' }; } }));
     }
