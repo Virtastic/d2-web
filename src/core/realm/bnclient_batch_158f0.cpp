@@ -198,12 +198,13 @@ Byte* load(State& state, const Imports& io, const char* path, U32* size) {
     return load_with(io,path,size,[&](Byte* d,U32 n){ return validate(state,io,d,n); });
 }
 
-// 1.13c BNClient+0x162B0 -- initialize the .gid/.clh resource buffers.
-void load_resources(State& state, const Imports& io) {
+// 1.13c BNClient+0x162B0 -- initialize the .gid/.clh resource buffers. The first load is a call to
+// 0x160E0 (`first`); the fallbacks, the .clh load and the extra load are inlined copies of it (`valid` = 0x16070).
+template <class First, class Valid>
+void load_resources_with(State& state, const Imports& io, char (&path)[260], First first, Valid valid) {
     if (state.gid || state.clh) die(io,0x213);
-    char path[260];
     std::snprintf(path,sizeof(path),"%s\\%s.gid","font","font");
-    state.gid=load(state,io,path,&state.gid_size);
+    state.gid=first(path,&state.gid_size);
     // These are retail's indexed-alphabet fallback paths, decoded below instead
     // of preserving the compiler's overlapping byte-array stack temporaries.
     constexpr char alphabet[]="vwaxdnirosucflbgt\\.mpyeh8";
@@ -215,24 +216,30 @@ void load_resources(State& state, const Imports& io) {
         constexpr Byte indices[]={4,2,16,2,17,15,13,8,14,2,13,17,9,12,3,17,11,10,7,9,
                                  8,7,17,1,2,0,6,5,4,3,18,1,2,0};
         fallback(indices,sizeof(indices));
-        state.gid=load(state,io,path,&state.gid_size);
+        state.gid=load_with(io,path,&state.gid_size,valid);
     }
     std::snprintf(path,sizeof(path),"%s\\%s.clh","font","font");
-    state.clh=load(state,io,path,&state.clh_size);
+    state.clh=load_with(io,path,&state.clh_size,valid);
     if (!state.clh) {
         constexpr Byte indices[]={4,2,16,2,17,15,13,8,14,2,13,17,9,12,3,17,11,10,7,9,
                                  8,7,17,11,10,7,6,5,4,3,18,1,2,0};
         fallback(indices,sizeof(indices));
-        state.clh=load(state,io,path,&state.clh_size);
+        state.clh=load_with(io,path,&state.clh_size,valid);
     }
     if (io.extra_enabled(io.user)) {
         constexpr Byte indices[]={4,2,16,2,17,15,13,8,14,2,13,17,11,23,2,7,9,17,2,19,
                                  17,11,8,12,17,2,19,14,13,3,14,8,1,18,11,8,12};
         fallback(indices,sizeof(indices));
-        state.extra=load(state,io,path,&state.extra_size);
+        state.extra=load_with(io,path,&state.extra_size,valid);
     }
     state.resource_flag=0;
     for (char* p=path;*p;++p) *p=0;
+}
+void load_resources(State& state, const Imports& io) {
+    char path[260];
+    load_resources_with(state,io,path,
+        [&](const char* p,U32* n){ return load(state,io,p,n); },
+        [&](Byte* d,U32 n){ return validate(state,io,d,n); });
 }
 
 // 1.13c BNClient+0x16F40 -- broken SHA used by BNCS, distinct from grid SHA.
@@ -291,5 +298,44 @@ std::uint8_t* bn_load_160e0(const char* path, std::uint32_t* size,
     io.load=[](void*,const char* n,Byte** d,U32* z,U32,U32){ l(n,d,z); };
     io.release=[](void*,Byte* d){ r(d); };
     return load_with(io,path,size,valid);
+}
+
+// FN-probe seam for BNClient+0x162B0: the 0x160E0 call, Storm 279/280/10227, the 0x16070 check and the
+// fatal path are the caller's recorders; the slots stand for the module globals 1E8D4..1E8EB and 1DCE4.
+struct BnResourceSlots {
+    std::uint32_t gid_size, clh_size, extra_size;
+    std::uint8_t *gid, *clh, *extra;
+    std::uint32_t flag;
+};
+struct BnResourceEnv {
+    std::uint8_t* (*first)(const char*, std::uint32_t*);
+    void (*load)(const char*, std::uint8_t**, std::uint32_t*);
+    void (*release)(std::uint8_t*);
+    bool (*valid)(std::uint8_t*, std::uint32_t);
+    std::int32_t (*extra_enabled)();
+    void (*fatal)(std::uint32_t);
+};
+void bn_load_resources_162b0(BnResourceSlots* slots, const BnResourceEnv* env) {
+    using namespace d2::bnclient::grid;
+    static State st; static BnResourceSlots* sl; static const BnResourceEnv* e;
+    sl=slots; e=env;
+    st.gid_size=slots->gid_size; st.clh_size=slots->clh_size; st.extra_size=slots->extra_size;
+    st.gid=slots->gid; st.clh=slots->clh; st.extra=slots->extra; st.resource_flag=slots->flag;
+    // The port writes its own State: the recorders get the slot each size pointer stands for.
+    static U32* (*slot)(U32*)=[](U32* z)->U32* {
+        U32* s=z==&st.gid_size ? &sl->gid_size : z==&st.clh_size ? &sl->clh_size : &sl->extra_size;
+        *s=*z; return s;
+    };
+    Imports io{}; io.user=nullptr;
+    io.load=[](void*,const char* n,Byte** d,U32* z,U32,U32){ U32* s=slot(z); e->load(n,d,s); *z=*s; };
+    io.release=[](void*,Byte* d){ e->release(d); };
+    io.extra_enabled=[](void*)->I32{ return e->extra_enabled(); };
+    io.fatal=[](void*,U32 m){ e->fatal(m); };
+    char path[260]={}; // the capture's zero-filled stack: the bytes past each name's NUL
+    load_resources_with(st,io,path,
+        [](const char* p,U32* z){ U32* s=slot(z); Byte* r=e->first(p,s); *z=*s; return r; },
+        [](Byte* d,U32 n){ return e->valid(d,n); });
+    slots->gid_size=st.gid_size; slots->clh_size=st.clh_size; slots->extra_size=st.extra_size;
+    slots->gid=st.gid; slots->clh=st.clh; slots->extra=st.extra; slots->flag=st.resource_flag;
 }
 
