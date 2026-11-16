@@ -8345,14 +8345,6 @@ static void sessionClientMonsterFootsteps(bool newOnly = false) {
     const int32_t fallback = lv ? d2client_session_level_material((uint32_t)(lv->dwSoundEnv & 0xff)) : 1;
     for (uint32_t id : ids)
         if (D2UnitStrc* u = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)id)) {
-            if (auto it = g_monCltMissileRows.find(id); it != g_monCltMissileRows.end()) {
-                for (const MonCltMissile& c : it->second) {
-                    d2client_clmissile::monsterDo(u, c.missile, c.skill, c.level, c.tx, c.ty);
-                    const D2MissilesTxt* m = DATATBLS_GetMissilesTxtRecord(c.missile);
-                    if (m && m->wTravelSound > 0 && m->wTravelSound != 0xFFFF) d2client_sound_unit_submit(m->wTravelSound);
-                }
-                g_monCltMissileRows.erase(it);
-            }
             // 0x4F4A0 runs the unit's idle sound (0x237E0) just before its footstep check (0x23C00)
             if (auto it = g_sessionIdleRowsReady.find(id); it != g_sessionIdleRowsReady.end()) d2client_sound_unit_submit((int32_t)it->second);
             d2client_session_monster_footstep(id, (int32_t)u->dwClassId, u->dwAnimMode, (uint16_t)u->wAnimSpeed, (uint32_t)u->dwFrameCountPrecise,
@@ -8361,6 +8353,15 @@ static void sessionClientMonsterFootsteps(bool newOnly = false) {
             // mode the unit held before the order
             { extern void d2_client_monster_order_unit(uint32_t); d2_client_monster_order_unit(id); }
             sessionClientMonsterHitSounds(id);
+            // then 0x2B1E0 runs the unit's queued packets (0xABC20, unit+0xD8) in order: its order, struck modes, client missiles
+            if (auto it = g_monCltMissileRows.find(id); it != g_monCltMissileRows.end()) {
+                for (const MonCltMissile& c : it->second) {
+                    d2client_clmissile::monsterDo(u, c.missile, c.skill, c.level, c.tx, c.ty);
+                    const D2MissilesTxt* m = DATATBLS_GetMissilesTxtRecord(c.missile);
+                    if (m && m->wTravelSound > 0 && m->wTravelSound != 0xFFFF) d2client_sound_unit_submit(m->wTravelSound);
+                }
+                g_monCltMissileRows.erase(it);
+            }
         }
     if (!newOnly) g_monCltMissileRows.clear();   // a do of a unit the client does not hold makes no client missile
     if (!newOnly) for (int32_t row : d2client_clmissile::takeUnitHits()) d2client_sound_unit_submit(row);   // the client missiles' hits, in their type-3 slots after the monsters
