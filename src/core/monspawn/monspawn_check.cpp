@@ -1207,13 +1207,13 @@ extern "C" uint32_t d2_session_client_frame_now() { return g_sessionClientFrame;
 static uint32_t g_sessionScreenSwitchFrame = 0xffffffffu;
 extern "C" EMSCRIPTEN_KEEPALIVE int d2_session_client_screen_switch_frame(int frame) { g_sessionScreenSwitchFrame = frame > 0 ? (uint32_t)frame : 0xffffffffu; return 1; }
 
-static D2DrlgActStrc* g_sessionTownAct = nullptr; static uint32_t g_sessionTownUnits = 0;   // sessionClientTownSeen: the client's town, its client-only presets
+static D2DrlgActStrc* g_sessionTownAct = nullptr; static uint32_t g_sessionTownUnits = 0; static bool g_sessionTownBuilt = false;   // sessionClientTownSeen: the client's town, its client-only presets
 static void resetSessionClientMapMirror() {
     if (g_sessionClientPlayerUnit) UNITS_FreeUnit(g_sessionClientPlayerUnit);
     g_sessionClientPlayerUnit = nullptr;
     d2client::weather::reset(); d2client_ambient::reset(); d2_client_monster_idle_reset(); sessionClientMonsterModeReset(); d2_client_attack_roll_reset(); g_sessionClientRoomsSeen.clear(); g_clientSpotMissiles.clear(); g_sessionClientFrame = 0; d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset(); { extern void d2_client_monster_hit_reset(); d2_client_monster_hit_reset(); }
     if (g_sessionTownAct) { DUNGEON_FreeAct(g_sessionTownAct); g_sessionTownAct = nullptr; }   // after the critters that stand in it
-    g_sessionTownUnits = 0;
+    g_sessionTownUnits = 0; g_sessionTownBuilt = false;
     if (g_sessionClientActOwned) d2_drlg_act_end();
     g_sessionClientActOwned = false;
     g_sessionClientMapStarted = false;
@@ -8079,16 +8079,24 @@ static void sessionClientRoomSpots(D2DrlgRoomStrc* room, D2ActiveRoomStrc* activ
         if (active && COLLISION_CheckMask(active, x, y, 5) == 0) { ++ok; g_clientSpotMissiles.push_back({x, y}); }
     }
 }
-// The client is sent a room that has a town room in its near list (1.13c D2Client+0x18370 capture, a Cold Plains start: 35
-// Rogue Encampment rooms first seen in the frame of the 97 the server sent): the sight status crosses the level boundary and a
-// town level tiles as a whole, so the client holds every town room, its critters and its client-only presets, from then on.
-// The server act has no active town room here; the town is built in a client act of the same seed, which `seen` is sent to.
+// The client's act is allocated by the 0x03 handler (D2Client+0x43F90 -> DUNGEON_AllocAct with bClient set and the automap
+// callbacks 0x62AA0/0x62760, town level left uninitialised), and every 0x07 handler (D2Client+0xAC440) is one
+// DUNGEON_SetClientIsInSight on it. The sight propagation reaches a warp-linked level and InitLevels it; for an automap preset
+// level, DRLGPRESET_GenerateLevel then InitLevels its vis levels and gives EVERY room of the level its active room
+// (DRLGACTIVATE_InitializeRoomEx + the automap callback). So a Cold Plains start holds every Rogue Encampment room after a few
+// 0x07 packets (1.13c D2Client+0x18370 capture: 35 town rooms in the frame of the 97 the server sent), with their critters and
+// client-only presets. The server act has no active town room here; each room the client is sent is sighted in a client act
+// of the same seed, and the town is taken once that act's town level holds active rooms.
 static void sessionClientTownSeen(D2DrlgRoomStrc* seen, int32_t townLevel) {
     static const AUTOMAPFN noMap = [](D2ActiveRoomStrc*) {};
     static const TOWNAUTOMAPFN noTownMap = [](int32_t, int32_t, int32_t, int32_t) {};
-    g_sessionTownAct = DUNGEON_AllocAct((uint8_t)g_currentAct, g_gameSeed, TRUE, nullptr, (uint8_t)g_gameDiff, nullptr, townLevel, noMap, noTownMap);
+    if (!g_sessionTownAct) g_sessionTownAct = DUNGEON_AllocAct((uint8_t)g_currentAct, g_gameSeed, TRUE, nullptr, (uint8_t)g_gameDiff, nullptr, townLevel, noMap, noTownMap);
     if (!g_sessionTownAct) return;
     DUNGEON_SetClientIsInSight(g_sessionTownAct, seen->pLevel->nLevelId, seen->nTileXPos, seen->nTileYPos, nullptr);
+    D2DrlgLevelStrc* town = nullptr;   // read without DRLG_GetLevel, which would allocate the level
+    for (D2DrlgLevelStrc* lv = g_sessionTownAct->pDrlg ? g_sessionTownAct->pDrlg->pLevel : nullptr; lv; lv = lv->pNextLevel) if (lv->nLevelId == townLevel) town = lv;
+    if (!town || !town->pFirstRoomEx || !town->pFirstRoomEx->pRoom) return;
+    g_sessionTownBuilt = true;
     for (D2ActiveRoomStrc* room = DUNGEON_GetRoomFromAct(g_sessionTownAct); room; room = room->pRoomNext) {
         D2DrlgRoomStrc* dr = room->pDrlgRoom;
         if (!dr || !dr->pLevel || dr->pLevel->nLevelId != townLevel) continue;
@@ -8115,11 +8123,12 @@ static void sessionClientRoomPass() {
                 if (nr && nr->pLevel && nr->fRoomStatus == ROOMSTATUS_UNTILE && !activeLevels.count(nr->pLevel) && !nr->pRoom && !g_sessionClientRoomsSeen.count(nr)) { warpRoom = nr; break; }
             }
         if (!g_sessionClientRoomsSeen.insert(dr).second) continue;
-        if (!g_sessionClientActOwned && !g_sessionTownAct && !DRLG_IsTownLevel(dr->pLevel->nLevelId))
-            for (int q = 0; q < dr->nRoomsNear; ++q) {
-                D2DrlgRoomStrc* nr = dr->ppRoomsNear[q];
-                if (nr && nr->pLevel && DRLG_IsTownLevel(nr->pLevel->nLevelId) && !activeLevels.count(nr->pLevel)) { sessionClientTownSeen(dr, nr->pLevel->nLevelId); break; }
-            }
+        if (!g_sessionClientActOwned && !g_sessionTownBuilt && !DRLG_IsTownLevel(dr->pLevel->nLevelId)) {
+            const int32_t townLevel = DUNGEON_GetTownLevelIdFromActNo((uint8_t)g_currentAct);
+            bool townActive = false;
+            for (D2DrlgLevelStrc* lv : activeLevels) if (lv && lv->nLevelId == townLevel) townActive = true;
+            if (!townActive) sessionClientTownSeen(dr, townLevel);
+        }
         d2client_critter::room_seen(room, dr->pLevel->nLevelId, g_sessionClientFrame);   // 1.13c D2Client+0x18370
         for (D2PresetUnitStrc* p = dr->pPresetUnits; p; p = p->pNext) if (p->bSpawned & 1) d2client_critter::preset_seen(room, room->tCoords.nSubtileX + p->nXpos, room->tCoords.nSubtileY + p->nYpos);   // 1.13c D2Client+0xA7D00
         if (dr->pLevel->nLevelId == 8) sessionClientRoomSpots(dr, room);
