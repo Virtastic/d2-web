@@ -549,6 +549,7 @@ uint32_t d2_dg_feed_level(D2DrlgLevelStrc* lv, int l, int t, int r, int b, int o
                 const FeedUnit* f = nullptr;
                 for (const FeedUnit& u : g_feedUnits) if (u.slot == s) { f = &u; break; }
                 if (!f) continue;
+                if (f->flagsEx & 0x40000) { d2c_cru_set_aux(s, ~0u); continue; }   // +0xC8 bit 18: in the list, its draw leaves at once
                 const int32_t ks = d2_dg_stage_unit((uint32_t)f->cls, f->type, f->sx, f->sy, (uint32_t)d2c_cru_a6180(s), (f->flags >> 20) & 1, ((f->flagsEx & 1) ? 0u : 1u) | (f->flagsEx & 2));   // flagsEx bit1: the unit fails the draw's visibility test
                 if (ks < 0) continue;   // the stage table is full
                 const uint32_t k = (uint32_t)ks;

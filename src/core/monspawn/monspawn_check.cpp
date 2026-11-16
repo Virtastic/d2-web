@@ -12376,7 +12376,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
             if ((p->bSpawned & 1) && p->nUnitType >= 1 && p->nUnitType <= 3) ++g_walkUnits;
         if (!room || !(clientHeldCount(room) > 0 || inStartLattice(roomEx))) continue;   // only the rooms the client holds
         for (D2UnitStrc* u = room->pUnitFirst; u; u = u->pRoomNext) {
-            uint32_t mode = u->dwAnimMode, fx = 0x8000, fy = 0x8000, drawn = 0; int32_t x, y;
+            uint32_t mode = u->dwAnimMode, fx = 0x8000, fy = 0x8000, drawn = 0, hidden = 0; int32_t x, y;
             if (u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MONSTER) {
                 if (!u->pDynamicPath) continue;
                 if (u->dwUnitType == UNIT_MONSTER && !g_heldMonsters.count(u->dwUnitId)) continue;   // a monster the server never announced to the client is not in its room lists
@@ -12395,7 +12395,9 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
                 static std::unordered_map<uint32_t, uint32_t> seen; if (first) seen.clear();
                 const D2MissilesTxt* mt = (int32_t)u->dwClassId >= 0 && (int32_t)u->dwClassId < (int32_t)sgptDataTables->nMissilesTxtRecordCount ? DATATBLS_GetMissilesTxtRecord(u->dwClassId) : nullptr;
                 const uint32_t born = seen.emplace(u->dwUnitId, g_sessionClientFrame).first->second;
-                if (mt && mt->nInitSteps && g_sessionClientFrame - born < (uint32_t)mt->nInitSteps + 2) { ++g_walkUnits; continue; }
+                // Hidden, it is still a unit of its room's list (made there by D2Common+0x66900, sorted by 664B0 with the rest):
+                // fed with +0xC8 bit 18 so the walk keeps its list place and draws nothing for it.
+                if (mt && mt->nInitSteps && g_sessionClientFrame - born < (uint32_t)mt->nInitSteps + 2) hidden = 0x40000;
                 // +0xC8 bit7 (the shadow node) is set by the unit draw's 0x66620 step, so a missile carries it from the walk after
                 // the first frame it is drawn on; its shadow step (D2Client+0x6BA90) then leaves on the +0xC4 bit5 the missile init sets.
                 drawn = born + (mt && mt->nInitSteps ? (uint32_t)mt->nInitSteps + 2 : 0);
@@ -12411,7 +12413,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
                 if (heroRoom && DRLG_GetLOSDrawFromLevelId(DUNGEON_GetLevelIdFromRoom(heroRoom))) losBlocked = UNITS_TestCollisionWithUnit(g_targetPlayer, u, 2) != 0;
             }
             // the first walk's units have +0xC8 bit7 still clear, as has a missile until the walk after its first drawn frame
-            d2_dg_feed_unit_ex((int)u->dwUnitType, u->dwUnitId, (int)u->dwClassId, x, y, mode, fx, fy, 0, (first || (u->dwUnitType == UNIT_MISSILE && g_sessionClientFrame <= drawn) ? 1u : 0u) | (losBlocked ? 2u : 0u));
+            d2_dg_feed_unit_ex((int)u->dwUnitType, u->dwUnitId, (int)u->dwClassId, x, y, mode, fx, fy, 0, (first || (u->dwUnitType == UNIT_MISSILE && g_sessionClientFrame <= drawn) ? 1u : 0u) | (losBlocked ? 2u : 0u) | hidden);
             // the COF is the one of the mode D2Common #10175 gives: a player or monster in a sequence draws its sequence mode
             const uint32_t cofMode = (u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MONSTER) ? (uint32_t)UNITS_GetAnimOrSeqMode(u) : mode;
             if (sessionUnitCof(u, cofMode, cof, sizeof cof) && d2_dg_feed_unit_cof(cof)) {
