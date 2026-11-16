@@ -1204,7 +1204,7 @@ extern "C" uint32_t d2_session_client_frame_now() { return g_sessionClientFrame;
 // The client frame from which the recorded rig's screen (D2Client+0x8BC48/0x8BC4C) reads 800x600; before it, 640x480.
 // Rigs differ: some switch at their 13th frame, others hold 640x480 for the whole recording (every rain line they draw
 // stays inside 640x480). The replay names its rig; 0 = never switch.
-static uint32_t g_sessionScreenSwitchFrame = 13;
+static uint32_t g_sessionScreenSwitchFrame = 0xffffffffu;
 extern "C" EMSCRIPTEN_KEEPALIVE int d2_session_client_screen_switch_frame(int frame) { g_sessionScreenSwitchFrame = frame > 0 ? (uint32_t)frame : 0xffffffffu; return 1; }
 
 static D2DrlgActStrc* g_sessionTownAct = nullptr; static uint32_t g_sessionTownUnits = 0;   // sessionClientTownSeen: the client's town, its client-only presets
