@@ -81,7 +81,7 @@ extern "C" void d2_batch_d2common_53f70()
 // 1.13c D2Common+0x54200: teardown of the level/monster table group. It runs six of the routines
 // above in retail's order, releases three linker/pointer pairs and walks four slots (plus their +0x10
 // companions) that still hold an allocation.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_54200()
+extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_54200_Unload()
 {
 	if (sgptDataTables->pMonEquipTxt != 0)
 	{
@@ -194,7 +194,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_port_d2common_5de00()
 
 // 1.13c D2Common+0x6C7E0: clear the two words at sgptDataTables+0xC58/+0xC5C; the first is a guard
 // naming the levels bin and its record count in the retail layout.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_6c7e0()
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_port_d2common_6c7e0()
 {
 	DATATBLS_UnloadBin(sgptDataTables->pLevelsTxt);
 	sgptDataTables->nLevelsTxtRecordCount = 0;
@@ -202,7 +202,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_6c7e0()
 
 // 1.13c D2Common+0x71180: one unconditional pool release, the guarded slot at 0x6FDF0AD0, then the
 // linker at 0x6FDF0ACC.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_71180()
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_port_d2common_71180()
 {
 	D2_FREE_POOL(nullptr, sgptDataTables->pItemTypesEquivalenceLUTs);
 	if (sgptDataTables->pItemTypesTxt != 0)
@@ -214,7 +214,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_71180()
 
 // 1.13c D2Common+0x716B0: release two linkers (0x6FDF0AE0, 0x6FDF0AEC) unconditionally, two guarded
 // slots, then clear the two companion words.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_716b0()
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_port_d2common_716b0()
 {
 	FOG_FreeLinker(sgptDataTables->pSetsLinker);
 	FOG_FreeLinker(sgptDataTables->pSetItemsLinker);

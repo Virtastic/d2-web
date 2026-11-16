@@ -158,7 +158,7 @@ namespace
 }
 
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_51c60(D2UnitStrc* pUnit, int32_t* pMinOut,
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_51c60_batch(D2UnitStrc* pUnit, int32_t* pMinOut,
 	int32_t* pMaxOut, int32_t* pBonusOut)
 {
 	if (!pUnit) return;

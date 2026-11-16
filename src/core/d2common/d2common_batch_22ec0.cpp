@@ -211,6 +211,7 @@ struct D2Common51870Env
 	int32_t* (*place)(int32_t*, uint32_t*, uint32_t*, int32_t, uint32_t, uint32_t, int32_t, uint32_t, int32_t); //0x10 0x4D140
 	bool (*finalize)(uint32_t, uint32_t, uint32_t, uint32_t, int32_t*, uint32_t); //0x14 0x4E750
 	bool (*end)(void);															//0x18 0x4F120
+	int32_t* (*get_room)(int32_t*);												//0x1C 0x2FE10
 };
 
 // 1.13c D2Common+0x51870 (#10566)
@@ -259,26 +260,28 @@ bool D2Common_51870_FindPlacement(int32_t* pUnit, int32_t* pTarget, uint32_t* pO
 	nNewX = static_cast<uint32_t>(static_cast<int32_t>(nTargetX - nUnitX) * 2 / nScale + static_cast<int32_t>(nTargetX));
 	nNewY = static_cast<uint32_t>(static_cast<int32_t>(nTargetY - nUnitY) * 2 / nScale + static_cast<int32_t>(nTargetY));
 
-	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(reinterpret_cast<D2UnitStrc*>(pUnit));
+	// 0x2FE10 (unit): the unit's room; retail halts on a null room (line 0x10BF).
+	int32_t* pRoom = pEnv->get_room ? pEnv->get_room(pUnit) : nullptr;
 	if (!pRoom)
 		return false;
 
 	if (!pEnv->room_test)
 		return false;
-	const uint32_t nCollision = pEnv->room_test(reinterpret_cast<int32_t*>(pRoom), nNewX, nNewY,
+	const uint32_t nCollision = pEnv->room_test(pRoom, nNewX, nNewY,
 	                                            RdU32(PC(static_cast<uint32_t>(pUnit[0xB])), 0x48), 0x1C09);
-	int32_t* pEntry = nullptr;
+	// The last test takes the room, or the entry the search hands back.
+	int32_t* pEntry = pRoom;
 	if (nCollision != 0)
 	{
-		const int32_t nSizeX = pEnv->unit_size_x ? pEnv->unit_size_x(reinterpret_cast<int32_t*>(pRoom)) : 0;
-		// retail seeds the in/out point with the TARGET coords (not the extrapolated ones)
-		nNewX = nTargetX;
-		nNewY = nTargetY;
-		pEntry = pEnv->place ? pEnv->place(reinterpret_cast<int32_t*>(pRoom), &nNewX, &nNewY, nSizeX,
-		                                   0x1C09, 0x1C09, 0, 0x32, 1)
-		                     : nullptr;
+		// retail seeds the in/out point pair with the TARGET coords (not the extrapolated ones) and
+		// asks 0x30F80 for the UNIT's size; the third argument of 0x4D140 is 0.
+		uint32_t aPoint[2] = { nTargetX, nTargetY };
+		const int32_t nSizeX = pEnv->unit_size_x ? pEnv->unit_size_x(pUnit) : 0;
+		pEntry = pEnv->place ? pEnv->place(pRoom, aPoint, nullptr, nSizeX, 0x1C09, 0x1C09, 0, 0x32, 1) : nullptr;
 		if (!pEntry)
 			return false;
+		nNewX = aPoint[0];
+		nNewY = aPoint[1];
 	}
 
 	const uint32_t nLastX = UnitCoordX(pUnit);

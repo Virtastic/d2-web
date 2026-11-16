@@ -33,7 +33,7 @@ namespace
 // from the 0x1330 grid record (its +0x20 pointer, then the layer's own +0x20 cell array), the cell
 // index is (nY - layer[+0x04]) * layer[+0x08] - layer[+0x00] + nX. The first argument is not read.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_4c940(uint32_t nUnused, int32_t nX, int32_t nY, uint16_t nFlags,
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_4c940_batch(uint32_t nUnused, int32_t nX, int32_t nY, uint16_t nFlags,
 	void* (*pfnGrid1330)(void))
 {
 	(void)nUnused;

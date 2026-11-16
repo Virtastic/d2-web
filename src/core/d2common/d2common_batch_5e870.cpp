@@ -14,11 +14,11 @@ W void Ordinal_10043(int32_t a, int32_t b);
 W void Ordinal_10212(uint32_t p);
 W void d2_batch_d2common_18f90();
 void d2_batch_d2common_53bd0();
-W void d2_fn_d2common_54200();
+W void D2Common_54200_Unload();
 W void d2_port_d2common_5de00();
-W void d2_fn_d2common_6c7e0();
-W void d2_fn_d2common_71180();
-W void d2_fn_d2common_716b0();
+W void d2_port_d2common_6c7e0();
+W void d2_port_d2common_71180();
+W void d2_port_d2common_716b0();
 #define D2C5E870_W(n, r) W char DAT_##n[4];
 D2C5E870_SLOTS(D2C5E870_W)
 }
@@ -40,12 +40,12 @@ static void callReal(uint32_t rva) {
     case 0x71330: DATATBLS_UnloadItemStatCostTxt(); break;
     case 0x5d8b0: DATATBLS_UnloadStatesTxt(); break;
     case 0x71a50: DATATBLS_UnloadItemsTxt(); break;
-    case 0x716b0: d2_fn_d2common_716b0(); break;
-    case 0x71180: d2_fn_d2common_71180(); break;
+    case 0x716b0: d2_port_d2common_716b0(); break;
+    case 0x71180: d2_port_d2common_71180(); break;
     case 0x53bd0: d2_batch_d2common_53bd0(); break;
     case 0x18f90: d2_batch_d2common_18f90(); break;
-    case 0x54200: d2_fn_d2common_54200(); break;
-    case 0x6c7e0: d2_fn_d2common_6c7e0(); break;
+    case 0x54200: D2Common_54200_Unload(); break;
+    case 0x6c7e0: d2_port_d2common_6c7e0(); break;
     case 0x6c9c0: DATATBLS_UnloadLvlPrestTxt(); break;
     case 0x6c840: DATATBLS_UnloadLvlSubTxt(); break;
   }

@@ -57,8 +57,8 @@ extern "C" void D2Common_44D90_Engine(uint32_t pUnit, uint8_t* pnIntensity, uint
 
 // 1.13c D2Common+0x3C6A0 (ordinal 10636, GetUnitLevelLight; the function list name CopyStats is wrong):
 // forwards the unit (register argument, passed through untouched) and the four output pointers to 0x44D90.
-extern "C" void d2_fn_d2common_3c6a0(uint32_t pUnit, uint8_t* pnIntensity, uint8_t* pnRed,
-                                     uint8_t* pnGreen, uint8_t* pnBlue)
+extern "C" void d2_fn_d2common_3c6a0_batch(uint32_t pUnit, uint8_t* pnIntensity, uint8_t* pnRed,
+                                           uint8_t* pnGreen, uint8_t* pnBlue)
 {
 	D2Common_44D90_Engine(pUnit, pnIntensity, pnRed, pnGreen, pnBlue);
 }

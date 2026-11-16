@@ -72,7 +72,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_31200_CanSwitchAI(uint32_t nMonsterId) { 
 // of the nine byte-indexed ids in the function's table with a non-zero flag byte. A null unit is
 // retail's fatal path; we answer 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_45be0(uint32_t pUnit, uint32_t pAffixData) {   // 1.13c D2Common+0x45BE0
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_45be0_batch(uint32_t pUnit, uint32_t pAffixData) {   // 1.13c D2Common+0x45BE0
 	if (!pUnit)
 		return 0;
 	const uint8_t* pAffix = P(pAffixData);

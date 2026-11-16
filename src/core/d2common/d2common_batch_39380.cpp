@@ -142,7 +142,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_38160(uint32_t list,int
 
 struct D2Common4FDC0Env { uint32_t tables; int32_t (*total_stat)(uint32_t); uint32_t (*state)(int32_t); };
 // 1.13c D2Common+0x4FDC0: gate a player by stat nine and state twelve.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4fdc0(uint32_t unit,uint32_t record,
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4fdc0_batch(uint32_t unit,uint32_t record,
  const D2Common4FDC0Env* e) {
  if (!unit || i32(p(unit),0)!=0 || !record || !u32(p(record),0)) return 1;
  int16_t threshold=i16(p(u32(p(record),0)),0x184); if (threshold<=0) return 1;

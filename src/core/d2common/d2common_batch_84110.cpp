@@ -18,22 +18,6 @@ inline uint32_t step(uintptr_t a) {
 }
 
 extern "C" {
-// 1.13c D2Common+0x84110: walk the table at (EBX+0x50)->+0x50 (0x18-byte records, count at +0x4c)
-// from a seed-picked start (unless EBX+0x44 is set), stop at the first record the worker accepts.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_84110(uintptr_t a1, uintptr_t ebx,
-	uint32_t (*rng)(uintptr_t), int32_t (*work)(uintptr_t, uintptr_t, uintptr_t)) {
-	uintptr_t t = w(ebx, 0x50);
-	int32_t n = iw(t, 0x4c), i = 0;
-	uint32_t start = 0;
-	if (n == 0) return;
-	if (iw(a1, 0x14) == -1) iw(a1, 0x14) = 0x3e;
-	if (w(ebx, 0x44) == 0) start = rng(w(a1, 0) + 0x1c4);
-	for (; i < n; ++i) {
-		int32_t r = work(a1, ebx, (uintptr_t)w(t, 0x50) + (int32_t)(start + i) % n * 0x18);
-		if (r != 0 && w(ebx, 0x44) == 0) return;
-	}
-}
-
 // D2Common 0x17B70: advance node n (EAX) one step (cursor +0x18, dir +0x1c, count +0x14); on the
 // count reaching 3 climb parents (+0x20) until the root (*ctx, EDI), advancing each. Returns the node.
 uintptr_t d2_batch_d2common_17b70(uintptr_t n, const uint32_t* ctx) {

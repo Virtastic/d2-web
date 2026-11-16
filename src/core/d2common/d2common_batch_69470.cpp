@@ -14,7 +14,7 @@ extern "C" {
 // (p3,p4) lies outside the rect at self+0x34/0x38 (size +0x3c/0x40). Finds the node in the (self+0x54)[0]
 // list whose [0] flag equals (type==0), else allocates one ({flag,0,next}) and pushes it. Then dispatches
 // to 0x69170 (type 0), 0x68CD0 (type 13) or 0x68F00 (+0x69360 for types 10/11); returns the callee result.
-EMSCRIPTEN_KEEPALIVE uintptr_t d2_fn_d2common_69470(uintptr_t self, uint32_t type, uint32_t p1_unused, uint32_t p2, int32_t p3, int32_t p4,
+EMSCRIPTEN_KEEPALIVE uintptr_t d2_fn_d2common_69470_batch(uintptr_t self, uint32_t type, uint32_t p1_unused, uint32_t p2, int32_t p3, int32_t p4,
 	uintptr_t (*alloc10045)(const char*, int32_t, int32_t), uint32_t (*w68b90)(uintptr_t, uint32_t),
 	uintptr_t (*w69170)(uintptr_t, int32_t, int32_t, uint32_t, uint32_t),
 	uintptr_t (*w68cd0)(uintptr_t, int32_t, uintptr_t, int32_t, uint32_t),

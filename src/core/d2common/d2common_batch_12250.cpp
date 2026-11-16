@@ -106,15 +106,6 @@ EMSCRIPTEN_KEEPALIVE void d2c_3cf30_legacy(uint32_t records, uint32_t count,
   std::memcpy(p(records+j*12),saved,12);
  }
 }
-// 1.13c D2Common+0x7BA00: reject inactive/short text chains and flagged links.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_7ba00(uint32_t text,
- uint32_t (*resolve)(uint32_t,uint32_t*,uint32_t*)) {
- if (!text || (w(text,0x28)&0x400000) || !w(text,0x58)) return 0;
- uint32_t chain=w(w(text,0x58),0x1B4); if (!chain || (p(chain)[0x8C]&1) || p(text)[0x44]<2) return 0;
- uint32_t owner=0,kind=0; if (resolve && resolve(text,&owner,&kind) && owner && kind==0x78)
-  for (uint32_t n=w(owner,0x10);n;n=w(n,0x24)) if (p(n)[0x44]<2) return 0;
- return 1;
-}
 // 1.13c D2Common+0x241A0: item data signature and unit type gate.
 EMSCRIPTEN_KEEPALIVE uint32_t D2Common_241A0_ItemDataGate(uint32_t unit) {
  if (!unit) return 0;

@@ -351,6 +351,8 @@ struct D2Common46920Env
 {
 	const int32_t* pTable;
 	int32_t nCount;
+	uint32_t (*pfn38640)(uint32_t nKey, uint32_t pArrayHeader, uint32_t pPool);   // null: a missing stat stays missing
+	void (*pfn39F70)(uint32_t pStatList, uint32_t nKey, int32_t nDelta);          // null: no parent propagation
 };
 
 // 1.13c D2Common+0x46920
@@ -395,8 +397,51 @@ EMSCRIPTEN_KEEPALIVE void D2Common_ITEMS_RollEthDefault_46920(uint32_t pUnit, co
 		nStatValue = 1;
 	}
 
-	D2StatListStrc* pStatList = reinterpret_cast<D2StatListStrc*>(P(W(u, 0x5C)));
-	int32_t nSet = pStatList ? STATLIST_SetStat(pStatList, 0x47, nStatValue, 0) : 0;
+	// 0x3A280 (list, 0x47, value, layer 0) on the unit's 32-bit stat list. The value is never 0 here, so the
+	// removal branch (0x381A0) is not reached from this caller.
+	uint8_t* sl = P(W(u, 0x5C));
+	int32_t nSet = 0;
+	if (sl)
+	{
+		const int32_t nKey = 0x47 << 16;
+		// 0x382B0: signed binary search of the {key, value} array (list +0x24 pointer, +0x28 int16 count).
+		uint8_t* pArr = P(W(sl, 0x24));
+		uint8_t* pEntry = nullptr;
+		int32_t lo = 0;
+		int32_t hi = static_cast<int16_t>(W(sl, 0x28) & 0xFFFF);
+		while (lo < hi)
+		{
+			const int32_t mid = lo + (hi - lo) / 2;
+			const int32_t k = static_cast<int32_t>(W(pArr, mid * 8));
+			if (k < nKey)
+				lo = mid + 1;
+			else if (k > nKey)
+				hi = mid;
+			else
+			{
+				pEntry = pArr + mid * 8;
+				break;
+			}
+		}
+		// 0x38640 (EAX key, ESI array header, stack: the list's pool at +0) makes the missing entry.
+		if (!pEntry && pEnv && pEnv->pfn38640)
+			pEntry = P(pEnv->pfn38640(static_cast<uint32_t>(nKey), A(sl + 0x24), W(sl, 0)));
+		if (pEntry)
+		{
+			const int32_t nDelta = nStatValue - static_cast<int32_t>(W(pEntry, 4));
+			if (nDelta != 0)
+			{
+				W(pEntry, 4) = static_cast<uint32_t>(nStatValue);
+				// 0x39F70 (EAX list, EDI key, stack: delta, 0) carries the change to the parent lists.
+				if (pEnv && pEnv->pfn39F70)
+					pEnv->pfn39F70(A(sl), static_cast<uint32_t>(nKey), nDelta);
+				// An extended list (flags +0x10 negative) without an owner at +8 marks the stat.
+				if (static_cast<int32_t>(W(sl, 0x10)) < 0 && W(sl, 8) == 0 && pfn38550)
+					pfn38550();
+				nSet = 1;
+			}
+		}
+	}
 	if (nSet != 0 && W(u, 0) == 0 && pfn38550)
 		pfn38550();
 }

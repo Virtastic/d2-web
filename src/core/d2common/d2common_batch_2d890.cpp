@@ -115,7 +115,7 @@ uint32_t D2Common_81950_RoomTileCell(uint32_t pRoom, int32_t nX, int32_t nY)
 // 1.13c D2Common+0x4BB30: clear nMask over the 3x3 bounding box centred on (nX, nY) -- the size-3
 // and big-unit-pattern footprint. Builds {nX-1, nY-1, nX+1, nY+1} and walks it through
 // COLLISION_ResetCollisionMaskForBoundingBoxRecursively (retail 0x4B2F0).
-extern "C" void d2_fn_d2common_4bb30(uint32_t pRoom, int32_t nX, int32_t nY, uint16_t nMask)
+extern "C" void d2_fn_d2common_4bb30_batch(uint32_t pRoom, int32_t nX, int32_t nY, uint16_t nMask)
 {
 	D2BoundingBoxStrc pBoundingBox = { nX - 1, nY - 1, nX + 1, nY + 1 };
 

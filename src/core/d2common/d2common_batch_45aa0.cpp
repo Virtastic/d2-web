@@ -36,7 +36,7 @@ struct D2Common45AA0Env {
     void (*fatal)(uint32_t);
 };
 
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_45aa0(
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_45aa0_batch(
     int32_t nArg1, int32_t nArg2, const int32_t* unit, const int32_t* propertyFunction,
     const D2Common45AA0Env* env) { // 1.13c D2Common+0x45AA0
     if (!unit) {

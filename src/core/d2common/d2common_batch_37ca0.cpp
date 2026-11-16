@@ -385,9 +385,10 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_4E150_GetDword10(uint32_t pStruct)
 	return s ? W(s, 0x10) : 0;
 }
 
-// 1.13c D2Common+0x39CC0 (#10379): forwards to 0x39380.
+// 1.13c D2Common+0x39CC0 (#10379): forwards to 0x39380. The FN probe owns the d2_fn_ name and calls
+// the retail-signature port in d2common_39cc0.cpp; this argument-less engine forwarder keeps its own.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_39cc0(void)
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_39cc0_batch(void)
 {
 	if (g_d2common_fn_39380)
 		g_d2common_fn_39380();

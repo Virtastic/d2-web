@@ -69,7 +69,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_37320_batch(uint32_t pRecord) {   /
 // *(*(param_1 + 0x10) + 0x4C), following the next pointer at node +0x04. Null param_1 is retail's
 // fatal 0x62; the null intermediate pointer is not dereferenced here.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3bb80(uint32_t pRecord, uint32_t nValue) {   // 1.13c D2Common+0x3BB80
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3bb80_batch(uint32_t pRecord, uint32_t nValue) {   // 1.13c D2Common+0x3BB80
 	uint8_t* r = P(pRecord);
 	if (!r) return;
 	uint8_t* outer = P(U(r, 0x10));
