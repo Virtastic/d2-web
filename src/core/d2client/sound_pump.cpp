@@ -198,6 +198,14 @@ void d2client_sound_unit_submit_now(int32_t row, int32_t p3) {
     curTick = ambTick + 1;
     submitRows(curTick - 1, std::vector<int32_t>{ row }, p3);
 }
+// A packet handler's 0x88A70 with no unit (0x4BC80's item_gold): the allocation's #10034 alone, logged at once
+void d2client_sound_nounit_submit_now(int32_t row) {
+    if (!armed || row < 1) return;
+    initOnce();
+    curTick = ambTick + 1;
+    out += std::to_string(curTick) + " A 10034 0,0 snd=" + std::to_string(row) + "\n";
+    ++sndHandle;
+}
 // 0x7D3C0's NPC speech submit, 0x88A70(player, 5, 0, 0) under the packet dispatch: logged at once; the entry's handle back
 int32_t d2client_sound_speech_submit(int32_t row) {
     if (!armed || row < 1) return 0;

@@ -144,6 +144,7 @@ extern "C" int D2WEB_NpcAlertActive(int32_t guid) {
 static D2GSPacketSrv27 g_d2webLastDialogPacket = {};
 static bool g_d2webHasDialogPacket = false;
 extern "C" void d2_client_npc_speech_packet(const D2GSPacketSrv27* p27, uint32_t guid);   // d2client/npc_speech_start.cpp (replay only)
+extern "C" void d2_client_4bc80_reply(const uint8_t* p, uint32_t n);   // d2client/d2client_4bc80.cpp (replay only)
 
 extern "C" void D2WEB_ResetLastDialogPacket() {
     std::memset(&g_d2webLastDialogPacket, 0, sizeof g_d2webLastDialogPacket);
@@ -926,6 +927,7 @@ void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, in
         g_d2webNpcAlertCount = 0;
         if (g_d2webHasDialogPacket) d2_client_npc_speech_packet(&g_d2webLastDialogPacket, static_cast<D2GSPacketSrv28*>(pPacket)->unk0x02);
     }
+    if (pClient && pPacket && nPacketSize > 0) d2_client_4bc80_reply(static_cast<const uint8_t*>(pPacket), (uint32_t)nPacketSize);
     if (pClient && pPacket && nPacketSize == (int32_t)sizeof(D2GSPacketSrv5D) &&
         static_cast<D2GSPacketSrv5D*>(pPacket)->nHeader == 0x5D) {
         g_d2webLastQuestStatusPacket = *static_cast<D2GSPacketSrv5D*>(pPacket);
