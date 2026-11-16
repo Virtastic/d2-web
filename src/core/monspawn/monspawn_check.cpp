@@ -6160,6 +6160,9 @@ EMSCRIPTEN_KEEPALIVE int d2_session_player_gold() { return g_targetPlayer ? STAT
 // The stash panel's two numbers: gold in the stash (STAT_GOLDBANK) and its limit (UNITS_GetStashGoldLimit).
 EMSCRIPTEN_KEEPALIVE int d2_session_stash_gold(int limit) { return !g_targetPlayer ? -1 : limit ? (int)UNITS_GetStashGoldLimit(g_targetPlayer) : STATLIST_UnitGetStatValue(g_targetPlayer, STAT_GOLDBANK, 0); }
 EMSCRIPTEN_KEEPALIVE int d2_session_player_id() { return g_targetPlayer ? (int)g_targetPlayer->dwUnitId : -1; }
+// The server unit's own animation rate (+0x4C), not the drawn client clock d2_session_motion reports: a hero
+// allocated in neutral keeps the 15% rate it got before its stats were set until its first mode change.
+EMSCRIPTEN_KEEPALIVE int d2_session_player_anim_speed() { return g_targetPlayer ? (int)(uint16_t)g_targetPlayer->wAnimSpeed : -1; }
 
 EMSCRIPTEN_KEEPALIVE int d2_session_command_npc(uint32_t npcId) {
     if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
