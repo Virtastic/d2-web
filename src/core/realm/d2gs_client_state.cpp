@@ -5032,6 +5032,7 @@ uint32_t dispatch_call(void* ctx, uint32_t rva, uint32_t, uint32_t, uint32_t, ui
 // A packet the stream cannot frame (an opcode the size table does not know, or a size over the receive
 // node) stops the feed where retail's splitter stops: the bytes stay pending, nothing after them is
 // dispatched and the state built so far is kept. d2_realm_client_feed_stall names the opcode.
+extern "C" void d2_dg_server_packet(const uint8_t*, uint32_t);
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_feed(const uint8_t* bytes, int length) {
     if ((!bytes && length) || length < 0 || length > kPendingCapacity - g_pendingLength) return reject_stream(-1);
     if (length) {
@@ -5064,6 +5065,7 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_feed(const uint8_t* bytes, int l
             d2c_ace20(bound, kDispatchModule, kDispatchPacket, static_cast<int32_t>(size));
             if (dispatch.rejected) return reject_stream(dispatch.rejected);
             if (dispatch.fatal) { g_feedStall = 0x300u | packet[0]; break; }
+            d2_dg_server_packet(packet, size);   // 0x69 (+0xAF390 -> 0x2A750 -> 0x4DC70) and 0x0C hit-flash cases (draw_grid_7a9f0.cpp)
             applied += dispatch.applied;
         }
         ctLast = size;
