@@ -67,8 +67,8 @@ void StormSetLastError(uint32_t e) { g_lastError = (int32_t)e; }
 void StormShowCursor(int a) { STORM_IMP(0x432f4, a, 0, 0); }
 void StormEndPaint() { STORM_IMP(0x432cc, 0, 0, 0); }
 void StormSetPropA(HWND h, const char* n, HANDLE v) { STORM_IMP(0x432fc, (uintptr_t)h, (uintptr_t)n, (uintptr_t)v); }
-HANDLE StormGetPropA(HWND, const char*) { return nullptr; }
-void StormRemovePropA(HWND, const char*) {}
+HANDLE StormGetPropA(HWND h, const char* n) { return g_storm_imp_hook ? (HANDLE)(uintptr_t)g_storm_imp_hook(0x43298, (uint32_t)(uintptr_t)h, (uint32_t)(uintptr_t)n, 0) : nullptr; }
+void StormRemovePropA(HWND h, const char* n) { STORM_IMP(0x4328c, (uintptr_t)h, (uintptr_t)n, 0); }
 void StormEndDialog(HWND h, INT_PTR v) { STORM_IMP(0x4331c, (uintptr_t)h, (uintptr_t)v, 0); }
 void StormSetTextColor(HDC h, uint32_t v) { STORM_IMP(0x43044, (uintptr_t)h, v, 0); }
 void StormSetBkColor(HDC h, uint32_t v) { STORM_IMP(0x43034, (uintptr_t)h, v, 0); }
@@ -76,10 +76,10 @@ void StormSetBkMode(HDC h, int v) { STORM_IMP(0x43028, (uintptr_t)h, v, 0); }
 HGDIOBJ StormGetStockObject(int v) { STORM_IMP(0x43090, v, 0, 0); return nullptr; }
 int StormGetClassNameA(HWND h, LPSTR out, int n) { STORM_IMP(0x432bc, (uintptr_t)h, 0, n); if (n > 0) out[0] = '\0'; return 0; }
 void StormPostMessageA(HWND h, uint32_t m, WPARAM w, LPARAM) { STORM_IMP(0x43334, (uintptr_t)h, m, w); }   // lParam: always 0 here
-HWND StormGetDesktopWindow() { return nullptr; }
-BOOL StormIsIconic(HWND) { return 0; }
-void StormEnableWindow(HWND, BOOL) {}
-void StormDestroyWindow(HWND) {}
+HWND StormGetDesktopWindow() { return g_storm_imp_hook ? (HWND)(uintptr_t)g_storm_imp_hook(0x43320, 0, 0, 0) : nullptr; }
+BOOL StormIsIconic(HWND h) { return g_storm_imp_hook ? (BOOL)g_storm_imp_hook(0x432a4, (uint32_t)(uintptr_t)h, 0, 0) : 0; }
+void StormEnableWindow(HWND h, BOOL b) { STORM_IMP(0x43340, (uintptr_t)h, b, 0); }
+void StormDestroyWindow(HWND h) { STORM_IMP(0x432c4, (uintptr_t)h, 0, 0); }
 HWND StormGetDlgItem(HWND h, int id) { return g_storm_imp_hook ? (HWND)(uintptr_t)g_storm_imp_hook(0x43318, (uint32_t)(uintptr_t)h, (uint32_t)id, 0) : nullptr; }
 BOOL StormGetClientRect(HWND, RECT* r) { std::memset(r, 0, sizeof(*r)); return 1; }
 BOOL StormGetWindowRect(HWND, RECT* r) { std::memset(r, 0, sizeof(*r)); return 1; }
@@ -106,8 +106,13 @@ int32_t StormSub11F10(uint32_t*, uint32_t*, uint32_t*, uint32_t* a, uint32_t* b,
 }
 void StormSub169A0() {}                       // 0x169A0 SDlg init
 int32_t StormSub1220() { return 1; }          // host stub of SDlg class registration (the retail body is storm_sub_21220.cpp)
-void* StormSub1DF90(void*, int*, HWND, void*, LPARAM) { return nullptr; }  // 0x1DF90 dialog create
-void StormSub1D600() {}                       // 0x1D600 message pump
+// 0x1DF90 dialog create and 0x1D600 message pump: no window manager, so nothing is created; under a FUNCTION-mode
+// probe scope each is the capture's hook recorder (0x1DF90 logs its first four stack words).
+void* StormSub1DF90(void* hi, int* t, HWND p, void* proc, LPARAM) {
+    stormhk::Scope* c = stormhk::Scope::cur();
+    return c ? (void*)(uintptr_t)c->e.h(0x1DF90, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)hi, (uint32_t)(uintptr_t)t, (uint32_t)(uintptr_t)p, (uint32_t)(uintptr_t)proc) : nullptr;
+}
+void StormSub1D600() { if (stormhk::Scope* c = stormhk::Scope::cur()) c->e.h(0x1D600); }
 void StormSub4D60(void*) {}                   // 0x4D60 list unlink
 }  // namespace
 extern "C" int32_t Storm_Sub1B960(void* p, const char* tag, int32_t line);  // 0x1B960 SMemFree (storm_alloc_1b960.cpp)
@@ -243,7 +248,7 @@ struct ImpScope {
     static uint32_t log(uint32_t slot, uint32_t w0, uint32_t w1, uint32_t w2) {
         stormhk::Scope* c = stormhk::Scope::cur();
         if (slot == 0x432cc) { w0 = c->r[0]; w1 = c->r[1]; }   // EndPaint is the tail jump: it gets the caller's own two words
-        if (slot == 0x432fc) w1 = 0;                           // property-name pointer (hookmask'd in the descriptor)
+        if (slot == 0x432fc || slot == 0x43298 || slot == 0x4328c) w1 = 0;   // Set/Get/RemovePropA name pointer (hookmask'd in the descriptor)
         return (uint32_t)c->e.h(slot, 0, 0, 0, 0, 0, w0, w1, w2);
     }
     explicit ImpScope(uint32_t* r, int nb = 2, const uint32_t* sc = kSc) : hk(r, 0, nb, sc) { g_storm_imp_hook = log; }
@@ -396,9 +401,14 @@ stock_white:
 // 1.13c Storm+0x21350: show a modal SDlg dialog and return its SDlg_EndResult.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_storm_21350(uint32_t* r) {
+    // blobs: 0 lg, 1 gvar flg (0x553B8, the SDlg-registered flag), 2 sc (hook returns: (rva, value) pairs, 0-terminated)
+    ImpScope impScope(r, 3, (const uint32_t*)(uintptr_t)r[18]);
+    const uint32_t keepFlg = g_453b8;
+    g_453b8 = *(const uint32_t*)(uintptr_t)r[16];
     HANDLE result = StormSub21350((HINSTANCE)(uintptr_t)r[0], (int*)(uintptr_t)r[1],
                                   (HWND)(uintptr_t)r[2], (void*)(uintptr_t)r[3],
                                   (LPARAM)(uintptr_t)r[5]);
+    g_453b8 = keepFlg;
     r[4] = (uint32_t)(uintptr_t)result;
 }
 
