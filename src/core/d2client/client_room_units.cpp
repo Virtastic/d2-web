@@ -13,6 +13,7 @@
 #include <Units/Units.h>
 
 extern "C" void d2common_sub_664b0(uint32_t pStruct);
+extern "C" void d2_dg_walked_drop(uint32_t type, uint32_t id);   // draw_grid_7a9f0.cpp
 
 namespace {
 constexpr uint32_t kMaxUnits = 2048, kMaxRooms = 512;
@@ -108,7 +109,14 @@ EMSCRIPTEN_KEEPALIVE int32_t d2c_cru_unit(uint32_t type, uint32_t id, int32_t cl
 }
 // End of the frame's unit set: units not seen leave their room and free their slot.
 EMSCRIPTEN_KEEPALIVE void d2c_cru_end() {
-    for (uint32_t i = 0; i < kMaxUnits; i++) if (g_um[i].used && !g_um[i].seen) { unlink((int32_t)i); g_um[i].used = 0; }
+    // A freed unit's +0xC8 bit7 (the draw's visibility pass, held by type and id in draw_grid_7a9f0.cpp) goes with it, unless
+    // another held unit (a critter of another class) carries the same type and id.
+    for (uint32_t i = 0; i < kMaxUnits; i++) if (g_um[i].used && !g_um[i].seen) {
+        unlink((int32_t)i); g_um[i].used = 0;
+        bool shared = false;
+        for (uint32_t j = 0; j < kMaxUnits && !shared; j++) shared = g_um[j].used && g_um[j].type == g_um[i].type && g_um[j].id == g_um[i].id;
+        if (!shared) d2_dg_walked_drop(g_um[i].type, g_um[i].id);
+    }
     g_walkFed = true;
 }
 EMSCRIPTEN_KEEPALIVE int32_t d2c_cru_room(int32_t level, int32_t tx, int32_t ty) { return roomFind(level, tx, ty, false); }

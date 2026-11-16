@@ -350,6 +350,8 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_stage_tile(uint32_t type, uint32_t flags, in
 }
 // A new game's client units have not been walked yet.
 EMSCRIPTEN_KEEPALIVE void d2_dg_walked_reset() { g_nWalked = 0; }
+// A freed client unit takes its +0xC8 with it: a unit the server sends again later is a new struct whose bit7 is clear.
+EMSCRIPTEN_KEEPALIVE void d2_dg_walked_drop(uint32_t type, uint32_t id) { const uint32_t i = walkedFind((uint64_t)type << 32 | id); if (i < g_nWalked) g_walked[i] = g_walked[--g_nWalked]; }
 // Returns the staged index, or -1 when the table is full (the caller then skips the unit's setters).
 EMSCRIPTEN_KEEPALIVE int32_t d2_dg_stage_unit(uint32_t unit, int32_t type, int32_t sx, int32_t sy, uint32_t a6180, uint32_t bit20, uint32_t bit7) {
     if (g_nUnits >= kMaxUnits) return -1;
