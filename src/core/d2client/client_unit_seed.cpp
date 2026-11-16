@@ -38,6 +38,7 @@ std::vector<Pending> g_pending;
 // A session tracks which monsters the server announces to the client (0xAC: those of the rooms near the hero). Only an
 // announced monster becomes a client unit and rolls its client room's seed, when it is announced; one the client is never
 // told of leaves the room seed alone (the room's first-sight critter rolls, +0x18370, then start from the untouched seed).
+// Objects likewise: one rolls when its 0x51 arrives (its room entering the near list), not at its server creation.
 bool g_tellMode = false;
 uint64_t key(uint32_t type, uint32_t id) { return uint64_t(type) << 32 | id; }
 }
@@ -105,7 +106,7 @@ void flush() {
     if (g_pending.empty()) return;
     std::vector<Pending> q;
     q.swap(g_pending);
-    if (g_tellMode) { std::vector<Pending> k; for (const Pending& p : q) if (p.type != UNIT_MONSTER || p.told) k.push_back(p); q.swap(k); }
+    if (g_tellMode) { std::vector<Pending> k; for (const Pending& p : q) if ((p.type != UNIT_MONSTER && p.type != UNIT_OBJECT) || p.told) k.push_back(p); q.swap(k); }
     auto rank = [](uint32_t t) { return t == UNIT_PLAYER ? 0 : t == UNIT_MONSTER ? 1 : 2; };
     std::vector<Pending> order;
     for (int r = 0; r < 3; ++r) {

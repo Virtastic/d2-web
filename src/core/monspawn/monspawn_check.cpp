@@ -1748,7 +1748,7 @@ static bool sessionClientHoldsRoom(D2ActiveRoomStrc* room) {
 }
 // a retail recording: which monsters retail's client holds. The capture's join announces the monsters within 40 subtiles (box) of the start (0xAC, D2CAPTURE_SESSION_RADIUS);
 // afterwards 0x4B1D0 diffs the hero room's near list: units of a room that enters it reach the client (0x9DC10 -> 0x7B0A0), those of a room that leaves it are removed.
-static std::set<uint32_t> g_heldMonsters, g_heldSeen; static std::set<D2DrlgRoomStrc*> g_heldNear; static D2UnitStrc* g_heldFor = nullptr; static int g_heldX0, g_heldY0;
+static std::set<uint32_t> g_heldMonsters, g_heldSeen, g_heldObjects, g_heldObjSeen; static std::set<D2DrlgRoomStrc*> g_heldNear; static D2UnitStrc* g_heldFor = nullptr; static int g_heldX0, g_heldY0;
 // the monster classes an 0xAC has built a unit of this game: the handler (0xAE420 -> 0x53C30) loads the class's palshift.dat table once, kept by class
 static std::set<int32_t> g_heldClasses;
 // the monsters the last near-list diff added: the client builds each from its 0xAC on that frame (0xA7780 -> 0x4D160)
@@ -1778,6 +1778,14 @@ static void sessionHeldStep() {
     // One that walks in from a room outside the near list is not new: retail sends it no 0xAC (a retail recording: Fallen walking in, 0x67/0x6D only), so the client never holds it.
     for (D2DrlgRoomStrc* r : cur) each(r, [&](D2UnitStrc* u) { if (g_heldSeen.insert(u->dwUnitId).second && g_heldNear.count(r) && g_heldMonsters.insert(u->dwUnitId).second) { g_heldClasses.insert((int32_t)u->dwClassId); d2client_unitseed::told(u); } });
     for (D2DrlgRoomStrc* r = h->pLevel ? h->pLevel->pFirstRoomEx : nullptr; r; r = r->pDrlgRoomNext) if (!cur.count(r)) each(r, [&](D2UnitStrc* u) { g_heldSeen.insert(u->dwUnitId); });
+    // Objects reach the client the same way (0x51 from the near-list diff, no join box: a retail recording sends every object of its
+    // start rooms at its first tick, and a loose boulder only when its room enters the near list, after that room's monsters' 0xAC);
+    // the client builds each when its 0x51 arrives (rolling its room's seed), one created in a held room at once.
+    if (first) { g_heldObjects.clear(); g_heldObjSeen.clear(); }
+    auto eachObj = [](D2DrlgRoomStrc* r, auto f) { if (r->pRoom) for (D2UnitStrc* u = r->pRoom->pUnitFirst; u; u = u->pRoomNext) if (u->dwUnitType == UNIT_OBJECT) f(u); };
+    for (D2DrlgRoomStrc* r : cur) eachObj(r, [&](D2UnitStrc* u) { const bool fresh = g_heldObjSeen.insert(u->dwUnitId).second; if ((first || !g_heldNear.count(r) || fresh) && g_heldObjects.insert(u->dwUnitId).second) d2client_unitseed::told(u); });
+    for (D2DrlgRoomStrc* r : g_heldNear) if (!cur.count(r)) eachObj(r, [&](D2UnitStrc* u) { g_heldObjects.erase(u->dwUnitId); });
+    for (D2DrlgRoomStrc* r = h->pLevel ? h->pLevel->pFirstRoomEx : nullptr; r; r = r->pDrlgRoomNext) if (!cur.count(r)) eachObj(r, [&](D2UnitStrc* u) { g_heldObjSeen.insert(u->dwUnitId); });
     g_heldNear = cur;
 }
 // a retail recording: retail's client holds the town's river rooms while the hero's level lies within two Levels.txt vis links of the town (Blood Moor 2 at one;
