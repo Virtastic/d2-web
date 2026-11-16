@@ -680,7 +680,15 @@ static uint32_t stageUnit(uint32_t rec) {
 static void unit666d0(uint32_t rec) { uint32_t u = stageUnit(rec); d2c_666d0(hostCall, 0, u, 2, 0); }
 // 1.13c D2Client+0x6BA90 (the flag-2 node, named "1BA90" in the walk env by mistake): 10036 (returns 0), the 10013 read, then per layer 10011 at the 6C490 position minus 2 (the 6A3D0 cull, flag 1).
 static void unit6ba90(uint32_t rec) {
-    stageUnit(rec); lo10494(g_hu[0], 0x92); gRec(10036, {}, g_lecx, g_ledx); rec10013();   // 10494(unit, 0x92) at 0x6fb1bac1, then 10036 and 10013 keep its leftover
+    stageUnit(rec);
+    // The step leaves at once when the unit's +0xC4 bit5 is set (0x6fb1bab5). The client's missile init (D2Client+0xB0170) sets that
+    // bit on every missile, so a missile's shadow node reads only the walk's own 10013.
+    if (g_hu[0] == 3) return;
+    lo10494(g_hu[0], 0x92);   // 10494(unit, 0x92) at 0x6fb1bac1
+    // Any other unit type above 2 leaves through 0x6AA30 and returns: 10494(unit, 0x92) again, 10175, 10350, then its one 10013 read.
+    // Its 6A3D0 cull finds no COF header on the gfx node and fails, so no 10011 follows.
+    if (g_hu[0] > 2) { lo10494(g_hu[0], 0x92); rec10013(); return; }
+    gRec(10036, {}, g_lecx, g_ledx); rec10013();   // 10036 and 10013 keep the state test's leftover
     int32_t x = g_hpx - g_uox - 2, y = g_hpy - g_uoy + 8;   // 6BA90: (cc418 - 9960) - 2 + X, (Y - 995c) + 8
     if (!cull6a3d0(x, y, 1)) return;
     uint32_t n = g_hhdr[0] & 0xff;
