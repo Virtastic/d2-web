@@ -48,6 +48,7 @@ extern "C" uint32_t d2_session_client_frame_now();
 extern "C" int32_t d2_client_play_sound_busy();
 extern "C" uint32_t d2_client_play_sound_now();
 extern "C" int32_t d2_client_play_sound_attack_roll(uint32_t id);
+extern "C" void d2_client_last_roll_mark();   // monster_face.cpp: the session's copy of D2Client+0x11C4C4
 
 static_assert(offsetof(D2MonStatsTxt, wMonStatsEx) == 0x18, "0x1510 reads MonStats +0x18");
 
@@ -140,8 +141,9 @@ uint32_t host(D2cCall* c) {
     case 0x23630: {
         const uint32_t m = c->s[0];
         g_sub = 0x23630; g_subCalls = 0; g_hitMode = (g.type == 1) ? (m == 3 || m == 0xD) : (m == 4 || m == 0x13);
-        uint32_t sfx = 0;
-        d2_client_23630_rule(unitAddr(), g.hit, (int32_t)m, (g.flags & F_HERO) ? unitAddr() : 0, d2_client_play_sound_now(), &sfx, &g_stamp, host);
+        uint32_t sfx = 0, stamp = 0xFFFFFFFFu;   // stays the marker on 0x23630's early returns (no 0x11C4C4 write)
+        d2_client_23630_rule(unitAddr(), g.hit, (int32_t)m, (g.flags & F_HERO) ? unitAddr() : 0, d2_client_play_sound_now(), &sfx, &stamp, host);
+        if (stamp != 0xFFFFFFFFu) { g_stamp = stamp; d2_client_last_roll_mark(); }
         g_sub = 0;
         return 0;
     }
@@ -180,15 +182,17 @@ uint32_t host(D2cCall* c) {
             return 0x10; };
         e.ord10265 = [](uint32_t) { return 0u; }; e.ord10024 = [](uint32_t) {}; e.exit_ = [](int32_t) {};
         e.g6fbc97f8 = d2_session_client_frame_now();
-        uint32_t last = 0; e.g6fbcc4c4 = &last;
+        uint32_t last = 0xFFFFFFFFu; e.g6fbcc4c4 = &last;   // the marker stays unless 0x22CA0 submitted (its 0x11C4C4 write)
         g_skillMode = c->edx;
         d2c_22ca0(&e, unitAddr(), c->edx, g_scratch);
+        if (last != 0xFFFFFFFFu) d2_client_last_roll_mark();
         return 0;
     }
     case 0x22D60: {
         // 1.13c D2Client+0x22D60 -> 0x221C0: the block row from the hit class's low nibble
         const uint32_t n = g.hit & 0xF;
         keep(n >= 1 && n <= 9 ? 0x18E : (n == 10 || n == 11) ? 0x191 : 0, K_BLOCK);
+        g_stamp = d2_client_play_sound_now(); d2_client_last_roll_mark();   // 0x22D60 writes unit+0x7C and 0x11C4C4
         return 0;
     }
     }

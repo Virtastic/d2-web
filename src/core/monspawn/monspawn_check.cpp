@@ -8176,6 +8176,7 @@ static void sessionClientMonsterFootsteps() {
     const int32_t fallback = lv ? d2client_session_level_material((uint32_t)(lv->dwSoundEnv & 0xff)) : 1;
     for (uint32_t id : ids)
         if (D2UnitStrc* u = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)id)) {
+            { extern void d2_client_monster_order_unit(uint32_t); d2_client_monster_order_unit(id); }   // 0x4F4A0 -> 0x4DC70: the unit's order (attack roll) first
             // 0x4F4A0 runs the unit's idle sound (0x237E0) just before its footstep check (0x23C00)
             if (auto it = g_sessionIdleRowsReady.find(id); it != g_sessionIdleRowsReady.end()) d2client_sound_unit_submit((int32_t)it->second);
             d2client_session_monster_footstep(id, (int32_t)u->dwClassId, u->dwAnimMode, (uint16_t)u->wAnimSpeed, (uint32_t)u->dwFrameCountPrecise,
@@ -8681,6 +8682,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             d2client_sound_stage_log();
             if (g_sessionClientDraws) d2client::weather::tick(*reinterpret_cast<d2client::weather::Seed*>(heroSeed), env);
         }
+        { extern void d2_client_monster_order_unit(uint32_t); d2_client_monster_order_unit(~0u); }   // orders of units the unit pass did not reach
         sessionClientMonsterIdlePass();
     }
     updateSessionSnapshot(); return 1;

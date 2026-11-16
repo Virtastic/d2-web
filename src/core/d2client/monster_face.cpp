@@ -62,13 +62,16 @@ static void face(D2UnitStrc* unit, int32_t selector, int32_t x, int32_t y, D2Uni
 // The monster attack-sound roll: the order handler (0x4DC70) sets the client unit's mode and calls 0x24490, which
 // for a monster remaps the mode through the MonSounds CvtMo slots and sends A1/A2 (4/5) to 0x242B0. 0x242B0 draws
 // one value from the client hero seed (r = lo32 % 100) when the attack sound is set, gated for Prb < 100 by the
-// 15-tick last-roll stamp (D2Client+0x11C4C4) and the busy test. The draw happens as the order arrives, in the
-// frame the server sent it and before that frame's weather pass. The shell plays the sound; it reads r here per unit.
-// ponytail: 0x87BD0 (BUSY, a monster sound still playing) is the sound engine's state, not held here: read as idle.
+// 15-tick last-roll stamp (D2Client+0x11C4C4) and the busy test. The draw happens in the unit pass (0x4F4A0), in the
+// frame the server sent the order, before the unit's idle sound and footstep. The shell plays the sound; it reads r here per unit.
+// 0x87BD0 (the busy test) reads idle: retail's recorded calls all return 0.
+// D2Client+0x11C4C4 starts at 0 (0x5EF90 clears it); each writer the play path runs stamps it through
+// d2_client_last_roll_mark (0x23630 struck/death, 0x22CA0 skill, 0x22D60 block), as does a played attack.
 extern "C" uint32_t d2_session_client_rand(uint32_t n);
 extern "C" void d2_client_monster_sfx_stamp(uint32_t id, uint32_t now);
+extern "C" uint32_t d2_session_client_frame_now();
 namespace {
-uint32_t g_frame = 0, g_lastRoll = 0xFFFFFF00u;
+uint32_t g_frame = 0, g_lastRoll = 0;
 struct Roll { uint32_t id, frame; int32_t r; };
 std::vector<Roll> g_rolls;
 // 1.13c D2Client+0x22A70: the unit's MonSounds record.
@@ -107,8 +110,11 @@ void attackEntry(D2UnitStrc* u, int32_t mode) {
 }
 // The struck-unit sound (a client mode change into GetHit/knockback or death): its normal path
 // stamps the unit's sound tick and the shared last-roll tick with the frame the change arrives in.
-extern "C" void d2_client_monster_hit_stamp(uint32_t id, uint32_t frame) { g_lastRoll = frame; d2_client_monster_sfx_stamp(id, frame); }
-extern "C" void d2_client_attack_roll_reset() { g_frame = 0; g_lastRoll = 0xFFFFFF00u; g_rolls.clear(); }
+extern "C" void d2_client_monster_hit_stamp(uint32_t id, uint32_t frame) { d2_client_monster_sfx_stamp(id, frame); }   // 0x11C4C4: 0x23630's own write
+extern "C" void d2_client_attack_roll_reset() { g_frame = 0; g_lastRoll = 0; g_rolls.clear(); }
+// A D2Client+0x11C4C4 write in the client frame being run: the hit pass runs before this frame's order roll steps g_frame,
+// the rolls after it; both are the session client frame + 1.
+extern "C" void d2_client_last_roll_mark() { g_lastRoll = d2_session_client_frame_now() + 1; }
 // The roll 0x242B0 drew for this monster's latest attack entry, oldest first; -1 when none is pending.
 extern "C" __attribute__((used, visibility("default"))) int d2_client_attack_roll_take(uint32_t id) {
     for (size_t i = 0; i < g_rolls.size(); ++i)
@@ -123,15 +129,22 @@ std::vector<Order> g_orders;
 extern "C" void d2_client_monster_order_face(D2UnitStrc* unit, int32_t selector, int32_t x, int32_t y, D2UnitStrc* target) {
     if (!unit || !unit->pGame) return;
     g_orders.push_back({ unit->pGame, unit->dwUnitType, unit->dwUnitId, selector, x, y,
-                         target ? target->dwUnitType : 0u, target ? target->dwUnitId : 0u, target != nullptr, int32_t(unit->dwAnimMode), false });
+                         target ? target->dwUnitType : 0u, target ? target->dwUnitId : 0u, target != nullptr, UNITS_GetAnimOrSeqMode(unit), false });
 }
+// The order's mode is what 0x24490 reads when the handler's tail (0x2A6C0) calls it with bUseGiven = 0: 0x223D0, D2Common
+// #10175 (UNITS_GetAnimOrSeqMode), so a sequence (mode SQ, the 0x4C/0x4D skill actions) enters with its current frame's mode.
 // The previous frame's orders, in arrival order.
 // This frame's orders, at the client frame's tail: the attack-sound roll as each arrives (before the frame's weather).
 extern "C" void d2_client_monster_order_roll() {
     ++g_frame;
     while (!g_rolls.empty() && g_frame - g_rolls.front().frame > 4) g_rolls.erase(g_rolls.begin());
+}
+// 0x4F4A0 (the unit pass, 0x2B1E0) applies a monster's pending order before its idle sound (0x237E0) and footstep
+// (0x23C00): the attack entry rolls there, in the client unit table's order. id = ~0u: the orders whose unit the
+// pass did not reach.
+extern "C" void d2_client_monster_order_unit(uint32_t id) {
     for (Order& o : g_orders) {
-        if (o.rolled) continue;
+        if (o.rolled || (id != ~0u && (o.type != 1u || o.id != id))) continue;
         o.rolled = true;
         if (D2UnitStrc* u = SUNIT_GetServerUnit(o.game, int32_t(o.type), int32_t(o.id))) attackEntry(u, o.mode);
     }

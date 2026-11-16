@@ -21,6 +21,7 @@
 #include <Path/Path.h>
 #include <Units/Units.h>
 #include "../d2moo/include/D2Game/UNIT/SUnit.h"
+#include "sound_unit_refs.h"
 
 namespace d2client_unitseed { uint32_t* unit_seed(const D2GameStrc* game, uint32_t type, uint32_t id); }
 namespace d2client_clmissile { void spawn(D2UnitStrc* source, int32_t missileId, int32_t level, int32_t tx, int32_t ty); }
@@ -103,6 +104,9 @@ extern "C" void d2_client_monster_hit_flush() {
         } else {
             if (v) g_life[key(e.type, e.id)] = v;
             bleed(u, 1, u->dwAnimMode, 1);
+            // Retail then calls 0x24490(unit, 0xD, given) at 0x6fafe1c4, a monster's struck sound (0x23630). Not
+            // played yet: it waits on the client monster footstep matching retail's, which it would otherwise
+            // push out of step.
         }
     }
 }
