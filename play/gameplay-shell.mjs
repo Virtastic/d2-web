@@ -3153,6 +3153,7 @@ function drainUnitSounds() {
   // D35: client-side event sounds (pickup, gold, drop, footstep) run every tick, not only on ticks the engine queued a sound.
   eventSounds?.update(snapshot, readAdvancement()?.level);
   drainAmbientSounds();   // the ambient module is fed by the engine or by the realm's area audio, never both
+  for (let r; (r = Module._d2_client_4bc80_take_sound?.() | 0) > 0;) if (enginePlays) unitSounds.playRow(r, { source: 'transaction', unitType: -1 }).catch(() => {});   // 0x4BC80: a 0x2A reply of result 1 (a sale) plays item_gold, no unit
   if (!enginePlays) return;
   const cap = 32; if (!soundBuf) soundBuf = Number(Module.ccall('malloc', 'bigint', ['number'], [cap * 28]));
   const n = Module.ccall('d2_session_take_sounds', 'number', ['bigint', 'number'], [BigInt(soundBuf), cap * 7]);
