@@ -644,13 +644,18 @@ void __fastcall D2GAME_PACKETS_SendPacket0x29_6FC3F370(D2ClientStrc* pClient, D2
 // 1.13c D2Game+0x8AC90: 15-byte transaction reply {header, action, result, 4 bytes retail leaves unset (zero here), item id, gold}
 // The last 0x2A transaction reply's result byte, for the client's 0x4B5D0 refusal box (-1: none since read).
 int32_t g_d2LastTransactionResult = -1;
-void __fastcall D2GAME_SendPacket0x2A_6FC3F3B0(D2ClientStrc* pClient, char nHeader, char result,
-    int32_t gold, int32_t itemId, char action) {
+void D2GAME_SendPacket0x2A_Stack(D2ClientStrc* pClient, char nHeader, char result,
+    int32_t gold, int32_t itemId, char action, uint32_t nStackBytes) {
     g_d2LastTransactionResult = (uint8_t)result;
     D2GSPacketSrv2A packet = {};
     packet.nHeader = nHeader; packet.unk0x01 = action; packet.unk0x02 = result;
+    packet.unk0x03 = nStackBytes;
     packet.unk0x07 = itemId; packet.unk0x0B = gold;
     if (pClient) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+}
+void __fastcall D2GAME_SendPacket0x2A_6FC3F3B0(D2ClientStrc* pClient, char nHeader, char result,
+    int32_t gold, int32_t itemId, char action) {
+    D2GAME_SendPacket0x2A_Stack(pClient, nHeader, result, gold, itemId, action, 0);
 }
 // 1.13c D2Game+0x8B010 (D57): the item stat update, retail's bytes: {0x3E, size, 32-byte bit payload}; guid, flag, 9-bit stat,
 // value, layer, each width-prefixed (8/16/32 bits for the guid and value, 8/16 for the layer). A stack merge sends one.

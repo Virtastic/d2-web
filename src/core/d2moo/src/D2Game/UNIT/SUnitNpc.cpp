@@ -1462,8 +1462,9 @@ int32_t __fastcall sub_6FCC88B0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
         L117_loop:
             sub_6FCC7E20(pGame, pNpc, pItem, pPlayer, nTab);
             ITEMS_SetItemFlag(pDupe, IFLAG_TARGET, 1);   // 1.13c
-            D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 0,
-                STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), pDupe->dwUnitId, 4);   // 1.13c: type 4, real id
+            D2GAME_SendPacket0x2A_Stack(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 0,
+                STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), pDupe->dwUnitId, 4,
+                D2GAME_StoreBuyReplyStackBytes(pDupe->dwUnitId));   // 1.13c: type 4, real id
             nBought = 1;
         }
 
@@ -1489,8 +1490,9 @@ int32_t __fastcall sub_6FCC88B0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
         }
         sub_6FCC7E20(pGame, pNpc, pItem, pPlayer, nTab);
         ITEMS_SetItemFlag(pDupe, IFLAG_TARGET, 1);   // 1.13c
-        D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 0,
-            STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), pDupe->dwUnitId, 4);   // 1.13c: type 4, real id
+        D2GAME_SendPacket0x2A_Stack(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 0,
+            STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), pDupe->dwUnitId, 4,
+            D2GAME_StoreBuyReplyStackBytes(pDupe->dwUnitId));   // 1.13c: type 4, real id (one send block, 0x6fcdeca7)
         return 0;
     }
 

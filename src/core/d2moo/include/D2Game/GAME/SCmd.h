@@ -203,6 +203,11 @@ void __fastcall D2GAME_PACKETS_SendPacket0x29_6FC3F370(D2ClientStrc* pClient, D2
 void __fastcall sub_6FC3F380(D2ClientStrc* pClient, D2GSPacketSrv5D* pPacket);
 //D2Game.0x6FC3F3B0
 void __fastcall D2GAME_SendPacket0x2A_6FC3F3B0(D2ClientStrc* pClient, char a2, char a3, int32_t a4, int32_t a5, char a6);
+// The same reply with bytes 3..6 set: retail's builder never writes them, so they carry what the caller's stack held
+// there. The store buy (D2Game 0x6fcdeca7, after D2Common 10973 pushed EBX and EDI) leaves EDI's high byte -- the item
+// guid's top byte -- then EBX's low three bytes, EBX being 1 from the successful 0x6FCF76A0 call.
+void D2GAME_SendPacket0x2A_Stack(D2ClientStrc* pClient, char a2, char a3, int32_t a4, int32_t a5, char a6, uint32_t nStackBytes);
+inline uint32_t D2GAME_StoreBuyReplyStackBytes(uint32_t nItemGuid) { return (nItemGuid >> 24) | (1u << 8); }
 //D2Game.0x6FC3F3F0
 void __fastcall sub_6FC3F3F0(D2ClientStrc* pClient, D2GSPacketSrv2C* pPacket);
 //D2Game.0x6FC3F410
