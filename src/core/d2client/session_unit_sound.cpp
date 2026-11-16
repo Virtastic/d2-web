@@ -133,7 +133,36 @@ void d2client_session_event_packets(uint32_t* heroSeed, uint32_t cycle, uint32_t
         d2client_sound_unit_submit_now(row, 1);
     }
 }
-void d2client_session_unit_sound_reset() { g_obj.clear(); g_plr.clear(); g_ev.clear(); d2client_9cad0_reset(); }
+// The client units' state bits (D2Common #10494 / #10945 on the client unit), as the 0xA7/0xA8/0xAA/0xA9 packets set them.
+#include "../d2moo/include/D2DataTbls.h"
+namespace { std::set<uint64_t> g_clientStates; uint64_t stateKey(const D2UnitStrc* u, int32_t s) { return uint64_t(u->dwUnitType) << 48 | uint64_t(u->dwUnitId) << 16 | uint32_t(s & 0xFFFF); } }
+// 1.13c D2Client+0x73760 (from the 0xA7/0xA8/0xAA handlers 0xADEB0/0xADD70/0xADB90) and +0x73630 (from the 0xA9 handler 0xADD30), their
+// sounds: a state the unit did not hold plays its States.txt onsound (+0x26, >= 0); a held state going off plays its offsound (+0x28).
+// A dead unit (monster mode 0xC, player 0x11) taking a state whose +0x14 byte has bit 0x80 only sets the bit. The 0x88A70 submit runs
+// under the packet dispatch, before the frame's 0x5F020: logged at once.
+extern "C" void d2_client_state_packet(const D2UnitStrc* u, int32_t s, int32_t on) {
+    if (!u || !d2client_sound_armed()) return;
+    const D2StatesTxt* t = DATATBLS_GetStatesTxtRecord(s);
+    if (!t) return;
+    const uint64_t k = stateKey(u, s);
+    const bool held = g_clientStates.count(k) != 0;
+    if (on) {
+        const bool dead = (u->dwUnitType == 1 && u->dwAnimMode == 0xC) || (u->dwUnitType == 0 && u->dwAnimMode == 0x11);
+        if (!(dead && (reinterpret_cast<const uint8_t*>(t)[0x14] & 0x80)) && !held && int16_t(t->wOnSound) >= 0)
+            d2client_sound_unit_submit_now(int16_t(t->wOnSound), 0);
+        g_clientStates.insert(k);
+    } else {
+        if (held && int16_t(t->wOffSound) >= 0) d2client_sound_unit_submit_now(int16_t(t->wOffSound), 0);
+        g_clientStates.erase(k);
+    }
+}
+// A 0x0A remove: the client frees the unit, its state bits with it.
+extern "C" void d2_client_unit_remove_packet(const D2UnitStrc* u) {
+    if (!u) return;
+    const uint64_t lo = stateKey(u, 0);
+    g_clientStates.erase(g_clientStates.lower_bound(lo), g_clientStates.lower_bound(lo + 0x10000));
+}
+void d2client_session_unit_sound_reset() { g_obj.clear(); g_plr.clear(); g_ev.clear(); g_clientStates.clear(); d2client_9cad0_reset(); }
 // An item 0x9C action 0 (added to the ground, mode 3): the client's 0x84BB0 -> 0x827C0 plays the drop flippy (row 216), then the item's
 // own drop sound (Items wDropSound) when it has one.
 #include "../d2moo/include/DataTbls/ItemsTbls.h"

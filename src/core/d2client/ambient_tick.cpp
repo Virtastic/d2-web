@@ -42,6 +42,7 @@ struct Amb final : Services {
     void f88770(U, U) override {}
     void f88230(U, U, U, U, U) override {}
     U f88a70(U row, U kind) override {
+        if (int32_t(row) < 1) return 0;   // 0x88A70's first test: a row below 1 takes no record
         holdNow = Now;
         const bool full = kind == 2 && live() >= kPool;   // a one-shot needs a record and the pool has none left
         if (qn < 256) { q[qn * 2] = int32_t(row); q[qn * 2 + 1] = full ? 3 : int32_t(kind); ++qn; }   // 3 = recorded, rejected

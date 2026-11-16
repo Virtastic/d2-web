@@ -112,9 +112,9 @@ void attackEntry(D2UnitStrc* u, int32_t mode) {
 // stamps the unit's sound tick and the shared last-roll tick with the frame the change arrives in.
 extern "C" void d2_client_monster_hit_stamp(uint32_t id, uint32_t frame) { d2_client_monster_sfx_stamp(id, frame); }   // 0x11C4C4: 0x23630's own write
 extern "C" void d2_client_attack_roll_reset() { g_frame = 0; g_lastRoll = 0; g_rolls.clear(); }
-// A D2Client+0x11C4C4 write in the client frame being run: the hit pass runs before this frame's order roll steps g_frame,
-// the rolls after it; both are the session client frame + 1.
-extern "C" void d2_client_last_roll_mark() { g_lastRoll = d2_session_client_frame_now() + 1; }
+// A D2Client+0x11C4C4 write in the client frame being run, whether it comes from the frame's packets or its unit pass.
+extern "C" uint32_t d2_session_client_frame_run();
+extern "C" void d2_client_last_roll_mark() { g_lastRoll = d2_session_client_frame_run(); }
 // The roll 0x242B0 drew for this monster's latest attack entry, oldest first; -1 when none is pending.
 extern "C" __attribute__((used, visibility("default"))) int d2_client_attack_roll_take(uint32_t id) {
     for (size_t i = 0; i < g_rolls.size(); ++i)

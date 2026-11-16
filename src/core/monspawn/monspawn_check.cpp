@@ -1212,6 +1212,9 @@ static std::unordered_set<const D2DrlgRoomStrc*> g_sessionReleasedRooms;   // ro
 static void sessionClientMonsterModeReset();
 static uint32_t g_sessionClientFrame = 0;   // the client frames run since the session began (the frame tail counts them)
 extern "C" uint32_t d2_session_client_frame_now() { return g_sessionClientFrame; }
+// The client frame being run: the frame's packets and its tail before the counter steps read frame + 1, its unit pass after it the counter itself.
+static bool g_sessionClientFrameStepped = false;
+extern "C" uint32_t d2_session_client_frame_run() { return g_sessionClientFrame + (g_sessionClientFrameStepped ? 0u : 1u); }
 // The client frame from which the recorded rig's screen (D2Client+0xDBC48/0xDBC4C) reads 800x600; before it, 640x480.
 // Rigs differ: some switch at their 13th frame, others hold 640x480 for the whole recording (every rain line they draw
 // stays inside 640x480). The replay names its rig; 0 = never switch.
@@ -8263,11 +8266,13 @@ static std::unordered_map<uint32_t, uint32_t> g_sessionIdleRows, g_sessionIdleRo
 // reaches the struck-unit sound, which stamps the unit before the frame's attack rolls.
 extern "C" void d2_client_monster_hit_stamp(uint32_t id, uint32_t frame);
 static std::unordered_map<uint32_t, uint32_t> g_sessionClientMonsterMode;
+static std::vector<std::pair<uint32_t, uint32_t>> g_sessionClientMonsterHits;   // (id, mode) mode changes awaiting the unit pass
+static void sessionClientMonsterHitSounds(uint32_t id);
 void d2client_session_footstep_reset(); int32_t d2client_session_level_material(uint32_t soundEnv);   // session_footstep.cpp (C linkage)
 void d2client_session_player_footstep(uint32_t serverMode, uint32_t cls, int32_t inTown, int32_t floor, uint32_t now, int32_t staminaZero, void (*rate)(uint32_t, uint32_t*, uint32_t*));
 void d2client_session_monster_footstep(uint32_t id, int32_t cls, uint32_t serverMode, uint32_t step, uint32_t total, int32_t floor, uint32_t now, const void* game);
 extern "C" int32_t d2_session_floor_class(int32_t unitType, int32_t unitId, int32_t fallback);
-static void sessionClientMonsterModeReset() { g_sessionClientMonsterMode.clear(); g_sessionIdleRows.clear(); g_sessionIdleRowsReady.clear(); d2client_session_unit_sound_reset(); d2client_session_footstep_reset(); d2client_critter::reset(); }
+static void sessionClientMonsterModeReset() { g_sessionClientMonsterMode.clear(); g_sessionClientMonsterHits.clear();g_sessionIdleRows.clear(); g_sessionIdleRowsReady.clear(); d2client_session_unit_sound_reset(); d2client_session_footstep_reset(); d2client_critter::reset(); }
 // The client player unit's rate in `mode` (D2Common 0x33110 on the hero's own records): the velocity percent is the hero's less
 // the run bonus the server unit carries while it runs, plus the bonus the client unit posts itself when it enters run
 // (0x32E10: 100 * RunSpeed / WalkSpeed - 100). The hero's path, anim fields and record are put back untouched.
@@ -8315,6 +8320,7 @@ static void sessionClientMonsterFootsteps(bool newOnly = false) {
     for (uint32_t id : ids)
         if (D2UnitStrc* u = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)id)) {
             { extern void d2_client_monster_order_unit(uint32_t); d2_client_monster_order_unit(id); }   // 0x4F4A0 -> 0x4DC70: the unit's order (attack roll) first
+            sessionClientMonsterHitSounds(id);
             // 0x4F4A0 runs the unit's idle sound (0x237E0) just before its footstep check (0x23C00)
             if (auto it = g_sessionIdleRowsReady.find(id); it != g_sessionIdleRowsReady.end()) d2client_sound_unit_submit((int32_t)it->second);
             d2client_session_monster_footstep(id, (int32_t)u->dwClassId, u->dwAnimMode, (uint16_t)u->wAnimSpeed, (uint32_t)u->dwFrameCountPrecise,
@@ -8345,7 +8351,8 @@ static void sessionClientSoundUnits() {
     for (const D2SndUnit& s : v) o.push_back(s);
     d2client_session_objects(o.data(), (uint32_t)o.size());   // 1.13c D2Client+0x237E0 object branch
     sessionClientPlayerFootstep();   // 0x2B1E0 -> 0x1C150 -> 0x23C00 on the local player's client unit
-    sessionClientMonsterFootsteps();   // 0xA8110 -> 0x2B1E0 -> 0x4F4A0 -> 0x23C00 on the held monsters' client units
+    d2client_session_player_packets();   // the hero's 0x0D modes reach 0x24490 after its frame's footstep check, before the monsters' pass
+    sessionClientMonsterFootsteps();  // 0xA8110 -> 0x2B1E0 -> 0x4F4A0 -> 0x23C00 on the held monsters' client units
 }
 static void sessionClientMonsterHitPass(uint32_t frame) {
     std::unordered_map<uint32_t, uint32_t> now;
@@ -8357,11 +8364,19 @@ static void sessionClientMonsterHitPass(uint32_t frame) {
         auto it = g_sessionClientMonsterMode.find(id);
         if (it != g_sessionClientMonsterMode.end() && it->second != m && (m == 3 || m == 13 || m == 0 || m == 12)) {
             d2_client_monster_hit_stamp(id, frame);
-            d2client_session_unit_mode(u, m, -1, false);   // 1.13c D2Client+0x24490: the struck/dying unit's sounds
+            g_sessionClientMonsterHits.push_back({ id, m });   // its 0x24490 sounds come in the unit pass, after the unit's order
         }
     }
     g_sessionClientMonsterMode.swap(now);
-    d2client_session_player_packets();   // the hero's 0x0D mode packets (its hit sound: 0x22CA0 hero branch)
+}
+// 1.13c D2Client+0x24490: the struck/dying unit's sounds, from 0x4F4A0 on its client unit after the unit's order (id = ~0u: the
+// units the unit pass did not reach).
+static void sessionClientMonsterHitSounds(uint32_t id) {
+    std::vector<std::pair<uint32_t, uint32_t>> q;
+    for (auto it = g_sessionClientMonsterHits.begin(); it != g_sessionClientMonsterHits.end();)
+        if (id == ~0u || it->first == id) { q.push_back(*it); it = g_sessionClientMonsterHits.erase(it); } else ++it;
+    for (const auto& h : q)
+        if (D2UnitStrc* u = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)h.first)) d2client_session_unit_mode(u, h.second, -1, false);
 }
 static void sessionClientMonsterIdlePass() {
     std::vector<uint32_t> ids(g_heldMonsters.begin(), g_heldMonsters.end());
@@ -8793,11 +8808,11 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         }
         sessionClientMonsterHitPass(g_sessionClientFrame + 1);
         { extern void d2_client_monster_order_roll(); d2_client_monster_order_roll(); extern void d2_client_monster_hit_flush(uint32_t); d2_client_monster_hit_flush(g_sessionClientFrame + 1); }   // 1.13c D2Client+0x4C500 (blood)
-        ++g_sessionClientFrame;
+        ++g_sessionClientFrame; g_sessionClientFrameStepped = true;
         // 1.13c D2Client+0x5F020 (the sound pump, its 0x4F860 ambient first) runs before the frame 0x44A80, whose 0x440C0 room pass
         // draws the light spots from the same hero seed: the room pass follows the ambient tick.
         auto roomPass = [] { sessionClientRoomPass(); d2client_critter::tick(g_targetPlayer, g_sessionClientFrame); };
-        if (g_currentLevel < 0) roomPass();
+        if (g_currentLevel < 0) { d2client_session_player_packets(); roomPass(); }
         if (g_currentLevel >= 0) {
             // 1.13c D2Client+0x81340: the weather pass draws from the client hero seed. A session that never mirrored the client map has no
             // client unit: its seed is the one retail's first 0x4F860 call reads (a retail recording capture; the derivation is not recovered).
@@ -8829,7 +8844,9 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             if (g_sessionClientDraws) d2client::weather::tick(*reinterpret_cast<d2client::weather::Seed*>(heroSeed), env);
         }
         { extern void d2_client_monster_order_unit(uint32_t); d2_client_monster_order_unit(~0u); }   // orders of units the unit pass did not reach
+        sessionClientMonsterHitSounds(~0u);
         sessionClientMonsterIdlePass();
+        g_sessionClientFrameStepped = false;
     }
     updateSessionSnapshot(); return 1;
 }

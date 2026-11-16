@@ -177,6 +177,8 @@ void __fastcall D2GAME_SUNITMSG_FirstFn_6FCC5520(D2GameStrc* pGame, D2UnitStrc* 
 
 //D2Game.0x6FCC58E0
 // 1.13c D2Game+0x7A940 (checked against decompile, no delta)
+extern "C" void d2_client_state_packet(const D2UnitStrc* pUnit, int32_t nState, int32_t bOn);   // d2client/session_unit_sound.cpp (replay only)
+extern "C" void d2_client_unit_remove_packet(const D2UnitStrc* pUnit);                         // d2client/session_unit_sound.cpp (replay only)
 void __fastcall D2GAME_STATES_SendUnitStates_6FCC58E0(D2UnitStrc* pUnit, D2ClientStrc* pClient)
 {
     D2BitBufferStrc bitBuffer = {};
@@ -210,6 +212,7 @@ void __fastcall D2GAME_STATES_SendUnitStates_6FCC58E0(D2UnitStrc* pUnit, D2Clien
             if (pStatesTxtRecord && !(pStatesTxtRecord->nStateFlags[0] & gdwBitMasks[0]))
             {
                 BITMANIP_Write(&bitBuffer, nStateId, 8);
+                d2_client_state_packet(pUnit, nStateId, 1);   // the client's 0xAA handler runs D2Client+0x73760 per state
 
                 D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, nStateId);
                 if (pStatList)
@@ -304,6 +307,7 @@ void __fastcall D2GAME_STATES_SendUnitStateUpdates_6FCC5BE0(D2UnitStrc* pUnit, D
             D2StatesTxt* pStatesTxtRecord = SKILLS_GetStatesTxtRecord(nStateId);
             if (pStatesTxtRecord && !(pStatesTxtRecord->nStateFlags[0] & gdwBitMasks[0]))
             {
+                d2_client_state_packet(pUnit, nStateId, STATES_CheckState(pUnit, nStateId) ? 1 : 0);   // one 0xA8/0xA7 (D2Client+0x73760) or 0xA9 (0x73630)
                 if (STATES_CheckState(pUnit, nStateId))
                 {
                     D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, nStateId);
@@ -419,6 +423,7 @@ void __fastcall sub_6FCC5F20(D2UnitStrc* pItem, D2ClientStrc* pClient)
 //D2Game.0x6FCC5F80
 void __fastcall D2GAME_PACKETS_SendPacket0x0A_RemoveObject_6FCC5F80(D2UnitStrc* pUnit, D2ClientStrc* pClient)
 {
+    d2_client_unit_remove_packet(pUnit);   // the client frees its unit, states and all
     D2GAME_PACKETS_SendPacket0x0A_RemoveObject_6FC3D3A0(pClient, 0x0A, pUnit->dwUnitType, pUnit->dwUnitId);
 }
 
