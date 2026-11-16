@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
 import http from 'node:http';
@@ -60,13 +60,19 @@ const create = (id) => mcpFrame(0x03, Buffer.concat([Buffer.from([id, 0]), Buffe
 const gamelogon = (name) => { const b = Buffer.alloc(37); b[0] = 0x68; b.write(name, 21, 'latin1'); return b; };
 const tick = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// A test that throws before its done() would leave three servers listening and the file would never exit
+// (a hung landing under load): whatever a test left open is closed when the file ends.
+const open = new Set();
+after(() => { for (const t of [...open]) t.done(); });
 async function start(opts = {}) {
   const r = await realm();
   const bridge = createWsBridge({ listen: 0, targets: {
     mcp: { host: '127.0.0.1', port: r.mcp.address().port }, d2gs: { host: '127.0.0.1', port: r.d2gs.address().port } },
   graceSec: 0.05, pingSec: 0, ...opts });
   await once(bridge, 'listening');
-  return { port: bridge.address().port, r, done() { socks.splice(0).forEach((x) => x.destroy()); bridge.close(); bridge.closeAllConnections?.(); r.close(); } };
+  const t = { port: bridge.address().port, r, done() { open.delete(t); socks.splice(0).forEach((x) => x.destroy()); bridge.close(); bridge.closeAllConnections?.(); r.close(); } };
+  open.add(t);
+  return t;
 }
 async function login(port, name) {
   const m = await ws(port, '/mcp');
@@ -152,11 +158,13 @@ test('a browser that goes silent is dropped even while the realm keeps talking',
 });
 
 test('a browser that answers pings is kept', async () => {
-  const t = await start({ pingSec: 0.04 });
+  // the dead-peer cut is 2.5 ping periods of silence: 0.2 s pings leave 500 ms, so a loaded box (a landing runs
+  // 16 test files at once) cannot starve a live browser's pong past it
+  const t = await start({ pingSec: 0.2 });
   const a = await ws(t.port, '/d2gs');
   a.sock.on('data', () => { for (const f of a.got.splice(0)) if (f.opcode === 0x9) send(a.sock, f.data, 0xa); });
   const iv = setInterval(() => { for (const f of a.got.splice(0)) if (f.opcode === 0x9) send(a.sock, Buffer.alloc(0), 0xa); }, 10);
-  await tick(400);
+  await tick(1200);
   clearInterval(iv);
   assert.equal(t.r.seen.d2gsSockets[0].destroyed, false);
   t.done();
