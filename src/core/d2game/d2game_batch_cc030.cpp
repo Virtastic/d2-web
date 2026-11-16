@@ -231,17 +231,18 @@ EMSCRIPTEN_KEEPALIVE void d2_game_e02a0(void* game, void* unit)
         headPtr = (uint8_t*)game + kUnitListHead[type] + (rd32(unit, 0x0C) & 0x7F) * 4;
     }
 
-    void* node = rdptr(headPtr, 0);
+    // the list links are retail's 32-bit words: the bucket heads are 4 bytes apart, so a host-width read takes in the next head
+    void* node = (void*)(uintptr_t)rd32(headPtr, 0);
     void* previous = nullptr;
     while (node != nullptr && node != unit) {
         previous = node;
-        node = rdptr(node, 0xE4);
+        node = (void*)(uintptr_t)rd32(node, 0xE4);
     }
     if (node == nullptr) return;
     if (previous == nullptr) {
-        wr32(headPtr, 0, (uint32_t)(uintptr_t)rdptr(node, 0xE4));
+        wr32(headPtr, 0, rd32(node, 0xE4));
     } else {
-        wr32(previous, 0xE4, (uint32_t)(uintptr_t)rdptr(node, 0xE4));
+        wr32(previous, 0xE4, rd32(node, 0xE4));
     }
 }
 

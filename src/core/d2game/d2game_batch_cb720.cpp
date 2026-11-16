@@ -77,7 +77,8 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_cb720(void* unit, const D2GameBatchCB720En
     const int32_t count = (int32_t)rd32(env->dataTables, 0xBC8);
     if ((int32_t)uVar2 < 0 || count <= (int32_t)uVar2) return uVar2 & 0xFFFFFF00u;
 
-    const uintptr_t record = (uintptr_t)rdptr(env->dataTables, 0xBC4) + (uintptr_t)(uVar2 * 0xC4);
+    // the array pointer is retail's 32-bit word; its count sits right behind it at +0xBC8
+    const uintptr_t record = (uintptr_t)rd32(env->dataTables, 0xBC4) + (uintptr_t)(uVar2 * 0xC4);
     if (record == 0) return 0;
 
     int32_t div = (int32_t)rd8((const void*)record, 0x3A) * 0x19;

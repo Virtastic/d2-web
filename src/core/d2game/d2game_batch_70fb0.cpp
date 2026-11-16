@@ -182,7 +182,8 @@ struct D2Game76570Env {
 };
 // 1.13c D2Game+0x76570: ECX=game, EDX=unit. If the timer at unit+0xA4 has expired (<= game+0xA8) clear it
 // and flag 0x100, else reschedule.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_76570(void* game, int32_t* unit, const D2Game76570Env* e) {
+// (Named _env: d2_fn_d2game_76570 is the FN probe's export, src/core/fn/d2game_76570.cpp over d2game_76570.h.)
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_76570_env(void* game, int32_t* unit, const D2Game76570Env* e) {
     if (!unit || unit[0x29] == 0) return;
     int32_t v = unit[0x29];
     uint32_t t = e->a11067(v);

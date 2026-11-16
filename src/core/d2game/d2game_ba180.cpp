@@ -17,7 +17,7 @@ uint32_t g_ba180(uint32_t game, uint32_t unit, const GBA180Env& env)
     const uint32_t list = rd32(pd + 0x10 + *(const uint8_t*)(uintptr_t)(game + 0x6D) * 4);
     if (env.stat(list, 0x19, 0xD) != 0 && unit != 0 && rd32(unit + 0x80) != 0 && rd32(unit) == 0) {
         const uint32_t id = env.unitId(unit);
-        if ((id & 0xFFFF) != 0xFFFF) env.notify(id, 0, game, 0x6FC20000u + 0xB94F0);
+        if ((id & 0xFFFF) != 0xFFFF) env.notify(id, 0, game, 0xB2000000u | 0xB94F0);
     }
     return 0;
 }

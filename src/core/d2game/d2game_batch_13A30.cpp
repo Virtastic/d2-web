@@ -165,25 +165,26 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E73C0(void* game, void* unit, 
     if (!game) return;
     void* p = (void*)(uintptr_t)rd32(game, 0x10F4);
     if (!p) return;
-    uint8_t* node = (uint8_t*)rdptr(p, 0);
+    // retail's pointers are 32-bit: the dword after each one is the next field, not a high half
+    uint8_t* node = (uint8_t*)(uintptr_t)rd32(p, 0);
     if (!node) return;
     while (rd32(node, 0) != 0x13) {
-        node = (uint8_t*)rdptr(node, 0xF4);
+        node = (uint8_t*)(uintptr_t)rd32(node, 0xF4);
         if (!node) return;
     }
     if (!rd8(node, 9)) return;
-    uint8_t* rec = (uint8_t*)rdptr(node, 0x18);
+    uint8_t* rec = (uint8_t*)(uintptr_t)rd32(node, 0x18);
     uint32_t count = rd32(rec, 0x30);
     wr8(rec, 5, 1);
     if ((int32_t)count >= 6) return;
     uint32_t unitId = unit ? rd32(unit, 0xC) : 0xFFFFFFFFu;
-    for (uint32_t i = 0; i < count; i++)
-        if (rd32(rec, 0x10 + 4 * i) == unitId) return;
+    for (int32_t i = 0; i < (int32_t)count; i++)   // signed, as retail: a negative count scans nothing and stores below the array
+        if (rd32(rec, 0x10 + 4 * (uint32_t)i) == unitId) return;
     wr32(rec, 0x10 + 4 * count, unitId);
     wr32(rec, 0x30, count + 1);
     wr32(rec, 0x34, count + 1);
 
-    void* u = rdptr(node, 4);
+    void* u = (void*)(uintptr_t)rd32(node, 4);
     uint8_t target = (rd8(node, 0xC) > 1) ? 3 : 1;
     if (rd8(node, 0xB) != target) {
         wr8(node, 0x14, 0);

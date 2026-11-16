@@ -89,7 +89,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_CC750(void* game, uint32_t
     int p = env->ord10920(param_1);
     void* other = nullptr;
     if (p && 7 < (int)c7rd32(env->gdwBitMasks /*sgptDataTables*/, 0xbf0) && c7rdp((void*)(intptr_t)p, 0x44)) {
-        uint8_t* node = (uint8_t*)c7rdp(c7rdp((void*)(intptr_t)p, 0x44), 0x54);
+        // +0x44 holds a pointer to the record pointer: the list head is at +0x54 of the record it names
+        uint8_t* node = (uint8_t*)c7rdp(c7rdp(c7rdp((void*)(intptr_t)p, 0x44), 0), 0x54);
         for (; node; node = (uint8_t*)c7rdp(node, 0x14)) {
             if ((node[0] & 1) == 0) {
                 other = c7chain(game, 0x1320, c7rd32(node, 4));

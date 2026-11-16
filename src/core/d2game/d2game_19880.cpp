@@ -20,7 +20,7 @@ extern "C" void d2g_19880(uint32_t game, uint32_t unit, uint32_t cd, const D2Sea
             for (uint32_t n = d2rd32(ai); n; n = d2rd32(n + 8)) if (d2rd32(n) != 0) { busy = true; break; }
         }
         if (busy) { e->call(0xF22C0, game, 0, 0, 0, unit, 0xA); return; }
-        const uint32_t rec = d2rd32(d2rd32(cd));
+        const uint32_t rec = d2rd32(cd);   // the stack word addresses the record pointer (one load, as the capture's a0 -> ctr shows)
         if (dist >= 0x18) {
             if ((int32_t)d2rd32(rec + 0x18) <= 0) d2wr32(rec + 0x18, 0x3C);
             d2wr32(rec + 0x18, d2rd32(rec + 0x18) - 1);

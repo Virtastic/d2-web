@@ -152,7 +152,8 @@ void d2game_c8fd0(uint32_t unit, uint32_t room, int32_t* pos) {
     pos[1] -= 3;
     uint32_t c = g_b->f1280(room);
     g_b->f54130(room, (uint32_t)(uintptr_t)pos, 3, 0x100);
-    struct { uint32_t game, a, b, c, d, e, f, g; uint16_t h; } q = {rd32(unit, 4), c, 0, 0xc9, 1, (uint32_t)pos[0], (uint32_t)pos[1], 0xffffffffu, 0};
+    // Ten dwords: retail zeroes [5] and puts x, y at [6], [7], -1 at [8] and a zero word at [9].
+    struct { uint32_t game, a, b, c, d, z, e, f, g; uint16_t h; } q = {rd32(unit, 4), c, 0, 0xc9, 1, 0, (uint32_t)pos[0], (uint32_t)pos[1], 0xffffffffu, 0};
     uint32_t u = g_b->fEF10(&q);
     if (!u) u = g_b->fF650(0xc9, 1, rd32(unit, 4), c, pos[0], pos[1], 2, 0);
     if (u) {

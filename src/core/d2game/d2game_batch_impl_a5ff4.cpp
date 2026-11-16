@@ -93,7 +93,7 @@ W void d2game_a5ff4_saf5c0(int pGame);
 W int  d2game_a5ff4_sd19c0(int nX, int pRoom, int a, int pUnit, int pUnit2, int nY); // EAX = nY (the register argument)
 
 extern "C" char* sgptDataTables_exref;
-static inline int dt(int off) { return *(int*)(*(intptr_t*)sgptDataTables_exref + off); }
+static inline int dt(int off) { return *(int*)((intptr_t)*(unsigned*)sgptDataTables_exref + off); }   // the table pointer is one dword, as in retail
 static inline int rd(int p, int o) { return *(int*)(intptr_t)(p + o); }
 static inline void wr(int p, int o, int v) { *(int*)(intptr_t)(p + o) = v; }
 static inline unsigned char rd8(int p, int o) { return *(unsigned char*)(intptr_t)(p + o); }

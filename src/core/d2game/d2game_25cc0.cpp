@@ -16,7 +16,7 @@ extern "C" void d2g_25cc0(uint32_t game, uint32_t unit, const D2Seam* e)
         q[7] = dx[i] + x; q[8] = dy[i] + y;
         for (uint32_t k = 0; k < 2; k++) {
             q[22] = k;
-            e->call(0x6F930, 0, game, (uint32_t)(uintptr_t)q);
+            e->call(0x6F930, 0, game, (uint32_t)(uintptr_t)q, q[8], k);   // EBX = y + dy and ESI = the pass index are live at the call
             e->blk(0x6F930, q, 23);
         }
     }

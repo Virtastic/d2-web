@@ -28,7 +28,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2game_864a0_port(const D2Game77dEnv* e, co
             wander(unit, 3);
             e->subF2540(game, unit, target, 2, 0, 0, 1, 0);
         } else {
-            e->subF22C0(game, (uint32_t)w(0x62));
+            o->subF22C0s(game, unit, (uint32_t)w(0x62));   // ESI = the unit across the step
         }
         return;
     }
@@ -50,7 +50,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2game_864a0_port(const D2Game77dEnv* e, co
         e->subF2540(game, unit, foe, 0xf, 0, 0, (dist & 0xffffff00u) | b, 0);
         return;
     }
-    if ((int32_t)roll100(unit) >= w(0x5c)) { e->subF22C0(game, (uint32_t)w(0x62)); return; }
+    if ((int32_t)roll100(unit) >= w(0x5c)) { o->subF22C0s(game, unit, (uint32_t)w(0x62)); return; }
     // EAX keeps what the call site last loaded (the skill, or the foe for +0x174) under the mode byte
     auto cast = [&](uint32_t skOff, uint32_t modeOff, uint32_t hi) {
         o->subF2380a((hi & 0xffffff00u) | rd8(row, modeOff), unit, game, (uint32_t)rdS16(row, skOff), foe, 0, 0);

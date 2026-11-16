@@ -220,8 +220,10 @@ uint32_t d2game_D2070_113c(int32_t* unit, int32_t eax, const uint8_t* ebx, int32
     if (unit && unit[0] == 4 && e->ord10106(unit) == 7) {
         int32_t k = e->ord10620(unit);
         if (k >= 0) k = e->ord10620(unit);   // retail asks twice (sign test, then the index)
-        if (k >= 0 && k < (int32_t)rd32(rdptr(e->dataTables, 0), 0xc28)) {
-            const uint8_t* rec = (const uint8_t*)rdptr(rdptr(e->dataTables, 0), 0xc24) + (size_t)k * 0x14c;
+        // retail pointer fields are one 32-bit word: the count at +0xc28 sits right behind the array pointer at +0xc24
+        const uint8_t* tables = (const uint8_t*)(uintptr_t)rd32(e->dataTables, 0);
+        if (k >= 0 && k < (int32_t)rd32(tables, 0xc28)) {
+            const uint8_t* rec = (const uint8_t*)(uintptr_t)rd32(tables, 0xc24) + (size_t)k * 0x14c;
             if (rec && (e->bitMask8 & rec[0x2c]) != 0) {
                 int16_t v; std::memcpy(&v, rec, 2); want = v;
             }

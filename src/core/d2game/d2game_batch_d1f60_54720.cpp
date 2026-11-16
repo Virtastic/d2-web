@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <unistd.h>
 
 namespace {
 struct ModeInput {
@@ -29,26 +30,33 @@ static_assert(offsetof(SavedItemInput, flags) == 0x20);
 static_assert(offsetof(SavedItemInput, quality) == 0x30);
 static_assert(offsetof(SavedItemInput, name) == 0x32);
 
-using Predicate = int (*)(const ModeInput*, int);
+using ItemTest = int (*)(const void*, int);
+using ItemTest3 = int (*)(const void*, int, int);
 using Creator = void* (*)(void*, const void*);
 using SetFlags = void (*)(void*, uint32_t);
 using SetQuality = void (*)(void*, uint8_t);
 }
 
 // 1.13c D2Game+0xD1F60
-extern "C" void D2Game_D1F60_ModeFlags(const ModeInput* item, int32_t* flags,
-    Predicate equipment, Predicate auxiliary, Predicate firstState,
-    Predicate secondState)
+// EAX = unit {type, class}, EDI = item, ESI = the ten output flags. Every test asks about the item: 0xA430 is
+// (item, item type) for types 0x43 0x1b 0x23 5 6 0x33 0x2d 0xa in that order, 0xA8FE and 0xA9AC take the item alone,
+// and 0xA802 (item, 0x7d, 0) is asked only when 0xA9AC answered 0. A null item or unit is retail's fatal exit.
+extern "C" void D2Game_D1F60_ModeFlags(const ModeInput* unit, const void* item, int32_t* flags,
+    ItemTest typeTest, ItemTest auxiliary, ItemTest firstState, ItemTest3 secondState)
 {
-    if (!item || !flags) return;
+    if (!item || !unit) _exit(-1);                 // asserts 0x676 / 0x677
     std::memset(flags, 0, 10 * sizeof(*flags));
-    if (item->type == 0 && item->mode == 4) flags[7] = 1;
-    if (item->type == 0 && item->mode == 6 && equipment(item, 7)) flags[7] = 1;
-    for (int i = 0; i < 5; ++i) flags[i] = equipment(item, i) != 0;
-    flags[6] = auxiliary(item, 6) != 0;
-    flags[5] = equipment(item, 5) != 0;
-    flags[8] = firstState(item, 8) || secondState(item, 8);
-    flags[9] = equipment(item, 9) != 0;
+    if (unit->type == 0 && unit->mode == 4) flags[7] = 1;
+    if (unit->type == 0 && unit->mode == 6 && typeTest(item, 0x43)) flags[7] = 1;
+    if (typeTest(item, 0x1b)) flags[0] = 1;
+    if (typeTest(item, 0x23)) flags[1] = 1;
+    if (typeTest(item, 5)) flags[2] = 1;
+    if (typeTest(item, 6)) flags[3] = 1;
+    if (typeTest(item, 0x33)) flags[4] = 1;
+    if (auxiliary(item, 0)) flags[6] = 1;
+    if (typeTest(item, 0x2d)) flags[5] = 1;
+    if (firstState(item, 0) || secondState(item, 0x7d, 0)) flags[8] = 1;
+    if (typeTest(item, 0xa)) flags[9] = 1;
 }
 
 // 1.13c D2Game+0x54720

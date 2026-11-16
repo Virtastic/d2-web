@@ -6,9 +6,11 @@ uint32_t f90ea0(GE& e, uint32_t a, uint32_t u, uint32_t x)
 {
     if (!u) return a;
     uint32_t v = e.h(0xad06, 0, 0, 0, 0, 0, u);
-    if ((int32_t)v >= 0x4e) v = 0x4d;
-    e.h(0xAD42, 0, 0, 0, 0, 0, u, v);
-    e.h(0xAC7C, 0, 0, 0, 0, 0, u, v);
+    if ((int32_t)v >= 0x4e) {   // 0xAD42 and 0xAC7C run only when the value is capped (jl 0x90ECC skips both)
+        v = 0x4d;
+        e.h(0xAD42, 0, 0, 0, 0, 0, u, v);
+        e.h(0xAC7C, 0, 0, 0, 0, 0, u, v);
+    }
     const uint32_t p = e.rd32(u + 0x2c);
     e.h(0xA628, 0, u + 0x20, x, 0, 0);
     e.h(0xAAFC, 0, 0, 0, 0, 0, p, 0xa);
