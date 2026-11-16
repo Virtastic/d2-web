@@ -340,8 +340,9 @@ void tick(Seed& s, const Env& e) {
 // Ordinal_10047 (ecx = the live count 0x805A0 left), clips x to [0, W) (DAT_6FBCC414 1/2 halve it) and y to [0, H-0x2F).
 // A falling drop is a line from (x, y) by (ftol(cos t*frame), ftol(sin t*frame)) cut at its landing row, a landed one a
 // point: Ordinal_10010(x0, y0, x1, y1, colour, alpha). The line path leaves ecx = colour, edx = x; the point path x, colour.
-void drawG(std::string& out, int32_t W, int32_t H, int32_t mode) {
-    if (!g.weatherLevel || g.live == 0) return;
+// Without the 0x7FE80 tail call 0x805A0 returns through its pop ecx (0x806fb): ecx = its local, Ordinal_10215(level) != 0.
+uint32_t drawG(std::string& out, int32_t W, int32_t H, int32_t mode) {
+    if (!g.weatherLevel || g.live == 0) return g.weatherLevel ? 1u : 0u;
     char b[96];
     std::snprintf(b, sizeof b, "10047 %x,0\n", unsigned(g.live));
     out += b;
@@ -373,6 +374,7 @@ void drawG(std::string& out, int32_t W, int32_t H, int32_t mode) {
             emit(uint32_t(p.x), p.colour, p.x, p.y, p.x, p.y, p);
         }
     }
+    return 0;
 }
 
 } // namespace d2client::weather

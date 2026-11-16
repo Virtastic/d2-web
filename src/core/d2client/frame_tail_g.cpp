@@ -89,13 +89,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first
         if (g_clk >= g_rewalk + 600) g_rewalk = ++g_clk;         // 44A80: 6D010 runs again and 44ADB re-reads the clock into DAT 0x11C03C
         g_clk += 1 + walk + (g_deadline ? 1 : 0); now = g_clk;   // 8AFDA, the walk; 10EC0 reads the clock only while a deadline is set
     }
-    uint32_t lead = 0;
-    if (!first) d2client::weather::drawG(out, W, H, 0);          // 7FE80's rain (the first frame has none)
+    uint32_t lead = 0, ecx805 = 0;
+    if (!first) ecx805 = d2client::weather::drawG(out, W, H, 0);   // 7FE80's rain (the first frame has none)
     if (g_deadline && g_deadline >= now) {
         lead = (g_deadline - now) * 255;
         const uint32_t alpha = lead / 500;
         rec(10045, lead, alpha, {0, 0, uint32_t(W), uint32_t(H - 0x2f), 0, alpha});
-    } else { lead = g_deadline; g_deadline = 0; }                // expired: 10EC0 clears the deadline, its compare leaves it in ecx
+    } else { lead = g_deadline ? g_deadline : ecx805; g_deadline = 0; }   // expired: 10EC0 clears the deadline, its compare leaves it in ecx; unset: 10EC0 returns at once and ecx is 805A0's
     g_clk += 5;                                                  // 12FF8 x3, 7B92E, 5A9A9 after the draw
     rec(10031, lead, 0);                                         // 739E0 head
     rec(10078, 1, 1); rec(10031, 1, 1); rec(10031, 0, 1);        // 29250
