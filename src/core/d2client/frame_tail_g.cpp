@@ -3,7 +3,7 @@
 //   8B110 tail: 805A0 -> 7FE80 rain (weather_sim drawG); 739E0 head 10031; 29250's HUD chain: 10078(1), 10031 x2, 27290 (the
 //   five control-panel cels), 27BD0, 27A90 (10078 0xA, 10074, cel), 26970 (none), 28320, 278B0 (the 10014 line), 26880,
 //   28DC0 (belt slots 0..3: 6B5A0 cel + 10013), 28CE0 (two skill buttons, 28BC0 -> 10019), 289A0/267B0 (none, panels shut);
-//   739E0 tail: 10031(4, 0x30000) x2, 10043, 10080, 10085.
+//   739E0 tail: C39E0's level-up buttons (levelButtons below; 10031(4, 0x30000) x2 with none pending), 10043, 10080, 10085.
 // Register leftovers (ecx/edx a prior call left) are taken from what the code path computes where the disassembly shows it
 // (a cel draw's x or y), otherwise they are arguments.
 #include <cstdint>
@@ -144,6 +144,60 @@ extern "C" int d2_client_item_gleam(uint32_t id, int32_t* dx, int32_t* dy, uint3
     return 1;
 }
 
+// C39E0's level-up buttons. 50E70 sets the "New Stats" flag (0xFAD98) while the client player's stat 4 (unspent stat points,
+// D2Common 10587) is non-zero, and the "New Skill" flag (0xFAD9C, panel 7 through C2790) while stat 5 is above 0; each set or
+// clear runs C1C40 / C21F0, one D2Gfx 10048 (the window handle) apiece. C39E0 then draws 50100 / 50020 (a lone 10031 when the
+// resolution is not 2) while a flag is clear, else 50430 / 501F0: 10031, D2CMP 10021 / 10060 (the socket cel's width), D2Lang
+// 0xF92 / 0xF93, D2Win 10028, 10031, the label through D2Win 10150 (one 10019 per character in the current font, font16,
+// advancing by the .tbl's width byte, from x = w/2 - text/2 + base + 1 at y = h - 0x8E), the socket Panel\Levelsocket at
+// (base, h - 0x69), 10031 x2, the button Panel\Level at (base + 3, h - 0x6D); base 0x28 (stats) and w - 0x49 (skill).
+// Panels are shut on this path (every gate of 50E70 and 50430 / 501F0 reads them closed).
+struct D2ArchiveHandleStrc;
+void* ARCHIVE_AllocateBufferAndReadFile(D2ArchiveHandleStrc*, const char*, size_t*, const char*, int);
+extern "C" const char16_t* d2lang_Ordinal_10003(uint16_t index);
+extern "C" int d2_realm_client_hero_stat(int stat, int layer, int base);
+namespace {
+uint32_t g_newStats = 0, g_newSkill = 0;
+uint8_t g_fontAdv[0x10000] = {};
+int32_t g_socketW = -1;
+void loadUi() {
+    if (g_socketW >= 0) return;
+    g_socketW = 0;
+    size_t n = 0;
+    if (auto* b = static_cast<uint8_t*>(ARCHIVE_AllocateBufferAndReadFile(nullptr, "data\\local\\font\\latin\\font16.tbl", &n, __FILE__, __LINE__))) {
+        for (size_t i = 12; i + 14 <= n; i += 14) g_fontAdv[b[i] | b[i + 1] << 8] = b[i + 3];
+        std::free(b);
+    }
+    n = 0;
+    if (auto* b = static_cast<uint8_t*>(ARCHIVE_AllocateBufferAndReadFile(nullptr, "data\\global\\ui\\Panel\\Levelsocket.dc6", &n, __FILE__, __LINE__))) {
+        uint32_t f0 = 0, w = 0;
+        if (n >= 28) { std::memcpy(&f0, b + 24, 4); if (size_t(f0) + 8 <= n) { std::memcpy(&w, b + f0 + 4, 4); g_socketW = int32_t(w); } }
+        std::free(b);
+    }
+}
+int32_t half(int32_t v) { return (v - (v >> 31)) >> 1; }   // cdq; sub eax,edx; sar eax,1
+void levelButton(uint16_t str, int32_t base, int32_t H) {
+    loadUi();
+    const char16_t* s = d2lang_Ordinal_10003(str);
+    int32_t tw = 0;
+    for (const char16_t* c = s; c && *c; ++c) tw += g_fontAdv[uint16_t(*c)];
+    rec(10031, 0, 0); rec(10031, 0, 5);
+    int32_t x = half(g_socketW) - half(tw) + base + 1;
+    for (const char16_t* c = s; c && *c; ++c) { rec(10019, 0, uint16_t(*c), {P, uint32_t(x), uint32_t(H - 0x8e), P, 5, 0}); x += g_fontAdv[uint16_t(*c)]; }
+    cel(0, uint32_t(H - 0x69), base, H - 0x69);
+    rec(10031, 0, uint32_t(H - 0x69)); rec(10031, 0, 5);
+    cel(0, 5, base + 3, H - 0x6d);
+}
+void levelButtons(int32_t first, int32_t W, int32_t H) {
+    if (first) g_newStats = g_newSkill = 0;
+    const uint32_t stats = d2_realm_client_hero_stat(4, 0, 0) != 0, skill = d2_realm_client_hero_stat(5, 0, 0) > 0;
+    if (stats != g_newStats) { g_newStats = stats; rec(10048, 1, 1); }
+    if (skill != g_newSkill) { g_newSkill = skill; rec(10048, 1, 1); }
+    if (g_newStats) levelButton(0xF92, 0x28, H); else rec(10031, 4, 0x30000);
+    if (g_newSkill) levelButton(0xF93, W - 0x49, H); else rec(10031, 4, 0x30000);
+}
+}
+
 extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first, int32_t tick, uint32_t pump) {
     out.clear();
     pump = d2_local_d2gs_frame_bytes() > 0;                      // the bytes this tick's receive held
@@ -200,7 +254,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first
     }
     rec(10019, 0, 0, {P, 0x75, uint32_t(H), P, 5, 1});            // 28CE0 -> 28BC0, left and right skill buttons
     rec(10019, 0, 0, {P, uint32_t(W - 0xa5), uint32_t(H), P, 5, 1});
-    rec(10031, 4, 0x30000); rec(10031, 4, 0x30000);              // 739E0 tail
+    levelButtons(first, W, H);                                   // C39E0: 50E70, then 50100 / 50430 and 50020 / 501F0
     rec(10043, lead, 0);
     rec(10080, 0, 0, {P, P});
     rec(10085, 0, 0, {0, 0, 0, 0});
