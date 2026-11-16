@@ -116,7 +116,9 @@ export function createRealmHud({ experience, waypoints, skills }, { levelName = 
      * to level, from the wasm client's skill list). Null before the server has sent any skill. `canLearn` is the
      * conjunction the server's 0x3B handler tests (in game, level, prerequisites, attributes, the level cap, points) so
      * the + shows only where the server will accept; the server still decides. A point cost the table gives as a
-     * formula cannot be worked out here, so such a skill is not offered. No mana line is drawn.
+     * formula cannot be worked out here, so such a skill is not offered. The mana line is the table's (SkillDesc's line
+     * types) at SKILLS_GetManaCosts' price for the level the tooltip describes (the held level with bonuses, 1 when the
+     * skill is not held), floored at the skill's minimum mana as the plate shows it.
      */
     classSkills(playerClass, levels, bonuses) {
       if (!levels || levels.size === 0) return null;
@@ -128,7 +130,9 @@ export function createRealmHud({ experience, waypoints, skills }, { levelName = 
           && (row.reqStr ?? 0) <= s(STAT.strength) && (row.reqDex ?? 0) <= s(STAT.dexterity)
           && (row.reqInt ?? 0) <= s(STAT.energy) && (row.reqVit ?? 0) <= s(STAT.vitality)
           && baseLevel < (row.maxLevel ?? 20) && !row.costFormula && s(STAT.skillPoints) >= 1;
-        return { ...row, baseLevel, level: baseLevel, bonus: bonuses?.get(row.id) ?? 0, canLearn, manaLine: false, manaCost: 0 };
+        const bonus = bonuses?.get(row.id) ?? 0, total = baseLevel > 0 ? baseLevel + bonus : 0;
+        const cost = Math.max(0, (row.mana + ((total > 0 ? total : 1) - 1) * row.lvlMana) << row.manaShift, row.minMana << 8);
+        return { ...row, baseLevel, level: baseLevel, bonus, canLearn, manaLine: Boolean(row.manaLine), manaCost: Math.min(cost, 0xffff) };
       });
     },
     /** The waypoint menu the server opened (consumed once), or null. */

@@ -13,6 +13,9 @@ function rows(bytes) {
 }
 const num = (v, fallback = 0) => { const n = Number(v); return Number.isFinite(n) && v !== '' ? n : fallback; };
 
+const DESC_LINE_COLUMNS = [1, 2, 3, 4, 5, 6].map((i) => 'descline' + i)
+  .concat([1, 2, 3, 4].map((i) => 'dsc2line' + i), [1, 2, 3, 4, 5, 6, 7].map((i) => 'dsc3line' + i));
+
 const CLASS_COLUMN = ['amazon', 'sorceress', 'necromancer', 'paladin', 'barbarian', 'druid', 'assassin'];
 
 /** Experience.txt: row N is the total experience that completes level N. */
@@ -86,7 +89,11 @@ export function createSkillTable(read, langIndex) {
           // prerequisite skills (by id), the attributes, the level cap (0 means 20) and the points one level costs.
           inGame: num(row.ingame) === 1, reqSkills: [row.reqskill1, row.reqskill2, row.reqskill3].filter((n) => n && ids.has(n.toLowerCase())).map((n) => ids.get(n.toLowerCase())),
           reqStr: num(row.reqstr), reqDex: num(row.reqdex), reqInt: num(row.reqint), reqVit: num(row.reqvit),
-          maxLevel: num(row.maxlvl) > 0 ? num(row.maxlvl) : 20, costFormula: row.skpoints !== '' });
+          maxLevel: num(row.maxlvl) > 0 ? num(row.maxlvl) : 20, costFormula: row.skpoints !== '',
+          // The tooltip's mana line: SkillDesc's 17 line types (descline1-6, dsc2line1-4, dsc3line1-7) carry a 1 or a 5
+          // on some line; and the Skills.txt columns its cost is priced from.
+          manaLine: DESC_LINE_COLUMNS.some((c) => d[c] === '1' || d[c] === '5'),
+          mana: num(row.mana), lvlMana: num(row.lvlmana), manaShift: num(row.manashift), minMana: num(row.minmana) });
       }
       byClass.set(playerClass, out);
       return out;
