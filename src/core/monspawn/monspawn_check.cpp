@@ -11451,9 +11451,28 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_lines(uint32_t itemId, char* buf, 
                 const D2SkillDescTxt* sd = sr ? DATATBLS_GetSkillDescTxtRecord(sr->wSkillDesc) : nullptr;
                 if (!sd) return "";
                 return str(21249) + str(3995) + std::to_string(st.nLayer & 0x3f) + str(3995) + str(sd->wStrName) + str(3995) + subst(pos, { v & 0xff, v >> 8 }); }
+            case 15: case 16: {   // 1.13c D2Client+0x54E10 cases 0xF/0x10: skill procs (layer = skill << 6 | level) and auras (layer = skill)
+                const int sk = func == 15 ? st.nLayer >> 6 : st.nLayer;
+                if (func == 15 && sk < 1) return "";
+                const D2SkillsTxt* sr = sk >= 0 && sk < sgptDataTables->nSkillsTxtRecordCount ? DATATBLS_GetSkillsTxtRecord(sk) : nullptr;
+                const D2SkillDescTxt* sd = sr ? DATATBLS_GetSkillDescTxtRecord(sr->wSkillDesc) : nullptr;
+                if (!sd) return "";
+                // D2Lang+0xB250 (Unicode::sprintf) takes one argument word per spec, %% included: 0xF passes (chance, 0, level,
+                // skill) to DescStrPos ("%d%% Chance to cast level %d %s ..."), 0x10 passes (level, skill) to the signed string.
+                const std::string a[4] = { std::to_string(v), func == 15 ? "0" : str(sd->wStrName), std::to_string(st.nLayer & 0x3f), str(sd->wStrName) };
+                const std::string f = func == 15 ? pos : body(v);
+                std::string r; size_t k = 0;
+                for (size_t i = 0; i < f.size(); ++i) {
+                    if (f[i] != '%' || i + 1 >= f.size()) { r += f[i]; continue; }
+                    const char c = f[++i];
+                    if (c != '%' && c != 'd' && c != 'u' && c != 's') return "";   // retail fatals (0x154)
+                    r += c == '%' ? std::string("%") : k < 4 ? a[k] : std::string();
+                    ++k;
+                }
+                return r; }
             case 20: v = -v; return pre("", "%") + body(v) + post("", "%");
             case 21: v = -v; return pre("", "") + body(v) + post("", "");
-            default: return "";   // 11, 15-18, 22-23, 25-28: replenish, skill procs/auras, by-time, skill names: not ported
+            default: return "";   // 11, 17-18, 22-23, 25-28: replenish, by-time, skill names: not ported
             } };
         std::map<int, std::vector<const D2StatStrc*>> groups;
         for (const D2StatStrc& st : sv) {
