@@ -38,6 +38,7 @@
 #include <Drlg/D2DrlgDrlg.h>
 #include "../d2client/inv_weapon_hands.h"
 #include "../d2client/character_screen.h"
+#include "../d2client/d2client_a7630.h"
 #include "client_refusal_sound.h"
 #include "skill_update_packet.h"
 #include "client_unit_sound.h"
@@ -1180,21 +1181,20 @@ static int assign_player(const uint8_t* packet, int length) {
     std::memcpy(created.name, assigned.name, sizeof(created.name));
     created.cunitInitSeed = initSeed;
     created.cunitInitSeedValid = level != 0;
-    // FUN_6FB57630 always initializes CUnit.pSeed to {1,666}. A resolved room then
-    // replaces it with {dwInitSeed,666}; FUN_6FAC91E0 advances it once because a newly
-    // constructed unit differs from the currently selected CUnit (including fresh null state).
-    created.cunitRngLow = level ? initSeed : 1;
-    created.cunitRngHigh = 666;
-    const uint64_t advanced = static_cast<uint64_t>(created.cunitRngLow) * 0x6ac690c5ULL +
-        created.cunitRngHigh;
-    created.cunitRngLow = static_cast<uint32_t>(advanced);
-    created.cunitRngHigh = static_cast<uint32_t>(advanced >> 32);
+    // The seed and facing rule of 1.13c D2Client+0xA7630 (d2client_a7630.h): {1,666}, or {roll,666} when a room
+    // was found (the context call above rolled it), then one more roll for the facing unless the new unit is the
+    // current player. Retail compares the new allocation with [0x11BBFC]; the new entry is not yet in g_players,
+    // so it is the selected one only if the selection points at it.
+    const bool isCurrent = g_selectedPlayer >= 0 && static_cast<size_t>(g_selectedPlayer) < g_players.size() &&
+        &g_players[static_cast<size_t>(g_selectedPlayer)] == &entry;
+    const d2client_a7630::Result seeded = d2client_a7630::fromInit(level != 0, initSeed, isCurrent);
+    created.cunitRngLow = seeded.unit.lo;
+    created.cunitRngHigh = seeded.unit.hi;
     created.cunitRngValid = 1;
-    // FUN_6FAC91E0 sets the fresh player to PLRMODE_TOWNNEUTRAL (5), advances pSeed
-    // when the new unit differs from the current unit, then calls D2Common #10706 with
-    // the resulting low six bits. In 1.13c #10706 writes both path direction fields.
+    // FUN_6FAC91E0 sets the fresh player to PLRMODE_TOWNNEUTRAL (5); #10706 (both path direction fields in 1.13c)
+    // gets the facing only when it rolled one.
     created.initialMode = 5;
-    created.initialDirection = created.cunitRngLow & 0x3f;
+    created.initialDirection = seeded.facingSet ? seeded.facing : 0;
     entry.motionDirection = static_cast<uint8_t>(created.initialDirection);
     refresh_player_room_level(created, false);
 
