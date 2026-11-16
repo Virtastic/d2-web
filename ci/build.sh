@@ -119,6 +119,16 @@ fi
 MSYS_NO_PATHCONV=1 docker run --rm "${CACHE_ARGS[@]}" "${SEED_ARGS[@]}" \
   -e D2_TOOLCHAIN_ID="$TOOLCHAIN_ID" -e D2_COMPILE_JOBS="$JOBS" -e HOME=/tmp -e D2_CXXFLAGS="${D2_CXXFLAGS:-}" -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" -e D2_QUARANTINE="${D2_QUARANTINE:-0}" -e D2_QUARANTINE_KEEP="${D2_QUARANTINE_KEEP:-}" \
   -v "$MOUNT:/build" -v "$MOUNT:$MOUNT:ro" "${PRIV_ARGS[@]}" "$TOOLCHAIN_ID" bash wasm-build/link-d2.sh
+# The main checkout only ever builds the default flags, so a worktree built with other flags (the session role's
+# -DD2_CALLTRACE) had nothing to seed from and compiled every source cold. After a successful link, publish this tree's
+# object dirs to the main checkout's store for any flag set it lacks; the rename is atomic, so a seeder never sees half a dir.
+if [ ! "$LOCK_DIR" -ef build-wasm ] && [ -d build-wasm/obj ]; then
+  for d in build-wasm/obj/*/; do
+    h=$(basename "$d"); [ -e "$LOCK_DIR/obj/$h" ] && continue
+    t=$(mktemp -d "$LOCK_DIR/obj/.publish-$h.XXXXXX") || continue
+    if cp -a --reflink=auto "$d." "$t/" && mv -T "$t" "$LOCK_DIR/obj/$h" 2>/dev/null; then echo "==> published object dir $h to the main checkout"; else rm -rf "$t"; fi
+  done
+fi
 
 echo "==> synthetic smoke.mpq"
 NODE_BIN="$(command -v node || command -v node.exe || true)"
