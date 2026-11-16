@@ -84,8 +84,10 @@ struct SweepSvc : d2client_batch_5ebc0::Svc {
     int32_t o10105() override { return (int32_t)file.size(); }
     void o10103() override {}
     int32_t o10016() override { return idx + 1; }
-    int32_t o10091() override { return 0; }
-    int32_t o10095() override { return 0; }
+    // Fog #10091 (AsyncDataLoadFileEx) hands back a request for a file that opens; #10095 is its buffer size (the whole file).
+    // #10092 (AsyncDataTestLoaded) stays 0: the capture's async loads never complete (no 0x5DA80 10025 follows them).
+    int32_t o10091() override { return have ? idx + 1 : 0; }
+    int32_t o10095() override { return (int32_t)file.size(); }
     int32_t o10092(int32_t) override { return 0; }
     void f5ebc0(int32_t i, int32_t eax, int32_t p1) override { d2client_batch_5ebc0::sub_5EBC0(*this, *g, i, eax, p1); }
     void fatal302() override {}
