@@ -1032,7 +1032,7 @@ function sessionAdapter() {
   if (window.Module?._d2_session_create && window.Module?._d2_session_snapshot) {
     return {
       // bare: no start kit, for a player a saved file is about to be applied to.
-      create(f, playerClass = 0, bare = false) { Module.ccall('d2_session_create_stream', 'number', ['number'], [0]); Module.ccall('d2_session_join_units', null, ['number'], [1]); Module.ccall('d2_session_join_reveal', null, ['number'], [JOIN_REVEAL]); const made = Module.ccall(bare && Module._d2_session_create_class_bare ? 'd2_session_create_class_bare' : 'd2_session_create_class', 'number', ['number', 'number', 'number', 'number', 'number'], [f.seed, f.difficulty, f.act0, f.level, playerClass]); if (made) { Module.ccall('d2_session_client_map_start', 'number'); Module.ccall('d2_client_npc_speech_reset', null, []); } return made; },
+      create(f, playerClass = 0, bare = false) { Module.ccall('d2_session_create_stream', 'number', ['number'], [0]); Module.ccall('d2_session_join_units', null, ['number'], [LOCAL_REALM ? 1 : 0]); Module.ccall('d2_session_join_reveal', null, ['number'], [LOCAL_REALM ? JOIN_REVEAL : 0]); const made = Module.ccall(bare && Module._d2_session_create_class_bare ? 'd2_session_create_class_bare' : 'd2_session_create_class', 'number', ['number', 'number', 'number', 'number', 'number'], [f.seed, f.difficulty, f.act0, f.level, playerClass]); if (made) { Module.ccall('d2_session_client_map_start', 'number'); Module.ccall('d2_client_npc_speech_reset', null, []); } return made; },
       // Create the character FROM the file: the engine reads the header and everything -- class,
       // act, town level, map seed -- comes out of it (PLRSAVE2_ReadSaveHeader, client-parity C3e).
       // Returns 0, or the PLRSAVE2 error code that refused the file.
@@ -1040,7 +1040,7 @@ function sessionAdapter() {
         const p = Module._malloc(bytes.length);
         try {
           Module.HEAPU8.set(bytes, Number(p));
-          Module.ccall('d2_session_join_units', null, ['number'], [1]);   // arms this create only, as create() does
+          Module.ccall('d2_session_join_units', null, ['number'], [LOCAL_REALM ? 1 : 0]);   // arms this create only, as create() does
           const loaded = Module.ccall('d2_session_create_from_save', 'number', ['bigint', 'number', 'number'], [BigInt(p), bytes.length, difficulty]);
           if (loaded === 0) Module.ccall('d2_session_client_map_start', 'number');
           return loaded;
@@ -1269,7 +1269,7 @@ function installFixtureSelect() {
 async function swapLocalSession(create, error, swapped = () => {}) {
   const api = session;
   if (!api) return false;
-  const entering = sessionEntryRunning, local = entering || Boolean(realmFlow?.local);
+  const entering = sessionEntryRunning, local = LOCAL_REALM && (entering || Boolean(realmFlow?.local));
   // Left, the old game's transport is closed: until the new join opens one, the shell draws and steers the new game
   // itself, never through the old game's camera and packets (its input waits for that join).
   const leave = () => {
@@ -1469,7 +1469,7 @@ async function enterSession() {
     if (chosenName) { if (!navigator.webdriver) await entryYield(); persistCurrentCharacter(); }
     // ?skills=id:level,... gives the new character those skills before any join (the parity script's casts).
     for (const grant of (new URLSearchParams(window.__d2Entry.search).get('skills') || '').split(',').filter(Boolean)) Module.ccall('d2_session_fixture_skill_level', 'number', ['number', 'number'], grant.split(':').map(Number));
-    await enterLocalRealm();
+    if (LOCAL_REALM) await enterLocalRealm();
   } catch (error) { sessionError = String(error?.stack || error); }
   finally { sessionEntering = false; }
 }
@@ -2219,8 +2219,10 @@ async function authenticateConfiguredRealm({ account, password }) {
     if (!keepRealmSession) { try { protocol?.free(); } catch { /* engine gone */ } }
   }
 }
-// The local game is always joined through the realm client path, over the in-process connection
-// (assets/realm-local.mjs) in place of the game-server socket.
+// The local game is joined through the realm client path, over the in-process connection (assets/realm-local.mjs) in
+// place of the game-server socket. ?localrealm=0 keeps the game unjoined: the shell reads the server's own state, for
+// checks that drive the engine directly and feed or read no client of their own.
+const LOCAL_REALM = new URLSearchParams(window.__d2Entry.search).get('localrealm') !== '0';
 // How the local game's join walk reveals rooms to the packet client before their units (?joinreveal=0..3; 0 as before). The
 // default 2 is retail's set: every adjacent room once (LEVEL_AddClient per room), the client's own room by the join's own reveal.
 const JOIN_REVEAL = Number(new URLSearchParams(window.__d2Entry.search).get('joinreveal') ?? 2) || 0;
