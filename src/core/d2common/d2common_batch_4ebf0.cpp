@@ -20,8 +20,8 @@ static_assert(offsetof(D2SkillsTxt, nItemTypeAB) == 0x18);
 static_assert(offsetof(D2SkillsTxt, nElemTypeAB) == 0x24);
 static_assert(offsetof(D2ItemTypesTxt, wShoots) == 0xc);
 
-// 1.13c D2Common+0x50610
-extern "C" bool d2_fn_d2common_50610(D2UnitStrc* item, D2UnitStrc* unit,
+// D2Common 0x50610 in 64-bit struct form (no callers; the 1.13c port the FN probe calls is d2common_50610.cpp)
+extern "C" bool D2Common_50610_HandTypeOk64(D2UnitStrc* item, D2UnitStrc* unit,
     D2SkillsTxt* skill, int32_t type)
 {
     const auto* words = reinterpret_cast<const int16_t*>(skill);
