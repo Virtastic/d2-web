@@ -17,7 +17,8 @@
 //            path and when it ends. Mode 2 walks (0x2A700: #10342 at rate 1024) and ends when the path is done; mode 8 does not
 //            walk and ends at the animation loop's end. The walk velocity is MonStats Velocity << 8 at the stat VELOCITYPERCENT the
 //            client monster init (0x4D160) sets to 75 (#10819 on the mode change).
-// ponytail: the animation rate of the walking modes is the AnimData one (not MonStats WalkAnimSpeed at 75%).
+//            The walking modes' animation rate is MonStats WalkAnimSpeed at the same percent, which the action sets (walk,
+//            wander and flee pass their own) and the walk tail re-rates.
 #include <memory>
 #include <cstdint>
 #include <cstdio>
@@ -49,6 +50,7 @@ struct Critter {
     uint32_t born;
     int32_t state;                // monster data +0x34 (0x179E0: 1 while it goes to a corpse)
     int32_t vel;                  // path +0x7C
+    int32_t pct = 75;             // stat 0x43 VELOCITYPERCENT (0x4D160 sets 75; a walk block's +0x10 replaces it)
     uint32_t fx = 0x8000, fy = 0x8000;   // the path position's fp16 fraction (a walk moves it off the subtile centre)
     struct Walk { D2UnitStrc u; D2DynamicPathStrc p; };
     std::shared_ptr<Walk> w;      // the client unit's own dynamic path, the one the per-frame step walks
@@ -75,15 +77,20 @@ int32_t distance(const Critter& c, D2UnitStrc* u) {
     int32_t nx = s + dx, ny = s + dy; if (nx < 0) nx = 0; if (ny < 0) ny = 0;
     return nx <= ny ? (nx + 2 * ny) / 2 : (ny + 2 * nx) / 2;
 }
+// #10819 (D2Common+0x33110) for a mode that takes the velocity modifier (2 and 8 here): the animation rate is MonStats
+// WalkAnimSpeed and the path velocity MonStats Velocity << 8, each at VELOCITYPERCENT (no faster-run/walk on a client critter)
+void rate(Critter& c) {
+    const D2MonStatsTxt* ms = monStats((int32_t)c.cls);
+    if (!ms) return;
+    c.f4c = (uint32_t)(c.pct * (int32_t)ms->nWalkAnimSpeed / 100);
+    c.vel = (int32_t)((((uint32_t)ms->nVelocity << 8) * (uint32_t)c.pct) / 100u);
+    if (c.w) c.w->p.dwVelocity = c.vel;
+}
 // 0x2A6C0 -> #11090: a new mode resets the clock and reaches 0x24490
 void setMode(Critter& c, uint32_t m, uint32_t frame) {
     if (c.mode == m) return;
     c.mode = m; c.f44 = 0; anim(c);
-    if (m == 2 || m == 8) {   // #10819: base velocity at VELOCITYPERCENT 75 (no faster-run/walk on a client critter)
-        const D2MonStatsTxt* ms = monStats((int32_t)c.cls);
-        c.vel = ms ? (int32_t)((((uint32_t)ms->nVelocity << 8) * 75u) / 100u) : 0;
-        if (c.w) c.w->p.dwVelocity = c.vel;
-    }
+    if (m == 2 || m == 8) rate(c);
     char b[96]; snprintf(b, sizeof b, "%u C id=%x mode=%u\n", frame, c.id, m); g_log += b;
     const uint32_t n = d2_client_unit_mode_sounds(1, c.id, (int32_t)c.cls, 0, -1, m, 0, 0, 0, -1);
     for (uint32_t i = 0; i < n; ++i) {
@@ -124,26 +131,29 @@ bool path(Critter& c, int32_t tx, int32_t ty) {
     return true;
 }
 // 0x4DC70 through the six-word walk block {x, y, ...}: action 0xC (mode 8 first, then the path), 1 (mode 2 when a path is made)
-void walk(Critter& c, int32_t x, int32_t y, uint32_t action, uint32_t frame) {
+void walk(Critter& c, int32_t x, int32_t y, uint32_t action, uint32_t frame, int32_t pct = 0) {
     char b[96]; snprintf(b, sizeof b, "%u W id=%x a=%u to=%d,%d\n", frame, c.id, action, x, y); g_log += b;
-    if (action == 0xC) { setMode(c, 8, frame); path(c, x, y); return; }
-    if (path(c, x, y)) setMode(c, 2, frame); else neutral(c, frame);
+    if (action == 0xC) { setMode(c, 8, frame); path(c, x, y); }
+    else if (path(c, x, y)) setMode(c, 2, frame); else neutral(c, frame);
+    // the block's +0x10, when set and not the unit's VELOCITYPERCENT, becomes it (#10551 by the difference) and #10819 retakes the
+    // velocity; the path's step vectors stay those its build made until the next step recomputes them
+    if (pct && pct != c.pct) { c.pct = pct; if (c.mode == 2 || c.mode == 8) rate(c); }
 }
 // 0x173E0
-void wander(Critter& c, uint32_t step, uint32_t action, uint32_t frame) {
+void wander(Critter& c, uint32_t step, uint32_t action, uint32_t frame, int32_t pct = 0) {
     int32_t dx = (int32_t)(step & 0xFF), dy = dx;
     if (lcg(c.lo, c.hi) & 1) dx = -dx;
     if (lcg(c.lo, c.hi) & 1) dy = -dy;
-    walk(c, c.x + dx, c.y + dy, action, frame);
+    walk(c, c.x + dx, c.y + dy, action, frame, pct);
 }
 // 0x17500(unit, step, action, extra): away from the unit, when the next spot that way is free for size 1 under the mask of the
 // critter's path (0x17E80 sets 0xC01 on it first; a client monster's path otherwise carries the monster default 0x3C01)
-bool flee(Critter& c, D2UnitStrc* from, int32_t step, uint32_t action, uint32_t mask, uint32_t frame) {
+bool flee(Critter& c, D2UnitStrc* from, int32_t step, uint32_t action, uint32_t mask, uint32_t frame, int32_t pct = 0) {
     D2CoordStrc p{}; UNITS_GetCoords(from, &p);
     const uint32_t tx = (uint32_t)c.x, ty = (uint32_t)c.y, sx = (uint32_t)p.nX, sy = (uint32_t)p.nY;
     const int32_t dx = sx > tx ? -1 : sx < tx ? 1 : 0, dy = sy > ty ? -1 : sy < ty ? 1 : 0;
     if (!c.room || COLLISION_CheckMaskWithSize(c.room, c.x + dx, c.y + dy, 1, mask)) return false;
-    walk(c, c.x + step * dx, c.y + step * dy, action, frame);
+    walk(c, c.x + step * dx, c.y + step * dy, action, frame, pct);
     return true;
 }
 // 0x17E80
@@ -160,7 +170,7 @@ void chicken(Critter& c, uint32_t frame) {
         }
     if (!best) return;
     char b[96]; snprintf(b, sizeof b, "%u T id=%x tgt=%u:%x d=%d\n", frame, c.id, best->dwUnitType, best->dwUnitId, bd); g_log += b;
-    if (bd < 4) { if (!flee(c, best, 4, 0xC, 0xC01, frame)) wander(c, 4, 0xC, frame); return; }
+    if (bd < 4) { if (!flee(c, best, 4, 0xC, 0xC01, frame, 0x78)) wander(c, 4, 0xC, frame, 0x78); return; }
     if (lcg(c.lo, c.hi) % 100 < 0x1E) { wander(c, 2, 1, frame); return; }
     c.delay = 5;
 }
@@ -209,8 +219,8 @@ void rat(Critter& c, D2UnitStrc* player, int32_t dist, uint32_t frame) {
 void bat(Critter& c, D2UnitStrc* player, int32_t dist, uint32_t frame) {
     if (c.mode != 1) return;
     if ((uint32_t)dist >= 5) { wander(c, 9, 1, frame); return; }
-    if (lcg(c.lo, c.hi) % 100 < 0x42) { if (player) flee(c, player, 8, 1, 0x3C01, frame); return; }
-    wander(c, 0xC, 1, frame);
+    if (lcg(c.lo, c.hi) % 100 < 0x42) { if (player) flee(c, player, 8, 1, 0x3C01, frame, 0x1E); return; }
+    wander(c, 0xC, 1, frame, 0x1E);
 }
 // 0x17F70 (the class switch's jump table: 0x95/0x10C chicken, 0x97/0x10D/0x11B/0x153 rat, 0x9F bat, 0x116..0x11A nothing; the
 // classes whose AI is not ported here take the default, 0x17270)
