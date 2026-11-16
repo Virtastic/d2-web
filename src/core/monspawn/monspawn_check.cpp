@@ -1278,10 +1278,11 @@ static void sessionMirrorPacket(const void* client, const uint8_t* p, uint32_t n
     else DUNGEON_UnsetClientIsInSight(g_sessionMirrorAct, level, x, y, nullptr);
 }
 extern "C" void D2WEB_SetSessionPacketTap(void (*tap)(const void*, const uint8_t*, uint32_t));
+extern "C" void d2_session_weather_drop();   // below: drops a weather pass left pending
 static void resetSessionClientMapMirror() {
     if (g_sessionClientPlayerUnit) UNITS_FreeUnit(g_sessionClientPlayerUnit);
     g_sessionClientPlayerUnit = nullptr;
-    d2client::weather::reset(); d2client_ambient::reset(); d2_client_monster_idle_reset(); sessionClientMonsterModeReset(); d2_client_attack_roll_reset(); g_sessionClientRoomsSeen.clear(); g_sessionClientPresets.clear(); g_sessionReleasedRooms.clear(); g_clientSpotMissiles.clear(); g_sessionClientFrame = 0; d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset(); { extern void d2_client_monster_hit_reset(); d2_client_monster_hit_reset(); }
+    d2client::weather::reset(); d2_session_weather_drop(); d2client_ambient::reset(); d2_client_monster_idle_reset(); sessionClientMonsterModeReset(); d2_client_attack_roll_reset(); g_sessionClientRoomsSeen.clear(); g_sessionClientPresets.clear(); g_sessionReleasedRooms.clear(); g_clientSpotMissiles.clear(); g_sessionClientFrame = 0; d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset(); { extern void d2_client_monster_hit_reset(); d2_client_monster_hit_reset(); }
     if (g_sessionTownAct) { DUNGEON_FreeAct(g_sessionTownAct); g_sessionTownAct = nullptr; }   // after the critters that stand in it
     g_sessionTownUnits = 0; g_sessionTownBuilt = false; g_sessionTownSighted.clear();
     g_sessionMirrorSeen.clear(); g_sessionMirrorTownCounted.clear();
@@ -2708,6 +2709,16 @@ EMSCRIPTEN_KEEPALIVE void d2_session_client_join_level(int on) { g_sessionJoinLe
 static bool g_sessionClientDraws = true;
 extern "C" void d2client_sound_trace_weather(bool on);   // sound_pump.cpp
 EMSCRIPTEN_KEEPALIVE void d2_session_client_draws(int on) { g_sessionClientDraws = on != 0; d2client_sound_trace_weather(on != 0); }
+// The weather pass 0x81340 is called by the render 0x44230, which follows the frame's unit pass 0x44A80 (A8110 -> 2B1E0): the
+// unit pass's hero-seed draws (an item's gleam, 0x6B300) come first. The step leaves the frame's pass pending; the frame's G
+// pass runs it once its unit pass clock has run (d2_session_weather_flush), and a frame that is not drawn runs it at the next step.
+static struct { bool pending; uint32_t* seed; d2client::weather::Env env; } g_weatherPending{};
+extern "C" void d2_session_weather_flush() {
+    if (!g_weatherPending.pending) return;
+    g_weatherPending.pending = false;
+    d2client::weather::tick(*reinterpret_cast<d2client::weather::Seed*>(g_weatherPending.seed), g_weatherPending.env);
+}
+extern "C" void d2_session_weather_drop() { g_weatherPending.pending = false; }
 // What the join walk sent the client (room reveals, then the units in them): a connected client is owed these bytes, a
 // headless session never reads them. Recorded whole, not cut from the bounded per-tick stream: a join walk over a level
 // seam sends more than that stream holds, and the units past its end (the far rooms' objects and monsters) were never
@@ -8876,6 +8887,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             else if (wasMoving) syncSessionLevelFromPlayer();
         }
         syncSessionClientMapFromPlayer();
+        d2_session_weather_flush();   // the last frame's weather pass, when no G pass ran it
         // 1.13c D2Client+0xC9BE0 / 0x72C20: the client sees the Hurricane state the server set this frame.
         d2client_hurricane::tick(g_targetPlayer, sessionClientHeroSeed());
         d2client_vine::tick(g_targetPlayer);   // 1.13c D2Client+0xC50F0 (cltactivefunc 89, state vine_beast)
@@ -8923,7 +8935,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
               d2client_ambient::tick(heroSeed, ev ? (uint32_t)ev->nCycleIndex : 0u, env.weatherLevel); }
             d2client_sound_stage_log();
             roomPass();
-            if (g_sessionClientDraws) d2client::weather::tick(*reinterpret_cast<d2client::weather::Seed*>(heroSeed), env);
+            if (g_sessionClientDraws) { g_weatherPending.seed = heroSeed; g_weatherPending.env = env; g_weatherPending.pending = true; }
         }
         { extern void d2_client_monster_order_unit(uint32_t); d2_client_monster_order_unit(~0u); }   // orders of units the unit pass did not reach
         sessionClientMonsterHitSounds(~0u);

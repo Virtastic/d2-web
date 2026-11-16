@@ -130,7 +130,8 @@ static void clockUnits(int32_t first, int32_t tick) {
 // The shell names the frame before its room walk; the walk, once it has fed its units, runs the frame's unit pass clock so
 // the draw sees this frame's overlay state. Without either the frame tail runs it.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_frame_clock_begin(int32_t first, int32_t tick) { g_begin = 1; g_beginFirst = first; g_beginTick = tick; }
-extern "C" void d2_client_frame_clock_units() { if (g_begin == 1) { clockUnits(g_beginFirst, g_beginTick); g_begin = 2; } }
+extern "C" void d2_session_weather_flush();   // monspawn_check.cpp: the frame's weather pass 0x81340, after the unit pass
+extern "C" void d2_client_frame_clock_units() { if (g_begin == 1) { clockUnits(g_beginFirst, g_beginTick); g_begin = 2; } d2_session_weather_flush(); }
 // A ground item's overlay 0x46 as 6AEE0 draws it: 1 with the row's offsets and Trans when it is shown and its frame is in range.
 extern "C" int d2_client_item_gleam(uint32_t id, int32_t* dx, int32_t* dy, uint32_t* trans) {
     auto it = g_gleam.find(id);
@@ -152,6 +153,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first
     const uint32_t walk = d2_session_walk_rooms() + d2_dg_n9e970() + d2_dg_n9ee90() + d2_dg_n13a00();
     if (g_begin != 2 || g_beginTick != tick) clockUnits(first, tick);
     g_begin = 0;
+    d2_session_weather_flush();
     uint32_t now;
     if (first) {
         g_clk += 3 + walk + 1; now = g_clk;                      // 44AC1, C154D, 8AFDA, the walk, 10ECF
