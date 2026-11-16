@@ -62,6 +62,7 @@ extern "C" int d2_session_gleam_roll(uint32_t id, uint32_t* pos);   // monspawn_
 extern "C" const uint8_t* d2_dg_overlay_row(int32_t row, uint32_t* dccFrames);
 uint32_t& d2client_frame_clock() { return g_clk; }   // npc_speech_start.cpp: its reads advance the same clock
 void d2client_npc_speech_frame(uint32_t tick);       // npc_speech_start.cpp: 0x7EA90 -> 0x7E970, the speech window step
+extern "C" uint32_t d2client_item_packet_held();   // item_container_packet.cpp
 extern "C" uint32_t d2_dg_n9e970();
 extern "C" uint32_t d2_dg_n9ee90();
 extern "C" uint32_t d2_dg_n13a00();
@@ -109,6 +110,7 @@ static void clockUnits(int32_t first, int32_t tick) {
             if ((int32_t)g.len <= (int32_t)g.pos) { g.pos -= g.len; g.vis = 0; g.last = ++g_clk; }
         }
         g_clk += U - done;
+        g_clk += d2client_item_packet_held();                    // the item hash walk: the held items the room walk does not count
     };
     if (first) {
         g_frames = g_lastReset = 0; g_fn14.clear(); g_gleam.clear();

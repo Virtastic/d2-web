@@ -147,6 +147,7 @@ extern "C" int D2WEB_NpcAlertActive(int32_t guid) {
 }
 static D2GSPacketSrv27 g_d2webLastDialogPacket = {};
 static bool g_d2webHasDialogPacket = false;
+extern "C" void d2_client_item_packet(const uint8_t* p, int32_t n);   // d2client/item_container_packet.cpp (replay only)
 extern "C" void d2_client_npc_speech_packet(const D2GSPacketSrv27* p27, uint32_t guid);   // d2client/npc_speech_start.cpp (replay only)
 extern "C" void d2_client_4bc80_reply(const uint8_t* p, uint32_t n);   // d2client/d2client_4bc80.cpp (replay only)
 
@@ -904,6 +905,8 @@ void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, in
                 if (g_d2webRoutedSink) g_d2webRoutedSink(slot, static_cast<const uint8_t*>(pPacket), (uint32_t)nPacketSize);
                 return;
             }
+    // replay only: the session client's item hash follows the item packets 0x9C/0x9D/0x0A
+    if (pClient && pPacket) d2_client_item_packet(static_cast<const uint8_t*>(pPacket), nPacketSize);
     // The headless client has no socket, but packet 0x27 is the recovered durable boundary
     // between quest callbacks and the client dialogue menu. Preserve its exact fixed-width
     // payload for pointer-free session observation; all other network sends remain no-ops.

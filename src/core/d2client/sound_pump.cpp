@@ -227,8 +227,9 @@ void d2client_sound_log_at(uint32_t tick, uint32_t ord, uint32_t ecx, uint32_t e
     logA(ord, ecx, edx);
 }
 void d2client_npc_speech_reset();   // npc_speech.cpp
+void d2client_item_packet_reset();   // item_container_packet.cpp
 extern "C" {
-EMSCRIPTEN_KEEPALIVE void d2_snd_trace_reset() { out.clear(); armed = true; unitQ.clear(); sndHandle = 0; d2client_npc_speech_reset(); }
+EMSCRIPTEN_KEEPALIVE void d2_snd_trace_reset() { out.clear(); armed = true; unitQ.clear(); sndHandle = 0; d2client_npc_speech_reset(); d2client_item_packet_reset(); }
 EMSCRIPTEN_KEEPALIVE const char* d2_snd_trace_ptr() { return out.c_str(); }
 EMSCRIPTEN_KEEPALIVE uint32_t d2_snd_trace_len() { return (uint32_t)out.size(); }
 // one pump pass at session tick `tick` (>= 1); the sound "now" counter is tick - 1 (0 at the first pass)
