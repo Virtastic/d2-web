@@ -481,6 +481,17 @@ static_assert(sizeof(D2MonStatsTxt) == 0x1A8, "the monstats row 1.13c D2Client+0
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_missile_row(int32_t cls) {
     return d2_drlg_init() ? (uint32_t)(uintptr_t)DATATBLS_GetMissilesTxtRecord(cls) : 0;
 }
+// The Overlay.txt row (0x84 bytes, sgptDataTables+0xBBC) and the frames per direction of its DCC, data\global\overlays\<file>.dcc
+// (the u32 at +3, which D2Client+0x6E9C0 reads for a client overlay node's length): null / 0 for a row out of range or a file that does not load.
+extern "C" EMSCRIPTEN_KEEPALIVE const uint8_t* d2_dg_overlay_row(int32_t row, uint32_t* dccFrames) {
+    if (dccFrames) *dccFrames = 0;
+    if (!d2_drlg_init() || row < 0 || row >= (int32_t)sgptDataTables->nOverlayTxtRecordCount || !sgptDataTables->pOverlayTxt) return nullptr;
+    const D2OverlayTxt* o = &sgptDataTables->pOverlayTxt[row];
+    char path[96]; std::snprintf(path, sizeof path, "data\\global\\overlays\\%.64s.dcc", o->szFilename);
+    std::vector<uint8_t> f;
+    if (dccFrames && d2::sharedVfs().read(path, f) && f.size() >= 7) std::memcpy(dccFrames, f.data() + 3, 4);
+    return reinterpret_cast<const uint8_t*>(o);
+}
 extern "C" EMSCRIPTEN_KEEPALIVE uint8_t d2_dg_monstats_0d(int32_t cls) {
     const D2MonStatsTxt* m = d2_drlg_init() ? DATATBLS_GetMonStatsTxtRecord(cls) : nullptr;
     return m ? reinterpret_cast<const uint8_t*>(m)[0xd] : 0;

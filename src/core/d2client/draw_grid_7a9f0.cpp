@@ -256,7 +256,8 @@ uint32_t g_unitId[kMaxUnits];
 constexpr uint32_t kMaxWalked = 4096; uint64_t g_walked[kMaxWalked]; uint32_t g_nWalked;   // type << 32 | id of every client unit whose +0xC8 bit7 is set
 static uint32_t walkedFind(uint64_t key) { uint32_t i = 0; while (i < g_nWalked && g_walked[i] != key) ++i; return i; }
 // The client unit fields the hit flash reads (unit +0x58 the counter, stat 6 the life; the client's maximum life is 0x80 << 8).
-struct HitState { uint32_t type, id, c58; int32_t life; };
+// ov: the unit's client info block (unit +0x54) as its overlay list reads it, +0x2C the head of the 0xA8-byte timed nodes (+0xA4 the next).
+struct HitState { uint32_t type, id, c58; int32_t life; uint32_t ov[0x10]; };
 HitState g_hits[64]; uint32_t g_nHits;
 HitState* hitFind(uint32_t type, uint32_t id, bool add) {
     for (uint32_t i = 0; i < g_nHits; i++) if (g_hits[i].type == type && g_hits[i].id == id) return &g_hits[i];
@@ -372,7 +373,61 @@ EMSCRIPTEN_KEEPALIVE void d2_dg_unit_hit(uint32_t type, uint32_t id, uint32_t li
     if (v) h->life = (int32_t)(v << 8);
     h->c58 = 3;
 }
-EMSCRIPTEN_KEEPALIVE void d2_dg_hit_reset() { g_nHits = 0; }
+static void ovFree(HitState& h) {
+    for (uint32_t n = h.ov[0x2c / 4]; n;) { uint32_t nx = ((const uint32_t*)(uintptr_t)n)[0x29]; free((void*)(uintptr_t)n); n = nx; }
+    h.ov[0x2c / 4] = 0;
+}
+EMSCRIPTEN_KEEPALIVE void d2_dg_hit_reset() { for (uint32_t i = 0; i < g_nHits; i++) ovFree(g_hits[i]); g_nHits = 0; }
+extern "C" const uint8_t* d2_dg_overlay_row(int32_t row, uint32_t* dccFrames);   // drlg_check.cpp
+// 1.13c D2Client+0x6B300 for a play-once overlay (kind 2) on a unit: a zeroed 0xA8-byte node {+0 kind 2, +4 the Overlay.txt row, +8 live 1,
+// +0x14 step AnimRate << 4, +0x18 position 0, +0x1C length = the DCC's frames per direction << 8 (0x6E9C0; 1 when it does not load),
+// +0x20 OffsetX, +0x24 OffsetY + Height2 (D2Common #10172 answers 1 for a player), +0x28 LoopWaitTime, +0x34 PreDraw}, put at the head
+// of the unit's list (info +0x2C). The row's light (Radius) is not hosted.
+static void ovAdd(HitState* h, int32_t row) {
+    uint32_t frames; const uint8_t* r = d2_dg_overlay_row(row, &frames);
+    if (!r) return;
+    auto f = [r](int o) { uint32_t v; memcpy(&v, r + o, 4); return v; };
+    uint32_t* n = (uint32_t*)calloc(0x2a, 4);
+    n[0] = 2; n[1] = (uint32_t)row; n[2] = 1; n[7] = frames ? frames << 8 : 1;
+    n[8] = f(0x54); n[9] = f(0x58) + f(0x60);
+    n[0xd] = r[0x48]; n[0x29] = h->ov[0x2c / 4]; h->ov[0x2c / 4] = (uint32_t)(uintptr_t)n;
+    n[5] = f(0x6c) << 4; n[10] = f(0x78);
+}
+// A player's get-hit (packet 0x0D {type u8, id u32, mode u8, x u16, y u16, hit class u8, life u8}): 1.13c D2Client+0x19830 on
+// mode 0x13 reads the hit class the handler stored at unit +0xB0; with both nibbles set, its high nibble picks the overlay it plays once.
+static void playerHitOverlay(uint32_t id, uint8_t cls) {
+    if (!(cls & 0x0f)) return;
+    int32_t row;
+    switch (cls >> 4) {
+        case 1: row = 0x36; break; case 2: row = 0x51; break; case 3: row = 0x24; break; case 4: row = 0x01; break;
+        case 7: row = 0x93; break; case 8: row = 0x15; break; case 9: row = 0x71; break;
+        default: return;
+    }
+    if (HitState* h = hitFind(0, id, true)) ovAdd(h, row);
+}
+struct D2cSeam6C130 {
+    uint32_t (*tick)(); uint32_t (*curId)(uint32_t); void (*unlink)(uint32_t, uint32_t); void (*queue)(uint32_t, const uint32_t*);
+    uint32_t (*o10494)(uint32_t, uint32_t); void (*cap)(uint32_t, uint32_t, uint32_t); void (*fatal)();
+};
+extern "C" void d2_client_6c130(uint32_t ctx, const D2cSeam6C130* s);
+// 1.13c D2Client+0x6C130 once a frame over every unit's list (the stamp is the frame count; an unlinked node is freed).
+static uint32_t g_ovTick;
+static void ovStep() {
+    ++g_ovTick;
+    static const D2cSeam6C130 s = {
+        []() -> uint32_t { return g_ovTick; }, [](uint32_t) -> uint32_t { return 0; },
+        [](uint32_t node, uint32_t ctx) {
+            uint32_t* head = (uint32_t*)(uintptr_t)(((const uint32_t*)(uintptr_t)ctx)[0x15] + 0x2c);
+            for (uint32_t* p = head; *p; p = &((uint32_t*)(uintptr_t)*p)[0x29])
+                if (*p == node) { *p = ((const uint32_t*)(uintptr_t)node)[0x29]; free((void*)(uintptr_t)node); return; }
+        },
+        [](uint32_t, const uint32_t*) {}, [](uint32_t, uint32_t) -> uint32_t { return 0; }, [](uint32_t, uint32_t, uint32_t) {}, []() {} };
+    for (uint32_t i = 0; i < g_nHits; i++) {
+        if (!g_hits[i].ov[0x2c / 4]) continue;
+        uint32_t ctx[0x16] = {}; ctx[0x15] = (uint32_t)(uintptr_t)g_hits[i].ov;
+        d2_client_6c130((uint32_t)(uintptr_t)ctx, &s);
+    }
+}
 // A server packet as the client receives it: the two that reach 0x4DC70's flash cases (0x69 {id u32, state u8, x u16, y u16,
 // life u8} in state 6 -> case 6; 0x0C {type u8, id u32, mode u8, word u8, life u8} in mode 0x13 -> case 0x13: its handler 0xAF5F0
 // passes byte +6 alone as the mode, byte +7 is the case's first word), each ending in 0xA4B60, apply as d2_dg_unit_hit.
@@ -380,6 +435,7 @@ EMSCRIPTEN_KEEPALIVE void d2_dg_server_packet(const uint8_t* p, uint32_t n) {
     auto u32 = [p](int o) { return (uint32_t)p[o] | (uint32_t)p[o + 1] << 8 | (uint32_t)p[o + 2] << 16 | (uint32_t)p[o + 3] << 24; };
     if (n >= 11 && p[0] == 0x69 && p[5] == 6) d2_dg_unit_hit(1, u32(1), p[10]);   // a monster
     else if (n >= 9 && p[0] == 0x0C && p[6] == 0x13) d2_dg_unit_hit(p[1], u32(2), p[8]);
+    else if (n >= 13 && p[0] == 0x0D && p[1] == 0 && p[6] == 0x13) playerHitOverlay(u32(2), p[11]);
 }
 // The staged unit k's fp16 position fraction (the client unit's path; a static unit ignores it).
 EMSCRIPTEN_KEEPALIVE void d2_dg_stage_unit_frac(uint32_t k, uint32_t fx, uint32_t fy) {
@@ -556,6 +612,23 @@ static uint32_t pal53a30() {
     if (!tab) tab = (uint8_t*)calloc(0x1008, 1);
     return (uint32_t)(uintptr_t)(tab + 4 + 2 * 0x100);
 }
+static HitState* curHit();
+// 1.13c D2Client+0x6AEE0's walk of the unit's overlay list after its 10013 (#10013 answers 0: the plain place, X - (DAT_6fbc9960 -
+// DAT_6fbcc418), Y - (DAT_6fbc995c - 8), less 8 when hidden; info +0x30 is null): a node whose PreDraw matches the pass (pass 1 before
+// the layers, 0 after them) and whose frame (+0x18 >> 8) is below its length (+0x1C >> 8) draws through #10041 at its offset (+0x20,
+// +0x24) in the row's Trans mode, ecx = y and edx = x at the call (0x6fb1b11d).
+static void ovDraw(i32_ pass, i32_ hid) {
+    const HitState* h = curHit();
+    if (!h) return;
+    const int32_t X = g_hpx - g_uox, Y = g_hpy - g_uoy + 8 - (hid ? 8 : 0);
+    for (uint32_t a = h->ov[0x2c / 4]; a; a = ((const uint32_t*)(uintptr_t)a)[0x29]) {
+        const uint32_t* n = (const uint32_t*)(uintptr_t)a;
+        if ((n[0xd] != 0) != (pass != 0)) continue;
+        const uint8_t* r = d2_dg_overlay_row((int32_t)n[1], nullptr);
+        if (!r) continue;
+        if (((int32_t)n[6] >> 8) < ((int32_t)n[7] >> 8)) rec10041(X + (int32_t)n[8], Y + (int32_t)n[9], r[0x7c], 0, 0);
+    }
+}
 static const D2c6C490Env kE6c490 = {
     [](u32_ a) { u32_ v; memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }, [](u32_ a) -> u32_ { return *(const uint8_t*)(uintptr_t)a; },
     // 10175: the unit's mode, 1 (the staged node's key); 10350 leaves the type/class read off the unit.
@@ -565,7 +638,7 @@ static const D2c6C490Env kE6c490 = {
     []() -> i32_ { gRec(10036, {}, g_lecx, g_ledx); return 0; },
     // 6AEE0's 10013: opening (0x6fb1c5e3) ecx = 6A3D0's leftover, edx = 6C490's second argument; closing (0x6fb1cb01) ecx = the layer count, edx = the hidden flag.
     [](i32_) {}, [](u32_, i32_ x, i32_ y, i32_ f) -> i32_ { return cull6a3d0(x, y, f); },
-    [](u32_, u32_ a, i32_ open, i32_, i32_, i32_ hid) { if (open) g_ledx = a; else { g_lecx = g_hhdr[0] & 0xff; g_ledx = (u32_)hid; } rec10013(); },
+    [](u32_, u32_ a, i32_ open, i32_, i32_, i32_ hid) { if (open) g_ledx = a; else { g_lecx = g_hhdr[0] & 0xff; g_ledx = (u32_)hid; } rec10013(); ovDraw(open, hid); },
     [](u32_, u32_* f, u32_*) { *f = g_hframe; },   // #10569: the frame (the count is not read)
     // D2Gfx #10164 (called with unit+0x6C set): the colour shift table's row for index - 1, a pointer (its bytes are not read here).
     [](u32_) -> u32_ { static uint8_t* t = nullptr; if (!t) t = (uint8_t*)calloc(0x100, 1); return (u32_)(uintptr_t)t; },
@@ -757,6 +830,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
     // reloaded at 0x6fac3c23).
     if (rd(kSq) & 2) { ++g_n13a00; rec10013(); gRec(10047, {}); gRec(10054, {}, 0, 4u << 14); }
     else gRec(10054, {}, g_lecx, 0);
+    ovStep();   // the next frame's 6C130, which runs before that frame's packets
     return g_gout.c_str();
 }
 }
