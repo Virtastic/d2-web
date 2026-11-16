@@ -333,9 +333,9 @@ int32_t __fastcall PLAYER_IsBusy(D2UnitStrc* pUnit)
         return 0;
     }
 
-    int32_t nUnitType = 0;
-    int32_t nUnitGUID = 0;
-    if (SUNIT_GetInteractInfo(pUnit, &nUnitType, &nUnitGUID) || INVENTORY_GetCursorItem(pUnit->pInventory))
+    // 1.13c tests the low byte of the interact field inline (mov al,[esi+0x6C]); 1.10f called
+    // SUNIT_GetInteractInfo, which returns the whole 16-bit field.
+    if ((uint8_t)pUnit->nInteract || INVENTORY_GetCursorItem(pUnit->pInventory))
     {
         return 1;
     }
