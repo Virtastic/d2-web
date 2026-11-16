@@ -640,7 +640,9 @@ static const H6cc00 kH6cc00 = {
     // 6CC00's 10013 (0x6fb1cc0b): ecx = the unit (reads 0), edx = its edx argument.
     []() -> uint32_t { g_lecx = 0; g_ledx = g_p6cc00; return rec10013(); }, []() -> uint32_t { return 0; }, [](uint32_t, void*, void*, void*) {}, [](uint32_t) -> uint8_t { return 0; }, [](uint32_t) {}, []() -> uint32_t { return 0; },
     [](uint32_t) -> int { return 0; }, [](uint32_t, int, int) -> uint32_t { return 0; }, [](void*, int, int) -> int { return 1; }, [](int, uint32_t, void*, int) -> int { return 0; },
-    [](uint32_t m, int32_t x, int32_t y, uint32_t, uint32_t col, int32_t pal) { rec10041(x, y, col, m ? (uint32_t)pal : 0, 1, m != 0); }, gateA4b90,
+    // the item draw (0x6fb1cfe0) follows D2Common #10893 (the item's transform palette), which leaves ecx and edx 0
+    [](uint32_t m, int32_t x, int32_t y, uint32_t, uint32_t col, int32_t pal) {
+        if (m) rec10041(x, y, col, (uint32_t)pal, 1, true); else gRec(10041, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, col, 0}, 0, 0); }, gateA4b90,
     []() { d2_client_6b700((uint32_t)(uintptr_t)g_hu, &kH6b700, 0, 640, g_uoy, g_uox, 0); },
     [](uint32_t u, int32_t dx, int32_t dy) -> int { return d2c_6c490(&kE6c490, g_hpy + dy, u, g_p6cc00, g_hpx + dx, 0, 1, g_uox, 0, g_uoy, 0, 640, g_hself, 0, 0, 0); },
     [](uint32_t, void* r) -> int { uint32_t* w = (uint32_t*)r; w[16] = 0; w[17] = (uint32_t)g_hpy; return 1; }, []() -> uint32_t { return g_hself; }, []() -> uint32_t { return d2_dg_missile_row((int32_t)g_hu[1]); },

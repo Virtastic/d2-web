@@ -78,9 +78,11 @@ int d2_client_6cc00(uint32_t p, uint32_t param2, const H6cc00* h, uint32_t glob_
     mode = t[0];
     if (mode != 3) {
         uint32_t col = self ? 7 : 5;
-        int32_t pal = (int32_t)rec[18];
-        if (mode == 4 && h->ord10893(0, p, &rec[16], 0)) pal = (int32_t)rec[18];  // GUESS: out replaces palette
-        h->ord10041(0, x, (int32_t)rec[17], a, col, pal);
+        // an item takes the transform #10893 answers (0x6fb1cf34: its non-zero result is the palette argument), else the record's;
+        // the y is the one both branches computed (rec y + 8 - the unit origin y, stored back over the record's slot)
+        int32_t pal = mode == 4 ? h->ord10893(0, p, &rec[16], 0) : 0;
+        if (!pal) pal = (int32_t)rec[18];
+        h->ord10041(0, x, y, a, col, pal);
         if (rec[13]) h->sub_1aee0(p, a, 0, -1, -1, 0);
         return 1;
     }

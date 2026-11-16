@@ -12472,6 +12472,10 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
                 // +0xC8 bit7 (the shadow node) is set by the unit draw's 0x66620 step, so a missile carries it from the walk after
                 // the first frame it is drawn on; its shadow step (D2Client+0x6BA90) then leaves on the +0xC4 bit5 the missile init sets.
                 drawn = born + (mt && mt->nInitSteps ? (uint32_t)mt->nInitSteps + 2 : 0);
+            } else if (u->dwUnitType == UNIT_ITEM && u->pStaticPath) {
+                // a ground item the client was sent (0x9C) is a unit of its room's list: the cell walk draws it through D2Client+0x6CC00's
+                // item path (6E2C0's type-4 arm), at its static path position
+                x = u->pStaticPath->tGameCoords.nX; y = u->pStaticPath->tGameCoords.nY;
             } else continue;
             ++g_walkUnits;
             if (u->dwUnitType == UNIT_OBJECT) objs.push_back({u->dwUnitId, u->pObjectData->pObjectTxt->nClientFn == 14});
