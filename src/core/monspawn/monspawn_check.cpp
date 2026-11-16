@@ -720,6 +720,7 @@ static void clientRoomActivate(D2ActiveRoomStrc* room, int levelId) {
     }
 }
 extern "C" int32_t d2_client_walk_tick(uint32_t); extern "C" void d2_client_walk_reset();  // src/core/d2client/client_walk_path.cpp
+extern "C" void d2_client_play_sound_reset(uint32_t, uint32_t, int32_t);  // src/core/d2client/play_sound_queue.cpp
 // D19: an object's client-side animation clock, apart from the server unit's (retail's headless server never advances it;
 // the retail captures). Rebuilt from Objects.txt whenever the mode changes.
 // `mode` is the server's; `shown` the effective mode. Retail's D2Client stepper (D2Client+0x25660) flips a
@@ -12489,6 +12490,7 @@ EMSCRIPTEN_KEEPALIVE void d2_session_destroy() {
     g_sessionMonsterLights.clear();
     g_sessionRigJoined = false;
     resetSessionClientMapMirror();
+    d2_client_play_sound_reset(0, 0, 0);   // leaving the game frees every queued and playing sound: the next game's queue starts empty
     d2_monspawn_reset(); g_sessionLive = false; g_sessionMovePending = false;
     g_sessionAttackTarget = nullptr; g_sessionAttackSkill = nullptr;
     g_sessionApproachKind = 0; g_sessionApproachTarget = 0;
