@@ -746,8 +746,13 @@ EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
     // lists (cell+0x1C) layer by layer 1..4; a node whose tile is hidden or pitch black (0x408) is skipped, the rest are
     // clipped against the ctx rect (+0x14..+0x20) and drawn by 10076. Only the head is emitted: this ctx carries no clip
     // rect, no roof cel and no fade timer, so the roof draws themselves are not modelled (the recordings hold no 10076).
-    if (rd(kSq) & 2) { rec10013(); gRec(10047, {}); }
-    gRec(10054, {});   // 1.13c D2Client+0x8B110 tail: Ordinal_10054() after the 4EE90 cell walk
+    // 1.13c D2Client+0x8B110 tail: Ordinal_10054(). Nothing between the 9EE90 cell walk's last 666D0 return and this call
+    // writes ecx (9EE90's loop tail touches only esi/ebp/ebx; an empty cell skips its colour code), so the record carries
+    // the walk's leftover ecx; edx is the gdwBitMasks pointer the roof test loads (0x6fb3b288, reads 0). After 13A00 it
+    // carries that pass's exit: ecx = the ctx (reads 0), edx = its last layer's mask word, layer 4 << 14 (0x6fac3a7c,
+    // reloaded at 0x6fac3c23).
+    if (rd(kSq) & 2) { rec10013(); gRec(10047, {}); gRec(10054, {}, 0, 4u << 14); }
+    else gRec(10054, {}, g_lecx, 0);
     return g_gout.c_str();
 }
 }
