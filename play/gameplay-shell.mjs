@@ -392,7 +392,7 @@ let walkMemory = null;
 const clickDispatch = []; let clickDispatchN = 0;
 let walkPlannerContext = null;
 const noteClick = (x, y, button) => {
-  const record = { n: ++clickDispatchN, screen, button, at: [Math.round(x), Math.round(y)],
+  const record = { n: ++clickDispatchN, screen, button, at: [Math.round(x), Math.round(y)], point: [x, y],
     hero: snapshot?.player
       ? { hp: snapshot.player.hp, hpMax: snapshot.player.hpMax, mode: snapshot.mode }
       : { hp: 0, hpMax: 0, mode: null },
@@ -2897,6 +2897,11 @@ function armWalk(goal) {
 
 function walkStep() {
   if (!walkGoal || !session) return;
+  // A joined client's level is its map reveal's, which follows a hero put on a new level (a seam command, a respawn)
+  // only once he first moves there: a level change under a hero who stepped no more than a subtile is that view
+  // catching up, not a warp, and the goal stays.
+  if (walkGoal.level !== snapshot.level && clientView().fromPackets && walkLast
+    && chebyshev(snapshot.player.x, snapshot.player.y, walkLast.x, walkLast.y) <= 1) walkGoal.level = snapshot.level;
   if (walkGoal.level !== snapshot.level) {
     // The goal belongs to the level where its click was made. A warp or seam invalidates its
     // coordinates; discard it before the next per-frame hop can issue a move in the new level.
@@ -3240,9 +3245,11 @@ function update(forceTick = false, live = false) {
           result: 1, held: Boolean(command.held), serial: ++lastSkillCommandSerial };
       } else if (command.type === COMMAND.MOVE && !command.directional && command === pointerMoves.at(-1)) {
         lastMoveCommand = { type: command.type, x: command.x, y: command.y, directional: false, held: !!command.held };   // the pointer command this packet answers
-        const hit = realmInput().leftClick(command.x, command.y, { held: Boolean(command.held), stand: heldStandStillKeys.size > 0 });
-        // What the packet path resolved the click to (the unit it acted on and its cell), on the click's own record.
+        // A press is picked at the pointer's own point, as the scene's hover tests it (the command carries it rounded).
         const rec = clickDispatch.findLast((r) => r.spent === 'world' && r.button === 0 && r.hit === undefined);
+        const [px, py] = !command.held && rec && rec.at[0] === command.x && rec.at[1] === command.y ? rec.point : [command.x, command.y];
+        const hit = realmInput().leftClick(px, py, { held: Boolean(command.held), stand: heldStandStillKeys.size > 0 });
+        // What the packet path resolved the click to (the unit it acted on and its cell), on the click's own record.
         if (rec) { rec.hit = hit?.kind ?? null; if (hit?.unit) rec.walkTo = [hit.unit.x, hit.unit.y]; }
       } else if (command.type === COMMAND.MOVE && command.directional && !heldStandStillKeys.size) {
         realmInput().step(command.x, command.y);
@@ -4108,6 +4115,7 @@ function realmInput() {
       const camera = worldToScreen(cameraCentre().x, cameraCentre().y);
       return { ready: true, player: { x: Math.round(me.x), y: Math.round(me.y) }, playerMode: snapshot?.mode, cursorId: realmWorldState?.cursorId ?? 0,
         monsters: realmSceneEvidence?.monsters ?? [], objects: snapshot.objects ?? [], items: snapshot.items ?? [], warps: snapshot.warps ?? [], warpAt: warpUnderPointer,
+        objectAt: session && objectRenderer?.measure ? (px, py) => objectUnderPointer(px, py) : null,
         players: realmSceneEvidence?.players ?? [], inTown: TOWN_LEVELS.includes(realmWorldView?.mapLevel),
         isNpc: (classId) => realmTables().monsters.isNpc(classId),
         itemRow: (classId) => realmTables().items.byClass(classId),
@@ -4848,6 +4856,10 @@ function drawFrame() {
           mode: r.mode, direction: r.direction, framePrecise: r.framePrecise ?? null, frameCountPrecise: r.frameCountPrecise ?? null,
           motionActive: r.framePrecise !== undefined, selected: false, clientRoomLevel: entity.clientRoomLevel,
           anchorX: Math.round(sx), anchorY: Math.round(sy), drawn: Boolean(drawn), evidence: drawn || null, error });
+        // A player unit in the dead mode is a corpse: its draw is the corpse evidence, as on the engine-view path.
+        if (entity.mode === 17) corpseEvidence = { unit: { id: entity.id, classId: entity.classId, x: entity.x, y: entity.y, mode: entity.mode,
+          direction: entity.direction, hasDynamicPath: entity.hasDynamicPath }, anchor: { x: Math.round(sx), y: Math.round(sy) },
+          engineDirection: entity.direction, hasDynamicPath: entity.hasDynamicPath, renderedDccDirection: drawn?.direction, ...(drawn || {}), ...(error ? { error } : {}) };
       } });
       continue;
     }

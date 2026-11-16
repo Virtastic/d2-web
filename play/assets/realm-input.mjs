@@ -157,7 +157,8 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     if (corpse) return { kind: 'corpse', unit: corpse };
     const item = s.items.filter((i) => i.mode === 3 && spot(i)).sort((a, b) => d2(a) - d2(b))[0];
     if (item) return { kind: 'item', unit: item };
-    const object = s.objects.filter((o) => o.selectable !== false && spot(o)).sort((a, b) => d2(a) - d2(b))[0];
+    // An object is picked by its drawn box (the scene's own object hit test) when the scene has one.
+    const object = s.objectAt ? s.objectAt(px, py) : s.objects.filter((o) => o.selectable !== false && spot(o)).sort((a, b) => d2(a) - d2(b))[0];
     if (object) return { kind: 'object', unit: object };
     // A level exit is a tile unit: the scene's own hit test (the one a local game hovers with) names it.
     const warp = s.warpAt?.(px, py);

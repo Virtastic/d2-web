@@ -2381,7 +2381,7 @@ static const RealmSkillDoHost& client_skill_do_host() {
     };
     return host;
 }
-struct RealmMissileCollision { D2UnitStrc* missile; D2UnitStrc* owner; uint32_t hitGuid = 0xffffffffu; };
+struct RealmMissileCollision { D2UnitStrc* missile; D2UnitStrc* owner; uint32_t hitGuid = 0xffffffffu; D2UnitStrc* hit = nullptr; };
 static int __fastcall ordinary_projectile_target(D2UnitStrc* target, void* context) {
     auto* collision = static_cast<RealmMissileCollision*>(context);
     // 0xB1000: a target carrying the NextHit state is not a hit for a NextHit missile.
@@ -2400,6 +2400,7 @@ static int __fastcall ordinary_projectile_target(D2UnitStrc* target, void* conte
     if (it == g_monsters.end() || it->ownerGuid != 0) return 0;
     if (STATLIST_AreUnitsAligned(target, collision->owner)) return 0;
     collision->hitGuid = target->dwUnitId;
+    collision->hit = target;
     return 1;
 }
 static int __fastcall query_specific_monster(D2UnitStrc* target, void* context) {
@@ -2568,10 +2569,11 @@ static void advance_client_missiles() {
             }
             if (collided) hitGuid = context.hitGuid;
             if (collided && hitGuid != 0xffffffffu) {
-                // 0xB1420 with a unit: at its own target point (10227) there is no hit; otherwise a NextHit
+                // 0xB1420 with a unit: a hit on the LastCollide missile's own owner (1.13c #10227 is
+                // D2Common+0x6A130, MISSILE_CheckUnitIfOwner(missile, hit), not D2MOO's 1.10f 10227) is no hit; otherwise a NextHit
                 // missile holds the target for NextDelay frames, the hit plays, and a missile whose
                 // CollideKill is 0 is not freed. 0xB17C0 returns after a unit hit either way.
-                if (D2Common_10227(unit)) break;
+                if (MISSILE_CheckUnitIfOwner(unit, context.hit)) break;
                 if (txt->nNextHit) {
                     g_clientNextHits.erase(std::remove_if(g_clientNextHits.begin(), g_clientNextHits.end(),
                         [](const ClientNextHit& n) { return n.until <= g_clientMissileTick; }), g_clientNextHits.end());

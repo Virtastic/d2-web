@@ -93,7 +93,7 @@ bool terminal(D2UnitStrc* unit, D2UnitStrc* owner, bool wall, D2UnitStrc* target
     bool play = true;
     if (target) {
         if (txt->nNextHit && nextHitHeld(target)) return false;
-        if (D2Common_10227(unit)) return false;   // at its own target point: no hit
+        if (MISSILE_CheckUnitIfOwner(unit, target)) return false;   // 1.13c #10227 (D2Common+0x6A130): its own owner is no hit
         if (!(target->dwFlags & 0x4u)) return false;
         if (owner && STATLIST_AreUnitsAligned(target, owner) && !txt->nCollideFriend) return false;
     } else if (!wall && !txt->nAlwaysExplode) play = false;
