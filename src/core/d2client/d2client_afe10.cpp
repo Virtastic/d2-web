@@ -37,5 +37,5 @@ extern "C" uint32_t d2c13_afe10(const Env& e, const GEnv& g) {
     e.W(g.G(0xfae24), e.H(0xcef5c));
     e.W(g.G(0xfae20), 0);
     cb(0xafd30);
-    return e.H(0x109c0);   // tail jump: EAX is the callee's
+    return e.H(0x109c0);
 }

@@ -20,11 +20,13 @@ struct H6cc00 {
     void (*ord10041)(uint32_t, int32_t, int32_t, uint32_t, uint32_t, int32_t);
     bool (*sub_54b90)(void);
     void (*sub_1b700)(void);
-    int (*sub_6c490)(uint32_t);
+    int (*sub_6c490)(uint32_t, int32_t dx, int32_t dy);  // dx/dy: what 6CC00 added to its x and y arguments
     int (*sub_6e2c0)(uint32_t, void*);
     uint32_t (*sub_01a80)(void);
     uint32_t (*sub_01580)(void);  // returns base of a config struct (+0x18d,+0x1a2)
     void (*sub_1aee0)(uint32_t, uint32_t, int, int, int, int);
+    const uint8_t* (*ord10688)(uint32_t cls);  // IAT thunk 0xC226: the object's objects.txt record
+    void (*fatal)(int line);
 };
 
 // 1.13c D2Client+0x6CC00
@@ -42,8 +44,17 @@ int d2_client_6cc00(uint32_t p, uint32_t param2, const H6cc00* h, uint32_t glob_
     uint32_t s30 = (p && rd32(p + 0x54)) ? rd32(rd32(p + 0x54) + 0x30) : 0;
     px += s30 ? (int32_t)rd32(s30 + 0x34) : 0;
     py += (s30 ? (int32_t)rd32(s30 + 0x38) : 0) + (s30 ? (int32_t)rd32(s30 + 0x3c) : 0);
-    (void)px; (void)py;
-    if (p && (int32_t)rd32(p) >= 0 && (int32_t)rd32(p) < 3) return h->sub_6c490(p);
+    // 0x6fb1ccf0: an object (the type 10350 left) reads its record; one whose Draw byte (+0x150) is 0 draws nothing, any
+    // other moves by the record's XOffset (+0x148) and YOffset (+0x14C).
+    if (t[0] == 2) {
+        const uint8_t* orec = h->ord10688(t[1]);
+        if (!orec) { h->fatal(0xafd); return 0; }
+        if (!orec[0x150]) return 0;
+        int32_t ox, oy;
+        __builtin_memcpy(&ox, orec + 0x148, 4); __builtin_memcpy(&oy, orec + 0x14c, 4);
+        px += ox; py += oy;
+    }
+    if (p && (int32_t)rd32(p) >= 0 && (int32_t)rd32(p) < 3) return h->sub_6c490(p, px, py);
 
     uint8_t shade = h->ord10663(p);
     h->ord10569(p);
@@ -63,6 +74,8 @@ int d2_client_6cc00(uint32_t p, uint32_t param2, const H6cc00* h, uint32_t glob_
     bool self = h->sub_01a80() == p;
     uint32_t a = shade;
     if (self) { a = (a & 0xff) * 2; if ((shade & 0xff) == 0x20 || a < 0x40) a = 0x40; else if (a > 0xfe) a = 0xff; }
+    // the dispatch tests the unit's type (the 10350 out slot), not Ordinal_10013: 3 = a missile (its Missiles.txt row, sub_01580), 4 = an item
+    mode = t[0];
     if (mode != 3) {
         uint32_t col = self ? 7 : 5;
         int32_t pal = (int32_t)rec[18];
@@ -77,6 +90,6 @@ int d2_client_6cc00(uint32_t p, uint32_t param2, const H6cc00* h, uint32_t glob_
     if (*(const char*)(uintptr_t)(c + 0x18d) == 2) col = 4;
     if (self) col = 7;
     int32_t pal = (*(const char*)(uintptr_t)(c + 0x1a2) == 0 || glob_cc380 == 0) ? (int32_t)rec[18] : glob_cc2d8;
-    h->ord10041(0, x, y, a, col, pal);
+    h->ord10041(1, x, y, a, col, pal);   // first argument 1: the missile draw (edx = the colour at the call)
     return 1;
 }

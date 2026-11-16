@@ -6,6 +6,7 @@
 #include <emscripten.h>
 #include <algorithm>
 #include <cstring>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -394,10 +395,12 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_drlg_client_room_status_cells(int levelId
 extern "C" int32_t d2_dg_stage_unit(uint32_t, int32_t, int32_t, int32_t, uint32_t, uint32_t, uint32_t);
 extern "C" void d2_dg_stage_unit_cof(uint32_t, const uint8_t*);
 extern "C" void d2_dg_stage_unit_palshift(uint32_t);
+extern "C" void d2_dg_stage_unit_anim(uint32_t, const uint8_t*, uint32_t, uint32_t, uint32_t, const uint8_t*);
 extern "C" void d2_dg_stage_unit_shift(uint32_t, uint32_t);
 extern "C" void d2_dg_stage_unit_frac(uint32_t, uint32_t, uint32_t);
 struct FeedUnit { int32_t type, cls, sx, sy; uint32_t flags, flagsEx; uint8_t cof[0x18]; bool hasCof;
-                  bool hasId; uint32_t id, mode, fx, fy; int32_t slot, rank, floor; bool palshift = false; uint32_t shift = 0; };
+                  bool hasId; uint32_t id, mode, fx, fy; int32_t slot, rank, floor; bool palshift = false; uint32_t shift = 0;
+                  const std::vector<uint8_t>* full = nullptr; bool hasAnim = false; uint32_t dir = 0, frame = 0; uint8_t ovr[16] = {}; };
 static std::vector<FeedUnit> g_feedUnits;   // the caller's per-tick client units (JS has no game logic: raw fields only)
 static bool g_cruLive;                      // a unit with an id was fed: rooms walk the persistent client room lists
 EMSCRIPTEN_KEEPALIVE void d2_dg_feed_unit(int type, int cls, int sx, int sy, uint32_t flags, uint32_t flagsEx) {
@@ -435,12 +438,25 @@ EMSCRIPTEN_KEEPALIVE int d2_dg_feed_unit_cof(const char* path) {
     std::vector<uint8_t> f;
     if (g_feedUnits.empty() || !path || !d2::sharedVfs().read(path, f) || f.size() < 0x18) return 0;
     memcpy(g_feedUnits.back().cof, f.data(), 0x18); g_feedUnits.back().hasCof = true;
+    {   // the whole file, kept per path for the walk (d2_dg_feed_unit_anim hands it on)
+        static std::map<std::string, std::vector<uint8_t>> whole;
+        auto it = whole.find(path);
+        if (it == whole.end()) it = whole.emplace(path, f).first;
+        g_feedUnits.back().full = &it->second;
+    }
     // a monster's class loads Data\Global\Monsters\<token>\COF\palshift.dat when present (D2Client+0x53C30, from the 0xAC handler)
     if (g_feedUnits.back().type == 1) {
         std::string p(path); size_t s = p.find_last_of('\\');
         if (s != std::string::npos && d2::sharedVfs().read((p.substr(0, s + 1) + "palshift.dat").c_str(), f) && !f.empty()) g_feedUnits.back().palshift = true;
     }
     return 1;
+}
+// The last fed unit's animation state for its COF's priority row and layer modes: the path direction (D2Common #10663), the frame
+// (#10569) and, per component, the draw mode its item record gives plus one (0 none; D2Client+0x6DFE0's item arm).
+EMSCRIPTEN_KEEPALIVE void d2_dg_feed_unit_anim(uint32_t dir, uint32_t frame, const uint8_t* ovr) {
+    if (g_feedUnits.empty()) return;
+    FeedUnit& u = g_feedUnits.back(); u.hasAnim = true; u.dir = dir; u.frame = frame;
+    if (ovr) memcpy(u.ovr, ovr, 16);
 }
 // An object class's objects.txt token (D2ObjectsTxt+0xC0, up to 3 chars, NUL-terminated): the name an object's COF path
 // is built from (data\global\objects\<token>\cof\<token><mode><weapon class>.cof). "" for a class outside the table.
@@ -451,8 +467,17 @@ EMSCRIPTEN_KEEPALIVE const char* d2_dg_object_token(int cls) {
     memcpy(tok, DATATBLS_GetObjectsTxtRecord(cls)->szToken, 3); tok[3] = 0;
     return tok;
 }
+// An object class's objects.txt row (D2Common #10688), as 1.13c D2Client+0x6CC00 reads it: XOffset +0x148, YOffset +0x14C, Draw +0x150.
+static_assert(offsetof(D2ObjectsTxt, dwXOffset) == 0x148 && offsetof(D2ObjectsTxt, dwYOffset) == 0x14C && offsetof(D2ObjectsTxt, nDraw) == 0x150, "the objects row D2Client+0x6CC00 reads");
+extern "C" const uint8_t* d2_dg_object_rec(uint32_t cls) {
+    return d2_drlg_init() ? reinterpret_cast<const uint8_t*>(DATATBLS_GetObjectsTxtRecord(int(cls))) : nullptr;
+}
 static_assert(sizeof(D2MonStatsTxt) == 0x1A8, "the monstats row 1.13c D2Client+0x68CF0 indexes");
 // A monster class's monstats byte +0xD (D2Client+0x68CF0 tests bit 4 for the blue flash). 0 for a class outside the table.
+// The Missiles.txt row of a client missile class (client 0x1580's table).
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_missile_row(int32_t cls) {
+    return d2_drlg_init() ? (uint32_t)(uintptr_t)DATATBLS_GetMissilesTxtRecord(cls) : 0;
+}
 extern "C" EMSCRIPTEN_KEEPALIVE uint8_t d2_dg_monstats_0d(int32_t cls) {
     const D2MonStatsTxt* m = d2_drlg_init() ? DATATBLS_GetMonStatsTxtRecord(cls) : nullptr;
     return m ? reinterpret_cast<const uint8_t*>(m)[0xd] : 0;
@@ -524,10 +549,11 @@ uint32_t d2_dg_feed_level(D2DrlgLevelStrc* lv, int l, int t, int r, int b, int o
                 const FeedUnit* f = nullptr;
                 for (const FeedUnit& u : g_feedUnits) if (u.slot == s) { f = &u; break; }
                 if (!f) continue;
-                const int32_t ks = d2_dg_stage_unit((uint32_t)f->cls, f->type, f->sx, f->sy, (uint32_t)d2c_cru_a6180(s), (f->flags >> 20) & 1, (f->flagsEx & 1) ? 0 : 1);
+                const int32_t ks = d2_dg_stage_unit((uint32_t)f->cls, f->type, f->sx, f->sy, (uint32_t)d2c_cru_a6180(s), (f->flags >> 20) & 1, ((f->flagsEx & 1) ? 0u : 1u) | (f->flagsEx & 2));   // flagsEx bit1: the unit fails the draw's visibility test
                 if (ks < 0) continue;   // the stage table is full
                 const uint32_t k = (uint32_t)ks;
                 if (f->hasCof) d2_dg_stage_unit_cof(k, f->cof);
+                if (f->hasCof && f->hasAnim && f->full) d2_dg_stage_unit_anim(k, f->full->data(), (uint32_t)f->full->size(), f->dir, f->frame, f->ovr);
                 if (f->palshift) d2_dg_stage_unit_palshift(k);
                 d2_dg_stage_unit_shift(k, f->shift);
                 d2_dg_stage_unit_frac(k, f->fx, f->fy);

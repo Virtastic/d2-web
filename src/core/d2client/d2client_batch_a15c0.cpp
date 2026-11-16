@@ -92,7 +92,8 @@ static void unitSize(const Env* e, uintptr_t u, int32_t* w, int32_t* h) {
 }
 
 // 1.13c D2Client+0xA15C0 (86 B): the player-owned context object, or 0.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2client_a15c0(const Env* e) {
+// (an early reading; the FN probe d2_fn_d2client_a15c0 calls the env port d2c_a15c0 in d2client_a1410.cpp)
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_a15c0_ctx(const Env* e) {
     int32_t out[2] = {0, 0};  // out[0] = local_8, out[1] = local_4
     if (e->getClientCtx(out) && out[0] != 0 && out[1] != 0) return e->f60450(out[0]);
     return 0;

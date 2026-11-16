@@ -33,7 +33,7 @@ struct D2c6C490Env {
     i32 (*f6e2c0)(u32 unit, u32* rec, u32* p64);
     i32 (*f6dfe0)(u32 unit, u32 ebx, u32 comp, u32* mode);      // eax = unit, ebx = [64]
     u32 (*f6dee0)(u32 unit, u32 comp, u32 pal);                 // eax = unit
-    i32 (*f6d780)(u32 hdr);                                     // ecx = hdr
+    i32 (*f6d780)(u32 hdr, u32 comp);                           // ecx = hdr, edi = comp
     u32 (*f6d690)(u32 hdr, u32 comp);                           // eax = hdr, esi = comp
     void (*ord10016)(const u32* rec, u32 a, u32 b, u32 a1, u32 mode, i32 g414, u32 pal);   // 0xD120
     u32 (*ord11080)(u32 unit);                                  // 0xC1AE
@@ -45,6 +45,9 @@ struct D2c6C490Env {
 };
 
 extern "C" {
+// Which of the function's three #10041 call sites the layer's draw goes through (they leave different ecx/edx behind): 0 at 0x6fb1c9a2
+// (the COF flags the component), 1 at 0x6fb1ca1c (the plain mode-5 layer), 2 the shared tail (forced mode 1, mode 7, the item's mode).
+uint32_t g_d2c6c490Site;
 // 1.13c D2Client+0x6C490
 EMSCRIPTEN_KEEPALIVE i32 d2c_6c490(const D2c6C490Env* e, i32 yBase, u32 unit, u32 a1, i32 xBase, u32 a3, u32 a4,
     i32 g9960, i32 gcc418, i32 g995c, i32 gcc414, i32 g8bc48, u32 gHero, i32 g17c8, i32 gcc380, u32 gcc2d8) {
@@ -117,13 +120,15 @@ EMSCRIPTEN_KEEPALIVE i32 d2c_6c490(const D2c6C490Env* e, i32 yBase, u32 unit, u3
         i32 dm = e->f6dfe0(unit, s64, comp, &m3c);
         if (pal2c && (type != 0 || e->rd32(unit + 0x6c) != 0x6c)) p = e->f6dee0(unit, comp, p);
         u32 md;
-        if (e->f6d780(hdr)) {
+        g_d2c6c490Site = 2;
+        if (e->f6d780(hdr, comp)) {
+            g_d2c6c490Site = 0;
             if (a3) md = 1; else if (!dm) md = e->f6d690(hdr, comp); else md = m3c;
             if (draw && obj1) { u32 b = e->ord11080(unit); u32 c = e->ord11168(unit); e->ord10016(rec, b, c, a1, md, gcc414, p); continue; }
         } else if (!r58 && !dm) {
             if (a3) md = 1;
             else if (draw && obj1) { u32 b = e->ord11080(unit); u32 c = e->ord11168(unit); e->ord10016(rec, b, c, a1, 5, gcc414, p); continue; }
-            else md = 5;
+            else { md = 5; g_d2c6c490Site = 1; }
         } else if (a3) md = 1;
         else if (!dm && r58) {
             md = 7;

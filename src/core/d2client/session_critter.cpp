@@ -46,7 +46,7 @@ struct Critter {
     int32_t vel;                  // path +0x7C
 };
 std::vector<Critter> g_c;
-uint32_t g_counter;               // D2Client+0xDE834
+uint32_t g_counter = 1;           // D2Client+0xDE834
 std::string g_log;
 uint32_t lcg(uint32_t& lo, uint32_t& hi) { const uint64_t v = uint64_t(lo) * 0x6ac690c5ull + hi; lo = uint32_t(v); hi = uint32_t(v >> 32); return lo; }
 uint32_t lim(uint32_t lo, uint32_t n) { return (n & (n - 1)) ? lo % n : lo & (n - 1); }
@@ -212,11 +212,21 @@ void room_seen(D2ActiveRoomStrc* room, int32_t levelId, uint32_t frame) {
         for (; count > 0; --count) create(room, cls, frame);
     }
 }
+// 1.13c D2Client+0xA7D00 -> +0xA7BF0 (from 0x440C0, after the room's critters): each preset unit of the room the server leaves to
+// the client (flag bit 0) becomes a client-only unit. It takes the next id of the counter the critters share and, like every
+// client unit creator, rolls the seed of the client room at its coordinates. ponytail: the unit itself is not kept, only its
+// id and its roll.
+void preset_seen(D2ActiveRoomStrc* room, int32_t x, int32_t y) {
+    if (!room) return;
+    if (++g_counter == 0xFFFFFFFFu) g_counter = 0;
+    D2ActiveRoomStrc* at = DUNGEON_FindRoomBySubtileCoordinates(room->pAct, x, y);
+    d2client_unitseed::roll(at ? at : room);
+}
 // 1.13c D2Client+0xA8030, the critters' part
 void tick(D2UnitStrc* player, uint32_t frame) {
     for (Critter& c : g_c) { step(c, frame); think(c, player, frame); }
 }
-void reset() { g_c.clear(); g_counter = 0; g_log += "RESET\n"; }
+void reset() { g_c.clear(); g_counter = 1; g_log += "RESET\n"; }   // the counter's image value is 1: the first client-only unit is id 2
 }
 // 1.13c D2Common+0x3C870 (room teardown): every unit in the freed room, client units too, is taken out of it and its path room
 // cleared (0x668A0), so a critter there keeps ticking with no room, and 0x17E80/0x17500/0x2A040 return on that.
@@ -227,6 +237,8 @@ extern "C" bool d2_session_critter_unit(uint32_t i, uint32_t* out) {
     if (i >= g_c.size() || !g_c[i].room) return false;
     const Critter& c = g_c[i]; out[0] = c.id; out[1] = c.cls; out[2] = (uint32_t)c.x; out[3] = (uint32_t)c.y; out[4] = c.mode; return true;
 }
+// every critter the client made stays in its unit hash (its room freed or not): one 6C130 step each per frame
+extern "C" uint32_t d2_session_critter_count() { return (uint32_t)g_c.size(); }
 extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_session_critter_dump() {
     for (const Critter& c : g_c) {
         char b[128]; snprintf(b, sizeof b, "E id=%x mode=%u f44=%x delay=%d at=%d,%d\n", c.id, c.mode, c.f44, c.delay, c.x, c.y); g_log += b;

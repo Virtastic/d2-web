@@ -60,7 +60,11 @@ extern "C" uint32_t d2c_3b300(const cl::Env& e) {
             e.H(0xbfa10);
             // EDI = the nine-dword constant block at 0xD0900 (read-only data); the capture logs it as a `D` record
             uint32_t blk[9];
-            for (uint32_t j = 0; j < 9; j++) blk[j] = G(e, 0xD0900 + 4 * j);
+            for (uint32_t j = 0; j < 9; j++) {
+                blk[j] = G(e, 0xD0900 + 4 * j);
+                // the capture logs a module address as 0xB2000000 | RVA (as the 0xD0B4 argument below is)
+                if (blk[j] - 0x6FAB0000u < 0x140000u) blk[j] = 0xB2000000u | (blk[j] - 0x6FAB0000u);
+            }
             if (e.blk) e.blk(e.ctx, 0xbfa10, (uint32_t)(uintptr_t)blk, 9);
             const uint32_t h = e.H(0xd0b4, 0xB2000000u | 0xDBE6C);
             return e.H(0x3ccc0, h, 0, 0, 0, 0, 2);

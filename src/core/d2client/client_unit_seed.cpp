@@ -31,8 +31,12 @@ std::unordered_map<const D2ActiveRoomStrc*, Seed> g_room;
 std::unordered_map<uint64_t, uint32_t> g_unit;
 // the client monster's live seed (+0x20/+0x24) after its init rolls, per game (a session runs more than one)
 std::unordered_map<const D2GameStrc*, std::unordered_map<uint64_t, Seed>> g_seed;
-struct Pending { D2GameStrc* game; uint32_t type, id; };
+struct Pending { D2GameStrc* game; uint32_t type, id; bool told; };
 std::vector<Pending> g_pending;
+// A session tracks which monsters the server announces to the client (0xAC: those of the rooms near the hero). Only an
+// announced monster becomes a client unit and rolls its client room's seed, when it is announced; one the client is never
+// told of leaves the room seed alone (the room's first-sight critter rolls, +0x18370, then start from the untouched seed).
+bool g_tellMode = false;
 uint64_t key(uint32_t type, uint32_t id) { return uint64_t(type) << 32 | id; }
 }
 
@@ -85,12 +89,21 @@ void monster_direction(D2UnitStrc* u, uint32_t init) {
 // unit list is LIFO); so a frame's creations are queued and rolled in that order when the frame ends.
 void created(D2UnitStrc* u) {
     if (!u || u->dwUnitType == UNIT_MISSILE || !u->pGame) return;
-    g_pending.push_back({ u->pGame, u->dwUnitType, u->dwUnitId });
+    g_pending.push_back({ u->pGame, u->dwUnitType, u->dwUnitId, false });
+}
+void tell_mode(bool on) { g_tellMode = on; }
+// The server announces monster u to the client (its 0xAC). The announcements of one frame go out newest-first per room.
+void told(D2UnitStrc* u) {
+    if (!u || !u->pGame || !g_tellMode) return;
+    auto at = g_pending.begin();
+    while (at != g_pending.end() && !(at->told && at->id > u->dwUnitId)) ++at;   // kept ascending: flush walks it backwards
+    g_pending.insert(at, { u->pGame, u->dwUnitType, u->dwUnitId, true });
 }
 void flush() {
     if (g_pending.empty()) return;
     std::vector<Pending> q;
     q.swap(g_pending);
+    if (g_tellMode) { std::vector<Pending> k; for (const Pending& p : q) if (p.type != UNIT_MONSTER || p.told) k.push_back(p); q.swap(k); }
     auto rank = [](uint32_t t) { return t == UNIT_PLAYER ? 0 : t == UNIT_MONSTER ? 1 : 2; };
     std::vector<Pending> order;
     for (int r = 0; r < 3; ++r) {
@@ -129,3 +142,5 @@ uint32_t* unit_seed(const D2GameStrc* game, uint32_t type, uint32_t id) {
 void d2client_unitseed_room(const D2ActiveRoomStrc* r, uint32_t lowSeed) { d2client_unitseed::room(r, lowSeed); }
 void d2client_unitseed_created(D2UnitStrc* u) { d2client_unitseed::created(u); }
 extern "C" void d2client_unitseed_flush() { d2client_unitseed::flush(); }
+void d2client_unitseed_tell_mode(bool on) { d2client_unitseed::tell_mode(on); }
+void d2client_unitseed_told(D2UnitStrc* u) { d2client_unitseed::told(u); }

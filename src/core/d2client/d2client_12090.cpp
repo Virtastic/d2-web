@@ -6,7 +6,7 @@ extern "C" uint32_t d2c_12090(uint32_t msg, const cl::Env& e) {
     uint32_t out = 0;
     if (!e.R(0x6fba8bec)) { e.W(0x6fba8bec, 1); return sn18::tail(e, msg); }
     const uint32_t rec = e.R(e.R(0x6fba8b94) + e.R(0x6fbcc538) * 10);
-    if (e.H(0xEA270, e.R(0x6fba8be8), sn18::R16(e, msg + 8), 0, 0, 0, (uint32_t)(uintptr_t)&out, rec)) {
+    if (e.H(0x3A270, e.R(0x6fba8be8), sn18::R16(e, msg + 8), 0, 0, 0, (uint32_t)(uintptr_t)&out, rec)) {
         e.H(0x114F0, 1);
         e.H(0x88A70, 0, 0, 0, 0, 0, 0, 0, 0, 2);
     }

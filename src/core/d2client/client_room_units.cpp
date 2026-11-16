@@ -124,14 +124,20 @@ EMSCRIPTEN_KEEPALIVE int32_t d2c_cru_unit_at(uint32_t type, uint32_t id, int32_t
 }
 // The frame's unit set is in: units not set leave their rooms, and every room holding a unit gets the one #10667 sort
 // pass D2Client 7A5D0 gives it when it walks the room.
+// A room the frame's room walk already sorted (d2c_cru_first_sorted) keeps that one pass: retail sorts a room once per frame.
+static bool g_walkSorted[kMaxRooms];
 EMSCRIPTEN_KEEPALIVE void d2c_cru_frame_end() {
     d2c_cru_end();
-    for (uint32_t r = 0; r < kMaxRooms; r++) if (g_rm[r].used && W(&g_room[r], 0x74)) d2common_sub_664b0(A(&g_room[r]));
+    for (uint32_t r = 0; r < kMaxRooms; r++) {
+        if (g_rm[r].used && W(&g_room[r], 0x74) && !g_walkSorted[r]) d2common_sub_664b0(A(&g_room[r]));
+        g_walkSorted[r] = false;
+    }
 }
 // #10667 as D2Client 7A5D0 calls it: sort the room's list (664B0), return its first unit's slot.
 EMSCRIPTEN_KEEPALIVE int32_t d2c_cru_first_sorted(int32_t r) {
     if (r < 0 || r >= (int32_t)kMaxRooms) return -1;
     d2common_sub_664b0(A(&g_room[r]));
+    g_walkSorted[r] = true;
     return slotOf(W(&g_room[r], 0x74));
 }
 EMSCRIPTEN_KEEPALIVE int32_t d2c_cru_first(int32_t r) { return r < 0 || r >= (int32_t)kMaxRooms ? -1 : slotOf(W(&g_room[r], 0x74)); }

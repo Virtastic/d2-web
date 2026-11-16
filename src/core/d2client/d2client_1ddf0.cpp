@@ -16,7 +16,8 @@ extern "C" uint32_t d2c_1ddf0(uint32_t eax0, uint32_t msg, const cl::Env& e) {
     if (e.R8(0x6fbd23f3)) return sn18::tail(e, msg);
     int32_t slot = (int32_t)e.H(0xCCA60, 0, 0, 0, 0, 0, (uint32_t)y);
     if (slot == -1) {
-        slot = (int32_t)e.H(0xCC7A0);
+        slot = (int32_t)e.H(0xCC7A0, 0, 0, 0, 0, 0, 0, 0, 0, (uint32_t)x);  // EBX = x
+        e.Ej(0xCC7A0, (uint32_t)y);  // EDI = y, logged after the call record as the capture's REGS `J` does
         if (slot != -1 && slot < (int32_t)e.R(0x6fbd23e0)) {
             uint32_t p = 0x6fbd274d;
             for (int32_t i = 0; i < (int32_t)e.R(0x6fbd23e0); i++, p += 0x26a) {

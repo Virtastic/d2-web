@@ -33,8 +33,9 @@ void sub_AD9D0(Env& e,uintptr_t p){
  uintptr_t b=p+4;
  for(int i=0;i<n;i++,b+=9){
   uint8_t type=*(const uint8_t*)b; uint32_t id=r32(b+1); uint16_t arg=r16(b+7);
-  uintptr_t slot=(uintptr_t)e.ga(0xFBA608)+((uintptr_t)type*0x80+(id&0x7f))*sizeof(uintptr_t);
-  for(uintptr_t u=rdp(slot);u;u=rdp(u+NEXT_OFF)){
+  // the unit table and the node link (+0xE4) are 32-bit words of the retail image: 4-byte slots, 4-byte loads
+  uintptr_t slot=(uintptr_t)e.ga(0xFBA608)+((uintptr_t)type*0x80+(id&0x7f))*4;
+  for(uintptr_t u=r32(slot);u;u=r32(u+NEXT_OFF)){
    if(r32(u+12)==id){ if(r32(u)!=type){ e.fatal(0x5a); return; } e.f1A1B0(arg,0,0); break; }
   }
  }

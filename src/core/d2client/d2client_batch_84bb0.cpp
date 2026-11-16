@@ -16,7 +16,7 @@ struct D2cItmEnv {
     uint8_t** buckets;                        // +0x10AE08 unit hash, 128 chains, next at unit+0xE4
     uint8_t*  player;                         // +0x10BBFC
     int32_t   tbl_shift, tbl_mask;            // sgptDataTables +0xC6C / +0xC70
-    uint16_t* v5c;                            // +0x10CF58 (v5c[0]) / +0x10CF5C (v5c[1]) slot words
+    uint16_t* v5c;                            // slot words at +0x11BF58 (v5c[0]) and +0x11BF5C (v5c[2]): two 16-bit stores 4 bytes apart
     const char* file;                         // "..\Source\D2Client\UNIT\Item.cpp"
     uint8_t*  slotOn;                         // +0x10C484 u8[4]
     uint32_t  tick;                           // DAT_6fbc9854
@@ -35,7 +35,8 @@ static W call4(const D2cItmEnv* e, uint32_t id, W a = 0, W b = 0, W c = 0, W d =
 
 static uint8_t* findItem(const D2cItmEnv* e, uint32_t id, bool& bad) {
     bad = false;
-    for (uint8_t* u = e->buckets[id & 0x7f]; u; u = rd<uint8_t*>(u, 0xE4))
+    // the retail table and the +0xE4 link hold 32-bit words (a host pointer is wider)
+    for (uint8_t* u = (uint8_t*)(uintptr_t)rd<uint32_t>((const uint8_t*)e->buckets, 4 * (id & 0x7f)); u; u = (uint8_t*)(uintptr_t)rd<uint32_t>(u, 0xE4))
         if (rd<uint32_t>(u, 0xC) == id) { if (rd<int32_t>(u, 0) != 4) bad = true; return u; }
     return nullptr;
 }
@@ -169,7 +170,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2_client_84f00(const D2cItmEnv* e, con
         if (u == pl) {
             C(F_SELECT, 0, 0, 0, 0);
             if (h.slot == 4) e->v5c[0] = 0;
-            else if (h.slot == 5) e->v5c[1] = 0;
+            else if (h.slot == 5) e->v5c[2] = 0;
         }
         item = (uint8_t*)C(F_MAKE, A(p), A(&h), 0, 0);
         C(10058, A(item), rd<uint32_t>((const uint8_t*)&h, 0x11), 0, 0);
@@ -241,44 +242,46 @@ done:
 // 1.13c D2Client+0x85710 (packet in EAX)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_85710(const D2cItmEnv* e, const uint8_t* p) {
     D2cHdr h; memset(&h, 0, sizeof h);
-    C(11105, 0, 0, A(&h), 0);
+    C(11105, A(p + 0xd), W(p[2]) - 0xd, A(&h), 0);            // (body, length, 0, &header)
     uint8_t* u = (uint8_t*)C(F_UNPACK_PLAYER, rd<uint32_t>(p, 9), p[8], 0, 0);
     if (!u) return;
-    C(10584, A(u), 0, e->tick, 0);
+    const W stamp = C(10584, A(u), 0, e->tick, 0);            // kept for Ordinal_11107
     W inv = rd<uint32_t>(u, 0x60);
-    W rec = inv ? C(11139, inv, 0, 0, 0) : 0;
-    if (!rec) FATAL(0);
-    C(F_PRE, A(u), 0, 0, 0);
+    if (!inv) FATAL(0xaa7);
+    W rec = C(11139, inv, h.slot, 0, 0);
+    if (!rec) FATAL(0xaa9);
+    C(F_PRE, A(u), 0, 0, 0);                                  // EDX = unit
     C(10694, inv, rec, 0, 0);
-    C(F_PRE2, A(u), 0, 0, 0);
-    C(10605, A(u), inv, A(&h), h.slot);
+    C(F_PRE2, p[3], A(u), 0, 0);                              // EAX = packet byte 3, ECX = unit
+    C(10605, A(u), inv, A(&rec), h.slot);                     // the third word is the address of the record local
     W old = C(10646, inv, rec, 0, 0);
     if (!old) FATAL(0xaaf);
-    if (old != (W)&h) FATAL(0xab0);
-    C(10061, inv, 0, 0, 0);
+    if (old != rec) FATAL(0xab0);
+    if (rd<int32_t>(u, 0) == 0) C(10061, rd<uint32_t>(u, 0x60), 0, 0, 0);
     if (!C(10202, old, 0x100, 0x96, A(e->file))) C(11127, A(u), old, 0, 0);
     C(10600, A(u), old, 1, 1);
     C(F_REFRESH, 0, 0, 0, 0);
     C(10608, inv, h.slot, 0, 0);
-    C(F_UI3, 0, 0, 0, 0);
-    uint8_t* it = nullptr;
-    if (!C(10197, A(u), 1, 0, 0)) C(V(0x6fb32980), 0, h.act, 0, 0);
+    C(F_UI3, A(u), 0, 0, 0);                                  // EAX = unit, stack 0
+    W it = rec;                                               // the record local: 0x833F0's item replaces it
+    if (!C(10197, h.a, 1, 0, 0)) C(V(0x6fb32980), rec, h.act, 0, 0);   // EAX = record, stack (0, act, 0, header dword 4)
     else {
         C(F_CHAIN, 0x6fbbae08, rd<uint32_t>(p, 4) & 0x7f, rd<uint32_t>(p, 4), 4);
         if (u != e->player) return;
-        it = (uint8_t*)C(F_MAKE, A(p), A(&h), 0, 0);
+        it = C(F_MAKE, A(p), A(&h), 0, 0);
         if (!it) FATAL(0xabd);
     }
     if (u != e->player) return;
     C(F_SELECT, 0, 0, 0, 0);
-    if (h.slot == 4) e->v5c[0] = 0; else if (h.slot == 5) e->v5c[1] = 0;
-    if (!C(11107, inv, 0, h.a, 1)) FATAL(0xadf);
-    if (C(10405, inv, A(it), 1)) {
-        C(10058, A(old), 0, 0, 0);
+    if (h.slot == 4) e->v5c[0] = 0; else if (h.slot == 5) e->v5c[2] = 0;
+    if (!C(11107, inv, it, stamp, 1)) FATAL(0xadf);           // (inv, ECX residue, header words 2 and 3, stamp, 1, 0)
+    if (C(10405, inv, it, 1)) {
+        C(10058, it, 0, 0, 0);
         C(10466, inv, 0, 0, 0);
         C(11017, inv, 0, 0, 0);
         C(F_KILL, 0, 0, 0, 0);
-        tail(e, A(u));
+        C(F_UNREF, A(u), 0, 0, 0);
+        C(F_UNREF, A(u), 0, 0, 0);
         C(F_REFRESH, 0, 0, 0, 0);
     }
 }
@@ -412,7 +415,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_85ed0(const D2cItmEnv* e, const u
     }
     C(V(0x6faf7cd0), rd<uint32_t>(u, 0xC), 0, 0, 0);
     C(F_SELECT, 0, 0, 0, 0);
-    if (h.slot == 4) e->v5c[0] = 0; else if (h.slot == 5) e->v5c[1] = 0;
+    if (h.slot == 4) e->v5c[0] = 0; else if (h.slot == 5) e->v5c[2] = 0;
     if (C(10197, h.b, 0x20, 0, 0)) { C(F_CHAIN, 0x6fbbae08, id & 0x7f, id, 4); return; }
     uint8_t* it = u;
     if (!C(10197, h.a, 1, 0, 0)) C(V(0x6fb32980), 0, h.act, 0, 0);
@@ -459,7 +462,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_861a0(const D2cItmEnv* e, const u
     C(F_UI3, 0, 0, 0, 0);
     if (u == e->player) {
         C(F_SELECT, 0, 0, 0, 0);
-        if (slot == 4) e->v5c[0] = 0; else if (slot == 5) e->v5c[1] = 0;
+        if (slot == 4) e->v5c[0] = 0; else if (slot == 5) e->v5c[2] = 0;
         C(V(0x6fb32980), 0, 4, 0, 0);
         C(10058, A(&h), 0, 0, 0);
         C(10466, inv, A(u), 0, 0);

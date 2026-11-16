@@ -12,7 +12,7 @@ extern "C" uint32_t d2c_12150(uint32_t msg, const cl::Env& e) {
             e.W(0x6fba8bec, 0);
         } else {
             const uint32_t rec = e.R(e.R(0x6fba8b94) + e.R(0x6fbcc538) * 10);
-            bool found = e.H(0xEA270, e.R(0x6fba8be8), sn18::R16(e, msg + 8), 0, 0, 0, (uint32_t)(uintptr_t)&out, rec) != 0;
+            bool found = e.H(0x3A270, e.R(0x6fba8be8), sn18::R16(e, msg + 8), 0, 0, 0, (uint32_t)(uintptr_t)&out, rec) != 0;
             bool clear = false;
             if (found) {
                 e.H(0x114F0, 1);

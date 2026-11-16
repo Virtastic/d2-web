@@ -30,9 +30,9 @@ struct D2ClientSub8F710Imports {
     void     (*halt)(void);                   // type != 1: Fog halt, _exit(-1)
 };
 
-// 1.13c D2Client+0x8F710
+// 1.13c D2Client+0x8F710 (the import-table form; the FN probe d2_fn_d2client_8f710 calls the env port d2c_8f710)
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2client_8f710(uint32_t tab, D2ClientSub8F710State* s, const D2ClientSub8F710Imports* im) {
+void d2_client_8f710_tabs(uint32_t tab, D2ClientSub8F710State* s, const D2ClientSub8F710Imports* im) {
     uint8_t t = (uint8_t)tab;
     if (t >= 5) t = 0;
     if (s->busy || !s->playerValid) return;

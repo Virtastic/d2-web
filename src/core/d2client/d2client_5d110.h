@@ -29,8 +29,8 @@ struct D2cRes5dEnv {
     int      (*ord10046)(void);
     int      (*ord10059)(void);
     void     (*ord10066)(void);
-    uint32_t (*ord10094)(void);
-    uint32_t (*ord10095)(void);
+    uint32_t (*ord10094)(uint32_t h);    // thunk 0xC058: ECX = the record's handle (+0x82)
+    uint32_t (*ord10095)(uint32_t h);    // thunk 0xC05E: ECX = the record's handle (+0x82)
     void     (*ord10062)(void);
     void     (*ord10018)(void);
     void     (*ord10097)(void);

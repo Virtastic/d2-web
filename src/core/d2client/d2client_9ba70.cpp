@@ -5,7 +5,7 @@
 // y in [[0x10B294], [0x10B298]] the message is finished (+0x18 = 1, +0x1C = 0, 0xBE84), 0x595C0 runs when [0x11BE64] is set and the state words
 // [0x11BEEC], [0x11BE68], [0x11BE64] clear. Outside: 0x8B7F0 (EAX = x, EDX = y) nonzero runs 0x59600 when [0x11BE64] and [0x11BE6C] are set and
 // clears [0x11BEEC], [0x11BE6C]; else 0x8B7A0 (same registers) nonzero runs 0x59650 and clears [0x11BE68] when [0x11BE68] and [0x11BE70] are set,
-// then clears [0x11BE70], [0x11BEEC], [0x11BE6C]; else 0x26320 equal to 1 clears [0x11BE6C] and the three state words and returns without
+// then clears [0x11BE70], [0x11BEEC] (not [0x11BE6C]); else 0x26320 equal to 1 clears [0x11BE6C] and the three state words and returns without
 // finishing the message; else 0x8D3D0 (EAX = y) nonzero with [0x11BE78] clear runs 0xC30E0(2), and [0x11BEEC] clear falls into the in-box finish.
 // Otherwise [0x11BEEC] clears, [0x11BE68] (with [0x11BE70] set and [0x11BE6C] clear) or [0x11BE64] (= 1 -> cleared, 0x595C0) update, [0x11BE70]
 // and [0x11BE6C] clear and the message is finished.
@@ -38,8 +38,7 @@ extern "C" uint32_t d2c_9ba70(uint32_t msg, const cl::Env& e) {
                 S(e, 0x11be68, 0);
             }
             S(e, 0x11be70, 0);
-            S(e, 0x11beec, 0);
-            S(e, 0x11be6c, 0);
+            S(e, 0x11beec, 0);   // 0x9BB73 jumps to 0x9BBF4: [0x11BE6C] is not cleared on this path
             return fin(e, msg);
         }
         if (e.H(0x26320, 0, 0, 0, 0, 0, msg) == 1) {

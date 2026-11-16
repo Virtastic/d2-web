@@ -9,5 +9,5 @@ extern "C" uint32_t d2c13_afdd0(const Env& e, const GEnv& g) {
     e.H(0xd22e);
     uint32_t st = e.R(g.G(0x11c394));
     if (st == 0 || st == 1 || st == 6 || st == 8) e.H(0xd216);
-    return e.H(0x109c0);   // tail jump: EAX is the callee's
+    return e.H(0x109c0);
 }

@@ -28,17 +28,17 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_88930(D2c88State* s, const D2c88E
         wr<uint32_t>(o, 0x3d, 1);
         uint8_t b = R(s, id, 0x40);
         if (!b || rd<int32_t>(o, 0x30) != 1) continue;
-        uint8_t* key = rd<uint8_t*>(o, 8);
+        uint32_t key = rd<uint32_t>(o, 8);   // the key is a 4-byte field (+0xC is the next field), whatever the host pointer width
         if (!key) continue;
         for (void** m = s->list; m; m = (void**)m[1]) {
             uint8_t* p = (uint8_t*)m[0];
-            if (rd<uint8_t*>(p, 8) != key) continue;
-            if (!e->fn87e90(o, (int)(intptr_t)key)) {
+            if (rd<uint32_t>(p, 8) != key) continue;
+            if (!e->fn87e90(o, (int)key)) {
                 uint32_t u = b, o40 = R(s, rd<int32_t>(p, 4), 0x40);
                 if (u < o40) u = o40;
                 if (!rd<int32_t>(p, 0x45) || rd<int32_t>(p, 0x4d) || s->now + u < rd<uint32_t>(p, 0x55)) {
                     wr<uint32_t>(p, 0x3d, 1);
-                    if (!u) e->fn87ed0((int)(intptr_t)key, 0);   // EDX still holds the key (0x87E90 leaves it alone)
+                    if (!u) e->fn87ed0((int)key, 0);   // EDX still holds the key (0x87E90 leaves it alone)
                     else {
                         wr<uint32_t>(p, 0x51, s->now);
                         wr<uint32_t>(p, 0x49, rd<uint32_t>(p, 0x1c));
@@ -57,7 +57,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_88930(D2c88State* s, const D2c88E
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_88ba0(D2c88State* s, const D2c88Env* e, uint8_t* key, int32_t x, int32_t y, int32_t z) {
     if (!key) return;
     for (void** n = s->list; n; n = (void**)n[1])
-        if (rd<uint8_t*>((uint8_t*)n[0], 8) == key) {
+        if (rd<uint32_t>((uint8_t*)n[0], 8) == (uint32_t)(uintptr_t)key) {   // 4-byte key field
             float v[3] = {(float)x, (float)y, (float)((double)z + (double)s->biasZ)};   // fild z; fadd bias; fstp: one rounding to float
             e->fn88350(v, n[0]);
             return;

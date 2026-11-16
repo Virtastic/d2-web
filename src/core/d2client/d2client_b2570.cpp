@@ -6,6 +6,6 @@
 extern "C" uint32_t d2c_b2570(uint32_t u, uint32_t t, const cl::Env& e) {
     if (!t) return 1;
     uint32_t row = e.UnitRow(u);
-    if (row && e.R16s(row + 0x36) > 0) e.H(0x6b300, t, 2, 0, 0, 0, (uint32_t)e.R16s(row + 0x36));   // seven stack words: target, 2, five zeros; EAX = the short
+    if (row && e.R16s(row + 0x36) > 0) e.H(0x6b300, t, 2, 0, 0, 0);
     return 1;
 }

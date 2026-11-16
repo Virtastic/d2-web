@@ -239,7 +239,7 @@ static uint32_t g_sessionClientMapEventsDropped = 0;
 void d2client_sound_stage_feed(uint32_t soundEnv); void d2client_sound_stage_log();   // sound_pump.cpp (replay-armed)
 #include "../d2client/sound_unit_refs.h"
 #include "../session/calltrace.h"
-namespace d2client_critter { void room_seen(D2ActiveRoomStrc* room, int32_t levelId, uint32_t frame); void tick(D2UnitStrc* player, uint32_t frame); void reset(); }
+namespace d2client_critter { void room_seen(D2ActiveRoomStrc* room, int32_t levelId, uint32_t frame); void preset_seen(D2ActiveRoomStrc* room, int32_t x, int32_t y); void tick(D2UnitStrc* player, uint32_t frame); void reset(); }
 namespace d2client_ambient { void reset(); void tick(uint32_t* seed, uint32_t period, bool weatherLevel); uint32_t* fallbackSeed(uint32_t (*playerInit)()); }
 extern "C" void d2_client_monster_idle_reset();   // 1.13c D2Client+0x237E0 monster branch state (unit_sound_trigger_237e0.cpp)
 extern "C" void d2_client_attack_roll_reset();   // 1.13c D2Client+0x242B0 attack-roll state (monster_face.cpp)
@@ -249,7 +249,7 @@ namespace d2client_clmissile { void reset(); void cast(int32_t skillId, int32_t 
 namespace d2client_nova { void reset(); void selectSkill(int32_t skillId); int32_t selectedSkill(); void cast(int32_t skillId, bool presentation); void tick(); }   // 1.13c D2Client+0x73CB0 (cltdofunc 25, Poison Nova), +0x73D70 (cltdofunc 29, Frozen Orb)
 namespace d2client_blizzard { void reset(); void cast(int32_t skillId, D2UnitStrc* target, int32_t tx, int32_t ty); void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)); }   // 1.13c D2Client+0xBBC10 (cltdofunc 13, Blizzard center)
 static D2UnitStrc* g_sessionClientPlayerUnit = nullptr;
-namespace d2client_unitseed { uint32_t init(uint32_t type, uint32_t id); }
+namespace d2client_unitseed { uint32_t init(uint32_t type, uint32_t id); void tell_mode(bool on); void told(D2UnitStrc* u); }
 static uint32_t sessionClientPlayerInit() { return g_targetPlayer ? d2client_unitseed::init(UNIT_PLAYER, g_targetPlayer->dwUnitId) : 0; }
 // The client hero seed (+0x20): the client unit's own when the client map was mirrored, else the one derived from the local player's client init seed.
 static uint32_t* sessionClientHeroSeed() {
@@ -1196,6 +1196,7 @@ static void syncSessionLevelFromPlayer() {
 }
 
 static void syncSessionClientMapFromPlayer();
+static std::vector<std::pair<int32_t, int32_t>> g_clientSpotMissiles;   // the client-only missiles 0x53550's spots made, in creation order
 static std::unordered_set<D2DrlgRoomStrc*> g_sessionClientRoomsSeen;   // D2Client+0x440C0's seen bit
 static void sessionClientMonsterModeReset();
 static uint32_t g_sessionClientFrame = 0;   // the client frames run since the session began (the frame tail counts them)
@@ -1206,10 +1207,13 @@ extern "C" uint32_t d2_session_client_frame_now() { return g_sessionClientFrame;
 static uint32_t g_sessionScreenSwitchFrame = 13;
 extern "C" EMSCRIPTEN_KEEPALIVE int d2_session_client_screen_switch_frame(int frame) { g_sessionScreenSwitchFrame = frame > 0 ? (uint32_t)frame : 0xffffffffu; return 1; }
 
+static D2DrlgActStrc* g_sessionTownAct = nullptr; static uint32_t g_sessionTownUnits = 0;   // sessionClientTownSeen: the client's town, its client-only presets
 static void resetSessionClientMapMirror() {
     if (g_sessionClientPlayerUnit) UNITS_FreeUnit(g_sessionClientPlayerUnit);
     g_sessionClientPlayerUnit = nullptr;
-    d2client::weather::reset(); d2client_ambient::reset(); d2_client_monster_idle_reset(); sessionClientMonsterModeReset(); d2_client_attack_roll_reset(); g_sessionClientRoomsSeen.clear(); g_sessionClientFrame = 0; d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset(); { extern void d2_client_monster_hit_reset(); d2_client_monster_hit_reset(); }
+    d2client::weather::reset(); d2client_ambient::reset(); d2_client_monster_idle_reset(); sessionClientMonsterModeReset(); d2_client_attack_roll_reset(); g_sessionClientRoomsSeen.clear(); g_clientSpotMissiles.clear(); g_sessionClientFrame = 0; d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset(); { extern void d2_client_monster_hit_reset(); d2_client_monster_hit_reset(); }
+    if (g_sessionTownAct) { DUNGEON_FreeAct(g_sessionTownAct); g_sessionTownAct = nullptr; }   // after the critters that stand in it
+    g_sessionTownUnits = 0;
     if (g_sessionClientActOwned) d2_drlg_act_end();
     g_sessionClientActOwned = false;
     g_sessionClientMapStarted = false;
@@ -1663,11 +1667,11 @@ static void sessionHeldStep() {
     const bool first = g_heldFor != g_targetPlayer;
     if (first) { g_heldMonsters.clear(); g_heldSeen.clear(); g_heldNear.clear(); g_heldFor = g_targetPlayer; D2CoordStrc c = {}; UNITS_GetCoords(g_targetPlayer, &c); g_heldX0 = c.nX; g_heldY0 = c.nY; }
     auto each = [](D2DrlgRoomStrc* r, auto f) { if (r->pRoom) for (D2UnitStrc* u = r->pRoom->pUnitFirst; u; u = u->pRoomNext) if (u->dwUnitType == UNIT_MONSTER) f(u); };
-    for (D2DrlgRoomStrc* r : cur) if (!g_heldNear.count(r)) each(r, [&](D2UnitStrc* u) { D2CoordStrc c = {}; UNITS_GetCoords(u, &c); if (!first || (abs(c.nX - g_heldX0) <= 40 && abs(c.nY - g_heldY0) <= 40)) g_heldMonsters.insert(u->dwUnitId); });
+    for (D2DrlgRoomStrc* r : cur) if (!g_heldNear.count(r)) each(r, [&](D2UnitStrc* u) { D2CoordStrc c = {}; UNITS_GetCoords(u, &c); if ((!first || (abs(c.nX - g_heldX0) <= 40 && abs(c.nY - g_heldY0) <= 40)) && g_heldMonsters.insert(u->dwUnitId).second) d2client_unitseed::told(u); });
     for (D2DrlgRoomStrc* r : g_heldNear) if (!cur.count(r)) each(r, [&](D2UnitStrc* u) { g_heldMonsters.erase(u->dwUnitId); });
     // A monster that appears in a room the client already holds (a summoned golem) is announced to it with a 0xAC: held from that tick.
     // One that walks in from a room outside the near list is not new: retail sends it no 0xAC (a retail recording: Fallen walking in, 0x67/0x6D only), so the client never holds it.
-    for (D2DrlgRoomStrc* r : cur) each(r, [&](D2UnitStrc* u) { if (g_heldSeen.insert(u->dwUnitId).second && g_heldNear.count(r)) g_heldMonsters.insert(u->dwUnitId); });
+    for (D2DrlgRoomStrc* r : cur) each(r, [&](D2UnitStrc* u) { if (g_heldSeen.insert(u->dwUnitId).second && g_heldNear.count(r) && g_heldMonsters.insert(u->dwUnitId).second) d2client_unitseed::told(u); });
     for (D2DrlgRoomStrc* r = h->pLevel ? h->pLevel->pFirstRoomEx : nullptr; r; r = r->pDrlgRoomNext) if (!cur.count(r)) each(r, [&](D2UnitStrc* u) { g_heldSeen.insert(u->dwUnitId); });
     g_heldNear = cur;
 }
@@ -2273,6 +2277,7 @@ EMSCRIPTEN_KEEPALIVE int d2_monspawn_init() {
 EMSCRIPTEN_KEEPALIVE void d2_monspawn_reset() {
     g_sessionAiThinkWatchUnit = UINT32_MAX;
     g_sessionAiThinkWatchCount = 0; g_sessionAiThinkWatchLastFrame = -1;
+    d2client_unitseed::tell_mode(false);   // a session turns it on again (the monsters its server announces)
     g_sessionAiThinkWatchHasPath = false;
     d2::weather::reset();
     d2_session_object_pop_seed_override_reset();
@@ -3626,6 +3631,7 @@ static int d2_session_create_for_class(uint32_t seed, int difficulty, int act, i
     g_sessionPlayerClass = playerClass;
     resetSessionClientMapMirror();
     d2_monspawn_reset(); g_sessionLive = false; g_sessionMovePending = false; g_d2ClientSoundObjects = 1;
+    d2client_unitseed::tell_mode(true);   // the session's server announces monsters to its client (sessionHeldStep)
     g_sessionAiThinkWatchUnit = UINT32_MAX; g_sessionAiThinkWatchCount = 0; g_sessionAiThinkWatchLastFrame = -1;
     g_sessionAiThinkAttachFrame = -1; g_sessionAiThinkAttachMode = -1; g_sessionAiThinkAttachDeadline = -1;
     g_sessionAiThinkAttachRoomX = -1; g_sessionAiThinkAttachRoomY = -1; g_sessionAiThinkAttachRoomHasWarriv = 0;
@@ -5934,6 +5940,11 @@ EMSCRIPTEN_KEEPALIVE int d2_session_player_act() { return g_targetPlayer ? (int)
 EMSCRIPTEN_KEEPALIVE int d2_session_set_stat(uint32_t statId, int32_t value) {
     if (!g_sessionLive || !g_targetPlayer) return 0;
     STATLIST_SetUnitStat(g_targetPlayer, (int32_t)statId, value, 0);
+    // The server tells its client a changed hero stat with the 0x1D/0x1E/0x1F stat packet (D2GAME_UpdateAttribute, the sender
+    // the join walk uses); a bare statlist write leaves the client's copy stale. Gold (14) and experience (13) already go out
+    // on every client frame (PlrMsg 0x19 and 0x1A..0x1C compare against the client's last-sent value), so they are not doubled.
+    if (statId != STAT_GOLD && statId != STAT_EXPERIENCE && g_targetClient)
+        D2GAME_UpdateAttribute_6FC822D0(g_targetPlayer, (WORD)statId, (uint32_t)value, g_targetPlayer);
     return 1;
 }
 // Load the game's global quest record (the state earlier play left; packet 0x29 echoes it).
@@ -8052,7 +8063,28 @@ static void sessionClientRoomSpots(D2DrlgRoomStrc* room, D2ActiveRoomStrc* activ
     for (int i = 0, ok = 0; i <= 0x18 && ok < 3; ++i) {
         const int32_t x = int32_t(rnd(c.nSubtileWidth)) + c.nSubtileX;
         const int32_t y = c.nSubtileY + int32_t(rnd(c.nSubtileHeight));
-        if (active && COLLISION_CheckMask(active, x, y, 5) == 0) ++ok;
+        // a free spot: 0xB30F0 makes the class-0x11f client missile (type 3) on that subtile
+        if (active && COLLISION_CheckMask(active, x, y, 5) == 0) { ++ok; g_clientSpotMissiles.push_back({x, y}); }
+    }
+}
+// The client is sent a room that has a town room in its near list (1.13c D2Client+0x18370 capture, a Cold Plains start: 35
+// Rogue Encampment rooms first seen in the frame of the 97 the server sent): the sight status crosses the level boundary and a
+// town level tiles as a whole, so the client holds every town room, its critters and its client-only presets, from then on.
+// The server act has no active town room here; the town is built in a client act of the same seed, which `seen` is sent to.
+static void sessionClientTownSeen(D2DrlgRoomStrc* seen, int32_t townLevel) {
+    static const AUTOMAPFN noMap = [](D2ActiveRoomStrc*) {};
+    static const TOWNAUTOMAPFN noTownMap = [](int32_t, int32_t, int32_t, int32_t) {};
+    g_sessionTownAct = DUNGEON_AllocAct((uint8_t)g_currentAct, g_gameSeed, TRUE, nullptr, (uint8_t)g_gameDiff, nullptr, townLevel, noMap, noTownMap);
+    if (!g_sessionTownAct) return;
+    DUNGEON_SetClientIsInSight(g_sessionTownAct, seen->pLevel->nLevelId, seen->nTileXPos, seen->nTileYPos, nullptr);
+    for (D2ActiveRoomStrc* room = DUNGEON_GetRoomFromAct(g_sessionTownAct); room; room = room->pRoomNext) {
+        D2DrlgRoomStrc* dr = room->pDrlgRoom;
+        if (!dr || !dr->pLevel || dr->pLevel->nLevelId != townLevel) continue;
+        d2client_critter::room_seen(room, townLevel, g_sessionClientFrame);
+        for (D2PresetUnitStrc* p = dr->pPresetUnits; p; p = p->pNext) if (p->bSpawned & 1) {
+            d2client_critter::preset_seen(room, room->tCoords.nSubtileX + p->nXpos, room->tCoords.nSubtileY + p->nYpos);
+            if (p->nUnitType >= 1 && p->nUnitType <= 3) ++g_sessionTownUnits;
+        }
     }
 }
 static void sessionClientRoomPass() {
@@ -8071,7 +8103,13 @@ static void sessionClientRoomPass() {
                 if (nr && nr->pLevel && nr->fRoomStatus == ROOMSTATUS_UNTILE && !activeLevels.count(nr->pLevel) && !nr->pRoom && !g_sessionClientRoomsSeen.count(nr)) { warpRoom = nr; break; }
             }
         if (!g_sessionClientRoomsSeen.insert(dr).second) continue;
+        if (!g_sessionClientActOwned && !g_sessionTownAct && !DRLG_IsTownLevel(dr->pLevel->nLevelId))
+            for (int q = 0; q < dr->nRoomsNear; ++q) {
+                D2DrlgRoomStrc* nr = dr->ppRoomsNear[q];
+                if (nr && nr->pLevel && DRLG_IsTownLevel(nr->pLevel->nLevelId) && !activeLevels.count(nr->pLevel)) { sessionClientTownSeen(dr, nr->pLevel->nLevelId); break; }
+            }
         d2client_critter::room_seen(room, dr->pLevel->nLevelId, g_sessionClientFrame);   // 1.13c D2Client+0x18370
+        for (D2PresetUnitStrc* p = dr->pPresetUnits; p; p = p->pNext) if (p->bSpawned & 1) d2client_critter::preset_seen(room, room->tCoords.nSubtileX + p->nXpos, room->tCoords.nSubtileY + p->nYpos);   // 1.13c D2Client+0xA7D00
         if (dr->pLevel->nLevelId == 8) sessionClientRoomSpots(dr, room);
     }
     if (warpRoom && g_sessionClientFrame >= 7 && g_sessionClientFrame % 7 == 0) {
@@ -12200,7 +12238,9 @@ extern "C" void d2_dg_set_origin(int32_t, int32_t);
 extern "C" const char* d2_dg_walk_g();
 extern "C" void d2_dg_feed_unit_ex(int, uint32_t, int, int, int, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 extern "C" int d2_dg_feed_unit_cof(const char*);
+extern "C" void d2_dg_feed_unit_anim(uint32_t, uint32_t, const uint8_t*);
 extern "C" void d2_dg_cru_reset();
+extern "C" void d2_dg_walked_reset();
 // The client view origin: the hero's client coordinates (PATH_UpdateClientCoords: the 16.16 position >> 11, X = (gx - gy) >> 1,
 // Y = (gx + gy) >> 2) less half the 640x480 screen.
 static void sessionViewOrigin(int32_t* vx, int32_t* vy) {
@@ -12283,22 +12323,33 @@ static bool sessionMonsterCof(int32_t cls, uint32_t mode, char* out, size_t cap)
     return true;
 }
 extern "C" bool d2_session_critter_unit(uint32_t i, uint32_t* out);
-EMSCRIPTEN_KEEPALIVE int g_walkOpt = 0;   // off by default; bit0 critters, bit1 only the monsters the client was told of, bit2 critter COF
+extern "C" uint32_t d2_session_critter_count();
+extern "C" int d2_session_monster_held(uint32_t id) { return g_heldMonsters.count(id) ? 1 : 0; }
+EMSCRIPTEN_KEEPALIVE int g_walkOpt = 3;   // every session's client makes its rooms' critters; bit0 critters, bit1 only the monsters the client was told of, bit2 critter COF
 EMSCRIPTEN_KEEPALIVE void d2_session_walk_opt(int v) { g_walkOpt = v; }
 static uint32_t g_walkRooms, g_walkUnits;   // the walk's room count (7A385 clock reads) and client unit count (6C130 steps), for the frame clock model
 extern "C" uint32_t d2_dg_n7a340();
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_walk_rooms() { return d2_dg_n7a340(); }
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_walk_units() { return g_walkUnits; }
+// frame clock: the objects whose Objects.txt ClientFn is 14 (D2Client+0x253D0 reads the clock once per step, twice when its
+// 500-unit timer at unit+0xD4 ran out), as {unit id, units 0xA8110 steps before it}: the client-side tables, players, monsters,
+// then the object table's 128 buckets (id & 127) in order.
+static std::vector<std::pair<uint32_t, uint32_t>> g_walkFn14;
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_walk_fn14(uint32_t i, uint32_t* out) {
+    if (i >= g_walkFn14.size()) return 0;
+    out[0] = g_walkFn14[i].first; out[1] = g_walkFn14[i].second; return 1;
+}
 EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
-    g_walkRooms = g_walkUnits = 0;
+    g_walkRooms = g_walkUnits = 0; g_walkFn14.clear();
+    uint32_t nonObj = 0; std::vector<std::pair<uint32_t, bool>> objs;   // for g_walkFn14
     if (!g_sessionLive || !g_game || !g_lastLevel || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return "";
     auto fl = [](int32_t v) { return v >= 0 ? v / 160 : -((-v + 159) / 160); };
     int32_t vx, vy; sessionViewOrigin(&vx, &vy);
     const bool first = g_walkGame != g_game;
-    if (first) { d2_dg_cru_reset(); g_walkGame = g_game; }
+    if (first) { d2_dg_cru_reset(); d2_dg_walked_reset(); g_walkGame = g_game; }
     // The client's units: the player, monsters and objects of the level's active rooms, each with its id, mode and fp16
-    // fraction (the client room lists, client_room_units.cpp), and the COF its mode loads. The first walk's units have
-    // +0xC8 bit7 still clear (retail's first shadow pass is the second frame).
+    // fraction (the client room lists, client_room_units.cpp), and the COF its mode loads. A unit's +0xC8 bit7 is clear
+    // until its first per-unit draw passes the visibility test, so its first shadow node comes one frame after that.
     d2_dg_feed_unit(-1, 0, 0, 0, 0, 0);
     char cof[96];
     // The client's own critters (Levels.txt cmon, made at room activation 0x440C0 before any server unit is learnt): type 1 units
@@ -12309,13 +12360,21 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
         if ((g_walkOpt & 4) && sessionMonsterCof((int32_t)c[1], c[4], cof, sizeof cof)) d2_dg_feed_unit_cof(cof);
         d2_dg_feed_unit_shift(0);
     }
+    g_walkUnits += g_sessionTownUnits;   // the town the client built beside this level (sessionClientTownSeen)
+    // Frame clock: a critter stays in D2Client's second unit hash after its room is freed, one 6C130 step each per frame. When the
+    // walk does not feed the critters itself (bit0 clear), they are counted here. The client-only presets are counted per room below.
+    if (!(g_walkOpt & 1)) g_walkUnits += d2_session_critter_count();
     for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
         D2ActiveRoomStrc* room = roomEx->pRoom;
+        // frame clock: the client-only presets (bSpawned bit0; the server skips them) D2Client 0xA7D00 makes at room first-sight
+        // (0x440C0 -> 0xA7BF0, flag 0x600000) sit in the client-side hash 0xA8030 walks; each is one 6C130 clock read per frame.
+        // First sight covers every room the client was sent, not only those it holds units of. 0xA8110 walks the client-side
+        // table of missiles, objects and monsters only: a preset of another type (a type 5 tile) is made but never stepped.
+        if (g_sessionClientRoomsSeen.count(roomEx)) for (D2PresetUnitStrc* p = roomEx->pPresetUnits; p; p = p->pNext)
+            if ((p->bSpawned & 1) && p->nUnitType >= 1 && p->nUnitType <= 3) ++g_walkUnits;
         if (!room || !(clientHeldCount(room) > 0 || inStartLattice(roomEx))) continue;   // only the rooms the client holds
         for (D2UnitStrc* u = room->pUnitFirst; u; u = u->pRoomNext) {
             uint32_t mode = u->dwAnimMode, fx = 0x8000, fy = 0x8000; int32_t x, y;
-            // a monster the server never sent this client (outside the rooms its first-sight chain covers) has no client unit
-            if ((g_walkOpt & 2) && u->dwUnitType == UNIT_MONSTER && !g_clientInitSeed.count(1ull << 32 | u->dwUnitId)) continue;
             if (u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MONSTER) {
                 if (!u->pDynamicPath) continue;
                 if (u->dwUnitType == UNIT_MONSTER && !g_heldMonsters.count(u->dwUnitId)) continue;   // a monster the server never announced to the client is not in its room lists
@@ -12323,13 +12382,74 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_room_walk_g(uint32_t now) {
                 fx =u->pDynamicPath->tGameCoords.dwPrecisionX & 0xFFFF; fy = u->pDynamicPath->tGameCoords.dwPrecisionY & 0xFFFF;
             } else if (u->dwUnitType == UNIT_OBJECT && u->pObjectData && u->pObjectData->pObjectTxt && u->pStaticPath) {
                 x = u->pStaticPath->tGameCoords.nX; y = u->pStaticPath->tGameCoords.nY; mode = clientObjectClock(u).shown;
+            } else if (u->dwUnitType == UNIT_MISSILE && u->pDynamicPath && d2_session_missile_on_client(u->dwUnitId)) {
+                // a missile the client holds is a unit of its room lists too: the cell walk draws it through D2Client+0x6CC00's type-3 path
+                x = u->pDynamicPath->tGameCoords.wPosX; y = u->pDynamicPath->tGameCoords.wPosY;
+                fx = u->pDynamicPath->tGameCoords.dwPrecisionX & 0xFFFF; fy = u->pDynamicPath->tGameCoords.dwPrecisionY & 0xFFFF;
+                // The client makes a missile whose Missiles.txt InitSteps is set with +0xC8 bit 18, and its update clears the bit once
+                // the frames it has run pass InitSteps; the unit draw leaves at once while the bit is set. The walk has the server's
+                // unit, so the client's bit is counted from the client frame the missile was first walked on: the frame it is made
+                // on and InitSteps + 1 updates stay hidden.
+                static std::unordered_map<uint32_t, uint32_t> seen; if (first) seen.clear();
+                const D2MissilesTxt* mt = (int32_t)u->dwClassId >= 0 && (int32_t)u->dwClassId < (int32_t)sgptDataTables->nMissilesTxtRecordCount ? DATATBLS_GetMissilesTxtRecord(u->dwClassId) : nullptr;
+                const uint32_t born = seen.emplace(u->dwUnitId, g_sessionClientFrame).first->second;
+                if (mt && mt->nInitSteps && g_sessionClientFrame - born < (uint32_t)mt->nInitSteps + 2) { ++g_walkUnits; continue; }
             } else continue;
             ++g_walkUnits;
-            d2_dg_feed_unit_ex((int)u->dwUnitType, u->dwUnitId, (int)u->dwClassId, x, y, mode, fx, fy, 0, first ? 1 : 0);
-            if (sessionUnitCof(u, mode, cof, sizeof cof)) d2_dg_feed_unit_cof(cof);
+            if (u->dwUnitType == UNIT_OBJECT) objs.push_back({u->dwUnitId, u->pObjectData->pObjectTxt->nClientFn == 14});
+            // The per-unit draw's visibility test (it sets unit +0xC8 bit7 on a pass, clears it on a fail): another player or a
+            // monster, neither dead nor dying, fails when the hero's level draws by line of sight (Levels.txt LOSDraw) and the
+            // line from the hero to it is blocked for mask 2. Every other unit passes.
+            bool losBlocked = false;
+            if (g_targetPlayer && u != g_targetPlayer && ((u->dwUnitType == UNIT_PLAYER && u->dwAnimMode != PLRMODE_DEATH && u->dwAnimMode != PLRMODE_DEAD) || (u->dwUnitType == UNIT_MONSTER && u->dwAnimMode != MONMODE_DEATH && u->dwAnimMode != MONMODE_DEAD))) {
+                D2ActiveRoomStrc* heroRoom = UNITS_GetRoom(g_targetPlayer);
+                if (heroRoom && DRLG_GetLOSDrawFromLevelId(DUNGEON_GetLevelIdFromRoom(heroRoom))) losBlocked = UNITS_TestCollisionWithUnit(g_targetPlayer, u, 2) != 0;
+            }
+            // The shadow step (D2Client+0x6BA90) leaves for a unit type above 2 after its cull's one D2Gfx #10013 read and draws no
+            // shadow. The draw grid's shadow step has no such exit yet, so a missile is staged without the node: its #10013 read is
+            // the one record still short per drawn missile. Stage the node again once that step leaves for a missile.
+            d2_dg_feed_unit_ex((int)u->dwUnitType, u->dwUnitId, (int)u->dwClassId, x, y, mode, fx, fy, 0, (first || u->dwUnitType == UNIT_MISSILE ? 1u : 0u) | (losBlocked ? 2u : 0u));
+            // the COF is the one of the mode D2Common #10175 gives: a player or monster in a sequence draws its sequence mode
+            const uint32_t cofMode = (u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MONSTER) ? (uint32_t)UNITS_GetAnimOrSeqMode(u) : mode;
+            if (sessionUnitCof(u, cofMode, cof, sizeof cof) && d2_dg_feed_unit_cof(cof)) {
+                // the priority row's direction (#10663: path +0x64, a static path's +0x1C) and frame (#10569: unit +0x44 >> 8), and the
+                // draw mode a monster component's variant code gives when it is an item code whose record is Transparent (6E2C0's monster
+                // arm, 6DFE0's item arm; in DT and DD only a compositeDeath class reads its variants).
+                uint32_t dir = 0, frame = 0; uint8_t ovr[16] = {};
+                if (u->dwUnitType == UNIT_OBJECT) { dir = u->pStaticPath->nDirection; frame = (uint32_t)(clientObjectClock(u).clock >> 8); }
+                else {
+                    dir = u->pDynamicPath->nDirection; int32_t fp = u->nSeqCurrentFramePrecise;
+                    if (u->dwUnitType == UNIT_MONSTER) {
+                        auto it = g_clientMonsterClock.find(u->dwUnitId);
+                        if (it != g_clientMonsterClock.end() && it->second.valid && it->second.mode == u->dwAnimMode) fp = it->second.clock;
+                    }
+                    frame = (uint32_t)(fp >> 8);
+                }
+                if (u->dwUnitType == UNIT_MONSTER && u->pMonsterData) {
+                    const D2MonStats2Txt* m2 = UNITS_GetMonStats2TxtRecordFromMonsterId((int)u->dwClassId);
+                    if ((cofMode != 0 && cofMode != 12) || (m2 && (m2->dwFlags & MONSTATS2FLAG_COMPOSITEDEATH)))
+                        for (uint32_t c = 0; c < 16; ++c) {
+                            const uint32_t code = D2Common_11069(u, c, u->pMonsterData->nComponent[c]);
+                            int id = -1; const D2ItemsTxt* it = code ? DATATBLS_GetItemRecordFromItemCode(code, &id) : nullptr;
+                            if (it && it->nTransparent) ovr[c] = (uint8_t)(it->nTransTbl + 1);
+                        }
+                }
+                d2_dg_feed_unit_anim(dir, frame, ovr);
+            }
             if (u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MONSTER) d2_dg_feed_unit_shift(sessionColourShift(u));
         }
     }
+    // the client-only light-spot missiles (class 0x11f, type 3) 0x53550 made: placed on their subtile centre, ids local to the client
+    // Off until the spots land where retail's do: our 27 level-8 rooms reach the pass in the server act's list order, retail's client
+    // list has (tile 1500,1024) tenth where ours has it second-from-last, so every later room draws different hero-seed values and
+    // the spots (and the 12 vs 7 class-0x11f draws at tick 1) differ. Fed, the G count rose 21287 -> 23044.
+    static const bool kFeedClientSpots = false;
+    for (size_t i = 0; kFeedClientSpots && i < g_clientSpotMissiles.size(); ++i)
+        d2_dg_feed_unit_ex(UNIT_MISSILE, 0x7F000000u + (uint32_t)i, 0x11f, g_clientSpotMissiles[i].first, g_clientSpotMissiles[i].second, 0, 0x8000, 0x8000, 0, first ? 1 : 0);
+    nonObj = g_walkUnits - (uint32_t)objs.size();
+    std::stable_sort(objs.begin(), objs.end(), [](const auto& a, const auto& b) {
+        return (a.first & 127) != (b.first & 127) ? (a.first & 127) < (b.first & 127) : a.first > b.first; });
+    for (uint32_t i = 0; i < objs.size(); ++i) if (objs[i].second) g_walkFn14.push_back({objs[i].first, nonObj + i});
     // 7A0D0: columns = w/160 + 11, rows = h/80 + 12, side = columns + rows - 1; 7A9F0: origin = the view corner's tile less (3, columns)
     const int32_t cols = 640 / 160 + 11, side = cols + 480 / 80 + 12 - 1;
     d2_dg_set_origin(vx, vy);

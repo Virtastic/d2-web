@@ -11,7 +11,7 @@ struct Env {
  uint32_t cookie;               // DAT_6fb8b780
  P (*callSettingFrame)(P, P, uint32_t);  // __CallSettingFrame_12
  uint32_t exceptionList;        // fs:[0] shadow
- uint8_t (*tolower_)(uint8_t); int (*iscntrl_)(uint8_t);
+ uint8_t (*tolower_)(uint8_t); int (*isdigit_)(uint8_t);   // 0x3FD3 tests ctype mask 4 (_DIGIT); Ghidra's FID name says iscntrl
  uint8_t decimalPoint;          // DAT_6fb8b914
  void (*cvtDouble)(P out, P str); void (*cvtInt)(P out, P str);   // FUN_6fb7c2d0 / c315
  void (*shift)(P s, int32_t d); // __shift
@@ -45,7 +45,7 @@ P CallCatchBlock2(const Env& e, P reg, P funcInfo, P handler, int32_t state, uin
 // 1.13c D2Client+0xCB1C5  (strip to 'e', insert decimal point there, shift tail right)
 void sub_CB1C5(const Env& e, P s) {
  bool stop = e.tolower_(e.rd8(s)) == 'e';
- while (!stop) { ++s; stop = e.iscntrl_(e.rd8(s)) == 0; }
+ while (!stop) { ++s; stop = e.isdigit_(e.rd8(s)) == 0; }
  uint8_t c = e.rd8(s); e.wr8(s, e.decimalPoint);
  uint8_t n;
  do { ++s; n = e.rd8(s); e.wr8(s, c); c = n; } while (e.rd8(s));

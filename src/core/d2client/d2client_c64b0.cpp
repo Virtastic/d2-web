@@ -1,7 +1,7 @@
 // 1.13c D2Client+0xC64B0, written from the disassembly. ECX = unit, one unused stack word (ret 4). path = [unit+0x2C]; p = 0xC838(ECX = unit); no p or no path
 // returns 0. a = 10344(p) (0xCB68), b = 10350(p) (0xCB6E), m = 0xC628(p). m&3 == 3: size = type ? 0x100 : 0x80 (type = [unit]); cd = 0xCD30(unit)
-// (it takes ONE word, so `size` stays on the stack as the fifth argument of 0xCB98), 0xCB98(0xC1F0(unit), a, b, cd, size), 0xC400(a, size),
-// 0xC3AC(a, type ? 0x3C01 : 0x1C09), 0xC60A(p, 0), then 0x88BF0(EDX = 0x225D0(EAX = 0x9E3, ECX = unit)). Else m&1: 0xCB56(unit, 3), [unit+0x48] = 0x500. Returns 1.
+// (it takes ONE word, so `size` stays on the stack as the fifth argument of 0xCB98), 0xCB98(0xC1F0(unit), a, b, cd, size), 0xC400(path, size),
+// 0xC3AC(path, type ? 0x3C01 : 0x1C09), 0xC60A(p, 0), then 0x88BF0(EDX = 0x225D0(EAX = 0x9E3, ECX = unit)). Else m&1: 0xCB56(unit, 3), [unit+0x48] = 0x500. Returns 1.
 #include "cl_mb2.h"
 // 1.13c D2Client+0xC64B0
 extern "C" uint32_t d2c_c64b0(uint32_t u, uint32_t, const clm::Env& e) {
@@ -17,8 +17,8 @@ extern "C" uint32_t d2c_c64b0(uint32_t u, uint32_t, const clm::Env& e) {
         const uint32_t cd = e.H(0xcd30, 0, 0, 0, 0, 0, u);
         const uint32_t f = e.H(0xc1f0, 0, 0, 0, 0, 0, u);
         e.H(0xcb98, 0, 0, 0, 0, 0, f, a, b, cd, size);
-        e.H(0xc400, 0, 0, 0, 0, 0, a, size);
-        e.H(0xc3ac, 0, 0, 0, 0, 0, a, type == 0 ? 0x1c09u : 0x3c01u);
+        e.H(0xc400, 0, 0, 0, 0, 0, path, size);   // [esp+0x1c] after the push is the path local, not a
+        e.H(0xc3ac, 0, 0, 0, 0, 0, path, type == 0 ? 0x1c09u : 0x3c01u);
         e.H(0xc60a, 0, 0, 0, 0, 0, p, 0);
         const uint32_t k = e.H(0x225d0, 0x9e3, u);
         e.H(0x88bf0, 0, 0, k);

@@ -34,7 +34,7 @@ extern "C" uint32_t d2c_3aee0(const cl::Env& e) {
     }
     uint32_t edx = G(e, 0xfae10);
     if (edx == 0) {
-        if (G(e, 0x113a68)) return G(e, 0x113a68);
+        if (G(e, 0x113a68)) return eax;   // the decompile's bare return leaves EAX as the last call set it
         uint32_t i = 0;
         do {
             if (G(e, 0xFAD80 + 4 * i) == 1) {

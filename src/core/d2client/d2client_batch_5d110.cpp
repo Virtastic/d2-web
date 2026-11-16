@@ -83,8 +83,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_5d600(D2cRes5d* s, const D2cR
 // 1.13c D2Client+0x5DA80 (record in EAX)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_5da80(D2cRes5d* s, const D2cRes5dEnv* e, uint8_t* r) {
     if (rd<int32_t>(r, 0x86) != 1) e->fatal(0x40);
-    wr<uint32_t>(r, 0x6c, e->ord10094());
-    wr<uint32_t>(r, 0x70, e->ord10095());
+    wr<uint32_t>(r, 0x6c, e->ord10094(rd<uint32_t>(r, 0x82)));
+    wr<uint32_t>(r, 0x70, e->ord10095(rd<uint32_t>(r, 0x82)));
     wr<int32_t>(r, 0x86, 2);
     e->fn5cd10();
     s->live--;

@@ -285,7 +285,10 @@ EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_pump() { return g_server.outLength; }
 
 EMSCRIPTEN_KEEPALIVE const uint8_t* d2_local_d2gs_out() { return g_server.out; }
 // The queued server bytes' length; the queue is empty afterwards (read d2_local_d2gs_out first).
-EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_take() { const int n = g_server.outLength; g_server.outLength = 0; return n; }
+static int g_lastTake;
+EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_take() { const int n = g_server.outLength; g_server.outLength = 0; g_lastTake = n; return n; }
+// What the client's latest receive held: D2Client's packet pump (0xACE20, one clock read) runs only on a frame that got bytes.
+int d2_local_d2gs_last_take() { return g_lastTake; }
 // Bytes lost on the way to the client since the connection opened (a consumer that never takes).
 EMSCRIPTEN_KEEPALIVE int d2_local_d2gs_dropped() { return g_server.outDropped; }
 // {opcode, result} per client packet the server did not take, oldest first.

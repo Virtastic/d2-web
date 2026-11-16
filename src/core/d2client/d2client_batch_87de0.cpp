@@ -106,7 +106,10 @@ static void snd_kick(D2cSnd87* s, const D2cSnd87Env* e, uint8_t* p) {   // 1.13c
     uint8_t* r = rec(s, rd<int32_t>(p, 4));
     wr<int32_t>(p, 0x3d, 1);
     int32_t k = rd<int32_t>(p, 8);
-    if (rd<uint8_t>(r, 0x40) != 0 && rd<int32_t>(p, 0x30) == 1) d2_client_88230(s, e, k, 0, 0, rd<uint8_t>(r, 0x40));   // retail: EAX = rec[0x40] (the base duration), stack key, 0, 0
+    if (rd<uint8_t>(r, 0x40) != 0 && rd<int32_t>(p, 0x30) == 1) {   // retail: EAX = rec[0x40] (the base duration), ECX = key, stack key, 0, 0
+        if (e && e->fn88230) e->fn88230(rd<uint8_t>(r, 0x40), k, k, 0, 0);
+        else d2_client_88230(s, e, k, 0, 0, rd<uint8_t>(r, 0x40));
+    }
 }
 
 // 1.13c D2Client+0x88550 (entry in ECX)

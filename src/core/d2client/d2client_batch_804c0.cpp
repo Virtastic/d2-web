@@ -103,6 +103,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_80700(D2cB8G* g, const D2cB8Env* 
     wr<int32_t>(p, 0x20, 3);
 }
 
+// A data-table record: the array base is a 32-bit field of the retail table image (the count dword follows it), and
+// retail's null test is on the 32-bit sum base + i * stride.
+static uint8_t* rec32(const uint8_t* dt, size_t baseOff, int32_t i, uint32_t stride) {
+    return (uint8_t*)(uintptr_t)(uint32_t)(rd<uint32_t>(dt, baseOff) + (uint32_t)i * stride);
+}
+
 // 1.13c D2Client+0x81D70
 extern "C" EMSCRIPTEN_KEEPALIVE int d2_client_81d70(D2cB8G* g, const D2cB8Env* e, const uint8_t* unit) {
     int r = 0;
@@ -112,13 +118,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE int d2_client_81d70(D2cB8G* g, const D2cB8Env* e
     if (k == 7) {
         int i = e->ord10620();
         if (i >= 0 && i < rd<int32_t>(g->dt, 0xc28)) {
-            uint8_t* rec = rd<uint8_t*>(g->dt, 0xc24) + (size_t)i * 0x14c;
+            uint8_t* rec = rec32(g->dt, 0xc24, i, 0x14c);
             if (rec && rd<int16_t>(rec, 0x84) > 0) return rd<int16_t>(rec, 0x86);
         }
     } else if (e->ord10106() == 5) {
         int i = e->ord10620();
         if (i >= 0 && i < rd<int32_t>(g->dt, 0xc1c)) {
-            uint8_t* rec = rd<uint8_t*>(g->dt, 0xc18) + (size_t)i * 0x1b8;
+            uint8_t* rec = rec32(g->dt, 0xc18, i, 0x1b8);
             if (rec && rd<int16_t>(rec, 0x82) > 0) r = rd<int16_t>(rec, 0x84);
         }
     }
@@ -139,7 +145,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int d2_client_81e40(D2cB8G* g, const D2cB8Env* e
         if (e->ord10620() >= 0) {
             int i = e->ord10620();
             if (i >= 0 && i < rd<int32_t>(g->dt, 0xc28)) {
-                uint8_t* rec = rd<uint8_t*>(g->dt, 0xc24) + (size_t)i * 0x14c;
+                uint8_t* rec = rec32(g->dt, 0xc24, i, 0x14c);
                 if (rec && rd<int16_t>(rec, 0x84) > 0) {
                     if (out && rec[0x88]) *out = rec[0x88];
                     return rd<int16_t>(rec, 0x84);
@@ -149,7 +155,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int d2_client_81e40(D2cB8G* g, const D2cB8Env* e
     } else if (e->ord10106() == 5) {
         int i = e->ord10620();
         if (i >= 0 && i < rd<int32_t>(g->dt, 0xc1c)) {
-            uint8_t* rec = rd<uint8_t*>(g->dt, 0xc18) + (size_t)i * 0x1b8;
+            uint8_t* rec = rec32(g->dt, 0xc18, i, 0x1b8);
             if (rec && rd<int16_t>(rec, 0x82) > 0) {
                 if (out && rec[0x86]) *out = rec[0x86];
                 r = rd<int16_t>(rec, 0x82);
