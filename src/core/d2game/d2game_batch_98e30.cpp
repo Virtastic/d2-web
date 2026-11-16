@@ -85,10 +85,11 @@ void D2Game_9BC70(Env98& e, void* unit, int* out2, int amount, int* out1) {
 
 // 1.13c D2Game+0x9BD40 ; in_EAX = game (party list at +0x1d2c); returns nothing, bumps *list
 void D2Game_9BD40(char* game) {
-  uint16_t* hd = (uint16_t*)at<uintptr_t>(game, 0x1d2c);
+  // retail pointer fields are dwords (game+0x1D2C, head+4, slot+8): an 8-byte read runs past them
+  uint16_t* hd = (uint16_t*)(uintptr_t)at<uint32_t>(game, 0x1d2c);
   uint16_t v = *hd; if (v < 3) v = 3;
-  for (uint8_t* p; (p = (uint8_t*)at<uintptr_t>(hd, 4)) != nullptr;) {   // ponytail: next slot offsets guessed
-    while (*(uint16_t*)p != v) { p = (uint8_t*)at<uintptr_t>(p, 8); if (!p) goto done; }
+  for (uint8_t* p; (p = (uint8_t*)(uintptr_t)at<uint32_t>(hd, 4)) != nullptr;) {
+    while (*(uint16_t*)p != v) { p = (uint8_t*)(uintptr_t)at<uint32_t>(p, 8); if (!p) goto done; }
     if (++v < 3) v = 3;
   }
 done:
@@ -97,7 +98,7 @@ done:
 
 // 1.13c D2Game+0x9BF70 ; unaff_EBX = game
 uint16_t D2Game_9BF70(Env98& e, char* game) {
-  char* hd = (char*)at<uintptr_t>(game, 0x1d2c);
+  char* hd = (char*)(uintptr_t)at<uint32_t>(game, 0x1d2c);   // dword pointer fields, as 0x9BD40 reads them
   if (!hd) e.fatal(0x7f);
   char* n = (char*)e.alloc10045("..\\Source\\D2Game\\UNIT\\Party.cpp", 0x80, 0);
   if (!n) e.fatal(0x81);
@@ -106,8 +107,8 @@ uint16_t D2Game_9BF70(Env98& e, char* game) {
   uint16_t id = 0; { // FUN_6fcbbd40 on this game
     uint16_t* h = (uint16_t*)hd; D2Game_9BD40(game); id = (uint16_t)(*h - 1); }
   *(uint16_t*)n = id;
-  at<uintptr_t>(n, 8) = at<uintptr_t>(hd, 4);
-  at<uintptr_t>(hd, 4) = (uintptr_t)n;
+  at<uint32_t>(n, 8) = at<uint32_t>(hd, 4);
+  at<uint32_t>(hd, 4) = (uint32_t)(uintptr_t)n;
   return id;
 }
 
