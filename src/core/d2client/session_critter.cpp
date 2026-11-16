@@ -47,6 +47,7 @@ struct Critter {
     uint32_t mode; int32_t delay; // +0x10, data +0x30
     uint32_t f44, f48, f4c, u7c;  // animation clock, length, rate; last 0x22CA0 sound frame
     uint32_t born;
+    int32_t state;                // monster data +0x34 (0x179E0: 1 while it goes to a corpse)
     int32_t vel;                  // path +0x7C
     uint32_t fx = 0x8000, fy = 0x8000;   // the path position's fp16 fraction (a walk moves it off the subtile centre)
     struct Walk { D2UnitStrc u; D2DynamicPathStrc p; };
@@ -135,13 +136,14 @@ void wander(Critter& c, uint32_t step, uint32_t action, uint32_t frame) {
     if (lcg(c.lo, c.hi) & 1) dy = -dy;
     walk(c, c.x + dx, c.y + dy, action, frame);
 }
-// 0x17500: away from the unit, when the next spot that way is free for size 1 under the critter's mask
-bool flee(Critter& c, D2UnitStrc* from, uint32_t frame) {
+// 0x17500(unit, step, action, extra): away from the unit, when the next spot that way is free for size 1 under the mask of the
+// critter's path (0x17E80 sets 0xC01 on it first; a client monster's path otherwise carries the monster default 0x3C01)
+bool flee(Critter& c, D2UnitStrc* from, int32_t step, uint32_t action, uint32_t mask, uint32_t frame) {
     D2CoordStrc p{}; UNITS_GetCoords(from, &p);
     const uint32_t tx = (uint32_t)c.x, ty = (uint32_t)c.y, sx = (uint32_t)p.nX, sy = (uint32_t)p.nY;
     const int32_t dx = sx > tx ? -1 : sx < tx ? 1 : 0, dy = sy > ty ? -1 : sy < ty ? 1 : 0;
-    if (!c.room || COLLISION_CheckMaskWithSize(c.room, c.x + dx, c.y + dy, 1, 0xC01)) return false;
-    walk(c, c.x + 4 * dx, c.y + 4 * dy, 0xC, frame);
+    if (!c.room || COLLISION_CheckMaskWithSize(c.room, c.x + dx, c.y + dy, 1, mask)) return false;
+    walk(c, c.x + step * dx, c.y + step * dy, action, frame);
     return true;
 }
 // 0x17E80
@@ -158,11 +160,52 @@ void chicken(Critter& c, uint32_t frame) {
         }
     if (!best) return;
     char b[96]; snprintf(b, sizeof b, "%u T id=%x tgt=%u:%x d=%d\n", frame, c.id, best->dwUnitType, best->dwUnitId, bd); g_log += b;
-    if (bd < 4) { if (!flee(c, best, frame)) wander(c, 4, 0xC, frame); return; }
+    if (bd < 4) { if (!flee(c, best, 4, 0xC, 0xC01, frame)) wander(c, 4, 0xC, frame); return; }
     if (lcg(c.lo, c.hi) % 100 < 0x1E) { wander(c, 2, 1, frame); return; }
     c.delay = 5;
 }
-// 0x17F70
+// 0x16C20 over the adjacent rooms' units with the callback 0x16DD0: a dead player (mode 0/0x11) or a monster corpse (mode 0/0xC)
+// 3..25 from the critter and more than 7 from the local player takes a coin roll on the critter's seed; the last that wins is kept.
+D2UnitStrc* corpse(Critter& c, D2UnitStrc* player) {
+    D2UnitStrc* got = nullptr;
+    D2ActiveRoomStrc** rl = nullptr; int32_t nr = 0; DUNGEON_GetAdjacentRoomsListFromRoom(c.room, &rl, &nr);
+    for (uint32_t i = 0; i < (uint32_t)nr; ++i)
+        for (D2UnitStrc* u = rl[i]->pUnitFirst; u; u = u->pRoomNext) {
+            const uint32_t m = u->dwAnimMode;
+            if (u->dwUnitType == UNIT_PLAYER) { if (m != 0 && m != 0x11) continue; }
+            else if (u->dwUnitType == UNIT_MONSTER) { if (m != 0 && m != 0xC) continue; }
+            else continue;
+            const int32_t d = distance(c, u);
+            if (d < 3 || d > 25 || !player) continue;
+            D2CoordStrc a{}, b{}; UNITS_GetCoords(u, &a); UNITS_GetCoords(player, &b);   // #10522(corpse, local player)
+            int32_t dx = a.nX - b.nX, dy = a.nY - b.nY; if (dx < 0) dx = -dx; if (dy < 0) dy = -dy;
+            const int32_t s = UNITS_GetUnitSizeX(u) / -2 - UNITS_GetUnitSizeX(player) / 2;
+            int32_t nx = s + dx, ny = s + dy; if (nx < 0) nx = 0; if (ny < 0) ny = 0;
+            if ((nx <= ny ? (nx + 2 * ny) / 2 : (ny + 2 * nx) / 2) <= 7) continue;
+            if (lcg(c.lo, c.hi) & 1) got = u;
+        }
+    return got;
+}
+// 0x179E0 (the rat's, classes 0x97/0x10D/0x11B/0x153)
+void rat(Critter& c, D2UnitStrc* player, int32_t dist, uint32_t frame) {
+    if (c.mode == 0xC || c.mode == 0) return;
+    if (dist < 2 && player) {   // 0x16CB0: on the player's own subtile -> 0x17300 (action 8 at its spot). ponytail: not ported
+        D2CoordStrc p{}; UNITS_GetCoords(player, &p);
+        if (p.nX == c.x && p.nY == c.y) return;
+    }
+    if (c.mode != 1 || !c.room) return;
+    if (dist < 4) { flee(c, player, 6, 1, 0x3C01, frame); return; }
+    D2UnitStrc* a = dist > 7 ? corpse(c, player) : nullptr;
+    if (a && c.state == 0) {   // 0x176A0: walk to the corpse (action 0 on its type and id); ponytail: the walk path to its spot
+        D2CoordStrc p{}; UNITS_GetCoords(a, &p);
+        walk(c, p.nX, p.nY, 1, frame); c.state = 1; return;
+    }
+    if (c.state != 0) { if (lcg(c.lo, c.hi) % 100 < 20) c.state = 0; c.delay = 0x20; neutral(c, frame); return; }
+    if (lcg(c.lo, c.hi) % 100 < 0x4B) { c.delay = 0x1E; neutral(c, frame); return; }
+    wander(c, 5, 1, frame);
+}
+// 0x17F70 (the class switch's jump table: 0x95/0x10C chicken, 0x97/0x10D/0x11B/0x153 rat, 0x116..0x11A nothing; the classes whose
+// AI is not ported here take the default, 0x17270)
 void think(Critter& c, D2UnitStrc* player, uint32_t frame) {
     if (c.delay > 0) { --c.delay; return; }
     int32_t dist = 0x7fffffff; D2UnitStrc* tgt = nullptr;
@@ -170,24 +213,46 @@ void think(Critter& c, D2UnitStrc* player, uint32_t frame) {
     if (!tgt && !player) { c.delay = 0x19; neutral(c, frame); return; }
     if (dist > 30) { c.delay = dist - 15 > 199 ? 200 : dist - 15; neutral(c, frame); return; }
     if (c.cls == 0x95 || c.cls == 0x10C) chicken(c, frame);
+    else if (c.cls == 0x97 || c.cls == 0x10D || c.cls == 0x11B || c.cls == 0x153) rat(c, tgt, dist, frame);
+    else if (c.cls >= 0x116 && c.cls <= 0x11A) return;
     else neutral(c, frame);
 }
-// 0x2B1E0 -> 0x4F4A0: mode 2 first walks its path (0x2A700 -> #10342(unit, 1024); FALSE = the path is done) and ends when it is
-// done; then the animation clock (0x4EE40), whose loop end ends mode 8. The end is neutral (0x4DA60).
+// 0x4BFF0: the mode's record {walks its path, animation kind, end kind}, from D2Client+0xF2268 when MonStats2's moving-mode bit
+// (+0x104) is set for the mode, else D2Client+0xF21A8
+const uint8_t kModeRec[2][16][3] = {
+    {{0,2,0},{0,0,0},{1,0,1},{0,1,2},{2,1,3},{2,1,3},{0,1,2},{0,1,2},{0,1,2},{0,1,2},{0,2,0},{0,0,0},{0,2,0},{1,2,2},{2,1,2},{1,0,1}},
+    {{1,2,0},{0,1,2},{0,1,2},{0,1,2},{1,0,4},{1,0,4},{2,1,3},{1,0,4},{1,0,4},{1,0,4},{0,2,0},{1,2,0},{1,2,0},{1,2,0},{1,2,0},{1,2,0}},
+};
+// #10426: the animation's next step reaches its end
+bool atEnd(const Critter& c) { return c.f48 <= c.f4c + c.f44; }
+// 0x2B1E0 -> 0x4F4A0: a walking mode first walks its path (0x2A700 -> #10342(unit, 1024); FALSE = the path is done); then the
+// animation clock (0x4EE40: kind 0 steps, 1 ends at the loop's end, 2 holds the last frame, 3 holds the first); the end kind says
+// what ends the mode (1 the path, 2/3 the clock, 4 the path and the clock's end). The end is neutral (0x4DA60).
 void step(Critter& c, uint32_t frame) {
-    bool end = false;
-    if (c.mode == 2) {
-        end = !c.w || !D2Common_10226(&c.w->u, 1024);
+    if (c.mode >= 16) return;
+    const D2MonStats2Txt* m2 = monStats2(monStats((int32_t)c.cls));
+    const uint8_t* r = kModeRec[m2 && (m2->nModeEnabledWhenMovingFlags[c.mode >> 3] >> (c.mode & 7) & 1) ? 1 : 0][c.mode];
+    bool done = false, clock = false, end = false;
+    if (r[0] == 1) {
+        done = !c.w || !D2Common_10226(&c.w->u, 1024);
         if (c.w) {
             const uint32_t px = c.w->p.tGameCoords.dwPrecisionX, py = c.w->p.tGameCoords.dwPrecisionY;
             c.x = (int32_t)(px >> 16); c.y = (int32_t)(py >> 16); c.fx = px & 0xFFFF; c.fy = py & 0xFFFF;
         }
     }
-    if (c.f48) {
-        c.f44 += c.f4c;
-        if (c.f44 >= c.f48) { c.f44 -= c.f48; if (c.mode == 8) end = true; }
+    const auto advance = [&] { if (c.f48) { c.f44 += c.f4c; if (c.f44 >= c.f48) c.f44 -= c.f48; } };
+    switch (r[1]) {
+    case 0: advance(); break;
+    case 1: if (atEnd(c)) clock = true; else advance(); break;
+    case 2: if (atEnd(c)) { c.f44 = c.f48 - 0x100; c.f4c = 0; } else advance(); break;
+    case 3: c.f44 = 0x100; c.f4c = 0; break;
     }
-    if (end && (c.mode == 2 || c.mode == 8)) setMode(c, 1, frame);
+    switch (r[2]) {
+    case 1: end = done; break;
+    case 2: case 3: end = clock; break;
+    case 4: end = done && atEnd(c); break;
+    }
+    if (end) setMode(c, 1, frame);
 }
 // 0x181A0 + 0xA7780 + 0x4D160
 void create(D2ActiveRoomStrc* room, int32_t cls, uint32_t frame) {
