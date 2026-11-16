@@ -48,6 +48,7 @@ void cel(uint32_t ecx, uint32_t edx, int32_t x, int32_t y) { rec(10041, ecx, edx
 // flag's gdwBitMasks[3]), 9EEEE once per 9EE90 cell holding a list, and 10ECF's; the first frame has the fixed loading sequence.
 namespace {
 uint32_t g_clk = 0, g_deadline = 0, g_frames = 0, g_lastReset = 0, g_rewalk = 0;
+uint32_t g_msgDeadline = 0;   // the game-message list's one entry (D2Client 0x113AA4/0x113AA8): 7D89B stamps the join message now + 10000; 0 once 7B730 drops it
 std::map<uint32_t, uint32_t> g_fn14;   // unit id -> a ClientFn 14 object's timer (unit+0xD4)
 }
 extern "C" uint32_t d2_dg_n9e970();
@@ -81,6 +82,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first
         g_frames = g_lastReset = 0; g_fn14.clear();
         g_clk = 40 + 5; g_deadline = g_clk + 500;                // 10EA6 reads the clock after 4 loading-sequence reads
         g_rewalk = g_clk + 11;                                   // the loading walk's 6D206 read (AF711, 8 x C1788, 6D1DA before it)
+        g_msgDeadline = g_clk + 12 + 10000;                      // 7D89B, the read after 6D206: the join message's expiry (+0x1E)
         g_clk += 15; units();                                    // ... 7D89B, D2Win 12FF8 x2, then 44A89 and the unit steps
         g_clk += 3 + walk + 1; now = g_clk;                      // 44AC1, C154D, 8AFDA, the walk, 10ECF
     } else {
@@ -96,7 +98,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first
         const uint32_t alpha = lead / 500;
         rec(10045, lead, alpha, {0, 0, uint32_t(W), uint32_t(H - 0x2f), 0, alpha});
     } else { lead = g_deadline ? g_deadline : ecx805; g_deadline = 0; }   // expired: 10EC0 clears the deadline, its compare leaves it in ecx; unset: 10EC0 returns at once and ecx is 805A0's
-    g_clk += 5;                                                  // 12FF8 x3, 7B92E, 5A9A9 after the draw
+    g_clk += 1;                                                  // 29250's D2Win 12FF8
+    if (g_msgDeadline) {                                         // 7B730 returns at once on an empty message list; else 12FF8, 7B92E, 12FF8
+        g_clk += 2;
+        if (g_msgDeadline < g_clk) g_msgDeadline = 0;            // an entry whose +0x1E is below 7B92E's read is unlinked
+        g_clk += 1;
+    }
+    g_clk += 1;                                                  // 5A9A9
     rec(10031, lead, 0);                                         // 739E0 head
     rec(10078, 1, 1); rec(10031, 1, 1); rec(10031, 0, 1);        // 29250
     cel(H, 0, 0, H);                                             // 27290: the control panel's five cels along y = H
