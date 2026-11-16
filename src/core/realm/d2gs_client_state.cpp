@@ -1841,7 +1841,9 @@ static int apply_unit_queue_packet(const uint8_t* packet, int length) {
     uint32_t guid = 0;
     std::memcpy(&guid, packet + 2, sizeof guid);
     if (is0e && packet[1] == UNIT_OBJECT) {
-        // D2Client+0xAF560, object branch: byte 6 == 3 sets the object's mode to the dword at +8.
+        // D2Client+0xAF560, object branch: byte 6 == 3 sets the object's mode to the dword at +8. The object's
+        // client unit takes it (the scene draws and picks that unit); a record with no unit yet keeps it in its view.
+        if (d2gs_client_object_find(guid)) return apply_object_packet(packet, length);
         if (packet[6] != 3) return 0;
         uint32_t mode = 0;
         std::memcpy(&mode, packet + 8, sizeof mode);
