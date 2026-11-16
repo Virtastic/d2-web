@@ -2132,9 +2132,15 @@ function transportFailure(message) { return Object.assign(new Error(message), { 
 // CREATE NEW ACCOUNT's terms (D2Launch+0x18E10) ask the open Battle.net connection for tos-unicode_<lang>.txt. The local realm
 // answers no file request, so the text is empty: retail's terms screen with no text (+0x18E10's empty-file path). NOT retail:
 // retail waits for the file with CANCEL; a file that never comes is answered here at once.
+// The terms (D2Launch+0x18E10): the file is downloaded on a connection of its own to the Battle.net port (BNClient+0xE740),
+// then the screen goes on only while the Battle.net connection is still up (BNClient+0xEA20, interface slot +0x68).
 async function fetchConfiguredRealmTerms() {
+  const server = realmFlow?.server;
+  if (!realmFlow?.bncs?.isOpen || !server?.ws) throw transportFailure('the Battle.net connection is not open');
+  const [{ webSocketTransport }, { fetchTermsOfService }] = await Promise.all([import('./assets/realm-client.mjs'), import('./assets/bnet-terms.mjs')]);
+  const text = await fetchTermsOfService(() => webSocketTransport(realmServiceUrl(server.ws, 'bncs')));
   if (!realmFlow?.bncs?.isOpen) throw transportFailure('the Battle.net connection is not open');
-  return '';
+  return text;
 }
 // CREATE NEW ACCOUNT's last step: a connection of its own makes the account, then the screen logs on with it, as retail's does.
 async function createConfiguredRealmAccount({ account, password }) {
