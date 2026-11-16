@@ -6,7 +6,7 @@
 #include "cl_env.h"
 extern "C" uint32_t d2cl_a5d90(const cl::Env& e, uint32_t obj, uint32_t ecx0) {
     const auto P = [](const void* p) { return (uint32_t)(uintptr_t)p; };
-    const auto D = [&](uint32_t id) { return e.H(0xd1ec, 0, 0, 0, 0, 0, 0, id); };
+    const auto D = [&](uint32_t id) { return e.H(0xd1ec, 0, 0, 0, 0, 0, 0, id & 0xffffu); };   // REGS `W`: only CX is the argument; the upper half is hook-stub residue
     if (!obj) { const uint32_t m = e.H(0xbf92, 0x99d); e.H(0xbf80, 0x6fb8359fu, m); e.H(0x3664, 0xffffffffu); return 0; }
     switch (e.R(obj)) {
     case 1: {

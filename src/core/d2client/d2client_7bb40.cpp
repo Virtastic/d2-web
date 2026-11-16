@@ -35,7 +35,8 @@ extern "C" uint32_t d2c_7bb40_r(const cl::Env& e, uint32_t p, uint32_t tick, uin
         e.H(0xd0ba, ec38, g91 - 5, ec38 + 0x145, g91 + 0x75, 0);
         volatile uint32_t rect[4] = {ec38 - 1, g91 - 6, ec38 + 0x146, g91 + 0x75};
         uint32_t ra = (uint32_t)(uintptr_t)&rect[0];
-        e.H(0xbe4c0, 0, 0, 0, 0, 0, ra);
+        e.H(0xbe4c0);   // the capture logs no register for 0xBE4C0 (`hook 0xbe4c0 0 -`); the rect at EAX is its block record
+
         if (e.blk) e.blk(e.ctx, 0xbe4c0, ra, 4);
     }
     uint32_t cur = e.R(p), first = 0, last = 0, lastT = 0, firstT = 0, rem = e.R(p + 8);

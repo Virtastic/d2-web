@@ -21,41 +21,7 @@ void d2_client_77da0(uint32_t unit_bbfc, int32_t* tab_3d38, int (*ord11120)(uint
         if (tab_3d38[i] == 1) tab_3d38[i] = 0;
 }
 
-// 1.13c D2Client+0x77F30 (665 B): hit-test the mouse against the three button rows for `cls` and draw
-// the highlight box + three text calls on a hit.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_77f30(int32_t cls, int32_t mouse_x_b828, int32_t mouse_y_b824, int32_t w_bc48, int32_t x0_b9a0,
-                     int32_t y0_b9a4, int32_t y1_bc4c, uint8_t* col_bfcc,
-                     uint8_t (*ord10190)(int, int, int), void (*ord10184)(void),
-                     void (*ord10014)(int, int, int, int, int), void (*ord10003)(void),
-                     void (*ord10028)(void), void (*ord10150)(int, int, int)) {
-    int32_t x = mouse_x_b828, y = mouse_y_b824, sel = 0;
-    bool hit = false;
-    int32_t L = w_bc48 - x0_b9a0, base = y0_b9a4 + y1_bc4c;
-    *col_bfcc = ord10190(0, 0, 0);
-    if (x >= L - 0x59 && x <= L + 1) {
-        int32_t v;
-        if (cls == 1) {
-            if (y <= base - 0x9c && base - 0x108 <= y) { hit = true; sel = base - 0x108; }
-            else if (!(base - 0x108 < y || y < base - 0x174)) { hit = true; sel = base - 0x174; }
-        } else if (cls == 2 || cls == 3) {
-            v = base - 0x9c;
-            if (cls == 2) {
-                if (y <= base - 0x108 && base - 0x174 <= y) { hit = true; sel = base - 0x174; }
-                else if (y <= base - 0x30 && v <= y) { hit = true; sel = v; }
-            } else {
-                if (y <= v && base - 0x108 <= y) { hit = true; sel = base - 0x108; }
-                else if (y <= base - 0x30 && v <= y) { hit = true; sel = v; }
-            }
-        }
-    }
-    ord10184();
-    if (hit) {
-        uint32_t c = *col_bfcc;
-        ord10014(L - 0x59, sel + 5, L + 1, sel + 0x19, c);
-        ord10003(); ord10028(); ord10150(c + 0x14, 0, 0);
-    }
-}
+// 1.13c D2Client+0x77F30: its own file, d2client_77f30.cpp.
 
 // 1.13c D2Client+0x781D0 (77 B) fastcall(ecx unused, edx=off): one text draw at off-0x1e0+base.
 extern "C" EMSCRIPTEN_KEEPALIVE

@@ -134,42 +134,6 @@ void d2_client_755d0(uint32_t head, uint32_t col_bfe0, int32_t px_b9a0, int32_t 
 
 // D2Client 75690, 75780 and 758C0 moved to d2client_75690.cpp, d2client_75780.cpp and d2client_758c0.cpp (register inputs and returns from the disassembly).
 
-// 1.13c D2Client+0x75D30 (790 B): hover tooltips for the party panel: the local party badge (box
-// panel_x+0xe3..+0x118, y 0x18..0x23 minus panel_y) and each list entry button (+4/+8/+0x14/+0x18, next at +0xcd).
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_75d30(uint32_t btn_bfd8, uint32_t pl_bc14, int32_t mx_b828, int32_t my_b824, int32_t px_b9a0,
-                     int32_t py_b9a4, uint32_t* col_bff8,
-                     uint32_t (*ord10190)(int, int, int), void (*ord10003)(int, int, int), void (*ord10150)(void),
-                     void (*sub_75220)(uint32_t, int, int, int), int32_t (*sub_75370)(uint32_t, int)) {
-    *col_bff8 = ord10190(0, 0, 0);
-    int n = 0;
-    uint32_t nxt = pl_bc14;
-    if (pl_bc14) {
-        for (uint32_t q = pl_bc14; q; q = rd32(q + 0x80)) if (rd16(q + 0x22) == rd16(pl_bc14 + 0x22)) n++;
-        if (n > 1 && rd16(pl_bc14 + 0x22) != -1 && px_b9a0 + 0xe3 <= mx_b828 && mx_b828 <= px_b9a0 + 0x118 &&
-            0x18 - py_b9a4 <= my_b824 && my_b824 <= 0x23 - py_b9a4) {
-            sub_75220(0x1018, 0, 0xd5, 0);
-            sub_75370(0x1018, 0xd5);
-            ord10003(0x37 - py_b9a4, 0, 0);
-            ord10150();
-        }
-        nxt = rd32(pl_bc14 + 0x80);
-    }
-    for (uint32_t b = btn_bfd8; b; b = rd32(b + 0xcd)) {
-        int32_t x = (int32_t)rd32(b + 4) + px_b9a0, y = (int32_t)rd32(b + 8) - py_b9a4;
-        if (x <= mx_b828 && mx_b828 <= x + 0x35 && y - 0x14 <= my_b824 && my_b824 <= y && rd32(b + 0x14) == 0) {
-            uint32_t k = rd32(b + 0x18), s;
-            if (k == 0) s = 0x1004; else if (k == 2) s = 0x1006; else if (k == 4) s = 0x1008; else continue;
-            sub_75220(s, s + 1, 0xda, 1);
-            sub_75370(s, 0xda);
-            ord10003(0x32 - py_b9a4, 0, 0);
-            ord10150();
-            sub_75370(s + 1, 0xda);
-            ord10003(0x41 - py_b9a4, 0, 0);
-            ord10150();
-        }
-        nxt = nxt ? rd32(nxt + 0x80) : 0;  // retail advances a second list cursor in lockstep; unused afterwards
-    }
-}
+// D2Client 75D30 moved to d2client_75d30.cpp (text id in ECX, draw x from the 0x75370 width, from the disassembly).
 
 // D2Client 760F0 moved to d2client_760f0.cpp.

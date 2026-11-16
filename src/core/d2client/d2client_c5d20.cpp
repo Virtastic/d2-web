@@ -1,7 +1,7 @@
 // 1.13c D2Client+0xC5D20: fastcall(ECX = unit, EDX = skill index) + 1 stack word a3 (ret 4).
 // Skill row (sgptDataTables+0xB98, stride 0x23C, count +0xBA0) missing returns 0. mi = #40550(EAX = index, stack unit) outside [0, count at +0xB6C) returns 0.
 // #A1340(EBX = unit, EDI = &X, stack &Y) == 0 returns 0 (X, Y unread). A non-null unit gets word +0xC4 |= 0x40. o = #B99D0(mi, index, a3) == 0 returns 0.
-// d = #C430(o); s = #C316(unit, row+0x118, index, a3) + #C7EC0(EAX = unit); h = d ? s / d (signed) : (s - sign(s)) >> 1; #C7E30(EAX = o, ECX = s, EDX = 0, stack 0).
+// d = #C430(o); s = #C316(unit, row+0x118, index, a3) + #C7EC0(EAX = unit) (the leaf, inline: ECX carries s across it); h = d ? s / d (signed) : (s - sign(s)) >> 1; #C7E30(EAX = o, ECX = s, EDX = 0, stack 0).
 // If o word +0x54 and its word +0x30 are non-null: [+0x10] = 0, [+0x14] = 0, [+0x18] = -h << 11. #C7FB0(o). Returns 1.
 #include "cl_env.h"
 extern "C" uint32_t d2c_c5d20(uint32_t unit, int32_t cls, uint32_t a3, const cl::Env& e) {
@@ -18,7 +18,9 @@ extern "C" uint32_t d2c_c5d20(uint32_t unit, int32_t cls, uint32_t a3, const cl:
     if (!o) return 0;
     int32_t d = (int32_t)e.H(0xc430, o);
     uint32_t s = e.H(0xc316, unit, e.R(row + 0x118), (uint32_t)cls, a3);
-    s += e.H(0xc7ec0, 0, 0, 0, 0, 0, unit);
+    // #C7EC0(EAX = unit) is a leaf (it preserves ECX, which holds s across the call): unit +0x54 -> +0x30 -> int +0xC >> 11, else 0.
+    uint32_t g = unit ? e.R(unit + 0x54) : 0, x = g ? e.R(g + 0x30) : 0;
+    s += x ? (uint32_t)((int32_t)e.R(x + 0xc) >> 11) : 0u;
     int32_t sv = (int32_t)s, h;
     if (d) h = (int32_t)((int64_t)sv / d);
     else h = (int32_t)(s - (uint32_t)(sv >> 31)) >> 1;

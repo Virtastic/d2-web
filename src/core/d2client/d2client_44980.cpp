@@ -1,6 +1,6 @@
 // 1.13c D2Client+0x44980 -- key-state update for the panel hotkey on a mouse/idle message (stack = message, ret 4).
-// g = pinned globals, one dword each: +0 [104A60] (written), +4 [11C3E8], +8 [1046C4], +0xC [1046C8], +0x10 [11C3E0], +0x14 [11C3FC],
-// +0x18 [11C3E4], +0x1C [11C2F8], +0x20 [10ADB4], +0x24 [11C3F0], +0x28 [11C2F4], +0x2C [DD5D0] table size (retail aborts when it is not 0x26;
+// g = pinned globals, one dword each: +0 [F4A60] (written), +4 [11C3E8], +8 [F46C4], +0xC [F46C8], +0x10 [11C3E0], +0x14 [11C3FC],
+// +0x18 [11C3E4], +0x1C [11C2F8], +0x20 [FADB4], +0x24 [11C3F0], +0x28 [11C2F4], +0x2C [DD5D0] table size (retail aborts when it is not 0x26;
 // the vector never reaches that exit).
 // [104A60] = message +8. Nonzero: Ordinal 10227(), then [10ADB4], [11C3F0], [11C2F8], [11C2F4] = 0, Ordinal 10153 with ECX = 0, message +0x18 = 0.
 // Zero: when 0x398C0(EDX = 0x22, ESI = 1) is nonzero, 0x38E50(EDX = 1, ESI = 0x22) gives a key code, and a GetAsyncKeyState of its low word with

@@ -179,37 +179,4 @@ void d2_client_7c730(uint32_t* win_c3a70, uint32_t* obj_c3a74, void (*sub_a3d20)
 
 // retired, see d2client_7c8f0.cpp: D2Client 0x7C8F0.
 
-// 1.13c D2Client+0x7CA40 (306 B, __fastcall(ECX=param_1, EDX=param_2), EAX = point {x,y}): if
-// Ordinal_11067(param_1) < [0x11C3ACE] { Ordinal_10422(0,param_1); if param_2: [param_2+0xA4]=0 }. Build a
-// box node, centre the point on it, probe the placement slot 0x7AF20 while [0x11C3AE4] < 0x10, place via
-// 0x7BAD0, free. The RECT passed to 0x7AF20 is an uninitialised stack local in retail (zeroed here).
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_7ca40(uint32_t param_1, uint32_t param_2, int32_t* pt, uint32_t* count_c3ae4, uint32_t lim_c3ace,
-                     uint32_t (*o11067)(uint32_t), void (*o10422)(uint32_t, uint32_t),
-                     void (*lock)(void), uint32_t (*o10042)(uint32_t, uint32_t), uint32_t (*o10059)(uint32_t),
-                     void (*sub_7bf60)(void), uint8_t (*sub_7af20)(int32_t* rect, uint32_t idx),
-                     void (*sub_7bad0)(uint32_t node, int32_t* pt), void (*sub_7b3d0)(void),
-                     void (*free_)(uint32_t, uint32_t)) {
-    if (o11067(param_1) < lim_c3ace) {
-        o10422(0, param_1);
-        if (param_2) W(param_2, 0xa4) = 0;
-    }
-    lock();
-    uint32_t node = o10042(0x659, 0);
-    W(node, 0) = o10059(0xb4);
-    sub_7bf60();
-    uint16_t w = *(uint16_t*)(uintptr_t)(node + 0x10);
-    int32_t y = pt[1];
-    pt[1] = y - 0x32;
-    pt[0] -= (uint32_t)(w >> 1);
-    pt[1] = y - 0x32 + (int32_t)W(node, 4) * -0xf - 3;
-    if (*count_c3ae4 < 0x10) {
-        int32_t rect[4] = {0, 0, 0, 0};
-        if (sub_7af20(rect, *count_c3ae4) == 0) { sub_7b3d0(); free_(0x68a, 0); return; }
-    }
-    (*count_c3ae4)++;
-    sub_7bad0(node, pt);
-    sub_7b3d0();
-    free_(0x68a, 0);
-    lock();
-}
+// 1.13c D2Client+0x7CA40: its own file, d2client_7ca40.cpp.

@@ -197,11 +197,12 @@ void d2_client_76b20(uint32_t list_fd8, uint32_t local_unit_11bbfc, uint32_t pla
 // for player; init via 769E0, copy name (+0x66), relation +0x1c, level +0x20, +0x24. tail = EBP (guess).
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_77170(uint32_t player, uint32_t tail_ebp, uint32_t* list_fd8,
-                     uint32_t (*ord10042)(int, int), void (*sub_769e0)(uint32_t),
+                     uint32_t (*ord10042)(uint32_t, int, int), void (*sub_769e0)(uint32_t, uint32_t),
                      uint32_t (*ord10265)(int), void (*ord10024)(uint32_t, uint32_t), void (*exit_fn)(int)) {
-    uint32_t e = ord10042(0x14d, 0);
+    // tail_ebp: the list head read from DAT 0x11BFD8 at entry (walked to the tail below).
+    uint32_t e = ord10042(0xd1, 0x14d, 0);   // ECX = size 0xD1, stack line 0x14D, 0
     memset((void*)(uintptr_t)e, 0, 0xd1);
-    sub_769e0(e);
+    sub_769e0(player, e);   // EAX = roster entry, ESI = new row
     if (!player) { ord10024(0, ord10265(0x171)); exit_fn(-1); return; }
     const char* s = (const char*)(uintptr_t)(player + 0x66);
     char* d = (char*)(uintptr_t)(e + 0xa0);
@@ -248,8 +249,8 @@ void d2_client_772e0(uint32_t player_list_c14, void (*sub_4f90)(void), void (*su
 // 1.13c D2Client+0x77A50 (505 B): draws the 8 corner cels (frames 0-3, then 4*5+0..3 = 20-23) of the panel
 // frame at 4 positions {x0,x1} x {y0,y1}; rec[13]=param_1 (palette/mode). Frame ids 0..3 then (5*4)+0..3.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_77a50(uint32_t param_1, int32_t org_x_9a0, int32_t org_y_9a4, int32_t base_x_bc4c, int32_t base_y_bc48,
-                     void (*ord10041)(uint32_t*, int32_t, int32_t, int32_t, int32_t, int32_t)) {
+void d2_client_77a50(uint32_t param_1, uint32_t param_2, int32_t org_x_9a0, int32_t org_y_9a4, int32_t base_x_bc4c, int32_t base_y_bc48,
+                     void (*ord10041)(uint32_t*, int32_t, int32_t, int32_t, int32_t, int32_t)) {   // stdcall, ret 8: the second group's frames are param_2*4 + 0..3
     uint32_t rec[18] = {0};
     rec[13] = param_1;
     int32_t xa = org_y_9a4 - 0xe0 + base_x_bc4c, xb = org_y_9a4 - 0x30 + base_x_bc4c;
@@ -258,7 +259,7 @@ void d2_client_77a50(uint32_t param_1, int32_t org_x_9a0, int32_t org_y_9a4, int
     int32_t px[4] = {xa, xa, xb, xb}, py[4] = {ya, yb, ya, yb};
     for (int g = 0; g < 2; g++)
         for (int k = 0; k < 4; k++) {
-            rec[0] = g ? 20 + k : k;
+            rec[0] = g ? param_2 * 4 + k : k;
             ord10041(rec, py[k], px[k], -1, 5, 0);
         }
 }

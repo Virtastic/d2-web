@@ -1,6 +1,6 @@
 // 1.13c D2Client+0x506A0 -- mouse-down on the panel toggle (stack = message, ret 4; Ordinal 511 pops the message).
-// g = pinned globals, one dword each: +0 [11C414] mode, +4 [10ADA4] gate, +8 [11C30C] pressed flag (written), +0xC [119663].
-// Ordinal 10031() == 2 with [10ADA4] set returns at once. Else the hit test is 0x4FE70() when Ordinal 10031() is 2, otherwise
+// g = pinned globals, one dword each: +0 [11C414] mode, +4 [FADA4] gate, +8 [11C30C] pressed flag (written), +0xC [119663].
+// Ordinal 10031() == 2 with [FADA4] set returns at once. Else the hit test is 0x4FE70() when Ordinal 10031() is 2, otherwise
 // 0x4FEC0(EAX = mode, ECX = message x); zero sets message +0x18 = 0. A hit sets [11C30C] = 1, calls 0x88A70(0,0,0,0) with EBX = 4,
 // 0x16360(); with mode 1, 0x46150() nonzero and [119663] == 1 it returns, else message +0x18 = 1, +0x1C = 0 and Ordinal 511.
 #include "cl_env.h"
