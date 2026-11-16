@@ -895,6 +895,14 @@ void D2WEB_ClientMissileTravelSound(int32_t nCltMissile) {
     const D2MissilesTxt* m = DATATBLS_GetMissilesTxtRecord(nCltMissile);
     if (m && m->wTravelSound > 0 && m->wTravelSound != 0xFFFF) g_cltMissileRow = m->wTravelSound;   // reaches the client one drain later, as the player's do sound does
 }
+// 1.13c D2Client+0xA2C90 -> 0xA26B0 -> 0xB30F0: a monster's client do creates its Skills.txt cltmissile (no lob flag), and the new
+// client missile submits its Missiles.txt TravelSound (+0x12) through 0x88A70 at once, in the monster's slot of the unit pass.
+static std::unordered_map<uint32_t, std::vector<int32_t>> g_monCltMissileRows;
+void D2WEB_MonsterClientMissileDo(uint32_t nUnitId, int32_t nCltMissile) {
+    if (!g_sessionLive || nCltMissile <= 0 || nCltMissile >= sgptDataTables->nMissilesTxtRecordCount) return;
+    const D2MissilesTxt* m = DATATBLS_GetMissilesTxtRecord(nCltMissile);
+    if (m && m->wTravelSound > 0 && m->wTravelSound != 0xFFFF) g_monCltMissileRows[nUnitId].push_back(m->wTravelSound);
+}
 static std::vector<std::array<int32_t, 7>> g_pendingSkillDo; // 1.13c D2Client+0xA2C90 wDoSound events, emitted one drain after the do
 // s2420 watches one unit so its scheduled timer can be paired with proof that the event dispatcher
 // actually invoked that unit's AITHINK callback. This is diagnostic only and does not change timing.
@@ -8321,11 +8329,16 @@ static void sessionClientMonsterFootsteps(bool newOnly = false) {
         if (D2UnitStrc* u = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)id)) {
             { extern void d2_client_monster_order_unit(uint32_t); d2_client_monster_order_unit(id); }   // 0x4F4A0 -> 0x4DC70: the unit's order (attack roll) first
             sessionClientMonsterHitSounds(id);
+            if (auto it = g_monCltMissileRows.find(id); it != g_monCltMissileRows.end()) {
+                for (int32_t row : it->second) d2client_sound_unit_submit(row);
+                g_monCltMissileRows.erase(it);
+            }
             // 0x4F4A0 runs the unit's idle sound (0x237E0) just before its footstep check (0x23C00)
             if (auto it = g_sessionIdleRowsReady.find(id); it != g_sessionIdleRowsReady.end()) d2client_sound_unit_submit((int32_t)it->second);
             d2client_session_monster_footstep(id, (int32_t)u->dwClassId, u->dwAnimMode, (uint16_t)u->wAnimSpeed, (uint32_t)u->dwFrameCountPrecise,
                                               d2_session_floor_class(1, (int32_t)id, fallback), g_sessionClientFrame - 1, g_game);
         }
+    if (!newOnly) g_monCltMissileRows.clear();   // a do of a unit the client does not hold makes no client missile
 }
 // 1.13c D2Client+0x22B20: the client units' sound references (replay only; nothing happens before the Sounds table is loaded).
 // The client's units are the held monsters and the objects of the rooms it holds (the sets d2_session_client_view prints).

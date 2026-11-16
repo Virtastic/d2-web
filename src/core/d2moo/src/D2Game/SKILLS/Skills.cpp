@@ -2463,6 +2463,7 @@ int32_t __fastcall sub_6FD12950(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nS
 }
 
 void D2WEB_ClientMissileTravelSound(int32_t nCltMissile);
+void D2WEB_MonsterClientMissileDo(uint32_t nUnitId, int32_t nCltMissile);
 // Player skill dos of this step, read by the session sound drain (client do-function sound, D2Client+0xA2C90).
 int32_t g_playerSkillDoIds[8];
 int32_t g_playerSkillDoCount;
@@ -2523,7 +2524,13 @@ int32_t __fastcall D2GAME_SKILLS_Handler_6FD12BA0(D2GameStrc* pGame, D2UnitStrc*
     {
         nDoFunc = pSkillsTxtRecord->wItemEffect;
     }
-    
+
+    // The monster's client unit runs the same do (1.13c D2Client+0xA2C90) and makes its own cltmissile there.
+    if (pUnit->dwUnitType == UNIT_MONSTER && !(pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_LOB]))
+    {
+        D2WEB_MonsterClientMissileDo(pUnit->dwUnitId, (int16_t)pSkillsTxtRecord->wCltMissile);
+    }
+
     SkillDoFunc pDoFunc = gpSkillSrvDoFnTable_6FD40A20[nDoFunc];
     int32_t nResult = 0;
     if (pDoFunc)
