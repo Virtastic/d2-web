@@ -62,6 +62,7 @@ extern "C" int d2_session_gleam_roll(uint32_t id, uint32_t* pos);   // monspawn_
 extern "C" const uint8_t* d2_dg_overlay_row(int32_t row, uint32_t* dccFrames);
 uint32_t& d2client_frame_clock() { return g_clk; }   // npc_speech_start.cpp: its reads advance the same clock
 void d2client_npc_speech_frame(uint32_t tick);       // npc_speech_start.cpp: 0x7EA90 -> 0x7E970, the speech window step
+std::string d2client_npc_speech_take_frame_g();      // npc_speech_start.cpp: that step's 10048s
 extern "C" uint32_t d2client_item_packet_held();   // item_container_packet.cpp
 extern "C" uint32_t d2_dg_n9e970();
 extern "C" uint32_t d2_dg_n9ee90();
@@ -255,6 +256,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_frame_tail_g(int32_t first
     rec(10019, 0, 0, {P, 0x75, uint32_t(H), P, 5, 1});            // 28CE0 -> 28BC0, left and right skill buttons
     rec(10019, 0, 0, {P, uint32_t(W - 0xa5), uint32_t(H), P, 5, 1});
     levelButtons(first, W, H);                                   // C39E0: 50E70, then 50100 / 50430 and 50020 / 501F0
+    out += d2client_npc_speech_take_frame_g();                   // the speech step's 10048s (window end, next window)
     rec(10043, lead, 0);
     rec(10080, 0, 0, {P, P});
     rec(10085, 0, 0, {0, 0, 0, 0});
