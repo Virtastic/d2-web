@@ -1018,9 +1018,14 @@ void __fastcall sub_6FC63FD0(D2GameStrc* pGame, D2UnitStrc* pAttacker)
 }
 
 //D2Game.0x6FC64090
-// 1.13c D2Game+0x760F0 (unit in EAX; owner lookup and the AI-think event sweep are inline; checked against decompile, no delta)
+// 1.13c D2Game+0x760F0 (unit in EAX; owner lookup and the AI-think event sweep are inline; gated on the stored-owner flag)
 void __fastcall sub_6FC64090(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+    if (!pUnit || !(pUnit->dwFlagEx & UNITFLAGEX_STOREOWNERINFO))
+    {
+        return;
+    }
+
     D2UnitStrc* pMonster = SUNIT_GetOwner(pGame, pUnit);
     if (pMonster)
     {
