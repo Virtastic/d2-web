@@ -6,6 +6,7 @@
 #include "Drlg/D2DrlgPreset.h"
 #include "D2Seed.h"
 #include <DataTbls/LevelsIds.h>
+#include <test_seam.h>
 
 // Helper functions
 // not-1.13c: no standalone body; the four free-location scans 0x10730/0x10820/0x10910/0x10A00 walk the orth list inline.
@@ -1465,6 +1466,9 @@ void __fastcall DRLGMAZE_ScanReplaceSpecialPreset(D2DrlgLevelStrc* pLevel, const
 	}
 }
 
+// the later placements call the row scan through the test seam (empty in the game)
+#define DRLGMAZE_ScanReplaceSpecialPreset(pLevel, pMazeInit, pRand) D2_CALL(DRLGMAZE_ScanReplaceSpecialPreset, pLevel, pMazeInit, pRand)
+
 //D2Common.0x6FD7B330
 // 1.13c D2Common+0x116B0 (ESI = level): Sewers 1 chains rooms north and east from the 0x10A00 / 0x10820 free
 // rooms then adds the "next" row; Sewers 2 / 3 and the Ancient Tunnels apply their rows through 0x106B0.
@@ -1661,12 +1665,12 @@ BOOL __fastcall DRLGMAZE_CheckIfMayPlaceAdjacentPresetRoom(D2DrlgRoomStrc* pDrlg
 		return FALSE;
 	}
 
-	D2DrlgRoomStrc* pNewRoomEx = DRLGMAZE_AllocLinkedMazeRoom(pDrlgRoom, nDirection, FALSE);
+	D2DrlgRoomStrc* pNewRoomEx = D2_CALL(DRLGMAZE_AllocLinkedMazeRoom, pDrlgRoom, nDirection, FALSE);
 
 	if (pNewRoomEx)
 	{
-		DRLGMAZE_PickRoomPreset(pNewRoomEx, TRUE);
-		DRLGROOM_FreeRoomEx(pNewRoomEx);
+		D2_CALL(DRLGMAZE_PickRoomPreset, pNewRoomEx, TRUE);
+		D2_CALL(DRLGROOM_FreeRoomEx, pNewRoomEx);
 	}
 
 	return pNewRoomEx != 0;

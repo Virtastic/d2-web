@@ -5,6 +5,7 @@
 #include "Drlg/D2DrlgDrlgGrid.h"
 #include "Drlg/D2DrlgRoomTile.h"
 #include <D2CMP.h>
+#include <test_seam.h>
 
 
 
@@ -146,7 +147,7 @@ void __fastcall DRLGANIM_AnimateTiles(D2DrlgRoomStrc* pDrlgRoom)
 {
 	for (int i = 0; i < pDrlgRoom->nRoomsNear; ++i)
 	{
-		DRLGANIM_AnimateRoomTiles_12DC0(pDrlgRoom->ppRoomsNear[i]);
+		D2_CALL(DRLGANIM_AnimateRoomTiles_12DC0, pDrlgRoom->ppRoomsNear[i]);
 	}
 }
 

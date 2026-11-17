@@ -4,6 +4,7 @@
 #include <Archive.h>
 
 #include "D2Items.h"
+#include <test_seam.h>
 
 // Inlined in both Parsers
 // not-1.13c: retail has no such function, both parsers compare the modifier word against the literal (string and its NUL) in place (0x1C020, 0x1BA60)
@@ -27,7 +28,7 @@ void __fastcall DATATBLS_CubeMainInputLinker(char* pSrc, void* pRecord, int nOff
 {
 	if (pRecord && pSrc && *pSrc)
 	{
-		DATATBLS_CubeMainInputParser(&((D2CubeMainTxt*)pRecord)->pInputItem[nOffset], pSrc, nTxtRow, nOffset);
+		D2_CALL(DATATBLS_CubeMainInputParser, &((D2CubeMainTxt*)pRecord)->pInputItem[nOffset], pSrc, nTxtRow, nOffset);
 	}
 }
 
@@ -82,7 +83,7 @@ BOOL __fastcall DATATBLS_CubeMainInputParser(D2CubeInputItem* pCubeInput, char* 
 
 			if (strlen(szInput) <= 4)
 			{
-				nLinkId = FOG_GetLinkIndex(sgptDataTables->pItemTypesLinker, DATATBLS_StringToCode(szInput), 0);
+				nLinkId = D2_CALL(FOG_GetLinkIndex, sgptDataTables->pItemTypesLinker, DATATBLS_StringToCode(szInput), 0);
 			}
 
 			if (nLinkId >= 0)
@@ -90,7 +91,7 @@ BOOL __fastcall DATATBLS_CubeMainInputParser(D2CubeInputItem* pCubeInput, char* 
 				pCubeInput->wInputFlags |= CUBEFLAG_IN_ITEMCODE;
 				pCubeInput->wItem = nLinkId;
 			}
-			else if (strlen(szInput) <= 4 && DATATBLS_GetItemRecordFromItemCode(DATATBLS_StringToCode(szInput), &nBaseItemId))
+			else if (strlen(szInput) <= 4 && D2_CALL(DATATBLS_GetItemRecordFromItemCode, DATATBLS_StringToCode(szInput), &nBaseItemId))
 			{
 				pCubeInput->wInputFlags |= CUBEFLAG_IN_USEANY;
 				pCubeInput->wItem = nBaseItemId;
@@ -101,12 +102,12 @@ BOOL __fastcall DATATBLS_CubeMainInputParser(D2CubeInputItem* pCubeInput, char* 
 
 				if (sgptDataTables->pUniqueItemsLinker)
 				{
-					nLinkId = FOG_GetRowFromTxt(sgptDataTables->pUniqueItemsLinker, szInput, 0);
+					nLinkId = D2_CALL(FOG_GetRowFromTxt, sgptDataTables->pUniqueItemsLinker, szInput, 0);
 				}
 
 				if (nLinkId >= 0)
 				{
-					DATATBLS_GetItemRecordFromItemCode(sgptDataTables->pUniqueItemsTxt[nLinkId].dwBaseItemCode, &nBaseItemId);
+					D2_CALL(DATATBLS_GetItemRecordFromItemCode, sgptDataTables->pUniqueItemsTxt[nLinkId].dwBaseItemCode, &nBaseItemId);
 					pCubeInput->wInputFlags |= CUBEFLAG_IN_SPECIAL | CUBEFLAG_IN_USEANY;
 					pCubeInput->nQuality = ITEMQUAL_UNIQUE;
 					pCubeInput->wItemID = nLinkId + 1;
@@ -118,12 +119,12 @@ BOOL __fastcall DATATBLS_CubeMainInputParser(D2CubeInputItem* pCubeInput, char* 
 
 					if (sgptDataTables->pSetItemsLinker)
 					{
-						nLinkId = FOG_GetRowFromTxt(sgptDataTables->pSetItemsLinker, szInput, 0);
+						nLinkId = D2_CALL(FOG_GetRowFromTxt, sgptDataTables->pSetItemsLinker, szInput, 0);
 					}
 
 					if (nLinkId >= 0)
 					{
-						DATATBLS_GetItemRecordFromItemCode(sgptDataTables->pSetItemsTxt[nLinkId].szItemCode, &nBaseItemId);
+						D2_CALL(DATATBLS_GetItemRecordFromItemCode, sgptDataTables->pSetItemsTxt[nLinkId].szItemCode, &nBaseItemId);
 						pCubeInput->wInputFlags |= CUBEFLAG_IN_SPECIAL | CUBEFLAG_IN_USEANY;
 						pCubeInput->nQuality = ITEMQUAL_SET;
 						pCubeInput->wItemID = nLinkId + 1;
@@ -260,7 +261,7 @@ void __fastcall DATATBLS_CubeMainOutputLinker(char* pSrc, void* pRecord, int nOf
 {
 	if (pRecord && pSrc && *pSrc)
 	{
-		DATATBLS_CubeMainOutputParser(&((D2CubeMainTxt*)pRecord)->pOutputItem[nOffset], pSrc, nTxtRow, nOffset);
+		D2_CALL(DATATBLS_CubeMainOutputParser, &((D2CubeMainTxt*)pRecord)->pOutputItem[nOffset], pSrc, nTxtRow, nOffset);
 	}
 }
 
@@ -577,13 +578,13 @@ void __fastcall DATATBLS_CubeMainParamLinker(char* pSrc, void* pRecord, int nOff
 	{
 		if (*pSrc == '-' || *pSrc >= '0' && *pSrc <= '9')
 		{
-			*(int*)pRecord = atoi(pSrc);
+			*(int*)pRecord = D2_CALL(atoi, pSrc);
 		}
 		else
 		{
 			if (sgptDataTables->pItemStatCostLinker)
 			{
-				nValue = FOG_GetRowFromTxt(sgptDataTables->pItemStatCostLinker, pSrc, 0);
+				nValue = D2_CALL(FOG_GetRowFromTxt, sgptDataTables->pItemStatCostLinker, pSrc, 0);
 				if (nValue >= 0)
 				{
 					*(int*)pRecord = nValue;

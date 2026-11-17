@@ -14,6 +14,7 @@
 #include "Units/UnitRoom.h"
 #include "Units/Units.h"
 #include "D2Seed.h"
+#include <test_seam.h>
 
 
 //D2Common.0x6FD8B8A0 (#10038)
@@ -389,7 +390,7 @@ void __stdcall DUNGEON_GetSubtileRect(D2ActiveRoomStrc* pRoom, RECT* pRect)
 // 1.13c D2Common+0x3C6A0
 void __stdcall DUNGEON_GetRGB_IntensityFromRoom(D2ActiveRoomStrc* pRoom, uint8_t* pIntensity, uint8_t* pRed, uint8_t* pGreen, uint8_t* pBlue)
 {
-	return DRLGROOM_GetRGB_IntensityFromRoomEx(pRoom->pDrlgRoom, pIntensity, pRed, pGreen, pBlue);
+	return D2_CALL(DRLGROOM_GetRGB_IntensityFromRoomEx, pRoom->pDrlgRoom, pIntensity, pRed, pGreen, pBlue);
 }
 
 //D2Common.0x6FD8C240 (#10041)
@@ -610,7 +611,7 @@ int __stdcall DUNGEON_GetWarpDestinationLevel(D2ActiveRoomStrc* pRoom, int nSour
 {
 	if (pRoom)
 	{
-		return DRLGROOM_GetWarpDestinationLevel(pRoom->pDrlgRoom, nSourceLevel);
+		return D2_CALL(DRLGROOM_GetWarpDestinationLevel, pRoom->pDrlgRoom, nSourceLevel);
 	}
 
 	return 0;
@@ -889,7 +890,7 @@ void __stdcall DUNGEON_RemoveClientFromRoom(D2ActiveRoomStrc* pRoom, D2ClientStr
 	--pRoom->nNumClients;
 	pRoom->ppClients[i] = pRoom->ppClients[pRoom->nNumClients];
 
-	DUNGEON_UpdateClientListOfRoom(pRoom);
+	D2_CALL(DUNGEON_UpdateClientListOfRoom, pRoom);
 }
 
 //D2Common.0x6FD8CDF0 (#10081)
@@ -1186,11 +1187,19 @@ int __stdcall D2Common_10095(D2ActiveRoomStrc* pRoom, int nX, int nY)
 	return DRLGLOGIC_GetRoomCoordListIndex(pFound->pDrlgRoom, nX / 5, nY / 5);
 }
 
+D2RoomCoordListStrc* __fastcall DUNGEON_GetRoomCoordListFromSubtile_81950(D2DrlgRoomStrc* pDrlgRoom, int nX, int nY);
+
 //D2Common.0x6FD8D3A0 (#10096)
 // 1.13c D2Common+0x3C680
 D2RoomCoordListStrc* __stdcall D2Common_10096(D2ActiveRoomStrc* pRoom, int nX, int nY)
 {
-	return sub_6FD77110(pRoom->pDrlgRoom, nX / 5, nY / 5);
+	return D2_CALL(DUNGEON_GetRoomCoordListFromSubtile_81950, pRoom->pDrlgRoom, nX, nY);
+}
+
+// 1.13c D2Common+0x81950 (ESI = drlg room, stack = subtile x and y): the cell lookup that 1.10f's caller did after dividing by 5
+D2RoomCoordListStrc* __fastcall DUNGEON_GetRoomCoordListFromSubtile_81950(D2DrlgRoomStrc* pDrlgRoom, int nX, int nY)
+{
+	return sub_6FD77110(pDrlgRoom, nX / 5, nY / 5);
 }
 
 //D2Common.0x6FD8D3C0 (#10097)
@@ -1200,26 +1209,45 @@ D2RoomCoordListStrc* __stdcall DUNGEON_GetRoomCoordList(D2ActiveRoomStrc* pRoom)
 	return DRLGLOGIC_GetRoomCoordList(pRoom->pDrlgRoom);
 }
 
-// 1.13c D2Common+0x3BC80: the body is the port in src/core/d2common/d2common_3bc80.cpp. The portal table and
-// count come from the data tables here, and the pool allocation goes through D2_ALLOC_POOL.
-static uint32_t DUNGEON_PortalLevelAlloc(uint32_t pMemPool, uint32_t nSize, uint32_t nFile, uint32_t nLine, uint32_t nFlags)
-{
-	(void)nFile; (void)nLine; (void)nFlags;
-	return (uint32_t)(uintptr_t)D2_ALLOC_POOL((void*)(uintptr_t)pMemPool, nSize);
-}
-
-extern "C" void D2Common_3BC80_PortalLevelArray(uint32_t pMemPool, uint32_t nFlags, uint32_t ppLevels, uint32_t pnLevels,
-	uint32_t portalCount, uint32_t portalTable, uint32_t (*alloc)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t));
-
 //D2Common.0x6FD8D3D0 (#10098)
-// 1.13c D2Common+0x3BC80
+// 1.13c D2Common+0x3BC80: the portal table and its count are the module globals at 0xA1420 / 0xA1424; a count above 0x20 is fatal (0x60A).
+// Each set bit of nFlags, from bit 0 up, takes the table entry at that index; a non-empty list is copied into a pool allocation.
 void __stdcall DUNGEON_GetPortalLevelArrayFromPortalFlags(void* pMemPool, int nFlags, int** ppLevels, int* pnLevels)
 {
 	int nPortalLevels = 0;
-	int* pPortalLevels = DATATBLS_GetPortalLevels(&nPortalLevels);
+	int* pPortalLevels = D2_CALL(DATATBLS_GetPortalLevels, &nPortalLevels);
 
-	D2Common_3BC80_PortalLevelArray((uint32_t)(uintptr_t)pMemPool, (uint32_t)nFlags, (uint32_t)(uintptr_t)ppLevels,
-		(uint32_t)(uintptr_t)pnLevels, (uint32_t)nPortalLevels, (uint32_t)(uintptr_t)pPortalLevels, DUNGEON_PortalLevelAlloc);
+	if (nPortalLevels > 0x20)
+	{
+		FOG_DisplayAssert("portal level count", __FILE__, __LINE__);
+		exit(-1);
+	}
+
+	int pLevels[32];
+	int nCount = 0;
+	for (int i = 0; i < nPortalLevels; ++i)
+	{
+		if (nFlags & (1 << i))
+		{
+			pLevels[nCount++] = pPortalLevels[i];
+		}
+	}
+
+	if (nCount)
+	{
+		int* pCopy = (int*)D2_ALLOC_POOL(pMemPool, nCount * sizeof(int));
+		for (int i = 0; i < nCount; ++i)
+		{
+			pCopy[i] = pLevels[i];
+		}
+		*ppLevels = pCopy;
+	}
+	else
+	{
+		*ppLevels = NULL;
+	}
+
+	*pnLevels = nCount;
 }
 
 //D2Common.0x6FD8D4B0 (#10099)

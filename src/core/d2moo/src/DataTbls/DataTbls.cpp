@@ -6,6 +6,7 @@
 #include <D2Lang.h>
 
 #include "D2DataTbls.h"
+#include <test_seam.h>
 #include "D2States.h"
 #include "Units/Units.h"
 
@@ -34,7 +35,7 @@ uint16_t __fastcall DATATBLS_GetStringIdFromReferenceString(char* szReference)
 	const Unicode* pUnicode = NULL;
 	uint16_t nIndex = 0;
 
-	nIndex = D2LANG_GetTblIndex(szReference, &pUnicode);
+	nIndex = D2_CALL(D2LANG_GetTblIndex, szReference, &pUnicode);
 	if (!nIndex)
 	{
 		nIndex = 5382;
@@ -491,22 +492,26 @@ void __fastcall DATATBLS_LoadPetTypeTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD4F990 (#11298)
-// 1.13c D2Common+0x5F260
+// 1.13c D2Common+0x5F260: the buffer starts empty. Player, object and missile units get their name written; monster and item units go to
+// retail's two module-state helpers (+0x5E480, +0x5E410) that take no buffer, so the buffer stays empty; "NULL Unit" and "Invalid Unit"
+// are printed to the console in retail, not written to the buffer.
 char* __stdcall DATATBLS_GetUnitNameFromUnit(D2UnitStrc* pUnit, char* szName)
 {
 	*szName = 0;
 
 	if (pUnit)
 	{
-		if ((uint32_t)pUnit->dwUnitType > UNIT_ITEM)
+		switch (pUnit->dwUnitType)
 		{
-			strcpy(szName, "Invalid Unit");
-			return szName;
+		case UNIT_PLAYER:
+		case UNIT_OBJECT:
+		case UNIT_MISSILE:
+			return DATATBLS_GetUnitNameFromUnitTypeAndClassId(pUnit->dwUnitType, pUnit->dwClassId, szName);
+		default:
+			break;
 		}
-		return DATATBLS_GetUnitNameFromUnitTypeAndClassId(pUnit->dwUnitType, pUnit->dwClassId, szName);
 	}
 
-	strcpy(szName, "NULL Unit");
 	return szName;
 }
 
@@ -867,7 +872,7 @@ void __stdcall DATATBLS_UnloadAllBins()
 }
 
 // 1.13c D2Common+0x60920 (retail keeps the experience table in its own loader)
-static void DATATBLS_LoadExperienceTxt(HD2ARCHIVE hArchive)
+void DATATBLS_LoadExperienceTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
 	{
@@ -882,7 +887,7 @@ static void DATATBLS_LoadExperienceTxt(HD2ARCHIVE hArchive)
 		{ "end", TXTFIELD_NONE, 0, 0, NULL },
 	};
 
-	sgptDataTables->pExperienceTxt = (D2ExperienceDataTbl*)DATATBLS_CompileTxt(hArchive, "experience", pTbl, NULL, sizeof(D2ExperienceTxt));
+	sgptDataTables->pExperienceTxt = (D2ExperienceDataTbl*)D2_CALL(DATATBLS_CompileTxt, hArchive, "experience", pTbl, NULL, sizeof(D2ExperienceTxt));
 }
 
 //D2Common.0x6FD504B0 (#10576)
@@ -1047,56 +1052,31 @@ void __fastcall DATATBLS_LoadSomeTxts(HD2ARCHIVE hArchive)
 		{ "end", TXTFIELD_NONE, 0, 0, NULL },
 	};
 
-	sgptDataTables->pCompCodeLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
-	sgptDataTables->pCompCodeTxt = (D2CompCodeTxt*)DATATBLS_CompileTxt(hArchive, "compcode", pCompCodeTbl, &sgptDataTables->nCompCodeTxtRecordCount, sizeof(D2CompCodeTxt));
+	// Retail runs every load through the same Fog linker and text-compile calls; both are seams for the per-function proof
+#define LOADTXT(LINKER, TABLE, TYPE, FILE, FIELDS, COUNT, SIZE) \
+	sgptDataTables->LINKER = (D2TxtLinkStrc*)D2_CALL(FOG_AllocLinker, __FILE__, __LINE__); \
+	sgptDataTables->TABLE = (TYPE)D2_CALL(DATATBLS_CompileTxt, hArchive, FILE, FIELDS, COUNT, SIZE)
+	LOADTXT(pCompCodeLinker, pCompCodeTxt, D2CompCodeTxt*, "compcode", pCompCodeTbl, &sgptDataTables->nCompCodeTxtRecordCount, sizeof(D2CompCodeTxt));
 
 	if (sgptDataTables->bCompileTxt)
 	{
-		sgptDataTables->pPlayerClassLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
-		sgptDataTables->pPlayerClassTxt = (D2PlayerClassTxt*)DATATBLS_CompileTxt(hArchive, "playerclass", pPlayerClassTbl, &nRecordCount, sizeof(D2PlayerClassTxt));
-
-		sgptDataTables->pBodyLocsLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
-		sgptDataTables->pBodyLocsTxt = (D2BodyLocsTxt*)DATATBLS_CompileTxt(hArchive, "bodylocs", pBodyLocsTbl, &nRecordCount, sizeof(D2BodyLocsTxt));
-
-		sgptDataTables->pStorePageLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
-		sgptDataTables->pStorePageTxt = (D2StorePageTxt*)DATATBLS_CompileTxt(hArchive, "storepage", pStorePageTbl, &nRecordCount, sizeof(D2StorePageTxt));
-
-		sgptDataTables->pElemTypesLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
-		sgptDataTables->pElemTypesTxt = (D2ElemTypesTxt*)DATATBLS_CompileTxt(hArchive, "elemtypes", pElemTypesTbl, &nRecordCount, sizeof(D2ElemTypesTxt));
-
-		sgptDataTables->pHitClassLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
-		sgptDataTables->pHitClassTxt = (D2HitClassTxt*)DATATBLS_CompileTxt(hArchive, "hitclass", pHitClassTbl, &nRecordCount, sizeof(D2HitClassTxt));
-
-		sgptDataTables->pColorsLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
-		sgptDataTables->pColorsTxt = (D2ColorsTxt*)DATATBLS_CompileTxt(hArchive, "colors", pColorsTbl, &nRecordCount, sizeof(D2ColorsTxt));
-
-		sgptDataTables->pHireDescLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
-		sgptDataTables->pHireDescTxt = (D2HireDescTxt*)DATATBLS_CompileTxt(hArchive, "hiredesc", pHireDescTbl, &nRecordCount, sizeof(D2HireDescTxt));
-
-		sgptDataTables->pMonModeLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
-		sgptDataTables->pMonModeTxtStub = (D2MonModeTxtStub*)DATATBLS_CompileTxt(hArchive, "monmode", pMonModeTbl, &nRecordCount, sizeof(D2MonModeTxtStub));
-
-		sgptDataTables->pPlrModeLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
-		sgptDataTables->pPlrModeTxtStub = (D2PlrModeTxtStub*)DATATBLS_CompileTxt(hArchive, "plrmode", pPlrModeTbl, &nRecordCount, sizeof(D2PlrModeTxtStub));
-
-		sgptDataTables->pMonAiLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
-		sgptDataTables->pMonAiTxt = (D2MonAiTxt*)DATATBLS_CompileTxt(hArchive, "monai", pMonAiTbl, &sgptDataTables->nMonAiTxtRecordCount, sizeof(D2MonAiTxt));
-
-		sgptDataTables->pMonPlaceLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
-		sgptDataTables->pMonPlaceTxt = (D2MonPlaceTxt*)DATATBLS_CompileTxt(hArchive, "monplace", pMonPlaceTbl, &sgptDataTables->nMonPlaceTxtRecordCount, sizeof(D2MonPlaceTxt));
-
-		sgptDataTables->pSkillCalcLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
-		sgptDataTables->pSkillCalcTxt = (D2SkillCalcTxt*)DATATBLS_CompileTxt(hArchive, "skillcalc", pSkillCalcTbl, &nRecordCount, sizeof(D2SkillCalcTxt));
-
-		sgptDataTables->pMissileCalcLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
-		sgptDataTables->pMissileCalcTxt = (D2MissCalcTxt*)DATATBLS_CompileTxt(hArchive, "misscalc", pMissCalcTbl, &nRecordCount, sizeof(D2MissCalcTxt));
-
-		sgptDataTables->iSkillCode = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
-		sgptDataTables->pSkillCode = (const char*)DATATBLS_CompileTxt(hArchive, "skills", pSkillCodeTbl, &nRecordCount, 2);
-
-		sgptDataTables->pEventsLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
-		sgptDataTables->pEventsTxt = (D2EventsTxt*)DATATBLS_CompileTxt(hArchive, "events", pEventsTbl, &nRecordCount, sizeof(D2EventsTxt));
+		LOADTXT(pPlayerClassLinker, pPlayerClassTxt, D2PlayerClassTxt*, "playerclass", pPlayerClassTbl, &nRecordCount, sizeof(D2PlayerClassTxt));
+		LOADTXT(pBodyLocsLinker, pBodyLocsTxt, D2BodyLocsTxt*, "bodylocs", pBodyLocsTbl, &nRecordCount, sizeof(D2BodyLocsTxt));
+		LOADTXT(pStorePageLinker, pStorePageTxt, D2StorePageTxt*, "storepage", pStorePageTbl, &nRecordCount, sizeof(D2StorePageTxt));
+		LOADTXT(pElemTypesLinker, pElemTypesTxt, D2ElemTypesTxt*, "elemtypes", pElemTypesTbl, &nRecordCount, sizeof(D2ElemTypesTxt));
+		LOADTXT(pHitClassLinker, pHitClassTxt, D2HitClassTxt*, "hitclass", pHitClassTbl, &nRecordCount, sizeof(D2HitClassTxt));
+		LOADTXT(pColorsLinker, pColorsTxt, D2ColorsTxt*, "colors", pColorsTbl, &nRecordCount, sizeof(D2ColorsTxt));
+		LOADTXT(pHireDescLinker, pHireDescTxt, D2HireDescTxt*, "hiredesc", pHireDescTbl, &nRecordCount, sizeof(D2HireDescTxt));
+		LOADTXT(pMonModeLinker, pMonModeTxtStub, D2MonModeTxtStub*, "monmode", pMonModeTbl, &nRecordCount, sizeof(D2MonModeTxtStub));
+		LOADTXT(pPlrModeLinker, pPlrModeTxtStub, D2PlrModeTxtStub*, "plrmode", pPlrModeTbl, &nRecordCount, sizeof(D2PlrModeTxtStub));
+		LOADTXT(pMonAiLinker, pMonAiTxt, D2MonAiTxt*, "monai", pMonAiTbl, &sgptDataTables->nMonAiTxtRecordCount, sizeof(D2MonAiTxt));
+		LOADTXT(pMonPlaceLinker, pMonPlaceTxt, D2MonPlaceTxt*, "monplace", pMonPlaceTbl, &sgptDataTables->nMonPlaceTxtRecordCount, sizeof(D2MonPlaceTxt));
+		LOADTXT(pSkillCalcLinker, pSkillCalcTxt, D2SkillCalcTxt*, "skillcalc", pSkillCalcTbl, &nRecordCount, sizeof(D2SkillCalcTxt));
+		LOADTXT(pMissileCalcLinker, pMissileCalcTxt, D2MissCalcTxt*, "misscalc", pMissCalcTbl, &nRecordCount, sizeof(D2MissCalcTxt));
+		LOADTXT(iSkillCode, pSkillCode, const char*, "skills", pSkillCodeTbl, &nRecordCount, 2);
+		LOADTXT(pEventsLinker, pEventsTxt, D2EventsTxt*, "events", pEventsTbl, &nRecordCount, sizeof(D2EventsTxt));
 	}
+#undef LOADTXT
 }
 
 //D2Common.0x6FD50FB0

@@ -19,6 +19,7 @@
 #include <DataTbls/MonsterIds.h>
 #include <DataTbls/ObjectsIds.h>
 #include <Units/Units.h>
+#include <test_seam.h>
 
 struct D2UnkDrlgRoomTileStrc
 {
@@ -839,7 +840,7 @@ BOOL __fastcall DRLGROOMTILE_AddWarp(D2DrlgRoomStrc* pDrlgRoom, int nX, int nY, 
 
 // 1.13c D2Common+0x68800 (warp tile in ESI, tile type on the stack): a record facing neither 'b' nor the
 // wall's side is swapped for the same level's record on that side. Missing tile or record is fatal.
-static void DRLGROOMTILE_UpdateLvlWarpTxtRecord(D2RoomTileStrc* pWarpTile, int nTileType)
+void DRLGROOMTILE_UpdateLvlWarpTxtRecord(D2RoomTileStrc* pWarpTile, int nTileType)   // not static: the per-function proof calls it
 {
 	D2_ASSERT(pWarpTile);
 	D2LvlWarpTxt* pLvlWarpTxtRecord = pWarpTile->pLvlWarpTxtRecord;
@@ -851,7 +852,7 @@ static void DRLGROOMTILE_UpdateLvlWarpTxtRecord(D2RoomTileStrc* pWarpTile, int n
 		const char szDirection = nTileType == TILETYPE_WALL_RIGHT_EXIT ? 'r' : 'l';
 		if (cCurrent != szDirection)
 		{
-			pWarpTile->pLvlWarpTxtRecord = DATATBLS_GetLvlWarpTxtRecordFromLevelIdAndDirection(pLvlWarpTxtRecord->dwLevelId, szDirection);
+			pWarpTile->pLvlWarpTxtRecord = D2_CALL(DATATBLS_GetLvlWarpTxtRecordFromLevelIdAndDirection, pLvlWarpTxtRecord->dwLevelId, szDirection);
 		}
 	}
 }
@@ -955,16 +956,13 @@ void __fastcall DRLGROOMTILE_LoadFloorWarpTiles(D2DrlgRoomStrc* pDrlgRoom, int n
 
 //1.10f:D2Common.0x6FD897E0
 //1.11: D2Common.0x6FD8D130
-// 1.13c D2Common+0x68780 (the per-room scan is the helper at +0x681A0, inline here)
-D2DrlgTileDataStrc* __fastcall DRLGROOMTILE_GetLinkedTileData(D2DrlgRoomStrc* pDrlgRoom, BOOL bFloor, uint32_t nPackedTileInformation, int nX, int nY, D2DrlgRoomStrc** ppDrlgRoom)
+// 1.13c D2Common+0x681A0 (the per-room hit test of the scan below; the per-function proof calls it through the seam)
+D2DrlgTileDataStrc* DRLGROOMTILE_FindLinkedTileDataInRoom(D2DrlgRoomStrc* pNearRoomEx, BOOL bFloor, uint32_t nPackedTileInformation, int nX, int nY)
 {
 	D2C_PackedTileInformation nTileInformation{ nPackedTileInformation };
 
-	for (int i = 0; i < pDrlgRoom->nRoomsNear; ++i)
 	{
-		D2DrlgRoomStrc* pNearRoomEx = pDrlgRoom->ppRoomsNear[i];
-
-		if (pNearRoomEx != pDrlgRoom && pNearRoomEx->pTileGrid && DRLGROOM_AreXYInsideCoordinatesOrOnBorder(&pNearRoomEx->pDrlgCoord, nX, nY))
+		if (pNearRoomEx->pTileGrid && DRLGROOM_AreXYInsideCoordinatesOrOnBorder(&pNearRoomEx->pDrlgCoord, nX, nY))
 		{
 			for (D2DrlgTileLinkStrc* pTileLink = pNearRoomEx->pTileGrid->pMapLinks; pTileLink; pTileLink = pTileLink->pNext)
 			{
@@ -978,7 +976,6 @@ D2DrlgTileDataStrc* __fastcall DRLGROOMTILE_GetLinkedTileData(D2DrlgRoomStrc* pD
 							{
 								if (!HasMapTileLayer(pTileData->dwFlags) || GetMapTileLayer(pTileData->dwFlags) == nTileInformation.nWallLayer)
 								{
-									*ppDrlgRoom = pDrlgRoom->ppRoomsNear[i];
 									return pTileData;
 								}
 							}
@@ -986,6 +983,27 @@ D2DrlgTileDataStrc* __fastcall DRLGROOMTILE_GetLinkedTileData(D2DrlgRoomStrc* pD
 					}
 				}
 			}
+		}
+	}
+
+	return nullptr;
+}
+
+// 1.13c D2Common+0x68780: the first neighbour other than the room itself whose hit test answers is returned and written to the out slot
+D2DrlgTileDataStrc* __fastcall DRLGROOMTILE_GetLinkedTileData(D2DrlgRoomStrc* pDrlgRoom, BOOL bFloor, uint32_t nPackedTileInformation, int nX, int nY, D2DrlgRoomStrc** ppDrlgRoom)
+{
+	for (int i = 0; i < pDrlgRoom->nRoomsNear; ++i)
+	{
+		D2DrlgRoomStrc* pNearRoomEx = pDrlgRoom->ppRoomsNear[i];
+		if (pNearRoomEx == pDrlgRoom)
+		{
+			continue;
+		}
+
+		if (D2DrlgTileDataStrc* pTileData = D2_CALL(DRLGROOMTILE_FindLinkedTileDataInRoom, pNearRoomEx, bFloor, nPackedTileInformation, nX, nY))
+		{
+			*ppDrlgRoom = pNearRoomEx;
+			return pTileData;
 		}
 	}
 
@@ -1166,43 +1184,16 @@ void __fastcall DRLGROOMTILE_LinkedTileDataManager(void* pMemPool, D2DrlgRoomStr
 // 1.13c D2Common+0x697C0
 void __fastcall DRLGROOMTILE_GetCreateLinkedTileData(void* pMemPool, D2DrlgRoomStrc* pDrlgRoom, int nTileType, uint32_t nPackedTileInformation, int nX, int nY)
 {
-	D2C_PackedTileInformation nTileInformation{ nPackedTileInformation };
-
-	for (int i = 0; i < pDrlgRoom->nRoomsNear; ++i)
+	// retail asks the neighbour scan (+0x68780) with the floor flag; a hit goes to the link manager (+0x695D0), none to the adder (+0x69470)
+	D2DrlgRoomStrc* pNearRoom = nullptr;
+	D2DrlgTileDataStrc* pTileData = D2_CALL(DRLGROOMTILE_GetLinkedTileData, pDrlgRoom, nTileType == TILETYPE_FLOOR, nPackedTileInformation, nX, nY, &pNearRoom);
+	if (pTileData)
 	{
-		D2DrlgRoomStrc* pNearRoomEx = pDrlgRoom->ppRoomsNear[i];
-		if (pNearRoomEx != pDrlgRoom && pNearRoomEx->pTileGrid && DRLGROOM_AreXYInsideCoordinatesOrOnBorder(&pNearRoomEx->pDrlgCoord, nX, nY))
-		{
-			D2DrlgTileLinkStrc* pTileLink = pNearRoomEx->pTileGrid->pMapLinks;
-			while (pTileLink)
-			{
-				D2DrlgTileDataStrc* pTileData = pTileLink->pMapTile;
-
-				if ((!pTileLink->bFloor && nTileType != TILETYPE_FLOOR) || (pTileLink->bFloor && nTileType == TILETYPE_FLOOR))
-				{
-					while (pTileData)
-					{
-						if (pNearRoomEx->nTileXPos + pTileData->nPosX == nX && pNearRoomEx->nTileYPos + pTileData->nPosY == nY)
-						{
-							if (pTileData->nTileType != TILETYPE_WALL_TOP_CORNER_LEFT && (pTileData->nTileType == TILETYPE_SHADOW || !nTileInformation.bShadow))
-							{
-								if (!HasMapTileLayer(pTileData->dwFlags) || GetMapTileLayer(pTileData->dwFlags) == nTileInformation.nWallLayer)
-								{
-									return DRLGROOMTILE_LinkedTileDataManager(pMemPool, pDrlgRoom, pDrlgRoom->ppRoomsNear[i], pTileData, nTileType, nPackedTileInformation, nX, nY);
-								}
-							}
-						}
-
-						pTileData = pTileData->unk0x20;
-					}
-				}
-
-				pTileLink = pTileLink->pNext;
-			}
-		}
+		D2_CALL(DRLGROOMTILE_LinkedTileDataManager, pMemPool, pDrlgRoom, pNearRoom, pTileData, nTileType, nPackedTileInformation, nX, nY);
+		return;
 	}
 
-	DRLGROOMTILE_AddLinkedTileData(pMemPool, pDrlgRoom, nTileType, nPackedTileInformation, nX, nY);
+	D2_CALL(DRLGROOMTILE_AddLinkedTileData, pMemPool, pDrlgRoom, nTileType, nPackedTileInformation, nX, nY);
 }
 
 //D2Common.0x6FD89E30

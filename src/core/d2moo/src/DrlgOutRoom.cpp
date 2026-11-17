@@ -6,6 +6,7 @@
 #include "Drlg/D2DrlgDrlgVer.h"
 #include "Drlg/D2DrlgRoomTile.h"
 #include "D2Seed.h"
+#include <test_seam.h>
 
 
 //TODO: Check calls with DrlgGridStrc args
@@ -90,7 +91,7 @@ BOOL __fastcall DRLGOUTROOM_LinkLevelsByLevelDef(D2DrlgLevelLinkDataStrc* pLevel
 		pLevelLinkData->pLevelCoord[pLevelLinkData->nIteration].nHeight = 64;
 	}
 
-	pLevelDefBin = DATATBLS_GetLevelDefRecord(pLevelLinkData->nCurrentLevel);
+	pLevelDefBin = D2_CALL(DATATBLS_GetLevelDefRecord, pLevelLinkData->nCurrentLevel);
 
 	pLevelLinkData->pLevelCoord[pLevelLinkData->nIteration].nPosX = pLevelDefBin->dwOffsetX;
 	pLevelLinkData->pLevelCoord[pLevelLinkData->nIteration].nPosY = pLevelDefBin->dwOffsetY;

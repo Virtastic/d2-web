@@ -53,5 +53,7 @@ D2COMMON_DLL_DECL short __stdcall TEXT_GetStringIdOfMenuType0Or2Node(D2TextHeade
 D2COMMON_DLL_DECL void __stdcall TEXT_CreateMessageListFromTextHeader(D2TextHeaderStrc* pTextHeader, D2MessageListStrc* pMsgList);
 //D2Common.0x6FDC3970 (#10910)
 D2COMMON_DLL_DECL void __stdcall TEXT_CreateTextHeaderFromMessageList(D2TextHeaderStrc* pTextHeader, D2MessageListStrc* pMsgList);
+// 1.13c D2Common+0x3D250
+void __fastcall TEXT_ClearTextNodes(D2TextHeaderStrc* pTextHeader);
 //D2Common.0x6FDC3A70 (#10911)
 D2COMMON_DLL_DECL void __stdcall TEXT_SortTextNodeListByStringId(D2TextHeaderStrc* pTextHeader);

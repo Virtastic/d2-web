@@ -1,5 +1,6 @@
 #include "D2Text.h"
 #include <Fog.h>
+#include <test_seam.h>
 
 //D2Common.0x6FDC36E0 (#10901)
 // 1.13c D2Common+0x3D280
@@ -202,14 +203,9 @@ void __stdcall TEXT_CreateMessageListFromTextHeader(D2TextHeaderStrc* pTextHeade
 	}
 }
 
-// 1.13c D2Common+0x3D380
-//D2Common.0x6FDC3970 (#10910)
-void __stdcall TEXT_CreateTextHeaderFromMessageList(D2TextHeaderStrc* pTextHeader, D2MessageListStrc* pMsgList)
+// 1.13c D2Common+0x3D250: release every node (the next link is read first), zero the count; the head link is left as is.
+void __fastcall TEXT_ClearTextNodes(D2TextHeaderStrc* pTextHeader)
 {
-	D2_ASSERT(pTextHeader != nullptr);
-	D2_ASSERT(pMsgList != nullptr);
-
-	// Retail 0x3D250: release every node (the next link is read first), zero the count; the head link is left as is.
 	for (D2TextNodeStrc* pCurrent = pTextHeader->pNode; pCurrent != nullptr; )
 	{
 		D2TextNodeStrc* pNext = pCurrent->pNext;
@@ -217,6 +213,16 @@ void __stdcall TEXT_CreateTextHeaderFromMessageList(D2TextHeaderStrc* pTextHeade
 		pCurrent = pNext;
 	}
 	pTextHeader->nCount = 0;
+}
+
+// 1.13c D2Common+0x3D380
+//D2Common.0x6FDC3970 (#10910)
+void __stdcall TEXT_CreateTextHeaderFromMessageList(D2TextHeaderStrc* pTextHeader, D2MessageListStrc* pMsgList)
+{
+	D2_ASSERT(pTextHeader != nullptr);
+	D2_ASSERT(pMsgList != nullptr);
+
+	D2_CALL(TEXT_ClearTextNodes, pTextHeader);
 
 	D2_ASSERT(pMsgList->nCount < MAX_TEXT_LIST_NODES);
 

@@ -12,6 +12,7 @@
 #include "Drlg/D2DrlgRoomTile.h"
 #include "D2Dungeon.h"
 #include "D2Seed.h"
+#include <test_seam.h>
 #include <D2CMP.h>
 #include <DataTbls/LevelsIds.h>
 
@@ -239,7 +240,7 @@ void __fastcall DRLG_FreeLevel(void* pMemPool, D2DrlgLevelStrc* pLevel, BOOL bAl
 
 // 1.13c D2Common+0x2DF80: add nDelta to a level's active count and to that of every level it sees (the vis levels from
 // the level's own row, created when missing), arm the inactive-frame delay on each, and clamp the counts at zero.
-static void DRLG_AdjustLevelActiveCount(D2DrlgLevelStrc* pLevel, int nDelta)
+void DRLG_AdjustLevelActiveCount(D2DrlgLevelStrc* pLevel, int nDelta)   // not static: the 0x3C810 proof probe stands in for it through D2Seam
 {
 	pLevel->bActive += nDelta;
 	pLevel->dwInactiveFrames = 10;
@@ -268,12 +269,12 @@ void __fastcall sub_6FD745C0(D2DrlgRoomStrc* pDrlgRoom1, D2DrlgRoomStrc* pDrlgRo
 	{
 		if (pLevel1)
 		{
-			DRLG_AdjustLevelActiveCount(pLevel1, -1);
+			D2_CALL(DRLG_AdjustLevelActiveCount, pLevel1, -1);
 		}
 
 		if (pLevel2)
 		{
-			DRLG_AdjustLevelActiveCount(pLevel2, 1);
+			D2_CALL(DRLG_AdjustLevelActiveCount, pLevel2, 1);
 		}
 	}
 }
