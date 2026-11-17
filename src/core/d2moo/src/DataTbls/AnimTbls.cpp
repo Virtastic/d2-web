@@ -30,6 +30,7 @@ D2AnimDataTableStrc* __fastcall DATATBLS_LoadAnimDataD2(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD47460
+// not-1.13c: retail inlines this unload in DATATBLS_UnloadAllBins (0x5E870); fold target DataTbls.cpp is outside this batch
 void __fastcall DATATBLS_UnloadAnimDataD2(D2AnimDataTableStrc* pAnimData)
 {
 	if (pAnimData)
@@ -90,6 +91,7 @@ const D2AnimDataRecordStrc* __fastcall DATATBLS_GetAnimDataRecord(D2UnitStrc* pU
 }
 
 //D2Common.0x6FD475D0 (#10640)
+// 1.13c D2Common+0x41FD0: sets the anim speed on the unit's record and returns; no halt in retail
 void __stdcall DATATBLS_UnitAnimInfoDebugSet(D2UnitStrc* pUnit, int nAnimSpeed)
 {
 	int nWeaponClassCode = 0;
@@ -99,8 +101,6 @@ void __stdcall DATATBLS_UnitAnimInfoDebugSet(D2UnitStrc* pUnit, int nAnimSpeed)
 	{
 		pRecord->dwAnimSpeed = nAnimSpeed;
 	}
-	FOG_DisplayHalt("DataTablesUnitAnimInfoDebugSet", __FILE__, __LINE__);
-	exit(-1);
 }
 
 //D2Common.0x6FD47700 (#10641)

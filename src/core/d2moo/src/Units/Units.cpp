@@ -429,7 +429,7 @@ void __stdcall UNITS_SetTargetX(D2UnitStrc* pUnit, int nTargetX)
 {
 	D2_ASSERT(pUnit);
 
-	PATH_SetClientCoordX(pUnit->pDynamicPath, nTargetX);
+	pUnit->pDynamicPath->dwClientCoordX = nTargetX;
 }
 
 // 1.13c D2Common+0x300E0
@@ -438,7 +438,7 @@ void __stdcall UNITS_SetTargetY(D2UnitStrc* pUnit, int nTargetY)
 {
 	D2_ASSERT(pUnit);
 
-	PATH_SetClientCoordY(pUnit->pDynamicPath, nTargetY);
+	pUnit->pDynamicPath->dwClientCoordY = nTargetY;
 }
 
 //D2Common.0x6FDBDD10 (#10332)

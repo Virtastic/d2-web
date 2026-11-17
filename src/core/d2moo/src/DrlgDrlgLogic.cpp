@@ -9,6 +9,7 @@
 #include "Drlg/D2DrlgRoomTile.h"
 #include "D2CMP.h"
 
+// 1.13c D2Common+0x80F70
 //D2Common.0x6FD76420
 void __fastcall DRLGLOGIC_FreeDrlgCoordList(D2DrlgRoomStrc* pDrlgRoom)
 {
@@ -35,6 +36,7 @@ void __fastcall DRLGLOGIC_FreeDrlgCoordList(D2DrlgRoomStrc* pDrlgRoom)
 	}
 }
 
+// 1.13c D2Common+0x81CA0 (the tree-flag pass 0x81650, the wall and neighbour pass 0x814C0 and the region walk 0x81BC0 are inline here)
 //D2Common.0x6FD764A0
 void __fastcall DRLGLOGIC_InitializeDrlgCoordList(D2DrlgRoomStrc* pDrlgRoom, D2DrlgGridStrc* pTileTypeGrid, D2DrlgGridStrc* pFloorGrid, D2DrlgGridStrc* pWallGrid)
 {
@@ -153,6 +155,7 @@ void __fastcall DRLGLOGIC_InitializeDrlgCoordList(D2DrlgRoomStrc* pDrlgRoom, D2D
 	sub_6FD769B0(pDrlgRoom);
 }
 
+// 1.13c D2Common+0x817A0
 //D2Common.0x6FD76830
 void __fastcall DRLGLOGIC_SetTileGridFlags(D2UnkDrlgLogicStrc* a1, int nX, int nY, int a4)
 {
@@ -243,6 +246,7 @@ void __fastcall DRLGLOGIC_SetTileGridFlags(D2UnkDrlgLogicStrc* a1, int nX, int n
 	}
 }
 
+// 1.13c D2Common+0x81AD0
 //D2Common.0x6FD769B0
 void __fastcall sub_6FD769B0(D2DrlgRoomStrc* pDrlgRoom)
 {
@@ -272,6 +276,7 @@ void __fastcall sub_6FD769B0(D2DrlgRoomStrc* pDrlgRoom)
 	}
 }
 
+// 1.13c D2Common+0x816C0
 //D2Common.0x6FD76A90
 void __fastcall sub_6FD76A90(D2DrlgRoomStrc* pDrlgRoom1, D2DrlgRoomStrc* pDrlgRoom2, int nX, int nY)
 {
@@ -293,6 +298,7 @@ void __fastcall sub_6FD76A90(D2DrlgRoomStrc* pDrlgRoom1, D2DrlgRoomStrc* pDrlgRo
 	}
 }
 
+// 1.13c D2Common+0x80EE0
 //D2Common.0x6FD76B90
 void __fastcall sub_6FD76B90(D2DrlgRoomStrc* pDrlgRoom, int nIndex1, int nIndex2, BOOL bNode)
 {
@@ -328,6 +334,7 @@ void __fastcall sub_6FD76B90(D2DrlgRoomStrc* pDrlgRoom, int nIndex1, int nIndex2
 	}
 }
 
+// not-1.13c: retail has no function; the same test is written inline in the wall pass of D2Common+0x814C0
 //D2Common.0x6FD76C20
 BOOL __fastcall DRLG_CheckLayer1ButNotWallObject(D2DrlgTileDataStrc* pTileData)
 {
@@ -342,6 +349,7 @@ BOOL __fastcall DRLG_CheckLayer1ButNotWallObject(D2DrlgTileDataStrc* pTileData)
 	return FALSE;
 }
 
+// 1.13c D2Common+0x81A20
 //D2Common.0x6FD76C50
 void __fastcall DRLGLOGIC_SetCoordListForTiles(D2DrlgRoomStrc* pDrlgRoom)
 {
@@ -361,6 +369,7 @@ void __fastcall DRLGLOGIC_SetCoordListForTiles(D2DrlgRoomStrc* pDrlgRoom)
 	}
 }
 
+// 1.13c D2Common+0x81200
 //D2Common.0x6FD76CF0
 void __fastcall DRLGLOGIC_AssignCoordListsForGrids(D2DrlgRoomStrc* pDrlgRoom, D2DrlgLogicalRoomInfoStrc* pDrlgCoordList, int nLists)
 {
@@ -523,6 +532,7 @@ D2RoomCoordListStrc* __fastcall sub_6FD77110(D2DrlgRoomStrc* pDrlgRoom, int nX, 
 	return pDrlgRoom->pLogicalRoomInfo->ppCoordListByCell[(pDrlgRoom->pLogicalRoomInfo->pIndexY.pCellsRowOffsets[nY - pDrlgRoom->nTileYPos] - pDrlgRoom->nTileXPos) + nX];
 }
 
+// 1.13c D2Common+0x80E80
 //D2Common.0x6FD77190
 D2RoomCoordListStrc* __fastcall DRLGLOGIC_GetRoomCoordList(D2DrlgRoomStrc* pDrlgRoom)
 {

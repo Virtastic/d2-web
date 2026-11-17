@@ -192,6 +192,7 @@ D2ObjModeDataTbl* __fastcall DATATBLS_GetObjMode_TypeDataTables()
 }
 
 //D2Common.0x6FD73180 (#10646)
+// 1.13c D2Common+0x18EF0: unsigned count check returns NULL; mode 0 is the type table, mode 1 the mode table, others NULL
 D2PlrModeTypeTxt* __stdcall DATATBLS_GetPlrModeTypeTxtRecord(int nIndex, int bGetMode)
 {
 	// 1.13c treats the index and count as unsigned before any table access.

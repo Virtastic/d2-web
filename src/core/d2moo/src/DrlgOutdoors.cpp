@@ -19,6 +19,7 @@
 
 
 //D2Common.0x6FD7DC20
+// 1.13c D2Common+0x42C00 (the vis-flag lookup 0x42A20 is inline here)
 int __fastcall DRLGOUTDOORS_GetOutLinkVisFlag(D2DrlgLevelStrc* pLevel, D2DrlgVertexStrc* pDrlgVertex)
 {
 	static const D2CoordStrc pOffsetCoords[] =
@@ -82,6 +83,7 @@ int __fastcall DRLGOUTDOORS_GetOutLinkVisFlag(D2DrlgLevelStrc* pLevel, D2DrlgVer
 }
 
 //D2Common.0x6FD7DD00
+// 1.13c D2Common+0x42330
 int __fastcall DRLGOUTDOORS_GetPresetIndexFromGridCell(D2DrlgLevelStrc* pLevel, int nX, int nY)
 {
 	if (DRLGOUTDOORS_GetPackedGrid2Info(pLevel->pOutdoors, nX, nY).bHasPickedFile)
@@ -111,12 +113,14 @@ void __fastcall DRLGOUTDOORS_SetBlankGridCell(D2DrlgLevelStrc* pLevel, int nX, i
 }
 
 //D2Common.0x6FD7DDB0
+// 1.13c D2Common+0x42270
 unsigned int __fastcall DRLGOUTDOORS_TestGridCellNonLvlLink(D2DrlgLevelStrc* pLevel, int nX, int nY)
 {
 	return DRLGOUTDOORS_GetPackedGrid2Info(pLevel->pOutdoors, nX, nY).bLvlLink == 0;
 }
 
 //D2Common.0x6FD7DDD0
+// not-1.13c: retail has no function; the (flags & 0x1B81) == 0 test is written inline in D2Common+0x42370, 0x42460 and 0x426A0
 BOOL __fastcall DRLGOUTDOORS_TestGridCellSpawnValid(D2DrlgLevelStrc* pLevel, int nX, int nY)
 {
 	D2DrlgOutdoorPackedGrid2InfoStrc tPackedInfo = DRLGOUTDOORS_GetPackedGrid2Info(pLevel->pOutdoors, nX, nY);
@@ -125,6 +129,7 @@ BOOL __fastcall DRLGOUTDOORS_TestGridCellSpawnValid(D2DrlgLevelStrc* pLevel, int
 }
 
 //D2Common.0x6FD7DDF0
+// 1.13c D2Common+0x42370 (diffed line by line, spawn-valid test inline)
 BOOL __fastcall DRLGOUTDOORS_TestOutdoorLevelPreset(D2DrlgLevelStrc* pLevel, int nX, int nY, int nLevelPrestId, int nOffset, char nFlags)
 {
 	D2LvlPrestTxt* pLvlPrestTxtRecord = NULL;
@@ -341,6 +346,7 @@ BOOL __fastcall DRLGOUTDOORS_SpawnPresetFarAway(D2DrlgLevelStrc* pLevel, D2DrlgC
 }
 
 //D2Common.0x6FD7E330
+// 1.13c D2Common+0x42CE0 (diffed line by line, tables byte-compared with the DLL)
 BOOL __fastcall DRLGOUTDOORS_SpawnOutdoorLevelPreset(D2DrlgLevelStrc* pLevel, int nLevelPrestId, int nRand, int nOffset, char nFlags)
 {
 	D2CoordStrc pCoord[256] = {};
@@ -394,6 +400,7 @@ BOOL __fastcall DRLGOUTDOORS_SpawnOutdoorLevelPreset(D2DrlgLevelStrc* pLevel, in
 }
 
 //D2Common.0x6FD7E4D0
+// 1.13c D2Common+0x43350 (diffed line by line, tables byte-compared with the DLL)
 BOOL __fastcall DRLGOUTDOORS_SpawnRandomOutdoorDS1(D2DrlgLevelStrc* pLevel, int nLvlPrestId, int nRand)
 {
 	static const char nOffsetX[] =
@@ -473,6 +480,7 @@ BOOL __fastcall DRLGOUTDOORS_SpawnRandomOutdoorDS1(D2DrlgLevelStrc* pLevel, int 
 }
 
 //D2Common.0x6FD7E6D0
+// 1.13c D2Common+0x426A0 (disassembly diffed: same clamps, 0x20000 and 0x10000 marks, shuffle and seed rolls)
 void __fastcall DRLGOUTDOORS_SpawnAct12Waypoint(D2DrlgLevelStrc* pLevel)
 {
 	D2CoordStrc pCoord[256] = {};
@@ -488,14 +496,13 @@ void __fastcall DRLGOUTDOORS_SpawnAct12Waypoint(D2DrlgLevelStrc* pLevel)
 	if (pLevel->nLevelId == LEVEL_COLDPLAINS)
 	{
 		pVisArray = DRLGROOM_GetVisArrayFromLevelId(pLevel->pDrlg, LEVEL_COLDPLAINS);
-		for (int i = 0; i < 8; ++i)
+		int nVisIndex = 0;
+		while (nVisIndex < 8 && pVisArray[nVisIndex] != LEVEL_BLOODMOOR)
 		{
-			if (pVisArray[i] == LEVEL_BLOODMOOR)
-			{
-				nFlags = 1 << (i + 4);
-				break;
-			}
+			++nVisIndex;
 		}
+		// retail keeps the index 8 when there is no hit
+		nFlags = 1 << (nVisIndex + 4);
 
 		for (int i = 0; i < pLevel->pOutdoors->nGridHeight; ++i)
 		{
@@ -577,6 +584,7 @@ void __fastcall DRLGOUTDOORS_SpawnAct12Waypoint(D2DrlgLevelStrc* pLevel)
 }
 
 //D2Common.0x6FD7E940
+// 1.13c D2Common+0x42460
 void __fastcall DRLGOUTDOORS_SpawnAct12Shrines(D2DrlgLevelStrc* pLevel, int nShrines)
 {
 	static const int dword_6FDCF948[] =
@@ -649,6 +657,7 @@ void __fastcall DRLGOUTDOORS_SpawnAct12Shrines(D2DrlgLevelStrc* pLevel, int nShr
 }
 
 //D2Common.0x6FD7EB20
+// 1.13c D2Common+0x43100 (disassembly diffed: same struct slots, same callback table)
 //TODO: a1
 void __fastcall DRLGOUTDOORS_AddAct124SecondaryBorder(D2DrlgLevelStrc* pLevel, int nLvlSubId, int nLevelPrestId)
 {
@@ -829,6 +838,7 @@ void __fastcall DRLGOUTDOORS_GenerateLevel(D2DrlgLevelStrc* pLevel)
 }
 
 //D2Common.0x6FD7EEE0
+// 1.13c D2Common+0x420E0 (grid frees, vertex frees, vertex memsets and the pool frees diffed against the decompile)
 void __fastcall DRLGOUTDOORS_FreeOutdoorInfo(D2DrlgLevelStrc* pLevel, BOOL bKeepRoomData)
 {
 	if (pLevel->pOutdoors->dwFlags & 0x20)
@@ -1365,6 +1375,7 @@ void __fastcall sub_6FD7F810(D2DrlgLevelStrc* pLevel, int nVertexId)
 }
 
 //D2Common.0x6FD7F9B0
+// 1.13c D2Common+0x861A0 (the fortress-transition pass 0x86000 and the chaos sanctum lava loop 0x85FD0 are inline here; preset tables byte-compared with the DLL)
 void __fastcall DRLGOUTDOORS_InitAct4OutdoorLevel(D2DrlgLevelStrc* pLevel)
 {
 	static const int nMesaLvlPrestIds[] =

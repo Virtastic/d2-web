@@ -2,7 +2,8 @@
 #include <Calc.h>
 #include <Storm.h>
 
-// the four-byte link code retail builds on the stack: the first four characters, space-padded after the terminator
+// not-1.13c: no retail function; 1.13c 0x7C640 (the keyword mapper) calls no pack helper (callees 0x7C5F0 and the
+// Storm/Fog imports only), so the four-byte link code is built inline there. Kept as a port helper: first four characters, space-padded
 static uint32_t MissilesTbl_PackLinkCode(const char* szText)
 {
 	char szCode[4] = { ' ', ' ', ' ', ' ' };

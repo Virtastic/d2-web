@@ -12,6 +12,7 @@ extern "C" void d2web_msvc_qsort(void* base, size_t num, size_t width, int (*cmp
 #include "../../../d2common/runes_tbl.h"   // d2-web: the growth/copy body of 0x70FF0, shared with the s3004 probe
 
 //D2Common.0x6FD550E0
+// 1.13c D2Common+0x71B40
 int __fastcall DATATBLS_MapItemsTxtKeywordToNumber(char* szKey)
 {
 	if (!SStrCmpI(szKey, "min", 32))
@@ -37,12 +38,14 @@ int __fastcall DATATBLS_MapItemsTxtKeywordToNumber(char* szKey)
 }
 
 //D2Common.0x6FD55140
+// 1.13c D2Common+0x71B30
 int __fastcall DATATBLS_Return2(int)
 {
 	return 2;
 }
 
 //D2Common.0x6FD55150
+// 1.13c D2Common+0x71AA0
 //TODO: Find a name
 int __fastcall sub_6FD55150(char* szText, int* a2, int a3, int nKeywordNumber)
 {
@@ -81,19 +84,20 @@ int __fastcall sub_6FD55150(char* szText, int* a2, int a3, int nKeywordNumber)
 }
 
 //D2Common.0x6FD551E0
+// 1.13c D2Common+0x71BA0: 0x400-byte expression buffer (256 dwords)
 void __fastcall DATATBLS_ItemCalcLinker(char* pSrc, void* pRecord, int nOffset, int nPosition, int nTxtRow, int nTxtColumn)
 {
 	int nBufferSize = 0;
-	FOGASTNodeStrc pBuffer[1024] = {};
+	uint32_t pBuffer[256];
 
 	if (pRecord)
 	{
 		if (pSrc)
 		{
-			nBufferSize = DATATBLS_CompileExpression(pSrc, pBuffer, sizeof(pBuffer), DATATBLS_MapItemsTxtKeywordToNumber, DATATBLS_Return2, sub_6FD55150);
+			nBufferSize = DATATBLS_CompileExpression(pSrc, (FOGASTNodeStrc*)pBuffer, sizeof(pBuffer), DATATBLS_MapItemsTxtKeywordToNumber, DATATBLS_Return2, sub_6FD55150);
 			if (nBufferSize > 0)
 			{
-				*(uint32_t*)((char*)pRecord + nOffset) = DATATBLS_AppendMemoryBuffer((char**)&sgptDataTables->pItemsCode, (int*)&sgptDataTables->nItemsCodeSize, &sgptDataTables->nItemsCodeSizeEx, pBuffer, nBufferSize);
+				*(uint32_t*)((char*)pRecord + nOffset) = DATATBLS_AppendMemoryBuffer((char**)&sgptDataTables->pItemsCode, (int*)&sgptDataTables->nItemsCodeSize, &sgptDataTables->nItemsCodeSizeEx, (FOGASTNodeStrc*)pBuffer, nBufferSize);
 			}
 			else
 			{
@@ -440,6 +444,7 @@ int __stdcall DATATBLS_GetItemIdFromItemCode(uint32_t dwCode)
 }
 
 //D2Common.0x6FD57740
+// 1.13c D2Common+0x718B0: no trace on a failed parse (1.10f logged it)
 void __fastcall DATATBLS_ItemParamLinker(char* pSrc, void* pRecord, int nOffset, int nPosition, int nTxtRow, int nTxtColumn)
 {
 	int nRow = 0;
@@ -485,7 +490,6 @@ void __fastcall DATATBLS_ItemParamLinker(char* pSrc, void* pRecord, int nOffset,
 				}
 
 				*(uint32_t*)((char*)pRecord + nOffset) = 0;
-				FOG_Trace("Failed to parse '%s' line %d", pSrc, nTxtRow);
 			}
 		}
 		else
@@ -580,16 +584,6 @@ void __fastcall DATATBLS_LoadMagicSuffix_Prefix_AutomagicTxt(HD2ARCHIVE hArchive
 	}
 }
 
-//D2Common.0x6FD58080
-void __fastcall DATATBLS_UnloadMagicSuffix_Prefix_AutomagicTxt()
-{
-	if (sgptDataTables->pMagicAffixDataTables.pMagicAffixTxt)
-	{
-		D2_FREE_POOL(nullptr, sgptDataTables->pMagicAffixDataTables.pMagicAffixTxt);
-	}
-	sgptDataTables->pMagicAffixDataTables.pMagicAffixTxt = NULL;
-}
-
 //D2Common.0x6FD580B0 (#10603)
 // not-1.13c: retail has no getter; users read the affix table block from the table global
 D2MagicAffixDataTbl* __stdcall DATATBLS_GetMagicAffixDataTables()
@@ -613,6 +607,7 @@ D2MagicAffixTxt* __stdcall DATATBLS_GetMagicAffixTxtRecord(int nIndex)
 }
 
 //D2Common.0x6FD58110
+// 1.13c D2Common+0x77B70: compared field by field and call by call, no delta
 void __fastcall DATATBLS_LoadRareSuffix_PrefixTxt(HD2ARCHIVE hArchive)
 {
 	const Unicode* pUnicode = NULL;
@@ -662,17 +657,8 @@ void __fastcall DATATBLS_LoadRareSuffix_PrefixTxt(HD2ARCHIVE hArchive)
 	}
 }
 
-//D2Common.0x6FD58450
-void __fastcall DATATBLS_UnloadRareSuffix_PrefixTxt()
-{
-	if (sgptDataTables->pRareAffixDataTables.pRareAffixTxt)
-	{
-		D2_FREE_POOL(nullptr, sgptDataTables->pRareAffixDataTables.pRareAffixTxt);
-	}
-	sgptDataTables->pRareAffixDataTables.pRareAffixTxt = NULL;
-}
-
 //D2Common.0x6FD58480 (#10605)
+// 1.13c D2Common+0x717E0: retail returns the address of the rare affix table global; this returns the same block
 D2RareAffixDataTbl* __fastcall DATATBLS_GetRareAffixDataTables()
 {
 	return &sgptDataTables->pRareAffixDataTables;
@@ -787,14 +773,6 @@ void __fastcall DATATBLS_LoadUniqueItemsTxt(HD2ARCHIVE hArchive)
 			sgptDataTables->pUniqueItemsTxt[i].wTblIndex = 5383;
 		}
 	}
-}
-
-//D2Common.0x6FD59110
-void __fastcall DATATBLS_UnloadUniqueItemsTxt()
-{
-	FOG_FreeLinker(sgptDataTables->pUniqueItemsLinker);
-	DATATBLS_UnloadBin(sgptDataTables->pUniqueItemsTxt);
-	sgptDataTables->nUniqueItemsTxtRecordCount = 0;
 }
 
 //D2Common.0x6FD59140
@@ -1015,17 +993,6 @@ void __fastcall DATATBLS_LoadSets_SetItemsTxt(HD2ARCHIVE hArchive)
 	}
 }
 
-//D2Common.0x6FD5AE00
-void __fastcall DATATBLS_UnloadSets_SetItemsTxt()
-{
-	FOG_FreeLinker(sgptDataTables->pSetsLinker);
-	FOG_FreeLinker(sgptDataTables->pSetItemsLinker);
-	DATATBLS_UnloadBin(sgptDataTables->pSetItemsTxt);
-	DATATBLS_UnloadBin(sgptDataTables->pSetsTxt);
-	sgptDataTables->nSetsTxtRecordCount = 0;
-	sgptDataTables->nSetItemsTxtRecordCount = 0;
-}
-
 // Inlined
 // 1.13c D2Common+0x1800
 D2SetItemsTxt* __stdcall DATATBLS_GetSetItemsTxtRecord(int nSetItemId)
@@ -1047,6 +1014,7 @@ D2SetsTxt* __stdcall DATATBLS_GetSetsTxtRecord(int nSetId)
 	return nullptr;
 }
 
+// not-1.13c: inlined in retail callers (no function at any retail address); only Items.cpp calls it
 D2SetsTxt* __stdcall DATATBLS_GetSetsTxtRecordFromSetItemId(int nSetItemId)
 {
 	if (D2SetItemsTxt* pSetItemTxt = DATATBLS_GetSetItemsTxtRecord(nSetItemId))
@@ -1104,19 +1072,15 @@ void __fastcall DATATBLS_LoadQualityItemsTxt(HD2ARCHIVE hArchive)
 	}
 }
 
-//D2Common.0x6FD5B250
-void __fastcall DATATBLS_UnloadQualityItemsTxt()
-{
-	DATATBLS_UnloadBin(sgptDataTables->pQualityItemDataTables.pQualityItemsTxt);
-}
-
 //D2Common.0x6FD5B260 (#10611)
+// 1.13c D2Common+0x71660: retail returns the address of the quality table global; this returns the same block
 D2QualityItemDataTbl* __fastcall DATATBLS_GetQualityItemDataTables()
 {
 	return &sgptDataTables->pQualityItemDataTables;
 }
 
 //D2Common.0x6FD5B270 (#10612)
+// 1.13c D2Common+0x71610: signed bound check, -1 -> NULL, 0x70-byte stride, fatal assert on a NULL table
 D2QualityItemsTxt* __stdcall DATATBLS_GetQualityItemsTxtRecord(int nIndex)
 {
 	if (nIndex >= sgptDataTables->pQualityItemDataTables.nQualityItemsTxtRecordCount || nIndex == -1)
@@ -1209,13 +1173,8 @@ void __fastcall DATATBLS_LoadGemsTxt(HD2ARCHIVE hArchive)
 	}
 }
 
-//D2Common.0x6FD5BAE0
-void __fastcall DATATBLS_UnloadGemsTxt()
-{
-	DATATBLS_UnloadBin(sgptDataTables->pGemDataTables.pGemsTxt);
-}
-
 //D2Common.0x6FD5BAF0 (#10615)
+// 1.13c D2Common+0x715C0: retail returns the address of the gem table global; this returns the same block
 D2GemDataTbl* __fastcall DATATBLS_GetGemDataTables()
 {
 	return &sgptDataTables->pGemDataTables;
@@ -1258,12 +1217,6 @@ void __fastcall DATATBLS_LoadBooksTxt(HD2ARCHIVE hArchive)
 	sgptDataTables->pBookDataTables.pBooksTxt = (D2BooksTxt*)DATATBLS_CompileTxt(hArchive, "books", pTbl, &sgptDataTables->pBookDataTables.nBooksTxtRecordCount, sizeof(D2BooksTxt));
 }
 
-//D2Common.0x6FD5BD10
-void __fastcall DATATBLS_UnloadBooksTxt()
-{
-	DATATBLS_UnloadBin(sgptDataTables->pBookDataTables.pBooksTxt);
-}
-
 //D2Common.0x6FD5BD20 (#10617)
 // not-1.13c: retail has no getter; users read the book table block from the table global
 D2BookDataTbl* __fastcall DATATBLS_GetBookDataTables()
@@ -1272,6 +1225,7 @@ D2BookDataTbl* __fastcall DATATBLS_GetBookDataTables()
 }
 
 //D2Common.0x6FD5BD30 (#10618)
+// 1.13c D2Common+0x714D0: signed bound check, -1 -> NULL, 0x20-byte stride, fatal assert on a NULL table
 D2BooksTxt* __stdcall DATATBLS_GetBooksTxtRecord(int nBookId)
 {
 	if (nBookId >= sgptDataTables->pBookDataTables.nBooksTxtRecordCount || nBookId == -1)
@@ -1306,19 +1260,15 @@ void __fastcall DATATBLS_LoadLowQualityItemsTxt(HD2ARCHIVE hArchive)
 	}
 }
 
-//D2Common.0x6FD5BE40
-void __fastcall DATATBLS_UnloadLowQualityItemsTxt()
-{
-	DATATBLS_UnloadBin(sgptDataTables->pLowQualityItemDataTables.pLowQualityItemsTxt);
-}
-
 //D2Common.0x6FD5BE50 (#10613)
+// 1.13c D2Common+0x71480: retail returns the address of the low-quality table global; this returns the same block
 D2LowQualityItemDataTbl* __fastcall DATATBLS_GetLowQualityItemDataTables()
 {
 	return &sgptDataTables->pLowQualityItemDataTables;
 }
 
 //D2Common.0x6FD5BE60 (#10614)
+// 1.13c D2Common+0x71430: signed bound check, -1 -> NULL, 0x22-byte stride, fatal assert on a NULL table
 D2LowQualityItemsTxt* __stdcall DATATBLS_GetLowQualityItemsTxtRecord(int nId)
 {
 	if (nId >= sgptDataTables->pLowQualityItemDataTables.nLowQualityItemsTxtRecordCount || nId == -1)
@@ -1365,13 +1315,8 @@ void __fastcall DATATBLS_LoadItemRatioTxt(HD2ARCHIVE hArchive)
 	sgptDataTables->pItemRatioDataTables.pItemRatioTxt = (D2ItemRatioTxt*)DATATBLS_CompileTxt(hArchive, "itemratio", pTbl, &sgptDataTables->pItemRatioDataTables.nItemRatioTxtRecordCount, sizeof(D2ItemRatioTxt));
 }
 
-//D2Common.0x6FD5C200
-void __fastcall DATATBLS_UnloadItemRatioTxt()
-{
-	DATATBLS_UnloadBin(sgptDataTables->pItemRatioDataTables.pItemRatioTxt);
-}
-
 //D2Common.0x6FD5C210 (#10622)
+// 1.13c D2Common+0x713E0: retail returns the address of the item ratio table global; this returns the same block
 D2ItemRatioDataTbl* __fastcall DATATBLS_GetItemRatioDataTables()
 {
 	return &sgptDataTables->pItemRatioDataTables;
@@ -1687,14 +1632,8 @@ void __fastcall DATATBLS_LoadPropertiesTxt(HD2ARCHIVE hArchive)
 	sgptDataTables->pPropertiesTxt = (D2PropertiesTxt*)DATATBLS_CompileTxt(hArchive, "properties", pTbl, &sgptDataTables->nPropertiesTxtRecordCount, sizeof(D2PropertiesTxt));
 }
 
-//D2Common.0x6FD5D5E0
-void __fastcall DATATBLS_UnloadPropertiesTxt()
-{
-	DATATBLS_UnloadBin(sgptDataTables->pPropertiesTxt);
-	FOG_FreeLinker(sgptDataTables->pPropertiesLinker);
-}
-
 //D2Common.0x6FD5D600
+// 1.13c D2Common+0x72C50: compared line by line, no delta (the CRT qsort order is the d2web_msvc_qsort call)
 void __fastcall DATATBLS_LoadGambleTxt(HD2ARCHIVE hArchive)
 {
 	int nCounter = 0;
@@ -1770,24 +1709,15 @@ int __cdecl DATATBLS_CompareGambleTxtRecords(const void* pRecord1, const void* p
 	return -(int)(nLevel1 < nLevel2);
 }
 
-//D2Common.0x6FD5D7B0
-void __fastcall DATATBLS_UnloadGambleTxt()
-{
-	if (sgptDataTables->pGambleDataTables.pGambleSelection)
-	{
-		D2_FREE_POOL(nullptr, sgptDataTables->pGambleDataTables.pGambleSelection);
-		sgptDataTables->pGambleDataTables.pGambleSelection = NULL;
-		sgptDataTables->pGambleDataTables.nGambleTxtRecordCount = 0;
-	}
-}
-
 //D2Common.0x6FD5D7F0 (#10671)
+// 1.13c D2Common+0x71280: retail returns the address of the gamble table global; this returns the same block
 D2GambleDataTbl* __fastcall DATATBLS_GetGambleDataTables()
 {
 	return &sgptDataTables->pGambleDataTables;
 }
 
 //D2Common.0x6FD5D800
+// 1.13c D2Common+0x711E0: same walk with a 1-based stack; no trace on an invalid type (1.10f logged it)
 BOOL __fastcall DATATBLS_CheckItemTypesEquivalenceNested(int nItemType1, int nItemType2)
 {
 	int nParentItemTypes[129] = {};
@@ -1814,7 +1744,6 @@ BOOL __fastcall DATATBLS_CheckItemTypesEquivalenceNested(int nItemType1, int nIt
 
 			if (nItemType >= sgptDataTables->nItemTypesTxtRecordCount)
 			{
-				FOG_Trace("Invalid item type at line %d of file %s", __LINE__, __FILE__);
 				return FALSE;
 			}
 
@@ -1922,14 +1851,6 @@ void __fastcall DATATBLS_LoadItemTypesTxt(HD2ARCHIVE hArchive)
 	}
 }
 
-//D2Common.0x6FD5DFE0
-void __fastcall DATATBLS_UnloadItemTypesTxt()
-{
-	D2_FREE_POOL(nullptr, sgptDataTables->pItemTypesEquivalenceLUTs);
-	DATATBLS_UnloadBin(sgptDataTables->pItemTypesTxt);
-	FOG_FreeLinker(sgptDataTables->pItemTypesLinker);
-}
-
 //D2Common.0x6FD5E020
 // 1.13c D2Common+0x71C20
 void __fastcall DATATBLS_LoadRunesTxt(HD2ARCHIVE hArchive)
@@ -2020,14 +1941,8 @@ void __fastcall DATATBLS_LoadRunesTxt(HD2ARCHIVE hArchive)
 	}
 }
 
-//D2Common.0x6FD5E9C0
-void __fastcall DATATBLS_UnloadRunesTxt()
-{
-	DATATBLS_UnloadBin(sgptDataTables->pRuneDataTables.pRunesTxt);
-	FOG_FreeLinker(sgptDataTables->pRunesLinker);
-}
-
 //D2Common.0x6FD5E9E0 (#10619)
+// 1.13c D2Common+0x710A0: retail returns the address of the rune table global; this returns the same block
 D2RuneDataTbl* __fastcall DATATBLS_GetRuneDataTables()
 {
 	return &sgptDataTables->pRuneDataTables;

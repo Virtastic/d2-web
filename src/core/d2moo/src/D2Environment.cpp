@@ -52,10 +52,7 @@ const int gnTimeRates[4] =
 // not-1.13c: retail selects the cycle table inline in each environment update (D2Common+0x371C0, 0x376F0)
 static const D2EnvironmentCycleStrc* ENVIRONMENT_GetCycle(int nCycle, int nAct, bool bEclipse)
 {
-	// Lectem's note: Checks are inconsitents between functions
-	// In most, the act check has priority, but sometimes the eclipse one has it.
-	// Eclipse seems to be only be triggered by the tainted sun quest, make sure it's the case.
-	D2_ASSERT(!(bEclipse && nAct == ACT_IV));
+	// retail has no assert here: the act IV table wins over the eclipse flag
 	if (nAct == ACT_IV)
 	{
 		return &gAct4EnvironmentCycle[nCycle];
@@ -71,6 +68,7 @@ static const D2EnvironmentCycleStrc* ENVIRONMENT_GetCycle(int nCycle, int nAct, 
 }
 
 
+// 1.13c D2Common+0x37BA0
 //D2Common.0x6FD8D8E0
 D2DrlgEnvironmentStrc* __fastcall ENVIRONMENT_AllocDrlgEnvironment(void* pMemPool)
 {
@@ -94,6 +92,7 @@ D2DrlgEnvironmentStrc* __fastcall ENVIRONMENT_AllocDrlgEnvironment(void* pMemPoo
 	return pEnvironment;
 }
 
+// 1.13c D2Common+0x376F0
 //D2Common.0x6FD8D970
 void __fastcall ENVIRONMENT_UpdateLightIntensity(D2DrlgEnvironmentStrc* pEnvironment, int nLevelId, int nAct)
 {
@@ -196,6 +195,7 @@ static uint8_t LerpLightColor(uint8_t nThis, uint8_t nNext, double lerpRatio)
 	return uint8_t(nThis + nDelta);
 }
 
+// 1.13c D2Common+0x371C0
 //D2Common.0x6FD8DAC0
 void __fastcall ENVIRONMENT_UpdateLightColor(D2DrlgEnvironmentStrc* pEnvironment, int nAct)
 {
@@ -297,6 +297,7 @@ void __fastcall ENVIRONMENT_UpdateTicks(D2DrlgEnvironmentStrc* pEnvironment, int
 	}
 }
 
+// 1.13c D2Common+0x37660
 //D2Common.0x6FD8DD60 (#10924)
 BOOL __stdcall ENVIRONMENT_UpdateCycleIndex(D2DrlgActStrc* pAct, int nActNo)
 {
@@ -352,6 +353,7 @@ int __stdcall ENVIRONMENT_GetIntensityFromAct(D2DrlgActStrc* pAct)
 	return 0;
 }
 
+// 1.13c D2Common+0x37470
 //D2Common.0x6FD8DE20 (#10933)
 int __stdcall ENVIRONMENT_GetPeriodOfDayFromAct(D2DrlgActStrc* pAct, int* pBaseTime)
 {
@@ -382,6 +384,7 @@ int __stdcall ENVIRONMENT_GetPeriodOfDayFromAct(D2DrlgActStrc* pAct, int* pBaseT
 	}
 }
 
+// 1.13c D2Common+0x37430
 //D2Common.0x6FD8DE70 (#10928) - UNUSED
 int __stdcall ENVIRONMENT_GetUnusedMember(D2DrlgActStrc* pAct)
 {
@@ -394,6 +397,7 @@ int __stdcall ENVIRONMENT_GetUnusedMember(D2DrlgActStrc* pAct)
 	return 0;
 }
 
+// 1.13c D2Common+0x37A20
 //D2Common.0x6FD8DE90 (#10929) - UNUSED
 void __stdcall ENVIRONMENT_NextEnvCycle(D2DrlgActStrc* pAct, D2ActiveRoomStrc* pRoom)
 {
@@ -429,12 +433,14 @@ void __stdcall ENVIRONMENT_NextEnvCycle(D2DrlgActStrc* pAct, D2ActiveRoomStrc* p
 	}
 }
 
+// 1.13c D2Common+0x37400
 //D2Common.0x6FD8DF30 (#10930)
 int __stdcall ENVIRONMENT_GetCycleIndexFromAct(D2DrlgActStrc* pAct)
 {
 	return DUNGEON_GetEnvironmentFromAct(pAct)->nCycleIndex;
 }
 
+// 1.13c D2Common+0x37920
 //D2Common.0x6FD8DF40 (#10932)
 void __stdcall ENVIRONMENT_InitializeEnvironment(D2DrlgActStrc* pAct, D2ActiveRoomStrc* pRoom, int nIndex, int nTicks, BOOL bEclipse)
 {
@@ -469,8 +475,6 @@ void __stdcall ENVIRONMENT_InitializeEnvironment(D2DrlgActStrc* pAct, D2ActiveRo
 
 	ENVIRONMENT_UpdateLightIntensity(pEnvironment, nLevelId, nAct);
 
-	// See ENVIRONMENT_GetCycle
-	D2_ASSERT(!(bEclipse && nAct == ACT_IV));
 	pEnvironment->bEclipse = bEclipse;
 
 	if (bEclipse)
@@ -501,6 +505,7 @@ void __stdcall ENVIRONMENT_GetCycleIndex_Ticks_EclipseFromAct(D2DrlgActStrc* pAc
 	*pEclipse = pEnvironment->bEclipse;
 }
 
+// 1.13c D2Common+0x37350
 //D2Common.0x6FD8E0B0 (#10925) - UNUSED
 void __stdcall ENVIRONMENT_GetStatistics(D2DrlgActStrc* pAct, float* pCos, float* pLast, float* pSin, int* a5)
 {
@@ -513,6 +518,7 @@ void __stdcall ENVIRONMENT_GetStatistics(D2DrlgActStrc* pAct, float* pCos, float
 	*a5 = 0;
 }
 
+// 1.13c D2Common+0x37320
 //D2Common.0x6FD8E0F0 (#10934) - UNUSED
 int __stdcall ENVIRONMENT_GetTimeRateFromAct(D2DrlgActStrc* pAct)
 {
@@ -521,6 +527,7 @@ int __stdcall ENVIRONMENT_GetTimeRateFromAct(D2DrlgActStrc* pAct)
 
 void ENVIRONMENT_SetNextTimeRateForLevel(D2DrlgEnvironmentStrc* pEnvironment, int nLevelId);
 
+// 1.13c D2Common+0x37840
 //D2Common.0x6FD8E100 (#10935) - UNUSED
 void __stdcall ENVIRONMENT_SetNextTimeRate(D2DrlgActStrc* pAct, D2ActiveRoomStrc* pRoom)
 {
@@ -529,6 +536,7 @@ void __stdcall ENVIRONMENT_SetNextTimeRate(D2DrlgActStrc* pAct, D2ActiveRoomStrc
 	ENVIRONMENT_SetNextTimeRateForLevel(pEnvironment, nRoomLevelId);
 }
 
+// not-1.13c: retail has no such function; it is the body of D2Common+0x37840 split out for the d2common_4d810 port, which holds the record and level id already.
 // The body of the above on an environment record and a level id: 1.13c's 0x37840 reaches the record through act+4 and the level
 // through room+0x10, +0x58, +0x1D0 rather than through the 1.10 act layout.
 void ENVIRONMENT_SetNextTimeRateForLevel(D2DrlgEnvironmentStrc* pEnvironment, int nLevelId)
@@ -565,6 +573,7 @@ void ENVIRONMENT_SetNextTimeRateForLevel(D2DrlgEnvironmentStrc* pEnvironment, in
 	}
 }
 
+// 1.13c D2Common+0x37CA0
 //D2Common.0x6FD8E1B0 (#10936)
 void __stdcall ENVIRONMENT_TaintedSunBegin(D2DrlgActStrc* pAct)
 {
@@ -573,9 +582,21 @@ void __stdcall ENVIRONMENT_TaintedSunBegin(D2DrlgActStrc* pAct)
 	pEnvironment->nTimeRateIndex = 1;
 	pEnvironment->nTimeRate = gnTimeRates[1];
 
-	ENVIRONMENT_InitializeEnvironment(pAct, NULL, ENVCYCLE_SUNRISE, 0, TRUE);
+	pEnvironment->nCycleIndex = ENVCYCLE_SUNRISE;
+	pEnvironment->nTicks = 0;
+	pEnvironment->nPeriodOfDay = gEclipseEnvironmentCycle[ENVCYCLE_SUNRISE].nPeriodOfDay;
+
+	ENVIRONMENT_UpdateLightIntensity(pEnvironment, 0, 0);
+
+	pEnvironment->bEclipse = TRUE;
+	pEnvironment->nPeriodOfDay = gEclipseEnvironmentCycle[pEnvironment->nCycleIndex].nPeriodOfDay;
+	pEnvironment->nTicks = gEclipseEnvironmentCycle[pEnvironment->nCycleIndex].nTicksBegin * pEnvironment->nTimeRate;
+
+	ENVIRONMENT_UpdateLightIntensity(pEnvironment, 0, 0);
+	ENVIRONMENT_UpdateLightColor(pEnvironment, 0);
 }
 
+// 1.13c D2Common+0x37C20
 //D2Common.0x6FD8E1E0 (#10937)
 void __stdcall ENVIRONMENT_TaintedSunEnd(D2DrlgActStrc* pAct)
 {
@@ -584,5 +605,11 @@ void __stdcall ENVIRONMENT_TaintedSunEnd(D2DrlgActStrc* pAct)
 	pEnvironment->nTimeRateIndex = 0;
 	pEnvironment->nTimeRate = gnTimeRates[0];
 
-	ENVIRONMENT_InitializeEnvironment(pAct, NULL, ENVCYCLE_NOON, 0, FALSE);
+	pEnvironment->nCycleIndex = ENVCYCLE_NOON;
+	pEnvironment->nTicks = 0;
+	pEnvironment->nPeriodOfDay = gNormalEnvironmentCycle[ENVCYCLE_NOON].nPeriodOfDay;
+
+	ENVIRONMENT_UpdateLightIntensity(pEnvironment, 0, 0);
+
+	pEnvironment->bEclipse = FALSE;
 }

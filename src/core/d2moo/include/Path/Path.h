@@ -255,11 +255,9 @@ D2COMMON_DLL_DECL BOOL __stdcall PATH_RemoveCollisionFootprintForUnit(D2UnitStrc
 //1.13c: D2Common.0x6FD86230 (#10334)
 D2COMMON_DLL_DECL int __stdcall D2Common_10142(D2DynamicPathStrc* pPath, D2UnitStrc* pUnit, int bAllowInTown);
 //D2Common.0x6FDA8E30
-int __fastcall PATH_ComputePathClassicMissile(D2DynamicPathStrc* pDynamicPath, D2UnitStrc* pUnit);
+int __fastcall PATH_ComputePathClassicMissile(D2DynamicPathStrc* pDynamicPath);
 //D2Common.0x6FDA8FE0
 void __fastcall PATH_FindValidTargetCoordsByMovingOrthogonally(D2PathInfoStrc* pPathInfo);
-//D2Common.0x6FDA90C0
-uint8_t __fastcall PATH_AdvanceToDoor(D2PathInfoStrc* pPathInfo);
 //D2Common.0x6FDA9190 (#10156)
 D2COMMON_DLL_DECL void __stdcall PATH_FreeDynamicPath(void* pMemPool, D2DynamicPathStrc* pDynamicPath);
 //D2Common.0x6FDA91B0 (#11282)
@@ -332,10 +330,6 @@ D2COMMON_DLL_DECL void __stdcall PATH_SetPrecisionY(D2DynamicPathStrc* pDynamicP
 D2COMMON_DLL_DECL int __stdcall PATH_GetClientCoordX(D2DynamicPathStrc* pDynamicPath);
 //D2Common.0x6FDC3CE0 (#10165)
 D2COMMON_DLL_DECL int __stdcall PATH_GetClientCoordY(D2DynamicPathStrc* pDynamicPath);
-//D2Common.0x6FDA9DC0
-void __fastcall PATH_SetClientCoordX(D2DynamicPathStrc* pDynamicPath, int nTargetX);
-//D2Common.0x6FDA9DD0
-void __fastcall PATH_SetClientCoordY(D2DynamicPathStrc* pDynamicPath, int nTargetY);
 //D2Common.0x6FDA9DE0 (#10175)
 D2COMMON_DLL_DECL int __stdcall D2COMMON_10175_PathGetFirstPointX(D2DynamicPathStrc* pDynamicPath);
 //D2Common.0x6FDA9DF0 (#10176)

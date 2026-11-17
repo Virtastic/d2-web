@@ -28,6 +28,7 @@ BOOL DATATBLS_LoadFromBin = TRUE;
 // BELTS
 
 //D2Common.0x6FD494D0
+// 1.13c D2Common+0x5E350
 uint16_t __fastcall DATATBLS_GetStringIdFromReferenceString(char* szReference)
 {
 	const Unicode* pUnicode = NULL;
@@ -36,10 +37,6 @@ uint16_t __fastcall DATATBLS_GetStringIdFromReferenceString(char* szReference)
 	nIndex = D2LANG_GetTblIndex(szReference, &pUnicode);
 	if (!nIndex)
 	{
-		if (*szReference)
-		{
-			FOG_Trace("Couldn't find string hash: %s", szReference);
-		}
 		nIndex = 5382;
 	}
 
@@ -153,6 +150,7 @@ uint32_t __stdcall DATATBLS_GetCurrentLevelFromExp(int nClass, uint32_t dwExperi
 }
 
 //D2Common.0x6FD49760
+// not-1.13c: retail inlines this read/write into each loader (0x787C0 and the other table loaders; 0x5E710 is the shared out-of-line copy used by 0x61EC0, 0x787C0, 0x7C8D0)
 void __fastcall DATATBLS_GetBinFileHandle(HD2ARCHIVE hArchive, const char* szFile, void** ppFileHandle, int* pSize, int* pSizeEx)
 {
 	FILE* pFile = NULL;
@@ -179,6 +177,7 @@ void __fastcall DATATBLS_GetBinFileHandle(HD2ARCHIVE hArchive, const char* szFil
 }
 
 //D2Common.0x6FD49850
+// 1.13c D2Common+0x5DD80
 int __fastcall DATATBLS_AppendMemoryBuffer(char** ppCodes, int* pSize, int* pSizeEx, void* pBuffer, int nBufferSize)
 {
 	int nNewSize = 0;
@@ -221,6 +220,7 @@ int __fastcall DATATBLS_AppendMemoryBuffer(char** ppCodes, int* pSize, int* pSiz
 // SKILLS
 
 //D2Common.0x6FD4E4B0 (#10593)
+// not-1.13c: no retail function; retail callers (e.g. 0x5E4D0) read the charstats pointer at sgptDataTables+0xbc4 directly
 D2CharStatsTxt* __fastcall DATATBLS_GetCharstatsTxtTable()
 {
 	return sgptDataTables->pCharStatsTxt;
@@ -491,23 +491,27 @@ void __fastcall DATATBLS_LoadPetTypeTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD4F990 (#11298)
+// 1.13c D2Common+0x5F260
 char* __stdcall DATATBLS_GetUnitNameFromUnit(D2UnitStrc* pUnit, char* szName)
 {
 	*szName = 0;
 
 	if (pUnit)
 	{
+		if ((uint32_t)pUnit->dwUnitType > UNIT_ITEM)
+		{
+			strcpy(szName, "Invalid Unit");
+			return szName;
+		}
 		return DATATBLS_GetUnitNameFromUnitTypeAndClassId(pUnit->dwUnitType, pUnit->dwClassId, szName);
 	}
-	else
-	{
-		printf(szName, "NULL Unit");
-	}
 
+	strcpy(szName, "NULL Unit");
 	return szName;
 }
 
 //D2Common.0x6FD4FB50 (#11299)
+// 1.13c D2Common+0x5F1C0
 char* __stdcall DATATBLS_GetUnitNameFromUnitTypeAndClassId(int nUnitType, int nClassId, char* szName)
 {
 	D2CharStatsTxt* pCharStatsTxtRecord = NULL;
@@ -579,7 +583,7 @@ char* __stdcall DATATBLS_GetUnitNameFromUnitTypeAndClassId(int nUnitType, int nC
 		break;
 
 	default:
-		sprintf_s(szName, 64, "Invalid Unit");
+		strcpy(szName, "Invalid Unit Type");
 		break;
 	}
 
@@ -733,6 +737,7 @@ void __stdcall DATATBLS_UnloadBin(void* pBinFile)
 }
 
 //D2Common.0x6FD50150 (#10575)
+// 1.13c D2Common+0x5E870
 void __stdcall DATATBLS_UnloadAllBins()
 {
 	DATATBLS_UnloadBin(sgptDataTables->pCompCodeTxt);
@@ -783,18 +788,49 @@ void __stdcall DATATBLS_UnloadAllBins()
 	FOG_FreeLinker(sgptDataTables->pPetTypeLinker);
 
 	DATATBLS_UnloadItemsTxt();
-	DATATBLS_UnloadPropertiesTxt();
-	DATATBLS_UnloadMagicSuffix_Prefix_AutomagicTxt();
-	DATATBLS_UnloadRareSuffix_PrefixTxt();
-	DATATBLS_UnloadUniqueItemsTxt();
-	DATATBLS_UnloadSets_SetItemsTxt();
-	DATATBLS_UnloadQualityItemsTxt();
-	DATATBLS_UnloadLowQualityItemsTxt();
-	DATATBLS_UnloadGemsTxt();
-	DATATBLS_UnloadBooksTxt();
-	DATATBLS_UnloadItemRatioTxt();
-	DATATBLS_UnloadGambleTxt();
-	DATATBLS_UnloadItemTypesTxt();
+	// The item-table unloaders below are inlined in retail (D2Common+0x5E870), not separate functions.
+	DATATBLS_UnloadBin(sgptDataTables->pPropertiesTxt);
+	FOG_FreeLinker(sgptDataTables->pPropertiesLinker);
+
+	if (sgptDataTables->pMagicAffixDataTables.pMagicAffixTxt)
+	{
+		D2_FREE_POOL(nullptr, sgptDataTables->pMagicAffixDataTables.pMagicAffixTxt);
+	}
+	sgptDataTables->pMagicAffixDataTables.pMagicAffixTxt = NULL;
+
+	if (sgptDataTables->pRareAffixDataTables.pRareAffixTxt)
+	{
+		D2_FREE_POOL(nullptr, sgptDataTables->pRareAffixDataTables.pRareAffixTxt);
+	}
+	sgptDataTables->pRareAffixDataTables.pRareAffixTxt = NULL;
+
+	FOG_FreeLinker(sgptDataTables->pUniqueItemsLinker);
+	DATATBLS_UnloadBin(sgptDataTables->pUniqueItemsTxt);
+	sgptDataTables->nUniqueItemsTxtRecordCount = 0;
+
+	FOG_FreeLinker(sgptDataTables->pSetsLinker);
+	FOG_FreeLinker(sgptDataTables->pSetItemsLinker);
+	DATATBLS_UnloadBin(sgptDataTables->pSetItemsTxt);
+	DATATBLS_UnloadBin(sgptDataTables->pSetsTxt);
+	sgptDataTables->nSetsTxtRecordCount = 0;
+	sgptDataTables->nSetItemsTxtRecordCount = 0;
+
+	DATATBLS_UnloadBin(sgptDataTables->pQualityItemDataTables.pQualityItemsTxt);
+	DATATBLS_UnloadBin(sgptDataTables->pLowQualityItemDataTables.pLowQualityItemsTxt);
+	DATATBLS_UnloadBin(sgptDataTables->pGemDataTables.pGemsTxt);
+	DATATBLS_UnloadBin(sgptDataTables->pBookDataTables.pBooksTxt);
+	DATATBLS_UnloadBin(sgptDataTables->pItemRatioDataTables.pItemRatioTxt);
+
+	if (sgptDataTables->pGambleDataTables.pGambleSelection)
+	{
+		D2_FREE_POOL(nullptr, sgptDataTables->pGambleDataTables.pGambleSelection);
+		sgptDataTables->pGambleDataTables.pGambleSelection = NULL;
+		sgptDataTables->pGambleDataTables.nGambleTxtRecordCount = 0;
+	}
+
+	D2_FREE_POOL(nullptr, sgptDataTables->pItemTypesEquivalenceLUTs);
+	DATATBLS_UnloadBin(sgptDataTables->pItemTypesTxt);
+	FOG_FreeLinker(sgptDataTables->pItemTypesLinker);
 	DATATBLS_UnloadMonTypeTxt();
 	DATATBLS_UnloadPlrMode_Type_MonMode_ObjMode_Type_Composit_ArmtypeTxt();
 	DATATBLS_UnloadBin(sgptDataTables->pExperienceTxt);
@@ -813,7 +849,8 @@ void __stdcall DATATBLS_UnloadAllBins()
 	DATATBLS_UnloadObjGroupTxt();
 	DATATBLS_UnloadShrinesTxt();
 	DATATBLS_UnloadInventoryTxt();
-	DATATBLS_UnloadRunesTxt();
+	DATATBLS_UnloadBin(sgptDataTables->pRuneDataTables.pRunesTxt);
+	FOG_FreeLinker(sgptDataTables->pRunesLinker);
 	if (sgptDataTables->pFieldData)
 	{
 		D2_FREE_POOL(nullptr, sgptDataTables->pFieldData);

@@ -355,6 +355,7 @@ BOOL __fastcall D2Common_11081(int nLowSeed, D2HirelingInitStrc* pHirelingInit, 
 }
 
 //D2Common.0x6FDA51A0 (#11085)
+// 1.13c D2Common+0x2C9C0: id in [0, 9) with a nonzero string entry; otherwise NULL
 const Unicode* __fastcall MONSTERS_GetHirelingDescString(int nId)
 {
 	//D2Common.0x6FDD16E0
@@ -402,17 +403,12 @@ int __stdcall MONSTERS_GetHirelingExpForNextLevel(int nLevel, int nExpPerLevel)
 }
 
 //D2Common.0x6FDA5220 (#11083)
+// 1.13c D2Common+0x2CC60: the level comes from the extended stat list and the cost is ((level*level)/2)*15, capped;
+// the port's 1.10f body (15*L*L/2 on the base stat list) differed for odd levels, so this now calls the 1.13c port
+extern "C" uint32_t D2Common_2CC60_HirelingReviveCost(D2UnitStrc* unit);
 int __stdcall MONSTERS_GetHirelingResurrectionCost(D2UnitStrc* pHireling)
 {
-	int nLevel = STATLIST_UnitGetStatValue(pHireling, STAT_LEVEL, 0);
-	int nCost = 15 * nLevel * nLevel / 2;
-
-	if (nCost > 50000)
-	{
-		nCost = 50000;
-	}
-
-	return nCost;
+	return static_cast<int>(D2Common_2CC60_HirelingReviveCost(pHireling));
 }
 
 //D2Common.0x6FDA5270 (#11068)
@@ -895,6 +891,7 @@ BOOL __stdcall MONSTERS_IsDead(D2UnitStrc* pMonster)
 }
 
 //D2Common.0x6FDA5930 (#11280)
+// 1.13c D2Common+0x1A3D0
 int __stdcall MONSTERS_GetSpawnMode_XY(D2UnitStrc* pMonster, BOOL bFromMonster, int nSkillId, int nSkillLevel, int* pSpawnMode, int* pX, int* pY)
 {
 	D2_MAYBE_UNUSED(nSkillLevel);

@@ -185,6 +185,7 @@ void __fastcall sub_6FDA8220(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDA82A0 (#10141)
+// 1.13c D2Common+0x35B00: the game-to-client transform is inlined (x' = (x - y) >> 1, y' = (y + x) >> 2).
 void __stdcall PATH_GetClientCoordsVelocity(D2UnitStrc* pUnit, int* pX, int* pY)
 {
 	if (pUnit && UNITS_IsInMovingMode(pUnit) && pUnit->pDynamicPath->dwPathPoints)
@@ -192,8 +193,11 @@ void __stdcall PATH_GetClientCoordsVelocity(D2UnitStrc* pUnit, int* pX, int* pY)
 		*pX = pUnit->pDynamicPath->tVelocityVector.nX;
 		*pY = pUnit->pDynamicPath->tVelocityVector.nY;
 		*pX >>= 11;
-		*pY >>= 11;
-		DUNGEON_GameToClientCoords(pX, pY);
+		const int nY = *pY >> 11;
+		*pY = nY;
+		const int nX = *pX;
+		*pX = (nX - nY) >> 1;
+		*pY = (nY + nX) >> 2;
 	}
 	else
 	{
@@ -242,6 +246,8 @@ static_assert(offsetof(D2CoordStrc, nX) == 0 && offsetof(D2CoordStrc, nY) == 0x0
 static_assert(offsetof(D2ObjectDataStrc, pObjectTxt) == 0x00);
 static_assert(offsetof(D2ObjectsTxt, nHasCollision) == 0x120);
 
+// 1.13c D2Common+0x35800 (#10775): player/monster spare the dead and death modes unless forced; an object
+// without collision is spared unless forced; any other unit is always cleared.
 BOOL __stdcall PATH_RemoveCollisionFootprintForUnit(D2UnitStrc* pUnit, BOOL bForce)
 {
 	D2CoordStrc pCoords = {};
@@ -283,6 +289,7 @@ BOOL __stdcall PATH_RemoveCollisionFootprintForUnit(D2UnitStrc* pUnit, BOOL bFor
 // the target (and its level), a level rectangle holds the target (its level), frame]. Read by
 // d2_path_refusals(); it never changes the answer (FALSE: the path is refused, as retail's is).
 int32_t g_d2webPathRefusals[64][12]; uint32_t g_d2webPathRefusalCount = 0;
+// not-1.13c: d2-web diagnostic recorder with no retail counterpart (0x36230 tests the target room and fails with no call)
 static BOOL D2WEB_PATH_LogRefusal(D2UnitStrc* pUnit, D2PathInfoStrc* pInfo)
 {
 	int32_t* r = g_d2webPathRefusals[g_d2webPathRefusalCount++ & 63];
@@ -337,13 +344,13 @@ BOOL __fastcall PATH_IsTargetDestinationAllowed(D2PathInfoStrc* pPathInfo, D2Uni
 
 // Author: Araksson
 //1.10f: Inlined
-//1.13C: D2Common.0x6FD85780
+// 1.13c D2Common+0x35780: any type other than missile / charged bolt / blessed hammer is a fatal assert.
 static int PATH_MissileToTarget(D2DynamicPathStrc* pPath, D2UnitStrc* pUnit)
 {
 	switch (pPath->dwPathType)
 	{
 	case PATHTYPE_MISSILE:
-		if (!PATH_ComputePathClassicMissile(pPath, pUnit))
+		if (!PATH_ComputePathClassicMissile(pPath))
 		{
 			pPath->dwFlags &= ~PATH_UNKNOWN_FLAG_0x00020;
 			return 0;
@@ -352,13 +359,10 @@ static int PATH_MissileToTarget(D2DynamicPathStrc* pPath, D2UnitStrc* pUnit)
 	case PATHTYPE_CHARGEDBOLT:
 		PATH_ComputePathChargedBolt_6FDAB4A0(pPath, &pUnit->pSeed);
 		break;
-	case PATHTYPE_BLESSEDHAMMER:
+	default:
+		D2_ASSERT(pPath->dwPathType == PATHTYPE_BLESSEDHAMMER);
 		PATH_ComputePathBlessedHammer_6FDAB3C0(pPath);
 		break;
-	default:
-		FOG_DisplayWarning("Not a missile path!", __FILE__, __LINE__);
-		pPath->dwFlags &= ~PATH_UNKNOWN_FLAG_0x00020;
-		return 0;
 	}
 
 	pPath->dwFlags |= PATH_UNKNOWN_FLAG_0x00020;
@@ -393,7 +397,19 @@ uint8_t PATH_UpdateTargetUnit(D2PathInfoStrc* pPathInfo)
 			{
 				return 2;
 			}
-			return PATH_AdvanceToDoor(pPathInfo);
+			// 1.13c inlines the door step here: shift the target 2 tiles past the door along its axis.
+			D2_ASSERT(UNITS_IsDoor(pPathTargetUnit));
+			if (!UNITS_CheckIfObjectOrientationIs1(pPathTargetUnit))
+			{
+				if (pPath->tGameCoords.wPosX >= UNITS_GetXPosition(pPathTargetUnit)) pPath->tTargetCoord.X += 2;
+				else pPath->tTargetCoord.X -= 2;
+			}
+			else
+			{
+				if (pPath->tGameCoords.wPosY >= UNITS_GetYPosition(pPathTargetUnit)) pPath->tTargetCoord.Y += 2;
+				else pPath->tTargetCoord.Y -= 2;
+			}
+			return 2;
 		case UNIT_ITEM:
 			return 2;
 		default:
@@ -545,19 +561,10 @@ int __stdcall D2Common_10142(D2DynamicPathStrc* pPath, D2UnitStrc* pUnit, int bA
 }
 
 //D2Common.0x6FDA8E30
-int __fastcall PATH_ComputePathClassicMissile(D2DynamicPathStrc* pDynamicPath, D2UnitStrc* pUnit)
+// 1.13c D2Common+0x35530: a target 100+ tiles away on either axis is refused (returns 0), not asserted.
+int __fastcall PATH_ComputePathClassicMissile(D2DynamicPathStrc* pDynamicPath)
 {
-	int nXDistance = 0;
-	int nYDistance = 0;
-	int nOldX = 0;
-	int nOldY = 0;
-	char szText[256] = {};
-	D2_MAYBE_UNUSED(szText);
-
 	D2CoordStrc pCoords = {};
-
-	nOldX = pDynamicPath->tGameCoords.wPosX;
-	nOldY = pDynamicPath->tGameCoords.wPosY;
 
 	pDynamicPath->dwCurrentPointIdx = 0;
 
@@ -569,21 +576,25 @@ int __fastcall PATH_ComputePathClassicMissile(D2DynamicPathStrc* pDynamicPath, D
 		pDynamicPath->tTargetCoord.Y = pCoords.nY;
 	}
 
-	nXDistance = nOldX - pDynamicPath->tTargetCoord.X;
+	int nXDistance = (int)pDynamicPath->tGameCoords.wPosX - (int)pDynamicPath->tTargetCoord.X;
 	if (nXDistance < 0)
 	{
 		nXDistance = -nXDistance;
 	}
+	if (nXDistance > 99)
+	{
+		return 0;
+	}
 
-	D2_ASSERTM(nXDistance < 100, FOG_csprintf(szText, "Missile Firing too far : %d", pUnit ? pUnit->dwClassId : -1));
-
-	nYDistance = nOldY - pDynamicPath->tTargetCoord.Y;
+	int nYDistance = (int)pDynamicPath->tGameCoords.wPosY - (int)pDynamicPath->tTargetCoord.Y;
 	if (nYDistance < 0)
 	{
 		nYDistance = -nYDistance;
 	}
-
-	D2_ASSERTM(nYDistance < 100, FOG_csprintf(szText, "Missile Firing too far : %d", pUnit ? pUnit->dwClassId : -1));
+	if (nYDistance > 99)
+	{
+		return 0;
+	}
 
 	if (pDynamicPath->tTargetCoord.X && pDynamicPath->tTargetCoord.Y)
 	{
@@ -639,39 +650,6 @@ void __fastcall PATH_FindValidTargetCoordsByMovingOrthogonally(D2PathInfoStrc* p
 			pPathInfo->tTargetCoord.Y = tCoords.Y;
 		}
 	}
-}
-
-//D2Common.0x6FDA90C0
-uint8_t __fastcall PATH_AdvanceToDoor(D2PathInfoStrc* pPathInfo)
-{
-	D2UnitStrc* pTargetUnit = pPathInfo->pDynamicPath->pTargetUnit;
-
-	D2_ASSERT(UNITS_IsDoor(pTargetUnit));
-
-	if (!UNITS_CheckIfObjectOrientationIs1(pTargetUnit))
-	{
-		if (pPathInfo->pDynamicPath->tGameCoords.wPosX >= UNITS_GetXPosition(pTargetUnit))
-		{
-			pPathInfo->pDynamicPath->tTargetCoord.X += 2;
-		}
-		else
-		{
-			pPathInfo->pDynamicPath->tTargetCoord.X -= 2;
-		}
-	}
-	else
-	{
-		if (pPathInfo->pDynamicPath->tGameCoords.wPosY >= UNITS_GetYPosition(pTargetUnit))
-		{
-			pPathInfo->pDynamicPath->tTargetCoord.Y += 2;
-		}
-		else
-		{
-			pPathInfo->pDynamicPath->tTargetCoord.Y -= 2;
-		}
-	}
-
-	return 2;
 }
 
 //D2Common.0x6FDA9190 (#10156)
@@ -919,19 +897,22 @@ void __stdcall D2COMMON_10193_PATH_AdjustDirection(D2DynamicPathStrc* pDynamicPa
 
 //D2Common.0x6FDA97C0 (#10216)
 //TODO: Find a name
+// 1.13c D2Common+0x352F0 (#10739): calls the direction-vector routine directly toward the tile centre.
 void __stdcall D2Common_10216(D2DynamicPathStrc* pDynamicPath, int nX, int nY, int a4)
 {
 	if (pDynamicPath)
 	{
-		const uint8_t nNormalizedDirection = PATH_NormalizeDirection(PATH_ComputeDirectionFromPreciseCoords_6FDAC760(pDynamicPath->tGameCoords.dwPrecisionX, pDynamicPath->tGameCoords.dwPrecisionY, PATH_ToFP16Center(nX), PATH_ToFP16Center(nY)));
+		D2CoordStrc tVector = {};
+		int nDirection = 0;
+		PATH_GetDirectionVector(&tVector, &nDirection, pDynamicPath->tGameCoords.dwPrecisionX, pDynamicPath->tGameCoords.dwPrecisionY, nX * 0x10000 + 0x8000, nY * 0x10000 + 0x8000);
 		if (a4)
 		{
-			pDynamicPath->nNewDirection = nNormalizedDirection;
-			pDynamicPath->nDirection = nNormalizedDirection;
+			pDynamicPath->nDirection = (uint8_t)(nDirection & 0x3F);
+			pDynamicPath->nNewDirection = (uint8_t)(nDirection & 0x3F);
 		}
 		else
 		{
-			sub_6FDA9720(pDynamicPath, nNormalizedDirection);
+			sub_6FDA9720(pDynamicPath, (uint8_t)nDirection);
 		}
 	}
 }
@@ -1037,24 +1018,28 @@ int __stdcall PATH_GetVelocity(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDA9AC0 (#10148)
+// 1.13c D2Common+0x34D10
 void __stdcall PATH_SetMaxVelocity(D2DynamicPathStrc* pDynamicPath, int nMaxVelocity)
 {
 	pDynamicPath->dwMaxVelocity = nMaxVelocity;
 }
 
 //D2Common.0x6FDA9AE0 (#10149)
+// 1.13c D2Common+0x34D00
 int __stdcall PATH_GetMaxVelocity(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->dwMaxVelocity;
 }
 
 //D2Common.0x6FDA9AF0 (#10150)
+// 1.13c D2Common+0x34CE0
 void __stdcall PATH_SetAcceleration(D2DynamicPathStrc* pDynamicPath, int nAcceleration)
 {
 	pDynamicPath->dwAcceleration = nAcceleration;
 }
 
 //D2Common.0x6FDA9B10 (#10151)
+// 1.13c D2Common+0x34CD0
 int __stdcall PATH_GetAcceleration(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->dwAcceleration;
@@ -1062,10 +1047,11 @@ int __stdcall PATH_GetAcceleration(D2DynamicPathStrc* pDynamicPath)
 
 //D2Common.0x6FDA9B20 (#10153)
 //TODO: Find a name
+// 1.13c D2Common+0x34CB0
 void __stdcall D2Common_10153(D2DynamicPathStrc* pDynamicPath)
 {
-	pDynamicPath->dwPathPoints = 0;
 	pDynamicPath->dwFlags &= (~PATH_UNKNOWN_FLAG_0x00020);
+	pDynamicPath->dwPathPoints = 0;
 }
 
 //D2Common.0x6FDA9B40 (#10208)
@@ -1114,6 +1100,7 @@ void __stdcall PATH_SetNumberOfPathPoints(D2DynamicPathStrc* pDynamicPath, int a
 
 //D2Common.0x6FDA9BC0 (#10155)
 //TODO: Find a name
+// 1.13c D2Common+0x34C50
 int __stdcall D2Common_10155(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->dwCurrentPointIdx;
@@ -1140,6 +1127,7 @@ uint8_t __stdcall PATH_GetDirection(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDA9C10 (#10159)
+// 1.13c D2Common+0x34C00
 uint8_t __stdcall PATH_GetNewDirection(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->nNewDirection;
@@ -1203,39 +1191,31 @@ int __stdcall PATH_GetPrecisionY(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDA9D90 (#10196)
+// 1.13c D2Common+0x34B10
 void __stdcall PATH_SetPrecisionX(D2DynamicPathStrc* pDynamicPath, int nPrecisionX)
 {
 	pDynamicPath->tGameCoords.dwPrecisionX = nPrecisionX;
 }
 
 //D2Common.0x6FDA9DA0 (#10197)
+// 1.13c D2Common+0x34B00
 void __stdcall PATH_SetPrecisionY(D2DynamicPathStrc* pDynamicPath, int nPrecisionY)
 {
 	pDynamicPath->tGameCoords.dwPrecisionY = nPrecisionY;
 }
 
 //D2Common.0x6FDA9DB0 (#10164)
+// 1.13c D2Common+0x34AF0
 int __stdcall PATH_GetClientCoordX(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->dwClientCoordX;
 }
 
 //D2Common.0x6FDC3CE0 (#10165)
+// 1.13c D2Common+0x34AE0
 int __stdcall PATH_GetClientCoordY(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->dwClientCoordY;
-}
-
-//D2Common.0x6FDA9DC0
-void __fastcall PATH_SetClientCoordX(D2DynamicPathStrc* pDynamicPath, int nTargetX)
-{
-	pDynamicPath->dwClientCoordX = nTargetX;
-}
-
-//D2Common.0x6FDA9DD0
-void __fastcall PATH_SetClientCoordY(D2DynamicPathStrc* pDynamicPath, int nTargetY)
-{
-	pDynamicPath->dwClientCoordY = nTargetY;
 }
 
 //D2Common.0x6FDA9DE0 (#10175)
@@ -1256,6 +1236,7 @@ int __stdcall D2COMMON_10176_PathGetFirstPointY(D2DynamicPathStrc* pDynamicPath)
 
 //D2Common.0x6FDA9E00 (#10224)
 //TODO: Find a name
+// 1.13c D2Common+0x34A90
 int __stdcall D2Common_10224(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->tFinalTargetCoord.X;
@@ -1263,6 +1244,7 @@ int __stdcall D2Common_10224(D2DynamicPathStrc* pDynamicPath)
 
 //D2Common.0x6FDA9E10 (#10225)
 //TODO: Find a name
+// 1.13c D2Common+0x34A80
 int __stdcall D2Common_10225(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->tFinalTargetCoord.Y;
@@ -1314,6 +1296,7 @@ D2ActiveRoomStrc* __stdcall PATH_GetNextRoom(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDA9E80 (#10169)
+// 1.13c D2Common+0x34A00
 void __stdcall PATH_ClearNextRoom(D2DynamicPathStrc* pDynamicPath)
 {
 	pDynamicPath->pPreviousRoom = NULL;
@@ -1370,6 +1353,7 @@ void __stdcall PATH_SetUnusedFlag_0x00004(D2DynamicPathStrc* pDynamicPath, BOOL 
 }
 
 //D2Common.0x6FDA9F30 (#10174)
+// 1.13c D2Common+0x34950
 BOOL __stdcall PATH_GetUnusedFlag_0x00004(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->dwFlags & PATH_UNUSED_FLAG_0x00004;
@@ -1389,6 +1373,7 @@ void __stdcall PATH_SetTargetUnit(D2DynamicPathStrc* pDynamicPath, D2UnitStrc* p
 }
 
 //D2Common.0x6FDA9F60 (#10171)
+// 1.13c D2Common+0x34910
 void __stdcall PATH_GetTargetTypeAndGUID(D2DynamicPathStrc* pDynamicPath, int* pTargetType, D2UnitGUID* pTargetGUID)
 {
 	D2_ASSERT(pDynamicPath->pTargetUnit);
@@ -1454,12 +1439,14 @@ void __stdcall PATH_SetFootprintCollisionMask(D2DynamicPathStrc* pDynamicPath, i
 }
 
 //D2Common.0x6FDAA0C0 (#10183)
+// 1.13c D2Common+0x348C0
 int __stdcall PATH_GetMoveTestCollisionMask(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->nMoveTestCollisionMask;
 }
 
 //D2Common.0x6FDAA0D0 (#10184)
+// 1.13c D2Common+0x348B0
 void __stdcall PATH_SetMoveTestCollisionMask(D2DynamicPathStrc* pDynamicPath, int nCollisionMask)
 {
 	pDynamicPath->nMoveTestCollisionMask = nCollisionMask;
@@ -1524,6 +1511,7 @@ int __stdcall PATH_GetType(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDAA250 (#10190)
+// 1.13c D2Common+0x34880
 // TODO: rename
 void __stdcall D2COMMON_10190_PATH_SetDistance(D2DynamicPathStrc* pDynamicPath, uint8_t nDistance)
 {
@@ -1562,6 +1550,7 @@ uint8_t __stdcall PATH_GetMaxDistance(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDAA2C0 (#10201)
+// 1.13c D2Common+0x35BA0
 //TODO: Find a name
 uint16_t __stdcall D2Common_10201(D2DynamicPathStrc* pDynamicPath)
 {
@@ -1574,6 +1563,7 @@ uint16_t __stdcall D2Common_10201(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDAA300 (#10202)
+// 1.13c D2Common+0x34850
 //TODO: Find a name
 uint16_t __stdcall D2Common_10202(D2DynamicPathStrc* pDynamicPath)
 {
@@ -1601,6 +1591,7 @@ int __stdcall D2COMMON_10198_PathGetSaveStep(D2DynamicPathStrc* pDynamicPath, D2
 }
 
 //D2Common.0x6FDAA390 (#10199)
+// 1.13c D2Common+0x34770
 //TODO: Check name
 int __stdcall D2COMMON_10199_PathGetSaveX(D2DynamicPathStrc* pDynamicPath)
 {
@@ -1615,6 +1606,7 @@ int __stdcall D2COMMON_10199_PathGetSaveX(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDAA3E0 (#10200)
+// 1.13c D2Common+0x34720
 //TODO: Check name
 int __stdcall D2COMMON_10200_PathGetSaveY(D2DynamicPathStrc* pDynamicPath)
 {
@@ -1698,6 +1690,7 @@ void __stdcall PATH_SetDistance(D2DynamicPathStrc* pDynamicPath, int nDist)
 }
 
 //D2Common.0x6FDAA520 (#10218)
+// 1.13c D2Common+0x34620
 int __stdcall PATH_GetDistance(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->nDistance;

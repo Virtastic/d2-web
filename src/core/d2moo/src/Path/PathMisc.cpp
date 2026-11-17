@@ -146,6 +146,7 @@ const D2CoordStrc gatDirectionToOffset[8] = {
 };
 
 //D2Common.0x6FDAA720
+// 1.13c D2Common+0x674C0
 int __fastcall sub_6FDAA720(D2PathInfoStrc* pPathInfo)
 {
 	D2DynamicPathStrc* pDynamicPath = pPathInfo->pDynamicPath;
@@ -223,44 +224,6 @@ BOOL __fastcall sub_6FDAA880(D2PathInfoStrc* pPathInfo, int* pTestDir, D2PathPoi
 	{
 		*pDirection = pTestDir[2];
 		return TRUE;
-	}
-
-	return FALSE;
-}
-
-// Very similar to D2Common.0x6FDAA880, except it doesn't assert on pTestDir[2] != PATH_DIR_NULL, simply checks it.
-// It also accumulates positions.
-BOOL __fastcall PATH_CheckTestDirForCollisions(const D2PathInfoStrc* pPathInfo, const int* pTestDir, D2PathPointStrc* pPoints, int* pFreeOfCollisionDirIndex)
-{
-	D2UnitStrc* pUnit = pPathInfo->pDynamicPath->pUnit;
-
-	D2_ASSERT(pUnit->dwUnitType == UNIT_PLAYER || pUnit->dwUnitType == UNIT_MONSTER);
-
-	pPoints[0].X += gatDirectionToOffset[pTestDir[0]].nX;
-	pPoints[0].Y += gatDirectionToOffset[pTestDir[0]].nY;
-	if (!COLLISION_CheckAnyCollisionWithPattern(pPathInfo->pStartRoom, pPoints[0].X, pPoints[0].Y, pPathInfo->nCollisionPattern, pPathInfo->nCollisionMask))
-	{
-		*pFreeOfCollisionDirIndex = 0;
-		return TRUE;
-	}
-
-	pPoints[1].X += gatDirectionToOffset[pTestDir[1]].nX;
-	pPoints[1].Y += gatDirectionToOffset[pTestDir[1]].nY;
-	if (!COLLISION_CheckAnyCollisionWithPattern(pPathInfo->pStartRoom, pPoints[1].X, pPoints[1].Y, pPathInfo->nCollisionPattern, pPathInfo->nCollisionMask))
-	{
-		*pFreeOfCollisionDirIndex = 1;
-		return TRUE;
-	}
-
-	if (pTestDir[2] != PATH_DIR_NULL)
-	{
-		pPoints[2].X += gatDirectionToOffset[pTestDir[2]].nX;
-		pPoints[2].Y += gatDirectionToOffset[pTestDir[2]].nY;
-		if (!COLLISION_CheckAnyCollisionWithPattern(pPathInfo->pStartRoom, pPoints[2].X, pPoints[2].Y, pPathInfo->nCollisionPattern, pPathInfo->nCollisionMask))
-		{
-			*pFreeOfCollisionDirIndex = 2;
-			return TRUE;
-		}
 	}
 
 	return FALSE;
@@ -346,6 +309,7 @@ BOOL PATH_PreparePathTargetForPathUpdate(D2PathInfoStrc* pPathInfo)
 
 //1.00:  D2Common.0x1005B890
 //1.10f: D2Common.0x6FDAA9F0
+// 1.13c D2Common+0x678B0
 int __fastcall PATH_Toward_6FDAA9F0(D2PathInfoStrc *pPathInfo)
 {
 	D2DynamicPathStrc* pPath = pPathInfo->pDynamicPath;
@@ -621,6 +585,7 @@ BOOL __fastcall PATH_RayTrace(D2DynamicPathStrc* pDynamicPath, D2PathPointStrc* 
 }
 
 //D2Common.0x6FDAB0B0
+// 1.13c D2Common+0x67B70
 int __fastcall sub_6FDAB0B0(D2PathInfoStrc* pPathInfo)
 {
 	pPathInfo->pDynamicPath->dwCurrentPointIdx = 0;
@@ -628,6 +593,7 @@ int __fastcall sub_6FDAB0B0(D2PathInfoStrc* pPathInfo)
 }
 
 //D2Common.0x6FDAB0C0
+// 1.13c D2Common+0x67850
 int __fastcall PATH_BackupTurn_Compute(D2PathInfoStrc* pPathInfo)
 {
 	int result = 0;
@@ -731,6 +697,7 @@ int __fastcall PATH_Leap_6FDAB1E0(D2PathInfoStrc* pPathInfo)
 }
 
 //D2Common.0x6FDAB240
+// 1.13c D2Common+0x677C0
 int __fastcall PATH_Knockback_Client(D2PathInfoStrc* pPathInfo)
 {
 	pPathInfo->pDynamicPath->dwCurrentPointIdx = 0;
@@ -740,6 +707,7 @@ int __fastcall PATH_Knockback_Client(D2PathInfoStrc* pPathInfo)
 }
 
 //D2Common.0x6FDAB270
+// 1.13c D2Common+0x67390
 int __fastcall PATH_Knockback_Server(D2PathInfoStrc* pPathInfo)
 {
 	D2DynamicPathStrc* pDynamicPath = pPathInfo->pDynamicPath;
@@ -778,6 +746,7 @@ int __fastcall PATH_Knockback_Server(D2PathInfoStrc* pPathInfo)
 }
 
 //D2Common.0x6FDAB3C0
+// 1.13c D2Common+0x66920: x87 cos/sin ring, 0x2580 radius step, 16-unit angle step, up to 77 points (checked by disassembly).
 signed int __fastcall PATH_ComputePathBlessedHammer_6FDAB3C0(D2DynamicPathStrc* pDynamicPath)
 {
 	const uint32_t dwOriginPrecisionX = pDynamicPath->tGameCoords.dwPrecisionX;
@@ -813,43 +782,31 @@ signed int __fastcall PATH_ComputePathBlessedHammer_6FDAB3C0(D2DynamicPathStrc* 
 	return nbPointsToGenerate;
 }
 
-static DWORD getChargedBoltDirOffset(uint64_t i)
-{
-	// Note the discontinuity in the sequence. Fixing it is actually a *bad* idea as the bolts will spread less.
-	int dirOffsetSequence[32] = {
-		-1, 0, 1,
-		-1, 0, 1,
-		-1, 0, 1,
-		-1, 0, 1,
-		-1, 0, 1,
-		-1, 0, 1,
-		-1, 0, 1,
-		-1, 0, 1,
-		-1, 0, 1,
-		-1, 0, 1,
-		-1, /*0,*/ 1,
-	};
-	return dirOffsetSequence[i & 31];
-}
-
 //D2Common.0x6FDAB4A0
+// 1.13c D2Common+0x66AA0: the 32-entry wobble table is built on the stack and only the main direction of the
+// heading triple is read, so the offset helper and the direction-triple fetch are folded in here.
 int __fastcall PATH_ComputePathChargedBolt_6FDAB4A0(D2DynamicPathStrc* pDynamicPath, D2SeedStrc* pSeed)
 {
+	// Note the discontinuity at the end: entries 30 and 31 are -1 and 1.
+	const int32_t anDirOffsets[32] = {
+		-1, 0, 1,  -1, 0, 1,  -1, 0, 1,  -1, 0, 1,  -1, 0, 1,
+		-1, 0, 1,  -1, 0, 1,  -1, 0, 1,  -1, 0, 1,  -1, 0, 1,
+		-1, 1,
+	};
+
 	D2PathPointStrc nPrevPoint;
 	nPrevPoint.X = pDynamicPath->tGameCoords.wPosX;
 	nPrevPoint.Y = pDynamicPath->tGameCoords.wPosY;
 
-	int v16[3];
-	PATH_GetDirections_6FDAB790(v16, nPrevPoint, pDynamicPath->tTargetCoord);
+	const int32_t nMainDirection = stru_6FDD2158[sub_6FDAB6A0(nPrevPoint, pDynamicPath->tTargetCoord)].unk0x00;
 
 	int nMaxPathPoints = pDynamicPath->nDistMax >> 1;
 	for (int nCurPointIdx = 0; nCurPointIdx < nMaxPathPoints; nCurPointIdx++)
 	{
 		pDynamicPath->PathPoints[nCurPointIdx] = nPrevPoint;
 
-		char nMainDirection = v16[0];
-		DWORD nDir = getChargedBoltDirOffset(SEED_RollRandomNumber(pSeed));
-		nDir = (nMainDirection + (char)nDir) % ARRAY_SIZE(gatDirectionToOffset);
+		const uint32_t nRoll = (uint32_t)SEED_RollRandomNumber(pSeed);
+		const uint32_t nDir = (uint32_t)(anDirOffsets[nRoll & 31] + nMainDirection) & 7;
 		nPrevPoint.X += 2 * gatDirectionToOffset[nDir].nX;
 		nPrevPoint.Y += 2 * gatDirectionToOffset[nDir].nY;
 	}
@@ -1039,49 +996,6 @@ int __stdcall sub_6FDABA50(D2PathPointStrc pPoint1, D2PathPointStrc pPoint2)
 }
 
 
-//D2Common.0x6FDAC170
-int __fastcall PATH_SimplifyToLines_6FDAC170(D2PathPointStrc* pOutPathPoints, D2PathPointStrc* pInputPoints, D2PathPointStrc tStartCoord, signed int nbTempPoints)
-{
-	if (nbTempPoints >= 2)
-	{
-		int nbOutPoints = 0;
-		
-		int prevDeltaX = pInputPoints->X - tStartCoord.X;
-		int prevDeltaY = pInputPoints->Y - tStartCoord.Y;
-		int nbPointsInLine = 0;
-		int nCurrentPointIdx;
-		for (nCurrentPointIdx = 0; nCurrentPointIdx < nbTempPoints - 1; ++nCurrentPointIdx)
-		{
-			int deltaX = pInputPoints[nCurrentPointIdx + 1].X - pInputPoints[nCurrentPointIdx].X;
-			int deltaY = pInputPoints[nCurrentPointIdx + 1].Y - pInputPoints[nCurrentPointIdx].Y;
-			if (deltaX == prevDeltaX && deltaY == prevDeltaY)
-			{
-				++nbPointsInLine;
-			}
-			else if (nbPointsInLine > 0 || prevDeltaX == deltaX || prevDeltaY == deltaY)
-			{
-				nbPointsInLine = 0;
-				pOutPathPoints[nbOutPoints++] = pInputPoints[nCurrentPointIdx];
-			}
-			else
-			{
-				nbPointsInLine = 1;
-				deltaX = -2;
-			}
-			prevDeltaY = deltaY;
-			prevDeltaX = deltaX;
-		}
-		if (nCurrentPointIdx < nbTempPoints)
-			pOutPathPoints[nbOutPoints++] = pInputPoints[nCurrentPointIdx];
-	}
-	else if (nbTempPoints == 1)
-	{
-		*pOutPathPoints = *pInputPoints;
-		return 1;
-	}
-	return 0;
-}
-
 // 1.13c D2Common+0x0D180 (#10493)
 int __stdcall PATH_ComputeDirection(int nX1, int nY1, int nX2, int nY2)
 {
@@ -1094,6 +1008,7 @@ int __stdcall PATH_ComputeDirection(int nX1, int nY1, int nX2, int nY2)
 }
 
 //D2Common.0x6FDAC760
+// not-1.13c: retail calls the direction-vector routine (0xCF40) inline at each site (e.g. 0x352F0); kept for the monspawn_check.cpp harness callers
 int __stdcall PATH_ComputeDirectionFromPreciseCoords_6FDAC760(DWORD dwStartPrecisionX, DWORD dwStartPrecisionY, DWORD dwTargetPrecisionX, DWORD dwTargetPrecisionY)
 {
 	D2CoordStrc pCoords = {};
@@ -1407,6 +1322,7 @@ BOOL __stdcall D2Common_10227(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDAD590 (#10229)
+// 1.13c D2Common+0x0E1E0 (#10533)
 BOOL __stdcall D2Common_10229(D2DynamicPathStrc *pDynamicPath, D2UnitStrc *pUnit, D2ActiveRoomStrc *pDestRoom, uint32_t nDestX, uint32_t nDestY)
 {
 	D2PathPointStrc tCoords = { uint16_t(nDestX), uint16_t(nDestY) };

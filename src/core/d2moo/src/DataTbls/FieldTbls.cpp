@@ -12,6 +12,7 @@ static const int gnFieldYOffsets[] = { -1, -1, 0, 1, 1, 1, 0, -1, 0 };
 
 
 //D2Common.0x6FD52010 (#11089)
+// 1.13c D2Common+0x7E4F0
 BOOL __stdcall DATATBLS_InitializeCollisionFieldTable(char* pExpField, int nSize)
 {
 	// expfield.d2 stores these little-endian dwords at deliberately unaligned
@@ -26,10 +27,11 @@ BOOL __stdcall DATATBLS_InitializeCollisionFieldTable(char* pExpField, int nSize
 
 	sgptDataTables->pCollisionField.nWidth = v3;
 	sgptDataTables->pCollisionField.nHeight = v2;
+	// 1.13c stores the caller's EBX in the area word; nothing reads it, so the port keeps the product.
 	sgptDataTables->pCollisionField.nArea = v2 * v3;
-	// 1.13c 0x7E4F0: center X (0x1414) is half the height, center Y (0x1418) is half the width
-	sgptDataTables->pCollisionField.nCenterX = v2 >> 1;
-	sgptDataTables->pCollisionField.nCenterY = v3 >> 1;
+	// 1.13c 0x7E4F0: center X (0x1414) is half the width (+6), center Y (0x1418) is half the height (+2)
+	sgptDataTables->pCollisionField.nCenterX = v3 >> 1;
+	sgptDataTables->pCollisionField.nCenterY = v2 >> 1;
 
 	for (int i = 0; i < ARRAY_SIZE(gnFieldXOffsets); ++i)
 	{
@@ -71,12 +73,14 @@ void __stdcall DATATBLS_GetCollisionFieldCenter(int* pCenterX, int* pCenterY)
 }
 
 //D2Common.0x6FD52160 (#11092)
+// 1.13c D2Common+0x7E470
 int __stdcall DATATBLS_GetCollisionFieldWidth()
 {
 	return sgptDataTables->pCollisionField.nWidth;
 }
 
 //D2Common.0x6FD52170 (#11093)
+// 1.13c D2Common+0x7E460
 int __stdcall DATATBLS_GetCollisionFieldHeight()
 {
 	return sgptDataTables->pCollisionField.nHeight;
@@ -105,6 +109,7 @@ void __stdcall DATATBLS_FreeField(D2FieldStrc* pField)
 }
 
 //D2Common.0x6FD52210 (#11096)
+// 1.13c D2Common+0x7E390
 void __stdcall DATATBLS_SetFieldCoordinates(D2FieldStrc* pField, int nX, int nY)
 {
 	D2_ASSERT(pField);

@@ -278,6 +278,7 @@ void __fastcall DATATBLS_LoadShrinesTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD72000 (#10624)
+// 1.13c D2Common+0x3E910: index check (count, then non-negative) with the record stride 0xB8; matches the retail assert order
 D2ShrinesTxt* __stdcall DATATBLS_GetShrinesTxtRecord(int nShrineId)
 {
 	D2_ASSERT(nShrineId < sgptDataTables->nShrinesTxtRecordCount);
