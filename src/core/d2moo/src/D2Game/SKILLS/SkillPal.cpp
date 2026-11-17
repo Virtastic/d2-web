@@ -68,6 +68,7 @@ struct D2UnkPalSkillStrc2
 
 
 //D2Game.0x6FD18330
+// 1.13c D2Game+0x98E90 (start slot 29; the hit flags come from the skill row's hit-flag word ORed with 1)
 int32_t __fastcall SKILLS_SrvSt29_Sacrifice(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -94,7 +95,7 @@ int32_t __fastcall SKILLS_SrvSt29_Sacrifice(D2GameStrc* pGame, D2UnitStrc* pUnit
                 D2GAME_RollElementalDamage_6FD14DD0(pUnit, &damage, nSkillId, nSkillLevel);
                 damage.dwHitFlags = 1;
                 damage.wResultFlags |= pSkillsTxtRecord->wResultFlags;
-                damage.dwHitFlags |= 1;
+                damage.dwHitFlags = pSkillsTxtRecord->dwHitFlags | 1;
             }
 
             SUNITDMG_AllocCombat(pGame, pUnit, pTarget, &damage, 128);
@@ -494,6 +495,7 @@ int32_t __fastcall SKILLS_AuraCallback_BasicAura(D2AuraCallbackStrc* pAuraCallba
 }
 
 //D2Game.0x6FD18FE0
+// 1.13c D2Game+0x98450 (state off, no-mana-regen state off, passive refresh, aura list refresh; no delta)
 void __fastcall SKILLS_CurseStateCallback_BasicAura(D2UnitStrc* pUnit, int32_t nState, D2StatListStrc* pStatList)
 {
     D2_MAYBE_UNUSED(pStatList);
@@ -600,6 +602,7 @@ int32_t __fastcall SKILLS_SrvDo066_HolyFire_HolyShock_Sanctuary_Conviction(D2Gam
 }
 
 //D2Game.0x6FD19390
+// 1.13c D2Game+0x9A7C0 (basic aura when the passive state is set, then the damage events; no delta)
 int32_t __fastcall SKILLS_AuraCallback_HolyFire_HolyShock_Sanctuary_Conviction(D2AuraCallbackStrc* pAuraCallback, D2UnitStrc* pUnit)
 {
     D2DamageAuraParamStrc* pArgs = (D2DamageAuraParamStrc*)pAuraCallback->pArgs;
@@ -636,6 +639,7 @@ int32_t __fastcall SKILLS_AuraCallback_HolyFire_HolyShock_Sanctuary_Conviction(D
 }
 
 //D2Game.0x6FD19460
+// 1.13c D2Game+0x99620 (start slot 31; a target equal to the charger is treated as no target)
 int32_t __fastcall SKILLS_SrvSt31_Charge(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -651,6 +655,11 @@ int32_t __fastcall SKILLS_SrvSt31_Charge(D2GameStrc* pGame, D2UnitStrc* pUnit, i
     }
 
     D2UnitStrc* pTargetUnit = SUNIT_GetTargetUnit(pGame, pUnit);
+    if (pTargetUnit == pUnit)
+    {
+        pTargetUnit = nullptr;
+    }
+
     if (pTargetUnit && UNITS_IsInMeleeRange(pUnit, pTargetUnit, 0))
     {
         if (pUnit->dwUnitType != UNIT_PLAYER)
@@ -940,6 +949,7 @@ int32_t __fastcall SKILLS_SrvDo067_Charge(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FD19C80
+// 1.13c D2Game+0x98BA0 (start slot 35; a target equal to the attacker ends it)
 int32_t __fastcall SKILLS_SrvSt35_Vengeance(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -955,7 +965,7 @@ int32_t __fastcall SKILLS_SrvSt35_Vengeance(D2GameStrc* pGame, D2UnitStrc* pUnit
     }
 
     D2UnitStrc* pTargetUnit = SUNIT_GetTargetUnit(pGame, pUnit);
-    if (!pTargetUnit)
+    if (!pTargetUnit || pTargetUnit == pUnit)
     {
         return 0;
     }
@@ -1126,6 +1136,7 @@ int32_t __fastcall SKILLS_SrvDo073_BlessedHammer(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FD1A480
+// 1.13c D2Game+0x98390 (start slot 36; checked line by line, no delta)
 int32_t __fastcall SKILLS_SrvSt36_HolyShield(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (pUnit->pInventory)
@@ -1137,9 +1148,9 @@ int32_t __fastcall SKILLS_SrvSt36_HolyShield(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FD1A4A0
+// 1.13c D2Game+0x99830 (do slot 79; the roll helper is retail 0x988B0, inlined here; a target equal to the caster ends it)
 int32_t __fastcall SKILLS_SrvDo079_Conversion(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
-    // TODO: v8
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
     if (!pSkillsTxtRecord)
     {
@@ -1152,7 +1163,7 @@ int32_t __fastcall SKILLS_SrvDo079_Conversion(D2GameStrc* pGame, D2UnitStrc* pUn
     }
 
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
-    if (!pTarget)
+    if (!pTarget || pTarget == pUnit)
     {
         return 0;
     }
@@ -1254,6 +1265,7 @@ int32_t __fastcall SKILLS_SrvDo079_Conversion(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FD1A900
+// 1.13c D2Game+0x98950 (stat-remove callback set by do slot 79; checked line by line, no delta)
 void __fastcall SKILLS_StatRemoveCallback_Conversion(D2UnitStrc* pUnit, int32_t nState, D2StatListStrc* pStatList)
 {
     STATES_ToggleState(pUnit, nState, 0);
@@ -1291,6 +1303,7 @@ void __fastcall SKILLS_StatRemoveCallback_Conversion(D2UnitStrc* pUnit, int32_t 
 }
 
 //D2Game.0x6FD1AA50
+// 1.13c D2Game+0x993A0 (do slot 80; a target equal to the caster ends it)
 int32_t __fastcall SKILLS_SrvDo080_FistOfTheHeavens(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1300,7 +1313,7 @@ int32_t __fastcall SKILLS_SrvDo080_FistOfTheHeavens(D2GameStrc* pGame, D2UnitStr
         if (nMissileId > 0)
         {
             D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
-            if (pTarget)
+            if (pTarget && pTarget != pUnit)
             {
                 D2MissileStrc missileParams = {};
                 missileParams.dwFlags = 1;
@@ -1425,6 +1438,7 @@ int32_t __fastcall SKILLS_SrvDo081_HolyFreeze(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FD1AF40
+// 1.13c D2Game+0x985D0 (dead and stay-death states keep the state; shatter cleared while alive; no delta)
 void __fastcall SKILLS_CurseStateCallback_HolyFreeze(D2UnitStrc* pUnit, int32_t nState, D2StatListStrc* pStatList)
 {
     D2_MAYBE_UNUSED(pStatList);
@@ -1442,6 +1456,7 @@ void __fastcall SKILLS_CurseStateCallback_HolyFreeze(D2UnitStrc* pUnit, int32_t 
 }
 
 //D2Game.0x6FD1AF90
+// 1.13c D2Game+0x9A630 (cold-immune monsters skipped, basic aura, damage events, 20% shatter; no delta)
 int32_t __fastcall SKILLS_AuraCallback_HolyFreeze(D2AuraCallbackStrc* pAuraCallback, D2UnitStrc* pUnit)
 {
     D2BasicAuraParamStrc* pArgs = (D2BasicAuraParamStrc*)pAuraCallback->pArgs;
@@ -1491,6 +1506,7 @@ int32_t __fastcall SKILLS_AuraCallback_HolyFreeze(D2AuraCallbackStrc* pAuraCallb
 }
 
 //D2Game.0x6FD1B100
+// not-1.13c: retail has no separate function; the effect is inlined in the aura callback at D2Game+0x98680 (chance roll always taken); the bSkipChanceRoll=1 caller is the Radament first-frame missile callback
 int32_t __fastcall SKILLS_ApplyRedemptionEffect(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pCorpse, int32_t nSkillId, int32_t nSkillLevel, int32_t bSkipChanceRoll)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1570,6 +1586,7 @@ int32_t __fastcall SKILLS_SrvDo082_Redemption(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FD1B490
+// 1.13c D2Game+0x98680 (corpse check, chance roll, hp/mana gain, redeemed state, counter; effect inlined in retail, shared helper here)
 int32_t __fastcall SKILLS_AuraCallback_Redemption(D2AuraCallbackStrc* pAuraCallback, D2UnitStrc* pUnit)
 {
     D2UnkPalSkillStrc2* pArgs = (D2UnkPalSkillStrc2*)pAuraCallback->pArgs;

@@ -47,6 +47,7 @@ struct D2EnergyShieldDataStrc
 
 
 //D2Game.0x6FD156F0
+// 1.13c D2Game+0x441C0
 int32_t __fastcall SKILLS_DoInferno(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t nMissileId)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -189,10 +190,11 @@ int32_t __fastcall SKILLS_SrvSt11_Inferno_ArcticBlast(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FD15B40
+// 1.13c D2Game+0x42360 (delta vs 1.10f: a target that is the caster itself is refused)
 int32_t __fastcall SKILLS_SrvSt12_Telekinesis_DragonFlight(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
-    if (!pTarget)
+    if (!pTarget || pTarget == pUnit)
     {
         return 0;
     }
@@ -221,6 +223,7 @@ int32_t __fastcall SKILLS_SrvSt12_Telekinesis_DragonFlight(D2GameStrc* pGame, D2
 }
 
 //D2Game.0x6FD15CF0
+// 1.13c D2Game+0x42230
 int32_t __fastcall SKILLS_SrvSt13_ThunderStorm(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (!SKILLS_GetSkillsTxtRecord(nSkillId))
@@ -240,6 +243,7 @@ int32_t __fastcall SKILLS_SrvSt13_ThunderStorm(D2GameStrc* pGame, D2UnitStrc* pU
 }
 
 //D2Game.0x6FD15D50
+// 1.13c D2Game+0x42AD0
 int32_t __fastcall SKILLS_SrvSt14_Hydra(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     int32_t nX = 0;
@@ -256,6 +260,7 @@ int32_t __fastcall SKILLS_SrvSt14_Hydra(D2GameStrc* pGame, D2UnitStrc* pUnit, in
 }
 
 //D2Game.0x6FD15E50
+// 1.13c D2Game+0x41F50
 void __fastcall SKILLS_MissileInit_ChargedBolt(D2UnitStrc* pMissile, int32_t a2)
 {
     if (!pMissile)
@@ -322,6 +327,7 @@ int32_t __fastcall SKILLS_SrvDo017_ChargedBolt_BoltSentry(D2GameStrc* pGame, D2U
 }
 
 //D2Game.0x6FD16040
+// 1.13c D2Game+0x422B0 (the animation-rate refresh reports SkillSor.cpp line 425)
 void __fastcall SKILLS_CurseStateCallback_DefensiveBuff(D2UnitStrc* pUnit, int32_t nState, D2StatListStrc* pStatList)
 {
     D2_MAYBE_UNUSED(pStatList);
@@ -333,7 +339,7 @@ void __fastcall SKILLS_CurseStateCallback_DefensiveBuff(D2UnitStrc* pUnit, int32
     }
 
     STATES_ToggleState(pUnit, nState, 0);
-    UNITS_UpdateAnimRateAndVelocity(pUnit, __FILE__, __LINE__);
+    UNITS_UpdateAnimRateAndVelocity(pUnit, __FILE__, 425);
     sub_6FD14C30(pUnit);
 }
 
@@ -395,6 +401,7 @@ int32_t __fastcall SKILLS_SrvDo018_DefensiveBuff(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FD16270
+// 1.13c D2Game+0x44390 (skill server do-function slot 19)
 int32_t __fastcall SKILLS_SrvDo019_Inferno_ArcticBlast(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -644,6 +651,7 @@ int32_t __fastcall SKILLS_SrvDo023_Blaze_EnergyShield_SpiderLay(D2GameStrc* pGam
 }
 
 //D2Game.0x6FD16C00
+// 1.13c D2Game+0x439A0
 void __fastcall SKILLS_CreateBlazeMissile(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (!pUnit->pDynamicPath || !D2Common_10234(pUnit->pDynamicPath))
@@ -659,6 +667,11 @@ void __fastcall SKILLS_CreateBlazeMissile(D2GameStrc* pGame, D2UnitStrc* pUnit)
 
     const int32_t nSkillId = STATLIST_GetStatValue(pStatList, STAT_MODIFIERLIST_SKILL, 0);
     int32_t nSkillLevel = STATLIST_GetStatValue(pStatList, STAT_MODIFIERLIST_LEVEL, 0);
+    if (nSkillId <= 0 || nSkillId >= sgptDataTables->nSkillsTxtRecordCount)
+    {
+        return;
+    }
+
     if (nSkillLevel < 0)
     {
         nSkillLevel = 1;
@@ -688,6 +701,7 @@ void __fastcall SKILLS_CreateBlazeMissile(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FD16D70
+// 1.13c D2Game+0x437D0 (skill server do-function slot 24)
 int32_t __fastcall SKILLS_SrvDo024_FireWall(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -760,6 +774,7 @@ int32_t __fastcall SKILLS_SrvDo024_FireWall(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FD17040
+// 1.13c D2Game+0x42570 (skill server do-function slot 25)
 int32_t __fastcall SKILLS_SrvDo025_Enchant(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -833,6 +848,7 @@ int32_t __fastcall SKILLS_SrvDo026_ChainLightning(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FD172B0
+// 1.13c D2Game+0x43610 (skill server do-function slot 151)
 int32_t __fastcall SKILLS_SrvDo151_Unused(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -869,6 +885,7 @@ int32_t __fastcall SKILLS_SrvDo151_Unused(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FD17450
+// 1.13c D2Game+0x43450 (skill server do-function slot 27)
 int32_t __fastcall SKILLS_SrvDo027_Teleport(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     int32_t nTargetX = 0;
@@ -891,6 +908,7 @@ int32_t __fastcall SKILLS_SrvDo027_Teleport(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FD174E0
+// 1.13c D2Game+0x42D90 (skill server do-function slot 28)
 int32_t __fastcall SKILLS_SrvDo028_Meteor_Blizzard_Eruption_BaalTaunt_Catapult(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -899,17 +917,39 @@ int32_t __fastcall SKILLS_SrvDo028_Meteor_Blizzard_Eruption_BaalTaunt_Catapult(D
         return 0;
     }
 
+    const int32_t nMissileId = pSkillsTxtRecord->wSrvMissileA;
     if (pUnit)
     {
         pUnit->dwFlags |= UNITFLAG_SKSRVDOFUNC;
     }
 
-    if (!sub_6FD15340(pGame, pUnit, pSkillsTxtRecord->wSrvMissileA))
+    if (!sub_6FD15340(pGame, pUnit, nMissileId) || !pUnit)
     {
         return 0;
     }
 
-    return D2GAME_CreateMissile_6FD115E0(pGame, pUnit, nSkillId, nSkillLevel, pSkillsTxtRecord->wSrvMissileA, 0, 0) != 0;
+    int32_t nTargetX = 0;
+    int32_t nTargetY = 0;
+    D2GAME_GetXAndYFromTargetUnit_6FD14020(pGame, pUnit, &nTargetX, &nTargetY);
+    if (!nTargetX && !nTargetY)
+    {
+        return 0;
+    }
+
+    if (UNITS_GetDistanceToCoordinates(pUnit, nTargetX, nTargetY) > 100)
+    {
+        return 0;
+    }
+
+    D2MissileStrc missileParams = {};
+    missileParams.dwFlags = 1;
+    missileParams.pOwner = pUnit;
+    missileParams.nMissile = nMissileId;
+    missileParams.nX = nTargetX;
+    missileParams.nY = nTargetY;
+    missileParams.nSkill = nSkillId;
+    missileParams.nSkillLevel = nSkillLevel;
+    return MISSILES_CreateMissileFromParams(pGame, &missileParams) != nullptr;
 }
 
 //D2Game.0x6FD17570
@@ -976,6 +1016,7 @@ int32_t __fastcall SKILLS_SrvDo029_ThunderStorm(D2GameStrc* pGame, D2UnitStrc* p
 }
 
 //D2Game.0x6FD17820
+// 1.13c D2Game+0x41FB0 (unit event callback slot 24)
 int32_t __fastcall SKILLS_EventFunc24_EnergyShield(D2GameStrc* pGame, int32_t nEvent, D2UnitStrc* pAttacker, D2UnitStrc* pUnit, D2DamageStrc* pDamage, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (!pAttacker || !pDamage)
@@ -1172,6 +1213,7 @@ int32_t __fastcall SKILLS_SrvDo144_Hydra(D2GameStrc* pGame, D2UnitStrc* pUnit, i
 }
 
 //D2Game.0x6FD17F40
+// 1.13c D2Game+0x434E0 (unit event callback slot 1)
 int32_t __fastcall SKILLS_EventFunc01_ChillingArmor(D2GameStrc* pGame, int32_t nEvent, D2UnitStrc* pAttacker, D2UnitStrc* pUnit, D2DamageStrc* pDamage, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (!pAttacker || !pUnit)

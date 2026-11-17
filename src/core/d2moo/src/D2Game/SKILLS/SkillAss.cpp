@@ -69,10 +69,11 @@ struct D2SrvDo142Strc
 
 
 //D2Game.0x6FCF5090
+// 1.13c D2Game+0x92060 (checked against the decompile; retail also refuses a target equal to the caster)
 int32_t __fastcall SKILLS_SrvSt22_PsychicHammer(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2UnitStrc* pTargetUnit = SUNIT_GetTargetUnit(pGame, pUnit);
-    if (!pTargetUnit)
+    if (!pTargetUnit || pTargetUnit == pUnit)
     {
         return 0;
     }
@@ -156,10 +157,11 @@ int32_t __fastcall SKILLS_SrvDo033_PsychicHammer(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FCF52C0
+// 1.13c D2Game+0x92030 (checked against the decompile; retail also refuses a target equal to the caster)
 int32_t __fastcall SKILLS_SrvSt23_AssasinChargeStrikes(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2UnitStrc* pTargetUnit = SUNIT_GetTargetUnit(pGame, pUnit);
-    if (!pTargetUnit)
+    if (!pTargetUnit || pTargetUnit == pUnit)
     {
         return 0;
     }
@@ -168,6 +170,7 @@ int32_t __fastcall SKILLS_SrvSt23_AssasinChargeStrikes(D2GameStrc* pGame, D2Unit
 }
 
 //D2Game.0x6FCF52E0
+// 1.13c D2Game+0x90F00 (checked against the decompile, no delta)
 void __fastcall SKILLS_StatRemoveCallback_ProgressiveStrike(D2UnitStrc* pUnit, int32_t nState, D2StatListStrc* pStatList)
 {
     D2_MAYBE_UNUSED(pStatList);
@@ -269,6 +272,7 @@ int32_t __fastcall SKILLS_SrvDo034_TigerStrike_CobraStrike_RoyalStrike(D2GameStr
 }
 
 //D2Game.0x6FCF55B0
+// 1.13c D2Game+0x961A0 (checked against the decompile, no delta)
 int32_t __fastcall SKILLS_SrvDo035_FistsOfFire_ClawsOfThunder_BladesOfIce(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2UnitStrc* pRightWeapon = nullptr;
@@ -443,6 +447,7 @@ void __fastcall sub_6FCF5870(D2UnitStrc* pUnit, D2DamageStrc* pDamage)
 }
 
 //D2Game.0x6FCF5B90
+// not-1.13c: retail inlines this range check at its callers (seen at D2Game+0x4C1C0, +0x4C3A0, +0x4CB00, +0x91340)
 D2SkillsTxt* __fastcall SKILLS_GetSkillsTxtRecord(int32_t nSkillId)
 {
     if (nSkillId >= 0 && nSkillId < sgptDataTables->nSkillsTxtRecordCount)
@@ -505,6 +510,7 @@ void __fastcall sub_6FCF5BC0(D2UnitStrc* pUnit, D2StatListStrc* pStatList, D2Dam
 }
 
 //D2Game.0x6FCF5DE0
+// 1.13c D2Game+0x92CC0 (checked against the decompile, no delta)
 int32_t __fastcall sub_6FCF5DE0(D2AuraCallbackStrc* pAuraCallback, D2UnitStrc* pUnit)
 {
     D2DamageStrc damage = {};
@@ -516,6 +522,7 @@ int32_t __fastcall sub_6FCF5DE0(D2AuraCallbackStrc* pAuraCallback, D2UnitStrc* p
 }
 
 //D2Game.0x6FCF5E20
+// 1.13c D2Game+0x91340 (checked against the decompile, no delta)
 int32_t __fastcall SKILLS_GetProgressiveSkillMissileId(D2UnitStrc* pUnit, int32_t nSkillId)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -683,10 +690,12 @@ int32_t __fastcall SKILLS_SrvDo039_FistsOfFire_BladesOfIce_ProgressiveFn3(D2Game
 }
 
 //D2Game.0x6FCF6420
+// 1.13c D2Game+0x95040 (target refresh first, a self target refused, missile velocity read before the skill formula)
 int32_t __fastcall SKILLS_SrvDo036_ClawsOfThunder_ProgressiveFn2(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
-    D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
-    if (!pTarget || nSkillLevel <= 0)
+    sub_6FCBC7E0(pGame, pUnit);
+    D2UnitStrc* pTarget = PATH_GetTargetUnit(pUnit->pDynamicPath);
+    if (!pTarget || pTarget == pUnit || nSkillLevel <= 0)
     {
         return 0;
     }
@@ -703,14 +712,17 @@ int32_t __fastcall SKILLS_SrvDo036_ClawsOfThunder_ProgressiveFn2(D2GameStrc* pGa
         return 0;
     }
 
-    const int32_t nVelocity = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwCalc[0], nSkillId, nSkillLevel) + DATATBLS_GetMissileVelocityFromMissilesTxt(nMissileId, nSkillLevel);
+    int32_t nVelocity = DATATBLS_GetMissileVelocityFromMissilesTxt(nMissileId, nSkillLevel);
+    nVelocity += SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwCalc[0], nSkillId, nSkillLevel);
     sub_6FD14170(pGame, pUnit, pTarget, nMissileId, nSkillId, nSkillLevel, nVelocity);
     return 1;
 }
 
 //D2Game.0x6FCF6500
+// 1.13c D2Game+0x94F50 (the unit seed is rolled first, before the skill id check)
 int32_t __fastcall SKILLS_SrvDo037_ClawsOfThunder_ProgressiveFn3(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
+    const int32_t nLowSeed = ITEMS_RollRandomNumber(&pUnit->pSeed);
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
     if (!pSkillsTxtRecord)
     {
@@ -731,11 +743,12 @@ int32_t __fastcall SKILLS_SrvDo037_ClawsOfThunder_ProgressiveFn3(D2GameStrc* pGa
         nValue = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwAuraRangeCalc, nSkillId, nSkillLevel);
     }
 
-    sub_6FCF6600(pGame, pUnit, ITEMS_RollRandomNumber(&pUnit->pSeed), nMissileId, nX, nY, nSkillId, nSkillLevel, nValue);
+    sub_6FCF6600(pGame, pUnit, nLowSeed, nMissileId, nX, nY, nSkillId, nSkillLevel, nValue);
     return 1;
 }
 
 //D2Game.0x6FCF6600
+// 1.13c D2Game+0x94370
 void __fastcall sub_6FCF6600(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nLowSeed, int32_t nMissileId, int32_t nX, int32_t nY, int32_t nSkillId, int32_t nSkillLevel, int32_t nStep)
 {
     D2SeedStrc seed = {};
@@ -780,6 +793,7 @@ void __fastcall sub_6FCF6600(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nLowS
 }
 
 //D2Game.0x6FCF6C10
+// 1.13c D2Game+0x90EA0
 void __fastcall sub_6FCF6C10(D2UnitStrc* pMissile, int32_t nLowSeed)
 {
     if (!pMissile)
@@ -802,8 +816,10 @@ void __fastcall sub_6FCF6C10(D2UnitStrc* pMissile, int32_t nLowSeed)
 }
 
 //D2Game.0x6FCF6C70
+// 1.13c D2Game+0x94E60 (the unit seed is rolled first, before the skill id check)
 int32_t __fastcall SKILLS_SrvDo143_FistsOfFire_RoyalStrike_ProgressiveFn(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
+    const int32_t nLowSeed = ITEMS_RollRandomNumber(&pUnit->pSeed);
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
     if (!pSkillsTxtRecord)
     {
@@ -824,11 +840,12 @@ int32_t __fastcall SKILLS_SrvDo143_FistsOfFire_RoyalStrike_ProgressiveFn(D2GameS
         nAuraRange = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwAuraRangeCalc, nSkillId, nSkillLevel);
     }
 
-    sub_6FCF6D70(pGame, pUnit, ITEMS_RollRandomNumber(&pUnit->pSeed), nMissileId, nX, nY, nSkillId, nSkillLevel, nAuraRange);
+    sub_6FCF6D70(pGame, pUnit, nLowSeed, nMissileId, nX, nY, nSkillId, nSkillLevel, nAuraRange);
     return 1;
 }
 
 //D2Game.0x6FCF6D70
+// 1.13c D2Game+0x93D60
 void __fastcall sub_6FCF6D70(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nLowSeed, int32_t nMissileId, int32_t nX, int32_t nY, int32_t nSkillId, int32_t nSkillLevel, int32_t nStep)
 {
     D2SeedStrc seed = {};
@@ -876,6 +893,7 @@ void __fastcall sub_6FCF6D70(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nLowS
 }
 
 //D2Game.0x6FCF7390
+// 1.13c D2Game+0x91040
 void __fastcall sub_6FCF7390(D2UnitStrc* pMissile, int32_t nInitSeed)
 {
     // TODO: Names
@@ -938,6 +956,7 @@ void __fastcall sub_6FCF7390(D2UnitStrc* pMissile, int32_t nInitSeed)
 }
 
 //D2Game.0x6FCF7590
+// 1.13c D2Game+0x92230 (checked against the decompile, no delta)
 int32_t __fastcall SKILLS_SrvDo040_RoyalStrike_ProgressiveFn1(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     int32_t nX = 0;
@@ -1126,6 +1145,7 @@ void __fastcall sub_6FCF77E0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2DamageStrc*
 }
 
 //D2Game.0x6FCF7AD0
+// 1.13c D2Game+0x92DF0 (a target that is the caster itself resets the kick count like no target)
 int32_t __fastcall SKILLS_SrvSt24_DragonTalon(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1141,7 +1161,7 @@ int32_t __fastcall SKILLS_SrvSt24_DragonTalon(D2GameStrc* pGame, D2UnitStrc* pUn
     }
 
     D2UnitStrc* pTargetUnit = SUNIT_GetTargetUnit(pGame, pUnit);
-    if (pTargetUnit)
+    if (pTargetUnit && pTargetUnit != pUnit)
     {
         if (UNITS_IsInMeleeRange(pUnit, pTargetUnit, 0))
         {
@@ -1160,11 +1180,13 @@ int32_t __fastcall SKILLS_SrvSt24_DragonTalon(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FCF7BC0
+// 1.13c D2Game+0x92BB0 (the skill's to-hit factor is read before the progressive to-hit stat)
 void __fastcall sub_6FCF7BC0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, D2SkillsTxt* pSkillsTxtRecordArg, int32_t nSkillId, int32_t nSkillLevel, int32_t bKnockback)
 {
     D2DamageStrc damage = {};
 
-    const int32_t nToHit = STATLIST_UnitGetStatValue(pUnit, STAT_PROGRESSIVE_TOHIT, 0) + SKILLS_GetToHitFactor(pUnit, nSkillId, nSkillLevel);
+    int32_t nToHit = SKILLS_GetToHitFactor(pUnit, nSkillId, nSkillLevel);
+    nToHit += STATLIST_UnitGetStatValue(pUnit, STAT_PROGRESSIVE_TOHIT, 0);
     damage.wResultFlags = SUNITDMG_GetResultFlags(pGame, pUnit, pTarget, nToHit, 0);
 
     if (damage.wResultFlags & DAMAGERESULTFLAG_SUCCESSFULHIT)
@@ -1256,6 +1278,7 @@ void __fastcall sub_6FCF7CE0(D2GameStrc* pGame, D2DamageStrc* pDamage, D2UnitStr
 }
 
 //D2Game.0x6FCF8110
+// 1.13c D2Game+0x95FE0 (a target that is the caster itself is refused; a missing used skill ends the kick after the first hit)
 int32_t __fastcall SKILLS_SrvDo042_DragonTalon(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1265,7 +1288,7 @@ int32_t __fastcall SKILLS_SrvDo042_DragonTalon(D2GameStrc* pGame, D2UnitStrc* pU
     }
 
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
-    if (!pTarget)
+    if (!pTarget || pTarget == pUnit)
     {
         return 0;
     }
@@ -1274,7 +1297,11 @@ int32_t __fastcall SKILLS_SrvDo042_DragonTalon(D2GameStrc* pGame, D2UnitStrc* pU
     SUNITDMG_DrainItemDurability(pGame, pUnit, pTarget, 0);
 
     D2SkillStrc* pSkill = UNITS_GetUsedSkill(pUnit);
-    
+    if (!pSkill)
+    {
+        return 0;
+    }
+
     const int32_t nParam = SKILLS_GetParam1(pSkill) - 1;
     if (nParam < 0)
     {
@@ -1478,6 +1505,7 @@ D2UnitStrc* __fastcall sub_6FCF8610(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_
 }
 
 //D2Game.0x6FCF88E0
+// 1.13c D2Game+0x96310 (checked against the decompile, no delta)
 int32_t __fastcall SKILLS_SrvDo044_BladeSentinel(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1529,6 +1557,7 @@ int32_t __fastcall SKILLS_SrvDo044_BladeSentinel(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FCF8B00
+// 1.13c D2Game+0x96280 (checked against the decompile, no delta)
 int32_t __fastcall SKILLS_SrvDo045_Sentry(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1623,6 +1652,7 @@ void __fastcall sub_6FCF8C70(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
 }
 
 //D2Game.0x6FCF8DD0
+// 1.13c D2Game+0x90F30
 void __fastcall sub_6FCF8DD0(D2UnitStrc* pDefender)
 {
     if (!STATES_CheckStateMaskRemHitOnUnit(pDefender))
@@ -1734,6 +1764,7 @@ int32_t __fastcall SKILLS_SrvDo047_CloakOfShadows(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FCF9160
+// 1.13c D2Game+0x93850
 int32_t __fastcall SKILLS_AuraCallback_CloakOfShadows(D2AuraCallbackStrc* pAuraCallback, D2UnitStrc* pUnit)
 {
     D2SrvDo47Strc* pArgs = (D2SrvDo47Strc*)pAuraCallback->pArgs;
@@ -1842,6 +1873,7 @@ int32_t __fastcall SKILLS_SrvDo048_BladeFury(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FCF93B0
+// 1.13c D2Game+0x95BC0 (checked against the decompile, no delta)
 int32_t __fastcall SKILLS_SrvSt26_BladeFury(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1907,6 +1939,7 @@ int32_t __fastcall SKILLS_SrvSt26_BladeFury(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FCF9550
+// 1.13c D2Game+0x90F10 (checked against the decompile, no delta)
 void __fastcall SKILLS_StatRemoveCallback_RemoveState(D2UnitStrc* pUnit, int32_t nState, D2StatListStrc* pStatList)
 {
     D2_MAYBE_UNUSED(pStatList);
@@ -2198,6 +2231,7 @@ int32_t __fastcall SKILLS_SrvDo050_DragonTail(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FCF9EA0
+// 1.13c D2Game+0x914F0 (checked against the disassembly, no delta; the percentage helper takes its operands in registers)
 void __fastcall SKILLS_StatRemoveCallback_MindBlast(D2UnitStrc* pItem, int32_t nState, D2StatListStrc* pStatList)
 {
     D2_MAYBE_UNUSED(pStatList);
@@ -2523,6 +2557,7 @@ int32_t __fastcall SKILLS_SrvDo053_Unused(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FCFA980
+// 1.13c D2Game+0x93040 (checked against the decompile; the hit-flag helper is inlined, same result)
 int32_t __fastcall SKILLS_AuraCallback_SrvDo142(D2AuraCallbackStrc* pAuraCallback, D2UnitStrc* pUnit)
 {
     D2SrvDo142Strc* pArgs = (D2SrvDo142Strc*)pAuraCallback->pArgs;

@@ -40,19 +40,8 @@ struct D2SrvDo06Strc
 #pragma pack(pop)
 
 
-// Same as #10049
-int32_t __stdcall D2Game_10048_Return1(int32_t a1, int32_t a2, int32_t a3, int32_t a4, int32_t a5, int32_t a6)
-{
-    return 1;
-}
-
-//D2Game.0x6FCF30D0
-int32_t __stdcall D2Game_10049_Return1(int32_t a1, int32_t a2, int32_t a3, int32_t a4, int32_t a5, int32_t a6)
-{
-    return 1;
-}
-
 //D2Game.0x6FCF30E0
+// 1.13c D2Game+0x4C840 (checked against the decompile, no delta)
 int32_t __fastcall SKILLS_SrvSt04_Arrow_Bolt(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (sub_6FD119C0(pUnit))
@@ -66,6 +55,7 @@ int32_t __fastcall SKILLS_SrvSt04_Arrow_Bolt(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FCF3120
+// 1.13c D2Game+0x4C1C0 (checked against the decompile, no delta)
 int32_t __fastcall SKILLS_SrvSt05_Jab(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (SKILLS_GetSkillsTxtRecord(nSkillId))
@@ -77,6 +67,7 @@ int32_t __fastcall SKILLS_SrvSt05_Jab(D2GameStrc* pGame, D2UnitStrc* pUnit, int3
 }
 
 //D2Game.0x6FCF3170
+// 1.13c D2Game+0x4C720 (checked against the decompile, no delta)
 int32_t __fastcall SKILLS_SrvSt06_PowerStrike_ChargedStrike(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
@@ -189,6 +180,7 @@ int32_t __fastcall SKILLS_SrvSt07_Impale(D2GameStrc* pGame, D2UnitStrc* pUnit, i
 }
 
 //D2Game.0x6FCF3510
+// 1.13c D2Game+0x4C870 (checked against the decompile, no delta)
 int32_t __fastcall SKILLS_SrvSt08_Strafe(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     // TODO: v11, v12, v13
@@ -339,6 +331,7 @@ int32_t __fastcall SKILLS_SrvSt37_Zeal_Fury_BloodLordFrenzy(D2GameStrc* pGame, D
 }
 
 //D2Game.0x6FCF38C0
+// 1.13c D2Game+0x4C3A0 (checked against the decompile, no delta)
 int32_t __fastcall SKILLS_SrvSt10_LightningStrike(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -384,6 +377,7 @@ int32_t __fastcall SKILLS_SrvSt10_LightningStrike(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FCF3A70
+// 1.13c D2Game+0x4C2A0 (checked against the decompile, no delta)
 int32_t __fastcall SKILLS_SrvDo006_InnerSight_SlowMissiles(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -406,6 +400,7 @@ int32_t __fastcall SKILLS_SrvDo006_InnerSight_SlowMissiles(D2GameStrc* pGame, D2
 }
 
 //D2Game.0x6FCF3B90
+// 1.13c D2Game+0x4C220 (checked against the decompile, no delta)
 int32_t __fastcall SKILLS_AuraCallback_InnerSight_SlowMissiles(D2AuraCallbackStrc* pAuraCallback, D2UnitStrc* pUnit)
 {
     D2SrvDo06Strc* pArgs = (D2SrvDo06Strc*)pAuraCallback->pArgs;
@@ -427,6 +422,7 @@ int32_t __fastcall SKILLS_AuraCallback_InnerSight_SlowMissiles(D2AuraCallbackStr
 }
 
 //D2Game.0x6FCF3C00
+// 1.13c D2Game+0x4CB00 (checked against the decompile, no delta)
 int32_t __fastcall SKILLS_SrvDo007_Jab(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -476,6 +472,7 @@ int32_t __fastcall SKILLS_SrvDo007_Jab(D2GameStrc* pGame, D2UnitStrc* pUnit, int
 }
 
 //D2Game.0x6FCF3D70
+// 1.13c D2Game+0x4D420 (checked against the decompile, no delta)
 int32_t __fastcall SKILLS_SrvDo008_MultipleShot_Teeth_ShockWave(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     // TODO: v9, v21, v24, v31
@@ -570,6 +567,7 @@ int32_t __fastcall SKILLS_SrvDo008_MultipleShot_Teeth_ShockWave(D2GameStrc* pGam
 }
 
 //D2Game.0x6FCF4080
+// 1.13c D2Game+0x4D270 (checked against the decompile, no delta)
 int32_t __fastcall SKILLS_SrvDo010_GuidedArrow_BoneSpirit(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (pUnit)
@@ -648,6 +646,7 @@ int32_t __fastcall SKILLS_SrvDo010_GuidedArrow_BoneSpirit(D2GameStrc* pGame, D2U
 }
 
 //D2Game.0x6FCF4280
+// 1.13c D2Game+0x4C190 (checked against the decompile, no delta)
 void __fastcall SKILLS_AddDamagePercentBonus(D2UnitStrc* pUnit, int32_t nBonus)
 {
     if (nBonus)
@@ -657,6 +656,7 @@ void __fastcall SKILLS_AddDamagePercentBonus(D2UnitStrc* pUnit, int32_t nBonus)
 }
 
 //D2Game.0x6FCF42B0
+// 1.13c D2Game+0x4D040 (checked against the decompile; retail also refuses a target equal to the caster)
 int32_t __fastcall SKILLS_SrvDo011_ChargedStrike(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (pUnit)
@@ -669,9 +669,9 @@ int32_t __fastcall SKILLS_SrvDo011_ChargedStrike(D2GameStrc* pGame, D2UnitStrc* 
     {
         return 0;
     }
-    
+
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
-    if (!pTarget)
+    if (!pTarget || pTarget == pUnit)
     {
         return 0;
     }
@@ -711,6 +711,7 @@ int32_t __fastcall SKILLS_SrvDo011_ChargedStrike(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FCF44D0
+// 1.13c D2Game+0x4DCD0 (checked against the decompile, no delta)
 int32_t __fastcall SKILLS_SrvDo012_Strafe(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     // TODO: v15, v23
@@ -982,10 +983,11 @@ int32_t __fastcall SKILLS_SrvDo015_Dopplezon(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FCF4EE0
+// 1.13c D2Game+0x4D710 (checked against the decompile; retail refuses a null or non-player caster)
 int32_t __fastcall SKILLS_SrvDo016_Valkyrie(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
-    if (!pSkillsTxtRecord)
+    if (!pSkillsTxtRecord || !pUnit || pUnit->dwUnitType != UNIT_PLAYER)
     {
         return 0;
     }

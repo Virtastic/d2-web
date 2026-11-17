@@ -41,92 +41,110 @@ struct D2PartyScreenCallbackStrc
 #pragma pack(pop)
 
 
-//D2Game.0x6FC7AB50
-void __fastcall PARTYSCREEN_ToggleLootability(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t nParam, int32_t* pFailure)
+// Retail inlines the player->client lookup at every party-screen site: the player data's client
+// for a player unit, null for anything else.
+static D2ClientStrc* PARTYSCREEN_GetClient(D2UnitStrc* pPlayer)
 {
-    D2_MAYBE_UNUSED(pFailure);
-    if (!CLIENTS_CheckFlag(SUNIT_GetClientFromPlayer(pPlayer1, __FILE__, __LINE__), CLIENTSAVEFLAG_HARDCORE))
+    if (!pPlayer || pPlayer->dwUnitType != UNIT_PLAYER)
     {
-        return;
+        return nullptr;
     }
 
+    return UNITS_GetPlayerData(pPlayer)->pClient;
+}
+
+// 1.13c D2Game+0xF0C60: both roster records, the relation flag set to the requested state, and the
+// roster update both ways. The lootability command is its only caller.
+static void PARTYSCREEN_SetRosterFlag(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t nFlag, int32_t nParam)
+{
     PLAYERLIST_AllocPlayerList(pGame, pPlayer1, pPlayer2);
     PLAYERLIST_AllocPlayerList(pGame, pPlayer2, pPlayer1);
 
-    if (PLAYERLIST_CheckFlag(pPlayer1, pPlayer2, 1) != nParam)
+    if (PLAYERLIST_CheckFlag(pPlayer1, pPlayer2, nFlag) != nParam)
     {
-        PLAYERLIST_ToggleFlag(pGame, pPlayer1, pPlayer2, 1, nParam);
+        PLAYERLIST_ToggleFlag(pGame, pPlayer1, pPlayer2, nFlag, nParam);
     }
 
     SCMD_Send0x75_PartyRosterUpdate(pPlayer1, pPlayer2);
     SCMD_Send0x75_PartyRosterUpdate(pPlayer2, pPlayer1);
+}
+
+//D2Game.0x6FC7AB50
+// 1.13c D2Game+0xF0F40
+void __fastcall PARTYSCREEN_ToggleLootability(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t nParam, int32_t* pFailure)
+{
+    D2_MAYBE_UNUSED(pFailure);
+    if (!CLIENTS_CheckFlag(PARTYSCREEN_GetClient(pPlayer1), CLIENTSAVEFLAG_HARDCORE))
+    {
+        return;
+    }
+
+    PARTYSCREEN_SetRosterFlag(pGame, pPlayer1, pPlayer2, 1, nParam);
 
     uint8_t nType = 0;
-    if (pPlayer1 && (pPlayer1->dwClassId == PCLASS_AMAZON || pPlayer1->dwClassId == PCLASS_SORCERESS || pPlayer1->dwClassId == PCLASS_ASSASSIN))
-    {
-        nType = nParam != 0 ? PARTYSCREENTYPE_ALLOW_FEMALE_TO_LOOT : PARTYSCREENTYPE_DISALLOW_FEMALE_TO_LOOT;
-    }
-    else
+    if (!pPlayer1 || (pPlayer1->dwClassId > PCLASS_SORCERESS && pPlayer1->dwClassId != PCLASS_ASSASSIN))
     {
         nType = nParam != 0 ? PARTYSCREENTYPE_ALLOW_MALE_TO_LOOT : PARTYSCREENTYPE_DISALLOW_MALE_TO_LOOT;
     }
+    else
+    {
+        nType = nParam != 0 ? PARTYSCREENTYPE_ALLOW_FEMALE_TO_LOOT : PARTYSCREENTYPE_DISALLOW_FEMALE_TO_LOOT;
+    }
 
-    PARTYSCREEN_SendEventUpdateToClient(SUNIT_GetClientFromPlayer(pPlayer2, __FILE__, __LINE__), pPlayer1 ? pPlayer1->dwUnitId : -1, nType);
+    PARTYSCREEN_SendEventUpdateToClient(PARTYSCREEN_GetClient(pPlayer2), pPlayer1 ? pPlayer1->dwUnitId : -1, nType);
 }
 
 //D2Game.0x6FC7AC20
+// 1.13c D2Game+0xF0720
 void __fastcall PARTYSCREEN_SendEventUpdateToClient(D2ClientStrc* pClient, int32_t nUnitGUID, uint8_t nType)
 {
     D2GSPacketSrv5A packet5A = {};
     packet5A.nHeader = 0x5A;
     packet5A.nType = EVENTTYPE_PVPSTATUS;
-    packet5A.dwParam = nUnitGUID;
     packet5A.nParam = nType;
+    packet5A.dwParam = nUnitGUID;
 
+    uint8_t nColor = STRCOLOR_BLUE;
     switch (nType)
     {
     case PARTYSCREENTYPE_ALLOW_MALE_TO_LOOT:
     case PARTYSCREENTYPE_ALLOW_FEMALE_TO_LOOT:
-        packet5A.nColor = STRCOLOR_DARK_GOLD;
+        nColor = STRCOLOR_DARK_GOLD;
         break;
-
     case PARTYSCREENTYPE_HOSTILE:
-        packet5A.nColor = STRCOLOR_ORANGE;
+        nColor = STRCOLOR_ORANGE;
         break;
-
     case PARTYSCREENTYPE_NO_LONGER_HOSTILE:
-        packet5A.nColor = STRCOLOR_WHITE;
+        nColor = STRCOLOR_WHITE;
         break;
-
     case PARTYSCREENTYPE_RECEIVED_INVITE:
     case PARTYSCREENTYPE_HAS_JOINED_PARTY:
     case PARTYSCREENTYPE_NOW_ALLIED_WITH:
-        packet5A.nColor = STRCOLOR_LIGHTGREEN;
+        nColor = STRCOLOR_LIGHTGREEN;
         break;
-
     case PARTYSCREENTYPE_INVITATION_CANCELLED:
     case PARTYSCREENTYPE_HAS_LEFT_PARTY:
     case PARTYSCREENTYPE_DISALLOW_MALE_TO_LOOT:
     case PARTYSCREENTYPE_DISALLOW_FEMALE_TO_LOOT:
-        packet5A.nColor = STRCOLOR_YELLOW;
+        nColor = STRCOLOR_YELLOW;
         break;
-
     default:
-        packet5A.nColor = STRCOLOR_BLUE;
         break;
     }
+    packet5A.nColor = nColor;
 
     D2GAME_PACKETS_SendPacket0x5A_6FC3DEC0(pClient, &packet5A);
 }
 
 //D2Game.0x6FC7AD10
+// 1.13c D2Game+0xF0EE0
 void __fastcall PARTYSCREEN_ToggleIgnore(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t nParam, int32_t* pFailure)
 {
     D2_MAYBE_UNUSED(pFailure);
     PLAYERLIST_AllocPlayerList(pGame, pPlayer1, pPlayer2);
     PLAYERLIST_AllocPlayerList(pGame, pPlayer2, pPlayer1);
 
-    if (PLAYERLIST_CheckFlag(pPlayer1, pPlayer2, 2) != nParam)
+    if ((uint32_t)PLAYERLIST_CheckFlag(pPlayer1, pPlayer2, 2) != (uint32_t)nParam)
     {
         PLAYERLIST_ToggleFlag(pGame, pPlayer1, pPlayer2, 2, nParam);
     }
@@ -136,13 +154,14 @@ void __fastcall PARTYSCREEN_ToggleIgnore(D2GameStrc* pGame, D2UnitStrc* pPlayer1
 }
 
 //D2Game.0x6FC7AD70
+// 1.13c D2Game+0xF0E80
 void __fastcall PARTYSCREEN_ToggleSquelch(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t nParam, int32_t* pFailure)
 {
     D2_MAYBE_UNUSED(pFailure);
     PLAYERLIST_AllocPlayerList(pGame, pPlayer1, pPlayer2);
     PLAYERLIST_AllocPlayerList(pGame, pPlayer2, pPlayer1);
 
-    if (PLAYERLIST_CheckFlag(pPlayer1, pPlayer2, 4) != nParam)
+    if ((uint32_t)PLAYERLIST_CheckFlag(pPlayer1, pPlayer2, 4) != (uint32_t)nParam)
     {
         PLAYERLIST_ToggleFlag(pGame, pPlayer1, pPlayer2, 4, nParam);
     }
@@ -152,25 +171,26 @@ void __fastcall PARTYSCREEN_ToggleSquelch(D2GameStrc* pGame, D2UnitStrc* pPlayer
 }
 
 //D2Game.0x6FC7ADD0
+// 1.13c D2Game+0xF0D50
 void __fastcall D2GAME_PARTYSCREEN_Command8_6FC7ADD0(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t nParam, int32_t* pFailure)
 {
     D2_MAYBE_UNUSED(nParam);
     D2_MAYBE_UNUSED(pFailure);
-    int16_t nPartyId = SUNIT_GetPartyId(pPlayer2);
+    uint16_t nPartyId = (uint16_t)SUNIT_GetPartyId(pPlayer2);
 
     PLAYERLIST_AllocPlayerList(pGame, pPlayer1, pPlayer2);
     PLAYERLIST_AllocPlayerList(pGame, pPlayer2, pPlayer1);
 
-    if (sub_6FCBA9D0(pPlayer1, pPlayer2) != 2)
+    if ((int16_t)sub_6FCBA9D0(pPlayer1, pPlayer2) != 2)
     {
         sub_6FCBAA20(pPlayer2, pPlayer1);
         sub_6FCBAA20(pPlayer1, pPlayer2);
         return;
     }
 
-    if (nPartyId == -1)
+    if (nPartyId == 0xFFFF)
     {
-        nPartyId = sub_6FCB9C40(pGame);
+        nPartyId = (uint16_t)sub_6FCB9C40(pGame);
         sub_6FCB9D10(pGame, nPartyId, pPlayer2);
         sub_6FCB9D10(pGame, nPartyId, pPlayer1);
         PLAYERLIST_sub_6FCBAD60(pGame, pPlayer2);
@@ -182,81 +202,64 @@ void __fastcall D2GAME_PARTYSCREEN_Command8_6FC7ADD0(D2GameStrc* pGame, D2UnitSt
 
     PLAYERLIST_sub_6FCBAD60(pGame, pPlayer1);
 
-    D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer1, __FILE__, __LINE__);
-    PARTYSCREEN_SendEventUpdateToClient(pClient, pPlayer2 ? pPlayer2->dwUnitId : -1, PARTYSCREENTYPE_NOW_ALLIED_WITH);
+    PARTYSCREEN_SendEventUpdateToClient(PARTYSCREEN_GetClient(pPlayer1), pPlayer2 ? pPlayer2->dwUnitId : -1, PARTYSCREENTYPE_NOW_ALLIED_WITH);
 
     D2PartyScreenCallbackStrc arg = {};
     arg.pPlayer1 = pPlayer2;
     arg.pPlayer2 = pPlayer1;
-    arg.nPartyId = nPartyId;
+    arg.nPartyId = (int16_t)nPartyId;
     SUNIT_IterateLivingPlayers(pGame, sub_6FC7AED0, &arg);
 }
 
 //Inlined in D2Game.0x6FC7AED0
+// 1.13c D2Game+0xF09E0
 void __fastcall inlinedfunction(D2UnitStrc* pLocalPlayer, D2UnitStrc* pOtherPlayer)
 {
-    int32_t nLocalGUID = -1;
-    if (pLocalPlayer)
-    {
-        nLocalGUID = pLocalPlayer->dwUnitId;
-    }
-
-    int32_t nOtherGUID = -1;
-    if (pOtherPlayer)
-    {
-        nOtherGUID = pOtherPlayer->dwUnitId;
-    }
-
+    const int32_t nLocalGUID = pLocalPlayer ? pLocalPlayer->dwUnitId : -1;
+    const int32_t nOtherGUID = pOtherPlayer ? pOtherPlayer->dwUnitId : -1;
     if (nLocalGUID == nOtherGUID)
     {
         return;
     }
 
     const int16_t nPartyId = SUNIT_GetPartyId(pLocalPlayer);
-    if (nPartyId != -1)
-    {
-        sub_6FCBA980(pOtherPlayer, pLocalPlayer, 1);
-        sub_6FCBA980(pLocalPlayer, pOtherPlayer, 1);
-    }
-    else if (sub_6FCBA9D0(pOtherPlayer, pLocalPlayer) == 4)
+    if (nPartyId == -1 && sub_6FCBA9D0(pOtherPlayer, pLocalPlayer) == 4)
     {
         sub_6FCBA980(pLocalPlayer, pOtherPlayer, 2);
+        return;
     }
-    else
-    {
-        sub_6FCBA980(pOtherPlayer, pLocalPlayer, 0);
-        sub_6FCBA980(pLocalPlayer, pOtherPlayer, 1);
-    }
+
+    sub_6FCBA980(pOtherPlayer, pLocalPlayer, nPartyId != -1);
+    sub_6FCBA980(pLocalPlayer, pOtherPlayer, 1);
 }
 
 //D2Game.0x6FC7AED0
+// 1.13c D2Game+0xF0B90
 void __fastcall sub_6FC7AED0(D2GameStrc* pGame, D2UnitStrc* pLocalPlayer, void* a3)
 {
     D2PartyScreenCallbackStrc* pArg = (D2PartyScreenCallbackStrc*)a3;
-    D2UnitStrc* pPlayer1 = pArg->pPlayer1;
-    D2UnitStrc* pPlayer2 = pArg->pPlayer2;
 
     const int16_t nPartyId = SUNIT_GetPartyId(pLocalPlayer);
-    PLAYERLIST_AllocPlayerList(pGame, pLocalPlayer, pPlayer1);
-    PLAYERLIST_AllocPlayerList(pGame, pPlayer1, pLocalPlayer);
-    PLAYERLIST_AllocPlayerList(pGame, pLocalPlayer, pPlayer2);
-    PLAYERLIST_AllocPlayerList(pGame, pPlayer2, pLocalPlayer);
+    PLAYERLIST_AllocPlayerList(pGame, pLocalPlayer, pArg->pPlayer1);
+    PLAYERLIST_AllocPlayerList(pGame, pArg->pPlayer1, pLocalPlayer);
+    PLAYERLIST_AllocPlayerList(pGame, pLocalPlayer, pArg->pPlayer2);
+    PLAYERLIST_AllocPlayerList(pGame, pArg->pPlayer2, pLocalPlayer);
 
-    inlinedfunction(pLocalPlayer, pPlayer1);
-    inlinedfunction(pLocalPlayer, pPlayer2);
+    inlinedfunction(pLocalPlayer, pArg->pPlayer1);
+    inlinedfunction(pLocalPlayer, pArg->pPlayer2);
 
-    if (nPartyId == pArg->nPartyId && nPartyId != -1 && pLocalPlayer != pPlayer2)
+    if (nPartyId == pArg->nPartyId && nPartyId != -1 && pLocalPlayer != pArg->pPlayer2)
     {
-        D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pLocalPlayer, __FILE__, __LINE__);
-        PARTYSCREEN_SendEventUpdateToClient(pClient, pPlayer2 ? pPlayer2->dwUnitId : -1, PARTYSCREENTYPE_HAS_JOINED_PARTY);
+        PARTYSCREEN_SendEventUpdateToClient(PARTYSCREEN_GetClient(pLocalPlayer), pArg->pPlayer2 ? pArg->pPlayer2->dwUnitId : -1, PARTYSCREENTYPE_HAS_JOINED_PARTY);
     }
 
-    sub_6FCBAA20(pLocalPlayer, pPlayer1);
-    sub_6FCBAA20(pLocalPlayer, pPlayer2);
+    sub_6FCBAA20(pLocalPlayer, pArg->pPlayer1);
+    sub_6FCBAA20(pLocalPlayer, pArg->pPlayer2);
     sub_6FC3F8F0(pGame, pLocalPlayer);
 }
 
 //D2Game.0x6FC7B030
+// 1.13c D2Game+0xF0900
 void __fastcall PARTYSCREEN_InvitationCancelled(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t nParam, int32_t* pFailure)
 {
     D2_MAYBE_UNUSED(nParam);
@@ -264,12 +267,11 @@ void __fastcall PARTYSCREEN_InvitationCancelled(D2GameStrc* pGame, D2UnitStrc* p
     PLAYERLIST_AllocPlayerList(pGame, pPlayer1, pPlayer2);
     PLAYERLIST_AllocPlayerList(pGame, pPlayer2, pPlayer1);
 
-    if (sub_6FCBA9D0(pPlayer1, pPlayer2) == 4)
+    if ((int16_t)sub_6FCBA9D0(pPlayer1, pPlayer2) == 4)
     {
         sub_6FCBA980(pPlayer1, pPlayer2, SUNIT_GetPartyId(pPlayer2) != -1);
         sub_6FCBA980(pPlayer2, pPlayer1, SUNIT_GetPartyId(pPlayer1) != -1);
-
-        PARTYSCREEN_SendEventUpdateToClient(SUNIT_GetClientFromPlayer(pPlayer2, __FILE__, __LINE__), pPlayer1 ? pPlayer1->dwUnitId : -1, PARTYSCREENTYPE_INVITATION_CANCELLED);
+        PARTYSCREEN_SendEventUpdateToClient(PARTYSCREEN_GetClient(pPlayer2), pPlayer1 ? pPlayer1->dwUnitId : -1, PARTYSCREENTYPE_INVITATION_CANCELLED);
     }
 
     sub_6FCBAA20(pPlayer1, pPlayer2);
@@ -277,6 +279,7 @@ void __fastcall PARTYSCREEN_InvitationCancelled(D2GameStrc* pGame, D2UnitStrc* p
 }
 
 //D2Game.0x6FC7B0E0
+// 1.13c D2Game+0xF0870
 void __fastcall PARTYSCREEN_ReceivedInvitation(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t nParam, int32_t* pFailure)
 {
     D2_MAYBE_UNUSED(nParam);
@@ -284,12 +287,11 @@ void __fastcall PARTYSCREEN_ReceivedInvitation(D2GameStrc* pGame, D2UnitStrc* pP
     PLAYERLIST_AllocPlayerList(pGame, pPlayer1, pPlayer2);
     PLAYERLIST_AllocPlayerList(pGame, pPlayer2, pPlayer1);
 
-    if (!sub_6FCBA9D0(pPlayer1, pPlayer2))
+    if ((int16_t)sub_6FCBA9D0(pPlayer1, pPlayer2) == 0)
     {
         sub_6FCBA980(pPlayer1, pPlayer2, 4);
         sub_6FCBA980(pPlayer2, pPlayer1, 2);
-
-        PARTYSCREEN_SendEventUpdateToClient(SUNIT_GetClientFromPlayer(pPlayer2, __FILE__, __LINE__), pPlayer1 ? pPlayer1->dwUnitId : -1, PARTYSCREENTYPE_RECEIVED_INVITE);
+        PARTYSCREEN_SendEventUpdateToClient(PARTYSCREEN_GetClient(pPlayer2), pPlayer1 ? pPlayer1->dwUnitId : -1, PARTYSCREENTYPE_RECEIVED_INVITE);
     }
 
     sub_6FCBAA20(pPlayer1, pPlayer2);
@@ -297,27 +299,56 @@ void __fastcall PARTYSCREEN_ReceivedInvitation(D2GameStrc* pGame, D2UnitStrc* pP
 }
 
 //D2Game.0x6FC7B160
+// 1.13c D2Game+0xF10F0
 void __fastcall PARTYSCREEN_PlayerLeftParty(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t nParam, int32_t* pFailure)
 {
     D2_MAYBE_UNUSED(pPlayer2);
     D2_MAYBE_UNUSED(nParam);
     D2_MAYBE_UNUSED(pFailure);
-    PARTY_IteratePartyMembers(pGame, SUNIT_GetPartyId(pPlayer1), PARTYSCREEN_PartyIterate_PlayerLeftParty, pPlayer1);
+    const int16_t nPartyId = SUNIT_GetPartyId(pPlayer1);
+    PARTY_IteratePartyMembers(pGame, nPartyId, PARTYSCREEN_PartyIterate_PlayerLeftParty, pPlayer1);
     PARTY_LeaveParty(pGame, pPlayer1);
 }
 
 //D2Game.0x6FC7B190
+// 1.13c D2Game+0xF0820
 void __fastcall PARTYSCREEN_PartyIterate_PlayerLeftParty(D2GameStrc* pGame, D2UnitStrc* pPlayer1, void* pArg)
 {
     D2_MAYBE_UNUSED(pGame);
     D2UnitStrc* pPlayer2 = (D2UnitStrc*)pArg;
-    if (pPlayer1 != pPlayer2)
+    if (pPlayer1 == pPlayer2)
     {
-        PARTYSCREEN_SendEventUpdateToClient(SUNIT_GetClientFromPlayer(pPlayer1, __FILE__, __LINE__), pPlayer2 ? pPlayer2->dwUnitId : -1, PARTYSCREENTYPE_HAS_LEFT_PARTY);
+        return;
     }
+
+    PARTYSCREEN_SendEventUpdateToClient(PARTYSCREEN_GetClient(pPlayer1), pPlayer2 ? pPlayer2->dwUnitId : -1, PARTYSCREENTYPE_HAS_LEFT_PARTY);
+}
+
+// 1.13c D2Game+0xF0FF0: hostility opened by pPlayer1 against pPlayer2. A partied target turns the
+// whole party hostile (when pPlayer1 is past level 8); a lone target gets hostility both ways
+// (FRIENDLY_OpenHostility, which retail inlines here) and the HOSTILE event.
+static void PARTYSCREEN_OpenHostility(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2)
+{
+    if (pPlayer2 && pPlayer2->pGame && pPlayer2->dwUnitType == UNIT_PLAYER)
+    {
+        const int16_t nPartyId = SUNIT_GetPartyId(pPlayer2);
+        if (nPartyId != -1)
+        {
+            if (STATLIST_GetUnitBaseStat(pPlayer1, STAT_LEVEL, 0) > 8)
+            {
+                PARTY_IteratePartyMembers(pGame, nPartyId, sub_6FC7B3F0, pPlayer1);
+            }
+            return;
+        }
+    }
+
+    FRIENDLY_OpenHostility(pGame, pPlayer1, pPlayer2);
+    FRIENDLY_OpenHostility(pGame, pPlayer2, pPlayer1);
+    PARTYSCREEN_SendEventUpdateToClient(PARTYSCREEN_GetClient(pPlayer2), pPlayer1 ? pPlayer1->dwUnitId : -1, PARTYSCREENTYPE_HOSTILE);
 }
 
 //D2Game.0x6FC7B1D0
+// 1.13c D2Game+0xF1130
 void __fastcall PARTYSCREEN_ToggleHostile(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t nParam, int32_t* pFailure)
 {
     D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pPlayer1);
@@ -330,100 +361,86 @@ void __fastcall PARTYSCREEN_ToggleHostile(D2GameStrc* pGame, D2UnitStrc* pPlayer
     PLAYERLIST_AllocPlayerList(pGame, pPlayer1, pPlayer2);
     PLAYERLIST_AllocPlayerList(pGame, pPlayer2, pPlayer1);
 
-    if (PLAYERLIST_CheckFlag(pPlayer1, pPlayer2, 8) == nParam)
+    if ((uint32_t)PLAYERLIST_CheckFlag(pPlayer1, pPlayer2, 8) != (uint32_t)nParam)
     {
-        sub_6FCBAAA0(pGame, pPlayer1, pPlayer2);
-        sub_6FCBAAA0(pGame, pPlayer2, pPlayer1);
-        return;
-    }
+        if (!PLAYERLIST_CheckFlag(pPlayer1, pPlayer2, 8) && STATLIST_UnitGetStatValue(pPlayer2, STAT_LEVEL, 0) < 9)
+        {
+            return;
+        }
 
-    if (!PLAYERLIST_CheckFlag(pPlayer1, pPlayer2, 8) && STATLIST_UnitGetStatValue(pPlayer2, STAT_LEVEL, 0) < 9)
-    {
-        return;
-    }
+        if (!nParam)
+        {
+            FRIENDLY_RemoveHostility(pGame, pPlayer1, pPlayer2);
+            PARTYSCREEN_SendEventUpdateToClient(PARTYSCREEN_GetClient(pPlayer2), pPlayer1 ? pPlayer1->dwUnitId : -1, PARTYSCREENTYPE_NO_LONGER_HOSTILE);
+            return;
+        }
 
-    if (!nParam)
-    {
-        FRIENDLY_RemoveHostility(pGame, pPlayer1, pPlayer2);
-        PARTYSCREEN_SendEventUpdateToClient(SUNIT_GetClientFromPlayer(pPlayer2, __FILE__, __LINE__), pPlayer1 ? pPlayer1->dwUnitId : -1, PARTYSCREENTYPE_NO_LONGER_HOSTILE);
-        return;
-    }
+        if (PLAYERLIST_GetHostileDelay(pPlayer1, pPlayer2) <= GetTickCount())
+        {
+            PLAYERLIST_SetHostileDelay(pPlayer1, pPlayer2, GetTickCount() + 60000);
+            PARTYSCREEN_OpenHostility(pGame, pPlayer1, pPlayer2);
+            sub_6FC7C170(pGame, pPlayer1);
 
-    if (PLAYERLIST_GetHostileDelay(pPlayer1, pPlayer2) > GetTickCount())
-    {
+            const int16_t nPartyId1 = SUNIT_GetPartyId(pPlayer1);
+            if (nPartyId1 != -1 && nPartyId1 == SUNIT_GetPartyId(pPlayer2))
+            {
+                PARTYSCREEN_PlayerLeftParty(pGame, pPlayer1, nullptr, 0, nullptr);
+            }
+            return;
+        }
+
         SUNIT_AttachSound(pPlayer1, 0x13u, pPlayer1);
         PLRTRADE_SendEventPacketToPlayer(pPlayer1, EVENTTYPE_PLEASEWAITHOSTILE, nullptr);
-        sub_6FCBAAA0(pGame, pPlayer1, pPlayer2);
-        sub_6FCBAAA0(pGame, pPlayer2, pPlayer1);
-        return;
     }
 
-    PLAYERLIST_SetHostileDelay(pPlayer1, pPlayer2, GetTickCount() + 60000);
-
-    const int32_t nPartyId2 = SUNIT_GetPartyId(pPlayer2);
-    if (nPartyId2 == -1)
-    {
-        FRIENDLY_OpenHostility(pGame, pPlayer1, pPlayer2);
-        FRIENDLY_OpenHostility(pGame, pPlayer2, pPlayer1);
-
-        PARTYSCREEN_SendEventUpdateToClient(SUNIT_GetClientFromPlayer(pPlayer2, __FILE__, __LINE__), pPlayer1 ? pPlayer1->dwUnitId : -1, PARTYSCREENTYPE_HOSTILE);
-    }
-    else if (STATLIST_GetUnitBaseStat(pPlayer1, STAT_LEVEL, 0) >= 9)
-    {
-        PARTY_IteratePartyMembers(pGame, nPartyId2, sub_6FC7B3F0, pPlayer1);
-    }
-
-    sub_6FC7C170(pGame, pPlayer1);
-
-    const int32_t nPartyId1 = SUNIT_GetPartyId(pPlayer1);
-    if (nPartyId1 != -1 && nPartyId1 == SUNIT_GetPartyId(pPlayer2))
-    {
-        PARTY_IteratePartyMembers(pGame, SUNIT_GetPartyId(pPlayer1), PARTYSCREEN_PartyIterate_PlayerLeftParty, pPlayer1);
-        PARTY_LeaveParty(pGame, pPlayer1);
-    }
+    sub_6FCBAAA0(pGame, pPlayer1, pPlayer2);
+    sub_6FCBAAA0(pGame, pPlayer2, pPlayer1);
 }
 
 //D2Game.0x6FC7B3F0
+// 1.13c D2Game+0xF0CD0
 void __fastcall sub_6FC7B3F0(D2GameStrc* pGame, D2UnitStrc* pPlayer1, void* pArg)
 {
     D2UnitStrc* pPlayer2 = (D2UnitStrc*)pArg;
-    if (pPlayer2 == pPlayer1 || STATLIST_GetUnitBaseStat(pPlayer1, STAT_LEVEL, 0) < 9)
+    if (pPlayer2 == pPlayer1 || STATLIST_GetUnitBaseStat(pPlayer1, STAT_LEVEL, 0) <= 8)
     {
         return;
     }
 
     FRIENDLY_OpenHostility(pGame, pPlayer2, pPlayer1);
     FRIENDLY_OpenHostility(pGame, pPlayer1, pPlayer2);
-
-    PARTYSCREEN_SendEventUpdateToClient(SUNIT_GetClientFromPlayer(pPlayer1, __FILE__, __LINE__), pPlayer2 ? pPlayer2->dwUnitId : -1, PARTYSCREENTYPE_HOSTILE);
+    PARTYSCREEN_SendEventUpdateToClient(PARTYSCREEN_GetClient(pPlayer1), pPlayer2 ? pPlayer2->dwUnitId : -1, PARTYSCREENTYPE_HOSTILE);
 }
 
 //D2Game.0x6FC7B450
+// not-1.13c: retail has no wrapper; the party functions at D2Game+0x9C76F and +0x9C8FB call the
+// living-player walk (D2Game+0xDFC10) with D2Game+0xF0B10 themselves. Kept for UNIT/Party.cpp.
 void __fastcall sub_6FC7B450(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     SUNIT_IterateLivingPlayers(pGame, sub_6FC7B460, pPlayer);
 }
 
 //D2Game.0x6FC7B460
+// 1.13c D2Game+0xF0B10
 void __fastcall sub_6FC7B460(D2GameStrc* pGame, D2UnitStrc* pPlayer1, void* pArg)
 {
+    D2_MAYBE_UNUSED(pGame);
     D2UnitStrc* pPlayer2 = (D2UnitStrc*)pArg;
-    if (pPlayer1 == pPlayer2)
-    {
-        sub_6FCBA980(pPlayer1, pPlayer1, 1);
-        SCMD_Send0x75_PartyRosterUpdate(pPlayer1, pPlayer1);
-    }
-    else
+    if (pPlayer1 != pPlayer2)
     {
         sub_6FCBA980(pPlayer1, pPlayer2, 0);
         sub_6FCBA980(pPlayer2, pPlayer1, SUNIT_GetPartyId(pPlayer1) != -1);
-
         SCMD_Send0x75_PartyRosterUpdate(pPlayer1, pPlayer2);
         SCMD_Send0x75_PartyRosterUpdate(pPlayer2, pPlayer1);
+        return;
     }
+
+    sub_6FCBA980(pPlayer1, pPlayer1, 1);
+    SCMD_Send0x75_PartyRosterUpdate(pPlayer1, pPlayer1);
 }
 
 //D2Game.0x6FC7B4C0
+// 1.13c D2Game+0xF0A70
 int32_t __fastcall PARTYSCREEN_CommandHandler(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nCallbackId, int32_t nOtherPlayerGUID, int32_t nParam)
 {
     constexpr void(__fastcall* gpfPartyCommands_6FD28E60[10])(D2GameStrc*, D2UnitStrc*, D2UnitStrc*, int32_t, int32_t*) =
@@ -440,23 +457,26 @@ int32_t __fastcall PARTYSCREEN_CommandHandler(D2GameStrc* pGame, D2UnitStrc* pUn
         PARTYSCREEN_PlayerLeftParty,
     };
 
+    int32_t bFailure = 0;
+    // Retail inlines SUNIT_GetServerUnit (pGame asserted, then the player hash chain).
     D2UnitStrc* pOtherPlayer = SUNIT_GetServerUnit(pGame, UNIT_PLAYER, nOtherPlayerGUID);
-    if (!pOtherPlayer || !gpfPartyCommands_6FD28E60[nCallbackId])
+    if (!pOtherPlayer)
     {
         return 0;
     }
 
-    if (IsBadCodePtr((FARPROC)gpfPartyCommands_6FD28E60[nCallbackId]))
+    if (gpfPartyCommands_6FD28E60[nCallbackId])
     {
-        FOG_DisplayAssert("sgcptPartyCommands[eCommand].pfnProcess", __FILE__, __LINE__);
-        exit(-1);
-    }
+        if (IsBadCodePtr((FARPROC)gpfPartyCommands_6FD28E60[nCallbackId]))
+        {
+            return 3;
+        }
 
-    int32_t bFailure = 0;
-    gpfPartyCommands_6FD28E60[nCallbackId](pGame, pUnit, pOtherPlayer, nParam, &bFailure);
-    if (bFailure)
-    {
-        return 3;
+        gpfPartyCommands_6FD28E60[nCallbackId](pGame, pUnit, pOtherPlayer, nParam, &bFailure);
+        if (bFailure)
+        {
+            return 3;
+        }
     }
 
     return 0;

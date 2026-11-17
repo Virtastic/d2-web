@@ -108,7 +108,7 @@ void __fastcall D2GAME_NPC_FirstFn_6FCC67D0(D2GameStrc* pGame, int32_t nVendorId
 }
 
 //D2Game.0x6FCC6970
-// 1.13c D2Game+0xBD9B0
+// 1.13c D2Game+0xBD9B0 (diffed line by line; BDE50 is only the repair-all callback adapter that swaps the item and game arguments, so this function is passed directly)
 void __fastcall D2GAME_NPC_RepairItem_6FCC6970(D2GameStrc* pGame, D2UnitStrc* pItem, D2UnitStrc* pPlayer)
 {
     if (ITEMS_IsRepairable(pItem))
@@ -149,6 +149,7 @@ void __fastcall D2GAME_NPC_RepairItem_6FCC6970(D2GameStrc* pGame, D2UnitStrc* pI
 }
 
 //D2Game.0x6FCC6A60
+// 1.13c D2Game+0xBEE30 (diffed line by line: upgrade rolls, Cracked retry x5, base-code retry at quality 2, page 1 -> 2 fallback, vendor flag)
 D2UnitStrc* __fastcall D2GAME_NPC_GenerateStoreItem_6FCC6A60(D2UnitStrc* pNpc, int32_t szCode, D2GameStrc* pGame, int32_t a4, int32_t nQuality, int32_t nItemLevel, int32_t nPlayerLevel)
 {
     D2_ASSERT(pGame);
@@ -295,6 +296,7 @@ D2UnitStrc* __fastcall D2GAME_NPC_GenerateStoreItem_6FCC6A60(D2UnitStrc* pNpc, i
 }
 
 //D2Game.0x6FCC6F10
+// 1.13c D2Game+0xBD880 (asserts game, npc, item in that order; remove from the npc inventory, then flag + trade inventory + cmd flag, or free)
 void __fastcall sub_6FCC6F10(D2UnitStrc* pNpc, D2UnitStrc* pItem, D2GameStrc* pGame, int32_t bInit)
 {
     D2_ASSERT(pGame);
@@ -317,7 +319,7 @@ void __fastcall sub_6FCC6F10(D2UnitStrc* pNpc, D2UnitStrc* pItem, D2GameStrc* pG
     }
 }
 
-//D2Game.0x6FCC6FF0
+// 1.13c D2Game+0xBD330 (hire-list refresh: class gate 0x96/0xC6/0x203/0xFC, 0x4F header, lazy list init, one 0x4E per available unhired entry)
 void __fastcall D2GAME_NPC_BuildHirelingList_6FCC6FF0(D2GameStrc* pGame, D2ClientStrc* pClient, D2UnitStrc* pUnit, int32_t a4)
 {
     if (!pUnit)
@@ -370,6 +372,7 @@ void __fastcall D2GAME_NPC_BuildHirelingList_6FCC6FF0(D2GameStrc* pGame, D2Clien
 }
 
 //D2Game.0x6FCC7100
+// 1.13c D2Game+0xBF2E0 (item level = player level + 5 capped by act on normal = 0xBCB20; counts, quality bands, magic and perm passes diffed)
 void __fastcall D2GAME_NPC_FillStoreInventory_6FCC7100(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNpc, D2NpcTradeStrc* pTrade)
 {    
     D2SeedStrc* pSeed = SUNITPROXY_GetSeedFromNpcControl(pGame);
@@ -493,7 +496,7 @@ void __fastcall D2GAME_NPC_FillStoreInventory_6FCC7100(D2GameStrc* pGame, D2Unit
     }
 }
 
-//D2Game.0x6FCC74F0
+// 1.13c D2Game+0xBF810 (the hire-list classes 0x96/0x203/0xC6 are the ones that return after the trade-record setup; every other NPC refreshes and flags its items)
 void __fastcall D2GAME_STORES_CreateVendorCache_6FCC74F0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNPC, int32_t a4, int32_t a5)
 {
     if (!pNPC)
@@ -517,9 +520,9 @@ void __fastcall D2GAME_STORES_CreateVendorCache_6FCC74F0(D2GameStrc* pGame, D2Un
     case MONSTER_KASHYA:
     case MONSTER_GREIZ:
     case MONSTER_QUAL_KEHK:
-        break;
-    default:
         return;
+    default:
+        break;
     }
 
     if (a4 && !a5 && pNpcRecord->npcTrade.bRefreshInventory)
@@ -573,6 +576,7 @@ void __fastcall D2GAME_STORES_CreateVendorCache_6FCC74F0(D2GameStrc* pGame, D2Un
 }
 
 //D2Game.0x6FCC7680
+// 1.13c D2Game+0xBF990 (the copy's second pricing and the body-slot refusal were missing from the 1.10f body)
 int32_t __fastcall D2GAME_STORES_SellItem_6FCC7680(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nNpcGUID, int32_t nItemGUID, uint16_t nItemMode, int32_t a6)
 {
     D2_ASSERT(pGame);
@@ -609,7 +613,8 @@ int32_t __fastcall D2GAME_STORES_SellItem_6FCC7680(D2GameStrc* pGame, D2UnitStrc
         return 3;
     }
 
-    const int32_t nTransactionCost = ITEMS_GetTransactionCost(pPlayer, pItem, (D2C_Difficulties)pGame->nDifficulty, UNITS_GetPlayerData(pPlayer)->pQuestData[pGame->nDifficulty], pNpc->dwClassId, D2C_TransactionTypes::TRANSACTIONTYPE_SELL);
+    int32_t nTransactionCost = ITEMS_GetTransactionCost(pPlayer, pItem, (D2C_Difficulties)pGame->nDifficulty, UNITS_GetPlayerData(pPlayer)->pQuestData[pGame->nDifficulty], pNpc->dwClassId, D2C_TransactionTypes::TRANSACTIONTYPE_SELL);
+    D2UnitStrc* pStoredDupe = nullptr;
 
     int32_t bReSellAble = 1;
 
@@ -718,6 +723,13 @@ int32_t __fastcall D2GAME_STORES_SellItem_6FCC7680(D2GameStrc* pGame, D2UnitStrc
                     INVENTORY_AddItemToTradeInventory(pNpc->pInventory, pDupeItem);
                     STATLIST_SetUnitStat(pDupeItem, STAT_DURABILITY, STATLIST_GetMaxDurabilityFromUnit(pDupeItem), 0);
                     STATLIST_SetUnitStat(pDupeItem, STAT_QUANTITY, ITEMS_GetTotalMaxStack(pDupeItem), 0);
+                    pStoredDupe = pDupeItem;
+                    // the copy at full durability and quantity is priced again; the sale takes the lower price
+                    const int32_t nDupeCost = ITEMS_GetTransactionCost(pPlayer, pDupeItem, (D2C_Difficulties)pGame->nDifficulty, UNITS_GetPlayerData(pPlayer)->pQuestData[pGame->nDifficulty], pNpc->dwClassId, D2C_TransactionTypes::TRANSACTIONTYPE_SELL);
+                    if (nDupeCost < nTransactionCost)
+                    {
+                        nTransactionCost = nDupeCost;
+                    }
                 }
                 else if (nStorePage == 1)
                 {
@@ -739,6 +751,12 @@ int32_t __fastcall D2GAME_STORES_SellItem_6FCC7680(D2GameStrc* pGame, D2UnitStrc
                         INVENTORY_AddItemToTradeInventory(pNpc->pInventory, pDupeItem);
                         STATLIST_SetUnitStat(pDupeItem, STAT_DURABILITY, STATLIST_GetMaxDurabilityFromUnit(pDupeItem), 0);
                         STATLIST_SetUnitStat(pDupeItem, STAT_QUANTITY, ITEMS_GetTotalMaxStack(pDupeItem), 0);
+                        pStoredDupe = pDupeItem;
+                        const int32_t nDupeCost = ITEMS_GetTransactionCost(pPlayer, pDupeItem, (D2C_Difficulties)pGame->nDifficulty, UNITS_GetPlayerData(pPlayer)->pQuestData[pGame->nDifficulty], pNpc->dwClassId, D2C_TransactionTypes::TRANSACTIONTYPE_SELL);
+                        if (nDupeCost < nTransactionCost)
+                        {
+                            nTransactionCost = nDupeCost;
+                        }
                     }
                     else
                     {
@@ -846,7 +864,16 @@ int32_t __fastcall D2GAME_STORES_SellItem_6FCC7680(D2GameStrc* pGame, D2UnitStrc
     }
     else
     {
-        sub_6FC45B30(pGame, pPlayer, ITEMS_GetBodyLocation(pItem), 1, &nUnused);
+        int32_t nModeSlot = nItemMode;
+        if (!sub_6FC45B30(pGame, pPlayer, ITEMS_GetBodyLocation(pItem), 1, &nModeSlot))
+        {
+            if (pStoredDupe)
+            {
+                // not-1.13c: retail also frees a copy it already freed after a failed placement (BF990); only a stored copy is freed here
+                ITEMS_RemoveFromAllPlayers(pGame, pStoredDupe);
+            }
+            return 1;
+        }
     }
 
     ITEMS_HandleGoldTransaction(pGame, pPlayer, nTransactionCost);
@@ -859,6 +886,7 @@ int32_t __fastcall D2GAME_STORES_SellItem_6FCC7680(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FCC7E20
+// 1.13c D2Game+0xBDD80 (gamble removal is 0xBD920, the shared-store removal 0xBD880 = sub_6FCC6F10, the perm / hp4 / hp5 / mp4 / mp5 test 0xBCAA0; retail has no trace on a missing gamble inventory)
 void __fastcall sub_6FCC7E20(D2GameStrc* pGame, D2UnitStrc* pNpc, D2UnitStrc* pItem, D2UnitStrc* pUnit, int32_t a5)
 {
     int32_t nUnused = 0;
@@ -896,10 +924,6 @@ void __fastcall sub_6FCC7E20(D2GameStrc* pGame, D2UnitStrc* pNpc, D2UnitStrc* pI
                             UNITS_RefreshInventory(pNpc, 1);
                             INVENTORY_AddItemToTradeInventory(pGambleInventory, pItem);
                             ITEMS_SetItemCMDFlag(pItem, 1, 1);
-                        }
-                        else
-                        {
-                            FOG_Trace("Error at line %d of file %s", __LINE__, __FILE__);
                         }
                     }
                     return;
@@ -954,7 +978,8 @@ static void NPC_RefillHirelingListIfExhausted(D2GameStrc* pGame, int32_t nVendor
     D2GAME_NPC_FirstFn_6FCC67D0(pGame, nVendorId, pNpcRecord);
 }
 
-//D2Game.0x6FCC7FA0
+// 1.13c D2Game+0xC1510 (body diffed against the decompile: same level cap, quest refusals, name-range and hired checks, gold, spawn and reply order;
+// not-1.13c: the quest/no-record refusals are a raw 15-byte 0x2A in retail (C1510 -> BA3E0) whose bytes 3..6 are never written, here zero)
 void __fastcall sub_6FCC7FA0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNpc, uint16_t wName)
 {
     int32_t nLevel = STATLIST_UnitGetStatValue(pPlayer, STAT_LEVEL, 0);
@@ -1063,15 +1088,6 @@ void __fastcall sub_6FCC7FA0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
     D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 5, STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), pMerc ? pMerc->dwUnitId : -1, 0);
 
     NPC_RefillHirelingListIfExhausted(pGame, nVendorId, pNpcRecord);
-}
-
-//D2Game.0x6FCC8430
-void __fastcall sub_6FCC8430(D2GameStrc* pGame, D2UnitStrc* pUnit)
-{
-    if (sub_6FC7E8B0(pGame, pUnit, 7, 0))
-    {
-        sub_6FC7E310(pGame, pUnit, CLIENTS_GetUnitX(pUnit), CLIENTS_GetUnitY(pUnit));
-    }
 }
 
 //D2Game.0x6FCC84D0
@@ -1192,7 +1208,7 @@ D2UnitStrc* __fastcall D2GAME_MERCS_Create_6FCC8630(D2GameStrc* pGame, D2UnitStr
     return pMerc;
 }
 
-//D2Game.0x6FCC87C0
+// 1.13c D2Game+0xBC6B0 (find a stack the item can top up: equipped-list then backpack-list, room left or the last maximum out)
 D2UnitStrc* __fastcall sub_6FCC87C0(D2GameStrc* pPlayer, D2UnitStrc* pUnit, D2UnitStrc* pItem, int32_t* a4)
 {
     *a4 = 1;
@@ -1247,7 +1263,7 @@ D2UnitStrc* __fastcall sub_6FCC87C0(D2GameStrc* pPlayer, D2UnitStrc* pUnit, D2Un
     return pStackItem;
 }
 
-//D2Game.0x6FCC88B0) --------------------------------------------------------
+// 1.13c D2Game+0xBE640 (the purchase handler; diffed against the decompile for the item lookup, gating, pricing, charges, merge and new-stack paths)
 extern int32_t dword_6FD4DD80;   // SUnitProxy: item code ' vqc' (weapon-swap auto-equip class)
 extern int32_t dword_6FD4DD84;   // SUnitProxy: item code ' vqa'
 int32_t __fastcall sub_6FCC88B0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNpc, int32_t nItemGUID, int32_t nItemMode, uint16_t nTransactionType, int32_t nCost, int32_t bMultibuy)
@@ -1537,7 +1553,7 @@ int32_t __fastcall sub_6FCC88B0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
     return 0;
 }
 
-//D2Game.0x6FCC92A0
+// 1.13c D2Game+0xBF200 (interact-unit gate, then BE640; the gate's refusal is a raw 15-byte 0x2A in retail with bytes 3..6 unwritten, zero here)
 int32_t __fastcall D2GAME_NPC_BuyItemHandler_6FCC92A0(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nNpcUnitId, int32_t nItemId, int32_t nItemMode, uint16_t nTransactionType, int32_t nCost, int32_t bMultibuy)
 {
     D2_ASSERT(pGame);
@@ -1620,7 +1636,7 @@ void __fastcall D2GAME_NPC_ResurrectMerc_6FCC9350(D2GameStrc* pGame, D2UnitStrc*
     return D2GAME_SendPacket0x2A_6FC3F3B0(pClient, 0x2Au, 5, STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), pHireling->dwUnitId, 0);
 }
 
-//D2Game.0x6FCC9540
+// 1.13c D2Game+0xC1890 (interact-unit gate, then C1510; the gate's refusal is a raw 15-byte 0x2A in retail with bytes 3..6 unwritten, zero here)
 void __fastcall D2GAME_NPC_HireMerc_6FCC9540(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nNpcUnitId, uint16_t a4)
 {
     D2UnitStrc* pInteractUnit = SUNIT_GetInteractUnit(pGame, pPlayer);
@@ -1635,7 +1651,30 @@ void __fastcall D2GAME_NPC_HireMerc_6FCC9540(D2GameStrc* pGame, D2UnitStrc* pPla
     }
 }
 
+// 1.13c D2Game+0xBCC60: spend nCost from the gold stat, then the stash gold stat; 0 (nothing spent) when the two together fall short
+static int32_t SUNITNPC_SpendGold(D2UnitStrc* pUnit, int32_t nCost)
+{
+    const int32_t nGold = STATLIST_UnitGetStatValue(pUnit, STAT_GOLD, 0);
+    if (STATLIST_UnitGetStatValue(pUnit, STAT_GOLDBANK, 0) + nGold < nCost)
+    {
+        return 0;
+    }
+
+    if (nCost <= nGold)
+    {
+        PLRTRADE_AddGold(pUnit, STAT_GOLD, -nCost);
+    }
+    else
+    {
+        PLRTRADE_AddGold(pUnit, STAT_GOLD, -nGold);
+        PLRTRADE_AddGold(pUnit, STAT_GOLDBANK, nGold - nCost);
+    }
+
+    return 1;
+}
+
 //D2Game.0x6FCC95B0
+// 1.13c D2Game+0xBDE60 (reached from packet 0x35 at CF0A0; diffed against the decompile: interact/class gates, repair-all through BCC60 + the BDE50 callback, single item gating, partial repair with the broken-flag test before the gold spend)
 int32_t __fastcall D2GAME_NPC_Repair_6FCC95B0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nNpcGUID, int32_t nItemGUID, int32_t nUnused, int32_t a6)
 {
     D2_ASSERT(pGame);
@@ -1666,21 +1705,10 @@ int32_t __fastcall D2GAME_NPC_Repair_6FCC95B0(D2GameStrc* pGame, D2UnitStrc* pUn
         const int32_t nRepairCosts = ITEMS_GetAllRepairCosts(pGame, pUnit, pNpc->dwClassId, (D2C_Difficulties)pGame->nDifficulty, UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], nullptr);
         if (nRepairCosts)
         {
-            const int32_t nGold = STATLIST_UnitGetStatValue(pUnit, STAT_GOLD, 0);
-            if (nGold + STATLIST_UnitGetStatValue(pUnit, STAT_GOLDBANK, 0) < nRepairCosts)
+            if (!SUNITNPC_SpendGold(pUnit, nRepairCosts))   // 1.13c D2Game+0xBCC60
             {
                 D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), 0x2Au, 12, STATLIST_UnitGetStatValue(pUnit, STAT_GOLD, 0), -1, 0);
                 return 1;
-            }
-
-            if (nRepairCosts > nGold)
-            {
-                PLRTRADE_AddGold(pUnit, STAT_GOLD, -nGold);
-                PLRTRADE_AddGold(pUnit, STAT_GOLDBANK, nGold - nRepairCosts);
-            }
-            else
-            {
-                PLRTRADE_AddGold(pUnit, STAT_GOLD, -nRepairCosts);
             }
 
             ITEMS_GetAllRepairCosts(pGame, pUnit, pNpc->dwClassId, (D2C_Difficulties)pGame->nDifficulty, UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], D2GAME_NPC_RepairItem_6FCC6970);
@@ -1716,19 +1744,8 @@ int32_t __fastcall D2GAME_NPC_Repair_6FCC95B0(D2GameStrc* pGame, D2UnitStrc* pUn
     }
 
     const int32_t nTransactionCosts = ITEMS_GetTransactionCost(pUnit, pItem, (D2C_Difficulties)pGame->nDifficulty, UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], pNpc->dwClassId, D2C_TransactionTypes::TRANSACTIONTYPE_REPAIR);
-    const int32_t nGold = STATLIST_UnitGetStatValue(pUnit, STAT_GOLD, 0);
-    if (nGold + STATLIST_UnitGetStatValue(pUnit, STAT_GOLDBANK, 0) >= nTransactionCosts)
+    if (SUNITNPC_SpendGold(pUnit, nTransactionCosts))   // 1.13c D2Game+0xBCC60
     {
-        if (nTransactionCosts > nGold)
-        {
-            PLRTRADE_AddGold(pUnit, STAT_GOLD, -nGold);
-            PLRTRADE_AddGold(pUnit, STAT_GOLDBANK, nGold - nTransactionCosts);
-        }
-        else
-        {
-            PLRTRADE_AddGold(pUnit, STAT_GOLD, -nTransactionCosts);
-        }
-
         D2GAME_NPC_RepairItem_6FCC6970(pGame, pItem, pUnit);
         D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), 0x2Au, 2, STATLIST_UnitGetStatValue(pUnit, STAT_GOLD, 0), -1, 1);
         return 0;
@@ -1736,14 +1753,13 @@ int32_t __fastcall D2GAME_NPC_Repair_6FCC95B0(D2GameStrc* pGame, D2UnitStrc* pUn
 
     if (nDurability < nMaxDurability)
     {
+        const int32_t nGold = STATLIST_UnitGetStatValue(pUnit, STAT_GOLD, 0);
         const uint32_t nDivisor = (nTransactionCosts << 10) / (uint32_t)(nMaxDurability - nDurability);
-        if (nGold > 0 && nDivisor < nGold << 10 && nDivisor > 0)
+        if (nGold > 0 && (int32_t)nDivisor < nGold * 0x400 && (int32_t)nDivisor > 0)
         {
-            const uint32_t nRepairDurability = (nGold << 10) / nDivisor;
-            if (!ITEMS_CheckItemFlag(pItem, IFLAG_BROKEN, __LINE__, __FILE__))
+            const int32_t nRepairDurability = (nGold * 0x400) / (int32_t)nDivisor;
+            if (!ITEMS_CheckItemFlag(pItem, IFLAG_BROKEN, __LINE__, __FILE__) && SUNITNPC_SpendGold(pUnit, nGold))   // 1.13c D2Game+0xBCC60
             {
-                PLRTRADE_AddGold(pUnit, STAT_GOLD, -nGold);
-
                 int32_t nNewDurability = nMaxDurability;
                 if (nNewDurability > nRepairDurability + nDurability)
                 {
@@ -2292,6 +2308,7 @@ int32_t __fastcall NPC_HandleDialogMessage(D2GameStrc* pGame, D2UnitStrc* pPlaye
 }
 
 //D2Game.0x6FCCA990
+// 1.13c D2Game+0xBDA90 (diffed against the decompile: bought-id check, item lookup, the identified-flag test at SUNITNPC.CPP line 0xd1f, then the identify call at F6BC0)
 void __fastcall D2GAME_NPC_IdentifyBoughtItem_6FCCA990(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nItemGUID)
 {
     if (UNITS_GetPlayerData(pPlayer)->dwBoughtItemId != nItemGUID)
@@ -2308,7 +2325,7 @@ void __fastcall D2GAME_NPC_IdentifyBoughtItem_6FCCA990(D2GameStrc* pGame, D2Unit
     D2GAME_ITEMS_Identify_6FC49670(pGame, pPlayer, pItem);
 }
 
-//D2Game.0x6FCCA9F0
+// 1.13c D2Game+0xBE2A0 (entered from BF730 through BF1C0's already-listed check; the exceptional/elite chance is BD040's body, written inline below with its signed compare)
 void __fastcall D2GAME_STORES_FillGamble_6FCCA9F0(D2GameStrc* pGame, D2UnitStrc* pNpc, D2UnitStrc* pUnit, D2NpcRecordStrc* pNpcRecord)
 {
     static int32_t gnRingItemId = 0;
@@ -2468,7 +2485,7 @@ void __fastcall D2GAME_STORES_FillGamble_6FCCA9F0(D2GameStrc* pGame, D2UnitStrc*
     while (nCounter < 14);
 }
 
-//D2Game.0x6FCCAE20
+// 1.13c D2Game+0xBF730 (trade-record init: gamble path checks the player's list, whose miss falls into the gamble fill at BE2A0 via BF1C0; vendor path fills once, then hire list once)
 void __fastcall D2GAME_STORES_CreateVendorCache_6FCCAE20(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNpc, int32_t bGamble)
 {
     if (!pNpc)
@@ -2538,7 +2555,7 @@ void __fastcall D2GAME_STORES_CreateVendorCache_6FCCAE20(D2GameStrc* pGame, D2Un
     }
 }
 
-//D2Game.0x6FCCAF30
+// 1.13c D2Game+0xBC920
 int32_t __fastcall D2GAME_NPC_RemoveStates_6FCCAF30(D2UnitStrc* pUnit)
 {
     int32_t bStateRemoved = 0;
@@ -2559,7 +2576,7 @@ int32_t __fastcall D2GAME_NPC_RemoveStates_6FCCAF30(D2UnitStrc* pUnit)
     return bStateRemoved;
 }
 
-//D2Game.0x6FCCAFA0
+// 1.13c D2Game+0xBCBE0
 void __fastcall SUNITNPC_PetIterate_Heal(D2GameStrc* pGame, D2UnitStrc* a2, D2UnitStrc* pUnit, void* a4)
 {
     const int32_t nMaxHp = STATLIST_GetMaxLifeFromUnit(pUnit);
@@ -2569,18 +2586,9 @@ void __fastcall SUNITNPC_PetIterate_Heal(D2GameStrc* pGame, D2UnitStrc* a2, D2Un
         *(uint8_t*)a4 = 1;
     }
 
-    for (int32_t nState = 0; nState < sgptDataTables->nStatesTxtRecordCount; ++nState)
+    if (D2GAME_NPC_RemoveStates_6FCCAF30(pUnit))
     {
-        if (STATES_CheckState(pUnit, nState) && STATES_CheckStateMaskCurableByStateId(nState))
-        {
-            D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, nState);
-            if (pStatList)
-            {
-                D2Common_10474(pUnit, pStatList);
-                STATLIST_FreeStatList(pStatList);
-                *(uint8_t*)a4 = 1;
-            }
-        }
+        *(uint8_t*)a4 = 1;
     }
 
     D2StatListStrc* pStatListPoison = STATLIST_GetStatListFromUnitAndState(pUnit, STATE_POISON);
@@ -2601,6 +2609,7 @@ void __fastcall SUNITNPC_PetIterate_Heal(D2GameStrc* pGame, D2UnitStrc* a2, D2Un
 }
 
 //D2Game.0x6FCCB080
+// 1.13c D2Game+0xBD490 (diffed against the decompile and disassembly: interact-unit gate, life/mana/stamina top-up, poison then freeze, the curable-state sweep BC920, pets, sound 10)
 void __fastcall D2GAME_NPC_HealPlayer_6FCCB080(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pNpc)
 {
     if (SUNIT_GetInteractUnit(pGame, pUnit) != pNpc)
@@ -2650,18 +2659,9 @@ void __fastcall D2GAME_NPC_HealPlayer_6FCCB080(D2GameStrc* pGame, D2UnitStrc* pU
         bPlaySound = 1;
     }
 
-    for (int32_t nState = 0; nState < sgptDataTables->nStatesTxtRecordCount; ++nState)
+    if (D2GAME_NPC_RemoveStates_6FCCAF30(pUnit))
     {
-        if (STATES_CheckState(pUnit, nState) && STATES_CheckStateMaskCurableByStateId(nState))
-        {
-            D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, nState);
-            if (pStatList)
-            {
-                D2Common_10474(pUnit, pStatList);
-                STATLIST_FreeStatList(pStatList);
-                bPlaySound = 1;
-            }
-        }
+        bPlaySound = 1;
     }
 
     PLAYERPETS_IteratePets(pGame, pUnit, SUNITNPC_PetIterate_Heal, &bPlaySound);
@@ -2673,6 +2673,7 @@ void __fastcall D2GAME_NPC_HealPlayer_6FCCB080(D2GameStrc* pGame, D2UnitStrc* pU
 }
 
 //D2Game.0x6FCCB220
+// 1.13c D2Game+0xBD810 (npc guid global, then the heal for classes 0x94, 0xB0, 0xB2, 0xFF, 0x195 and 0x201)
 void __fastcall D2GAME_NPC_Heal_6FCCB220(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pNpc)
 {
     if (pNpc)
@@ -2700,13 +2701,9 @@ void __fastcall D2GAME_NPC_Heal_6FCCB220(D2GameStrc* pGame, D2UnitStrc* pUnit, D
 }
 
 //D2Game.0x6FCCB280
+// 1.13c D2Game+0xBD5E0 (retail has no null-unit guard; the spend is BCC60 and its failure is the code-9 refusal)
 void __fastcall D2GAME_NPC_PurchaseHeal_6FCCB280(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nNpcGUID)
 {
-    if (!pUnit)
-    {
-        return;
-    }
-
     D2UnitStrc* pNpc = SUNIT_GetServerUnit(pGame, UNIT_MONSTER, nNpcGUID);
     D2UnitStrc* pInteractUnit = SUNIT_GetInteractUnit(pGame, pUnit);
     if (!pNpc || pInteractUnit != pNpc)
@@ -2745,14 +2742,10 @@ void __fastcall D2GAME_NPC_PurchaseHeal_6FCCB280(D2GameStrc* pGame, D2UnitStrc* 
         return D2GAME_SendPacket0x2A_6FC3F3B0(pClient, 0x2A, 12, STATLIST_UnitGetStatValue(pUnit, STAT_GOLD, 0), -1, 0);
     }
 
-    if (nHealingCost > nGold)
+    if (!SUNITNPC_SpendGold(pUnit, nHealingCost))
     {
-        PLRTRADE_AddGold(pUnit, STAT_GOLD, -nGold);
-        PLRTRADE_AddGold(pUnit, STAT_GOLDBANK, nGold - nHealingCost);
-    }
-    else
-    {
-        PLRTRADE_AddGold(pUnit, STAT_GOLD, -nHealingCost);
+        D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__);
+        return D2GAME_SendPacket0x2A_6FC3F3B0(pClient, 0x2A, 9, STATLIST_UnitGetStatValue(pUnit, STAT_GOLD, 0), -1, 0);
     }
 
     D2GAME_NPC_HealPlayer_6FCCB080(pGame, pUnit, pNpc);
@@ -2762,6 +2755,7 @@ void __fastcall D2GAME_NPC_PurchaseHeal_6FCCB280(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FCCB4D0
+// 1.13c D2Game+0xBCB90 (retail folds SUNIT_ResetInteractInfo in: +0x64 = -1, +0x68 = 6, byte +0x6C = 0; then the interact list at monster data +0x30 of a monster npc, else none, goes to 48300; checked against the disassembly)
 void __fastcall D2GAME_NPC_ResetInteract_6FCCB4D0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNpc)
 {
     SUNIT_ResetInteractInfo(pPlayer);
@@ -2776,6 +2770,8 @@ void __fastcall D2GAME_NPC_ResetInteract_6FCCB4D0(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FCCB520
+// 1.13c D2Game+0xC1030 (called from the minion event handler E9600; 1.10f's sub_6FC7E8B0 is inlined for the non-expansion pet test, the spawn is EDDB0 with
+// the three tries at radius 4, 6, 12 and the merc attach 68FC0 with id 0xFFFF; every path that does not return early ends in the BD160 refill)
 void __fastcall D2GAME_NPC_AssignMercenary_6FCCB520(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nMonster)
 {
     int32_t nUnused = 0;
@@ -2831,23 +2827,7 @@ void __fastcall D2GAME_NPC_AssignMercenary_6FCCB520(D2GameStrc* pGame, D2UnitStr
         }
     }
 
-    D2HirelingTxt* pHirelingTxtRecord = DATATBLS_GetNextHirelingTxtRecordFromVendorIdAndDifficulty(pGame->bExpansion, nMonster, 0, 0);
-    D2_ASSERT(pHirelingTxtRecord);
-
-    for (int32_t i = 0; i < pHirelingTxtRecord->wNameLast - pHirelingTxtRecord->wNameFirst + 1; ++i)
-    {
-        if (pNpcRecord->pMercData[i].bAvailable && !pNpcRecord->pMercData[i].bHired)
-        {
-            return;
-        }
-    }
-
-    D2_FREE_POOL(pGame->pMemoryPool, pNpcRecord->pMercData);
-
-    pNpcRecord->npcTrade.bHireInit = 0;
-    pNpcRecord->pMercData = nullptr;
-
-    D2GAME_NPC_FirstFn_6FCC67D0(pGame, nMonster, pNpcRecord);
+    NPC_RefillHirelingListIfExhausted(pGame, nMonster, pNpcRecord);   // 1.13c D2Game+0xBD160
 }
 
 //D2Game.0x6FCCB7D0

@@ -400,6 +400,7 @@ void __fastcall D2GAME_STATES_SendStates_6FCC5F00(D2UnitStrc* pUnit, D2ClientStr
 }
 
 //D2Game.0x6FCC5F20
+// 1.13c D2Game+0x7A570 (checked against decompile and disassembly, no delta)
 void __fastcall sub_6FCC5F20(D2UnitStrc* pItem, D2ClientStrc* pClient)
 {
     D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndFlag(pItem, 0x80);
@@ -421,10 +422,14 @@ void __fastcall sub_6FCC5F20(D2UnitStrc* pItem, D2ClientStrc* pClient)
 }
 
 //D2Game.0x6FCC5F80
+// 1.13c D2Game+0x7A540: a missile is never announced as removed (1.10f sent it too)
 void __fastcall D2GAME_PACKETS_SendPacket0x0A_RemoveObject_6FCC5F80(D2UnitStrc* pUnit, D2ClientStrc* pClient)
 {
-    d2_client_unit_remove_packet(pUnit);   // the client frees its unit, states and all
-    D2GAME_PACKETS_SendPacket0x0A_RemoveObject_6FC3D3A0(pClient, 0x0A, pUnit->dwUnitType, pUnit->dwUnitId);
+    if (pUnit->dwUnitType != UNIT_MISSILE)
+    {
+        d2_client_unit_remove_packet(pUnit);   // not-1.13c: replay hook; the client frees its unit, states and all
+        D2GAME_PACKETS_SendPacket0x0A_RemoveObject_6FC3D3A0(pClient, 0x0A, pUnit->dwUnitType, pUnit->dwUnitId);
+    }
 }
 
 //D2Game.0x6FCC5FA0
@@ -478,6 +483,7 @@ void __fastcall D2GAME_UpdateUnit_6FCC6080(D2UnitStrc* pPlayer, D2ClientStrc* pC
 }
 
 //D2Game.0x6FCC60D0
+// 1.13c D2Game+0x7A4C0 (checked against disassembly, no delta; retail allocates exactly 0x14 bytes)
 void __fastcall sub_6FCC60D0(D2UnitStrc* pUnit, int16_t nSkillId, uint8_t nSkillLevel, uint8_t nUnitType, int32_t nUnitGUID, uint8_t a6)
 {
     D2UnitPacketListStrc* pMsg = (D2UnitPacketListStrc*)D2_ALLOC_POOL(pUnit->pMemoryPool, sizeof(D2UnitPacketListStrc));
@@ -504,6 +510,7 @@ void __fastcall sub_6FCC60D0(D2UnitStrc* pUnit, int16_t nSkillId, uint8_t nSkill
 }
 
 //D2Game.0x6FCC6150
+// 1.13c D2Game+0x7A440 (checked against disassembly, no delta; retail allocates exactly 0x14 bytes)
 void __fastcall sub_6FCC6150(D2UnitStrc* pUnit, int16_t nSkillId, uint8_t nSkillLevel, int16_t nX, int16_t nY, uint8_t a6)
 {
     D2UnitPacketListStrc* pMsg = (D2UnitPacketListStrc*)D2_ALLOC_POOL(pUnit->pMemoryPool, sizeof(D2UnitPacketListStrc));
@@ -557,6 +564,7 @@ void __fastcall D2GAME_MERCS_SendStat_6FCC61D0(D2UnitStrc* pUnit, uint16_t nStat
 }
 
 //D2Game.0x6FCC6270
+// 1.13c D2Game+0x7A260 (checked against disassembly, no delta)
 void __fastcall sub_6FCC6270(D2UnitStrc* pUnit, uint8_t a2)
 {
     D2UnitPacketListStrc* pMsg = (D2UnitPacketListStrc*)D2_CALLOC_POOL(pUnit->pMemoryPool, sizeof(D2UnitPacketListStrc));
@@ -650,6 +658,7 @@ void __fastcall sub_6FCC63D0(D2UnitStrc* pUnit, int16_t a2)
 }
 
 //D2Game.0x6FCC6470
+// 1.13c D2Game+0x7A090 (checked against disassembly, no delta; retail allocates exactly 0xC bytes)
 void __fastcall sub_6FCC6470(D2UnitStrc* pUnit, int16_t a2)
 {
     D2UnitPacketListStrc* pMsg = (D2UnitPacketListStrc*)D2_ALLOC_POOL(pUnit->pMemoryPool, sizeof(D2UnitPacketListStrc));
@@ -672,6 +681,7 @@ void __fastcall sub_6FCC6470(D2UnitStrc* pUnit, int16_t a2)
 }
 
 //D2Game.0x6FCC64D0
+// 1.13c D2Game+0x7A020 (checked against disassembly, no delta; retail allocates exactly 0x10 bytes)
 void __fastcall sub_6FCC64D0(D2UnitStrc* pUnit, uint8_t bLeftSkill, int16_t nSkillId, int32_t nOwnerGUID)
 {
     D2UnitPacketListStrc* pMsg = (D2UnitPacketListStrc*)D2_ALLOC_POOL(pUnit->pMemoryPool, sizeof(D2UnitPacketListStrc));

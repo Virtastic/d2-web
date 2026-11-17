@@ -58,120 +58,59 @@ constexpr D2NpcIndexMapStrc npcIndexMap[] =
 
 constexpr uint32_t bufferSize = 8;
 
+// The intro table walk every intro function shares: the bit index of the first entry naming the
+// NPC class, bit 0 (the shared "any intro" bit) when none does.
+static int32_t PLRINTRO_GetIntroBitIndex(int32_t nNpcId)
+{
+    for (int32_t i = 0; i < std::size(npcIndexMap); ++i)
+    {
+        if (npcIndexMap[i].nNpcClassId == nNpcId)
+        {
+            return npcIndexMap[i].nIndex;
+        }
+    }
+
+    return 0;
+}
+
 //D2Game.0x6FC7F000
+// 1.13c D2Game+0x695F0: the first matching entry's bit only; bit 0 only when no entry matches.
 void __fastcall PLRINTRO_SetQuestIntroFlag(D2UnitStrc* pUnit, D2GameStrc* pGame, int32_t nNpcId)
 {
     D2PlrIntroStrc* pPlayerIntro = UNITS_GetPlayerData(pUnit)->pPlayerIntro[pGame->nDifficulty];
-
-    for (int32_t i = 0; i < std::size(npcIndexMap); ++i)
-    {
-        if (npcIndexMap[i].nNpcClassId == nNpcId)
-        {
-            BITMANIP_SetBitState(pPlayerIntro->pQuestIntroFlags->pBuffer, npcIndexMap[i].nIndex);
-        }
-    }
-
-    BITMANIP_SetBitState(pPlayerIntro->pQuestIntroFlags->pBuffer, 0);
+    BITMANIP_SetBitState(pPlayerIntro->pQuestIntroFlags->pBuffer, PLRINTRO_GetIntroBitIndex(nNpcId));
 }
 
 //D2Game.0x6FC7F060
+// 1.13c D2Game+0x69590
 int32_t __fastcall PLRINTRO_GetQuestIntroFlag(D2UnitStrc* pUnit, D2GameStrc* pGame, int32_t nNpcId)
 {
     D2PlrIntroStrc* pPlayerIntro = UNITS_GetPlayerData(pUnit)->pPlayerIntro[pGame->nDifficulty];
-
-    for (int32_t i = 0; i < std::size(npcIndexMap); ++i)
-    {
-        if (npcIndexMap[i].nNpcClassId == nNpcId)
-        {
-            return BITMANIP_GetBitState(pPlayerIntro->pQuestIntroFlags->pBuffer, npcIndexMap[i].nIndex);
-        }
-    }
-
-    return BITMANIP_GetBitState(pPlayerIntro->pQuestIntroFlags->pBuffer, 0);
+    return BITMANIP_GetBitState(pPlayerIntro->pQuestIntroFlags->pBuffer, PLRINTRO_GetIntroBitIndex(nNpcId));
 }
 
 //D2Game.0x6FC7F0C0
+// not-1.13c: retail inlines this in its NPC-list loop at D2Game+0x34D00 (the first matching entry's
+// bit, bit 0 only on a miss); the body here is that inlined step.
 void __fastcall PLRINTRO_SetNpcIntroFlag(D2PlrIntroStrc* pPlayerIntro, int32_t nNpcId)
 {
-    for (int32_t i = 0; i < std::size(npcIndexMap); ++i)
-    {
-        if (npcIndexMap[i].nNpcClassId == nNpcId)
-        {
-            BITMANIP_SetBitState(pPlayerIntro->pNpcIntroFlags->pBuffer, npcIndexMap[i].nIndex);
-        }
-    }
-
-    BITMANIP_SetBitState(pPlayerIntro->pNpcIntroFlags->pBuffer, 0);
-}
-
-// d2-web: the npcIndexMap walk both PLRINTRO_Get/SetNpcIntroFlag do before they fall back to bit 0.
-// Index 0 is the table's own {-1, 0} entry, so nIndex == 0 means "not an intro NPC".
-bool PLRINTRO_HasNpcIntro(int32_t nNpcId)
-{
-    for (int32_t i = 0; i < std::size(npcIndexMap); ++i)
-    {
-        if (npcIndexMap[i].nNpcClassId == nNpcId)
-        {
-            return npcIndexMap[i].nIndex != 0;
-        }
-    }
-
-    return false;
+    BITMANIP_SetBitState(pPlayerIntro->pNpcIntroFlags->pBuffer, PLRINTRO_GetIntroBitIndex(nNpcId));
 }
 
 //D2Game.0x6FC7F100
+// not-1.13c: retail inlines this in its NPC-list loop at D2Game+0x34C70 (the first matching entry's
+// bit, bit 0 on a miss); the body here is that inlined step.
 int32_t __fastcall PLRINTRO_GetNpcIntroFlag(D2PlrIntroStrc* pPlayerIntro, int32_t nNpcId)
 {
-    for (int32_t i = 0; i < std::size(npcIndexMap); ++i)
-    {
-        if (npcIndexMap[i].nNpcClassId == nNpcId)
-        {
-            return BITMANIP_GetBitState(pPlayerIntro->pNpcIntroFlags->pBuffer, npcIndexMap[i].nIndex);
-        }
-    }
-
-    return BITMANIP_GetBitState(pPlayerIntro->pNpcIntroFlags->pBuffer, 0);
+    return BITMANIP_GetBitState(pPlayerIntro->pNpcIntroFlags->pBuffer, PLRINTRO_GetIntroBitIndex(nNpcId));
 }
 
 //D2Game.0x6FC7F140
+// 1.13c D2Game+0x69490
 void __fastcall PLRINTRO_MaskNpcIntroFlag(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nNpcId)
 {
     D2PlrIntroStrc* pPlayerIntro = UNITS_GetPlayerData(pPlayer)->pPlayerIntro[pGame->nDifficulty];
-
-    for (int32_t i = 0; i < std::size(npcIndexMap); ++i)
-    {
-        if (npcIndexMap[i].nNpcClassId == nNpcId)
-        {
-            BITMANIP_MaskBitstate(pPlayerIntro->pNpcIntroFlags->pBuffer, npcIndexMap[i].nIndex);
-            return;
-        }
-    }
-
-    BITMANIP_MaskBitstate(pPlayerIntro->pNpcIntroFlags->pBuffer, 0);
-}
-
-//D2Game.0x6FC7F1A0
-void __fastcall PLRINTRO_CopyQuestIntroFlagsToBuffer(D2PlrIntroStrc* pPlayerIntro, uint8_t* pBuffer)
-{
-    memcpy(pBuffer, pPlayerIntro->pQuestIntroFlags->pBuffer, bufferSize);
-}
-
-//D2Game.0x6FC7F1B0
-void __fastcall PLRINTRO_CopyNpcIntroFlagsToBuffer(D2PlrIntroStrc* pPlayerIntro, uint8_t* pBuffer)
-{
-    memcpy(pBuffer, pPlayerIntro->pNpcIntroFlags->pBuffer, bufferSize);
-}
-
-//D2Game.0x6FC7F1C0
-void __fastcall PLRINTRO_CopyBufferToQuestIntroFlags(D2PlrIntroStrc* pPlayerIntro, uint8_t* pBuffer)
-{
-    memcpy(pPlayerIntro->pQuestIntroFlags->pBuffer, pBuffer, bufferSize);
-}
-
-//D2Game.0x6FC7F1D0
-void __fastcall PLRINTRO_CopyBufferToNpcIntroFlags(D2PlrIntroStrc* pPlayerIntro, uint8_t* pBuffer)
-{
-    memcpy(pPlayerIntro->pNpcIntroFlags->pBuffer, pBuffer, bufferSize);
+    BITMANIP_MaskBitstate(pPlayerIntro->pNpcIntroFlags->pBuffer, PLRINTRO_GetIntroBitIndex(nNpcId));
 }
 
 //D2Game.0x6FC7F1E0

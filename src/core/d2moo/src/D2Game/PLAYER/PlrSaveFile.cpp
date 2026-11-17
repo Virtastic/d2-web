@@ -41,6 +41,8 @@
 #include <UNIT/SUnitMsg.h>         // D2GAME_MERCS_SendStat_6FCC61D0
 #include <UNIT/SUnitNpc.h>         // D2GAME_MERCS_Create_6FCC8630
 #include <cstring>
+#include <cstdlib>
+#include <Fog.h>
 #include <ctime>
 #include <climits>
 
@@ -101,26 +103,32 @@ int32_t D2GAME_SAVE_FileChecksum(D2SaveHeaderStrc* pSaveHeader, int32_t nSize)
 }
 
 //D2Game.0x6FC8CC50
+// 1.13c D2Game+0xEBD10: no player null check; an index at or past 0x7FFF is fatal.
 int16_t __fastcall PLRSAVE2_GetItemIndex(D2UnitStrc* pPlayer, int32_t nGUID)
 {
-    if (nGUID == -1 || !pPlayer || !pPlayer->pInventory)
+    if (nGUID == -1 || !pPlayer->pInventory)
     {
         return 0;
     }
 
-    int16_t nIdx = 1;
+    int32_t nIdx = 1;
     D2UnitStrc* pItem = INVENTORY_GetFirstItem(pPlayer->pInventory);
     while (pItem)
     {
         D2UnitStrc* pCheckedItem = INVENTORY_UnitIsItem(pItem);
-        D2UnitStrc* pNextItem = INVENTORY_GetNextItem(pItem);
+        pItem = INVENTORY_GetNextItem(pItem);
         if ((pCheckedItem ? (int32_t)pCheckedItem->dwUnitId : -1) == nGUID)
         {
-            return nIdx;
+            if (nIdx >= 0x7FFF)
+            {
+                FOG_DisplayAssert("!\"Character has too many items\"", __FILE__, __LINE__);
+                exit(-1);
+            }
+
+            return (int16_t)nIdx;
         }
 
         ++nIdx;
-        pItem = pNextItem;
     }
 
     return 0;
@@ -557,6 +565,7 @@ D2UnitStrc* __fastcall D2WEB_PLRSAVE2_ReadMercData(D2GameStrc* pGame, D2UnitStrc
 // PLRSAVE2_ReadPetSection (D2Game.0x6FC8E850): the 'j f' block, applied to the hireling. The block
 // is the same item format as the player's own ('JM', a count, byte-aligned items), read by the
 // same reader (sub_6FC8BC70), against the mercenary's inventory instead of the player's.
+// 1.13c D2Game+0xECBD0: checked against the decompile (reader error -> its code in *pSectionSize, 0x16).
 int32_t __fastcall D2WEB_PLRSAVE2_ReadPetSection(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pMerc,
     uint8_t** ppSection, uint8_t* pEnd, uint32_t dwVersion, int32_t* pSectionSize)
 {
@@ -669,6 +678,7 @@ int32_t __fastcall D2WEB_PLRSAVE2_CreateItem(D2GameStrc* pGame, D2UnitStrc* pPla
 // PLRSAVE2_ReadIronGolemSection (D2Game.0x6FC8EAB0): the 'k f' marker, a present flag, and the
 // golem's own item when the flag is set. The flag is 0 in every save we hold, so the section is the
 // three bytes the writer emits; the item arm is ported for the chain's sake and is unasserted.
+// 1.13c D2Game+0xED880: the client for the golem item id is read inline from the player data.
 int32_t __fastcall D2WEB_PLRSAVE2_ReadIronGolemSection(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint8_t** ppSection,
     uint8_t* pEnd, uint32_t dwVersion)
 {
@@ -706,7 +716,13 @@ int32_t __fastcall D2WEB_PLRSAVE2_ReadIronGolemSection(D2GameStrc* pGame, D2Unit
         }
 
         UNITS_ChangeAnimMode(pItem, IMODE_ONGROUND);
-        CLIENTS_SetIronGolemItemGUID(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), pItem ? (int32_t)pItem->dwUnitId : -1);
+        const int32_t nItemGUID = pItem ? (int32_t)pItem->dwUnitId : -1;
+        D2ClientStrc* pClient = nullptr;
+        if (pPlayer && pPlayer->dwUnitType == UNIT_PLAYER)
+        {
+            pClient = UNITS_GetPlayerData(pPlayer)->pClient;
+        }
+        CLIENTS_SetIronGolemItemGUID(pClient, nItemGUID);
     }
 
     *ppSection = pSectionEnd;
@@ -727,6 +743,8 @@ int32_t __fastcall D2WEB_PLRSAVE2_ReadIronGolemSection(D2GameStrc* pGame, D2Unit
 // offset 0, which is always 0xAA55AA55 -- and compares it to '!ooW', a test that can never pass. The
 // quest marker it means to check lives at the section pointer, which is what the vendored
 // D2WEB_PLRSAVE2_ReadQuestSection does. We use the section pointer.
+// not-1.13c: the section half of retail's save loader D2Game+0xEDB50 (which also creates the unit via
+// 0xED250), applied to the session's existing player; plus the hand restore no retail loader does here.
 int32_t __fastcall D2WEB_PLRSAVE2_LoadIntoPlayer(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint8_t* pSaveFile, uint32_t nSize)
 {
     if (!pGame || !pPlayer || !pSaveFile) return PLRSAVE2ERROR_UNKNOWN;
@@ -881,6 +899,7 @@ int32_t __fastcall PLRSAVE2_CheckPlayerFlags(D2GameStrc* pGame, uint32_t dwFlags
 //   - PLRSAVE2_CheckPlayerFlags, which the session calls once the game it created exists.
 // Everything that is a property of the FILE is here, in retail's order: signature, checksum, size,
 // version, the name terminator, the class bound, the newbie-save refusal, and the acts and map seed.
+// not-1.13c: the file-validation half of retail's D2Game+0xED250, run before the session's game exists.
 int32_t __fastcall D2WEB_PLRSAVE2_ReadSaveHeader(uint8_t* pSaveFile, uint32_t nSize, int32_t nDifficulty, D2SaveHeaderReadStrc* pOut)
 {
     if (pOut) { pOut->pHeader = nullptr; pOut->dwMapSeed = 0; pOut->nAct = ACT_I; pOut->nClass = 0; }
@@ -943,6 +962,7 @@ int32_t __fastcall D2WEB_PLRSAVE2_ReadSaveHeader(uint8_t* pSaveFile, uint32_t nS
 // the client and the player unit the session allocated with the class the reader read. Retail does
 // these inline in ReadSaveHeader between the unit allocation and the return; the seam is the
 // allocation itself, which in this session belongs to the attach that stands the unit in a room.
+// not-1.13c: the unit-and-client half of retail's D2Game+0xED250, applied after the session allocates the unit.
 int32_t __fastcall D2WEB_PLRSAVE2_ApplySaveHeader(D2ClientStrc* pClient, D2UnitStrc* pPlayer, const D2SaveHeaderStrc* pHeader, int32_t nAct)
 {
     if (!pClient || !pPlayer || !pHeader) return PLRSAVE2ERROR_BAD_CLIENT;

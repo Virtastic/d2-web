@@ -1,5 +1,7 @@
 #include "PLAYER/PlayerList.h"
 
+#include <cstring>
+
 #include <D2States.h>
 
 #include "GAME/SCmd.h"
@@ -73,9 +75,16 @@ void __fastcall PLAYERLIST_IterateCallback_FreePlayerList(D2GameStrc* pGame, D2U
 }
 
 //Inlined in some functions
+// 1.13c D2Game+0xF0060: retail takes the two units (EDI owner, ESI other) and finds nothing when
+// they are the same unit; the callers here pass the other unit's GUID, so the self case is the
+// owner's own GUID.
 D2PlayerListStrc* __fastcall PLAYERLIST_GetPlayerListRecordFromUnitGUID(D2UnitStrc* pPlayer, int32_t nUnitGUID)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
+    if (pPlayer && pPlayer->dwUnitId == nUnitGUID)
+    {
+        return nullptr;
+    }
 
     for (D2PlayerListStrc* pPlayerList = pPlayerData->pPlayerList; pPlayerList; pPlayerList = pPlayerList->pNext)
     {
@@ -124,15 +133,25 @@ void __fastcall PLAYERLIST_AllocPlayerList(D2GameStrc* pGame, D2UnitStrc* pPlaye
 }
 
 //D2Game.0x6FCBA840
+// 1.13c D2Game+0xF0640: the record lookup and the 0x8C relation packet are inlined; the packet
+// {0x8C, owner id, other id, flag word} goes to every living player through the 0x8C690 callback.
 void __fastcall PLAYERLIST_ToggleFlag(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, uint32_t nFlags, int32_t bSet)
 {
-    if (pPlayer1 == pPlayer2)
+    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer1);
+    const int32_t nUnitGUID = pPlayer2 ? pPlayer2->dwUnitId : -1;
+    D2PlayerListStrc* pPlayerList = nullptr;
+    if (pPlayer1 != pPlayer2)
     {
-        return;
+        for (pPlayerList = pPlayerData->pPlayerList; pPlayerList; pPlayerList = pPlayerList->pNext)
+        {
+            if (pPlayerList->nUnitGUID == nUnitGUID)
+            {
+                break;
+            }
+        }
     }
 
-    D2PlayerListStrc* pPlayerList = PLAYERLIST_GetPlayerListRecordFromUnitGUID(pPlayer1, pPlayer2 ? pPlayer2->dwUnitId : -1);
-    if (!pPlayerList)
+    if (pPlayer1 == pPlayer2 || !pPlayerList)
     {
         return;
     }
@@ -146,7 +165,13 @@ void __fastcall PLAYERLIST_ToggleFlag(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D
         pPlayerList->dwFlags &= ~nFlags;
     }
 
-    sub_6FC3F840(pGame, pPlayer1 ? pPlayer1->dwUnitId : -1, pPlayer2 ? pPlayer2->dwUnitId : -1, pPlayerList->dwFlags);
+    const int32_t nPlayer1GUID = pPlayer1 ? pPlayer1->dwUnitId : -1;
+    const int16_t nRelation = (int16_t)pPlayerList->dwFlags;
+    uint8_t packet[12] = { 0x8C };
+    memcpy(packet + 1, &nPlayer1GUID, sizeof(nPlayer1GUID));
+    memcpy(packet + 5, &nUnitGUID, sizeof(nUnitGUID));
+    memcpy(packet + 9, &nRelation, sizeof(nRelation));
+    SUNIT_IterateLivingPlayers(pGame, sub_6FC3F880, packet);
 }
 
 //D2Game.0x6FCBA8E0
@@ -343,26 +368,26 @@ int32_t __fastcall PLAYERLIST_GetHostileDelay(D2UnitStrc* pPlayer1, D2UnitStrc* 
 }
 
 //D2Game.0x6FCBAE70
+// 1.13c D2Game+0xF0090
 void __fastcall PLAYERLIST_SetHostileDelay(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t a3)
 {
+    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer1);
+    const int32_t nUnitGUID = pPlayer2 ? pPlayer2->dwUnitId : -1;
     if (pPlayer1 != pPlayer2)
     {
-        D2PlayerListStrc* pPlayerList = PLAYERLIST_GetPlayerListRecordFromUnitGUID(pPlayer1, pPlayer2 ? pPlayer2->dwUnitId : -1);
-        if (pPlayerList)
+        for (D2PlayerListStrc* pPlayerList = pPlayerData->pPlayerList; pPlayerList; pPlayerList = pPlayerList->pNext)
         {
-            pPlayerList->field_8 = a3;
+            if (pPlayerList->nUnitGUID == nUnitGUID)
+            {
+                pPlayerList->field_8 = a3;
+                break;
+            }
         }
     }
 
-    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer1);
+    pPlayerData = UNITS_GetPlayerData(pPlayer1);
     if (pPlayerData)
     {
         pPlayerData->dwHostileDelay = GetTickCount();
     }
-}
-
-//D2Game.0x6FCBAED0
-void __fastcall sub_6FCBAED0()
-{
-    dword_6FD4DC40 = GetTickCount();
 }

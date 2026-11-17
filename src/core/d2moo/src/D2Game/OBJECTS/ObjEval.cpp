@@ -13,6 +13,7 @@
 
 
 //D2Game.0x6FC745D0
+// 1.13c D2Game+0xF42D0
 void __fastcall OBJEVAL_ApplyTrapObjectDamage(D2GameStrc* pGame, D2UnitStrc* pSrcUnit, D2UnitStrc* pTargetUnit, int32_t nDamageType)
 {
     D2ActiveRoomStrc* pTargetRoom = UNITS_GetRoom(pTargetUnit);
@@ -44,10 +45,8 @@ void __fastcall OBJEVAL_ApplyTrapObjectDamage(D2GameStrc* pGame, D2UnitStrc* pSr
     const uint8_t nBaseDamage = DATATBLS_GetObjectsTxtRecord(pSrcUnit ? pSrcUnit->dwClassId : -1)->nDamage;
 
     const int32_t nDamage = (ITEMS_RollLimitedRandomNumber(&pSrcUnit->pSeed, nMaxDamage - nMinDamage + 256) + nMinDamage) * (uint32_t)nBaseDamage / 100;
-    if (!nBaseDamage)
-    {
-        FOG_DisplayWarning("ptObjectData->bDamage", __FILE__, __LINE__);
-    }
+    // 1.13c D2Game+0xF4260 (the scaled roll the body calls) takes the fatal path on a zero percent, after the roll
+    D2_ASSERT(nBaseDamage);
 
     if (!nDamage)
     {

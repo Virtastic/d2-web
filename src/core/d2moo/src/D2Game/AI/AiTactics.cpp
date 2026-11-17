@@ -22,12 +22,14 @@
 #include "ITEMS/Items.h"
 #include "MONSTER/Monster.h"
 #include "MONSTER/MonsterMode.h"
+#include "MONSTER/MonsterUnique.h"
 #include "MONSTER/MonsterRegion.h"
 #include "QUESTS/Quests.h"
 #include "UNIT/SUnit.h"
 #include "UNIT/SUnitInactive.h"
 
 //D2Game.0x6FCCF9D0
+// 1.13c D2Game+0xF3220 (the walk-capable AI-state test and the walk-mode flag test are inline, F1B10 gets AL = 5)
 D2UnitStrc* __fastcall sub_6FCCF9D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiControlStrc* pAiControl, int32_t* pDistance, int32_t* pCombat)
 {
 	D2UnitStrc* pResult = sub_6FCF2110(pGame, pUnit, pAiControl, pDistance, pCombat);
@@ -36,32 +38,33 @@ D2UnitStrc* __fastcall sub_6FCCF9D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCo
 		return pResult;
 	}
 
-	if ((sub_6FCF2E70(pUnit) && pUnit) || COLLISION_CheckAnyCollisionWithPattern(UNITS_GetRoom(pUnit), CLIENTS_GetUnitX(pUnit), CLIENTS_GetUnitY(pUnit), PATH_GetUnitCollisionPattern(pUnit), COLLIDE_MISSILE))
+	if (sub_6FCF2E70(pUnit) && MONSTERUNIQUE_CheckMonModeFlag(pUnit->dwClassId, MONMODE_WALK))
 	{
-		D2MonStats2Txt* pMonStats2TxtRecord = MONSTERREGION_GetMonStats2TxtRecord(pUnit->dwClassId);
-		if (pMonStats2TxtRecord && pMonStats2TxtRecord->dwModeFlags & gdwBitMasks[MONMODE_WALK])
-		{
-			AITACTICS_WalkCloseToUnit(pGame, pUnit, 5u);
-			return nullptr;
-		}
+		AITACTICS_WalkCloseToUnit(pGame, pUnit, 5u);
+		return nullptr;
+	}
+
+	if (COLLISION_CheckAnyCollisionWithPattern(UNITS_GetRoom(pUnit), CLIENTS_GetUnitX(pUnit), CLIENTS_GetUnitY(pUnit), PATH_GetUnitCollisionPattern(pUnit), COLLIDE_MISSILE)
+		&& MONSTERUNIQUE_CheckMonModeFlag(pUnit->dwClassId, MONMODE_WALK))
+	{
+		AITACTICS_WalkCloseToUnit(pGame, pUnit, 5u);
+		return nullptr;
 	}
 
 	const int32_t nDistance = *pDistance;
-	int32_t nFrames = 0;
-	if (nDistance >= 35)
+	if (nDistance > 34)
 	{
-		nFrames = 25;
+		AITACTICS_IdleInNeutralMode(pGame, pUnit, 25);
 	}
-	else if (nDistance >= 25)
+	else if (nDistance < 25)
 	{
-		nFrames = nDistance - 10;
+		AITACTICS_IdleInNeutralMode(pGame, pUnit, 10);
 	}
 	else
 	{
-		nFrames = 10;
+		AITACTICS_IdleInNeutralMode(pGame, pUnit, nDistance - 10);
 	}
 
-	AITACTICS_IdleInNeutralMode(pGame, pUnit, nFrames);
 	return nullptr;
 }
 
@@ -90,6 +93,7 @@ D2UnitStrc* __fastcall sub_6FCCFC00(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCo
 }
 
 //D2Game.0x6FCCFD40
+// not-1.13c: retail callers call 0xF1C90 and compare its distance against the limit inline, no standalone function
 D2UnitStrc* __fastcall sub_6FCCFD40(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiControlStrc* pAiControl, int32_t* pDistance, int32_t* pCombat, int32_t nMaxDistance)
 {
 	D2UnitStrc* pResult = sub_6FCF2110(pGame, pUnit, pAiControl, pDistance, pCombat);
@@ -130,7 +134,7 @@ D2UnitStrc* __fastcall sub_6FCCFD70(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_
 }
 
 //D2Game.0x6FCCFDE0
-// 1.13c D2Game+0xF1A90 (the near-player callback 0xF30C0 hands the unit scan)
+// 1.13c D2Game+0xF1A90 (player type test, distance gate, then the interact-flag (15D0) / quest-cycler (34EA0) test)
 D2UnitStrc* __fastcall sub_6FCCFDE0(D2GameStrc* pGame, D2UnitStrc* pNPC, D2UnitStrc* pPlayer, void* pCallbackArg)
 {
 	UnkAiStrc1* pArg = (UnkAiStrc1*)pCallbackArg;
@@ -146,25 +150,11 @@ D2UnitStrc* __fastcall sub_6FCCFDE0(D2GameStrc* pGame, D2UnitStrc* pNPC, D2UnitS
 		return nullptr;
 	}
 
-	if (!pNPC)
+	if (!MONSTERUNIQUE_CheckMonStatsFlag(pNPC ? pNPC->dwClassId : -1, MONSTATSFLAGINDEX_INTERACT)
+		|| (QUESTS_ActiveCycler(pGame, pPlayer, pNPC) && nDistance < pArg->nDistance))
 	{
-		pArg->pTarget = pPlayer;
 		pArg->nDistance = nDistance;
-		return pPlayer;
-	}
-
-	D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(pNPC->dwClassId);
-	if (!pMonStatsTxtRecord || !(gdwBitMasks[MONSTATSFLAGINDEX_INTERACT] & pMonStatsTxtRecord->dwMonStatsFlags))
-	{
 		pArg->pTarget = pPlayer;
-		pArg->nDistance = nDistance;
-		return pPlayer;
-	}
-
-	if (QUESTS_ActiveCycler(pGame, pPlayer, pNPC) && nDistance < pArg->nDistance)
-	{
-		pArg->pTarget = pPlayer;
-		pArg->nDistance = nDistance;
 		return pPlayer;
 	}
 
@@ -172,6 +162,7 @@ D2UnitStrc* __fastcall sub_6FCCFDE0(D2GameStrc* pGame, D2UnitStrc* pNPC, D2UnitS
 }
 
 //D2Game.0x6FCCFEA0
+// 1.13c D2Game+0xF2220 (unit from EAX: mode-change info 0x75070, target unit at +0x10, then 0x75E10)
 int32_t __fastcall AITACTICS_ChangeModeAndTargetUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMode, D2UnitStrc* pTargetUnit)
 {
 	D2ModeChangeStrc modeChange = {};
@@ -182,6 +173,7 @@ int32_t __fastcall AITACTICS_ChangeModeAndTargetUnit(D2GameStrc* pGame, D2UnitSt
 }
 
 //D2Game.0x6FCCFEE0
+// not-1.13c: retail callers build the coordinate mode change inline (0x75070 mode-change info, x/y words, 0x75E10), no standalone function
 int32_t __fastcall AITACTICS_ChangeModeAndTargetCoordinates(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMode, int32_t nX, int32_t nY)
 {
 	D2ModeChangeStrc modeChange = {};
@@ -315,6 +307,7 @@ void __fastcall AITACTICS_SetVelocity(D2UnitStrc* pUnit, int32_t a2, int32_t nVe
 }
 
 //D2Game.0x6FCD0220
+// not-1.13c: retail callers call 0xF2540 directly with mode 2, step 1 and the flag byte; no standalone function
 int32_t __fastcall AITACTICS_WalkToTargetUnitWithFlags(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTargetUnit, uint8_t nFlag)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, pTargetUnit, MONMODE_WALK, 0, 0, 1u, nFlag);
@@ -384,66 +377,75 @@ int32_t __fastcall AITACTICS_MoveToTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FCD03B0
+// not-1.13c: retail callers call 0xF2540 directly with mode 2, step 1, flags 0; no standalone function
 int32_t __fastcall AITACTICS_WalkToTargetUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, pTarget, MONMODE_WALK, 0, 0, 1u, 0);
 }
 
 //D2Game.0x6FCD03D0
+// not-1.13c: retail callers call 0xF2540 directly with mode 0xF, step 1 and the flag byte; no standalone function
 int32_t __fastcall AITACTICS_RunToTargetUnitWithFlags(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, uint8_t nFlags)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, pTarget, MONMODE_RUN, 0, 0, 1u, nFlags);
 }
 
 //D2Game.0x6FCD03F0
+// not-1.13c: retail callers call 0xF2540 directly with mode 0xF, step 1, flags 0; no standalone function
 int32_t __fastcall AITACTICS_RunToTargetUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, pTarget, MONMODE_RUN, 0, 0, 1u, 0);
 }
 
 //D2Game.0x6FCD0410
+// 1.13c D2Game+0xF3000 (AI param +0x18 = 0xD written directly, then F2540 walk with one step)
 int32_t __fastcall sub_6FCD0410(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, uint8_t nFlags)
 {
 	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)
 	{
-		D2GAME_MONSTERMODE_SetVelocityParams_6FC62FC0(pUnit->pMonsterData->pAiParam, 13, 0, 0);
+		pUnit->pMonsterData->pAiParam->unk0x18 = 13;
 	}
 
-	return AITACTICS_WalkToTargetUnitWithFlags(pGame, pUnit, pTarget, nFlags);
+	return AITACTICS_MoveToTarget(pGame, pUnit, pTarget, MONMODE_WALK, 0, 0, 1u, nFlags);
 }
 
 //D2Game.0x6FCD0460
+// not-1.13c: retail callers call 0xF2540 directly with mode 2 and coordinates; no standalone function
 int32_t __fastcall AITACTICS_WalkToTargetCoordinates(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_WALK, nX, nY, 1u, 0);
 }
 
 //D2Game.0x6FCD0480
+// not-1.13c: retail callers call 0xF2540 directly with mode 0xF and coordinates; no standalone function
 int32_t __fastcall AITACTICS_RunToTargetCoordinates(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_RUN, nX, nY, 1u, 0);
 }
 
 //D2Game.0x6FCD04A0
+// not-1.13c: retail callers call 0xF2540 directly with mode 2, coordinates and flag 4; no standalone function
 int32_t __fastcall AITACTICS_WalkToTargetCoordinatesDeleteAiEvent(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_WALK, nX, nY, 1u, 4);
 }
 
 //D2Game.0x6FCD04C0
+// not-1.13c: retail callers call 0xF2540 directly with mode 0xF, coordinates and flag 4; no standalone function
 int32_t __fastcall AITACTICS_RunToTargetCoordinatesDeleteAiEvent(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_RUN, nX, nY, 1u, 4);
 }
 
 //D2Game.0x6FCD04E0
-// not-1.13c: 1.13c inlines this wrapper; its callers (e.g. +0x16970) call MoveToTarget (+0xF2540) in walk mode directly.
+// not-1.13c: retail callers call 0xF2540 directly with mode 2, coordinates and step 0; no standalone function
 int32_t __fastcall AITACTICS_WalkToTargetCoordinatesNoSteps(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_WALK, nX, nY, 0, 0);
 }
 
 //D2Game.0x6FCD0500
+// 1.13c D2Game+0xF2F30 (step byte 0 becomes 1, then F2540 with walk mode 2)
 int32_t __fastcall AITACTICS_WalkToTargetUnitWithSteps(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, uint8_t bStep)
 {
 	if (!bStep)
@@ -455,6 +457,7 @@ int32_t __fastcall AITACTICS_WalkToTargetUnitWithSteps(D2GameStrc* pGame, D2Unit
 }
 
 //D2Game.0x6FCD0530
+// 1.13c D2Game+0xF2F00 (step byte 0 becomes 1, then F2540 with run mode 0xF)
 int32_t __fastcall AITACTICS_RunToTargetUnitWithSteps(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, uint8_t bStep)
 {
 	if (!bStep)
@@ -496,14 +499,16 @@ int32_t __fastcall D2GAME_AICORE_Escape_6FCD0560(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FCD06D0
+// 1.13c D2Game+0xF2C10 (no null checks; the distance is a byte, speed byte +0x20 = min(distance, 0x4D) when above 5)
 int32_t __fastcall sub_6FCD06D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t nMaxDistance, int32_t bDeleteAiEventCallback)
 {
 	const int32_t nX = CLIENTS_GetUnitX(pUnit);
 	const int32_t nY = CLIENTS_GetUnitY(pUnit);
 	const int32_t nXSign = D2signum(nX - CLIENTS_GetUnitX(pTarget));
 	const int32_t nYSign = D2signum(nY - CLIENTS_GetUnitY(pTarget));
+	const int32_t nDistance = (uint8_t)nMaxDistance;
 
-	if (nMaxDistance > 5u)
+	if (nDistance > 5)
 	{
 		D2AiParamStrc* pAiParam = nullptr;
 		if (pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)
@@ -511,10 +516,10 @@ int32_t __fastcall sub_6FCD06D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
 			pAiParam = pUnit->pMonsterData->pAiParam;
 		}
 
-		D2GAME_MONSTERMODE_SetVelocityParams_6FC62FC0(pAiParam, 0, 0, nMaxDistance);
+		D2GAME_MONSTERMODE_SetVelocityParams_6FC62FC0(pAiParam, 0, 0, (uint8_t)nDistance);
 	}
 
-	return AITACTICS_MoveToTarget(pGame, pUnit, 0, MONMODE_RUN, nX + nXSign * nMaxDistance, nY + nYSign * nMaxDistance, 1u, bDeleteAiEventCallback != 0 ? 4 : 0);
+	return AITACTICS_MoveToTarget(pGame, pUnit, 0, MONMODE_RUN, nX + nXSign * nDistance, nY + nYSign * nDistance, 1u, bDeleteAiEventCallback != 0 ? 4 : 0);
 }
 
 // 1.13c D2Game+0xF1B10
@@ -551,14 +556,21 @@ int32_t __fastcall AITACTICS_WalkCloseToUnit(D2GameStrc* pGame, D2UnitStrc* pUni
 	return AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_WALK, nTargetX + nOffsetX, nTargetY + nOffsetY, 1u, 0);
 }
 
-//D2Game.0x6FCD09D0
-int32_t __fastcall AITACTICS_WanderToTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t nMaxDistance)
+// 1.13c D2Game+0xF2870: null owner passes the caller's nMaxDistance (AL) through, not the 1.10f constant 2;
+// the 1.10f AITACTICS_WanderToTarget (0x6FCD09D0) is inlined here in retail, so it is folded in
+//D2Game.0x6FCD0B60
+int32_t __fastcall D2GAME_AICORE_WalkToOwner_6FCD0B60(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pOwner, int32_t nMaxDistance)
 {
+	if (!pOwner)
+	{
+		return AITACTICS_WalkCloseToUnit(pGame, pUnit, nMaxDistance);
+	}
+
 	int32_t nOffsetX = 0;
 	int32_t nOffsetY = 0;
 
-	const int32_t nTargetX = CLIENTS_GetUnitX(pTarget);
-	const int32_t nTargetY = CLIENTS_GetUnitY(pTarget);
+	const int32_t nTargetX = CLIENTS_GetUnitX(pOwner);
+	const int32_t nTargetY = CLIENTS_GetUnitY(pOwner);
 
 	if (ITEMS_RollRandomNumber(&pUnit->pSeed) & 1)
 	{
@@ -582,18 +594,6 @@ int32_t __fastcall AITACTICS_WanderToTarget(D2GameStrc* pGame, D2UnitStrc* pUnit
 	}
 
 	return AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_WALK, nTargetX + nOffsetX, nTargetY + nOffsetY, 1u, 0);
-}
-
-// 1.13c D2Game+0xF2870: null owner passes the caller's nMaxDistance (AL) through, not the 1.10f constant 2
-//D2Game.0x6FCD0B60
-int32_t __fastcall D2GAME_AICORE_WalkToOwner_6FCD0B60(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pOwner, int32_t nMaxDistance)
-{
-	if (!pOwner)
-	{
-		return AITACTICS_WalkCloseToUnit(pGame, pUnit, nMaxDistance);
-	}
-
-	return AITACTICS_WanderToTarget(pGame, pUnit, pOwner, nMaxDistance);
 }
 
 //D2Game.0x6FCD0D00
@@ -657,9 +657,10 @@ int32_t __fastcall sub_6FCD0E80(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
 }
 
 //D2Game.0x6FCD0F10
+// 1.13c D2Game+0xF18B0 (only the zero-message test remains; the word cannot exceed 0xFFFF)
 void __fastcall AITACTICS_AddMessage(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pScrollTarget, uint16_t wMessage, int32_t bScrollMessage)
 {
-	if (!wMessage || wMessage > USHRT_MAX)
+	if (!wMessage)
 	{
 		return;
 	}
@@ -716,6 +717,7 @@ void __fastcall AITACTICS_AddMessage(D2GameStrc* pGame, D2UnitStrc* pUnit, D2Uni
 }
 
 //D2Game.0x6FCD1020
+// not-1.13c: retail callers set path step 1 and the mode change inline (0x75070, 0x75E10), no standalone function
 int32_t __fastcall AITACTICS_ChangeModeAndTargetCoordinatesOneStep(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY, int32_t nMode)
 {
 	D2ModeChangeStrc modeChange = {};
@@ -728,6 +730,7 @@ int32_t __fastcall AITACTICS_ChangeModeAndTargetCoordinatesOneStep(D2GameStrc* p
 }
 
 //D2Game.0x6FCD1070
+// not-1.13c: retail callers set path step 0 and the mode change inline (0x75070, 0x75E10), no standalone function
 int32_t __fastcall AITACTICS_ChangeModeAndTargetCoordinatesNoStep(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY, int32_t nMode)
 {
 	D2ModeChangeStrc modeChange = {};
@@ -785,6 +788,7 @@ int32_t __fastcall AITACTICS_MoveInRadiusToTarget(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FCD12C0
+// not-1.13c: retail callers call 0xF1D90 directly with walk mode 2, no standalone function
 // TODO: Check name
 int32_t __fastcall AITACTICS_WalkInRadiusToTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t a4, int32_t a5)
 {
@@ -792,25 +796,32 @@ int32_t __fastcall AITACTICS_WalkInRadiusToTarget(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FCD12E0
+// 1.13c D2Game+0xF1C30 (standalone in retail, called only from the Raven AI at 0xAA1D0; EAX = target, EDI = unit)
+// Retail does not use the mode-change info call: it fills a zeroed block directly (mode 2, path type 0x65) and skips the pAiControl argument.
 int32_t __fastcall AITACTICS_WalkAroundTargetWithScaledDistance(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiControlStrc* pAiControl, D2UnitStrc* pTarget, int32_t nScale)
 {
 	const int32_t nDistance = UNITS_GetDistanceToOtherUnit(pUnit, pTarget);
+	const int32_t nTargetX = CLIENTS_GetUnitX(pTarget);
+	const int32_t nTargetY = CLIENTS_GetUnitY(pTarget);
 	if (!nDistance)
 	{
 		return 0;
 	}
 
-	const int32_t nTargetX = CLIENTS_GetUnitX(pTarget);
-	const int32_t nTargetY = CLIENTS_GetUnitY(pTarget);
+	const int32_t nUnitX = CLIENTS_GetUnitX(pUnit);
+	const int32_t nUnitY = CLIENTS_GetUnitY(pUnit);
 
 	D2ModeChangeStrc modeChange = {};
-	MONSTERMODE_GetModeChangeInfo(pUnit, MONMODE_WALK, &modeChange);
-	modeChange.nX = nTargetX + (nScale * (CLIENTS_GetUnitX(pUnit) - nTargetX)) / nDistance;
-	modeChange.nY = nTargetY + (nScale * (CLIENTS_GetUnitY(pUnit) - nTargetY)) / nDistance;
+	modeChange.nMode = MONMODE_WALK;
+	modeChange.pUnit = pUnit;
+	modeChange.nX = nTargetX + (nUnitX - nTargetX) * nScale / nDistance;
+	modeChange.nY = nTargetY + (nUnitY - nTargetY) * nScale / nDistance;
+	modeChange.unk0x14[1] = 101;
 	return D2GAME_ModeChange_6FC65220(pGame, &modeChange, 1);
 }
 
 //D2Game.0x6FCD1430
+// not-1.13c: retail inlines the last-attacker minion test in the Overseer AI 0x17CB0 (seen: it calls 0xE09D0 and 0xE0A60 itself), no standalone function
 D2UnitStrc* __fastcall AITACTICS_GetTargetMinion(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2UnitStrc* pTarget = SUNIT_GetLastAttacker(pGame, pUnit);

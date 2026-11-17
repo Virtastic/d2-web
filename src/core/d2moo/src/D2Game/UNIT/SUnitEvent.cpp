@@ -52,27 +52,6 @@ D2UnitEventStrc* __fastcall SUNITEVENT_Register(D2GameStrc* pGame, D2UnitStrc* p
     return pUnitEvent;
 }
 
-// Helper function
-static void __fastcall SUNITEVENT_FreeEvent(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitEventStrc* pUnitEvent)
-{
-	D2UnitEventStrc* pNext = pUnitEvent->pNext;
-	if (pUnitEvent->pPrevious)
-	{
-		pUnitEvent->pPrevious->pNext = pNext;
-	}
-	else
-	{
-		pUnit->pSrvUnitEventsList = pNext;
-	}
-
-	if (pUnitEvent->pNext)
-	{
-		pUnitEvent->pNext->pPrevious = pUnitEvent->pPrevious;
-	}
-
-	D2_FREE_POOL(pGame->pMemoryPool, pUnitEvent);
-}
-
 //D2Game.0x6FCC36D0
 // 1.13c D2Game+0x37110 (checked against decompile)
 void __fastcall SUNITEVENT_Unregister(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nTimerQueueNo, int32_t a4)
@@ -94,7 +73,22 @@ void __fastcall SUNITEVENT_Unregister(D2GameStrc* pGame, D2UnitStrc* pUnit, int3
             }
             else
             {
-				SUNITEVENT_FreeEvent(pGame, pUnit, pUnitEvent);
+                // 1.13c D2Game+0x37110: the unlink and free of the event are inlined here (free at SUnitEvent.cpp line 0x95)
+                if (pUnitEvent->pPrevious)
+                {
+                    pUnitEvent->pPrevious->pNext = pNext;
+                }
+                else
+                {
+                    pUnit->pSrvUnitEventsList = pNext;
+                }
+
+                if (pUnitEvent->pNext)
+                {
+                    pUnitEvent->pNext->pPrevious = pUnitEvent->pPrevious;
+                }
+
+                D2_FREE_POOL(pGame->pMemoryPool, pUnitEvent);
             }
         }
 
@@ -144,7 +138,22 @@ void __fastcall SUNITEVENT_Trigger(D2GameStrc* pGame, D2C_UnitEventTypes nUnitEv
 
             if ((pUnitEvent->nFlags & UNITEVENTFLAG_SHOULD_BE_FREED) || !pUnitEvent->nQueueNo)
             {
-				SUNITEVENT_FreeEvent(pGame, pUnit, pUnitEvent);
+                // 1.13c D2Game+0x37030: the unlink and free of the event are inlined here (free at SUnitEvent.cpp line 0xEB)
+                if (pUnitEvent->pPrevious)
+                {
+                    pUnitEvent->pPrevious->pNext = pNext;
+                }
+                else
+                {
+                    pUnit->pSrvUnitEventsList = pNext;
+                }
+
+                if (pUnitEvent->pNext)
+                {
+                    pUnitEvent->pNext->pPrevious = pUnitEvent->pPrevious;
+                }
+
+                D2_FREE_POOL(pGame->pMemoryPool, pUnitEvent);
             }
         }
         pUnitEvent = pNext;

@@ -51,7 +51,8 @@ void __fastcall AITHINK_Fn018_PantherWoman(D2GameStrc* pGame, D2UnitStrc* pUnit,
 //D2Game.0x6FCD41F0
 D2UnitStrc* __fastcall AITHINK_TargetCallback_Panther(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, void* pCallbackArg);
 //D2Game.0x6FCD4390
-void __fastcall AITHINK_Fn012_019_Goatman_Swarm(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam);
+void __fastcall AITHINK_Fn012_Goatman(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam);
+void __fastcall AITHINK_Fn019_Swarm(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam);
 //D2Game.0x6FCD4440
 void __fastcall AITHINK_Fn020_Scarab(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam);
 //D2Game.0x6FCD4720
@@ -430,8 +431,6 @@ void __fastcall AITHINK_AncientBarb3SkillHandler(D2GameStrc* pGame, D2UnitStrc* 
 void __fastcall AITHINK_Fn133_Ancient(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam);
 //D2Game.0x6FCEFBF0
 void __fastcall AITHINK_Fn134_BaalThrone(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam);
-//D2Game.0x6FCF0030
-void __fastcall AITHINK_BaalThroneSetAiParamFlag(D2AiTickParamStrc* pAiTickParam, int32_t nFlag, int32_t bSet);
 //D2Game.0x6FCF0050
 D2UnitStrc* __fastcall AITHINK_TargetCallback_BaalToStairs(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, void* pCallbackArg);
 //D2Game.0x6FCF0090
@@ -463,7 +462,5 @@ void __fastcall AITHINK_ExecuteAiFn(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCo
 void __fastcall D2GAME_MONSTERS_AiFunction03_6FCF0A70(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4);
 //D2Game.0x6FCF0D10
 int32_t __fastcall D2GAME_AICORE_MinionLeash_6FCF0D10(D2GameStrc* pGame, D2UnitStrc* pMonster, D2AiTickParamStrc* pAiTickParam);
-//Inlined in D2Game.0x6FCF0E40
-int32_t __fastcall sub_6FCF0E40_inline(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam);
 //D2Game.0x6FCF0E40
 int32_t __fastcall sub_6FCF0E40(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam);

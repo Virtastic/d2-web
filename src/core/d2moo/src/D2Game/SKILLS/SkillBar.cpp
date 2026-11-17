@@ -33,6 +33,7 @@
 #include "MONSTER/MonsterRegion.h"
 #include "OBJECTS/ObjMode.h"
 #include "PLAYER/Player.h"
+#include "PLAYER/PlayerPets.h"
 #include "PLAYER/PlrModes.h"
 #include "PLAYER/PlrSave2.h"
 #include "SKILLS/SkillAss.h"
@@ -146,10 +147,11 @@ int32_t __fastcall SKILLS_SrvSt32_Conversion_Bash_Stun_Concentrate_BearSmite(D2G
 }
 
 //D2Game.0x6FCFAE50
+// 1.13c D2Game+0x27270 (a target that is the caster itself is refused)
 int32_t __fastcall SKILLS_SrvSt33_FindPotion_GrimWard(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
-    if (!pTarget)
+    if (!pTarget || pTarget == pUnit)
     {
         return 0;
     }
@@ -313,10 +315,11 @@ int32_t __fastcall SKILLS_SrvDo068_BasicShout(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FCFB270
+// 1.13c D2Game+0x27B90 (a target that is the caster itself is refused)
 int32_t __fastcall SKILLS_SrvDo070_DoubleSwing(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
-    if (!pTarget)
+    if (!pTarget || pTarget == pUnit)
     {
         return 0;
     }
@@ -430,10 +433,11 @@ int32_t __fastcall SKILLS_SrvDo071_Taunt(D2GameStrc* pGame, D2UnitStrc* pUnit, i
 }
 
 //D2Game.0x6FCFB610
+// 1.13c D2Game+0x27240 (a target that is the caster itself is refused)
 int32_t __fastcall SKILLS_SrvSt34_FindItem(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
-    if (!pTarget)
+    if (!pTarget || pTarget == pUnit)
     {
         return 0;
     }
@@ -745,6 +749,7 @@ int32_t __fastcall SKILLS_SrvDo009_Frenzy(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FCFBF80
+// 1.13c D2Game+0x27190 (retail ends with the player pet refresh 0x96FA0 only, no passive skill refresh)
 void __fastcall SKILLS_CurseStateCallback_Whirlwind(D2UnitStrc* pUnit, int32_t nState, D2StatListStrc* pStatList)
 {
     D2_MAYBE_UNUSED(pStatList);
@@ -756,7 +761,10 @@ void __fastcall SKILLS_CurseStateCallback_Whirlwind(D2UnitStrc* pUnit, int32_t n
     {
         STATES_ToggleState(pUnit, nState, 0);
         UNITS_UpdateAnimRateAndVelocity(pUnit, __FILE__, __LINE__);
-        sub_6FD14C30(pUnit);
+        if (pUnit->dwUnitType == UNIT_PLAYER)
+        {
+            sub_6FC7DF40(pGame, pUnit);
+        }
     }
 }
 

@@ -9,8 +9,7 @@
 #include "UNIT/SUnitInactive.h"
 
 
-//D2Game.0x6FCCED00
-// not-1.13c: 1.13c inlines the pool allocation into the monster initializer (+0xB0320); no stand-alone function.
+// not-1.13c: retail has no stand-alone function; the monster-data builder (D2Game+0xB0320) inlines this calloc and the four field writes (owner guid/type pairs = -1/1)
 D2AiControlStrc* __fastcall AIGENERAL_AllocAiControl(D2GameStrc* pGame)
 {
 	D2AiControlStrc* pAiControl = D2_CALLOC_STRC_POOL(pGame->pMemoryPool, D2AiControlStrc);
@@ -22,7 +21,7 @@ D2AiControlStrc* __fastcall AIGENERAL_AllocAiControl(D2GameStrc* pGame)
 	return pAiControl;
 }
 
-//D2Game.0x6FCCED40
+// not-1.13c: retail inlines the index 1/2/3 -> control+0x14/+0x18/+0x1C store at each caller
 void __fastcall AIGENERAL_SetAiControlParam(D2UnitStrc* pMonster, int32_t nIndex, int32_t nParamValue)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pMonster);
@@ -49,7 +48,7 @@ void __fastcall AIGENERAL_SetAiControlParam(D2UnitStrc* pMonster, int32_t nIndex
 	}
 }
 
-//D2Game.0x6FCCED80
+// not-1.13c: retail inlines the index 1/2/3 -> control+0x14/+0x18/+0x1C load at each caller
 int32_t __fastcall AIGENERAL_GetAiControlParam(D2UnitStrc* pUnit, int32_t nIndex)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
@@ -163,7 +162,7 @@ void __fastcall AIGENERAL_FreeAllAiCommands(D2GameStrc* pGame, D2UnitStrc* pUnit
 	}
 }
 
-//D2Game.0x6FCCEEF0
+// not-1.13c: retail inlines the control->pCurrentCmd (+0x20) read at each caller
 D2AiCmdStrc* __fastcall AIGENERAL_GetCurrentAiCommandFromUnit(D2UnitStrc* pUnit)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
@@ -274,23 +273,27 @@ D2AiCmdStrc* __fastcall AIGENERAL_CopyAiCommand(D2GameStrc* pGame, D2UnitStrc* p
 	return pCopy;
 }
 
-//D2Game.0x6FCCF090
 // 1.13c D2Game+0x217D0
 D2AiCmdStrc* __fastcall AIGENERAL_SetCurrentAiCommand(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nCmdParam, int32_t bSet)
 {
-	// 1.13c: no AiControl check up front; a missing command is created through the copy routine (+0x21290)
-	// from a block whose params are { nCmdParam, 0, 0, 0, 0 }.
-	if (!AIGENERAL_GetAiCommandFromParam(pUnit, nCmdParam, bSet))
+	D2AiCmdStrc* pAiCmd = AIGENERAL_GetAiCommandFromParam(pUnit, nCmdParam, bSet);
+	if (!pAiCmd)
 	{
-		D2AiCmdStrc tBlock = {};
-		tBlock.nCmdParam[0] = nCmdParam;
-		AIGENERAL_CopyAiCommand(pGame, pUnit, &tBlock);
+		if (!AIGENERAL_GetAiControlFromUnit(pUnit))
+		{
+			return nullptr; // not-1.13c: retail faults on a unit without a control here
+		}
+
+		// retail builds the one-parameter command on the stack and hands it to the copy function (0x21290)
+		D2AiCmdStrc tmpCmd = {};
+		tmpCmd.nCmdParam[0] = nCmdParam;
+		AIGENERAL_CopyAiCommand(pGame, pUnit, &tmpCmd);
 	}
 
 	return AIGENERAL_GetAiCommandFromParam(pUnit, nCmdParam, bSet);
 }
 
-//D2Game.0x6FCCF190
+// 1.13c D2Game+0x20C00 (the command-chain free loop is 0x20B60, the minion-node loop is 0x20B30; retail inlines both)
 void __fastcall AIGENERAL_FreeAiControl(D2GameStrc* pGame, D2AiControlStrc* pAiControl)
 {
 	if (!pAiControl)
@@ -310,7 +313,7 @@ void __fastcall AIGENERAL_FreeAiControl(D2GameStrc* pGame, D2AiControlStrc* pAiC
 		D2_FREE_POOL(pGame->pMemoryPool, i);
 	}
 
-	// 1.13c D2Game+0x20B60 (command-chain free loop, ESI=pAiControl; no delta vs 1.10f)
+	// 1.13c D2Game+0x20B60: free every command while both the last and the current pointer are set
 	for (D2AiCmdStrc* i = pAiControl->pLastCmd; i; i = pAiControl->pLastCmd)
 	{
 		D2AiCmdStrc* pCurrentCmd = pAiControl->pCurrentCmd;
@@ -351,19 +354,24 @@ D2MapAIStrc** __stdcall AIGENERAL_GetMapAiFromUnit(D2UnitStrc* pUnit)
 	return &pAiControl->pMapAi;
 }
 
-//D2Game.0x6FCCF270
+// 1.13c D2Game+0x20D90
 void __fastcall AIGENERAL_SetOwnerData(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nOwnerGUID, int32_t nOwnerType, int32_t bSetFlag1, int32_t bSetFlag2)
 {
+	// retail only acts on a monster unit (type 1) and writes straight through its control
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
+	if (!pAiControl)
+	{
+		return;
+	}
 
 	if (bSetFlag2)
 	{
-		AIUTIL_ToggleAiControlFlag(pAiControl, 2u, 1);
+		pAiControl->nAiFlags |= 2;
 	}
 
 	if (bSetFlag1)
 	{
-		AIUTIL_ToggleAiControlFlag(pAiControl, 1u, 1);
+		pAiControl->nAiFlags |= 1;
 	}
 
 	pAiControl->dwOwnerGUIDEx = nOwnerGUID;
@@ -400,10 +408,16 @@ D2UnitStrc* __fastcall AIGENERAL_GetMinionOwner(D2UnitStrc* pUnit)
 	return nullptr;
 }
 
-//D2Game.0x6FCCF360
+// 1.13c D2Game+0x20CF0
 void __fastcall AIGENERAL_AllocMinionList(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pMinion)
 {
+	// retail returns without allocating unless pUnit is a monster (type 1)
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
+	if (!pAiControl)
+	{
+		return;
+	}
+
 	D2MinionListStrc* pMinionList = D2_CALLOC_STRC_POOL(pGame->pMemoryPool, D2MinionListStrc);
 
 	if (pMinion)
@@ -419,7 +433,7 @@ void __fastcall AIGENERAL_AllocMinionList(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 	pAiControl->pMinionList = pMinionList;
 }
 
-//D2Game.0x6FCCF3C0
+// 1.13c D2Game+0x216A0
 void __fastcall AIGENERAL_FreeMinionList(D2UnitStrc* pUnit)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
@@ -428,7 +442,12 @@ void __fastcall AIGENERAL_FreeMinionList(D2UnitStrc* pUnit)
 		return;
 	}
 
+	// retail returns unless the owner resolves to a monster unit (type 1) with a control
 	D2AiControlStrc* pOwnerAiControl = AIGENERAL_GetAiControlFromUnit(SUNIT_GetServerUnit(pAiControl->pGame, pAiControl->dwOwnerTypeEx, pAiControl->dwOwnerGUIDEx));
+	if (!pOwnerAiControl)
+	{
+		return;
+	}
 
 	D2MinionListStrc* pPreviousMinionList = nullptr;
 	for (D2MinionListStrc* pMinionList = pOwnerAiControl->pMinionList; pMinionList; pMinionList = pMinionList->pNext)
@@ -460,7 +479,7 @@ void __fastcall AIGENERAL_FreeMinionList(D2UnitStrc* pUnit)
 	}
 }
 
-//D2Game.0x6FCCF4B0
+// 1.13c D2Game+0x21590
 void __fastcall sub_6FCCF4B0(D2UnitStrc* pUnit)
 {
 	if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER || !pUnit->pMonsterData)
@@ -499,7 +518,7 @@ void __fastcall sub_6FCCF4B0(D2UnitStrc* pUnit)
 	pAiControl->pMinionList = nullptr;
 }
 
-//D2Game.0x6FCCF590
+// 1.13c D2Game+0x20B30
 void __fastcall AIGENERAL_FreeAllMinionLists(D2GameStrc* pGame, D2MinionListStrc* pMinionList)
 {
 	while (pMinionList)
@@ -510,7 +529,7 @@ void __fastcall AIGENERAL_FreeAllMinionLists(D2GameStrc* pGame, D2MinionListStrc
 	}
 }
 
-//D2Game.0x6FCCF5C0
+// 1.13c D2Game+0x21490
 void __fastcall AIGENERAL_ExecuteCallbackOnMinions(D2UnitStrc* pUnit, void* a2, void* a3, void(__fastcall* pfnParty)(D2UnitStrc*, void*, void*))
 {
 	D2_ASSERT(pfnParty);
@@ -521,7 +540,13 @@ void __fastcall AIGENERAL_ExecuteCallbackOnMinions(D2UnitStrc* pUnit, void* a2, 
 		return;
 	}
 
+	// retail stops here unless the owner resolves to a monster unit (type 1)
 	D2AiControlStrc* pOwnerAiControl = AIGENERAL_GetAiControlFromUnit(SUNIT_GetServerUnit(pAiControl->pGame, pAiControl->dwOwnerTypeEx, pAiControl->dwOwnerGUIDEx));
+	if (!pOwnerAiControl)
+	{
+		return;
+	}
+
 	D2MinionListStrc* pNext = nullptr;
 	for (D2MinionListStrc* pMinionList = pOwnerAiControl->pMinionList; pMinionList; pMinionList = pNext)
 	{
@@ -534,7 +559,7 @@ void __fastcall AIGENERAL_ExecuteCallbackOnMinions(D2UnitStrc* pUnit, void* a2, 
 	}
 }
 
-//D2Game.0x6FCCF680
+// not-1.13c: retail has no stand-alone function; the inactive-monster compress (D2Game+0x1F600) inlines it: when control+0x30 == 1 it reads +0x2C, the two flag bits and +0x34, then writes +0x2C = -1 and +0x34 = 0; the node's owner field starts at -1
 void __fastcall AIGENERAL_GetAiControlInfo(D2UnitStrc* pUnit, int32_t* pOwnerGUID, int32_t* pOwnerType, int32_t* pAiControlFlag1, int32_t* pAiControlFlag2, D2MinionListStrc** ppMinionList)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
@@ -554,7 +579,7 @@ void __fastcall AIGENERAL_GetAiControlInfo(D2UnitStrc* pUnit, int32_t* pOwnerGUI
 	}
 }
 
-//D2Game.0x6FCCF710
+// 1.13c D2Game+0x21210
 void __fastcall AIGENERAL_SetAiControlInfo(D2GameStrc* pGame, D2UnitStrc* pUnit, DWORD nOwnerGUID, DWORD nOwnerType, int32_t bSetFlag1, int32_t bSetFlag2, D2MinionListStrc* pMinionList)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
@@ -564,24 +589,73 @@ void __fastcall AIGENERAL_SetAiControlInfo(D2GameStrc* pGame, D2UnitStrc* pUnit,
 	}
 
 	AIGENERAL_FreeAllMinionLists(pGame, pAiControl->pMinionList);
-
-	if (bSetFlag2)
-	{
-		AIUTIL_ToggleAiControlFlag(pAiControl, 2u, 1);
-	}
-
-	if (bSetFlag1)
-	{
-		AIUTIL_ToggleAiControlFlag(pAiControl, 1u, 1);
-	}
-
-	pAiControl->dwOwnerGUIDEx = nOwnerGUID;
-	pAiControl->dwOwnerTypeEx = nOwnerType;
-	pAiControl->pGame = pGame;
+	AIGENERAL_SetOwnerData(pGame, pUnit, nOwnerGUID, nOwnerType, bSetFlag1, bSetFlag2);
 	pAiControl->pMinionList = pMinionList;
 }
 
-//D2Game.0x6FCCF7C0
+// 1.13c D2Game+0x21040: owner flag clear -> every listed minion that still exists drops its owner (guid -1, type 1, game kept)
+static void AIGENERAL_ClearMinionOwners(D2AiControlStrc* pAiControl)
+{
+	D2GameStrc* pGame = pAiControl->pGame;
+	for (D2MinionListStrc* pMinionList = pAiControl->pMinionList; pMinionList; pMinionList = pMinionList->pNext)
+	{
+		D2_ASSERT(pGame);
+
+		D2UnitStrc* pMinion = SUNIT_GetServerUnit(pGame, UNIT_MONSTER, pMinionList->dwMinionGUID);
+		if (pMinion)
+		{
+			AIGENERAL_SetOwnerData(pGame, pMinion, -1, UNIT_MONSTER, 0, 0);
+		}
+	}
+}
+
+// 1.13c D2Game+0x210D0: owner flag set -> the first listed minion that still exists becomes the owner of the whole list
+static void AIGENERAL_LinkMinionsToFirst(D2AiControlStrc* pAiControl, D2UnitStrc* pUnit)
+{
+	D2MinionListStrc* pHead = pAiControl->pMinionList;
+	if (!pHead)
+	{
+		return;
+	}
+
+	D2GameStrc* pGame = pAiControl->pGame;
+	D2MinionListStrc* pMinionList = pHead;
+	D2UnitStrc* pFirst = nullptr;
+	while (pMinionList)
+	{
+		D2_ASSERT(pGame);
+
+		pFirst = SUNIT_GetServerUnit(pGame, UNIT_MONSTER, pMinionList->dwMinionGUID);
+		if (pFirst)
+		{
+			break;
+		}
+
+		pMinionList = pMinionList->pNext;
+	}
+
+	if (!pFirst)
+	{
+		return;
+	}
+
+	const int32_t nFirstGUID = pMinionList->dwMinionGUID;
+	AIGENERAL_SetOwnerData(pGame, pFirst, nFirstGUID, UNIT_MONSTER, 1, 1);
+	AIGENERAL_SetOwnerData(pGame, pUnit, nFirstGUID, UNIT_MONSTER, 0, 0);
+	AIGENERAL_AllocMinionList(pGame, pFirst, pUnit);
+
+	for (D2MinionListStrc* i = pHead; i; i = i->pNext)
+	{
+		D2UnitStrc* pOther = SUNIT_GetServerUnit(pGame, UNIT_MONSTER, i->dwMinionGUID);
+		if (pOther && pOther != pFirst)
+		{
+			AIGENERAL_SetOwnerData(pGame, pOther, nFirstGUID, UNIT_MONSTER, 0, 0);
+			AIGENERAL_AllocMinionList(pGame, pFirst, pOther);
+		}
+	}
+}
+
+// not-1.13c: retail has no stand-alone function; the monster-death handler (D2Game+0x75350) tests control flag 1, then flag 2, and calls 0x21040 or 0x210D0
 void __fastcall AIGENERAL_UpdateMinionList(D2UnitStrc* pUnit)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
@@ -592,64 +666,15 @@ void __fastcall AIGENERAL_UpdateMinionList(D2UnitStrc* pUnit)
 
 	if (!AIUTIL_CheckAiControlFlag(pAiControl, 2u))
 	{
-		for (D2MinionListStrc* i = pAiControl->pMinionList; i; i = i->pNext)
-		{
-			AIGENERAL_SetOwnerData(pAiControl->pGame, SUNIT_GetServerUnit(pAiControl->pGame, UNIT_MONSTER, i->dwMinionGUID), -1, UNIT_MONSTER, 0, 0);
-		}
-		return;
+		AIGENERAL_ClearMinionOwners(pAiControl);
 	}
-
-	D2MinionListStrc* pMinionList = pAiControl->pMinionList;
-	D2MinionListStrc* pList = pAiControl->pMinionList;
-
-	while (pMinionList)
+	else
 	{
-		D2UnitStrc* pMinion = SUNIT_GetServerUnit(pAiControl->pGame, UNIT_MONSTER, pMinionList->dwMinionGUID);
-		if (pMinion)
-		{
-			if (pMinion->dwUnitType == UNIT_MONSTER)
-			{
-				AIGENERAL_SetOwnerData(pAiControl->pGame, pMinion, pMinionList->dwMinionGUID, UNIT_MONSTER, 1, 1);
-			}
-
-			if (pUnit && pUnit->dwUnitType == UNIT_MONSTER)
-			{
-				AIGENERAL_SetOwnerData(pAiControl->pGame, pUnit, pMinionList->dwMinionGUID, UNIT_MONSTER, 0, 0);
-			}
-
-			if (pMinion->dwUnitType == UNIT_MONSTER)
-			{
-				D2AiControlStrc* pMinionAiControl = AIGENERAL_GetAiControlFromUnit(pMinion);
-
-				D2MinionListStrc* pNewList = D2_CALLOC_STRC_POOL(pAiControl->pGame->pMemoryPool, D2MinionListStrc);
-				pNewList->dwMinionGUID = pUnit ? pUnit->dwUnitId : -1;
-
-				if (pMinionAiControl->pMinionList)
-				{
-					pNewList->pNext = pMinionAiControl->pMinionList;
-				}
-				pMinionAiControl->pMinionList = pNewList;
-			}
-
-			do
-			{
-				D2UnitStrc* pTemp = SUNIT_GetServerUnit(pAiControl->pGame, UNIT_MONSTER, pList->dwMinionGUID);
-				if (pTemp && pTemp != pMinion)
-				{
-					AIGENERAL_SetOwnerData(pAiControl->pGame, pTemp, pMinionList->dwMinionGUID, UNIT_MONSTER, 0, 0);
-					AIGENERAL_AllocMinionList(pAiControl->pGame, pMinion, pTemp);
-				}
-				pList = pList->pNext;
-			}
-			while (pList);
-			return;
-		}
-
-		pMinionList = pMinionList->pNext;
+		AIGENERAL_LinkMinionsToFirst(pAiControl, pUnit);
 	}
 }
 
-//D2Game.0x6FCCF9B0
+// 1.13c D2Game+0x20C60
 int32_t __fastcall AIGENERAL_GetMinionSpawnClassId(D2UnitStrc* pUnit)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);

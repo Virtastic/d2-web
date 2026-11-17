@@ -152,6 +152,7 @@ void __stdcall sub_6FC62020(D2SeedStrc* pSeed, D2MonRegDataStrc* pMonRegData, in
 }
 
 //D2Game.0x6FC62420
+// 1.13c D2Game+0xDF4A0
 int32_t __fastcall MONSTERCHOOSE_GetPresetMonsterId(D2GameStrc* pGame, D2MonsterRegionStrc* pMonsterRegion, D2ActiveRoomStrc* pRoom, D2MonStatsTxt** ppMonStatsTxtRecord, uint8_t nChance, int32_t bSpawnUMon)
 {
     D2SeedStrc* pSeed = nullptr;
@@ -193,11 +194,12 @@ int32_t __fastcall MONSTERCHOOSE_GetPresetMonsterId(D2GameStrc* pGame, D2Monster
         ++pMonRegData;
     }
 
-    int32_t nMonsterId = pMonRegData->nMonHcIdx;
+    // 1.13c reads the region's id and the record's spawn id as signed shorts (movsx, then the `-1 <` test)
+    int32_t nMonsterId = (int16_t)pMonRegData->nMonHcIdx;
     D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nMonsterId);
-    if (pMonStatsTxtRecord && pMonStatsTxtRecord->wSpawn >= 0 && pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_PLACESPAWN] && (ITEMS_RollRandomNumber(pSeed) % 100) > nChance)
+    if (pMonStatsTxtRecord && (int16_t)pMonStatsTxtRecord->wSpawn >= 0 && pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_PLACESPAWN] && (ITEMS_RollRandomNumber(pSeed) % 100) > nChance)
     {
-        nMonsterId = pMonStatsTxtRecord->wSpawn;
+        nMonsterId = (int16_t)pMonStatsTxtRecord->wSpawn;
     }
 
     *ppMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nMonsterId);
@@ -205,6 +207,8 @@ int32_t __fastcall MONSTERCHOOSE_GetPresetMonsterId(D2GameStrc* pGame, D2Monster
 }
 
 //D2Game.0x6FC62640
+// not-1.13c: retail has no such function; its nType==1 branch (D2Game+0x47A20) advances the room seed in place (the
+// `*(u64*)(room+0x6C) = lo*0x6AC690C5 + hi` store, seen at the 0x47A20 nType==1 site) before calling the boss spawner
 D2UnkMonCreateStrc2* __fastcall sub_6FC62640(D2ActiveRoomStrc* pRoom)
 {
     if (pRoom)

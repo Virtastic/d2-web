@@ -129,12 +129,84 @@ void __fastcall PLAYERSTATS_LevelUp(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC7EDE0
+// 1.13c D2Game+0xEB070: the walked player (EBX) receives the leveled-up player's roster line (EAX).
 void __fastcall PLAYERSTATS_OnPlayerLeveledUp(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pLeveledUpPlayer)
 {
     SCMD_Send0x75_PartyRosterUpdate(pUnit, (D2UnitStrc*)pLeveledUpPlayer);
 }
 
+// 1.13c D2Game+0xEAE20: nCount points into energy. The mana gain only for a positive count, the max
+// mana always, then mana clamped to the max.
+static void PLAYERSTATS_AddEnergy(D2UnitStrc* pUnit, int32_t nCount)
+{
+    if (!nCount || !pUnit)
+    {
+        return;
+    }
+
+    D2CharStatsTxt* pCharStatsTxtRecord = PLRSAVE2_GetCharStatsTxtRecord(pUnit->dwClassId);
+    if (!pCharStatsTxtRecord)
+    {
+        return;
+    }
+
+    STATLIST_AddUnitStat(pUnit, STAT_STATPTS, -nCount, 0);
+    STATLIST_AddUnitStat(pUnit, STAT_ENERGY, nCount, 0);
+    if (nCount > 0)
+    {
+        STATLIST_AddUnitStat(pUnit, STAT_MANA, (pCharStatsTxtRecord->nManaPerMagic * nCount) << 6, 0);
+    }
+    STATLIST_AddUnitStat(pUnit, STAT_MAXMANA, (pCharStatsTxtRecord->nManaPerMagic * nCount) << 6, 0);
+
+    const int32_t nMaxMana = STATLIST_UnitGetStatValue(pUnit, STAT_MAXMANA, 0);
+    if (STATLIST_UnitGetStatValue(pUnit, STAT_MANA, 0) > nMaxMana)
+    {
+        STATLIST_SetUnitStat(pUnit, STAT_MANA, nMaxMana, 0);
+    }
+}
+
+// 1.13c D2Game+0xEAD10: nCount points into vitality. Max life and max stamina always grow, life and
+// stamina only for a positive count, each clamped to its max.
+static void PLAYERSTATS_AddVitality(D2UnitStrc* pUnit, int32_t nCount)
+{
+    if (!nCount || !pUnit)
+    {
+        return;
+    }
+
+    D2CharStatsTxt* pCharStatsTxtRecord = PLRSAVE2_GetCharStatsTxtRecord(pUnit->dwClassId);
+    if (!pCharStatsTxtRecord)
+    {
+        return;
+    }
+
+    STATLIST_AddUnitStat(pUnit, STAT_STATPTS, -nCount, 0);
+    STATLIST_AddUnitStat(pUnit, STAT_VITALITY, nCount, 0);
+    STATLIST_AddUnitStat(pUnit, STAT_MAXHP, (pCharStatsTxtRecord->nLifePerVitality * nCount) << 6, 0);
+    if (nCount > 0)
+    {
+        STATLIST_AddUnitStat(pUnit, STAT_HITPOINTS, (pCharStatsTxtRecord->nLifePerVitality * nCount) << 6, 0);
+    }
+    const int32_t nMaxHp = STATLIST_UnitGetStatValue(pUnit, STAT_MAXHP, 0);
+    if (STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0) > nMaxHp)
+    {
+        STATLIST_SetUnitStat(pUnit, STAT_HITPOINTS, nMaxHp, 0);
+    }
+
+    STATLIST_AddUnitStat(pUnit, STAT_MAXSTAMINA, (pCharStatsTxtRecord->nStaminaPerVitality * nCount) << 6, 0);
+    if (nCount > 0)
+    {
+        STATLIST_AddUnitStat(pUnit, STAT_STAMINA, (pCharStatsTxtRecord->nStaminaPerVitality * nCount) << 6, 0);
+    }
+    const int32_t nMaxStamina = STATLIST_UnitGetStatValue(pUnit, STAT_MAXSTAMINA, 0);
+    if (STATLIST_UnitGetStatValue(pUnit, STAT_STAMINA, 0) > nMaxStamina)
+    {
+        STATLIST_SetUnitStat(pUnit, STAT_STAMINA, nMaxStamina, 0);
+    }
+}
+
 //D2Game.0x6FC7EDF0
+// 1.13c D2Game+0xEAEE0: strength and dexterity in place, energy and vitality through their helpers.
 int32_t __fastcall PLAYERSTATS_SpendStatPoint(D2UnitStrc* pUnit, int32_t nStatId)
 {
     if (!STATLIST_UnitGetStatValue(pUnit, STAT_STATPTS, 0))
@@ -152,17 +224,8 @@ int32_t __fastcall PLAYERSTATS_SpendStatPoint(D2UnitStrc* pUnit, int32_t nStatId
         return 1;
     }
     case STAT_ENERGY:
-    {
-        D2CharStatsTxt* pCharStatsTxtRecord = PLRSAVE2_GetCharStatsTxtRecord(pUnit->dwClassId);
-        if (pCharStatsTxtRecord)
-        {
-            STATLIST_AddUnitStat(pUnit, STAT_STATPTS, -1, 0);
-            STATLIST_AddUnitStat(pUnit, STAT_ENERGY, 1, 0);
-            STATLIST_AddUnitStat(pUnit, STAT_MANA, pCharStatsTxtRecord->nManaPerMagic << 6, 0);
-            STATLIST_AddUnitStat(pUnit, STAT_MAXMANA, pCharStatsTxtRecord->nManaPerMagic << 6, 0);
-        }
+        PLAYERSTATS_AddEnergy(pUnit, 1);
         return 1;
-    }
     case STAT_DEXTERITY:
     {
         STATLIST_AddUnitStat(pUnit, STAT_STATPTS, -1, 0);
@@ -171,32 +234,8 @@ int32_t __fastcall PLAYERSTATS_SpendStatPoint(D2UnitStrc* pUnit, int32_t nStatId
         return 1;
     }
     case STAT_VITALITY:
-    {
-        if (pUnit)
-        {
-            D2CharStatsTxt* pCharStatsTxtRecord = PLRSAVE2_GetCharStatsTxtRecord(pUnit->dwClassId);
-            if (pCharStatsTxtRecord)
-            {
-                STATLIST_AddUnitStat(pUnit, STAT_STATPTS, -1, 0);
-                STATLIST_AddUnitStat(pUnit, STAT_VITALITY, 1, 0);
-                STATLIST_AddUnitStat(pUnit, STAT_MAXHP, pCharStatsTxtRecord->nLifePerVitality << 6, 0);
-                STATLIST_AddUnitStat(pUnit, STAT_HITPOINTS, pCharStatsTxtRecord->nLifePerVitality << 6, 0);
-                const int32_t nMaxHp = STATLIST_UnitGetStatValue(pUnit, STAT_MAXHP, 0);
-                if (STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0) > nMaxHp)
-                {
-                    STATLIST_SetUnitStat(pUnit, STAT_HITPOINTS, nMaxHp, 0);
-                }
-                STATLIST_AddUnitStat(pUnit, STAT_MAXSTAMINA, pCharStatsTxtRecord->nStaminaPerVitality << 6, 0);
-                STATLIST_AddUnitStat(pUnit, STAT_STAMINA, pCharStatsTxtRecord->nStaminaPerVitality << 6, 0);
-                const int32_t nMaxStamina = STATLIST_UnitGetStatValue(pUnit, STAT_MAXSTAMINA, 0);
-                if (STATLIST_UnitGetStatValue(pUnit, STAT_STAMINA, 0) > nMaxStamina)
-                {
-                    STATLIST_SetUnitStat(pUnit, STAT_STAMINA, nMaxStamina, 0);
-                }
-            }
-        }
+        PLAYERSTATS_AddVitality(pUnit, 1);
         return 1;
-    }
 	default:
 		return 0;
     }

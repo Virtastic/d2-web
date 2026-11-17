@@ -45,8 +45,6 @@ void __fastcall sub_6FD0C2B0(D2UnitStrc* pUnit, int32_t nState, D2StatListStrc* 
 void __fastcall D2GAME_SetSummonResistance_6FD0C2E0(D2UnitStrc* pUnit, D2UnitStrc* pPet);
 //D2Game.0x6FD0C3A0
 void __fastcall D2GAME_SetUnitComponent_6FD0C3A0(D2UnitStrc* pUnit, D2UnitStrc* pPet, int32_t nLevel, int32_t bHasShield, int32_t bSpecial);
-//D2Game.0x6FD0C500
-void __fastcall sub_6FD0C500(D2UnitStrc* pMonster, uint8_t nIndex, uint8_t nComponent);
 //D2Game.0x6FD0C530
 int32_t __fastcall D2GAME_SetSummonPassiveStats_6FD0C530(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pPet, int32_t nSkillId, int32_t nSkillLevel, int32_t nItemLevel);
 //D2Game.0x6FD0CB10

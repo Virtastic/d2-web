@@ -15,6 +15,8 @@
 
 
 //D2Game.0x6FC40FB0
+// 1.13c D2Game+0x9BB10 (checked against the disassembly: the nested pass re-sends the outer item,
+// as retail passes the outer item in EAX to D2Game+0x9B630 for every nested hit; no other delta)
 void __fastcall D2GAME_INVMODE_First_6FC40FB0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient, D2InventoryStrc* pInventoryArg)
 {
     D2InventoryStrc* pInventory = pUnit->pInventory;
@@ -64,11 +66,13 @@ void __fastcall D2GAME_INVMODE_First_6FC40FB0(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FC410E0
+// 1.13c D2Game+0x9B630 (checked against the disassembly: same vendor/cmd-flag/item-flag ladder and
+// packet codes; retail inlines the interact-unit lookup, reading the client player without a null test)
 int32_t __fastcall sub_6FC410E0(D2UnitStrc* pPlayer, D2UnitStrc* pItem, D2UnitStrc* pUnused, D2ClientStrc* pClient)
 {
     D2UnitStrc* pClientPlayer = CLIENTS_GetPlayerFromClient(pClient, 0);
     D2GameStrc* pGame = CLIENTS_GetGame(pClient);
-    D2UnitStrc* pInteractUnit = SUNIT_GetInteractUnit(pGame, pClientPlayer);
+    D2UnitStrc* pInteractUnit = pClientPlayer->nInteract ? SUNIT_GetServerUnit(pGame, pClientPlayer->dwInteractType, pClientPlayer->dwInteractGUID) : nullptr;
 
     if (pItem)
     {
@@ -267,6 +271,7 @@ void __fastcall D2GAME_ResetSomeItemFlags_6FC415F0(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FC41660
+// 1.13c D2Game+0x9B570
 int32_t __fastcall sub_6FC41660(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (pUnit && (pUnit->dwFlagEx & 0x400000 || pUnit->dwFlagEx & 0x800000))
@@ -274,9 +279,13 @@ int32_t __fastcall sub_6FC41660(D2GameStrc* pGame, D2UnitStrc* pUnit)
         return 1;
     }
 
-    for (D2InventoryNodeStrc* pInventoryNode = INVENTORY_GetTradeInventory(pUnit->pInventory); pInventoryNode; pInventoryNode = INVENTORY_GetNextNode(pInventoryNode))
+    // Retail steps to the next node before it tests the lookup result.
+    D2InventoryNodeStrc* pInventoryNode = INVENTORY_GetTradeInventory(pUnit->pInventory);
+    while (pInventoryNode)
     {
-        if (SUNIT_GetServerUnit(pGame, UNIT_ITEM, INVENTORY_GetItemGUIDFromNode(pInventoryNode)))
+        D2UnitStrc* pItem = SUNIT_GetServerUnit(pGame, UNIT_ITEM, INVENTORY_GetItemGUIDFromNode(pInventoryNode));
+        pInventoryNode = INVENTORY_GetNextNode(pInventoryNode);
+        if (pItem)
         {
             return 1;
         }

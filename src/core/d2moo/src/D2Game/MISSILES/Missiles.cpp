@@ -25,6 +25,7 @@
 
 
 //D2Game.0x6FC552A0
+// 1.13c D2Game+0x6FEC0 (the list link is read straight from pListNext)
 void __fastcall MISSILES_RemoveAll(D2GameStrc* pGame)
 {
     for (int32_t i = 0; i < 128; ++i)
@@ -32,7 +33,7 @@ void __fastcall MISSILES_RemoveAll(D2GameStrc* pGame)
         D2UnitStrc* pUnit = pGame->pUnitList[4][i];
         while (pUnit)
         {
-            D2UnitStrc* pNext = SUNIT_GetNextUnitFromList(pUnit);
+            D2UnitStrc* pNext = pUnit->pListNext;
             SUNIT_RemoveUnit(pGame, pUnit);
             pUnit = pNext;
         }
@@ -40,6 +41,7 @@ void __fastcall MISSILES_RemoveAll(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC552F0
+// 1.13c D2Game+0x6F8A0 (the timer delete and the mode-change event node are inline)
 void __fastcall MISSILES_Initialize(D2GameStrc* pGame, D2UnitStrc* pMissile, int32_t nUnitGUID)
 {
     if (!pMissile)
@@ -50,11 +52,32 @@ void __fastcall MISSILES_Initialize(D2GameStrc* pGame, D2UnitStrc* pMissile, int
     MISSILE_AllocMissileData(pMissile);
     pMissile->dwUnitId = nUnitGUID;
     pMissile->dwFlags &= ~(UNITFLAG_TARGETABLE | UNITFLAG_ISVALIDTARGET);
-    sub_6FC349F0(pGame, pMissile);
-    sub_6FC35570(pGame, pMissile, EVENTTYPE_MODECHANGE, 0, 0);
+    if (SUNIT_GetTimerFromUnit(pMissile))
+    {
+        sub_6FC349F0(pGame, pMissile);
+    }
+    SUNIT_SetTimerOnUnit(pMissile, nullptr);
+
+    D2EventTimerStrc* pTimer = EVENT_AllocateUnitTimer(pGame, pMissile);
+    pTimer->nFlags |= 4;
+    pTimer->nEventType = EVENTTYPE_MODECHANGE;
+    pTimer->nExpireFrame = -1;
+    pTimer->dwEventCustomId = 0;
+    pTimer->dwEventCustomParam = 0;
+    pTimer->pCallback = nullptr;
+
+    D2EventTimerStrc** ppHead = sub_6FC353D0(pGame, pMissile->dwUnitType, -1);
+    pTimer->pNextFreeEventTimer = *ppHead;
+    pTimer->unk0x20 = nullptr;
+    if (*ppHead)
+    {
+        (*ppHead)->unk0x20 = pTimer;
+    }
+    *ppHead = pTimer;
 }
 
 //D2Game.0x6FC55340
+// 1.13c D2Game+0x6F880 (no delta)
 void __fastcall MISSILES_Free(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
     if (!pMissile)
@@ -67,9 +90,21 @@ void __fastcall MISSILES_Free(D2GameStrc* pGame, D2UnitStrc* pMissile)
 }
 
 //D2Game.0x6FC55360
+// 1.13c D2Game+0x6F930 (the missile branch of SUNIT_AllocUnitData, D2Game+0xE1D90, is inline in retail; the
+// damage block is D2Game+0x6F620, the pierce roll D2Game+0x6F660; 1.10f's trailing sub_6FC7CA10(owner, 0) is a no-op retail drops)
 D2UnitStrc* __fastcall MISSILES_CreateMissileFromParams(D2GameStrc* pGame, D2MissileStrc* missileParams)
 {
-    if (!missileParams->pOwner || (missileParams->pOwner->dwUnitType != UNIT_PLAYER && missileParams->pOwner->dwUnitType != UNIT_MONSTER))
+    if (!missileParams->pOwner)
+    {
+        return 0;
+    }
+
+    if (missileParams->nMissile < 0 || missileParams->nMissile >= sgptDataTables->nMissilesTxtRecordCount)
+    {
+        return 0;
+    }
+
+    if (missileParams->pOwner->dwUnitType != UNIT_PLAYER && missileParams->pOwner->dwUnitType != UNIT_MONSTER)
     {
         return 0;
     }
@@ -195,6 +230,7 @@ D2UnitStrc* __fastcall MISSILES_CreateMissileFromParams(D2GameStrc* pGame, D2Mis
         }
     }
 
+    // retail inlines this call's missile branch here (alloc, act, seed, GUID counter, D2Game+0x6F8A0, SUNIT_Add)
     D2UnitStrc* pMissile = SUNIT_AllocUnitData(UNIT_MISSILE, missileParams->nMissile, nX, nY, pGame, pRoom, 1, pMissilesTxtRecord->nCollideType, 0);
     if (!pMissile)
     {
@@ -285,10 +321,10 @@ D2UnitStrc* __fastcall MISSILES_CreateMissileFromParams(D2GameStrc* pGame, D2Mis
             nDistance = 1;
         }
 
-        int32_t nCurrentFrame = 0;
-        if (nVelocity)
+        uint32_t nCurrentFrame = 0;
+        if ((uint32_t)nVelocity << 4)
         {
-            nCurrentFrame = (nDistance << 16) / (16 * nVelocity);
+            nCurrentFrame = ((uint32_t)nDistance << 16) / ((uint32_t)nVelocity << 4);
         }
 
         MISSILE_SetCurrentFrame(pMissile, nCurrentFrame);
@@ -304,38 +340,37 @@ D2UnitStrc* __fastcall MISSILES_CreateMissileFromParams(D2GameStrc* pGame, D2Mis
     MISSILE_SetSkill(pMissile, missileParams->nSkill);
     MISSILE_SetLevel(pMissile, missileParams->nSkillLevel);
 
+    // D2Game+0x6F620: weapon-state swap, then the damage data; no restore call follows
     sub_6FC7C900(missileParams->pOwner, 0);
     D2MissileDamageDataStrc missileDamageData = {};
     MISSILE_CalculateDamageData(&missileDamageData, missileParams->pOwner, missileParams->pOrigin, pMissile, missileParams->nSkillLevel);
     MISSILE_SetDamageStats(missileParams->pOwner, pMissile, &missileDamageData, missileParams->nSkillLevel);
 
-    sub_6FC7CA10(missileParams->pOwner, 0);
     UNITS_StoreOwner(pMissile, missileParams->pOwner);
 
     pMissile->dwFlags &= ~UNITFLAG_ISVALIDTARGET;
 
-    if (missileParams->pOwner && pMissile->dwUnitType == UNIT_MISSILE && (missileParams->pOwner->dwUnitType == UNIT_PLAYER || missileParams->pOwner->dwUnitType == UNIT_MONSTER))
+    // D2Game+0x6F660: the pierce roll, gated on the missile's own record; signed compare of roll % 100 against the pierce value
+    D2UnitStrc* pOwner = missileParams->pOwner;
+    if (pOwner && pMissile->dwUnitType == UNIT_MISSILE && (pOwner->dwUnitType == UNIT_PLAYER || pOwner->dwUnitType == UNIT_MONSTER)
+        && SKILLS_GetMissilesTxtRecord(pMissile->dwClassId)->dwMissileFlags & gdwBitMasks[MISSILESFLAGINDEX_PIERCE])
     {
-        if (pMissilesTxtRecord->dwMissileFlags & gdwBitMasks[MISSILESFLAGINDEX_PIERCE])
+        const int32_t nPierceValue = STATLIST_UnitGetItemStatOrSkillStatValue(pOwner, STAT_ITEM_PIERCE, 0) + STATLIST_UnitGetStatValue(pOwner, STAT_SKILL_PIERCE, 0);
+        if (nPierceValue)
         {
-            const int32_t nPierceValue = STATLIST_UnitGetItemStatOrSkillStatValue(missileParams->pOwner, STAT_ITEM_PIERCE, 0) + STATLIST_UnitGetStatValue(missileParams->pOwner, STAT_SKILL_PIERCE, 0);
-            if (nPierceValue)
+            D2SeedStrc seed = {};
+            SEED_InitLowSeed(&seed, STATLIST_GetUnitBaseStat(pOwner, STAT_PIERCE_IDX, 0));
+
+            int32_t nPierceIndex = 0;
+            while (nPierceIndex < 4)
             {
-                D2SeedStrc seed = {};
-                SEED_InitLowSeed(&seed, STATLIST_GetUnitBaseStat(missileParams->pOwner, STAT_PIERCE_IDX, 0));
-                
-                int32_t nPierceIndex = 0;
-                do
+                if ((int32_t)(ITEMS_RollRandomNumber(&seed) % 100) >= nPierceValue)
                 {
-                    if ((ITEMS_RollRandomNumber(&seed) % 100) >= nPierceValue)
-                    {
-                        break;
-                    }
-                    ++nPierceIndex;
+                    break;
                 }
-                while (nPierceIndex < 4);
-                STATLIST_SetUnitStat(pMissile, STAT_PIERCE_IDX, nPierceIndex, 0);
+                ++nPierceIndex;
             }
+            STATLIST_SetUnitStat(pMissile, STAT_PIERCE_IDX, nPierceIndex, 0);
         }
     }
 
@@ -352,19 +387,21 @@ D2UnitStrc* __fastcall MISSILES_CreateMissileFromParams(D2GameStrc* pGame, D2Mis
     sub_6FC6E8B0(pGame, missileParams->pOwner, pMissile);
     STATLIST_SetUnitStat(pMissile, STAT_DAMAGE_FRAMERATE, pMissilesTxtRecord->dwDamageRate, 0);
 
+    // not-1.13c: d2-web's missile-birth note for the client mirror; retail returns here (D2Game+0x6F930 tail)
     { extern void d2_note_missile_birth(D2UnitStrc*); d2_note_missile_birth(pMissile); }
     return pMissile;
 }
 
 //D2Game.0x6FC55B70
+// 1.13c D2Game+0x6F740 (SUNIT_GetOwner inline: the STOREOWNERINFO gate, then SUNIT_GetServerUnit)
 void __fastcall MISSILES_SyncToClient(D2ClientStrc* pClient, D2GameStrc* pGame, D2UnitStrc* pMissile, int32_t nVelocity)
 {
-    if (!pMissile || pMissile->dwUnitType != UNIT_MISSILE)
+    if (!pMissile || pMissile->dwUnitType != UNIT_MISSILE || !(pMissile->dwFlagEx & UNITFLAGEX_STOREOWNERINFO))
     {
         return;
     }
 
-    D2UnitStrc* pOwner = SUNIT_GetOwner(pGame, pMissile);
+    D2UnitStrc* pOwner = SUNIT_GetServerUnit(pGame, pMissile->dwOwnerType, pMissile->dwOwnerGUID);
     if (!pOwner)
     {
         return;

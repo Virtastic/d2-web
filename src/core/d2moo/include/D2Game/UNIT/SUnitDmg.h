@@ -166,7 +166,6 @@ extern D2CombatHitRollTraceCallback gpCombatHitRollTraceCallback;
 
 
 //D2Game.0x6FCBE2F0
-int32_t __fastcall SUNITDMG_SetHitClass(D2DamageStrc* pDamage, uint32_t nHitClass);
 //D2Game.0x6FCBE310
 int32_t __fastcall SUNITDMG_GetColdEffect(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FCBE360

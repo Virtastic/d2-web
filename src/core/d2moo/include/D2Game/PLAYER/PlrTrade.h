@@ -58,8 +58,6 @@ void __fastcall sub_6FC92920(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc
 int32_t __fastcall sub_6FC92A90(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2);
 //D2Game.0x6FC92CF0
 void __fastcall PLRTRADE_StopAllPlayerInteractions(D2GameStrc* pGame, D2UnitStrc* pPlayer);
-//D2Game.0x6FC92EE0
-void __fastcall sub_6FC92EE0(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FC92EF0
 void __fastcall sub_6FC92EF0(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FC92F10

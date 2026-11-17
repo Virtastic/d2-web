@@ -106,8 +106,6 @@ int32_t __fastcall D2GAME_STORES_SellItem_6FCC7680(D2GameStrc* pGame, D2UnitStrc
 void __fastcall sub_6FCC7E20(D2GameStrc* pGame, D2UnitStrc* pNpc, D2UnitStrc* pItem, D2UnitStrc* pUnit, int32_t a5);
 //D2Game.0x6FCC7FA0
 void __fastcall sub_6FCC7FA0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNpc, uint16_t wName);
-//D2Game.0x6FCC8430
-void __fastcall sub_6FCC8430(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FCC84D0
 void __fastcall sub_6FCC84D0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pPet);
 //D2Game.0x6FCC8630

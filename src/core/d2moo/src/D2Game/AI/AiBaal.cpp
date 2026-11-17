@@ -19,6 +19,7 @@
 #include "AI/AiThink.h"
 #include "AI/AiUtil.h"
 #include "GAME/Clients.h"
+#include "GAME/Event.h"
 #include "ITEMS/Items.h"
 #include "MONSTER/Monster.h"
 #include "MONSTER/MonsterMode.h"
@@ -30,7 +31,7 @@
 #include "SKILLS/SkillAss.h"
 
 
-//D2Game.0x6FCCD450
+// 1.13c D2Game+0xB6CE0
 void __fastcall AIBAAL_CountLivingMinions(D2UnitStrc* pUnit, void* ppUnitArg, void* pCounterArg)
 {
 	D2UnitStrc** ppUnit = (D2UnitStrc**)ppUnitArg;
@@ -42,7 +43,7 @@ void __fastcall AIBAAL_CountLivingMinions(D2UnitStrc* pUnit, void* ppUnitArg, vo
 	}
 }
 
-//D2Game.0x6FCCD470
+// 1.13c D2Game+0xB78A0
 void __fastcall D2GAME_AI_Unk135_140_6FCCD470(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	int32_t nParam1 = 0;
@@ -74,7 +75,7 @@ void __fastcall D2GAME_AI_Unk135_140_6FCCD470(D2GameStrc* pGame, D2UnitStrc* pUn
 	AITACTICS_IdleInNeutralMode(pGame, pUnit, 1);
 }
 
-//D2Game.0x6FCCD520
+// 1.13c D2Game+0xB8610
 void __fastcall AITHINK_Fn135_BaalCrab(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	int32_t nCount = 0;
@@ -92,12 +93,25 @@ void __fastcall AITHINK_Fn135_BaalCrab(D2GameStrc* pGame, D2UnitStrc* pUnit, D2A
 		pAiCmd = AIGENERAL_GetAiCommandFromParam(pUnit, 10, 0);
 	}
 
-	AIBAAL_MainSkillHandler(pGame, pUnit, pAiTickParam->pAiControl, pTarget, AIBAAL_RollRandomAiParam(pGame, pUnit, pAiTickParam->pAiControl, pTarget, nMax, nCount, pAiCmd), pAiCmd);
-	AITACTICS_Idle(pGame, pUnit, 25);
+	const int32_t nParam = AIBAAL_RollRandomAiParam(pGame, pUnit, pAiTickParam->pAiControl, pTarget, nMax, nCount, pAiCmd);
+	AIBAAL_MainSkillHandler(pGame, pUnit, pAiTickParam->pAiControl, pTarget, nParam, pAiCmd);
+
+	// retail drops the unit's queued think events one by one and arms the next think 25 frames out, rather than calling the idle helper
+	D2EventTimerStrc* pTimer = pUnit->pTimer;
+	while (pTimer)
+	{
+		D2EventTimerStrc* pNextTimer = pTimer->pNext;
+		if (pTimer->nEventType == EVENTTYPE_AITHINK)
+		{
+			sub_6FC34890(pGame, pTimer);
+		}
+		pTimer = pNextTimer;
+	}
+	EVENT_SetEvent(pGame, pUnit, EVENTTYPE_AITHINK, pGame->dwGameFrame + 25, 0, 0);
 }
 
 #ifdef D2_VERSION_HAS_UBERS
-//Inlined
+// not-1.13c: 1.14 uber-Baal weight table; no 1.13c twin, retail's uber slot (D2Game+0xB6C80) is empty and nothing calls this any more
 int32_t __fastcall AIBAAL_RollRandomUberAiParamForNonCollidingUnit(D2GameStrc* pGame, D2AiControlStrc* pAiControl, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t nCount, int32_t bInMediumRange, int32_t bInFarRange, int32_t bInCloseRange, int32_t nMax)
 {
 	// UBER TWEAK START
@@ -179,7 +193,7 @@ int32_t __fastcall AIBAAL_RollRandomUberAiParamForNonCollidingUnit(D2GameStrc* p
 	return AI_GetRandomArrayIndex(aiParams, std::size(aiParams), pUnit, 1);
 }
 
-//Inlined
+// not-1.13c: 1.14 uber-Baal weight table; no 1.13c twin, retail's uber slot (D2Game+0xB6C80) is empty and nothing calls this any more
 int32_t __fastcall AIBAAL_RollRandomUberAiParam(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiControlStrc* pAiControl, D2UnitStrc* pTarget, int32_t nMax, int32_t nCount, D2AiCmdStrc* pAiCmd)
 {
 	if (pAiControl->dwAiParam[0])
@@ -314,8 +328,7 @@ int32_t __fastcall AIBAAL_RollRandomUberAiParam(D2GameStrc* pGame, D2UnitStrc* p
 	return AI_GetRandomArrayIndex(aiParams, std::size(aiParams), pUnit, 1);
 }
 
-//1.11 : D2Game.0x6FD0ACC0
-//1.14d: 0x005FD0F0
+// not-1.13c: 1.14 uber-Baal minion spawn; no 1.13c twin, retail's uber slot (D2Game+0xB6C80) is empty and nothing calls this any more
 void __fastcall AIBAAL_SpawnUberBaalMinion(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2CoordStrc coord;
@@ -342,74 +355,9 @@ void __fastcall AIBAAL_SpawnUberBaalMinion(D2GameStrc* pGame, D2UnitStrc* pUnit)
 	}
 }
 
-//1.14d: 0x005FD200
+// 1.13c D2Game+0xB6C80: the slot is an empty function in 1.13c (the uber Baal brain is 1.14 only)
 void __fastcall AITHINK_Fn145_UberBaal(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
-	int32_t nCount = 0;
-	int32_t nMax = 0;
-
-	D2UnitStrc* pTarget = AIBAAL_GetTarget(pGame, pUnit, &nMax, &nCount, nullptr, AIBAAL_CullPotentialTargets);
-
-	// UBER TWEAK START
-	D2UbersAiCallbackArgStrc arg_target = {};
-	arg_target.nDistance = INT_MAX;
-	sub_6FCF1E80(pGame, pTarget ? pTarget : pUnit, &arg_target, AIUTIL_TargetCallback_Ubers, 1);
-	BOOL bAlone = (arg_target.nUberDiablo == 0 && arg_target.nUberMephisto == 0);
-	if (bAlone && pTarget)
-	{
-		D2UbersAiCallbackArgStrc arg_self = {};
-		arg_self.nDistance = INT_MAX;
-		sub_6FCF1E80(pGame, pUnit, &arg_self, AIUTIL_TargetCallback_Ubers, 1);
-		bAlone = (arg_self.nUberDiablo == 0 && arg_self.nUberMephisto == 0);
-	}
-	if ((bAlone && arg_target.nBaalMinions < 15 && SEED_RollPercentage(&pUnit->pSeed) < 45)
-	|| (arg_target.nBaalMinions < 7 && SEED_RollPercentage(&pUnit->pSeed) < 30))
-	{
-		AIBAAL_SpawnUberBaalMinion(pGame, pUnit);
-	}
-
-	if (pAiTickParam->pMonstatsTxt->nSkill[7] >= 0)
-	{
-		D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(pAiTickParam->pMonstatsTxt->nSkill[7]);
-		if (pSkillsTxtRecord
-		&& pSkillsTxtRecord->nAuraState >= 0
-		&& !STATES_CheckState(pUnit, pSkillsTxtRecord->nAuraState))
-		{
-			AITACTICS_UseSkill(pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[7], pAiTickParam->pMonstatsTxt->nSkill[7], 0, 0, 0);
-			return;
-		}
-	}
-	// UBER TWEAK END
-
-	D2AiCmdStrc* pAiCmd = AIGENERAL_GetAiCommandFromParam(pUnit, 10, 0);
-	if (!pAiCmd)
-	{
-		D2AiCmdStrc aiCmd = {};
-		aiCmd.nCmdParam[0] = 10;
-		aiCmd.nCmdParam[1] = CLIENTS_GetUnitX(pUnit);
-		aiCmd.nCmdParam[2] = CLIENTS_GetUnitY(pUnit);
-		AIGENERAL_CopyAiCommand(pGame, pUnit, &aiCmd);
-		pAiCmd = AIGENERAL_GetAiCommandFromParam(pUnit, 10, 0);
-	}
-
-	int32_t nParam = AIBAAL_RollRandomUberAiParam(pGame, pUnit, pAiTickParam->pAiControl, pTarget, nMax, nCount, pAiCmd);
-
-	// UBER TWEAK START
-	if (!pTarget)
-	{
-		return;
-	}
-	if (UNITS_TestCollisionWithUnit(pUnit, pTarget, COLLIDE_VISIBLE | COLLIDE_MISSILE_BARRIER))
-	{
-		const int32_t nX = CLIENTS_GetUnitX(pTarget);
-		const int32_t nY = CLIENTS_GetUnitY(pTarget);
-		AITACTICS_UseSkill(pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[4], pAiTickParam->pMonstatsTxt->nSkill[4], 0, nX, nY);
-		return;
-	}
-	// UBER TWEAK END
-
-	AIBAAL_MainSkillHandler(pGame, pUnit, pAiTickParam->pAiControl, pTarget, nParam, pAiCmd);
-	AITACTICS_Idle(pGame, pUnit, 25);
 }
 #endif
 
@@ -527,7 +475,7 @@ D2UnitStrc* __fastcall AIBAAL_GetTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, in
 	return pTarget;
 }
 
-//D2Game.0x6FCCD8A0
+// 1.13c D2Game+0xB6DA0
 int32_t __fastcall AIBAAL_GetTargetScore(D2UnitStrc* pUnit, D2UnitStrc* pTarget, void* pArgs)
 {
 	const int32_t bInMeleeRange = UNITS_IsInMeleeRange(pUnit, pTarget, 0);
@@ -554,7 +502,7 @@ int32_t __fastcall AIBAAL_GetTargetScore(D2UnitStrc* pUnit, D2UnitStrc* pTarget,
 	const int32_t nDamageWeight = static_cast<int32_t>(nMaxDamage + nFireMaxDamage + nLightningMaxDamage + nMagicMaxDamage + nColdMaxDamage + nPoisonMaxDamage) / 2;
 
 	const int32_t nColdStateWeight = STATES_CheckState(pTarget, STATE_COLD) ? 100 : 0;
-	const int32_t nLifePercentageWeight = (UNITS_GetCurrentLifePercentage(pTarget) >= 20) ? 100 : 0;
+	const int32_t nLifePercentageWeight = (UNITS_GetCurrentLifePercentage(pTarget) > 19) ? 0 : 100; // 1.13c: a target under 20% life weighs 100 (1.10f weighed the healthy ones)
 	
 	int32_t nLeftSkillLevel = 0;
 	int32_t nLeftSkillAttackRank = 0;
@@ -604,23 +552,18 @@ int32_t __fastcall AIBAAL_GetTargetScore(D2UnitStrc* pUnit, D2UnitStrc* pTarget,
 	return nTotalScore;
 }
 
-//1.10: D2Game.0x6FCCDBB0
-//1.14d: 0x005FC000
+// 1.13c D2Game+0xB6D30 (1.10f culled at 55 units, 1.13c at 1020)
 int32_t __fastcall AIBAAL_CullPotentialTargets(D2UnitStrc* pBaal, D2UnitStrc* pTarget)
 {
 	D2_ASSERT(pBaal);
 	D2_ASSERT(pTarget);
 
-	if (pBaal->nAct == pTarget->nAct)
+	if (pBaal->nAct != pTarget->nAct)
 	{
-#ifdef D2_VERSION_HAS_UBERS
-		return AIUTIL_GetDistanceToCoordinates_NoUnitSize(pTarget, CLIENTS_GetUnitX(pBaal), CLIENTS_GetUnitY(pBaal)) < 1020;
-#else
-		return AIUTIL_GetDistanceToCoordinates_NoUnitSize(pTarget, CLIENTS_GetUnitX(pBaal), CLIENTS_GetUnitY(pBaal)) < 55;
-#endif
+		return 0;
 	}
 
-	return 0;
+	return AIUTIL_GetDistanceToCoordinates_NoUnitSize(pTarget, CLIENTS_GetUnitX(pBaal), CLIENTS_GetUnitY(pBaal)) < 1020;
 }
 
 //D2Game.0x6FCCDC80
@@ -775,10 +718,9 @@ int32_t __fastcall AIBAAL_RollRandomAiParam(D2GameStrc* pGame, D2UnitStrc* pUnit
 	return AI_GetRandomArrayIndex(aiParams, std::size(aiParams), pUnit, 1);
 }
 
-//D2Game.0x6FCCE040
-int32_t __fastcall AI_CheckSpecialSkillsOnPrimeEvil(D2UnitStrc* pUnit)
+// 1.13c D2Game+0xB6C90: one skill, the owner unit in a register
+static int32_t AIBAAL_IsPrimeEvilSpecialSkill(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
-	D2SkillStrc* pSkill = UNITS_GetRightSkill(pUnit);
 	if (pSkill)
 	{
 		const int32_t nSkillId = SKILLS_GetSkillIdFromSkill(pSkill, __FILE__, __LINE__);
@@ -794,44 +736,23 @@ int32_t __fastcall AI_CheckSpecialSkillsOnPrimeEvil(D2UnitStrc* pUnit)
 				return 1;
 			}
 		}
-		else if (nSkillId == SKILL_IMMOLATIONARROW)
-		{
-			if (SKILLS_GetSkillLevel(pUnit, pSkill, 1) > 7)
-			{
-				return 1;
-			}
-		}
-	}
-
-	pSkill = UNITS_GetLeftSkill(pUnit);
-	if (pSkill)
-	{
-		const int32_t nSkillId = SKILLS_GetSkillIdFromSkill(pSkill, __FILE__, __LINE__);
-		if (nSkillId == SKILL_BLIZZARD || nSkillId == SKILL_METEOR)
+		else if (nSkillId == SKILL_IMMOLATIONARROW && SKILLS_GetSkillLevel(pUnit, pSkill, 1) > 7)
 		{
 			return 1;
-		}
-
-		if (nSkillId == SKILL_FIREWALL)
-		{
-			if (SKILLS_GetSkillLevel(pUnit, pSkill, 1) > 3)
-			{
-				return 1;
-			}
-		}
-		else if (nSkillId == SKILL_IMMOLATIONARROW)
-		{
-			if (SKILLS_GetSkillLevel(pUnit, pSkill, 1) > 7)
-			{
-				return 1;
-			}
 		}
 	}
 
 	return 0;
 }
 
-//D2Game.0x6FCCE100
+// not-1.13c: retail's two callers (D2Game+0xB7380 and D2Game+0xB75D0) call the per-skill check at D2Game+0xB6C90 on the right skill, then the left skill, themselves
+int32_t __fastcall AI_CheckSpecialSkillsOnPrimeEvil(D2UnitStrc* pUnit)
+{
+	return AIBAAL_IsPrimeEvilSpecialSkill(pUnit, UNITS_GetRightSkill(pUnit))
+		|| AIBAAL_IsPrimeEvilSpecialSkill(pUnit, UNITS_GetLeftSkill(pUnit));
+}
+
+// 1.13c D2Game+0xB7300 (retail's copy sums the table the caller sizes and falls back to index 1; the default index is a parameter here)
 int32_t __fastcall AI_GetRandomArrayIndex(int32_t* pArray, int32_t nArraySize, D2UnitStrc* pUnit, int32_t nDefaultValue)
 {
 	int32_t nSum = 0;
@@ -950,8 +871,72 @@ int32_t __fastcall AIBAAL_RollRandomAiParamForNonCollidingUnit(D2GameStrc* pGame
 	return AI_GetRandomArrayIndex(aiParams, std::size(aiParams), pUnit, 1);
 }
 
-//1.10: D2Game.0x6FCCE450
-//1.14d: 0x005FCB60
+// 1.13c D2Game+0xB7D30: the clone spawn of handler mode 15 (the unit in a register, the game and the control passed in)
+static int32_t AIBAAL_SpawnBaalClone(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiControlStrc* pAiControl)
+{
+	D2UnitStrc* pTemp = pUnit;
+	int32_t nLivingMinions = 0;
+	AIGENERAL_ExecuteCallbackOnMinions(pUnit, &pTemp, &nLivingMinions, AIBAAL_CountLivingMinions);
+	if (nLivingMinions)
+	{
+		return 0;
+	}
+
+	D2UnitStrc* pOwner = SUNIT_GetOwner(pGame, pUnit);
+	if (pOwner && !SUNIT_IsDead(pOwner))
+	{
+		return 0;
+	}
+
+	int32_t nMonsterId = MONSTER_BAALCLONE;
+	int32_t nUnused1 = 0;
+	int32_t nUnused2 = 0;
+	int32_t nMode = MONMODE_NEUTRAL;
+	MONSTERS_GetMinionSpawnInfo(pUnit, &nMonsterId, &nUnused1, &nUnused2, &nMode, pGame->nDifficulty, 0);
+
+	int32_t nX = ITEMS_RollRandomNumber(&pUnit->pSeed) % 24 - 12;
+	int32_t nY = ITEMS_RollRandomNumber(&pUnit->pSeed) % 24 - 12;
+
+	D2UnitStrc* pTargetUnit = SUNIT_GetTargetUnit(pGame, pUnit);
+	if (pTargetUnit)
+	{
+		nX += CLIENTS_GetUnitX(pTargetUnit);
+		nY += CLIENTS_GetUnitY(pTargetUnit);
+	}
+	else
+	{
+		nX += CLIENTS_GetUnitX(pUnit);
+		nY += CLIENTS_GetUnitY(pUnit);
+	}
+
+	D2ActiveRoomStrc* pRoom = D2GAME_GetRoom_6FC52070(UNITS_GetRoom(pUnit), nX, nY);
+	if (!pRoom)
+	{
+		return 0;
+	}
+
+	D2UnitStrc* pBaalClone = D2GAME_SpawnMonster_6FC69F10(pGame, pRoom, nX, nY, nMonsterId, nMode, -1, 0);
+	if (!pBaalClone)
+	{
+		return 0;
+	}
+
+	pBaalClone->dwFlags |= UNITFLAG_NOXP | UNITFLAG_NOTC;
+	AITACTICS_Idle(pGame, pBaalClone, 15);
+	AIGENERAL_SetOwnerData(pGame, pUnit, pUnit->dwUnitId, pUnit->dwUnitType, 1, 0);
+	AIGENERAL_AllocMinionList(pGame, pUnit, pBaalClone);
+	AIGENERAL_SetOwnerData(pGame, pBaalClone, pUnit->dwUnitId, pUnit->dwUnitType, 1, 0);
+	STATLIST_SetUnitStat(pBaalClone, STAT_MAXHP, STATLIST_GetMaxLifeFromUnit(pUnit) / 3, 0);
+	STATLIST_SetUnitStat(pBaalClone, STAT_HITPOINTS, STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0) / 3, 0);
+	STATLIST_SetUnitStat(pBaalClone, STAT_HPREGEN, 0, 0);
+	UNITS_StoreOwner(pBaalClone, pUnit);
+	UNITS_StoreOwner(pUnit, pBaalClone);
+	SUNIT_AttachSound(pUnit, 16, 0);
+	++pAiControl->dwAiParam[1];
+	return 1;
+}
+
+// 1.13c D2Game+0xB8070 (the clone spawn of mode 15 is split out at D2Game+0xB7D30)
 void __fastcall AIBAAL_MainSkillHandler(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiControlStrc* pAiControl, D2UnitStrc* pTarget, int32_t nParam, D2AiCmdStrc* pAiCmd)
 {
 	if (!pUnit)
@@ -1090,65 +1075,7 @@ void __fastcall AIBAAL_MainSkillHandler(D2GameStrc* pGame, D2UnitStrc* pUnit, D2
 	}
 	case 15:
 	{
-		D2UnitStrc* pTemp = pUnit;
-		int32_t nLivingMinions = 0;
-		AIGENERAL_ExecuteCallbackOnMinions(pUnit, &pTemp, &nLivingMinions, AIBAAL_CountLivingMinions);
-
-		if (nLivingMinions)
-		{
-			AITACTICS_IdleInNeutralMode(pGame, pUnit, 5);
-			return;
-		}
-
-		D2UnitStrc* pOwner = SUNIT_GetOwner(pGame, pUnit);
-		if (pOwner && !SUNIT_IsDead(pOwner))
-		{
-			AITACTICS_IdleInNeutralMode(pGame, pUnit, 5);
-			return;
-		}
-
-		int32_t nMonsterId = MONSTER_BAALCLONE;
-		int32_t nUnused1 = 0;
-		int32_t nUnused2 = 0;
-		int32_t nMode = MONMODE_NEUTRAL;
-		MONSTERS_GetMinionSpawnInfo(pUnit, &nMonsterId, &nUnused1, &nUnused2, &nMode, pGame->nDifficulty, 0);
-
-		int32_t nX = ITEMS_RollRandomNumber(&pUnit->pSeed) % 24 - 12;
-		int32_t nY = ITEMS_RollRandomNumber(&pUnit->pSeed) % 24 - 12;
-
-		D2UnitStrc* pTargetUnit = SUNIT_GetTargetUnit(pGame, pUnit);
-		if (pTargetUnit)
-		{
-			nX += CLIENTS_GetUnitX(pTargetUnit);
-			nY += CLIENTS_GetUnitY(pTargetUnit);
-		}
-		else
-		{
-			nX += CLIENTS_GetUnitX(pUnit);
-			nY += CLIENTS_GetUnitY(pUnit);
-		}
-
-		D2ActiveRoomStrc* pRoom = D2GAME_GetRoom_6FC52070(UNITS_GetRoom(pUnit), nX, nY);
-		if (pRoom)
-		{
-			D2UnitStrc* pBaalClone = D2GAME_SpawnMonster_6FC69F10(pGame, pRoom, nX, nY, nMonsterId, nMode, -1, 0);
-			if (pBaalClone)
-			{
-				pBaalClone->dwFlags |= UNITFLAG_NOXP | UNITFLAG_NOTC;
-				AITACTICS_Idle(pGame, pBaalClone, 15);
-				AIGENERAL_SetOwnerData(pGame, pUnit, pUnit->dwUnitId, pUnit->dwUnitType, 1, 0);
-				AIGENERAL_AllocMinionList(pGame, pUnit, pBaalClone);
-				AIGENERAL_SetOwnerData(pGame, pBaalClone, pUnit->dwUnitId, pUnit->dwUnitType, 1, 0);
-				STATLIST_SetUnitStat(pBaalClone, STAT_MAXHP, STATLIST_GetMaxLifeFromUnit(pUnit) / 3, 0);
-				STATLIST_SetUnitStat(pBaalClone, STAT_HITPOINTS, STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0) / 3, 0);
-				STATLIST_SetUnitStat(pBaalClone, STAT_HPREGEN, 0, 0);
-				UNITS_StoreOwner(pBaalClone, pUnit);
-				UNITS_StoreOwner(pUnit, pBaalClone);
-				SUNIT_AttachSound(pUnit, 16, 0);
-				++pAiControl->dwAiParam[1];
-			}
-		}
-
+		AIBAAL_SpawnBaalClone(pGame, pUnit, pAiControl);
 		AITACTICS_IdleInNeutralMode(pGame, pUnit, 5);
 		return;
 	}

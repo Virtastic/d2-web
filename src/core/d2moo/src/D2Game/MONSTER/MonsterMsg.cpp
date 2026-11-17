@@ -119,7 +119,8 @@ void __fastcall sub_6FC659E0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc*
     }
 }
 
-// Inline
+// not-1.13c: retail tests this inline in D2Game+0xF35C0 (`(mode == 2 || mode == 0xF) && 4 < pathType < 7`, the walk/run
+// anim modes and the two circle path types); D2Game+0x49A50 is the unit-room client scan, not this
 static bool IsPathCircling(int32_t nAnimMode, D2DynamicPathStrc* pDynamicPath)
 {
     if (nAnimMode == MONMODE_WALK || nAnimMode == MONMODE_RUN)

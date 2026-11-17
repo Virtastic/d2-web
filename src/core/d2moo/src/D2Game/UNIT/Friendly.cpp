@@ -6,6 +6,7 @@
 
 
 //D2Game.0x6FCB9A50
+// 1.13c D2Game+0xF4210 (checked against decompile and disassembly, no delta)
 int32_t __fastcall FRIENDLY_RemoveHostility(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2)
 {
     D2_ASSERT(pPlayer1 && pPlayer1->dwUnitType == UNIT_PLAYER);
@@ -16,6 +17,7 @@ int32_t __fastcall FRIENDLY_RemoveHostility(D2GameStrc* pGame, D2UnitStrc* pPlay
 }
 
 //D2Game.0x6FCB9AB0
+// 1.13c D2Game+0xF41C0 (checked against decompile and disassembly, no delta)
 void __fastcall FRIENDLY_OpenHostility(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2)
 {
     D2_ASSERT(pPlayer1 && pPlayer1->dwUnitType == UNIT_PLAYER);

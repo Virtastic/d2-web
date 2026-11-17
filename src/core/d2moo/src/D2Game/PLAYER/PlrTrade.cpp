@@ -72,6 +72,7 @@ int32_t __fastcall OBJECTS_OperateFunction32_Bank(D2ObjOperateFnStrc* pOp, int32
 }
 
 //D2Game.0x6FC8F450
+// 1.13c D2Game+0x70240 (the per-slot input test; the loop over the seven slots is 0x70CF0)
 int32_t __fastcall PLRTRADE_CheckCubeInput(D2GameStrc* pGame, D2InventoryStrc* pInventory, D2CubeMainTxt* pCubeMainTxt, int32_t nInputIndex, D2CubeItemStrc* pCubeItem, int32_t* a6)
 {
     if (!pInventory)
@@ -157,10 +158,10 @@ int32_t __fastcall PLRTRADE_CheckCubeInput(D2GameStrc* pGame, D2InventoryStrc* p
 
                 if (pCubeMainTxt->pInputItem[nInputIndex].nQuality && ITEMS_GetItemQuality(pItem) != pCubeMainTxt->pInputItem[nInputIndex].nQuality)
                 {
-                    //if (pCubeMainTxt->pInputItem[nInputIndex].nQuality == ITEMQUAL_TEMPERED)
-                    //{
-                    //    STATLIST_GetFullStatsCountFromUnit(pItem);
-                    //}
+                    if (pCubeMainTxt->pInputItem[nInputIndex].nQuality == ITEMQUAL_TEMPERED)
+                    {
+                        STATLIST_GetFullStatsCountFromUnit(pItem);
+                    }
                     continue;
                 }
 
@@ -257,126 +258,44 @@ int32_t __fastcall PLRTRADE_CheckCubeInput(D2GameStrc* pGame, D2InventoryStrc* p
 
                     if (pCubeMainTxt->nOp)
                     {
-                        switch (pCubeMainTxt->nOp)
+                        const int32_t nOp = pCubeMainTxt->nOp;
+                        if (nOp >= 15 && nOp <= 26)
                         {
-                        case 15u:
-                        {
-                            D2ItemStatCostTxt* pItemStatCostTxtRecord = SKILLS_GetItemStatCostTxtRecord(pCubeMainTxt->nParam);
-                            if (!pItemStatCostTxtRecord || STATLIST_UnitGetStatValue(pItem, pCubeMainTxt->nParam, 0) < (pCubeMainTxt->nValue >> pItemStatCostTxtRecord->nValShift))
+                            // 1.13c: an id outside 0..record count skips the test; the record lookup fails at id == count and then the item is rejected
+                            const int32_t nStatId = pCubeMainTxt->nParam;
+                            if (nStatId >= 0 && nStatId <= sgptDataTables->nItemStatCostTxtRecordCount)
                             {
-                                continue;
+                                D2ItemStatCostTxt* pItemStatCostTxtRecord = SKILLS_GetItemStatCostTxtRecord(nStatId);
+                                if (!pItemStatCostTxtRecord)
+                                {
+                                    continue;
+                                }
+
+                                const int32_t nThreshold = pCubeMainTxt->nValue >> (pItemStatCostTxtRecord->nValShift & 0x1F);
+                                const int32_t nFamily = (nOp - 15) / 4;
+                                const int32_t nStatValue = nFamily == 0 ? STATLIST_UnitGetStatValue(pItem, nStatId, 0)
+                                    : nFamily == 1 ? STATLIST_GetUnitBaseStat(pItem, nStatId, 0)
+                                    : STATLIST_GetUnitStatBonus(pItem, nStatId, 0);
+                                switch ((nOp - 15) % 4)
+                                {
+                                case 0:
+                                    if (nStatValue < nThreshold) { continue; }
+                                    break;
+                                case 1:
+                                    if (nStatValue > nThreshold) { continue; }
+                                    break;
+                                case 2:
+                                    if (nStatValue == nThreshold) { continue; }
+                                    break;
+                                default:
+                                    if (nStatValue != nThreshold) { continue; }
+                                    break;
+                                }
                             }
-                            break;
                         }
-                        case 16u:
+                        else if (nOp == 27 && ITEMS_GetFileIndex(pItem) == pCubeMainTxt->nValue)
                         {
-                            D2ItemStatCostTxt* pItemStatCostTxtRecord = SKILLS_GetItemStatCostTxtRecord(pCubeMainTxt->nParam);
-                            if (!pItemStatCostTxtRecord || STATLIST_UnitGetStatValue(pItem, pCubeMainTxt->nParam, 0) > (pCubeMainTxt->nValue >> pItemStatCostTxtRecord->nValShift))
-                            {
-                                continue;
-                            }
-                            break;
-                        }
-                        case 17u:
-                        {
-                            D2ItemStatCostTxt* pItemStatCostTxtRecord = SKILLS_GetItemStatCostTxtRecord(pCubeMainTxt->nParam);
-                            if (!pItemStatCostTxtRecord || STATLIST_UnitGetStatValue(pItem, pCubeMainTxt->nParam, 0) == (pCubeMainTxt->nValue >> pItemStatCostTxtRecord->nValShift))
-                            {
-                                continue;
-                            }
-                            break;
-                        }
-                        case 18u:
-                        {
-                            D2ItemStatCostTxt* pItemStatCostTxtRecord = SKILLS_GetItemStatCostTxtRecord(pCubeMainTxt->nParam);
-                            if (!pItemStatCostTxtRecord || STATLIST_UnitGetStatValue(pItem, pCubeMainTxt->nParam, 0) != (pCubeMainTxt->nValue >> pItemStatCostTxtRecord->nValShift))
-                            {
-                                continue;
-                            }
-                            break;
-                        }
-                        case 19u:
-                        {
-                            D2ItemStatCostTxt* pItemStatCostTxtRecord = SKILLS_GetItemStatCostTxtRecord(pCubeMainTxt->nParam);
-                            if (!pItemStatCostTxtRecord || STATLIST_GetUnitBaseStat(pItem, pCubeMainTxt->nParam, 0) < (pCubeMainTxt->nValue >> pItemStatCostTxtRecord->nValShift))
-                            {
-                                continue;
-                            }
-                            break;
-                        }
-                        case 20u:
-                        {
-                            D2ItemStatCostTxt* pItemStatCostTxtRecord = SKILLS_GetItemStatCostTxtRecord(pCubeMainTxt->nParam);
-                            if (!pItemStatCostTxtRecord || STATLIST_GetUnitBaseStat(pItem, pCubeMainTxt->nParam, 0) > (pCubeMainTxt->nValue >> pItemStatCostTxtRecord->nValShift))
-                            {
-                                continue;
-                            }
-                            break;
-                        }
-                        case 21u:
-                        {
-                            D2ItemStatCostTxt* pItemStatCostTxtRecord = SKILLS_GetItemStatCostTxtRecord(pCubeMainTxt->nParam);
-                            if (!pItemStatCostTxtRecord || STATLIST_GetUnitBaseStat(pItem, pCubeMainTxt->nParam, 0) == (pCubeMainTxt->nValue >> pItemStatCostTxtRecord->nValShift))
-                            {
-                                continue;
-                            }
-                            break;
-                        }
-                        case 22u:
-                        {
-                            D2ItemStatCostTxt* pItemStatCostTxtRecord = SKILLS_GetItemStatCostTxtRecord(pCubeMainTxt->nParam);
-                            if (!pItemStatCostTxtRecord || STATLIST_GetUnitBaseStat(pItem, pCubeMainTxt->nParam, 0) != (pCubeMainTxt->nValue >> pItemStatCostTxtRecord->nValShift))
-                            {
-                                continue;
-                            }
-                            break;
-                        }
-                        case 23u:
-                        {
-                            D2ItemStatCostTxt* pItemStatCostTxtRecord = SKILLS_GetItemStatCostTxtRecord(pCubeMainTxt->nParam);
-                            if (!pItemStatCostTxtRecord || STATLIST_GetUnitStatBonus(pItem, pCubeMainTxt->nParam, 0) < (pCubeMainTxt->nValue >> pItemStatCostTxtRecord->nValShift))
-                            {
-                                continue;
-                            }
-                            break;
-                        }
-                        case 24u:
-                        {
-                            D2ItemStatCostTxt* pItemStatCostTxtRecord = SKILLS_GetItemStatCostTxtRecord(pCubeMainTxt->nParam);
-                            if (!pItemStatCostTxtRecord || STATLIST_GetUnitStatBonus(pItem, pCubeMainTxt->nParam, 0) > (pCubeMainTxt->nValue >> pItemStatCostTxtRecord->nValShift))
-                            {
-                                continue;
-                            }
-                            break;
-                        }
-                        case 25u:
-                        {
-                            D2ItemStatCostTxt* pItemStatCostTxtRecord = SKILLS_GetItemStatCostTxtRecord(pCubeMainTxt->nParam);
-                            if (!pItemStatCostTxtRecord || STATLIST_GetUnitStatBonus(pItem, pCubeMainTxt->nParam, 0) == (pCubeMainTxt->nValue >> pItemStatCostTxtRecord->nValShift))
-                            {
-                                continue;
-                            }
-                            break;
-                        }
-                        case 26u:
-                        {
-                            D2ItemStatCostTxt* pItemStatCostTxtRecord = SKILLS_GetItemStatCostTxtRecord(pCubeMainTxt->nParam);
-                            if (!pItemStatCostTxtRecord || STATLIST_GetUnitStatBonus(pItem, pCubeMainTxt->nParam, 0) != (pCubeMainTxt->nValue >> pItemStatCostTxtRecord->nValShift))
-                            {
-                                continue;
-                            }
-                            break;
-                        }
-                        case 27u:
-                        {
-                            if (ITEMS_GetFileIndex(pItem) == pCubeMainTxt->nValue)
-                            {
-                                continue;
-                            }
-                            break;
-                        }
-                        default:
-                            break;
+                            continue;
                         }
                     }
 
@@ -463,6 +382,7 @@ int32_t __fastcall PLRTRADE_CheckCubeInput(D2GameStrc* pGame, D2InventoryStrc* p
 }
 
 //D2Game.0x6FC8FE40
+// 1.13c D2Game+0x71060 (1.13c stores the version gate as wVersion < 100 || game item format >= 100, same as here)
 int16_t __fastcall PLRTRADE_RollRandomItemClassOfSameType(D2GameStrc* pGame, int32_t nItemLevel, int32_t nItemId)
 {
     D2ItemDataTbl* pItemDataTbl = DATATBLS_GetItemDataTables();
@@ -517,27 +437,27 @@ int16_t __fastcall PLRTRADE_RollRandomItemClassOfSameType(D2GameStrc* pGame, int
 }
 
 //D2Game.0x6FC90000
+// 1.13c D2Game+0x72210
 int32_t __fastcall PLRTRADE_CreateCowPortal(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     return ACT1Q4_CreateCowPortal(pGame, pUnit);
 }
 
-#ifdef D2_VERSION_HAS_UBERS
-//1.14d: 0x00565A90
-int32_t __fastcall PLRTRADE_CreateUberRunPortal(D2GameStrc* pGame, D2UnitStrc* pUnit)
+// 1.13c D2Game+0x70180 (the cube output table's slot 2 is a stub that returns 0; the Uber portals are 1.14 only)
+static int32_t __fastcall PLRTRADE_CreateUberRunPortal(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
-    return ACT1Q4_CreateUberRunPortal(pGame, pUnit);
+    return 0;
 }
 
-//1.14d: 0x00565AA0
-int32_t __fastcall PLRTRADE_CreateUberFinalePortal(D2GameStrc* pGame, D2UnitStrc* pUnit)
+// 1.13c D2Game+0x70170 (the cube output table's slot 3 is a stub that returns 0)
+static int32_t __fastcall PLRTRADE_CreateUberFinalePortal(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
-    return ACT1Q4_CreateUberFinalePortal(pGame, pUnit);
+    return 0;
 }
-#endif
 
 //1.10: D2Game.0x6FC90010
 //1.14d: 0x00565AB0
+// 1.13c D2Game+0x72220 (the copied item and the slot keep the duplicate pointer, not what InitItemStats may rewrite; retail returns output 0, no caller reads it)
 void __fastcall PLRTRADE_CreateCubeOutputs(D2GameStrc* pGame, D2UnitStrc* pUnit, D2CubeMainTxt* pCubeMainTxt, D2CubeItemStrc* pCubeItem)
 {
     using CubeOutputFunc = int32_t(__fastcall*)(D2GameStrc*, D2UnitStrc*);
@@ -545,10 +465,8 @@ void __fastcall PLRTRADE_CreateCubeOutputs(D2GameStrc* pGame, D2UnitStrc* pUnit,
     {
         nullptr,
         PLRTRADE_CreateCowPortal,
-#ifdef D2_VERSION_HAS_UBERS
         PLRTRADE_CreateUberRunPortal,
         PLRTRADE_CreateUberFinalePortal
-#endif
     };
 
     int32_t nSocketables = 0;
@@ -654,8 +572,8 @@ void __fastcall PLRTRADE_CreateCubeOutputs(D2GameStrc* pGame, D2UnitStrc* pUnit,
 
             D2UnitStrc* pTempItem = pDupeItem;
             D2GAME_InitItemStats_6FC4E520(pGame, &pTempItem, 0, 0);
-            pOutputs[nCounter] = pTempItem;
-            UNITS_ChangeAnimMode(pTempItem, IMODE_ONCURSOR);
+            pOutputs[nCounter] = pDupeItem;
+            UNITS_ChangeAnimMode(pDupeItem, IMODE_ONCURSOR);
             ITEMS_SetInvPage(pItem, INVPAGE_CUBE);
         }
         else
@@ -1091,6 +1009,7 @@ void __fastcall sub_6FC90AE0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3)
 }
 
 //D2Game.0x6FC90BE0
+// 1.13c D2Game+0x70C90
 void __fastcall sub_6FC90BE0(D2GameStrc* pGame, D2UnitStrc* pPlayer, void* pArg)
 {
     D2UnitStrc* pOtherPlayer = (D2UnitStrc*)pArg;
@@ -1110,6 +1029,17 @@ void __fastcall sub_6FC90C20(D2GameStrc* pGame, D2UnitStrc* pPlayer)
     D2PlayerTradeStrc* pTrade = pPlayerData->pTrade;
     D2_ASSERT(pTrade);
 
+    // retail walks the unit's timer chain (next read first) and frees every periodic-stats timer before it restores the snapshot
+    for (D2EventTimerStrc* pTimerNode = SUNIT_GetTimerFromUnit(pPlayer); pTimerNode;)
+    {
+        D2EventTimerStrc* pNextTimerNode = pTimerNode->pNext;
+        if (pTimerNode->nEventType == EVENTTYPE_PERIODICSTATS)
+        {
+            sub_6FC34890(pGame, pTimerNode);
+        }
+        pTimerNode = pNextTimerNode;
+    }
+
     int32_t nUnused = 0;
     sub_6FC8BC70(pGame, pPlayer, pTrade->pSaveData, 0x60u, 0x2000u, 0, &nUnused);
 
@@ -1125,6 +1055,7 @@ void __fastcall sub_6FC90C20(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 }
 
 //D2Game.0x6FC90D70
+// 1.13c D2Game+0x70BF0
 void __fastcall PLRTRADE_SendEventPacketToPlayer(D2UnitStrc* pPlayer, D2C_SRV2CLT5A_TYPES nType, char* szSource)
 {
     D2GSPacketSrv5A packet5A = {};
@@ -1147,6 +1078,7 @@ void __fastcall PLRTRADE_SendEventPacketToPlayer(D2UnitStrc* pPlayer, D2C_SRV2CL
 }
 
 //D2Game.0x6FC90DE0
+// 1.13c D2Game+0x70D90
 void __fastcall PLRTRADE_TryToTrade(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2)
 {
     if (PLAYER_IsBusy(pPlayer1) || ACT4Q2_HasDiabloBeenKilled(pGame))
@@ -1213,6 +1145,7 @@ void __fastcall PLRTRADE_TryToTrade(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2U
 }
 
 //D2Game.0x6FC91050
+// 1.13c D2Game+0x719A0
 void __fastcall sub_6FC91050(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, D2PlayerDataStrc* pPlayerData1, D2PlayerDataStrc* pPlayerData2, int32_t nTradeState)
 {
     UNITS_RefreshInventory(pPlayer1, 1);
@@ -1253,7 +1186,134 @@ void __fastcall sub_6FC91050(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc
     EVENT_SetEvent(pGame, pPlayer2, EVENTTYPE_UPDATETRADE, pGame->dwGameFrame + 1, 0, 0);
 }
 
+// 1.13c D2Game+0x73D90: both sides have accepted; check the offered gold against both purses and limits, the room for the items, then swap
+static void PLRTRADE_PerformTrade(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pInteractPlayer, D2PlayerDataStrc* pPlayerData, D2PlayerDataStrc* pInteractPlayerData)
+{
+    if (pPlayerData->pTrade->nGoldInTrade)
+    {
+        if (STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0) < pPlayerData->pTrade->nGoldInTrade)
+        {
+            sub_6FC92920(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
+            return;
+        }
+
+        if ((uint32_t)(pPlayerData->pTrade->nGoldInTrade + STATLIST_UnitGetStatValue(pInteractPlayer, STAT_GOLD, 0)) > (uint32_t)UNITS_GetInventoryGoldLimit(pInteractPlayer))
+        {
+            sub_6FC92920(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
+            D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), UPDATEUI_BUYERNOROOM);
+            D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pInteractPlayer, __FILE__, __LINE__), UPDATEUI_SELLERNOROOM);
+            return;
+        }
+    }
+
+    if (pInteractPlayerData->pTrade->nGoldInTrade)
+    {
+        if (STATLIST_UnitGetStatValue(pInteractPlayer, STAT_GOLD, 0) < pInteractPlayerData->pTrade->nGoldInTrade)
+        {
+            sub_6FC92920(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
+            return;
+        }
+
+        if ((uint32_t)(pInteractPlayerData->pTrade->nGoldInTrade + STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0)) > (uint32_t)UNITS_GetInventoryGoldLimit(pPlayer))
+        {
+            sub_6FC92920(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
+            D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), UPDATEUI_SELLERNOROOM);
+            D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pInteractPlayer, __FILE__, __LINE__), UPDATEUI_BUYERNOROOM);
+            return;
+        }
+    }
+
+    D2TradeStates nTradeState = TRADESTATE_OTHERNOROOM;
+    if (!INVENTORY_CanItemsBeTraded(pGame->pMemoryPool, pPlayer, pInteractPlayer, &nTradeState))
+    {
+        pPlayerData->pTrade->nGoldInTrade = 0;
+        pInteractPlayerData->pTrade->nGoldInTrade = 0;
+
+        if (nTradeState == TRADESTATE_OTHERNOROOM)
+        {
+            D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), UPDATEUI_BUYERNOROOM);
+            D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pInteractPlayer, __FILE__, __LINE__), UPDATEUI_SELLERNOROOM);
+        }
+        else
+        {
+            D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), UPDATEUI_SELLERNOROOM);
+            D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pInteractPlayer, __FILE__, __LINE__), UPDATEUI_BUYERNOROOM);
+        }
+
+        sub_6FC92920(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
+        return;
+    }
+
+    for (D2UnitStrc* pItem = INVENTORY_GetFirstItem(pPlayer->pInventory); pItem; pItem = INVENTORY_GetNextItem(pItem))
+    {
+        D2UnitStrc* pCheckedItem = INVENTORY_UnitIsItem(pItem);
+        if (ITEMS_GetInvPage(pCheckedItem) == 2 && !sub_6FC425F0(pGame, pInteractPlayer, pCheckedItem))
+        {
+            sub_6FC92920(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
+            return;
+        }
+    }
+
+    for (D2UnitStrc* pItem = INVENTORY_GetFirstItem(pInteractPlayer->pInventory); pItem; pItem = INVENTORY_GetNextItem(pItem))
+    {
+        D2UnitStrc* pCheckedItem = INVENTORY_UnitIsItem(pItem);
+        if (ITEMS_GetInvPage(pCheckedItem) == 2 && !sub_6FC425F0(pGame, pPlayer, pCheckedItem))
+        {
+            sub_6FC92920(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
+            return;
+        }
+    }
+
+    pPlayer->dwFlagEx |= 0x800000u;
+    pInteractPlayer->dwFlagEx |= 0x800000u;
+
+    pPlayerData->dwTradeState = 9;
+    pInteractPlayerData->dwTradeState = 9;
+
+    EVENT_SetEvent(pGame, pPlayer, EVENTTYPE_UPDATETRADE, pGame->dwGameFrame + 1, 0, 0);
+    EVENT_SetEvent(pGame, pInteractPlayer, EVENTTYPE_UPDATETRADE, pGame->dwGameFrame + 1, 0, 0);
+
+    if (!sub_6FC92A90(pGame, pPlayer, pInteractPlayer) || !sub_6FC92A90(pGame, pInteractPlayer, pPlayer))
+    {
+        sub_6FC92920(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
+        return;
+    }
+
+    if (pPlayerData->pTrade->nGoldInTrade)
+    {
+        if (STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0) >= pPlayerData->pTrade->nGoldInTrade)
+        {
+            PLRTRADE_AddGold(pPlayer, STAT_GOLD, -pPlayerData->pTrade->nGoldInTrade);
+        }
+
+        ITEMS_HandleGoldTransaction(pGame, pInteractPlayer, pPlayerData->pTrade->nGoldInTrade);
+    }
+
+    if (pInteractPlayerData->pTrade->nGoldInTrade)
+    {
+        if (STATLIST_UnitGetStatValue(pInteractPlayer, STAT_GOLD, 0) >= pInteractPlayerData->pTrade->nGoldInTrade)
+        {
+            PLRTRADE_AddGold(pInteractPlayer, STAT_GOLD, -pInteractPlayerData->pTrade->nGoldInTrade);
+        }
+
+        ITEMS_HandleGoldTransaction(pGame, pPlayer, pInteractPlayerData->pTrade->nGoldInTrade);
+    }
+
+    SUNIT_ResetInteractInfo(pPlayer);
+    SUNIT_ResetInteractInfo(pInteractPlayer);
+
+    PLRTRADE_Free(pGame, pPlayer);
+    PLRTRADE_Free(pGame, pInteractPlayer);
+
+    sub_6FC4B830(pGame, pPlayer);
+    sub_6FC4B830(pGame, pInteractPlayer);
+
+    D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 13);
+    D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pInteractPlayer, __FILE__, __LINE__), 13);
+}
+
 //D2Game.0x6FC91250
+// 1.13c D2Game+0x74200
 int32_t __fastcall sub_6FC91250(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint16_t nButton, int32_t nGoldAmount)
 {
     if (!pPlayer)
@@ -1511,157 +1571,7 @@ int32_t __fastcall sub_6FC91250(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint16_t
                     return 0;
                 }
 
-                if (pPlayerData->pTrade->nGoldInTrade)
-                {
-                    if (STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0) < pPlayerData->pTrade->nGoldInTrade)
-                    {
-                        sub_6FC92920(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
-
-                        const uint32_t nTickCount = GetTickCount();
-                        pInteractPlayerData->dwAcceptTradeTick = nTickCount;
-                        pPlayerData->dwAcceptTradeTick = nTickCount;
-                        return 0;
-                    }
-                    else if (pPlayerData->pTrade->nGoldInTrade + STATLIST_UnitGetStatValue(pInteractPlayer, STAT_GOLD, 0) > UNITS_GetInventoryGoldLimit(pInteractPlayer))
-                    {
-                        sub_6FC92920(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
-
-                        D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 10);
-                        D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pInteractPlayer, __FILE__, __LINE__), 9u);
-
-                        const uint32_t nTickCount = GetTickCount();
-                        pInteractPlayerData->dwAcceptTradeTick = nTickCount;
-                        pPlayerData->dwAcceptTradeTick = nTickCount;
-                        return 0;
-                    }
-                }
-
-                if (pInteractPlayerData->pTrade->nGoldInTrade)
-                {
-                    if (STATLIST_UnitGetStatValue(pInteractPlayer, STAT_GOLD, 0) < pInteractPlayerData->pTrade->nGoldInTrade)
-                    {
-                        sub_6FC92920(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
-
-                        const uint32_t nTickCount = GetTickCount();
-                        pInteractPlayerData->dwAcceptTradeTick = nTickCount;
-                        pPlayerData->dwAcceptTradeTick = nTickCount;
-                        return 0;
-                    }
-
-                    if (pInteractPlayerData->pTrade->nGoldInTrade + STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0) > UNITS_GetInventoryGoldLimit(pPlayer))
-                    {
-                        sub_6FC92920(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
-
-                        D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 9u);
-                        D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pInteractPlayer, __FILE__, __LINE__), 10);
-
-                        const uint32_t nTickCount = GetTickCount();
-                        pInteractPlayerData->dwAcceptTradeTick = nTickCount;
-                        pPlayerData->dwAcceptTradeTick = nTickCount;
-                        return 0;
-                    }
-                }
-
-                D2TradeStates nTradeState = TRADESTATE_OTHERNOROOM;
-                if (!INVENTORY_CanItemsBeTraded(pGame->pMemoryPool, pPlayer, pInteractPlayer, &nTradeState))
-                {
-                    pPlayerData->pTrade->nGoldInTrade = 0;
-                    pInteractPlayerData->pTrade->nGoldInTrade = 0;
-
-                    if (nTradeState == TRADESTATE_OTHERNOROOM)
-                    {
-                        D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), UPDATEUI_BUYERNOROOM);
-                        D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pInteractPlayer, __FILE__, __LINE__), UPDATEUI_SELLERNOROOM);
-                        sub_6FC92920(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
-                    }
-                    else
-                    {
-                        D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), UPDATEUI_SELLERNOROOM);
-                        D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pInteractPlayer, __FILE__, __LINE__), UPDATEUI_BUYERNOROOM);
-                        sub_6FC92920(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
-                    }
-
-                    const uint32_t nTickCount = GetTickCount();
-                    pInteractPlayerData->dwAcceptTradeTick = nTickCount;
-                    pPlayerData->dwAcceptTradeTick = nTickCount;
-                    return 0;
-                }
-
-                for (D2UnitStrc* pItem = INVENTORY_GetFirstItem(pPlayer->pInventory); pItem; pItem = INVENTORY_GetNextItem(pItem))
-                {
-                    D2UnitStrc* pCheckedItem = INVENTORY_UnitIsItem(pItem);
-                    if (ITEMS_GetInvPage(pCheckedItem) == 2 && !sub_6FC425F0(pGame, pInteractPlayer, pCheckedItem))
-                    {
-                        sub_6FC92920(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
-
-                        const uint32_t nTickCount = GetTickCount();
-                        pInteractPlayerData->dwAcceptTradeTick = nTickCount;
-                        pPlayerData->dwAcceptTradeTick = nTickCount;
-                        return 0;
-                    }
-                }
-
-                for (D2UnitStrc* pItem = INVENTORY_GetFirstItem(pInteractPlayer->pInventory); pItem; pItem = INVENTORY_GetNextItem(pItem))
-                {
-                    D2UnitStrc* pCheckedItem = INVENTORY_UnitIsItem(pItem);
-                    if (ITEMS_GetInvPage(pCheckedItem) == 2 && !sub_6FC425F0(pGame, pPlayer, pCheckedItem))
-                    {
-                        sub_6FC92920(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
-
-                        const uint32_t nTickCount = GetTickCount();
-                        pInteractPlayerData->dwAcceptTradeTick = nTickCount;
-                        pPlayerData->dwAcceptTradeTick = nTickCount;
-                        return 0;
-                    }
-                }
-
-                pPlayer->dwFlagEx |= 0x800000u;
-                pInteractPlayer->dwFlagEx |= 0x800000u;
-
-                pPlayerData->dwTradeState = 9;
-                pInteractPlayerData->dwTradeState = 9;
-
-                EVENT_SetEvent(pGame, pPlayer, EVENTTYPE_UPDATETRADE, pGame->dwGameFrame + 1, 0, 0);
-                EVENT_SetEvent(pGame, pInteractPlayer, EVENTTYPE_UPDATETRADE, pGame->dwGameFrame + 1, 0, 0);
-
-                if (sub_6FC92A90(pGame, pPlayer, pInteractPlayer) && sub_6FC92A90(pGame, pInteractPlayer, pPlayer))
-                {
-                    if (pPlayerData->pTrade->nGoldInTrade)
-                    {
-                        if (STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0) >= pPlayerData->pTrade->nGoldInTrade)
-                        {
-                            PLRTRADE_AddGold(pPlayer, STAT_GOLD, -pPlayerData->pTrade->nGoldInTrade);
-                        }
-
-                        ITEMS_HandleGoldTransaction(pGame, pInteractPlayer, pPlayerData->pTrade->nGoldInTrade);
-                    }
-
-                    if (pInteractPlayerData->pTrade->nGoldInTrade)
-                    {
-                        if (STATLIST_UnitGetStatValue(pInteractPlayer, STAT_GOLD, 0) >= pInteractPlayerData->pTrade->nGoldInTrade)
-                        {
-                            PLRTRADE_AddGold(pInteractPlayer, STAT_GOLD, -pInteractPlayerData->pTrade->nGoldInTrade);
-                        }
-
-                        ITEMS_HandleGoldTransaction(pGame, pPlayer, pInteractPlayerData->pTrade->nGoldInTrade);
-                    }
-
-                    SUNIT_ResetInteractInfo(pPlayer);
-                    SUNIT_ResetInteractInfo(pInteractPlayer);
-
-                    PLRTRADE_Free(pGame, pPlayer);
-                    PLRTRADE_Free(pGame, pInteractPlayer);
-
-                    sub_6FC4B830(pGame, pPlayer);
-                    sub_6FC4B830(pGame, pInteractPlayer);
-
-                    D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 13);
-                    D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pInteractPlayer, __FILE__, __LINE__), 13);
-                }
-                else
-                {
-                    sub_6FC92920(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
-                }
+                PLRTRADE_PerformTrade(pGame, pPlayer, pInteractPlayer, pPlayerData, pInteractPlayerData);
 
                 const uint32_t nTickCount = GetTickCount();
                 pInteractPlayerData->dwAcceptTradeTick = nTickCount;
@@ -1729,7 +1639,28 @@ int32_t __fastcall sub_6FC91250(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint16_t
     return 0;
 }
 
+// 1.13c D2Game+0x70CF0: runs the seven input slots of one recipe row against the cube inventory with a fresh 48-entry visited array
+static int32_t PLRTRADE_CheckCubeInputs(D2GameStrc* pGame, D2InventoryStrc* pInventory, D2CubeMainTxt* pCubeMainTxt, D2CubeItemStrc* pCubeItem)
+{
+    if (!pInventory || !pCubeMainTxt)
+    {
+        return 0;
+    }
+
+    int32_t aVisited[48] = {};
+    for (int32_t nInputIndex = 0; nInputIndex < 7; ++nInputIndex)
+    {
+        if (!PLRTRADE_CheckCubeInput(pGame, pInventory, pCubeMainTxt, nInputIndex, pCubeItem, aVisited))
+        {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 //D2Game.0x6FC92130
+// 1.13c D2Game+0x72FC0
 void __fastcall PLRTRADE_HandleCubeInteraction(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (!pUnit)
@@ -2002,20 +1933,13 @@ void __fastcall PLRTRADE_HandleCubeInteraction(D2GameStrc* pGame, D2UnitStrc* pU
                 break;
             }
 
-            if (bOpConditionsFulfilled && pUnit->pInventory)
+            if (bOpConditionsFulfilled)
             {
                 D2CubeItemStrc a5[3] = {};
-                int32_t a6[48] = {};
-
-                int32_t nInputs = 0;
-                while (PLRTRADE_CheckCubeInput(pGame, pUnit->pInventory, pCubeMainTxtRecord, nInputs, a5, a6))
+                if (PLRTRADE_CheckCubeInputs(pGame, pUnit->pInventory, pCubeMainTxtRecord, a5))
                 {
-                    ++nInputs;
-                    if (nInputs >= 7)
-                    {
-                        PLRTRADE_CreateCubeOutputs(pGame, pUnit, pCubeMainTxtRecord, a5);
-                        return;
-                    }
+                    PLRTRADE_CreateCubeOutputs(pGame, pUnit, pCubeMainTxtRecord, a5);
+                    return;
                 }
             }
         }
@@ -2023,6 +1947,7 @@ void __fastcall PLRTRADE_HandleCubeInteraction(D2GameStrc* pGame, D2UnitStrc* pU
 }
 
 //D2Game.0x6FC927D0
+// 1.13c D2Game+0x70FB0
 int32_t __fastcall PLRTRADE_AllocPlayerTrade(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -2047,6 +1972,7 @@ int32_t __fastcall PLRTRADE_AllocPlayerTrade(D2GameStrc* pGame, D2UnitStrc* pPla
 }
 
 //D2Game.0x6FC92890
+// 1.13c D2Game+0x1670
 void __fastcall PLRTRADE_AddGold(D2UnitStrc* pUnit, int32_t nStat, int32_t nValue)
 {
     if (!pUnit)
@@ -2131,7 +2057,23 @@ void __fastcall sub_6FC92920(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc
     EVENT_SetEvent(pGame, pPlayer2, EVENTTYPE_UPDATETRADE, pGame->dwGameFrame + 1, 0, 0);
 }
 
+// 1.13c D2Game+0x70010: an ear takes the source's name and level and the named flag; a personalized item takes the name
+static void PLRTRADE_CopyItemOwnerName(D2UnitStrc* pDupeItem, D2UnitStrc* pSourceItem, int32_t bSet)
+{
+    if (ITEMS_GetItemType(pDupeItem) == ITEMTYPE_PLAYER_BODY_PART)
+    {
+        ITEMS_SetEarName(pDupeItem, ITEMS_GetEarName(pSourceItem));
+        ITEMS_SetEarLevel(pDupeItem, ITEMS_GetEarLevel(pSourceItem));
+        ITEMS_SetItemFlag(pDupeItem, IFLAG_NAMED, bSet);
+    }
+    else if (ITEMS_CheckItemFlag(pDupeItem, IFLAG_PERSONALIZED, __LINE__, __FILE__))
+    {
+        ITEMS_SetEarName(pDupeItem, ITEMS_GetEarName(pSourceItem));
+    }
+}
+
 //D2Game.0x6FC92A90
+// 1.13c D2Game+0x71E10 (retail has the item placement inlined here; the engine keeps it in D2GAME_PlaceItem_6FC44410, same steps)
 int32_t __fastcall sub_6FC92A90(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2)
 {
     D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer1, __FILE__, __LINE__);
@@ -2145,16 +2087,7 @@ int32_t __fastcall sub_6FC92A90(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitS
             D2UnitStrc* pDupeItem = ITEMS_Duplicate(pGame, pCheckedItem, 0, 0);
             if (pDupeItem)
             {
-                if (ITEMS_GetItemType(pDupeItem) == ITEMTYPE_PLAYER_BODY_PART)
-                {
-                    ITEMS_SetEarName(pDupeItem, ITEMS_GetEarName(pCheckedItem));
-                    ITEMS_SetEarLevel(pDupeItem, ITEMS_GetEarLevel(pCheckedItem));
-                    ITEMS_SetItemFlag(pDupeItem, IFLAG_NAMED, bSet);
-                }
-                else if (ITEMS_CheckItemFlag(pDupeItem, IFLAG_PERSONALIZED, __LINE__, __FILE__))
-                {
-                    ITEMS_SetEarName(pDupeItem, ITEMS_GetEarName(pCheckedItem));
-                }
+                PLRTRADE_CopyItemOwnerName(pDupeItem, pCheckedItem, bSet);
 
                 UNITS_ChangeAnimMode(pDupeItem, 4);
                 ITEMS_SetInvPage(pDupeItem, 0);
@@ -2257,12 +2190,6 @@ void __fastcall PLRTRADE_StopAllPlayerInteractions(D2GameStrc* pGame, D2UnitStrc
     EVENT_SetEvent(pGame, pOtherPlayer, EVENTTYPE_UPDATETRADE, pGame->dwGameFrame + 1, 0, 0);
 }
 
-//D2Game.0x6FC92EE0
-void __fastcall sub_6FC92EE0(D2GameStrc* pGame, D2UnitStrc* pUnit)
-{
-    PLRTRADE_StopAllPlayerInteractions(pGame, pUnit);
-}
-
 // 1.13c D2Game+0x6FFC0
 // Records an (original item, duplicate item) pair at the head of the player's trade list.
 static void PLRTRADE_AddItemTradePair(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nItemGUID1, int32_t nItemGUID2)
@@ -2287,6 +2214,7 @@ void __fastcall sub_6FC92EF0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC92F10
+// 1.13c D2Game+0x71B00 (retail places the copy through its own placement entry, 0xD76A0; the engine's D2GAME_PlaceItem_6FC44410 is that step)
 void __fastcall sub_6FC92F10(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem)
 {
     int32_t nUnitType = 0;
@@ -2346,6 +2274,7 @@ void __fastcall sub_6FC92F10(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 }
 
 //D2Game.0x6FC931D0
+// not-1.13c: no standalone retail function; the 1.13c trade block (D2Game+0x70000..0x74200) has no row for "remove item from the trade list", retail inlines it in the item-mode callers
 void __fastcall sub_6FC931D0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem)
 {
     int32_t nUnitType = 0;
@@ -2433,6 +2362,7 @@ int32_t __fastcall PLRTRADE_CopyTradeSaveDataToBuffer(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FC93430
+// not-1.13c: no standalone retail function; the 1.13c trade block has no row for this "start trade-confirm state 7" check, retail inlines it in the player-busy caller
 int32_t __fastcall sub_6FC93430(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem)
 {
     D2PlayerDataStrc* pPlayerData1 = UNITS_GetPlayerData(pPlayer);
@@ -2539,6 +2469,7 @@ int32_t __fastcall sub_6FC93430(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
 }
 
 //D2Game.0x6FC93740
+// not-1.13c: no standalone retail function; the 1.13c trade block has no row for the "no item on the trade page" belt check, retail inlines it in the belt-move caller
 int32_t __fastcall sub_6FC93740(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     int32_t nUnitType = 0;
@@ -2561,6 +2492,7 @@ int32_t __fastcall sub_6FC93740(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC937A0
+// 1.13c D2Game+0x70D60
 int32_t __fastcall D2GAME_PLRTRADE_IsInteractingWithPlayer(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     int32_t nUnitType = 0;
@@ -2570,6 +2502,7 @@ int32_t __fastcall D2GAME_PLRTRADE_IsInteractingWithPlayer(D2GameStrc* pGame, D2
 }
 
 //D2Game.0x6FC937F0
+// 1.13c D2Game+0x73570
 void __fastcall D2GAME_PLRTRADE_Last_6FC937F0(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t a3, int32_t a4)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -2658,15 +2591,12 @@ void __fastcall D2GAME_PLRTRADE_Last_6FC937F0(D2GameStrc* pGame, D2UnitStrc* pPl
     }
     case 13:
     {
-        FOG_TraceF("TRADE", "  time: %d", pGame->dwGameFrame);
+        // 1.13c: state 13 resets exactly like state 10 (no hack-list kick, no trace).
         pPlayerData->dwTradeState = 0;
         if (pPlayer)
         {
             pPlayer->dwFlagEx &= 0xFF3FFFFFu;
         }
-
-        GAME_LogMessage(3, "[HACKLIST]  PlayerTradeUpdate: Player %s caught in bad trade state", pPlayerData->szName);
-        sub_6FC36C20(pGame, pPlayerData->pClient->dwClientId, __FILE__, __LINE__);
         return;
     }
     case 14:

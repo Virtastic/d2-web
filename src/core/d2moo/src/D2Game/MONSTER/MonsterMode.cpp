@@ -394,9 +394,17 @@ void __fastcall D2GAME_MONSTER_ApplyCriticalDamage_6FC62E70(D2UnitStrc* pAttacke
             pDamage->dwColdDamage *= 2;
             pDamage->dwPoisDamage *= 2;
 
-            if (pDefender && !SUNITDMG_SetHitClass(pDamage, 0x10u))
+            // 1.13c D2Game+0x770E0: the hit-class set is inlined here
+            if (pDefender)
             {
-                UNITS_SetOverlay(pDefender, 54, 0);
+                if (!(pDamage->dwHitClass & 0xF0))
+                {
+                    pDamage->dwHitClass |= 0x10u;
+                }
+                else
+                {
+                    UNITS_SetOverlay(pDefender, 54, 0);
+                }
             }
         }
     }

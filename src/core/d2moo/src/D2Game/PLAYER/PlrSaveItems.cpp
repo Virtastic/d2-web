@@ -124,15 +124,18 @@ int32_t __fastcall sub_6FC898F0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
 }
 
 //D2Game.0x6FC89AB0 (#10029)
+// 1.13c D2Game+0x54400
 int32_t __stdcall D2GAME_10029_SAVE_WriteFileInterface(D2GameStrc* pGame, D2UnitStrc* pPlayer, const char* szName)
 {
     return D2GAME_SAVE_WriteFile_6FC8A500(pGame, pPlayer, szName, 0);
 }
+
+// 1.13c D2Game+0x53470: only a null item or one flagged 0x8000 in dwFlagEx is skipped.
 int32_t __stdcall D2GAME_SAVE_SerializeItem_6FC89AD0(D2UnitStrc* pItem, uint8_t* pBitstream, uint32_t nBitstreamSize, int32_t n0, int32_t a5)
 {
     int32_t nBitsLeft = 0;
 
-    if (pItem && !(pItem->dwFlagEx & 0x8000)/* && (n0 || !a5 || D2GAME_Return1_6FC41900())*/)
+    if (pItem && !(pItem->dwFlagEx & 0x8000))
     {
         nBitsLeft = ITEMS_SerializeItemToBitstream(pItem, pBitstream, nBitstreamSize, 1, 1, 0);
 
@@ -147,6 +150,7 @@ int32_t __stdcall D2GAME_SAVE_SerializeItem_6FC89AD0(D2UnitStrc* pItem, uint8_t*
 }
 
 //D2Game.0x6FC89B50
+// 1.13c D2Game+0x537D0: the hand items are serialized once into a scratch buffer before the node walk.
 int32_t __stdcall PLRSAVE_WriteItems_6FC89B50(D2InventoryStrc* pInventory, uint8_t* pBitstream, uint32_t nBitstreamSize, int32_t a4, int32_t a5)
 {
     if (nBitstreamSize < 2)
@@ -187,6 +191,47 @@ int32_t __stdcall PLRSAVE_WriteItems_6FC89B50(D2InventoryStrc* pInventory, uint8
         return pData - pBitstream;
     }
 
+    D2UnitStrc* pWeapon = INVENTORY_GetLeftHandWeapon(pInventory);
+    D2UnitStrc* pRightHandItem = INVENTORY_GetItemFromBodyLoc(pInventory, BODYLOC_RARM);
+    D2UnitStrc* pLeftHandItem = INVENTORY_GetItemFromBodyLoc(pInventory, BODYLOC_LARM);
+    D2UnitStrc* pCursorItem = INVENTORY_GetCursorItem(pInventory);
+
+    // Retail first serializes the hand items into an 8 KiB scratch buffer (output discarded), failing on
+    // a negative size, in the same order as the hand pass below.
+    {
+        uint8_t scratch[0x2000];
+        if (pWeapon)
+        {
+            D2UnitStrc* pFirst = pRightHandItem == pWeapon ? pRightHandItem : pLeftHandItem;
+            D2UnitStrc* pSecond = pRightHandItem == pWeapon ? pLeftHandItem : pRightHandItem;
+            if (ITEMS_SerializeItemToBitstream(pFirst, scratch, sizeof(scratch), 1, 1, 0) < 0)
+            {
+                return -1;
+            }
+
+            if (pSecond && ITEMS_SerializeItemToBitstream(pSecond, scratch, sizeof(scratch), 1, 1, 0) < 0)
+            {
+                return -1;
+            }
+        }
+        else if (pRightHandItem)
+        {
+            if (ITEMS_SerializeItemToBitstream(pRightHandItem, scratch, sizeof(scratch), 1, 1, 0) < 0)
+            {
+                return -1;
+            }
+
+            if (pLeftHandItem && ITEMS_SerializeItemToBitstream(pLeftHandItem, scratch, sizeof(scratch), 1, 1, 0) < 0)
+            {
+                return -1;
+            }
+        }
+        else if (pLeftHandItem && ITEMS_SerializeItemToBitstream(pLeftHandItem, scratch, sizeof(scratch), 1, 1, 0) < 0)
+        {
+            return -1;
+        }
+    }
+
     int32_t nSize = 0;
     for (D2UnitStrc* pItem = INVENTORY_GetFirstItem(pInventory); pItem; pItem = INVENTORY_GetNextItem(pItem))
     {
@@ -210,9 +255,6 @@ int32_t __stdcall PLRSAVE_WriteItems_6FC89B50(D2InventoryStrc* pInventory, uint8
         }
     }
 
-    D2UnitStrc* pWeapon = INVENTORY_GetLeftHandWeapon(pInventory);
-    D2UnitStrc* pRightHandItem = INVENTORY_GetItemFromBodyLoc(pInventory, BODYLOC_RARM);
-    D2UnitStrc* pLeftHandItem = INVENTORY_GetItemFromBodyLoc(pInventory, BODYLOC_LARM);
     if (pWeapon)
     {
         if (pRightHandItem == pWeapon)
@@ -313,7 +355,6 @@ int32_t __stdcall PLRSAVE_WriteItems_6FC89B50(D2InventoryStrc* pInventory, uint8
         }
     }
 
-    D2UnitStrc* pCursorItem = INVENTORY_GetCursorItem(pInventory);
     if (pCursorItem && pCursorItem->dwUnitType == UNIT_ITEM)
     {
         nSize = D2GAME_SAVE_SerializeItem_6FC89AD0(pCursorItem, pData, nBitstreamSize + pBitstream - pData, a4, a5);
@@ -334,6 +375,7 @@ int32_t __stdcall PLRSAVE_WriteItems_6FC89B50(D2InventoryStrc* pInventory, uint8
     return pData - pBitstream;
 }
 
+// 1.13c D2Game+0x54810
 int32_t __fastcall PLRSAVE_ReadItems_6FC8B8A0(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint8_t* pSection, uint32_t dwVersion, int32_t nSize, int32_t a6, int32_t* pSize)
 {
     if (*(uint16_t*)pSection != 0x4D4A)
@@ -522,7 +564,7 @@ int32_t __fastcall sub_6FC8BAA0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
     }
 }
 
-// Recovered current-version gf player base-stat section.
+// 1.13c D2Game+0xEBE70: the 'gf' base-stat section; values clamp to the CSV width with no trace calls.
 int32_t __fastcall PLRSAVE2_WritePlayerStats(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint8_t** ppSection, const uint8_t* pEnd)
 {
     uint8_t* pData = *ppSection + 2;
@@ -552,58 +594,35 @@ int32_t __fastcall PLRSAVE2_WritePlayerStats(D2GameStrc* pGame, D2UnitStrc* pPla
             {
                 if (pItemStatCostTxtRecord->nCsvBits < 32)
                 {
+                    int32_t nMaximum = 0;
                     if (pItemStatCostTxtRecord->dwItemStatFlags & gdwBitMasks[ITEMSTATCOSTFLAGINDEX_CSVSIGNED])
                     {
                         const int32_t nMinimum = -(1 << (pItemStatCostTxtRecord->nCsvBits - 1));
-                        int32_t nMaximum = 1 << (pItemStatCostTxtRecord->nCsvBits - 1);
-                        if (nValue <= nMinimum || nValue >= nMaximum)
-                        {
-                            FOG_Trace("Save error: stat:%d  value:%d", nStatId, nValue);
-                        }
-
-                        nMaximum -= 1;
-
+                        nMaximum = (1 << (pItemStatCostTxtRecord->nCsvBits - 1)) - 1;
                         if (nValue < nMinimum)
                         {
                             nValue = nMinimum;
                         }
-
-                        if (nValue > nMaximum)
-                        {
-                            nValue = nMaximum;
-                        }
                     }
                     else
                     {
-                        int32_t nMaximum = 1 << pItemStatCostTxtRecord->nCsvBits;
-                        if (nValue < 0 || nValue >= nMaximum)
-                        {
-                            FOG_Trace("Save error: stat:%d  value:%d", nStatId, nValue);
-                        }
-
-                        nMaximum -= 1;
-
-                        if (nValue < 0)
+                        nMaximum = (1 << pItemStatCostTxtRecord->nCsvBits) - 1;
+                        if (nValue < 1)
                         {
                             nValue = 0;
                         }
+                    }
 
-                        if (nValue >= nMaximum)
-                        {
-                            nValue = nMaximum;
-                        }
+                    if (nValue >= nMaximum)
+                    {
+                        nValue = nMaximum;
                     }
                 }
 
                 BITMANIP_Write(&bitBuffer, nStatId, 9);
                 if (pItemStatCostTxtRecord->nCsvParam)
                 {
-                    if (nLayer >= 1 << pItemStatCostTxtRecord->nCsvParam)
-                    {
-                        FOG_Trace("Save error: stat:%d  param:%d", nStatId, nLayer);
-                    }
-
-                    BITMANIP_Write(&bitBuffer, nLayer, pItemStatCostTxtRecord->nCsvParam);
+                    BITMANIP_Write(&bitBuffer, (uint16_t)nLayer, pItemStatCostTxtRecord->nCsvParam);
                 }
 
                 BITMANIP_Write(&bitBuffer, nValue, pItemStatCostTxtRecord->nCsvBits);
@@ -782,6 +801,7 @@ int32_t __fastcall PLRSAVE2_ReadSkills(D2GameStrc* pGame, D2UnitStrc* pPlayer, u
 }
 
 // Recovered native quest record section extracted from PLRSAVE2_CreateSaveFile/ProcessSaveFile.
+// 1.13c D2Game+0xEB7B0
 int32_t __fastcall D2WEB_PLRSAVE2_WriteQuestSection(D2UnitStrc* pPlayer, uint8_t** ppSection, const uint8_t* pEnd)
 {
     if (*ppSection + 298 > pEnd) return 1;
@@ -798,12 +818,12 @@ int32_t __fastcall D2WEB_PLRSAVE2_WriteQuestSection(D2UnitStrc* pPlayer, uint8_t
     return 0;
 }
 
+// 1.13c D2Game+0xEB560: no player-data check (retail reads the player data unguarded).
 int32_t __fastcall D2WEB_PLRSAVE2_ReadQuestSection(D2UnitStrc* pPlayer, uint8_t** ppSection, const uint8_t* pEnd)
 {
     if (*ppSection + 298 > pEnd || *(uint32_t*)*ppSection != 0x216F6F57u || *(uint32_t*)(*ppSection + 4) != 6)
         return PLRSAVE2ERROR_BAD_QUESTRECORD;
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
-    if (!pPlayerData) return PLRSAVE2ERROR_BAD_QUESTRECORD;
     uint8_t* record = *ppSection + 10;
     for (int32_t i = 0; i < 3; ++i, record += 96)
         QUESTRECORD_CopyBufferToRecord(pPlayerData->pQuestData[i], record, 96, 1);
@@ -822,39 +842,46 @@ int32_t __fastcall PLRSAVE2_WritePlrIntroSection(D2GameStrc* pGame, D2UnitStrc* 
     save.nHeader = 0x7701u;
     save.nLength = sizeof(D2PlrIntroSaveStrc);
     for (int32_t i = 0; i < 3; ++i) {
-        PLRINTRO_CopyQuestIntroFlagsToBuffer(pPlayerData->pPlayerIntro[i], save.unk0x04[i]);
-        PLRINTRO_CopyNpcIntroFlagsToBuffer(pPlayerData->pPlayerIntro[i], save.unk0x1C[i]);
+        memcpy(save.unk0x04[i], pPlayerData->pPlayerIntro[i]->pQuestIntroFlags->pBuffer, 8);
+        memcpy(save.unk0x1C[i], pPlayerData->pPlayerIntro[i]->pNpcIntroFlags->pBuffer, 8);
     }
     memcpy(*ppSection, &save, sizeof save);
     *ppSection += sizeof save;
     return 0;
 }
 
+// 1.13c D2Game+0xEB440: the 0x7701 section copied straight into the six intro bit buffers (the copy
+// helpers inlined), with no player-data check.
 int32_t __fastcall D2WEB_PLRSAVE2_ReadPlrIntroSection(D2UnitStrc* pPlayer, uint8_t** ppSection, const uint8_t* pEnd)
 {
     if (*ppSection + sizeof(D2PlrIntroSaveStrc) > pEnd) return PLRSAVE2ERROR_BAD_PLAYERINTRO;
     D2PlrIntroSaveStrc* save = (D2PlrIntroSaveStrc*)*ppSection;
     if (save->nHeader != 0x7701u) return PLRSAVE2ERROR_BAD_PLAYERINTRO;
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
-    if (!pPlayerData) return PLRSAVE2ERROR_BAD_PLAYERINTRO;
     for (int32_t i = 0; i < 3; ++i) {
-        PLRINTRO_CopyBufferToQuestIntroFlags(pPlayerData->pPlayerIntro[i], save->unk0x04[i]);
-        PLRINTRO_CopyBufferToNpcIntroFlags(pPlayerData->pPlayerIntro[i], save->unk0x1C[i]);
+        memcpy(pPlayerData->pPlayerIntro[i]->pQuestIntroFlags->pBuffer, save->unk0x04[i], 8);
+        memcpy(pPlayerData->pPlayerIntro[i]->pNpcIntroFlags->pBuffer, save->unk0x1C[i], 8);
     }
     *ppSection += sizeof *save;
     return 0;
 }
 
+// not-1.13c: retail passes pUnit->pInventory straight to its item writer D2Game+0x537D0 (from 0x53B40 via
+// 0xEC0E0, and from 0xEC1E0 and 0x70FB0); this wrapper stays because the trade code calls it.
 int32_t __fastcall sub_6FC8A0F0(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t* pSection, int32_t nSize, int32_t a5, int32_t a6)
 {
     return PLRSAVE_WriteItems_6FC89B50(pUnit->pInventory, pSection, nSize, a5, a6);
 }
 
+// not-1.13c: retail's item-section dispatch D2Game+0x55050 also sends version 0x47 to the legacy reader
+// D2Game+0x54D90, which is not ported; versions 0x48..0x60 go to 0x54810 as here, anything else is 1.
 int32_t __fastcall sub_6FC8BC70(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t* pSection, uint32_t dwVersion, int32_t nSize, int32_t a6, int32_t* pSize)
 {
     if (dwVersion >= 72 && dwVersion <= 96) return PLRSAVE_ReadItems_6FC8B8A0(pGame, pUnit, pSection, dwVersion, nSize, a6, pSize);
     return 1;
 }
+// 1.13c D2Game+0xEC260: of the corpses holding items, the one whose non-gold items sum to the largest
+// transaction cost (count starts at 1, a later corpse wins a tie) is the one written.
 int32_t __fastcall PLRSAVE2_WriteCorpsesSection(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint8_t** ppSection, const uint8_t* pEnd, int32_t a5)
 {
     if (!pPlayer->pInventory)
@@ -862,15 +889,28 @@ int32_t __fastcall PLRSAVE2_WriteCorpsesSection(D2GameStrc* pGame, D2UnitStrc* p
         return 2;
     }
 
-    uint16_t bHasCorpseWithItems = 0;
+    uint32_t nBest = 0;
     D2UnitStrc* pUnit = nullptr;
     for (D2CorpseStrc* pCorpse = INVENTORY_GetFirstCorpse(pPlayer->pInventory); pCorpse; pCorpse = INVENTORY_GetNextCorpse(pCorpse))
     {
-        pUnit = SUNIT_GetServerUnit(pGame, UNIT_PLAYER, INVENTORY_GetUnitGUIDFromCorpse(pCorpse));
-        if (pUnit && pUnit->pInventory && INVENTORY_GetItemCount(pUnit->pInventory))
+        D2UnitStrc* pCorpseUnit = SUNIT_GetServerUnit(pGame, UNIT_PLAYER, INVENTORY_GetUnitGUIDFromCorpse(pCorpse));
+        if (pCorpseUnit && pCorpseUnit->pInventory && INVENTORY_GetItemCount(pCorpseUnit->pInventory) > 0)
         {
-            bHasCorpseWithItems = 1;
-            break;
+            uint32_t nValue = 1;
+            for (D2UnitStrc* pNode = INVENTORY_GetFirstItem(pCorpseUnit->pInventory); pNode; pNode = INVENTORY_GetNextItem(pNode))
+            {
+                D2UnitStrc* pItem = INVENTORY_UnitIsItem(pNode);
+                if (!ITEMS_CheckItemTypeId(pItem, ITEMTYPE_GOLD))
+                {
+                    nValue += ITEMS_GetTransactionCost(pPlayer, pItem, (D2C_Difficulties)3, UNITS_GetPlayerData(pPlayer)->pQuestData[pGame->nDifficulty], 0x201, (D2C_TransactionTypes)0);
+                }
+            }
+
+            if (nValue >= nBest)
+            {
+                nBest = nValue;
+                pUnit = pCorpseUnit;
+            }
         }
     }
 
@@ -883,10 +923,10 @@ int32_t __fastcall PLRSAVE2_WriteCorpsesSection(D2GameStrc* pGame, D2UnitStrc* p
     *(uint16_t*)pSection = 0x4D4A;
     pSection += 2;
 
-    *(uint16_t*)pSection = bHasCorpseWithItems;
+    *(uint16_t*)pSection = pUnit ? 1 : 0;
     pSection += 2;
 
-    if (!pUnit || !bHasCorpseWithItems)
+    if (!pUnit)
     {
         *ppSection = pSection;
         return 0;
@@ -897,7 +937,7 @@ int32_t __fastcall PLRSAVE2_WriteCorpsesSection(D2GameStrc* pGame, D2UnitStrc* p
         return 1;
     }
 
-    //*(uint32_t*)pSection = v23; // TODO: Maybe Corpse Id??? In IDA it's undefined
+    *(uint32_t*)pSection = 0; // retail leaves this dword as stack residue
     *((uint32_t*)pSection + 1) = CLIENTS_GetUnitX(pUnit);
     *((uint32_t*)pSection + 2) = CLIENTS_GetUnitY(pUnit);
 
@@ -913,9 +953,15 @@ int32_t __fastcall PLRSAVE2_WriteCorpsesSection(D2GameStrc* pGame, D2UnitStrc* p
     return 0;
 }
 
+// 1.13c D2Game+0xECF30: the client is read inline (no player or not a player -> 101), and a class past
+// the seven player classes fails the allocation (106) before the body unit is created.
 int32_t __fastcall PLRSAVE2_ReadCorpses(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint8_t** ppSection, uint8_t* pEnd, uint32_t nVersion, int32_t* a6)
 {
-    D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
+    D2ClientStrc* pClient = nullptr;
+    if (pPlayer && pPlayer->dwUnitType == UNIT_PLAYER)
+    {
+        pClient = UNITS_GetPlayerData(pPlayer)->pClient;
+    }
 
     if (!pClient)
     {
@@ -972,7 +1018,12 @@ int32_t __fastcall PLRSAVE2_ReadCorpses(D2GameStrc* pGame, D2UnitStrc* pPlayer, 
             return PLRSAVE2ERROR_BAD_CORPSES;
         }
 
-        D2UnitStrc* pPlayerBody = SUNIT_AllocUnitData(UNIT_PLAYER, pPlayer ? pPlayer->dwClassId : -1, 0, 0, pGame, nullptr, 1, PLRMODE_DEAD, 0);
+        D2UnitStrc* pPlayerBody = nullptr;
+        if (pPlayer->dwClassId < 7)
+        {
+            pPlayerBody = SUNIT_AllocUnitData(UNIT_PLAYER, pPlayer->dwClassId, 0, 0, pGame, nullptr, 1, PLRMODE_DEAD, 0);
+        }
+
         if (!pPlayerBody)
         {
             if (a6)
@@ -992,7 +1043,7 @@ int32_t __fastcall PLRSAVE2_ReadCorpses(D2GameStrc* pGame, D2UnitStrc* pPlayer, 
 
         pPlayerBody->dwFlags &= 0xFFFFFFEFu;
 
-        INVENTORY_SetOwnerId(pPlayerBody->pInventory, pPlayer ? pPlayer->dwUnitId : -1);
+        INVENTORY_SetOwnerId(pPlayerBody->pInventory, pPlayer->dwUnitId);
 
         int32_t nLength = 0;
         const int32_t nErrorCode = sub_6FC8BC70(pGame, pPlayerBody, pData, nVersion, pEnd - pData, 0, &nLength);

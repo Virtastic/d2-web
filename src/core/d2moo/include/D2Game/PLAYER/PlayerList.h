@@ -35,5 +35,3 @@ void __fastcall PLAYERLIST_sub_6FCBAD60(D2GameStrc* pGame, D2UnitStrc* pPlayer);
 int32_t __fastcall PLAYERLIST_GetHostileDelay(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2);
 //D2Game.0x6FCBAE70
 void __fastcall PLAYERLIST_SetHostileDelay(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t a3);
-//D2Game.0x6FCBAED0
-void __fastcall sub_6FCBAED0();
