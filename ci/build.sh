@@ -113,20 +113,23 @@ fi
 # A worktree's empty object dir is seeded from the main checkout's objects (wasm-build/obj-seed.sh),
 # so its first build compiles only what it changed. D2_OBJ_SEED=0 disables.
 SEED_ARGS=()
-if [ "${D2_OBJ_SEED:-1}" = 1 ] && [ -d "$LOCK_DIR/obj" ] && [ ! "$LOCK_DIR" -ef build-wasm ]; then
-  SEED_ARGS=(-v "$LOCK_DIR/obj:/d2-obj-seed:ro")
+if [ "${D2_OBJ_SEED:-1}" = 1 ] && [ ! "$LOCK_DIR" -ef build-wasm ]; then
+  mkdir -p "$LOCK_DIR/obj" "$LOCK_DIR/obj-pub"
+  SEED_ARGS=(-v "$LOCK_DIR/obj:/d2-obj-seed:ro" -v "$LOCK_DIR/obj-pub:/d2-obj-pub:ro")
 fi
 MSYS_NO_PATHCONV=1 docker run --rm "${CACHE_ARGS[@]}" "${SEED_ARGS[@]}" \
   -e D2_TOOLCHAIN_ID="$TOOLCHAIN_ID" -e D2_COMPILE_JOBS="$JOBS" -e HOME=/tmp -e D2_CXXFLAGS="${D2_CXXFLAGS:-}" -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" -e D2_QUARANTINE="${D2_QUARANTINE:-0}" -e D2_QUARANTINE_KEEP="${D2_QUARANTINE_KEEP:-}" \
   -v "$MOUNT:/build" -v "$MOUNT:$MOUNT:ro" "${PRIV_ARGS[@]}" "$TOOLCHAIN_ID" bash wasm-build/link-d2.sh
 # The main checkout only ever builds the default flags, so a worktree built with other flags (the session role's
-# -DD2_CALLTRACE) had nothing to seed from and compiled every source cold. After a successful link, publish this tree's
-# object dirs to the main checkout's store for any flag set it lacks; the rename is atomic, so a seeder never sees half a dir.
-if [ ! "$LOCK_DIR" -ef build-wasm ] && [ -d build-wasm/obj ]; then
+# -DD2_CALLTRACE) has no fresh seed there. After a successful link, publish this tree's object dirs to the shared
+# store obj-pub/, replaced whenever a tree is built on a newer main (wasm-build/obj-seed.sh d2_obj_publish); the
+# main checkout's own obj/ is never written from here. link-d2.sh seeds from whichever of the two is fresher.
+if [ "${D2_OBJ_SEED:-1}" = 1 ] && [ ! "$LOCK_DIR" -ef build-wasm ] && [ -d build-wasm/obj ]; then
+  . wasm-build/obj-seed.sh
+  PUB_BASE=$(git merge-base HEAD main 2>/dev/null || true)
   for d in build-wasm/obj/*/; do
-    h=$(basename "$d"); [ -e "$LOCK_DIR/obj/$h" ] && continue
-    t=$(mktemp -d "$LOCK_DIR/obj/.publish-$h.XXXXXX") || continue
-    if cp -a --reflink=auto "$d." "$t/" && mv -T "$t" "$LOCK_DIR/obj/$h" 2>/dev/null; then echo "==> published object dir $h to the main checkout"; else rm -rf "$t"; fi
+    [ -n "$(find "$d" -maxdepth 0 -mmin -1440 2>/dev/null)" ] || continue   # a flag set this tree no longer builds
+    d2_obj_publish "${d%/}" "$LOCK_DIR/obj-pub/$(basename "$d")" "$PUB_BASE" || true
   done
 fi
 
