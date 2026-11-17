@@ -9,7 +9,7 @@ extern "C" {
 __attribute__((weak)) void d2_fn_d2common_bf70(uint8_t* u);
 __attribute__((weak)) void D2Common_7BC60_LinkTail(uint8_t* u, const D2Common7bc60Env* env);
 
-// 1.13c D2Common+0x7BEE0: unit u (ECX). 0x68400 takes the room in ESI (the decompile shows no argument): loadDT1 is that call.
+// stand-alone twin of D2Common 0x7BEE0 (the proven row runs DRLGACTIVATE_RoomExSetStatus_Untile):unit u (ECX). 0x68400 takes the room in ESI (the decompile shows no argument): loadDT1 is that call.
 EMSCRIPTEN_KEEPALIVE void D2Common_7BEE0_PostUpdate(uint8_t* u, const D2Common7bc60Env* env, void (*loadDT1)(uint8_t* room)) {
     uint32_t flags, mode;
     std::memcpy(&flags, u + 0x28, 4);

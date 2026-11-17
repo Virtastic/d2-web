@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x14B00 -- placement step (ecx = the work record): start direction and direction of the current rectangle become 3, the record seed steps once, and the rectangle goes to the right edge of its anchor: an odd seed puts it 8 above the bottom-aligned line and stores 0x800000 at image offset 0xA146C, an even seed puts it 8 above the anchor top and stores 0x400000. Returns 1.
+// stand-alone 32-bit layout twin of D2Common 0x14B00 (the proven row runs sub_6FD81CA0) -- placement step (ecx = the work record): start direction and direction of the current rectangle become 3, the record seed steps once, and the rectangle goes to the right edge of its anchor: an odd seed puts it 8 above the bottom-aligned line and stores 0x800000 at image offset 0xA146C, an even seed puts it 8 above the anchor top and stores 0x400000. Returns 1.
 #include <cstdint>
 #include "../fn/d2game_gp.h"
 __attribute__((weak)) uint32_t g_d2common_a146c;

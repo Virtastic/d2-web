@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x14E30 -- placement step (ecx = the work record), two directions: a start direction of -1 draws 1 or 2 from the record seed; otherwise the direction toggles between 1 and 2 and the step answers 0 when it comes back to the start. Direction 1 puts the rectangle left of its anchor, 2 above it (0 and 3: bottom-right aligned and right). Returns 1.
+// stand-alone 32-bit layout twin of D2Common 0x14E30 (the proven row runs sub_6FD81B30) -- placement step (ecx = the work record), two directions: a start direction of -1 draws 1 or 2 from the record seed; otherwise the direction toggles between 1 and 2 and the step answers 0 when it comes back to the start. Direction 1 puts the rectangle left of its anchor, 2 above it (0 and 3: bottom-right aligned and right). Returns 1.
 #include <cstdint>
 #include "../fn/d2game_gp.h"
 namespace d2common {

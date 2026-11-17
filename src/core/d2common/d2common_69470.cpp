@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x69470 (sub_69470): room-tile add. Retail layout: EAX = type, ECX = room context, stack = pool, p2, x, y (ret 0x10).
+// stand-alone twin of D2Common 0x69470 (the proven row runs DRLGROOMTILE_AddLinkedTileData): room-tile add. Retail layout: EAX = type, ECX = room context, stack = pool, p2, x, y (ret 0x10).
 // Types 10/11 are rejected when (x,y) lies outside the rect at ctx+0x34/0x38 (extent +0x3c/0x40). It looks in the list at (ctx+0x54)[0]
 // (next link at +8) for a node whose first word is zero exactly when the type is nonzero; none found, it allocates a 12-byte node
 // {type==0, 0, old head} through the Fog allocator (ECX = pool, EDX = 12, stack: "RoomTile.cpp", 0x37B, 0) and pushes it. Then it

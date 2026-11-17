@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x7BED0: level callback (table entry) that only forwards: ecx = the room record, which is moved
+// stand-alone twin of D2Common 0x7BED0 (the proven row runs DRLGACTIVATE_RoomExSetStatus_ClientInRoom):level callback (table entry) that only forwards: ecx = the room record, which is moved
 // to eax for the shared routine at 0x7BD40 (a tail jump), whose result is returned.
 #pragma once
 #include <cstdint>

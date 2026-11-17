@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x44870 (sub_44870, __fastcall; sole caller +0x44B20): ordering predicate on two
+// D2Common 0x44870 (sub_44870, __fastcall;sole caller +0x44B20): ordering predicate on two
 // records. Field +4 is a kind; lower kind sorts first (returns 1). On equal kind, +0x10 points at a
 // pair of ints and the kind picks the compare: 0 -> a[1] < b[1]; 1 -> b[0] < a[0]; 2 -> b[1] < a[1];
 // 3 -> a[0] < b[0]. Anything else returns 0. Pointer widens under wasm64, so layout is by field.
@@ -11,7 +11,7 @@ struct D2Common44870Rec {
     const int32_t* pKey;  // +0x10 (retail 32-bit)
 };
 
-// 1.13c D2Common+0x44870
+// stand-alone 32-bit layout twin of D2Common 0x44870 (the proven row runs sub_6FD776B0)
 int D2Common_44870_Less(const D2Common44870Rec* a, const D2Common44870Rec* b)
 {
     if (a->nKind < b->nKind) return 1;

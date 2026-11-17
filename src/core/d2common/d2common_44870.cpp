@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x44870
+// stand-alone twin of D2Common 0x44870 (the proven row runs sub_6FD776B0)
 // Ordering of two list nodes: type at +4 first, then the sub-record key at +0x10 for that type.
 #include <cstdint>
 #include <cstring>

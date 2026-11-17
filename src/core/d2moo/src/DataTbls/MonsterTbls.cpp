@@ -1914,6 +1914,7 @@ void __fastcall DATATBLS_LoadMonSoundsTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD6BF50 (#11252)
+// 1.13c D2Common+0x52ff0
 D2MonSoundsTxt* __stdcall DATATBLS_GetMonSoundsTxtRecordFromSoundId(int nSoundId)
 {
 	if (sgptDataTables->pMonSoundsTxt && nSoundId >= 0 && nSoundId < sgptDataTables->nMonSoundsTxtRecordCount)
@@ -1945,6 +1946,7 @@ D2MonSoundsTxt* __stdcall DATATBLS_GetMonSoundsTxtRecordFromMonsterId(int nMonst
 }
 
 //D2Common.0x6FD6BFE0
+// 1.13c D2Common+0x53c80
 void __fastcall DATATBLS_MonStats2CompositLinker(char* pSrc, void* pRecord, int nOffset, int nPosition, int nTxtRow, int nTxtColumn)
 {
 	D2MonStats2Txt* pMonStats2TxtRecord = NULL;
@@ -2172,6 +2174,7 @@ void __fastcall DATATBLS_LoadMonStats2Txt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD6D660
+// 1.13c D2Common+0x52ef0
 int __fastcall DATATBLS_CheckNestedMonsterTypes(int nMonType1, int nMonType2)
 {
 	D2MonTypeTxt* pMonTypeTxtRecord = NULL;
@@ -2198,7 +2201,7 @@ int __fastcall DATATBLS_CheckNestedMonsterTypes(int nMonType1, int nMonType2)
 
 			if (nMonsterType >= sgptDataTables->nMonTypeTxtRecordCount)
 			{
-				break;
+				return 0;
 			}
 
 			if (nIndex > 124)
@@ -2226,14 +2229,13 @@ int __fastcall DATATBLS_CheckNestedMonsterTypes(int nMonType1, int nMonType2)
 				return nIndex;
 			}
 		}
-
-		FOG_Trace("Invalid monster type at line %d of file %s", __LINE__, __FILE__);
 	}
 
 	return 0;
 }
 
 //D2Common.0x6FD6D730
+// 1.13c D2Common+0x56a10
 void __fastcall DATATBLS_LoadMonTypeTxt(HD2ARCHIVE hArchive)
 {
 	uint32_t* pMonTypeNest = NULL;
@@ -2270,6 +2272,7 @@ void __fastcall DATATBLS_LoadMonTypeTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD6D910
+// 1.13c D2Common+0x53bd0
 void __fastcall DATATBLS_UnloadMonTypeTxt()
 {
 	if (sgptDataTables->pMonTypeTxt)
@@ -2469,6 +2472,7 @@ void __fastcall DATATBLS_MonPresetPlaceLinker(char* pSrc, void* pRecord, int nOf
 }
 
 //D2Common.0x6FD6EE60
+// 1.13c D2Common+0x55490
 void __fastcall DATATBLS_LoadMonPresetTxt(HD2ARCHIVE hArchive)
 {
 	D2MonPresetTxt* pMonPresetTxt = NULL;
@@ -2559,6 +2563,7 @@ void __fastcall DATATBLS_LoadSoundsTxt(HD2ARCHIVE hArchive)
 
 
 //D2Common.0x6FD6F230
+// 1.13c D2Common+0x54ef0
 void __fastcall DATATBLS_LoadMonEquipTxt(HD2ARCHIVE hArchive)
 {
 	D2MonStatsTxt* pMonStatsTxtRecord = NULL;
@@ -2583,10 +2588,7 @@ void __fastcall DATATBLS_LoadMonEquipTxt(HD2ARCHIVE hArchive)
 
 	sgptDataTables->pMonEquipTxt = (D2MonEquipTxt*)DATATBLS_CompileTxt(hArchive, "monequip", pTbl, &sgptDataTables->nMonEquipTxtRecordCount, sizeof(D2MonEquipTxt));
 
-	if (sgptDataTables->nMonEquipTxtRecordCount >= 32767)
-	{
-		FOG_DisplayWarning("Monequip.txt exceeded maximum number of allowable rows", __FILE__, __LINE__);
-	}
+	D2_ASSERT(sgptDataTables->nMonEquipTxtRecordCount < 32767);
 
 	for (int i = 0; i < sgptDataTables->nMonStatsTxtRecordCount; ++i)
 	{

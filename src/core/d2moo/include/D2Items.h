@@ -404,8 +404,6 @@ void __fastcall ITEMS_CalculateAdditionalCostsForBonusStats(D2UnitStrc* pItem, i
 int __fastcall ITEMS_CalculateTransactionCost(D2UnitStrc* pPlayer, D2UnitStrc* pItem, D2C_Difficulties nDifficulty, D2BitBufferStrc* pQuestFlags, int nVendorId, D2C_TransactionTypes nTransactionType);
 //D2Common.0x6FD9CB50
 void __fastcall ITEMS_CalculateAdditionalCostsForItemSkill(D2UnitStrc* pItem, int* pSellCost, int* pBuyCost, int* pRepCost, unsigned int nDivisor);
-//D2Common.0x6FD9CDC0
-int __fastcall ITEMS_CheckUnitFlagEx(D2UnitStrc* pUnit, int nFlag);
 //D2Common.0x6FD9CDE0 (#10775)
 D2COMMON_DLL_DECL int __stdcall ITEMS_GetTransactionCost(D2UnitStrc* pPlayer, D2UnitStrc* pItem, D2C_Difficulties nDifficulty, D2BitBufferStrc* pQuestFlags, int nVendorId, D2C_TransactionTypes nTransactionType);
 //D2Common.0x6FD9CE10 (#10794)
@@ -525,8 +523,6 @@ D2COMMON_DLL_DECL int __stdcall ITEMS_GetAllRepairCosts(D2GameStrc* pGame, D2Uni
 D2COMMON_DLL_DECL BOOL __stdcall ITEMS_AreStackablesEqual(D2UnitStrc* pItem1, D2UnitStrc* pItem2);
 //D2Common.0x6FD9FA70 (#10834)
 D2COMMON_DLL_DECL BOOL __stdcall ITEMS_CanItemBeUsedForThrowSkill(D2UnitStrc* pItem);
-//D2Common.0x6FD9FB40 (#11079)
-D2COMMON_DLL_DECL int __stdcall D2COMMON_11079_Return0(int a1, int a2);
 //D2Common.0x6FD9FB50 (#10836)
 D2COMMON_DLL_DECL uint32_t __stdcall ITEMS_GetSetItemsMask(D2UnitStrc* pPlayer, D2UnitStrc* pSetItem, BOOL bDontIgnoreInputItem);
 //D2Common.0x6FD9FD80 (#10838)

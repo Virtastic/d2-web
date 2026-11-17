@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x44CE0
+// stand-alone twin of D2Common 0x44CE0 (the proven row runs DRLGROOM_GetVisArrayFromLevelId)
 // Vis-id array of a level: the DRLG's override chain (drlg +0x90, node +0 level id, +4 the array, +0x44 next) is searched
 // first, then the level-defs row (stride 0x9C, array at +0x48) when the id is in range; otherwise the bare offset 0x48
 // (retail's null-based pointer). A chain node with level id 0 is fatal in retail. Retail links are 32-bit tokens, so the

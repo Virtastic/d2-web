@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x7C470: level callback (table entry). ecx = the room record. The flags at +0x28 are returned
+// stand-alone twin of D2Common 0x7C470 (the proven row runs DRLGACTIVATE_RoomExSetStatus_ClientOutOfSight):level callback (table entry). ecx = the room record. The flags at +0x28 are returned
 // as they are unless bit 24 is set, the record is not of kind 2 (+0x48) without bit 25, and the byte at +0x44 is
 // above 2; then the routine at 0x7C3D0 takes over (a tail jump with eax = the flags, ecx = the record, edx = 2).
 #pragma once

@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x455B0. The three failure ids (0x25C, 0x25E, 0x25F) end in a fatal exit and are not capturable.
+// stand-alone 32-bit layout twin of D2Common 0x455B0 (the proven row runs DRLGROOM_GetWarpDestinationLevel). The three failure ids (0x25C, 0x25E, 0x25F) end in a fatal exit and are not capturable.
 #include <cstdint>
 #include "d2common_455b0.h"
 

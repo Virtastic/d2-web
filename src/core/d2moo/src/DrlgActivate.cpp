@@ -12,6 +12,7 @@ static int gStatsFreedRooms;
 static int gStatsAllocatedRooms;
 
 // D2Common.0x6FDE07B0
+// not-1.13c: function-pointer table, not code; retail keeps the same four setters at data rva 0x99BE8
 static void (__fastcall* gRoomExSetStatus[ROOMSTATUS_COUNT])(D2DrlgRoomStrc*) =
 {
 	DRLGACTIVATE_RoomExSetStatus_ClientInRoom,
@@ -21,6 +22,8 @@ static void (__fastcall* gRoomExSetStatus[ROOMSTATUS_COUNT])(D2DrlgRoomStrc*) =
 };
 
 // D2Common.0x6FDE07C0
+// not-1.13c: function-pointer table, not code; retail data rva 0x99BF8 holds three byte-identical identify
+// copies (0x7BE90, 0x7BE50, 0x7BE10) for slots 0-2, one body here
 static void (__fastcall* gRoomExUnsetStatus[ROOMSTATUS_COUNT])(D2DrlgRoomStrc*) =
 {
 	DRLGACTIVATE_RoomExIdentifyRealStatus,
@@ -30,6 +33,7 @@ static void (__fastcall* gRoomExUnsetStatus[ROOMSTATUS_COUNT])(D2DrlgRoomStrc*) 
 };
 
 //Helper functions
+// not-1.13c: list insert inlined into every 1.13c status setter
 static void DRLGACTIVATE_RoomExStatuslink(D2DrlgRoomStrc* pStatusRoomsListHead, D2DrlgRoomStrc* pDrlgRoom)
 {
 	pDrlgRoom->pStatusNext = pStatusRoomsListHead;
@@ -38,6 +42,7 @@ static void DRLGACTIVATE_RoomExStatuslink(D2DrlgRoomStrc* pStatusRoomsListHead, 
 	pStatusRoomsListHead->pStatusPrev->pStatusNext = pDrlgRoom;
 	pStatusRoomsListHead->pStatusPrev = pDrlgRoom;
 }
+// not-1.13c: list unlink inlined into every 1.13c status setter
 static void DRLGACTIVATE_RoomExStatusUnlink(D2DrlgRoomStrc* pDrlgRoom)
 {
 	if (pDrlgRoom->pStatusPrev && pDrlgRoom->pStatusNext)
@@ -64,6 +69,7 @@ static void DRLGACTIVATE_ForceRoomExStatusImpl(D2DrlgRoomStrc* pDrlgRoom, D2Drlg
 	}
 }
 // Returns true if status changed
+// not-1.13c: priority test inlined into each 1.13c status setter
 static bool DRLGACTIVATE_UpdateRoomExStatusImpl(D2DrlgRoomStrc* pDrlgRoom, D2DrlgRoomStatus nStatus)
 {
 	// Note: Lower value has priority over others
@@ -75,6 +81,7 @@ static bool DRLGACTIVATE_UpdateRoomExStatusImpl(D2DrlgRoomStrc* pDrlgRoom, D2Drl
 	return false;
 }
 // Returns -1 if no status up to nMaxStatus is referenced
+// not-1.13c: ref-count scan inlined into the 1.13c propagate and identify functions
 static int DRLGACTIVATE_RoomExFindFirstStatusWithRefCount(D2DrlgRoomStrc* pDrlgRoom, D2DrlgRoomStatus nMaxStatus)
 {
 	for (int nFirstNonEmptyListStatus = 0; nFirstNonEmptyListStatus <= nMaxStatus && nFirstNonEmptyListStatus < ROOMSTATUS_COUNT; nFirstNonEmptyListStatus++)
@@ -88,39 +95,48 @@ static int DRLGACTIVATE_RoomExFindFirstStatusWithRefCount(D2DrlgRoomStrc* pDrlgR
 }
 
 //D2Common.0x6FD733D0
+// 1.13c D2Common+0x7BED0
 void __fastcall DRLGACTIVATE_RoomExSetStatus_ClientInRoom(D2DrlgRoomStrc* pDrlgRoom)
 {
 	DRLGACTIVATE_UpdateRoomExStatusImpl(pDrlgRoom, ROOMSTATUS_CLIENT_IN_ROOM);
 }
 
 //Helper function
+// not-1.13c: timeout store inlined into the 1.13c client-in-sight setter
 static void DRLGACTIVATE_InitRoomsInitTimeout(D2DrlgStrc* pDrlg)
 {
 	pDrlg->nRoomsInitTimeout = 2 * (DRLG_IsOnClient(pDrlg) == 0) + 5;
 }
+// 1.13c D2Common+0x7C0E0
+static void DRLGACTIVATE_RoomEx_CreateRoom(D2DrlgRoomStrc* pDrlgRoom)
+{
+	D2DrlgStrc* pDrlg = pDrlgRoom->pLevel->pDrlg;
+	if (!pDrlgRoom->nRoomsNear)
+	{
+		sub_6FD77BB0(pDrlg->pMempool, pDrlgRoom);
+	}
+
+	DRLGROOMTILE_InitRoomGrids(pDrlgRoom);
+	DRLGROOMTILE_AddRoomMapTiles(pDrlgRoom);
+	DRLG_CreateRoomForRoomEx(pDrlg, pDrlgRoom);
+	++pDrlg->nRoomsInitSinceLastUpdate;
+	++pDrlg->nAllocatedRooms;
+}
+// not-1.13c: the guard and timeout are inlined into the 1.13c client-in-sight setter
 void DRLGACTIVATE_RoomEx_EnsureHasRoom(D2DrlgRoomStrc* pDrlgRoom, bool bInitTimeoutCounter)
 {
 	if (pDrlgRoom->pRoom == nullptr && !(pDrlgRoom->dwFlags & DRLGROOMFLAG_HAS_ROOM))
 	{
-		D2DrlgStrc* pDrlg = pDrlgRoom->pLevel->pDrlg;
-		if (!pDrlgRoom->nRoomsNear)
-		{
-			sub_6FD77BB0(pDrlg->pMempool, pDrlgRoom);
-		}
-
-		DRLGROOMTILE_InitRoomGrids(pDrlgRoom);
-		DRLGROOMTILE_AddRoomMapTiles(pDrlgRoom);
-		DRLG_CreateRoomForRoomEx(pDrlg, pDrlgRoom);
-		++pDrlg->nRoomsInitSinceLastUpdate;
-		++pDrlg->nAllocatedRooms;
+		DRLGACTIVATE_RoomEx_CreateRoom(pDrlgRoom);
 		if (bInitTimeoutCounter)
 		{
-			DRLGACTIVATE_InitRoomsInitTimeout(pDrlg);
+			DRLGACTIVATE_InitRoomsInitTimeout(pDrlgRoom->pLevel->pDrlg);
 		}
 	}
 }
 
 //D2Common.0x6FD73450
+// 1.13c D2Common+0x7C370
 void __fastcall DRLGACTIVATE_RoomExSetStatus_ClientInSight(D2DrlgRoomStrc* pDrlgRoom)
 {
 	DRLGACTIVATE_RoomEx_EnsureHasRoom(pDrlgRoom, true);
@@ -128,6 +144,7 @@ void __fastcall DRLGACTIVATE_RoomExSetStatus_ClientInSight(D2DrlgRoomStrc* pDrlg
 }
 
 //D2Common.0x6FD73550
+// 1.13c D2Common+0x7C470
 void __fastcall DRLGACTIVATE_RoomExSetStatus_ClientOutOfSight(D2DrlgRoomStrc* pDrlgRoom)
 {
 	if (pDrlgRoom->dwFlags & DRLGROOMFLAG_TILELIB_LOADED 
@@ -143,6 +160,7 @@ void __fastcall DRLGACTIVATE_RoomExSetStatus_ClientOutOfSight(D2DrlgRoomStrc* pD
 }
 
 //D2Common.0x6FD736F0
+// 1.13c D2Common+0x7BEE0
 void __fastcall DRLGACTIVATE_RoomExSetStatus_Untile(D2DrlgRoomStrc* pDrlgRoom)
 {
 	if (!(pDrlgRoom->dwFlags & DRLGROOMFLAG_TILELIB_LOADED))
@@ -158,30 +176,38 @@ void __fastcall DRLGACTIVATE_RoomExSetStatus_Untile(D2DrlgRoomStrc* pDrlgRoom)
 }
 
 //D2Common.0x6FD73790
+// 1.13c D2Common+0x7BE90
+// 1.13c D2Common+0x7BE50
+// 1.13c D2Common+0x7BE10
+// 1.13c D2Common+0x7BC20
+// (four byte-identical retail copies: unset slots 0, 1, 2 and the untile unsetter's register-call copy)
 void __fastcall DRLGACTIVATE_RoomExIdentifyRealStatus(D2DrlgRoomStrc* pDrlgRoom)
 {
 	if (pDrlgRoom->fRoomStatus >= ROOMSTATUS_COUNT || pDrlgRoom->wRoomsInList[pDrlgRoom->fRoomStatus] == 0)
 	{
-		const int nFirstStatusWithRefCount = DRLGACTIVATE_RoomExFindFirstStatusWithRefCount(pDrlgRoom, ROOMSTATUS_COUNT);
-		const D2DrlgRoomStatus nRealStatus = nFirstStatusWithRefCount < 0 ? ROOMSTATUS_COUNT : D2DrlgRoomStatus(nFirstStatusWithRefCount);
-		if (pDrlgRoom->fRoomStatus != nRealStatus)
+		uint8_t nStatus = 0;
+		while (nStatus < ROOMSTATUS_COUNT && pDrlgRoom->wRoomsInList[nStatus] == 0)
 		{
-			DRLGACTIVATE_ForceRoomExStatusImpl(pDrlgRoom, nRealStatus);
+			++nStatus;
 		}
+		DRLGACTIVATE_ForceRoomExStatusImpl(pDrlgRoom, D2DrlgRoomStatus(nStatus));
+		// 1.13c: the status byte is stored after the move even when no list takes the room (4)
+		pDrlgRoom->fRoomStatus = nStatus;
 	}
 }
 
 //D2Common.0x6FD73880
+// 1.13c D2Common+0x7BDB0
 void __fastcall DRLGACTIVATE_RoomExStatusUnset_Untile(D2DrlgRoomStrc* pDrlgRoom)
 {
 	if (pDrlgRoom->fRoomStatus != ROOMSTATUS_COUNT)
 	{
 		DRLGACTIVATE_RoomExIdentifyRealStatus(pDrlgRoom);
-		
-		// We may unload the room if no status is now set
 		if (pDrlgRoom->fRoomStatus == ROOMSTATUS_COUNT)
 		{
-			if (DRLG_IsOnClient(pDrlgRoom->pLevel->pDrlg))
+			D2DrlgStrc* pDrlg = pDrlgRoom->pLevel->pDrlg;
+			D2_ASSERT(pDrlg);
+			if (DRLG_IsOnClient(pDrlg))
 			{
 				DRLGROOMTILE_FreeRoom(pDrlgRoom, false);
 			}
@@ -266,27 +292,19 @@ static void DRLGACTIVATE_RoomSetAndPropagateStatus(D2DrlgRoomStrc* pDrlgRoom, D2
 	++pDrlgRoom->wRoomsInList[nStatus];
 }
 
+// not-1.13c: inlined into the 1.13c unset-in-sight (0x7BF20) and change-client-room export (0x3CC40)
 static void DRLGACTIVATE_RoomUnsetAndPropagateStatus(D2DrlgRoomStrc* pDrlgRoom, D2DrlgRoomStatus nStatus)
 {
 	if (pDrlgRoom->wRoomsInList[nStatus] != 0)
 	{
 		--pDrlgRoom->wRoomsInList[nStatus];
-
 		gRoomExUnsetStatus[nStatus](pDrlgRoom);
-
-		for (int i = 0; i < pDrlgRoom->nRoomsNear; ++i)
-		{
-			if (D2DrlgRoomStrc * pNearRoom = pDrlgRoom->ppRoomsNear[i])
-			{
-				--pNearRoom->wRoomsInList[nStatus + 1];
-				gRoomExUnsetStatus[nStatus + 1](pNearRoom);
-				DRLGACTIVATE_RoomExPropagateUnsetStatus(pNearRoom, nStatus + 2);
-			}
-		}
+		DRLGACTIVATE_RoomExPropagateUnsetStatus(pDrlgRoom, nStatus + 1);
 	}
 }
 
 //D2Common.0x6FD739A0
+// 1.13c D2Common+0x7C300
 void __fastcall DRLGACTIVATE_SetClientIsInSight(D2DrlgStrc* pDrlg, int nLevelId, int nX, int nY, D2DrlgRoomStrc* pDrlgRoomHint)
 {
 	D2DrlgLevelStrc* pLevel = DRLG_GetLevel(pDrlg, nLevelId);
@@ -303,6 +321,7 @@ void __fastcall DRLGACTIVATE_SetClientIsInSight(D2DrlgStrc* pDrlg, int nLevelId,
 }
 
 //D2Common.0x6FD73B40
+// 1.13c D2Common+0x7BF20
 void __fastcall DRLGACTIVATE_UnsetClientIsInSight(D2DrlgStrc* pDrlg, int nLevelId, int nX, int nY, D2DrlgRoomStrc* pDrlgRoomHint)
 {
 	D2DrlgLevelStrc* pLevel = DRLG_GetLevel(pDrlg, nLevelId);
@@ -311,14 +330,18 @@ void __fastcall DRLGACTIVATE_UnsetClientIsInSight(D2DrlgStrc* pDrlg, int nLevelI
 		pDrlgRoomHint = nullptr;
 	}
 
-	if (D2DrlgRoomStrc* pDrlgRoom = DRLG_GetRoomExFromCoordinates(nX, nY, pDrlg, pDrlgRoomHint, pLevel))
+	D2DrlgRoomStrc* pDrlgRoom = DRLG_GetRoomExFromCoordinates(nX, nY, pDrlg, pDrlgRoomHint, pLevel);
+	if (pDrlgRoom && pDrlgRoom->wRoomsInList[ROOMSTATUS_CLIENT_IN_SIGHT] != 0)
 	{
-		DRLGACTIVATE_RoomUnsetAndPropagateStatus(pDrlgRoom, ROOMSTATUS_CLIENT_IN_SIGHT);
+		--pDrlgRoom->wRoomsInList[ROOMSTATUS_CLIENT_IN_SIGHT];
+		gRoomExUnsetStatus[ROOMSTATUS_CLIENT_IN_SIGHT](pDrlgRoom);
+		DRLGACTIVATE_RoomExPropagateUnsetStatus(pDrlgRoom, ROOMSTATUS_CLIENT_OUT_OF_SIGHT);
 	}
 }
 
 
 //D2Common.0x6FD73C40
+// not-1.13c: inlined into the 1.13c change-client-room export, which takes active rooms
 void __fastcall DRLGACTIVATE_ChangeClientRoom(D2DrlgRoomStrc* pPreviousRoom, D2DrlgRoomStrc* pNewRoom)
 {
 	if (pPreviousRoom == pNewRoom)
@@ -338,6 +361,7 @@ void __fastcall DRLGACTIVATE_ChangeClientRoom(D2DrlgRoomStrc* pPreviousRoom, D2D
 }
 
 //D2Common.0x6FD73CF0
+// 1.13c D2Common+0x7C270
 void __fastcall DRLGACTIVATE_InitializeRoomEx(D2DrlgRoomStrc* pDrlgRoom)
 {
 	if (!(pDrlgRoom->dwFlags & DRLGROOMFLAG_TILELIB_LOADED))
@@ -350,10 +374,15 @@ void __fastcall DRLGACTIVATE_InitializeRoomEx(D2DrlgRoomStrc* pDrlgRoom)
 		DRLGPRESET_SpawnHardcodedPresetUnits(pDrlgRoom);
 	}
 
-	DRLGACTIVATE_RoomEx_EnsureHasRoom(pDrlgRoom, false);
+	// 1.13c: only the has-room flag gates the build, never the active-room pointer
+	if (!(pDrlgRoom->dwFlags & DRLGROOMFLAG_HAS_ROOM))
+	{
+		DRLGACTIVATE_RoomEx_CreateRoom(pDrlgRoom);
+	}
 }
 
 //D2Common.0x6FD73D80
+// not-1.13c: inlined into the 1.13c stream-room export 0x3CDA0
 D2ActiveRoomStrc* __fastcall DRLGACTIVATE_StreamRoomAtCoords(D2DrlgStrc* pDrlg, int nX, int nY)
 {
 	if (D2DrlgRoomStrc* pDrlgRoom = DRLG_GetRoomExFromCoordinates(nX, nY, pDrlg, 0, 0))
@@ -378,10 +407,11 @@ void __fastcall DRLGACTIVATE_InitializeRoomExStatusLists(D2DrlgStrc* pDrlg)
 }
 
 //Helper function
+// not-1.13c: list-head read inlined into the 1.13c exports 0x3C5E0 and 0x3C570
 static D2DrlgRoomStrc* DRLGACTIVATE_RoomExStatusList_GetFirst(D2DrlgStrc* pDrlg, D2DrlgRoomStatus nStatus)
 {
 	const D2DrlgRoomStrc* pStatusListHead = &pDrlg->tStatusRoomsLists[nStatus];
-	if (pStatusListHead != pStatusListHead->pStatusNext) // If not empty
+	if (pStatusListHead->pStatusNext && pStatusListHead != pStatusListHead->pStatusNext) // If not empty
 	{
 		return pStatusListHead->pStatusNext;
 	}
@@ -389,6 +419,7 @@ static D2DrlgRoomStrc* DRLGACTIVATE_RoomExStatusList_GetFirst(D2DrlgStrc* pDrlg,
 }
 
 //D2Common.0x6FD73E60
+// not-1.13c: inlined into the 1.13c export 0x3C5E0 (#10811)
 D2ActiveRoomStrc* __fastcall DRLGACTIVATE_GetARoomInClientSight(D2DrlgStrc* pDrlg)
 {
 	if (D2DrlgRoomStrc* pDrlgRoom = DRLGACTIVATE_RoomExStatusList_GetFirst(pDrlg, ROOMSTATUS_CLIENT_IN_ROOM))
@@ -403,6 +434,7 @@ D2ActiveRoomStrc* __fastcall DRLGACTIVATE_GetARoomInClientSight(D2DrlgStrc* pDrl
 }
 
 //D2Common.0x6FD73E90
+// not-1.13c: inlined into the 1.13c export 0x3C570 (#10547)
 D2ActiveRoomStrc* __fastcall DRLGACTIVATE_GetARoomInSightButWithoutClient(D2DrlgStrc* pDrlg, D2DrlgRoomStrc* pDrlgRoom)
 {
 	if (D2DrlgRoomStrc* pNextStatusRoom = pDrlgRoom->pStatusNext)
@@ -483,6 +515,7 @@ void __stdcall DRLGACTIVATE_Update(D2DrlgStrc* pDrlg)
 }
 
 //D2Common.0x6FD74060
+// 1.13c D2Common+0x7BA00
 BOOL __fastcall DRLGACTIVATE_TestRoomCanUnTile(D2DrlgRoomStrc* pDrlgRoom)
 {
 	if (pDrlgRoom->dwFlags & DRLGROOMFLAG_HASPORTAL)
@@ -490,7 +523,9 @@ BOOL __fastcall DRLGACTIVATE_TestRoomCanUnTile(D2DrlgRoomStrc* pDrlgRoom)
 		return FALSE;
 	}
 
-	D2_ASSERT(!DRLG_IsOnClient(DRLGROOM_GetDrlgFromRoomEx(pDrlgRoom)));
+	D2_ASSERT(pDrlgRoom->pLevel);
+	D2_ASSERT(pDrlgRoom->pLevel->pDrlg);
+	D2_ASSERT(!DRLG_IsOnClient(pDrlgRoom->pLevel->pDrlg));
 
 	if (pDrlgRoom->fRoomStatus <= 1)
 	{
@@ -512,6 +547,7 @@ BOOL __fastcall DRLGACTIVATE_TestRoomCanUnTile(D2DrlgRoomStrc* pDrlgRoom)
 }
 
 //D2Common.0x6FD740F0
+// not-1.13c: inlined into the 1.13c export 0x3BC10 (#10346)
 void __fastcall DRLGACTIVATE_ToggleHasPortalFlag(D2DrlgRoomStrc* pDrlgRoom, BOOL bReset)
 {
 	if (bReset)
@@ -525,6 +561,7 @@ void __fastcall DRLGACTIVATE_ToggleHasPortalFlag(D2DrlgRoomStrc* pDrlgRoom, BOOL
 }
 
 //D2Common.0x6FD74110
+// not-1.13c: inlined into the 1.13c export 0x3BF00 (#10969)
 uint8_t __fastcall DRLGACTIVATE_GetRoomStatusFlags(D2DrlgRoomStrc* pDrlgRoom)
 {
 	return pDrlgRoom->fRoomStatus;

@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x146C0 -- overlap test (ecx = the work record, edx = n): answers 0 when rectangle n overlaps any earlier rectangle other than its anchor (the per-rectangle anchor column of the preset table at image offset 0x8D0A0), 1 otherwise.
+// stand-alone 32-bit layout twin of D2Common 0x146C0 (the proven row runs DRLGOUTPLACE_LinkAct4Outdoors) -- overlap test (ecx = the work record, edx = n): answers 0 when rectangle n overlaps any earlier rectangle other than its anchor (the per-rectangle anchor column of the preset table at image offset 0x8D0A0), 1 otherwise.
 #include <cstdint>
 #include "../fn/d2game_gp.h"
 namespace d2common {

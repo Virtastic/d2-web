@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x44d90
+// stand-alone 32-bit layout twin of D2Common 0x44d90 (the proven row runs DRLGROOM_GetRGB_IntensityFromRoomEx)
 // Four palette bytes (+0x88..+0x8b) of the txt row named by pUnit->pInfo+0x1d0.
 #include <cstdint>
 #include <cstring>
@@ -27,7 +27,7 @@ extern "C" void D2Common_44D90(const uint8_t* pUnit, const uint8_t* pDataTables,
 }
 
 // Engine form (native tables): the same rule read from sgptDataTables; the unit is a retail 32-bit token.
-// 1.13c D2Common+0x44D90: copy a unit's level palette. The level id is at pGfxDataCopy(+0x58)+0x1D0;
+// stand-alone engine twin of D2Common 0x44D90 (the proven row runs DRLGROOM_GetRGB_IntensityFromRoomEx): copy a unit's level palette. The level id is at pGfxDataCopy(+0x58)+0x1D0;
 // an id outside [0, nLevelsTxtRecordCount) makes retail read the zero-filled low image at 0x88, so the
 // outputs are zero. Otherwise the four bytes come from the levels.bin row's nIntensity/nRed/nGreen/
 // nBlue. The unit is the register argument (EAX) and the four outputs are the stack arguments. Retail

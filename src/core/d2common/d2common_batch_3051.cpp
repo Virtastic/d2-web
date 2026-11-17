@@ -44,7 +44,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3B5B0_RoomDword20(void* object
     return read32(object, 0x20);
 }
 
-// 1.13c D2Common+0x7BF20 (__thiscall owner in ECX, room in EAX, key in EDI, two stack words p1 p2). Retail-layout tokens.
+// stand-alone 32-bit layout twin of D2Common 0x7BF20 (the proven row runs DRLGACTIVATE_UnsetClientIsInSight) (__thiscall owner in ECX, room in EAX, key in EDI, two stack words p1 p2). Retail-layout tokens.
 // Finds the owner's list entry (list head +0x47c, next +0x1ac, key +0x1d0) or asks 0x2D9B0 for one; hands the room
 // to 0x2E5C0 only when its level's key (+0x58 then +0x1d0) equals the key. A result with a non-zero u16 at +0xE
 // loses one count, runs the callback at [0x6FDE9BFC] (= 0x7BE50) and then 0x7BB20(result, 2).

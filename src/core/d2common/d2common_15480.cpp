@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x15480 -- placement step (ecx = the work record), eight directions with half-size offsets: the step rule of the eight-direction variant; the rectangle goes under (0, 1), left of (2, 3), above (4, 5) or right of (6, 7) its anchor, shifted by half its own width or height plus 8 to one side or the other. Returns 1, or 0 when the direction comes back to the start.
+// stand-alone 32-bit layout twin of D2Common 0x15480 (the proven row runs sub_6FD81530) -- placement step (ecx = the work record), eight directions with half-size offsets: the step rule of the eight-direction variant; the rectangle goes under (0, 1), left of (2, 3), above (4, 5) or right of (6, 7) its anchor, shifted by half its own width or height plus 8 to one side or the other. Returns 1, or 0 when the direction comes back to the start.
 #include <cstdint>
 #include "../fn/d2game_gp.h"
 namespace d2common {

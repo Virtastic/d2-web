@@ -6,7 +6,7 @@
 struct D2DrlgRoomStrc;
 extern "C" uint32_t D2Common_44950(uint8_t*, uint32_t, int32_t, uint8_t* (*)(uint32_t), uint32_t (*)(uint32_t, uint32_t, uint32_t));
 
-// 1.13c D2Common+0x44BA0
+// stand-alone 32-bit layout twin of D2Common 0x44BA0 (the proven row runs DRLGROOM_AllocDrlgOrthsForRooms)
 extern "C" uint32_t D2Common_44BA0(int32_t direction, uint32_t first, uint32_t second, uint8_t* (*resolve)(uint32_t),
                                    uint32_t (*alloc)(uint32_t pool, uint32_t size, uint32_t line))
 {

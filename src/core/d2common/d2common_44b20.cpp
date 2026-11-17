@@ -10,7 +10,7 @@ static int32_t Dir44B20(const D2DrlgOrthStrc* orth)
     int32_t value; std::memcpy(&value, &orth->nDirection, sizeof(value)); return value;
 }
 
-// 1.13c D2Common+0x44870 (the comparator): same direction compares the boxes, else the direction decides.
+// D2Common 0x44870 (the comparator): same direction compares the boxes, else the direction decides.
 extern "C" bool D2Common_44B20_Before(const D2DrlgOrthStrc* a, const D2DrlgOrthStrc* b)
 {
     const int32_t da = Dir44B20(a), db = Dir44B20(b);

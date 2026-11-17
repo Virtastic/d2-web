@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x697C0 (sub_697C0): room-tile dispatch. Retail layout: EBX, ESI, EDI are inputs it forwards unchanged; stack = a0, a1 (room), a2 (type), ret 0xC.
+// stand-alone twin of D2Common 0x697C0 (the proven row runs DRLGROOMTILE_GetCreateLinkedTileData): room-tile dispatch. Retail layout: EBX, ESI, EDI are inputs it forwards unchanged; stack = a0, a1 (room), a2 (type), ret 0xC.
 // Asks 0x68780 (EAX = EBX; stack a1, a2==0, edi, esi, &out) for a node, with the out value cleared first. A node goes to 0x695D0
 // (EAX = a2, ECX = node; stack a0, a1, out, ebx, edi, esi); none goes to 0x69470 (EAX = a2, ECX = a1; stack a0, ebx, edi, esi).
 #include <cstdint>

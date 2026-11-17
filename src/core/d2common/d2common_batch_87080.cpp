@@ -85,7 +85,7 @@ EMSCRIPTEN_KEEPALIVE uint64_t D2Common_87080_Alldiv(uint32_t nDividendLow, uint3
 	return nQuotient;
 }
 
-// 1.13c D2Common+0x7BE90 (1.10f DRLGACTIVATE_RoomExIdentifyRealStatus): when the room's current
+// stand-alone 32-bit layout twin of D2Common 0x7BE90 (the proven row runs DRLGACTIVATE_RoomExIdentifyRealStatus) (1.10f DRLGACTIVATE_RoomExIdentifyRealStatus): when the room's current
 // status byte (+0x44) is at least 4 or its ref count at +0xC+status*2 is zero, take the first status
 // in 0..3 whose ref count is non-zero (4 when none is) and force the room to it through 0x7BB70; the
 // status byte is written afterwards.

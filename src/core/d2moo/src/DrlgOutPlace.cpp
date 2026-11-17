@@ -116,6 +116,7 @@ static D2DrlgLinkStrc gAct5TundraDrlgLink[15] =
 
 
 //D2Common.0x6FD80480
+// 1.13c D2Common+0x856C0 (level in EAX)
 void __fastcall DRLGOUTPLACE_BuildKurast(D2DrlgLevelStrc* pLevel)
 {
 	switch (pLevel->nLevelId)
@@ -176,12 +177,9 @@ void __fastcall DRLGOUTPLACE_BuildKurast(D2DrlgLevelStrc* pLevel)
 }
 
 //D2Common.0x6FD806A0
+// 1.13c D2Common+0x84DA0 (level in ESI; the grid-link, jungle and Kurast calls moved to the caller 0x43580)
 void __fastcall DRLGOUTPLACE_InitAct3OutdoorLevel(D2DrlgLevelStrc* pLevel)
 {
-	DRLGOUTPLACE_SetOutGridLinkFlags(pLevel);
-	DRLGOUTJUNG_BuildJungle(pLevel);
-	DRLGOUTPLACE_BuildKurast(pLevel);
-
 	if (pLevel->nLevelId == LEVEL_TRAVINCAL)
 	{
 		DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, 0, 0, LVLPREST_ACT3_TRAVINCAL_NW, -1, 0);
@@ -556,22 +554,26 @@ static const int32_t gnOutBorderRdataDCAA0[] =
 	LVLPREST_ACT5_BARRICADE_CLIFF_BORDER_12,	LVLPREST_ACT5_BARRICADE_CLIFF_BORDER_12_SNOW,
 };
 
+// not-1.13c: a d2-web accessor for the inline [rva + 4*index] .rdata reads in 0x17180 and the siege border placer
 static int32_t DRLGOUTPLACE_BorderRdata5590(uint32_t nRva, int32_t nIndex)
 {
 	return gnOutBorderRdata5590[(int32_t)((nRva - 0x5590) / 4) + nIndex];
 }
 
+// not-1.13c: a d2-web accessor for the inline [rva + 4*index] .rdata reads in 0x17180 and the siege border placer
 static int32_t DRLGOUTPLACE_BorderRdataDCAA0(uint32_t nRva, int32_t nIndex)
 {
 	return gnOutBorderRdataDCAA0[(int32_t)((nRva - 0xDCAA0) / 4) + nIndex];
 }
 
+// not-1.13c: the step bump 0x17180 computes inline before the corner-class index
 static int32_t DRLGOUTPLACE_BumpBorderStep(int32_t nStep)
 {
 	return nStep < 0 ? nStep - 2 : (nStep > 0 ? nStep + 2 : nStep);
 }
 
 // The edge tile of a border run: edge class of (dx, dy), then the tile set column (0..3 act 1/2/4, 4..5 barricade)
+// not-1.13c: the edge-tile lookup 0x17180 performs inline
 static int32_t DRLGOUTPLACE_GetBorderEdgeTile(int32_t nDiffX, int32_t nDiffY, int32_t nColumn)
 {
 	const int32_t nClass = DRLGOUTPLACE_BorderRdata5590(0x5734, nDiffX + nDiffY * 3);
@@ -579,6 +581,7 @@ static int32_t DRLGOUTPLACE_GetBorderEdgeTile(int32_t nDiffX, int32_t nDiffY, in
 }
 
 // The corner tile at a vertex from the corner class (-1: none), then the tile set column
+// not-1.13c: the corner-tile lookup 0x17180 performs inline
 static int32_t DRLGOUTPLACE_GetBorderCornerTile(int32_t nIndex, int32_t nColumn)
 {
 	const int32_t nCorner = DRLGOUTPLACE_BorderRdata5590(0x5680, nIndex);
@@ -670,6 +673,7 @@ void __fastcall DRLGOUTPLACE_SetBlankBorderGridCells(D2DrlgLevelStrc* pLevel)
 }
 
 //D2Common.0x6FD80DA0
+// 1.13c D2Common+0x176F0
 void __fastcall DRLGOUTPLACE_SetOutGridLinkFlags(D2DrlgLevelStrc* pLevel)
 {
 	D2DrlgVertexStrc* pVertex = pLevel->pOutdoors->pVertex;
@@ -1079,6 +1083,7 @@ void __fastcall sub_6FD81430(D2DrlgCoordStrc* pDrlgCoord1, D2DrlgCoordStrc* pDrl
 }
 
 //D2Common.0x6FD81530
+// 1.13c D2Common+0x15480 (the offset switch below is inline there)
 BOOL __fastcall sub_6FD81530(D2DrlgLevelLinkDataStrc* pLevelLinkData)
 {
 	if (pLevelLinkData->nRand[1][pLevelLinkData->nIteration] == -1)
@@ -1101,6 +1106,7 @@ BOOL __fastcall sub_6FD81530(D2DrlgLevelLinkDataStrc* pLevelLinkData)
 }
 
 //D2Common.0x6FD815E0
+// not-1.13c: retail inlines this 8-way offset switch into its two callers 0x15480 (a4 1) and 0x14D00 (a4 0)
 void __fastcall sub_6FD815E0(D2DrlgCoordStrc* pDrlgCoord1, D2DrlgCoordStrc* pDrlgCoord2, int a3, int a4)
 {
 	switch (a3)
@@ -1458,6 +1464,7 @@ BOOL __fastcall sub_6FD81AD0(D2DrlgLevelLinkDataStrc* pLevelLinkData)
 }
 
 //D2Common.0x6FD81B30
+// 1.13c D2Common+0x14E30 (both offset switches inline there)
 BOOL __fastcall sub_6FD81B30(D2DrlgLevelLinkDataStrc* pLevelLinkData)
 {
 	int nRand = 0;
@@ -1492,6 +1499,7 @@ BOOL __fastcall sub_6FD81B30(D2DrlgLevelLinkDataStrc* pLevelLinkData)
 }
 
 //D2Common.0x6FD81BF0
+// 1.13c D2Common+0x14D00 (the offset switch inline there)
 BOOL __fastcall sub_6FD81BF0(D2DrlgLevelLinkDataStrc* pLevelLinkData)
 {
 	int nRand = 0;
@@ -1519,6 +1527,7 @@ BOOL __fastcall sub_6FD81BF0(D2DrlgLevelLinkDataStrc* pLevelLinkData)
 }
 
 //D2Common.0x6FD81CA0
+// 1.13c D2Common+0x14B00 (both offset switches inline there; dword_6FDEA6FC is retail's 0x6FDF146C)
 BOOL __fastcall sub_6FD81CA0(D2DrlgLevelLinkDataStrc* pLevelLinkData)
 {
 	pLevelLinkData->nRand[1][pLevelLinkData->nIteration] = 3;
@@ -1739,6 +1748,7 @@ BOOL __fastcall sub_6FD82130(D2DrlgLevelLinkDataStrc* pLevelLinkData, int nItera
 }
 
 //D2Common.0x6FD821E0
+// 1.13c D2Common+0x14870 (table 0x6FDDCDC8)
 BOOL __fastcall DRLGOUTPLACE_LinkAct2Outdoors(D2DrlgLevelLinkDataStrc* pLevelLinkData, int nIteration)
 {
 	int nLevelLink = gAct2OutdoorDrlgLink[nIteration].nLevelLink;
@@ -1755,6 +1765,7 @@ BOOL __fastcall DRLGOUTPLACE_LinkAct2Outdoors(D2DrlgLevelLinkDataStrc* pLevelLin
 }
 
 //D2Common.0x6FD82240
+// 1.13c D2Common+0x147E0 (table 0x6FDDCEB8)
 BOOL __fastcall DRLGOUTPLACE_LinkAct2Canyon(D2DrlgLevelLinkDataStrc* pLevelLinkData, int nIteration)
 {
 	int nLevelLink = gAct2CanyonDrlgLink[nIteration].nLevelLink;
@@ -1773,6 +1784,7 @@ BOOL __fastcall DRLGOUTPLACE_LinkAct2Canyon(D2DrlgLevelLinkDataStrc* pLevelLinkD
 #ifdef D2_VERSION_HAS_UBERS
 //1.11 : D2Common.0x6FD6C560
 //1.14d: 0x00677030
+// 1.13c D2Common+0x14750 (table 0x6FDDCFA8)
 BOOL __fastcall DRLGOUTPLACE_LinkAct5Ubers(D2DrlgLevelLinkDataStrc* pLevelLinkData, int nIteration)
 {
 	int nLevelLink = gAct5UbersDrlgLink[nIteration].nLevelLink;
@@ -1790,6 +1802,7 @@ BOOL __fastcall DRLGOUTPLACE_LinkAct5Ubers(D2DrlgLevelLinkDataStrc* pLevelLinkDa
 #endif
 
 //D2Comon.0x6FD822A0
+// 1.13c D2Common+0x146C0 (table 0x6FDDD098)
 BOOL __fastcall DRLGOUTPLACE_LinkAct4Outdoors(D2DrlgLevelLinkDataStrc* pLevelLinkData, int nIteration)
 {
 	int nLevelLink = gAct4OutdoorDrlgLink[nIteration].nLevelLink;
@@ -2090,6 +2103,7 @@ static const D2C_LvlPrestIds gSpiderForestPresets[] = {
 
 static const int nPresetBlocksDimensions = 32;
 
+// not-1.13c: d2-web split of the attach-point pass of 0x15A80 (retail runs it inline, once per jungle per retry)
 static void DRLG_GenerateJunglesAttachPoints(
 	D2DrlgStrc* pDrlg,
 	D2JungleStrc* tJungles,
@@ -2114,8 +2128,9 @@ static void DRLG_GenerateJunglesAttachPoints(
 		const int32_t nJungleOffsetX = tCurrentJungle.pDrlgCoord.nPosX - nMinX;
 		const int32_t nJungleOffsetY = tCurrentJungle.pDrlgCoord.nPosY - nMinY;
 
-		tCurrentJungle.nPresetsBlocksX = (((nJungleOffsetX & 0x1F) + nJungleOffsetX) >> 5) + 1;
-		tCurrentJungle.nPresetsBlocksY = (((nJungleOffsetY & 0x1F) + nJungleOffsetY) >> 5) + 1;
+		// 0x15A80 divides by 32 rounding toward zero (the bias is the sign mask, not the low bits)
+		tCurrentJungle.nPresetsBlocksX = (((nJungleOffsetX >> 31) & 0x1F) + nJungleOffsetX >> 5) + 1;
+		tCurrentJungle.nPresetsBlocksY = (((nJungleOffsetY >> 31) & 0x1F) + nJungleOffsetY >> 5) + 1;
 
 		// Note: Original game could leak memory here (if jungle generation fails, we would realloc without freeing)
 		if (tCurrentJungle.pJungleDefs)
@@ -2284,6 +2299,7 @@ static void DRLG_GenerateJunglesAttachPoints(
 	}
 }
 
+// not-1.13c: d2-web split of the neighbour-flag pass of 0x15A80 (inline in retail)
 static void DRLG_JungleComputeConnexity(
 	D2DrlgStrc* pDrlg,
 	int32_t nPresetsWidth,
@@ -2383,6 +2399,7 @@ static void DRLG_JungleComputeConnexity(
 
 
 // Returns false if we need to generate a new map due to invalid attach points
+// not-1.13c: d2-web split of the attach-direction pass of 0x15A80 (inline in retail; false is its jump back to the zero-fill)
 static bool DRLG_JungleUpdateAttachPointsDirections(
 	D2DrlgStrc* pDrlg,
 	int32_t nPresetsWidth,
@@ -2513,6 +2530,8 @@ static bool DRLG_JungleUpdateAttachPointsDirections(
 	return true;
 }
 
+// not-1.13c: d2-web split of the preset-id pass of 0x15A80 (inline in retail). Retail feeds each flag lookup the
+// previous lookup's result as the index; this keeps the first index, which agrees whenever one direction flag is set.
 static D2C_LvlPrestIds DRLG_JungleNormalizeLevelPresetId(int32_t nLevelPresetId)
 {
 	const int32_t nbDirections = 16;
@@ -2547,8 +2566,8 @@ static D2C_LvlPrestIds DRLG_JungleNormalizeLevelPresetId(int32_t nLevelPresetId)
 }
 
 // D2Common.0x6FD82820
-// Checked to be working correctly, but with a single save only
 // See https://web.archive.org/web/20220928163841/http://www.dos486.com/diablo/jungle/ for an overview about act 3 jungles
+// 1.13c D2Common+0x15A80 (level in EAX)
 D2DrlgLevelStrc* __fastcall DRLG_GenerateJungles(D2DrlgLevelStrc* pLevel)
 {
 	D2LevelDefBin* pSpiderForestLevelDef = DATATBLS_GetLevelDefRecord(LEVEL_SPIDERFOREST);
@@ -2674,11 +2693,26 @@ D2DrlgLevelStrc* __fastcall DRLG_GenerateJungles(D2DrlgLevelStrc* pLevel)
 		}
 	}
 
-	std::sort(tJungles, tJungles + JUNGLE_MAX_ATTACH, 
-		[](const auto& lhs, const auto& rhs) 
-		{ // Order from higher to lower nPosY
-			return lhs.pDrlgCoord.nPosY > rhs.pDrlgCoord.nPosY; 
-		});
+	// Order from higher to lower nPosY: retail swaps 0/1 when 0 is lower, then 1/2 while 2 is higher, and repeats
+	// while the first swap fired; equal nPosY never swaps.
+	bool bSwapped;
+	do
+	{
+		for (;;)
+		{
+			bSwapped = false;
+			if (tJungles[0].pDrlgCoord.nPosY < tJungles[1].pDrlgCoord.nPosY)
+			{
+				std::swap(tJungles[0], tJungles[1]);
+				bSwapped = true;
+			}
+			if (tJungles[2].pDrlgCoord.nPosY <= tJungles[1].pDrlgCoord.nPosY)
+			{
+				break;
+			}
+			std::swap(tJungles[1], tJungles[2]);
+		}
+	} while (bSwapped);
 
 	D2DrlgLevelStrc* pJungleLevel = nullptr;
 	for (int i = 0; i < JUNGLE_MAX_ATTACH; ++i)
@@ -2705,52 +2739,43 @@ D2DrlgLevelStrc* __fastcall DRLG_GenerateJungles(D2DrlgLevelStrc* pLevel)
 
 
 //D2Common.0x6FD83970
+// 1.13c D2Common+0x13F30 (out in EBX, width in EDI, height in ESI; origin and direction on the stack)
 void __fastcall sub_6FD83970(D2DrlgCoordStrc* pDrlgCoord, D2JungleStrc* pJungle, int nRand, int nSizeX, int nSizeY)
 {
-	unsigned int nTemp = 0;
-	int nX = 0;
-	int nY = 0;
+	int32_t nX = 0;
+	int32_t nY = 0;
+	int32_t nHigh = 0;
 
 	switch (nRand)
 	{
 	case 0:
-		nX = 0;
-		nY = -nSizeY;
+		nY = (int32_t)(0u - (uint32_t)nSizeY);
 		break;
 
 	case 1:
-		nX = -nSizeX;
-		nTemp = (signed int)((0x55555555ull * nSizeY >> 32) - nSizeY) >> 1;
-		nY = (nTemp >> 31) + nTemp;
-		break;
-
 	case 2:
-		nX = nSizeX;
-		nTemp = (signed int)((0x55555555ull * nSizeY >> 32) - nSizeY) >> 1;
-		nY = (nTemp >> 31) + nTemp;
+		nHigh = (int32_t)(((int64_t)nSizeY * 0x55555555LL) >> 32);
+		nHigh = (int32_t)((uint32_t)nHigh - (uint32_t)nSizeY) >> 1;
+		nY = (int32_t)((uint32_t)nHigh + ((uint32_t)nHigh >> 31));
+		nX = nRand == 1 ? (int32_t)(0u - (uint32_t)nSizeX) : nSizeX;
 		break;
 
 	case 3:
-		nX = -nSizeX;
-		nTemp = 0xFFFFFFFF55555554ull * nSizeY >> 32;
-		nY = (nTemp >> 31) + nTemp;
-		break;
-
 	case 4:
-		nX = nSizeX;
-		nTemp = 0xFFFFFFFF55555554ull * nSizeY >> 32;
-		nY = (nTemp >> 31) + nTemp;
+		nHigh = (int32_t)(((int64_t)(int32_t)((0u - (uint32_t)nSizeY) << 1) * 0x55555556LL) >> 32);
+		nY = (int32_t)((uint32_t)nHigh + ((uint32_t)nHigh >> 31));
+		nX = nRand == 3 ? (int32_t)(0u - (uint32_t)nSizeX) : nSizeX;
 		break;
 
 	default:
 		break;
 	}
 
-	pJungle->pDrlgCoord.nPosX = nX + pDrlgCoord->nPosX;
-	pJungle->pDrlgCoord.nHeight = nSizeY;
-	pJungle->pDrlgCoord.nWidth = nSizeX;
-	pJungle->pDrlgCoord.nPosY = nY + pDrlgCoord->nPosY;
+	pJungle->pDrlgCoord.nPosX = (int32_t)((uint32_t)pDrlgCoord->nPosX + (uint32_t)nX);
 	pJungle->field_10 = nRand;
+	pJungle->pDrlgCoord.nPosY = (int32_t)((uint32_t)pDrlgCoord->nPosY + (uint32_t)nY);
+	pJungle->pDrlgCoord.nWidth = nSizeX;
+	pJungle->pDrlgCoord.nHeight = nSizeY;
 }
 
 //D2Common.0x6FD83A20

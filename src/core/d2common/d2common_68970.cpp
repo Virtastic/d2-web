@@ -19,7 +19,7 @@ void W32(uint32_t a, uint32_t v) { memcpy((void*)(uintptr_t)a, &v, 4); }
 int32_t Row(const uint8_t* p, int o) { int32_t v; memcpy(&v, p + o, 4); return v; }
 }
 
-// 1.13c D2Common+0x68970
+// stand-alone 32-bit layout twin of D2Common 0x68970 (the proven row runs DRLGROOMTILE_AddTilePresetUnits)
 extern "C" void D2Common_68970_TileSound(const D2TileSoundSeam* s, uint32_t pRoom, int32_t x, uint32_t pTile, uint32_t nId,
                                          int32_t y, int32_t nFallbackType)
 {

@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x69170: take the next 0x30-byte slot of the owner's slot pool (pool = owner +0x54;
+// stand-alone twin of D2Common 0x69170 (the proven row runs DRLGROOMTILE_InitFloorTileData):take the next 0x30-byte slot of the owner's slot pool (pool = owner +0x54;
 // slot = array +0x1C plus 0x30 * used count +0xC), link it in front of the list whose head cell is ECX
 // (the slot's +0x20 gets the old head; no cell: +0x20 = 0), count it, then let 0x68DF0 fill it.
 // EAX = owner, stack a, b, c, d (ret 0x10); returns the slot.

@@ -29,12 +29,12 @@ extern const int32_t DAT_6fde5f98[], DAT_6fde5fd8[], DAT_6fde6018[], DAT_6fde605
 extern const int32_t DAT_6fde6ce8[]; // 6 dwords per entry
 }
 
-// 1.13c D2Common+0x45550 (room warps, reached from 0x7C0E0 for a room with no neighbours). Not ported: the seam
+// stand-alone stub of D2Common 0x45550 (the proven row runs sub_6FD77BB0) (room warps,reached from 0x7C0E0 for a room with no neighbours). Not ported: the seam
 // D2Common_45550_RoomWarps (d2common_batch_3e310.cpp) takes three callees, and 0x445A0, the neighbour sort that 0x44DF0 needs,
 // has no port. Reaching it stops the process; a silent skip would leave the room without the warps retail builds.
 void sub_45550() { std::abort(); }
 
-// 1.13c D2Common+0x7C0E0  (in_EAX = unit)
+// stand-alone twin of D2Common 0x7C0E0 (the proven row runs DRLGACTIVATE_RoomEx_CreateRoom)  (in_EAX = unit)
 void sub_7C0E0(void* unit) {
     // Untouched only when this room would reach a callee that is not ported yet (kind 1 or 2, or no neighbours).
     const int kind = I(unit, 0x48);

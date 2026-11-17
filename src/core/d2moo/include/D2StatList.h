@@ -692,8 +692,6 @@ D2COMMON_DLL_DECL int __stdcall D2COMMON_11269_CopyStats(D2StatListExStrc* pStat
 int __fastcall D2Common_CopyStats_6FDB9C50(D2StatListStrc* pStatListEx, int nStatId, D2StatStrc* pBuffer, int nBufferSize);
 //D2Common.0x6FDB9D20 (#11270)
 D2COMMON_DLL_DECL int __stdcall STATLIST_CopyStats(D2UnitStrc* pUnit, int nStatId, D2StatStrc* pBuffer, int nBufferSize);
-//D2Common.0x6FDB9D60 (#11273)
-D2COMMON_DLL_DECL int __stdcall D2Common_11273(D2UnitStrc* pUnit, int nStatId);
 //D2Common.0x6FDB9D90 (#11274)
 D2COMMON_DLL_DECL BOOL __stdcall D2Common_11274(D2UnitStrc* pTarget, D2UnitStrc* pUnit);
 //D2Common.0x6FDB9E60 (#11275)

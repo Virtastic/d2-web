@@ -114,7 +114,7 @@ void D2Common_1F8F0_UnlinkInventory(D2UnitStrc* item, D2UnitStrc** endpoints)
     extra->pNextItem = extra->pPreviousItem = nullptr;
 }
 
-// 1.13c D2Common+0x45550
+// stand-alone twin of D2Common 0x45550 (the proven row runs sub_6FD77BB0)
 // Mandatory seams are the three retail callees, with their register operands explicit.
 void D2Common_45550_RoomWarps(void* pool, D2DrlgRoomStrc* room,
     void (*nearRooms)(void*, D2DrlgRoomStrc*),

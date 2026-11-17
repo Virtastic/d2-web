@@ -10,7 +10,7 @@ inline uint32_t rd(uint32_t a, uint32_t o) { uint32_t v; std::memcpy(&v, reinter
 inline void wr(uint32_t a, uint32_t o, uint32_t v) { std::memcpy(reinterpret_cast<void*>(uintptr_t(a) + o), &v, 4); }
 }
 
-// 1.13c D2Common+0x68CD0: take record (pool+0x24)[pool+0x10 * 0x30] from the pool at room+0x54, link it on *head (+0x20), fill the
+// stand-alone twin of D2Common 0x68CD0 (the proven row runs DRLGROOMTILE_InitShadowTileData):take record (pool+0x24)[pool+0x10 * 0x30] from the pool at room+0x54, link it on *head (+0x20), fill the
 // room-relative tile and screen words, kind 0xd, then build the flag word at +0x14 from the packed flags and the handle's flag import.
 extern "C" uint32_t D2Common_68CD0_AllocTileRec(const D2TileRecSeam* s, uint32_t room, int32_t x, uint32_t flags,
                                                 uint32_t head, int32_t y, uint32_t handle)

@@ -18,7 +18,7 @@ inline uint32_t rd(uint32_t a, uint32_t o) { uint32_t v; std::memcpy(&v, reinter
 inline void wr(uint32_t a, uint32_t o, uint32_t v) { std::memcpy(reinterpret_cast<void*>(uintptr_t(a) + o), &v, 4); }
 }
 
-// 1.13c D2Common+0x68F00
+// stand-alone 32-bit layout twin of D2Common 0x68F00 (the proven row runs DRLGROOMTILE_InitWallTileData)
 extern "C" uint32_t D2Common_68F00_AllocTileRec(const D2TileRec68F00Seam* s, uint32_t room, uint32_t head, int32_t x, int32_t y,
                                                 uint32_t flags, uint32_t v6, uint32_t v7)
 {

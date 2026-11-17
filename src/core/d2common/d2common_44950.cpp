@@ -9,7 +9,7 @@
 #include "Drlg/D2DrlgDrlg.h"
 #include "Drlg/D2DrlgDrlgRoom.h"
 
-// 1.13c D2Common+0x44950
+// stand-alone 32-bit layout twin of D2Common 0x44950 (the proven row runs DRLGROOM_AddOrthToRoom)
 extern "C" uint32_t D2Common_44950(uint8_t* pOwner, uint32_t room, int32_t direction, uint8_t* (*resolve)(uint32_t),
                                    uint32_t (*alloc)(uint32_t pool, uint32_t size, uint32_t line))
 {
@@ -30,7 +30,7 @@ extern "C" uint32_t D2Common_44950(uint8_t* pOwner, uint32_t room, int32_t direc
     return node;
 }
 
-// 1.13c D2Common+0x44950
+// stand-alone engine-struct twin of D2Common 0x44950 (the proven row runs DRLGROOM_AddOrthToRoom)
 extern "C" void D2Common_44950_Engine(D2DrlgRoomStrc* owner, D2DrlgRoomStrc* room, int32_t direction)
 {
     // ESI is the owning room, EAX the neighbour, stack+4 the direction.

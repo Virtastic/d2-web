@@ -89,7 +89,7 @@ struct B452Room {
     int32_t x, y, w, h;
 };
 
-// 1.13c D2Common+0x452C0: walk the linked list from `head` (eax) via +0x24. For nodes whose flags (+0x28) have
+// stand-alone twin of D2Common 0x452C0 (the proven row runs sub_6FD77F00):walk the linked list from `head` (eax) via +0x24. For nodes whose flags (+0x28) have
 // bit (level+4): if the register arg param_5 != -1, call 44A30 then 45240 and return 1. Otherwise measure the
 // gap between the node's and the room's [x,y] extents (+0x34/+0x38 pos, +0x3C/+0x40 size); when both gaps
 // are < 6, grow room's neighbour array (+0x2C count, +8 array; DrlgRoom.cpp:0x314) appending the node, call

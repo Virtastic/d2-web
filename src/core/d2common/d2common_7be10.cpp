@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x7BE10 -- state pick (ecx = the record, ebx carried): when the state byte at +0x44 is below 4 and its word at +0xC[state] is not zero the record is returned untouched; otherwise the first of the four words that is not zero (4 when all are zero) is handed to the worker 0x7BB70 in BL (eax = the record) and stored as the new state byte of the record it answers.
+// stand-alone 32-bit layout twin of D2Common 0x7BE10 (the proven row runs DRLGACTIVATE_RoomExIdentifyRealStatus) -- state pick (ecx = the record, ebx carried): when the state byte at +0x44 is below 4 and its word at +0xC[state] is not zero the record is returned untouched; otherwise the first of the four words that is not zero (4 when all are zero) is handed to the worker 0x7BB70 in BL (eax = the record) and stored as the new state byte of the record it answers.
 #include <cstdint>
 #include "../fn/d2game_gp.h"
 namespace d2common {

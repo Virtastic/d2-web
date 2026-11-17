@@ -76,7 +76,7 @@ int sub_3E2B0(uint32_t a, uint32_t b) {
     return dy < dx ? dy + dx * 2 : dx + dy * 2;
 }
 
-// 1.13c D2Common+0x7C370 (fastcall: ecx = unit)
+// stand-alone twin of D2Common 0x7C370 (the proven row runs DRLGACTIVATE_RoomExSetStatus_ClientInSight) (fastcall: ecx = unit)
 void sub_7C370(char* u) {
     if (rd(u, 0x30) == 0 && (static_cast<uint32_t>(rd(u, 0x28)) & 0x100000) == 0) {
         char* pl = static_cast<char*>(gp(gp(u, 0x58), 0x1b4));

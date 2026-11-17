@@ -95,7 +95,7 @@ static void InitRec(int32_t* r, void* pRoom, int32_t** pHead, int32_t x, int32_t
     wr<B>(r, 0x29, 0xff); wr<B>(r, 0x2a, 0xff); wr<B>(r, 0x28, 0xff);
 }
 
-// 1.13c D2Common+0x68F00: same for the array at (+0x14)/count (+8); calls 0x68A90(pRoom,v7); when
+// D2Common 0x68F00 (the proven row runs DRLGROOMTILE_InitWallTileData): same for the array at (+0x14)/count (+8); calls 0x68A90(pRoom,v7); when
 // v7==3 recurses with type 4 (v6 from 0x68B90(pRoom,4)) and OR-s ((flags>>18&3)*0x4000+0x4000) plus
 // the shared flag logic into the child. Returns the outer record.
 int32_t* D2Common_68F00(void* pRoom, int32_t** pHead, int32_t x, int32_t y, uint32_t flags,

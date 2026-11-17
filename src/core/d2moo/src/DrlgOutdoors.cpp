@@ -8,6 +8,7 @@
 #include "Drlg/D2DrlgDrlgVer.h"
 #include "Drlg/D2DrlgMaze.h"
 #include "Drlg/D2DrlgOutDesr.h"
+#include "Drlg/D2DrlgOutJung.h"
 #include "Drlg/D2DrlgOutPlace.h"
 #include "Drlg/D2DrlgOutRoom.h"
 #include "Drlg/D2DrlgOutSiege.h"
@@ -760,6 +761,10 @@ void __fastcall DRLGOUTDOORS_GenerateLevel(D2DrlgLevelStrc* pLevel)
 		break;
 
 	case ACT_III:
+		// 1.13c 0x43580: the grid-link flags, jungle and Kurast builds are called here, then the Travincal presets
+		DRLGOUTPLACE_SetOutGridLinkFlags(pLevel);
+		DRLGOUTJUNG_BuildJungle(pLevel);
+		DRLGOUTPLACE_BuildKurast(pLevel);
 		DRLGOUTPLACE_InitAct3OutdoorLevel(pLevel);
 		break;
 

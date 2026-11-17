@@ -1169,7 +1169,11 @@ void __stdcall D2COMMON_10475_PostStatToStatList(D2UnitStrc* pUnit, D2StatListSt
 			if (pStatListEx)
 			{
 				pOwner = pStatListEx->pOwner;
+			}
 
+			// 1.13c re-applies the item-op stats only for a permanent extended list.
+			if (pStatListEx && (pStatList->dwFlags & STATLIST_PERMANENT))
+			{
 				int nCounter = 0;
 				D2SLayerStatIdStrc nLayer_StatIds[16] = {};
 				// 1.13c only runs the item-op pass for permanent lists
@@ -1198,7 +1202,7 @@ void __stdcall D2COMMON_10475_PostStatToStatList(D2UnitStrc* pUnit, D2StatListSt
 			{
 				pStatList->dwFlags &= ~STATLIST_DYNAMIC;
 
-				for (D2StatStrc* i = pStatsArray->pStat; i < &pStatsArray->pStat[pStatsArray->nStatCount]; ++i)
+				for (D2StatStrc* i = pStatsArray->pStat; i < &pStatsArray->pStat[(int16_t)pStatsArray->nStatCount]; ++i) // 1.13c: signed-short count
 				{
 					sub_6FDB6C10(pUnitStatListEx, i->nPackedValue, i->nValue, pOwner);
 				}
@@ -1207,7 +1211,7 @@ void __stdcall D2COMMON_10475_PostStatToStatList(D2UnitStrc* pUnit, D2StatListSt
 			{
 				pStatList->dwFlags |= STATLIST_DYNAMIC;
 
-				for (D2StatStrc* i = pStatsArray->pStat; i < &pStatsArray->pStat[pStatsArray->nStatCount]; ++i)
+				for (D2StatStrc* i = pStatsArray->pStat; i < &pStatsArray->pStat[(int16_t)pStatsArray->nStatCount]; ++i) // 1.13c: signed-short count
 				{
 					D2ItemStatCostTxt* pItemStatCostTxtRecord = ITEMS_GetItemStatCostTxtRecord(i->nStat);
 					if (pItemStatCostTxtRecord && !(pItemStatCostTxtRecord->dwItemStatFlags & gdwBitMasks[ITEMSTATCOSTFLAGINDEX_DAMAGERELATED]))
@@ -2497,7 +2501,7 @@ BOOL __stdcall D2Common_11274_11275_Impl(D2UnitStrc* pTarget, D2UnitStrc* pUnit,
 	D2StatListExStrc* pUnitStatListEx = STATLIST_StatListExCast(pUnit->pStatListEx);
 	D2StatsArrayStrc* pStatsArray = pUnitStatListEx ? &pUnitStatListEx->FullStats : &pUnit->pStatListEx->Stats;
 
-	for (D2StatStrc* i = pStatsArray->pStat; i < &pStatsArray->pStat[pStatsArray->nStatCount]; ++i)
+	for (D2StatStrc* i = pStatsArray->pStat; i < &pStatsArray->pStat[(int16_t)pStatsArray->nStatCount]; ++i) // 1.13c: signed-short count
 	{
 		D2ItemStatCostTxt* pItemStatCostTxtRecord = ITEMS_GetItemStatCostTxtRecord(i->nStat);
 		if (pItemStatCostTxtRecord && (pItemStatCostTxtRecord->dwItemStatFlags & gdwBitMasks[ITEMSTATCOSTFLAGINDEX_DAMAGERELATED]))
@@ -2512,6 +2516,7 @@ BOOL __stdcall D2Common_11274_11275_Impl(D2UnitStrc* pTarget, D2UnitStrc* pUnit,
 
 //D2Common.0x6FDB9D90 (#11274)
 // 1.13c D2Common+0x3A100
+// 1.13c D2Common+0x3A100
 BOOL __stdcall D2Common_11274(D2UnitStrc* pTarget, D2UnitStrc* pUnit)
 {
 	return D2Common_11274_11275_Impl(pTarget, pUnit, true);
@@ -2519,6 +2524,7 @@ BOOL __stdcall D2Common_11274(D2UnitStrc* pTarget, D2UnitStrc* pUnit)
 
 //D2Common.0x6FDB9E60 (#11275)
 // 1.13c D2Common+0x3A030 (subtract direction, addOrSubstract=false)
+// 1.13c D2Common+0x3A030
 BOOL __stdcall D2Common_11275(D2UnitStrc* pTarget, D2UnitStrc* pUnit)
 {
 	return D2Common_11274_11275_Impl(pTarget, pUnit, false);

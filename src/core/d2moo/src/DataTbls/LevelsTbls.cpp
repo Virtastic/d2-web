@@ -558,6 +558,7 @@ void __fastcall DATATBLS_UnloadLevelTypesTxt()
 }
 
 //D2Common.0x6FD61460 (#10023)
+// 1.13c D2Common+0x6C690
 D2LvlTypesTxt* __stdcall DATATBLS_GetLevelTypesTxtRecord(int nLevelType)
 {
 	D2_ASSERT(sgptDataTables->pLvlTypesTxt);
@@ -699,6 +700,7 @@ void __fastcall DATATBLS_UnloadLvlPrestTxt()
 }
 
 //D2Common.0x6FD61B50 (#10024)
+// 1.13c D2Common+0x6C990
 D2LvlPrestTxt* __stdcall DATATBLS_GetLvlPrestTxtRecord(int nId)
 {
 	if (nId >= 0 && nId < sgptDataTables->nLvlPrestTxtRecordCount)
@@ -756,6 +758,7 @@ void __fastcall DATATBLS_UnloadLvlWarpTxt()
 
 //1.10f:D2Common.0x6FD61DE0
 //1.11: D2Common.0x6FD86840
+// 1.13c D2Common+0x6C5D0
 D2LvlWarpTxt* __fastcall DATATBLS_GetLvlWarpTxtRecordFromLevelIdAndDirection(int nLevelId, char szDirection)
 {
 	D2_ASSERT(sgptDataTables->pLvlWarpTxt);
@@ -801,10 +804,10 @@ void __fastcall DATATBLS_UnloadLvlMazeTxt()
 }
 
 //D2Common.0x6FD61FA0
+// 1.13c D2Common+0x6C520
 D2LvlMazeTxt* __fastcall DATATBLS_GetLvlMazeTxtRecordFromLevelId(int nLevelId)
 {
 	D2_ASSERT(sgptDataTables->pLvlMazeTxt);
-	D2_ASSERT(sgptDataTables->nLvlMazeTxtRecordCount > 0);
 
 	for (int i = 0; i < sgptDataTables->nLvlMazeTxtRecordCount; ++i)
 	{
@@ -986,6 +989,7 @@ void __fastcall DATATBLS_UnloadLvlSubTxt()
 }
 
 //D2Common.0x6FD626F0
+// 1.13c D2Common+0x6C4D0
 D2LvlSubTxt* __fastcall DATATBLS_GetLvlSubTxtRecord(int nSubType)
 {
 	D2_ASSERT(nSubType >= 0);
@@ -1005,6 +1009,7 @@ struct D2TileLibraryHashSeam
 	void (*loadSlot)(D2TileLibraryHashStrc** ppSlots, const char* szFile);
 };
 
+// not-1.13c: test seam for src/core/fn/d2common_6c3a0.cpp
 void DATATBLS_AllocGlobalTileLibraryHashSeam(const D2TileLibraryHashSeam* pSeam)
 {
 	static char szTest[] = "0";

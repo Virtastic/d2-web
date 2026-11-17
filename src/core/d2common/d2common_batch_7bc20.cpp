@@ -6,7 +6,7 @@ extern "C" {
 // 0x7BB70(room in EAX, status in BL): relink the room into the status list; not yet wired.
 void D2Common_7BB70_RelinkStatus(intptr_t pRoom, uint8_t nStatus);
 
-// 1.13c D2Common+0x7BC20: when the room's status byte (+0x44) is >= 4 or its ref count at
+// stand-alone 32-bit layout twin of D2Common 0x7BC20 (the proven row runs DRLGACTIVATE_RoomExIdentifyRealStatus): when the room's status byte (+0x44) is >= 4 or its ref count at
 // +0xC+status*2 is zero, pick the first status 0..3 with a non-zero count (4 if none), relink via
 // 0x7BB70, then store it at +0x44.
 EMSCRIPTEN_KEEPALIVE void D2Common_7BC20_NormaliseStatus(intptr_t pRoom) {

@@ -48,7 +48,7 @@ uint32_t D2Common_83E20(P p1, P p2, P p3)
     return 0;
 }
 
-// 1.13c D2Common+0x68340 : search the static table (stride 0x1c at 0x6fddbf2c-based rows) in
+// stand-alone 32-bit layout twin of D2Common 0x68340 (the proven row runs DRLGROOMTILE_FindTilePresetUnit): search the static table (stride 0x1c at 0x6fddbf2c-based rows) in
 // ranges [lo,hi] selected by key==param_1 (triplets at 0x6fddbd68, stride 12). tbl = range table, rows = row table.
 int D2Common_68340(P ranges, P rows, P rangesEnd, int key, uint32_t packed, uint32_t third)
 {

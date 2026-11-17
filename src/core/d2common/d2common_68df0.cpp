@@ -15,7 +15,7 @@ void W32(uint32_t a, uint32_t v) { memcpy((void*)(uintptr_t)a, &v, 4); }
 void W8(uint32_t a, uint8_t v) { memcpy((void*)(uintptr_t)a, &v, 1); }
 }
 
-// 1.13c D2Common+0x68DF0
+// stand-alone 32-bit layout twin of D2Common 0x68DF0 (the proven row runs DRLGROOMTILE_InitTileData)
 extern "C" void D2Common_68DF0_FillTileRec(const D2TileFillSeam* s, uint32_t rec, uint32_t pRoom, int32_t x, int32_t y,
                                            uint32_t f, uint32_t hTile)
 {

@@ -6,7 +6,7 @@
 static inline uint32_t rd32(uint32_t a) { return *reinterpret_cast<const uint32_t*>(uintptr_t(a)); }
 static inline void wr32(uint32_t a, uint32_t v) { *reinterpret_cast<uint32_t*>(uintptr_t(a)) = v; }
 
-// 1.13c D2Common+0x44480
+// stand-alone 32-bit layout twin of D2Common 0x44480 (the proven row runs DRLGROOM_AllocPresetUnit)
 extern "C" uint32_t D2Common_44480(uint32_t (*alloc)(uint32_t pool, uint32_t size, uint32_t line), uint32_t pool,
 	uint32_t room, uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4)
 {

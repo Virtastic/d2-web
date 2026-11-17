@@ -10,7 +10,7 @@
 extern "C" void D2Common_44B20(D2DrlgOrthStrc** head, D2DrlgOrthStrc* node, bool (*before)(const D2DrlgOrthStrc*, const D2DrlgOrthStrc*));
 extern "C" bool D2Common_44B20_Before(const D2DrlgOrthStrc* a, const D2DrlgOrthStrc* b);
 
-// 1.13c D2Common+0x44F20
+// stand-alone 32-bit layout twin of D2Common 0x44F20 (the proven row runs DRLGROOM_AddOrth)
 extern "C" uint32_t D2Common_44F20(uint32_t level, uint32_t head, int32_t direction, int32_t preset, uint8_t* (*resolve)(uint32_t),
                                    uint32_t (*alloc)(uint32_t pool, uint32_t size, uint32_t line), uint32_t (*insert)(uint32_t node, uint32_t head))
 {
@@ -28,7 +28,7 @@ extern "C" uint32_t D2Common_44F20(uint32_t level, uint32_t head, int32_t direct
     return insert(node, head);
 }
 
-// 1.13c D2Common+0x44F20
+// stand-alone twin of D2Common 0x44F20 (the proven row runs DRLGROOM_AddOrth)
 extern "C" void D2Common_44F20_Engine(D2DrlgOrthStrc** head, D2DrlgLevelStrc* level,
     int32_t direction, int32_t preset)
 {

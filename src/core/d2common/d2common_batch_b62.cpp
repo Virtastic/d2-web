@@ -95,7 +95,7 @@ int32_t sub_35780(void* pCtxEDI, void* pArg)
     return rd<int32_t>(pCtxEDI, 0x28);
 }
 
-// 1.13c D2Common+0x7C300: __thiscall ECX = key (compared with +0x1d0), ESI = owner (list head +0x47c, next +0x1ac), EAX = room, stack p1 p2.
+// stand-alone twin of D2Common 0x7C300 (the proven row runs DRLGACTIVATE_SetClientIsInSight):__thiscall ECX = key (compared with +0x1d0), ESI = owner (list head +0x47c, next +0x1ac), EAX = room, stack p1 p2.
 // Same lookup as 0x7BF20; a result whose u16 at +0xE is zero goes to 0x7C090 (EDI = result, BL = 1). Retail-layout tokens.
 struct D2Common7c300Env {
     uint32_t (*sub2D9B0)(uint32_t pOwner, uint32_t nKey);
@@ -122,7 +122,7 @@ struct D2Common7C270Env {
     void (*postInit)(void* pRoom, uint32_t nEcx);   // 0x7C0E0: EAX = room, ECX = room+0x58 -> +0x1B4 -> +0x478
 };
 
-// 1.13c D2Common+0x7C270: register map EAX = room. Each step is gated by its done flag in room+0x28, re-read after
+// stand-alone twin of D2Common 0x7C270 (the proven row runs DRLGACTIVATE_InitializeRoomEx):register map EAX = room. Each step is gated by its done flag in room+0x28, re-read after
 // the previous call; the spawn step also needs room+0x48 == 2. Returns room+0x30.
 uint32_t D2Common_7C270_With(void* pRoomEAX, const D2Common7C270Env* e)
 {
