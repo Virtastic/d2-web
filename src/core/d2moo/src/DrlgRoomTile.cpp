@@ -182,7 +182,7 @@ D2TileLibraryEntryStrc* __fastcall DRLGROOMTILE_GetTileCache(D2DrlgRoomStrc* pDr
 }
 
 // Helper function
-// not-1.13c: d2moo helper, inlined into each 1.13c tile-data initialiser
+// not-1.13c: inlined into the 1.13c tile-data initialisers D2Common+0x68F00, +0x68DF0 and +0x68CD0
 static void DRLGROOMTILE_InitTileDataDefaults(D2DrlgRoomStrc* pDrlgRoom, D2DrlgTileDataStrc* pTileData, int nX, int nY, uint32_t nPackedTileInformation, int nTileType, D2TileLibraryEntryStrc* pTileLibraryEntry)
 {
 	D2WEB_StampRoll(pTileData);
@@ -535,7 +535,7 @@ D2DrlgTileDataStrc* __fastcall DRLGROOMTILE_InitShadowTileData(D2DrlgRoomStrc* p
 }
 
 //D2Common.0x6FD88FD0
-// not-1.13c: inlined into its 1.13c callers
+// not-1.13c: D2MOO wrapper (GetTileCache + 0x68CD0); retail's 0x84220 calls 0x68B90 and 0x68CD0 directly
 void __fastcall DRLGROOMTILE_InitTileShadow(D2DrlgRoomStrc* pDrlgRoom, int nX, int nY, uint32_t nPackedTileInformation)
 {
 	DRLGROOMTILE_InitShadowTileData(pDrlgRoom, nullptr, nX, nY, nPackedTileInformation, DRLGROOMTILE_GetTileCache(pDrlgRoom, TILETYPE_SHADOW, nPackedTileInformation));
@@ -1273,7 +1273,7 @@ void __fastcall DRLGROOMTILE_CountWallWarpTiles(D2DrlgRoomStrc* pDrlgRoom, D2Drl
 }
 
 //D2Common.0x6FD89FA0
-// not-1.13c: inlined into the 1.13c room build
+// not-1.13c: inlined into D2Common+0x7C0E0 (type 1 / type 2 branches call the grid builders directly)
 void __fastcall DRLGROOMTILE_InitRoomGrids(D2DrlgRoomStrc* pDrlgRoom)
 {
 	SEED_InitLowSeed(&pDrlgRoom->pSeed, pDrlgRoom->dwInitSeed);
@@ -1289,7 +1289,7 @@ void __fastcall DRLGROOMTILE_InitRoomGrids(D2DrlgRoomStrc* pDrlgRoom)
 }
 
 //D2Common.0x6FD89FD0
-// not-1.13c: inlined into the 1.13c room build
+// not-1.13c: inlined into D2Common+0x7C0E0 (type 1 calls 0x4A9B0, type 2 calls 0xC940, then ORs the room flag)
 void __fastcall DRLGROOMTILE_AddRoomMapTiles(D2DrlgRoomStrc* pDrlgRoom)
 {
 	if (pDrlgRoom->nType == DRLGTYPE_MAZE)
@@ -1305,8 +1305,7 @@ void __fastcall DRLGROOMTILE_AddRoomMapTiles(D2DrlgRoomStrc* pDrlgRoom)
 }
 
 //D2Common.0x6FD8A010
-// not-1.13c: inlined into its 1.13c tile-grid callers
-void __fastcall DRLGROOMTILE_AllocTileGrid(D2DrlgRoomStrc* pDrlgRoom)
+// not-1.13c: inlined into the tile-grid builders D2Common+0x4A9B0 and +0xC940void __fastcall DRLGROOMTILE_AllocTileGrid(D2DrlgRoomStrc* pDrlgRoom)
 {
 	if (!pDrlgRoom->pTileGrid)
 	{

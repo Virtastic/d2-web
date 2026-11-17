@@ -4302,7 +4302,7 @@ int __stdcall ITEMS_GetWeaponAttackSpeed(D2UnitStrc* pUnit, D2UnitStrc* pWeapon)
 	return ITEMS_GetWeaponAttackSpeedImpl(pUnit, pWeapon, TRUE);
 }
 
-// not-1.13c: client tooltip helper; 1.13c has only the variant that adds faster-attack-rate
+// not-1.13c: d2-web check-only variant (sole caller monspawn_check.cpp); D2Common has the one attack-speed function 0x267F0 (the TRUE variant above, sole caller 0x50CE0)
 int __stdcall ITEMS_GetWeaponAttackSpeedForUnidentified(D2UnitStrc* pUnit, D2UnitStrc* pWeapon)
 {
 	return ITEMS_GetWeaponAttackSpeedImpl(pUnit, pWeapon, FALSE);

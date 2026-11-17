@@ -479,7 +479,7 @@ D2EventTimerSlabListStrc* __fastcall EVENT_AllocTimerSlab(D2GameStrc* pGame)
 }
 
 // Helper function
-// not-1.13c: retail inlines the timer-to-unit link at its callers (8E680)
+// not-1.13c: retail inlines the timer-to-unit link into its timer-add function D2Game+0x8E680, after the 0x8E540 allocation (its only caller here)
 static void EVENT_AssignTimerToUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, D2EventTimerStrc* pTimer)
 {
 	pTimer->pUnit = pUnit;

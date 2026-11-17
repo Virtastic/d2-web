@@ -207,11 +207,13 @@ void __stdcall UNITROOM_UpdatePath(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDBD2B0 (#10391)
-// not-1.13c: no retail function with this body (1.13c #10391 is a different function, D2Common+0x1F6E0)
+// 1.13c D2Common+0x663B0 (#10127). Delta: a null room is retail-fatal (0x2AD).
 void __stdcall UNITROOM_ClearUpdateQueue(D2ActiveRoomStrc* pRoom)
 {
 	D2UnitStrc** ppChangeUnit = NULL;
 	D2UnitStrc* pNextChangeUnit = NULL;
+
+	D2_ASSERT(pRoom);
 
 	ppChangeUnit = DUNGEON_GetUnitUpdateListFromRoom(pRoom, FALSE);
 	while (*ppChangeUnit)
