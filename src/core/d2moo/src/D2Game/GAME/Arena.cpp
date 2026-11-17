@@ -11,15 +11,6 @@
 #pragma warning(disable: 33010)
 
 
-int32_t dword_6FD43FB0;
-
-
-//D2Game.0x6FC31010
-int32_t __fastcall D2Game_10001_Return0()
-{
-    return dword_6FD43FB0;
-}
-
 //D2Game.0x6FC31040 -- 1.13c D2Game+0xB2560 (template argument not stored)
 void __fastcall ARENA_AllocArena(D2GameStrc* pGame, int32_t nUnused, uint32_t nFlags, int32_t nTemplate)
 {
@@ -30,6 +21,7 @@ void __fastcall ARENA_AllocArena(D2GameStrc* pGame, int32_t nUnused, uint32_t nF
 }
 
 //D2Game.0x6FC31090
+// not-1.13c: retail inlines this free (pMemoryPool free of pGame+0x1D28, Arena.cpp line 0x40, then the field cleared) in FreeGame D2Game+0x2CD30
 void __fastcall ARENA_FreeArena(D2GameStrc* pGame)
 {
     if (!pGame->pArenaCtrl)
@@ -70,6 +62,7 @@ void __fastcall ARENA_FreeArenaUnit(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 }
 
 //D2Game.0x6FC31160
+// not-1.13c: retail inlines the pArenaCtrl assert and the nAlternateStartTown read in its act allocator (d2game_batch_9d6f0.cpp, assert line 0x63); 0xB23D0 is a player-data accessor, not this
 int32_t __fastcall ARENA_GetAlternateStartTown(D2GameStrc* pGame)
 {
     D2ArenaStrc* pArena = pGame->pArenaCtrl;
@@ -234,6 +227,7 @@ void __fastcall ARENA_SendScoresToClient(D2GameStrc* pGame, D2ClientStrc* pClien
 }
 
 //D2Game.0x6FC31690
+// not-1.13c: retail inlines this test (assert, then fFlags & GAMEFLAG_ARENA_UPDATECLIENTS, assert line 0xCDF) in UpdateAllClients D2Game+0x2D9B0
 uint32_t __fastcall ARENA_NeedsClientUpdate(D2GameStrc* pGame)
 {
     D2ArenaStrc* pArena = pGame->pArenaCtrl;
@@ -253,6 +247,7 @@ uint32_t __fastcall ARENA_IsInArenaMode(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC31710
+// not-1.13c: retail inlines this flag test (assert 0x27, then fFlags & GAMEFLAG_ARENA_ACTIVE) at its callers 0xCC8E0 and 0xCC860
 uint32_t __fastcall ARENA_IsActive(D2GameStrc* pGame)
 {
     D2ArenaStrc* pArena = pGame->pArenaCtrl;
@@ -272,6 +267,7 @@ uint32_t __fastcall ARENA_GetFlags(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC31780
+// not-1.13c: retail's resurrect handler D2Game+0xD14B0 makes no call here (no constant-0 helper exists in 1.13c)
 int32_t __fastcall ARENA_Return0()
 {
     return 0;

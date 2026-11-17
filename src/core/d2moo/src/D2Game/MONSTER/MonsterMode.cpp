@@ -141,18 +141,9 @@ constexpr D2MonModeCallbackTableStrc gShadowMasterWarrior_Skill4_Callbacks =
 
 
 extern const char* g_d2webRegenSite;
-//D2Game.0x6FC62770
-int32_t __fastcall D2GAME_IsMonster_6FC62770(D2UnitStrc* pUnit)
-{
-    if (pUnit && pUnit->dwUnitType == UNIT_MONSTER)
-    {
-        return 1;
-    }
-
-    return 0;
-}
 
 //D2Game.0x6FC62780
+// 1.13c D2Game+0x777F0 (checked against decompile: attacker in ECX, defender in EAX; no delta)
 void __fastcall sub_6FC62780(D2UnitStrc* pAttacker, D2UnitStrc* pDefender, D2GameStrc* pGame)
 {
     if (pAttacker && pDefender && !(pDefender->dwFlags & 0x04000000))
@@ -360,6 +351,7 @@ void __fastcall sub_6FC627B0(D2UnitStrc* pUnit, int32_t nMode)
 }
 
 //D2Game.0x6FC62D90
+// 1.13c D2Game+0x77790 (checked against decompile: target = refreshed path target unless it is the unit itself; no delta)
 void __fastcall sub_6FC62D90(D2UnitStrc* pUnit, D2GameStrc* pGame)
 {
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
@@ -372,15 +364,29 @@ void __fastcall sub_6FC62D90(D2UnitStrc* pUnit, D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC62DF0
+// 1.13c D2Game+0x771D0 (the base-id lookup is inline: monsters only, class id kept when the record is missing)
 void __stdcall sub_6FC62DF0(D2UnitStrc* pUnit, D2DamageStrc* pDamage)
 {
-    if (pDamage->wResultFlags & 4 && D2GAME_GetMonsterBaseId_6FC64B10(pUnit) == MONSTER_SANDLEAPER1 && !STATES_CheckState(pUnit, STATE_FREEZE))
+    if (!(pDamage->wResultFlags & 4) || !pUnit || pUnit->dwUnitType != UNIT_MONSTER)
+    {
+        return;
+    }
+
+    int32_t nBaseId = pUnit->dwClassId;
+    D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nBaseId);
+    if (pMonStatsTxtRecord)
+    {
+        nBaseId = pMonStatsTxtRecord->nBaseId;
+    }
+
+    if (nBaseId == MONSTER_SANDLEAPER1 && !STATES_CheckState(pUnit, STATE_FREEZE))
     {
         pDamage->wResultFlags |= 8u;
     }
 }
 
 //D2Game.0x6FC62E70
+// 1.13c D2Game+0x770E0 (attacker in EAX, damage in ECX; the hit-class set is inline)
 void __fastcall D2GAME_MONSTER_ApplyCriticalDamage_6FC62E70(D2UnitStrc* pAttacker, D2UnitStrc* pDefender, D2DamageStrc* pDamage)
 {
     if (pAttacker && pAttacker->dwUnitType == UNIT_MONSTER)
@@ -429,6 +435,7 @@ uint8_t __fastcall sub_6FC62F50(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC62F90
+// not-1.13c: retail has no function for this; the three-field clear is inline in its only caller (D2Game+0xF2540)
 void __fastcall D2GAME_MONSTERMODE_ResetVelocityParams_6FC62F90(D2UnitStrc* pUnit)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)
@@ -441,6 +448,7 @@ void __fastcall D2GAME_MONSTERMODE_ResetVelocityParams_6FC62F90(D2UnitStrc* pUni
 }
 
 //D2Game.0x6FC62FC0
+// not-1.13c: retail has no function for this; the field stores are inline in the AI tactics callers (e.g. D2Game+0xF1A20, D2Game+0xF2D80)
 void __fastcall D2GAME_MONSTERMODE_SetVelocityParams_6FC62FC0(D2AiParamStrc* pAiParam, int32_t a2, int32_t nVel, uint8_t a4)
 {
     if (a2)
@@ -460,18 +468,21 @@ void __fastcall D2GAME_MONSTERMODE_SetVelocityParams_6FC62FC0(D2AiParamStrc* pAi
 }
 
 //D2Game.0x6FC62FF0
+// not-1.13c: retail has no function for this; the pool calloc (MonsterMode.cpp line 0x13F) is inline in the monster init at D2Game+0xB0320
 D2AiParamStrc* __fastcall D2GAME_MONSTERMODE_AllocParams_6FC62FF0(D2GameStrc* pGame)
 {
     return D2_CALLOC_STRC_POOL(pGame->pMemoryPool, D2AiParamStrc);
 }
 
 //D2Game.0x6FC63020
+// not-1.13c: retail has no function for this; the pool free (MonsterMode.cpp line 0x147) is inline in the monster free at D2Game+0xAFB90
 void __fastcall D2GAME_MONSTERMODE_FreeParams_6FC63020(D2GameStrc* pGame, D2AiParamStrc* pAiParam)
 {
     D2_FREE_POOL(pGame->pMemoryPool, pAiParam);
 }
 
 //D2Game.0x6FC63040
+// 1.13c D2Game+0x75900 (checked against decompile: spawn-no-item flag, bone wall abort, collision mask 0x801, then the drop at +0x75680; no delta)
 void __fastcall D2GAME_MONSTERMODE_Unk_6FC63040(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange, int32_t a3)
 {
     D2UnitStrc* pUnit = pModeChange->pUnit;
@@ -807,6 +818,7 @@ void __fastcall sub_6FC63680(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC63940
+// 1.13c D2Game+0x76B20 (attack end callback, table entry D:0xFA5C0; checked against disassembly, no delta)
 void __fastcall sub_6FC63940(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     UNITS_SetUsedSkill(pUnit, nullptr);
@@ -840,6 +852,7 @@ void __fastcall sub_6FC63940(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC63A30
+// 1.13c D2Game+0x76A50 (skill end callback, table entry D:0xFA5D0; byte-identical body to +0x76B20, no delta)
 void __fastcall sub_6FC63A30(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     UNITS_SetUsedSkill(pUnit, nullptr);
@@ -881,6 +894,7 @@ int32_t __fastcall D2GAME_RemoveModeChangeEventCallback_6FC63B20(D2GameStrc* pGa
 }
 
 //D2Game.0x6FC63B30
+// 1.13c D2Game+0x76270 (death start callback, table entry D:0xFA498; the kill-count bump is inline; checked against decompile, no delta)
 int32_t __fastcall sub_6FC63B30(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange)
 {
     SUNIT_SetCombatMode(pGame, pModeChange->pUnit, MONMODE_DEATH);
@@ -939,6 +953,7 @@ int32_t __fastcall sub_6FC63B30(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
 }
 
 //D2Game.0x6FC63E80
+// 1.13c D2Game+0x75350 (unit in EAX; the minion-list update is inline; checked against decompile, no delta)
 void __fastcall sub_6FC63E80(D2GameStrc* pGame, D2UnitStrc* pUnit, DWORD dwDir)
 {
     if (!pUnit)
@@ -980,6 +995,7 @@ void __fastcall sub_6FC63E80(D2GameStrc* pGame, D2UnitStrc* pUnit, DWORD dwDir)
 }
 
 //D2Game.0x6FC63FD0
+// 1.13c D2Game+0x755C0 (attacker in EBX; checked against decompile, no delta)
 void __fastcall sub_6FC63FD0(D2GameStrc* pGame, D2UnitStrc* pAttacker)
 {
     for (D2UnitStrc* i = UNITS_GetRoom(pAttacker)->pUnitFirst; i; i = i->pRoomNext)
@@ -1002,6 +1018,7 @@ void __fastcall sub_6FC63FD0(D2GameStrc* pGame, D2UnitStrc* pAttacker)
 }
 
 //D2Game.0x6FC64090
+// 1.13c D2Game+0x760F0 (unit in EAX; owner lookup and the AI-think event sweep are inline; checked against decompile, no delta)
 void __fastcall sub_6FC64090(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2UnitStrc* pMonster = SUNIT_GetOwner(pGame, pUnit);
@@ -1027,6 +1044,7 @@ void __fastcall sub_6FC64090(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC641D0
+// 1.13c D2Game+0x76040 (death end callback, table entry D:0xFA4A0; checked against decompile, no delta)
 void __fastcall sub_6FC641D0(D2GameStrc* pGame, D2UnitStrc* pAttacker)
 {
     if (pAttacker)
@@ -1079,6 +1097,7 @@ int32_t __fastcall sub_6FC64280(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC642C0
+// 1.13c D2Game+0x75460 (the periodic-skill and periodic-stat event sweeps are inline; checked against decompile, no delta)
 int32_t __fastcall sub_6FC642C0(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange)
 {
     if (pModeChange->pUnit)
@@ -1316,6 +1335,8 @@ int32_t __fastcall sub_6FC645E0(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
 }
 
 //D2Game.0x6FC64790
+// 1.13c D2Game+0x75CE0 (attack update callback; the moving-mode test is +0x74F20, the missile shot +0x75C60 and
+// the quill rat volley +0x75A40, all inline here: volley seed high word = unit GUID, combat target fetched once)
 int32_t __fastcall sub_6FC64790(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2SkillStrc* pSkill = UNITS_GetUsedSkill(pUnit);
@@ -1378,9 +1399,15 @@ int32_t __fastcall sub_6FC64790(D2GameStrc* pGame, D2UnitStrc* pUnit)
                 nSkillLevel = STATLIST_UnitGetStatValue(pUnit, STAT_LEVEL, 0);
             }
 
-            if (sub_6FD11420(pGame, nMissileId, pUnit, 0, nSkillLevel, 0, 0, 0, 0, 1))
+            if (sub_6FD11420(pGame, nMissileId, pUnit, 0, nSkillLevel, 0, 0, 0, 0, 1) && pUnit && pUnit->dwUnitType == UNIT_MONSTER)
             {
-                const int32_t nBaseId = D2GAME_GetMonsterBaseId_6FC64B10(pUnit);
+                int32_t nBaseId = pUnit->dwClassId;
+                D2MonStatsTxt* pBaseMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nBaseId);
+                if (pBaseMonStatsTxtRecord)
+                {
+                    nBaseId = pBaseMonStatsTxtRecord->nBaseId;
+                }
+
                 if (nBaseId == MONSTER_QUILLRAT1)
                 {
                     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
@@ -1405,6 +1432,7 @@ int32_t __fastcall sub_6FC64790(D2GameStrc* pGame, D2UnitStrc* pUnit)
                     D2SeedStrc seed = {};
                     SEED_InitSeed(&seed);
                     SEED_InitLowSeed(&seed, 'SEIS');
+                    seed.nHighSeed = pUnit->dwUnitId;
 
                     const int32_t nParam = MONSTERMODE_GetMonStatsTxtRecord(pUnit->dwClassId)->wAiParam[2][pGame->nDifficulty];
                     for (int32_t i = 0; i < nParam; ++i)
@@ -1432,10 +1460,7 @@ int32_t __fastcall sub_6FC64790(D2GameStrc* pGame, D2UnitStrc* pUnit)
         {
             sub_6FC62D90(pUnit, pGame);
 
-            // Retail 1.13c calls its target-validation helper here before resolving the
-            // queued combat. This call is present at 0x6FC95DD2 in the attack callback.
-            sub_6FCBC7E0(pGame, pUnit);
-
+            // the target refresh (+0xE07A0) runs once more here, inside the target fetch
             D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
             if (pTarget)
             {
@@ -1487,6 +1512,7 @@ int32_t __fastcall sub_6FC64790(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC64B10
+// not-1.13c: retail has no function for this; the base-id lookup is inline at every caller (D2Game+0x771D0, +0x75A40, +0xAF920)
 int32_t __fastcall D2GAME_GetMonsterBaseId_6FC64B10(D2UnitStrc* pUnit)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER)
@@ -1557,6 +1583,7 @@ int32_t __fastcall sub_6FC64B60(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
 }
 
 //D2Game.0x6FC64CD0
+// 1.13c D2Game+0x765E0 (checked against disassembly: get-hit mode 3, hit class 0xA0, stun delay 45 else 15; no delta)
 void __fastcall sub_6FC64CD0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     PATH_ResetToPreviousType(pUnit->pDynamicPath);
@@ -1663,6 +1690,7 @@ int32_t __fastcall sub_6FC64E90(D2GameStrc* pGame, D2UnitStrc* pUnit)
 
 //1.10: D2Game.0x6FC64F50
 //1.14d: 0x005A78A0
+// 1.13c D2Game+0x749A0 (unit in ECX, mode in EAX; an out-of-range mode returns null without a trace)
 const D2MonModeCallbackTableStrc* __fastcall MONSTERMODE_GetCallbackTableRecord(D2UnitStrc* pUnit, int32_t nMode)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
@@ -1671,14 +1699,8 @@ const D2MonModeCallbackTableStrc* __fastcall MONSTERMODE_GetCallbackTableRecord(
     }
 
     D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(pUnit->dwClassId);
-    if (!pMonStatsTxtRecord)
+    if (!pMonStatsTxtRecord || nMode < 0 || nMode >= 16)
     {
-        return 0;
-    }
-
-    if (nMode < 0 || nMode >= 16)
-    {
-        FOG_Trace("Invalid monster mode.  Class:%d  Mode:%d", pUnit->dwClassId, nMode);
         return 0;
     }
 
@@ -2140,12 +2162,14 @@ void __stdcall MONSTERMODE_GetModeChangeInfo(D2UnitStrc* pUnit, int32_t nMode, D
 }
 
 //D2Game.0x6FC65890
+// 1.13c D2Game+0x74870 (checked against decompile, no delta)
 void __fastcall D2GAME_MONSTERS_AiFunction13_6FC65890(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4)
 {
     STATLIST_UpdateStatListsExpiration(pUnit, pGame->dwGameFrame);
 }
 
 //D2Game.0x6FC658B0
+// 1.13c D2Game+0x76570 (checked against decompile, no delta)
 void __fastcall D2GAME_MONSTERS_AiFunction07_6FC658B0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4)
 {
     if (!pUnit || !pUnit->pHoverText)
@@ -2168,12 +2192,18 @@ void __fastcall D2GAME_MONSTERS_AiFunction07_6FC658B0(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FC65920
+// 1.13c D2Game+0x74E40 (the monster-data field clear is inline)
 void __fastcall D2GAME_MONSTERS_AiFunction11_6FC65920(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4)
 {
-    sub_6FC61F00(pUnit);
+    if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)
+    {
+        pUnit->pMonsterData->unk0x38 = 0;
+        pUnit->pMonsterData->unk0x34 = 0;
+    }
 }
 
 //D2Game.0x6FC65930
+// 1.13c D2Game+0x769A0 (event in ESI; handler table D:0xFBC14; checked against decompile, no delta)
 void __fastcall MONSTERMODE_EventHandler(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventTypes nEvent, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (nEvent < 0 || nEvent >= EVENTTYPE_COUNT)
@@ -2205,6 +2235,7 @@ void __fastcall MONSTERMODE_EventHandler(D2GameStrc* pGame, D2UnitStrc* pUnit, D
 }
 
 //D2Game.0x6FC659B0
+// 1.13c D2Game+0x758D0 (unit in EAX, target in ECX; retail leaves the rest of the mode-change block uninitialised, zeroed here)
 void __fastcall sub_6FC659B0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t a4)
 {
     D2ModeChangeStrc modeChange = {};

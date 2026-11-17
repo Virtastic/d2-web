@@ -1201,6 +1201,7 @@ void __fastcall ACT4Q2_SpawnSealBoss(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCAFD80
+// 1.13c D2Game+0xB88C0
 int32_t __fastcall ACT4Q2_HasDiabloBeenKilled(D2GameStrc* pGame)
 {
 	if (pGame->bExpansion)
@@ -1218,6 +1219,7 @@ int32_t __fastcall ACT4Q2_HasDiabloBeenKilled(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FCAFDB0
+// 1.13c D2Game+0xB8870
 void __fastcall OBJECTS_InitFunction78_LastLastPortal(D2ObjInitFnStrc* pOp)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A4Q2_DIABLO);

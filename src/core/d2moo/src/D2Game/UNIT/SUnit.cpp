@@ -32,6 +32,7 @@
 #include "ITEMS/ItemMode.h"
 #include "ITEMS/Items.h"
 
+// not-1.13c: d2-web helper for a pointer slot of a packed struct (retail reads the slot with a plain mov); no game rule
 template <class T>
 static T* SUNIT_LoadPackedPointer(T* const* pSlot)
 {
@@ -42,6 +43,7 @@ static T* SUNIT_LoadPackedPointer(T* const* pSlot)
     return value;
 }
 
+// not-1.13c: d2-web helper for a pointer slot of a packed struct (retail writes the slot with a plain mov); no game rule
 template <class T>
 static void SUNIT_StorePackedPointer(T** pSlot, T* value)
 {
@@ -234,6 +236,7 @@ void __fastcall SUNIT_RemoveUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCBB160
+// not-1.13c: retail has no function for this; the list walks read unit+0xE4 in place (e.g. D2Game+0xE0310, +0xE03A0)
 D2UnitStrc* __fastcall SUNIT_GetNextUnitFromList(D2UnitStrc* pUnit)
 {
     D2_ASSERT(pUnit);
@@ -458,6 +461,8 @@ void __fastcall SUNIT_InitSeed(D2UnitStrc* pUnit, D2SeedStrc* pSeed)
 }
 
 //D2Game.0x6FCBB6C0
+// 1.13c D2Game+0xE1D90 (type in ECX, class in EDX; the GUID counter is D2Game+0xDF9C0, inlined here with the same
+// wrap and type<6 fatal; the item case passes no room to +0x10160; the missile case only sets the mode)
 D2UnitStrc* __fastcall SUNIT_AllocUnitData(int32_t nUnitType, int32_t nClassId, int32_t nX, int32_t nY, D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, char a7, int32_t nMode, DWORD a3)
 {
     if (nUnitType == UNIT_PLAYER)
@@ -589,24 +594,6 @@ D2UnitStrc* __fastcall SUNIT_AllocUnitData(int32_t nUnitType, int32_t nClassId, 
     case UNIT_MISSILE:
     {
         pUnit->dwAnimMode = nMode;
-        // The missile's sequence record -- Missiles.txt's `wAnimRate` and `nAnimLen` for the mode it
-        // is in -- derived here, the same two fields `UNITS_SetAnimStartFrame` (#10349) writes for a
-        // missile on a mode change.  Without it a missile carries `dwFrameCountPrecise` 0 and
-        // `wAnimSpeed` 0, so the per-frame unit animation pass skips it (`dwFrameCountPrecise <= 0`)
-        // and its cel never advances: the client drew the first frame for the whole flight, or worse,
-        // a frame off its own shell tick.  Same defect, same function, one unit type over from the
-        // UNIT_OBJECT branch above, which the animation band fixed for objects (s351).
-        //
-        // Not `UNITS_SetAnimStartFrame` itself, deliberately: that function also rewrites
-        // `nSeqCurrentFramePrecise` from `UNITS_GetFrameBonus`, and a missile's clock is set from the
-        // spawn parameters under `missileParams->dwFlags & 0x200` (`MISSILES_Initialize`, called just
-        // below) -- taking the frame bonus here would overwrite that.  The two fields written are the
-        // ones #10349's own UNIT_MISSILE case writes, at the same rate.
-        if (const D2MissilesTxt* pMissilesTxtRecord = DATATBLS_GetMissilesTxtRecord(nClassId))
-        {
-            pUnit->wAnimSpeed = ((int16_t)pMissilesTxtRecord->wAnimRate << 8) / 1024;
-            pUnit->dwFrameCountPrecise = pMissilesTxtRecord->nAnimLen << 8;
-        }
         MISSILES_Initialize(pGame, pUnit, nUnitGUID);
         break;
     }
@@ -697,6 +684,7 @@ D2UnitStrc* __fastcall SUNIT_GetOwner(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCBBC00
+// 1.13c D2Game+0xE09D0 (unit in EAX, game on the stack; checked against disassembly, no delta)
 D2UnitStrc* __fastcall SUNIT_GetLastAttacker(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2_ASSERT(pUnit);
@@ -844,6 +832,7 @@ void __fastcall SUNIT_Add(D2UnitStrc* pUnit, int32_t nX, int32_t nY, D2GameStrc*
 }
 
 //D2Game.0x6FCBBFE0
+// 1.13c D2Game+0xE0D00 (checked against decompile, no delta; the room-has-clients test is D2Game+0xDF9A0, inline here)
 void __fastcall SUNIT_Restore(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY)
 {
     D2_ASSERT(pGame);
@@ -1334,6 +1323,7 @@ void __fastcall SUNIT_SetCombatMode(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_
 }
 
 //D2Game.0x6FCBC9C0
+// 1.13c D2Game+0xDFDC0 (first in EDI, second in ESI; the unit X/Y reads are inline; checked against disassembly, no delta)
 void __fastcall sub_6FCBC9C0(D2UnitStrc* pFirst, D2UnitStrc* pSecond)
 {
     D2_ASSERT(pFirst);
@@ -1365,6 +1355,7 @@ void __fastcall sub_6FCBC9C0(D2UnitStrc* pFirst, D2UnitStrc* pSecond)
 }
 
 //D2Game.0x6FCBCB30
+// 1.13c D2Game+0xE1570 (stdcall game, portal; checked against disassembly, no delta)
 D2UnitStrc* __fastcall SUNIT_GetPortalOwner(D2GameStrc* pGame, D2UnitStrc* pPortal)
 {
     D2_ASSERT(pPortal);
@@ -1558,6 +1549,7 @@ void __fastcall sub_6FCBCE70(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCBCFD0
+// 1.13c D2Game+0xE2600 (unit in ESI; the two event deletes are inline walks of unit+0xDC; checked against decompile, no delta)
 void __fastcall sub_6FCBCFD0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3)
 {
     D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_MODECHANGE, 0);
@@ -1700,6 +1692,7 @@ void __fastcall sub_6FCBD120(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3)
 }
 
 //D2Game.0x6FCBD260
+// 1.13c D2Game+0xE2310 (unit in EBX; the two event deletes are inline walks of unit+0xDC; checked against decompile, no delta)
 void __fastcall D2GAME_SKILLS_RewindSkillEx_6FCBD260(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3)
 {
     D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_MODECHANGE, 0);
@@ -1801,9 +1794,10 @@ void __fastcall SUNIT_FillUnitInfo(D2UnitStrc* pUnit, D2UnitInfoStrc* pInfo)
 }
 
 //D2Game.0x6FCBD4D0
+// not-1.13c: retail inlines this at each use (byte test of unit+0x6C, then +0xE03A0 with type +0x68 / GUID +0x64; e.g. D2Game+0x6A7AD, +0x9B6A8)
 D2UnitStrc* __fastcall SUNIT_GetInteractUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
-    if (!pUnit->nInteract)
+    if (!*reinterpret_cast<uint8_t*>(&pUnit->nInteract))
     {
         return nullptr;
     }
@@ -1877,6 +1871,7 @@ D2GameStrc* __fastcall SUNIT_GetGameFromUnit(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCBD760
+// 1.13c D2Game+0xDF750 (unit in EAX; player data +0x40)
 void __fastcall D2GAME_SetNecropetFlag_6FCBD760(D2UnitStrc* pUnit, int32_t nFlag)
 {
     //TODO: pUnit == PLAYER or MONSTER?
@@ -1886,6 +1881,7 @@ void __fastcall D2GAME_SetNecropetFlag_6FCBD760(D2UnitStrc* pUnit, int32_t nFlag
 }
 
 //D2Game.0x6FCBD790
+// 1.13c D2Game+0xDF720 (unit in EAX; player data +0x40)
 uint32_t __fastcall D2GAME_GetNecropetFlag_6FCBD790(D2UnitStrc* pUnit)
 {
     //TODO: pUnit == PLAYER or MONSTER?
@@ -1895,27 +1891,30 @@ uint32_t __fastcall D2GAME_GetNecropetFlag_6FCBD790(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCBD7C0
+// 1.13c D2Game+0xDF6F0 (unit in EAX; writes one byte at +0x78)
 void __fastcall D2GAME_SetSparkChest_6FCBD7C0(D2UnitStrc* pUnit, uint8_t nSparkChest)
 {
     D2_ASSERT(pUnit);
 
-    pUnit->bSparkChest = nSparkChest;
+    *reinterpret_cast<uint8_t*>(&pUnit->bSparkChest) = nSparkChest;
 }
 
 //D2Game.0x6FCBD7F0
+// 1.13c D2Game+0xDF6C0 (unit in EAX; reads one byte at +0x78)
 uint8_t __fastcall D2GAME_CheckIfSparklyChest_6FCBD7F0(D2UnitStrc* pUnit)
 {
     D2_ASSERT(pUnit);
 
-    return pUnit->bSparkChest;
+    return *reinterpret_cast<uint8_t*>(&pUnit->bSparkChest);
 }
 
 //D2Game.0x6FCBD820
+// 1.13c D2Game+0xDF6A0 (unit in EAX, GUID out in EDX, type out on the stack; returns the byte at +0x6C)
 int32_t __stdcall SUNIT_GetInteractInfo(D2UnitStrc* pUnit, int32_t* pInteractUnitType, int32_t* pInteractUnitGUID)
 {
     *pInteractUnitGUID = pUnit->dwInteractGUID;
     *pInteractUnitType = pUnit->dwInteractType;
-    return pUnit->nInteract;
+    return *reinterpret_cast<uint8_t*>(&pUnit->nInteract);
 }
 
 //D2Game.0x6FCBD840
@@ -1943,6 +1942,7 @@ void __stdcall SUNIT_SetInteractInfo(D2UnitStrc* pUnit, int32_t nInteractUnitTyp
 }
 
 //D2Game.0x6FCBD890
+// 1.13c D2Game+0xDF680 (unit in EAX)
 void __stdcall SUNIT_ResetInteractInfo(D2UnitStrc* pUnit)
 {
     pUnit->dwInteractGUID = -1;
@@ -1980,6 +1980,8 @@ int32_t __fastcall SUNIT_IsDead(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCBD900
+// 1.13c D2Game+0xE0A60 (unit in ECX, target in EAX, game on the stack; minion-owner lookups inlined)
+// 1.13c walks the target's owner chain while it is a monster (1.10f tested for a player there)
 int32_t __fastcall sub_6FCBD900(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget)
 {
     D2UnitStrc* pTestUnit = pUnit;
@@ -2002,7 +2004,7 @@ int32_t __fastcall sub_6FCBD900(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
     }
 
     D2UnitStrc* i = pTarget;
-    while (i && i->dwUnitType == UNIT_PLAYER)
+    while (i && i->dwUnitType == UNIT_MONSTER)
     {
         D2UnitStrc* pOwner = AIGENERAL_GetMinionOwner(i);
         if (!pOwner || pOwner == i)
@@ -2051,6 +2053,7 @@ D2UnitStrc** __fastcall SUNIT_GetUnitList(int32_t nUnitType, D2GameStrc* pGame, 
 }
 
 //D2Game.0x6FCBDA40
+// 1.13c D2Game+0xE0210 (pet in EAX, owner in ESI, skill in ECX; checked against decompile, no delta)
 int32_t __fastcall SUNIT_CanPetBeTargetedBySkill(D2GameStrc* pGame, D2UnitStrc* pOwner, D2UnitStrc* pPet, int32_t nSkillId)
 {
     if (!pOwner || !pPet || (pOwner->dwUnitType != UNIT_PLAYER && pPet->dwUnitType != UNIT_MONSTER))
@@ -2076,6 +2079,8 @@ int32_t __fastcall SUNIT_CanPetBeTargetedBySkill(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FCBDAD0
+// 1.13c D2Game+0xE0660 (pet in EAX; owner, skill and game on the stack; party lookups via +0xDFA60)
+// 1.13c returns 0 when the looked-up unit is missing (1.10f dereferenced it)
 int32_t __fastcall SUNIT_CanAllyBeTargetedBySkill(D2GameStrc* pGame, D2UnitStrc* pOwner, D2UnitStrc* pPet, int32_t nSkillId)
 {
     if (!pOwner || !pPet || pOwner->dwUnitType != UNIT_PLAYER)
@@ -2117,7 +2122,7 @@ int32_t __fastcall SUNIT_CanAllyBeTargetedBySkill(D2GameStrc* pGame, D2UnitStrc*
     }
 
     D2UnitStrc* pOtherPlayer = SUNIT_GetServerUnit(pGame, nUnitType, nUnitGUID);
-    if (!pOtherPlayer->pGame || pOtherPlayer->dwUnitType != UNIT_PLAYER)
+    if (!pOtherPlayer || !pOtherPlayer->pGame || pOtherPlayer->dwUnitType != UNIT_PLAYER)
     {
         return 0;
     }
@@ -2126,6 +2131,7 @@ int32_t __fastcall SUNIT_CanAllyBeTargetedBySkill(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FCBDC60
+// 1.13c D2Game+0xE0570 (unit 1 in ECX, unit 2 in EAX; minion-owner lookups inlined; checked against decompile, no delta)
 int32_t __fastcall SUNIT_AreUnitsAligned(D2GameStrc* pGame, D2UnitStrc* pUnit1, D2UnitStrc* pUnit2)
 {
     D2_MAYBE_UNUSED(pGame);
@@ -2292,6 +2298,7 @@ void __fastcall sub_6FCBDE90(D2UnitStrc* pUnit, int32_t bSetUninterruptable)
 }
 
 //D2Game.0x6FCBDF90
+// 1.13c D2Game+0xE0410 (event callback; checked against decompile, no delta)
 int32_t __fastcall sub_6FCBDF90(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2C_EventTypes nEventType, int32_t a4, int32_t a5)
 {
 	D2_MAYBE_UNUSED(nEventType);
@@ -2313,6 +2320,7 @@ int32_t __fastcall sub_6FCBDF90(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2C_Even
 }
 
 //D2Game.0x6FCBDFE0
+// 1.13c D2Game+0xE19C0 (nY in EAX, nX in ECX, room in EDX; game, unit, a6, a7 on the stack; checked against disassembly, no delta)
 int32_t __fastcall sub_6FCBDFE0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ActiveRoomStrc* pInputRoom, int32_t nX, int32_t nY, int32_t a6, int32_t a7)
 {
     D2_ASSERT(pUnit);
@@ -2379,7 +2387,7 @@ int32_t __fastcall sub_6FCBDFE0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ActiveRo
             pPlayerData->unk0xA0 = 0;
         }
 
-        j_D2GAME_InitTimer_6FC351D0(pGame, pUnit, EVENTTYPE_REMOVESKILLCOOLDOWN, pGame->dwGameFrame + 50, sub_6FCBDF90, 0, 0);
+        D2GAME_InitTimer_6FC351D0(pGame, pUnit, EVENTTYPE_REMOVESKILLCOOLDOWN, pGame->dwGameFrame + 50, sub_6FCBDF90, 0, 0);
         sub_6FC7E310(pGame, pUnit, coords.nX, coords.nY);
     }
     else

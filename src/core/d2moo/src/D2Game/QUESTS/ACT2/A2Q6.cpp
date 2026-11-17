@@ -113,6 +113,7 @@ D2NPCMessageTableStrc gpAct2Q6NpcMessages[] =
 };
 
 
+// not-1.13c: retail's Tyrael AI (D2Game+0x19880) calls the unit iterator 0xDFCC0 with callback 0xC4CC0 directly; there is no wrapper
 void __fastcall ACT2Q6_AttachCompletionSoundToPlayers(D2GameStrc* pGame)
 {
 	SUNIT_IterateUnitsOfType(pGame, 0, nullptr, ACT2Q6_UnitIterate_AttachCompletionSound);
@@ -970,6 +971,7 @@ void __fastcall ACT2Q6_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 }
 
 //D2Game.0x6FCA59F0
+// 1.13c D2Game+0xC4B10 (EBX = game, ECX = unit; packet 0x50, quest 0xD, tomb level - 0x42, 0xF bytes; the quest lookup is an inline list walk)
 void __fastcall ACT2Q6_SendTombIdToClient(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A2Q6_DURIEL);
@@ -1363,6 +1365,7 @@ void __fastcall ACT2Q6_DeleteAllHoradricItemsAndOpenTomb(D2GameStrc* pGame, D2Un
 }
 
 //D2Game.0x6FCA6310
+// 1.13c D2Game+0xC4AA0 (EAX = game; walks the quest list inline for type 0xD; callback 0xC1A40)
 int32_t __fastcall ACT2Q6_IsInRangeOfTyrael(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A2Q6_DURIEL);
@@ -1389,6 +1392,7 @@ int32_t __fastcall ACT2Q6_IsInRangeOfTyrael(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FCA6370
+// 1.13c D2Game+0xC1A40 (distance below 12 sets bCloseToTyrael at +0x44)
 void __fastcall ACT2Q6_UnitIterate_CheckDistanceToTyrael(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2Act2Quest6Strc* pQuestDataEx = (D2Act2Quest6Strc*)pData;

@@ -3490,6 +3490,8 @@ static bool AI_RollPctBelowParam(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickP
 	return (int32_t)AI_RollPercentage(pUnit) < AI_GetParamValue(pGame, pAiTickParam, nParamId);
 }
 
+// not-1.13c: D2MOO-only helper; retail inlines this compare in each caller (no function at this body)
+// not-1.13c: D2MOO-only helper; retail inlines this compare in each caller
 // Same compare where retail draws through its RollLimited(seed, 100) helper (D2Game+0x1180).
 static bool AI_RollLimitedBelowParam(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam, int32_t nParamId)
 {

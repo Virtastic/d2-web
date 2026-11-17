@@ -1021,6 +1021,7 @@ void __fastcall sub_6FC90BE0(D2GameStrc* pGame, D2UnitStrc* pPlayer, void* pArg)
 }
 
 //D2Game.0x6FC90C20
+// 1.13c D2Game+0x715E0 (the D2Common #10608 page loop over 1..12 is a ret-8 stub, so it is omitted)
 void __fastcall sub_6FC90C20(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -1046,11 +1047,9 @@ void __fastcall sub_6FC90C20(D2GameStrc* pGame, D2UnitStrc* pPlayer)
     const int32_t nGold = STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0);
     if (nGold > 0 && pPlayer->dwAnimMode != PLRMODE_DEATH && pPlayer->dwAnimMode != PLRMODE_DEAD)
     {
-        const int32_t nGoldDiff = STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0) - nGold;
-        D2GAME_SetStatOrResetGold_6FC7CA70(pPlayer, STAT_GOLD, nGoldDiff);
-
-        const int32_t nGoldSum = pTrade->nGoldInTradeOtherPlayer + STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0);
-        D2GAME_SetStatOrResetGold_6FC7CA70(pPlayer, STAT_GOLD, nGoldSum);
+        // 1.13c: the gold setter takes -gold (clears the stat), then the stored trade gold
+        D2GAME_SetStatOrResetGold_6FC7CA70(pPlayer, STAT_GOLD, -nGold);
+        D2GAME_SetStatOrResetGold_6FC7CA70(pPlayer, STAT_GOLD, pTrade->nGoldInTradeOtherPlayer);
     }
 }
 

@@ -108,6 +108,7 @@ constexpr D2UnkPlrMsgStrc stru_6FD30708[20] =
 
 
 //D2Game.0x6FC81C00
+// 1.13c D2Game+0xCBBB0 (packet 0x0D, mode 0x13; no delta)
 extern "C" void d2_client_player_mode_packet(D2UnitStrc* pUnit, int32_t nAnimMode);   // d2client/session_unit_sound.cpp (replay only)
 void __fastcall sub_6FC81C00(D2UnitStrc* pUnit, D2ClientStrc* pClient)
 {
@@ -116,6 +117,7 @@ void __fastcall sub_6FC81C00(D2UnitStrc* pUnit, D2ClientStrc* pClient)
 }
 
 //D2Game.0x6FC81CA0
+// 1.13c D2Game+0xCBB10 (packet 0x15; no delta)
 void __fastcall sub_6FC81CA0(D2UnitStrc* pUnit, D2ClientStrc* pClient, char a3)
 {
     D2GAME_PACKETS_SendPacket0x15_6FC3D0D0(pClient, 0x15u, pUnit->dwUnitType, pUnit->dwUnitId, CLIENTS_GetUnitX(pUnit), CLIENTS_GetUnitY(pUnit), a3);
@@ -173,12 +175,14 @@ void __fastcall sub_6FC81E10(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc*
 }
 
 //D2Game.0x6FC81F60
+// 1.13c D2Game+0xCBA20 (mode-send table entry; packet 0x0F built in place; no delta)
 void __fastcall sub_6FC81F60(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient, int32_t nAnimMode)
 {
     D2GAME_PACKETS_SendPacket0x0F_6FC3CA00(pClient, 0x0F, 0, pUnit->dwUnitId, (BYTE)stru_6FD30708[nAnimMode].field_4, D2COMMON_10175_PathGetFirstPointX(pUnit->pDynamicPath), D2COMMON_10176_PathGetFirstPointY(pUnit->pDynamicPath), (BYTE)pUnit->dwLastHitClass, CLIENTS_GetUnitX(pUnit), CLIENTS_GetUnitY(pUnit));
 }
 
 //D2Game.0x6FC82010
+// 1.13c D2Game+0xCB950 (mode-send table entry; no delta)
 extern "C" void d2_client_player_mode_packet(D2UnitStrc* pUnit, int32_t nAnimMode);   // d2client/session_unit_sound.cpp (replay only)
 void __fastcall sub_6FC82010(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient, int32_t nAnimMode)
 {
@@ -187,6 +191,7 @@ void __fastcall sub_6FC82010(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc*
 }
 
 //D2Game.0x6FC820C0
+// 1.13c D2Game+0xCD2C0 (stat 0xAF goes through D2Game+0xCC2F0 with pUnit == player, the same 0x1D/0x1E/0x1F send; no delta)
 void __fastcall sub_6FC820C0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient, int32_t nAnimMode)
 {
     sub_6FC82010(pGame, pUnit, pClient, nAnimMode);
@@ -202,6 +207,7 @@ void __fastcall sub_6FC820C0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc*
 }
 
 //D2Game.0x6FC821C0
+// 1.13c D2Game+0xCD190 (no delta)
 void __fastcall sub_6FC821C0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient, int32_t nAnimMode)
 {
     if (pUnit != CLIENTS_GetPlayerFromClient(pClient, 0))
@@ -211,6 +217,7 @@ void __fastcall sub_6FC821C0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc*
 }
 
 //D2Game.0x6FC82270
+// 1.13c D2Game+0xCB8F0 (IsBadCodePtr guard, fatal 0x148; no delta)
 void __fastcall sub_6FC82270(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient)
 {
     int32_t nAnimMode = 0;
@@ -251,6 +258,7 @@ void __fastcall D2GAME_UpdateAttribute_6FC822D0(D2UnitStrc* pUnit, WORD nStat, u
 }
 
 //D2Game.0x6FC82360
+// 1.13c D2Game+0xCC030 (potion percents 0xCB840/0xCB720 are bytes; path offsets are byte differences)
 int32_t __fastcall sub_6FC82360(D2UnitStrc* pUnit, D2UnitStrc* pUnit2, int32_t bSkipHpCheck)
 {
     if (!pUnit2 || !pUnit)
@@ -288,23 +296,25 @@ int32_t __fastcall sub_6FC82360(D2UnitStrc* pUnit, D2UnitStrc* pUnit2, int32_t b
     const int32_t nUnitX = CLIENTS_GetUnitX(pUnit);
     const int32_t nUnitY = CLIENTS_GetUnitY(pUnit);
 
-    int32_t nX = 0;
-    int32_t nY = 0;
+    // 1.13c: the path offsets are byte differences (stored zero-extended at +0x10/+0x12)
+    uint8_t nX = 0;
+    uint8_t nY = 0;
     if (pUnit->pDynamicPath)
     {
-        nX = nUnitX - D2COMMON_10175_PathGetFirstPointX(pUnit->pDynamicPath);
-        nY = nUnitY - D2COMMON_10176_PathGetFirstPointY(pUnit->pDynamicPath);
+        nX = (uint8_t)nUnitX - (uint8_t)D2COMMON_10175_PathGetFirstPointX(pUnit->pDynamicPath);
+        nY = (uint8_t)nUnitY - (uint8_t)D2COMMON_10176_PathGetFirstPointY(pUnit->pDynamicPath);
     }
-    
+
+    // 1.13c: the potion percents come back from 0xCB840/0xCB720 as bytes
     D2StatListStrc* pHealthPotStatList = STATLIST_GetStatListFromUnitAndState(pUnit, STATE_HEALTHPOT);
-    int32_t nPotionLifePercent = 0;
+    uint8_t nPotionLifePercent = 0;
     if (pHealthPotStatList && nShiftedMaxHp)
     {
         D2GameStrc* pGame = SUNIT_GetGameFromUnit(pUnit);
         const int32_t nFrameDiff = D2COMMON_10473(pHealthPotStatList) - pGame->dwGameFrame;
 
-        nPotionLifePercent = 100 * ((STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0) + nFrameDiff * STATLIST_GetStatValue(pHealthPotStatList, STAT_HPREGEN, 0)) >> 8) / nShiftedMaxHp;
-        if ((uint8_t)nPotionLifePercent > 100u)
+        nPotionLifePercent = (uint8_t)(100 * ((STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0) + nFrameDiff * STATLIST_GetStatValue(pHealthPotStatList, STAT_HPREGEN, 0)) >> 8) / nShiftedMaxHp);
+        if (nPotionLifePercent > 100u)
         {
             nPotionLifePercent = 100;
         }
@@ -312,7 +322,7 @@ int32_t __fastcall sub_6FC82360(D2UnitStrc* pUnit, D2UnitStrc* pUnit2, int32_t b
 
     const int32_t nMaxMana = STATLIST_GetMaxManaFromUnit(pUnit);
     D2StatListStrc* pManaPotStatList = STATLIST_GetStatListFromUnitAndState(pUnit, STATE_MANAPOT);
-    int32_t nPotionManaPercent = 0;
+    uint8_t nPotionManaPercent = 0;
     if (pManaPotStatList && nMaxMana)
     {
         D2CharStatsTxt* pCharStatsTxtRecord = PLRSAVE2_GetCharStatsTxtRecord(pUnit->dwClassId);
@@ -333,8 +343,8 @@ int32_t __fastcall sub_6FC82360(D2UnitStrc* pUnit, D2UnitStrc* pUnit2, int32_t b
             const int32_t nFrameMultiplier = nManaMultiplier * (STATLIST_UnitGetStatValue(pUnit, STAT_MANARECOVERYBONUS, 0) + 100) / 100 + STATLIST_UnitGetStatValue(pUnit, STAT_MANARECOVERY, 0);
             D2GameStrc* pGame = SUNIT_GetGameFromUnit(pUnit);
             
-            nPotionManaPercent = 100 * (STATLIST_UnitGetStatValue(pUnit, STAT_MANA, 0) + nFrameMultiplier * (D2COMMON_10473(pManaPotStatList) - pGame->dwGameFrame)) / nMaxMana;
-            if ((uint8_t)nPotionManaPercent > 100u)
+            nPotionManaPercent = (uint8_t)(100 * (STATLIST_UnitGetStatValue(pUnit, STAT_MANA, 0) + nFrameMultiplier * (D2COMMON_10473(pManaPotStatList) - pGame->dwGameFrame)) / nMaxMana);
+            if (nPotionManaPercent > 100u)
             {
                 nPotionManaPercent = 100;
             }
@@ -432,6 +442,7 @@ int32_t __fastcall sub_6FC82360(D2UnitStrc* pUnit, D2UnitStrc* pUnit2, int32_t b
 }
 
 //D2Game.0x6FC82830
+// 1.13c D2Game+0xCD0E0 (stats 0x43/0x44/0x0C/0x00/0x02 through 0xCC2F0; retail asserts on a missing client, we return)
 void __fastcall sub_6FC82830(D2UnitStrc* pUnit, D2ClientStrc* pClient)
 {
     constexpr int32_t dword_6FD307F8[] =
@@ -457,6 +468,7 @@ void __fastcall sub_6FC82830(D2UnitStrc* pUnit, D2ClientStrc* pClient)
 }
 
 //D2Game.0x6FC828D0
+// 1.13c D2Game+0xD01D0 (checked against the decompile and disassembly: object mode >= 8 returns 3; rest no delta)
 int32_t __fastcall sub_6FC828D0(D2UnitStrc* pPlayer, int32_t nUnitType, int32_t nUnitGUID, int32_t a4, D2GameStrc* pGame)
 {
     switch (nUnitType)
@@ -554,6 +566,12 @@ int32_t __fastcall sub_6FC828D0(D2UnitStrc* pPlayer, int32_t nUnitType, int32_t 
         {
             FOG_DisplayAssert("ptObjectData", __FILE__, __LINE__);
             exit(-1);
+        }
+
+        // 1.13c: an object in mode 8 or above refuses the interaction (cmp [esi+0x10],8; jge -> return 3)
+        if (pUnit->dwAnimMode >= 8)
+        {
+            return 3;
         }
 
         if (D2Common_10399(pPlayer, pUnit) > 50)
@@ -827,6 +845,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x05_ShiftLeftClickSkill_6FC832B0(D2
 }
 
 //D2Game.0x6FC83340
+// 1.13c D2Game+0xCDF30 (no delta)
 int32_t __fastcall sub_6FC83340(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStrc* pSkill, int32_t nX, int32_t nY)
 {
     if (!pUnit || pUnit->dwAnimMode == PLRMODE_DEATH || pUnit->dwAnimMode == PLRMODE_DEAD)
@@ -881,6 +900,7 @@ int32_t __fastcall sub_6FC83340(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStr
 }
 
 //D2Game.0x6FC83450
+// 1.13c D2Game+0xCB1F0 (no delta; fatal 0x6EE on a missing left-hand swing)
 D2SkillStrc* __fastcall sub_6FC83450(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
     if (SKILLS_GetSkillIdFromSkill(pSkill, __FILE__, __LINE__))
@@ -921,6 +941,7 @@ D2SkillStrc* __fastcall sub_6FC83450(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 }
 
 //D2Game.0x6FC83550
+// 1.13c D2Game+0xCE9D0 (client packet 0x06; lookup/act/range test is D2Game+0xCD630 -> 0xCCFE0; no delta)
 int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x06_LeftSkillOnUnit_6FC83550(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
     if (nSize != 9)
@@ -1055,6 +1076,7 @@ int32_t __fastcall sub_6FC836D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStr
 }
 
 //D2Game.0x6FC83890
+// 1.13c D2Game+0xCE950 (client packet 0x07; no delta)
 int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x07_ShiftLeftSkillOnUnit_6FC83890(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
     if (nSize != 9)
@@ -1177,6 +1199,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x09_LeftSkillOnUnitHold_6FC83AC0(D2
 }
 
 //D2Game.0x6FC83C60
+// 1.13c D2Game+0xCB690 (no delta)
 int32_t __fastcall sub_6FC83C60(D2UnitStrc* pUnit, uint16_t nX, uint16_t nY, int32_t nMaxDistance)
 {
     int32_t nXDiff = CLIENTS_GetUnitX(pUnit) - nX;
@@ -1199,6 +1222,7 @@ int32_t __fastcall sub_6FC83C60(D2UnitStrc* pUnit, uint16_t nX, uint16_t nY, int
 }
 
 //D2Game.0x6FC83D00
+// 1.13c D2Game+0xCB370 (called from 0xCD6D0; 0xCCFE0 inlines the same compare; no delta)
 int32_t __fastcall sub_6FC83D00(D2UnitStrc* pUnit, D2UnitStrc* a2)
 {
     if (DRLG_GetActNoFromLevelId(DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(pUnit))) == DRLG_GetActNoFromLevelId(DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(a2))))
@@ -1290,6 +1314,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x0C_RightSkill_6FC83EF0(D2GameStrc*
 }
 
 //D2Game.0x6FC83F80
+// 1.13c D2Game+0xCE870 (client packet 0x0D; no delta)
 int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x0D_RightSkillOnUnit_6FC83F80(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
     if (nSize != 9)
@@ -1335,6 +1360,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x0D_RightSkillOnUnit_6FC83F80(D2Gam
 }
 
 //D2Game.0x6FC84100
+// 1.13c D2Game+0xCE7F0 (client packet 0x0E; no delta)
 int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x0E_ShiftRightSkillOnUnit_6FC84100(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
     if (nSize != 9)
@@ -1578,6 +1604,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x14_HandleOverheadChat_6FC84690(D2G
 }
 
 //D2Game.0x6FC847B0
+// 1.13c D2Game+0xCD530 (interact checks are the 0xCCB10 helper; no delta)
 void __fastcall D2GAME_PACKETS_HandlePlayerMessage_6FC847B0(D2ClientStrc* pClient, void* pArgs)
 {
     D2GSPacketSrv26Args* pPacket26Args = (D2GSPacketSrv26Args*)pArgs;
@@ -1622,6 +1649,7 @@ void __fastcall D2GAME_PACKETS_HandlePlayerMessage_6FC847B0(D2ClientStrc* pClien
 }
 
 //D2Game.0x6FC848A0
+// 1.13c D2Game+0xCCA00 (no delta)
 void __fastcall D2GAME_PACKETS_HandleWhisper_6FC848A0(D2ClientStrc* pClient, void* pArgs)
 {
     D2GSPacketSrv26Args* pPacket26Args = (D2GSPacketSrv26Args*)pArgs;
@@ -1646,12 +1674,16 @@ void __fastcall D2GAME_PACKETS_HandleWhisper_6FC848A0(D2ClientStrc* pClient, voi
 }
 
 //D2Game.0x6FC84940
+// 1.13c D2Game+0xCB580 (thunk to 0x8B470)
 void __fastcall j_D2GAME_PACKETS_SendPacket0x26_ServerMessage_6FC3DDF0(D2ClientStrc* pClient, void* pMsg)
 {
     D2GAME_PACKETS_SendPacket0x26_ServerMessage_6FC3DDF0(pClient, (D2GSPacketSrv26*)pMsg);
 }
 
+extern "C" char* Ordinal_571(const char* s, int32_t c); // Storm #571 SStrChr (compat_link_weak.cpp)
+
 //D2Game.0x6FC84950
+// 1.13c D2Game+0xCDBB0 (client packet 0x15; from the disassembly, Ghidra fails)
 int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x15_HandleChatMessage_6FC84950(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
     D2GSPacketClt15* pPacket15 = (D2GSPacketClt15*)pPacket;
@@ -1697,9 +1729,10 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x15_HandleChatMessage_6FC84950(D2Ga
 
     packet26.nNameColor = STATLIST_UnitGetStatValue(pUnit, STAT_LEVEL, 0);
 
-    if (packet15.szMessage[255])
+    // 1.13c: an unterminated message or one holding a 0xFF colour escape (Storm#571 SStrChr) is dropped with 0, not 2
+    if (packet15.szMessage[255] || Ordinal_571(packet15.szMessage, -1))
     {
-        return 2;
+        return 0;
     }
 
     memcpy(packet26.szMessage, packet15.szMessage, sizeof(packet26.szMessage));
@@ -1804,6 +1837,7 @@ void __fastcall sub_6FC84C70(D2GameStrc* pGame, const char* szMessage, uint8_t n
 }
 
 //D2Game.0x6FC84CD0
+// 1.13c D2Game+0xCBE10 (no delta)
 void __fastcall sub_6FC84CD0(D2GameStrc* pGame, const char* szMessage, uint8_t nColor)
 {
     D2GSPacketSrv26 pPacket = {};
@@ -1820,12 +1854,14 @@ void __fastcall sub_6FC84CD0(D2GameStrc* pGame, const char* szMessage, uint8_t n
 }
 
 //D2Game.0x6FC84D30
+// 1.13c D2Game+0xCB570 (thunk to 0x8B400)
 void __fastcall j_D2GAME_SendPacket0x5A_6FC3DEC0(D2ClientStrc* pClient, void* pPacket)
 {
     D2GAME_PACKETS_SendPacket0x5A_6FC3DEC0(pClient, (D2GSPacketSrv5A*)pPacket);
 }
 
 //D2Game.0x6FC84D40
+// 1.13c D2Game+0xCBDB0 (no delta)
 void __fastcall sub_6FC84D40(D2GameStrc* pGame, D2GSPacketSrv5A* pPacket5A)
 {
     for (int32_t i = 0; i < 16; ++i)
@@ -1839,6 +1875,7 @@ void __fastcall sub_6FC84D40(D2GameStrc* pGame, D2GSPacketSrv5A* pPacket5A)
 }
 
 //D2Game.0x6FC84D70
+// 1.13c D2Game+0xD0910 (client packet 0x13; no delta)
 int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x13_InteractWithEntity_6FC84D70(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
     if (nSize == 9)
@@ -2542,6 +2579,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x25_SwitchBeltItem_6FC86040(D2GameS
 }
 
 //D2Game.0x6FC86150
+// 1.13c D2Game+0xCF5B0 (client packet 0x26; no delta)
 int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x26_UseBeltItem_6FC86150(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
     D2GSPacketClt26* pPacket26 = (D2GSPacketClt26*)pPacket;
@@ -2649,6 +2687,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x29_ScrollToBook_6FC86450(D2GameStr
 }
 
 //D2Game.0x6FC86520
+// 1.13c D2Game+0xCD6D0 (ground: 0xCB370 act compare then 0xCB690 range 10; inventory modes: 0xCCE20; no delta)
 int32_t __fastcall sub_6FC86520(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nItemGUID)
 {
     D2_ASSERT(pGame);
@@ -2659,7 +2698,7 @@ int32_t __fastcall sub_6FC86520(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t 
         switch (pItem->dwAnimMode)
         {
         case IMODE_ONGROUND:
-            if (DRLG_GetActNoFromLevelId(DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(pPlayer))) != DRLG_GetActNoFromLevelId(DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(pItem))))
+            if (sub_6FC83D00(pPlayer, pItem))
             {
                 return 2;
             }
@@ -3675,6 +3714,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x50_DropGold_6FC88210(D2GameStrc* p
 }
 
 //D2Game.0x6FC88290
+// 1.13c D2Game+0xCBC70 (client packet 0x51; no delta)
 int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x51_BindHotkeyToSkill_6FC88290(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
     D2GSPacketClt51* pPacket51 = (D2GSPacketClt51*)pPacket;
@@ -4269,6 +4309,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x2E_42_43_64_65_6FC89310(D2GameStrc
 }
 
 //D2Game.0x6FC89320
+// 1.13c D2Game+0xCC550 (table at D2Game+0xFA078 has slots 0..0x66; 0x64/0x65 empty; 0x66 skips the mode gate)
 int32_t __fastcall D2GAME_PACKET_Handler_6FC89320(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
     D2ServerPacketTableStrc gpPacketCallbackTable_6FD28FA0[] =
@@ -4373,8 +4414,9 @@ int32_t __fastcall D2GAME_PACKET_Handler_6FC89320(D2GameStrc* pGame, D2UnitStrc*
         { D2GAME_PACKETCALLBACK_Rcv0x61_DropPickupMercItem_6FC88930, 1 },
         { D2GAME_PACKETCALLBACK_Rcv0x62_ResurrectMerc_6FC86C00, 1 },
         { D2GAME_PACKETCALLBACK_Rcv0x63_ShiftLeftClickItemToBelt_6FC88F80, 1 },
-        { D2GAME_PACKETCALLBACK_Rcv0x2E_42_43_64_65_6FC89310, 0 },
-        { D2GAME_PACKETCALLBACK_Rcv0x2E_42_43_64_65_6FC89310, 0 },
+        { nullptr, 0 },     // 1.13c: slots 0x64 and 0x65 are empty (packet answered with 3)
+        { nullptr, 0 },
+        { D2GAME_PACKETCALLBACK_Rcv0x2E_42_43_64_65_6FC89310, 0 },    // 1.13c: slot 0x66 (D2Game+0xCB190, returns 0)
     };
 
     const uint8_t nHeader = *(uint8_t*)pPacket;
@@ -4395,6 +4437,7 @@ int32_t __fastcall D2GAME_PACKET_Handler_6FC89320(D2GameStrc* pGame, D2UnitStrc*
         case 0x15u:
         case 0x3Cu:
         case 0x43u:
+        case 0x66u:
             break;
 
         default:
@@ -4424,6 +4467,7 @@ int32_t __fastcall D2GAME_PACKET_Handler_6FC89320(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FC89450
+// 1.13c D2Game+0xCC370 (slain-by message 0x5A; the client broadcast is D2Game+0xCBDB0; no delta)
 void __fastcall D2GAME_PLRMSG_Last_6FC89450(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender)
 {
     D2UnitStrc* pPlayer = pAttacker;

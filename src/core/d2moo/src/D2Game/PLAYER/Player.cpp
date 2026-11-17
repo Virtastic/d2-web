@@ -353,6 +353,7 @@ int32_t __fastcall PLAYER_IsBusy(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC7BDB0
+// not-1.13c: retail has no such function; the packet 0x48 handler D2Game+0xCB4E0 clears PlayerData+0x4C inline (fatal 0x1C6 when already clear)
 void __fastcall PLAYER_ResetBusyState(D2UnitStrc* pUnit)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pUnit);
@@ -623,6 +624,7 @@ int32_t __fastcall sub_6FC7C260(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nU
 }
 
 //D2Game.0x6FC7C3A0
+// 1.13c D2Game+0x388C0 (checked against the disassembly: same interact-unit lookup, reset, player/monster/busy branches; no delta)
 int32_t __fastcall sub_6FC7C3A0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* a3)
 {
     int32_t nUnitType = 0;
@@ -657,6 +659,7 @@ int32_t __fastcall sub_6FC7C3A0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
 }
 
 //D2Game.0x6FC7C450
+// 1.13c D2Game+0x37890 (null/non-player and null-client return 0, hotkey slot written in place; no delta)
 int32_t __fastcall sub_6FC7C450(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nHotkeyId, int16_t nSkillId, char a4, int32_t nFlags)
 {
     D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
@@ -670,6 +673,7 @@ int32_t __fastcall sub_6FC7C450(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t 
 }
 
 //D2Game.0x6FC7C490 (#10059)
+// 1.13c D2Game+0x37430 (#10049; checked against the disassembly: 0..8 range test, no delta)
 void __fastcall PLAYER_SetVirtualPlayerCount(int32_t nPlayers)
 {
     if (nPlayers >= 0 && nPlayers <= 8)
@@ -694,6 +698,7 @@ int32_t __fastcall PLAYER_GetPlayerCount(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC7C4E0
+// 1.13c D2Game+0x37810 (no delta)
 void __fastcall PLAYER_CountLivingPlayers(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pLivingPlayers)
 {
     if (!SUNIT_IsDead(pUnit))
@@ -703,6 +708,9 @@ void __fastcall PLAYER_CountLivingPlayers(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FC7C500
+// 1.13c D2Game+0x383A0 (gold part D2Game+0x38180, checked against the disassembly: the only
+// carried-gold clamp is under nGameType 3; a PvE death whose penalty exceeds the carried gold
+// debits the stash. Experience part D2Game+0x37730.)
 void __fastcall PLAYER_ApplyDeathPenalty(D2GameStrc* pGame, D2UnitStrc* pDefender, D2UnitStrc* pAttacker)
 {
     const int32_t nDefenderLevel = STATLIST_UnitGetStatValue(pDefender, STAT_LEVEL, 0);
@@ -738,14 +746,6 @@ void __fastcall PLAYER_ApplyDeathPenalty(D2GameStrc* pGame, D2UnitStrc* pDefende
             nGoldPenalty = std::max(nDefenderTotalGold - 500 * nDefenderLevel, 0);
         }
 
-        nGoldPenalty = std::min(nGoldPenalty, nDefenderInventoryGold);
-    }
-    else if (!bAttackedByAnotherPlayer && nDefenderBankGold >= (int32_t)UNITS_GetStashGoldLimit(pDefender))
-    {
-        // Retail 1.13c F248: with the stash already at its level-dependent cap, a PvE death
-        // charges the carried gold only. The death screen reports the full 1,000 carried gold,
-        // and STAT_GOLDBANK remains at 2,500,000. The 1.10f-derived total-gold formula above
-        // would otherwise debit the capped stash; do not generalize this boundary to non-full banks.
         nGoldPenalty = std::min(nGoldPenalty, nDefenderInventoryGold);
     }
 
@@ -848,6 +848,7 @@ int32_t __fastcall D2GAME_IteratePlayers_6FC7C750(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FC7C790
+// 1.13c D2Game+0x37940 (PLAYERLIST_CheckFlag(...,8) inlined; same self-skip; no delta)
 void __fastcall sub_6FC7C790(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pArgs)
 {
     D2RosterIterateStrc* pRosterIterate = (D2RosterIterateStrc*)pArgs;
@@ -1005,6 +1006,7 @@ void __fastcall sub_6FC7C900(D2UnitStrc* pAttacker, int32_t a2)
 }
 
 //D2Game.0x6FC7CA10
+// 1.13c D2Game+0x37260 (no delta)
 void __fastcall sub_6FC7CA10(D2UnitStrc* pTarget, int32_t a2)
 {
     if (!a2)

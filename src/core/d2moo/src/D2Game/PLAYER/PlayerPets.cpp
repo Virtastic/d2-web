@@ -24,6 +24,7 @@
 
 
 //D2Game.0x6FC7CAF0
+// 1.13c D2Game+0x97120 (checked against decompile; the per-type loop is helper 0x96F40 there)
 void __fastcall PLAYERPETS_AllocPetList(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -48,6 +49,7 @@ void __fastcall PLAYERPETS_AllocPetList(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 }
 
 //D2Game.0x6FC7CD10
+// 1.13c D2Game+0x97730 (checked against decompile, no delta)
 void __fastcall D2GAME_KillPlayerPets_6FC7CD10(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -69,6 +71,7 @@ void __fastcall D2GAME_KillPlayerPets_6FC7CD10(D2GameStrc* pGame, D2UnitStrc* pP
 }
 
 //D2Game.0x6FC7CDC0
+// 1.13c D2Game+0x97420 (checked against decompile, no delta)
 void __fastcall sub_6FC7CDC0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2PetListStrc* pPetList, int32_t a4, int32_t a5)
 {
     D2PetDataStrc* pPetData = pPetList->pPetData;
@@ -134,6 +137,7 @@ void __fastcall sub_6FC7CDC0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2PetListSt
 }
 
 //D2Game.0x6FC7CF20
+// 1.13c D2Game+0x96810 (checked against decompile; packet 0x7A built inline there)
 void __fastcall PLAYERPETS_PlayerIterate_SynchronizeWithClient(D2GameStrc* pGame, D2UnitStrc* pPlayer, void* pArg)
 {
     D2PetArgStrc* pPetArg = (D2PetArgStrc*)pArg;
@@ -142,6 +146,7 @@ void __fastcall PLAYERPETS_PlayerIterate_SynchronizeWithClient(D2GameStrc* pGame
 }
 
 //D2Game.0x6FC7CF50
+// 1.13c D2Game+0x977E0 (a deleted pet is fatal there, line 0x5A; 1.10f warned and removed it)
 void __fastcall sub_6FC7CF50(D2GameStrc* pGame, int32_t nPetGUID)
 {
     D2UnitStrc* pPet = SUNIT_GetServerUnit(pGame, UNIT_MONSTER, nPetGUID);
@@ -150,12 +155,7 @@ void __fastcall sub_6FC7CF50(D2GameStrc* pGame, int32_t nPetGUID)
         return;
     }
 
-    if (pPet->dwFlagEx & UNITFLAGEX_HASBEENDELETED)
-    {
-        FOG_DisplayWarning("!hPet", __FILE__, __LINE__);
-        SUNIT_RemoveUnit(pGame, pPet);
-    }
-    else
+    D2_ASSERT(!(pPet->dwFlagEx & UNITFLAGEX_HASBEENDELETED));
     {
         pPet->dwFlags |= UNITFLAG_NOXP;
 
@@ -202,6 +202,7 @@ void __fastcall PLAYERPETS_FreePetsFromPlayerData(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FC7D150
+// 1.13c D2Game+0x96EA0 (the trim loop calls 0x967B0 for the head GUID)
 void __fastcall sub_6FC7D150(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nPetType, int32_t nBaseMax)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -222,7 +223,7 @@ void __fastcall sub_6FC7D150(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nPe
 
     for (int32_t nCurrent = pPetList->nCurrent; nCurrent > nBaseMax && nCurrent > 0 && nPetType != PETTYPE_HIREABLE; nCurrent = pPetList->nCurrent)
     {
-        sub_6FC7D260(pGame, pPlayer, pPetList->pPetData ? pPetList->pPetData->nUnitGUID : -1, 1);
+        sub_6FC7D260(pGame, pPlayer, sub_6FC7D9D0(pPlayer, nPetType), 1);
     }
 }
 
@@ -258,6 +259,7 @@ void __fastcall sub_6FC7D260(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nPe
 }
 
 //D2Game.0x6FC7D390
+// 1.13c D2Game+0x97920 (checked against decompile, no delta)
 void __fastcall PLAYERPETS_RemovePetFromList(D2GameStrc* pGame, D2PetListStrc* pPetList, int32_t nUnitGUID, int32_t a4)
 {
     D2PetDataStrc* pPrevious = nullptr;
@@ -399,6 +401,7 @@ int32_t __fastcall sub_6FC7D5F0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
 }
 
 //D2Game.0x6FC7D720
+// 1.13c D2Game+0x966E0 (checked against decompile, no delta)
 void __fastcall PLAYERPETS_PlayerIterate_UpdateClient(D2GameStrc* pGame, D2UnitStrc* pPlayer, void* pArg)
 {
     D2PetArgStrc* pPetArg = (D2PetArgStrc*)pArg;
@@ -445,9 +448,10 @@ static void PLAYERPETS_DismissGroupPets(D2GameStrc* pGame, D2UnitStrc* pPlayer, 
 }
 
 //D2Game.0x6FC7D7A0
+// 1.13c D2Game+0x97F50 (pet type range-checked 1..count-1 up front there; the add tail is 0x97E20 inlined)
 void __fastcall sub_6FC7D7A0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pPet, int32_t nPetType, int32_t nPetMax)
 {
-    if (!pPlayer || pPlayer->dwUnitType != UNIT_PLAYER)
+    if (!pPlayer || pPlayer->dwUnitType != UNIT_PLAYER || nPetType <= 0 || nPetType >= sgptDataTables->nPetTypeTxtRecordCount)
     {
         return;
     }
@@ -461,6 +465,7 @@ void __fastcall sub_6FC7D7A0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 }
 
 //D2Game.0x6FC7D9D0
+// 1.13c D2Game+0x967B0 (checked against decompile, no delta)
 int32_t __fastcall sub_6FC7D9D0(D2UnitStrc* pPlayer, int32_t nPetType)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -481,6 +486,7 @@ int32_t __fastcall sub_6FC7D9D0(D2UnitStrc* pPlayer, int32_t nPetType)
 }
 
 //D2Game.0x6FC7DA40
+// 1.13c D2Game+0x97A20 (checked against decompile, no delta)
 int32_t __fastcall sub_6FC7DA40(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2PetListStrc* pPetList, D2UnitStrc* pPet, D2PetInfoStrc* pPetInfo)
 {
     if (!pPetList->nMax)
@@ -542,9 +548,15 @@ int32_t __fastcall sub_6FC7DA40(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2PetLis
 }
 
 //D2Game.0x6FC7DB90
+// 1.13c D2Game+0x96680 (a player without a pet block is skipped there)
 void __fastcall PLAYERPETS_UpdatePetInfo(D2UnitStrc* pUnit, int32_t nPetType, int32_t nUnitGUID, D2PetInfoStrc* pPetInfo)
 {
     D2PlayerPetStrc* pPlayerPets = UNITS_GetPlayerData(pUnit)->pPlayerPets;
+    if (!pPlayerPets)
+    {
+        return;
+    }
+
     D2PetListStrc* pPetList = PLAYERPETS_GetPetListFromPetType(pPlayerPets, nPetType);
     if (!pPetList)
     {
@@ -564,6 +576,7 @@ void __fastcall PLAYERPETS_UpdatePetInfo(D2UnitStrc* pUnit, int32_t nPetType, in
 }
 
 //D2Game.0x6FC7DBF0
+// 1.13c D2Game+0x97E20 (checked against decompile, no delta)
 void __fastcall sub_6FC7DBF0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pPet, int32_t nPetType, D2PetInfoStrc* pPetInfo)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -644,6 +657,7 @@ int32_t __fastcall PLAYERPETS_GetPetTypeFromPetGUID(D2UnitStrc* pPlayer, int32_t
 }
 
 //D2Game.0x6FC7DD90
+// 1.13c D2Game+0x96D70 (checked against decompile, no delta)
 int32_t __fastcall sub_6FC7DD90(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pPet)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -803,6 +817,7 @@ D2PetListStrc* __fastcall PLAYERPETS_GetPetListFromPetType(D2PlayerPetStrc* pPla
 }
 
 //D2Game.0x6FC7E310
+// 1.13c D2Game+0x97340 (checked against decompile; the three branches are helpers 0x972C0, 0x96C00, 0x964B0 there)
 void __fastcall sub_6FC7E310(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t a3, int32_t a4)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -907,6 +922,7 @@ void __fastcall sub_6FC7E550(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2PetDataSt
 }
 
 //D2Game.0x6FC7E640
+// 1.13c D2Game+0x98250 (checked against decompile; the dead-pet sweep is helper 0x97D10 there)
 void __fastcall sub_6FC7E640(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     D2PlayerPetStrc* pPlayerPets = UNITS_GetPlayerData(pPlayer)->pPlayerPets;
@@ -960,6 +976,7 @@ void __fastcall sub_6FC7E640(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 }
 
 //D2Game.0x6FC7E7C0
+// 1.13c D2Game+0x96AF0 (checked against decompile, no delta)
 void __fastcall PLAYERPETS_IteratePets(D2GameStrc* pGame, D2UnitStrc* pPlayer, void(__fastcall* pCallback)(D2GameStrc*, D2UnitStrc*, D2UnitStrc*, void*), void* a4)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -996,6 +1013,7 @@ void __fastcall PLAYERPETS_IteratePets(D2GameStrc* pGame, D2UnitStrc* pPlayer, v
 }
 
 //D2Game.0x6FC7E8B0
+// 1.13c D2Game+0x96A40 (checked against decompile, no delta)
 D2UnitStrc* __fastcall sub_6FC7E8B0(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nPetType, int32_t a4)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -1022,6 +1040,7 @@ D2UnitStrc* __fastcall sub_6FC7E8B0(D2GameStrc* pGame, D2UnitStrc* pPlayer, int3
 }
 
 //D2Game.0x6FC7E930
+// not-1.13c: no standalone function; 1.13c D2Game+0x1E140 sums nCurrent over the pet lists inline
 int32_t __fastcall PLAYERPETS_GetTotalPetCount(D2UnitStrc* pPlayer)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -1040,11 +1059,13 @@ int32_t __fastcall PLAYERPETS_GetTotalPetCount(D2UnitStrc* pPlayer)
 }
 
 //D2Game.0x6FC7E970
+// 1.13c D2Game+0x96920 (a null player is fatal there, line 0xA2A)
 void __fastcall D2GAME_PLAYERPETS_Last_6FC7E970(D2ClientStrc* pClient, D2UnitStrc* pPlayer)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
+    D2_ASSERT(pPlayer);
 
-    if (!pPlayerData || !pPlayer || !pPlayer->pGame || !pPlayerData->pPlayerPets)
+    if (!pPlayerData || !pPlayer->pGame || !pPlayerData->pPlayerPets)
     {
         return;
     }

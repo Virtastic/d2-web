@@ -65,6 +65,7 @@ void __fastcall PARTY_FreePartyControl(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FCB9C40
+// 1.13c D2Game+0x9BF70 (id search is helper 0x9BD40)
 int16_t __fastcall sub_6FCB9C40(D2GameStrc* pGame)
 {
     D2_ASSERT(pGame->pPartyControl);
@@ -266,6 +267,7 @@ void __fastcall PARTY_LeaveParty(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCBA0C0
+// 1.13c D2Game+0x9C1F0
 int32_t __fastcall PARTY_GetLivingPartyMemberCountInSameLevel(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     int32_t nLivingPartyMembers = 0;
@@ -274,6 +276,7 @@ int32_t __fastcall PARTY_GetLivingPartyMemberCountInSameLevel(D2GameStrc* pGame,
 }
 
 //D2Game.0x6FCBA0E0
+// 1.13c D2Game+0x9C000
 void __fastcall PARTY_CountLivingUnits(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pLivingUnits)
 {
     if (pUnit && !SUNIT_IsDead(pUnit))
@@ -309,6 +312,7 @@ void __fastcall PARTY_IteratePartyMembers(D2GameStrc* pGame, int16_t nPartyId, P
 }
 
 //D2Game.0x6FCBA190
+// 1.13c D2Game+0x9C070
 void __fastcall PARTY_IteratePartyMembersInSameLevel(D2GameStrc* pGame, D2UnitStrc* pUnit, PartyCallbackFunction pCallback, void* pArgs)
 {
     D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
@@ -348,6 +352,7 @@ void __fastcall PARTY_IteratePartyMembersInSameLevel(D2GameStrc* pGame, D2UnitSt
 }
 
 //D2Game.0x6FCBA270
+// 1.13c D2Game+0x9C270
 int32_t __fastcall PARTY_ShareGoldDrop(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nGoldValue)
 {
     const int32_t nLivingPartyMembers = PARTY_GetLivingPartyMemberCountInSameLevel(pGame, pUnit);
@@ -402,6 +407,7 @@ int32_t __fastcall PARTY_ShareGoldDrop(D2GameStrc* pGame, D2UnitStrc* pUnit, int
 }
 
 //D2Game.0x6FCBA510
+// not-1.13c: inlined at both tails of 1.13c 0x9C270 (limit via 10049, gold stat 0xE, pick = limit-gold when over)
 void __fastcall PARTY_CalculatePickAndDrop(D2UnitStrc* pUnit, int32_t nValue, int32_t* pGoldToPick, int32_t* pGoldToDrop)
 {
     const int32_t nGoldLimit = UNITS_GetInventoryGoldLimit(pUnit);

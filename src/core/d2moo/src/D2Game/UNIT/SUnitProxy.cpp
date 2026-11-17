@@ -78,14 +78,14 @@ D2NpcRecordStrc* __fastcall SUNITPROXY_GetNpcRecordFromUnit(D2GameStrc* pGame, D
 }
 
 //D2Game.0x6FCCB980
+// 1.13c D2Game+0x90260 (retail allocs the event before the record lookup and leaks it when no record is found; this frees nothing either way)
 void __fastcall SUNITPROXY_AllocNpcEvent(D2UnitStrc* pNpc, D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t a4)
 {
     int32_t nUnused = 0;
+    D2NpcEventStrc* pNpcEvent = D2_ALLOC_STRC_POOL(pGame->pMemoryPool, D2NpcEventStrc);
     D2NpcRecordStrc* pNpcRecord = SUNITPROXY_GetNpcRecordFromUnit(pGame, pNpc, &nUnused);
     if (pNpcRecord)
     {
-        D2NpcEventStrc* pNpcEvent = D2_ALLOC_STRC_POOL(pGame->pMemoryPool, D2NpcEventStrc);
-
         pNpcEvent->pNext = pNpcRecord->pEvent;
         pNpcRecord->pEvent = pNpcEvent;
         pNpcEvent->field_C = 1;
@@ -371,6 +371,7 @@ void __fastcall SUNITPROXY_FreeNpcControl(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FCCC140
+// 1.13c D2Game+0x90170
 void __fastcall SUNITPROXY_ClearNpcRecordData(D2GameStrc* pGame, D2NpcRecordStrc* pNpcRecord)
 {
     if (pNpcRecord->bGambleInit)
@@ -476,6 +477,7 @@ void __fastcall SUNITPROXY_UpdateNpcsOnActChange(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FCCC540
+// 1.13c D2Game+0x90320 (the no-players reset is 0x902E0)
 void __fastcall SUNITPROXY_UpdateVendorInventory(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t nAct, int32_t bNoMorePlayersInLevel)
 {
     const uint32_t nTickCount = GetTickCount();
@@ -531,6 +533,7 @@ void __fastcall SUNITPROXY_UpdateVendorInventory(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FCCC690
+// 1.13c D2Game+0x8F410
 void __fastcall SUNITPROXY_CountPlayersInLevel(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pArg)
 {
     D2UnitProxyArgStrc* pUnitProxyArg = (D2UnitProxyArgStrc*)pArg;
@@ -613,12 +616,14 @@ void __fastcall SUNITPROXY_InitializeNpcEventChain(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FCCC8B0
+// not-1.13c: no 1.13c function returns the npc-control seed; every caller reads pNpcControl+8 inline
 D2SeedStrc* __fastcall SUNITPROXY_GetSeedFromNpcControl(D2GameStrc* pGame)
 {
     return &pGame->pNpcControl->pSeed;
 }
 
 //D2Game.0x6FCCC8C0
+// 1.13c D2Game+0x8FAF0 (record lookup is the 0x8F5C0 helper, which asserts on class id 0)
 void __fastcall SUNITPROXY_FreeVendorChain(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNpc)
 {
     int32_t nNpcId = -1;
@@ -701,6 +706,7 @@ void __fastcall SUNITPROXY_FreeVendorChain(D2GameStrc* pGame, D2UnitStrc* pPlaye
 }
 
 //D2Game.0x6FCCCA70
+// not-1.13c: no standalone 1.13c function; the 1.13c npc message handler inlines the gamble inventory refresh (no decomp references this body)
 void __fastcall SUNITPROXY_UpdateGambleInventory(D2GameStrc* pGame, D2UnitStrc* pNpc, D2UnitStrc* pPlayer, D2ClientStrc* pClient)
 {
     D2GAME_INVMODE_First_6FC40FB0(pGame, pNpc, pClient, nullptr);
@@ -725,6 +731,7 @@ void __fastcall SUNITPROXY_UpdateGambleInventory(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FCCCB20
+// 1.13c D2Game+0x8FAA0
 D2InventoryStrc* __fastcall SUNITPROXY_GetGambleInventory(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNpc)
 {
     int32_t nUnused = 0;
@@ -769,6 +776,7 @@ D2NpcVendorChainStrc* __fastcall SUNITPROXY_GetVendorChain(D2GameStrc* pGame, D2
 }
 
 //D2Game.0x6FCCCC00
+// 1.13c D2Game+0x902E0
 void __fastcall SUNITPROXY_AllocNpcInventory(D2GameStrc* pGame, D2NpcRecordStrc* pNpcRecord, D2UnitStrc* pNpc)
 {
     SUNITPROXY_ClearNpcRecordData(pGame, pNpcRecord);
@@ -956,6 +964,7 @@ void __fastcall SUNITPROXY_ClearGlobalItemCache()
 }
 
 //D2Game.0x6FCCD190
+// not-1.13c: no standalone 1.13c function; inlined into the monster AI npc-leave path (no decomp references this body)
 void __fastcall SUNITPROXY_FreeNpcGamble(D2GameStrc* pGame, D2UnitStrc* pNpc, D2UnitStrc* pPlayer)
 {
     int32_t nUnused = 0;

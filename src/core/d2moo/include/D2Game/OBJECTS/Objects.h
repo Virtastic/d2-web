@@ -39,7 +39,7 @@ void __fastcall OBJECTS_InitFunction28_GoldPlaceHolder(D2ObjInitFnStrc* pOp);
 //D2Game.0x6FC70A50
 void __fastcall OBJECTS_InitFunction01_Shrine(D2ObjInitFnStrc* pOp);
 //D2Game.0x6FC70BA0
-int32_t __fastcall OBJECTS_GetShrineId(D2GameStrc* pGame, uint8_t nShrineClass, int32_t nLevelId, D2ActiveRoomStrc* pRoom);
+int32_t __fastcall OBJECTS_GetShrineId(D2GameStrc* pGame, uint8_t nShrineClass, int32_t nLevelId);
 //D2Game.0x6FC70CA0
 void __fastcall OBJECTS_InitFunction22_Fire(D2ObjInitFnStrc* pOp);
 //D2Game.0x6FC70CF0

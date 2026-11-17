@@ -33,8 +33,6 @@ struct D2ArenaUnitStrc
 
 #pragma pack()
 
-//D2Game.0x6FC31010
-int32_t __fastcall D2Game_10001_Return0();
 //D2Game.0x6FC31040
 void __fastcall ARENA_AllocArena(D2GameStrc* pGame, int32_t nUnused, uint32_t nFlags, int32_t nTemplate);
 //D2Game.0x6FC31090

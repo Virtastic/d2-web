@@ -530,7 +530,7 @@ void __fastcall OBJECTS_InitFunction01_Shrine(D2ObjInitFnStrc* pOp)
             break;
         }
 
-        nShrineId = OBJECTS_GetShrineId(pOp->pGame, nClass, DUNGEON_GetLevelIdFromRoom(pOp->pRoom), 0);
+        nShrineId = OBJECTS_GetShrineId(pOp->pGame, nClass, DUNGEON_GetLevelIdFromRoom(pOp->pRoom));
     }
     else
     {
@@ -565,34 +565,31 @@ void __fastcall OBJECTS_InitFunction01_Shrine(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC70BA0
-int32_t __fastcall OBJECTS_GetShrineId(D2GameStrc* pGame, uint8_t nShrineClass, int32_t nLevelId, D2ActiveRoomStrc* pRoom)
+// 1.13c D2Game+0x2ED70: class in AL, game and level on the stack (the 1.10f room argument is gone); up to 8 rolls
+// on the object-control seed (game+0x10F0), stopping at the first shrine whose level-min (unsigned compare) is met
+int32_t __fastcall OBJECTS_GetShrineId(D2GameStrc* pGame, uint8_t nShrineClass, int32_t nLevelId)
 {
-    uint8_t nClass = nShrineClass;
     if (!nShrineClass || nShrineClass > 4u)
     {
-        nClass = 2;
+        nShrineClass = 2;
     }
 
-    D2ShrineDataStrc* pShrineData = OBJRGN_GetShrineDataFromGame(pGame);
-    D2ObjectControlStrc* pObjectControl = OBJRGN_GetObjectControlFromGame(pGame);
+    D2ObjectControlStrc* pObjectControl = pGame->pObjectControl;
+    D2ShrineDataStrc* pShrineData = &pObjectControl->shrineData;
 
-    D2_ASSERT(pShrineData->nShrineSubTypes[nClass]);
+    D2_ASSERT(pShrineData->nShrineSubTypes[nShrineClass]);
 
     int32_t nShrineId = 0;
-    for (int32_t i = 0; i < std::size(pShrineData->nShrineSubTypes); ++i)
+    int32_t nTries = 8;
+    do
     {
-        const int32_t nShrineSubTypes = pShrineData->nShrineSubTypes[nClass];
-        nShrineId = pShrineData->pShrineSubTypeIds[nClass][ITEMS_RollLimitedRandomNumber(&pObjectControl->pSeed, nShrineSubTypes)];
+        nShrineId = pShrineData->pShrineSubTypeIds[nShrineClass][ITEMS_RollLimitedRandomNumber(&pGame->pObjectControl->pSeed, pShrineData->nShrineSubTypes[nShrineClass])];
         if (!nShrineId)
         {
             nShrineId = 1;
         }
-
-        if (nLevelId >= DATATBLS_GetShrinesTxtRecord(nShrineId)->dwLevelMin)
-        {
-            break;
-        }
     }
+    while ((uint32_t)nLevelId < DATATBLS_GetShrinesTxtRecord(nShrineId)->dwLevelMin && --nTries > 0);
 
     return nShrineId;
 }
@@ -616,12 +613,14 @@ void __fastcall OBJECTS_InitFunction22_Fire(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC70CF0
+// 1.13c D2Game+0x2E760 (checked against the decompile: interact type = 2 * low byte of parm[2]; no delta)
 void __fastcall OBJECTS_InitFunction16_Well(D2ObjInitFnStrc* pOp)
 {
     pOp->pObject->pObjectData->InteractType = 2 * LOBYTE(pOp->pObjectTxt->dwParm[2]);
 }
 
 //D2Game.0x6FC70D10
+// 1.13c D2Game+0x336D0 (checked against the decompile: event 3 at frame + 25; no delta)
 void __fastcall OBJECTS_InitFunction24_SpikeFloorTrap(D2ObjInitFnStrc* pOp)
 {
     EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_STATREGEN, pOp->pGame->dwGameFrame + 25, 0, 0);
@@ -689,45 +688,21 @@ void __fastcall OBJECTS_InitFunction03_Chest(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC70F30
+// 1.13c D2Game+0x2EF50: the chest init (0x2ECB0) is called, the object asserted, then the spark-chest flag set
 void __fastcall OBJECTS_InitFunction57_SparklyChest(D2ObjInitFnStrc* pOp)
 {
-    const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(pOp->pRoom);
-    D2LevelsTxt* pLevelsTxtRecord = DATATBLS_GetLevelsTxtRecord(nLevelId);
+    OBJECTS_InitFunction03_Chest(pOp);
 
-    if ((ITEMS_RollRandomNumber(&pOp->pObjectregion->pSeed) % 100) >= (WORD)(pLevelsTxtRecord->wMonLvl[0] / 8 + 5))
-    {
-        pOp->pObject->pObjectData->InteractType = 0;
-    }
-    else
-    {
-        pOp->pObject->pObjectData->InteractType = (ITEMS_RollRandomNumber(&pOp->pObjectregion->pSeed) & 7) + 1;
-    }
-
-    if (pOp->pObjectTxt->nLockable)
-    {
-        if ((ITEMS_RollRandomNumber(&pOp->pObjectregion->pSeed) % 100) < (WORD)(pLevelsTxtRecord->wMonLvl[0] / 2 + 8))
-        {
-            pOp->pObject->pObjectData->InteractType |= 0x80;
-        }
-        else
-        {
-            pOp->pObject->pObjectData->InteractType &= 0x7F;
-        }
-    }
-    else
-    {
-        pOp->pObject->pObjectData->InteractType &= 0x7F;
-    }
-
-    SEED_InitLowSeed(&pOp->pObject->pSeed, ITEMS_RollRandomNumber(&pOp->pObjectregion->pSeed) % 65534 + 1);
+    D2_ASSERT(pOp->pObject);
 
     pOp->pObject->bSparkChest = 1;
 }
 
 //D2Game.0x6FC71060
+// 1.13c D2Game+0x33680: the delay roll is on the object-control seed (game+0x10F0)
 void __fastcall OBJECTS_InitFunction58_Fissure(D2ObjInitFnStrc* pOp)
 {
-    EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_PERIODICSKILLS, pOp->pGame->dwGameFrame + ITEMS_RollRandomNumber(&pOp->pObjectregion->pSeed) % 250 + 25, 0, 0);
+    EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_PERIODICSKILLS, pOp->pGame->dwGameFrame + 25 + ITEMS_RollRandomNumber(&pOp->pGame->pObjectControl->pSeed) % 250, 0, 0);
 }
 
 //D2Game.0x6FC710B0
@@ -846,21 +821,24 @@ void __fastcall OBJECTS_InitFunction08_Torch(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC71370
+// 1.13c D2Game+0x2E740 (checked against the decompile: mode 1; no delta)
 void __fastcall OBJECTS_InitFunction14_Brazier(D2ObjInitFnStrc* pOp)
 {
     UNITS_ChangeAnimMode(pOp->pObject, OBJMODE_OPERATING);
 }
 
 //D2Game.0x6FC71380
+// 1.13c D2Game+0x2EC70: the roll is on the object-control seed (game+0x10F0)
 void __fastcall OBJECTS_InitFunction34_HellBrazierFire(D2ObjInitFnStrc* pOp)
 {
-    if (ITEMS_RollRandomNumber(&pOp->pObjectregion->pSeed) & 1)
+    if (ITEMS_RollRandomNumber(&pOp->pGame->pObjectControl->pSeed) & 1)
     {
         UNITS_ChangeAnimMode(pOp->pObject, OBJMODE_OPERATING);
     }
 }
 
 //D2Game.0x6FC713D0
+// 1.13c D2Game+0x33330: the end-anim event fires (FrameCnt[1] >> 8) + 1 ticks out (not OBJECTS_GetOperatingTicks)
 void __fastcall OBJECTS_InitFunction11_Portal(D2ObjInitFnStrc* pOp)
 {
     const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(pOp->pRoom);
@@ -873,11 +851,12 @@ void __fastcall OBJECTS_InitFunction11_Portal(D2ObjInitFnStrc* pOp)
     if (pOp->pObject && pOp->pObject->dwAnimMode == OBJMODE_OPERATING)
     {
         UNITS_BlockCollisionPath(pOp->pObject, pOp->pRoom, pOp->nX, pOp->nY);
-        EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pOp->pObjectTxt) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_ENDANIM, (pOp->pObjectTxt->dwFrameCnt[1] >> 8) + 1 + pOp->pGame->dwGameFrame, 0, 0);
     }
 }
 
 //D2Game.0x6FC71470
+// 1.13c D2Game+0x332F0 (checked against the decompile: modes 2 or 1 arm event 9 at frame + 35; no delta)
 void __fastcall OBJECTS_InitFunction51_TrappedSoul(D2ObjInitFnStrc* pOp)
 {
     if (!pOp->pObject)
@@ -893,6 +872,8 @@ void __fastcall OBJECTS_InitFunction51_TrappedSoul(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC714A0
+// 1.13c D2Game+0x2F690 (checked against the decompile and disassembly: the placement test is retail's 0x2E660
+// helper with size 3, the spawns go through the 0xEEF10 spawn-params path, rolls in the same order; no further delta)
 void __fastcall OBJECTS_InitFunction46_TrappedSoulPlaceHolder(D2ObjInitFnStrc* pOp)
 {
     constexpr int32_t nXOffsets[] =
@@ -1365,6 +1346,8 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn3_CommonObjects(D2GameStrc* pGame, D2Ac
 }
 
 //D2Game.0x6FC72510
+// 1.13c D2Game+0x31E20 (checked against the disassembly: 5 tries on the object-control seed, the bounds compare the
+// low words, collision 0x3F11 at size + 6, then the inlined object alloc; no delta)
 D2UnitStrc* __fastcall OBJECTS_CreateObject(D2GameStrc* pGame, int32_t nClassId, int32_t nSizeX, int32_t nSizeY, D2ActiveRoomStrc* pRoom)
 {
     D2DrlgCoordsStrc drlgCoords = {};
@@ -1441,6 +1424,8 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn9_TrappedSoul(D2GameStrc* pGame, D2Acti
 }
 
 //D2Game.0x6FC727F0
+// 1.13c D2Game+0x33260: populate-fn 3 (0x32CE0), then retail's 0x30E50 (inlined below): a roll above 70 on the
+// object-control seed drops flies (object 103) on the object's coordinates; no delta
 D2UnitStrc* __fastcall OBJECTS_PopulateFn6_RogueGuardCorpse(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, uint8_t nDensity, uint32_t nObjectId, uint16_t nProbability)
 {
     D2UnitStrc* pObject = OBJECTS_PopulateFn3_CommonObjects(pGame, pRoom, nDensity, nObjectId, nProbability);
@@ -1636,7 +1621,7 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn2_WaypointShrine(D2GameStrc* pGame, D2A
                     pObject->dwClassId = nClassId;
                 }
 
-                OBJECTS_GetShrineId(pGame, 2u, 1, pRoom);
+                OBJECTS_GetShrineId(pGame, 2u, 1);
                 pObject->pObjectData->InteractType = 2;
                 UNITS_SetShrineTxtRecordInObjectData(pObject, DATATBLS_GetShrinesTxtRecord(2));
                 OBJRGN_IncreaseHealingShrineCount(pGame, nLevelId);
@@ -1884,6 +1869,7 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn5_Crate(D2GameStrc* pGame, D2ActiveRoom
 }
 
 //D2Game.0x6FC73A70
+// 1.13c D2Game+0x2E5C0 (returns 1; no delta)
 int32_t __fastcall OBJECTS_SpawnNothing(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2DrlgCoordsStrc* pDrlgCoords)
 {
     return 1;
@@ -1932,6 +1918,8 @@ int32_t __fastcall OBJECTS_SpawnBarrel(D2GameStrc* pGame, D2ActiveRoomStrc* pRoo
 }
 
 //D2Game.0x6FC73C50
+// 1.13c D2Game+0x2F4B0 (checked against the disassembly: the placement test is retail's 0x2E5D0 helper with size 1,
+// the spawn is 0x12230, at most 32; no delta)
 int32_t __fastcall OBJECTS_SpawnNothing2(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2DrlgCoordsStrc* pDrlgCoords)
 {
     const uint16_t nXEnd = pDrlgCoords->nSubtileX + std::min(pDrlgCoords->nSubtileWidth, 12);
@@ -1970,6 +1958,7 @@ int32_t __fastcall OBJECTS_SpawnNothing2(D2GameStrc* pGame, D2ActiveRoomStrc* pR
 }
 
 //D2Game.0x6FC73D80
+// 1.13c D2Game+0x327B0 (0x2FA90 with EAX = 0; returns 1)
 int32_t __fastcall OBJECTS_SpawnArmorStand(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2DrlgCoordsStrc* pDrlgCoords)
 {
     OBJECTS_SpawnArmorStandOrWeaponRack(pGame, pRoom, pDrlgCoords, 0);
@@ -1977,6 +1966,8 @@ int32_t __fastcall OBJECTS_SpawnArmorStand(D2GameStrc* pGame, D2ActiveRoomStrc* 
 }
 
 //D2Game.0x6FC73DA0
+// 1.13c D2Game+0x2FA90 (checked against the disassembly: bWeaponRack in EAX against the table count 2, one roll on
+// the object-control seed picks table[rand + 2 * bWeaponRack], placement is retail's 0x2E660 helper, the alloc inlined; no delta)
 void __fastcall OBJECTS_SpawnArmorStandOrWeaponRack(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2DrlgCoordsStrc* pDrlgCoords, int32_t bWeaponRack)
 {
     constexpr int32_t nObjectIds[4] =
@@ -2040,6 +2031,7 @@ void __fastcall OBJECTS_SpawnArmorStandOrWeaponRack(D2GameStrc* pGame, D2ActiveR
 }
 
 //D2Game.0x6FC740C0
+// 1.13c D2Game+0x32790 (0x2FA90 with EAX = 1; returns 1)
 int32_t __fastcall OBJECTS_SpawnWeaponRack(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2DrlgCoordsStrc* pDrlgCoords)
 {
     OBJECTS_SpawnArmorStandOrWeaponRack(pGame, pRoom, pDrlgCoords, 1);
@@ -2206,6 +2198,7 @@ void __fastcall OBJECTS_PopulationHandler(D2GameStrc* pGame, D2ActiveRoomStrc* p
 }
 
 //D2Game.0x6FC744B0
+// 1.13c D2Game+0x2EE60 (the timer-arg chain free is retail's 0x2E790 helper, inlined here; no delta)
 void __fastcall OBJECTS_FreeHoverMessage(D2GameStrc* pGame, D2UnitStrc* pObject)
 {
     if (pObject && pObject->pHoverText)
@@ -2254,6 +2247,8 @@ void __fastcall OBJECTS_SetUnitIdInTimerArg(D2UnitStrc* pPortal, int32_t nUnitId
 }
 
 //D2Game.0x6FC745B0
+// not-1.13c: retail has no function for this; the timer-arg unit-id read (D2Common #10181, +4, else -1) is inlined
+// at its call sites (e.g. D2Game+0x6B6F0, 0x6D0F0); kept for the ObjMode.cpp callers
 int32_t __fastcall OBJECTS_GetUnitIdFromTimerArg(D2UnitStrc* pUnit)
 {
     D2TimerArgStrc* pTimerArg = UNITS_GetTimerArg(pUnit);

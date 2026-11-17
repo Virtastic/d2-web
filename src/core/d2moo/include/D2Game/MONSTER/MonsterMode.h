@@ -35,8 +35,6 @@ struct D2MonModeCallbackTableStrc
 #pragma pack(pop)
 
 
-//D2Game.0x6FC62770
-int32_t __fastcall D2GAME_IsMonster_6FC62770(D2UnitStrc* pUnit);
 //D2Game.0x6FC62780
 void __fastcall sub_6FC62780(D2UnitStrc* pAttacker, D2UnitStrc* pDefender, D2GameStrc* pGame);
 //D2Game.0x6FC627B0

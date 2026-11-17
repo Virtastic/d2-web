@@ -212,21 +212,6 @@ void __fastcall LEVEL_RemoveClient(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D
     D2GAME_PACKETS_SendPacket0x08_6FC3D160(pClient, DUNGEON_GetLevelIdFromRoom(pRoom), drlgCoords.nTileXPos, drlgCoords.nTileYPos);
 }
 
-//D2Game.0x6FC3BFB0
-void __fastcall LEVEL_RemoveClientFromAdjacentRooms(D2ActiveRoomStrc* pRoom, D2ClientStrc* pClient)
-{
-    D2_ASSERT(pRoom);
-
-    D2ActiveRoomStrc** ppRoomList = nullptr;
-    int32_t nNumRooms = 0;
-    DUNGEON_GetAdjacentRoomsListFromRoom(pRoom, &ppRoomList, &nNumRooms);
-
-    for (int32_t i = 0; i < nNumRooms; ++i)
-    {
-        DUNGEON_RemoveClientFromRoom(ppRoomList[i], pClient);
-    }
-}
-
 //D2Game.0x6FC3C010
 // 1.13c D2Game+0x9D610 (a null client is fatal 0x7CB; packet 0x03 then packet 0x53, otherwise identical to 1.10f)
 void __fastcall LEVEL_SynchronizeDayNightCycleWithClient(D2GameStrc* pGame, D2ClientStrc* pClient)
@@ -380,6 +365,7 @@ void __fastcall LEVEL_LoadAct(D2GameStrc* pGame, uint8_t nAct)
 }
 
 //D2Game.0x6FC3C580
+// not-1.13c: retail has no combined function; FreeGame D2Game+0x2CD30 calls the per-type removers itself (objects: 0x33290, a 128-bucket walk of game+0x1520)
 void __fastcall LEVEL_RemoveAllUnits(D2GameStrc* pGame)
 {
     MONSTER_RemoveAll(pGame);

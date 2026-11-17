@@ -107,8 +107,14 @@ void __fastcall sub_6FC34890(D2GameStrc* pGame, D2EventTimerStrc* pTimer)
 }
 
 //D2Game.0x6FC349B0
+// 1.13c D2Game+0x8E8C0 (a null unit is skipped; the unit's timers of this type and callback are deleted, next link read first)
 void __fastcall sub_6FC349B0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nEvent, EventTimerCallback pCallback)
 {
+    if (!pUnit)
+    {
+        return;
+    }
+
     D2EventTimerStrc* pEventTimer = SUNIT_GetTimerFromUnit(pUnit);
     while (pEventTimer)
     {
@@ -564,10 +570,4 @@ void __fastcall sub_6FC35570(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventType
     }
 
     *ppEventTimer = pNewTimer;
-}
-
-//D2Game.0x6FC351D0
-void __fastcall j_D2GAME_InitTimer_6FC351D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventTypes nEventType, int32_t nExpireFrame, EventTimerCallback pfCallBack, int32_t nSkillId, int32_t nSkillLevel)
-{
-    D2GAME_InitTimer_6FC351D0(pGame, pUnit, nEventType, nExpireFrame, pfCallBack, nSkillId, nSkillLevel);
 }

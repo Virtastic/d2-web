@@ -13,8 +13,6 @@ void __fastcall LEVEL_FreeDrlgDeletes(D2GameStrc* pGame);
 void __fastcall LEVEL_AddClient(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2ClientStrc* pClient);
 //D2Game.0x6FC3BF00
 void __fastcall LEVEL_RemoveClient(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2ClientStrc* pClient);
-//D2Game.0x6FC3BFB0
-void __fastcall LEVEL_RemoveClientFromAdjacentRooms(D2ActiveRoomStrc* pRoom, D2ClientStrc* pClient);
 //D2Game.0x6FC3C010
 void __fastcall LEVEL_SynchronizeDayNightCycleWithClient(D2GameStrc* pGame, D2ClientStrc* pClient);
 //D2Game.0x6FC3C0B0

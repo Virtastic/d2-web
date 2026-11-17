@@ -65,6 +65,7 @@ void __fastcall SUNITINACTIVE_RestoreInactiveUnits(D2GameStrc* pGame, D2ActiveRo
 	SUNITINACTIVE_RestoreInactiveRest(pGame, pRoom, nAct, &pDrlgCoords);
 }
 
+// 1.13c D2Game+0x1FB90 (see the declaration above for the delta)
 void __fastcall SUNITINACTIVE_RestoreInactiveMonsters(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom)
 {
 	D2DrlgCoordsStrc pDrlgCoords = {};
@@ -500,6 +501,7 @@ D2AiControlStrc* __fastcall AIGENERAL_GetAiControlFromUnit(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCC40F0
+// not-1.13c: inlined at its call sites (SUnitInactive.cpp line 0x8D free in 0x1EC40 and 0x1EBD0)
 void __fastcall SUNITINACTIVE_FreeInactiveMonsterNode(D2GameStrc* pGame, D2InactiveMonsterNodeStrc* pInactiveMonsterNode)
 {
 	if (pInactiveMonsterNode->pMapAI)
@@ -511,6 +513,7 @@ void __fastcall SUNITINACTIVE_FreeInactiveMonsterNode(D2GameStrc* pGame, D2Inact
 }
 
 //D2Game.0x6FCC4120
+// 1.13c D2Game+0x1F9F0
 D2UnitStrc* __fastcall SUNITINACTIVE_RestoreInactiveItem(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2InactiveItemNodeStrc* pInactiveItemNode)
 {
 	D2ItemSaveStrc pItemSave = {};
@@ -548,11 +551,7 @@ D2UnitStrc* __fastcall SUNITINACTIVE_RestoreInactiveItem(D2GameStrc* pGame, D2Ac
 		{
 			ITEMS_GetCompactItemDataFromBitstream(pBitstream, nAvailableSize, 1, &pItemSave);
 			D2UnitStrc* pSocketable = sub_6FC4EC10(pGame, nullptr, pBitstream, nAvailableSize, 1, &pItemSave, &nSize, 96);
-			if (!pSocketable)
-			{
-				FOG_DisplayWarning("Unable to create item", __FILE__, __LINE__);
-				return nullptr;
-			}
+			D2_ASSERT(pSocketable);	// 1.13c: asserts (line 0x10D) and exits; 1.10f warned and returned nullptr
 
 			pBitstream = &pBitstream[nSize];
 			nAvailableSize -= nSize;
@@ -1038,9 +1037,9 @@ void __fastcall SUNITINACTIVE_CompressInactiveUnit(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FCC4C90
+// 1.13c D2Game+0x1EC40 (monster nodes only; every caller passes UNIT_MONSTER)
 void __fastcall SUNITINACTIVE_DeleteSingleListNode(D2GameStrc* pGame, uint16_t nUnitType, uint16_t nClassId, uint8_t nAct)
 {
-	if (nUnitType == UNIT_MONSTER)
 	{
 		D2InactiveUnitListStrc* pInactiveUnitList = pGame->pInactiveUnitList[nAct];
 		while (pInactiveUnitList)
@@ -1068,38 +1067,6 @@ void __fastcall SUNITINACTIVE_DeleteSingleListNode(D2GameStrc* pGame, uint16_t n
 
 				pPreviousMonsterNode = pInactiveMonsterNode;
 				pInactiveMonsterNode = pInactiveMonsterNode->pNext;
-			}
-
-			pInactiveUnitList = pInactiveUnitList->pNext;
-		}
-	}
-	else
-	{
-		D2InactiveUnitListStrc* pInactiveUnitList = pGame->pInactiveUnitList[nAct];
-		while (pInactiveUnitList)
-		{
-			D2InactiveUnitNodeStrc* pInactiveUnitNode = pInactiveUnitList->pInactiveUnits;
-			D2InactiveUnitNodeStrc* pPreviousUnitNode = nullptr;
-
-			while (pInactiveUnitNode)
-			{
-				if (pInactiveUnitNode->nUnitType == nUnitType && pInactiveUnitNode->nClassId == nClassId)
-				{
-					if (pInactiveUnitNode == pInactiveUnitList->pInactiveUnits)
-					{
-						pInactiveUnitList->pInactiveUnits = pInactiveUnitNode->pNext;
-					}
-					else
-					{
-						pPreviousUnitNode->pNext = pInactiveUnitNode->pNext;
-					}
-
-					D2_FREE_POOL(pGame->pMemoryPool, pInactiveUnitNode);
-					return;
-				}
-
-				pPreviousUnitNode = pInactiveUnitNode;
-				pInactiveUnitNode = pInactiveUnitNode->pNext;
 			}
 
 			pInactiveUnitList = pInactiveUnitList->pNext;
@@ -1161,6 +1128,7 @@ D2InactiveUnitListStrc* __fastcall SUNITINACTIVE_GetListNodeFromActAndCoordinate
 }
 
 //D2Game.0x6FCC4E80
+// not-1.13c: retail 0x1F600 computes the room coordinates inline and calls 0x1E960 directly; 0x204E0 and 0x203D0 never call a room wrapper
 D2InactiveUnitListStrc* __fastcall SUNITINACTIVE_GetListNodeFromRoom(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t bAllocNewNode)
 {
 	D2DrlgCoordsStrc pCoord = {};
@@ -1249,6 +1217,7 @@ void __fastcall SUNITINACTIVE_RestoreSpecialMonsterParameters(D2GameStrc* pGame,
 }
 
 //D2Game.0x6FCC50B0
+// 1.13c D2Game+0x1EF50 (called from the monster dispatch 0x1F600; class ids 0x44 / 0x21F / 0x137 / 0x138 and the type-10 AI command match)
 void __fastcall SUNITINACTIVE_SaveSpecialMonsterParameters(D2GameStrc* pGame, D2UnitStrc* pUnit, D2InactiveMonsterNodeStrc* pInactiveMonsterNode)
 {
 	const int32_t nClassId = pUnit->dwClassId;
@@ -1367,6 +1336,7 @@ int32_t __fastcall SUNITINACTIVE_IsUnitInsideRoom(D2GameStrc* pGame, D2ActiveRoo
 }
 
 //D2Game.0x6FCC5490
+// 1.13c D2Game+0x1EB20
 void __fastcall SUNITINACTIVE_DeleteExpiredItemNodes(D2GameStrc* pGame, int32_t nAct)
 {
 	for (D2InactiveUnitListStrc* i = pGame->pInactiveUnitList[nAct]; i; i = i->pNext)
@@ -1402,6 +1372,7 @@ void __fastcall SUNITINACTIVE_DeleteExpiredItemNodes(D2GameStrc* pGame, int32_t 
 }
 
 //D2Game.0x6FCC54F0
+// not-1.13c: retail has no (unit, flag, set) function; the dwFlagEx read-modify-write is inlined at its callers (0x1FB90)
 void __fastcall SUNITINACTIVE_SetUnitFlagEx(D2UnitStrc* pUnit, uint32_t nFlag, int32_t bSet)
 {
 	if (!pUnit)
