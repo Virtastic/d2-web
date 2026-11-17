@@ -164,6 +164,7 @@ int32_t __fastcall MISSMODE_SrvHit04_ExplodingArrow_FreezingArrow_RoyalStrikeMet
 int32_t __fastcall MISSMODE_SrvHit11_Unused(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit);
 //D2Game.0x6FC5B6A0
 int32_t __fastcall MISSMODE_SrvHit14_MeteorCenter_CatapultMeteor_RoyalStrikeMeteor(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit);
+int32_t __fastcall MISSMODE_GetSkillRangeParam(int32_t nSkillId, int32_t nLevel);
 //D2Game.0x6FC5B910
 void __fastcall MISSMODE_CreateMeteor_MoltenBoulderSubmissiles(D2GameStrc* pGame, D2UnitStrc* pMissile, int32_t nMissileId, int32_t nRange, int32_t nStep);
 //D2Game.0x6FC5BA50

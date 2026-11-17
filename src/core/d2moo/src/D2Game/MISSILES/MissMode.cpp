@@ -2885,7 +2885,18 @@ int32_t __fastcall MISSMODE_SrvHit11_Unused(D2GameStrc* pGame, D2UnitStrc* pMiss
 }
 
 //D2Game.0x6FC5B6A0
-// 1.13c D2Game+0x3DEF0 (HitPar clamp signed: cmp/jge, was unsigned)
+// 1.13c D2Game+0x1A40: the skill's Param[2] + (level - 1) * Param[3], 0 for a bad skill id or a level below 1
+int32_t __fastcall MISSMODE_GetSkillRangeParam(int32_t nSkillId, int32_t nLevel)
+{
+    D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
+    if (pSkillsTxtRecord && nLevel > 0)
+    {
+        return pSkillsTxtRecord->dwParam[2] + (nLevel - 1) * pSkillsTxtRecord->dwParam[3];
+    }
+    return 0;
+}
+
+// 1.13c D2Game+0x3DEF0 (HitPar clamp signed: cmp/jge, was unsigned; X/Y read before the range; area damage direct, always returns 1)
 int32_t __fastcall MISSMODE_SrvHit14_MeteorCenter_CatapultMeteor_RoyalStrikeMeteor(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)
@@ -2899,9 +2910,9 @@ int32_t __fastcall MISSMODE_SrvHit14_MeteorCenter_CatapultMeteor_RoyalStrikeMete
         return 1;
     }
 
-    const int32_t nSkillId = MISSILE_GetSkill(pMissile);
-    const int32_t nLevel = MISSILE_GetLevel(pMissile);
-    D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
+    const int32_t nSkillId = D2_CALL(MISSILE_GetSkill, pMissile);
+    const int32_t nLevel = D2_CALL(MISSILE_GetLevel, pMissile);
+    D2SkillsTxt* pSkillsTxtRecord = D2_CALL(SKILLS_GetSkillsTxtRecord, nSkillId);
     if (!pSkillsTxtRecord)
     {
         return 1;
@@ -2913,41 +2924,32 @@ int32_t __fastcall MISSMODE_SrvHit14_MeteorCenter_CatapultMeteor_RoyalStrikeMete
         return 1;
     }
 
-    const int32_t nX = CLIENTS_GetUnitX(pMissile);
-    const int32_t nY = CLIENTS_GetUnitY(pMissile);
+    const int32_t nX = D2_CALL(CLIENTS_GetUnitX, pMissile);
+    const int32_t nY = D2_CALL(CLIENTS_GetUnitY, pMissile);
 
     int32_t nRange = pMissilesTxtRecord->dwHitPar[0];
     if (nRange <= 0)
     {
-        nRange = std::max(SKILLS_EvaluateSkillFormula(pOwner, pSkillsTxtRecord->dwAuraRangeCalc, nSkillId, nLevel), 1);
+        nRange = std::max(D2_CALL(SKILLS_EvaluateSkillFormula, pOwner, pSkillsTxtRecord->dwAuraRangeCalc, nSkillId, nLevel), 1);
     }
 
     D2DamageStrc damage = {};
-    MISSMODE_FillDamageParams(pMissile, pUnit, &damage);
+    D2_CALL(MISSMODE_FillDamageParams, pMissile, pUnit, &damage);
 
     damage.dwHitFlags |= pMissilesTxtRecord->dwHitFlags;
     damage.wResultFlags |= pMissilesTxtRecord->wResultFlags;
 
-    int32_t nResult = 1;
-    if (!sub_6FD10200(pGame, pOwner, nX, nY, nRange, &damage, 0))
-    {
-        nResult = 3;
-    }
+    D2_CALL(sub_6FD0FE80, pGame, pOwner, nX, nY, nRange, 0x8583u, sub_6FCF5DE0, &damage, 0, __FILE__, __LINE__);
 
     const int32_t nHitSubMissile = pMissilesTxtRecord->wHitSubMissile[0];
     if (nHitSubMissile >= 0)
     {
-        int32_t nMissileRange = 0;
-        if (nLevel > 0)
-        {
-            nMissileRange = pSkillsTxtRecord->dwParam[2] + (nLevel - 1) * pSkillsTxtRecord->dwParam[3];
-        }
-
+        const int32_t nMissileRange = D2_CALL(MISSMODE_GetSkillRangeParam, nSkillId, nLevel);
         const int32_t nParam = std::max(int32_t(pMissilesTxtRecord->dwHitPar[1]), 1);
-        MISSMODE_CreateMeteor_MoltenBoulderSubmissiles(pGame, pMissile, nHitSubMissile, nMissileRange, nParam);
+        D2_CALL(MISSMODE_CreateMeteor_MoltenBoulderSubmissiles, pGame, pMissile, nHitSubMissile, nMissileRange, nParam);
     }
 
-    return nResult;
+    return 1;
 }
 
 //D2Game.0x6FC5B910
@@ -3192,7 +3194,7 @@ int32_t __fastcall MISSMODE_SrvHit19_FingerMageSpider(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FC5C0D0
-// 1.13c D2Game+0x3DD60 (checked against decompile, no delta)
+// 1.13c D2Game+0x3DD60 (X/Y read before the HitPar formulas)
 int32_t __fastcall MISSMODE_SrvHit20_LightningFury(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)
@@ -3221,6 +3223,10 @@ int32_t __fastcall MISSMODE_SrvHit20_LightningFury(D2GameStrc* pGame, D2UnitStrc
         return 1;
     }
 
+    // retail reads the missile position before evaluating the two formulas
+    const int32_t nX = D2_CALL(CLIENTS_GetUnitX, pMissile);
+    const int32_t nY = D2_CALL(CLIENTS_GetUnitY, pMissile);
+
     int32_t nAuraRange = pMissilesTxtRecord->dwHitPar[0];
     if (nAuraRange <= 0)
     {
@@ -3247,8 +3253,6 @@ int32_t __fastcall MISSMODE_SrvHit20_LightningFury(D2GameStrc* pGame, D2UnitStrc
     params.nParam = nParam;
     params.nHitSubMissile = pMissilesTxtRecord->wHitSubMissile[0];
 
-    const int32_t nX = D2_CALL(CLIENTS_GetUnitX, pMissile);
-    const int32_t nY = D2_CALL(CLIENTS_GetUnitY, pMissile);
     D2_CALL(sub_6FD0FE80, pGame, pOwner, nX, nY, nAuraRange, nAuraFilter, MISSMODE_LightningFury_AuraCallback, &params, 1, __FILE__, __LINE__);
     return 3;
 }
@@ -4056,7 +4060,7 @@ int32_t __fastcall MISSMODE_SrvHit45_LightningTrailingJavelin(D2GameStrc* pGame,
 }
 
 //D2Game.0x6FC5DA80
-// 1.13c D2Game+0x3D8C0 (HitPar clamp signed: cmp/jge, was unsigned)
+// 1.13c D2Game+0x3D8C0 (HitPar clamp signed: cmp/jge, was unsigned; a null hit unit passes, the area damage is called directly, returns 1)
 int32_t __fastcall MISSMODE_SrvHit47_MoltenBoulder(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)
@@ -4076,50 +4080,49 @@ int32_t __fastcall MISSMODE_SrvHit47_MoltenBoulder(D2GameStrc* pGame, D2UnitStrc
         return 1;
     }
 
-    if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
+    // retail: a hit unit is only required to be a large monster when one is given; none passes
+    if (pUnit)
     {
-        return 2;
+        if (pUnit->dwUnitType != UNIT_MONSTER)
+        {
+            return 2;
+        }
+
+        if (!D2_CALL(MONSTERREGION_CheckMonStats2Flag, pUnit->dwClassId, MONSTATS2FLAGINDEX_LARGE))
+        {
+            return 2;
+        }
     }
 
-    D2MonStats2Txt* pMonStats2TxtRecord = MONSTERREGION_GetMonStats2TxtRecord(pUnit->dwClassId);
-    if (!pMonStats2TxtRecord || !(pMonStats2TxtRecord->dwFlags & gdwBitMasks[MONSTATS2FLAGINDEX_LARGE]))
-    {
-        return 2;
-    }
-
-    const int32_t nX = CLIENTS_GetUnitX(pMissile);
-    const int32_t nY = CLIENTS_GetUnitY(pMissile);
-
-    int32_t nResult = 1;
+    const int32_t nX = D2_CALL(CLIENTS_GetUnitX, pMissile);
+    const int32_t nY = D2_CALL(CLIENTS_GetUnitY, pMissile);
 
     D2DamageStrc damage = {};
-    MISSMODE_FillDamageParams(pMissile, pUnit, &damage);
+    D2_CALL(MISSMODE_FillDamageParams, pMissile, pUnit, &damage);
 
     int32_t nRange = pMissilesTxtRecord->dwHitPar[0];
     if (nRange <= 0)
     {
-        const int32_t nSkillId = MISSILE_GetSkill(pMissile);
-        const int32_t nLevel = MISSILE_GetLevel(pMissile);
-        D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
+        const int32_t nSkillId = D2_CALL(MISSILE_GetSkill, pMissile);
+        const int32_t nLevel = D2_CALL(MISSILE_GetLevel, pMissile);
+        D2SkillsTxt* pSkillsTxtRecord = D2_CALL(SKILLS_GetSkillsTxtRecord, nSkillId);
         if (!pSkillsTxtRecord)
         {
             return 1;
         }
 
-        nRange = std::max(SKILLS_EvaluateSkillFormula(pOwner, pSkillsTxtRecord->dwAuraRangeCalc, nSkillId, nLevel), 1);
+        nRange = std::max(D2_CALL(SKILLS_EvaluateSkillFormula, pOwner, pSkillsTxtRecord->dwAuraRangeCalc, nSkillId, nLevel), 1);
     }
 
     damage.dwHitFlags |= pMissilesTxtRecord->dwHitFlags;
     damage.wResultFlags |= pMissilesTxtRecord->wResultFlags;
 
-    if (!sub_6FD10200(pGame, pOwner, nX, nY, nRange, &damage, 0))
-    {
-        nResult = 3;
-    }
+    // retail inlines the area-damage wrapper (0xA1240): filter 0x8583, the result is not used
+    D2_CALL(sub_6FD0FE80, pGame, pOwner, nX, nY, nRange, 0x8583u, sub_6FCF5DE0, &damage, 0, __FILE__, __LINE__);
 
     const int32_t nParam = std::max(int32_t(pMissilesTxtRecord->dwHitPar[1]), 1);
-    MISSMODE_CreateMeteor_MoltenBoulderSubmissiles(pGame, pMissile, pMissilesTxtRecord->wHitSubMissile[0], nRange, nParam);
-    return nResult;
+    D2_CALL(MISSMODE_CreateMeteor_MoltenBoulderSubmissiles, pGame, pMissile, pMissilesTxtRecord->wHitSubMissile[0], nRange, nParam);
+    return 1;
 }
 
 //D2Game.0x6FC5DD10
