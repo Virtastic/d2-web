@@ -1,4 +1,6 @@
 // Link seams for the z14 number/strans batch (callees not yet ported). The numeric ones below are reached by the string-to-double probes.
+#include <cstdarg>
+#include <cstddef>
 #include <cstdint>
 #include "storm_batch_34d60.h"
 uint32_t z14_vtbl36848;
@@ -40,5 +42,8 @@ int z14_Sub23EA0(uint32_t*, uint32_t*, uint8_t*, uint32_t, uint32_t*, uint32_t*,
 void z14_Sub27C10(uint8_t*, uint32_t, uint32_t, int, uint32_t*, void*, uint32_t*) {}
 int z14_Sub291E0(uint32_t*, const void*, uint32_t*) { return 0; }
 void z14_Sub2B080(void*, const void*, uint32_t) {}
-uint32_t z14_vsnprintf(char*, uint32_t, const char*, void*) { return 0; }
-uint32_t z14_vsprintf(char*, const char*, void*) { return 0; }
+// Storm+0x5801 __vsnprintf / Storm+0x553B _vsprintf (src/core/crt/storm_vprintf.cpp); `ap` points at the caller's va_list.
+extern "C" int storm___vsnprintf(char*, size_t, const char*, va_list);
+extern "C" int storm__vsprintf(char*, const char*, va_list);
+uint32_t z14_vsnprintf(char* d, uint32_t n, const char* f, void* ap) { return (uint32_t)storm___vsnprintf(d, n, f, *static_cast<va_list*>(ap)); }
+uint32_t z14_vsprintf(char* d, const char* f, void* ap) { return (uint32_t)storm__vsprintf(d, f, *static_cast<va_list*>(ap)); }

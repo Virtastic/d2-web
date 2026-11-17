@@ -6,18 +6,7 @@
 #include <cstdarg>
 #include <cstdio>
 
-// 1.13c Storm+0x0553B
-extern "C" int storm__vsprintf(char* dest, const char* fmt, va_list ap) {
-    if (!dest) return vsnprintf(nullptr, 0, fmt, ap);
-    return vsnprintf(dest, 0x7fffffff, fmt, ap);
-}
-
-// 1.13c Storm+0x05801
-extern "C" int storm___vsnprintf(char* dest, size_t count, const char* fmt, va_list ap) {
-    if (!dest) return vsnprintf(nullptr, 0, fmt, ap);
-    int n = vsnprintf(dest, count, fmt, ap);
-    return (n < 0 || (size_t)n >= count) ? -1 : n;
-}
+// Storm+0x0553B _vsprintf and Storm+0x05801 __vsnprintf: src/core/crt/storm_vprintf.cpp.
 
 // 1.13c Storm+0x0E930
 extern "C" uint64_t storm___allmul(uint64_t a, uint64_t b) { return a * b; }

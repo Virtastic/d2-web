@@ -84,7 +84,15 @@ int32_t SStrCmpI(const char* a, const char* b, size_t n) {
 int32_t SStrCmp(const char* a, const char* b, size_t n) { return storm25220::compare(stormStrState(), a, b, (uint32_t)n); }
 size_t  SStrCopy(char* dest, const char* src, size_t destsize) { return storm25220::copy(stormStrState(), dest, src, (uint32_t)destsize); }
 size_t  SStrLen(const char* s) { return Storm_Sub3AFD0(s); }
-int     SStrVPrintf(char* dst, size_t max, char* fmt, va_list args) { return vsnprintf(dst, max, fmt, args); }
+// SStrVPrintf (#581) runs retail's row Storm+0x3BA00 over Storm's VS2003 CRT formatters.
+uint32_t Storm_Sub3BA00_z14(char* dst, uint32_t cap, const char* fmt, void* ap);
+int     SStrVPrintf(char* dst, size_t max, char* fmt, va_list args) {
+    va_list ap;
+    va_copy(ap, args);
+    const int n = (int)Storm_Sub3BA00_z14(dst, (uint32_t)max, fmt, &ap);
+    va_end(ap);
+    return n;
+}
 
 // Fog #10137 / #10086: the CRC-16 over a name and the 14-bit-to-2-chars encoding the client
 // preview uses. Nothing in the spawn path hashes; kept minimal until a scenario reads them.
