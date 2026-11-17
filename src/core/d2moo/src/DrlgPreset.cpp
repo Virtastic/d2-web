@@ -47,6 +47,7 @@ D2PresetUnitStrc* DRLGPRESET_AllocateAndAddPresetUnitToMap(D2DrlgRoomStrc* pDrlg
 }
 
 
+// 1.13c D2Common+0xA0B0 (ordinal 10726; delta: a full 150-entry act row returns 150, 1.10f returned 0)
 //D2Common.0x6FD859A0 (#11222)
 int __stdcall DRLGPRESET_CountPresetObjectsByAct(uint8_t nAct)
 {
@@ -58,7 +59,7 @@ int __stdcall DRLGPRESET_CountPresetObjectsByAct(uint8_t nAct)
 		}
 	}
 
-	return 0;
+	return 150;
 }
 
 //D2Common.0x6FD859E0 (#11223)
@@ -701,6 +702,7 @@ void __fastcall DRLGPRESET_FreeMapAI(void* pMemPool, D2MapAIStrc* pMapAI)
 	D2_FREE_POOL(pMemPool, pMapAI);
 }
 
+// 1.13c D2Common+0xB320 (diffed; identical: same unit-type gates, seed draws and monster/object ids)
 //D2Common.0x6FD86540
 void __fastcall DRLGPRESET_AddPresetUnitToDrlgMap(void* pMemPool, D2DrlgMapStrc* pDrlgMap, D2SeedStrc* pSeed)
 {
@@ -943,6 +945,7 @@ void __fastcall DRLGPRESET_AddPresetRiverObjects(D2DrlgMapStrc* pDrlgMap, void* 
 	}
 }
 
+// 1.13c D2Common+0xAEC0 (diffed; identical: grids, tombstone tiles, record, pointer cleared)
 //D2Common.0x6FD86C80
 void __fastcall DRLGPRESET_FreePresetRoomData(D2DrlgRoomStrc* pDrlgRoom)
 {
@@ -987,6 +990,7 @@ void __fastcall DRLGPRESET_FreeDrlgGrids(void* pMemPool, D2DrlgRoomStrc* pDrlgRo
 	}
 }
 
+// not-1.13c: retail's caller (D2Common+0x688B0) calls the grid free (D2Common+0xA440) directly; it does its own null checks
 //D2Common.0x6FD86D60
 void __fastcall DRLGPRESET_FreeDrlgGridsFromPresetRoom(D2DrlgRoomStrc* pDrlgRoom)
 {
@@ -1687,6 +1691,7 @@ char* __fastcall DRLGPRESET_GetPickedLevelPrestFilePathFromRoomEx(D2DrlgRoomStrc
 	return pDrlgRoom->pMaze->pMap->pLvlPrestTxtRecord->szFile[pDrlgRoom->pMaze->pMap->nPickedFile];
 }
 
+// 1.13c D2Common+0xA6A0 (diffed branch by branch; identical)
 //D2Common.0x6FD881D0
 void __fastcall DRLGPRESET_UpdatePops(D2DrlgRoomStrc* pDrlgRoom, int nX, int nY, BOOL bOtherRoom)
 {
@@ -1765,6 +1770,7 @@ void __fastcall DRLGPRESET_UpdatePops(D2DrlgRoomStrc* pDrlgRoom, int nX, int nY,
 	}
 }
 
+// 1.13c D2Common+0xA180 (diffed branch by branch; identical)
 //D2Common.0x6FD88450
 void __fastcall DRLGPRESET_TogglePopsVisibility(D2DrlgRoomStrc* pDrlgRoom, int nPopSubIndex, D2DrlgCoordStrc* pDrlgCoord, int nTick, BOOL nCellFlags)
 {
@@ -1913,6 +1919,7 @@ void __fastcall DRLGPRESET_GenerateLevel(D2DrlgLevelStrc* pLevel)
 	}
 }
 
+// not-1.13c: retail indexes the same 42-entry table (D2Common+0x8BCC0, 0 differences) inline in the DS1 parser D2Common+0xB560
 //D2Common.0x6FD88850
 int __fastcall DRLGPRESET_MapTileType(int nId)
 {

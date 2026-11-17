@@ -29,18 +29,21 @@ void __fastcall DRGLGRID_OrFlag(int* pFlag, int nFlag)
 }
 
 //D2Common.0x6FD75BC0
+// 1.13c D2Common+0x36C00
 void __fastcall DRGLGRID_AndFlag(int* pFlag, int nFlag)
 {
 	*pFlag &= nFlag;
 }
 
 //D2Common.0x6FD75BD0
+// 1.13c D2Common+0x36BF0
 void __fastcall DRGLGRID_XorFlag(int* pFlag, int nFlag)
 {
 	*pFlag ^= nFlag;
 }
 
 //D2Common.6FD75BE0
+// 1.13c D2Common+0x36BE0
 void __fastcall DRGLGRID_OverwriteFlagIfZero(int* pFlag, int nFlag)
 {
 	if (*pFlag == 0)
@@ -57,6 +60,7 @@ void __fastcall DRGLGRID_AndNegatedFlag(int* pFlag, int nFlag)
 }
 
 //D2Common.0x6FD75C00
+// not-1.13c: retail has no function between D2Common+0x36C20 and 0x36CD0; callers test the grid and its flag array inline
 BOOL __fastcall DRLGGRID_IsGridValid(D2DrlgGridStrc* pDrlgGrid)
 {
 	return pDrlgGrid && pDrlgGrid->pCellsFlags;

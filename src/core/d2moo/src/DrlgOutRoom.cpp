@@ -63,6 +63,7 @@ void __fastcall DRLGOUTROOM_InitializeDrlgOutdoorRoom(D2DrlgRoomStrc* pDrlgRoom)
 	DRLGLOGIC_AllocCoordLists(pDrlgRoom);
 }
 
+// 1.13c D2Common+0x40FC0 (diffed; identical)
 //D2Common.0x6FD83EC0
 BOOL __fastcall DRLGOUTROOM_LinkLevelsByLevelCoords(D2DrlgLevelLinkDataStrc* pLevelLinkData)
 {
@@ -88,6 +89,7 @@ BOOL __fastcall DRLGOUTROOM_LinkLevelsByLevelCoords(D2DrlgLevelLinkDataStrc* pLe
 	return TRUE;
 }
 
+// 1.13c D2Common+0x40F00 (diffed; identical)
 //D2Common.0x6FD83F70
 BOOL __fastcall DRLGOUTROOM_LinkLevelsByLevelDef(D2DrlgLevelLinkDataStrc* pLevelLinkData)
 {
@@ -116,6 +118,7 @@ BOOL __fastcall DRLGOUTROOM_LinkLevelsByLevelDef(D2DrlgLevelLinkDataStrc* pLevel
 	return TRUE;
 }
 
+// 1.13c D2Common+0x40E10 (diffed; identical, offset table read from the DLL)
 //D2Common.0x6FD84010
 BOOL __fastcall DRLGOUTROOM_LinkLevelsByOffsetCoords(D2DrlgLevelLinkDataStrc* pLevelLinkData)
 {

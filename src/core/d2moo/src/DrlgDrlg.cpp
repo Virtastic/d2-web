@@ -132,6 +132,7 @@ void __fastcall DRLG_FreeDrlg(D2DrlgStrc* pDrlg)
 }
 
 //D2Common.0x6FD74440
+// 1.13c D2Common+0x2DAF0: a level of any other drlg type is left alone (no unreachable)
 void __fastcall DRLG_FreeLevel(void* pMemPool, D2DrlgLevelStrc* pLevel, BOOL bAlloc)
 {
 	D2DrlgBuildStrc* pNextDrlgBuild = NULL;
@@ -206,7 +207,7 @@ void __fastcall DRLG_FreeLevel(void* pMemPool, D2DrlgLevelStrc* pLevel, BOOL bAl
 		DRLGOUTDOORS_FreeOutdoorInfo(pLevel, bAlloc);
 		break;
 	default:
-		D2_UNREACHABLE;
+		break;
 	}
 
 	memset(pLevel->pTileInfo, 0x00, sizeof(pLevel->pTileInfo));
@@ -428,6 +429,7 @@ D2DrlgLevelStrc* __stdcall DRLG_GetLevel(D2DrlgStrc* pDrlg, int nLevelId)
 }
 
 //D2Common.0x6FD749D0
+// not-1.13c: retail has no such helper; DUNGEON_GetHoradricStaffTombLevelId (D2Common+0x3B270) asserts the act and returns act+0x48 itself
 int __fastcall DRLG_GetHoradricStaffTombLevelId(D2DrlgStrc* pDrlg)
 {
 	if (pDrlg)
@@ -517,12 +519,14 @@ void __fastcall DRLG_CreateRoomForRoomEx(D2DrlgStrc* pDrlg, D2DrlgRoomStrc* pDrl
 }
 
 //D2Common.0x6FD74B30
+// not-1.13c: retail has no such function; DUNGEON_GetWarpCoordinatesFromRoom (D2Common+0x3B1A0) computes room->level->warp-x array inline
 int* __fastcall DRLG_GetRoomCenterX_RoomWarpXFromRoom(D2DrlgRoomStrc* pDrlgRoom)
 {
 	return pDrlgRoom->pLevel->nRoom_Center_Warp_X;
 }
 
 //D2Common.0x6FD74B40
+// 1.13c D2Common+0x2DC90 (ESI = level): same walk; retail's per-room warp flag is only ever set just before it is used
 void __fastcall DRLG_ComputeLevelWarpInfo(D2DrlgLevelStrc* pLevel)
 {
 	for (D2DrlgRoomStrc* pDrlgRoom = pLevel->pFirstRoomEx; pDrlgRoom; pDrlgRoom = pDrlgRoom->pDrlgRoomNext)
@@ -602,6 +606,7 @@ void __stdcall DRLG_InitLevel(D2DrlgLevelStrc* pLevel)
 }
 
 //D2Common.0x6FD74D50
+// 1.13c D2Common+0x2E1A0: counts the level's rooms without the population-zero flag (0x800000)
 int __fastcall DRLG_GetNumberOfPopulatedRoomsInLevel(D2DrlgStrc* pDrlg, int nLevelId)
 {
 	D2DrlgLevelStrc* pLevel = DRLG_GetLevel(pDrlg, nLevelId);
@@ -796,6 +801,7 @@ BOOL __fastcall DRLG_IsTownLevel(int nLevelId)
 }
 
 //D2Common.0x6FD75260 (#10000)
+// 1.13c D2Common+0x2D970: the levels.txt LevelType column of the row
 int __stdcall DRLG_GetLevelTypeFromLevelId(int nLevelId)
 {
 	return DATATBLS_GetLevelDefRecord(nLevelId)->dwLevelType;
@@ -848,6 +854,7 @@ uint8_t __stdcall DRLG_GetActNoFromLevelId(int nLevelId)
 }
 
 //D2Common.0x6FD75330 (#10004)
+// 1.13c D2Common+0x2D850: the levels.txt SaveMonsters column of the row
 int __stdcall DRLG_GetSaveMonstersFromLevelId(int nLevelId)
 {
 	return DATATBLS_GetLevelDefRecord(nLevelId)->dwSaveMonsters;

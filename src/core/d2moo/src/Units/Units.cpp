@@ -1782,6 +1782,7 @@ const D2Common33110Env& UNITS_AnimRateEnv()
 	return kEnv;
 }
 
+// 1.13c D2Common+0x33110 (body: d2common/d2common_33110.cpp)
 void __stdcall UNITS_UpdateAnimRateAndVelocity(D2UnitStrc* pUnit, const char* szFile, int nLine)
 {
 	(void)szFile; (void)nLine;
@@ -2257,6 +2258,7 @@ BOOL __stdcall UNITS_IsSoftMonster(D2UnitStrc* pUnit)
 	return FALSE;
 }
 
+// not-1.13c: d2-web callee table that binds the 1.13c player-data alloc/free ports to the D2MOO functions; retail has no such table (it calls them directly)
 const D2UnitsPlayerDataSeams& UNITS_PlayerDataSeams()
 {
 	static const D2UnitsPlayerDataSeams kSeams = {
@@ -2469,6 +2471,7 @@ int __stdcall UNITS_GetOverlayHeight(D2UnitStrc* pUnit)
 	return 0;
 }
 
+// not-1.13c: d2-web callee table that binds the 1.13c defense port to the D2MOO functions; retail has no such table (it calls them directly)
 const D2UnitsDefenseSeams& UNITS_DefenseSeams()
 {
 	static const D2UnitsDefenseSeams kSeams = {
@@ -3380,6 +3383,7 @@ __attribute__((weak)) char DAT_6fdda728[1];
 	__builtin_trap();
 }
 
+// not-1.13c: d2-web callee table that binds the 1.13c item-component port to the D2MOO functions; retail has no such table (it calls them directly)
 const D2UnitsComponentSeams& UNITS_ComponentSeams()
 {
 	static const D2UnitsComponentSeams kSeams = {

@@ -250,6 +250,7 @@ void __fastcall DRLGOUTWILD_SpawnRiver(D2DrlgLevelStrc* pLevel, int nX)
 	}
 }
 
+// 1.13c D2Common+0x7EF60 (the per-cell body of its cave scan loop; retail inlines it: grid 16 -> preset 0x19, 17 -> 0x18, then flag 0x40)
 //D2Common.0x6FD85390
 BOOL __fastcall DRLGOUTWILD_SpawnCliffCaves(D2DrlgLevelStrc* pLevel, int nX, int nY)
 {
@@ -500,6 +501,7 @@ void __fastcall DRLGOUTWILD_SpawnSpecialPresets(D2DrlgLevelStrc* pLevel)
 	}
 }
 
+// 1.13c D2Common+0x7EDC0 (diffed; identical: same seed draws, same preset ids)
 //D2Common.0x6FD85920
 void __fastcall DRLGOUTWILD_SpawnCottage(D2DrlgLevelStrc* pLevel, int nLvlPrestId, int a3)
 {

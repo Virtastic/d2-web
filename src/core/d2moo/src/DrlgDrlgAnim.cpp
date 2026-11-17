@@ -61,6 +61,7 @@ void __fastcall DRLGANIM_InitCache(D2DrlgStrc* pDrlg, D2DrlgTileDataStrc* pTileD
 }
 
 //D2Common.0x6FD75560
+// 1.13c D2Common+0x12E50 (EAX = nTileX, EDX = nTileY, EDI = room): same tests as 1.10f
 void __fastcall DRLGANIM_TestLoadAnimatedRoomTiles(D2DrlgRoomStrc* pDrlgRoom, D2DrlgGridStrc* pDrlgGrid, D2DrlgGridStrc* pTileTypeGrid, int nTileType, int nTileX, int nTileY)
 {
 	D2TileLibraryEntryStrc* ppTileLibraryEntry[40] = {};
@@ -104,12 +105,13 @@ void __fastcall DRLGANIM_TestLoadAnimatedRoomTiles(D2DrlgRoomStrc* pDrlgRoom, D2
 	}
 }
 
-// Helper functions
+// not-1.13c: D2MOO helper; retail shifts the frame by 8 inline (>> 8) in 0x12DC0
 static int AnimationFrameFixedPointToInteger(int nFixedPointFrame)
 {
 	return nFixedPointFrame >> 8;
 }
 
+// not-1.13c: D2MOO helper; retail shifts the frame count by 8 inline (<< 8) in 0x12DC0
 static int AnimationFrameIntegerToFixedPoint(int nIntegerPart)
 {
 	return nIntegerPart << 8;
@@ -139,6 +141,7 @@ void __fastcall DRLGANIM_AnimateRoomTiles_12DC0(D2DrlgRoomStrc* pCurrentRoomEx)
 }
 
 //D2Common.0x6FD756B0
+// not-1.13c: retail's 0x12DC0 is the per-room body only (DRLGANIM_AnimateRoomTiles_12DC0 above); its caller 0x3BBD0 walks the near rooms
 void __fastcall DRLGANIM_AnimateTiles(D2DrlgRoomStrc* pDrlgRoom)
 {
 
@@ -169,6 +172,7 @@ void __fastcall DRLGANIM_AnimateTiles(D2DrlgRoomStrc* pDrlgRoom)
 }
 
 //D2Common.0x6FD75740
+// not-1.13c: retail's caller 0xC940 makes the three 0x12F80 calls itself; there is no wrapper function
 void __fastcall DRLGANIM_AllocAnimationTileGrids(D2DrlgRoomStrc* pDrlgRoom, int nAnimationSpeed, D2DrlgGridStrc* pWallGrid, int nWalls, D2DrlgGridStrc* pFloorGrid, int nFloors, D2DrlgGridStrc* pShadowGrid)
 {
 	DRLGANIM_AllocAnimationTileGrid(pDrlgRoom, nAnimationSpeed, pDrlgRoom->pTileGrid->pTiles.pWallTiles, pDrlgRoom->pTileGrid->nWalls, pWallGrid, nWalls);
@@ -176,7 +180,7 @@ void __fastcall DRLGANIM_AllocAnimationTileGrids(D2DrlgRoomStrc* pDrlgRoom, int 
 	DRLGANIM_AllocAnimationTileGrid(pDrlgRoom, nAnimationSpeed, pDrlgRoom->pTileGrid->pTiles.pRoofTiles, pDrlgRoom->pTileGrid->nShadows, pShadowGrid, 1);
 }
 
-// Helper function
+// not-1.13c: retail inlines this rarity search into 0x12F80; a miss there is fatal (string ids 0xB6 / 0xCB, then exit), not a warning
 D2TileLibraryEntryStrc* DRLGANIM_FindAnimatedTileFrame(D2TileLibraryEntryStrc** pTileLibraryEntries, int nbTileEntries, int nRarity, int nStyle, int nSeq)
 {
 	for (int nEntryIndex = 0; nEntryIndex < nbTileEntries; nEntryIndex++)
@@ -193,6 +197,7 @@ D2TileLibraryEntryStrc* DRLGANIM_FindAnimatedTileFrame(D2TileLibraryEntryStrc** 
 }
 
 //D2Common.0x6FD757B0
+// 1.13c D2Common+0x12F80 (EAX = pTiles): same walk and tile init as 1.10f; the rarity search is inlined
 void __fastcall DRLGANIM_AllocAnimationTileGrid(D2DrlgRoomStrc* pDrlgRoom, int nAnimationSpeed, D2DrlgTileDataStrc* pTiles, int nTiles, D2DrlgGridStrc* pDrlgGrid, int nUnused)
 {
 	D2_MAYBE_UNUSED(nUnused);

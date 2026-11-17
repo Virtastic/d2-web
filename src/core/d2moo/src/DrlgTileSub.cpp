@@ -675,6 +675,7 @@ void __fastcall DRLGTILESUB_InitializeDrlgFile(HD2ARCHIVE hArchive, D2LvlSubTxt*
 	}
 }
 
+// 1.13c D2Common+0x833F0 (diffed; identical: both layer grids per wall layer, floor, shadow, then the file)
 //D2Common.0x6FD8B770
 void __fastcall DRLGTILESUB_FreeDrlgFile(D2LvlSubTxt* pLvlSubTxtRecord)
 {
@@ -693,6 +694,7 @@ void __fastcall DRLGTILESUB_FreeDrlgFile(D2LvlSubTxt* pLvlSubTxtRecord)
 	}
 }
 
+// 1.13c D2Common+0x83740 (diffed; identical)
 //D2Common.0x6FD8B7E0
 int __fastcall DRLGTILESUB_PickSubThemes(D2DrlgRoomStrc* pDrlgRoom, int nSubType, int nSubTheme)
 {

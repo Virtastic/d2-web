@@ -30,6 +30,7 @@ static BOOL UNITROOM_CheckUnitForAdd(D2ActiveRoomStrc* pRoom, D2UnitStrc* pUnit,
 	return TRUE;
 }
 
+// not-1.13c: d2-web callee table that binds the 1.13c add-to-room port (D2Common+0x66800) to the D2MOO functions; retail calls them directly
 const D2UnitRoomAddSeams& UNITROOM_AddSeams()
 {
 	static const D2UnitRoomAddSeams kSeams = {
@@ -157,6 +158,7 @@ static_assert(offsetof(D2DynamicPathStrc, dwClientCoordY) == 0x0C, "D540 [3]");
 static_assert(PATH_CURRENT_ROOM_INVALID == 2, "D540 flag |2");
 // Retail passes the path in ESI; room and unit fields remain native pointers.
 // Not static: the function probe (src/core/fn/d2common_d540.cpp) calls it.
+// 1.13c D2Common+0xD540
 void UNITROOM_ResetDynamicPath(D2DynamicPathStrc* pPath)
 {
 	pPath->tGameCoords.dwPrecisionX = dword_6FDDD458;
@@ -223,6 +225,8 @@ void __stdcall UNITROOM_ClearUpdateQueue(D2ActiveRoomStrc* pRoom)
 	*ppChangeUnit = NULL;
 }
 
+// 1.13c D2Common+0x66700 (#11016). Delta: with a room, retail checks nothing after the unlink; the "room link must be
+// clear" fatal (0xF7) is only for a unit that has no room (1.10f asserted it on every path).
 //D2Common.0x6FDBD300 (#10386)
 void __stdcall UNITROOM_RemoveUnitFromRoom(D2UnitStrc* pUnit)
 {
@@ -280,7 +284,10 @@ void __stdcall UNITROOM_RemoveUnitFromRoom(D2UnitStrc* pUnit)
 			UNITS_ResetRoom(pUnit);
 		}
 	}
-	D2_ASSERT(!pUnit->pRoomNext);
+	else
+	{
+		D2_ASSERT(!pUnit->pRoomNext);
+	}
 }
 
 //1.10f: D2Common.0x6FDBD400 (#10387)
@@ -334,6 +341,8 @@ void __stdcall UNITROOM_RemoveUnitFromUpdateQueue(D2UnitStrc* pUnit)
 	}
 }
 
+// 1.13c D2Common+0x66350 (#10821): same walk of the room's unit list; retail's do-while reads the head's link without a
+// null check, so an empty room faults there, this answers FALSE
 //D2Common.0x6FDBD4C0 (#10389)
 BOOL __stdcall UNITROOM_IsUnitInRoom(D2ActiveRoomStrc* pRoom, D2UnitStrc* pUnit)
 {
