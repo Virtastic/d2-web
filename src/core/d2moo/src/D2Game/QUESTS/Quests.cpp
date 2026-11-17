@@ -1396,7 +1396,7 @@ void __fastcall QUESTS_SetGlobalState(D2GameStrc* pGame, int32_t nQuestId, int32
 {
 	D2_ASSERT(pGame && pGame->pQuestControl && pGame->pQuestControl->bPickedSet);
 
-	QUESTRECORD_SetQuestState(pGame->pQuestControl->pQuestFlags, nQuestId, nState);
+	D2_CALL(QUESTRECORD_SetQuestState, pGame->pQuestControl->pQuestFlags, nQuestId, nState);
 }
 
 //D2Game.0x6FC95700
