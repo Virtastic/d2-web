@@ -5,7 +5,8 @@ import { beltCelAt, celAt, cursorCelAt, gridCelAt, mercSlotCelAt, slotCelAt } fr
 import { AMAZON2_EQUIPMENT_LAYOUT, AMAZON2_INVENTORY_LAYOUT, WORN_ANCHOR_OFFSET, weaponSetArmShift } from '../play/assets/inventory-panel.mjs';
 import { TRADE_LAYOUT } from '../play/assets/npc-panel.mjs';
 import { VENDOR_LAYOUT } from '../play/assets/vendor-panel.mjs';
-import { beltBoxes } from '../play/assets/belt-renderer.mjs';
+// A bare character's four Belts.txt boxes (29x29, first column x=423, bottom row y=562, pitch 31).
+const beltBoxes = () => [0, 1, 2, 3].map((i) => ({ left: 423 + 31 * i, right: 452 + 31 * i, top: 562, bottom: 591 }));
 import { stashGeometry } from '../play/assets/stash-panel.mjs';
 
 // Regression: small items straddled the cell lines in some panels. Retail 1.13c D2Client has ONE

@@ -21,11 +21,10 @@ export function parseItemLines(raw) {
 // colour rule: a magic (quality 4) name is D2Win blue 3, otherwise white; the engine's own
 // "\x01<digit>" markers colour each property line (1 red unmet requirement, 3 blue magical).
 // The name colour rule is the engine's (src/core/d2client/item_name_colour_93450.cpp, d2_client_item_name_colour); the shell
-// installs the export, and the same table runs here only before the engine loads.
+// installs the export; white until the engine loads.
 let colourEngine = null;
 export const setItemNameColourEngine = (fn) => { colourEngine = fn; };
-export const itemNameColour = (q, f) => (colourEngine ? colourEngine(q, f)
-  : q >= 4 && q <= 9 ? [3, 2, 9, 4, 8, 10][q - 4] : (f & 0x800 || f & 0x400000) ? 5 : 0);
+export const itemNameColour = (q, f) => (colourEngine ? colourEngine(q, f) : 0);
 export function itemTooltipSpec(h) {
   // D2Client+0x93450: quality 4..9 -> D2Win colour 3,2,9,4,8,10 (magic blue,
   // set green, rare yellow, unique gold, crafted orange, tempered dark green); any other quality is grey (5)

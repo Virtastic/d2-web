@@ -2,7 +2,7 @@
 // src/core/d2client/d2client_cells.cpp d2_client_94820 with the sizes d2_client_held_cell hands it).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { centredCell, heldCellAt, setHeldCellEngine } from './grid-cell.mjs';
+import { heldCellAt, setHeldCellEngine } from './grid-cell.mjs';
 
 const u = (n) => n >>> 0;
 // 94820: a and b are the art pixel size (6E930 reads D2CMP #10060 and #10000).
@@ -29,18 +29,7 @@ test('the engine rule goes through heldCellAt and is clamped to the grid', () =>
   setHeldCellEngine(null);
 });
 
-test('record where the old rule and 94820 differ', () => {
-  const diff = {};
-  const grids = { inventory: inv, stash: { left: 100, top: 143, cellWidth: 29, cellHeight: 29, columns: 6, rows: 8 }, cube: { left: 100, top: 143, cellWidth: 29, cellHeight: 29, columns: 3, rows: 4 } };
-  for (const [name, g] of Object.entries(grids)) for (const [w, h] of sizes) {
-    let n = 0, tot = 0, ex = null;
-    for (let x = g.left; x < g.left + g.columns * 29; x++) for (let y = g.top; y < g.top + g.rows * 29; y++) {
-      tot++;
-      const o = clamp(g, w, h, centredCell(g, w, h, x, y)), e = clamp(g, w, h, model94820(g, w, h, w * 29, h * 29, x, y));
-      if (o.x !== e.x || o.y !== e.y) { n++; ex ||= { at: [x, y], old: o, engine: e }; }
-    }
-    diff[`${name} ${w}x${h}`] = { differ: n, of: tot, first: ex };
-  }
-  console.log(JSON.stringify(diff));
-  assert.ok(Object.values(diff).some((d) => d.differ > 0));
+test('without the engine the cell is null, never a JS guess', () => {
+  setHeldCellEngine(null);
+  assert.equal(heldCellAt(inv, { invWidth: 1, invHeight: 1 }, inv.left + 5, inv.top + 5), null);
 });

@@ -85,31 +85,6 @@ export function resolveLevelMusicNative(levelId, engine = globalThis.Module) {
   return { levelId: level, environmentId, soundId, name: path, path, volume };
 }
 
-/** Select the native day/night ambience and event rows for a level's SoundEnviron. */
-export function resolveLevelSoundEnvironment(levelId, cycleState, levelsTxt, soundEnvironTxt) {
-  const level = integerInput(levelId, 'retail level id'), cycle = integerInput(cycleState, 'native environment cycle state');
-  if (level < 0) throw new TypeError('retail level id must be non-negative');
-  const levels = tableRows(levelsTxt, 'Levels.txt');
-  const levelIdColumn = column(levels.columns, 'Id', 'Levels.txt');
-  const levelEnvColumn = column(levels.columns, 'SoundEnv', 'Levels.txt');
-  const levelRows = levels.rows.filter((row) => integerField(row, levelIdColumn) === level);
-  if (levelRows.length !== 1) throw new Error(`expected one Levels.txt row for level ${level}, found ${levelRows.length}`);
-  const environmentId = integerField(levelRows[0], levelEnvColumn);
-  if (environmentId < 0) throw new Error(`invalid SoundEnv for level ${level}`);
-
-  const environments = tableRows(soundEnvironTxt, 'SoundEnviron.txt');
-  const envIdColumn = column(environments.columns, 'Index', 'SoundEnviron.txt');
-  const envRows = environments.rows.filter((row) => integerField(row, envIdColumn) === environmentId);
-  if (envRows.length !== 1) throw new Error(`expected one SoundEnviron.txt row for environment ${environmentId}, found ${envRows.length}`);
-  const [row] = envRows;
-  const ambienceColumn = column(environments.columns, cycle >= 1 && cycle <= 3 ? 'Night Ambience' : 'Day Ambience', 'SoundEnviron.txt');
-  const eventColumn = column(environments.columns, cycle >= 1 && cycle <= 3 ? 'Night Event' : 'Day Event', 'SoundEnviron.txt');
-  const delayColumn = column(environments.columns, 'Event Delay', 'SoundEnviron.txt');
-  const ambienceId = integerField(row, ambienceColumn), eventId = integerField(row, eventColumn), eventDelay = integerField(row, delayColumn);
-  if (ambienceId < 0 || eventId < 0 || eventDelay < 0) throw new Error(`invalid ambience/event row for SoundEnviron ${environmentId}`);
-  return { levelId: level, environmentId, cycleState: cycle, ambienceId, eventId, eventDelay };
-}
-
 /** Native FUN_6FB30450 gate over two raw values; neither input's semantic name is recovered. */
 export function nativeAmbienceEnabled(levelPredicateValue, suppressionGlobalValue) {
   const levelValue = integerInput(levelPredicateValue, 'native level predicate value');

@@ -14,6 +14,9 @@
 #include <Drlg/D2DrlgDrlg.h>
 #include <Units/Units.h>
 #include <D2Game/UNIT/SUnit.h>
+#include "../d2moo/include/D2DataTbls.h"
+#include "../d2moo/include/DataTbls/LevelsTbls.h"
+#include "d2client_5dfd0.h"
 
 extern "C" D2UnitStrc* d2_session_target_player_unit();   // monspawn_check.cpp
 
@@ -40,6 +43,11 @@ const D2DrlgTileDataStrc* roomTile(const D2ActiveRoomStrc* room, int32_t x, int3
 }
 }
 
+extern "C" int32_t d2client_session_level_material(uint32_t soundEnv);   // session_footstep.cpp
+
+// The same with the level's own fallback: SoundEnviron "Material 1" of Levels' SoundEnv row for `level`, read from the tables 0x5DFD0 loads.
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_session_floor_class_level(int32_t unitType, int32_t unitId, int32_t level);
+
 // unitType 0 = the local player, 1 = a monster by id. Returns the class 0..6 (0: no unit or room).
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_session_floor_class(int32_t unitType, int32_t unitId, int32_t fallback) {
     D2UnitStrc* player = d2_session_target_player_unit();
@@ -55,4 +63,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_session_floor_class(int32_t unitType,
     if (!rec) return ebp;
     const uint32_t cls = tileClass(rec);
     return cls ? int32_t(cls) : ebp;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_session_floor_class_level(int32_t unitType, int32_t unitId, int32_t level) {
+    if (!d2client_sounds::records()) d2client_sounds::load();
+    const D2LevelsTxt* lv = level >= 0 ? DATATBLS_GetLevelsTxtRecord(level) : nullptr;
+    return d2_session_floor_class(unitType, unitId, lv ? d2client_session_level_material(uint32_t(lv->dwSoundEnv & 0xff)) : 1);
 }

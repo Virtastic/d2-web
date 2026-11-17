@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { versionLabel, RETAIL_LABEL } from './build-version.mjs';
 import { TITLE_VERSION } from './frontend.mjs';
-import { AREA_NAME_BLOCK, areaNameBlockLines } from './area-name-block.mjs';
+import { AREA_NAME_BLOCK } from './area-name-block.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(here, '../../electron/package.json'), 'utf8'));
@@ -37,10 +37,9 @@ test('the harness/parity path still draws v 1.13 on the title screen and the aut
     assert.equal(RETAIL_LABEL, 'v 1.13');
     assert.equal(TITLE_VERSION.text, 'v 1.13');
     assert.equal(AREA_NAME_BLOCK.version, 'v 1.13');
-    assert.equal(areaNameBlockLines({ name: 'A' }).find((l) => l.key === 'version').text, 'v 1.13');
     globalThis.__d2Entry = { versionLabel: 'release' };
     assert.equal(TITLE_VERSION.text, 'v dev');
-    assert.equal(areaNameBlockLines({ name: 'A' }).find((l) => l.key === 'version').text, 'v dev');
+    assert.equal(AREA_NAME_BLOCK.version, 'v dev');
   } finally { globalThis.__d2Entry = saved; }
 });
 

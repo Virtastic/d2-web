@@ -202,14 +202,19 @@ export function createFont({ dc6, tbl, palette, documentObject = globalThis.docu
     cellHeight: Math.max(...dc6.frames.map((f) => f.height)),
     /** The glyph a code point resolves to (null when the font has none) -- identity evidence. */
     glyph(code) { return glyphFor(code); },
+    /** The font's 65536-byte advance table (the .tbl width per code point), what the engine's width loop reads. */
+    advanceTable() {
+      if (!advances) {
+        advances = new Uint8Array(65536);
+        for (const code of tbl.chars.keys()) advances[code] = glyphFor(code)?.advance ?? 0;
+      }
+      return advances;
+    },
     measure(text, coded = false) {
       const s = String(text);
       // The width sum is D2Win's own loop when the engine is up (advance table = this font's .tbl widths).
       if (textWidthBackend) {
-        if (!advances) {
-          advances = new Uint8Array(65536);
-          for (const code of tbl.chars.keys()) advances[code] = glyphFor(code)?.advance ?? 0;
-        }
+        this.advanceTable();
         const w = textWidthBackend(advances, s, coded);
         if (w !== null) return w;
       }

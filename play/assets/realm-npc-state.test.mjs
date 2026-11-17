@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRealmNpc } from './realm-npc-state.mjs';
+import { setResurrectEngine } from './npc-menu.mjs';
+import { nativeResurrectEngine } from './resurrect-engine-native.mjs';
+setResurrectEngine(nativeResurrectEngine());
 
 const GUID = 0x55, KASHYA = 150, CHARSI = 154;
 const info = (guid, msgs) => { const p = new Uint8Array(40); p[0] = 0x27; p[1] = 1; p[2] = guid; p[6] = msgs.length;

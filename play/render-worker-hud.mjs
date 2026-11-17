@@ -11,7 +11,7 @@ const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 // Pure: exactly what the control-panel and belt renderers read, as plain data. Inputs are the values the
 // gameplay shell holds at the HUD call site; w/h are the canvas size.
 export function hudState({ w, h, snapshot, advancement, screen, orbs = null, left = false, right = false, iconRow = true, runToggle = false,
-  miniDown = null, levelPressed = -1, hudPressed = null, beltBoxes = null, beltKeys = null, clearScreen = false } = {}) {
+  miniDown = null, levelPressed = -1, hudPressed = null, beltBoxes = null, beltOps = null, clearScreen = false } = {}) {
   if (clearScreen) return null;
   const p = snapshot?.player ?? {}, a = advancement ?? {}, shift = HUD_LAYOUT.miniPanelShift;
   return {
@@ -26,7 +26,7 @@ export function hudState({ w, h, snapshot, advancement, screen, orbs = null, lef
     wideStrips: w > 800,   // main still paints the free-resolution strips (needs its art); not drawn in the worker
     items: (snapshot?.items ?? []).filter((it) => it.mode === 2).map((it) => ({ mode: 2, gridX: it.gridX, invFile: it.invFile ?? '' })),
     beltBoxes: (beltBoxes ?? []).map((b) => ({ left: b.left, right: b.right, top: b.top, bottom: b.bottom })),
-    beltKeys: beltKeys ? [...beltKeys] : undefined,
+    beltOps: beltOps ?? undefined,
   };
 }
 
@@ -47,7 +47,7 @@ export function hudDraw(ctx, frame, assets, env) {
       { iconRow: s.iconRow, offsetX: s.offsetX, arrowOpen: s.arrowOpen, runToggle: s.runToggle, miniPressed: s.miniPressed, levelPressed: s.levelPressed, hudPressed: s.hudPressed, strips: null, stamina: s.stamina, orbs: s.orbs });
     const bo = hudOrigin(s.w, s.h, 'bottom');
     ctx.save(); ctx.translate(bo.x, bo.y);
-    try { const beltEv = built.belt.draw(ctx, s.items, s.beltBoxes, true, s.beltKeys);
+    try { const beltEv = built.belt.draw(ctx, s.beltOps, s.items, s.beltBoxes);
       if (env.evidence) { env.evidence.controlPanel = panelEv; env.evidence.belt = { ...beltEv, origin: { x: bo.x, y: bo.y } }; } } finally { ctx.restore(); }
   } catch {
     // A file not here yet is recorded in env.missed by read(); rebuild both renderers next frame.

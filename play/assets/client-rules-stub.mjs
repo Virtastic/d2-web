@@ -3,7 +3,7 @@
 import { bindClientRules } from './client-rules.mjs';
 
 export function bindStubRules() {
-  const heap = new Int32Array(16);
+  const heap = new Int32Array(256);
   bindClientRules({
     HEAP32: heap,
     _malloc: () => 0,
@@ -57,6 +57,26 @@ export function bindStubRules() {
         const w = Number(BigInt.asIntN(32, BigInt(cur >>> 0) * 0x66n)) / mx | 0;
         if (w < 0x19) slot = 0;
         return (slot << 16) | w;
+      }
+      if (name === 'd2_client_draw_orbs') {   // d2client_27bd0.cpp / d2client_27a90.cpp with no poison or frozen state, at 800x600
+        const [life, lifeMax, mana, manaMax, alive, fluid, overlap, out] = a, recs = [];
+        const fill = (cur, mx, kind) => {
+          if (kind === 1 && cur > mx) cur = mx;
+          let f = Math.trunc(Number(BigInt.asIntN(32, BigInt(cur >>> 0) * 80n)) / mx);
+          if (kind === 0 && alive && f > 0 && f <= 2) f = 2;
+          return f;
+        };
+        if (lifeMax) {
+          const f = fill(life, lifeMax, 0);
+          if (f) recs.push([0xd1b6, fluid, 0, 0x1d, 587, 0, f, 5]);
+          recs.push([0xd096, overlap, 0, 0x1c, 595, -1, 5, 0]);
+        }
+        if (manaMax) {
+          const f = fill(mana, manaMax, 1);
+          recs.push([0xd1b6, fluid, 1, 689, 587, 0, f, 5], [0xd096, overlap, 1, 690, 591, -1, 5, 0]);
+        }
+        recs.forEach((r, i) => r.forEach((v, j) => { heap[(out >> 2) + i * 8 + j] = v; }));
+        return recs.length;
       }
       throw new Error(`stub: ${name}`);
     },

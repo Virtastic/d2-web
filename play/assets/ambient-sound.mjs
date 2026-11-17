@@ -1,5 +1,4 @@
 import { decodeWav } from './wav.mjs';
-import { resolveLevelSoundEnvironment } from './act-music.mjs';
 import { unlockOnGesture } from './audio-unlock.mjs';
 import { sliderPercent } from './sound-channel-volume.mjs';
 import { nativeSoundChannel, soundFadeLevel } from './sound-mixer-rules.mjs';
@@ -29,27 +28,32 @@ export function ambientCycleOf(Module) {
   return Module?._d2_session_period_of_day ? Module.ccall('d2_session_period_of_day', 'number', [], []) | 0 : 0;
 }
 
-/** 1.13c area-event cadence: E + R - floor(E/3), R in [0, 2*floor(E/3)]. */
-export function nextEventInterval(delay, rand) {
-  const d = Math.floor(delay / 3);
-  return delay + Math.floor(rand() * (2 * d + 1)) - d;
+/** The engine's SoundEnviron selection of a level for a period (d2_client_ambient_select over the tables 0x5DFD0 loads): { environmentId, ambienceId, eventId, eventDelay }. */
+export function nativeAmbientSelect(Module) {
+  return (levelId, cycle) => {
+    const f = (field) => Number(Module._d2_client_ambient_select(levelId, cycle, field)) | 0;
+    const sel = { levelId, environmentId: f(0), cycleState: cycle, ambienceId: f(1), eventId: f(2), eventDelay: f(3) };
+    if (sel.environmentId < 0 || sel.ambienceId < 0 || sel.eventId < 0 || sel.eventDelay < 0) throw new Error(`no SoundEnviron row for level ${levelId}`);
+    return sel;
+  };
 }
 
 /**
- * Looping area ambience plus jittered one-shot events. One loop source at a time: the same ambience id
- * is a no-op, a different id (level or day/night change) fades the old loop out as the new one fades in.
- * `cycle` is the raw D2Common-10396 value (1..3 = night), read via ambientCycleOf(Module).
+ * The area ambience loop (one-shot events and the weather loop come from the engine's 0x4F860). One loop source at a time:
+ * the same ambience id is a no-op, a different id (level or day/night change) fades the old loop out as the new one fades in.
+ * `select(level, cycle)` is the engine's SoundEnviron row (nativeAmbientSelect); `cycle` is the raw D2Common-10396 value (1..3 = night).
  */
-export function createAmbientSound(read, AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext, rand = Math.random, fetched = null, gestureTarget = globalThis.window) {
+export function createAmbientSound(read, AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext, select = null, fetched = null, gestureTarget = globalThis.window) {
   if (typeof read !== 'function') throw new TypeError('retail asset reader is required');
+  if (typeof select !== 'function') throw new TypeError('the engine ambient selection is required');
   if (!AudioContextClass) throw new Error('Web Audio is unavailable');
   const context = new AudioContextClass(), buffers = new Map();
   unlockOnGesture(context, gestureTarget);   // the shared gesture unlock (a fresh context starts suspended)
   const gain = typeof context.createGain === 'function' ? context.createGain() : null;
   if (gain) gain.connect(context.destination);
   const out = gain ?? context.destination;
-  let tables = null, sliders = { sound: 1, music: 1 }, volume = 1;
-  let loop = null, loopId = 0, serial = 0, key = '', env = null, countdown = 0, error = '', events = 0;
+  let soundsTxt = null, sliders = { sound: 1, music: 1 }, volume = 1;
+  let loop = null, loopId = 0, serial = 0, key = '', error = '';
   const fading = new Set();   // loops on their way out: each stops when its fade ends
   // A source's live level (entry +0x1C) steps once per mixer tick along its fade; its node holds that tick's channel.
   const channel = (snd, l) => nativeSoundChannel(snd, sliderPercent(sliders.sound), 100, null, l) / 255;
@@ -109,25 +113,20 @@ export function createAmbientSound(read, AudioContextClass = globalThis.AudioCon
     } else src.connect(out);
     src.start(); return lp;
   };
-  function read_() {
-    return tables ??= ['Levels', 'SoundEnviron', 'Sounds'].map((n) => new TextDecoder('latin1').decode(read(`data\\global\\excel\\${n}.txt`)));
-  }
+  const sounds = () => soundsTxt ??= new TextDecoder('latin1').decode(read('data\\global\\excel\\Sounds.txt'));
   return {
     /** Select the level's ambience for `cycle`; idempotent per (level, ambience). */
     async sync(levelId, cycle = 0) {
-      const [lv, se, sn] = read_();
-      const sel = resolveLevelSoundEnvironment(levelId, cycle, lv, se);
+      const sel = select(levelId, cycle);
       const k = `${sel.environmentId}:${sel.ambienceId}:${sel.eventId}:${sel.eventDelay}`;
       if (k === key) return sel;
       key = k; const mine = ++serial;
-      env = sel.eventId > 0 && sel.eventDelay > 0 ? { snd: soundByIndex(sn, sel.eventId), delay: sel.eventDelay } : null;
-      countdown = env ? nextEventInterval(env.delay, rand) : 0;
-      const snd = soundByIndex(sn, sel.ambienceId);
+      const snd = soundByIndex(sounds(), sel.ambienceId);
       if (loopId === sel.ambienceId && loop) return sel;
       // 0x4F860: a change between the same area's day and night loops cross-fades them (the old to 0, the new from 0,
       // over the longer of 250 ticks and the row's fade); any other change fades the old loop out over its Fade Out
       // (0x88550) and starts the new one with its Fade In.
-      const day = resolveLevelSoundEnvironment(levelId, 0, lv, se).ambienceId, night = resolveLevelSoundEnvironment(levelId, 1, lv, se).ambienceId;
+      const day = select(levelId, 0).ambienceId, night = select(levelId, 1).ambienceId;
       const swap = Boolean(loop) && sel.ambienceId > 0 && day !== night
         && ((loopId === day && sel.ambienceId === night) || (loopId === night && sel.ambienceId === day));
       stopLoop(true, swap ? Math.max(AMBIENT_SWAP_TICKS, loop.snd.fadeOut) : null);
@@ -139,17 +138,7 @@ export function createAmbientSound(read, AudioContextClass = globalThis.AudioCon
       } catch (e) { error = String(e); key = ''; throw e; }
       return sel;
     },
-    /** SoundEnviron row of the level for the engine's ambient updater (0x4F860): day and night selections. */
-    environment(levelId) { const [lv, se] = read_(); return { day: resolveLevelSoundEnvironment(levelId, 0, lv, se), night: resolveLevelSoundEnvironment(levelId, 1, lv, se) }; },
-    /** Advance the event countdown by `n` engine ticks. */
-    async tick(n = 1) {
-      if (!env?.snd || !loop) return;
-      countdown -= n;
-      if (countdown > 0) return;
-      countdown = nextEventInterval(env.delay, rand);
-      try { start(await load(env.snd), env.snd, false); events++; } catch (e) { error = String(e); }
-    },
-    stop() { serial++; key = ''; env = null; stopLoop(); for (const lp of [...fading]) end(lp); },
+    stop() { serial++; key = ''; stopLoop(); for (const lp of [...fading]) end(lp); },
     close() { this.stop(); return context.close?.(); },
     setVolume(v, next) {
       volume = Math.max(0, Math.min(1, Number(v) || 0));
@@ -158,6 +147,6 @@ export function createAmbientSound(read, AudioContextClass = globalThis.AudioCon
       for (const lp of fading) apply(lp);
     },
     get volume() { return volume; },
-    get evidence() { return { loopId, events, error, state: context.state }; },
+    get evidence() { return { loopId, error, state: context.state }; },
   };
 }

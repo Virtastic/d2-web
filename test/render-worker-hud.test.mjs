@@ -4,7 +4,7 @@ import { hudState, hudDraw, resetHud, HUD_OPS } from '../play/render-worker-hud.
 
 const input = { w: 1024, h: 600, snapshot: { player: { hp: 10, hpMax: 20, mana: 5, manaMax: 9 }, items: [{ mode: 2, gridX: 1, invFile: 'invpot', x: 1 }, { mode: 0, gridX: 0 }] },
   advancement: { statPoints: 5, experience: 3, nextExperience: 9, prevExperience: 0 }, screen: [0, 0, 0, 0, 50, 100], left: true,
-  beltBoxes: [{ left: 1, right: 2, top: 3, bottom: 4 }], beltKeys: ['1', '2', '3', '4'] };
+  beltBoxes: [{ left: 1, right: 2, top: 3, bottom: 4 }], beltOps: [{ op: 'bg', x: 1, y: 2 }] };
 
 test('hudState is structured-clone safe and plain', () => {
   const s = hudState(input);

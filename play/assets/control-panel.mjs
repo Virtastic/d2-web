@@ -1,6 +1,7 @@
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { recordDc6, recordPrim } from './drawlist.mjs';
-import { rulesBound, expBarPixels, orbFill, staminaBar, staminaColours } from './client-rules.mjs';
+import { rulesBound, expBarPixels, orbDrawList, staminaBar, staminaColours } from './client-rules.mjs';
+import { replayOrbs, CELL_FLUID, CELL_OVERLAP } from './draw-list.mjs';
 
 export function resourceRatio(value, maximum) {
   const max = Number(maximum), current = Number(value);
@@ -180,6 +181,9 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
   const p = panel.frames.map((f) => frameCanvas(f, palette, documentObject));
   const fluid = fluids.frames.slice(0, 2).map((f) => frameCanvas(f, palette, documentObject));
   const overlap = overlaps.frames.slice(0, 2).map((f) => frameCanvas(f, palette, documentObject));
+  const FLUID_PATH = 'data\\global\\ui\\PANEL\\hlthmana.dc6', OVERLAP_PATH = 'data\\global\\ui\\PANEL\\overlap.dc6';
+  const orbCels = { [CELL_FLUID]: fluid.map((image, i) => ({ image, path: FLUID_PATH, frame: i, dc6: fluids.frames[i] })),
+    [CELL_OVERLAP]: overlap.map((image, i) => ({ image, path: OVERLAP_PATH, frame: i, dc6: overlaps.frames[i] })) };
   // The mini-panel, its icon row, the open/close arrow and the run button, each decoded once.
   const miniPanelDc6 = decodeDc6(read(HUD_LAYOUT.miniPanel.path));
   const miniButtonDc6 = decodeDc6(read(HUD_LAYOUT.miniButtons.path));
@@ -242,18 +246,11 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     // D2Client+0x27BD0 / +0x27A90 (engine rule): fill rows = cur * 80 / max, integer; the float rounding below is the pre-engine fallback.
     // hud.orbs (raw 1/256): a local game's values come smoothed through D2Client+0x26B20 at the client tick, as 27BD0/27A90 read them.
     const pl = snapshot?.player, alive = snapshot?.mode !== 0x11, orbs = hud.orbs || null;
-    const fillRows = (image, ratio, cur, max, kind) => rulesBound() ? Math.min(image.height, Math.max(0, orbFill(cur, max, kind, alive))) : image.height - Math.round(image.height * (1 - ratio));
-    const lifeRows = fillRows(fluid[0], life, orbs ? orbs.life : pl?.hp, orbs ? orbs.lifeMax : pl?.hpMax, 0),
-      manaRows = fillRows(fluid[1], mana, orbs ? orbs.mana : pl?.mana, orbs ? orbs.manaMax : pl?.manaMax, 1);
-    const drawFluid = (image, x, y, rows) => { const top = image.height - rows, shown = rows;
-      if (shown > 0) ctx.drawImage(image, 0, top, image.width, shown, x, y + top, image.width, shown); };
-    drawFluid(fluid[0], 29 - edge, 12, lifeRows); drawFluid(fluid[1], 689 + edge, 12, manaRows);
-    ctx.drawImage(overlap[0], 28 - edge, 12); ctx.drawImage(overlap[1], 690 + edge, 8);
-    const FLUID_PATH = 'data\\global\\ui\\PANEL\\hlthmana.dc6', OVERLAP_PATH = 'data\\global\\ui\\PANEL\\overlap.dc6';
-    recordDc6(FLUID_PATH, 0, fluids.frames[0], 29 - edge, top + 12, { op: 'celex', extra: lifeRows });
-    recordDc6(OVERLAP_PATH, 0, overlaps.frames[0], 28 - edge, top + 12);
-    recordDc6(FLUID_PATH, 1, fluids.frames[1], 689 + edge, top + 12, { op: 'celex', extra: manaRows });
-    recordDc6(OVERLAP_PATH, 1, overlaps.frames[1], 690 + edge, top + 8);
+    // The orbs are the ported draw functions' own D2Gfx calls (draw sink), replayed in their order.
+    if (rulesBound()) {
+      const v = orbs || { life: pl?.hp, lifeMax: pl?.hpMax, mana: pl?.mana, manaMax: pl?.manaMax };
+      replayOrbs(ctx, orbDrawList(v.life, v.lifeMax, v.mana, v.manaMax, alive, CELL_FLUID, CELL_OVERLAP), orbCels, edge, recordDc6);
+    }
     // The ornate strips between each skill button and the console (wide views only): hud.strips paints them.
     if (edge > 0 && hud.strips) hud.strips(ctx);
 

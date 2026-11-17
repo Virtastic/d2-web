@@ -32,12 +32,8 @@ export function hudBarTooltip(w, h, mx, my, { experience, nextExperience, stamin
 // (New Skill, right). Retail D2Client+0x50430 / +0x501F0 (800x600 mode, which the widescreen client keeps): SetPopUpUnicodeText
 // at x = W/2 -179 / +178, y = H-50, centred; W/H are the screen size, so the plate follows the screen centre, never the 800 panel.
 // `engine(w, h, mx, my)` is the retail hit test and plate position (d2_client_level_btn_tip, via 0x4FF10 / 0x4FE70): null off
-// both, else {side: 0|1, x, y}; `lit[side]` is the caller's evidence that the button is drawn lit. Without an engine the
-// caller's own hit index and the offsets above stand in.
-export function levelButtonTooltip(index, w, h, texts, { engine = null, mx = 0, my = 0, lit = [] } = {}) {
-  if (engine) {
-    const r = engine(w, h, mx, my);
-    return r && lit[r.side] ? { bar: r.side ? 'skill' : 'stats', text: texts[r.side], x: r.x, y: r.y, color: 0 } : null;
-  }
-  return index < 0 ? null : { bar: index ? 'skill' : 'stats', text: texts[index], x: Math.trunc(w / 2) + (index ? 178 : -179), y: h - 50, color: 0 };
+// both, else {side: 0|1, x, y}; `lit[side]` is the caller's evidence that the button is drawn lit. No engine, no plate.
+export function levelButtonTooltip(w, h, texts, { engine = null, mx = 0, my = 0, lit = [] } = {}) {
+  const r = engine ? engine(w, h, mx, my) : null;
+  return r && lit[r.side] ? { bar: r.side ? 'skill' : 'stats', text: texts[r.side], x: r.x, y: r.y, color: 0 } : null;
 }

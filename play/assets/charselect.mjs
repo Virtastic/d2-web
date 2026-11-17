@@ -87,7 +87,7 @@ export const DELETE_STRINGS = { confirm: 5163, yes: 5166, no: 5167, ok: 5102 };
 export const PORTRAIT = { x: 67, anchor: 165 };
 
 /** `characters` is the store's listing. onPlay(name), onCreate(), onCancel(), onDelete(name). */
-export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, characters, onPlay, onPlayRefused = null, onCreate, onCancel, onDelete = null, connected = null, onConvert = null, realm = () => false, string = null, componentToken = null, documentObject = globalThis.document }) {
+export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, characters, onPlay, onPlayRefused = null, onCreate, onCancel, onDelete = null, connected = null, onConvert = null, realm = () => false, string = null, componentToken = null, cardAt = null, documentObject = globalThis.document }) {
   // Keep the requested path separate from the bytes that were actually decoded.  The latter is
   // carried to every confirmation blit: a constant copied into both sides of an assertion cannot
   // make a substituted DC6 or palette look correct.
@@ -316,6 +316,8 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
     w: popupDc6.frames[0].width + (popupDc6.frames[1]?.width || 0), h: popupDc6.frames[0].height });
   const dialogButtonBox = (id) => ({ x: DELETE_DIALOG[id].x, y: DELETE_DIALOG[id].top, w: okCancel.states[0].frame.width, h: okCancel.states[0].frame.height });
   const inBox = (p, b) => p.x >= b.x && p.x < b.x + b.w && p.y >= b.y && p.y < b.y + b.h;
+  // The card under a screen point: D2Launch's own type-4 controls (the engine's hit test), limited to the loaded rows.
+  const cardRow = (p) => { const r = cardAt ? cardAt(Math.floor(p.x), Math.floor(p.y)) : -1; return r >= 0 && r < list.length ? r : -1; };
   const hitControl = (p) => {
     if (deleteFlow.state === 'notice') return inBox(p, noticeOkBox()) ? 'notice-ok' : null;
     if (deleteFlow.armed >= 0) {
@@ -324,8 +326,8 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       return null;
     }
     for (const id of ORDER) if (inBox(p, buttonBox(id))) return `button-${id}`;
-    for (let i = 0; i < list.length; i++) if (inBox(p, characterCardHitBox(i))) return `card-${i}`;
-    return null;
+    const row = cardRow(p);
+    return row >= 0 ? `card-${row}` : null;
   };
   // Retail's rule: CONVERT is live only for a classic character (an expansion one cannot be converted); with no character it is dead too.
   const convertDisabled = () => selected < 0 || Boolean(list[selected].expansion);
@@ -420,7 +422,8 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       if (inBox(p, buttonBox('exit'))) { onCancel?.(); return 'exit'; }
       if (inBox(p, buttonBox('convert'))) { if (convertDisabled()) return null; void onConvert?.(list[selected].name); return 'convert'; }
       if (inBox(p, buttonBox('delete'))) { if (selected >= 0 && deleteFlow.arm(selected)) return 'delete-arm'; return null; }
-      for (let i = 0; i < list.length; i++) if (inBox(p, characterCardHitBox(i))) { select(i); return list[i].name; }
+      const row = cardRow(p);
+      if (row >= 0) { select(row); return list[row].name; }
       return null;
     },
     press(x, y, width, height) {

@@ -9,22 +9,9 @@ import { OBJECT_MODE_SOUNDS, OBJECT_SELECT_SOUNDS, SHARED_ROW_CLASSES } from './
 // modeSounds: the engine's 0x24490 (combatSoundEngine(Module).modeSounds in combat-sound-trigger.mjs), for the local attack's swing row.
 export function createEventSounds(read, play, monsterStep = null, monsterLayer = null, monsterIdle = null, floorClass = null, stepDue = null, modeSounds = null) {
   const rows = (p) => new TextDecoder('latin1').decode(read(p)).split(/\r?\n/).map((l) => l.split('\t'));
-  // D2Client 0x226A0's level class: Levels.txt SoundEnv indexes the SoundEnviron table by row (record 0x58 bytes, "Material 1"
-  // at +0x1C); a value outside 1..6, or no row, is 1. Read once, on the first footstep.
-  let materials = null;
-  const levelMaterial = (level) => {
-    if (!materials) {
-      materials = new Map();
-      try {
-        const [lh, ...lr] = rows('data\\global\\excel\\Levels.txt'), [sh, ...sr] = rows('data\\global\\excel\\SoundEnviron.txt');
-        const id = lh.indexOf('Id'), env = lh.indexOf('SoundEnv'), mat = sh.indexOf('Material 1'), table = sr.filter((c) => c[0]);
-        for (const c of lr) if (c[id] !== '' && c[id] !== undefined) { const m = Number(table[Number(c[env])]?.[mat]); materials.set(Number(c[id]), m > 0 && m < 7 ? m : 1); }
-      } catch { /* no tables: every level falls back to 1 */ }
-    }
-    return materials.get(level) ?? 1;
-  };
+  // floorClass(unitType, id, level) is the engine's D2Client 0x226A0 (its level-class fallback is the native SoundEnviron "Material 1" of the level).
   let stepLevel = 1;
-  const floorOffset = (unitType, id) => { const c = floorClass ? floorClass(unitType, id, levelMaterial(stepLevel)) : 0; return c >= 2 && c <= 6 ? 4 * (c - 1) : 0; }; // 0x22FB0
+  const floorOffset = (unitType, id) => { const c = floorClass ? floorClass(unitType, id, stepLevel) : 0; return c >= 2 && c <= 6 ? 4 * (c - 1) : 0; }; // 0x22FB0
   const idx = new Map(rows('data\\global\\excel\\Sounds.txt').slice(1).filter((c) => c[0]).map((c) => [c[0], Number(c[1])]));
   const drop = new Map();
   for (const f of ['armor', 'weapons', 'misc']) {

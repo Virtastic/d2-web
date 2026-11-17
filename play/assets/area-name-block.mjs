@@ -59,7 +59,7 @@
 // disassembly of the functions named.
 import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 import { decodeDatPalette, decodeDc6 } from './d2-formats.mjs';
-import { versionLabel } from './build-version.mjs';
+import { versionLabel, RETAIL_LABEL } from './build-version.mjs';
 
 export const AREA_NAME_BLOCK = Object.freeze({
   font: 'data\\local\\font\\latin\\font16.dc6',
@@ -69,52 +69,46 @@ export const AREA_NAME_BLOCK = Object.freeze({
   // D2Win's text colour index: retail's own `color=4` on every record of the block, carried onto each
   // glyph blit as the draw list's `extra` (recordDc6), the field s198 asserts for the trademark screen.
   colour: 4,
-  // x = screenWidth - width - 16 (every line function: `sub edx,eax; sub edx,0x10` on DAT_6fba9e14).
-  margin: 16,
-  // The line cursor DAT_6fbcc21c: 0x18 at the start of 0x62680, += 0x10 per line.
-  top: 24,
-  step: 16,
-  // 0x5FE90 formats `v %d.%02d` from the launcher's version getter: `v 1.13` in retail. Shipped builds
-  // show the release version (build-version.mjs); the parity harness keeps `v 1.13`.
+  // The shipped build's version text (build-version.mjs); the parity harness keeps retail's `v 1.13`,
+  // which the engine's own 0x5FE90 writes (the layout is then asked for no override).
   get version() { return versionLabel(); },
-  // The eng .tbl texts the other line functions read through D2Lang (indexes in the header).
-  strings: Object.freeze({ game: 'Game: ', password: 'Password: ', difficulty: 'Difficulty: %s',
-    nightmare: 'Nightmare', hell: 'Hell', expansion: 'EXPANSION' }),
 });
 
-/**
- * Where retail starts a right-aligned line: `measure` is the font's own advance sum (the .tbl's byte
- * 3 per code point, which is what D2Win #10028 lays text out with -- the DC6 cell width is not the
- * advance), `screenWidth` the game's screen width (D2Client DAT_6fba9e14).
- */
-export function rightAlignedX(measure, text, screenWidth) {
-  return (screenWidth | 0) - measure(text) - AREA_NAME_BLOCK.margin;
-}
+const LINE_KEYS = ['', 'game', 'name', 'version', 'difficulty', 'address', 'expansion'];
+const REC = 216;   // bytes per record of d2_client_area_name_block: kind, x, y (i32), 101 UTF-16 units, pad
 
 /**
- * D2Client+0x62680's line sequence: which lines show and on which row. `gameName`/`password`: the
- * game info's (+0x1b / +0x241, empty in single player); `difficulty` 0..2 (DAT_6fbcc390);
- * `address` the host address, given only for game types 6 and 8 (DAT_6fbcc394); `expansion`
- * DAT_6fbc9854. The version line takes its row even when it draws nothing (0x5FE90).
+ * The block's line layout, which is the engine's: D2Client+0x62680 and its line writers decide which
+ * lines show, on which row, with which text, and x = screen width - D2Win width - 16 (the font's advance
+ * table goes to the engine's width loop). `engine` is the wasm module.
  */
-export function areaNameBlockLines({ name = '', gameName = '', password = '', difficulty = 0, address = '',
-  expansion = true, version = AREA_NAME_BLOCK.version } = {}) {
-  const t = AREA_NAME_BLOCK.strings, out = [];
-  let y = AREA_NAME_BLOCK.top;
-  const put = (key, text) => { out.push({ key, text, y }); y += AREA_NAME_BLOCK.step; };
-  if (gameName) put('game', t.game + gameName);
-  if (password) put('password', t.password + password);
-  if (name) put('name', name);
-  if (version) put('version', version); else y += AREA_NAME_BLOCK.step;
-  if (difficulty === 1 || difficulty === 2) {
-    put('difficulty', t.difficulty.replace('%s', difficulty === 2 ? t.hell : t.nightmare));
-  }
-  if (address) put('address', address);
-  if (expansion) put('expansion', t.expansion);
-  return out;
+export function engineAreaNameLayout(engine) {
+  return (font, { name, screenWidth, difficulty, expansion, version }) => {
+    const alloc = (n) => Number(engine.ccall('malloc', 'bigint', ['number'], [n]));
+    const free = (p) => engine.ccall('free', null, ['bigint'], [BigInt(p)]);
+    const utf8 = (s) => { const b = new TextEncoder().encode(`${s}\0`), p = alloc(b.length); engine.HEAPU8.set(b, p); return p; };
+    const adv = alloc(65536), out = alloc(REC * 12);
+    const strs = [utf8(name)];
+    engine.HEAPU8.set(font.advanceTable(), adv);
+    // Retail's own `v 1.13` comes from the engine; a shipped build passes its release label instead.
+    const vp = version === null ? 0 : utf8(version);
+    if (vp) strs.push(vp);
+    try {
+      const n = engine._d2_client_area_name_block(BigInt(adv), screenWidth | 0, difficulty | 0, expansion ? 1 : 0,
+        BigInt(strs[0]), 0n, BigInt(vp), BigInt(out), 12);
+      const lines = [];
+      for (let i = 0; i < n; i++) {
+        const v = new DataView(engine.HEAPU8.buffer, out + i * REC, REC);
+        let text = '';
+        for (let k = 0; k < 100; k++) { const u = v.getUint16(12 + k * 2, true); if (!u) break; text += String.fromCharCode(u); }
+        lines.push({ key: LINE_KEYS[v.getInt32(0, true)], text, x: v.getInt32(4, true), y: v.getInt32(8, true) });
+      }
+      return lines;
+    } finally { for (const p of [adv, out, ...strs]) free(p); }
+  };
 }
 
-export function createAreaNameBlockRenderer(read, documentObject = globalThis.document) {
+export function createAreaNameBlockRenderer(read, documentObject = globalThis.document, layout = null) {
   const perAct = new Map();
   // createFont's glyph callback is set once per font, so the capture list is swapped per line: each
   // blit reaches it in call order, which is what makes the evidence per-blit rather than per-line.
@@ -155,14 +149,16 @@ export function createAreaNameBlockRenderer(read, documentObject = globalThis.do
       if (!text) throw new Error('the area name block needs the engine\'s own level name');
       const entry = fontFor(act);
       const lines = [];
-      for (const { key, text: body, y } of areaNameBlockLines({ ...state, name: text })) {
-        const x = rightAlignedX((t) => entry.font.measure(t), body, screenWidth);
+      if (!layout) throw new Error('the area name block needs the engine layout (d2_client_area_name_block)');
+      const label = versionLabel();
+      for (const { key, text: body, x, y } of layout(entry.font, { name: text, screenWidth, difficulty: state.difficulty | 0,
+        expansion: state.expansion !== false, version: label === RETAIL_LABEL ? null : label })) {
         const glyphs = [];
         capture = glyphs;
         try { entry.font.drawAnchored(ctx, body, x, y); } finally { capture = null; }
         lines.push({ key, text: body, x, y, glyphs });
       }
-      return { name: text, act, colour: AREA_NAME_BLOCK.colour, right: screenWidth - AREA_NAME_BLOCK.margin,
+      return { name: text, act, colour: AREA_NAME_BLOCK.colour, right: screenWidth - 16,
         font: AREA_NAME_BLOCK.font, palette: entry.palette, paletteShifted: entry.shifted, lines };
     },
   };

@@ -1,7 +1,19 @@
 // The stats-panel cell rules, read from the engine (the same code D2Client's stats panel port runs).
 // The shell binds the wasm module once; the panels only ask.
+import { decodeDrawList } from './draw-list.mjs';
 let mod = null;
 export function bindClientRules(module) { mod = module; }
+
+/** The orb draw calls (D2Client+0x27BD0 then +0x27A90 run against the engine's draw sink): records in retail's call order. */
+export function orbDrawList(life, lifeMax, mana, manaMax, alive, cellFluid, cellOverlap) {
+  if (!mod) throw new Error('client rules are not bound to the engine');
+  const p = mod._malloc(8 * 16 * 4);
+  try {
+    const n = mod.ccall('d2_client_draw_orbs', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+      [life | 0, lifeMax | 0, mana | 0, manaMax | 0, alive ? 1 : 0, cellFluid, cellOverlap, p]);
+    return decodeDrawList(mod.HEAP32, p >> 2, n);
+  } finally { mod._free(p); }
+}
 
 function call(name, types, args) {
   if (!mod) throw new Error('client rules are not bound to the engine');

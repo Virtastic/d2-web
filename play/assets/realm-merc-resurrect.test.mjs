@@ -8,7 +8,9 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createRealmNpc } from './realm-npc-state.mjs';
-import { withResurrectRow, resurrectLabel, S_RESURRECT } from './npc-menu.mjs';
+import { withResurrectRow, resurrectLabel, S_RESURRECT, setResurrectEngine } from './npc-menu.mjs';
+import { nativeResurrectEngine } from './resurrect-engine-native.mjs';
+setResurrectEngine(nativeResurrectEngine());
 
 const FIXTURE = String.raw`
 #include "d2gs_client_game_packets.h"

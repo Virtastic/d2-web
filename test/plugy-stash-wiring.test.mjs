@@ -8,6 +8,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createStashPanelRenderer } from '../play/assets/stash-panel.mjs';
 import { createPlugyStash, createPlugyPanelArt, createStashLayoutReader, PLUGY_GRID } from '../play/assets/plugy-stash-ui.mjs';
+import { setGridCellEngine, setHeldCellEngine } from '../play/assets/grid-cell.mjs';
+// The shell installs the d2_client_inv_grid_cell / d2_client_held_cell exports; these are the same unsigned divisions.
+setGridCellEngine((l, t, w, h, x, y, c, r) => { const cx = Math.floor(((x - l) >>> 0) / w), cy = Math.floor(((y - t) >>> 0) / h); return cx >= c || cy >= r ? null : { x: cx, y: cy }; });
+setHeldCellEngine((g, w, h, pw, ph, x, y) => ({ x: Math.floor(((x - g.left) >>> 0) / g.cellWidth) - (w >> 1), y: Math.floor(((y - g.top) >>> 0) / g.cellHeight) - (h >> 1) }));
 
 const dc6 = (n) => { const F = 38, b = new DataView(new ArrayBuffer(24 + 4 * n + F * n)); b.setInt32(0, 6, true); b.setInt32(4, 1, true); b.setUint32(12, 0xEEEEEEEE, true); b.setInt32(16, 1, true); b.setInt32(20, n, true);
   for (let i = 0; i < n; i++) { const o = 24 + 4 * n + F * i; b.setUint32(24 + 4 * i, o, true); b.setInt32(o + 4, 1, true); b.setInt32(o + 8, 1, true); b.setInt32(o + 28, 3, true);

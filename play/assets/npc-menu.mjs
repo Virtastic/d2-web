@@ -110,11 +110,18 @@ export const deadHireling = (roster) => roster.find((h) => h && (h.flags & 1)) ?
  */
 export const S_RESURRECT = 5383, S_RESURRECT_FORMAT = 22696;
 export const RESURRECT_CLASSES = [252, 198, 515, 367, 150];
+// Where the row goes is the engine's own insert (d2_client_npc_menu_resurrect_at, D2Client+0x4A060): the shell installs it with
+// setResurrectEngine. Entries are named to it by the table's handler addresses (the insert tests only Hire's and its own); with no
+// engine installed the menu has no Resurrect row.
+let resurrectAt = null;
+export const setResurrectEngine = (fn) => { resurrectAt = fn; };
+const HANDLER_VA = { talk: 0x6FAFA2F0, trade: 0x6FAFAEE0, gamble: 0x6FAFABE0, hire: 0x6FAF9440, identify: 0x6FAF6AF0, resurrect: 0x6FAF6D10 };
 export function withResurrectRow(entries, classId, label) {
-  if (!entries || label === null || !RESURRECT_CLASSES.includes(classId) || entries.some((e) => e.action === 'resurrect')) return entries;
+  if (!entries || label === null || !RESURRECT_CLASSES.includes(classId) || !resurrectAt) return entries;
+  const at = resurrectAt(entries.map((e) => HANDLER_VA[e.action] ?? 0));
+  if (at < 0) return entries;
   const row = { stringId: S_RESURRECT, action: 'resurrect', label };
-  const at = entries.findIndex((e) => e.action === HIRE);
-  return at >= 0 ? [...entries.slice(0, at), row, ...entries.slice(at)] : [...entries.slice(0, -1), row, entries[entries.length - 1]];
+  return [...entries.slice(0, at), row, ...entries.slice(at)];
 }
 /** The 0x58A8 text: the format's two conversions take the name string and the price in order. */
 export const resurrectLabel = (format, name, cost) => format.replace('%s', name).replace('%d', String(cost));

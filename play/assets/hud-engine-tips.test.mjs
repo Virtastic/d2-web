@@ -7,16 +7,16 @@ const texts = ['New Stats', 'New Skill'];
 const calls = [];
 const engine = (w, h, mx, my) => { calls.push([w, h, mx, my]); return { side: 1, x: 999, y: 111 }; };
 // the engine's side and plate win over the caller's own index; a button not drawn lit shows nothing
-assert.deepEqual(levelButtonTooltip(-1, 800, 600, texts, { engine, mx: 5, my: 6, lit: [false, true] }), { bar: 'skill', text: 'New Skill', x: 999, y: 111, color: 0 });
+assert.deepEqual(levelButtonTooltip(800, 600, texts, { engine, mx: 5, my: 6, lit: [false, true] }), { bar: 'skill', text: 'New Skill', x: 999, y: 111, color: 0 });
 assert.deepEqual(calls, [[800, 600, 5, 6]]);
-assert.equal(levelButtonTooltip(1, 800, 600, texts, { engine, lit: [true, false] }), null);
-assert.equal(levelButtonTooltip(1, 800, 600, texts, { engine: () => null, lit: [true, true] }), null);
+assert.equal(levelButtonTooltip(800, 600, texts, { engine, lit: [true, false] }), null);
+assert.equal(levelButtonTooltip(800, 600, texts, { engine: () => null, lit: [true, true] }), null);
 
 const lang = (id) => `s${id}`;
 const mini = (engineFn) => miniPanelTooltip(0, 100, 800, 600, 110, 540, { lang, bindings: [], slotOf: () => -1, engine: engineFn });
 assert.deepEqual(mini((...a) => (assert.deepEqual(a, [800, 600, 110, 540, 100]), { x: 7, y: 8 })), { text: 's4169', x: 7, y: 8, color: 0 });
 assert.equal(mini(() => null), null);
-assert.deepEqual(mini(null), { text: 's4169', x: 97, y: 524, color: 0 });   // fallback rectangle
+assert.equal(mini(null), null);   // no engine, no plate
 console.log('ok');
 
 // the bar text goes through the engine's formatter when one is given, the JS replace otherwise

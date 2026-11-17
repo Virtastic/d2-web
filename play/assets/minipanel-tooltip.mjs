@@ -30,16 +30,16 @@ export function keyLabel(name, lang) {
 // screenLeft: the hovered button's left edge in screen pixels (800x600: W/2-74+21*i, plus the side shift);
 // index: 0..6 into the seven drawn buttons. Returns null off the row.
 // `engine(w, h, mx, my, left)` is retail's hit test and plate position (d2_client_mini_tip, D2Client+0x644F0): null off the
-// button, else {x, y}. The rectangle below stands in before the engine loads.
+// button, else {x, y}. No engine, no plate.
 export function miniPanelTooltip(index, screenLeft, w, h, mx, my, { lang, bindings, slotOf, engine = null }) {
   if (index < 0 || index > 6) return null;
   const hit = engine ? engine(w, h, mx, my, screenLeft) : null;
-  if (engine ? !hit : !(mx > screenLeft && mx < screenLeft + 20 && my > h - 69 && my < h - 47)) return null;
+  if (!hit) return null;
   let text = lang(MINI_TOOLTIP_STRINGS[index]);
   const action = MINI_TOOLTIP_ACTIONS[index];
   if (action) {
     const keys = bindings?.[slotOf(action)] ?? [];
     for (const key of [keys[1], keys[0]]) if (key) text += lang(4178).replace('%s', keyLabel(key, lang));
   }
-  return { text, x: hit ? hit.x : screenLeft - 3, y: hit ? hit.y : h - 76, color: 0 };
+  return { text, x: hit.x, y: hit.y, color: 0 };
 }

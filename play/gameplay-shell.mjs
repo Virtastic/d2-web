@@ -93,6 +93,7 @@ import { createItemTable, createLevelTable, createInventoryTable, createBeltTabl
 import { panelSides as panelViewSides, viewCentreX } from './assets/panel-view-shift.mjs';
 import { createFreeResArt, barParts, halfParts, stoneTiles, drawParts } from './assets/wide-hud.mjs';
 import { createBeltRenderer } from './assets/belt-renderer.mjs';
+import { createBeltDraw } from './assets/belt-draw-engine.mjs';
 import { createBeltPopup, popupRows, beltClickAction } from './assets/belt-popup.mjs';
 import { beltHoverPlan, createBeltTooltip } from './assets/belt-tooltip.mjs';
 import { createActMusicPlayer, createLevelMusicSync, levelMusicDue } from './assets/act-music.mjs';
@@ -102,7 +103,7 @@ import { createVideoResolutionSettings } from './assets/video-resolution-setting
 import { createUiClickSoundPlayer } from './assets/ui-click-sound.mjs';
 import { unitSoundNativeSpatial, unitSoundNativePanCode } from './assets/unit-sound-spatial.mjs';
 import { createUnitSoundPlayer } from './assets/unit-sound-player.mjs';
-import { createAmbientSound, ambientCycleOf } from './assets/ambient-sound.mjs';
+import { createAmbientSound, ambientCycleOf, nativeAmbientSelect } from './assets/ambient-sound.mjs';
 import { createCombatSoundTrigger, combatSoundEngine } from './assets/combat-sound-trigger.mjs';
 import { createEventSounds } from './assets/event-sounds.mjs';
 import { createStatUpdateWatch, ITEM_RECHECK } from './assets/stat-update-watch.mjs';
@@ -162,7 +163,7 @@ import { rightGroundWalks } from './assets/world-click-dispatch.mjs';
 import { createDeathScreen, deathScreenShown, respawnAllowed } from './assets/death-screen.mjs';
 import { createRealmGameUi } from './assets/realm-game-ui.mjs';
 import { realmHeroFlags, realmCorpseViews, createRealmDeath, heroIsDown, deathBlocksKey, markCharactersDead } from './assets/realm-death.mjs';
-import { S_RESURRECT_FORMAT, resurrectLabel, createNpcMenu, hireSkillText, npcMenuChoiceOnRelease, npcMenuInputCoolingDown, npcMenuEntries, withTravelRow, withHireRow, deadHireling, resurrectPacket, talkEntries, menuReturnsAfterSpeech, entriesAfterSpeech, nextSpeechAfterTopic, TRAVEL_LEVEL } from './assets/npc-menu.mjs';
+import { S_RESURRECT_FORMAT, resurrectLabel, createNpcMenu, hireSkillText, npcMenuChoiceOnRelease, npcMenuInputCoolingDown, npcMenuEntries, withTravelRow, withHireRow, deadHireling, resurrectPacket, setResurrectEngine, talkEntries, menuReturnsAfterSpeech, entriesAfterSpeech, nextSpeechAfterTopic, TRAVEL_LEVEL } from './assets/npc-menu.mjs';
 import { talkSpeechId } from './assets/npc-topics.mjs';
 import { createWeatherRenderer } from './assets/weather-renderer.mjs';
 import { readEngineRainDrops } from './assets/weather-engine.mjs';
@@ -174,7 +175,7 @@ import { createMissileRenderer, parseMissileAnimations, isHoveredMissile } from 
 import { blizzardClient } from './assets/blizzard-client.mjs';
 import { createNpcSpeechAlertRenderer } from './assets/npc-speech-alert.mjs';
 import { npcVendorIsOpen, closeInventoryPanel } from './assets/npc-vendor-state.mjs';
-import { createAreaNameBlockRenderer } from './assets/area-name-block.mjs';
+import { createAreaNameBlockRenderer, engineAreaNameLayout } from './assets/area-name-block.mjs';
 import { createEntryBanner, ENTRY_BANNER } from './assets/level-entry-banner.mjs';
 import { hudBarTooltip, levelButtonTooltip } from './assets/hud-bar-tooltip.mjs';
 import { miniPanelTooltip } from './assets/minipanel-tooltip.mjs';
@@ -349,7 +350,7 @@ const realmLoadOrder = createLoadCompleteOrder((b) => realmFlow.protocol.d2gsPac
 const realmAreaAudio = createRealmAreaAudio({
   get music() { return actMusic ? levelMusicSync : null; },
   playMusic: (level) => syncAreaMusic(level),
-  get ambience() { return ambient ? { change: (level) => { const { day, night } = ambient.environment(level); Module._d2_ambient_record?.(day.environmentId, night.ambienceId, day.ambienceId, night.eventId, day.eventId, day.eventDelay); Module._d2_ambient_area?.(day.environmentId); }, sync: (level, cycle) => ambient.sync(level, cycle).catch((error) => { console.warn('Ambient sound', error); }) } : null; },
+  get ambience() { return ambient ? { change: (level) => { Module._d2_ambient_level?.(level); }, sync: (level, cycle) => ambient.sync(level, cycle).catch((error) => { console.warn('Ambient sound', error); }) } : null; },
   cycle: () => ambientCycleOf(Module),
 });
 let realmEventFeed = null;   // a joined game's event sounds (pickup, gold, drop, footfall), fed from the packets' client state
@@ -567,6 +568,17 @@ function readBeltHudBoxes() {
   let bottom = boxes[0].bottom;
   for (const b of boxes) if (b.bottom > bottom) bottom = b.bottom;
   return boxes.filter((b) => b.bottom === bottom);
+}
+
+// The belt's draw list from the engine (the D2Client belt draw port) for the worn record's boxes; null until the export and the boxes exist.
+let beltDrawEngine = null;
+const beltItems = (snapshot) => (snapshot?.items ?? []).filter((it) => it.mode === 2).map((it) => ({ gridX: it.gridX, invFile: it.invFile ?? '' }));
+function beltOpsNow(snapshot, open) {
+  if (typeof Module === 'undefined') return null;
+  beltDrawEngine ??= createBeltDraw(Module, read);
+  const all = clientView().fromPackets && !session ? realmReads?.beltBoxes ?? null : readBeltBoxes();
+  if (!beltDrawEngine || !all?.length) return null;
+  return beltDrawEngine.draw({ w: 800, h: 600, record: snapOr('beltIndex', readBeltIndex), open, boxes: all, items: beltItems(snapshot), keys: beltKeyNames(controlsPanel?.bindings ?? bootControlBindings) });
 }
 
 // The boxes the belt shows and takes clicks on: the bottom row, or every row the popup opens (belt-popup.mjs).
@@ -788,9 +800,10 @@ const stashGoldSpinnerRepeat = createStashSpinnerRepeat();
 let waypointPanelRenderer = null, waypointPanelError = '', waypointEvidence = null, waypointMenu = null, lastWaypointTravel = null;
 const waypointMenuInput = createWaypointMenuInput();
 const beltPopup = createBeltPopup((...a) => (Module._d2_client_belt_hit ? Module.ccall('d2_client_belt_hit', 'number', a.map(() => 'number'), a) : 0));
-// The inventory, stash and vendor grids' point-to-cell rule is D2Client+0x96AA0 (d2_client_inv_grid_cell); JS divides only before the engine loads.
+// The inventory, stash and vendor grids' point-to-cell rule is D2Client+0x96AA0 (d2_client_inv_grid_cell); JS does no division.
+// The Resurrect row's place in an NPC menu is D2Client+0x4A060 (d2_client_npc_menu_resurrect_at); the handler words name the entries.
+setResurrectEngine((hs) => (Module._d2_client_npc_menu_resurrect_at && hs.length <= 5 ? Module.ccall('d2_client_npc_menu_resurrect_at', 'number', Array(6).fill('number'), [hs.length, ...Array.from({ length: 5 }, (_, i) => hs[i] ?? 0)]) : -1));
 setGridCellEngine((...a) => {
-  if (!Module._d2_client_inv_grid_cell) { const [l, t, w, h, x, y, c, r] = a; const cx = Math.floor((x - l) / w), cy = Math.floor((y - t) / h); return cx < 0 || cy < 0 || cx >= c || cy >= r ? null : { x: cx, y: cy }; }
   const p = BigInt(Module.ccall('malloc', 'bigint', ['number'], [8])), i = Number(p) >> 2;
   try { return Module.ccall('d2_client_inv_grid_cell', 'number', [...a.map(() => 'number'), 'bigint'], [...a, p]) ? { x: Module.HEAP32[i], y: Module.HEAP32[i + 1] } : null; }
   finally { Module.ccall('free', null, ['bigint'], [p]); }
@@ -839,16 +852,15 @@ const beltToggleTip = (w, h, mx, my, open) => {
     return id ? { bar: 'belt', text: hudLang(id), x: Module.HEAP32[i], y: Module.HEAP32[i + 1], color: 0 } : null;
   } finally { Module.ccall('free', null, ['bigint'], [p]); }
 };
-// The cell a held item is put down at is D2Client+0x94820's rule (d2_client_held_cell); JS rounds only before the engine loads.
+// The cell a held item is put down at is D2Client+0x94820's rule (d2_client_held_cell); JS does no rounding.
 setHeldCellEngine((g, w, h, pw, ph, x, y) => {
-  if (!Module._d2_client_held_cell) return null;
   const p = BigInt(Module.ccall('malloc', 'bigint', ['number'], [8])), i = Number(p) >> 2;
   try { return Module.ccall('d2_client_held_cell', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'bigint'],
     [g.columns, g.rows, g.left, g.top, g.cellWidth, g.cellHeight, w, h, pw, ph, x, y, p]) ? { x: Module.HEAP32[i], y: Module.HEAP32[i + 1] } : null; }
   finally { Module.ccall('free', null, ['bigint'], [p]); }
 });
 // An item's name colour (tooltip and ground label) is D2Client+0x93450's choice (d2_client_item_name_colour).
-setItemNameColourEngine((q, f) => (Module._d2_client_item_name_colour ? Module._d2_client_item_name_colour(q, f) : (q >= 4 && q <= 9 ? [3, 2, 9, 4, 8, 10][q - 4] : (f & 0x400800) ? 5 : 0)));
+setItemNameColourEngine((q, f) => (Module._d2_client_item_name_colour ? Module._d2_client_item_name_colour(q, f) : 0));
 let beltRenderer = null, beltTooltip = null, beltEvidence = null, beltBoxCache = null, beltBoxRecord = -1;
 let miniDown = -1, miniPointerId = null;
 let controlPanelRenderer = null, controlPanelEvidence = null, hudIconRow = true, lastRunToggle = null;
@@ -2730,6 +2742,8 @@ function ensureCharSelect() {
     charSelect = createCharacterSelect({
       read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette,
       characters: savedCharacters,
+      // D2Launch's card controls (the expansion extension is registered: this is the LoD client).
+      cardAt: (x, y) => Module._d2_launch_card_at(x, y, 1),
       onPlay: (name) => {
         charSelectError = '';
         if (realmSelect) { enterBnetLobby(name); return; }
@@ -3416,7 +3430,7 @@ function update(forceTick = false, live = false) {
     // 1.13c 0x4F860 has its SoundEnviron row before the level's first 0x5F020 tick: record it ahead of the advance (the post-advance block below sees it already set).
     // The level is read from the session itself: the cached snapshot is the previous step's, one level behind when a session is swapped in under the shell (a retail recording).
     const preLevel = session && ambient ? (session.level ? session.level() : session.snapshot()?.level) : null;
-    if (session && ambient && Number.isInteger(preLevel) && preLevel !== ambientLevel) { const { day, night } = ambient.environment(preLevel); Module._d2_ambient_record(day.environmentId, night.ambienceId, day.ambienceId, night.eventId, day.eventId, day.eventDelay); Module._d2_ambient_area(day.environmentId); }
+    if (session && ambient && Number.isInteger(preLevel) && preLevel !== ambientLevel) Module._d2_ambient_level(preLevel);
     try { engineAdvanced = advanceEngine(forceTick) > 0; }
     catch (error) { sessionError = String(error?.stack || error); session = null; }
     if (localServerFrames) {
@@ -3494,7 +3508,7 @@ function updateAfterAdvance(engineAdvanced, live = false) {
   // Ambient loop/events (Levels.SoundEnv -> SoundEnviron -> Sounds.txt); cycle = the engine period of day (dusk/night/dawn pick the night variants).
   if (session && !clientView().fromPackets && ambient && Number.isInteger(snapshot?.level)) {
     const cycle = ambientCycleOf(Module);
-    if (snapshot.level !== ambientLevel) { const { day, night } = ambient.environment(snapshot.level); Module._d2_ambient_record(day.environmentId, night.ambienceId, day.ambienceId, night.eventId, day.eventId, day.eventDelay); Module._d2_ambient_area(day.environmentId); } // 1.13c 0x4F860 reads the SoundEnviron row of Levels.SoundEnv
+    if (snapshot.level !== ambientLevel) Module._d2_ambient_level(snapshot.level); // 1.13c 0x4F860 reads the SoundEnviron row of Levels.SoundEnv
     if (snapshot.level !== ambientLevel || cycle !== ambientCycle) { ambientLevel = snapshot.level; ambientCycle = cycle; ambient.sync(ambientLevel, cycle).catch((error) => { console.warn('Ambient sound', error); }); }
   }
   if (session && !clientView().fromPackets && actMusic && Number.isInteger(snapshot?.level) && levelMusicDue(snapshot.level, levelMusicSync.activeLevel, musicLevelTick, engineTicks)) {
@@ -4579,7 +4593,7 @@ function render(now = false) {
       hud: hudState({ w: canvas.width, h: canvas.height, snapshot, advancement: snapOr('advancement', readAdvancement), screen: snapOr('characterScreen', readCharacterScreen), orbs: snapOr('hudOrbs', readHudOrbs),
         left: Boolean(characterVisible || questVisible || hirelingVisible || stashOpen || waypointMenu || shopOpen()), right: Boolean(skillsVisible || inventoryVisible),
         iconRow: hudIconRow, runToggle: snapOr('runToggle', readRunToggle), miniDown, ...hudHeld(pointer), beltBoxes: snapOr('beltHudBoxes', readBeltHudBoxes),
-        beltKeys: beltKeyNames(controlsPanel?.bindings ?? bootControlBindings), clearScreen: clearScreen || !controlPanelRenderer || screen !== SCREEN.GAME }) } });
+        beltOps: beltOpsNow(snapshot, false), clearScreen: clearScreen || !controlPanelRenderer || screen !== SCREEN.GAME }) } });
   perfT('world', pWorld);
   if (screen === SCREEN.GAME && gameMenu?.open && !controlsPanel?.open) { const p = perfT0(); gameMenu.draw(ctx, canvas.width, canvas.height); perfT('menu', p); }
   if (screen === SCREEN.GAME && controlsPanel?.open) { const p = perfT0(); controlsPanel.draw(ctx, canvas.width, canvas.height); perfT('controls', p); }   // F218
@@ -4738,7 +4752,7 @@ function buildChromeUnits(fresh, read) {
   if (need(corpseRenderer)) corpseRenderer = createPlayerRenderer(read);   // its own instance: the player's draw evidence stays the player's
   if (need(monsterRenderer)) monsterRenderer = createMonsterRenderer(read, document, { shadow: true, mayLoad: mayLoadSprite });
   if (need(npcSpeechAlertRenderer)) npcSpeechAlertRenderer = createNpcSpeechAlertRenderer(read);
-  if (need(areaNameRenderer)) areaNameRenderer = createAreaNameBlockRenderer(read, document);
+  if (need(areaNameRenderer)) areaNameRenderer = createAreaNameBlockRenderer(read, document, Module._d2_client_area_name_block ? engineAreaNameLayout(Module) : null);
   if (need(entryBannerRenderer)) entryBannerRenderer = createEntryBanner({ read, decodeDc6, decodeDatPalette, documentObject: document });
 }
 function buildChromePanels(fresh, read) {
@@ -4788,7 +4802,7 @@ function buildChromeSounds(fresh, read) {
   if (fresh || !uiClickSounds) { try { uiClickSounds = audioVolume.attach('sound', createUiClickSoundPlayer(assetReader, canvas)); } catch (error) { musicError = String(error); } }
   if (fresh || !(unitSounds && combatSounds && eventSounds && missileSounds && ambient)) {
     realmEventFeed = null;
-    try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), combatSoundEngine(Module), (row, event) => unitSounds.noteSubmit(row, event), () => unitSounds.voices()); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a)), (c) => Number(Module._d2_client_monster_footstep_layer(c)), Module._d2_session_monster_idle_take ? (id) => Number(Module._d2_session_monster_idle_take(id)) >>> 0 : null, Module._d2_session_floor_class ? (type, id, fallback) => Number(Module._d2_session_floor_class(type, id, fallback)) : null, Module._d2_client_footstep_due, combatSoundEngine(Module)?.modeSounds); missileSounds = createMissileSounds(wasmMissileRules(Module),(row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error)), (id) => !Module._d2_session_missile_on_client || Module._d2_session_missile_on_client(id) !== 0, (id) => (Module._d2_session_client_unit_roll ? Number(Module._d2_session_client_unit_roll(id)) >>> 0 : 0), (id) => { const f = Module._d2_session_missile_bolt_seed, lo = f ? Number(f(id, 0)) >>> 0 : 0, hi = f ? Number(f(id, 1)) >>> 0 : 0; return lo || hi ? [lo, hi] : null; }); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; canvas.__d2MissileSound = missileSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, undefined, soundFetched)); } catch (error) { musicError = String(error); }
+    try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), combatSoundEngine(Module), (row, event) => unitSounds.noteSubmit(row, event), () => unitSounds.voices()); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a)), (c) => Number(Module._d2_client_monster_footstep_layer(c)), Module._d2_session_monster_idle_take ? (id) => Number(Module._d2_session_monster_idle_take(id)) >>> 0 : null, Module._d2_session_floor_class_level ? (type, id, level) => Number(Module._d2_session_floor_class_level(type, id, level)) : null, Module._d2_client_footstep_due, combatSoundEngine(Module)?.modeSounds); missileSounds = createMissileSounds(wasmMissileRules(Module),(row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error)), (id) => !Module._d2_session_missile_on_client || Module._d2_session_missile_on_client(id) !== 0, (id) => (Module._d2_session_client_unit_roll ? Number(Module._d2_session_client_unit_roll(id)) >>> 0 : 0), (id) => { const f = Module._d2_session_missile_bolt_seed, lo = f ? Number(f(id, 0)) >>> 0 : 0, hi = f ? Number(f(id, 1)) >>> 0 : 0; return lo || hi ? [lo, hi] : null; }); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; canvas.__d2MissileSound = missileSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, nativeAmbientSelect(Module), soundFetched)); } catch (error) { musicError = String(error); }
   }
 }
 // The stash, cube and stash gold panels: built when a local game starts, and by a joined game that had none before it.
@@ -5453,11 +5467,10 @@ function drawFrame() {
   // a centred Font16 plate (D2Win #10085: box = text + 8, bottom = y + 2, glyphs 3 above the bottom).
   if (controlPanelRenderer && !clearScreen && hoverFont) {
     const adv = snapOr('advancement', readAdvancement), scr = snapOr('characterScreen', readCharacterScreen);
-    const lvIndex = controlPanelRenderer.hitLevelButton(controlPanelEvidence, pointer.x, pointer.y, w, h);
     const tip = (adv && scr && hudBarTooltip(w, h, pointer.x, pointer.y, { experience: adv.experience, nextExperience: adv.nextExperience,
       stamina: scr[4], staminaMax: scr[5], fmtExp: hudLang(4163),
       fmtStamina: hudLang(4164), engine: hudBarEngine, formatEngine: Module._d2_client_format_string ? hudFormatEngine : null })) ||
-      levelButtonTooltip(lvIndex, w, h, [3986, 3987].map(hudLang), { engine: Module._d2_client_level_btn_tip ? levelBtnEngine : null, mx: pointer.x, my: pointer.y,
+      levelButtonTooltip(w, h, [3986, 3987].map(hudLang), { engine: Module._d2_client_level_btn_tip ? levelBtnEngine : null, mx: pointer.x, my: pointer.y,
         lit: (controlPanelEvidence?.hud?.levelButtons || []).map((b) => b.frame === HUD_LAYOUT.levelButtons.litFrame || b.frame === HUD_LAYOUT.levelButtons.pressedFrame) }) || miniHoverTip(w, h) || beltToggleTip(w, h, pointer.x, pointer.y, beltPopup.open) || (realmSceneActive ? realmTrade().tip(pointer.x, pointer.y, w, h) : null);
     if (tip) {
       const bw = hoverFont.measure(tip.text) + 8, left = Math.min(Math.max(tip.left ? tip.x : tip.x - (bw >> 1), 0), w - bw), bottom = tip.y + 2;   // a trade tip gives the plate's left edge
@@ -5472,7 +5485,7 @@ function drawFrame() {
   // was actually laid out.
   if (beltRenderer && !ownsWorld) { const bo = hudOrigin(w, h, 'bottom');   // belt boxes are retail 800x600 coordinates; bottom-centre anchored
     ctx.save(); ctx.translate(bo.x, bo.y);
-    beltEvidence = { ...beltRenderer.draw(ctx, snapshot.items, (beltPopup.frame(), snapOr('beltShown' + beltPopup.open, beltShownBoxes)), true, beltKeyNames(controlsPanel?.bindings ?? bootControlBindings), beltPopup.open ? { rows: popupRows(readBeltIndex(), readBeltBoxes()?.length) } : null),
+    beltEvidence = { ...beltRenderer.draw(ctx, (beltPopup.frame(), beltOpsNow(snapshot, beltPopup.open)), beltItems(snapshot), snapOr('beltShown' + beltPopup.open, beltShownBoxes)),
       record: snapOr('beltIndex', readBeltIndex), recordBoxes: snapOr('beltBoxCount', () => readBeltBoxes()?.length ?? 0), origin: { x: bo.x, y: bo.y } };
     ctx.restore(); }
   else if (clearScreen) beltEvidence = null;
@@ -5889,7 +5902,7 @@ function realmInventoryClick(x, y, button, e = {}) {
   const rShop = button === 0 && !cursor && onPanel ? realmShopView() : null;
   if (rShop) {
     const item = inventoryPanelRenderer.itemAt(x, y, canvas.width, canvas.height, snapshot), slot = inventoryPanelRenderer.slotAt(x, y, canvas.width, canvas.height, snapshot), target = item || slot?.item;
-    const route = (...a) => Module._d2_client_inv_click_route ? Module.ccall('d2_client_inv_click_route', 'number', ['number', 'number', 'number', 'number', 'number', 'number'], a) : (a[3] ? 1 : 0);
+    const route = (...a) => Module.ccall('d2_client_inv_click_route', 'number', ['number', 'number', 'number', 'number', 'number', 'number'], a);
     const act = target ? inventoryClickAction(route, { itemId: target.id, bodyLoc: item ? 0 : slot?.bodyLoc, mode: shopModeOf({ shopOpen: true, sell: rShop.sellMode, repair: rShop.repairMode }), ctrl: Boolean(e.ctrlKey), npcOpen: true, targeting: false }) : null;
     if (act === 'repair' || act === 'sell' || act === 'sell-direct') { realmCarriedClick(target.id, rShop, act); return true; }
   }

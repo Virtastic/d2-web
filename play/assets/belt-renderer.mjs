@@ -1,94 +1,49 @@
 import { beltCelAt } from './item-cel-place.mjs';
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
-import { POPUP_BG, popupBgPosition } from './belt-popup.mjs';
+import { POPUP_BG } from './belt-popup.mjs';
 import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
+import { BELT_FONT } from './belt-draw-engine.mjs';
 
-// The belt's boxes are TABLE DATA, not a layout this file gets to choose. Retail computes them in
-// DATATBLS_GetInvRectFromBeltsTxt (D2Common #10638) from Belts.txt, at the requested resolution,
-// and the engine hands them over through `d2_session_belt_boxes`.
-//
-// This used to be `{ x: 342, y: 561, cells: 4, cell: 31 }` -- typed in, uncited, and wrong: retail's
-// 800x600 belt is 29x29 boxes with its first column at x=423, so the belt was drawn 81px left of
-// where the game puts it. 
-//
-// Kept only as the fallback for when the engine is not up (the panel still has to draw something
-// during boot), and marked as such rather than presented as the layout.
-export const BELT_FALLBACK = Object.freeze({ x: 423, y: 562, cells: 4, cell: 29, pitch: 31 });
+// Rasterises the belt's draw list. WHAT the belt draws and where (which popup frames, which potions, which hotkey labels,
+// how a label is trimmed) is D2Client+0x28DC0 run by the engine (belt-draw-engine.mjs); this file turns those ops into pixels.
+// The boxes themselves are Belts.txt through D2Common #10638, handed over by the engine.
 
 function raster(frame, palette, documentObject) { const c = documentObject.createElement('canvas'); c.width = frame.width; c.height = frame.height;
   c.getContext('2d').putImageData(new ImageData(dc6FrameToRgba(frame, palette), frame.width, frame.height), 0, 0); return c; }
 
-/**
- * `boxes` is the engine's Belts.txt rectangles: [{ left, right, top, bottom }, ...] in the belt's
- * own order, which is bottom row first. A belt with no record falls back to the four-box row.
- */
-export function beltBoxes(boxes) {
-  if (Array.isArray(boxes) && boxes.length) return boxes;
-  const { x, y, cells, cell, pitch } = BELT_FALLBACK;
-  return Array.from({ length: cells }, (_, i) =>
-    ({ left: x + i * pitch, right: x + i * pitch + cell, top: y, bottom: y + cell }));
-}
-
-// Retail's drawBelt (D2Client+0x28DC0) draws the hotkey text only for a slot (< 4) that HOLDS an item
-//.
-// A second gate: the label is the slot's bound key name, looked up in the key-binding table (both the
-// primary and secondary entries); a slot whose binding is -1 (unbound) draws no label even with a potion.
-// keys: per-slot key name or null/'' when unbound; default is retail's '1'..'4'.
-export function beltLabelSlots(items, rects, keys = ['1', '2', '3', '4']) {
-  const out = [];
-  for (let i = 0; i < Math.min(4, rects.length); i++)
-    if (keys[i] && (items || []).some((it) => it.mode === 2 && it.gridX === i && it.invFile)) out.push(i);
-  return out;
-}
-
 export function createBeltRenderer(read, documentObject = globalThis.document) {
   const palette = decodeDatPalette(read('data\\global\\palette\\SKY\\pal.dat')), cache = new Map();
   const icon = name => { let c = cache.get(name); if (!c) { const d = decodeDc6(read(`data\\global\\items\\${name}.dc6`)); c = raster(d.frames[0], palette, documentObject); cache.set(name, c); } return c; };
-  // Retail labels the belt's four columns '1'..'4': `text '1' x=425 y=589 color=4` = Font16, gold shift
-  // (extra=4), 2 px in from each column's left and 27 px below its top.
   let bg;
-  const FONT = 'data\\local\\font\\latin\\font16';
-  let numFont = null;
-  const numbers = (ctx, rects, items, keys) => {
-    numFont ??= createFont({ dc6: decodeDc6(read(FONT + '.dc6')), tbl: decodeFontTbl(read(FONT + '.tbl')),
-      palette: textColourPalette(read('data\\global\\palette\\SKY\\pal.pl2'), palette, 4), documentObject, path: FONT + '.dc6', drawAs: { op: 'celcolor', mode: 5, extra: 4 } });
-    for (const i of beltLabelSlots(items, rects, keys)) numFont.drawAnchored(ctx, keys[i], rects[i].left + 2, rects[i].top + 27);
+  const fonts = new Map();
+  // The labels are Font16, colour shift = the op's colour (retail: `text '1' color=4`, gold).
+  const font = (color) => {
+    let f = fonts.get(color);
+    if (!f) fonts.set(color, f = createFont({ dc6: decodeDc6(read(BELT_FONT + '.dc6')), tbl: decodeFontTbl(read(BELT_FONT + '.tbl')),
+      palette: textColourPalette(read('data\\global\\palette\\SKY\\pal.pl2'), palette, color), documentObject, path: BELT_FONT + '.dc6', drawAs: { op: 'celcolor', mode: 5, extra: color } }));
+    return f;
   };
   return {
-    itemAt(x, y, items, boxes) {
-      const rects = beltBoxes(boxes);
-      const slot = rects.findIndex((b) => x >= b.left && x < b.right && y >= b.top && y < b.bottom);
-      if (slot < 0) return null;
-      return (items || []).find(item => item.mode === 2 && item.gridX === slot) || null;
-    },
-    // popup: { rows } -- the background cels of the rows above the HUD row, drawn before the potions (drawBelt 0x28DC0).
-    draw(ctx, items, boxes, labels = false, keys, popup = null) {   // labels: the HUD passes true; item-pixel rows count the sprites alone
-      const rects = beltBoxes(boxes);
+    // ops: the engine's draw list; items: the belt items the 'item' ops index ({ invFile }); boxes: the record's boxes (evidence only).
+    draw(ctx, ops, items, boxes = []) {
       let count = 0, pixels = 0;
       const bgCalls = [];
-      if (popup?.rows > 0) {
-        bg ??= (() => { try { const d = decodeDc6(read(POPUP_BG + '.dc6')); return raster(d.frames[0], palette, documentObject); } catch { return null; } })();
-        for (let i = 0; i < popup.rows; i++) {
-          const p = popupBgPosition(i, popup.width ?? 800, popup.height ?? 600);
-          bgCalls.push(p);
-          if (bg) ctx.drawImage(bg, p.x, p.y - bg.height);   // DC6 cels are placed by their bottom-left
-        }
+      for (const op of ops || []) {
+        if (op.op === 'bg') {
+          bgCalls.push({ x: op.x, y: op.y });
+          bg ??= (() => { try { const d = decodeDc6(read(POPUP_BG + '.dc6')); return raster(d.frames[0], palette, documentObject); } catch { return null; } })();
+          if (bg) ctx.drawImage(bg, op.x, op.y - bg.height);   // DC6 cels are placed by their bottom-left
+        } else if (op.op === 'item') {
+          const it = items?.[op.item];
+          if (!it?.invFile) continue;
+          const c = icon(it.invFile);
+          // The cel is 28x28 in a 29x29 Belts.txt box and sits one row BELOW the box's top row (item-cel-place.mjs).
+          const at = beltCelAt({ left: op.x, top: op.y });
+          ctx.drawImage(c, at.left, at.top);
+          count++; pixels += c.width * c.height;
+        } else if (op.op === 'text') font(op.color).drawAnchored(ctx, op.text, op.x, op.y);
       }
-      for (const item of items || []) {
-        if (item.mode !== 2 || item.gridX < 0 || item.gridX >= rects.length || !item.invFile) continue;
-        const b = rects[item.gridX], c = icon(item.invFile);
-        // The cel is 28x28 in a 29x29 Belts.txt box and sits one row BELOW the box's top row: retail
-        // draws the HUD belt poticon with its bottom row on the box's bottom row (cel ? 28x28 at
-        // y=590 against a box of 562..591), which is the same +1
-        // the inventory places a 28x28 cel in a 29x29 cell with (play/assets/inventory-panel.mjs:229
-        // grid, :234 body). Measured: F228/s813 reads our canvas 1 px up and finds 889 of 948 belt
-        // pixels wrong; at the +1 they are retail's.
-        const at = beltCelAt(b);
-        ctx.drawImage(c, at.left, at.top);
-        count++; pixels += c.width * c.height;
-      }
-      if (labels) numbers(ctx, rects, items, keys);
-      return { count, pixels, bg: bgCalls, boxes: rects.length, cell: rects.length ? rects[0].right - rects[0].left : 0 };
+      return { count, pixels, bg: bgCalls, boxes: boxes.length, cell: boxes.length ? boxes[0].right - boxes[0].left : 0 };
     },
   };
 }

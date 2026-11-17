@@ -1,47 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BELT_FALLBACK, beltBoxes } from '../play/assets/belt-renderer.mjs';
+import { parseBeltOps } from '../play/assets/belt-draw-engine.mjs';
+import { createBeltDraw } from '../play/assets/belt-draw-engine.mjs';
 
-// This test used to pin { x: 342, y: 561, cells: 4, cell: 31 } -- numbers typed into the renderer
-// with no source, which put the potions 81px left of the slots the panel art draws for them.
-// Pinning them made the defect permanent and called it coverage. The real layout is Belts.txt,
-// read through retail's DATATBLS_GetInvRectFromBeltsTxt and handed over by the engine, so what is
-// worth asserting here is that the renderer USES what it is given and that the boot-time fallback
-// matches retail's own 800x600 numbers.
+// What the belt draws and where is the engine's (D2Client belt draw port, proved on its own); the shell only unpacks its ops.
 
-test('the fallback belt matches retail Belts.txt at 800x600', () => {
-  // From d2_session_belt_boxes(2, 1, ...): 29x29 boxes, first column at x=423, bottom row y=562.
-  assert.deepEqual(BELT_FALLBACK, { x: 423, y: 562, cells: 4, cell: 29, pitch: 31 });
+test('the engine op list unpacks into frames, item cels and labels', () => {
+  const text = [...'12'].map((c) => c.charCodeAt(0));
+  const ops = parseBeltOps(Int32Array.from([1, 444, 559, 2, 0, 423, 562, 3, 425, 590, 4, 2, ...text]));
+  assert.deepEqual(ops, [{ op: 'bg', x: 444, y: 559 }, { op: 'item', item: 0, x: 423, y: 562 }, { op: 'text', text: '12', x: 425, y: 590, color: 4 }]);
+  assert.throws(() => parseBeltOps(Int32Array.from([9])));
 });
 
-test('the engine boxes are used verbatim when supplied', () => {
-  const given = [
-    { left: 10, right: 39, top: 100, bottom: 129 },
-    { left: 41, right: 70, top: 100, bottom: 129 },
-  ];
-  assert.equal(beltBoxes(given), given);
-});
-
-test('the fallback is a real four-column row when the engine has nothing', () => {
-  const boxes = beltBoxes(null);
-  assert.equal(boxes.length, 4);
-  assert.deepEqual(boxes.map((b) => b.right - b.left), [29, 29, 29, 29]);
-  assert.deepEqual(boxes.map((b) => b.left), [423, 454, 485, 516]);
-  assert.ok(boxes.every((b) => b.bottom - b.top === 29));
-});
-
-test('hotkey labels are drawn only for belt slots that hold an item (drawBelt 0x28DC0)', async () => {
-  const { beltLabelSlots } = await import('../play/assets/belt-renderer.mjs');
-  const rects = beltBoxes(null);
-  const items = [{ mode: 2, gridX: 1, invFile: 'a' }, { mode: 2, gridX: 2, invFile: 'b' }, { mode: 2, gridX: 5, invFile: 'c' }];
-  assert.deepEqual(beltLabelSlots(items, rects), [1, 2]);
-  assert.deepEqual(beltLabelSlots([], rects), []);
-});
-
-test('a slot with a potion but an unbound hotkey draws no label (drawBelt 0x28DC0 binding lookup)', async () => {
-  const { beltLabelSlots } = await import('../play/assets/belt-renderer.mjs');
-  const items = [0, 1, 2, 3].map((g) => ({ mode: 2, gridX: g, invFile: 'p' }));
-  assert.deepEqual(beltLabelSlots(items, beltBoxes(null), ['1', '2', '3', null]), [0, 1, 2]);
+test('no engine export, no belt draw', () => {
+  assert.equal(createBeltDraw({}, () => null), null);
 });
 
 test('belt hotkey labels follow the configured Use Belt bindings', async () => {

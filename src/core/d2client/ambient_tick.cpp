@@ -9,6 +9,8 @@
 
 #include "sub_4f860.h"
 #include "d2client_5dfd0.h"
+#include "../d2moo/include/D2DataTbls.h"
+#include "../d2moo/include/DataTbls/LevelsTbls.h"
 
 namespace {
 using namespace d2client_4f860;
@@ -129,14 +131,29 @@ void tick(uint32_t* seed, U period, bool weatherLevel) {
 }
 
 extern "C" {
-// SoundEnviron.txt row `idx`, in the in-memory 0x58 layout 0x5DFD0 loads: +4 day amb, +8 night amb, +0xC day event,
-// +0x10 night event, +0x14 delay (0x4F860 takes +4/+0xC while #10396 is 1..3, else +8/+0x10).
-EMSCRIPTEN_KEEPALIVE void d2_ambient_area(int key) { d2client_ambient::setArea(U(key)); }
-EMSCRIPTEN_KEEPALIVE void d2_ambient_record(int idx, int nightAmb, int dayAmb, int nightEvt, int dayEvt, int delay) {
-    if (idx < 0 || idx >= int(kMaxRec)) return;
-    uint32_t* r = reinterpret_cast<uint32_t*>(A.tbl + idx * kRec);
-    r[1] = dayAmb; r[2] = nightAmb; r[3] = dayEvt; r[4] = nightEvt; r[5] = delay;
-    if (U(idx + 1) > A.nrec) A.nrec = idx + 1;
+// The level's SoundEnviron row as 0x4F860 reads it: Levels +0x21C (a byte) indexes the 0x58-byte records 0x5DFD0 loads
+// (+4 day amb, +8 night amb, +0xC day event, +0x10 night event, +0x14 delay; 0x4F860 takes +4/+0xC while #10396 is 1..3, else +8/+0x10).
+// Hands the updater the loaded table and the area key; 0 when the level or the table does not resolve.
+EMSCRIPTEN_KEEPALIVE int d2_ambient_level(int level) {
+    if (!d2client_sounds::records() && !d2client_sounds::load()) return 0;
+    const D2LevelsTxt* r = DATATBLS_GetLevelsTxtRecord(level);
+    if (!r) return 0;
+    d2client_ambient::useEnvTable();
+    d2client_ambient::setArea(U(r->dwSoundEnv & 0xff));
+    return 1;
+}
+// field 0 SoundEnviron row, 1 ambience Sounds row, 2 event Sounds row, 3 event delay, for period `cycle` (#10396); -1 when unresolved.
+EMSCRIPTEN_KEEPALIVE int d2_client_ambient_select(int level, int cycle, int field) {
+    if (!d2client_sounds::records() && !d2client_sounds::load()) return -1;
+    const D2LevelsTxt* r = DATATBLS_GetLevelsTxtRecord(level);
+    if (!r) return -1;
+    const int32_t env = int32_t(r->dwSoundEnv & 0xff);
+    if (field == 0) return env;
+    if (!d2client_sounds::envTable() || env >= d2client_sounds::envCount()) return -1;
+    const bool night = cycle >= 1 && cycle <= 3;
+    const uint32_t off = field == 1 ? (night ? 8u : 4u) : field == 2 ? (night ? 0x10u : 0xCu) : field == 3 ? 0x14u : 0xFFFFu;
+    if (off == 0xFFFFu) return -1;
+    int32_t v; memcpy(&v, d2client_sounds::envTable() + size_t(env) * kRec + off, 4); return v;
 }
 // DAT_6fbc97f8 as the unit pass reads it: the frame about to run (0x4F860 is called with it, then it advances).
 EMSCRIPTEN_KEEPALIVE uint32_t d2_ambient_now() { return Now; }

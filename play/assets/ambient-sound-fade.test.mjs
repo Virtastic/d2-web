@@ -6,10 +6,10 @@ import { createAmbientSound, soundByIndex, AMBIENT_SWAP_TICKS } from './ambient-
 
 const wav = () => { const b = new Uint8Array(48), v = new DataView(b.buffer); b.set([...Buffer.from('RIFF')], 0); v.setUint32(4, 40, true); b.set([...Buffer.from('WAVEfmt ')], 8); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 22050, true); v.setUint32(28, 44100, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); b.set([...Buffer.from('data')], 36); v.setUint32(40, 4, true); return b; };
 const files = {
-  Levels: 'Id\tSoundEnv\n1\t1\n2\t2',
-  SoundEnviron: 'Index\tDay Ambience\tNight Ambience\tDay Event\tNight Event\tEvent Delay\n0\t0\t0\t0\t0\t0\n1\t10\t11\t0\t0\t0\n2\t20\t21\t0\t0\t0',
   Sounds: 'Sound\tIndex\tFileName\tVolume\tGroup Size\tLoop\tFade In\tFade Out\nx\t10\ttown.wav\t100\t0\t1\t12\t12\nx\t11\ttownn.wav\t100\t0\t1\t12\t12\nx\t20\tbirds.wav\t80\t0\t1\t12\t12\nx\t21\tcrick.wav\t90\t0\t1\t6\t300',
 };
+// The engine's SoundEnviron selection (d2_client_ambient_select): level 1 -> env 1 (10 day / 11 night), level 2 -> env 2 (20 / 21).
+const select = (level, cycle) => ({ levelId: level, environmentId: level, cycleState: cycle, ambienceId: level * 10 + (cycle >= 1 && cycle <= 3 ? 1 : 0), eventId: 0, eventDelay: 0 });
 function fake() {
   const clock = { now: 5 }, nodes = [], sources = [];
   class Ctx {
@@ -34,14 +34,14 @@ test('soundByIndex reads the Fade In and Fade Out columns', () => {
 });
 
 test('a new area loop fades in over its row Fade In, one level step per tick', async () => {
-  const f = fake(), a = createAmbientSound(f.read, f.Ctx);
+  const f = fake(), a = createAmbientSound(f.read, f.Ctx, select);
   await a.sync(2, 0);
   assert.deepEqual(bytes(f.nodes[1]), ramp(80, 0, 255, 12));
   assert.deepEqual(times(f.nodes[1]), Array.from({ length: 13 }, (_, k) => Number((5 + k * 0.04).toFixed(6))));
 });
 
 test('another area: the old loop fades out over its Fade Out and stops at the end, the new fades in', async () => {
-  const f = fake(), a = createAmbientSound(f.read, f.Ctx);
+  const f = fake(), a = createAmbientSound(f.read, f.Ctx, select);
   await a.sync(2, 0);
   f.clock.now = 7;
   await a.sync(1, 0);
@@ -52,7 +52,7 @@ test('another area: the old loop fades out over its Fade Out and stops at the en
 });
 
 test('day to night in one area cross-fades over the longer of 250 ticks and the row fade', async () => {
-  const f = fake(), a = createAmbientSound(f.read, f.Ctx);
+  const f = fake(), a = createAmbientSound(f.read, f.Ctx, select);
   await a.sync(2, 0);
   f.clock.now = 7;
   await a.sync(2, 1);
@@ -67,7 +67,7 @@ test('day to night in one area cross-fades over the longer of 250 ticks and the 
 });
 
 test('a slider change inside a fade re-steps the rest of it from the current tick', async () => {
-  const f = fake(), a = createAmbientSound(f.read, f.Ctx);
+  const f = fake(), a = createAmbientSound(f.read, f.Ctx, select);
   await a.sync(2, 0);
   f.clock.now = 5 + 6 * 0.04;
   a.setVolume(0.5, { sound: 0.5, music: 1 });
