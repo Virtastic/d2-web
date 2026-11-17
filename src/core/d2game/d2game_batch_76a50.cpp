@@ -114,7 +114,7 @@ void D2Game_77790(D2GameBatch76Env& e, void* game, void* esiUnit)
     }
 }
 
-// 1.13c D2Game+0x77A50: ediObj type at +0x10 selects the threshold test.
+// standalone port of D2Game 0x77A50: ediObj type at +0x10 selects the threshold test.
 void D2Game_77A50(D2GameBatch76Env& e, const void* ediObj)
 {
     uint32_t a = (uint32_t)e.Ord10973();

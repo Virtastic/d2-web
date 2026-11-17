@@ -483,7 +483,7 @@ int32_t __fastcall sub_6FC42120(D2UnitStrc* pUnit, D2UnitStrc* pItem, int32_t a3
 }
 
 //D2Game.0x6FC42310
-// 1.10f body; the 1.13c port of 0xD47C0 is src/core/d2game/d2g_d47c0.cpp
+// 1.13c D2Game+0xD47C0 (checked against the decompile: the call to 0xD4670 is player-only inside the callee, equal to the guard below; the assert line arguments of the item-flag and anim calls differ, which only matters to a trace; no other delta)
 void __fastcall D2GAME_ITEMS_UpdateItemStatlist_6FC42310(D2GameStrc* pGame, D2UnitStrc* pItem, D2UnitStrc* pUnit, int32_t a4)
 {
     if (!pUnit || !pItem)
@@ -961,6 +961,7 @@ void __fastcall D2GAME_PickupGold_6FC42DD0(D2GameStrc* pGame, D2UnitStrc* pUnit,
 }
 
 //D2Game.0x6FC42F20
+// 1.13c D2Game+0xD2610
 int32_t __fastcall sub_6FC42F20(D2UnitStrc* pUnit, D2UnitStrc* pItem, int32_t* pBodyLoc, int32_t bSkipRequirementCheck)
 {
     D2_ASSERT(pUnit);
@@ -2170,6 +2171,7 @@ void __fastcall D2GAME_ITEMS_UpdateInventoryItems_6FC44A90(D2GameStrc* pGame, D2
 }
 
 //D2Game.0x6FC44F00
+// 1.13c D2Game+0xD1890 (checked against the decompile: same stat reads and skill owner/id pairs, -1/0 for a null skill; no delta)
 void __fastcall sub_6FC44F00(D2UnitStrc* pUnit, D2UnkItemModeStrc* a2)
 {
     a2->nHitpoints = STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0);
@@ -2239,6 +2241,7 @@ void __fastcall D2GAME_ITEMS_UpdateInventoryItems_6FC45050(D2GameStrc* pGame, D2
 }
 
 //D2Game.0x6FC45060
+// 1.13c D2Game+0xD60D0 (checked against the decompile: same lookup, requirement check, body-location placement, flag and refresh order; the body-location-fails path still returns 1; no delta)
 int32_t __fastcall sub_6FC45060(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nItemGUID, uint8_t nBodyLoc, int32_t bSkipRequirementCheck, int32_t* a6)
 {
     int32_t bIsSwitchWeapon = 0;
@@ -4185,6 +4188,7 @@ int32_t __stdcall D2GAME_Return0_6FC48930(int32_t a1, int32_t* a2)
 }
 
 //D2Game.0x6FC48940
+// 1.13c D2Game+0xD4E80 (checked against the decompile: belt placement from the cursor, free-slot or fixed-slot path, socket mode 2, in-belt anim mode; no delta)
 int32_t __fastcall sub_6FC48940(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nItemGUID, int32_t nBeltSlot, int32_t bFindFreeSlot, int32_t* a6)
 {
     D2_ASSERT(pGame);
@@ -6137,6 +6141,7 @@ int32_t __fastcall D2GAME_RechargeItem_6FC4BD50(D2GameStrc* pGame, D2UnitStrc* p
 }
 
 //D2Game.0x6FC4BE80
+// 1.13c D2Game+0x10160
 void __fastcall sub_6FC4BE80(D2UnitStrc* pUnit, D2GameStrc* pGame, int32_t nUnitGUID, D2ActiveRoomStrc* pRoom)
 {
     if (pUnit)
@@ -6545,6 +6550,7 @@ int32_t __fastcall ITEMS_SelectUnique_F370(D2GameStrc* pGame, D2UnitStrc* pItem,
 }
 
 //D2Game.0x6FC4C5F0
+// 1.13c D2Game+0x10A20
 int32_t __fastcall sub_6FC4C5F0(D2GameStrc* pGame, D2UnitStrc** ppUnit, D2ItemDropStrc* pItemDrop)
 {
     D2UnitStrc* pItem = *ppUnit;

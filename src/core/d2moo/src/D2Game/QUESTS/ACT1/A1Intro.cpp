@@ -38,6 +38,7 @@ D2NPCMessageTableStrc gpAct1IntroNpcMessages[] =
 
 
 //D2Game.0x6FC975E0
+// 1.13c D2Game+0x63CC0
 void __fastcall ACT1Intro_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));
@@ -156,6 +157,7 @@ void __fastcall ACT1Intro_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2
 }
 
 //D2Game.0x6FC97770
+// 1.13c D2Game+0x62DF0
 bool __fastcall ACT1Intro_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
 	return QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pPlayer)->pQuestData[pQuest->pGame->nDifficulty], QUESTSTATEFLAG_A1Q1, QFLAG_REWARDGRANTED) != 1

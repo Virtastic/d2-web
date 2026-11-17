@@ -70,7 +70,7 @@ typedef uint8_t u8;
 template <class T> static inline T& at(void* p, int off) { return *(T*)((u8*)p + off); }
 [[noreturn]] static void fatal(int id) { Ordinal_10024(DAT_6fd19ff9, Ordinal_10265(id)); _Exit(-1); }
 
-// 1.13c D2Game+0x77A50  (REG: edi = obj)
+// standalone port of D2Game 0x77A50  (REG: edi = obj)
 extern "C" void D2GAME_77A50(void* edi)
 {
     uint32_t a = Ordinal_10973(0, 0, 0); // GUESS args

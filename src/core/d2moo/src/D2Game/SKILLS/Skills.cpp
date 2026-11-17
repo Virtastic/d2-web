@@ -1756,6 +1756,7 @@ void __fastcall sub_6FD11BA0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkil
 }
 
 //D2Game.0x6FD11C00
+// 1.13c D2Game+0x9FF70 (checked against the decompile: player only, skill-delay state list with the expiry frame; no delta)
 void __fastcall D2GAME_SKILLS_SetDelay_6FD11C00(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nDelay)
 {
     const int32_t nExpireFrame = nDelay + pGame->dwGameFrame;
@@ -1961,6 +1962,7 @@ void __fastcall sub_6FD11E40(D2UnitStrc* pUnit, D2DamageStrc* pDamage, int32_t n
 }
 
 //D2Game.0x6FD11FF0
+// 1.13c D2Game+0xA1630 (checked against the decompile: frame bonus, state mask 38, bow ammo test and fail helpers; no delta)
 int32_t __fastcall SKILLS_SrvSt01_Attack_LeftHandSwing(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     pUnit->nSeqCurrentFramePrecise = UNITS_GetFrameBonus(pUnit) << 8;
@@ -2110,6 +2112,7 @@ int32_t __fastcall SKILLS_SrvDo001_Attack_LeftHandSwing(D2GameStrc* pGame, D2Uni
 }
 
 //D2Game.0x6FD123D0
+// 1.13c D2Game+0xA3220 (checked against the decompile: overlay, target aura state, own aura state, do-func flag 0x40, durability drain; the length clamp is not visible in the decompile; no delta found)
 int32_t __fastcall SKILLS_SrvDo002_Kick_PowerStrike_MonIceSpear_Impale_Bash_Stun_Concentrate_BearSmite_Vengeance_Berserk_FireClaws(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -2862,6 +2865,7 @@ void __fastcall D2GAME_MONSTERS_AiFunction09_6FD13470(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FD13610
+// 1.13c D2Game+0xA37D0 (checked against the decompile: aura state range, dead check and item aura stat; no delta)
 void __fastcall D2GAME_MONSTERS_AiFunction10_6FD13610(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t nSkillId)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);

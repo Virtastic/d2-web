@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x76A10: monster mode callback "update get-hit animation" (table entry). ecx = game, edx = the
+// D2Game+0x76A10 (marker lives on sub_6FC64E20): monster mode callback "update get-hit animation" (table entry). ecx = game, edx = the
 // monster, no stack words. The monster's animation step runs (0xE1930: eax = monster), its frame is advanced
 // (0xB08A: monster) and the end-of-animation test is read (0xB084: monster). Non-zero: the recovery step runs
 // (0x765E0: game, monster) and the result is 2. Zero: 1.

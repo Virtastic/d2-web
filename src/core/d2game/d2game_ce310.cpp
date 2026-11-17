@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xCE310 -- ECX game, EDX unit, two stack words a0, a1 (ret 8). No result. a0 rides in EAX (and ESI) to the senders; a1 is unused.
+// standalone port of D2Game 0xCE310 (marker on d2moo sub_6FC81D20) -- ECX game, EDX unit, two stack words a0, a1 (ret 8). No result. a0 rides in EAX (and ESI) to the senders; a1 is unused.
 // h = 0xAABA(unit): zero ends. 0xA79C(h) with bit 2 of its low byte clear: 0x4AD10(0) equal to unit ends. id = unit[+0xC] (-1 for no unit); 0xE07A0(EAX unit, ECX game);
 // t0 = 0xA598(unit[+0x2C]), tgt = 0 when t0 == unit else t0; v = 0xA49C(h, "..\Source\D2Game\PLAYER\PlrMsg.cpp" (0xFB188), 0xCF); b = byte 0xA400(unit, h, 1).
 // tgt non-zero and 0x49A50(EAX tgt) non-zero: 0x8D210(EAX a0, EBX 0; 0, id, tgt[0], tgt[+0xC], v, 0, b dword); done. Otherwise the 17-byte packet

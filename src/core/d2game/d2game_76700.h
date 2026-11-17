@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x76700: monster mode callback "reset to neutral with delay" (table entry). ecx = game, edx = the
+// D2Game+0x76700 (marker lives on sub_6FC64410): monster mode callback "reset to neutral with delay" (table entry). ecx = game, edx = the
 // mode argument block whose word 1 is the monster, no stack words. The attacker list is released (0xDA750: edi =
 // monster; game), the monster goes to mode 11 (0xA4A2: monster, 11) and an event of type 2 is queued 15 frames
 // ahead (0x8EA80: game, monster, 2, frame + 15, 0, 0, 0). The result is 1.

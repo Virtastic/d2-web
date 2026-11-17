@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x687D0 -- A1Q4 quest-record initializer. ECX = the quest record.
+// D2Game+0x687D0 (marker lives on ACT1Q4_InitQuestData) -- A1Q4 quest-record initializer. ECX = the quest record.
 // Zeroes the 15 callback dwords at +0xA0, fills the callback slots, then allocates the 0x1BC-byte per-quest data (pool [[q+4]+0x1C],
 // file a1q4.cpp line 0x95F) and zeroes it. Pure rule + seams: cb(rva) yields the code address of a D2Game function (or the data
 // address 0x1093C8 for slot +0xDC), alloc is the Fog pool allocator (D2Game+0xA2E6).

@@ -2,7 +2,7 @@
 // generic finish. ECX = P, EAX = drop, one stack word (ret 4).
 #include <cstdint>
 #include "d2game_itemqual.h"
-extern "C" void d2g_10600(void* drop, uint32_t P, uint32_t arg, const D2GItemQualEnv* env) {  // 1.13c D2Game+0x10600
+extern "C" void d2g_10600(void* drop, uint32_t P, uint32_t arg, const D2GItemQualEnv* env) {  // 1.13c 0x10600 (marker lives on sub_6FC4D900)
     switch (env->imp_aa66(P)) {
     case 7:    env->imp_b1aa(P, d2g_itemqual_owner(drop)); env->imp_a65e(P, 0x10000, 1); return;
     case 0xd:  env->sub10240(P, drop); return;

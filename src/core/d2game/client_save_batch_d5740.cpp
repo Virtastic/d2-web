@@ -11,14 +11,14 @@
 #include <UNIT/SUnit.h>
 #include <D2PacketDef.h>
 
-// 1.13c D2Game+0x49D70
+// Stand-alone body of D2Game 0x49D70 (the marker is on the play-path CLIENTS_SetActNo)
 void D2GAME_49D70_SetAct(D2ClientStrc* client, uint8_t act)
 {
     assert(client && act < 5);
     client->nAct = act;
 }
 
-// 1.13c D2Game+0x49AE0
+// Stand-alone body of D2Game 0x49AE0 (the marker is on the play-path CLIENTS_SetCreateTime)
 void D2GAME_49AE0_SetCreateTime(D2ClientStrc* client, uint32_t time)
 {
     assert(client);
@@ -62,12 +62,13 @@ uint32_t D2GAME_EB8B0_InventoryItemId(D2UnitStrc* unit, int32_t index)
     return UINT32_MAX;
 }
 
+// 1.13c D2Game+0x8C530: the per-player callback, the 10-byte 0x8E to the player's client (player data +0x9C).
 static void __fastcall SendCorpseAssignment(D2GameStrc*, D2UnitStrc* player, void* packet)
 {
     D2GAME_PACKETS_SendPacket_6FC3C710(SUNIT_GetClientFromPlayer(player, __FILE__, __LINE__), packet, 10);
 }
 
-// 1.10f corpse assignment (the 1.13c routine is d2game_8cf80.cpp)
+// 1.13c D2Game+0x8CF80: {0x8E, kind, player id, corpse id}, 10 bytes, to every living player's client (0xDFC10, callback 0x8C530).
 void D2GAME_8CF80_CorpseAssignment(D2GameStrc* game, int32_t playerId,
                                   int32_t corpseId, uint8_t assign)
 {

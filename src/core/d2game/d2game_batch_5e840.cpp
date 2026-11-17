@@ -76,7 +76,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_5E840(uint32_t q, uint32_t uni
     e->subAEA80(g, unit, 7, rd32(g, 0xa8) + 0x19, 0, 0, 0);
 }
 
-// 1.13c D2Game+0x5FC20
+// D2Game+0x5FC20 (marker lives on ACT5Q3_InitQuestData)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_5FC20(uint32_t q, const D2GameBatch5E840Env* e)
 {
     std::memset(P(q) + 0xa0, 0, 0x3c);

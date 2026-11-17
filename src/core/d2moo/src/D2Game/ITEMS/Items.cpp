@@ -101,6 +101,7 @@ int32_t __fastcall sub_E800(D2GameStrc* pGame, D2UnitStrc* pItem)
 }
 
 //D2Game.0x6FC4D4E0
+// 1.13c D2Game+0xEDC0
 int32_t __fastcall ITEMS_CanUniqueItemBeDropped(D2GameStrc* pGame, D2UnitStrc* pItem)
 {
     if (!pItem)
@@ -136,6 +137,7 @@ int32_t __fastcall ITEMS_CanUniqueItemBeDropped(D2GameStrc* pGame, D2UnitStrc* p
 }
 
 //D2Game.0x6FC4D5E0
+// 1.13c D2Game+0x103C0
 int32_t __fastcall sub_6FC4D5E0(D2UnitStrc** ppItem, D2ItemDropStrc* pItemDrop)
 {
     // TODO: v5
@@ -185,6 +187,7 @@ int32_t __fastcall sub_6FC4D5E0(D2UnitStrc** ppItem, D2ItemDropStrc* pItemDrop)
 }
 
 //D2Game.0x6FC4D6B0
+// 1.13c D2Game+0xEC90
 void __fastcall sub_6FC4D6B0(D2GameStrc* pGame, D2UnitStrc* pItem, D2ItemDropStrc* pItemDrop)
 {
     if (ITEMS_GetItemQuality(pItem) < 2 || !ITEMS_CheckIfSocketable(pItem) || ITEMS_CheckIfStackable(pItem))
@@ -246,6 +249,7 @@ void __fastcall sub_6FC4D6B0(D2GameStrc* pGame, D2UnitStrc* pItem, D2ItemDropStr
 }
 
 //D2Game.0x6FC4D800
+// 1.13c D2Game+0xEBB0 (checked against the decompile: the roll is the seed step modulo 100, identical to the limited roll of 0x1180; no delta)
 void __fastcall ITEMS_MakeEthereal(D2UnitStrc* pItem, D2ItemDropStrc* pItemDrop)
 {
     if (pItemDrop->dwFlags2 & ITEMDROPFLAG_NEVERETH || (!ITEMS_CheckItemTypeId(pItem, ITEMTYPE_WEAPON) && !ITEMS_CheckItemTypeId(pItem, ITEMTYPE_ANY_ARMOR)) || !ITEMS_HasDurability(pItem))
@@ -283,6 +287,7 @@ void __fastcall ITEMS_MakeEthereal(D2UnitStrc* pItem, D2ItemDropStrc* pItemDrop)
 }
 
 //D2Game.0x6FC4D900
+// 1.13c D2Game+0x10600
 void __fastcall sub_6FC4D900(D2GameStrc* pGame, D2UnitStrc* pItem, D2ItemDropStrc* pItemDrop)
 {
     switch (ITEMS_GetItemType(pItem))
@@ -335,6 +340,7 @@ void __fastcall sub_6FC4D900(D2GameStrc* pGame, D2UnitStrc* pItem, D2ItemDropStr
 }
 
 //D2Game.0x6FC4DA10
+// 1.13c D2Game+0x10240
 int32_t __fastcall ITEMS_AssignCharmAffixes(D2GameStrc* pGame, D2UnitStrc* pItem, D2ItemDropStrc* pItemDrop)
 {
     // TODO: nRand
@@ -388,6 +394,7 @@ int32_t __fastcall ITEMS_AssignCharmAffixes(D2GameStrc* pGame, D2UnitStrc* pItem
 }
 
 //D2Game.0x6FC4DB60
+// 1.13c D2Game+0x10550
 void __fastcall D2GAME_ITEMS_AssignSpecial_6FC4DB60(D2GameStrc* pGame, D2UnitStrc* pItem, D2ItemDropStrc* pItemDrop)
 {
     if (ITEMS_CheckItemTypeId(pItem, ITEMTYPE_CHARM))
@@ -432,6 +439,7 @@ void __fastcall D2GAME_ITEMS_AssignSpecial_6FC4DB60(D2GameStrc* pGame, D2UnitStr
 }
 
 //D2Game.0x6FC4DC20
+// 1.13c D2Game+0x107B0
 void __fastcall sub_6FC4DC20(D2GameStrc* pGame, D2UnitStrc* pItem, D2ItemDropStrc* pItemDrop)
 {
     if (ITEMS_GetItemFormat(pItem))
@@ -445,6 +453,7 @@ void __fastcall sub_6FC4DC20(D2GameStrc* pGame, D2UnitStrc* pItem, D2ItemDropStr
 }
 
 //D2Game.0x6FC4DE00
+// 1.13c D2Game+0xEE90
 int32_t __fastcall ITEMS_RollItemQuality(D2UnitStrc* pItem, D2ItemDropStrc* pItemDrop)
 {
     constexpr int32_t nItemQualities[] =
@@ -583,6 +592,7 @@ int32_t __fastcall ITEMS_RollItemQuality(D2UnitStrc* pItem, D2ItemDropStrc* pIte
 }
 
 //D2Game.0x6FC4E1A0
+// 1.13c D2Game+0xE210
 void __fastcall sub_6FC4E1A0(D2UnitStrc** ppItem)
 {
     for (int32_t i = 0; i < 3; ++i)
@@ -1512,7 +1522,6 @@ D2UnitStrc* __fastcall D2GAME_CreateItemUnit_6FC501A0(D2UnitStrc* pPlayer, int32
 }
 
 //D2Game.0x6FC502B0
-// 1.13c D2Game+0x387E0
 void __fastcall sub_6FC502B0(D2GameStrc* pGame, D2UnitStrc* pItem)
 {
     if (ITEMS_CheckIfSocketable(pItem))

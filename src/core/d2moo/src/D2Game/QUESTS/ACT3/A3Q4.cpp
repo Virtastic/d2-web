@@ -207,6 +207,7 @@ void __fastcall ACT3Q4_UnitIterate_UpdateCurrentQuestState(D2GameStrc* pGame, D2
 }
 
 //D2Game.0x6FCAA270
+// 1.13c D2Game+0xE92D0
 void __fastcall ACT3Q4_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));

@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x8C490: one-byte packet {AL} to the client in the stack word (ret 4).
+// Stand-alone body of D2Game 0x8C490 (the marker is on the play-path D2GAME_PACKETS_SendHeaderOnlyPacket): one-byte packet {AL} to the client in the stack word (ret 4).
 #include <cstdint>
 typedef void (*D2GSend)(void* client, const void* buf, uint32_t len);
 

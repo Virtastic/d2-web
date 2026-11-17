@@ -118,6 +118,7 @@ void __fastcall ACT1Q6_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FC9E0E0
+// 1.13c D2Game+0x60940
 bool __fastcall ACT1Q6_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
 	int32_t nUnitId = -1;

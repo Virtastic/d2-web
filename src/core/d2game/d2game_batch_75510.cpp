@@ -9,7 +9,7 @@
 
 static inline uint32_t rd32(uint32_t a, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)(uintptr_t)a + o, 4); return v; }
 
-// 1.13c D2Game+0x75510
+// D2Game+0x75510 (marker lives on sub_6FC645E0)
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_game_75510(uint32_t param1, const uint32_t* param2,
                                                  const D2GameBatch75510Env* env)

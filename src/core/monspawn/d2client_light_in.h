@@ -11,4 +11,4 @@ struct D2SessionLightmap;
 struct D2ClientLightIn { D2UnitStrc* unit; int32_t type, classId, x, y, radius; uint32_t guid; D2ActiveRoomStrc* room; };
 
 extern "C" const D2SessionLightmap* d2_client_lightmap_compose(D2UnitStrc* player, D2DrlgActStrc* act,
-    const D2ClientLightIn* in, int n, int ambientOverride, int occludeUnits);
+    const D2ClientLightIn* in, int n, int ambientOverride, int tier);

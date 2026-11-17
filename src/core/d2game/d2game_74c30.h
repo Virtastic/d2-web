@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x74C30: monster mode-start callback "run" (table entry). ecx = game, edx = the mode block (+0x04
+// D2Game+0x74C30 (marker lives on sub_6FC644E0): monster mode-start callback "run" (table entry). ecx = game, edx = the mode block (+0x04
 // the monster). The monster's path (+0x2C) is asked whether it can move (0xAC70); if not the result is 0.
 // Otherwise the attacker list is dropped (0xDA750: one stack word = game), the monster goes to animation mode 15
 // (0xA4A2: unit, mode) and the result is 1.

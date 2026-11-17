@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xD4E80 (EAX item id, ECX player, EDX game; stack page, direct, out; ret 0xC)
+// 1.13c 0xD4E80 (marker lives on sub_6FC48940; EAX item id, ECX player, EDX game; stack page, direct, out; ret 0xC)
 #include "d2game_d4e80.h"
 #include <cstdlib>
 #include <cstring>

@@ -73,7 +73,7 @@ extern "C" void d2game_26320(D2GameStrc* game, D2UnitStrc* unit, int32_t mod, in
 }
 
 // EAX=skill id; coordinates are writable native pointers.
-// 1.13c D2Game+0x26BB0
+// (marker lives on SKILLS_FindLeapTargetPosition) 1.13c 0x26BB0
 extern "C" int32_t d2game_26bb0(D2UnitStrc* unit, int32_t skillId, int32_t level, int32_t* x, int32_t* y)
 {
     return SKILLS_FindLeapTargetPosition(unit, skillId, level, x, y);

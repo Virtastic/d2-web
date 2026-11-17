@@ -173,6 +173,7 @@ D2UnitStrc* __fastcall OBJECTS_SpawnPresetChest(D2GameStrc* pGame, D2ActiveRoomS
 }
 
 //D2Game.0x6FC70470
+// 1.13c D2Game+0x331B0 (checked against the decompile: the roll only on levels 62-64 with a cut of 50, tower cellar 5 sets type 3; the class swap for that level is not visible in the decompile; no delta found)
 D2UnitStrc* __fastcall OBJECTS_SpawnSpecialChest(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nClassId, int32_t nX, int32_t nY, int32_t nMode)
 {
     const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(pRoom);
@@ -457,6 +458,7 @@ void __fastcall OBJECTS_InitFunction10_Unused(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC708B0
+// 1.13c D2Game+0x2F580 (checked against the decompile: piles 1-9, two rolls each, room test at the previous accepted position plus the roll, collision at origin plus the roll, mask 0x3F11; no delta)
 void __fastcall OBJECTS_InitFunction28_GoldPlaceHolder(D2ObjInitFnStrc* pOp)
 {
     if (pOp->pObject && pOp->pObject->dwAnimMode != OBJMODE_NEUTRAL)
@@ -503,6 +505,7 @@ void __fastcall OBJECTS_InitFunction28_GoldPlaceHolder(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC70A50
+// 1.13c D2Game+0x2EF90 (checked against the decompile: class parm 1/2 map to classes 2/3, otherwise 4 with a one-in-ten roll for 1, then the 0x2ED70 pick or the eight-try level-min loop; ids 4/5/16 remap to 2/3/18; no delta)
 void __fastcall OBJECTS_InitFunction01_Shrine(D2ObjInitFnStrc* pOp)
 {
     int32_t nShrineId = 0;
@@ -628,6 +631,7 @@ void __fastcall OBJECTS_InitFunction24_SpikeFloorTrap(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC70D30
+// 1.13c D2Game+0x2EA40 (checked against the decompile: one roll below levels.txt monlvl/8+5 percent, then the 1-to-8 roll; no delta)
 void __fastcall OBJECTS_InitFunction02_Urn(D2ObjInitFnStrc* pOp)
 {
     pOp->pObject->pObjectData->InteractType = 0;
@@ -641,6 +645,7 @@ void __fastcall OBJECTS_InitFunction02_Urn(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC70DC0
+// 1.13c D2Game+0x2E9F0 (checked against the decompile: roll modulo 1000 below 333 gives type 3; no delta)
 void __fastcall OBJECTS_InitFunction27_GooPile(D2ObjInitFnStrc* pOp)
 {
     pOp->pObject->pObjectData->InteractType = 0;
@@ -652,6 +657,7 @@ void __fastcall OBJECTS_InitFunction27_GooPile(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC70E10
+// 1.13c D2Game+0x2ECB0 (checked against the decompile: the urn roll inline, lock bit from monlvl/2+8, then the object seed from one more roll; same roll order; no delta)
 void __fastcall OBJECTS_InitFunction03_Chest(D2ObjInitFnStrc* pOp)
 {
     const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(pOp->pRoom);
@@ -1192,6 +1198,7 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn1_CasketJarSarcophagusUrn(D2GameStrc* p
 }
 
 //D2Game.0x6FC71FB0
+// 1.13c D2Game+0x32DF0 (checked against the decompile: probability gate, four coordinate patterns, eight placement tries, per-corpse flies; no delta)
 D2UnitStrc* __fastcall OBJECTS_PopulateFn7_RogueOnStick(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, uint8_t nDensity, uint32_t nObjectId, uint16_t nProbability)
 {
     constexpr D2CoordStrc stru_6FD2F758[6] =

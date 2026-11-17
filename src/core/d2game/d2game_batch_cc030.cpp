@@ -180,7 +180,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_379e0(void* game, void* player, const D2GameBa
     }
 }
 
-// 1.13c D2Game+0xB2480
+// (marker now on the d2moo ARENA_FreeArenaUnit)
 // FUN_6fcd2480 ARENA_FreeArenaUnit(pGame in ECX, pPlayer in EAX): the player data is mandatory
 // (fatal 0x52), and pArenaUnit (+0x34) is freed and cleared (Arena.cpp:0x57).
 extern "C"
@@ -340,18 +340,4 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_b2480(uint32_t* r)
     d2_game_b2480(rdptr((void*)(uintptr_t)r[1], 0x1C), (void*)(uintptr_t)r[0], &e);
     r[4] = 0;
 }
-// 0xF0390: r[0] player (EAX), r[1] game (ECX), r[2] player data blob, r[3] hook log. 0xDFC10 takes the player on the stack, the game in EDI and the 0xF0040 callback in EBX.
-static void g15Iter(void* game, void* player) {
-    g15H->ed((uint32_t)(uintptr_t)game);
-    g15H->h(0xDFC10, 0, 0, 0, 0xB20F0040u, 0, (uint32_t)(uintptr_t)player);
-    g15H->edi(0xDFC10, (uint32_t)(uintptr_t)game); }
-static void g15Free4E(void* pool, void* p, uint32_t line) {
-    g15H->h(0xA2EC, 0, (uint32_t)(uintptr_t)pool, (uint32_t)(uintptr_t)p, 0, 0, 0xB20FB9A4u, line, 0); }
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_f0390(uint32_t* r)
-{
-    static uint32_t none[2] = {0, 0};
-    HookEnv he((uint32_t*)(uintptr_t)r[3], none); g15H = &he; g15Pd = r[2];
-    D2GameBatch15Env e{}; e.getPlayerData = g15GetPd; e.freePool = g15Free4E; e.iterateLivingPlayers = g15Iter;
-    d2_game_f0390((void*)(uintptr_t)r[1], (void*)(uintptr_t)r[0], &e);
-    r[4] = 0;
-}
+// The 0xF0390 FN probe is src/core/fn/d2game_f0390.cpp (it runs the vendored PLAYERLIST_FreePlayerLists).

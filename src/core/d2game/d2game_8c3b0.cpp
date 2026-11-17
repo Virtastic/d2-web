@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x8C3B0: 6-byte packet to the client in the stack word (ret 4): byte 0 = AL, byte 1 = CL, bytes 2..5 = EDX.
+// Stand-alone body of D2Game 0x8C3B0 (the marker is on the play-path shim): 6-byte packet to the client in the stack word (ret 4): byte 0 = AL, byte 1 = CL, bytes 2..5 = EDX.
 #include <cstdint>
 #include <cstring>
 typedef void (*D2GSend)(void* client, const void* buf, uint32_t len);

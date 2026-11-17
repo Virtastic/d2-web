@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xCE150: tell a client where a unit is. Disassembled convention: ECX = game, EDX = unit, stack = client, table index;
+// standalone port of D2Game 0xCE150 (marker on d2moo sub_6FC81E10): tell a client where a unit is. Disassembled convention: ECX = game, EDX = unit, stack = client, table index;
 // ret 8. A null client is retail's fatal assert (line 0xFB) and is not reached here. The client's current target is client+0x174 when
 // byte client+0x3D4 bit 0 is set; otherwise 0 when that word is 0, else 0xE03A0 (EAX = client+0x16C, ECX = client+0x1A8,
 // EDX = client+0x170), a zero result clearing client+0x174. The target itself returns. Then 0xE07A0 (EAX = unit, ECX = game); when

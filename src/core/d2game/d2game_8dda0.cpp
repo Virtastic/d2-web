@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x8DDA0 -- SCmd command dispatch on AL.
+// D2Game 0x8DDA0 -- SCmd command dispatch on AL.
 // AL = command, ECX = unit/object handle (opaque), EDX = client (EBX at the 0x8D3D0 calls), plain ret.
 // Ordinals: 0xA6C4 #10020, 0xAFD6 #10728, 0xA92E #10012, 0xAFDC #10516, 0xA8A4 #10202.
 #include "d2game_8d6_common.h"
@@ -10,7 +10,7 @@ struct D2Game8DDA0Env {
     void     (*ord10012)(uint32_t p, uint32_t v);                                      // 0xA92E, two stack words
     void     (*sub8D3D0)(uint32_t client, uint32_t id, uint32_t arg, uint32_t flag);
 };
-// 1.13c D2Game+0x8DDA0
+// Stand-alone body of D2Game 0x8DDA0 (the marker is on the play-path shim D2GAME_SendP0x9C_ItemAction_AddOrRemoveFromShop_6FC3F260)
 void d2game_port_8dda0(uint8_t cmd, uint32_t p, uint32_t client, const D2Game8DDA0Env* env)
 {
     static const char kFile[] = "..\\Source\\D2Game\\GAME\\SCmd.cpp";

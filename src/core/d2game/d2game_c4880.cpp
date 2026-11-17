@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xC4880 -- ECX = quest record q: the 0xF dwords at +0xA0 are cleared and bytes +0xB, +0xC set to 0, then the callbacks are installed (+0xA0 = 0xC2680, +0xCC = 0xC2720, +0xDC = data 0x105E08, +0xE8 = 0xC1960, +0xEC = 0xC25F0; +0xE0 = 0x1F; byte +0xA = 1). A 2-byte block comes from the allocator 0xA2E6 (ECX = [[q+4]+0x1C], EDX = 2; stack: source file string, line 0x96, 0), its pointer goes to q+0x18 and its first two bytes are zeroed. EAX leaves as the block.
+// D2Game+0xC4880 (marker lives on ACT2Q8_InitQuestData) -- ECX = quest record q: the 0xF dwords at +0xA0 are cleared and bytes +0xB, +0xC set to 0, then the callbacks are installed (+0xA0 = 0xC2680, +0xCC = 0xC2720, +0xDC = data 0x105E08, +0xE8 = 0xC1960, +0xEC = 0xC25F0; +0xE0 = 0x1F; byte +0xA = 1). A 2-byte block comes from the allocator 0xA2E6 (ECX = [[q+4]+0x1C], EDX = 2; stack: source file string, line 0x96, 0), its pointer goes to q+0x18 and its first two bytes are zeroed. EAX leaves as the block.
 #include <cstdint>
 #include "../fn/d2game_gp.h"
 namespace d2g {

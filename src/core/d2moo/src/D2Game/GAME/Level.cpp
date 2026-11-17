@@ -399,7 +399,7 @@ void __fastcall LEVEL_RemoveAllUnits(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC3C5B0
-// 1.13c D2Game 0x9D850
+// 1.13c D2Game+0x9D850
 void __fastcall LEVEL_UpdateQueuedUnitsInAllActs(D2GameStrc* pGame)
 {
     struct Environment {

@@ -154,7 +154,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E5F60(uintptr_t game, const D2
     wr32(d, 0x2c, 2);
 }
 
-// 1.13c D2Game+0xE6660
+// D2Game+0xE6660 (marker lives on ACT3Q0_InitQuestData)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E6660(uintptr_t q, const D2GameBatchE4900Env* env)
 {
     std::memset((uint8_t*)q + 0xa0, 0, 15 * 4);

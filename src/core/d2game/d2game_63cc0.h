@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x63CC0: quest-record init callback (table entry); the shape is d2game_qinit.h, the words are
+// D2Game+0x63CC0 (marker lives on ACT1Intro_InitQuestData): quest-record init callback (table entry); the shape is d2game_qinit.h, the words are
 // this quest's handlers and message table.
 #pragma once
 #include "d2game_qinit.h"

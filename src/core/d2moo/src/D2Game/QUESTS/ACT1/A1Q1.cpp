@@ -113,6 +113,7 @@ int32_t __fastcall ACT1Q1_GetMonstersToBeKilled(D2QuestDataStrc* pQuestData)
 }
 
 //D2Game.0x6FC979A0
+// 1.13c D2Game+0x60750
 bool __fastcall ACT1Q1_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
 	if (nNpcId != MONSTER_AKARA || QUESTRECORD_GetQuestState(pQuestFlags, pQuest->nQuestFilter, QFLAG_REWARDGRANTED) == 1)

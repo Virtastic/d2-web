@@ -45,7 +45,7 @@ struct D2GameBatchEBB0Env {
     int32_t  (*getTotalStat)(void* pItem, int32_t nStat, int32_t nLayer);
 };
 
-// 1.13c D2Game+0xEBB0
+// 1.13c 0xEBB0 (marker lives on ITEMS_MakeEthereal)
 // ESI = pItem, EBX = pItemDrop. Return when the drop forbids ethereal, the item is neither weapon nor
 // armour or has no durability, its quality is inferior/set, or it is a quest item. Otherwise roll
 // low32(ITEMS_GetItemSeed(pItem)) % 100 < 5 (via 0x1180), honour the two force flags, and apply
@@ -75,7 +75,6 @@ static void MakeEthereal(void* pItem, void* pItemDrop, const D2GameBatchEBB0Env*
     }
 }
 
-// 1.13c D2Game+0xEBB0
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2game_ebb0_port(uint32_t pItem, uint32_t pDrop, const D2GameBatchEBB0Env* env)
 {

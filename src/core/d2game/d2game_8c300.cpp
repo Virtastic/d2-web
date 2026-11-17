@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x8C300: 12-byte packet to the client in the first stack word (ret 0x10). Byte 0 = AL, byte 1 = CL,
+// Stand-alone body of D2Game 0x8C300 (the marker is on the play-path shim): 12-byte packet to the client in the first stack word (ret 0x10). Byte 0 = AL, byte 1 = CL,
 // bytes 2..5 = EDX, byte 6 and byte 7 = the next two stack bytes, dword at 8 = the last stack word.
 #include <cstdint>
 #include <cstring>

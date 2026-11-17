@@ -31,7 +31,7 @@ static uint32_t findNode(uint32_t unit, uint32_t type) {
 static inline uint32_t state(uint32_t unit) { return R(unit, 0) == 1 && R(unit, 0x14) ? R(R(unit, 0x14), 0x2C) : 0; }
 static inline void setState(uint32_t unit, uint32_t v) { if (uint32_t s = state(unit)) W(s, 0x18, v); }
 
-// 1.13c D2Game+0x16A30
+// (marker lives on the d2moo sub_6FCE69A0)
 extern "C" uint32_t d2game_16a30_port(const D2G16A30Env& e, uint32_t game, uint32_t unit, uint32_t* counter) {
     if (!unit) return 0;
     if (R(unit, 0) != 1) return 0;

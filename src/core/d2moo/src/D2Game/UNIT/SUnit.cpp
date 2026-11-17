@@ -969,6 +969,7 @@ D2ClientStrc* __fastcall SUNIT_GetClientFromPlayer(D2UnitStrc* pPlayer, const ch
 }
 
 //D2Game.0x6FCBC300
+// 1.13c D2Game+0xE0860 (checked against the decompile: same clear masks, the double damage-reduction overlay check, per-type tail; no delta)
 void __fastcall sub_6FCBC300(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2_ASSERT(pUnit);
@@ -1037,6 +1038,7 @@ void __fastcall sub_6FCBC300(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCBC480
+// 1.13c D2Game+0xDFFD0
 void __fastcall SUNIT_AttachSound(D2UnitStrc* pUnit, int32_t nUpdateType, D2UnitStrc* pUpdateUnit)
 {
     D2_ASSERT(pUnit);
@@ -1080,6 +1082,7 @@ void __fastcall sub_6FCBC4D0(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCBC590
+// 1.13c D2Game+0xE12D0 (checked against the decompile: monster -> preset monster, object class 573 refused and above it the preset object, item -> init item stats, flags |= 0x3000000; nUnitFlags is not read in 1.13c; no other delta)
 D2UnitStrc* __fastcall SUNIT_CreatePresetUnit(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nUnitType, int32_t nClassId, int32_t nX, int32_t nY, int32_t nMode, int32_t nUnitFlags)
 {
     D2UnitStrc* pUnit = nullptr;
@@ -1135,6 +1138,7 @@ D2UnitStrc* __fastcall SUNIT_CreatePresetUnit(D2GameStrc* pGame, D2ActiveRoomStr
 }
 
 //D2Game.0x6FCBC6F0
+// 1.13c D2Game+0xE13B0
 void __fastcall SUNIT_SpawnPresetUnit(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2PresetUnitStrc* pPresetUnit)
 {
     D2DrlgCoordsStrc pCoord = {};
@@ -1166,6 +1170,7 @@ void __fastcall SUNIT_SpawnPresetUnit(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom
 // 1.13c D2Game+0x6FD01430 replay seam (kind 3452, s3255): stands in for the three retail callees (A664 presets, A556 level, E13B0 spawn); null in the game.
 struct D2Gate1430Seam { D2PresetUnitStrc* (*presets)(D2ActiveRoomStrc*); int32_t (*level)(D2ActiveRoomStrc*); void (*spawn)(D2GameStrc*, D2ActiveRoomStrc*, D2PresetUnitStrc*); };
 D2Gate1430Seam g_d2Gate1430 = {};
+// 1.13c D2Game+0xE1430
 void __fastcall SUNIT_SpawnPresetUnitsInRoom(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom)
 {
     if (!pGame)

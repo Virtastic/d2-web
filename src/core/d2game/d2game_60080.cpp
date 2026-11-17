@@ -3,7 +3,7 @@
 #include "d2game_q32.h"
 using namespace q32;
 static uint32_t M(uint32_t rva) { return 0xB2000000u | rva; }
-// 1.13c D2Game+0x60080
+// D2Game+0x60080 (marker lives on ACT5Q6_InitQuestData)
 void d2game_60080_q32(const Call& X, uint32_t q)
 {
     for (uint32_t o = 0xa0; o < 0xa0 + 0x3c; o += 4) wr32(q, o, 0);

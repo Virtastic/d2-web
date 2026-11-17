@@ -36,7 +36,7 @@ template <class E> void Scale(E& e, uint32_t u, int32_t n)
 }
 template <class E> uint32_t ObjectModeDispatch(E& e, uint32_t game, uint32_t pp, uint32_t ctx)
 {
-    // 1.13c D2Game+0x10A20
+    // 1.13c 0x10A20 (marker lives on sub_6FC4C5F0)
     const uint32_t u = e.rd32(pp);
     if (!u || e.rd32(u) != 4) return 0;
     const uint32_t rec = e.h(0xA53E, 0, 0, 0, 0, 0, e.rd32(u + 4));

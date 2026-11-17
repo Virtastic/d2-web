@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x759F0: monster mode update callback (table entry). ecx = game, edx = the monster. When the
+// D2Game+0x759F0 (marker lives on sub_6FC64280): monster mode update callback (table entry). ecx = game, edx = the monster. When the
 // animation check passes (0xB07E: monster, 0; non-zero) the animation advances (0xE1930: eax = monster; 0xB08A:
 // monster) and, unless it has now ended (0xB084: monster, non-zero), nothing more happens. A failed check or an
 // ended animation frees the attacker list (0xDA750: edi = monster; stack: game) and puts the monster in mode 12

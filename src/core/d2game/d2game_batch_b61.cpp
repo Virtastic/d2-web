@@ -34,7 +34,7 @@ struct D2GameB61Env {
     void*    (*allocP)(uint32_t pool, uint32_t size, const char* file, uint32_t line, uint32_t zero);
 };
 
-// 1.13c D2Game+0x9D3B0
+// D2Game +0x9D3B0 (marker lives on the d2moo D2GAME_MONSTERS_AiFunction03_6FCF0A70)
 // __fastcall(param_1 = ECX, param_2 = EDX unit). Builds a callback context {handler table, 0.., stats
 // row, ...} and, if the unit's two data rows exist and none of the three veto checks fire, calls
 // the handler at table+4.
@@ -92,7 +92,7 @@ uint32_t d2_port_d2game_b9b00(uint8_t* param_1, int32_t* param_2, const D2GameB6
     return 0;
 }
 
-// 1.13c D2Game+0xBAE40
+// D2Game+0xBAE40 (marker lives on ACT4Q1_InitQuestData)
 // __fastcall(param_1 = ECX quest record). Initialises the Act 4 quest 1 record: clears 0xF dwords at
 // +0xA0, sets flags/state bytes, installs the callback table, allocates the 0x1C-byte state (a4q1.cpp
 // line 0x2A0) and zeroes it.

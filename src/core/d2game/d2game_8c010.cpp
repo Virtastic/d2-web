@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x8C010: 16-byte packet (zero-filled first) to the client in the first stack word (ret 0x20).
+// Stand-alone body of D2Game 0x8C010 (the marker is on the play-path shim): 16-byte packet (zero-filled first) to the client in the first stack word (ret 0x20).
 // Byte 0 = CL, bytes 1..4 = EDX, byte 5 = stack byte, word 6, word 8, byte 10, byte 11, word 12, word 14.
 #include <cstdint>
 #include <cstring>

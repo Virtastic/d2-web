@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xF1A90 -- ECX = a, EDX = b, stack: P, out (ret 8). A null P or P with a nonzero type word returns 0. d = 0xB0A20(EBX = b, stack P) above 0xF (signed) returns 0. With the table check 0x15D0 (EAX = b +4 word or -1, EDX = 9) answering 0, out+4 = d, out+0 = P and P is returned; otherwise the test 0x34EA0 (EDI = P, stack a, b) must answer nonzero and d below out+4 (signed) for the same stores, else 0.
+// D2Game +0xF1A90 (marker lives on the d2moo sub_6FCCFDE0) --ECX = a, EDX = b, stack: P, out (ret 8). A null P or P with a nonzero type word returns 0. d = 0xB0A20(EBX = b, stack P) above 0xF (signed) returns 0. With the table check 0x15D0 (EAX = b +4 word or -1, EDX = 9) answering 0, out+4 = d, out+0 = P and P is returned; otherwise the test 0x34EA0 (EDI = P, stack a, b) must answer nonzero and d below out+4 (signed) for the same stores, else 0.
 #include <cstdint>
 #include "../fn/d2game_gp.h"
 namespace d2g {

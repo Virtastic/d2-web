@@ -21,7 +21,7 @@ void D2Game_8A7E0_PacketSend8B(D2GSend send, void* client, uint32_t eax, uint8_t
     send(client, b, 6);
 }
 
-// 1.13c D2Game+0x8AB20: copy a 7-byte record (dword, word at +4, byte at +6) and send it, length 7.
+// Stand-alone body of D2Game 0x8AB20 (the marker is on the play-path shim D2GAME_SendPacket0x58_6FC3F520): copy a 7-byte record (dword, word at +4, byte at +6) and send it, length 7.
 void D2Game_8AB20_PacketSendRecord7(D2GSend send, void* client, const uint8_t* rec)
 {
     uint8_t b[7];

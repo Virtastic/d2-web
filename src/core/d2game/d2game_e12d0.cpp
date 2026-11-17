@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xE12D0: create a preset unit by type.
+// 1.13c 0xE12D0 (marker lives on SUNIT_CreatePresetUnit): create a preset unit by type.
 // Callees are seams taking retail's own registers and stack words (the decompile hides the extra stack words and the
 // ESI/EBX register inputs; read from the disassembly). Replaces n67_CreatePresetUnit in d2game_n67.cpp.
 #include <cstdint>
@@ -12,7 +12,6 @@ struct D2GameE12D0Env {
 };
 
 // ECX = p1 (carried through, pushed again as a hidden stack word), EDX = type, EAX = preset id; stack p3..p6 (ret 0x10).
-// 1.13c D2Game+0xe12d0
 extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t d2game_e12d0_port(uint32_t id, uint32_t p1, uint32_t type, uint32_t p3, uint32_t p4, uint32_t p5, uint32_t p6, const D2GameE12D0Env* env)
 {

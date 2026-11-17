@@ -28,7 +28,7 @@
 namespace d2game_c85a { void goldDeathPenalty(D2GameStrc*, D2UnitStrc*, D2UnitStrc*); }
 
 namespace d2game_32df0 {
-// 1.13c D2Game+0x32DF0
+// (marker lives on OBJECTS_PopulateFn7_RogueOnStick) 1.13c 0x32DF0
 D2UnitStrc* populateRogues(D2GameStrc* game, D2ActiveRoomStrc* room,
                          uint8_t density, uint32_t objectId, uint16_t probability)
 {

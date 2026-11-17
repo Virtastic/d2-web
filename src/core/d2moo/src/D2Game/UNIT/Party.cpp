@@ -16,10 +16,11 @@
 
 
 //D2Game.0x6FCB9B00
+// 1.13c D2Game+0x9BE40
 void __fastcall PARTY_AllocPartyControl(D2GameStrc* pGame)
 {
     D2_ASSERT(pGame);
-    D2_ASSERT(pGame);   // 1.13c D2Game+0x9C160 asserts pGame non-null
+    D2_ASSERT(!pGame->pPartyControl);   // 1.13c 0x9BE40: a second control is fatal (assert line 0x19)
 
     D2PartyControlStrc* pPartyControl = D2_ALLOC_STRC_POOL(pGame->pMemoryPool, D2PartyControlStrc);
     D2_ASSERT(pPartyControl);
@@ -160,6 +161,7 @@ int32_t __fastcall sub_6FCB9D10(D2GameStrc* pGame, int16_t nPartyId, D2UnitStrc*
 }
 
 //D2Game.0x6FCB9E80
+// 1.13c D2Game+0x9C840 (checked against the decompile: party id lookup, node unlink, clear/send 0x8D/free, destroy at fewer than two nodes; the inline pGame asserts live in 1.13c callees; no delta)
 void __fastcall PARTY_LeaveParty(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2_ASSERT(pUnit && pUnit->dwUnitType == UNIT_PLAYER);

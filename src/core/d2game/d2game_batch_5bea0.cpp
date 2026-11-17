@@ -9,7 +9,7 @@ void r_587A0(); void r_56E00(); void r_56D80(); void r_56D10(); extern char r_DA
 void r_9E170(i32 eaxUnit, i32 ediCode, i32 game, i32 arg); // EAX unit, EDI code, stack (game,arg)
 }
 
-// 1.13c D2Game+0x5BEA0
+// D2Game+0x5BEA0 (marker lives on ACT5Q1_InitQuestData)
 void D2GAME_5BEA0(i32 b)
 {
     i32* z = (i32*)(intptr_t)(b + 0xa0);

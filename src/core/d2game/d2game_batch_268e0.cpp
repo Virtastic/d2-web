@@ -53,7 +53,7 @@ struct D2GameBatch268E0Env {
 // at most param_1+0xA8, ordinal 10494(unit, 0x15) either sends the param_1+0xA8 + 0x2D tail, or -- for
 // a type-1 unit with a +0x14 record whose first dword is non-null -- sends the +0xA8 plus the record's
 // +0x4F byte (0xF when zero), indexed by param_1+0x6D unless param_1+0x6A is clear and +0x74 is zero.
-// 1.13c D2Game+0x74E60
+// D2Game+0x74E60 (marker lives on sub_6FC64310)
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_74E60(uint32_t param1, void* param2,
                                                  const D2GameBatch268E0Env* env)

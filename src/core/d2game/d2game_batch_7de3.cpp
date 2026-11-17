@@ -92,7 +92,7 @@ struct D2GameBatchEbd10Env {
 };
 
 // ---- unit field getters --------------------------------------------------------------------------
-// 1.13c D2Game+0x49AB0
+// Stand-alone body of D2Game 0x49AB0 (the marker is on the play-path CLIENTS_GetCreateTime)
 // unit arrived in EAX. A null unit is a Fog assertion (id 0x98B); otherwise the dword at +0x488.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t D2GAME_GetClientCreateTime(void* unit) {

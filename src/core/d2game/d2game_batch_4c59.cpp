@@ -117,7 +117,7 @@ EMSCRIPTEN_KEEPALIVE void d2game_port_37b10(void* self, void* pGame, uint32_t nU
     }
 }
 
-// 1.13c D2Game+0x49DB0
+// Stand-alone body of D2Game 0x49DB0 (the marker is on the play-path CLIENTS_GetActNo)
 // Client act getter: the client arrives in EAX (explicit here); a null client is the 0x7CB fatal.
 // Returns the act byte the client is currently in (+0x1AC).
 extern "C"
@@ -127,7 +127,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t d2game_49db0(void* pClient)
     return rd8(pClient, 0x1AC);
 }
 
-// 1.13c D2Game+0x8B710
+// Stand-alone body of D2Game 0x8B710 (the marker is on the play-path shim).
 // Packet 0x23 (13 bytes): header, AL (param_1), EDX (param_2), then the three stack fields. The client
 // is the first stack argument; param_3 stands in for it and is not read here.
 extern "C"

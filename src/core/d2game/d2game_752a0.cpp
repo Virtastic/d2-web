@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x752A0: the monster mode dispatcher. ECX = pGame, EDX = pUnit, two unread
+// D2Game+0x752A0: the monster mode dispatcher. ECX = pGame, EDX = pUnit, two unread
 // stack words (ret 8). The mode-table lookup 0x749A0 (EAX = mode, ECX = pUnit) is retail's own code and is inlined here;
 // the table words are the slot-[2] handlers of D2Game's 16-entry table 0xFA498 and its class overrides (read from the DLL).
 #include <cstdint>
@@ -27,7 +27,7 @@ static uint32_t g_749a0_slot2(int32_t mode, uint32_t unit, uint32_t dt)
     }
     return kPlain[mode];
 }
-// 1.13c D2Game+0x752A0
+// (marker lives on D2GAME_MONSTERS_AiFunction02_6FC65150)
 uint32_t g_752a0(uint32_t game, uint32_t unit, uint32_t dt, const G752A0Env& env)
 {
     const uint32_t mode = unit ? rd32(unit + 0x10) : 0;

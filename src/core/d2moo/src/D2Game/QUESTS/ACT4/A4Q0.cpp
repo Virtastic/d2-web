@@ -26,6 +26,7 @@ D2NPCMessageTableStrc gpAct4Q0NpcMessages[] =
 
 
 //D2Game.0x6FCAD6F0
+// 1.13c D2Game+0xB9D80
 void __fastcall ACT4Q0_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));

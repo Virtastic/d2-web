@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xCE090: ECX = game, EDX = unit, w0 = packet, w1 = length. 0xCD630 validates (writes w0/w1 back); on success 0x78430(game, 0, 2, w0, w1, 0), return 0.
+// standalone port of D2Game 0xCE090 (marker on d2moo Rcv0x02_WalkToEntity): ECX = game, EDX = unit, w0 = packet, w1 = length. 0xCD630 validates (writes w0/w1 back); on success 0x78430(game, 0, 2, w0, w1, 0), return 0.
 #include <cstdint>
 struct GCd630Env {
     uint32_t (*cd630)(uint32_t eax, uint32_t ecx, uint32_t* ebx, uint32_t s0, uint32_t s1, uint32_t* s2);

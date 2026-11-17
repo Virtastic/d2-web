@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x273C0: the Bash / Stun / Concentrate / Bear-smite skill handler, read off the 1.13c disassembly.
+// 1.13c 0x273C0: the Bash / Stun / Concentrate / Bear-smite skill handler, read off the 1.13c disassembly.
 // __fastcall(ecx = pGame, edx = pUnit, nSkill, nLevel); ret 8. Called by 0xB41B0 (unit type 0) and 0x27B90.
 // Retail-shaped 32-bit handles as d2game_batch_impl_a5ff4.cpp: data read by raw offset; every callee is a weak seam.
 // The logged seams (E07A0, 10392, 10653, DE5A0, DDDE0) are the d2game_a5ff4_* seams of that file; the rest are d2game_273c0_*.
@@ -33,7 +33,7 @@ static inline int rd(int p, int o) { return *(int*)(intptr_t)(p + o); }
 static inline int rds(int p, int o) { return *(short*)(intptr_t)(p + o); }
 static inline unsigned char rd8(int p, int o) { return *(unsigned char*)(intptr_t)(p + o); }
 
-// 1.13c D2Game+0x273C0
+// (marker lives on SKILLS_SrvSt32_Conversion_Bash_Stun_Concentrate_BearSmite) 1.13c 0x273C0
 extern "C" int d2game_273c0_fn(int pGame, int pUnit, int nSkill, int nLvl)
 {
     if (nSkill < 0 || nSkill >= dt(0xBA0)) return 0;

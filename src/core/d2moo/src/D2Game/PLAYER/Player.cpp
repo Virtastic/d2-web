@@ -85,6 +85,7 @@ void __fastcall PLAYER_Create(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nP
 }
 
 //D2Game.0x6FC7B630
+// 1.13c D2Game+0x387E0 (checked against decompile)
 void __fastcall PLAYER_Destroy(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     PLAYERPETS_FreePetsFromPlayerData(pGame, pPlayer);

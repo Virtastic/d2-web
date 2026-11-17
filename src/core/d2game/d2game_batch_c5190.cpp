@@ -90,7 +90,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_C52B0(void* p1, void* unit
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_C5630(void* p1, void* unit, const D2GameBatchC5190Env* env) { return slotCheck(p1, unit, 0x9, env); }  // 1.13c D2Game+0xC5630
 
 // 0xC5690: reset the 0xF-dword callback table at +0xA0 and install the a2q0 handlers; allocate its 0x80-byte state.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C5690(void* q, const D2GameBatchC5190Env* env) {  // 1.13c D2Game+0xC5690
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C5690(void* q, const D2GameBatchC5190Env* env) {  // D2Game+0xC5690 (marker lives on ACT2Q0_InitQuestData)
     std::memset((uint8_t*)q + 0xA0, 0, 0xF * 4);
     wrptr(q, 0xA0, env->a2q0Fn[0]);
     wrptr(q, 0xCC, env->a2q0Fn[1]);

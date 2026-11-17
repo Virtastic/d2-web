@@ -29,7 +29,7 @@ struct D2GameEDC0Env {
     int32_t  (*subE800)(void* game, void* item);           // 0xE800 unique already dropped in the game mask
 };
 
-// 1.13c D2Game+0x0EDC0
+// (marker now on the d2moo ITEMS_CanUniqueItemBeDropped)
 // EAX = game, EBX = item. Null item: the item class id is -1. Returns 0 when there is no ItemsTxt
 // record or the item's file index is out of the UniqueItems range; returns 1 without touching the
 // mask when the UniqueItems row carries the NOLIMIT flag (bit 1). Otherwise a quest item (nQuest) or

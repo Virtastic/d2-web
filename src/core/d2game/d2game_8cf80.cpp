@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x8CF80: ten-byte corpse-assignment packet {0x8E, kind byte, player id dword, corpse id dword} handed to the
+// Stand-alone body of D2Game 0x8CF80 (the marker is on the play-path D2GAME_8CF80_CorpseAssignment): ten-byte corpse-assignment packet {0x8E, kind byte, player id dword, corpse id dword} handed to the
 // 0xDFC10 per-client broadcast with the per-client sender 0x6FCAC530 as callback (EBX). EAX = player id, ECX = corpse id,
 // stack byte = kind (ret 4).
 #include <cstdint>

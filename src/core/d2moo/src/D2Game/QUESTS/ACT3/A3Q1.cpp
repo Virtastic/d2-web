@@ -393,6 +393,7 @@ void __fastcall ACT3Q1_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2Q
 }
 
 //D2Game.0x6FCA7580
+// 1.13c D2Game+0xE93C0
 void __fastcall ACT3Q1_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));

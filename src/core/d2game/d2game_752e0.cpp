@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x752E0: dispatch through a table entry's +4 handler, else the default 0x750F0. Injectable callees.
+// D2Game+0x752E0: dispatch through a table entry's +4 handler, else the default 0x750F0. Injectable callees.
 // ECX = a (passed through), EDX = rec (pointer or null); two unused stack words (ret 8).
 #include <cstdint>
 struct G752E0Env {
@@ -6,7 +6,7 @@ struct G752E0Env {
     void     (*handler)(uint32_t fn, uint32_t ecx, uint32_t edx);   // call fn with ECX, EDX
     void     (*f750f0)(uint32_t a);                                 // stdcall, 1 word
 };
-// 1.13c D2Game+0x752E0
+// (marker lives on D2GAME_MONSTERS_AiFunction01_6FC65080)
 void g_752e0(uint32_t ecx, uint32_t edx, const G752E0Env& env)
 {
     uint32_t key = edx ? *(const uint32_t*)(uintptr_t)(edx + 0x10) : 0;

@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x60940 -- npc availability test of the quest 6: ids 0x109, 0x9B, 0x94, 0x96
+// D2Game+0x60940 (marker lives on ACT1Q6_ActiveFilterCallback) -- npc availability test of the quest 6: ids 0x109, 0x9B, 0x94, 0x96
 #include <cstdint>
 #include "../fn/d2game_nm2.h"
 namespace d2g {

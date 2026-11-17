@@ -225,14 +225,14 @@ int32_t d2game_cbf50(uint32_t pkt, uint32_t unit, uint32_t game, int32_t param2,
     return (int32_t)d2game_cbf50_port(pkt, unit, game, (uint32_t)param2, (uint32_t)(uintptr_t)out1, (uint32_t)(uintptr_t)out2, &env);
 }
 
-// 1.13c D2Game+0xCE040 (fastcall ecx=param_1, edx=param_2; stack param_3, param_4; hidden regs of 0xCBF50 forwarded)
+// standalone port of D2Game 0xCE040 (marker on d2moo Rcv0x03_Run) (fastcall ecx=param_1, edx=param_2; stack param_3, param_4; hidden regs of 0xCBF50 forwarded)
 int32_t d2game_ce040(uint32_t p1, uint32_t p2, uint16_t p3, uint32_t p4, uint32_t pkt, uint32_t unit, uint32_t game, uint32_t slot5) {
     uint16_t o2; int32_t r = d2game_cbf50(pkt, unit, game, (int32_t)p4, &p3, &o2, slot5);
     if (r == 0) { g_b->f98550(p1, p2, 0, 3, p3, o2, 0); r = 0; }
     return r;
 }
 
-// 1.13c D2Game+0xCE0D0 (same shape as 0xCE040 with mode 2)
+// standalone port of D2Game 0xCE0D0 (marker on d2moo Rcv0x01_Walk) (same shape as 0xCE040 with mode 2)
 int32_t d2game_ce0d0(uint32_t p1, uint32_t p2, uint16_t p3, uint32_t p4, uint32_t pkt, uint32_t unit, uint32_t game, uint32_t slot5) {
     uint16_t o2; int32_t r = d2game_cbf50(pkt, unit, game, (int32_t)p4, &p3, &o2, slot5);
     if (r == 0) { g_b->f98550(p1, p2, 0, 2, p3, o2, 0); r = 0; }

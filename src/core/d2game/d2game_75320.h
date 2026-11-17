@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x75320: monster mode callback that drops the unit's pending events (table entry). ecx = game, edx =
+// D2Game+0x75320 (marker lives on D2GAME_RemoveModeChangeEventCallback_6FC63B20): monster mode callback that drops the unit's pending events (table entry). ecx = game, edx =
 // the unit. The unit's event list (+0xDC, next at node +0x24) is walked; every node whose first byte is 0 is freed
 // (0x8E6F0: eax = the node, edi = game), the next pointer being read before the call. Result 1.
 #pragma once

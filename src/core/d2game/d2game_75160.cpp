@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x75160 -- unit event (fastcall ECX = game, EDX = block, block[1] = unit, may be null): the unit's class id (unit ? unit[1] : -1) must pass 0x1560(EAX id, EDX 3) and
+// D2Game+0x75160 (marker lives on sub_6FC64B60) -- unit event (fastcall ECX = game, EDX = block, block[1] = unit, may be null): the unit's class id (unit ? unit[1] : -1) must pass 0x1560(EAX id, EDX 3) and
 // 0x1560(EAX id, EDX 0xD), else 0. For a unit with unit[0x10] != 0: p = unit[0x2C]; 0xAAFC(p, 8); 0x18A0(EAX unit) picks 0xA when it is 0x4E (and inside sgptDataTables +0xA80), else 5, and
 // 0xAD24(p, v); 0xAAF0(p, unit, 0); 0xDA750(game; EDI = unit); 0xA4A2(unit, 0xD). Returns 1.
 #include <cstdint>

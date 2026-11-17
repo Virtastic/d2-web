@@ -81,7 +81,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_E6B90(uintptr_t unit, cons
 // quest-record init: zero 0xf dwords at +0xa0, then caller-specific fields.
 static void zero0xa0(uintptr_t q) { std::memset((void*)(q + 0xa0), 0, 0x3c); }
 
-// 1.13c D2Game+0xE7CE0   (a3q2; ECX = quest record, [q+4] = game)
+// D2Game+0xE7CE0 (marker lives on ACT3Q2_InitQuestData)  (a3q2; ECX = quest record, [q+4] = game)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E7CE0(uintptr_t q, const D2GameBatchE6850Env* env)
 {
     zero0xa0(q);
@@ -177,7 +177,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E87E0(uintptr_t self, uintptr_
     if (O(10174, id, 0x15, 4, 0, 0) != 0 && O(10174, id, 0x15, 0, 0, 0) == 0) O(10003, id, 0x15, 0, 0, 0);
 }
 
-// 1.13c D2Game+0xE92D0   (a3q4; ECX = quest record, [q+4] = game)
+// D2Game+0xE92D0 (marker lives on ACT3Q4_InitQuestData)  (a3q4; ECX = quest record, [q+4] = game)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E92D0(uintptr_t q, const D2GameBatchE6850Env* env)
 {
     zero0xa0(q);
@@ -197,7 +197,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E92D0(uintptr_t q, const D2Gam
     wr8(d, 12, 1); wr8(d, 1, 1);
 }
 
-// 1.13c D2Game+0xE93C0   (a3q1; ECX = quest record, [q+4] = game)
+// D2Game+0xE93C0 (marker lives on ACT3Q1_InitQuestData)  (a3q1; ECX = quest record, [q+4] = game)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E93C0(uintptr_t q, const D2GameBatchE6850Env* env)
 {
     zero0xa0(q);

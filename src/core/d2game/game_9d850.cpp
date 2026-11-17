@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x9D850 (EBX = game): per act 0..4 with its pending flag set, run the queued units of every room, then clear the flag;
+// (marker lives on LEVEL_UpdateQueuedUnitsInAllActs) 1.13c 0x9D850 (EBX = game): per act 0..4 with its pending flag set, run the queued units of every room, then clear the flag;
 // finally clear bit 0x400 of the arena control's flags. Retail 32-bit layout; the room/unit walk is a seam.
 #include <cstddef>
 #include <cstdint>

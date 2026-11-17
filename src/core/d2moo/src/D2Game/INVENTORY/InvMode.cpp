@@ -286,6 +286,7 @@ int32_t __fastcall sub_6FC41660(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC416D0
+// 1.13c D2Game+0x9B3B0 (checked against the decompile: item-flag clears, nested item list pass, remove-from-all-players on cmd flag 1; no delta)
 void __fastcall D2GAME_INVMODE_Last_6FC416D0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (!pUnit->pInventory)

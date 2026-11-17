@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xCE520: the skill packet handler twin of 0xCE5A0 (thunk 0xA3B2 for 0xA3AC). Disassembled convention: ECX = game,
+// standalone port of D2Game 0xCE520 (marker on d2moo Rcv0x0C_RightSkill): the skill packet handler twin of 0xCE5A0 (thunk 0xA3B2 for 0xA3AC). Disassembled convention: ECX = game,
 // EDX = unit, stack word0 = packet pointer, word1 = length; ret 8. 0xCBF50 (EAX = packet, ESI = unit; stack game, length, &word0,
 // &word1) rewrites both argument slots; a non-zero result returns. A zero 0xA3B2(unit) returns 3; otherwise stat 0x148 is bumped
 // (0xA3E2 unit, 0x148, 0 then 0xA472 unit, 0x148, value + 1, 0), and 0xCDF30 takes EAX = a second 0xA3B2(unit), ECX = unit and

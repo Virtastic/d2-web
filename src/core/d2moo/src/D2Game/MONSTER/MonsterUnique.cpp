@@ -83,6 +83,7 @@ void __fastcall MONSTERUNIQUE_ToggleUnitFlag(D2UnitStrc* pUnit, int32_t nFlag, i
 }
 
 //D2Game.0x6FC6AC30
+// 1.13c D2Game+0x22AF0
 uint8_t* __fastcall MONSTERUNIQUE_GetUMods(D2UnitStrc* pUnit)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)

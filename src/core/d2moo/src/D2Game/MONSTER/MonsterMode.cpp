@@ -682,6 +682,7 @@ void __fastcall D2GAME_MONSTER_ApplyStatRegen_6FC63440(D2GameStrc* pGame, D2Unit
 }
 
 //D2Game.0x6FC63650
+// 1.13c D2Game+0x1220
 D2MonStatsTxt* __fastcall MONSTERMODE_GetMonStatsTxtRecord(int32_t nMonsterId)
 {
     if (nMonsterId >= 0 && nMonsterId < sgptDataTables->nMonStatsTxtRecordCount)
@@ -863,6 +864,7 @@ void __fastcall sub_6FC63A30(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC63B20
+// 1.13c D2Game+0x75320
 int32_t __fastcall D2GAME_RemoveModeChangeEventCallback_6FC63B20(D2GameStrc* pGame, D2UnitStrc* pMonster)
 {
     D2GAME_EVENTS_Delete_6FC34840(pGame, pMonster, EVENTTYPE_MODECHANGE, 0);
@@ -1047,6 +1049,7 @@ void __fastcall sub_6FC641D0(D2GameStrc* pGame, D2UnitStrc* pAttacker)
 }
 
 //D2Game.0x6FC64280
+// 1.13c D2Game+0x759F0
 int32_t __fastcall sub_6FC64280(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (!MONSTERS_IsSandLeaper(pUnit, 0))
@@ -1085,6 +1088,7 @@ int32_t __fastcall sub_6FC642C0(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
 }
 
 //D2Game.0x6FC64310
+// 1.13c D2Game+0x74E60
 int32_t __fastcall sub_6FC64310(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange)
 {
     SUNIT_SetCombatMode(pGame, pModeChange->pUnit, 1);
@@ -1126,6 +1130,7 @@ int32_t __fastcall sub_6FC64310(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
 }
 
 //D2Game.0x6FC643D0
+// 1.13c D2Game+0x74C90
 int32_t __fastcall sub_6FC643D0(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange)
 {
     SUNIT_SetCombatMode(pGame, pModeChange->pUnit, 10);
@@ -1133,6 +1138,7 @@ int32_t __fastcall sub_6FC643D0(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
 }
 
 //D2Game.0x6FC643E0
+// 1.13c D2Game+0x759B0
 int32_t __fastcall sub_6FC643E0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     sub_6FCBC930(pGame, pUnit);
@@ -1146,6 +1152,7 @@ int32_t __fastcall sub_6FC643E0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC64410
+// 1.13c D2Game+0x76700
 int32_t __fastcall sub_6FC64410(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange)
 {
     SUNIT_SetCombatMode(pGame, pModeChange->pUnit, 11);
@@ -1154,6 +1161,7 @@ int32_t __fastcall sub_6FC64410(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
 }
 
 //D2Game.0x6FC64450
+// 1.13c D2Game+0x74C60
 int32_t __fastcall sub_6FC64450(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange)
 {
     if (PATH_GetNumberOfPathPoints(pModeChange->pUnit->pDynamicPath))
@@ -1166,6 +1174,7 @@ int32_t __fastcall sub_6FC64450(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
 }
 
 //D2Game.0x6FC64480
+// 1.13c D2Game+0x77010
 // the client unit's own copy of the path ends on the same frame unless another unit stopped this one: d2client/session_footstep.cpp
 extern "C" void d2_client_monster_path_done(uint32_t nUnitId, uint16_t nCollidedWithMask);
 int32_t __fastcall sub_6FC64480(D2GameStrc* pGame, D2UnitStrc* pUnit)
@@ -1191,6 +1200,7 @@ int32_t __fastcall sub_6FC64480(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC644E0
+// 1.13c D2Game+0x74C30
 int32_t __fastcall sub_6FC644E0(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange)
 {
     if (PATH_GetNumberOfPathPoints(pModeChange->pUnit->pDynamicPath))
@@ -1203,6 +1213,7 @@ int32_t __fastcall sub_6FC644E0(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
 }
 
 //D2Game.0x6FC64510
+// 1.13c D2Game+0x76FE0
 int32_t __fastcall sub_6FC64510(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (sub_6FCBC930(pGame, pUnit) == 2)
@@ -1216,6 +1227,7 @@ int32_t __fastcall sub_6FC64510(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC64540
+// 1.13c D2Game+0x75210
 int32_t __fastcall sub_6FC64540(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange)
 {
     if (pModeChange->pUnit)
@@ -1236,6 +1248,7 @@ int32_t __fastcall sub_6FC64540(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
 }
 
 //D2Game.0x6FC645E0
+// 1.13c D2Game+0x75510
 int32_t __fastcall sub_6FC645E0(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange)
 {
     if (pModeChange->pUnit && pModeChange->nMode < 16)
@@ -1484,6 +1497,7 @@ int32_t __fastcall D2GAME_GetMonsterBaseId_6FC64B10(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC64B50
+// 1.13c D2Game+0x74C10
 int32_t __fastcall sub_6FC64B50(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange)
 {
     SUNIT_SetCombatMode(pGame, pModeChange->pUnit, 6);
@@ -1491,6 +1505,7 @@ int32_t __fastcall sub_6FC64B50(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
 }
 
 //D2Game.0x6FC64B60
+// 1.13c D2Game+0x75160
 int32_t __fastcall sub_6FC64B60(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange)
 {
     if (!pModeChange->pUnit)
@@ -1573,6 +1588,7 @@ void __fastcall sub_6FC64CD0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC64E20
+// 1.13c D2Game+0x76A10
 int32_t __fastcall sub_6FC64E20(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     sub_6FCBC930(pGame, pUnit);
@@ -1587,6 +1603,7 @@ int32_t __fastcall sub_6FC64E20(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC64E60
+// 1.13c D2Game+0x754E0
 int32_t __fastcall sub_6FC64E60(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange)
 {
     SUNIT_SetCombatMode(pGame, pModeChange->pUnit, 14);
@@ -1716,6 +1733,7 @@ const D2MonModeCallbackTableStrc* __fastcall MONSTERMODE_GetCallbackTableRecord(
 }
 
 //D2Game.0x6FC65080
+// 1.13c D2Game+0x752E0
 void __fastcall D2GAME_MONSTERS_AiFunction01_6FC65080(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4)
 {
     int32_t nAnimMode = 0;
@@ -1745,6 +1763,7 @@ void __fastcall D2GAME_MONSTERS_AiFunction01_6FC65080(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FC65150
+// 1.13c D2Game+0x752A0
 void __fastcall D2GAME_MONSTERS_AiFunction02_6FC65150(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4)
 {
     int32_t nAnimMode = 0;
@@ -2078,6 +2097,7 @@ int32_t __fastcall sub_6FC65680(D2UnitStrc* pUnit, int32_t nPathType, D2AiParamS
 }
 
 //D2Game.0x6FC65780
+// 1.13c D2Game+0x75070
 void __stdcall MONSTERMODE_GetModeChangeInfo(D2UnitStrc* pUnit, int32_t nMode, D2ModeChangeStrc* pModeChange)
 {
     D2_ASSERT(nMode < 16);

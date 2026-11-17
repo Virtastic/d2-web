@@ -86,7 +86,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2game_8a770_send(const void* src, void (*s
     d2_fn_d2game_8A770(src, &env);
 }
 
-// 1.13c D2Game+0x8B3D0  (EAX = 40-byte source)
+// Stand-alone body of D2Game 0x8B3D0 (the marker is on the play-path shim)  (EAX = 40-byte source)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8B3D0(const void* src, const D2GameB82Env* e)
 {
     uint8_t b[40]; std::memcpy(b, src, 40);

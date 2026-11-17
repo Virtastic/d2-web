@@ -60,7 +60,7 @@ static int32_t g_clientListInitialized;        // 0x6FD31C18
 // +0x508 dwLocale, +0x50C dwLangId.
 static const char kClientsFile[] = "..\\Source\\D2Game\\GAME\\Clients.cpp";
 
-// 1.13c D2Game+0x49B70
+// Stand-alone body of D2Game 0x49B70 (the marker is on the play-path CLIENTS_SetClientState in game_net_stubs.cpp)
 // CLIENTS_SetClientState (1.10f 0x6FC33970-area D2GAME_SetClientState): the client arrives in EAX
 // (explicit here); a null client is the 0x95F fatal, otherwise store the state at client+0x04.
 void CLIENTS_SetClientState(void* pClient, uint32_t nState)

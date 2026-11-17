@@ -28,7 +28,7 @@ void n67_SendPacket0x81(const N67Seams* s, uint32_t p2, uint8_t p4, uint32_t p5,
     s->sendPacket(b, 0x14);
 }
 
-// 1.13c D2GAME+0xE12D0
+// 1.13c 0xE12D0 (marker lives on SUNIT_CreatePresetUnit)
 int* n67_CreatePresetUnit(const N67Seams* s, uint32_t eax, int type, int a3, void* a4, int a5, int a6)
 {
     int* u;
@@ -56,7 +56,7 @@ done:
     return u;
 }
 
-// 1.13c D2GAME+0xE13B0
+// (marker now on the d2moo SUNIT_SpawnPresetUnit)
 int* n67_PresetUnitFromDesc(const N67Seams* s, const uint32_t* d /*ESI*/, int ebx, void* edi, int frame /*local_20 base*/)
 {
     s->ord(10561, 0, 0, 0);

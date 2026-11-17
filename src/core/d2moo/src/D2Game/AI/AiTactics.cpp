@@ -130,6 +130,7 @@ D2UnitStrc* __fastcall sub_6FCCFD70(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_
 }
 
 //D2Game.0x6FCCFDE0
+// 1.13c D2Game+0xF1A90 (the near-player callback 0xF30C0 hands the unit scan)
 D2UnitStrc* __fastcall sub_6FCCFDE0(D2GameStrc* pGame, D2UnitStrc* pNPC, D2UnitStrc* pPlayer, void* pCallbackArg)
 {
 	UnkAiStrc1* pArg = (UnkAiStrc1*)pCallbackArg;
@@ -436,6 +437,7 @@ int32_t __fastcall AITACTICS_RunToTargetCoordinatesDeleteAiEvent(D2GameStrc* pGa
 }
 
 //D2Game.0x6FCD04E0
+// not-1.13c: 1.13c inlines this wrapper; its callers (e.g. +0x16970) call MoveToTarget (+0xF2540) in walk mode directly.
 int32_t __fastcall AITACTICS_WalkToTargetCoordinatesNoSteps(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_WALK, nX, nY, 0, 0);

@@ -43,7 +43,7 @@ extern "C" uint32_t d2game_8a4f0(void* client, uint32_t n, const void* data)
     return 1;
 }
 
-// 1.13c D2Game+0x8A570: seven-byte packet 0xA9, byte at [6].
+// Stand-alone body of D2Game 0x8A570 (the marker is on the play-path shim): seven-byte packet 0xA9, byte at [6].
 extern "C" void d2game_8a570(void* client, uint8_t b)
 {
     uint8_t pkt[7] = {};
@@ -52,7 +52,7 @@ extern "C" void d2game_8a570(void* client, uint8_t b)
     FUN_6fcaa3e0(client, pkt, 7);
 }
 
-// 1.13c D2Game+0x8A5A0: seven-byte packet 0xA7, byte at [6].
+// Stand-alone body of D2Game 0x8A5A0 (the marker is on the play-path shim): seven-byte packet 0xA7, byte at [6].
 extern "C" void d2game_8a5a0(void* client, uint8_t b)
 {
     uint8_t pkt[7] = {};

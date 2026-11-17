@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x9D3B0 -- sub_9D3B0, rebuilt from the retail disassembly (fastcall ECX = game, EDX = unit, two unused stack words, ret 8).
+// D2Game +0x9D3B0 -- sub_9D3B0, rebuilt from the retail disassembly (fastcall ECX = game, EDX = unit, two unused stack words, ret 8).
 // Builds the nine-dword context {[0] = unit.pData+0x28 (AI data, unit type 1 only), [7] = monstats row (stride 0x1A8, table +0xA78/+0xA80),
 // [8] = second row (stride 0x134, table +0xA90/+0xA98, indexed by the short at row+0x18)} and, when both rows exist and none of the three
 // vetoes fires, calls the handler at [ctx[0] + 4] (IsBadCodePtr first: a bad pointer is the fatal path). Every callee is an Env function.
@@ -16,7 +16,7 @@ struct D2G9D3B0Env {
     void (*handler)(uint32_t fn, uint32_t game, uint32_t unit, uint32_t ctx);   // ECX game, EDX unit, stack ctx
 };
 static inline uint32_t d9rd(uint32_t a) { uint32_t v; std::memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }
-// 1.13c D2Game+0x9D3B0
+// (marker lives on the d2moo D2GAME_MONSTERS_AiFunction03_6FCF0A70)
 extern "C" void d2g_9d3b0(const D2G9D3B0Env* ep, uint32_t game, uint32_t unit) {
     const D2G9D3B0Env& e = *ep;
     uint32_t ctx[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};

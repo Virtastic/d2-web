@@ -45,6 +45,7 @@ struct D2UnkAiTableStrc
 
 
 //Inlined in D2Game.0x6FCF1210 and D2Game.0x6FCF1310
+// not-1.13c: inlined in 1.13c as well; no stand-alone function to flip.
 int32_t __fastcall AIUTIL_GetDistanceToCoordinatesWithSize(D2UnitStrc* pUnit, int32_t nX, int32_t nY, int32_t nSize)
 {
 	// d2-web: retail 1.13c D2Game 0x6FCD0AED..0AFB (the full-size distance the target scan uses): each axis is

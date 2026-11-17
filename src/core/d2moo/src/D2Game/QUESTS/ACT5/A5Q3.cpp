@@ -307,6 +307,7 @@ void __fastcall ACT5Q3_UnitIterate_CheckForDefrostPotion(D2GameStrc* pGame, D2Un
 }
 
 //D2Game.0x6FCB38B0
+// 1.13c D2Game+0x5FC20
 void __fastcall ACT5Q3_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));

@@ -23,7 +23,7 @@ struct D2GameBatchEC90Env {
     uint32_t (*getStartSeed)(void*);                     // #10193
     void     (*addSockets)(void*, uint32_t);             // #10992
 };
-// 1.13c D2Game+0xEC90
+// 1.13c 0xEC90 (marker lives on sub_6FC4D6B0)
 static void RollSockets(void* pItem, void* pGame, void* pDrop, const D2GameBatchEC90Env* env)
 {
     if (env->getItemQuality(pItem) < 2 || !env->checkSocketable(pItem) || env->checkStackable(pItem)) return;

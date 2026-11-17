@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x77A50: one step of a unit's stamina regeneration. EDI = pUnit, no stack args, plain ret.
+// standalone port of D2Game 0x77A50 (marker on d2moo EVENTS_StaminaRegen): one step of a unit's stamina regeneration. EDI = pUnit, no stack args, plain ret.
 // Callees are D2Common stat thunks: 0xA42A GetUnitStat(unit, stat, layer), 0xA460 the max-stamina total (unit),
 // 0xA472 SetUnitStat(unit, stat, value, layer). The value returned is EAX at retail's `ret` (no declared result):
 // the 0x1C stat on the two early exits, the max total when nothing is added, else whatever SetUnitStat leaves.
@@ -8,7 +8,7 @@ struct G77A50Env {
     int32_t  (*maxLife)(uint32_t unit);                                              // 0xA460
     uint32_t (*setStat)(uint32_t unit, uint32_t stat, uint32_t value, uint32_t layer); // 0xA472
 };
-// 1.13c D2Game+0x77A50
+// standalone port of D2Game 0x77A50
 uint32_t g_77a50(uint32_t unit, const G77A50Env& env)
 {
     const int32_t cur0 = env.getStat(unit, 10, 0);

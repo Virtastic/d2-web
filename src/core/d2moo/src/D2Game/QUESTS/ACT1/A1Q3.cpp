@@ -231,6 +231,7 @@ int32_t __fastcall ACT1Q3_UnitIterate_UpdateQuestStateFlags(D2GameStrc* pGame, D
 }
 
 //D2Game.0x6FC99240
+// 1.13c D2Game+0x61B70
 bool __fastcall ACT1Q3_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
 	if (nNpcId != MONSTER_CHARSI || QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q3, QFLAG_REWARDGRANTED) == 1)

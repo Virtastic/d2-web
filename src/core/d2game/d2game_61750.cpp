@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x61750 -- npc availability test of the quest 4: ids 0x94 and 0x109
+// D2Game+0x61750 (marker lives on ACT1Q4_ActiveFilterCallback) -- npc availability test of the quest 4: ids 0x94 and 0x109
 #include <cstdint>
 #include "../fn/d2game_nm2.h"
 namespace d2g {

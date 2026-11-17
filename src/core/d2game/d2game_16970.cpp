@@ -12,7 +12,7 @@ struct D2G16970Env {
 static inline uint32_t rd(uint32_t p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)(uintptr_t)p + o, 4); return v; }
 static inline void wr(uint32_t p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)(uintptr_t)p + o, &v, 4); }
 
-// 1.13c D2Game+0x16970
+// (marker lives on the d2moo sub_6FCE61E0)
 extern "C" uint32_t d2game_16970_port(uint32_t game, uint32_t unit, uint32_t arg, const D2G16970Env* e)
 {
     if (!unit) return 0;

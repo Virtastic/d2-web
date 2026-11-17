@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xCE620: the targeted skill-use dispatch (the unit-target twin of 0xCDF30). Disassembled convention: EAX = skill,
+// standalone port of D2Game 0xCE620 (marker on d2moo sub_6FC836D0): the targeted skill-use dispatch (the unit-target twin of 0xCDF30). Disassembled convention: EAX = skill,
 // ECX = unit, stack = game, target type, target id, flag; ret 0x10. Ordinal_10747(unit) non-zero swaps the skill for 0xCB1F0's
 // (EBX = unit, stack = skill); the use mode is Ordinal_10787(unit, skill); a null Ordinal_10858 record (ECX = skill) returns 2.
 // Modes 1, 2 and 4 with the record's +7 byte holding gdwBitMasks[4] (0x10) re-pick the skill (Ordinal_10708 ECX = unit, EDX = 0,

@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xCE5A0, injectable callees. Registers: ECX = game, EDX = unit; stack word 0 = packet pointer, word 1 = length (ret 8).
+// standalone port of D2Game 0xCE5A0 (marker on d2moo Rcv0x05), injectable callees. Registers: ECX = game, EDX = unit; stack word 0 = packet pointer, word 1 = length (ret 8).
 // 0xCBF50 takes EAX = packet, ESI = unit and stack game, length, &word0, &word1 (ret 0x10); it rewrites both argument slots.
 // Thunk 0xA3AC (1 word) is called twice; 0xA3E2 / 0xA472 bump stat 0x148; 0xCDF30 takes EAX = the second skill result, ECX = unit and
 // stack game, word0 & 0xFFFF, word1 & 0xFFFF (ret 0xC).
@@ -10,7 +10,7 @@ struct GCe5a0Env {
     void (*a472)(uint32_t unit, uint32_t id, uint32_t v, uint32_t z);
     void (*cdf30)(uint32_t eax, uint32_t ecx, uint32_t s0, uint32_t s1, uint32_t s2);
 };
-// 1.13c D2Game+0xCE5A0
+// standalone port of D2Game 0xCE5A0
 uint32_t g_ce5a0(uint32_t ecx, uint32_t edx, uint32_t pkt, uint32_t len, const GCe5a0Env& env)
 {
     uint32_t w0 = pkt, w1 = len;

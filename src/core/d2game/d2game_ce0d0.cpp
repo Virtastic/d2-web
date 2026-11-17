@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xCE0D0 (size 68, ret 8): ECX = this, EDX = arg, two stack words (w0, w1).
+// standalone port of D2Game 0xCE0D0 (marker on d2moo Rcv0x01_Walk) (size 68, ret 8): ECX = this, EDX = arg, two stack words (w0, w1).
 // 0xCBF50 gets (w0 value, EDX, this, w1, &w0, &w1) and may rewrite both words through the pointers.
 // If it returns 0, 0x78550 runs in mode 2 with this, EDX, 0, 2, low 16 bits of w0, low 16 bits of w1, 0,
 // and the function returns 0; otherwise it returns the 0xCBF50 result.

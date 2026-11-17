@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x8D670 -- 14-byte unit packet to a client.
+// D2Game 0x8D670 -- 14-byte unit packet to a client.
 // ESI = client, BL = unit type, EDI = unit id; six stack arguments (ret 0x18): a1 byte -> pkt[0], a2 word -> pkt[6],
 // a3 word -> pkt[8], a4 word -> pkt[0xA], a5 byte -> pkt[0xC], a6 byte -> pkt[0xD]. pkt[1] = type, pkt[2..5] = id.
 // Fatal 0x996 (no client) / 0x341 (the unit is not in the client's game); the packet goes out through 0x8A3E0 (EAX = client).
@@ -7,7 +7,7 @@ struct D2Game8D670Env {
     uint32_t (*getUnit)(uint32_t game, uint32_t type, uint32_t id);                  // 0xE03A0 (EAX type, ECX game, EDX id)
     void     (*send)(uint32_t client, const void* packet, uint32_t length);          // 0x8A3E0 (client in EAX)
 };
-// 1.13c D2Game+0x8D670
+// Stand-alone body of D2Game 0x8D670 (the marker is on the play-path shim D2GAME_PACKETS_SendPacket0x51_6FC3D300)
 void d2game_port_8d670(uint32_t client, uint8_t type, uint32_t id, uint8_t a1, uint16_t a2, uint16_t a3, uint16_t a4,
                        uint8_t a5, uint8_t a6, const D2Game8D670Env* env)
 {

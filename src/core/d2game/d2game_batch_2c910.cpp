@@ -200,7 +200,7 @@ void CLIENTS_FillCharacterPreviewInfo(void* client, uint8_t* preview, const Batc
     }
 }
 
-// 1.13c D2Game+0x9C840
+// 1.13c 0x9C840 (marker lives on PARTY_LeaveParty)
 // PARTY_LeaveParty: find the unit's party id (0x9BEB0); remove the node whose GUID is unit+0x0C
 // from the party's list (node head party+0x04, next node+0x04), marking the unit and sending the
 // 0x8D packet; when fewer than two nodes remain, destroy the party (0x9C7D0).

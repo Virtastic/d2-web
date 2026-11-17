@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xC7ED0 -- Act 2 quest 2 node constructor (ECX = quest node); written from the 1.13c disassembly.
+// D2Game+0xC7ED0 (marker lives on ACT2Q2_InitQuestData) -- Act 2 quest 2 node constructor (ECX = quest node); written from the 1.13c disassembly.
 // Clears the callback area (node +0xA0 .. +0xDB), then sets the node: +0xDC a data table, +0xA byte 1, +0x18 a 0x30-byte zeroed block from the game pool
 // (0xA2E6: ECX game +0x1C pool, EDX 0x30, source file a2q2.cpp, line 0x3ED), +0xE0 = 10, +0xD byte 0, +0xB byte 0xD, and the callback words
 // (+0xA0, AC, B0, B4, C0, C4, C8, CC, D4, D8, E8, EC). The words are module code and data addresses, stored as module-relative values here.

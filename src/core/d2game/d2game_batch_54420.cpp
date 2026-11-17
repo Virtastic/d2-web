@@ -89,7 +89,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_54420_old(void* self, uint32_t param1
 // The monster-kind flag check: moved to d2game_771d0.h.
 
 // Store param_1 into the +0x54 dword of a type-1 unit's +0x14 record.
-// 1.13c D2Game+0xaf710
+// (marker lives on MONSTER_SetAiState) D2Game+0xaf710
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_AF710(uint32_t param1, void* eaxIn,
                                              const D2GameBatch54420Env* env)
@@ -247,7 +247,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_A1D10(uint32_t param1, int32_t param2, vo
 // the per-mode 0x14xxx/0x10xxx action, then the high-99 stat scaling (0xEBB0/0xEC90 doubling, the
 // 0x14B50 roll and the 11050/10248/10996 tail). Answer 1 when the final 10106 is positive and its
 // no-argument probe is below 10, else 0.
-// 1.13c D2Game+0x10a20
+// 1.13c 0x10a20 (marker lives on sub_6FC4C5F0)
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_10A20(uint32_t param1, void* param2, void* esiPtr,
                                                  const D2GameBatch54420Env* env)

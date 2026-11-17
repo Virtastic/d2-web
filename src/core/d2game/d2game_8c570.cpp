@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x8C570: seven-byte packet {0x8D, unit id dword (-1 if none), party word} sent to the recipient's client.
+// Stand-alone body of D2Game 0x8C570 (the marker is on the play-path shim): seven-byte packet {0x8D, unit id dword (-1 if none), party word} sent to the recipient's client.
 // EAX = unit, ESI = recipient unit. The party word is 0xFFFF unless the unit is non-null, has a game (+0x80) and *unit == 0,
 // in which case it is the 0xBBEB0 lookup (that routine reads the game pointer from EDI). The client is [10920(recipient)+0x9C]
 // when the recipient is a player (*recipient == 0), otherwise NULL.

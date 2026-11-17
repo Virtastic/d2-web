@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x8E090 -- unit/client assertion (fatal 0x7D2), zero the position of ECX, then 0x8D3D0 action 1
+// D2Game 0x8E090 -- unit/client assertion (fatal 0x7D2), zero the position of ECX, then 0x8D3D0 action 1
 //. EAX = unit, ECX = object to zero, EDX = expected client, [esp+4] = argument (ret 4).
 #include "d2game_8d6_common.h"
 struct D2Game8E090Env {
@@ -7,7 +7,7 @@ struct D2Game8E090Env {
     void     (*ord11118)(uint32_t p, uint32_t v);                                   // 0xA964 SetY
     void     (*sub8D3D0)(uint32_t client, uint32_t id, uint32_t arg, uint32_t flag);
 };
-// 1.13c D2Game+0x8E090
+// Stand-alone body of D2Game 0x8E090 (the marker is on the play-path shim D2GAME_SendP0x9C_ItemAction_GroundToCursor_6FC3E870)
 void d2game_port_8e090(uint32_t unit, uint32_t p, uint32_t client, uint32_t arg, const D2Game8E090Env* env)
 {
     uint32_t owner = 0;

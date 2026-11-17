@@ -302,7 +302,7 @@ EMSCRIPTEN_KEEPALIVE void d2game_8b470_send(void* record, void* client, void (*s
 
 // Eight-byte action packet: 0xA5, the low byte of ECX, the dword in EDX, the low word of the first
 // stack argument. The second stack argument is the client 0x8A3E0 sends to.
-// 1.13c D2Game+0x8BA10
+// Stand-alone body of D2Game 0x8BA10 (the marker is on the play-path shim)
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8BA10(uint32_t p1, uint32_t p2, void* client,
                                                         uint16_t arg, const D2GameBatch141E0Env* env)

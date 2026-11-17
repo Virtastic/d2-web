@@ -2,7 +2,7 @@
 // own step, then the staff mods. EAX = P, EDI = drop, one unused stack word (ret 4).
 #include <cstdint>
 #include "d2game_itemqual.h"
-extern "C" void d2g_10550(uint32_t P, void* drop, uint32_t arg, const D2GItemQualEnv* env) {  // 1.13c D2Game+0x10550
+extern "C" void d2g_10550(uint32_t P, void* drop, uint32_t arg, const D2GItemQualEnv* env) {  // 1.13c 0x10550 (marker lives on D2GAME_ITEMS_AssignSpecial_6FC4DB60)
     (void)arg;
     if (env->imp_a430(P, 0xd)) env->sub10240(P, drop);
     if (env->imp_a430(P, 0x28)) env->imp_b1aa(P, d2g_itemqual_owner(drop));

@@ -211,7 +211,7 @@ void __fastcall QUESTS_FreeChainRecord(D2GameStrc* pGame, D2QuestChainStrc* pRec
 }
 
 //D2Game.0x6FC93B90
-// 1.13c D2Game 0x33F30 (walk is the same; 1.13c keeps the link at quest record +0xF4, 1.10f at +0xF0 -- layout only)
+// 1.13c D2Game+0x33F30 (walk is the same; 1.13c keeps the link at quest record +0xF4, 1.10f at +0xF0 -- layout only)
 D2QuestDataStrc* __fastcall QUESTS_GetQuestData(D2GameStrc* pGame, int32_t nId)
 {
 	D2_ASSERT(nId >= 0);
@@ -233,6 +233,8 @@ D2QuestDataStrc* __fastcall QUESTS_GetQuestData(D2GameStrc* pGame, int32_t nId)
 }
 
 //D2Game.0x6FC93BD0
+// not-1.13c: 1.13c has no stand-alone twin; the levels-quest test and the chain-record call are inlined into its
+// callers (e.g. D2Game+0x10160, the monster spawn tail).
 void __fastcall QUESTS_AttachLevelChainRecord(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom, int32_t bDebug)
 {
 	const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(pRoom);
@@ -1317,6 +1319,9 @@ void __fastcall QUESTS_SendCurrentFlags(D2GameStrc* pGame, D2ClientStrc* pClient
 }
 
 //D2Game.0x6FC95490
+// 1.13c D2Game+0x34EA0
+// 1.13c walks the same list (control head, link +0xF4) and sends the 6-byte 0x8A through 0x8A770; a player with no
+// client is a fatal assert there (0x49DB0), here a return of 0 -- unreachable for a connected player.
 int32_t __fastcall QUESTS_ActiveCycler(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNPC)
 {
 	D2_ASSERT(pPlayer && pPlayer->dwUnitType == UNIT_PLAYER);
@@ -2416,6 +2421,7 @@ int32_t __fastcall QUESTS_CheckPlayerGUID(D2QuestDataStrc* pQuest, int32_t dwGUI
 }
 
 //D2Game.0x6FC968E0
+// not-1.13c: 1.13c inlines this into every quest init as a 16-bit count store (e.g. D2Game+0x687D0, +0xC5690).
 void __fastcall QUESTS_ResetPlayerGUIDCount(D2QuestGUIDStrc* pGUIDs)
 {
 	pGUIDs->nPlayerCount = 0;

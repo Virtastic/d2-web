@@ -34,6 +34,7 @@
 
 
 //D2Game.0x6FC601C0
+// 1.13c D2Game+0xAF710
 void __fastcall MONSTER_SetAiState(D2UnitStrc* pMonster, int32_t nAiState)
 {
     if (pMonster && pMonster->dwUnitType == UNIT_MONSTER && pMonster->pMonsterData)

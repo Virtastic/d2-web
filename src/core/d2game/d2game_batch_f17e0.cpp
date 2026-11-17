@@ -27,7 +27,7 @@ I sub_F17E0(Env& e,P unit,P game,P a,P b) {
     if (ai && e.stateTest(unit,0x36)==0 && e.f114f0(unit,ai,a,b,nullptr,0)) { e.f7a4c0(a,I(uintptr_t(b))); return 1; }
     return 0;
 }
-// 1.13c D2Game+0xF1A20
+// (marker lives on the d2moo AITACTICS_SetVelocity)
 void sub_F1A20(Env& e,P unit,I a,I b,uint8_t c) {
     if (!(b>-0x7f&&b<0x7f)) { e.fatal(0x110); return; }
     if (a==1) a=7;

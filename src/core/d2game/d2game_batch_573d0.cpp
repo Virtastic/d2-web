@@ -156,7 +156,7 @@ extern "C" int32_t d2game_65500(uint8_t* q, void* p2, void* p3, uint32_t flags, 
     return 1;
 }
 
-// 1.13c D2Game+0x66320  (ECX=ctx: [0]=game,[1]=unit,[2]=a,[5]/[6]=pos)
+// D2Game+0x66320 (marker lives on OBJECTS_InitFunction54_CainStartPosition)  (ECX=ctx: [0]=game,[1]=unit,[2]=a,[5]/[6]=pos)
 extern "C" void d2game_66320(int32_t* ctx)
 {
     D2G573Env* e = d2g573_env();
@@ -357,7 +357,7 @@ extern "C" int32_t d2game_68150(uint8_t* game, uint8_t* msg)
     return 1;
 }
 
-// 1.13c D2Game+0x687D0  (ECX=quest) a1q4 quest-record init
+// D2Game+0x687D0 (marker lives on ACT1Q4_InitQuestData)  (ECX=quest) a1q4 quest-record init
 extern "C" void d2game_687d0(uint8_t* q)
 {
     D2G573Env* e = d2g573_env();

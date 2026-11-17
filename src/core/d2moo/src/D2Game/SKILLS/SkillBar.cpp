@@ -57,6 +57,7 @@ struct D2PotionCodeStrc
 
 
 //D2Game.0x6FCFABF0
+// 1.13c D2Game+0x273C0 (checked against the decompile: target other than self and not in town, calc 2 to 0x9E7B0, hit flags, convert, physical add, aura state list; no delta)
 int32_t __fastcall SKILLS_SrvSt32_Conversion_Bash_Stun_Concentrate_BearSmite(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1323,6 +1324,7 @@ int32_t __fastcall SKILLS_SrvSt40_Leap(D2GameStrc* pGame, D2UnitStrc* pUnit, int
 }
 
 //D2Game.0x6FCFCF60
+// 1.13c D2Game+0x26BB0 (checked against the decompile: range clamp, three free-coordinate tries with the swapped-axis offsets, mask 0x1C09; no delta)
 int32_t __fastcall SKILLS_FindLeapTargetPosition(D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t* pX, int32_t* pY)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);

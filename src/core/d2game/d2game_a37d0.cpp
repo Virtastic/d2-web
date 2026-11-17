@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xA37D0 -- the PeriodicStats aura event (D2MOO D2GAME_MONSTERS_AiFunction10_6FD13610, which the engine runs; same rule).
+// 1.13c 0xA37D0 -- the PeriodicStats aura event (D2MOO D2GAME_MONSTERS_AiFunction10_6FD13610, which the engine runs; same rule).
 // ECX = game, EDX = unit, stack a3 and skill id (ret 8). dt = *sgptDataTables. The skill row (0x23C bytes at dt+0xB98, count
 // dt+0xBA0) must exist with its +0x80 state short in [0, dt+0xC4), the unit must not be dead (D2Game+0xDFA90, EAX = unit), and
 // aura = D2Game+0xA42A(unit, 0x97, id) (stdcall, 3 words) must be > 0: then D2Game+0xA19A0 (EAX = unit; game, id, aura, 1, 1, 0)
@@ -7,7 +7,7 @@
 #pragma once
 #include <cstdint>
 namespace ga37d0 {
-// 1.13c D2Game+0xA37D0
+// (marker lives on D2GAME_MONSTERS_AiFunction10_6FD13610) 1.13c 0xA37D0
 template <class E>
 uint32_t Periodic(E& e, uint32_t dt, uint32_t game, uint32_t unit, uint32_t a3, int32_t id)
 {

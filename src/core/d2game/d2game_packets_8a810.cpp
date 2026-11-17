@@ -60,7 +60,7 @@ void D2Game_8A960_PacketSend7E(D2GSend send, void* client)
     send(client, b, 5);
 }
 
-// 1.13c D2Game+0x8AA40: opcode 0x65, seven bytes (bytes 1..6 unset in retail).
+// Stand-alone body of D2Game 0x8AA40 (the marker is on the play-path shim): opcode 0x65, seven bytes (bytes 1..6 unset in retail).
 void D2Game_8AA40_PacketSend65(D2GSend send, void* client)
 {
     uint8_t b[7] = { 0x65, 0, 0, 0, 0, 0, 0 };
@@ -97,7 +97,7 @@ void D2Game_8ABF0_PacketCopy15(D2GSend send, void* client, const uint8_t* rec)
     send(client, b, 15);
 }
 
-// 1.13c D2Game+0x8AC30 (EAX = source record): copies the 7-byte record (dword, word, byte) and sends it.
+// Stand-alone body of D2Game 0x8AC30 (the marker is on the play-path shim D2GAME_SendPacket0x4E_6FC3F410) (EAX = source record): copies the 7-byte record (dword, word, byte) and sends it.
 void D2Game_8AC30_PacketCopy7(D2GSend send, void* client, const uint8_t* rec)
 {
     uint8_t b[7];
@@ -105,7 +105,7 @@ void D2Game_8AC30_PacketCopy7(D2GSend send, void* client, const uint8_t* rec)
     send(client, b, 7);
 }
 
-// 1.13c D2Game+0x8AC60 (EAX = source record): copies the 8-byte record (two dwords) and sends it.
+// Stand-alone body of D2Game 0x8AC60 (the marker is on the play-path shim sub_6FC3F3F0) (EAX = source record): copies the 8-byte record (two dwords) and sends it.
 void D2Game_8AC60_PacketCopy8(D2GSend send, void* client, const uint8_t* rec)
 {
     uint8_t b[8];

@@ -45,6 +45,7 @@
 int32_t gnNpcGUID_6FD4DC48;
 
 //D2Game.0x6FCC67D0
+// 1.13c D2Game+0xBCED0
 void __fastcall D2GAME_NPC_FirstFn_6FCC67D0(D2GameStrc* pGame, int32_t nVendorId, D2NpcRecordStrc* pNpcRecord)
 {
     if (pNpcRecord->npcTrade.bHireInit)

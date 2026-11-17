@@ -45,7 +45,7 @@ struct D2GameBatch37F20Env {
     uint32_t (*unitsGetPlayerData)(void* pUnit);
     // D2Common #10979, 1.10f WAYPOINTS_CopyAndValidateWaypointData(pWaypointData, pSavedData).
     void (*waypointCopyAndValidate)(void* pWaypointData, const void* pSavedData);
-    // 1.13c D2Game+0xD60D0, called as (pAttacker, nArg2, flag, pDefender, 1).
+    // 1.13c 0xD60D0 (sub_6FC45060), called as (pAttacker, nArg2, flag, pDefender, 1).
     int32_t (*subD60D0)(void* pAttacker, uint32_t nArg2, uint8_t flag, void* pDefender, uint32_t one);
     // D2Common #10417, 1.10f UNITS_StoreLastAttacker(pUnit, pKiller). 1.10f declares void; retail
     // reads the returned byte (Ghidra's AL) into 0xD60D0's third argument.

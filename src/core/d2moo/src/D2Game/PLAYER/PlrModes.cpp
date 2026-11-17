@@ -1159,6 +1159,7 @@ void __fastcall EVENTS_HpRegen(D2UnitStrc* pUnit)
 }
 
 //Inlined in D2Game.0x6FC80F80
+// 1.13c D2Game+0x77A50 (a walking unit below one whole stamina point is tested as unsigned, (stamina & 0xFFFFFF00) == 0)
 void __fastcall EVENTS_StaminaRegen(D2UnitStrc* pUnit)
 {
     const int32_t nStamina = STATLIST_UnitGetStatValue(pUnit, STAT_STAMINA, 0);
@@ -1173,7 +1174,7 @@ void __fastcall EVENTS_StaminaRegen(D2UnitStrc* pUnit)
 
     case PLRMODE_WALK:
         nShift = 9;
-        if (nStamina < 256)
+        if (((uint32_t)nStamina & 0xFFFFFF00u) == 0)
         {
             return;
         }
@@ -1413,6 +1414,7 @@ void __fastcall sub_6FC814F0(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 }
 
 //D2Game.0x6FC81560
+// 1.13c D2Game+0x77B20 (the skill pair filled by D2Game+0x778A0, inlined in sub_6FC81250; no delta)
 void __fastcall sub_6FC81560(D2UnitStrc* pUnit, D2UnkPlrModeStrc2* a2)
 {
     if (a2->nLeftSkillId)

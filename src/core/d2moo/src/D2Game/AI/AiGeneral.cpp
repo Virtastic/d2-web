@@ -10,6 +10,7 @@
 
 
 //D2Game.0x6FCCED00
+// not-1.13c: 1.13c inlines the pool allocation into the monster initializer (+0xB0320); no stand-alone function.
 D2AiControlStrc* __fastcall AIGENERAL_AllocAiControl(D2GameStrc* pGame)
 {
 	D2AiControlStrc* pAiControl = D2_CALLOC_STRC_POOL(pGame->pMemoryPool, D2AiControlStrc);
@@ -259,7 +260,6 @@ void __fastcall AIGENERAL_AllocCommandsForMinions(D2GameStrc* pGame, D2UnitStrc*
 
 //D2Game.0x6FCCF050
 // 1.13c D2Game+0x21290
-// 1.13c D2Game+0x21290
 D2AiCmdStrc* __fastcall AIGENERAL_CopyAiCommand(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCmdStrc* pAiCmd)
 {
 	D2AiCmdStrc* pCopy = AIGENERAL_AllocAiCommand(pGame, pUnit);
@@ -275,20 +275,16 @@ D2AiCmdStrc* __fastcall AIGENERAL_CopyAiCommand(D2GameStrc* pGame, D2UnitStrc* p
 }
 
 //D2Game.0x6FCCF090
+// 1.13c D2Game+0x217D0
 D2AiCmdStrc* __fastcall AIGENERAL_SetCurrentAiCommand(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nCmdParam, int32_t bSet)
 {
-	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
-	if (!pAiControl)
+	// 1.13c: no AiControl check up front; a missing command is created through the copy routine (+0x21290)
+	// from a block whose params are { nCmdParam, 0, 0, 0, 0 }.
+	if (!AIGENERAL_GetAiCommandFromParam(pUnit, nCmdParam, bSet))
 	{
-		return 0;
-	}
-
-	D2AiCmdStrc* pAiCmd = AIGENERAL_GetAiCommandFromParam(pUnit, nCmdParam, bSet);
-	if (!pAiCmd)
-	{
-		const int32_t nCmdParams[5] = { nCmdParam, 0, 0, 0, 0 };
-		pAiControl->pCurrentCmd = AIGENERAL_AllocAiCommand(pGame, pUnit);
-		memcpy(pAiControl->pCurrentCmd->nCmdParam, nCmdParams, sizeof(pAiControl->pCurrentCmd->nCmdParam));
+		D2AiCmdStrc tBlock = {};
+		tBlock.nCmdParam[0] = nCmdParam;
+		AIGENERAL_CopyAiCommand(pGame, pUnit, &tBlock);
 	}
 
 	return AIGENERAL_GetAiCommandFromParam(pUnit, nCmdParam, bSet);

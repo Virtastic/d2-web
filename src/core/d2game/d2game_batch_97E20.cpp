@@ -105,7 +105,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_97E20(uint32_t param1, uint32_t param2, i
 // Eighteen-byte packet 0x7D: type byte, a byte from *in_EAX (6 when in_EAX is null), in_EAX[3]
 // split into two words, *(param_2+0x0C) split the same way, then param_4 and param_5 as dwords.
 // param_1 and param_3 are unused.
-// 1.13c D2Game+0x8ADE0
+// Stand-alone body of D2Game 0x8ADE0 (the marker is on the play-path shim sub_6FC3EFC0)
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8ADE0(uint32_t param1, uint32_t param2, uint32_t param3,
                                              uint32_t param4, uint32_t param5,

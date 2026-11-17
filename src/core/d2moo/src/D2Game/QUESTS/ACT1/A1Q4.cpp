@@ -281,29 +281,33 @@ void __fastcall ACT1Q4_SetInvisibleObjectGUID(D2GameStrc* pGame, D2QuestDataStrc
 }
 
 //D2Game.0x6FC99FC0
+// 1.13c D2Game+0x61750
+// 1.13c reads the three A1Q4 flags (primary goal done, reward granted, reward pending) once, before the NPC test, and
+// for Cain in town a player already in the pQuestGUID list is active (1.10f returned false for him).
 bool __fastcall ACT1Q4_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
+	const int32_t bPrimaryGoalDone = QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q4, QFLAG_PRIMARYGOALDONE);
+	const int32_t bRewardGranted = QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q4, QFLAG_REWARDGRANTED);
+	const int32_t bRewardPending = QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q4, QFLAG_REWARDPENDING);
+
 	if (nNpcId == MONSTER_AKARA)
 	{
-		if (pQuest->fState == 4 && !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q4, QFLAG_REWARDGRANTED) && !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q4, QFLAG_REWARDPENDING))
-		{
-			if (ITEMS_FindQuestItem(pPlayer->pGame, pPlayer, ' skb'))
-			{
-				return true;
-			}
-		}
-
-		if (pQuest->fState == 1 && !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q4, QFLAG_REWARDGRANTED) && !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q4, QFLAG_REWARDPENDING))
+		if (pQuest->fState == 4 && !bRewardGranted && !bRewardPending && ITEMS_FindQuestItem(pPlayer->pGame, pPlayer, ' skb'))
 		{
 			return true;
 		}
 
-		if (pQuest->fState == 6 && QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q4, QFLAG_PRIMARYGOALDONE) == 1 && !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q4, QFLAG_REWARDGRANTED))
+		if (pQuest->fState == 1 && !bRewardGranted && !bRewardPending)
 		{
 			return true;
 		}
 
-		if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q4, QFLAG_REWARDPENDING))
+		if (pQuest->fState == 6 && bPrimaryGoalDone == 1 && !bRewardGranted)
+		{
+			return true;
+		}
+
+		if (bRewardPending)
 		{
 			return true;
 		}
@@ -317,7 +321,12 @@ bool __fastcall ACT1Q4_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 		}
 
 		D2Act1Quest4Strc* pQuestDataEx = (D2Act1Quest4Strc*)pQuest->pQuestDataEx;
-		if (QUESTS_QuickCheckPlayerGUID(&pQuestDataEx->pQuestGUID, nPlayerId) != 1 && !QUESTS_QuickCheckPlayerGUID(&pQuestDataEx->tPlayerGUIDs, nPlayerId) && QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q4, QFLAG_PRIMARYGOALDONE))
+		if (QUESTS_QuickCheckPlayerGUID(&pQuestDataEx->pQuestGUID, nPlayerId))
+		{
+			return true;
+		}
+
+		if (!QUESTS_QuickCheckPlayerGUID(&pQuestDataEx->tPlayerGUIDs, nPlayerId) && bPrimaryGoalDone)
 		{
 			return true;
 		}
@@ -1047,6 +1056,8 @@ void __fastcall ACT1Q4_SendStoneOrderToClient(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FC9B0F0
+// 1.13c D2Game+0x687D0
+// (1.13c inlines QUESTS_ResetPlayerGUIDCount here as two 16-bit count stores after the memset.)
 void __fastcall ACT1Q4_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));
@@ -1844,6 +1855,7 @@ void __fastcall ACT1Q4_UpdateQuestStateOnActChange(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FC9C540
+// 1.13c D2Game+0x66320
 void __fastcall OBJECTS_InitFunction54_CainStartPosition(D2ObjInitFnStrc* pOp)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A1Q4_CAIN);

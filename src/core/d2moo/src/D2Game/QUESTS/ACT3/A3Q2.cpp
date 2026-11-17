@@ -169,7 +169,14 @@ bool __fastcall ACT3Q2_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 	return false;
 }
 
+// D2Game+0xE2EF0 (1.13c): the empty function 1.13c stores in callback slot 10 of A3Q2.
+static void __fastcall ACT3Q2_Callback10_Empty(D2QuestDataStrc*, D2QuestArgStrc*)
+{
+}
+
 //D2Game.0x6FCA7CD0
+// 1.13c D2Game+0xE7CE0
+// 1.13c fills callback slot 10 with an empty function (0xE2EF0); 1.10f left it commented out.
 void __fastcall ACT3Q2_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));
@@ -187,7 +194,7 @@ void __fastcall ACT3Q2_InitQuestData(D2QuestDataStrc* pQuestData)
 	pQuestData->pfCallback[QUESTEVENT_SCROLLMESSAGE] = ACT3Q2_Callback11_ScrollMessage;
 	pQuestData->pfCallback[QUESTEVENT_CHANGEDLEVEL] = ACT3Q2_Callback03_ChangedLevel;
 	pQuestData->pfCallback[QUESTEVENT_PLAYERSTARTEDGAME] = ACT3Q2_Callback13_PlayerStartedGame;
-	//pQuestData->pfCallback[QUESTEVENT_PLAYERLEAVESGAME] = (QUESTCALLBACK)D2GAME_OBJECTS_InitFunction05_Door_6FCA6660;
+	pQuestData->pfCallback[QUESTEVENT_PLAYERLEAVESGAME] = ACT3Q2_Callback10_Empty;
 	pQuestData->pfCallback[QUESTEVENT_ITEMPICKEDUP] = ACT3Q2_Callback04_ItemPickedUp;
 
 	D2Act3Quest2Strc* pQuestDataEx = D2_ALLOC_STRC_POOL(pQuestData->pGame->pMemoryPool, D2Act3Quest2Strc);

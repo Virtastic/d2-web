@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x34EA0: run the current act's quest "player entered" handler. EDI = unit (must be a player, type 0), stack = (game, pArgs) (ret 8), pArgs[0] must be 1.
+// D2Game+0x34EA0 (marker lives on QUESTS_ActiveCycler): run the current act's quest "player entered" handler. EDI = unit (must be a player, type 0), stack = (game, pArgs) (ret 8), pArgs[0] must be 1.
 // Flow: the 0x15D0 flag test (EAX = pArgs[1], EDX = 9) gates everything (0 returns 0); the game's quest control (game+0x10F4) needs a non-empty list (ctl+8);
 // the act byte comes from 0x49DB0 (client word = playerData(unit)+0x9C); walk the nodes (ctl+0, chain +0xF4) whose act byte (+8) matches; the handler word
 // (+0xEC) must be set, callable, and the unit's player data and its flags (pd+0x10+4*game[0x6D]) non-null (each failure is a fatal _exit, not ported);

@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x759B0: monster mode callback "recover to neutral" (table entry). ecx = game, edx = the monster,
+// D2Game+0x759B0 (marker lives on sub_6FC643E0): monster mode callback "recover to neutral" (table entry). ecx = game, edx = the monster,
 // no stack words. The monster's animation step runs (0xE1930: eax = monster), its frame is advanced (0xB08A:
 // monster) and the end-of-animation test is read (0xB084: monster). When that is non-zero the attacker list is
 // released (0xDA750: edi = monster; game) and the monster goes to mode 11 (0xA4A2: monster, 11). The result is 1.

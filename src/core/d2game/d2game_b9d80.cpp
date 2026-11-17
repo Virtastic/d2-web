@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xB9D80 -- ECX = quest record: the fifteen words from +0xA0 are cleared, then +0xa0 = the callback 0xB9730, +0xcc = the callback 0xB97A0, +0xe8 = the callback 0xB8B80, +0xec = the callback 0xB8B50, +0xDC = the table at 0x105F90, the +0xA byte = 1, the +0xB and +0xC bytes = 0, the +0x18 word = 0 and +0xE0 = 0x18. Returns 0.
+// D2Game+0xB9D80 (marker lives on ACT4Q0_InitQuestData) -- ECX = quest record: the fifteen words from +0xA0 are cleared, then +0xa0 = the callback 0xB9730, +0xcc = the callback 0xB97A0, +0xe8 = the callback 0xB8B80, +0xec = the callback 0xB8B50, +0xDC = the table at 0x105F90, the +0xA byte = 1, the +0xB and +0xC bytes = 0, the +0x18 word = 0 and +0xE0 = 0x18. Returns 0.
 #include <cstdint>
 #include "../fn/d2game_gp.h"
 namespace d2g {

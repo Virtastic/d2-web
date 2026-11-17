@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xCE040: ECX = game, EDX = unit, w0 = packet, w1 = length. 0xCBF50 validates (writes 16-bit w0/w1 back); on success 0x78550(game, unit, 0, 3, w0 & 0xFFFF, w1 & 0xFFFF, 0), return 0.
+// standalone port of D2Game 0xCE040 (marker on d2moo Rcv0x03_Run): ECX = game, EDX = unit, w0 = packet, w1 = length. 0xCBF50 validates (writes 16-bit w0/w1 back); on success 0x78550(game, unit, 0, 3, w0 & 0xFFFF, w1 & 0xFFFF, 0), return 0.
 #include <cstdint>
 struct GCe040Env {
     uint32_t (*cbf50)(uint32_t eax, uint32_t esi, uint32_t s0, uint32_t s1, uint32_t* s2, uint32_t* s3);

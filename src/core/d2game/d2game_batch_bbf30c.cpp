@@ -649,7 +649,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_D2F00(uint8_t* game, uint8_t* item, u
     return 1;
 }
 
-// 1.13c D2Game+0xD4E80
+// 1.13c 0xD4E80 (marker lives on sub_6FC48940)
 // Takes item `id` out of the player's inventory (self+0x60) into the cursor. eax = item id, game is
 // the server game; *notFound is set to 1 when no item with the id exists or the item is not in mode 4
 // slot, 0 otherwise. param_3 selects the 10655 (zero) or 10729 removal route. Fatal 0x11FC (no game),
@@ -694,7 +694,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_D4E80(uint8_t* self, uint8_t* game, u
     return 0;
 }
 
-// 1.13c D2Game+0xD60D0
+// 1.13c 0xD60D0 (marker lives on sub_6FC45060)
 // Moves item `id` from the ground (game item hash +0x1720) into the player's inventory block
 // (self+0x60) for mode `mode`; modes 0xB/0xC skip the 10244 test. eax = item id, ebp = `skipPd`
 // (nonzero skips the 10061/11055 step). *out3 is set to 1 when 10405 refuses, *out4 to 1 when the

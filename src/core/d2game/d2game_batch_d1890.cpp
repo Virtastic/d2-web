@@ -26,7 +26,7 @@ static inline void wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*
 
 static inline void* rdptr(const void* p, uint32_t o) { void* v; std::memcpy(&v, (const uint8_t*)p + o, sizeof v); return v; }
 
-// 1.13c D2Game+0xD1890
+// 1.13c 0xD1890 (marker lives on sub_6FC44F00)
 // ItemMode.cpp constructor-time state fill: three ordinal-10973 reads go to +0x00/+0x04/+0x08; the
 // item from 10828 (or 10507) yields its handle and name into +0x06/+0x04 (or +0x05/+0x03), with
 // -1/0 when the handle is null. The decompile carries the context in ESI.
@@ -312,7 +312,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_B2D90(uint32_t eaxUnit, void* ebx, const 
     }
 }
 
-// 1.13c D2Game+0x9B3B0
+// 1.13c 0x9B3B0 (marker lives on D2GAME_INVMODE_Last_6FC416D0)
 // Inventory-mode walk over the unit-id list behind client+0x60 (ordinal 10170 head, 10691 next,
 // 10727 id). The game (param_1) is required (fatal 0x2D3); the bucket at game+0x1720+(id&0x7F)*4
 // is chased through node+0xE4 until node+3 is the id. Each match clears item flags 0x10/0x4000 and,

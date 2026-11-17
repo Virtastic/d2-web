@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x75210: monster mode start callback (table entry). ecx = game, edx = a block whose +0x04 is the
+// D2Game+0x75210 (marker lives on sub_6FC64540): monster mode start callback (table entry). ecx = game, edx = a block whose +0x04 is the
 // monster. No monster, or a monster in mode 0 or 12 (+0x10): 1. Otherwise the class check runs (0x1560: eax = the
 // monster's class at +0x04, edx = 3); zero ends with 0. Non-zero: the attacker list is freed (0xDA750: edi =
 // monster; stack: game), the monster goes to mode 3 (0xA4A2: monster, 3) and the result is 1.

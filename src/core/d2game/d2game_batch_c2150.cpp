@@ -104,7 +104,7 @@ struct D2GameBatchC2150Env {
 // leads (one dereference) to a unit list walked by the +0xF4 link until the +0x00 id is 10, and that
 // node's +0x18 sub-record has a one-shot flag pair at +2/+3. Only the flag byte at +3 triggers the
 // D2Common #10337 call on the +0xC0 value, clearing +3 and setting +2.
-// 1.13c D2Game+0xC2150
+// D2Game+0xC2150 (marker lives on ACT2Q3_BrightenEnvironment)
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C2150(uint32_t param1, uint8_t inAL,
                                              const D2GameBatchC2150Env* env)

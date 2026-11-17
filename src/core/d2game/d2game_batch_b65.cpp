@@ -27,9 +27,9 @@ static const char kItemMode[] = "..\\Source\\D2Game\\ITEMS\\ItemMode.cpp";
 static const char kSUnitDmg[] = "..\\Source\\D2Game\\UNIT\\SUnitDmg.cpp";
 static inline uint32_t& U32(I base, int off) { return *(uint32_t*)(base + off); }
 
-// 1.13c D2Game+0xCE520: moved to src/core/d2game/d2game_ce520.cpp (retail registers and stack).
+// standalone port of D2Game 0xCE520: moved to src/core/d2game/d2game_ce520.cpp (retail registers and stack).
 
-// 1.13c D2Game+0xCE620  (hidden: EAX=unit, EBX, EBP, ESI)
+// standalone port of D2Game 0xCE620  (hidden: EAX=unit, EBX, EBP, ESI)
 I D2GAME_CE620(I eax, uint32_t ebx, I ebp, I esi, I p1)
 {
     I r = Ord10747(p1);

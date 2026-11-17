@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x10160: detach a unit.
+// 1.13c 0x10160 (marker lives on sub_6FC4BE80): detach a unit.
 // Convention: EAX = the value stamped at +0xC, ESI = pUnit, EDI = the game/owner word passed on. Callees are seams in
 // retail argument order (the three D2Common imports are stdcall; 0x35890 takes EAX = unit, EBX = flag, [esp+4] = EDI).
 #include <cstdint>
@@ -11,7 +11,7 @@ struct D2Game10160Env {
     void    (*sub35890)(void* unit, uint32_t ebx, uint32_t edi);             // 0x35890: EAX = unit, EBX = flag-1, stack = EDI
     void    (*sub8E880)(uint32_t edi, void* unit);                           // 0x8E880: EAX = EDI, stack = unit
 };
-extern "C" void d2g_10160(void* unit, uint32_t eax, uint32_t edi, const D2Game10160Env* env) {  // 1.13c D2Game+0x10160
+extern "C" void d2g_10160(void* unit, uint32_t eax, uint32_t edi, const D2Game10160Env* env) {  // 1.13c 0x10160 (marker lives on sub_6FC4BE80)
     uint8_t* u = (uint8_t*)unit;
     if (u) {
         uint32_t f; std::memcpy(&f, u + 0xC4, 4); f = (f & 0xFFFFFFF7u) | 2u;

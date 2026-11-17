@@ -10,7 +10,7 @@ struct D2Game75070Env {
     void (*fatal)(uint32_t code);
 };
 
-// 1.13c D2Game+0x75070
+// (marker lives on MONSTERMODE_GetModeChangeInfo)
 void D2Game_75070(uint8_t* rec, uint32_t edi, int32_t index, const D2Game75070Env& e)
 {
     if (index >= 0x10) { e.fatal(0x7B8); return; }

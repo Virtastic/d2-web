@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xD60D0 (EAX item id, ECX player; stack game, loc, force, out; ret 0x10)
+// 1.13c 0xD60D0 (marker lives on sub_6FC45060; EAX item id, ECX player; stack game, loc, force, out; ret 0x10)
 #include "d2game_d60d0.h"
 #include <cstdlib>
 #include <cstring>

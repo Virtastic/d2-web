@@ -1761,6 +1761,7 @@ int32_t __fastcall SKILLITEM_EventFunc29_RestInPeace(D2GameStrc* pGame, int32_t 
 }
 
 //D2Game.0x6FD05780
+// 1.13c D2Game+0xAE200 (checked against the decompile: owner lookup, spawn flags 0x402000E, event frames 25 and 1500, sequence mode change; the tail after the spawn is lower confidence; no delta found)
 int32_t __fastcall SKILLITEM_TimerCallback_ReanimateMonster(D2GameStrc* pGame, int32_t nEvent, D2UnitStrc* pSource, D2UnitStrc* pTarget, D2DamageStrc* pDamage, int32_t nMonId, int32_t nOwnerId)
 {
     if (!pSource || pSource->dwUnitType != UNIT_MONSTER)

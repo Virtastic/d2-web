@@ -7,7 +7,7 @@
 #include <initializer_list>
 #include <unistd.h>
 
-// 1.13c D2Game+0xAF610 -- true if any of the 16 bytes at (data+4) is nonzero.
+// D2Game+0xAF610 (marker lives on MONSTER_HasComponents) -- true if any of the 16 bytes at (data+4) is nonzero.
 // unit: int* with [0]==1 type tag, [5] = data pointer.
 extern "C" uint32_t D2Game_AF610_HasComponents(const int32_t* unit)
 {

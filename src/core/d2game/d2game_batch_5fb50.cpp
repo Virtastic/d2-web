@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x5FB50 -- A5Q5 quest record init (Quests/a5q5.cpp). Retail is 32-bit: offsets are bytes,
+// D2Game+0x5FB50 (marker lives on ACT5Q5_InitQuestData) -- A5Q5 quest record init (Quests/a5q5.cpp). Retail is 32-bit: offsets are bytes,
 // handler slots hold retail addresses (base 0x6FC20000). Allocator is a seam (Fog #10045 @0xA2E6, unverified).
 #include <cstdint>
 #include <cstring>
@@ -9,7 +9,7 @@ struct D2GameBatch5FB50Env {
     void* (*allocPool)(const char* file, uint32_t line, uint32_t zero); // 0xA2E6, Fog #10045 (unverified)
 };
 
-// 1.13c D2Game+0x5FB50
+// D2Game+0x5FB50
 void D2Game_5FB50_A5Q5Init(uint8_t* q, const D2GameBatch5FB50Env* env) {
     std::memset(q + 0xA0, 0, 0xF * 4);
     q[0x0C] = 0;

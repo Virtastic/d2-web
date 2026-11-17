@@ -273,6 +273,7 @@ void __fastcall OBJRGN_SetShrineCoordinates(D2GameStrc* pGame, int32_t nLevelId,
 }
 
 //D2Game.0x6FC7AA20
+// 1.13c D2Game+0xB510 (checked against the decompile: cached id, act II offset into the first table, ranges 5 and 4, flying scimitar fallback; no delta)
 int32_t __fastcall OBJRGN_GetTrapMonsterId(D2ObjOperateFnStrc* pOp)
 {
     const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(pOp->pObject));

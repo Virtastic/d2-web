@@ -245,7 +245,7 @@ EMSCRIPTEN_KEEPALIVE void d2game_f3410_impl(uint32_t ebxUnit, uint32_t client,
     env->sendPacket(client, pkt, 14);
 }
 
-// 1.13c D2Game+0x77B20
+// standalone port of D2Game 0x77B20 (marker on d2moo sub_6FC81560)
 // ESI = unit, EDI = the record filled by 0x778A0. Applies each side's skill through 0x6FCC2100
 // when the skill exists, differs from the current one, and its use state is neither 2 nor 7.
 extern "C"

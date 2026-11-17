@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xE6660: ECX = quest record; the a3q0 quest init (callbacks, 0x1c-byte data block).
+// D2Game+0xE6660 (marker lives on ACT3Q0_InitQuestData): ECX = quest record; the a3q0 quest init (callbacks, 0x1c-byte data block).
 #include "d2game_h16.h"
 namespace h16 {
 void e6660(const Env& e, uint32_t q)

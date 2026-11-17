@@ -264,7 +264,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_CD790(void* thisp, uint32_
 
 // D2Game 1.13c 0xCDF30: the retail-layout port is src/core/d2game/d2game_cdf30.cpp (EAX = skill, ECX = unit, three stack words).
 
-// 1.13c D2Game+0xCE000
+// standalone port of D2Game 0xCE000
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_CE000(void* game, void* unit, uint32_t p3, uint32_t len,
                                                            const uint8_t* pkt, const D2GameBatchCc75Env* env)
 {
@@ -274,7 +274,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_CE000(void* game, void* uni
     return r;
 }
 
-// 1.13c D2Game+0xCE090
+// standalone port of D2Game 0xCE090
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_CE090(void* game, void* unit, uint32_t p3, uint32_t len,
                                                            const uint8_t* pkt, const D2GameBatchCc75Env* env)
 {

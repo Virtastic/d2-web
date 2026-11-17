@@ -93,7 +93,7 @@ static int bump148(void* unit, const D2GameCE5A0Env* e)
     return n;
 }
 
-// 1.13c D2Game+0xCE5A0 (a3/a4 double as the two out-words of FUN_CBF50)
+// standalone port of D2Game 0xCE5A0 (a3/a4 double as the two out-words of FUN_CBF50)
 int d2game_CE5A0_113c(int32_t a1, void* unit, uint32_t a3, uint32_t a4, const D2GameCE5A0Env* e)
 {
     int r = e->fnBF50(a1, (int32_t)a4, (uint16_t*)&a3, (uint16_t*)&a4);

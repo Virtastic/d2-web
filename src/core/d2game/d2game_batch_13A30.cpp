@@ -254,7 +254,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CB950(void* unit, void* client
 
 // 0x8AA10: fixed 0x20-byte packet forwarder. EAX=buf, client pushed. The bytes are copied to a stack
 // block before the append.
-// 1.13c D2Game+0x8AA10
+// Stand-alone body of D2Game 0x8AA10 (the marker is on the play-path shim)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8AA10(const void* buf32, void* client, const D2GameBatchB87Env* env) {
     uint8_t copy[0x20];
     std::memcpy(copy, buf32, sizeof copy);

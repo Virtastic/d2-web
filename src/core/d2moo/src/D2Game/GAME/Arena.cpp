@@ -42,6 +42,7 @@ void __fastcall ARENA_FreeArena(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC310C0
+// 1.13c D2Game+0xB24D0
 void __fastcall ARENA_AllocArenaUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2ArenaUnitStrc* pArenaUnit = D2_CALLOC_STRC_POOL(pGame->pMemoryPool, D2ArenaUnitStrc);
@@ -53,6 +54,7 @@ void __fastcall ARENA_AllocArenaUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC31110
+// 1.13c D2Game+0xB2480
 void __fastcall ARENA_FreeArenaUnit(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -119,6 +121,7 @@ void __fastcall ARENA_ProcessKillEvent(D2GameStrc* pGame, D2UnitStrc* pAttacker,
 }
 
 //D2Game.0x6FC31280
+// 1.13c D2Game+0xB2820
 void __fastcall ARENA_UpdateScore(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender, D2ArenaScoreTypes eScore)
 {
     D2_ASSERT(pAttacker && pAttacker->dwUnitType == UNIT_PLAYER);
@@ -256,6 +259,7 @@ uint32_t __fastcall ARENA_IsActive(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC31750
+// 1.13c D2Game+0xB23A0
 uint32_t __fastcall ARENA_GetFlags(D2GameStrc* pGame)
 {
     D2ArenaStrc* pArena = pGame->pArenaCtrl;

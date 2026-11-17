@@ -6,7 +6,7 @@ static uint32_t d2g_10240_set(const D2GItemQualEnv* env, uint32_t P, uint32_t b,
     if (env->imp_b37e(P) >= 1) return env->sub144d0(P, 1, b, 1, d, (uint32_t)e, 0);
     return env->sub148a0(P, 1, b, 1, d, (uint32_t)e);
 }
-extern "C" uint32_t d2g_10240(uint32_t P, void* drop, const D2GItemQualEnv* env) {  // 1.13c D2Game+0x10240
+extern "C" uint32_t d2g_10240(uint32_t P, void* drop, const D2GItemQualEnv* env) {  // 1.13c 0x10240 (marker lives on ITEMS_AssignCharmAffixes)
     const uint8_t* c = (const uint8_t*)drop;
     uint32_t bx = 0, bp = 0, flag = 0;
     const int32_t c68 = *(const int32_t*)(c + 0x68);

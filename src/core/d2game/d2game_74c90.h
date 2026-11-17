@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x74C90: monster mode-start callback (table entry). ecx = game, edx = the mode block (+0x04 the
+// D2Game+0x74C90 (marker lives on sub_6FC643D0): monster mode-start callback (table entry). ecx = game, edx = the mode block (+0x04 the
 // monster). Drops the monster's attacker list (0xDA750: one stack word = game, same registers), then puts the
 // monster in animation mode 10 (0xA4A2: unit, mode). Result 1.
 #pragma once

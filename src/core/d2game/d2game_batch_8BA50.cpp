@@ -153,7 +153,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2game_8ba50_send(void* client, uint32_t ec
 }
 
 // 0x8A6C0: 7-byte packet 0x98 to the client in EAX; bytes 1..4 = ECX, 5..6 = DX.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8a6c0(void* client, uint32_t ecxIn, uint16_t dxIn, const D2GameBatch16Env* env) { // 1.13c D2Game+0x8a6c0
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8a6c0(void* client, uint32_t ecxIn, uint16_t dxIn, const D2GameBatch16Env* env) { // stand-alone 0x8A6C0 (marker on the play-path shim)
     uint8_t b[7];
     b[0] = 0x98;
     wr32(b, 1, ecxIn);
@@ -164,7 +164,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8a6c0(void* client, uint32_t ecxIn,
 // 0x8AAE0: 7-byte packet 0x60. Retail prologue is `sub $8; push %esi`, and the pushed ESI is the
 // argument of #10258 (UNITS_GetObjectPortalFlags, stdcall 1), so after its ret the buffer base is
 // E-8 and the client is the first stack argument [E+4].
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8aae0(void* client, void* unit, const D2GameBatch16Env* env) { // 1.13c D2Game+0x8AAE0
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8aae0(void* client, void* unit, const D2GameBatch16Env* env) { // stand-alone 0x8AAE0 (marker on the play-path shim)
     uint8_t b[7];
     b[0] = 0x60;
     b[1] = (uint8_t)env->ordinal10258(unit);
@@ -275,7 +275,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_cd0e0(void* client, void* unit, con
 // arguments: s1 (opcode modifier byte), s2 (unit id), s3 (unit type byte), s4 (unit id 2), s5
 // (word), s6 (word), s7 (byte). Not-found path: 0x4C/0x99 with 0x10 bytes. Found and in another
 // room: 0x4D/0x9A with 0x11 bytes including the two missile words.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8d210(void* client, int32_t ebx, uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4, uint32_t s5, uint32_t s6, uint32_t s7, const D2GameBatch16Env* env) { // 1.13c D2Game+0x8D210
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8d210(void* client, int32_t ebx, uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4, uint32_t s5, uint32_t s6, uint32_t s7, const D2GameBatch16Env* env) { // Stand-alone body of D2Game 0x8D210 (the marker is on the play-path shim sub_6FC3F0C0)
     if (!client) d2game_fatal(0x996);
     uint8_t opcode = (ebx == 0) ? 0x4C : 0x99;
     void* unit = env->getUnit(rdptr(client, 0x1A8), s3 & 0xFF, s4);

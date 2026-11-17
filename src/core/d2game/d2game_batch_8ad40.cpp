@@ -23,7 +23,7 @@ static inline void w32(uint8_t* p, uint32_t o, uint32_t v) { std::memcpy(p + o, 
 static inline void w16(uint8_t* p, uint32_t o, uint16_t v) { std::memcpy(p + o, &v, 2); }
 
 // 0x8AD40: 0x67-byte packet: [0]=AL, [1]=CL, [2..5]=EDX, [6]=flag (stack arg 2), [7..0x66]=quest record bytes (0x60).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8ad40(uint32_t eaxIn, uint32_t ecxIn, uint32_t edxIn, void* client, void* record, uint8_t param5, const D2GameBatch8AD40Env* env) { // 1.13c D2Game+0x8AD40
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8ad40(uint32_t eaxIn, uint32_t ecxIn, uint32_t edxIn, void* client, void* record, uint8_t param5, const D2GameBatch8AD40Env* env) { // Stand-alone body of D2Game 0x8AD40 (the marker is on the play-path shim D2GAME_SendPacket0x28_6FC3F2F0)
     uint8_t b[0x67] = {};
     b[0] = (uint8_t)eaxIn;
     b[1] = (uint8_t)ecxIn;
@@ -49,9 +49,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8b2f0(D2ClientStrc* client, const v
     D2GAME_PACKETS_SendPacket_6FC3C710(client, b, 0x15);
 }
 
-// 1.13c D2Game+0x8B400 (EAX = source, client on the stack): relays the 0x28-byte block at EAX; a NUL-terminated name at +8
+// Stand-alone body of D2Game 0x8B400 (the marker is on the play-path shim) (EAX = source, client on the stack): relays the 0x28-byte block at EAX; a NUL-terminated name at +8
 // of 16 bytes or more is fatal (Fog 10265(0x5DA) -> 10024 -> _exit(-1)).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8b400(D2ClientStrc* client, const void* src) { // 1.13c D2Game+0x8B400
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8b400(D2ClientStrc* client, const void* src) { // stand-alone 0x8B400
     const char* name = (const char*)src + 8;
     if (strnlen(name, 32) > 15) _exit(-1);
     uint8_t b[0x28];

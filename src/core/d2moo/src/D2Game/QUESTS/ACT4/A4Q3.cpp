@@ -251,6 +251,7 @@ bool __fastcall ACT4Q3_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 }
 
 //D2Game.0x6FCB0460
+// 1.13c D2Game+0xBAD40
 void __fastcall ACT4Q3_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));

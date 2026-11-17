@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x607D0 -- ECX unused, EDX = id, three stack arguments (the second = quest-flag buffer). AL = 1 only for id 0x9b with the D2Common import 0xA568(buffer, 0, 0) answering 0; otherwise AL = 0. The upper bytes of EAX are the caller's, or the import's answer's once it ran.
+// D2Game+0x607D0 (marker lives on ACT1Q0_ActiveFilterCallback) -- ECX unused, EDX = id, three stack arguments (the second = quest-flag buffer). AL = 1 only for id 0x9b with the D2Common import 0xA568(buffer, 0, 0) answering 0; otherwise AL = 0. The upper bytes of EAX are the caller's, or the import's answer's once it ran.
 #include <cstdint>
 #include "../fn/d2game_gp.h"
 namespace d2g {

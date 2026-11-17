@@ -1584,6 +1584,7 @@ int32_t __fastcall SKILLS_AuraCallback_Redemption(D2AuraCallbackStrc* pAuraCallb
 }
 
 //D2Game.0x6FD1B4C0
+// 1.13c D2Game+0x98A70 (checked against the decompile: one eighth for players and hirelings, hit class 0x8D, flags 0x4021; no delta)
 void __fastcall SKILLS_ApplyThornsDamage(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender, D2DamageStrc* pDamage)
 {
     int32_t nThornsPercent = STATLIST_UnitGetStatValue(pDefender, STAT_THORNS_PERCENT, 0);

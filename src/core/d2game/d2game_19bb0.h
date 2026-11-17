@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x19BB0, +0x19A00 and +0x19AD0: three monster reaction callbacks (table entries). ecx = the game,
+// D2Game +0x19BB0, +0x19A00 and +0x19AD0 (markers live on the d2moo sub_6FCE6270 / sub_6FCE6340): three monster reaction callbacks (table entries). ecx = the game,
 // edx = the monster, two stack words (ret 8): a word passed on and the attacker record (x at +4, y at +8). The
 // result is a byte in al; the upper bytes of eax are whatever the last call left (the entry eax when nothing is
 // called). Without a monster, a record or either coordinate nothing happens. Otherwise the common reaction runs

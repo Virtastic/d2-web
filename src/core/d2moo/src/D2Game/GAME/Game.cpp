@@ -370,6 +370,7 @@ BOOL __fastcall GAME_VerifyCreateNewGame(int32_t nClientId, D2GSPacketClt66* pPa
 }
 
 //D2Game.0x6FC35E50
+// 1.13c D2Game+0x2A1F0
 void __stdcall D2Game_10056(int32_t a1)
 {
     dword_6FD45820 = 0;
@@ -3185,6 +3186,7 @@ void __fastcall GAME_LeaveGlobalGamesCriticalSection()
 }
 
 //D2Game.0x6FC3B280
+// 1.13c D2Game+0x29800
 void __stdcall D2Game_10008(int32_t a1)
 {
     gnTargetFrameRate_6FD2CA60 = a1;

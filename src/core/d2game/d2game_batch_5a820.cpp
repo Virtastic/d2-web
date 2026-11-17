@@ -77,7 +77,7 @@ L1:
 
 // The quest-node arm: moved to d2game_5cc30.h.
 
-// 1.13c D2Game+0x5CC70
+// D2Game+0x5CC70 (marker lives on ACT5Q2_InitQuestData)
 void D2GAME_5CC70(i32 b)
 {
     i32* z = (i32*)(intptr_t)(b + 0xa0);

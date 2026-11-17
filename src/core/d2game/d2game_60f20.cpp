@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x60F20 -- ECX = quest record, EDX = id, three stack arguments (the first = unit). The unit's id (+0xC, -1 for none) is searched in the id list of the quest's +0x18 data (count: 16-bit +0x64, ids from +0x34). AL = 1 when it is found and the id argument is neither 0x9B nor 0x93; otherwise AL = 0. The upper bytes of EAX are those of the index reached.
+// D2Game+0x60F20 (marker lives on ACT1Q5_ActiveFilterCallback) -- ECX = quest record, EDX = id, three stack arguments (the first = unit). The unit's id (+0xC, -1 for none) is searched in the id list of the quest's +0x18 data (count: 16-bit +0x64, ids from +0x34). AL = 1 when it is found and the id argument is neither 0x9B nor 0x93; otherwise AL = 0. The upper bytes of EAX are those of the index reached.
 #include <cstdint>
 #include "../fn/d2game_gp.h"
 namespace d2g {

@@ -121,6 +121,7 @@ int32_t __fastcall SKILLS_DoInferno(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_
 }
 
 //D2Game.0x6FD15940
+// 1.13c D2Game+0x443F0 (checked against the decompile: monster timeout, existing list extends 6 frames, new list 20 frames; no delta)
 int32_t __fastcall SKILLS_StartInferno(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t a5)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);

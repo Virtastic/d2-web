@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x60750 -- EAX = whatever the caller left (only AL is the result; the upper bytes come back from the last value computed), ECX = quest record, EDX = id, three stack arguments. For id 0x94 only, with Q = the record's +0xE0 word and the second stack argument as buffer: the import 0xA568(buffer, Q, 0) answering 1 gives AL = 0. With the record's +9 byte and its +0xC byte both 1, (buffer, Q, 1) answering 0 gives AL = 1. Otherwise AL = 1 exactly when (buffer, Q, 1) answers 1.
+// D2Game+0x60750 (marker lives on ACT1Q1_ActiveFilterCallback) -- EAX = whatever the caller left (only AL is the result; the upper bytes come back from the last value computed), ECX = quest record, EDX = id, three stack arguments. For id 0x94 only, with Q = the record's +0xE0 word and the second stack argument as buffer: the import 0xA568(buffer, Q, 0) answering 1 gives AL = 0. With the record's +9 byte and its +0xC byte both 1, (buffer, Q, 1) answering 0 gives AL = 1. Otherwise AL = 1 exactly when (buffer, Q, 1) answers 1.
 #include <cstdint>
 #include "../fn/d2game_gp.h"
 namespace d2g {

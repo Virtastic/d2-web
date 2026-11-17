@@ -4,7 +4,7 @@
 #include "d2game_q32.h"
 using namespace q32;
 static uint32_t M(uint32_t rva) { return 0xB2000000u | rva; }
-// 1.13c D2Game+0x5FC20
+// D2Game+0x5FC20 (marker lives on ACT5Q3_InitQuestData)
 void d2game_5fc20_q32(const Call& X, uint32_t q)
 {
     for (uint32_t o = 0xa0; o < 0xa0 + 0x3c; o += 4) wr32(q, o, 0);

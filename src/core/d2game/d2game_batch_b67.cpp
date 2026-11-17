@@ -9,7 +9,7 @@ extern const char DAT_6fd19ff9[];
 
 void D2GAME_2D140(void* a);                // 1.13c D2Game+0x2D140
 void D2GAME_2D500(void* game, uint32_t f); // 1.13c D2Game+0x2D500
-void D2GAME_29820(const void* name);       // 1.13c D2Game+0x29820
+void D2GAME_29820(const void* name);       // D2Game 0x29820 (the marker is on GAME_ForEachIngameClient)
 
 namespace {
 template <class T> T& at(void* p, uint32_t off) { return *reinterpret_cast<T*>(static_cast<char*>(p) + off); }

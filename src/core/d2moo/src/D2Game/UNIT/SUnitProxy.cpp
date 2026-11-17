@@ -755,6 +755,7 @@ D2InventoryStrc* __fastcall SUNITPROXY_GetGambleInventory(D2GameStrc* pGame, D2U
 }
 
 //D2Game.0x6FCCCBB0
+// 1.13c D2Game+0x8F6C0
 D2NpcVendorChainStrc* __fastcall SUNITPROXY_GetVendorChain(D2GameStrc* pGame, D2NpcRecordStrc* pNpcRecord, D2UnitStrc* pNpc)
 {
     const int32_t nNpcGUID = pNpc ? pNpc->dwUnitId : -1;

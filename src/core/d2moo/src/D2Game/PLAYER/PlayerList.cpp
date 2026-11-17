@@ -14,6 +14,7 @@ uint32_t dword_6FD4DC40;
 
 
 //D2Game.0x6FCBA690
+// 1.13c D2Game+0xF0390 (checked against decompile)
 void __fastcall PLAYERLIST_FreePlayerLists(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -88,6 +89,7 @@ D2PlayerListStrc* __fastcall PLAYERLIST_GetPlayerListRecordFromUnitGUID(D2UnitSt
 }
 
 //D2Game.0x6FCBA750
+// 1.13c D2Game+0xF02F0 (checked against decompile)
 void __fastcall PLAYERLIST_AllocPlayerList(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer1);
@@ -166,6 +168,7 @@ int32_t __fastcall PLAYERLIST_CheckFlag(D2UnitStrc* pPlayer1, D2UnitStrc* pPlaye
 }
 
 //D2Game.0x6FCBA930
+// not-1.13c: no retail row; nothing calls it in 1.10f or 1.13c (the 1.13c list code reads the flag word in place)
 uint16_t __fastcall PLAYERLIST_GetFlags(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2)
 {
     if (pPlayer1 == pPlayer2)
@@ -183,6 +186,7 @@ uint16_t __fastcall PLAYERLIST_GetFlags(D2UnitStrc* pPlayer1, D2UnitStrc* pPlaye
 }
 
 //D2Game.0x6FCBA980
+// 1.13c D2Game+0xF0220 (checked against decompile)
 void __fastcall sub_6FCBA980(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t a3)
 {
     if (pPlayer1 == pPlayer2)
@@ -200,6 +204,7 @@ void __fastcall sub_6FCBA980(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t
 }
 
 //D2Game.0x6FCBA9D0
+// 1.13c D2Game+0xF01D0 (checked against decompile)
 int16_t __fastcall sub_6FCBA9D0(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2)
 {
     if (pPlayer1 == pPlayer2)
@@ -217,6 +222,7 @@ int16_t __fastcall sub_6FCBA9D0(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2)
 }
 
 //D2Game.0x6FCBAA20
+// 1.13c D2Game+0xF0130 (checked against decompile)
 void __fastcall sub_6FCBAA20(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2)
 {
     if (pPlayer1 == pPlayer2)
@@ -234,6 +240,7 @@ void __fastcall sub_6FCBAA20(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2)
 }
 
 //D2Game.0x6FCBAAA0
+// 1.13c D2Game+0xF05B0 (checked against decompile)
 void __fastcall sub_6FCBAAA0(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2)
 {
     if (pPlayer1 == pPlayer2)
@@ -251,6 +258,7 @@ void __fastcall sub_6FCBAAA0(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc
 }
 
 //D2Game.0x6FCBAB20
+// not-1.13c: no retail row of its own; 1.13c inlines the living-player walk into its caller and passes the pair body (D2Game+0xF0480) as the callback
 void __fastcall sub_6FCBAB20(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     D2_ASSERT(pPlayer);
@@ -259,6 +267,7 @@ void __fastcall sub_6FCBAB20(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 }
 
 //D2Game.0x6FCBAB50
+// 1.13c D2Game+0xF0480 (checked against decompile)
 void __fastcall sub_6FCBAB50(D2GameStrc* pGame, D2UnitStrc* pPlayer, void* pArg)
 {
     D2UnitStrc* pUnit = (D2UnitStrc*)pArg;
@@ -288,6 +297,7 @@ void __fastcall sub_6FCBAB50(D2GameStrc* pGame, D2UnitStrc* pPlayer, void* pArg)
 }
 
 //D2Game.0x6FCBAD60
+// 1.13c D2Game+0xF03E0 (checked against decompile)
 void __fastcall PLAYERLIST_sub_6FCBAD60(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);

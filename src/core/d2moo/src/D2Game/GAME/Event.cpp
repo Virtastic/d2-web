@@ -369,6 +369,8 @@ void __fastcall EVENT_SetEvent(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventTy
 }
 
 //D2Game.0x6FC351D0
+// 1.13c D2Game+0x8EA80
+// (the nExpireFrame == -1 branch is the separate D2Game+0x8E810 in 1.13c; inline here)
 void __fastcall D2GAME_InitTimer_6FC351D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventTypes nEventType, int32_t nExpireFrame, EventTimerCallback pfCallBack, int32_t dwEventCustomId, int32_t dwEventCustomParam)
 {
     // TODO: v19
@@ -496,7 +498,7 @@ static void EVENT_AssignTimerToUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, D2Even
 }
 
 //1.10f: Inlined
-//1.13c: D2Game.0x6FCAE540
+// 1.13c D2Game+0x8E540
 D2EventTimerStrc* EVENT_AllocateTimer(D2GameStrc* pGame)
 {
 	D2EventTimerSlabListStrc* pEventTimerArray = pGame->pTimerQueue->pSlabListHead;
@@ -539,6 +541,7 @@ D2EventTimerStrc* __fastcall EVENT_AllocateUnitTimer(D2GameStrc* pGame, D2UnitSt
 }
 
 //D2Game.0x6FC35570
+// 1.13c D2Game+0x8E810
 void __fastcall sub_6FC35570(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventTypes nEventType, int32_t dwEventCustomId, int32_t dwEventCustomParam)
 {
     if (nEventType >= EVENTTYPE_COUNT)

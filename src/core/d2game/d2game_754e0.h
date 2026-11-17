@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x754E0: monster mode-start callback "sequence" (table entry). ecx = game, edx = the mode block
+// D2Game+0x754E0 (marker lives on sub_6FC64E60): monster mode-start callback "sequence" (table entry). ecx = game, edx = the mode block
 // (+0x04 the monster). Drops the attacker list (0xDA750: one stack word = game, same registers), puts the monster
 // in animation mode 14 (0xA4A2: unit, mode), clears bit 0x40 of the unit flags (+0xC4) when there is a unit, then
 // runs the skill start (0xA0830: one stack word = game, esi and edi = the monster); that call's result is the

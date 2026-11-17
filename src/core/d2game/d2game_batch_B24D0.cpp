@@ -75,7 +75,7 @@ static const D2GameBatchB74Env& batchEnv(const uint32_t* r) {
     return r[5] ? *(const D2GameBatchB74Env*)(uintptr_t)r[5] : kNoEnv;
 }
 
-// 1.13c D2Game+0xB24D0
+// (marker now on the d2moo ARENA_AllocArenaUnit)
 // ARENA_AllocArenaUnit. EAX=pGame (its memory pool at +0x1C), stack argument pUnit, ret 4. Allocate
 // an 8-byte D2ArenaUnitStrc from the game pool, clear both dwords, and store it in the player data
 // at +0x34. Asserts 0x4A when the unit has no player data.
@@ -109,7 +109,7 @@ static void d2game_B24D0_113c(void* pGame, void* pUnit, const D2GameBatchB74Env&
     return (int32_t)rd32(pPetData, 0x4);
 }
 
-// 1.13c D2Game+0x8B9B0
+// Stand-alone body of D2Game 0x8B9B0 (the marker is on the play-path shim sub_6FC3D830)
 // ATTRIBUTEUPDATE (0x20). EAX carries the attribute id in AX, the client is stack argument 1
 // (player data +0x9C at the retail call sites), stack 2 is the packet id (the callers pass 0x20),
 // stack 3 the unit GUID and stack 4 the value. Asserts 0x4B8 for an attribute id of 0xFF or more.
@@ -160,7 +160,7 @@ static void d2game_D29F0_113c(void* pUnit, const D2GameBatchB74Env& env)
     } while (pNode != nullptr);
 }
 
-// 1.13c D2Game+0x8AF10
+// Stand-alone body of D2Game 0x8AF10 (the marker is on the play-path shim)
 // CLEARCURSOR (0x42). EAX=record, stack argument 1 = client, ret 4. {0x42, record type or 6,
 // GUID or -1} -- 6 bytes; the record type is the low byte of the record's +0x00 dword and the GUID
 // its +0x0C dword.

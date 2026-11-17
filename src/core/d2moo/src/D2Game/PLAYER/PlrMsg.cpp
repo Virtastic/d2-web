@@ -122,6 +122,7 @@ void __fastcall sub_6FC81CA0(D2UnitStrc* pUnit, D2ClientStrc* pClient, char a3)
 }
 
 //D2Game.0x6FC81D20
+// 1.13c D2Game+0xCE310: a unit whose target is itself takes the point form (0x4D), not the unit form
 void __fastcall sub_6FC81D20(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient, int32_t nAnimMode)
 {
     D2SkillStrc* pSkill = UNITS_GetUsedSkill(pUnit);
@@ -134,6 +135,10 @@ void __fastcall sub_6FC81D20(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc*
         }
 
         D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
+        if (pTarget == pUnit)
+        {
+            pTarget = nullptr;
+        }
         const int32_t nSkillId = SKILLS_GetSkillIdFromSkill(pSkill, __FILE__, __LINE__);
         const int32_t nSkillLevel = SKILLS_GetSkillLevel(pUnit, pSkill, 1);
 
@@ -149,12 +154,13 @@ void __fastcall sub_6FC81D20(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc*
 }
 
 //D2Game.0x6FC81E10
+// 1.13c D2Game+0xCE150
 void __fastcall sub_6FC81E10(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient, int32_t nAnimMode)
 {
     if (pUnit != CLIENTS_GetPlayerFromClient(pClient, 0))
     {
         D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
-        // 1.13c D2Game+0xCE150: a unit whose target is itself takes the point form, not the unit form.
+        // a unit whose target is itself takes the point form, not the unit form.
         if (pTarget && pTarget != pUnit && CLIENTS_IsInUnitsRoom(pTarget, pClient))
         {
             D2GAME_PACKETS_SendPacket0x10_6FC3C9A0(pClient, 0x10, 0, pUnit->dwUnitId, (BYTE)stru_6FD30708[nAnimMode].field_8, pTarget->dwUnitType, pTarget->dwUnitId, CLIENTS_GetUnitX(pUnit), CLIENTS_GetUnitY(pUnit));
@@ -642,6 +648,7 @@ int32_t __fastcall sub_6FC828D0(D2UnitStrc* pPlayer, int32_t nUnitType, int32_t 
 }
 
 //D2Game.0x6FC82CB0
+// 1.13c D2Game+0xCE0D0
 int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x01_Walk_6FC82CB0(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
     uint16_t nX = 0;
@@ -658,6 +665,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x01_Walk_6FC82CB0(D2GameStrc* pGame
 }
 
 //D2Game.0x6FC82D10
+// 1.13c D2Game+0xCBF50
 int32_t __fastcall sub_6FC82D10(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nPacketSize, uint16_t* pX, uint16_t* pY)
 {
     *pX = 0;
@@ -701,6 +709,7 @@ int32_t __fastcall sub_6FC82D10(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPac
 }
 
 //D2Game.0x6FC82ED0
+// 1.13c D2Game+0xCE090 (packet 0x02; the target check is D2Game+0xCD630 with D2Game+0xCCFE0 inlined, no delta)
 int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x02_WalkToEntity_6FC82ED0(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
     if (nSize != 9)
@@ -739,6 +748,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x02_WalkToEntity_6FC82ED0(D2GameStr
 }
 
 //D2Game.0x6FC83090
+// 1.13c D2Game+0xCE040
 int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x03_Run_6FC83090(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
     uint16_t nX = 0;
@@ -755,6 +765,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x03_Run_6FC83090(D2GameStrc* pGame,
 }
 
 //D2Game.0x6FC830F0
+// 1.13c D2Game+0xCE000 (packet 0x04; the same target check as D2Game+0xCE090, mode 3)
 int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x04_RunToEntity_6FC830F0(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
     if (nSize != 9)
@@ -793,6 +804,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x04_RunToEntity_6FC830F0(D2GameStrc
 }
 
 //D2Game.0x6FC832B0
+// 1.13c D2Game+0xCE5A0 (packet 0x05, left skill; no delta)
 int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x05_ShiftLeftClickSkill_6FC832B0(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
     uint16_t nX = 0;
@@ -952,7 +964,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x06_LeftSkillOnUnit_6FC83550(D2Game
     return 3;
 }
 
-// 1.13c D2Game+0x536D0: AttackNoMana test uses SKILLSFLAGINDEX_ATTACKNOMANA (28), not the literal bit 27 (TargetItem)
+// 1.13c D2Game+0xCE620: AttackNoMana test uses SKILLSFLAGINDEX_ATTACKNOMANA (28), not the literal bit 27 (TargetItem)
 //D2Game.0x6FC836D0
 int32_t __fastcall sub_6FC836D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStrc* pSkill, int32_t nUnitType, int32_t nUnitGUID, int32_t a6)
 {
@@ -1255,6 +1267,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x0B_6FC83EE0(D2GameStrc* pGame, D2U
 }
 
 //D2Game.0x6FC83EF0
+// 1.13c D2Game+0xCE520 (packet 0x0C, right skill; no delta)
 int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x0C_RightSkill_6FC83EF0(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
     uint16_t nX = 0;

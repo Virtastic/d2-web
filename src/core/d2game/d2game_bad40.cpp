@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xBAD40, injectable callee. ECX = quest record (a4q3 init), plain ret. The callback addresses are
+// D2Game+0xBAD40 (marker lives on ACT4Q3_InitQuestData), injectable callee. ECX = quest record (a4q3 init), plain ret. The callback addresses are
 // module words the caller supplies (retail stores its own code addresses); the state block comes from the 0xA2E6
 // pool allocator (ECX = [[q+4]+0x1C], EDX = 0x20, stack: file, line 0x358, 0).
 #include <cstdint>
@@ -7,7 +7,7 @@ struct GBAD40Env {
     uint32_t (*alloc)(uint32_t pool, uint32_t size, uint32_t file, uint32_t line, uint32_t zero);
     uint32_t cb_a0, cb_a8, cb_ac, cb_b0, cb_c0, cb_c4, cb_c8, cb_cc, cb_d4, cb_d8, cb_dc, cb_ec, cb_f0, file;
 };
-// 1.13c D2Game+0xBAD40
+// D2Game+0xBAD40
 void g_bad40(uint32_t qa, const GBAD40Env& e)
 {
     uint8_t* q = (uint8_t*)(uintptr_t)qa;

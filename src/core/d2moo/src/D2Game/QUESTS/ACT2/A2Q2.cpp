@@ -327,7 +327,14 @@ bool __fastcall ACT2Q2_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitStrc*
 	return true;
 }
 
+// D2Game+0xC2450 (1.13c): the empty function 1.13c stores in callback slot 8 of A2Q2.
+static void __fastcall ACT2Q2_Callback08_Empty(D2QuestDataStrc*, D2QuestArgStrc*)
+{
+}
+
 //D2Game.0x6FCA06C0
+// 1.13c D2Game+0xC7ED0
+// 1.13c fills callback slot 8 with an empty function (0xC2450); 1.10f left it commented out.
 void __fastcall ACT2Q2_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));
@@ -346,7 +353,7 @@ void __fastcall ACT2Q2_InitQuestData(D2QuestDataStrc* pQuestData)
 	pQuestData->pfCallback[QUESTEVENT_PLAYERLEAVESGAME] = ACT2Q2_Callback10_PlayerLeavesGame;
 	pQuestData->pfCallback[QUESTEVENT_ITEMPICKEDUP] = ACT2Q2_Callback04_ItemPickedUp;
 	pQuestData->pfCallback[QUESTEVENT_ITEMDROPPED] = ACT2Q2_Callback05_ItemDropped;
-	//pQuestData->pfCallback[8] = (QUESTCALLBACK)D2GAME_OBJECTS_InitFunction05_Door_6FCA6660;
+	pQuestData->pfCallback[8] = ACT2Q2_Callback08_Empty;
 	pQuestData->pfCallback[QUESTEVENT_PLAYERSTARTEDGAME] = ACT2Q2_Callback13_PlayerStartedGame;
 	pQuestData->pfCallback[QUESTEVENT_PLAYERJOINEDGAME] = ACT2Q2_Callback14_PlayerJoinedGame;
 	pQuestData->pfCallback[QUESTEVENT_PLAYERDROPPEDWITHQUESTITEM] = ACT2Q2_Callback09_PlayerDroppedWithQuestItem;

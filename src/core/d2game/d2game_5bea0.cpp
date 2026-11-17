@@ -3,7 +3,7 @@
 #include "d2game_2e790.h"
 using namespace d2g32;
 
-// 1.13c D2Game+0x5BEA0 (ECX = quest record)
+// D2Game+0x5BEA0 (marker lives on ACT5Q1_InitQuestData) (ECX = quest record)
 void ACT5Q1_QuestInit(uint32_t q, D2GPoolAlloc poolAlloc, uint32_t file, uint32_t mod)
 {
     for (uint32_t o = 0xA0; o < 0xA0 + 15 * 4; o += 4) wr32(q + o, 0);

@@ -1,7 +1,7 @@
 #pragma once
 
 namespace d2game {
-// 1.13c D2Game+0x9D850. The environment owns the pointer representation
+// (marker lives on LEVEL_UpdateQueuedUnitsInAllActs) 1.13c 0x9D850. The environment owns the pointer representation
 // and the callee bindings; traversal never converts a retail address to a native pointer.
 template<class Environment>
 void updateQueuedUnits(Environment& env)

@@ -29,7 +29,7 @@ template <class E> static u32 FindType(E& e, u32 game, u32 t)
     return 0;
 }
 
-// 1.13c D2Game+0x5D5C0 (ECX=quest record)
+// D2Game+0x5D5C0 (marker lives on ACT5Q4_InitQuestData) (ECX=quest record)
 template <class E> void A5Q4Init(E& e, u32 q)
 {
     for (u32 i = 0; i < 15; i++) e.wr32(q + 0xA0 + i * 4, 0);

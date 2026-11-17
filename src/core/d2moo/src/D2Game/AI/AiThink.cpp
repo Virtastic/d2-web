@@ -222,6 +222,7 @@ static int16_t AI_GetParamValue(D2GameStrc* pGame, D2AiTickParamStrc* pAiTickPar
 	return pAiTickParam->pMonstatsTxt->wAiParam[nParamId][pGame->nDifficulty];
 }
 
+// not-1.13c: 1.13c inlines the seed step and the % 100 at each call site (e.g. +0x1BBC0); no stand-alone function.
 static uint32_t AI_RollPercentage(D2UnitStrc* pUnit)
 {
 	return SEED_RollPercentage(&pUnit->pSeed);
@@ -10546,7 +10547,10 @@ void __fastcall AITHINK_Fn059_BloodRaven(D2GameStrc* pGame, D2UnitStrc* pUnit, D
 	AITACTICS_ChangeModeAndTargetUnit(pGame, pUnit, MONMODE_ATTACK1, pAiTickParam->pTarget);
 }
 
+bool __fastcall AITHINK_ReturnHome113(D2GameStrc* game, D2UnitStrc* unit, uint32_t distance);
+
 //D2Game.0x6FCE5EE0
+// 1.13c D2Game+0x19C20
 uint8_t __fastcall sub_6FCE5EE0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	//TODO: v8, v9
@@ -10555,21 +10559,20 @@ uint8_t __fastcall sub_6FCE5EE0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 	D2UnitStrc* pTarget = sub_6FCCFD70(pGame, pUnit, &bCloseToTarget);
 	const int32_t nDistance = AIUTIL_GetDistanceToCoordinates_FullUnitSize(pUnit, pTarget);
 
-	if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER || !pUnit->pMonsterData)
+	// 1.13c: no interaction list -> 0 before anything else is read.
+	if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER || !pUnit->pMonsterData || !pUnit->pMonsterData->pMonInteract)
 	{
 		return 0;
 	}
 
-	// The matched 1.13c Warriv fixture follows the ordinary approach path. Treat interaction-list
-	// membership, rather than the presence of an interaction object, as active interaction state.
 	D2MonsterInteractStrc* pMonInteract = pUnit->pMonsterData->pMonInteract;
-	int32_t v8 = pMonInteract ? MONSTERAI_IsInteractingWith(pMonInteract, pTarget) : 0;
+	int32_t v8 = MONSTERAI_IsInteractingWith(pMonInteract, pTarget);
 	if (pTarget && pTarget->dwUnitType == UNIT_PLAYER && PLAYER_IsBusy(pTarget) == 1)
 	{
 		v8 = 1;
 	}
 
-	const int32_t v9 = pMonInteract ? MONSTERAI_HasInteractUnit(pMonInteract) : 0;
+	const int32_t v9 = MONSTERAI_HasInteractUnit(pMonInteract);
 
 	if (v9 || v8 || pAiTickParam->pAiControl->dwAiParam[0] > 0)
 	{
@@ -10638,56 +10641,15 @@ uint8_t __fastcall sub_6FCE5EE0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 		}
 		else
 		{
-			D2AiCmdStrc* pAiCmd = AIGENERAL_GetAiCommandFromParam(pUnit, 10, 0);
-			if (!pAiCmd)
+			// 1.13c: the home-command step is the shared +0x16610 (radius 16, its +0x15D10 fallback stores home and idles 20).
+			if (AITHINK_ReturnHome113(pGame, pUnit, 16))
 			{
-				D2AiCmdStrc* pCurrentAiCmd = AIGENERAL_SetCurrentAiCommand(pGame, pUnit, 10, 0);
-				if (pCurrentAiCmd && !pCurrentAiCmd->nCmdParam[1] && !pCurrentAiCmd->nCmdParam[2])
-				{
-					pCurrentAiCmd->nCmdParam[1] = CLIENTS_GetUnitX(pUnit);
-					pCurrentAiCmd->nCmdParam[2] = CLIENTS_GetUnitY(pUnit);
-					AITACTICS_IdleInNeutralMode(pGame, pUnit, 20);
-					return 1;
-				}
-
-				AITACTICS_SetVelocity(pUnit, 1, 0, 0);
-
-				if (nDistance < 5)
-				{
-					AITACTICS_WalkInRadiusToTarget(pGame, pUnit, pTarget, nDistance - 2, 2);
-				}
-				else
-				{
-					AITACTICS_WalkInRadiusToTarget(pGame, pUnit, pTarget, 3, 2);
-				}
 				return 1;
 			}
 
-			if (AIUTIL_GetDistanceToCoordinates(pUnit, pAiCmd->nCmdParam[1], pAiCmd->nCmdParam[2]) <= 16)
-			{
-				AITACTICS_SetVelocity(pUnit, 1, 0, 0);
-
-				if (nDistance < 5)
-				{
-					AITACTICS_WalkInRadiusToTarget(pGame, pUnit, pTarget, nDistance - 2, 2);
-				}
-				else
-				{
-					AITACTICS_WalkInRadiusToTarget(pGame, pUnit, pTarget, 3, 2);
-				}
-				return 1;
-			}
-
-			D2AiCmdStrc* pCurrentAiCmd = AIGENERAL_SetCurrentAiCommand(pGame, pUnit, 4, 0);
-			if (pCurrentAiCmd)
-			{
-				pCurrentAiCmd->nCmdParam[1] = pAiCmd->nCmdParam[1];
-				pCurrentAiCmd->nCmdParam[2] = pAiCmd->nCmdParam[2];
-				pCurrentAiCmd->nCmdParam[3] = 12;
-				pCurrentAiCmd->nCmdParam[4] = 10;
-			}
-
-			AITACTICS_IdleInNeutralMode(pGame, pUnit, 10);
+			// 1.13c writes the move-method word (7) inline.
+			pUnit->pMonsterData->pAiParam->unk0x18 = 7;
+			AITACTICS_WalkInRadiusToTarget(pGame, pUnit, pTarget, nDistance < 5 ? nDistance - 2 : 3, 2);
 		}
 	}
 
@@ -10695,6 +10657,7 @@ uint8_t __fastcall sub_6FCE5EE0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 }
 
 //D2Game.0x6FCE61E0
+// 1.13c D2Game+0x16970
 int32_t __fastcall sub_6FCE61E0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam, D2MapAIPathPositionStrc* pPosition)
 {
 	if (!pUnit || !pPosition || pPosition->nX == 0 || pPosition->nY == 0 || !AIUTIL_GetDistanceToCoordinates(pUnit, pPosition->nX, pPosition->nY))
@@ -10702,8 +10665,10 @@ int32_t __fastcall sub_6FCE61E0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 		return 0;
 	}
 
-	AITACTICS_SetVelocity(pUnit, 7, 0, 0);
-	AITACTICS_WalkToTargetCoordinatesNoSteps(pGame, pUnit, pPosition->nX, pPosition->nY);
+	// 1.13c inlines the velocity setter (only the move-method word, 7) and the walk wrapper (MoveToTarget, walk mode).
+	D2AiParamStrc* pAiParam = (pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData) ? pUnit->pMonsterData->pAiParam : nullptr;
+	pAiParam->unk0x18 = 7;
+	AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_WALK, pPosition->nX, pPosition->nY, 0, 0);
 
 	D2AiCmdStrc* pAiCmd = AIGENERAL_SetCurrentAiCommand(pGame, pUnit, 4, 0);
 	if (pAiCmd)
@@ -10718,6 +10683,7 @@ int32_t __fastcall sub_6FCE61E0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 }
 
 //D2Game.0x6FCE6270
+// 1.13c D2Game+0x19BB0
 int32_t __fastcall sub_6FCE6270(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam, D2MapAIPathPositionStrc* pPosition)
 {
 	if (!pUnit || !pPosition || pPosition->nX == 0 || pPosition->nY == 0)
@@ -10725,23 +10691,8 @@ int32_t __fastcall sub_6FCE6270(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 		return 0;
 	}
 
-	int32_t bResult = 0;
-	if (AIUTIL_GetDistanceToCoordinates(pUnit, pPosition->nX, pPosition->nY))
-	{
-		AITACTICS_SetVelocity(pUnit, 7, 0, 0);
-		AITACTICS_WalkToTargetCoordinatesNoSteps(pGame, pUnit, pPosition->nX, pPosition->nY);
-
-		D2AiCmdStrc* pAiCmd = AIGENERAL_SetCurrentAiCommand(pGame, pUnit, 4, 0);
-		if (pAiCmd)
-		{
-			pAiCmd->nCmdParam[1] = pPosition->nX;
-			pAiCmd->nCmdParam[2] = pPosition->nY;
-			pAiCmd->nCmdParam[3] = 12;
-			pAiCmd->nCmdParam[4] = 10;
-		}
-
-		bResult = 1;
-	}
+	// 1.13c calls the common reaction (+0x16970) instead of repeating it.
+	const int32_t bResult = sub_6FCE61E0(pGame, pUnit, pAiTickParam, pPosition) & 0xFF;
 
 	D2AiCmdStrc* pAiCmd = AIGENERAL_SetCurrentAiCommand(pGame, pUnit, 4, 0);
 	if (pAiCmd)
@@ -10756,6 +10707,7 @@ int32_t __fastcall sub_6FCE6270(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 }
 
 //D2Game.0x6FCE6340
+// 1.13c D2Game+0x19AD0
 int32_t __fastcall sub_6FCE6340(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam, D2MapAIPathPositionStrc* pPosition)
 {
 	if (!pUnit || !pPosition || !pPosition->nX || !pPosition->nY)
@@ -10763,37 +10715,13 @@ int32_t __fastcall sub_6FCE6340(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 		return 0;
 	}
 
-	int32_t bResult = 0;
-	if (AIUTIL_GetDistanceToCoordinates(pUnit, pPosition->nX, pPosition->nY))
-	{
-		AITACTICS_SetVelocity(pUnit, 7, 0, 0);
-		AITACTICS_WalkToTargetCoordinatesNoSteps(pGame, pUnit, pPosition->nX, pPosition->nY);
-
-		D2AiCmdStrc* pAiCmd = AIGENERAL_SetCurrentAiCommand(pGame, pUnit, 4, 0);
-		if (pAiCmd)
-		{
-			pAiCmd->nCmdParam[1] = pPosition->nX;
-			pAiCmd->nCmdParam[2] = pPosition->nY;
-			pAiCmd->nCmdParam[3] = 12;
-			pAiCmd->nCmdParam[4] = 10;
-		}
-
-		bResult = 1;
-	}
+	// 1.13c calls the common reaction (+0x16970) and reads the mode flag through +0x1560 (no trace).
+	const int32_t bResult = sub_6FCE61E0(pGame, pUnit, pAiTickParam, pPosition) & 0xFF;
 
 	D2AiCmdStrc* pAiCmd = AIGENERAL_SetCurrentAiCommand(pGame, pUnit, 7, 0);
 	if (pAiCmd)
 	{
-		D2MonStats2Txt* pMonStats2TxtRecord = MONSTERREGION_GetMonStats2TxtRecord(pUnit->dwClassId);
-		if (pMonStats2TxtRecord && pMonStats2TxtRecord->dwModeFlags & gdwBitMasks[MONMODE_SKILL1])
-		{
-			pAiCmd->nCmdParam[1] = 8;
-		}
-		else
-		{
-			FOG_Trace("NPC: %d tried to skill1", pUnit->dwClassId);
-			pAiCmd->nCmdParam[1] = 1;
-		}
+		pAiCmd->nCmdParam[1] = MONSTERUNIQUE_CheckMonModeFlag(pUnit->dwClassId, MONMODE_SKILL1) ? 8 : 1;
 
 		pAiCmd->nCmdParam[2] = pPosition->nX;
 		pAiCmd->nCmdParam[3] = pPosition->nY;
@@ -10869,17 +10797,19 @@ int32_t __fastcall sub_6FCE64D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 	return bResult;
 }
 
+bool __fastcall AITHINK_EnsureHomeCommand113(D2GameStrc* game, D2UnitStrc* unit);
+
 //D2Game.0x6FCE6660
+// 1.13c D2Game+0x1DB40
 void __fastcall AITHINK_Fn032_Npc(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
-	D2AiCmdStrc* pAiCmd = AIGENERAL_SetCurrentAiCommand(pGame, pUnit, 10, 0);
-	if (pAiCmd && !pAiCmd->nCmdParam[1] && !pAiCmd->nCmdParam[2])
+	// 1.13c: the home-command step is the shared +0x15D10 (store x,y in command 10 and idle 20 the first time).
+	if (AITHINK_EnsureHomeCommand113(pGame, pUnit))
 	{
-		pAiCmd->nCmdParam[1] = CLIENTS_GetUnitX(pUnit);
-		pAiCmd->nCmdParam[2] = CLIENTS_GetUnitY(pUnit);
-		AITACTICS_IdleInNeutralMode(pGame, pUnit, 20);
 		return;
 	}
+
+	D2AiCmdStrc* pAiCmd = nullptr;
 
 	int32_t nClassId = -1;
 	if (pUnit)
@@ -10983,30 +10913,30 @@ void __fastcall AITHINK_Fn032_Npc(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTick
 	}
 }
 
+// 1.13c: a module global (D2Game data +0x111F90), not a local; it counts every such walk of every monster.
+static int32_t dword_6FD4DD88 = 0;
+
 //D2Game.0x6FCE69A0
+// 1.13c D2Game+0x16A30
 uint8_t __fastcall sub_6FCE69A0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
-	//TODO: v18, dword_6FD4DD88
-	int32_t dword_6FD4DD88 = 0;
-
 	int32_t nAnimMode = 0;
 	int32_t v18 = 0;
+
+	// 1.13c: only a monster unit is handled.
+	if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
+	{
+		return 0;
+	}
 
 	D2AiCmdStrc* pAiCmd = AIGENERAL_GetAiCommandFromParam(pUnit, 4, 0);
 	if (pAiCmd && pAiCmd->nCmdParam[3] > 0)
 	{
 		if (pAiCmd->nCmdParam[1] && pAiCmd->nCmdParam[2] && (uint32_t)AIUTIL_GetDistanceToCoordinates(pUnit, pAiCmd->nCmdParam[1], pAiCmd->nCmdParam[2]) > 3)
 		{
-			if ((dword_6FD4DD88 % 4) == 0)
-			{
-				AITACTICS_SetVelocity(pUnit, 5, 0, 0);
-				AITACTICS_WalkToTargetCoordinatesNoSteps(pGame, pUnit, pAiCmd->nCmdParam[1], pAiCmd->nCmdParam[2]);
-			}
-			else
-			{
-				AITACTICS_SetVelocity(pUnit, 1, 0, 0);
-				AITACTICS_WalkToTargetCoordinatesNoSteps(pGame, pUnit, pAiCmd->nCmdParam[1], pAiCmd->nCmdParam[2]);
-			}
+			// 1.13c writes the move-method word inline (5 on every fourth walk, else 7) and calls MoveToTarget in walk mode.
+			pUnit->pMonsterData->pAiParam->unk0x18 = (dword_6FD4DD88 % 4) == 0 ? 5 : 7;
+			AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_WALK, pAiCmd->nCmdParam[1], pAiCmd->nCmdParam[2], 0, 0);
 
 			++dword_6FD4DD88;
 			--pAiCmd->nCmdParam[3];
@@ -11034,7 +10964,7 @@ uint8_t __fastcall sub_6FCE69A0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 		{
 			if ((pAiCmd->nCmdParam[1] % 2) != 0)
 			{
-				AITACTICS_WalkCloseToUnit(pGame, pUnit, pAiCmd->nCmdParam[2]);
+				AITACTICS_WalkCloseToUnit(pGame, pUnit, (uint8_t)pAiCmd->nCmdParam[2]);	// 1.13c passes the low byte
 				--pAiCmd->nCmdParam[1];
 				return 1;
 			}
@@ -11100,7 +11030,7 @@ uint8_t __fastcall sub_6FCE69A0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 			}
 			else if (pUnit->dwClassId == MONSTER_LARZUK)
 			{
-				if (AI_RollPercentage(pUnit) > 4)
+				if (ITEMS_RollLimitedRandomNumber(&pUnit->pSeed, 100) > 4)	// 1.13c rolls through +0x1180
 				{
 					pAiCmd->nCmdParam[1] = 0;
 					AITACTICS_IdleInNeutralMode(pGame, pUnit, 50);
@@ -11132,7 +11062,7 @@ uint8_t __fastcall sub_6FCE69A0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 			return 1;
 		}
 
-		if (pUnit && pUnit->dwClassId == MONSTER_FARA && AI_RollPercentage(pUnit) < 66)
+		if (pUnit && pUnit->dwClassId == MONSTER_FARA && ITEMS_RollLimitedRandomNumber(&pUnit->pSeed, 100) < 66)
 		{
 			pAiCmd->nCmdParam[1] = 8;
 		}
@@ -11140,9 +11070,9 @@ uint8_t __fastcall sub_6FCE69A0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 		return 0;
 	}
 
-	AITACTICS_SetVelocity(pUnit, 7, 0, 0);
+	pUnit->pMonsterData->pAiParam->unk0x18 = 7;
 
-	if (!AITACTICS_WalkToTargetCoordinatesNoSteps(pGame, pUnit, pAiCmd->nCmdParam[2], pAiCmd->nCmdParam[3]))
+	if (!AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_WALK, pAiCmd->nCmdParam[2], pAiCmd->nCmdParam[3], 0, 0))
 	{
 		AITACTICS_IdleInNeutralMode(pGame, pUnit, 25);
 	}
@@ -11152,6 +11082,7 @@ uint8_t __fastcall sub_6FCE69A0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 }
 
 //D2Game.0x6FCE6CD0
+// 1.13c D2Game+0x1BBC0 (the percentage roll is inline; the handler's result is its low byte)
 int32_t __fastcall AITHINK_ExecuteMapAiAction(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	typedef int32_t(__fastcall* ACTIONFN)(D2GameStrc*, D2UnitStrc*, D2AiTickParamStrc*, D2MapAIPathPositionStrc*);
@@ -11169,7 +11100,7 @@ int32_t __fastcall AITHINK_ExecuteMapAiAction(D2GameStrc* pGame, D2UnitStrc* pUn
 	};
 
 	D2MapAIStrc* pMapAi = pAiTickParam->pAiControl->pMapAi;
-	if (!pMapAi || AI_RollPercentage(pUnit) >= 66 || !pMapAi->nPathNodes)
+	if (!pMapAi || SEED_RollPercentage(&pUnit->pSeed) >= 66 || !pMapAi->nPathNodes)
 	{
 		return 0;
 	}
@@ -11183,7 +11114,7 @@ int32_t __fastcall AITHINK_ExecuteMapAiAction(D2GameStrc* pGame, D2UnitStrc* pUn
 	ACTIONFN pfAction = dword_6FD3F970[pPosition->nMapAIAction];
 	if (pfAction)
 	{
-		return pfAction(pGame, pUnit, pAiTickParam, pPosition);
+		return pfAction(pGame, pUnit, pAiTickParam, pPosition) & 0xFF;
 	}
 
 	return 0;
@@ -11775,8 +11706,9 @@ void __fastcall AITHINK_Fn058_Navi(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTic
 }
 
 //D2Game.0x6FCE7C10
+// 1.13c D2Game+0x9CB00 (the Idle entry; the Buffy entry is a byte-identical copy, marked on the brace)
 void __fastcall AITHINK_Fn001_100_Idle_Buffy(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
-{
+{	// 1.13c D2Game+0xA5D40
 	if (UNITS_GetRoom(pUnit))
 	{
 		AITACTICS_IdleInNeutralMode(pGame, pUnit, 200);
@@ -17401,6 +17333,7 @@ void __fastcall AITHINK_ExecuteAiFn(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCo
 }
 
 //D2Game.0x6FCF0A70
+// 1.13c D2Game+0x9D3B0 (the stunned/door/leash gate is 0x9CD90, the target switch 0x9D160)
 void __fastcall D2GAME_MONSTERS_AiFunction03_6FCF0A70(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4)
 {
 	D2AiTickParamStrc aiTickParam = {};
@@ -17588,6 +17521,7 @@ int32_t __fastcall sub_6FCF0E40_inline(D2GameStrc* pGame, D2UnitStrc* pUnit, D2A
 }
 
 //D2Game.0x6FCF0E40
+// 1.13c D2Game+0x9CFE0 (1.13c splits out the boss-sight sound as 0x9CA60 and the flee/teleport as 0x9CDE0; same rule)
 int32_t __fastcall sub_6FCF0E40(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	if (!pAiTickParam->pTarget)

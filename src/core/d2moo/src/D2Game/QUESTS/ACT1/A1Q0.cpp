@@ -33,6 +33,7 @@ D2NPCMessageTableStrc gpAct1Q0NpcMessages[] =
 
 
 //D2Game.0x6FC977D0
+// 1.13c D2Game+0x62D90
 void __fastcall ACT1Q0_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));
@@ -82,6 +83,7 @@ void __fastcall ACT1Q0_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 }
 
 //D2Game.0x6FC978F0
+// 1.13c D2Game+0x607D0
 bool __fastcall ACT1Q0_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
 	return nNpcId == MONSTER_WARRIV1 && !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q0, QFLAG_REWARDGRANTED);

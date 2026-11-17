@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x76FE0: monster mode-update callback "run" (table entry). ecx = game, edx = the monster. The
+// D2Game+0x76FE0 (marker lives on sub_6FC64510): monster mode-update callback "run" (table entry). ecx = game, edx = the monster. The
 // movement step (0xE1930: eax and esi = the monster, ecx and edi = game, edx = the monster) reports its state; on
 // state 2 the mode-end handler runs (0x76BF0: ecx = game, edx = the monster) and the result is 2. Otherwise 1.
 #pragma once

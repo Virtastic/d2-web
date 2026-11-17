@@ -722,6 +722,7 @@ void __fastcall SUNITDMG_FillDamageValues(D2GameStrc* pGame, D2UnitStrc* pAttack
 }
 
 //D2Game.0x6FCBF400
+// 1.13c D2Game+0x1620
 int32_t __fastcall SUNITDMG_CheckMonType(int32_t nMonType1, int32_t nMonType2)
 {
 	if (nMonType1 > 0 && nMonType1 < sgptDataTables->nMonTypeTxtRecordCount 
@@ -1407,6 +1408,7 @@ void __fastcall SUNITDMG_ExecuteEvents(D2GameStrc* pGame, D2UnitStrc* pAttacker,
 }
 
 //D2Game.0x6FCC05D0
+// 1.13c D2Game+0x1540
 D2MonStatsTxt* __fastcall SUNITDMG_GetMonStatsTxtRecordFromUnit(D2UnitStrc* pUnit)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)
@@ -2243,6 +2245,7 @@ BOOL __fastcall sub_6FCC1870(D2UnitStrc* pUnit, D2DamageStrc* pDamage, int32_t n
 }
 
 //D2Game.0x6FCC1A50
+// 1.13c D2Game+0xDA660
 int32_t __fastcall SUNITDMG_GetHitClass(D2DamageStrc* pDamage, uint32_t nBaseHitClass)
 {
 	constexpr D2DamageHitClassMappingStrc sgDamageHitClassMapping[] =
@@ -2684,6 +2687,8 @@ uint16_t __fastcall SUNITDMG_GetResultFlags(D2GameStrc* pGame, D2UnitStrc* pAtta
 }
 
 //D2Game.0x6FCC2420
+// 1.13c D2Game+0xDDDE0
+// (1.13c outlines the combat-record allocation below as D2Game+0xDAB90; here it is inline)
 void __fastcall SUNITDMG_AllocCombat(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender, D2DamageStrc* pDamage, uint8_t nSrcDam)
 {
 	if (!pAttacker || !pDefender)
@@ -3160,6 +3165,7 @@ uint32_t __fastcall SUNITDMG_ComputeExperienceGain(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FCC3170
+// 1.13c D2Game+0xDE6D0
 void __fastcall SUNITDMG_AddExperienceForPlayer(D2GameStrc* pGame, D2UnitStrc* pUnit, uint32_t nOldLevel, uint32_t nExperienceGained)
 {
 	if (!pUnit || pUnit->dwUnitType != UNIT_PLAYER)

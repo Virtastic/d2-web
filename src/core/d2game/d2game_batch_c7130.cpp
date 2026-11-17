@@ -100,7 +100,7 @@ static void questInit(const D2GameBatchC7130Env* e, void* q, const uint32_t (&cb
     std::memset(e->ptr(p), 0, zeroDwords * 4);
 }
 
-// 1.13c D2Game+0xC7480
+// D2Game+0xC7480 (marker lives on ACT2Q3_InitQuestData)
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_fn_d2game_C7480(void* q, const D2GameBatchC7130Env* e)
 {
@@ -111,7 +111,7 @@ void d2_fn_d2game_C7480(void* q, const D2GameBatchC7130Env* e)
     w32(p, 8, 0); w16(p, 0x94, 0);
 }
 
-// 1.13c D2Game+0xC9400
+// D2Game+0xC9400 (marker lives on ACT2Q4_InitQuestData)
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_fn_d2game_C9400(void* q, const D2GameBatchC7130Env* e)
 {

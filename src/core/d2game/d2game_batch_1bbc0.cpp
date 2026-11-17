@@ -15,7 +15,7 @@ struct D2Game1BBC0Env {
 
 static inline uint32_t rd32_1bbc0(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
 
-// 1.13c D2Game+0x1BBC0. unit+0x20 is the u64 seed; ctx -> g (dword at ctx+0), g+0x38 -> {count, records*};
+// D2Game +0x1BBC0 (marker lives on the d2moo AITHINK_ExecuteMapAiAction). unit+0x20 is the u64 seed; ctx -> g (dword at ctx+0), g+0x38 -> {count, records*};
 // records are 0xC bytes, +0 = kind. Returns AL only (the other bits are residue).
 static uint32_t sub_1BBC0(const void* game, void* unit, const void* ctx, const D2Game1BBC0Env* env)
 {
@@ -47,7 +47,7 @@ template <uint32_t Rva> static uint32_t h1bbc0(const void* game, void* unit, con
     w[6] = (uint32_t)(uintptr_t)ctx; w[7] = (uint32_t)(uintptr_t)rec; w[8] = w[9] = 0;
     return g_ret1bbc0;
 }
-// 1.13c D2Game+0x1BBC0
+// probe for D2Game +0x1BBC0
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_1bbc0(uint32_t* r)
 {
     D2Game1BBC0Env env{};

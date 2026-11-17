@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xD47C0: ESI = owner unit, EDI = item, stack force; ret 4.
+// (marker lives on D2GAME_ITEMS_UpdateItemStatlist_6FC42310) 1.13c 0xD47C0: ESI = owner unit, EDI = item, stack force; ret 4.
 // No owner, no item or a non-item (type 4) returns. A player owner in state 7 (thunk 0xA68E) returns. A gem (type 0x14)
 // or rune (0x4A, thunk 0xA430) socketed in an item owner applies its gems.txt properties (item record thunk 0xA53E, gem
 // record +0xF0 via thunk 0xA87A, apply type thunk 0xA9E2(owner, 0), thunk 0xA9D0 with mode 2 / owner 0, or mode 5 / owner);
@@ -29,7 +29,6 @@ struct Env {
     void (*anim)(P unit, U file, I line);             // thunk 0xA59E (stdcall 3)
     U file;                                           // the source-file string as the caller sees it
 };
-// 1.13c D2Game+0xD47C0
 inline void UpdateItemStatlist_113c(const Env& e, P unit, P item, I force) {
     if (!unit || !item || rd(item, 0) != 4) return;
     if (rd(unit, 0) == 0 && e.state(unit, 7)) return;

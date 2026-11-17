@@ -66,7 +66,7 @@ void D2GAME_734E0(int16_t mode, i32* param_2, i32* u)
     } else if (mode == 0x18) r_92FC0(param_2, u);
 }
 
-// 1.13c D2Game+0x752A0 (fastcall: edx = param_2)
+// D2Game+0x752A0 (fastcall: edx = param_2; marker lives on D2GAME_MONSTERS_AiFunction02_6FC65150)
 void D2GAME_752A0(i32, i32* param_2)
 {
     i32* e = r_749A0(param_2);

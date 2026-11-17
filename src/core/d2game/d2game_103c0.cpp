@@ -6,7 +6,7 @@ static uint32_t d2g_103c0_set(const D2GItemQualEnv* env, uint32_t h, uint32_t b,
     if (env->imp_b37e(h) >= 1) return env->sub144d0(h, 1, b, 1, d, e, 0);
     return env->sub148a0(h, 1, b, 1, d, e);
 }
-extern "C" uint32_t d2g_103c0(const uint32_t* pP, void* drop, const D2GItemQualEnv* env) {  // 1.13c D2Game+0x103C0
+extern "C" uint32_t d2g_103c0(const uint32_t* pP, void* drop, const D2GItemQualEnv* env) {  // 1.13c 0x103C0 (marker lives on sub_6FC4D5E0)
     const uint8_t* c = (const uint8_t*)drop;
     const int32_t c68 = *(const int32_t*)(c + 0x68);
     uint32_t fl = 0, ebx = 0, ebp = 0;
