@@ -17,7 +17,7 @@ struct D2DrlgOutDesertInitStrc				// size: 0x10
 };
 
 
-//Inlined in D2Common.0x6FD7D430
+// 1.13c D2Common+0x85990
 void __fastcall DRLGOUTDESR_PlaceDesertTransitionToTown(D2DrlgLevelStrc* pLevel)
 {
 	D2DrlgOrthStrc* pTownRoomData = pLevel->pOutdoors->pRoomData;
@@ -40,16 +40,35 @@ void __fastcall DRLGOUTDESR_PlaceDesertTransitionToTown(D2DrlgLevelStrc* pLevel)
 	}
 }
 
-//1.10f: D2Common.0x6FD7D430
-//1.11 : D2Common.0x6FDD58A0
-//1.14d: 0x0067F980
+// 1.13c D2Common+0x85D90
+static void DRLGOUTDESR_PlaceFillsInRockyWaste(D2DrlgLevelStrc* pLevel)
+{
+	const int nLevelPrestIds[] = { LVLPREST_ACT2_DESERT_OASIS_1, LVLPREST_ACT2_DESERT_RUINS_08X08, LVLPREST_ACT2_DESERT_FILL_BONE_1, LVLPREST_ACT2_DESERT_FILL_BONE_2, LVLPREST_ACT2_DESERT_FILL_HEAD_1, LVLPREST_ACT2_DESERT_FILL_MESA_1, LVLPREST_ACT2_DESERT_FILL_WAGON_1 };
+
+	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds, ARRAY_SIZE(nLevelPrestIds), FALSE);
+}
+
+// 1.13c D2Common+0x85D20
+static void DRLGOUTDESR_PlaceFillsInDryHills(D2DrlgLevelStrc* pLevel)
+{
+	const int nLevelPrestIds1[] = { LVLPREST_ACT2_DESERT_OASIS_1, LVLPREST_ACT2_DESERT_RUINS_08X08, LVLPREST_ACT2_DESERT_FILL_HEAD_2, LVLPREST_ACT2_DESERT_FILL_MESA_1 };
+	const int nLevelPrestIds2[] = { LVLPREST_ACT2_DESERT_FILL_BERMS_1, LVLPREST_ACT2_DESERT_FILL_BERMS_2, LVLPREST_ACT2_DESERT_FILL_BERMS_3, LVLPREST_ACT2_DESERT_FILL_BERMS_4 };
+
+	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds1, ARRAY_SIZE(nLevelPrestIds1), FALSE);
+	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds2, ARRAY_SIZE(nLevelPrestIds2), TRUE);
+}
+
+// 1.13c D2Common+0x85CF0
+static void DRLGOUTDESR_PlaceOasesInFarOasis(D2DrlgLevelStrc* pLevel)
+{
+	const int nLevelPrestIds[] = { LVLPREST_ACT2_DESERT_OASIS_2, LVLPREST_ACT2_DESERT_OASIS_3 };
+
+	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds, ARRAY_SIZE(nLevelPrestIds), FALSE);
+}
+
+// 1.13c D2Common+0x85E20
 void __fastcall DRLGOUTDESR_InitAct2OutdoorLevel(D2DrlgLevelStrc* pLevel)
 {
-	const int nLevelPrestIds1[] = { LVLPREST_ACT2_DESERT_OASIS_1, LVLPREST_ACT2_DESERT_RUINS_08X08, LVLPREST_ACT2_DESERT_FILL_BONE_1, LVLPREST_ACT2_DESERT_FILL_BONE_2, LVLPREST_ACT2_DESERT_FILL_HEAD_1, LVLPREST_ACT2_DESERT_FILL_MESA_1, LVLPREST_ACT2_DESERT_FILL_WAGON_1 };
-	const int nLevelPrestIds2[] = { LVLPREST_ACT2_DESERT_OASIS_1, LVLPREST_ACT2_DESERT_RUINS_08X08, LVLPREST_ACT2_DESERT_FILL_HEAD_2, LVLPREST_ACT2_DESERT_FILL_MESA_1 };
-	const int nLevelPrestIds3[] = { LVLPREST_ACT2_DESERT_FILL_BERMS_1, LVLPREST_ACT2_DESERT_FILL_BERMS_2, LVLPREST_ACT2_DESERT_FILL_BERMS_3, LVLPREST_ACT2_DESERT_FILL_BERMS_4 };
-	const int nLevelPrestIds4[] = { LVLPREST_ACT2_DESERT_OASIS_2, LVLPREST_ACT2_DESERT_OASIS_3 };
-
 	DRLGOUTPLACE_SetOutGridLinkFlags(pLevel);
 	DRLGOUTPLACE_PlaceAct1245OutdoorBorders(pLevel);
 
@@ -60,7 +79,7 @@ void __fastcall DRLGOUTDESR_InitAct2OutdoorLevel(D2DrlgLevelStrc* pLevel)
 		DRLGOUTDESR_PlaceBorders(pLevel);
 		DRLGOUTDESR_AddExits(pLevel);
 		DRLGOUTDOORS_SpawnAct12Shrines(pLevel, 5);
-		DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds1, ARRAY_SIZE(nLevelPrestIds1), FALSE);
+		DRLGOUTDESR_PlaceFillsInRockyWaste(pLevel);
 		break;
 
 	case LEVEL_DRYHILLS:
@@ -69,15 +88,14 @@ void __fastcall DRLGOUTDESR_InitAct2OutdoorLevel(D2DrlgLevelStrc* pLevel)
 		DRLGOUTDESR_AddExits(pLevel);
 		DRLGOUTDOORS_SpawnAct12Waypoint(pLevel);
 		DRLGOUTDOORS_SpawnAct12Shrines(pLevel, 5);
-		DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds2, ARRAY_SIZE(nLevelPrestIds2), FALSE);
-		DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds3, ARRAY_SIZE(nLevelPrestIds3), TRUE);
+		DRLGOUTDESR_PlaceFillsInDryHills(pLevel);
 		break;
 
 	case LEVEL_FAROASIS:
 		DRLGOUTDESR_PlaceCliffs(pLevel);
 		DRLGOUTDESR_PlaceBorders(pLevel);
 		DRLGOUTDESR_AddExits(pLevel);
-		DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds4, ARRAY_SIZE(nLevelPrestIds4), FALSE);
+		DRLGOUTDESR_PlaceOasesInFarOasis(pLevel);
 		DRLGOUTDOORS_SpawnAct12Waypoint(pLevel);
 		DRLGOUTDOORS_SpawnAct12Shrines(pLevel, 5);
 		DRLGOUTDESR_PlaceFillsInFarOasis(pLevel);
@@ -118,7 +136,7 @@ void __fastcall DRLGOUTDESR_InitAct2OutdoorLevel(D2DrlgLevelStrc* pLevel)
 	}
 }
 
-//D2Common.0x6FD7D870
+// 1.13c D2Common+0x85A80
 void __fastcall DRLGOUTDESR_PlacePresetVariants(D2DrlgLevelStrc* pLevel, const int* pLevelPrestIds, unsigned int nVariants, BOOL bIterateFiles)
 {
 	unsigned int nRand = SEED_RollLimitedRandomNumber(&pLevel->pSeed, nVariants);
@@ -141,7 +159,7 @@ void __fastcall DRLGOUTDESR_PlacePresetVariants(D2DrlgLevelStrc* pLevel, const i
 	}
 }
 
-//D2Common.6FD7D950
+// 1.13c D2Common+0x85930
 void __fastcall DRLGOUTDESR_PlaceCliffs(D2DrlgLevelStrc* pLevel)
 {
 	static const D2DrlgOutDesertInitStrc pOutDesertInit[8][5] =
@@ -212,7 +230,7 @@ void __fastcall DRLGOUTDESR_PlaceCliffs(D2DrlgLevelStrc* pLevel)
 	}
 }
 
-//D2Common.0x6FD7D9B0
+// 1.13c D2Common+0x85DF0
 void __fastcall DRLGOUTDESR_PlaceBorders(D2DrlgLevelStrc* pLevel)
 {
 	DRLGOUTDOORS_AddAct124SecondaryBorder(pLevel, 2, LVLPREST_ACT2_DESERT_BORDER_1);
@@ -220,7 +238,7 @@ void __fastcall DRLGOUTDESR_PlaceBorders(D2DrlgLevelStrc* pLevel)
 	DRLGOUTDOORS_AddAct124SecondaryBorder(pLevel, 3, LVLPREST_ACT2_DESERT_BORDER_1);
 }
 
-//D2Common.0x6FD7D9F0
+// 1.13c D2Common+0x859F0
 void __fastcall DRLGOUTDESR_AddExits(D2DrlgLevelStrc* pLevel)
 {
 	int nLevelPrestId = 0;
@@ -256,7 +274,7 @@ void __fastcall DRLGOUTDESR_AddExits(D2DrlgLevelStrc* pLevel)
 	}
 }
 
-//D2Common.0x6FD7DA60
+// 1.13c D2Common+0x85C90
 void __fastcall DRLGOUTDESR_PlaceFillsInFarOasis(D2DrlgLevelStrc* pLevel)
 {
 	const int nLevelPrestIds1[4] = { LVLPREST_ACT2_DESERT_RUINS_08X08, LVLPREST_ACT2_DESERT_FILL_HEAD_1, LVLPREST_ACT2_DESERT_FILL_MESA_1, LVLPREST_ACT2_DESERT_FILL_WAGON_1 };
@@ -267,7 +285,7 @@ void __fastcall DRLGOUTDESR_PlaceFillsInFarOasis(D2DrlgLevelStrc* pLevel)
 	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds2, ARRAY_SIZE(nLevelPrestIds2), TRUE);
 }
 
-//D2Common.0x6FD7DAC0
+// 1.13c D2Common+0x85C50
 void __fastcall DRLGOUTDESR_PlaceRuinsInLostCity(D2DrlgLevelStrc* pLevel)
 {
 	const int nLevelPrestIds[4] = { LVLPREST_ACT2_DESERT_RUINS_ELDER, LVLPREST_ACT2_DESERT_RUINS_16X16, LVLPREST_ACT2_DESERT_RUINS_16X08, LVLPREST_ACT2_DESERT_RUINS_08X16 };
@@ -275,7 +293,7 @@ void __fastcall DRLGOUTDESR_PlaceRuinsInLostCity(D2DrlgLevelStrc* pLevel)
 	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds, ARRAY_SIZE(nLevelPrestIds), FALSE);
 }
 
-//D2Common.0x6FD7DB00
+// 1.13c D2Common+0x85BE0
 void __fastcall DRLGOUTDESR_PlaceFillsInLostCity(D2DrlgLevelStrc* pLevel)
 {
 	const int nLevelPrestIds1[5] = { LVLPREST_ACT2_DESERT_OASIS_1, LVLPREST_ACT2_DESERT_FILL_HEAD_2, LVLPREST_ACT2_DESERT_FILL_MESA_1, LVLPREST_ACT2_DESERT_FILL_BERMS_1, LVLPREST_ACT2_DESERT_FILL_BERMS_2 };
@@ -286,7 +304,7 @@ void __fastcall DRLGOUTDESR_PlaceFillsInLostCity(D2DrlgLevelStrc* pLevel)
 	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds2, ARRAY_SIZE(nLevelPrestIds2), TRUE);
 }
 
-//D2Common.6FD7DB70
+// 1.13c D2Common+0x858E0
 void __fastcall DRLGOUTDESR_PlaceTombEntriesInCanyon(D2DrlgLevelStrc* pLevel)
 {
 	static const D2DrlgOutDesertInitStrc pOutDesertInit[9] =
@@ -310,8 +328,7 @@ void __fastcall DRLGOUTDESR_PlaceTombEntriesInCanyon(D2DrlgLevelStrc* pLevel)
 	DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, 4, 4, LVLPREST_ACT2_DESERT_VALLEY_WARP, -1, 0);
 }
 
-// 1.10f:D2Common.0x6FD7DBC0
-// 1.11 :D2Common.0x6FDD5600
+// 1.13c D2Common+0x85B80
 void __fastcall DRLGOUTDESR_PlaceFillsInCanyon(D2DrlgLevelStrc* pLevel)
 {
 	const int nLevelPrestIds1[5] = { LVLPREST_ACT2_DESERT_FILL_BONE_1, LVLPREST_ACT2_DESERT_FILL_BONE_2, LVLPREST_ACT2_DESERT_FILL_BERMS_3, LVLPREST_ACT2_DESERT_FILL_BERMS_4, LVLPREST_ACT2_DESERT_FILL_WAGON_1 };

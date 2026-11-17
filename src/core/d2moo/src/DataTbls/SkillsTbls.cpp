@@ -936,6 +936,7 @@ D2SkillsTxt* __fastcall DATATBLS_GetSkillsTxtRecord(int nSkillId)
 }
 
 //Inlined at various places
+// not-1.13c: retail has no function; each user bounds-checks and indexes the skilldesc table global inline
 D2SkillDescTxt* __fastcall DATATBLS_GetSkillDescTxtRecord(int nSkillDesc)
 {
 	if (nSkillDesc >= 0 && nSkillDesc < sgptDataTables->nSkillDescTxtRecordCount)

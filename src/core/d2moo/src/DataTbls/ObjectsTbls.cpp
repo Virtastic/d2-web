@@ -286,6 +286,7 @@ D2ShrinesTxt* __stdcall DATATBLS_GetShrinesTxtRecord(int nShrineId)
 }
 
 //D2Common.0x6FD72070 (#10625)
+// not-1.13c: retail has no getter; users read the shrine count from the table global
 int __stdcall DATATBLS_GetShrinesTxtRecordCount()
 {
 	return sgptDataTables->nShrinesTxtRecordCount;

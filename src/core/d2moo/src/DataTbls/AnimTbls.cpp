@@ -39,34 +39,21 @@ void __fastcall DATATBLS_UnloadAnimDataD2(D2AnimDataTableStrc* pAnimData)
 	}
 }
 
-static void ToUpperCase(char* str)
-{
-	while (*str != '\0')
-	{
-		if (*str >= 'a' && *str <= 'z')
-		{
-			*str -= ' ';
-		}
-		++str;
-	}
-}
-
-static uint8_t SimpleStringHash(char* str)
-{
-	uint8_t nHash = 0;
-	while (*str)
-	{
-		nHash += *str;
-		++str;
-	}
-	return nHash;
-}
-
-// 1.13c D2Common+0x41DD0 (upper-case in place, byte-sum bucket, 8-byte name compare)
+// 1.13c D2Common+0x41DD0 (upper-case in place, byte-sum bucket, 8-byte name compare); the upper-casing and the byte-sum hash are inlined here as in retail
 static D2AnimDataRecordStrc* DATATBLS_GetAnimDataRecordFromPath(char* szPath)
 {
-	ToUpperCase(szPath);
-	const uint8_t nHash = SimpleStringHash(szPath);
+	for (char* pChar = szPath; *pChar != '\0'; ++pChar)
+	{
+		if (*pChar >= 'a' && *pChar <= 'z')
+		{
+			*pChar -= ' ';
+		}
+	}
+	uint8_t nHash = 0;
+	for (const char* pChar = szPath; *pChar != '\0'; ++pChar)
+	{
+		nHash += *pChar;
+	}
 
 	D2AnimDataTableStrc* pAnimData = DATATBLS_GetAnimData();
 
@@ -86,6 +73,7 @@ static D2AnimDataRecordStrc* DATATBLS_GetAnimDataRecordFromPath(char* szPath)
 }
 
 //D2Common.0x6FD474A0
+// 1.13c D2Common+0x41F70
 const D2AnimDataRecordStrc* __fastcall DATATBLS_GetAnimDataRecord(D2UnitStrc* pUnit, int nClassId, int nMode, int nUnitType, D2InventoryStrc* pInventory)
 {
 	int nWeaponClassCode = 0;

@@ -87,6 +87,7 @@ void __fastcall DATATBLS_LoadInventoryTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD54F10
+// not-1.13c: retail inlines the inventory unload into the unload-all function at 0x5E870
 void __fastcall DATATBLS_UnloadInventoryTxt()
 {
 	DATATBLS_UnloadBin(sgptDataTables->pInventoryTxt);

@@ -6,6 +6,7 @@
 #include "D2Items.h"
 
 // Inlined in both Parsers
+// not-1.13c: retail has no such function, both parsers compare the modifier word against the literal (string and its NUL) in place (0x1C020, 0x1BA60)
 static BOOL DATATBLS_AreStringsEqual(const char* szString1, const char* szString2)
 {
 	for (size_t i = strlen(szString2) + 1; i; --i)
@@ -21,6 +22,7 @@ static BOOL DATATBLS_AreStringsEqual(const char* szString1, const char* szString
 
 
 //D2Common.0x6FD523E0
+// 1.13c D2Common+0x1C490: record, source and first character checked; input slot nOffset at record+0x14+nOffset*8 goes to the input parser (checked against the decompile)
 void __fastcall DATATBLS_CubeMainInputLinker(char* pSrc, void* pRecord, int nOffset, int nPosition, int nTxtRow, int nTxtColumn)
 {
 	if (pRecord && pSrc && *pSrc)
@@ -30,6 +32,7 @@ void __fastcall DATATBLS_CubeMainInputLinker(char* pSrc, void* pRecord, int nOff
 }
 
 //D2Common.0x6FD52410
+// 1.13c D2Common+0x1C020: quote strip, "any" / item type / item code / unique / set lookup in that order, then the modifier words (checked against the decompile)
 BOOL __fastcall DATATBLS_CubeMainInputParser(D2CubeInputItem* pCubeInput, char* szInput, int nTxtRow, int nItemId)
 {
 	D2_MAYBE_UNUSED(nTxtRow);
@@ -252,6 +255,7 @@ BOOL __fastcall DATATBLS_CubeMainInputParser(D2CubeInputItem* pCubeInput, char* 
 }
 
 //D2Common.0x6FD528D0
+// 1.13c D2Common+0x1C460: record, source and first character checked; output slot nOffset at record+0x4C+nOffset*0x54 goes to the output parser (checked against the decompile)
 void __fastcall DATATBLS_CubeMainOutputLinker(char* pSrc, void* pRecord, int nOffset, int nPosition, int nTxtRow, int nTxtColumn)
 {
 	if (pRecord && pSrc && *pSrc)
@@ -263,8 +267,11 @@ void __fastcall DATATBLS_CubeMainOutputLinker(char* pSrc, void* pRecord, int nOf
 //1.10f: D2Common.0x6FD52910
 //1.11 : D2Common.0x6FDAD210
 //1.14d: 0x00668A90
+// 1.13c D2Common+0x1BA60: no trace output on a parse failure; a set-item hit and a miss both return FALSE
 BOOL __fastcall DATATBLS_CubeMainOutputParser(D2CubeOutputItem* pCubeOutputParam, char* szOutput, int nTxtRow, int nItemId)
 {
+	D2_MAYBE_UNUSED(nTxtRow);
+	D2_MAYBE_UNUSED(nItemId);
 	char* szOutputModifier = NULL;
 	char* szNext = NULL;
 	char* szTemp = NULL;
@@ -382,7 +389,6 @@ BOOL __fastcall DATATBLS_CubeMainOutputParser(D2CubeOutputItem* pCubeOutputParam
 				}
 				else
 				{
-					FOG_Trace("Couldn't parse horardric cube output!  (Line:%d  Item:%d)\n", nTxtRow, nItemId);
 					return FALSE;
 				}
 			}
@@ -405,12 +411,6 @@ BOOL __fastcall DATATBLS_CubeMainOutputParser(D2CubeOutputItem* pCubeOutputParam
 		else
 		{
 			szNext = NULL;
-		}
-
-		if (!szOutputModifier)
-		{
-			FOG_Trace("Couldn't parse horardric cube output modifier!  (Line:%d  Item:%d)\n", nTxtRow, nItemId);
-			return TRUE;
 		}
 
 		if (DATATBLS_AreStringsEqual(szOutputModifier, "qty"))
@@ -556,7 +556,6 @@ BOOL __fastcall DATATBLS_CubeMainOutputParser(D2CubeOutputItem* pCubeOutputParam
 		}
 		else
 		{
-			FOG_Trace("Couldn't parse horardric cube output modifier '%s'!  (Line:%d  Item:%d)\n", szOutputModifier, nTxtRow, nItemId);
 			return TRUE;
 		}
 	}
@@ -565,8 +564,13 @@ BOOL __fastcall DATATBLS_CubeMainOutputParser(D2CubeOutputItem* pCubeOutputParam
 }
 
 //D2Common.0x6FD52FC0
+// 1.13c D2Common+0x1B8E0: no trace line on an unknown stat name, the value is stored as 0
 void __fastcall DATATBLS_CubeMainParamLinker(char* pSrc, void* pRecord, int nOffset, int nPosition, int nTxtRow, int nTxtColumn)
 {
+	D2_MAYBE_UNUSED(nOffset);
+	D2_MAYBE_UNUSED(nPosition);
+	D2_MAYBE_UNUSED(nTxtRow);
+	D2_MAYBE_UNUSED(nTxtColumn);
 	int nValue = 0;
 
 	if (pRecord && pSrc && *pSrc)
@@ -588,7 +592,6 @@ void __fastcall DATATBLS_CubeMainParamLinker(char* pSrc, void* pRecord, int nOff
 			}
 
 			*(int*)pRecord = 0;
-			FOG_Trace("Failed to parse '%s' line %d", pSrc, nTxtRow);
 		}
 	}
 }
@@ -726,6 +729,7 @@ void __fastcall DATATBLS_LoadCubeMainTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD54250
+// not-1.13c: retail inlines the cubemain unload into the unload-all function at 0x5E870
 void __fastcall DATATBLS_UnloadCubeMainTxt()
 {
 	DATATBLS_UnloadBin(sgptDataTables->pCubeMainTxt);
@@ -744,6 +748,7 @@ D2CubeMainTxt* __stdcall DATATBLS_GetCubemainTxtRecord(int nIndex)
 }
 
 //D2Common.0x6FD542C0 (#11233)
+// 1.13c D2Common+0x1B880: returns the cubemain record count (checked against the decompile)
 int __fastcall DATATBLS_GetCubemainTxtRecordCount()
 {
 	return sgptDataTables->nCubeMainTxtRecordCount;

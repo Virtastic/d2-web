@@ -27,6 +27,7 @@ uint32_t PATHUtil_AdvanceTowardsTargetEax(D2DynamicPathStrc* ptPath)
 	return (uint32_t)nStepY;
 }
 
+// 1.13c D2Common+0x3E080 (void; the body is PATHUtil_AdvanceTowardsTargetEax above, which only adds the EAX return for the proof)
 void __fastcall PATHUtil_AdvanceTowardsTarget_6FDAB890(D2DynamicPathStrc* ptPath)
 {
 	PATHUtil_AdvanceTowardsTargetEax(ptPath);

@@ -365,6 +365,7 @@ int __stdcall DATATBLS_GetMonsterLevelInArea(int nLevelId, uint8_t nDifficulty, 
 }
 
 //D2Common.0x6FD60560
+// not-1.13c: retail has no getter; users read the portal level list and its count from the table global
 int* __fastcall DATATBLS_GetPortalLevels(int* pnPortalLevels)
 {
 	*pnPortalLevels = sgptDataTables->nPortalLevels;
@@ -1069,6 +1070,7 @@ void __fastcall DATATBLS_FreeGlobalTileLibraryHash()
 }
 
 //D2Common.0x6FD628C0
+// 1.13c D2Common+0x6CCF0
 void __fastcall DATATBLS_LoadAutomapTxt(HD2ARCHIVE hArchive)
 {
 	D2AutomapShortStrc* pAutomap = NULL;

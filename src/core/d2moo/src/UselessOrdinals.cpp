@@ -1,211 +1,74 @@
-#include <Fog.h>   // d2-web: FOG_Trace
 #include "UselessOrdinals.h"
 
-#include "D2Skills.h"
+#include "D2DataTbls.h"
+#include "D2States.h"
 #include "D2StatList.h"
+#include "Units/Units.h"
+#include <D2BitManip.h>
+#include <D2Monsters.h>
 
 
-int __stdcall D2COMMON_10016_Return0()
-{
-	REMOVE_LATER_Trace("D2COMMON_10016_Return0: Useless");
-	return 0;
-}
-
-void __stdcall D2COMMON_10019_Return(int a1)
-{
-	REMOVE_LATER_Trace("D2COMMON_10019_Return: Useless");
-}
-
-void __stdcall D2COMMON_10139_Return()
-{
-	REMOVE_LATER_Trace("D2COMMON_10139_Return: Useless");
-}
-
-void __stdcall D2COMMON_10140_Return()
-{
-	REMOVE_LATER_Trace("D2COMMON_10140_Return: Useless");
-}
-
-void __stdcall D2COMMON_10238_Return()
-{
-	REMOVE_LATER_Trace("D2COMMON_10238_Return: Useless");
-}
-
-int __stdcall D2COMMON_10239_Return0(int a1, int a2)
-{
-	REMOVE_LATER_Trace("D2COMMON_10239_Return0: Useless");
-	return 0;
-}
-
-void __stdcall D2COMMON_10251_Return(int a1)
-{
-	REMOVE_LATER_Trace("D2COMMON_10251_Return: Useless");
-}
-
-int __stdcall D2COMMON_10254_Return0(int a1, int a2)
-{
-	REMOVE_LATER_Trace("D2COMMON_10254_Return0: Useless");
-	return 0;
-}
-
-void __stdcall D2COMMON_10267_Return(int a1, int a2)
-{
-	REMOVE_LATER_Trace("D2COMMON_10267_Return: Useless");
-}
-
-int __stdcall D2COMMON_10301_Return0(int a1)
-{
-	REMOVE_LATER_Trace("D2COMMON_10301_Return0: Useless");
-	return 0;
-}
-
-void __stdcall D2COMMON_10303_Return(int a1, int a2)
-{
-	REMOVE_LATER_Trace("D2COMMON_10303_Return: Useless");
-}
-
-void __stdcall D2COMMON_10308_Return(int a1, int a2)
-{
-	REMOVE_LATER_Trace("D2COMMON_10308_Return: Useless");
-}
-
-int __stdcall D2COMMON_10309_Return0(int a1)
-{
-	REMOVE_LATER_Trace("D2COMMON_10309_Return0: Useless");
-	return 0;
-}
-
-void __stdcall D2COMMON_10441_Return(int a1, int a2)
-{
-	REMOVE_LATER_Trace("D2COMMON_10441_Return: Useless");
-}
-
+// not-1.13c: 1.13c exports one expire-frame getter, D2Common+0x383A0 (STATLIST_GetExpireFrame); retail callers such as
+// D2Game+0x99B60 reach it through the D2Game import thunk at +0xAB74. This 1.10f duplicate ordinal only forwards to it.
 int __stdcall D2COMMON_10473(D2StatListStrc* pStatList)
 {
 	return STATLIST_GetExpireFrame(pStatList);
 }
 
+// not-1.13c: 1.13c exports one expire-frame setter, D2Common+0x38380 (STATLIST_SetExpireFrame); retail callers such as
+// D2Game+0x99B60 reach it through the D2Game import thunk at +0xA7C6. This 1.10f duplicate ordinal only forwards to it.
 void __stdcall D2COMMON_10476(D2StatListStrc* pStatList, int nExpireFrame)
 {
 	return STATLIST_SetExpireFrame(pStatList, nExpireFrame);
 }
 
-int __stdcall D2COMMON_10661_Return0(int a1, int a2)
-{
-	REMOVE_LATER_Trace("D2COMMON_10661_Return0: Useless");
-	return 0;
-}
-
-int __stdcall D2COMMON_10835_Return0(int a1, int a2)
-{
-	REMOVE_LATER_Trace("D2COMMON_10835_Return0: Useless");
-	return 0;
-}
-
-void __stdcall D2COMMON_10856_Return(int a1, int a2, int a3)
-{
-	REMOVE_LATER_Trace("D2COMMON_10856_Return: Useless");
-}
-
-int __stdcall D2COMMON_10943_Return1(int a1)
-{
-	REMOVE_LATER_Trace("D2COMMON_10943_Return1: Useless");
-	return 1;
-}
-
-int __stdcall D2COMMON_11009_Return0(int a1)
-{
-	REMOVE_LATER_Trace("D2COMMON_11009_Return0: Useless");
-	return 0;
-}
-
+// A dead monster, in no state of the undead mask, whose MonStats2 row is both corpse-selectable and soft.
+// Retail inlines the whole test; the same body is exported again at D2Common+0x50020.
+// 1.13c D2Common+0x500E0
 BOOL __stdcall D2COMMON_11018(D2UnitStrc* pUnit)
 {
-	REMOVE_LATER_Trace("D2COMMON_11018: Duplicate of D2Common_11020");
-	return D2Common_11020(pUnit);
+	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->dwAnimMode == MONMODE_DEAD && !STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_UDEAD))
+	{
+		D2MonStats2Txt* pMonStats2TxtRecord = UNITS_GetMonStats2TxtRecordFromMonsterId(pUnit->dwClassId);
+		if (pMonStats2TxtRecord && (pMonStats2TxtRecord->dwFlags & gdwBitMasks[MONSTATS2FLAGINDEX_CORPSESEL])
+			&& (pMonStats2TxtRecord->dwFlags & gdwBitMasks[MONSTATS2FLAGINDEX_SOFT]))
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
 }
 
+// A dead monster, in no state of the undead mask, whose MonStats2 row is corpse-selectable (retail inlines the test;
+// identical bodies are exported at D2Common+0x4FF80 and +0x4FFD0).
+// 1.13c D2Common+0x50090
 BOOL __stdcall D2COMMON_11019(D2UnitStrc* pUnit)
 {
-	REMOVE_LATER_Trace("D2COMMON_11019: Duplicate of SKILLS_CanUnitCorpseBeSelected");
-	return SKILLS_CanUnitCorpseBeSelected(pUnit);
+	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->dwAnimMode == MONMODE_DEAD && !STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_UDEAD))
+	{
+		D2MonStats2Txt* pMonStats2TxtRecord = UNITS_GetMonStats2TxtRecordFromMonsterId(pUnit->dwClassId);
+		if (pMonStats2TxtRecord && (pMonStats2TxtRecord->dwFlags & gdwBitMasks[MONSTATS2FLAGINDEX_CORPSESEL]))
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
 }
 
+// Same test as D2COMMON_11019, at its own 1.13c export.
+// 1.13c D2Common+0x4FFD0
 BOOL __stdcall D2COMMON_11021(D2UnitStrc* pUnit)
 {
-	REMOVE_LATER_Trace("D2COMMON_11021: Duplicate of SKILLS_CanUnitCorpseBeSelected");
-	return SKILLS_CanUnitCorpseBeSelected(pUnit);
-}
+	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->dwAnimMode == MONMODE_DEAD && !STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_UDEAD))
+	{
+		D2MonStats2Txt* pMonStats2TxtRecord = UNITS_GetMonStats2TxtRecordFromMonsterId(pUnit->dwClassId);
+		if (pMonStats2TxtRecord && (pMonStats2TxtRecord->dwFlags & gdwBitMasks[MONSTATS2FLAGINDEX_CORPSESEL]))
+		{
+			return TRUE;
+		}
+	}
 
-int __stdcall D2COMMON_11048_Return1(int a1)
-{
-	REMOVE_LATER_Trace("D2COMMON_11048_Return1: Useless");
-	return 1;
-}
-
-void __stdcall D2COMMON_11062_Return(int a1, int a2)
-{
-	REMOVE_LATER_Trace("D2COMMON_11062_Return: Useless");
-}
-
-void __stdcall D2COMMON_11076_Return(int a1, int a2)
-{
-	REMOVE_LATER_Trace("D2COMMON_11076_Return: Useless");
-}
-
-void __stdcall D2COMMON_11077_Return(int a1, int a2)
-{
-	REMOVE_LATER_Trace("D2COMMON_11077_Return: Useless");
-}
-
-int __stdcall D2COMMON_11078_Return0(int a1, int a2)
-{
-	REMOVE_LATER_Trace("D2COMMON_11078_Return0: Useless");
-	return 0;
-}
-
-void __stdcall D2COMMON_11080_Return(int a1)
-{
-	REMOVE_LATER_Trace("D2COMMON_11080_Return: Useless");
-}
-
-void __stdcall D2COMMON_11229_Return(int a1)
-{
-	REMOVE_LATER_Trace("D2COMMON_11229_Return: Useless");
-}
-
-int __stdcall D2COMMON_11235_Return0(int a1)
-{
-	REMOVE_LATER_Trace("D2COMMON_11235_Return0: Useless");
-	return 0;
-}
-
-void __stdcall D2COMMON_11236_Return(int a1, int a2, int a3)
-{
-	REMOVE_LATER_Trace("D2COMMON_11236_Return: Useless");
-}
-
-void __stdcall D2COMMON_11237_Return(int a1, int a2, int a3)
-{
-	REMOVE_LATER_Trace("D2COMMON_11237_Return: Useless");
-}
-
-void __stdcall D2COMMON_11240_Return(int a1, int a2, int a3)
-{
-	REMOVE_LATER_Trace("D2COMMON_11240_Return: Useless");
-}
-
-void __stdcall D2COMMON_11241_Return(int a1)
-{
-	REMOVE_LATER_Trace("D2COMMON_11241_Return: Useless");
-}
-
-void __stdcall D2COMMON_11277_Return(int a1)
-{
-	REMOVE_LATER_Trace("D2COMMON_11277_Return: Useless");
-}
-
-void __stdcall D2COMMON_11296_Return(int a1)
-{
-	REMOVE_LATER_Trace("D2COMMON_11296_Return: Useless");
+	return FALSE;
 }

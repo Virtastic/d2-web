@@ -227,6 +227,7 @@ D2CharStatsTxt* __fastcall DATATBLS_GetCharstatsTxtTable()
 }
 
 //D2Common.0x6FD4E4C0
+// not-1.13c: retail has no getter, each user (0x41DD0, 0x41EF0, 0x41F70) reads the anim-data table global directly
 D2AnimDataTableStrc* __fastcall DATATBLS_GetAnimData()
 {
 	return sgptDataTables->pAnimData;
@@ -828,8 +829,8 @@ void __stdcall DATATBLS_UnloadAllBins()
 	DATATBLS_UnloadBin(sgptDataTables->pDifficultyLevelsTxt);
 }
 
-//D2Common.0x6FD504B0 (#10576)
-void __stdcall DATATBLS_LoadAllTxts(HD2ARCHIVE hArchive, int a2, int a3)
+// 1.13c D2Common+0x60920 (retail keeps the experience table in its own loader)
+static void DATATBLS_LoadExperienceTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
 	{
@@ -844,6 +845,13 @@ void __stdcall DATATBLS_LoadAllTxts(HD2ARCHIVE hArchive, int a2, int a3)
 		{ "end", TXTFIELD_NONE, 0, 0, NULL },
 	};
 
+	sgptDataTables->pExperienceTxt = (D2ExperienceDataTbl*)DATATBLS_CompileTxt(hArchive, "experience", pTbl, NULL, sizeof(D2ExperienceTxt));
+}
+
+//D2Common.0x6FD504B0 (#10576)
+// 1.13c D2Common+0x66160 (retail inlines the expfield.d2 read and the sounds-table release)
+void __stdcall DATATBLS_LoadAllTxts(HD2ARCHIVE hArchive, int a2, int a3)
+{
 	DATATBLS_LoadSomeTxts(hArchive);
 	DATATBLS_LoadItemTypesTxt(hArchive);
 	DATATBLS_LoadMonTypeTxt(hArchive);
@@ -876,7 +884,7 @@ void __stdcall DATATBLS_LoadAllTxts(HD2ARCHIVE hArchive, int a2, int a3)
 	DATATBLS_LoadCompositTxt(hArchive);
 	DATATBLS_LoadArmTypeTxt(hArchive);
 
-	sgptDataTables->pExperienceTxt = (D2ExperienceDataTbl*)DATATBLS_CompileTxt(hArchive, "experience", pTbl, NULL, sizeof(D2ExperienceTxt));
+	DATATBLS_LoadExperienceTxt(hArchive);
 
 	sgptDataTables->pAnimData = DATATBLS_LoadAnimDataD2(hArchive);
 	DATATBLS_LoadSomeMonsterTxts(hArchive);
@@ -896,16 +904,27 @@ void __stdcall DATATBLS_LoadAllTxts(HD2ARCHIVE hArchive, int a2, int a3)
 	DATATBLS_LoadObjGroupTxt(hArchive);
 	DATATBLS_LoadShrinesTxt(hArchive);
 	DATATBLS_LoadInventoryTxt(hArchive);
-	DATATBLS_LoadExpFieldD2(hArchive);
+	char szExpFieldPath[260] = {};
+	size_t nExpFieldSize = 0;
+	wsprintfA(szExpFieldPath, "%s\\expfield.d2", "DATA\\GLOBAL");
+	char* pExpField = (char*)ARCHIVE_ALLOC_BUFFER_AND_READ_FILE_TO_IT(hArchive, szExpFieldPath, &nExpFieldSize);
+	DATATBLS_InitializeCollisionFieldTable(pExpField, (int)nExpFieldSize);
 	DATATBLS_LoadBeltsTxt(hArchive);
 	DATATBLS_LoadMonItemPercentTxt(hArchive);
 	//DATATBLS_10916_Return();
 	DATATBLS_LoadCubeMainTxt(hArchive);
 	DATATBLS_LoadDifficultyLevelsTxt(hArchive);
-	DATATBLS_UnloadSoundsTxt();
+	// The sounds table is only built in text-compile mode; retail releases it and its linker here and does not null the globals
+	if (sgptDataTables->pSoundsTxtCodes)
+	{
+		DATATBLS_UnloadBin(sgptDataTables->pSoundsTxtCodes);
+		FOG_FreeLinker(sgptDataTables->pSoundsLinker);
+		sgptDataTables->nSoundsTxtCodes = 0;
+	}
 }
 
 //D2Common.0x6FD507B0
+// 1.13c D2Common+0x616D0
 void __fastcall DATATBLS_LoadSomeTxts(HD2ARCHIVE hArchive)
 {
 	int nRecordCount = 0;

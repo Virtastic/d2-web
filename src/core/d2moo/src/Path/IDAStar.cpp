@@ -311,15 +311,15 @@ int dword_6FDD1CE0[32] = {
 };
 
 //1.10c: D2Common.0x6FDA81C0
-//1.13f: D2Common.0x6FDC07E0
+// 1.13c D2Common+0x707E0
 void __fastcall PATH_IDAStar_GetNextNeighborIndex(D2PathIDAStarNodeStrc* pNode, D2PathIDAStarContextStrc* pContext)
 {
 	if (pContext->bRandomDirection)
 	{
 		const uint64_t nRand = SEED_RollRandomNumber(pContext->pSeed);
-		pNode->nNextNeighborIndex = ((unsigned __int8)pNode->nNextNeighborIndex
-			+ (unsigned __int8)*pNode->pNeighborsSequence
-			+ (unsigned __int8)dword_6FDD1CE0[nRand & 0x1F]) & 7;
+		pNode->nNextNeighborIndex = (dword_6FDD1CE0[nRand & 0x1F]
+			+ *pNode->pNeighborsSequence
+			+ pNode->nNextNeighborIndex) & 7;
 	}
 	else
 	{

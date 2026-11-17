@@ -287,6 +287,7 @@ int __stdcall MISSILE_GetStreamMissile(D2UnitStrc* pMissile)
 }
 
 //D2Common.0x6FDBA300 (#11133)
+// 1.13c D2Common+0x6A0C0
 void __stdcall MISSILE_SetStreamRange(D2UnitStrc* pMissile, short nStreamRange)
 {
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
@@ -296,6 +297,7 @@ void __stdcall MISSILE_SetStreamRange(D2UnitStrc* pMissile, short nStreamRange)
 }
 
 //D2Common.0x6FDBA320 (#11134)
+// 1.13c D2Common+0x6A0A0
 int __stdcall MISSILE_GetStreamRange(D2UnitStrc* pMissile)
 {
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
@@ -390,29 +392,6 @@ void __stdcall MISSILE_SetAnimSpeed(D2UnitStrc* pMissile, int nAnimSpeed)
 	}
 }
 
-//D2Common.0x6FDBA450
-void __fastcall MISSILE_SetStream(D2UnitStrc* pMissile, D2MissileStreamStrc* pStream)
-{
-	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE)
-	{
-		if (pMissile->pMissileData)
-		{
-			pMissile->pMissileData->pStream = pStream;
-		}
-	}
-}
-
-//D2Common.0x6FDBA470
-D2MissileStreamStrc* __fastcall MISSILE_GetStream(D2UnitStrc* pMissile)
-{
-	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
-	{
-		return pMissile->pMissileData->pStream;
-	}
-
-	return NULL;
-}
-
 //D2Common.0x6FDBA490 (#11140)
 // 1.13c D2Common+0x69FB0
 void __stdcall MISSILE_SetTargetX(D2UnitStrc* pMissile, int nTargetX)
@@ -477,6 +456,7 @@ void __stdcall MISSILE_SetHomeType(D2UnitStrc* pMissile, D2UnitStrc* pTarget)
 }
 
 //D2Common.0x6FDBA550 (#11145)
+// 1.13c D2Common+0x69EB0
 void __stdcall MISSILE_GetHomeType(D2UnitStrc* pMissile, int* nHomeType, D2UnitGUID* nHomeGUID)
 {
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
@@ -859,6 +839,7 @@ BOOL __fastcall MISSILE_HasBonusStats(D2UnitStrc* pUnit, D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FDBAED0
+// 1.13c D2Common+0x6ABE0 (stat ids 0x30..0x3B, 0x65, 0x146, 0x3C, 0x3E, 0x13B..0x13D, as retail)
 void __fastcall MISSILE_AddStatsToDamage(D2MissileDamageDataStrc* pMissileDamageData, D2UnitStrc* pMissile, uint8_t nShift)
 {
 	int nPoisonLength = 0;
@@ -921,6 +902,7 @@ void __fastcall MISSILE_CalculateFinalDamage(D2MissileDamageDataStrc* pMissileDa
 }
 
 //D2Common.0x6FDBB1B0
+// 1.13c D2Common+0x6AB20
 int __fastcall MISSILE_CalculateMasteryBonus(D2UnitStrc* pUnit, int nElemType, int nSrcDamage)
 {
 	int32_t statId = 0;
@@ -949,6 +931,7 @@ int __fastcall MISSILE_CalculateMasteryBonus(D2UnitStrc* pUnit, int nElemType, i
 }
 
 //D2Common.0x6FDBB2E0 (#11218)
+// 1.13c D2Common+0x6B4A0 (#10484)
 void __stdcall MISSILE_SetDamageStats(D2UnitStrc* pOwner, D2UnitStrc* pMissile, D2MissileDamageDataStrc* pMissileDamageData, int nLevel)
 {
 	D2StatStrc pStat[128] = {};
@@ -1445,6 +1428,7 @@ int __stdcall MISSILE_GetSpecialParamValue(D2UnitStrc* pMissile, D2UnitStrc* pOw
 }
 
 //D2Common.0x6FDBC060
+// 1.13c D2Common+0x6B160
 int __fastcall MISSILE_GetCalcParamValue(int32_t nParamId, void* pUserData)
 {
 	if (D2MissileCalcStrc * pMissileCalc = (D2MissileCalcStrc*)pUserData)
@@ -1456,6 +1440,7 @@ int __fastcall MISSILE_GetCalcParamValue(int32_t nParamId, void* pUserData)
 }
 
 //D2Common.0x6FDBC080
+// 1.13c D2Common+0x69DB0
 int __fastcall MISSILE_GetMinimum(int a1, int a2, int a3, void* pUserData)
 {
 	if (a1 >= a2)
@@ -1467,6 +1452,7 @@ int __fastcall MISSILE_GetMinimum(int a1, int a2, int a3, void* pUserData)
 }
 
 //D2Common.0x6FDBC090
+// 1.13c D2Common+0x69DA0
 int __fastcall MISSILE_GetMaximum(int a1, int a2, int a3, void* pUserData)
 {
 	if (a1 <= a2)
@@ -1478,6 +1464,7 @@ int __fastcall MISSILE_GetMaximum(int a1, int a2, int a3, void* pUserData)
 }
 
 //D2Common.0x6FDBC0A0
+// 1.13c D2Common+0x6B140 (the seed is the record's own +0x20; the roll is the 0x1180 range roll)
 int __fastcall MISSILE_GetRandomNumberInRange(int nMin, int nMax, int nUnused, void* pUserData){
 	D2_MAYBE_UNUSED(nUnused);
 	D2UnkMissileCalcStrc* pCalc = (D2UnkMissileCalcStrc*)pUserData;
@@ -1499,6 +1486,7 @@ int __fastcall MISSILE_GetRandomNumberInRange(int nMin, int nMax, int nUnused, v
 }
 
 //D2Common.0x6FDBC120
+// 1.13c D2Common+0x6B430 (owner at +4 of the record; the skill-level clamp is SKILLS_GetSkillLevel's)
 int __fastcall MISSILE_GetSpecialParamValueForSkillMissile(int nSkillId, int nParamId, int nUnused, void* pUserData)
 {
 	D2_MAYBE_UNUSED(nUnused);

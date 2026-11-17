@@ -99,6 +99,7 @@ int __stdcall TEXT_GetMenuType2NodeCount(D2TextHeaderStrc* pTextHeader)
 	return nNodes;
 }
 
+// 1.13c D2Common+0x3D160
 //D2Common.0x6FDC33820 (#10906)
 short __stdcall TEXT_GetStringIdOfMenuType2Node(D2TextHeaderStrc* pTextHeader, int nNodeId)
 {
@@ -125,6 +126,7 @@ short __stdcall TEXT_GetStringIdOfMenuType2Node(D2TextHeaderStrc* pTextHeader, i
 	return 3724;
 }
 
+// 1.13c D2Common+0x3D0F0: retail counts only nodes whose menu kind is exactly 1 (1.10f counted every non-zero kind).
 //D2Common.0x6FDC3850 (#10907)
 short __stdcall TEXT_GetStringIdOfMenuType1Or2Node(D2TextHeaderStrc* pTextHeader, int nNodeId)
 {
@@ -135,7 +137,7 @@ short __stdcall TEXT_GetStringIdOfMenuType1Or2Node(D2TextHeaderStrc* pTextHeader
 
 	while (pNode)
 	{
-		if (pNode->nMenu != 0)
+		if (pNode->nMenu == 1)
 		{
 			if (nCounter == nNodeId)
 			{
@@ -151,6 +153,7 @@ short __stdcall TEXT_GetStringIdOfMenuType1Or2Node(D2TextHeaderStrc* pTextHeader
 	return -1;
 }
 
+// 1.13c D2Common+0x3D120: retail counts only nodes whose menu kind is exactly 0 (1.10f counted every kind but 1).
 //D2Common.0x6FDC3890 (#10908)
 short __stdcall TEXT_GetStringIdOfMenuType0Or2Node(D2TextHeaderStrc* pTextHeader, int nNodeId)
 {
@@ -161,7 +164,7 @@ short __stdcall TEXT_GetStringIdOfMenuType0Or2Node(D2TextHeaderStrc* pTextHeader
 
 	while (pNode)
 	{
-		if (pNode->nMenu != 1)
+		if (pNode->nMenu == 0)
 		{
 			if (nCounter == nNodeId)
 			{
@@ -199,31 +202,40 @@ void __stdcall TEXT_CreateMessageListFromTextHeader(D2TextHeaderStrc* pTextHeade
 	}
 }
 
+// 1.13c D2Common+0x3D380
 //D2Common.0x6FDC3970 (#10910)
 void __stdcall TEXT_CreateTextHeaderFromMessageList(D2TextHeaderStrc* pTextHeader, D2MessageListStrc* pMsgList)
 {
 	D2_ASSERT(pTextHeader != nullptr);
 	D2_ASSERT(pMsgList != nullptr);
 
-	D2TextNodeStrc* pNext;
-	for (D2TextNodeStrc* pCurrent = pTextHeader->pNode; pCurrent != nullptr; pCurrent = pNext)
+	// Retail 0x3D250: release every node (the next link is read first), zero the count; the head link is left as is.
+	for (D2TextNodeStrc* pCurrent = pTextHeader->pNode; pCurrent != nullptr; )
 	{
-		pNext = pCurrent->pNext;
+		D2TextNodeStrc* pNext = pCurrent->pNext;
 		D2_FREE_POOL(pTextHeader->pMemPool, pCurrent);
+		pCurrent = pNext;
 	}
+	pTextHeader->nCount = 0;
 
 	D2_ASSERT(pMsgList->nCount < MAX_TEXT_LIST_NODES);
 
-	for (pTextHeader->nCount = 0; pTextHeader->nCount < pMsgList->nCount; ++pTextHeader->nCount)
+	// Each entry becomes a node pushed on the head of the list; the count rises by one per node.
+	for (int i = 0; i < pMsgList->nCount; ++i)
 	{
+		D2TextNodeStrc* pHead = pTextHeader->pNode;
+		const uint8_t nMenu = pMsgList->pMessages[i].nMenu;
+		const int16_t nStringId = pMsgList->pMessages[i].nStringId;
 		D2TextNodeStrc* pNode = D2_ALLOC_STRC_POOL(pTextHeader->pMemPool, D2TextNodeStrc);
-		pNode->nMenu = pMsgList->pMessages[pTextHeader->nCount].nMenu;
-		pNode->nStringId = pMsgList->pMessages[pTextHeader->nCount].nStringId;
-		pNode->pNext = pTextHeader->pNode;
+		pNode->pNext = pHead;
+		pNode->nStringId = nStringId;
+		pNode->nMenu = nMenu;
+		++pTextHeader->nCount;
 		pTextHeader->pNode = pNode;
 	}
 }
 
+// 1.13c D2Common+0x3D2B0: insertion sort of a copy; the comparator (0x3D040) orders the string ids as unsigned 16-bit.
 //D2Common.0x6FDC3A70 (#10911)
 void __stdcall TEXT_SortTextNodeListByStringId(D2TextHeaderStrc* pTextHeader)
 {
@@ -249,12 +261,12 @@ void __stdcall TEXT_SortTextNodeListByStringId(D2TextHeaderStrc* pTextHeader)
 	}
 
 	// Sort the node list via insertion sort.
-	short nPreviousStringId = pNodeList[0].nStringId;
+	uint16_t nPreviousStringId = (uint16_t)pNodeList[0].nStringId;
 	int nPreviousMenu = pNodeList[0].nMenu;
 
 	for (size_t i = 0; i + 1 < pTextHeader->nCount; ++i)
 	{
-		short nStringId = pNodeList[i + 1].nStringId;
+		uint16_t nStringId = (uint16_t)pNodeList[i + 1].nStringId;
 		int nMenu = pNodeList[i + 1].nMenu;
 
 		// If the current node is sorted, move to the next node.
@@ -272,7 +284,7 @@ void __stdcall TEXT_SortTextNodeListByStringId(D2TextHeaderStrc* pTextHeader)
 		int nId;
 		for (nId = i; nId != 0; --nId)
 		{
-			if (pNodeList[nId - 1].nStringId <= nStringId)
+			if ((uint16_t)pNodeList[nId - 1].nStringId <= nStringId)
 			{
 				break;
 			}

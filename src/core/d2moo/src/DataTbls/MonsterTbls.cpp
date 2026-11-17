@@ -8,6 +8,7 @@
 #include <D2Monsters.h>
 
 //Inlined in some functions
+// not-1.13c: retail has no such function; each caller (e.g. 0x54430, 0x5A030) packs the four code bytes inline, space-padded
 uint32_t __fastcall DATATBLS_StringToCode(char* szText)
 {
 	char dwCode[4] = {};
@@ -562,6 +563,8 @@ void __fastcall DATATBLS_LoadMonStatsTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD67BD0 (#11261)
+// 1.13c D2Common+0x54A00: checked branch by branch against the retail body (identical: clamps, field offsets, the
+// no-ratio flag at monstats +0xC bit 2, and retail's habit of writing the no-ratio elemental damage into the S1 slots)
 BOOL __stdcall DATATBLS_CalculateMonsterStatsByLevel(int nMonsterId, int nGameType, int nDifficulty, int nLevel, short nFlags, D2MonStatsInitStrc* pMonStatsInit)
 {
 	D2MonStatsTxt* pMonStatsTxtRecord = NULL;
@@ -1517,6 +1520,7 @@ D2SuperUniquesTxt* __stdcall DATATBLS_GetSuperUniquesTxtRecord(int nSuperUniqueI
 }
 
 //D2Common.0x6FD6A470 (#11257)
+// not-1.13c: retail has no getter; users read the super-unique count from the table global
 int __fastcall DATATBLS_GetSuperUniquesTxtRecordCount()
 {
 	return sgptDataTables->nSuperUniquesTxtRecordCount;
@@ -2537,6 +2541,7 @@ int __stdcall DATATBLS_MapSuperUniqueId(int nType, int nSuperUnique)
 }
 
 //D2Common.0x6FD6EFA0
+// 1.13c D2Common+0x55400
 void __fastcall DATATBLS_LoadSoundsTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -2549,19 +2554,6 @@ void __fastcall DATATBLS_LoadSoundsTxt(HD2ARCHIVE hArchive)
 	{
 		sgptDataTables->pSoundsLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
 		sgptDataTables->pSoundsTxtCodes = (D2SoundsTxtStub*)DATATBLS_CompileTxt(hArchive, "sounds", pTbl, &sgptDataTables->nSoundsTxtCodes, sizeof(D2SoundsTxtStub));
-	}
-}
-
-//D2Common.0x6FD6F020
-void __fastcall DATATBLS_UnloadSoundsTxt()
-{
-	if (sgptDataTables->pSoundsTxtCodes)
-	{
-		DATATBLS_UnloadBin(sgptDataTables->pSoundsTxtCodes);
-		sgptDataTables->pSoundsTxtCodes = NULL;
-		FOG_FreeLinker(sgptDataTables->pSoundsLinker);
-		sgptDataTables->pSoundsLinker = NULL;
-		sgptDataTables->nSoundsTxtCodes = 0;
 	}
 }
 
@@ -2692,6 +2684,7 @@ void __fastcall DATATBLS_LoadSomeMonsterTxts(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD6F810
+// 1.13c D2Common+0x547D0: both record allocations go through the treasure-class allocator at 0x53780
 void __fastcall DATATBLS_CreateItemTypeTreasureClasses()
 {
 	D2ItemTypesTxt* pItemTypesTxtRecord = NULL;
@@ -2705,14 +2698,7 @@ void __fastcall DATATBLS_CreateItemTypeTreasureClasses()
 	char v37[8] = {};
 	char dest[32] = {};
 
-	FOG_10216_AddRecordToLinkingTable(sgptDataTables->pTreasureClassExLinker, &sgptDataTables->szDefaultString);
-
-	if (!(sgptDataTables->nTreasureClassEx % 16))
-	{
-		sgptDataTables->pTreasureClassEx = (D2TCExShortStrc*)D2_REALLOC_POOL(NULL, sgptDataTables->pTreasureClassEx, sizeof(D2TCExShortStrc) * (sgptDataTables->nTreasureClassEx + 16));
-	}
-	memset(&sgptDataTables->pTreasureClassEx[sgptDataTables->nTreasureClassEx], 0x00, sizeof(sgptDataTables->pTreasureClassEx[sgptDataTables->nTreasureClassEx]));
-	++sgptDataTables->nTreasureClassEx;
+	D2Common_53780_NewTreasureClassEx(&sgptDataTables->szDefaultString);
 
 	for (int i = 0; i < sgptDataTables->nItemTypesTxtRecordCount; ++i)
 	{
@@ -2732,15 +2718,7 @@ void __fastcall DATATBLS_CreateItemTypeTreasureClasses()
 				{
 					// Note: Game actually uses Storm.dll SStrVPrintf
 					wsprintfA(dest, "%s%d", v37, nLevel);
-					FOG_10216_AddRecordToLinkingTable(sgptDataTables->pTreasureClassExLinker, dest);
-
-					if (!(sgptDataTables->nTreasureClassEx % 16))
-					{
-						sgptDataTables->pTreasureClassEx = (D2TCExShortStrc*)D2_REALLOC_POOL(NULL, sgptDataTables->pTreasureClassEx, sizeof(D2TCExShortStrc) * (sgptDataTables->nTreasureClassEx + 16));
-					}
-					memset(&sgptDataTables->pTreasureClassEx[sgptDataTables->nTreasureClassEx], 0x00, sizeof(sgptDataTables->pTreasureClassEx[sgptDataTables->nTreasureClassEx]));
-
-					pTCExTxtRecord = &sgptDataTables->pTreasureClassEx[sgptDataTables->nTreasureClassEx++];
+					pTCExTxtRecord = D2Common_53780_NewTreasureClassEx(dest);
 
 					if (pTCExTxtRecord)
 					{

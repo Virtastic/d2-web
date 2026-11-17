@@ -421,8 +421,6 @@ D2COMMON_DLL_DECL BOOL __stdcall UNITS_TestCollisionByCoordinates(D2UnitStrc* pU
 BOOL __fastcall UNITS_TestCollision(int nX1, int nY1, int nSize1, int nX2, int nY2, int nSize2, D2ActiveRoomStrc* pRoom, int nCollisionMask);
 //D2Common.0x6FDC14C0 (#10362)
 D2COMMON_DLL_DECL BOOL __stdcall UNITS_TestCollisionWithUnit(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, int nCollisionMask);
-//D2Common.0x6FDC1760
-void __fastcall UNITS_ToggleUnitFlag(D2UnitStrc* pUnit, int nFlag, BOOL bSet);
 //D2Common.0x6FDC1790 (#10363)
 D2COMMON_DLL_DECL BOOL __stdcall UNITS_TestCollisionBetweenInteractingUnits(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, int nCollisionMask);
 //D2Common.0x6FDC1A70 (#10361)

@@ -9,6 +9,7 @@
 
 
 //D2Common.0x6FDBC680 (#10408)
+// 1.13c D2Common+0x12450
 BOOL __stdcall UNITFINDS_AreUnitsInNeighboredRooms(D2UnitStrc* pDestUnit, D2UnitStrc* pSrcUnit)
 {
 	D2ActiveRoomStrc** ppRoomList = NULL;
@@ -69,6 +70,7 @@ D2UnitStrc* __stdcall UNITFINDS_FindUnitInNeighboredRooms(D2ActiveRoomStrc* pRoo
 }
 
 //D2Common.0x6FDBC7B0 (#10405)
+// 1.13c D2Common+0x12140
 int __stdcall UNITFINDS_GetTestedUnitsFromRoom(D2ActiveRoomStrc* pRoom, D2UnitStrc** ppUnits, UNITFINDTEST pfnUnitTest, D2UnitFindArgStrc* pUnitFindArg)
 {	
 	int nUnitIndex = 0;
@@ -90,6 +92,7 @@ int __stdcall UNITFINDS_GetTestedUnitsFromRoom(D2ActiveRoomStrc* pRoom, D2UnitSt
 }
 
 //D2Common.0x6FDBC840 (#11088)
+// 1.13c D2Common+0x12330
 D2UnitStrc* __stdcall UNITFINDS_GetNearestTestedUnit(D2UnitStrc* pUnit, int nX, int nY, int nSize, int(__fastcall* pfnUnitTest)(D2UnitStrc*, D2UnitStrc*))
 {
 	D2ActiveRoomStrc** ppRoomList = NULL;
@@ -158,6 +161,7 @@ void __stdcall UNITFINDS_InitializeUnitFindData(void* pMemPool, D2UnitFindDataSt
 }
 
 //D2Common.0x6FDBCA50 (#10402)
+// 1.13c D2Common+0x12000
 void __stdcall UNITFINDS_FreeUnitFindData(D2UnitFindDataStrc* pUnitFindData)
 {
 	if (pUnitFindData && pUnitFindData->pUnitsArray)
@@ -256,6 +260,7 @@ int __stdcall UNITFINDS_FindAllMatchingUnitsInNeighboredRooms(D2UnitFindDataStrc
 }
 
 //D2Common.0x6FDBCCA0 (#10404)
+// 1.13c D2Common+0x124E0
 int __stdcall UNITFINDS_TestUnit(D2UnitStrc* pUnit, D2UnitFindArgStrc* pUnitFindArg)
 {
 	D2MissilesTxt* pMissilesTxtRecord = NULL;

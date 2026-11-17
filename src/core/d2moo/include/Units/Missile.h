@@ -172,10 +172,6 @@ D2COMMON_DLL_DECL int __stdcall MISSILE_GetActivateFrame(D2UnitStrc* pMissile);
 D2COMMON_DLL_DECL int __stdcall MISSILE_GetAnimSpeed(D2UnitStrc* pMissile);
 //D2Common.0x6FDBA410 (#11139)
 D2COMMON_DLL_DECL void __stdcall MISSILE_SetAnimSpeed(D2UnitStrc* pMissile, int nAnimSpeed);
-//D2Common.0x6FDBA450
-void __fastcall MISSILE_SetStream(D2UnitStrc* pMissile, D2MissileStreamStrc* pStream);
-//D2Common.0x6FDBA470
-D2MissileStreamStrc* __fastcall MISSILE_GetStream(D2UnitStrc* pMissile);
 //D2Common.0x6FDBA490 (#11140)
 D2COMMON_DLL_DECL void __stdcall MISSILE_SetTargetX(D2UnitStrc* pMissile, int nTargetX);
 //D2Common.0x6FDBA4B0 (#11141)

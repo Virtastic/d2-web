@@ -7,6 +7,7 @@
 
 
 //D2Common.0x6FD729C0
+// 1.13c D2Common+0x19650
 void __fastcall DATATBLS_LoadPlrType_ModeTxt(HD2ARCHIVE hArchive)
 {
 	D2PlrModeTypeTxt* pPlrModeTypeTxt = NULL;
@@ -75,6 +76,7 @@ void __fastcall DATATBLS_LoadMonModeTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD72E50
+// 1.13c D2Common+0x19190
 void __fastcall DATATBLS_LoadObjType_ModeTxt(HD2ARCHIVE hArchive)
 {
 	D2ObjModeTypeTxt* pObjModeTypeTxt = NULL;
@@ -216,6 +218,7 @@ D2PlrModeTypeTxt* __stdcall DATATBLS_GetPlrModeTypeTxtRecord(int nIndex, int bGe
 }
 
 //D2Common.0x6FD73230 (#10647)
+// not-1.13c: retail exports only the player-mode getter (0x18EF0); monster-mode rows are read from the table global by each user
 D2MonModeTxt* __stdcall DATATBLS_GetMonModeTxtRecord(int nIndex, int bGetMode)
 {
 	if (nIndex >= sgptDataTables->pMonModeDataTables.nMonModeTxtRecordCount)

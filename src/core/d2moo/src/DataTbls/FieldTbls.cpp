@@ -11,19 +11,6 @@ static const int gnFieldXOffsets[] = { 0, 1, 1, 1, 0, -1, -1, -1, 0 };
 static const int gnFieldYOffsets[] = { -1, -1, 0, 1, 1, 1, 0, -1, 0 };
 
 
-//D2Common.0x6FD51FC0
-BOOL __fastcall DATATBLS_LoadExpFieldD2(HD2ARCHIVE hArchive)
-{
-	char szPath[80] = {};
-	char* pExpField = NULL;
-	size_t nSize = 0;
-
-	wsprintfA(szPath, "%s\\expfield.d2", "DATA\\GLOBAL");
-	pExpField = (char*)ARCHIVE_ALLOC_BUFFER_AND_READ_FILE_TO_IT(hArchive, szPath, &nSize);
-
-	return DATATBLS_InitializeCollisionFieldTable(pExpField, nSize);
-}
-
 //D2Common.0x6FD52010 (#11089)
 BOOL __stdcall DATATBLS_InitializeCollisionFieldTable(char* pExpField, int nSize)
 {

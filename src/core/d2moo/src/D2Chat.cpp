@@ -5,41 +5,35 @@
 #include <D2StrTable.h>
 #include <Fog.h>
 
+// 1.13c D2Common+0x18280
 //D2Common.0x6FDC3BF0 (#10892)
 D2HoverTextStrc* __stdcall CHAT_AllocHoverMsg(void* pMemPool, const char* szText, int nTimeout)
 {
-	D2HoverTextStrc* pHoverMsg = NULL;
-	size_t nTextLength = 0;
-	int nLength = 0;
-
-	nTextLength = strlen(szText);
+	// Retail measures the text, clamps the copied length to 254, allocates (Chat.cpp line 0x32), stores
+	// display time 8 * len + 125 and expiry display + timeout, copies len + 1 bytes of text, writes the
+	// terminator at szMsg[len + 1], then the language byte.
+	const size_t nTextLength = strlen(szText);
 	if (nTextLength == 0)
 	{
 		return NULL;
 	}
 
-	if (nTextLength < 255)
-	{
-		nLength = nTextLength;
-	}
-	else
-	{
-		nLength = 254;
-	}
+	const int nLength = nTextLength < 255 ? (int)nTextLength : 254;
 
-	pHoverMsg = D2_CALLOC_STRC_POOL(pMemPool, D2HoverTextStrc);
-	
-	pHoverMsg->dwDisplayTime = 8 * nLength + 125;
-	pHoverMsg->dwExpireTime = 8 * nLength + 125 + nTimeout;
-	pHoverMsg->nLangId = STRTABLE_GetLanguage();
+	D2HoverTextStrc* pHoverMsg = D2_CALLOC_STRC_POOL(pMemPool, D2HoverTextStrc);
+
+	const int nDisplayTime = nLength * 8 + 125;
+	pHoverMsg->dwDisplayTime = nDisplayTime;
+	pHoverMsg->dwExpireTime = nDisplayTime + nTimeout;
 	pHoverMsg->bUsed = FALSE;
-
-	strncpy_s(pHoverMsg->szMsg, szText, nLength + 1);
+	strncpy(pHoverMsg->szMsg, szText, nLength + 1);
 	pHoverMsg->szMsg[nLength + 1] = '\0';
+	pHoverMsg->nLangId = STRTABLE_GetLanguage();
 
 	return pHoverMsg;
 }
 
+// 1.13c D2Common+0x18260
 //D2Common.0x6FDC3C80 (#10893)
 void __stdcall CHAT_FreeHoverMsg(void* pMemPool, D2HoverTextStrc* pHoverMsg)
 {
@@ -49,6 +43,7 @@ void __stdcall CHAT_FreeHoverMsg(void* pMemPool, D2HoverTextStrc* pHoverMsg)
 	}
 }
 
+// 1.13c D2Common+0x18250
 //D2Common.0x6FDC3CA0 (#10894)
 uint32_t __stdcall CHAT_GetDisplayTimeFromHoverMsg(D2HoverTextStrc* pHoverMsg)
 {
@@ -77,18 +72,14 @@ void __stdcall CHAT_CopyHoverMsgToBuffer(D2HoverTextStrc* pHoverMsg, char* szMes
 	while (pHoverMsg->szMsg[nCounter - 1]);
 }
 
+// 1.13c D2Common+0x18210
 //D2Common.0x6FDC3CE0 (#10897)
 BOOL __stdcall CHAT_GetUsedFromHoverMsg(D2HoverTextStrc* pHoverMsg)
 {
-	if (pHoverMsg)
-	{
-		return pHoverMsg->bUsed;
-	}
-
-	REMOVE_LATER_Trace("CHAT_GetUsedFromHoverMsg: NULL pointer");
-	return FALSE;
+	return pHoverMsg->bUsed;
 }
 
+// 1.13c D2Common+0x18200
 //D2Common.0x6FDC3CF0 (#10898)
 void __stdcall CHAT_SetUsedInHoverMsg(D2HoverTextStrc* pHoverMsg, BOOL bUsed)
 {
@@ -102,6 +93,7 @@ uint8_t __stdcall CHAT_GetLangIdFromHoverMsg(D2HoverTextStrc* pHoverMsg)
 	return pHoverMsg->nLangId;
 }
 
+// 1.13c D2Common+0x181E0
 //D2Common.0x6FDC3D10 (#10900)
 void __stdcall CHAT_SetLangIdInHoverMsg(D2HoverTextStrc* pHoverMsg, uint8_t nLangId)
 {

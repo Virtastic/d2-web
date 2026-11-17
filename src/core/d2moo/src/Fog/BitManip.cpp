@@ -227,6 +227,7 @@ Function:		BITMANIP_SetBitState
 Address:		Fog.#10118
 Notes:
 */
+// 1.13c Fog+0x14090
 void __stdcall BITMANIP_SetBitState(uint8_t* pBitStream, int nBit)
 {
 	pBitStream[nBit >> 3] |= (uint8_t)gdwBitMasks[nBit & 7];
@@ -248,6 +249,7 @@ Function:		BITMANIP_GoToNextByte
 Address:		Fog.#10120
 Notes:
 */
+// 1.13c Fog+0x14040
 void __stdcall BITMANIP_MaskBitstate(uint8_t* pBitStream, int nBit)
 {
 	pBitStream[nBit >> 3] &= (uint8_t)gdwInvBitMasks[nBit & 7];

@@ -4,11 +4,11 @@
 #include "Drlg/D2DrlgOutdoors.h"
 #include "D2Seed.h"
 #include <DataTbls/LevelsIds.h>
+#include <cstdlib>
 
 //TODO: Find names, rename variables + globals
 
-//D2Common.0x6FD7FC20
-//TODO: v19
+// 1.13c D2Common+0x854C0
 void __fastcall DRLGOUTJUNG_BuildJungle(D2DrlgLevelStrc* pLevel)
 {
 	static const int dword_6FDCFB18[] =
@@ -38,9 +38,11 @@ void __fastcall DRLGOUTJUNG_BuildJungle(D2DrlgLevelStrc* pLevel)
 
 		nRand = SEED_RollLimitedRandomNumber(&pLevel->pSeed, 4 * (pLevel->nJungleDefs == 3) + 2);
 
+		// 1.13c: a missing grid is fatal (error string 0x27, then _exit(-1)), not a warning; the roll above has already advanced the seed
 		if (!pLevel->pJungleDefs)
 		{
-			FOG_DisplayWarning("ptDrlgLevel->pnJungleDefs", __FILE__, __LINE__);
+			FOG_DisplayAssert("ptDrlgLevel->pnJungleDefs", __FILE__, __LINE__);
+			exit(-1);
 		}
 
 		for (int i = 0; i < nSizeY; ++i)
@@ -65,7 +67,9 @@ void __fastcall DRLGOUTJUNG_BuildJungle(D2DrlgLevelStrc* pLevel)
 					{
 						if (nFileIndex >= 3)
 						{
-							FOG_DisplayWarning("nFileIndex < 3", __FILE__, __LINE__);
+							// 1.13c: fatal (error string 0x47, then _exit(-1))
+							FOG_DisplayAssert("nFileIndex < 3", __FILE__, __LINE__);
+							exit(-1);
 						}
 
 						nJungleDef += dword_6FDCFB18[pLevel->nLevelId - 76];

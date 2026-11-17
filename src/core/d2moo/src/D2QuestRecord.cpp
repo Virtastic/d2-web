@@ -12,6 +12,7 @@ BOOL __stdcall QUESTRECORD_GetQuestState(D2BitBufferStrc* pQuestRecord, int nQue
 	return BITMANIP_GetBitState(pQuestRecord->pBuffer, nState + 8 * sizeof(uint16_t) * nQuest) != 0;
 }
 
+// 1.13c D2Common+0x2D0B0
 //D2Common.0x6FDAE850 (#11108)
 void __stdcall QUESTRECORD_SetQuestState(D2BitBufferStrc* pQuestRecord, int nQuest, int nState)
 {
@@ -20,6 +21,7 @@ void __stdcall QUESTRECORD_SetQuestState(D2BitBufferStrc* pQuestRecord, int nQue
 	BITMANIP_SetBitState(pQuestRecord->pBuffer, nState + 8 * sizeof(uint16_t) * nQuest);
 }
 
+// 1.13c D2Common+0x2D070
 //D2Common.0x6FDAE890 (#11109)
 void __stdcall QUESTRECORD_ClearQuestState(D2BitBufferStrc* pQuestRecord, int nQuest, int nState)
 {
@@ -63,6 +65,7 @@ void __stdcall QUESTRECORD_FreeRecord(void* pMemPool, D2BitBufferStrc* pQuestRec
 	}
 }
 
+// 1.13c D2Common+0x2D140
 //D2Common.0x6FDAE9B0 (#11113)
 void __stdcall QUESTRECORD_CopyBufferToRecord(D2BitBufferStrc* pQuestRecord, uint8_t* pBuffer, uint16_t nBufferSize, BOOL bResetStates)
 {
@@ -72,7 +75,8 @@ void __stdcall QUESTRECORD_CopyBufferToRecord(D2BitBufferStrc* pQuestRecord, uin
 
 	if (bResetStates)
 	{
-		for (int i = 0; i < 41; ++i)
+		// 1.13c: the loop runs for bit bases 14, 30, ... while below 0x2AE, 42 quest rows (1.10f stopped at 41).
+		for (int i = 0; i < 42; ++i)
 		{
 			BITMANIP_MaskBitstate(pQuestRecord->pBuffer, 8 * sizeof(uint16_t) * i + QFLAG_PRIMARYGOALDONE);
 			BITMANIP_MaskBitstate(pQuestRecord->pBuffer, 8 * sizeof(uint16_t) * i + QFLAG_COMPLETEDNOW);

@@ -1302,6 +1302,7 @@ void __stdcall DATATBLS_GetSequenceEvent(D2AnimSeqTxt* pMonSeqTxt, int nSeqFrame
 }
 
 //D2Common.0x6FD6F050
+// 1.13c D2Common+0x55250
 void __fastcall DATATBLS_LoadMonSeqTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =

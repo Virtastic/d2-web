@@ -17,8 +17,6 @@ void __fastcall DRLGOUTSIEGE_InitAct5OutdoorLevel(D2DrlgLevelStrc* pLevel);
 void __fastcall DRLGOUTSIEGE_PlaceCaves(D2DrlgLevelStrc* pLevel);
 //D2Common.0x6FD84580
 void __fastcall DRLGOUTSIEGE_PlaceBarricadeEntrancesAndExits(D2DrlgLevelStrc* pLevel);
-//D2Common.0x6FD846C0
-void __fastcall sub_6FD846C0(D2DrlgLevelStrc* pLevel);
 //D2Common.0x6FD84700
 void __fastcall DRLGOUTSIEGE_AddACt5SecondaryBorder(D2DrlgLevelStrc* pLevel);
 //D2Common.0x6FD84780

@@ -23,6 +23,7 @@ void __fastcall DATATBLS_LoadArenaTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD47970 (#10596)
+// not-1.13c: retail has no accessor; nothing in D2Common reads the arena table after the 0x80D50 loader and the 0x5E870 unload, D2Game reads the global itself
 D2ArenaTxt* __fastcall DATATBLS_GetArenaTxtRecord(int nArenaType)
 {
 	D2_ASSERT(nArenaType < NUM_ARENA_TYPES);
@@ -31,6 +32,7 @@ D2ArenaTxt* __fastcall DATATBLS_GetArenaTxtRecord(int nArenaType)
 }
 
 //D2Common.0x6FD479B0
+// not-1.13c: retail inlines the arena unload into the unload-all function at 0x5E870
 void __fastcall DATATBLS_UnloadArenaTxt()
 {
 	DATATBLS_UnloadBin(gpArenaTxtTable);
@@ -152,6 +154,7 @@ void __fastcall DATATBLS_LoadCharTemplateStartIds(D2CharTemplateTxt* pCharTempla
 }
 
 //D2Common.0x6FD48770
+// not-1.13c: retail inlines the chartemplate unload into the unload-all function at 0x5E870
 void __fastcall DATATBLS_UnloadCharTemplateTxt()
 {
 	DATATBLS_UnloadBin(gpCharTemplateTxtTable);
@@ -159,6 +162,7 @@ void __fastcall DATATBLS_UnloadCharTemplateTxt()
 }
 
 //D2Common.0x6FD48790 (#10664)
+// 1.13c D2Common+0x7FE90: returns the chartemplate record count (checked against the decompile)
 int __fastcall DATATBLS_GetCharTemplateTxtRecordCount()
 {
 	return gnCharTemplateTxtTableRecordCount;

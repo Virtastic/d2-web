@@ -25,144 +25,6 @@ void __fastcall DATATBLS_IntStackPush(Fog64IntStack* pCalcStack, int32_t nValue)
 	}
 }
 
-// Inlined
-template<class T>
-T ReadFromBuffer(const FOGASTNodeStrc*& pBuffer)
-{
-	T val = *(T*)pBuffer;
-	pBuffer += sizeof(T);
-	return val;
-}
-
-// Inlined
-static void DATATBLS_EvaluateCalcCallback(Fog64IntStack* pCalcStack, const FOGASTNodeStrc*& pBufferCurrentPos, D2CalcCallbackInfoStrc* pTableData, int nTableSize, void* pUserData)
-{
-	int nTableIndex = ReadFromBuffer<uint8_t>(pBufferCurrentPos);
-	int nResult = 0;
-	if (nTableIndex < nTableSize)
-	{
-		int nParameters = pTableData[nTableIndex].nParameters;
-		int nParam1 = 0;
-		int nParam2 = 0;
-		int nParam3 = 0;
-		switch (nParameters)
-		{
-		case 3:
-			nParam3 = DATATBLS_IntStackPop(pCalcStack);
-			// FALLTHROUGH
-		case 2:
-			nParam2 = DATATBLS_IntStackPop(pCalcStack);
-			// FALLTHROUGH
-		case 1:
-			nParam1 = DATATBLS_IntStackPop(pCalcStack);
-			// FALLTHROUGH
-		case 0:
-			nResult = pTableData[nTableIndex].fpCallBack(nParam1, nParam2, nParam3, pUserData);
-			break;
-		default:
-			break;
-		}
-	}
-	DATATBLS_IntStackPush(pCalcStack, nResult);
-}
-
-// Inlined
-static void DATATBLS_EvaluateUsingConstantFromBuffer(Fog64IntStack* pCalcStack, FOGASTType nASTType, const FOGASTNodeStrc*& pBufferCurrentPos, CalcFogCallBack2_t fpParamCallBack, void* pUserData)
-{
-	int nCallbackResult = 0;
-
-	switch (nASTType)
-	{
-	case AST_Callback_Param_UInt8:
-		nCallbackResult = fpParamCallBack(ReadFromBuffer<uint8_t>(pBufferCurrentPos), pUserData);
-		break;
-	case AST_Callback_Param_UInt16:
-		nCallbackResult = fpParamCallBack(ReadFromBuffer<uint16_t>(pBufferCurrentPos), pUserData);
-		break;
-	case AST_Callback_Param_UInt32:
-		nCallbackResult = fpParamCallBack(ReadFromBuffer<uint32_t>(pBufferCurrentPos), pUserData);
-		break;
-	case AST_Raw_Int8:
-		nCallbackResult = ReadFromBuffer<int8_t>(pBufferCurrentPos); // NOLINT
-		break;
-	case AST_Raw_Int16:
-		nCallbackResult = ReadFromBuffer<int16_t>(pBufferCurrentPos);
-		break;
-	case AST_Raw_Int32:
-		nCallbackResult = ReadFromBuffer<int32_t>(pBufferCurrentPos);
-		break;
-	default:
-		D2_UNREACHABLE;
-	}
-
-	DATATBLS_IntStackPush(pCalcStack, nCallbackResult);
-}
-
-// Inlined
-static void DATATBLS_EvaluateBinaryOperator(Fog64IntStack* pCalcStack, FOGASTType nAST)
-{
-	const int nRightHandSide = DATATBLS_IntStackPop(pCalcStack);
-	const int nLeftHandSide = DATATBLS_IntStackPop(pCalcStack);
-	switch (nAST)
-	{
-	case AST_LessThan:
-		DATATBLS_IntStackPush(pCalcStack, nLeftHandSide < nRightHandSide);
-		break;
-	case AST_GreaterThan:
-		DATATBLS_IntStackPush(pCalcStack, nLeftHandSide > nRightHandSide);
-		break;
-	case AST_LessOrEqualThan:
-		DATATBLS_IntStackPush(pCalcStack, nLeftHandSide <= nRightHandSide);
-		break;
-	case AST_GreaterOrEqualThan:
-		DATATBLS_IntStackPush(pCalcStack, nLeftHandSide >= nRightHandSide);
-		break;
-	case AST_Equal:
-		DATATBLS_IntStackPush(pCalcStack, nLeftHandSide == nRightHandSide);
-		break;
-	case AST_NotEqual:
-		DATATBLS_IntStackPush(pCalcStack, nLeftHandSide != nRightHandSide);
-		break;
-	case AST_Addition:
-		DATATBLS_IntStackPush(pCalcStack, nLeftHandSide + nRightHandSide);
-		break;
-	case AST_Substraction:
-		DATATBLS_IntStackPush(pCalcStack, nLeftHandSide - nRightHandSide);
-		break;
-	case AST_Multipliction:
-		DATATBLS_IntStackPush(pCalcStack, nLeftHandSide * nRightHandSide);
-		break;
-	case AST_Division:
-		if (nRightHandSide == 0)
-		{
-			DATATBLS_IntStackPush(pCalcStack, 0);
-		}
-		else 
-		{
-			DATATBLS_IntStackPush(pCalcStack, nLeftHandSide / nRightHandSide);
-		}
-		break;
-	case AST_Power:
-		if (nRightHandSide <= 0)
-		{
-			DATATBLS_IntStackPush(pCalcStack, 1);
-		}
-		else
-		{
-			int nPower = nLeftHandSide;
-			int nExponent = nRightHandSide;
-			while ((--nExponent) != 0)
-			{
-				nPower *= nLeftHandSide;
-			}
-			DATATBLS_IntStackPush(pCalcStack, nPower);
-		}
-		break;
-	default:
-		D2_UNREACHABLE;
-	}
-}
-
 
 //1.10f: 0x6FF51E30 (#10253)
 //1.13c: 0x6FF69E90 (#10253)
@@ -173,47 +35,114 @@ int __stdcall DATATBLS_CalcEvaluateExpression(const FOGASTNodeStrc* pExpressionB
 		return 0;
 	}
 
-	const FOGASTNodeStrc* pBufferCurrentPos = pExpressionBuffer;
-
-	// Note: This actually does not prevent reading more than 1 byte, which means that some of the functions below may read out of bounds...
-	//       Not fixing it to keep game behaviour
-	auto ReachedEndOfBuffer = [&]()
-	{
-		return pBufferCurrentPos - pExpressionBuffer >= nExpressionBufferSize;
-	};
+	// Retail Fog+0x19E90 keeps the 64-slot stack inline: a push onto a full stack is dropped, a pop from an
+	// empty one yields 0 (Fog+0x19CB0 / 0x19CD0 do the same for the table-call pops). The operand reads
+	// (u8 / sign-extended i16 / 32-bit) and the binary operators are inlined in the same switch.
+	const uint8_t* pStart = (const uint8_t*)pExpressionBuffer;
+	const uint8_t* pBufferCurrentPos = pStart;
 
 	Fog64IntStack tCalcStack;
 	tCalcStack.nSize = 0;
 
-	while (!ReachedEndOfBuffer())
+	do
 	{
-		uint8_t nAST = ReadFromBuffer<uint8_t>(pBufferCurrentPos);
-		switch (nAST)
+		const uint8_t* pNext = pBufferCurrentPos + 1;
+		switch (*pBufferCurrentPos)
 		{
 		case AST_CallbackTable:
 		{
-			DATATBLS_EvaluateCalcCallback(&tCalcStack, pBufferCurrentPos, pTableData, nTableSize, pUserData);
+			const int nTableIndex = *pNext;
+			pNext = pBufferCurrentPos + 2;
+			int nResult = 0;
+			if (nTableIndex < nTableSize)
+			{
+				int nParam1 = 0;
+				int nParam2 = 0;
+				int nParam3 = 0;
+				bool bCall = true;
+				switch (pTableData[nTableIndex].nParameters)
+				{
+				case 3:
+					nParam3 = DATATBLS_IntStackPop(&tCalcStack);
+					nParam2 = DATATBLS_IntStackPop(&tCalcStack);
+					nParam1 = DATATBLS_IntStackPop(&tCalcStack);
+					break;
+				case 2:
+					nParam2 = DATATBLS_IntStackPop(&tCalcStack);
+					nParam1 = DATATBLS_IntStackPop(&tCalcStack);
+					break;
+				case 1:
+					nParam1 = DATATBLS_IntStackPop(&tCalcStack);
+					break;
+				case 0:
+					break;
+				default:
+					bCall = false;
+					break;
+				}
+				if (bCall)
+				{
+					nResult = pTableData[nTableIndex].fpCallBack(nParam1, nParam2, nParam3, pUserData);
+				}
+			}
+			DATATBLS_IntStackPush(&tCalcStack, nResult);
 			break;
 		}
 		case AST_Callback_Param_UInt8:
 		case AST_Callback_Param_UInt16:
 		case AST_Callback_Param_UInt32:
+		{
 			if (!fpParamCallBack)
 			{
 				return 0;
 			}
-			// FALLTHROUGH
-		case AST_Raw_Int8:
-		case AST_Raw_Int16:
-		case AST_Raw_Int32:
-		{
-			if (ReachedEndOfBuffer()) // We may read OOB for non 8bit constants...
+			if (nExpressionBufferSize <= pNext - pStart)
 			{
 				return 0;
 			}
-			DATATBLS_EvaluateUsingConstantFromBuffer(&tCalcStack, (FOGASTType)nAST, pBufferCurrentPos, fpParamCallBack, pUserData);
+			int nOperand;
+			if (*pBufferCurrentPos == AST_Callback_Param_UInt8)
+			{
+				nOperand = *(const uint8_t*)pNext;
+				pNext = pBufferCurrentPos + 2;
+			}
+			else if (*pBufferCurrentPos == AST_Callback_Param_UInt16)
+			{
+				nOperand = *(const int16_t*)pNext; // retail movsx at Fog+0x19F3B
+				pNext = pBufferCurrentPos + 3;
+			}
+			else
+			{
+				nOperand = *(const int32_t*)pNext;
+				pNext = pBufferCurrentPos + 5;
+			}
+			DATATBLS_IntStackPush(&tCalcStack, fpParamCallBack(nOperand, pUserData));
 			break;
 		}
+		case AST_Raw_Int8:
+			if (nExpressionBufferSize <= pNext - pStart)
+			{
+				return 0;
+			}
+			DATATBLS_IntStackPush(&tCalcStack, *(const int8_t*)pNext);
+			pNext = pBufferCurrentPos + 2;
+			break;
+		case AST_Raw_Int16:
+			if (nExpressionBufferSize <= pNext - pStart)
+			{
+				return 0;
+			}
+			DATATBLS_IntStackPush(&tCalcStack, *(const int16_t*)pNext);
+			pNext = pBufferCurrentPos + 3;
+			break;
+		case AST_Raw_Int32:
+			if (nExpressionBufferSize <= pNext - pStart)
+			{
+				return 0;
+			}
+			DATATBLS_IntStackPush(&tCalcStack, *(const int32_t*)pNext);
+			pNext = pBufferCurrentPos + 5;
+			break;
 		case AST_LessThan:
 		case AST_GreaterThan:
 		case AST_LessOrEqualThan:
@@ -225,10 +154,42 @@ int __stdcall DATATBLS_CalcEvaluateExpression(const FOGASTNodeStrc* pExpressionB
 		case AST_Multipliction:
 		case AST_Division:
 		case AST_Power:
-			DATATBLS_EvaluateBinaryOperator(&tCalcStack, (FOGASTType)nAST);
+		{
+			const int nRightHandSide = DATATBLS_IntStackPop(&tCalcStack);
+			const int nLeftHandSide = DATATBLS_IntStackPop(&tCalcStack);
+			int nResult = 0;
+			switch (*pBufferCurrentPos)
+			{
+			case AST_LessThan: nResult = nLeftHandSide < nRightHandSide; break;
+			case AST_GreaterThan: nResult = nRightHandSide < nLeftHandSide; break;
+			case AST_LessOrEqualThan: nResult = nLeftHandSide <= nRightHandSide; break;
+			case AST_GreaterOrEqualThan: nResult = nRightHandSide <= nLeftHandSide; break;
+			case AST_Equal: nResult = nLeftHandSide == nRightHandSide; break;
+			case AST_NotEqual: nResult = nLeftHandSide != nRightHandSide; break;
+			case AST_Addition: nResult = (int)((uint32_t)nLeftHandSide + (uint32_t)nRightHandSide); break;
+			case AST_Substraction: nResult = (int)((uint32_t)nLeftHandSide - (uint32_t)nRightHandSide); break;
+			case AST_Multipliction: nResult = (int)((uint32_t)nLeftHandSide * (uint32_t)nRightHandSide); break;
+			case AST_Division:
+				nResult = nRightHandSide ? nLeftHandSide / nRightHandSide : 0;
+				break;
+			default: // AST_Power: exponent < 1 gives 1, otherwise the base multiplied (exponent - 1) times
+				nResult = 1;
+				if (nRightHandSide >= 1)
+				{
+					uint32_t nPower = (uint32_t)nLeftHandSide;
+					for (int nExponent = nRightHandSide - 1; nExponent > 0; --nExponent)
+					{
+						nPower *= (uint32_t)nLeftHandSide;
+					}
+					nResult = (int)nPower;
+				}
+				break;
+			}
+			DATATBLS_IntStackPush(&tCalcStack, nResult);
 			break;
+		}
 		case AST_Negate:
-			DATATBLS_IntStackPush(&tCalcStack, -DATATBLS_IntStackPop(&tCalcStack));
+			DATATBLS_IntStackPush(&tCalcStack, (int)(0u - (uint32_t)DATATBLS_IntStackPop(&tCalcStack)));
 			break;
 		case AST_Ternary:
 		{
@@ -236,75 +197,90 @@ int __stdcall DATATBLS_CalcEvaluateExpression(const FOGASTNodeStrc* pExpressionB
 			const int nIfTrue = DATATBLS_IntStackPop(&tCalcStack);
 			const int nCondition = DATATBLS_IntStackPop(&tCalcStack);
 			DATATBLS_IntStackPush(&tCalcStack, nCondition ? nIfTrue : nIfFalse);
+			break;
 		}
 		default:
 			return DATATBLS_IntStackPop(&tCalcStack);
 		}
+		pBufferCurrentPos = pNext;
 	}
-	
+	while (pBufferCurrentPos - pStart < nExpressionBufferSize);
+
 	return 0;
-}
-
-// Helper function
-static FOGASTNodeStrc* __fastcall DATATBLS_ExpressionBuffer_PushConstant(FOGASTNodeStrc* pExpressionBufferPos, FOGASTNodeStrc* pExpressionBufferStart, int szBufferSize, FOGExpressionParserContextStrc* pCalc, int32_t nValue, bool bCallback)
-{
-	FOGASTNodeStrc* pNewExpressionBufferPos;
-
-	if (std::numeric_limits<int8_t>::lowest() <= nValue && nValue <= std::numeric_limits<int8_t>::max())
-	{
-		const int nPayloadSize = 1 + sizeof(int8_t);
-		if (pExpressionBufferPos - pExpressionBufferStart >= szBufferSize) // Can overflow...
-		{
-			pExpressionBufferStart->nType = AST_None;
-			return nullptr;
-		}
-		pExpressionBufferPos[0].nType = bCallback ? AST_Callback_Param_UInt8 : AST_Raw_Int8;
-		pExpressionBufferPos[1].nRawValue = nValue;
-		pNewExpressionBufferPos = pExpressionBufferPos + nPayloadSize;
-	}
-	else if (std::numeric_limits<int16_t>::lowest() <= nValue && nValue <= std::numeric_limits<int16_t>::max())
-	{
-		const int nPayloadSize = 1 + sizeof(int16_t);
-		if (pExpressionBufferPos - pExpressionBufferStart + nPayloadSize >= szBufferSize)
-		{
-			pExpressionBufferStart->nType = AST_None;
-			return nullptr;
-		}
-		pExpressionBufferPos[0].nType = bCallback ? AST_Callback_Param_UInt16 : AST_Raw_Int16;
-		*(int16_t*)(pExpressionBufferPos + 1) = nValue;
-		pNewExpressionBufferPos = pExpressionBufferPos + nPayloadSize;
-	}
-	else
-	{
-		const int nPayloadSize = 1 + sizeof(int32_t);
-		if (pExpressionBufferPos - pExpressionBufferStart + nPayloadSize >= szBufferSize)
-		{
-			pExpressionBufferStart->nType = AST_None;
-			return nullptr;
-		}
-		pExpressionBufferPos[0].nType = bCallback ? AST_Callback_Param_UInt32 : AST_Raw_Int32;
-		*(int32_t*)(pExpressionBufferPos + 1) = nValue;
-		pNewExpressionBufferPos = pExpressionBufferPos + nPayloadSize;
-	}
-	++pCalc->nPendingParameters;
-	return pNewExpressionBufferPos;
 }
 
 //1.10f: 0x6FF53280
 //1.13c: 0x6FF69680
 FOGASTNodeStrc* __fastcall DATATBLS_ExpressionBuffer_PushRawConstant(FOGASTNodeStrc* pExpressionBufferPos, FOGASTNodeStrc* pExpressionBufferStart, int szBufferSize, FOGExpressionParserContextStrc* pCalc, int32_t nValue)
 {
-	return DATATBLS_ExpressionBuffer_PushConstant(pExpressionBufferPos, pExpressionBufferStart, szBufferSize, pCalc, nValue, false);
+	if (nValue < -0x80 || nValue > 0x7F)
+	{
+		if (nValue < -0x8000 || nValue > 0x7FFF)
+		{
+			if (pExpressionBufferPos - pExpressionBufferStart + 5 < szBufferSize)
+			{
+				pExpressionBufferPos[0].nType = AST_Raw_Int32;
+				*(int32_t*)(pExpressionBufferPos + 1) = nValue;
+				++pCalc->nPendingParameters;
+				return pExpressionBufferPos + 5;
+			}
+		}
+		else if (pExpressionBufferPos - pExpressionBufferStart + 3 < szBufferSize)
+		{
+			pExpressionBufferPos[0].nType = AST_Raw_Int16;
+			*(int16_t*)(pExpressionBufferPos + 1) = (int16_t)nValue;
+			++pCalc->nPendingParameters;
+			return pExpressionBufferPos + 3;
+		}
+	}
+	else if (pExpressionBufferPos - pExpressionBufferStart < szBufferSize)
+	{
+		pExpressionBufferPos[0].nType = AST_Raw_Int8;
+		pExpressionBufferPos[1].nRawValue = (uint8_t)nValue;
+		++pCalc->nPendingParameters;
+		return pExpressionBufferPos + 2;
+	}
+	pExpressionBufferStart->nType = AST_None;
+	return nullptr;
 }
 
 //1.10f: Inlined
 //1.13c: 0x6FF695E0
 FOGASTNodeStrc* __fastcall DATATBLS_ExpressionBuffer_PushCallbackConstant(FOGASTNodeStrc* pExpressionBufferPos, FOGASTNodeStrc* pExpressionBufferStart, int szBufferSize, FOGExpressionParserContextStrc* pCalc, int32_t nValue)
 {
-	return DATATBLS_ExpressionBuffer_PushConstant(pExpressionBufferPos, pExpressionBufferStart, szBufferSize, pCalc, nValue, true);
+	if (nValue < -0x80 || nValue > 0x7F)
+	{
+		if (nValue < -0x8000 || nValue > 0x7FFF)
+		{
+			if (pExpressionBufferPos - pExpressionBufferStart + 5 < szBufferSize)
+			{
+				pExpressionBufferPos[0].nType = AST_Callback_Param_UInt32;
+				*(int32_t*)(pExpressionBufferPos + 1) = nValue;
+				++pCalc->nPendingParameters;
+				return pExpressionBufferPos + 5;
+			}
+		}
+		else if (pExpressionBufferPos - pExpressionBufferStart + 3 < szBufferSize)
+		{
+			pExpressionBufferPos[0].nType = AST_Callback_Param_UInt16;
+			*(int16_t*)(pExpressionBufferPos + 1) = (int16_t)nValue;
+			++pCalc->nPendingParameters;
+			return pExpressionBufferPos + 3;
+		}
+	}
+	else if (pExpressionBufferPos - pExpressionBufferStart < szBufferSize)
+	{
+		pExpressionBufferPos[0].nType = AST_Callback_Param_UInt8;
+		pExpressionBufferPos[1].nRawValue = (uint8_t)nValue;
+		++pCalc->nPendingParameters;
+		return pExpressionBufferPos + 2;
+	}
+	pExpressionBufferStart->nType = AST_None;
+	return nullptr;
 }
 
-// Helper function
+// not-1.13c: retail has no such function; the same switch is inlined at Fog+0x19D5E (inside 0x19CF0, the
+// HandleNewOp reduction loop) and at Fog+0x1A59B (inside 0x1A4A0, the ')' handler).
 static int GetASTNodeParameterCount(FOGASTType nASTType, int nTokenAssociatedValue, CalcGetFunctionParameterCount_t pfnGetFunctionParameterCount)
 {
 	switch (nASTType)
@@ -447,127 +423,6 @@ FOGASTNodeStrc* __fastcall DATATBLS_Evaluate_HandleNewOp(FOGASTNodeStrc* pASTBuf
 	}
 }
 
-// Helper function
-static void DATATBLS_ResolveConstantLink(char* szLinkName, FOGExpressionParserContextStrc* pCalc, FOGCalcExpressionParserTokenType* pOutTokenType, int* pTokenAssociatedValue, CalcGetLinkerIndex_t pfnLinkParse)
-{
-	BOOL bHasResolvedToConstant = FALSE;
-	const int32_t nLinkerIndex = pfnLinkParse(
-		szLinkName,
-		&bHasResolvedToConstant,
-		pCalc->tPendingOperationsASTs[pCalc->nPendingOps - 1],
-		pCalc->tLinkerIndex[pCalc->nPendingOps - 1]
-	);
-	if (nLinkerIndex >= 0)
-	{
-		*pOutTokenType = bHasResolvedToConstant ? TOKEN_CUSTOM_RAW_CONSTANT : TOKEN_CUSTOM_FUNCTION_PARAMETER_CONSTANT;
-		*pTokenAssociatedValue = nLinkerIndex;
-	}
-	else // Not found
-	{
-		*pOutTokenType = TOKEN_CUSTOM_RAW_CONSTANT;
-		*pTokenAssociatedValue = 0;
-	}
-}
-
-// Helper function
-static const char* DATATBLS_ParseLinkToken(const char* szExpression, FOGExpressionParserContextStrc* pCalc, FOGCalcExpressionParserTokenType* pOutTokenType, int* pTokenAssociatedValue, CalcGetLinkerIndex_t pfnLinkParse)
-{
-	D2_ASSERT(*szExpression == '\'');
-	const char* pLinkNameCurCharacter = szExpression + 1; // Skip '\''
-	char tLinkNameBuffer[256];
-	int nLinkNameSize = 0;
-	while (*pLinkNameCurCharacter != 0 && *pLinkNameCurCharacter != '\'')
-	{
-		if (nLinkNameSize < 255)
-		{
-			tLinkNameBuffer[nLinkNameSize++] = *pLinkNameCurCharacter;
-		}
-		pLinkNameCurCharacter++;
-	}
-	if (*pLinkNameCurCharacter != 0) // we stopped because we reached an '
-		pLinkNameCurCharacter++;
-
-	tLinkNameBuffer[nLinkNameSize] = 0;
-	
-	DATATBLS_ResolveConstantLink(tLinkNameBuffer, pCalc, pOutTokenType, pTokenAssociatedValue, pfnLinkParse);
-
-	return pLinkNameCurCharacter;
-}
-
-// Helper function
-static const char* DATATBLS_ParseSublinkToken(const char* szExpression, FOGExpressionParserContextStrc* pCalc, FOGCalcExpressionParserTokenType* pOutTokenType, int* pTokenAssociatedValue, CalcGetLinkerIndex_t pfnLinkParse)
-{
-	D2_ASSERT(*szExpression == '.');
-	const char* pLinkNameCurrentCharacter = szExpression + 1; // Skip '.'
-	char tLinkNameBuffer[256];
-	int nLinkNameSize = 0;
-	while (isalnum(*pLinkNameCurrentCharacter))
-	{
-		if (nLinkNameSize < 255)
-		{
-			tLinkNameBuffer[nLinkNameSize++] = *pLinkNameCurrentCharacter;
-		}
-		pLinkNameCurrentCharacter++;
-	}
-	tLinkNameBuffer[nLinkNameSize] = 0;
-
-	BOOL bHasResolvedToConstant = FALSE;
-	const int32_t nLinkerIndex = pfnLinkParse(
-		tLinkNameBuffer,
-		&bHasResolvedToConstant,
-		pCalc->tPendingOperationsASTs[pCalc->nPendingOps - 1],
-		pCalc->tLinkerIndex[pCalc->nPendingOps - 1]
-	);
-	if (nLinkerIndex >= 0)
-	{
-		*pOutTokenType = TOKEN_CUSTOM_RAW_CONSTANT;
-		*pTokenAssociatedValue = nLinkerIndex;
-		return pLinkNameCurrentCharacter;
-	}
-	else
-	{
-		return nullptr;
-	}
-}
-
-// Helper function
-static const char* DATATABLS_ParseSubExpression(const char* szExpression, FOGExpressionParserContextStrc* pCalc, FOGCalcExpressionParserTokenType* pOutTokenType, int* pTokenAssociatedValue, CalcGetKeyWordToNumber_t pfnFunctionNameToId, CalcGetLinkerIndex_t pfnLinkParse)
-{
-	// Read token
-	int nSubExpressionSize = 0;
-	char tSubExpressionBuffer[256];
-	while (isalnum(*szExpression))
-	{
-		if (nSubExpressionSize < 255)
-		{
-			tSubExpressionBuffer[nSubExpressionSize++] = *szExpression;
-		}
-		szExpression++;
-	}
-	tSubExpressionBuffer[nSubExpressionSize] = 0;
-
-	// Skip spaces
-	while (isspace(*szExpression))
-	{
-		szExpression++;
-	}
-
-	// Function call ?
-	if (*szExpression == '(')
-	{
-		if (const int nFunctionId = pfnFunctionNameToId(tSubExpressionBuffer))
-		{
-			*pOutTokenType = TOKEN_CUSTOM_FUNCTION_TABLE;
-			*pTokenAssociatedValue = nFunctionId;
-			return szExpression + 1;
-		}
-	}
-	
-	// If we couldn't resolve a function, try constants
-	DATATBLS_ResolveConstantLink(tSubExpressionBuffer, pCalc, pOutTokenType, pTokenAssociatedValue, pfnLinkParse);
-	return szExpression;
-}
-
 //1.10f: Inlined
 //1.13c: 0x6FF697B0
 // Returns the position after the parsed token
@@ -591,11 +446,97 @@ const char* DATATABLS_ParseExpressionToken(const char* szExpression, FOGCalcExpr
 	}
 	else if(*szExpression == '\'')
 	{
-		return DATATBLS_ParseLinkToken(szExpression, pCalc, pOutTokenType, pTokenAssociatedValue, pfnLinkParse);
+		// Quoted link name (inlined in retail Fog+0x197B0): the first character after the quote is copied
+		// unconditionally, the scan for the closing quote starts at the second one.
+		char tLinkNameBuffer[256];
+		tLinkNameBuffer[0] = szExpression[1];
+		const char* pCur = szExpression + 2;
+		int nLinkNameSize = 1;
+		if (*pCur != 0)
+		{
+			char c = *pCur;
+			do
+			{
+				if (c == '\'')
+				{
+					if (*pCur != 0)
+					{
+						pCur++;
+					}
+					break;
+				}
+				if (nLinkNameSize < 255)
+				{
+					tLinkNameBuffer[nLinkNameSize++] = c;
+				}
+				c = pCur[1];
+				pCur++;
+			}
+			while (c != 0);
+		}
+		tLinkNameBuffer[nLinkNameSize] = 0;
+		BOOL bHasResolvedToConstant = FALSE;
+		const int nLinkerIndex = pfnLinkParse(tLinkNameBuffer, &bHasResolvedToConstant,
+			pCalc->tPendingOperationsASTs[pCalc->nPendingOps - 1], pCalc->tLinkerIndex[pCalc->nPendingOps - 1]);
+		if (nLinkerIndex < 0)
+		{
+			*pOutTokenType = TOKEN_CUSTOM_RAW_CONSTANT;
+			*pTokenAssociatedValue = 0;
+		}
+		else
+		{
+			*pOutTokenType = bHasResolvedToConstant ? TOKEN_CUSTOM_RAW_CONSTANT : TOKEN_CUSTOM_FUNCTION_PARAMETER_CONSTANT;
+			*pTokenAssociatedValue = nLinkerIndex;
+		}
+		return pCur;
 	}
 	else if (isalpha(*szExpression))
 	{
-		return DATATABLS_ParseSubExpression(szExpression, pCalc, pOutTokenType, pTokenAssociatedValue, pfnFunctionNameToId, pfnLinkParse);
+		// Identifier: a function name when followed by '(' and known to pfnFunctionNameToId (id >= 0),
+		// otherwise a constant link (inlined in retail Fog+0x197B0).
+		char tNameBuffer[256];
+		tNameBuffer[0] = *szExpression;
+		int nNameSize = 1;
+		while (isalnum(szExpression[1]))
+		{
+			szExpression++;
+			if (nNameSize < 255)
+			{
+				tNameBuffer[nNameSize++] = *szExpression;
+			}
+		}
+		szExpression++;
+		tNameBuffer[nNameSize] = 0;
+
+		while (isspace(*szExpression))
+		{
+			szExpression++;
+		}
+		if (*szExpression == '(')
+		{
+			const int nFunctionId = pfnFunctionNameToId(tNameBuffer);
+			if (nFunctionId >= 0)
+			{
+				*pOutTokenType = TOKEN_CUSTOM_FUNCTION_TABLE;
+				*pTokenAssociatedValue = nFunctionId;
+				return szExpression + 1;
+			}
+		}
+
+		BOOL bHasResolvedToConstant = FALSE;
+		const int nLinkerIndex = pfnLinkParse(tNameBuffer, &bHasResolvedToConstant,
+			pCalc->tPendingOperationsASTs[pCalc->nPendingOps - 1], pCalc->tLinkerIndex[pCalc->nPendingOps - 1]);
+		if (nLinkerIndex < 0)
+		{
+			*pOutTokenType = TOKEN_CUSTOM_RAW_CONSTANT;
+			*pTokenAssociatedValue = 0;
+		}
+		else
+		{
+			*pOutTokenType = bHasResolvedToConstant ? TOKEN_CUSTOM_RAW_CONSTANT : TOKEN_CUSTOM_FUNCTION_PARAMETER_CONSTANT;
+			*pTokenAssociatedValue = nLinkerIndex;
+		}
+		return szExpression;
 	}
 	else
 	{
@@ -628,7 +569,32 @@ const char* DATATABLS_ParseExpressionToken(const char* szExpression, FOGCalcExpr
 			*pOutTokenType = TOKEN_MINUS;
 			break;
 		case '.':
-			return DATATBLS_ParseSublinkToken(szExpression, pCalc, pOutTokenType, pTokenAssociatedValue, pfnLinkParse);
+		{
+			// Sub-link (inlined in retail Fog+0x197B0): the character after '.' is copied unconditionally.
+			char tLinkNameBuffer[256];
+			tLinkNameBuffer[0] = szExpression[1];
+			const char* pCur = szExpression + 2;
+			int nLinkNameSize = 1;
+			while (isalnum(*pCur))
+			{
+				if (nLinkNameSize < 255)
+				{
+					tLinkNameBuffer[nLinkNameSize++] = *pCur;
+				}
+				pCur++;
+			}
+			tLinkNameBuffer[nLinkNameSize] = 0;
+			BOOL bHasResolvedToConstant = FALSE;
+			const int nLinkerIndex = pfnLinkParse(tLinkNameBuffer, &bHasResolvedToConstant,
+				pCalc->tPendingOperationsASTs[pCalc->nPendingOps - 1], pCalc->tLinkerIndex[pCalc->nPendingOps - 1]);
+			if (nLinkerIndex < 0)
+			{
+				return nullptr;
+			}
+			*pOutTokenType = TOKEN_CUSTOM_RAW_CONSTANT;
+			*pTokenAssociatedValue = nLinkerIndex;
+			return pCur;
+		}
 		case '/':
 			*pOutTokenType = TOKEN_SLASH;
 			break;

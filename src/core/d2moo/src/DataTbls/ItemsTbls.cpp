@@ -383,6 +383,7 @@ void __fastcall DATATBLS_UnloadItemsTxt()
 }
 
 //D2Common.0x6FD57620 (#10599)
+// not-1.13c: retail has no getter; users read the item table block from the table global
 D2ItemDataTbl* __stdcall DATATBLS_GetItemDataTables()
 {
 	return &sgptDataTables->pItemDataTables;
@@ -590,6 +591,7 @@ void __fastcall DATATBLS_UnloadMagicSuffix_Prefix_AutomagicTxt()
 }
 
 //D2Common.0x6FD580B0 (#10603)
+// not-1.13c: retail has no getter; users read the affix table block from the table global
 D2MagicAffixDataTbl* __stdcall DATATBLS_GetMagicAffixDataTables()
 {
 	return &sgptDataTables->pMagicAffixDataTables;
@@ -1263,6 +1265,7 @@ void __fastcall DATATBLS_UnloadBooksTxt()
 }
 
 //D2Common.0x6FD5BD20 (#10617)
+// not-1.13c: retail has no getter; users read the book table block from the table global
 D2BookDataTbl* __fastcall DATATBLS_GetBookDataTables()
 {
 	return &sgptDataTables->pBookDataTables;
@@ -1285,6 +1288,7 @@ D2BooksTxt* __stdcall DATATBLS_GetBooksTxtRecord(int nBookId)
 }
 
 //D2Common.0x6FD5BDA0
+// 1.13c D2Common+0x74400
 void __fastcall DATATBLS_LoadLowQualityItemsTxt(HD2ARCHIVE hArchive)
 {
 	const Unicode* pUnicode = NULL;
@@ -1410,23 +1414,18 @@ D2ItemRatioTxt* __stdcall DATATBLS_GetItemRatioTxtRecord(int nItemId, uint8_t nD
 }
 
 //D2Common.0x6FD5C2F0
+// 1.13c D2Common+0x713B0: signed word at +2, lower priority first
 int __cdecl DATATBLS_CompareItemStatCostDescs(const void* pRecord1, const void* pRecord2)
 {
-	D2ItemStatCostDescStrc* pElem1 = (D2ItemStatCostDescStrc*)pRecord1;
-	D2ItemStatCostDescStrc* pElem2 = (D2ItemStatCostDescStrc*)pRecord2;
+	const D2ItemStatCostDescStrc* pElem1 = (const D2ItemStatCostDescStrc*)pRecord1;
+	const D2ItemStatCostDescStrc* pElem2 = (const D2ItemStatCostDescStrc*)pRecord2;
 
-	if (pElem1->nDescPriority > pElem2->nDescPriority)
-	{
-		return 1;
-	}
-	else if (pElem1->nDescPriority == pElem2->nDescPriority)
-	{
-		return 0;
-	}
-	else
+	if (pElem1->nDescPriority < pElem2->nDescPriority)
 	{
 		return -1;
 	}
+
+	return pElem1->nDescPriority != pElem2->nDescPriority;
 }
 
 //D2Common.0x6FD5C320
@@ -1757,23 +1756,18 @@ void __fastcall DATATBLS_LoadGambleTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD5D790
+// 1.13c D2Common+0x712D0: the level at +4 is compared as an unsigned dword
 int __cdecl DATATBLS_CompareGambleTxtRecords(const void* pRecord1, const void* pRecord2)
 {
-	D2GambleTxt* pElem1 = (D2GambleTxt*)pRecord1;
-	D2GambleTxt* pElem2 = (D2GambleTxt*)pRecord2;
+	const uint32_t nLevel1 = (uint32_t)((const D2GambleTxt*)pRecord1)->nLevel;
+	const uint32_t nLevel2 = (uint32_t)((const D2GambleTxt*)pRecord2)->nLevel;
 
-	if (pElem1->nLevel > pElem2->nLevel)
+	if (nLevel2 < nLevel1)
 	{
 		return 1;
 	}
-	else if (pElem1->nLevel == pElem2->nLevel)
-	{
-		return 0;
-	}
-	else
-	{
-		return -1;
-	}
+
+	return -(int)(nLevel1 < nLevel2);
 }
 
 //D2Common.0x6FD5D7B0

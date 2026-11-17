@@ -51,17 +51,23 @@ BOOL __stdcall WAYPOINTS_GetLevelIdFromWaypointNo(short nWaypointNo, int* pLevel
 // TRUE when that byte is not 0xFF.
 BOOL __stdcall WAYPOINTS_GetWaypointNoFromLevelId(int nLevelId, short* pWaypointNo)
 {
-	D2LevelsTxt* pLevelsTxtRecord = NULL;
-
 	*pWaypointNo = 255;
 
-	pLevelsTxtRecord = DATATBLS_GetLevelsTxtRecord(nLevelId);
-	if (pLevelsTxtRecord)
+	// Retail reads the levels row directly (id inside 1..count-1, row base nonzero), no table accessor.
+	if (nLevelId < sgptDataTables->nLevelsTxtRecordCount && nLevelId > 0)
 	{
-		*pWaypointNo = pLevelsTxtRecord->nWaypoint;
+		const D2LevelsTxt* pLevelsTxtRecord = &sgptDataTables->pLevelsTxt[nLevelId];
+		if (pLevelsTxtRecord)
+		{
+			*pWaypointNo = (uint16_t)pLevelsTxtRecord->nWaypoint;
+			if ((uint16_t)*pWaypointNo != 0xFF)
+			{
+				return TRUE;
+			}
+		}
 	}
 
-	return *pWaypointNo != 255;
+	return FALSE;
 }
 
 //D2Common.0x6FDC3DE0 (#11146)
@@ -69,6 +75,8 @@ BOOL __stdcall WAYPOINTS_GetWaypointNoFromLevelId(int nLevelId, short* pWaypoint
 // table entry's word ANDed with its mask (the masked word itself, not 0/1).
 int __stdcall WAYPOINTS_IsActivated(D2WaypointDataStrc* pData, uint16_t wField)
 {
+	// Retail asserts the pointer, then the waypoint count global (0x70), then the index; the bit is the
+	// 16-bit word at index wField / 16 + 1 (the word before it is the header) masked by 1 << (wField & 15).
 	D2_ASSERT(pData);
 	D2_ASSERT(gWaypointFlagTable.nCount == gnNumberOfWaypoints);
 	D2_ASSERT(wField < gnNumberOfWaypoints);
@@ -123,19 +131,13 @@ void __stdcall WAYPOINTS_FreeWaypointData(void* pMemPool, D2WaypointDataStrc* pD
 // word; no caller reads it.
 void __stdcall WAYPOINTS_CopyAndValidateWaypointData(D2WaypointDataStrc* pDestination, D2WaypointDataStrc* pSource)
 {
-	pDestination->nFlags[0] = pSource->nFlags[0];
-	pDestination->nFlags[1] = pSource->nFlags[1];
-	pDestination->nFlags[2] = pSource->nFlags[2];
-	pDestination->nFlags[3] = pSource->nFlags[3];
-	pDestination->nFlags[4] = pSource->nFlags[4];
-	pDestination->nFlags[5] = pSource->nFlags[5];
-	pDestination->nFlags[6] = pSource->nFlags[6];
-	pDestination->nFlags[7] = pSource->nFlags[7];
+	// Retail copies four dwords, then if the header is not 0x102 asserts it is 0 or 0x101 and clears all
+	// eight words (the header too), and finally sets word 1 bit 0.
+	memmove(pDestination, pSource, 4 * sizeof(uint32_t));
 
 	if (pDestination->nFlags[0] != 0x102)
 	{
 		D2_ASSERT(pDestination->nFlags[0] == 0x00 || pDestination->nFlags[0] == 0x101);
-		pDestination->nFlags[0] = 0x102;
 		memset(pDestination, 0x00, sizeof(D2WaypointDataStrc));
 	}
 

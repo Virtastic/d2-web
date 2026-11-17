@@ -44,56 +44,40 @@ struct D2DrlgOutSiegeInitStrc3
 };
 
 
-//D2Common.0x6FD84100
+// not-1.13c: retail has no such function; the expression (level id == 0x75) + 4 is inlined at D2Common+0x145A0 (case 0x1f) and at D2Common+0x41340
 int __fastcall sub_6FD84100(D2DrlgLevelStrc* pLevel)
 {
 	return (pLevel->nLevelId == LEVEL_TUNDRAWASTELANDS) + 4;
 }
 
-//D2Common.0x6FD84110
-void __fastcall DRLGOUTSIEGE_InitAct5OutdoorLevel(D2DrlgLevelStrc* pLevel)
+// 1.13c D2Common+0x41070
+static void DRLGOUTSIEGE_PlaceSiegeToTownRow(D2DrlgLevelStrc* pLevel)
 {
-	static const D2CoordStrc stru_6FDD09C8[] =
-	{
-		{ -1, 0 },
-		{ 0, -1 },
-		{ 1, 0 },
-		{ 0, 1 },
-		{ 0, -1 },
-		{ 1, 0 },
-		{ 0, 1 },
-		{ -1, 0 },
-		{ -1, 0 },
-		{ 0, -1 },
-		{ 1, 0 },
-		{ 0, 1 },
-	};
-
 	D2DrlgOutdoorInfoStrc* pOutdoors = pLevel->pOutdoors;
-	if (pLevel->nLevelId == LEVEL_BLOODYFOOTHILLS)
+	D2_ASSERT(pOutdoors);
+
+	D2LvlPrestTxt* pLvlPrestTxtRecord = DATATBLS_GetLvlPrestTxtRecord(LVLPREST_ACT5_SIEGE_TO_TOWN);
+	D2_ASSERT(pLvlPrestTxtRecord);
+
+	int nSize = pOutdoors->nGridWidth - pLvlPrestTxtRecord->nSizeX / 8;
+	for (int i = 0; i < 15; ++i)
 	{
-		D2_ASSERT(pOutdoors);
+		D2_ASSERTM(nSize >= 0, "Siege Level is the wrong size");
 
-		D2LvlPrestTxt* pLvlPrestTxtRecord = DATATBLS_GetLvlPrestTxtRecord(LVLPREST_ACT5_SIEGE_TO_TOWN);
-		D2_ASSERT(pLvlPrestTxtRecord);
-
-		int nSize = pOutdoors->nGridWidth - pLvlPrestTxtRecord->nSizeX / 8;
-		for (int i = 0; i < 15; ++i)
-		{
-			D2_ASSERTM(nSize >= 0, "Siege Level is the wrong size");
-
-			DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, nSize, 0, i + LVLPREST_ACT5_SIEGE_TO_TOWN, 0, 0);
-			nSize -= pLvlPrestTxtRecord->nSizeX / 8;
-		}
+		DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, nSize, 0, i + LVLPREST_ACT5_SIEGE_TO_TOWN, 0, 0);
+		nSize -= pLvlPrestTxtRecord->nSizeX / 8;
 	}
-	else
-	{
-		DRLGOUTPLACE_SetOutGridLinkFlags(pLevel);
+}
 
+// 1.13c D2Common+0x41340
+static void DRLGOUTSIEGE_PlaceVertexBorders(D2DrlgLevelStrc* pLevel)
+{
+	D2DrlgOutdoorInfoStrc* pOutdoors = pLevel->pOutdoors;
+	{
 		D2DrlgVertexStrc* pPreviousVertex = pOutdoors->pVertex;
 		D2DrlgVertexStrc* pDrlgVertex = pPreviousVertex->pNext;
 
-		const int nLookupId = sub_6FD84100(pLevel);
+		const int nLookupId = (pLevel->nLevelId == LEVEL_TUNDRAWASTELANDS) + 4;
 		do
 		{
 			int nPreviousDiffX, nPreviousDiffY;
@@ -154,9 +138,32 @@ void __fastcall DRLGOUTSIEGE_InitAct5OutdoorLevel(D2DrlgLevelStrc* pLevel)
 
 		if (pLevel->nLevelId == LEVEL_ID_ACT5_BARRICADE_1)
 		{
-			sub_6FD846C0(pLevel);
+			// Two link-flag cells on the right edge, inlined at the end of D2Common+0x41340
+			D2DrlgOutdoorPackedGrid2InfoStrc tPackedInfo{ 0 };
+			tPackedInfo.bLvlLink = true;
+			DRLGGRID_AlterGridFlag(&pOutdoors->pGrid[2], pOutdoors->nGridWidth - 2, pOutdoors->nGridHeight - 4, tPackedInfo.nPackedValue, FLAG_OPERATION_OR);
+			DRLGGRID_AlterGridFlag(&pOutdoors->pGrid[2], pOutdoors->nGridWidth - 2, pOutdoors->nGridHeight - 3, tPackedInfo.nPackedValue, FLAG_OPERATION_OR);
 		}
+	}
+}
 
+// 1.13c D2Common+0x41230
+static void DRLGOUTSIEGE_PlaceCliffRavineBorders(D2DrlgLevelStrc* pLevel)
+{
+	static const D2CoordStrc stru_6FDD09C8[] =
+	{
+		{ -1, 0 },
+		{ 0, -1 },
+		{ 1, 0 },
+		{ 0, 1 },
+		{ 0, -1 },
+		{ 1, 0 },
+		{ 0, 1 },
+		{ -1, 0 },
+	};
+
+	D2DrlgOutdoorInfoStrc* pOutdoors = pLevel->pOutdoors;
+	{
 		const int nLastX = pOutdoors->nGridWidth - 2;
 		const int nLastY = pOutdoors->nGridHeight - 2;
 		int nX = nLastX;
@@ -176,6 +183,21 @@ void __fastcall DRLGOUTSIEGE_InitAct5OutdoorLevel(D2DrlgLevelStrc* pLevel)
 
 		DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, pOutdoors->nGridWidth - 2, 0, pLevel->nLevelId == LEVEL_TUNDRAWASTELANDS ? LVLPREST_ACT5_BARRICADE_CLIFF_RAVINE_BORDER_7_SNOW : LVLPREST_ACT5_BARRICADE_CLIFF_RAVINE_BORDER_7, -1, 0);
 		DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, 0, pOutdoors->nGridHeight - 2, pLevel->nLevelId == LEVEL_TUNDRAWASTELANDS ? LVLPREST_ACT5_BARRICADE_RAVINE_CLIFF_BORDER_5_SNOW : LVLPREST_ACT5_BARRICADE_RAVINE_CLIFF_BORDER_5, -1, 0);
+	}
+}
+
+// 1.13c D2Common+0x41CA0
+void __fastcall DRLGOUTSIEGE_InitAct5OutdoorLevel(D2DrlgLevelStrc* pLevel)
+{
+	if (pLevel->nLevelId == LEVEL_BLOODYFOOTHILLS)
+	{
+		DRLGOUTSIEGE_PlaceSiegeToTownRow(pLevel);
+	}
+	else
+	{
+		DRLGOUTPLACE_SetOutGridLinkFlags(pLevel);
+		DRLGOUTSIEGE_PlaceVertexBorders(pLevel);
+		DRLGOUTSIEGE_PlaceCliffRavineBorders(pLevel);
 
 		DRLGOUTSIEGE_PlaceBarricadeEntrancesAndExits(pLevel);
 		DRLGOUTSIEGE_PlaceCaves(pLevel);
@@ -192,6 +214,7 @@ void __fastcall DRLGOUTSIEGE_InitAct5OutdoorLevel(D2DrlgLevelStrc* pLevel)
 }
 
 //D2Common.0x6FD844F0
+// 1.13c D2Common+0x416B0
 void __fastcall DRLGOUTSIEGE_PlaceCaves(D2DrlgLevelStrc* pLevel)
 {
 	static const D2DrlgOutSiegeInitStrc stru_6FDD0988[] =
@@ -244,6 +267,7 @@ void __fastcall DRLGOUTSIEGE_PlaceCaves(D2DrlgLevelStrc* pLevel)
 }
 
 //D2Common.0x6FD84580
+// 1.13c D2Common+0x41B50
 void __fastcall DRLGOUTSIEGE_PlaceBarricadeEntrancesAndExits(D2DrlgLevelStrc* pLevel)
 {
 	for (int i = 0; i < pLevel->pOutdoors->nGridWidth; ++i)
@@ -283,16 +307,8 @@ void __fastcall DRLGOUTSIEGE_PlaceBarricadeEntrancesAndExits(D2DrlgLevelStrc* pL
 	}
 }
 
-//D2Common.0x6FD846C0
-void __fastcall sub_6FD846C0(D2DrlgLevelStrc* pLevel)
-{
-	D2DrlgOutdoorPackedGrid2InfoStrc tPackedInfo{ 0 };
-	tPackedInfo.bLvlLink = true;
-	DRLGGRID_AlterGridFlag(&pLevel->pOutdoors->pGrid[2], pLevel->pOutdoors->nGridWidth - 2, pLevel->pOutdoors->nGridHeight - 4, tPackedInfo.nPackedValue, FLAG_OPERATION_OR);
-	DRLGGRID_AlterGridFlag(&pLevel->pOutdoors->pGrid[2], pLevel->pOutdoors->nGridWidth - 2, pLevel->pOutdoors->nGridHeight - 3, tPackedInfo.nPackedValue, FLAG_OPERATION_OR);
-}
-
 //D2Common.0x6FD84700
+// 1.13c D2Common+0x41AD0
 //TODO: a1
 void __fastcall DRLGOUTSIEGE_AddACt5SecondaryBorder(D2DrlgLevelStrc* pLevel)
 {
@@ -317,6 +333,7 @@ void __fastcall DRLGOUTSIEGE_AddACt5SecondaryBorder(D2DrlgLevelStrc* pLevel)
 }
 
 //D2Common.0x6FD84780
+// 1.13c D2Common+0x40C20
 int __fastcall sub_6FD84780(D2DrlgLevelStrc* pLevel, int nStyle, int a3)
 {
 	static const D2DrlgOutSiegeInitStrc2 stru_6FDD0A28[] =
@@ -354,6 +371,7 @@ int __fastcall sub_6FD84780(D2DrlgLevelStrc* pLevel, int nStyle, int a3)
 }
 
 //D2Common.0x6FD84820
+// 1.13c D2Common+0x40DB0
 //TODO: v8
 BOOL __fastcall sub_6FD84820(D2DrlgLevelStrc* pLevel, int nX, int nY, int a4, int a5, unsigned int a6)
 {
@@ -372,6 +390,7 @@ BOOL __fastcall sub_6FD84820(D2DrlgLevelStrc* pLevel, int nX, int nY, int a4, in
 }
 
 //D2Common.0x6FD84870
+// 1.13c D2Common+0x41A20
 void __fastcall DRLGOUTSIEGE_PlaceSpecialPresets(D2DrlgLevelStrc* pLevel)
 {
 	static const D2DrlgOutSiegeInitStrc3 stru_6FDD0AF8[] =
@@ -422,6 +441,7 @@ void __fastcall DRLGOUTSIEGE_PlaceSpecialPresets(D2DrlgLevelStrc* pLevel)
 }
 
 //D2Common.0x6FD84910
+// 1.13c D2Common+0x41730
 void __fastcall DRLGOUTSIEGE_PlacePrisons(D2DrlgLevelStrc* pLevel)
 {
 	int nPrisonsPlaced = 0;
@@ -467,12 +487,15 @@ void __fastcall DRLGOUTSIEGE_PlacePrisons(D2DrlgLevelStrc* pLevel)
 
 		if (NeedsMorePrisons())
 		{
-			FOG_DisplayWarning("Could not place enough prisons for quest 2. Please include seed in bug report.", __FILE__, __LINE__);
+			// 1.13c: the failure is fatal (error string 0x259, then _exit(-1)), not a warning
+			FOG_DisplayAssert("Could not place enough prisons for quest 2. Please include seed in bug report.", __FILE__, __LINE__);
+			exit(-1);
 		}
 	}
 }
 
 //D2Common.0x6FD84BB0
+// 1.13c D2Common+0x41120
 void __fastcall DRLGOUTSIEGE_ConnectBarricadeAndSiege(D2DrlgLevelStrc* pLevel)
 {
 	D2LvlPrestTxt* pLvlPrestTxtRecord = NULL;

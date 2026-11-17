@@ -3,15 +3,12 @@
 #include <D2CommonDefinitions.h>
 #include <Fog.h>
 
+// 1.13c D2Common+0x366F0: retail's body is a bare return.
 //D2Common.0x6FDA5260 (#10916)
 void __stdcall SEED_Return()
 {
-	REMOVE_LATER_Trace("SEED_Return: Useless");
 }
 
-//D2Common.0x6FDAEA80 (#10920)
-// 1.13c D2Common+0x36760: three steps of the 0x19660D / 0x3C6EF35F LCG over (time32 + tick + arg), masked to 31 bits.
-// d2-web: the 1.10f single-step form is replaced; time is truncated to 32 bits as retail's time32 is.
 // Probe clock seam: when g_seedClockPinned is set, the test probe supplies
 // the time32 that retail reads through helper 0x265D and the tick count that GetTickCount returns. Unset, the
 // function reads the wall clock as before, so the game never sees the seam.
@@ -21,6 +18,9 @@ extern "C" {
 	uint32_t g_seedPinTick = 0;
 }
 
+//D2Common.0x6FDAEA80 (#10920)
+// 1.13c D2Common+0x36760: three steps of the 0x19660D / 0x3C6EF35F LCG over (time32 + tick + arg), masked to 31 bits.
+// d2-web: the 1.10f single-step form is replaced; time is truncated to 32 bits as retail's time32 is.
 int __fastcall SEED_GetRandomValue(int nValue)
 {
 	uint32_t nTime32 = g_seedClockPinned ? g_seedPinTime32 : (uint32_t)time(NULL);
@@ -48,12 +48,14 @@ void __fastcall SEED_InitLowSeed(D2SeedStrc* pSeed, int nLowSeed)
 	pSeed->nHighSeed = 666;
 }
 
+// 1.13c D2Common+0x36730
 //D2Common.0x6FDAEAD0 (#10914)
 uint32_t  __fastcall SEED_GetLowSeed(D2SeedStrc* pSeed)
 {
 	return pSeed->nLowSeed;
 }
 
+// 1.13c D2Common+0x36720
 //D2Common.0x6FDAEAE0 (#10921)
 void __fastcall SEED_SetSeeds(D2SeedStrc* pSeed, uint32_t  nLowSeed, uint32_t  nHighSeed)
 {
@@ -69,6 +71,7 @@ void __fastcall SEED_GetSeeds(D2SeedStrc* pSeed, uint32_t* pLowSeed, uint32_t* p
 	*pHighSeed = pSeed->nHighSeed;
 }
 
+// 1.13c D2Common+0x36700
 //D2Common.0x6FDAEB00 (#10915)
 uint32_t __fastcall SEED_GetHighSeed(D2SeedStrc* pSeed)
 {

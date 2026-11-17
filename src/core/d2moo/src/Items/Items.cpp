@@ -253,6 +253,8 @@ void __stdcall ITEMS_AssignRareSuffix(D2UnitStrc* pItem, uint16_t nSuffix)
 }
 
 //D2Common.0x6FD98750 (#10707)
+// 1.13c D2Common+0x23940 (item data +0x18, the item flags; 0x238B0 is the command-flag twin): retail takes only (pItem, dwFlag); nLine and szFile are the 1.10f debug
+// arguments, kept so existing callers compile, and are never read.
 BOOL __stdcall ITEMS_CheckItemFlag(D2UnitStrc* pItem, uint32_t dwFlag, int nLine, const char* szFile)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -991,49 +993,54 @@ void __stdcall ITEMS_SetOrRemoveFlag(int* pFlags, int nFlag, BOOL bSet)
 	}
 }
 
+// 1.13c D2Common+0x266E0: sum of a stat over the items socketed in pItem; only counted while pItem itself
+// is equipped (the walk still runs, as in retail, for any other mode and adds nothing).
 static int ITEMS_GetBonusStatFromSockets(D2UnitStrc* pItem, D2C_ItemStats stat)
 {
 	int nStatBonusFromSockets = 0;
-	if (pItem->dwUnitType == UNIT_ITEM)
+	if (pItem && pItem->dwUnitType == UNIT_ITEM && ITEMS_CheckIfSocketableByItemId(pItem->dwClassId))
 	{
-		if (ITEMS_CheckIfSocketableByItemId(pItem->dwClassId))
+		for (D2UnitStrc* i = INVENTORY_GetFirstItem(pItem->pInventory); i != NULL; )
 		{
-			for (D2UnitStrc* i = INVENTORY_GetFirstItem(pItem->pInventory); i != NULL; i = INVENTORY_GetNextItem(i))
+			if (pItem->dwAnimMode == IMODE_EQUIP)
 			{
-				i = INVENTORY_UnitIsItem(i);
-				if (pItem->dwAnimMode == IMODE_EQUIP)
-				{
-					nStatBonusFromSockets += STATLIST_UnitGetStatValue(i, stat, 0);
-				}
+				nStatBonusFromSockets += STATLIST_UnitGetStatValue(i->dwUnitType == UNIT_ITEM ? i : NULL, stat, 0);
 			}
+
+			if (i->dwUnitType != UNIT_ITEM || !i->pItemData)
+			{
+				break;
+			}
+
+			i = INVENTORY_GetNextItem(i);
 		}
 	}
 	return nStatBonusFromSockets;
 }
 
-static bool ITEMS_CheckStatRequirement(D2UnitStrc* pItem, D2UnitStrc* pUnit, D2C_ItemStats stat, BOOL bEquipping, int nStatWithPctBonus)
+// 1.13c D2Common+0x24280: the class an item type is restricted to, 7 (any class) when the type or the
+// byte is out of range.
+static uint8_t ITEMS_GetClassRequirement(D2UnitStrc* pItem)
 {
-
-	BOOL bStatReqMet = FALSE;
-	const int nUnitStat = STATLIST_UnitGetStatValue(pUnit, stat, 0);
-	if (nUnitStat > 0 && nUnitStat >= nStatWithPctBonus)
+	if (pItem && pItem->dwUnitType == UNIT_ITEM)
 	{
-		bStatReqMet = TRUE;
-		// Note: Owner was not checked in the original game for STAT_DEXTERITY
-		if (bEquipping && STATLIST_GetOwner(pItem, 0))
+		const int32_t nItemType = (int32_t)ITEMS_GetItemType(pItem);
+		if (nItemType >= 0 && nItemType < sgptDataTables->nItemTypesTxtRecordCount && sgptDataTables->pItemTypesTxt)
 		{
-			const int nStatBonusFromSockets = ITEMS_GetBonusStatFromSockets(pItem, stat);
-			if ((nUnitStat - nStatBonusFromSockets) <= 0 || (nUnitStat - nStatBonusFromSockets) < nStatWithPctBonus)
+			const uint8_t nClass = sgptDataTables->pItemTypesTxt[nItemType].nClass;
+			if (nClass < NUMBER_OF_PLAYERCLASSES)
 			{
-				bStatReqMet = FALSE;
+				return nClass;
 			}
 		}
 	}
-	return bStatReqMet;
+
+	return NUMBER_OF_PLAYERCLASSES;
 }
 
-
 //D2Common.0x6FD99740 (#10756)
+// 1.13c D2Common+0x26DB0: retail has no separate stat-requirement helper; the strength and dexterity
+// tests are written out here, strength alone with the owner test.
 BOOL __stdcall ITEMS_CheckRequirements(D2UnitStrc* pItem, D2UnitStrc* pUnit, BOOL bEquipping, BOOL* bStrength, BOOL* bDexterity, BOOL* bLevel)
 {
 	if (bStrength)
@@ -1063,43 +1070,85 @@ BOOL __stdcall ITEMS_CheckRequirements(D2UnitStrc* pItem, D2UnitStrc* pUnit, BOO
 		return FALSE;
 	}
 
+	BOOL bStrReqMet = TRUE;
+	BOOL bDexReqMet = TRUE;
+	BOOL bLevelReqMet = TRUE;
 
-	BOOL bIdentified = FALSE;
 	const D2ItemDataStrc* pItemData = pItem->pItemData;
-	if (pItemData)
-	{
-		bIdentified = pItemData->dwItemFlags & IFLAG_IDENTIFIED;
-	}
-	else
-	{
-		bIdentified = FALSE;
-	}
-
+	const uint32_t nIdentified = pItemData ? (pItemData->dwItemFlags & IFLAG_IDENTIFIED) : 0;
 	const int nBaseReqStr = pItemsTxtRecord->wReqStr;
 	const int nBaseReqDex = pItemsTxtRecord->wReqDex;
 
-
 	int nReqStrBonus = 0;
 	int nReqDexBonus = 0;
-	if (int nReqPctBonus = STATLIST_UnitGetItemStatOrSkillStatValue(pItem, STAT_ITEM_REQ_PERCENT, 0))
+	D2ItemStatCostTxt* pReqPercentTxt = ITEMS_GetItemStatCostTxtRecord(STAT_ITEM_REQ_PERCENT);
+	if (pItem->pStatListEx && pReqPercentTxt)
 	{
-		// It seems the original game has some additional logic to handle overflow here
-		nReqStrBonus = nBaseReqStr * int64_t(nReqPctBonus) / 100;
-		nReqDexBonus = nBaseReqDex * int64_t(nReqPctBonus) / 100;
+		const int nReqPctBonus = STATLIST_GetTotalStat_6FDB63E0(pItem->pStatListEx, D2SLayerStatIdStrc::MakeFromStatId(STAT_ITEM_REQ_PERCENT).nPackedValue, pReqPercentTxt);
+		if (nReqPctBonus)
+		{
+			nReqStrBonus = DATATBLS_ApplyRatio(nBaseReqStr, nReqPctBonus, 100);
+			nReqDexBonus = DATATBLS_ApplyRatio(nBaseReqDex, nReqPctBonus, 100);
+		}
 	}
 
-	if (pItemData && pItemData->dwItemFlags & IFLAG_ETHEREAL)
+	if (pItemData && (pItemData->dwItemFlags & IFLAG_ETHEREAL))
 	{
 		nReqStrBonus -= 10;
 		nReqDexBonus -= 10;
 	}
 
-	const BOOL bStrReqMet = ITEMS_CheckStatRequirement(pItem, pUnit, STAT_STRENGTH, bEquipping, nBaseReqStr + nReqStrBonus);
-	const BOOL bDexReqMet = ITEMS_CheckStatRequirement(pItem, pUnit, STAT_DEXTERITY, bEquipping, nBaseReqDex + nReqDexBonus);
+	const int nStrength = STATLIST_UnitGetStatValue(pUnit, STAT_STRENGTH, 0);
+	if (nStrength < 1)
+	{
+		bStrReqMet = FALSE;
+	}
+	else
+	{
+		const int nReqStr = nBaseReqStr + nReqStrBonus;
+		if (nStrength < nReqStr)
+		{
+			bStrReqMet = FALSE;
+		}
+		else if (bEquipping && STATLIST_GetOwner(pItem, NULL))
+		{
+			const int nSocketBonus = ITEMS_GetBonusStatFromSockets(pItem, STAT_STRENGTH);
+			if (nStrength - nSocketBonus < 1 || nStrength - nSocketBonus < nReqStr)
+			{
+				bStrReqMet = FALSE;
+			}
+		}
+	}
 
-	BOOL bLevelReqMet = FALSE;
-	const int nLevelReq = ITEMS_GetLevelRequirement(pItem, pUnit);
-	bLevelReqMet = nLevelReq == -1 || STATLIST_UnitGetStatValue(pUnit, STAT_LEVEL, 0) >= nLevelReq;
+	// Retail does not test the owner for dexterity.
+	const int nDexterity = STATLIST_UnitGetStatValue(pUnit, STAT_DEXTERITY, 0);
+	if (nDexterity < 1)
+	{
+		bDexReqMet = FALSE;
+	}
+	else
+	{
+		const int nReqDex = nBaseReqDex + nReqDexBonus;
+		if (nDexterity < nReqDex)
+		{
+			bDexReqMet = FALSE;
+		}
+		else if (bEquipping)
+		{
+			const int nSocketBonus = ITEMS_GetBonusStatFromSockets(pItem, STAT_DEXTERITY);
+			bDexReqMet = nDexterity - nSocketBonus > 0;
+			if (nDexterity - nSocketBonus < nReqDex)
+			{
+				bDexReqMet = FALSE;
+			}
+		}
+	}
+
+	const int nLevelReq = ITEMS_GetRequiredLevel(pItem, pUnit);
+	if (nLevelReq != -1 && STATLIST_UnitGetStatValue(pUnit, STAT_LEVEL, 0) < nLevelReq)
+	{
+		bLevelReqMet = FALSE;
+	}
 
 	if (bStrength)
 	{
@@ -1116,40 +1165,33 @@ BOOL __stdcall ITEMS_CheckRequirements(D2UnitStrc* pItem, D2UnitStrc* pUnit, BOO
 		*bLevel = bLevelReqMet;
 	}
 
-	if (bStrReqMet && bDexReqMet && bLevelReqMet && bIdentified)
+	if (bStrReqMet && bDexReqMet && bLevelReqMet && nIdentified)
 	{
-		if (pItemsTxtRecord->wType[0] == ITEMTYPE_BOOK && STATLIST_UnitGetStatValue(pItem, STAT_QUANTITY, 0) <= 0)
+		if (ITEMS_GetItemType(pItem) == ITEMTYPE_BOOK && STATLIST_UnitGetStatValue(pItem, STAT_QUANTITY, 0) <= 0)
 		{
 			return FALSE;
 		}
 
-		const int nItemType = ITEMS_GetItemTypeFromItemId(pItem->dwClassId);
-		const D2ItemTypesTxt* pItemTypesTxtRecord = DATATBLS_GetItemTypesTxtRecord(nItemType);
-
-		if (!pItemTypesTxtRecord || pItemTypesTxtRecord->nClass >= NUMBER_OF_PLAYERCLASSES)
+		const uint8_t nClassReq = ITEMS_GetClassRequirement(pItem);
+		if (nClassReq == NUMBER_OF_PLAYERCLASSES)
 		{
 			return TRUE;
 		}
 
-		const int nClassReq = pItemTypesTxtRecord->nClass;
-
-		if (!pUnit)
+		if (pUnit)
 		{
-			return FALSE;
-		}
-
-		if (pUnit->dwUnitType == UNIT_MONSTER && nClassReq == PCLASS_BARBARIAN)
-		{
-			const int nMonsterId = pUnit->dwClassId;
-			if (nMonsterId >= MONSTER_ACT5HIRE1 && nMonsterId <= MONSTER_ACT5HIRE2)
+			// 1.13c D2Common+0x1280: the monster id passes only while it is a valid monstats row
+			if (pUnit->dwUnitType == UNIT_MONSTER && nClassReq == PCLASS_BARBARIAN
+				&& (int32_t)pUnit->dwClassId >= 0 && (int32_t)pUnit->dwClassId < sgptDataTables->nMonStatsTxtRecordCount
+				&& pUnit->dwClassId >= MONSTER_ACT5HIRE1 && pUnit->dwClassId <= MONSTER_ACT5HIRE2)
 			{
 				return TRUE;
 			}
-		}
 
-		if (pUnit->dwUnitType == UNIT_PLAYER && nClassReq == pUnit->dwClassId)
-		{
-			return TRUE;
+			if (pUnit->dwUnitType == UNIT_PLAYER && nClassReq == pUnit->dwClassId)
+			{
+				return TRUE;
+			}
 		}
 	}
 
@@ -1454,38 +1496,34 @@ int __stdcall ITEMS_GetLevelRequirement(D2UnitStrc* pItem, D2UnitStrc* pUnit)
 // 1.13c D2Common+0x24C80
 BOOL __stdcall ITEMS_CheckBodyLocation(D2UnitStrc* pItem, uint8_t nBodyLoc)
 {
-	D2ItemTypesTxt* pItemTypesTxtRecord = NULL;
-	D2ItemsTxt* pItemsTxtRecord = NULL;
+	if (!pItem || pItem->dwUnitType != UNIT_ITEM)
+	{
+		return FALSE;
+	}
+
+	// 1.13c: the two body locations of the item's type (0x23130, type from 0x230F0), 0/0 when the type is unknown
 	uint8_t nBodyLoc1 = 0;
 	uint8_t nBodyLoc2 = 0;
-
-	if (pItem && pItem->dwUnitType == UNIT_ITEM)
+	const int32_t nType = (int32_t)ITEMS_GetItemType(pItem);
+	if (nType >= 0 && nType < sgptDataTables->nItemTypesTxtRecordCount && sgptDataTables->pItemTypesTxt)
 	{
-		pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-		D2_ASSERT(pItemsTxtRecord);
-
-		if (pItemsTxtRecord->wType[0] >= 0 && pItemsTxtRecord->wType[0] < sgptDataTables->nItemTypesTxtRecordCount)
-		{
-			pItemTypesTxtRecord = &sgptDataTables->pItemTypesTxt[pItemsTxtRecord->wType[0]];
-			if (pItemTypesTxtRecord)
-			{
-				nBodyLoc1 = pItemTypesTxtRecord->nBodyLoc1;
-				nBodyLoc2 = pItemTypesTxtRecord->nBodyLoc2;
-			}
-		}
-
-		if (nBodyLoc1 == nBodyLoc || nBodyLoc2 == nBodyLoc
-			|| (nBodyLoc == BODYLOC_SWRARM || nBodyLoc == BODYLOC_SWLARM) && (nBodyLoc1 == BODYLOC_RARM || nBodyLoc2 == BODYLOC_RARM || nBodyLoc1 == BODYLOC_LARM || nBodyLoc2 == BODYLOC_LARM))
-		{
-			return TRUE;
-		}
-	}
-	else
-	{
-		FOG_Trace(" ----- JONM NOTE: Would have crashed, see code at ITEMSCheckBodyLocation. From FILE: %s  LINE: %d", __FILE__, __LINE__);
+		nBodyLoc1 = sgptDataTables->pItemTypesTxt[nType].nBodyLoc1;
+		nBodyLoc2 = sgptDataTables->pItemTypesTxt[nType].nBodyLoc2;
 	}
 
-	return FALSE;
+	if (nBodyLoc1 != nBodyLoc && nBodyLoc2 != nBodyLoc)
+	{
+		if (nBodyLoc != BODYLOC_SWRARM && nBodyLoc != BODYLOC_SWLARM)
+		{
+			return FALSE;
+		}
+		if (nBodyLoc1 != BODYLOC_RARM && nBodyLoc2 != BODYLOC_RARM && nBodyLoc1 != BODYLOC_LARM && nBodyLoc2 != BODYLOC_LARM)
+		{
+			return FALSE;
+		}
+	}
+
+	return TRUE;
 }
 
 //D2Common.0x6FD9A4F0 (#10762)
@@ -2709,6 +2747,7 @@ int __stdcall ITEMS_CheckIfSocketableByItemId(int nItemId)
 }
 
 //D2Common.0x6FD9D360 (#10810)
+// 1.13c D2Common+0x246F0
 int __stdcall ITEMS_CheckIfSocketable(D2UnitStrc* pItem)
 {
 	if (pItem && pItem->dwUnitType == UNIT_ITEM)
@@ -3178,6 +3217,7 @@ const D2RunesTxt* __stdcall ITEMS_GetRunesTxtRecordFromItem(const D2UnitStrc* pI
 }
 
 
+// not-1.13c: retail inlines this bit test into its type-equivalence checks (D2Common+0x24500, 0x24430)
 static BOOL ITEMS_CheckTypeEquivalenceFromLUT(uint32_t* pEquivalenceLUT, uint32_t nItemType)
 {
 	return pEquivalenceLUT[nItemType / 32] & gdwBitMasks[nItemType % 32];
@@ -4728,6 +4768,8 @@ size_t __stdcall ITEMS_DecodeItemFromBitstream(D2UnitStrc* pItem, uint8_t* pBits
 }
 
 //D2Common.0x6FDA0620
+// 1.13c D2Common+0x2C0C0 (EAX = item, EDI = buffer in retail; the second code lookup goes through the
+// items linker, the quest-difficulty stat record is asserted present before it is read)
 int __fastcall ITEMS_DecodeItemBitstreamCompact(D2UnitStrc* pItem, D2BitBufferStrc* pBuffer, BOOL bCheckForHeader, uint32_t dwVersion)
 {
 	D2ItemStatCostTxt* pItemStatCostTxtRecord = NULL;
@@ -4762,7 +4804,7 @@ int __fastcall ITEMS_DecodeItemBitstreamCompact(D2UnitStrc* pItem, D2BitBufferSt
 
 	if (pItemData->dwItemFlags & IFLAG_ISEAR)
 	{
-		pItemData->dwFileIndex = BITMANIP_Read(pBuffer, 3);
+		ITEMS_SetFileIndex(pItem, BITMANIP_Read(pBuffer, 3));
 		pItemData->nEarLvl = (uint8_t)BITMANIP_Read(pBuffer, 7);
 
 		int i = 0;
@@ -4777,7 +4819,7 @@ int __fastcall ITEMS_DecodeItemBitstreamCompact(D2UnitStrc* pItem, D2BitBufferSt
 	else
 	{
 		dwCode = BITMANIP_Read(pBuffer, 32);
-		pItem->dwClassId = DATATBLS_GetItemIdFromItemCode(dwCode);
+		pItem->dwClassId = FOG_GetLinkIndex(sgptDataTables->pItemsLinker, dwCode, 0);
 
 		if (ITEMS_CheckItemTypeId(pItem, ITEMTYPE_GOLD))
 		{
@@ -4807,17 +4849,17 @@ int __fastcall ITEMS_DecodeItemBitstreamCompact(D2UnitStrc* pItem, D2BitBufferSt
 
 	if (dwVersion > 92)
 	{
-		pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-		D2_ASSERT(pItemsTxtRecord);
-
-		pItemsTxtRecord = DATATBLS_GetItemRecordFromItemCode(pItemsTxtRecord->dwCode, &nItemId);
-		if (!pItemsTxtRecord)
+		// 1.13c: the item's own code is looked up in the items linker again (no items.txt row-count test)
+		nItemId = FOG_GetLinkIndex(sgptDataTables->pItemsLinker, ITEMS_GetBaseCode(pItem), 0);
+		if (nItemId < 0 || !sgptDataTables->pItemDataTables.pItemsTxt)
 		{
 			return -1;
 		}
+		pItemsTxtRecord = &sgptDataTables->pItemDataTables.pItemsTxt[nItemId];
 
 		if (pItemsTxtRecord->nQuest && pItemsTxtRecord->nQuestDiffCheck)
 		{
+			D2_ASSERT(sgptDataTables->nItemStatCostTxtRecordCount > STAT_QUESTITEMDIFFICULTY && sgptDataTables->pItemStatCostTxt);
 			pItemStatCostTxtRecord = ITEMS_GetItemStatCostTxtRecord(STAT_QUESTITEMDIFFICULTY);
 			nValue = (BITMANIP_Read(pBuffer, pItemStatCostTxtRecord->nSaveBits) - pItemStatCostTxtRecord->dwSaveAdd) << pItemStatCostTxtRecord->nValShift;
 
@@ -4854,6 +4896,7 @@ int __fastcall ITEMS_DecodeItemBitstreamCompact(D2UnitStrc* pItem, D2BitBufferSt
 	return 1;
 }
 
+// 1.13c D2Common+0x2A600
 //D2Common.0x6FDA0A20
 int __fastcall ITEMS_DecodeItemBitstreamComplete(D2UnitStrc* pItem, D2BitBufferStrc* pBuffer, BOOL bCheckForHeader, BOOL bGamble, int* pSocketedItems, uint32_t dwVersion)
 {
@@ -5159,7 +5202,7 @@ int __fastcall ITEMS_DecodeItemBitstreamComplete(D2UnitStrc* pItem, D2BitBufferS
 					pSetItemsTxtRecord = &sgptDataTables->pSetItemsTxt[nSetRecordId];
 					if (pSetItemsTxtRecord)
 					{
-						pItemData->dwFileIndex = pSetItemsTxtRecord->wSetItemId;
+						pItemData->dwFileIndex = (uint32_t)(int32_t)(int16_t)pSetItemsTxtRecord->wSetItemId; // retail sign-extends the 16-bit id
 						bError = FALSE;
 					}
 				}
@@ -5176,7 +5219,7 @@ int __fastcall ITEMS_DecodeItemBitstreamComplete(D2UnitStrc* pItem, D2BitBufferS
 							D2SetItemsTxt* pSetItem = DATATBLS_GetSetItemOfSet(pSetsTxtRecord, i);
 							if (pSetItem && pSetItem->szItemCode == dwCode)
 							{
-								pItemData->dwFileIndex = pSetItem->wSetItemId;
+								pItemData->dwFileIndex = (uint32_t)(int32_t)(int16_t)pSetItem->wSetItemId; // retail sign-extends the 16-bit id
 								bError = FALSE;
 								break;
 							}
@@ -7181,6 +7224,7 @@ void __fastcall ITEMS_SerializeItemComplete(D2UnitStrc* pItem, D2BitBufferStrc* 
 }
 
 //D2Common.0x6FDA42B0
+// 1.13c D2Common+0x17A0 (row index in EAX; no null test of the table pointer, as in retail)
 D2ItemStatCostTxt* __fastcall ITEMS_GetItemStatCostTxtRecord(int nStatId)
 {
 	if (nStatId >= 0 && nStatId < sgptDataTables->nItemStatCostTxtRecordCount)

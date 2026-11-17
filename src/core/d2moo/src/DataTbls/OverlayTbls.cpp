@@ -41,6 +41,7 @@ void __fastcall DATATBLS_LoadOverlayTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD72500
+// not-1.13c: retail inlines the overlay unload into the unload-all function at 0x5E870
 void __fastcall DATATBLS_UnloadOverlayTxt()
 {
 	FOG_FreeLinker(sgptDataTables->pOverlayLinker);
@@ -64,52 +65,64 @@ uint32_t __stdcall DATATBLS_GetFramesFromOverlayTxt(int nOverlayId)
 }
 
 //D2Common.0x6FD72570 (#10675)
+// 1.13c D2Common+0x82EC0: the bound test and the record address are inline, no table-pointer test
 int __stdcall DATABLS_GetPreDrawFromOverlayTxt(int nOverlayId)
 {
-	D2OverlayTxt* pOverlayTxt = DATATBLS_GetOverlayTxtRecord(nOverlayId);
-
-	if (pOverlayTxt)
+	if (nOverlayId > -1 && nOverlayId < sgptDataTables->nOverlayTxtRecordCount)
 	{
-		return pOverlayTxt->nPreDraw;
+		const D2OverlayTxt* pOverlayTxt = &sgptDataTables->pOverlayTxt[nOverlayId];
+		if (pOverlayTxt)
+		{
+			return pOverlayTxt->nPreDraw;
+		}
 	}
 
 	return 0;
 }
 
 //D2Common.0x6FD725B0 (#10676)
+// 1.13c D2Common+0x82E80
 uint32_t __stdcall DATATBLS_GetOffsetXFromOverlayTxt(int nOverlayId)
 {
-	D2OverlayTxt* pOverlayTxt = DATATBLS_GetOverlayTxtRecord(nOverlayId);
-
-	if (pOverlayTxt)
+	if (nOverlayId > -1 && nOverlayId < sgptDataTables->nOverlayTxtRecordCount)
 	{
-		return pOverlayTxt->dwOffsetX;
+		const D2OverlayTxt* pOverlayTxt = &sgptDataTables->pOverlayTxt[nOverlayId];
+		if (pOverlayTxt)
+		{
+			return pOverlayTxt->dwOffsetX;
+		}
 	}
 
 	return 0;
 }
 
 //D2Common.0x6FD725F0 (#10677)
+// 1.13c D2Common+0x82E40
 uint32_t __stdcall DATATBLS_GetOffsetYFromOverlayTxt(int nOverlayId)
 {
-	D2OverlayTxt* pOverlayTxt = DATATBLS_GetOverlayTxtRecord(nOverlayId);
-
-	if (pOverlayTxt)
+	if (nOverlayId > -1 && nOverlayId < sgptDataTables->nOverlayTxtRecordCount)
 	{
-		return pOverlayTxt->dwOffsetY;
+		const D2OverlayTxt* pOverlayTxt = &sgptDataTables->pOverlayTxt[nOverlayId];
+		if (pOverlayTxt)
+		{
+			return pOverlayTxt->dwOffsetY;
+		}
 	}
 
 	return 0;
 }
 
 //D2Common.0x6FD72630 (#10678)
+// 1.13c D2Common+0x82E00
 int __stdcall DATATBLS_GetTransFromOverlayTxt(int nOverlayId)
 {
-	D2OverlayTxt* pOverlayTxt = DATATBLS_GetOverlayTxtRecord(nOverlayId);
-
-	if (pOverlayTxt)
+	if (nOverlayId > -1 && nOverlayId < sgptDataTables->nOverlayTxtRecordCount)
 	{
-		return pOverlayTxt->nTrans;
+		const D2OverlayTxt* pOverlayTxt = &sgptDataTables->pOverlayTxt[nOverlayId];
+		if (pOverlayTxt)
+		{
+			return pOverlayTxt->nTrans;
+		}
 	}
 
 	return 0;
@@ -169,6 +182,7 @@ int __stdcall DATATBLS_GetDirFromOverlayTxt(int nOverlayId)
 }
 
 //Inlined at various places
+// not-1.13c: retail inlines the bound test into each accessor; this helper adds a table-pointer test (see README)
 D2OverlayTxt* __fastcall DATATBLS_GetOverlayTxtRecord(int nOverlay)
 {
 	// The table-pointer test is ours. 1.13c D2Common+0x82d60 tests only the record address (base + id*0x84, non-zero):

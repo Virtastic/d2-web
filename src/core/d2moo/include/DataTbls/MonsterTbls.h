@@ -782,8 +782,6 @@ D2COMMON_DLL_DECL D2MonPresetTxt* __stdcall DATATBLS_GetMonPresetTxtActSection(i
 D2COMMON_DLL_DECL int __stdcall DATATBLS_MapSuperUniqueId(int nType, int nSuperUnique);
 //D2Common.0x6FD6EFA0
 void __fastcall DATATBLS_LoadSoundsTxt(HD2ARCHIVE hArchive);
-//D2Common.0x6FD6F020
-void __fastcall DATATBLS_UnloadSoundsTxt();
 //D2Common.0x6FD6F230
 void __fastcall DATATBLS_LoadMonEquipTxt(HD2ARCHIVE hArchive);
 //D2Common.0x6FD6F580
