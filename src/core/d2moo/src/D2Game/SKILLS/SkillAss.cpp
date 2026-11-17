@@ -1,4 +1,5 @@
 #include "SKILLS/SkillAss.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -458,20 +459,27 @@ D2SkillsTxt* __fastcall SKILLS_GetSkillsTxtRecord(int32_t nSkillId)
     return nullptr;
 }
 
+// the skills row's fifth parameter; retail inlines this read as a small accessor that 1.13c's 918D0 calls (D2Game+0x1C50)
+int32_t __fastcall SKILLS_GetSkillParam4(int32_t nSkillId)
+{
+    D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
+    return pSkillsTxtRecord ? (int32_t)pSkillsTxtRecord->dwParam[4] : 0;
+}
+
 //D2Game.0x6FCF5BC0
 // 1.13c D2Game+0x918D0
 void __fastcall sub_6FCF5BC0(D2UnitStrc* pUnit, D2StatListStrc* pStatList, D2DamageStrc* pDamage)
 {
-    const int32_t nSkillId = STATLIST_GetStatValue(pStatList, STAT_MODIFIERLIST_SKILL, 0);
+    const int32_t nSkillId = D2_CALL(STATLIST_GetStatValue, pStatList, STAT_MODIFIERLIST_SKILL, 0);
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
     if (!pSkillsTxtRecord)
     {
         return;
     }
 
-    int32_t nSkillLevel = STATLIST_GetStatValue(pStatList, STAT_MODIFIERLIST_LEVEL, 0);
-    D2SkillStrc* pSkill = SKILLS_GetHighestLevelSkillFromUnitAndId(pUnit, nSkillId);
-    const int32_t nLevel = SKILLS_GetSkillLevel(pUnit, pSkill, 1);
+    int32_t nSkillLevel = D2_CALL(STATLIST_GetStatValue, pStatList, STAT_MODIFIERLIST_LEVEL, 0);
+    D2SkillStrc* pSkill = D2_CALL(SKILLS_GetHighestLevelSkillFromUnitAndId, pUnit, nSkillId);
+    const int32_t nLevel = D2_CALL(SKILLS_GetSkillLevel, pUnit, pSkill, 1);
     if (nLevel > nSkillLevel)
     {
         nSkillLevel = nLevel;
@@ -482,27 +490,31 @@ void __fastcall sub_6FCF5BC0(D2UnitStrc* pUnit, D2StatListStrc* pStatList, D2Dam
         const int32_t nAuraStat = pSkillsTxtRecord->wAuraStat[0];
         if (nAuraStat >= 0 && nAuraStat < sgptDataTables->nItemStatCostTxtRecordCount)
         {
-            const int32_t nValue = STATLIST_GetStatValue(pStatList, nAuraStat, 0);
+            const int32_t nValue = D2_CALL(STATLIST_GetStatValue, pStatList, nAuraStat, 0);
             if (nValue > 0)
             {
-                D2GAME_RollElementalDamage_6FD14DD0(pUnit, pDamage, nSkillId, nSkillLevel);
+                D2_CALL(D2GAME_RollElementalDamage_6FD14DD0, pUnit, pDamage, nSkillId, nSkillLevel);
 
-                if (pSkillsTxtRecord->nEType == ELEMTYPE_COLD && nValue == 3 && pSkillsTxtRecord->dwParam[4])
+                if (pSkillsTxtRecord->nEType == ELEMTYPE_COLD && nValue == 3)
                 {
-                    pDamage->dwFrzLen += pDamage->dwColdLen / pSkillsTxtRecord->dwParam[4];
+                    const int32_t nDivisor = D2_CALL(SKILLS_GetSkillParam4, nSkillId);
+                    if (nDivisor)
+                    {
+                        pDamage->dwFrzLen += pDamage->dwColdLen / nDivisor;
+                    }
                 }
 
                 pDamage->wResultFlags |= DAMAGERESULTFLAG_SOFTHIT;
 
-                int32_t nPercentage = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwCalc[0], nSkillId, nSkillLevel);
+                int32_t nPercentage = D2_CALL(SKILLS_EvaluateSkillFormula, pUnit, pSkillsTxtRecord->dwCalc[0], nSkillId, nSkillLevel);
                 if (nPercentage > 0)
                 {
                     nPercentage = std::min(nPercentage, 100);
 
                     const int32_t nBaseDamage = pDamage->dwPhysDamage;
-                    const int32_t nDamage = std::min(MONSTERUNIQUE_CalculatePercentage(nBaseDamage, nPercentage, 100), nBaseDamage);
+                    const int32_t nDamage = std::min(D2_CALL(MONSTERUNIQUE_CalculatePercentage, nBaseDamage, nPercentage, 100), nBaseDamage);
                     pDamage->dwPhysDamage = nBaseDamage - nDamage;
-                    sub_6FD11E40(pUnit, pDamage, pSkillsTxtRecord->nEType, nDamage, 0, 0, 0);
+                    D2_CALL(sub_6FD11E40, pUnit, pDamage, pSkillsTxtRecord->nEType, nDamage, 0, 0, 0);
                 }
             }
         }
@@ -639,21 +651,21 @@ int32_t __fastcall SKILLS_SrvDo039_FistsOfFire_BladesOfIce_ProgressiveFn3(D2Game
 
     int32_t nTargetX = 0;
     int32_t nTargetY = 0;
-    if (!pSkillsTxtRecord || !D2GAME_GetXAndYFromTargetUnit_6FD14020(pGame, pUnit, &nTargetX, &nTargetY))
+    if (!pSkillsTxtRecord || !D2_CALL(D2GAME_GetXAndYFromTargetUnit_6FD14020, pGame, pUnit, &nTargetX, &nTargetY))
     {
         return 0;
     }
 
-    const int32_t nMissileId = SKILLS_GetProgressiveSkillMissileId(pUnit, nSkillId);
+    const int32_t nMissileId = D2_CALL(SKILLS_GetProgressiveSkillMissileId, pUnit, nSkillId);
     if (nMissileId <= 0)
     {
         return 0;
     }
 
-    int32_t nRange = SKILLS_EvaluateProgressiveSkillCalc(pUnit, nSkillId, nSkillLevel);
+    int32_t nRange = D2_CALL(SKILLS_EvaluateProgressiveSkillCalc, pUnit, nSkillId, nSkillLevel);
     if (!nRange)
     {
-        nRange = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwAuraRangeCalc, nSkillId, nSkillLevel);
+        nRange = D2_CALL(SKILLS_EvaluateSkillFormula, pUnit, pSkillsTxtRecord->dwAuraRangeCalc, nSkillId, nSkillLevel);
     }
 
     D2MissileStrc missileParams = {};
@@ -665,9 +677,9 @@ int32_t __fastcall SKILLS_SrvDo039_FistsOfFire_BladesOfIce_ProgressiveFn3(D2Game
     missileParams.nSkillLevel = nSkillLevel;
 
     D2SeedStrc seed = {};
-    SEED_InitLowSeed(&seed, nRand);
+    D2_CALL(SEED_InitLowSeed, &seed, nRand);
 
-    D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
+    D2ActiveRoomStrc* pRoom = D2_CALL(UNITS_GetRoom, pUnit);
     const int32_t nArea = nRange * nRange;
     for (int32_t i = 0; i < nArea; ++i)
     {
@@ -679,9 +691,9 @@ int32_t __fastcall SKILLS_SrvDo039_FistsOfFire_BladesOfIce_ProgressiveFn3(D2Game
             missileParams.nX = nTargetX + nX;
             missileParams.nY = nTargetY + nY;
 
-            if (D2GAME_GetRoom_6FC52070(pRoom, missileParams.nX, missileParams.nY))
+            if (D2_CALL(D2GAME_GetRoom_6FC52070, pRoom, missileParams.nX, missileParams.nY))
             {
-                MISSILES_CreateMissileFromParams(pGame, &missileParams);
+                D2_CALL(MISSILES_CreateMissileFromParams, pGame, &missileParams);
             }
         }
     }

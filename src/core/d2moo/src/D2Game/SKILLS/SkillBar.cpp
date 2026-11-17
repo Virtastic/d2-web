@@ -1,4 +1,5 @@
 #include "SKILLS/SkillBar.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -352,7 +353,7 @@ int32_t __fastcall SKILLS_Callback_FindTargetForTaunt(D2GameStrc* pGame, D2UnitS
         return 0;
     }
 
-    if (!sub_6FD15190(pUnit, AISPECIALSTATE_TAUNT) || SUNIT_IsDead(pUnit))
+    if (!D2_CALL(sub_6FD15190, pUnit, AISPECIALSTATE_TAUNT) || D2_CALL(SUNIT_IsDead, pUnit))
     {
         return 0;
     }
@@ -1452,32 +1453,32 @@ int32_t __fastcall SKILLS_SetVelocityForLeap(D2GameStrc* pGame, D2UnitStrc* pUni
         return 0;
     }
 
-    SKILLS_SetFlags(pSkill, 0x1101u);
-    PATH_SetMoveTestCollisionMask(pUnit->pDynamicPath, COLLIDE_NONE);
-    PATH_SetFootprintCollisionMask(pUnit->pDynamicPath, COLLIDE_NONE);
+    D2_CALL(SKILLS_SetFlags, pSkill, 0x1101u);
+    D2_CALL(PATH_SetMoveTestCollisionMask, pUnit->pDynamicPath, COLLIDE_NONE);
+    D2_CALL(PATH_SetFootprintCollisionMask, pUnit->pDynamicPath, COLLIDE_NONE);
 
-    const int32_t nX = SKILLS_GetParam1(pSkill);
-    const int32_t nY = SKILLS_GetParam2(pSkill);
+    const int32_t nX = D2_CALL(SKILLS_GetParam1, pSkill);
+    const int32_t nY = D2_CALL(SKILLS_GetParam2, pSkill);
     if (!nX || !nY)
     {
         return 0;
     }
 
-    D2COMMON_10170_PathSetTargetPos(pUnit->pDynamicPath, nX, nY);
-    PATH_SetType(pUnit->pDynamicPath, PATHTYPE_LEAP);
+    D2_CALL(D2COMMON_10170_PathSetTargetPos, pUnit->pDynamicPath, nX, nY);
+    D2_CALL(PATH_SetType, pUnit->pDynamicPath, PATHTYPE_LEAP);
 
     if (pUnit->dwUnitType != UNIT_MONSTER)
     {
-        PATH_SetVelocity(pUnit->pDynamicPath, PLRSAVE2_GetCharStatsTxtRecord(pUnit->dwClassId)->nRunSpeed << 8, __FILE__, __LINE__);
-        D2Common_10142(pUnit->pDynamicPath, pUnit, 0);
+        D2_CALL(PATH_SetVelocity, pUnit->pDynamicPath, D2_CALL(PLRSAVE2_GetCharStatsTxtRecord, pUnit->dwClassId)->nRunSpeed << 8, __FILE__, __LINE__);
+        D2_CALL(D2Common_10142, pUnit->pDynamicPath, pUnit, 0);
         return 1;
     }
 
-    D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(pUnit->dwClassId);
+    D2MonStatsTxt* pMonStatsTxtRecord = D2_CALL(MONSTERMODE_GetMonStatsTxtRecord, pUnit->dwClassId);
     if (pMonStatsTxtRecord)
     {
-        PATH_SetVelocity(pUnit->pDynamicPath, pMonStatsTxtRecord->nRun << 8, __FILE__, __LINE__);
-        D2Common_10142(pUnit->pDynamicPath, pUnit, 0);
+        D2_CALL(PATH_SetVelocity, pUnit->pDynamicPath, pMonStatsTxtRecord->nRun << 8, __FILE__, __LINE__);
+        D2_CALL(D2Common_10142, pUnit->pDynamicPath, pUnit, 0);
         return 1;
     }
 
@@ -1659,25 +1660,25 @@ int32_t __fastcall SKILLS_SrvSt41_LeapAttack(D2GameStrc* pGame, D2UnitStrc* pUni
 // 1.13c D2Game+0x293B0
 int32_t __fastcall SKILLS_SrvDo078_LeapAttack(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
-    D2SkillStrc* pSkill = SKILLS_GetHighestLevelSkillFromUnitAndId(pUnit, nSkillId);
+    D2SkillStrc* pSkill = D2_CALL(SKILLS_GetHighestLevelSkillFromUnitAndId, pUnit, nSkillId);
     if (!pSkill)
     {
         return 0;
     }
 
-    const int32_t nSkillFlags = SKILLS_GetFlags(pSkill);
+    const int32_t nSkillFlags = D2_CALL(SKILLS_GetFlags, pSkill);
     if (nSkillFlags & 0x100)
     {
-        if (SKILLS_Leap(pGame, pUnit, pSkill))
+        if (D2_CALL(SKILLS_Leap, pGame, pUnit, pSkill))
         {
-            if (!SKILLS_FindLeapAttackTarget(pGame, pUnit, pSkill))
+            if (!D2_CALL(SKILLS_FindLeapAttackTarget, pGame, pUnit, pSkill))
             {
                 D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_ENDANIM, 0);
-                EVENT_SetEvent(pGame, pUnit, EVENTTYPE_ENDANIM, pGame->dwGameFrame + 4, 0, 0);
+                D2_CALL(EVENT_SetEvent, pGame, pUnit, EVENTTYPE_ENDANIM, pGame->dwGameFrame + 4, 0, 0);
                 return 0;
             }
 
-            D2GAME_SKILLS_RewindSkillEx_6FCBD260(pGame, pUnit, 16);
+            D2_CALL(D2GAME_SKILLS_RewindSkillEx_6FCBD260, pGame, pUnit, 16);
         }
 
         return 1;
@@ -1685,15 +1686,21 @@ int32_t __fastcall SKILLS_SrvDo078_LeapAttack(D2GameStrc* pGame, D2UnitStrc* pUn
 
     if (nSkillFlags & 0x80)
     {
-        return SKILLS_SetVelocityForLeap(pGame, pUnit, pSkill);
+        return D2_CALL(SKILLS_SetVelocityForLeap, pGame, pUnit, pSkill);
     }
 
-    if (!(SKILLS_GetFlags(pSkill) & 0x200))
+    if (!(D2_CALL(SKILLS_GetFlags, pSkill) & 0x200))
     {
-        SKILLS_SetFlags(pSkill, 0x1000u);
+        D2_CALL(SKILLS_SetFlags, pSkill, 0x1000u);
         return 1;
     }
 
+    return D2_CALL(SKILLS_LeapAttackHit, pGame, pUnit, pSkill, nSkillId, nSkillLevel);
+}
+
+// The damage part of the leap attack (retail calls it as its own function, 1.13c D2Game+0x27820).
+int32_t __fastcall SKILLS_LeapAttackHit(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStrc* pSkill, int32_t nSkillId, int32_t nSkillLevel)
+{
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
     if (!pSkillsTxtRecord)
     {

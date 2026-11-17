@@ -12,6 +12,7 @@ int32_t __fastcall SKILLS_SrvSt04_Arrow_Bolt(D2GameStrc* pGame, D2UnitStrc* pUni
 int32_t __fastcall SKILLS_SrvSt05_Jab(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel);
 //D2Game.0x6FCF3170
 int32_t __fastcall SKILLS_SrvSt06_PowerStrike_ChargedStrike(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel);
+int32_t __fastcall SKILLS_ImpaleDurabilityProc(int32_t nChance, D2UnitStrc* pItem, D2UnitStrc* pUnit, D2GameStrc* pGame, int32_t nAmount);
 //D2Game.0x6FCF3280
 int32_t __fastcall SKILLS_SrvSt07_Impale(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel);
 //D2Game.0x6FCF3510

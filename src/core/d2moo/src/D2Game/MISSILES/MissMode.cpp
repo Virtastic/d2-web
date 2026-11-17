@@ -491,7 +491,7 @@ void __fastcall MISSMODE_AddDamageValue(D2GameStrc* pGame, D2UnitStrc* pMissile,
         return;
     }
 
-    switch (MISSILE_GetElemTypeFromMissileId(pMissile->dwClassId))
+    switch (D2_CALL(MISSILE_GetElemTypeFromMissileId, pMissile->dwClassId))
     {
     case ELEMTYPE_NONE:
         pDamage->dwPhysDamage += nDamage;
@@ -3270,9 +3270,9 @@ int32_t __fastcall MISSMODE_LightningFury_AuraCallback(D2AuraCallbackStrc* pAura
     missileParams.nSkill = pParams->nSkillId;
     missileParams.nSkillLevel = pParams->nLevel;
     missileParams.nMissile = pParams->nHitSubMissile;
-    missileParams.nTargetX = CLIENTS_GetUnitX(pTarget);
-    missileParams.nTargetY = CLIENTS_GetUnitY(pTarget);
-    MISSILES_CreateMissileFromParams(pAuraCallback->pGame, &missileParams);
+    missileParams.nTargetX = D2_CALL(CLIENTS_GetUnitX, pTarget);
+    missileParams.nTargetY = D2_CALL(CLIENTS_GetUnitY, pTarget);
+    D2_CALL(MISSILES_CreateMissileFromParams, pAuraCallback->pGame, &missileParams);
 
     return 1;
 }
@@ -3430,9 +3430,9 @@ int32_t __fastcall MISSMODE_FistOfTheHeavensDelay_AuraCallback(D2AuraCallbackStr
     missileParams.nSkill = pParams->nSkillId;
     missileParams.nSkillLevel = pParams->nLevel;
     missileParams.nMissile = pParams->nHitSubMissile;
-    missileParams.nTargetX = CLIENTS_GetUnitX(pTarget);
-    missileParams.nTargetY = CLIENTS_GetUnitY(pTarget);
-    MISSILES_CreateMissileFromParams(pAuraCallback->pGame, &missileParams);
+    missileParams.nTargetX = D2_CALL(CLIENTS_GetUnitX, pTarget);
+    missileParams.nTargetY = D2_CALL(CLIENTS_GetUnitY, pTarget);
+    D2_CALL(MISSILES_CreateMissileFromParams, pAuraCallback->pGame, &missileParams);
 
     return 1;
 }
@@ -4334,15 +4334,15 @@ int32_t __fastcall MISSMODE_SrvHit55_Baalnferno(D2GameStrc* pGame, D2UnitStrc* p
         return 1;
     }
 
-    const int32_t nCurrentMana = STATLIST_UnitGetStatValue(pUnit, STAT_MANA, 0);
+    const int32_t nCurrentMana = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_MANA, 0);
     if (nCurrentMana <= 0)
     {
         return 1;
     }
 
     const int32_t nPercentage = D2Clamp(pMissilesTxtRecord->dwHitPar[0], 1u, 100u);
-    const int32_t nLostMana = D2Clamp(MONSTERUNIQUE_CalculatePercentage(nCurrentMana, nPercentage, 100), 1, nCurrentMana);
-    STATLIST_SetUnitStat(pUnit, STAT_MANA, nCurrentMana - nLostMana, 0);
+    const int32_t nLostMana = D2Clamp(D2_CALL(MONSTERUNIQUE_CalculatePercentage, nCurrentMana, nPercentage, 100), 1, nCurrentMana);
+    D2_CALL(STATLIST_SetUnitStat, pUnit, STAT_MANA, nCurrentMana - nLostMana, 0);
     return 2;
 }
 

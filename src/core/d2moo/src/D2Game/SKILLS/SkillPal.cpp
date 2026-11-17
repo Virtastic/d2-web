@@ -1,4 +1,5 @@
 #include "SKILLS/SkillPal.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -1092,10 +1093,10 @@ int32_t __fastcall SKILLS_SrvDo073_BlessedHammer(D2GameStrc* pGame, D2UnitStrc* 
 {
     if (SKILLS_GetSkillsTxtRecord(nSkillId))
     {
-        const int32_t nMissileId = SKILLS_GetProgressiveSkillMissileId(pUnit, nSkillId);
+        const int32_t nMissileId = D2_CALL(SKILLS_GetProgressiveSkillMissileId, pUnit, nSkillId);
         int32_t nTargetX = 0;
         int32_t nTargetY = 0;
-        if (nMissileId > 0 && D2GAME_GetXAndYFromTargetUnit_6FD14020(pGame, pUnit, &nTargetX, &nTargetY))
+        if (nMissileId > 0 && D2_CALL(D2GAME_GetXAndYFromTargetUnit_6FD14020, pGame, pUnit, &nTargetX, &nTargetY))
         {
             if (pUnit)
             {
@@ -1112,19 +1113,19 @@ int32_t __fastcall SKILLS_SrvDo073_BlessedHammer(D2GameStrc* pGame, D2UnitStrc* 
             missileParams.nSkill = nSkillId;
             missileParams.nSkillLevel = nSkillLevel;
 
-            D2UnitStrc* pMissile = MISSILES_CreateMissileFromParams(pGame, &missileParams);
+            D2UnitStrc* pMissile = D2_CALL(MISSILES_CreateMissileFromParams, pGame, &missileParams);
             if (pMissile)
             {
-                PATH_SetType(pMissile->pDynamicPath, PATHTYPE_BLESSEDHAMMER);
-                D2Common_10142(pMissile->pDynamicPath, pMissile, 0);
+                D2_CALL(PATH_SetType, pMissile->pDynamicPath, PATHTYPE_BLESSEDHAMMER);
+                D2_CALL(D2Common_10142, pMissile->pDynamicPath, pMissile, 0);
 
-                const int32_t nPercentage = SKILLS_GetConcentrationDamageBonus(pUnit, nSkillId) + 100;
+                const int32_t nPercentage = D2_CALL(SKILLS_GetConcentrationDamageBonus, pUnit, nSkillId) + 100;
                 if (nPercentage != 100)
                 {
-                    const int32_t nMinDamage = MONSTERUNIQUE_CalculatePercentage(STATLIST_GetUnitBaseStat(pMissile, STAT_MAGICMINDAM, 0), nPercentage, 100);
-                    STATLIST_SetUnitStat(pMissile, STAT_MAGICMINDAM, nMinDamage, 0);
-                    const int32_t nMaxDamage = MONSTERUNIQUE_CalculatePercentage(STATLIST_GetUnitBaseStat(pMissile, STAT_MAGICMAXDAM, 0), nPercentage, 100);
-                    STATLIST_SetUnitStat(pMissile, STAT_MAGICMAXDAM, nMaxDamage, 0);
+                    const int32_t nMinDamage = D2_CALL(MONSTERUNIQUE_CalculatePercentage, D2_CALL(STATLIST_GetUnitBaseStat, pMissile, STAT_MAGICMINDAM, 0), nPercentage, 100);
+                    D2_CALL(STATLIST_SetUnitStat, pMissile, STAT_MAGICMINDAM, nMinDamage, 0);
+                    const int32_t nMaxDamage = D2_CALL(MONSTERUNIQUE_CalculatePercentage, D2_CALL(STATLIST_GetUnitBaseStat, pMissile, STAT_MAGICMAXDAM, 0), nPercentage, 100);
+                    D2_CALL(STATLIST_SetUnitStat, pMissile, STAT_MAGICMAXDAM, nMaxDamage, 0);
                 }
 
                 return 1;

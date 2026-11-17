@@ -1,4 +1,5 @@
 #include "SKILLS/SkillAma.h"
+#include <test_seam.h>
 
 #include "D2DataTbls.h"
 #include "DataTbls/SkillsTbls.h"
@@ -104,8 +105,57 @@ int32_t __fastcall SKILLS_SrvSt06_PowerStrike_ChargedStrike(D2GameStrc* pGame, D
     return 1;
 }
 
+// 1.13c D2Game+0x4C9E0: the weapon wear of an Impale hit, a separate function in 1.13c. The return value is whatever the last step left
+// behind (a roll quotient, a stat value or a callee result); the caller ignores it.
+int32_t __fastcall SKILLS_ImpaleDurabilityProc(int32_t nChance, D2UnitStrc* pItem, D2UnitStrc* pUnit, D2GameStrc* pGame, int32_t nAmount)
+{
+    if (!D2_CALL(ITEMS_CheckItemTypeId, pItem, ITEMTYPE_WEAPON))
+    {
+        return 0;
+    }
+
+    if (D2_CALL(ITEMS_CheckIfStackable, pItem))
+    {
+        const int32_t nQuantity = D2_CALL(STATLIST_UnitGetStatValue, pItem, STAT_QUANTITY, 0);
+        if (nQuantity <= 0)
+        {
+            return nQuantity;
+        }
+
+        const uint32_t nRoll = ITEMS_RollRandomNumber(&pUnit->pSeed);
+        if ((int32_t)(nRoll % 100) >= nChance)
+        {
+            return nRoll / 100;
+        }
+
+        return D2_CALL(sub_6FD118C0, pGame, pUnit);
+    }
+
+    if (!D2_CALL(ITEMS_HasDurability, pItem))
+    {
+        return 0;
+    }
+
+    const uint32_t nRoll = ITEMS_RollRandomNumber(&pUnit->pSeed);
+    if ((int32_t)(nRoll % 100) >= nChance)
+    {
+        return nRoll / 100;
+    }
+
+    const int32_t nNewDurability = D2_CALL(STATLIST_UnitGetStatValue, pItem, STAT_DURABILITY, 0) - nAmount;
+    if (nNewDurability <= 0)
+    {
+        D2_CALL(sub_6FC4B580, pGame, pUnit, pItem);
+        return 0;   // retail leaves the callee's result in EAX; nobody reads it
+    }
+
+    D2_CALL(STATLIST_SetUnitStat, pItem, STAT_DURABILITY, nNewDurability, 0);
+    D2_CALL(D2GAME_PACKETS_SendPacket0x3E_6FC3EC20, SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), pItem, 1, STAT_DURABILITY, nNewDurability, 0);
+    return 0;   // retail leaves the packet routine's result in EAX; nobody reads it
+}
+
 //D2Game.0x6FCF3280
-// 1.13c D2Game+0x4C9E0 (inlined helper)
+// the Impale hit (its weapon wear is SKILLS_ImpaleDurabilityProc, D2Game+0x4C9E0)
 int32_t __fastcall SKILLS_SrvSt07_Impale(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {    
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -149,29 +199,7 @@ int32_t __fastcall SKILLS_SrvSt07_Impale(D2GameStrc* pGame, D2UnitStrc* pUnit, i
         {
             const int32_t nChance = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwCalc[1], nSkillId, nSkillLevel);
             const int32_t nAmount = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwCalc[2], nSkillId, nSkillLevel);
-            if (ITEMS_CheckItemTypeId(pItem, ITEMTYPE_WEAPON))
-            {
-                if (ITEMS_CheckIfStackable(pItem))
-                {
-                    if (STATLIST_UnitGetStatValue(pItem, STAT_QUANTITY, 0) > 0 && (ITEMS_RollRandomNumber(&pUnit->pSeed) % 100) < nChance)
-                    {
-                        sub_6FD118C0(pGame, pUnit);
-                    }
-                }
-                else if (ITEMS_HasDurability(pItem) && (ITEMS_RollRandomNumber(&pUnit->pSeed) % 100) < nChance)
-                {
-                    const int32_t nNewDurability = STATLIST_UnitGetStatValue(pItem, STAT_DURABILITY, 0) - nAmount;
-                    if (nNewDurability <= 0)
-                    {
-                        sub_6FC4B580(pGame, pUnit, pItem);
-                    }
-                    else
-                    {
-                        STATLIST_SetUnitStat(pItem, STAT_DURABILITY, nNewDurability, 0);
-                        D2GAME_PACKETS_SendPacket0x3E_6FC3EC20(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), pItem, 1, STAT_DURABILITY, nNewDurability, 0);
-                    }
-                }
-            }
+            SKILLS_ImpaleDurabilityProc(nChance, pItem, pUnit, pGame, nAmount);
         }
     }
 
@@ -252,45 +280,45 @@ int32_t __fastcall SKILLS_SrvSt08_Strafe(D2GameStrc* pGame, D2UnitStrc* pUnit, i
 int32_t __fastcall SKILLS_SrvSt09_Fend(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     // TODO: v10, v11
-    D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
+    D2SkillsTxt* pSkillsTxtRecord = D2_CALL(SKILLS_GetSkillsTxtRecord, nSkillId);
     if (!pSkillsTxtRecord)
     {
         return 0;
     }
 
-    D2SkillStrc* pSkill = UNITS_GetUsedSkill(pUnit);
+    D2SkillStrc* pSkill = D2_CALL(UNITS_GetUsedSkill, pUnit);
     if (!pSkill)
     {
         return 0;
     }
 
-    const int32_t nAuraRange = sub_6FD15460(pUnit);
+    const int32_t nAuraRange = D2_CALL(sub_6FD15460, pUnit);
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
 
     int32_t v11 = 0;
     if (pTarget)
     {
-        v11 = sub_6FD10790(pGame, pUnit, 0, 0, nAuraRange, 0x20003);
+        v11 = D2_CALL(sub_6FD10790, pGame, pUnit, 0, 0, nAuraRange, 0x20003);
     }
     else
     {
-        pTarget = sub_6FD107F0(pGame, pUnit, 0, 0, nAuraRange, 0x20003, -1, &v11);
+        pTarget = D2_CALL(sub_6FD107F0, pGame, pUnit, 0, 0, nAuraRange, 0x20003, -1, &v11);
         if (!pTarget)
         {
-            SKILLS_SetParam1(pSkill, 0);
+            D2_CALL(SKILLS_SetParam1, pSkill, 0);
             return 1;
         }
     }
 
-    const int32_t v10 = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwCalc[0], nSkillId, nSkillLevel);
+    const int32_t v10 = D2_CALL(SKILLS_EvaluateSkillFormula, pUnit, pSkillsTxtRecord->dwCalc[0], nSkillId, nSkillLevel);
     if (v11 >= v10)
     {
         v11 = v10;
     }
 
-    SKILLS_SetParam1(pSkill, v11);
-    SKILLS_SetParam2(pSkill, pTarget->dwUnitType);
-    SKILLS_SetParam3(pSkill, pTarget->dwUnitId);
+    D2_CALL(SKILLS_SetParam1, pSkill, v11);
+    D2_CALL(SKILLS_SetParam2, pSkill, pTarget->dwUnitType);
+    D2_CALL(SKILLS_SetParam3, pSkill, pTarget->dwUnitId);
     return 1;
 }
 
@@ -298,34 +326,34 @@ int32_t __fastcall SKILLS_SrvSt09_Fend(D2GameStrc* pGame, D2UnitStrc* pUnit, int
 // 1.13c D2Game+0x4C4F0
 int32_t __fastcall SKILLS_SrvSt37_Zeal_Fury_BloodLordFrenzy(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
-    D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
+    D2SkillsTxt* pSkillsTxtRecord = D2_CALL(SKILLS_GetSkillsTxtRecord, nSkillId);
     if (!pSkillsTxtRecord)
     {
         return 0;
     }
 
-    D2SkillStrc* pSkill = UNITS_GetUsedSkill(pUnit);
+    D2SkillStrc* pSkill = D2_CALL(UNITS_GetUsedSkill, pUnit);
     if (!pSkill)
     {
         return 0;
     }
 
-    const int32_t nAuraRange = sub_6FD15460(pUnit);
+    const int32_t nAuraRange = D2_CALL(sub_6FD15460, pUnit);
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
     if (!pTarget)
     {
-        pTarget = sub_6FD107F0(pGame, pUnit, 0, 0, nAuraRange, 0x20003, -1, 0);
+        pTarget = D2_CALL(sub_6FD107F0, pGame, pUnit, 0, 0, nAuraRange, 0x20003, -1, 0);
     }
 
     if (!pTarget)
     {
-        SKILLS_SetParam1(pSkill, 0);
+        D2_CALL(SKILLS_SetParam1, pSkill, 0);
         return 0;
     }
 
-    SKILLS_SetParam1(pSkill, SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwCalc[0], nSkillId, nSkillLevel));
-    SKILLS_SetParam2(pSkill, pTarget->dwUnitType);
-    SKILLS_SetParam3(pSkill, pTarget->dwUnitId);
+    D2_CALL(SKILLS_SetParam1, pSkill, D2_CALL(SKILLS_EvaluateSkillFormula, pUnit, pSkillsTxtRecord->dwCalc[0], nSkillId, nSkillLevel));
+    D2_CALL(SKILLS_SetParam2, pSkill, pTarget->dwUnitType);
+    D2_CALL(SKILLS_SetParam3, pSkill, pTarget->dwUnitId);
 
     return 1;
 }

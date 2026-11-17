@@ -1,4 +1,5 @@
 #include "AI/AiBaal.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -367,8 +368,8 @@ D2UnitStrc* __fastcall AIBAAL_GetTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, in
 {
 	D2_ASSERT(pfCull);
 
-	const int32_t nX = CLIENTS_GetUnitX(pUnit);
-	const int32_t nY = CLIENTS_GetUnitY(pUnit);
+	const int32_t nX = D2_CALL(CLIENTS_GetUnitX, pUnit);
+	const int32_t nY = D2_CALL(CLIENTS_GetUnitY, pUnit);
 
 	D2TargetNodeStrc* pTargetNode = nullptr;
 	D2UnitStrc* pTarget = nullptr;
@@ -390,7 +391,7 @@ D2UnitStrc* __fastcall AIBAAL_GetTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, in
 				}
 				else
 				{
-					nCurrent = AIBAAL_GetTargetScore(pUnit, pTargetNode->pUnit, pArgs);
+					nCurrent = D2_CALL(AIBAAL_GetTargetScore, pUnit, pTargetNode->pUnit, pArgs);
 				}
 
 				while (1)
@@ -409,7 +410,7 @@ D2UnitStrc* __fastcall AIBAAL_GetTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, in
 						break;
 					}
 
-					nCurrent = AIBAAL_GetTargetScore(pUnit, pTargetNode->pUnit, pArgs);
+					nCurrent = D2_CALL(AIBAAL_GetTargetScore, pUnit, pTargetNode->pUnit, pArgs);
 				}
 			}
 		}
@@ -421,7 +422,7 @@ D2UnitStrc* __fastcall AIBAAL_GetTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, in
 	{
 		if (pUnit->nAct == pTargetNode->pUnit->nAct)
 		{
-			nCurrent = AIBAAL_GetTargetScore(pUnit, pTargetNode->pUnit, pArgs);
+			nCurrent = D2_CALL(AIBAAL_GetTargetScore, pUnit, pTargetNode->pUnit, pArgs);
 			if (nMax < nCurrent)
 			{
 				nMax = nCurrent;
@@ -443,7 +444,7 @@ D2UnitStrc* __fastcall AIBAAL_GetTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, in
 		{
 			if (pUnit->nAct == pTargetNode->pUnit->nAct)
 			{
-				nCurrent = AIBAAL_GetTargetScore(pUnit, pTargetNode->pUnit, pArgs);
+				nCurrent = D2_CALL(AIBAAL_GetTargetScore, pUnit, pTargetNode->pUnit, pArgs);
 				if (nTemp < nCurrent)
 				{
 					nTemp = nCurrent;
@@ -455,13 +456,13 @@ D2UnitStrc* __fastcall AIBAAL_GetTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, in
 		}
 		while (pTargetNode);
 
-		if (pTemp && AIUTIL_GetDistanceToCoordinates_NoUnitSize(pTemp, nX, nY) < 5 && !UNITS_IsInMeleeRange(pUnit, pTarget, 0))
+		if (pTemp && D2_CALL(AIUTIL_GetDistanceToCoordinates_NoUnitSize, pTemp, nX, nY) < 5 && !D2_CALL(UNITS_IsInMeleeRange, pUnit, pTarget, 0))
 		{
-			PATH_SetTargetUnit(pUnit->pDynamicPath, pTarget);
-			PATH_SetType(pUnit->pDynamicPath, PATHTYPE_TOWARD);
-			D2Common_10142(pUnit->pDynamicPath, pUnit, 0);
+			D2_CALL(PATH_SetTargetUnit, pUnit->pDynamicPath, pTarget);
+			D2_CALL(PATH_SetType, pUnit->pDynamicPath, PATHTYPE_TOWARD);
+			D2_CALL(D2Common_10142, pUnit->pDynamicPath, pUnit, 0);
 
-			if (!PATH_GetNumberOfPathPoints(pUnit->pDynamicPath))
+			if (!D2_CALL(PATH_GetNumberOfPathPoints, pUnit->pDynamicPath))
 			{
 				nMax = nTemp;
 				pTarget = pTemp;

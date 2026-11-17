@@ -1,6 +1,8 @@
 #include "GAME/Event.h"
+#include <test_seam.h>
 
 #include <D2States.h>
+#include <test_seam.h>
 
 #include "ITEMS/ItemMode.h"
 #include "GAME/Game.h"
@@ -37,7 +39,7 @@ void __fastcall D2GAME_EVENTS_Delete_6FC34840(D2GameStrc* pGame, D2UnitStrc* pUn
         D2EventTimerStrc* pNextTimer = pEventTimer->pNext;
         if (pEventTimer->nEventType == nEventType && (!nEventCustomId || pEventTimer->dwEventCustomId == nEventCustomId))
         {
-            sub_6FC34890(pGame, pEventTimer);
+            D2_CALL(sub_6FC34890, pGame, pEventTimer);
         }
 
         pEventTimer = pNextTimer;

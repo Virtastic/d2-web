@@ -27,6 +27,7 @@ void __fastcall sub_6FCF5680(D2UnitStrc* pUnit, D2DamageStrc* pDamage);
 void __fastcall sub_6FCF5870(D2UnitStrc* pUnit, D2DamageStrc* pDamage);
 //D2Game.0x6FCF5B90
 D2SkillsTxt* __fastcall SKILLS_GetSkillsTxtRecord(int32_t nSkillId);
+int32_t __fastcall SKILLS_GetSkillParam4(int32_t nSkillId);
 //D2Game.0x6FCF5BC0
 void __fastcall sub_6FCF5BC0(D2UnitStrc* pUnit, D2StatListStrc* pStatList, D2DamageStrc* pDamage);
 //D2Game.0x6FCF5DE0

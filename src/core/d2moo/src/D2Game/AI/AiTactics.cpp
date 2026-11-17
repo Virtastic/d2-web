@@ -291,11 +291,11 @@ void __fastcall sub_6FCD0150(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nFram
 		nFrames = 1;
 	}
 
-	const uint32_t dwEventFrame = EVENT_GetEventFrame(pGame, pUnit, EVENTTYPE_AITHINK);
+	const uint32_t dwEventFrame = D2_CALL(EVENT_GetEventFrame, pGame, pUnit, EVENTTYPE_AITHINK);
 	if (!dwEventFrame || dwEventFrame == pGame->dwGameFrame || dwEventFrame >= nFrames + pGame->dwGameFrame)
 	{
 		D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_AITHINK, 0);
-		EVENT_SetEvent(pGame, pUnit, EVENTTYPE_AITHINK, nFrames + pGame->dwGameFrame, 0, 0);
+		D2_CALL(EVENT_SetEvent, pGame, pUnit, EVENTTYPE_AITHINK, nFrames + pGame->dwGameFrame, 0, 0);
 	}
 }
 
@@ -623,11 +623,11 @@ int32_t __fastcall AITACTICS_RunCloseToTargetUnit(D2GameStrc* pGame, D2UnitStrc*
 	if (ITEMS_RollRandomNumber(&pUnit->pSeed) & 1)
 	{
 		nOffsetX = nMaxDistance;
-		nOffsetY = ITEMS_RollLimitedRandomNumber(&pUnit->pSeed, nMaxDistance);
+		nOffsetY = D2_CALL(ITEMS_RollLimitedRandomNumber, &pUnit->pSeed, nMaxDistance);
 	}
 	else
 	{
-		nOffsetX = ITEMS_RollLimitedRandomNumber(&pUnit->pSeed, nMaxDistance);
+		nOffsetX = D2_CALL(ITEMS_RollLimitedRandomNumber, &pUnit->pSeed, nMaxDistance);
 		nOffsetY = nMaxDistance;
 	}
 
@@ -641,7 +641,7 @@ int32_t __fastcall AITACTICS_RunCloseToTargetUnit(D2GameStrc* pGame, D2UnitStrc*
 		nOffsetY = -nOffsetY;
 	}
 
-	return AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_RUN, nTargetX + nOffsetX, nTargetY + nOffsetY, 1u, 0);
+	return D2_CALL(AITACTICS_MoveToTarget, pGame, pUnit, nullptr, MONMODE_RUN, nTargetX + nOffsetX, nTargetY + nOffsetY, 1u, 0);
 }
 
 //D2Game.0x6FCD0E80

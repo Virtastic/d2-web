@@ -1,4 +1,5 @@
 #include "SKILLS/SkillItem.h"
+#include <test_seam.h>
 
 #include <D2BitManip.h>
 
@@ -1372,16 +1373,16 @@ int32_t __fastcall SKILLITEM_EventFunc15_OpenWounds(D2GameStrc* pGame, int32_t n
         return 0;
     }
 
-    const int32_t nChance = STATLIST_UnitGetItemStatOrSkillStatValue(pAttacker, (uint32_t)nSkillId >> 16, nSkillId);
+    const int32_t nChance = D2_CALL(STATLIST_UnitGetItemStatOrSkillStatValue, pAttacker, (uint32_t)nSkillId >> 16, nSkillId);
     if (nChance <= 0 || (ITEMS_RollRandomNumber(&pAttacker->pSeed) % 100) >= nChance)
     {
         return 0;
     }
 
-    const int32_t nLevel = std::max(STATLIST_UnitGetStatValue(pAttacker, STAT_LEVEL, 0), 1);
+    const int32_t nLevel = std::max(D2_CALL(STATLIST_UnitGetStatValue, pAttacker, STAT_LEVEL, 0), 1);
     const int32_t nValues[] = { 9, 18, 27, 36, 45 };
 
-    int32_t nHpRegen = SKILLITEM_CalculateOpenWoundsHpRegen(nLevel, nValues) + 40;
+    int32_t nHpRegen = D2_CALL(SKILLITEM_CalculateOpenWoundsHpRegen, nLevel, nValues) + 40;
     if (pUnit->dwUnitType == UNIT_PLAYER)
     {
         nHpRegen /= 4;
@@ -1391,7 +1392,7 @@ int32_t __fastcall SKILLITEM_EventFunc15_OpenWounds(D2GameStrc* pGame, int32_t n
             nHpRegen /= 2;
         }
     }
-    else if (pUnit->dwUnitType == UNIT_MONSTER && MONSTERUNIQUE_CheckMonTypeFlag(pUnit, 0xCu))
+    else if (pUnit->dwUnitType == UNIT_MONSTER && D2_CALL(MONSTERUNIQUE_CheckMonTypeFlag, pUnit, 0xCu))
     {
         nHpRegen /= 2;
     }
@@ -1405,7 +1406,7 @@ int32_t __fastcall SKILLITEM_EventFunc15_OpenWounds(D2GameStrc* pGame, int32_t n
     pCurse.nStat = STAT_HPREGEN;
     pCurse.nStatValue = -nHpRegen;
     pCurse.nState = STATE_OPENWOUNDS;
-    sub_6FD10EC0(&pCurse);
+    D2_CALL(sub_6FD10EC0, &pCurse);
     return 1;
 }
 

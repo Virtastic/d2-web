@@ -1,6 +1,7 @@
 #include "UNIT/SUnit.h"
 #include <test_seam.h>
 #include <cstdio>
+#include <test_seam.h>
 
 #include <D2BitManip.h>
 
@@ -955,7 +956,7 @@ D2ClientStrc* __fastcall SUNIT_GetClientFromPlayer(D2UnitStrc* pPlayer, const ch
         return nullptr;
     }
 
-    return UNITS_GetPlayerData(pPlayer)->pClient;
+    return D2_CALL(UNITS_GetPlayerData, pPlayer)->pClient;
 }
 
 //D2Game.0x6FCBC300
@@ -1296,8 +1297,8 @@ void __fastcall sub_6FCBC7E0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // 1.13c D2Game+0xE0BD0
 D2UnitStrc* __stdcall SUNIT_GetTargetUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
-    sub_6FCBC7E0(pGame, pUnit);
-    return SUNIT_TargetOrNull(pUnit, PATH_GetTargetUnit(pUnit->pDynamicPath));
+    D2_CALL(sub_6FCBC7E0, pGame, pUnit);
+    return SUNIT_TargetOrNull(pUnit, D2_CALL(PATH_GetTargetUnit, pUnit->pDynamicPath));
 }
 
 //D2Game.0x6FCBC930
