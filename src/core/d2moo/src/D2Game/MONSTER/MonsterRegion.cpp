@@ -28,6 +28,7 @@
 // d2-web: D2Game's packed pMonReg array is not naturally aligned on wasm64.
 // Bytewise volatile access preserves the native pointer without an aligned load/store,
 // matching the packed unit-list accessors in SUnit.cpp.
+// not-1.13c: wasm64 pointer width helper, retail reads the 4-byte slot directly
 static D2MonsterRegionStrc* MONSTERREGION_LoadPackedPointer(D2MonsterRegionStrc* const* slot)
 {
     D2MonsterRegionStrc* value = nullptr;
@@ -37,6 +38,7 @@ static D2MonsterRegionStrc* MONSTERREGION_LoadPackedPointer(D2MonsterRegionStrc*
     return value;
 }
 
+// not-1.13c: wasm64 pointer width helper, retail writes the 4-byte slot directly
 static void MONSTERREGION_StorePackedPointer(D2MonsterRegionStrc** slot, D2MonsterRegionStrc* value)
 {
     const uint8_t* src = reinterpret_cast<const uint8_t*>(&value);
@@ -974,6 +976,7 @@ int32_t __fastcall sub_6FC67570(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2Ro
 }
 
 //D2Game.0x6FC677D0
+// 1.13c D2Game+0x47700 (checked against decompile)
 D2UnitStrc* __fastcall sub_6FC677D0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t nMonsterId, uint8_t nMin, uint8_t nMax)
 {
     if (!nMin || !nMax || nMax < nMin)
@@ -1014,6 +1017,7 @@ D2UnitStrc* __fastcall sub_6FC677D0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, 
 
 static void sub_47660(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2MonsterRegionStrc* pMonsterRegion, D2LevelsTxt* pLevelsTxtRecord);
 
+// 1.13c D2Game+0x47820 (checked against decompile: room seed roll %100 < 3, region wander count < 3, then 0x47660)
 void sub_47820(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nLevelId, D2LevelsTxt* pLevelsTxtRecord)
 {
     if ((int32_t)(ITEMS_RollRandomNumber(&pRoom->pSeed) % 100) >= 3)
@@ -1031,7 +1035,7 @@ void sub_47820(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nLevelId, D2L
 }
 
 //D2Game.0x6FC679F0
-// 1.13c D2Game+0x47820 (thiscall room, stdcall level): roll %100 < 3 + region count gate, then 0x47660
+// 1.13c D2Game+0x47950 (room in ESI): roll & 0x7FFF, no clients, levels.txt MonWndr, then 0x47820
 void __fastcall sub_6FC679F0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom)
 {
     if (!pRoom || ITEMS_RollRandomNumber(&pRoom->pSeed) & 0x7FFF || pRoom->nNumClients)
@@ -1094,6 +1098,7 @@ static void sub_47660(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2MonsterRegio
 }
 
 //D2Game.0x6FC67B90
+// 1.13c D2Game+0xCAB30 (field writes checked against decompile; retail moves the per-level monster pick into 0xCA760, this body keeps it inline)
 void __fastcall MONSTERREGION_InitializeAll(void* pMemPool, D2MonsterRegionStrc** ppMonsterRegion, D2SeedStrc* pSeed, uint32_t nLowSeed, uint8_t nDifficulty, int32_t bExpansion)
 {
     SEED_InitLowSeed(pSeed, nLowSeed);
@@ -1221,6 +1226,7 @@ void __fastcall MONSTERREGION_FreeAll(void* pMemPool, D2MonsterRegionStrc** ppMo
 }
 
 //D2Game.0x6FC67F90
+// 1.13c D2Game+0xCA3A0
 D2MonsterRegionStrc* __fastcall MONSTERREGION_GetMonsterRegionFromLevelId(D2MonsterRegionStrc** ppMonsterRegion, int32_t nLevelId)
 {
     return MONSTERREGION_LoadPackedPointer(ppMonsterRegion + nLevelId);
@@ -1297,6 +1303,7 @@ void __fastcall sub_6FC68110(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC68180
+// 1.13c D2Game+0xCA5B0 (retail inlines the summoner flag set and the level id read)
 void __fastcall sub_6FC68180(D2MonsterRegionStrc** ppMonsterRegion, D2ActiveRoomStrc* pRoom, D2UnitStrc* pUnit, int32_t bToggleFlag)
 {
     if (bToggleFlag)
@@ -1311,6 +1318,7 @@ void __fastcall sub_6FC68180(D2MonsterRegionStrc** ppMonsterRegion, D2ActiveRoom
 }
 
 //D2Game.0x6FC681C0
+// 1.13c D2Game+0xCA530
 void __fastcall sub_6FC681C0(D2MonsterRegionStrc** ppMonsterRegion, D2UnitStrc* pUnit, int32_t nPreviousAlignment, int32_t nNewAlignment)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && !SUNIT_IsDead(pUnit) && !MONSTER_CheckSummonerFlag(pUnit, 2u))
@@ -1332,6 +1340,7 @@ void __fastcall sub_6FC681C0(D2MonsterRegionStrc** ppMonsterRegion, D2UnitStrc* 
 }
 
 //D2Game.0x6FC68240
+// 1.13c D2Game+0xCA4E0
 void __fastcall sub_6FC68240(D2MonsterRegionStrc** ppMonsterRegion, D2UnitStrc* pUnit)
 {
     if (!MONSTER_CheckSummonerFlag(pUnit, 2u))
@@ -1345,6 +1354,7 @@ void __fastcall sub_6FC68240(D2MonsterRegionStrc** ppMonsterRegion, D2UnitStrc* 
 }
 
 //D2Game.0x6FC68280
+// 1.13c D2Game+0xCA490
 void __fastcall sub_6FC68280(D2MonsterRegionStrc** ppMonsterRegion, D2UnitStrc* pUnit)
 {
     if (!MONSTER_CheckSummonerFlag(pUnit, 2u))
@@ -1358,6 +1368,7 @@ void __fastcall sub_6FC68280(D2MonsterRegionStrc** ppMonsterRegion, D2UnitStrc* 
 }
 
 //D2Game.0x6FC682C0
+// 1.13c D2Game+0xCA410
 void __fastcall sub_6FC682C0(D2MonsterRegionStrc** ppMonRegion, int32_t nLevelId1, int32_t nLevelId2, int32_t nAlignment, int32_t bDead, int32_t a6, D2UnitStrc* pUnit)
 {
     D2MonsterRegionStrc* pMonsterRegion1 = MONSTERREGION_LoadPackedPointer(ppMonRegion + nLevelId1);

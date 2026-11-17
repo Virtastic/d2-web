@@ -56,6 +56,7 @@ int32_t __fastcall MONSTER_GetAiState(D2UnitStrc* pMonster)
 }
 
 //D2Game.0x6FC60200
+// not-1.13c: retail inlines the +0x58 write at its callers (e.g. MONSTER_Initialize D2Game+0xB0320)
 void __fastcall MONSTER_SetLevelId(D2UnitStrc* pMonster, int32_t nLevelId)
 {
     if (pMonster && pMonster->dwUnitType == UNIT_MONSTER && pMonster->pMonsterData)
@@ -89,6 +90,7 @@ int32_t __fastcall MONSTER_CheckSummonerFlag(D2UnitStrc* pMonster, uint16_t nFla
 }
 
 //D2Game.0x6FC60270
+// not-1.13c: retail inlines the +0x5C flag or at its callers (e.g. D2Game+0xEE6F0 summoner case)
 void __fastcall MONSTER_ToggleSummonerFlag(D2UnitStrc* pMonster, uint16_t nFlag, int32_t bSet)
 {
     if (!pMonster || pMonster->dwUnitType != UNIT_MONSTER || !pMonster->pMonsterData)
@@ -107,6 +109,7 @@ void __fastcall MONSTER_ToggleSummonerFlag(D2UnitStrc* pMonster, uint16_t nFlag,
 }
 
 //D2Game.0x6FC602A0
+// 1.13c D2Game+0xB0320 (checked against decompile; retail inlines the quest-chain attach and has a debug error path not modelled)
 void __fastcall MONSTER_Initialize(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2UnitStrc* pMonster, int32_t nUnitGUID)
 {
     if (pMonster)
@@ -447,6 +450,7 @@ int32_t __fastcall MONSTER_GetHpBonus(int32_t nPlayerCount)
 }
 
 //Inlined in D2Game.0x6FC60E90
+// 1.13c D2Game+0xAF5F0 (table at D2Game+0xFB614 is the same nine entries; n >= 9 is (n - 2) * 50, 1.10f: 2 * (5 * n + 130))
 int32_t __fastcall MONSTER_GetExperienceBonus(int32_t nPlayerCount)
 {
     static const int32_t gnExperienceBonusTable[] =
@@ -456,7 +460,7 @@ int32_t __fastcall MONSTER_GetExperienceBonus(int32_t nPlayerCount)
 
     if (nPlayerCount >= 9)
     {
-        return 2 * (5 * nPlayerCount + 130);
+        return (nPlayerCount - 2) * 50;
     }
 
     return gnExperienceBonusTable[nPlayerCount];
@@ -501,6 +505,7 @@ void __fastcall MONSTER_GetPlayerCountBonus(D2GameStrc* pGame, D2PlayerCountBonu
 }
 
 //D2Game.0x6FC60F70
+// 1.13c D2Game+0xAF730 (checked against decompile)
 void __fastcall MONSTER_SetComponents(D2MonRegDataStrc* pMonRegData, D2UnitStrc* pUnit)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
@@ -553,6 +558,7 @@ int32_t __fastcall MONSTER_HasComponents(D2UnitStrc* pMonster)
 D2ReinitializeSeam g_d2Reinitialize;
 
 //D2Game.0x6FC610F0
+// 1.13c D2Game+0xAFC50 (checked against decompile)
 int32_t __fastcall MONSTER_Reinitialize(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nClassId, int32_t nMode)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)

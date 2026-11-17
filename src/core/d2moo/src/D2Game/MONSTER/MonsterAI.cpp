@@ -316,7 +316,7 @@ static_assert(offsetof(D2MonsterInteractStrc, pInteractInfo) == 0);
 static_assert(offsetof(D2InteractInfoStrc, pUnit) == 0);
 static_assert(offsetof(D2InteractInfoStrc, pNext) == sizeof(void*) + sizeof(int32_t));
 static_assert(sizeof(D2InteractInfoStrc) == 2 * sizeof(void*) + sizeof(int32_t));
-//D2Game.0x6FC619F0
+// 1.13c D2Game+0x48390
 int32_t __fastcall MONSTERAI_GetInteractUnitCount(D2MonsterInteractStrc* pMonInteract)
 {
     int32_t nResult = 0;
@@ -392,7 +392,7 @@ void __fastcall MONSTERAI_RemoveInteractInfoFor(D2GameStrc* pGame, D2UnitStrc* p
     }
 }
 
-//D2Game.0x6FC61AB0
+// 1.13c D2Game+0x48B60
 void __fastcall sub_6FC61AB0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pNpc, D2MonsterInteractStrc* pMonInteract)
 {
     for (D2InteractInfoStrc* pInteractInfo = pMonInteract->pInteractInfo; pInteractInfo; pInteractInfo = pInteractInfo->pNext)
@@ -410,7 +410,7 @@ void __fastcall sub_6FC61AB0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
 
 }
 
-//D2Game.0x6FC61AF0
+// 1.13c D2Game+0x48710
 void __fastcall D2GAME_NPCS_SetInteractTrading_6FC61AF0(D2UnitStrc* pNPC, D2UnitStrc* pPlayer)
 {
     if (!pNPC || pNPC->dwUnitType != UNIT_MONSTER || !pNPC->pMonsterData || !pNPC->pMonsterData->pMonInteract)
@@ -431,7 +431,7 @@ void __fastcall D2GAME_NPCS_SetInteractTrading_6FC61AF0(D2UnitStrc* pNPC, D2Unit
     }
 }
 
-//D2Game.0x6FC61B30
+// 1.13c D2Game+0x486D0
 int32_t __fastcall sub_6FC61B30(D2UnitStrc* pMonster, D2UnitStrc* pPlayer)
 {
     if (!pMonster || pMonster->dwUnitType != UNIT_MONSTER || !pMonster->pMonsterData || !pMonster->pMonsterData->pMonInteract)
@@ -451,6 +451,7 @@ int32_t __fastcall sub_6FC61B30(D2UnitStrc* pMonster, D2UnitStrc* pPlayer)
 }
 
 //D2Game.0x6FC61B70
+// 1.13c D2Game+0x485C0 (checked against decompile; retail inlines the SUNIT_ResetInteractInfo write)
 void __fastcall sub_6FC61B70(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNpc, D2MonsterInteractStrc* pMonInteract)
 {
     QUESTS_NPCDeactivate(pGame, pPlayer, pNpc);
@@ -489,31 +490,37 @@ void __fastcall sub_6FC61B70(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
     }
 }
 
-//D2Game.0x6FC61C70
-void __fastcall sub_6FC61C70(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, D2MonsterInteractStrc* pMonInteract, char a5)
+// 1.13c D2Game+0x487A0: retail returns 1 when the target is not interactable
+// or the player is already listed, 0 otherwise
+int32_t __fastcall sub_6FC61C70(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, D2MonsterInteractStrc* pMonInteract, char a5)
 {
     if (SUNIT_GetInteractUnit(pGame, pUnit))
     {
-        return;
+        return 0;
     }
 
     if (!pTarget || pTarget->dwAnimMode == MONMODE_DEATH || pTarget->dwAnimMode == MONMODE_DEAD || PLAYER_IsBusy(pUnit) == 1)
     {
-        return;
+        return 0;
     }
 
     int32_t nClassId = pTarget->dwClassId;
     D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nClassId);
-    if (!pMonStatsTxtRecord || !(pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_INTERACT]) || (nClassId == MONSTER_CAIN1 && ACT1Q4_IsCainInTristramDeactivated(pGame)))
+    if (!pMonStatsTxtRecord || !(pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_INTERACT]))
     {
-        return;
+        return 1;
+    }
+
+    if (nClassId == MONSTER_CAIN1 && ACT1Q4_IsCainInTristramDeactivated(pGame))
+    {
+        return 0;
     }
 
     for (D2InteractInfoStrc* i = pMonInteract->pInteractInfo; i; i = i->pNext)
     {
         if (i->pUnit == pUnit)
         {
-            return;
+            return 1;
         }
     }
 
@@ -551,9 +558,10 @@ void __fastcall sub_6FC61C70(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
 
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pUnit);
     D2GAME_SendPacket0x28_6FC3F2F0(pClient, 0x28u, UNIT_MONSTER, pTarget->dwUnitId, pPlayerData->pQuestData[pGame->nDifficulty], a5);
+    return 0;
 }
 
-//D2Game.0x6FC61E30
+// 1.13c D2Game+0x48750
 int32_t __fastcall sub_6FC61E30(D2UnitStrc* pUnit, int32_t a2, int32_t a3)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER || a2 >= 5)
@@ -572,7 +580,7 @@ int32_t __fastcall sub_6FC61E30(D2UnitStrc* pUnit, int32_t a2, int32_t a3)
     return 0;
 }
 
-//D2Game.0x6FC61EC0
+// 1.13c D2Game+0x48580
 int32_t __fastcall sub_6FC61EC0(D2UnitStrc* pMonster)
 {
     if (pMonster && pMonster->dwUnitType == UNIT_MONSTER && pMonster->pMonsterData)
@@ -583,7 +591,7 @@ int32_t __fastcall sub_6FC61EC0(D2UnitStrc* pMonster)
     return 0;
 }
 
-//D2Game.0x6FC61EE0
+// 1.13c D2Game+0x48560
 int32_t __fastcall sub_6FC61EE0(D2UnitStrc* pMonster)
 {
     if (pMonster && pMonster->dwUnitType == UNIT_MONSTER && pMonster->pMonsterData)
@@ -594,7 +602,7 @@ int32_t __fastcall sub_6FC61EE0(D2UnitStrc* pMonster)
     return 0;
 }
 
-//D2Game.0x6FC61F00
+// 1.13c D2Game+0x48540
 void __fastcall sub_6FC61F00(D2UnitStrc* pMonster)
 {
     if (pMonster && pMonster->dwUnitType == UNIT_MONSTER && pMonster->pMonsterData)
@@ -604,7 +612,7 @@ void __fastcall sub_6FC61F00(D2UnitStrc* pMonster)
     }
 }
 
-//D2Game.0xFC61F20
+// 1.13c D2Game+0x484F0
 int32_t __fastcall sub_6FC61F20(D2UnitStrc* pMonster, D2UnitStrc* pUnit)
 {
     if (!pMonster || pMonster->dwUnitType != UNIT_MONSTER || !pMonster->pMonsterData || !pMonster->pMonsterData->pMonInteract)
@@ -623,7 +631,7 @@ int32_t __fastcall sub_6FC61F20(D2UnitStrc* pMonster, D2UnitStrc* pUnit)
     return 1;
 }
 
-//D2Game.0x6FC61F70
+// 1.13c D2Game+0x48410
 void __fastcall D2GAME_MONSTERAI_Last_6FC61F70(D2GameStrc* pGame, D2UnitStrc* pMonster, void(__fastcall* pCallback)(D2UnitStrc*))
 {
     if (!pMonster || pMonster->dwUnitType != UNIT_MONSTER || !pMonster->pMonsterData)

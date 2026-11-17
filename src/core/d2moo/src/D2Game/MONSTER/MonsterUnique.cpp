@@ -65,6 +65,8 @@ struct D2UnkUModStrc
 
 
 //D2Game.0x6FC6AC00
+// not-1.13c: no unit-flag toggle helper in 1.13c .text; callers write unit+0xC4 inline (the register-operand
+// `or [esi+0xC4]` sites 0x6C3F1 and 0x6C771 sit inside larger functions)
 void __fastcall MONSTERUNIQUE_ToggleUnitFlag(D2UnitStrc* pUnit, int32_t nFlag, int32_t bSet)
 {
     if (!pUnit)
@@ -95,6 +97,7 @@ uint8_t* __fastcall MONSTERUNIQUE_GetUMods(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC6AC50
+// 1.13c D2Game+0x22AD0 (EAX unit; 0x1506 default; no delta)
 uint16_t __fastcall MONSTERUNIQUE_GetNameSeed(D2UnitStrc* pUnit)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)
@@ -106,6 +109,7 @@ uint16_t __fastcall MONSTERUNIQUE_GetNameSeed(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC6AC70
+// 1.13c D2Game+0x22A80 (EAX unit, flag on the stack; no delta)
 int32_t __fastcall MONSTERUNIQUE_CheckMonTypeFlag(D2UnitStrc* pUnit, uint16_t nFlag)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)
@@ -117,6 +121,7 @@ int32_t __fastcall MONSTERUNIQUE_CheckMonTypeFlag(D2UnitStrc* pUnit, uint16_t nF
 }
 
 //D2Game.0x6FC6ACA0
+// 1.13c D2Game+0x22A50 (EAX unit, CX flag, bSet on the stack; no delta)
 void __fastcall MONSTERUNIQUE_ToggleMonTypeFlag(D2UnitStrc* pUnit, uint16_t nFlag, int32_t bSet)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER || !pUnit->pMonsterData)
@@ -135,6 +140,7 @@ void __fastcall MONSTERUNIQUE_ToggleMonTypeFlag(D2UnitStrc* pUnit, uint16_t nFla
 }
 
 //D2Game.0x6FC6ACD0
+// 1.13c D2Game+0x22A30 (EAX unit; -1 default; no delta)
 int16_t __fastcall MONSTERUNIQUE_GetBossHcIdx(D2UnitStrc* pUnit)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)
@@ -146,6 +152,7 @@ int16_t __fastcall MONSTERUNIQUE_GetBossHcIdx(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC6ACF0
+// not-1.13c: inlined in 1.13c (the unit-update writer D2Game+0x8CA20 reads nMonUmod[0] itself)
 int32_t __fastcall MONSTERUNIQUE_HasUMods(D2UnitStrc* pUnit)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)
@@ -179,6 +186,7 @@ void __fastcall MONSTERUNIQUE_UMod1_RandomName(D2UnitStrc* pUnit, int32_t nUMod,
 }
 
 //D2Game.0x6FC6AD90
+// 1.13c D2Game+0x22FA0 (umod init table D2Game+0x10E550 slot 2; the percentage add is 0x21EC0; no delta)
 void __fastcall MONSTERUNIQUE_UMod2_HealthBonus(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
@@ -269,7 +277,6 @@ int32_t __fastcall MONSTERUNIQUE_CalculatePercentage(int32_t a1, int32_t a2, int
 
 //D2Game.0x6FC6AFF0
 // 1.13c D2Game+0x21E80
-// 1.13c D2Game+0x21E80
 void __fastcall MONSTERUNIQUE_UMod4_LevelBonus(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER)
@@ -347,6 +354,7 @@ void __fastcall MONSTERUNIQUE_UMod16_Champion(D2UnitStrc* pUnit, int32_t nUMod, 
 }
 
 //D2Game.0x6FC6B210
+// 1.13c D2Game+0x23850 (umod init slot 36; no delta)
 void __fastcall MONSTERUNIQUE_UMod36_Ghostly(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
@@ -404,6 +412,7 @@ void __fastcall MONSTERUNIQUE_UMod37_Fanatic(D2UnitStrc* pUnit, int32_t nUMod, i
 }
 
 //D2Game.0x6FC6B3E0
+// 1.13c D2Game+0x237C0 (umod init slot 38; 0x21EC0 with 100 percent; no delta)
 void __fastcall MONSTERUNIQUE_UMod38_Possessed(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER || !bUnique)
@@ -426,6 +435,7 @@ void __fastcall MONSTERUNIQUE_UMod38_Possessed(D2UnitStrc* pUnit, int32_t nUMod,
 }
 
 //D2Game.0x6FC6B4B0
+// 1.13c D2Game+0x22D00 (umod init slot 39)
 void __fastcall MONSTERUNIQUE_UMod39_Berserk(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER || !pUnit->pGame || !bUnique)
@@ -438,17 +448,32 @@ void __fastcall MONSTERUNIQUE_UMod39_Berserk(D2UnitStrc* pUnit, int32_t nUMod, i
     STATLIST_SetUnitStat(pUnit, STAT_MAXHP, nNewHp, 0);
     STATLIST_SetUnitStat(pUnit, STAT_HITPOINTS, nNewHp, 0);
 
+    int32_t nToHit = 300;
     int32_t nDamage = 300;
     D2DifficultyLevelsTxt* pDifficultyLevelsTxtRecord = DATATBLS_GetDifficultyLevelsTxtRecord(pUnit->pGame->nDifficulty);
     if (pDifficultyLevelsTxtRecord)
     {
-        nDamage = 3 * pDifficultyLevelsTxtRecord->dwChampionDmgBonus;
+        nToHit = pDifficultyLevelsTxtRecord->dwChampionDmgBonus * 300 / 100;
+        nDamage = nToHit;
+
+        // the base class (D2Game+0x18A0, range-checked by 0x1850) 0x76 halves the damage bonus only
+        int32_t nBaseId = pUnit->dwClassId;
+        if (D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nBaseId))
+        {
+            nBaseId = pMonStatsTxtRecord->nBaseId;
+        }
+
+        if (MONSTERREGION_SanitizeMonsterId(nBaseId) == 0x76)
+        {
+            nDamage = nToHit / 2;
+        }
     }
     STATLIST_AddUnitStat(pUnit, STAT_DAMAGEPERCENT, nDamage, 0);
-    STATLIST_AddUnitStat(pUnit, STAT_ITEM_TOHIT_PERCENT, nDamage, 0);
+    STATLIST_AddUnitStat(pUnit, STAT_ITEM_TOHIT_PERCENT, nToHit, 0);
 }
 
 //D2Game.0x6FC6B5D0
+// 1.13c D2Game+0x269F0 (umod init slot 41; no delta)
 void __fastcall MONSTERUNIQUE_UMod41_AlwaysRun(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pGame)
@@ -606,6 +631,7 @@ void __fastcall MONSTERUNIQUE_UMod8_Resistant(D2UnitStrc* pUnit, int32_t nUMod, 
 }
 
 //D2Game.0x6FC6B8C0
+// 1.13c D2Game+0x241B0 (umod init slot 26; D2GAME_SetSkills_6FD14C60 and the AI-control flag toggle are inlined; no delta)
 void __fastcall MONSTERUNIQUE_UMod26_Teleport(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && bUnique)
@@ -673,6 +699,7 @@ void __fastcall MONSTERUNIQUE_UMod30_AuraEnchanted(D2UnitStrc* pUnit, int32_t nU
 }
 
 //D2Game.0x6FC6BA70
+// 1.13c D2Game+0x22BC0 (umod init slot 5)
 void __fastcall MONSTERUNIQUE_UMod5_Strong(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
@@ -710,6 +737,18 @@ void __fastcall MONSTERUNIQUE_UMod5_Strong(D2UnitStrc* pUnit, int32_t nUMod, int
     {
         nDamagePercent = nDamagePercent * pDifficultyLevelsTxtRecord->dwChampionDmgBonus / 100;
         nToHitPercent = nToHitPercent * pDifficultyLevelsTxtRecord->dwChampionDmgBonus / 100;
+
+        // the base class (D2Game+0x18A0, then the monstats range check) 0x76 halves the damage bonus only
+        int32_t nBaseId = pUnit->dwClassId;
+        if (D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nBaseId))
+        {
+            nBaseId = pMonStatsTxtRecord->nBaseId;
+        }
+
+        if (MONSTERREGION_SanitizeMonsterId(nBaseId) == 0x76)
+        {
+            nDamagePercent /= 2;
+        }
     }
 
     STATLIST_AddUnitStat(pUnit, STAT_DAMAGEPERCENT, nDamagePercent, 0);
@@ -717,6 +756,7 @@ void __fastcall MONSTERUNIQUE_UMod5_Strong(D2UnitStrc* pUnit, int32_t nUMod, int
 }
 
 //D2Game.0x6FC6BB80
+// 1.13c D2Game+0x22880 (umod init slot 6; no delta)
 void __fastcall MONSTERUNIQUE_UMod6_Fast(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
@@ -735,6 +775,7 @@ void __fastcall MONSTERUNIQUE_UMod6_Fast(D2UnitStrc* pUnit, int32_t nUMod, int32
 }
 
 //D2Game.0x6FC6BC10
+// 1.13c D2Game+0x22740 (umod init slot 9; game read from pUnit->pGame, umod constants via 0x21FB0; no delta)
 void __fastcall MONSTERUNIQUE_UMod9_FireEnchanted(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
@@ -787,6 +828,7 @@ void __fastcall MONSTERUNIQUE_UMod9_FireEnchanted(D2UnitStrc* pUnit, int32_t nUM
 }
 
 //D2Game.0x6FC6BDD0
+// 1.13c D2Game+0x22600 (umod init slot 17; no delta)
 void __fastcall MONSTERUNIQUE_UMod17_LightningEnchanted(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
@@ -839,6 +881,7 @@ void __fastcall MONSTERUNIQUE_UMod17_LightningEnchanted(D2UnitStrc* pUnit, int32
 }
 
 //D2Game.0x6FC6BF90
+// 1.13c D2Game+0x22490 (umod init slot 18; no delta)
 void __fastcall MONSTERUNIQUE_UMod18_ColdEnchanted(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
@@ -893,6 +936,7 @@ void __fastcall MONSTERUNIQUE_UMod18_ColdEnchanted(D2UnitStrc* pUnit, int32_t nU
 }
 
 //D2Game.0x6FC6C160
+// 1.13c D2Game+0x22320 (umod init slot 23; no delta)
 void __fastcall MONSTERUNIQUE_UMod23_PoisonEnchanted(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
@@ -947,6 +991,7 @@ void __fastcall MONSTERUNIQUE_UMod23_PoisonEnchanted(D2UnitStrc* pUnit, int32_t 
 }
 
 //D2Game.0x6FC6C340
+// 1.13c D2Game+0x221D0 (umod init slot 25; no delta)
 void __fastcall MONSTERUNIQUE_UMod25_ManaSteal(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
@@ -999,6 +1044,7 @@ void __fastcall MONSTERUNIQUE_UMod25_ManaSteal(D2UnitStrc* pUnit, int32_t nUMod,
 }
 
 //D2Game.0x6FC6C4F0
+// 1.13c D2Game+0x24250 (umod callback table D2Game+0x10F448; no delta)
 void __fastcall MONSTERUNIQUE_CastAmplifyDamage(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4)
 {
     if (!a4 || ((uint8_t)ITEMS_RollRandomNumber(&pUnit->pSeed) & 3u) < 1)
@@ -1018,6 +1064,7 @@ void __fastcall MONSTERUNIQUE_CastAmplifyDamage(D2GameStrc* pGame, D2UnitStrc* p
 }
 
 //D2Game.0x6FC6C5B0
+// 1.13c D2Game+0x24030 (the curse callback 0x24250 passes; no delta)
 void __fastcall MONSTERUNIQUE_CurseCallback_ApplyAmplifyDamage(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t nSkillLevel)
 {
     if (!sub_6FCBD900(pGame, pUnit, pTarget))
@@ -1068,6 +1115,7 @@ void __fastcall MONSTERUNIQUE_CurseCallback_ApplyAmplifyDamage(D2GameStrc* pGame
 }
 
 //D2Game.0x6FC6C710
+// 1.13c D2Game+0x21BB0 (no delta)
 void __fastcall MONSTERUNIQUE_FireEnchantedModeChange(D2GameStrc* pGame, D2UnitStrc* pBoss, int32_t nUMod, int32_t bUnique)
 {
     if (bUnique && (!pBoss || pBoss->dwAnimMode == MONMODE_DEATH))
@@ -1077,6 +1125,7 @@ void __fastcall MONSTERUNIQUE_FireEnchantedModeChange(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FC6C740
+// 1.13c D2Game+0x266B0 (adds the per-difficulty scaling of the explosion)
 void __fastcall MONSTERUNIQUE_CastCorpseExplode(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     const int32_t nX = CLIENTS_GetUnitX(pUnit);
@@ -1097,8 +1146,35 @@ void __fastcall MONSTERUNIQUE_CastCorpseExplode(D2GameStrc* pGame, D2UnitStrc* p
         return;
     }
 
-    const int32_t nMaxDamage = MONSTERUNIQUE_CalculatePercentage(monStatsInit.nMaxHP, pDifficultyLevelsTxtRecord->dwMonsterCEDmgPercent, 100);
-    const int32_t nMinDamage = MONSTERUNIQUE_CalculatePercentage(nMaxDamage, 60, 100);
+    int32_t nMaxDamage = MONSTERUNIQUE_CalculatePercentage(monStatsInit.nMaxHP, pDifficultyLevelsTxtRecord->dwMonsterCEDmgPercent, 100);
+    // 1.13c scales the explosion per difficulty: normal x - x/4, nightmare x - x/3, hell x/8
+    switch (pGame->nDifficulty)
+    {
+    case 0:
+        nMaxDamage -= nMaxDamage / 4;
+        break;
+    case 1:
+        nMaxDamage -= nMaxDamage / 3;
+        break;
+    case 2:
+        nMaxDamage /= 8;
+        break;
+    }
+
+    // the inlined 60 percent of 1.13c (D2Game+0x14D0's overflow branches)
+    int32_t nMinDamage = 0;
+    if (nMaxDamage <= 0x100000)
+    {
+        nMinDamage = nMaxDamage * 60 / 100;
+    }
+    else if ((nMaxDamage & ~0xF) < 0x640)
+    {
+        nMinDamage = (int32_t)((int64_t)nMaxDamage * 60 / 100);
+    }
+    else
+    {
+        nMinDamage = nMaxDamage / 100 * 60;
+    }
     const int32_t nDamage = ITEMS_RollLimitedRandomNumber(&pUnit->pSeed, nMaxDamage - nMinDamage);
 
     D2DamageStrc damage = {};
@@ -1108,6 +1184,7 @@ void __fastcall MONSTERUNIQUE_CastCorpseExplode(D2GameStrc* pGame, D2UnitStrc* p
 }
 
 //D2Game.0x6FC6C9E0
+// 1.13c D2Game+0x265E0 (no delta)
 void __fastcall MONSTERUNIQUE_CastCorpseExplode2(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     const int32_t nX = CLIENTS_GetUnitX(pUnit);
@@ -1126,6 +1203,7 @@ void __fastcall MONSTERUNIQUE_CastCorpseExplode2(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FC6CAB0
+// 1.13c D2Game+0x26520 (minion-owner lookup inlined; no delta)
 void __fastcall MONSTERUNIQUE_CastNova(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!bUnique)
@@ -1153,6 +1231,7 @@ void __fastcall MONSTERUNIQUE_CastNova(D2GameStrc* pGame, D2UnitStrc* pUnit, int
 }
 
 //D2Game.0x6FC6CB40
+// 1.13c D2Game+0x26320 (no delta)
 void __fastcall MONSTERUNIQUE_CastLightUniqueMissile(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!bUnique)
@@ -1211,6 +1290,7 @@ void __fastcall MONSTERUNIQUE_CastLightUniqueMissile(D2GameStrc* pGame, D2UnitSt
 }
 
 //D2Game.0x6FC6CD30
+// 1.13c D2Game+0x268C0 (0x26320 inlined; no delta)
 void __fastcall sub_6FC6CD30(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (bUnique && (!pUnit || pUnit->dwAnimMode != MONMODE_GETHIT))
@@ -1220,6 +1300,7 @@ void __fastcall sub_6FC6CD30(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod
 }
 
 //D2Game.0x6FC6CD60
+// 1.13c D2Game+0x262D0 (no delta)
 void __fastcall MONSTERUNIQUE_CastColdUniqueMissile(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!bUnique)
@@ -1239,6 +1320,7 @@ void __fastcall MONSTERUNIQUE_CastCorpsePoisonCloud(D2GameStrc* pGame, D2UnitStr
 }
 
 //D2Game.0x6FC6CE50
+// 1.13c D2Game+0x23BF0 (owner lookup and owner-data reset inlined; no delta)
 void __fastcall MONSTERUNIQUE_KillMinions(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (pUnit && pUnit->dwAnimMode != MONMODE_DEATH)
@@ -1265,6 +1347,7 @@ void __fastcall MONSTERUNIQUE_KillMinions(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FC6CEC0
+// 1.13c D2Game+0x23730 (the callback 0x23BF0 passes; no delta)
 void __fastcall MONSTERUNIQUE_MinionCallback_KillMinion(D2UnitStrc* pUnit, void* pGameArg, void* pUnused)
 {
     D2GameStrc* pGame = (D2GameStrc*)pGameArg;
@@ -1281,6 +1364,7 @@ void __fastcall MONSTERUNIQUE_MinionCallback_KillMinion(D2UnitStrc* pUnit, void*
 }
 
 //D2Game.0x6FC6CF10
+// 1.13c D2Game+0x21B30 (no delta)
 void __fastcall sub_6FC6CF10(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     int32_t nMinDamage = STATLIST_UnitGetStatValue(pUnit, STAT_MINDAMAGE, 0);
@@ -1297,6 +1381,7 @@ void __fastcall sub_6FC6CF10(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod
 }
 
 //D2Game.0x6FC6CF90
+// 1.13c D2Game+0x23670 (no delta)
 void __fastcall sub_6FC6CF90(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MISSILE)
@@ -1325,6 +1410,7 @@ void __fastcall sub_6FC6CF90(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod
 }
 
 //D2Game.0x6FC6D030
+// 1.13c D2Game+0x21B00 (no delta)
 void __fastcall MONSTERUNIQUE_ScarabModeChange(D2GameStrc* pGame, D2UnitStrc* pBoss, int32_t nUMod, int32_t bUnique)
 {
     if (!pBoss || pBoss->dwAnimMode == MONMODE_GETHIT || pBoss->dwAnimMode == MONMODE_DEATH)
@@ -1334,6 +1420,7 @@ void __fastcall MONSTERUNIQUE_ScarabModeChange(D2GameStrc* pGame, D2UnitStrc* pB
 }
 
 //D2Game.0x6FC6D060
+// 1.13c D2Game+0x260D0 (no delta)
 void __fastcall MONSTERUNIQUE_CastBugLightningMissile(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     D2MissileStrc missileParams = {};
@@ -1365,6 +1452,7 @@ void __fastcall MONSTERUNIQUE_CastBugLightningMissile(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FC6D1C0
+// 1.13c D2Game+0x22B60 (rolls the element; the stat body is 0x21FE0, table at D2Game+0xFCE00; no delta)
 void __fastcall MONSTERUNIQUE_ApplyElementalDamage(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     constexpr int32_t dword_6FD28C38[5][3] =
@@ -1443,6 +1531,7 @@ void __fastcall MONSTERUNIQUE_ApplyElementalDamage(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FC6D410
+// not-1.13c: no standalone record getter; 1.13c inlines the index check (0x21FE0) or reads dwConstants through 0x21FB0
 D2MonUModTxt* __fastcall MONSTERUNIQUE_GetMonUModTxtRecord(uint32_t nUMod)
 {
     if (nUMod < sgptDataTables->nMonUModTxtRecordCount)
@@ -1454,6 +1543,7 @@ D2MonUModTxt* __fastcall MONSTERUNIQUE_GetMonUModTxtRecord(uint32_t nUMod)
 }
 
 //D2Game.0x6FC6D440
+// 1.13c D2Game+0x23650 (no delta)
 void __fastcall sub_6FC6D440(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MISSILE)
@@ -1509,6 +1599,7 @@ void __fastcall MONSTERUNIQUE_StealBeltItem(D2GameStrc* pGame, D2UnitStrc* pUnit
 
 //1.10: D2Game.0x6FC6D800
 //1.14d: 0x005A3250
+// 1.13c D2Game+0x25E60 (no delta)
 void __fastcall MONSTERUNIQUE_QuestCompleteModeChange(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit)
@@ -1577,6 +1668,7 @@ void __fastcall MONSTERUNIQUE_QuestCompleteModeChange(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FC6D8B0
+// 1.13c D2Game+0x25CC0 (no delta)
 void __fastcall MONSTERUNIQUE_CastQueenPoisonCloudMissile(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     D2MissileStrc missileParams = {};
@@ -1607,6 +1699,7 @@ void __fastcall MONSTERUNIQUE_CastQueenPoisonCloudMissile(D2GameStrc* pGame, D2U
 }
 
 //D2Game.0x6FC6DA40
+// 1.13c D2Game+0x25AD0 (no delta)
 void __fastcall sub_6FC6DA40(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!bUnique || !pUnit || pUnit->dwUnitType != UNIT_MISSILE)
@@ -1676,6 +1769,7 @@ void __fastcall sub_6FC6DA40(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod
 }
 
 //D2Game.0x6FC6DCB0
+// 1.13c D2Game+0x21AD0 (no delta)
 void __fastcall MONSTERUNIQUE_LightningEnchantedModeChange(D2GameStrc* pGame, D2UnitStrc* pBoss, int32_t nUMod, int32_t bUnique)
 {
     if (bUnique && pBoss && pBoss->dwAnimMode == MONMODE_GETHIT)
@@ -1685,6 +1779,7 @@ void __fastcall MONSTERUNIQUE_LightningEnchantedModeChange(D2GameStrc* pGame, D2
 }
 
 //D2Game.0x6FC6DCE0
+// 1.13c D2Game+0x21A90 (no delta)
 void __fastcall MONSTERUNIQUE_ColdEnchantedModeChange(D2GameStrc* pGame, D2UnitStrc* pBoss, int32_t nUMod, int32_t bUnique)
 {
     if ((bUnique || nUMod != 18) && (!pBoss || pBoss->dwAnimMode == MONMODE_DEATH))
@@ -1694,6 +1789,7 @@ void __fastcall MONSTERUNIQUE_ColdEnchantedModeChange(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FC6DD20
+// 1.13c D2Game+0x23570 (no delta for a live unit; the callback table never passes null)
 void __fastcall sub_6FC6DD20(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit)
@@ -1716,6 +1812,7 @@ void __fastcall sub_6FC6DD20(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod
 }
 
 //D2Game.0x6FC6DDE0
+// 1.13c D2Game+0x23E20 (dead check inlined; no delta)
 void __fastcall sub_6FC6DDE0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit)
@@ -1760,6 +1857,7 @@ void __fastcall sub_6FC6DDE0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod
 }
 
 //D2Game.0x6FC6DFA0
+// 1.13c D2Game+0x21A70 (no delta)
 void __fastcall MONSTERUNIQUE_ApplyShatterState(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit || pUnit->dwAnimMode == MONMODE_DEATH)
@@ -1769,6 +1867,7 @@ void __fastcall MONSTERUNIQUE_ApplyShatterState(D2GameStrc* pGame, D2UnitStrc* p
 }
 
 //D2Game.0x6FC6DFC0
+// 1.13c D2Game+0x23440 (dead check and minion-owner lookup inlined; no delta)
 void __fastcall sub_6FC6DFC0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (SUNIT_IsDead(pUnit))
@@ -1856,6 +1955,7 @@ void __fastcall MONSTERUNIQUE_SetTrapDamage(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FC6E240
+// 1.13c D2Game+0x24300 (no delta)
 void __fastcall sub_6FC6E240(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit)
@@ -1876,6 +1976,7 @@ void __fastcall sub_6FC6E240(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod
 }
 
 //D2Game.0x6FC6E390
+// 1.13c D2Game+0x23390 (no delta)
 void __fastcall MONSTERUNIQUE_SuicideModeChange(D2GameStrc* pGame, D2UnitStrc* pBoss, int32_t nUMod, int32_t bUnique)
 {
     if (!pBoss || pBoss->dwAnimMode == MONMODE_DEATH || pBoss->dwAnimMode == MONMODE_DEAD)
@@ -1894,6 +1995,7 @@ void __fastcall MONSTERUNIQUE_SuicideModeChange(D2GameStrc* pGame, D2UnitStrc* p
 }
 
 //D2Game.0x6FC6E410
+// 1.13c D2Game+0x257D0 (no delta)
 void __fastcall MONSTERUNIQUE_CastSuicideExplodeMissile(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit)
@@ -1949,6 +2051,7 @@ void __fastcall MONSTERUNIQUE_CastSuicideExplodeMissile(D2GameStrc* pGame, D2Uni
 }
 
 //D2Game.0x6FC6E700
+// 1.13c D2Game+0x22B10 (the spawn helper's level and class checks inlined; no delta)
 void __fastcall MONSTERUNIQUE_CreatePainWorm(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit || pUnit->dwAnimMode == MONMODE_DEATH)
@@ -1959,6 +2062,7 @@ void __fastcall MONSTERUNIQUE_CreatePainWorm(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FC6E730
+// 1.13c D2Game+0x23320 (dead check inlined; no delta)
 void __fastcall sub_6FC6E730(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (SUNIT_IsDead(pUnit))
@@ -1971,12 +2075,14 @@ void __fastcall sub_6FC6E730(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod
 }
 
 //D2Game.0x6FC6E770
+// 1.13c D2Game+0x269E0 (no delta)
 void __fastcall sub_6FC6E770(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     sub_6FC6E780(pGame, pUnit, 0, 0);
 }
 
 //D2Game.0x6FC6E780
+// 1.13c D2Game+0x268E0 (the walk is d2game_268e0_walk; no delta)
 void __fastcall sub_6FC6E780(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pMissile, int32_t nIndex)
 {
     constexpr D2UnkUModStrc stru_6FD2F0C8[43] =
@@ -2047,36 +2153,42 @@ void __fastcall sub_6FC6E780(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
 }
 
 //D2Game.0x6FC6E860
+// 1.13c D2Game+0x269D0 (no delta)
 void __fastcall sub_6FC6E860(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     sub_6FC6E780(pGame, pUnit, 0, 1);
 }
 
 //D2Game.0x6FC6E870
+// 1.13c D2Game+0x269B0 (no delta)
 void __fastcall D2GAME_MONSTERS_AiFunction08_6FC6E870(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     sub_6FC6E780(pGame, pUnit, 0, 2);
 }
 
 //D2Game.0x6FC6E890
+// 1.13c D2Game+0x21830 (no delta)
 void __fastcall sub_6FC6E890(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     sub_6FC6E780(pGame, pUnit, 0, 3);
 }
 
 //D2Game.0x6FC6E8A0
+// 1.13c D2Game+0x21820 (no delta)
 void __fastcall sub_6FC6E8A0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     sub_6FC6E780(pGame, pUnit, 0, 4);
 }
 
 //D2Game.0x6FC6E8B0
+// 1.13c D2Game+0x21880 (body is d2game_21880; no delta)
 void __fastcall sub_6FC6E8B0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pMissile)
 {
     d2game_21880(pGame, pUnit, pMissile);
 }
 
 //D2Game.0x6FC6E8D0
+// 1.13c D2Game+0x24C70 (no delta)
 D2UnitStrc* __fastcall sub_6FC6E8D0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t nSuperUniqueId, int32_t a5, uint16_t nX, uint16_t nY, int32_t a8)
 {
     D2UnitStrc* pMonster = D2GAME_SpawnMonster_6FC6F220(pGame, pRoom, pRoomCoordList, nX, nY, -1, nSuperUniqueId, a8);
@@ -2211,6 +2323,7 @@ void __fastcall sub_6FC6E940(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3)
 }
 
 //D2Game.0x6FC6EBE0
+// not-1.13c: no standalone getter; 1.13c inlines the type-1 check and +0x14 load at each call site (e.g. 0x445A0, 0x24BF0)
 D2MonsterDataStrc* __fastcall MONSTERUNIQUE_GetMonsterData(D2UnitStrc* pUnit)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER)
@@ -2235,6 +2348,7 @@ int32_t __fastcall MONSTERUNIQUE_GetUModCount(uint8_t* pUMods)
 }
 
 //D2Game.0x6FC6EC10
+// 1.13c D2Game+0x23100 (the exclude walk stops at the first non-positive entry; mon type check is 0x22790)
 BOOL __fastcall sub_6FC6EC10(D2UnitStrc* pUnit, D2MonUModTxt* pMonUModTxtRecord, int32_t bExpansion)
 {
     if (!pMonUModTxtRecord->nEnabled)
@@ -2249,16 +2363,17 @@ BOOL __fastcall sub_6FC6EC10(D2UnitStrc* pUnit, D2MonUModTxt* pMonUModTxtRecord,
 
     for (int32_t i = 0; i < 2; ++i)
     {
+        // 1.13c stops at the first exclude that is not a positive mon type
         const int16_t nExcludeMonType = pMonUModTxtRecord->wExclude[i];
+        if (nExcludeMonType <= 0)
+        {
+            break;
+        }
+
         if (pUnit && pUnit->dwUnitType == UNIT_MONSTER)
         {
 			if (D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(pUnit->dwClassId))
 			{
-				// SUNITDMG_CheckMonType does not check sgptDataTables->pMonTypeNest if mon type is 0
-				// However original code in this function does. Just in case, trigger the error if this should actually be supported.
-				// This is unlikely since 0 is MONTYPE_NONE.
-				// d2-web: retail checks the nest with type 0 as well (most umods have no exclude, so
-				// the assert upstream put here fires on the first boss pack); do what retail does.
 				const int32_t nMonType = pMonStatsTxtRecord->wMonType;
 				if (nMonType >= 0 && nMonType < sgptDataTables->nMonTypeTxtRecordCount && nExcludeMonType >= 0 && nExcludeMonType < sgptDataTables->nMonTypeTxtRecordCount
 					&& (gdwBitMasks[nMonType & 31] & sgptDataTables->pMonTypeNest[(nMonType >> 5) + nExcludeMonType * sgptDataTables->nMonTypeIndex]))
@@ -2480,6 +2595,7 @@ D2UnitStrc* __fastcall D2GAME_SpawnMonster_6FC6F220(D2GameStrc* pGame, D2ActiveR
 
 // d2-web: Minion callbacks carry pointer-sized arguments; the UMod implementation
 // takes retail int32 values. A typed adapter avoids an incompatible wasm64 indirect call.
+// not-1.13c: wasm64 call adapter; 1.13c passes 0x21840 to the minion walk directly (0x248A0)
 static void __fastcall MONSTERUNIQUE_ApplyMinionUMod(D2UnitStrc* pUnit, void* pMod, void* pUnique)
 {
     sub_6FC6F670(pUnit, static_cast<int32_t>(reinterpret_cast<uintptr_t>(pMod)),
@@ -2487,6 +2603,7 @@ static void __fastcall MONSTERUNIQUE_ApplyMinionUMod(D2UnitStrc* pUnit, void* pM
 }
 
 //D2Game.0x6FC6F440
+// 1.13c D2Game+0x248A0 (the minion spawn block is its own function at 0x445A0, umod transfer 0x23060; no delta)
 void __fastcall D2GAME_SpawnMinions_6FC6F440(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, D2UnitStrc* pUnit, int32_t bSpawnMinions, int32_t nMinGroup, int32_t nMaxGroup)
 {
     if (bSpawnMinions)
@@ -2591,6 +2708,7 @@ void __fastcall D2GAME_SpawnMinions_6FC6F440(D2GameStrc* pGame, D2ActiveRoomStrc
 }
 
 //D2Game.0x6FC6F670
+// 1.13c D2Game+0x21840 (the table at D2Game+0x10E550 matches slot for slot; no delta)
 void __fastcall sub_6FC6F670(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     constexpr UModInitFunc dword_6FD2F018[] =
@@ -2987,6 +3105,7 @@ void __fastcall MONSTERUNIQUE_SetUniqueFlag_6FC43260(D2GameStrc* pGame, D2UnitSt
 }
 
 //D2Game.0x6FC6FF10
+// 1.13c D2Game+0x232B0 (no delta)
 void __fastcall D2GAME_BOSSES_AssignUMod_6FC6FF10(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     uint8_t* pUMods = MONSTERUNIQUE_GetUMods(pUnit);
@@ -3012,6 +3131,7 @@ void __fastcall D2GAME_BOSSES_AssignUMod_6FC6FF10(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FC6FFD0
+// 1.13c D2Game+0x24BF0 (the unique flag and region count go through 0x23260, which reads the level from the monster data)
 void __fastcall D2GAME_MONSTERS_Unk_6FC6FFD0(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t nUMod)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
@@ -3025,22 +3145,13 @@ void __fastcall D2GAME_MONSTERS_Unk_6FC6FFD0(D2GameStrc* pGame, D2UnitStrc* pUni
         return;
     }
 
-    D2MonsterRegionStrc* pMonsterRegion = MONSTERREGION_GetMonsterRegionFromLevelId(pGame->pMonReg, MONSTER_GetLevelId(pUnit));
-    if (pMonsterRegion && !(pMonsterData->nTypeFlag & MONTYPEFLAG_UNIQUE))
-    {
-        ++pMonsterRegion->dwUniqueCount;
-    }
-
-    pMonsterData->nTypeFlag |= MONTYPEFLAG_UNIQUE;
+    MONSTERUNIQUE_SetUniqueFlag_6FC43260(pGame, pUnit);
     pMonsterData->nTypeFlag |= MONTYPEFLAG_CHAMPION | MONTYPEFLAG_OTHER;
 
-    for (int32_t i = 0; i < 9; ++i)
+    const int32_t nIndex = MONSTERUNIQUE_GetUModCount(pMonsterData->nMonUmod);
+    if (nIndex < 9)
     {
-        if (!pMonsterData->nMonUmod[i])
-        {
-            pMonsterData->nMonUmod[i] = nUMod;
-            D2GAME_SpawnMinions_6FC6F440(pGame, UNITS_GetRoom(pUnit), nullptr, pUnit, 1, 0, 0);
-            return;
-        }
+        pMonsterData->nMonUmod[nIndex] = nUMod;
+        D2GAME_SpawnMinions_6FC6F440(pGame, UNITS_GetRoom(pUnit), nullptr, pUnit, 1, 0, 0);
     }
 }

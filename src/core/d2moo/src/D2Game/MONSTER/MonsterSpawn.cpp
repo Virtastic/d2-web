@@ -210,9 +210,10 @@ int32_t __fastcall sub_6FC68630(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nS
 }
 
 //D2Game.0x6FC68CC0
-int32_t __fastcall MONSTERSPAWN_GetResurrectMode(D2UnitStrc* pUnit, int32_t a2)
+// 1.13c D2Game+0xF3CB0 (retail takes only the unit; the second argument is kept for the callers and is not read)
+int32_t __fastcall MONSTERSPAWN_GetResurrectMode(D2UnitStrc* pUnit, int32_t /*a2*/)
 {
-    if (!a2 || !pUnit)
+    if (!pUnit)
     {
         return MONMODE_NEUTRAL;
     }
@@ -560,6 +561,7 @@ D2UnitStrc* __fastcall D2GAME_SpawnNormalMonster_6FC68E30(D2UnkMonCreateStrc* pM
 }
 
 //D2Game.0x6FC69B60
+// not-1.13c: retail has no separate function; the ancient-barbarian equip is inlined into the boss-mod setup at 0xEE7B0
 void __fastcall MONSTERSPAWN_EquipAncientBarbarians(D2UnitStrc* pUnit)
 {
     constexpr Unk dword_6FD28B08[] =
@@ -922,6 +924,7 @@ D2UnitStrc* __fastcall sub_6FC69F70(D2GameStrc* pGame, D2RoomCoordListStrc* pRoo
 }
 
 //D2Game.0x6FC6A030
+// 1.13c D2Game+0xEF510 (checked against decompile: same create-struct fields, then the spawn core)
 D2UnitStrc* __fastcall sub_6FC6A030(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t nX, int32_t nY, int32_t nMonsterId, int32_t nAnimMode, int32_t a8, int16_t nFlags)
 {
     D2UnkMonCreateStrc monCreate = {};
@@ -941,6 +944,7 @@ D2UnitStrc* __fastcall sub_6FC6A030(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, 
 }
 
 //D2Game.0x6FC6A090
+// 1.13c D2Game+0xEF4B0 (checked against decompile: no coord list, no unit id, field_20 = -1)
 D2UnitStrc* __fastcall sub_6FC6A090(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nMonsterId, int32_t nAnimMode, int16_t nFlags)
 {
     D2UnkMonCreateStrc monCreate = {};
@@ -1223,6 +1227,7 @@ int32_t __fastcall sub_6FC6A350(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int3
 }
 
 //D2Game.0x6FC6A810
+// 1.13c D2Game+0xEFB80 (checked against decompile: gate on the bone-prison class, target unit x/y, then the 0xEF940 spawn)
 int32_t __fastcall sub_6FC6A810(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t a3, int32_t a4, D2UnitStrc* pTargetUnit, int32_t a6, int16_t a7)
 {
     D2UnkMonCreateStrc2 dword_6FD2EEAC =
@@ -1245,6 +1250,7 @@ int32_t __fastcall sub_6FC6A810(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int3
 }
 
 //D2Game.0x6FC6A8C0
+// 1.13c D2Game+0xEE0A0 (checked against decompile; the 12-entry offset table is the one at D2Game+0xFC298)
 int32_t __fastcall sub_6FC6A8C0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMonsterId, int32_t nAnimMode, int32_t nCount, int32_t bNonWaterSpawn, int16_t nFlags)
 {
     static const D2CoordStrc stru_6FD28B68[12] =

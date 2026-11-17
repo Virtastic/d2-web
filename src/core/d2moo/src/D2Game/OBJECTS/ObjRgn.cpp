@@ -86,6 +86,7 @@ int32_t __fastcall OBJRGN_AllocObjectControl(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC7A5C0
+// 1.13c D2Game+0xB8A0 (checked against decompile, no delta)
 void __fastcall OBJRGN_FreeObjectControl(D2GameStrc* pGame)
 {
     D2_ASSERT(pGame);
@@ -129,12 +130,14 @@ D2ObjectRegionStrc* __fastcall OBJRGN_GetObjectRegionForLevel(D2GameStrc* pGame,
 }
 
 //D2Game.0x6FC7A6C0
+// not-1.13c: retail inlines this at its callers (e.g. populate fn D2Game+0x32A10 reads region+0x18/0x08 inline)
 D2ObjectControlStrc* __fastcall OBJRGN_GetObjectControlFromGame(D2GameStrc* pGame)
 {
     return pGame->pObjectControl;
 }
 
 //D2Game.0x6FC7A6D0
+// not-1.13c: retail inlines this at its callers (e.g. populate fn D2Game+0x32A10 reads region+0x18/0x08 inline)
 D2ShrineDataStrc* __fastcall OBJRGN_GetShrineDataFromGame(D2GameStrc* pGame)
 {
     return &pGame->pObjectControl->shrineData;
@@ -188,6 +191,7 @@ void __fastcall OBJECTS_InitFunction17_Waypoint(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC7A860
+// not-1.13c: retail inlines this at its callers (e.g. populate fn D2Game+0x32A10 reads region+0x18/0x08 inline)
 bool __fastcall OBJRGN_CanNotSpawnMoreWells(D2GameStrc* pGame, int32_t nLevelId)
 {
     D2ObjectRegionStrc* pObjectRegion = pGame->pObjectControl->pObjectRegion[nLevelId];
@@ -195,6 +199,7 @@ bool __fastcall OBJRGN_CanNotSpawnMoreWells(D2GameStrc* pGame, int32_t nLevelId)
 }
 
 //D2Game.0x6FC7A890
+// not-1.13c: retail inlines this at its callers (e.g. populate fn D2Game+0x32A10 reads region+0x18/0x08 inline)
 bool __fastcall OBJRGN_ShouldSpawnHealingShrineOrWell(D2GameStrc* pGame, int32_t nLevelId)
 {
     D2ObjectRegionStrc* pObjectRegion = pGame->pObjectControl->pObjectRegion[nLevelId];
@@ -202,6 +207,7 @@ bool __fastcall OBJRGN_ShouldSpawnHealingShrineOrWell(D2GameStrc* pGame, int32_t
 }
 
 //D2Game.0x6FC7A8C0
+// not-1.13c: retail inlines this at its callers (e.g. populate fn D2Game+0x32A10 reads region+0x18/0x08 inline)
 bool __fastcall OBJRGN_CanNotSpawnMoreShrines(D2GameStrc* pGame, int32_t nLevelId)
 {
     D2ObjectRegionStrc* pObjectRegion = pGame->pObjectControl->pObjectRegion[nLevelId];
@@ -209,6 +215,7 @@ bool __fastcall OBJRGN_CanNotSpawnMoreShrines(D2GameStrc* pGame, int32_t nLevelI
 }
 
 //D2Game.0x6FC7A8F0
+// not-1.13c: retail inlines this at its callers (e.g. populate fn D2Game+0x32A10 reads region+0x18/0x08 inline)
 void __fastcall OBJRGN_IncreaseHealingShrineCount(D2GameStrc* pGame, int32_t nLevelId)
 {
     D2ObjectRegionStrc* pObjectRegion = pGame->pObjectControl->pObjectRegion[nLevelId];
@@ -216,6 +223,7 @@ void __fastcall OBJRGN_IncreaseHealingShrineCount(D2GameStrc* pGame, int32_t nLe
 }
 
 //D2Game.0x6FC7A900
+// 1.13c D2Game+0xB700 (checked against decompile, no delta)
 bool __fastcall OBJRGN_CanSpawnWell(D2GameStrc* pGame, int32_t nLevelId, int32_t nX, int32_t nY)
 {
     D2ObjectRegionStrc* pObjectRegion = pGame->pObjectControl->pObjectRegion[nLevelId];
@@ -231,6 +239,7 @@ bool __fastcall OBJRGN_CanSpawnWell(D2GameStrc* pGame, int32_t nLevelId, int32_t
 }
 
 //D2Game.0x6FC7A960
+// not-1.13c: retail inlines this at its callers (e.g. populate fn D2Game+0x32A10 reads region+0x18/0x08 inline)
 void __fastcall OBJRGN_SetWellCoordinates(D2GameStrc* pGame, int32_t nLevelId, int32_t nX, int32_t nY)
 {
     D2ObjectRegionStrc* pObjectRegion = pGame->pObjectControl->pObjectRegion[nLevelId];
@@ -245,6 +254,7 @@ void __fastcall OBJRGN_SetWellCoordinates(D2GameStrc* pGame, int32_t nLevelId, i
 }
 
 //D2Game.0x6FC7A990
+// 1.13c D2Game+0xB670 (checked against decompile, no delta)
 bool __fastcall OBJRGN_CanSpawnShrine(D2GameStrc* pGame, int32_t nLevelId, int32_t nX, int32_t nY)
 {
     D2ObjectRegionStrc* pObjectRegion = pGame->pObjectControl->pObjectRegion[nLevelId];
@@ -260,6 +270,7 @@ bool __fastcall OBJRGN_CanSpawnShrine(D2GameStrc* pGame, int32_t nLevelId, int32
 }
 
 //D2Game.0x6FC7A9F0
+// not-1.13c: retail inlines this at its callers (e.g. populate fn D2Game+0x32A10 reads region+0x18/0x08 inline)
 void __fastcall OBJRGN_SetShrineCoordinates(D2GameStrc* pGame, int32_t nLevelId, int32_t nX, int32_t nY)
 {
     D2ObjectRegionStrc* pObjectRegion = pGame->pObjectControl->pObjectRegion[nLevelId];

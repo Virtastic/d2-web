@@ -168,6 +168,7 @@ void __fastcall PLRMODE_StartXY_Neutral(D2GameStrc* pGame, D2UnitStrc* pPlayer, 
     }
 
     D2GAME_DeletePlayerPerFrameEvents_6FCBCE50(pGame, pPlayer);
+    SUNITDMG_FreeAttackerCombatList(pGame, pPlayer);
     SUNIT_SetCombatMode(pGame, pPlayer, nCombatMode);
     UNITS_SetUsedSkill(pPlayer, 0);
 }
@@ -244,11 +245,63 @@ void __fastcall PLRMODE_StartXY_WalkRunKnockback(D2GameStrc* pGame, D2UnitStrc* 
     sub_6FC7F600(pGame, pPlayer, nMode);
 }
 
+// 1.13c D2Game+0x77BB0 (EDI = pUnit; the run drain and its town test, the 1.10f inline block; 1 while the unit keeps running)
+static int32_t PLRMODE_RunDrain_77BB0(D2UnitStrc* pPlayer)
+{
+    if (!pPlayer)
+    {
+        return 0;
+    }
+
+    if (DUNGEON_IsRoomInTown(UNITS_GetRoom(pPlayer)))
+    {
+        return 1;
+    }
+
+    D2CharStatsTxt* pCharStatsTxtRecord = PLRSAVE2_GetCharStatsTxtRecord(pPlayer->dwClassId);
+    if (!pCharStatsTxtRecord || !pPlayer->pInventory)
+    {
+        return 0;
+    }
+
+    int32_t nStaminaLost = 2 * pCharStatsTxtRecord->nRunDrain;
+
+    D2UnitStrc* pTorsoArmor = INVENTORY_GetItemFromBodyLoc(pPlayer->pInventory, BODYLOC_TORSO);
+    if (pTorsoArmor)
+    {
+        D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pTorsoArmor->dwClassId);
+        if (pItemsTxtRecord)
+        {
+            nStaminaLost *= pItemsTxtRecord->dwSpeed / 10 + 1;
+        }
+    }
+
+    const int32_t nStaminaDrainPct = STATLIST_UnitGetItemStatOrSkillStatValue(pPlayer, STAT_ITEM_STAMINADRAINPCT, 0);
+    if (nStaminaDrainPct)
+    {
+        nStaminaLost += nStaminaLost * nStaminaDrainPct / -100;
+    }
+
+    if (nStaminaLost < 1)
+    {
+        nStaminaLost = 1;
+    }
+
+    STATLIST_AddUnitStat(pPlayer, STAT_STAMINA, -nStaminaLost, 0);
+
+    if (STATLIST_UnitGetStatValue(pPlayer, STAT_STAMINA, 0) > 0)
+    {
+        return 1;
+    }
+
+    STATLIST_SetUnitStat(pPlayer, STAT_STAMINA, 0, 0);
+    return 0;
+}
+
 //D2Game.0x6FC7F780
+// 1.13c D2Game+0x79B90 (the run drain is D2Game+0x77BB0, the neutral fallbacks are D2Game+0x782F0 calls, the pending-interaction clear is inlined)
 int32_t __fastcall sub_6FC7F780(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t a3, int32_t a4)
 {
-    // TODO: Names
-
     sub_6FCBC7E0(pGame, pPlayer);
 
     if (STATES_CheckState(pPlayer, STATE_BLAZE))
@@ -256,46 +309,9 @@ int32_t __fastcall sub_6FC7F780(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t 
         SKILLS_CreateBlazeMissile(pGame, pPlayer);
     }
 
-    if (pPlayer && pPlayer->dwAnimMode == PLRMODE_RUN && !DUNGEON_IsRoomInTown(UNITS_GetRoom(pPlayer)))
+    if (pPlayer && pPlayer->dwAnimMode == PLRMODE_RUN && !PLRMODE_RunDrain_77BB0(pPlayer))
     {
-        D2CharStatsTxt* pCharStatsTxtRecord = PLRSAVE2_GetCharStatsTxtRecord(pPlayer->dwClassId);
-        if (!pCharStatsTxtRecord || !pPlayer->pInventory)
-        {
-            sub_6FC7F600(pGame, pPlayer, PLRMODE_WALK);
-        }
-        else
-        {
-            int32_t nStaminaLost = 2 * pCharStatsTxtRecord->nRunDrain;
-
-            D2UnitStrc* pTorsoArmor = INVENTORY_GetItemFromBodyLoc(pPlayer->pInventory, BODYLOC_TORSO);
-            if (pTorsoArmor)
-            {
-                D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pTorsoArmor->dwClassId);
-                if (pItemsTxtRecord)
-                {
-                    nStaminaLost *= pItemsTxtRecord->dwSpeed / 10 + 1;
-                }
-            }
-
-            const int32_t nStaminaDrainPct = STATLIST_UnitGetItemStatOrSkillStatValue(pPlayer, STAT_ITEM_STAMINADRAINPCT, 0);
-            if (nStaminaDrainPct)
-            {
-                nStaminaLost += nStaminaLost * nStaminaDrainPct / -100;
-            }
-
-            if (nStaminaLost < 1)
-            {
-                nStaminaLost = 1;
-            }
-
-            STATLIST_AddUnitStat(pPlayer, STAT_STAMINA, -nStaminaLost, 0);
-
-            if (STATLIST_UnitGetStatValue(pPlayer, STAT_STAMINA, 0) <= 0)
-            {
-                STATLIST_SetUnitStat(pPlayer, STAT_STAMINA, 0, 0);
-                sub_6FC7F600(pGame, pPlayer, PLRMODE_WALK);
-            }
-        }
+        sub_6FC7F600(pGame, pPlayer, PLRMODE_WALK);
     }
 
     const int32_t v44 = sub_6FCBC930(pGame, pPlayer);
@@ -338,53 +354,26 @@ int32_t __fastcall sub_6FC7F780(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t 
         return v44;
     }
 
+    int32_t nResult = v44;
     const int32_t v28 = pPlayer->pPlayerData->unk0xA8[43];
     if (v28 < 0)
     {
-        int32_t nMode = PLRMODE_NEUTRAL;
-        D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pPlayer);
-        if (pRoom && DUNGEON_IsRoomInTown(pRoom))
-        {
-            nMode = PLRMODE_TOWNNEUTRAL;
-        }
-
-        D2GAME_DeletePlayerPerFrameEvents_6FCBCE50(pGame, pPlayer);
-        SUNIT_SetCombatMode(pGame, pPlayer, nMode);
-        UNITS_SetUsedSkill(pPlayer, 0);
+        PLRMODE_StartXY_Neutral(pGame, pPlayer, 1, 0, 0);
         sub_6FC828D0(pPlayer, sub_6FC7FB90(pPlayer), sub_6FC7FBB0(pPlayer), v28 == -2, pGame);
-        sub_6FC7FB70(pPlayer, 0);
-        return v44;
-    }
-
-    int32_t nResult = 0;
-    D2SkillStrc* pSkill = SKILLS_GetHighestLevelSkillFromUnitAndId(pPlayer, v28);
-    if (pSkill)
-    {
-        const int32_t nSkillMode = SKILLS_GetSkillModeFromUnit(pPlayer, pSkill);
-        if (pPlayer->dwUnitType == UNIT_PLAYER && pPlayer->pPlayerData)
-        {
-            D2GAME_PLAYERMODE_Change_6FC81A00(pGame, pPlayer, pSkill, nSkillMode, pPlayer->pPlayerData->unk0xA8[44], pPlayer->pPlayerData->unk0xA8[45], 0);
-        }
-        else
-        {
-            D2GAME_PLAYERMODE_Change_6FC81A00(pGame, pPlayer, pSkill, nSkillMode, 0, 0, 0);
-        }
-
-        nResult = 1;
     }
     else
     {
-        int32_t nMode = PLRMODE_NEUTRAL;
-        D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pPlayer);
-        if (pRoom && DUNGEON_IsRoomInTown(pRoom))
+        D2SkillStrc* pSkill = SKILLS_GetHighestLevelSkillFromUnitAndId(pPlayer, v28);
+        if (pSkill)
         {
-            nMode = PLRMODE_TOWNNEUTRAL;
+            const int32_t nSkillMode = SKILLS_GetSkillModeFromUnit(pPlayer, pSkill);
+            D2GAME_PLAYERMODE_Change_6FC81A00(pGame, pPlayer, pSkill, nSkillMode, sub_6FC7FB90(pPlayer), sub_6FC7FBB0(pPlayer), 0);
+            nResult = 1;
         }
-
-        D2GAME_DeletePlayerPerFrameEvents_6FCBCE50(pGame, pPlayer);
-        SUNIT_SetCombatMode(pGame, pPlayer, nMode);
-        UNITS_SetUsedSkill(pPlayer, 0);
-        nResult = v44;
+        else
+        {
+            PLRMODE_StartXY_Neutral(pGame, pPlayer, 1, 0, 0);
+        }
     }
 
     if (pPlayer->dwUnitType == UNIT_PLAYER && pPlayer->pPlayerData)
@@ -395,16 +384,8 @@ int32_t __fastcall sub_6FC7F780(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t 
     return nResult;
 }
 
-//D2Game.0x6FC7FB70
-void __fastcall sub_6FC7FB70(D2UnitStrc* pPlayer, int32_t a2)
-{
-    if (pPlayer && pPlayer->dwUnitType == UNIT_PLAYER && pPlayer->pPlayerData)
-    {
-        pPlayer->pPlayerData->unk0xA8[42] = a2;
-    }
-}
-
 //D2Game.0x6FC7FB90
+// 1.13c D2Game+0x1D90
 int32_t __fastcall sub_6FC7FB90(D2UnitStrc* pPlayer)
 {
     if (pPlayer && pPlayer->dwUnitType == UNIT_PLAYER && pPlayer->pPlayerData)
@@ -416,6 +397,7 @@ int32_t __fastcall sub_6FC7FB90(D2UnitStrc* pPlayer)
 }
 
 //D2Game.0x6FC7FBB0
+// 1.13c D2Game+0x1DB0
 int32_t __fastcall sub_6FC7FBB0(D2UnitStrc* pPlayer)
 {
     if (pPlayer && pPlayer->dwUnitType == UNIT_PLAYER && pPlayer->pPlayerData)
@@ -693,6 +675,7 @@ void __fastcall sub_6FC802F0(D2GameStrc* pGame, int32_t nBodyloc, D2UnitStrc* pI
 }
 
 //D2Game.0x6FC803F0
+// 1.13c D2Game+0x77D90
 void __fastcall sub_6FC803F0(D2GameStrc* pGame, D2UnitStrc* pItem, D2UnitStrc* pPlayer)
 {
     D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
@@ -705,6 +688,7 @@ void __fastcall sub_6FC803F0(D2GameStrc* pGame, D2UnitStrc* pItem, D2UnitStrc* p
 }
 
 //D2Game.0x6FC80440
+// 1.13c D2Game+0x79910 (checked against decompile and bytes, no delta; the owner and party test is D2Game+0x77E70, inlined here with the same three asserts)
 void __fastcall sub_6FC80440(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pDeadBody)
 {
     if (!STATES_CheckState(pDeadBody, STATE_PLAYERBODY))
@@ -812,6 +796,7 @@ void __fastcall PLRMODE_StartID_Death(D2GameStrc* pGame, D2UnitStrc* pDefender, 
 }
 
 //D2Game.0x6FC80710
+// 1.13c D2Game+0x79730
 void __fastcall PLRMODE_StartXY_Dead(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4, int32_t a5)
 {
     D2GAME_CORPSE_Handler_6FC7FBD0(pGame, pUnit, CLIENTS_GetUnitX(pUnit), CLIENTS_GetUnitY(pUnit), UNITS_GetRoom(pUnit));
@@ -825,28 +810,20 @@ void __fastcall PLRMODE_StartXY_Dead(D2GameStrc* pGame, D2UnitStrc* pUnit, int32
         D2GAME_SAVE_WriteFile_6FC8A500(pGame, pUnit, CLIENTS_GetName(pClient), 0);
     }
 
+    SUNITDMG_FreeAttackerCombatList(pGame, pUnit);
     SUNIT_SetCombatMode(pGame, pUnit, PLRMODE_DEAD);
     sub_6FCBC4D0(pUnit);
-    STATLIST_SetUnitStat(pUnit, STAT_HITPOINTS, 0, 0);
-    D2Common_10469(pUnit);
-    STATES_UpdateStayDeathFlags(pUnit, 0);
-
-    D2GAME_SetClientDead_6FC33830(pClient, nullptr);
-
-    PATH_SetUnitDeadCollision(pUnit, 1);
-
-    D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_PERIODICSKILLS, 0);
-    D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_PERIODICSTATS, 0);
-
-    D2GAME_DeletePlayerPerFrameEvents_6FCBCE50(pGame, pUnit);
+    sub_6FC814F0(pGame, pUnit);
     D2GAME_DeletePlayerPerFrameEvents_6FCBCE50(pGame, pUnit);
 }
 
 //D2Game.0x6FC80870
+// 1.13c D2Game+0x781C0
 void __fastcall PLRMODE_StartXY_Block(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nMode, int32_t nX, int32_t nY)
 {
     D2_ASSERT(pPlayer);
 
+    SUNITDMG_FreeAttackerCombatList(pGame, pPlayer);
     SUNIT_SetCombatMode(pGame, pPlayer, nMode);
     sub_6FCBC4D0(pPlayer);
     UNITS_SetUsedSkill(pPlayer, nullptr);
@@ -855,16 +832,31 @@ void __fastcall PLRMODE_StartXY_Block(D2GameStrc* pGame, D2UnitStrc* pPlayer, in
 }
 
 //D2Game.0x6FC808D0
+// 1.13c D2Game+0x77920
 int32_t __fastcall sub_6FC808D0(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nSkillId, int32_t nSkillLevel)
 {
     return 1;
 }
 
+// 1.13c D2Game+0x77930 (a separate copy of the same body in 1.13c, with its own table slots)
+int32_t __fastcall sub_6FC808D0_77930(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nSkillId, int32_t nSkillLevel)
+{
+    return 1;
+}
+
+// 1.13c D2Game+0x77940 (a separate copy of the same body in 1.13c, with its own table slots)
+int32_t __fastcall sub_6FC808D0_77940(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nSkillId, int32_t nSkillLevel)
+{
+    return 1;
+}
+
 //D2Game.0x6FC808E0
+// 1.13c D2Game+0x78150
 void __fastcall PLRMODE_StartXY_GetHit(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nMode, int32_t nX, int32_t nY)
 {
     D2_ASSERT(pPlayer);
 
+    SUNITDMG_FreeAttackerCombatList(pGame, pPlayer);
     SUNIT_SetCombatMode(pGame, pPlayer, nMode);
     sub_6FCBC4D0(pPlayer);
     UNITS_SetUsedSkill(pPlayer, 0);
@@ -873,6 +865,7 @@ void __fastcall PLRMODE_StartXY_GetHit(D2GameStrc* pGame, D2UnitStrc* pPlayer, i
 }
 
 //D2Game.0x6FC80940
+// 1.13c D2Game+0x78840
 void __fastcall PLRMODE_StartXY_AttackCastThrowKickSpecialSequence(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nMode, int32_t nX, int32_t nY)
 {
     D2COMMON_10170_PathSetTargetPos(pPlayer->pDynamicPath, nX, nY);
@@ -886,6 +879,7 @@ void __fastcall PLRMODE_StartXY_AttackCastThrowKickSpecialSequence(D2GameStrc* p
 }
 
 //D2Game.0x6FC809B0
+// 1.13c D2Game+0x787C0
 void __fastcall PLRMODE_StartID_AttackCastThrowKickSpecialSequence(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nMode, D2UnitStrc* pTarget)
 {
     SUNIT_SetCombatMode(pGame, pPlayer, nMode);
@@ -906,6 +900,7 @@ void __fastcall PLRMODE_StartID_AttackCastThrowKickSpecialSequence(D2GameStrc* p
 }
 
 //D2Game.0x6FC80A30
+// 1.13c D2Game+0x79100
 void __fastcall sub_6FC80A30(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_PLAYER && pUnit->pInventory)
@@ -969,6 +964,7 @@ void __fastcall sub_6FC80A30(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC80B90
+// 1.13c D2Game+0x78DD0 (the re-equip tail is D2Game+0x78B60)
 void __fastcall sub_6FC80B90(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pWeapon)
 {
     if ((ITEMS_CheckIfStackable(pWeapon) || ITEMS_CheckIfThrowable(pWeapon) || STATLIST_UnitGetItemStatOrSkillStatValue(pWeapon, STAT_ITEM_THROWABLE, 0)) && (int32_t)STATLIST_UnitGetStatValue(pWeapon, STAT_QUANTITY, 0) <= 0)
@@ -1050,6 +1046,7 @@ void __fastcall sub_6FC80B90(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 }
 
 //D2Game.0x6FC80E10
+// 1.13c D2Game+0x78A90
 void __fastcall sub_6FC80E10(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     if (pPlayer && pPlayer->dwUnitType == UNIT_PLAYER)
@@ -1080,6 +1077,7 @@ void __fastcall sub_6FC80E10(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 }
 
 //D2Game.0x6FC80EE0
+// 1.13c D2Game+0x79170
 int32_t __fastcall sub_6FC80EE0(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillStrc* pSkill = UNITS_GetUsedSkill(pPlayer);
@@ -1108,6 +1106,7 @@ int32_t __fastcall sub_6FC80EE0(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t 
 }
 
 //Inlined in D2Game.0x6FC80F80
+// 1.13c D2Game+0x77CB0
 void __fastcall EVENTS_HpRegen(D2UnitStrc* pUnit)
 {
     const int32_t nHpRegen = STATLIST_UnitGetStatValue(pUnit, STAT_HPREGEN, 0);
@@ -1212,6 +1211,7 @@ void __fastcall EVENTS_StaminaRegen(D2UnitStrc* pUnit)
 }
 
 //Inlined in D2Game.0x6FC80F80
+// 1.13c D2Game+0x77950
 void __fastcall EVENTS_ManaRegen(D2UnitStrc* pUnit)
 {
     if (pUnit)
@@ -1272,6 +1272,7 @@ void __fastcall EVENTS_ManaRegen(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC80F80
+// 1.13c D2Game+0x79B10
 void __fastcall D2GAME_EVENTS_StatRegen_6FC80F80(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4)
 {
     EVENT_SetEvent(pGame, pUnit, EVENTTYPE_STATREGEN, pGame->dwGameFrame + 1, a3, a4);
@@ -1289,97 +1290,42 @@ void __fastcall D2GAME_EVENTS_StatRegen_6FC80F80(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FC81250
+// 1.13c D2Game+0x79850
 void __fastcall sub_6FC81250(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4)
 {
-    int32_t bSkip = 0;
     int32_t nAnimMode = 0;
+    int32_t bRunPass = 0;
     if (pUnit)
     {
         nAnimMode = pUnit->dwAnimMode;
-        if (nAnimMode != PLRMODE_ATTACK1 && nAnimMode != PLRMODE_ATTACK2 && nAnimMode != PLRMODE_THROW)
+        if (nAnimMode >= PLRMODE_ATTACK1 && (nAnimMode <= PLRMODE_ATTACK2 || nAnimMode == PLRMODE_THROW))
         {
-            D2SkillStrc* pUsedSkill = UNITS_GetUsedSkill(pUnit);
-            if (pUsedSkill)
+            bRunPass = 1;
+        }
+    }
+
+    if (!bRunPass)
+    {
+        D2SkillStrc* pUsedSkill = UNITS_GetUsedSkill(pUnit);
+        if (pUsedSkill)
+        {
+            D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(SKILLS_GetSkillIdFromSkill(pUsedSkill, __FILE__, __LINE__));
+            if (pSkillsTxtRecord && (pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_DURABILITY]))
             {
-                D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(SKILLS_GetSkillIdFromSkill(pUsedSkill, __FILE__, __LINE__));
-                if (!pSkillsTxtRecord || !(pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_DURABILITY]))
-                {
-                    bSkip = 1;
-                }
-                else if (!pUnit)
-                {
-                    sub_6FC80E10(pGame, pUnit);
-                    bSkip = 1;
-                }
+                bRunPass = 1;
             }
         }
     }
 
-    if (!bSkip)
+    if (bRunPass)
     {
-        if (pUnit->dwUnitType == UNIT_PLAYER && pUnit->pInventory)
-        {
-            D2UnkPlrModeStrc2 a2 = {};
-
-            D2SkillStrc* pLeftSkill = UNITS_GetLeftSkill(pUnit);
-            if (pLeftSkill)
-            {
-                a2.nLeftSkillOwnerGUID = SKILLS_GetOwnerGUIDFromSkill(pLeftSkill);
-                a2.nLeftSkillId = SKILLS_GetSkillIdFromSkill(pLeftSkill, __FILE__, __LINE__);
-            }
-            else
-            {
-                a2.nLeftSkillOwnerGUID = -1;
-                a2.nLeftSkillId = 0;
-            }
-
-            D2SkillStrc* pRightSkill = UNITS_GetRightSkill(pUnit);
-            if (pRightSkill)
-            {
-                a2.nRightSkillOwnerGUID = SKILLS_GetOwnerGUIDFromSkill(pRightSkill);
-                a2.nRightSkillId = SKILLS_GetSkillIdFromSkill(pRightSkill, __FILE__, __LINE__);
-            }
-            else
-            {
-                a2.nRightSkillOwnerGUID = -1;
-                a2.nRightSkillId = 0;
-            }
-
-            D2UnitStrc* pRightWeapon = INVENTORY_GetItemFromBodyLoc(pUnit->pInventory, BODYLOC_RARM);
-            if (pRightWeapon)
-            {
-                sub_6FC80B90(pGame, pUnit, pRightWeapon);
-            }
-
-            D2UnitStrc* pLeftWeapon = INVENTORY_GetItemFromBodyLoc(pUnit->pInventory, BODYLOC_LARM);
-            if (pLeftWeapon)
-            {
-                sub_6FC80B90(pGame, pUnit, pLeftWeapon);
-            }
-
-            sub_6FC81560(pUnit, &a2);
-        }
-
+        sub_6FC80A30(pGame, pUnit);
         sub_6FC80E10(pGame, pUnit);
     }
 
     if (nAnimMode == PLRMODE_DEATH)
     {
-        D2GAME_CORPSE_Handler_6FC7FBD0(pGame, pUnit, CLIENTS_GetUnitX(pUnit), CLIENTS_GetUnitY(pUnit), UNITS_GetRoom(pUnit));
-        D2GAME_KillPlayerPets_6FC7CD10(pGame, pUnit);
-        
-        D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__);
-        CLIENTS_ToggleFlag(pClient, CLIENTSAVEFLAG_DEAD, TRUE);
-
-        if (!gpD2EventCallbackTable_6FD45830 || CLIENTS_CheckFlag(pClient, CLIENTSAVEFLAG_HARDCORE))
-        {
-            D2GAME_SAVE_WriteFile_6FC8A500(pGame, pUnit, CLIENTS_GetName(pClient), 0);
-        }
-
-        SUNIT_SetCombatMode(pGame, pUnit, PLRMODE_DEAD);
-        sub_6FCBC4D0(pUnit);
-        sub_6FC814F0(pGame, pUnit);
-        D2GAME_DeletePlayerPerFrameEvents_6FCBCE50(pGame, pUnit);
+        PLRMODE_StartXY_Dead(pGame, pUnit, PLRMODE_DEAD, 0, 0);
     }
     else if (nAnimMode == PLRMODE_KNOCKBACK)
     {
@@ -1387,26 +1333,19 @@ void __fastcall sub_6FC81250(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, i
     }
     else
     {
-        int32_t nCombatMode = PLRMODE_NEUTRAL;
-        D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
-        if (pRoom)
-        {
-            nCombatMode = DUNGEON_IsRoomInTown(pRoom) != 0 ? PLRMODE_TOWNNEUTRAL : PLRMODE_NEUTRAL;
-        }
-        D2GAME_DeletePlayerPerFrameEvents_6FCBCE50(pGame, pUnit);
-        SUNIT_SetCombatMode(pGame, pUnit, nCombatMode);
-        UNITS_SetUsedSkill(pUnit, 0);
+        PLRMODE_StartXY_Neutral(pGame, pUnit, PLRMODE_NEUTRAL, 0, 0);
     }
 }
 
 //D2Game.0x6FC814F0
+// 1.13c D2Game+0x78230 (the client flag bit 2 is cleared inline)
 void __fastcall sub_6FC814F0(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     STATLIST_SetUnitStat(pPlayer, STAT_HITPOINTS, 0, 0);
     D2Common_10469(pPlayer);
     STATES_UpdateStayDeathFlags(pPlayer, 0);
     D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
-    D2GAME_SetClientDead_6FC33830(pClient, nullptr);
+    pClient->dwFlags &= ~2u;
     PATH_SetUnitDeadCollision(pPlayer, 1);
     D2GAME_EVENTS_Delete_6FC34840(pGame, pPlayer, EVENTTYPE_PERIODICSKILLS, 0);
     D2GAME_EVENTS_Delete_6FC34840(pGame, pPlayer, EVENTTYPE_PERIODICSTATS, 0);
@@ -1445,16 +1384,17 @@ void __fastcall sub_6FC81560(D2UnitStrc* pUnit, D2UnkPlrModeStrc2* a2)
 }
 
 //D2Game.0x6FC81600
+// 1.13c D2Game+0x79A10
 void __fastcall sub_6FC81600(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     int32_t(__fastcall* off_6FD304B8[])(D2GameStrc*, D2UnitStrc*, int32_t, int32_t) =
     {
-        sub_6FC808D0,
-        sub_6FC808D0,
+        sub_6FC808D0_77940,
+        sub_6FC808D0_77930,
         sub_6FC7F780,
         sub_6FC7F780,
         sub_6FC808D0,
-        sub_6FC808D0,
+        sub_6FC808D0_77930,
         sub_6FC7F780,
         sub_6FC80EE0,
         sub_6FC80EE0,
@@ -1466,7 +1406,7 @@ void __fastcall sub_6FC81600(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkil
         sub_6FC80EE0,
         sub_6FC80EE0,
         sub_6FC80EE0,
-        sub_6FC808D0,
+        sub_6FC808D0_77940,
         sub_6FC80EE0,
         sub_6FC7F780,
         //nullptr,
@@ -1569,6 +1509,7 @@ void __fastcall sub_6FC81650(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2ClientStr
 }
 
 //D2Game.0x6FC817D0
+// 1.13c D2Game+0x78550 (checked against decompile, no delta; the mode gate is D2Game+0x78340 and the interrupt check D2Game+0x77FA0)
 void __fastcall sub_6FC817D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStrc* pUsedSkill, int32_t nMode, int32_t nX, int32_t nY, int32_t a7)
 {
     D2_ASSERT(pGame);
@@ -1710,6 +1651,7 @@ void __fastcall D2GAME_PLAYERMODE_Change_6FC81A00(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FC81B20
+// 1.13c D2Game+0x79AA0 (checked against decompile, no delta)
 void __fastcall sub_6FC81B20(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4)
 {
     if (!pUnit || !pUnit->pHoverText)
@@ -1732,6 +1674,7 @@ void __fastcall sub_6FC81B20(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, i
 }
 
 //D2Game.0x6FC81B90
+// 1.13c D2Game+0x79A60 (checked against decompile, no delta; party sync D2Game+0x9C620, pet sync D2Game+0x98250, event 11 at +30 frames)
 void __fastcall sub_6FC81B90(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4)
 {
     PARTY_SynchronizeWithClient(pGame, pUnit);
@@ -1740,6 +1683,7 @@ void __fastcall sub_6FC81B90(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, i
 }
 
 //D2Game.0x6FC81BD0
+// not-1.13c: 1.13c has no standalone callback; the event table at D2Game+0xFBB74 (15 slots, same order) is indexed inline in D2Game+0x8ECC0
 void __fastcall D2GAME_EVENTS_Callback_6FC81BD0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventTypes nEvent, int32_t dwArg, int32_t dwArgEx)
 {
     using EventCallbackFunction = void(__fastcall*)(D2GameStrc*, D2UnitStrc*, int32_t, int32_t);

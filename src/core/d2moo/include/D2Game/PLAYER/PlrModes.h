@@ -26,8 +26,6 @@ void __fastcall sub_6FC7F600(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nMo
 void __fastcall PLRMODE_StartXY_WalkRunKnockback(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nMode, int32_t nX, int32_t nY);
 //D2Game.0x6FC7F780
 int32_t __fastcall sub_6FC7F780(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t a3, int32_t a4);
-//D2Game.0x6FC7FB70
-void __fastcall sub_6FC7FB70(D2UnitStrc* pPlayer, int32_t a2);
 //D2Game.0x6FC7FB90
 int32_t __fastcall sub_6FC7FB90(D2UnitStrc* pPlayer);
 //D2Game.0x6FC7FBB0
@@ -49,6 +47,8 @@ void __fastcall PLRMODE_StartXY_Dead(D2GameStrc* pGame, D2UnitStrc* pUnit, int32
 void __fastcall PLRMODE_StartXY_Block(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nMode, int32_t nX, int32_t nY);
 //D2Game.0x6FC808D0
 int32_t __fastcall sub_6FC808D0(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nSkillId, int32_t nSkillLevel);
+int32_t __fastcall sub_6FC808D0_77930(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nSkillId, int32_t nSkillLevel);
+int32_t __fastcall sub_6FC808D0_77940(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nSkillId, int32_t nSkillLevel);
 //D2Game.0x6FC808E0
 void __fastcall PLRMODE_StartXY_GetHit(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nMode, int32_t nX, int32_t nY);
 //D2Game.0x6FC80940
