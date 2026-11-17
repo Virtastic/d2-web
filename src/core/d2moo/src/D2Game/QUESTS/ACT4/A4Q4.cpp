@@ -33,7 +33,7 @@ D2NPCMessageTableStrc gpAct4Q4NpcMessages[] =
 
 
 //D2Game.0x6FCB0E50
-// 1.13c D2Game+0xB97D0
+// 1.13c D2Game+0xB97D0 (checked against decompile)
 void __fastcall ACT4Q4_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));
@@ -49,6 +49,7 @@ void __fastcall ACT4Q4_InitQuestData(D2QuestDataStrc* pQuestData)
 }
 
 //D2Game.0x6FCB0EB0
+// 1.13c D2Game+0xB8C00 (checked against decompile)
 void __fastcall ACT4Q4_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	if (!pQuestArg->pTarget || pQuestArg->pTarget->dwClassId != MONSTER_MALACHAI)
@@ -72,6 +73,7 @@ void __fastcall ACT4Q4_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 }
 
 //D2Game.0x6FCB0F50
+// 1.13c D2Game+0xB8B90 (checked against decompile)
 bool __fastcall ACT4Q4_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
 	if (nNpcId != MONSTER_MALACHAI)
@@ -93,7 +95,7 @@ bool __fastcall ACT4Q4_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 	return false;
 }
 
-//
+// 1.13c D2Game+0xB87D0 (checked against decompile)
 bool __fastcall ACT4Q4_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitStrc* pPlayer, D2BitBufferStrc* pGlobalFlags, D2BitBufferStrc* pFlags, uint8_t* pStatus)
 {
 	return false;

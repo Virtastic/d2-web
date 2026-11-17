@@ -121,6 +121,7 @@ D2NPCMessageTableStrc gpAct5Q3NpcMessages[] =
 
 
 //D2Game.0x6FCB3530
+// 1.13c D2Game+0x580A0 (diffed line by line, no delta)
 void __fastcall ACT5Q3_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -144,6 +145,7 @@ void __fastcall ACT5Q3_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FCB35A0
+// 1.13c D2Game+0x5DEF0 (retail inlines 5DD00 here; diffed, no delta)
 void __fastcall ACT5Q3_RemoveNihlathakFromTown(D2GameStrc* pGame)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q3_PRISONOFICE);
@@ -186,6 +188,7 @@ void __fastcall ACT5Q3_RemoveNihlathakFromTown(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FCB3670
+// 1.13c D2Game+0x57F50 (diffed line by line, no delta)
 bool __fastcall ACT5Q3_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
 	if (nNpcId == MONSTER_MALAH)
@@ -234,6 +237,7 @@ bool __fastcall ACT5Q3_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 }
 
 //D2Game.0x6FCB3760
+// 1.13c D2Game+0x5A000 (diffed line by line, no delta)
 void __fastcall ACT5Q3_UpdateResistances(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nValue)
 {
 	int32_t nUnitType = 6;
@@ -292,6 +296,7 @@ void __fastcall ACT5Q3_ApplyResistanceReward(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FCB3880
+// 1.13c D2Game+0x57D80 (diffed line by line, no delta; looks up quest id 3 like retail)
 void __fastcall ACT5Q3_UnitIterate_CheckForDefrostPotion(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	if (!ITEMS_FindQuestItem(pGame, pUnit, ' eci'))
@@ -307,7 +312,7 @@ void __fastcall ACT5Q3_UnitIterate_CheckForDefrostPotion(D2GameStrc* pGame, D2Un
 }
 
 //D2Game.0x6FCB38B0
-// 1.13c D2Game+0x5FC20
+// 1.13c D2Game+0x5FC20 (diffed line by line, no delta)
 void __fastcall ACT5Q3_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));
@@ -337,6 +342,7 @@ void __fastcall ACT5Q3_InitQuestData(D2QuestDataStrc* pQuestData)
 }
 
 //D2Game.0x6FCB39A0
+// 1.13c D2Game+0x5A0A0 (diffed line by line, no delta)
 void __fastcall ACT5Q3_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	if (!pQuestArg->pTarget || pQuestArg->pTarget->dwClassId != MONSTER_MALAH)
@@ -362,6 +368,7 @@ void __fastcall ACT5Q3_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2Q
 }
 
 //D2Game.0x6FCB3A20
+// 1.13c D2Game+0x591D0 (diffed: cycles unless (granted||completedbefore) && !primarygoal && !completednow)
 int32_t __fastcall ACT5Q3_UnitIterate_StatusCyclerEx(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -377,6 +384,7 @@ int32_t __fastcall ACT5Q3_UnitIterate_StatusCyclerEx(D2GameStrc* pGame, D2UnitSt
 }
 
 //D2Game.0x6FCB3A90
+// 1.13c D2Game+0x56B10 (diffed; the one sequence function, also called by 5EB30, 5C480 and 5C690)
 bool __fastcall ACT5Q3_SeqCallback(D2QuestDataStrc* pQuestData)
 {
 	if (pQuestData->fState < 5 && pQuestData->bNotIntro)
@@ -403,6 +411,7 @@ bool __fastcall ACT5Q3_SeqCallback(D2QuestDataStrc* pQuestData)
 }
 
 //D2Game.0x6FCB3B00
+// 1.13c D2Game+0x5F5E0 (diffed; sub-call 5EC30 is sub_6FCB4400 below)
 void __fastcall ACT5Q3_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	static const uint32_t gdwNormalAmazonRewardCodes[] =
@@ -742,6 +751,7 @@ void __fastcall ACT5Q3_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 }
 
 //D2Game.0x6FCB4040
+// 1.13c D2Game+0x58110 (diffed line by line, no delta)
 int32_t __fastcall ACT5Q3_UnitIterate_UpdateQuestStateFlags(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -769,6 +779,7 @@ int32_t __fastcall ACT5Q3_UnitIterate_UpdateQuestStateFlags(D2GameStrc* pGame, D
 }
 
 //D2Game.0x6FCB40B0
+// 1.13c D2Game+0x5DDF0 (diffed line by line, no delta)
 int32_t __fastcall ACT5Q3_RemoveDrehyaIced(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	if (!pUnit || pUnit->dwClassId != MONSTER_DREHYAICED)
@@ -802,6 +813,7 @@ int32_t __fastcall ACT5Q3_RemoveDrehyaIced(D2GameStrc* pGame, D2UnitStrc* pUnit,
 }
 
 //D2Game.0x6FCB4150
+// 1.13c D2Game+0x59180 (diffed line by line, no delta)
 void __fastcall ACT5Q3_SendPacket0x5DToClient(D2UnitStrc* pUnit)
 {
 	D2GSPacketSrv5D packet5D = {};
@@ -812,34 +824,6 @@ void __fastcall ACT5Q3_SendPacket0x5DToClient(D2UnitStrc* pUnit)
 	packet5D.field_4 = 0;
 
 	D2GAME_PACKETS_SendPacket_6FC3C710(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), &packet5D, sizeof(packet5D));
-}
-
-//D2Game.0x6FCB4190
-// 1.13c D2Game+0x56B10 (standalone helper called from 5C690; ECX = quest). Returns 1 when the quest is
-// started or idle below state 5, else the quest's sequence callback result (0 when the quest is missing).
-static int32_t __fastcall ACT5Q3_QuestSeqHelper(D2QuestDataStrc* pQuestData)
-{
-	if (pQuestData->fState < 5 && pQuestData->bNotIntro)
-	{
-		if (!pQuestData->fState)
-		{
-			pQuestData->fState = 1;
-		}
-		return 1;
-	}
-
-	D2QuestDataStrc* pQuest = QUESTS_GetQuestData(pQuestData->pGame, pQuestData->nSeqId);
-	if (!pQuest)
-	{
-		return 0;
-	}
-
-	if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
-	{
-		FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
-		exit(-1);
-	}
-	return pQuest->pfSeqFilter(pQuest);
 }
 
 // 1.10f body; the 1.13c port (D2Game 0x5C690) is src/core/d2game/d2game_5c690.cpp
@@ -888,10 +872,11 @@ void __fastcall ACT5Q3_SpawnDrehyaInTown(D2QuestDataStrc* pQuestData, D2Act5Ques
 		}
 	}
 
-	ACT5Q3_QuestSeqHelper(pQuestData);
+	ACT5Q3_SeqCallback(pQuestData);
 }
 
 //D2Game.0x6FCB4400
+// 1.13c D2Game+0x5EC30 (diffed line by line, no delta)
 //TODO: Find a name
 void __fastcall sub_6FCB4400(D2QuestDataStrc* pQuestData)
 {
@@ -979,6 +964,7 @@ void __fastcall sub_6FCB4400(D2QuestDataStrc* pQuestData)
 }
 
 //D2Game.0x6FCB45E0
+// 1.13c D2Game+0x5DA70 (retail also tests !CUSTOM4 at the end of the Malah reward condition)
 void __fastcall ACT5Q3_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	static const int32_t nIndices[] =
@@ -1021,7 +1007,8 @@ void __fastcall ACT5Q3_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 			&& !pQuestDataEx->bRewarded
 			&& QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A5Q3, QFLAG_CUSTOM4)
 			&& !QUESTRECORD_GetQuestState(pQuestFlags, pQuestData->nQuestFilter, QFLAG_CUSTOM3)
-			&& !ITEMS_FindQuestItem(pQuestArg->pGame, pQuestArg->pPlayer, ' 2rt'))
+			&& !ITEMS_FindQuestItem(pQuestArg->pGame, pQuestArg->pPlayer, ' 2rt')
+			&& !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A5Q3, QFLAG_CUSTOM4)) // retail tests CUSTOM4 both ways, so this branch never runs
 		{
 			QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, MONSTER_MALAH, 5);
 		}
@@ -1067,6 +1054,7 @@ void __fastcall ACT5Q3_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 }
 
 //D2Game.0x6FCB4810
+// 1.13c D2Game+0x58040 (diffed line by line, no delta)
 void __fastcall ACT5Q3_Callback10_PlayerLeavesGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	int32_t nUnitId = -1;
@@ -1087,6 +1075,7 @@ void __fastcall ACT5Q3_Callback10_PlayerLeavesGame(D2QuestDataStrc* pQuestData, 
 }
 
 //D2Game.0x6FCB4870
+// 1.13c D2Game+0x5F3F0 (diffed line by line, no delta)
 void __fastcall ACT5Q3_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	if (pQuestArg->nNewLevel == LEVEL_ARREATPLATEAU)
@@ -1167,6 +1156,7 @@ void __fastcall ACT5Q3_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2Qu
 }
 
 //D2Game.0x6FCB4A10
+// 1.13c D2Game+0x59120 (diffed line by line, no delta)
 int32_t __fastcall ACT5Q3_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -1183,6 +1173,7 @@ int32_t __fastcall ACT5Q3_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2Uni
 }
 
 //D2Game.0x6FCB4A80
+// 1.13c D2Game+0x57E80 (diffed line by line, no delta)
 void __fastcall ACT5Q3_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	D2Act5Quest3Strc* pQuestDataEx = (D2Act5Quest3Strc*)pQuestData->pQuestDataEx;
@@ -1232,6 +1223,7 @@ void __fastcall ACT5Q3_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 }
 
 //D2Game.0x6FCB4B50
+// 1.13c D2Game+0x57DD0 (diffed line by line, no delta)
 void __fastcall ACT5Q3_Callback14_PlayerJoinedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	if (ITEMS_FindQuestItem(pQuestArg->pGame, pQuestArg->pPlayer, ' eci'))
@@ -1265,6 +1257,7 @@ void __fastcall ACT5Q3_Callback14_PlayerJoinedGame(D2QuestDataStrc* pQuestData, 
 }
 
 //D2Game.0x6FCB4BF0
+// 1.13c D2Game+0x5B8C0 (retail inlines the 5B030 party check; diffed, no delta)
 bool __fastcall ACT5Q3_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitStrc* pPlayer, D2BitBufferStrc* pGlobalFlags, D2BitBufferStrc* pFlags, uint8_t* pStatus)
 {
 	*pStatus = 0;
@@ -1328,6 +1321,7 @@ bool __fastcall ACT5Q3_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitStrc*
 }
 
 //D2Game.0x6FCB4D30
+// 1.13c D2Game+0x5EB30 (retail calls the 56B10 sequence function and finishes with 5E7F0)
 void __fastcall OBJECTS_InitFunction66_DrehyaStartInTown(D2ObjInitFnStrc* pOp)
 {
 	D2QuestDataStrc* pQuestData33 = QUESTS_GetQuestData(pOp->pGame, QUEST_A5Q3_PRISONOFICE);
@@ -1341,26 +1335,7 @@ void __fastcall OBJECTS_InitFunction66_DrehyaStartInTown(D2ObjInitFnStrc* pOp)
 
 		if (pQuestDataEx->unk0x84 == 2)
 		{
-			if (pQuestData33->fState < 5 && pQuestData33->bNotIntro)
-			{
-				if (!pQuestData33->fState)
-				{
-					pQuestData33->fState = 1;
-				}
-			}
-			else
-			{
-				D2QuestDataStrc* pQuest = QUESTS_GetQuestData(pQuestData33->pGame, pQuestData33->nSeqId);
-				if (pQuest)
-				{
-					if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
-					{
-						FOG_DisplayAssert("pQuestInfo->pSequence", "..\\D2Game/Quests/a5q3.cpp", 331);
-						exit(-1);
-					}
-					pQuest->pfSeqFilter(pQuest);
-				}
-			}
+			ACT5Q3_SeqCallback(pQuestData33);
 
 			if (!pQuestDataEx->bDrehyaMonsterInTownSpawned)
 			{
@@ -1388,6 +1363,7 @@ void __fastcall OBJECTS_InitFunction66_DrehyaStartInTown(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FCB4EA0
+// 1.13c D2Game+0x5E940 (diffed line by line, no delta)
 void __fastcall ACT5Q3_SpawnFrozenDrehya(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q3_PRISONOFICE);
@@ -1421,6 +1397,7 @@ void __fastcall ACT5Q3_SpawnFrozenDrehya(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCB4FB0
+// 1.13c D2Game+0x5E8D0 (diffed line by line, no delta)
 void __fastcall OBJECTS_InitFunction67_DrehyaStartOutsideTown(D2ObjInitFnStrc* pOp)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A5Q3_PRISONOFICE);
@@ -1444,6 +1421,7 @@ void __fastcall OBJECTS_InitFunction67_DrehyaStartOutsideTown(D2ObjInitFnStrc* p
 }
 
 //D2Game.0x6FCB5010
+// 1.13c D2Game+0x5C5C0 (diffed line by line, no delta)
 void __fastcall OBJECTS_InitFunction68_NihlathakStartInTown(D2ObjInitFnStrc* pOp)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A5Q3_PRISONOFICE);
@@ -1484,6 +1462,7 @@ void __fastcall OBJECTS_InitFunction68_NihlathakStartInTown(D2ObjInitFnStrc* pOp
 }
 
 //D2Game.0x6FCB50C0
+// 1.13c D2Game+0x5CF70 (diffed line by line, no delta)
 void __fastcall OBJECTS_InitFunction69_NihlathakStartOutsideTown(D2ObjInitFnStrc* pOp)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A5Q3_PRISONOFICE);
@@ -1508,10 +1487,12 @@ void __fastcall OBJECTS_InitFunction69_NihlathakStartOutsideTown(D2ObjInitFnStrc
 }
 
 //D2Game.0x6FCB5130
+// 1.13c D2Game+0x5E840 (retail re-arms the event even for a null unit; 1.10f returned early)
 void __fastcall ACT5Q3_UpdateDrehyaPortalMode(D2QuestDataStrc* pQuestData, D2UnitStrc* pUnit)
 {
 	if (!pUnit)
 	{
+		EVENT_SetEvent(pQuestData->pGame, pUnit, EVENTTYPE_QUESTFN, pQuestData->pGame->dwGameFrame + 25, 0, 0);
 		return;
 	}
 
@@ -1598,6 +1579,7 @@ int32_t __fastcall ACT5Q3_SpawnDrehyaPortalOutsideTown(D2GameStrc* pGame, D2Unit
 }
 
 //D2Game.0x6FCB5320
+// 1.13c D2Game+0x56A40 (diffed line by line, no delta)
 int32_t __fastcall ACT5Q3_GetDrehyaPortalCoordinates(D2GameStrc* pGame, D2UnitStrc* pUnit, D2CoordStrc* pCoord)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q3_PRISONOFICE);
@@ -1626,6 +1608,7 @@ int32_t __fastcall ACT5Q3_GetDrehyaPortalCoordinates(D2GameStrc* pGame, D2UnitSt
 }
 
 //D2Game.0x6FCB5390
+// 1.13c D2Game+0x56A00 (diffed line by line, no delta)
 int32_t __fastcall ACT5Q3_InitializeDrehyaPortalCoordinates(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q3_PRISONOFICE);
@@ -1642,6 +1625,7 @@ int32_t __fastcall ACT5Q3_InitializeDrehyaPortalCoordinates(D2GameStrc* pGame, D
 }
 
 //D2Game.0x6FCB53D0
+// 1.13c D2Game+0x5CC30 (diffed line by line, no delta; calls 5C690)
 //TODO: Find a name
 void __fastcall sub_6FCB53D0(D2GameStrc* pGame)
 {
@@ -1674,6 +1658,7 @@ int32_t __fastcall sub_6FCB5400(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FCB5430
+// 1.13c D2Game+0x59F80 (diffed line by line, no delta)
 //TODO: Find a name
 void __fastcall sub_6FCB5430(D2GameStrc* pGame)
 {
@@ -1687,6 +1672,7 @@ void __fastcall sub_6FCB5430(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FCB5470
+// 1.13c D2Game+0x59EF0 (diffed line by line, no delta)
 void __fastcall OBJECTS_InitFunction74_FrozenAnya(D2ObjInitFnStrc* pOp)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A5Q3_PRISONOFICE);
@@ -1779,6 +1765,7 @@ int32_t __fastcall OBJECTS_OperateFunction67_FrozenAnya(D2ObjOperateFnStrc* pOp,
 }
 
 //D2Game.0x6FCB56D0
+// 1.13c D2Game+0x5B120 (the player/game/type guards live in SUNIT_GetPartyId; diffed, no delta)
 int32_t __fastcall ACT5Q3_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	if (!QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A5Q3, QFLAG_PRIMARYGOALDONE))
@@ -1796,6 +1783,7 @@ int32_t __fastcall ACT5Q3_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameSt
 }
 
 //D2Game.0x6FCB5720
+// 1.13c D2Game+0x5C480 (retail calls the 56B10 sequence function at the end)
 bool __fastcall ACT5Q3_SpawnDrehyaIcedMonsterOutsideTown(D2GameStrc* pGame, D2QuestDataStrc* pQuestData)
 {
 	D2Act5Quest3Strc* pQuestDataEx = (D2Act5Quest3Strc*)pQuestData->pQuestDataEx;
@@ -1848,28 +1836,7 @@ bool __fastcall ACT5Q3_SpawnDrehyaIcedMonsterOutsideTown(D2GameStrc* pGame, D2Qu
 	pQuestDataEx->bDrehyaIcedMonsterSpawned = 1;
 	pQuestDataEx->nDrehyaIcedMonsterGUID = pDrehya->dwUnitId;
 
-	if (pQuestData->fState < 5 && pQuestData->bNotIntro)
-	{
-		if (!pQuestData->fState)
-		{
-			pQuestData->fState = 1;
-			pQuestDataEx->bTimerActive = 0;
-			return true;
-		}
-	}
-	else
-	{
-		D2QuestDataStrc* pQuest = QUESTS_GetQuestData(pQuestData->pGame, pQuestData->nSeqId);
-		if (pQuest)
-		{
-			if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
-			{
-				FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
-				exit(-1);
-			}
-			pQuest->pfSeqFilter(pQuest);
-		}
-	}
+	ACT5Q3_SeqCallback(pQuestData);
 
 	pQuestDataEx->bTimerActive = 0;
 	return true;

@@ -193,7 +193,6 @@ int32_t __fastcall ACT2Q3_UnitIterate_UpdateClient(D2GameStrc* pGame, D2UnitStrc
 	return 0;
 }
 
-//D2Game.0x6FCA1730
 // 1.13c D2Game+0xC7480
 void __fastcall ACT2Q3_InitQuestData(D2QuestDataStrc* pQuestData)
 {
@@ -777,7 +776,6 @@ int32_t __fastcall ACT2Q3_UnitIterate_DetermineViperAmuletDropCount(D2GameStrc* 
 	return 0;
 }
 
-//D2Game.0x6FCA2580
 // 1.13c D2Game+0xC2150
 void __fastcall ACT2Q3_BrightenEnvironment(D2GameStrc* pGame, uint8_t nActNo)
 {

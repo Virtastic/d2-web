@@ -50,19 +50,18 @@ D2NPCMessageTableStrc gpAct1Q7NpcMessages[] =
 };
 
 
-// D2Game+0x60180 (1.13c): the empty function 1.13c stores in callback slot 8 of A1Q7.
-static void __fastcall ACT1Q7_Callback08_Empty(D2QuestDataStrc*, D2QuestArgStrc*)
+// 1.13c D2Game+0x60180
+static void __fastcall ACT1Q7_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 }
 
 //D2Game.0x6FC9EF40
 // 1.13c D2Game+0x62FA0
-// 1.13c fills callback slot 8 with an empty function (0x60180); 1.10f left it commented out.
 void __fastcall ACT1Q7_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));
 	pQuestData->pfCallback[QUESTEVENT_NPCACTIVATE] = ACT1Q7_Callback00_NpcActivate;
-	pQuestData->pfCallback[8] = ACT1Q7_Callback08_Empty;
+	pQuestData->pfCallback[QUESTEVENT_MONSTERKILLED] = ACT1Q7_Callback08_MonsterKilled;
 	pQuestData->pNPCMessages = gpAct1Q7NpcMessages;
 	pQuestData->bActive = 1;
 	pQuestData->fState = 0;

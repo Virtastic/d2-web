@@ -99,7 +99,7 @@ D2NPCMessageTableStrc gpAct3Q3NpcMessages[] =
 };
 
 
-//D2Game.0x6FCA8DC0
+// 1.13c D2Game+0xE45B0
 bool __fastcall ACT3Q3_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitStrc* pPlayer, D2BitBufferStrc* pGlobalFlags, D2BitBufferStrc* pFlags, uint8_t* pStatus)
 {
 	if (!QUESTRECORD_GetQuestState(pFlags, QUESTSTATEFLAG_A2COMPLETED, QFLAG_REWARDGRANTED))
@@ -156,7 +156,7 @@ bool __fastcall ACT3Q3_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitStrc*
 	return true;
 }
 
-//D2Game.0x6FCA8F10
+// 1.13c D2Game+0xE4500
 bool __fastcall ACT3Q3_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
 	if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q3, QFLAG_REWARDGRANTED))
@@ -206,7 +206,7 @@ bool __fastcall ACT3Q3_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 	return false;
 }
 
-//D2Game.0x6FCA8FC0
+// 1.13c D2Game+0xE41D0
 void __fastcall ACT3Q3_UnitIterate_SetGidbinnBroughtBackQuestState(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	if (!QUESTS_GetQuestData(pGame, QUEST_A3Q3_GIDBINN))
@@ -265,7 +265,7 @@ void __fastcall ACT3Q3_InitQuestData(D2QuestDataStrc* pQuestData)
 	pQuestDataEx->nAltarObjectMode = 0;
 }
 
-//D2Game.0x6FCA9130
+// 1.13c D2Game+0xE6CF0
 void __fastcall ACT3Q3_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	int32_t nNpcId = -1;
@@ -295,7 +295,7 @@ void __fastcall ACT3Q3_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2Q
 	}
 }
 
-//D2Game.0x6FCA91A0
+// 1.13c D2Game+0xE46F0
 int32_t __fastcall ACT3Q3_UnitIterate_UpdateQuestStateFlags(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -336,7 +336,7 @@ int32_t __fastcall ACT3Q3_UnitIterate_UpdateQuestStateFlags(D2GameStrc* pGame, D
 	return 0;
 }
 
-//D2Game.0x6FCA9260
+// 1.13c D2Game+0xE6130
 int32_t __fastcall ACT3Q3_UnitIterate_StatusCyclerEx(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -345,13 +345,15 @@ int32_t __fastcall ACT3Q3_UnitIterate_StatusCyclerEx(D2GameStrc* pGame, D2UnitSt
 		|| QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q3, QFLAG_PRIMARYGOALDONE)
 		|| QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q3, QFLAG_COMPLETEDNOW))
 	{
+		// retail D2Game+0xE6130 does "mov al, 0x11; mov ecx, pPlayer; push pGame; call D2Game+0x354F0": the callee
+		// takes the quest id in AL, so the third argument here is that register input, not an extra stack argument.
 		QUESTS_StatusCyclerEx(pGame, pUnit, QUEST_A3Q3_GIDBINN);
 	}
 
 	return 0;
 }
 
-//D2Game.0x6FCA92D0
+// 1.13c D2Game+0xE42F0
 void __fastcall ACT3Q3_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	static const int32_t nIndices[] =
@@ -376,7 +378,10 @@ void __fastcall ACT3Q3_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 		return;
 	}
 
-	if (ITEMS_FindQuestItem(pQuestArg->pGame, pQuestArg->pPlayer, ' 33g') && QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q3, QFLAG_CUSTOM1) && !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q3, QFLAG_CUSTOM4))
+	// retail looks the item up once and reuses the result below
+	D2UnitStrc* pGidbinn = ITEMS_FindQuestItem(pQuestArg->pGame, pQuestArg->pPlayer, ' 33g');
+
+	if (pGidbinn && QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q3, QFLAG_CUSTOM1) && !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q3, QFLAG_CUSTOM4))
 	{
 		QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, nNpcId, 3);
 		return;
@@ -420,7 +425,7 @@ void __fastcall ACT3Q3_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 			return;
 		}
 
-		if (pQuestData->fState < 4 && !ITEMS_FindQuestItem(pQuestArg->pGame, pQuestArg->pPlayer, ' 33g'))
+		if (pQuestData->fState < 4 && !pGidbinn)
 		{
 			const int32_t nIndex = nIndices[pQuestData->fState];
 			if (nIndex != -1 && nIndex < 8)
@@ -431,7 +436,7 @@ void __fastcall ACT3Q3_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 	}
 }
 
-//D2Game.0x6FCA9490
+// 1.13c D2Game+0xE7880
 void __fastcall ACT3Q3_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	if (pQuestArg->nNewLevel == LEVEL_FLAYERJUNGLE && pQuestData->bNotIntro && !pQuestData->fState)
@@ -461,7 +466,7 @@ void __fastcall ACT3Q3_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2Qu
 	}
 }
 
-//D2Game.0x6FCA9540
+// 1.13c D2Game+0xE9600
 void __fastcall ACT3Q3_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];
@@ -583,7 +588,7 @@ void __fastcall ACT3Q3_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 	}
 }
 
-//D2Game.0x6FCA9820
+// 1.13c D2Game+0xE4280
 int32_t __fastcall ACT3Q3_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -600,7 +605,7 @@ int32_t __fastcall ACT3Q3_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2Uni
 	return 0;
 }
 
-//D2Game.0x6FCA98A0
+// 1.13c D2Game+0xE7770
 void __fastcall ACT3Q3_Callback04_ItemPickedUp(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	QUESTS_DebugOutput(pQuestData->pGame, "ginbinn acquired", __FILE__, __LINE__);
@@ -632,7 +637,7 @@ void __fastcall ACT3Q3_Callback04_ItemPickedUp(D2QuestDataStrc* pQuestData, D2Qu
 	SUNIT_IterateUnitsOfType(pQuestData->pGame, 0, 0, ACT3Q3_UnitIterate_UpdateQuestStateFlags);
 }
 
-//D2Game.0x6FCA9990
+// 1.13c D2Game+0xE2D40
 bool __fastcall ACT3Q3_SeqCallback(D2QuestDataStrc* pQuestData)
 {
 	if (pQuestData->fState != 5 && pQuestData->bNotIntro)
@@ -660,7 +665,7 @@ bool __fastcall ACT3Q3_SeqCallback(D2QuestDataStrc* pQuestData)
 	return pQuest->pfSeqFilter(pQuest);
 }
 
-//D2Game.0x6FCA9A00
+// 1.13c D2Game+0xE41A0
 void __fastcall ACT3Q3_Callback14_PlayerJoinedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	D2Act3Quest3Strc* pQuestDataEx = (D2Act3Quest3Strc*)pQuestData->pQuestDataEx;
@@ -676,7 +681,7 @@ void __fastcall ACT3Q3_Callback14_PlayerJoinedGame(D2QuestDataStrc* pQuestData, 
 	}
 }
 
-//D2Game.0x6FCA9A30
+// 1.13c D2Game+0xE2D00
 void __fastcall ACT3Q3_Callback09_PlayerDroppedWithQuestItem(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	D2Act3Quest3Strc* pQuestDataEx = (D2Act3Quest3Strc*)pQuestData->pQuestDataEx;
@@ -693,14 +698,15 @@ void __fastcall ACT3Q3_Callback09_PlayerDroppedWithQuestItem(D2QuestDataStrc* pQ
 	}
 }
 
-// 1.13c D2Game+0xE6000 (checked against decompile)
-//D2Game.0x6FCA9A70
+// 1.13c D2Game+0xE6000
 void __fastcall ACT3Q3_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];
 	D2Act3Quest3Strc* pQuestDataEx = (D2Act3Quest3Strc*)pQuestData->pQuestDataEx;
 
-	if (ITEMS_FindQuestItem(pQuestArg->pGame, pQuestArg->pPlayer, ' 33g'))
+	// retail looks the item up once and reuses the result below
+	D2UnitStrc* pGidbinn = ITEMS_FindQuestItem(pQuestArg->pGame, pQuestArg->pPlayer, ' 33g');
+	if (pGidbinn)
 	{
 		++pQuestDataEx->nGidbinnsInGame;
 	}
@@ -709,7 +715,7 @@ void __fastcall ACT3Q3_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 	{
 		pQuestDataEx->nAltarObjectMode = OBJMODE_OPENED;
 	}
-	else if (ITEMS_FindQuestItem(pQuestArg->pGame, pQuestArg->pPlayer, ' 33g'))
+	else if (pGidbinn)
 	{
 		pQuestData->fLastState = 4;
 		pQuestData->fState = 4;
@@ -758,7 +764,9 @@ void __fastcall ACT3Q3_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 	}
 }
 
-//D2Game.0x6FCA9BA0
+static void ACT3Q3_SpawnFetishBoss(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2Act3Quest3Strc* pQuestDataEx);
+
+// 1.13c D2Game+0xE8EB0
 void __fastcall OBJECTS_InitFunction25_Gidbinn(D2ObjInitFnStrc* pOp)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A3Q3_GIDBINN);
@@ -784,15 +792,7 @@ void __fastcall OBJECTS_InitFunction25_Gidbinn(D2ObjInitFnStrc* pOp)
 		return;
 	}
 
-	pQuestDataEx->bBossIsSpawning = 1;
-	D2UnitStrc* pFetishBoss = sub_6FC6E8D0(pOp->pGame, pOp->pRoom, 0, MONSTER_FETISH11, 1, 0, 0, 1);
-	if (pFetishBoss)
-	{
-		pQuestDataEx->bGidbinnObjectActivated = 0;
-		pQuestDataEx->bBossHasSpawned = 1;
-		pQuestDataEx->nFetishBossGUID = pFetishBoss->dwUnitId;
-	}
-	pQuestDataEx->bBossIsSpawning = 0;
+	ACT3Q3_SpawnFetishBoss(pOp->pGame, pOp->pRoom, pQuestDataEx);
 }
 
 //D2Game.0x6FCA9C30
@@ -850,7 +850,7 @@ int32_t __fastcall OBJECTS_OperateFunction31_GidbinnDecoy(D2ObjOperateFnStrc* pO
 	return 0;
 }
 
-// 1.10f body for D2Game 0xE8780, ported in src/core/d2game/d2game_e8780.cpp (split out of the boss-spawn check; the unique spawn helper is inlined in retail)
+// 1.13c D2Game+0xE8780 (the unique spawn, umods and minion calls live in sub_6FC6E8D0, which is the same 0x24950/0x23CA0/0x248A0 chain retail calls here)
 static void ACT3Q3_SpawnFetishBoss(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2Act3Quest3Strc* pQuestDataEx)
 {
 	pQuestDataEx->bBossIsSpawning = 1;
@@ -864,7 +864,7 @@ static void ACT3Q3_SpawnFetishBoss(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D
 	pQuestDataEx->bBossIsSpawning = 0;
 }
 
-//D2Game.0x6FCA9D50
+// 1.13c D2Game+0xE8F30
 bool __fastcall ACT3Q3_SpawnGidbinnBoss(D2GameStrc* pGame, D2QuestDataStrc* pQuestData)
 {
 	D2Act3Quest3Strc* pQuestDataEx = nullptr;
@@ -917,7 +917,7 @@ bool __fastcall ACT3Q3_SpawnGidbinnBoss(D2GameStrc* pGame, D2QuestDataStrc* pQue
 	return true;
 }
 
-//D2Game.0x6FCA9E40
+// 1.13c D2Game+0xE8140
 void __fastcall ACT3Q3_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	QUESTS_DebugOutput(pQuestData->pGame, "killed boss for quest", __FILE__, __LINE__);
@@ -943,7 +943,7 @@ void __fastcall ACT3Q3_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 	}
 }
 
-//D2Game.0x6FCA9EF0
+// 1.13c D2Game+0xE2C40
 int32_t __fastcall ACT3Q3_GetAltarCoordinates(D2GameStrc* pGame, D2CoordStrc* pCoord)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A3Q3_GIDBINN);
@@ -963,7 +963,7 @@ int32_t __fastcall ACT3Q3_GetAltarCoordinates(D2GameStrc* pGame, D2CoordStrc* pC
 	return 1;
 }
 
-//D2Game.0x6FCA9F30
+// 1.13c D2Game+0xE5F60
 void __fastcall ACT3Q3_SetAltarMode(D2GameStrc* pGame)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A3Q3_GIDBINN);
@@ -987,7 +987,7 @@ void __fastcall ACT3Q3_SetAltarMode(D2GameStrc* pGame)
 	pQuestDataEx->nAltarObjectMode = OBJMODE_OPENED;
 }
 
-//D2Game.0x6FCA9FA0
+// 1.13c D2Game+0xE4120
 void __fastcall OBJECTS_InitFunction39_GidbinnAltar(D2ObjInitFnStrc* pOp)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A3Q3_GIDBINN);

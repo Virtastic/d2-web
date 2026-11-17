@@ -328,7 +328,6 @@ void __fastcall QUESTS_SetGlobalState(D2GameStrc* pGame, int32_t nQuestId, int32
 //D2Game.0x6FC95700
 int32_t __fastcall QUESTS_GetGlobalState(D2GameStrc* pGame, int32_t nQuestId, int32_t nState);
 //D2Game.0x6FC95740
-void __fastcall QUESTS_WarrivSpawn(D2GameStrc* pGame, D2UnitStrc* pWarriv, int32_t nXpos, int32_t nYpos, int32_t nWarrivID);
 //D2Game.0x6FC95790
 void __fastcall QUESTS_UseClueItem(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUnitId);
 //D2Game.0x6FC95800

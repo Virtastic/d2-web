@@ -131,6 +131,7 @@ D2NPCMessageTableStrc gpAct5Q2NpcMessages[] =
 };
 
 
+// 1.13c D2Game+0x582E0 (diffed line by line against the decompile: matches)
 //D2Game.0x6FCB1F30
 void __fastcall ACT5Q2_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -170,6 +171,7 @@ void __fastcall ACT5Q2_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitS
 	}
 }
 
+// 1.13c D2Game+0x56C40 (diffed line by line against the decompile: matches)
 //D2Game.0x6FCB1FF0
 bool __fastcall ACT5Q2_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
@@ -201,6 +203,7 @@ bool __fastcall ACT5Q2_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 	return false;
 }
 
+// 1.13c D2Game+0x5CC70 (diffed line by line against the decompile and the callback table: matches)
 //D2Game.0x6FCB2080
 // 1.13c D2Game+0x5CC70
 void __fastcall ACT5Q2_InitQuestData(D2QuestDataStrc* pQuestData)
@@ -230,6 +233,7 @@ void __fastcall ACT5Q2_InitQuestData(D2QuestDataStrc* pQuestData)
 	QUESTS_ResetPlayerGUIDCount(&pQuestDataEx->tPlayerGUIDs);
 }
 
+// 1.13c D2Game+0x5A530 (diffed line by line against the decompile: matches)
 //D2Game.0x6FCB2160
 void __fastcall ACT5Q2_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -250,6 +254,7 @@ void __fastcall ACT5Q2_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2Q
 	pQuestData->pfCallback[QUESTEVENT_NPCDEACTIVATE] = nullptr;
 }
 
+// 1.13c D2Game+0x593F0 (diffed line by line against the decompile: matches)
 //D2Game.0x6FCB21C0
 int32_t __fastcall ACT5Q2_UnitIterate_StatusCyclerEx(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -265,6 +270,7 @@ int32_t __fastcall ACT5Q2_UnitIterate_StatusCyclerEx(D2GameStrc* pGame, D2UnitSt
 	return 0;
 }
 
+// 1.13c D2Game+0x5C9E0 (diffed against the decompile and disassembly: matches)
 //D2Game.0x6FCB2230
 void __fastcall ACT5Q2_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -358,6 +364,7 @@ void __fastcall ACT5Q2_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 	}
 }
 
+// 1.13c D2Game+0x58530 (diffed line by line against the decompile: matches)
 //D2Game.0x6FCB2460
 int32_t __fastcall ACT5Q2_UnitIterate_UpdateQuestStateFlags(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -385,6 +392,7 @@ int32_t __fastcall ACT5Q2_UnitIterate_UpdateQuestStateFlags(D2GameStrc* pGame, D
 	return 0;
 }
 
+// 1.13c D2Game+0x583C0 (diffed line by line against the disassembly and the 0x6FD2BC20 index table: matches)
 //D2Game.0x6FCB24D0
 void __fastcall ACT5Q2_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -438,6 +446,7 @@ void __fastcall ACT5Q2_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 	}
 }
 
+// 1.13c D2Game+0x582A0 (diffed line by line against the decompile: matches)
 //D2Game.0x6FCB2610
 void __fastcall ACT5Q2_Callback10_PlayerLeavesGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -455,6 +464,7 @@ void __fastcall ACT5Q2_Callback10_PlayerLeavesGame(D2QuestDataStrc* pQuestData, 
 	}
 }
 
+// 1.13c D2Game+0x5A310
 //D2Game.0x6FCB2650
 void __fastcall ACT5Q2_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -494,38 +504,39 @@ void __fastcall ACT5Q2_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 				}
 			}
 		}
-
-		if (pQuestDataEx->nKilledWussies >= 5 && pQuestData->fLastState != 12)
-		{
-			pQuestData->dwFlags &= 0xFFFFFF00;
-			QUESTS_UnitIterate(pQuestData, 12, 0, ACT5Q2_UnitIterate_StatusCyclerEx, 1);
-			pQuestDataEx->bQualKehkActivated = 0;
-			SUNIT_IterateUnitsOfType(pQuestData->pGame, 0, pQuestArg->pPlayer, ACT5Q2_UnitIterate_SetCompletionFlag);
-		}
 	}
 	else
 	{
-		if (pQuestDataEx->nWussiesInRangeToDoor > 0)
+		// 1.13c: a wussie freed at the door only feeds its soldier group; any other kill counts,
+		// also when no wussie was freed yet (D2MOO guarded the count with nWussiesInRangeToDoor > 0)
+		for (int32_t i = 0; i < pQuestDataEx->nWussiesInRangeToDoor; ++i)
 		{
-			int32_t nCounter = 0;
-			while (nUnitGUID != pQuestDataEx->nFreedWussieUnitGUIDs[nCounter])
+			if (nUnitGUID == pQuestDataEx->nFreedWussieUnitGUIDs[i])
 			{
-				++nCounter;
-				if (nCounter >= pQuestDataEx->nWussiesInRangeToDoor)
+				const int32_t nGroup = ACT5Q2_FindSoldierGroup(pQuestData, pQuestArg->pTarget);
+				if (nGroup < 0)
 				{
-					++pQuestDataEx->nKilledWussies;
-
-					if (pQuestDataEx->nKilledWussies >= 5 && pQuestData->fLastState != 12)
-					{
-						pQuestData->dwFlags &= 0xFFFFFF00;
-						QUESTS_UnitIterate(pQuestData, 12, 0, ACT5Q2_UnitIterate_StatusCyclerEx, 1);
-						pQuestDataEx->bQualKehkActivated = 0;
-						SUNIT_IterateUnitsOfType(pQuestData->pGame, 0, pQuestArg->pPlayer, ACT5Q2_UnitIterate_SetCompletionFlag);
-					}
-					break;
+					return;
 				}
+
+				++pQuestDataEx->unk0x114[nGroup];
+				if (pQuestDataEx->unk0x114[nGroup] >= 5)
+				{
+					pQuestDataEx->unk0x108[nGroup] = 1;
+				}
+				return;
 			}
 		}
+
+		++pQuestDataEx->nKilledWussies;
+	}
+
+	if (pQuestDataEx->nKilledWussies >= 5 && pQuestData->fLastState != 12)
+	{
+		pQuestData->dwFlags &= 0xFFFFFF00;
+		QUESTS_UnitIterate(pQuestData, 12, 0, ACT5Q2_UnitIterate_StatusCyclerEx, 1);
+		pQuestDataEx->bQualKehkActivated = 0;
+		SUNIT_IterateUnitsOfType(pQuestData->pGame, 0, pQuestArg->pPlayer, ACT5Q2_UnitIterate_SetCompletionFlag);
 	}
 
 	const int32_t nIndex = ACT5Q2_FindSoldierGroup(pQuestData, pQuestArg->pTarget);
@@ -544,6 +555,7 @@ void __fastcall ACT5Q2_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 	}
 }
 
+// 1.13c D2Game+0x59390 (diffed line by line against the decompile: matches)
 //D2Game.0x6FCB2860
 int32_t __fastcall ACT5Q2_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -616,6 +628,7 @@ void __fastcall ACT5Q2_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2Qu
 	}
 }
 
+// 1.13c D2Game+0x56BD0 (diffed line by line against the decompile: matches)
 //D2Game.0x6FCB2A20
 bool __fastcall ACT5Q2_SeqCallback(D2QuestDataStrc* pQuestData)
 {
@@ -643,12 +656,14 @@ bool __fastcall ACT5Q2_SeqCallback(D2QuestDataStrc* pQuestData)
 	return pQuest->pfSeqFilter(pQuest);
 }
 
+// 1.13c D2Game+0x58240 (diffed line by line against the decompile: matches)
 //D2Game.0x6FCB2A90
 void __fastcall ACT5Q2_Callback14_PlayerJoinedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	QUESTRECORD_ClearQuestState(UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty], QUESTSTATEFLAG_A5Q2, QFLAG_ENTERAREA);
 }
 
+// 1.13c D2Game+0x581A0 (diffed line by line against the decompile: matches)
 //D2Game.0x6FCB2AC0
 void __fastcall ACT5Q2_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -673,6 +688,7 @@ void __fastcall ACT5Q2_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 	}
 }
 
+// 1.13c D2Game+0x5C2A0 (diffed line by line against the decompile: matches)
 //D2Game.0x6FCB2B60
 int32_t __fastcall ACT5Q2_SpawnCagedWussies(D2QuestDataStrc* pQuestData, D2ObjInitFnStrc* pOp, int32_t nCount)
 {
@@ -703,6 +719,7 @@ int32_t __fastcall ACT5Q2_SpawnCagedWussies(D2QuestDataStrc* pQuestData, D2ObjIn
 	return nWussiesSpawned;
 }
 
+// 1.13c D2Game+0x5C850 (diffed line by line against the decompile: matches)
 //D2Game.0x6FCB2C00
 void __fastcall OBJECTS_InitFunction62_CagedWussie(D2ObjInitFnStrc* pOp)
 {
@@ -809,6 +826,7 @@ void __fastcall ACT5Q2_UpdateWussieCounters(D2GameStrc* pGame, int32_t nUnused, 
 	}
 }
 
+// 1.13c D2Game+0x5B9B0
 //D2Game.0x6FCB2DE0
 void __fastcall ACT5Q2_UpdateQuestState(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pWussie)
 {
@@ -953,7 +971,8 @@ void __fastcall ACT5Q2_UpdateQuestState(D2GameStrc* pGame, D2UnitStrc* pPlayer, 
 					QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A5Q2, QFLAG_ENTERAREA);
 					if (pQuestDataEx->nKilledWussies < 5)
 					{
-						pQuestData->dwFlags = 0x00000020;
+						// 1.13c stores the low byte only
+						pQuestData->dwFlags = (pQuestData->dwFlags & 0xFFFFFF00) | 0x20;
 						QUESTS_UnitIterate(pQuestData, 2, 0, ACT5Q2_UnitIterate_StatusCyclerEx, 1);
 					}
 					pQuestDataEx->bQualKehkActivated = 0;
@@ -964,6 +983,7 @@ void __fastcall ACT5Q2_UpdateQuestState(D2GameStrc* pGame, D2UnitStrc* pPlayer, 
 	}
 }
 
+// 1.13c D2Game+0x5B180 (diffed line by line against the decompile; SUNIT_GetPartyId carries the inlined null/type test: matches)
 //D2Game.0x6FCB3240
 int32_t __fastcall ACT5Q2_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -981,6 +1001,7 @@ int32_t __fastcall ACT5Q2_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameSt
 	return 0;
 }
 
+// 1.13c D2Game+0x592F0 (diffed line by line against the decompile; SUNIT_AttachSound is the inlined store: matches)
 //D2Game.0x6FCB3290
 int32_t __fastcall ACT5Q2_UnitIterate_AttachCompletionSound(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -1016,6 +1037,7 @@ int32_t __fastcall ACT5Q2_GetBarbsToBeRescued(D2QuestDataStrc* pQuestData)
 	return pQuestDataEx->nSpawnedWussies - pQuestDataEx->nFreedWussies - pQuestDataEx->nKilledWussies + nBarbs;
 }
 
+// 1.13c D2Game+0x5EE30 (diffed line by line against the disassembly: matches)
 //D2Game.0x6FCB3310
 void __fastcall ACT5Q2_UpdatePortalMode(D2QuestDataStrc* pQuestData, D2UnitStrc* pPortal)
 {
@@ -1072,6 +1094,7 @@ void __fastcall ACT5Q2_UpdatePortalMode(D2QuestDataStrc* pQuestData, D2UnitStrc*
 	EVENT_SetEvent(pQuestData->pGame, pPortal, EVENTTYPE_QUESTFN, pQuestData->pGame->dwGameFrame + 25, 0, 0);
 }
 
+// 1.13c D2Game+0x5A290 (diffed line by line against the decompile; the object hash walk is SUNIT_GetServerUnit: matches)
 //D2Game.0x6FCB33B0
 int32_t __fastcall ACT5Q2_FindPortal(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc** ppPortal)
 {
@@ -1104,6 +1127,7 @@ int32_t __fastcall ACT5Q2_FindPortal(D2GameStrc* pGame, D2UnitStrc* pUnit, D2Uni
 	return 1;
 }
 
+// 1.13c D2Game+0x5A200 (diffed line by line against the decompile: matches)
 //D2Game.0x6FCB3440
 void __fastcall ACT5Q2_OnWussieActivated(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
@@ -1123,6 +1147,7 @@ void __fastcall ACT5Q2_OnWussieActivated(D2GameStrc* pGame, D2UnitStrc* pUnit)
 	QUESTS_UnitIterate(pQuestData, 5, 0, ACT5Q2_UnitIterate_StatusCyclerEx, 1);
 }
 
+// 1.13c D2Game+0x5A160 (diffed line by line against the decompile: matches)
 //D2Game.0x6FCB3490
 int32_t __fastcall ACT5Q2_IsPrisonDoorDead(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pWussie)
 {

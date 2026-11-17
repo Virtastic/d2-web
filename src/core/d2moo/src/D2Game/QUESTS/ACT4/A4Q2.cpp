@@ -86,6 +86,7 @@ D2NPCMessageTableStrc gpAct4Q2NpcMessages[] =
 
 
 //D2Game.0x6FCAE4C0
+// 1.13c D2Game+0xB8970
 bool __fastcall ACT4Q2_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
 	if (nNpcId == MONSTER_TYRAEL2)
@@ -213,6 +214,7 @@ void __fastcall ACT4Q2_InitQuestData(D2QuestDataStrc* pQuestData)
 }
 
 //D2Game.0x6FCAE750
+// 1.13c D2Game+0xBA4F0
 bool __fastcall ACT4Q2_SeqCallback(D2QuestDataStrc* pQuestData)
 {
 	if (!pQuestData->fState && pQuestData->bNotIntro == 1)
@@ -224,6 +226,7 @@ bool __fastcall ACT4Q2_SeqCallback(D2QuestDataStrc* pQuestData)
 }
 
 //D2Game.0x6FCAE780
+// 1.13c D2Game+0xBB250
 void __fastcall ACT4Q2_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	D2Act4Quest2Strc* pQuestDataEx = (D2Act4Quest2Strc*)pQuestData->pQuestDataEx;
@@ -298,6 +301,7 @@ void __fastcall ACT4Q2_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 }
 
 //D2Game.0x6FCAE950
+// 1.13c D2Game+0xB9290
 int32_t __fastcall ACT4Q2_UnitIterate_UpdateQuestStateFlags(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -424,6 +428,7 @@ void __fastcall ACT4Q2_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 }
 
 //D2Game.0x6FCAEBD0
+// 1.13c D2Game+0xBA3A0
 void __fastcall ACT4Q2_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	if (pQuestArg->nOldLevel == LEVEL_THEPANDEMONIUMFORTRESS && pQuestData->fState == 2)
@@ -441,7 +446,7 @@ void __fastcall ACT4Q2_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2Qu
 		if (pQuestData->fLastState < 1)
 		{
 			pQuestData->dwFlags &= 0xFFFFFF00;
-			QUESTS_UnitIterate(pQuestData, 1, 0, ACT4Q2_UnitIterate_StatusCyclerEx, 0);
+			pQuestData->fLastState = 1;
 		}
 
 		SUNIT_IterateUnitsOfType(pQuestData->pGame, 0, 0, ACT4Q2_UnitIterate_UpdateQuestStateFlags);
@@ -457,7 +462,8 @@ void __fastcall ACT4Q2_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2Qu
 		if (pQuestData->fLastState < 1)
 		{
 			pQuestData->dwFlags &= 0xFFFFFF00;
-			QUESTS_UnitIterate(pQuestData, 1, 0, ACT4Q2_UnitIterate_StatusCyclerEx, 1);
+			pQuestData->fLastState = 1;
+			SUNIT_IterateUnitsOfType(pQuestData->pGame, 0, 0, ACT4Q2_UnitIterate_StatusCyclerEx);
 		}
 
 		SUNIT_IterateUnitsOfType(pQuestData->pGame, 0, 0, ACT4Q2_UnitIterate_UpdateQuestStateFlags);
@@ -465,6 +471,7 @@ void __fastcall ACT4Q2_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2Qu
 }
 
 //D2Game.0x6FCAECC0
+// 1.13c D2Game+0xB99D0
 int32_t __fastcall ACT4Q2_UnitIterate_StatusCyclerEx(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -480,6 +487,7 @@ int32_t __fastcall ACT4Q2_UnitIterate_StatusCyclerEx(D2GameStrc* pGame, D2UnitSt
 }
 
 //D2Game.0x6FCAED30
+// 1.13c D2Game+0xBB1B0
 void __fastcall ACT4Q2_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	if (!pQuestArg->pTarget || pQuestArg->pTarget->dwClassId != MONSTER_TYRAEL2)
@@ -492,7 +500,8 @@ void __fastcall ACT4Q2_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2Q
 	if (pQuestDataEx->bTalkedToTyrael == 1)
 	{
 		pQuestData->dwFlags &= 0xFFFFFF00;
-		QUESTS_UnitIterate(pQuestData, 1, 0, ACT4Q2_UnitIterate_StatusCyclerEx, 1);
+		pQuestData->fLastState = 1;
+		SUNIT_IterateUnitsOfType(pQuestData->pGame, 0, 0, ACT4Q2_UnitIterate_StatusCyclerEx);
 		pQuestDataEx->bTalkedToTyrael = 0;
 	}
 
@@ -525,6 +534,7 @@ void __fastcall ACT4Q2_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2Q
 }
 
 //D2Game.0x6FCAEE30
+// 1.13c D2Game+0xB8FE0
 void __fastcall ACT4Q2_Callback14_PlayerJoinedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	if (!pQuestArg->pGame->bExpansion)
@@ -540,6 +550,7 @@ void __fastcall ACT4Q2_Callback14_PlayerJoinedGame(D2QuestDataStrc* pQuestData, 
 }
 
 //D2Game.0x6FCAEE80
+// 1.13c D2Game+0xB8F20
 void __fastcall ACT4Q2_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];
@@ -572,6 +583,7 @@ void __fastcall ACT4Q2_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 }
 
 //D2Game.0x6FCAEF40
+// 1.13c D2Game+0xBC2C0
 void __fastcall ACT4Q2_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	D2Act4Quest2Strc* pQuestDataEx = (D2Act4Quest2Strc*)pQuestData->pQuestDataEx;
@@ -590,7 +602,6 @@ void __fastcall ACT4Q2_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 			return;
 		}
 
-		bool bNotRewarded = false;
 		pQuestDataEx->pRoom = pRoom;
 		if (pQuestArg->pPlayer)
 		{
@@ -611,16 +622,14 @@ void __fastcall ACT4Q2_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 				return;
 			}
 
-			if (!QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty], QUESTSTATEFLAG_A4Q2, QFLAG_REWARDGRANTED))
-			{
-				bNotRewarded = true;
-			}
+			QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty], QUESTSTATEFLAG_A4Q2, QFLAG_REWARDGRANTED);
 		}
 
 		if (pQuestData->bNotIntro)
 		{
 			pQuestDataEx->nPlayerCount = 0;
-			QUESTS_UnitIterate(pQuestData, 13, 0, ACT4Q2_UnitIterate_StatusCyclerEx, 1);
+			pQuestData->fLastState = 13;
+			SUNIT_IterateUnitsOfType(pQuestData->pGame, 0, 0, ACT4Q2_UnitIterate_StatusCyclerEx);
 			// Retail 1.13c's second iterate here is the room-guarded GRANT, not a state-flag update:
 			// D2Game.dll 0x6FCDC2C0's Diablo branch enters its iterate block at 0x6FCDC400 and calls
 			// through 0x6FCFFCC0 with 0x6FCD99D0, 0x6FCD9F20, 0x6FCDA490, 0x6FCD9BC0, 0x6FCD9B00 in
@@ -634,14 +643,6 @@ void __fastcall ACT4Q2_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 			SUNIT_IterateUnitsOfType(pQuestArg->pGame, 0, pQuestArg->pTarget, ACT4Q2_UnitIterate_SetPrimaryGoalDoneForPartyMembers);
 			SUNIT_IterateUnitsOfType(pQuestArg->pGame, 0, pQuestArg->pTarget, ACT4Q2_UnitIterate_SetCompletionFlag);
 			SUNIT_IterateUnitsOfType(pQuestArg->pGame, 0, pQuestArg->pTarget, ACT4Q2_UnitIterate_AttachCompletionSound);
-
-			if (bNotRewarded)
-			{
-				for(int nPlayer = 0; nPlayer < pQuestDataEx->nPlayerCount; nPlayer++)
-				{
-					D2Game_10034_Return(64);
-				}
-			}
 		}
 
 		return;
@@ -679,6 +680,7 @@ void __fastcall ACT4Q2_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 }
 
 //D2Game.0x6FCAF110
+// 1.13c D2Game+0xB9BC0
 int32_t __fastcall ACT4Q2_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -694,6 +696,7 @@ int32_t __fastcall ACT4Q2_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2Uni
 }
 
 //D2Game.0x6FCAF160
+// 1.13c D2Game+0xB9B00
 int32_t __fastcall ACT4Q2_UnitIterate_AttachCompletionSound(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	if (!QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A4Q2, QFLAG_PRIMARYGOALDONE))
@@ -712,6 +715,7 @@ int32_t __fastcall ACT4Q2_UnitIterate_AttachCompletionSound(D2GameStrc* pGame, D
 }
 
 //D2Game.0x6FCAF1E0
+// 1.13c D2Game+0xBBDC0
 bool __fastcall ACT4Q2_SpawnDiablo(D2GameStrc* pGame, D2QuestDataStrc* pQuestData)
 {
 	D2Act4Quest2Strc* pQuestDataEx = (D2Act4Quest2Strc*)pQuestData->pQuestDataEx;
@@ -792,6 +796,7 @@ bool __fastcall ACT4Q2_SpawnDiablo(D2GameStrc* pGame, D2QuestDataStrc* pQuestDat
 }
 
 //D2Game.0x6FCAF3D0
+// 1.13c D2Game+0xBBCE0
 int32_t __fastcall ACT4Q2_UnitIterate_WarpToTownEndGame(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	sub_6FC7BEC0(pGame, pUnit);
@@ -823,6 +828,7 @@ int32_t __fastcall ACT4Q2_UnitIterate_WarpToTownEndGame(D2GameStrc* pGame, D2Uni
 }
 
 //D2Game.0x6FCAF4A0
+// 1.13c D2Game+0xBA490
 int32_t __fastcall ACT4Q2_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	if (!QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A4Q2, QFLAG_PRIMARYGOALDONE))
@@ -840,6 +846,7 @@ int32_t __fastcall ACT4Q2_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameSt
 }
 
 //D2Game.0x6FCAF4F0
+// 1.13c D2Game+0xB9F20
 int32_t __fastcall ACT4Q2_UnitIterate_UpdatePlayerState(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -895,6 +902,7 @@ int32_t __fastcall ACT4Q2_UnitIterate_UpdatePlayerState(D2GameStrc* pGame, D2Uni
 }
 
 //D2Game.0x6FCAF630
+// 1.13c D2Game+0xBB3B0
 void __fastcall ACT4Q2_KillAllMonstersInCS(D2GameStrc* pGame, D2Act4Quest2Strc* pQuestDataEx)
 {
 	if (pQuestDataEx->bSanctumCleared)
@@ -911,10 +919,13 @@ void __fastcall ACT4Q2_KillAllMonstersInCS(D2GameStrc* pGame, D2Act4Quest2Strc* 
 		{
 			for (D2UnitStrc* pUnit = pRoom->pUnitFirst; pUnit; pUnit = pUnit->pRoomNext)
 			{
-				if (pUnit->dwUnitType == UNIT_MONSTER && pUnit->dwClassId != MONSTER_DIABLO && pUnit->dwClassId != MONSTER_DIABLOCLONE && !SUNIT_IsDead(pUnit) && STATLIST_GetUnitAlignment(pUnit) == UNIT_ALIGNMENT_EVIL)
+				if (pUnit->dwUnitType == UNIT_MONSTER && pUnit->dwClassId != MONSTER_DIABLO && !(pUnit->dwFlags & UNITFLAG_ISDEAD) && pUnit->dwAnimMode != MONMODE_DEATH && pUnit->dwAnimMode != MONMODE_DEAD && STATLIST_GetUnitAlignment(pUnit) == UNIT_ALIGNMENT_EVIL)
 				{
+					// retail builds the death mode change inline (speed 100) rather than through the mode-info table
+					UNITS_SetUsedSkill(pUnit, nullptr);
 					D2ModeChangeStrc modeChange = {};
-					MONSTERMODE_GetModeChangeInfo(pUnit, MONMODE_DEATH, &modeChange);
+					modeChange.pUnit = pUnit;
+					modeChange.unk0x14[1] = 100;
 					D2GAME_ModeChange_6FC65220(pGame, &modeChange, 1);
 				}
 			}
@@ -923,6 +934,7 @@ void __fastcall ACT4Q2_KillAllMonstersInCS(D2GameStrc* pGame, D2Act4Quest2Strc* 
 }
 
 //D2Game.0x6FCAF6D0
+// 1.13c D2Game+0xBC220
 void __fastcall OBJECTS_InitFunction55_DiabloStartPoint(D2ObjInitFnStrc* pOp)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A4Q2_DIABLO);
@@ -972,19 +984,35 @@ void __fastcall OBJECTS_InitFunction55_DiabloStartPoint(D2ObjInitFnStrc* pOp)
 	}
 }
 
+// 1.13c D2Game+0xBC050 (shared by the three spawn-seal operate functions; the mode argument is a dead local in retail)
+static void ACT4Q2_CreateSealObject(D2ObjOperateFnStrc* pOp, D2CoordStrc* pCoord)
+{
+	D2ActiveRoomStrc* pRoom = D2GAME_GetRoom_6FC52070(UNITS_GetRoom(pOp->pObject), pCoord->nX, pCoord->nY);
+	if (!pRoom)
+	{
+		return;
+	}
+
+	D2ActiveRoomStrc* pNewRoom = nullptr;
+	QUESTS_GetFreePosition(pRoom, pCoord, 3, COLLIDE_MASK_PLACEMENT, &pNewRoom, 100);
+	if (pNewRoom && SUNIT_AllocUnitData(UNIT_OBJECT, 131, pCoord->nX, pCoord->nY, pOp->pGame, pNewRoom, 1, 0, 0))
+	{
+		DUNGEON_ToggleHasPortalFlag(pNewRoom, 0);
+		OBJECTS_OperateFunction52_DiabloSeal(pOp, 0);
+	}
+}
+
 //D2Game.0x6FCAF760
+// 1.13c D2Game+0xBC580
 int32_t __fastcall OBJECTS_OperateFunction54_DiabloSeal(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
-	if (!pOp || !pOp->pObject)
+	if (pOp->pObject && pOp->pObject->dwAnimMode != OBJMODE_NEUTRAL)
 	{
 		return 0;
 	}
 
-	D2UnitStrc* pObject = pOp->pObject;
-
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A4Q2_DIABLO);
-
-	if (pObject->dwAnimMode != OBJMODE_NEUTRAL || !pQuestData || !pQuestData->pQuestDataEx)
+	if (!pQuestData)
 	{
 		return 0;
 	}
@@ -992,43 +1020,24 @@ int32_t __fastcall OBJECTS_OperateFunction54_DiabloSeal(D2ObjOperateFnStrc* pOp,
 	D2Act4Quest2Strc* pQuestDataEx = (D2Act4Quest2Strc*)pQuestData->pQuestDataEx;
 	D2CoordStrc* pCoord = &pQuestDataEx->pSealCoords[0];
 	UNITS_GetCoords(pOp->pObject, pCoord);
+	pCoord->nX -= 12;
+	pCoord->nY -= 52;
 
-	const int32_t nX = pQuestDataEx->pSealCoords[0].nX - 12;
-	const int32_t nY = pQuestDataEx->pSealCoords[0].nY - 52;
-	pQuestDataEx->pSealCoords[0].nX = nX;
-	pQuestDataEx->pSealCoords[0].nY = nY;
-
-	D2ActiveRoomStrc* pRoom = D2GAME_GetRoom_6FC52070(UNITS_GetRoom(pOp->pObject), nX, nY);
-	if (!pRoom)
-	{
-		return 0;
-	}
-
-	D2ActiveRoomStrc* pNewRoom = nullptr;
-	// 1.13c routes all three spawn seals through 0x6FCDC050 with radius 100.
-	QUESTS_GetFreePosition(pRoom, pCoord, 3, COLLIDE_MASK_PLACEMENT, &pNewRoom, 100);
-	if (pNewRoom && SUNIT_AllocUnitData(UNIT_OBJECT, 131, pCoord->nX, pCoord->nY, pOp->pGame, pNewRoom, 1, 0, 0))
-	{
-		DUNGEON_ToggleHasPortalFlag(pNewRoom, 0);
-		OBJECTS_OperateFunction52_DiabloSeal(pOp, nOperate);
-	}
-
+	ACT4Q2_CreateSealObject(pOp, pCoord);
 	return 0;
 }
 
 //D2Game.0x6FCAF8D0
+// 1.13c D2Game+0xBC510
 int32_t __fastcall OBJECTS_OperateFunction55_DiabloSeal(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
-	if (!pOp || !pOp->pObject)
+	if (pOp->pObject && pOp->pObject->dwAnimMode != OBJMODE_NEUTRAL)
 	{
 		return 0;
 	}
 
-	D2UnitStrc* pObject = pOp->pObject;
-
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A4Q2_DIABLO);
-
-	if (pObject->dwAnimMode != OBJMODE_NEUTRAL || !pQuestData || !pQuestData->pQuestDataEx)
+	if (!pQuestData)
 	{
 		return 0;
 	}
@@ -1036,43 +1045,24 @@ int32_t __fastcall OBJECTS_OperateFunction55_DiabloSeal(D2ObjOperateFnStrc* pOp,
 	D2Act4Quest2Strc* pQuestDataEx = (D2Act4Quest2Strc*)pQuestData->pQuestDataEx;
 	D2CoordStrc* pCoord = &pQuestDataEx->pSealCoords[1];
 	UNITS_GetCoords(pOp->pObject, pCoord);
+	pCoord->nX -= 39;
+	pCoord->nY += 33;
 
-	const int32_t nX = pQuestDataEx->pSealCoords[1].nX - 39;
-	const int32_t nY = pQuestDataEx->pSealCoords[1].nY + 33;
-	pQuestDataEx->pSealCoords[1].nX = nX;
-	pQuestDataEx->pSealCoords[1].nY = nY;
-
-	D2ActiveRoomStrc* pRoom = D2GAME_GetRoom_6FC52070(UNITS_GetRoom(pOp->pObject), nX, nY);
-	if (!pRoom)
-	{
-		return 0;
-	}
-
-	D2ActiveRoomStrc* pNewRoom = nullptr;
-	// 1.13c routes all three spawn seals through 0x6FCDC050 with radius 100.
-	QUESTS_GetFreePosition(pRoom, pCoord, 3, COLLIDE_MASK_PLACEMENT, &pNewRoom, 100);
-	if (pNewRoom && SUNIT_AllocUnitData(UNIT_OBJECT, 131, pCoord->nX, pCoord->nY, pOp->pGame, pNewRoom, 1, 0, 0))
-	{
-		DUNGEON_ToggleHasPortalFlag(pNewRoom, 0);
-		OBJECTS_OperateFunction52_DiabloSeal(pOp, nOperate);
-	}
-
+	ACT4Q2_CreateSealObject(pOp, pCoord);
 	return 0;
 }
 
 //D2Game.0x6FCAFA40
+// 1.13c D2Game+0xBC4A0
 int32_t __fastcall OBJECTS_OperateFunction56_DiabloSeal(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
-	if (!pOp || !pOp->pObject)
+	if (pOp->pObject && pOp->pObject->dwAnimMode != OBJMODE_NEUTRAL)
 	{
 		return 0;
 	}
 
-	D2UnitStrc* pObject = pOp->pObject;
-
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A4Q2_DIABLO);
-
-	if (pObject->dwAnimMode != OBJMODE_NEUTRAL || !pQuestData || !pQuestData->pQuestDataEx)
+	if (!pQuestData)
 	{
 		return 0;
 	}
@@ -1080,41 +1070,20 @@ int32_t __fastcall OBJECTS_OperateFunction56_DiabloSeal(D2ObjOperateFnStrc* pOp,
 	D2Act4Quest2Strc* pQuestDataEx = (D2Act4Quest2Strc*)pQuestData->pQuestDataEx;
 	D2CoordStrc* pCoord = &pQuestDataEx->pSealCoords[2];
 	UNITS_GetCoords(pOp->pObject, pCoord);
+	pCoord->nX += 32;
+	pCoord->nY += 16;
 
-	const int32_t nX = pQuestDataEx->pSealCoords[2].nX + 32;
-	const int32_t nY = pQuestDataEx->pSealCoords[2].nY + 16;
-	pQuestDataEx->pSealCoords[2].nX = nX;
-	pQuestDataEx->pSealCoords[2].nY = nY;
-
-	D2ActiveRoomStrc* pRoom = D2GAME_GetRoom_6FC52070(UNITS_GetRoom(pOp->pObject), nX, nY);
-	if (!pRoom)
-	{
-		return 0;
-	}
-
-	D2ActiveRoomStrc* pNewRoom = nullptr;
-	// 1.13c routes all three spawn seals through 0x6FCDC050 with radius 100.
-	QUESTS_GetFreePosition(pRoom, pCoord, 3, COLLIDE_MASK_PLACEMENT, &pNewRoom, 100);
-	if (pNewRoom && SUNIT_AllocUnitData(UNIT_OBJECT, 131, pCoord->nX, pCoord->nY, pOp->pGame, pNewRoom, 1, 0, 0))
-	{
-		DUNGEON_ToggleHasPortalFlag(pNewRoom, 0);
-		OBJECTS_OperateFunction52_DiabloSeal(pOp, nOperate);
-	}
-
+	ACT4Q2_CreateSealObject(pOp, pCoord);
 	return 0;
 }
 
 //D2Game.0x6FCAFBB0
+// 1.13c D2Game+0xBBF30
 int32_t __fastcall OBJECTS_OperateFunction52_DiabloSeal(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
-	if (!pOp || !pOp->pObject)
-	{
-		return 0;
-	}
-
 	D2UnitStrc* pObject = pOp->pObject;
 
-	if (pObject->dwAnimMode != OBJMODE_NEUTRAL)
+	if (pObject && pObject->dwAnimMode != OBJMODE_NEUTRAL)
 	{
 		return 0;
 	}
@@ -1132,7 +1101,7 @@ int32_t __fastcall OBJECTS_OperateFunction52_DiabloSeal(D2ObjOperateFnStrc* pOp,
 
 	D2Act4Quest2Strc* pQuestDataEx = (D2Act4Quest2Strc*)pQuestData->pQuestDataEx;
 
-	switch (pObject->dwClassId)
+	switch (pObject ? (int32_t)pObject->dwClassId : -1)
 	{
 	case 392:
 		pQuestDataEx->bSealActivated[0] = 1;
@@ -1189,6 +1158,7 @@ int32_t __fastcall OBJECTS_OperateFunction52_DiabloSeal(D2ObjOperateFnStrc* pOp,
 }
 
 //D2Game.0x6FCAFCB0
+// not-1.13c: retail has no standalone function; the seal-coordinate match and the event-7 arm sit inside the 0x36C50 dispatcher seal case (via 0xBBC00 and 0x36820)
 void __fastcall ACT4Q2_SpawnSealBoss(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2CoordStrc pCoord = {};

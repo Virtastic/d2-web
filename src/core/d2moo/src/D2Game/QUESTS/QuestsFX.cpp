@@ -1,6 +1,7 @@
 #include "QUESTS/QuestsFX.h"
 
 #include <algorithm>
+#include <cstdlib>
 
 #include "D2DataTbls.h"
 #include <DataTbls/MissilesIds.h>
@@ -24,12 +25,14 @@
 
 
 //D2Game.0x6FCB95A0
+// 1.13c D2Game+0xEAA20 (thunk: MainHandler(35, 25, 125, bCheckIfUndead 1))
 void __fastcall QUESTSFX_Bloodraven(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     return QUESTSFX_MainHandler(pGame, pUnit, 35, 25, 125, 1);
 }
 
 //D2Game.0x6FCB95B0
+// 1.13c D2Game+0xEA730 (checked against decompile and disassembly)
 void __fastcall QUESTSFX_MainHandler(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSize, int32_t nDelayMin, int32_t nDelayMax, int32_t bCheckIfUndead)
 {
     D2_ASSERT(nDelayMax);
@@ -70,6 +73,7 @@ void __fastcall QUESTSFX_MainHandler(D2GameStrc* pGame, D2UnitStrc* pUnit, int32
 }
 
 //D2Game.0x6FCB97D0
+// 1.13c D2Game+0xEAB10
 void __fastcall QUESTSFX_SpawnMephistoDeathControlMissile(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2MissileStrc missileParams = {};
@@ -85,12 +89,14 @@ void __fastcall QUESTSFX_SpawnMephistoDeathControlMissile(D2GameStrc* pGame, D2U
 }
 
 //D2Game.0x6FCB9820
+// 1.13c D2Game+0xEAA10 (thunk: MainHandler(35, 1, 51, 0))
 void __fastcall QUESTSFX_Andariel(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     return QUESTSFX_MainHandler(pGame, pUnit, 35, 1, 51, 0);
 }
 
 //D2Game.0x6FCB9830
+// 1.13c D2Game+0xEA930
 void __fastcall QUESTSFX_SpawnRadamentDeathMissile(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2MissilesTxt* pMissilesTxtRecord = SKILLS_GetMissilesTxtRecord(MISSILE_RADAMENTDEATH);
@@ -103,6 +109,7 @@ void __fastcall QUESTSFX_SpawnRadamentDeathMissile(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FCB98F0
+// 1.13c D2Game+0xEAB60
 void __fastcall QUESTSFX_SpawnCompellingOrbMissile(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2UnitStrc* pStairs = UNITFINDS_FindUnitInNeighboredRooms(UNITS_GetRoom(pUnit), UNIT_OBJECT, 386);
@@ -133,19 +140,21 @@ void __fastcall QUESTSFX_SpawnCompellingOrbMissile(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FCB9A30
+// 1.13c D2Game+0xEA920 (thunk: MainHandler(105, 1, 2, 0))
 void __fastcall QUESTSFX_Izual(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     return QUESTSFX_MainHandler(pGame, pUnit, 105, 1, 2, 0);
 }
 
 //D2Game.0x6FCB9A40
+// 1.13c D2Game+0xEA910 (thunk: MainHandler(35, 25, 125, 0))
 void __fastcall QUESTSFX_ShenkTheOverseer(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     return QUESTSFX_MainHandler(pGame, pUnit, 35, 25, 125, 0);
 }
 
 #ifdef D2_VERSION_HAS_UBERS
-//1.14d: 0x005E0070
+// 1.13c D2Game+0xEAA30 (the unknown-class case is the 0xE6 fatal, as in retail)
 void __fastcall QUESTSFX_UberPrimeEvil(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     int32_t nMonsterId;
@@ -171,8 +180,8 @@ void __fastcall QUESTSFX_UberPrimeEvil(D2GameStrc* pGame, D2UnitStrc* pUnit)
         pGame->bUberBaalKilled = 1;
         break;
     default:
-        //ASSERT();
-        return;
+        FOG_DisplayAssert("", __FILE__, 0xE6);
+        exit(-1);
     }
 
     if (pGame->bUberMephistoKilled && pGame->bUberDiabloKilled && pGame->bUberBaalKilled)
