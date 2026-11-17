@@ -693,7 +693,6 @@ D2COMMON_DLL_DECL BOOL __stdcall DATATBLS_CalculateMonsterStatsByLevel(int nMons
 //D2Common.0x6FD689B0 (#10642)
 D2COMMON_DLL_DECL int32_t __stdcall DATATBLS_SetVelocityInMonStatsTxtRecord(int nMonsterId, short nVelocity);
 //D2Common.0x6FD68A00
-void __stdcall DATATBLS_ResetGlobalDefaultUnicodeString();
 //D2Common.0x6FD68A10 (#10651)
 D2COMMON_DLL_DECL const Unicode* __fastcall DATATBLS_RollRandomUniqueTitleString(D2UnitStrc* pUnit);
 //D2Common.0x6FD68A80 (#10652)
@@ -717,7 +716,6 @@ D2COMMON_DLL_DECL D2TCExShortStrc* __stdcall DATATBLS_GetTreasureClassExRecordFr
 //D2Common.0x6FD68EC0
 void __fastcall DATATBLS_LoadTreasureClassExTxt(HD2ARCHIVE hArchive);
 //D2Common.0x6FD69B70 (#10656)
-D2COMMON_DLL_DECL int __stdcall DATATBLS_ShouldNeverCallInExpansion();
 //D2Common.0x6FD69B90
 void __fastcall DATATBLS_LoadMonItemPercentTxt(HD2ARCHIVE hArchive);
 //D2Common.0x6FD69C40

@@ -308,9 +308,10 @@ uint8_t __stdcall DATATBLS_GetRainFromLevelsTxt(int nLevelId)
 }
 
 //D2Common.0x6FD60430 (#10634)
+// 1.13c D2Common+0x6CC60 (id 0 reads as 0; 1.10f accepted it)
 uint8_t __stdcall DATATBLS_GetNoPerFromLevelsTxt(int nLevelId)
 {
-	if (nLevelId >= 0 && nLevelId < sgptDataTables->nLevelsTxtRecordCount)
+	if (nLevelId > 0 && nLevelId < sgptDataTables->nLevelsTxtRecordCount)
 	{
 		return sgptDataTables->pLevelsTxt[nLevelId].nNoPer;
 	}
@@ -319,9 +320,10 @@ uint8_t __stdcall DATATBLS_GetNoPerFromLevelsTxt(int nLevelId)
 }
 
 //D2Common.0x6FD60470 (#10633)
+// 1.13c D2Common+0x6CC30 (id 0 reads as 0; 1.10f accepted it)
 uint8_t __stdcall DATATBLS_GetMudFromLevelsTxt(int nLevelId)
 {
-	if (nLevelId >= 0 && nLevelId < sgptDataTables->nLevelsTxtRecordCount)
+	if (nLevelId > 0 && nLevelId < sgptDataTables->nLevelsTxtRecordCount)
 	{
 		return sgptDataTables->pLevelsTxt[nLevelId].nMud;
 	}
@@ -330,6 +332,7 @@ uint8_t __stdcall DATATBLS_GetMudFromLevelsTxt(int nLevelId)
 }
 
 //D2Common.0x6FD604B0
+// 1.13c D2Common+0x6C7E0
 void __fastcall DATATBLS_UnloadLevelsTxt()
 {
 	if (sgptDataTables->pLevelsTxt)
@@ -455,6 +458,7 @@ void __fastcall DATATBLS_LoadLevelDefsBin(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD60D60
+// not-1.13c: inlined in UnloadAllBins 0x5E870 (the level defs bin unload and the portal level array free)
 void __fastcall DATATBLS_UnloadLevelDefsBin()
 {
 	if (sgptDataTables->pLevelDefBin)
@@ -552,6 +556,7 @@ void __fastcall DATATBLS_LoadLevelTypesTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD61450
+// not-1.13c: inlined in UnloadAllBins 0x5E870
 void __fastcall DATATBLS_UnloadLevelTypesTxt()
 {
 	DATATBLS_UnloadBin(sgptDataTables->pLvlTypesTxt);
@@ -579,6 +584,7 @@ bool __stdcall DATATBLS_CheckActInLevelTypesTxt(int nLevelType, uint8_t nAct)
 }
 
 //D2Common.0x6FD61500 (#11227)
+// 1.13c D2Common+0x6CA70
 void __stdcall DATATBLS_GetFileNameFromLevelTypeAndFileId(int nLevelType, int nFile, char* szFile)
 {
 	D2LvlTypesTxt* pLevelTypesTxtRecord = NULL;
@@ -751,6 +757,7 @@ void __fastcall DATATBLS_LoadLvlWarpTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD61DD0
+// not-1.13c: inlined in UnloadAllBins 0x5E870
 void __fastcall DATATBLS_UnloadLvlWarpTxt()
 {
 	DATATBLS_UnloadBin(sgptDataTables->pLvlWarpTxt);
@@ -798,6 +805,7 @@ void __fastcall DATATBLS_LoadLvlMazeTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD61F90
+// not-1.13c: inlined in UnloadAllBins 0x5E870
 void __fastcall DATATBLS_UnloadLvlMazeTxt()
 {
 	DATATBLS_UnloadBin(sgptDataTables->pLvlMazeTxt);
@@ -820,6 +828,7 @@ D2LvlMazeTxt* __fastcall DATATBLS_GetLvlMazeTxtRecordFromLevelId(int nLevelId)
 }
 
 //D2Common.0x6FD62020
+// 1.13c D2Common+0x6FBA0
 void __fastcall DATATBLS_LoadLvlSubTxt(HD2ARCHIVE hArchive, int a2, int a3)
 {
 	int nLength = 0;
@@ -1060,12 +1069,14 @@ void DATATBLS_AllocGlobalTileLibraryHashSeam(const D2TileLibraryHashSeam* pSeam)
 }
 
 //D2Common.0x6FD62780
+// 1.13c D2Common+0x6C3A0 (the body is the seam above; the pointer table is native-width in wasm64)
 void __fastcall DATATBLS_AllocGlobalTileLibraryHash()
 {
 	DATATBLS_AllocGlobalTileLibraryHashSeam(nullptr);
 }
 
 //D2Common.0x6FD628A0
+// not-1.13c: inlined in UnloadAllBins 0x5E870
 void __fastcall DATATBLS_FreeGlobalTileLibraryHash()
 {
 	if (sgptDataTables->ppTileLibraryHash)
@@ -1227,6 +1238,7 @@ int __fastcall DATATBLS_GetAutomapCellId(uint32_t dwAutomapLevelType, uint32_t d
 }
 
 //D2Common.0x6FD62E70
+// not-1.13c: inlined in UnloadAllBins 0x5E870
 void __fastcall DATATBLS_FreeAutomap()
 {
 	if (sgptDataTables->pAutoMap)

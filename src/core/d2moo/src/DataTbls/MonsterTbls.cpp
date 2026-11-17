@@ -93,6 +93,7 @@ int __stdcall DATATBLS_GetMonsterChainInfo(int nMonsterId, int* pMaxChainId, int
 }
 
 //D2Common.0x6FD64CD0
+// 1.13c D2Common+0x54130
 void __fastcall DATATBLS_MonStatsSkillModeLinker(char* pSrc, void* pRecord, int nOffset, int nPosition, int nTxtRow, int nTxtColumn)
 {
 	D2MonStatsTxt* pMonStatsTxtRecord = NULL;
@@ -756,12 +757,6 @@ int32_t __stdcall DATATBLS_SetVelocityInMonStatsTxtRecord(int nMonsterId, short 
 	return nMonsterId;
 }
 
-//D2Common.0x6FD68A00
-void __stdcall DATATBLS_ResetGlobalDefaultUnicodeString()
-{
-	sgptDataTables->wszDefault = 0;
-}
-
 //D2Common.0x6FD68A10 (#10651)
 // 0x5A850 in 1.13c: the body is the seam in src/core/d2common/d2common_5a850.cpp (the D2Lang lookup injected)
 const Unicode* DATATBLS_RollRandomUniqueTitleStringSeam(D2UnitStrc* pUnit, const Unicode* (*pfnLookup)(short));
@@ -978,6 +973,7 @@ D2TCExShortStrc* __stdcall DATATBLS_GetTreasureClassExRecordFromActAndDifficulty
 }
 
 //Inlined in DATATBLS_LoadTreasureClassExTxt
+// not-1.13c: inlined in LoadTreasureClassExTxt 0x5A030
 __forceinline void __fastcall DATATBLS_ProcessAdditionalTreasureClassArguments(D2TCExInfoStrc* pTCExInfo, char* szNext, int nCounter, int nItemCounter)
 {
 	char* szTmp = NULL;
@@ -1342,13 +1338,6 @@ void __fastcall DATATBLS_LoadTreasureClassExTxt(HD2ARCHIVE hArchive)
 	DATATBLS_UnloadBin(pTreasureClassExTxt);
 }
 
-//D2Common.0x6FD69B70 (#10656)
-int __stdcall DATATBLS_ShouldNeverCallInExpansion()
-{
-	FOG_DisplayWarning("should never call this function in expansion", __FILE__, __LINE__);
-	return 0;
-}
-
 //D2Common.0x6FD69B90
 // 1.13c D2Common+0x59F70
 void __fastcall DATATBLS_LoadMonItemPercentTxt(HD2ARCHIVE hArchive)
@@ -1366,6 +1355,7 @@ void __fastcall DATATBLS_LoadMonItemPercentTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD69C40
+// not-1.13c: inlined in UnloadAllBins 0x5E870
 void __fastcall DATATBLS_UnloadMonItemPercentTxt()
 {
 	DATATBLS_UnloadBin(sgptDataTables->pMonItemPercentDataTables.pMonItemPercentTxt);
@@ -1373,6 +1363,7 @@ void __fastcall DATATBLS_UnloadMonItemPercentTxt()
 }
 
 //D2Common.0x6FD69C50 (#10662)
+// 1.13c D2Common+0x533E0
 D2MonItemPercentDataTbl* __fastcall DATATBLS_GetMonItemPercentDataTables()
 {
 	return &sgptDataTables->pMonItemPercentDataTables;
@@ -1509,9 +1500,10 @@ void __fastcall DATATBLS_LoadSuperUniquesTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD6A440 (#10668)
+// 1.13c D2Common+0x53370 (no lower-bound check)
 D2SuperUniquesTxt* __stdcall DATATBLS_GetSuperUniquesTxtRecord(int nSuperUniqueId)
 {
-	if (nSuperUniqueId >= 0 && nSuperUniqueId < sgptDataTables->nSuperUniquesTxtRecordCount)
+	if (nSuperUniqueId <sgptDataTables->nSuperUniquesTxtRecordCount)
 	{
 		return &sgptDataTables->pSuperUniquesTxt[nSuperUniqueId];
 	}
@@ -1652,6 +1644,7 @@ D2ItemTypesTxt* __fastcall DATATBLS_GetItemTypesTxtRecord(int nItemType)
 }
 
 //D2Common.0x6FD6B1D0 (#10583)
+// 1.13c D2Common+0x532C0
 D2HirelingTxt* __stdcall DATATBLS_GetHirelingTxtRecordFromIdAndLevel(BOOL bExpansion, int nId, int nLevel)
 {
 	if (nId >= 256)
@@ -1847,6 +1840,7 @@ void __fastcall DATATBLS_LoadNpcTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD6B820 (#10588)
+// 1.13c D2Common+0x53020
 D2NpcTxt* __stdcall DATATBLS_GetNpcTxtRecord(uint32_t dwNpcId)
 {
 	for (int i = 0; i < sgptDataTables->nNpcTxtRecordCount; ++i)
@@ -2432,6 +2426,7 @@ void __fastcall DATATBLS_LoadMonLvlTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD6EDE0
+// 1.13c D2Common+0x52E70
 void __fastcall DATATBLS_MonPresetPlaceLinker(char* pSrc, void* pRecord, int nOffset, int nPosition, int nTxtRow, int nTxtColumn)
 {
 	int nRow = 0;
@@ -2775,6 +2770,7 @@ void __fastcall DATATBLS_CreateItemTypeTreasureClasses()
 }
 
 //D2Common.0x6FD6FBB0
+// 1.13c D2Common+0x54200
 void __fastcall DATATBLS_UnloadSomeMonsterTxts()
 {
 	if (sgptDataTables->pMonEquipTxt)

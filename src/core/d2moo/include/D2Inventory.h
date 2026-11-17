@@ -336,8 +336,6 @@ D2COMMON_DLL_DECL D2UnitStrc* __stdcall INVENTORY_GetNextItem(D2UnitStrc* pItem)
 D2UnitStrc* __stdcall INVENTORY_GetNextGridItem(D2UnitStrc* pItem);
 //D2Common.0x6FD920C0 (#10305)
 D2COMMON_DLL_DECL D2UnitStrc* __stdcall INVENTORY_UnitIsItem(D2UnitStrc* pItem);
-//D2Common.0x6FD920E0 (#10306)
-D2COMMON_DLL_DECL D2UnitGUID __stdcall INVENTORY_GetItemGUID(D2UnitStrc* pItem);
 //D2Common.0x6FD92100 (#10307)
 D2COMMON_DLL_DECL int __stdcall INVENTORY_GetItemNodePage(D2UnitStrc* pItem);
 //D2Common.0x6FD92140 (#10310)

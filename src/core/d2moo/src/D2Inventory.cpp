@@ -688,6 +688,7 @@ D2UnitStrc* __stdcall INVENTORY_GetFirstItem(D2InventoryStrc* pInventory)
 }
 
 //D2Common.0x6FD8E7C0 (#10278)
+// 1.13c D2Common+0x1E170: signature check, then the dword at +0x10; no delta
 D2UnitStrc* __stdcall INVENTORY_GetLastItem(D2InventoryStrc* pInventory)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory))
@@ -866,6 +867,7 @@ BOOL __fastcall INVENTORY_FindFreePositionBottomRightToTopLeftWithWeight(D2Inven
 }
 
 //D2Common.0x6FD8EE20
+// 1.13c D2Common+0x1E010: validated, no delta (four-side neighbour count, off-grid side counts its full length, 255 when fully enclosed)
 uint8_t __fastcall INVENTORY_GetPlacementWeight(D2InventoryGridStrc* pInventoryGrid, int nXPos, int nYPos, uint8_t nItemWidth, uint8_t nItemHeight)
 {
 	uint8_t nResult = 0;
@@ -1250,6 +1252,7 @@ BOOL __fastcall INVENTORY_PlaceItemInGrid(D2InventoryStrc* pInventory, D2UnitStr
 }
 
 //D2Common.0x6FD8F600 (#10247)
+// 1.13c D2Common+0x1F1F0
 BOOL __stdcall INVENTORY_CanItemBePlaced(D2InventoryStrc* pInventory, D2UnitStrc* pItem, int nXPos, int nYPos, int nInventoryRecordId, D2UnitStrc** ppExchangeItem, unsigned int* pHoveredItems, uint8_t nPage)
 {
 	*pHoveredItems = 0;
@@ -1289,7 +1292,9 @@ BOOL __stdcall INVENTORY_CanItemBePlaced(D2InventoryStrc* pInventory, D2UnitStrc
 		{
 			if (nX >= pInventoryGrid->nGridWidth)
 			{
-				return FALSE;
+				// 1.13c: running off the right edge ends only this row; the next rows are still scanned (hover count and exchange item keep updating)
+				bFree = FALSE;
+				break;
 			}
 
 			D2UnitStrc* pCurrentItem = pInventoryGrid->ppItems[nX + nY * pInventoryGrid->nGridWidth];
@@ -1395,12 +1400,14 @@ BOOL __stdcall INVENTORY_PlaceItemAtInventoryPage(D2InventoryStrc* pInventory, D
 }
 
 //D2Common.0x6FD8F970 (#10250)
+// 1.13c D2Common+0x1DFF0: empty body, eight argument words, ret 0x20
 void __stdcall INVENTORY_Return(const char* szFile, int nLine, D2InventoryStrc* pInventory, int nX, int nY, int nInventoryRecordId, BOOL bClient, uint8_t nPage)
 {
 	return;
 }
 
 //D2Common.0x6FD8F980 (#10252)
+// 1.13c D2Common+0x1EF90: validated; retail reads the cell position through the shared unit x/y getters (0x1050, 0x1080), same result as the switch below
 D2UnitStrc* __stdcall INVENTORY_GetItemFromInventoryPage(D2InventoryStrc* pInventory, int nGridX, int nGridY, int* pX, int* pY, int nInventoryRecordId, uint8_t nPage)
 {
 	if (!INVENTORY_GetPtrIfValid(pInventory))
@@ -1459,6 +1466,7 @@ BOOL __stdcall INVENTORY_PlaceItemInBodyLoc(D2InventoryStrc* pInventory, D2UnitS
 }
 
 //D2Common.0x6FD8FAE0 (#10257)
+// 1.13c D2Common+0x1E670: signature check, slot 0..12 of the body grid; no delta
 D2UnitStrc* __stdcall INVENTORY_GetItemFromBodyLoc(D2InventoryStrc* pInventory, int nBodyLoc)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory) && INVENTORY_ValidateBodyLoc(nBodyLoc))
@@ -1501,6 +1509,7 @@ void __stdcall INVENTORY_GetSecondWieldingWeapon(D2UnitStrc* pPlayer, D2Inventor
 }
 
 //D2Common.0x6FD8FBB0 (#10256)
+// 1.13c D2Common+0x203B0: slot 5 then slot 4, equippable and weapon-class match; no delta
 BOOL __stdcall INVENTORY_CheckEquipmentForWeaponByClass(D2InventoryStrc* pInventory, int nWeaponClass)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory))
@@ -1552,6 +1561,7 @@ D2UnitStrc* __stdcall INVENTORY_GetLeftHandWeapon(D2InventoryStrc* pInventory)
 }
 
 //D2Common.0x6FD8FD10 (#11301)
+// 1.13c D2Common+0x20270: validated, no delta (weapon in slot 5 and slot 4, return the one that is not the left-hand GUID)
 D2UnitStrc* __stdcall INVENTORY_GetSecondaryWeapon(D2InventoryStrc* pInventory)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory) && pInventory->dwLeftItemGUID != D2UnitInvalidGUID)
@@ -1635,6 +1645,7 @@ D2UnitStrc* __stdcall INVENTORY_GetCompositItem(D2InventoryStrc* pInventory, int
 }
 
 //D2Common.0x6FD8FE80 (#10260)
+// 1.13c D2Common+0x1E630: x position of the item when below 11, else 0; no delta
 int __stdcall INVENTORY_GetBodyLocFromEquippedItem(D2InventoryStrc* pInventory, D2UnitStrc* pItem)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory) && INVENTORY_UnitIsItem(pItem) && pItem->pStaticPath->tGameCoords.nX < 11)
@@ -1657,8 +1668,7 @@ int __stdcall INVENTORY_GetItemsXPosition(D2InventoryStrc* pInventory, D2UnitStr
 	return 0;
 }
 
-// 1.13c D2Common+0x21790
-// The fields the 1.13c body reads: inventory signature and cursor slot, unit type and item data, parent inventory.
+// The fields the 1.13c body (D2Common+0x21790) reads: inventory signature and cursor slot, unit type and item data, parent inventory.
 static_assert(offsetof(D2InventoryStrc, dwSignature) == 0x00);
 static_assert(offsetof(D2InventoryStrc, pCursorItem) == 0x20 + 5 * (sizeof(void*) - 4));
 static_assert(offsetof(D2UnitStrc, dwUnitType) == 0x00);
@@ -1667,6 +1677,7 @@ static_assert(offsetof(D2ItemDataStrc, pExtraData) == 0x5C);
 static_assert(offsetof(D2ItemExtraDataStrc, pParentInv) == 0x00);
 
 //D2Common.0x6FD8FF20 (#10261)
+// 1.13c D2Common+0x21790: validated, no delta
 void __stdcall INVENTORY_SetCursorItem(D2InventoryStrc* pInventory, D2UnitStrc* pItem)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory))
@@ -1796,6 +1807,7 @@ D2UnitStrc* __stdcall INVENTORY_FindEquippedItemForStack(D2InventoryStrc* pInven
 }
 
 //D2Common.0x6FD90130 (#10265)
+// 1.13c D2Common+0x20BC0: owner player picks the layout record, pack grid chain from the check item, book with the same suffix id and room left; no delta
 D2UnitStrc* __stdcall INVENTORY_FindFillableBook(D2InventoryStrc* pInventory, D2UnitStrc* pScrolls, D2UnitStrc* pCheckItem)
 {
 	if (!INVENTORY_GetPtrIfValid(pInventory))
@@ -1868,6 +1880,7 @@ BOOL __stdcall INVENTORY_PlaceItemInBeltSlot(D2InventoryStrc* pInventory, D2Unit
 }
 
 //D2Common.0x6FD902B0 (#10268)
+// 1.13c D2Common+0x1EEE0: not isc/tsc, any of the four belt slots with a matching potion type; no delta
 BOOL __stdcall INVENTORY_HasSimilarPotionInBelt(D2InventoryStrc* pInventory, D2UnitStrc* pPotion)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory) && INVENTORY_UnitIsItem(pPotion))
@@ -2028,9 +2041,10 @@ BOOL __stdcall INVENTORY_GetUseableItemFromBeltSlot(D2InventoryStrc* pInventory,
 }
 
 //D2Common.0x6FD90690 (#10273)
+// 1.13c D2Common+0x1FF40: a null inventory returns before the out pointer is cleared; a bad signature clears it and finds nothing
 BOOL __stdcall INVENTORY_GetEquippedShield(D2InventoryStrc* pInventory, D2UnitStrc** ppItem)
 {
-	if (!INVENTORY_GetPtrIfValid(pInventory))
+	if (!pInventory)
 	{
 		return FALSE;
 	}
@@ -2038,6 +2052,11 @@ BOOL __stdcall INVENTORY_GetEquippedShield(D2InventoryStrc* pInventory, D2UnitSt
 	if (ppItem)
 	{
 		*ppItem = nullptr;
+	}
+
+	if (!INVENTORY_GetPtrIfValid(pInventory))
+	{
+		return FALSE;
 	}
 
 	D2InventoryGridStrc* pInventoryGrid = INVENTORY_GetGrid(pInventory, INVGRID_BODYLOC, &gBodyLocInventoryGridInfo);
@@ -2150,6 +2169,7 @@ BOOL __stdcall INVENTORY_HasBodyArmorEquipped(D2InventoryStrc* pInventory)
 }
 
 //D2Common.0x6FD908A0 (#10276)
+// 1.13c D2Common+0x20B50: validated, no delta (body slot occupied and a free position exists for the occupant)
 BOOL __stdcall INVENTORY_IsItemBodyLocFree(D2InventoryStrc* pInventory, D2UnitStrc* pItem, int nBodyLoc, int nInventoryRecordId)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory) && INVENTORY_ValidateBodyLoc(nBodyLoc))
@@ -2259,7 +2279,7 @@ void __stdcall INVENTORY_AddItemToTradeInventory(D2InventoryStrc* pInventory, D2
 }
 
 //D2Common.0x6FD90AB0 (#10316)
-//TODO: Find a name
+// 1.13c D2Common+0x1DC40: null check, dword at +0x00 (no trace in retail)
 int __stdcall D2Common_10316(D2CorpseStrc* pCorpse)
 {
 	if (pCorpse)
@@ -2267,11 +2287,11 @@ int __stdcall D2Common_10316(D2CorpseStrc* pCorpse)
 		return pCorpse->unk0x00;
 	}
 
-	REMOVE_LATER_Trace("D2Common_10316: nullptr pointer");
 	return 0;
 }
 
 //D2Common.0x6FD90AC0 (#10284)
+// 1.13c D2Common+0x1DE90: signature check, dword at +0x28; no delta
 int __stdcall INVENTORY_GetItemCount(D2InventoryStrc* pInventory)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory))
@@ -2338,6 +2358,7 @@ D2UnitStrc* __stdcall INVENTORY_GetBackPackItemByType(D2InventoryStrc* pInventor
 }
 
 //D2Common.0x6FD90BC0 (#10286)
+// 1.13c D2Common+0x1FD40: body grid chain from the check item on, first item of the type with x < 11; no delta
 D2UnitStrc* __stdcall INVENTORY_GetEquippedItemByType(D2InventoryStrc* pInventory, int nItemType, D2UnitStrc* pCheckItem)
 {
 	if (!INVENTORY_GetPtrIfValid(pInventory))
@@ -2379,6 +2400,7 @@ D2UnitStrc* __stdcall INVENTORY_GetEquippedItemByType(D2InventoryStrc* pInventor
 }
 
 //D2Common.0x6FD90C80 (#10287)
+// 1.13c D2Common+0x1EDF0: item code to class id, body grid chain, first item of the class with x < 11; no delta
 D2UnitStrc* __stdcall INVENTORY_GetEquippedItemByCode(D2InventoryStrc* pInventory, int nItemCode, D2UnitStrc* pCheckItem)
 {
 	int nClassId = 0;
@@ -2421,6 +2443,7 @@ D2UnitStrc* __stdcall INVENTORY_GetEquippedItemByCode(D2InventoryStrc* pInventor
 }
 
 //D2Common.0x6FD90D50 (#11306)
+// 1.13c D2Common+0x1ED00: as 0x1EDF0 on grid 2 (retail passes the same 13x1 size pair for it); no delta
 D2UnitStrc* __stdcall INVENTORY_GetBackPackItemByCode(D2InventoryStrc* pInventory, int nItemCode, D2UnitStrc* pCheckItem)
 {
 	int nClassId = 0;
@@ -2463,6 +2486,7 @@ D2UnitStrc* __stdcall INVENTORY_GetBackPackItemByCode(D2InventoryStrc* pInventor
 }
 
 //D2Common.0x6FD90E20 (#10288)
+// 1.13c D2Common+0x1EC30: body grid chain, set-quality items of the file index with x < 11; no delta
 int __stdcall INVENTORY_GetSetItemEquipCountByFileIndex(D2InventoryStrc* pInventory, int nItemFileIndex)
 {
 	if (!INVENTORY_GetPtrIfValid(pInventory))
@@ -2751,6 +2775,7 @@ D2CorpseStrc* __stdcall INVENTORY_GetFirstCorpse(D2InventoryStrc* pInventory)
 }
 
 //D2Common.0x6FD912B0 (#10297)
+// 1.13c D2Common+0x1DCB0: signature check, dword at +0x3C; no delta
 int __stdcall INVENTORY_GetCorpseCount(D2InventoryStrc* pInventory)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory))
@@ -2762,6 +2787,7 @@ int __stdcall INVENTORY_GetCorpseCount(D2InventoryStrc* pInventory)
 }
 
 //D2Common.0x6FD912D0 (#10313)
+// 1.13c D2Common+0x1DC90: null check, next pointer at +0x0C (no trace in retail)
 D2CorpseStrc* __stdcall INVENTORY_GetNextCorpse(D2CorpseStrc* pCorpse)
 {
 	if (pCorpse)
@@ -2769,11 +2795,11 @@ D2CorpseStrc* __stdcall INVENTORY_GetNextCorpse(D2CorpseStrc* pCorpse)
 		return pCorpse->pNextCorpse;
 	}
 
-	REMOVE_LATER_Trace("INVENTORY_GetNextCorpse: nullptr pointer");
 	return nullptr;
 }
 
 //D2Common.0x6FDAFEA0 (#10314)
+// 1.13c D2Common+0x1DC70: null check, dword at +0x04 (no trace in retail)
 D2UnitGUID __stdcall INVENTORY_GetUnitGUIDFromCorpse(D2CorpseStrc* pCorpse)
 {
 	if (pCorpse)
@@ -2781,12 +2807,11 @@ D2UnitGUID __stdcall INVENTORY_GetUnitGUIDFromCorpse(D2CorpseStrc* pCorpse)
 		return pCorpse->dwUnitId;
 	}
 
-	REMOVE_LATER_Trace("INVENTORY_GetUnitGUIDFromCorpse: nullptr pointer");
 	return 0;
 }
 
 //D2Common.0x6FDB18D0 (#10315)
-//TODO: Find a name
+// 1.13c D2Common+0x1DC50: null check, dword at +0x08
 int __stdcall D2Common_10315(D2CorpseStrc* pCorpse)
 {
 	if (pCorpse)
@@ -2797,7 +2822,7 @@ int __stdcall D2Common_10315(D2CorpseStrc* pCorpse)
 	return 0;
 }
 
-// Helper function
+// 1.13c D2Common+0x1FB50: the slot search over 1..254 for the alternate graphic or the code; 0 when no slot matches
 inline int INVENTORY_GetComponentArrayIndexFromItemsTxtRecord(D2ItemsTxt* pItemsTxtRecord)
 {
 	for (int nCounter = 1; nCounter < kComponentArrayLogicalSize; ++nCounter)
@@ -2808,10 +2833,10 @@ inline int INVENTORY_GetComponentArrayIndexFromItemsTxtRecord(D2ItemsTxt* pItems
 		}
 	}
 
-	return kComponentArrayLogicalSize;
+	return 0;
 }
 
-// Helper function
+// 1.13c D2Common+0x1FB50: the same search with the arm type token as both keys; 0 when no slot matches
 inline int INVENTORY_GetComponentArrayIndexFromArmTypeTxtRecord(D2ArmTypeTxt* pArmTypeTxtRecord)
 {
 	for (int nCounter = 1; nCounter < kComponentArrayLogicalSize; ++nCounter)
@@ -2822,10 +2847,66 @@ inline int INVENTORY_GetComponentArrayIndexFromArmTypeTxtRecord(D2ArmTypeTxt* pA
 		}
 	}
 
-	return kComponentArrayLogicalSize;
+	return 0;
+}
+
+// 1.13c D2Common+0x21300: head and hand items. Slot from the items.txt component byte, forced to 5/6 for the composite right/left hand item.
+static void INVENTORY_UpdateEquippedItemComponent(D2UnitStrc* pPlayer, uint8_t* pComponents, uint8_t* pColor, D2UnitStrc* pItem)
+{
+	D2InventoryStrc* pInventory = pPlayer->pInventory;
+	if (!pInventory)
+	{
+		return;
+	}
+
+	D2UnitStrc* pRightHandItem = INVENTORY_GetCompositItem(pInventory, COMPOSIT_RIGHTHAND);
+	D2UnitStrc* pLeftHandItem = INVENTORY_GetCompositItem(pInventory, COMPOSIT_LEFTHAND);
+
+	D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
+	D2_ASSERT(pItemsTxtRecord);
+
+	uint8_t nComponent = ITEMS_GetComponent(pItem);
+	const int nIndex = INVENTORY_GetComponentArrayIndexFromItemsTxtRecord(pItemsTxtRecord);
+	if (nIndex == 0)
+	{
+		if (nComponent < NUM_COMPONENTS)
+		{
+			pComponents[nComponent] = -1;
+			pColor[nComponent] = -1;
+		}
+		return;
+	}
+
+	if (pItem == pRightHandItem)
+	{
+		nComponent = COMPOSIT_RIGHTHAND;
+	}
+	else if (pItem == pLeftHandItem)
+	{
+		nComponent = COMPOSIT_LEFTHAND;
+	}
+	else if (nComponent >= NUM_COMPONENTS)
+	{
+		return;
+	}
+
+	pComponents[nComponent] = nIndex;
+
+	sub_6FD917B0(pPlayer, pComponents, pColor, pItem);
+
+	uint8_t* pComponentColor = &pColor[nComponent];
+	if (ITEMS_GetColor(pPlayer, pItem, pComponentColor, 0))
+	{
+		++*pComponentColor;
+	}
+	else
+	{
+		*pComponentColor = -1;
+	}
 }
 
 //D2Common.0x6FD912F0 (#10298)
+// 1.13c D2Common+0x21420: the walk stops at the first non-item node; item data +0x44 (body location) 1/4/5 go to the head and hand update, 3 fills the six armor slots
 void __stdcall INVENTORY_GetItemSaveGfxInfo(D2UnitStrc* pPlayer, uint8_t* pComponents, uint8_t* pColor)
 {
 	for (D2UnitStrc* pItem = INVENTORY_GetFirstItem(pPlayer->pInventory); pItem; pItem = INVENTORY_GetNextItem(pItem))
@@ -2835,77 +2916,43 @@ void __stdcall INVENTORY_GetItemSaveGfxInfo(D2UnitStrc* pPlayer, uint8_t* pCompo
 			D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
 			D2_ASSERT(pItemsTxtRecord);
 
-			const uint8_t nBodyLoc = ITEMS_GetBodyLocation(pItem);
-			if (nBodyLoc == BODYLOC_HEAD || nBodyLoc == BODYLOC_RARM || nBodyLoc == BODYLOC_LARM)
+			if (D2ItemDataStrc* pItemData = pItem->pItemData)
 			{
-				if (!ITEMS_CheckType(pItemsTxtRecord->wType[0], ITEMTYPE_CIRCLET) && pPlayer->pInventory)
+				const uint8_t nBodyLoc = pItemData->nBodyLoc;
+				if (nBodyLoc == BODYLOC_HEAD || nBodyLoc == BODYLOC_RARM || nBodyLoc == BODYLOC_LARM)
 				{
-					D2UnitStrc* pRightHandItem = INVENTORY_GetCompositItem(pPlayer->pInventory, COMPOSIT_RIGHTHAND);
-					D2UnitStrc* pLeftHandItem = INVENTORY_GetCompositItem(pPlayer->pInventory, COMPOSIT_LEFTHAND);
-
-					uint8_t nComponent = ITEMS_GetComponent(pItem);
-
-					INVENTORY_InitializeComponentArray();
-
-					const int nIndex = INVENTORY_GetComponentArrayIndexFromItemsTxtRecord(pItemsTxtRecord);
-
-					if (nIndex >= kComponentArrayLogicalSize)
+					if (!ITEMS_CheckType(pItemsTxtRecord->wType[0], ITEMTYPE_CIRCLET))
 					{
-						if (nComponent < NUM_COMPONENTS)
-						{
-							pComponents[nComponent] = -1;
-							pColor[nComponent] = -1;
-						}
+						INVENTORY_UpdateEquippedItemComponent(pPlayer, pComponents, pColor, pItem);
 					}
-					else
+				}
+				else if (nBodyLoc == BODYLOC_TORSO)
+				{
+					uint8_t pArmorComponents[6] = {};
+					for (int i = 0; i < 6; ++i)
 					{
-						if (pItem == pRightHandItem)
-						{
-							nComponent = COMPOSIT_RIGHTHAND;
-						}
-						else if (pItem == pLeftHandItem)
-						{
-							nComponent = COMPOSIT_LEFTHAND;
-						}
-						if (nComponent < NUM_COMPONENTS)
-						{
-							pComponents[nComponent] = nIndex;
+						pArmorComponents[i] = pItemsTxtRecord->nArmorComp[i];
+					}
 
-							sub_6FD917B0(pPlayer, pComponents, pColor, pItem);
+					for (int i = 0; i < NUM_COMPONENTS; ++i)
+					{
+						if (COMPOSIT_IsArmorComponent(i))
+						{
+							D2ArmTypeTxt* pArmTypeTxtRecord = DATATBLS_GetArmTypeTxtRecord(COMPOSIT_GetArmorTypeFromComponent(i, pArmorComponents));
+							D2_ASSERT(pArmTypeTxtRecord);
 
-							uint8_t* pComponentColor = &pColor[nComponent];
-							if (ITEMS_GetColor(pPlayer, pItem, pComponentColor, 0))
+							int nIndex = 0;
+							if (pItem->dwClassId > 0)
 							{
-								++*pComponentColor;
+								nIndex = INVENTORY_GetComponentArrayIndexFromArmTypeTxtRecord(pArmTypeTxtRecord);
+							}
+
+							if (nIndex == 0)
+							{
+								pComponents[i] = -1;
+								pColor[i] = -1;
 							}
 							else
-							{
-								*pComponentColor = -1;
-							}
-						}
-					}
-				}
-			}
-			else if (nBodyLoc == BODYLOC_TORSO)
-			{
-				uint8_t pArmorComponents[6] = {};
-				for(int i = 0; i < 6; ++i)
-				{
-					pArmorComponents[i] = pItemsTxtRecord->nArmorComp[i];
-				}
-
-				for (int i = 0; i < NUM_COMPONENTS; ++i)
-				{
-					if (COMPOSIT_IsArmorComponent(i))
-					{
-						D2ArmTypeTxt* pArmTypeTxtRecord = DATATBLS_GetArmTypeTxtRecord(COMPOSIT_GetArmorTypeFromComponent(i, pArmorComponents));
-						if (pItem->dwClassId > 0)
-						{
-							INVENTORY_InitializeComponentArray();
-
-							const int nIndex = INVENTORY_GetComponentArrayIndexFromArmTypeTxtRecord(pArmTypeTxtRecord);
-
-							if (nIndex < kComponentArrayLogicalSize)
 							{
 								pComponents[i] = nIndex;
 
@@ -2919,16 +2966,6 @@ void __stdcall INVENTORY_GetItemSaveGfxInfo(D2UnitStrc* pPlayer, uint8_t* pCompo
 									*pComponentColor = -1;
 								}
 							}
-							else
-							{
-								pComponents[i] = -1;
-								pColor[i] = -1;
-							}
-						}
-						else
-						{
-							pComponents[i] = -1;
-							pColor[i] = -1;
 						}
 					}
 				}
@@ -2938,6 +2975,7 @@ void __stdcall INVENTORY_GetItemSaveGfxInfo(D2UnitStrc* pPlayer, uint8_t* pCompo
 }
 
 //D2Common.0x6FD915C0
+// 1.13c D2Common+0x1E920: slots 1..3 preset; a record joins when it is a weapon, armor, shield or helm and is not a circlet
 void __fastcall INVENTORY_InitializeComponentArray()
 {
 	if (!gbComponentArrayInitialized)
@@ -2972,10 +3010,10 @@ void __fastcall INVENTORY_InitializeComponentArray()
 			}
 
 			BOOL bNeedsToBeAdded = FALSE;
-			if (ITEMS_CheckType(pItemsTxtRecord->wType[0], ITEMTYPE_WEAPON)
+			if ((ITEMS_CheckType(pItemsTxtRecord->wType[0], ITEMTYPE_WEAPON)
 				|| ITEMS_CheckType(pItemsTxtRecord->wType[0], ITEMTYPE_ARMOR)
 				|| ITEMS_CheckType(pItemsTxtRecord->wType[0], ITEMTYPE_ANY_SHIELD)
-				|| ITEMS_CheckType(pItemsTxtRecord->wType[0], ITEMTYPE_HELM) && !ITEMS_CheckType(pItemsTxtRecord->wType[0], ITEMTYPE_CIRCLET))
+				|| ITEMS_CheckType(pItemsTxtRecord->wType[0], ITEMTYPE_HELM)) && !ITEMS_CheckType(pItemsTxtRecord->wType[0], ITEMTYPE_CIRCLET))
 			{
 				bNeedsToBeAdded = TRUE;
 			}
@@ -3022,7 +3060,7 @@ void __fastcall INVENTORY_InitializeComponentArray()
 }
 
 //D2Common.0x6FD917B0
-//TODO: Find a name
+// 1.13c D2Common+0x20E80: crossbow fills the left hand slot from the composite right hand item, bow with the left hand component fills the right hand slot from the "lit " record; 0 from the slot search clears the slot
 void __fastcall sub_6FD917B0(D2UnitStrc* pUnit, uint8_t* a2, uint8_t* pColor, D2UnitStrc* pItem)
 {
 	D2_ASSERT(pUnit);
@@ -3049,7 +3087,7 @@ void __fastcall sub_6FD917B0(D2UnitStrc* pUnit, uint8_t* a2, uint8_t* pColor, D2
 
 					const int nIndex = INVENTORY_GetComponentArrayIndexFromItemsTxtRecord(pItemsTxtRecord);
 
-					if (nIndex >= kComponentArrayLogicalSize)
+					if (nIndex == 0)
 					{
 						a2[COMPOSIT_LEFTHAND] = -1;
 						pColor[COMPOSIT_LEFTHAND] = -1;
@@ -3073,7 +3111,7 @@ void __fastcall sub_6FD917B0(D2UnitStrc* pUnit, uint8_t* a2, uint8_t* pColor, D2
 
 					const int nIndex = INVENTORY_GetComponentArrayIndexFromItemsTxtRecord(pItemsTxtRecord);
 
-					if (nIndex >= kComponentArrayLogicalSize)
+					if (nIndex == 0)
 					{
 						a2[COMPOSIT_RIGHTHAND] = -1;
 						pColor[COMPOSIT_RIGHTHAND] = -1;
@@ -3109,7 +3147,7 @@ D2UnitStrc* __stdcall INVENTORY_GetNextItem(D2UnitStrc* pItem)
 	return nullptr;
 }
 
-//Inlined at various places
+// not-1.13c: retail has no function for this; the grid-next link (item data +0x70) is read inline at each caller
 D2UnitStrc* __stdcall INVENTORY_GetNextGridItem(D2UnitStrc* pItem)
 {
 	D2ItemExtraDataStrc* pItemExtraData = INVENTORY_GetItemExtraDataFromItem(pItem);
@@ -3128,17 +3166,6 @@ D2UnitStrc* __stdcall INVENTORY_UnitIsItem(D2UnitStrc* pItem)
 	return pItem && pItem->dwUnitType == UNIT_ITEM ? pItem : nullptr;
 }
 
-//D2Common.0x6FD920E0 (#10306)
-D2UnitGUID __stdcall INVENTORY_GetItemGUID(D2UnitStrc* pItem)
-{
-	if (INVENTORY_UnitIsItem(pItem))
-	{
-		return pItem->dwUnitId;
-	}
-
-	return 0;
-}
-
 //D2Common.0x6FD92100 (#10307)
 // 1.13c D2Common+0x1E8C0
 int __stdcall INVENTORY_GetItemNodePage(D2UnitStrc* pItem)
@@ -3153,6 +3180,7 @@ int __stdcall INVENTORY_GetItemNodePage(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD92140 (#10310)
+// 1.13c D2Common+0x1E880: returns the item when its parent inventory is the given one; no delta
 D2UnitStrc* __stdcall INVENTORY_IsItemInInventory(D2InventoryStrc* pInventory, D2UnitStrc* pItem)
 {
 	if (pInventory)
@@ -3168,6 +3196,7 @@ D2UnitStrc* __stdcall INVENTORY_IsItemInInventory(D2InventoryStrc* pInventory, D
 }
 
 //D2Common.0x6FDAFEA0 (#10311)
+// 1.13c D2Common+0x1DEC0: null check, next pointer at +0x04
 D2InventoryNodeStrc* __stdcall INVENTORY_GetNextNode(D2InventoryNodeStrc* pNode)
 {
 	if (pNode)
@@ -3179,6 +3208,7 @@ D2InventoryNodeStrc* __stdcall INVENTORY_GetNextNode(D2InventoryNodeStrc* pNode)
 }
 
 //D2Common.0x6FD90AB0 (#10312)
+// 1.13c D2Common+0x1DEB0: null check, dword at +0x00
 D2UnitGUID __stdcall INVENTORY_GetItemGUIDFromNode(D2InventoryNodeStrc* pNode)
 {
 	if (pNode)
@@ -3212,13 +3242,14 @@ BOOL __stdcall INVENTORY_RemoveAllItems(D2InventoryStrc* pInventory)
 	return TRUE;
 }
 
-// Helper function
+// 1.13c D2Common+0x20D20: items of the first player's list with item data +0x45 (inventory page) 2 must all fit; a non-item node ends the walk
 BOOL __fastcall INVENTORY_CanItemBePlacedInTradeInventory(D2InventoryStrc* pTradeInventory, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2)
 {
-	for (D2UnitStrc* pItem = INVENTORY_GetFirstItem(pPlayer1->pInventory); pItem; pItem = INVENTORY_GetNextItem(pItem))
+	for (D2UnitStrc* pNode = INVENTORY_GetFirstItem(pPlayer1->pInventory); pNode;)
 	{
-		pItem = INVENTORY_UnitIsItem(pItem);
-		if (ITEMS_GetInvPage(pItem) == INVPAGE_TRADE && !INVENTORY_CanItemBePlacedInInventory(pPlayer2, pItem, pTradeInventory))
+		D2UnitStrc* pItem = pNode;
+		pNode = INVENTORY_GetNextItem(pNode);
+		if (pItem->dwUnitType == UNIT_ITEM && pItem->pItemData && pItem->pItemData->nInvPage == INVPAGE_TRADE && !INVENTORY_CanItemBePlacedInInventory(pPlayer2, pItem, pTradeInventory))
 		{
 			return FALSE;
 		}
@@ -3294,6 +3325,7 @@ BOOL __fastcall INVENTORY_CopyUnitItemsToTradeInventory(D2InventoryStrc* pTradeI
 }
 
 //D2Common.0x6FD92490
+// 1.13c D2Common+0x20A30: validated, no delta (inventory grid of the first record, free position, size and bounds check, then the covered cells marked)
 BOOL __fastcall INVENTORY_CanItemBePlacedInInventory(D2UnitStrc* pPlayer, D2UnitStrc* pItem, D2InventoryStrc* pInventory)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory))

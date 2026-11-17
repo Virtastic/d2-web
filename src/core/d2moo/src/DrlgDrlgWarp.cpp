@@ -50,48 +50,53 @@ void __fastcall DRLGWARP_ToggleRoomTilesEnableFlag(D2DrlgRoomStrc* pDrlgRoom, BO
 
 // 1.13c D2Common+0x19810
 //D2Common.0x6FD78810
+// 1.13c D2Common+0x19810 (ECX = drlg room, EAX = level id): only the first tile warping to the level is
+// updated, then it returns; 1.10f kept scanning the rest of the list
 void __fastcall DRLGWARP_UpdateWarpRoomSelect(D2DrlgRoomStrc* pDrlgRoom, int nLevelId)
 {
 	for (D2RoomTileStrc* pRoomTile = pDrlgRoom->pRoomTiles; pRoomTile; pRoomTile = pRoomTile->pNext)
 	{
 		if (pRoomTile->pLvlWarpTxtRecord->dwLevelId == nLevelId)
 		{
+			for (D2DrlgTileDataStrc* i = pRoomTile->unk0x0C; i; i = i->unk0x20)
+			{
+				i->dwFlags &= 0xFFFFFFF7;
+			}
+
 			if (pRoomTile->unk0x0C)
 			{
-				for (D2DrlgTileDataStrc* i = pRoomTile->unk0x0C; i; i = i->unk0x20)
-				{
-					i->dwFlags &= 0xFFFFFFF7;
-				}
-
 				for (D2DrlgTileDataStrc* i = pRoomTile->unk0x10; i; i = i->unk0x20)
 				{
 					i->dwFlags |= 8;
 				}
 			}
+			return;
 		}
 	}
 }
 
 // 1.13c D2Common+0x19860
 //D2Common.0x6FD78870
+// 1.13c D2Common+0x19860 (ECX = drlg room, EAX = level id): first matching tile only, as in the select
 void __fastcall DRLGWARP_UpdateWarpRoomDeselect(D2DrlgRoomStrc* pDrlgRoom, int nLevelId)
 {
 	for (D2RoomTileStrc* pRoomTile = pDrlgRoom->pRoomTiles; pRoomTile; pRoomTile = pRoomTile->pNext)
 	{
 		if (pRoomTile->pLvlWarpTxtRecord->dwLevelId == nLevelId)
 		{
+			for (D2DrlgTileDataStrc* i = pRoomTile->unk0x10; i; i = i->unk0x20)
+			{
+				i->dwFlags &= 0xFFFFFFF7;
+			}
+
 			if (pRoomTile->unk0x10)
 			{
-				for (D2DrlgTileDataStrc* i = pRoomTile->unk0x10; i; i = i->unk0x20)
-				{
-					i->dwFlags &= 0xFFFFFFF7;
-				}
-
 				for (D2DrlgTileDataStrc* i = pRoomTile->unk0x0C; i; i = i->unk0x20)
 				{
 					i->dwFlags |= 8;
 				}
 			}
+			return;
 		}
 	}
 }

@@ -54,8 +54,6 @@ D2COMMON_DLL_DECL void __stdcall DUNGEON_GetSubtileRect(D2ActiveRoomStrc* pRoom,
 D2COMMON_DLL_DECL void __stdcall DUNGEON_GetRGB_IntensityFromRoom(D2ActiveRoomStrc* pRoom, uint8_t* pIntensity, uint8_t* pRed, uint8_t* pGreen, uint8_t* pBlue);
 //D2Common.0x6FD8C240 (#10041)
 D2COMMON_DLL_DECL D2ActiveRoomStrc* __stdcall DUNGEON_FindRoomBySubtileCoordinates(D2DrlgActStrc* pAct, int nX, int nY);
-//D2Common.0x6FD8C290
-BOOL __fastcall DUNGEON_AreSubtileCoordinatesInsideRoom(D2DrlgCoordsStrc* pDrlgCoords, int nX, int nY);
 //D2Common.0x6FD8C2F0 (#10046)
 D2COMMON_DLL_DECL D2ActiveRoomStrc* __stdcall DUNGEON_FindActSpawnLocation(D2DrlgActStrc* pAct, int nLevelId, int nTileIndex, int* pX, int* pY);
 //D2Common.0x6FD8C340 (#10045)
