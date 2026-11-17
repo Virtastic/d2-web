@@ -26,7 +26,7 @@ D2NPCMessageTableStrc gpAct2Q8NpcMessages[] =
 
 
 //D2Game.0x6FCA66F0
-// 1.13c D2Game+0xC4880
+// 1.13c D2Game+0xC4880 (checked against decompile)
 void __fastcall ACT2Q8_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));
@@ -48,6 +48,7 @@ void __fastcall ACT2Q8_InitQuestData(D2QuestDataStrc* pQuestData)
 }
 
 //D2Game.0x6FCA6770
+// 1.13c D2Game+0xC2720 (checked against decompile)
 void __fastcall ACT2Q8_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	if (pQuestArg->nNPCNo == MONSTER_ACT2GUARD5 && pQuestArg->nMessageIndex == 303)
@@ -57,6 +58,7 @@ void __fastcall ACT2Q8_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 }
 
 //D2Game.0x6FCA67B0
+// 1.13c D2Game+0xC2680 (checked against decompile; the quest-10 check is retail's local helper at 0xC21A0)
 void __fastcall ACT2Q8_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	if (!pQuestArg->pTarget || pQuestArg->pTarget->dwClassId != MONSTER_ACT2GUARD5)
@@ -84,6 +86,7 @@ void __fastcall ACT2Q8_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 }
 
 //D2Game.0x6FCA6850
+// 1.13c D2Game+0xC25F0 (checked against decompile)
 bool __fastcall ACT2Q8_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
 	if (nNpcId != MONSTER_ACT2GUARD5)
@@ -104,7 +107,7 @@ bool __fastcall ACT2Q8_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 		&& !QUESTRECORD_GetQuestState(pFlags, QUESTSTATEFLAG_A2Q6, QFLAG_REWARDGRANTED);
 }
 
-//
+// 1.13c D2Game+0xC1960 (returns 0)
 bool __fastcall ACT2Q8_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitStrc* pPlayer, D2BitBufferStrc* pGlobalFlags, D2BitBufferStrc* pFlags, uint8_t* pStatus)
 {
 	return false;

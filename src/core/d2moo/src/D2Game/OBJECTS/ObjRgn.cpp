@@ -122,6 +122,7 @@ void __fastcall OBJRGN_FreeObjectControl(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC7A6B0
+// not-1.13c: retail has no function for this; every caller reads the region array inline (game+0x10F0 -> +0x48 + level*4, e.g. D2Game+0x2F0D0)
 D2ObjectRegionStrc* __fastcall OBJRGN_GetObjectRegionForLevel(D2GameStrc* pGame, int32_t nLevelId)
 {
     return pGame->pObjectControl->pObjectRegion[nLevelId];

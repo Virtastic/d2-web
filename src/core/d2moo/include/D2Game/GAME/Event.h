@@ -93,8 +93,6 @@ void __fastcall sub_6FC34890(D2GameStrc* pGame, D2EventTimerStrc* pTimer);
 void __fastcall sub_6FC349B0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nEvent, EventTimerCallback pCallback);
 //D2Game.0x6FC349F0
 void __fastcall sub_6FC349F0(D2GameStrc* pGame, D2UnitStrc* pUnit);
-//D2Game.0x6FC34A30
-void __fastcall D2GAME_DeleteTimersOnUnit_6FC34A30(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //1.10f: D2Game.0x6FC34A80
 //1.13c: D2Game.6FCAE4D0
 void __fastcall EVENT_FreeEventQueue(D2GameStrc* pGame);

@@ -98,6 +98,7 @@ void __fastcall LEVEL_UpdateUnitsInAdjacentRooms(D2GameStrc* pGame, D2ActiveRoom
 }
 
 //D2Game.0x6FC3BD10
+// 1.13c D2Game+0x9D780 (EAX = room; a missile delete (type 3) is never sent)
 void __fastcall LEVEL_RemoveUnitsExceptClientPlayer(D2ActiveRoomStrc* pRoom, D2ClientStrc* pClient)
 {
     D2_ASSERT(pRoom);
@@ -113,7 +114,7 @@ void __fastcall LEVEL_RemoveUnitsExceptClientPlayer(D2ActiveRoomStrc* pRoom, D2C
     {
         for (D2DrlgDeleteStrc* pDrlgDelete = DUNGEON_GetDrlgDeleteFromRoom(ppRoomList[i]); pDrlgDelete; pDrlgDelete = pDrlgDelete->pNext)
         {
-            if (pDrlgDelete->nUnitType != pUnit->dwUnitType || pDrlgDelete->nUnitGUID != pUnit->dwUnitId)
+            if ((pDrlgDelete->nUnitType != pUnit->dwUnitType || pDrlgDelete->nUnitGUID != pUnit->dwUnitId) && pDrlgDelete->nUnitType != UNIT_MISSILE)
             {
                 D2GAME_PACKETS_SendPacket0x0A_RemoveObject_6FC3D3A0(pClient, 0x0A, pDrlgDelete->nUnitType, pDrlgDelete->nUnitGUID);
             }
@@ -227,8 +228,10 @@ void __fastcall LEVEL_RemoveClientFromAdjacentRooms(D2ActiveRoomStrc* pRoom, D2C
 }
 
 //D2Game.0x6FC3C010
+// 1.13c D2Game+0x9D610 (a null client is fatal 0x7CB; packet 0x03 then packet 0x53, otherwise identical to 1.10f)
 void __fastcall LEVEL_SynchronizeDayNightCycleWithClient(D2GameStrc* pGame, D2ClientStrc* pClient)
 {
+    D2_ASSERT(pClient);
     const uint8_t nAct = CLIENTS_GetActNo(pClient);
     D2GAME_PACKETS_SendPacket0x03_6FC3C810(pClient, 3, nAct, pGame->dwInitSeed, pGame->dwObjSeed, DUNGEON_GetTownLevelIdFromAct(pGame->pAct[nAct]));
 
@@ -257,7 +260,10 @@ void __fastcall LEVEL_ChangeAct(D2GameStrc* pGame, D2ClientStrc* pClient, int32_
     const uint8_t nNewAct = DRLG_GetActNoFromLevelId(nDestinationLevelId);
     D2_ASSERT(nNewAct != pClient->nAct);
 
-    LEVEL_LoadAct(pGame, nNewAct);
+    if (!pGame->pAct[nNewAct])
+    {
+        LEVEL_LoadAct(pGame, nNewAct);
+    }
 
     CLIENTS_SetClientState(pClient, CLIENTSTATE_CHANGING_ACT);
 
@@ -356,13 +362,9 @@ void __fastcall LEVEL_WarpUnit(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t n
 }
 
 //D2Game.0x6FC3C510
+// 1.13c D2Game+0x9D6F0 (no already-loaded early-out here: the callers 0x2BF90 and 0x9DF40 test the slot first)
 void __fastcall LEVEL_LoadAct(D2GameStrc* pGame, uint8_t nAct)
 {
-    if (pGame->pAct[nAct])
-    {
-        return;
-    }
-
     int32_t nTownLevelId = 0;
     if (ARENA_IsInArenaMode(pGame))
     {

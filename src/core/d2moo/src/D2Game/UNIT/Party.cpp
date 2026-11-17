@@ -420,30 +420,45 @@ void __fastcall PARTY_CalculatePickAndDrop(D2UnitStrc* pUnit, int32_t nValue, in
 }
 
 //D2Game.0x6FCBA550
+// 1.13c D2Game+0x9C620
 void __fastcall PARTY_SynchronizeWithClient(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
-    D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__);
-    const int16_t nPartyId = SUNIT_GetPartyId(pUnit);
+    // 1.13c: the player-type and client tests are inlined; the party id comes from the owner helper (0x9BEB0)
+    // and the party from 0x9BD00; each node's unit is found in the game's unit-list hash and skipped when it is the player.
+    if (!pUnit || pUnit->dwUnitType != UNIT_PLAYER || !UNITS_GetPlayerData(pUnit)->pClient)
+    {
+        return;
+    }
+    D2ClientStrc* pClient = UNITS_GetPlayerData(pUnit)->pClient;
+
+    const int16_t nPartyId = PARTY_GetPartyIdForUnitOwner(pGame, pUnit);
     if (nPartyId == -1)
     {
         return;
     }
 
-    D2_ASSERT(pGame);   // 1.13c D2Game+0x9C160 asserts pGame non-null
-
-    for (D2PartyStrc* pParty = pGame->pPartyControl->pParties; pParty; pParty = pParty->pNext)
+    D2PartyStrc* pParty = nullptr;
+    D2_ASSERT(pGame->pPartyControl);
+    for (D2PartyStrc* i = pGame->pPartyControl->pParties; i; i = i->pNext)
     {
-        if (pParty->nPartyId == nPartyId)
+        if (i->nPartyId == nPartyId)
         {
-            for (D2PartyNodeStrc* pPartyNode = pParty->pPartyNodes; pPartyNode; pPartyNode = pPartyNode->pNext)
-            {
-                D2UnitStrc* pPartyMember = SUNIT_GetServerUnit(pGame, UNIT_PLAYER, pPartyNode->nUnitGUID);
-                if (pPartyMember && pPartyMember != pUnit)
-                {
-                    sub_6FC3E200(pClient, pPartyMember);
-                }
-            }
-            return;
+            pParty = i;
+            break;
+        }
+    }
+    if (!pParty)
+    {
+        return;
+    }
+
+    for (D2PartyNodeStrc* pPartyNode = pParty->pPartyNodes; pPartyNode; pPartyNode = pPartyNode->pNext)
+    {
+        D2_ASSERT(pGame);
+        D2UnitStrc* pPartyMember = SUNIT_GetServerUnit(pGame, UNIT_PLAYER, pPartyNode->nUnitGUID);
+        if (pPartyMember && pPartyMember != pUnit)
+        {
+            sub_6FC3E200(pClient, pPartyMember);
         }
     }
 }

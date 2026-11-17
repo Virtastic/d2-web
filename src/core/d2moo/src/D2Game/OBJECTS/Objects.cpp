@@ -256,6 +256,7 @@ D2UnitStrc* __fastcall OBJECTS_SpawnPresetObject(D2GameStrc* pGame, D2ActiveRoom
 }
 
 //D2Game.0x6FC70600
+// 1.13c D2Game+0x2F300
 void __fastcall OBJECTS_InitHandler(D2GameStrc* pGame, D2UnitStrc* pObject, int32_t nUnitId, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY)
 {
     constexpr ObjInitFunction gpObjectInitFnTable[] =
@@ -343,10 +344,8 @@ void __fastcall OBJECTS_InitHandler(D2GameStrc* pGame, D2UnitStrc* pObject, int3
     };
 
 
-    if (!pGame || !pObject)
-    {
-        return;
-    }
+    // 1.13c has no game test; a null unit is the fatal assert (retail 0x2F300 line 0xA48)
+    D2_ASSERT(pObject);
 
     D2ObjectsTxt* pObjectsTxtRecord = UNITS_GetObjectTxtRecordFromObject(pObject);
 
@@ -375,7 +374,7 @@ void __fastcall OBJECTS_InitHandler(D2GameStrc* pGame, D2UnitStrc* pObject, int3
         pObject->pObjectData->InteractType = 0;
     }
 
-    D2GAME_DeleteTimersOnUnit_6FC34A30(pGame, pObject);
+    sub_6FC349F0(pGame, pObject);
 
     if (pObject->dwClassId >= 573)
     {
@@ -389,28 +388,25 @@ void __fastcall OBJECTS_InitHandler(D2GameStrc* pGame, D2UnitStrc* pObject, int3
         exit(-1);
     }
 
-    if (pObjectsTxtRecord->nInitFn < std::size(gpObjectInitFnTable))
+    ObjInitFunction pInitFn = gpObjectInitFnTable[pObjectsTxtRecord->nInitFn];
+    if (pInitFn)
     {
-        ObjInitFunction pInitFn = gpObjectInitFnTable[pObjectsTxtRecord->nInitFn];
-        if (pInitFn)
+        if (IsBadCodePtr((FARPROC)pInitFn))
         {
-            if (IsBadCodePtr((FARPROC)pInitFn))
-            {
-                FOG_DisplayAssert("sgInitTable[ptTypeData->bInitFunction]", __FILE__, __LINE__);
-                exit(-1);
-            }
-
-            D2ObjInitFnStrc pObjInit = {};
-            pObjInit.pGame = pGame;
-            pObjInit.pObject = pObject;
-            pObjInit.pRoom = pRoom;
-            pObjInit.pObjectregion = pGame->pObjectControl;
-            pObjInit.pObjectTxt = pObjectsTxtRecord;
-            pObjInit.nX = nX;
-            pObjInit.nY = nY;
-
-            pInitFn(&pObjInit);
+            FOG_DisplayAssert("sgInitTable[ptTypeData->bInitFunction]", __FILE__, __LINE__);
+            exit(-1);
         }
+
+        D2ObjInitFnStrc pObjInit = {};
+        pObjInit.pGame = pGame;
+        pObjInit.pObject = pObject;
+        pObjInit.pRoom = pRoom;
+        pObjInit.pObjectregion = pGame->pObjectControl;
+        pObjInit.pObjectTxt = pObjectsTxtRecord;
+        pObjInit.nX = nX;
+        pObjInit.nY = nY;
+
+        pInitFn(&pObjInit);
     }
 
     if (pObjectsTxtRecord->nSelectable[pObject->dwAnimMode])
@@ -842,6 +838,7 @@ void __fastcall OBJECTS_InitFunction12_PermanentPortal(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC71360
+// 1.13c D2Game+0x2E750
 void __fastcall OBJECTS_InitFunction08_Torch(D2ObjInitFnStrc* pOp)
 {
     UNITS_ChangeAnimMode(pOp->pObject, OBJMODE_OPENED);
@@ -2049,6 +2046,7 @@ int32_t __fastcall OBJECTS_SpawnWeaponRack(D2GameStrc* pGame, D2ActiveRoomStrc* 
 }
 
 //D2Game.0x6FC740E0
+// 1.13c D2Game+0x2F0D0 (the room gate that opens the body is retail's 0x2EEA0 with its theme roll 0x2EAD0; diffed branch for branch, no delta)
 void __fastcall OBJECTS_PopulationHandler(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom)
 {
     constexpr D2ObjectPopulateStrc stru_6FD2F844[7] =

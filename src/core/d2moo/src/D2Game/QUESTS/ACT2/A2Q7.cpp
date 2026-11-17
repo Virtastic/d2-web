@@ -72,6 +72,7 @@ void __fastcall ACT2Q7_InitQuestData(D2QuestDataStrc* pQuestData)
 }
 
 //D2Game.0x6FCA64B0
+// 1.13c D2Game+0xC4A40 (checked against decompile)
 void __fastcall ACT2Q7_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	if (pQuestArg->nNPCNo != MONSTER_ACT2GUARD4)
@@ -92,6 +93,7 @@ void __fastcall ACT2Q7_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 }
 
 //D2Game.0x6FCA6510
+// 1.13c D2Game+0xC27C0 (checked against decompile)
 void __fastcall ACT2Q7_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	if (!pQuestArg->pTarget || pQuestArg->pTarget->dwClassId != MONSTER_ACT2GUARD4)
@@ -108,6 +110,7 @@ void __fastcall ACT2Q7_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2Q
 }
 
 //D2Game.0x6FCA6540
+// 1.13c D2Game+0xC4900: the three rolls are the retail limited rolls (3 then +2, or 2)
 void __fastcall ACT2Q7_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	if (!pQuestArg->pTarget || pQuestArg->pTarget->dwClassId != MONSTER_ACT2GUARD4)
@@ -122,7 +125,7 @@ void __fastcall ACT2Q7_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 		|| QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A2Q1, QFLAG_REWARDPENDING)
 		|| QUESTS_GetGlobalState(pQuestArg->pGame, QUESTSTATEFLAG_A2Q1, QFLAG_PRIMARYGOALDONE))
 	{
-		QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, MONSTER_ACT2GUARD4, (uint32_t)SEED_RollRandomNumber(&pQuestArg->pPlayer->pSeed) % 3 + 2);
+		QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, MONSTER_ACT2GUARD4, SEED_RollLimitedRandomNumber(&pQuestArg->pPlayer->pSeed, 3) + 2);
 		return;
 	}
 
@@ -130,20 +133,22 @@ void __fastcall ACT2Q7_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 	
 	if (pQuestData8 && !pQuestData8->bNotIntro || QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A2Q7, QFLAG_PRIMARYGOALDONE))
 	{
-		QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, MONSTER_ACT2GUARD4, (uint32_t)SEED_RollRandomNumber(&pQuestArg->pPlayer->pSeed) % 3 + 2);
+		QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, MONSTER_ACT2GUARD4, SEED_RollLimitedRandomNumber(&pQuestArg->pPlayer->pSeed, 3) + 2);
 	}
 	else
 	{
-		QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, MONSTER_ACT2GUARD4, SEED_RollRandomNumber(&pQuestArg->pPlayer->pSeed) & 1);
+		QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, MONSTER_ACT2GUARD4, SEED_RollLimitedRandomNumber(&pQuestArg->pPlayer->pSeed, 2));
 	}
 }
 
 //D2Game.0x6FCA6660
+// 1.13c D2Game+0x2E720 (object init table slot 5: retail's empty body)
 void __fastcall OBJECTS_InitFunction05_Door(D2ObjInitFnStrc* pOp)
 {
 }
 
 //D2Game.0x6FCA6680
+// 1.13c D2Game+0xC2750 (checked against decompile)
 bool __fastcall ACT2Q7_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
 	if (nNpcId != MONSTER_ACT2GUARD4)
@@ -165,7 +170,7 @@ bool __fastcall ACT2Q7_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 	return false;
 }
 
-//
+// 1.13c D2Game+0xC1970 (returns 0)
 bool __fastcall ACT2Q7_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitStrc* pPlayer, D2BitBufferStrc* pGlobalFlags, D2BitBufferStrc* pFlags, uint8_t* pStatus)
 {
 	return false;

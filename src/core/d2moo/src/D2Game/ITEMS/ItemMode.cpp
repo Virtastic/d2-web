@@ -1703,6 +1703,7 @@ void __fastcall sub_6FC44030(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nItem
 }
 
 //D2Game.0x6FC44410
+// 1.13c D2Game+0xD76A0 (diffed step by step: target-flag clear 0xD29F0, item type/mode 4 lookup, page record, free-position vs cell place, socket place, scroll/book learn 0xD4670 -> 0xD43E0 only for a player and a non-stash page, flag clears, trade refresh; no delta)
 int32_t __fastcall D2GAME_PlaceItem_6FC44410(const char* szFile, int32_t nLine, D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nUnitId, int32_t nX, int32_t nY, int32_t a8, int32_t a9, D2InventoryStrc* pInventory)
 {
     if (!pGame || !pPlayer)
@@ -6165,7 +6166,7 @@ void __fastcall sub_6FC4BE80(D2UnitStrc* pUnit, D2GameStrc* pGame, int32_t nUnit
         QUESTS_CreateChainRecord(pGame, pUnit, nQuest - 1);
     }
 
-    D2GAME_DeleteTimersOnUnit_6FC34A30(pGame, pUnit);
+    sub_6FC349F0(pGame, pUnit);
 }
 
 //D2Game.0x6FC4BF00
@@ -6344,7 +6345,7 @@ int32_t __fastcall sub_6FC4C3D0(D2GameStrc* pGame, D2SeedStrc* pSeed, int32_t nL
     return pData->nIndex;
 }
 
-//Inlined in D2Game.0x6FC4C5F0
+// 1.13c D2Game+0x10A20 (the tail after the quality switch: quality 1..9, ethereal roll at format >= 100, quality 1..3 follow-up, autoprefix; diffed against the decompile, no delta)
 int32_t __fastcall sub_6FC4C5F0_End(D2GameStrc* pGame, D2UnitStrc* pItem, D2ItemDropStrc* pItemDrop, D2ItemsTxt* pItemsTxtRecord)
 {
     const int32_t nItemQuality = ITEMS_GetItemQuality(pItem);

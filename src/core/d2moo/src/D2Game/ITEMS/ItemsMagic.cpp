@@ -799,7 +799,7 @@ int32_t __fastcall sub_6FC53CD0(D2UnitStrc* pItem, D2ItemDropStrc* pItemDrop)
     return D2GAME_AssignMagicAffixesForRareItem(pItem, pItemDrop, nMaxAffixesToSpawn);
 }
 
-//D2Game.0x6FC54240
+// 1.13c D2Game+0x132A0 (diffed against the decompile: books table null -> -1, no item row or no table rows -> count, else first row whose scroll/book code equals the item code; no delta)
 int32_t __fastcall sub_6FC54240(D2UnitStrc* pItem, int32_t bScroll)
 {
     D2BookDataTbl* pBookDataTbl = DATATBLS_GetBookDataTables();

@@ -44,6 +44,7 @@ void __fastcall MONSTER_SetAiState(D2UnitStrc* pMonster, int32_t nAiState)
 }
 
 //D2Game.0x6FC601E0
+// not-1.13c: retail inlines this unit-type/pMonsterData guard and the +0x54 read at each caller (setter is AF710, reader e.g. B0BE0)
 int32_t __fastcall MONSTER_GetAiState(D2UnitStrc* pMonster)
 {
     if (pMonster && pMonster->dwUnitType == UNIT_MONSTER && pMonster->pMonsterData)
@@ -64,6 +65,7 @@ void __fastcall MONSTER_SetLevelId(D2UnitStrc* pMonster, int32_t nLevelId)
 }
 
 //D2Game.0x6FC60220
+// not-1.13c: retail inlines the +0x58 read at its callers (e.g. CA490)
 int32_t __fastcall MONSTER_GetLevelId(D2UnitStrc* pMonster)
 {
     if (pMonster && pMonster->dwUnitType == UNIT_MONSTER && pMonster->pMonsterData)
@@ -75,6 +77,7 @@ int32_t __fastcall MONSTER_GetLevelId(D2UnitStrc* pMonster)
 }
 
 //D2Game.0x6FC60240
+// not-1.13c: retail inlines the +0x5C summoner-flag test at its callers (e.g. CA490, CA5B0)
 int32_t __fastcall MONSTER_CheckSummonerFlag(D2UnitStrc* pMonster, uint16_t nFlag)
 {
     if (pMonster && pMonster->dwUnitType == UNIT_MONSTER && pMonster->pMonsterData)
@@ -112,7 +115,7 @@ void __fastcall MONSTER_Initialize(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D
         pMonster->dwFlags |= UNITFLAG_ISVALIDTARGET | UNITFLAG_TARGETABLE;
     }
 
-    D2GAME_DeleteTimersOnUnit_6FC34A30(pGame, pMonster);
+    sub_6FC349F0(pGame, pMonster);
 
     if (pMonster && pMonster->dwUnitType == UNIT_MONSTER && pMonster->pMonsterData)
     {
@@ -140,6 +143,7 @@ void __fastcall MONSTER_Initialize(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D
 }
 
 //Inlined in D2Game.0x6FC603D0
+// not-1.13c: retail inlines the MonProp record bounds check inside AFDB0
 D2MonPropTxt* __fastcall MONSTER_GetMonPropTxtRecord(int32_t nId)
 {
     if (nId >= 0 && nId < sgptDataTables->nMonPropTxtRecordCount)
@@ -237,7 +241,8 @@ void __fastcall MONSTER_InitializeStatsAndSkills(D2GameStrc* pGame, D2ActiveRoom
     {
         if (pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_INTERACT])
         {
-            pUnit->pInventory = SUNITPROXY_GetNpcInventory(pGame, nClassId);
+            int32_t nNpcIndex = 0;
+            pUnit->pInventory = SUNITPROXY_GetNpcRecordFromClassId(pGame, nClassId, &nNpcIndex)->pInventory;
         }
         else
         {

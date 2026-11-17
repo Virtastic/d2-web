@@ -948,7 +948,7 @@ void __fastcall SUNIT_Restore(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ActiveRoom
     UNITS_SetCurrentRoomInvalid(pUnit, 1);
 }
 
-//D2Game.0x6FCBC280
+// 1.13c D2Game+0xE0040 (diffed against the decompile: null unit and non-player unit are fatal, then the client pointer goes into the player data; no delta)
 void __fastcall SUNIT_InitClientInPlayerData(D2UnitStrc* pUnit, D2ClientStrc* pClient)
 {
     D2_ASSERT(pUnit);
@@ -957,7 +957,7 @@ void __fastcall SUNIT_InitClientInPlayerData(D2UnitStrc* pUnit, D2ClientStrc* pC
     UNITS_GetPlayerData(pUnit)->pClient = pClient;
 }
 
-//D2Game.0x6FCBC2E0
+// not-1.13c: retail has no function for this; the null/player-type test and the player-data client read are inlined at every call site (e.g. D2Game+0x8DFD0)
 D2ClientStrc* __fastcall SUNIT_GetClientFromPlayer(D2UnitStrc* pPlayer, const char* szFile, int32_t nLine)
 {
     if (!pPlayer || pPlayer->dwUnitType != UNIT_PLAYER)
@@ -1446,7 +1446,7 @@ void __fastcall SUNIT_IterateLivingPlayers(D2GameStrc* pGame, void(__fastcall* p
     }
 }
 
-//D2Game.0x6FCBCE30
+// not-1.13c: retail has no function for this; the event code writes the unit's timer pointer in place
 void __fastcall SUNIT_SetTimerOnUnit(D2UnitStrc* pUnit, D2EventTimerStrc* pTimer)
 {
     if (pUnit)
@@ -1455,7 +1455,7 @@ void __fastcall SUNIT_SetTimerOnUnit(D2UnitStrc* pUnit, D2EventTimerStrc* pTimer
     }
 }
 
-//D2Game.0x6FCBCE40
+// not-1.13c: retail has no function for this; the event code reads the unit's timer pointer in place
 D2EventTimerStrc* __fastcall SUNIT_GetTimerFromUnit(D2UnitStrc* pUnit)
 {
     if (pUnit)
@@ -2026,7 +2026,7 @@ int32_t __fastcall sub_6FCBD900(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
     return STATLIST_AreUnitsAligned(pTestUnit, i) == 0;
 }
 
-//D2Game.0x6FCBDA10
+// not-1.13c: retail has no function for this; the per-type game unit-list index (type -> list, id & 127) is inlined in SUNIT_Add (D2Game+0xE0F40) and its siblings
 D2UnitStrc** __fastcall SUNIT_GetUnitList(int32_t nUnitType, D2GameStrc* pGame, int32_t nUnitGUID)
 {
     switch (nUnitType)

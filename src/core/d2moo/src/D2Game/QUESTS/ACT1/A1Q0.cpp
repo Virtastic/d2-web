@@ -32,6 +32,7 @@ D2NPCMessageTableStrc gpAct1Q0NpcMessages[] =
 };
 
 
+// 1.13c D2Game+0x62d90 (checked against decompile, no delta; retail leaves +0xE4 alone, our struct has no such field)
 //D2Game.0x6FC977D0
 // 1.13c D2Game+0x62D90
 void __fastcall ACT1Q0_InitQuestData(D2QuestDataStrc* pQuestData)
@@ -49,6 +50,7 @@ void __fastcall ACT1Q0_InitQuestData(D2QuestDataStrc* pQuestData)
 	pQuestData->pfActiveFilter = ACT1Q0_ActiveFilterCallback;
 }
 
+// 1.13c D2Game+0x62490 (checked against decompile, no delta)
 //D2Game.0x6FC97830
 void __fastcall ACT1Q0_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -82,6 +84,7 @@ void __fastcall ACT1Q0_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 	}
 }
 
+// 1.13c D2Game+0x607d0 (checked against decompile, no delta)
 //D2Game.0x6FC978F0
 // 1.13c D2Game+0x607D0
 bool __fastcall ACT1Q0_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
@@ -89,7 +92,7 @@ bool __fastcall ACT1Q0_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 	return nNpcId == MONSTER_WARRIV1 && !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q0, QFLAG_REWARDGRANTED);
 }
 
-//
+// 1.13c D2Game+0x60800 (checked against decompile, no delta)
 bool __fastcall ACT1Q0_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitStrc* pPlayer, D2BitBufferStrc* pGlobalFlags, D2BitBufferStrc* pFlags, uint8_t* pStatus)
 {
 	return false;

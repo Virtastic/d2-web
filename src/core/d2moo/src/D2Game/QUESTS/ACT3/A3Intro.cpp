@@ -40,7 +40,7 @@ D2NPCMessageTableStrc gpAct3IntroNpcMessages[] =
 
 
 //D2Game.0x6FCA68D0
-// 1.13c D2Game+0xE6700
+// 1.13c D2Game+0xE6700 (checked against decompile)
 void __fastcall ACT3Intro_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));
@@ -57,6 +57,7 @@ void __fastcall ACT3Intro_InitQuestData(D2QuestDataStrc* pQuestData)
 }
 
 //D2Game.0x6FCA6930
+// 1.13c D2Game+0xE56E0 (checked against decompile)
 void __fastcall ACT3Intro_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	const int16_t nMessageIndex = pQuestArg->nMessageIndex;
@@ -111,6 +112,7 @@ void __fastcall ACT3Intro_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, 
 }
 
 //D2Game.0x6FCA6A00
+// 1.13c D2Game+0xE55F0 (checked against decompile: class map Ashera 0, Alkor 2, Ormus 3, Meshif 4; index 1 on match, else 0)
 void __fastcall ACT3Intro_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	int32_t nNpcId = -1;
@@ -169,6 +171,7 @@ void __fastcall ACT3Intro_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2
 }
 
 //D2Game.0x6FCA6B00
+// 1.13c D2Game+0xE3040 (checked against decompile)
 bool __fastcall ACT3Intro_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitStrc* pPlayer, D2BitBufferStrc* pGlobalFlags, D2BitBufferStrc* pFlags, uint8_t* pStatus)
 {
 	*pStatus = 0;
@@ -176,6 +179,7 @@ bool __fastcall ACT3Intro_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitSt
 }
 
 //D2Game.0x6FCA6B10
+// 1.13c D2Game+0xE55C0 (checked against decompile)
 bool __fastcall ACT3Intro_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
 	return nNpcId == MONSTER_CAIN3 && !PLRINTRO_GetQuestIntroFlag(pPlayer, pQuest->pGame, MONSTER_CAIN3);

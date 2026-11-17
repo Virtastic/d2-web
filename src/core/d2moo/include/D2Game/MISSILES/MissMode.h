@@ -282,8 +282,6 @@ struct D2SrvDmg14Seam
     uint32_t (*roll)(D2SeedStrc* pSeed, int32_t nMax);
 };
 extern D2SrvDmg14Seam g_d2SrvDmg14;
-//D2Game.0x6FC5F4B0
-D2MonStats2Txt* __fastcall D2GAME_GetMonStats2TxtRecord_6FC5F4B0(int32_t nRecordId);
 //D2Game.0x6FC5F4E0
 void __fastcall MISSMODE_SetDamageFlags(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pDefender, D2DamageStrc* pDamage);
 //D2Game.0x6FC5F6C0

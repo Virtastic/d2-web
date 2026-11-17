@@ -118,6 +118,7 @@ int32_t __fastcall OBJECTS_OperateFunction06_TowerTome(D2ObjOperateFnStrc* pOp, 
 }
 
 //D2Game.0x6FC9CDA0
+// 1.13c D2Game+0x62870 (checked against decompile, no delta)
 int32_t __fastcall ACT1Q5_UnitIterate_StatusCyclerEx(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -133,6 +134,7 @@ int32_t __fastcall ACT1Q5_UnitIterate_StatusCyclerEx(D2GameStrc* pGame, D2UnitSt
 }
 
 //D2Game.0x6FC9CE00
+// 1.13c D2Game+0x61250 (checked against decompile, no delta)
 int32_t __fastcall ACT1Q5_UnitIterate_UpdateQuestStateFlags(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -177,7 +179,7 @@ int32_t __fastcall ACT1Q5_UnitIterate_UpdateQuestStateFlags(D2GameStrc* pGame, D
 }
 
 //D2Game.0x6FC9CED0
-// 1.13c D2Game+0x60F20
+// 1.13c D2Game+0x60F20 (checked against decompile, no delta)
 bool __fastcall ACT1Q5_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
 	D2Act1Quest5Strc* pQuestDataEx = (D2Act1Quest5Strc*)pQuest->pQuestDataEx;
@@ -204,6 +206,7 @@ bool __fastcall ACT1Q5_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 }
 
 //D2Game.0x6FC9CF20
+// 1.13c D2Game+0x60EC0 (checked against decompile, no delta)
 void __fastcall ACT1Q5_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -228,6 +231,7 @@ void __fastcall ACT1Q5_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FC9CFD0
+// 1.13c D2Game+0x65E90 (checked against decompile, no delta)
 void __fastcall ACT1Q5_SpawnTowerChestMissiles(D2QuestDataStrc* pQuestData, D2Act1Quest5Strc* pQuestDataEx)
 {
 	if (!pQuestDataEx->bCountessKilled || pQuestDataEx->bDeathMissilesCreated)
@@ -312,6 +316,7 @@ void __fastcall ACT1Q5_InitQuestData(D2QuestDataStrc* pQuestData)
 }
 
 //D2Game.0x6FC9D3B0
+// 1.13c D2Game+0x64430 (checked against decompile, no delta)
 void __fastcall ACT1Q5_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	const int16_t nMsgId = pQuestArg->nMessageIndex;
@@ -387,6 +392,7 @@ void __fastcall ACT1Q5_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 }
 
 //D2Game.0x6FC9D5D0
+// 1.13c D2Game+0x602A0 (checked against decompile, no delta; retail inlines it into 0x611B0 and 0x64430)
 int32_t __fastcall ACT1Q5_UpdateUnitGUIDLists(D2Act1Quest5Strc* pQuestDataEx, int32_t nUnitGUID, int32_t a3)
 {
 	if (a3)
@@ -426,6 +432,7 @@ int32_t __fastcall ACT1Q5_UpdateUnitGUIDLists(D2Act1Quest5Strc* pQuestDataEx, in
 }
 
 //D2Game.0x6FC9D650
+// 1.13c D2Game+0x611B0 (checked against decompile, no delta)
 void __fastcall ACT1Q5_Callback10_PlayerLeavesGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	D2Act1Quest5Strc* pQuestDataEx = (D2Act1Quest5Strc*)pQuestData->pQuestDataEx;
@@ -585,6 +592,7 @@ void __fastcall ACT1Q5_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 }
 
 //D2Game.0x6FC9D830
+// 1.13c D2Game+0x642D0 (checked against decompile, no delta)
 void __fastcall ACT1Q5_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	D2Act1Quest5Strc* pQuestDataEx = (D2Act1Quest5Strc*)pQuestData->pQuestDataEx;
@@ -664,6 +672,7 @@ void __fastcall ACT1Q5_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2Qu
 }
 
 //D2Game.0x6FC9D970
+// 1.13c D2Game+0x601B0 (checked against decompile, no delta)
 bool __fastcall ACT1Q5_SeqCallback(D2QuestDataStrc* pQuestData)
 {
 	if (pQuestData->fState < 2 && pQuestData->bNotIntro == 1)
@@ -691,6 +700,7 @@ bool __fastcall ACT1Q5_SeqCallback(D2QuestDataStrc* pQuestData)
 }
 
 //D2Game.0x6FC9D9F0
+// 1.13c D2Game+0x68B90 (checked against decompile, no delta; retail's 0x63350 and 0x63270 are inlined here)
 void __fastcall ACT1Q5_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	D2Act1Quest5Strc* pQuestDataEx = (D2Act1Quest5Strc*)pQuestData->pQuestDataEx;
@@ -749,6 +759,7 @@ void __fastcall ACT1Q5_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 }
 
 //D2Game.0x6FC9DBE0
+// 1.13c D2Game+0x60F70 (checked against decompile, no delta)
 int32_t __fastcall ACT1Q5_UnitIterate_SetRewardGranted(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -787,6 +798,7 @@ int32_t __fastcall ACT1Q5_UnitIterate_SetRewardGranted(D2GameStrc* pGame, D2Unit
 }
 
 //D2Game.0x6FC9DC80
+// 1.13c D2Game+0x627A0 (checked against decompile, no delta)
 int32_t __fastcall ACT1Q5_UnitIterate_AttachCompletionSound(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -830,6 +842,7 @@ int32_t __fastcall ACT1Q5_UnitIterate_AttachCompletionSound(D2GameStrc* pGame, D
 }
 
 //D2Game.0x6FC9DD40
+// 1.13c D2Game+0x62760 (checked against decompile, no delta)
 int32_t __fastcall ACT1Q5_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -845,6 +858,7 @@ int32_t __fastcall ACT1Q5_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2Uni
 }
 
 //D2Game.0x6FC9DD90
+// 1.13c D2Game+0x64150 (checked against decompile, no delta)
 int32_t __fastcall ACT1Q5_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	if (!QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A1Q5, QFLAG_PRIMARYGOALDONE))
@@ -862,6 +876,7 @@ int32_t __fastcall ACT1Q5_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameSt
 }
 
 //D2Game.0x6FC9DDE0
+// 1.13c D2Game+0x63210 (checked against decompile, no delta)
 bool __fastcall ACT1Q5_Timer_StatusCycler(D2GameStrc* pGame, D2QuestDataStrc* pQuestData)
 {
 	D2Act1Quest5Strc* pQuestDataEx = (D2Act1Quest5Strc*)pQuestData->pQuestDataEx;
@@ -878,6 +893,7 @@ bool __fastcall ACT1Q5_Timer_StatusCycler(D2GameStrc* pGame, D2QuestDataStrc* pQ
 }
 
 //D2Game.0x6FC9DE10
+// 1.13c D2Game+0x60E00 (checked against decompile, no delta)
 void __fastcall ACT1Q5_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];
@@ -915,6 +931,7 @@ void __fastcall ACT1Q5_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 }
 
 //D2Game.0x6FC9DEE0
+// 1.13c D2Game+0x60DA0 (checked against decompile, no delta)
 void __fastcall OBJECTS_InitFunction04_TowerTome(D2ObjInitFnStrc* pOp)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A1Q5_COUNTESS);
@@ -927,6 +944,7 @@ void __fastcall OBJECTS_InitFunction04_TowerTome(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC9DF30
+// 1.13c D2Game+0x68AB0
 void __fastcall OBJECTS_InitFunction47_CountessChest(D2ObjInitFnStrc* pOp)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A1Q5_COUNTESS);
@@ -942,43 +960,24 @@ void __fastcall OBJECTS_InitFunction47_CountessChest(D2ObjInitFnStrc* pOp)
 		nUnitId = pOp->pObject->dwUnitId;
 	}
 
-	if (pQuestDataEx->nObjectCount <= 0)
+	for (int32_t i = 0; i < pQuestDataEx->nObjectCount; ++i)
 	{
-		if (pQuestDataEx->nObjectCount < 8)
+		if (pQuestDataEx->nObjectGUIDs[i] == nUnitId)
 		{
-			pQuestDataEx->nObjectGUIDs[pQuestDataEx->nObjectCount] = nUnitId;
-			++pQuestDataEx->nObjectCount;
-		}
-
-		ACT1Q5_SpawnTowerChestMissiles(pQuestData, pQuestDataEx);
-
-		if (pQuestDataEx->bCountessKilled && !pQuestDataEx->bDeathMissilesCreated)
-		{
-			EVENT_SetEvent(pQuestData->pGame, pOp->pObject, EVENTTYPE_QUESTFN, pQuestData->pGame->dwGameFrame + 10, 0, 0);
+			return;
 		}
 	}
-	else
+
+	if (pQuestDataEx->nObjectCount < 8)
 	{
-		int32_t nCounter = 0;
-		while (pQuestDataEx->nObjectGUIDs[nCounter] != nUnitId)
-		{
-			++nCounter;
-			if (nCounter >= pQuestDataEx->nObjectCount)
-			{
-				if (pQuestDataEx->nObjectCount < 8)
-				{
-					pQuestDataEx->nObjectGUIDs[pQuestDataEx->nObjectCount] = nUnitId;
-					++pQuestDataEx->nObjectCount;
-				}
+		pQuestDataEx->nObjectGUIDs[pQuestDataEx->nObjectCount] = nUnitId;
+		++pQuestDataEx->nObjectCount;
+	}
 
-				ACT1Q5_SpawnTowerChestMissiles(pQuestData, pQuestDataEx);
+	ACT1Q5_SpawnTowerChestMissiles(pQuestData, pQuestDataEx);
 
-				if (pQuestDataEx->bCountessKilled && !pQuestDataEx->bDeathMissilesCreated)
-				{
-					EVENT_SetEvent(pQuestData->pGame, pOp->pObject, EVENTTYPE_QUESTFN, pQuestData->pGame->dwGameFrame + 10, 0, 0);
-				}
-				return;
-			}
-		}
+	if (pQuestDataEx->bCountessKilled && !pQuestDataEx->bDeathMissilesCreated)
+	{
+		EVENT_SetEvent(pQuestData->pGame, pOp->pObject, EVENTTYPE_QUESTFN, pQuestData->pGame->dwGameFrame + 10, 0, 0);
 	}
 }

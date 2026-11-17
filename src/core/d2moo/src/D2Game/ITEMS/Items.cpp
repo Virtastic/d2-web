@@ -2061,7 +2061,7 @@ D2UnitStrc* __fastcall ITEMS_Duplicate(D2GameStrc* pGame, D2UnitStrc* pItem, D2U
     return pDupe;
 }
 
-//D2Game.0x6FC512C0
+// 1.13c D2Game+0xEA70 (diffed against the decompile: stat 252 read, skip on zero or a pending regen event, regen event type 3 at 2500/n + frame + 1; no delta)
 void __fastcall sub_6FC512C0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     const int32_t nReplenishDurability = STATLIST_UnitGetStatValue(pUnit, STAT_ITEM_REPLENISH_DURABILITY, 0);
@@ -2071,7 +2071,7 @@ void __fastcall sub_6FC512C0(D2GameStrc* pGame, D2UnitStrc* pUnit)
     }
 }
 
-//D2Game.0x6FC51310
+// 1.13c D2Game+0xEA10 (diffed against the decompile: same as the durability twin on stat 253; no delta)
 void __fastcall sub_6FC51310(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     const int32_t nReplenishQuantity = STATLIST_UnitGetStatValue(pUnit, STAT_ITEM_REPLENISH_QUANTITY, 0);
@@ -2770,7 +2770,7 @@ void __fastcall ITEMS_DestroyRunewordStatList(D2GameStrc* pGame, D2UnitStrc* pIt
     }
 }
 
-//D2Game.0x6FC52410
+// 1.13c D2Game+0x13DE0 (diffed against the decompile: class from the staff mods, 0..6 bound, class skill count, class first skill, format 0 vs the ilvl-flag path; no delta)
 void __fastcall sub_6FC52410(D2UnitStrc* pUnit, D2ItemDropStrc* pItemDrop)
 {
     const int32_t nClassId = ITEMS_GetStaffMods(pUnit);

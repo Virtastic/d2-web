@@ -612,13 +612,6 @@ void __fastcall SUNITPROXY_InitializeNpcEventChain(D2GameStrc* pGame, D2UnitStrc
     }
 }
 
-//D2Game.0x6FCCC860
-D2InventoryStrc* __fastcall SUNITPROXY_GetNpcInventory(D2GameStrc* pGame, int32_t nNpc)
-{
-    int32_t nUnused = 0;
-    return SUNITPROXY_GetNpcRecordFromClassId(pGame, nNpc, &nUnused)->pInventory;
-}
-
 //D2Game.0x6FCCC8B0
 D2SeedStrc* __fastcall SUNITPROXY_GetSeedFromNpcControl(D2GameStrc* pGame)
 {

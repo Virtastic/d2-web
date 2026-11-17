@@ -26,7 +26,7 @@ D2NPCMessageTableStrc gpAct4Q0NpcMessages[] =
 
 
 //D2Game.0x6FCAD6F0
-// 1.13c D2Game+0xB9D80
+// 1.13c D2Game+0xB9D80 (checked against decompile, no delta)
 void __fastcall ACT4Q0_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));
@@ -43,6 +43,7 @@ void __fastcall ACT4Q0_InitQuestData(D2QuestDataStrc* pQuestData)
 }
 
 //D2Game.0x6FCAD750
+// 1.13c D2Game+0xB97A0 (checked against decompile, no delta)
 void __fastcall ACT4Q0_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	if (pQuestArg->nNPCNo == MONSTER_TYRAEL2 && pQuestArg->nMessageIndex == 664)
@@ -69,12 +70,13 @@ void __fastcall ACT4Q0_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 }
 
 //D2Game.0x6FCAD800
+// 1.13c D2Game+0xB8B50 (checked against decompile, no delta)
 bool __fastcall ACT4Q0_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
 	return nNpcId == MONSTER_TYRAEL2 && !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A4Q0, QFLAG_REWARDGRANTED);
 }
 
-//
+// 1.13c D2Game+0xB8B80 (checked against decompile, no delta; returns 0)
 bool __fastcall ACT4Q0_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitStrc* pPlayer, D2BitBufferStrc* pGlobalFlags, D2BitBufferStrc* pFlags, uint8_t* pStatus)
 {
 	return false;

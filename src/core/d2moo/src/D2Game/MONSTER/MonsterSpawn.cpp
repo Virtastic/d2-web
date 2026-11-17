@@ -615,6 +615,7 @@ void __fastcall MONSTERSPAWN_EquipAncientBarbarians(D2UnitStrc* pUnit)
 
 //1.10: Inlined
 //1.14d: 0x005B1CF0
+// 1.13c D2Game+0xEE7B0 (compared branch for branch: same base-id cases, quest chains, boss mods and flag writes; the 1.13c UMod and chain ids match; only the ancient-barbarian tail is a separate call here, inlined in retail)
 void __fastcall MONSTERSPAWN_SetupBossMods(D2UnkMonCreateStrc* pMonCreate, D2UnitStrc* pUnit)
 {
     int32_t nMonsterId = pMonCreate->nMonsterId;
@@ -813,6 +814,7 @@ void __fastcall MONSTERSPAWN_SetupNormalMods(D2UnkMonCreateStrc* pMonCreate, D2U
 }
 
 //D2Game.0x6FC69C00
+// 1.13c D2Game+0xEE480: the tentacle base id is tested first; the minion spawns go through the shared spawner (EDDB0) instead of an inline spawn record
 void __fastcall sub_6FC69C00(D2UnkMonCreateStrc* pMonCreate, D2UnitStrc* pUnit)
 {
     D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(pMonCreate->nMonsterId);
@@ -829,56 +831,7 @@ void __fastcall sub_6FC69C00(D2UnkMonCreateStrc* pMonCreate, D2UnitStrc* pUnit)
     }
 
     const int32_t nBaseId = pMonStatsTxtRecord->nBaseId;
-    if (nBaseId < 0 || nBaseId >= sgptDataTables->nMonStatsTxtRecordCount || nBaseId != MONSTER_TENTACLEHEAD1)
-    {
-        if (pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_SETBOSS])
-        {
-            AIGENERAL_SetOwnerData(pMonCreate->pGame, pUnit, pUnit ? pUnit->dwUnitId : -1, 1, 1, pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_BOSSXFER]);
-        }
-
-        int32_t nMinionIndex = 0;
-        int32_t nThreshold = 0;
-        if (pMonStatsTxtRecord->wMinion[1] >= 0 && pMonStatsTxtRecord->wMinion[1] < sgptDataTables->nMonStatsTxtRecordCount)
-        {
-            nThreshold = 1;
-        }
-
-        int32_t nMinions = pMonStatsTxtRecord->nPartyMin;
-        if (nMinions < pMonStatsTxtRecord->nPartyMax)
-        {
-            nMinions += ITEMS_RollLimitedRandomNumber(&pUnit->pSeed, pMonStatsTxtRecord->nPartyMax - nMinions + 1);
-        }
-
-        for (int32_t i = 0; i < nMinions; ++i)
-        {
-            D2UnkMonCreateStrc monCreate = {};
-            monCreate.nUnitGUID = 0;
-            monCreate.nAnimMode = 1;
-            monCreate.nMonsterId = pMonStatsTxtRecord->wMinion[nMinionIndex];
-            monCreate.field_20 = 4;
-            monCreate.pRoomCoordList = nullptr;
-            monCreate.pRoom = UNITS_GetRoom(pUnit);
-            monCreate.pGame = pMonCreate->pGame;
-            monCreate.nFlags = 64;
-            monCreate.nX = CLIENTS_GetUnitX(pUnit);
-            monCreate.nY = CLIENTS_GetUnitY(pUnit);
-
-            D2UnitStrc* pMonster = D2GAME_SpawnNormalMonster_6FC68E30(&monCreate);
-            if (pMonster && pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_SETBOSS])
-            {
-                AIGENERAL_SetOwnerData(pMonCreate->pGame, pMonster, pUnit->dwUnitId, 1, 0, 0);
-                AIGENERAL_AllocMinionList(pMonCreate->pGame, pUnit, pMonster);
-            }
-
-            ++nMinionIndex;
-
-            if (nMinionIndex > nThreshold)
-            {
-                nMinionIndex = 0;
-            }
-        }
-    }
-    else
+    if (nBaseId >= 0 && nBaseId < sgptDataTables->nMonStatsTxtRecordCount && nBaseId == MONSTER_TENTACLEHEAD1)
     {
         AIGENERAL_SetOwnerData(pMonCreate->pGame, pUnit, pUnit ? pUnit->dwUnitId : -1, 1, 1, pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_BOSSXFER]);
         int32_t nMinions = pMonStatsTxtRecord->nPartyMin;
@@ -886,8 +839,44 @@ void __fastcall sub_6FC69C00(D2UnkMonCreateStrc* pMonCreate, D2UnitStrc* pUnit)
         {
             nMinions += ITEMS_RollLimitedRandomNumber(&pUnit->pSeed, pMonStatsTxtRecord->nPartyMax - nMinions + 1);
         }
-        // d2-web: 1.13c 0x6FD0E5A6 passes !(nFlags & 4) (shr 2; not; and 1); the upstream expression always gave 0
+        // d2-web: 1.13c passes !(nFlags & 4) (shr 2; not; and 1); the upstream expression always gave 0
         sub_6FC6A8C0(pMonCreate->pGame, pUnit, pMonStatsTxtRecord->wMinion[0], 1, nMinions, (((uint32_t)pMonCreate->nFlags >> 2) & 1) ^ 1, 0x40u);
+        return;
+    }
+
+    if (pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_SETBOSS])
+    {
+        AIGENERAL_SetOwnerData(pMonCreate->pGame, pUnit, pUnit ? pUnit->dwUnitId : -1, 1, 1, pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_BOSSXFER]);
+    }
+
+    int32_t nMinionIndex = 0;
+    int32_t nThreshold = 0;
+    if (pMonStatsTxtRecord->wMinion[1] >= 0 && pMonStatsTxtRecord->wMinion[1] < sgptDataTables->nMonStatsTxtRecordCount)
+    {
+        nThreshold = 1;
+    }
+
+    int32_t nMinions = pMonStatsTxtRecord->nPartyMin;
+    if (nMinions < pMonStatsTxtRecord->nPartyMax)
+    {
+        nMinions += ITEMS_RollLimitedRandomNumber(&pUnit->pSeed, pMonStatsTxtRecord->nPartyMax - nMinions + 1);
+    }
+
+    for (int32_t i = 0; i < nMinions; ++i)
+    {
+        D2UnitStrc* pMonster = sub_6FC68D70(pMonCreate->pGame, pUnit, pMonStatsTxtRecord->wMinion[nMinionIndex], 1, 4, 0x40);
+        if (pMonster && pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_SETBOSS])
+        {
+            AIGENERAL_SetOwnerData(pMonCreate->pGame, pMonster, pUnit->dwUnitId, 1, 0, 0);
+            AIGENERAL_AllocMinionList(pMonCreate->pGame, pUnit, pMonster);
+        }
+
+        ++nMinionIndex;
+
+        if (nMinionIndex > nThreshold)
+        {
+            nMinionIndex = 0;
+        }
     }
 }
 

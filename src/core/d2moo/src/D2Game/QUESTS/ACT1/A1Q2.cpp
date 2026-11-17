@@ -70,6 +70,7 @@ D2NPCMessageTableStrc gpAct1Q2NpcMessages[] =
 };
 
 
+// 1.13c D2Game+0x61ec0 (checked against decompile, no delta)
 //D2Game.0x6FC98450
 void __fastcall ACT1Q2_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -94,6 +95,7 @@ void __fastcall ACT1Q2_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitS
 	}
 }
 
+// 1.13c D2Game+0x60660 (checked against decompile, no delta)
 //D2Game.0x6FC984C0
 // 1.13c D2Game+0x60660
 bool __fastcall ACT1Q2_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
@@ -150,6 +152,7 @@ void __fastcall ACT1Q2_InitQuestData(D2QuestDataStrc* pQuestData)
 	pQuestData->fState = 0;
 }
 
+// 1.13c D2Game+0x63ad0 (checked against decompile, no delta)
 //D2Game.0x6FC98600
 void __fastcall ACT1Q2_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -171,6 +174,7 @@ void __fastcall ACT1Q2_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2Q
 	SUNIT_IterateUnitsOfType(pQuestData->pGame, 0, 0, ACT1Q2_UnitIterate_UpdateQuestStateFlags);
 }
 
+// 1.13c D2Game+0x62c00 (checked against decompile, no delta)
 //D2Game.0x6FC98660
 int32_t __fastcall ACT1Q2_UnitIterate_StatusCyclerEx(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -186,6 +190,7 @@ int32_t __fastcall ACT1Q2_UnitIterate_StatusCyclerEx(D2GameStrc* pGame, D2UnitSt
 	return 0;
 }
 
+// 1.13c D2Game+0x62040 (checked against decompile, no delta)
 //D2Game.0x6FC986D0
 int32_t __fastcall ACT1Q2_UnitIterate_UpdateQuestStateFlags(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -221,6 +226,7 @@ int32_t __fastcall ACT1Q2_UnitIterate_UpdateQuestStateFlags(D2GameStrc* pGame, D
 	return 0;
 }
 
+// 1.13c D2Game+0x68920 (checked against decompile, no delta)
 //D2Game.0x6FC98760
 void __fastcall ACT1Q2_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -275,6 +281,7 @@ void __fastcall ACT1Q2_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 	}
 }
 
+// 1.13c D2Game+0x61f50 (checked against decompile, no delta)
 //D2Game.0x6FC988F0
 void __fastcall ACT1Q2_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -317,6 +324,7 @@ void __fastcall ACT1Q2_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 	}
 }
 
+// 1.13c D2Game+0x65620 (checked against decompile, no delta)
 //D2Game.0x6FC989D0
 void __fastcall ACT1Q2_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -352,6 +360,7 @@ void __fastcall ACT1Q2_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 	QUESTS_SetGlobalState(pQuestArg->pGame, pQuestData->nQuestFilter, QFLAG_PRIMARYGOALDONE);
 }
 
+// 1.13c D2Game+0x63a80 (checked against decompile, no delta)
 //D2Game.0x6FC98AB0
 bool __fastcall ACT1Q2_Timer_StatusCycler(D2GameStrc* pGame, D2QuestDataStrc* pQuestData)
 {
@@ -361,6 +370,7 @@ bool __fastcall ACT1Q2_Timer_StatusCycler(D2GameStrc* pGame, D2QuestDataStrc* pQ
 	return true;
 }
 
+// 1.13c D2Game+0x63930 (checked against decompile, no delta)
 //D2Game.0x6FC98AD0
 int32_t __fastcall ACT1Q2_UnitIterate_SetRewardPending(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -417,6 +427,7 @@ int32_t __fastcall ACT1Q2_UnitIterate_SetRewardPending(D2GameStrc* pGame, D2Unit
 	return 0;
 }
 
+// 1.13c D2Game+0x62bb0 (checked against decompile, no delta)
 //D2Game.0x6FC98C00
 int32_t __fastcall ACT1Q2_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -431,6 +442,7 @@ int32_t __fastcall ACT1Q2_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2Uni
 	return 0;
 }
 
+// 1.13c D2Game+0x62b40 (checked against decompile, no delta)
 //D2Game.0x6FC98C60
 int32_t __fastcall ACT1Q2_UnitIterate_AttachCompletionSound(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -442,6 +454,7 @@ int32_t __fastcall ACT1Q2_UnitIterate_AttachCompletionSound(D2GameStrc* pGame, D
 	return 0;
 }
 
+// 1.13c D2Game+0x64fe0 (checked against decompile, no delta)
 //D2Game.0x6FC98CA0
 int32_t __fastcall ACT1Q2_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -508,6 +521,7 @@ void __fastcall ACT1Q2_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2Qu
 	}
 }
 
+// 1.13c D2Game+0x64e10 (checked against decompile, no delta)
 //D2Game.0x6FC98DD0
 bool __fastcall ACT1Q2_SeqCallback(D2QuestDataStrc* pQuestData)
 {
@@ -536,6 +550,7 @@ bool __fastcall ACT1Q2_SeqCallback(D2QuestDataStrc* pQuestData)
 	return pQuest->pfSeqFilter(pQuest);
 }
 
+// 1.13c D2Game+0x61e30 (checked against decompile, no delta)
 //D2Game.0x6FC98E60
 void __fastcall ACT1Q2_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -563,7 +578,7 @@ void __fastcall ACT1Q2_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 	}
 }
 
-//
+// 1.13c D2Game+0x61f30 (checked against decompile, no delta)
 void __fastcall ACT1Q2_Callback10_PlayerLeavesGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	if (pQuestArg->pPlayer)

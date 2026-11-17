@@ -78,7 +78,7 @@ void __fastcall PLAYER_Create(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nP
     }
 
     SUNIT_InitClientInPlayerData(pPlayer, nullptr);
-    D2GAME_DeleteTimersOnUnit_6FC34A30(pGame, pPlayer);
+    sub_6FC349F0(pGame, pPlayer);
     ARENA_AllocArenaUnit(pGame, pPlayer);
     PLAYERPETS_AllocPetList(pGame, pPlayer);
     sub_6FCBDD30(pPlayer, 2u, 1);
@@ -159,9 +159,16 @@ void __fastcall PLAYER_RemoveAllPlayers(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC7B7A0
+// 1.13c D2Game+0x37E20: asserts pGame, inlines the cursor-item gate of the mode change (a held cursor item skips it), then arms the two frame events
 void __fastcall sub_6FC7B7A0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
-    sub_6FC817D0(pGame, pUnit, nullptr, PLRMODE_NEUTRAL, nX, nY, 1);
+    D2_ASSERT(pGame);
+
+    if (!pUnit->pInventory || !INVENTORY_GetCursorItem(pUnit->pInventory))
+    {
+        sub_6FC817D0(pGame, pUnit, nullptr, PLRMODE_NEUTRAL, nX, nY, 1);
+    }
+
     EVENT_SetEvent(pGame, pUnit, EVENTTYPE_STATREGEN, pGame->dwGameFrame + 1, 0, 0);
     EVENT_SetEvent(pGame, pUnit, EVENTTYPE_DELAYEDPORTAL, pGame->dwGameFrame + 250, 0, 0);
 }
@@ -303,6 +310,7 @@ void __fastcall PLAYER_CreateStartItemsFromCharStatsTxt(D2UnitStrc* pPlayer, D2G
 }
 
 //D2Game.0x6FC7BC90
+// 1.13c D2Game+0x37C90 (compared branch for branch, identical: equip packet for page 3, container packet for page 1, belt packet for page 2, owner re-resolved each time)
 void __fastcall PLAYER_SynchronizeItemsToClient(D2UnitStrc* pUnit, D2ClientStrc* pClient)
 {
     D2_ASSERT(pUnit->pInventory);

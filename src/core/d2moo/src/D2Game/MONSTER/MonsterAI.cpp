@@ -289,6 +289,7 @@ void __fastcall MONSTERAI_UpdateMercStatsAndSkills(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FC61980
+// not-1.13c: retail inlines the pool allocation in the monster init at its caller
 D2MonsterInteractStrc* __fastcall MONSTERAI_AllocMonsterInteract(D2GameStrc* pGame)
 {
     D2MonsterInteractStrc* pMonInteract = D2_ALLOC_STRC_POOL(pGame->pMemoryPool, D2MonsterInteractStrc);
@@ -347,6 +348,7 @@ int32_t __fastcall MONSTERAI_HasInteractUnit(D2MonsterInteractStrc* pMonInteract
 }
 
 //D2Game.0x6FC61A30
+// not-1.13c: retail inlines this interact-list walk at its callers
 int32_t __fastcall MONSTERAI_IsInteractingWith(D2MonsterInteractStrc* pMonInteract, D2UnitStrc* pUnit)
 {
     for (D2InteractInfoStrc* i = pMonInteract->pInteractInfo; i; i = i->pNext)

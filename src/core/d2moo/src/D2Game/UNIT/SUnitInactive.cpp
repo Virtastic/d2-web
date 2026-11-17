@@ -488,7 +488,7 @@ static void __fastcall SUNITINACTIVE_RestoreInactiveRest(D2GameStrc* pGame, D2Ac
 	}
 }
 
-//D2Game.0x6FCC40D0
+// not-1.13c: retail has no function for this; the monster-type test and the monster-data AI control read are inlined at every call site
 D2AiControlStrc* __fastcall AIGENERAL_GetAiControlFromUnit(D2UnitStrc* pUnit)
 {
 	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)

@@ -617,17 +617,12 @@ void __fastcall D2GAME_OBJMODE_InvokeEventFunction_6FC75250(D2GameStrc* pGame, D
     gpEventFunctions_6FD28CD8[nEventType](pGame, pObject);
 }
 
-//D2Game.0x6FC752A0
+// 1.13c D2Game+0x6A0D0 (diffed against the decompile: the 0x0E packet carries the targetable bit as 0/1, the id is -1 only
+// for a null unit, the anim mode is read unguarded; the subclass-4 and shrine branches are unchanged)
 void __fastcall sub_6FC752A0(D2UnitStrc* pUnit, D2ClientStrc* pClient)
 {
-    int32_t bTargetable = 0;
-    int32_t nObjectGUID = -1;
-
-    if (pUnit)
-    {
-        nObjectGUID = pUnit->dwUnitId;
-        bTargetable = pUnit->dwFlags & UNITFLAG_TARGETABLE;
-    }
+    int32_t nObjectGUID = pUnit ? pUnit->dwUnitId : -1;
+    int32_t bTargetable = pUnit ? ((pUnit->dwFlags >> 1) & 1) : 0;
 
     D2GAME_PACKETS_SendPacket0x0E_6FC3C8E0(pClient, 0xEu, 2, nObjectGUID, 3, bTargetable, (uint16_t)pUnit->dwAnimMode);
 
@@ -657,7 +652,8 @@ void __fastcall sub_6FC752A0(D2UnitStrc* pUnit, D2ClientStrc* pClient)
     }
 }
 
-//D2Game.0x6FC75350
+// 1.13c D2Game+0x6B200 (diffed against the decompile: bits 0, 10, 8 of the flag word then the flag-ex bit 0 inventory
+// walk, then the unconditional tail; same order and arguments, no delta)
 void __fastcall sub_6FC75350(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient)
 {
     if (pUnit)

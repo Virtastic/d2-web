@@ -820,6 +820,7 @@ void __fastcall GAME_SendGameInit(int32_t nClientId, char* szGameName, uint8_t n
 }
 
 //D2Game.0x6FC369C0
+// 1.13c D2Game+0x2C120 (compared branch for branch, identical: pairwise unit sync, corpse packets, own sync, arena scores)
 void __fastcall sub_6FC369C0(D2GameStrc* pGame, D2ClientStrc* pClient)
 {
     D2UnitStrc* pNewUnit = CLIENTS_GetPlayerFromClient(pClient, 0);
@@ -940,7 +941,10 @@ void __fastcall GAME_SendActInit(int32_t nClientId)
         {
             D2_ASSERT(pClient);
 
-            LEVEL_LoadAct(pGame, pClient->nAct);
+            if (!pGame->pAct[pClient->nAct])
+            {
+                LEVEL_LoadAct(pGame, pClient->nAct);
+            }
             LEVEL_SynchronizeDayNightCycleWithClient(pGame, pClient);
             CLIENTS_SetClientState(pClient, CLIENTSTATE_ACT_INIT_SENT);
             GAME_LogMessage(6, "[SERVER]  SrvSendActInit:        Sent act init to client %d '%s' for game %d '%s'", pClient->dwClientId, pClient->szName, pGame->nGameId, pGame->szGameName);

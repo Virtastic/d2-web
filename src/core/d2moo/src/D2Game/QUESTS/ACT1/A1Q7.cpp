@@ -73,6 +73,7 @@ void __fastcall ACT1Q7_InitQuestData(D2QuestDataStrc* pQuestData)
 }
 
 //D2Game.0x6FC9EFA0
+// 1.13c D2Game+0x624D0
 void __fastcall ACT1Q7_Callback00_NpcActivate(D2QuestDataStrc* pQuest, D2QuestArgStrc* pQuestArg)
 {
 	if (!pQuestArg->pTarget || pQuestArg->pTarget->dwClassId != MONSTER_NAVI)
@@ -112,7 +113,7 @@ bool __fastcall ACT1Q7_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 		&& !QUESTRECORD_GetQuestState(pFlags, QUESTSTATEFLAG_A1Q1, QFLAG_REWARDPENDING);
 }
 
-//
+// 1.13c D2Game+0x60170
 bool __fastcall ACT1Q7_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitStrc* pPlayer, D2BitBufferStrc* pGlobalFlags, D2BitBufferStrc* pFlags, uint8_t* pStatus)
 {
 	return false;

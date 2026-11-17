@@ -82,6 +82,7 @@ D2NPCMessageTableStrc gpAct1Q1NpcMessages[] =
 };
 
 
+// 1.13c D2Game+0x621b0 (checked against decompile, no delta)
 //D2Game.0x6FC97920
 void __fastcall ACT1Q1_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -106,12 +107,14 @@ void __fastcall ACT1Q1_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitS
 	}
 }
 
+// not-1.13c: retail has no such function, the quest packet builders read pQuestDataEx+0x88 inline (D2Game+0x354f0)
 //D2Game.0x6FC97990
 int32_t __fastcall ACT1Q1_GetMonstersToBeKilled(D2QuestDataStrc* pQuestData)
 {
 	return ((D2Act1Quest1Strc*)pQuestData->pQuestDataEx)->nMonstersLeft;
 }
 
+// 1.13c D2Game+0x60750 (checked against decompile, no delta)
 //D2Game.0x6FC979A0
 // 1.13c D2Game+0x60750
 bool __fastcall ACT1Q1_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
@@ -164,10 +167,11 @@ void __fastcall ACT1Q1_InitQuestData(D2QuestDataStrc* pQuestData)
 	QUESTS_ResetPlayerGUIDCount(&pQuestDataEx->pQuestGUID);
 }
 
+// 1.13c D2Game+0x63c40 (retail does not test the argument block itself)
 //D2Game.0x6FC97AE0
 void __fastcall ACT1Q1_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
-	if (!pQuestArg || !pQuestArg->pTarget || pQuestArg->pTarget->dwClassId != MONSTER_AKARA)
+	if (!pQuestArg->pTarget || pQuestArg->pTarget->dwClassId != MONSTER_AKARA)
 	{
 		return;
 	}
@@ -184,6 +188,7 @@ void __fastcall ACT1Q1_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2Q
 	pQuestData->pfCallback[QUESTEVENT_NPCDEACTIVATE] = nullptr;
 }
 
+// 1.13c D2Game+0x62d30 (checked against decompile, no delta)
 //D2Game.0x6FC97B30
 int32_t __fastcall ACT1Q1_UnitIterate_StatusCyclerEx(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -199,6 +204,7 @@ int32_t __fastcall ACT1Q1_UnitIterate_StatusCyclerEx(D2GameStrc* pGame, D2UnitSt
 	return 0;
 }
 
+// 1.13c D2Game+0x65260 (retail also sets the two flags of quest slot 0x29 when the reward is taken)
 //D2Game.0x6FC97BA0
 void __fastcall ACT1Q1_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -244,6 +250,8 @@ void __fastcall ACT1Q1_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 
 		QUESTRECORD_SetQuestState(pQuestFlags, pQuestData->nQuestFilter, QFLAG_REWARDGRANTED);
 		QUESTRECORD_ClearQuestState(pQuestFlags, pQuestData->nQuestFilter, QFLAG_REWARDPENDING);
+		QUESTRECORD_SetQuestState(pQuestFlags, 0x29, QFLAG_PRIMARYGOALDONE);
+		QUESTRECORD_SetQuestState(pQuestFlags, 0x29, QFLAG_REWARDPENDING);
 		QUESTRECORD_ResetIntermediateStateFlags(pQuestFlags, pQuestData->nQuestFilter);
 		STATLIST_AddUnitStat(pQuestArg->pPlayer, STAT_SKILLPTS, 1, 0);
 
@@ -252,6 +260,7 @@ void __fastcall ACT1Q1_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 	}
 }
 
+// 1.13c D2Game+0x62370 (checked against decompile, no delta)
 //D2Game.0x6FC97D30
 int32_t __fastcall ACT1Q1_UnitIterate_UpdateQuestStateFlags(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -287,6 +296,7 @@ int32_t __fastcall ACT1Q1_UnitIterate_UpdateQuestStateFlags(D2GameStrc* pGame, D
 	return 0;
 }
 
+// 1.13c D2Game+0x62220 (checked against decompile, no delta)
 //D2Game.0x6FC97DC0
 void __fastcall ACT1Q1_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -320,6 +330,7 @@ void __fastcall ACT1Q1_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 	}
 }
 
+// 1.13c D2Game+0x65760 (retail writes only the low byte of dwFlags)
 //D2Game.0x6FC97ED0
 void __fastcall ACT1Q1_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -351,13 +362,13 @@ void __fastcall ACT1Q1_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 		{
 			if (pQuestData->fLastState == 4 && pQuestDataEx->nMonstersLeft > 5)
 			{
-				pQuestData->dwFlags = 0x00000020;
+				pQuestData->dwFlags = (pQuestData->dwFlags & 0xFFFFFF00) | 0x20;
 				QUESTS_UnitIterate(pQuestData, 4, 0, ACT1Q1_UnitIterate_StatusCyclerEx, 1);
 			}
 		}
 		else
 		{
-			pQuestData->dwFlags = 0x00000020;
+			pQuestData->dwFlags = (pQuestData->dwFlags & 0xFFFFFF00) | 0x20;
 			QUESTS_UnitIterate(pQuestData, 4, 0, ACT1Q1_UnitIterate_StatusCyclerEx, 1);
 			pQuestData->pfCallback[QUESTEVENT_NPCDEACTIVATE] = nullptr;
 		}
@@ -384,6 +395,7 @@ void __fastcall ACT1Q1_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 	}
 }
 
+// 1.13c D2Game+0x62cd0 (checked against decompile, no delta)
 //D2Game.0x6FC980C0
 int32_t __fastcall ACT1Q1_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -400,6 +412,7 @@ int32_t __fastcall ACT1Q1_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2Uni
 	return 0;
 }
 
+// 1.13c D2Game+0x62c60 (checked against decompile, no delta)
 //D2Game.0x6FC98120
 int32_t __fastcall ACT1Q1_UnitIterate_AttachCompletionSound(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -411,6 +424,7 @@ int32_t __fastcall ACT1Q1_UnitIterate_AttachCompletionSound(D2GameStrc* pGame, D
 	return 0;
 }
 
+// 1.13c D2Game+0x65200 (checked against decompile, no delta)
 //D2Game.0x6FC98160
 int32_t __fastcall ACT1Q1_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
@@ -428,6 +442,7 @@ int32_t __fastcall ACT1Q1_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameSt
 	return 0;
 }
 
+// 1.13c D2Game+0x63b50 (checked against decompile, no delta)
 //D2Game.0x6FC981B0
 bool __fastcall ACT1Q1_Timer_StatusCycler(D2GameStrc* pGame, D2QuestDataStrc* pQuestData)
 {
@@ -444,6 +459,7 @@ bool __fastcall ACT1Q1_Timer_StatusCycler(D2GameStrc* pGame, D2QuestDataStrc* pQ
 	return 1;
 }
 
+// 1.13c D2Game+0x65040 (checked against decompile, no delta)
 //D2Game.0x6FC981E0
 void __fastcall ACT1Q1_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -507,6 +523,7 @@ void __fastcall ACT1Q1_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2Qu
 	}
 }
 
+// 1.13c D2Game+0x606e0 (retail validates its own sequence pointer, not the target quest's)
 //D2Game.0x6FC98330
 bool __fastcall ACT1Q1_SeqCallback(D2QuestDataStrc* pQuestData)
 {
@@ -521,7 +538,7 @@ bool __fastcall ACT1Q1_SeqCallback(D2QuestDataStrc* pQuestData)
 		return false;
 	}
 
-	if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
+	if (IsBadCodePtr((FARPROC)pQuestData->pfSeqFilter))
 	{
 		FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
 		exit(-1);
@@ -530,6 +547,7 @@ bool __fastcall ACT1Q1_SeqCallback(D2QuestDataStrc* pQuestData)
 	return pQuest->pfSeqFilter(pQuest);
 }
 
+// 1.13c D2Game+0x620e0 (checked against decompile, no delta)
 //D2Game.0x6FC983A0
 void __fastcall ACT1Q1_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -557,13 +575,14 @@ void __fastcall ACT1Q1_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 	}
 }
 
+// not-1.13c: retail has no such function, the status builder tests bNotIntro && fState >= 4 inline (D2Game+0x35090)
 //D2Game.0x6FC98430
 bool __fastcall ACT1Q1_CanClientFXBeTriggered(D2QuestDataStrc* pQuestData)
 {
 	return pQuestData->bNotIntro && pQuestData->fState >= 4;
 }
 
-//
+// 1.13c D2Game+0x62170 (checked against decompile, no delta)
 void __fastcall ACT1Q1_Callback10_PlayerLeavesGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	QUESTS_FastRemovePlayerGUID(&pQuestData->tPlayerGUIDs, (pQuestArg->pPlayer ? pQuestArg->pPlayer->dwUnitId : -1));

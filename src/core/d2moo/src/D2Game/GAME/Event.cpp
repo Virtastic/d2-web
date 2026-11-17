@@ -15,6 +15,7 @@
 extern "C" void D2WEB_RecordSessionAiThinkEvent(D2GameStrc* pGame, uint32_t unitId, uint32_t frame);
 
 
+// not-1.13c: retail inlines the unit-type to queue-index table at each use in the timer functions (8E420-8EA80)
 __forceinline int32_t EVENT_MapUnitTypeToIndex(int32_t nUnitType)
 {
     static const int32_t dword_6FD27D6C[] =
@@ -127,6 +128,12 @@ void __fastcall sub_6FC349B0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nEven
 // 1.13c D2Game+0x8E880
 void __fastcall sub_6FC349F0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+    // 1.13c has one function for the 1.10f pair (sub_6FC349F0 + D2GAME_DeleteTimersOnUnit_6FC34A30): a null unit is skipped
+    if (!pUnit)
+    {
+        return;
+    }
+
     D2EventTimerStrc* pEventTimer = SUNIT_GetTimerFromUnit(pUnit);
     while (pEventTimer)
     {
@@ -134,17 +141,6 @@ void __fastcall sub_6FC349F0(D2GameStrc* pGame, D2UnitStrc* pUnit)
         sub_6FC34890(pGame, pEventTimer);
         pEventTimer->pUnit = nullptr;
         pEventTimer = pNext;
-    }
-
-    SUNIT_SetTimerOnUnit(pUnit, nullptr);
-}
-
-//D2Game.0x6FC34A30
-void __fastcall D2GAME_DeleteTimersOnUnit_6FC34A30(D2GameStrc* pGame, D2UnitStrc* pUnit)
-{
-    if (SUNIT_GetTimerFromUnit(pUnit))
-    {
-        sub_6FC349F0(pGame, pUnit);
     }
 
     SUNIT_SetTimerOnUnit(pUnit, nullptr);
@@ -216,6 +212,7 @@ void __fastcall EVENT_IterateEvents(D2GameStrc* pGame)
 // Only differs from EventTimerCallback by return type
 using ExecuteEventCallback = void(__fastcall*)(D2GameStrc*, D2UnitStrc*, D2C_EventTypes, int32_t, int32_t);
 // Helper function
+// not-1.13c: retail has no shared executor; the 1.13c player and monster timer-dispatch functions each carry their own copy of this loop (the d2-web session hook is not in retail)
 static void __fastcall EVENT_ExecuteEventsImpl(ExecuteEventCallback pDefaultCallback, D2GameStrc* pGame, D2EventTimerQueueStrc* pTimerQueue, D2EventTimerStrc* pEventTimer, int32_t a4)
 {
     pTimerQueue->pCurrent = nullptr;
@@ -438,6 +435,7 @@ void __fastcall D2GAME_InitTimer_6FC351D0(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FC353D0
+// not-1.13c: retail inlines this slot lookup (infinite list or expire-frame % 64 bucket) in the timer functions
 D2EventTimerStrc** __fastcall sub_6FC353D0(D2GameStrc* pGame, int32_t nUnitType, int32_t nExpireFrame)
 {
     const int32_t nIndex = EVENT_MapUnitTypeToIndex(nUnitType);
@@ -473,6 +471,7 @@ D2EventTimerSlabListStrc* __fastcall EVENT_AllocTimerSlab(D2GameStrc* pGame)
 }
 
 // Helper function
+// not-1.13c: retail inlines the timer-to-unit link at its callers (8E680)
 static void EVENT_AssignTimerToUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, D2EventTimerStrc* pTimer)
 {
 	pTimer->pUnit = pUnit;

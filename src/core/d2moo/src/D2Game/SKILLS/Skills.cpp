@@ -4287,6 +4287,7 @@ int32_t __fastcall SKILLS_SrvSt18_Attract(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 
+// not-1.13c: retail inlines the States record bounds check at each caller
 D2StatesTxt* __fastcall SKILLS_GetStatesTxtRecord(int32_t nStateId)
 {
     if (nStateId >= 0 && nStateId < sgptDataTables->nStatesTxtRecordCount)
@@ -4297,6 +4298,7 @@ D2StatesTxt* __fastcall SKILLS_GetStatesTxtRecord(int32_t nStateId)
     return nullptr;
 }
 
+// not-1.13c: retail inlines the ItemStatCost record bounds check at each caller
 D2ItemStatCostTxt* __fastcall SKILLS_GetItemStatCostTxtRecord(int32_t nStatId)
 {
     if (nStatId >= 0 && nStatId < sgptDataTables->nItemStatCostTxtRecordCount)

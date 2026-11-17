@@ -166,6 +166,7 @@ void __fastcall ARENA_UpdateScore(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2Un
 }
 
 //D2Game.0x6FC31470
+// 1.13c D2Game+0xB2D90 (EAX = client, EBX = game; the per-client loop is 0xB2C20, the 0x65 send 0xB2760)
 void __fastcall ARENA_SynchronizeWithClients(D2GameStrc* pGame, D2ClientStrc* pClient)
 {
     D2ArenaStrc* pArena = pGame->pArenaCtrl;
@@ -209,6 +210,7 @@ void __fastcall ARENA_SynchronizeWithClients(D2GameStrc* pGame, D2ClientStrc* pC
 }
 
 //D2Game.0x6FC315C0
+// 1.13c D2Game+0xB2D40 (EAX = game, ESI = client; the loop over the clients is 0xB2C20 with its send-all flag set)
 void __fastcall ARENA_SendScoresToClient(D2GameStrc* pGame, D2ClientStrc* pClient)
 {
     for (D2ClientStrc* i = pGame->pClientList; i; i = i->pNext)
@@ -241,6 +243,7 @@ uint32_t __fastcall ARENA_NeedsClientUpdate(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC316D0
+// not-1.13c: retail inlines this flag test (assert, then fFlags & GAMEFLAG_ARENA_MODE) at its callers 0x9D6F0 and 0x9DF40
 uint32_t __fastcall ARENA_IsInArenaMode(D2GameStrc* pGame)
 {
     D2ArenaStrc* pArena = pGame->pArenaCtrl;
