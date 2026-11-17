@@ -105,6 +105,7 @@ int32_t __fastcall MISSMODE_SrvDo17_CairnStones(D2GameStrc* pGame, D2UnitStrc* p
 int32_t __fastcall MISSMODE_SrvDo18_TowerChestSpawner(D2GameStrc* pGame, D2UnitStrc* pMissile);
 //D2Game.0x6FC58860
 int32_t __fastcall MISSMODE_SrvDo20_BladeCreeper(D2GameStrc* pGame, D2UnitStrc* pMissile);
+void __fastcall MISSMODE_MoveMissileToOwner(D2GameStrc* pGame, D2UnitStrc* pMissile);
 //D2Game.0x6FC58940
 int32_t __fastcall MISSMODE_SrvDo21_Distraction(D2GameStrc* pGame, D2UnitStrc* pMissile);
 //D2Game.0x6FC58B00

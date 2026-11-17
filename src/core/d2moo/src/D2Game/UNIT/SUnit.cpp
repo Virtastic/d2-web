@@ -1,4 +1,5 @@
 #include "UNIT/SUnit.h"
+#include <test_seam.h>
 #include <cstdio>
 
 #include <D2BitManip.h>
@@ -680,7 +681,7 @@ D2UnitStrc* __fastcall SUNIT_GetOwner(D2GameStrc* pGame, D2UnitStrc* pUnit)
         return nullptr;
     }
     
-    return SUNIT_GetServerUnit(pGame, pUnit->dwOwnerType, pUnit->dwOwnerGUID);
+    return D2_CALL(SUNIT_GetServerUnit, pGame, pUnit->dwOwnerType, pUnit->dwOwnerGUID);
 }
 
 //D2Game.0x6FCBBC00
