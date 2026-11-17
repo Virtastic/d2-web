@@ -1,3 +1,4 @@
+import './item-name-colour-stub.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { itemTooltipSpec, parseItemLines } from '../play/assets/item-tooltip.mjs';

@@ -27,7 +27,6 @@ const hitTested = () => modules().filter((p) => readFileSync(p, 'utf8').split('\
 
 // File -> the aim(s) or shell probes that reach its controls. The aim names are checked against the source below.
 const COVERED = {
-  'play/assets/belt-renderer.mjs': 'beltAim',
   'play/assets/belt-tooltip.mjs': 'beltAim (beltSlotAt: the hover plan reads the slot the belt aim reaches)',
   'play/assets/byo-door.mjs': 'door-finger.mjs (fingerHit: the door\'s own touch snap, hit(p, touch))',
   'play/assets/door-finger.mjs': 'byo-door.mjs (fingerHit, the front-door snap; not input-touch.mjs)',

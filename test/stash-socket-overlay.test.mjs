@@ -1,3 +1,4 @@
+import './item-name-colour-stub.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStashPanelRenderer } from '../play/assets/stash-panel.mjs';

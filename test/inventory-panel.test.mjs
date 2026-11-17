@@ -1,3 +1,4 @@
+import './item-name-colour-stub.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AMAZON2_EQUIPMENT_LAYOUT, AMAZON2_INVENTORY_LAYOUT, inventoryGridPosition, inventoryItemAsset, inventoryItemAt, parseInventoryItems } from '../play/assets/inventory-panel.mjs';

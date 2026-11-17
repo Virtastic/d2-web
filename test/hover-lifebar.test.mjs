@@ -1,3 +1,4 @@
+import './item-name-colour-stub.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { hoverLife, plateBoxes, platePaintOps, paintHoverPlate } from '../play/assets/hover-lifebar.mjs';
