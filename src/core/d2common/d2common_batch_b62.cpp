@@ -33,7 +33,7 @@ template <class T> static void wr(void* p, size_t o, T v) { std::memcpy((char*)p
 static void* rdp(const void* p, size_t o) { return (void*)(uintptr_t)rd<uint32_t>(p, o); }
 [[noreturn]] static void fatal() { __builtin_trap(); } // retail: Ordinal_10024(msg); _exit(-1)
 
-// 1.13c D2Common+0x35470: register map EDI = pCtx (+0x30 -> pathInfo), ESI only feeds a fatal-code arg.
+// stand-alone copy of D2Common 0x35470: register map EDI = pCtx (+0x30 -> pathInfo), ESI only feeds a fatal-code arg.
 int32_t sub_35470(void* pCtxEDI)
 {
     char* p1 = (char*)rdp(pCtxEDI, 0x30);

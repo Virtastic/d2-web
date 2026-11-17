@@ -12,7 +12,7 @@ static_assert(offsetof(D2DrlgEnvironmentStrc, nRed) == 0x18, "environment nRed")
 static_assert(offsetof(D2DrlgEnvironmentStrc, nGreen) == 0x19, "environment nGreen");
 static_assert(offsetof(D2DrlgEnvironmentStrc, nBlue) == 0x1A, "environment nBlue");
 
-// 1.13c D2Common+0x37520 (#10189): act -> day/night environment -> RGB light color.
+// D2Common 0x37520 (#10189; marker on the d2moo function): act -> day/night environment -> RGB light color.
 // The decompile checks pAct for null (fatal in retail) and reads the environment pointer at act+0x04,
 // i.e. the 1.13c D2DrlgActStrc order (eLevelIdFirst, pEnvironment). Our engine allocates the vendored
 // 1.10f D2DrlgActStrc (DUNGEON_AllocAct), so the member is used and the RGB offsets are pinned above.
@@ -44,7 +44,7 @@ int __stdcall D2Common_2F910_GetDirectionToCoords(D2UnitStrc* pUnit, int nX, int
     return UNITS_GetDirectionToCoords(pUnit, nX, nY);
 }
 
-// 1.13c D2Common+0x23450 (#10208): an item unit's itemTypes.txt nVarInvGfx count (+0x23 of the
+// Export of 1.13c D2Common 0x23450 (#10208), body ITEMS_GetVarInvGfxCount in src/core/d2moo/src/Items/Items.cpp: an item unit's itemTypes.txt nVarInvGfx count (+0x23 of the
 // 0xE4-byte row). Non-item/null -> 0; the type index is items.txt wType[0] via 0x230F0
 // (sign-extended int16, 0 when out of range), then 0 <= nType < nItemTypesTxtRecordCount.
 // The decompile is the vendored 1.10f ITEMS_GetVarInvGfxCount (ordinal 10789) with the rows at

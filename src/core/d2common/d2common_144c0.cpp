@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x144C0 -- placement step (ecx = the work record): zeroes the start direction at +0x138[i] and the direction at +0xFC[i] of the current rectangle i (+0x1EC), then puts rectangle i at the anchor rectangle (index at link-table entry i +8): direction 0 is the anchor x and the anchor bottom edge. Returns 1.
+// (superseded by the d2moo port sub_6FD81AD0; was D2Common+0x144C0) -- placement step (ecx = the work record): zeroes the start direction at +0x138[i] and the direction at +0xFC[i] of the current rectangle i (+0x1EC), then puts rectangle i at the anchor rectangle (index at link-table entry i +8): direction 0 is the anchor x and the anchor bottom edge. Returns 1.
 #include <cstdint>
 #include "../fn/d2game_gp.h"
 namespace d2common {

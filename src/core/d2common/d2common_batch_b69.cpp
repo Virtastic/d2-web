@@ -63,7 +63,7 @@ void sub_69360(void* thisp, void* edi, char* p1, uint32_t p2, void* p3) {
     }
 }
 
-// 1.13c D2Common+0x3E2B0
+// stand-alone twin of D2Common 0x3E2B0 (the proven row runs sub_6FDABA50)
 int sub_3E2B0(uint32_t a, uint32_t b) {
     int dx = static_cast<int>(a & 0xffff) - static_cast<int>(b & 0xffff);
     if (dx < 0) dx = -dx;

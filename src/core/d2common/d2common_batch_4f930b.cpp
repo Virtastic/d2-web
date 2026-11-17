@@ -27,7 +27,7 @@ void D2Common_17AA0_RunActTable0(
     apply(self, index, 0x28, 0x2e);
 }
 
-// 1.13c D2Common+0x17AE0
+// (superseded by the d2moo port DRLGOUTPLACE_CreateAct1LevelConnections; was D2Common+0x17AE0)
 void D2Common_17AE0_RunActTable1(
     void* game, void* self, int index,
     void* tableA, int (*fnA)(), void (*postA)(int*),
@@ -54,7 +54,7 @@ void D2Common_2D4E0_LoadTownTiles(void* drlg, void (*loadTiles)(void*, const cha
     loadTiles(static_cast<uint8_t*>(drlg) + 0xc, path);
 }
 
-// 1.13c D2Common+0x7B8D0
+// retail-layout seam of D2Common 0x7B8D0 (the marker sits on DRLGACTIVATE_InitializeRoomExStatusLists)
 void D2Common_7B8D0_InitDrlgLists(void* drlg) {  // retail pointers are 32-bit: the low 32 bits of the blob address
     auto* base = static_cast<uint8_t*>(drlg);
     put<uint32_t>(drlg, 0xbc, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(base + 0xa0)));

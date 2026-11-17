@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x34D40 (#10488)
+// stand-alone copy of D2Common 0x34D40 (#10488)
 #include <cstdint>
 // Set a dynamic path's velocity. Operates on retail's 32-bit image through the low 32 bits of a wasm address.
 void D2Common_34D40_SetVelocity(uint32_t pPath, int32_t v)

@@ -93,6 +93,7 @@ int __fastcall DRLGOUTDOORS_GetPresetIndexFromGridCell(D2DrlgLevelStrc* pLevel, 
 }
 
 //D2Common.0x6FD7DD40
+// 1.13c D2Common+0x422F0
 void __fastcall DRLGOUTDOORS_AlterAdjacentPresetGridCells(D2DrlgLevelStrc* pLevel, int nX, int nY)
 {
 	DRLGGRID_AlterGridFlag(&pLevel->pOutdoors->pGrid[0], nX, nY, 0, FLAG_OPERATION_OVERWRITE);
@@ -100,6 +101,7 @@ void __fastcall DRLGOUTDOORS_AlterAdjacentPresetGridCells(D2DrlgLevelStrc* pLeve
 }
 
 //D2Common.0x6FD7DD70
+// 1.13c D2Common+0x422A0
 void __fastcall DRLGOUTDOORS_SetBlankGridCell(D2DrlgLevelStrc* pLevel, int nX, int nY)
 {
 	DRLGGRID_AlterGridFlag(&pLevel->pOutdoors->pGrid[0], nX, nY, 0, FLAG_OPERATION_OVERWRITE);
@@ -191,6 +193,7 @@ BOOL __fastcall DRLGOUTDOORS_TestOutdoorLevelPreset(D2DrlgLevelStrc* pLevel, int
 }
 
 //D2Common.0x6FD7DEF0
+// 1.13c D2Common+0x42A70
 void __fastcall DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(D2DrlgLevelStrc* pLevel, int nX, int nY, int nLevelPrestId, int nPickedFile, BOOL bBorder)
 {
 	D2LvlPrestTxt* pLvlPrestTxtRecord = NULL;
@@ -236,11 +239,10 @@ void __fastcall DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(D2DrlgLevelStrc* pLevel, 
 		for (int i = nX; i < nX + nSizeX; ++i)
 		{
 			D2DrlgOutdoorPackedGrid2InfoStrc tPackedInfo{ 0 };
-			tPackedInfo.bHasPickedFile = true;
-			tPackedInfo.nPickedFile = nPickedFile;
 
 			DRLGGRID_AlterGridFlag(&pLevel->pOutdoors->pGrid[2], i, j, 0xF0000, FLAG_OPERATION_AND_NEGATED); // Clear nPickedFile
-			DRLGGRID_AlterGridFlag(&pLevel->pOutdoors->pGrid[2], i, j, tPackedInfo.nPackedValue, FLAG_OPERATION_OR);
+			// retail ORs (nPickedFile << 16) | 0x200 unmasked; the 4-bit bitfield would truncate a larger value
+			DRLGGRID_AlterGridFlag(&pLevel->pOutdoors->pGrid[2], i, j, (int)(((uint32_t)nPickedFile << 16) | 0x200u), FLAG_OPERATION_OR);
 
 			if (bBorder && (nLevelPrestId >= LVLPREST_ACT1_WILD_BORDER_1 && nLevelPrestId <= LVLPREST_ACT1_WILD_BORDER_12 || nLevelPrestId >= LVLPREST_ACT2_DESERT_BORDER_1 && nLevelPrestId <= LVLPREST_ACT2_DESERT_BORDER_12))
 			{

@@ -112,7 +112,7 @@ EMSCRIPTEN_KEEPALIVE void D2Common_7BE90_NormaliseStatus(uint32_t pRoom, const D
 	wr8(pRoom, 0x44, nRealStatus);
 }
 
-// 1.13c D2Common+0x7C090 (1.10f DRLGACTIVATE_RoomSetAndPropagateStatus): raise a room to nStatus.
+// retail-layout seam of D2Common 0x7C090 (marker on DRLGACTIVATE_RoomSetAndPropagateStatus) (1.10f DRLGACTIVATE_RoomSetAndPropagateStatus): raise a room to nStatus.
 // nStatus+1 is propagated to the rooms near it first. When the room's status byte (+0x44) is at least
 // nStatus and no ref count in 0..nStatus is non-zero, the per-status callback runs; the status ref
 // count at +0xC+nStatus*2 is then incremented. The room is the register argument (EDI) and nStatus the

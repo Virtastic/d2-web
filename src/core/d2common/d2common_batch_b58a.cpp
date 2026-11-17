@@ -72,7 +72,7 @@ struct D2Common30BD0Env
 	uint32_t nBitMask3;                //0x14 gdwBitMasks word at +0xC
 };
 
-// 1.13c D2Common+0x30BD0 (fastcall ECX,EDX + 2 stack): nMode 0 selects table 0, nMode 1 table 1
+// Superseded by UNITS_CanAnimModeUseAttackRate (Units.cpp, the 1.13c row for 0x30BD0); kept for reference. (fastcall ECX,EDX + 2 stack): nMode 0 selects table 0, nMode 1 table 1
 // (split on nArg4 at 0x19A); row stride 0x14. Row +0xC set -> 1; else row +8 set and the 0x303A0
 // check passing -> byte +6 of the 0x1250 record masked with gdwBitMasks[3]; otherwise 0. Any other
 // nMode is fatal in retail (_exit); modelled as 0.

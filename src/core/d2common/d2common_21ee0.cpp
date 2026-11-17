@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x21ee0: belt-slot fit test for an item (stdcall: inventory, item, slot).
+// Twin of INVENTORY_PlaceItemInBeltSlot (the d2moo function carries the 1.13c marker): belt-slot fit test for an item (stdcall: inventory, item, slot).
 // Item type 4, beltable per ITEMS_CheckIfBeltable, a 1x1 record, slot 0..15: placed in the belt grid (grid 1).
 // Retail's record-less fallback compares the item pointer's low byte; that is not reproducible, so fixtures
 // always carry a record.

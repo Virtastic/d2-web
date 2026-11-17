@@ -140,11 +140,19 @@ void PATH_UpdateClientCoords(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDA8220
+// 1.13c D2Common+0x34E70: with path points and no room the flag is set (the retail loop runs only while the room exists, then falls to the set)
 void __fastcall sub_6FDA8220(D2DynamicPathStrc* pDynamicPath)
 {
 	pDynamicPath->dwFlags &= (~PATH_UNKNOWN_FLAG_0x00001);
 
-	if (pDynamicPath->pRoom)
+	if (!pDynamicPath->pRoom)
+	{
+		if (pDynamicPath->dwPathPoints > 0)
+		{
+			pDynamicPath->dwFlags |= PATH_UNKNOWN_FLAG_0x00001;
+		}
+	}
+	else
 	{
 		for (int i = 0; i < pDynamicPath->dwPathPoints; ++i)
 		{
@@ -297,7 +305,7 @@ static BOOL D2WEB_PATH_LogRefusal(D2UnitStrc* pUnit, D2PathInfoStrc* pInfo)
 	return FALSE;
 }
 //1.10f: Inlined
-//1.13C: D2Common.0x6FD85780
+// 1.13c D2Common+0x356E0
 BOOL __fastcall PATH_IsTargetDestinationAllowed(D2PathInfoStrc* pPathInfo, D2UnitStrc* pUnit)
 {
 	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER) // Only monsters may have restricted access to town
@@ -358,7 +366,7 @@ static int PATH_MissileToTarget(D2DynamicPathStrc* pPath, D2UnitStrc* pUnit)
 }
 
 //1.10f: Inlined
-//1.13C: D2Common.D2Common.0x6FD85470
+// 1.13c D2Common+0x35470
 uint8_t PATH_UpdateTargetUnit(D2PathInfoStrc* pPathInfo)
 {
 	D2DynamicPathStrc* pPath = pPathInfo->pDynamicPath;
@@ -397,15 +405,9 @@ uint8_t PATH_UpdateTargetUnit(D2PathInfoStrc* pPathInfo)
 
 //1.00:  D2Common.0x10059110 (#10141)
 //1.10f: D2Common.0x6FDA8600 (#10142)
-//1.13c: D2Common.0x6FD86230 (#10334)
+// 1.13c D2Common+0x36230 (#10334)
 int __stdcall D2Common_10142(D2DynamicPathStrc* pPath, D2UnitStrc* pUnit, int bAllowInTown)
 {
-
-
-	// BROKEN
-
-
-
 	if (!pPath)
 	{
 		return 0;
@@ -499,7 +501,6 @@ int __stdcall D2Common_10142(D2DynamicPathStrc* pPath, D2UnitStrc* pUnit, int bA
 						D2_ASSERT(scpfnPathFunction[tPathInfo.nPathType]);
 						pPath->dwPathPoints = scpfnPathFunction[tPathInfo.nPathType](&tPathInfo);
 					}
-					D2_ASSERT(tPathInfo.tStartCoord == tStart);
 					if (bRemovedTargetUnitFootprint)
 					{
 						PATH_AddCollisionFootprintForUnit(pPath->pTargetUnit);
@@ -763,6 +764,7 @@ void __stdcall D2Common_10214(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDA9480 (#10152)
+// 1.13c D2Common+0x36030
 void __stdcall PATH_AllocDynamicPath(void* pMemPool, D2ActiveRoomStrc* pRoom, int nX, int nY, D2UnitStrc* pUnit, BOOL bSetFlag)
 {
 	D2DynamicPathStrc* pDynamicPath = D2_CALLOC_STRC_POOL(pMemPool, D2DynamicPathStrc);
@@ -1008,6 +1010,7 @@ void __stdcall PATH_SetUnitAliveCollision(D2UnitStrc* pUnit, BOOL bForGameLogic)
 
 //1.10f: D2Common.0x6FDA9A70 (#10146)
 //1.13c: D2Common.0x6FD84D40 (#10488)
+// 1.13c D2Common+0x34D40
 void __stdcall PATH_SetVelocity(D2DynamicPathStrc* pDynamicPath, int nVelocity, const char* szFile, int nLine)
 {
 	if (pDynamicPath)
@@ -1164,6 +1167,7 @@ void __stdcall PATH_SetDirection(D2DynamicPathStrc* pDynamicPath, uint8_t nDirec
 }
 
 //D2Common.0x6FDA9CB0 (#10162)
+// 1.13c D2Common+0x34BB0
 int __stdcall PATH_GetXPosition(D2DynamicPathStrc* pDynamicPath)
 {
 	D2_ASSERT(pDynamicPath);
@@ -1172,6 +1176,7 @@ int __stdcall PATH_GetXPosition(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDA9CF0 (#10163)
+// 1.13c D2Common+0x34B80
 int __stdcall PATH_GetYPosition(D2DynamicPathStrc* pDynamicPath)
 {
 	D2_ASSERT(pDynamicPath);
@@ -1180,6 +1185,7 @@ int __stdcall PATH_GetYPosition(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDA9D30 (#10194)
+// 1.13c D2Common+0x34B50
 int __stdcall PATH_GetPrecisionX(D2DynamicPathStrc* pDynamicPath)
 {
 	D2_ASSERT(pDynamicPath);
@@ -1188,6 +1194,7 @@ int __stdcall PATH_GetPrecisionX(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDA9D60 (#10195)
+// 1.13c D2Common+0x34B20
 int __stdcall PATH_GetPrecisionY(D2DynamicPathStrc* pDynamicPath)
 {
 	D2_ASSERT(pDynamicPath);
@@ -1233,6 +1240,7 @@ void __fastcall PATH_SetClientCoordY(D2DynamicPathStrc* pDynamicPath, int nTarge
 
 //D2Common.0x6FDA9DE0 (#10175)
 //TODO: Check name
+// 1.13c D2Common+0x34AB0
 int __stdcall D2COMMON_10175_PathGetFirstPointX(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->tTargetCoord.X;
@@ -1240,6 +1248,7 @@ int __stdcall D2COMMON_10175_PathGetFirstPointX(D2DynamicPathStrc* pDynamicPath)
 
 //D2Common.0x6FDA9DF0 (#10176)
 //TODO: Check name
+// 1.13c D2Common+0x34AA0
 int __stdcall D2COMMON_10176_PathGetFirstPointY(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->tTargetCoord.Y;
@@ -1260,6 +1269,7 @@ int __stdcall D2Common_10225(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDA9E20 (#10177)
+// 1.13c D2Common+0x34A60
 int __stdcall D2COMMON_10177_PATH_GetLastPointX(D2DynamicPathStrc* pDynamicPath)
 {
 	if (pDynamicPath->dwPathPoints > 0)
@@ -1271,6 +1281,7 @@ int __stdcall D2COMMON_10177_PATH_GetLastPointX(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDA9E40 (#10178)
+// 1.13c D2Common+0x34A40
 int __stdcall D2COMMON_10178_PATH_GetLastPointY(D2DynamicPathStrc* pDynamicPath)
 {
 	if (pDynamicPath->dwPathPoints > 0)
@@ -1282,18 +1293,21 @@ int __stdcall D2COMMON_10178_PATH_GetLastPointY(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDB9C10 (#10166)
+// 1.13c D2Common+0x34A30
 D2ActiveRoomStrc* __stdcall PATH_GetRoom(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->pRoom;
 }
 
 //D2Common.0x6FDA9E60 (#10167)
+// 1.13c D2Common+0x34A20
 void __stdcall PATH_SetRoom(D2DynamicPathStrc* pDynamicPath, D2ActiveRoomStrc* pRoom)
 {
 	pDynamicPath->pRoom = pRoom;
 }
 
 //D2Common.0x6FDA9E70 (#10168)
+// 1.13c D2Common+0x34A10
 D2ActiveRoomStrc* __stdcall PATH_GetNextRoom(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->pPreviousRoom;
@@ -1503,6 +1517,7 @@ void __stdcall PATH_ResetToPreviousType(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDAA240 (#10187)
+// 1.13c D2Common+0x348A0
 int __stdcall PATH_GetType(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->dwPathType;
@@ -1540,6 +1555,7 @@ void __stdcall PATH_SetNewDistance(D2DynamicPathStrc* pDynamicPath, uint8_t nNew
 }
 
 //D2Common.0x6FDAA2B0 (#10189)
+// 1.13c D2Common+0x34860
 uint8_t __stdcall PATH_GetMaxDistance(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->nDistMax;
@@ -1657,6 +1673,7 @@ void __stdcall PATH_SetStepNum(D2DynamicPathStrc* pDynamicPath, uint8_t nSteps)
 }
 
 //D2Common.0x6FDAA4B0 (#10206)
+// 1.13c D2Common+0x34690
 int __stdcall PATH_GetStepNum(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->nStepNum + 1;

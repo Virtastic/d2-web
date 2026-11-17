@@ -132,15 +132,11 @@ extern "C" uint32_t D2Common_22880_ItemGemApplyType(uint32_t nItemId)
     return pRow->nGemApplyType;
 }
 
-// 1.13c D2Common+0x230A0 (#10082): items.txt row nItemId, int16 at +0x11E (wType[0]), sign-extended.
-// Out of range is fatal in retail.
+// Export of 1.13c D2Common 0x230A0 (#10082): the body is ITEMS_GetItemTypeFromItemId in src/core/d2moo/src/Items/Items.cpp.
 int32_t D2Common_230A0_ItemTypeFromItemId(uint32_t nItemId)
 {
     static_assert(offsetof(D2ItemsTxt, wType) == 0x11E, "items.txt wType");
-    const D2ItemsTxt* pRow = DATATBLS_GetItemsTxtRecord(static_cast<int32_t>(nItemId));
-    if (!pRow)
-        d2_fatal(0x68E);   // retail: 0x1EF if the table is unloaded, else 0x68E
-    return static_cast<int16_t>(pRow->wType[0]);
+    return static_cast<int32_t>(ITEMS_GetItemTypeFromItemId(nItemId));
 }
 
 // 1.13c D2Common+0x27090 (#10087): item usability gate.

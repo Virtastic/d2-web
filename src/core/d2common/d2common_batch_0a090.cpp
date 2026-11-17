@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include "D2DataTbls.h"
+#include "D2Items.h"
 #include "DataTbls/ItemsTbls.h"
 #include "Units/Units.h"
 #include "Drlg/D2DrlgPreset.h"
@@ -28,11 +29,8 @@ static_assert(offsetof(D2ItemsTxt, nUnique) == 0x129, "items.txt nUnique");
 static_assert(sizeof(void*) != 4 || offsetof(D2DynamicPathStrc, dwPathPoints) == 0x28,
               "dynamic path dwPathPoints");   // retail 32-bit offset; wasm64 pointers widen the struct
 
-// 1.13c D2Common+0x0A090 (#10039): act nAct, preset-object slot nUnitId -> the object class id.
-// The module table at 0x6FDEE2C8 is 5 act rows of 0x96 (150) dwords, read with no bounds check.
-// Same function as D2MOO 1.10f DRLGPRESET_GetObjectIndexFromObjPreset (0x6FD859E0, 5x150 shapes);
-// the vendored copy carries the table. UNVERIFIED: the 1.13c table at 0x6FDEE2C8 has not been
-// diffed against the vendored 1.10f cells; only the index shape (act*0x96 + id) is pinned.
+// D2Common 0x0A090 (#10039) forwarder: act nAct, preset-object slot nUnitId -> the object class id.
+// The proven code is the vendored DRLGPRESET_GetObjectIndexFromObjPreset (its table equals 0x6FDEE2C8).
 int D2Common_A090_GetObjectIndexFromObjPreset(uint8_t nAct, int32_t nUnitId)
 {
     return DRLGPRESET_GetObjectIndexFromObjPreset(nAct, nUnitId);
@@ -54,7 +52,7 @@ int __stdcall D2Common_E1A0_RepositionPath(D2DynamicPathStrc* pDynamicPath, D2Un
     return 1;
 }
 
-// 1.13c D2Common+0x2EA30 (#10111): set an object's portal flags. Only a UNIT_OBJECT unit is valid:
+// Superseded by UNITS_SetObjectPortalFlags (Units.cpp, the row for 0x2EA30, #10111): set an object's portal flags. Only a UNIT_OBJECT unit is valid:
 // a null unit is fatal 0xFEF and any other type fatal 0xFF0, both followed by _exit(-1) (no return
 // to model). Writes the byte at pObjectData+0x05 (nPortalFlags). Prior art D2MOO 1.10f
 // UNITS_SetObjectPortalFlags (Units.cpp, 0x6FDC0760).
@@ -65,19 +63,10 @@ void D2Common_2EA30_SetObjectPortalFlags(D2UnitStrc* pUnit, uint8_t nPortalFlags
     pUnit->pObjectData->nPortalFlags = nPortalFlags;
 }
 
-// 1.13c D2Common+0x22C20 (#10119): items.txt byte at +0x129 (nUnique) for a UNIT_ITEM's class id.
-// Null unit is fatal 0x9CE, non-item fatal 0x9CF, missing record fatal 0x9D2; fatal here too.
-// Prior art D2MOO 1.10f ITEMS_GetUniqueColumnFromItemsTxt (Items.cpp, 0x6FD9AA70).
+// Export of 1.13c D2Common 0x22C20 (#10119): the body is ITEMS_GetUniqueColumnFromItemsTxt in src/core/d2moo/src/Items/Items.cpp.
 extern "C" uint8_t D2Common_22C20_ItemUniqueColumn(D2UnitStrc* pUnit)
 {
-    if (!pUnit)
-        d2_fatal(0x9CE);
-    if (pUnit->dwUnitType != UNIT_ITEM)
-        d2_fatal(0x9CF);
-    const D2ItemsTxt* pRow = DATATBLS_GetItemsTxtRecord(pUnit->dwClassId);
-    if (!pRow)
-        d2_fatal(0x9D2);
-    return pRow->nUnique;
+    return static_cast<uint8_t>(ITEMS_GetUniqueColumnFromItemsTxt(pUnit));
 }
 
 // 1.13c D2Common+0x22970 (#10120): items.txt int16 at +0x108 (nDexBonus) for a UNIT_ITEM, except

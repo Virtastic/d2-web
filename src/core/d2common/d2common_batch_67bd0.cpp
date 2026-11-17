@@ -247,17 +247,11 @@ void d2_fn_d2common_4e0a0_batch(uint8_t* pObject, uint32_t nValue)
 	*(uint32_t*)(pObject + 0x14) = nValue;
 }
 
-// 1.13c D2Common+0x24BF0 (#10326) items.txt n2Handed (+0x11C) of an item unit; any other unit type
-// answers 0. The items row is reached through 0x22E70, whose stride is 0x1A8 and whose out-of-range
-// path is a fatal report in retail; we answer 0.
-// 1.13c D2Common+0x24BF0
+// Export of 1.13c D2Common 0x24BF0 (#10326): the body is ITEMS_CheckWeaponIfTwoHanded in src/core/d2moo/src/Items/Items.cpp.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint8_t D2Common_24BF0_GetItem2Handed(D2UnitStrc* pUnit)
 {
-	if (!pUnit || pUnit->dwUnitType != UNIT_ITEM) return 0;
-
-	const D2ItemsTxt* pItem = DATATBLS_GetItemsTxtRecord(pUnit->dwClassId);
-	return pItem ? pItem->n2Handed : 0;
+	return static_cast<uint8_t>(ITEMS_CheckWeaponIfTwoHanded(pUnit));
 }
 
 // 1.13c D2Common+0x25BD0 (#10328) applies the base-variant check (0x24D00) to an item unit's class
@@ -287,7 +281,7 @@ void D2Common_1D760_AllocMissileStream(uint32_t pUnit, const D2CommonFogEnv* env
 	if (md) W(md, 0x30) = pStream;
 }
 
-// 1.13c D2Common+0x13340 (#10333) GetGlobalBeltSlotPosition: copies the belt box nBoxId of row
+// Retail 0x13340 (#10333) GetGlobalBeltSlotPosition (the play path runs DATATBLS_GetInvRectFromBeltsTxt, which carries the marker): copies the belt box nBoxId of row
 // nHigherRes * 7 + nIndex out of the belts.txt table (record stride 0x108, box stride 0x10, boxes at
 // +0x08) into the caller's four dwords. A missing table or row is fatal in retail (0x79/0x7A/0x8F);
 // here a no-op.

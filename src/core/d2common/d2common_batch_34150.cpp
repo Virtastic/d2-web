@@ -296,7 +296,7 @@ struct D2Common21EE0Env
 	int32_t (*pPlaceInBelt)(int32_t nArg, D2UnitStrc* pItem);
 };
 
-// 1.13c D2Common+0x21EE0 (#10655): whether a 1x1 item that is belt-able fits the belt slot
+// D2Common ordinal 10655 (INVENTORY_PlaceItemInBeltSlot, marked in d2moo): whether a 1x1 item that is belt-able fits the belt slot
 // requested through 0x21D70. Non-item units, non-belt-able items and other item sizes yield 0.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t D2Common_ItemBeltSlotFits_21ee0(int32_t nArg, D2UnitStrc* pItem,

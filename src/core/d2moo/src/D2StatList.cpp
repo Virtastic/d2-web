@@ -7,6 +7,7 @@
 #include "D2Items.h"
 #include "D2States.h"
 #include "Units/Units.h"
+#include "DataTbls/MonsterTbls.h"
 //TODO: Find names
 
 
@@ -167,12 +168,14 @@ static int ComputeStatPercentage(int nValue, D2StatListExStrc* pStatListEx, uint
 	int nOpStatValue = sub_6FDB5830(pStatListEx, D2SLayerStatIdStrc::MakeFromStatId(opStatId).nPackedValue);
 	if (nOpStatValue)
 	{
-		return nValue * (nOpStatValue / 100.0);
+		return DATATBLS_ApplyRatio(nValue, nOpStatValue, 100);
 	}
 	return 0;
 }
 
 //D2Common.0x6FDB5830
+// The game's copy of retail D2Common+0x39530 (the base-plus-children sum of +0x38CD0 is its first lines; percentages go through the +0x11E0 ratio). The
+// retail-layout hand port keeps the marker because its capture scripts every callee.
 int __fastcall sub_6FDB5830(D2StatListExStrc* pStatListEx, D2SLayerStatIdStrc::PackedType nLayer_StatId)
 {
 	int nAccumulatedValue = 0;
@@ -281,7 +284,7 @@ int __fastcall sub_6FDB5830(D2StatListExStrc* pStatListEx, D2SLayerStatIdStrc::P
 								if (nRecursiveValue)
 								{
 									int nTemp = (nShiftedVal * nRecursiveValue) >> opStatData.nOpParam;
-									nAccumulatedValue += nTemp * nPreviousOpStatValue / 100.0;
+									nAccumulatedValue += DATATBLS_ApplyRatio(nPreviousOpStatValue, nTemp, 100);
 								}
 							}
 						}
@@ -329,7 +332,7 @@ int __fastcall sub_6FDB5830(D2StatListExStrc* pStatListEx, D2SLayerStatIdStrc::P
 							if (nRecursiveValue)
 							{
 								int nTemp = (nTmp * nRecursiveValue) >> opStatData.nOpParam;
-								nAccumulatedValue += nPreviousOpStatValue * nTemp / 100.0;
+								nAccumulatedValue += DATATBLS_ApplyRatio(nPreviousOpStatValue, nTemp, 100);
 							}
 						}
 					}
@@ -356,7 +359,7 @@ int __fastcall sub_6FDB5830(D2StatListExStrc* pStatListEx, D2SLayerStatIdStrc::P
 				{
 					int nBaseTime = 0;
 					int nPeriodOfDay = ENVIRONMENT_GetPeriodOfDayFromAct(pStatListEx->pOwner->pDrlgAct, &nBaseTime);
-					nAccumulatedValue += nAccumulatedValue * ITEMMODS_GetByTimeAdjustment(nTmp, nPeriodOfDay, nBaseTime, NULL, NULL, NULL) / 100.0;
+					nAccumulatedValue += DATATBLS_ApplyRatio(nAccumulatedValue, ITEMMODS_GetByTimeAdjustment(nTmp, nPeriodOfDay, nBaseTime, NULL, NULL, NULL), 100);
 				}
 			}
 			break;
@@ -468,6 +471,7 @@ static int STATLIST_ApplyMinValue(int nValue, D2ItemStatCostTxt* pItemStatCostTx
 }
 
 //D2Common.0x6FDB6340
+// 1.13c D2Common+0x38B00 (list in EBX, packed id in EDI, ItemStatCost row on the stack; the base stat array at +0x24)
 int __fastcall STATLIST_GetBaseStat_6FDB6340(D2StatListStrc* pStatList, D2SLayerStatIdStrc::PackedType nLayer_StatId, D2ItemStatCostTxt* pItemStatCostTxtRecord)
 {
 	if (D2StatStrc* pStat = STATLIST_FindStat_6FDB6920(&pStatList->Stats, nLayer_StatId))
@@ -493,6 +497,8 @@ int __fastcall STATLIST_GetTotalStat_6FDB63E0(D2StatListStrc* pStatList, D2SLaye
 }
 
 //D2Common.0x6FDB64A0
+// The game's copy of retail D2Common+0x39CE0 (an apply-to-item operand with a positive total only clears the update flag, it never sets it again).
+// The retail-layout hand port keeps the marker because its capture scripts every callee.
 int __fastcall sub_6FDB64A0(D2StatListExStrc* pStatListEx, D2SLayerStatIdStrc::PackedType nLayer_StatId, D2ItemStatCostTxt* pItemStatCostTxtRecord, D2UnitStrc* pUnit)
 {
 	int nNewValue = sub_6FDB5830(pStatListEx, nLayer_StatId);
@@ -566,7 +572,10 @@ int __fastcall sub_6FDB64A0(D2StatListExStrc* pStatListEx, D2SLayerStatIdStrc::P
 							if (D2ItemStatCostTxt* pOpItemStatCost = ITEMS_GetItemStatCostTxtRecord(nOpBase))
 							{
 								int nOpStatValue = STATLIST_GetTotalStat_6FDB63E0(pStatListEx->pUnit->pStatListEx, D2SLayerStatIdStrc::MakeFromStatId(nOpBase).nPackedValue, pOpItemStatCost);
-								bUpdate = nOpStatValue <= 0;
+								if (nOpStatValue > 0)
+								{
+									bUpdate = FALSE;
+								}
 							}
 						}
 					}
@@ -685,6 +694,7 @@ void __fastcall STATLIST_RemoveStat_6FDB6A30(void* pMemPool, D2StatsArrayStrc* p
 }
 
 //D2Common.0x6FDB6AB0
+// 1.13c D2Common+0x38940 (list in EBX; the FullStats array at +0x48)
 void __fastcall STATLIST_UpdateUnitStat_6FDB6AB0(D2StatListExStrc* pStatListEx, D2SLayerStatIdStrc::PackedType nLayer_StatId, int nNewValue, D2ItemStatCostTxt* pItemStatCostTxtRecord, D2UnitStrc* pUnit)
 {
 	D2StatsArrayStrc* pStatsArray = &pStatListEx->FullStats;
@@ -1380,6 +1390,7 @@ void __stdcall STATLIST_AddUnitStat(D2UnitStrc* pUnit, int nStatId, int nValue, 
 }
 
 //D2Common.0x6FDB7B30 (#10521)
+// 1.13c D2Common+0x38C20 (#10587; retail takes the layer in a register, the probe keys layer 0)
 int __stdcall STATLIST_GetUnitBaseStat(D2UnitStrc* pUnit, int nStatId, uint16_t nLayer)
 {
 	if (!pUnit || !pUnit->pStatListEx)
@@ -1422,8 +1433,13 @@ int32_t __stdcall STATLIST_GetTotalStatValue(D2StatListStrc* pStatList, int nSta
 }
 
 //D2Common.0x6FDB7C30 (#10519)
+// 1.13c D2Common+0x38B70: a null unit answers 0 (1.10f dereferenced it)
 int32_t __stdcall STATLIST_UnitGetStatValue(const D2UnitStrc* pUnit, int nStatId, uint16_t nLayer)
 {
+	if (!pUnit)
+	{
+		return 0;
+	}
 	return STATLIST_GetTotalStatValue(pUnit->pStatListEx, nStatId, nLayer);
 }
 
@@ -1442,6 +1458,7 @@ int32_t __stdcall STATLIST_UnitGetItemStatOrSkillStatValue(D2UnitStrc* pUnit, in
 
 
 //D2Common.0x6FDB7D40 (#10466)
+// 1.13c D2Common+0x38C80 (the same body compiled a second time, register-called, no direct callers)
 // 1.13c D2Common+0x39140: list in EBX, packed layer/stat id in EDI, ItemStatCost row = the stat id's record; the
 // body is 0x38B00 (find the entry, clamp to the record's minimum for a player/monster owner). Same as 1.10f.
 int __stdcall STATLIST_GetStatValue(D2StatListStrc* pStatList, int nStatId, uint16_t nLayer)
@@ -1839,11 +1856,12 @@ void __stdcall D2Common_10534(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDB8770 (#10530)
+// 1.13c D2Common+0x37DE0 (answers the bit, 0 or 1, not the masked word)
 BOOL __stdcall D2COMMON_10530_D2CheckStatlistFlagDMGRed(D2UnitStrc* pUnit)
 {
 	if (pUnit && pUnit->pStatListEx)
 	{
-		return pUnit->pStatListEx->dwFlags & STATLIST_UNK_0x100;
+		return (pUnit->pStatListEx->dwFlags >> 8) & 1;
 	}
 
 	return FALSE;
@@ -2214,12 +2232,14 @@ int __stdcall STATLIST_GetMaxLifeFromUnit(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDB92C0 (#10565)
+// 1.13c D2Common+0x390A0
 int __stdcall STATLIST_GetMaxManaFromUnit(D2UnitStrc* pUnit)
 {
 	return D2Common_11248(NULL, pUnit, STAT_MAXMANA);
 }
 
 //D2Common.0x6FDB93B0 (#10566)
+// 1.13c D2Common+0x39050
 int __stdcall STATLIST_GetMaxStaminaFromUnit(D2UnitStrc* pUnit)
 {
 	return D2Common_11248(NULL, pUnit, STAT_MAXSTAMINA);
@@ -2228,10 +2248,21 @@ int __stdcall STATLIST_GetMaxStaminaFromUnit(D2UnitStrc* pUnit)
 //D2Common.0x6FDB94A0 (#10567)
 int __stdcall STATLIST_GetMaxDurabilityFromUnit(D2UnitStrc* pUnit)
 {
+	// 1.13c delta (D2Common+0x38FF0): a unit whose base max-durability stat reads 0 answers 0 whatever the totals say
+	if (!pUnit || !pUnit->pStatListEx)
+	{
+		return 0;
+	}
+	D2ItemStatCostTxt* pRecord = ITEMS_GetItemStatCostTxtRecord(STAT_MAXDURABILITY);
+	if (!pRecord || !STATLIST_GetBaseStat_6FDB6340(pUnit->pStatListEx, D2SLayerStatIdStrc::Make(0, STAT_MAXDURABILITY).nPackedValue, pRecord))
+	{
+		return 0;
+	}
 	return D2Common_11248(NULL, pUnit, STAT_MAXDURABILITY);
 }
 
 //D2Common.0x6FDB95D0 (#10568)
+// 1.13c D2Common+0x38F60
 int __stdcall STATLIST_GetMaxDamageFromUnit(D2UnitStrc* pUnit, BOOL b2Handed)
 {
 	if (b2Handed)
@@ -2271,6 +2302,7 @@ int __stdcall STATLIST_GetMinThrowDamageFromUnit(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDB99F0 (#10572)
+// 1.13c D2Common+0x38DE0
 int __stdcall STATLIST_GetDefenseFromUnit(D2UnitStrc* pUnit)
 {
 	return D2Common_11248(NULL, pUnit, STAT_ARMORCLASS);

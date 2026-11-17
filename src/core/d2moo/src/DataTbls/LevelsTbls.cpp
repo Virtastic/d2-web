@@ -296,9 +296,10 @@ D2LevelsTxt* __stdcall DATATBLS_GetLevelsTxtRecord(int nLevelId)
 }
 
 //D2Common.0x6FD603F0 (#10632)
+// 1.13c D2Common+0x6CC90 (row 0 reads as no rain)
 uint8_t __stdcall DATATBLS_GetRainFromLevelsTxt(int nLevelId)
 {
-	if (nLevelId >= 0 && nLevelId < sgptDataTables->nLevelsTxtRecordCount)
+	if (nLevelId > 0 &&nLevelId < sgptDataTables->nLevelsTxtRecordCount)
 	{
 		return sgptDataTables->pLevelsTxt[nLevelId].nRain;
 	}
@@ -467,6 +468,7 @@ void __fastcall DATATBLS_UnloadLevelDefsBin()
 }
 
 //D2Common.0x6FD60D90 (#10010)
+// 1.13c D2Common+0x6CB20
 D2LevelDefBin* __fastcall DATATBLS_GetLevelDefRecord(int nLevelId)
 {
 	if (nLevelId >= 0 && nLevelId < sgptDataTables->nLevelsTxtRecordCount)

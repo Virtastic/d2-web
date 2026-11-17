@@ -12,8 +12,6 @@ struct N87Env
 	void (*f7C270)(void);							// 0x7C270
 	void (*f7C300)(void* a, int b, int c);					// 0x7C300
 	void (*f1B0D)(void);
-	uint32_t (*f208E0)(uint32_t inv, uint32_t item, int rec, uint32_t* pX, uint32_t* pY, uint32_t page);
-	uint32_t (*f218A0)(uint32_t inv, uint32_t item, uint32_t x, uint32_t y, uint32_t grid, int rec);
 	void (*f21B40)(uint32_t p);
 	void (*f28E80)(uint32_t a, int b, uint32_t* c, int d, int e);
 	void (*f2E2C0)(void);
@@ -80,15 +78,6 @@ extern "C" void D2Common_21C50(const N87Env* e, uint32_t arg)
 	}
 }
 
-// 1.13c D2Common+0x21E10: stdcall(inv, item, rec, unused, page) ret 0x1c (7 stack words; words 3, 5, 6 are ignored)
-extern "C" uint32_t D2Common_21E10(const N87Env* e, uint32_t inv, uint32_t item, int rec, uint32_t, uint32_t page)
-{
-	if (!inv || !item || W(e, item)[0] != 4) return 0;
-	uint32_t x, y;
-	if (!e->f208E0(inv, item, rec, &x, &y, page)) return 0;
-	return e->f218A0(inv, item, x, y, (page & 0xff) + 2, rec);
-}
-
 // 1.13c D2Common+0x29D60
 extern "C" void D2Common_29D60(const N87Env* e, uint32_t, uint32_t a, int b, uint32_t* c, int d, int f)
 {
@@ -107,15 +96,7 @@ extern "C" void D2Common_2E360(const N87Env* e, uint32_t unit)
 	e->f7D420(unit); e->f7DC90(unit);
 }
 
-// FN-probe entries for 0x21E10 and 0x2E360 (identity guest->host mapping, as 0x37AF0)
-extern "C" uint32_t d2common_21e10_port(uint32_t inv, uint32_t item, int rec, uint32_t page,
-	uint32_t (*f208)(uint32_t, uint32_t, int, uint32_t*, uint32_t*, uint32_t),
-	uint32_t (*f218)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, int))
-{
-	N87Env e = {};
-	e.at = n87Identity; e.fatal = n87Fatal; e.f208E0 = f208; e.f218A0 = f218;
-	return D2Common_21E10(&e, inv, item, rec, 0, page);
-}
+// FN-probe entry for 0x2E360 (identity guest->host mapping, as 0x37AF0)
 extern "C" void d2common_2e360_port(uint32_t unit, void (*f11bf0)(uint32_t), void (*fcd10)(uint32_t), void (*f43580)(uint32_t),
 	void (*f2d420)(uint32_t), void (*f2dc90)(uint32_t))
 {
@@ -177,7 +158,7 @@ extern "C" void D2Common_36030(const N87Env* e, int y, uint32_t unit, int force,
 	if (force) p[0xd] |= 0x10;
 }
 
-// 1.13c D2Common+0x37AF0
+// raw-layout body of D2Common 0x37AF0 (the marked port is ENVIRONMENT_UpdatePeriodOfDay)
 extern "C" bool D2Common_37AF0(const N87Env* e, uint32_t a, uint32_t b)
 {
 	if (!a) e->fatal(0x547);
@@ -226,7 +207,7 @@ extern "C" uint32_t D2Common_3A1D0(const N87Env* e, uint32_t o, uint32_t, int v,
 	return 1;
 }
 
-// 1.13c D2COMMON+0x3C800
+// raw-layout body of D2Common 0x3C800 (the marked port is DUNGEON_UpdateAndFreeInactiveRooms)
 extern "C" void D2Common_3C800(const N87Env* e) { e->f2E2C0(); }
 
 // D2Common 0x4CF40

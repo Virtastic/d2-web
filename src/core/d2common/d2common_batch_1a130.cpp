@@ -12,7 +12,7 @@ template<class T> T rd(const void* p, int o) { return *reinterpret_cast<const T*
 }
 
 extern "C" {
-// 1.13c D2Common+0x2FAC0: select the normal or expansion level-monster list entry.
+// Superseded by UNITS_AnimModeAllowsAnimSpeed (Units.cpp, the row for 0x2FAC0): select the normal or expansion level-monster list entry.
 EMSCRIPTEN_KEEPALIVE int32_t d2_batch_d2common_2fac0(int32_t level, int32_t selector, int32_t difficulty,
  const int32_t* baseTable, const int32_t* normalTable, const int32_t* expansionTable)
 {
@@ -22,7 +22,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_batch_d2common_2fac0(int32_t level, int32_t sele
  return selected ? selected[level * 5] : 0;
 }
 
-// 1.13c D2Common+0x30B80: unit eligibility predicate, with the two retail lookup calls injected.
+// Superseded by UNITS_IsSeqAnimSpeedModulatedByFCR (Units.cpp, the row for 0x30B80): unit eligibility predicate, with the two retail lookup calls injected.
 // Named d2c_30b80_eligible: the FN probe owns the d2_fn_d2common_30b80 symbol (r[] shape).
 using D2C_UnitLookup = int32_t (*)(uint32_t);
 EMSCRIPTEN_KEEPALIVE int32_t d2c_30b80_eligible(int32_t unitType, uint32_t unit, int32_t table,
@@ -39,7 +39,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2c_30b80_eligible(int32_t unitType, uint32_t unit,
  return table == 1 && unitType == 7;
 }
 
-// 1.13c D2Common+0x30C70: reads the correct normal/expansion eligibility record, then applies
+// Superseded by UNITS_CanAnimModeUseVelocityModifier (Units.cpp, the row for 0x30C70): reads the correct normal/expansion eligibility record, then applies
 // the unit's active-state flags. The three records tables are retail's contiguous 0x14-byte-row modulator
 // tables (player, monster, expansion monster); unitFlags is the word at +0xC of what 0x303A0 answers.
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_30c70_batch(int32_t index, int32_t table, uint32_t unit,
@@ -63,7 +63,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_30c70_batch(int32_t index, int32_t t
  return (f & 1u) && !(f & 0x1000u);
 }
 
-// 1.13c D2Common+0x323E0: resolve the selected stat's resistance value; composition follows retail.
+// Superseded by UNITS_GetAnimStatBasePercentage (Units.cpp, the row for 0x323E0): resolve the selected stat's resistance value; composition follows retail.
 using D2C_StatValue = int32_t (*)(uint32_t, int32_t);
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_323e0_batch(uint32_t unit, int32_t statId,
  int32_t baseId, int32_t itemValue, int32_t combine, D2C_StatValue readStat)

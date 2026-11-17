@@ -13,7 +13,7 @@
 #include <cstdlib>
 #include "d2common_41340.h"
 
-// 1.13c D2Common+0x42A70: the footprint stamp retail calls directly (ECX=level, EDX=x, stack y, idx, flag, extra).
+// Retail 0x42A70: the footprint stamp retail calls directly (ECX=level, EDX=x, stack y, idx, flag, extra).
 extern "C" void D2Common_42A70(void*, int32_t, int32_t, int32_t, int32_t, int32_t);
 
 // 1.13c D2Common+0x41070 is in src/core/d2common/d2common_41070.cpp (one file per function).
@@ -77,7 +77,7 @@ void D2Common_7EE50(D2DrlgLevelStrc* level) {
     }
 }
 
-// (superseded by the per-function port; was D2Common+0x7EF60): ESI level, ECX forwarded; preserves transposed scan bounds.
+// 1.13c D2Common+0x7EF60: ESI level, ECX forwarded; preserves transposed scan bounds.
 void D2Common_7EF60(D2DrlgLevelStrc* level) {
     if (level->nLevelId == 0x27) return;
     auto* out = level->pOutdoors;
@@ -101,7 +101,7 @@ void D2Common_7EF60(D2DrlgLevelStrc* level) {
     }
 }
 
-// (superseded by the per-function port; was D2Common+0x7F180): EAX level; cottage IDs recovered from caller EAX loads.
+// 1.13c D2Common+0x7F180: EAX level; cottage IDs recovered from caller EAX loads.
 void D2Common_7F180(D2DrlgLevelStrc* level) {
     const auto preset = [level](int id) { DRLGOUTDOORS_SpawnOutdoorLevelPreset(level, id, -1, 0, 15); };
     const auto random = [level](int id) { DRLGOUTDOORS_SpawnRandomOutdoorDS1(level, id, -1); };

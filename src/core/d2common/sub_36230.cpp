@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x36230
+// stand-alone slice of D2Common 0x36230
 #include <cstddef>
 #include <cstdint>
 // Retail's 32-bit path image, only the offsets this slice reads or writes.

@@ -52,11 +52,11 @@ extern "C"
 	uint32_t g_d2common_dat_6fdefa5c = 0;   // base address of the 0xF0-stride position records
 }
 
-// 1.13c D2Common+0x82030 (#11012): copy the 16-byte record at (nSecond * 16 + nFirst) of the global
+// Retail 0x82030 (#11012; play path: DATATBLS_GetInventoryRect): copy the 16-byte record at (nSecond * 16 + nFirst) of the global
 // inventory-position table into pOut. The index is unsigned; each record is 0xF0 bytes. A missing base
 // is fatal 0x7F and a missing/out-of-range record fatal 0x8C in retail (Fog message, then _exit); both
 // are modelled as a plain return of 0. Retail leaves the record's fourth word (the last one copied) in EAX.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_82030_GetGlobalInventoryPosition(int32_t nFirst, int32_t nSecond, uint32_t* pOut) {  // 1.13c D2Common+0x82030 (#11012)
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_82030_GetGlobalInventoryPosition(int32_t nFirst, int32_t nSecond, uint32_t* pOut) {  // retail 0x82030 (#11012)
 	const uint32_t nIndex = static_cast<uint32_t>(nSecond) * 0x10u + static_cast<uint32_t>(nFirst);
 	if (g_d2common_dat_6fdefa5c == 0 || pOut == nullptr)
 		return 0;                                   // retail fatal 0x7F
@@ -138,52 +138,18 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_32330_GetStatPercent(D2UnitStrc
 	return 0;
 }
 
-// 1.13c D2Common+0x23400 (#11036): items.txt class -> ItemTypesTxt row -> nRare (+0x15). Only a
-// non-null UNIT_ITEM reaches the row; the type index is 0x230F0's (items.txt wType[0]) with the type
-// table bounds at +0xBF8/+0xBFC. The vendored 1.10f twin is ITEMS_CanBeRare, whose body is this one.
-extern "C" EMSCRIPTEN_KEEPALIVE uint8_t D2Common_23400_CanBeRare(D2UnitStrc* pItem) {  // 1.13c D2Common+0x23400 (#11036)
-	// Follows the decompile: no assert on a null items.txt row; every miss is 0.
-	if (!pItem || pItem->dwUnitType != UNIT_ITEM)
-		return 0;
-	const D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-	if (!pItemsTxtRecord)
-		return 0;
-	const int32_t nType = pItemsTxtRecord->wType[0];
-	if (nType < 0 || nType >= sgptDataTables->nItemTypesTxtRecordCount || !sgptDataTables->pItemTypesTxt)
-		return 0;
-	return sgptDataTables->pItemTypesTxt[nType].nRare;
+// Export of 1.13c D2Common 0x23400 (#11036); the body is ITEMS_CanBeRare in src/core/d2moo/src/Items/Items.cpp.
+extern "C" EMSCRIPTEN_KEEPALIVE uint8_t D2Common_23400_CanBeRare(D2UnitStrc* pItem) {
+	return static_cast<uint8_t>(ITEMS_CanBeRare(pItem));
 }
 
 // 1.13c D2Common+0x34450 (#11039): set (nSet != 0) or clear a state bit in the unit's extended stat
 // list. Only an extended list (dwFlags negative, bit 31) with a StatFlags array is valid; the bit lives
 // in the second bitset, one word past ceil(nStates/32), masked by gdwBitMasks[nState & 31] on set and
 // gdwInvBitMasks[nState & 31] on clear. Both paths refresh the unit's room membership (0x665C0).
-extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_34450_ToggleStatListState(D2UnitStrc* pUnit, uint32_t nState, int32_t nSet) {  // 1.13c D2Common+0x34450 (#11039)
-	if (pUnit == nullptr || pUnit->pStatListEx == nullptr)
-		return;
+// The body now lives in STATES_ToggleGfxStateFlag (src/core/d2moo/src/D2States.cpp), same marker.
 
-	D2StatListExStrc* pStatList = pUnit->pStatListEx;
-	if (static_cast<int32_t>(pStatList->dwFlags) >= 0 || pStatList->StatFlags == nullptr)
-		return;
-
-	const int32_t nStateId = static_cast<int32_t>(nState);
-	if (nStateId < 0 || nStateId >= sgptDataTables->nStatesTxtRecordCount)
-		return;
-
-	// Retail's sign-corrected divide by 32 of nStates + 0x1F.
-	const int32_t nBits = sgptDataTables->nStatesTxtRecordCount + 0x1F;
-	const int32_t nWords = (nBits + ((nBits >> 31) & 0x1F)) >> 5;
-	uint32_t* pWord = &pStatList->StatFlags[nWords + (nStateId >> 5)];
-
-	if (nSet != 0)
-		*pWord |= gdwBitMasks[nStateId & 0x1F];
-	else
-		*pWord &= gdwInvBitMasks[nStateId & 0x1F];
-
-	UNITROOM_RefreshUnit(pUnit);
-}
-
-// 1.13c D2Common+0x21DA0 (#11041): class-skill id at nPosition in the unit's class skill list, i.e.
+// D2Common ordinal 11041 (not the 0x21DA0 body-location placement): class-skill id at nPosition in the unit's class skill list, i.e.
 // 0x218A0(nPosition, 0, 0, 0). A null unit or a position outside 0..0xC answers 0.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_21DA0_D2GetPlayerSkillID(D2UnitStrc* pUnit, uint32_t nUnused, int32_t nPosition) {  // 1.13c D2Common+0x21DA0 (#11041)
 	(void)nUnused;

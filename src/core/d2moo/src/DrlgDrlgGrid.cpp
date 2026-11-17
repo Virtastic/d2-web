@@ -15,6 +15,7 @@ void(__fastcall* gpfFlagOperations[])(int*, int) =
 
 
 //D2Common.0x6FD75BA0
+// 1.13c D2Common+0x36C20
 void __fastcall DRGLGRID_OverwriteFlag(int* pFlag, int nFlag)
 {
 	*pFlag = nFlag;
@@ -49,6 +50,7 @@ void __fastcall DRGLGRID_OverwriteFlagIfZero(int* pFlag, int nFlag)
 }
 
 //D2Common.6FD75BF0
+// 1.13c D2Common+0x36BD0
 void __fastcall DRGLGRID_AndNegatedFlag(int* pFlag, int nFlag)
 {
 	*pFlag &= ~nFlag;
@@ -117,7 +119,7 @@ void __fastcall DRLGGRID_AlterEdgeGridFlags(D2DrlgGridStrc* pDrlgGrid, int nFlag
 }
 
 //D2Common.6FD75DE0
-//TODO: Name
+// 1.13c D2Common+0x37020
 void __fastcall sub_6FD75DE0(D2DrlgGridStrc* pDrlgGrid, D2DrlgVertexStrc* pDrlgVertex, int nFlag, FlagOperation eOperation, BOOL bAlterNextVertex)
 {
 	D2DrlgVertexStrc* pNext = pDrlgVertex->pNext;
@@ -206,7 +208,7 @@ void __fastcall DRLGGRID_SetVertexGridFlags(D2DrlgGridStrc* pDrlgGrid, D2DrlgVer
 }
 
 //D2Common.0x6FD75F60
-//TODO: Name
+// 1.13c D2Common+0x36CD0
 void __fastcall sub_6FD75F60(D2DrlgGridStrc* pDrlgGrid, D2DrlgVertexStrc* pDrlgVertex, D2DrlgCoordStrc* pDrlgCoord, int nFlag, FlagOperation eOperation, int nSize)
 {
 	int nX = pDrlgVertex->nPosX;

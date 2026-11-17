@@ -10,7 +10,7 @@
 #include "Drlg/D2DrlgDrlg.h"
 #include "Units/Units.h"
 
-// 1.13c D2Common+0x2E990 (#10169): stores arg2 at +0x7C of arg1, the D2ActiveRoomStrc::pRoomNext
+// Superseded by UNITS_SetTimerArg (Units.cpp, the row for 0x2E990, #10169): stores arg2 at +0x7C of arg1, the D2ActiveRoomStrc::pRoomNext
 // link (field identified by offset; the only caller is the export thunk). Null arg1 takes the
 // module's fatal path (0x150B), which never returns, so nothing is stored. Retail stores a
 // four-byte image; our rooms are native pointers.
@@ -56,21 +56,4 @@ EMSCRIPTEN_KEEPALIVE int D2Common_30830_UNITS_GetOverlayHeight(D2UnitStrc* pUnit
 	return UNITS_GetOverlayHeight(pUnit);
 }
 
-// 1.13c D2Common+0x390A0 (#10186): the unit's total maximum-mana stat. Guards: null unit, null
-// stat list, fewer than 10 ItemStatCost rows (the row at index 9 is STAT_MAXMANA), null table.
-// The call is STATLIST_GetTotalStat with packed id 0x90000 (stat 9, layer 0).
-EMSCRIPTEN_KEEPALIVE int D2Common_390A0_GetUnitMaxManaTotal(D2UnitStrc* pUnit)
-{
-	if (!pUnit || !pUnit->pStatListEx)
-	{
-		return 0;
-	}
-	if (sgptDataTables->nItemStatCostTxtRecordCount <= 9 || !sgptDataTables->pItemStatCostTxt)
-	{
-		return 0;
-	}
-	return STATLIST_GetTotalStat_6FDB63E0(
-		pUnit->pStatListEx,   // the list itself: 0x38A80 picks the full-stats array by the list's own flag
-		D2SLayerStatIdStrc::MakeFromStatId(STAT_MAXMANA).nPackedValue,
-		&sgptDataTables->pItemStatCostTxt[9]);
-}
+// D2Common+0x390A0 now runs as STATLIST_GetMaxManaFromUnit (src/core/d2moo/src/D2StatList.cpp).

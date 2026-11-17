@@ -97,7 +97,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_31d20_batch(uint32_t pUnit, int32_t 
 	return nTotal < 0x4B ? nTotal : 0x4B;
 }
 
-// 1.13c D2Common+0x3BFB0 (#11025): room+0x10 -> data; data+0x28 flag 0x800000 clear -> level (data+0x58) +0x1D0.
+// D2Common 0x3BFB0 (#11025; marker on the d2moo function): room+0x10 -> data; data+0x28 flag 0x800000 clear -> level (data+0x58) +0x1D0.
 // Null room returns 0; a null data block is fatal in retail (0x26B) and returns 0 here.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3BFB0(uint32_t pRoom)

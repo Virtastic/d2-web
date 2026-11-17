@@ -36,7 +36,7 @@ extern "C" uint32_t d2common_2e2c0(uint32_t pDrlg, const D2Common2e2c0Env* e) {
     return eax;
 }
 
-// 1.13c D2Common+0x3C800
+// raw-layout body of D2Common 0x3C800 (the marked port is DUNGEON_UpdateAndFreeInactiveRooms)
 extern "C" uint32_t d2common_3c800(uint32_t p, const D2Common2e2c0Env* e) {
     return d2common_2e2c0(rd(p + 0x48), e);
 }

@@ -10,13 +10,10 @@
 #include "Units/UnitRoom.h"
 #include "D2States.h"
 
-// 1.13c D2Common+0x22920 (#10211): ItemsTxt row `nItemId`, byte at +0x137 (nHasInv), or 0 when the
-// id is out of range. Retail reads the loader's contiguous table directly; the bounds check is the
-// same unsigned compare DATATBLS_GetItemsTxtRecord (1.13c+0x719A0) performs.
+// Export of 1.13c D2Common 0x22920 (#10211): the body is ITEMS_CheckIfSocketableByItemId in src/core/d2moo/src/Items/Items.cpp.
 extern "C" EMSCRIPTEN_KEEPALIVE int D2Common_10211_ITEMS_CheckIfSocketableByItemId(int nItemId)
 {
-	const D2ItemsTxt* pItemsTxt = DATATBLS_GetItemsTxtRecord(nItemId);
-	return pItemsTxt ? pItemsTxt->nHasInv : 0;
+	return ITEMS_CheckIfSocketableByItemId(nItemId);
 }
 
 // 1.13c D2Common+0x229A0 (#10213): ITEMS_GetStrengthBonus. Null unit or non-item type (unit+0x00)
@@ -27,7 +24,7 @@ EMSCRIPTEN_KEEPALIVE short D2Common_10213_ITEMS_GetStrengthBonus(D2UnitStrc* pIt
 	return ITEMS_GetStrengthBonus(pItem);
 }
 
-// 1.13c D2Common+0x24C80 (#10217): ITEMS_CheckBodyLocation. The item's ItemTypesTxt body
+// Export of 1.13c D2Common 0x24C80 (#10217), body ITEMS_CheckBodyLocation in src/core/d2moo/src/Items/Items.cpp. The item's ItemTypesTxt body
 // locations (ItemType index from ItemsTxt.wType[0], bytes +0x0A/+0x0B) match the requested one, or
 // the request is 0xB/0xC (either left arm) and one of them is 4/5 (right/left arm).
 EMSCRIPTEN_KEEPALIVE BOOL D2Common_10217_ITEMS_CheckBodyLocation(D2UnitStrc* pItem, uint32_t nBodyLoc)

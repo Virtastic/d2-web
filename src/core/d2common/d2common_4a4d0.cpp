@@ -6,7 +6,7 @@
 static inline uint32_t rd(uint32_t a) { return *reinterpret_cast<const uint32_t*>(uintptr_t(a)); }
 static inline void wr(uint32_t a, uint32_t v) { *reinterpret_cast<uint32_t*>(uintptr_t(a)) = v; }
 
-// 1.13c D2Common+0x4A4D0
+// stand-alone port of the retail 0x4A4D0 body (engine function DRLGOUTROOM_FreeDrlgOutdoorRoomData)
 extern "C" void D2Common_4A4D0_With(uint32_t outdoor, uint32_t pool, const D2Common4a4d0Env* e)
 {
 	for (uint32_t g = 0; g < 0x50; g += 0x14) {   // grids at +0, +0x14, +0x28, +0x3C: +0 cells, +4 row offsets

@@ -14,6 +14,9 @@
 #include "../d2moo/compat/datatbls_bridge.h"
 #include "../tables/shared.h"
 
+// The Units.cpp row the 0x12D0 probe calls (declared in d2moo Units.h).
+D2CharStatsTxt* __fastcall UNITS_GetCharStatsTxtRecord(int nRecordId);
+
 static_assert(sizeof(D2CharStatsTxt) == 0xC4, "charstats row size");
 static_assert(offsetof(D2SkillsTxt, dwParam) == 0x148, "skills.txt dwParam");
 static_assert(offsetof(D2SkillsTxt, wSkillDesc) == 0x194, "skills.txt wSkillDesc");
@@ -160,18 +163,13 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1280(uint32_t* r)
 	r[4] = (nId >= 0 && nId < sgptDataTables->nMonStatsTxtRecordCount) ? static_cast<uint32_t>(nId) : 0xFFFFFFFFu;
 }
 
-// 1.13c D2Common+0x12D0: charstats row nClassId (0xC4 each) as a byte offset from the table base.
+// Probe of the D2Common+0x12D0 row: the charstats row for nClassId as a byte offset from the table base (0xC4 per row). It calls
+// the Units.cpp row (UNITS_GetCharStatsTxtRecord); NULL is 0xFFFFFFFF in the vector (fnptr capture), an offset of 0 is a real row.
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_12d0(uint32_t* r)
 {
 	if (!TablesLoaded()) { r[4] = 0x7EADBEEF; return; }
-	const int32_t nClassId = static_cast<int32_t>(r[0]);
-	// NULL is 0xFFFFFFFF in the vector (fnptr capture); an offset of 0 is a real row.
-	if (!sgptDataTables->pCharStatsTxt || nClassId < 0 || nClassId >= sgptDataTables->nCharStatsTxtRecordCount)
-	{
-		r[4] = 0xFFFFFFFFu;
-		return;
-	}
-	r[4] = static_cast<uint32_t>(nClassId) * 0xC4;
+	const D2CharStatsTxt* p = UNITS_GetCharStatsTxtRecord(static_cast<int32_t>(r[0]));
+	r[4] = p ? static_cast<uint32_t>((p - sgptDataTables->pCharStatsTxt) * 0xC4) : 0xFFFFFFFFu;
 }
 
 // 1.13c D2Common+0x1400: MonStats2 nModeFlags (+0xF0) bit nBit of monster row nMonsterId.

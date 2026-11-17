@@ -15,7 +15,7 @@
 #include "Units/Units.h"
 #include "Units/UnitRoom.h"
 
-// 1.13c D2Common+0x2FE70 (#10481): clear the path state that belongs to unit types that never carry
+// Superseded by UNITS_ResetRoom (Units.cpp, the row for 0x2FE70, #10481): clear the path state that belongs to unit types that never carry
 // a live path (object, item, tile clear the first path dword; every other type clears the path's
 // room pointer at +0x1C). A null unit is fatal in retail (0x87D); we return.
 extern "C"

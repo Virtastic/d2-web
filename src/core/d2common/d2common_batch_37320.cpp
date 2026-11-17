@@ -91,40 +91,13 @@ EMSCRIPTEN_KEEPALIVE uint8_t D2Common_24E10_GetItemAutoStack(uint32_t pUnit) {  
 	return pRow[nItemType].nAutoStack;
 }
 
-// 1.13c D2Common+0x246A0: itemtypes.txt nStaffMods (+0x1F) of an item unit's item type. Anything
-// but a type-4 unit, an out-of-range item type or a missing row answers the retail default 7.
+// Export of 1.13c D2Common 0x246A0; the body is ITEMS_GetStaffMods in src/core/d2moo/src/Items/Items.cpp.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint8_t D2Common_246A0_StaffMods(uint32_t pUnit) {   // the FN probe src/core/fn/d2common_246a0.cpp owns d2_fn_d2common_246a0 (r[] ABI)   // 1.13c D2Common+0x246A0
-	uint8_t* u = P(pUnit);
-	if (!u || U(u, 0x00) != 4) return 7;
-	const int32_t nItemType = static_cast<int32_t>(ITEMS_GetItemType(reinterpret_cast<D2UnitStrc*>(u)));
-	if (nItemType < 0 || nItemType >= sgptDataTables->nItemTypesTxtRecordCount) return 7;
-	const D2ItemTypesTxt* pRow = sgptDataTables->pItemTypesTxt;
-	if (!pRow) return 7;
-	return pRow[nItemType].nStaffMods;
+EMSCRIPTEN_KEEPALIVE uint8_t D2Common_246A0_StaffMods(uint32_t pUnit) {   // the FN probe src/core/fn/d2common_246a0.cpp owns d2_fn_d2common_246a0 (r[] ABI)
+	return static_cast<uint8_t>(ITEMS_GetStaffMods(reinterpret_cast<D2UnitStrc*>(P(pUnit))));
 }
 
-// 1.13c D2Common+0x34390: when the record at param_1+0x5C exists and its +0x10 dword is negative,
-// zero ceil(n/32) dwords starting ceil(n/32)*4 bytes into the buffer at that record's +0x58, where n
-// is the dword at data tables +0xC4. The decompiler lost the count of the trailing byte loop, so
-// only the dword loop below is modelled; the byte tail is unproven.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_34390_batch(uint32_t pRecord) {   // 1.13c D2Common+0x34390
-	uint8_t* r = P(pRecord);
-	if (!r) return;
-	const uint32_t pInner = U(r, 0x5C);
-	if (!pInner) return;
-	uint8_t* inner = P(pInner);
-	if (I(inner, 0x10) >= 0) return;
-	if (!sgptDataTables) return;
-
-	const int32_t nBits = I(reinterpret_cast<uint8_t*>(sgptDataTables), 0xC4);
-	const uint32_t nDwords = static_cast<uint32_t>((nBits + 0x1F + ((nBits + 0x1F) >> 31 & 0x1F)) >> 5);
-	uint8_t* pDst = P(U(inner, 0x58) + nDwords * 4);
-	if (!pDst) return;
-	for (uint32_t i = 0; i < nDwords; ++i)
-		U(pDst, static_cast<int>(i * 4)) = 0;
-}
+// D2Common+0x34390 now runs as STATES_ClearGfxStateFlags (src/core/d2moo/src/D2States.cpp).
 
 // 1.13c D2Common+0x71430: address of row param_1 in the 0x22-byte table (count at
 // DAT_6fdefd98, base at DAT_6fdefd9C; wired to sgptDataTables->pLowQualityItemDataTables, the

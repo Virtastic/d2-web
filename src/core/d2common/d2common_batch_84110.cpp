@@ -114,7 +114,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_68340_batch(int32_t a, ui
 }
 
 extern "C" {
-// 1.13c D2Common+0x3E230: direction index from the offsets (eax - x2, y1 - y2) (fastcall: ecx=y1, edx=y2,
+// stand-alone twin of D2Common 0x3E230 (the proven row runs sub_6FDAB610): direction index from the offsets (eax - x2, y1 - y2) (fastcall: ecx=y1, edx=y2,
 // stack=x2, eax=x1). Same body as the private copy in d2common_batch_15840.cpp.
 int32_t D2Common_3E230_DirFromOffsets(int32_t eax, int32_t y1, int32_t y2, int32_t x2) {
 	uint32_t a = (uint32_t)(eax - x2), b = (uint32_t)(y1 - y2);

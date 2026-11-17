@@ -133,64 +133,8 @@ void D2Common_3D810_Read3x3(const B81Grid* g, int row, int col, int32_t out[9])
     out[8] = at(row - 1, col + 1); out[7] = at(row, col + 1); out[6] = at(row + 1, col + 1);
 }
 
-// the line is a DRLG vertex (x, y, direction, flags); its end is the next vertex (pointer at +0x10, {x,y} first)
-struct B36Line { int32_t x, y; int32_t _8, _c; uint32_t end; };   // +0x10 is a 32-bit retail slot, as the caller's P32 walk reads it
-static_assert(offsetof(B36Line, end) == 0x10, "B36Line end at +0x10");
-struct B36Rect { int32_t x, y, w, h; };
-// retail grid as laid out in the room data (the caller passes room+0x3C): two 32-bit words, cells pointer then row-offsets pointer
-struct B36Grid { uint32_t data; uint32_t rowOff; };
-static_assert(sizeof(B36Grid) == 8 && offsetof(B36Grid, rowOff) == 4, "B36Grid is two 32-bit words");
-
-// 1.13c D2Common+0x36CD0: EAX = line, ESI = clip rect, stack (grid, value, sel, nThick), ret 0x10. Bresenham from the
-// line start (x,y) to *end, plotting an nThick-long run per step (perpendicular to the major axis); each cell inside the
-// rect is combined with `value` by table entry `sel` of 0x6FDEB244 (or and xor mov mov-if-zero and-not) at
-// grid.data[grid.rowOff[y - rect.y] + (x - rect.x)] (the callback gets ECX = that cell, EDX = value).
-void D2Common_36CD0_PlotLine(const B36Line* l, const B36Rect* r, const B36Grid* grid, int value, int sel, int nThick)
-{
-    auto inRect = [](const B36Rect* r, int x, int y) { return r->x <= x && r->y <= y && x < r->w + r->x && y < r->h + r->y; };
-    int x = l->x, y = l->y;
-    const int32_t* end = (const int32_t*)(uintptr_t)l->end;
-    int dx = end[0] - x, dy = end[1] - y, sx = 1, sy = 1;
-    if (dx < 0) { dx = -dx; sx = -1; }
-    if (dy < 0) { dy = -dy; sy = -1; }
-    int err = 0;
-    auto plot = [&](int px, int py) {
-        if (!inRect(r, px, py)) return;
-        // cell = [grid+0] + 4*([[grid+4] + 4*(y - rect.y)] + (x - rect.x)); both grid words are 32-bit retail pointers
-        int32_t* cells = (int32_t*)(uintptr_t)grid->data;
-        const int32_t* rows = (const int32_t*)(uintptr_t)grid->rowOff;
-        int32_t* c = &cells[rows[py - r->y] + (px - r->x)];   // the grid is addressed from the rect's origin
-        const int32_t v = value;
-        switch (sel) {
-        case 0: *c |= v; break;
-        case 1: *c &= v; break;
-        case 2: *c ^= v; break;
-        case 3: *c = v; break;
-        case 4: if (*c == 0) *c = v; break;
-        case 5: *c &= ~v; break;
-        }
-    };
-    if (dx < dy) {
-        for (int i = 0; i < nThick; ++i) plot(x + i, y);
-        for (int n = dy; n > 0; --n) {
-            y += sy; err += dx;
-            if (dy < err) { x += sx; err -= dy; }
-            for (int i = 0; i < nThick; ++i) plot(x + i, y);
-        }
-    } else {
-        for (int i = 0; i < nThick; ++i) plot(x, y + i);
-        for (int n = dx; n > 0; --n) {
-            x += sx; err += dy;
-            if (dx < err) { y += sy; err -= dx; }
-            for (int i = 0; i < nThick; ++i) plot(x, y + i);
-        }
-    }
-}
-
-extern "C" void d2common_36cd0_port(const B36Line* l, const B36Rect* r, const B36Grid* grid, int value, int sel, int nThick)
-{
-    D2Common_36CD0_PlotLine(l, r, grid, value, sel, nThick);
-}
+// +0x36CD0 (the line plot) is DRLG_PlotLine = sub_6FD75F60 in src/core/d2moo/src/DrlgDrlgGrid.cpp; its
+// d2common_36cd0_port shim over the retail images lives in d2common_batch_7be50.cpp.
 
 // 1.13c D2Common+0x83CA0: lazily build the cached preset descriptor at param+0x50. If null: 5BE50(this, param+4)
 // fills it; if its +0x4C is null that is fatal 0x2B6 -> exit(-1). Then for each of the +0x14 entries call

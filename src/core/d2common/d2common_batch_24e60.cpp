@@ -21,26 +21,16 @@ namespace
 }
 
 // Item unit -> ItemTypes.txt row (via 0x230F0) field +0x0E (wQuiver), sign-extended; 0 otherwise.
-// 1.13c D2Common+0x24E60
+// Export of 1.13c D2Common 0x24E60; the body is ITEMS_GetQuiverType in src/core/d2moo/src/Items/Items.cpp.
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_24E60_GetItemQuiver(uint32_t pUnit) {
-	if (!pUnit || W(P(pUnit), 0) != 4) return 0;
-	const int32_t t = static_cast<int32_t>(ITEMS_GetItemType(reinterpret_cast<D2UnitStrc*>(P(pUnit))));
-	if (t < 0 || t >= sgptDataTables->nItemTypesTxtRecordCount || !sgptDataTables->pItemTypesTxt) return 0;
-	return static_cast<int16_t>(sgptDataTables->pItemTypesTxt[t].wQuiver);
+	return ITEMS_GetQuiverType(reinterpret_cast<D2UnitStrc*>(P(pUnit)));
 }
 
 // Maximum sockets for an item unit (ITEMS_GetMaxSockets): ItemTypes row of the item's type, cap by
 // item level (<=25 nMaxSock1, <=40 nMaxSock25, else nMaxSock40), min with items.txt nGemSockets.
-// 1.13c D2Common+0x24610
+// Export of 1.13c D2Common 0x24610; the body is ITEMS_GetMaxSockets in src/core/d2moo/src/Items/Items.cpp.
 extern "C" uint32_t d2_ours_d2common_24610(D2UnitStrc* pItem) {
-	if (!pItem || pItem->dwUnitType != 4) return 0;
-	const int32_t t = static_cast<int32_t>(ITEMS_GetItemType(pItem));
-	if (t < 0 || t >= sgptDataTables->nItemTypesTxtRecordCount || !sgptDataTables->pItemTypesTxt) return 0;
-	const D2ItemTypesTxt* r = &sgptDataTables->pItemTypesTxt[t];
-	const uint32_t gem = ITEMS_GetAllowedGemSocketsFromItemId(pItem->dwClassId);
-	const int lvl = ITEMS_GetItemLevel(pItem);
-	const uint32_t cap = lvl < 26 ? r->nMaxSock1 : lvl < 41 ? r->nMaxSock25 : r->nMaxSock40;
-	return gem < cap ? gem : cap;
+	return ITEMS_GetMaxSockets(pItem);
 }
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_24610_MaxSockets_u32(uint32_t pUnit) {
 	return d2_ours_d2common_24610(reinterpret_cast<D2UnitStrc*>(P(pUnit)));
@@ -131,30 +121,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2common_24e60_2e2c0(uint32_t pDrlg) {
 	}
 }
 
-// Value of stat nStatId (EDI) in stat list pList (EBX), binary-searched in the array at +0x24
-// (0x382B0); with the ItemStatCost record pRec (stack): flag byte+5 bit 2 (gdwBitMasks+8) + extended list (flags<0) + owner
-// type 0/1 + value < pRec->+0x2C => value = +0x2C << (+0x18 & 31). 0 if the stat is absent.
-// 1.13c D2Common+0x38B00
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_38B00_StatValue(uint32_t pList, int32_t nStatId, uint32_t pRec) {
-	const uint8_t* l = P(pList);
-	const uint8_t* arr = P(W(l, 0x24));
-	int32_t hi = static_cast<int16_t>(*reinterpret_cast<const uint16_t*>(l + 0x28)), lo = 0, idx = -1;
-	while (lo < hi) {
-		const int32_t mid = (hi - lo) / 2 + lo;
-		const int32_t v = static_cast<int32_t>(W(arr, mid * 8));
-		if (v < nStatId) lo = mid + 1;
-		else if (v == nStatId) { idx = mid; break; }
-		else hi = mid;
-	}
-	if (idx < 0) return 0;
-	int32_t val = static_cast<int32_t>(W(arr, idx * 8 + 4));
-	if (pRec && (P(pRec)[5] & 4) && static_cast<int32_t>(W(l, 0x10)) < 0) {
-		const uint32_t o = W(l, 0x44);
-		if (o && (W(P(o), 0) == 0 || W(P(o), 0) == 1) && val < static_cast<int32_t>(W(P(pRec), 0x2C)))
-			val = static_cast<int32_t>(W(P(pRec), 0x2C)) << (P(pRec)[0x18] & 31);
-	}
-	return val;
-}
+// D2Common+0x38B00 now runs as STATLIST_GetBaseStat_6FDB6340 (src/core/d2moo/src/D2StatList.cpp).
 
 // Add nDelta to a level's reference count (+0x0C, clamped at 0, delay +0x1D4 = 10), then do the same
 // to the level record of each nonzero id in its eight-entry link list (0x44CE0 on the DRLG at +0x1B4

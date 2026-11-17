@@ -195,6 +195,7 @@ int __fastcall sub_6FDAA720(D2PathInfoStrc* pPathInfo)
 
 //1.00:  D2Common.0x1005B6D0
 //1.10f: D2Common.0x6FDAA880
+// 1.13c D2Common+0x671B0
 BOOL __fastcall sub_6FDAA880(D2PathInfoStrc* pPathInfo, int* pTestDir, D2PathPointStrc pPoint, int* pDirection)
 {
 	D2UnitStrc* pUnit = pPathInfo->pDynamicPath->pUnit;
@@ -663,7 +664,7 @@ extern int32_t g_d2webAStarNodesPopped, g_d2webAStarAdvanced, g_d2webAStarExhaus
 int32_t g_d2webStraightTowardPoints = -1, g_d2webStraightTowardEarlyReturn = -1, g_d2webStraightAStarGate = -1, g_d2webStraightSquaredDist = -1;
 
 //1.10f: D2Common.0x6FDAB130
-//1.13c: D2Common.0x6FDB7AD0
+// 1.13c D2Common+0x67AD0
 int __fastcall PATH_Straight_Compute(D2PathInfoStrc* pPathInfo)
 {
 	g_d2webStraightTowardPoints = -1; g_d2webStraightTowardEarlyReturn = 0; g_d2webStraightAStarGate = 0; g_d2webStraightSquaredDist = -1;
@@ -855,6 +856,7 @@ int __fastcall PATH_ComputePathChargedBolt_6FDAB4A0(D2DynamicPathStrc* pDynamicP
 }
 
 //D2Common.0x6FDAB610
+// 1.13c D2Common+0x3E230 (same arithmetic; retail's registers carry the deltas as eax-x2 and y1-y2)
 int __fastcall sub_6FDAB610(int nX1, int nY1, int nX2, int nY2)
 {
 	int nAbsDiffX = 0;
@@ -933,7 +935,7 @@ int __fastcall sub_6FDAB610(int nX1, int nY1, int nX2, int nY2)
 }
 
 //1.10f: D2Common.0x6FDAB6A0
-//1.13c: D2Common.0x6FD8E190
+// 1.13c D2Common+0x3E190
 int __stdcall sub_6FDAB6A0(D2PathPointStrc pPoint1, D2PathPointStrc pPoint2)
 {
 	return sub_6FDAB610(pPoint1.X, pPoint1.Y, pPoint2.X, pPoint2.Y);
@@ -977,6 +979,7 @@ void __fastcall sub_6FDAB7D0(int* pTestDir, int nUnused, D2PathPointStrc pPoint1
 }
 
 //D2Common.0x6FDABA50
+// 1.13c D2Common+0x3E2B0
 int __stdcall sub_6FDABA50(D2PathPointStrc pPoint1, D2PathPointStrc pPoint2)
 {
 	static const int dword_6FDD22D8[] =
@@ -1414,6 +1417,7 @@ BOOL __stdcall D2Common_10229(D2DynamicPathStrc *pDynamicPath, D2UnitStrc *pUnit
 
 //1.10f: D2Common.0x6FDADA20
 //1.13c: D2Common.0x6FD5D760
+// 1.13c D2Common+0xD760
 void __fastcall PATH_RecacheRoom(D2DynamicPathStrc* pDynamicPath, D2ActiveRoomStrc* pHintRoom)
 {
 	if (pDynamicPath->pRoom && DungeonTestRoomGame(pDynamicPath->pRoom, pDynamicPath->tGameCoords.wPosX, pDynamicPath->tGameCoords.wPosY))
@@ -1422,33 +1426,19 @@ void __fastcall PATH_RecacheRoom(D2DynamicPathStrc* pDynamicPath, D2ActiveRoomSt
 		return;
 	}
 
-	// 1.13c D2Common+0xD760: lookup order changed for a teleport into another level.
-	// A teleport into another level (a waypoint across acts) searches the hint room first. The previous
-	// room's neighbours can hold a room of the old level that covers the same subtile (Lut Gholein's
-	// neighbours cover Harrogath's spawn subtile), which would keep the unit in the wrong level.
-	D2ActiveRoomStrc* pRoomAtLocation = nullptr;
-	if (pHintRoom && pDynamicPath->pRoom && DUNGEON_GetLevelIdFromRoom(pHintRoom) != DUNGEON_GetLevelIdFromRoom(pDynamicPath->pRoom))
+	// 1.13c D2Common+0xD760: the room is looked up from the previous room's neighbourhood, then from the hint room (when
+	// there is one). A unit that finds none still leaves its old room and takes the null one (the SetRoom steps are inlined in
+	// this function); only a missile keeps its room and loses its path.
+	D2ActiveRoomStrc* pRoomAtLocation = DUNGEON_GetRoomAtPosition(pDynamicPath->pRoom, pDynamicPath->tGameCoords.wPosX, pDynamicPath->tGameCoords.wPosY);
+	if (!pRoomAtLocation && pHintRoom)
 	{
 		pRoomAtLocation = DUNGEON_GetRoomAtPosition(pHintRoom, pDynamicPath->tGameCoords.wPosX, pDynamicPath->tGameCoords.wPosY);
 	}
 
-	// Try to find room using previous path room
-	if (!pRoomAtLocation)
-	{
-		pRoomAtLocation = DUNGEON_GetRoomAtPosition(pDynamicPath->pRoom, pDynamicPath->tGameCoords.wPosX, pDynamicPath->tGameCoords.wPosY);
-	}
-	if (!pRoomAtLocation)
-	{
-		// Try looking for the room using the hint room
-		pRoomAtLocation = DUNGEON_GetRoomAtPosition(pHintRoom, pDynamicPath->tGameCoords.wPosX, pDynamicPath->tGameCoords.wPosY);
-	}
-
-	if (pRoomAtLocation)
-	{
-		PATHMISC_SetRoom(pDynamicPath, pRoomAtLocation);
-	}
-	else if((pDynamicPath->dwFlags & PATH_MISSILE_MASK) != 0)
+	if (!pRoomAtLocation && (pDynamicPath->dwFlags & PATH_MISSILE_MASK) != 0)
 	{
 		pDynamicPath->dwPathPoints = 0;
+		return;
 	}
+	PATHMISC_SetRoom(pDynamicPath, pRoomAtLocation);
 }

@@ -39,7 +39,6 @@ __attribute__((weak)) void d2_port8_gen1(void);
 __attribute__((weak)) void d2_port8_gen2(void);
 __attribute__((weak)) void d2_port8_gen3(void);
 __attribute__((weak)) void d2_port8_gen4(void);
-__attribute__((weak)) int32_t d2_sub_38B00_StatValue(uint32_t pList, int32_t nStatId, uint32_t pRec); // +0x38B00 (D2Common_38B00_StatValue)
 __attribute__((weak)) int32_t d2_sub_38A80_StatMax(uint32_t pList, int32_t nStatId, uint32_t pRec);   // +0x38A80
 __attribute__((weak)) uint32_t d2_port8_5EF40_CompileTxt(uint32_t hArchive, uint32_t szName, const uint32_t* pTbl, uint32_t pCountOut, uint32_t dwSize);
 __attribute__((weak)) uint32_t d2_port8_4CE90_Collision(uint32_t pRoom, int32_t x, int32_t y, uint32_t nPattern, uint32_t nMask);
@@ -166,13 +165,7 @@ namespace
 	}
 }
 
-// 1.13c D2Common+0x38C80 (EAX = stat-cost id, ECX = stat list, stack = layer word; ret 4).
-// Null list or id outside [0, count): 0; else 0x38B00(list, (id << 16) + layer, record) (EBX = list, EDI = key).
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_38C80_StatValueById(uint32_t pDataTables, int32_t nStatCostId, uint32_t pList, int32_t nLayer)
-{
-	const uint32_t rec = pList ? StatCostRecord(pDataTables, nStatCostId) : 0;
-	return rec ? d2_sub_38B00_StatValue(pList, static_cast<int32_t>((static_cast<uint32_t>(nStatCostId) << 16) + (static_cast<uint32_t>(nLayer) & 0xFFFFu)), rec) : 0;
-}
+// D2Common+0x38C80 now runs as STATLIST_GetStatValue (src/core/d2moo/src/D2StatList.cpp).
 
 // 1.13c D2Common+0x39490: same gates, calls 0x38A80 (the clamped/maximum variant) instead.
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_39490_StatMaxById(uint32_t pDataTables, int32_t nStatCostId, uint32_t pList, int32_t nPackedStatId)

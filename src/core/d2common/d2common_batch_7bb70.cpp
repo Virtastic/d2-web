@@ -3,7 +3,7 @@
 #include <emscripten.h>
 
 extern "C" {
-// 1.13c D2Common+0x7BB70: room in EAX, status in BL (unaff_BL). If the status differs from +0x44,
+// retail-layout seam of D2Common 0x7BB70 (marker on DRLGACTIVATE_ForceRoomExStatusImpl): room in EAX, status in BL (unaff_BL). If the status differs from +0x44,
 // unlink the room from its current list node (+0x1c prev / +0xe8 next, only when both set), then if
 // status < 4 insert it after list head (*(*(+0x58)+0x1b4) + 0xa0 + status*0xec) and store +0x44.
 // Oddity: when status >= 4 the room is left unlinked and +0x44 is not updated.

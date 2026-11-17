@@ -15,7 +15,7 @@ namespace {
 uint32_t R32(uint32_t a) { uint32_t v; memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }
 }
 
-// 1.13c D2Common+0x671B0
+// stand-alone 32-bit layout twin of D2Common 0x671B0 (the proven row runs sub_6FDAA880)
 extern "C" int32_t D2Common_671B0_TryDirections(const D2PathTryDirSeam* s, uint32_t pPathInfo, uint32_t nPoint,
                                                 const int32_t* pDirs, int32_t* pOut)
 {

@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x422a0
+// stand-alone port of the retail 0x422a0 body (the engine function is DRLGOUTDOORS_SetBlankGridCell)
 // fastcall(obj = ecx, x = edx), stack y, callee clean (ret 4). obj+0x14 = state S; S+4 = cells A, S+8 = row offsets A;
 // S+0x2c = cells B, S+0x30 = row offsets B. Each cell write is a dword store of the value shown.
 // A[rowA[y] + x] = 0; B[rowB[y] + x] = 0x100 (dword cells).

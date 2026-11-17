@@ -421,11 +421,9 @@ void D2Common_3C520_AssignTextToRoom(uint32_t pRoom, uint32_t pText)
 // and the hit mask returned; on a miss it is placed at the destination and 0 returned.
 // The vendored COLLISION_TryTeleportUnitCollisionMask (+0x44950) is the same rule; this row is
 // the caller-facing copy and calls the three primitives directly.
-uint32_t D2Common_4D6E0_MoveCollisionMask(uint32_t pRoom, int32_t nX1, int32_t nY1, int32_t nX2, int32_t nY2,
+uint32_t D2Common_4D6E0_MoveCollisionMask(D2ActiveRoomStrc* room, int32_t nX1, int32_t nY1, int32_t nX2, int32_t nY2,
                                           int32_t nCollisionPattern, uint16_t nFootprintMask, uint16_t nMoveConditionMask)
 {
-	D2ActiveRoomStrc* room = reinterpret_cast<D2ActiveRoomStrc*>(static_cast<uintptr_t>(pRoom));
-
 	COLLISION_ResetMaskWithPattern(room, nX1, nY1, nCollisionPattern, nFootprintMask);
 	const uint16_t nCollidedWithMask = COLLISION_CheckMaskWithPattern(room, nX2, nY2, nCollisionPattern, nMoveConditionMask);
 
@@ -468,7 +466,7 @@ uint32_t D2Common_3D0F0_GetTextListIdByIndex(uint32_t pList, int32_t nIndex)
 	}
 }
 
-// 1.13c D2Common+0x3C460 (#10079): append a client pointer to a room's client array, in the
+// D2Common 0x3C460 (#10079; marker on the d2moo function): append a client pointer to a room's client array, in the
 // retail room layout (array +0x48, count +0x78, capacity +0x04). The vendored
 // DUNGEON_AddClientToRoom works on the 1.10f engine layout; this is the retail-layout form the
 // FN capture replays. Retail fatals (0x473/0x474/0x475/0x477) become silent returns. When

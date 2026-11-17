@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "D2BitManip.h"
+#include "D2Items.h"
 #include "D2Collision.h"
 #include "D2DataTbls.h"
 #include "D2Skills.h"
@@ -149,17 +150,10 @@ uint32_t D2Common_22700_ItemBitField1Bit2(uint32_t nItemId)
 	return 0;
 }
 
-// 1.13c D2Common+0x22AD0 (#10017) items.txt dwMinStack (+0xE4). Out of range is fatal in retail
-// (_exit); we return 0.
+// Export of 1.13c D2Common 0x22AD0 (#10017): the body is ITEMS_GetMinStackFromItemId in src/core/d2moo/src/Items/Items.cpp.
 int32_t D2Common_22AD0_ItemMinStack(uint32_t nItemId)
 {
-	const D2ItemDataTbl* pTable = DATATBLS_GetItemDataTables();
-	if (pTable && nItemId < (uint32_t)pTable->nItemsTxtRecordCount)
-	{
-		const D2ItemsTxt* pItem = DATATBLS_GetItemsTxtRecord((int32_t)nItemId);
-		if (pItem) return (int32_t)pItem->dwMinStack;
-	}
-	return 0;
+	return ITEMS_GetMinStackFromItemId(static_cast<int>(nItemId));
 }
 
 // 1.13c D2Common+0x1D7C0 (#10018) path/missile-stream rebuild. Implemented: the path field reset

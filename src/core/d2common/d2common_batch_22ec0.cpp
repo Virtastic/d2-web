@@ -6,6 +6,7 @@
 // retail call is fatal or unavailable, so the caller returns the function's neutral value).
 // Retail's fatal asserts (_exit) are modelled as the function's neutral return.
 #include <cstdarg>
+#include "D2Items.h"
 #include <cstddef>
 #include <cstdint>
 
@@ -75,22 +76,10 @@ uint32_t D2Common_22B70_GetMaxStack(uint32_t nItemId)
 // ---------------------------------------------------------------------------------------------
 // 0x23360: itemtypes.txt nNormal for an item unit's wType[0]. Non-item units, an invalid item id
 // (retail assert 0x67e in the inlined 0x230F0) and out-of-range types all yield 1.
-// 1.13c D2Common+0x23360 (#10556)
+// Export of 1.13c D2Common 0x23360 (#10556); the body is ITEMS_CanBeNormal in src/core/d2moo/src/Items/Items.cpp.
 uint8_t D2Common_23360_CanBeNormal(uint32_t pUnit)
 {
-	if (!pUnit || RdU32(PC(pUnit), 0x00) != 4)
-		return 1;
-
-	const D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(static_cast<int32_t>(RdU32(PC(pUnit), 0x04)));
-	if (!pItemsTxtRecord)
-		return 1;
-
-	const int32_t nType = pItemsTxtRecord->wType[0];
-	if (nType < 0 || nType >= sgptDataTables->nItemTypesTxtRecordCount)
-		return 1;
-	if (!sgptDataTables->pItemTypesTxt)
-		return 1;
-	return sgptDataTables->pItemTypesTxt[nType].nNormal;
+	return static_cast<uint8_t>(ITEMS_CanBeNormal(reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit))));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -113,7 +102,7 @@ void D2Common_4DEE0_SetField20(uint32_t pBlock, uint32_t dwValue)
 
 // ---------------------------------------------------------------------------------------------
 // 0x3B440: flag bit 1 of the dword at +0x34. Retail asserts on a null block (0x42f).
-// 1.13c D2Common+0x3b440 (#10752)
+// raw-layout body of D2Common 0x3b440 (the marked port is D2Common_10074)
 uint32_t D2Common_3B440_GetFlag2(uint32_t pBlock)
 {
 	if (!pBlock)
@@ -137,13 +126,6 @@ void D2Common_2EBB0_ValidateUnitFields(uint32_t pBlock)
 }
 
 // ---------------------------------------------------------------------------------------------
-// 0x6CB20: leveldefs.bin row for a level id, null out of range.
-// 1.13c D2Common+0x6CB20 (#10749)
-D2LevelDefBin* D2Common_6CB20_GetLevelDefRecord(int32_t nLevelId)
-{
-	return DATATBLS_GetLevelDefRecord(nLevelId);
-}
-
 // ---------------------------------------------------------------------------------------------
 // 0x12C00: variadic log line. Retail guards on a global log FILE*, takes the log critical section,
 // calls the formatter at 0x12AF0 and leaves the section; the formatter itself re-checks its own

@@ -140,26 +140,5 @@ uint32_t D2Common_10438_GetUnitDataDwordOrFatal(int32_t* pUnit)
     std::_Exit(-1);
 }
 
-// 1.13c D2Common+0x67E50: defaults *pOut to 0xFF, then for in-range record nIndex (stride 0x220)
-// copies the byte at +0xE4 and returns 1 when it is not 0xFF. Index 0 and out-of-range yield 0.
-extern "C"
-uint32_t D2Common_10436_GetTableRecordByteField(int32_t nIndex, uint16_t* pOut)
-{
-    *pOut = 0xff;
-    const int32_t nCount = sgptDataTables ? sgptDataTables->nLevelsTxtRecordCount : 0;
-    const uint8_t* pBase = sgptDataTables ? (const uint8_t*)sgptDataTables->pLevelsTxt : nullptr;
-    if (nIndex < nCount && nIndex > 0 && pBase != nullptr)
-    {
-        const uint8_t* pRecord = pBase + (intptr_t)nIndex * 0x220;
-        const uint16_t nValue = pRecord[0xe4];
-        *pOut = nValue;
-        if (nValue != 0xff)
-        {
-            return 1;
-        }
-    }
-    return 0;
-}
-
 // FN probe seam: install the 0x1330 emulation the 4C990 probe supplies.
 extern "C" void D2Common_4C990_SetEnv(void* (*pfn)(void)) { env_1330_GetGridRecord = pfn; }

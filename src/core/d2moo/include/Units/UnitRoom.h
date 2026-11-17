@@ -29,3 +29,13 @@ D2COMMON_DLL_DECL void __stdcall UNITROOM_RemoveUnitFromRoom(D2UnitStrc* pUnit);
 D2COMMON_DLL_DECL void __stdcall UNITROOM_RemoveUnitFromUpdateQueue(D2UnitStrc* pUnit);
 //D2Common.0x6FDBD4C0 (#10389)
 D2COMMON_DLL_DECL BOOL __stdcall UNITROOM_IsUnitInRoom(D2ActiveRoomStrc* pRoom, D2UnitStrc* pUnit);
+
+// 1.13c D2Common+0x66800 callee seams (UNITROOM_AddUnitToRoomEx); the defaults are the engine callees.
+struct D2UnitRoomAddSeams
+{
+	BOOL (*check)(D2ActiveRoomStrc* pRoom, D2UnitStrc* pUnit, int nOne);  // 0x66630
+	void (*refresh)(D2UnitStrc* pUnit);                                   // 0x665C0
+	int (*alignment)(D2UnitStrc* pUnit);                                  // 0x391F0
+};
+const D2UnitRoomAddSeams& UNITROOM_AddSeams();
+int UNITROOM_AddUnitToRoomWith(D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom, const D2UnitRoomAddSeams& s);

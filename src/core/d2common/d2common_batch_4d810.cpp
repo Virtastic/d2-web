@@ -38,7 +38,7 @@ extern "C" uint8_t D2Common_234F0_GetReEquip(D2UnitStrc* item)
     return sgptDataTables->pItemTypesTxt[type].nReEquip;
 }
 
-// 1.13c D2Common+0x373B0: guest layout (retail 32-bit records). act+0x04 is the environment pointer; the
+// raw-layout body of D2Common 0x373B0 (the marked port is ENVIRONMENT_GetCycleIndex_Ticks_EclipseFromAct): guest layout (retail 32-bit records). act+0x04 is the environment pointer; the
 // cycle index is env+0x00, ticks env+0x08, eclipse env+0x30. A null act is fatal in retail; here it returns.
 extern "C" void D2Common_373B0_GetEnvironmentState(D2DrlgActStrc* act,
     int* cycle, int* ticks, BOOL* eclipse)

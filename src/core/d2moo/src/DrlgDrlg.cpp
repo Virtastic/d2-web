@@ -894,6 +894,7 @@ int __stdcall DRLG_GetSaveMonstersFromLevelId(int nLevelId)
 }
 
 //D2Common.0x6FD75350 (#10002)
+// 1.13c D2Common+0x2D810
 int __stdcall DRLG_GetLOSDrawFromLevelId(int nLevelId)
 {
 	return DATATBLS_GetLevelDefRecord(nLevelId)->dwLOSDraw;
@@ -930,6 +931,7 @@ D2DrlgWarpStrc* __fastcall DRLG_GetDrlgWarpFromLevelId(D2DrlgStrc* pDrlg, int nL
 }
 
 //D2Common.0x6FD753F0
+// 1.13c D2Common+0x2D210
 void __fastcall DRLG_SetWarpId(D2DrlgWarpStrc* pDrlgWarp, int nVis, int nWarp, int nId)
 {
 	for (int i = 0; i < 8; ++i)
@@ -952,13 +954,13 @@ void __fastcall DRLG_SetWarpId(D2DrlgWarpStrc* pDrlgWarp, int nVis, int nWarp, i
 				return;
 			}
 		}
-		D2_UNREACHABLE;
+		// 1.13c has no fatal here: with no free slot nId stays -1 and falls through to the writes below
 	}
-	D2_ASSERT(nId >= 0 && nId < 8);
 
-
-	pDrlgWarp->nVis[nId] = nVis;
-	pDrlgWarp->nWarp[nId] = nWarp;
+	// 1.13c writes the id at word nId + 1 and the value at word nId + 9 with no range check (nId -1 hits words 0 and 8)
+	int32_t* pWords = reinterpret_cast<int32_t*>(pDrlgWarp);
+	pWords[nId + 1] = nVis;
+	pWords[nId + 9] = nWarp;
 }
 
 //D2Common.0x6FD75450

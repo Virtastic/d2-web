@@ -555,6 +555,29 @@ static const D2C_LvlPrestIds levelPrestBorder[13][4] = {
 	LVLPREST_NONE,						LVLPREST_ACT1_WILD_BORDER_12,	LVLPREST_ACT2_DESERT_BORDER_12, LVLPREST_ACT4_MESA_BORDER_12,
 };
 
+// The tile-set column the border presets use for a level's style (nFlag: the vertex direction itself; act 1 answers column 1 for direction 0)
+// 1.13c D2Common+0x145A0
+int __fastcall DRLGOUTPLACE_GetBorderTileColumn(D2DrlgLevelStrc* pLevel, char nFlag)
+{
+	switch (pLevel->nLevelType)
+	{
+	case LVLTYPE_ACT1_WILDERNESS:
+		return nFlag == 0;
+
+	case LVLTYPE_ACT2_DESERT:
+		return 2;
+
+	case LVLTYPE_ACT4_MESA:
+		return 3;
+
+	case LVLTYPE_ACT5_BARRICADE:
+		return sub_6FD84100(pLevel);
+
+	default:
+		return -1;
+	}
+}
+
 //D2Common.0x6FD80BE0
 int __fastcall sub_6FD80BE0(int a1, int a2, int a3)
 {
@@ -773,28 +796,7 @@ void __fastcall DRLGOUTPLACE_PlaceAct1245OutdoorBorders(D2DrlgLevelStrc* pLevel)
 		{
 			nDiff = -nDiff;
 		}
-		switch (pLevel->nLevelType)
-		{
-		case LVLTYPE_ACT1_WILDERNESS:
-			nLevelPrestId = sub_6FD80BE0(nCurrentDiffX, nCurrentDiffY, pDrlgVertex->nDirection == 0);
-			break;
-
-		case LVLTYPE_ACT2_DESERT:
-			nLevelPrestId = sub_6FD80BE0(nCurrentDiffX, nCurrentDiffY, 2);
-			break;
-
-		case LVLTYPE_ACT4_MESA:
-			nLevelPrestId = sub_6FD80BE0(nCurrentDiffX, nCurrentDiffY, 3);
-			break;
-
-		case LVLTYPE_ACT5_BARRICADE:
-			nLevelPrestId = sub_6FD80BE0(nCurrentDiffX, nCurrentDiffY, sub_6FD84100(pLevel));
-			break;
-
-		default:
-			nLevelPrestId = sub_6FD80BE0(nCurrentDiffX, nCurrentDiffY, -1);
-			break;
-		}
+		nLevelPrestId = sub_6FD80BE0(nCurrentDiffX, nCurrentDiffY, DRLGOUTPLACE_GetBorderTileColumn(pLevel, pDrlgVertex->nDirection));
 
 		if (!(pDrlgVertex->dwFlags & 2))
 		{
@@ -912,28 +914,7 @@ void __fastcall DRLGOUTPLACE_PlaceAct1245OutdoorBorders(D2DrlgLevelStrc* pLevel)
 			tLvlPrestPackedInfo.bHasDirection = nDirection != 0;
 		}
 
-		switch (pLevel->nLevelType)
-		{
-		case LVLTYPE_ACT1_WILDERNESS:
-			v41 = nDirection == 0;
-			break;
-
-		case LVLTYPE_ACT2_DESERT:
-			v41 = 2;
-			break;
-
-		case LVLTYPE_ACT4_MESA:
-			v41 = 3;
-			break;
-
-		case LVLTYPE_ACT5_BARRICADE:
-			v41 = sub_6FD84100(pLevel);
-			break;
-
-		default:
-			v41 = -1;
-			break;
-		}
+		v41 = DRLGOUTPLACE_GetBorderTileColumn(pLevel, nDirection);
 
 		if (pDrlgVertex->dwFlags & 2)
 		{
@@ -1357,6 +1338,7 @@ BOOL __fastcall sub_6FD81950(D2DrlgLevelLinkDataStrc* pLevelLinkData)
 }
 
 //D2Common.0x6FD81AD0
+// 1.13c D2Common+0x144C0
 BOOL __fastcall sub_6FD81AD0(D2DrlgLevelLinkDataStrc* pLevelLinkData)
 {
 	pLevelLinkData->nRand[1][pLevelLinkData->nIteration] = 0;
@@ -1448,6 +1430,16 @@ BOOL __fastcall sub_6FD81CA0(D2DrlgLevelLinkDataStrc* pLevelLinkData)
 	return TRUE;
 }
 
+// The act 1 case of the switch below, which 1.13c keeps as its own function
+// 1.13c D2Common+0x17AE0
+void __fastcall DRLGOUTPLACE_CreateAct1LevelConnections(D2DrlgStrc* pDrlg)
+{
+	sub_6FD823C0(pDrlg, gAct1WildernessDrlgLink, sub_6FD82050, sub_6FD82360);
+	sub_6FD823C0(pDrlg, gAct1MonasteryDrlgLink, sub_6FD82130, sub_6FD82360);
+
+	sub_6FD82750(pDrlg, LEVEL_ROGUEENCAMPMENT, LEVEL_BURIALGROUNDS);
+}
+
 //1.10: D2Common.0x6FD81D60
 //1.14d: 0x00678AD0
 void __fastcall DRLGOUTPLACE_CreateLevelConnections(D2DrlgStrc* pDrlg, uint8_t nAct)
@@ -1462,10 +1454,7 @@ void __fastcall DRLGOUTPLACE_CreateLevelConnections(D2DrlgStrc* pDrlg, uint8_t n
 	switch (nAct)
 	{
 	case ACT_I:
-		sub_6FD823C0(pDrlg, gAct1WildernessDrlgLink, sub_6FD82050, sub_6FD82360);
-		sub_6FD823C0(pDrlg, gAct1MonasteryDrlgLink, sub_6FD82130, sub_6FD82360);
-
-		sub_6FD82750(pDrlg, LEVEL_ROGUEENCAMPMENT, LEVEL_BURIALGROUNDS);
+		DRLGOUTPLACE_CreateAct1LevelConnections(pDrlg);
 		break;
 
 	case ACT_II:
@@ -1682,6 +1671,7 @@ BOOL __fastcall DRLGOUTPLACE_LinkAct4Outdoors(D2DrlgLevelLinkDataStrc* pLevelLin
 }
 
 //D2Common.0x6FD82300
+// 1.13c D2Common+0x14630
 BOOL __fastcall DRLGOUTPLACE_LinkAct4ChaosSanctum(D2DrlgLevelLinkDataStrc* pLevelLinkData, int nIteration)
 {
 	int nLevelLink = gAct4ChaosSanctumDrlgLink[nIteration].nLevelLink;

@@ -161,6 +161,7 @@ D2DrlgTileDataStrc* __stdcall DUNGEON_GetTileDataFromAct(D2DrlgActStrc* pAct)
 }
 
 //D2Common.0x6FD8BBB0 (#10034)
+// 1.13c D2Common+0x3BA60: asserts the out pointer first; a null room zeroes all eight dwords
 void __stdcall DUNGEON_GetRoomCoordinates(D2ActiveRoomStrc* pRoom, D2DrlgCoordsStrc* pCoords)
 {
 	D2_ASSERT(pCoords);
@@ -171,12 +172,12 @@ void __stdcall DUNGEON_GetRoomCoordinates(D2ActiveRoomStrc* pRoom, D2DrlgCoordsS
 	}
 	else
 	{
-		FOG_Trace(" ----- RJS NOTE: Would have crashed, see code");
 		memset(pCoords, 0x00, sizeof(D2DrlgCoordsStrc));
 	}
 }
 
 //D2Common.0x6FD8BC10 (#10035)
+// 1.13c D2Common+0x3BA20: the count (room +0x24) goes through the third argument first, then the list head (room +0x00) through the second
 void __stdcall DUNGEON_GetAdjacentRoomsListFromRoom(D2ActiveRoomStrc* pRoom, D2ActiveRoomStrc*** pppRoomList, int* pNumRooms)
 {
 	D2_ASSERT(pRoom);
@@ -535,6 +536,7 @@ D2PresetUnitStrc* __stdcall DUNGEON_GetPresetUnitsFromRoom(D2ActiveRoomStrc* pRo
 }
 
 //D2Common.0x6FD8C600
+// 1.13c D2Common+0x3B5B0 (room in EAX, assert on null, returns room +0x20)
 D2RoomCollisionGridStrc* __fastcall DUNGEON_GetCollisionGridFromRoom(D2ActiveRoomStrc* pRoom)
 {
 	D2_ASSERT(pRoom);
@@ -590,6 +592,7 @@ D2ActiveRoomStrc* __stdcall DUNGEON_GetRoomFromAct(D2DrlgActStrc* pAct)
 }
 
 //D2Common.0x6FD8C7A0 (#10057)
+// 1.13c D2Common+0x3C000 (null room -> 0, else room->pDrlgRoom->pLevel->nLevelId with no further null test)
 int __stdcall DUNGEON_GetLevelIdFromRoom(D2ActiveRoomStrc* pRoom)
 {
 	if (pRoom)
@@ -612,7 +615,7 @@ int __stdcall DUNGEON_GetWarpDestinationLevel(D2ActiveRoomStrc* pRoom, int nSour
 }
 
 //D2Common.0x6FD8C7E0 (#10059)
-// D2Common 0x3BFB0
+// 1.13c D2Common+0x3BFB0
 // Cached retail inlines the populated-room check and aborts on a missing
 // room-ex. Keep the 0x800000 flag and level field through native pointers.
 int __stdcall DUNGEON_GetLevelIdFromPopulatedRoom(D2ActiveRoomStrc* pRoom)
@@ -756,6 +759,7 @@ BOOL __stdcall D2Common_10073(D2ActiveRoomStrc* pRoom)
 }
 
 //D2Common.0x6FD8CAE0 (#10074)
+// 1.13c D2Common+0x3B440
 BOOL __stdcall D2Common_10074(D2ActiveRoomStrc* pRoom)
 {
 	D2_ASSERT(pRoom);
@@ -780,7 +784,7 @@ void __stdcall D2Common_10075(D2ActiveRoomStrc* pRoom, BOOL bSet)
 }
 
 //D2Common.0x6FD8CB60 (#10079)
-// D2Common 0x3C460
+// 1.13c D2Common+0x3C460
 void __stdcall DUNGEON_AddClientToRoom(D2ActiveRoomStrc* pRoom, D2ClientStrc* pClient)
 {
 	D2_ASSERT(pRoom);
@@ -992,6 +996,7 @@ void __stdcall D2Common_10077(D2ActiveRoomStrc* pRoom1, D2ActiveRoomStrc* pRoom2
 }
 
 //D2Common.0x6FD8D030 (#10078)
+// 1.13c D2Common+0x3C800: reads act +0x48 (the drlg) and runs the inactive-room sweep on it, no null test
 void __stdcall DUNGEON_UpdateAndFreeInactiveRooms(D2DrlgActStrc* pAct)
 {
 	DRLG_UpdateAndFreeInactiveRooms(pAct->pDrlg);
@@ -1049,6 +1054,7 @@ BOOL __stdcall DUNGEON_IsTownLevelId(int nLevelId)
 }
 
 //D2Common.0x6FD8D0E0 (#10082)
+// 1.13c D2Common+0x3C390
 BOOL __stdcall DUNGEON_IsRoomInTown(D2ActiveRoomStrc* pRoom)
 {
 	if (pRoom)
@@ -1073,6 +1079,7 @@ int __stdcall D2COMMON_10083_Return0(D2ActiveRoomStrc* pRoom)
 }
 
 //D2Common.0x6FD8D130 (#10084)
+// 1.13c D2Common+0x3B220
 int __stdcall D2Common_10084(D2ActiveRoomStrc* pRoom)
 {
 	return pRoom->dwFlags & 4;
@@ -1090,6 +1097,7 @@ int __stdcall DUNGEON_GetTownLevelIdFromActNo(uint8_t nAct)
 }
 
 //D2Common.0x6FD8D180 (#10087)
+// 1.13c D2Common+0x3C330
 int __stdcall D2Common_10087(D2ActiveRoomStrc* pRoom)
 {
 	D2_ASSERT(pRoom);

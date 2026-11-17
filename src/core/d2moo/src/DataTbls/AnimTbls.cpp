@@ -62,6 +62,7 @@ static uint8_t SimpleStringHash(char* str)
 	return nHash;
 }
 
+// 1.13c D2Common+0x41DD0 (upper-case in place, byte-sum bucket, 8-byte name compare)
 static D2AnimDataRecordStrc* DATATBLS_GetAnimDataRecordFromPath(char* szPath)
 {
 	ToUpperCase(szPath);

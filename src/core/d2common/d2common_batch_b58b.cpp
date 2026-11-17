@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <initializer_list>
 
-// 1.13c D2Common+0x3E190
+// stand-alone twin of D2Common 0x3E190 (the proven row runs sub_6FDAB6A0)
 // Direction index between two packed (y<<16|x) points: delta signs/magnitudes pick one of the
 // 5-wide rows, result = row*5 + 12 + col (or row*5 + 10 when col < -1).
 int32_t d2_fn_d2common_3e190(uint32_t a, uint32_t b)

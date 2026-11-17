@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include "D2Items.h"
 
 #include "D2DataTbls.h"
 
@@ -187,7 +188,8 @@ struct D2Common_10531_Env
 	uint32_t (*pValidateRoomUnit)(int32_t*, int32_t*, int32_t);
 };
 
-// 1.13c D2Common+0x66800: links the unit at the head of the room's unit list (room+0x74, unit
+// Superseded by UNITROOM_AddUnitToRoomEx (src/core/d2moo/src/Units/UnitRoom.cpp, the row for 0x66800); kept for reference only.
+// D2Common 0x66800: links the unit at the head of the room's unit list (room+0x74, unit
 // next at +0xE8), refreshes it, and counts it in room+0x28 when it is a plain unit or a
 // type-1 unit with alignment 2. Null unit/room (fatal 0x42/0x43) and a failed validation
 // (fatal 0x4C) are retail's _exit(-1).
@@ -263,18 +265,10 @@ void D2Common_10542_SetWordInDword0x38(uint8_t* pBlock, int32_t nValue)
 	W(pBlock, 0x38) = (R(pBlock, 0x38) & 0xff) + static_cast<uint32_t>(nValue) * 0x100;
 }
 
-// 1.13c D2Common+0x24EB0: items.txt wShoots (word +0x0C) of a type-4 unit's item type.
-// The type index comes from 0x230F0, still an UNMAPPED row; a null unit or a non-item yields 0.
+// Export of 1.13c D2Common 0x24EB0: the body is ITEMS_GetAmmoType in src/core/d2moo/src/Items/Items.cpp.
+// The env seam is kept for the old probe signature and is no longer consulted.
 extern "C"
-int32_t D2Common_10543_GetItemShoots(const int32_t* pUnit, const D2Common_10523_Env* pEnv)
+int32_t D2Common_10543_GetItemShoots(const int32_t* pUnit, const D2Common_10523_Env*)
 {
-	if (pUnit == nullptr || pUnit[0] != 4)
-		return 0;
-	const int32_t nType = (pEnv != nullptr && pEnv->pItemTypeFromUnit)
-	                          ? pEnv->pItemTypeFromUnit(pUnit)
-	                          : -1;
-	if (nType < 0 || sgptDataTables == nullptr || sgptDataTables->pItemTypesTxt == nullptr ||
-	    nType >= sgptDataTables->nItemTypesTxtRecordCount)
-		return 0;
-	return static_cast<int16_t>(sgptDataTables->pItemTypesTxt[nType].wShoots);
+	return ITEMS_GetAmmoType(reinterpret_cast<D2UnitStrc*>(const_cast<int32_t*>(pUnit)));
 }

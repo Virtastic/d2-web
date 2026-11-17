@@ -25,14 +25,6 @@ namespace
 	inline uint32_t& W(void* b, int o) { return *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(b) + o); }
 }
 
-// Env seams for callees that are still-UNMAPPED rows. Signatures follow the 1.13c calls; a null
-// pointer means the environment has not installed the implementation yet.
-extern "C"
-{
-	// 0x38B00: stat value from a stat list (EBX = list, EDI = packed layer/stat id).
-	int32_t (*g_d2common_fn_38B00)(uint32_t, int32_t) = nullptr;
-}
-
 // 1.13c D2Common+0x22590 (#10572): the two dwords at pItemData+0x1C/+0x20 for a UNIT_ITEM with a
 // non-null item data block; everything else (null unit, another unit type, null data) writes 0/0.
 extern "C"
@@ -73,40 +65,13 @@ EMSCRIPTEN_KEEPALIVE void D2SetEnabledStat(D2UnitStrc* unit, D2ActiveRoomStrc* p
 	path->dwClientCoordY = (nX + nY) * 8;
 }
 
-// 1.13c D2Common+0x39050 (#10578): the unit's total stat 11 (max stamina, layer 0, packed
-// 0xB0000) from ItemStatCost row 11. Guards: null unit, null stat list, fewer than 12 rows.
-extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t UNITS_GetTotalMaxStamina_39050(D2UnitStrc* pUnit)
-{
-	if (!pUnit || !pUnit->pStatListEx)
-		return 0;
-	if (!sgptDataTables || !sgptDataTables->pItemStatCostTxt)
-		return 0;
-	if (sgptDataTables->nItemStatCostTxtRecordCount <= 0xB)
-		return 0;
-	return STATLIST_GetTotalStat_6FDB63E0(pUnit->pStatListEx,   // the list itself: 0x38A80 picks the full-stats array by the list's own flag
-		D2SLayerStatIdStrc::MakeFromStatId(0xB).nPackedValue,
-		&sgptDataTables->pItemStatCostTxt[0xB]);
-}
+// D2Common+0x39050 now runs as STATLIST_GetMaxStaminaFromUnit (src/core/d2moo/src/D2StatList.cpp).
 
-// 1.13c D2Common+0x38C20 (#10587): stat value (layer nLayer, stat nStatId) of a unit, from
-// ItemStatCost row nStatId through the 0x38B00 getter. Guards: null unit, nStatId out of range,
-// null row, null stat list.
+// D2Common+0x38C20 now runs as STATLIST_GetUnitBaseStat (src/core/d2moo/src/D2StatList.cpp); the probes' entry
+// point stays a forward to it.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_38c20(D2UnitStrc* pUnit, int32_t nStatId,
-                                                  int32_t nLayer)
+EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_38c20(D2UnitStrc* pUnit, int32_t nStatId, int32_t nLayer)
 {
-	if (!pUnit)
-		return 0;
-	if (!sgptDataTables || !sgptDataTables->pItemStatCostTxt)
-		return 0;
-	if (nStatId < 0 || nStatId >= sgptDataTables->nItemStatCostTxtRecordCount)
-		return 0;
-	if (!pUnit->pStatListEx)
-		return 0;
-	const int32_t nPacked = (nStatId << 16) | (nLayer & 0xFFFF);
-	return STATLIST_GetBaseStat_6FDB6340(STATLIST_StatListExCast(pUnit->pStatListEx),
-		D2SLayerStatIdStrc::Make(static_cast<uint16_t>(nLayer), nStatId).nPackedValue,
-		&sgptDataTables->pItemStatCostTxt[nStatId]);
+	return STATLIST_GetUnitBaseStat(pUnit, nStatId, static_cast<uint16_t>(nLayer));
 }
 

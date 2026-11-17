@@ -45,28 +45,28 @@ uint8_t __stdcall UNITS_GetDirection(D2UnitStrc* pUnit)
 	}
 }
 
-//D2Common.0x6FDBD570 (#10320)
+// 1.13c D2Common+0x304A0 (#10320)
 D2SkillStrc* __stdcall UNITS_GetStartSkill(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);
 	return SKILLS_GetFirstSkillFromSkillList(pUnit->pSkills);
 }
 
-//D2Common.0x6FDBD5B0 (#10321)
+// 1.13c D2Common+0x30460 (#10321)
 D2SkillStrc* __stdcall UNITS_GetLeftSkill(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);
 	return SKILLS_GetLeftSkillFromSkillList(pUnit->pSkills);
 }
 
-//D2Common.0x6FDBD5F0 (#10322)
+// 1.13c D2Common+0x30420 (#10322)
 D2SkillStrc* __stdcall UNITS_GetRightSkill(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);
 	return SKILLS_GetRightSkillFromSkillList(pUnit->pSkills);
 }
 
-//D2Common.0x6FDBD630 (#10324)
+// 1.13c D2Common+0x303E0 (#10324)
 void __stdcall UNITS_SetUsedSkill(D2UnitStrc* pUnit, D2SkillStrc* pUsedSkill)
 {
 	D2_ASSERT(pUnit);
@@ -74,7 +74,7 @@ void __stdcall UNITS_SetUsedSkill(D2UnitStrc* pUnit, D2SkillStrc* pUsedSkill)
 }
 
 //1.10f: D2Common.0x6FDBD670 (#10323)
-//1.13c: D2Common.0x6FD803A0 (#10511)
+// 1.13c D2Common+0x303A0 (#10511)
 D2SkillStrc* __stdcall UNITS_GetUsedSkill(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);
@@ -163,7 +163,8 @@ int __stdcall UNITS_GetPrecisionY(D2UnitStrc* pUnit)
 	}
 }
 
-//D2Common.0x6FDBD820 (#10328)
+//1.10f: D2Common.0x6FDBD820 (#10328)
+// 1.13c D2Common+0x2F2C0
 void __stdcall UNITS_SetXForStaticUnit(D2UnitStrc* pUnit, int nX)
 {
 	D2_ASSERT(pUnit);
@@ -181,7 +182,8 @@ void __stdcall UNITS_SetXForStaticUnit(D2UnitStrc* pUnit, int nX)
 	}
 }
 
-//D2Common.0x6FDBD890 (#10331)
+//1.10f: D2Common.0x6FDBD890 (#10331)
+// 1.13c D2Common+0x2F270
 void __stdcall UNITS_SetYForStaticUnit(D2UnitStrc* pUnit, int nY)
 {
 	D2_ASSERT(pUnit);
@@ -587,7 +589,8 @@ void __stdcall UNITS_InitializeStaticPath(D2UnitStrc* pUnit, D2ActiveRoomStrc* p
 	pUnit->pStaticPath->dwClientCoordY = nY;
 }
 
-//D2Common.0x6FDBE210 (#10343)
+//1.10f: D2Common.0x6FDBE210 (#10343)
+// 1.13c D2Common+0x2FE70
 void __stdcall UNITS_ResetRoom(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);
@@ -1237,14 +1240,7 @@ struct D2UnitAnimModeStatBasePercentageStrc
 	int32_t nStatId;
 };
 
-enum D2C_UnitAnimModeStats
-{
-	ANIMMODESTAT_ATTACKRATE,
-	ANIMMODESTAT_GETHITRATE,
-	ANIMMODESTAT_CASTRATE,
-	ANIMMODESTAT_BLOCKRATE,
-	ANIMMODESTAT_MOVEVELOCITY,
-};
+// D2C_UnitAnimModeStats is declared in Units.h (the 0x323E0 probe calls UNITS_GetAnimStatBasePercentage).
 //1.10f: Inlined
 //1.13c: 0x6FDE4608
 D2UnitAnimModeStatBasePercentageStrc gaAnimModeStatBasePercentage[5] = {
@@ -1256,7 +1252,7 @@ D2UnitAnimModeStatBasePercentageStrc gaAnimModeStatBasePercentage[5] = {
 };
 
 //1.10f: Inlined
-//1.13c: 0x6FD823E0
+// 1.13c D2Common+0x323E0 (stat row in EAX, unit on the stack)
 int UNITS_GetAnimStatBasePercentage(D2C_UnitAnimModeStats nStat, D2UnitStrc* pUnit)
 {
 	const int nStatId = gaAnimModeStatBasePercentage[nStat].nStatId;
@@ -1271,7 +1267,7 @@ int UNITS_GetAnimStatBasePercentage(D2C_UnitAnimModeStats nStat, D2UnitStrc* pUn
 }
 
 //1.10f: Inlined
-//1.13c: 0x6FD7FB10
+// 1.13c D2Common+0x2FB10
 int UNITS_GetBaseAnimSpeed(int nUnitType, int nClassId, int nAnimMode)
 {
 	switch (nUnitType)
@@ -1303,7 +1299,7 @@ int UNITS_GetBaseAnimSpeed(int nUnitType, int nClassId, int nAnimMode)
 }
 
 //1.10f: Inlined
-//1.13c: 0x6FD80D50
+// 1.13c D2Common+0x30D50
 int UNITS_GetBaseVelocity(int nUnitType, int nClassId)
 {
 	if (nUnitType == UNIT_PLAYER)
@@ -1318,7 +1314,7 @@ int UNITS_GetBaseVelocity(int nUnitType, int nClassId)
 }
 
 //1.10f: Inlined
-//1.13c: D2Common.0x6FD80BD0
+// 1.13c D2Common+0x30BD0 (returns the raw masked flag byte, not a BOOL: see the skill branch)
 BOOL UNITS_CanAnimModeUseAttackRate(int nUnitType, int nAnimMode, D2UnitStrc* pUnit, int nClassId)
 {
 	D2_ASSERT((nUnitType == UNIT_PLAYER) || (nUnitType == UNIT_MONSTER));
@@ -1366,7 +1362,8 @@ BOOL UNITS_CanAnimModeUseAttackRate(int nUnitType, int nAnimMode, D2UnitStrc* pU
 		}
 
 		D2SkillsTxt* pSkillsRecord = DATATBLS_GetSkillsTxtRecord(pUsedSkill->pSkillsTxt->nSkillId);
-		return (pSkillsRecord->dwFlags[0] & SKILLSFLAG_USEATTACKRATE) != 0;
+		// 1.13c returns the masked byte itself (record +6 & bit 3), not a BOOL
+		return reinterpret_cast<const uint8_t*>(pSkillsRecord)[6] & gdwBitMasks[3];
 	}
 
 	return FALSE;
@@ -1457,7 +1454,7 @@ __forceinline void __fastcall UNITS_UpdateAttackAnimRateAndVelocity(D2UnitStrc* 
 }
 
 //1.10f: Inlined
-//1.13c: D2Common.0x6FD7EF90
+// 1.13c D2Common+0x2EF90
 BOOL UNITS_IsAnimModeBlocking(int nUnitType, int nAnimMode)
 {
 	switch (nUnitType)
@@ -1499,7 +1496,7 @@ __forceinline void __fastcall UNITS_UpdateBlockAnimRateAndVelocity(D2UnitStrc* p
 }
 
 //1.10f: Inlined
-//1.13c: D2Common.0x6FD80B80
+// 1.13c D2Common+0x30B80
 BOOL UNITS_IsSeqAnimSpeedModulatedByFCR(D2UnitStrc* pUnit, int nUnitType, int nAnimMode)
 {
 	switch (nUnitType)
@@ -1557,7 +1554,7 @@ __forceinline void __fastcall UNITS_UpdateCastAnimRateAndVelocity(D2UnitStrc* pU
 }
 
 //1.10f: Inlined
-//1.13c: D2Common.0x6FD7EFC0
+// 1.13c D2Common+0x2EFC0
 BOOL UNITS_IsAnimModeGetHit(int nUnitType, int nAnimMode)
 {
 	// d2-web: D2MOO tested the BLOCK modes here (a copy of UNITS_IsAnimModeBlocking), so a get-hit ran
@@ -1590,7 +1587,7 @@ __forceinline void __fastcall UNITS_UpdateGetHitAnimRateAndVelocity(D2UnitStrc* 
 }
 
 //1.10f: Inlined
-//1.13c: D2Common.0x6FD7F010
+// 1.13c D2Common+0x2F010
 BOOL UNITS_IsAnimModeKnockBack(int nUnitType, int nAnimMode)
 {
 	switch (nUnitType)
@@ -1614,7 +1611,7 @@ __forceinline void __fastcall UNITS_UpdateKnockbackAnimRateAndVelocity(D2UnitStr
 }
 
 //1.10f: Inlined
-//1.13c: D2Common.0x6FD7FAC0
+// 1.13c D2Common+0x2FAC0
 BOOL UNITS_AnimModeAllowsAnimSpeed(int nUnitType, int nAnimMode, int nClassId)
 {
 	switch (nUnitType)
@@ -1654,7 +1651,7 @@ __forceinline void __fastcall UNITS_UpdateOtherAnimRateAndVelocity(D2UnitStrc* p
 
 
 //1.10f: Inlined
-//1.13c: D2Common.0x6FD80BD0
+// 1.13c D2Common+0x30C70
 BOOL UNITS_CanAnimModeUseVelocityModifier(int nUnitType, int nAnimMode, D2UnitStrc* pUnit, int nClassId)
 {
 	D2_ASSERT((nUnitType == UNIT_PLAYER) || (nUnitType == UNIT_MONSTER));
@@ -1969,7 +1966,8 @@ BOOL __stdcall UNITS_IsShrine(D2UnitStrc* pUnit)
 	return FALSE;
 }
 
-//D2Common.0x6FDBFCB0 (#10394)
+//1.10f: D2Common.0x6FDBFCB0 (#10394)
+// 1.13c D2Common+0x2ECF0
 D2ObjectsTxt* __stdcall UNITS_GetObjectTxtRecordFromObject(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);
@@ -2228,44 +2226,92 @@ BOOL __stdcall UNITS_IsSoftMonster(D2UnitStrc* pUnit)
 	return FALSE;
 }
 
-//D2Common.0x6FDC0320 (#10420)
-void __stdcall UNITS_AllocPlayerData(D2UnitStrc* pUnit)
+const D2UnitsPlayerDataSeams& UNITS_PlayerDataSeams()
+{
+	static const D2UnitsPlayerDataSeams kSeams = {
+		[](void* pool, size_t n, int nLine) -> void* { return FOG_AllocPool(pool, n, __FILE__, nLine, 0); },
+		[](void* pool, void* p, int nLine) { FOG_FreePool(pool, p, __FILE__, nLine, 0); },
+		[](D2BitBufferStrc* b, uint8_t* p, size_t n) { BITMANIP_Initialize(b, p, n); },
+		1, 1,   // the town waypoint's {word, bits}: WAYPOINTS_ActivateWaypoint's {0 / 16 + 1, 1 << (0 & 15)}
+	};
+	return kSeams;
+}
+
+//1.10f: D2Common.0x6FDC0320 (#10420)
+// 1.13c D2Common+0x30970 (#10356). 1.13c deltas: QUESTRECORD_AllocRecord and WAYPOINTS_AllocWaypointData are inlined
+// (record QuestRecord.cpp:0x50, its zeroed 0x60-byte stream :0x51, BITMANIP_Initialize; waypoint block Waypoint.cpp:0xFC,
+// zeroed, word 0 = 0x102, then the town entry of the {word, bits} table OR-ed in); the player data comes uncleared from
+// Units.cpp:0xF52 and is zeroed in place; DUNGEON_GetPortalFlagFromLevelId is inlined. Fatal: null unit 0xF4F, player
+// data already set 0xF51.
+void UNITS_AllocPlayerDataWith(D2UnitStrc* pUnit, const D2UnitsPlayerDataSeams& s)
 {
 	D2_ASSERT(pUnit);
 	D2_ASSERT(!pUnit->pPlayerData);
 
-	pUnit->pPlayerData = D2_CALLOC_STRC_POOL(pUnit->pMemoryPool, D2PlayerDataStrc);
+	pUnit->pPlayerData = (D2PlayerDataStrc*)s.alloc(pUnit->pMemoryPool, sizeof(D2PlayerDataStrc), 0xF52);
+	memset(pUnit->pPlayerData, 0x00, sizeof(D2PlayerDataStrc));
 	pUnit->pPlayerData->szName[0] = 0;
 
 	for (int i = 0; i < ARRAY_SIZE(pUnit->pPlayerData->pQuestData); ++i)
 	{
-		pUnit->pPlayerData->pQuestData[i] = QUESTRECORD_AllocRecord(pUnit->pMemoryPool);
-		pUnit->pPlayerData->pWaypointData[i] = WAYPOINTS_AllocWaypointData(pUnit->pMemoryPool);
+		D2BitBufferStrc* pRecord = (D2BitBufferStrc*)s.alloc(pUnit->pMemoryPool, sizeof(D2BitBufferStrc), 0x50);
+		uint8_t* pStream = (uint8_t*)s.alloc(pUnit->pMemoryPool, sizeof(uint16_t) * NUM_QUEST_WORDS, 0x51);
+		memset(pStream, 0x00, sizeof(uint16_t) * NUM_QUEST_WORDS);
+		s.bitInit(pRecord, pStream, sizeof(uint16_t) * NUM_QUEST_WORDS);
+		pUnit->pPlayerData->pQuestData[i] = pRecord;
+
+		D2WaypointDataStrc* pWaypoint = (D2WaypointDataStrc*)s.alloc(pUnit->pMemoryPool, sizeof(D2WaypointDataStrc), 0xFC);
+		memset(pWaypoint, 0x00, sizeof(D2WaypointDataStrc));
+		pWaypoint->nFlags[0] = 0x102;
+		// The table's word index is not bounded by the 8-word block; retail ORs at that word wherever it lies.
+		reinterpret_cast<uint16_t*>(pWaypoint)[s.nTownWpWord] |= s.nTownWpBits;
+		pUnit->pPlayerData->pWaypointData[i] = pWaypoint;
 	}
 
 	pUnit->pPlayerData->nPortalFlags = DUNGEON_GetPortalFlagFromLevelId(LEVEL_ROGUEENCAMPMENT);
 	pUnit->pPlayerData->bBusy = 0;
-
-	//D2COMMON_11296_Return(pUnit);
 }
 
-//D2Common.0x6FDC03F0 (#10421)
-void __stdcall UNITS_FreePlayerData(void* pMemPool, D2UnitStrc* pPlayer)
+// 1.13c D2Common+0x30970
+void __stdcall UNITS_AllocPlayerData(D2UnitStrc* pUnit)
+{
+	UNITS_AllocPlayerDataWith(pUnit, UNITS_PlayerDataSeams());
+}
+
+//1.10f: D2Common.0x6FDC03F0 (#10421)
+// 1.13c D2Common+0x30880 (#11002). 1.13c deltas: QUESTRECORD_FreeRecord and WAYPOINTS_FreeWaypointData are inlined
+// (stream QuestRecord.cpp:0x60, record :0x61, waypoint Waypoint.cpp:0x121, its state word 0 / 0x101 set to 0x102 and any
+// other value fatal 0x113); the waypoint pointer is not null-checked. Fatal: null unit 0xF6B, no player data 0xF6D.
+void UNITS_FreePlayerDataWith(void* pMemPool, D2UnitStrc* pPlayer, const D2UnitsPlayerDataSeams& s)
 {
 	D2_ASSERT(pPlayer);
 	D2_ASSERT(pPlayer->pPlayerData);
 
 	for (int i = 0; i < ARRAY_SIZE(pPlayer->pPlayerData->pQuestData); ++i)
 	{
-		QUESTRECORD_FreeRecord(pMemPool, pPlayer->pPlayerData->pQuestData[i]);
-		WAYPOINTS_FreeWaypointData(pMemPool, pPlayer->pPlayerData->pWaypointData[i]);
+		if (D2BitBufferStrc* pRecord = pPlayer->pPlayerData->pQuestData[i])
+		{
+			s.free(pMemPool, pRecord->pBuffer, 0x60);
+			s.free(pMemPool, pRecord, 0x61);
+		}
 
+		D2WaypointDataStrc* pWaypoint = pPlayer->pPlayerData->pWaypointData[i];
+		if (pWaypoint->nFlags[0] != 0x102)
+		{
+			D2_ASSERT(pWaypoint->nFlags[0] == 0x00 || pWaypoint->nFlags[0] == 0x101);
+			pWaypoint->nFlags[0] = 0x102;
+		}
+		s.free(pMemPool, pWaypoint, 0x121);
 	}
 
-	//D2COMMON_10916_Return();
-
-	D2_FREE_POOL(pMemPool, pPlayer->pPlayerData);
+	s.free(pMemPool, pPlayer->pPlayerData, 0xF76);
 	pPlayer->pPlayerData = NULL;
+}
+
+// 1.13c D2Common+0x30880
+void __stdcall UNITS_FreePlayerData(void* pMemPool, D2UnitStrc* pPlayer)
+{
+	UNITS_FreePlayerDataWith(pMemPool, pPlayer, UNITS_PlayerDataSeams());
 }
 
 //D2Common.0x6FDC04A0 (#10422)
@@ -2291,7 +2337,8 @@ char* __stdcall UNITS_GetPlayerName(D2UnitStrc* pUnit)
 	return pUnit->pPlayerData->szName;
 }
 
-//D2Common.0x6FDC05B0 (#10424)
+//1.10f: D2Common.0x6FDC05B0 (#10424)
+// 1.13c D2Common+0x2EB70
 D2PlayerDataStrc* __stdcall UNITS_GetPlayerData(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);
@@ -2301,7 +2348,8 @@ D2PlayerDataStrc* __stdcall UNITS_GetPlayerData(D2UnitStrc* pUnit)
 	return pUnit->pPlayerData;
 }
 
-//D2Common.0x6FDC0600 (#10425)
+//1.10f: D2Common.0x6FDC0600 (#10425)
+// 1.13c D2Common+0x2EB30
 void __stdcall UNITS_SetPlayerPortalFlags(D2UnitStrc* pUnit, int nPortalFlags)
 {
 	D2_ASSERT(pUnit);
@@ -2310,7 +2358,8 @@ void __stdcall UNITS_SetPlayerPortalFlags(D2UnitStrc* pUnit, int nPortalFlags)
 	pUnit->pPlayerData->nPortalFlags = nPortalFlags;
 }
 
-//D2Common.0x6FDC0660 (#10426)
+//1.10f: D2Common.0x6FDC0660 (#10426)
+// 1.13c D2Common+0x2EAF0
 int __stdcall UNITS_GetPlayerPortalFlags(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);
@@ -2333,7 +2382,8 @@ uint32_t __stdcall UNITS_GetNameOffsetFromObject(D2UnitStrc* pUnit)
 	return 0;
 }
 
-//D2Common.0x6FDC0700 (#10427)
+//1.10f: D2Common.0x6FDC0700 (#10427)
+// 1.13c D2Common+0x2EA70
 uint8_t __stdcall UNITS_GetObjectPortalFlags(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);
@@ -2341,7 +2391,8 @@ uint8_t __stdcall UNITS_GetObjectPortalFlags(D2UnitStrc* pUnit)
 	return pUnit->pObjectData->nPortalFlags;
 }
 
-//D2Common.0x6FDC0760 (#10428)
+//1.10f: D2Common.0x6FDC0760 (#10428)
+// 1.13c D2Common+0x2EA30
 void __stdcall UNITS_SetObjectPortalFlags(D2UnitStrc* pUnit, uint8_t nPortalFlag)
 {
 	D2_ASSERT(pUnit);
@@ -2383,65 +2434,87 @@ int __stdcall UNITS_GetOverlayHeight(D2UnitStrc* pUnit)
 	return 0;
 }
 
-//D2Common.0x6FDC08B0 (#10431)
-int __stdcall UNITS_GetDefense(D2UnitStrc* pUnit)
+const D2UnitsDefenseSeams& UNITS_DefenseSeams()
 {
-	D2SkillsTxt* pSkillsTxtRecord = NULL;
-	D2StatListStrc* pStatList = NULL;
-	D2UnitStrc* pShieldItem = NULL;
-	int nArmorOverridePercent = 0;
-	int nDefenseBonus = 0;
-	int nTotalDefense = 0;
-	int nArmorPercent = 0;
-	int nSkillLevel = 0;
-	int nSkillId = 0;
-	int nDefense = 0;
+	static const D2UnitsDefenseSeams kSeams = {
+		[](D2UnitStrc* u, int n) -> BOOL { return STATES_CheckState(u, n); },
+		[](int n) -> D2SkillsTxt* { return DATATBLS_GetSkillsTxtRecord(n); },
+		[](D2InventoryStrc* i, D2UnitStrc** pp) -> BOOL { return INVENTORY_GetEquippedShield(i, pp); },
+		[](D2UnitStrc* u, unsigned int c, int n, int l) -> int { return SKILLS_EvaluateSkillFormula(u, c, n, l); },
+	};
+	return kSeams;
+}
 
-	nDefense = STATLIST_UnitGetStatValue(pUnit, STAT_DEXTERITY, 0) / 4 + STATLIST_UnitGetStatValue(pUnit, STAT_ARMORCLASS, 0);
-	nArmorPercent = STATLIST_UnitGetItemStatOrSkillStatValue(pUnit, STAT_ITEM_ARMOR_PERCENT, 0) + STATLIST_UnitGetItemStatOrSkillStatValue(pUnit, STAT_SKILL_ARMOR_PERCENT, 0);
+//1.10f: D2Common.0x6FDC08B0 (#10431)
+// 1.13c D2Common+0x32890 (#10672). 1.13c deltas: the holy-shield gate is inline (unit type 0, 1 or 3, states.txt
+// count above 101, then the state bit) before the state's list is fetched; the skill and level must both be positive
+// before the skills.txt record is fetched (1.10f fetched it for any id); the defense products wrap at 32 bits; the
+// armor-override percent takes retail's branches: 32-bit product when total <= 0x100000 and percent <= 0x10000,
+// (percent / 100) * total or (total / 100) * percent when the larger one is at least 0x640, else the 64-bit product.
+int UNITS_GetDefenseWith(D2UnitStrc* pUnit, const D2UnitsDefenseSeams& s)
+{
+	int nDefense = STATLIST_UnitGetStatValue(pUnit, STAT_ARMORCLASS, 0) + STATLIST_UnitGetStatValue(pUnit, STAT_DEXTERITY, 0) / 4;
+	int nArmorPercent = STATLIST_UnitGetItemStatOrSkillStatValue(pUnit, STAT_SKILL_ARMOR_PERCENT, 0) + STATLIST_UnitGetItemStatOrSkillStatValue(pUnit, STAT_ITEM_ARMOR_PERCENT, 0);
 
-	if (STATES_CheckState(pUnit, STATE_HOLYSHIELD))
+	if ((pUnit->dwUnitType == UNIT_PLAYER || pUnit->dwUnitType == UNIT_MONSTER || pUnit->dwUnitType == UNIT_MISSILE)
+		&& sgptDataTables->nStatesTxtRecordCount > STATE_HOLYSHIELD && s.checkState(pUnit, STATE_HOLYSHIELD))
 	{
-		pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, STATE_HOLYSHIELD);
-		if (pStatList)
+		if (D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, STATE_HOLYSHIELD))
 		{
-			nSkillId = STATLIST_GetStatValue(pStatList, STAT_MODIFIERLIST_SKILL, 0);
-			nSkillLevel = STATLIST_GetStatValue(pStatList, STAT_MODIFIERLIST_LEVEL, 0);
-
-			pSkillsTxtRecord = DATATBLS_GetSkillsTxtRecord(nSkillId);
-			if (pSkillsTxtRecord && nSkillLevel > 0)
+			const int nSkillId = STATLIST_GetStatValue(pStatList, STAT_MODIFIERLIST_SKILL, 0);
+			const int nSkillLevel = STATLIST_GetStatValue(pStatList, STAT_MODIFIERLIST_LEVEL, 0);
+			if (nSkillId > 0 && nSkillLevel > 0)
 			{
-				INVENTORY_GetEquippedShield(pUnit->pInventory, &pShieldItem);
-
-				if (pShieldItem)
+				if (D2SkillsTxt* pSkillsTxtRecord = s.getSkillsTxt(nSkillId))
 				{
-					nArmorPercent += SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwCalc[0], nSkillId, nSkillLevel);
+					D2UnitStrc* pShieldItem = NULL;
+					s.getShield(pUnit->pInventory, &pShieldItem);
+					if (pShieldItem)
+					{
+						nArmorPercent += s.evalFormula(pUnit, pSkillsTxtRecord->dwCalc[0], nSkillId, nSkillLevel);
+					}
 				}
 			}
 		}
 	}
 
-	if (nDefense <= 0)
-	{
-		nDefenseBonus = nDefense * nArmorPercent / -100;
-	}
-	else
-	{
-		nDefenseBonus = nDefense * nArmorPercent / 100;
-	}
+	const int32_t nProduct = (int32_t)((uint32_t)nArmorPercent * (uint32_t)nDefense);
+	const int32_t nTotal = nDefense + (nDefense <= 0 ? nProduct / -100 : nProduct / 100);
 
-	nTotalDefense = nDefenseBonus + nDefense;
-	nArmorOverridePercent = STATLIST_UnitGetStatValue(pUnit, STAT_ARMOR_OVERRIDE_PERCENT, 0);
-
-	if (!nArmorOverridePercent)
+	const int32_t nOverride = STATLIST_UnitGetStatValue(pUnit, STAT_ARMOR_OVERRIDE_PERCENT, 0);
+	if (!nOverride)
 	{
-		return nTotalDefense;
+		return nTotal;
 	}
 
-	return nTotalDefense + (int)((long long int)nTotalDefense * (long long int)nArmorOverridePercent / 100);
+	const uint32_t uTotal = (uint32_t)nTotal;
+	const uint32_t uOverride = (uint32_t)nOverride;
+	if (nTotal <= 0x100000)
+	{
+		if (nOverride <= 0x10000)
+		{
+			return (int)(uTotal + (uint32_t)((int32_t)(uOverride * uTotal) / 100));
+		}
+		if ((int32_t)(uOverride & 0xFFFFFFF0u) > 0x63F)
+		{
+			return (int)(uTotal + (uint32_t)(nOverride / 100) * uTotal);
+		}
+	}
+	else if ((int32_t)(uTotal & 0xFFFFFFF0u) > 0x63F)
+	{
+		return (int)(uTotal + (uint32_t)(nTotal / 100) * uOverride);
+	}
+	return (int)(uTotal + (uint32_t)((int64_t)nOverride * (int64_t)nTotal / 100));
 }
 
-//D2Common.0x6FDC0AC0 (#10432)
+// 1.13c D2Common+0x32890
+int __stdcall UNITS_GetDefense(D2UnitStrc* pUnit)
+{
+	return UNITS_GetDefenseWith(pUnit, UNITS_DefenseSeams());
+}
+
+//1.10f: D2Common.0x6FDC0AC0 (#10432)
+// 1.13c D2Common+0x31EA0: 5 * dexterity + to-hit - 35, plus the class's charstats ToHitFactor (+0x3C) when the class is a row.
 int __stdcall UNITS_GetAttackRate(D2UnitStrc* pAttacker)
 {
 	D2CharStatsTxt* pCharStatsTxtRecord = NULL;
@@ -3258,59 +3331,90 @@ D2MonStats2Txt* __fastcall UNITS_GetMonStats2TxtRecord(int nRecordId)
 	return NULL;
 }
 
-//D2Common.0x6FDC1F10 (#10442)
+// Retail fatal: Ordinal_10024(&DAT_6fdda728, Ordinal_10265(code)); _exit(-1). Seams are weak, as in d2common_batch_1a330.
+__attribute__((weak)) uint32_t Ordinal_10265(uint32_t);
+__attribute__((weak)) void Ordinal_10024(const void*, uint32_t);
+__attribute__((weak)) char DAT_6fdda728[1];
+[[noreturn]] static void UNITS_FatalCode(uint32_t code)
+{
+	if (Ordinal_10265 && Ordinal_10024)
+		Ordinal_10024(DAT_6fdda728, Ordinal_10265(code));
+	__builtin_trap();
+}
+
+const D2UnitsComponentSeams& UNITS_ComponentSeams()
+{
+	static const D2UnitsComponentSeams kSeams = {
+		[](D2InventoryStrc* i, int g, D2InventoryGridInfoStrc* p) -> D2InventoryGridStrc* { return INVENTORY_GetGrid(i, g, p); },
+		[](int n) -> uint32_t { return ITEMS_CheckWeaponIfTwoHandedByItemId(n); },
+		[](D2UnitStrc* u) -> BOOL { return UNITS_CanDualWield(u); },
+		[](D2InventoryStrc* i) -> D2UnitStrc* { return INVENTORY_GetLeftHandWeapon(i); },
+		[](int n) -> D2ItemsTxt* { return DATATBLS_GetItemsTxtRecord(n); },
+	};
+	return kSeams;
+}
+
+extern D2InventoryGridInfoStrc gBodyLocInventoryGridInfo;   // D2Inventory.cpp
+
+// The equipped item at a body location as 1.13c reads it inline: a valid inventory, the body-location grid, the slot,
+// and an item that is broken or flagged unequippable counts as none.
+static D2UnitStrc* UNITS_GetEquippedForComponent(D2InventoryStrc* pInventory, int nBodyLoc, const D2UnitsComponentSeams& s)
+{
+	if (!pInventory || !INVENTORY_CheckSignature(pInventory))
+	{
+		return NULL;
+	}
+	D2InventoryGridStrc* pGrid = s.getGrid(pInventory, INVGRID_BODYLOC, &gBodyLocInventoryGridInfo);
+	if (!pGrid)
+	{
+		return NULL;
+	}
+	D2UnitStrc* pItem = pGrid->ppItems[nBodyLoc];
+	return ITEMS_CanBeEquipped(pItem) ? pItem : NULL;
+}
+
+//1.10f: D2Common.0x6FDC1F10 (#10442)
+// 1.13c D2Common+0x31260 (#10921). 1.13c deltas: the hands are read from the body-location grid inline (one grid lookup
+// per hand); the two-handed test is by class id and only for items; the class gate (barbarian, assassin, shadow
+// warrior/master) is UNITS_CanDualWield; ITEMS_GetBodyLocation and ITEMS_GetComponent are inline, the latter fatal on a null
+// item (0x635), a non-item (0x636) or a missing items.txt row (0x639).
+uint8_t UNITS_GetItemComponentIdWith(D2UnitStrc* pUnit, D2UnitStrc* pItem, const D2UnitsComponentSeams& s)
+{
+	const uint8_t nBodyLoc = (pItem && pItem->dwUnitType == UNIT_ITEM && pItem->pItemData) ? pItem->pItemData->nBodyLoc : 0;
+	if (nBodyLoc == BODYLOC_LARM || nBodyLoc == BODYLOC_RARM)
+	{
+		D2InventoryStrc* pInventory = pUnit->pInventory;
+		D2UnitStrc* pRightHandItem = UNITS_GetEquippedForComponent(pInventory, BODYLOC_RARM, s);
+		D2UnitStrc* pLeftHandItem = UNITS_GetEquippedForComponent(pInventory, BODYLOC_LARM, s);
+		if (pRightHandItem && pLeftHandItem
+			&& (pRightHandItem->dwUnitType != UNIT_ITEM || !s.twoHanded(pRightHandItem->dwClassId))
+			&& (pLeftHandItem->dwUnitType != UNIT_ITEM || !s.twoHanded(pLeftHandItem->dwClassId))
+			&& s.canDualWield(pUnit) && s.leftHandWeapon(pInventory) != pItem)
+		{
+			return 6;
+		}
+	}
+
+	if (!pItem)
+	{
+		UNITS_FatalCode(0x635);
+	}
+	if (pItem->dwUnitType != UNIT_ITEM)
+	{
+		UNITS_FatalCode(0x636);
+	}
+	D2ItemsTxt* pItemsTxtRecord = s.itemsTxt(pItem->dwClassId);
+	if (!pItemsTxtRecord)
+	{
+		UNITS_FatalCode(0x639);
+	}
+	return pItemsTxtRecord->nComponent;
+}
+
+// 1.13c D2Common+0x31260
 uint8_t __stdcall UNITS_GetItemComponentId(D2UnitStrc* pUnit, D2UnitStrc* pItem)
 {
-	D2UnitStrc* pRightHandItem = NULL;
-	D2UnitStrc* pLeftHandItem = NULL;
-	int nBodyloc = 0;
-	int nClassId = 0;
-
-	nBodyloc = ITEMS_GetBodyLocation(pItem);
-	if (nBodyloc != BODYLOC_LARM && nBodyloc != BODYLOC_RARM)
-	{
-		return ITEMS_GetComponent(pItem);
-	}
-
-	pRightHandItem = INVENTORY_GetItemFromBodyLoc(pUnit->pInventory, BODYLOC_RARM);
-	if (!ITEMS_CanBeEquipped(pRightHandItem))
-	{
-		pRightHandItem = NULL;
-	}
-
-	pLeftHandItem = INVENTORY_GetItemFromBodyLoc(pUnit->pInventory, BODYLOC_LARM);
-	if (!ITEMS_CanBeEquipped(pLeftHandItem))
-	{
-		pLeftHandItem = NULL;
-	}
-
-	if (!pRightHandItem || !pLeftHandItem || ITEMS_CheckWeaponIfTwoHanded(pRightHandItem) || ITEMS_CheckWeaponIfTwoHanded(pLeftHandItem))
-	{
-		return ITEMS_GetComponent(pItem);
-	}
-
-	nClassId = pUnit->dwClassId;
-	if (pUnit->dwUnitType != UNIT_PLAYER)
-	{
-		if (pUnit->dwUnitType != UNIT_MONSTER || nClassId < MONSTER_SHADOWWARRIOR || nClassId > MONSTER_SHADOWMASTER)
-		{
-			return ITEMS_GetComponent(pItem);
-		}
-	}
-	else
-	{
-		if (nClassId != PCLASS_BARBARIAN && nClassId != PCLASS_ASSASSIN)
-		{
-			return ITEMS_GetComponent(pItem);
-		}
-	}
-
-	if (pItem == INVENTORY_GetLeftHandWeapon(pUnit->pInventory))
-	{
-		return ITEMS_GetComponent(pItem);
-	}
-
-	return 6;
+	return UNITS_GetItemComponentIdWith(pUnit, pItem, UNITS_ComponentSeams());
 }
 
 //D2Common.0x6FDC1FE0
@@ -3430,17 +3534,6 @@ void __stdcall UNITS_GetLeftSkillData(D2UnitStrc* pUnit, int* pLeftSkillId, int*
 		*pLeftSkillId = 0;
 		*pLeftSkillFlags = -1;
 	}
-}
-
-// Retail fatal: Ordinal_10024(&DAT_6fdda728, Ordinal_10265(code)); _exit(-1). Seams are weak, as in d2common_batch_1a330.
-__attribute__((weak)) uint32_t Ordinal_10265(uint32_t);
-__attribute__((weak)) void Ordinal_10024(const void*, uint32_t);
-__attribute__((weak)) char DAT_6fdda728[1];
-[[noreturn]] static void UNITS_FatalCode(uint32_t code)
-{
-	if (Ordinal_10265 && Ordinal_10024)
-		Ordinal_10024(DAT_6fdda728, Ordinal_10265(code));
-	__builtin_trap();
 }
 
 //D2Common.0x6FDC22B0 (#10449)
@@ -3621,7 +3714,8 @@ BOOL __fastcall UNITS_CanSwitchAI(int nMonsterId)
 	return FALSE;
 }
 
-//D2Common.0x6FDC2720 (#10458)
+//1.10f: D2Common.0x6FDC2720 (#10458)
+// 1.13c D2Common+0x2E990
 void __fastcall UNITS_SetTimerArg(D2UnitStrc* pUnit, D2TimerArgStrc* pTimerArg)
 {
 	D2_ASSERT(pUnit);
@@ -3815,7 +3909,8 @@ BOOL __stdcall UNITS_IsObjectInInteractRange(D2UnitStrc* pUnit, D2UnitStrc* pObj
 	return UNITS_IsObjectInInteractRangeAt(pUnit, pObject, unitCoords.nX, unitCoords.nY);
 }
 
-//D2Common.0x6FDC2C80
+//1.10f: D2Common.0x6FDC2C80
+// 1.13c D2Common+0x12D0 (record id in EAX)
 D2CharStatsTxt* __fastcall UNITS_GetCharStatsTxtRecord(int nRecordId)
 {
 	if (nRecordId >= 0 && nRecordId < sgptDataTables->nCharStatsTxtRecordCount)

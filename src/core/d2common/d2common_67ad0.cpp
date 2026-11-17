@@ -19,7 +19,7 @@ uint32_t R32(uint32_t a) { uint32_t v; memcpy(&v, (const void*)(uintptr_t)a, 4);
 void W32(uint32_t a, uint32_t v) { memcpy((void*)(uintptr_t)a, &v, 4); }
 }
 
-// 1.13c D2Common+0x67AD0
+// stand-alone 32-bit layout twin of D2Common 0x67AD0 (the proven row runs PATH_Straight_Compute)
 extern "C" uint32_t D2Common_67AD0_PlanPath(const D2PathPlanSeam* s, uint32_t pPathInfo)
 {
     const uint32_t pDyn = R32(pPathInfo + 0x30);

@@ -87,53 +87,11 @@ void __fastcall D2Common_COLLISION_FirstFn_6FD41000(D2ActiveRoomStrc* pRoom, D2D
 }
 
 //D2Common.0x6FD411F0
+// Forwards to the proven 1.13c D2Common+0x4B780 (OR a tile's flag bytes into the 5x5 block).
+void D2Common_4B780_OrTileFlags5x5(D2RoomCollisionGridStrc* g, int nX, int nY, D2TileLibraryEntryStrc* pTile);
 void __fastcall sub_6FD411F0(D2RoomCollisionGridStrc* pCollisionGrid, D2TileLibraryEntryStrc* pTileLibraryEntry, int nX, int nY)
 {
-	uint16_t* pCollisionMask = NULL;
-	uint8_t* v5 = NULL;
-	uint8_t* pTmp = NULL;
-	int nCappedX = 0;
-	int nCappedY = 0;
-	int nIndex = 0;
-
-	if (pCollisionGrid && pCollisionGrid->pCollisionMask)
-	{
-		v5 = D2CMP_10085_GetTileFlagArray(pTileLibraryEntry);
-
-		if (nX > 0)
-		{
-			nCappedX = nX;
-		}
-		else
-		{
-			nCappedX = 0;
-		}
-
-		if (nY > 0)
-		{
-			nCappedY = nY;
-		}
-		else
-		{
-			nCappedY = 0;
-		}
-
-		pTmp = &v5[5 * (nY - nCappedY + 4) - nX];
-
-		nIndex = pCollisionGrid->pRoomCoords.nSubtileWidth * nCappedY;
-
-		for (int nYCounter = nCappedY; nYCounter < nY + 5; ++nYCounter)
-		{
-			pCollisionMask = &pCollisionGrid->pCollisionMask[nIndex];
-			for (int nXCounter = nCappedX; nXCounter < nX + 5; ++nXCounter)
-			{
-				pCollisionMask[nXCounter] |= pTmp[nXCounter];
-			}
-
-			pTmp -= 5;
-			nIndex += pCollisionGrid->pRoomCoords.nSubtileWidth;
-		}
-	}
+	D2Common_4B780_OrTileFlags5x5(pCollisionGrid, nX, nY, pTileLibraryEntry);
 }
 
 //D2Common.0x6FD412B0 (#10018)
@@ -180,121 +138,15 @@ void __fastcall COLLISION_AllocRoomCollisionGrid(void* pMemPool, D2ActiveRoomStr
 }
 
 //D2Common.0x6FD413E0
+struct D2Coll4CA90Entry { int nDX, nDY; uint8_t nFlags; D2TileLibraryEntryStrc* pTile; };
+void D2Common_4CA90_StampEntries(D2RoomCollisionGridStrc* g, const D2Coll4CA90Entry* e, int nCount, int nTileX, int nTileY, int bFlag);
 void __fastcall sub_6FD413E0(D2RoomCollisionGridStrc* pCollisionGrid, D2RoomCollisionGridStrc* pAdjacentCollisionGrid, D2DrlgTileDataStrc* pTiles, int nTiles, BOOL bRemoveOldFlags)
 {
-	uint16_t* pCollisionMask = NULL;
-	uint8_t* v11 = NULL;
-	uint8_t* pTmp = NULL;
-	int nCappedX = 0;
-	int nCappedY = 0;
-	int nIndex = 0;
-	int nFlags = 0;
-	int nX = 0;
-	int nY = 0;
-
+	// Each tile goes through the proven 1.13c D2Common+0x4CA90 stamp (bounds test, tile flags, 0x10/1/4 bits).
 	for (int i = 0; i < nTiles; ++i)
 	{
-		nX = pTiles[i].nPosX + pAdjacentCollisionGrid->pRoomCoords.nTileXPos;
-		nY = pTiles[i].nPosY + pAdjacentCollisionGrid->pRoomCoords.nTileYPos;
-
-		DUNGEON_GameTileToSubtileCoords(&nX, &nY);
-
-		if (DUNGEON_AreSubtileCoordinatesInsideRoom(&pCollisionGrid->pRoomCoords, nX, nY))
-		{
-			nX -= pCollisionGrid->pRoomCoords.nSubtileX;
-			nY -= pCollisionGrid->pRoomCoords.nSubtileY;
-
-			if (bRemoveOldFlags)
-			{
-				if (pCollisionGrid->pCollisionMask)
-				{
-					v11 = D2CMP_10085_GetTileFlagArray(pTiles[i].pTile);
-
-					if (nX > 0)
-					{
-						nCappedX = nX;
-					}
-					else
-					{
-						nCappedX = 0;
-					}
-					
-					if (nY > 0)
-					{
-						nCappedY = nY;
-					}
-					else
-					{
-						nCappedY = 0;
-					}
-
-					pTmp = &v11[5 * (nY - nCappedY + 4) - nX];
-					nIndex = pCollisionGrid->pRoomCoords.nSubtileWidth * nCappedY;
-
-					for (int nYCounter = nCappedY; nYCounter < nY + 5; ++nYCounter)
-					{
-						pCollisionMask = &pCollisionGrid->pCollisionMask[nIndex];
-						for (int nXCounter = nCappedX; nXCounter < nX + 5; ++nXCounter)
-						{
-							pCollisionMask[nXCounter] = pTmp[nXCounter];
-						}
-						pTmp -= 5;
-						nIndex += pCollisionGrid->pRoomCoords.nSubtileWidth;
-					}
-				}
-			}
-			else
-			{
-				sub_6FD411F0(pCollisionGrid, pTiles[i].pTile, nX, nY);
-			}
-
-			nFlags = 0;
-			if (pTiles[i].dwFlags & 2)
-			{
-				nFlags = COLLIDE_PRESET;
-			}
-			if (pTiles[i].dwFlags & 0x40)
-			{
-				nFlags |= COLLIDE_WALL;
-			}
-			if (pTiles[i].dwFlags & 0x80)
-			{
-				nFlags |= COLLIDE_MISSILE_BARRIER;
-			}
-
-			if (nFlags && pCollisionGrid->pCollisionMask)
-			{
-				if (nX > 0)
-				{
-					nCappedX = nX;
-				}
-				else
-				{
-					nCappedX = 0;
-				}
-				
-				if (nY > 0)
-				{
-					nCappedY = nY;
-				}
-				else
-				{
-					nCappedY = 0;
-				}
-
-				nIndex = pCollisionGrid->pRoomCoords.nSubtileWidth * nCappedY;
-
-				for (int nYCounter = nCappedY; nYCounter < nY + 5; ++nYCounter)
-				{
-					pCollisionMask = &pCollisionGrid->pCollisionMask[nIndex];
-					for (int nXCounter = nCappedX; nXCounter < nX + 5; ++nXCounter)
-					{
-						pCollisionMask[nXCounter] |= nFlags;
-					}
-					nIndex += pCollisionGrid->pRoomCoords.nSubtileWidth;
-				}
-			}
-		}
+		const D2Coll4CA90Entry tEntry = { pTiles[i].nPosX, pTiles[i].nPosY, (uint8_t)pTiles[i].dwFlags, pTiles[i].pTile };
+		D2Common_4CA90_StampEntries(pCollisionGrid, &tEntry, 1, pAdjacentCollisionGrid->pRoomCoords.nTileXPos, pAdjacentCollisionGrid->pRoomCoords.nTileYPos, bRemoveOldFlags ? 1 : 0);
 	}
 }
 
@@ -1206,21 +1058,11 @@ void __fastcall COLLISION_CreateBoundingBox(D2BoundingBoxStrc* pBoundingBox, int
 }
 
 //D2Common.0x6FD44950 (#10132)
+// Forwards to the proven 1.13c D2Common+0x4D6E0.
+uint32_t D2Common_4D6E0_MoveCollisionMask(D2ActiveRoomStrc* pRoom, int32_t nX1, int32_t nY1, int32_t nX2, int32_t nY2, int32_t nCollisionPattern, uint16_t nFootprintMask, uint16_t nMoveConditionMask);
 uint16_t __fastcall COLLISION_TryTeleportUnitCollisionMask(D2ActiveRoomStrc* pRoom, int nX1, int nY1, int nX2, int nY2, int nCollisionPattern, uint16_t nFootprintCollisionMask, uint16_t nMoveConditionMask)
 {
-	COLLISION_ResetMaskWithPattern(pRoom, nX1, nY1, nCollisionPattern, nFootprintCollisionMask);
-
-	if (const uint16_t nCollidedWithMask = COLLISION_CheckMaskWithPattern(pRoom, nX2, nY2, nCollisionPattern, nMoveConditionMask))
-	{
-		COLLISION_SetMaskWithPattern(pRoom, nX1, nY1, nCollisionPattern, nFootprintCollisionMask);
-		return nCollidedWithMask;
-	}
-	else
-	{
-		COLLISION_SetMaskWithPattern(pRoom, nX2, nY2, nCollisionPattern, nFootprintCollisionMask);
-		return 0;
-	}
-
+	return (uint16_t)D2Common_4D6E0_MoveCollisionMask(pRoom, nX1, nY1, nX2, nY2, nCollisionPattern, nFootprintCollisionMask, nMoveConditionMask);
 }
 
 //D2Common.0x6FD44BB0
@@ -1848,9 +1690,12 @@ D2ActiveRoomStrc* __fastcall COLLISION_GetFreeCoordinatesImpl(D2ActiveRoomStrc* 
 
 //1.10f:D2Common.0x6FD46280 (#10134)
 //1.11: D2Common.0x? (#10180)
+// Forwards through the proven 1.13c D2Common+0x4D840 seam over the Impl (0x4D140).
+extern "C" D2ActiveRoomStrc* D2Common_4D840_FindFieldRecordNearby_Seam(D2ActiveRoomStrc* (*f)(D2ActiveRoomStrc*, D2CoordStrc*, D2CoordStrc*, int32_t, uint32_t, uint32_t, int32_t, int32_t, int32_t),
+                                                                      D2ActiveRoomStrc* pRoom, D2CoordStrc* pSpawn, int32_t nSize, uint32_t nMask, int32_t bNeighbours);
 D2ActiveRoomStrc* __stdcall COLLISION_GetFreeCoordinates(D2ActiveRoomStrc* pRoom, D2CoordStrc* pSpawnPoint, int nUnitSize, unsigned int nMask, BOOL bAllowNeighborRooms)
 {
-	return COLLISION_GetFreeCoordinatesImpl(pRoom, pSpawnPoint, NULL, nUnitSize, nMask, nMask, bAllowNeighborRooms, 50, 1);
+	return D2Common_4D840_FindFieldRecordNearby_Seam(COLLISION_GetFreeCoordinatesImpl, pRoom, pSpawnPoint, nUnitSize, nMask, bAllowNeighborRooms);
 }
 
 //1.10f: D2Common.0x6FD462B0 (#10137)

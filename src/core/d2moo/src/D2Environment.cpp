@@ -217,6 +217,7 @@ void __fastcall ENVIRONMENT_FreeDrlgEnvironment(void* pMemPool, D2DrlgEnvironmen
 }
 
 //D2Common.0x6FD8DC00 (#10923)
+// 1.13c D2Common+0x37AF0
 BOOL __stdcall ENVIRONMENT_UpdatePeriodOfDay(D2DrlgActStrc* pAct, D2ActiveRoomStrc* pRoom)
 {
 	D2DrlgEnvironmentStrc* pEnvironment = DUNGEON_GetEnvironmentFromAct(pAct);
@@ -327,6 +328,7 @@ BOOL __stdcall ENVIRONMENT_UpdateCycleIndex(D2DrlgActStrc* pAct, int nActNo)
 }
 
 //D2Common.0x6FD8DDD0 (#10927)
+// 1.13c D2Common+0x37520
 void __stdcall ENVIRONMENT_GetLightColorFromAct(D2DrlgActStrc* pAct, uint8_t* pRed, uint8_t* pGreen, uint8_t* pBlue)
 {
 	if (D2DrlgEnvironmentStrc* pEnvironment = DUNGEON_GetEnvironmentFromAct(pAct))
@@ -338,6 +340,7 @@ void __stdcall ENVIRONMENT_GetLightColorFromAct(D2DrlgActStrc* pAct, uint8_t* pR
 }
 
 //D2Common.0x6FD8DE00 (#10926)
+// 1.13c D2Common+0x374E0
 int __stdcall ENVIRONMENT_GetIntensityFromAct(D2DrlgActStrc* pAct)
 {
 	if (D2DrlgEnvironmentStrc* pEnvironment = DUNGEON_GetEnvironmentFromAct(pAct))
@@ -486,6 +489,7 @@ void __stdcall ENVIRONMENT_InitializeEnvironment(D2DrlgActStrc* pAct, D2ActiveRo
 }
 
 //D2Common.0x6FD8E080 (#10931)
+// 1.13c D2Common+0x373B0
 void __stdcall ENVIRONMENT_GetCycleIndex_Ticks_EclipseFromAct(D2DrlgActStrc* pAct, int* pCycleIndex, int* pTicks, BOOL* pEclipse)
 {
 	D2DrlgEnvironmentStrc* pEnvironment = DUNGEON_GetEnvironmentFromAct(pAct);

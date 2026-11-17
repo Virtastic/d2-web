@@ -35,10 +35,10 @@ int32_t OwnerRecord(uint32_t owner)   // 0x2FB60(owner, 0, 1); the player class 
     return -1;
 }
 }
-// 1.13c D2Common+0x81FB0: stdcall(rec, sub, out24); row = rec + sub*16.
+// Retail 0x81FB0 (play path: DATATBLS_GetInventoryGridInfo): stdcall(rec, sub, out24); row = rec + sub*16.
 bool D2Common_81FB0_GetLayout(const InvEnv& e, int32_t rec, int32_t sub, uint8_t* out24) { return LayoutInfo(e, rec + sub * 16, out24); }
 // EAX index, EBX inventory, stack info (2 bytes: width, height) or null.
-// 1.13c D2Common+0x1E1B0
+// Twin of INVENTORY_GetGrid (the d2moo function carries the 1.13c marker)
 uint32_t D2Common_1E1B0_GetGrid(const InvEnv& e, uint32_t inv, int32_t index, uint32_t info)
 {
     uint8_t* v = P(inv);
@@ -69,7 +69,7 @@ uint32_t D2Common_1E1B0_GetGrid(const InvEnv& e, uint32_t inv, int32_t index, ui
     return (uint32_t)(uintptr_t)g;
 }
 // stdcall (inv, item, record id, &x, &y, page).
-// 1.13c D2Common+0x208E0
+// Twin of INVENTORY_GetFreePosition (the d2moo function carries the 1.13c marker)
 uint32_t D2Common_208E0_GetFreePosition(const InvEnv& e, uint32_t inv, uint32_t item, int32_t rec, uint32_t pX, uint32_t pY, uint8_t page)
 {
     uint8_t* v = P(inv); uint8_t* u = P(item);

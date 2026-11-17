@@ -70,10 +70,31 @@ extern "C" void D2Common_13F30_Placement(const int32_t* origin, int32_t directio
     out->width = width; out->height = height; out->direction = direction;
 }
 
-// 1.13c D2Common+0x37020
+// The 1.13c +0x37020 body is sub_6FD75DE0 in DrlgDrlgGrid.cpp; this is only the extern "C" entry the probe calls.
 extern "C" void d2common_37020_port(D2DrlgGridStrc* grid, D2DrlgVertexStrc* vertex,
     int32_t flag, FlagOperation operation, BOOL includeNext)
 {
     sub_6FD75DE0(grid, vertex, flag, operation, includeNext);
+}
+
+// The 1.13c +0x36CD0 body is sub_6FD75F60 in DrlgDrlgGrid.cpp. Callers hold retail images (a vertex whose end is the
+// 32-bit pointer at +0x10, a grid of two 32-bit words {cells, rows}, a {x,y,w,h} clip rect); this builds the native
+// views over the same memory, plots, and leaves every write in the caller's cells.
+extern "C" void d2common_36cd0_port(const void* pLine, const void* pRect, const void* pGrid, int nValue, int nSel, int nThick)
+{
+    const int32_t* l = (const int32_t*)pLine;
+    const uint32_t* g = (const uint32_t*)pGrid;
+    D2DrlgGridStrc grid{};
+    grid.pCellsFlags = (int32_t*)(uintptr_t)g[0];
+    grid.pCellsRowOffsets = (int32_t*)(uintptr_t)g[1];
+    const int32_t* e = (const int32_t*)(uintptr_t)(uint32_t)l[4];
+    D2DrlgVertexStrc next{};
+    next.nPosX = e[0]; next.nPosY = e[1];
+    D2DrlgVertexStrc cur{};
+    cur.nPosX = l[0]; cur.nPosY = l[1];
+    cur.pNext = &next;
+    D2DrlgCoordStrc rect;
+    std::memcpy(&rect, pRect, sizeof rect);
+    sub_6FD75F60(&grid, &cur, &rect, nValue, (FlagOperation)nSel, nThick);
 }
 

@@ -172,7 +172,8 @@ EMSCRIPTEN_KEEPALIVE void D2Common_3A650_DropListEntries(uint32_t pList)
 
 // D2Common #10346 (toggle the room has-portal flag) is DUNGEON_ToggleHasPortalFlag in D2Dungeon.cpp.
 
-// 1.13c D2Common+0x30970 (#10356): allocate the three-difficulty quest record set.
+// Superseded by UNITS_AllocPlayerData (src/core/d2moo/src/Units/Units.cpp, the row for 0x30970); kept for reference only.
+// D2Common 0x30970 (#10356): allocate the three-difficulty quest record set.
 // set+0x14 must be null (otherwise fatal 0xF51); the 0x16C-byte set is zeroed. Three times it
 // allocates a 0x60-byte quest record (copied from a zeroed scratch block through 0x92A0), stores
 // it at set+0x10/+0x14/+0x18, allocates a 16-byte waypoint block, writes 0x0102 and ORs in the
@@ -451,7 +452,8 @@ EMSCRIPTEN_KEEPALIVE void d2_legacy_d2common_39b60(uint16_t* pUnit, uint32_t pPa
 	}
 }
 
-// 1.13c D2Common+0x664B0 (#10384): insertion-sort a unit's linked list by effect key.
+// Superseded by UNITROOM_SortUnitListByTargetY (UnitRoom.cpp, the row for 0x664B0, #10384); this retail-layout copy still
+// serves the client's room lists (client_room_units.cpp). Insertion-sort a unit's linked list by effect key.
 // struct+0x74 is the head; every node's next is at +0xE8 and its payload pointer at +0x2C. The key
 // is payload+0x08 for node types 2 and 4..5 and payload+0x0C otherwise. The list is walked with a
 // trailing pointer, swapping a node ahead of a lower-keyed predecessor. The walk runs to the tail;

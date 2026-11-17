@@ -8,6 +8,11 @@
 #include "D2Seed.h"
 #include <DataTbls/LevelsIds.h>
 
+// The 1.13c wilderness steps the level initializer runs (src/core/d2common/d2common_batch_41070.cpp)
+void D2Common_7EF60(D2DrlgLevelStrc* pLevel);
+void D2Common_7EE50(D2DrlgLevelStrc* pLevel);
+void D2Common_7F180(D2DrlgLevelStrc* pLevel);
+
 //D2Common.0x6FD84CA0
 void __fastcall DRLGOUTWILD_GetBridgeCoords(D2DrlgLevelStrc* pLevel, int* pX, int* pY)
 {
@@ -107,96 +112,12 @@ void __fastcall DRLGOUTWILD_InitAct1OutdoorLevel(D2DrlgLevelStrc* pLevel)
 	{
 		DRLGOUTDOORS_AddAct124SecondaryBorder(pLevel, LVLSUB_ACT1_BORDER_CLIFFS, LVLPREST_ACT1_WILD_BORDER_1);
 
-		if (pLevel->nLevelId != LEVEL_MOOMOOFARM)
-		{
-			if (pLevel->pOutdoors->dwFlags & 0xC)
-			{
-				if (DRLGOUTWILD_TestSpawnRiver(pLevel, pLevel->pOutdoors->nGridWidth - 2))
-				{
-					DRLGOUTWILD_SpawnRiver(pLevel, pLevel->pOutdoors->nGridWidth - 2);
-				}
-			}
-
-			if (pLevel->pOutdoors->dwFlags & 0x20 && !(pLevel->pOutdoors->dwFlags & 0x40))
-			{
-				bAdded = FALSE;
-
-				if (!(SEED_RollRandomNumber(&pLevel->pSeed) & 1))
-				{
-					for (int j = 0; j < pLevel->pOutdoors->nGridHeight; ++j)
-					{
-						if (bAdded)
-						{
-							break;
-						}
-
-						for (int i = 0; i < pLevel->pOutdoors->nGridWidth; ++i)
-						{
-							if (bAdded)
-							{
-								break;
-							}
-
-							bAdded = DRLGOUTWILD_SpawnCliffCaves(pLevel, i, j);
-						}
-					}
-
-					if (!bAdded)
-					{
-						FOG_DisplayWarning("fAdded", __FILE__, __LINE__);
-					}
-				}
-				else
-				{
-					for (int j = 0; j < pLevel->pOutdoors->nGridHeight; ++j)
-					{
-						if (bAdded)
-						{
-							break;
-						}
-
-						for (int i = 0; i < pLevel->pOutdoors->nGridWidth; ++i)
-						{
-							if (bAdded)
-							{
-								break;
-							}
-
-							bAdded = DRLGOUTWILD_SpawnCliffCaves(pLevel, j, i);
-						}
-					}
-
-					if (!bAdded)
-					{
-						FOG_DisplayWarning("fAdded", __FILE__, __LINE__);
-					}
-				}
-			}
-
-			if (pLevel->pOutdoors->dwFlags & 0x1C && !(pLevel->pOutdoors->dwFlags & 0x40))
-			{
-				nY = pLevel->pOutdoors->nGridHeight - 4;
-				nX = pLevel->pOutdoors->nGridWidth - ((~(uint8_t)pLevel->pOutdoors->dwFlags & 0x10 | 0x40) >> 4);
-
-				v21 = SEED_RollRandomNumber(&pLevel->pSeed) & 3;
-				if ((v21 % 2) != 0)
-				{
-					nX = 3;
-				}
-
-				if (v21 / 2)
-				{
-					nY = 3;
-				}
-
-				DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, nX, nY, (pLevel->nLevelId == LEVEL_BLOODMOOR) + 51, -1, 0);
-				pLevel->pOutdoors->dwFlags |= 0x40;
-			}
-		}
+		// river, cliff caves and the entrance placement (the farm is skipped inside)
+		D2Common_7EF60(pLevel);
 
 		DRLGOUTDOORS_AddAct124SecondaryBorder(pLevel, LVLSUB_ACT1_BORDER_MIDDLE, LVLPREST_ACT1_WILD_BORDER_1);
 		DRLGOUTDOORS_AddAct124SecondaryBorder(pLevel, LVLSUB_ACT1_BORDER_CORNER, LVLPREST_ACT1_WILD_BORDER_1);
-		DRLGOUTWILD_SpawnTownTransitionsAndCaves(pLevel);
+		D2Common_7EE50(pLevel);
 		DRLGOUTDOORS_AddAct124SecondaryBorder(pLevel, LVLSUB_ACT1_BORDER_BORDER, LVLPREST_ACT1_WILD_BORDER_1);
 		DRLGOUTDOORS_SpawnAct1DirtPaths(pLevel);
 	}
@@ -219,7 +140,7 @@ void __fastcall DRLGOUTWILD_InitAct1OutdoorLevel(D2DrlgLevelStrc* pLevel)
 		DRLGOUTDOORS_SpawnAct12Shrines(pLevel, 5);
 	}
 
-	DRLGOUTWILD_SpawnSpecialPresets(pLevel);
+	D2Common_7F180(pLevel);
 }
 
 //D2Common.0x6FD85060

@@ -276,254 +276,154 @@ void __fastcall sub_6FDAB810(int* a1, int* a2)
 	}
 }
 
+uint32_t D2Common_D420_PathMoveCollision(D2DynamicPathStrc* pPath, uint32_t dst, uint32_t src);
+
+// 1.13c D2Common+0xD0A0
+//1.13c: D2Common.0x6FD5D0A0
+// The step this tick: the velocity, or (non-missile) the remaining offset to the current path point when that is
+// no further than the velocity. Returns 1 when the offset to the path point was used.
+static BOOL PATH_StepDelta_6FD5D0A0(D2DynamicPathStrc* pDynamicPath, int32_t* pDelta)
+{
+	pDelta[0] = pDynamicPath->tVelocityVector.nX;
+	pDelta[1] = pDynamicPath->tVelocityVector.nY;
+	if (pDynamicPath->dwPathType == PATHTYPE_MISSILE)
+	{
+		return 0;
+	}
+
+	const D2PathPointStrc tPoint = pDynamicPath->PathPoints[pDynamicPath->dwCurrentPointIdx];
+	const int32_t nTargetX = PATH_ToFP16Center(tPoint.X);
+	const int32_t nTargetY = PATH_ToFP16Center(tPoint.Y);
+	int32_t nOffX = nTargetX - pDynamicPath->tGameCoords.dwPrecisionX;
+	const int32_t nOffY = nTargetY - pDynamicPath->tGameCoords.dwPrecisionY;
+	const int32_t nAbsOffX = nOffX < 0 ? -nOffX : nOffX;
+	const int32_t nAbsOffY = nOffY < 0 ? -nOffY : nOffY;
+	int32_t nAbsVelY = pDelta[1] < 0 ? -pDelta[1] : pDelta[1];
+	int32_t nLimit = pDelta[0] < 0 ? -pDelta[0] : pDelta[0];
+	if (nLimit <= nAbsVelY)
+	{
+		nLimit = nAbsVelY;
+	}
+	if (nAbsOffX <= nLimit && nAbsOffY <= nLimit)
+	{
+		pDelta[0] = nOffX;
+		pDelta[1] = nOffY;
+		return 1;
+	}
+	return 0;
+}
+
+// 1.13c D2Common+0xD580
+//1.13c: D2Common.0x6FD5D580
+// Walks the step tile by tile, moving the path's collision footprint each time. Returns 1 when a tile is blocked.
+static BOOL PATH_StepCrossTiles_6FD5D580(D2DynamicPathStrc* pDynamicPath, int32_t nDx, int32_t nDy, D2FP32_16* a2, uint32_t* pCount)
+{
+	pDynamicPath->nSavedStepsCount = 0;
+	int32_t nStepX = nDx;
+	int32_t nStepY = nDy;
+	sub_6FDAB810(&nStepX, &nStepY);
+
+	uint32_t nX = pDynamicPath->tGameCoords.dwPrecisionX;
+	uint32_t nY = pDynamicPath->tGameCoords.dwPrecisionY;
+	const uint32_t nFlags = pDynamicPath->dwFlags;
+	const uint32_t nEndX = nX + nDx;
+	const uint32_t nEndY = nY + nDy;
+	uint16_t nTileX = (uint16_t)(nX >> 16);
+	uint16_t nTileY = (uint16_t)(nY >> 16);
+
+	while (!(nTileX == (uint16_t)(nEndX >> 16) && nTileY == (uint16_t)(nEndY >> 16)))
+	{
+		const uint32_t nNextY = nY + nStepY;
+		const uint16_t nNextTileX = (uint16_t)((nX + nStepX) >> 16);
+		const uint16_t nNextTileY = (uint16_t)(nNextY >> 16);
+		if (nTileX != nNextTileX || nTileY != nNextTileY)
+		{
+			if (!D2Common_D420_PathMoveCollision(pDynamicPath, nNextTileX | ((uint32_t)nNextTileY << 16), nTileX | ((uint32_t)nTileY << 16)))
+			{
+				a2->dwPrecisionX = PATH_FP16FitToCenter(nX);
+				a2->dwPrecisionY = PATH_FP16FitToCenter(nY);
+				*pCount = pDynamicPath->nSavedStepsCount;
+				return 1;
+			}
+			if (nFlags & PATH_SAVE_STEPS_MASK)
+			{
+				pDynamicPath->SavedSteps[pDynamicPath->nSavedStepsCount] = D2PathPointStrc{ nNextTileX, nNextTileY };
+			}
+			const int32_t nCount = pDynamicPath->nSavedStepsCount++;
+			if (nCount + 1 > 9)
+			{
+				break;
+			}
+		}
+		nTileX = nNextTileX;
+		nTileY = nNextTileY;
+		nY = nNextY;
+		nX += nStepX;
+	}
+
+	if (pDynamicPath->nSavedStepsCount)
+	{
+		pDynamicPath->dwFlags |= 8u;
+	}
+	a2->dwPrecisionX = nEndX;
+	a2->dwPrecisionY = nEndY;
+	*pCount = pDynamicPath->nSavedStepsCount;
+	return 0;
+}
+
 //1.00:  D2Common.0x1005F420
 //1.10f: D2Common.0x6FDACEC0
+// 1.13c D2Common+0xD8E0
 //1.13c: D2Common.0x6FD5D8E0
 BOOL __fastcall sub_6FDACEC0(D2DynamicPathStrc* pDynamicPath, D2FP32_16* a2, D2UnitStrc** pUnit)
 {
-	D2UnitStrc* v4; // eax
-	uint32_t v5; // eax
-	int v7; // edi
-	int v8; // ebx
-	int32_t v9; // ecx
-	int v10; // eax
-	int v11; // ecx
-	int v12; // eax
-	int v13; // ecx
-	int v14; // ebp
-	int v15; // edx
-	uint32_t v16; // eax
-	uint32_t v17; // ecx
-	uint32_t v18; // ebp
-	uint32_t v19; // ecx
-	uint8_t v20; // al
-	uint32_t v21; // ecx
-	uint32_t v22; // ebp
-	uint32_t v23; // edi
-	uint32_t v24; // eax
-	uint32_t v25; // ebx
-	uint32_t v26; // ecx
-	D2PathPointStrc v27; // edx
-	int v28; // ebx
-	uint16_t nCollidedWithMask; // ax
-	signed int v35; // eax
-	uint32_t v36; // edx
-	int v37; // [esp+10h] [ebp-48h]
-	D2PathPointStrc v38; // [esp+10h] [ebp-48h]
-	int v40; // [esp+18h] [ebp-40h]
-	int v41; // [esp+18h] [ebp-40h]
-	int v42; // [esp+1Ch] [ebp-3Ch]
-	int v43; // [esp+20h] [ebp-38h]
-	D2UnitStrc* v44; // [esp+24h] [ebp-34h]
-	D2PathPointStrc v45; // [esp+28h] [ebp-30h]
-	D2PathPointStrc v46; // [esp+30h] [ebp-28h]
-	signed int v47; // [esp+34h] [ebp-24h]
-	signed int v48; // [esp+38h] [ebp-20h] BYREF
-	signed int v49; // [esp+3Ch] [ebp-1Ch] BYREF
-	uint32_t v50; // [esp+40h] [ebp-18h]
-	uint32_t v51; // [esp+44h] [ebp-14h]
-	int v52; // [esp+48h] [ebp-10h]
-	uint32_t v53; // [esp+4Ch] [ebp-Ch]
-	uint32_t v54; // [esp+50h] [ebp-8h]
-	uint32_t v55; // [esp+54h] [ebp-4h]
-
-	v4 = pDynamicPath->pUnit;
+	D2UnitStrc* pPathUnit = pDynamicPath->pUnit;
 	pDynamicPath->nCollidedWithMask = 0;
-	v44 = v4;
 	*pUnit = 0;
 
-	v42 = v4 && v4->dwUnitType == UNIT_MONSTER && (pDynamicPath->dwFlags & PATH_UNKNOWN_FLAG_0x00010) != 0;
+	const bool bUnitPath = pPathUnit && pPathUnit->dwUnitType == UNIT_MONSTER && (pDynamicPath->dwFlags & PATH_UNKNOWN_FLAG_0x00010) != 0;
 
 	if (!pDynamicPath->tVelocityVector.nX && !pDynamicPath->tVelocityVector.nY)
 	{
-		v5 = pDynamicPath->tGameCoords.dwPrecisionX;
 		pDynamicPath->dwPathPoints = 0;
 		pDynamicPath->dwCurrentPointIdx = 0;
-		a2->dwPrecisionX = PATH_FP16FitToCenter(v5);
+		a2->dwPrecisionX = PATH_FP16FitToCenter(pDynamicPath->tGameCoords.dwPrecisionX);
 		a2->dwPrecisionY = PATH_FP16FitToCenter(pDynamicPath->tGameCoords.dwPrecisionY);
 		return 0;
 	}
-	v7 = pDynamicPath->tVelocityVector.nY;
-	v8 = pDynamicPath->tVelocityVector.nX;
-	v47 = v7;
-	if (pDynamicPath->dwPathType == PATHTYPE_MISSILE)
+
+	int32_t aDelta[2];
+	const BOOL bUsedPoint = PATH_StepDelta_6FD5D0A0(pDynamicPath, aDelta);
+	const uint32_t nNewX = (uint32_t)aDelta[0] + pDynamicPath->tGameCoords.dwPrecisionX;
+	const uint32_t nNewY = (uint32_t)aDelta[1] + pDynamicPath->tGameCoords.dwPrecisionY;
+
+	if ((int16_t)(pDynamicPath->tGameCoords.dwPrecisionX >> 16) != (int16_t)(nNewX >> 16)
+		|| (int16_t)(pDynamicPath->tGameCoords.dwPrecisionY >> 16) != (int16_t)(nNewY >> 16))
 	{
-		v40 = 0;
-	}
-	else
-	{
-		v9 = pDynamicPath->dwCurrentPointIdx;
-		v10 = PATH_ToFP16Center(pDynamicPath->PathPoints[v9].X);
-		v11 = PATH_ToFP16Center(pDynamicPath->PathPoints[v9].Y);
-		v12 = v10 - pDynamicPath->tGameCoords.dwPrecisionX;
-		if (v12 < 0)
-			v41 = -v12;
-		else
-			v41 = v12;
-		v13 = v11 - pDynamicPath->tGameCoords.dwPrecisionY;
-		if (v13 < 0)
-			v37 = -v13;
-		else
-			v37 = v13;
-		v14 = v7;
-		if (v7 < 0)
-			v14 = -v7;
-		v15 = v8;
-		if (v8 < 0)
-			v15 = -v8;
-		if (v15 <= v14)
-			v15 = v14;
-		if (v41 > v15 || v37 > v15)
+		if (pDynamicPath->nDist && pDynamicPath->dwPathType != PATHTYPE_KNOCKBACK_SERVER && pDynamicPath->dwPathType != PATHTYPE_KNOCKBACK_CLIENT)
 		{
-			v40 = 0;
+			--pDynamicPath->nDist;
 		}
-		else
+		uint32_t nCount = 0;
+		const BOOL bBlocked = PATH_StepCrossTiles_6FD5D580(pDynamicPath, aDelta[0], aDelta[1], a2, &nCount);
+		*pUnit = (D2UnitStrc*)(uintptr_t)nCount;
+		if (bBlocked)
 		{
-			v8 = v12;
-			v47 = v13;
-			v40 = 1;
-			v7 = v13;
-		}
-	}
-	v16 = pDynamicPath->tGameCoords.dwPrecisionX;
-	v17 = pDynamicPath->tGameCoords.dwPrecisionY;
-	v18 = v8 + pDynamicPath->tGameCoords.dwPrecisionX;
-	v55 = v17 + v7;
-	v54 = v18;
-	v19 = HIWORD(v17);
-	if (HIWORD(v16) != HIWORD(v18) || (WORD)v19 != HIWORD(v55))
-	{
-		v20 = pDynamicPath->nDist;
-		if (v20)
-		{
-			v21 = pDynamicPath->dwPathType;
-			if (v21 != PATHTYPE_KNOCKBACK_SERVER && v21 != PATHTYPE_KNOCKBACK_CLIENT)
-				pDynamicPath->nDist = v20 - 1;
-		}
-		pDynamicPath->nSavedStepsCount = 0;
-		v48 = v8;
-		v49 = v47;
-		sub_6FDAB810(&v48, &v49);
-		v22 = pDynamicPath->tGameCoords.dwPrecisionY;
-		v23 = pDynamicPath->tGameCoords.dwPrecisionX;
-		v45.Y = HIWORD(v22);
-		v24 = v8 + pDynamicPath->tGameCoords.dwPrecisionX;
-		v25 = v47 + v22;
-		v38.X = HIWORD(v24);
-		v38.Y = (v47 + v22) >> 16;
-		v26 = pDynamicPath->dwFlags;
-		v50 = v24;
-		v27.X = HIWORD(v23);
-		v45.X = HIWORD(v23);
-		v51 = v47 + v22;
-		v43 = v26 & 0x20000;
-		while (1)
-		{
-			if (D2PathPointStrc{ v27.X, v45.Y } == v38)
+			if (!bUnitPath)
 			{
-			LABEL_58:
-				if (pDynamicPath->nSavedStepsCount)
-					pDynamicPath->dwFlags |= 8u;
-				v18 = v54;
-				a2->dwPrecisionX = v24;
-				a2->dwPrecisionY = v25;
-				*pUnit = (D2UnitStrc*)pDynamicPath->nSavedStepsCount;
-				goto LABEL_61;
+				pDynamicPath->dwCurrentPointIdx = pDynamicPath->dwPathPoints;
+				return 0;
 			}
-			v28 = v48 + v23;
-			v53 = v22 + v49;
-			v52 = v48 + v23;
-			v46.X = (v48 + v23) >> 16;
-			v46.Y = (v22 + v49) >> 16;
-			if (D2PathPointStrc{ v27.X,v45.Y } != v46)
-				break;
-		LABEL_56:
-			v22 = v53;
-			v23 = v28;
-			v25 = v51;
-			v45 = v46;
-			v27.X = v46.X;
-			v24 = v50;
+			return D2Common_10236(pPathUnit, pDynamicPath->pTargetUnit != 0) == 0;
 		}
-		if ((pDynamicPath->dwFlags & 4) != 0)
-		{
-			D2_CHECK(pDynamicPath->pUnit && (pDynamicPath->pUnit->dwUnitType == UNIT_PLAYER || pDynamicPath->pUnit->dwUnitType == UNIT_MONSTER));
-			COLLISION_SetUnitCollisionMask(
-				pDynamicPath->pRoom,
-				v45.X,
-				v45.Y,
-				pDynamicPath->pRoom,
-				v46.X,
-				v46.Y,
-				pDynamicPath->dwCollisionPattern,
-				pDynamicPath->nFootprintCollisionMask);
-		LABEL_53:
-			if (v43)
-				pDynamicPath->SavedSteps[pDynamicPath->nSavedStepsCount] = v46;
-			pDynamicPath->nSavedStepsCount++;
-			if (pDynamicPath->nSavedStepsCount >= D2DynamicPathStrc::PATH_MAX_STEP_LEN)
-			{
-				v24 = v50;
-				v25 = v51;
-				goto LABEL_58;
-			}
-			goto LABEL_56;
-		}
-		const bool bIsMissilePath = pDynamicPath->dwFlags & PATH_MISSILE_MASK;
-		uint32_t nMoveTestColMask = pDynamicPath->nMoveTestCollisionMask;
-		if (nMoveTestColMask == COLLIDE_MASK_MONSTER_THAT_CAN_OPEN_DOORS)
-			nMoveTestColMask = COLLIDE_MASK_MONSTER_PATH;
-		if (bIsMissilePath)
-			nCollidedWithMask = COLLISION_TryMoveUnitCollisionMask(
-				pDynamicPath->pRoom,
-				v45.X,
-				v45.Y,
-				v46.X,
-				v46.Y,
-				pDynamicPath->dwUnitSize,
-				pDynamicPath->nFootprintCollisionMask,
-				nMoveTestColMask);
-		else
-			nCollidedWithMask = COLLISION_TryTeleportUnitCollisionMask(
-				pDynamicPath->pRoom,
-				v45.X,
-				v45.Y,
-				v46.X,
-				v46.Y,
-				pDynamicPath->dwCollisionPattern,
-				pDynamicPath->nFootprintCollisionMask,
-				nMoveTestColMask);
-		pDynamicPath->nCollidedWithMask |= nCollidedWithMask;
-		if (pDynamicPath->nCollidedWithMask)
-		{
-			if (!bIsMissilePath)
-				goto LABEL_49;
-		}
-		else if (!bIsMissilePath)
-		{
-		LABEL_52:
-			v28 = v52;
-			goto LABEL_53;
-		}
-		if ((pDynamicPath->nCollidedWithMask & (COLLIDE_WALL | COLLIDE_MISSILE_BARRIER)) != 0)
-		{
-		LABEL_49:
-			a2->dwPrecisionX = PATH_FP16FitToCenter(v23);
-			a2->dwPrecisionY = PATH_FP16FitToCenter(v22);
-			*pUnit = (D2UnitStrc*)pDynamicPath->nSavedStepsCount;
-			if (v42)
-				return D2Common_10236(v44, pDynamicPath->pTargetUnit != 0) == 0;
-			pDynamicPath->dwCurrentPointIdx = pDynamicPath->dwPathPoints;
-			return 0;
-		}
-		goto LABEL_52;
 	}
-LABEL_61:
-	v36 = v55;
-	a2->dwPrecisionX = v18;
-	a2->dwPrecisionY = v36;
-	if (!v40)
+
+	a2->dwPrecisionX = nNewX;
+	a2->dwPrecisionY = nNewY;
+	if (!bUsedPoint)
+	{
 		return 0;
+	}
 	++pDynamicPath->dwCurrentPointIdx;
 	return 1;
 }

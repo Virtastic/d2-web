@@ -156,15 +156,11 @@ void D2Common_30E20_SetTargetUnit(D2UnitStrc* pUnit, D2UnitStrc* pTargetUnit)
 	UNITS_SetTargetUnitForPlayerOrMonster(pUnit, pTargetUnit);
 }
 
-// 1.13c D2Common+0x247C0 (#10432): minimum stack of the items.txt row of a type-4 unit. Null unit
-// is fatal 0xD94 and another unit type fatal 0xD95; both are returns here.
+// Export of 1.13c D2Common 0x247C0 (#10432): the body is ITEMS_GetMinStack in src/core/d2moo/src/Items/Items.cpp.
 // ponytail: no export, plain C++
 int32_t D2Common_247C0_UnitItemMinStack(const int32_t* pUnit)
 {
-	if (pUnit == nullptr || pUnit[0] != 4)
-		return 0;
-
-	return D2Common_22AD0_ItemMinStack(static_cast<uint32_t>(pUnit[1]));
+	return ITEMS_GetMinStack(reinterpret_cast<D2UnitStrc*>(const_cast<int32_t*>(pUnit)));
 }
 
 // The skill-description evaluator is the Fog ordinal 10253 (RVA 0x9270), which walks the byte code

@@ -1100,17 +1100,11 @@ __forceinline void __fastcall DATATBLS_ProcessAdditionalTreasureClassArguments(D
 
 //1.10f: Inlined
 //1.13c: D2Common.0x6FDA3780
+// The verified 1.13c body (d2common_batch_53780.cpp) also bumps the count, so the loader no longer does.
+D2TCExShortStrc* D2Common_53780_NewTreasureClassEx(const char* szName);
 D2TCExShortStrc* DATATBLS_NewTreasureClassEx(const char* nTreasureClass)
 {
-	FOG_10216_AddRecordToLinkingTable(sgptDataTables->pTreasureClassExLinker, nTreasureClass);
-
-	if (!(sgptDataTables->nTreasureClassEx % 16))
-	{
-		sgptDataTables->pTreasureClassEx = (D2TCExShortStrc*)D2_REALLOC_POOL(NULL, sgptDataTables->pTreasureClassEx, sizeof(D2TCExShortStrc) * (sgptDataTables->nTreasureClassEx + 16));
-	}
-	memset(&sgptDataTables->pTreasureClassEx[sgptDataTables->nTreasureClassEx], 0x00, sizeof(sgptDataTables->pTreasureClassEx[sgptDataTables->nTreasureClassEx]));
-
-	return &sgptDataTables->pTreasureClassEx[sgptDataTables->nTreasureClassEx];
+	return D2Common_53780_NewTreasureClassEx(nTreasureClass);
 }
 
 //1.10f: Inlined
@@ -1303,7 +1297,6 @@ void __fastcall DATATBLS_LoadTreasureClassExTxt(HD2ARCHIVE hArchive)
 		}
 
 		D2TCExShortStrc* pTCExTxtRecord = DATATBLS_NewTreasureClassEx(pTreasureClassExTxt[i].szTreasureClass);
-		++sgptDataTables->nTreasureClassEx;
 		if (pTCExTxtRecord)
 		{
 			if (pTreasureClassExTxt[i].nGroup != 0)
@@ -1643,6 +1636,7 @@ void __fastcall DATATBLS_LoadHirelingTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD6B1A0
+// 1.13c D2Common+0x1300
 D2ItemTypesTxt* __fastcall DATATBLS_GetItemTypesTxtRecord(int nItemType)
 {
 	if (nItemType >= 0 && nItemType < sgptDataTables->nItemTypesTxtRecordCount)

@@ -39,7 +39,7 @@ int32_t add32(int32_t a, int32_t b) {
 
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3B5B0_RoomDword20(void* object,   // the FN probe src/core/fn/d2common_3b5b0.cpp owns d2_fn_d2common_3b5b0 (r[] ABI)
 
-    const D2Common3051Env* env) { // 1.13c D2Common+0x3B5B0
+    const D2Common3051Env* env) { // raw-layout body of D2Common 0x3B5B0 (the marked port is DUNGEON_GetCollisionGridFromRoom)
     if (!object) fatal(env, 0x2c5);
     return read32(object, 0x20);
 }

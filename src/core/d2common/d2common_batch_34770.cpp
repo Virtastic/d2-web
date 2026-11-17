@@ -14,7 +14,7 @@ uint32_t D2Common_10253_PATH_GetSaveX(D2DynamicPathStrc* pDynamicPath)
     return (uint32_t)D2COMMON_10199_PathGetSaveX(pDynamicPath);
 }
 
-// 1.13c D2Common+0x2EA70: object units only (type 2); returns the object data's portal flags byte
+// Superseded by UNITS_GetObjectPortalFlags (Units.cpp, the row for 0x2EA70): object units only (type 2); returns the object data's portal flags byte
 // (pObjectData+5). Retail fatals 0xfe4 on a null unit and 0xfe5 on a non-object unit.
 uint8_t D2Common_10258_UNITS_GetObjectPortalFlags(D2UnitStrc* pUnit)
 {

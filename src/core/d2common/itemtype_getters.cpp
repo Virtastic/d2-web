@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include "D2DataTbls.h"
+#include "D2Items.h"
 #include "DataTbls/ItemsTbls.h"
 static_assert(sizeof(D2ItemTypesTxt) == 0xE4, "itemtypes record");
 static_assert(offsetof(D2ItemTypesTxt, wShoots) == 0xC, "+0xC");
@@ -13,14 +14,14 @@ static const D2ItemTypesTxt* Rec(int32_t id)
 {
     return (id >= 0 && id < sgptDataTables->nItemTypesTxtRecordCount) ? &sgptDataTables->pItemTypesTxt[id] : nullptr;
 }
-// 1.13c D2Common+0x22F80
-uint32_t D2Common_22F80_ItemTypeThrowable(int32_t id) { const D2ItemTypesTxt* r = Rec(id); return r ? r->nThrowable : 0; }
+// Export of 1.13c D2Common 0x22F80; the body is ITEMS_CheckItemTypeIfThrowable in src/core/d2moo/src/Items/Items.cpp.
+uint32_t D2Common_22F80_ItemTypeThrowable(int32_t id) { return (uint32_t)ITEMS_CheckItemTypeIfThrowable(id); }
 // 1.13c D2Common+0x23590
 uint32_t D2Common_23590_ItemTypeAutoStack(int32_t id) { const D2ItemTypesTxt* r = Rec(id); return r ? r->nAutoStack : 0; }
-// 1.13c D2Common+0x235D0
-int32_t D2Common_235D0_ItemTypeQuiver(int32_t id) { const D2ItemTypesTxt* r = Rec(id); return r ? (int16_t)r->wQuiver : 0; }
-// 1.13c D2Common+0x23610
-int32_t D2Common_23610_ItemTypeShoots(int32_t id) { const D2ItemTypesTxt* r = Rec(id); return r ? (int16_t)r->wShoots : 0; }
+// Export of 1.13c D2Common 0x235D0; the body is ITEMS_GetQuiverTypeFromItemType in src/core/d2moo/src/Items/Items.cpp.
+int32_t D2Common_235D0_ItemTypeQuiver(int32_t id) { return ITEMS_GetQuiverTypeFromItemType(id); }
+// Export of 1.13c D2Common 0x23610; the body is ITEMS_GetAmmoTypeFromItemType in src/core/d2moo/src/Items/Items.cpp.
+int32_t D2Common_23610_ItemTypeShoots(int32_t id) { return ITEMS_GetAmmoTypeFromItemType(id); }
 // 1.13c D2Common+0x33B00
 uint32_t D2Common_33B00_StateMask12Bit(int32_t id)
 {

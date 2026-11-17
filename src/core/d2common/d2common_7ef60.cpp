@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x7EF60: ESI = level, ECX forwarded to 0x7E9F0, EAX unused (returned unchanged on the early exit), plain ret.
+// (probe seam on the retail layout; the level initializer runs the engine body; was D2Common+0x7EF60) ESI = level, ECX forwarded to 0x7E9F0, EAX unused (returned unchanged on the early exit), plain ret.
 // Level type 0x27 does nothing. Outdoor info g = level+0x14 (flags +0, kind grid cells +4 with row offsets +8, width +0x5C, height +0x60):
 //  1. flags & 0xC and 0x7E9F0(EAX level, ECX fwd, EDX w - 2) true: 0x7ECC0 (ECX level, EAX w - 2).
 //  2. flags & 0x20 and not 0x40: roll the seed; scan the kind grid (bit 0 of the roll picks the scan order) for the first cell 0x10 (tile 0x19)

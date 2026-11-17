@@ -88,6 +88,7 @@ void __fastcall DATATBLS_UnloadBeltsTxt()
 }
 
 //D2Common.0x6FD493B0 (#10638)
+// 1.13c D2Common+0x132A0
 void __stdcall DATATBLS_GetBeltsTxtRecord(int nIndex, int bHigherRes, D2BeltsTxt* pRecord)
 {
 	D2_ASSERT(gpBeltsTxtTable);
@@ -95,6 +96,7 @@ void __stdcall DATATBLS_GetBeltsTxtRecord(int nIndex, int bHigherRes, D2BeltsTxt
 }
 
 //D2Common.0x6FD49420 (#10639)
+// 1.13c D2Common+0x13340
 void __stdcall DATATBLS_GetInvRectFromBeltsTxt(int nIndex, int bHigherRes, D2InvRectStrc* pInvRect, int nBoxId)
 {
 	D2BeltsTxt* ptBeltsTxtRecord = NULL;

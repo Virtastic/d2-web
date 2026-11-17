@@ -33,26 +33,14 @@ struct D2CommonBatch233B0Env
 	void (*clear_unit_flag)(uint32_t pOwnerBlob, uint32_t nKey);  // 0x19810
 };
 
-// 1.13c D2Common+0x233B0 (ITEMS_CanBeMagic_1_13c): whether an item unit's ItemTypesTxt row (reachable through 0x230F0 and the
-// item's class id) has nMagic set. The 1.10f twin is ITEMS_CanBeMagic; a null or non-item unit, an
-// out-of-range type index and a null row all yield 0.
+// Export of 1.13c D2Common 0x233B0 (ITEMS_CanBeMagic_1_13c); the body is ITEMS_CanBeMagic in src/core/d2moo/src/Items/Items.cpp.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint8_t ITEMS_CanBeMagic_1_13c(uint32_t pItem)
 {
-	// Follows the decompile: no assert on a null items.txt row; every miss is 0.
-	const D2UnitStrc* pUnit = reinterpret_cast<const D2UnitStrc*>(static_cast<uintptr_t>(pItem));
-	if (!pUnit || pUnit->dwUnitType != UNIT_ITEM)
-		return 0;
-	const D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pUnit->dwClassId);
-	if (!pItemsTxtRecord)
-		return 0;
-	const int32_t nType = pItemsTxtRecord->wType[0];
-	if (nType < 0 || nType >= sgptDataTables->nItemTypesTxtRecordCount || !sgptDataTables->pItemTypesTxt)
-		return 0;
-	return sgptDataTables->pItemTypesTxt[nType].nMagic;
+	return static_cast<uint8_t>(ITEMS_CanBeMagic(reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pItem))));
 }
 
-// 1.13c D2Common+0x24C30 (community name D2ItemSetFlags, but the body reads the item type's
+// Export of 1.13c D2Common 0x24C30 (community name D2ItemSetFlags, but the body reads the item type's
 // nThrowable byte at +0x10): the 1.10f twin is ITEMS_CheckIfThrowable.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint8_t D2Common_ItemIsThrowable_24C30(uint32_t pItem)
@@ -88,7 +76,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3C120_GetAdjacentRoomByTile(uint32_t pRoo
 	return 0;
 }
 
-// 1.13c D2Common+0x7C170 (DRLGACTIVATE_Update, stack arg = the lists struct, ret 4): mirror the +8 / +0x468
+// retail-layout seam of D2Common 0x7C170 (marker on DRLGACTIVATE_Update) (DRLGACTIVATE_Update, stack arg = the lists struct, ret 4): mirror the +8 / +0x468
 // pair into the four DAT_6FDEFB84.. globals when lists+0x8C bit 0 is set, then once every 5 or 7 timeouts
 // (+0x45C) walk the status-2 ring from +0x460 and run 0x7C0E0 on each idle room. Retail 32-bit layout:
 // pDrlg and every link are retail tokens; the globals are passed in as G[4] (84, 88, 8C, 90).
@@ -179,7 +167,7 @@ EMSCRIPTEN_KEEPALIVE void D2Common_12D20_SetLogFile(const char* szFile, const D2
 	}
 }
 
-// 1.13c D2Common+0x374e0: dword at +0x0C of the object pointed to by +0x04; a null +0x04 yields 0.
+// raw-layout body of D2Common 0x374e0 (the marked port is ENVIRONMENT_GetIntensityFromAct): dword at +0x0C of the object pointed to by +0x04; a null +0x04 yields 0.
 // Null param is retail fatal 0x547.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_374e0_batch(uint32_t pArg)

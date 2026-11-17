@@ -15,7 +15,7 @@ constexpr uint32_t kSignature = 0x1020304;
 constexpr int kWeaponType = 0x2D;
 }
 
-// 1.13c D2Common+0x20320
+// Image-layout twin of INVENTORY_GetLeftHandWeapon (the d2moo function carries the 1.13c marker)
 uint32_t D2Common_20320_GetLeftHandWeaponImg(const InvEnv& e, uint32_t inv, uint32_t info)
 {
     if (!inv || W(P(inv), 0) != kSignature) return 0;

@@ -174,9 +174,9 @@ uint32_t D2Common_211D0_BodyLocAnswer(D2UnitStrc* pUn, uint32_t nBodyLoc, D2Unit
 	}
 }
 
-// 1.13c D2Common+0x304A0 (#10947): the skill list's first skill (list+0x04), or 0 without a
+// Superseded by UNITS_GetStartSkill (Units.cpp), the old stand-alone (#10947): the skill list's first skill (list+0x04), or 0 without a
 // skill list. A null unit is fatal 0x638 in retail, modelled as 0.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_304A0_FirstSkill(uint32_t pUnit) { // 1.13c D2Common+0x304A0
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_304A0_FirstSkill(uint32_t pUnit) {
 	if (!pUnit)
 		return 0;
 	const uint32_t pSkills = *reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(pUnit) + 0xA8);

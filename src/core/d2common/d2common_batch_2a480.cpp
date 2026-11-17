@@ -88,13 +88,14 @@ extern "C" void D2Common_1D710_FreeMissileStream(uint32_t pUnit, const D2CommonF
 	env->free(W(u, 8), pStream);
 }
 
+// Superseded by UNITS_FreePlayerData (src/core/d2moo/src/Units/Units.cpp, the row for 0x30880); kept for reference only.
 // +0x30880 (#11002): clear a quest record's waypoint block. The pointer at param+0x14 addresses three
 // 12-byte entries: dwords at +0x10/+0x14/+0x18 and a uint16 waypoint state pointer at +0x1C/+0x20/+0x24.
 // A state that is neither 0x102, 0 nor 0x101 fatals 0x113; 0/0x101 become 0x102. The block pointer is
 // then cleared. A null param fatals 0xF6B and a null block 0xF6D. The QuestRecord.cpp:0x60/0x61 and
 // Waypoint.cpp:0x121 Fog ordinal-10046 calls are not modelled: their first two arguments are
 // register-only in the decompile.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30880_batch(uint32_t nMemPool, uint32_t pData) { // 1.13c D2Common+0x30880
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30880_batch(uint32_t nMemPool, uint32_t pData) { // superseded copy of D2Common 0x30880
 	(void)nMemPool;
 	uint8_t* p = P(pData);
 	if (!p) return;                                          // retail fatal 0xF6B

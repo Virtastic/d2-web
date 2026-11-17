@@ -498,6 +498,7 @@ static int PATH_BresenhamLine(D2PathPointStrc tStartPoint, D2PathPointStrc tTarg
 // Author: Araksson
 // D2Common.0x6FDAC270 (1.10f) 
 // D2Common.0x6FD68C40 (1.13C)
+// 1.13c D2Common+0x18C40
 int __fastcall PATH_ComputePathOrSlideAlongObstacles(D2PathInfoStrc* ptPathInfo)
 {
 	D2_ASSERT(ptPathInfo->pDynamicPath->pUnit && (ptPathInfo->pDynamicPath->pUnit->dwUnitType == UNIT_PLAYER || ptPathInfo->pDynamicPath->pUnit->dwUnitType == UNIT_MONSTER));

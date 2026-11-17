@@ -1,8 +1,12 @@
 // 1.13c D2Common+0x4D840 (#10509): stdcall forwarder over 0x4D140 (FindFreeSpot, 9 stdcall words); the callee is injected so a
 // replay probe can record what it is handed.
 #include <cstdint>
-typedef uint32_t (*D2Common4D140Fn)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
-extern "C" uint32_t D2Common_4D840_FindFieldRecordNearby_Seam(D2Common4D140Fn f, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4)
+struct D2ActiveRoomStrc;
+struct D2CoordStrc;
+// 0x4D140 (COLLISION_GetFreeCoordinatesImpl): room, spawn point, field point, unit size, mask, field mask, neighbours, max distance, step.
+typedef D2ActiveRoomStrc* (*D2Common4D140Fn)(D2ActiveRoomStrc*, D2CoordStrc*, D2CoordStrc*, int32_t, uint32_t, uint32_t, int32_t, int32_t, int32_t);
+extern "C" D2ActiveRoomStrc* D2Common_4D840_FindFieldRecordNearby_Seam(D2Common4D140Fn f, D2ActiveRoomStrc* pRoom, D2CoordStrc* pSpawn,
+                                                                      int32_t nSize, uint32_t nMask, int32_t bNeighbours)
 {
-    return f(a0, a1, 0, a2, a3, a3, a4, 0x32, 1);
+    return f(pRoom, pSpawn, nullptr, nSize, nMask, nMask, bNeighbours, 0x32, 1);
 }

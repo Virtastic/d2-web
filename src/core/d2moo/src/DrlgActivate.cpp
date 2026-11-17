@@ -48,14 +48,20 @@ static void DRLGACTIVATE_RoomExStatusUnlink(D2DrlgRoomStrc* pDrlgRoom)
 		pDrlgRoom->pStatusNext = nullptr;
 	}
 }
+// 1.13c D2Common+0x7BB70
 static void DRLGACTIVATE_ForceRoomExStatusImpl(D2DrlgRoomStrc* pDrlgRoom, D2DrlgRoomStatus nStatus)
 {
+	if (pDrlgRoom->fRoomStatus == nStatus)
+	{
+		return;
+	}
 	DRLGACTIVATE_RoomExStatusUnlink(pDrlgRoom);
+	// 1.13c: a status outside the four lists leaves the room unlinked and its status unchanged
 	if (nStatus < ROOMSTATUS_COUNT)
 	{
 		DRLGACTIVATE_RoomExStatuslink(&pDrlgRoom->pLevel->pDrlg->tStatusRoomsLists[nStatus], pDrlgRoom);
+		pDrlgRoom->fRoomStatus = nStatus;
 	}
-	pDrlgRoom->fRoomStatus = nStatus;
 }
 // Returns true if status changed
 static bool DRLGACTIVATE_UpdateRoomExStatusImpl(D2DrlgRoomStrc* pDrlgRoom, D2DrlgRoomStatus nStatus)
@@ -246,6 +252,7 @@ void __fastcall DRLGACTIVATE_RoomExPropagateUnsetStatus(D2DrlgRoomStrc* pDrlgRoo
 }
 
 // Helper functions
+// 1.13c D2Common+0x7C090
 static void DRLGACTIVATE_RoomSetAndPropagateStatus(D2DrlgRoomStrc* pDrlgRoom, D2DrlgRoomStatus nStatus)
 {
 	DRLGACTIVATE_RoomExPropagateSetStatus(pDrlgRoom->pLevel->pDrlg->pMempool, pDrlgRoom, nStatus + 1);
@@ -358,6 +365,7 @@ D2ActiveRoomStrc* __fastcall DRLGACTIVATE_StreamRoomAtCoords(D2DrlgStrc* pDrlg, 
 }
 
 //D2Common.0x6FD73E30
+// 1.13c D2Common+0x7B8D0
 void __fastcall DRLGACTIVATE_InitializeRoomExStatusLists(D2DrlgStrc* pDrlg)
 {
 	for (int nStatus = 0; nStatus < ROOMSTATUS_COUNT; ++nStatus)
@@ -424,6 +432,7 @@ void __fastcall DRLGACTIVATE_GetRoomsAllocationStats(int* pOutStatsClientAllocat
 }
 
 //D2Common.0x6FD73F20 (#10003)
+// 1.13c D2Common+0x7C170
 void __stdcall DRLGACTIVATE_Update(D2DrlgStrc* pDrlg)
 {
 	if (DRLG_IsOnClient(pDrlg))

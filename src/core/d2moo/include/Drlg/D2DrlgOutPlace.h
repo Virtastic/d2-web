@@ -44,6 +44,8 @@ void __fastcall DRLGOUTPLACE_InitAct3OutdoorLevel(D2DrlgLevelStrc* pLevel);
 BOOL __fastcall sub_6FD80750(D2DrlgLevelStrc* pLevel, int nVertexId);
 //D2Common.0x6FD80BE0
 int __fastcall sub_6FD80BE0(int a1, int a2, int a3);
+int __fastcall DRLGOUTPLACE_GetBorderTileColumn(D2DrlgLevelStrc* pLevel, char nFlag);
+void __fastcall DRLGOUTPLACE_CreateAct1LevelConnections(D2DrlgStrc* pDrlg);
 //D2Common.0x6FD80C10
 int __fastcall sub_6FD80C10(int a1, int a2, int a3, int a4, int a5);
 //D2Common.0x6FD80C80

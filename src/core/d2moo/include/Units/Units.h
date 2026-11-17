@@ -496,6 +496,17 @@ D2COMMON_DLL_DECL BOOL __stdcall UNITS_IsObjectInInteractRange(D2UnitStrc* pUnit
 D2COMMON_DLL_DECL BOOL __stdcall UNITS_IsObjectInInteractRangeAt(D2UnitStrc* pUnit, D2UnitStrc* pObject, int32_t nX, int32_t nY);
 //D2Common.0x6FDC2C80
 struct D2CharStatsTxt* __fastcall UNITS_GetCharStatsTxtRecord(int nRecordId);
+// The rows of the 1.13c anim-stat table, in table order.
+enum D2C_UnitAnimModeStats
+{
+	ANIMMODESTAT_ATTACKRATE,
+	ANIMMODESTAT_GETHITRATE,
+	ANIMMODESTAT_CASTRATE,
+	ANIMMODESTAT_BLOCKRATE,
+	ANIMMODESTAT_MOVEVELOCITY,
+};
+// inlined in 1.10f; its own function in 1.13c (the marker is on the body in Units.cpp)
+int UNITS_GetAnimStatBasePercentage(D2C_UnitAnimModeStats nStat, D2UnitStrc* pUnit);
 //1.10f: D2Common.0x6FDC2CB0 (#10399)
 //1.13c: D2Common.0x6FDCFCD0 (#10407)
 D2COMMON_DLL_DECL int __stdcall D2Common_10399(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2);
@@ -511,3 +522,46 @@ D2COMMON_DLL_DECL D2UnitStrc* __stdcall D2Common_10406(D2UnitStrc* pUnit, int(__
 D2COMMON_DLL_DECL D2UnitStrc* __stdcall D2Common_10407(D2ActiveRoomStrc* pRoom, int nX, int nY, int(__fastcall* pCallback)(D2UnitStrc*, void*), void* a5, int a6);
 //D2Common.0x6FDC3680 (#10419)
 D2COMMON_DLL_DECL void __fastcall UNITS_SetInteractData(D2UnitStrc* pUnit, int nSkillId, int nUnitType, D2UnitGUID nUnitGUID);
+
+// Callee seams of the rows 1.13c inlines or calls through registers; each defaults to the engine callee
+// (UNITS_*Seams() in Units.cpp). The FN probes pass their own recorders; the play path never sees them.
+struct D2InventoryGridStrc;
+struct D2InventoryGridInfoStrc;
+struct D2ItemsTxt;
+struct D2SkillsTxt;
+struct D2BitBufferStrc;
+// 1.13c D2Common+0x32890 (UNITS_GetDefense)
+struct D2UnitsDefenseSeams
+{
+	BOOL (*checkState)(D2UnitStrc* pUnit, int nState);                                    // 0x37DB0
+	D2SkillsTxt* (*getSkillsTxt)(int nSkillId);                                           // 0x1250
+	BOOL (*getShield)(D2InventoryStrc* pInventory, D2UnitStrc** ppItem);                  // 0x1FF40
+	int (*evalFormula)(D2UnitStrc* pUnit, unsigned int nCalc, int nSkillId, int nLevel);  // 0x51BF0
+};
+const D2UnitsDefenseSeams& UNITS_DefenseSeams();
+int UNITS_GetDefenseWith(D2UnitStrc* pUnit, const D2UnitsDefenseSeams& s);
+// 1.13c D2Common+0x31260 (UNITS_GetItemComponentId)
+struct D2UnitsComponentSeams
+{
+	D2InventoryGridStrc* (*getGrid)(D2InventoryStrc* pInventory, int nGrid, D2InventoryGridInfoStrc* pInfo);  // 0x1E1B0
+	uint32_t (*twoHanded)(int nItemId);                                                    // 0x22E70
+	BOOL (*canDualWield)(D2UnitStrc* pUnit);                                               // 0x30530
+	D2UnitStrc* (*leftHandWeapon)(D2InventoryStrc* pInventory);                            // 0x20320
+	D2ItemsTxt* (*itemsTxt)(int nItemId);                                                  // 0x719A0
+};
+const D2UnitsComponentSeams& UNITS_ComponentSeams();
+uint8_t UNITS_GetItemComponentIdWith(D2UnitStrc* pUnit, D2UnitStrc* pItem, const D2UnitsComponentSeams& s);
+// 1.13c D2Common+0x30970 / +0x30880 (UNITS_AllocPlayerData / UNITS_FreePlayerData): the Fog pool calls (ordinals 10045 /
+// 10046, by the retail source line), the bit-buffer init (10126) and the town entry of the waypoint {word, bits} table
+// (D2Common+0x99C58 / +0x99C5A).
+struct D2UnitsPlayerDataSeams
+{
+	void* (*alloc)(void* pMemPool, size_t nSize, int nLine);
+	void (*free)(void* pMemPool, void* pMemory, int nLine);
+	void (*bitInit)(D2BitBufferStrc* pBuffer, uint8_t* pBitStream, size_t nSize);
+	uint16_t nTownWpWord;
+	uint16_t nTownWpBits;
+};
+const D2UnitsPlayerDataSeams& UNITS_PlayerDataSeams();
+void UNITS_AllocPlayerDataWith(D2UnitStrc* pUnit, const D2UnitsPlayerDataSeams& s);
+void UNITS_FreePlayerDataWith(void* pMemPool, D2UnitStrc* pPlayer, const D2UnitsPlayerDataSeams& s);

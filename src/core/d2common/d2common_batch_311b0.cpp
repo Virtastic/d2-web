@@ -119,7 +119,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2common_38850_port(uint32_t pUnit, uint32_t pCont
 	return static_cast<uint32_t>(n);
 }
 
-// 1.13c D2Common+0x132A0 GetGlobalBeltRecord: copies the 0x108-byte record at (nRow * 7 + nIndex) of
+// Retail 0x132A0 GetGlobalBeltRecord (the play path runs DATATBLS_GetBeltsTxtRecord, which carries the marker): copies the 0x108-byte record at (nRow * 7 + nIndex) of
 // the global belt table (gpBeltsTxtTable, loaded by bringUp) to pOut. A null table with index 0 is
 // retail's fatal path and becomes a no-op. The FN probe is src/core/fn/d2common_132a0.cpp.
 void D2Common_132A0_GetGlobalBeltRecord(uint32_t nIndex, uint32_t nRow, uint32_t* pOut)

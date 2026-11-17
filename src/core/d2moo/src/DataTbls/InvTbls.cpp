@@ -93,13 +93,14 @@ void __fastcall DATATBLS_UnloadInventoryTxt()
 }
 
 //D2Common.0x6FD54F20 (#10635)
+// 1.13c D2Common+0x82030 (the index bound is inclusive: retail faults only above the record count)
 void __stdcall DATATBLS_GetInventoryRect(int nInventoryTxtId, int bHigherRes, D2InvRectStrc* pInvRect)
 {
 
 	D2_ASSERT(sgptDataTables->pInventoryTxt);
 
 	const int nIndex = nInventoryTxtId + 16 * bHigherRes;
-	D2_ASSERT(nIndex < sgptDataTables->nInventoryTxtRecordCount);
+	D2_ASSERT((unsigned)nIndex <= (unsigned)sgptDataTables->nInventoryTxtRecordCount);
 	const D2InventoryTxt* pInventoryTxtRecord = &sgptDataTables->pInventoryTxt[nIndex];
 	D2_ASSERT(pInventoryTxtRecord);
 
@@ -110,13 +111,14 @@ void __stdcall DATATBLS_GetInventoryRect(int nInventoryTxtId, int bHigherRes, D2
 }
 
 //D2Common.0x6FD54FB0 (#10636)
+// 1.13c D2Common+0x81FB0
 void __stdcall DATATBLS_GetInventoryGridInfo(int nInventoryTxtId, int bHigherRes, D2InventoryGridInfoStrc* pInventoryGridInfo)
 {
 	D2InventoryTxt* pInventoryTxtRecord = NULL;
 	int nIndex = nInventoryTxtId + 16 * bHigherRes;
 
 	D2_ASSERT(sgptDataTables->pInventoryTxt);
-	D2_ASSERT(nIndex < sgptDataTables->nInventoryTxtRecordCount);
+	D2_ASSERT((unsigned)nIndex <= (unsigned)sgptDataTables->nInventoryTxtRecordCount);
 	pInventoryTxtRecord = &sgptDataTables->pInventoryTxt[nIndex];
 	D2_ASSERT(pInventoryTxtRecord);
 
@@ -124,12 +126,13 @@ void __stdcall DATATBLS_GetInventoryGridInfo(int nInventoryTxtId, int bHigherRes
 }
 
 //D2Common.0x6FD55030 (#10637)
+// 1.13c D2Common+0x81F20
 void __stdcall DATATBLS_GetInventoryComponentGrid(int nInventoryTxtId, int bHigherRes, D2InvCompGridStrc* pInvCompGrid, int nComponent)
 {
 	int nIndex = nInventoryTxtId + 16 * bHigherRes;
 
 	D2_ASSERT(sgptDataTables->pInventoryTxt);
-	D2_ASSERT(nIndex < sgptDataTables->nInventoryTxtRecordCount);
+	D2_ASSERT((unsigned)nIndex <= (unsigned)sgptDataTables->nInventoryTxtRecordCount);
 
 	const D2InventoryTxt* pInventoryTxtRecord = &sgptDataTables->pInventoryTxt[nIndex];
 	D2_ASSERT(pInventoryTxtRecord);

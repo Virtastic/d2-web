@@ -11,40 +11,62 @@
 constexpr int dword_6FDDD458 = 0;
 constexpr int dword_6FDDD45C = 0;
 
-//D2Common.0x6FDBCF10 (#11279)
-int __stdcall UNITROOM_AddUnitToRoomEx(D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom, int nUnused)
+// 1.13c D2Common+0x66630: the unit's tile must lie in the room (fatal 0x2E otherwise); a unit already on the room's
+// list answers 0, or is fatal (0x36) when the caller passes 1. The default room check of UNITROOM_AddUnitToRoomEx.
+static BOOL UNITROOM_CheckUnitForAdd(D2ActiveRoomStrc* pRoom, D2UnitStrc* pUnit, int nOne)
 {
-	D2_MAYBE_UNUSED(nUnused);
-
-	D2_ASSERT(pUnit);
-	D2_ASSERT(pRoom);
-
-	//Note: tRoomCoord is unused but filled in the original code
-	//D2DrlgCoordsStrc tRoomCoord = {};
-	//DUNGEON_GetRoomCoordinates(pRoom, &tRoomCoord);
-
 	D2CoordStrc tCoord = {};
 	UNITS_GetCoords(pUnit, &tCoord);
 	D2_ASSERT(DungeonTestRoomGame(pRoom, tCoord.nX, tCoord.nY));
 
 	for (D2UnitStrc* i = pRoom->pUnitFirst; i; i = i->pRoomNext)
 	{
-		D2_ASSERTM(pUnit != i, "Unit being added to a room it is already in");
+		if (i == pUnit)
+		{
+			D2_ASSERTM(!nOne, "Unit being added to a room it is already in");
+			return FALSE;
+		}
 	}
+	return TRUE;
+}
 
-	D2UnitStrc** ppUnitFirst = DUNGEON_GetUnitListFromRoom(pRoom);
-	D2_ASSERT(ppUnitFirst);
-	pUnit->pRoomNext = *ppUnitFirst;
-	*ppUnitFirst = pUnit;
+const D2UnitRoomAddSeams& UNITROOM_AddSeams()
+{
+	static const D2UnitRoomAddSeams kSeams = {
+		[](D2ActiveRoomStrc* r, D2UnitStrc* u, int n) -> BOOL { return UNITROOM_CheckUnitForAdd(r, u, n); },
+		[](D2UnitStrc* u) { UNITROOM_RefreshUnit(u); },
+		[](D2UnitStrc* u) -> int { return STATLIST_GetUnitAlignment(u); },
+	};
+	return kSeams;
+}
 
-	UNITROOM_RefreshUnit(pUnit);
+//1.10f: D2Common.0x6FDBCF10 (#11279)
+// 1.13c D2Common+0x66800 (#10531). 1.13c deltas: the room check is one call (0x66630 with 1: box test and the
+// "already in" walk) whose 0 answer is fatal 0x4C; the list head is the room's own field (no DUNGEON_GetUnitListFromRoom);
+// the allied count is bumped inline. Fatal codes: null unit 0x42, null room 0x43.
+int UNITROOM_AddUnitToRoomWith(D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom, const D2UnitRoomAddSeams& s)
+{
+	D2_ASSERT(pUnit);
+	D2_ASSERT(pRoom);
+	D2_ASSERT(s.check(pRoom, pUnit, 1));
 
-	if (pUnit->dwUnitType == UNIT_PLAYER || (pUnit->dwUnitType == UNIT_MONSTER && STATLIST_GetUnitAlignment(pUnit) == UNIT_ALIGNMENT_GOOD))
+	pUnit->pRoomNext = pRoom->pUnitFirst;
+	pRoom->pUnitFirst = pUnit;
+	s.refresh(pUnit);
+
+	if (pUnit->dwUnitType == UNIT_PLAYER || (pUnit->dwUnitType == UNIT_MONSTER && s.alignment(pUnit) == UNIT_ALIGNMENT_GOOD))
 	{
-		DUNGEON_IncreaseAlliedCountOfRoom(pRoom);
+		++pRoom->nAllies;
 	}
 
 	return 1;
+}
+
+// 1.13c D2Common+0x66800
+int __stdcall UNITROOM_AddUnitToRoomEx(D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom, int nUnused)
+{
+	D2_MAYBE_UNUSED(nUnused);
+	return UNITROOM_AddUnitToRoomWith(pUnit, pRoom, UNITROOM_AddSeams());
 }
 
 //D2Common.0x6FDBD100 (#10384)
@@ -73,7 +95,8 @@ void __stdcall UNITROOM_RefreshUnit(D2UnitStrc* pUnit)
 	}
 }
 
-//D2Common.0x6FDBD1B0 (#10388)
+//1.10f: D2Common.0x6FDBD1B0 (#10388)
+// 1.13c D2Common+0x664B0 (#10384): one pass over the room's unit list, moving a unit ahead of a lower client-Y predecessor.
 void __stdcall UNITROOM_SortUnitListByTargetY(D2ActiveRoomStrc* pRoom)
 {
 	D2UnitStrc** ppUnitFirst = NULL;
@@ -259,7 +282,9 @@ void __stdcall UNITROOM_RemoveUnitFromRoom(D2UnitStrc* pUnit)
 	D2_ASSERT(!pUnit->pRoomNext);
 }
 
-//D2Common.0x6FDBD400 (#10387)
+//1.10f: D2Common.0x6FDBD400 (#10387)
+// 1.13c D2Common+0x66410 (#10681): retail checks for a stale update link only when the unit has no room; with a room it
+// unlinks the unit if it is on the update list and checks nothing after (1.10f checked the link on every path).
 void __stdcall UNITROOM_RemoveUnitFromUpdateQueue(D2UnitStrc* pUnit)
 {
 	D2UnitStrc** ppChangeUnit = NULL;
@@ -270,7 +295,11 @@ void __stdcall UNITROOM_RemoveUnitFromUpdateQueue(D2UnitStrc* pUnit)
 	D2_ASSERT(pUnit);
 
 	pRoom = UNITS_GetRoom(pUnit);
-	if (pRoom)
+	if (!pRoom)
+	{
+		D2_ASSERT(!pUnit->pChangeNextUnit);
+		return;
+	}
 	{
 		ppChangeUnit = DUNGEON_GetUnitUpdateListFromRoom(pRoom, FALSE);
 		pChangeUnit = *ppChangeUnit;
@@ -302,7 +331,6 @@ void __stdcall UNITROOM_RemoveUnitFromUpdateQueue(D2UnitStrc* pUnit)
 			}
 		}
 	}
-	D2_ASSERT(!pUnit->pChangeNextUnit);
 }
 
 //D2Common.0x6FDBD4C0 (#10389)

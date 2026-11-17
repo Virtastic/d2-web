@@ -107,7 +107,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_24C10(uint32_t pUnit, int32_t nValue
 	return 0;
 }
 
-// 1.13c D2Common+0x2ECF0 (#10296, D2GetRunesBIN)
+// Superseded by UNITS_GetObjectTxtRecordFromObject (Units.cpp, the row for 0x2ECF0, #10296)
 // Object units (type 2) answer their object record, unit+0x14 -> +0x00. A null unit (fatal 0xE3C) and
 // every other type (fatal 0xE43) return 0; a null record faults in retail and returns 0 here.
 extern "C"
@@ -216,7 +216,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t D2Common_22380_ItemHitClass(uint32_t pUnit)
 	return pRow != nullptr ? pRow->nHitClass : 0;
 }
 
-// 1.13c D2Common+0x31EA0 (#10621)
+// Superseded by UNITS_GetAttackRate (Units.cpp, the row for 0x31EA0, #10621)
 // Player attack rating: 5 * dexterity + to-hit - 0x23. A null unit or one that is not a type-0 player
 // is retail's fatal 0x107F. The +0x5C stat list is only read when it exists: with at least 20
 // ItemStatCost rows the to-hit total (stat 19) is read, with at least 3 the dexterity total (stat 2).

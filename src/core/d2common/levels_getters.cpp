@@ -16,8 +16,6 @@ static const D2LevelDefBin* LevelDef(int32_t id)
 {
     return (id >= 0 && id < sgptDataTables->nLevelsTxtRecordCount) ? &sgptDataTables->pLevelDefBin[id] : nullptr;
 }
-// 1.13c D2Common+0x2D810
-uint32_t D2Common_2D810_LevelDefLOSDraw(int32_t id) { const D2LevelDefBin* d = LevelDef(id); return d ? d->dwLOSDraw : 0; }
 // 1.13c D2Common+0x2D850
 uint32_t D2Common_2D850_LevelDefSaveMonsters(int32_t id) { const D2LevelDefBin* d = LevelDef(id); return d ? d->dwSaveMonsters : 0; }
 // 1.13c D2Common+0x2D970

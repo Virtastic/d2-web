@@ -195,7 +195,8 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_2FD50_PathField60(uint32_t pUnit)
 	return W(p, 0x60);
 }
 
-// 1.13c D2Common+0x32890 (#10672): scaled stat total. Base = total(31) + total(2)/4;
+// Superseded by UNITS_GetDefense (src/core/d2moo/src/Units/Units.cpp, the row for 0x32890); kept for reference only.
+// D2Common 0x32890 (#10672): scaled stat total. Base = total(31) + total(2)/4;
 // bonus = total(171) + total(16); for unit types 0, 1 and 3 that carry state 101 the first matching
 // list node (state number at node+0x14, chains at +0x3C and +0x40 via +0x2C) adds the two stats
 // 350/351 scaled by a skill (+0x138) through the hidden callees. The result is
@@ -209,7 +210,7 @@ struct D2Common32890Env
 	int32_t (*fn87080)(uint32_t pUnit, uint32_t nSkill, int32_t nTotalA, int32_t nTotalB);
 };
 
-// 1.13c D2Common+0x32890
+// superseded copy of D2Common 0x32890
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t D2Common_32890_ScaledDefense(uint32_t pUnit, const D2Common32890Env* pEnv)
 {
@@ -314,7 +315,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_50090_UnitStateHit(uint32_t pUnit,
 	return (pfn51470 && pfn51470(pUnit, 7) != 0) ? 1 : 0;
 }
 
-// D2Common+0x66410 moved to d2common_66410.cpp.
+// D2Common+0x66410 is UNITROOM_RemoveUnitFromUpdateQueue (d2moo UnitRoom.cpp).
 
 // 1.13c D2Common+0x46920 (#10684): roll an item's file index from the table at DAT_6fdeefa4 (count
 // DAT_6fdeefa0) with the item's seed (item data +4, LCG 0x6AC690C5), store it at item data +0x28,
@@ -436,7 +437,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2GetUniqueID(uint32_t pUnit)
 	return 0;
 }
 
-// 1.13c D2Common+0x81F20 (#10701, GetGlobalEquipmentSlotLayout): five dwords at
+// Retail 0x81F20 (#10701, GetGlobalEquipmentSlotLayout; play path: DATATBLS_GetInventoryComponentGrid): five dwords at
 // (nIndex*5+10)*4 of record (nSub*0x10 + nRow) in the 0xF0-stride layout table.
 struct D2Common81F20Env
 {
@@ -444,7 +445,6 @@ struct D2Common81F20Env
 	int32_t nRecords;
 };
 
-// 1.13c D2Common+0x81F20
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t GetGlobalEquipmentSlotLayout(int32_t nRow, int32_t nSub,
 	uint32_t* pOut, int32_t nIndex, const D2Common81F20Env* pEnv)

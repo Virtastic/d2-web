@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x7F180: EAX = level (kept in ESI), plain ret. Switch on the level type (+0x1D0) over a fixed list of tile-set steps:
+// (probe seam on the retail layout; the level initializer runs the engine body; was D2Common+0x7F180) EAX = level (kept in ESI), plain ret. Switch on the level type (+0x1D0) over a fixed list of tile-set steps:
 // 0x43350 (EAX level, id, -1), 0x42CE0 (ESI level, id, -1, 0, 0xF) and 0x7EDC0 (EAX tile, ESI level, 1 stack word flag).
 // Types 2..7 and 0x27 run their list then the common tail (0x42CE0 0x1D, 0x1E); types 4 and 7 return before the tail; type 0x11 places tile 0x6C
 // at (1, 1) with 0x42A70 (ECX level, EDX 1, 1, 0x6C, -1, 0); other types do nothing.

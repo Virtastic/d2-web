@@ -61,6 +61,7 @@ int __stdcall DRLGPRESET_CountPresetObjectsByAct(uint8_t nAct)
 }
 
 //D2Common.0x6FD859E0 (#11223)
+// 1.13c D2Common+0x0A090 (the retail table at 0x6FDEE2C8 matches these 750 cells, 0 differences)
 int __stdcall DRLGPRESET_GetObjectIndexFromObjPreset(uint8_t nAct, int nUnitId)
 {
 	static const int dword_6FDE1180[5][150] =

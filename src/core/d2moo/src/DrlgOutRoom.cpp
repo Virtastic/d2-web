@@ -23,6 +23,7 @@ void __fastcall DRLGOUTROOM_FreeDrlgOutdoorRoom(D2DrlgRoomStrc* pDrlgRoom)
 }
 
 //D2Common.0x6FD83D90
+// 1.13c D2Common+0x4A4D0
 void __fastcall DRLGOUTROOM_FreeDrlgOutdoorRoomData(D2DrlgRoomStrc* pDrlgRoom)
 {
 	if (pDrlgRoom->pOutdoor)
@@ -42,6 +43,7 @@ void __fastcall DRLGOUTROOM_AllocDrlgOutdoorRoom(D2DrlgRoomStrc* pDrlgRoom)
 }
 
 //D2Common.6FD83E20
+// 1.13c D2Common+0x4A9B0
 void __fastcall DRLGOUTROOM_InitializeDrlgOutdoorRoom(D2DrlgRoomStrc* pDrlgRoom)
 {
 	DRLGROOMTILE_AllocTileGrid(pDrlgRoom);

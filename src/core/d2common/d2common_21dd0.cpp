@@ -3,7 +3,7 @@
 #include "D2Inventory.h"
 #include "Units/Units.h"
 
-// 1.13c D2Common+0x21DD0
+// Twin of INVENTORY_PlaceItemAtInventoryPage (the d2moo function carries the 1.13c marker)
 extern "C" void D2Common_21DD0_PlaceAtPage(D2InventoryStrc* pInventory, D2UnitStrc* pItem, int32_t nXPos, int32_t nYPos,
                                            int32_t nRecordId, int32_t bUnused, uint8_t nPage)
 {

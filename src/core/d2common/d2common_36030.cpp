@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x36030 (#11003): allocate the unit's dynamic path (unit+0x2C), seed position, room and size, pick
+// stand-alone copy of D2Common 0x36030 (#11003; the game runs the D2MOO Path.cpp one): allocate the unit's dynamic path (unit+0x2C), seed position, room and size, pick
 // the path type defaults by unit type, register in the room and derive the half extents. Stdcall, six stack words
 // (ret 0x18): memory pool (handed to the Fog 10045 allocator in ECX, with EDX = 0x200, the Path.cpp file string and
 // line 0x453), room, x, y, unit, flag. Retail does not check the allocation. Every callee is a seam and every address
@@ -26,7 +26,7 @@ void w8(uint32_t a, uint8_t v) { *(uint8_t*)(uintptr_t)a = v; }
 }
 
 extern "C" void D2Common_36030_AllocPath(const D2Common36030Env* e, uint32_t pool, uint32_t room, int32_t x, int32_t y,
-                                         uint32_t unit, int32_t flag) // 1.13c D2Common+0x36030
+                                         uint32_t unit, int32_t flag) // stand-alone copy of D2Common 0x36030
 {
     const uint32_t p = e->alloc(pool, 0x200, 0x453, 0);
     std::memset((void*)(uintptr_t)p, 0, 0x200);

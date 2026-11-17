@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x14630 -- overlap test (ecx = the work record, edx = n): answers 0 when rectangle n overlaps any earlier rectangle other than its anchor (the per-rectangle anchor column of the preset table at image offset 0x8D190), 1 otherwise.
+// (superseded by the d2moo port DRLGOUTPLACE_LinkAct4ChaosSanctum; was D2Common+0x14630) -- overlap test (ecx = the work record, edx = n): answers 0 when rectangle n overlaps any earlier rectangle other than its anchor (the per-rectangle anchor column of the preset table at image offset 0x8D190), 1 otherwise.
 #include <cstdint>
 #include "../fn/d2game_gp.h"
 namespace d2common {

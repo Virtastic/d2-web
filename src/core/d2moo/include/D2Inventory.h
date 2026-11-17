@@ -196,6 +196,8 @@ D2COMMON_DLL_DECL BOOL __stdcall INVENTORY_GetFreePosition(D2InventoryStrc* pInv
 D2InventoryGridStrc* __fastcall INVENTORY_GetGrid(D2InventoryStrc* pInventory, int nInventoryGrid, D2InventoryGridInfoStrc* pInventoryGridInfo);
 //D2Common.0x6FD8EC70
 BOOL __fastcall INVENTORY_CanItemBePlacedAtPos(D2InventoryGridStrc* pInventoryGrid, int nX, int nY, uint8_t nItemWidth, uint8_t nItemHeight);
+// The footprint-empty loop of the test above, without its bounds test (1.13c 0x1E360)
+BOOL __fastcall INVENTORY_AreCellsFree(D2InventoryGridStrc* pInventoryGrid, int nX, int nY, uint8_t nItemWidth, uint8_t nItemHeight);
 //D2Common.0x6FD8ECF0
 BOOL __fastcall INVENTORY_FindFreePositionBottomRightToTopLeftWithWeight(D2InventoryGridStrc* pInventoryGrid, int* pFreeX, int* pFreeY, uint8_t nItemWidth, uint8_t nItemHeight);
 //D2Common.0x6FD8EE20
@@ -204,8 +206,14 @@ uint8_t __fastcall INVENTORY_GetPlacementWeight(D2InventoryGridStrc* pInventoryG
 BOOL __fastcall INVENTORY_FindFreePositionTopLeftToBottomRightWithWeight(D2InventoryGridStrc* pInventoryGrid, int* pFreeX, int* pFreeY, uint8_t nItemWidth, uint8_t nItemHeight);
 //D2Common.0x6FD8F0E0
 BOOL __fastcall INVENTORY_FindFreePositionTopLeftToBottomRight(D2InventoryGridStrc* pInventoryGrid, int* pFreeX, int* pFreeY, uint8_t nItemWidth, uint8_t nItemHeight);
+// d2-web: 1.13c's split-out first-fit right-to-left scan and the per-shape owner wrappers of INVENTORY_GetFreePosition
+BOOL __fastcall INVENTORY_FindFreePositionTopRightToBottomLeft(D2InventoryGridStrc* pInventoryGrid, int* pFreeX, int* pFreeY, uint8_t nItemWidth, uint8_t nItemHeight);
+BOOL __fastcall INVENTORY_FindFreePositionForOwner(D2InventoryStrc* pInventory, D2InventoryGridStrc* pInventoryGrid, int* pFreeX, int* pFreeY, uint8_t nItemWidth, uint8_t nItemHeight);
+BOOL __fastcall INVENTORY_FindFreePositionForOwnerSquare(D2InventoryStrc* pInventory, D2InventoryGridStrc* pInventoryGrid, int* pFreeX, int* pFreeY, uint8_t nItemWidth, uint8_t nItemHeight);
+BOOL __fastcall INVENTORY_FindFreePositionForOwnerTall(D2InventoryStrc* pInventory, D2InventoryGridStrc* pInventoryGrid, int* pFreeX, int* pFreeY, uint8_t nItemWidth, uint8_t nItemHeight);
+BOOL __fastcall INVENTORY_FindFreePositionForOwnerFlat(D2InventoryStrc* pInventory, D2InventoryGridStrc* pInventoryGrid, int* pFreeX, int* pFreeY, uint8_t nItemWidth, uint8_t nItemHeight);
 //D2Common.0x6FD8F1E0 (#10246)
-D2COMMON_DLL_DECL BOOL __stdcall INVENTORY_PlaceItemAtFreePosition(D2InventoryStrc* pInventory, D2UnitStrc* pItem, int nInventoryRecordId, BOOL bUnused, uint8_t nPage, const char* szFile, int nLine);
+D2COMMON_DLL_DECL BOOL __stdcall INVENTORY_PlaceItemAtFreePosition(D2InventoryStrc* pInventory, D2UnitStrc* pItem, int nInventoryRecordId, BOOL bUnused, uint32_t nPage, const char* szFile, int nLine);
 //D2Common.0x6FD8F250
 BOOL __fastcall INVENTORY_PlaceItemInGrid(D2InventoryStrc* pInventory, D2UnitStrc* pItem, int nXPos, int nYPos, int nInventoryGrid, int nInventoryRecordId, BOOL bUnused);
 //D2Common.0x6FD8F600 (#10247)
@@ -322,10 +330,6 @@ void __fastcall INVENTORY_InitializeComponentArray();
 void __fastcall sub_6FD917B0(D2UnitStrc* pUnit, uint8_t* a2, uint8_t* pColor, D2UnitStrc* pItem);
 //D2Common.0x6FD91B60 (#10299)
 D2COMMON_DLL_DECL int __stdcall D2Common_10299(D2UnitStrc* pUnit, int nBodyLoc, D2UnitStrc* pItem, BOOL bDontCheckReqs);
-//D2Common.0x6FD91D50
-int __fastcall sub_6FD91D50(D2UnitStrc* pPlayer, int a2, int nBodyLoc, D2UnitStrc* a3, D2UnitStrc* a4, D2UnitStrc* pItem, int nUnused);
-//D2Common.0x6FD91E80
-BOOL __fastcall sub_6FD91E80(D2UnitStrc* pUnit, D2UnitStrc* pItem1, D2UnitStrc* pItem2);
 //D2Common.0x6FD92080 (#10304)
 D2COMMON_DLL_DECL D2UnitStrc* __stdcall INVENTORY_GetNextItem(D2UnitStrc* pItem);
 //Inlined at various places

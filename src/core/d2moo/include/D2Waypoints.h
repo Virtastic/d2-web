@@ -39,7 +39,16 @@ struct D2WaypointTableStrc
 	int32_t nLevelId;							//0x00
 	bool bActivated;						//0x04
 };
+
+// 1.13c D2Common+0x99C58: the waypoint bit table (0x70 pairs) and, at +0x1C0, its entry count.
+struct D2WaypointFlagTables
+{
+	D2WaypointFlagTableStrc pEntries[0x70];		//0x000
+	int32_t nCount;								//0x1C0
+};
 #pragma pack()
+
+extern D2WaypointFlagTables gWaypointFlagTable;
 
 //D2Common.0x6FDC3D20 (#11153)
 D2COMMON_DLL_DECL BOOL __stdcall WAYPOINTS_GetLevelIdFromWaypointNo(short nWaypointNo, int* pLevelId);

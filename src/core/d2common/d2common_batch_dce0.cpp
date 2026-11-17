@@ -67,7 +67,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_22a20_batch(const int32_t* pUnit)
 	return pRow != nullptr ? pRow->nDurWarning : 0;
 }
 
-// 1.13c D2Common+0x3C330 (#10283): for a room whose pDrlgRoom is a maze room (nType ==
+// raw-layout body of D2Common 0x3C330 (the marked port is D2Common_10087): for a room whose pDrlgRoom is a maze room (nType ==
 // DRLGTYPE_MAZE) returns the outdoor room's flag bit 0x80, else 0. The 1.10f body is sub_6FD779F0
 // (DrlgDrlgRoom.cpp); retail fatals on a null room (0x5A5), here a null pointer returns 0.
 extern "C"

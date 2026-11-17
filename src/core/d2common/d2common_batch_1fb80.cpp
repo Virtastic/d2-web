@@ -45,7 +45,7 @@ namespace
 	}
 }
 
-// 1.13c D2Common+0x1FB80: wield type from the body-location grid's both hands (-1 none, 1 one or
+// Twin of INVENTORY_GetWieldType (the d2moo function carries the 1.13c marker): wield type from the body-location grid's both hands (-1 none, 1 one or
 // two one-handed/1-or-2-handed weapons, 2 a two-handed weapon). The grid is only read when the
 // inventory carries signature 0x01020304; the player is only used by ITEMS_Is1Or2Handed.
 int32_t D2Common_1FB80_GetWieldType(D2UnitStrc* pPlayer, D2InventoryStrc* pInventory)

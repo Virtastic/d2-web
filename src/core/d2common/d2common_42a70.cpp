@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x42A70: stamp a level-preset entry's footprint onto the two tile grids of a DRLG context.
+// Stand-alone port of the retail 0x42A70 body (engine function DRLGOUTDOORS_SpawnOutdoorLevelPresetEx): stamp a level-preset entry's footprint onto the two tile grids of a DRLG context.
 // ECX = ctx, EDX = x0, stack y0, idx, flag, extra (ret 0x10). The pointer at ctx+0x14 names a sub-struct: grid A cells at sub+0x2C with row
 // offsets at sub+0x30, grid C cells at sub+0x04 with row offsets at sub+0x08 (retail 4-byte pointers, wasm32 host addresses). The three slot
 // globals (PTR_FUN_6fdeb258 / 244 / 250) are static initialisers of tiny mask ops, so they run natively here:
@@ -24,7 +24,7 @@ inline void slotB(uint32_t* c, uint32_t m) { *c |= m; }
 inline void slotC(uint32_t* c, uint32_t m) { *c = m; }
 }
 
-// 1.13c D2Common+0x42A70
+// stand-alone port
 extern "C" void D2Common_42A70(void* ctx, int32_t x0, int32_t y0, int32_t idx, int32_t flag, int32_t extra)
 {
     if (!sgptDataTables || !sgptDataTables->pLvlPrestTxt) return;

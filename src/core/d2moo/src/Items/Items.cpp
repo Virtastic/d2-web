@@ -82,6 +82,7 @@ D2SeedStrc* __stdcall ITEMS_GetItemSeed(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD98490 (#10692)
+// 1.13c D2Common+0x23BE0
 void __stdcall ITEMS_InitItemSeed(D2UnitStrc* pItem)
 {
 	if (D2ItemDataStrc* pItemData = ITEMS_GetItemData(pItem))
@@ -574,66 +575,49 @@ BOOL __stdcall ITEMS_IsRepairable(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD98C60 (#10780)
+// 1.13c D2Common+0x23610
 int32_t __stdcall ITEMS_GetAmmoTypeFromItemType(int nItemType)
 {
-	D2ItemTypesTxt* pItemTypesTxtRecord = NULL;
-
 	if (nItemType >= 0 && nItemType < sgptDataTables->nItemTypesTxtRecordCount)
 	{
-		pItemTypesTxtRecord = &sgptDataTables->pItemTypesTxt[nItemType];
-		if (pItemTypesTxtRecord)
-		{
-			return pItemTypesTxtRecord->wShoots;
-		}
+		return (int16_t)sgptDataTables->pItemTypesTxt[nItemType].wShoots;
 	}
 
 	return 0;
 }
 
 //D2Common.0x6FD98CA0 (#10781)
+// 1.13c D2Common+0x24EB0
 int32_t __stdcall ITEMS_GetAmmoType(D2UnitStrc* pItem)
 {
-	D2ItemsTxt* pItemsTxtRecord = NULL;
-
+	// 1.13c: item type via ITEMS_GetItemType (0x230F0), table row sign-extended
 	if (pItem && pItem->dwUnitType == UNIT_ITEM)
 	{
-		pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-		D2_ASSERT(pItemsTxtRecord);
-
-		return ITEMS_GetAmmoTypeFromItemType(pItemsTxtRecord->wType[0]);
+		return ITEMS_GetAmmoTypeFromItemType((int)ITEMS_GetItemType(pItem));
 	}
 
 	return 0;
 }
 
 //D2Common.0x6FD98D20 (#10782)
+// 1.13c D2Common+0x235D0
 int32_t __stdcall ITEMS_GetQuiverTypeFromItemType(int nItemType)
 {
-	D2ItemTypesTxt* pItemTypesTxtRecord = NULL;
-
 	if (nItemType >= 0 && nItemType < sgptDataTables->nItemTypesTxtRecordCount)
 	{
-		pItemTypesTxtRecord = &sgptDataTables->pItemTypesTxt[nItemType];
-		if (pItemTypesTxtRecord)
-		{
-			return pItemTypesTxtRecord->wQuiver;
-		}
+		return (int16_t)sgptDataTables->pItemTypesTxt[nItemType].wQuiver;
 	}
 
 	return 0;
 }
 
 //D2Common.0x6FD98D60 (#10783)
+// 1.13c D2Common+0x24E60
 int32_t __stdcall ITEMS_GetQuiverType(D2UnitStrc* pItem)
 {
-	D2ItemsTxt* pItemsTxtRecord = NULL;
-
 	if (pItem && pItem->dwUnitType == UNIT_ITEM)
 	{
-		pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-		D2_ASSERT(pItemsTxtRecord);
-
-		return ITEMS_GetQuiverTypeFromItemType(pItemsTxtRecord->wType[0]);
+		return ITEMS_GetQuiverTypeFromItemType((int)ITEMS_GetItemType(pItem));
 	}
 
 	return 0;
@@ -745,23 +729,16 @@ uint8_t __stdcall ITEMS_GetStorePage(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD99020 (#10789)
+// 1.13c D2Common+0x23450
 uint8_t __stdcall ITEMS_GetVarInvGfxCount(D2UnitStrc* pItem)
 {
-	D2ItemTypesTxt* pItemTypesTxtRecord = NULL;
-	D2ItemsTxt* pItemsTxtRecord = NULL;
-
+	// 1.13c: item type via ITEMS_GetItemType (0x230F0)
 	if (pItem && pItem->dwUnitType == UNIT_ITEM)
 	{
-		pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-		D2_ASSERT(pItemsTxtRecord);
-
-		if (pItemsTxtRecord->wType[0] >= 0 && pItemsTxtRecord->wType[0] < sgptDataTables->nItemTypesTxtRecordCount)
+		const int32_t nType = (int32_t)ITEMS_GetItemType(pItem);
+		if (nType >= 0 && nType < sgptDataTables->nItemTypesTxtRecordCount)
 		{
-			pItemTypesTxtRecord = &sgptDataTables->pItemTypesTxt[pItemsTxtRecord->wType[0]];
-			if (pItemTypesTxtRecord)
-			{
-				return pItemTypesTxtRecord->nVarInvGfx;
-			}
+			return sgptDataTables->pItemTypesTxt[nType].nVarInvGfx;
 		}
 	}
 
@@ -787,23 +764,15 @@ char* __stdcall ITEMS_GetVarInvGfxString(D2UnitStrc* pItem, int nId)
 }
 
 //D2Common.0x6FD99140 (#10792)
+// 1.13c D2Common+0x23400
 BOOL __stdcall ITEMS_CanBeRare(D2UnitStrc* pItem)
 {
-	D2ItemTypesTxt* pItemTypesTxtRecord = NULL;
-	D2ItemsTxt* pItemsTxtRecord = NULL;
-
 	if (pItem && pItem->dwUnitType == UNIT_ITEM)
 	{
-		pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-		D2_ASSERT(pItemsTxtRecord);
-
-		if (pItemsTxtRecord->wType[0] >= 0 && pItemsTxtRecord->wType[0] < sgptDataTables->nItemTypesTxtRecordCount)
+		const int32_t nType = (int32_t)ITEMS_GetItemType(pItem);
+		if (nType >= 0 && nType < sgptDataTables->nItemTypesTxtRecordCount)
 		{
-			pItemTypesTxtRecord = &sgptDataTables->pItemTypesTxt[pItemsTxtRecord->wType[0]];
-			if (pItemTypesTxtRecord)
-			{
-				return pItemTypesTxtRecord->nRare;
-			}
+			return sgptDataTables->pItemTypesTxt[nType].nRare;
 		}
 	}
 
@@ -811,23 +780,15 @@ BOOL __stdcall ITEMS_CanBeRare(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD991C0 (#10791)
+// 1.13c D2Common+0x233B0
 BOOL __stdcall ITEMS_CanBeMagic(D2UnitStrc* pItem)
 {
-	D2ItemTypesTxt* pItemTypesTxtRecord = NULL;
-	D2ItemsTxt* pItemsTxtRecord = NULL;
-
 	if (pItem && pItem->dwUnitType == UNIT_ITEM)
 	{
-		pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-		D2_ASSERT(pItemsTxtRecord);
-
-		if (pItemsTxtRecord->wType[0] >= 0 && pItemsTxtRecord->wType[0] < sgptDataTables->nItemTypesTxtRecordCount)
+		const int32_t nType = (int32_t)ITEMS_GetItemType(pItem);
+		if (nType >= 0 && nType < sgptDataTables->nItemTypesTxtRecordCount)
 		{
-			pItemTypesTxtRecord = &sgptDataTables->pItemTypesTxt[pItemsTxtRecord->wType[0]];
-			if (pItemTypesTxtRecord)
-			{
-				return pItemTypesTxtRecord->nMagic;
-			}
+			return sgptDataTables->pItemTypesTxt[nType].nMagic;
 		}
 	}
 
@@ -835,27 +796,20 @@ BOOL __stdcall ITEMS_CanBeMagic(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD99240 (#10793)
+// 1.13c D2Common+0x23360
 BOOL __stdcall ITEMS_CanBeNormal(D2UnitStrc* pItem)
 {
-	D2ItemTypesTxt* pItemTypesTxtRecord = NULL;
-	D2ItemsTxt* pItemsTxtRecord = NULL;
-
 	if (pItem && pItem->dwUnitType == UNIT_ITEM)
 	{
-		pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-		D2_ASSERT(pItemsTxtRecord);
-
-		if (pItemsTxtRecord->wType[0] >= 0 && pItemsTxtRecord->wType[0] < sgptDataTables->nItemTypesTxtRecordCount)
+		const int32_t nType = (int32_t)ITEMS_GetItemType(pItem);
+		if (nType >= 0 && nType < sgptDataTables->nItemTypesTxtRecordCount)
 		{
-			pItemTypesTxtRecord = &sgptDataTables->pItemTypesTxt[pItemsTxtRecord->wType[0]];
-			if (pItemTypesTxtRecord)
-			{
-				return pItemTypesTxtRecord->nNormal;
-			}
+			return sgptDataTables->pItemTypesTxt[nType].nNormal;
 		}
 	}
 
-	return 0;
+	// 1.13c: a non-item or an unknown item type can be normal
+	return 1;
 }
 
 // 1.13c D2Common+0x23330
@@ -991,6 +945,7 @@ uint32_t __stdcall ITEMS_GetItemType(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD99640 (#10752)
+// 1.13c D2Common+0x230A0
 uint32_t __stdcall ITEMS_GetItemTypeFromItemId(uint32_t dwItemId)
 {
 	D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(dwItemId);
@@ -1494,6 +1449,7 @@ int __stdcall ITEMS_GetLevelRequirement(D2UnitStrc* pItem, D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FD9A400 (#10758)
+// 1.13c D2Common+0x24C80
 BOOL __stdcall ITEMS_CheckBodyLocation(D2UnitStrc* pItem, uint8_t nBodyLoc)
 {
 	D2ItemTypesTxt* pItemTypesTxtRecord = NULL;
@@ -1531,33 +1487,24 @@ BOOL __stdcall ITEMS_CheckBodyLocation(D2UnitStrc* pItem, uint8_t nBodyLoc)
 }
 
 //D2Common.0x6FD9A4F0 (#10762)
+// 1.13c D2Common+0x22F80
 int __stdcall ITEMS_CheckItemTypeIfThrowable(int nItemType)
 {
-	D2ItemTypesTxt* pItemTypesTxtRecord = NULL;
-
 	if (nItemType >= 0 && nItemType < sgptDataTables->nItemTypesTxtRecordCount)
 	{
-		pItemTypesTxtRecord = &sgptDataTables->pItemTypesTxt[nItemType];
-		if (pItemTypesTxtRecord)
-		{
-			return pItemTypesTxtRecord->nThrowable;
-		}
+		return sgptDataTables->pItemTypesTxt[nItemType].nThrowable;
 	}
 
 	return 0;
 }
 
 //D2Common.0x6FD9A530 (#10759)
+// 1.13c D2Common+0x24C30
 int __stdcall ITEMS_CheckIfThrowable(D2UnitStrc* pItem)
 {
-	D2ItemsTxt* pItemsTxtRecord = NULL;
-
 	if (pItem && pItem->dwUnitType == UNIT_ITEM)
 	{
-		pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-		D2_ASSERT(pItemsTxtRecord);
-
-		return ITEMS_CheckItemTypeIfThrowable(pItemsTxtRecord->wType[0]);
+		return ITEMS_CheckItemTypeIfThrowable((int)ITEMS_GetItemType(pItem));
 	}
 
 	return 0;
@@ -1609,6 +1556,7 @@ BOOL __stdcall ITEMS_CheckWeaponClass(D2UnitStrc* pItem, int nWeapClass)
 }
 
 //D2Common.0x6FD9A6C0 (#10766)
+// 1.13c D2Common+0x22E70
 uint32_t __stdcall ITEMS_CheckWeaponIfTwoHandedByItemId(int nItemId)
 {
 	D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(nItemId);
@@ -1619,6 +1567,7 @@ uint32_t __stdcall ITEMS_CheckWeaponIfTwoHandedByItemId(int nItemId)
 }
 
 //D2Common.0x6FD9A700 (#10765)
+// 1.13c D2Common+0x24BF0
 uint32_t __stdcall ITEMS_CheckWeaponIfTwoHanded(D2UnitStrc* pItem)
 {
 	if (pItem && pItem->dwUnitType == UNIT_ITEM)
@@ -1817,6 +1766,7 @@ BOOL __stdcall ITEMS_CheckIfUseable(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD9AA70 (#10772)
+// 1.13c D2Common+0x22C20
 int __stdcall ITEMS_GetUniqueColumnFromItemsTxt(D2UnitStrc* pItem)
 {
 	D2_ASSERT(pItem);
@@ -2615,6 +2565,7 @@ int __stdcall ITEMS_GetSpawnStack(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD9CFB0 (#10796)
+// 1.13c D2Common+0x22AD0
 int __stdcall ITEMS_GetMinStackFromItemId(int nItemId)
 {
 	D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(nItemId);
@@ -2625,6 +2576,7 @@ int __stdcall ITEMS_GetMinStackFromItemId(int nItemId)
 }
 
 //D2Common.0x6FD9CFF0 (#10797)
+// 1.13c D2Common+0x247C0
 int __stdcall ITEMS_GetMinStack(D2UnitStrc* pItem)
 {
 	D2_ASSERT(pItem);
@@ -2741,6 +2693,7 @@ short __stdcall ITEMS_GetDexBonus(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD9D340 (#10809)
+// 1.13c D2Common+0x22920
 int __stdcall ITEMS_CheckIfSocketableByItemId(int nItemId)
 {
 	D2ItemsTxt* pItemsTxtRecord = NULL;
@@ -2783,23 +2736,15 @@ BOOL __stdcall ITEMS_HasDurability(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD9D3F0 (#10813)
+// 1.13c D2Common+0x246A0
 int __stdcall ITEMS_GetStaffMods(D2UnitStrc* pItem)
 {
-	D2ItemTypesTxt* pItemTypesTxtRecord = NULL;
-	D2ItemsTxt* pItemsTxtRecord = NULL;
-
 	if (pItem && pItem->dwUnitType == UNIT_ITEM)
 	{
-		pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-		D2_ASSERT(pItemsTxtRecord);
-
-		if (pItemsTxtRecord->wType[0] >= 0 && pItemsTxtRecord->wType[0] < sgptDataTables->nItemTypesTxtRecordCount)
+		const int32_t nType = (int32_t)ITEMS_GetItemType(pItem);
+		if (nType >= 0 && nType < sgptDataTables->nItemTypesTxtRecordCount)
 		{
-			pItemTypesTxtRecord = &sgptDataTables->pItemTypesTxt[pItemsTxtRecord->wType[0]];
-			if (pItemTypesTxtRecord)
-			{
-				return pItemTypesTxtRecord->nStaffMods;
-			}
+			return sgptDataTables->pItemTypesTxt[nType].nStaffMods;
 		}
 	}
 
@@ -2820,59 +2765,33 @@ uint8_t __stdcall ITEMS_GetAllowedGemSocketsFromItemId(int nItemId)
 }
 
 //D2Common.0x6FD9D490 (#10815)
+// 1.13c D2Common+0x24610
 uint8_t __stdcall ITEMS_GetMaxSockets(D2UnitStrc* pItem)
 {
-	D2ItemTypesTxt* pItemTypesTxtRecord = NULL;
-	D2ItemsTxt* pItemsTxtRecord = NULL;
-	uint8_t nMaxSockets = 0;
-
 	if (pItem && pItem->dwUnitType == UNIT_ITEM)
 	{
-		pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-		D2_ASSERT(pItemsTxtRecord);
-
-		if (pItemsTxtRecord->wType[0] >= 0 && pItemsTxtRecord->wType[0] < sgptDataTables->nItemTypesTxtRecordCount)
+		const int32_t nType = (int32_t)ITEMS_GetItemType(pItem);
+		if (nType >= 0 && nType < sgptDataTables->nItemTypesTxtRecordCount)
 		{
-			pItemTypesTxtRecord = &sgptDataTables->pItemTypesTxt[pItemsTxtRecord->wType[0]];
-			if (pItemTypesTxtRecord)
+			const D2ItemTypesTxt* pType = &sgptDataTables->pItemTypesTxt[nType];
+			const uint8_t nGemSockets = ITEMS_GetAllowedGemSocketsFromItemId(pItem->dwClassId);
+			// 1.13c: item level via ITEMS_GetItemLevel (0x23810), which clamps it to at least 1
+			const int nItemLevel = ITEMS_GetItemLevel(pItem);
+			uint8_t nMaxSockets;
+			if (nItemLevel < 26)
 			{
-				if (pItem->pItemData)
-				{
-					if (pItem->pItemData->dwItemLevel < 1)
-					{
-						pItem->pItemData->dwItemLevel = 1;
-					}
-
-					if (pItem->pItemData->dwItemLevel > 25)
-					{
-						if (pItem->pItemData->dwItemLevel > 40)
-						{
-							nMaxSockets = pItemTypesTxtRecord->nMaxSock40;
-						}
-						else
-						{
-							nMaxSockets = pItemTypesTxtRecord->nMaxSock25;
-						}
-					}
-					else
-					{
-						nMaxSockets = pItemTypesTxtRecord->nMaxSock1;
-					}
-				}
-				else
-				{
-					nMaxSockets = pItemTypesTxtRecord->nMaxSock1;
-				}
-
-				if (pItemsTxtRecord->nGemSockets < nMaxSockets)
-				{
-					return pItemsTxtRecord->nGemSockets;
-				}
-				else
-				{
-					return nMaxSockets;
-				}
+				nMaxSockets = pType->nMaxSock1;
 			}
+			else if (nItemLevel < 41)
+			{
+				nMaxSockets = pType->nMaxSock25;
+			}
+			else
+			{
+				nMaxSockets = pType->nMaxSock40;
+			}
+
+			return nGemSockets <= nMaxSockets ? nGemSockets : nMaxSockets;
 		}
 	}
 

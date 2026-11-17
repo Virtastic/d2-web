@@ -6,7 +6,7 @@
 static inline uint32_t rd(uint32_t a) { return *reinterpret_cast<const uint32_t*>(uintptr_t(a)); }
 static inline void wr(uint32_t a, uint32_t v) { *reinterpret_cast<uint32_t*>(uintptr_t(a)) = v; }
 
-// 1.13c D2Common+0x4A9B0
+// stand-alone port of the retail 0x4A9B0 body (engine function DRLGOUTROOM_InitializeDrlgOutdoorRoom)
 extern "C" void D2Common_4A9B0_With(uint32_t room, const D2Common4a9b0Env* e)
 {
 	// Tile grid (room+0x54): allocated from the drlg pool (room+0x58 level, +0x1B4 drlg, +0x478 pool) and zeroed.

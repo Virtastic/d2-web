@@ -43,12 +43,14 @@ BOOL __stdcall STATES_CheckState(D2UnitStrc* pUnit, int nState)
 	return FALSE;
 }
 
+// 1.13c D2Common+0x34450
 //D2Common.0x6FDB45F0 (#10488)
 void __stdcall STATES_ToggleGfxStateFlag(D2UnitStrc* pUnit, int nState, BOOL bSet)
 {
 	uint32_t* pGfxFlags = D2COMMON_STATES_GetListGfxFlags_6FDB8AC0(pUnit);
 
-	if (pGfxFlags && nState >= 0 && nState < sgptDataTables->nStatesTxtRecordCount)
+	// 1.13c delta: a list without its state-flag array is left alone
+	if (pGfxFlags && pUnit->pStatListEx->StatFlags && nState >= 0 && nState < sgptDataTables->nStatesTxtRecordCount)
 	{
 		if (bSet)
 		{
@@ -80,6 +82,7 @@ BOOL __stdcall STATES_CheckGfxStateFlag(D2UnitStrc* pUnit, int nState)
 	return FALSE;
 }
 
+// 1.13c D2Common+0x34390 (the D2MOO memset size had the /32 outside the *4 term)
 //D2Common.0x6FDB46C0 (#10491)
 void __stdcall STATES_ClearGfxStateFlags(D2UnitStrc* pUnit)
 {
@@ -87,7 +90,7 @@ void __stdcall STATES_ClearGfxStateFlags(D2UnitStrc* pUnit)
 
 	if (pGfxFlags)
 	{
-		memset(pGfxFlags, 0x00, sizeof(uint32_t) * (sgptDataTables->nStatesTxtRecordCount + 31) / 32);
+		memset(pGfxFlags, 0x00, sizeof(uint32_t) * ((sgptDataTables->nStatesTxtRecordCount + 31) / 32));
 	}
 }
 
@@ -117,6 +120,7 @@ BOOL __stdcall STATES_IsAnyGfxStateFlagSet(D2UnitStrc* pUnit)
 	return FALSE;
 }
 
+// not-1.13c: thin assert wrapper over the proven D2COMMON_STATES_GetListGfxFlags (D2Common+0x342D0)
 //D2Common.0x6FDB4760 (#10492)
 uint32_t* __stdcall STATES_GetGfxStateFlags(D2UnitStrc* pUnit)
 {
@@ -429,6 +433,7 @@ BOOL __stdcall STATES_CheckStateMaskGreenOnUnit(D2UnitStrc* pUnit)
 	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_GREEN);
 }
 
+// 1.13c D2Common+0x33D10
 //D2Common.0x6FDB5740 (#11303)
 BOOL __stdcall STATES_CheckStateMaskOnUnit(D2UnitStrc* pUnit, int nStateMask)
 {
