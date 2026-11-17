@@ -4562,6 +4562,7 @@ function render(now = false) {
   bnetInput.sync();   // the touch keyboard goes down once no Battle.net box takes text
   if (FOLD_RENDER && !now && !liveFrame && performance.now() - rafAt < 100) { renderOwed = true; return; }
   renderOwed = false;
+  if (typeof Module !== 'undefined' && Module.ccall) bindClientRules(Module);   // the panels' rules are the engine's; a frame can draw before the first game tick binds them
   W?.park();
   hoverPick = null;
   fillFrameSnapshot();
