@@ -218,7 +218,7 @@ import { createGameLife, flushUnloadLeave, joinDeadline, lifePhaseFromFrame, TIC
 import { createJoinLoading, createJoinLoadingArt } from './assets/bnet-join-loading.mjs';
 import { reasonString, REASON_DISCONNECTED } from './assets/d2gs-deny.mjs';
 import { orderUnitSprites } from './assets/unit-draw-order.mjs';
-import { bindClientRules, rulesBound, questTabActs, setQuestLogStates, requestLocalQuestLogStates } from './assets/client-rules.mjs';
+import { bindClientRules, rulesBound, questTabActs, setQuestLogStates, requestLocalQuestLogStates, readHudOrbValues } from './assets/client-rules.mjs';
 
 const canvas = document.querySelector('#game');
 const screenshotAction = createScreenshotAction();
@@ -4091,7 +4091,7 @@ function fillFrameSnapshot() {
   const ready = typeof Module !== 'undefined' && window.__d2?.ready;
   seenPrev = seenNow; seenNow = newSeen();
   frameSnaps.fill(ready ? { Module, gates: frameGates(), readers: {
-    advancement: readAdvancement, characterScreen: readCharacterScreen, runToggle: readRunToggle, classSkills: readClassSkills,
+    advancement: readAdvancement, characterScreen: readCharacterScreen, hudOrbs: readHudOrbs, runToggle: readRunToggle, classSkills: readClassSkills,
     beltHudBoxes: readBeltHudBoxes, beltIndex: readBeltIndex, beltBoxes: readBeltBoxes, skillChoices: readSkillChoices, selectedSkills: readSelectedSkills,
     hoverTarget, inventoryLayout: readInventoryLayout, hirelingRoster: readHirelingRoster, stashLayout: readStashLayout,
     bankGold: () => stashGoldStat(STASH_GOLD.bank), cubeLayout: readCubeLayout, waypointTable: readWaypointTable, questWords: readQuestWords,
@@ -4576,7 +4576,7 @@ function render(now = false) {
       weather: RENDER_WIRE.ownsWorld ? wireWeather : undefined,
       floorVisible: RENDER_WIRE.ownsWorld && Module._d2_client_floor_submit_visible && frameSnap?.tiles?.length ? floorSubmitFlags(frameSnap.tiles, { ...snapshot?.player, ...cameraCentre() }, canvas.width, canvas.height, viewCX(), Module._d2_client_floor_submit_visible) : undefined,
       localPlayer: (() => { const s = selectedPlayerSource(); return s.source !== 'none' && s.renderState ? { renderState: s.renderState, x: s.x, y: s.y } : null; })(),
-      hud: hudState({ w: canvas.width, h: canvas.height, snapshot, advancement: snapOr('advancement', readAdvancement), screen: snapOr('characterScreen', readCharacterScreen),
+      hud: hudState({ w: canvas.width, h: canvas.height, snapshot, advancement: snapOr('advancement', readAdvancement), screen: snapOr('characterScreen', readCharacterScreen), orbs: snapOr('hudOrbs', readHudOrbs),
         left: Boolean(characterVisible || questVisible || hirelingVisible || stashOpen || waypointMenu || shopOpen()), right: Boolean(skillsVisible || inventoryVisible),
         iconRow: hudIconRow, runToggle: snapOr('runToggle', readRunToggle), miniDown, ...hudHeld(pointer), beltBoxes: snapOr('beltHudBoxes', readBeltHudBoxes),
         beltKeys: beltKeyNames(controlsPanel?.bindings ?? bootControlBindings), clearScreen: clearScreen || !controlPanelRenderer || screen !== SCREEN.GAME }) } });
@@ -5437,7 +5437,7 @@ function drawFrame() {
         ...hudHeld(pointer),
         // The ornate bar strips between the skill buttons and the console (wide views only; fitView's `fill`).
         strips: w > 800 && ensureFreeRes()?.ready ? (c) => { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); drawParts(c, freeResArt, barParts(w, h)); c.restore(); } : null,
-        stamina: screen ? { value: screen[4], maximum: screen[5] } : null });
+        stamina: screen ? { value: screen[4], maximum: screen[5] } : null, orbs: snapOr('hudOrbs', readHudOrbs) });
   }
   // The mini-panel row's button hover text: name plus the keys bound to it (string.tbl 4169..4176, " (%s)" 4178).
   const miniHoverTip = (w, h) => {
@@ -6003,6 +6003,8 @@ function readCharacterScreen() {
   const over = (s) => Module._d2_session_player_base_stat ? Module.ccall('d2_session_player_stat', 'number', ['number', 'number'], [s, 0]) - Module.ccall('d2_session_player_base_stat', 'number', ['number'], [s]) : null;
   sc.push(over(7), over(9)); return sc;
 }
+// The HUD's orbs and stamina bar (d2_session_hud_orbs): D2Client 0x26B20's smoothed life, mana and stamina with their maxima, raw 1/256.
+function readHudOrbs() { return session && Module._d2_session_hud_orbs ? readHudOrbValues(Module) : null; }
 function readCharacterScreenRows() {
   if (!session || !Module._d2_session_character_screen) return null;
   const p = Module._malloc(64);

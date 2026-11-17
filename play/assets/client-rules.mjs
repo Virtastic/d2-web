@@ -59,6 +59,17 @@ export function staminaBar(cur, max, over = false) {
   return { width: v & 0xffff, slot: v >>> 16 };
 }
 
+/** The local game's HUD values (d2_session_hud_orbs): { life, lifeMax, mana, manaMax, stamina, staminaMax }, raw 1/256 stat values,
+ *  each current one smoothed through D2Client+0x26B20 at the client tick; null without a player. Pointers cross wasm64 as BigInt. */
+export function readHudOrbValues(module) {
+  const raw = module._malloc(24), p = Number(raw);
+  try {
+    if (!module.ccall('d2_session_hud_orbs', 'number', ['bigint'], [BigInt(p)])) return null;
+    const v = new Int32Array(module.HEAPU8.buffer.slice(p, p + 24));
+    return { life: v[0], lifeMax: v[1], mana: v[2], manaMax: v[3], stamina: v[4], staminaMax: v[5] };
+  } finally { module._free(raw); }
+}
+
 /** The stamina bar's palette index per slot ([red, normal, blue]) over a 256-entry RGBA palette, as 278B0 latches them
  *  through D2Win #10190 (D2CMP+0x9D30, nearest entry); null without the engine. */
 export function staminaColours(palette) {

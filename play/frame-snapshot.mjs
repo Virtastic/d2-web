@@ -37,6 +37,7 @@ export function collectFrameSnapshot({ Module, gates, readers }) {
   if (gates.session) {
     fs.advancement = readers.advancement();
     fs.characterScreen = readers.characterScreen();
+    if (readers.hudOrbs) fs.hudOrbs = readers.hudOrbs();
     fs.runToggle = readers.runToggle();
   }
   if (gates.skills) fs.classSkills = readers.classSkills();

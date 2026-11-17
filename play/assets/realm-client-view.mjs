@@ -79,7 +79,10 @@ export function realmFrameReads(resources, world = null, tables = null, playerCl
   const heroScreen = advancement && hero?.screen ? hero.screen.slice() : null;
   // Life, mana and stamina tick per packet: their current values stay the ones the orbs and the stamina bar read.
   if (heroScreen && resources) { heroScreen[4] = screen[4]; heroScreen[11] = screen[11]; heroScreen[13] = screen[13]; }
-  const reads = { characterScreen: heroScreen ?? (resources ? (hud ? hud.characterSlots(playerClass, screen) && screen : screen.slice(0, 11)) : null), advancement,
+  // The HUD's raw (1/256) values, as the stamina bar's max + 5 test reads them; not smoothed: no client tick here (not-yet: 0x26B20).
+  const hudOrbs = resources ? { life: resources.hp ?? 0, lifeMax: resources.hpMax ?? 0, mana: resources.mana ?? 0, manaMax: resources.manaMax ?? 0,
+    stamina: resources.stamina ?? 0, staminaMax: resources.staminaMax ?? 0 } : null;
+  const reads = { hudOrbs, characterScreen:heroScreen ?? (resources ? (hud ? hud.characterSlots(playerClass, screen) && screen : screen.slice(0, 11)) : null), advancement,
     attributeTotals: (heroScreen && hero.stat ? { strength: hero.stat(0), energy: hero.stat(1), dexterity: hero.stat(2), vitality: hero.stat(3) } : hud?.attributeTotals()) ?? null, questWords: quests?.player ?? null, questStates: quests?.states ?? null,
     classSkills: hud?.classSkills(playerClass, skillLevels, skillBonuses) ?? null, waypointTable: hud?.waypointTable() ?? null,
     hotkeys: Array.from({ length: 8 }, (_, i) => ({ skill: hotkeys?.[i]?.skill ?? -1, left: Boolean(hotkeys?.[i]?.left) })), beltIndex: 2, beltHudBoxes: null, beltBoxCount: 0 };

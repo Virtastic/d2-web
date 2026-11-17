@@ -240,9 +240,11 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     const life = resourceRatio(snapshot?.player?.hp, snapshot?.player?.hpMax);
     const mana = resourceRatio(snapshot?.player?.mana, snapshot?.player?.manaMax);
     // D2Client+0x27BD0 / +0x27A90 (engine rule): fill rows = cur * 80 / max, integer; the float rounding below is the pre-engine fallback.
-    const pl = snapshot?.player, alive = snapshot?.mode !== 0x11;
+    // hud.orbs (raw 1/256): a local game's values come smoothed through D2Client+0x26B20 at the client tick, as 27BD0/27A90 read them.
+    const pl = snapshot?.player, alive = snapshot?.mode !== 0x11, orbs = hud.orbs || null;
     const fillRows = (image, ratio, cur, max, kind) => rulesBound() ? Math.min(image.height, Math.max(0, orbFill(cur, max, kind, alive))) : image.height - Math.round(image.height * (1 - ratio));
-    const lifeRows = fillRows(fluid[0], life, pl?.hp, pl?.hpMax, 0), manaRows = fillRows(fluid[1], mana, pl?.mana, pl?.manaMax, 1);
+    const lifeRows = fillRows(fluid[0], life, orbs ? orbs.life : pl?.hp, orbs ? orbs.lifeMax : pl?.hpMax, 0),
+      manaRows = fillRows(fluid[1], mana, orbs ? orbs.mana : pl?.mana, orbs ? orbs.manaMax : pl?.manaMax, 1);
     const drawFluid = (image, x, y, rows) => { const top = image.height - rows, shown = rows;
       if (shown > 0) ctx.drawImage(image, 0, top, image.width, shown, x, y + top, image.width, shown); };
     drawFluid(fluid[0], 29 - edge, 12, lifeRows); drawFluid(fluid[1], 689 + edge, 12, manaRows);
@@ -265,7 +267,8 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     const stamina = hud.stamina || null;
     const staminaRatio = stamina ? resourceRatio(stamina.value, stamina.maximum) : 0;
     // D2Client+0x278B0 (engine rule, hud_bar_rules.h): width = cur * 0x66 / max in integers; the fallback is the pre-engine float.
-    const staminaRule = stamina && rulesBound() ? staminaBar(stamina.value, stamina.maximum) : null;
+    // 278B0 reads raw 1/256 values (its max + 5 blue test is 5/256 of a point): hud.orbs when the engine gave them, else whole points shifted up.
+    const staminaRule = stamina && rulesBound() ? (orbs ? staminaBar(orbs.stamina, orbs.staminaMax) : staminaBar(stamina.value * 256, stamina.maximum * 256)) : null;
     const staminaPixels = staminaRule ? Math.min(HUD_LAYOUT.stamina.width, staminaRule.width) : Math.floor(staminaRatio * HUD_LAYOUT.stamina.width);
     // 278B0's colour: the slot it picks (red below 0x19 px, blue over max + 5) indexes the three colours it latched on its
     // first draw (staminaColours); the pre-engine fallback is the normal colour's index 109.

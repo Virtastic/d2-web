@@ -6239,6 +6239,22 @@ EMSCRIPTEN_KEEPALIVE int d2_session_character_screen(int32_t* out) {
 }
 // The character screen's maximum-stamina base: D2Client+0xBCEA0 draws the total (out[5]) in colour 3 when it exceeds
 // this base (retail: 1560 in colour 3, the Increased Stamina passive's 30% over a base of 1200), colour 1 below.
+// The HUD's orbs and stamina bar as 1.13c D2Client reads them (0x27BD0 / 0x27A90 / 0x278B0): each current value through
+// 0x26B20's smoothing (hud_orbs.cpp) at the client tick D2Client+0x1197F8 (g_sessionClientFrame, the counter 0x24490's port
+// reads), each maximum through D2Common's max getter (10913 / 10186 / 10578). All raw 1/256 stat values; the client's own
+// current values are the whole points the server's 0x95 carries (shifted back up by 8). out: life, max, mana, max, stamina, max.
+extern "C" int32_t d2_client_orb_smooth(int32_t stat, int32_t cur, int32_t max, uint32_t frame);
+EMSCRIPTEN_KEEPALIVE int d2_session_hud_orbs(int32_t* out) {
+    if (!out || !g_targetPlayer) return 0;
+    const int stats[3] = { STAT_HITPOINTS, STAT_MANA, STAT_STAMINA };
+    const int32_t maxv[3] = { STATLIST_GetMaxLifeFromUnit(g_targetPlayer), STATLIST_GetMaxManaFromUnit(g_targetPlayer), STATLIST_GetMaxStaminaFromUnit(g_targetPlayer) };
+    for (int i = 0; i < 3; i++) {
+        const int32_t cur = STATLIST_UnitGetStatValue(g_targetPlayer, stats[i], 0) & ~0xff;
+        out[2 * i] = d2_client_orb_smooth(stats[i], cur, maxv[i], g_sessionClientFrame);
+        out[2 * i + 1] = maxv[i];
+    }
+    return 1;
+}
 EMSCRIPTEN_KEEPALIVE int d2_session_character_stamina_base() { return g_targetPlayer ? STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_MAXSTAMINA, 0) >> 8 : 0; }
 // Character panel colours: retail D2Client+0xBCEA0 draws max life / max mana (stats 7, 9) in colour 3 when the
 // total (D2Common ord 10973) exceeds the base (ord 10587), colour 1 when below; this is the base read.
