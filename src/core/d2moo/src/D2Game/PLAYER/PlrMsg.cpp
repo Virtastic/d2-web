@@ -2733,26 +2733,61 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x2C_2D_52_6FC867B0(D2GameStrc* pGam
 }
 
 //D2Game.0x6FC867C0
+// 1.13c D2Game+0xCF810: the town-portal placement (1.10f D2GAME_CreatePortalObject_6FD13DF0 with object
+// 0x3B, no source out-pointer, bPerm 0) is inlined here
 void __fastcall D2GAME_PlayerChangeAct_6FC867C0(D2GameStrc* pGame, D2UnitStrc* pUnit, DWORD dwDestLvl, DWORD nTileCalc)
 {
+    const uint8_t nDestAct = DRLG_GetActNoFromLevelId(dwDestLvl);
     D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
     const uint8_t nSourceAct = DRLG_GetActNoFromLevelId(DUNGEON_GetLevelIdFromRoom(pRoom));
-    const uint8_t nDestAct = DRLG_GetActNoFromLevelId(dwDestLvl);
 
-    if (dwDestLvl)
-    {
-        if (nDestAct == nSourceAct)
-        {
-            D2GAME_CreatePortalObject_6FD13DF0(pGame, pUnit, pRoom, CLIENTS_GetUnitX(pUnit) - 5, CLIENTS_GetUnitY(pUnit), dwDestLvl, 0, OBJECT_TOWN_PORTAL, 0);
-        }
-        else
-        {
-            LEVEL_WarpUnit(pGame, pUnit, dwDestLvl, nTileCalc);
-        }
-    }
-    else
+    if (!dwDestLvl)
     {
         LEVEL_WarpUnit(pGame, pUnit, DUNGEON_GetTownLevelIdFromActNo(nSourceAct), nTileCalc);
+        return;
+    }
+
+    if (nDestAct != nSourceAct)
+    {
+        LEVEL_WarpUnit(pGame, pUnit, dwDestLvl, nTileCalc);
+        return;
+    }
+
+    D2CoordStrc pCoord = {};
+    pCoord.nX = CLIENTS_GetUnitX(pUnit) - 5;
+    pCoord.nY = CLIENTS_GetUnitY(pUnit);
+
+    D2_ASSERT(pRoom);
+
+    if (DUNGEON_IsRoomInTown(pRoom))
+    {
+        SUNIT_AttachSound(pUnit, 0x18u, pUnit);
+        return;
+    }
+
+    const int32_t nSourceLevel = DUNGEON_GetLevelIdFromRoom(pRoom);
+    D2_ASSERT(nDestAct == DRLG_GetActNoFromLevelId(nSourceLevel));
+
+    if (!COLLISION_GetFreeCoordinatesWithField(pRoom, &pCoord, &pCoord, 3, 0x3E01u, 0xC01u, 0))
+    {
+        return;
+    }
+
+    D2ActiveRoomStrc* pTargetRoom = D2GAME_GetRoom_6FC52070(pRoom, pCoord.nX, pCoord.nY);
+    if (!pTargetRoom)
+    {
+        return;
+    }
+
+    D2UnitStrc* pPortal = SUNIT_AllocUnitData(UNIT_OBJECT, OBJECT_TOWN_PORTAL, pCoord.nX, pCoord.nY, pGame, pTargetRoom, 1, 1, 0);
+    UNITS_ChangeAnimMode(pPortal, 1);
+
+    D2UnitStrc* pLinkPortal = D2GAME_CreateLinkPortal_6FD13B20(pGame, pPortal, dwDestLvl, nSourceLevel);
+    if (pLinkPortal)
+    {
+        UNITS_SetObjectPortalFlags(pLinkPortal, UNITS_GetObjectPortalFlags(pLinkPortal) | 3);
+        DUNGEON_ToggleHasPortalFlag(pTargetRoom, 0);
+        DUNGEON_ToggleHasPortalFlag(UNITS_GetRoom(pLinkPortal), 0);
     }
 }
 

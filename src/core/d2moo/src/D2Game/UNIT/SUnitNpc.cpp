@@ -16,6 +16,7 @@
 #include <D2States.h>
 #include <D2Items.h>
 #include <D2Waypoints.h>
+#include <Units/UnitRoom.h>
 
 
 #include "AI/AiGeneral.h"
@@ -26,6 +27,7 @@
 #include "ITEMS/Items.h"
 #include "MONSTER/MonsterAI.h"
 #include "MONSTER/MonsterMode.h"
+#include "MONSTER/MonsterUnique.h"
 #include "MONSTER/MonsterSpawn.h"
 #include "PLAYER/PlayerPets.h"
 #include "PLAYER/PlrMsg.h"
@@ -1869,17 +1871,214 @@ void __fastcall D2GAME_NPC_IdentifyAllItems_6FCC9C90(D2GameStrc* pGame, D2UnitSt
     }
 }
 
-//D2Game.0x6FCC9F40
-int32_t __fastcall NPC_HandleDialogMessage(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nType, int32_t nNpcGUID, int32_t nItemGUID)
+// 1.13c D2Game+0xBC990 (eax = player, one stack arg): the item on the player's cursor is the one the client named
+static int32_t NPC_IsCursorItem(D2UnitStrc* pPlayer, int32_t nItemGUID)
 {
-    D2UnitStrc* pMonster = SUNIT_GetServerUnit(pGame, UNIT_MONSTER, nNpcGUID);
-    if (!pPlayer || !pMonster || pMonster->dwUnitType != UNIT_MONSTER)
+    if (!pPlayer->pInventory)
     {
         return 0;
     }
 
-    D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(pMonster->dwClassId);
-    if (!pMonStatsTxtRecord || !(pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_INTERACT]) || !pMonster->pMonsterData || !pMonster->pMonsterData->pMonInteract)
+    D2UnitStrc* pCursorItem = INVENTORY_GetCursorItem(pPlayer->pInventory);
+    return pCursorItem && pCursorItem->dwUnitId == nItemGUID;
+}
+
+// 1.13c D2Game+0x62340 (eax = player, stack pGame): Akara's reset is granted on Hell after Den of Evil
+static void NPC_GrantAkaraReset(D2UnitStrc* pPlayer, D2GameStrc* pGame)
+{
+    D2BitBufferStrc* pQuestRecord = UNITS_GetPlayerData(pPlayer)->pQuestData[pGame->nDifficulty];
+    QUESTRECORD_SetQuestState(pQuestRecord, 0x29, 0xD);
+    QUESTRECORD_SetQuestState(pQuestRecord, 0x29, QFLAG_REWARDPENDING);
+}
+
+// 1.13c D2Game+0x9F9A0 (eax = skill id, esi = unit, stack level and remove): assign, then the passive and pet refresh run
+// for every id. D2MOO's D2GAME_SetSkills_6FD14C60 is the 1.10f twin, which skips the refresh for an id out of range.
+static void NPC_AssignSkill(D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t bRemove)
+{
+    if (nSkillId >= 0 && nSkillId < sgptDataTables->nSkillsTxtRecordCount)
+    {
+        SKILLS_AssignSkill(pUnit, nSkillId, nSkillLevel, bRemove, __FILE__, 0x112A);
+    }
+
+    SKILLS_RefreshPassiveSkills(pUnit);
+    if (pUnit && pUnit->dwUnitType == UNIT_PLAYER)
+    {
+        sub_6FC7DF40(pUnit->pGame, pUnit);
+    }
+}
+
+// 1.13c D2Game+0xA1280 (eax = unit, stack pGame): every class skill is removed, its hard points go back as skill points
+static void NPC_ResetSkills(D2UnitStrc* pUnit, D2GameStrc* pGame)
+{
+    if (!pUnit || pUnit->dwUnitType != UNIT_PLAYER)
+    {
+        return;
+    }
+
+    const int32_t nClassId = pUnit->dwClassId;
+    const int32_t nCount = SKILLS_GetPlayerSkillCount(nClassId);
+    int32_t nTotal = 0;
+    for (int32_t i = 0; i < nCount; ++i)
+    {
+        const int32_t nSkillId = SKILLS_GetClassSkillId(nClassId, i);
+        D2SkillStrc* pSkill = SKILLS_GetSkillById(pUnit, nSkillId, -1);
+        if (pSkill)
+        {
+            nTotal += SKILLS_GetSkillLevel(pUnit, pSkill, 0);
+            NPC_AssignSkill(pUnit, nSkillId, 0, 1);
+            D2ClientStrc* pClient = pUnit->dwUnitType == UNIT_PLAYER ? UNITS_GetPlayerData(pUnit)->pClient : nullptr;
+            D2GAME_PACKETS_SendPacket0x21_UpdateSkills_6FC3DB50(pClient, pUnit, nSkillId, 0, 1);
+        }
+    }
+
+    STATLIST_AddUnitStat(pUnit, STAT_SKILLPTS, nTotal, 0);
+    D2GAME_UpdatePlayerVitals_6FC4B240(pGame, pUnit);
+    D2GAME_ITEMS_UpdateInventoryItems_6FC44A90(pGame, pUnit, 0);
+    UNITS_RefreshInventory(pUnit, 1);
+}
+
+// 1.13c D2Game+0xEAE20 (eax = energy delta, esi = unit): energy moves to or from the stat pool; mana follows a gain
+static void NPC_ResetEnergy(int32_t nDelta, D2UnitStrc* pUnit)
+{
+    if (!nDelta || !pUnit || pUnit->dwClassId < 0 || pUnit->dwClassId >= sgptDataTables->nCharStatsTxtRecordCount)
+    {
+        return;
+    }
+
+    D2CharStatsTxt* pCharStatsTxtRecord = &sgptDataTables->pCharStatsTxt[pUnit->dwClassId];
+    if (!pCharStatsTxtRecord)
+    {
+        return;
+    }
+
+    STATLIST_AddUnitStat(pUnit, STAT_STATPTS, -nDelta, 0);
+    STATLIST_AddUnitStat(pUnit, STAT_ENERGY, nDelta, 0);
+    if (nDelta > 0)
+    {
+        STATLIST_AddUnitStat(pUnit, STAT_MANA, (pCharStatsTxtRecord->nManaPerMagic * nDelta) << 6, 0);
+        STATLIST_AddUnitStat(pUnit, STAT_MAXMANA, (pCharStatsTxtRecord->nManaPerMagic * nDelta) << 6, 0);
+    }
+
+    const int32_t nMaxMana = STATLIST_UnitGetStatValue(pUnit, STAT_MAXMANA, 0);
+    if (STATLIST_UnitGetStatValue(pUnit, STAT_MANA, 0) > nMaxMana)
+    {
+        STATLIST_SetUnitStat(pUnit, STAT_MANA, nMaxMana, 0);
+    }
+}
+
+// 1.13c D2Game+0xEAD10 (eax = vitality delta, esi = unit): max life and max stamina always move; life and stamina follow a gain
+static void NPC_ResetVitality(int32_t nDelta, D2UnitStrc* pUnit)
+{
+    if (!nDelta || !pUnit || pUnit->dwClassId < 0 || pUnit->dwClassId >= sgptDataTables->nCharStatsTxtRecordCount)
+    {
+        return;
+    }
+
+    D2CharStatsTxt* pCharStatsTxtRecord = &sgptDataTables->pCharStatsTxt[pUnit->dwClassId];
+    if (!pCharStatsTxtRecord)
+    {
+        return;
+    }
+
+    STATLIST_AddUnitStat(pUnit, STAT_STATPTS, -nDelta, 0);
+    STATLIST_AddUnitStat(pUnit, STAT_VITALITY, nDelta, 0);
+
+    STATLIST_AddUnitStat(pUnit, STAT_MAXHP, (pCharStatsTxtRecord->nLifePerVitality * nDelta) << 6, 0);
+    if (nDelta > 0)
+    {
+        STATLIST_AddUnitStat(pUnit, STAT_HITPOINTS, (pCharStatsTxtRecord->nLifePerVitality * nDelta) << 6, 0);
+    }
+
+    const int32_t nMaxLife = STATLIST_UnitGetStatValue(pUnit, STAT_MAXHP, 0);
+    if (STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0) > nMaxLife)
+    {
+        STATLIST_SetUnitStat(pUnit, STAT_HITPOINTS, nMaxLife, 0);
+    }
+
+    STATLIST_AddUnitStat(pUnit, STAT_MAXSTAMINA, (pCharStatsTxtRecord->nStaminaPerVitality * nDelta) << 6, 0);
+    if (nDelta > 0)
+    {
+        STATLIST_AddUnitStat(pUnit, STAT_STAMINA, (pCharStatsTxtRecord->nStaminaPerVitality * nDelta) << 6, 0);
+    }
+
+    const int32_t nMaxStamina = STATLIST_UnitGetStatValue(pUnit, STAT_MAXSTAMINA, 0);
+    if (STATLIST_UnitGetStatValue(pUnit, STAT_STAMINA, 0) > nMaxStamina)
+    {
+        STATLIST_SetUnitStat(pUnit, STAT_STAMINA, nMaxStamina, 0);
+    }
+}
+
+// 1.13c D2Game+0xEAF80 (eax = unit): strength, energy, dexterity and vitality go back to the class's starting values,
+// the difference to or from the stat pool
+static void NPC_ResetAttributes(D2UnitStrc* pUnit)
+{
+    if (!pUnit || pUnit->dwUnitType != UNIT_PLAYER || pUnit->dwClassId < 0 || pUnit->dwClassId >= sgptDataTables->nCharStatsTxtRecordCount)
+    {
+        return;
+    }
+
+    D2CharStatsTxt* pCharStatsTxtRecord = &sgptDataTables->pCharStatsTxt[pUnit->dwClassId];
+    if (!pCharStatsTxtRecord)
+    {
+        return;
+    }
+
+    int32_t nDelta = pCharStatsTxtRecord->nStr - STATLIST_GetUnitBaseStat(pUnit, STAT_STRENGTH, 0);
+    if (nDelta)
+    {
+        STATLIST_AddUnitStat(pUnit, STAT_STATPTS, -nDelta, 0);
+        STATLIST_AddUnitStat(pUnit, STAT_STRENGTH, nDelta, 0);
+        UNITROOM_RefreshUnit(pUnit);
+    }
+
+    NPC_ResetEnergy(pCharStatsTxtRecord->nInt - STATLIST_GetUnitBaseStat(pUnit, STAT_ENERGY, 0), pUnit);
+
+    nDelta = pCharStatsTxtRecord->nDex - STATLIST_GetUnitBaseStat(pUnit, STAT_DEXTERITY, 0);
+    if (nDelta)
+    {
+        STATLIST_AddUnitStat(pUnit, STAT_STATPTS, -nDelta, 0);
+        STATLIST_AddUnitStat(pUnit, STAT_DEXTERITY, nDelta, 0);
+        UNITROOM_RefreshUnit(pUnit);
+    }
+
+    NPC_ResetVitality(pCharStatsTxtRecord->nVit - STATLIST_GetUnitBaseStat(pUnit, STAT_VITALITY, 0), pUnit);
+}
+
+// 1.13c D2Game+0x63BB0 (eax = player, edi = pGame): the reset is spent; unless the record's bit 0xF is set, quest 0x1E
+// stops being active. Retail then writes a debug trace only while its quest-debug flag (D2Game+0x111C20) is on; that
+// flag is never set in a release game, so the trace is not reproduced.
+static void NPC_SpendAkaraReset(D2UnitStrc* pPlayer, D2GameStrc* pGame)
+{
+    D2BitBufferStrc* pQuestRecord = UNITS_GetPlayerData(pPlayer)->pQuestData[pGame->nDifficulty];
+    QUESTRECORD_SetQuestState(pQuestRecord, 0x29, QFLAG_REWARDGRANTED);
+    QUESTRECORD_ClearQuestState(pQuestRecord, 0x29, QFLAG_REWARDPENDING);
+    if (QUESTRECORD_GetQuestState(pQuestRecord, 0x29, 0xF))
+    {
+        return;
+    }
+
+    D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, 0x1E);
+    D2_ASSERT(pQuestData);
+    pQuestData->bActive = 0;
+}
+
+//D2Game.0x6FCC9F40
+// 1.13c D2Game+0xC00C0 (ecx = player; stack pGame, type, npc guid, item guid; the quest-item steps call D8310, D6710,
+// D76A0 and CF810, and Akara's reset is the new 0x94 branch)
+int32_t __fastcall NPC_HandleDialogMessage(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nType, int32_t nNpcGUID, int32_t nItemGUID)
+{
+    D2UnitStrc* pMonster = SUNIT_GetServerUnit(pGame, UNIT_MONSTER, nNpcGUID);
+    if (!pMonster || !pPlayer)
+    {
+        return 0;
+    }
+
+    if (!MONSTERUNIQUE_CheckMonStatsFlag(pMonster->dwClassId, MONSTATSFLAGINDEX_INTERACT))
+    {
+        return 0;
+    }
+
+    if (pMonster->dwUnitType != UNIT_MONSTER || !pMonster->pMonsterData || !pMonster->pMonsterData->pMonInteract)
     {
         return 0;
     }
@@ -1939,7 +2138,10 @@ int32_t __fastcall NPC_HandleDialogMessage(D2GameStrc* pGame, D2UnitStrc* pPlaye
     }
     case 3:
     {
-        D2GAME_NPC_BuildHirelingList_6FCC6FF0(pGame, SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), pMonster, MONSTERAI_GetInteractUnitCount(pMonster->pMonsterData->pMonInteract) <= 1);
+        // retail reads the interact count and drops it: BD330 takes no fourth argument
+        const int32_t nInteractCount = MONSTERAI_GetInteractUnitCount(pMonster->pMonsterData->pMonInteract);
+        D2ClientStrc* pClient = pPlayer->dwUnitType == UNIT_PLAYER ? UNITS_GetPlayerData(pPlayer)->pClient : nullptr;
+        D2GAME_NPC_BuildHirelingList_6FCC6FF0(pGame, pClient, pMonster, nInteractCount);
         return 0;
     }
     default:
@@ -1954,14 +2156,8 @@ int32_t __fastcall NPC_HandleDialogMessage(D2GameStrc* pGame, D2UnitStrc* pPlaye
         packet58.nHeader = 0x58;
         packet58.nUnitId = nNpcGUID;
 
-        D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
-        if (!pPlayer->pInventory)
-        {
-            return 3;
-        }
-
-        D2UnitStrc* pCursorItem = INVENTORY_GetCursorItem(pPlayer->pInventory);
-        if (!pCursorItem || pCursorItem->dwUnitId != nItemGUID)
+        D2ClientStrc* pClient = pPlayer->dwUnitType == UNIT_PLAYER ? UNITS_GetPlayerData(pPlayer)->pClient : nullptr;
+        if (!NPC_IsCursorItem(pPlayer, nItemGUID))
         {
             return 3;
         }
@@ -2051,6 +2247,28 @@ int32_t __fastcall NPC_HandleDialogMessage(D2GameStrc* pGame, D2UnitStrc* pPlaye
 
         return 0;
     }
+    case MONSTER_AKARA:
+    {
+        D2BitBufferStrc* pQuestRecord = UNITS_GetPlayerData(pPlayer)->pQuestData[pGame->nDifficulty];
+        if (pGame->nDifficulty == DIFFMODE_HELL
+            && QUESTRECORD_GetQuestState(pQuestRecord, QUESTSTATEFLAG_A1Q1, QFLAG_REWARDGRANTED) == 1
+            && !QUESTRECORD_GetQuestState(pQuestRecord, 0x29, QFLAG_REWARDPENDING)
+            && !QUESTRECORD_GetQuestState(pQuestRecord, 0x29, QFLAG_REWARDGRANTED))
+        {
+            NPC_GrantAkaraReset(pPlayer, pGame);
+        }
+
+        if (!QUESTRECORD_GetQuestState(pQuestRecord, 0x29, QFLAG_REWARDPENDING))
+        {
+            return 0;
+        }
+
+        NPC_ResetSkills(pPlayer, pGame);
+        NPC_ResetAttributes(pPlayer);
+        SUNIT_AttachSound(pPlayer, 2, pPlayer);
+        NPC_SpendAkaraReset(pPlayer, pGame);
+        return 0;
+    }
     case MONSTER_WARRIV1:
     {
         if (!QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pPlayer)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A1Q6, QFLAG_REWARDGRANTED))
@@ -2124,14 +2342,8 @@ int32_t __fastcall NPC_HandleDialogMessage(D2GameStrc* pGame, D2UnitStrc* pPlaye
         packet58.nHeader = 0x58;
         packet58.nUnitId = nNpcGUID;
 
-        D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
-        if (!pPlayer->pInventory)
-        {
-            return 3;
-        }
-
-        D2UnitStrc* pCursorItem = INVENTORY_GetCursorItem(pPlayer->pInventory);
-        if (!pCursorItem || pCursorItem->dwUnitId != nItemGUID)
+        D2ClientStrc* pClient = pPlayer->dwUnitType == UNIT_PLAYER ? UNITS_GetPlayerData(pPlayer)->pClient : nullptr;
+        if (!NPC_IsCursorItem(pPlayer, nItemGUID))
         {
             return 3;
         }
@@ -2220,14 +2432,8 @@ int32_t __fastcall NPC_HandleDialogMessage(D2GameStrc* pGame, D2UnitStrc* pPlaye
         packet58.nHeader = 0x58;
         packet58.nUnitId = nNpcGUID;
 
-        D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
-        if (!pPlayer->pInventory)
-        {
-            return 3;
-        }
-
-        D2UnitStrc* pCursorItem = INVENTORY_GetCursorItem(pPlayer->pInventory);
-        if (!pCursorItem || pCursorItem->dwUnitId != nItemGUID)
+        D2ClientStrc* pClient = pPlayer->dwUnitType == UNIT_PLAYER ? UNITS_GetPlayerData(pPlayer)->pClient : nullptr;
+        if (!NPC_IsCursorItem(pPlayer, nItemGUID))
         {
             return 3;
         }
@@ -2260,7 +2466,7 @@ int32_t __fastcall NPC_HandleDialogMessage(D2GameStrc* pGame, D2UnitStrc* pPlaye
             packet58.unk0x05 = 7;
             D2GAME_SendPacket0x58_6FC3F520(pClient, &packet58);
             sub_6FC44030(pGame, pPlayer, nItemGUID);
-            // TODO: Missing return 0?
+            // no return: retail D2Game+0xC00C0 also goes on to the cursor removal here
         }
 
         if (!D2GAME_RemoveItemIfOnCursor_6FC49760(pGame, pPlayer, pInput))

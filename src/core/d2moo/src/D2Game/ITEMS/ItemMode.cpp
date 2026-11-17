@@ -1650,6 +1650,8 @@ static void ITEMMODE_UnpackDroppedCube(D2GameStrc* pGame, D2UnitStrc* pUnit, D2U
 }
 
 //D2Game.0x6FC44030
+// 1.13c D2Game+0xD8310 (eax = item guid; stack pGame, unit): the targeting-flag sweep is retail D29F0, the
+// filled-socket test is D1BC0
 void __fastcall sub_6FC44030(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nItemGUID)
 {
     D2_ASSERT(pGame);
@@ -1689,7 +1691,7 @@ void __fastcall sub_6FC44030(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nItem
 
     INVENTORY_SetCursorItem(pUnit->pInventory, nullptr);
 
-    if (pItem->dwUnitType == UNIT_ITEM && ITEMS_CheckIfSocketable(pItem) && pItem->pInventory && INVENTORY_GetItemCount(pItem->pInventory))
+    if (D2GAME_CheckHasFilledSockets_6FC4B2D0(pItem, __FILE__, __LINE__))
     {
         ITEMS_SetItemFlag(pItem, IFLAG_NEWITEM, 1);
     }
@@ -1800,7 +1802,7 @@ int32_t __fastcall D2GAME_PlaceItem_6FC44410(const char* szFile, int32_t nLine, 
     {
         ITEMS_SetItemCMDFlag(pItem, 2, 1);
 
-        if (pItem->dwUnitType == UNIT_ITEM && ITEMS_CheckIfSocketable(pItem) && pItem->pInventory && INVENTORY_GetItemCount(pItem->pInventory))
+        if (D2GAME_CheckHasFilledSockets_6FC4B2D0(pItem, __FILE__, __LINE__))
         {
             ITEMS_SetItemFlag(pItem, IFLAG_NEWITEM, 1);
         }
@@ -6024,6 +6026,7 @@ void __fastcall D2GAME_UpdatePlayerItems_6FC4BB90(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FC4BBB0
+// 1.13c D2Game+0xD6710 (eax = player, ecx = item, stack pGame)
 void __fastcall sub_6FC4BBB0(D2GameStrc* pGame, D2UnitStrc* pItem, D2UnitStrc* pPlayer)
 {
     ITEMS_SetItemFlag(pItem, IFLAG_IDENTIFIED, 1);
