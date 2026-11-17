@@ -28,6 +28,16 @@ import { d2winHeldFrame } from './d2win-button-frame.mjs';
 import { isControlHeld } from './frontend-pointer-states.mjs';
 
 /**
+ * D2Win's animated-image pointer test (1.13c D2Win 0x107C0): the control sits at (x, y) and its current image's
+ * first frame is w x h with offsets (ox, oy). The play path passes the engine's own port (`d2_win_anim_hit`); this
+ * is only the seam's default for a build without the engine.
+ */
+function retailAnimHit(mx, my, x, y, w, h, ox, oy) {
+  const sx = mx - ox, sy = my - oy;
+  return sx >= x && sy >= y - h && sx < x + w && sy < y;
+}
+
+/**
  * Per-class layout, from OpenDiablo2's select_hero_class.go.
  *
  * `anchor` is where the sprite is pinned; `hit` is the clickable rectangle as {x, y, w, h} (the
@@ -229,6 +239,8 @@ function animation(read, decodeDc6, path, palette, documentObject) {
   const load = () => { if (!decoded) { decoded = decodeDc6(read(path)); canvases = new Array(decoded.frames.length).fill(null); } return decoded; };
   return {
     path, get count() { return load().frames.length; },
+    /** Frame 0's size and offsets: the record D2Win's animated-image pointer test measures. */
+    get frame0() { const f = load().frames[0]; return f ? { w: f.width, h: f.height, ox: f.offsetX, oy: f.offsetY } : null; },
     /** Draw frame `index`; returns the frame index it actually drew, so a caller can record the
      * drawn identity rather than the requested one (the two differ whenever `index` wraps). */
     draw(ctx, index, anchorX, anchorY) {
@@ -294,7 +306,7 @@ export const POPUP = {
   strings: { ok: 5102, cancel: 5103, hardcore: 5303 },
 };
 
-export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCreate, onCancel, onSound, string = () => '', nameOk = (n) => n.length >= 2, documentObject = globalThis.document, realm = false }) {
+export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCreate, onCancel, onSound, string = () => '', nameOk = (n) => n.length >= 2, animHit = retailAnimHit, documentObject = globalThis.document, realm = false }) {
   const palette = decodeDatPalette(read(CREATE_ASSETS.palette));
   const fontPalette = decodeDatPalette(read(FRONTEND.palette));
   const background = composeTiled(decodeDc6(read(CREATE_ASSETS.background)), palette, TITLE_COLUMNS, documentObject);
@@ -474,6 +486,13 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
   const okBox = () => ({ x: LAYOUT.okButton.x, y: LAYOUT.okButton.y, w: buttons[0].width, h: buttons[0].height });
   const exitBox = () => ({ x: LAYOUT.exitButton.x, y: LAYOUT.exitButton.y, w: buttons[0].width, h: buttons[0].height });
   const inBox = (p, b) => p.x >= b.x && p.x < b.x + b.w && p.y >= b.y && p.y < b.y + b.h;
+  // Retail's class portraits are D2Win animated-image controls: the pointer test measures the first frame of the
+  // image the control shows now (idle, hover, walk-forward, chosen or walk-back).
+  const STANCE_ART = { [HERO_STANCE.IDLE]: 'idle', [HERO_STANCE.IDLE_SELECTED]: 'hover', [HERO_STANCE.APPROACHING]: 'forward', [HERO_STANCE.SELECTED]: 'idleSelected', [HERO_STANCE.RETREATING]: 'back' };
+  const heroFrame = (i) => heroes[i][STANCE_ART[stances.stance(i, tick)]]?.frame0 ?? null;
+  const heroOver = (i, p) => { const f = heroFrame(i), a = heroes[i].anchor; return !!f && !!animHit(Math.trunc(p.x), Math.trunc(p.y), a.x, a.y, f.w, f.h, f.ox, f.oy); };
+  const heroAt = (p) => { for (let i = 0; i < heroes.length; i++) if (heroOver(i, p)) return i; return -1; };
+  const heroBox = (i) => { const f = heroFrame(i), a = heroes[i].anchor; return f ? { x: a.x + f.ox, y: a.y + f.oy - f.h, w: f.w, h: f.h } : { x: a.x, y: a.y, w: 1, h: 1 }; };
   // A raised popup owns the pointer: only its buttons answer.
   const popupButtons = () => {
     if (!popup) return [];
@@ -486,7 +505,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     const checkbox = chosen >= 0 ? checkboxes.hitTest(p) : null;
     if (checkbox) return `checkbox-${checkbox}`;
     if (inBox(p, exitBox())) return 'exit';
-    const i = heroes.findIndex((h) => inBox(p, h.hit));
+    const i = heroAt(p);
     return i >= 0 ? `class-${heroes[i].key}` : null;
   };
   const releaseMatches = (token, p) => {
@@ -495,7 +514,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     if (token === 'ok') return inBox(p, okBox());
     if (token === 'exit') return inBox(p, exitBox());
     if (token.startsWith('checkbox-')) return checkboxes.contains(token.slice('checkbox-'.length), p);
-    if (token.startsWith('class-')) return inBox(p, heroes.find((h) => h.key === token.slice('class-'.length))?.hit || {});
+    if (token.startsWith('class-')) return heroOver(heroes.findIndex((h) => h.key === token.slice('class-'.length)), p);
     return false;
   };
   // Down cel only for the control the press armed (`pressed`) while the pointer is still over it.
@@ -616,7 +635,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
       const p = toScreen(x, y, width, height);
       pointer = [Math.trunc(p.x), Math.trunc(p.y)];
       if (popup) return -1;
-      const next = heroes.findIndex((h) => inBox(p, h.hit));
+      const next = heroAt(p);
       if (hovered >= 0 && hovered !== next) stances.unhover(hovered, tick);
       if (next >= 0) stances.hover(next, tick);
       hovered = next;
@@ -632,7 +651,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
       const checkboxTargets = Object.fromEntries(Object.entries(checkboxes.targets()).map(([key, [x, y]]) => [key, [Math.round(v.ox + x * v.scale), Math.round(v.oy + y * v.scale)]]));
       // The name box as a rect [x, y, w, h]: where a phone puts its text field over the drawn box.
       const name = [Math.round(v.ox + LAYOUT.nameBox.x * v.scale), Math.round(v.oy + LAYOUT.nameBox.y * v.scale), Math.round(textBox.width * v.scale), Math.round(textBox.height * v.scale)];
-      return { classes: Object.fromEntries(heroes.map((h) => [h.key, centre(h.hit)])), ok: centre(okBox()), exit: centre(exitBox()), checkboxes: checkboxTargets, name };
+      return { classes: Object.fromEntries(heroes.map((h, i) => [h.key, centre(heroBox(i))])), ok: centre(okBox()), exit: centre(exitBox()), checkboxes: checkboxTargets, name };
     },
     click(x, y, width, height) {
       const p = toScreen(x, y, width, height);
@@ -643,7 +662,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
         if (checkbox) return checkbox;
       }
       if (inBox(p, exitBox())) { onCancel?.(); return 'exit'; }
-      const i = heroes.findIndex((h) => inBox(p, h.hit));
+      const i = heroAt(p);
       if (i >= 0) { choose(i); return heroes[i].key; }
       return null;
     },

@@ -141,3 +141,14 @@ export function requestLocalQuestLogStates() {
   const stream = mod.HEAPU8.slice(at, at + length);
   return questLogStatesIn(stream, (o) => call('d2_realm_d2gs_packet_size', ['bigint', 'number'], [BigInt(at + o), length - o]));
 }
+
+/** The run button (+0x28320) then the menu arrow (+0x26880) against the draw sink, pointer in 800x600 space: records in call order. */
+export function hudButtonsDrawList(mx, my, running, runHot, arrowOpen, arrowHot, cellRun, cellMenu) {
+  if (!mod) throw new Error('client rules are not bound to the engine');
+  const p = mod._malloc(8 * 4 * 4);
+  try {
+    const n = mod.ccall('d2_client_draw_hud_buttons', 'number', Array(9).fill('number'),
+      [mx | 0, my | 0, running ? 1 : 0, runHot ? 1 : 0, arrowOpen ? 1 : 0, arrowHot ? 1 : 0, cellRun, cellMenu, p]);
+    return decodeDrawList(mod.HEAP32, p >> 2, n);
+  } finally { mod._free(p); }
+}

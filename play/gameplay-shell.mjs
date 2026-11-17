@@ -899,9 +899,11 @@ function hudHeld(pointer) {
   const t = gameUiButtonDown?.token;
   if (!t || !controlPanelEvidence) return { levelPressed: -1, hudPressed: null };
   const cp = controlPanelRenderer, at = (fn) => fn(controlPanelEvidence, pointer.x, pointer.y, canvas.width, canvas.height);
+  // run / menu: only which one is armed and where the pointer is; the engine's button ports decide whether the down cel shows.
   return {
     levelPressed: t.startsWith('level:') && at(cp.hitLevelButton) === Number(t.slice(6)) ? Number(t.slice(6)) : -1,
-    hudPressed: t === 'hud:run' && at(cp.hitRunButton) ? 'run' : t === 'hud:menu' && at(cp.hitMenuButton) ? 'menu' : null,
+    hudPressed: t === 'hud:run' ? 'run' : t === 'hud:menu' ? 'menu' : null,
+    hudPointer: { x: pointer.x, y: pointer.y },
   };
 }
 let automapOverlay = null, realmAutomapOverlay = null;
@@ -2886,7 +2888,6 @@ async function createRealmCharacter({ playerClass, name, checkboxes }) {
 }
 // The character-name rule of the original create screen, run by the engine's own D2Launch validator.
 function engineCharacterNameOk(name) {
-  if (!Module._d2_launch_charname_ok) return name.length >= 2;
   const at = Module._malloc((name.length + 1) * 2);
   try {
     const units = new Uint16Array(Module.HEAPU8.buffer, Number(at), name.length + 1);
@@ -2903,6 +2904,7 @@ function ensureCharCreate() {
       realm: realmCreate, read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette,
       string: (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]),
       nameOk: engineCharacterNameOk,
+      animHit: (...a) => Module.ccall('d2_win_anim_hit', 'number', a.map(() => 'number'), a) === 1,
       onCreate: ({ playerClass, name, checkboxes }) => {
         if (realmCreate) { createRealmCharacter({ playerClass, name, checkboxes }); return; }
         chosenClass = playerClass; chosenName = name;

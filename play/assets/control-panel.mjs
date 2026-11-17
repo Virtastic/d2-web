@@ -1,7 +1,7 @@
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { recordDc6, recordPrim } from './drawlist.mjs';
-import { rulesBound, expBarPixels, orbDrawList, staminaBar, staminaColours } from './client-rules.mjs';
-import { replayOrbs, CELL_FLUID, CELL_OVERLAP } from './draw-list.mjs';
+import { rulesBound, expBarPixels, orbDrawList, hudButtonsDrawList, staminaBar, staminaColours } from './client-rules.mjs';
+import { replayOrbs, replayCels, CELL_FLUID, CELL_OVERLAP, CELL_RUN, CELL_MENU } from './draw-list.mjs';
 
 export function resourceRatio(value, maximum) {
   const max = Number(maximum), current = Number(value);
@@ -195,6 +195,9 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
       runButtonDc6.frames.length <= HUD_LAYOUT.runButton.runFrame ||
       levelButtonDc6.frames.length <= HUD_LAYOUT.levelButtons.pressedFrame)
     throw new Error('unexpected retail mini-panel frame set');
+  const buttonCels = {
+    [CELL_RUN]: runButtonDc6.frames.map((f, i) => ({ image: frameCanvas(f, palette, documentObject), path: HUD_LAYOUT.runButton.path, frame: i, dc6: f })),
+    [CELL_MENU]: menuButtonDc6.frames.map((f, i) => ({ image: frameCanvas(f, palette, documentObject), path: HUD_LAYOUT.menuButton.path, frame: i, dc6: f })) };
   const miniPanel = frameCanvas(miniPanelDc6.frames[HUD_LAYOUT.miniPanel.frame], palette, documentObject);
   // The draw list records EVERY draw, so the HUD is recorded only where a row is comparing: the
   // records are what makes "the thing asked for is the thing drawn" checkable per blit.
@@ -274,11 +277,17 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     // The run button's cel follows the engine's own run/walk toggle (hud.runToggle), never a click
     // this module saw: the toggle's action goes to the engine and this reads the engine back.
     const running = hud.runToggle === true;
-    const run = (() => { const spec = HUD_LAYOUT.runButton, at = local(spec), index = (running ? spec.runFrame : spec.frame) + (hud.hudPressed === 'run' && runButtonDc6.frames.length > (running ? spec.runFrame : spec.frame) + 1 ? 1 : 0);
-      const f = runButtonDc6.frames[index];
-      ctx.drawImage(frameCanvas(f, palette, documentObject), at.x, at.y);
-      return { ...record(spec, index, f, spec.x, spec.y), pixels: 1, running,
-        left: spec.x, top: spec.y, w: f.width, h: f.height }; })();
+    // The run button and the arrow are the ported draw functions' own D2Gfx calls (D2Client+0x28320, +0x26880 via the draw sink):
+    // which frame (down only while armed AND the pointer is over it) and where are the engine's; this replays them. The pointer is
+    // taken into the 800x600 space the ports run in. The records are replayed where each button used to draw (run, then the bar, then the arrow).
+    const ptr = hud.hudPointer, bx = ptr ? Math.round((ptr.x - x0) / scale) : -1, by = ptr ? Math.round((ptr.y - y0) / scale) + PANEL_SCREEN_TOP : -1;
+    const buttons = rulesBound() ? hudButtonsDrawList(bx, by, running, hud.hudPressed === 'run', hud.arrowOpen !== false, hud.hudPressed === 'menu', CELL_RUN, CELL_MENU) : [];
+    const placeButton = (cell, extra) => {
+      const [p] = replayCels(ctx, buttons.filter((r) => r.cell === cell), buttonCels,
+        (path, frame, dc6, x, top) => recordDc6(path, frame, dc6, x, top, { op: 'cel', mode: 5 }), PANEL_SCREEN_TOP);
+      return p ? { ...p.rec, ...extra, left: p.left, top: p.top, w: p.w, h: p.h } : null;
+    };
+    const run = placeButton(CELL_RUN, { pixels: 1, running });
     const bar = (() => {
       const spec = HUD_LAYOUT.stamina, at = local(spec);
       if (staminaPixels <= 0) return { ...spec, requested: stamina?.value ?? null, next: stamina?.maximum ?? null,
@@ -303,11 +312,7 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     // a minipanel record), so only a click on the arrow may show frame 0 -- and no capture of a
     // collapsed row exists, so frame 0 is still the inference the module comment declares. Reading
     // the ROW's visibility here instead is what s391 measures: it drew frame 0 in the stash state.
-    const menu = (() => { const spec = HUD_LAYOUT.menuButton, at = local(spec), base = hud.arrowOpen === false ? spec.closedFrame : spec.openFrame, index = base + (hud.hudPressed === 'menu' && menuButtonDc6.frames.length > base + 1 ? 1 : 0);
-      const f = menuButtonDc6.frames[index];
-      ctx.drawImage(frameCanvas(f, palette, documentObject), at.x, at.y);
-      return { ...record(spec, index, f, spec.x, spec.y), collapsed: hud.arrowOpen === false,
-        left: spec.x, top: spec.y, w: f.width, h: f.height }; })();
+    const menu = placeButton(CELL_MENU, { collapsed: hud.arrowOpen === false });
     // The two add-point buttons either side of the belt, at retail's own anchors and in retail's own
     // (disabled) frame -- see HUD_LAYOUT.levelButtons.
     // LIT (frame 0, same anchors) while the engine holds points to spend: retail's charpanel-points /

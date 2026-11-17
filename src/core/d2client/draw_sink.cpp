@@ -7,6 +7,9 @@
 
 extern "C" void d2c_27bd0(const D2cSvc&, uint32_t, int32_t, int32_t, uint32_t, uint32_t);
 extern "C" void d2c_27a90(const D2cSvc&, uint32_t, int32_t, int32_t, uint32_t, uint32_t);
+extern "C" void d2c_28320(const D2cSvc&, int32_t, int32_t, int32_t, int32_t, uint32_t, uint32_t, uint32_t);
+extern "C" void d2c_26880(const D2cSvc&, int32_t, int32_t, int32_t, int32_t, uint32_t, uint32_t, uint32_t);
+extern "C" uint32_t D2Client_InRect265A0(int32_t, int32_t, int32_t, int32_t);
 
 namespace {
 // One record: callee RVA, cell handle (blk[13]), frame (blk[0]), x, y (bottom row), a, rows, mode.
@@ -16,7 +19,8 @@ int g_count = 0;
 
 struct Model { int32_t cur[2], max[2]; };   // [0] life, [1] mana
 Model g_model;
-uint32_t g_unit[8];   // the unit words the ports read: type at +0, mode at +0x10
+int32_t g_w = 800, g_h = 600;   // the screen the hover test (+0x265A0) reads: [0xDBC48], [0xDBC4C]
+uint32_t g_unit[8];  // the unit words the ports read: type at +0, mode at +0x10
 
 void push(uint32_t rva, const uint32_t* blk, const uint32_t* s, int firstArg) {
     if (g_count >= kMax) return;
@@ -31,6 +35,7 @@ uint32_t callee(void*, uint32_t rva, const uint32_t* r, const uint32_t* s) {
     case 0x26b20: return (uint32_t)g_model.cur[r[0] == 8 ? 1 : 0];     // smoothed stat 6 (life) / 8 (mana)
     case 0xc196: return (uint32_t)g_model.max[0];                      // life maximum
     case 0xcf4c: return (uint32_t)g_model.max[1];                      // mana maximum
+    case 0x265a0: return D2Client_InRect265A0((int32_t)r[1], (int32_t)r[4], g_w, g_h);   // x = ECX, y = ESI
     case 0xd096: case 0xd1b6: push(rva, (const uint32_t*)(uintptr_t)s[0], s, 1); return 0;
     default: return 0;                                                  // state tests, resolution query: nothing set
     }
@@ -48,6 +53,19 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_draw_orbs(int32_t life, int32_t lifeMax, 
     const uint32_t unit = (uint32_t)(uintptr_t)g_unit;
     d2c_27bd0(v, unit, 800, 600, cellFluid, cellOverlap);
     d2c_27a90(v, unit, 800, 600, cellFluid, cellOverlap);
+    for (int i = 0; i < g_count * kFields; i++) out[i] = g_list[i];
+    return g_count;
+}
+
+// Runs the run/walk button (+0x28320) then the menu arrow (+0x26880) at the 800x600 base with the pointer (mx, my) in that
+// space. running / arrowOpen are the engine's two toggles; runHot / arrowHot say the button is armed (mouse held down on it).
+// The frame (down cel only while armed and over) and the position are the ports' own. Records as d2_client_draw_orbs.
+EMSCRIPTEN_KEEPALIVE int32_t d2_client_draw_hud_buttons(int32_t mx, int32_t my, int32_t running, int32_t runHot, int32_t arrowOpen, int32_t arrowHot,
+                                                       uint32_t cellRun, uint32_t cellMenu, int32_t* out) {
+    g_count = 0; g_w = 800; g_h = 600;
+    const D2cSvc v = { nullptr, callee };
+    d2c_28320(v, g_w, g_h, mx, my, running ? 1 : 0, runHot ? 1 : 0, cellRun);
+    d2c_26880(v, g_w, g_h, mx, my, arrowOpen ? 1 : 0, arrowHot ? 1 : 0, cellMenu);
     for (int i = 0; i < g_count * kFields; i++) out[i] = g_list[i];
     return g_count;
 }

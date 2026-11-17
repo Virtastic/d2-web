@@ -58,6 +58,14 @@ export function bindStubRules() {
         if (w < 0x19) slot = 0;
         return (slot << 16) | w;
       }
+      if (name === 'd2_client_draw_hud_buttons') {   // d2client_28320.cpp / d2client_26880.cpp at 800x600
+        const [mx, my, running, runHot, arrowOpen, arrowHot, cellRun, cellMenu, out] = a;
+        const runIn = mx >= 255 && mx <= 272 && my >= 572 && my <= 592, menuIn = mx >= 392 && mx <= 405 && my >= 561 && my <= 587;
+        const recs = [[0xd096, cellRun, (running ? 2 : 0) + (runHot && runIn ? 1 : 0), 255, 590, -1, 5, 0],
+          [0xd096, cellMenu, (arrowOpen ? 2 : 0) + (arrowHot && menuIn ? 1 : 0), 392, 584, -1, 5, 0]];
+        recs.forEach((r, i) => r.forEach((v, j) => { heap[(out >> 2) + i * 8 + j] = v; }));
+        return recs.length;
+      }
       if (name === 'd2_client_draw_orbs') {   // d2client_27bd0.cpp / d2client_27a90.cpp with no poison or frozen state, at 800x600
         const [life, lifeMax, mana, manaMax, alive, fluid, overlap, out] = a, recs = [];
         const fill = (cur, mx, kind) => {

@@ -34,3 +34,21 @@ export function replayOrbs(ctx, list, cels, edge, record, originY = 496) {
     }
   }
 }
+
+export const CELL_RUN = 3, CELL_MENU = 4;
+
+/**
+ * Replay plain cel records (the run button and the menu arrow). `cels[cell][frame]` as in replayOrbs; `record(path, frame, dc6, x, top)`
+ * logs each blit and its result is returned per drawn cel with the cel's placed box, in call order. `originY` is the canvas origin's screen row.
+ */
+export function replayCels(ctx, list, cels, record, originY = 496) {
+  const placed = [];
+  for (const r of list) {
+    const c = cels[r.cell]?.[r.frame];
+    if (!c || r.rva !== DRAW_CEL) continue;
+    const top = r.y - c.image.height + 1;
+    ctx.drawImage(c.image, r.x, top - originY);
+    placed.push({ cell: r.cell, frame: r.frame, left: r.x, top, w: c.image.width, h: c.image.height, rec: record(c.path, c.frame, c.dc6, r.x, top) });
+  }
+  return placed;
+}
