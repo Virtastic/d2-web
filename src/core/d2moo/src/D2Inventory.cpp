@@ -2822,9 +2822,12 @@ int __stdcall D2Common_10315(D2CorpseStrc* pCorpse)
 	return 0;
 }
 
+void __fastcall INVENTORY_InitializeComponentArray();
+
 // 1.13c D2Common+0x1FB50: the slot search over 1..254 for the alternate graphic or the code; 0 when no slot matches
 inline int INVENTORY_GetComponentArrayIndexFromItemsTxtRecord(D2ItemsTxt* pItemsTxtRecord)
 {
+	INVENTORY_InitializeComponentArray();   // 1.13c D2Common+0x1FB50 builds the table first
 	for (int nCounter = 1; nCounter < kComponentArrayLogicalSize; ++nCounter)
 	{
 		if (gTxtComponentItemTypeMap[nCounter].dwCode == pItemsTxtRecord->dwAlternateGfx || gTxtComponentItemTypeMap[nCounter].dwCode == pItemsTxtRecord->dwCode)
@@ -2839,6 +2842,7 @@ inline int INVENTORY_GetComponentArrayIndexFromItemsTxtRecord(D2ItemsTxt* pItems
 // 1.13c D2Common+0x1FB50: the same search with the arm type token as both keys; 0 when no slot matches
 inline int INVENTORY_GetComponentArrayIndexFromArmTypeTxtRecord(D2ArmTypeTxt* pArmTypeTxtRecord)
 {
+	INVENTORY_InitializeComponentArray();   // 1.13c D2Common+0x1FB50 builds the table first
 	for (int nCounter = 1; nCounter < kComponentArrayLogicalSize; ++nCounter)
 	{
 		if (gTxtComponentItemTypeMap[nCounter].dwCode == *(uint32_t*)&pArmTypeTxtRecord->szToken[0])
