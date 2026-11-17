@@ -428,6 +428,9 @@ BOOL __fastcall sub_6FDACEC0(D2DynamicPathStrc* pDynamicPath, D2FP32_16* a2, D2U
 	return 1;
 }
 
+void PATH_StopMovement(D2DynamicPathStrc* pDynamicPath);
+
+// 1.13c D2Common+0xDF30
 //1.00:  D2Common.0x1005FAB0
 //1.10f: D2Common.0x6FDAD5E0
 BOOL __fastcall sub_6FDAD5E0(D2DynamicPathStrc* pDynamicPath, D2ActiveRoomStrc* pDestRoom, D2PathPointStrc tDest)
@@ -489,52 +492,12 @@ BOOL __fastcall sub_6FDAD5E0(D2DynamicPathStrc* pDynamicPath, D2ActiveRoomStrc* 
 	if (pDynamicPath->pRoom != pDestRoom)
 		pDynamicPath->dwFlags |= PATH_UNKNOWN_FLAG_0x00001;
 
-	bool bDestinationIsValid = true;
-	if (pDynamicPath->dwFlags & PATH_MISSILE_MASK)
-	{
-		if (!COLLISION_GetRoomBySubTileCoordinates(pDynamicPath->pRoom, tDest.X, tDest.Y))
-		{
-			pDynamicPath->dwPathPoints = 0;
-			bDestinationIsValid = false;
-		}
-	}
-
-	if (bDestinationIsValid)
-	{
-		pDynamicPath->tGameCoords.dwPrecisionX = PATH_ToFP16Center(tDest.X);
-		pDynamicPath->tGameCoords.dwPrecisionY = PATH_ToFP16Center(tDest.Y);
-
-		PATH_UpdateClientCoords(pDynamicPath);
-
-		if (pDynamicPath->pUnit && (pDynamicPath->dwFlags & PATH_UNKNOWN_FLAG_0x00001) != 0)
-			PATH_RecacheRoom(pDynamicPath, pDestRoom);
-	}
+	// 1.13c: recache at the destination's subtile centre (0xDA40), then end the movement (0xDC80)
+	PATH_RecacheRoomAtCoordIfNeeded(pDynamicPath, pDestRoom, PATH_ToFP16Center(tDest.X), PATH_ToFP16Center(tDest.Y));
 
 	D2_ASSERT(COORD_TEST_EQUAL(tDest, sgctZeroGameCoord) || COLLISION_GetRoomBySubTileCoordinates(pDestRoom, tDest.X, tDest.Y));
 
-	const uint32_t dwPrecisionSubileCenterX = PATH_FP16FitToCenter(pDynamicPath->tGameCoords.dwPrecisionX);
-	const uint32_t dwPrecisionSubtileCenterY = PATH_FP16FitToCenter(pDynamicPath->tGameCoords.dwPrecisionY);
-	if ((pDynamicPath->dwFlags & PATH_MISSILE_MASK) == 0
-		|| COLLISION_GetRoomBySubTileCoordinates(pDynamicPath->pRoom, PATH_FromFP16(dwPrecisionSubileCenterX), PATH_FromFP16(dwPrecisionSubtileCenterY)))
-	{
-		pDynamicPath->tGameCoords.dwPrecisionX = dwPrecisionSubileCenterX;
-		pDynamicPath->tGameCoords.dwPrecisionY = dwPrecisionSubtileCenterY;
-
-		PATH_UpdateClientCoords(pDynamicPath);
-
-		if (pDynamicPath->pUnit && (pDynamicPath->dwFlags & PATH_UNKNOWN_FLAG_0x00001) != 0)
-			PATH_RecacheRoom(pDynamicPath, 0);
-	}
-	else
-	{
-		pDynamicPath->dwPathPoints = 0;
-	}
-
-	pDynamicPath->dwFlags &= ~PATH_UNKNOWN_FLAG_0x00020;
-	pDynamicPath->dwPathPoints = 0;
-	pDynamicPath->dwCurrentPointIdx = 0;
-	pDynamicPath->tVelocityVector.nX = 0;
-	pDynamicPath->tVelocityVector.nY = 0;
+	PATH_StopMovement(pDynamicPath);
 	return TRUE;
 }
 
@@ -577,6 +540,7 @@ void __fastcall PATHMISC_SetRoom(D2DynamicPathStrc* pPath, D2ActiveRoomStrc* pNe
 
 
 
+// 1.13c D2Common+0xE150
 //1.00:  D2Common.0x10060640 (#10227)
 //1.10f: D2Common.0x6FDADF00 (#10230)
 BOOL __stdcall D2Common_10230(D2DynamicPathStrc* pDynamicPath, int a2, D2ActiveRoomStrc* pRoom, unsigned int a4, __int16 a5)
@@ -767,6 +731,7 @@ BOOL __stdcall D2Common_10234(D2DynamicPathStrc* pDynamicPath)
 	return FALSE;
 }
 
+// 1.13c D2Common+0xDAB0
 //1.00:  D2Common.0x10060C60 (#10231)
 //1.10f: D2Common.0x6FDAE520 (#10235)
 void __stdcall D2Common_10235_PATH_UpdateRiderPath(D2UnitStrc* pRiderUnit, D2UnitStrc* pMountUnit)
@@ -792,41 +757,8 @@ void __stdcall D2Common_10235_PATH_UpdateRiderPath(D2UnitStrc* pRiderUnit, D2Uni
 		pRiderPath->dwFlags |= PATH_UNKNOWN_FLAG_0x00001;
 	}
 
-	if (pRiderPath->dwFlags & PATH_MISSILE_MASK)
-	{
-		// Try to find the missile in the mount room list, if not, end its path
-		if (!COLLISION_GetRoomBySubTileCoordinates(pRiderPath->pRoom, PATH_FromFP16(pMountPath->tGameCoords.dwPrecisionX), PATH_FromFP16(pMountPath->tGameCoords.dwPrecisionY)))
-		{
-			pRiderPath->dwPathPoints = 0;
-			return;
-		}
-	}
-
-	// Update the rider's target position
-	pRiderPath->tGameCoords.dwPrecisionX = pMountPath->tGameCoords.dwPrecisionX;
-	pRiderPath->tGameCoords.dwPrecisionY = pMountPath->tGameCoords.dwPrecisionY;
-	PATH_UpdateClientCoords(pRiderPath);
-
-	D2ActiveRoomStrc* pMountRoom = pMountPath->pRoom;
-
-	// Rider was in a different room than the mount at some point
-	if (pRiderPath->pUnit && (pRiderPath->dwFlags & PATH_UNKNOWN_FLAG_0x00001))
-	{
-		// Try finding room from rider's current room list
-		D2ActiveRoomStrc* pRidersUpToDateRoom = COLLISION_GetRoomBySubTileCoordinates(pRiderPath->pRoom, pRiderPath->tGameCoords.wPosX, pRiderPath->tGameCoords.wPosY);
-
-		if (!pRidersUpToDateRoom)
-		{
-			// If not in the rider's current room list, try with the mount's room list
-			pRidersUpToDateRoom = COLLISION_GetRoomBySubTileCoordinates(pMountRoom, pRiderPath->tGameCoords.wPosX, pRiderPath->tGameCoords.wPosY);
-			// If not found and it is a missile, just end its path
-			if (!pRidersUpToDateRoom && (pRiderPath->dwFlags & PATH_MISSILE_MASK))
-			{
-				pRiderPath->dwPathPoints = 0;
-				return;
-			}
-		}
-
-		PATHMISC_SetRoom(pRiderPath, pRidersUpToDateRoom);
-	}
+	// 1.13c: the mount's precise position and room go through the room-recache helper (0xDA40),
+	// which also ends a missile's path when no room holds the position.
+	PATH_RecacheRoomAtCoordIfNeeded(pRiderPath, pMountPath->pRoom,
+		pMountPath->tGameCoords.dwPrecisionX, pMountPath->tGameCoords.dwPrecisionY);
 }

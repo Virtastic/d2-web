@@ -19,6 +19,7 @@ struct D2PathMovStrc
 	D2PathPointStrc pPoints[200];
 };
 
+// 1.13c D2Common+0x18400
 // D2Common.0x6FD68400 (1.13C)
 // Inlined (1.10f)
 void __vectorcall PATH_ReplaceSubpathPoints(D2PathMovStrc* pMov, D2PathPointStrc* pPoints, int* pSubPathStartIdx, int nSubPathLastIdx, int* nMaxIndex)
@@ -52,6 +53,7 @@ static const D2CoordStrc gnDirectionsToAdjacentCellOffsets[16] =
 };
 
 //1.10f: Inlined
+// 1.13c D2Common+0x186D0
 //1.13C: D2Common.0x6FD686D0
 BOOL __vectorcall PATH_FindNonCollidingTargetPoint(D2PathInfoStrc* pInfo, D2PathMovStrc* pMov)
 {
@@ -80,6 +82,7 @@ BOOL __vectorcall PATH_FindNonCollidingTargetPoint(D2PathInfoStrc* pInfo, D2Path
 
 
 // D2Common.0x6FDABAC0 (1.10f)
+// 1.13c D2Common+0x18830
 // D2Common.0x6FD68830 (1.13C)
 // The general idea of the algorithm is to evaluate two paths: One on the right and another on the left of the line between start and target points.
 // We try to advance both paths at the same pace (one point by one point), and both evaluate paths to avoid but stay close to obstacles.
@@ -272,14 +275,16 @@ int __fastcall PATH_FindSubpathWithoutObstacles(D2PathInfoStrc* pInfo, D2PathPoi
 	}
 
 	auto ComputeSquaredDistToTarget = [&](const D2PathMovStrc& rPath) {
-		// Note: original game does not clamp the index, and would use memory from pCache1.bWithCollision, which would be set to 0
-		// This means the distance would be the norm of tTargetCoord, which means we would have the bigger distance of the two paths
-		// It makes more sense to use INT_MAX as it means we will never pick this path.
+		// 1.13c reads pPoints[nPoints - 1] unchecked; with nPoints == 0 that is the dword
+		// before pPoints, bPathFinished (X = low half, Y = high half).
 		if (rPath.nPoints > 0)
 		{
 			return rPath.pPoints[rPath.nPoints - 1].SquaredDistance(pInfo->tTargetCoord);
 		}
-		return INT_MAX;
+		D2PathPointStrc tFinished;
+		tFinished.X = (int16_t)(uint32_t)rPath.bPathFinished;
+		tFinished.Y = (int16_t)((uint32_t)rPath.bPathFinished >> 16);
+		return tFinished.SquaredDistance(pInfo->tTargetCoord);
 	};
 
 	const int nSquaredDist1 = ComputeSquaredDistToTarget(tCache1);
