@@ -1305,7 +1305,8 @@ void __fastcall DRLGROOMTILE_AddRoomMapTiles(D2DrlgRoomStrc* pDrlgRoom)
 }
 
 //D2Common.0x6FD8A010
-// not-1.13c: inlined into the tile-grid builders D2Common+0x4A9B0 and +0xC940void __fastcall DRLGROOMTILE_AllocTileGrid(D2DrlgRoomStrc* pDrlgRoom)
+// not-1.13c: inlined into the tile-grid builders D2Common+0x4A9B0 and +0xC940
+void __fastcall DRLGROOMTILE_AllocTileGrid(D2DrlgRoomStrc* pDrlgRoom)
 {
 	if (!pDrlgRoom->pTileGrid)
 	{
