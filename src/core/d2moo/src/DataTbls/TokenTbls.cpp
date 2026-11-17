@@ -140,6 +140,7 @@ void __fastcall DATATBLS_LoadArmTypeTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD730C0
+// 1.13c D2Common+0x18F90
 void __fastcall DATATBLS_UnloadPlrMode_Type_MonMode_ObjMode_Type_Composit_ArmtypeTxt()
 {
 	if (sgptDataTables->pPlrModeDataTables.pPlrModeTypeTxt)
@@ -174,18 +175,21 @@ void __fastcall DATATBLS_UnloadPlrMode_Type_MonMode_ObjMode_Type_Composit_Armtyp
 }
 
 //D2Common.0x6FD73150 (#10643)
+// 1.13c D2Common+0x18F80
 D2PlrModeDataTbl* __fastcall DATATBLS_GetPlrMode_TypeDataTables()
 {
 	return &sgptDataTables->pPlrModeDataTables;
 }
 
 //D2Common.0x6FD73160 (#10644)
+// 1.13c D2Common+0x18F70
 D2MonModeDataTbl* __fastcall DATATBLS_GetMonModeDataTables()
 {
 	return &sgptDataTables->pMonModeDataTables;
 }
 
 //D2Common.0x6FD73170 (#10645)
+// 1.13c D2Common+0x18F60
 D2ObjModeDataTbl* __fastcall DATATBLS_GetObjMode_TypeDataTables()
 {
 	return &sgptDataTables->pObjModeDataTables;
@@ -219,10 +223,10 @@ D2PlrModeTypeTxt* __stdcall DATATBLS_GetPlrModeTypeTxtRecord(int nIndex, int bGe
 }
 
 //D2Common.0x6FD73230 (#10647)
-// not-1.13c: retail exports only the player-mode getter (0x18EF0); monster-mode rows are read from the table global by each user
+// 1.13c D2Common+0x18E90: unsigned index/count check returns NULL; mode 0 is the type table, mode 1 the mode table, others NULL
 D2MonModeTxt* __stdcall DATATBLS_GetMonModeTxtRecord(int nIndex, int bGetMode)
 {
-	if (nIndex >= sgptDataTables->pMonModeDataTables.nMonModeTxtRecordCount)
+	if (static_cast<uint32_t>(nIndex) >= static_cast<uint32_t>(sgptDataTables->pMonModeDataTables.nMonModeTxtRecordCount))
 	{
 		return NULL;
 	}
@@ -243,9 +247,10 @@ D2MonModeTxt* __stdcall DATATBLS_GetMonModeTxtRecord(int nIndex, int bGetMode)
 }
 
 //D2Common.0x6FD732B0 (#10648)
+// 1.13c D2Common+0x18E30: unsigned index/count check returns NULL; mode 0 is the type table, mode 1 the mode table, others NULL
 D2ObjModeTypeTxt* __stdcall DATATBLS_GetObjModeTypeTxtRecord(int nIndex, int bGetMode)
 {
-	if (nIndex >= sgptDataTables->pObjModeDataTables.nObjModeTypeTxtRecordCount)
+	if (static_cast<uint32_t>(nIndex) >= static_cast<uint32_t>(sgptDataTables->pObjModeDataTables.nObjModeTypeTxtRecordCount))
 	{
 		return NULL;
 	}
@@ -265,6 +270,7 @@ D2ObjModeTypeTxt* __stdcall DATATBLS_GetObjModeTypeTxtRecord(int nIndex, int bGe
 }
 
 //D2Common.0x6FD73330 (#10649)
+// 1.13c D2Common+0x18DF0
 D2CompositTxt* __stdcall DATATBLS_GetCompositTxtRecord(int nComposit)
 {
 	D2_ASSERT(&sgptDataTables->pCompositTxt[nComposit]);
@@ -273,6 +279,7 @@ D2CompositTxt* __stdcall DATATBLS_GetCompositTxtRecord(int nComposit)
 }
 
 //D2Common.0x6FD73370 (#10650)
+// 1.13c D2Common+0x18DB0
 D2ArmTypeTxt* __stdcall DATATBLS_GetArmTypeTxtRecord(int nId)
 {
 	D2_ASSERT(&sgptDataTables->pArmTypeTxt[nId]);

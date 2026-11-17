@@ -578,6 +578,7 @@ uint32_t __stdcall D2Common_11069(D2UnitStrc* pMonster, unsigned int nIndex, uns
 }
 
 //D2Common.0x6FDA5450 (#11070)
+// not-1.13c: retail 0x84C70 takes a unit; this monster-id variant has no 1.13c counterpart and is called by the realm and monspawn code
 int __stdcall D2Common_11070(int nMonsterId, unsigned int nComponent, unsigned int a3)
 {
 	D2MonStats2Txt* pMonStats2TxtRecord = NULL;
@@ -687,6 +688,7 @@ int __stdcall D2Common_11050(D2UnitStrc* pUnit, int a2)
 }
 
 //D2Common.0x6FDA55E0 (#11052)
+// 1.13c D2Common+0x1A2C0
 uint8_t __stdcall D2Common_11052(uint8_t a1)
 {
 	//D2Common.0x6FDE4F28
@@ -700,6 +702,7 @@ uint8_t __stdcall D2Common_11052(uint8_t a1)
 }
 
 //D2Common.0x6FDA5600 (#11053)
+// 1.13c D2Common+0x1A2B0
 uint8_t __stdcall D2Common_11053(uint8_t a1)
 {
 	//D2Common.0x6FDE4F68
@@ -713,6 +716,7 @@ uint8_t __stdcall D2Common_11053(uint8_t a1)
 }
 
 //D2Common.0x6FDA5620 (#11054)
+// 1.13c D2Common+0x1A2A0
 uint8_t __stdcall D2Common_11054(uint8_t a1)
 {
 	//D2Common.0x6FDE4FA8
@@ -725,6 +729,7 @@ uint8_t __stdcall D2Common_11054(uint8_t a1)
 }
 
 //D2Common.0x6FDA5640 (#11055)
+// 1.13c D2Common+0x1A270
 void __stdcall D2Common_11055(uint8_t a1, int* a2, int* a3)
 {
 	//D2Common.0x6FDD1738
@@ -824,6 +829,7 @@ BOOL __stdcall MONSTERS_IsSandLeaper(D2UnitStrc* pMonster, BOOL bAlwaysReturnFal
 }
 
 //D2Common.0x6FDA57D0 (#11058)
+// 1.13c D2Common+0x1A610
 BOOL __stdcall MONSTERS_IsDemon(D2UnitStrc* pMonster)
 {
 	D2MonStatsTxt* pMonStatsTxtRecord = NULL;
@@ -964,6 +970,7 @@ int __stdcall MONSTERS_GetSpawnMode_XY(D2UnitStrc* pMonster, BOOL bFromMonster, 
 //1.10f: D2Common.0x6FDA5B30 (#11061)
 //1.11: D2Common.0x6FD64390 (#10452)
 //1.14d: 0x0063EFA0
+// 1.13c D2Common+0x1AA00
 void __stdcall MONSTERS_GetMinionSpawnInfo(D2UnitStrc* pMonster, int* pId, int* pX, int* pY, int* pSpawnMode, int nDifficulty, int(__fastcall* pfSpawnClassCallback)(D2UnitStrc*))
 {
 	int nChainId = 0;
@@ -1100,7 +1107,11 @@ void __stdcall MONSTERS_GetMinionSpawnInfo(D2UnitStrc* pMonster, int* pId, int* 
 		*pY = pCoords.nY + 2;
 		*pSpawnMode = MONMODE_NEUTRAL;
 
-		STATES_ToggleState(pMonster, STATE_INVIS, 1);
+		// 1.13c: the INVIS toggle is skipped when the states table holds fewer than 0x93 rows
+		if (sgptDataTables->nStatesTxtRecordCount >= 0x93)
+		{
+			STATES_ToggleState(pMonster, STATE_INVIS, 1);
+		}
 		break;
 
 	case MONSTER_BAALCRAB:
@@ -1239,6 +1250,7 @@ BOOL __stdcall MONSTERS_IsPrimeEvil(D2UnitStrc* pMonster)
 }
 
 //D2Common.0x6FDA6680 (#11066)
+// 1.13c D2Common+0x1A330
 void __stdcall D2Common_11066(D2UnitStrc* pMonster, int* pDirectionX, int* pDirectionY)
 {
 	//D2Common.0x6FDD1778
@@ -1334,6 +1346,7 @@ void __stdcall MONSTERS_ApplyClassicScaling(D2UnitStrc* pMonster, BOOL bExpansio
 }
 
 //D2Common.0x6FDA6920
+// not-1.13c: retail inlines the base-id lookup at each call site; 0x1860 is the unit variant
 int __fastcall MONSTERS_GetBaseIdFromMonsterId(int nMonsterId)
 {
 	D2MonStatsTxt* pMonStatsTxtRecord = DATATBLS_GetMonStatsTxtRecord(nMonsterId);
@@ -1375,6 +1388,7 @@ int __fastcall MONSTERS_GetClassIdFromMonsterChain(int nMonsterId, int nChainId)
 }
 
 //D2Common.0x6FDA69C0
+// not-1.13c: retail inlines the monster-id validation at each call site
 int __fastcall MONSTERS_ValidateMonsterId(int nMonsterId)
 {
 	if (nMonsterId >= 0 && nMonsterId < sgptDataTables->nMonStatsTxtRecordCount)

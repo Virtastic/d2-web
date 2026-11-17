@@ -183,6 +183,7 @@ void __fastcall DATATBLS_LoadObjectsTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD718F0 (#10626)
+// 1.13c D2Common+0x3E980
 D2ObjectsTxt* __stdcall DATATBLS_GetObjectsTxtRecord(int nObjectId)
 {
 	D2_ASSERT(nObjectId < sgptDataTables->nObjectsTxtRecordCount);
@@ -191,6 +192,7 @@ D2ObjectsTxt* __stdcall DATATBLS_GetObjectsTxtRecord(int nObjectId)
 }
 
 //D2Common.0x6FD71960
+// not-1.13c: retail frees the objects table inline in the master unload (0x5E870), no separate function
 void __fastcall DATATBLS_UnloadObjectsTxt()
 {
 	DATATBLS_UnloadBin(sgptDataTables->pObjectsTxt);
@@ -199,6 +201,7 @@ void __fastcall DATATBLS_UnloadObjectsTxt()
 }
 
 //D2Common.0x6FD71980
+// not-1.13c: retail frees the objgroup table inline in the master unload (0x5E870), no separate function
 void __fastcall DATATBLS_UnloadObjGroupTxt()
 {
 	DATATBLS_UnloadBin(sgptDataTables->pObjGroupTxt);
@@ -245,6 +248,7 @@ void __fastcall DATATBLS_LoadObjGroupTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD71E00 (#10627)
+// 1.13c D2Common+0x3E960
 D2ObjGroupTxt* __stdcall DATATBLS_GetObjGroupTxtRecord(int nId)
 {
 	if (nId < sgptDataTables->nObjGroupTxtRecordCount)
@@ -287,13 +291,14 @@ D2ShrinesTxt* __stdcall DATATBLS_GetShrinesTxtRecord(int nShrineId)
 }
 
 //D2Common.0x6FD72070 (#10625)
-// not-1.13c: retail has no getter; users read the shrine count from the table global
+// 1.13c D2Common+0x3E900
 int __stdcall DATATBLS_GetShrinesTxtRecordCount()
 {
 	return sgptDataTables->nShrinesTxtRecordCount;
 }
 
 //D2Common.0x6FD72080
+// not-1.13c: retail frees the shrines table inline in the master unload (0x5E870), no separate function
 void __fastcall DATATBLS_UnloadShrinesTxt()
 {
 	DATATBLS_UnloadBin(sgptDataTables->pShrinesTxt);
