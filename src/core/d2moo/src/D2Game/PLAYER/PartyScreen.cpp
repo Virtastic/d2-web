@@ -281,8 +281,9 @@ void __fastcall PARTYSCREEN_InvitationCancelled(D2GameStrc* pGame, D2UnitStrc* p
 
 //D2Game.0x6FC7B0E0
 // 1.13c D2Game+0xF0870
-void __fastcall PARTYSCREEN_ReceivedInvitation(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t nParam, int32_t* pFailure)
+void __fastcall PARTYSCREEN_ReceivedInvitation(D2GameStrc* pGame, D2UnitStrc* pPlayer2, D2UnitStrc* pPlayer1, int32_t nParam, int32_t* pFailure)
 {
+    // 1.13c: the first unit argument (EDX) is the one that receives the invite, the second (stack) the sender; the body below reads them by role
     D2_MAYBE_UNUSED(nParam);
     D2_MAYBE_UNUSED(pFailure);
     D2_CALL(PLAYERLIST_AllocPlayerList, pGame, pPlayer1, pPlayer2);
