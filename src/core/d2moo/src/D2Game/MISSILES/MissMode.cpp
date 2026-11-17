@@ -4260,8 +4260,10 @@ int32_t __fastcall MISSMODE_SrvHit52_BladeFury(D2GameStrc* pGame, D2UnitStrc* pM
         0, 16, 16, 16, 0, -16, -16, -16
     };
 
-    for (int32_t i = 0; i < 8; i += nParam)
+    // 1.13c steps a 32-bit byte offset (step * 4), so a large step wraps like the shipped loop
+    for (uint32_t off = 0; (int32_t)off < 0x20; off += (uint32_t)nParam * 4)
     {
+        const uint32_t i = off / 4;
         missileParams.nTargetX = xOffsets[i];
         missileParams.nTargetY = yOffsets[i];
 
