@@ -1,5 +1,7 @@
 #include "UNIT/SUnitNpc.h"
 
+#include <test_seam.h>
+
 #include <algorithm>
 
 #include <Fog.h>
@@ -110,7 +112,7 @@ void __fastcall D2GAME_NPC_FirstFn_6FCC67D0(D2GameStrc* pGame, int32_t nVendorId
 }
 
 //D2Game.0x6FCC6970
-// 1.13c D2Game+0xBD9B0 (diffed line by line; BDE50 is only the repair-all callback adapter that swaps the item and game arguments, so this function is passed directly)
+// 1.13c D2Game+0xBD9B0 (diffed line by line; the repair-all callback +0xBDE50 forwards to it)
 void __fastcall D2GAME_NPC_RepairItem_6FCC6970(D2GameStrc* pGame, D2UnitStrc* pItem, D2UnitStrc* pPlayer)
 {
     if (ITEMS_IsRepairable(pItem))
@@ -148,6 +150,12 @@ void __fastcall D2GAME_NPC_RepairItem_6FCC6970(D2GameStrc* pGame, D2UnitStrc* pI
             }
         }
     }
+}
+
+// 1.13c D2Game+0xBDE50: the repair-all callback; hands the game, the item and the player on to the repair routine (+0xBD9B0)
+void __fastcall D2GAME_NPC_RepairAllCallback(D2GameStrc* pGame, D2UnitStrc* pItem, D2UnitStrc* pPlayer)
+{
+    D2_CALL(D2GAME_NPC_RepairItem_6FCC6970, pGame, pItem, pPlayer);
 }
 
 //D2Game.0x6FCC6A60
@@ -1713,7 +1721,7 @@ int32_t __fastcall D2GAME_NPC_Repair_6FCC95B0(D2GameStrc* pGame, D2UnitStrc* pUn
                 return 1;
             }
 
-            ITEMS_GetAllRepairCosts(pGame, pUnit, pNpc->dwClassId, (D2C_Difficulties)pGame->nDifficulty, UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], D2GAME_NPC_RepairItem_6FCC6970);
+            ITEMS_GetAllRepairCosts(pGame, pUnit, pNpc->dwClassId, (D2C_Difficulties)pGame->nDifficulty, UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], D2GAME_NPC_RepairAllCallback);
         }
 
         D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), 0x2Au, 2, STATLIST_UnitGetStatValue(pUnit, STAT_GOLD, 0), -1, 1);

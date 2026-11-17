@@ -90,6 +90,7 @@ struct D2NpcRecordStrc
 void __fastcall D2GAME_NPC_FirstFn_6FCC67D0(D2GameStrc* pGame, int32_t nVendorId, D2NpcRecordStrc* pNpcRecord);
 //D2Game.0x6FCC6970
 void __fastcall D2GAME_NPC_RepairItem_6FCC6970(D2GameStrc* pGame, D2UnitStrc* pItem, D2UnitStrc* pPlayer);
+void __fastcall D2GAME_NPC_RepairAllCallback(D2GameStrc* pGame, D2UnitStrc* pItem, D2UnitStrc* pPlayer);
 //D2Game.0x6FCC6A60
 D2UnitStrc* __fastcall D2GAME_NPC_GenerateStoreItem_6FCC6A60(D2UnitStrc* pNpc, int32_t szCode, D2GameStrc* pGame, int32_t a4, int32_t nQuality, int32_t nItemLevel, int32_t nPlayerLevel);
 //D2Game.0x6FCC6F10

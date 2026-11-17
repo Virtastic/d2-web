@@ -1,3 +1,4 @@
+#include <test_seam.h>
 #include "SKILLS/SkillNec.h"
 
 #include <algorithm>
@@ -301,6 +302,17 @@ int32_t __fastcall sub_6FD0B3D0(D2UnitStrc* pUnit, int32_t nStatId, int32_t nRes
     }
 }
 
+// 1.13c D2Game+0x500A0 (eax = skill id, edx = unit, stack = game; hands the unit's AI control and the skill's special state to the AI sender)
+void __fastcall D2GAME_SKILLS_ApplyCurseAi_6FD0B0A0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId)
+{
+    D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
+    if (pSkillsTxtRecord)
+    {
+        D2C_AiSpecialState nAiSpecialState = AiSpecialStateFromAuraState((D2C_States)pSkillsTxtRecord->wAuraTargetState);
+        D2_CALL(AITHINK_ExecuteAiFn, pGame, pUnit, AIGENERAL_GetAiControlFromUnit(pUnit), nAiSpecialState);
+    }
+}
+
 //D2Game.0x6FD0B450
 // 1.13c D2Game+0x50250 (ecx = target unit, edx = the curse record; the resist rule is the call to 0x4E230)
 int32_t __fastcall sub_6FD0B450(D2UnitStrc* pUnit, void* pArgs)
@@ -356,12 +368,7 @@ int32_t __fastcall sub_6FD0B450(D2UnitStrc* pUnit, void* pArgs)
 
     if (v2->unk0x08)
     {
-        D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(v2->nSkillId);
-        if (pSkillsTxtRecord)
-        {
-			D2C_AiSpecialState nAiSpecialState = AiSpecialStateFromAuraState((D2C_States)pSkillsTxtRecord->wAuraTargetState);
-            AITHINK_ExecuteAiFn(v2->pGame, pUnit, AIGENERAL_GetAiControlFromUnit(pUnit), nAiSpecialState);
-        }
+        D2GAME_SKILLS_ApplyCurseAi_6FD0B0A0(v2->pGame, pUnit, v2->nSkillId);
     }
 
     for (int32_t i = 1; i < 6; ++i)
@@ -1092,6 +1099,14 @@ int32_t __fastcall D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10(D2GameStrc* pGame, 
     return 1;
 }
 
+// 1.13c D2Game+0x50070 (esi = owner, eax = pet; the base stats, passives and resistance of a fresh summon)
+void __fastcall D2GAME_SetSummonStats_6FD0B070(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pPet, int32_t nSkillId, int32_t nSkillLevel)
+{
+    D2_CALL(D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10, pGame, pUnit, pPet, 0, nSkillLevel);
+    D2_CALL(D2GAME_SetSummonPassiveStats_6FD0C530, pGame, pUnit, pPet, nSkillId, nSkillLevel, 0);
+    D2_CALL(D2GAME_SetSummonResistance_6FD0C2E0, pUnit, pPet);
+}
+
 //D2Game.0x6FD0CC10
 // 1.13c D2Game+0x518B0 (skill server do-function slot 31; the self-damage block is 0x4F450, the pet component pick 0x4EB50/0x4E960/0x4E900)
 int32_t __fastcall SKILLS_SrvDo031_RaiseSkeleton_Mage(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
@@ -1363,9 +1378,7 @@ int32_t __fastcall SKILLS_SrvDo056_Golem(D2GameStrc* pGame, D2UnitStrc* pUnit, i
     D2UnitStrc* pPet = D2GAME_SummonPet_6FD14430(pGame, &pSummonArg);
     if (pPet)
     {
-        D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10(pGame, pUnit, pPet, 0, nSkillLevel);
-        D2GAME_SetSummonPassiveStats_6FD0C530(pGame, pUnit, pPet, nSkillId, nSkillLevel, 0);
-        D2GAME_SetSummonResistance_6FD0C2E0(pUnit, pPet);
+        D2GAME_SetSummonStats_6FD0B070(pGame, pUnit, pPet, nSkillId, nSkillLevel);
         sub_6FC3E200(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), pPet);
         D2GAME_UpdateSummonAI_6FC401F0(pGame, pPet, 0, pUnit->dwNodeIndex);
         return 1;
@@ -1435,9 +1448,7 @@ int32_t __fastcall SKILLS_SrvDo057_IronGolem(D2GameStrc* pGame, D2UnitStrc* pUni
     UNITS_ChangeAnimMode(pTargetUnit, IMODE_ONCURSOR);
     sub_6FC45060(pGame, pPet, pTargetUnit->dwUnitId, nBodyLoc1, 1, 0);
 
-    D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10(pGame, pUnit, pPet, 0, nSkillLevel);
-    D2GAME_SetSummonPassiveStats_6FD0C530(pGame, pUnit, pPet, nSkillId, nSkillLevel, 0);
-    D2GAME_SetSummonResistance_6FD0C2E0(pUnit, pPet);
+    D2GAME_SetSummonStats_6FD0B070(pGame, pUnit, pPet, nSkillId, nSkillLevel);
     sub_6FC3E200(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), pPet);
     D2GAME_UpdateSummonAI_6FC401F0(pGame, pPet, 0, pUnit->dwNodeIndex);
     return 1;

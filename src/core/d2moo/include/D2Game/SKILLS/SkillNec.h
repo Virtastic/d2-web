@@ -25,6 +25,8 @@ void __fastcall sub_6FD0B250(D2UnitStrc* pUnit, int32_t nState, D2StatListStrc* 
 int32_t __fastcall sub_6FD0B2B0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget);
 //D2Game.0x6FD0B3D0
 int32_t __fastcall sub_6FD0B3D0(D2UnitStrc* pUnit, int32_t nStatId, int32_t nResist);
+//D2Game.0x6FD0B0A0
+void __fastcall D2GAME_SKILLS_ApplyCurseAi_6FD0B0A0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId);
 //D2Game.0x6FD0B450
 int32_t __fastcall sub_6FD0B450(D2UnitStrc* pUnit, void* pArgs);
 //D2Game.0x6FD0B790
@@ -49,6 +51,8 @@ void __fastcall D2GAME_SetUnitComponent_6FD0C3A0(D2UnitStrc* pUnit, D2UnitStrc* 
 int32_t __fastcall D2GAME_SetSummonPassiveStats_6FD0C530(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pPet, int32_t nSkillId, int32_t nSkillLevel, int32_t nItemLevel);
 //D2Game.0x6FD0CB10
 int32_t __fastcall D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pPet, int32_t nPetLevelArg, int32_t nSkillLevel);
+//D2Game.0x6FD0B070
+void __fastcall D2GAME_SetSummonStats_6FD0B070(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pPet, int32_t nSkillId, int32_t nSkillLevel);
 //D2Game.0x6FD0CC10
 int32_t __fastcall SKILLS_SrvDo031_RaiseSkeleton_Mage(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel);
 //D2Game.0x6FD0CFC0
