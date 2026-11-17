@@ -126,4 +126,4 @@ D2EventTimerStrc* EVENT_AllocateTimer(D2GameStrc* pGame);
 //D2Game.0x6FC35460
 D2EventTimerStrc* __fastcall EVENT_AllocateUnitTimer(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FC35570
-void __fastcall sub_6FC35570(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventTypes nEventType, EventTimerCallback pCallback, int32_t dwEventCustomId, int32_t dwEventCustomParam);
+void __fastcall sub_6FC35570(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nEventType, EventTimerCallback pCallback, int32_t dwEventCustomId, int32_t dwEventCustomParam);

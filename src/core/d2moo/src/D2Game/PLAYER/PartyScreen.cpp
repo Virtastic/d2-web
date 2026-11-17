@@ -293,7 +293,7 @@ void __fastcall PARTYSCREEN_ReceivedInvitation(D2GameStrc* pGame, D2UnitStrc* pP
     {
         D2_CALL(sub_6FCBA980, pPlayer1, pPlayer2, 4);
         D2_CALL(sub_6FCBA980, pPlayer2, pPlayer1, 2);
-        D2_CALL(PARTYSCREEN_SendEventUpdateToClient, PARTYSCREEN_GetClient(pPlayer2), pPlayer1 ? pPlayer1->dwUnitId : -1, PARTYSCREENTYPE_RECEIVED_INVITE);
+        D2_CALL(PARTYSCREEN_SendEventUpdateToClient, PARTYSCREEN_GetClient(pPlayer1), pPlayer2 ? pPlayer2->dwUnitId : -1, PARTYSCREENTYPE_RECEIVED_INVITE);
     }
 
     D2_CALL(sub_6FCBAA20, pPlayer1, pPlayer2);

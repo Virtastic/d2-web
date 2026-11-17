@@ -549,14 +549,14 @@ D2EventTimerStrc* __fastcall EVENT_AllocateUnitTimer(D2GameStrc* pGame, D2UnitSt
 
 //D2Game.0x6FC35570
 // 1.13c D2Game+0x8E810
-void __fastcall sub_6FC35570(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventTypes nEventType, EventTimerCallback pCallback, int32_t dwEventCustomId, int32_t dwEventCustomParam)
+void __fastcall sub_6FC35570(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nEventType, EventTimerCallback pCallback, int32_t dwEventCustomId, int32_t dwEventCustomParam)
 {
     if (nEventType >= EVENTTYPE_COUNT)
     {
         return;
     }
 	D2EventTimerStrc* pNewTimer = D2_CALL(EVENT_AllocateUnitTimer, pGame, pUnit);
-    pNewTimer->nEventType = nEventType;
+    pNewTimer->nEventType = (D2C_EventTypes)nEventType;
     pNewTimer->nExpireFrame = -1;
     pNewTimer->nFlags |= 4;
     pNewTimer->dwEventCustomId = dwEventCustomId;
