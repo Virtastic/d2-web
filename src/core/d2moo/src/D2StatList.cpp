@@ -86,7 +86,7 @@ int StatArray_DichotomicSearch(const T* pStatArray, D2SLayerStatIdStrc::PackedTy
 
 // Helper function
 template<class T>
-// D2Common 1.13c +0x38640 (StatArray_InsertStat)
+// The insert step of the retail function marked on STATLIST_InsertStatOrFail_6FDB6970.
 decltype(T::pStat) __fastcall StatArray_InsertStat(void* pMemPool, T* pStatsArray, D2SLayerStatIdStrc::PackedType nLayer_StatId, int insertionIdx)
 {
 	typedef decltype(T::pStat) StatType;
@@ -115,6 +115,7 @@ decltype(T::pStat) __fastcall StatArray_InsertStat(void* pMemPool, T* pStatsArra
 }
 
 // Helper function
+// not-1.13c: d2moo helper with no single retail function
 static D2StatStrc* __fastcall STATLIST_GetOrInsertStat(void* pMemPool, D2StatsArrayStrc* pStatsArray, D2SLayerStatIdStrc::PackedType nLayer_StatId)
 {
 	bool bFoundStatInArray = false;
@@ -131,6 +132,7 @@ static D2StatStrc* __fastcall STATLIST_GetOrInsertStat(void* pMemPool, D2StatsAr
 }
 
 // Helper function
+// not-1.13c: 1.13c inlines the change callback into the stat setter
 static void STATLIST_NotifyUnitOfStatValueChange(D2ItemStatCostTxt* pItemStatCostTxtRecord, D2StatListExStrc* pStatListEx, D2UnitStrc* pUnit, D2SLayerStatIdStrc::PackedType nLayer_StatId, int nPreviousValue, int nNewValue)
 {
 	if (pStatListEx->pfOnValueChanged && (pItemStatCostTxtRecord->dwItemStatFlags & gdwBitMasks[ITEMSTATCOSTFLAGINDEX_FCALLBACK]))
@@ -140,6 +142,7 @@ static void STATLIST_NotifyUnitOfStatValueChange(D2ItemStatCostTxt* pItemStatCos
 }
 
 //Helper function
+// not-1.13c: 1.13c inlines the new-value write into the update and dependency walk
 static void STATLIST_SetUnitStatNewValue(D2StatListExStrc* pStatListEx, D2StatsArrayStrc* pStatsArray, D2StatStrc* pStat, D2SLayerStatIdStrc::PackedType nLayer_StatId, int nNewValue, D2ItemStatCostTxt* pItemStatCostTxtRecord, D2UnitStrc* pUnit)
 {
 	int nPreviousValue = pStat->nValue;
@@ -163,6 +166,7 @@ static void STATLIST_SetUnitStatNewValue(D2StatListExStrc* pStatListEx, D2StatsA
 }
 
 // Helper function
+// not-1.13c: 1.13c inlines the percentage into the op-chain stat value
 static int ComputeStatPercentage(int nValue, D2StatListExStrc* pStatListEx, uint16_t opStatId)
 {
 	int nOpStatValue = sub_6FDB5830(pStatListEx, D2SLayerStatIdStrc::MakeFromStatId(opStatId).nPackedValue);
@@ -174,8 +178,7 @@ static int ComputeStatPercentage(int nValue, D2StatListExStrc* pStatListEx, uint
 }
 
 //D2Common.0x6FDB5830
-// The game's copy of retail D2Common+0x39530 (the base-plus-children sum of +0x38CD0 is its first lines; percentages go through the +0x11E0 ratio). The
-// retail-layout hand port keeps the marker because its capture scripts every callee.
+// 1.13c D2Common+0x39530 (the base-plus-children sum of +0x38CD0 is its first lines; percentages go through the +0x11E0 ratio)
 int __fastcall sub_6FDB5830(D2StatListExStrc* pStatListEx, D2SLayerStatIdStrc::PackedType nLayer_StatId)
 {
 	int nAccumulatedValue = 0;
@@ -454,6 +457,7 @@ int __fastcall STATLIST_FindStatIndex_6FDB6300(D2StatsArrayStrc* pStatArray, D2S
 }
 
 // Helper function
+// not-1.13c: 1.13c inlines the minimum into the base and total stat getters
 static int STATLIST_ApplyMinValue(int nValue, D2ItemStatCostTxt* pItemStatCostTxtRecord, D2StatListExStrc* pStatListEx)
 {
 	if (pItemStatCostTxtRecord && pItemStatCostTxtRecord->dwItemStatFlags & gdwBitMasks[ITEMSTATCOSTFLAGINDEX_FMIN])
@@ -497,8 +501,7 @@ int __fastcall STATLIST_GetTotalStat_6FDB63E0(D2StatListStrc* pStatList, D2SLaye
 }
 
 //D2Common.0x6FDB64A0
-// The game's copy of retail D2Common+0x39CE0 (an apply-to-item operand with a positive total only clears the update flag, it never sets it again).
-// The retail-layout hand port keeps the marker because its capture scripts every callee.
+// 1.13c D2Common+0x39CE0 (an apply-to-item operand with a positive total only clears the update flag, it never sets it again)
 int __fastcall sub_6FDB64A0(D2StatListExStrc* pStatListEx, D2SLayerStatIdStrc::PackedType nLayer_StatId, D2ItemStatCostTxt* pItemStatCostTxtRecord, D2UnitStrc* pUnit)
 {
 	int nNewValue = sub_6FDB5830(pStatListEx, nLayer_StatId);
@@ -651,6 +654,7 @@ int __fastcall sub_6FDB64A0(D2StatListExStrc* pStatListEx, D2SLayerStatIdStrc::P
 }
 
 //D2Common.0x6FDB6920
+// not-1.13c: 1.13c inlines the search; callers take the index and form the address
 D2StatStrc* __fastcall STATLIST_FindStat_6FDB6920(D2StatsArrayStrc* pStatArray, D2SLayerStatIdStrc::PackedType nLayer_StatId)
 {
 	const int nStatIndex = STATLIST_FindStatIndex_6FDB6300(pStatArray, nLayer_StatId);
@@ -658,6 +662,7 @@ D2StatStrc* __fastcall STATLIST_FindStat_6FDB6920(D2StatsArrayStrc* pStatArray, 
 }
 
 //D2Common.0x6FDB6970
+// 1.13c D2Common+0x38640
 D2StatStrc* __fastcall STATLIST_InsertStatOrFail_6FDB6970(void* pMemPool, D2StatsArrayStrc* pStatsArray, D2SLayerStatIdStrc::PackedType nLayer_StatId)
 {
 	bool bFoundStatInArray = false;
@@ -1451,6 +1456,7 @@ int32_t __stdcall STATLIST_UnitGetStatValue(const D2UnitStrc* pUnit, int nStatId
 // This can easily be tracked by checking the function responsible for computing the defense rate and its usage of both functions.
 // - 1.00 to 1.05 : UNITS_GetDefenseRate#10426. STATLIST_UnitGetStatValue#10497. STATLIST_UnitGetItemStatOrSkillStatValue#10498.
 // - 1.08 to 1.10f: UNITS_GetDefenseRate#10431. STATLIST_UnitGetStatValue#10519. STATLIST_UnitGetItemStatOrSkillStatValue#10520.
+// 1.13c D2Common+0x39430
 int32_t __stdcall STATLIST_UnitGetItemStatOrSkillStatValue(D2UnitStrc* pUnit, int nStatId, uint16_t nLayer)
 {
 	return STATLIST_UnitGetStatValue(pUnit, nStatId, nLayer);
@@ -1566,6 +1572,7 @@ int __stdcall D2Common_10467(D2StatListStrc* pStatList, int nStat)
 }
 
 //D2Common.0x6FDB8150 (#10468)
+// 1.13c D2Common+0x3A650
 void __stdcall STATLIST_RemoveAllStats(D2StatListStrc* pStatList)
 {
 	if (pStatList == nullptr)
@@ -1743,6 +1750,7 @@ void __stdcall STATLIST_MergeStatLists(D2UnitStrc* pTarget, D2UnitStrc* pUnit, B
 
 
 //D2Common.0x6FDB83A0 (#10535)
+// 1.13c D2Common+0x37E70
 D2UnitStrc* __stdcall STATLIST_GetOwner(D2UnitStrc* pUnit, BOOL* pStatNotDynamic)
 {
 	if (!pUnit || !pUnit->pStatListEx || !pUnit->pStatListEx->pParent || !STATLIST_IsExtended(pUnit->pStatListEx->pParent))
@@ -1762,6 +1770,7 @@ D2UnitStrc* __stdcall STATLIST_GetOwner(D2UnitStrc* pUnit, BOOL* pStatNotDynamic
 }
 
 //D2Common.0x6FDB8420 (#10512)
+// 1.13c D2Common+0x388E0
 void __stdcall D2Common_10512(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, int nStatId, void (__fastcall* pfCallback)(D2UnitStrc*, int, int, D2UnitStrc*))
 {
 	if (!pUnit1 || !pUnit1->pStatListEx || !STATLIST_IsExtended(pUnit1->pStatListEx))
@@ -1783,6 +1792,7 @@ void __stdcall D2Common_10512(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, int nStatI
 }
 
 //D2Common.0x6FDB84E0 (#10513)
+// 1.13c D2Common+0x38850
 void __stdcall D2Common_10513(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, void (__fastcall* pfCallback)(D2UnitStrc*, int, int, D2UnitStrc*))
 {
 	if (!pUnit1 || (!pUnit2 && pfCallback) || !pUnit1->pStatListEx || !STATLIST_IsExtended(pUnit1->pStatListEx))
@@ -1868,6 +1878,7 @@ BOOL __stdcall D2COMMON_10530_D2CheckStatlistFlagDMGRed(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDB87A0 (#10532)
+// 1.13c D2Common+0x391A0
 int __stdcall STATLIST_GetTotalStatValue_Layer0(D2StatListStrc* pStatListEx, int nStatId)
 {
 	return STATLIST_GetTotalStatValue(pStatListEx, nStatId, 0);
@@ -1994,6 +2005,7 @@ void __stdcall STATLIST_UpdateStatListsExpiration(D2UnitStrc* pUnit, int nFrame)
 
 
 // Helper function
+// not-1.13c: 1.13c inlines the copy into the full-stats copy
 int __stdcall STATLIST_CopyStatsData(D2StatsArrayStrc* pStatsArray, D2StatStrc* pOutStatBuffer, int nBufferSize)
 {
 	int nStatCount = pStatsArray->nStatCount;
@@ -2108,6 +2120,7 @@ void __stdcall D2Common_10469(D2UnitStrc* pUnit)
 }
 
 // Helper function
+// not-1.13c: 1.13c inlines the clamp into the stamina, mana and life setters
 static void STATLIST_ClampStat(D2StatListExStrc* pStatListEx, int nStatId)
 {
 	int nCurrentValue = 0;
@@ -2246,6 +2259,7 @@ int __stdcall STATLIST_GetMaxStaminaFromUnit(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDB94A0 (#10567)
+// 1.13c D2Common+0x38FF0
 int __stdcall STATLIST_GetMaxDurabilityFromUnit(D2UnitStrc* pUnit)
 {
 	// 1.13c delta (D2Common+0x38FF0): a unit whose base max-durability stat reads 0 answers 0 whatever the totals say
@@ -2328,6 +2342,7 @@ int __stdcall D2Common_10531_SetStatInStatListLayer0(D2StatListStrc* pStatList, 
 }
 
 //D2Common.0x6FDB9B10 (#11248)
+// 1.13c D2Common+0x38DC0
 int __stdcall D2Common_11248(D2UnitStrc* pUnused, D2UnitStrc* pUnit, int nStatId)
 {
 	D2_MAYBE_UNUSED(pUnused);
@@ -2388,6 +2403,7 @@ int __stdcall D2COMMON_11269_CopyStats(D2StatListExStrc* pStatListEx, int nStatI
 }
 
 //D2Common.0x6FDB9C50
+// 1.13c D2Common+0x382F0
 int __fastcall D2Common_CopyStats_6FDB9C50(D2StatListStrc* pStatList, int nStatId, D2StatStrc* pBuffer, int nBufferSize)
 {
 	if (!pStatList)
@@ -2420,6 +2436,7 @@ int __fastcall D2Common_CopyStats_6FDB9C50(D2StatListStrc* pStatList, int nStatI
 }
 
 //D2Common.0x6FDB9D20 (#11270)
+// 1.13c D2Common+0x386E0
 int __stdcall STATLIST_CopyStats(D2UnitStrc* pUnit, int nStatId, D2StatStrc* pBuffer, int nBufferSize)
 {
 	// 1.13c delta: a unit with no stat list (pStatListEx == NULL) copies nothing and returns 0.

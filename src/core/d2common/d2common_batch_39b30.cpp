@@ -70,7 +70,7 @@ EMSCRIPTEN_KEEPALIVE bool D2Common_24320_ItemClassBelow7(uint32_t nItemId)
 }
 
 
-// 1.13c D2Common+0x391a0 (#10848): total of one itemstatcost stat on a stat list. Null list or an
+// stand-alone twin of D2Common 0x391A0 (the proven row runs STATLIST_GetTotalStatValue_Layer0), #10848: total of one itemstatcost stat on a stat list. Null list or an
 // out-of-range stat id answers 0.
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_legacy_d2common_391a0(uint32_t pStatList, int32_t nStatId)

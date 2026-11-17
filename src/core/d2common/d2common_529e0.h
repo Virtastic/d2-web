@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x529E0 (#10506): give a unit its class base skills, retail record layout, written from
+// stand-alone 32-bit layout twin of D2Common 0x529E0 (the proven row runs SKILLS_InitSkillList), #10506: give a unit its class base skills, retail record layout, written from
 // the 1.13c disassembly as a rule over E (see d2common_528b0.h). stdcall (unit), ret 4. T is the value of
 // sgptDataTables: +0xBA0 skills.txt count, +0xBC4 charstats rows (0xC4 each), +0xBC8 their count.
 // Unless the skill list (unit +0xA8, first node at +4) already holds a node whose row word is 0 with

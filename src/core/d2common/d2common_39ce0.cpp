@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x39CE0: recursive stat dependency walk.
+// stand-alone 32-bit layout twin of D2Common 0x39CE0 (the proven row runs sub_6FDB64A0): recursive stat dependency walk.
 // Retail (decompile + disassembly): value = 0x39530(owner, key). A record whose byte +0x51 is zero is recorded once and returned.
 // Otherwise a zero value is recorded first, then each of up to three child ids (u16 at rec+0x58, stop at 0xFFFF) is resolved
 // recursively and recorded; a nonzero child value clears "keep" by rec+0x54 (mode): 0, 8..11 never; 2..3 when the owner mode (+8) is

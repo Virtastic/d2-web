@@ -126,7 +126,7 @@ static const PathFunctionType scpfnPathFunction[] = {
 };
 static_assert(ARRAY_SIZE(scpfnPathFunction) == PATHTYPE_COUNT, "This array must have PATHTYPE_COUNT entries");
 
-// Helper function
+// not-1.13c: retail writes the isometric client coords inline at each call site (for example D2Common+0xDA40)
 void PATH_UpdateClientCoords(D2DynamicPathStrc* pDynamicPath)
 {
 	// To game "pixels"

@@ -368,6 +368,7 @@ int __fastcall PATH_SimplifyToLines(D2PathPointStrc* pOutPathPoints, D2PathPoint
 
 //1.10f: Inlined
 //1.13C: D2Common.0x6FD684C0
+// 1.13c D2Common+0x184C0
 static int PATH_BresenhamLine(D2PathPointStrc tStartPoint, D2PathPointStrc tTargetPoint, int nDistMax, int* nMajorDirection, D2PathPointStrc* pOutPoints)
 {
 	// We kind of "null terminate" the path by setting the last point X to 0

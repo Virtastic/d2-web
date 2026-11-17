@@ -16,7 +16,7 @@ struct StatNode { uint32_t kind; U8 pad[8]; int32_t statId; U8 pad2[4]; uint32_t
 static_assert(offsetof(StatNode, statId) == 0x0c && offsetof(StatNode, next) == 0x14);
 }
 
-// 1.13c D2Common+0x50870: an inventory owner passes if its first stat-list node
+// stand-alone twin of D2Common 0x50870 (the proven row runs sub_6FDB1070): an inventory owner passes if its first stat-list node
 // has no matching owner ID or has stat 0xCC. An absent list also passes.
 extern "C" bool D2Common_50870_OwnerStatGate(uint32_t pOwner, uint32_t pItem,
     int32_t (*getStat)(uint32_t, uint32_t))
@@ -83,7 +83,7 @@ extern "C" uint32_t D2Common_50930_EquipmentGate(uint32_t pContext, uint32_t pUn
     return finish(first);
 }
 
-// 1.13c D2Common+0x50AF0: item level gate. The table-driven stat-6 branch
+// stand-alone twin of D2Common 0x50AF0 (the proven row runs D2Common_SKILLMANA_CheckStat_6FDB0F50): item level gate. The table-driven stat-6 branch
 // applies only to unit kinds 0, 1 and 3; an item flag may override it.
 extern "C" bool D2Common_50AF0_ItemLevelGate(uint32_t pUnit, uint32_t pItem,
     int32_t qualityBonus, int32_t levelCap, bool stat72Available,
@@ -124,7 +124,7 @@ extern "C" uint8_t D2Common_222B0_RecordFlag(uint32_t pUnit, const U8* table,
     return table[static_cast<size_t>(index) * 0x1a8 + 0x143];
 }
 
-// 1.13c D2Common+0x39CE0: recursively walk stat dependencies. The caller
+// stand-alone twin of D2Common 0x39CE0 (the proven row runs sub_6FDB64A0): recursively walk stat dependencies. The caller
 // supplies the five local stat-list operations and the ItemStatCost table.
 extern "C" int32_t D2Common_39CE0_ResolveStatDependencies(uint32_t pOwner, uint32_t key,
     const U8* rec, uint32_t flags, const U8* statTable, int32_t statCount,

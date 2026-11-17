@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x3A650 (#10343): stdcall(pStatList), ret 4. Empty a stat list's own array (+0x24: entries {key, value},
+// stand-alone 32-bit layout twin of D2Common 0x3A650 (the proven row runs STATLIST_RemoveAllStats), #10343: stdcall(pStatList), ret 4. Empty a stat list's own array (+0x24: entries {key, value},
 // s16 count at +0x28, s16 capacity at +0x2A), announcing each removal. While the count is positive: binary-search the array
 // for the first entry's key; on the hit remove the entry (0x381A0, below), announce it with the negated value (0x39F70) and,
 // for a list with flag bit 31 set at +0x10 and no owner kind at +8, notify 0x38550. 32-bit retail layout through raw reads.
@@ -29,7 +29,7 @@ void removeEntry(uint32_t pool, uint32_t e, uint32_t list, const D2Common3A650En
 }
 }
 
-// 1.13c D2Common+0x3A650
+// stand-alone twin of D2Common 0x3A650 (the proven row runs STATLIST_RemoveAllStats)
 extern "C" uint32_t D2Common_3A650_ClearStats(uint32_t st, uint32_t eax, const D2Common3A650Env* e)
 {
     if (!st) return eax;

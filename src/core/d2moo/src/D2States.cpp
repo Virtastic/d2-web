@@ -169,12 +169,6 @@ void __stdcall STATES_UpdateStayDeathFlags(D2UnitStrc* pUnit, BOOL bIsBoss)
 	}
 }
 
-//D2Common.0x6FDB48F0 (#10494)
-uint32_t* __stdcall D2COMMON_10494_STATES_GetStatFlags(D2UnitStrc* pUnit)
-{
-	return D2COMMON_STATES_GetStatFlags_6FDB8A90(pUnit);
-}
-
 //D2Common.0x6FDB4900 (#10495)
 // 1.13c D2Common+0x33c80
 int __fastcall STATES_GetNumberOfStateFlags()
@@ -316,12 +310,6 @@ BOOL __stdcall STATES_CheckStateMaskStayDeathOnUnitByStateId(D2UnitStrc* pUnit, 
 	}
 
 	return FALSE;
-}
-
-//D2Common.0x6FDB4F60
-BOOL __fastcall STATES_CheckStateMaskRestrictOnUnit(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
-{
-	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_RESTRICT);
 }
 
 //D2Common.0x6FDB4FC0 (#10536)

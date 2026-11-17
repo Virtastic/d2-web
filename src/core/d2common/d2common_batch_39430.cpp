@@ -12,7 +12,7 @@ int32_t __stdcall STATLIST_GetTotalStatValue(D2StatListStrc* pStatList, int nSta
 
 extern "C" {
 
-// 1.13c D2Common+0x39430
+// stand-alone twin of D2Common 0x39430 (the proven row runs STATLIST_UnitGetItemStatOrSkillStatValue)
 EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_39430(D2UnitStrc* pUnit, int32_t nStatId, uint16_t nLayer)
 {
 	return STATLIST_GetTotalStatValue(pUnit->pStatListEx, nStatId, nLayer);

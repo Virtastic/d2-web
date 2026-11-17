@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x38FF0: stdcall(unit), ret 4.
+// stand-alone 32-bit layout twin of D2Common 0x38FF0 (the proven row runs STATLIST_GetMaxDurabilityFromUnit): stdcall(unit), ret 4.
 // A null unit, a table count not above 0x49, a null record (table base + 0x5C64) or a zero unit+0x5C returns 0.
 // The 0x38B00 gate runs with EBX = unit+0x5C, EDI = 0x490000 and the record as the stack word. When it passes, the
 // 0x38A80 total runs with the same registers and is returned; otherwise the result is 0. The two callees come in

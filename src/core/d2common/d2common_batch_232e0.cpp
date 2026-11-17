@@ -460,7 +460,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t GetGlobalEquipmentSlotLayout(int32_t nRow, int32_t
 	return pOut[4];   // retail leaves the fifth word (the last one copied) in EAX
 }
 
-// 1.13c D2Common+0x386E0 (#10702): collect up to nMax stats of itemstatcost id nStatId from the
+// stand-alone twin of D2Common 0x386E0 (the proven row runs STATLIST_CopyStats), #10702: collect up to nMax stats of itemstatcost id nStatId from the
 // unit's extended stat list into pOut (packed+value pairs); returns the count copied.
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t D2Common_386E0_CollectExtStats(uint32_t pUnit, int32_t nStatId,

@@ -1633,7 +1633,7 @@ void __fastcall sub_6FCF8DD0(D2UnitStrc* pDefender)
     const int32_t nRecords = (sgptDataTables->nStatesTxtRecordCount + 31) / 32;
 
     uint32_t nFlags[8] = {};
-    memcpy(nFlags, D2COMMON_10494_STATES_GetStatFlags(pDefender), sizeof(uint32_t) * nRecords);
+    memcpy(nFlags, D2COMMON_STATES_GetStatFlags_6FDB8A90(pDefender), sizeof(uint32_t) * nRecords);
 
     for (int32_t i = 0; i < nRecords; ++i)
     {

@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x52210 -- 1 unless a player's state 0x79 refuses the skill (EAX = unit, stack skill, ret 4).
+// stand-alone 32-bit layout twin of D2Common 0x52210 (the proven row runs SKILLS_CheckSkillDelay) -- 1 unless a player's state 0x79 refuses the skill (EAX = unit, stack skill, ret 4).
 // Written from the disassembly (the decompile hides EAX). Offsets (1.13c, 32-bit): unit +0 type; skill +0 skills.txt record,
 // +0x28 base level, +0x34 charge owner (-1 = learned, the bonus applies); record +0 (s16) id, +0x190 calc index;
 // data tables +0xC4 states count.
@@ -11,7 +11,6 @@ inline uint32_t rd32(uint32_t a) { uint32_t v; std::memcpy(&v, reinterpret_cast<
 inline int16_t rd16(uint32_t a) { int16_t v; std::memcpy(&v, reinterpret_cast<const void*>(uintptr_t(a)), 2); return v; }
 }
 
-// 1.13c D2Common+0x52210
 extern "C" uint32_t D2Common_52210_StateSkillGate(uint32_t unit, uint32_t skill, const D2Common52210Env* e)
 {
     if (!unit || rd32(unit) != 0) return 1;

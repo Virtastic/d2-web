@@ -416,6 +416,7 @@ int __stdcall MONSTERS_GetHirelingResurrectionCost(D2UnitStrc* pHireling)
 }
 
 //D2Common.0x6FDA5270 (#11068)
+// not-1.13c: no retail function with this body (1.13c #11068 is a different function, D2Common+0x4E5A0)
 int __stdcall D2COMMON_11068_GetCompInfo(D2UnitStrc* pMonster, int nComponent)
 {
 	D2MonStats2Txt* pMonStats2TxtRecord = NULL;
@@ -882,6 +883,7 @@ BOOL __stdcall MONSTERS_IsBoss(D2MonStatsTxt* pMonStatsTxtRecord, D2UnitStrc* pM
 }
 
 //D2Common.0x6FDA5900 (#11064)
+// not-1.13c: no retail function with this body (1.13c #11064 is a different function, D2Common+0x22760); retail tests the death modes inline
 BOOL __stdcall MONSTERS_IsDead(D2UnitStrc* pMonster)
 {
 	if (pMonster && pMonster->dwUnitType == UNIT_MONSTER)
@@ -1311,6 +1313,7 @@ static D2ClassicStatAdjustmentStrc aClassicStatAdjustments[]
 };
 
 //1.10f: D2Common.0x6FDA6790 (#11246)
+// 1.13c D2Common+0x1B1D0 (#11136): same gate, same three stat rows, level = record level + 25*difficulty
 void __stdcall MONSTERS_ApplyClassicScaling(D2UnitStrc* pMonster, BOOL bExpansion, uint8_t nDifficulty)
 {
 	D2MonStatsTxt* pMonStatsTxtRecord = NULL;

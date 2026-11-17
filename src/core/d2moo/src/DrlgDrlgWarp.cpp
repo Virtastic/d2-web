@@ -94,7 +94,7 @@ void __fastcall DRLGWARP_UpdateWarpRoomDeselect(D2DrlgRoomStrc* pDrlgRoom, int n
 }
 
 //D2Common.0x6FD788D0
-//TODO: Name
+// 1.13c D2Common+0x1A130 (checked against it and D2Common+0x19B60/0x19AD0/0x19A50/0x2D600: same branches, same seed draws, same fallbacks; no change needed)
 D2ActiveRoomStrc* __fastcall sub_6FD788D0(D2DrlgStrc* pDrlg, int nLevelId, int nTileIndex, int* pX, int* pY)
 {
 	// Sanitizer-flagged: nTileIndex
@@ -387,6 +387,7 @@ int* __fastcall DRLGWARP_GetWarpIdArrayFromLevelId(D2DrlgStrc* pDrlg, int nLevel
 
 // 1.10f:D2Common.0x6FD78D10
 // 1.11 :D2Common.0x6FD77400
+// not-1.13c: retail callers call the warp-array lookup (D2Common+0x19950) and index the result themselves
 int __fastcall DRLGWARP_GetWarpDestinationFromArray(D2DrlgLevelStrc* pLevel, uint8_t nArrayId)
 {
 	return DRLGWARP_GetWarpIdArrayFromLevelId(pLevel->pDrlg, pLevel->nLevelId)[nArrayId];

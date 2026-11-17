@@ -102,6 +102,7 @@ int __stdcall D2COMMON_10018_Return0()
 }
 
 //D2Common.0x6FD412C0
+// 1.13c D2Common+0x4D010: block = header + 4*width + 2*width*height bytes, spans stamped floor, wall, roof
 void __fastcall COLLISION_AllocRoomCollisionGrid(void* pMemPool, D2ActiveRoomStrc* pRoom)
 {
 	D2RoomCollisionGridStrc* pAdjacentCollisionGrid = NULL;
@@ -116,7 +117,7 @@ void __fastcall COLLISION_AllocRoomCollisionGrid(void* pMemPool, D2ActiveRoomStr
 	{
 		DUNGEON_GetRoomCoordinates(pRoom, &pDrlgCoords);
 
-		pCollisionGrid = (D2RoomCollisionGridStrc*)D2_ALLOC_POOL(pMemPool, sizeof(D2RoomCollisionGridStrc) + /*align*/ sizeof(uint16_t) * ((pDrlgCoords.nSubtileWidth + 2) * pDrlgCoords.nSubtileHeight));
+		pCollisionGrid = (D2RoomCollisionGridStrc*)D2_ALLOC_POOL(pMemPool, sizeof(D2RoomCollisionGridStrc) + 4 * pDrlgCoords.nSubtileWidth + sizeof(uint16_t) * (pDrlgCoords.nSubtileWidth * pDrlgCoords.nSubtileHeight));
 		memcpy(&pCollisionGrid->pRoomCoords, &pDrlgCoords, sizeof(D2DrlgCoordsStrc));
 		DUNGEON_SetCollisionGridInRoom(pRoom, pCollisionGrid);
 
@@ -151,6 +152,7 @@ void __fastcall sub_6FD413E0(D2RoomCollisionGridStrc* pCollisionGrid, D2RoomColl
 }
 
 //D2Common.0x6FD41610
+// not-1.13c: retail frees room+0x20 inline in its room teardown (D2Common+0x3C870 / 0x3CA20)
 void __fastcall COLLISION_FreeRoomCollisionGrid(void* pMemPool, D2ActiveRoomStrc* pRoom)
 {
 	D2RoomCollisionGridStrc* pCollisionGrid = NULL;
@@ -1049,6 +1051,7 @@ uint16_t __fastcall COLLISION_TryMoveUnitCollisionMask(D2ActiveRoomStrc* pRoom, 
 }
 
 //D2Common.0x6FD44910
+// not-1.13c: retail builds the box inline at each caller (the 3x3 form is D2Common+0x4BB30)
 void __fastcall COLLISION_CreateBoundingBox(D2BoundingBoxStrc* pBoundingBox, int nCenterX, int nCenterY, unsigned int nSizeX, unsigned int nSizeY)
 {
 	pBoundingBox->nLeft = nCenterX - (nSizeX / 2);
@@ -1787,6 +1790,7 @@ void __fastcall D2Common_10136(D2ActiveRoomStrc* pRoom, D2CoordStrc* pCoord, int
 
 //D2Common.0x6FD46620
 //Named DungeonFindRoomGame in the original game
+// 1.13c D2Common+0x1330 (body is DUNGEON_GetRoomAtPosition)
 D2ActiveRoomStrc* __fastcall COLLISION_GetRoomBySubTileCoordinates(D2ActiveRoomStrc* pRoom, int nX, int nY)
 {
 	return DUNGEON_GetRoomAtPosition(pRoom, nX, nY);

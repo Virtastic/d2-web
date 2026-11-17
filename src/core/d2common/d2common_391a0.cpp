@@ -1,5 +1,4 @@
-// 1.13c D2Common+0x391a0
-// 1.13c D2Common+0x391A0: record lookup in the 0x144-byte table (sgptDataTables +0xBCC pointer, +0xBD4 count). stdcall (a0, a1), ret 8.
+// stand-alone 32-bit layout twin of D2Common 0x391A0 (the proven row runs STATLIST_GetTotalStatValue_Layer0): record lookup in the 0x144-byte table (sgptDataTables +0xBCC pointer, +0xBD4 count). stdcall (a0, a1), ret 8.
 // a0 == 0, an index outside [0, count) or a null record gives 0; otherwise the callee at RVA 0x38A80 runs with EBX = a0, EDI = a1 << 16 and
 // stack (record), ret 4, and its result is returned. `dt` is the address of the data-tables block (retail reads the global).
 #include <cstdint>

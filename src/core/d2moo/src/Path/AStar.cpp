@@ -77,7 +77,7 @@ static D2PathFoWallNodeStrc* PATH_IdaStar_FindSortedByFScoreInsertionPoint(D2Pat
 	return pInsertionPoint;
 }
 
-// Helper function
+// not-1.13c: retail inlines the pending-cache removal into the A* search bodies (D2Common+0x7AFB0, 0x7B3C0, 0x7B630)
 static D2PathFoWallNodeStrc* PATH_AStar_RemoveFromPendingCache(D2PathFoWallContextStrc* pContext, D2PathFoWallNodeStrc* pToRemove)
 {
 	D2PathFoWallNodeStrc* pPreviousPoint = nullptr;
@@ -196,7 +196,7 @@ int __fastcall PATH_AStar_ComputePath(D2PathInfoStrc* pPathInfo)
 	return 0;
 }
 
-//D2Common.0x6FDA6D10
+// not-1.13c: retail inlines the visited-cache push into the A* search bodies (D2Common+0x7AFB0, 0x7B3C0, 0x7B630)
 int __fastcall PATH_AStar_PushToVisitedCache(D2PathFoWallContextStrc* pContext, D2PathFoWallNodeStrc* pNode)
 {
 	const uint8_t nHash = (gaIdaStar_PointCacheHashMaskX[pNode->tPoint.X & 0x7F] + gaIdaStar_PointCacheHashMaskY[pNode->tPoint.Y & 0x7F]) & 0x7F;
@@ -266,7 +266,7 @@ int __stdcall PATH_AStar_Heuristic(D2PathPointStrc tPoint1, D2PathPointStrc tPoi
 	}
 }
 
-// Helper function
+// not-1.13c: retail inlines the neighbour step cost into the A* search bodies (D2Common+0x7AFB0, 0x7B3C0, 0x7B630)
 int16_t PATH_AStar_HeuristicForNeighbor(D2PathPointStrc tPoint, D2PathPointStrc tNeighbor)
 {
 	if (tPoint.X == tNeighbor.X || tPoint.Y == tNeighbor.Y)
@@ -378,7 +378,7 @@ D2PathFoWallNodeStrc* __fastcall PATH_AStar_GetNewNode(D2PathFoWallContextStrc* 
 	return pNewNode;
 }
 
-// Helper function
+// not-1.13c: retail inlines the child link into the A* search bodies (D2Common+0x7AFB0, 0x7B3C0, 0x7B630)
 static void PATH_AStar_AddChildToNode(D2PathFoWallNodeStrc* pNode, D2PathFoWallNodeStrc* pChild)
 {
 	for (D2PathFoWallNodeStrc*& pChildRef : pNode->pChildren)

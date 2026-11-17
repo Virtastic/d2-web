@@ -303,13 +303,6 @@ void __fastcall DRLGMAZE_PickRoomPreset(D2DrlgRoomStrc* pDrlgRoom, BOOL bResetFl
 }
 
 
-//D2Common.0x6FD79480
-void __fastcall DRLGMAZE_InitLevelData(D2DrlgLevelStrc* pLevel)
-{
-	pLevel->pMaze = DATATBLS_GetLvlMazeTxtRecordFromLevelId(pLevel->nLevelId);
-	DRLG_SetLevelPositionAndSize(pLevel->pDrlg, pLevel);
-}
-
 // 1.13c D2Common+0x0FE70 (compiler-split tail of GenerateLevel, catacombs "prev" stairs room; pLevelFirstRoomEx == pLevel->pFirstRoomEx)
 static void DRLGMAZE_PlaceCatacombsPrev(D2DrlgLevelStrc* pLevel, BOOL bLevel1)
 {
@@ -3429,11 +3422,3 @@ void __fastcall DRLGMAZE_RollBasicPresets(D2DrlgLevelStrc* pLevel)
 	}
 }
 
-//D2Common.0x6FD7D3D0
-void __fastcall DRLGMAZE_ResetMazeRecord(D2DrlgLevelStrc* pLevel, BOOL bKeepMazeRecord)
-{
-	if (!bKeepMazeRecord)
-	{
-		pLevel->pMaze = NULL;
-	}
-}

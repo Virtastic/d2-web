@@ -164,7 +164,6 @@ void __fastcall DRLGPRESET_InitLevelData(D2DrlgLevelStrc* pLevel);
 //D2Common.0x6FD886F0
 void __fastcall DRLGPRESET_GenerateLevel(D2DrlgLevelStrc* pLevel);
 //D2Common.0x6FD88810
-void __fastcall DRLGPRESET_ResetDrlgMap(D2DrlgLevelStrc* pLevel, BOOL bKeepPreset);
 //D2Common.0x6FD88850
 int __fastcall DRLGPRESET_MapTileType(int nId);
 

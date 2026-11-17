@@ -19,11 +19,13 @@
 namespace d2::path {
 static D2PathContinuationTrace g_groundContinuationTrace;
 
+// not-1.13c: d2-web-only trace helper, retail has no counterpart (the trace is read by the session probes only)
 void PATH_BeginGroundContinuationTrace(const D2UnitStrc* unit)
 {
 	beginGroundContinuationTrace(g_groundContinuationTrace, unit);
 }
 
+// not-1.13c: d2-web-only trace helper, retail has no counterpart (the trace is read by the session probes only)
 void PATH_RecordGroundContinuationPredicate(const D2UnitStrc* unit, bool needsReplan)
 {
 	recordGroundContinuationPredicate(g_groundContinuationTrace, unit, needsReplan);
@@ -34,6 +36,7 @@ void PATH_RecordContinuationReplan(const D2UnitStrc* unit, int targetUnitArgumen
 	recordContinuationReplan(g_groundContinuationTrace, unit, targetUnitArgument, result);
 }
 
+// not-1.13c: d2-web-only trace helper, retail has no counterpart (the trace is read by the session probes only)
 void PATH_RecordGroundContinuationUpdate(const D2UnitStrc* unit, int result)
 {
 	recordGroundContinuationUpdate(g_groundContinuationTrace, unit, result);
@@ -941,7 +944,7 @@ int __stdcall sub_6FDAB6A0(D2PathPointStrc pPoint1, D2PathPointStrc pPoint2)
 	return sub_6FDAB610(pPoint1.X, pPoint1.Y, pPoint2.X, pPoint2.Y);
 }
 
-//D2Common.0x6FDAB750
+// not-1.13c: retail folds this direction-table read into its callers (the table lookup is inline at each call site, see 0x3E190 for the index)
 int __fastcall sub_6FDAB750(int nX1, int nY1, int nX2, int nY2)
 {
 	return stru_6FDD2158[sub_6FDAB610(nX1, nY1, nX2, nY2)].unk0x00;
@@ -954,7 +957,7 @@ int __stdcall sub_6FDAB770(D2PathPointStrc pPoint1, D2PathPointStrc pPoint2)
 	return stru_6FDD2158[sub_6FDAB6A0(pPoint1, pPoint2)].unk0x00;
 }
 
-//D2Common.0x6FDAB790
+// not-1.13c: retail folds the three-entry direction row read into its callers (see 0x3E190 for the index)
 void __fastcall PATH_GetDirections_6FDAB790(int* pTestDir, D2PathPointStrc pPoint1, D2PathPointStrc pPoint2)
 {
 	int nIndex = sub_6FDAB6A0(pPoint1, pPoint2);

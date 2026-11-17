@@ -15,7 +15,7 @@ struct D2Common388E0Env {
     void (*callback)(uint32_t unit, uint32_t key, uint32_t value, uint32_t id);
 };
 
-// 1.13c D2Common+0x388E0 (#10771): stdcall(unit, id, key, callback). The third word is the key the lookups
+// stand-alone twin of D2Common 0x388E0 (the proven row runs D2Common_10512), #10771: stdcall(unit, id, key, callback). The third word is the key the lookups
 // take (the 1.10f-style "unused" slot is not unused in 1.13c); id is only handed to the callback.
 extern "C" void D2Common_388E0_StatCallback(uint32_t unit, uint32_t id, uint32_t key, const D2Common388E0Env* env)
 {

@@ -109,7 +109,6 @@ void __fastcall DRLGOUTDOORS_SpawnAct12Shrines(D2DrlgLevelStrc* pLevel, int nShr
 //D2Common.0x6FD7EB20
 void __fastcall DRLGOUTDOORS_AddAct124SecondaryBorder(D2DrlgLevelStrc* pLevel, int nLvlSubId, int nLevelPrestId);
 //D2Common.0x6FD7EBA0
-void __fastcall DRLGOUTDOORS_AllocOutdoorInfo(D2DrlgLevelStrc* pLevel);
 //D2Common.0x6FD7EBD0
 void __fastcall DRLGOUTDOORS_GenerateLevel(D2DrlgLevelStrc* pLevel);
 //D2Common.0x6FD7EEE0

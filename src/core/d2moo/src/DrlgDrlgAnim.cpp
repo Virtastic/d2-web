@@ -11,17 +11,17 @@
 //TODO: Variable names
 
 
-//D2Common.0x6FD75480
+// 1.13c D2Common+0x2E0C0 (EAX = drlg, ESI = tile data)
 void __fastcall DRLGANIM_InitCache(D2DrlgStrc* pDrlg, D2DrlgTileDataStrc* pTileData)
 {
-	D2TileLibraryEntryStrc* ppTileLibraryEntry[40] = {};
+	D2TileLibraryEntryStrc* ppTileLibraryEntry[40];
 	int nSequence = 0;
 	int nStyle = 0;
 
 	D2_ASSERT(pDrlg);
 	D2_ASSERT(pTileData);
 
-	memset(pTileData, 0x00, sizeof(D2DrlgTileDataStrc));
+	memset(pTileData, 0x00, 0x30);
 
 	if (pDrlg->nAct != ACT_I)
 	{
@@ -42,7 +42,22 @@ void __fastcall DRLGANIM_InitCache(D2DrlgStrc* pDrlg, D2DrlgTileDataStrc* pTileD
 
 	const int nSize = D2CMP_10088_GetTiles(pDrlg->pTiles, 0, nStyle, nSequence, ppTileLibraryEntry, ARRAY_SIZE(ppTileLibraryEntry));
 	D2_ASSERT(nSize);
-	DRLGROOMTILE_InitTileData(NULL, pTileData, 0, 0, 0, ppTileLibraryEntry[0]);
+	pTileData->pTile = ppTileLibraryEntry[0];
+	pTileData->nTileType = 0;
+	pTileData->unk0x24 = 0;
+	pTileData->nGreen = 0xFF;
+	pTileData->nBlue = 0xFF;
+	pTileData->nRed = 0xFF;
+	pTileData->dwFlags = 0x4000;
+	const uint16_t nFlags = D2CMP_10079_GetTileFlags(ppTileLibraryEntry[0]);
+	if (nFlags & 1)
+	{
+		pTileData->dwFlags |= 4;
+	}
+	if (nFlags & 4)
+	{
+		pTileData->dwFlags |= 0x800;
+	}
 }
 
 //D2Common.0x6FD75560

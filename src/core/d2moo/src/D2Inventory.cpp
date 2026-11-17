@@ -792,6 +792,7 @@ D2InventoryGridStrc* __fastcall INVENTORY_GetGrid(D2InventoryStrc* pInventory, i
 }
 
 //D2Common.0x6FD8EC70
+// not-1.13c: retail folds the bounds test and the anchor-cell test into its placement search (D2Common+0x1F580), then calls the cell test (0x1E360)
 BOOL __fastcall INVENTORY_CanItemBePlacedAtPos(D2InventoryGridStrc* pInventoryGrid, int nX, int nY, uint8_t nItemWidth, uint8_t nItemHeight)
 {
 	if (nItemWidth + nX > pInventoryGrid->nGridWidth || nItemHeight + nY > pInventoryGrid->nGridHeight)
@@ -3331,6 +3332,7 @@ BOOL __fastcall INVENTORY_CanItemBePlacedInInventory(D2UnitStrc* pPlayer, D2Unit
 }
 
 //D2Common.0x6FD925E0
+// not-1.13c: retail reads the unit's path through the path getter (D2Common+0x34BB0) at each call site
 int __fastcall UNITS_GetXPosition(D2UnitStrc* pUnit)
 {
 	switch (pUnit->dwUnitType)
@@ -3350,6 +3352,7 @@ int __fastcall UNITS_GetXPosition(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FD92610
+// not-1.13c: retail reads the unit's path through the path getter (D2Common+0x34B80) at each call site
 int __fastcall UNITS_GetYPosition(D2UnitStrc* pUnit)
 {
 	switch (pUnit->dwUnitType)

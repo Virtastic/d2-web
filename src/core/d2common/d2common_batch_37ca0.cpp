@@ -111,7 +111,7 @@ EMSCRIPTEN_KEEPALIVE bool d2common_impl_317c0(void* pThis, int32_t* pRecord)
 	return false;
 }
 
-// 1.13c D2Common+0x3A650 (#10343): drop entries from a sorted list.
+// stand-alone twin of D2Common 0x3A650 (the proven row runs STATLIST_RemoveAllStats), #10343: drop entries from a sorted list.
 // list+0x24 is the array of 8-byte entries (key dword at +0, value dword at +4) and list+0x28 a
 // signed 16-bit count. Each pass binary-searches for the first entry whose key equals the key of
 // entry 0; on a hit with a non-zero value it calls 0x381A0(list+0, entry), 0x39F70(-value, 0) and,

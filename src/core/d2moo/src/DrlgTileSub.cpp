@@ -15,6 +15,7 @@
 
 
 //D2Common.0x6FD8A460
+// 1.13c D2Common+0x84110 (group start roll) + 0x83E20 (cell shuffle and placement); diffed identical
 void __fastcall DRLGTILESUB_AddSecondaryBorder(D2UnkOutdoorStrc* a1)
 {
 	D2LvlSubTxt* pLvlSubTxtRecord = NULL;
@@ -144,6 +145,7 @@ void __fastcall DRLGTILESUB_AddSecondaryBorder(D2UnkOutdoorStrc* a1)
 }
 
 //D2Common.0x6FD8A750
+// 1.13c D2Common+0x83B30
 //TODO: variable names
 BOOL __fastcall DRLGTILESUB_TestReplaceSubPreset(int a1, int a2, D2UnkOutdoorStrc* a3, D2DrlgSubstGroupStrc* pSubstGroup, D2LvlSubTxt* pLvlSubTxtRecord)
 {
@@ -219,6 +221,7 @@ BOOL __fastcall DRLGTILESUB_TestReplaceSubPreset(int a1, int a2, D2UnkOutdoorStr
 }
 
 //D2Common.0x6FD8A8E0
+// 1.13c D2Common+0x83990
 //TODO: variable names
 void __fastcall DRLGTILESUB_ReplaceSubPreset(int a1, int a2, D2UnkOutdoorStrc* a3, D2DrlgSubstGroupStrc* pSubstGroup, D2LvlSubTxt* pLvlSubTxtRecord, int a6)
 {
@@ -287,6 +290,7 @@ void __fastcall DRLGTILESUB_ReplaceSubPreset(int a1, int a2, D2UnkOutdoorStrc* a
 }
 
 //D2Common.0x6FD8AA80
+// 1.13c D2Common+0x84AD0 (dispatcher) + 0x84890 (fixed and random group loops, diffed identical)
 void __fastcall sub_6FD8AA80(D2UnkOutdoorStrc2* a1)
 {
 	D2DrlgSubstGroupStrc* pSubstGroup = NULL;
@@ -359,6 +363,7 @@ void __fastcall sub_6FD8AA80(D2UnkOutdoorStrc2* a1)
 }
 
 //D2Common.0x6FD8ACE0
+// 1.13c D2Common+0x84220 (retail's trailing node sweep 0x83630 is the preset-unit loop below; same values copied, 1.10f field order)
 void __fastcall sub_6FD8ACE0(void* pMemPool, int nX, int nY, D2UnkOutdoorStrc2* a4, D2DrlgSubstGroupStrc* pSubstGroup, D2LvlSubTxt* pLvlSubTxtRecord, int a7)
 {
 	int nCounter = 0;
@@ -443,6 +448,7 @@ void __fastcall sub_6FD8ACE0(void* pMemPool, int nX, int nY, D2UnkOutdoorStrc2* 
 }
 
 //D2Common.0x6FD8B010
+// 1.13c D2Common+0x834D0
 BOOL __fastcall sub_6FD8B010(int a1, int a2, D2UnkOutdoorStrc2* a3, D2DrlgSubstGroupStrc* pSubstGroup, D2LvlSubTxt* pLvlSubTxtRecord)
 {
 	int nFlags = 0;
@@ -474,6 +480,7 @@ BOOL __fastcall sub_6FD8B010(int a1, int a2, D2UnkOutdoorStrc2* a3, D2DrlgSubstG
 }
 
 //D2Common.0x6FD8B130
+// 1.13c D2Common+0x837F0
 BOOL __fastcall sub_6FD8B130(int a1, int a2, D2UnkOutdoorStrc2* a3, D2DrlgSubstGroupStrc* pSubstGroup, D2LvlSubTxt* pLvlSubTxtRecord)
 {
 	int nTileType = 0;
@@ -622,6 +629,7 @@ void __fastcall DRLGTILESUB_DoSubstitutions(D2UnkOutdoorStrc2* pOutdoorLevel, D2
 }
 
 //D2Common.0x6FD8B640
+// 1.13c D2Common+0x83CA0 (delta: a file without substitution groups halts and exits, 1.10f only warned)
 void __fastcall DRLGTILESUB_InitializeDrlgFile(HD2ARCHIVE hArchive, D2LvlSubTxt* pLvlSubTxtRecord)
 {
 	D2DrlgFileStrc** ppDrlgFile = NULL;
@@ -640,7 +648,8 @@ void __fastcall DRLGTILESUB_InitializeDrlgFile(HD2ARCHIVE hArchive, D2LvlSubTxt*
 
 		if (!(*ppDrlgFile)->nSubstGroups)
 		{
-			FOG_DisplayWarning("Substitution File was not saved with substitution groups", __FILE__, __LINE__);
+			FOG_DisplayHalt("Substitution File was not saved with substitution groups", __FILE__, __LINE__);
+			exit(-1);
 		}
 
 		for (int i = 0; i < (*ppDrlgFile)->nWallLayers; ++i)

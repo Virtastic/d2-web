@@ -47,7 +47,7 @@ extern "C"
 	void (*g_d2common_fn_3A740)(uint32_t, uint32_t, int32_t) = nullptr;
 }
 
-// 1.13c D2Common+0x38DC0 (#10597): forwards to the stat getter 0x38B70 with its own second and
+// stand-alone twin of D2Common 0x38DC0 (the proven row runs D2Common_11248), #10597: forwards to the stat getter 0x38B70 with its own second and
 // third arguments; the first argument is unused.
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_legacy_d2common_38dc0(uint32_t nUnused, uint32_t pUnit, int32_t nStatId)

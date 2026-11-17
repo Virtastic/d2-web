@@ -413,7 +413,7 @@ EMSCRIPTEN_KEEPALIVE int32_t D2Common_12140_CollectRoomUnits(uint32_t pOwner, ui
 	return nCount;
 }
 
-// 1.13c D2Common+0x4E2B0 (#10304): the dword at pObject+0x34. A null object is fatal in retail
+// stand-alone 32-bit layout twin of D2Common 0x4E2B0 (the proven row runs SKILLS_GetOwnerGUIDFromSkill), #10304: the dword at pObject+0x34. A null object is fatal in retail
 // (0x638); modelled as a 0 return.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t D2Common_4E2B0_GetField34(uint32_t pObject)

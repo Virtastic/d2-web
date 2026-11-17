@@ -540,6 +540,7 @@ BOOL __fastcall sub_6FDAD5E0(D2DynamicPathStrc* pDynamicPath, D2ActiveRoomStrc* 
 
 //1.00:  D2Common.0x100604E0 Note: Changed since then. Used to look for the room using coordinates
 //1.10f: D2Common.0x6FDAE250
+// not-1.13c: retail inlines the room swap into PATH_RecacheRoom (D2Common+0xD760)
 void __fastcall PATHMISC_SetRoom(D2DynamicPathStrc* pPath, D2ActiveRoomStrc* pNewRoom)
 {
 	D2ActiveRoomStrc* pRoomDest = pNewRoom;

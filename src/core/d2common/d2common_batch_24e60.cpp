@@ -74,7 +74,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2common_4ffd0_value(uint32_t pUnit) {
 }
 
 // Read the object's flags result and its one-bit auxiliary marker.
-// 1.13c D2Common+0x37E70
+// stand-alone 32-bit layout twin of D2Common 0x37E70 (the proven row runs STATLIST_GetOwner)
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_37e70_batch(uint32_t pUnit, uint32_t pAux) {
 	if (pAux) W(P(pAux), 0, 0);
 	if (!pUnit) return 0;

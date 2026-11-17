@@ -58,7 +58,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_528b0_port(D2UnitStrc* pUnit, int32_t n
 	D2COMMON_SKILLS_RemoveSkill_6FDAFFF0(pUnit, nSkillId, bDecrementAndCheckSkillLevel, __FILE__, __LINE__);
 }
 
-// 1.13c D2Common+0x4FCB0 (#?): SKILLS_GetBonusSkillLevel. Starts from the skill's nLevelBonus, adds the
+// stand-alone twin of D2Common 0x4FCB0 (the proven row runs SKILLS_GetBonusSkillLevel). Starts from the skill's nLevelBonus, adds the
 // shrine-skill state bonus (2), stat 0x7F (all skills), and only for a player whose class matches the
 // records' nCharClass the class skill 0x53 plus, when the skilldesc's page is set, the tab skill 0xBC.
 // Stat 0x61 (non-class skill) is added clamped to 3 on the class path and on the non-player path with a

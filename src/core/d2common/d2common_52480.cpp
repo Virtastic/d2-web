@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x52480 (#10056): refresh a passive skill's state stat list. Retail-layout (32-bit) reader over the
+// stand-alone 32-bit layout twin of D2Common 0x52480 (the proven row runs SKILLS_RefreshSkill), #10056: refresh a passive skill's state stat list. Retail-layout (32-bit) reader over the
 // data tables image with the eleven callees as seams. The skill row (stride 0x23C) must carry a passive state
 // (+0x94) inside the states count (+0xC4). With no skill of that id (0x4E480 returns 0) the state's list is looked
 // up under the unit's +0x5C list (flag bit 31), expired (0x3A3B0) and freed (0x3A9F0) once its own bit 31 is clear.

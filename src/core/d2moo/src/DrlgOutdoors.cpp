@@ -670,15 +670,9 @@ void __fastcall DRLGOUTDOORS_AddAct124SecondaryBorder(D2DrlgLevelStrc* pLevel, i
 	DRLGTILESUB_AddSecondaryBorder(&a1);
 }
 
-//D2Common.0x6FD7EBA0
-void __fastcall DRLGOUTDOORS_AllocOutdoorInfo(D2DrlgLevelStrc* pLevel)
-{
-	pLevel->pOutdoors = D2_CALLOC_STRC_POOL(pLevel->pDrlg->pMempool, D2DrlgOutdoorInfoStrc);
-}
-
 //1.10: D2Common.0x6FD7EBD0
 //1.14d: 0x00675360
-//TODO: a6a, v13, v14
+// 1.13c D2Common+0x43580 (vertex build 0x1B6E0, divide-by-8 and merge pass 0x42070, per-act init, and the grid walk of 0x43190 are inline here; diffed against all four: same order, same grid cells, same dt1 masks per level type, same level-0x86 act II override)
 void __fastcall DRLGOUTDOORS_GenerateLevel(D2DrlgLevelStrc* pLevel)
 {
 	D2DrlgCoordStrc pDrlgCoord = {};
@@ -913,6 +907,9 @@ static const uint8_t byte_6FDCF958[] =
 // D2WEB: observer for the rasterised dirt-path grid (set by src/core/drlg/drlg_check.cpp).
 void (*g_d2webOnDirtPathGrid)(D2DrlgLevelStrc*, D2DrlgRoomStrc*, D2DrlgGridStrc*) = nullptr;
 
+// not-1.13c: retail has no such function; the act I branch of D2Common+0x4A670 allocates the (w+3)x(h+3) grid inline,
+// then calls D2Common+0x3DC90 (path rasteriser) and D2Common+0x3DB20 (3x3 window, 256-entry table, writes the floor grid).
+// Diffed against 0x3DC90/0x3DB20/0x3D810: same loop bounds, window slide, mask bit order and table (byte-compared).
 //D2Common.0x6FD7EFE0
 void __fastcall DRLG_OUTDOORS_GenerateDirtPath(D2DrlgLevelStrc* pLevel, D2DrlgRoomStrc* pDrlgRoom)
 {
@@ -1187,6 +1184,7 @@ void __fastcall DRLGOUTDOORS_CalculatePathCoordinates(D2DrlgLevelStrc* pLevel, D
 	pVertex2->nPosY += pLevel->nPosY;
 }
 
+// 1.13c D2Common+0x3DD40 (diffed line by line, tables byte-compared with the DLL; no change needed)
 //D2Common.0x6FD7F5B0
 void __fastcall sub_6FD7F5B0(D2DrlgLevelStrc* pLevel)
 {
@@ -1297,6 +1295,7 @@ void __fastcall sub_6FD7F5B0(D2DrlgLevelStrc* pLevel)
 	}
 }
 
+// 1.13c D2Common+0x3D920 (diffed line by line, tables byte-compared with the DLL; no change needed)
 //D2Common.0x6FD7F810
 void __fastcall sub_6FD7F810(D2DrlgLevelStrc* pLevel, int nVertexId)
 {

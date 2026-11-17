@@ -63,24 +63,28 @@ BOOL __fastcall DRLGGRID_IsGridValid(D2DrlgGridStrc* pDrlgGrid)
 }
 
 //D2Common.0x6FD75C20
+// not-1.13c: retail has no function; the bounds test is inlined at each caller (retail grid rows start at D2Common+0x367F0)
 BOOL __fastcall DRLGGRID_IsPointInsideGridArea(D2DrlgGridStrc* pDrlgGrid, int nX, int nY)
 {
 	return nX >= 0 && nX < pDrlgGrid->nWidth && nY >= 0 && nY < pDrlgGrid->nHeight;
 }
 
 //D2Common.0x6FD75C50
+// not-1.13c: retail has no function; the flag-operation call on the cell is inlined at each caller
 void __fastcall DRLGGRID_AlterGridFlag(D2DrlgGridStrc* pDrlgGrid, int nX, int nY, int nFlag, FlagOperation eOperation)
 {
 	gpfFlagOperations[eOperation](&pDrlgGrid->pCellsFlags[nX + pDrlgGrid->pCellsRowOffsets[nY]], nFlag);
 }
 
 //D2Common.0x6FD75C80
+// not-1.13c: retail has no function; the cell address is computed inline at each caller
 int* __fastcall DRLGGRID_GetGridFlagsPointer(D2DrlgGridStrc* pDrlgGrid, int nX, int nY)
 {
 	return &pDrlgGrid->pCellsFlags[nX + pDrlgGrid->pCellsRowOffsets[nY]];
 }
 
 //D2Common.0x6FD75CA0
+// not-1.13c: retail has no function; the cell read is inlined at each caller
 int __fastcall DRLGGRID_GetGridEntry(D2DrlgGridStrc* pDrlgGrid, int nX, int nY)
 {
 	return pDrlgGrid->pCellsFlags[nX + pDrlgGrid->pCellsRowOffsets[nY]];
@@ -393,6 +397,7 @@ void __fastcall DRLGGRID_AssignCellsOffsetsAndFlags(D2DrlgGridStrc* pDrlgGrid, i
 }
 
 //D2Common.0x6FD763E0
+// not-1.13c: retail has no function; the row-offset free (DrlgGrid.cpp line 0x218) and the two pointer clears are inlined at each caller, e.g. D2Common+0x420E0
 void __fastcall DRLGGRID_FreeGrid(void* pMemPool, D2DrlgGridStrc* pDrlgGrid)
 {
 	if (pDrlgGrid->pCellsRowOffsets)
@@ -405,6 +410,7 @@ void __fastcall DRLGGRID_FreeGrid(void* pMemPool, D2DrlgGridStrc* pDrlgGrid)
 }
 
 //D2Common.0x6FD76410
+// not-1.13c: retail has no function; the two pointer clears are inlined at each caller, e.g. D2Common+0x420E0
 void __fastcall DRLGGRID_ResetGrid(D2DrlgGridStrc* pDrlgGrid)
 {
 	pDrlgGrid->pCellsFlags = 0;

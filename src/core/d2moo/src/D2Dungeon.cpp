@@ -1181,7 +1181,7 @@ int __stdcall D2Common_10095(D2ActiveRoomStrc* pRoom, int nX, int nY)
 //D2Common.0x6FD8D3A0 (#10096)
 D2RoomCoordListStrc* __stdcall D2Common_10096(D2ActiveRoomStrc* pRoom, int nX, int nY)
 {
-	return sub_6FD77110(pRoom->pDrlgRoom, nX, nY);
+	return sub_6FD77110(pRoom->pDrlgRoom, nX / 5, nY / 5);
 }
 
 //D2Common.0x6FD8D3C0 (#10097)

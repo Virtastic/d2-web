@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x39CE0 with injectable callees (0x39530 lookup, 0x38940 record, 0x38B70 unit stat, 0x382B0 list search).
+// stand-alone twin of D2Common 0x39CE0 (the proven row runs sub_6FDB64A0) with injectable callees (0x39530 lookup, 0x38940 record, 0x38B70 unit stat, 0x382B0 list search).
 #pragma once
 #include <cstdint>
 struct D2Common39CE0Callees {

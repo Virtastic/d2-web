@@ -27,8 +27,6 @@ void __fastcall DRLGMAZE_PickRoomPreset(D2DrlgRoomStrc* pDrlgRoom, BOOL bResetFl
 D2DrlgRoomStrc* __fastcall sub_6FD79240(D2DrlgLevelStrc* pLevel);
 //D2Common.0x6FD79360
 D2DrlgRoomStrc* __fastcall sub_6FD79360(D2DrlgLevelStrc* pLevel);
-//D2Common.0x6FD79480
-void __fastcall DRLGMAZE_InitLevelData(D2DrlgLevelStrc* pLevel);
 //D2Common.0x6FD794A0
 void __fastcall DRLGMAZE_GenerateLevel(D2DrlgLevelStrc* pLevel);
 //D2Common.0x6FD79E10
@@ -95,5 +93,3 @@ void __fastcall DRLGMAZE_PlaceAct5IceStuff(D2DrlgLevelStrc* pLevel);
 void __fastcall DRLGMAZE_RollAct_1_2_3_BasicPresets(D2DrlgLevelStrc* pLevel);
 //D2Common.0x6FD7D130
 void __fastcall DRLGMAZE_RollBasicPresets(D2DrlgLevelStrc* pLevel);
-//D2Common.0x6FD7D3D0
-void __fastcall DRLGMAZE_ResetMazeRecord(D2DrlgLevelStrc* pLevel, BOOL bKeepMazeRecord);

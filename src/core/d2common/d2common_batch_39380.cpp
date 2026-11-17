@@ -49,7 +49,7 @@ int32_t stat_value(uint32_t list, uint16_t id, const D2Common39530Env* e) {
 }
 int32_t ratio(int32_t v,const D2Common39530Env* e) { return e->ratio ? e->ratio(100,v) : v/100; }
 }
-// 1.13c D2Common+0x39530: apply up to sixteen itemstatcost op records to a base stat.
+// stand-alone twin of D2Common 0x39530 (the proven row runs sub_6FDB5830): apply up to sixteen itemstatcost op records to a base stat.
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_batch_d2common_39530(uint32_t ctx, uint32_t packed,
  const D2Common39530Env* e) {
  if (!ctx || !e || !e->tables) return 0;
@@ -141,7 +141,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_38160(uint32_t list,int
 }
 
 struct D2Common4FDC0Env { uint32_t tables; int32_t (*total_stat)(uint32_t); uint32_t (*state)(int32_t); };
-// 1.13c D2Common+0x4FDC0: gate a player by stat nine and state twelve.
+// stand-alone twin of D2Common 0x4FDC0 (the proven row runs D2Common_SKILLMANA_CheckStartStat_6FDB1400): gate a player by stat nine and state twelve.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4fdc0_batch(uint32_t unit,uint32_t record,
  const D2Common4FDC0Env* e) {
  if (!unit || i32(p(unit),0)!=0 || !record || !u32(p(record),0)) return 1;

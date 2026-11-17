@@ -11,6 +11,7 @@
 //TODO: Check calls with DrlgGridStrc args
 
 //D2Common.0x6FD83D20
+// not-1.13c: retail inlines it in the room teardown (D2Common+0x44F90): data free (D2Common+0x4A4D0), pool free (OutRoom.cpp line 0xAD), pointer cleared
 void __fastcall DRLGOUTROOM_FreeDrlgOutdoorRoom(D2DrlgRoomStrc* pDrlgRoom)
 {
 	if (pDrlgRoom->pOutdoor)
@@ -37,6 +38,7 @@ void __fastcall DRLGOUTROOM_FreeDrlgOutdoorRoomData(D2DrlgRoomStrc* pDrlgRoom)
 }
 
 //D2Common.0x6FD83DE0
+// not-1.13c: retail inlines the zeroed alloc (OutRoom.cpp line 0xC5) in the room allocator (D2Common+0x44BD0)
 void __fastcall DRLGOUTROOM_AllocDrlgOutdoorRoom(D2DrlgRoomStrc* pDrlgRoom)
 {
 	pDrlgRoom->pOutdoor = D2_CALLOC_STRC_POOL(pDrlgRoom->pLevel->pDrlg->pMempool, D2DrlgOutdoorRoomStrc);

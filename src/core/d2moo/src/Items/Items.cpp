@@ -87,7 +87,9 @@ void __stdcall ITEMS_InitItemSeed(D2UnitStrc* pItem)
 {
 	if (D2ItemDataStrc* pItemData = ITEMS_GetItemData(pItem))
 	{
-		SEED_InitSeed(&pItemData->pSeed);
+		// retail writes the two seed words in place (low 1, high 666)
+		pItemData->pSeed.nLowSeed = 1;
+		pItemData->pSeed.nHighSeed = 666;
 	}
 }
 
@@ -262,6 +264,7 @@ BOOL __stdcall ITEMS_CheckItemFlag(D2UnitStrc* pItem, uint32_t dwFlag, int nLine
 }
 
 //D2Common.0x6FD98780 (#10708)
+// 1.13c D2Common+0x23900
 void __stdcall ITEMS_SetItemFlag(D2UnitStrc* pItem, uint32_t dwFlag, BOOL bSet)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -301,6 +304,7 @@ BOOL __stdcall ITEMS_CheckItemCMDFlag(D2UnitStrc* pItem, int nFlag)
 }
 
 //D2Common.0x6FD98810 (#10711)
+// 1.13c D2Common+0x23870
 void __stdcall ITEMS_SetItemCMDFlag(D2UnitStrc* pItem, int nFlag, BOOL bSet)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -1212,6 +1216,7 @@ uint32_t __stdcall ITEMS_GetNormalCode(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD99DB0
+// 1.13c D2Common+0x26190
 int __fastcall ITEMS_GetRequiredLevel(D2UnitStrc* pItem, D2UnitStrc* pPlayer)
 {
 	D2UniqueItemsTxt* pUniqueItemsTxtRecord = NULL;
@@ -1228,14 +1233,11 @@ int __fastcall ITEMS_GetRequiredLevel(D2UnitStrc* pItem, D2UnitStrc* pPlayer)
 	int nCraftBonus = 0;
 	D2StatStrc pStat[64] = {};
 	
+	// retail: a missing item data falls back to quality 2 (the default arm) and still reads items.txt, the sockets and the stats
 	D2ItemDataStrc* pItemData = ITEMS_GetItemData(pItem);
-	if (!pItemData)
-	{
-		return 0;
-	}
 
 	nRequiredLevel = 0;
-	switch (pItemData->dwQualityNo)
+	switch (pItemData ? pItemData->dwQualityNo : ITEMQUAL_NORMAL)
 	{
 	case ITEMQUAL_MAGIC:
 		pPrefixTxtRecord = DATATBLS_GetMagicAffixTxtRecord(pItemData->wMagicPrefix[0]);
@@ -2527,16 +2529,15 @@ int __stdcall ITEMS_GetMaxStack(int nItemId)
 }
 
 //D2Common.0x6FD9CE50 (#10795)
+// 1.13c D2Common+0x260F0
 int __stdcall ITEMS_GetTotalMaxStack(D2UnitStrc* pItem)
 {
-
 	D2_ASSERT(pItem);
 	D2_ASSERT(pItem->dwUnitType == UNIT_ITEM);
 
-	const D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-	D2_ASSERT(pItemsTxtRecord);
-
-	int nMaxStack = STATLIST_UnitGetStatValue(pItem, STAT_ITEM_EXTRA_STACK, 0) + pItemsTxtRecord->dwMaxStack;
+	// retail: items.txt max stack (0x22B70), then the extra-stack stat, clamped to 511
+	int nMaxStack = ITEMS_GetMaxStack(pItem->dwClassId);
+	nMaxStack += STATLIST_UnitGetStatValue(pItem, STAT_ITEM_EXTRA_STACK, 0);
 	if (nMaxStack >= 511)
 	{
 		nMaxStack = 511;
@@ -3182,6 +3183,7 @@ static BOOL ITEMS_CheckTypeEquivalenceFromLUT(uint32_t* pEquivalenceLUT, uint32_
 	return pEquivalenceLUT[nItemType / 32] & gdwBitMasks[nItemType % 32];
 }
 
+// not-1.13c: retail inlines the row address (LUT base + type * nItemTypesIndex words) in its callers 0x24430 and 0x24500
 static uint32_t* ITEMS_TypeEquivalenceLUT(int nItemTypeLUT)
 {
 	return &sgptDataTables->pItemTypesEquivalenceLUTs[nItemTypeLUT * sgptDataTables->nItemTypesIndex];
@@ -3323,6 +3325,7 @@ void __stdcall ITEMS_SetRealmData(D2UnitStrc* pItem, int a2, int a3)
 }
 
 //D2Common.0x6FD9E0A0 (#10734)
+// 1.13c D2Common+0x22510
 void __stdcall ITEMS_SetOwnerId(D2UnitStrc* pItem, D2UnitGUID nOwnerGUID)
 {
 	D2_ASSERT(ITEMS_GetItemData(pItem));
@@ -6071,6 +6074,7 @@ size_t __stdcall ITEMS_SerializeItemToBitstream(D2UnitStrc* pItem, uint8_t* pBit
 }
 
 //Inlined in D2Common.0x6FDA2C00
+// 1.13c D2Common+0x25C10 (retail looks the items.txt row up itself; the caller passes it here)
 void __fastcall ITEMS_SerializeItemCompact(D2UnitStrc* pItem, D2BitBufferStrc* pBuffer, D2ItemsTxt* pItemsTxtRecord, BOOL bServer)
 {
 	D2ItemStatCostTxt* pItemStatCostTxtRecord = NULL;
@@ -6138,7 +6142,7 @@ void __fastcall ITEMS_SerializeItemCompact(D2UnitStrc* pItem, D2BitBufferStrc* p
 		}
 		ITEMS_WriteBitsToBitstream(pBuffer, nY, 4);
 
-		ITEMS_WriteBitsToBitstream(pBuffer, (uint8_t)(ITEMS_GetInvPage(pItem) + 1), 3);   // d2-web: byte arithmetic -- INVPAGE_NULL (255) serialises as 0, as retail 1.13c does (s04 corpus); the int form clamped to 7
+		ITEMS_WriteBitsToBitstream(pBuffer, (int8_t)(ITEMS_GetInvPage(pItem) + 1), 3);   // retail: signed byte arithmetic -- INVPAGE_NULL (255) serialises as 0 (s04 corpus); a page of 127 or above is negative and clamps to 0
 	}
 
 	if (ITEMS_GetItemFlags(pItem) & IFLAG_ISEAR)
@@ -6195,33 +6199,18 @@ void __fastcall ITEMS_SerializeItemCompact(D2UnitStrc* pItem, D2BitBufferStrc* p
 }
 
 //D2Common.0x6FDA2C00
+// 1.13c D2Common+0x28D70
 size_t __fastcall ITEMS_SerializeItem(D2UnitStrc* pItem, D2BitBufferStrc* pBuffer, BOOL bServer, BOOL bSaveItemInv, BOOL bGamble)
 {
-	D2ItemsTxt* pItemsTxtRecord = NULL;
-	uint32_t nItemFlags = 0;
-
-	if (!pItem || pItem->dwUnitType != UNIT_ITEM)
-	{
-		return 0;
-	}
-
-	D2ItemDataStrc* pItemData = pItem->pItemData;
-	if (pItemData)
-	{
-		nItemFlags = pItemData->dwItemFlags;
-	}
-	else
-	{
-		nItemFlags = 0;
-	}
+	// retail has no unit-type guard: the flags come from the item data (0 when absent) and the
+	// items.txt row (0x222B0) is fatal when the class id is out of range
+	D2ItemDataStrc* pItemData = ITEMS_GetItemData(pItem);
+	uint32_t nItemFlags = pItemData ? pItemData->dwItemFlags : 0;
 
 	nItemFlags = nItemFlags & ~IFLAG_INIT | IFLAG_JUSTSAVED;
 
-	pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-	if (!pItemsTxtRecord)
-	{
-		return 0;
-	}
+	D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
+	D2_ASSERT(pItemsTxtRecord);
 
 	if (pItemsTxtRecord->nCompactSave)
 	{

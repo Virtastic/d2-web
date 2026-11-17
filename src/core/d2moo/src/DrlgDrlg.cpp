@@ -21,13 +21,13 @@ static_assert(DRLGROOMFLAG_HAS_WAYPOINT == (1 << DRLGROOMFLAG_HAS_WAYPOINT_FIRST
 
 //1.10f: D2Common.0x6FD74120 (#10014)
 //1.11:  D2Common.0x6FDC7AA0 (#11155)
+// 1.13c D2Common+0x2E3E0 (retail has no archive assert; the tile library path is built by 0x2D4E0, inlined below)
 D2DrlgStrc* __fastcall DRLG_AllocDrlg(D2DrlgActStrc* pAct, uint8_t nActNo, HD2ARCHIVE hArchive, uint32_t nInitSeed, int nTownLevelId, uint32_t nFlags, D2GameStrc* pGame, uint8_t nDifficulty, AUTOMAPFN pfAutoMap, TOWNAUTOMAPFN pfTownAutoMap)
 {
 	D2DrlgStrc* pDrlg = D2_CALLOC_STRC_POOL(pAct->pMemPool, D2DrlgStrc);
 
 	pDrlg->pAct = pAct;
 	pDrlg->pMempool = pAct->pMemPool;
-	D2_ASSERT(hArchive == nullptr);
 	pDrlg->hArchive = hArchive; // Always nullptr in the game
 	pDrlg->nAct = nActNo;
 
@@ -42,7 +42,6 @@ D2DrlgStrc* __fastcall DRLG_AllocDrlg(D2DrlgActStrc* pAct, uint8_t nActNo, HD2AR
 	pDrlg->pfTownAutomap = pfTownAutoMap;
 
 	char szPath[MAX_PATH] = {};
-	szPath[0] = sgptDataTables->szDefaultString;
 
 	switch (nActNo)
 	{
@@ -188,11 +187,19 @@ void __fastcall DRLG_FreeLevel(void* pMemPool, D2DrlgLevelStrc* pLevel, BOOL bAl
 	switch (pLevel->nDrlgType)
 	{
 	case DRLGTYPE_MAZE:
-		DRLGMAZE_ResetMazeRecord(pLevel, bAlloc);
+		if (!bAlloc)
+		{
+			pLevel->pMaze = NULL;
+		}
 		break;
 
 	case DRLGTYPE_PRESET:
-		DRLGPRESET_ResetDrlgMap(pLevel, bAlloc);
+		pLevel->pPreset->pDrlgMap = NULL;
+		if (!bAlloc)
+		{
+			D2_FREE_POOL(pMemPool, pLevel->pPreset);
+			pLevel->pPreset = NULL;
+		}
 		break;
 
 	case DRLGTYPE_OUTDOOR:
@@ -229,90 +236,119 @@ void __fastcall DRLG_FreeLevel(void* pMemPool, D2DrlgLevelStrc* pLevel, BOOL bAl
 	}
 }
 
-//D2Common.0x6FD745C0
-//TODO: Name
+// 1.13c D2Common+0x2DF80: add nDelta to a level's active count and to that of every level it sees (the vis levels from
+// the level's own row, created when missing), arm the inactive-frame delay on each, and clamp the counts at zero.
+static void DRLG_AdjustLevelActiveCount(D2DrlgLevelStrc* pLevel, int nDelta)
+{
+	pLevel->bActive += nDelta;
+	pLevel->dwInactiveFrames = 10;
+	pLevel->bActive = pLevel->bActive > 0 ? pLevel->bActive : 0;
+
+	int* pVisLevelIds = DRLGROOM_GetVisArrayFromLevelId(pLevel->pDrlg, pLevel->nLevelId);
+	for (int i = 0; i < 8; ++i)
+	{
+		if (pVisLevelIds[i])
+		{
+			D2DrlgLevelStrc* pVisLevel = DRLG_GetLevel(pLevel->pDrlg, pVisLevelIds[i]);
+			pVisLevel->bActive += nDelta;
+			pVisLevel->dwInactiveFrames = 10;
+			pVisLevel->bActive = pVisLevel->bActive > 0 ? pVisLevel->bActive : 0;
+		}
+	}
+}
+
+// 1.13c D2Common+0x3C810 (retail's export body; the per-level step is 0x2DF80, DRLG_AdjustLevelActiveCount above)
 void __fastcall sub_6FD745C0(D2DrlgRoomStrc* pDrlgRoom1, D2DrlgRoomStrc* pDrlgRoom2)
 {
-	D2DrlgLevelStrc* pLevel1 = NULL;
-	D2DrlgLevelStrc* pLevel2 = NULL;
-	D2DrlgLevelStrc* pLevel = NULL;
-	int* pVisLevelIds = NULL;
-	int nVisLevelId = 0;
-
-	if (pDrlgRoom1)
-	{
-		pLevel1 = pDrlgRoom1->pLevel;
-	}
-
-	if (pDrlgRoom2)
-	{
-		pLevel2 = pDrlgRoom2->pLevel;
-	}
+	D2DrlgLevelStrc* pLevel1 = pDrlgRoom1 ? pDrlgRoom1->pLevel : NULL;
+	D2DrlgLevelStrc* pLevel2 = pDrlgRoom2 ? pDrlgRoom2->pLevel : NULL;
 
 	if (pLevel1 != pLevel2)
 	{
 		if (pLevel1)
 		{
-			--pLevel1->bActive;
-			if (pLevel1->bActive <= 0)
-			{
-				pLevel1->bActive = 0;
-			}
-			pLevel1->dwInactiveFrames = 10;
-
-			pVisLevelIds = DRLGROOM_GetVisArrayFromLevelId(pLevel1->pDrlg, pLevel1->nLevelId);
-
-			for (int i = 0; i < 8; ++i)
-			{
-				nVisLevelId = pVisLevelIds[i];
-				if (nVisLevelId)
-				{
-					pLevel = DRLG_GetLevel(pLevel1->pDrlg, nVisLevelId);
-
-					pLevel->dwInactiveFrames = 10;
-					--pLevel->bActive;
-					if (pLevel->bActive <= 0)
-					{
-						pLevel->bActive = 0;
-					}
-				}
-			}
+			DRLG_AdjustLevelActiveCount(pLevel1, -1);
 		}
 
 		if (pLevel2)
 		{
-			++pLevel2->bActive;
-			if (pLevel2->bActive <= 0)
-			{
-				pLevel2->bActive = 0;
-			}
-			pLevel2->dwInactiveFrames = 10;
-
-			pVisLevelIds = DRLGROOM_GetVisArrayFromLevelId(pLevel2->pDrlg, pLevel2->nLevelId);
-
-			for (int i = 0; i < 8; ++i)
-			{
-				nVisLevelId = pVisLevelIds[i];
-				if (nVisLevelId)
-				{
-					pLevel = DRLG_GetLevel(pLevel2->pDrlg, nVisLevelId);
-
-					pLevel->dwInactiveFrames = 10;
-					++pLevel->bActive;
-					if (pLevel->bActive <= 0)
-					{
-						pLevel->bActive = 0;
-					}
-				}
-			}
+			DRLG_AdjustLevelActiveCount(pLevel2, 1);
 		}
 	}
 }
 
-//D2Common.0x6FD74700
-//TODO: Clean loops
+// 1.13c D2Common+0x2DDB0: whether an inactive level can be freed. Any of its rooms still needing its status or holding a
+// room blocks it (return 0, nothing freed); otherwise the near-room data of every room of its vis levels that faces back at
+// it is released as each vis level is passed, and a later vis level may still block after earlier ones were released.
+static BOOL DRLG_CanDiscardLevel(D2DrlgLevelStrc* pLevel)
+{
+	D2DrlgStrc* pDrlg = pLevel->pDrlg;
+	void* pMemPool = pDrlg->pMempool;
+
+	for (D2DrlgRoomStrc* pRoom = pLevel->pFirstRoomEx; pRoom; pRoom = pRoom->pDrlgRoomNext)
+	{
+		if (pRoom->fRoomStatus < 4 || (pRoom->dwFlags & DRLGROOMFLAG_HAS_ROOM))
+		{
+			return FALSE;
+		}
+	}
+
+	int* pVisLevelIds = DRLGROOM_GetVisArrayFromLevelId(pDrlg, pLevel->nLevelId);
+	for (int j = 0; j < 8; ++j)
+	{
+		if (!pVisLevelIds[j])
+		{
+			continue;
+		}
+
+		D2DrlgLevelStrc* pVisLevel = DRLG_GetLevel(pDrlg, pVisLevelIds[j]);
+		if (!pVisLevel->pFirstRoomEx)
+		{
+			continue;
+		}
+
+		int* pBackIds = DRLGROOM_GetVisArrayFromLevelId(pVisLevel->pDrlg, pVisLevel->nLevelId);
+		uint32_t dwMask = 0;
+		for (int i = 0; i < 8; ++i)
+		{
+			if (pBackIds[i] == pLevel->nLevelId)
+			{
+				dwMask |= 0x10u << i;
+			}
+		}
+
+		for (D2DrlgRoomStrc* pRoom = pVisLevel->pFirstRoomEx; pRoom; pRoom = pRoom->pDrlgRoomNext)
+		{
+			if ((dwMask & pRoom->dwFlags) && (pRoom->fRoomStatus < 4 || (pRoom->dwFlags & DRLGROOMFLAG_HAS_ROOM)))
+			{
+				return FALSE;
+			}
+		}
+
+		for (D2DrlgRoomStrc* pRoom = pVisLevel->pFirstRoomEx; pRoom; pRoom = pRoom->pDrlgRoomNext)
+		{
+			if (pRoom->dwFlags & dwMask)
+			{
+				DRLGROOM_FreeRoomTiles(pMemPool, pRoom);
+
+				if (pRoom->ppRoomsNear)
+				{
+					D2_FREE_POOL(pMemPool, pRoom->ppRoomsNear);
+					pRoom->ppRoomsNear = NULL;
+					pRoom->nRoomsNear = 0;
+				}
+			}
+		}
+	}
+
+	return TRUE;
+}
+
+// 1.13c D2Common+0x2E2C0
 void __fastcall DRLG_UpdateAndFreeInactiveRooms(D2DrlgStrc* pDrlg)
 {
+	void* pMemPool = pDrlg->pMempool;
+
 	for (D2DrlgLevelStrc* pLevel = pDrlg->pLevel; pLevel; pLevel = pLevel->pNextLevel)
 	{
 		if (!pLevel->bActive && pLevel->pFirstRoomEx)
@@ -321,82 +357,13 @@ void __fastcall DRLG_UpdateAndFreeInactiveRooms(D2DrlgStrc* pDrlg)
 			{
 				--pLevel->dwInactiveFrames;
 			}
+			else if (DRLG_CanDiscardLevel(pLevel))
+			{
+				DRLG_FreeLevel(pMemPool, pLevel, TRUE);
+			}
 			else
 			{
-				D2DrlgRoomStrc* pDrlgRoom = pLevel->pFirstRoomEx;
-
-				while (pDrlgRoom && pDrlgRoom->fRoomStatus > 3 && !(pDrlgRoom->dwFlags & DRLGROOMFLAG_HAS_ROOM))
-				{
-					pDrlgRoom = pDrlgRoom->pDrlgRoomNext;
-				}
-
-				if (pDrlgRoom)
-				{
-					pLevel->dwInactiveFrames = 10;
-				}
-				else
-				{
-					int* pLevelIds = DRLGROOM_GetVisArrayFromLevelId(pLevel->pDrlg, pLevel->nLevelId);
-
-					D2DrlgRoomStrc* k = nullptr;
-					for (int j = 0; j < 8; ++j)
-					{
-						if (pLevelIds[j])
-						{
-							D2DrlgLevelStrc* pCurrentLevel = DRLG_GetLevel(pLevel->pDrlg, pLevelIds[j]);
-
-							if (pCurrentLevel->pFirstRoomEx)
-							{
-								int* pLevels = DRLGROOM_GetVisArrayFromLevelId(pCurrentLevel->pDrlg, pCurrentLevel->nLevelId);
-								int dwFlags = 0;
-
-								for (int i = 0; i < 8; ++i)
-								{
-									if (pLevels[i] == pLevel->nLevelId)
-									{
-										dwFlags |= (1 << (i + 4));
-									}
-								}
-
-								for (k = pCurrentLevel->pFirstRoomEx; k; k = k->pDrlgRoomNext)
-								{
-									if (k->dwFlags & dwFlags && (k->fRoomStatus <= 3 || k->dwFlags & DRLGROOMFLAG_HAS_ROOM))
-									{
-										break;
-									}
-								}
-
-								if (k)
-								{
-									pLevel->dwInactiveFrames = 10;
-									break;
-								}
-								else
-								{
-									for (D2DrlgRoomStrc* i = pCurrentLevel->pFirstRoomEx; i; i = i->pDrlgRoomNext)
-									{
-										if (i->dwFlags & dwFlags)
-										{
-											DRLGROOM_FreeRoomTiles(pLevel->pDrlg->pMempool, i);
-
-											if (i->ppRoomsNear)
-											{
-												D2_FREE_POOL(pLevel->pDrlg->pMempool, i->ppRoomsNear);
-												i->ppRoomsNear = NULL;
-												i->nRoomsNear = 0;
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-
-					if (!k)
-					{
-						DRLG_FreeLevel(pDrlg->pMempool, pLevel, TRUE);
-					}
-				}
+				pLevel->dwInactiveFrames = 10;
 			}
 		}
 	}
@@ -424,7 +391,8 @@ D2DrlgLevelStrc* __fastcall DRLG_AllocLevel(D2DrlgStrc* pDrlg, int nLevelId)
 	switch (pLevel->nDrlgType)
 	{
 	case DRLGTYPE_MAZE:
-		DRLGMAZE_InitLevelData(pLevel);
+		pLevel->pMaze = DATATBLS_GetLvlMazeTxtRecordFromLevelId(pLevel->nLevelId);
+		DRLG_SetLevelPositionAndSize(pLevel->pDrlg, pLevel);
 		break;
 	
 	case DRLGTYPE_PRESET:
@@ -432,7 +400,7 @@ D2DrlgLevelStrc* __fastcall DRLG_AllocLevel(D2DrlgStrc* pDrlg, int nLevelId)
 		break;
 		
 	case DRLGTYPE_OUTDOOR:
-		DRLGOUTDOORS_AllocOutdoorInfo(pLevel);
+		pLevel->pOutdoors = D2_CALLOC_STRC_POOL(pLevel->pDrlg->pMempool, D2DrlgOutdoorInfoStrc);
 		break;
 	default:
 		D2_UNREACHABLE;
@@ -593,6 +561,7 @@ void __fastcall DRLG_ComputeLevelWarpInfo(D2DrlgLevelStrc* pLevel)
 }
 
 //D2Common.0x6FD74C10 (#10006)
+// 1.13c D2Common+0x2E360 (a level of an unknown type skips the generator but still runs the preset-map flag step and the warp info)
 void __stdcall DRLG_InitLevel(D2DrlgLevelStrc* pLevel)
 {
 	SEED_InitLowSeed(&pLevel->pSeed, pLevel->nLevelId + pLevel->pDrlg->dwStartSeed);
@@ -612,7 +581,7 @@ void __stdcall DRLG_InitLevel(D2DrlgLevelStrc* pLevel)
 		break;
 
 	default:
-		return;
+		break;
 	}
 
 	if (pLevel->nRooms && pLevel->pPresetMaps)
@@ -733,35 +702,25 @@ void __fastcall DRLG_UpdateRoomExCoordinates(D2DrlgLevelStrc* pLevel)
 }
 
 //D2Common.0x6FD74EF0
+// 1.13c D2Common+0x2D600 (retail ends in its fatal exit, assert lines 0x2FD / 0x2FE, on a null level or an empty room list)
 D2DrlgRoomStrc* __fastcall DRLG_GetRoomExFromLevelAndCoordinates(D2DrlgLevelStrc* pLevel, int nX, int nY)
 {
-	D2DrlgRoomStrc* pDrlgRoom = NULL;
+	D2_ASSERT(pLevel);
+	D2_ASSERT(pLevel->pFirstRoomEx);
 
-	if (!pLevel)
-	{
-		FOG_DisplayWarning("ptDrlgLevel", __FILE__, __LINE__);
-	}
-
-	if (!pLevel->pFirstRoomEx)
-	{
-		FOG_DisplayWarning("ptDrlgLevel->ptRoomFirst", __FILE__, __LINE__);
-	}
-
-	pDrlgRoom = pLevel->pFirstRoomEx;
-	while (pDrlgRoom)
+	for (D2DrlgRoomStrc* pDrlgRoom = pLevel->pFirstRoomEx; pDrlgRoom; pDrlgRoom = pDrlgRoom->pDrlgRoomNext)
 	{
 		if (DRLGROOM_AreXYInsideCoordinates(&pDrlgRoom->pDrlgCoord, nX, nY))
 		{
 			return pDrlgRoom;
 		}
-
-		pDrlgRoom = pDrlgRoom->pDrlgRoomNext;
 	}
 
 	return NULL;
 }
 
 //D2Common.0x6FD74F70
+// 1.13c D2Common+0x2E5C0
 D2DrlgRoomStrc* __fastcall DRLG_GetRoomExFromCoordinates(int nX, int nY, D2DrlgStrc* pDrlg, D2DrlgRoomStrc* pDrlgRoomHint, D2DrlgLevelStrc* pLevel)
 {
 
@@ -843,6 +802,7 @@ int __stdcall DRLG_GetLevelTypeFromLevelId(int nLevelId)
 }
 
 //D2Common.0x6FD75270
+// 1.13c D2Common+0x2D890
 void __fastcall DRLG_SetLevelPositionAndSize(D2DrlgStrc* pDrlg, D2DrlgLevelStrc* pLevel)
 {
 	D2LevelDefBin* pLevelDefBin = DATATBLS_GetLevelDefRecord(pLevel->nLevelId);
@@ -901,6 +861,7 @@ int __stdcall DRLG_GetLOSDrawFromLevelId(int nLevelId)
 }
 
 //D2Common.0x6FD75370
+// 1.13c D2Common+0x2D730
 D2DrlgWarpStrc* __fastcall DRLG_GetDrlgWarpFromLevelId(D2DrlgStrc* pDrlg, int nLevelId)
 {
 	D2LevelDefBin* pLevelDefBin = NULL;
@@ -963,10 +924,8 @@ void __fastcall DRLG_SetWarpId(D2DrlgWarpStrc* pDrlgWarp, int nVis, int nWarp, i
 	pWords[nId + 9] = nWarp;
 }
 
-//D2Common.0x6FD75450
+// not-1.13c: retail has no such function; each caller tests bit 0 of the DRLG flag word (drlg+0x8C) in place, e.g. 0x7B8D0
 int __fastcall DRLG_IsOnClient(D2DrlgStrc* pDrlg)
 {
-	D2_ASSERT(pDrlg);
-
 	return pDrlg->dwFlags & DRLGFLAG_ONCLIENT;
 }

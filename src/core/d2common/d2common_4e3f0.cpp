@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x4E3F0 (#10856) skill-list head: a 0x18-byte record from the caller's pool (Skills.cpp
+// stand-alone 32-bit layout twin of D2Common 0x4E3F0 (the proven row runs SKILLS_AllocSkillList), #10856 skill-list head: a 0x18-byte record from the caller's pool (Skills.cpp
 // line 0x380), zeroed, with the pool kept in its first dword. The allocation result is not checked.
 #include <cstring>
 #include "d2common_4e3f0.h"

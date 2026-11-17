@@ -49,6 +49,7 @@ const int gnTimeRates[4] =
 	128, 4, 8, 0
 };
 
+// not-1.13c: retail selects the cycle table inline in each environment update (D2Common+0x371C0, 0x376F0)
 static const D2EnvironmentCycleStrc* ENVIRONMENT_GetCycle(int nCycle, int nAct, bool bEclipse)
 {
 	// Lectem's note: Checks are inconsitents between functions
@@ -211,6 +212,7 @@ void __fastcall ENVIRONMENT_UpdateLightColor(D2DrlgEnvironmentStrc* pEnvironment
 }
 
 //D2Common.6FD8DBE0
+// not-1.13c: retail frees the environment block inline in its act teardown
 void __fastcall ENVIRONMENT_FreeDrlgEnvironment(void* pMemPool, D2DrlgEnvironmentStrc* pEnvironment)
 {
 	D2_FREE_POOL(pMemPool, pEnvironment);

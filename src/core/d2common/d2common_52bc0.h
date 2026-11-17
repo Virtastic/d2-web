@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x52BC0: set a unit's skill level, retail record layout, written from the 1.13c
+// stand-alone 32-bit layout twin of D2Common 0x52BC0 (the proven row runs SKILLS_AssignSkill): set a unit's skill level, retail record layout, written from the 1.13c
 // disassembly as a rule over E (see d2common_528b0.h). stdcall (unit, skill id, level, bRemove, two
 // unused words), ret 0x18.
 // Level 0 with bRemove: 0x528B0 (EBX = unit, stack = id, 0), then 0x52480(unit, id).

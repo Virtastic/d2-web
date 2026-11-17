@@ -3,6 +3,7 @@
 
 
 //D2Common.0x6FD782A0
+// not-1.13c: retail inlines the 0x14-byte calloc (DrlgVer.cpp line 0x13) at each call site in D2Common+0x1B4B0, +0x1B6E0, +0x17EB0, +0x3D920
 D2DrlgVertexStrc* __fastcall DRLGVER_AllocVertex(void* pMemPool, uint8_t nDirection)
 {
 	D2DrlgVertexStrc* pDrlgVertex = D2_CALLOC_STRC_POOL(pMemPool, D2DrlgVertexStrc);
@@ -11,7 +12,7 @@ D2DrlgVertexStrc* __fastcall DRLGVER_AllocVertex(void* pMemPool, uint8_t nDirect
 }
 
 //D2Common.0x6FD782D0
-//TODO: v15, v16, v21, v23
+// 1.13c D2Common+0x1B6E0 (with the room-box merge loop of D2Common+0x1B4B0 inline; checked branch by branch: same four-corner build, same per-direction cases, same flag writes)
 void __fastcall DRLGVER_CreateVertices(void* pMemPool, D2DrlgVertexStrc** ppVertices, D2DrlgCoordStrc* pDrlgCoord, uint8_t nDirection, D2DrlgOrthStrc* pDrlgRoomData)
 {
 	D2DrlgOrthStrc* pCurrentRoomData = NULL;
@@ -253,6 +254,7 @@ void __fastcall DRLGVER_FreeVertices(void* pMemPool, D2DrlgVertexStrc** ppVertic
 }
 
 //D2Common.0x6FD78730
+// not-1.13c: retail has no such function; the sign-of-difference step is inlined in the vertex walkers (no decompiled function for it)
 void __fastcall DRLGVER_GetCoordDiff(D2DrlgVertexStrc* pDrlgVertex, int* pDiffX, int* pDiffY)
 {
 	*pDiffX = pDrlgVertex->pNext->nPosX - pDrlgVertex->nPosX;

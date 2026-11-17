@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x39530 (callers 0x39CE0, 0x39B30, 0x39B60, itself): ECX = stat list, EDX = layer | stat << 16, plain ret.
+// stand-alone 32-bit layout twin of D2Common 0x39530 (the proven row runs sub_6FDB5830; callers 0x39CE0, 0x39B30, 0x39B60, itself): ECX = stat list, EDX = layer | stat << 16, plain ret.
 // A stat's value with its ItemStatCost op chain applied: the base value (0x38CD0) plus, for a record flagged at +0x52, up to
 // sixteen op entries at +0xDE (stride 6: u16 stat, u16 target, u8 op, u8 param), each adding a term built from the target's
 // own value (this function, recursing). Ops 1-9, 11 and 13 have cases; op 0 ends the chain. 32-bit retail layout through raw reads.
@@ -22,7 +22,7 @@ int32_t valueAt(uint32_t hdr, uint32_t key, const D2Common39530Env* e)
 }
 }
 
-// 1.13c D2Common+0x39530
+// stand-alone twin of D2Common 0x39530 (the proven row runs sub_6FDB5830)
 extern "C" int32_t D2Common_39530_StatWithOps(uint32_t S, uint32_t key, const D2Common39530Env* e)
 {
     const uint32_t id = (key >> 16) & 0xFFFF, dt = e->dataTables;

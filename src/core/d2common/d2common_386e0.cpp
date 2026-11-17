@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x386E0: stdcall(unit, nType, out, nLimit). When the
+// stand-alone 32-bit layout twin of D2Common 0x386E0 (the proven row runs STATLIST_CopyStats): stdcall(unit, nType, out, nLimit). When the
 // unit's stat list (unit+0x5C) exists and its flag dword at +0x10 is negative, the entries come from
 // 0x382F0 (list in EAX, output in ECX, nType and nLimit on the stack); otherwise the result is 0.
 #include <cstdint>

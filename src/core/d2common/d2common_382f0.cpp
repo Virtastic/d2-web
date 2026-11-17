@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x382F0: copy the entries of a stat list whose high
+// stand-alone 32-bit layout twin of D2Common 0x382F0 (the proven row runs D2Common_CopyStats_6FDB9C50): copy the entries of a stat list whose high
 // word is nType, starting at the first entry of the (nType << 16) key, at most nLimit of them, 8 bytes
 // each. The array is the list's +0x24 array when the flag dword at +0x10 is >= 0, else its +0x48 array.
 // Returns the number of entries copied (the 1.13c register result; the decompile shows void).

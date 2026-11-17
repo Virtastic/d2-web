@@ -40,7 +40,7 @@ namespace
 	}
 }
 
-// 1.13c D2Common+0x52660 (#10008) skills.txt row's passive state, stat-list bits, then add skill
+// stand-alone twin of D2Common 0x52660 (the proven row runs SKILLS_AddSkill), #10008: skills.txt row's passive state, stat-list bits, then add skill
 // Docs/re: SKILLS_AddSkill. The passive state and the skill-list walk are implemented; the two
 // stat-list calls (0x665C0 room refresh, 0x52480 skill refresh) are the vendored equivalents.
 D2SkillStrc* D2Common_52660_AddSkill(D2UnitStrc* pUnit, int32_t nSkillId)

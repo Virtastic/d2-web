@@ -186,7 +186,7 @@ D2UnitStrc* D2Common_20320_GetLeftHandWeapon(D2InventoryStrc* pInventory)
 	return nullptr;
 }
 
-// 1.13c D2Common+0x52480: refresh a passive skill's state stat list. The skill must have a
+// native twin of D2Common 0x52480 (the proven row runs SKILLS_RefreshSkill; SKILLS_RemoveSkill still calls this one): refresh a passive skill's state stat list. The skill must have a
 // passive state below the states table count; with no skill, or while its aura state is active,
 // the state list is torn down. Otherwise the level is recomputed, the state list is created if
 // absent, and when its level stat differs from the current level the five passive stats are

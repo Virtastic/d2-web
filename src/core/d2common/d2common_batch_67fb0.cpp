@@ -86,7 +86,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t UNIT_GetLevelRegenPenalty_32040(D2UnitStrc* pUnit,
 	return ((nManaGap + nLifeGap) * (uint32_t)nLevel) >> 2;
 }
 
-// 1.13c D2Common+0x529E0 (#10506): give a player unit its class base skills. Unless the skill list
+// stand-alone twin of D2Common 0x529E0 (the proven row runs SKILLS_InitSkillList), #10506: give a player unit its class base skills. Unless the skill list
 // already holds skill 0 with owner -1, add skill 0 and the ten nBaseSkill entries of the charstats
 // row (guarded by the skills.txt count), then make sure the left and right active skills are set.
 // A null skill list after the adds is fatal in retail; we return.

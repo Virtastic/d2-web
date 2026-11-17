@@ -105,7 +105,7 @@ struct D2CommonSkillListEnv {
     void (*remove)(int a, int b);                          // 0x528B0
 };
 
-// 1.13c D2Common+0x52BC0
+// stand-alone 32-bit layout twin of D2Common 0x52BC0 (the proven row runs SKILLS_AssignSkill)
 void d2common_sub_52bc0(int32_t* p1, int p2, int p3, int p4, const D2CommonSkillListEnv* e) {
     if (p3 == 0) {
         if (p4) { e->remove(p2, 0); e->refresh(p1, p2); return; }

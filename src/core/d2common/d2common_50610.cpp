@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x50610 (caller 0x50F00): EAX = hand index, stack = (item A, item B, skills.txt record), ret 0xC. The skill's
+// stand-alone 32-bit layout twin of D2Common 0x50610 (the proven row runs sub_6FDB1130), caller 0x50F00: EAX = hand index, stack = (item A, item B, skills.txt record), ret 0xC. The skill's
 // item-type check for one hand: the record's two excluded types for that hand (+0x24 + hand*4) and three required types
 // (+0x18 + hand*6) are tested against item A with 0x24430; with no item A only the empty-hand rule (types 0x2D/0x2E/0x43 at
 // +0x18, +0x1E) applies. A matched weapon then passes unless its items.txt-indexed record (0x230A0, sgptDataTables +0xBF8,
@@ -12,7 +12,6 @@ int32_t rd16s(uint32_t a) { int16_t v; std::memcpy(&v, reinterpret_cast<const vo
 uint32_t rd8(uint32_t a) { return *reinterpret_cast<const uint8_t*>(uintptr_t(a)); }
 }
 
-// 1.13c D2Common+0x50610
 extern "C" uint32_t D2Common_50610_HandTypeOk(uint32_t hand, uint32_t a, uint32_t b, uint32_t txt, const D2Common50610Env* e)
 {
     const uint32_t et = txt + 0x24 + hand * 4, it = txt + 0x18 + hand * 6;

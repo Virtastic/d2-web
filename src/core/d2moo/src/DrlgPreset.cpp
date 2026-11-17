@@ -31,13 +31,14 @@
 D2LevelFileListStrc* gpLevelFilesList_6FDEA700;
 
 
-// Helper functions
+// not-1.13c: retail inlines the three-store list push (D2Common+0xA3B0 area callers) at each call site; kept as one helper for the same stores
 void DRLGPRESET_AddPresetUnitToMap(D2DrlgMapStrc* pMazeMap, D2PresetUnitStrc* pNewPresetUnit, BOOL bSpawned)
 {
 	pNewPresetUnit->pNext = pMazeMap->pPresetUnit;
 	pMazeMap->pPresetUnit = pNewPresetUnit;
 	pNewPresetUnit->bSpawned |= bSpawned;
 }
+// not-1.13c: retail calls its preset-unit allocator and pushes the unit on the map list inline at each caller (e.g. D2Common+0xB290, +0xAFD0)
 D2PresetUnitStrc* DRLGPRESET_AllocateAndAddPresetUnitToMap(D2DrlgRoomStrc* pDrlgRoom, void* pMemPool, int nUnitType, int nIndex, int nMode, int nX, int nY, D2DrlgMapStrc* pMazeMap, BOOL bSpawned)
 {
 	D2PresetUnitStrc* pPresetUnit = DRLGROOM_AllocPresetUnit(pDrlgRoom, pMemPool, nUnitType, nIndex, nMode, nX, nY);
@@ -126,6 +127,7 @@ struct D2DS1FileStrc
 // wasm64 Safe Heap (the same class as MonsterRegion.cpp's packed array). Retail's x86
 // code reads it unaligned without issue, so the fix is memcpy, never re-deriving the offset: any
 // padding here would parse a different byte, changing every roll drawn from the file downstream.
+// not-1.13c: retail reads the DS1 words as raw x86 loads inline in the DS1 parser (D2Common+0xB560); this is the wasm64 unaligned-safe form
 static int32_t ReadInt32(int32_t*& pData)
 {
 	int32_t v;
@@ -134,6 +136,7 @@ static int32_t ReadInt32(int32_t*& pData)
 	return v;
 }
 
+// not-1.13c: retail advances the DS1 cursor by a literal pointer add inline in D2Common+0xB560
 static void SkipInt32s(int32_t*& pData, uint32_t nbToSkip)
 {
 	pData += nbToSkip;
@@ -656,7 +659,7 @@ D2PresetUnitStrc* __fastcall DRLGPRESET_CopyPresetUnit(void* pMemPool, D2PresetU
 	return pNewPresetUnit;
 }
 
-//D2Common.0x6FD86430
+// not-1.13c: retail inlines this (free the map-AI record via 0x9D90's two frees, then the unit) in the map free loop at D2Common+0xA8E0 and in the room free
 void __fastcall DRLGPRESET_FreePresetUnit(void* pMemPool, D2PresetUnitStrc* pPresetUnit)
 {
 	if (pPresetUnit->pMapAI)
@@ -667,14 +670,16 @@ void __fastcall DRLGPRESET_FreePresetUnit(void* pMemPool, D2PresetUnitStrc* pPre
 	D2_FREE_POOL(pMemPool, pPresetUnit);
 }
 
-//D2Common.0x6FD86480 (#10020)
+// 1.13c D2Common+0x9DE0: retail clears the new record first, then sets the node count, then allocates and copies the nodes
 D2MapAIStrc* __fastcall DRLGPRESET_CreateCopyOfMapAI(void* pMemPool, D2MapAIStrc* pMapAI)
 {
 	D2MapAIStrc* pNewMapAI = D2_ALLOC_STRC_POOL(pMemPool, D2MapAIStrc);
 
+	pNewMapAI->nPathNodes = 0;
+	pNewMapAI->pPosition = NULL;
 	pNewMapAI->nPathNodes = pMapAI->nPathNodes;
-	pNewMapAI->pPosition = (D2MapAIPathPositionStrc*)D2_ALLOC_POOL(pMemPool, sizeof(D2MapAIPathPositionStrc) * pMapAI->nPathNodes);
-	memcpy(pNewMapAI->pPosition, pMapAI->pPosition, sizeof(D2MapAIPathPositionStrc) * pMapAI->nPathNodes);
+	pNewMapAI->pPosition = (D2MapAIPathPositionStrc*)D2_ALLOC_POOL(pMemPool, sizeof(D2MapAIPathPositionStrc) * pNewMapAI->nPathNodes);
+	memcpy(pNewMapAI->pPosition, pMapAI->pPosition, sizeof(D2MapAIPathPositionStrc) * pNewMapAI->nPathNodes);
 	return pNewMapAI;
 }
 
@@ -805,13 +810,6 @@ void DRLGPRESET_SpawnRiverSoundColumn(D2DrlgMapStrc* pMazeMap, void* pDrlgMemPoo
 	}
 }
 
-// Helper function
-void DRLGPRESET_SpawnRiver(D2DrlgMapStrc* pMazeMap, const D2DrlgCoordStrc& tDrlgCoord,void* pDrlgMemPool, D2DrlgGridStrc* pDrlgGrid, int nOffsetX)
-{
-	DRLGPRESET_SpawnRiverSoundColumn(pMazeMap, pDrlgMemPool, tDrlgCoord.nPosX + nOffsetX + 1, tDrlgCoord.nPosY);
-	DRLGPRESET_AddPresetRiverObjects(pMazeMap, pDrlgMemPool, nOffsetX, pDrlgGrid);
-}
-
 // d2-web: retail builds the river sound objects (bSpawned, never spawned by the server) on the CLIENT DRLG only; with this set the session's
 // server DRLG also records them in its preset lists so the shell can export them as client-only objects (no server unit, no id, no hash).
 int g_d2ClientSoundObjects = 0;
@@ -836,7 +834,8 @@ static void DRLGPRESET_SpawnRiverBranch(D2DrlgRoomStrc* pDrlgRoom, D2DrlgMapStrc
 
 		if (pMazeMap->pLvlPrestTxtRecord->dwDef == LVLPREST_ACT1_RIVER_LOWER)
 		{
-			DRLGPRESET_SpawnRiver(pMazeMap, tDrlgCoord, pDrlgMemPool, &tDrlgGrid, -1);
+			DRLGPRESET_SpawnRiverSoundColumn(pMazeMap, pDrlgMemPool, tDrlgCoord.nPosX, tDrlgCoord.nPosY);
+			DRLGPRESET_AddPresetRiverObjects(pMazeMap, pDrlgMemPool, -1, &tDrlgGrid);
 		}
 		else
 		{
@@ -846,7 +845,8 @@ static void DRLGPRESET_SpawnRiverBranch(D2DrlgRoomStrc* pDrlgRoom, D2DrlgMapStrc
 				const D2C_PackedTileInformation nTileInfo{ nGridEntry };
 				if (nTileInfo.nTileStyle == 2 && nTileInfo.nTileSequence == 24)
 				{
-					DRLGPRESET_SpawnRiver(pMazeMap, tDrlgCoord, pDrlgMemPool, &tDrlgGrid, nOffsetX);
+					DRLGPRESET_SpawnRiverSoundColumn(pMazeMap, pDrlgMemPool, tDrlgCoord.nPosX + nOffsetX + 1, tDrlgCoord.nPosY);
+					DRLGPRESET_AddPresetRiverObjects(pMazeMap, pDrlgMemPool, nOffsetX, &tDrlgGrid);
 					nOffsetX += (nRiverBlockSizeInTilesX - 1);
 				}
 			}
@@ -996,7 +996,7 @@ void __fastcall DRLGPRESET_FreeDrlgGridsFromPresetRoom(D2DrlgRoomStrc* pDrlgRoom
 	}
 }
 
-//D2Common.0x6FD86D80
+// not-1.13c: retail zero-allocates the 0xF8-byte preset record inline in the room allocator (D2Common+0x44BD0, type 2 branch)
 void __fastcall DRLGPRESET_AllocPresetRoomData(D2DrlgRoomStrc* pDrlgRoom)
 {
 	pDrlgRoom->pMaze = D2_CALLOC_STRC_POOL(pDrlgRoom->pLevel->pDrlg->pMempool, D2DrlgPresetRoomStrc);
@@ -1569,7 +1569,7 @@ void __fastcall DRLGPRESET_BuildPresetArea(D2DrlgLevelStrc* pLevel, D2DrlgGridSt
 	}
 }
 
-//D2Common.0x6FD87E10
+// not-1.13c: retail stores the picked file inline at its callers (the outdoor preset builder, 0x42A70 area)
 void __fastcall DRLGPRESET_SetPickedFileInDrlgMap(D2DrlgMapStrc* pDrlgMap, int nPickedFile)
 {
 	pDrlgMap->nPickedFile = nPickedFile;
@@ -1606,13 +1606,13 @@ D2DrlgMapStrc* __fastcall DRLGPRESET_AllocDrlgMap(D2DrlgLevelStrc* pLevel, int n
 	return pDrlgMap;
 }
 
-//D2Common.0x6FD87F00
+// not-1.13c: retail reads the level-preset record's width field inline in D2Common+0x42A70
 int __fastcall DRLGPRESET_GetSizeX(int nLvlPrestId)
 {
 	return DATATBLS_GetLvlPrestTxtRecord(nLvlPrestId)->nSizeX;
 }
 
-//D2Common.0x6FD87F10
+// not-1.13c: retail reads the level-preset record's height field inline in D2Common+0x42A70
 int __fastcall DRLGPRESET_GetSizeY(int nLvlPrestId)
 {
 	return DATATBLS_GetLvlPrestTxtRecord(nLvlPrestId)->nSizeY;
@@ -1910,18 +1910,6 @@ void __fastcall DRLGPRESET_GenerateLevel(D2DrlgLevelStrc* pLevel)
 				pLevel->pDrlg->pfAutomap(i->pRoom);
 			}
 		}
-	}
-}
-
-//D2Common.0x6FD88810
-void __fastcall DRLGPRESET_ResetDrlgMap(D2DrlgLevelStrc* pLevel, BOOL bKeepPreset)
-{
-	pLevel->pPreset->pDrlgMap = NULL;
-
-	if (!bKeepPreset)
-	{
-		D2_FREE_POOL(pLevel->pDrlg->pMempool, pLevel->pPreset);
-		pLevel->pPreset = NULL;
 	}
 }
 

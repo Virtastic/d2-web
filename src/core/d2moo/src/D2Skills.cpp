@@ -23,7 +23,7 @@
 //TODO: Find names
 
 extern "C" int32_t D2Common_4F0E0_PassiveState(int32_t nSkillId);   // 1.13c D2Common+0x4F0E0
-void D2Common_52480_RefreshSkill(D2UnitStrc* pUnit, int nSkillId);   // 1.13c D2Common+0x52480
+void D2Common_52480_RefreshSkill(D2UnitStrc* pUnit, int nSkillId);   // native twin of SKILLS_RefreshSkill (d2common_batch_1fb80.cpp)
 
 D2CalcCallbackInfoStrc off_6FDE5804[] =
 {
@@ -521,6 +521,7 @@ int __stdcall SKILLS_EvaluateSkillDescFormula(D2UnitStrc* pUnit, unsigned int nC
 }
 
 //D2Common.0x6FDAF8C0 (#10940)
+// 1.13c D2Common+0x52480
 void __stdcall SKILLS_RefreshSkill(D2UnitStrc* pUnit, int nSkillId)
 {
 	D2SkillsTxt* pSkillsTxtRecord = NULL;
@@ -691,6 +692,7 @@ int __stdcall SKILLS_GetRange(D2SkillStrc* pSkill)
 }
 
 //D2Common.0x6FDAFCD0 (#10945)
+// 1.13c D2Common+0x4E3F0
 D2SkillListStrc* __stdcall SKILLS_AllocSkillList(void* pMemPool)
 {
 	D2SkillListStrc* pSkillList = D2_CALLOC_STRC_POOL(pMemPool, D2SkillListStrc);
@@ -701,6 +703,7 @@ D2SkillListStrc* __stdcall SKILLS_AllocSkillList(void* pMemPool)
 }
 
 //D2Common.0x6FDAFD10 (#10946)
+// 1.13c D2Common+0x529E0
 void __stdcall SKILLS_InitSkillList(D2UnitStrc* pUnit)
 {
 	D2CharStatsTxt* pCharStatsTxtRecord = NULL;
@@ -742,6 +745,7 @@ void __stdcall SKILLS_InitSkillList(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDAFEA0 (#10947)
+// 1.13c D2Common+0x4E3D0
 D2SkillStrc* __stdcall SKILLS_GetNextSkill(D2SkillStrc* pSkill)
 {
 	if (pSkill)
@@ -754,6 +758,7 @@ D2SkillStrc* __stdcall SKILLS_GetNextSkill(D2SkillStrc* pSkill)
 }
 
 //D2Common.0x6FDAFEA0 (#10948)
+// 1.13c D2Common+0x4E3B0
 D2SkillStrc* __stdcall SKILLS_GetFirstSkillFromSkillList(D2SkillListStrc* pSkillList)
 {
 	if (pSkillList)
@@ -766,6 +771,7 @@ D2SkillStrc* __stdcall SKILLS_GetFirstSkillFromSkillList(D2SkillListStrc* pSkill
 }
 
 //D2Common.0x6FDAFEC0
+// not-1.13c: inlined into the unit left-skill getter, which reads the skill list's left slot itself
 D2SkillStrc* __fastcall SKILLS_GetLeftSkillFromSkillList(D2SkillListStrc* pSkillList)
 {
 	D2_ASSERT(pSkillList);
@@ -774,6 +780,7 @@ D2SkillStrc* __fastcall SKILLS_GetLeftSkillFromSkillList(D2SkillListStrc* pSkill
 }
 
 //D2Common.0x6FDAFEF0
+// not-1.13c: inlined into the unit right-skill getter, which reads the skill list's right slot itself
 D2SkillStrc* __fastcall SKILLS_GetRightSkillFromSkillList(D2SkillListStrc* pSkillList)
 {
 	D2_ASSERT(pSkillList);
@@ -782,6 +789,7 @@ D2SkillStrc* __fastcall SKILLS_GetRightSkillFromSkillList(D2SkillListStrc* pSkil
 }
 
 //D2Common.0x6FDAFF20
+// not-1.13c: inlined into the unit used-skill setter
 void __fastcall SKILLS_SetUsedSkillInSkillList(D2SkillListStrc* pSkillList, D2SkillStrc* pUsedSkill)
 {
 	if (pSkillList)
@@ -791,6 +799,7 @@ void __fastcall SKILLS_SetUsedSkillInSkillList(D2SkillListStrc* pSkillList, D2Sk
 }
 
 //D2Common.0x6FDAFF30
+// not-1.13c: inlined into the unit used-skill getter
 D2SkillStrc* __fastcall SKILLS_GetUsedSkillFromSkillList(D2SkillListStrc* pSkillList)
 {
 	if (pSkillList)
@@ -802,6 +811,7 @@ D2SkillStrc* __fastcall SKILLS_GetUsedSkillFromSkillList(D2SkillListStrc* pSkill
 }
 
 //D2Common.0x6FDAFF40 (#10949)
+// not-1.13c: 1.13c exports the lookup itself (SKILLS_GetSkill); there is no separate forwarder
 D2SkillStrc* __fastcall SKILLS_GetSkillById(D2UnitStrc* pUnit, int nSkillId, D2UnitGUID nOwnerGUID)
 {
 	return SKILLS_GetSkill(pUnit, nSkillId, nOwnerGUID);
@@ -884,7 +894,7 @@ void __fastcall D2COMMON_SKILLS_RemoveSkill_6FDAFFF0(D2UnitStrc* pUnit, int nSki
 		}
 	}
 
-	D2Common_52480_RefreshSkill(pUnit, nSkillId);   // 1.13c D2Common+0x52480
+	D2Common_52480_RefreshSkill(pUnit, nSkillId);   // the skill refresh (native twin of SKILLS_RefreshSkill)
 }
 
 // 1.13c D2Common+0x4E300 (#10958)
@@ -939,6 +949,7 @@ void __stdcall SKILLS_FreeSkillList(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDB0320 (#10952)
+// 1.13c D2Common+0x52660
 D2SkillStrc* __stdcall SKILLS_AddSkill(D2UnitStrc* pUnit, int nSkillId)
 {
 	D2SkillsTxt* pSkillsTxtRecord = NULL;
@@ -1036,6 +1047,7 @@ D2SkillStrc* __stdcall SKILLS_AddSkill(D2UnitStrc* pUnit, int nSkillId)
 }
 
 //D2Common.0x6FDB04D0 (#10953)
+// 1.13c D2Common+0x52BC0
 void __stdcall SKILLS_AssignSkill(D2UnitStrc* pUnit, int nSkillId, int nSkillLevel, BOOL bRemove, const char* szFile, int nLine)
 {
 	D2SkillStrc* pSkill = NULL;
@@ -1201,6 +1213,7 @@ void __stdcall D2Common_10954(D2UnitStrc* pUnit, D2UnitGUID nOwnerGUID, int nSki
 }
 
 //D2Common.0x6FDB08C0 (#10957)
+// 1.13c D2Common+0x4E2B0
 D2UnitGUID __stdcall SKILLS_GetOwnerGUIDFromSkill(D2SkillStrc* pSkill)
 {
 	D2_ASSERT(pSkill);
@@ -1335,17 +1348,17 @@ void __stdcall SKILLS_SetRightActiveSkill(D2UnitStrc* pUnit, int nSkillId, D2Uni
 }
 
 //D2Common.0x6FDB0AC0 (#10963)
+// 1.13c D2Common+0x4E1D0 (retail returns 0 for a null skill without a trace; szFile/nLine are unused)
 int __stdcall SKILLS_GetSkillIdFromSkill(D2SkillStrc* pSkill, const char* szFile, int nLine)
 {
+	(void)szFile;
+	(void)nLine;
 	if (pSkill)
 	{
 		return pSkill->pSkillsTxt->nSkillId;
 	}
-	else
-	{
-		FOG_Trace("Null skill passed to SkillsGetType() from FILE:%s  LINE:%d", szFile, nLine);
-		return 0;
-	}
+
+	return 0;
 }
 
 //D2Common.0x6FDB0AF0 (#10965)
@@ -1385,6 +1398,7 @@ int __fastcall SKILLS_GetSeqNumFromSkill(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 }
 
 //D2Common.0x6FDB0B70 (#10964)
+// 1.13c D2Common+0x52340
 int __stdcall SKILLS_GetUseState(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
 	D2UnitStrc* pRightHandItem = NULL;
@@ -1616,6 +1630,7 @@ int __stdcall SKILLS_GetUseState(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 }
 
 //D2Common.0x6FDB0F50
+// 1.13c D2Common+0x50AF0
 //TODO: Check name
 BOOL __fastcall D2Common_SKILLMANA_CheckStat_6FDB0F50(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
@@ -1671,6 +1686,7 @@ D2UnitStrc* __fastcall sub_6FDB1050(D2InventoryStrc* pInventory, int nBodyLoc)
 }
 
 //D2Common.0x6FDB1070
+// 1.13c D2Common+0x50870
 BOOL __fastcall sub_6FDB1070(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
 	D2UnitStrc* pItem = NULL;
@@ -1721,6 +1737,7 @@ BOOL __fastcall sub_6FDB1070(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 // nType==0) or "B" row (nType==1) of skills.txt's itype/etype columns; D2SkillsTxt now holds them as
 // nItemTypeAB[2][3]/nElemTypeAB[2][2] (see DataTbls/SkillsTbls.h) instead of four separately-bounded same-width
 // arrays, so `nType`'s row selection stays a plain row index instead of overrunning the "A" array.
+// 1.13c D2Common+0x50610
 BOOL __fastcall sub_6FDB1130(D2UnitStrc* pItem, D2UnitStrc* pUnit, D2SkillsTxt* pSkillsTxtRecord, int nType)
 {
 
@@ -1836,7 +1853,7 @@ BOOL __fastcall D2Common_SKILLS_CheckShapeRestriction_6FDB1380(D2UnitStrc* pUnit
 	D2SkillsTxt* pSkillsTxt = pSkill->pSkillsTxt;
 	if (pSkillsTxt->nRestrict == 0)
 	{
-		return !STATES_CheckStateMaskRestrictOnUnit(pUnit, pSkill);
+		return !STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_RESTRICT);
 	}
 
 	if (pSkillsTxt->nRestrict == 1 || pSkillsTxt->nRestrict != 2)
@@ -1844,7 +1861,7 @@ BOOL __fastcall D2Common_SKILLS_CheckShapeRestriction_6FDB1380(D2UnitStrc* pUnit
 		return TRUE;
 	}
 
-	if (!STATES_CheckStateMaskRestrictOnUnit(pUnit, pSkill))
+	if (!STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_RESTRICT))
 	{
 		return FALSE;
 	}
@@ -1865,6 +1882,7 @@ BOOL __fastcall D2Common_SKILLS_CheckShapeRestriction_6FDB1380(D2UnitStrc* pUnit
 }
 
 //D2Common.0x6FDB1400
+// 1.13c D2Common+0x4FDC0
 //TODO: Check name
 BOOL __fastcall D2Common_SKILLMANA_CheckStartStat_6FDB1400(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
@@ -1878,6 +1896,7 @@ BOOL __fastcall D2Common_SKILLMANA_CheckStartStat_6FDB1400(D2UnitStrc* pUnit, D2
 }
 
 //D2Common.0x6FDB1450
+// 1.13c D2Common+0x52210
 BOOL __fastcall SKILLS_CheckSkillDelay(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
 	if (pUnit && pUnit->dwUnitType == UNIT_PLAYER && STATES_CheckState(pUnit, STATE_SKILLDELAY))
@@ -1915,6 +1934,7 @@ int __stdcall SKILLS_GetShrineSkillLevelBonus(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDB1580
+// 1.13c D2Common+0x4FCB0
 int __fastcall SKILLS_GetBonusSkillLevel(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
 	D2SkillDescTxt* pSkillDescTxtRecord = NULL;
@@ -2401,6 +2421,7 @@ BOOL __stdcall SKILLS_CheckRequiredSkills(D2UnitStrc* pUnit, int nSkillId)
 }
 
 //D2Common.0x6FDB1F80
+// 1.13c D2Common+0x4F080
 D2SkillStrc* __fastcall SKILLS_GetSkill(D2UnitStrc* pUnit, int nSkillId, D2UnitGUID nOwnerGUID)
 {
 	D2SkillStrc* pSkill = NULL;

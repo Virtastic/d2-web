@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x52340 (#10787) -- stdcall(unit, skill), ret 8: why a skill cannot be used, a reason code 0..8 (0 = usable).
+// stand-alone 32-bit layout twin of D2Common 0x52340 (the proven row runs SKILLS_GetUseState), #10787 -- stdcall(unit, skill), ret 8: why a skill cannot be used, a reason code 0..8 (0 = usable).
 // Written from the disassembly. Offsets (1.13c, 32-bit): skill +0 skills.txt record, +0x28 base level, +0x34 charge owner
 // (-1 = learned, the bonus applies); record byte +4 flags (0x10, 0x20), byte +5 flags (4). Retail reads the bits through Fog's
 // mask table (entries 2, 4, 5 = 4, 0x10, 0x20). A null skill is retail-fatal; we return 3.
@@ -11,7 +11,6 @@ inline uint32_t rd32(uint32_t a) { uint32_t v; std::memcpy(&v, reinterpret_cast<
 inline uint8_t rd8(uint32_t a) { return *reinterpret_cast<const uint8_t*>(uintptr_t(a)); }
 }
 
-// 1.13c D2Common+0x52340
 extern "C" uint32_t D2Common_52340_SkillUseCheck(uint32_t unit, uint32_t skill, const D2Common52340Env* e)
 {
     if (!skill) return 3;

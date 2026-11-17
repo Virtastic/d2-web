@@ -87,7 +87,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_22B20_ItemDword(uint32_t nIndex) {   // 1
 extern "C"
 // Returns what retail leaves in EAX: the unit on the early exits and a null list, the list's +0x10 flags word when the walk
 // does not run, else the sign-extended count reloaded after the last callback.
-EMSCRIPTEN_KEEPALIVE uint32_t d2common_38850_port(uint32_t pUnit, uint32_t pContext, void (*pCallback)(uint32_t unit, uint32_t edx, uint32_t value, uint32_t ctx)) {   // 1.13c D2Common+0x38850
+EMSCRIPTEN_KEEPALIVE uint32_t d2common_38850_port(uint32_t pUnit, uint32_t pContext, void (*pCallback)(uint32_t unit, uint32_t edx, uint32_t value, uint32_t ctx)) {   // stand-alone twin of D2Common 0x38850 (the proven row runs D2Common_10513)
 	if (!pUnit || (!pContext && pCallback))
 		return pUnit;
 	const uint8_t* r = reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(pUnit) + 0x5C)));

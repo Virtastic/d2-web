@@ -33,8 +33,9 @@ void __fastcall DRLGOUTWILD_GetBridgeCoords(D2DrlgLevelStrc* pLevel, int* pX, in
 	*pY = -1;
 }
 
+// 1.13c D2Common+0x7F3A0 (step order and level-id gates diffed against it; the vertex loop is the body of D2Common+0x7E8C0,
+// rewritten here to its retail form with the two 1.10f vertex predicates inlined as retail does)
 //D2Common.0x6FD84D30
-//TODO: Check v21, v22
 void __fastcall DRLGOUTWILD_InitAct1OutdoorLevel(D2DrlgLevelStrc* pLevel)
 {
 	int nX = 0;
@@ -72,17 +73,19 @@ void __fastcall DRLGOUTWILD_InitAct1OutdoorLevel(D2DrlgLevelStrc* pLevel)
 						bBreak = TRUE;
 					}
 
-					if (sub_6FD85350(pVertex))
+					D2DrlgVertexStrc* pNext = pVertex->pNext;
+					if (pVertex->nPosY < pNext->nPosY || pNext->nPosX < pVertex->nPosX || (pVertex->dwFlags & 1) || (pNext->dwFlags & 1))
 					{
 						break;
 					}
 
-					if (sub_6FD85300(pVertex))
+					if ((pVertex->nPosX < pNext->nPosX && pNext->nPosY < pNext->pNext->nPosY && !(pNext->dwFlags & 1))
+						|| (pNext->nPosY < pVertex->nPosY && pNext->nPosX < pNext->pNext->nPosX && !(pNext->dwFlags & 1)))
 					{
 						pSpecialVertex = pVertex;
 					}
 
-					pVertex = pVertex->pNext;
+					pVertex = pNext;
 				}
 				while (pVertex != pFirstVertex);
 
@@ -143,6 +146,7 @@ void __fastcall DRLGOUTWILD_InitAct1OutdoorLevel(D2DrlgLevelStrc* pLevel)
 	D2Common_7F180(pLevel);
 }
 
+// 1.13c D2Common+0x7E9F0 (diffed; identical)
 //D2Common.0x6FD85060
 BOOL __fastcall DRLGOUTWILD_TestSpawnRiver(D2DrlgLevelStrc* pLevel, int nX)
 {
@@ -158,7 +162,7 @@ BOOL __fastcall DRLGOUTWILD_TestSpawnRiver(D2DrlgLevelStrc* pLevel, int nX)
 	return TRUE;
 }
 
-//1.10f: Inlined
+// 1.13c D2Common+0x7ECC0 (the per-row loop body; retail inlines it there; the 12-entry table was read from the DLL)
 void DRLGOUTWILD_SpawnRiverPreset(D2DrlgLevelStrc* pLevel, int nX, int nY, bool bLowerRiver)
 {
 	static const struct {
@@ -212,6 +216,7 @@ void DRLGOUTWILD_SpawnRiverPreset(D2DrlgLevelStrc* pLevel, int nX, int nY, bool 
 	DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, nX + int(bLowerRiver), nY, bLowerRiver ? LVLPREST_ACT1_RIVER_LOWER : LVLPREST_ACT1_RIVER_UPPER, nPickedFile, FALSE);
 
 }
+// 1.13c D2Common+0x7ECC0, with the bridge placement of D2Common+0x7EB40 (diffed branch by branch)
 //D2Common.0x6FD850B0
 void __fastcall DRLGOUTWILD_SpawnRiver(D2DrlgLevelStrc* pLevel, int nX)
 {
@@ -224,7 +229,8 @@ void __fastcall DRLGOUTWILD_SpawnRiver(D2DrlgLevelStrc* pLevel, int nX)
 	if (pLevel->pOutdoors->dwFlags & (OUTDOOR_RIVER|OUTDOOR_BRIDGE))
 	{
 		const int nRowRange = pLevel->pOutdoors->nGridHeight - 2;
-		int nRand = SEED_RollLimitedRandomNumber(&pLevel->pSeed, nRowRange);
+		// retail draws only when the range is positive
+		int nRand = nRowRange > 0 ? SEED_RollLimitedRandomNumber(&pLevel->pSeed, nRowRange) : 0;
 
 		for (int i = 0; i < nRowRange; ++i)
 		{
@@ -242,38 +248,6 @@ void __fastcall DRLGOUTWILD_SpawnRiver(D2DrlgLevelStrc* pLevel, int nX)
 			}
 		}
 	}
-}
-
-//D2Common.0x6FD85300
-BOOL __fastcall sub_6FD85300(D2DrlgVertexStrc* pDrlgVertex)
-{
-	D2DrlgVertexStrc* pNext = pDrlgVertex->pNext;
-
-	if (pDrlgVertex->nPosX >= pNext->nPosX || pNext->nPosY >= pNext->pNext->nPosY || pDrlgVertex->dwFlags & 1 || pNext->dwFlags & 1)
-	{
-		if (pDrlgVertex->nPosY <= pNext->nPosY || pNext->nPosX >= pNext->pNext->nPosX || pDrlgVertex->dwFlags & 1 || pNext->dwFlags & 1)
-		{
-			return FALSE;
-		}
-	}
-
-	return TRUE;
-}
-
-//D2Common.0x6FD85350
-BOOL __fastcall sub_6FD85350(D2DrlgVertexStrc* pDrlgVertex)
-{
-	D2DrlgVertexStrc* pNext = pDrlgVertex->pNext;
-
-	if (pDrlgVertex->nPosY >= pNext->nPosY && pDrlgVertex->nPosX <= pNext->nPosX)
-	{
-		if (!(pDrlgVertex->dwFlags & 1))
-		{
-			return pNext->dwFlags & 1;
-		}
-	}
-
-	return TRUE;
 }
 
 //D2Common.0x6FD85390
@@ -296,6 +270,8 @@ BOOL __fastcall DRLGOUTWILD_SpawnCliffCaves(D2DrlgLevelStrc* pLevel, int nX, int
 	}
 }
 
+// not-1.13c: no caller runs this; retail splits it: river, cliff caves and the entrance are D2Common+0x7EF60 (which
+// InitAct1OutdoorLevel calls); retail's 0x7EF60 has no town-transition step
 //D2Common.0x6FD853F0
 void __fastcall DRLGOUTWILD_SpawnTownTransitionsAndCaves(D2DrlgLevelStrc* pLevel)
 {
@@ -370,6 +346,7 @@ void __fastcall DRLGOUTWILD_SpawnTownTransitionsAndCaves(D2DrlgLevelStrc* pLevel
 	}
 }
 
+// not-1.13c: no caller runs this; retail's per-level special presets are D2Common+0x7F180 (which InitAct1OutdoorLevel calls)
 //D2Common.0x6FD85520
 void __fastcall DRLGOUTWILD_SpawnSpecialPresets(D2DrlgLevelStrc* pLevel)
 {

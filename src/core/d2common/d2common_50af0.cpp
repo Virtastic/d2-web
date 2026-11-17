@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x50AF0 (caller 0x52340, the skill-use check): EAX = skill, ECX = unit, plain ret. Can the unit pay the skill's
+// stand-alone 32-bit layout twin of D2Common 0x50AF0 (the proven row runs D2Common_SKILLMANA_CheckStat_6FDB0F50; caller 0x52340, the skill-use check): EAX = skill, ECX = unit, plain ret. Can the unit pay the skill's
 // cost. A charged skill (+0x34 != -1) answers its charges left (+0x38 > 0). Otherwise the level is the skill's base level (+0x28)
 // plus 0x4FCB0's bonus, floored at 0 and capped by the max-level global (0 without a unit); cost =
 // (txt+0x18C * max(level - 1, 0) + txt+0x18A) << (txt+0x188 & 31). A player, monster or missile pays it from stat 6 when the
@@ -13,7 +13,6 @@ int32_t rd16s(uint32_t a) { int16_t v; std::memcpy(&v, reinterpret_cast<const vo
 uint32_t rd8(uint32_t a) { return *reinterpret_cast<const uint8_t*>(uintptr_t(a)); }
 }
 
-// 1.13c D2Common+0x50AF0
 extern "C" uint32_t D2Common_50AF0_CanPayCost(uint32_t pSkill, uint32_t pUnit, const D2Common50AF0Env* e)
 {
     if (!pSkill) __builtin_trap();   // retail: fatal assertion (line 0x638)

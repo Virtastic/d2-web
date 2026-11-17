@@ -24,7 +24,7 @@ namespace
     };
 }
 
-// 1.13c D2Common+0x382F0: copies successive 8-byte records from the selected entry table while
+// stand-alone twin of D2Common 0x382F0 (the proven row runs D2Common_CopyStats_6FDB9C50): copies successive 8-byte records from the selected entry table while
 // their upper halfword matches the requested type and the caller's output limit is not reached.
 extern "C" int32_t D2Common_382F0_CopyMatchingEntries(void* pOutput, uint32_t nType, int32_t nLimit,
     int32_t nEntryMode, const uint8_t* pPrimary, int32_t nPrimaryCount, const uint8_t* pSecondary,

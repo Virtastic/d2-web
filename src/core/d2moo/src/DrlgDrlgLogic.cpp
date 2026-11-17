@@ -277,8 +277,8 @@ void __fastcall sub_6FD76A90(D2DrlgRoomStrc* pDrlgRoom1, D2DrlgRoomStrc* pDrlgRo
 {
 	if (DRLGROOM_AreXYInsideCoordinatesOrOnBorder(&pDrlgRoom2->pDrlgCoord, nX, nY))
 	{
-		D2RoomCoordListStrc* pRoomCoordList1 = sub_6FD77110(pDrlgRoom1, nX * 5, nY * 5);
-		D2RoomCoordListStrc* pRoomCoordList2 = sub_6FD77110(pDrlgRoom2, nX * 5, nY * 5);
+		D2RoomCoordListStrc* pRoomCoordList1 = sub_6FD77110(pDrlgRoom1, nX, nY);
+		D2RoomCoordListStrc* pRoomCoordList2 = sub_6FD77110(pDrlgRoom2, nX, nY);
 
 		const int nIndex1 = pRoomCoordList1->nIndex;
 		const int nIndex2 = pRoomCoordList2->nIndex;
@@ -497,9 +497,10 @@ void __fastcall DRLGLOGIC_AllocCoordLists(D2DrlgRoomStrc* pDrlgRoom)
 }
 
 //D2Common.0x6FD77080
+// not-1.13c: retail has no function; the callers read the coord list by tile coordinates (D2Common+0x810A0) and take its index field. This wrapper divides subtile coordinates by 5 for them.
 int __fastcall DRLGLOGIC_GetRoomCoordListIndex(D2DrlgRoomStrc* pDrlgRoom, int nX, int nY)
 {
-	D2RoomCoordListStrc* pRoomCoordList = sub_6FD77110(pDrlgRoom, nX, nY);
+	D2RoomCoordListStrc* pRoomCoordList = sub_6FD77110(pDrlgRoom, nX / 5, nY / 5);
 
 	if (pRoomCoordList)
 	{
@@ -509,7 +510,7 @@ int __fastcall DRLGLOGIC_GetRoomCoordListIndex(D2DrlgRoomStrc* pDrlgRoom, int nX
 	return -1;
 }
 
-//D2Common.0x6FD77110
+// 1.13c D2Common+0x810A0 (ECX = tile y, EDX = room, stack = tile x); nX and nY are tile coordinates
 D2RoomCoordListStrc* __fastcall sub_6FD77110(D2DrlgRoomStrc* pDrlgRoom, int nX, int nY)
 {
 	D2_ASSERT(pDrlgRoom->pLogicalRoomInfo);
@@ -518,16 +519,8 @@ D2RoomCoordListStrc* __fastcall sub_6FD77110(D2DrlgRoomStrc* pDrlgRoom, int nX, 
 	{
 		return pDrlgRoom->pLogicalRoomInfo->pCoordList;
 	}
-	else
-	{
-		const int nGridX = nX / 5 - pDrlgRoom->nTileXPos;
-		const int nGridY = nY / 5 - pDrlgRoom->nTileYPos;
-		if (nGridX < 0 || nGridY < 0 || nGridX >= pDrlgRoom->pLogicalRoomInfo->pIndexY.nWidth || nGridY >= pDrlgRoom->pLogicalRoomInfo->pIndexY.nHeight)
-		{
-			return nullptr;
-		}
-		return pDrlgRoom->pLogicalRoomInfo->ppCoordListByCell[nGridY * pDrlgRoom->pLogicalRoomInfo->pIndexY.nWidth + nGridX];
-	}
+
+	return pDrlgRoom->pLogicalRoomInfo->ppCoordListByCell[(pDrlgRoom->pLogicalRoomInfo->pIndexY.pCellsRowOffsets[nY - pDrlgRoom->nTileYPos] - pDrlgRoom->nTileXPos) + nX];
 }
 
 //D2Common.0x6FD77190

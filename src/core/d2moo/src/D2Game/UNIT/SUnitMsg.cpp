@@ -191,7 +191,7 @@ void __fastcall D2GAME_STATES_SendUnitStates_6FCC58E0(D2UnitStrc* pUnit, D2Clien
     }
 
     const int32_t nTotalStatFlagCount = (sgptDataTables->nStatesTxtRecordCount + 31) / 32;
-    memcpy(nFlags, D2COMMON_10494_STATES_GetStatFlags(pUnit), sizeof(uint32_t) * nTotalStatFlagCount);
+    memcpy(nFlags, D2COMMON_STATES_GetStatFlags_6FDB8A90(pUnit), sizeof(uint32_t) * nTotalStatFlagCount);
 
     D2GSPacketSrvAA packetAA = {};
     packetAA.nHeader = 0xAAu;
