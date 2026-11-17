@@ -1,4 +1,5 @@
 #include "PLAYER/PlayerList.h"
+#include <test_seam.h>
 
 #include <cstring>
 
@@ -346,25 +347,30 @@ int32_t __fastcall PLAYERLIST_GetHostileDelay(D2UnitStrc* pPlayer1, D2UnitStrc* 
 {
     if (!pPlayer2)
     {
-        D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer1);
+        D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer1);
         if (pPlayerData)
         {
             return pPlayerData->dwHostileDelay;
         }
     }
 
+    // 1.13c inlines the record lookup: the player data is fetched before the self check.
+    D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer1);
+    const int32_t nUnitGUID = pPlayer2 ? pPlayer2->dwUnitId : -1;
     if (pPlayer1 == pPlayer2)
     {
         return 0;
     }
 
-    D2PlayerListStrc* pPlayerList = PLAYERLIST_GetPlayerListRecordFromUnitGUID(pPlayer1, pPlayer2 ? pPlayer2->dwUnitId : -1);
-    if (!pPlayerList)
+    for (D2PlayerListStrc* pPlayerList = pPlayerData->pPlayerList; pPlayerList; pPlayerList = pPlayerList->pNext)
     {
-        return 0;
+        if (pPlayerList->nUnitGUID == nUnitGUID)
+        {
+            return pPlayerList->field_8;
+        }
     }
- 
-    return pPlayerList->field_8;
+
+    return 0;
 }
 
 //D2Game.0x6FCBAE70

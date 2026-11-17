@@ -1,4 +1,5 @@
 #include "AI/AiTactics.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -133,8 +134,15 @@ D2UnitStrc* __fastcall sub_6FCCFD70(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_
 	return pCallbackArg.pTarget;
 }
 
+// 1.13c D2Game+0x15D0: whether the monster class has the interact flag
+int32_t __fastcall AITACTICS_IsInteractClass(int32_t nClassId)
+{
+	D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nClassId);
+	return pMonStatsTxtRecord && (gdwBitMasks[MONSTATSFLAGINDEX_INTERACT] & pMonStatsTxtRecord->dwMonStatsFlags);
+}
+
 //D2Game.0x6FCCFDE0
-// 1.13c D2Game+0xF1A90 (player type test, distance gate, then the interact-flag (15D0) / quest-cycler (34EA0) test)
+// 1.13c D2Game+0xF1A90 (the near-player callback 0xF30C0 hands the unit scan)
 D2UnitStrc* __fastcall sub_6FCCFDE0(D2GameStrc* pGame, D2UnitStrc* pNPC, D2UnitStrc* pPlayer, void* pCallbackArg)
 {
 	UnkAiStrc1* pArg = (UnkAiStrc1*)pCallbackArg;
@@ -144,17 +152,23 @@ D2UnitStrc* __fastcall sub_6FCCFDE0(D2GameStrc* pGame, D2UnitStrc* pNPC, D2UnitS
 		return nullptr;
 	}
 
-	const int32_t nDistance = AIUTIL_GetDistanceToCoordinates_FullUnitSize(pNPC, pPlayer);
+	const int32_t nDistance = D2_CALL(AIUTIL_GetDistanceToCoordinates_FullUnitSize, pNPC, pPlayer);
 	if (nDistance > 15)
 	{
 		return nullptr;
 	}
 
-	if (!MONSTERUNIQUE_CheckMonStatsFlag(pNPC ? pNPC->dwClassId : -1, MONSTATSFLAGINDEX_INTERACT)
-		|| (QUESTS_ActiveCycler(pGame, pPlayer, pNPC) && nDistance < pArg->nDistance))
+	// the class check runs for a missing NPC too (class -1 has no record)
+	if (!D2_CALL(AITACTICS_IsInteractClass, pNPC ? (int32_t)pNPC->dwClassId : -1))
 	{
 		pArg->nDistance = nDistance;
+		return pPlayer;
+	}
+
+	if (D2_CALL(QUESTS_ActiveCycler, pGame, pPlayer, pNPC) && nDistance < pArg->nDistance)
+	{
 		pArg->pTarget = pPlayer;
+		pArg->nDistance = nDistance;
 		return pPlayer;
 	}
 
@@ -438,7 +452,7 @@ int32_t __fastcall AITACTICS_RunToTargetCoordinatesDeleteAiEvent(D2GameStrc* pGa
 }
 
 //D2Game.0x6FCD04E0
-// not-1.13c: retail callers call 0xF2540 directly with mode 2, coordinates and step 0; no standalone function
+// not-1.13c: 1.13c inlines this wrapper; its callers (e.g. +0x16970) call MoveToTarget (+0xF2540) in walk mode directly.
 int32_t __fastcall AITACTICS_WalkToTargetCoordinatesNoSteps(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_WALK, nX, nY, 0, 0);

@@ -1,4 +1,5 @@
 #include "QUESTS/Quests.h"
+#include <test_seam.h>
 #include "../../../../quests/chain_record.h"
 
 #include <algorithm>
@@ -963,10 +964,10 @@ int32_t __fastcall QUESTS_DebugOutput(D2GameStrc* pGame, const char* szMessage, 
 // 1.13c D2Game+0x366A0 (no standalone body; the find+delete is inlined at call sites)
 void __fastcall QUESTS_DeleteItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint32_t dwItemCode)
 {
-	D2UnitStrc* pItem = ITEMS_FindQuestItem(pGame, pPlayer, dwItemCode);
+	D2UnitStrc* pItem = D2_CALL(ITEMS_FindQuestItem, pGame, pPlayer, dwItemCode);
 	if (pItem)
 	{
-		QUESTS_DeleteItemEx(pGame, pPlayer, pPlayer->pInventory, pItem);
+		D2_CALL(QUESTS_DeleteItemEx, pGame, pPlayer, pPlayer->pInventory, pItem);
 	}
 }
 
@@ -2504,29 +2505,16 @@ void __fastcall QUESTS_GetFreePosition(D2ActiveRoomStrc* pRoom, D2CoordStrc* pCo
 }
 
 //D2Game.0x6FC96C80
-// D2Game 1.13c 0x340C0: the retail-layout port is src/core/d2game/d2game_340c0.cpp
+// 1.13c D2Game+0x340C0 (the GUID removal is a call to QUESTS_FastRemovePlayerGUID, not inlined)
 void __fastcall QUESTS_RemovePlayerGUID(D2QuestDataStrc* pQuest, D2QuestArgStrc* pArgs)
 {
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pArgs->pPlayer)->pQuestData[pQuest->pGame->nDifficulty];
-	if (QUESTRECORD_GetQuestState(pQuestFlags, pQuest->nQuestFilter, 1) != 1 || !QUESTRECORD_GetQuestState(pQuestFlags, pQuest->nQuestFilter, 0) || !pQuest->tPlayerGUIDs.nPlayerCount)
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pArgs->pPlayer)->pQuestData[pQuest->pGame->nDifficulty];
+	if (D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, pQuest->nQuestFilter, 1) != 1 || !D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, pQuest->nQuestFilter, 0) || !pQuest->tPlayerGUIDs.nPlayerCount)
 	{
 		return;
 	}
 
-	const int32_t nUnitGUID = pArgs->pPlayer ? pArgs->pPlayer->dwUnitId : -1;
-
-	for (int32_t i = 0; i < pQuest->tPlayerGUIDs.nPlayerCount; ++i)
-	{
-		if (pQuest->tPlayerGUIDs.nPlayerGUIDs[i] == nUnitGUID)
-		{
-			if (i != pQuest->tPlayerGUIDs.nPlayerCount - 1)
-			{
-				pQuest->tPlayerGUIDs.nPlayerGUIDs[i] = pQuest->tPlayerGUIDs.nPlayerGUIDs[pQuest->tPlayerGUIDs.nPlayerCount - 1];
-			}
-			--pQuest->tPlayerGUIDs.nPlayerCount;
-			return;
-		}
-	}
+	D2_CALL(QUESTS_FastRemovePlayerGUID, &pQuest->tPlayerGUIDs, pArgs->pPlayer ? (int32_t)pArgs->pPlayer->dwUnitId : -1);
 }
 
 //D2Game.0x6FC96D20

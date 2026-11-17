@@ -1,4 +1,5 @@
 #include <unordered_map>
+#include <test_seam.h>
 #include <cstdlib>
 #include <unordered_set>
 #include "MONSTER/MonsterMode.h"
@@ -1628,23 +1629,23 @@ int32_t __fastcall sub_6FC64E60(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
 // 1.13c D2Game+0x76F20 (whole function, including the tail taken when the cycle has not ended)
 int32_t __fastcall sub_6FC64E90(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
-    if (UNITS_IsAtEndOfFrameCycle(pUnit))
+    if (D2_CALL(UNITS_IsAtEndOfFrameCycle, pUnit))
     {
-        sub_6FC63680(pGame, pUnit);
+        D2_CALL(sub_6FC63680, pGame, pUnit);
         return 2;
     }
 
-    D2SkillStrc* pSkill = UNITS_GetUsedSkill(pUnit);
-    const int32_t nSkillFlags = SKILLS_GetFlags(pSkill);
+    D2SkillStrc* pSkill = D2_CALL(UNITS_GetUsedSkill, pUnit);
+    const int32_t nSkillFlags = D2_CALL(SKILLS_GetFlags, pSkill);
     int32_t bCheck = 1;
     if (nSkillFlags & 1)
     {
-        sub_6FCBC7E0(pGame, pUnit);
+        D2_CALL(sub_6FCBC7E0, pGame, pUnit);
 
-        if (sub_6FCBC930(pGame, pUnit) == 2)
+        if (D2_CALL(sub_6FCBC930, pGame, pUnit) == 2)
         {
-            SKILLS_SetFlags(pSkill, nSkillFlags | 2);
-            sub_6FD13410(pGame, pUnit);
+            D2_CALL(SKILLS_SetFlags, pSkill, nSkillFlags | 2);
+            D2_CALL(sub_6FD13410, pGame, pUnit);
             bCheck = 0;
         }
     }
@@ -1652,10 +1653,10 @@ int32_t __fastcall sub_6FC64E90(D2GameStrc* pGame, D2UnitStrc* pUnit)
     const int32_t nActionFrame = pUnit->nActionFrame;
     if (nActionFrame == 4 || bCheck && !((pUnit->dwFlags >> 6) & 1) && (nActionFrame == 1 || nActionFrame == 2))
     {
-        sub_6FD13410(pGame, pUnit);
+        D2_CALL(sub_6FD13410, pGame, pUnit);
     }
 
-    UNITS_StopSequence(pUnit);
+    D2_CALL(UNITS_StopSequence, pUnit);
 
     return 1;
 }

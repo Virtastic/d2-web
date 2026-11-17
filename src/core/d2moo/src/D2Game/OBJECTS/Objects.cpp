@@ -1,4 +1,5 @@
 #include "OBJECTS/Objects.h"
+#include <test_seam.h>
 #include <cstdio>
 
 #include <algorithm>
@@ -2245,7 +2246,7 @@ void __fastcall OBJECTS_RemoveAll(D2GameStrc* pGame)
 // 1.13c D2Game+0x2E4F0
 void __fastcall OBJECTS_SetUnitIdInTimerArg(D2UnitStrc* pPortal, int32_t nUnitId)
 {
-    D2TimerArgStrc* pTimerArg = UNITS_GetTimerArg(pPortal);
+    D2TimerArgStrc* pTimerArg = D2_CALL(UNITS_GetTimerArg, pPortal);
     if (pTimerArg)
     {
         pTimerArg->dwUnitId = nUnitId;

@@ -21,6 +21,7 @@ D2UnitStrc* __fastcall sub_6FCCFD40(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCo
 //D2Game.0x6FCCFD70
 D2UnitStrc* __fastcall sub_6FCCFD70(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t* bCloseToTarget);
 //D2Game.0x6FCCFDE0
+int32_t __fastcall AITACTICS_IsInteractClass(int32_t nClassId);
 D2UnitStrc* __fastcall sub_6FCCFDE0(D2GameStrc* pGame, D2UnitStrc* pNPC, D2UnitStrc* pPlayer, void* pCallbackArg);
 //D2Game.0x6FCCFEA0
 int32_t __fastcall AITACTICS_ChangeModeAndTargetUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMode, D2UnitStrc* pTargetUnit);

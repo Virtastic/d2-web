@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <test_seam.h>
 #include "ITEMS/Items.h"
 
 #include <algorithm>
@@ -1549,7 +1550,7 @@ void __fastcall ITEMS_RemoveAll(D2GameStrc* pGame)
             }
             else
             {
-                SUNIT_RemoveUnit(pGame, pUnit);
+                D2_CALL(SUNIT_RemoveUnit, pGame, pUnit);
                 pUnit = *ppUnit;
             }
         }

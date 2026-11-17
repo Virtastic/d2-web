@@ -1,5 +1,7 @@
 #include "AI/AiGeneral.h"
 
+#include <test_seam.h>
+
 #include <Drlg/D2DrlgPreset.h>
 #include <D2Monsters.h>
 
@@ -9,7 +11,8 @@
 #include "UNIT/SUnitInactive.h"
 
 
-// not-1.13c: retail has no stand-alone function; the monster-data builder (D2Game+0xB0320) inlines this calloc and the four field writes (owner guid/type pairs = -1/1)
+//D2Game.0x6FCCED00
+// not-1.13c: 1.13c inlines the pool allocation into the monster initializer (+0xB0320); no stand-alone function.
 D2AiControlStrc* __fastcall AIGENERAL_AllocAiControl(D2GameStrc* pGame)
 {
 	D2AiControlStrc* pAiControl = D2_CALLOC_STRC_POOL(pGame->pMemoryPool, D2AiControlStrc);
@@ -273,24 +276,20 @@ D2AiCmdStrc* __fastcall AIGENERAL_CopyAiCommand(D2GameStrc* pGame, D2UnitStrc* p
 	return pCopy;
 }
 
+//D2Game.0x6FCCF090
 // 1.13c D2Game+0x217D0
 D2AiCmdStrc* __fastcall AIGENERAL_SetCurrentAiCommand(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nCmdParam, int32_t bSet)
 {
-	D2AiCmdStrc* pAiCmd = AIGENERAL_GetAiCommandFromParam(pUnit, nCmdParam, bSet);
-	if (!pAiCmd)
+	// 1.13c: no AiControl check up front; a missing command is created through the copy routine (+0x21290)
+	// from a block whose params are { nCmdParam, 0, 0, 0, 0 }.
+	if (!D2_CALL(AIGENERAL_GetAiCommandFromParam, pUnit, nCmdParam, bSet))
 	{
-		if (!AIGENERAL_GetAiControlFromUnit(pUnit))
-		{
-			return nullptr; // not-1.13c: retail faults on a unit without a control here
-		}
-
-		// retail builds the one-parameter command on the stack and hands it to the copy function (0x21290)
-		D2AiCmdStrc tmpCmd = {};
-		tmpCmd.nCmdParam[0] = nCmdParam;
-		AIGENERAL_CopyAiCommand(pGame, pUnit, &tmpCmd);
+		D2AiCmdStrc tBlock = {};
+		tBlock.nCmdParam[0] = nCmdParam;
+		D2_CALL(AIGENERAL_CopyAiCommand, pGame, pUnit, &tBlock);
 	}
 
-	return AIGENERAL_GetAiCommandFromParam(pUnit, nCmdParam, bSet);
+	return D2_CALL(AIGENERAL_GetAiCommandFromParam, pUnit, nCmdParam, bSet);
 }
 
 // 1.13c D2Game+0x20C00 (the command-chain free loop is 0x20B60, the minion-node loop is 0x20B30; retail inlines both)

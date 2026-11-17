@@ -1,5 +1,7 @@
 #include "AI/AiThink.h"
 
+#include <test_seam.h>
+
 #include <algorithm>
 #include <bit>
 
@@ -222,7 +224,7 @@ static int16_t AI_GetParamValue(D2GameStrc* pGame, D2AiTickParamStrc* pAiTickPar
 	return pAiTickParam->pMonstatsTxt->wAiParam[nParamId][pGame->nDifficulty];
 }
 
-// not-1.13c: inlined in retail (the seed roll modulo 100)
+// not-1.13c: 1.13c inlines the seed step and the % 100 at each call site (e.g. +0x1BBC0); no stand-alone function.
 static uint32_t AI_RollPercentage(D2UnitStrc* pUnit)
 {
 	return SEED_RollPercentage(&pUnit->pSeed);
@@ -10403,13 +10405,14 @@ void __fastcall AITHINK_Fn059_BloodRaven(D2GameStrc* pGame, D2UnitStrc* pUnit, D
 bool __fastcall AITHINK_ReturnHome113(D2GameStrc* game, D2UnitStrc* unit, uint32_t distance);
 
 //D2Game.0x6FCE5EE0
-// 1.13c D2Game+0x19C20 (retail inlines the interaction-list scans and the 0x16610 return-home step)
+// 1.13c D2Game+0x19C20
 uint8_t __fastcall sub_6FCE5EE0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	int32_t bCloseToTarget = 0;
 	D2UnitStrc* pTarget = sub_6FCCFD70(pGame, pUnit, &bCloseToTarget);
 	const int32_t nDistance = AIUTIL_GetDistanceToCoordinates_FullUnitSize(pUnit, pTarget);
 
+	// 1.13c: no interaction list -> 0 before anything else is read.
 	if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER || !pUnit->pMonsterData || !pUnit->pMonsterData->pMonInteract)
 	{
 		return 0;
@@ -10510,7 +10513,7 @@ uint8_t __fastcall sub_6FCE5EE0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 // 1.13c D2Game+0x16970
 int32_t __fastcall sub_6FCE61E0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam, D2MapAIPathPositionStrc* pPosition)
 {
-	if (!pUnit || !pPosition || pPosition->nX == 0 || pPosition->nY == 0 || !AIUTIL_GetDistanceToCoordinates(pUnit, pPosition->nX, pPosition->nY))
+	if (!pUnit || !pPosition || pPosition->nX == 0 || pPosition->nY == 0 || !D2_CALL(AIUTIL_GetDistanceToCoordinates, pUnit, pPosition->nX, pPosition->nY))
 	{
 		return 0;
 	}
@@ -10518,9 +10521,9 @@ int32_t __fastcall sub_6FCE61E0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 	// 1.13c inlines the velocity setter (only the move-method word, 7) and the walk wrapper (MoveToTarget, walk mode).
 	D2AiParamStrc* pAiParam = (pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData) ? pUnit->pMonsterData->pAiParam : nullptr;
 	pAiParam->unk0x18 = 7;
-	AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_WALK, pPosition->nX, pPosition->nY, 0, 0);
+	D2_CALL(AITACTICS_MoveToTarget, pGame, pUnit, nullptr, MONMODE_WALK, pPosition->nX, pPosition->nY, 0, 0);
 
-	D2AiCmdStrc* pAiCmd = AIGENERAL_SetCurrentAiCommand(pGame, pUnit, 4, 0);
+	D2AiCmdStrc* pAiCmd = D2_CALL(AIGENERAL_SetCurrentAiCommand, pGame, pUnit, 4, 0);
 	if (pAiCmd)
 	{
 		pAiCmd->nCmdParam[1] = pPosition->nX;
@@ -10541,7 +10544,8 @@ int32_t __fastcall sub_6FCE6270(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 		return 0;
 	}
 
-	const int32_t bResult = sub_6FCE61E0(pGame, pUnit, pAiTickParam, pPosition);
+	// 1.13c calls the common reaction (+0x16970) instead of repeating it.
+	const int32_t bResult = sub_6FCE61E0(pGame, pUnit, pAiTickParam, pPosition) & 0xFF;
 
 	D2AiCmdStrc* pAiCmd = AIGENERAL_SetCurrentAiCommand(pGame, pUnit, 4, 0);
 	if (pAiCmd)
@@ -10564,27 +10568,20 @@ int32_t __fastcall sub_6FCE6340(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 		return 0;
 	}
 
-	const int32_t bResult = sub_6FCE61E0(pGame, pUnit, pAiTickParam, pPosition);
+	// 1.13c calls the common reaction (+0x16970) and reads the mode flag through +0x1560 (no trace).
+	const int32_t bResult = D2_CALL(sub_6FCE61E0, pGame, pUnit, pAiTickParam, pPosition) & 0xFF;
 
-	D2AiCmdStrc* pAiCmd = AIGENERAL_SetCurrentAiCommand(pGame, pUnit, 7, 0);
+	D2AiCmdStrc* pAiCmd = D2_CALL(AIGENERAL_SetCurrentAiCommand, pGame, pUnit, 7, 0);
 	if (pAiCmd)
 	{
-		D2MonStats2Txt* pMonStats2TxtRecord = MONSTERREGION_GetMonStats2TxtRecord(pUnit->dwClassId);
-		if (pMonStats2TxtRecord && pMonStats2TxtRecord->dwModeFlags & gdwBitMasks[MONMODE_SKILL1])
-		{
-			pAiCmd->nCmdParam[1] = 8;
-		}
-		else
-		{
-			pAiCmd->nCmdParam[1] = 1;
-		}
+		pAiCmd->nCmdParam[1] = D2_CALL(MONSTERUNIQUE_CheckMonModeFlag, pUnit->dwClassId, MONMODE_SKILL1) ? 8 : 1;
 
 		pAiCmd->nCmdParam[2] = pPosition->nX;
 		pAiCmd->nCmdParam[3] = pPosition->nY;
 		pAiCmd->nCmdParam[4] = 4;
 	}
 
-	pAiCmd = AIGENERAL_SetCurrentAiCommand(pGame, pUnit, 4, 0);
+	pAiCmd = D2_CALL(AIGENERAL_SetCurrentAiCommand, pGame, pUnit, 4, 0);
 	if (pAiCmd)
 	{
 		pAiCmd->nCmdParam[1] = pPosition->nX;
@@ -10640,7 +10637,7 @@ int32_t __fastcall sub_6FCE64D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 bool __fastcall AITHINK_EnsureHomeCommand113(D2GameStrc* game, D2UnitStrc* unit);
 
 //D2Game.0x6FCE6660
-// 1.13c D2Game+0x1DB40 (retail calls the 0x15D10 home-position step first; the same work is written out here)
+// 1.13c D2Game+0x1DB40
 void __fastcall AITHINK_Fn032_Npc(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	// 1.13c: the home-command step is the shared +0x15D10 (store x,y in command 10 and idle 20 the first time).
@@ -10922,7 +10919,7 @@ uint8_t __fastcall sub_6FCE69A0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 }
 
 //D2Game.0x6FCE6CD0
-// 1.13c D2Game+0x1BBC0 (the percentage roll is inline; the handler's result is its low byte; table slot 3 is a thunk to the slot 1 action)
+// 1.13c D2Game+0x1BBC0 (the percentage roll is inline; the handler's result is its low byte)
 int32_t __fastcall AITHINK_ExecuteMapAiAction(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	typedef int32_t(__fastcall* ACTIONFN)(D2GameStrc*, D2UnitStrc*, D2AiTickParamStrc*, D2MapAIPathPositionStrc*);
@@ -10931,11 +10928,11 @@ int32_t __fastcall AITHINK_ExecuteMapAiAction(D2GameStrc* pGame, D2UnitStrc* pUn
 	ACTIONFN dword_6FD3F970[] =
 	{
 		nullptr,
-		sub_6FCE61E0,
-		sub_6FCE6270,
-		sub_6FCE61E0,
-		sub_6FCE6340,
-		sub_6FCE64D0,
+		D2_FN(sub_6FCE61E0),
+		D2_FN(sub_6FCE6270),
+		D2_FN(sub_6FCE61E0),
+		D2_FN(sub_6FCE6340),
+		D2_FN(sub_6FCE64D0),
 		nullptr
 	};
 
@@ -11557,7 +11554,7 @@ void __fastcall AITHINK_Fn058_Navi(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTic
 }
 
 //D2Game.0x6FCE7C10
-// 1.13c D2Game+0x9CB00 (the Idle entry; the Buffy entry is a byte-identical copy, marked on the brace): idles 200 only while the unit has a room
+// 1.13c D2Game+0x9CB00 (the Idle entry; the Buffy entry is a byte-identical copy, marked on the brace)
 void __fastcall AITHINK_Fn001_100_Idle_Buffy(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {	// 1.13c D2Game+0xA5D40
 	if (UNITS_GetRoom(pUnit))
@@ -16700,7 +16697,7 @@ static int32_t __fastcall AITHINK_SelectTickTarget113(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FCF0A70
-// 1.13c D2Game+0x9D3B0 (ECX = game, EDX = unit; the stunned/door/leash gate is 0x9CD90, the target switch 0x9D160)
+// 1.13c D2Game+0x9D3B0 (the stunned/door/leash gate is 0x9CD90, the target switch 0x9D160)
 void __fastcall D2GAME_MONSTERS_AiFunction03_6FCF0A70(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4)
 {
 	D2AiTickParamStrc aiTickParam = {};
