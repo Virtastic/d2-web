@@ -98,6 +98,7 @@ BOOL __fastcall sub_6FD95050(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, co
 BOOL __fastcall sub_6FD95200(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, const D2PropertyStrc* pProperty, int nStatId, int nApplyType, int nState, int fStatList, D2UnitStrc* a9);
 //D2Common.0x6FD95210
 BOOL __fastcall sub_6FD95210(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, const D2PropertyStrc* pProperty, int nStatId, int nApplyType, int nState, int fStatList, D2UnitStrc* a9);
+int __fastcall ITEMMODS_RollInRange(int nMax, int nMin, D2UnitStrc* pItem);
 //D2Common.0x6FD95430 (#10855)
 D2COMMON_DLL_DECL void __stdcall ITEMMODS_AssignProperty(int nType, D2UnitStrc* a2, D2UnitStrc* pItem, const void* pMods, int nPropSet, int nApplyType);
 //D2Common.0x6FD95810
@@ -174,5 +175,6 @@ D2COMMON_DLL_DECL void __stdcall D2COMMON_11292_ItemAssignProperty(int nType, D2
 int __fastcall sub_6FD98220(int nMin, int nMax, int nUnused, void* pUserData);
 //D2Common.0x6FD982A0
 int __fastcall sub_6FD982A0(int nStatId, int a2, int nUnused, void* pUserData);
+int __fastcall ITEMMODS_GetCalcParamValue_Return0(int, void*);
 //D2Common.0x6FD98300 (#11300)
 D2COMMON_DLL_DECL int __stdcall ITEMMODS_EvaluateItemFormula(D2UnitStrc* pUnit, D2UnitStrc* pItem, unsigned int nCalc);

@@ -193,18 +193,6 @@ void D2Common_3CD80_Forward(uint32_t pUnit, uint32_t nArg, const D2CommonWarpEnv
     if (!pWarpUnit) d2common_fatal(0x25F);
 }
 
-// 1.13c D2Common+0x4D870 (#10078): thin forwarder to 0x4D140 with the argument list
-// (a1, a2, NULL, a3, a4, a4, a5, a6, 1).
-struct D2Common4D140Env;
-extern "C" int* D2Common_4D140_FindFreeSpot(const D2Common4D140Env* e, void* pLevel, int* pPos, uint32_t* pUnit,
-    uint32_t p4, uint32_t p5, uint32_t p6, int p7, int p8, int p9);
-// The 0x4D140 env (callee function pointers) is passed in; the retail forwarder has them implicitly.
-int* D2Common_4D870_Forward(const D2Common4D140Env* e, void* pLevel, int* pPos, uint32_t nArg3,
-                            uint32_t nArg4, int32_t nArg5, int32_t nArg6)
-{
-    return D2Common_4D140_FindFreeSpot(e, pLevel, pPos, 0, nArg3, nArg4, nArg4, nArg5, nArg6, 1);
-}
-
 // 1.13c D2Common+0x53020 (#10079, function list name D2InitPlayerData): linear scan of the player-data
 // pool (DAT 0x1DF0880 base, 0x1DF0884 count; records of 0x13 dwords, first dword = key) returning
 // the record whose first dword equals nKey, else NULL.

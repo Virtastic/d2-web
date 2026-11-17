@@ -55,7 +55,7 @@ behaviour differs from 1.10f.
 - D2Common+0x6B2B0 MISSILE_EvaluateMissileFormula: arguments, level and id defaults, and the expression table guard match 1.13c; no change. The callback at 0x6B160 is not decompiled (Ghidra refuses the label), so its identity with MISSILE_GetCalcParamValue is unverified.
 - D2Common+0x26BA0 ITEMS_GetRunesTxtRecordFromItem: returns NULL unless the socketed inventory's signature is 0x1020304 (1.13c check added).
 - D2Common+0x28850 ITEMS_CalculateAdditionalCostsForBonusStats: all encode cases match the 1.13c arithmetic; encode 2/3 skips the stat when the skill record is missing (1.13c's null read contributes zero).
-- D2Common+0x2C910 ITEMS_UpdateSets: body matches; the 1.13c routing through 0x2C7C0 and 0x2C630 is ported in src/core/d2common/d2common_2c910.cpp (D2Common_2C910_UpdateSets); the play path still calls this 1.10f-routed copy.
+- D2Common+0x2C910 ITEMS_UpdateSets: now the 1.13c body, routed through 0x2C7C0 (sub_6FDA4380) and 0x2C630 (sub_6FDA4490), which carry their 1.13c bodies too.
 - D2Game+0x68D70 OBJECTS_OperateFunction06_TowerTome (QUESTS/ACT1/A1Q5.cpp): returns 0 on every path (1.10f returned 1 after activating the tome); validated against the vector.
 - D2Game+0x5CD50 OBJECTS_OperateFunction67_FrozenAnya (QUESTS/ACT5/A5Q3.cpp): returns 0 on every path (1.10f returned 1 when the quest is missing and at the end).
 - D2Game+0x56B10 (QUESTS/ACT5/A5Q3.cpp `ACT5Q3_SeqCallback`): the quest-sequence function; 0x5C690 ACT5Q3_SpawnDrehyaInTown, InitFn66 (0x5EB30) and the iced-Drehya timer (0x5C480) call it in 1.13c instead of inlining it.

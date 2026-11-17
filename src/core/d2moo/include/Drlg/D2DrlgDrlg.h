@@ -497,8 +497,7 @@ struct D2DrlgOrthStrc
 		D2DrlgRoomStrc* pDrlgRoom;			//0x00
 		D2DrlgLevelStrc* pLevel;			//0x00
 	};
-	uint8_t nDirection;						//0x04
-	uint8_t unk0x05[3];						//0x05
+	int32_t nDirection;						//0x04 (a signed dword in 1.13c; the 0x44870 order test compares it signed)
 	BOOL bPreset;							//0x08
 	BOOL bInit;								//0x0C
 	D2DrlgCoordStrc* pBox;					//0x10

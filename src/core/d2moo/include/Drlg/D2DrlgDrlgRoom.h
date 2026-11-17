@@ -27,6 +27,7 @@ void __fastcall DRLGROOM_FreeRoomEx(D2DrlgRoomStrc* pDrlgRoom);
 void __fastcall DRLGROOM_FreeRoomData(void* pMemPool, D2DrlgOrthStrc* pDrlgRoomData);
 //D2Common.0x6FD77520
 void __fastcall DRLGROOM_AllocDrlgOrthsForRooms(D2DrlgRoomStrc* pDrlgRoom1, D2DrlgRoomStrc* pDrlgRoom2, int nDirection);
+void __fastcall DRLGROOM_InsertOrthSorted(D2DrlgOrthStrc** ppDrlgOrth, D2DrlgOrthStrc* pNew);
 //D2Common.0x6FD77600
 void __fastcall DRLGROOM_AddOrth(D2DrlgOrthStrc** ppDrlgOrth, D2DrlgLevelStrc* pLevel, int nDirection, BOOL bIsPreset);
 //D2Common.0x6FD776B0

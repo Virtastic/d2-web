@@ -32,3 +32,9 @@ void __fastcall DRLGOUTDESR_PlaceFillsInLostCity(D2DrlgLevelStrc* pLevel);
 void __fastcall DRLGOUTDESR_PlaceTombEntriesInCanyon(D2DrlgLevelStrc* pLevel);
 //D2Common.0x6FD7DBC0
 void __fastcall DRLGOUTDESR_PlaceFillsInCanyon(D2DrlgLevelStrc* pLevel);
+//D2Common.0x6FD7DD90
+void __fastcall DRLGOUTDESR_PlaceFillsInRockyWaste(D2DrlgLevelStrc* pLevel);
+//D2Common.0x6FD7DD20
+void __fastcall DRLGOUTDESR_PlaceFillsInDryHills(D2DrlgLevelStrc* pLevel);
+//D2Common.0x6FD7DCF0
+void __fastcall DRLGOUTDESR_PlaceOasesInFarOasis(D2DrlgLevelStrc* pLevel);

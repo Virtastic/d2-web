@@ -6977,186 +6977,196 @@ int gnSetMaskToBonusMappingTable[] =
 	2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6
 };
 
-// 1.13c D2Common+0x2C7C0 (retail: pItem in EBX)
-//D2Common.0x6FDA4380
-//TODO: Find a name
-BOOL __fastcall sub_6FDA4380(D2UnitStrc* pItem, unsigned int nSetItemMask)
-{
-	D2SetItemsTxt* pSetItemsTxt = NULL;
-	int nSetItems = 0;
-	int nBonuses = 0;
-	int nIndex = 0;
-	BOOL bSet = FALSE;
+D2SetItemsTxt* D2Common_1800_GetSetItemsTxtRecord(int32_t nSetItemId);
+void D2Common_3A330_AddStatLayer(D2StatListStrc* pStatList, int32_t nStatId, int32_t nDelta, uint16_t nLayer);
+static_assert(offsetof(D2SetItemsTxt, nSetId) == 0x2C, "setitems.txt nSetId");
 
-	if (!pItem || pItem->dwUnitType != UNIT_ITEM || ITEMS_GetItemQuality(pItem) != ITEMQUAL_SET)
-	{
-		return FALSE;
-	}
-	
-	pSetItemsTxt = ITEMS_GetSetItemsTxtRecordFromItem(pItem);
-	if (!pSetItemsTxt || !pSetItemsTxt->nAddFunc)
-	{
-		return FALSE;
-	}
+// 1.13c D2Common+0x2C7C0 (SetItemToggleStates; retail: pItem in EBX, nSetItemMask on the stack)
+// Only a set-quality item with a set record and a nonzero nAddFunc does anything. nAddFunc 1 sets or clears each
+// state except the item's own set rank; nAddFunc 2 clears the states below the bonus count, then re-posts the rest
+// of the owner's state lists (SET 0x2000) unless that flag is already present. Returns 1 once it ran, else 0.
+BOOL __fastcall sub_6FDA4380(D2UnitStrc* pItemS, unsigned int nSetItemMask)
+{
+	if (pItemS == nullptr)
+		return 0;
+
+	if (pItemS->dwUnitType != 4 || ITEMS_GetItemQuality(pItemS) != 5)
+		return 0;
+
+	D2SetItemsTxt* pSetItemsTxt = ITEMS_GetSetItemsTxtRecordFromItem(pItemS);
+	if (pSetItemsTxt == nullptr || pSetItemsTxt->nAddFunc == 0)
+		return 0;
 
 	if (pSetItemsTxt->nAddFunc == 1)
 	{
-		nSetItems = ITEMS_GetNoOfSetItemsFromItem(pItem);
-		for (int i = 0; i < 6; ++i)
+		const int32_t nSetItems = ITEMS_GetNoOfSetItemsFromItem(pItemS);
+		for (int32_t i = 0; i < 6; ++i)
 		{
-			nIndex = i;
-			if (i != nSetItems)
-			{
-				if (i > nSetItems)
-				{
-					--nIndex;
-				}
+			if (i == nSetItems)
+				continue;
 
-				if ((1 << i) & nSetItemMask)
-				{
-					bSet = FALSE;
-				}
-				else
-				{
-					bSet = TRUE;
-				}
+			int32_t nIndex = i;
+			if (nSetItems < i)
+				--nIndex;
 
-				D2Common_10574(pItem, gnItemSetStates[nIndex], bSet);
-			}
+			const bool bUnset = (nSetItemMask & (1u << i)) == 0;
+			D2Common_10574(pItemS, gnItemSetStates[nIndex], bUnset ? 1 : 0);
 		}
 	}
 	else if (pSetItemsTxt->nAddFunc == 2)
 	{
-		nBonuses = nSetItemMask < ARRAY_SIZE(gnSetMaskToBonusMappingTable) ? gnSetMaskToBonusMappingTable[nSetItemMask] : 0;
+		const int32_t nBonuses = nSetItemMask < 64
+			? gnSetMaskToBonusMappingTable[nSetItemMask] : 0;
+		const int32_t nFirst = nBonuses - 1;
 
-		for (int i = 0; i < nBonuses - 1; ++i)
-		{
-			D2Common_10574(pItem, gnItemSetStates[i], FALSE);
-		}
+		for (int32_t i = 0; i < nFirst; ++i)
+			D2Common_10574(pItemS, gnItemSetStates[i], 0);
 
-		if (nBonuses - 1 >= 5)
-		{
-			return TRUE;
-		}
+		if (nFirst >= 5)
+			return 1;
 
-		// 1.13c (D2Common+0x2C7C0): the switch-on walk stops before the sixth set state, and a zero mask starts it one slot
-		// early on a zero state id, which toggles nothing.
-		for(int i = nBonuses - 1; i < 5; ++i)
+		for (int32_t i = nFirst; i < 5; ++i)
 		{
-			if (i >= 0)
-			{
-				D2Common_10574(pItem, gnItemSetStates[i], TRUE);
-			}
+			// With zero bonuses retail starts one word before the table; that slot reads as zero.
+			const int32_t nState = i < 0 ? 0 : gnItemSetStates[i];
+			D2StatListExStrc* pStatListEx = pItemS->pStatListEx;
+			if (nState == 0 || pStatListEx == nullptr || static_cast<int32_t>(pStatListEx->dwFlags) >= 0)
+				continue;
+
+			D2StatListStrc* pStateList = D2Common_GetStateFromStatListEx_6FDB8190(pStatListEx, nState);
+			if (pStateList == nullptr || (pStateList->dwFlags & 0x2000u) != 0)
+				continue;
+
+			D2Common_ExpireStatList_6FDB6E30(pStateList);
+			pStateList->dwFlags |= 0x2000u;
+			D2COMMON_10475_PostStatToStatList(pItemS, pStateList, 1);
 		}
 	}
 
-	return TRUE;
+	return 1;
 }
 
-// 1.13c D2Common+0x2C630 (retail: pUnit in EAX); the set row comes through the setitems.txt accessor,
-// a new state list is stamped only when the allocation succeeded.
-//D2Common.0x6FDA4490
-//TODO: Find a name
-BOOL __fastcall sub_6FDA4490(D2UnitStrc* pUnit, D2UnitStrc* pItem, int a3)
+// 1.13c D2Common+0x2C630 (retail: pUnit in EAX): apply (nMode 0) or remove (1) one set item's bonus on its owner.
+// The item must be a set item; an owner that is itself an item must not be magic/set/rare/unique/crafted/tempered.
+// The six set-state lists are searched for the one whose STAT_VALUE holds the set id, remembering the first empty
+// state; add into an empty state allocates a list, posts it and stamps the state; remove expires and frees the list.
+BOOL __fastcall sub_6FDA4490(D2UnitStrc* pUnit, D2UnitStrc* pItem, int nMode)
 {
-	D2SetItemsTxt* pSetItemsTxtRecord = NULL;
-	D2StatListStrc* pStatList = NULL;
-	int nFileIndex = 0;
-	int nIndex = 0;
-	int nValue = 0;
+	if (nMode >= 2 || pUnit == nullptr || pItem == nullptr)
+		return 0;
+	if (pItem->dwUnitType != UNIT_ITEM || ITEMS_GetItemQuality(pItem) != ITEMQUAL_SET)
+		return 0;
+	if (pUnit->dwUnitType == UNIT_ITEM && ITEMS_IsMagSetRarUniCrfOrTmp(pUnit) != 0)
+		return 0;
 
-	if (a3 <= 1 && pUnit && pItem && pItem->dwUnitType == UNIT_ITEM && ITEMS_GetItemQuality(pItem) == ITEMQUAL_SET && (pUnit->dwUnitType != UNIT_ITEM || !ITEMS_IsMagSetRarUniCrfOrTmp(pUnit)))
+	D2SetItemsTxt* pSetItemsTxt = D2Common_1800_GetSetItemsTxtRecord(ITEMS_GetFileIndex(pItem));
+	if (pSetItemsTxt == nullptr)
+		return 0;
+	const int32_t nSetId = pSetItemsTxt->nSetId;
+	if (nSetId < 0 || nSetId >= sgptDataTables->nSetsTxtRecordCount)
+		return 0;
+
+	int32_t nEmptyState = -1;
+	int32_t nState = 0;
+	D2StatListStrc* pStatList = nullptr;
+	bool bFound = false;
+	for (int32_t i = 0; i < 6; ++i)
 	{
-		nFileIndex = ITEMS_GetFileIndex(pItem);
-		if (nFileIndex >= 0 && nFileIndex < sgptDataTables->nSetItemsTxtRecordCount)
+		nState = gnItemSetStates[i];
+		pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, nState);
+		if (pStatList == nullptr)
 		{
-			pSetItemsTxtRecord = &sgptDataTables->pSetItemsTxt[nFileIndex];
-			if (pSetItemsTxtRecord && pSetItemsTxtRecord->nSetId >= 0 && pSetItemsTxtRecord->nSetId < sgptDataTables->nSetsTxtRecordCount)
-			{
-				nValue = pSetItemsTxtRecord->nSetId;
-				nIndex = -1;
-
-				for (int i = 0; i < 6; ++i)
-				{
-					pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, gnItemSetStates[i]);
-					if (pStatList)
-					{
-						if (nValue == STATLIST_GetStatValue(pStatList, STAT_VALUE, 0))
-						{
-							if (a3 == 0)
-							{
-								STATLIST_RemoveAllStats(pStatList);
-								STATLIST_AddStat(pStatList, STAT_VALUE, nValue, 0);
-								ITEMMODS_UpdateFullSetBoni(pUnit, pItem, gnItemSetStates[i]);
-							}
-							else if (a3 == 1)
-							{
-								D2Common_10474(pUnit, pStatList);
-								STATLIST_FreeStatList(pStatList);
-							}
-
-							return TRUE;
-						}
-					}
-					else if (nIndex < 0)
-					{
-						nIndex = i;
-					}
-				}
-
-				if (a3 == 1 || nIndex < 0)
-				{
-					return FALSE;
-				}
-
-				pStatList = STATLIST_AllocStatList(pUnit->pMemoryPool, 0, 0, pItem->dwUnitType, pItem->dwUnitId);
-				D2COMMON_10475_PostStatToStatList(pUnit, pStatList, 1);
-				if (pStatList)
-				{
-					STATLIST_SetState(pStatList, gnItemSetStates[nIndex]);
-				}
-
-				if (a3 == 0)
-				{
-					STATLIST_AddStat(pStatList, STAT_VALUE, nValue, 0);
-					ITEMMODS_UpdateFullSetBoni(pUnit, pItem, gnItemSetStates[nIndex]);
-				}
-				//else if (a3 == 1)
-				//{
-				//	D2Common_10474(pUnit, pStatList);
-				//	STATLIST_FreeStatList(pStatList);
-				//}
-
-				return TRUE;
-			}
+			if (nEmptyState < 0)
+				nEmptyState = i;
+			continue;
+		}
+		if (nSetId == STATLIST_GetStatValue(pStatList, STAT_VALUE, 0))
+		{
+			bFound = true;
+			if (nMode == 0)
+				STATLIST_RemoveAllStats(pStatList);
+			break;
 		}
 	}
 
-	return FALSE;
+	if (!bFound)
+	{
+		if (nMode == 1 || nEmptyState < 0)
+			return 0;
+		nState = gnItemSetStates[nEmptyState];
+		pStatList = STATLIST_AllocStatList(pUnit->pMemoryPool, 0, 0, static_cast<int>(pItem->dwUnitType), pItem->dwUnitId);
+		D2COMMON_10475_PostStatToStatList(pUnit, pStatList, 1);
+		if (pStatList != nullptr)
+			STATLIST_SetState(pStatList, nState);
+	}
+
+	if (nMode == 0)
+	{
+		D2Common_3A330_AddStatLayer(pStatList, STAT_VALUE, nSetId, 0);
+		ITEMMODS_UpdateFullSetBoni(pUnit, pItem, nState);
+	}
+	else
+	{
+		D2Common_ExpireStatList_6FDB6E30(pStatList);
+		STATLIST_FreeStatList(pStatList);
+	}
+	return 1;
 }
 
 // 1.13c D2Common+0x2C910
 //D2Common.0x6FDA4640 (#10866)
-BOOL __stdcall ITEMS_UpdateSets(D2UnitStrc* pUnit, D2UnitStrc* pItem, int a3, int a4)
+BOOL __stdcall ITEMS_UpdateSets(D2UnitStrc* pUnit, D2UnitStrc* pItem, int nMode, int bForceStates)
 {
+	if (pUnit == nullptr)
+		return 0;
+	if (pItem == nullptr || pItem->dwUnitType != UNIT_ITEM || pUnit->pInventory == nullptr)
+		return 0;
+
 	unsigned int nSetItemMask = 0;
+	// 0x1E880 hands back the item when the inventory owns it; 0x1E8C0 reads its node page.
+	if (INVENTORY_IsItemInInventory(pUnit->pInventory, pItem) != nullptr
+		&& INVENTORY_GetItemNodePage(pItem) == 3)
+		nSetItemMask = ITEMS_GetSetItemsMask(pUnit, pItem, TRUE); // 0x23F90
 
-	if (pUnit && pItem && pItem->dwUnitType == UNIT_ITEM && pUnit->pInventory)
+	if (bForceStates != 0 || nMode == 0)
+		sub_6FDA4380(pItem, nSetItemMask);
+
+	sub_6FDA4490(pUnit, pItem, nMode);
+	return 1;
+}
+
+// 1.13c D2Common+0x222B0: items.txt nCompactSave byte of an item's class. Retail's out-of-range and no-table
+// paths call _exit(-1); this returns 0 for them and the capture never reaches them.
+uint8_t D2Common_222B0(const D2UnitStrc* pItem)
+{
+	const uint32_t nClass = pItem ? pItem->dwClassId : 0xFFFFFFFFu;
+	const D2ItemDataTbl& t = sgptDataTables->pItemDataTables;
+	if (nClass < (uint32_t)t.nItemsTxtRecordCount && t.pItemsTxt)
 	{
-		if (INVENTORY_IsItemInInventory(pUnit->pInventory, pItem) && INVENTORY_GetItemNodePage(pItem) == 3)
-		{
-			nSetItemMask = ITEMS_GetSetItemsMask(pUnit, pItem, TRUE);
-		}
+		return t.pItemsTxt[nClass].nCompactSave;
+	}
+	return 0;
+}
 
-		if (a4 || !a3)
-		{
-			sub_6FDA4380(pItem, nSetItemMask);
-		}
-
-		sub_6FDA4490(pUnit, pItem, a3);
-		
-		return TRUE;
+// 1.13c D2Common+0x22FC0: running maximum with one row's level byte (eax = running value, ecx = row, edx = key).
+// The row's slot byte (+0x67) picks the alternate byte (+0x68) when it is not 0xFF and equals the key's dword at +4;
+// otherwise the base byte (+0x65) is used. A null row returns the running value.
+extern "C" int32_t D2Common_22FC0_RunningMax(int32_t running, const uint8_t* pRow, const uint8_t* pKey)
+{
+	if (!pRow)
+	{
+		return running;
 	}
 
-	return FALSE;
+	const uint8_t slot = pRow[0x67];
+	bool useAlternate = false;
+	if (slot != 0xFF && pKey)
+	{
+		uint32_t keySlot = 0;
+		memcpy(&keySlot, pKey + 4, sizeof(keySlot));
+		useAlternate = (keySlot == slot);
+	}
+
+	const int32_t value = useAlternate ? pRow[0x68] : pRow[0x65];
+	return (running > value) ? running : value;
 }

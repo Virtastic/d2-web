@@ -1,4 +1,5 @@
 #include "D2ItemMods.h"
+#include <test_seam.h>
 
 #include "D2Collision.h"
 #include "D2Environment.h"
@@ -812,35 +813,20 @@ BOOL __fastcall sub_6FD92A80(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, co
 	{
 		if (nStatId >= STAT_ITEM_ARMOR_PERCENT && nStatId <= STAT_ITEM_MINDAMAGE_PERCENT || nType == 1)
 		{
-			sub_6FD92CF0(pItem, nStatId);
+			D2_CALL(sub_6FD92CF0, pItem, nStatId);
 		}
 
-		switch (nStatId)
-		{
-		case STAT_HITPOINTS:
-		case STAT_MAXHP:
-		case STAT_MANA:
-		case STAT_MAXMANA:
-		case STAT_STAMINA:
-		case STAT_MAXSTAMINA:
-		case STAT_ITEM_HP_PERLEVEL:
-		case STAT_ITEM_MANA_PERLEVEL:
-			nValue <<= 8;
-			break;
+		D2_CALL(sub_6FD94060, nStatId, &nValue);
 
-		default:
-			break;
-		}
-
-		pStatList = ITEMMODS_GetOrCreateStatList(pUnit, pItem, nState, fStatList);
+		pStatList = D2_CALL(ITEMMODS_GetOrCreateStatList, pUnit, pItem, nState, fStatList);
 		D2_ASSERT(pStatList);
 
 		if (nApplyType)
 		{
-			nValue = -STATLIST_GetStatValue(pStatList, nStatId, 0);
+			nValue = -D2_CALL(STATLIST_GetStatValue, pStatList, nStatId, (uint16_t)0);
 		}
 
-		STATLIST_AddStat(pStatList, nStatId, nValue, 0);
+		D2_CALL(STATLIST_AddStat, pStatList, nStatId, nValue, (uint16_t)0);
 		return TRUE;
 	}
 
@@ -980,7 +966,7 @@ void __fastcall sub_6FD92CF0(D2UnitStrc* pItem, int nStatId)
 //D2Common.0x6FD92E80
 BOOL __fastcall sub_6FD92E80(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, const D2PropertyStrc* pProperty, int nStatId, int nApplyType, int nState, int fStatList, D2UnitStrc* a9)
 {
-	return sub_6FD92EB0(nType, pUnit, pItem, pProperty, nStatId, nApplyType, 0, nState, fStatList, a9);
+	return D2_CALL(sub_6FD92EB0, nType, pUnit, pItem, pProperty, nStatId, nApplyType, 0, nState, fStatList, a9);
 }
 
 // 1.13c D2Common+0x47FA0
@@ -1089,8 +1075,8 @@ BOOL __fastcall sub_6FD93170(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, co
 {
 	D2_ASSERT(pProperty);
 
-	ITEMS_SetItemFlag(pItem, IFLAG_SOCKETED, TRUE);
-	ITEMS_SetSockets(pItem, pProperty->nLayer);
+	D2_CALL(ITEMS_SetItemFlag, pItem, IFLAG_SOCKETED, TRUE);
+	D2_CALL(ITEMS_SetSockets, pItem, pProperty->nLayer);
 
 	return 1;
 }
@@ -1117,7 +1103,7 @@ BOOL __fastcall sub_6FD931C0(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, co
 //D2Common.0x6FD93200
 BOOL __fastcall sub_6FD93200(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, const D2PropertyStrc* pProperty, int nStatId, int nApplyType, int nState, int fStatList, D2UnitStrc* a9)
 {
-	return sub_6FD92EB0(nType, pUnit, pItem, pProperty, nStatId, nApplyType, 1, nState, fStatList, a9);
+	return D2_CALL(sub_6FD92EB0, nType, pUnit, pItem, pProperty, nStatId, nApplyType, 1, nState, fStatList, a9);
 }
 
 // 1.13c D2Common+0x49F30
@@ -1131,10 +1117,10 @@ BOOL __fastcall sub_6FD93230(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, co
 
 	if (ITEMS_GetItemFormat(pItem) < 1)
 	{
-		sub_6FD92EB0(nType, pUnit, pItem, pProperty, STAT_FIRERESIST, nApplyType, 0, nState, fStatList, a9);
-		sub_6FD92EB0(nType, pUnit, pItem, pProperty, STAT_LIGHTRESIST, nApplyType, 0, nState, fStatList, a9);
-		sub_6FD92EB0(nType, pUnit, pItem, pProperty, STAT_COLDRESIST, nApplyType, 0, nState, fStatList, a9);
-		sub_6FD92EB0(nType, pUnit, pItem, pProperty, STAT_POISONRESIST, nApplyType, 0, nState, fStatList, a9);
+		D2_CALL(sub_6FD92EB0, nType, pUnit, pItem, pProperty, STAT_FIRERESIST, nApplyType, 0, nState, fStatList, a9);
+		D2_CALL(sub_6FD92EB0, nType, pUnit, pItem, pProperty, STAT_LIGHTRESIST, nApplyType, 0, nState, fStatList, a9);
+		D2_CALL(sub_6FD92EB0, nType, pUnit, pItem, pProperty, STAT_COLDRESIST, nApplyType, 0, nState, fStatList, a9);
+		D2_CALL(sub_6FD92EB0, nType, pUnit, pItem, pProperty, STAT_POISONRESIST, nApplyType, 0, nState, fStatList, a9);
 	}
 	else
 	{
@@ -1237,10 +1223,10 @@ BOOL __fastcall sub_6FD935B0(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, co
 
 	if (ITEMS_GetItemFormat(pItem) < 1)
 	{
-		sub_6FD92EB0(nType, pUnit, pItem, pProperty, STAT_MAXFIRERESIST, nApplyType, 0, nState, fStatList, a9);
-		sub_6FD92EB0(nType, pUnit, pItem, pProperty, STAT_MAXLIGHTRESIST, nApplyType, 0, nState, fStatList, a9);
-		sub_6FD92EB0(nType, pUnit, pItem, pProperty, STAT_MAXCOLDRESIST, nApplyType, 0, nState, fStatList, a9);
-		sub_6FD92EB0(nType, pUnit, pItem, pProperty, STAT_MAXPOISONRESIST, nApplyType, 0, nState, fStatList, a9);
+		D2_CALL(sub_6FD92EB0, nType, pUnit, pItem, pProperty, STAT_MAXFIRERESIST, nApplyType, 0, nState, fStatList, a9);
+		D2_CALL(sub_6FD92EB0, nType, pUnit, pItem, pProperty, STAT_MAXLIGHTRESIST, nApplyType, 0, nState, fStatList, a9);
+		D2_CALL(sub_6FD92EB0, nType, pUnit, pItem, pProperty, STAT_MAXCOLDRESIST, nApplyType, 0, nState, fStatList, a9);
+		D2_CALL(sub_6FD92EB0, nType, pUnit, pItem, pProperty, STAT_MAXPOISONRESIST, nApplyType, 0, nState, fStatList, a9);
 	}
 	else
 	{
@@ -1539,8 +1525,8 @@ BOOL __fastcall sub_6FD93CB0(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, co
 
 	if (ITEMS_GetItemFormat(pItem) < 1)
 	{
-		sub_6FD92EB0(nType, pUnit, pItem, pProperty, STAT_ITEM_MAXDAMAGE_PERCENT, nApplyType, 1, nState, fStatList, a9);
-		sub_6FD92EB0(nType, pUnit, pItem, pProperty, STAT_ITEM_MINDAMAGE_PERCENT, nApplyType, 1, nState, fStatList, a9);
+		D2_CALL(sub_6FD92EB0, nType, pUnit, pItem, pProperty, STAT_ITEM_MAXDAMAGE_PERCENT, nApplyType, 1, nState, fStatList, a9);
+		D2_CALL(sub_6FD92EB0, nType, pUnit, pItem, pProperty, STAT_ITEM_MINDAMAGE_PERCENT, nApplyType, 1, nState, fStatList, a9);
 		return nStatId;
 	}
 
@@ -1683,7 +1669,7 @@ void __fastcall sub_6FD94060(int nStatId, int* pValue)
 //D2Common.0x6FD94160
 BOOL __fastcall sub_6FD94160(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, const D2PropertyStrc* pProperty, int nStatId, int nApplyType, int nState, int fStatList, D2UnitStrc* a9)
 {
-	sub_6FD92EB0(nType, pUnit, pItem, pProperty, STAT_ITEM_ALLSKILLS, nApplyType, 0, nState, fStatList, a9);
+	D2_CALL(sub_6FD92EB0, nType, pUnit, pItem, pProperty, STAT_ITEM_ALLSKILLS, nApplyType, 0, nState, fStatList, a9);
 
 	return nStatId;
 }
@@ -1815,7 +1801,7 @@ BOOL __fastcall sub_6FD943C0(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, co
 	nMin = pProperty->nMin + 256;
 	nMax = pProperty->nMax + 256;
 
-	pStatList = ITEMMODS_GetOrCreateStatList(pUnit, pItem, nState, fStatList);
+	pStatList = D2_CALL(ITEMMODS_GetOrCreateStatList, pUnit, pItem, nState, fStatList);
 	D2_ASSERT(pStatList);
 
 	D2_ASSERT(nPeriod >= 0 && nPeriod <= 3);
@@ -1824,7 +1810,7 @@ BOOL __fastcall sub_6FD943C0(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, co
 	D2_ASSERT(nMin >= 0 && nMin < (1 << ITEM_BYTIME_VAL_BITS));
 	D2_ASSERT(nMax >= 0 && nMax < (1 << ITEM_BYTIME_VAL_BITS));
 
-	STATLIST_SetStatIfListIsValid(pStatList, nStatId, nPeriod + 4 * (nMin + (nMax << 10)), 0);
+	D2_CALL(STATLIST_SetStatIfListIsValid, pStatList, nStatId, nPeriod + 4 * (nMin + (nMax << 10)), (uint16_t)0);
 
 	return TRUE;
 }
@@ -2109,185 +2095,110 @@ BOOL __fastcall sub_6FD94AB0(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, co
 	return 1;
 }
 
+// The stat a property function negates when it removes its modifier: the list's base value of one stat row (1.13c D2Common+0x38B00 with the packed layer/stat id),
+// 0 when the stat cost table has no such row.
+static int ITEMMODS_GetNegatedBaseStat(D2StatListStrc* pStatList, int nStatId, int nLayer)
+{
+	int nBase = 0;
+	if (sgptDataTables->nItemStatCostTxtRecordCount > nStatId)
+	{
+		nBase = D2_CALL(STATLIST_GetBaseStat_6FDB6340, pStatList, D2SLayerStatIdStrc::Make((uint16_t)nLayer, (uint16_t)nStatId).nPackedValue, &sgptDataTables->pItemStatCostTxt[nStatId]);
+	}
+	return -nBase;
+}
+
 //D2Common.0x6FD94E80
 // 1.13c D2Common+0x47980
 BOOL __fastcall sub_6FD94E80(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, const D2PropertyStrc* pProperty, int nStatId, int nApplyType, int nState, int fStatList, D2UnitStrc* a9)
 {
-	D2StatListStrc* pStatList = NULL;
-	int nPossibleRolls = 0;
-	int nMin = 0;
-	int nMax = 0;
-
 	if (!pProperty)
 	{
 		return FALSE;
 	}
 
-	nMin = pProperty->nMin;
-	nMax = pProperty->nMax;
-
-	if (nMin != nMax)
+	int nValue = D2_CALL(ITEMMODS_RollInRange, pProperty->nMax, pProperty->nMin, pItem);
+	const int nSkillId = pProperty->nLayer;
+	if (nSkillId < 0 || nSkillId >= sgptDataTables->nSkillsTxtRecordCount)
 	{
-		if (nMax < nMin)
-		{
-			nMax = pProperty->nMin;
-			nMin = pProperty->nMax;
-		}
-
-		nPossibleRolls = nMax - nMin;
-		if (ITEMS_GetItemFormat(pItem) >= 1)
-		{
-			++nPossibleRolls;
-		}
-
-		nMin += SEED_RollLimitedRandomNumber(ITEMS_GetItemSeed(pItem), nPossibleRolls);
+		return FALSE;
 	}
 
-	if (DATATBLS_GetSkillsTxtRecord(pProperty->nLayer))
+	D2StatListStrc* pStatList = D2_CALL(ITEMMODS_GetOrCreateStatList, pUnit, pItem, nState, fStatList);
+	if (!pStatList)
 	{
-		pStatList = ITEMMODS_GetOrCreateStatList(pUnit, pItem, nState, fStatList);
-		if (pStatList)
-		{
-			if (nApplyType)
-			{
-				nMin = -STATLIST_GetStatValue(pStatList, STAT_ITEM_SINGLESKILL, pProperty->nLayer);
-			}
-
-			STATLIST_AddStat(pStatList, STAT_ITEM_SINGLESKILL, nMin, pProperty->nLayer);
-			return TRUE;
-		}
+		return FALSE;
 	}
 
-	return FALSE;
+	if (nApplyType)
+	{
+		nValue = -D2_CALL(STATLIST_GetStatValue, pStatList, STAT_ITEM_SINGLESKILL, (uint16_t)nSkillId);
+	}
+
+	D2_CALL(STATLIST_AddStat, pStatList, STAT_ITEM_SINGLESKILL, nValue, (uint16_t)nSkillId);
+	return TRUE;
 }
 
 //D2Common.0x6FD94F70
 // 1.13c D2Common+0x478F0
 BOOL __fastcall sub_6FD94F70(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, const D2PropertyStrc* pProperty, int nStatId, int nApplyType, int nState, int fStatList, D2UnitStrc* a9)
 {
-	D2StatListStrc* pStatList = NULL;
-	int nPossibleRolls = 0;
-	int nMin = 0;
-	int nMax = 0;
-
-	nMin = pProperty->nMin;
-	nMax = pProperty->nMax;
-
-	if (nMin != nMax)
+	int nValue = D2_CALL(ITEMMODS_RollInRange, pProperty->nMax, pProperty->nMin, pItem);
+	if (!nValue)
 	{
-		if (nMax < nMin)
-		{
-			nMax = pProperty->nMin;
-			nMin = pProperty->nMax;
-		}
-
-		nPossibleRolls = nMax - nMin;
-		if (ITEMS_GetItemFormat(pItem) >= 1)
-		{
-			++nPossibleRolls;
-		}
-
-		nMin += SEED_RollLimitedRandomNumber(ITEMS_GetItemSeed(pItem), nPossibleRolls);
+		return FALSE;
 	}
 
-	if (nMin)
+	D2StatListStrc* pStatList = D2_CALL(ITEMMODS_GetOrCreateStatList, pUnit, pItem, nState, fStatList);
+	if (!pStatList)
 	{
-		pStatList = ITEMMODS_GetOrCreateStatList(pUnit, pItem, nState, fStatList);
-		if (pStatList)
-		{
-			if (nApplyType)
-			{
-				nMin = -STATLIST_GetStatValue(pStatList, STAT_ITEM_ELEMSKILL, 1);
-			}
-
-			STATLIST_AddStat(pStatList, STAT_ITEM_ELEMSKILL, nMin, 1);
-			return TRUE;
-		}
+		return FALSE;
 	}
 
-	return FALSE;
+	if (nApplyType)
+	{
+		nValue = ITEMMODS_GetNegatedBaseStat(pStatList, STAT_ITEM_ELEMSKILL, 1);
+	}
+
+	D2_CALL(STATLIST_AddStat, pStatList, STAT_ITEM_ELEMSKILL, nValue, (uint16_t)1);
+	return TRUE;
 }
 
 //D2Common.0x6FD95050
 // 1.13c D2Common+0x47780
 BOOL __fastcall sub_6FD95050(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, const D2PropertyStrc* pProperty, int nStatId, int nApplyType, int nState, int fStatList, D2UnitStrc* a9)
 {
-	D2StatListStrc* pStatList = NULL;
-	int nPossibleRolls = 0;
+	int nValue = D2_CALL(ITEMMODS_RollInRange, pProperty->nMax, pProperty->nMin, pItem);
+	if (!nValue)
+	{
+		return FALSE;
+	}
+
+	D2StatListStrc* pStatList = D2_CALL(ITEMMODS_GetOrCreateStatList, pUnit, pItem, nState, fStatList);
+	if (!pStatList)
+	{
+		return FALSE;
+	}
+
 	int nLayer = 0;
-	int nMin = 0;
-	int nMax = 0;
-
-	nMin = pProperty->nMin;
-	nMax = pProperty->nMax;
-
-	if (nMin != nMax)
+	switch (nStatId)
 	{
-		if (nMax < nMin)
-		{
-			nMax = pProperty->nMin;
-			nMin = pProperty->nMax;
-		}
-
-		nPossibleRolls = nMax - nMin;
-		if (ITEMS_GetItemFormat(pItem) >= 1)
-		{
-			++nPossibleRolls;
-		}
-
-		nMin += SEED_RollLimitedRandomNumber(ITEMS_GetItemSeed(pItem), nPossibleRolls);
+	case STAT_ITEM_ADDCLASSSKILLS: nLayer = 0; break;
+	case STAT_UNSENTPARAM1: nLayer = 1; break;
+	case STAT_ITEM_ADDEXPERIENCE: nLayer = 2; break;
+	case STAT_ITEM_HEALAFTERKILL: nLayer = 3; break;
+	case STAT_ITEM_REDUCEDPRICES: nLayer = 4; break;
+	case STAT_ATTACK_VS_MONTYPE: nLayer = 5; break;
+	case STAT_DAMAGE_VS_MONTYPE: nLayer = 6; break;
+	default: break;
 	}
 
-	if (nMin)
+	if (nApplyType)
 	{
-		pStatList = ITEMMODS_GetOrCreateStatList(pUnit, pItem, nState, fStatList);
-		if (pStatList)
-		{
-			switch (nStatId)
-			{
-			case STAT_ITEM_ADDCLASSSKILLS:
-				nLayer = 0;
-				break;
-
-			case STAT_UNSENTPARAM1:
-				nLayer = 1;
-				break;
-
-			case STAT_ITEM_ADDEXPERIENCE:
-				nLayer = 2;
-				break;
-
-			case STAT_ITEM_HEALAFTERKILL:
-				nLayer = 3;
-				break;
-
-			case STAT_ITEM_REDUCEDPRICES:
-				nLayer = 4;
-				break;
-
-			case STAT_ATTACK_VS_MONTYPE:
-				nLayer = 5;
-				break;
-
-			case STAT_DAMAGE_VS_MONTYPE:
-				nLayer = 6;
-				break;
-
-			default:
-				break;
-			}
-
-			if (nApplyType)
-			{
-				nMin = -STATLIST_GetStatValue(pStatList, STAT_ITEM_ADDCLASSSKILLS, nLayer);
-			}
-
-			STATLIST_AddStat(pStatList, STAT_ITEM_ADDCLASSSKILLS, nMin, nLayer);
-			return TRUE;
-		}
+		nValue = ITEMMODS_GetNegatedBaseStat(pStatList, STAT_ITEM_ADDCLASSSKILLS, nLayer);
 	}
 
-	return FALSE;
+	D2_CALL(STATLIST_AddStat, pStatList, STAT_ITEM_ADDCLASSSKILLS, nValue, (uint16_t)nLayer);
+	return TRUE;
 }
 
 //D2Common.0x6FD95200
@@ -2301,68 +2212,32 @@ BOOL __fastcall sub_6FD95200(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, co
 // 1.13c D2Common+0x48B80
 BOOL __fastcall sub_6FD95210(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, const D2PropertyStrc* pProperty, int nStatId, int nApplyType, int nState, int fStatList, D2UnitStrc* a9)
 {
-	D2StatListStrc* pStatList = NULL;
-	int nPossibleRolls = 0;
-	int nMin = 0;
-	int nMax = 0;
+	const int nValue = D2_CALL(ITEMMODS_RollInRange, pProperty->nMax, pProperty->nMin, pItem);
+	return D2_CALL(sub_6FD93410, nType, pUnit, pItem, nValue, nStatId, nApplyType, 0, nState, fStatList, a9);
+}
 
-	nMin = pProperty->nMin;
-	nMax = pProperty->nMax;
-
-	if (nMin != nMax)
+// The seeded draw 1.13c D2Common+0x464D0 makes: a == b returns b; otherwise the bounds are put in order, the span gets +1 when the item's format is 1 or more, and the item seed is rolled.
+int __fastcall ITEMMODS_RollInRange(int nMax, int nMin, D2UnitStrc* pItem)
+{
+	if (nMin == nMax)
 	{
-		if (nMax < nMin)
-		{
-			nMax = pProperty->nMin;
-			nMin = pProperty->nMax;
-		}
-
-		nPossibleRolls = nMax - nMin;
-		if (ITEMS_GetItemFormat(pItem) >= 1)
-		{
-			++nPossibleRolls;
-		}
-
-		nMin += SEED_RollLimitedRandomNumber(ITEMS_GetItemSeed(pItem), nPossibleRolls);
+		return nMax;
 	}
 
-	if (nType == 1)
+	if (nMax < nMin)
 	{
-		sub_6FD92CF0(pItem, nStatId);
+		const int nTemp = nMax;
+		nMax = nMin;
+		nMin = nTemp;
 	}
 
-	if (nMin)
+	int nPossibleRolls = nMax - nMin;
+	if (ITEMS_GetItemFormat(pItem) >= 1)
 	{
-		switch (nStatId)
-		{
-		case STAT_HITPOINTS:
-		case STAT_MAXHP:
-		case STAT_MANA:
-		case STAT_MAXMANA:
-		case STAT_STAMINA:
-		case STAT_MAXSTAMINA:
-		case STAT_ITEM_HP_PERLEVEL:
-		case STAT_ITEM_MANA_PERLEVEL:
-			nMin <<= 8;
-			break;
-
-		default:
-			break;
-		}
-
-		pStatList = ITEMMODS_GetOrCreateStatList(pUnit, pItem, nState, fStatList);
-		D2_ASSERT(pStatList);
-
-		if (nApplyType)
-		{
-			nMin = -STATLIST_GetStatValue(pStatList, nStatId, 0);
-		}
-
-		STATLIST_AddStat(pStatList, nStatId, nMin, 0);
-		return TRUE;
+		++nPossibleRolls;
 	}
 
-	return FALSE;
+	return nMin + SEED_RollLimitedRandomNumber(ITEMS_GetItemSeed(pItem), nPossibleRolls);
 }
 
 //D2Common.0x6FD95430 (#10855)
@@ -3951,7 +3826,7 @@ int __fastcall ITEMMODS_PropertyFunc18(int nType, D2UnitStrc* pUnit, D2UnitStrc*
 
 	if (pProperty)
 	{
-		if (ITEMS_GetItemStatCostTxtRecord(nStatId))
+		if (D2_CALL(ITEMS_GetItemStatCostTxtRecord, nStatId))
 		{
 			nPropLayer = pProperty->nLayer;
 			nMin = pProperty->nMin + 256;
@@ -3993,10 +3868,10 @@ int __fastcall ITEMMODS_PropertyFunc18(int nType, D2UnitStrc* pUnit, D2UnitStrc*
 				nMax = 0;
 			}
 
-			pStatList = ITEMMODS_GetOrCreateStatList(pUnit, pItem, nState, fStatList);
+			pStatList = D2_CALL(ITEMMODS_GetOrCreateStatList, pUnit, pItem, nState, fStatList);
 			if (pStatList)
 			{
-				STATLIST_SetStatIfListIsValid(pStatList, nStatId, nPropLayer + 4 * (nMin + (nMax << 10)), 0);
+				D2_CALL(STATLIST_SetStatIfListIsValid, pStatList, nStatId, nPropLayer + 4 * (nMin + (nMax << 10)), (uint16_t)0);
 				return nMax;
 			}
 		}
@@ -4284,21 +4159,21 @@ int __fastcall sub_6FD982A0(int nStatId, int a2, int nUnused, void* pUserData)
 	{
 		if (nStatId == STAT_TOHIT)
 		{
-			return UNITS_GetAttackRate(pItemCalc->pUnit);
+			return D2_CALL(UNITS_GetAttackRate, pItemCalc->pUnit);
 		}
 		else
 		{
 			if (a2 == 1)
 			{
-				return STATLIST_GetUnitBaseStat(pItemCalc->pUnit, nStatId, 0);
+				return D2_CALL(STATLIST_GetUnitBaseStat, pItemCalc->pUnit, nStatId, 0);
 			}
 			else if (a2 == 2)
 			{
-				return STATLIST_UnitGetItemStatOrSkillStatValue(pItemCalc->pUnit, nStatId, 0);
+				return D2_CALL(STATLIST_UnitGetItemStatOrSkillStatValue, pItemCalc->pUnit, nStatId, 0);
 			}
 			else
 			{
-				return STATLIST_UnitGetStatValue(pItemCalc->pUnit, nStatId, 0);
+				return D2_CALL(STATLIST_UnitGetStatValue, pItemCalc->pUnit, nStatId, 0);
 			}
 		}
 	}
@@ -4307,7 +4182,7 @@ int __fastcall sub_6FD982A0(int nStatId, int a2, int nUnused, void* pUserData)
 }
 
 // 1.13c D2Common+0x21FF0 (the calc evaluator's parameter hook: returns 0)
-static int __fastcall ITEMMODS_GetCalcParamValue_Return0(int, void*)
+int __fastcall ITEMMODS_GetCalcParamValue_Return0(int, void*)
 {
 	return 0;
 }

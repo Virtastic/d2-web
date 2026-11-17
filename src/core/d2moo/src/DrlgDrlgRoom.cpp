@@ -10,6 +10,7 @@
 #include "Drlg/D2DrlgRoomTile.h"
 #include "D2Dungeon.h"
 #include "D2Seed.h"
+#include <test_seam.h>
 #include <DataTbls/LevelsIds.h> // d2-web: LEVEL_PANDEMONIUMRUN1 below (1.11+ build)
 
 
@@ -252,21 +253,11 @@ void __fastcall DRLGROOM_AllocDrlgOrthsForRooms(D2DrlgRoomStrc* pDrlgRoom1, D2Dr
 	DRLGROOM_AddOrthToRoom(pDrlgRoom2, pDrlgRoom1, (nDirection - 2) & 3);
 }
 
-//D2Common.0x6FD77600
-// 1.13c D2Common+0x44F20
-void __fastcall DRLGROOM_AddOrth(D2DrlgOrthStrc** ppDrlgOrth, D2DrlgLevelStrc* pLevel, int nDirection, BOOL bIsPreset)
+// 1.13c D2Common+0x44B20 (EBX = the new node): sorted insert into the singly linked orth list
+void __fastcall DRLGROOM_InsertOrthSorted(D2DrlgOrthStrc** ppDrlgOrth, D2DrlgOrthStrc* pNew)
 {
 	D2DrlgOrthStrc* pPrevious = NULL;
 	D2DrlgOrthStrc* pNext = NULL;
-	D2DrlgOrthStrc* pNew = NULL;
-
-	pNew = D2_CALLOC_STRC_POOL(pLevel->pDrlg->pMempool, D2DrlgOrthStrc);
-
-	pNew->pLevel = pLevel;
-	pNew->nDirection = nDirection;
-	pNew->bPreset = bIsPreset;
-	pNew->bInit = 0;
-	pNew->pBox = &pLevel->pLevelCoords;
 
 	if (!*ppDrlgOrth)
 	{
@@ -280,7 +271,7 @@ void __fastcall DRLGROOM_AddOrth(D2DrlgOrthStrc** ppDrlgOrth, D2DrlgLevelStrc* p
 		{
 			do
 			{
-				if (sub_6FD776B0(pNew, pNext))
+				if (D2_CALL(sub_6FD776B0, pNew, pNext))
 				{
 					break;
 				}
@@ -292,7 +283,7 @@ void __fastcall DRLGROOM_AddOrth(D2DrlgOrthStrc** ppDrlgOrth, D2DrlgLevelStrc* p
 		}
 		else
 		{
-			if (sub_6FD776B0(pNew, *ppDrlgOrth))
+			if (D2_CALL(sub_6FD776B0, pNew, *ppDrlgOrth))
 			{
 				pNew->pNext = *ppDrlgOrth;
 				*ppDrlgOrth = pNew;
@@ -303,6 +294,21 @@ void __fastcall DRLGROOM_AddOrth(D2DrlgOrthStrc** ppDrlgOrth, D2DrlgLevelStrc* p
 		pNew->pNext = pNext;
 		pPrevious->pNext = pNew;
 	}
+}
+
+//D2Common.0x6FD77600
+// 1.13c D2Common+0x44F20
+void __fastcall DRLGROOM_AddOrth(D2DrlgOrthStrc** ppDrlgOrth, D2DrlgLevelStrc* pLevel, int nDirection, BOOL bIsPreset)
+{
+	D2DrlgOrthStrc* pNew = D2_CALLOC_STRC_POOL(pLevel->pDrlg->pMempool, D2DrlgOrthStrc);
+
+	pNew->pLevel = pLevel;
+	pNew->nDirection = nDirection;
+	pNew->bPreset = bIsPreset;
+	pNew->bInit = 0;
+	pNew->pBox = &pLevel->pLevelCoords;
+
+	DRLGROOM_InsertOrthSorted(ppDrlgOrth, pNew);
 }
 
 //D2Common.0x6FD776B0

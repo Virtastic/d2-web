@@ -25,10 +25,10 @@ namespace
 	inline uint32_t& W(void* b, int o) { return *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(b) + o); }
 }
 
-// Name ports (one file each): 0x5E4D0, 0x5E480 and 0x5E410.
-void D2Common_5E4D0_GetPlayerName(int32_t nClassId, char* szOut);
-void D2Common_5E480_GetMonsterName(int32_t nClassId, char* szOut);
-void D2Common_5E410_GetItemName(int32_t nItemId, char* szOut);
+// Name helpers 0x5E4D0, 0x5E480 and 0x5E410 are game-tree bodies (D2DataTbls.h).
+void DATATBLS_GetPlayerClassName(int32_t nClassId, char* szName);
+void DATATBLS_GetMonsterClassName(int32_t nClassId, char* szName);
+void DATATBLS_GetItemClassName(int32_t nClassId, char* szName);
 
 // Env seam for 0x5D800, still an UNMAPPED row (null until the environment installs it).
 extern "C"
@@ -178,10 +178,10 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_5F1C0_UnitTypeName(uint32_t nUnitType, in
 	switch (nUnitType)
 	{
 	case 0: // 0x5E4D0: class id in ECX, buffer in EDX (both explicit in the 1.13c call)
-		D2Common_5E4D0_GetPlayerName(nClassId, reinterpret_cast<char*>(buf));
+		DATATBLS_GetPlayerClassName(nClassId, reinterpret_cast<char*>(buf));
 		break;
 	case 1: // 0x5E480: the 1.13c body writes through ESI, the buffer this function was entered with
-		D2Common_5E480_GetMonsterName(nClassId, reinterpret_cast<char*>(buf));
+		DATATBLS_GetMonsterClassName(nClassId, reinterpret_cast<char*>(buf));
 		break;
 	case 2:
 		if (g_d2common_fn_5D800)
@@ -191,7 +191,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_5F1C0_UnitTypeName(uint32_t nUnitType, in
 		std::sprintf(reinterpret_cast<char*>(buf), "missile %d", static_cast<int>(nClassId));
 		break;
 	case 4: // 0x5E410: the item-name port, buffer as for case 1
-		D2Common_5E410_GetItemName(nClassId, reinterpret_cast<char*>(buf));
+		DATATBLS_GetItemClassName(nClassId, reinterpret_cast<char*>(buf));
 		break;
 	default:
 		// 1.13c hands the narrow literal to a wide printf; retail's capture leaves the buffer empty.

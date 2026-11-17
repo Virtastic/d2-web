@@ -6,6 +6,7 @@
 #include "Drlg/D2DrlgOutPlace.h"
 #include "D2Seed.h"
 #include <DataTbls/LevelsIds.h>
+#include <test_seam.h>
 
 
 struct D2DrlgOutDesertInitStrc				// size: 0x10
@@ -41,29 +42,29 @@ void __fastcall DRLGOUTDESR_PlaceDesertTransitionToTown(D2DrlgLevelStrc* pLevel)
 }
 
 // 1.13c D2Common+0x85D90
-static void DRLGOUTDESR_PlaceFillsInRockyWaste(D2DrlgLevelStrc* pLevel)
+void __fastcall DRLGOUTDESR_PlaceFillsInRockyWaste(D2DrlgLevelStrc* pLevel)
 {
 	const int nLevelPrestIds[] = { LVLPREST_ACT2_DESERT_OASIS_1, LVLPREST_ACT2_DESERT_RUINS_08X08, LVLPREST_ACT2_DESERT_FILL_BONE_1, LVLPREST_ACT2_DESERT_FILL_BONE_2, LVLPREST_ACT2_DESERT_FILL_HEAD_1, LVLPREST_ACT2_DESERT_FILL_MESA_1, LVLPREST_ACT2_DESERT_FILL_WAGON_1 };
 
-	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds, ARRAY_SIZE(nLevelPrestIds), FALSE);
+	D2_CALL(DRLGOUTDESR_PlacePresetVariants, pLevel, nLevelPrestIds, ARRAY_SIZE(nLevelPrestIds), FALSE);
 }
 
 // 1.13c D2Common+0x85D20
-static void DRLGOUTDESR_PlaceFillsInDryHills(D2DrlgLevelStrc* pLevel)
+void __fastcall DRLGOUTDESR_PlaceFillsInDryHills(D2DrlgLevelStrc* pLevel)
 {
 	const int nLevelPrestIds1[] = { LVLPREST_ACT2_DESERT_OASIS_1, LVLPREST_ACT2_DESERT_RUINS_08X08, LVLPREST_ACT2_DESERT_FILL_HEAD_2, LVLPREST_ACT2_DESERT_FILL_MESA_1 };
 	const int nLevelPrestIds2[] = { LVLPREST_ACT2_DESERT_FILL_BERMS_1, LVLPREST_ACT2_DESERT_FILL_BERMS_2, LVLPREST_ACT2_DESERT_FILL_BERMS_3, LVLPREST_ACT2_DESERT_FILL_BERMS_4 };
 
-	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds1, ARRAY_SIZE(nLevelPrestIds1), FALSE);
-	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds2, ARRAY_SIZE(nLevelPrestIds2), TRUE);
+	D2_CALL(DRLGOUTDESR_PlacePresetVariants, pLevel, nLevelPrestIds1, ARRAY_SIZE(nLevelPrestIds1), FALSE);
+	D2_CALL(DRLGOUTDESR_PlacePresetVariants, pLevel, nLevelPrestIds2, ARRAY_SIZE(nLevelPrestIds2), TRUE);
 }
 
 // 1.13c D2Common+0x85CF0
-static void DRLGOUTDESR_PlaceOasesInFarOasis(D2DrlgLevelStrc* pLevel)
+void __fastcall DRLGOUTDESR_PlaceOasesInFarOasis(D2DrlgLevelStrc* pLevel)
 {
 	const int nLevelPrestIds[] = { LVLPREST_ACT2_DESERT_OASIS_2, LVLPREST_ACT2_DESERT_OASIS_3 };
 
-	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds, ARRAY_SIZE(nLevelPrestIds), FALSE);
+	D2_CALL(DRLGOUTDESR_PlacePresetVariants, pLevel, nLevelPrestIds, ARRAY_SIZE(nLevelPrestIds), FALSE);
 }
 
 // 1.13c D2Common+0x85E20
@@ -226,16 +227,16 @@ void __fastcall DRLGOUTDESR_PlaceCliffs(D2DrlgLevelStrc* pLevel)
 
 	for (int i = 0; i < 5; ++i)
 	{
-		DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, pOutDesertInit[nRand][i].nX, pOutDesertInit[nRand][i].nY, pOutDesertInit[nRand][i].nLvlPrestId, pOutDesertInit[nRand][i].nRand, 0);
+		D2_CALL(DRLGOUTDOORS_SpawnOutdoorLevelPresetEx, pLevel, pOutDesertInit[nRand][i].nX, pOutDesertInit[nRand][i].nY, pOutDesertInit[nRand][i].nLvlPrestId, pOutDesertInit[nRand][i].nRand, 0);
 	}
 }
 
 // 1.13c D2Common+0x85DF0
 void __fastcall DRLGOUTDESR_PlaceBorders(D2DrlgLevelStrc* pLevel)
 {
-	DRLGOUTDOORS_AddAct124SecondaryBorder(pLevel, 2, LVLPREST_ACT2_DESERT_BORDER_1);
-	DRLGOUTDOORS_AddAct124SecondaryBorder(pLevel, 1, LVLPREST_ACT2_DESERT_BORDER_1);
-	DRLGOUTDOORS_AddAct124SecondaryBorder(pLevel, 3, LVLPREST_ACT2_DESERT_BORDER_1);
+	D2_CALL(DRLGOUTDOORS_AddAct124SecondaryBorder, pLevel, 2, LVLPREST_ACT2_DESERT_BORDER_1);
+	D2_CALL(DRLGOUTDOORS_AddAct124SecondaryBorder, pLevel, 1, LVLPREST_ACT2_DESERT_BORDER_1);
+	D2_CALL(DRLGOUTDOORS_AddAct124SecondaryBorder, pLevel, 3, LVLPREST_ACT2_DESERT_BORDER_1);
 }
 
 // 1.13c D2Common+0x859F0
@@ -277,12 +278,12 @@ void __fastcall DRLGOUTDESR_AddExits(D2DrlgLevelStrc* pLevel)
 // 1.13c D2Common+0x85C90
 void __fastcall DRLGOUTDESR_PlaceFillsInFarOasis(D2DrlgLevelStrc* pLevel)
 {
-	const int nLevelPrestIds1[4] = { LVLPREST_ACT2_DESERT_RUINS_08X08, LVLPREST_ACT2_DESERT_FILL_HEAD_1, LVLPREST_ACT2_DESERT_FILL_MESA_1, LVLPREST_ACT2_DESERT_FILL_WAGON_1 };
-	const int nLevelPrestIds2[1] = { LVLPREST_ACT2_DESERT_OASIS_1 };
+	// 1.13c keeps both id tables in one frame array: the single-id table is its first word, the four-id table follows it.
+	const int nLevelPrestIds[5] = { LVLPREST_ACT2_DESERT_OASIS_1, LVLPREST_ACT2_DESERT_RUINS_08X08, LVLPREST_ACT2_DESERT_FILL_HEAD_1, LVLPREST_ACT2_DESERT_FILL_MESA_1, LVLPREST_ACT2_DESERT_FILL_WAGON_1 };
 
-	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds1, ARRAY_SIZE(nLevelPrestIds1), FALSE);
-	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds2, ARRAY_SIZE(nLevelPrestIds2), TRUE);
-	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds2, ARRAY_SIZE(nLevelPrestIds2), TRUE);
+	D2_CALL(DRLGOUTDESR_PlacePresetVariants, pLevel, nLevelPrestIds + 1, 4, FALSE);
+	D2_CALL(DRLGOUTDESR_PlacePresetVariants, pLevel, nLevelPrestIds, 1, TRUE);
+	D2_CALL(DRLGOUTDESR_PlacePresetVariants, pLevel, nLevelPrestIds, 1, TRUE);
 }
 
 // 1.13c D2Common+0x85C50
@@ -290,18 +291,18 @@ void __fastcall DRLGOUTDESR_PlaceRuinsInLostCity(D2DrlgLevelStrc* pLevel)
 {
 	const int nLevelPrestIds[4] = { LVLPREST_ACT2_DESERT_RUINS_ELDER, LVLPREST_ACT2_DESERT_RUINS_16X16, LVLPREST_ACT2_DESERT_RUINS_16X08, LVLPREST_ACT2_DESERT_RUINS_08X16 };
 
-	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds, ARRAY_SIZE(nLevelPrestIds), FALSE);
+	D2_CALL(DRLGOUTDESR_PlacePresetVariants, pLevel, nLevelPrestIds, ARRAY_SIZE(nLevelPrestIds), FALSE);
 }
 
 // 1.13c D2Common+0x85BE0
 void __fastcall DRLGOUTDESR_PlaceFillsInLostCity(D2DrlgLevelStrc* pLevel)
 {
-	const int nLevelPrestIds1[5] = { LVLPREST_ACT2_DESERT_OASIS_1, LVLPREST_ACT2_DESERT_FILL_HEAD_2, LVLPREST_ACT2_DESERT_FILL_MESA_1, LVLPREST_ACT2_DESERT_FILL_BERMS_1, LVLPREST_ACT2_DESERT_FILL_BERMS_2 };
-	const int nLevelPrestIds2[1] = { LVLPREST_ACT2_DESERT_RUINS_08X08 };
+	// One frame array in 1.13c: the single-id table is its first word, the five-id table follows it.
+	const int nLevelPrestIds[6] = { LVLPREST_ACT2_DESERT_RUINS_08X08, LVLPREST_ACT2_DESERT_OASIS_1, LVLPREST_ACT2_DESERT_FILL_HEAD_2, LVLPREST_ACT2_DESERT_FILL_MESA_1, LVLPREST_ACT2_DESERT_FILL_BERMS_1, LVLPREST_ACT2_DESERT_FILL_BERMS_2 };
 
-	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds1, ARRAY_SIZE(nLevelPrestIds1), FALSE);
-	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds2, ARRAY_SIZE(nLevelPrestIds2), TRUE);
-	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds2, ARRAY_SIZE(nLevelPrestIds2), TRUE);
+	D2_CALL(DRLGOUTDESR_PlacePresetVariants, pLevel, nLevelPrestIds + 1, 5, FALSE);
+	D2_CALL(DRLGOUTDESR_PlacePresetVariants, pLevel, nLevelPrestIds, 1, TRUE);
+	D2_CALL(DRLGOUTDESR_PlacePresetVariants, pLevel, nLevelPrestIds, 1, TRUE);
 }
 
 // 1.13c D2Common+0x858E0
@@ -322,18 +323,18 @@ void __fastcall DRLGOUTDESR_PlaceTombEntriesInCanyon(D2DrlgLevelStrc* pLevel)
 
 	for (int i = 0; i < ARRAY_SIZE(pOutDesertInit); ++i)
 	{
-		DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, pOutDesertInit[i].nX, pOutDesertInit[i].nY, pOutDesertInit[i].nLvlPrestId, pOutDesertInit[i].nRand, 0);
+		D2_CALL(DRLGOUTDOORS_SpawnOutdoorLevelPresetEx, pLevel, pOutDesertInit[i].nX, pOutDesertInit[i].nY, pOutDesertInit[i].nLvlPrestId, pOutDesertInit[i].nRand, 0);
 	}
 
-	DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, 4, 4, LVLPREST_ACT2_DESERT_VALLEY_WARP, -1, 0);
+	D2_CALL(DRLGOUTDOORS_SpawnOutdoorLevelPresetEx, pLevel, 4, 4, LVLPREST_ACT2_DESERT_VALLEY_WARP, -1, 0);
 }
 
 // 1.13c D2Common+0x85B80
 void __fastcall DRLGOUTDESR_PlaceFillsInCanyon(D2DrlgLevelStrc* pLevel)
 {
-	const int nLevelPrestIds1[5] = { LVLPREST_ACT2_DESERT_FILL_BONE_1, LVLPREST_ACT2_DESERT_FILL_BONE_2, LVLPREST_ACT2_DESERT_FILL_BERMS_3, LVLPREST_ACT2_DESERT_FILL_BERMS_4, LVLPREST_ACT2_DESERT_FILL_WAGON_1 };
-	const int nLevelPrestIds2[2] = { LVLPREST_ACT2_DESERT_VALLEY_RUIN_1, LVLPREST_ACT2_DESERT_VALLEY_RUIN_2 };
+	// One frame array in 1.13c: the two-id table first, the five-id table after it.
+	const int nLevelPrestIds[7] = { LVLPREST_ACT2_DESERT_VALLEY_RUIN_1, LVLPREST_ACT2_DESERT_VALLEY_RUIN_2, LVLPREST_ACT2_DESERT_FILL_BONE_1, LVLPREST_ACT2_DESERT_FILL_BONE_2, LVLPREST_ACT2_DESERT_FILL_BERMS_3, LVLPREST_ACT2_DESERT_FILL_BERMS_4, LVLPREST_ACT2_DESERT_FILL_WAGON_1 };
 
-	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds1, ARRAY_SIZE(nLevelPrestIds1), FALSE);
-	DRLGOUTDESR_PlacePresetVariants(pLevel, nLevelPrestIds2, ARRAY_SIZE(nLevelPrestIds2), TRUE);
+	D2_CALL(DRLGOUTDESR_PlacePresetVariants, pLevel, nLevelPrestIds + 2, 5, FALSE);
+	D2_CALL(DRLGOUTDESR_PlacePresetVariants, pLevel, nLevelPrestIds, 2, TRUE);
 }

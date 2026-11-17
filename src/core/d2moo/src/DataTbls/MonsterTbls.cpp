@@ -565,7 +565,8 @@ void __fastcall DATATBLS_LoadMonStatsTxt(HD2ARCHIVE hArchive)
 
 //D2Common.0x6FD67BD0 (#11261)
 // 1.13c D2Common+0x54A00: checked branch by branch against the retail body (identical: clamps, field offsets, the
-// no-ratio flag at monstats +0xC bit 2, and retail's habit of writing the no-ratio elemental damage into the S1 slots)
+// no-ratio flag at monstats +0xC bit 2, and retail's habit of writing the no-ratio elemental damage into the S1 slots).
+// 1.13c reads every monstats value signed (movsx); the struct declares them unsigned, hence the int16_t casts.
 BOOL __stdcall DATATBLS_CalculateMonsterStatsByLevel(int nMonsterId, int nGameType, int nDifficulty, int nLevel, short nFlags, D2MonStatsInitStrc* pMonStatsInit)
 {
 	D2MonStatsTxt* pMonStatsTxtRecord = NULL;
@@ -600,13 +601,13 @@ BOOL __stdcall DATATBLS_CalculateMonsterStatsByLevel(int nMonsterId, int nGameTy
 				{
 					if (pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_NORATIO])
 					{
-						pMonStatsInit->nMinHP = pMonStatsTxtRecord->nMinHP[nDifficulty];
-						pMonStatsInit->nMaxHP = pMonStatsTxtRecord->nMaxHP[nDifficulty];
+						pMonStatsInit->nMinHP = (int16_t)pMonStatsTxtRecord->nMinHP[nDifficulty];
+						pMonStatsInit->nMaxHP = (int16_t)pMonStatsTxtRecord->nMaxHP[nDifficulty];
 					}
 					else
 					{
-						pMonStatsInit->nMinHP = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwHP[nDifficulty + nOffset], pMonStatsTxtRecord->nMinHP[nDifficulty], 100);
-						pMonStatsInit->nMaxHP = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwHP[nDifficulty + nOffset], pMonStatsTxtRecord->nMaxHP[nDifficulty], 100);
+						pMonStatsInit->nMinHP = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwHP[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nMinHP[nDifficulty], 100);
+						pMonStatsInit->nMaxHP = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwHP[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nMaxHP[nDifficulty], 100);
 					}
 				}
 
@@ -614,11 +615,11 @@ BOOL __stdcall DATATBLS_CalculateMonsterStatsByLevel(int nMonsterId, int nGameTy
 				{
 					if (pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_NORATIO])
 					{
-						pMonStatsInit->nAC = pMonStatsTxtRecord->nAC[nDifficulty];
+						pMonStatsInit->nAC = (int16_t)pMonStatsTxtRecord->nAC[nDifficulty];
 					}
 					else
 					{
-						pMonStatsInit->nAC = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwAC[nDifficulty + nOffset], pMonStatsTxtRecord->nAC[nDifficulty], 100);
+						pMonStatsInit->nAC = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwAC[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nAC[nDifficulty], 100);
 					}
 				}
 
@@ -626,11 +627,11 @@ BOOL __stdcall DATATBLS_CalculateMonsterStatsByLevel(int nMonsterId, int nGameTy
 				{
 					if (pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_NORATIO])
 					{
-						pMonStatsInit->nExp = pMonStatsTxtRecord->nExp[nDifficulty];
+						pMonStatsInit->nExp = (int16_t)pMonStatsTxtRecord->nExp[nDifficulty];
 					}
 					else
 					{
-						pMonStatsInit->nExp = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwXP[nDifficulty + nOffset], pMonStatsTxtRecord->nExp[nDifficulty], 100);
+						pMonStatsInit->nExp = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwXP[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nExp[nDifficulty], 100);
 					}
 				}
 
@@ -638,15 +639,15 @@ BOOL __stdcall DATATBLS_CalculateMonsterStatsByLevel(int nMonsterId, int nGameTy
 				{
 					if (pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_NORATIO])
 					{
-						pMonStatsInit->nTH = pMonStatsTxtRecord->nA1TH[nDifficulty];
-						pMonStatsInit->nA1MinD = pMonStatsTxtRecord->nA1MinD[nDifficulty];
-						pMonStatsInit->nA1MaxD = pMonStatsTxtRecord->nA1MaxD[nDifficulty];
+						pMonStatsInit->nTH = (int16_t)pMonStatsTxtRecord->nA1TH[nDifficulty];
+						pMonStatsInit->nA1MinD = (int16_t)pMonStatsTxtRecord->nA1MinD[nDifficulty];
+						pMonStatsInit->nA1MaxD = (int16_t)pMonStatsTxtRecord->nA1MaxD[nDifficulty];
 					}
 					else
 					{
-						pMonStatsInit->nTH = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwTH[nDifficulty + nOffset], pMonStatsTxtRecord->nA1TH[nDifficulty], 100);
-						pMonStatsInit->nA1MinD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], pMonStatsTxtRecord->nA1MinD[nDifficulty], 100);
-						pMonStatsInit->nA1MaxD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], pMonStatsTxtRecord->nA1MaxD[nDifficulty], 100);
+						pMonStatsInit->nTH = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwTH[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nA1TH[nDifficulty], 100);
+						pMonStatsInit->nA1MinD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nA1MinD[nDifficulty], 100);
+						pMonStatsInit->nA1MaxD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nA1MaxD[nDifficulty], 100);
 					}
 				}
 
@@ -654,15 +655,15 @@ BOOL __stdcall DATATBLS_CalculateMonsterStatsByLevel(int nMonsterId, int nGameTy
 				{
 					if (pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_NORATIO])
 					{
-						pMonStatsInit->nTH = pMonStatsTxtRecord->nA2TH[nDifficulty];
-						pMonStatsInit->nA2MinD = pMonStatsTxtRecord->nA2MinD[nDifficulty];
-						pMonStatsInit->nA2MaxD = pMonStatsTxtRecord->nA2MaxD[nDifficulty];
+						pMonStatsInit->nTH = (int16_t)pMonStatsTxtRecord->nA2TH[nDifficulty];
+						pMonStatsInit->nA2MinD = (int16_t)pMonStatsTxtRecord->nA2MinD[nDifficulty];
+						pMonStatsInit->nA2MaxD = (int16_t)pMonStatsTxtRecord->nA2MaxD[nDifficulty];
 					}
 					else
 					{
-						pMonStatsInit->nTH = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwTH[nDifficulty + nOffset], pMonStatsTxtRecord->nA2TH[nDifficulty], 100);
-						pMonStatsInit->nA2MinD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], pMonStatsTxtRecord->nA2MinD[nDifficulty], 100);
-						pMonStatsInit->nA2MaxD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], pMonStatsTxtRecord->nA2MaxD[nDifficulty], 100);
+						pMonStatsInit->nTH = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwTH[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nA2TH[nDifficulty], 100);
+						pMonStatsInit->nA2MinD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nA2MinD[nDifficulty], 100);
+						pMonStatsInit->nA2MaxD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nA2MaxD[nDifficulty], 100);
 					}
 				}
 
@@ -670,15 +671,15 @@ BOOL __stdcall DATATBLS_CalculateMonsterStatsByLevel(int nMonsterId, int nGameTy
 				{
 					if (pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_NORATIO])
 					{
-						pMonStatsInit->nTH = pMonStatsTxtRecord->nS1TH[nDifficulty];
-						pMonStatsInit->nS1MinD = pMonStatsTxtRecord->nS1MinD[nDifficulty];
-						pMonStatsInit->nS1MaxD = pMonStatsTxtRecord->nS1MaxD[nDifficulty];
+						pMonStatsInit->nTH = (int16_t)pMonStatsTxtRecord->nS1TH[nDifficulty];
+						pMonStatsInit->nS1MinD = (int16_t)pMonStatsTxtRecord->nS1MinD[nDifficulty];
+						pMonStatsInit->nS1MaxD = (int16_t)pMonStatsTxtRecord->nS1MaxD[nDifficulty];
 					}
 					else
 					{
-						pMonStatsInit->nTH = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwTH[nDifficulty + nOffset], pMonStatsTxtRecord->nS1TH[nDifficulty], 100);
-						pMonStatsInit->nS1MinD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], pMonStatsTxtRecord->nS1MinD[nDifficulty], 100);
-						pMonStatsInit->nS1MaxD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], pMonStatsTxtRecord->nS1MaxD[nDifficulty], 100);
+						pMonStatsInit->nTH = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwTH[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nS1TH[nDifficulty], 100);
+						pMonStatsInit->nS1MinD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nS1MinD[nDifficulty], 100);
+						pMonStatsInit->nS1MaxD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nS1MaxD[nDifficulty], 100);
 					}
 				}
 
@@ -686,48 +687,48 @@ BOOL __stdcall DATATBLS_CalculateMonsterStatsByLevel(int nMonsterId, int nGameTy
 				{
 					if (pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_NORATIO])
 					{
-						pMonStatsInit->nS1MinD = pMonStatsTxtRecord->nElMinD[0][nDifficulty];
-						pMonStatsInit->nS1MaxD = pMonStatsTxtRecord->nElMaxD[0][nDifficulty];
+						pMonStatsInit->nS1MinD = (int16_t)pMonStatsTxtRecord->nElMinD[0][nDifficulty];
+						pMonStatsInit->nS1MaxD = (int16_t)pMonStatsTxtRecord->nElMaxD[0][nDifficulty];
 					}
 					else
 					{
-						pMonStatsInit->nElMinD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], pMonStatsTxtRecord->nElMinD[0][nDifficulty], 100);
-						pMonStatsInit->nElMaxD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], pMonStatsTxtRecord->nElMaxD[0][nDifficulty], 100);
+						pMonStatsInit->nElMinD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nElMinD[0][nDifficulty], 100);
+						pMonStatsInit->nElMaxD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nElMaxD[0][nDifficulty], 100);
 					}
 
-					pMonStatsInit->nElDur = pMonStatsTxtRecord->nElDur[0][nDifficulty];
+					pMonStatsInit->nElDur = (int16_t)pMonStatsTxtRecord->nElDur[0][nDifficulty];
 				}
 
 				if (nFlags & 0x80)
 				{
 					if (pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_NORATIO])
 					{
-						pMonStatsInit->nS1MinD = pMonStatsTxtRecord->nElMinD[1][nDifficulty];
-						pMonStatsInit->nS1MaxD = pMonStatsTxtRecord->nElMaxD[1][nDifficulty];
+						pMonStatsInit->nS1MinD = (int16_t)pMonStatsTxtRecord->nElMinD[1][nDifficulty];
+						pMonStatsInit->nS1MaxD = (int16_t)pMonStatsTxtRecord->nElMaxD[1][nDifficulty];
 					}
 					else
 					{
-						pMonStatsInit->nElMinD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], pMonStatsTxtRecord->nElMinD[1][nDifficulty], 100);
-						pMonStatsInit->nElMaxD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], pMonStatsTxtRecord->nElMaxD[1][nDifficulty], 100);
+						pMonStatsInit->nElMinD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nElMinD[1][nDifficulty], 100);
+						pMonStatsInit->nElMaxD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nElMaxD[1][nDifficulty], 100);
 					}
 
-					pMonStatsInit->nElDur = pMonStatsTxtRecord->nElDur[1][nDifficulty];
+					pMonStatsInit->nElDur = (int16_t)pMonStatsTxtRecord->nElDur[1][nDifficulty];
 				}
 
 				if (nFlags & 0x100)
 				{
 					if (pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_NORATIO])
 					{
-						pMonStatsInit->nS1MinD = pMonStatsTxtRecord->nElMinD[2][nDifficulty];
-						pMonStatsInit->nS1MaxD = pMonStatsTxtRecord->nElMaxD[2][nDifficulty];
+						pMonStatsInit->nS1MinD = (int16_t)pMonStatsTxtRecord->nElMinD[2][nDifficulty];
+						pMonStatsInit->nS1MaxD = (int16_t)pMonStatsTxtRecord->nElMaxD[2][nDifficulty];
 					}
 					else
 					{
-						pMonStatsInit->nElMinD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], pMonStatsTxtRecord->nElMinD[2][nDifficulty], 100);
-						pMonStatsInit->nElMaxD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], pMonStatsTxtRecord->nElMaxD[2][nDifficulty], 100);
+						pMonStatsInit->nElMinD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nElMinD[2][nDifficulty], 100);
+						pMonStatsInit->nElMaxD = DATATBLS_ApplyRatio(pMonLvlTxtRecord->dwDM[nDifficulty + nOffset], (int16_t)pMonStatsTxtRecord->nElMaxD[2][nDifficulty], 100);
 					}
 
-					pMonStatsInit->nElDur = pMonStatsTxtRecord->nElDur[2][nDifficulty];
+					pMonStatsInit->nElDur = (int16_t)pMonStatsTxtRecord->nElDur[2][nDifficulty];
 				}
 
 				return TRUE;

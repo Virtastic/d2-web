@@ -7,8 +7,7 @@
 #include <cstring>
 #include "Drlg/D2DrlgDrlg.h"
 
-extern "C" void D2Common_44B20(D2DrlgOrthStrc** head, D2DrlgOrthStrc* node, bool (*before)(const D2DrlgOrthStrc*, const D2DrlgOrthStrc*));
-extern "C" bool D2Common_44B20_Before(const D2DrlgOrthStrc* a, const D2DrlgOrthStrc* b);
+#include "Drlg/D2DrlgDrlgRoom.h"
 
 // stand-alone 32-bit layout twin of D2Common 0x44F20 (the proven row runs DRLGROOM_AddOrth)
 extern "C" uint32_t D2Common_44F20(uint32_t level, uint32_t head, int32_t direction, int32_t preset, uint8_t* (*resolve)(uint32_t),
@@ -35,6 +34,6 @@ extern "C" void D2Common_44F20_Engine(D2DrlgOrthStrc** head, D2DrlgLevelStrc* le
     auto* node = D2_CALLOC_STRC_POOL(level->pDrlg->pMempool, D2DrlgOrthStrc);
     node->pLevel = level; std::memcpy(&node->nDirection, &direction, sizeof(direction));
     node->bPreset = preset; node->pBox = &level->pLevelCoords;
-    D2Common_44B20(head, node, D2Common_44B20_Before);
+    DRLGROOM_InsertOrthSorted(head, node);
 }
 

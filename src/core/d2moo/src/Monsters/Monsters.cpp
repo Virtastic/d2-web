@@ -12,6 +12,7 @@
 #include <D2Lang.h>
 #include <D2BitManip.h>
 #include <DataTbls/MonsterIds.h>
+#include <test_seam.h>
 
 
 //TODO: Check names
@@ -404,11 +405,18 @@ int __stdcall MONSTERS_GetHirelingExpForNextLevel(int nLevel, int nExpPerLevel)
 
 //D2Common.0x6FDA5220 (#11083)
 // 1.13c D2Common+0x2CC60: the level comes from the extended stat list and the cost is ((level*level)/2)*15, capped;
-// the port's 1.10f body (15*L*L/2 on the base stat list) differed for odd levels, so this now calls the 1.13c port
-extern "C" uint32_t D2Common_2CC60_HirelingReviveCost(D2UnitStrc* unit);
+// level is 0 when the unit or its extended stat list is null or the ItemStatCost count is 12 or less; the square wraps in
+// 32 bits, the halving is signed, and the cost is clamped to 50000 unsigned (the 1.10f body, 15*L*L/2 on the base stat list, differed for odd levels)
 int __stdcall MONSTERS_GetHirelingResurrectionCost(D2UnitStrc* pHireling)
 {
-	return static_cast<int>(D2Common_2CC60_HirelingReviveCost(pHireling));
+	int32_t nLevel = 0;
+	if (pHireling && pHireling->pStatListEx && sgptDataTables->nItemStatCostTxtRecordCount > STAT_LEVEL && sgptDataTables->pItemStatCostTxt)
+	{
+		nLevel = STATLIST_GetTotalStat_6FDB63E0(pHireling->pStatListEx, D2SLayerStatIdStrc::Make(0, STAT_LEVEL).nPackedValue, &sgptDataTables->pItemStatCostTxt[STAT_LEVEL]);
+	}
+	const uint32_t nSquare = static_cast<uint32_t>(nLevel) * static_cast<uint32_t>(nLevel);
+	const uint32_t nCost = static_cast<uint32_t>(static_cast<int32_t>(nSquare) / 2) * 15u;
+	return static_cast<int>(nCost > 50000u ? 50000u : nCost);
 }
 
 //D2Common.0x6FDA5270 (#11068)
@@ -1334,13 +1342,13 @@ void __stdcall MONSTERS_ApplyClassicScaling(D2UnitStrc* pMonster, BOOL bExpansio
 		{
 			for (const auto& rAdjustment : aClassicStatAdjustments)
 			{
-				const int32_t nValue = STATLIST_UnitGetStatValue(pMonster, rAdjustment.nStatID, 0);
+				const int32_t nValue = D2_CALL(STATLIST_UnitGetStatValue, pMonster, rAdjustment.nStatID, 0);
 				const int32_t nAdjustedValue = nDifficulty == DIFFMODE_NIGHTMARE
-					? DATATBLS_ApplyRatio(nValue, rAdjustment.nNightmareMultiplier, rAdjustment.nNightmareDivisor)
-					: DATATBLS_ApplyRatio(nValue, rAdjustment.nHellMultiplier, rAdjustment.nHellDivisor);
-				STATLIST_SetUnitStat(pMonster, rAdjustment.nStatID, nAdjustedValue, 0);
+					? D2_CALL(DATATBLS_ApplyRatio, nValue, rAdjustment.nNightmareMultiplier, rAdjustment.nNightmareDivisor)
+					: D2_CALL(DATATBLS_ApplyRatio, nValue, rAdjustment.nHellMultiplier, rAdjustment.nHellDivisor);
+				D2_CALL(STATLIST_SetUnitStat, pMonster, rAdjustment.nStatID, nAdjustedValue, 0);
 			}
-			STATLIST_SetUnitStat(pMonster, STAT_LEVEL, 25 * nDifficulty + pMonStatsTxtRecord->nLevel[0], 0);
+			D2_CALL(STATLIST_SetUnitStat, pMonster, STAT_LEVEL, 25 * nDifficulty + pMonStatsTxtRecord->nLevel[0], 0);
 		}
 	}
 }
@@ -1397,4 +1405,27 @@ int __fastcall MONSTERS_ValidateMonsterId(int nMonsterId)
 	}
 
 	return -1;
+}
+
+// 1.13c D2Common+0x35100: path type of a monster unit from its MonStats record (plain ret, unit in EAX).
+// Flying (record byte +0xD, bit 0x40) answers 0x1804; open doors (record byte +0xC, bit 0x08) answers 0x3401;
+// anything else answers 0x3C01. Retail reads address 0x0D for a unit without a valid record (an access
+// fault), so this aborts the same way.
+extern "C" uint32_t D2Common_35100_MonsterPathType(D2UnitStrc* pUnit)
+{
+	if (!pUnit || !sgptDataTables || !sgptDataTables->pMonStatsTxt)
+	{
+		abort();
+	}
+	const int32_t nClass = pUnit->dwClassId;
+	if (nClass < 0 || nClass >= sgptDataTables->nMonStatsTxtRecordCount)
+	{
+		abort();
+	}
+	const uint8_t* pRec = reinterpret_cast<const uint8_t*>(sgptDataTables->pMonStatsTxt) + static_cast<size_t>(nClass) * 0x1A8;
+	if (pRec[0xD] & 0x40)
+	{
+		return 0x1804;
+	}
+	return (pRec[0xC] & 0x08) ? 0x3401u : 0x3C01u;
 }

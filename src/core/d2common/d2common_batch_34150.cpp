@@ -278,18 +278,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_BlockDword1C(uint32_t pBlock)
 	return R(P(pBlock), 0x1C);
 }
 
-struct D2Common4D140Env;
-extern "C" int* D2Common_4D140_FindFreeSpot(const D2Common4D140Env* e, void* pLevel, int* pPos, uint32_t* pUnit,
-	uint32_t p4, uint32_t p5, uint32_t p6, int p7, int p8, int p9);
-
-// 1.13c D2Common+0x4D7E0 (#10654): forwarder to 0x4D140 with p8 = 0x32, p9 = 1.
-extern "C"
-int* D2Common_4D7E0_FindFreeSpotR50(const D2Common4D140Env* e, void* pLevel, int* pPos, uint32_t* pUnit,
-                                    uint32_t p4, uint32_t p5, uint32_t p6, int p7)
-{
-	return D2Common_4D140_FindFreeSpot(e, pLevel, pPos, pUnit, p4, p5, p6, p7, 0x32, 1);
-}
-
 // 0x21D70 is a still-UNMAPPED row.
 struct D2Common21EE0Env
 {

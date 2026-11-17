@@ -39,8 +39,6 @@ extern "C" void D2Common_7BE50_NormaliseStatus(intptr_t pRoom)
 
 
 
-extern "C" void D2Common_44B20(D2DrlgOrthStrc** head, D2DrlgOrthStrc* node, bool (*before)(const D2DrlgOrthStrc*, const D2DrlgOrthStrc*));
-extern "C" bool D2Common_44B20_Before(const D2DrlgOrthStrc* a, const D2DrlgOrthStrc* b);
 
 struct D2CommonPlacement13c { int32_t x, y, width, height, direction; };
 static_assert(offsetof(D2CommonPlacement13c, direction) == 0x10);

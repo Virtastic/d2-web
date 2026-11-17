@@ -12,7 +12,7 @@
 #include "D2BitManip.h"
 #include "D2DataTbls.h"
 #include "D2Items.h"
-uint32_t D2Common_24430_CheckItemTypeId(const D2UnitStrc* pItem, int nItemType);
+static inline uint32_t D2Common_24430_CheckItemTypeId(const D2UnitStrc* pItem, int nItemType) { return ITEMS_CheckItemTypeId(pItem, nItemType); }   // the game's 0x24430 body
 #include "D2Monsters.h"
 #include "D2StatList.h"
 #include "DataTbls/MonsterTbls.h"

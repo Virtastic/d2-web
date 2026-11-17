@@ -515,48 +515,76 @@ char* __stdcall DATATBLS_GetUnitNameFromUnit(D2UnitStrc* pUnit, char* szName)
 	return szName;
 }
 
+// 1.13c D2Common+0x5E410
+void DATATBLS_GetItemClassName(int32_t nClassId, char* szName)
+{
+	const D2ItemDataTbl& itemData = sgptDataTables->pItemDataTables;
+	if (static_cast<uint32_t>(nClassId) < static_cast<uint32_t>(itemData.nItemsTxtRecordCount))
+	{
+		if (!itemData.pItemsTxt)
+		{
+			return;
+		}
+
+		const D2ItemsTxt* pItemsTxtRecord = itemData.pItemsTxt + nClassId;
+		if (pItemsTxtRecord && pItemsTxtRecord->wNameStr != 5382)
+		{
+			Unicode::unicode2Win(szName, (const Unicode*)D2LANG_GetStringFromTblIndex(pItemsTxtRecord->wNameStr), 64);
+			return;
+		}
+	}
+
+	sprintf_s(szName, 64, "item %d", nClassId);
+}
+
+// 1.13c D2Common+0x5E480
+void DATATBLS_GetMonsterClassName(int32_t nClassId, char* szName)
+{
+	if (nClassId >= 0 && nClassId < sgptDataTables->nMonStatsTxtRecordCount)
+	{
+		const D2MonStatsTxt* pMonStatsTxtRecord = sgptDataTables->pMonStatsTxt + nClassId;
+		if (pMonStatsTxtRecord && pMonStatsTxtRecord->wNameStr != 5382)
+		{
+			Unicode::unicode2Win(szName, (const Unicode*)D2LANG_GetStringFromTblIndex(pMonStatsTxtRecord->wNameStr), 64);
+			return;
+		}
+	}
+
+	sprintf_s(szName, 64, "monster %d", nClassId);
+}
+
+// 1.13c D2Common+0x5E4D0
+void DATATBLS_GetPlayerClassName(int32_t nClassId, char* szName)
+{
+	if (nClassId >= 0 && nClassId < sgptDataTables->nCharStatsTxtRecordCount)
+	{
+		const D2CharStatsTxt* pCharStatsTxtRecord = sgptDataTables->pCharStatsTxt + nClassId;
+		if (pCharStatsTxtRecord && pCharStatsTxtRecord->szClassName[0])
+		{
+			strcpy_s(szName, 64, pCharStatsTxtRecord->szClassName);
+			return;
+		}
+	}
+
+	sprintf_s(szName, 64, "player %d", nClassId);
+}
+
 //D2Common.0x6FD4FB50 (#11299)
 // 1.13c D2Common+0x5F1C0
 char* __stdcall DATATBLS_GetUnitNameFromUnitTypeAndClassId(int nUnitType, int nClassId, char* szName)
 {
-	D2CharStatsTxt* pCharStatsTxtRecord = NULL;
-	D2MonStatsTxt* pMonStatsTxtRecord = NULL;
 	D2ObjectsTxt* pObjectsTxtRecord = NULL;
-	D2ItemsTxt* pItemsTxtRecord = NULL;
 
 	*szName = 0;
 
 	switch (nUnitType)
 	{
 	case UNIT_PLAYER:
-		if (nClassId >= 0 && nClassId < sgptDataTables->nCharStatsTxtRecordCount)
-		{
-			pCharStatsTxtRecord = &sgptDataTables->pCharStatsTxt[nClassId];
-			if (pCharStatsTxtRecord && pCharStatsTxtRecord->szClassName[0])
-			{
-				strcpy_s(szName, 64, pCharStatsTxtRecord->szClassName);
-			}
-			else
-			{
-				sprintf_s(szName, 64, "player %d", nClassId);
-			}
-		}
-		else
-		{
-			sprintf_s(szName, 64, "player %d", nClassId);
-		}
+		DATATBLS_GetPlayerClassName(nClassId, szName);
 		break;
 
 	case UNIT_MONSTER:
-		pMonStatsTxtRecord = DATATBLS_GetMonStatsTxtRecord(nClassId);
-		if (pMonStatsTxtRecord && pMonStatsTxtRecord->wNameStr != 5382)
-		{
-			Unicode::unicode2Win(szName, (const Unicode*)D2LANG_GetStringFromTblIndex(pMonStatsTxtRecord->wNameStr), 64);
-		}
-		else
-		{
-			sprintf_s(szName, 64, "monster %d", nClassId);
-		}
+		DATATBLS_GetMonsterClassName(nClassId, szName);
 		break;
 
 	case UNIT_OBJECT:
@@ -576,15 +604,7 @@ char* __stdcall DATATBLS_GetUnitNameFromUnitTypeAndClassId(int nUnitType, int nC
 		break;
 
 	case UNIT_ITEM:
-		pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(nClassId);
-		if (pItemsTxtRecord && pItemsTxtRecord->wNameStr != 5382)
-		{
-			Unicode::unicode2Win(szName, (const Unicode*)D2LANG_GetStringFromTblIndex(pItemsTxtRecord->wNameStr), 64);
-		}
-		else
-		{
-			sprintf_s(szName, 64, "item %d", nClassId);
-		}
+		DATATBLS_GetItemClassName(nClassId, szName);
 		break;
 
 	default:
@@ -1217,3 +1237,23 @@ void __fastcall DATATBLS_LoadDifficultyLevelsTxt(HD2ARCHIVE hArchive)
 // OVERLAY
 
 // SEQUENCE & TOKEN
+
+// 1.13c D2Common+0x41D00: equality of two 16-byte name fields: both NUL-terminated names must be at most 8
+// characters, then dword 0 and dword 1 must match. A longer name is a fatal exit in retail (not reproduced: false).
+extern "C" bool D2Common_41D00(const char* pNameA, const char* pNameB)
+{
+	if (strnlen(pNameA, 9) > 8 || strnlen(pNameB, 9) > 8)
+	{
+		return false;
+	}
+	uint32_t a0, a1, b0, b1;
+	memcpy(&a0, pNameA, 4);
+	memcpy(&b0, pNameB, 4);
+	if (a0 != b0)
+	{
+		return false;
+	}
+	memcpy(&a1, pNameA + 4, 4);
+	memcpy(&b1, pNameB + 4, 4);
+	return a1 == b1;
+}

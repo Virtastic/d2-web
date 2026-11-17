@@ -1513,3 +1513,54 @@ void __stdcall DUNGEON_GameToClientSubtileDrawPositionCoords(int nX, int nY, int
 	*pX -= 16;
 	*pY += 16;
 }
+
+// 1.13c D2Common+0x3D040: sort comparator over two 16-bit keys: 1 when the first is larger, -1 when smaller, 0 when equal (unsigned).
+int32_t d2common_3d040(const uint16_t* a, const uint16_t* b)
+{
+	return *a > *b ? 1 : (*a < *b ? -1 : 0);
+}
+
+// 1.13c D2Common+0x3CF30: stable insertion sort of 12-byte records (count is the u16 in EAX). Only a record's word at +0 and
+// dword at +4 move (the dword at +8 stays in its slot). The comparator takes the held record copy and the candidate copy, both
+// {u16, dword}; a positive answer means the held record sorts after the candidate. The held copy is the largest record so far
+// and only changes when the candidate is not smaller.
+namespace
+{
+struct D2SortRec3CF30 { uint16_t w; uint32_t d; };
+inline D2SortRec3CF30 SortRecLoad3CF30(uint8_t* a, uint32_t i) { D2SortRec3CF30 r; memcpy(&r.w, a + i * 12, 2); memcpy(&r.d, a + i * 12 + 4, 4); return r; }
+inline void SortRecStore3CF30(uint8_t* a, uint32_t i, const D2SortRec3CF30& r) { memcpy(a + i * 12, &r.w, 2); memcpy(a + i * 12 + 4, &r.d, 4); }
+}
+
+extern "C" void D2Common_3CF30_Raw(uint16_t count, void* pArray, int32_t (*cmp)(const void* held, const void* cand))
+{
+	if (count <= 1)
+	{
+		return;
+	}
+	uint8_t* a = static_cast<uint8_t*>(pArray);
+	D2SortRec3CF30 held = SortRecLoad3CF30(a, 0);
+	for (uint32_t i = 1; i < count; i++)
+	{
+		D2SortRec3CF30 key = SortRecLoad3CF30(a, i);
+		if (cmp(&held, &key) > 0)
+		{
+			SortRecStore3CF30(a, i, held);
+			uint32_t j = i - 1;
+			while (j > 0)
+			{
+				D2SortRec3CF30 t = SortRecLoad3CF30(a, j - 1);
+				if (cmp(&t, &key) <= 0)
+				{
+					break;
+				}
+				SortRecStore3CF30(a, j, t);
+				j--;
+			}
+			SortRecStore3CF30(a, j, key);
+		}
+		else
+		{
+			held = key;
+		}
+	}
+}

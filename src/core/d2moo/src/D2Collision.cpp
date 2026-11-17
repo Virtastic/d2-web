@@ -4,6 +4,7 @@
 #include "D2Dungeon.h"
 #include <D2Lang.h>
 #include <D2CMP.h>
+#include <test_seam.h>
 
 //D2Common.0x6FD41000
 // 1.13c D2Common+0x4CA20: clear the tile's flag bytes from the 5x5 block under it, then OR the second tile's when given
@@ -807,9 +808,10 @@ void __stdcall COLLISION_ResetMaskWithSize(D2ActiveRoomStrc* pRoom, int nX, int 
 
 //D2Common.0x6FD43C10
 // 1.13c D2Common+0x4B4D0
+// 1.13c D2Common+0x4BB70 (the same clear again, with the arguments in registers)
 void __fastcall COLLISION_ResetCollisionMask(D2ActiveRoomStrc* pRoom, int nX, int nY, uint16_t nMask)
 {
-	pRoom = COLLISION_GetRoomBySubTileCoordinates(pRoom, nX, nY);
+	pRoom = D2_CALL(COLLISION_GetRoomBySubTileCoordinates, pRoom, nX, nY);
 	if (pRoom)
 	{
 		D2RoomCollisionGridStrc* pCollisionGrid = DUNGEON_GetCollisionGridFromRoom(pRoom);
@@ -844,6 +846,17 @@ void __fastcall COLLISION_ResetCollisionMaskForBoundingBoxRecursively(D2ActiveRo
 	}
 }
 
+// 1.13c D2Common+0x4BBB0: the plus-shaped five-subtile footprint centred on (nX, nY); each cell resolves its own
+// room through the neighbour search, so a footprint straddling a room edge clears both rooms.
+void COLLISION_ResetSmallUnitPresence(D2ActiveRoomStrc* pRoom, int nX, int nY, uint16_t nMask)
+{
+	COLLISION_ResetCollisionMask(pRoom, nX - 1, nY, nMask);
+	COLLISION_ResetCollisionMask(pRoom, nX, nY, nMask);
+	COLLISION_ResetCollisionMask(pRoom, nX + 1, nY, nMask);
+	COLLISION_ResetCollisionMask(pRoom, nX, nY - 1, nMask);
+	COLLISION_ResetCollisionMask(pRoom, nX, nY + 1, nMask);
+}
+
 //D2Common.0x6FD43E60 (#10126)
 // 1.13c D2Common+0x4BCF0
 void __stdcall COLLISION_ResetMaskWithPattern(D2ActiveRoomStrc* pRoom, int nX, int nY, int nCollisionPattern, uint16_t nMask)
@@ -855,11 +868,7 @@ void __stdcall COLLISION_ResetMaskWithPattern(D2ActiveRoomStrc* pRoom, int nX, i
 		switch (nCollisionPattern)
 		{
 		case COLLISION_PATTERN_SMALL_UNIT_PRESENCE:
-			COLLISION_ResetCollisionMask(pRoom, nX - 1, nY, nMask);
-			COLLISION_ResetCollisionMask(pRoom, nX, nY, nMask);
-			COLLISION_ResetCollisionMask(pRoom, nX + 1, nY, nMask);
-			COLLISION_ResetCollisionMask(pRoom, nX, nY - 1, nMask);
-			COLLISION_ResetCollisionMask(pRoom, nX, nY + 1, nMask);
+			COLLISION_ResetSmallUnitPresence(pRoom, nX, nY, nMask);
 
 			if (nMask)
 			{
@@ -1410,7 +1419,7 @@ BOOL __stdcall COLLISION_RayTrace(D2ActiveRoomStrc* pRoom, D2CoordStrc* pBeginCo
 // 1.13c D2Common+0x4D870 (field mask = mask, no field coord, step 1)
 D2ActiveRoomStrc* __stdcall COLLISION_GetFreeCoordinatesWithMaxDistance(D2ActiveRoomStrc* pRoom, D2CoordStrc* pSpawnPoint, int nUnitSize, unsigned int nMask, BOOL bAllowNeighborRooms, int nMaxDistance)
 {
-	return COLLISION_GetFreeCoordinatesImpl(pRoom, pSpawnPoint, NULL, nUnitSize, nMask, nMask, bAllowNeighborRooms, nMaxDistance, 1);
+	return D2_CALL(COLLISION_GetFreeCoordinatesImpl, pRoom, pSpawnPoint, NULL, nUnitSize, nMask, nMask, bAllowNeighborRooms, nMaxDistance, 1);
 }
 
 //1.10f: D2Common.0x6FD45A00
@@ -1683,7 +1692,7 @@ D2ActiveRoomStrc* __stdcall COLLISION_GetFreeCoordinatesEx(D2ActiveRoomStrc* pRo
 // 1.13c D2Common+0x4D7E0 (max distance 50, step 1)
 D2ActiveRoomStrc* __stdcall COLLISION_GetFreeCoordinatesWithField(D2ActiveRoomStrc* pRoom, D2CoordStrc* pSpawnPoint, D2CoordStrc* pFieldCoord, int nUnitSize, unsigned int nMask, unsigned int nFieldMask, BOOL bAllowNeighborRooms)
 {
-	return COLLISION_GetFreeCoordinatesImpl(pRoom, pSpawnPoint, pFieldCoord, nUnitSize, nMask, nFieldMask, bAllowNeighborRooms, 50, 1);
+	return D2_CALL(COLLISION_GetFreeCoordinatesImpl, pRoom, pSpawnPoint, pFieldCoord, nUnitSize, nMask, nFieldMask, bAllowNeighborRooms, 50, 1);
 }
 
 // 1.13c D2Common+0x4CB90 (retail inlines the size check, which is COLLISION_CheckMaskWithSizeXY with size a3 + 2)

@@ -139,6 +139,7 @@ void __fastcall COLLISION_ResetCollisionMask(D2ActiveRoomStrc* pRoom, int nX, in
 //D2Common.0x6FD43CE0
 void __fastcall COLLISION_ResetCollisionMaskForBoundingBoxRecursively(D2ActiveRoomStrc* pRoom, D2BoundingBoxStrc* pBoundingBox, uint16_t nMask);
 //D2Common.0x6FD43E60 (#10126)
+void COLLISION_ResetSmallUnitPresence(D2ActiveRoomStrc* pRoom, int nX, int nY, uint16_t nMask);
 D2COMMON_DLL_DECL void __stdcall COLLISION_ResetMaskWithPattern(D2ActiveRoomStrc* pRoom, int nX, int nY, int nCollisionPattern, uint16_t nMask);
 //D2Common.0x6FD44140 (#10125)
 D2COMMON_DLL_DECL void __stdcall COLLISION_ResetMaskWithSizeXY(D2ActiveRoomStrc* pRoom, int nX, int nY, unsigned int nSizeX, unsigned int nSizeY, uint16_t nMask);

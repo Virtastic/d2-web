@@ -611,6 +611,10 @@ D2StatesTxt* DATATBLS_GetStatesTxtRecord(int nStateId);
 void __fastcall DATATBLS_LoadPetTypeTxt(HD2ARCHIVE hArchive);
 //D2Common.0x6FD4F990 (#11298)
 D2COMMON_DLL_DECL char* __stdcall DATATBLS_GetUnitNameFromUnit(D2UnitStrc* pUnit, char* szName);
+// 1.13c D2Common+0x5E410 / 0x5E480 / 0x5E4D0: the per-type name helpers behind the dispatcher below
+void DATATBLS_GetItemClassName(int32_t nClassId, char* szName);
+void DATATBLS_GetMonsterClassName(int32_t nClassId, char* szName);
+void DATATBLS_GetPlayerClassName(int32_t nClassId, char* szName);
 //D2Common.0x6FD4FB50 (#11299)
 D2COMMON_DLL_DECL char* __stdcall DATATBLS_GetUnitNameFromUnitTypeAndClassId(int nUnitType, int nClassId, char* szName);
 //D2Common.0x6FD4FCF0 (#10580)

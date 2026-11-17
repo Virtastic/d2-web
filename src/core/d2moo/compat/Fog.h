@@ -61,7 +61,10 @@ inline void* FOG_ReallocPool(void*, void* p, size_t n, const char*, int, int) { 
 // can log the frees retail's 0xA2EC hook records. Null in the engine.
 inline void (*g_fogFreePoolHook)(void*, void*, const char*, int) = nullptr;
 inline void  FOG_FreePool(void* pool, void* p, const char* f, int l, int) { if (g_fogFreePoolHook) { g_fogFreePoolHook(pool, p, f, l); return; } free(p); }
-inline void* FOG_Alloc(size_t n, const char*, int, int) { return calloc(1, n ? n : 1); }
+// g_fogAllocHook: the FN probes' seam for a plain allocation (src/core/fn/d2common_1a6d0.cpp): when set, the allocation is answered by it
+// (retail's hooked Fog allocator hands back the capture's block). Null in the engine.
+inline void* (*g_fogAllocHook)(size_t, const char*, int) = nullptr;
+inline void* FOG_Alloc(size_t n, const char* f, int l, int) { if (g_fogAllocHook) return g_fogAllocHook(n, f, l); return calloc(1, n ? n : 1); }
 inline void  FOG_Free(void* p, const char*, int, int) { free(p); }
 
 #define D2_ALLOC(size) FOG_Alloc((size), __FILE__, __LINE__, 0)
