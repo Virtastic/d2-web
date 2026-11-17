@@ -403,14 +403,14 @@ void __fastcall PARTYSCREEN_ToggleHostile(D2GameStrc* pGame, D2UnitStrc* pPlayer
 void __fastcall sub_6FC7B3F0(D2GameStrc* pGame, D2UnitStrc* pPlayer1, void* pArg)
 {
     D2UnitStrc* pPlayer2 = (D2UnitStrc*)pArg;
-    if (pPlayer2 == pPlayer1 || STATLIST_GetUnitBaseStat(pPlayer1, STAT_LEVEL, 0) <= 8)
+    if (pPlayer2 == pPlayer1 || D2_CALL(STATLIST_GetUnitBaseStat, pPlayer1, STAT_LEVEL, 0) <= 8)
     {
         return;
     }
 
-    FRIENDLY_OpenHostility(pGame, pPlayer2, pPlayer1);
-    FRIENDLY_OpenHostility(pGame, pPlayer1, pPlayer2);
-    PARTYSCREEN_SendEventUpdateToClient(PARTYSCREEN_GetClient(pPlayer1), pPlayer2 ? pPlayer2->dwUnitId : -1, PARTYSCREENTYPE_HOSTILE);
+    D2_CALL(FRIENDLY_OpenHostility, pGame, pPlayer2, pPlayer1);
+    D2_CALL(FRIENDLY_OpenHostility, pGame, pPlayer1, pPlayer2);
+    D2_CALL(PARTYSCREEN_SendEventUpdateToClient, PARTYSCREEN_GetClient(pPlayer1), pPlayer2 ? pPlayer2->dwUnitId : -1, PARTYSCREENTYPE_HOSTILE);
 }
 
 //D2Game.0x6FC7B450
