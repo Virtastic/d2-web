@@ -2184,10 +2184,13 @@ void __fastcall sub_6FC6E8A0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC6E8B0
-// 1.13c D2Game+0x21880 (body is d2game_21880; no delta)
+// 1.13c D2Game+0x21880 (body is the d2game_21880 guard; no delta)
 void __fastcall sub_6FC6E8B0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pMissile)
 {
-    d2game_21880(pGame, pUnit, pMissile);
+    d2game_21880(pGame, pUnit, pMissile,
+        [](D2GameStrc* game, D2UnitStrc* unit, D2UnitStrc* missile, int column) {
+            sub_6FC6E780(game, unit, missile, column);
+        });
 }
 
 //D2Game.0x6FC6E8D0
