@@ -11,7 +11,9 @@ extern "C" void d2c_278b0(const D2cSvc& v, uint32_t unit /*0x11BBFC*/, int32_t w
         pal[1] = (uint8_t)d2c_call(v, 0xd390, 0, 0, 0, 0, 0, 0xf4, 0xc0, 0x4c);
         pal[2] = (uint8_t)d2c_call(v, 0xd390, 0, 0, 0, 0, 0, 0, 0, 0xff);
     }
-    const d2cl_hud::Stamina bar = d2cl_hud::staminaBar(cur, mx, d2c_call(v, 0xcbda, 0, 0, 0, 0, 0, unit, 0x18) != 0);   // hud_bar_rules.h
+    // the 0x18 state test (0xCBDA) runs only when the max + 5 test did not already pick blue
+    const bool over = !(mx + 5 < cur) && d2c_call(v, 0xcbda, 0, 0, 0, 0, 0, unit, 0x18) != 0;
+    const d2cl_hud::Stamina bar = d2cl_hud::staminaBar(cur, mx, over);   // hud_bar_rules.h
     const uint32_t col = pal[bar.slot];
     const int32_t width = bar.width;
     int32_t w2 = (w - (w >> 31)) >> 1;
