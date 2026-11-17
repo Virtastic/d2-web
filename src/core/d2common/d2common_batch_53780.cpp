@@ -25,12 +25,7 @@ D2TCExShortStrc* D2Common_53780_NewTreasureClassEx(const char* szName)
 // Append one info slot (1.13c D2Common+0x54020) seeded with the record's running totals.
 static D2TCExInfoStrc* AppendInfo(D2TCExShortStrc* pTC)
 {
-	const int n = pTC->nTypes;
-	DATATBLS_ReallocTCExInfo(pTC, n + 1);
-	D2TCExInfoStrc* pInfo = &pTC->pInfo[n];
-	pInfo->nClassic = pTC->nClassic;
-	pInfo->nProb = pTC->nProb;
-	return pInfo;
+	return DATATBLS_ReallocTCExInfo(pTC);
 }
 
 // Consume the next ',' separated numeric field (1.13c D2Common+0x535D0); *ppNext is the rest.

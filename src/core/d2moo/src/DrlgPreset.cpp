@@ -541,13 +541,11 @@ void __fastcall DRLGPRESET_LoadDrlgFile(D2DrlgFileStrc** ppDrlgFile, HD2ARCHIVE 
 	}
 }
 
-// 1.13c D2Common+0x9FA0 (retail keeps it as its own function; D2MOO 1.10f inlines it into
-// DRLGPRESET_FreeDrlgFile, and this port did too until the FN vector for the row needed to replay it).
 // The teardown of the loaded .ds1 file body: the raw file buffer, the substitution-group block, every
-// preset unit (its map-AI position array, its map-AI, the unit itself), then the file struct itself -- the
-// argument. Retail's 0x50b free is this function's last action (mov ebp,edx before the 0x9228 call), so the
-// struct is freed here, not by the caller; the split is so src/core/fn/d2common_9fa0.cpp can call exactly
-// this and nothing of the caller's.
+// preset unit (its map-AI position array, its map-AI, the unit itself), then the file struct itself (the
+// argument; retail's 0x50b free is this function's last action). D2MOO 1.10f inlines it into
+// DRLGPRESET_FreeDrlgFile; retail keeps it separate.
+// 1.13c D2Common+0x9FA0
 void __fastcall DRLGPRESET_FreeDrlgFileStruct(D2DrlgFileStrc* pDrlgFile)
 {
 	if (pDrlgFile->pDS1File)

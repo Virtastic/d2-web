@@ -702,7 +702,7 @@ D2COMMON_DLL_DECL const Unicode* __fastcall DATATBLS_RollRandomUniqueSuffixStrin
 //D2Common.0x6FD68B60 (#10654)
 D2COMMON_DLL_DECL const Unicode* __fastcall DATATBLS_RollRandomUniqueAppellationString(D2UnitStrc* pUnit);
 //D2Common.0x6FD68BD0
-void __fastcall DATATBLS_ReallocTCExInfo(D2TCExShortStrc* pTCExShort, int nNewRecordCount);
+D2TCExInfoStrc* __fastcall DATATBLS_ReallocTCExInfo(D2TCExShortStrc* pTCExShort);
 //D2Common.0x6FD68C40
 void __fastcall DATATBLS_UpdateTreasureClassProbabilities(D2TCExShortStrc* pTCExShort, D2TCExInfoStrc* pTCExInfo, int nProbability, BOOL bExpansion);
 //D2Common.0x6FD68D40

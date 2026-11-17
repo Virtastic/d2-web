@@ -478,6 +478,8 @@ int __fastcall DRLG_GetDirectionFromCoordinates(D2DrlgCoordStrc* pDrlgCoord1, D2
 }
 
 //D2Common.0x6FD74A40
+// 1.13c D2Common+0x2E1F0 (ESI = room): same body -- rect x5, seed step only when the tile grid has walls or floors,
+// flags 4 / 1 / 0 from the room flags; the two extern notes are d2-web diagnostics, not retail
 void __fastcall DRLG_CreateRoomForRoomEx(D2DrlgStrc* pDrlg, D2DrlgRoomStrc* pDrlgRoom)
 {
 	D2DrlgCoordsStrc pDrlgCoords = {};

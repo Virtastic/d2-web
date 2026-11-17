@@ -790,11 +790,18 @@ const Unicode* __fastcall DATATBLS_RollRandomUniqueAppellationString(D2UnitStrc*
 }
 
 //D2Common.0x6FD68BD0
-void __fastcall DATATBLS_ReallocTCExInfo(D2TCExShortStrc* pTCExShort, int nNewRecordCount)
+// 1.13c D2Common+0x54020 (ESI = record): grows the info array by one zeroed slot, seeds the slot's
+// nClassic/nProb with the record's running totals and returns the slot.
+D2TCExInfoStrc* __fastcall DATATBLS_ReallocTCExInfo(D2TCExShortStrc* pTCExShort)
 {
-	pTCExShort->pInfo = (D2TCExInfoStrc*)D2_REALLOC_POOL(nullptr, pTCExShort->pInfo, sizeof(D2TCExInfoStrc) * nNewRecordCount);
-	memset(&pTCExShort->pInfo[pTCExShort->nTypes], 0x00, sizeof(D2TCExInfoStrc) * (nNewRecordCount - pTCExShort->nTypes));
-	pTCExShort->nTypes = nNewRecordCount;
+	const int nOldCount = pTCExShort->nTypes;
+	const int nNewCount = nOldCount + 1;
+	pTCExShort->pInfo = (D2TCExInfoStrc*)D2_REALLOC_POOL(nullptr, pTCExShort->pInfo, sizeof(D2TCExInfoStrc) * nNewCount);
+	memset(&pTCExShort->pInfo[nOldCount], 0x00, sizeof(D2TCExInfoStrc));
+	pTCExShort->nTypes = nNewCount;
+	pTCExShort->pInfo[nOldCount].nClassic = pTCExShort->nClassic;
+	pTCExShort->pInfo[nOldCount].nProb = pTCExShort->nProb;
+	return &pTCExShort->pInfo[nOldCount];
 }
 
 //D2Common.0x6FD68C40
@@ -1149,12 +1156,7 @@ void DATATBLS_ParseTreasureClassItem(D2TCExShortStrc* pTCExTxtRecord, D2Treasure
 			int nItemId = 0;
 			if (D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemRecordFromItemCode(DATATBLS_StringToCode(szText), &nItemId))
 			{
-				const int nNewTypeIdx = pTCExTxtRecord->nTypes;
-				DATATBLS_ReallocTCExInfo(pTCExTxtRecord, nNewTypeIdx + 1);
-				D2TCExInfoStrc* pTCExInfo = &pTCExTxtRecord->pInfo[nNewTypeIdx];
-
-				pTCExInfo->nClassic = pTCExTxtRecord->nClassic;
-				pTCExInfo->nProb = pTCExTxtRecord->nProb;
+				D2TCExInfoStrc* pTCExInfo = DATATBLS_ReallocTCExInfo(pTCExTxtRecord);
 				pTCExInfo->nItemId = nItemId;
 				if (pItemsTxtRecord->wVersion >= 100)
 				{
@@ -1172,12 +1174,7 @@ void DATATBLS_ParseTreasureClassItem(D2TCExShortStrc* pTCExTxtRecord, D2Treasure
 			const int nTxtRow = FOG_GetRowFromTxt(sgptDataTables->pTreasureClassExLinker, szText, 0);
 			if (nTxtRow > 0)
 			{
-				const int nNewTypeIdx = pTCExTxtRecord->nTypes;
-				DATATBLS_ReallocTCExInfo(pTCExTxtRecord, nNewTypeIdx + 1);
-				D2TCExInfoStrc* pTCExInfo = &pTCExTxtRecord->pInfo[nNewTypeIdx];
-
-				pTCExInfo->nClassic = pTCExTxtRecord->nClassic;
-				pTCExInfo->nProb = pTCExTxtRecord->nProb;
+				D2TCExInfoStrc* pTCExInfo = DATATBLS_ReallocTCExInfo(pTCExTxtRecord);
 				pTCExInfo->nItemId = nTxtRow;
 				pTCExInfo->nFlags |= 4;
 				if (!sgptDataTables->pTreasureClassEx[nTxtRow].nClassic)
@@ -1197,12 +1194,7 @@ void DATATBLS_ParseTreasureClassItem(D2TCExShortStrc* pTCExTxtRecord, D2Treasure
 			const int nTxtRow = FOG_GetRowFromTxt(sgptDataTables->pUniqueItemsLinker, szText, 0);
 			if (nTxtRow > 0)
 			{
-				const int nNewTypeIdx = pTCExTxtRecord->nTypes;
-				DATATBLS_ReallocTCExInfo(pTCExTxtRecord, nNewTypeIdx + 1);
-				D2TCExInfoStrc* pTCExInfo = &pTCExTxtRecord->pInfo[nNewTypeIdx];
-
-				pTCExInfo->nClassic = pTCExTxtRecord->nClassic;
-				pTCExInfo->nProb = pTCExTxtRecord->nProb;
+				D2TCExInfoStrc* pTCExInfo = DATATBLS_ReallocTCExInfo(pTCExTxtRecord);
 				int nItemId = 0;
 				DATATBLS_GetItemRecordFromItemCode(sgptDataTables->pUniqueItemsTxt[nTxtRow].dwBaseItemCode, &nItemId);
 				pTCExInfo->nFlags |= 0x11;
@@ -1221,12 +1213,7 @@ void DATATBLS_ParseTreasureClassItem(D2TCExShortStrc* pTCExTxtRecord, D2Treasure
 			const int nTxtRow = FOG_GetRowFromTxt(sgptDataTables->pSetItemsLinker, szText, 0);
 			if (nTxtRow >= 0)
 			{
-				const int nNewTypeIdx = pTCExTxtRecord->nTypes;
-				DATATBLS_ReallocTCExInfo(pTCExTxtRecord, nNewTypeIdx + 1);
-				D2TCExInfoStrc* pTCExInfo = &pTCExTxtRecord->pInfo[nNewTypeIdx];
-
-				pTCExInfo->nClassic = pTCExTxtRecord->nClassic;
-				pTCExInfo->nProb = pTCExTxtRecord->nProb;
+				D2TCExInfoStrc* pTCExInfo = DATATBLS_ReallocTCExInfo(pTCExTxtRecord);
 				int nItemId = 0;
 				DATATBLS_GetItemRecordFromItemCode(sgptDataTables->pSetItemsTxt[nTxtRow].szItemCode, &nItemId);
 				pTCExInfo->nFlags |= 0x12;
@@ -2743,10 +2730,7 @@ void __fastcall DATATBLS_CreateItemTypeTreasureClasses()
 											}
 
 											nTypes = pTCExTxtRecord->nTypes;
-											DATATBLS_ReallocTCExInfo(pTCExTxtRecord, nTypes + 1);
-
-											pTCExTxtRecord->pInfo[nTypes].nClassic = pTCExTxtRecord->nClassic;
-											pTCExTxtRecord->pInfo[nTypes].nProb = pTCExTxtRecord->nProb;
+											DATATBLS_ReallocTCExInfo(pTCExTxtRecord);
 											pTCExTxtRecord->pInfo[nTypes].nItemId = j;
 
 											if (pItemsTxtRecord->wVersion >= 100)
