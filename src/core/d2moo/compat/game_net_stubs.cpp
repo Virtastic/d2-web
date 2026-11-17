@@ -148,6 +148,7 @@ extern "C" int D2WEB_NpcAlertActive(int32_t guid) {
 }
 static D2GSPacketSrv27 g_d2webLastDialogPacket = {};
 static bool g_d2webHasDialogPacket = false;
+// Not 1.13c: the d2_* functions in this file are our server-to-browser glue (replay hooks and queues), not retail code.
 extern "C" void d2_client_item_packet(const uint8_t* p, int32_t n);   // d2client/item_container_packet.cpp (replay only)
 extern "C" void d2_client_npc_speech_packet(const D2GSPacketSrv27* p27, uint32_t guid);   // d2client/npc_speech_start.cpp (replay only)
 extern "C" void d2_client_4bc80_reply(const uint8_t* p, uint32_t n);   // d2client/d2client_4bc80.cpp (replay only)
@@ -179,6 +180,7 @@ static DWORD g_d2webTickCount = 60000;
 extern "C" DWORD d2web_GetTickCount() { return g_d2webTickCount; }
 extern "C" void d2web_AdvanceTickCount(DWORD ms) { g_d2webTickCount += ms; }
 
+// 1.13c D2Game+0x49DB0: the act byte (client+0x1AC); retail's null client is the 0x7CB fatal, here 0.
 uint8_t CLIENTS_GetActNo(D2ClientStrc* pClient) { return pClient ? pClient->nAct : 0; }
 int32_t CLIENTS_GetExperienceLoss(D2ClientStrc* pClient) { return {}; }
 // Backed by the real struct rather than stubbed: the save header refuses to write without a name,
@@ -221,6 +223,7 @@ int32_t __fastcall CLIENTS_GetFlags(D2ClientStrc* pClient) {
     memcpy(&flags, &pClient->tSaveFlags, sizeof pClient->tSaveFlags);
     return (int32_t)flags;
 }
+// 1.13c D2Game+0x49AB0: the create-time dword (client+0x488); retail's null client is the 0x98B fatal, here 0.
 int32_t __fastcall CLIENTS_GetCreateTime(D2ClientStrc* pClient) { return pClient ? (int32_t)pClient->nCreateTime : 0; }
 void __fastcall CLIENTS_GetSkillHotKey(D2ClientStrc* pClient, int32_t nId, int32_t* pSkillId, int32_t* nHand, int32_t* nItemGUID) {
     if (pSkillId) *pSkillId = 0;
@@ -254,6 +257,7 @@ D2UnitStrc* CLIENTS_GetPlayerFromClient(D2ClientStrc* pClient, BOOL bIgnoreDeath
     // carrying the player unit. This is the retail fast path when the client owns a live player.
     return pClient ? pClient->pPlayer : nullptr;
 }
+// 1.13c D2Game+0x49A80: the game pointer (client+0x1A8); retail's null client is a fatal, here nullptr.
 D2GameStrc* __fastcall CLIENTS_GetGame(D2ClientStrc* pClient) { return pClient ? pClient->pGame : nullptr; }
 // 1.13c D2Game+0x49A50: the client is one of the clients listed on the unit's active room.
 int32_t CLIENTS_IsInUnitsRoom(D2UnitStrc* pUnit, D2ClientStrc* pClient) {
@@ -262,7 +266,9 @@ int32_t CLIENTS_IsInUnitsRoom(D2UnitStrc* pUnit, D2ClientStrc* pClient) {
     for (int32_t i = 0; i < pRoom->nNumClients; ++i) if (pRoom->ppClients[i] == pClient) return 1;
     return 0;
 }
-void CLIENTS_SetActNo(D2ClientStrc* pClient, uint8_t nAct) { if (pClient) pClient->nAct = nAct; }
+// 1.13c D2Game+0x49D70: store the act byte (client+0x1AC); retail fatals on a null client (0x7D6) or act >= 5 (0x7D7).
+void CLIENTS_SetActNo(D2ClientStrc* pClient, uint8_t nAct) { D2_ASSERT(nAct < 5); if (pClient) pClient->nAct = nAct; }
+// 1.13c D2Game+0x49B70: store the state dword (client+0x04); retail's null client is the 0x95F fatal.
 void CLIENTS_SetClientState(D2ClientStrc* pClient, D2ClientState nClientState) { if (pClient) pClient->dwClientState = nClientState; }
 void CLIENTS_SetExperienceLoss(D2ClientStrc* pClient, int32_t nExpLoss) {}
 // Recovered structural path from D2Game.0x6FC33020. Client room changes are also the DRLG
@@ -374,6 +380,7 @@ void __fastcall CLIENTS_SetFlags(D2ClientStrc* pClient, int32_t nFlags) {
     const uint16_t packed = (uint16_t)nFlags;
     memcpy(&pClient->tSaveFlags, &packed, sizeof packed);
 }
+// 1.13c D2Game+0x49AE0: store the create-time dword (client+0x488); retail's null client is a fatal.
 void __fastcall CLIENTS_SetCreateTime(D2ClientStrc* pClient, DWORD dwCreateTime) { if (pClient) pClient->nCreateTime = dwCreateTime; }
 // Declared in D2Game's Clients.h with no definition in the vendored tree (like the setters above).
 // The iron golem restore needs it; nothing in this engine summons a golem, so it is never reached.
@@ -525,6 +532,7 @@ void CLIENTS_UpdateCharacterProgression(D2ClientStrc* pClient, uint16_t nAct, ui
         pClient->tSaveFlags.nProgression = (uint16_t)nNewActDifficulty;
     }
 }
+// 1.13c D2Game+0x8C490: the one-byte packet {header} through the send queue 0x8A3E0.
 void D2GAME_PACKETS_SendHeaderOnlyPacket(D2ClientStrc* pClient, uint8_t nHeader) {
     if (pClient) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &nHeader, 1);
 }
@@ -561,7 +569,7 @@ void D2GAME_PACKETS_SendPacket0x09_6FC3D1A0(D2ClientStrc* pClient, BYTE a2, BYTE
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, packet, sizeof packet);
 }
 void D2GAME_PACKETS_SendPacket0x0A_RemoveObject_6FC3D3A0(D2ClientStrc* pClient, char alw0x0A, char nUnitType, int32_t nUnitId) {
-    // 1.13c D2Game+0x8C3A0 (SCmd.cpp 0x0A): {header, type, guid}, 6 bytes; missiles are never announced.
+    // 1.13c of D2Game 0x8C3B0 (SCmd.cpp 0x0A): {header, type, guid}, 6 bytes; missiles are never announced.
     if (nUnitType == UNIT_MISSILE) return;
     uint8_t packet[6] = { (uint8_t)alw0x0A, (uint8_t)nUnitType };  // D2PacketDef.h's struct is not packed here
     std::memcpy(packet + 2, &nUnitId, 4);
@@ -615,7 +623,7 @@ void D2GAME_PACKETS_SendPacket0x21_UpdateSkills_6FC3DB50(D2ClientStrc* pClient, 
     packet.nBonusSkillLevel = (uint8_t)SKILLS_GetBonusSkillLevelFromSkillId(pUnit, nSkillId);
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }
-// D2Game.0x6FC3DBE0 (1.13c D2Game+0x8D570 = 0x6FCAD570): item skill quantity update; bytes 2 and 0xA are never
+// 1.13c D2Game+0x8D570 (1.10f D2Game.0x6FC3DBE0): item skill quantity update; bytes 2 and 0xA are never
 // written by retail's composer (stack residue on the wire), zero unless the caller pins them.  Byte 0xB is 1 only when
 // the unit exists and has STATE_PLAYERBODY (1.13c disassembly; D2MOO's 1.10f reading inverts it).
 extern "C" uint8_t g_d2webPacket22Pad = 0;   // byte 0x0A of packet 0x22: caller stack residue, set by the caller that pins it
@@ -629,15 +637,21 @@ void __fastcall D2GAME_PACKETS_SendPacket0x22_6FC3DBE0(D2ClientStrc* pClient, BY
     packet.bIsCorpse = pUnit && STATES_CheckState(pUnit, STATE_PLAYERBODY);
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }
-// 1.13c D2Game+0x8D5F0 (SCmd.cpp 0x23): the selected skill of a unit, {header, type, guid, hand, skill, owner}, 13 bytes.
+// The proven 1.13c composers (D2Game+0x8C3B0, +0x8C300, +0x8C010) take an injected send; this is the play path's.
+void D2Game_8C3B0_PacketSend06(void (*send)(void*, const void*, uint32_t), void* client, uint8_t al, uint8_t cl, uint32_t edx);
+void D2Game_8C300_PacketSend0C(void (*send)(void*, const void*, uint32_t), void* client, uint8_t al, uint8_t cl, uint32_t edx, uint8_t b6, uint8_t b7, uint32_t d8);
+void D2Game_8C010_PacketSend10(void (*send)(void*, const void*, uint32_t), void* client, uint8_t cl, uint32_t edx, uint8_t s2, uint16_t s3, uint16_t s4,
+                               uint8_t s5, uint8_t s6, uint16_t s7, uint16_t s8);
+static void d2webSendAdapter(void* c, const void* b, uint32_t n) { D2GAME_PACKETS_SendPacket_6FC3C710((D2ClientStrc*)c, const_cast<void*>(b), (int32_t)n); }
+// 1.13c D2Game+0x8B710 (SCmd.cpp 0x23): the selected skill of a unit, {header, type, guid, hand, skill, owner}, 13 bytes.
 // The client's own selection only changes when this arrives, so a stub here leaves the realm client on its default skill.
+// The proven composer sends through a client-less callback, so the target client is held for the one call.
+extern "C" void d2game_8b710_send(uint32_t eaxByte, uint32_t edxDword, uint8_t s1, uint16_t s2, uint32_t s3, void (*send)(const void*, uint32_t));
+static D2ClientStrc* s_p23Client;
+static void d2webSend23(const void* b, uint32_t n) { D2GAME_PACKETS_SendPacket_6FC3C710(s_p23Client, const_cast<void*>(b), (int32_t)n); }
 void D2GAME_PACKETS_SendPacket0x23_6FC3DC60(D2ClientStrc* pClient, BYTE nUnitType, int32_t nUnitGUID, BYTE a4, WORD a5, int32_t a6) {
-    uint8_t packet[13] = { 0x23, nUnitType };
-    std::memcpy(packet + 2, &nUnitGUID, 4);
-    packet[6] = a4;
-    std::memcpy(packet + 7, &a5, 2);
-    std::memcpy(packet + 9, &a6, 4);
-    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, packet, sizeof packet);
+    s_p23Client = pClient;
+    d2game_8b710_send(nUnitType, (uint32_t)nUnitGUID, a4, a5, (uint32_t)a6, d2webSend23);
 }
 // 1.13c D2Game+0x3DDF0: variable-length chat/overhead message; byte 9 (name colour) is sent as built.
 void D2GAME_PACKETS_SendPacket0x26_ServerMessage_6FC3DDF0(D2ClientStrc* pClient, D2GSPacketSrv26* pMsg) {
@@ -649,13 +663,13 @@ void D2GAME_PACKETS_SendPacket0x26_ServerMessage_6FC3DDF0(D2ClientStrc* pClient,
     memcpy(b + n, pMsg->szMessage, ml); n += ml; b[n++] = 0;
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, (int)n);
 }
+// 1.13c D2Game+0x8B3D0: relays the 0x28-byte 0x27 block unchanged
 void __fastcall D2GAME_PACKETS_SendPacket0x27_6FC3DF20(D2ClientStrc* pClient, D2GSPacketSrv27* pPacket) {
     if (pClient && pPacket) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof(*pPacket));
 }
 void __fastcall D2GAME_PACKETS_SendPacket0x29_6FC3F370(D2ClientStrc* pClient, D2GSPacketSrv29* pPacket) {
     if (pClient && pPacket) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof(*pPacket));
 }
-// 1.13c D2Game+0x8AC90: 15-byte transaction reply {header, action, result, 4 bytes retail leaves unset (zero here), item id, gold}
 // The last 0x2A transaction reply's result byte, for the client's 0x4B5D0 refusal box (-1: none since read).
 int32_t g_d2LastTransactionResult = -1;
 void D2GAME_SendPacket0x2A_Stack(D2ClientStrc* pClient, char nHeader, char result,
@@ -667,6 +681,8 @@ void D2GAME_SendPacket0x2A_Stack(D2ClientStrc* pClient, char nHeader, char resul
     packet.unk0x07 = itemId; packet.unk0x0B = gold;
     if (pClient) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }
+// 1.13c D2Game+0x8AC90: 15-byte transaction reply {header, action, result, 4 bytes retail leaves unset (zero here), item id, gold}
+// (the body is the _Stack variant above, which a caller pinning the unset bytes uses directly)
 void __fastcall D2GAME_SendPacket0x2A_6FC3F3B0(D2ClientStrc* pClient, char nHeader, char result,
     int32_t gold, int32_t itemId, char action) {
     D2GAME_SendPacket0x2A_Stack(pClient, nHeader, result, gold, itemId, action, 0);
@@ -700,17 +716,19 @@ void D2GAME_PACKETS_SendPacket0x3F_6FC3EDC0(D2ClientStrc* pClient, D2UnitStrc* p
     pk.nSkill = (uint16_t)a6;
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &pk, sizeof(pk));
 }
-// 0x42: clears the unit's cursor item on the client.
+// 1.13c D2Game+0x8AF10: 0x42, clears the unit's cursor item on the client.
 void D2GAME_PACKETS_SendPacket0x42_6FC3EE40(D2ClientStrc* pClient, D2UnitStrc* pUnit) {
     uint8_t b[6];
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, scmd::encode42(b, pUnit != nullptr, pUnit ? pUnit->dwUnitType : 0, pUnit ? pUnit->dwUnitId : 0));
 }
-// 0x51: assigns an object (class, place, mode, interact type).
+// 1.13c D2Game+0x8D670: 0x51 assigns an object, 14 bytes {header, type, guid, class word, x, y, mode, interact}.
+// Retail aborts on a null client (0x996) or a unit not in the client's game (0x341); here neither sends.
 void D2GAME_PACKETS_SendPacket0x51_6FC3D300(D2ClientStrc* pClient, char nHeader, uint8_t nUnitType, int32_t nUnitGUID, int16_t nObjectId, int16_t nX, int16_t nY, char a8, char a9) {
+    if (!pClient || !SUNIT_GetServerUnit(CLIENTS_GetGame(pClient), nUnitType, nUnitGUID)) return;
     uint8_t b[14];
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, scmd::encode51(b, (uint8_t)nHeader, nUnitType, (uint32_t)nUnitGUID, (uint16_t)nObjectId, (uint16_t)nX, (uint16_t)nY, (uint8_t)a8, (uint8_t)a9));
 }
-// 0x5A: an event line (the "joined the game" notice and kin), the 0x28-byte record sent as is.
+// 1.13c D2Game+0x8B400: 0x5A event line (the "joined the game" notice and kin), the 0x28-byte record sent as is.
 void D2GAME_PACKETS_SendPacket0x5A_6FC3DEC0(D2ClientStrc* pClient, D2GSPacketSrv5A* pPacket) {
     if (pPacket) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof *pPacket);
 }
@@ -721,6 +739,7 @@ void D2GAME_PACKETS_SendPacket0x61_6FC3F590(D2ClientStrc* pClient, BYTE unk) {
 // The 0x67 / 0x68 monster move and attack-start packets (D2MOO SCmd.cpp bodies; retail D55 capture checks the 16/21 bytes):
 // {header, guid, message, x, y | target type, target guid} then {life, hit class, path type, velocity (i16), max distance}.
 // Path type 5/6 is sent as 1 with the path's last point, 8 as 11; velocity is the clamped STAT_VELOCITYPERCENT.
+// Not 1.13c: d2webPathTail/d2webSend67/d2webSend68 are our shared encoders for the four 0x67/0x68 senders below (retail inlines them per sender).
 static uint8_t d2webPathTail(D2UnitStrc* pMonster, uint8_t* pathType, int16_t* vel, uint8_t* maxDist) {
     int32_t t = PATH_GetType(pMonster->pDynamicPath);
     *pathType = (uint8_t)t;
@@ -788,10 +807,8 @@ void D2GAME_PACKETS_SendPacket0x6A_6FC3CEE0(D2ClientStrc* pClient, char a2, int3
 // state (e.g. 0x0C for a golem's SKILL1 mode), which the client keys its monster sound on: without it the
 // Clay Golem's summon sounds never play (a retail recording skill 75, sound-Q rows at ticks 19/87/157).
 void D2GAME_PACKETS_SendPacket0x6B_6FC3D000(D2ClientStrc* pClient, char a2, int32_t a3, char a4, int16_t a5, int16_t a6, char a7, char a8, int16_t a9, int16_t a10) {
-    D2GSPacketSrv6B packet = {};
-    packet.nHeader = a2; packet.unk0x01 = a3; packet.unk0x05 = a4; packet.unk0x06 = a5; packet.unk0x08 = a6;
-    packet.unk0x0A = a7; packet.unk0x0B = a8; packet.unk0x0C = a9; packet.unk0x0E = a10;
-    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+    D2Game_8C010_PacketSend10(d2webSendAdapter, pClient, (uint8_t)a2, (uint32_t)a3, (uint8_t)a4, (uint16_t)a5, (uint16_t)a6,
+                              (uint8_t)a7, (uint8_t)a8, (uint16_t)a9, (uint16_t)a10);
 }
 // 1.13c D2Game+0x8C090: 0x6C {header, unitId, b5, b6, dword7, b11, w12, w14}, 16 bytes.
 void D2GAME_PACKETS_SendPacket0x6C_6FC3CF90(D2ClientStrc* pClient, char a2, int32_t a3, char a4, char a5, int32_t a6, char a7, int16_t a8, int16_t a9) {
@@ -849,7 +866,7 @@ void D2GAME_PACKETS_SendPacket0x7A_6FC3E100(D2ClientStrc* pClient, char a2, char
     memcpy(b + 3, &v5, 2); memcpy(b + 5, &v4, 4); memcpy(b + 9, &v3, 4);
     if (pClient) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, 13);
 }
-// D2Game.0x6FC3E160: pet/hireling assignment {type, class, owner, pet GUID, seed, name}.
+// 1.13c D2Game+0x8B220 (1.10f 0x6FC3E160): pet/hireling assignment {type, class, owner, pet GUID, seed, name}.
 void __fastcall D2GAME_PACKETS_SendPacket0x81_6FC3E160(D2ClientStrc* pClient, char a2, int32_t a3, int32_t a4, int32_t a5, int32_t a6, int32_t a7, int32_t a8) {
     D2GSPacketSrv81 packet = {};
     packet.nHeader = 0x81; packet.unk0x01 = (uint8_t)a3; packet.unk0x02 = (uint16_t)a6; packet.unk0x04 = (uint32_t)a5;
@@ -866,6 +883,7 @@ void D2GAME_PACKETS_SendPacket0x82_6FC3F790(D2GameStrc* pGame, D2ClientStrc* pCl
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, scmd::encode82(b, pPlayer->dwUnitId, UNITS_GetPlayerData(pPlayer)->szName, (uint32_t)nPortalGUID, (uint32_t)nPortalOwnerGUID));
 }
 // 0x8D: {header, player id (-1 if none), party word}, 7 bytes, to pUnit's client (the join's living-player walk).
+// 1.13c D2Game+0x8C570
 void D2GAME_PACKETS_SendPacket0x8D_6FC3F960(D2UnitStrc* pUnit, D2UnitStrc* a2) {
     uint8_t b[7] = { 0x8D };
     const int32_t guid = a2 ? (int32_t)a2->dwUnitId : -1;
@@ -898,9 +916,10 @@ void D2GAME_PACKETS_SendPacket0xA0_A1_A2_6FC3D610(D2ClientStrc* pClient, D2UnitS
     else { b[0] = 0xA2; uint16_t w = (uint16_t)d; memcpy(b + 6, &w, 2); n = 8; }
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, n);
 }
+// Not 1.13c: 0xA3 and 0xA4 are empty stubs; the session sends neither (retail's senders are unlocated).
 void D2GAME_PACKETS_SendPacket0xA3_6FC3D730(D2ClientStrc* pClient, BYTE a2, WORD a3, WORD a4, BYTE a5, int32_t a6, BYTE a7, int32_t a8, int32_t a9, int32_t a10) {}
 void D2GAME_PACKETS_SendPacket0xA4_6FC3FC00(D2ClientStrc* pClient, int16_t a2) {}
-// 0xA5: a unit and a skill.
+// 1.13c D2Game+0x8BA10: 0xA5, a unit and a skill.
 void D2GAME_PACKETS_SendPacket0xA5_6FC3D7F0(D2ClientStrc* pClient, uint8_t a2, int32_t a3, uint16_t a4) {
     uint8_t b[8];
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, scmd::encodeA5(b, a2, (uint32_t)a3, a4));
@@ -912,10 +931,9 @@ void D2GAME_PACKETS_SendPacket0xAB_6FC3D7B0(D2ClientStrc* pClient, uint8_t nUnit
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof(packet));
 }
 // {header, unit type, guid}, 6 bytes: the 0x76 a unit's first send ends with (1.13c D2Game+0x7ACB0 builds it the same way), 0x7C, 0x92.
+// 1.13c D2Game+0x8C3B0
 void D2GAME_PACKETS_SendPacketSize06_6FC3C850(D2ClientStrc* pClient, DWORD nHeader, DWORD dwUnitType, DWORD dwUnitId) {
-    uint8_t packet[6] = { (uint8_t)nHeader, (uint8_t)dwUnitType };
-    std::memcpy(packet + 2, &dwUnitId, 4);
-    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, packet, sizeof packet);
+    D2Game_8C3B0_PacketSend06(d2webSendAdapter, pClient, (uint8_t)nHeader, (uint8_t)dwUnitType, dwUnitId);
 }
 void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, int32_t nPacketSize) {
     if (pClient && pPacket && nPacketSize > 0)
@@ -991,7 +1009,7 @@ void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, in
         g_d2webPacketRecord->insert(g_d2webPacketRecord->end(), (const uint8_t*)pPacket, (const uint8_t*)pPacket + nPacketSize);
 }
 int32_t D2GAME_SAVE_WriteFile_6FC8A500(D2GameStrc* pGame, D2UnitStrc* pPlayer, const char* szName, DWORD dwArg) { return {}; }
-// D2Game.0x6FC3F2F0: the player's quest record (96 bytes) behind a unit reference.
+// 1.13c D2Game+0x8AD40: 0x28, 0x67 bytes {header, a3, a4 dword, a6, the quest record's 96 bytes (D2Common #10579)}.
 void __fastcall D2GAME_SendPacket0x28_6FC3F2F0(D2ClientStrc* pClient, BYTE nHeader, BYTE a3, int32_t a4, D2BitBufferStrc* a5, BYTE a6) {
     D2GSPacketSrv28 packet = {};
     packet.nHeader = nHeader; packet.unk0x01 = a3; packet.unk0x02 = a4; packet.unk0x06 = a6;
@@ -1005,7 +1023,7 @@ void __fastcall D2GAME_SendPacket0x47_6FC3EEE0(D2ClientStrc* pClient, D2UnitStrc
     std::memcpy(packet + 3, &guid, 4);
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, packet, sizeof packet);
 }
-// SCmd.cpp 0x65: {header, unit id, kill count}, 7 bytes.
+// 1.13c D2Game+0x8AA40: 0x65 {header, unit id, kill count}, 7 bytes.
 void __fastcall D2GAME_PACKETS_SendPacket0x65_6FC3F5E0(D2ClientStrc* pClient, DWORD dwPlayerId, WORD nCount) {
     D2GSPacketSrv65 p = {}; p.nHeader = 0x65; p.dwUnitId = dwPlayerId; p.unk0x05 = nCount;
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &p, sizeof p);
@@ -1018,10 +1036,13 @@ void D2GAME_SendPacket0x48_6FC3EF40(D2ClientStrc* pClient, D2UnitStrc* pUnit, BY
     memcpy(packet + 3, &guid, 4);
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, packet, sizeof packet);
 }
+// Not 1.13c: an empty stub; the session sends no 0x50 (retail's sender is unlocated).
 void D2GAME_SendPacket0x50_6FC3F440(D2ClientStrc* pClient, D2GSPacketSrv50* pPacket) {}
+// 1.13c D2Game+0x8AC30: copies a 7-byte record (dword, word, byte) and sends it; retail has no direct caller.
 void __fastcall D2GAME_SendPacket0x4E_6FC3F410(D2ClientStrc* pClient, D2GSPacketSrv4E* pPacket) {
     if (pClient && pPacket) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof(*pPacket));
 }
+// 1.13c D2Game+0x8AB20: copies a 7-byte record (dword, word, byte) and sends it; the 0x58 callers (0xC6350) build it.
 void __fastcall D2GAME_SendPacket0x58_6FC3F520(D2ClientStrc* pClient, D2GSPacketSrv58* pPacket) {
     if (pClient && pPacket) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof(*pPacket));
 }
@@ -1031,6 +1052,7 @@ void __fastcall D2GAME_SendPacket0x8E_CorpseAssign_ToAllPlayers_6FC3F9B0(D2GameS
     D2GAME_8CF80_CorpseAssignment(pGame, nUnitId, nCorpseId, bAssign);
 }
 // Corpse-assign packet (0x8E) to one client; defined here because the vendored SCmd.cpp is not linked.
+// Not 1.13c: retail has no separate per-client 0x8E sender; its 10-byte body is 0x8C530 (marked in client_save_batch_d5740.cpp).
 void __fastcall D2GAME_PACKETS_SendPacket0x8E_6FC3FA20(D2ClientStrc* pClient, int32_t nUnitId, int32_t nCorpseId, BYTE bAssign) {
     D2GSPacketSrv8E packet8E = {};
     packet8E.nHeader = 0x8E;
@@ -1116,15 +1138,22 @@ void __fastcall D2GAME_SendPacket0x9D_6FC3E6F0(D2ClientStrc* pClient, D2UnitStrc
 void __fastcall D2GAME_SendP0x9C_ItemAction_AddToGround_6FC3E850(D2ClientStrc* pClient, D2UnitStrc* pItem, DWORD dwFlag) {
     D2GAME_SendPacket0x9C_6FC3E570(pClient, pItem, ITEMACTION_ADDTOGROUND, dwFlag, 0);
 }
+// The 0x8DE50-0x8E090 wrappers below: retail first asserts the player's client (player data +0x9C) is pClient
+// (fatal otherwise), then sends 0x9C (0x8D3D0) with the action, the argument and no gamble flag. The callers here
+// always pass the owner's client, so the assertion is not restated.
+// 1.13c D2Game+0x8E030: action 2.
 void __fastcall D2GAME_SendP0x9C_ItemAction_DropToGround_6FC3E8E0(D2ClientStrc* pClient, D2UnitStrc* pPlayer, D2UnitStrc* pItem, DWORD a4) {
     D2GAME_SendPacket0x9C_6FC3E570(pClient, pItem, ITEMACTION_DROPTOGROUND, a4, 0);
 }
+// 1.13c D2Game+0x8DFD0: action 3.
 void __fastcall D2GAME_SendP0x9C_ItemAction_OnGround_6FC3E930(D2ClientStrc* pClient, D2UnitStrc* pPlayer, D2UnitStrc* pItem, DWORD a4) {
     D2GAME_SendPacket0x9C_6FC3E570(pClient, pItem, ITEMACTION_ONGROUND, a4, 0);
 }
+// 1.13c D2Game+0x8DE50: action 0xE.
 void __fastcall D2GAME_SendP0x9C_ItemAction_PutInBelt_6FC3EB90(D2ClientStrc* pClient, D2UnitStrc* pPlayer, D2UnitStrc* pItem, DWORD a4) {
     D2GAME_SendPacket0x9C_6FC3E570(pClient, pItem, ITEMACTION_PUTINBELT, a4, 0);
 }
+// 1.13c D2Game+0x8DF70: action 4.
 void __fastcall D2GAME_SendP0x9C_ItemAction_PutInContainer_6FC3E980(D2ClientStrc* pClient, D2UnitStrc* pPlayer, D2UnitStrc* pItem, DWORD a4) {
     D2GAME_SendPacket0x9C_6FC3E570(pClient, pItem, ITEMACTION_PUTINCONTAINER, a4, 0);
 }
@@ -1163,12 +1192,13 @@ void __fastcall D2GAME_PACKETS_SendPacket0x0C_6FC3C8A0(D2ClientStrc* a0, char a1
     D2GAME_PACKETS_SendPacket_6FC3C710(a0, b, sizeof b);
 }
 // 0x0E object state (12 bytes: header, unit type, guid, 3, targetable, mode dword); a retail recording retail 0e0204000000030001000000.
+// 1.13c D2Game+0x8C300
 void __fastcall D2GAME_PACKETS_SendPacket0x0E_6FC3C8E0(D2ClientStrc* a0, char a1, char a2, int a3, char a4, char a5, int a6) {
-    uint8_t b[12] = { (uint8_t)a1, (uint8_t)a2 }; memcpy(b + 2, &a3, 4); b[6] = (uint8_t)a4; b[7] = a5 ? 1 : 0; memcpy(b + 8, &a6, 4);
-    D2GAME_PACKETS_SendPacket_6FC3C710(a0, b, sizeof b);
+    D2Game_8C300_PacketSend0C(d2webSendAdapter, a0, (uint8_t)a1, (uint8_t)a2, (uint32_t)a3, (uint8_t)a4, a5 ? 1 : 0, (uint32_t)a6);
 }
+// Not 1.13c: an empty stub; the session sends no 0x11 (retail's sender is unlocated).
 void __fastcall D2GAME_PACKETS_SendPacket0x11_6FC3F4A0(D2ClientStrc* a0, unsigned char a1, unsigned int a2, unsigned short a3) {}
-// 0xA7 state on / 0xA9 state off (7 bytes: opcode, unit type, guid dword, state byte); a retail recording retail a7010e00000069 / a901010000000b.
+// 1.13c D2Game+0x8A5A0 (0xA7 state on; the shatter hook is d2web glue) and 0x8A570 (0xA9 state off): 7 bytes: opcode, unit type, guid dword, state byte; a retail recording retail a7010e00000069 / a901010000000b.
 void __fastcall D2GAME_PACKETS_SendPacket0xA7_StateOn_6FC3FC20(D2ClientStrc* a0, unsigned char a1, unsigned int a2, unsigned short a3) {
     if (a0 && a1 == 1 && a3 == 107) d2client_blizzard::shatter();   // the client's shatter: icebreak missiles take client ids
     uint8_t b[7] = { 0xA7, a1, 0, 0, 0, 0, (uint8_t)a3 }; memcpy(b + 2, &a2, 4);
@@ -1179,6 +1209,8 @@ void __fastcall D2GAME_PACKETS_SendPacket0xA9_StateOff_6FC3FC50(D2ClientStrc* a0
     D2GAME_PACKETS_SendPacket_6FC3C710(a0, b, sizeof b);
 }
 // The item-action senders the inventory code calls; each is 0x9C (the player's own item) or 0x9D (a unit's item) with its action.
+// 1.13c D2Game+0x8DDA0: '8' sends ADDTOSHOP with the gamble flag (magic or better, unidentified); '9' sends
+// REMOVEFROMSHOP with the page swapped for the cell around the send.
 void __fastcall D2GAME_SendP0x9C_ItemAction_AddOrRemoveFromShop_6FC3F260(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, char a3) {
     if (a3 == 56) {
         const int32_t bGamble = ITEMS_IsMagSetRarUniCrfOrTmp(a2) && !ITEMS_CheckItemFlag(a2, IFLAG_IDENTIFIED, __LINE__, __FILE__);
@@ -1190,13 +1222,16 @@ void __fastcall D2GAME_SendP0x9C_ItemAction_AddOrRemoveFromShop_6FC3F260(D2Clien
         ITEMS_SetInvPage(a2, nPage);
     }
 }
+// 1.13c D2Game+0x8DF10: action 0xA (owner assertion as for 0x8E030).
 void __fastcall D2GAME_SendP0x9C_ItemAction_AddQuantity_6FC3EAF0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9C_6FC3E570(a0, a2, ITEMACTION_ADDQUANTITY, a3, 0); }
+// 1.13c D2Game+0x8E090: zero the item's position, then action 1 (owner assertion as for 0x8E030).
 void __fastcall D2GAME_SendP0x9C_ItemAction_GroundToCursor_6FC3E870(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {
     UNITS_SetXForStaticUnit(a2, 0);
     UNITS_SetYForStaticUnit(a2, 0);
     D2GAME_SendPacket0x9C_6FC3E570(a0, a2, ITEMACTION_GROUNDTOCURSOR, a3, 0);
 }
 void __fastcall D2GAME_SendP0x9C_ItemAction_SwapInBelt_6FC3EC00(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9C_6FC3E570(a0, a2, ITEMACTION_SWAPINBELT, a3, 0); }
+// 1.13c D2Game+0x8DEB0: action 0xD (owner assertion as for 0x8E030).
 void __fastcall D2GAME_SendP0x9C_ItemAction_SwapInContainer_6FC3EB40(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9C_6FC3E570(a0, a2, ITEMACTION_SWAPINCONTAINER, a3, 0); }
 void __fastcall D2GAME_SendP0x9C_ItemAction_ToCursor_6FC3EEA0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2) { D2GAME_SendPacket0x9C_6FC3E570(a0, a2, ITEMACTION_TOCURSOR, 0, 0); }
 void __fastcall D2GAME_SendP0x9D_ItemAction_AutoUnequip_6FC3EE20(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9D_6FC3E6F0(a0, a1, a2, ITEMACTION_AUTOUNEQUIP, a3, 0); }
@@ -1207,20 +1242,23 @@ void __fastcall D2GAME_SendP0x9D_ItemAction_Unknown0x14_6FC3EEC0(D2ClientStrc* a
 void __fastcall D2GAME_SendP0x9D_ItemAction_Unknown0x16_6FC3F040(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9D_6FC3E6F0(a0, a1, a2, ITEMACTION_UNKNOWN0x16, a3, 0); }
 void __fastcall D2GAME_SendP0x9D_ItemAction_UpdateStats_6FC3EFA0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9D_6FC3E6F0(a0, a1, a2, ITEMACTION_UPDATESTATS, a3, 0); }
 void __fastcall D2GAME_SendP0x9D_ItemAction_WeaponSwitch_6FC3EAD0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) { D2GAME_SendPacket0x9D_6FC3E6F0(a0, a1, a2, ITEMACTION_WEAPONSWITCH, a3, 0); }
-// 0x7D: sets or clears one flag of a player's item.
+// 1.13c D2Game+0x8ADE0: 0x7D sets or clears one flag of a player's item, 18 bytes {0x7D, type (6), guid (-1), item guid (-1), flag, set}.
 void __fastcall sub_6FC3EFC0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, int a3, int a4) {
     uint8_t b[18];
     D2GAME_PACKETS_SendPacket_6FC3C710(a0, b, scmd::encode7D(b, a1 != nullptr, a1 ? a1->dwUnitType : 0, a1 ? a1->dwUnitId : 0, a2 != nullptr, a2 ? a2->dwUnitId : 0, (uint32_t)a3, (uint32_t)a4));
 }
+// Not 1.13c: an empty stub the session never needs (no row; retail's body is unlocated).
 void __fastcall sub_6FC3F4D0(D2ClientStrc* a0, int a1, char a2, short a3, short a4, short a5, short a6) {}
 // 1.13c D2Game+0x93C10 (D2MOO Clients.cpp): the arena-related client flag.
 uint32_t __fastcall sub_6FC33C10(D2ClientStrc* pClient) { return pClient ? (pClient->dwFlags & CLIENTFLAGEX_ARENA_RELATED) : 0; }
 void sub_6FC37B10(D2GameStrc* pGame) {}
-// A stat of a unit other than the client's player (0x20): real body, for the one-client path.
+// 1.13c D2Game+0x8B9B0: a unit's attribute (0x20), 10 bytes {header, guid, stat byte, value}; retail aborts (0x4B8)
+// on a stat id of 0xFF or more. D2MOO's 1.10f struct carried an 11-byte stat word; 1.13c sends the byte.
 void sub_6FC3D830(D2ClientStrc* pClient, BYTE nHeader, int32_t nUnitGUID, WORD nStatId, int32_t nValue) {
-    D2GSPacketSrv20 packet = {};
-    packet.nHeader = nHeader; packet.dwUnitGUID = (uint32_t)nUnitGUID; packet.nStat = (PacketStatId)nStatId; packet.nValue = nValue;
-    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof(packet));
+    D2_ASSERT(nStatId < 0xFF);
+    uint8_t b[10] = {nHeader};
+    memcpy(b + 1, &nUnitGUID, 4); b[5] = (uint8_t)nStatId; memcpy(b + 6, &nValue, 4);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, sizeof b);
 }
 void sub_6FC3E200(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
 // 1.13c D2Client+0x24A70 (reached from the 0x4D handler 0xAF160 via 0x24B90): the shrine state sound is the Sounds
@@ -1250,24 +1288,51 @@ void sub_6FC3F060(D2ClientStrc* pClient, uint8_t a2, int32_t a3, uint16_t a4, ui
     memcpy(b + 11, &a4, 2); memcpy(b + 13, &a5, 2); memcpy(b + 15, &a7, 2);
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, sizeof b);
 }
-// Packet 0x4C, a unit's skill on a target unit (size 0x10): unit type, unit id, skill, skill level, target type,
-// target id, then the trailing word.
+// 1.13c D2Game+0x8D210: a unit's skill on a target unit. A missing target, or one whose room is adjacent to the
+// player's room, gets 16 bytes {a9 ? 0x99 : 0x4C, a2, a3 dword, a6 word, a8, type, guid, a7 word}; otherwise 17
+// bytes {a9 ? 0x9A : 0x4D, a2, a3 dword, a6 dword, a8, the target path's first point x and y words, a7 word}.
+// Retail aborts (0x996) on a null client; the headless session never passes one, so it returns.
 void sub_6FC3F0C0(D2ClientStrc* pClient, uint8_t a2, int32_t a3, uint8_t nUnitType, int32_t nUnitGUID, uint16_t a6, uint16_t a7, uint8_t a8, int32_t a9) {
-    uint8_t b[16] = {0x4C, a2};
-    memcpy(b + 2, &a3, 4); memcpy(b + 6, &a6, 2); b[8] = a8; b[9] = nUnitType;
-    memcpy(b + 10, &nUnitGUID, 4); memcpy(b + 14, &a7, 2);
+    if (!pClient) return;
+    D2UnitStrc* pUnit = SUNIT_GetServerUnit(CLIENTS_GetGame(pClient), nUnitType, nUnitGUID);
+    bool bNear = !pUnit;
+    if (pUnit) {
+        D2UnitStrc* pPlayer = CLIENTS_GetPlayerFromClient(pClient, 0);
+        D2ActiveRoomStrc* pRoom = pPlayer ? UNITS_GetRoom(pPlayer) : nullptr;
+        if (pRoom) {
+            D2ActiveRoomStrc** ppRooms = nullptr; int nRooms = 0;
+            DUNGEON_GetAdjacentRoomsListFromRoom(pRoom, &ppRooms, &nRooms);
+            D2ActiveRoomStrc* pUnitRoom = UNITS_GetRoom(pUnit);
+            for (int i = 0; i < nRooms && !bNear; ++i) bNear = ppRooms[i] == pUnitRoom;
+        }
+    }
+    if (bNear) {
+        uint8_t b[16] = {(uint8_t)(a9 ? 0x99 : 0x4C), a2};
+        memcpy(b + 2, &a3, 4); memcpy(b + 6, &a6, 2); b[8] = a8; b[9] = nUnitType;
+        memcpy(b + 10, &nUnitGUID, 4); memcpy(b + 14, &a7, 2);
+        D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, sizeof b);
+        return;
+    }
+    uint8_t b[17] = {(uint8_t)(a9 ? 0x9A : 0x4D), a2};
+    const uint32_t nSkill = a6;
+    const uint16_t nX = (uint16_t)D2COMMON_10175_PathGetFirstPointX(pUnit->pDynamicPath);
+    const uint16_t nY = (uint16_t)D2COMMON_10176_PathGetFirstPointY(pUnit->pDynamicPath);
+    memcpy(b + 2, &a3, 4); memcpy(b + 6, &nSkill, 4); b[10] = a8;
+    memcpy(b + 11, &nX, 2); memcpy(b + 13, &nY, 2); memcpy(b + 15, &a7, 2);
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, sizeof b);
 }
+// Not 1.13c: an empty stub the session never needs (no row; retail's body is unlocated).
 void sub_6FC3F340(D2ClientStrc* pClient, BYTE nHeader, BYTE nUnitType, int32_t nUnitId, int32_t a5) {}
+// 1.13c D2Game+0x8AC60: copies an 8-byte record (two dwords) and sends it (0x2C); retail has no direct caller.
 void sub_6FC3F3F0(D2ClientStrc* pClient, D2GSPacketSrv2C* pPacket) { D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof *pPacket); }
-// 0x60: a town portal's flags and destination level.
+// 1.13c D2Game+0x8AAE0: 0x60, a town portal's flags and destination level.
 void sub_6FC3F550(D2ClientStrc* pClient, D2UnitStrc* pUnit) {
     uint8_t b[7];
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, scmd::encode60(b, UNITS_GetObjectPortalFlags(pUnit), pUnit->pObjectData->InteractType, pUnit->dwUnitId));
 }
-// 0x73: a missile the receiving client did not create itself.
+// 1.13c D2Game+0x8AA10: 0x73, a missile the receiving client did not create itself (the 0x20-byte block relayed as is).
 void sub_6FC3F610(D2ClientStrc* pClient, D2GSPacketSrv73* pPacket) { D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof(*pPacket)); }
-// Minion-spawner class (0x98): real body. The monster-assign sender sub_6FC3FC80 lives in src/core/d2game/d2game_8ca20_unit.cpp.
+// 1.13c D2Game+0x8A6C0: minion-spawner class (0x98): real body. The monster-assign sender sub_6FC3FC80 lives in src/core/d2game/d2game_8ca20_unit.cpp.
 void sub_6FC3FAF0(D2ClientStrc* pClient, uint32_t a2, uint16_t a3) {
     D2GSPacketSrv98 packet = {};
     packet.nHeader = 0x98; packet.unk0x01 = a2; packet.unk0x05 = a3;

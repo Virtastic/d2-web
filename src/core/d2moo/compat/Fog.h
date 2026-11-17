@@ -52,7 +52,10 @@ void  FOG_10207(D2BinFileStrc* pBinFile, D2BinFieldStrc* pTbl, void* pTxt, int n
 
 // Zeroed on purpose: retail pools hand out fresh (zero) pages far more often than not, and
 // D2MOO marks several allocations D2_ALLOC that the original code reads before writing.
-inline void* FOG_AllocPool(void*, size_t n, const char*, int, int) { return calloc(1, n ? n : 1); }
+// g_fogAllocPoolHook: the FN probes' seam for a pool allocation (src/core/fn/d2common_67bd0.cpp): when set, the
+// allocation is answered by it (retail's hooked Fog 10045 returns the capture's record blob). Null in the engine.
+inline void* (*g_fogAllocPoolHook)(void*, size_t, const char*, int) = nullptr;
+inline void* FOG_AllocPool(void* pool, size_t n, const char* f, int l, int) { if (g_fogAllocPoolHook) return g_fogAllocPoolHook(pool, n, f, l); return calloc(1, n ? n : 1); }
 inline void* FOG_ReallocPool(void*, void* p, size_t n, const char*, int, int) { return realloc(p, n ? n : 1); }
 // g_fogFreePoolHook: the FN probes' seam (src/core/fn/d2game_700c0.cpp): when set, a pool free is reported to it instead of freeing, so a probe
 // can log the frees retail's 0xA2EC hook records. Null in the engine.

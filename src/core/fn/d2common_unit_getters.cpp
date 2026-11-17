@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x4DFA0 sub_4DFA0, +0x7E390 sub_7E390, +0x30420 sub_30420, +0x303A0 sub_303A0, +0x30460 sub_30460
+// 1.13c D2Common+0x4DFA0 sub_4DFA0, +0x7E390 sub_7E390; probes of d2common+0x30420, +0x303A0, +0x30460, +0x304A0 call the Units.cpp rows
 //. stdcall, one stack arg (ret 4; sub_7E390 ret 0xC). Null arg: assert + _exit, not probed.
 #include <emscripten.h>
 #include <cstdint>
@@ -9,9 +9,29 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_4dfa0(uint32_t* r) { r[4] = 
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_7e390(uint32_t* r) {   // 1.13c d2common+0x7E390
     uint32_t* p = (uint32_t*)(uintptr_t)r[0]; p[0] = r[1]; p[1] = r[2]; r[4] = 0;
 }
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30420(uint32_t* r) { r[4] = u32(pA8(r[0]))[0xC / 4]; }   // 1.13c d2common+0x30420
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_303a0(uint32_t* r) { r[4] = pA8(r[0]) ? u32(pA8(r[0]))[0x10 / 4] : 0; }   // 1.13c d2common+0x303A0
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30460(uint32_t* r) { r[4] = u32(pA8(r[0]))[8 / 4]; }   // 1.13c d2common+0x30460
+// The skill-slot getters call the 1.13c rows in Units.cpp on a native unit whose skill list carries the blob's four slots.
+#include <cstring>
+#include "../d2moo/include/D2Skills.h"
+#include "../d2moo/include/Units/Units.h"
+namespace {
+struct NativeSkills {
+    D2UnitStrc u; D2SkillListStrc list;
+    explicit NativeSkills(uint32_t unitBlob) {
+        memset((void*)&u, 0, sizeof u); memset((void*)&list, 0, sizeof list);
+        const uint32_t lb = pA8(unitBlob);
+        if (lb) {
+            list.pFirstSkill = (D2SkillStrc*)(uintptr_t)u32(lb)[4 / 4];
+            list.pLeftSkill = (D2SkillStrc*)(uintptr_t)u32(lb)[8 / 4];
+            list.pRightSkill = (D2SkillStrc*)(uintptr_t)u32(lb)[0xC / 4];
+            list.pUsedSkill = (D2SkillStrc*)(uintptr_t)u32(lb)[0x10 / 4];
+            u.pSkills = &list;
+        }
+    }
+};
+}
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30420(uint32_t* r) { NativeSkills n(r[0]); r[4] = (uint32_t)(uintptr_t)UNITS_GetRightSkill(&n.u); }
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_303a0(uint32_t* r) { NativeSkills n(r[0]); r[4] = (uint32_t)(uintptr_t)UNITS_GetUsedSkill(&n.u); }
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30460(uint32_t* r) { NativeSkills n(r[0]); r[4] = (uint32_t)(uintptr_t)UNITS_GetLeftSkill(&n.u); }
 // 1.13c D2Common+0x30670 sub_30670: stdcall(unit), player only (unit type 0).
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30670(uint32_t* r) {   // 1.13c d2common+0x30670
     uint32_t* u = (uint32_t*)(uintptr_t)r[0];

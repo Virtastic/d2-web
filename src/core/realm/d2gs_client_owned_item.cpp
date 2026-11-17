@@ -2,6 +2,7 @@
 #include "../d2client/item_needs_repair.h"
 #include "../d2client/item_inventory_file.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -326,13 +327,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE int d2_realm_client_item_repair_field(uint32_t g
     return field == 0 ? static_cast<int>(static_cast<uint16_t>(item->dwAnimMode)) : STATLIST_UnitGetStatValue(item, STAT_DURABILITY, 0);
 }
 
-// A unit-removal record for an item: an item on the ground goes; one somebody holds is not touched.
-// GUESS: retail's removal handler for an item unit is not read; this is the rule the screen copy used.
-// Settled by the decompile of the type-4 branch of the 0x0A handler.
+// 1.13c D2Client+0xA6EF0 for a type-4 unit: the client's unit-table remove unlinks the item whoever holds it,
+// clears its tracked-item globals (D2Client+0x8D370), then frees it (D2Client+0xA6D60 -> +0x82550: the holder's
+// inventory drops it, the stat list and the unit go). An id the client holds no item under changes nothing.
 int d2_realm_client_item_remove(uint32_t guid) {
     D2UnitStrc* item = find_item(guid);
-    if (!item || !item->pItemData || item->pItemData->pExtraData.pParentInv) return 0;
-    release_item(item);
+    if (!item) return 0;
+    destroy_item(item);
     return 1;
 }
 
@@ -618,6 +619,28 @@ int d2_realm_client_unit_items(const D2UnitStrc* owner, uint32_t* out, int capac
         write_view(item, out + 12 * count++);
     }
     return count;
+}
+
+// The items lying on the ground (placed by 0x9C, or dropping), 12 words each as d2_realm_client_unit_items, in
+// guid order. They are the client's item units kept by the 0x9C handler and cleared by the 0x0A and 0x03 ones.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_ground_items(uint32_t* out, int capacity) {
+    if (!out || capacity <= 0) return 0;
+    std::vector<D2UnitStrc*> lying;
+    for (const auto& held : g_items) {
+        D2UnitStrc* item = held.second;
+        if (item->pItemData && !item->pItemData->pExtraData.pParentInv &&
+                (item->dwAnimMode == IMODE_ONGROUND || item->dwAnimMode == IMODE_DROPPING)) lying.push_back(item);
+    }
+    std::sort(lying.begin(), lying.end(), [](D2UnitStrc* a, D2UnitStrc* b) { return a->dwUnitId < b->dwUnitId; });
+    int count = 0;
+    for (D2UnitStrc* item : lying) { if (count >= capacity) break; write_view(item, out + 12 * count++); }
+    return count;
+}
+
+// A held item's gold stat (a gold pile's amount), -1 for an item the client does not hold.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_item_gold(uint32_t guid) {
+    D2UnitStrc* item = find_item(guid);
+    return item ? STATLIST_UnitGetStatValue(item, STAT_GOLD, 0) : -1;
 }
 
 // The tests the item-box colour is chosen from, the bits of the local game's d2_session_item_box_state:

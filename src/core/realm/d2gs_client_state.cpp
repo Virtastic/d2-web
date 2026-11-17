@@ -1830,7 +1830,7 @@ static void object_create_cb(uint32_t kind, uint32_t guid, uint32_t classId, uin
     g_objects.push_back({ kind, guid, classId, x, y, mode, interact });
 }
 
-// 0x0A: D2Client+0xACA40 hands (row, bucket, guid, type) to the unit-table remove (0xA6EF0). The
+// 0x0A: 1.13c D2Client+0xACA40 hands (row, bucket, guid, type) to the unit-table remove (0xA6EF0). The
 // removal applies to the projection that owns the type.
 static const uint8_t* g_removePacket = nullptr;
 static int g_removeLength = 0;
@@ -2287,20 +2287,23 @@ static void clear_client_missiles() {
 // natural skill projectile (flags 0x21) and Fire Ball's children (0x201) are made.
 static D2UnitStrc* create_client_missile(const D2MissileStrc* params, bool general) {
     if (!params || !params->pOwner) return nullptr;
-    if (!general && params->dwFlags != 0x21u && params->dwFlags != 0x201u) return nullptr;
+    if (!general && params->dwFlags != 0x21u && params->dwFlags != 0x201u && params->dwFlags != 0x20u) return nullptr;
     auto* owner = params->pOwner;
     const int missileId = params->nMissile;
     auto* txt = DATATBLS_GetMissilesTxtRecord(missileId);
     // Do rule 4 (the gas cloud) is the ordinary flight after a spark of its own; the spark is not made.
     if (!txt || (txt->wCltDoFunc != 1 && !(general && txt->wCltDoFunc == 4))) return nullptr;
     if (general) {
+    } else if (params->dwFlags == 0x20u) {
+        // 1.13c D2Client+0xB1420: a stopped missile's Missiles.txt +0x16 ExplosionMissile, made from it (the origin).
+        const auto* source = params->pOrigin && params->pOrigin->dwUnitType == UNIT_MISSILE ?
+            DATATBLS_GetMissilesTxtRecord(params->pOrigin->dwClassId) : nullptr;
+        if (!source || missileId != static_cast<int>(source->wExplosionMissile)) return nullptr;
     } else if (params->dwFlags == 0x201u) {
         // 1.13c D2Client+0xB1420: a missile with hit function 1 (Fire Ball, Exploding Arrow) spawns its
-        // hit children (265) and its Missiles.txt +0x16 ExplosionMissile through the same create path;
-        // the request's skill is that missile's class.
+        // hit children (265) through the same create path; the request's skill is that missile's class.
         const auto* source = DATATBLS_GetMissilesTxtRecord(params->nSkill);
-        if (!source || source->wCltHitFunc != 1 ||
-            (missileId != 265 && missileId != static_cast<int>(source->wExplosionMissile))) return nullptr;
+        if (!source || source->wCltHitFunc != 1 || missileId != 265) return nullptr;
     } else {
         const auto* skill = DATATBLS_GetSkillsTxtRecord(params->nSkill);
         if (!skill || !is_client_launch_skill(params->nSkill) || skill->wCltMissile != missileId) return nullptr;
@@ -2373,6 +2376,9 @@ static D2UnitStrc* create_client_missile(const D2MissileStrc* params, bool gener
     }
     MISSILE_SetSkill(unit, params->nSkill);
     MISSILE_SetLevel(unit, static_cast<uint16_t>(levelValue));
+    // 1.13c D2Client+0xB30F0: after the skill, level, owner and light, the request's init function
+    // (+0x54) runs on the missile with its word (+0x58), before the travel sound.
+    if (general && params->pInitFunc) params->pInitFunc(unit, params->pInitArgs);
     g_clientMissiles.push_back({unit, level});
     record_client_missile_event(1, unit);
     if ((unit->dwClassId == 62 || unit->dwClassId == 42 || (general && txt->wCltHitFunc >= 2)) && txt->wTravelSound < 0x8000) // D2Client create: TravelSound row on the first client tick
@@ -2465,7 +2471,7 @@ static bool create_fireball_hit_child(D2UnitStrc* source,
     if (created) record_client_missile_event(9, created, UNIT_MISSILE, source->dwUnitId);
     return created != nullptr;
 }
-// 1.13c D2Client+0xB1420: after the callback-table hit children, a Fire Ball that
+// 1.13c D2Client+0xB1420: after the callback-table hit children, a missile that
 // collided (or expired with AlwaysExplode) spawns Missiles.txt +0x16 at its own
 // position. Negative +0x16 (signed) means no explosion, as in the native guard.
 static void spawn_fireball_explosion(D2UnitStrc* missile) {
@@ -2476,14 +2482,15 @@ static void spawn_fireball_explosion(D2UnitStrc* missile) {
         owner = player.motionUnit; break;
     }
     if (!owner) return;
+    // +0xB0450 (called with the class, target 0,0 and the missile's #10240 skill and #11029 level): flags 0x20,
+    // the owner, the stopped missile as the origin.
     D2MissileStrc params{};
-    params.dwFlags = 0x201;
+    params.dwFlags = 0x20;
     params.pOwner = owner;
+    params.pOrigin = missile;
     params.nMissile = fireball->wExplosionMissile;
-    params.nX = UNITS_GetXPosition(missile); params.nY = UNITS_GetYPosition(missile);
-    params.nSkill = static_cast<int>(missile->dwClassId);
+    params.nSkill = MISSILE_GetSkill(missile);
     params.nSkillLevel = static_cast<int>(MISSILE_GetLevel(missile));
-    params.nFrame = 0;
     auto* created = create_client_missile(&params);
     if (created) record_client_missile_event(9, created, UNIT_MISSILE, missile->dwUnitId);
 }
@@ -2576,7 +2583,12 @@ static void advance_client_missiles() {
         // 6FB617C0's ordinary looping missile advances the simple unit clock,
         // moves the real dynamic path, then decrements its missile-frame lifetime.
         if (txt && MISSILE_GetRemainingFrames(unit) > txt->nInitSteps) unit->dwFlagEx &= ~0x40000u;
-        if (txt && (txt->nLoopAnim || !UNITS_IsAtEndOfFrameCycle(unit))) UNITS_UpdateFrame(unit);
+        // A SubLoop row (Charged Strike's bolt) loops its frames in [SubStart, SubStop) while more than
+        // AnimLen - SubStop + 1 life frames remain (#10023, D2MOO's 10375); else the plain frame step.
+        if (txt && txt->nLoopAnim && txt->nSubLoop &&
+            txt->nAnimLen - txt->nSubStop + 1 < MISSILE_GetCurrentFrame(unit))
+            D2COMMON_10375_UNITS_SetFrameNonRate(unit, txt->nSubStart, txt->nSubStop);
+        else if (txt && (txt->nLoopAnim || !UNITS_IsAtEndOfFrameCycle(unit))) UNITS_UpdateFrame(unit);
         if (path->dwVelocity) D2Common_10226(unit, 1024);
         MISSILE_SetCurrentFrame(unit, MISSILE_GetCurrentFrame(unit) - 1);
         bool expired = MISSILE_GetCurrentFrame(unit) < 1;
@@ -2625,8 +2637,9 @@ static void advance_client_missiles() {
                 static_cast<size_t>(g_selectedPlayer) < g_players.size()) {
                 d2::realm::createFireballHitChildren(unit, g_players[g_selectedPlayer].motionUnit,
                     create_fireball_hit_child, nullptr);
-                spawn_fireball_explosion(unit);
             }
+            // +0xB1420: after the hit function, the explosion is made whatever the hit function (Fire Arrow's is 0).
+            if (txt && (collided || txt->nAlwaysExplode)) spawn_fireball_explosion(unit);
             if (txt && (collided || txt->nAlwaysExplode) && (txt->wCltHitFunc == 2 || txt->wCltHitFunc == 3)) {
                 if (static_cast<int16_t>(txt->wHitSound) >= 0)
                     g_clientMissileSoundEvents.push_back({1, g_clientMissileTick, unit->dwUnitId,
@@ -3369,6 +3382,12 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_right_cast_state(int field) {
     case 14: return unit->pInventory && INVENTORY_GetItemFromBodyLoc(unit->pInventory, 4) != nullptr;
     case 15: return unit->pInventory && INVENTORY_GetItemFromBodyLoc(unit->pInventory, 5) != nullptr;
     case 16: return d2client_realm_a0a30(unit);
+    case 19: return unit->nActionFrame;
+    case 20: { auto* used = UNITS_GetUsedSkill(unit); return used ? SKILLS_GetSkillIdFromSkill(used, __FILE__, __LINE__) : -1; }
+    case 21: return static_cast<int>(unit->dwFlags);
+    case 22: return static_cast<int>(unit->dwFrameCountPrecise);
+    case 23: return unit->nSeqCurrentFramePrecise;
+    case 24: return unit->wAnimSpeed;
     default: return -1;
     }
 }
@@ -3510,7 +3529,7 @@ static int apply_corpse_assign(const uint8_t* packet, int length) {
     return g_corpses.apply(record) ? 1 : 0;
 }
 
-// 0x74: a corpse was made this frame (see corpseDropAction).
+// 1.13c D2Client+0xADEF0 -> +0x194E0: a corpse was made this frame (see corpseDropAction).
 static int apply_corpse_drop(const uint8_t* packet, int length) {
     d2::realm::CorpsePacket record{};
     if (!d2::realm::decodeCorpsePacket(packet, length, 0x74, &record)) return -1;
@@ -3588,6 +3607,19 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_hero_stat(int stat, int layer, int base
     if (!unit || stat < 0 || stat > 511) return 0;
     return base ? STATLIST_GetUnitBaseStat(unit, stat, static_cast<uint16_t>(layer))
                 : STATLIST_UnitGetStatValue(unit, stat, static_cast<uint16_t>(layer));
+}
+
+extern "C" uint32_t d2_item_title_of_unit(D2UnitStrc* item, char* buf, uint32_t cap);
+extern "C" uint32_t d2_item_lines_of_unit(D2UnitStrc* item, D2UnitStrc* hero, char* buf, uint32_t cap);
+// A joined game's item hover text from the client's own item unit: the name and the property lines the
+// single-player tooltip words (0 when the client holds no such item).
+EMSCRIPTEN_KEEPALIVE uint32_t d2_realm_client_item_title(uint32_t guid, char* buf, uint32_t cap) {
+    D2UnitStrc* item = d2_realm_client_owned_item_find(guid);
+    return item ? d2_item_title_of_unit(item, buf, cap) : 0;
+}
+EMSCRIPTEN_KEEPALIVE uint32_t d2_realm_client_item_lines(uint32_t guid, char* buf, uint32_t cap) {
+    D2UnitStrc* item = d2_realm_client_owned_item_find(guid);
+    return item ? d2_item_lines_of_unit(item, selected_player_stat_unit(), buf, cap) : 0;
 }
 
 // The Belts.txt row of the selected player's worn belt; 2 (the four-box row) with none.
@@ -4852,7 +4884,17 @@ static int pkt_item_stat(const uint8_t* packet, int length) {
     return 1;
 }
 
+// 0x77 (0xaf930, 2 bytes): the server's interface update. Retail switches on the code byte (16 opens the stash,
+// 17 closes it, 21 opens the cube, and so on) and drives its own panels; the page's panels read the event, whose
+// a is the code.
+static int pkt_update_ui(const uint8_t* packet, int length) {
+    if (length != 2) return -1;
+    session_event({ 0x77, packet[1], 0, 0, 0, {}, {} });
+    return 1;
+}
+
 static const RealmPacketHandler kRealmPacketHandlers[] = {
+    { 0xaf930, pkt_update_ui },                                 // 0x77
     { 0xafa90, pkt_both<apply_game_state_packet, pkt_game_flags> },   // 0x01
     { 0xadb50, pkt_load_act },                                  // 0x03
     { 0xadfe0, pkt_load_complete },                             // 0x04
@@ -5324,7 +5366,7 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_owned_item_readback_by_guid(uint32_t ow
 // Den quest byte is set). The byte is g_QuestAvail[1], the second byte after the opcode of server packet 0x5E (D2Client
 // +0xAC090), fed to d2_client_lightmap_set_den_quest_avail when that packet arrives.
 // Returns the session lightmap record (same layout as d2_session_lightmap), or null without a player/act.
-EMSCRIPTEN_KEEPALIVE const void* d2_realm_client_lightmap(int ambientOverride, int occludeUnits) {
+EMSCRIPTEN_KEEPALIVE const void* d2_realm_client_lightmap(int ambientOverride, int tier) {
     D2DrlgActStrc* act = d2_drlg_client_act();
     if (!act || g_selectedPlayer < 0 || static_cast<size_t>(g_selectedPlayer) >= g_players.size()) return nullptr;
     D2UnitStrc* player = g_players[g_selectedPlayer].motionUnit;
@@ -5343,7 +5385,7 @@ EMSCRIPTEN_KEEPALIVE const void* d2_realm_client_lightmap(int ambientOverride, i
         in.push_back({ nullptr, UNIT_OBJECT, static_cast<int32_t>(object.classId), static_cast<int32_t>(object.x) * 8 + 4,
             static_cast<int32_t>(object.y) * 8 + 4, radius, object.guid, unit ? UNITS_GetRoom(unit) : nullptr });
     }
-    return d2_client_lightmap_compose(player, act, in.data(), static_cast<int>(in.size()), ambientOverride, occludeUnits);
+    return d2_client_lightmap_compose(player, act, in.data(), static_cast<int>(in.size()), ambientOverride, tier);
 }
 
 // Current day/night state of the client act: period, intensity, ticks, rgb; 0 without an act.

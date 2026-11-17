@@ -152,7 +152,9 @@ inline CorpseDropAction corpseDropAction(const CorpsePacket& packet, bool ownerF
     action.act = true;
     action.ownerFalls = !ownerDead;
     action.placeCorpseOnHero = ownerIsHero && corpseFound;
-    action.stripWornItems = true;
+    // The local player's branch looks the corpse up first and returns when the client holds no such unit: its
+    // worn items stay (1.13c D2Client+0x194E0, the second lookup before the item walk).
+    action.stripWornItems = !ownerIsHero || corpseFound;
     return action;
 }
 

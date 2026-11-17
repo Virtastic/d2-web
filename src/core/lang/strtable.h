@@ -25,8 +25,11 @@ public:
     size_t size() const { return entries_.size(); }
 private:
     struct Entry { bool active; uint16_t index; std::string key; std::u16string value; };
-    const Entry* lookup(const std::string& key) const;
+    const Entry* lookup(const std::string& key, int* index = nullptr) const;
+    const std::u16string* byId(uint16_t id) const;
     std::vector<Entry> entries_;   // hash-table slots, in file order
+    std::vector<uint8_t> raw_;     // the .tbl bytes the D2Lang lookup rows walk
+    std::vector<uint32_t> cache_;  // per slot: entries_ index + 1 (retail's decoded-string cache), 0 when empty
     uint32_t maxTries_ = 0;
 };
 

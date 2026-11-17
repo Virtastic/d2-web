@@ -27,14 +27,17 @@ bool StrTable::load(const uint8_t* d, size_t len) {
     size_t pos = 21 + (size_t)numElements * 2;              // skip the index -> slot table
     if (pos + (size_t)hashSize * 17 > len) return false;
     entries_.assign(hashSize, Entry{});
+    raw_.assign(d, d + len);
+    cache_.assign(hashSize, 0);
     for (uint32_t i = 0; i < hashSize; i++, pos += 17) {
         const uint8_t* e = d + pos;
         Entry& en = entries_[i];
         en.active = e[0] != 0;
         if (!en.active) continue;
+        cache_[i] = i + 1;   // the decoded-string cache slot, as a handle into entries_ (our pointers are 64-bit)
         en.index = rd16(e + 1);
         uint32_t keyOff = rd32(e + 7), valOff = rd32(e + 11); uint16_t valLen = rd16(e + 15);
-        if (keyOff >= len || valOff + valLen > len) { en.active = false; continue; }
+        if (keyOff >= len || valOff + valLen > len) continue;
         en.key.assign((const char*)d + keyOff, strnlen((const char*)d + keyOff, len - keyOff));
         std::string v((const char*)d + valOff, valLen ? valLen - 1 : 0);   // valLen counts the NUL
         en.value = utf8ToU16(v);
@@ -42,34 +45,43 @@ bool StrTable::load(const uint8_t* d, size_t len) {
     return true;
 }
 
-const StrTable::Entry* StrTable::lookup(const std::string& key) const {
+// 1.13c D2Lang+0x9360 (key to node index + cache slot) and +0x9050 (id to cache slot): the proven ports.
+extern "C" uint32_t d2lang_9360_find(const uint8_t* tbl, const uint32_t* cache, const uint8_t* key, uint32_t* out);
+extern "C" uint32_t d2lang_9050_lookup(const uint8_t* tbl, uint16_t id, const uint32_t* cache);
+
+const StrTable::Entry* StrTable::lookup(const std::string& key, int* index) const {
     if (entries_.empty()) return nullptr;
-    // ELF hash, as riiablo StringTBL.hash / retail STRTABLE_GetTblIndex
-    uint32_t h = 0;
-    for (unsigned char c : key) {
-        h = (h << 4) + c;
-        uint32_t t = h & 0xF0000000u;
-        if (t) { h &= 0x0FFFFFFFu; h ^= t >> 24; }
-    }
-    uint32_t slot = h % (uint32_t)entries_.size();
-    for (uint32_t tries = 0; tries < maxTries_; tries++) {
-        const Entry& e = entries_[slot];
-        if (!e.active) return nullptr;          // retail stops at the first empty slot
-        if (e.key == key) return &e;
-        slot = (slot + 1) % (uint32_t)entries_.size();
-    }
-    return nullptr;
+    uint32_t out = 0;
+    uint32_t r = d2lang_9360_find(raw_.data(), cache_.data(), (const uint8_t*)key.c_str(), &out);
+    if (r == 0xffff) return nullptr;
+    if (index) *index = (int)r;
+    return &entries_[out - 1];
+}
+// 1.13c D2Lang+0x9050 reaches the node through the index-to-slot map. The callee's fatal exits (slot out of
+// range, node not active, no cached string) are tested first here and read as a miss.
+const std::u16string* StrTable::byId(uint16_t id) const {
+    if (raw_.size() < 0x15) return nullptr;
+    const uint8_t* t = raw_.data();
+    uint32_t i = id;
+    if (rd16(t + 2) <= id) i = 500;
+    size_t mapAt = 0x15 + (size_t)i * 2;
+    if (mapAt + 2 > raw_.size()) return nullptr;
+    i = rd16(t + mapAt);
+    if ((int32_t)i >= (int32_t)rd32(t + 4) || i >= cache_.size()) return nullptr;
+    size_t nodeAt = 0x15 + (size_t)rd16(t + 2) * 2 + (size_t)i * 0x11;
+    if (nodeAt >= rd32(t + 0x11) || nodeAt >= raw_.size() || t[nodeAt] != 1 || cache_[i] == 0) return nullptr;
+    return &entries_[d2lang_9050_lookup(t, id, cache_.data()) - 1].value;
 }
 const std::u16string* StrTable::find(const std::string& key) const { const Entry* e = lookup(key); return e ? &e->value : nullptr; }
-int StrTable::findIndex(const std::string& key) const { const Entry* e = lookup(key); return e ? (int)e->index : -1; }
-const std::u16string* StrTable::findByIndex(uint16_t index) const {
-    for (const Entry& e : entries_) if (e.active && e.index == index) return &e.value;
-    return nullptr;
-}
+int StrTable::findIndex(const std::string& key) const { int i = -1; return lookup(key, &i) ? i : -1; }
+const std::u16string* StrTable::findByIndex(uint16_t index) const { return byId(index); }
+// 1.13c D2Lang+0x9450: a miss in the named window drops to the next table with the ORIGINAL index.
 const std::u16string* LangTables::byTblIndex(uint16_t index, int* table, uint16_t* inTable) const {
-    if (index >= 20000) { if (table) *table = 2; if (inTable) *inTable = (uint16_t)(index - 20000); return expansion.findByIndex((uint16_t)(index - 20000)); }
-    if (index >= 10000) { if (table) *table = 1; if (inTable) *inTable = (uint16_t)(index - 10000); return patch.findByIndex((uint16_t)(index - 10000)); }
-    if (table) *table = 0; if (inTable) *inTable = index;
+    if (table) *table = index >= 20000 ? 2 : index >= 10000 ? 1 : 0;
+    if (inTable) *inTable = (uint16_t)(index >= 20000 ? index - 20000 : index >= 10000 ? index - 10000 : index);
+    const std::u16string* v;
+    if (index >= 20000 && (v = expansion.findByIndex((uint16_t)(index - 20000)))) return v;
+    if (index >= 10000 && (v = patch.findByIndex((uint16_t)(index - 10000)))) return v;
     return classic.findByIndex(index);
 }
 

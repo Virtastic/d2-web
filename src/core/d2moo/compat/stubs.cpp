@@ -63,26 +63,40 @@ void* ARCHIVE_AllocateBufferAndReadFile(HD2ARCHIVE, const char* szFilePath, size
 
 // --- Storm string helpers (squall's storm/String.hpp declares them) ------------------------------
 #include <Storm.h>
-int32_t SStrCmpI(const char* a, const char* b, size_t n) { return strncasecmp(a, b, n); }
-int32_t SStrCmp(const char* a, const char* b, size_t n) { return strncmp(a, b, n); }
-size_t  SStrCopy(char* dest, const char* src, size_t destsize) { if (!destsize) return 0; size_t n = strlen(src); if (n >= destsize) n = destsize - 1; memcpy(dest, src, n); dest[n] = 0; return n; }
-size_t  SStrLen(const char* s) { return strlen(s); }
+#include "../../storm/storm_batch_25220.h"
+#include "../../storm/storm_batch_3b1e0.h"
+int storm_ascii_strnicmp(const char*, const char*, size_t);
+uint32_t Storm_Sub3AFD0(const char*);
+namespace {
+storm25220::State& stormStrState() {
+    static storm25220::State s;
+    static bool init = (s.setLastError = [](uint32_t) {}, s.encode = [](const void* p) { return (uint32_t)(uintptr_t)p; }, true);
+    (void)init;
+    return s;
+}
+}
+// The string imports run retail's rows: SStrCmpI Storm+0x3B1E0, SStrCmp Storm+0x3B230, SStrCopy Storm+0x3B080, SStrLen Storm+0x3AFD0.
+int32_t SStrCmpI(const char* a, const char* b, size_t n) {
+    static StormState3b1e0 st{};
+    static StormCalls3b1e0 c = [] { StormCalls3b1e0 k{}; k.error = [](uint32_t) {}; k.strnicmp = [](const char* x, const char* y, uint32_t m) { return (int32_t)storm_ascii_strnicmp(x, y, m); }; return k; }();
+    return Storm_Sub3B1E0(a, b, (uint32_t)n, st, c);
+}
+int32_t SStrCmp(const char* a, const char* b, size_t n) { return storm25220::compare(stormStrState(), a, b, (uint32_t)n); }
+size_t  SStrCopy(char* dest, const char* src, size_t destsize) { return storm25220::copy(stormStrState(), dest, src, (uint32_t)destsize); }
+size_t  SStrLen(const char* s) { return Storm_Sub3AFD0(s); }
 int     SStrVPrintf(char* dst, size_t max, char* fmt, va_list args) { return vsnprintf(dst, max, fmt, args); }
 
 // Fog #10137 / #10086: the CRC-16 over a name and the 14-bit-to-2-chars encoding the client
 // preview uses. Nothing in the spawn path hashes; kept minimal until a scenario reads them.
-uint16_t FOG_ComputeStringCRC16(const char* s) {
-    uint16_t crc = 0;
-    for (; s && *s; s++) { crc ^= (uint8_t)*s; for (int i = 0; i < 8; i++) crc = (crc & 1) ? (uint16_t)((crc >> 1) ^ 0xA001) : (uint16_t)(crc >> 1); }
-    return crc;
-}
-void FOG_Encode14BitsToString(uint16_t* p2, uint32_t v) { p2[0] = (uint16_t)(0x20 + (v & 0x7F)); p2[1] = (uint16_t)(0x20 + ((v >> 7) & 0x7F)); }
-
-// Fog #10083/#10084: 512-step unit circle. Fog ships these as float tables; until they are pulled
-// out of the 1.13c DLL this computes them (identical for the integer-heavy callers seen so far).
-#include <math.h>
-float FOG_10083_Cos_LUT(int16_t i) { return (float)cos((double)(i & 511) * 6.283185307179586 / 512.0); }
-float FOG_10084_Sin_LUT(int16_t i) { return (float)sin((double)(i & 511) * 6.283185307179586 / 512.0); }
+// These four run retail's rows: Fog+0x1F8C0 (#10137), Fog+0x18090 (#10086), Fog+0x16730 (#10083), Fog+0x16710 (#10084).
+extern "C" uint16_t fog_sub_1f8c0(const uint8_t*);
+extern "C" float fog_sub_16730(int32_t);
+extern "C" float fog_sub_16710(uint32_t);
+void __stdcall FOG_Encode14(uint8_t* pOut, uint32_t nValue);
+uint16_t FOG_ComputeStringCRC16(const char* s) { return fog_sub_1f8c0((const uint8_t*)s); }
+void FOG_Encode14BitsToString(uint16_t* p2, uint32_t v) { FOG_Encode14((uint8_t*)p2, v); }
+float FOG_10083_Cos_LUT(int16_t i) { return fog_sub_16730((int32_t)i); }
+float FOG_10084_Sin_LUT(int16_t i) { return fog_sub_16710((uint32_t)(int32_t)i); }
 
 // 1.13c D2CMP+0x04ABC -- CRT _NMSG_WRITE: looks rtc code up in the 0x13-entry table; console mode writes the text to stderr, else (code != 0xFC) a "Runtime Error!" MessageBox. Web has neither; abort path only.
 extern "C" void d2cmp_crt_nmsg_write(int) {}

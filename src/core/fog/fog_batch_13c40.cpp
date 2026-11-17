@@ -21,11 +21,11 @@ struct Bits { uint8_t* p; int32_t nBits, pos, bit, full; };
 }
 int32_t lowmask(int32_t n) { return (1 << n) - 1; }  // table at Fog+0x6FF76898 (n = 0..8)
 
-void bits_init(Bits* b, uint8_t* data, int32_t bytes) {  // 1.13c Fog+0x141E0 (internal)
+void bits_init(Bits* b, uint8_t* data, int32_t bytes) {  // internal copy of BITMANIP_Initialize (retail 0x141E0)
     if (!b) fatal(0x13c);
     b->p = data; b->nBits = bytes << 3; b->pos = 0; b->bit = 0; b->full = 0;
 }
-void bits_write(Bits* b, int32_t v, int32_t n) {  // 1.13c Fog+0x14120 (internal)
+void bits_write(Bits* b, int32_t v, int32_t n) {  // internal copy of BITMANIP_Write (retail 0x14120)
     if (b->nBits < b->bit + b->pos * 8 + n) { b->full = 1; b->pos = b->nBits / 8; b->bit = 0; return; }
     if (b->bit == 0) *b->p = 0;
     while (n >= 1) {
@@ -38,7 +38,7 @@ void bits_write(Bits* b, int32_t v, int32_t n) {  // 1.13c Fog+0x14120 (internal
         n -= k; v >>= k;
     }
 }
-int32_t bits_read(Bits* b, int32_t n) {  // 1.13c Fog+0x13CD0 (internal)
+int32_t bits_read(Bits* b, int32_t n) {  // internal copy of BITMANIP_Read (retail 0x13CD0)
     int32_t over = b->pos * 8 - b->nBits + n + b->bit;
     if (over < 0) over = 0;
     int32_t left = n - over;

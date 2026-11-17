@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x687D0 probe: the port over the HookEnv recorder.
+// D2Game+0x687D0 probe: the port over the HookEnv recorder.
 // Descriptor `regs ecx`, args 3: r[0] quest record, r[1] hook log, r[2] hook values, r[4] result (unused).
 #include <emscripten.h>
 #include <cstdint>
