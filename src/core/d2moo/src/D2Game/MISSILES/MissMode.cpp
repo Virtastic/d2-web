@@ -2837,7 +2837,7 @@ int32_t __fastcall MISSMODE_SrvHit04_ExplodingArrow_FreezingArrow_RoyalStrikeMet
 
     for (int32_t i = 0; i < 4; ++i)
     {
-        if (pMissilesTxtRecord->wHitSubMissile[i] > 0)
+        if ((int16_t)pMissilesTxtRecord->wHitSubMissile[i] > 0)
         {
             missileParams.nMissile = pMissilesTxtRecord->wHitSubMissile[i];
 
@@ -2941,7 +2941,7 @@ int32_t __fastcall MISSMODE_SrvHit14_MeteorCenter_CatapultMeteor_RoyalStrikeMete
 
     D2_CALL(sub_6FD0FE80, pGame, pOwner, nX, nY, nRange, 0x8583u, sub_6FCF5DE0, &damage, 0, __FILE__, __LINE__);
 
-    const int32_t nHitSubMissile = pMissilesTxtRecord->wHitSubMissile[0];
+    const int32_t nHitSubMissile = (int16_t)pMissilesTxtRecord->wHitSubMissile[0];
     if (nHitSubMissile >= 0)
     {
         const int32_t nMissileRange = D2_CALL(MISSMODE_GetSkillRangeParam, nSkillId, nLevel);
@@ -3203,7 +3203,7 @@ int32_t __fastcall MISSMODE_SrvHit20_LightningFury(D2GameStrc* pGame, D2UnitStrc
     }
 
     D2MissilesTxt* pMissilesTxtRecord = SKILLS_GetMissilesTxtRecord(pMissile->dwClassId);
-    if (!pMissilesTxtRecord || pMissilesTxtRecord->wHitSubMissile[0] < 0)
+    if (!pMissilesTxtRecord || (int16_t)pMissilesTxtRecord->wHitSubMissile[0] < 0)
     {
         return 1;
     }
@@ -3493,7 +3493,7 @@ int32_t __fastcall MISSMODE_SrvHit25_PantherPotGreen(D2GameStrc* pGame, D2UnitSt
     }
 
     D2MissilesTxt* pMissilesTxtRecord = SKILLS_GetMissilesTxtRecord(pMissile->dwClassId);
-    if (!pMissilesTxtRecord || pMissilesTxtRecord->wHitSubMissile[0] < 0)
+    if (!pMissilesTxtRecord || (int16_t)pMissilesTxtRecord->wHitSubMissile[0] < 0)
     {
         return 1;
     }
@@ -3673,7 +3673,7 @@ int32_t __fastcall MISSMODE_SrvHit05_Unused(D2GameStrc* pGame, D2UnitStrc* pMiss
     }
 
     D2MissilesTxt* pMissilesTxtRecord = SKILLS_GetMissilesTxtRecord(pMissile->dwClassId);
-    if (!pMissilesTxtRecord || pMissilesTxtRecord->wHitSubMissile[0] < 0)
+    if (!pMissilesTxtRecord || (int16_t)pMissilesTxtRecord->wHitSubMissile[0] < 0)
     {
         return 1;
     }
@@ -4121,7 +4121,7 @@ int32_t __fastcall MISSMODE_SrvHit47_MoltenBoulder(D2GameStrc* pGame, D2UnitStrc
     D2_CALL(sub_6FD0FE80, pGame, pOwner, nX, nY, nRange, 0x8583u, sub_6FCF5DE0, &damage, 0, __FILE__, __LINE__);
 
     const int32_t nParam = std::max(int32_t(pMissilesTxtRecord->dwHitPar[1]), 1);
-    D2_CALL(MISSMODE_CreateMeteor_MoltenBoulderSubmissiles, pGame, pMissile, pMissilesTxtRecord->wHitSubMissile[0], nRange, nParam);
+    D2_CALL(MISSMODE_CreateMeteor_MoltenBoulderSubmissiles, pGame, pMissile, (int16_t)pMissilesTxtRecord->wHitSubMissile[0], nRange, nParam);
     return 1;
 }
 
@@ -4230,7 +4230,7 @@ int32_t __fastcall MISSMODE_SrvHit52_BladeFury(D2GameStrc* pGame, D2UnitStrc* pM
     }
 
     D2MissilesTxt* pMissilesTxtRecord = SKILLS_GetMissilesTxtRecord(pMissile->dwClassId);
-    if (!pMissilesTxtRecord || pMissilesTxtRecord->wHitSubMissile[0] < 0)
+    if (!pMissilesTxtRecord || (int16_t)pMissilesTxtRecord->wHitSubMissile[0] < 0)
     {
         return 1;
     }
