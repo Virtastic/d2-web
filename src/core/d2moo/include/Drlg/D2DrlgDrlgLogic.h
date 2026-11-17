@@ -51,8 +51,6 @@ void __fastcall sub_6FD769B0(D2DrlgRoomStrc* pDrlgRoom);
 void __fastcall sub_6FD76A90(D2DrlgRoomStrc* pDrlgRoom1, D2DrlgRoomStrc* pDrlgRoom2, int nX, int nY);
 //D2Common.0x6FD76B90
 void __fastcall sub_6FD76B90(D2DrlgRoomStrc* pDrlgRoom, int nIndex1, int nIndex2, BOOL bNode);
-//D2Common.0x6FD76C20
-BOOL __fastcall DRLG_CheckLayer1ButNotWallObject(D2DrlgTileDataStrc* pTileData);
 //D2Common.0x6FD76C50
 void __fastcall DRLGLOGIC_SetCoordListForTiles(D2DrlgRoomStrc* pDrlgRoom);
 //D2Common.0x6FD76CF0

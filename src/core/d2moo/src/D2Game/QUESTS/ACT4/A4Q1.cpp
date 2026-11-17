@@ -589,7 +589,7 @@ void __fastcall ACT4Q1_OnIzualActivated(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FCAE400
-// not-1.13c: retail inlines the Izual ghost range check into the stationary NPC AI (AiThink, Fn054); there is no standalone function
+// 1.13c D2Game+0xB9C00 (EDI = game, one stack argument = the unit; the quest list walk, the activated flag and the result match; retail adds no null check on the extra data)
 int32_t __fastcall ACT4Q1_IsAnyPlayerInRangeOfIzualGhost(D2GameStrc* pGame, D2UnitStrc* pTargetUnit)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A4Q1_IZUAL);
@@ -612,7 +612,7 @@ int32_t __fastcall ACT4Q1_IsAnyPlayerInRangeOfIzualGhost(D2GameStrc* pGame, D2Un
 }
 
 //D2Game.0x6FCAE450
-// not-1.13c: retail inlines the player distance test into the stationary NPC AI (AiThink, Fn054); there is no standalone function
+// 1.13c D2Game+0xB8A50 (the per-player distance callback of 0xB9C00; a distance below 5 sets the close flag)
 void __fastcall ACT4Q1_UnitIterate_CheckDistanceToIzualGhost(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2Act4Quest1Strc* pQuestDataEx = (D2Act4Quest1Strc*)pData;
@@ -625,7 +625,7 @@ void __fastcall ACT4Q1_UnitIterate_CheckDistanceToIzualGhost(D2GameStrc* pGame, 
 }
 
 //D2Game.0x6FCAE470
-// not-1.13c: retail walks the players with the completion-sound callback (0xB9C60) directly at the call site; there is no wrapper
+// 1.13c D2Game+0xBA060 (EDI = game; EBX = the completion-sound callback 0xB9C60, unit type 0, no filter, then the 0xDFCC0 unit walk; D2Game+0x19880 carries the same call inline)
 void __fastcall ACT4Q1_AttachCompletionSoundToPlayers(D2GameStrc* pGame)
 {
 	SUNIT_IterateUnitsOfType(pGame, 0, 0, ACT4Q1_UnitIterate_AttachCompletionSound);

@@ -288,15 +288,6 @@ void __fastcall MONSTERAI_UpdateMercStatsAndSkills(D2GameStrc* pGame, D2UnitStrc
     }
 }
 
-//D2Game.0x6FC61980
-// not-1.13c: retail inlines the pool allocation in the monster init at its caller
-D2MonsterInteractStrc* __fastcall MONSTERAI_AllocMonsterInteract(D2GameStrc* pGame)
-{
-    D2MonsterInteractStrc* pMonInteract = D2_ALLOC_STRC_POOL(pGame->pMemoryPool, D2MonsterInteractStrc);
-    pMonInteract->pInteractInfo = nullptr;
-    return pMonInteract;
-}
-
 // 1.13c D2GAME+0x483B0 (retail body at this rva; 0x619A0 is the 1.10f address)
 void __fastcall MONSTERAI_FreeMonsterInteract(D2GameStrc* pGame, D2MonsterInteractStrc* pMonInteract)
 {

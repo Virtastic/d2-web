@@ -123,7 +123,7 @@ BOOL __stdcall STATES_IsAnyGfxStateFlagSet(D2UnitStrc* pUnit)
 	return FALSE;
 }
 
-// not-1.13c: thin assert wrapper over the proven D2COMMON_STATES_GetListGfxFlags (D2Common+0x342D0)
+// not-1.13c: no separate body; D2Common+0x342D0 (export #10315, the one D2Game+0x7A5E0 calls) is this null assert and D2COMMON_STATES_GetListGfxFlags folded into one function
 //D2Common.0x6FDB4760 (#10492)
 uint32_t* __stdcall STATES_GetGfxStateFlags(D2UnitStrc* pUnit)
 {

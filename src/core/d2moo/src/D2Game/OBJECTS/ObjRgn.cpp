@@ -122,22 +122,15 @@ void __fastcall OBJRGN_FreeObjectControl(D2GameStrc* pGame)
     D2_FREE_POOL(pGame->pMemoryPool, pGame->pObjectControl);
 }
 
-//D2Game.0x6FC7A6B0
-// not-1.13c: retail has no function for this; every caller reads the region array inline (game+0x10F0 -> +0x48 + level*4, e.g. D2Game+0x2F0D0)
-D2ObjectRegionStrc* __fastcall OBJRGN_GetObjectRegionForLevel(D2GameStrc* pGame, int32_t nLevelId)
-{
-    return pGame->pObjectControl->pObjectRegion[nLevelId];
-}
-
 //D2Game.0x6FC7A6C0
-// not-1.13c: retail inlines this at its callers (e.g. populate fn D2Game+0x32A10 reads region+0x18/0x08 inline)
+// not-1.13c: retail has no function; every caller loads game+0x10F0 inline (e.g. the seed step at D2Game+0x327D0 and D2Game+0x32DF0). Many callers here, so kept as one helper.
 D2ObjectControlStrc* __fastcall OBJRGN_GetObjectControlFromGame(D2GameStrc* pGame)
 {
     return pGame->pObjectControl;
 }
 
 //D2Game.0x6FC7A6D0
-// not-1.13c: retail inlines this at its callers (e.g. populate fn D2Game+0x32A10 reads region+0x18/0x08 inline)
+// not-1.13c: retail has no function; the shrine-id picker D2Game+0x2ED70 loads game+0x10F0 and reads the shrine data inline (its only caller here is d2game_batch_2a9f0.cpp)
 D2ShrineDataStrc* __fastcall OBJRGN_GetShrineDataFromGame(D2GameStrc* pGame)
 {
     return &pGame->pObjectControl->shrineData;
@@ -190,38 +183,6 @@ void __fastcall OBJECTS_InitFunction17_Waypoint(D2ObjInitFnStrc* pOp)
     }
 }
 
-//D2Game.0x6FC7A860
-// not-1.13c: retail inlines this at its callers (e.g. populate fn D2Game+0x32A10 reads region+0x18/0x08 inline)
-bool __fastcall OBJRGN_CanNotSpawnMoreWells(D2GameStrc* pGame, int32_t nLevelId)
-{
-    D2ObjectRegionStrc* pObjectRegion = pGame->pObjectControl->pObjectRegion[nLevelId];
-    return pObjectRegion->nWells == 4 || pObjectRegion->nWells > pObjectRegion->nPopulatedRooms / 8;
-}
-
-//D2Game.0x6FC7A890
-// not-1.13c: retail inlines this at its callers (e.g. populate fn D2Game+0x32A10 reads region+0x18/0x08 inline)
-bool __fastcall OBJRGN_ShouldSpawnHealingShrineOrWell(D2GameStrc* pGame, int32_t nLevelId)
-{
-    D2ObjectRegionStrc* pObjectRegion = pGame->pObjectControl->pObjectRegion[nLevelId];
-    return pObjectRegion->nPopulatedRooms > 0 && (pObjectRegion->field_4 << 7) / pObjectRegion->nPopulatedRooms > 96 && !pObjectRegion->nHealingShrines;
-}
-
-//D2Game.0x6FC7A8C0
-// not-1.13c: retail inlines this at its callers (e.g. populate fn D2Game+0x32A10 reads region+0x18/0x08 inline)
-bool __fastcall OBJRGN_CanNotSpawnMoreShrines(D2GameStrc* pGame, int32_t nLevelId)
-{
-    D2ObjectRegionStrc* pObjectRegion = pGame->pObjectControl->pObjectRegion[nLevelId];
-    return pObjectRegion->nShrines == 10 || pObjectRegion->nShrines > pObjectRegion->nPopulatedRooms / 8;
-}
-
-//D2Game.0x6FC7A8F0
-// not-1.13c: retail inlines this at its callers (e.g. populate fn D2Game+0x32A10 reads region+0x18/0x08 inline)
-void __fastcall OBJRGN_IncreaseHealingShrineCount(D2GameStrc* pGame, int32_t nLevelId)
-{
-    D2ObjectRegionStrc* pObjectRegion = pGame->pObjectControl->pObjectRegion[nLevelId];
-    ++pObjectRegion->nHealingShrines;
-}
-
 //D2Game.0x6FC7A900
 // 1.13c D2Game+0xB700 (checked against decompile, no delta)
 bool __fastcall OBJRGN_CanSpawnWell(D2GameStrc* pGame, int32_t nLevelId, int32_t nX, int32_t nY)
@@ -238,21 +199,6 @@ bool __fastcall OBJRGN_CanSpawnWell(D2GameStrc* pGame, int32_t nLevelId, int32_t
     return true;
 }
 
-//D2Game.0x6FC7A960
-// not-1.13c: retail inlines this at its callers (e.g. populate fn D2Game+0x32A10 reads region+0x18/0x08 inline)
-void __fastcall OBJRGN_SetWellCoordinates(D2GameStrc* pGame, int32_t nLevelId, int32_t nX, int32_t nY)
-{
-    D2ObjectRegionStrc* pObjectRegion = pGame->pObjectControl->pObjectRegion[nLevelId];
-    if (pObjectRegion->nWells >= std::size(pObjectRegion->wellCoordinates))
-    {
-        return;
-    }
-
-    pObjectRegion->wellCoordinates[pObjectRegion->nWells].nX = nX;
-    pObjectRegion->wellCoordinates[pObjectRegion->nWells].nY = nY;
-    ++pObjectRegion->nWells;
-}
-
 //D2Game.0x6FC7A990
 // 1.13c D2Game+0xB670 (checked against decompile, no delta)
 bool __fastcall OBJRGN_CanSpawnShrine(D2GameStrc* pGame, int32_t nLevelId, int32_t nX, int32_t nY)
@@ -267,21 +213,6 @@ bool __fastcall OBJRGN_CanSpawnShrine(D2GameStrc* pGame, int32_t nLevelId, int32
     }
 
     return true;
-}
-
-//D2Game.0x6FC7A9F0
-// not-1.13c: retail inlines this at its callers (e.g. populate fn D2Game+0x32A10 reads region+0x18/0x08 inline)
-void __fastcall OBJRGN_SetShrineCoordinates(D2GameStrc* pGame, int32_t nLevelId, int32_t nX, int32_t nY)
-{
-    D2ObjectRegionStrc* pObjectRegion = pGame->pObjectControl->pObjectRegion[nLevelId];
-    if (pObjectRegion->nShrines >= std::size(pObjectRegion->shrineCoordinates))
-    {
-        return;
-    }
-
-    pObjectRegion->shrineCoordinates[pObjectRegion->nShrines].nX = nX;
-    pObjectRegion->shrineCoordinates[pObjectRegion->nShrines].nY = nY;
-    ++pObjectRegion->nShrines;
 }
 
 //D2Game.0x6FC7AA20

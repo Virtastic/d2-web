@@ -56,21 +56,26 @@ D2SkillStrc* __stdcall UNITS_GetStartSkill(D2UnitStrc* pUnit)
 D2SkillStrc* __stdcall UNITS_GetLeftSkill(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);
-	return SKILLS_GetLeftSkillFromSkillList(pUnit->pSkills);
+	D2_ASSERT(pUnit->pSkills);
+	return pUnit->pSkills->pLeftSkill;
 }
 
 // 1.13c D2Common+0x30420 (#10322)
 D2SkillStrc* __stdcall UNITS_GetRightSkill(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);
-	return SKILLS_GetRightSkillFromSkillList(pUnit->pSkills);
+	D2_ASSERT(pUnit->pSkills);
+	return pUnit->pSkills->pRightSkill;
 }
 
 // 1.13c D2Common+0x303E0 (#10324)
 void __stdcall UNITS_SetUsedSkill(D2UnitStrc* pUnit, D2SkillStrc* pUsedSkill)
 {
 	D2_ASSERT(pUnit);
-	SKILLS_SetUsedSkillInSkillList(pUnit->pSkills, pUsedSkill);
+	if (pUnit->pSkills)
+	{
+		pUnit->pSkills->pUsedSkill = pUsedSkill;
+	}
 }
 
 //1.10f: D2Common.0x6FDBD670 (#10323)
@@ -78,7 +83,7 @@ void __stdcall UNITS_SetUsedSkill(D2UnitStrc* pUnit, D2SkillStrc* pUsedSkill)
 D2SkillStrc* __stdcall UNITS_GetUsedSkill(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);
-	return SKILLS_GetUsedSkillFromSkillList(pUnit->pSkills);
+	return pUnit->pSkills ? pUnit->pSkills->pUsedSkill : NULL;
 }
 
 //D2Common.0x6FDBD6B0 (#11259)
@@ -2725,7 +2730,8 @@ D2UnitStrc* __stdcall D2Common_10434(D2UnitStrc* pUnit, BOOL a2)
 		return pItem;
 	}
 
-	pSkill = SKILLS_GetUsedSkillFromSkillList(pUnit->pSkills);
+	// 1.13c reads the skill list's used-skill slot inline (null list gives no skill)
+	pSkill = pUnit->pSkills ? pUnit->pSkills->pUsedSkill : NULL;
 	if (!pSkill)
 	{
 		return pItem;

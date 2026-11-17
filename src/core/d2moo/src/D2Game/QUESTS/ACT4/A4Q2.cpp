@@ -1158,7 +1158,7 @@ int32_t __fastcall OBJECTS_OperateFunction52_DiabloSeal(D2ObjOperateFnStrc* pOp,
 }
 
 //D2Game.0x6FCAFCB0
-// not-1.13c: retail has no standalone function; the seal-coordinate match and the event-7 arm sit inside the 0x36C50 dispatcher seal case (via 0xBBC00 and 0x36820)
+// 1.13c D2Game+0xBBC00 (unit in EBX, game in EDI; called from the 0x36C50 dispatcher for the chaos sanctum level)
 void __fastcall ACT4Q2_SpawnSealBoss(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2CoordStrc pCoord = {};

@@ -1040,7 +1040,7 @@ D2UnitStrc* __fastcall sub_6FC7E8B0(D2GameStrc* pGame, D2UnitStrc* pPlayer, int3
 }
 
 //D2Game.0x6FC7E930
-// not-1.13c: no standalone function; 1.13c D2Game+0x1E140 sums nCurrent over the pet lists inline
+// not-1.13c: inlined in D2Game+0x1E140 (its only caller, AiThink.cpp:sub_6FCE34E0): a loop over nPetTypeTxtRecordCount summing nCurrent; the 1.13c layout has no function between 0x96880 and 0x96920
 int32_t __fastcall PLAYERPETS_GetTotalPetCount(D2UnitStrc* pPlayer)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);

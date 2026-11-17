@@ -32,7 +32,7 @@ D2DrlgRoomStrc* __fastcall DRLGROOM_AllocRoomEx(D2DrlgLevelStrc* pLevel, int nTy
 
 	if (nType == DRLGTYPE_MAZE)
 	{
-		DRLGOUTROOM_AllocDrlgOutdoorRoom(pDrlgRoom);
+		pDrlgRoom->pOutdoor = D2_CALLOC_STRC_POOL(pLevel->pDrlg->pMempool, D2DrlgOutdoorRoomStrc);
 	}
 	else if (nType == DRLGTYPE_PRESET)
 	{
@@ -98,7 +98,12 @@ void __fastcall DRLGROOM_FreeRoomEx(D2DrlgRoomStrc* pDrlgRoom)
 
 	if (pDrlgRoom->nType == DRLGTYPE_MAZE)
 	{
-		DRLGOUTROOM_FreeDrlgOutdoorRoom(pDrlgRoom);
+		if (pDrlgRoom->pOutdoor)
+		{
+			DRLGOUTROOM_FreeDrlgOutdoorRoomData(pDrlgRoom);
+			D2_FREE_POOL(pMemPool, pDrlgRoom->pOutdoor);
+			pDrlgRoom->pOutdoor = NULL;
+		}
 	}
 	else if (pDrlgRoom->nType == DRLGTYPE_PRESET)
 	{

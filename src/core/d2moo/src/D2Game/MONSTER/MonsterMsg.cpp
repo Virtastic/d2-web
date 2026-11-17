@@ -67,7 +67,13 @@ void __fastcall sub_6FC659E0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc*
             D2UnitStrc* pPlayer = CLIENTS_GetPlayerFromClient(pClient, 0);
             if (pPlayer && sub_6FC61B30(pUnit, pPlayer))
             {
-                SUNITPROXY_UpdateGambleInventory(pGame, pUnit, pPlayer, pClient);
+                // the gamble inventory refresh is inlined here in 1.13c (0x8FAA0 lookup, then the inventory mode send)
+                D2GAME_INVMODE_First_6FC40FB0(pGame, pUnit, pClient, nullptr);
+                D2InventoryStrc* pGambleInventory = SUNITPROXY_GetGambleInventory(pGame, pPlayer, pUnit);
+                if (pGambleInventory)
+                {
+                    D2GAME_INVMODE_First_6FC40FB0(pGame, pUnit, pClient, pGambleInventory);
+                }
             }
             else if (MONSTERS_GetHirelingTypeId(pUnit) && AIGENERAL_GetMinionOwner(pUnit) == pPlayer)
             {

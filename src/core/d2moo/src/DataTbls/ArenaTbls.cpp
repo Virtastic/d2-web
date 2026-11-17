@@ -23,7 +23,7 @@ void __fastcall DATATBLS_LoadArenaTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD47970 (#10596)
-// not-1.13c: retail has no accessor; nothing in D2Common reads the arena table after the 0x80D50 loader and the 0x5E870 unload, D2Game reads the global itself
+// 1.13c D2Common+0x7FF80 (export #10827: fatal for an index above 0, else idx * 0x1C + the table base)
 D2ArenaTxt* __fastcall DATATBLS_GetArenaTxtRecord(int nArenaType)
 {
 	D2_ASSERT(nArenaType < NUM_ARENA_TYPES);

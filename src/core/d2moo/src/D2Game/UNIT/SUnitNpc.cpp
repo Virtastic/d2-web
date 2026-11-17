@@ -64,7 +64,7 @@ void __fastcall D2GAME_NPC_FirstFn_6FCC67D0(D2GameStrc* pGame, int32_t nVendorId
 
     pNpcRecord->pMercData = (D2MercDataStrc*)D2_CALLOC_POOL(pGame->pMemoryPool, 0x450u);
 
-    D2SeedStrc* pSeed = SUNITPROXY_GetSeedFromNpcControl(pGame);
+    D2SeedStrc* pSeed = &pGame->pNpcControl->pSeed;
     D2HirelingTxt* pHirelingTxtRecord = DATATBLS_GetNextHirelingTxtRecordFromVendorIdAndDifficulty(pGame->bExpansion, nVendorId, 0, 0);
     D2_ASSERT(pHirelingTxtRecord);
 
@@ -165,7 +165,7 @@ D2UnitStrc* __fastcall D2GAME_NPC_GenerateStoreItem_6FCC6A60(D2UnitStrc* pNpc, i
     {
         if (pGame->nDifficulty == DIFFMODE_NIGHTMARE)
         {
-            if (ITEMS_RollRandomNumber(SUNITPROXY_GetSeedFromNpcControl(pGame)) % 100000 < (nItemLevel << 6) + 4000 && pItemsTxtRecord->dwUberCode && pItemsTxtRecord->dwUberCode != '    ')
+            if (ITEMS_RollRandomNumber(&pGame->pNpcControl->pSeed) % 100000 < (nItemLevel << 6) + 4000 && pItemsTxtRecord->dwUberCode && pItemsTxtRecord->dwUberCode != '    ')
             {
                 DATATBLS_GetItemRecordFromItemCode(pItemsTxtRecord->dwUberCode, &nItemId);
                 nItemCode = pItemsTxtRecord->dwUberCode;
@@ -178,7 +178,7 @@ D2UnitStrc* __fastcall D2GAME_NPC_GenerateStoreItem_6FCC6A60(D2UnitStrc* pNpc, i
         }
         else
         {
-            const uint32_t nRand = ITEMS_RollRandomNumber(SUNITPROXY_GetSeedFromNpcControl(pGame)) % 100000;
+            const uint32_t nRand = ITEMS_RollRandomNumber(&pGame->pNpcControl->pSeed) % 100000;
             if (pGame->bExpansion && nRand < 16 * nItemLevel + 1000 && pItemsTxtRecord->dwUltraCode && pItemsTxtRecord->dwUltraCode != '    ')
             {
                 DATATBLS_GetItemRecordFromItemCode(pItemsTxtRecord->dwUltraCode, &nItemId);
@@ -377,7 +377,7 @@ void __fastcall D2GAME_NPC_BuildHirelingList_6FCC6FF0(D2GameStrc* pGame, D2Clien
 // 1.13c D2Game+0xBF2E0 (item level = player level + 5 capped by act on normal = 0xBCB20; counts, quality bands, magic and perm passes diffed)
 void __fastcall D2GAME_NPC_FillStoreInventory_6FCC7100(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNpc, D2NpcTradeStrc* pTrade)
 {    
-    D2SeedStrc* pSeed = SUNITPROXY_GetSeedFromNpcControl(pGame);
+    D2SeedStrc* pSeed = &pGame->pNpcControl->pSeed;
 
     pTrade->dwTicks = GetTickCount();
 
@@ -2573,7 +2573,7 @@ void __fastcall D2GAME_STORES_FillGamble_6FCCA9F0(D2GameStrc* pGame, D2UnitStrc*
     pNpcRecord->pGamble = pGamble;
 
     const int32_t nLevel = STATLIST_UnitGetStatValue(pUnit, STAT_LEVEL, 0);
-    D2SeedStrc* pSeed = SUNITPROXY_GetSeedFromNpcControl(pGame);
+    D2SeedStrc* pSeed = &pGame->pNpcControl->pSeed;
     
     int32_t nCounter = 0;
     do

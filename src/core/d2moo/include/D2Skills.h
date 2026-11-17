@@ -177,14 +177,6 @@ D2COMMON_DLL_DECL void __stdcall SKILLS_InitSkillList(D2UnitStrc* pUnit);
 D2COMMON_DLL_DECL D2SkillStrc* __stdcall SKILLS_GetNextSkill(D2SkillStrc* pSkill);
 //D2Common.0x6FDAFEA0 (#10948)
 D2COMMON_DLL_DECL D2SkillStrc* __stdcall SKILLS_GetFirstSkillFromSkillList(D2SkillListStrc* pSkillList);
-//D2Common.0x6FDAFEC0
-D2SkillStrc* __fastcall SKILLS_GetLeftSkillFromSkillList(D2SkillListStrc* pSkillList);
-//D2Common.0x6FDAFEF0
-D2SkillStrc* __fastcall SKILLS_GetRightSkillFromSkillList(D2SkillListStrc* pSkillList);
-//D2Common.0x6FDAFF20
-void __fastcall SKILLS_SetUsedSkillInSkillList(D2SkillListStrc* pSkillList, D2SkillStrc* pUsedSkill);
-//D2Common.0x6FDAFF30
-D2SkillStrc* __fastcall SKILLS_GetUsedSkillFromSkillList(D2SkillListStrc* pSkillList);
 //D2Common.0x6FDAFF40 (#10949)
 D2COMMON_DLL_DECL D2SkillStrc* __fastcall SKILLS_GetSkillById(D2UnitStrc* pUnit, int nSkillId, D2UnitGUID nOwnerGUID);
 //D2Common.0x6FDAFF80 (#10950)

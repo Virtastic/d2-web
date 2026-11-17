@@ -124,7 +124,9 @@ void __fastcall MONSTER_Initialize(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D
     {
         pMonster->pMonsterData->pAiControl = AIGENERAL_AllocAiControl(pGame);
         pMonster->pMonsterData->pAiParam = D2GAME_MONSTERMODE_AllocParams_6FC62FF0(pGame);
-        pMonster->pMonsterData->pMonInteract = MONSTERAI_AllocMonsterInteract(pGame);
+        // retail allocates the interact record inline here (MonsterAI.cpp line 0x17B)
+        pMonster->pMonsterData->pMonInteract = D2_ALLOC_STRC_POOL(pGame->pMemoryPool, D2MonsterInteractStrc);
+        pMonster->pMonsterData->pMonInteract->pInteractInfo = nullptr;
         pMonster->pMonsterData->pMonstatsTxt = MONSTERMODE_GetMonStatsTxtRecord(pMonster->dwClassId);
 
         MONSTER_InitializeStatsAndSkills(pGame, pRoom, pMonster, sub_6FC67FA0(pGame->pMonReg, pRoom, pMonster));

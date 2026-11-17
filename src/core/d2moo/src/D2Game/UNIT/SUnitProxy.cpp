@@ -615,13 +615,6 @@ void __fastcall SUNITPROXY_InitializeNpcEventChain(D2GameStrc* pGame, D2UnitStrc
     }
 }
 
-//D2Game.0x6FCCC8B0
-// not-1.13c: no 1.13c function returns the npc-control seed; every caller reads pNpcControl+8 inline
-D2SeedStrc* __fastcall SUNITPROXY_GetSeedFromNpcControl(D2GameStrc* pGame)
-{
-    return &pGame->pNpcControl->pSeed;
-}
-
 //D2Game.0x6FCCC8C0
 // 1.13c D2Game+0x8FAF0 (record lookup is the 0x8F5C0 helper, which asserts on class id 0)
 void __fastcall SUNITPROXY_FreeVendorChain(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNpc)
@@ -702,31 +695,6 @@ void __fastcall SUNITPROXY_FreeVendorChain(D2GameStrc* pGame, D2UnitStrc* pPlaye
     {
         FOG_DisplayAssert("mc != 0", __FILE__, __LINE__);
         exit(-1);
-    }
-}
-
-//D2Game.0x6FCCCA70
-// not-1.13c: no standalone 1.13c function; the 1.13c npc message handler inlines the gamble inventory refresh (no decomp references this body)
-void __fastcall SUNITPROXY_UpdateGambleInventory(D2GameStrc* pGame, D2UnitStrc* pNpc, D2UnitStrc* pPlayer, D2ClientStrc* pClient)
-{
-    D2GAME_INVMODE_First_6FC40FB0(pGame, pNpc, pClient, nullptr);
-
-    int32_t nUnused = 0;
-    D2NpcRecordStrc* pNpcRecord = SUNITPROXY_GetNpcRecordFromUnit(pGame, pNpc, &nUnused);
-    if (pNpcRecord && pNpcRecord->bGambleInit)
-    {
-        const int32_t nPlayerGUID = pPlayer ? pPlayer->dwUnitId : -1;
-        for (D2NpcGambleStrc* pGamble = pNpcRecord->pGamble; pGamble; pGamble = pGamble->pNext)
-        {
-            if (pGamble->dwGUID == nPlayerGUID)
-            {
-                if (pGamble->pInventory)
-                {
-                    D2GAME_INVMODE_First_6FC40FB0(pGame, pNpc, pClient, pGamble->pInventory);
-                }
-                return;
-            }
-        }
     }
 }
 
@@ -964,7 +932,7 @@ void __fastcall SUNITPROXY_ClearGlobalItemCache()
 }
 
 //D2Game.0x6FCCD190
-// not-1.13c: no standalone 1.13c function; inlined into the monster AI npc-leave path (no decomp references this body)
+// 1.13c D2Game+0x8F620 (called only from the interact-list unlink at 0x485C0; retail takes the npc in a register and the player in ecx)
 void __fastcall SUNITPROXY_FreeNpcGamble(D2GameStrc* pGame, D2UnitStrc* pNpc, D2UnitStrc* pPlayer)
 {
     int32_t nUnused = 0;

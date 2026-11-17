@@ -489,7 +489,7 @@ static void __fastcall SUNITINACTIVE_RestoreInactiveRest(D2GameStrc* pGame, D2Ac
 	}
 }
 
-// not-1.13c: retail has no function for this; the monster-type test and the monster-data AI control read are inlined at every call site
+// 1.13c D2Game+0x1DD0 (unit in EAX; null and monster-type tests, then monster data +0x2C)
 D2AiControlStrc* __fastcall AIGENERAL_GetAiControlFromUnit(D2UnitStrc* pUnit)
 {
 	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)
@@ -501,7 +501,7 @@ D2AiControlStrc* __fastcall AIGENERAL_GetAiControlFromUnit(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCC40F0
-// not-1.13c: inlined at its call sites (SUnitInactive.cpp line 0x8D free in 0x1EC40 and 0x1EBD0)
+// 1.13c D2Game+0x1EAF0 (EDI = game, ESI = node; no direct caller in .text: 0x1EC40 and 0x1EBD0 carry the same SUnitInactive.cpp line 0x8D free inline)
 void __fastcall SUNITINACTIVE_FreeInactiveMonsterNode(D2GameStrc* pGame, D2InactiveMonsterNodeStrc* pInactiveMonsterNode)
 {
 	if (pInactiveMonsterNode->pMapAI)

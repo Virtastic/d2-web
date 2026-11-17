@@ -28,12 +28,8 @@ struct D2DrlgOutdoorRoomStrc
 #pragma pack()
 
 
-//D2Common.0x6FD83D20
-void __fastcall DRLGOUTROOM_FreeDrlgOutdoorRoom(D2DrlgRoomStrc* pDrlgRoom);
 //D2Common.0x6FD83D90
 void __fastcall DRLGOUTROOM_FreeDrlgOutdoorRoomData(D2DrlgRoomStrc* pDrlgRoom);
-//D2Common.0x6FD83DE0
-void __fastcall DRLGOUTROOM_AllocDrlgOutdoorRoom(D2DrlgRoomStrc* pDrlgRoom);
 //D2Common.6FD83E20
 void __fastcall DRLGOUTROOM_InitializeDrlgOutdoorRoom(D2DrlgRoomStrc* pDrlgRoom);
 //D2Common.0x6FD83EC0

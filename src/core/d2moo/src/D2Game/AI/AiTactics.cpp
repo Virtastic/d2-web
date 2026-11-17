@@ -94,7 +94,7 @@ D2UnitStrc* __fastcall sub_6FCCFC00(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCo
 }
 
 //D2Game.0x6FCCFD40
-// not-1.13c: retail callers call 0xF1C90 and compare its distance against the limit inline, no standalone function
+// 1.13c D2Game+0xF3130 (B1C90 result kept only when its distance is within the limit)
 D2UnitStrc* __fastcall sub_6FCCFD40(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiControlStrc* pAiControl, int32_t* pDistance, int32_t* pCombat, int32_t nMaxDistance)
 {
 	D2UnitStrc* pResult = sub_6FCF2110(pGame, pUnit, pAiControl, pDistance, pCombat);
@@ -187,7 +187,7 @@ int32_t __fastcall AITACTICS_ChangeModeAndTargetUnit(D2GameStrc* pGame, D2UnitSt
 }
 
 //D2Game.0x6FCCFEE0
-// not-1.13c: retail callers build the coordinate mode change inline (0x75070 mode-change info, x/y words, 0x75E10), no standalone function
+// 1.13c D2Game+0xF21E0 (mode in EAX; x/y words at block +0xC/+0x10 between 0x75070 and 0x75E10)
 int32_t __fastcall AITACTICS_ChangeModeAndTargetCoordinates(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMode, int32_t nX, int32_t nY)
 {
 	D2ModeChangeStrc modeChange = {};
@@ -321,7 +321,7 @@ void __fastcall AITACTICS_SetVelocity(D2UnitStrc* pUnit, int32_t a2, int32_t nVe
 }
 
 //D2Game.0x6FCD0220
-// not-1.13c: retail callers call 0xF2540 directly with mode 2, step 1 and the flag byte; no standalone function
+// 1.13c D2Game+0xF30A0 (F2540 with mode 2, step 1 and the flag word in EAX)
 int32_t __fastcall AITACTICS_WalkToTargetUnitWithFlags(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTargetUnit, uint8_t nFlag)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, pTargetUnit, MONMODE_WALK, 0, 0, 1u, nFlag);
@@ -391,21 +391,21 @@ int32_t __fastcall AITACTICS_MoveToTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FCD03B0
-// not-1.13c: retail callers call 0xF2540 directly with mode 2, step 1, flags 0; no standalone function
+// 1.13c D2Game+0xF3080 (F2540 with mode 2, step 1, flags 0)
 int32_t __fastcall AITACTICS_WalkToTargetUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, pTarget, MONMODE_WALK, 0, 0, 1u, 0);
 }
 
 //D2Game.0x6FCD03D0
-// not-1.13c: retail callers call 0xF2540 directly with mode 0xF, step 1 and the flag byte; no standalone function
+// 1.13c D2Game+0xF3060 (F2540 with mode 0xF, step 1 and the flag word in EAX)
 int32_t __fastcall AITACTICS_RunToTargetUnitWithFlags(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, uint8_t nFlags)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, pTarget, MONMODE_RUN, 0, 0, 1u, nFlags);
 }
 
 //D2Game.0x6FCD03F0
-// not-1.13c: retail callers call 0xF2540 directly with mode 0xF, step 1, flags 0; no standalone function
+// 1.13c D2Game+0xF3040 (F2540 with mode 0xF, step 1, flags 0)
 int32_t __fastcall AITACTICS_RunToTargetUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, pTarget, MONMODE_RUN, 0, 0, 1u, 0);
@@ -424,35 +424,35 @@ int32_t __fastcall sub_6FCD0410(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
 }
 
 //D2Game.0x6FCD0460
-// not-1.13c: retail callers call 0xF2540 directly with mode 2 and coordinates; no standalone function
+// 1.13c D2Game+0xF2FE0 (F2540 with mode 2, coordinates, step 1, flags 0)
 int32_t __fastcall AITACTICS_WalkToTargetCoordinates(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_WALK, nX, nY, 1u, 0);
 }
 
 //D2Game.0x6FCD0480
-// not-1.13c: retail callers call 0xF2540 directly with mode 0xF and coordinates; no standalone function
+// 1.13c D2Game+0xF2FC0 (F2540 with mode 0xF, coordinates, step 1, flags 0)
 int32_t __fastcall AITACTICS_RunToTargetCoordinates(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_RUN, nX, nY, 1u, 0);
 }
 
 //D2Game.0x6FCD04A0
-// not-1.13c: retail callers call 0xF2540 directly with mode 2, coordinates and flag 4; no standalone function
+// 1.13c D2Game+0xF2FA0 (F2540 with mode 2, coordinates, step 1, flags 4)
 int32_t __fastcall AITACTICS_WalkToTargetCoordinatesDeleteAiEvent(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_WALK, nX, nY, 1u, 4);
 }
 
 //D2Game.0x6FCD04C0
-// not-1.13c: retail callers call 0xF2540 directly with mode 0xF, coordinates and flag 4; no standalone function
+// 1.13c D2Game+0xF2F80 (F2540 with mode 0xF, coordinates, step 1, flags 4)
 int32_t __fastcall AITACTICS_RunToTargetCoordinatesDeleteAiEvent(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_RUN, nX, nY, 1u, 4);
 }
 
 //D2Game.0x6FCD04E0
-// not-1.13c: 1.13c inlines this wrapper; its callers (e.g. +0x16970) call MoveToTarget (+0xF2540) in walk mode directly.
+// 1.13c D2Game+0xF2F60 (F2540 with mode 2, coordinates, step 0, flags 0)
 int32_t __fastcall AITACTICS_WalkToTargetCoordinatesNoSteps(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
 	return AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_WALK, nX, nY, 0, 0);
@@ -731,7 +731,7 @@ void __fastcall AITACTICS_AddMessage(D2GameStrc* pGame, D2UnitStrc* pUnit, D2Uni
 }
 
 //D2Game.0x6FCD1020
-// not-1.13c: retail callers set path step 1 and the mode change inline (0x75070, 0x75E10), no standalone function
+// 1.13c D2Game+0xF1FF0 (mode in EAX, unit in ECX; 0x75070, path step 1 via 0xAD18, x/y words, 0x75E10)
 int32_t __fastcall AITACTICS_ChangeModeAndTargetCoordinatesOneStep(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY, int32_t nMode)
 {
 	D2ModeChangeStrc modeChange = {};
@@ -744,7 +744,7 @@ int32_t __fastcall AITACTICS_ChangeModeAndTargetCoordinatesOneStep(D2GameStrc* p
 }
 
 //D2Game.0x6FCD1070
-// not-1.13c: retail callers set path step 0 and the mode change inline (0x75070, 0x75E10), no standalone function
+// 1.13c D2Game+0xF1FA0 (mode in EAX, unit in ECX; 0x75070, path step 0 via 0xAD18, x/y words, 0x75E10)
 int32_t __fastcall AITACTICS_ChangeModeAndTargetCoordinatesNoStep(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY, int32_t nMode)
 {
 	D2ModeChangeStrc modeChange = {};
@@ -802,7 +802,7 @@ int32_t __fastcall AITACTICS_MoveInRadiusToTarget(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FCD12C0
-// not-1.13c: retail callers call 0xF1D90 directly with walk mode 2, no standalone function
+// 1.13c D2Game+0xF22A0 (F1D90 with walk mode 2)
 // TODO: Check name
 int32_t __fastcall AITACTICS_WalkInRadiusToTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t a4, int32_t a5)
 {
@@ -835,7 +835,7 @@ int32_t __fastcall AITACTICS_WalkAroundTargetWithScaledDistance(D2GameStrc* pGam
 }
 
 //D2Game.0x6FCD1430
-// not-1.13c: retail inlines the last-attacker minion test in the Overseer AI 0x17CB0 (seen: it calls 0xE09D0 and 0xE0A60 itself), no standalone function
+// 1.13c D2Game+0xF2250 (last attacker via 0xE09D0; player not in modes 0/0x11, monster not in modes 0/0xC and passing 0xE0A60)
 D2UnitStrc* __fastcall AITACTICS_GetTargetMinion(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2UnitStrc* pTarget = SUNIT_GetLastAttacker(pGame, pUnit);

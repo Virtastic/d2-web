@@ -117,7 +117,9 @@ int32_t __fastcall SKILLS_SrvDo033_PsychicHammer(D2GameStrc* pGame, D2UnitStrc* 
     D2UnitStrc* pTargetUnit = SUNIT_GetTargetUnit(pGame, pUnit);
 
     D2DamageStrc damage = {};
-    SUNITDMG_RollDamage(pUnit, nSkillId, nSkillLevel, &damage);
+    // 1.13c D2Game+0x92770 calls the physical roll 0x9F1A0 then the elemental roll 0x9F210 directly
+    D2GAME_RollPhysicalDamage_6FD14EC0(pUnit, &damage, nSkillId, nSkillLevel);
+    D2GAME_RollElementalDamage_6FD14DD0(pUnit, &damage, nSkillId, nSkillLevel);
     SUNITDMG_ExecuteEvents(pGame, pUnit, pTargetUnit, 1, &damage);
     damage.wResultFlags |= 1u;
 

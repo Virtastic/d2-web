@@ -2273,7 +2273,7 @@ void __fastcall sub_6FC92F10(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 }
 
 //D2Game.0x6FC931D0
-// not-1.13c: no standalone retail function; the 1.13c trade block (D2Game+0x70000..0x74200) has no row for "remove item from the trade list", retail inlines it in the item-mode callers
+// 1.13c D2Game+0x71330 (trade-list item removal: packets 0x77/0x0E, 0x79, then 0x70B70)
 void __fastcall sub_6FC931D0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem)
 {
     int32_t nUnitType = 0;
@@ -2361,7 +2361,7 @@ int32_t __fastcall PLRTRADE_CopyTradeSaveDataToBuffer(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FC93430
-// not-1.13c: no standalone retail function; the 1.13c trade block has no row for this "start trade-confirm state 7" check, retail inlines it in the player-busy caller
+// 1.13c D2Game+0x73860 (start trade-confirm state 7; called by 0x388C0)
 int32_t __fastcall sub_6FC93430(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem)
 {
     D2PlayerDataStrc* pPlayerData1 = UNITS_GetPlayerData(pPlayer);
@@ -2468,7 +2468,7 @@ int32_t __fastcall sub_6FC93430(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
 }
 
 //D2Game.0x6FC93740
-// not-1.13c: no standalone retail function; the 1.13c trade block has no row for the "no item on the trade page" belt check, retail inlines it in the belt-move caller
+// 1.13c D2Game+0x701F0 (no item on the trade page; called by 0xD1200 and 0xD12E0)
 int32_t __fastcall sub_6FC93740(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     int32_t nUnitType = 0;

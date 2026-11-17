@@ -901,7 +901,7 @@ int __stdcall sub_6FDAB6A0(D2PathPointStrc pPoint1, D2PathPointStrc pPoint2)
 	return sub_6FDAB610(pPoint1.X, pPoint1.Y, pPoint2.X, pPoint2.Y);
 }
 
-// not-1.13c: retail folds this direction-table read into its callers (the table lookup is inline at each call site, see 0x3E190 for the index)
+// not-1.13c: retail folds this direction-table read into its callers (the +0x3E190 index then the .rdata row at 0x6FDDC320, inline in D2Common+0x66AA0, +0x70BB0, +0x708F0, +0x674C0, +0x678B0; the stand-alone +0x3E5F0 copy takes two packed points and has no caller)
 int __fastcall sub_6FDAB750(int nX1, int nY1, int nX2, int nY2)
 {
 	return stru_6FDD2158[sub_6FDAB610(nX1, nY1, nX2, nY2)].unk0x00;
@@ -914,7 +914,7 @@ int __stdcall sub_6FDAB770(D2PathPointStrc pPoint1, D2PathPointStrc pPoint2)
 	return stru_6FDD2158[sub_6FDAB6A0(pPoint1, pPoint2)].unk0x00;
 }
 
-// not-1.13c: retail folds the three-entry direction row read into its callers (see 0x3E190 for the index)
+// not-1.13c: retail folds the three-entry direction row read into its callers (the +0x3E190 index then the three .rdata words inline in D2Common+0x674C0 and +0x678B0)
 void __fastcall PATH_GetDirections_6FDAB790(int* pTestDir, D2PathPointStrc pPoint1, D2PathPointStrc pPoint2)
 {
 	int nIndex = sub_6FDAB6A0(pPoint1, pPoint2);

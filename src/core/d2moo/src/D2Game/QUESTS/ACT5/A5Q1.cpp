@@ -595,7 +595,7 @@ void __fastcall ACT5Q1_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 }
 
 //D2Game.0x6FCB1D10
-// not-1.13c: no standalone 1.13c function; no decompiled 1.13c function has this body (searched by callee set), so retail inlines it
+// 1.13c D2Game+0x585C0 (player in EAX, game in EDI; its only caller is NPC_HandleDialogMessage, D2Game+0xC00C0)
 void __fastcall ACT5Q1_SetRewardGranted(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];

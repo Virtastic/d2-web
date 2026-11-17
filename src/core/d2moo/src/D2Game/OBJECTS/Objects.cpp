@@ -1527,7 +1527,9 @@ static D2UnitStrc* OBJECTS_PlaceShrine(D2GameStrc* pGame, int32_t nClassId,
 D2UnitStrc* __fastcall OBJECTS_PopulateFn8_Well(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, uint8_t nDensity, uint32_t nObjectId, uint16_t nProbability)
 {
     const int32_t nLevelId = DUNGEON_GetLevelIdFromPopulatedRoom(pRoom);
-    if (OBJRGN_CanNotSpawnMoreWells(pGame, nLevelId))
+    // Region well count test, inlined here in 1.13c (D2Game+0x32A10): four wells, or more wells than populated rooms / 8.
+    D2ObjectRegionStrc* pObjectRegion = pGame->pObjectControl->pObjectRegion[nLevelId];
+    if (pObjectRegion->nWells == 4 || pObjectRegion->nWells > pObjectRegion->nPopulatedRooms / 8)
     {
         return nullptr;
     }
@@ -1555,7 +1557,13 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn8_Well(D2GameStrc* pGame, D2ActiveRoomS
             pObject->dwFlags |= UNITFLAG_TARGETABLE;
         else
             pObject->dwFlags &= ~UNITFLAG_TARGETABLE;
-        OBJRGN_SetWellCoordinates(pGame, nLevelId, CLIENTS_GetUnitX(pObject), CLIENTS_GetUnitY(pObject));
+        // Well coordinate append, inlined here in 1.13c (D2Game+0x32A10).
+        if (pObjectRegion->nWells < 4)
+        {
+            pObjectRegion->wellCoordinates[pObjectRegion->nWells].nX = CLIENTS_GetUnitX(pObject);
+            pObjectRegion->wellCoordinates[pObjectRegion->nWells].nY = CLIENTS_GetUnitY(pObject);
+            ++pObjectRegion->nWells;
+        }
     }
 
     return pObject;
@@ -1577,7 +1585,9 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn2_WaypointShrine(D2GameStrc* pGame, D2A
     bool bSpawnHealingWell = false;
     int32_t nCounter = 3;
     const uint32_t nRoll = ITEMS_RollRandomNumber(pSeed) % 100;   // d2-web: 1.13c 0x6FC5281D rolls before the healing test, so the room seed advances either way
-    if (OBJRGN_ShouldSpawnHealingShrineOrWell(pGame, nLevelId))
+    // The region tests below are inlined in 1.13c (D2Game+0x327D0): the healing-well and shrine-count tests, the healing count and the coordinate append.
+    D2ObjectRegionStrc* pObjectRegion = pGame->pObjectControl->pObjectRegion[nLevelId];
+    if (pObjectRegion->nPopulatedRooms > 0 && (pObjectRegion->field_4 << 7) / pObjectRegion->nPopulatedRooms > 96 && !pObjectRegion->nHealingShrines)
     {
         bSpawnHealingWell = true;
         nCounter = 30;
@@ -1587,7 +1597,7 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn2_WaypointShrine(D2GameStrc* pGame, D2A
         return nullptr;
     }
 
-    if (OBJRGN_CanNotSpawnMoreShrines(pGame, nLevelId))
+    if (pObjectRegion->nShrines == 10 || pObjectRegion->nShrines > pObjectRegion->nPopulatedRooms / 8)
     {
         return nullptr;
     }
@@ -1609,7 +1619,7 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn2_WaypointShrine(D2GameStrc* pGame, D2A
 
             if (pObject->pObjectData->InteractType == 2)
             {
-                OBJRGN_IncreaseHealingShrineCount(pGame, nLevelId);
+                ++pObjectRegion->nHealingShrines;
             }
             else if (bSpawnHealingWell)
             {
@@ -1624,10 +1634,15 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn2_WaypointShrine(D2GameStrc* pGame, D2A
                 OBJECTS_GetShrineId(pGame, 2u, 1);
                 pObject->pObjectData->InteractType = 2;
                 UNITS_SetShrineTxtRecordInObjectData(pObject, DATATBLS_GetShrinesTxtRecord(2));
-                OBJRGN_IncreaseHealingShrineCount(pGame, nLevelId);
+                ++pObjectRegion->nHealingShrines;
             }
 
-            OBJRGN_SetShrineCoordinates(pGame, nLevelId, CLIENTS_GetUnitX(pObject), CLIENTS_GetUnitY(pObject));
+            if (pObjectRegion->nShrines < 10)
+            {
+                pObjectRegion->shrineCoordinates[pObjectRegion->nShrines].nX = CLIENTS_GetUnitX(pObject);
+                pObjectRegion->shrineCoordinates[pObjectRegion->nShrines].nY = CLIENTS_GetUnitY(pObject);
+                ++pObjectRegion->nShrines;
+            }
 
             return pObject;
         }
@@ -2079,7 +2094,7 @@ void __fastcall OBJECTS_PopulationHandler(D2GameStrc* pGame, D2ActiveRoomStrc* p
     }
 
     const int32_t nLevelId = DUNGEON_GetLevelIdFromPopulatedRoom(pRoom);
-    D2ObjectRegionStrc* pObjectRegion = OBJRGN_GetObjectRegionForLevel(pGame, nLevelId);
+    D2ObjectRegionStrc* pObjectRegion = pGame->pObjectControl->pObjectRegion[nLevelId];
 
     if (!nLevelId || D2Common_10087(pRoom) || nLevelId >= sgptDataTables->nLevelsTxtRecordCount || DUNGEON_IsRoomInTown(pRoom))
     {
@@ -2147,7 +2162,8 @@ void __fastcall OBJECTS_PopulationHandler(D2GameStrc* pGame, D2ActiveRoomStrc* p
     {
         const int32_t nObjGroup = pLevelsTxtRecord->nObjGroup[i];
         uint32_t nProbability = ITEMS_RollRandomNumber(&pRoom->pSeed) % 100;
-        if (OBJRGN_ShouldSpawnHealingShrineOrWell(pGame, DUNGEON_GetLevelIdFromPopulatedRoom(pRoom)) && DATATBLS_GetObjectsTxtRecord(nObjGroup)->nSubClass)
+        if (pObjectRegion->nPopulatedRooms > 0 && (pObjectRegion->field_4 << 7) / pObjectRegion->nPopulatedRooms > 96 && !pObjectRegion->nHealingShrines
+            && DATATBLS_GetObjectsTxtRecord(nObjGroup)->nSubClass)
         {
             nProbability = 100;
         }

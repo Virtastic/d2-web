@@ -777,46 +777,6 @@ D2SkillStrc* __stdcall SKILLS_GetFirstSkillFromSkillList(D2SkillListStrc* pSkill
 	return NULL;
 }
 
-//D2Common.0x6FDAFEC0
-// not-1.13c: inlined into the unit left-skill getter, which reads the skill list's left slot itself
-D2SkillStrc* __fastcall SKILLS_GetLeftSkillFromSkillList(D2SkillListStrc* pSkillList)
-{
-	D2_ASSERT(pSkillList);
-
-	return pSkillList->pLeftSkill;
-}
-
-//D2Common.0x6FDAFEF0
-// not-1.13c: inlined into the unit right-skill getter, which reads the skill list's right slot itself
-D2SkillStrc* __fastcall SKILLS_GetRightSkillFromSkillList(D2SkillListStrc* pSkillList)
-{
-	D2_ASSERT(pSkillList);
-
-	return pSkillList->pRightSkill;
-}
-
-//D2Common.0x6FDAFF20
-// not-1.13c: inlined into the unit used-skill setter
-void __fastcall SKILLS_SetUsedSkillInSkillList(D2SkillListStrc* pSkillList, D2SkillStrc* pUsedSkill)
-{
-	if (pSkillList)
-	{
-		pSkillList->pUsedSkill = pUsedSkill;
-	}
-}
-
-//D2Common.0x6FDAFF30
-// not-1.13c: inlined into the unit used-skill getter
-D2SkillStrc* __fastcall SKILLS_GetUsedSkillFromSkillList(D2SkillListStrc* pSkillList)
-{
-	if (pSkillList)
-	{
-		return pSkillList->pUsedSkill;
-	}
-
-	return NULL;
-}
-
 //D2Common.0x6FDAFF40 (#10949)
 // not-1.13c: 1.13c exports the lookup itself (SKILLS_GetSkill); there is no separate forwarder
 D2SkillStrc* __fastcall SKILLS_GetSkillById(D2UnitStrc* pUnit, int nSkillId, D2UnitGUID nOwnerGUID)

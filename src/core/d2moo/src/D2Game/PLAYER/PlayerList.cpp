@@ -194,7 +194,7 @@ int32_t __fastcall PLAYERLIST_CheckFlag(D2UnitStrc* pPlayer1, D2UnitStrc* pPlaye
 }
 
 //D2Game.0x6FCBA930
-// not-1.13c: no retail row; nothing calls it in 1.10f or 1.13c (the 1.13c list code reads the flag word in place)
+// not-1.13c: no retail row; inlined in D2Game+0x8D120 (the party roster packet walks the player list at [player data + 0x38] and reads the flag word in place); only d2game_8d120_packet.cpp calls it
 uint16_t __fastcall PLAYERLIST_GetFlags(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2)
 {
     if (pPlayer1 == pPlayer2)
@@ -284,7 +284,7 @@ void __fastcall sub_6FCBAAA0(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc
 }
 
 //D2Game.0x6FCBAB20
-// not-1.13c: no retail row of its own; 1.13c inlines the living-player walk into its caller and passes the pair body (D2Game+0xF0480) as the callback
+// 1.13c D2Game+0xF06E0 (player in EAX, EBX = the pair body 0xF0480, the 0xDFC10 living-player walk; D2Game+0x2D9B0 carries the same walk inline at 0x2DB48)
 void __fastcall sub_6FCBAB20(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     D2_ASSERT(pPlayer);

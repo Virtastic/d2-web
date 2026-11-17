@@ -92,7 +92,8 @@ void __fastcall DRLGLOGIC_InitializeDrlgCoordList(D2DrlgRoomStrc* pDrlgRoom, D2D
 				{
 					for (D2DrlgTileDataStrc* pDrlgTileData = pDrlgTileLink->pMapTile; pDrlgTileData; pDrlgTileData = pDrlgTileData->unk0x20)
 					{
-						if (DRLG_CheckLayer1ButNotWallObject(pDrlgTileData))
+						// the same inline test as the wall pass above (D2Common+0x814C0)
+						if ((pDrlgTileData->dwFlags & MAPTILE_WALL_LAYER_MASK) == (1u << MAPTILE_WALL_LAYER_BIT) && pDrlgTileData->nTileType != TILETYPE_ROOF && !(pDrlgTileData->dwFlags & MAPTILE_OBJECT_WALL))
 						{
 							const int nX = pDrlgRoomNear->nTileXPos + pDrlgTileData->nPosX;
 							const int nY = pDrlgRoomNear->nTileYPos + pDrlgTileData->nPosY;
@@ -334,20 +335,6 @@ void __fastcall sub_6FD76B90(D2DrlgRoomStrc* pDrlgRoom, int nIndex1, int nIndex2
 	}
 }
 
-// not-1.13c: retail has no function; the same test is written inline in the wall pass of D2Common+0x814C0
-//D2Common.0x6FD76C20
-BOOL __fastcall DRLG_CheckLayer1ButNotWallObject(D2DrlgTileDataStrc* pTileData)
-{
-	if ((pTileData->dwFlags & MAPTILE_WALL_LAYER_MASK) == (1u << MAPTILE_WALL_LAYER_BIT) /* d2-web: first wall layer (0x4000), see DRLGLOGIC_InitializeDrlgCoordList */)
-	{
-		if (pTileData->nTileType != TILETYPE_ROOF)
-		{
-			return (pTileData->dwFlags & MAPTILE_OBJECT_WALL) == 0;
-		}
-	}
-
-	return FALSE;
-}
 
 // 1.13c D2Common+0x81A20
 //D2Common.0x6FD76C50

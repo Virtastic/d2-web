@@ -38,7 +38,7 @@ D2ActiveRoomStrc* __fastcall DRLGWARP_GetDestinationRoom(int nSourceLevel, D2Drl
 	return NULL;
 }
 
-// not-1.13c: no retail function between D2Common+0x19650 and +0x19810; the ordinal-10026 export loops over the room tiles itself
+// not-1.13c: no retail function between D2Common+0x19650 and +0x19810; the ordinal-10026 export (D2Common+0x3BB80) loops over the room tiles itself
 //D2Common.0x6FD787F0
 void __fastcall DRLGWARP_ToggleRoomTilesEnableFlag(D2DrlgRoomStrc* pDrlgRoom, BOOL bEnabled)
 {
@@ -396,7 +396,7 @@ int* __fastcall DRLGWARP_GetWarpIdArrayFromLevelId(D2DrlgStrc* pDrlg, int nLevel
 
 // 1.10f:D2Common.0x6FD78D10
 // 1.11 :D2Common.0x6FD77400
-// not-1.13c: retail callers call the warp-array lookup (D2Common+0x19950) and index the result themselves
+// not-1.13c: retail callers (the callers of D2Common+0x19950: 0x19AD0, 0x17760, 0x19C90, 0x2DC90, 0x691C0, 0x69360, 0x69090, 0xC060, 0x453D0, 0x45240) call the warp-array lookup and index the result themselves
 int __fastcall DRLGWARP_GetWarpDestinationFromArray(D2DrlgLevelStrc* pLevel, uint8_t nArrayId)
 {
 	return DRLGWARP_GetWarpIdArrayFromLevelId(pLevel->pDrlg, pLevel->nLevelId)[nArrayId];

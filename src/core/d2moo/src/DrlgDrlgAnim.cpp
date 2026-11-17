@@ -141,33 +141,12 @@ void __fastcall DRLGANIM_AnimateRoomTiles_12DC0(D2DrlgRoomStrc* pCurrentRoomEx)
 }
 
 //D2Common.0x6FD756B0
-// not-1.13c: retail's 0x12DC0 is the per-room body only (DRLGANIM_AnimateRoomTiles_12DC0 above); its caller 0x3BBD0 walks the near rooms
+// not-1.13c: retail has no separate function; this near-room loop is inlined in D2Common+0x3BBD0 (DUNGEON_AnimateTiles, the only caller) and runs the per-room body 0x12DC0 above
 void __fastcall DRLGANIM_AnimateTiles(D2DrlgRoomStrc* pDrlgRoom)
 {
-
 	for (int i = 0; i < pDrlgRoom->nRoomsNear; ++i)
 	{
-		D2DrlgRoomStrc* pCurrentRoomEx = pDrlgRoom->ppRoomsNear[i];
-
-		if (pCurrentRoomEx->dwFlags & DRLGROOMFLAG_ANIMATED_FLOOR && pCurrentRoomEx->pTileGrid)
-		{
-			for (D2DrlgAnimTileGridStrc* j = pCurrentRoomEx->pTileGrid->pAnimTiles; j; j = j->pNext)
-			{
-				D2DrlgTileDataStrc* pTileData = j->ppMapTileData[AnimationFrameFixedPointToInteger(j->nCurrentFrame)];
-				if (pTileData)
-				{
-					pTileData->dwFlags |= MAPTILE_HIDDEN;
-				}
-
-				j->nCurrentFrame = (j->nCurrentFrame + j->nAnimationSpeed) % AnimationFrameIntegerToFixedPoint(j->nFrames);
-
-				pTileData = j->ppMapTileData[AnimationFrameFixedPointToInteger(j->nCurrentFrame)];
-				if (pTileData)
-				{
-					pTileData->dwFlags &= ~MAPTILE_HIDDEN;
-				}
-			}
-		}
+		DRLGANIM_AnimateRoomTiles_12DC0(pDrlgRoom->ppRoomsNear[i]);
 	}
 }
 

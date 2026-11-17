@@ -150,7 +150,7 @@ uint32_t __stdcall DATATBLS_GetCurrentLevelFromExp(int nClass, uint32_t dwExperi
 }
 
 //D2Common.0x6FD49760
-// not-1.13c: retail inlines this read/write into each loader (0x787C0 and the other table loaders; 0x5E710 is the shared out-of-line copy used by 0x61EC0, 0x787C0, 0x7C8D0)
+// 1.13c D2Common+0x5E710 (register-operand copy used by 0x61EC0, 0x787C0, 0x7C8D0; the other table loaders inline the same body: .bin write when compiling, DataTbls.cpp line 0x275 free, archive read)
 void __fastcall DATATBLS_GetBinFileHandle(HD2ARCHIVE hArchive, const char* szFile, void** ppFileHandle, int* pSize, int* pSizeEx)
 {
 	FILE* pFile = NULL;

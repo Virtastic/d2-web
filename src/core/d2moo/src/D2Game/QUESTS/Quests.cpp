@@ -972,7 +972,7 @@ void __fastcall QUESTS_DeleteItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint32
 }
 
 //D2Game.0x6FC94B20
-// 1.13c D2Game+0x354F0
+// 1.13c D2Game+0x354F0 (AL = quest id, ECX = player, stack = game; builds packet 0x5D: record 0x33F30, act check, filter callback record+0xE8 or the 0x33A30 ladder, 0x56B80 for filter 0x24, send 0x8ACD0)
 void __fastcall QUESTS_StatusCyclerEx(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint8_t nQuestId)
 {
 	if (!pGame)
@@ -2352,7 +2352,7 @@ void __fastcall QUESTS_HellPortalActChange(D2GameStrc* pGame, D2UnitStrc* pPlaye
 }
 
 //D2Game.0x6FC967D0
-// not-1.13c: retail D2Game+0x35C20 picks the NPC id list by act index (0,1,2,4) and calls D2Game+0x34D00 (callers D2Game+0x36890, +0x366C0); this takes the list directly
+// 1.13c D2Game+0x34D00 (list pointer and count in registers, the id -> bit table walk and bit set inline; D2Game+0x35C20 picks the list by act index 0,1,2,4 for callers 0x36890, 0x366C0, here the callers pass it)
 void __fastcall QUESTS_SetIntroFlags(D2GameStrc* pGame, D2UnitStrc* pPlayer, const int32_t* pNPCs, int32_t nNPCs)
 {
 	D2PlayerDataStrc* pPlayerData = pPlayerData = UNITS_GetPlayerData(pPlayer);

@@ -412,12 +412,12 @@ int __stdcall MONSTERS_GetHirelingResurrectionCost(D2UnitStrc* pHireling)
 }
 
 //D2Common.0x6FDA5270 (#11068)
-// not-1.13c: no retail function with this body (1.13c #11068 is a different function, D2Common+0x4E5A0)
+// 1.13c D2Common+0x84C30 (unsigned index test: retail compares the index below 0x10 unsigned)
 int __stdcall D2COMMON_11068_GetCompInfo(D2UnitStrc* pMonster, int nComponent)
 {
 	D2MonStats2Txt* pMonStats2TxtRecord = NULL;
 
-	if (pMonster && pMonster->dwUnitType == UNIT_MONSTER && nComponent < ARRAY_SIZE(pMonStats2TxtRecord->nComponentChoiceCounts))
+	if (pMonster && pMonster->dwUnitType == UNIT_MONSTER && static_cast<unsigned int>(nComponent) < ARRAY_SIZE(pMonStats2TxtRecord->nComponentChoiceCounts))
 	{
 		pMonStats2TxtRecord = UNITS_GetMonStats2TxtRecordFromMonsterId(pMonster->dwClassId);
 		if (pMonStats2TxtRecord)
@@ -578,7 +578,7 @@ uint32_t __stdcall D2Common_11069(D2UnitStrc* pMonster, unsigned int nIndex, uns
 }
 
 //D2Common.0x6FDA5450 (#11070)
-// not-1.13c: retail 0x84C70 takes a unit; this monster-id variant has no 1.13c counterpart and is called by the realm and monspawn code
+// not-1.13c: monster-id variant of the first half of D2Common+0x84C70 (retail takes a unit and adds the light/heavy override); only the realm and monspawn code call it
 int __stdcall D2Common_11070(int nMonsterId, unsigned int nComponent, unsigned int a3)
 {
 	D2MonStats2Txt* pMonStats2TxtRecord = NULL;
@@ -885,7 +885,7 @@ BOOL __stdcall MONSTERS_IsBoss(D2MonStatsTxt* pMonStatsTxtRecord, D2UnitStrc* pM
 }
 
 //D2Common.0x6FDA5900 (#11064)
-// not-1.13c: no retail function with this body (1.13c #11064 is a different function, D2Common+0x22760); retail tests the death modes inline
+// 1.13c D2Common+0x1A520
 BOOL __stdcall MONSTERS_IsDead(D2UnitStrc* pMonster)
 {
 	if (pMonster && pMonster->dwUnitType == UNIT_MONSTER)

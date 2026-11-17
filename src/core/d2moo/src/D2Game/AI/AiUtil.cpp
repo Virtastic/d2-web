@@ -45,7 +45,7 @@ struct D2UnkAiTableStrc
 
 
 //Inlined in D2Game.0x6FCF1210 and D2Game.0x6FCF1310
-// not-1.13c: inlined in 1.13c as well; no stand-alone function to flip.
+// not-1.13c: inlined in D2Game+0xB0A20 (full unit size) and D2Game+0xB0980 (half unit size); no stand-alone function in retail.
 int32_t __fastcall AIUTIL_GetDistanceToCoordinatesWithSize(D2UnitStrc* pUnit, int32_t nX, int32_t nY, int32_t nSize)
 {
 	// d2-web: retail 1.13c D2Game 0x6FCD0AED..0AFB (the full-size distance the target scan uses): each axis is
@@ -557,53 +557,6 @@ D2UnitStrc* __fastcall sub_6FCF1E80(D2GameStrc* pGame, D2UnitStrc* pUnit, void* 
 		return nullptr;
 	}
 }
-
-#ifdef D2_VERSION_HAS_UBERS
-//1.14d: 0x005DD140
-// not-1.13c: a 1.14d Uber Tristram counter; 1.13c has no such callback (the 0xB17B0 table ends at id 12)
-D2UnitStrc* __fastcall AIUTIL_TargetCallback_Ubers(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, void* pCallbackArg)
-{
-	D2UbersAiCallbackArgStrc* pArg = (D2UbersAiCallbackArgStrc*)pCallbackArg;
-
-	if (pTarget
-	&& pTarget->dwUnitType == UNIT_MONSTER
-	&& !SUNIT_IsDead(pTarget)
-	&& AIUTIL_GetDistanceToCoordinates_FullUnitSize(pUnit, pTarget) <= pArg->nDistance)
-	{
-		switch (pTarget->dwClassId)
-		{
-		case MONSTER_UBERMEPHISTO:
-			pArg->nUberMephisto++;
-			//pArg->nUberMephisto = TRUE;
-			break;
-		case MONSTER_UBERDIABLO:
-			pArg->nUberDiablo++;
-			//pArg->nUberDiablo = TRUE;
-			break;
-		case MONSTER_UBERBAAL:
-			pArg->nUberBaal++;
-			//pArg->nUberBaal = TRUE;
-			break;
-		case MONSTER_DEMONHOLE:
-			pArg->nDiabloSpawner++;
-			break;
-		case MONSTER_MEGADEMON6:
-			pArg->nDiabloMinions++;
-			break;
-		case MONSTER_WRAITH9:
-		case MONSTER_VAMPIRE9:
-		case MONSTER_WILLOWISP8:
-			pArg->nBaalMinions++;
-			break;
-		default:
-			pArg->nOtherMonsters++;
-			break;
-		}
-	}
-
-	return nullptr;
-}
-#endif
 
 //D2Game.0x6FCF20E0
 // 1.13c D2Game+0xB06F0: only while no result is held, the callback's non-null answer is stored

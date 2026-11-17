@@ -1476,7 +1476,7 @@ void __fastcall SUNITDMG_ApplyPoisonDamage(D2UnitStrc* pAttacker, D2UnitStrc* pD
 	if (pDefender && pDefender->dwUnitType == UNIT_MONSTER)
 	{
 		D2GAME_EVENTS_Delete_6FC34840(pGame, pDefender, EVENTTYPE_STATREGEN, 0);
-		g_d2webRegenSite = "SUNITDMG_ApplyPoisonDamage"; // not-1.13c: replay diagnostic
+		g_d2webRegenSite = "SUNITDMG_ApplyPoisonDamage"; // not-1.13c: d2-web diagnostic, names the arming site for Event.cpp's dead-regen report (no game effect)
 		EVENT_SetEvent(pGame, pDefender, EVENTTYPE_STATREGEN, pGame->dwGameFrame + 1, 0, 0);
 	}
 
@@ -1525,7 +1525,7 @@ void __fastcall SUNITDMG_ApplyBurnDamage(D2UnitStrc* pAttacker, D2UnitStrc* pDef
 	if (pDefender && pDefender->dwUnitType == UNIT_MONSTER)
 	{
 		D2GAME_EVENTS_Delete_6FC34840(pGame, pDefender, EVENTTYPE_STATREGEN, 0);
-		g_d2webRegenSite = "SUNITDMG_ApplyBurnDamage"; // not-1.13c: replay diagnostic
+		g_d2webRegenSite = "SUNITDMG_ApplyBurnDamage"; // not-1.13c: d2-web diagnostic, names the arming site for Event.cpp's dead-regen report (no game effect)
 		EVENT_SetEvent(pGame, pDefender, EVENTTYPE_STATREGEN, pGame->dwGameFrame + 1, 0, 0);
 	}
 
@@ -2952,17 +2952,8 @@ int32_t __fastcall SUNITDMG_SetMissileDamageFlagsForNearbyUnits(D2GameStrc* pGam
 	return bResult;
 }
 
-//D2Game.0x6FCC2BC0
-// not-1.13c: retail has no RollDamage; the PsychicHammer handler (D2Game+0x92770) calls the skill-level physical roll D2Game+0x9F1A0 then the elemental roll D2Game+0x9F210 directly
-void __fastcall SUNITDMG_RollDamage(D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, D2DamageStrc* pDamage)
-{
-	D2GAME_RollPhysicalDamage_6FD14EC0(pUnit, pDamage, nSkillId, nSkillLevel);
-
-	D2GAME_RollElementalDamage_6FD14DD0(pUnit, pDamage, nSkillId, nSkillLevel);
-}
-
 //D2Game.0x6FCC2BF0
-// not-1.13c: retail has no RollSuckBloodDamage; the caller rolls physical with the damage bonuses and elemental with D2Game+0x9F210 inline (no separate function seen)
+// 1.13c D2Game+0xDCE00 (register-argument form: skill id range-checked against the skills table, phys roll through 0xDC530 with flag 0x80, then 0x9F210)
 void __fastcall SUNITDMG_RollSuckBloodDamage(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender, int32_t nSkillId, int32_t nSkillLevel, D2DamageStrc* pDamage)
 {
     if (SKILLS_GetSkillsTxtRecord(nSkillId))

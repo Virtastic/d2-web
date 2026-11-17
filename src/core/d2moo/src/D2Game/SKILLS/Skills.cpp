@@ -4347,7 +4347,7 @@ int32_t __fastcall SKILLS_SrvSt18_Attract(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 
-// not-1.13c: retail inlines the States record bounds check at each caller
+// 1.13c D2Game+0x1AE0 (id in EAX; bounds test against the count at +0xC4, record size 0x3C from +0xBC)
 D2StatesTxt* __fastcall SKILLS_GetStatesTxtRecord(int32_t nStateId)
 {
     if (nStateId >= 0 && nStateId < sgptDataTables->nStatesTxtRecordCount)
@@ -4358,7 +4358,7 @@ D2StatesTxt* __fastcall SKILLS_GetStatesTxtRecord(int32_t nStateId)
     return nullptr;
 }
 
-// not-1.13c: retail inlines the ItemStatCost record bounds check at each caller
+// 1.13c D2Game+0x10D0 (id in EAX; bounds test against the count at +0xBD4, record size 0x144 from +0xBCC)
 D2ItemStatCostTxt* __fastcall SKILLS_GetItemStatCostTxtRecord(int32_t nStatId)
 {
     if (nStatId >= 0 && nStatId < sgptDataTables->nItemStatCostTxtRecordCount)
@@ -4369,7 +4369,7 @@ D2ItemStatCostTxt* __fastcall SKILLS_GetItemStatCostTxtRecord(int32_t nStatId)
     return nullptr;
 }
 
-// not-1.13c: retail inlines the Missiles record bounds check at each caller (e.g. D2Game+0xA0630)
+// 1.13c D2Game+0x1250 (id in EAX; bounds test against the count at +0xB6C, record size 0x1A4 from +0xB64)
 D2MissilesTxt* __fastcall SKILLS_GetMissilesTxtRecord(int32_t nMissileId)
 {
     if (nMissileId >= 0 && nMissileId < sgptDataTables->nMissilesTxtRecordCount)
