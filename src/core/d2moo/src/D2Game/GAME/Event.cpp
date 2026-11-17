@@ -370,7 +370,7 @@ void __fastcall EVENT_SetEvent(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventTy
         (pUnit->dwAnimMode == MONMODE_DEATH || pUnit->dwAnimMode == MONMODE_DEAD))
         g_d2webOnDeadRegen(pUnit, g_d2webRegenSite);
     g_d2webRegenSite = "";
-    D2GAME_InitTimer_6FC351D0(pGame, pUnit, nEventType, nExpireFrame, nullptr, dwEventCustomId, dwEventCustomParam);
+    D2_CALL(D2GAME_InitTimer_6FC351D0, pGame, pUnit, nEventType, nExpireFrame, nullptr, dwEventCustomId, dwEventCustomParam);
 }
 
 //D2Game.0x6FC351D0
@@ -522,7 +522,7 @@ D2EventTimerStrc* EVENT_AllocateTimer(D2GameStrc* pGame)
 
 	if (!pEventTimerArray)
 	{
-		pEventTimerArray = EVENT_AllocTimerSlab(pGame);
+		pEventTimerArray = D2_CALL(EVENT_AllocTimerSlab, pGame);
 		pEventTimerArray->pNextSlab = pGame->pTimerQueue->pSlabListHead->pNextSlab;
 		pGame->pTimerQueue->pSlabListHead->pNextSlab = pEventTimerArray;
 	}
@@ -555,7 +555,7 @@ void __fastcall sub_6FC35570(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventType
     {
         return;
     }
-	D2EventTimerStrc* pNewTimer = EVENT_AllocateUnitTimer(pGame, pUnit);
+	D2EventTimerStrc* pNewTimer = D2_CALL(EVENT_AllocateUnitTimer, pGame, pUnit);
     pNewTimer->nEventType = nEventType;
     pNewTimer->nExpireFrame = -1;
     pNewTimer->nFlags |= 4;

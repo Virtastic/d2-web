@@ -1,4 +1,5 @@
 #include "PLAYER/PartyScreen.h"
+#include <test_seam.h>
 
 #include <D2Dungeon.h>
 #include <D2StatList.h>
@@ -50,19 +51,19 @@ static D2ClientStrc* PARTYSCREEN_GetClient(D2UnitStrc* pPlayer)
         return nullptr;
     }
 
-    return UNITS_GetPlayerData(pPlayer)->pClient;
+    return D2_CALL(UNITS_GetPlayerData, pPlayer)->pClient;
 }
 
 // 1.13c D2Game+0xF0C60: both roster records, the relation flag set to the requested state, and the
 // roster update both ways. The lootability command is its only caller.
 static void PARTYSCREEN_SetRosterFlag(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t nFlag, int32_t nParam)
 {
-    PLAYERLIST_AllocPlayerList(pGame, pPlayer1, pPlayer2);
-    PLAYERLIST_AllocPlayerList(pGame, pPlayer2, pPlayer1);
+    D2_CALL(PLAYERLIST_AllocPlayerList, pGame, pPlayer1, pPlayer2);
+    D2_CALL(PLAYERLIST_AllocPlayerList, pGame, pPlayer2, pPlayer1);
 
-    if (PLAYERLIST_CheckFlag(pPlayer1, pPlayer2, nFlag) != nParam)
+    if (D2_CALL(PLAYERLIST_CheckFlag, pPlayer1, pPlayer2, nFlag) != nParam)
     {
-        PLAYERLIST_ToggleFlag(pGame, pPlayer1, pPlayer2, nFlag, nParam);
+        D2_CALL(PLAYERLIST_ToggleFlag, pGame, pPlayer1, pPlayer2, nFlag, nParam);
     }
 
     SCMD_Send0x75_PartyRosterUpdate(pPlayer1, pPlayer2);
@@ -223,14 +224,14 @@ void __fastcall inlinedfunction(D2UnitStrc* pLocalPlayer, D2UnitStrc* pOtherPlay
     }
 
     const int16_t nPartyId = SUNIT_GetPartyId(pLocalPlayer);
-    if (nPartyId == -1 && sub_6FCBA9D0(pOtherPlayer, pLocalPlayer) == 4)
+    if (nPartyId == -1 && D2_CALL(sub_6FCBA9D0, pOtherPlayer, pLocalPlayer) == 4)
     {
-        sub_6FCBA980(pLocalPlayer, pOtherPlayer, 2);
+        D2_CALL(sub_6FCBA980, pLocalPlayer, pOtherPlayer, 2);
         return;
     }
 
-    sub_6FCBA980(pOtherPlayer, pLocalPlayer, nPartyId != -1);
-    sub_6FCBA980(pLocalPlayer, pOtherPlayer, 1);
+    D2_CALL(sub_6FCBA980, pOtherPlayer, pLocalPlayer, nPartyId != -1);
+    D2_CALL(sub_6FCBA980, pLocalPlayer, pOtherPlayer, 1);
 }
 
 //D2Game.0x6FC7AED0
@@ -240,21 +241,21 @@ void __fastcall sub_6FC7AED0(D2GameStrc* pGame, D2UnitStrc* pLocalPlayer, void* 
     D2PartyScreenCallbackStrc* pArg = (D2PartyScreenCallbackStrc*)a3;
 
     const int16_t nPartyId = SUNIT_GetPartyId(pLocalPlayer);
-    PLAYERLIST_AllocPlayerList(pGame, pLocalPlayer, pArg->pPlayer1);
-    PLAYERLIST_AllocPlayerList(pGame, pArg->pPlayer1, pLocalPlayer);
-    PLAYERLIST_AllocPlayerList(pGame, pLocalPlayer, pArg->pPlayer2);
-    PLAYERLIST_AllocPlayerList(pGame, pArg->pPlayer2, pLocalPlayer);
+    D2_CALL(PLAYERLIST_AllocPlayerList, pGame, pLocalPlayer, pArg->pPlayer1);
+    D2_CALL(PLAYERLIST_AllocPlayerList, pGame, pArg->pPlayer1, pLocalPlayer);
+    D2_CALL(PLAYERLIST_AllocPlayerList, pGame, pLocalPlayer, pArg->pPlayer2);
+    D2_CALL(PLAYERLIST_AllocPlayerList, pGame, pArg->pPlayer2, pLocalPlayer);
 
     inlinedfunction(pLocalPlayer, pArg->pPlayer1);
     inlinedfunction(pLocalPlayer, pArg->pPlayer2);
 
     if (nPartyId == pArg->nPartyId && nPartyId != -1 && pLocalPlayer != pArg->pPlayer2)
     {
-        PARTYSCREEN_SendEventUpdateToClient(PARTYSCREEN_GetClient(pLocalPlayer), pArg->pPlayer2 ? pArg->pPlayer2->dwUnitId : -1, PARTYSCREENTYPE_HAS_JOINED_PARTY);
+        D2_CALL(PARTYSCREEN_SendEventUpdateToClient, PARTYSCREEN_GetClient(pLocalPlayer), pArg->pPlayer2 ? pArg->pPlayer2->dwUnitId : -1, PARTYSCREENTYPE_HAS_JOINED_PARTY);
     }
 
-    sub_6FCBAA20(pLocalPlayer, pArg->pPlayer1);
-    sub_6FCBAA20(pLocalPlayer, pArg->pPlayer2);
+    D2_CALL(sub_6FCBAA20, pLocalPlayer, pArg->pPlayer1);
+    D2_CALL(sub_6FCBAA20, pLocalPlayer, pArg->pPlayer2);
     sub_6FC3F8F0(pGame, pLocalPlayer);
 }
 
@@ -264,18 +265,18 @@ void __fastcall PARTYSCREEN_InvitationCancelled(D2GameStrc* pGame, D2UnitStrc* p
 {
     D2_MAYBE_UNUSED(nParam);
     D2_MAYBE_UNUSED(pFailure);
-    PLAYERLIST_AllocPlayerList(pGame, pPlayer1, pPlayer2);
-    PLAYERLIST_AllocPlayerList(pGame, pPlayer2, pPlayer1);
+    D2_CALL(PLAYERLIST_AllocPlayerList, pGame, pPlayer1, pPlayer2);
+    D2_CALL(PLAYERLIST_AllocPlayerList, pGame, pPlayer2, pPlayer1);
 
-    if ((int16_t)sub_6FCBA9D0(pPlayer1, pPlayer2) == 4)
+    if ((int16_t)D2_CALL(sub_6FCBA9D0, pPlayer1, pPlayer2) == 4)
     {
-        sub_6FCBA980(pPlayer1, pPlayer2, SUNIT_GetPartyId(pPlayer2) != -1);
-        sub_6FCBA980(pPlayer2, pPlayer1, SUNIT_GetPartyId(pPlayer1) != -1);
-        PARTYSCREEN_SendEventUpdateToClient(PARTYSCREEN_GetClient(pPlayer2), pPlayer1 ? pPlayer1->dwUnitId : -1, PARTYSCREENTYPE_INVITATION_CANCELLED);
+        D2_CALL(sub_6FCBA980, pPlayer1, pPlayer2, SUNIT_GetPartyId(pPlayer2) != -1);
+        D2_CALL(sub_6FCBA980, pPlayer2, pPlayer1, SUNIT_GetPartyId(pPlayer1) != -1);
+        D2_CALL(PARTYSCREEN_SendEventUpdateToClient, PARTYSCREEN_GetClient(pPlayer2), pPlayer1 ? pPlayer1->dwUnitId : -1, PARTYSCREENTYPE_INVITATION_CANCELLED);
     }
 
-    sub_6FCBAA20(pPlayer1, pPlayer2);
-    sub_6FCBAA20(pPlayer2, pPlayer1);
+    D2_CALL(sub_6FCBAA20, pPlayer1, pPlayer2);
+    D2_CALL(sub_6FCBAA20, pPlayer2, pPlayer1);
 }
 
 //D2Game.0x6FC7B0E0
@@ -284,18 +285,18 @@ void __fastcall PARTYSCREEN_ReceivedInvitation(D2GameStrc* pGame, D2UnitStrc* pP
 {
     D2_MAYBE_UNUSED(nParam);
     D2_MAYBE_UNUSED(pFailure);
-    PLAYERLIST_AllocPlayerList(pGame, pPlayer1, pPlayer2);
-    PLAYERLIST_AllocPlayerList(pGame, pPlayer2, pPlayer1);
+    D2_CALL(PLAYERLIST_AllocPlayerList, pGame, pPlayer1, pPlayer2);
+    D2_CALL(PLAYERLIST_AllocPlayerList, pGame, pPlayer2, pPlayer1);
 
-    if ((int16_t)sub_6FCBA9D0(pPlayer1, pPlayer2) == 0)
+    if ((int16_t)D2_CALL(sub_6FCBA9D0, pPlayer1, pPlayer2) == 0)
     {
-        sub_6FCBA980(pPlayer1, pPlayer2, 4);
-        sub_6FCBA980(pPlayer2, pPlayer1, 2);
-        PARTYSCREEN_SendEventUpdateToClient(PARTYSCREEN_GetClient(pPlayer2), pPlayer1 ? pPlayer1->dwUnitId : -1, PARTYSCREENTYPE_RECEIVED_INVITE);
+        D2_CALL(sub_6FCBA980, pPlayer1, pPlayer2, 4);
+        D2_CALL(sub_6FCBA980, pPlayer2, pPlayer1, 2);
+        D2_CALL(PARTYSCREEN_SendEventUpdateToClient, PARTYSCREEN_GetClient(pPlayer2), pPlayer1 ? pPlayer1->dwUnitId : -1, PARTYSCREENTYPE_RECEIVED_INVITE);
     }
 
-    sub_6FCBAA20(pPlayer1, pPlayer2);
-    sub_6FCBAA20(pPlayer2, pPlayer1);
+    D2_CALL(sub_6FCBAA20, pPlayer1, pPlayer2);
+    D2_CALL(sub_6FCBAA20, pPlayer2, pPlayer1);
 }
 
 //D2Game.0x6FC7B160
@@ -306,8 +307,8 @@ void __fastcall PARTYSCREEN_PlayerLeftParty(D2GameStrc* pGame, D2UnitStrc* pPlay
     D2_MAYBE_UNUSED(nParam);
     D2_MAYBE_UNUSED(pFailure);
     const int16_t nPartyId = SUNIT_GetPartyId(pPlayer1);
-    PARTY_IteratePartyMembers(pGame, nPartyId, PARTYSCREEN_PartyIterate_PlayerLeftParty, pPlayer1);
-    PARTY_LeaveParty(pGame, pPlayer1);
+    D2_CALL(PARTY_IteratePartyMembers, pGame, nPartyId, PARTYSCREEN_PartyIterate_PlayerLeftParty, pPlayer1);
+    D2_CALL(PARTY_LeaveParty, pGame, pPlayer1);
 }
 
 //D2Game.0x6FC7B190
@@ -321,7 +322,7 @@ void __fastcall PARTYSCREEN_PartyIterate_PlayerLeftParty(D2GameStrc* pGame, D2Un
         return;
     }
 
-    PARTYSCREEN_SendEventUpdateToClient(PARTYSCREEN_GetClient(pPlayer1), pPlayer2 ? pPlayer2->dwUnitId : -1, PARTYSCREENTYPE_HAS_LEFT_PARTY);
+    D2_CALL(PARTYSCREEN_SendEventUpdateToClient, PARTYSCREEN_GetClient(pPlayer1), pPlayer2 ? pPlayer2->dwUnitId : -1, PARTYSCREENTYPE_HAS_LEFT_PARTY);
 }
 
 // 1.13c D2Game+0xF0FF0: hostility opened by pPlayer1 against pPlayer2. A partied target turns the
@@ -428,14 +429,14 @@ void __fastcall sub_6FC7B460(D2GameStrc* pGame, D2UnitStrc* pPlayer1, void* pArg
     D2UnitStrc* pPlayer2 = (D2UnitStrc*)pArg;
     if (pPlayer1 != pPlayer2)
     {
-        sub_6FCBA980(pPlayer1, pPlayer2, 0);
-        sub_6FCBA980(pPlayer2, pPlayer1, SUNIT_GetPartyId(pPlayer1) != -1);
+        D2_CALL(sub_6FCBA980, pPlayer1, pPlayer2, 0);
+        D2_CALL(sub_6FCBA980, pPlayer2, pPlayer1, SUNIT_GetPartyId(pPlayer1) != -1);
         SCMD_Send0x75_PartyRosterUpdate(pPlayer1, pPlayer2);
         SCMD_Send0x75_PartyRosterUpdate(pPlayer2, pPlayer1);
         return;
     }
 
-    sub_6FCBA980(pPlayer1, pPlayer1, 1);
+    D2_CALL(sub_6FCBA980, pPlayer1, pPlayer1, 1);
     SCMD_Send0x75_PartyRosterUpdate(pPlayer1, pPlayer1);
 }
 

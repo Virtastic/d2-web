@@ -1,4 +1,5 @@
 #include "PLAYER/Player.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -67,7 +68,7 @@ void __fastcall PLAYER_Create(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nP
     STATLIST_AllocStatListEx(pPlayer, 0, D2GAME_ITEMMODE_ServerStatlistCallback_6FC41910, pGame);
     UNITS_AllocPlayerData(pPlayer);
 
-    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
+    D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer);
     if (pPlayerData)
     {
         for (int32_t i = 0; i < 3; ++i)
@@ -78,10 +79,10 @@ void __fastcall PLAYER_Create(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nP
     }
 
     SUNIT_InitClientInPlayerData(pPlayer, nullptr);
-    sub_6FC349F0(pGame, pPlayer);
-    ARENA_AllocArenaUnit(pGame, pPlayer);
-    PLAYERPETS_AllocPetList(pGame, pPlayer);
-    sub_6FCBDD30(pPlayer, 2u, 1);
+    D2_CALL(sub_6FC349F0, pGame, pPlayer);
+    D2_CALL(ARENA_AllocArenaUnit, pGame, pPlayer);
+    D2_CALL(PLAYERPETS_AllocPetList, pGame, pPlayer);
+    D2_CALL(sub_6FCBDD30, pPlayer, 2u, 1);
 }
 
 //D2Game.0x6FC7B630
@@ -152,7 +153,7 @@ void __fastcall PLAYER_RemoveAllPlayers(D2GameStrc* pGame)
         while (pPlayer)
         {
             D2UnitStrc* pNext = SUNIT_GetNextUnitFromList(pPlayer);
-            SUNIT_RemoveUnit(pGame, pPlayer);
+            D2_CALL(SUNIT_RemoveUnit, pGame, pPlayer);
             pPlayer = pNext;
         }
     }
@@ -513,7 +514,7 @@ void __fastcall PLAYER_SetUniqueIdInPlayerData(D2UnitStrc* pPlayer, int32_t nUni
 {
     D2_ASSERT(pPlayer);
 
-    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
+    D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer);
     D2_ASSERT(pPlayerData);
 
     pPlayerData->dwUniqueId = nUnitGUID;
@@ -537,7 +538,7 @@ void __fastcall sub_6FC7C170(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     D2_ASSERT(pPlayer);
 
-    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
+    D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer);
     D2_ASSERT(pPlayerData);
 
     D2UnitStrc* pPortal = SUNIT_GetServerUnit(pGame, UNIT_OBJECT, pPlayerData->dwUniqueId);
@@ -546,16 +547,16 @@ void __fastcall sub_6FC7C170(D2GameStrc* pGame, D2UnitStrc* pPlayer)
         return;
     }
 
-    ACT5Q5_OnPortalClosed(pGame, pPortal);
+    D2_CALL(ACT5Q5_OnPortalClosed, pGame, pPortal);
 
-    D2UnitStrc* pOwner = SUNIT_GetPortalOwner(pGame, pPortal);
-    D2ActiveRoomStrc* pPortalRoom = UNITS_GetRoom(pPortal);
+    D2UnitStrc* pOwner = D2_CALL(SUNIT_GetPortalOwner, pGame, pPortal);
+    D2ActiveRoomStrc* pPortalRoom = D2_CALL(UNITS_GetRoom, pPortal);
     if (pPortalRoom)
     {
         DUNGEON_AllocDrlgDelete(pPortalRoom, UNIT_OBJECT, pPortal->dwUnitId);
     }
 
-    SUNIT_RemoveUnit(pGame, pPortal);
+    D2_CALL(SUNIT_RemoveUnit, pGame, pPortal);
     DUNGEON_ToggleHasPortalFlag(pPortalRoom, 1);
 
     if (!pOwner)
@@ -563,15 +564,15 @@ void __fastcall sub_6FC7C170(D2GameStrc* pGame, D2UnitStrc* pPlayer)
         return;
     }
 
-    ACT5Q5_OnPortalClosed(pGame, pOwner);
+    D2_CALL(ACT5Q5_OnPortalClosed, pGame, pOwner);
 
-    D2ActiveRoomStrc* pOwnerRoom = UNITS_GetRoom(pOwner);
+    D2ActiveRoomStrc* pOwnerRoom = D2_CALL(UNITS_GetRoom, pOwner);
     if (pOwnerRoom)
     {
         DUNGEON_AllocDrlgDelete(pOwnerRoom, UNIT_OBJECT, pOwner->dwUnitId);
     }
 
-    SUNIT_RemoveUnit(pGame, pOwner);
+    D2_CALL(SUNIT_RemoveUnit, pGame, pOwner);
     DUNGEON_ToggleHasPortalFlag(pOwnerRoom, 1);
 }
 

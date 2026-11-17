@@ -1,4 +1,5 @@
 #include "GAME/Game.h"
+#include <test_seam.h>
 #include "../../../../d2game/d2game_2d4b0.h"
 
 #include <algorithm>
@@ -1204,15 +1205,15 @@ void __fastcall GAME_FreeGame(D2GameGUID nGameGUID, D2GameStrc* pGame)
 
     LeaveCriticalSection(&gCriticalSection_6FD45800);
 
-    MONSTERREGION_FreeAll(pGame->pMemoryPool, pGame->pMonReg);
+    D2_CALL(MONSTERREGION_FreeAll, pGame->pMemoryPool, pGame->pMonReg);
     OBJRGN_FreeObjectControl(pGame);
     QUESTS_QuestFree(pGame);
-    SUNITPROXY_FreeNpcControl(pGame);
+    D2_CALL(SUNITPROXY_FreeNpcControl, pGame);
     CLIENTS_FreeClientsFromGame(pGame);
     LEVEL_RemoveAllUnits(pGame);
-    SUNITINACTIVE_FreeInactiveUnitLists(pGame);
-    EVENT_FreeEventQueue(pGame);
-    PARTY_FreePartyControl(pGame);
+    D2_CALL(SUNITINACTIVE_FreeInactiveUnitLists, pGame);
+    D2_CALL(EVENT_FreeEventQueue, pGame);
+    D2_CALL(PARTY_FreePartyControl, pGame);
     ARENA_FreeArena(pGame);
 
     for (int32_t i = 0; i < 5; ++i)
@@ -3210,7 +3211,7 @@ void __fastcall sub_6FC3B2B0(D2UnitStrc* pUnit, D2GameStrc* pGame)
     D2_ASSERT(pGame);
 	GAME_ForEachIngameClient(pGame, (GAME_ForEachIngameClientCallbackPtr)sub_6FC3B3D0, pUnit);
 
-    SUNIT_RemoveUnit(pGame, pUnit);
+    D2_CALL(SUNIT_RemoveUnit, pGame, pUnit);
 }
 
 //D2Game.0x6FC3B3D0

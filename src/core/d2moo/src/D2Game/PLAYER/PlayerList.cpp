@@ -138,7 +138,7 @@ void __fastcall PLAYERLIST_AllocPlayerList(D2GameStrc* pGame, D2UnitStrc* pPlaye
 // {0x8C, owner id, other id, flag word} goes to every living player through the 0x8C690 callback.
 void __fastcall PLAYERLIST_ToggleFlag(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, uint32_t nFlags, int32_t bSet)
 {
-    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer1);
+    D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer1);
     const int32_t nUnitGUID = pPlayer2 ? pPlayer2->dwUnitId : -1;
     D2PlayerListStrc* pPlayerList = nullptr;
     if (pPlayer1 != pPlayer2)

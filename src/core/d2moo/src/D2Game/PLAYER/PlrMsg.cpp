@@ -1,4 +1,5 @@
 #include "PLAYER/PlrMsg.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -127,8 +128,8 @@ void __fastcall sub_6FC81CA0(D2UnitStrc* pUnit, D2ClientStrc* pClient, char a3)
 // 1.13c D2Game+0xCE310: a unit whose target is itself takes the point form (0x4D), not the unit form
 void __fastcall sub_6FC81D20(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient, int32_t nAnimMode)
 {
-    D2SkillStrc* pSkill = UNITS_GetUsedSkill(pUnit);
-    if (pSkill && (SKILLS_GetFlags(pSkill) & 4 || pUnit != CLIENTS_GetPlayerFromClient(pClient, 0)))
+    D2SkillStrc* pSkill = D2_CALL(UNITS_GetUsedSkill, pUnit);
+    if (pSkill && (D2_CALL(SKILLS_GetFlags, pSkill) & 4 || pUnit != CLIENTS_GetPlayerFromClient(pClient, 0)))
     {
         int32_t nUnitGUID = -1;
         if (pUnit)
@@ -672,7 +673,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x01_Walk_6FC82CB0(D2GameStrc* pGame
     uint16_t nX = 0;
     uint16_t nY = 0;
 
-    const int32_t nResult = sub_6FC82D10(pGame, pUnit, pPacket, nSize, &nX, &nY);
+    const int32_t nResult = D2_CALL(sub_6FC82D10, pGame, pUnit, pPacket, nSize, &nX, &nY);
     if (nResult)
     {
         return nResult;
@@ -691,13 +692,13 @@ int32_t __fastcall sub_6FC82D10(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPac
 
     if (nPacketSize == 5)
     {
-        D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pUnit);
+        D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pUnit);
         if (pPlayerData)
         {
             const uint16_t nX = *(uint16_t*)((char*)pPacket + 1);
             const uint16_t nY = *(uint16_t*)((char*)pPacket + 3);
 
-            if (!sub_6FC83C60(pUnit, nX, nY, 50))
+            if (!D2_CALL(sub_6FC83C60, pUnit, nX, nY, 50))
             {
                 pPlayerData->dwGameFrame = pGame->dwGameFrame;
                 *pX = nX;
@@ -761,7 +762,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x02_WalkToEntity_6FC82ED0(D2GameStr
         }
     }
 
-    D2GAME_PLAYERMODE_Change_6FC81A00(pGame, pUnit, 0, 2u, nUnitType, nItemGUID, 0);
+    D2_CALL(D2GAME_PLAYERMODE_Change_6FC81A00, pGame, pUnit, 0, 2u, nUnitType, nItemGUID, 0);
     return 0;
 }
 
@@ -772,7 +773,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x03_Run_6FC83090(D2GameStrc* pGame,
     uint16_t nX = 0;
     uint16_t nY = 0;
 
-    const int32_t nResult = sub_6FC82D10(pGame, pUnit, pPacket, nSize, &nX, &nY);
+    const int32_t nResult = D2_CALL(sub_6FC82D10, pGame, pUnit, pPacket, nSize, &nX, &nY);
     if (nResult)
     {
         return nResult;
@@ -817,7 +818,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x04_RunToEntity_6FC830F0(D2GameStrc
         }
     }
 
-    D2GAME_PLAYERMODE_Change_6FC81A00(pGame, pUnit, 0, 3u, nUnitType, nItemGUID, 0);
+    D2_CALL(D2GAME_PLAYERMODE_Change_6FC81A00, pGame, pUnit, 0, 3u, nUnitType, nItemGUID, 0);
     return 0;
 }
 
@@ -828,7 +829,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x05_ShiftLeftClickSkill_6FC832B0(D2
     uint16_t nX = 0;
     uint16_t nY = 0;
 
-    const int32_t nResult = sub_6FC82D10(pGame, pUnit, pPacket, nSize, &nX, &nY);
+    const int32_t nResult = D2_CALL(sub_6FC82D10, pGame, pUnit, pPacket, nSize, &nX, &nY);
     if (nResult)
     {
         return nResult;
@@ -837,7 +838,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x05_ShiftLeftClickSkill_6FC832B0(D2
     if (UNITS_GetLeftSkill(pUnit))
     {
         STATLIST_SetUnitStat(pUnit, STAT_PIERCE_IDX, STATLIST_GetUnitBaseStat(pUnit, STAT_PIERCE_IDX, 0) + 1, 0);
-        sub_6FC83340(pGame, pUnit, UNITS_GetLeftSkill(pUnit), nX, nY);
+        D2_CALL(sub_6FC83340, pGame, pUnit, UNITS_GetLeftSkill(pUnit), nX, nY);
         return 0;
     }
 
@@ -992,7 +993,7 @@ int32_t __fastcall sub_6FC836D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStr
     D2SkillStrc* pUsedSkill = nullptr;
     if (UNITS_CanDualWield(pUnit))
     {
-        pUsedSkill = sub_6FC83450(pUnit, pSkill);
+        pUsedSkill = D2_CALL(sub_6FC83450, pUnit, pSkill);
         pSkill = pUsedSkill;
     }
     else
@@ -1036,10 +1037,10 @@ int32_t __fastcall sub_6FC836D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStr
     int32_t nType = nUnitType;
     int32_t nGUID = nUnitGUID;
 
-    D2UnitStrc* pOtherUnit = SUNIT_GetServerUnit(pGame, nUnitType, nUnitGUID);
+    D2UnitStrc* pOtherUnit = D2_CALL(SUNIT_GetServerUnit, pGame, nUnitType, nUnitGUID);
     if (pOtherUnit && STATES_CheckState(pOtherUnit, STATE_ATTACHED))
     {
-        D2UnitStrc* pOwner = SUNIT_GetOwner(pGame, pOtherUnit);
+        D2UnitStrc* pOwner = D2_CALL(SUNIT_GetOwner, pGame, pOtherUnit);
         if (pOwner)
         {
             nType = pOwner->dwUnitType;
@@ -1050,7 +1051,7 @@ int32_t __fastcall sub_6FC836D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStr
 
     if (!a6 || !pOtherUnit)
     {
-        D2GAME_PLAYERMODE_Change_6FC81A00(pGame, pUnit, pSkill, nSkillMode, nType, nGUID, 0);
+        D2_CALL(D2GAME_PLAYERMODE_Change_6FC81A00, pGame, pUnit, pSkill, nSkillMode, nType, nGUID, 0);
         return 0;
     }
 
@@ -1060,17 +1061,17 @@ int32_t __fastcall sub_6FC836D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStr
     {
         if (UNITS_IsInMeleeRange(pUnit, pOtherUnit, UNITS_IsInMovingModeEx(pOtherUnit)))
         {
-            D2GAME_PLAYERMODE_Change_6FC81A00(pGame, pUnit, pSkill, nSkillMode, nType, nGUID, 0);
+            D2_CALL(D2GAME_PLAYERMODE_Change_6FC81A00, pGame, pUnit, pSkill, nSkillMode, nType, nGUID, 0);
             return 0;
         }
     }
     else if (v18 != 4)
     {
-        D2GAME_PLAYERMODE_Change_6FC81A00(pGame, pUnit, pSkill, nSkillMode, nType, nGUID, 0);
+        D2_CALL(D2GAME_PLAYERMODE_Change_6FC81A00, pGame, pUnit, pSkill, nSkillMode, nType, nGUID, 0);
         return 0;
     }
 
-    D2GAME_PLAYERMODE_Change_6FC81A00(pGame, pUnit, nullptr, PLRMODE_RUN, nType, nGUID, 0);
+    D2_CALL(D2GAME_PLAYERMODE_Change_6FC81A00, pGame, pUnit, nullptr, PLRMODE_RUN, nType, nGUID, 0);
     UNITS_SetInteractData(pUnit, SKILLS_GetSkillIdFromSkill(pSkill, __FILE__, __LINE__), nType, nGUID);
     return 0;
 }
@@ -1297,7 +1298,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x0C_RightSkill_6FC83EF0(D2GameStrc*
     uint16_t nX = 0;
     uint16_t nY = 0;
 
-    const int32_t nResult = sub_6FC82D10(pGame, pUnit, pPacket, nSize, &nX, &nY);
+    const int32_t nResult = D2_CALL(sub_6FC82D10, pGame, pUnit, pPacket, nSize, &nX, &nY);
     if (nResult)
     {
         return nResult;
@@ -1306,7 +1307,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x0C_RightSkill_6FC83EF0(D2GameStrc*
     if (UNITS_GetRightSkill(pUnit))
     {
         STATLIST_SetUnitStat(pUnit, STAT_PIERCE_IDX, STATLIST_GetUnitBaseStat(pUnit, STAT_PIERCE_IDX, 0) + 1, 0);
-        sub_6FC83340(pGame, pUnit, UNITS_GetRightSkill(pUnit), nX, nY);
+        D2_CALL(sub_6FC83340, pGame, pUnit, UNITS_GetRightSkill(pUnit), nX, nY);
         return 0;
     }
 
