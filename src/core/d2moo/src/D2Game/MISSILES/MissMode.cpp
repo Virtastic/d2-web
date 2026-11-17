@@ -2842,7 +2842,7 @@ int32_t __fastcall MISSMODE_SrvHit04_ExplodingArrow_FreezingArrow_RoyalStrikeMet
             missileParams.nMissile = pMissilesTxtRecord->wHitSubMissile[i];
 
             D2UnitStrc* pHitSubMissile = D2_CALL(MISSILES_CreateMissileFromParams, pGame, &missileParams);
-            if (pHitSubMissile && pMissilesTxtRecord->dwHitPar[0] > 0)
+            if (pHitSubMissile && (int32_t)pMissilesTxtRecord->dwHitPar[0] > 0)   // 1.13c compares signed
             {
                 D2_CALL(MISSMODE_SrvDmgHitHandler, pGame, pHitSubMissile, pUnit, 1);
             }
