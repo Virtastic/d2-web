@@ -2,8 +2,8 @@
 // list of play_sound_queue.h. The browser mixer submits a unit's rows here with their start offsets, runs the pump
 // once per client tick and plays the entries the pump started, with the variant row 0x5D7A0 picked; it reports a
 // source that ended so its entry stops. Positions, Falloff range, gain, pan and fades stay with the mixer: the
-// pump treats every entry as in range with voices free (ordinal 10001 > 0, 10011 true), which is the shell's state
-// while its Web Audio context runs.
+// pump treats every entry as in range with #10011 true; #10001 (voices) is the shell's report of its Web Audio
+// context running (d2_client_play_sound_voices).
 #include <cstring>
 #include <emscripten.h>
 #include "play_sound_queue.h"
@@ -21,6 +21,7 @@ int32_t g_handle = 0;          // DAT 0x10BF38
 uint64_t g_hero = 0;           // DAT 0x10BBFC, the client's own unit
 bool g_seedOn = false;         // a pinned seed (the deterministic tests) in place of the client hero seed
 uint32_t g_seed[2] = { 0, 0 };
+int32_t g_voices = 1;          // D2Sound #10001: the voices the mixer has (0 while it cannot sound)
 struct Started { int32_t handle, asked, row; uint32_t start; int32_t kind; uint64_t unit; };
 Started g_started[kPool];
 int32_t g_nStarted = 0;
@@ -97,6 +98,9 @@ void pump88dd0(uint32_t now) {
         if (e->state == 0) e->state = 2;
         if (e->state == 1) stop(e);
     }
+    // D2Sound #10001 > 0: the mixer has voices (0x88DD0's bVar2). The #10011 test that also closes rows in
+    // [+0x11C25C, +0x11C260] stays open: the shell's mixer plays those rows whenever it plays at all.
+    const bool voices = g_voices > 0;
     for (int32_t i = 0; i < g_listLen;) {
         Entry* e = &g_pool[g_list[i]];
         const uint8_t* r = recOf(e);
@@ -107,6 +111,7 @@ void pump88dd0(uint32_t now) {
             e->state = 0;                                    // a looping row requeues
         } else {
             if (e->state == 0 && e->start <= now && e->volume != 0) {
+                if (voices) {   // without voices nothing starts (no 0x5D7A0, so no variant draw); a one-shot is dropped below
                 const bool defer = r && r[0x41], stopInst = r && r[0x42];                Entry* o = nullptr;
                 if (defer || stopInst) { int32_t g = 0; if (r) memcpy(&g, r + 0x60, 4); o = inst87c30(g, e); }
                 if (e->units == 1 && e->id > 0xB75 && e->id < 0x1231) o = busy87bd0(e);
@@ -120,13 +125,14 @@ void pump88dd0(uint32_t now) {
                     e->state = 1;
                     g_started[g_nStarted++] = { e->handle, e->asked, e->id, e->start, e->kind, e->unit };
                 }
+                }
                 r = recOf(e);
                 if (!e->playing && !(r && r[0x3E])) { drop(i); continue; }
             }
             if (e->state == 1) {
                 r = recOf(e);
                 uint16_t d = 0; if (r) memcpy(&d, r + 0x43, 2);
-                if (d != 0 && (uint32_t)d < now - e->start) stop(e);
+                if ((d != 0 && (uint32_t)d < now - e->start) || !voices) stop(e);
             }
         }
         ++i;
@@ -145,6 +151,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_play_sound_submit(int32_t row,
 // f 0 handle, 1 the row asked, 2 the row started (the group variant), 3 its start tick, 4 kind, 5 unit.
 // 0x5F020 runs 0x88DD0 on its clock (0x11C268), then steps the clock: a submit after this pump starts `off` ticks
 // after now + 1.
+// D2Sound #10001 as 0x88DD0 asks it: the shell's mixer reports whether it can sound (its audio output running). With
+// none, the pump starts nothing and stops what plays, as retail does without a sound device.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_play_sound_voices(int32_t n) { g_voices = n; }
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_play_sound_pump(uint32_t now) { pump88dd0(now); g_now = now + 1; return g_nStarted; }
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_play_sound_started(int32_t i, int32_t f) {
     if (i < 0 || i >= g_nStarted) return 0;

@@ -36,6 +36,7 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
   let lastSnapshot = null, lastListener = null;
   const variant = typeof options.variant === 'function' ? options.variant
     : (row) => (typeof globalThis.Module?._d2_client_play_sound_variant === 'function' ? Number(globalThis.Module._d2_client_play_sound_variant(row)) | 0 : row);
+  const voices = () => (context.state === 'running' ? 1 : 0);   // D2Sound #10001 for the engine's 0x88DD0: the output can sound
   const ended = typeof options.ended === 'function' ? options.ended
     : (h) => globalThis.Module?._d2_client_play_sound_ended?.(h);
   const release = (rec) => { if (rec.queueHandle && !rec.released) { rec.released = true; ended(rec.queueHandle); } };
@@ -203,7 +204,8 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
       // 0x5D7A0 -> 0x5EE70: a row with a Group Size plays one of its variants, avoiding its last picks (the engine's
       // pick; a queued start already made it).
       let r = asked;
-      const pick = Number.isInteger(rec.variantRow) ? rec.variantRow : asked.groupSize > 1 ? variant(row) : row;
+      // Without voices (D2Sound #10001 0, the output suspended) 0x88DD0 never reaches 0x5D7A0: no pick, no draw.
+      const pick = Number.isInteger(rec.variantRow) ? rec.variantRow : asked.groupSize > 1 && voices() ? variant(row) : row;
       if (pick !== row || asked.groupSize > 1) {
         rec.variantRow = pick;
         const v = soundRow(t, pick);
@@ -386,5 +388,6 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
   }
   return { play, playRow, noteSubmit, starts, playDialogue, stopDialogue, stopUnitSounds, setWeatherLevel, whenDialogueDone: () => dialogueDone, updateSpatialGain, events, setVolume(v, nextSliders) { volume = Math.max(0, Math.min(1, Number(v) || 0)); if (nextSliders) sliders = { sound: nextSliders.sound, music: nextSliders.music }; else sliders = { sound: volume, music: 1 }; if (gain) gain.gain.value = volume; for (const [node, state] of activeSources) if (!state.stopping || state.fade) applyGain(node, state); },
     get volume() { return gain ? gain.gain.value : volume; },
+    voices,
     evidence: () => ({ started, dialogueActive: Boolean(dialogueSource), events: Array.from({ length: eventsDropped + events.length }, (_, i) => i < eventsDropped ? DROPPED : { ...events[i - eventsDropped] }), state: context.state }), close: () => context.close?.() };
 }

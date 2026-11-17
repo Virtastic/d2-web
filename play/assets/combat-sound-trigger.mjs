@@ -30,7 +30,8 @@ export function combatSoundEngine(M) {
   const queue = M._d2_client_play_sound_pump ? {
     submit: (row, unit, delay = 0, flags = 0) => Number(M._d2_client_play_sound_submit(row, unit >>> 0, delay >>> 0, flags, 0, 0)) | 0,
     // one 0x88DD0 pass at sound tick `now`: the entries it started, { handle, asked, row (the variant), start }
-    pump: (now) => Array.from({ length: Number(M._d2_client_play_sound_pump(now >>> 0)) | 0 }, (_, i) => ({ handle: at(i, 0) | 0, asked: at(i, 1) | 0, row: at(i, 2) | 0, start: at(i, 3) >>> 0 })),
+    // voices: D2Sound #10001 (the mixer can sound); with none 0x88DD0 starts nothing
+    pump: (now, voices = 1) => (M._d2_client_play_sound_voices?.(voices | 0), Array.from({ length: Number(M._d2_client_play_sound_pump(now >>> 0)) | 0 }, (_, i) => ({ handle: at(i, 0) | 0, asked: at(i, 1) | 0, row: at(i, 2) | 0, start: at(i, 3) >>> 0 }))),
     ended: (handle) => M._d2_client_play_sound_ended(handle),
     state: (handle) => Number(M._d2_client_play_sound_state(handle)) | 0,
     hero: (unit) => M._d2_client_play_sound_hero(unit >>> 0),
@@ -51,7 +52,8 @@ export const soundUnitKey = (type, id) => ((((id >>> 0) * 2) + (type & 1) + 2) %
 // offset (`note(row, event)` records the submit); each update ends by running the list's pump on the update's tick and
 // plays what it started (`play(row, event)`, event.variantRow = the variant started, event.queueHandle = the entry to
 // report ended). Without it a cue plays at once.
-export function createCombatSoundTrigger(read, play, engine = null, note = null) {
+// voices(): the mixer's D2Sound #10001 (unit-sound-player's voices), asked at each pump.
+export function createCombatSoundTrigger(read, play, engine = null, note = null, voices = () => 1) {
   const queue = engine?.queue ?? null, pending = new Map();
   queue?.reset();   // the list and its clock start with this trigger's tick count
   const text = (p) => new TextDecoder('latin1').decode(read(p));
@@ -86,7 +88,7 @@ export function createCombatSoundTrigger(read, play, engine = null, note = null)
   // 0x88DD0 at this tick: play every entry of ours it started, its variant picked by 0x5D7A0 (another caller's entries
   // are that caller's to play and end)
   const pump = () => {
-    for (const s of queue.pump(tick)) {
+    for (const s of queue.pump(tick, voices())) {
       const event = pending.get(s.handle); pending.delete(s.handle);
       if (event) play(s.asked, { ...event, baseRow: s.asked, variantRow: s.row, queueHandle: s.handle });
     }
