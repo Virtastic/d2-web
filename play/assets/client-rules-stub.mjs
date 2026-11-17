@@ -29,9 +29,9 @@ export function bindStubRules() {
         let [v, max, col, adj] = a; v += adj;
         const cap = Math.min(0x5f, max + 0x4b);
         if (v <= -100) v = -100;
-        if (v >= cap) { v = cap; if (col !== 3) { heap[a[4] >> 2] = v; return 4; } }
+        if (v >= cap) { v = cap; if (col !== 3) { heap[Number(a[4]) >> 2] = v; return 4; } }
         if (v < 0) col = 1;
-        heap[a[4] >> 2] = v;
+        heap[Number(a[4]) >> 2] = v;
         return col;
       }
       if (name === 'd2_client_exp_bar_pixels') {   // hud_bar_rules.h expBarPixels

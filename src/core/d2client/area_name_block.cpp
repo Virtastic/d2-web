@@ -80,8 +80,8 @@ void tail(const W* buf) {   // the writers' shared tail: x = screen width - widt
     env.draw(buf, c->width - w - 0x10, (int32_t)c->st.d_c21c);
     c->st.d_c21c += 0x10;
 }
-uint32_t o10331(uint32_t h) { return h; }
-uint32_t o10184(uint32_t) { return 0; }
+uint32_t unitRoomStub(uint32_t h) { return h; }
+uint32_t roomFlagStub(uint32_t) { return 0; }
 void nop() {}
 void h_game() { c->kind = K_GAME; }   // no game-info block here: 0x5FFE0 returns without one
 void h_level() {                      // 0x60AA0: the level's name line, then the cursor steps
@@ -126,7 +126,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_area_name_block(const uint8_t*
     x.adv = adv; x.width = width; x.difficulty = (uint8_t)difficulty;
     x.name = name; x.address = address; x.version = version; x.out = (Rec*)out; x.cap = cap;
     x.st = { 1, 1, address ? 6u : 0u, 0, expansion_on != 0 ? 1u : 0u };
-    D2ClientB61Env e{o10331, o10184, nop, nop, nop, h_game, h_level, h_version, h_difficulty, h_address, h_expansion};
+    D2ClientB61Env e{unitRoomStub, roomFlagStub, nop, nop, nop, h_game, h_level, h_version, h_difficulty, h_address, h_expansion};
     d2client_62680(&x.st, &e);
     int32_t n = x.n;
     c = nullptr;
