@@ -86,7 +86,7 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
         // (a town NPC held in its walk mode while it stands) makes no footstep. Retail's unit leaves the walk mode when it stops.
         if (!cut && (a.mode === 2 || a.mode === 0xF) && moved === 0) continue;
         if (!cut && a.mode === 1 && snapshot.engineNeutralSteps) continue;   // a neutral footstep steps on the client unit's own frame: the engine plays it
-        const row = monsterStep(a.classId, cut ? 2 : a.mode, prev[1], cut ? prev[6] : a.frameCountPrecise, cut ? prev[7] : a.animSpeed, tick, lastStep.get(e.id) ?? 0, floorClass ? floorClass(1, e.id, levelMaterial(stepLevel)) : 0);
+        const row = monsterStep(a.classId, cut ? 2 : a.mode, prev[1], cut ? prev[6] : a.frameCountPrecise, cut ? prev[7] : a.animSpeed, tick, lastStep.get(e.id) ?? 0, floorClass ? floorClass(1, e.id, stepLevel) : 0);
         // unitId attaches the footfall to the monster so the player places it against the listener (Falloff, pan).
         if (row) { lastStep.set(e.id, tick); play(row, { kind: 'footstep', id: e.id, unitId: e.id, unitType: 1, classId: a.classId }); const layer = monsterLayer?.(a.classId); if (layer) play(layer, { kind: 'footstep', id: e.id, unitId: e.id, unitType: 1, classId: a.classId }); /* retail 0x88A70 submits the layer row on the same footfall (FsPrb 100) */ }
       }

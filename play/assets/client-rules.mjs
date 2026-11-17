@@ -7,12 +7,12 @@ export function bindClientRules(module) { mod = module; }
 /** The orb draw calls (D2Client+0x27BD0 then +0x27A90 run against the engine's draw sink): records in retail's call order. */
 export function orbDrawList(life, lifeMax, mana, manaMax, alive, cellFluid, cellOverlap) {
   if (!mod) throw new Error('client rules are not bound to the engine');
-  const p = mod._malloc(8 * 16 * 4);
+  const raw = mod._malloc(8 * 16 * 4), p = Number(raw);
   try {
-    const n = mod.ccall('d2_client_draw_orbs', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
-      [life | 0, lifeMax | 0, mana | 0, manaMax | 0, alive ? 1 : 0, cellFluid, cellOverlap, p]);
+    const n = mod.ccall('d2_client_draw_orbs', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'bigint'],
+      [life | 0, lifeMax | 0, mana | 0, manaMax | 0, alive ? 1 : 0, cellFluid, cellOverlap, BigInt(p)]);
     return decodeDrawList(mod.HEAP32, p >> 2, n);
-  } finally { mod._free(p); }
+  } finally { mod._free(raw); }
 }
 
 function call(name, types, args) {
@@ -48,11 +48,11 @@ export function questIcon(mode, prev, anim, iconIndex) {
 /** A resist cell: `adj` is the difficulty penalty added to the value. Returns { value, colour }. */
 export function resistCell(value, maxStat, adj = 0, col = 0) {
   if (!mod) throw new Error('client rules are not bound to the engine');
-  const p = mod._malloc(4);
+  const raw = mod._malloc(4), p = Number(raw);
   try {
-    const colour = call('d2_client_resist_cell', ['number', 'number', 'number', 'number', 'number'], [value | 0, maxStat | 0, col | 0, adj | 0, p]);
+    const colour = call('d2_client_resist_cell', ['number', 'number', 'number', 'number', 'bigint'], [value | 0, maxStat | 0, col | 0, adj | 0, BigInt(p)]);
     return { value: mod.HEAP32[p >> 2], colour };
-  } finally { mod._free(p); }
+  } finally { mod._free(raw); }
 }
 
 /** Experience bar width in pixels of 0x77 (D2Client+0x26970); `have`/`total` are relative to the level start. */
@@ -145,10 +145,10 @@ export function requestLocalQuestLogStates() {
 /** The run button (+0x28320) then the menu arrow (+0x26880) against the draw sink, pointer in 800x600 space: records in call order. */
 export function hudButtonsDrawList(mx, my, running, runHot, arrowOpen, arrowHot, cellRun, cellMenu) {
   if (!mod) throw new Error('client rules are not bound to the engine');
-  const p = mod._malloc(8 * 4 * 4);
+  const raw = mod._malloc(8 * 4 * 4), p = Number(raw);
   try {
-    const n = mod.ccall('d2_client_draw_hud_buttons', 'number', Array(9).fill('number'),
-      [mx | 0, my | 0, running ? 1 : 0, runHot ? 1 : 0, arrowOpen ? 1 : 0, arrowHot ? 1 : 0, cellRun, cellMenu, p]);
+    const n = mod.ccall('d2_client_draw_hud_buttons', 'number', [...Array(8).fill('number'), 'bigint'],
+      [mx | 0, my | 0, running ? 1 : 0, runHot ? 1 : 0, arrowOpen ? 1 : 0, arrowHot ? 1 : 0, cellRun, cellMenu, BigInt(p)]);
     return decodeDrawList(mod.HEAP32, p >> 2, n);
-  } finally { mod._free(p); }
+  } finally { mod._free(raw); }
 }

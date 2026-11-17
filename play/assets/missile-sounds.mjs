@@ -12,8 +12,8 @@ export function wasmMissileRules(Module) {
   return {
     field: (id, f) => Module._d2_client_missile_field(id, f) | 0,
     born: (id) => Module._d2_client_missile_born_row(id) | 0,
-    birth: (id) => { Module._d2_client_missile_birth(id, out()); return { mode: w(0), row: w(1), own: w(2) === 1 }; },
-    removal: (id, span, own) => { Module._d2_client_missile_removal(id, span, own ? 1 : 0, out()); return { row: w(0), monster: w(1) === 1, expl: w(2) }; },
+    birth: (id) => { Module._d2_client_missile_birth(id, BigInt(out())); return { mode: w(0), row: w(1), own: w(2) === 1 }; },
+    removal: (id, span, own) => { Module._d2_client_missile_removal(id, span, own ? 1 : 0, BigInt(out())); return { row: w(0), monster: w(1) === 1, expl: w(2) }; },
   };
 }
 

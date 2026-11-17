@@ -2893,7 +2893,7 @@ function engineCharacterNameOk(name) {
     const units = new Uint16Array(Module.HEAPU8.buffer, Number(at), name.length + 1);
     for (let i = 0; i < name.length; i++) units[i] = name.charCodeAt(i);
     units[name.length] = 0;
-    return Module.ccall('d2_launch_charname_ok', 'number', ['number'], [at]) === 1;
+    return Module.ccall('d2_launch_charname_ok', 'number', ['bigint'], [BigInt(at)]) === 1;
   } finally { Module._free(at); }
 }
 function ensureCharCreate() {
@@ -3209,7 +3209,7 @@ function advanceRealmClientUnits(forced) {
     return 0;
   }
   let ticks = 0;
-  const tickClientUnits = () => { realmFlow.protocol.d2gsClientMotionTick(); realmAnimationFrame++; { const uses = realmFlow.protocol.d2gsClientTakeObjectEvents(); if (shrineDirectHpLoss(uses)) realmShrineUse = true; for (const used of uses) if (used.soundRow) unitSounds?.playRow(used.soundRow, { source: 'object-use', unitId: used.playerId }).catch(() => {}); } realmAreaAudio.step(realmAreaLevel(realmPlayerView, realmWorldView), realmAnimationFrame); ambient?.tick(1).catch(() => {}); realmChromeTick(); if (eventSounds && snapshot && !session) (realmEventFeed ??=createRealmEventSoundFeed(eventSounds)).tick(snapshot, readAdvancement()?.level, realmWorldState); };
+  const tickClientUnits = () => { realmFlow.protocol.d2gsClientMotionTick(); realmAnimationFrame++; { const uses = realmFlow.protocol.d2gsClientTakeObjectEvents(); if (shrineDirectHpLoss(uses)) realmShrineUse = true; for (const used of uses) if (used.soundRow) unitSounds?.playRow(used.soundRow, { source: 'object-use', unitId: used.playerId }).catch(() => {}); } realmAreaAudio.step(realmAreaLevel(realmPlayerView, realmWorldView), realmAnimationFrame); realmChromeTick(); if (eventSounds && snapshot && !session) (realmEventFeed ??=createRealmEventSoundFeed(eventSounds)).tick(snapshot, readAdvancement()?.level, realmWorldState); };
   if (forced) { realmGameClock = 0; tickClientUnits(); ticks = 1; }
   else {
     realmGameClock += STEP;
