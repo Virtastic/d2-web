@@ -140,12 +140,13 @@ uint8_t* d2cmp_140a0(const uint8_t* hdr, const uint8_t* data, uint32_t* total, v
         b = (uint32_t)raw.pos + rawSize;   bits_at(&code, raw, b);
         int32_t bitsUsed = 0;
         DccPixBuf pb = {env->pixbuf, 0};
+        // Stage 2's pixel-code stream: the code stream's start (taken before stage 1 advances the
+        // stream structs) + bitsUsed.
+        const DccBits code0 = code;
         d2cmp_13b70(&code, &box, env->cells, eqSize ? &eq1 : nullptr, &mask, encSize ? &enc : nullptr,
                     rawSize ? &raw : nullptr, &pb, &bitsUsed);
-        // The pixel-code stream after stage 1: its start position + bitsUsed (esp+0x44 struct).
         DccBits code2;
-        { DccBits c0; bits_at(&c0, raw, (uint32_t)raw.pos + rawSize);
-          bits_at(&code2, c0, (uint32_t)c0.pos + (uint32_t)bitsUsed); }
+        bits_at(&code2, code0, (uint32_t)code0.pos + (uint32_t)bitsUsed);
         for (int32_t i = 0; i < pb.len; i++) env->pixbuf[i] = mapB[env->pixbuf[i]];
 
         for (int32_t i = 0; i < nf; i++) {
@@ -163,7 +164,9 @@ uint8_t* d2cmp_140a0(const uint8_t* hdr, const uint8_t* data, uint32_t* total, v
             memset(&it, 0, sizeof it);
             it.frame = -1;
             if (d2cmp_13300(&it, &box)) {
-                memset(env->cells, 0, 0x6ddd * 4);
+                // Retail zeroes 0x6DDD dwords of 0x14-byte records: 5617 cells and the next one's colours.
+                memset(env->cells, 0, 5617 * sizeof(DccCell));
+                env->cells[5617].colors = nullptr;
                 DccBits* eq2 = eqSize ? &eq : nullptr;
                 int32_t last = 0, more;
                 do {
@@ -178,8 +181,7 @@ uint8_t* d2cmp_140a0(const uint8_t* hdr, const uint8_t* data, uint32_t* total, v
                         DccFrame* f = &frames[last];
                         int32_t h32[8] = {f->var0, f->w, f->h, f->xoff, f->yoff, 0, 0, (int32_t)f->coded};
                         memcpy(dst, h32, sizeof h32);
-                        if (f->pix == nullptr) env->fatal(0x65a);
-                        if (!d2cmp_13620(dst + 0x20, f, dst, env->log)) {
+                        if (f->pix == nullptr) env->fatal(0x65a);                        if (!d2cmp_13620(dst + 0x20, f, dst, env->log)) {
                             env->fileError(name);
                             env->fatal(0x66e);
                         }

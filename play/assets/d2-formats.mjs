@@ -114,6 +114,29 @@ function decodeDc6Frame(bytes, view, offset, frameIndex) {
   };
 }
 
+// The frames' pixels come from the wasm port's D2CMP run-length blitter when the engine is up; the JS decoder
+// above runs only without an engine (the node unit tests) and for a file the port's bounds pre-scan refuses, so
+// its own error names the bad frame.
+function wasmDc6Frames(bytes, view, framePointers) {
+  const M = globalThis.Module;
+  if (!M || typeof M._d2_dc6_decode !== 'function' || typeof M.ccall !== 'function') return null;
+  const raw = M._malloc(bytes.length), ptr = Number(raw);
+  try {
+    M.HEAPU8.set(bytes, ptr);
+    const count = M.ccall('d2_dc6_decode', 'number', ['bigint', 'number'], [BigInt(ptr), bytes.length]);
+    if (count !== framePointers.length) return null;
+    const offsets = new Uint32Array(M.HEAPU8.buffer, Number(M.ccall('d2_dc6_frame_offsets', 'number', [], [])), count).slice();
+    const pix = Number(M.ccall('d2_dc6_pixels', 'number', [], []));
+    return Array.from(framePointers, (offset, i) => {
+      const u32 = n => view.getUint32(offset + n, true), i32 = n => view.getInt32(offset + n, true);
+      const width = u32(4), height = u32(8), n = width * height, at = pix + offsets[i];
+      return { flipped: u32(0), width, height, offsetX: i32(12), offsetY: i32(16), unknown: u32(20), nextBlock: u32(24),
+        indices: M.HEAPU8.slice(at, at + n), opaque: M.HEAPU8.slice(at + n, at + 2 * n),
+        encoded: bytes.subarray(offset + DC6_FRAME_HEADER_BYTES, offset + DC6_FRAME_HEADER_BYTES + u32(28)) };
+    });
+  } finally { M._free(raw); }
+}
+
 /** Decode DC6 metadata and bottom-up RLE frames. Transparent pixels have opaque[i] === 0. */
 export function decodeDc6(input) {
   const bytes = bytesOf(input, 'DC6');
@@ -129,12 +152,9 @@ export function decodeDc6(input) {
   const count = directions * framesPerDirection;
   requireRange(bytes, DC6_HEADER_BYTES, count * 4, 'DC6 frame pointer table');
   const framePointers = new Uint32Array(count);
-  const frames = new Array(count);
-  for (let i = 0; i < count; i++) {
-    const pointer = view.getUint32(DC6_HEADER_BYTES + i * 4, true);
-    framePointers[i] = pointer;
-    frames[i] = decodeDc6Frame(bytes, view, pointer, i);
-  }
+  for (let i = 0; i < count; i++) framePointers[i] = view.getUint32(DC6_HEADER_BYTES + i * 4, true);
+  const frames = wasmDc6Frames(bytes, view, framePointers) ??
+    Array.from(framePointers, (pointer, i) => decodeDc6Frame(bytes, view, pointer, i));
   return {
     version: view.getInt32(0, true), flags: view.getUint32(4, true),
     encoding: view.getUint32(8, true), termination: bytes.slice(12, 16),

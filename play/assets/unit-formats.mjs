@@ -245,6 +245,40 @@ function decodeDccPixels(bytes, direction, directionEnd, index) {
 }
 
 
+// The pixel decode runs through the wasm port's DCC driver when the module is up (the JS decoder above is the
+// fallback before it loads and for boxes past the driver's canvas); the frame headers must agree or the JS result is used.
+const DCC_CANVAS = 0x1d4c0;
+let wasmFile = null, wasmFilePtr = 0;
+function wasmDccPixels(bytes, direction, index) {
+  const M = globalThis.Module;
+  if (!M || !M._d2_dcc_decode_direction || typeof M.ccall !== 'function') return false;
+  const { box, frames } = direction;
+  if ((box.maxX - box.minX) * (box.maxY - box.minY) > DCC_CANVAS) return false;
+  if (direction.compressionFlags & 1) return false;   // the encoded/raw stream path of the port is not byte-exact yet
+  if (wasmFile !== bytes) {
+    if (wasmFilePtr) M._free(wasmFilePtr);
+    wasmFilePtr = M._malloc(bytes.length); wasmFile = null;
+    M.HEAPU8.set(bytes, Number(wasmFilePtr)); wasmFile = bytes;
+  }
+  const count = M.ccall('d2_dcc_decode_direction', 'number', ['bigint', 'number', 'number'], [BigInt(wasmFilePtr), bytes.length, index]);
+  if (count !== frames.length) return false;
+  const meta = Number(M.ccall('d2_dcc_frame_meta', 'number', [], [])), pix = Number(M.ccall('d2_dcc_pixels', 'number', [], []));
+  const m = new Int32Array(M.HEAPU8.buffer, meta, count * 6);
+  for (let f = 0; f < count; f++) {
+    const fr = frames[f], o = f * 6;
+    if (m[o] !== fr.width || m[o + 1] !== fr.height || m[o + 2] !== fr.xOffset || m[o + 3] !== fr.yOffset || (m[o + 4] !== 0) !== fr.bottomUp) return false;
+  }
+  for (let f = 0; f < count; f++) {
+    const fr = frames[f], o = f * 6, n = fr.width * fr.height;
+    const indexed = M.HEAPU8.slice(pix + m[o + 5], pix + m[o + 5] + n), opaque = new Uint8Array(n);
+    for (let i = 0; i < n; i++) opaque[i] = indexed[i] === 0 ? 0 : 1;
+    fr.indexed = indexed; fr.opaque = opaque;
+    const top = fr.bottomUp ? fr.yOffset : fr.yOffset - fr.height + 1;
+    fr.cellsAcross = partition(fr.width, fr.xOffset - box.minX).length; fr.cellsDown = partition(fr.height, top - box.minY).length;
+  }
+  return true;
+}
+
 function decodeDccDirection(bytes, offset, directionEnd, framesPerDirection, index) {
   const r = new Bits(bytes, offset * 8, directionEnd * 8);
   const outSizeCoded = r.read(32, `direction ${index} header`);
@@ -292,7 +326,7 @@ function decodeDccDirection(bytes, offset, directionEnd, framesPerDirection, ind
   if (streamEnd > bytes.length * 8) throw new RangeError(`DCC direction ${index} substreams exceed file`);
   const direction = { offset, outSizeCoded, compressionFlags, widths, frames, box: { minX, minY, maxX, maxY },
     equalCellsBits, pixelMaskBits, encodingTypeBits, rawPixelCodesBits, paletteEntries, bitstreamStart: r.bit };
-  decodeDccPixels(bytes, direction, directionEnd, index);
+  if (!wasmDccPixels(bytes, direction, index)) decodeDccPixels(bytes, direction, directionEnd, index);
   return direction;
 }
 
