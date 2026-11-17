@@ -931,7 +931,7 @@ int32_t __fastcall SKILLS_SrvDo122_Hunger(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FCFF710
-// 1.13c D2Game+0x452C0 (checked against decompile, no delta)
+// 1.13c D2Game+0x452C0 (the roll is a limited roll of 0x100 truncated to a byte, not a full 32-bit roll)
 int32_t __fastcall SKILLS_SrvDo123_Volcano(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (!SKILLS_GetSkillsTxtRecord(nSkillId))
@@ -952,7 +952,7 @@ int32_t __fastcall SKILLS_SrvDo123_Volcano(D2GameStrc* pGame, D2UnitStrc* pUnit,
         pUnit->dwFlags |= UNITFLAG_SKSRVDOFUNC;
     }
 
-    const uint32_t nRand = ITEMS_RollRandomNumber(&pUnit->pSeed);
+    const uint32_t nRand = (uint8_t)ITEMS_RollLimitedRandomNumber(&pUnit->pSeed, 0x100);
 
     D2MissileStrc missileParams = {};
     missileParams.nMissile = nMissileId;
