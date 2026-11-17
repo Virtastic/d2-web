@@ -408,8 +408,9 @@ void __fastcall sub_6FC7B3F0(D2GameStrc* pGame, D2UnitStrc* pPlayer1, void* pArg
         return;
     }
 
-    D2_CALL(FRIENDLY_OpenHostility, pGame, pPlayer2, pPlayer1);
+    // 1.13c: the first worker call carries the unit, the second the other player (1.10f had them the other way round)
     D2_CALL(FRIENDLY_OpenHostility, pGame, pPlayer1, pPlayer2);
+    D2_CALL(FRIENDLY_OpenHostility, pGame, pPlayer2, pPlayer1);
     D2_CALL(PARTYSCREEN_SendEventUpdateToClient, PARTYSCREEN_GetClient(pPlayer1), pPlayer2 ? pPlayer2->dwUnitId : -1, PARTYSCREENTYPE_HOSTILE);
 }
 

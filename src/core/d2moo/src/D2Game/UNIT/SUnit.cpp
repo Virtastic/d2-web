@@ -1036,7 +1036,7 @@ void __fastcall SUNIT_AttachSound(D2UnitStrc* pUnit, int32_t nUpdateType, D2Unit
 
     pUnit->nUpdateType = nUpdateType;
     pUnit->pUpdateUnit = pUpdateUnit;
-    UNITROOM_RefreshUnit(pUnit);
+    D2_CALL(UNITROOM_RefreshUnit, pUnit);
     pUnit->dwFlags |= UNITFLAG_HASEVENTSOUND;
 }
 
@@ -1765,7 +1765,7 @@ void __fastcall D2GAME_SKILLS_RewindSkillEx_6FCBD260(D2GameStrc* pGame, D2UnitSt
 void __fastcall sub_6FCBD3A0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_MODECHANGE, 0);
-    sub_6FC35570(pGame, pUnit, EVENTTYPE_MODECHANGE, 0, 0);
+    sub_6FC35570(pGame, pUnit, EVENTTYPE_MODECHANGE, nullptr, 0, 0);
 }
 
 //D2Game.0x6FCBD3D0

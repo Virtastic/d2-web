@@ -1626,7 +1626,7 @@ void __fastcall sub_6FD00EC0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
                 UNITS_StoreOwner(pUnit, pTarget);
                 UNITS_StoreOwner(pTarget, pUnit);
                 D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
-                sub_6FC35570(pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId, nSkillLevel);
+                sub_6FC35570(pGame, pUnit, EVENTTYPE_ACTIVESTATE, nullptr, nSkillId, nSkillLevel);
                 pUnit->dwFlags &= 0xFFFFFFF1u;
                 if (pUnit->pMonsterData)
                 {
