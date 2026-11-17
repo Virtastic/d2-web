@@ -575,7 +575,7 @@ let beltDrawEngine = null;
 const beltItems = (snapshot) => (snapshot?.items ?? []).filter((it) => it.mode === 2).map((it) => ({ gridX: it.gridX, invFile: it.invFile ?? '' }));
 function beltOpsNow(snapshot, open) {
   if (typeof Module === 'undefined') return null;
-  beltDrawEngine ??= createBeltDraw(Module, read);
+  beltDrawEngine ??= createBeltDraw(Module, createMpqAssetReader(Module));
   const all = clientView().fromPackets && !session ? realmReads?.beltBoxes ?? null : readBeltBoxes();
   if (!beltDrawEngine || !all?.length) return null;
   return beltDrawEngine.draw({ w: 800, h: 600, record: snapOr('beltIndex', readBeltIndex), open, boxes: all, items: beltItems(snapshot), keys: beltKeyNames(controlsPanel?.bindings ?? bootControlBindings) });
