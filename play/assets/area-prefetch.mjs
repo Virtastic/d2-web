@@ -4,7 +4,7 @@
 // in the archive is in the MPQ hash/block table, so the chunks covering them are fetched in the
 // background into streamfs's in-memory cache. Pure latency hiding: no byte the engine reads changes.
 import { mpqTables, openMpqIndex } from './mpq-index.mjs';
-import { resolveLevelMusic } from './act-music.mjs';
+import { resolveLevelMusic, resolveLevelMusicNative } from './act-music.mjs';
 
 // Highest layer first (index.html RETAIL_ORDER). d2char holds the front end's hero art: without its index the
 // character-screen warm found nothing there and the select build spun 44 sync misses (271 ms).
@@ -52,7 +52,7 @@ export function createAreaPrefetch({ read, StreamFS, preload = null }) {
     // A monster's DCCs sit together in the archive, so one anchor file's 2 MB chunk covers its siblings.
     for (const c of lv.mons || []) for (const w of ['HTH', '1HS']) warmFile('data\\global\\monsters\\' + c + '\\tr\\' + c + 'trlitnu' + w + '.dcc');
     // The area's music is read whole and synchronously on arrival (act-music.mjs prepare): 6 MB of d2music.
-    try { const m = resolveLevelMusic(id, ...txt); if (m) warmFile('data\\global\\music\\' + m.path); } catch { /* no music row: nothing to warm */ }
+    try { const m = resolveLevelMusicNative(id) ?? resolveLevelMusic(id, ...txt); if (m) warmFile('data\\global\\music\\' + m.path); } catch { /* no music row: nothing to warm */ }
   }
   // A sound's WAV is read whole and synchronously on its first play. This resolves once the first of `names`
   // found in the archives is in streamfs's cache (or could not be fetched), so that read does not freeze the frame.

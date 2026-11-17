@@ -1,4 +1,5 @@
 // 1.13c D2Client+0xC0590 (life 0..128) and D2Win+0x133A0 (plate boxes).
+import { itemNameColour } from './item-tooltip.mjs';
 export function hoverLife(u) {
   if (!u || u.type !== 1 || (u.flags & 0x10000) || u.mode === 0 || u.mode === 0x0C) return 0;
   let life = ((u.hpPct | 0) * 128 / 100) | 0;
@@ -64,7 +65,7 @@ export function monsterNameColour(typeFlags, classId = -1) {
 // 1.13c D2Client+0x58FB0 switch on D2Common ord 10106 (dwQualityNo 1 low,2 normal,3 superior,4 magic,5 set,6 rare,7 unique,8 crafted,9 tempered): 4->3, 5->2, 6->9, 7->4, 8->8, 9->10, else 0. Retail greys (5) only ethereal/socketed, not low quality; the snapshot carries no flags.
 // set green 2, rare yellow 9, unique gold 4, crafted orange 8). Textcolour indices as textColourPalette takes.
 export function groundLabelColour(quality, flags = 0) {
-  return { 4: 3, 5: 2, 6: 9, 7: 4, 8: 8, 9: 10 }[quality] ?? ((flags & 0x400800) ? 5 : 0); // ethereal 0x400000 / socketed 0x800 -> grey
+  return itemNameColour(quality | 0, flags | 0); // D2Client+0x93450's name colour; ethereal 0x400000 / socketed 0x800 -> grey
 }
 
 // 1.13c D2Client+0x58FB0 (showitems.cpp): the label under the cursor gets fill colour D2Win #10190(0,0x40,0x80)

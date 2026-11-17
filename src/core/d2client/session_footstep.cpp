@@ -29,6 +29,7 @@ namespace {
 struct ClientMonster { uint32_t mode = 1, cur = 0, total = 0, step = 0, last = 0, serverMode = 1; };
 std::unordered_map<uint32_t, ClientMonster> g_cm;
 std::unordered_map<uint32_t, bool> g_pathDone;   // units whose server walk/run path ended since their last client frame
+int32_t g_neutral[2] = { 0, 0 };   // the last monster call's neutral-mode footstep and layer rows
 }
 
 extern "C" void d2client_session_footstep_reset() { g_cp = ClientPlayer{}; g_cm.clear(); g_pathDone.clear(); }
@@ -49,6 +50,7 @@ extern "C" void d2client_session_monster_footstep(uint32_t id, int32_t cls, uint
                                                   int32_t floor, uint32_t now, const void* game) {
     const bool fresh = !g_cm.count(id);
     ClientMonster& c = g_cm[id];
+    g_neutral[0] = g_neutral[1] = 0;
     // a unit the client creates in neutral starts on the frame its init rolled (0x4D160: +0x44 = roll % +0x48), not on 0
     if (fresh && serverMode == 1 && total) { c.cur = d2client_unitseed_start_frame(game, id) % total; c.step = step; c.total = total; }
     const bool done = g_pathDone.erase(id) && (c.mode == 2 || c.mode == 15);   // the client unit's walk or run reached its path's end
@@ -63,9 +65,12 @@ extern "C" void d2client_session_monster_footstep(uint32_t id, int32_t cls, uint
     // rand(100) on the hero seed (0x89640) whatever FsPrb (+0x64) is, and submits the layer when the draw is below it.
     const uint32_t* ms = d2_client_monster_footstep(cls);
     if (!ms) return;
-    if (ms[0]) d2client_sound_unit_submit(int32_t(row));
-    if (ms[1] && d2client_playsnd::seedRand(100) < ms[4]) d2client_sound_unit_submit(int32_t(ms[1]));
+    if (ms[0]) { d2client_sound_unit_submit(int32_t(row)); if (c.mode == 1) g_neutral[0] = int32_t(row); }
+    if (ms[1] && d2client_playsnd::seedRand(100) < ms[4]) { d2client_sound_unit_submit(int32_t(ms[1])); if (c.mode == 1) g_neutral[1] = int32_t(ms[1]); }
 }
+// The rows the last d2client_session_monster_footstep call submitted in neutral (a class whose 0x23C00 gate takes mode 1): the
+// frame its client unit started on is its own (the init roll), so the play path takes these rows from here. 0 = none.
+extern "C" void d2client_session_monster_neutral_rows(int32_t out[2]) { out[0] = g_neutral[0]; out[1] = g_neutral[1]; }
 
 // One client frame of the local player's unit. serverMode: the server unit's mode now (taken for the next frame); now: the client
 // tick counter D2Client+0x1197F8 (frame - 1); rate(mode) -> the client unit's step and length in that mode (D2Common 0x33110).

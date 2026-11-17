@@ -20,3 +20,4 @@ void d2client_session_unit_mode(const D2UnitStrc* u, uint32_t mode, int32_t roll
 void d2client_session_objects(const D2SndUnit* u, uint32_t n);                                  // 0x237E0 object branch, each held object
 void d2client_session_player_packets();                                                         // the frame's player 0x0D packets -> 0x24490
 void d2client_session_unit_sound_reset();
+bool d2client_state_sound_take(int32_t out[4]);   // a state packet's on/off sound for the play path: unit type, id, class, Sounds row

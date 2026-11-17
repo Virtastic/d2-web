@@ -17,6 +17,11 @@ import { isButtonHeldOverTarget } from './frontend-pointer-states.mjs';
 import { mixTable } from './mix-palette.mjs';
 import { createGatewaySelector, DEFAULT_GATEWAY_LABEL, GATEWAY_LAYOUT } from './bnet-servers.mjs';
 
+let fontTableBackend = null;
+/** Route font table loads to the engine (1.13c D2Win glyph lookup 0x12150): fn(bytes) -> Uint8Array of 5-byte records
+ *  (code u16 LE, advance, height, image index), or null to fall back to the JavaScript parse. */
+export function setFontTableBackend(fn) { fontTableBackend = fn; }
+
 /** 12-byte header, then one 14-byte record per code point. Layout per riiablo's FontTBL. */
 export function decodeFontTbl(bytes) {
   if (!(bytes instanceof Uint8Array) || bytes.length < 12) throw new TypeError('font tbl too short');
@@ -24,6 +29,15 @@ export function decodeFontTbl(bytes) {
   if (magic !== 'Woo!') throw new Error(`font tbl magic ${JSON.stringify(magic)}, expected "Woo!"`);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const header = { height: bytes[10], width: bytes[11] };
+  // D2Win's font loader and glyph lookup (0x12B40 / 0x12150) answer every record when the engine is up.
+  const engineRecs = fontTableBackend ? fontTableBackend(bytes) : null;
+  if (engineRecs) {
+    const chars = new Map();
+    for (let i = 0; i + 5 <= engineRecs.length; i += 5) {
+      chars.set(engineRecs[i] | (engineRecs[i + 1] << 8), { width: engineRecs[i + 2], height: engineRecs[i + 3], imageIndex: engineRecs[i + 4] });
+    }
+    return { header, chars, count: chars.size };
+  }
   const count = Math.floor((bytes.length - 12) / 14);
   const chars = new Map();
   for (let i = 0; i < count; i++) {
@@ -160,6 +174,10 @@ function frameCanvas(frame, palette, documentObject) {
   return canvas;
 }
 
+let textWidthBackend = null;
+/** Route font width sums to the engine: fn(advanceTable: Uint8Array(65536), text) -> width, or null to fall back. */
+export function setTextWidthBackend(fn) { textWidthBackend = fn; }
+
 /**
  * A retail bitmap font: the DC6 supplies the glyph images, the .tbl the advance widths and the
  * code-point -> frame mapping.
@@ -168,6 +186,7 @@ function frameCanvas(frame, palette, documentObject) {
 // callback. The two are handed different payloads (see draw), so they cannot share a name.
 export function createFont({ dc6, tbl, palette, documentObject = globalThis.document, path = null, drawAs = { op: 'celcolor', mode: 5 }, onGlyph: onFontGlyph = null }) {
   const glyphs = new Map();
+  let advances = null;
   const glyphFor = (code) => {
     if (glyphs.has(code)) return glyphs.get(code);
     const meta = tbl.chars.get(code);
@@ -183,10 +202,27 @@ export function createFont({ dc6, tbl, palette, documentObject = globalThis.docu
     cellHeight: Math.max(...dc6.frames.map((f) => f.height)),
     /** The glyph a code point resolves to (null when the font has none) -- identity evidence. */
     glyph(code) { return glyphFor(code); },
-    measure(text) {
+    measure(text, coded = false) {
+      const s = String(text);
+      // The width sum is D2Win's own loop when the engine is up (advance table = this font's .tbl widths).
+      if (textWidthBackend) {
+        if (!advances) {
+          advances = new Uint8Array(65536);
+          for (const code of tbl.chars.keys()) advances[code] = glyphFor(code)?.advance ?? 0;
+        }
+        const w = textWidthBackend(advances, s, coded);
+        if (w !== null) return w;
+      }
       let w = 0;
-      for (const ch of String(text)) w += glyphFor(ch.codePointAt(0))?.advance ?? 0;
+      for (const ch of s) w += glyphFor(ch.codePointAt(0))?.advance ?? 0;
       return w;
+    },
+    /** Width of text carrying `ÿc0`-`ÿc6` colour codes: D2Win+0x120C0 skips each code (engine), else the codes are stripped here. */
+    measureCoded(text) {
+      const s = String(text);
+      // The engine loop skips only codes 0-6 and only while more than 3 chars remain; anything else keeps the JS strip.
+      if (textWidthBackend && !/ÿc[^0-6]/.test(s) && !/ÿc.?$/.test(s) && !/ÿ$/.test(s)) return this.measure(s, true);
+      return s.split(/(?=ÿc\d)/).reduce((n, part) => n + this.measure(/^ÿc\d/.test(part) ? part.slice(3) : part), 0);
     },
     /**
      * Draw `text` as D2Win does: glyph by glyph from x (whole pixels, the .tbl advances), each glyph

@@ -1,4 +1,5 @@
 import { celAt, slotCelAt, cursorCelAt } from './item-cel-place.mjs';
+import { gridCellAt } from './grid-cell.mjs';
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { BORDER_RIGHT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
 import { fnv1a32, paperdollIdentity } from './paperdoll-identity.mjs';
@@ -8,6 +9,7 @@ import { boxTables, cellBoxes, gridBoxSlot, heldItemBoxes, itemBoxState, paintBo
 import { inventoryItemRemap, inventoryItemColourKey } from './inventory-item-colour.mjs';
 import { createItemTooltip, itemTooltipSpec } from './item-tooltip.mjs';
 import { createItemBlendCache, drawItemCel } from './item-draw-mode.mjs';
+import { heldCellAt } from './grid-cell.mjs';
 
 // Inventory.txt Amazon2, normalized from its 800x600 screen coordinates to the
 // invchar6 panel origin. Retail leaves the final 80 pixels for the screen edge.
@@ -180,12 +182,17 @@ export function inventoryGridRect(item, layout = null) {
 // The carried item under an 800x600 screen point: draw order is the list order, so the last match is
 // the one on top. Worn items are reached through the slot lookup, not here.
 export function inventoryItemAt(items, x, y, layout = null) {
+  // The cell is D2Client+0x96AA0's (grid-cell.mjs); the item is the topmost one whose footprint covers it.
+  const g = layout ? layout.grid : { left: AMAZON2_INVENTORY_LAYOUT.screenX + AMAZON2_INVENTORY_LAYOUT.gridX, top: AMAZON2_INVENTORY_LAYOUT.screenY + AMAZON2_INVENTORY_LAYOUT.gridY,
+    columns: AMAZON2_INVENTORY_LAYOUT.columns, rows: AMAZON2_INVENTORY_LAYOUT.rows, cellWidth: 29, cellHeight: 29 };
+  const cell = gridCellAt(g, x, y);
+  if (!cell) return null;
   for (let i = (items?.length || 0) - 1; i >= 0; i--) {
     const item = items[i];
     if (item.invPage !== 0 || item.mode !== 0) continue;   // before the rect: a ground/belt item's grid cell can be out of range
     const r = inventoryGridRect(item, layout);
-    if (x >= r.left && x < r.left + r.width && y >= r.top && y < r.top + r.height)
-      return item;
+    const gx = Math.round((r.left - g.left) / g.cellWidth), gy = Math.round((r.top - g.top) / g.cellHeight);
+    if (cell.x >= gx && cell.x < gx + (item.invWidth || 1) && cell.y >= gy && cell.y < gy + (item.invHeight || 1)) return item;
   }
   return null;
 }
@@ -313,9 +320,7 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     const g = layout ? layout.grid : { left: AMAZON2_INVENTORY_LAYOUT.screenX + AMAZON2_INVENTORY_LAYOUT.gridX, top: AMAZON2_INVENTORY_LAYOUT.screenY + AMAZON2_INVENTORY_LAYOUT.gridY,
       columns: AMAZON2_INVENTORY_LAYOUT.columns, rows: AMAZON2_INVENTORY_LAYOUT.rows, cellWidth: 29, cellHeight: 29 };
     if (x < g.left || y < g.top || x >= g.left + g.columns * g.cellWidth || y >= g.top + g.rows * g.cellHeight) return null;
-    const w = item?.invWidth || 1, h = item?.invHeight || 1;
-    const cx = Math.round((x - g.left) / g.cellWidth - w / 2), cy = Math.round((y - g.top) / g.cellHeight - h / 2);
-    return { x: Math.max(0, Math.min(g.columns - w, cx)), y: Math.max(0, Math.min(g.rows - h, cy)) };
+    return heldCellAt(g, item, x, y);
   },
   // The panel's own rectangle on the 800x600 screen: what `contains` tests and what the shell reports
   // to an input layer that has to bound a finger's own aim by the panel's chrome (M15, s377) -- so the

@@ -70,6 +70,21 @@ export function resolveLevelMusic(levelId, levelsTxt, soundEnvironTxt, soundsTxt
   return { levelId: level, environmentId, soundId, name, path, volume };
 }
 
+/** The same selection read from the engine's loaded Levels/SoundEnviron/Sounds tables (1.13c D2Client+0x5DFD0);
+ *  null when no music, undefined when the engine is not up (the caller falls back to the .txt reader). */
+export function resolveLevelMusicNative(levelId, engine = globalThis.Module) {
+  const level = Number(levelId);
+  if (!Number.isSafeInteger(level) || level < 0) throw new TypeError('retail level id is required');
+  if (typeof engine?._d2_client_level_music !== 'function' || typeof engine?.ccall !== 'function') return undefined;
+  const environmentId = Number(engine._d2_client_level_music(level, 0));
+  if (environmentId < 0) return undefined;
+  const soundId = environmentId > 0 ? Number(engine._d2_client_level_music(level, 1)) : 0;
+  if (soundId <= 0) return null;
+  const volume = Number(engine._d2_client_level_music(level, 2)), path = engine.ccall('d2_client_level_music_path', 'string', ['number'], [level]);
+  if (!path || volume < 0 || volume > MUSIC_VOLUME_MAX || Number(engine._d2_client_level_music(level, 3)) !== 1) throw new Error(`invalid music Sounds row for sound ${soundId}`);
+  return { levelId: level, environmentId, soundId, name: path, path, volume };
+}
+
 /** Select the native day/night ambience and event rows for a level's SoundEnviron. */
 export function resolveLevelSoundEnvironment(levelId, cycleState, levelsTxt, soundEnvironTxt) {
   const level = integerInput(levelId, 'retail level id'), cycle = integerInput(cycleState, 'native environment cycle state');
@@ -103,8 +118,8 @@ export function nativeAmbienceEnabled(levelPredicateValue, suppressionGlobalValu
 }
 
 /** 1.13c FUN_6FAF5660: a new level's song is adopted once more than 0x4a ticks have passed since the level changed (or nothing plays yet). */
-export function levelMusicDue(level, activeLevel, changedTick, tick) {
-  return level !== activeLevel && (activeLevel < 0 || tick - changedTick > 0x4a);
+export function levelMusicDue(level, activeLevel, changedTick, tick, engine = globalThis.Module) {
+  return Number(engine._d2_client_level_music_due(level, activeLevel, changedTick | 0, tick | 0)) !== 0;
 }
 
 /** Coalesce level changes, retry failed selection, and invalidate stale in-flight requests. */
@@ -200,10 +215,14 @@ export function createActMusicPlayer(read, AudioContextClass = globalThis.AudioC
   // A track is 6 MB of sectors StormLib decompresses on the main thread: read in parts when the reader can.
   const readTrack = (path) => (read.sliced ?? read)(path);
   async function prepare(levelId) {
+    const engineSelection = resolveLevelMusicNative(levelId);
+    if (engineSelection !== undefined) return finishSelection(engineSelection, levelId);
     if (levelsTxt === null) levelsTxt = new TextDecoder('latin1').decode(read('data\\global\\excel\\Levels.txt'));
     if (soundEnvironTxt === null) soundEnvironTxt = new TextDecoder('latin1').decode(read('data\\global\\excel\\SoundEnviron.txt'));
     if (soundsTxt === null) soundsTxt = new TextDecoder('latin1').decode(read('data\\global\\excel\\Sounds.txt'));
-    const selection = resolveLevelMusic(levelId, levelsTxt, soundEnvironTxt, soundsTxt);
+    return finishSelection(resolveLevelMusic(levelId, levelsTxt, soundEnvironTxt, soundsTxt), levelId);
+  }
+  async function finishSelection(selection, levelId) {
     if (!selection) return { levelId: Number(levelId), soundId: 0, path: null, volume: 0, buffer: null };
     sourceVolume = selection.volume; applyGain();
     let buffer = buffers.get(selection.soundId);

@@ -8,6 +8,7 @@ import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 import { createPanelChrome, BORDER_LEFT } from './panel-chrome.mjs';
 import { questCloseFrame } from './quest-close-gesture.mjs';
 import { listGeometry, listArrowAt } from './list-press.mjs';
+import { rulesBound, questIcon, questRecordMode } from './client-rules.mjs';
 
 const MENU = 'data\\global\\ui\\MENU\\';
 export const QUEST_ART = { bg: MENU + 'questbackground.dc6', tabs: MENU + 'expquesttabs.dc6', sockets: MENU + 'questsockets.dc6',
@@ -41,12 +42,20 @@ export const QUEST_DONE_ART = MENU + 'questdone.dc6';
 /** The icon cel retail draws for a quest: a held press on a done quest swaps to questdone.dc6 at the
  * quest's icon-table frame; a held press on a quest in progress draws frame 25; locked is never latched. */
 export const questIconCel = (act, q, status, pressed, animFrame = null) => {
+  if (rulesBound()) {   // the engine's rule (D2Client+0x1EF10); the branches below are the pre-engine fallback
+    const index = ICON_START[act - 1] + q - 1;
+    const r = questIcon(animFrame != null ? 0 : { done: 1, locked: 2 }[status] ?? 3, pressed, animFrame ?? 0, index);
+    return r.done ? { path: QUEST_DONE_ART, frame: r.frame } : { path: QUEST_ART.icon(act, q), frame: r.frame };
+  }
   if (animFrame != null) return { path: QUEST_ART.icon(act, q), frame: animFrame };
   if (pressed && status === 'done') return { path: QUEST_DONE_ART, frame: ICON_START[act - 1] + q - 1 };
   if (pressed && status === 'progress') return { path: QUEST_ART.icon(act, q), frame: 25 };
   return { path: QUEST_ART.icon(act, q), frame: FRAME[status] };
 };
+const MODE_STATUS = ['done', 'done', 'locked', 'progress'];   // the record mode of D2Client+0x1CE00: completing, done, locked, in progress
 export const questStatus = (words, act, q) => {
+  const mode = questRecordMode(words, questWord(act, q));   // the engine's record; the lines below are the pre-engine fallback
+  if (mode != null) return MODE_STATUS[mode] ?? 'locked';
   const base = ACT_BASE[act - 1], off = ACT_DONE[act - 1], w = words[questWord(act, q)] | 0;
   const done = (off ? words[base + off] & 1 : 0) || (w & 0x8001);
   return done ? 'done' : w ? 'progress' : 'locked';
@@ -201,7 +210,7 @@ export function createMessageLogRenderer(read, documentObject = globalThis.docum
       return { box: [127, 497, 672, 544], text: [131, 512], dim: DIM_ALPHA }; },
     /** A freshly posted line drawn over the game (posted-rb): alpha box 11,6-(text end+POSTED_PAD),22, line at 15,20. */
     drawPosted(ctx, width, height, line, act = 1) { const o = origin(width, height), f = fontFor(act); ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.scale, o.scale);
-      const w = String(line).split(/(?=ÿc\d)/).reduce((n, part) => n + f.chat[0].measure(/^ÿc\d/.test(part) ? part.slice(3) : part), 0), box = [11, 6, 15 + w + POSTED_PAD, 22];
+      const w = f.chat[0].measureCoded(line), box = [11, 6, 15 + w + POSTED_PAD, 22];
       ctx.fillStyle = `rgba(0,0,0,${DIM_ALPHA})`; ctx.fillRect(box[0], box[1], box[2] - box[0], box[3] - box[1]); drawChat(ctx, f, line, 15, 20); ctx.restore();
       return { box, text: [15, 20], width: w, dim: DIM_ALPHA }; },
     /** The Close label's rectangle (the button retail draws under its cursor is a 32x29 orotate cel). */

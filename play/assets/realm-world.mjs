@@ -12,8 +12,7 @@
 // Objects are not here: the engine's object unit is their one model (assets/realm-objects.mjs reads it back).
 //
 // Packet semantics are 1.13c's: 0x0A removes a unit, 0x9C and 0x9D carry an item as its saved-item bitstream
-// (the format ITEMS_DecodeItemFromBitstream reads without the 'JM' header or the seed), 0x19 and 0x1D-0x1F,
-// 0x20 carry the gold stats, 0x03 starts an act.
+// (the format ITEMS_DecodeItemFromBitstream reads without the 'JM' header or the seed), 0x03 starts an act.
 
 const ITEM_FLAG = Object.freeze({ IDENTIFIED: 0x10, SOCKETED: 0x800, EAR: 0x10000, COMPACT: 0x200000,
   ETHEREAL: 0x400000, LOW_QUALITY: 0x2000000 });
@@ -78,12 +77,15 @@ const u32 = (p, at) => (p[at] | (p[at + 1] << 8) | (p[at + 2] << 16) | (p[at + 3
  * client's own player), or null when the engine cannot say: { guid, classId, code, mode, x, y, page, bodyLoc,
  * quality, flags }.
  */
-export function createRealmWorld({ items: itemTable, heldItems = null }) {
+export function createRealmWorld({ items: itemTable, heldItems = null, heroStat = () => 0, groundItems = null, useItemState = null }) {
   let ownGuid = null;
+  // With the engine's client state (groundItems returns an array, not null) the item packets 0x9C, 0x9D, 0x0A, 0x03,
+  // 0x3F, 0x42 and 0x74 are the engine's: its item units are the one model and this file reads them back. The
+  // decisions below stay as the fallback for a build or a moment with no engine state. Checked once per feed.
+  let engineOn = false;
   const itemsByGuid = new Map();    // guid -> { ...decoded, id, owner: null (0x9C) | owner guid (0x9D) }
-  let gold = 0, stashGold = 0, cursorId = 0, received = 0;
+  let cursorId = 0, received = 0;
   let useItem = null, inventoryAsks = 0;   // 0x3f: the item the cursor is using, and how often it asked for the inventory
-  const uiEvents = [];              // 0x77 UpdateUi codes not yet taken (16 opens the stash, 17 closes it, 21 opens the cube)
 
   let revision = 0;                 // bumped by every feed and reset: the engine reads below are cached per revision
   const heldCache = new Map();
@@ -104,7 +106,18 @@ export function createRealmWorld({ items: itemTable, heldItems = null }) {
   }
   const onGround = (item) => item.mode === MODE.GROUND || item.mode === MODE.DROPPING;
   // The client's own items: what its unit holds plus what lies on the ground.
+  function engineGround() {
+    const records = engineOn ? groundItems() : null;
+    if (!records) return null;
+    return records.flatMap((r) => {
+      const entry = itemTable.byCode(r.code);
+      return entry ? [{ id: r.guid, owner: null, classId: entry.classId, entry, code: r.code, mode: r.mode, x: r.x, y: r.y,
+        page: NO_PAGE, bodyLoc: 0, quality: r.quality, flags: r.flags, goldAmount: r.gold ?? -1 }] : [];
+    });
+  }
   function ownItems() {
+    const ground = engineGround();
+    if (ground) return [...ground, ...(held(null) ?? [])];
     const mine = held(null);
     const copy = [...itemsByGuid.values()].filter(isOwn);
     return mine ? [...copy.filter(onGround), ...mine] : copy;
@@ -114,7 +127,7 @@ export function createRealmWorld({ items: itemTable, heldItems = null }) {
 
   function reset() {
     revision++; heldCache.clear();
-    itemsByGuid.clear(); uiEvents.length = 0; gold = 0; stashGold = 0; cursorId = 0; received = 0; useItem = null; inventoryAsks = 0;
+    itemsByGuid.clear(); cursorId = 0; received = 0; useItem = null; inventoryAsks = 0;
   }
   const isOwn = (item) => item.owner === null || item.owner === ownGuid;
 
@@ -152,22 +165,13 @@ export function createRealmWorld({ items: itemTable, heldItems = null }) {
     else if (cursorId === guid) cursorId = 0;
   }
 
-  function applyStat(stat, value) {
-    if (stat === GOLD_STAT) gold = value >>> 0;
-    else if (stat === STASH_GOLD_STAT) stashGold = value >>> 0;
-  }
-
   function handle(p) {
+    if (engineOn) return;
     switch (p[0]) {
       case 0x03: itemsByGuid.forEach((item, guid) => { if (!isOwn(item) || item.mode === MODE.GROUND || item.mode === MODE.DROPPING) itemsByGuid.delete(guid); });
         break;   // a new act: its ground items arrive afresh
-      case 0x0a: if (p[1] === 4) { const held = itemsByGuid.get(u32(p, 2)); if (held && (held.mode === MODE.GROUND || held.mode === MODE.DROPPING)) itemsByGuid.delete(u32(p, 2)); }
+      case 0x0a: if (p[1] === 4) removeItem(u32(p, 2));   // 1.13c +0xA6EF0 frees the item whoever holds it
         break;
-      case 0x19: gold = (gold + p[1]) >>> 0; break;
-      case 0x1d: applyStat(p[1], p[2]); break;
-      case 0x1e: applyStat(p[1], u16(p, 2)); break;
-      case 0x1f: applyStat(p[1], u32(p, 2)); break;
-      case 0x20: if (ownGuid !== null && u32(p, 1) === ownGuid) applyStat(p[5], u32(p, 6)); break;
       // A corpse was made (flag set): what its owner wore is on the corpse now, and the server sends no per-item removal.
       // The cursor takes up or lets go of an item it is using (a scroll or key being aimed). Letting go (kind 0xff,
       // word 0xffff) clears the item's targeting flag (4); taking up needs the item, sets the flag when the word
@@ -181,7 +185,6 @@ export function createRealmWorld({ items: itemTable, heldItems = null }) {
       case 0x74: if (p.length >= 10 && p[1]) { const owner = u32(p, 2);
         itemsByGuid.forEach((item, guid) => { if (item.mode === MODE.EQUIP && (item.owner === owner || (owner === ownGuid && item.owner === null))) itemsByGuid.delete(guid); });
       } break;
-      case 0x77: if (p.length >= 2) uiEvents.push(p[1]); break;
       case 0x9c: if (p.length >= 8) applyItem(p, false); break;
       case 0x9d: if (p.length >= 13) applyItem(p, true); break;
       default: break;
@@ -207,6 +210,7 @@ export function createRealmWorld({ items: itemTable, heldItems = null }) {
     /** Apply every complete server packet of `bytes`; `sizeOf(subarray)` is the 1.13c packet-size reader. */
     feed(bytes, sizeOf) {
       revision++;
+      engineOn = Boolean(groundItems && groundItems());
       for (let at = 0; at < bytes.length;) {
         const n = sizeOf(bytes.subarray(at));
         if (!(n > 0) || at + n > bytes.length) break;
@@ -220,12 +224,11 @@ export function createRealmWorld({ items: itemTable, heldItems = null }) {
     wornBy(guid) { return wornItems(guid >>> 0).map((item) => presentItem(item)); },
     /** The saved-item bitstream the server sent for an item (what its tooltip text is decoded from). */
     rawItem(guid) { return itemsByGuid.get(guid >>> 0)?.raw ?? null; },
-    /** The 0x77 UpdateUi codes received since the last call. */
-    takeUiEvents() { return uiEvents.splice(0); },
-    get gold() { return gold; },
-    get stashGold() { return stashGold; },
+    // The gold figures are the engine's: the client state applies 0x19 and 0x1D-0x20 to the player's stats 14 and 15.
+    get gold() { return heroStat(GOLD_STAT) >>> 0; },
+    get stashGold() { return heroStat(STASH_GOLD_STAT) >>> 0; },
     get cursorId() { const mine = held(null); return mine ? (mine.find((item) => item.mode === MODE.CURSOR)?.id ?? 0) : cursorId; },
-    get useItem() { return useItem; },
+    get useItem() { return engineOn && useItemState ? useItemState() : useItem; },
     takeInventoryAsks() { const n = inventoryAsks; inventoryAsks = 0; return n; },
     get itemPacketsSeen() { return received; },
     get ownItemCount() { return ownItems().length; },

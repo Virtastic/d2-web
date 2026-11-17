@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRealmUnitFx, parseRealmUnitFx, playRealmUnitSound, SKILL_CREATE, SKILL_STATE } from './realm-unit-fx.mjs';
 import { resolveUnitSound } from './unit-sound-resolver.mjs';
+import { installUnitSoundFixture } from './unit-sound-wasm-fixture.mjs';
+installUnitSoundFixture();
 
 const OVERLAY = ['Overlay\tFilename\tFrames\tPreDraw\tTrans\tAnimRate', 'null\tnull\t1\t0\t0\t16', 'cast\tcast_a\t4\t0\t3\t16', '', 'hit\thit_b\t2\t1\t0\t8'].join('\r\n');
 const read = () => new TextEncoder().encode(OVERLAY);

@@ -266,3 +266,17 @@ test('Talk-topic speech ends ping-pong over the list with no 0x31', () => {
   assert.equal(sent.length, n);
   assert.equal(npc.view().mode, 'speech');
 });
+
+test('Introduction speaks the id the speech selection returns, sends nothing, and returns to the Talk box', () => {
+  const asked = [];
+  const { npc, sent } = fresh({ classId: KASHYA, speechId: (a, c) => { asked.push([a, c]); return 77; } });
+  npc.handle(info(GUID, [])); npc.dismissSpeech();
+  npc.choose(npc.view().entries.find((e) => e.action === 'talk'));
+  const n = sent.length;
+  npc.choose({ action: 'intro', stringId: 3399 });
+  assert.deepEqual(asked, [['intro', KASHYA]]);
+  assert.equal(npc.view().speech.stringId, 77);
+  npc.dismissSpeech();
+  assert.equal(npc.view().mode, 'talk');
+  assert.equal(sent.length, n);
+});

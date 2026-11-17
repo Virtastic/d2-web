@@ -33,15 +33,30 @@ export const AUTOMAP_PATH = AUTOMAP_PATHS.full;
 // F234: D2Client's viewport producer (`0x6fb0f9f0`) uses this rectangle for marker gating, while
 // `0x6fb10250` supplies the separate small-map cell clip. The `selector284` input is deliberately
 // explicit: the binary's initial value is zero, but its runtime producer/meaning is not yet recovered.
+let engineLayout = null;
+export function bindAutomapLayout(Module) {
+  if (typeof Module?._d2_client_automap_layout !== 'function' || typeof Module._malloc !== 'function') { engineLayout = null; return false; }
+  const at = Module._malloc(32);
+  engineLayout = (width, height, mode, left, selector284, center) => {
+    Module.ccall('d2_client_automap_layout', null, ['number', 'number', 'number', 'number', 'number', 'number', 'bigint'],
+      [width, height, nativeAutomapMode(mode), left ? 1 : 0, selector284, center ? 1 : 0, BigInt(at)]);
+    return Array.from(new Int32Array(Module.HEAPU8.buffer.slice(Number(at), Number(at) + 32)));
+  };
+  return true;
+}
 export function automapViewport(width, height, { mode = 'full', left = true, selector284 = 0 } = {}) {
   const mini = nativeAutomapMode(mode) === 1;
   // 0x6fb0f9f0: AutoMapLeft writes 0 to the X anchor (0x6fbcc23c) and `(sel == 2) - 1 & 0x60` to the Y anchor (0x6fbcc238);
   // the viewport's left/right are built from 0x23c and its top/bottom from 0x238, and 0x608D0's scroll subtracts 0x23c from W/3.
-  const anchorX = left ? 0 : Math.floor(2 * width / 3);
-  const anchorY = left ? (selector284 === 2 ? 0 : 96) : 78;
-  const viewport = mini
+  let anchorX = left ? 0 : Math.floor(2 * width / 3);
+  let anchorY = left ? (selector284 === 2 ? 0 : 96) : 78;
+  let viewport = mini
     ? { left: anchorX - 8, top: anchorY, right: anchorX + Math.floor(width / 3), bottom: anchorY + Math.floor(height / 3) }
     : { left: -16, top: -16, right: width, bottom: height };
+  if (engineLayout) {   // the engine's 0x5F9F0 port; the arithmetic above is the fallback while the export is unbound
+    const o = engineLayout(width, height, mode, left, selector284, false);
+    anchorX = o[0]; anchorY = o[1]; viewport = { left: o[2], top: o[3], right: o[4], bottom: o[5] };
+  }
   const cellClip = !mini ? null : left
     ? { left: 0, top: selector284 === 2 ? -21 : 75, right: 279, bottom: (selector284 === 2 ? -21 : 75) + 225 }
     : { left: width - 281, top: 57, right: width - 2, bottom: 282 };
@@ -56,6 +71,10 @@ export function automapMarkerInViewport(x, y, viewport) {
 }
 export function automapScrollOffset(width, height, { mode = 'full', center = 'yes', anchorX, anchorY } = {}) {
   if (nativeAutomapMode(mode) !== 1 || center !== 'yes') return { x: 0, y: 0 };
+  if (engineLayout) {   // the engine's 0x608D0 port: it reads only the X anchor (0 = AutoMapLeft panel) and the screen size
+    const o = engineLayout(width, height, mode, anchorX === 0, anchorX === 0 && anchorY === 0 ? 2 : 0, true);
+    return { x: o[6], y: o[7] };
+  }
   return { x: Math.floor(width / 3) - anchorX - 16, y: Math.floor(height / 3) - anchorY - 16 };
 }
 
@@ -81,9 +100,18 @@ function makeFrameCanvas(frame, palette, documentObject) {
 
 // The only selection rule here is DATATBLS_GetAutomapCellId's table predicate:
 // level type + DT1 tile orientation + main/sub indices -> a row and one of its Cels.
-function selectRecord(index, levelType, tile) {
+function selectRecord(index, levelType, tile, Module = null) {
   const levelName = LEVEL_NAMES[levelType] ?? 'None', tileName = TILE_NAMES[tile.orientation] ?? null;
   if (!tileName) return null;
+  // The engine's own walk over its loaded AutoMap table (D2Common 0x6FAC0's row predicate); the .txt index below is the pre-engine fallback.
+  if (typeof Module?._d2_client_automap_record === 'function') {
+    const i = Number(Module._d2_client_automap_record(levelType, tile.orientation, tile.mainIndex, tile.subIndex));
+    if (i < 0) return null;
+    const field = (f) => Number(Module._d2_client_automap_field(i, f)), count = field(0);
+    const frames = [1, 2, 3, 4].slice(0, Math.max(count, 0)).map(field);
+    if (!frames.length) return null;
+    return { record: { frames, style: field(5), startSequence: field(6), endSequence: field(7) }, levelName, tileName };
+  }
   const record = selectIndexedAutomapRecord(index, levelName, tileName, tile);
   return record ? { record, levelName, tileName } : null;
 }
@@ -293,6 +321,7 @@ export function engineAutomapSource(Module) {
   };
 }
 export function createAutomapOverlay({ read, Module, documentObject = globalThis.document, source = engineAutomapSource(Module) }) {
+  bindAutomapLayout(Module);
   const rows = rowsFromTxt(read('data\\global\\excel\\automap.txt'));
   const recordIndex = createAutomapRecordIndex(rows);
   // The map is drawn through the CURRENT act's palette, as every in-game D2Gfx draw is: act 1's pal.dat
@@ -465,7 +494,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
             const room = rooms.find((r) => inRoom(r, tile.worldX * 5, tile.worldY * 5));
             if (!room || !rv.rooms.has(`${room.x},${room.y}`)) continue;
             if (!onScreen && !rv.entryRooms.has(`${room.x},${room.y}`)) continue;
-            const selected = selectRecord(recordIndex, levelType, tile);
+            const selected = selectRecord(recordIndex, levelType, tile, Module);
             if (!selected || !frames[selected.record.frames[0]]) { unnamed.add(key); continue; }
             // Retail rolls its private automap seed (gpAutomapSeed, low seed 0) per GetAutomapCellId call, in
             // the order retail adds cells -- an order this client does not have -- so the pick is a hash of the

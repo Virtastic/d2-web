@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRealmTrade, tradePoint, tradeBoxLayout, TRADE_BOX } from './realm-trade.mjs';
 import { TRADE_STATE as S } from './bnet-game-trade.mjs';
+import { installUnitSoundFixture } from './unit-sound-wasm-fixture.mjs';
+installUnitSoundFixture();
 
 const ui = (action) => Uint8Array.of(0x77, action);
 const gold = (own, amount) => { const b = new Uint8Array(6); b[0] = 0x79; b[1] = own; new DataView(b.buffer).setUint32(2, amount, true); return b; };

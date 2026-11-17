@@ -24,6 +24,7 @@ export function createRealmSessionPresenter(sinks = {}) {
         case 0x8a: overlays.set(`${e.a}:${e.b}`, { type: e.a, id: e.b, overlayId: e.c }); break;
         case 0x88a70: sinks.uiSound?.(e.a); break;
         case 0x01: sinks.gameFlags?.({ difficulty: e.a, flags: e.b, expansion: e.c !== 0, ladder: e.d !== 0 }); break;
+        case 0x77: sinks.uiUpdate?.(e.a); break;
         case 0x3f: if (e.d) sinks.openInventory?.(); break;
         case 0x47: case 0x48: sinks.recheckItems?.(e.a, e.b); break;
         default: break;

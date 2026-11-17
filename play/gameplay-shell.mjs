@@ -1,5 +1,5 @@
 import './assets/back-guard.mjs';   // Android Back (a pad's B) never leaves the game
-import { parseSessionTiles, readSessionTerrain, readSessionLightmap, worldToScreen, screenDeltaToWorld, UNIT_CENTRE_Y } from './assets/session-terrain.mjs';
+import { parseSessionTiles, readSessionTerrain, readSessionLightmap, floorSubmitFlags, worldToScreen, screenDeltaToWorld, UNIT_CENTRE_Y } from './assets/session-terrain.mjs';
 import { inventoryOwnsClick } from './assets/shop-click-owner.mjs';
 import { createRealmResync } from './assets/realm-resync.mjs';
 import { unitInView } from './assets/unit-view-cull.mjs';
@@ -54,7 +54,7 @@ import { beginInventoryGoldPress, cancelInventoryGoldPress, finishInventoryGoldP
 import { createCharacterPanelRenderer } from './assets/character-panel.mjs';
 import { readCharacterSkillRows } from './assets/character-skill-rows.mjs';
 import { createItemPropertyCache, itemPropsCacheable } from './assets/item-property-cache.mjs';
-import { parseItemLines } from './assets/item-tooltip.mjs';
+import { parseItemLines, setItemNameColourEngine } from './assets/item-tooltip.mjs';
 import { createNpcNameLabelCache } from './assets/npc-name-label-cache.mjs';
 import { savedCharacterReadError, setFrontdoorError } from './assets/frontdoor-error.mjs';
 import { setOverlayFont, setOverlayText } from './assets/overlay-text.mjs';
@@ -106,12 +106,12 @@ import { createAmbientSound, ambientCycleOf } from './assets/ambient-sound.mjs';
 import { createCombatSoundTrigger, combatSoundEngine } from './assets/combat-sound-trigger.mjs';
 import { createEventSounds } from './assets/event-sounds.mjs';
 import { createStatUpdateWatch, ITEM_RECHECK } from './assets/stat-update-watch.mjs';
-import { createMissileSounds } from './assets/missile-sounds.mjs';
+import { createMissileSounds, wasmMissileRules } from './assets/missile-sounds.mjs';
 import { playNpcDialogueVoice, npcDialogueVoiceSource } from './assets/npc-dialogue-voice.mjs';
 import { createNpcSpeechScrollGate } from './assets/npc-speech-scroll-gate.mjs';
 import { createNpcSpeechClickGate } from './assets/npc-speech-click.mjs';
 import { ensureFont, drawCentredBitmap, drawCentredLines, drawLeftBitmap, drawCentredMessage } from './assets/centred-text.mjs';
-import { createFont, createTitleScreen, decodeFontTbl, FRONTEND, textColourPalette } from './assets/frontend.mjs';
+import { createFont, createTitleScreen, decodeFontTbl, FRONTEND, setFontTableBackend, setTextWidthBackend, textColourPalette } from './assets/frontend.mjs';
 import { createExitSequence } from './assets/exit-sequence.mjs';
 import { loadBnetServers } from './assets/bnet-servers.mjs';
 import { BOOT_MOVIES, openMovie } from './assets/cinematics.mjs';
@@ -136,7 +136,6 @@ import { createChatLink } from './assets/bnet-chat-link.mjs';
 import { createNews, newsLines, createMotd } from './assets/bnet-news.mjs';
 import { returnToLobby } from './assets/realm-lobby-return.mjs';
 import { createBnetConnectingPopup, createBnetConnectFailureNotice, dialBnet } from './assets/bnet-connecting.mjs';
-import { goldLabel } from './assets/gold-label.mjs';
 import { hoveredLabel, labelItemAt, nearestGroundItem } from './item-pick.mjs';
 import { createSpeechBox } from './assets/speech-box.mjs';
 import { nativeObjectSpeechAcknowledgement } from './assets/object-speech-ack.mjs';
@@ -166,6 +165,7 @@ import { realmHeroFlags, realmCorpseViews, createRealmDeath, heroIsDown, deathBl
 import { S_RESURRECT_FORMAT, resurrectLabel, createNpcMenu, hireSkillText, npcMenuChoiceOnRelease, npcMenuInputCoolingDown, npcMenuEntries, withTravelRow, withHireRow, deadHireling, resurrectPacket, talkEntries, menuReturnsAfterSpeech, entriesAfterSpeech, nextSpeechAfterTopic, TRAVEL_LEVEL } from './assets/npc-menu.mjs';
 import { talkSpeechId } from './assets/npc-topics.mjs';
 import { createWeatherRenderer } from './assets/weather-renderer.mjs';
+import { readEngineRainDrops } from './assets/weather-engine.mjs';
 import { weatherWaterAnchors } from './assets/weather-water-anchors.mjs';
 import { createSkillFx } from './assets/skill-fx.mjs';
 import { createStateFx } from './assets/state-fx.mjs';
@@ -186,6 +186,7 @@ import { handleVendorRepairClick, disarmVendorRepair, vendorRepairArmed, repairC
 import { toggleSellMode, resetSellMode, vendorClickAction, sellModeArmed } from './assets/vendor-sell-mode.mjs';
 import { inventoryClickAction, shopModeOf } from './assets/inventory-click-route.mjs';
 import { decodeDc6 } from './assets/d2-formats.mjs';
+import { setGridCellEngine, setHeldCellEngine } from './assets/grid-cell.mjs';
 import { createGameCursor } from './assets/game-cursor.mjs';
 import { createItemTargeting } from './assets/item-targeting.mjs';
 import { createPointerLayer } from './assets/pointer-layer.mjs';
@@ -217,6 +218,7 @@ import { createGameLife, flushUnloadLeave, joinDeadline, lifePhaseFromFrame, TIC
 import { createJoinLoading, createJoinLoadingArt } from './assets/bnet-join-loading.mjs';
 import { reasonString, REASON_DISCONNECTED } from './assets/d2gs-deny.mjs';
 import { orderUnitSprites } from './assets/unit-draw-order.mjs';
+import { bindClientRules, rulesBound, questTabActs, setQuestLogStates, requestLocalQuestLogStates } from './assets/client-rules.mjs';
 
 const canvas = document.querySelector('#game');
 const screenshotAction = createScreenshotAction();
@@ -297,6 +299,37 @@ let hoverPickEngine = null;
 // command, or an engine write (markWorldWrites). Set back to false by the read.
 let worldDirty = true;
 const WORLD_WRITES = /^d2_(session_(command_|tick$|create|destroy$|stash_(insert|clear)$|hotkey_assign$|toggle_run$|weapon_switch$|set_|configure_|convert_|client_packet$|client_map_start$)|drlg_init$)/;
+// Font width sums run through the engine's D2Win width loop. wasm64: pointers are BigInt at the call boundary.
+const TEXT_WIDTH_UNITS = 2048;
+let textWidthScratch = null;
+const textWidthTables = new WeakMap();
+function installTextWidthBackend() {
+  if (!Module._d2_win_text_width) return;
+  const alloc = (n) => Number(Module.ccall('malloc', 'bigint', ['number'], [n]));
+  if (Module._d2_win_font_tbl_decode) {
+    setFontTableBackend((bytes) => {
+      if (bytes.length > 65536) return null;
+      const src = alloc(bytes.length), dst = alloc(5 * Math.ceil(bytes.length / 14));
+      Module.HEAPU8.set(bytes, src);
+      const n = Module._d2_win_font_tbl_decode(BigInt(src), bytes.length, BigInt(dst));
+      const out = n > 0 ? Module.HEAPU8.slice(dst, dst + n * 5) : null;
+      Module.ccall('free', null, ['bigint'], [BigInt(src)]); Module.ccall('free', null, ['bigint'], [BigInt(dst)]);
+      return out;
+    });
+  }
+  setTextWidthBackend((table, text, coded) => {
+    const width = coded ? Module._d2_win_text_width_cc : Module._d2_win_text_width;
+    if (!width) return null;
+    if (text.length > TEXT_WIDTH_UNITS) return null;
+    textWidthScratch ??= alloc(TEXT_WIDTH_UNITS * 2);
+    let tablePtr = textWidthTables.get(table);
+    if (!tablePtr) { tablePtr = alloc(65536); Module.HEAPU8.set(table, tablePtr); textWidthTables.set(table, tablePtr); }
+    const units = new Uint16Array(text.length);
+    for (let i = 0; i < text.length; i++) units[i] = text.charCodeAt(i);
+    Module.HEAPU8.set(new Uint8Array(units.buffer), textWidthScratch);
+    return width(BigInt(tablePtr), BigInt(textWidthScratch), text.length);
+  });
+}
 function markWorldWrites() {
   const ccall = Module.ccall;
   Module.ccall = function (name, ...rest) { if (!worldDirty && WORLD_WRITES.test(name)) worldDirty = true; return ccall.call(this, name, ...rest); };
@@ -579,6 +612,7 @@ let messageScroll = 0;   // V8d: the message log's scroll offset in lines (0 = n
 const messagePress = createListPress(MSG_LIST), scrollMessage = (d) => { messageScroll = Math.max(0, Math.min(messageScrollMax(messageLines.length), messageScroll + d)); };
 let messagePressPointer = null;   // the pointer holding a press on the log's list (list-press.mjs)
 let questOpenedAt = 0;   // V8d: the engine tick the quest log was opened on, for the completion animation
+let localQuestStates = null;   // an unjoined game's quest-log state bytes: the 0x52 its own server composed when the log opened
 // V8d: which quest icons play the completion animation this open (the engine's QFLAG_COMPLETEDNOW), and
 // which have already played it -- the client's stand-in for retail moving COMPLETEDNOW -> COMPLETEDBEFORE
 // when the log closes (there is no engine export to clear the record bit; declared in client-parity.md).
@@ -586,13 +620,14 @@ const questAnim = new Set(), questPlayed = new Set();
 const readQuestWords = () => { if (clientView().questWords) return clientView().questWords(); const p = Number(Module.ccall('d2_session_quest_record', 'number', [], [])); return p ? new Uint16Array(Module.HEAPU8.buffer.slice(p, p + 96)) : new Uint16Array(48); };
 // An act shows a tab once any of its OWN quest words is set (its six quests, or the trailing COMPLETED
 // word where it has one). Act V's words are 35..40, not 32..39 -- ACT_BASE, F411.
-const questTabs = (words, act) => { let top = act; for (let a = 1; a <= 5; a++) { const end = ACT_DONE[a - 1] || QUESTS_IN_ACT[a - 1];
+// With the engine bound the tabs are D2Client+0x1EF10's rule: act 1 and the selected act always, each later act once the one before it is completed; the rest is the pre-engine fallback.
+const questTabs = (words, act, selected) => { if (rulesBound()) return questTabActs(selected, true, [7, 0xF, 0x17, 0x1A].map((q) => words[q] & 1)); let top = act; for (let a = 1; a <= 5; a++) { const end = ACT_DONE[a - 1] || QUESTS_IN_ACT[a - 1];
   for (let i = 1; i <= end; i++) if (words[ACT_BASE[a - 1] + i]) { top = Math.max(top, a); break; } }
   return Array.from({ length: Math.min(5, top) }, (_, i) => i + 1); };
 const questFirst = (words, act) => { for (let q = 1; q <= QUESTS_IN_ACT[act - 1]; q++) if (questStatus(words, act, q) !== 'locked') return q; return 0; };
 const toggleQuest = () => { questVisible = !questVisible; if (questVisible) { characterVisible = hirelingVisible = false; questAct = 0; questOpenedAt = engineTicks; questDescrOn = false;
   // A joined game's log asks the server for the hero's record as it opens (retail's 0x40); the answer refreshes the words read below.
-  if (realmFlow?.d2gs?.isOpen) realmInput().questLogOpened();
+  if (realmFlow?.d2gs?.isOpen) realmInput().questLogOpened(); else localQuestStates = session ? requestLocalQuestLogStates() : null;   // an unjoined game asks its own server the same
   // On open, the engine's own COMPLETING quests (QFLAG_COMPLETEDNOW) play once: OpenDiablo2's
   // quest_log.go playQuestAnimations, which runs for the quests in QuestStatusCompleting.
   questAnim.clear(); const words = readQuestWords();
@@ -752,7 +787,68 @@ const stashGoldSpinnerRepeat = createStashSpinnerRepeat();
 // The waypoint menu is open because the engine sent 0x63; waypointMenu holds that waypoint's unit id.
 let waypointPanelRenderer = null, waypointPanelError = '', waypointEvidence = null, waypointMenu = null, lastWaypointTravel = null;
 const waypointMenuInput = createWaypointMenuInput();
-const beltPopup = createBeltPopup();
+const beltPopup = createBeltPopup((...a) => (Module._d2_client_belt_hit ? Module.ccall('d2_client_belt_hit', 'number', a.map(() => 'number'), a) : 0));
+// The inventory, stash and vendor grids' point-to-cell rule is D2Client+0x96AA0 (d2_client_inv_grid_cell); JS divides only before the engine loads.
+setGridCellEngine((...a) => {
+  if (!Module._d2_client_inv_grid_cell) { const [l, t, w, h, x, y, c, r] = a; const cx = Math.floor((x - l) / w), cy = Math.floor((y - t) / h); return cx < 0 || cy < 0 || cx >= c || cy >= r ? null : { x: cx, y: cy }; }
+  const p = BigInt(Module.ccall('malloc', 'bigint', ['number'], [8])), i = Number(p) >> 2;
+  try { return Module.ccall('d2_client_inv_grid_cell', 'number', [...a.map(() => 'number'), 'bigint'], [...a, p]) ? { x: Module.HEAP32[i], y: Module.HEAP32[i + 1] } : null; }
+  finally { Module.ccall('free', null, ['bigint'], [p]); }
+});
+// The XP and stamina bar hover boxes are D2Client+0x26970 / +0x278B0 (d2_client_hud_bar_tip); JS keeps rectangles only before the engine loads.
+const hudBarEngine = (...a) => {
+  if (!Module._d2_client_hud_bar_tip) return null;
+  const p = BigInt(Module.ccall('malloc', 'bigint', ['number'], [16])), i = Number(p) >> 2;
+  try {
+    const bar = Module.ccall('d2_client_hud_bar_tip', 'number', [...a.map(() => 'number'), 'bigint'], [...a, p]);
+    return bar ? { bar, x: Module.HEAP32[i], y: Module.HEAP32[i + 1], color: Module.HEAP32[i + 2], cur: Module.HEAP32[i + 3] } : null;
+  } finally { Module.ccall('free', null, ['bigint'], [p]); }
+};
+// The lit level-up button hover hit test and plate position are D2Client+0x50430 / +0x501F0 (d2_client_level_btn_tip).
+const levelBtnEngine = (w, h, mx, my) => {
+  if (!Module._d2_client_level_btn_tip) return null;
+  const p = BigInt(Module.ccall('malloc', 'bigint', ['number'], [8])), i = Number(p) >> 2;
+  try {
+    const k = Module.ccall('d2_client_level_btn_tip', 'number', ['number', 'number', 'number', 'number', 'bigint'], [w, h, mx, my, p]);
+    return k ? { side: k - 1, x: Module.HEAP32[i], y: Module.HEAP32[i + 1] } : null;
+  } finally { Module.ccall('free', null, ['bigint'], [p]); }
+};
+// The mini-panel hover row box, column test and plate position are D2Client+0x644F0 (d2_client_mini_tip).
+let miniSideMode = 2;
+const miniTipEngine = (w, h, mx, my, left, mode = miniSideMode) => {
+  if (!Module._d2_client_mini_tip) return null;
+  const p = BigInt(Module.ccall('malloc', 'bigint', ['number'], [8])), i = Number(p) >> 2;
+  try {
+    return Module.ccall('d2_client_mini_tip', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'bigint'], [w, h, mx, my, mode, Math.trunc(left), p])
+      ? { x: Module.HEAP32[i], y: Module.HEAP32[i + 1] } : null;
+  } finally { Module.ccall('free', null, ['bigint'], [p]); }
+};
+// The experience / stamina hover lines are string.tbl 4163 / 4164 formatted by the retail Unicode::sprintf (d2_client_format_string).
+const hudFormatEngine = (id, a, b) => {
+  const cap = 512, p = BigInt(Module.ccall('malloc', 'bigint', ['number'], [cap]));
+  try { return Module.ccall('d2_client_format_string', 'number', ['number', 'number', 'number', 'bigint', 'number'], [id, a, b, p, cap]) > 0 ? Module.UTF8ToString(Number(p)) : null; }
+  finally { Module.ccall('free', null, ['bigint'], [p]); }
+};
+// The belt-toggle button's hover plate (D2Client+0x267B0): hit box, string id (0x1047 / 0x1048) and plate position from the engine;
+// nothing is drawn before the engine loads.
+const beltToggleTip = (w, h, mx, my, open) => {
+  if (!Module._d2_client_belt_toggle_tip) return null;
+  const p = BigInt(Module.ccall('malloc', 'bigint', ['number'], [8])), i = Number(p) >> 2;
+  try {
+    const id = Module.ccall('d2_client_belt_toggle_tip', 'number', ['number', 'number', 'number', 'number', 'number', 'bigint'], [w, h, mx, my, open ? 1 : 0, p]);
+    return id ? { bar: 'belt', text: hudLang(id), x: Module.HEAP32[i], y: Module.HEAP32[i + 1], color: 0 } : null;
+  } finally { Module.ccall('free', null, ['bigint'], [p]); }
+};
+// The cell a held item is put down at is D2Client+0x94820's rule (d2_client_held_cell); JS rounds only before the engine loads.
+setHeldCellEngine((g, w, h, pw, ph, x, y) => {
+  if (!Module._d2_client_held_cell) return null;
+  const p = BigInt(Module.ccall('malloc', 'bigint', ['number'], [8])), i = Number(p) >> 2;
+  try { return Module.ccall('d2_client_held_cell', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'bigint'],
+    [g.columns, g.rows, g.left, g.top, g.cellWidth, g.cellHeight, w, h, pw, ph, x, y, p]) ? { x: Module.HEAP32[i], y: Module.HEAP32[i + 1] } : null; }
+  finally { Module.ccall('free', null, ['bigint'], [p]); }
+});
+// An item's name colour (tooltip and ground label) is D2Client+0x93450's choice (d2_client_item_name_colour).
+setItemNameColourEngine((q, f) => (Module._d2_client_item_name_colour ? Module._d2_client_item_name_colour(q, f) : (q >= 4 && q <= 9 ? [3, 2, 9, 4, 8, 10][q - 4] : (f & 0x400800) ? 5 : 0)));
 let beltRenderer = null, beltTooltip = null, beltEvidence = null, beltBoxCache = null, beltBoxRecord = -1;
 let miniDown = -1, miniPointerId = null;
 let controlPanelRenderer = null, controlPanelEvidence = null, hudIconRow = true, lastRunToggle = null;
@@ -1783,6 +1879,11 @@ const realmSessionPresenter = createRealmSessionPresenter({
   clearOverhead: (type, id) => { gameBubbles.delete(`${type}:${id}`); },
   uiSound: (row) => { unitSounds?.playRow(row, { source: 'realm-event' }).catch(() => {}); },
   openInventory: () => { inventoryVisible = true; },
+  uiUpdate: (code) => {
+    if (code === 16) { stashOpen = true; inventoryVisible = true; }
+    else if (code === 21) { cubeOpen = true; inventoryVisible = true; }
+    else if (code === 17) { stashOpen = false; inventoryVisible = false; closeStashGold(); }
+  },
 });
 function presentRealmSession() {
   const events = realmFlow?.protocol?.d2gsClientTakeSessionEvents?.();
@@ -2428,7 +2529,9 @@ function tipFields(id, code) {
   const p = itemProps(id);
   const [title, baseName] = (p.title || '').split('\n');
   const plain = title || Module.ccall('d2_lang_string', 'string', ['string'], [codeText]) || codeText;
-  return { name: (codeText === 'gld' || codeText === 'dlg') ? goldLabel(plain, Module.ccall('d2_session_unit_stat', 'number', ['number', 'number', 'number', 'number'], [4, id, 0x0E, 0])) : plain, baseName, quality: p.quality, flags: p.flags, props: p.lines, propColours: p.colours,
+  // A gold pile's line is D2Client's own (ground_gold_label.cpp); no server unit (INT32_MIN stat) keeps the plain name.
+  const gold = (codeText === 'gld' || codeText === 'dlg') ? Module.ccall('d2_session_unit_stat', 'number', ['number', 'number', 'number', 'number'], [4, id, 0x0E, 0]) : -0x80000000;
+  return { name: gold !== -0x80000000 ? Module.ccall('d2_client_gold_label', 'string', ['number', 'number', 'number', 'number', 'number'], [Module.ccall('d2_client_item_class_by_code', 'number', ['string'], [codeText]), gold, p.quality, p.flags, 0]) : plain, baseName, quality: p.quality, flags: p.flags, props: p.lines, propColours: p.colours,
     costLabel: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [3329]),
     // D2Client+0x46230: an item you carry, with a vendor open, ends its tooltip with string 3331 + the engine's sell price.
     sellLabel: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [3331]), sell: realmShopView() ? (realmFlow?.protocol?.d2gsClientSellValue?.(id, realmShopView().classId) ?? -1) : Module.ccall('d2_session_item_sell_value', 'number', ['number'], [id]) };
@@ -2767,6 +2870,17 @@ async function createRealmCharacter({ playerClass, name, checkboxes }) {
     bnetLoginScreen?.reset(); bnetLoginScreen?.fail(error);
   }
 }
+// The character-name rule of the original create screen, run by the engine's own D2Launch validator.
+function engineCharacterNameOk(name) {
+  if (!Module._d2_launch_charname_ok) return name.length >= 2;
+  const at = Module._malloc((name.length + 1) * 2);
+  try {
+    const units = new Uint16Array(Module.HEAPU8.buffer, Number(at), name.length + 1);
+    for (let i = 0; i < name.length; i++) units[i] = name.charCodeAt(i);
+    units[name.length] = 0;
+    return Module.ccall('d2_launch_charname_ok', 'number', ['number'], [at]) === 1;
+  } finally { Module._free(at); }
+}
 function ensureCharCreate() {
   if (screen !== SCREEN.CREATE || charCreate || charCreateError) return;
   if (!window.__d2?.ready || window.__d2.error) return;
@@ -2774,6 +2888,7 @@ function ensureCharCreate() {
     charCreate = createCharacterCreate({
       realm: realmCreate, read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette,
       string: (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]),
+      nameOk: engineCharacterNameOk,
       onCreate: ({ playerClass, name, checkboxes }) => {
         if (realmCreate) { createRealmCharacter({ playerClass, name, checkboxes }); return; }
         chosenClass = playerClass; chosenName = name;
@@ -3162,6 +3277,7 @@ function drainUnitSounds() {
   if (enginePlays) { let born = []; if (Module._d2_session_missile_births) { const cb = missileBirthBuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [8])); const bp = Number(Module.ccall('d2_session_missile_births', 'bigint', ['bigint'], [BigInt(cb)])), bn = Module.HEAP32[cb >> 2]; for (let i = 0; i < bn; i++) born.push([Module.HEAP32[(bp >> 2) + 2 * i], Module.HEAP32[(bp >> 2) + 2 * i + 1]]); }
     missileSounds?.update(snapshot?.entities ?? [], engineTicks, born); }
   // D35: client-side event sounds (pickup, gold, drop, footstep) run every tick, not only on ticks the engine queued a sound.
+  if (snapshot) snapshot.engineNeutralSteps = enginePlays;   // the engine plays neutral footsteps (0x104 below)
   eventSounds?.update(snapshot, readAdvancement()?.level);
   drainAmbientSounds();   // the ambient module is fed by the engine or by the realm's area audio, never both
   for (let r; (r = Module._d2_client_4bc80_take_sound?.() | 0) > 0;) if (enginePlays) unitSounds.playRow(r, { source: 'transaction', unitType: -1 }).catch(() => {});   // 0x4BC80: a 0x2A reply of result 1 (a sale) plays item_gold, no unit
@@ -3178,6 +3294,7 @@ function drainUnitSounds() {
     // The unit type and id attach the source to its unit: the mixer places it against the listener (Falloff, pan).
     if (event.soundEvent === 0x100) { unitSounds.playRow(event.nativeSelectedRow, { source: 'monster-init', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x23170: MonSounds Init
     if (event.soundEvent === 0x102) { unitSounds.playRow(event.nativeSelectedRow, { source: 'skill-dosound', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0xA2C90: wDoSound
+    if (event.soundEvent === 0x104) { unitSounds.playRow(event.nativeSelectedRow, { source: 'neutral-footstep', kind: 'footstep', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x23C00 in neutral on the client unit's frame
     if (event.soundEvent === 0x103) { unitSounds.playRow(event.nativeSelectedRow, { source: 'shrine-state', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x24A70: shrine state sound
     if (event.soundEvent === 0x101) { unitSounds.playRow(event.nativeSelectedRow, { source: 'state-onsound', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x73760: States.txt onsound on a new state set
     const spatial = unitSoundNativeSpatial(event, snapshot, listener);
@@ -3237,6 +3354,8 @@ function update(forceTick = false, live = false) {
   if (screen !== SCREEN.GAME) return;
   if (gameMenu?.open) { gameMenu.step(); controlsPanel?.step(); input.drain(); return; }   // single player pauses under the menu
   if (window.Module?.ccall && !Module.ccall.marksWorld) markWorldWrites();
+  bindClientRules(Module);
+  if (window.Module?.ccall) installTextWidthBackend();
   if (window.Module?.ccall && !hoverPickEngine) setHoverPickBackend(hoverPickEngine = createHoverPickBackend(Module));
   rejoinReplacedGame();
   const commands = input.drain();
@@ -3689,15 +3808,18 @@ function hoverTarget() {
       x: npc.x, y: npc.y, preciseX: npc.preciseX, preciseY: npc.preciseY };
   }
   if (selected?.kind === 'object') {
-    const object = selected.target;
-    const label = objectPortalLabel(objectNameFor(object, objectRetailName(Module, object.classId), Module.ccall('d2_lang_string_by_index', 'string', ['number'], [STR_LOCKED_CHEST])), object.portalLevel ? engineLevelName(object.portalLevel) : '');
-    if (label) return { kind: 'object', id: object.id, classId: object.classId, token: object.token,
-      label, locked: object.locked, x: object.x, y: object.y };
+    const label = objectHoverTarget(selected.target);
+    if (label) return label;
   }
   // A level entrance is a UNIT_TILE warp, not an object unit: its label is the destination level's
   // name resolved from the engine's own Levels.txt row (the same name the waypoint menu shows).
   const warp = warpUnderPointer(pointer.x, pointer.y);
   return warp ? areaEntranceLabel(warp, engineLevelName(warp.destinationLevel)) : null;
+}
+// The name plate of a hovered object (Objects.txt name, the locked-chest name while locked, the portal's destination).
+function objectHoverTarget(object) {
+  const label = objectPortalLabel(objectNameFor(object, objectRetailName(Module, object.classId), Module.ccall('d2_lang_string_by_index', 'string', ['number'], [STR_LOCKED_CHEST])), object.portalLevel ? engineLevelName(object.portalLevel) : '');
+  return label ? { kind: 'object', id: object.id, classId: object.classId, token: object.token, label, locked: object.locked, x: object.x, y: object.y } : null;
 }
 
 // V4/F6b: WHICH cel retail draws is decided by what is under the pointer, and the shell already
@@ -4014,6 +4136,8 @@ function realmNpc() {
       return resurrectLabel(str(S_RESURRECT_FORMAT), o.nameId === 0x421 ? str(0x2b0d) : str(o.nameId), o.cost);
     },
     questBit: (word) => realmQuestWords !== null && (realmQuestWords[word] & 1) === 1, expansion: () => realmFlow?.expansion === true,
+    // Introduction and Gossip speak the line the proven client speech selection picks for this NPC class and hero class.
+    speechId: (action, classId) => Module.ccall(action === 'intro' ? 'd2_client_npc_intro_id' : 'd2_client_npc_gossip_id', 'number', ['number', 'number'], [classId, realmPlayerView?.classId ?? 0]),
     // The displayed price of a stocked item: the engine's price for the selected hero at this vendor (gamble rows use the gamble price).
     transactionCost: (item, kind) => {
       if (kind !== 'buy') return null;
@@ -4030,7 +4154,9 @@ function realmNpc() {
     },
   }));
 }
-function realmWorldData() { return (realmWorldState ??= createRealmWorld({ ...realmTables(), heldItems: (guid) => realmFlow?.protocol?.d2gsClientItems?.(guid) ?? null })); }
+function realmWorldData() { return (realmWorldState ??= createRealmWorld({ ...realmTables(), heldItems: (guid) => realmFlow?.protocol?.d2gsClientItems?.(guid) ?? null, heroStat: (stat) => realmFlow?.protocol?.d2gsClientHeroStat?.(stat) ?? 0,
+  groundItems: () => realmFlow?.protocol?.d2gsClientGroundItems?.() ?? null,
+  useItemState: () => { const s = realmFlow?.protocol?.d2gsClientGameSession?.(); return s?.useItemGuid ? { id: s.useItemGuid, kind: s.useItemKind } : null; } })); }
 // Input in a joined game: what the pointer and keys mean is read from the client state the server's packets built, and
 // each action leaves as the retail D2GS packet (assets/realm-input.mjs).
 // The online town NPC on screen: the shell's own menu, vendor and speech renderers, fed from the state machine.
@@ -4066,7 +4192,7 @@ function realmCarriedClick(guid, view, act) {
     // D2Client 0x47500 state 3: the click opens the Repair box over the NPC and sends the 0x35 only on Yes.
     const send = () => realmNpc().repair(guid, r.mode, r.durability);
     const cost = p.d2gsClientItemPrice?.(guid, view.classId, 3) ?? 0;
-    const name = realmItemTextFor().describe(realmWorldState?.rawItem(guid))?.name ?? '';
+    const name = realmClientItemText(guid, 0)?.name ?? '';
     return realmNpcScreen()?.askRepair(guid, name, cost < 0 ? 0 : cost, send) ?? send();
   }
   const sent = realmNpc().sell(guid, 0 /* SELL_MODE.STORED */, p?.d2gsClientSellValue?.(guid, view.classId) ?? 0);
@@ -4076,8 +4202,7 @@ function realmCarriedClick(guid, view, act) {
 function realmNpcFeet(guid) {
   const m = realmSceneEvidence?.monsters?.find((u) => u.guid === guid);
   if (!m || m.anchorX == null) return null;
-  const p = worldToScreen(m.anchorX, m.anchorY), c = worldToScreen(cameraCentre().x, cameraCentre().y);
-  return { x: p.x - c.x + viewCX(), y: p.y - c.y + (canvas.height / 2 + UNIT_CENTRE_Y) };
+  return { x: m.anchorX, y: m.anchorY };   // the unit pass's own canvas feet (already camera-relative)
 }
 // The hero's death in a joined game (assets/realm-death.mjs): what closes when it falls, and what Esc then does.
 const realmDeadNames = new Set();
@@ -4263,7 +4388,7 @@ const realmClientView = {
   questWords: () => realmReads?.questWords ?? new Uint16Array(48),
   waypointTable: () => realmReads?.waypointTable ?? { rows: () => [], tabs: [] },
   skillMana: (id, level) => realmTables().skills.manaCost(id, level),
-  hoverTarget: (hit = realmInput().pick(pointer.x, pointer.y)) => hit?.kind === 'item' ? groundItemHover(hit.unit) : realmUnits.hoverTarget(hit, realmMonsterViews, (classId) => { const stringIndex = Module.ccall('d2_monster_name_str', 'number', ['number'], [classId]); return { stringIndex, label: stringIndex >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [stringIndex]) : '' }; }),
+  hoverTarget: (hit = realmInput().pick(pointer.x, pointer.y)) => hit?.kind === 'item' ? groundItemHover(hit.unit) : hit?.kind === 'object' ? objectHoverTarget(hit.unit) : hit?.kind === 'warp' ? areaEntranceLabel(hit.unit, engineLevelName(hit.unit.destinationLevel)) : realmUnits.hoverTarget(hit, realmMonsterViews, (classId) => { const stringIndex = Module.ccall('d2_monster_name_str', 'number', ['number'], [classId]); return { stringIndex, label: stringIndex >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [stringIndex]) : '' }; }),
   // a joined game's shop holds its own Repair and Sell modes; the mode's buysell cel wins over the unit under the pointer
   pointerContext: () => { const shop = realmShopView(); return shop?.repairMode ? { kind: 'repair' } : shop?.sellMode ? { kind: 'sell' } : realmUnits.cursorContext(realmInput().pick(pointer.x, pointer.y)); },
   pointerItem: () => realmWorldState?.cursorId ?? 0,
@@ -4318,10 +4443,25 @@ function realmItemTextFor() {
 function realmItemTip(item) {
   const entry = realmTables().items.byClass(item.classId);
   const plain = { name: entry?.name ?? '', quality: item.quality, flags: item.itemFlags, props: [], propColours: [] };
+  const text = realmClientItemText(item.id, item.code);
+  if (text) return { ...text, flags: item.itemFlags };
   const raw = realmWorldState?.rawItem(item.id);
-  if (!raw) return plain;
-  const text = realmItemTextFor().describe(raw);
-  return text ? { ...text, flags: item.itemFlags } : plain;
+  const fallback = raw ? realmItemTextFor().describe(raw) : null;
+  return fallback ? { ...fallback, flags: item.itemFlags } : plain;
+}
+// The hover text of an item the joined game's client holds, worded by the engine from the client's own item unit
+// (the same wording the single-player tooltip uses); null when the client has no unit for it.
+function realmClientItemText(guid, code) {
+  if (!Module._d2_realm_client_item_lines) return null;
+  const buf = (realmClientItemText.buf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [1024])));
+  const read = (name, cap) => (Module.ccall(name, 'number', ['number', 'bigint', 'number'], [guid, BigInt(buf), cap]) ? Module.UTF8ToString(buf) : '');
+  const rawTitle = read('d2_realm_client_item_title', 256);
+  const lines = read('d2_realm_client_item_lines', 1024);
+  if (!rawTitle && !lines) return null;
+  const [title, baseName] = rawTitle.split('\n');
+  const codeText = typeof code === 'number' ? String.fromCharCode(code & 255, (code >>> 8) & 255, (code >>> 16) & 255, (code >>> 24) & 255).replace(/\0/g, '').trim() : code;
+  const { lines: props, colours } = parseItemLines(lines.split('\n').filter(Boolean));
+  return { name: title || Module.ccall('d2_lang_string', 'string', ['string'], [codeText]) || codeText, baseName, props, propColours: colours };
 }
 // A joined game's stash and cube buttons (0x4F): the engine's command in a local game, the packet in a joined one.
 function commandButton(button, amount) {
@@ -4434,6 +4574,7 @@ function render(now = false) {
       heroFx: RENDER_WIRE.ownsWorld ? heroFx.map((f) => ({ kind: f.kind, file: f.file, classId: f.classId, age: f.age, trans: f.trans, predraw: !!f.predraw, wx: f.wx, wy: f.wy,
         cel: f.kind === 'missile' ? missileCelFile(f.classId) : undefined })) : undefined,
       weather: RENDER_WIRE.ownsWorld ? wireWeather : undefined,
+      floorVisible: RENDER_WIRE.ownsWorld && Module._d2_client_floor_submit_visible && frameSnap?.tiles?.length ? floorSubmitFlags(frameSnap.tiles, { ...snapshot?.player, ...cameraCentre() }, canvas.width, canvas.height, viewCX(), Module._d2_client_floor_submit_visible) : undefined,
       localPlayer: (() => { const s = selectedPlayerSource(); return s.source !== 'none' && s.renderState ? { renderState: s.renderState, x: s.x, y: s.y } : null; })(),
       hud: hudState({ w: canvas.width, h: canvas.height, snapshot, advancement: snapOr('advancement', readAdvancement), screen: snapOr('characterScreen', readCharacterScreen),
         left: Boolean(characterVisible || questVisible || hirelingVisible || stashOpen || waypointMenu || shopOpen()), right: Boolean(skillsVisible || inventoryVisible),
@@ -4647,7 +4788,7 @@ function buildChromeSounds(fresh, read) {
   if (fresh || !uiClickSounds) { try { uiClickSounds = audioVolume.attach('sound', createUiClickSoundPlayer(assetReader, canvas)); } catch (error) { musicError = String(error); } }
   if (fresh || !(unitSounds && combatSounds && eventSounds && missileSounds && ambient)) {
     realmEventFeed = null;
-    try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), combatSoundEngine(Module), (row, event) => unitSounds.noteSubmit(row, event)); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a)), (c) => Number(Module._d2_client_monster_footstep_layer(c)), Module._d2_session_monster_idle_take ? (id) => Number(Module._d2_session_monster_idle_take(id)) >>> 0 : null, Module._d2_session_floor_class ? (type, id, fallback) => Number(Module._d2_session_floor_class(type, id, fallback)) : null, Module._d2_client_footstep_due, combatSoundEngine(Module)?.modeSounds); missileSounds = createMissileSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error)), (id) => !Module._d2_session_missile_on_client || Module._d2_session_missile_on_client(id) !== 0, (id) => (Module._d2_session_client_unit_roll ? Number(Module._d2_session_client_unit_roll(id)) >>> 0 : 0), (id) => { const f = Module._d2_session_missile_bolt_seed, lo = f ? Number(f(id, 0)) >>> 0 : 0, hi = f ? Number(f(id, 1)) >>> 0 : 0; return lo || hi ? [lo, hi] : null; }); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; canvas.__d2MissileSound = missileSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, undefined, soundFetched)); } catch (error) { musicError = String(error); }
+    try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), combatSoundEngine(Module), (row, event) => unitSounds.noteSubmit(row, event)); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a)), (c) => Number(Module._d2_client_monster_footstep_layer(c)), Module._d2_session_monster_idle_take ? (id) => Number(Module._d2_session_monster_idle_take(id)) >>> 0 : null, Module._d2_session_floor_class ? (type, id, fallback) => Number(Module._d2_session_floor_class(type, id, fallback)) : null, Module._d2_client_footstep_due, combatSoundEngine(Module)?.modeSounds); missileSounds = createMissileSounds(wasmMissileRules(Module),(row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error)), (id) => !Module._d2_session_missile_on_client || Module._d2_session_missile_on_client(id) !== 0, (id) => (Module._d2_session_client_unit_roll ? Number(Module._d2_session_client_unit_roll(id)) >>> 0 : 0), (id) => { const f = Module._d2_session_missile_bolt_seed, lo = f ? Number(f(id, 0)) >>> 0 : 0, hi = f ? Number(f(id, 1)) >>> 0 : 0; return lo || hi ? [lo, hi] : null; }); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; canvas.__d2MissileSound = missileSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, undefined, soundFetched)); } catch (error) { musicError = String(error); }
   }
 }
 // The stash, cube and stash gold panels: built when a local game starts, and by a joined game that had none before it.
@@ -5008,13 +5149,14 @@ function drawFrame() {
         // Floors are lit from the engine's light map, as D2Client lights them.
         const lightmap = snapOr('lightmap', () => readSessionLightmap(Module));
         terrain.setLightGrid(lightmap ? (a, b) => lightmap.grid(a, b) : null, lightmap?.at, lightmap?.ambient, lightmap);
+        terrain.setFloorGate(Module._d2_client_floor_submit_visible ? (l, t, r, b, x, y) => Module._d2_client_floor_submit_visible(l, t, r, b, x, y) : null);
         // Retail's weather (F11b): the level's own Levels.txt `Rain` byte decides, and the rain draws
         // between the floors and the walls, where retail's own frame puts it (session-terrain.mjs).
         const rain = snapOr('rain', () => weatherRenderer ? view.levelRain() : -1);
         weatherRenderer?.setLevel(rain);
         weatherRenderer?.advance(engineTicks);
         weatherEvidence = { rain, blits: [] };
-        wireWeather = ownsWorld ? { rain, ticks: engineTicks, nearFeed: snapOr('activeNearFeed', () => readSessionActiveNearFeed(Module)), wcam: { x: 0, y: 0 }, cam: { x: 0, y: 0 } } : undefined;
+        wireWeather = ownsWorld ? { rain, ticks: engineTicks, drops: rain > 0 ? readEngineRainDrops(Module, w, h) : null, nearFeed: snapOr('activeNearFeed', () => readSessionActiveNearFeed(Module)), wcam: { x: 0, y: 0 }, cam: { x: 0, y: 0 } } : undefined;
         // Retail's camera is the player's PRECISE position, a subtile's centre (x + 0.5, y + 0.5): the
         // static world (floors, walls, objects, ground items) sits on the integer grid under it, while
         // units stand at their centres too.
@@ -5046,7 +5188,7 @@ function drawFrame() {
   // Retail's falling rain drops are line primitives drawn after the whole world, before the HUD (F11b).
   if (weatherRenderer && terrain && weatherEvidence.rain > 0 && !ownsWorld) {
     const pWeather = perfT0();
-    try { const cam = worldToScreen(cameraGrid().x, cameraGrid().y); weatherEvidence.lines = weatherRenderer.drawStreaks(ctx, w, h, realmWorld ? realmAnimationFrame : engineTicks, cam.x, cam.y); weatherEvidence.cycle = { ...weatherRenderer.cycle.state, intensity: weatherRenderer.cycle.intensity }; }
+    try { const cam = worldToScreen(cameraGrid().x, cameraGrid().y); weatherEvidence.lines = weatherRenderer.drawStreaks(ctx, w, h, realmWorld ? realmAnimationFrame : engineTicks, cam.x, cam.y, realmWorld ? null : readEngineRainDrops(Module, w, h)); weatherEvidence.cycle = { ...weatherRenderer.cycle.state, intensity: weatherRenderer.cycle.intensity }; }
     catch (error) { weatherEvidence.streakError = String(error); }
     perfT('weather', pWeather);
   }
@@ -5145,7 +5287,7 @@ function drawFrame() {
     const screenForNpc = realmNpcScreen();
     if (screenForNpc) { screenForNpc.checkScene(realmSceneEvidence?.monsters ?? []); screenForNpc.draw(ctx, w, h, { act: snapshot.act, pointer });
       if (realmNpc().shopOpen() && !realmShopShown) { inventoryVisible = true; realmShopShown = true; } }
-  } else realmShopShown = false;
+  } else { realmShopShown = false; if (realmNpcScreenState && npcMenu?.open) npcMenu.close(); }   // the conversation ended: its menu goes with it
   { const nv = realmNpc().isOpen() ? realmNpc().view() : null;   // the open NPC's greeting voice, from the packet view
     syncNpcDialogueVoice(nv?.speech ? { spoken: nv.speech.stringId, npcId: nv.guid } : null); }
   let pendingSpeech = null;
@@ -5223,8 +5365,9 @@ function drawFrame() {
   }
   questEvidence = null;
   if (questLogRenderer && panelShown(questVisible) && view.live && !clearScreen) {
+    setQuestLogStates(realmSceneActive ? realmReads?.questStates ?? null : localQuestStates);   // the quest-log state packet's bytes, the engine rule's init state
     const words = snapOr('questWords', readQuestWords), act = questAct || (questAct = snapshot.act || 1, questSelected = questFirst(words, questAct), questAct);
-    questEvidence = questLogRenderer.draw(ctx, w, h, { act, tabs: questTabs(words, snapshot.act || 1), words, selected: questSelected, descrOn: questDescrOn,
+    questEvidence = questLogRenderer.draw(ctx, w, h, { act, tabs: questTabs(words, snapshot.act || 1, act), words, selected: questSelected, descrOn: questDescrOn,
       pressed: questCloseGesture.pressed ? 'close' : null, pressedQuest: typeof questPick.pressed === 'number' ? questPick.pressed : 0,
       anim: { quests: questAnim, tick: engineTicks - questOpenedAt },
       string: langStr }, true, snapshot.act || 1);
@@ -5279,6 +5422,7 @@ function drawFrame() {
     // Only the actual vendor panel participates in the retail side-panel layout.
     const left = characterVisible || questVisible || hirelingVisible || stashOpen || waypointMenu || shopOpen();
     const right = skillsVisible || inventoryVisible;
+    miniSideMode = left && !right ? 3 : right && !left ? 1 : 2;   // the side word D2Client+0x644F0 takes in EAX
     const shift = HUD_LAYOUT.miniPanelShift;
     controlPanelEvidence = ownsWorld ? (RENDER_WIRE.evidence?.controlPanel ?? controlPanelEvidence) : controlPanelRenderer.draw(ctx, w, h, snapshot, snapOr('advancement', readAdvancement),
       { iconRow: hudIconRow && !(left && right), offsetX: left && !right ? shift.left : right && !left ? shift.right : 0,
@@ -5300,7 +5444,7 @@ function drawFrame() {
     const bindings = controlsPanel?.bindings ?? bootControlBindings, slotOf = (n) => CONFIGURE_CONTROLS_SLOTS.findIndex((e) => e && e[0] === n);
     for (let i = 0; i < 7; i++) {
       const left = controlPanelRenderer.miniButtonScreenLeft(controlPanelEvidence, i, w);
-      const tip = left === null ? null : miniPanelTooltip(i, left, w, h, pointer.x, pointer.y, { lang: hudLang, bindings, slotOf });
+      const tip = left === null ? null : miniPanelTooltip(i, left, w, h, pointer.x, pointer.y, { lang: hudLang, bindings, slotOf, engine: Module._d2_client_mini_tip ? miniTipEngine : null });
       if (tip) return tip;
     }
     return null;
@@ -5312,8 +5456,9 @@ function drawFrame() {
     const lvIndex = controlPanelRenderer.hitLevelButton(controlPanelEvidence, pointer.x, pointer.y, w, h);
     const tip = (adv && scr && hudBarTooltip(w, h, pointer.x, pointer.y, { experience: adv.experience, nextExperience: adv.nextExperience,
       stamina: scr[4], staminaMax: scr[5], fmtExp: hudLang(4163),
-      fmtStamina: hudLang(4164) })) ||
-      levelButtonTooltip(lvIndex, w, h, [3986, 3987].map(hudLang)) || miniHoverTip(w, h) || (realmSceneActive ? realmTrade().tip(pointer.x, pointer.y, w, h) : null);
+      fmtStamina: hudLang(4164), engine: hudBarEngine, formatEngine: Module._d2_client_format_string ? hudFormatEngine : null })) ||
+      levelButtonTooltip(lvIndex, w, h, [3986, 3987].map(hudLang), { engine: Module._d2_client_level_btn_tip ? levelBtnEngine : null, mx: pointer.x, my: pointer.y,
+        lit: (controlPanelEvidence?.hud?.levelButtons || []).map((b) => b.frame === HUD_LAYOUT.levelButtons.litFrame || b.frame === HUD_LAYOUT.levelButtons.pressedFrame) }) || miniHoverTip(w, h) || beltToggleTip(w, h, pointer.x, pointer.y, beltPopup.open) || (realmSceneActive ? realmTrade().tip(pointer.x, pointer.y, w, h) : null);
     if (tip) {
       const bw = hoverFont.measure(tip.text) + 8, left = Math.min(Math.max(tip.left ? tip.x : tip.x - (bw >> 1), 0), w - bw), bottom = tip.y + 2;   // a trade tip gives the plate's left edge
       ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(left, bottom - 16, bw, 16); ctx.restore();
@@ -5639,14 +5784,7 @@ function frame(now) {
 // The talkable NPC under a canvas point, if any. Uses the same projection the world is drawn with.
 // Retail's 0x77 UpdateUi codes the engine has sent since the last read (16 opens the stash).
 function pollUiEvents() {
-  if (!session) {   // a joined game: the server's own 0x77 codes (assets/realm-world.mjs)
-    for (const code of realmWorldState?.takeUiEvents() ?? []) {
-      if (code === 16) { stashOpen = true; inventoryVisible = true; }
-      else if (code === 21) { cubeOpen = true; inventoryVisible = true; }
-      else if (code === 17) { stashOpen = false; inventoryVisible = false; closeStashGold(); }
-    }
-    return;
-  }
+  if (!session) return;   // a joined game: the server's 0x77 codes arrive as session events (realmSessionPresenter)
   const p = Module._malloc(64);
   try {
     const n = Module.ccall('d2_session_take_ui_events', 'number', ['bigint', 'number'], [BigInt(p), 64]);
@@ -6299,7 +6437,7 @@ canvas.addEventListener('pointermove', (e) => {
   if (bnetInput.move(e)) return;
   const [x, y] = canvasPoint(e);
   pointer.x = x; pointer.y = y;
-  if (clientView().live && !clearScreen) { const o = hudOrigin(canvas.width, canvas.height, 'bottom'), all = clientView().fromPackets && !session ? realmReads?.beltBoxes ?? null : readBeltBoxes(); beltPopup.mouseMove(x - o.x, y - o.y, 800, 600, all, popupRows(clientView().fromPackets && !session ? realmReads?.beltIndex : readBeltIndex(), all?.length)); }
+  if (clientView().live && !clearScreen) { const o = hudOrigin(canvas.width, canvas.height, 'bottom'), all = clientView().fromPackets && !session ? realmReads?.beltBoxes ?? null : readBeltBoxes(); beltPopup.mouseMove(x - o.x, y - o.y, 800, 600, all); }
   if (controlsPanel?.open) controlsPanel.pointerMove(x, y, canvas.width, canvas.height, e.pointerId, e.buttons);
   if (worldPointerHeld && (e.buttons & 1) && heldPointerCanRetargetWorld(x, y)) {
     input.pointer(x, y, 0, true);

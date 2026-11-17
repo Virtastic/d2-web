@@ -8,6 +8,8 @@ test('area comes from the active room, then the last reveal', () => {
   assert.equal(realmAreaLevel(null, null), -1);
 });
 
+// The rule lives in the engine (d2_client_level_music_due, level_music_due.h); this stand-in only lets the node test run the caller.
+globalThis.Module ??= { _d2_client_level_music_due: (l, a, c, t) => (l !== a && (a < 0 || t - c > 0x4a) ? 1 : 0) };
 test('new song waits 0x4a ticks across an area change, first song is immediate', () => {
   const music = { activeLevel: -1 }, played = [], amb = [];
   const a = createRealmAreaAudio({ music, playMusic: (l) => played.push(l), ambience: { change: (l) => amb.push(['c', l]), sync: (l, c) => amb.push(['s', l, c]) }, cycle: () => 0 });

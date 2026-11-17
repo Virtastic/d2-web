@@ -31,7 +31,7 @@ export const chatEnd = (guid) => packets.npcChatEnd(UNIT.MONSTER, guid);
  */
 export function createRealmNpc({ send, classOf = () => -1, questDone = () => false, questName = () => '',
   resurrectLabel = () => null, transactionCost = () => null, hireStats = () => null, playerGuid = () => 0xffffffff,
-  questBit = () => false, expansion = () => true } = {}) {
+  questBit = () => false, expansion = () => true, speechId = () => -1 } = {}) {
   let npc = null;            // { guid, classId, messages, entries, speech, spoken, mode, offers }
   let stock = new Map();     // item guid -> { guid, bits, tab, x, y }
   let result = null;         // the last transaction outcome
@@ -146,6 +146,7 @@ export function createRealmNpc({ send, classOf = () => -1, questDone = () => fal
     dismissSpeech() {
       if (!npc || npc.mode !== 'speech') return false;
       const line = npc.speech[npc.spoken];
+      if (line?.local) { npc.afterTopic = false; npc.speech = []; npc.spoken = 0; npc.mode = 'talk'; return true; }
       if (npc.afterTopic) {
         // D2Client speech-end 0x46E60 after a Talk topic: speak the first list message other than the one just spoken
         // (nothing is marked heard, no 0x31 leaves), else the Talk box returns.
@@ -168,7 +169,11 @@ export function createRealmNpc({ send, classOf = () => -1, questDone = () => fal
         case 'talk': npc.entries = talkEntries(npc.messages, questName); npc.mode = 'talk'; return true;
         case 'topic':   // the topic is spoken (0x473B0); the capture shows no 0x31 and the topic stays listed
           npc.speech = [{ stringId: entry.stringId }]; npc.spoken = 0; npc.afterTopic = true; npc.mode = 'speech'; return true;
-        case 'intro': case 'gossip': return true;   // the line is played by the shell; nothing goes to the server
+        case 'intro': case 'gossip': {   // the line 1.13c's NPC speech selection picks (speechId); nothing goes to the server
+          const id = speechId(entry.action, npc.classId);
+          if (id >= 0) { npc.speech = [{ stringId: id, local: true }]; npc.spoken = 0; npc.afterTopic = true; npc.mode = 'speech'; }
+          return true;
+        }
         case 'trade': npc.mode = 'trade'; send(npcPackets.request(NPC_ACTION.TRADE, npc.guid, 0)); return true;
         case 'gamble': npc.mode = 'gamble'; send(npcPackets.request(NPC_ACTION.GAMBLE, npc.guid, 0)); return true;
         // The hire window lists the offers received at menu build (0x38 sent then): choosing Hire sends nothing.

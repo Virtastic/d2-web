@@ -24,6 +24,7 @@ void tick(Seed& seed, const Env& env);  // one 0x81340 pass (first call also run
 int32_t liveCount();                    // *(DAT_6FBCBF68 + 0x114)
 float intensity();                      // DAT_6FBC38F4
 int32_t target();                       // DAT_6FBC3934
+uint32_t lines(int32_t W, int32_t H, int32_t mode, int32_t* out, uint32_t cap);   // the same drops as {x0,y0,x1,y1,colour,alpha} sextets; returns the count
 uint32_t drawG(std::string& out, int32_t W, int32_t H, int32_t mode);   // 0x805A0/0x7FE80: the rain draw as G lines; returns the ecx 0x805A0 leaves
 
 } // namespace d2client::weather

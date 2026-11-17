@@ -119,8 +119,30 @@ function silhouette(bitmap) {
 // taken as height - 40 (560 on 600). The top: a floor is drawn while its 80 rows reach y >= 0.
 export const FLOOR_CULL_BOTTOM = 40;
 
+/** The terrain pass's camera offset: where the tile grid's origin lands for this player and view. */
+export function terrainOffset(player, width, height, centreX = width / 2) {
+  const origin = worldToScreen(player.x, player.y);
+  return { x: centreX - origin.x, y: height / 2 + UNIT_CENTRE_Y - origin.y };
+}
+
+/**
+ * The engine's per-tile floor submission decision, made where the engine is (the main thread) for a worker that
+ * has none: 1 submitted, 0 culled, 2 not decided here (a roof's anchor needs its DT1 height, the worker's).
+ */
+export function floorSubmitFlags(tiles, player, width, height, centreX, gate) {
+  const o = terrainOffset(player, width, height, centreX), out = new Uint8Array(tiles.length);
+  for (let i = 0; i < tiles.length; i++) {
+    const t = tiles[i];
+    out[i] = t.orientation !== 0 ? 2 : floorSubmissionVisible(Math.round(t.screenX + o.x), t.screenY + o.y + FLOOR_DY, width, height, gate) ? 1 : 0;
+  }
+  return out;
+}
+
 /** Floor submission bounds recovered from D2Client's surface-rectangle gate. */
-export function floorSubmissionVisible(submittedX, anchorY, width, height) {
+export function floorSubmissionVisible(submittedX, anchorY, width, height, gate = null) {
+  // The engine's half-open rectangle test decides when wired (x in [-80, width + 80), anchor y in
+  // [-80, height - FLOOR_CULL_BOTTOM)); the expression below is the fallback without an engine.
+  if (gate) return gate(-80, -80, width + 80, height - FLOOR_CULL_BOTTOM, submittedX, anchorY) !== 0;
   return submittedX >= -80 && submittedX < width + 80
     && anchorY < height - FLOOR_CULL_BOTTOM && anchorY + 80 >= 0;
 }
@@ -307,9 +329,11 @@ export function readLevelTileFiles(Module, cap = 4096, exportName = 'd2_session_
  * the variable, the occlusion is. Setting it is a quality OPTION we do not model, so the measured arm
  * is the default and a caller that needs the other one passes it.
  */
-export function readSessionLightmap(Module, ambientOverride = -1, occludeUnits = 1, exportName = 'd2_session_lightmap') {
+// The engine takes the client's light tier (0..2): units are occluded above 1, and tier 0 also shortens
+// other units' radii. occludeUnits picks tier 2 or 1; a caller that knows the tier passes it as `tier`.
+export function readSessionLightmap(Module, ambientOverride = -1, occludeUnits = 1, exportName = 'd2_session_lightmap', tier) {
   if (!Module['_' + exportName]) return null;
-  const p = Number(Module.ccall(exportName, 'number', ['number', 'number'], [ambientOverride, occludeUnits]));
+  const p = Number(Module.ccall(exportName, 'number', ['number', 'number'], [ambientOverride, tier ?? (occludeUnits ? 2 : 1)]));
   if (!p) return null;
   const v = new DataView(Module.HEAPU8.buffer, p, 16 + 48 * 48 * 2);
   const ox = v.getInt32(0, true), oy = v.getInt32(4, true);
@@ -467,6 +491,7 @@ function recordTile(entry, files) {
  * missing wall set should cost you those tiles, not the whole map.
  */
 export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palettePath, documentObject = globalThis.document }) {
+  let floorGate = null, floorFlags = null;
   // Keyed by FILE, not slot: the engine's library list is rebuilt with the world and grows as the
   // activation wave brings in a neighbouring level's rooms, so a slot number names different files
   // over a level's life (walking the Fortress into the Outer Steppes drew Mesa walls from Fortress
@@ -902,6 +927,10 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
      * byte-for-byte against the previous frame's and a generation counter is bumped only when a cell or the
      * map origin actually moved, which is what lets the floor pass skip rebuilding each tile's grid (below).
      */
+    /** The engine's floor submission rectangle test (left, top, right, bottom, x, y) -> 0/1; null = the JS fallback. */
+    setFloorGate(fn) { floorGate = fn; },
+    /** The per-tile decisions floorSubmitFlags made on the engine's side (a worker's frame carries them); null = decide here. */
+    setFloorFlags(flags) { floorFlags = flags ?? null; },
     setLightGrid(fn, cell = null, ambient = null, source = null) {
       lightGrid = fn; lightCell = fn ? cell : null; lightAmbient = fn ? ambient : null;
       if (!fn || !source || !source.cells) { lightGridKeyed = false; lightGridSource = null; return; }
@@ -933,9 +962,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
      * behind it (client-parity F11b).
      */
     draw(ctx, tiles, files, player, width, height, sprites = [], afterFloors = null, centreX = width / 2) {
-      const origin = worldToScreen(player.x, player.y);
-      const offsetX = centreX - origin.x;
-      const offsetY = height / 2 + UNIT_CENTRE_Y - origin.y;
+      const { x: offsetX, y: offsetY } = terrainOffset(player, width, height, centreX);
       // Count resolution before viewport culling: an off-screen wrong lookup is still wrong art,
       // and must not disappear from level-2 requested-versus-drawn identity evidence.
       let drawn = 0, missing = 0, empty = 0, requested = 0, resolved = 0, wrongIdentity = 0, noEntry = 0;
@@ -1037,7 +1064,8 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         // art hangs far above the submitted anchor.
         if (tile.orientation === 0 || tile.orientation === 15) {
           const submittedX = Math.round(x), ay = y + FLOOR_DY + kindDy;
-          const culled = !floorSubmissionVisible(submittedX, ay, width, height);
+          const f = floorFlags && tile.orientation === 0 ? floorFlags[ti] : 2;
+          const culled = f !== 2 ? f === 0 : !floorSubmissionVisible(submittedX, ay, width, height, floorGate);
           if (culled) continue;
         } else if (drawX + px.width <= 0 || drawX >= width || drawY + px.height <= 0 || drawY >= height) continue;
         // Carry the identity asked for AND the identity drawn, so a scenario can prove they match.

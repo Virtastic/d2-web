@@ -1,14 +1,14 @@
 // 1.13c D2Client+0x27BD0: life orb fill. Every callee goes through the injected dispatcher.
 #include "d2client_callee.h"
+#include "hud_bar_rules.h"
 // 1.13c D2Client+0x27BD0
 extern "C" void d2c_27bd0(const D2cSvc& v, uint32_t unit /*0x11BBFC*/, int32_t w /*0xDBC48 (unused)*/, int32_t h /*0xDBC4C*/, uint32_t cellA /*0x11A7CC*/, uint32_t cellB /*0x11A7E4*/) {
     (void)w;
     const int32_t cur = (int32_t)d2c_call(v, 0x26b20, 6, 0, 0, 0, 0);
     const int32_t mx = (int32_t)d2c_call(v, 0xc196, 0, 0, 0, 0, 0, unit);
     if (mx == 0) return;
-    int32_t fill = (int32_t)((uint32_t)cur * 80u) / mx;
     const uint32_t* u = (const uint32_t*)(uintptr_t)unit;
-    if (fill > 0 && fill <= 2 && unit && u[0] == 0 && u[4] != 0x11) fill = 2;   // unit+0x10
+    const int32_t fill = d2cl_hud::orbFill(cur, mx, false, unit && u[0] == 0 && u[4] != 0x11);   // unit+0x10; hud_bar_rules.h
     uint32_t blk[18] = {};
     blk[13] = cellA; blk[0] = 0;
     const uint32_t bp = (uint32_t)(uintptr_t)blk;

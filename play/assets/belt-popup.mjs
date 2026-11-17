@@ -14,25 +14,24 @@ export const popupRows = (record, boxCount = 16) => (popupGate(record) ? Math.ma
 // Background cel i (0 = nearest the HUD row): bottom-left at (w/2+21, h-i*32-41), 800x600 HUD coordinates -> (421, 559-32i).
 export const popupBgPosition = (i, w = 800, h = 600) => ({ x: (w >> 1) + 21, y: h - i * 32 - 41 });
 
-export function createBeltPopup() {
+// `hit(expanded, w, h, x, y, count, x0, y0, x1, y1)` is the engine's belt mouse test (d2_client_belt_hit, retail's own).
+export function createBeltPopup(hit = () => 0) {
   const s = { expanded: false, hover: false, key: false, blocked: false };
-  const inClosed = (x, y, w, h) => y > h - 0x30 && x >= (w >> 1) + 0x17 && x <= (w >> 1) + 0x91 && y >= h - 0x27 && y <= h - 10;
-  // boxes: the worn belt's full Belts.txt list, rows: popupRows(...). The open hit box is the top extra row's first box to the bottom row's last.
-  const inOpen = (x, y, boxes, rows) => {
+  const inClosed = (x, y, w, h) => hit(0, w, h, x, y, 0, 0, 0, 0, 0) === 1;
+  // boxes: the worn belt's full Belts.txt list. The open hit box runs from the top row's first box to the bottom row's fourth.
+  const inOpen = (x, y, boxes, w, h) => {
     if (!boxes?.length) return false;
-    const used = boxes.slice(0, 4 * (rows + 1));
-    const left = Math.min(...used.map((b) => b.left)), right = Math.max(...used.map((b) => b.right));
-    const top = Math.min(...used.map((b) => b.top)), bottom = Math.max(...used.map((b) => b.bottom));
-    return x >= left && x <= right && y >= top && y <= bottom;
+    const top = boxes[boxes.length - 4] ?? boxes[0], last = boxes[3] ?? boxes[boxes.length - 1];
+    return hit(1, w, h, x, y, boxes.length, top.left, top.top, last.right, last.bottom) === 1;
   };
   return {
     get open() { return s.expanded; },
     get state() { return { ...s }; },
     block(on) { s.blocked = Boolean(on); if (on) s.expanded = false; },
     toggleKey() { s.key = !s.key; s.expanded = s.key && !s.blocked; return s.expanded; },
-    mouseMove(x, y, w, h, boxes, rows) {
+    mouseMove(x, y, w, h, boxes) {
       if (s.expanded) {
-        if (!inOpen(x, y, boxes, rows)) { if (!s.key) s.expanded = false; s.hover = false; }
+        if (!inOpen(x, y, boxes, w, h)) { if (!s.key) s.expanded = false; s.hover = false; }
       } else if (inClosed(x, y, w, h) && !s.blocked) { s.expanded = true; s.hover = true; }
       return s.expanded;
     },

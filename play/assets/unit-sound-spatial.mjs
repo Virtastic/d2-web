@@ -9,13 +9,16 @@ export function nativeUnitSoundSpatial(source, listener) {
   const dy = 16 * ((sx + sy) - (lx + ly)) / 320;
   const dz = 2;
   const radius = Math.min(100, Math.sqrt(dx * dx + dy * dy + dz * dz));
+  // D2Sound ordinal 10047 (distance gain byte, pan byte) runs in the engine; its x input is the vertical displacement.
+  const packed = Number(globalThis.Module?._d2_sound_spatial?.(dy, dx, dz));
+  if (Number.isFinite(packed)) return { dx, dy, dz, radius, gainByte: packed & 0xFF, panCode: (packed >> 8) & 0xFF };
+  // No engine (node unit tests): the same rule in JavaScript.
   let gainByte = 255;
   if (radius >= 2) {
     // Retail rounds this logarithmic intermediate to float32 before exponentiation.
     const exponent = Math.fround(6 * Math.log2(radius / 2));
     gainByte = Math.trunc(255 / (10 ** (exponent * 0.05)));
   }
-  // D2Sound ordinal 10047 truncates the pan byte before ordinal 10028 sets balance.
   const panCode = Math.max(0, Math.min(255, Math.trunc(128 + 127 * 0.8 * dy)));
   return { dx, dy, dz, radius, gainByte: Math.max(0, Math.min(255, gainByte)), panCode };
 }
@@ -66,6 +69,8 @@ export function unitSoundNativeGainByte(event, snapshot, listener) {
 // D2Sound 1.13c ordinal 10028: native SetPan target in hundredths of a decibel.
 export function nativeSoundPanLevel(code) {
   if (!Number.isInteger(code) || code < 0 || code > 255) throw new RangeError('pan code must be an integer from 0 to 255');
+  const native = Number(globalThis.Module?._d2_sound_pan_level?.(code));
+  if (Number.isFinite(native)) return native | 0;
   if (code === 128) return 0;
   if (code === 0) return -10000;
   if (code === 255) return 10000;

@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { partyRows, ownState, hitTest, clickResult, tooltipFor, partyBars, inParty, hostileBlocked, cutText, headerFont, levelText,
   rowColour, PANEL, BOXES, REL, PARTY_NONE, MOST_ROWS } from './party-panel.mjs';
 
+import { bindStubRules } from './client-rules-stub.mjs';
+bindStubRules();
+
 const roster = (...ps) => ({ list: () => ps });
 const P = (id, name, extra = {}) => ({ id, name, classId: 1, level: 20, ...extra });
 

@@ -15,6 +15,7 @@ import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 import { BORDER_LEFT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
 import { characterPanelCloseFrame } from './character-panel-close.mjs';
+import { cellColour, resistCell } from './client-rules.mjs';
 import { skillRowHasDamage, skillRowHasRating } from './character-skill-rows.mjs';
 
 // Retail's own stat ids (D2StatList.h): the values the 0x3A packet carries.
@@ -30,7 +31,7 @@ const PANEL_FRAMES = [0, 1, 2, 3];
  *  `total` undefined (an older caller) falls back to the base in the default colour. */
 export function attributeCell(base, total) {
   if (total === undefined || total === null || base === undefined || base === null) return { value: base, c: 0 };
-  return { value: total, c: base < total ? 3 : total < base ? 1 : 0 };
+  return { value: total, c: cellColour(total, base) };
 }
 
 export const CHARACTER_LAYOUT = Object.freeze({ screenX: 0, screenY: 60, width: 320, height: 441 });
@@ -286,12 +287,12 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
       // D2Client+0xBCEA0: max life (stat 7) and max mana (stat 9) are drawn in colour 3 when the total exceeds the
       // base (charms, shield and other item or skill bonuses), colour 1 when below; the screen's last two entries,
       // after the skill rows, are total - base (readCharacterScreen).
-      const above = (d) => (d == null ? 0 : d > 0 ? 3 : d < 0 ? 1 : 0), over = sc.length >= 27 ? sc.slice(-2) : [];
+      const above = (d) => (d == null ? 0 : cellColour(d, 0)), over = sc.length >= 27 ? sc.slice(-2) : [];
       cell.lifeMax = { c: above(over[0]) }; cell.manaMax = { c: above(over[1]) };
       // max stamina (stat 11) the same way: its total (sc[5]) against its base (sc[16]); the Increased Stamina passive draws colour 3
       cell.staminaMax = { c: sc[16] == null ? 0 : above(sc[5] - sc[16]) };
       // resistances: colour 1 below zero, colour 4 (gold) at the cap, which the screen's values are already clamped to (0xBCEA0, stats 39/41/43/45)
-      state?.resMax?.forEach((m, i) => { const v = sc[6 + i], cap = Math.min(95, m + 75); cell[['fireRes', 'coldRes', 'lightRes', 'poisonRes'][i]] = { c: v >= cap ? 4 : v < 0 ? 1 : 0 }; });
+      state?.resMax?.forEach((m, i) => { cell[['fireRes', 'coldRes', 'lightRes', 'poisonRes'][i]] = { c: resistCell(sc[6 + i], m, 0).colour }; });
       const face = facesFor(state?.act || 1);
       // Every string drawn, as retail T2 records it: left x and anchor y, in the T2 frame (screen - (80,60)),
       // colour 0, uncentred. The list is the evidence a retail recording-text diffs.

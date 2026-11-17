@@ -6,6 +6,7 @@
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 import { CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
+import { resistCell } from './client-rules.mjs';
 import { mercSlotCelAt } from './item-cel-place.mjs';
 
 export const HIRELING_ART = Object.freeze({
@@ -56,9 +57,8 @@ function valueText(merc, stat) {
   }
   if (RESIST[stat] !== undefined) {
     if (v == null) return null;
-    const cap = Math.min(95, 75 + (merc.stats?.[RESIST[stat]] | 0));
-    const value = Math.max(-100, v + (merc.resistPenalty | 0));
-    return value >= cap ? { text: String(cap), colour: 4 } : { text: String(value), colour: value < 0 ? 1 : 0 };
+    const r = resistCell(v, merc.stats?.[RESIST[stat]] | 0, merc.resistPenalty | 0);
+    return { text: String(r.value), colour: r.colour };
   }
   if (stat === 21 || stat === 31) return null;   // ponytail: damage and defense need D2Common's formulas
   return v == null ? null : { text: String(v), colour: 0 };

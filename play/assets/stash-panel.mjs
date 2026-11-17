@@ -13,6 +13,7 @@
 // trust it.
 
 import { gridCelAt } from './item-cel-place.mjs';
+import { gridCellAt, heldCellAt } from './grid-cell.mjs';
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { inventoryCloseFrame } from './inventory-close-gesture.mjs';
 import { inventoryItemAsset, SOCKET_ART } from './inventory-panel.mjs';
@@ -145,9 +146,12 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
       if (!geometry) return null;
       const o = origin(width, height), x = (px - o.x) / o.scale, y = (py - o.y) / o.scale;
       const g = geometry;
+      // The cell is D2Client+0x96AA0's division (grid-cell.mjs, the stash and cube share the grid click handler's rule);
+      // the item is the topmost one whose footprint covers that cell.
+      const cell = gridCellAt({ left: g.gridLeft, top: g.gridTop, cellWidth: g.boxW, cellHeight: g.boxH, columns: g.columns, rows: g.rows }, x, y);
+      if (!cell) return null;
       return [...(items || [])].reverse().find((i) => i.invPage === page && i.invFile &&
-        x >= g.gridLeft + i.gridX * g.boxW && x < g.gridLeft + (i.gridX + (i.invWidth || 1)) * g.boxW &&
-        y >= g.gridTop + i.gridY * g.boxH && y < g.gridTop + (i.gridY + (i.invHeight || 1)) * g.boxH) || null;
+        cell.x >= i.gridX && cell.x < i.gridX + (i.invWidth || 1) && cell.y >= i.gridY && cell.y < i.gridY + (i.invHeight || 1)) || null;
     },
     /**
      * The stash cell a cursor item would be put down at, the item centred on the pointer as retail
@@ -157,10 +161,8 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
     cellAt(px, py, width, height, geometry, item) {
       if (!geometry) return null;
       const o = origin(width, height), x = (px - o.x) / o.scale, y = (py - o.y) / o.scale;
-      const g = geometry, w = item?.invWidth || 1, h = item?.invHeight || 1;
-      if (x < g.gridLeft || y < g.gridTop || x >= g.gridLeft + g.columns * g.boxW || y >= g.gridTop + g.rows * g.boxH) return null;
-      const cx = Math.round((x - g.gridLeft) / g.boxW - w / 2), cy = Math.round((y - g.gridTop) / g.boxH - h / 2);
-      return { x: Math.max(0, Math.min(g.columns - w, cx)), y: Math.max(0, Math.min(g.rows - h, cy)) };
+      const g = geometry;
+      return heldCellAt({ left: g.gridLeft, top: g.gridTop, cellWidth: g.boxW, cellHeight: g.boxH, columns: g.columns, rows: g.rows }, item, x, y);
     },
     // `hover` = { pointer, cursorItem, itemBoxState, cursorMode }: the item boxes (grid-highlight.mjs).
     draw(ctx, width, height, geometry, items, open, act = 1, closePressed = false, hover = null) {

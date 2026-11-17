@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <cstring>
 #include <emscripten.h>
+#include "party_row_76790.h"
 
 struct D2c76790Host {
     uint32_t (*lookup)(uint32_t ecx, uint32_t edx);                       // 9D630
@@ -48,8 +49,8 @@ uint32_t d2_client_76790(uint32_t rows, uint32_t players, uint32_t unit, const D
         const uint16_t pt = d2c_76790_rd16(node + 0x22);
         const uint32_t n = d2c_76790_share(players, pt);
         const uint32_t sv = n > 1 ? ((node & 0xffff0000u) | pt) : 0xffffu;
-        uint32_t mode = 0; bool live = false;
-        if (n > 1 && pt != 0xffff) { if (mine == (uint16_t)sv) { mode = 2; live = true; } else mode = 8; }
+        uint32_t mode = d2cl_party::rowMode(n, pt, (uint16_t)mine, false);
+        const bool live = mode == 2;
         if (unit) {
             const uint32_t me = d2c_76790_rd32(unit + 0xc), id = d2c_76790_rd32(node + 0x10);
             const uint32_t r = h->lookup(n, id);
@@ -57,7 +58,7 @@ uint32_t d2_client_76790(uint32_t rows, uint32_t players, uint32_t unit, const D
                 const uint32_t lh = d2c_76790_rd32(r + 0x34);
                 if (lh && id != me)
                     for (uint32_t q = d2c_76790_rd32(lh); q; q = d2c_76790_rd32(q + 8))
-                        if (d2c_76790_rd32(q) == me) { if (d2c_76790_rd32(q + 4) & 8) mode = 1; break; }
+                        if (d2c_76790_rd32(q) == me) { if (d2c_76790_rd32(q + 4) & 8) mode = d2cl_party::rowMode(n, pt, (uint16_t)mine, true); break; }
             }
         }
         h->font(0);

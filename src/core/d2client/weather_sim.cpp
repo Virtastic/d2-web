@@ -335,6 +335,40 @@ void tick(Seed& s, const Env& e) {
     fill(s, e);
 }
 
+// 1.13c D2Client+0x7FE80 drop geometry, shared by the G trace (drawG) and the browser (lines): fn(ecx, edx, x0, y0, x1, y1, particle) per drawn drop.
+template <class F> static void forEachDrop(int32_t W, int32_t H, int32_t mode, F fn) {
+    const int32_t ymax = H - 0x2f;
+    int32_t xmin = 0, xmax = W;
+    if (mode == 1) xmax = W - (W / 4) * 2;
+    else if (mode == 2) xmin = (W / 4) * 2;
+    auto in = [&](int32_t x, int32_t y) { return xmin <= x && x < xmax && 0 <= y && y < ymax; };
+    for (int32_t i = 0; i <= g.maxIndex; ++i) {
+        const Particle& p = g.pool[i];
+        if (!p.active || g.bf78 != 0) continue;   // the snow pair (0x84988/0x84998 tables) is not reached by these sessions
+        if (p.landed == 0) {
+            int32_t dx = ftol(double(FOG_10083_Cos_LUT(int16_t(g.t3918))) * double(p.frame));
+            int32_t dy = ftol(double(FOG_10084_Sin_LUT(int16_t(g.t3918))) * double(p.frame));
+            const int32_t room = p.bound - p.y;
+            if (room < dy) { dx = (room * dx) / dy; dy = room; }
+            const int32_t x1 = p.x + dx, y1 = p.y + dy;
+            if (in(p.x, p.y) || in(x1, y1)) fn(uint32_t(p.colour), uint32_t(p.x), p.x, p.y, x1, y1, p);
+        } else if (in(p.x, p.y)) {
+            fn(uint32_t(p.x), uint32_t(p.colour), p.x, p.y, p.x, p.y, p);
+        }
+    }
+}
+
+// The drops 0x7FE80 draws as {x0, y0, x1, y1, colour, alpha} sextets; returns the count (written up to cap).
+uint32_t lines(int32_t W, int32_t H, int32_t mode, int32_t* out, uint32_t cap) {
+    if (!g.weatherLevel || g.live == 0) return 0;
+    uint32_t n = 0;
+    forEachDrop(W, H, mode, [&](uint32_t, uint32_t, int32_t x0, int32_t y0, int32_t x1, int32_t y1, const Particle& p) {
+        if (n < cap) { int32_t* o = out + n * 6; o[0] = x0; o[1] = y0; o[2] = x1; o[3] = y1; o[4] = p.colour; o[5] = p.alpha; }
+        ++n;
+    });
+    return n;
+}
+
 // 1.13c D2Client+0x805A0 -> 0x7FE80: the rain draw as its D2Gfx calls. 0x805A0 draws when the hero's level rains and
 // *(pool+0x114) != 0 (DAT_6FBCC2AC >= 10 takes the 0x7FE10 fill instead; not reached here). 0x7FE80 gates the pass on
 // Ordinal_10047 (ecx = the live count 0x805A0 left), clips x to [0, W) (DAT_6FBCC414 1/2 halve it) and y to [0, H-0x2F).
@@ -346,11 +380,6 @@ uint32_t drawG(std::string& out, int32_t W, int32_t H, int32_t mode) {
     char b[96];
     std::snprintf(b, sizeof b, "10047 %x,0\n", unsigned(g.live));
     out += b;
-    const int32_t ymax = H - 0x2f;
-    int32_t xmin = 0, xmax = W;
-    if (mode == 1) xmax = W - (W / 4) * 2;
-    else if (mode == 2) xmin = (W / 4) * 2;
-    auto in = [&](int32_t x, int32_t y) { return xmin <= x && x < xmax && 0 <= y && y < ymax; };
     // The trace records a value only below 0x100000: a negative argument prints '*', a negative register 0.
     auto emit = [&](uint32_t ecx, uint32_t edx, int32_t x0, int32_t y0, int32_t x1, int32_t y1, const Particle& p) {
         std::snprintf(b, sizeof b, "10010 %x,%x", ecx < 0x100000u ? ecx : 0u, edx < 0x100000u ? edx : 0u);
@@ -360,20 +389,7 @@ uint32_t drawG(std::string& out, int32_t W, int32_t H, int32_t mode) {
         }
         out += '\n';
     };
-    for (int32_t i = 0; i <= g.maxIndex; ++i) {
-        const Particle& p = g.pool[i];
-        if (!p.active || g.bf78 != 0) continue;   // the snow pair (0x84988/0x84998 tables) is not reached by these sessions
-        if (p.landed == 0) {
-            int32_t dx = ftol(double(FOG_10083_Cos_LUT(int16_t(g.t3918))) * double(p.frame));
-            int32_t dy = ftol(double(FOG_10084_Sin_LUT(int16_t(g.t3918))) * double(p.frame));
-            const int32_t room = p.bound - p.y;
-            if (room < dy) { dx = (room * dx) / dy; dy = room; }
-            const int32_t x1 = p.x + dx, y1 = p.y + dy;
-            if (in(p.x, p.y) || in(x1, y1)) emit(p.colour, uint32_t(p.x), p.x, p.y, x1, y1, p);
-        } else if (in(p.x, p.y)) {
-            emit(uint32_t(p.x), p.colour, p.x, p.y, p.x, p.y, p);
-        }
-    }
+    forEachDrop(W, H, mode, emit);
     return 0;
 }
 

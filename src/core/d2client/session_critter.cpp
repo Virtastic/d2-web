@@ -40,6 +40,7 @@ namespace d2client_unitseed { uint32_t roll(const D2ActiveRoomStrc* r); bool kno
 extern "C" uint32_t d2_client_unit_mode_sounds(uint32_t type, uint32_t id, int32_t cls, uint32_t typeFlags, int32_t superUnique,
                                                uint32_t mode, uint32_t hit, uint32_t cvt, uint32_t flags, int32_t roll);
 extern "C" uint32_t d2_client_unit_mode_sound_at(uint32_t i);
+extern "C" void d2client_critter_sound(uint32_t id, uint32_t cls, int32_t row);   // monspawn_check.cpp: the play path's unit sound queue
 
 namespace {
 struct Critter {
@@ -106,6 +107,7 @@ void setMode(Critter& c, uint32_t m, uint32_t frame) {
         // 0x22CA0: the 0xA84 skill row waits 0x19 frames after the unit's last (+0x7C); the port reads +0x7C off a server unit
         if (row == 0xA84) { if (frame - c.u7c < 0x19) continue; c.u7c = frame; }
         d2client_sound_unit_submit(row);
+        d2client_critter_sound(c.id, c.cls, row);
     }
 }
 // 0x4DC30

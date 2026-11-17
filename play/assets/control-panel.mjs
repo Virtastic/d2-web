@@ -1,5 +1,6 @@
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { recordDc6, recordPrim } from './drawlist.mjs';
+import { rulesBound, expBarPixels, orbFill, staminaBar, staminaColours } from './client-rules.mjs';
 
 export function resourceRatio(value, maximum) {
   const max = Number(maximum), current = Number(value);
@@ -144,7 +145,7 @@ function createStaminaBlend(read, palette) {
     return best; };
   return { index, pl2,
     colour: [palette[109 * 4], palette[109 * 4 + 1], palette[109 * 4 + 2]],
-    apply(ctx, x, y, width, height) {
+    apply(ctx, x, y, width, height, colour = HUD_LAYOUT.stamina.index) {
       const X = Math.round(x), Y = Math.round(y), W = Math.round(width), H = Math.round(height);
       if (W <= 0 || H <= 0) return [];
       // The readback is in CANVAS pixels, so the panel transform is dropped for it and restored by
@@ -155,7 +156,7 @@ function createStaminaBlend(read, palette) {
         const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
         let under = index.get(key);
         if (under === undefined) index.set(key, under = nearest(d[i], d[i + 1], d[i + 2]));
-        const mapped = pl2[base + under * 256 + HUD_LAYOUT.stamina.index];
+        const mapped = pl2[base + under * 256 + colour];
         if (mapped === undefined) continue;
         seen.add((palette[mapped * 4] << 16) | (palette[mapped * 4 + 1] << 8) | palette[mapped * 4 + 2]);
         d[i] = palette[mapped * 4]; d[i + 1] = palette[mapped * 4 + 1]; d[i + 2] = palette[mapped * 4 + 2];
@@ -194,6 +195,7 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
   // The draw list records EVERY draw, so the HUD is recorded only where a row is comparing: the
   // records are what makes "the thing asked for is the thing drawn" checkable per blit.
   const staminaBlend = (() => { try { return createStaminaBlend(read, palette); } catch { return null; } })();
+  let staminaSlots = null;
   const record = (spec, index, frame, left, top) =>
     recordDc6(spec.path, index, frame, left, top, { op: 'cel', mode: 5 });
 
@@ -237,14 +239,18 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     recordDc6(PANEL_PATH, 5, panel.frames[5], CONTROL_LAYOUT.manaX + edge, top);
     const life = resourceRatio(snapshot?.player?.hp, snapshot?.player?.hpMax);
     const mana = resourceRatio(snapshot?.player?.mana, snapshot?.player?.manaMax);
-    const drawFluid = (image, x, y, ratio) => { const top = Math.round(image.height * (1 - ratio)), shown = image.height - top;
+    // D2Client+0x27BD0 / +0x27A90 (engine rule): fill rows = cur * 80 / max, integer; the float rounding below is the pre-engine fallback.
+    const pl = snapshot?.player, alive = snapshot?.mode !== 0x11;
+    const fillRows = (image, ratio, cur, max, kind) => rulesBound() ? Math.min(image.height, Math.max(0, orbFill(cur, max, kind, alive))) : image.height - Math.round(image.height * (1 - ratio));
+    const lifeRows = fillRows(fluid[0], life, pl?.hp, pl?.hpMax, 0), manaRows = fillRows(fluid[1], mana, pl?.mana, pl?.manaMax, 1);
+    const drawFluid = (image, x, y, rows) => { const top = image.height - rows, shown = rows;
       if (shown > 0) ctx.drawImage(image, 0, top, image.width, shown, x, y + top, image.width, shown); };
-    drawFluid(fluid[0], 29 - edge, 12, life); drawFluid(fluid[1], 689 + edge, 12, mana);
+    drawFluid(fluid[0], 29 - edge, 12, lifeRows); drawFluid(fluid[1], 689 + edge, 12, manaRows);
     ctx.drawImage(overlap[0], 28 - edge, 12); ctx.drawImage(overlap[1], 690 + edge, 8);
     const FLUID_PATH = 'data\\global\\ui\\PANEL\\hlthmana.dc6', OVERLAP_PATH = 'data\\global\\ui\\PANEL\\overlap.dc6';
-    recordDc6(FLUID_PATH, 0, fluids.frames[0], 29 - edge, top + 12, { op: 'celex', extra: fluid[0].height - Math.round(fluid[0].height * (1 - life)) });
+    recordDc6(FLUID_PATH, 0, fluids.frames[0], 29 - edge, top + 12, { op: 'celex', extra: lifeRows });
     recordDc6(OVERLAP_PATH, 0, overlaps.frames[0], 28 - edge, top + 12);
-    recordDc6(FLUID_PATH, 1, fluids.frames[1], 689 + edge, top + 12, { op: 'celex', extra: fluid[1].height - Math.round(fluid[1].height * (1 - mana)) });
+    recordDc6(FLUID_PATH, 1, fluids.frames[1], 689 + edge, top + 12, { op: 'celex', extra: manaRows });
     recordDc6(OVERLAP_PATH, 1, overlaps.frames[1], 690 + edge, top + 8);
     // The ornate strips between each skill button and the console (wide views only): hud.strips paints them.
     if (edge > 0 && hud.strips) hud.strips(ctx);
@@ -258,7 +264,13 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     const local = (spec) => ({ x: spec.x, y: spec.y - PANEL_SCREEN_TOP });
     const stamina = hud.stamina || null;
     const staminaRatio = stamina ? resourceRatio(stamina.value, stamina.maximum) : 0;
-    const staminaPixels = Math.floor(staminaRatio * HUD_LAYOUT.stamina.width);
+    // D2Client+0x278B0 (engine rule, hud_bar_rules.h): width = cur * 0x66 / max in integers; the fallback is the pre-engine float.
+    const staminaRule = stamina && rulesBound() ? staminaBar(stamina.value, stamina.maximum) : null;
+    const staminaPixels = staminaRule ? Math.min(HUD_LAYOUT.stamina.width, staminaRule.width) : Math.floor(staminaRatio * HUD_LAYOUT.stamina.width);
+    // 278B0's colour: the slot it picks (red below 0x19 px, blue over max + 5) indexes the three colours it latched on its
+    // first draw (staminaColours); the pre-engine fallback is the normal colour's index 109.
+    if (staminaRule && !staminaSlots) staminaSlots = staminaColours(palette);
+    const staminaIndex = staminaRule && staminaSlots ? staminaSlots[staminaRule.slot] : HUD_LAYOUT.stamina.index;
     // The run button's cel follows the engine's own run/walk toggle (hud.runToggle), never a click
     // this module saw: the toggle's action goes to the engine and this reads the engine back.
     const running = hud.runToggle === true;
@@ -274,16 +286,16 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
       // The bar is drawn INSIDE the panel transform, so the blend reads the canvas back at the
       // transformed rectangle, not at retail's raw screen coordinates.
       const colours = staminaBlend
-        ? staminaBlend.apply(ctx, x0 + at.x * scale, y0 + at.y * scale, staminaPixels * scale, spec.height * scale)
+        ? staminaBlend.apply(ctx, x0 + at.x * scale, y0 + at.y * scale, staminaPixels * scale, spec.height * scale, staminaIndex)
         : [];
-      if (!staminaBlend) { ctx.fillStyle = `rgb(${palette[spec.index * 4]},${palette[spec.index * 4 + 1]},${palette[spec.index * 4 + 2]})`;
+      if (!staminaBlend) { ctx.fillStyle = `rgb(${palette[staminaIndex * 4]},${palette[staminaIndex * 4 + 1]},${palette[staminaIndex * 4 + 2]})`;
         ctx.fillRect(at.x, at.y, staminaPixels, spec.height); }
       // Retail's own record: `box 273 573 375 591 color=109 mode=2` at full stamina, so the right
       // and bottom edges are exclusive and the whole 102 px rect is covered when the bar is full.
-      recordPrim('box', spec.x, spec.y, spec.x + staminaPixels, spec.y + spec.height, spec.index, 2);
+      recordPrim('box', spec.x, spec.y, spec.x + staminaPixels, spec.y + spec.height, staminaIndex, 2);
       return { ...spec, requested: stamina?.value ?? null, next: stamina?.maximum ?? null,
         ratio: staminaRatio, pixels: staminaPixels, colours, record: { op: 'box', x: spec.x, y: spec.y,
-          x2: spec.x + staminaPixels, y2: spec.y + spec.height, colour: spec.index, mode: 2 } };
+          x2: spec.x + staminaPixels, y2: spec.y + spec.height, colour: staminaIndex, mode: 2 } };
     })();
     // The arrow's cel follows the ARROW's OWN toggle (`hud.arrowOpen`), which is a different state
     // from the row being hidden by a panel on each side: retail keeps menubutton frame 2 while the
@@ -337,7 +349,8 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     const nextExperience = Number(advancement?.nextExperience);
     const experienceRatio = experienceBarRatio(experience, nextExperience, advancement?.prevExperience);
     // D2's renderer truncates the float width to an integer before its DrawRect call.
-    const experiencePixels = Math.floor(experienceRatio * CONTROL_LAYOUT.experienceWidth); // D2Client+0x26970: into*119/span, rows H-38,H-37
+    const expStart = Number(advancement?.prevExperience) || 0;
+    const experiencePixels = rulesBound() ? expBarPixels(Math.max(0, experience - expStart), Math.max(0, nextExperience - expStart)) : Math.floor(experienceRatio * CONTROL_LAYOUT.experienceWidth); // D2Client+0x26970: into*119/span, rows H-38,H-37
     if (experiencePixels > 0) {
       ctx.fillStyle = '#fff';
       ctx.fillRect(CONTROL_LAYOUT.experienceX, CONTROL_LAYOUT.experienceY,

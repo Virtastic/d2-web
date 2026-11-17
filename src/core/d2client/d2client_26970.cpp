@@ -1,5 +1,6 @@
 // 1.13c D2Client+0x26970: life/mana orb hint text (mouse over the bar) and the 2-line fill bar under it.
 #include "d2client_callee.h"
+#include "hud_bar_rules.h"
 // 1.13c D2Client+0x26970
 extern "C" void d2c_26970(const D2cSvc& v, const uint32_t* unit /*[0x11BBFC]*/, int32_t w, int32_t h, int32_t mouseA /*0x11B828*/, int32_t mouseB /*0x11B824*/) {
     const uint32_t u = (uint32_t)(uintptr_t)unit;
@@ -19,10 +20,7 @@ extern "C" void d2c_26970(const D2cSvc& v, const uint32_t* unit /*[0x11BBFC]*/, 
         d2c_call(v, 0xd384, 0, (uint32_t)(uintptr_t)buf, (uint32_t)(w2 - 0x92), 0, 0, (uint32_t)(h - 0x33), 0, 1);   // D2Win #10085 (ECX text, EDX x, stack y 0 1)
     }
     if (total == 0) return;
-    uint32_t num = have, den = total;
-    if (num >= 0x226b902u) { num >>= 7; den >>= 7; }
-    uint32_t bar = (num * 0x77u) / den;   // unsigned div; den == 0 after the shift would trap in retail too
-    if (bar > 0x77) bar = 0;
+    const uint32_t bar = d2cl_hud::expBarPixels(have, total);   // the rule the browser export runs (hud_bar_rules.h)
     const uint32_t lim = d2c_call(v, 0xc28c, 0, 0, 0, 0, 0, type);                 // D2Common #10066 (type)
     if (cur >= lim || bar == 0) return;
     const uint32_t x0 = (uint32_t)(w2 - 0x90), y = (uint32_t)(h - 0x26);

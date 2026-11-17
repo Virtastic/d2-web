@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstring>
 #include "../session/calltrace.h"
+#include "level_music_due.h"
 namespace d2client_45660 {
 using U = uint32_t;
 // Globals are 32-bit words at module RVAs (+0x11c340 block: 340..374; 254..260 table; bbfc player; 97f8 frame tick; 75b8 array).
@@ -40,8 +41,7 @@ void sub_45660(U now, G& g, Calls& c) {
         if (r && ((int32_t)r < (int32_t)*g.lo25c || (int32_t)r > (int32_t)*g.hi260)) r = 0;
     }
     bool ok = c.ordD270() && c.ordD26A();
-    bool f = *g.c348 == 0 || !ok || now - *g.c340 >= 0x4b;
-    if (*g.c348 != r && f) { *g.c348 = r; *g.c350 = now; }
+    if (d2client_music_selection_due(*g.c348, r, ok, now - *g.c340)) { *g.c348 = r; *g.c350 = now; }
     if (!ok) c.f388b0();
     if (!*g.c348) c.f388b0();
     if (*g.c354) {

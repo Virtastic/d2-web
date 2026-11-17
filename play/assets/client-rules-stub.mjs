@@ -1,0 +1,64 @@
+// A stand-in for the engine module in unit tests: the same rules the C++ exports run
+// (stats_cell_bcea0.h, party_row_76790.h), so a panel test can bind it without a wasm build.
+import { bindClientRules } from './client-rules.mjs';
+
+export function bindStubRules() {
+  const heap = new Int32Array(16);
+  bindClientRules({
+    HEAP32: heap,
+    _malloc: () => 0,
+    _free: () => {},
+    ccall(name, _ret, _types, a) {
+      if (name === 'd2_client_cell_colour') return a[0] > a[1] ? 3 : a[0] < a[1] ? 1 : a[2];
+      if (name === 'd2_client_party_row_mode') {
+        const [share, pt, mine, hostile] = a;
+        return hostile ? 1 : share > 1 && pt !== 0xffff ? (mine === pt ? 2 : 8) : 0;
+      }
+      if (name === 'd2_client_quest_tabs') {   // quest_rules_1ef10.h tabShown
+        const [sel, exp, mask] = a; let out = 0;
+        for (let i = 0; i < 5; i++) if (!(!exp && i > 3) && (i === sel || i === 0 || (mask >> i) & 1)) out |= 1 << i;
+        return out;
+      }
+      if (name === 'd2_client_quest_icon') {   // quest_rules_1ef10.h iconFor
+        const [mode, prev, anim, idx] = a;
+        if (mode === 0) return anim >= 0x19 ? 0x18 : anim;
+        if (mode === 1) return prev ? (1 << 16) | idx : 0x18;
+        return mode === 2 ? 0x1a : prev ? 0x19 : 0;
+      }
+      if (name === 'd2_client_resist_cell') {
+        let [v, max, col, adj] = a; v += adj;
+        const cap = Math.min(0x5f, max + 0x4b);
+        if (v <= -100) v = -100;
+        if (v >= cap) { v = cap; if (col !== 3) { heap[a[4] >> 2] = v; return 4; } }
+        if (v < 0) col = 1;
+        heap[a[4] >> 2] = v;
+        return col;
+      }
+      if (name === 'd2_client_exp_bar_pixels') {   // hud_bar_rules.h expBarPixels
+        let [num, den] = a;
+        if (!den) return 0;
+        if (num >= 0x226b902) { num >>>= 7; den >>>= 7; }
+        if (!den) return 0;
+        const bar = Number((BigInt(num) * 0x77n & 0xffffffffn) / BigInt(den));
+        return bar > 0x77 ? 0 : bar;
+      }
+      if (name === 'd2_client_orb_fill') {   // hud_bar_rules.h orbFill
+        let [cur, mx, kind, alive] = a;
+        if (!mx) return 0;
+        if (kind === 1 && cur > mx) cur = mx;
+        let fill = Math.trunc(Number(BigInt.asIntN(32, BigInt(cur >>> 0) * 80n)) / mx);
+        if (kind === 0 && alive && fill > 0 && fill <= 2) fill = 2;
+        return fill;
+      }
+      if (name === 'd2_client_stamina_bar') {   // hud_bar_rules.h staminaBar
+        let [cur, mx, over] = a, slot = 1;
+        if (mx + 5 < cur || over) { slot = 2; mx = cur; }
+        if (mx <= 0) return 0;
+        const w = Number(BigInt.asIntN(32, BigInt(cur >>> 0) * 0x66n)) / mx | 0;
+        if (w < 0x19) slot = 0;
+        return (slot << 16) | w;
+      }
+      throw new Error(`stub: ${name}`);
+    },
+  });
+}

@@ -17,8 +17,14 @@ function rows(bytes) {
 }
 
 /** Retail's object-table gate before an otherwise Shadow-set COF layer is submitted. */
-export function createObjectShadowPolicy(read) {
+export function createObjectShadowPolicy(read, engine = globalThis.Module) {
   let byClass = null;
+  // The engine's loaded Objects table answers when it is up; the .txt below is the pre-engine fallback.
+  const engineRow = (classId, mode) => {
+    if (typeof engine?._d2_client_object_shadow_row !== 'function') return null;
+    const v = Number(engine._d2_client_object_shadow_row(classId, mode | 0));
+    return v < 0 ? null : { drawUnder: v >> 1, blocks: (v & 1) !== 0 };
+  };
   const load = () => {
     if (!byClass) byClass = rows(read('data\\global\\excel\\objects.txt'));
     return byClass;
@@ -26,7 +32,9 @@ export function createObjectShadowPolicy(read) {
   return {
     decide(object) {
       const classId = Number(object?.classId);
-      const row = load().get(classId) || { drawUnder: 0, blocksLight: null };
+      const native = engineRow(classId, Number(object?.mode));
+      const row = native ? { drawUnder: native.drawUnder, blocksLight: Array.from({ length: 8 }, () => (native.blocks ? 1 : 0)) }
+        : load().get(classId) || { drawUnder: 0, blocksLight: null };
       const drawUnder = row.drawUnder;
       // D2Client 1.13c sets the unit's no-shadow bit (0x20, D2MOO's misnamed UNITFLAG_DRAWSHADOW) at object
       // creation and on every mode change when Objects.txt BlocksLight[mode] is 0; the shadow draw returns

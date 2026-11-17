@@ -51,6 +51,7 @@ export function terrainDraw(ctx, frame, assets, env) {
   }
   const lm = frame.lightmap;
   terrain.setLightGrid(lm ? (a, b) => lm.grid(a, b) : null, lm?.at, lm?.ambient, lm);
+  terrain.setFloorFlags(meta.floorVisible);   // the engine's per-tile floor decisions, made on main
   const sprites = buildSprites(ctx, frame, env);
   let stats = null;
   const wx = meta.weather, wr = wx ? weatherFor(env) : null;
@@ -63,7 +64,7 @@ export function terrainDraw(ctx, frame, assets, env) {
     if (env.missed && [...env.missed].some((m) => /\.(dt1|pal|pl2|dat)$/i.test(m))) sessions.delete(meta.palettePath);
   }
   if (env.evidence) env.evidence.terrainStats = stats;
-  if (wr && wx.rain > 0) { try { wr.drawStreaks(ctx, meta.width, meta.height, wx.ticks, wx.cam.x, wx.cam.y); } catch { /* as above */ } }
+  if (wr && wx.rain > 0) { try { wr.drawStreaks(ctx, meta.width, meta.height, wx.ticks, wx.cam.x, wx.cam.y, wx.drops ?? null); } catch { /* as above */ } }
   if (!stats?.drawn) for (const sp of sprites) sp.draw(ctx);   // no wall pass to interleave into (as main)
   endUnits(env, sprites);
 }

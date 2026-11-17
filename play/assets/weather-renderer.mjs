@@ -171,9 +171,22 @@ export function createWeatherRenderer({ read, rippleOffset }) {
      * The falling drops, drawn after the world (retail's line records).  `cx, cy` are the camera's screen
      * position, so the drops follow the scroll; returns the line records drawn ({x0,y0,x1,y1,colour}).
      */
-    drawStreaks(ctx, width, height, tick, cx, cy) {
+    drawStreaks(ctx, width, height, tick, cx, cy, engineDrops = null) {
       if (!levelRain) return [];
       if (!palette()) return [];
+      if (engineDrops) {   // the engine's own 1.13c rain pass (D2Client+0x7FE80): its drops, already in screen space and clipped
+        const out = [];
+        ctx.save();
+        for (const d of engineDrops) {
+          const o = d.colour * 4;
+          ctx.fillStyle = `rgb(${rgbaPal[o]},${rgbaPal[o + 1]},${rgbaPal[o + 2]})`;
+          plotRainLine(ctx, d.x0, d.y0, d.x1, d.y1);
+          recordPrim('line', d.x0, d.y0, d.x1, d.y1, d.colour, 127);
+          out.push({ x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1, colour: d.colour });
+        }
+        ctx.restore();
+        return out;
+      }
       // The retail count IS the cycle's intensity on 800x600; a wider or taller viewport gets the same
       // DENSITY (?parity=1: exactly retail's count, whatever the viewport).
       const want = Math.round(cycle.intensity * (parity ? 1 : (width * height) / 480000));

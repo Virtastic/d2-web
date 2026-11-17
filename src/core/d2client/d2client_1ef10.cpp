@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstring>
 #include "cl_env.h"
+#include "quest_rules_1ef10.h"
 struct D2C1EF10G { void* ctx; uint32_t (*at)(void* ctx, uint32_t rva); };
 namespace {
 constexpr uint32_t kDraw = 0xd096, kStr = 0xd1ec, kFont = 0xd3a8, kWidth = 0xd35a, kText = 0xd37e, kHover = 0xd384,
@@ -70,13 +71,8 @@ extern "C" void d2c_1ef10(const cl::Env& e, const D2C1EF10G& g) {
             uint32_t fr;
             if (i == p.G(0x123395)) fr = i * 2;
             else {
-                bool on = true;
-                if (i >= 1 && i <= 4) {
-                    const uint32_t q = e.H(kQGet, p.G(0x11973b), kActQ[i], 0);
-                    if (i < 4) on = q != 0;
-                    else on = e.H(kExp) && p.G(0x119854) && q != 0;
-                }
-                if (!on) continue;
+                const uint32_t q = (i >= 1 && i <= 4) ? e.H(kQGet, p.G(0x11973b), kActQ[i], 0) : 1;
+                if (!d2cl_quest::tabShown(i, p.G(0x123395), i < 4 || (e.H(kExp) && p.G(0x119854)), q != 0)) continue;
                 fr = i * 2 + 1;
             }
             p.D(0x10) = fr;
@@ -122,14 +118,14 @@ extern "C" void d2c_1ef10(const cl::Env& e, const D2C1EF10G& g) {
                         if (p.G(0x1223f5) == slot) {
                             p.cel(p.G(0x12241d), ico);
                             p.draw(p.sx(slot) + (int32_t)p.G(0x1234bc) + p.X(), p.sy(slot) - p.Y() + (int32_t)p.G(0xfa3fc), 5);
-                        } else { p.cel(icon, 0x18); p.draw(x, y, 5); }
+                        } else { p.cel(icon, d2cl_quest::iconFor(1, false, 0, ico).frame); p.draw(x, y, 5); }
                     } else if (ty == 2) {
                         p.SetG8(ent, 1);
-                        p.cel(icon, 0x1a); p.draw(x, y, 5);
+                        p.cel(icon, d2cl_quest::iconFor(2, false, 0, ico).frame); p.draw(x, y, 5);
                     } else {
                         if ((p.G(ent + 5) & 0xffff) == 0x3a0 && p.G8(ent + 0x265) == 7) gem = 1;
                         p.SetG8(ent, 1);
-                        p.cel(icon, p.G(0x1223f5) == slot ? 0x19u : 0u); p.draw(x, y, 5);
+                                p.cel(icon, d2cl_quest::iconFor(3, p.G(0x1223f5) == slot, 0, ico).frame); p.draw(x, y, 5);
                     }
                     p.SetG(0x1223e0, cnt + 1);
                     key = (int32_t)slot;

@@ -125,19 +125,16 @@ test('objects: the scene takes the engine object records as they are, and the wo
   assert.equal(snapshot.objects, objects);
 });
 
-test('ground items are removed by 0x0A; gold and stash gold from the stat packets', () => {
-  const w = createRealmWorld(tables()); w.setOwner(GUID);
+test('ground items are removed by 0x0A; the gold figures are the engine player stats 14 and 15', () => {
+  const stats = { 14: 300, 15: 123456 };
+  const w = createRealmWorld({ ...tables(), heroStat: (stat) => stats[stat] ?? 0 }); w.setOwner(GUID);
   feed(w, itemPacket(14, 3, { mode: 3, x: 1, y: 2, code: 'hax' }));
   feed(w, Uint8Array.from([0x0a, 4, ...u32le(14)]));
   assert.equal(w.ownItemCount, 0);
-  feed(w, Uint8Array.from([0x1d, 14, 50]), Uint8Array.from([0x1e, 14, 0x2c, 0x01]));
   assert.equal(w.gold, 300);
-  feed(w, Uint8Array.from([0x1f, 15, ...u32le(123456)]));
   assert.equal(w.stashGold, 123456);
-  feed(w, Uint8Array.from([0x20, ...u32le(GUID), 14, ...u32le(77)]));
-  assert.equal(w.gold, 77);
-  feed(w, Uint8Array.from([0x20, ...u32le(5), 14, ...u32le(9)]));
-  assert.equal(w.gold, 77);
+  stats[14] = -1;
+  assert.equal(w.gold, 0xffffffff);
 });
 
 test('feed walks a stream with the size reader and stops on a partial packet', () => {
@@ -171,13 +168,11 @@ test('the level table answers Levels.txt Rain by level id, -1 for a level it doe
   assert.deepEqual([levels.rain(2), levels.rain(0), levels.rain(99)], [1, 0, -1]);
 });
 
-test('raw item bytes and UpdateUi codes are kept for the shell', () => {
+test('raw item bytes are kept for the shell', () => {
   const w = createRealmWorld(tables()); w.setOwner(GUID);
-  feed(w, itemPacket(10, 0, { mode: 0, x: 2, y: 1, page: 0, code: 'wsd' }), Uint8Array.of(0x77, 16), Uint8Array.of(0x77, 21));
+  feed(w, itemPacket(10, 0, { mode: 0, x: 2, y: 1, page: 0, code: 'wsd' }));
   assert.ok(w.rawItem(10).length > 8);
   assert.equal(w.rawItem(11), null);
-  assert.deepEqual(w.takeUiEvents(), [16, 21]);
-  assert.deepEqual(w.takeUiEvents(), []);
 });
 
 test('belt boxes come from the 800x600 row set, seven rows after the 640x480 one', () => {
@@ -303,4 +298,28 @@ test('0x3f marks the item the cursor is using and lets it go', () => {
   assert.equal(w.takeInventoryAsks(), 1); assert.equal(w.takeInventoryAsks(), 0);
   feed(w, Uint8Array.from([0x3f, 0xff, ...u32le(10), 0xff, 0xff]));
   assert.equal(w.useItem, null);
+});
+
+test('with the engine state the item packets are not decided here: ground items and the item in use are read back', () => {
+  let ground = [{ guid: 77, code: fourcc('gld'), mode: 3, x: 5, y: 6, quality: 2, flags: 0x200000, gold: 321 }];
+  let using = null;
+  const w = createRealmWorld({ ...tables(), groundItems: () => ground, useItemState: () => using });
+  w.setOwner(GUID);
+  feed(w, itemPacket(10, 4, { mode: 3, x: 1, y: 2, code: 'hax' }));   // the engine's job: the page keeps nothing of it
+  feed(w, Uint8Array.from([0x3f, 0, ...u32le(10), 0xff, 0xff]));
+  assert.equal(w.useItem, null);
+  const views = w.itemViews();
+  assert.equal(views.length, 1);
+  assert.deepEqual([views[0].id, views[0].mode, views[0].x, views[0].y, views[0].goldAmount, views[0].landed], [77, 3, 5, 6, 321, true]);
+  using = { id: 10, kind: 0 };
+  assert.deepEqual(w.useItem, using);
+  ground = [];
+  feed(w, Uint8Array.from([0x0a, 4, ...u32le(77)]));
+  assert.equal(w.itemViews().length, 0);
+});
+
+test('an engine build without the ground read keeps the page decisions', () => {
+  const w = createRealmWorld({ ...tables(), groundItems: () => null }); w.setOwner(GUID);
+  feed(w, itemPacket(10, 4, { mode: 3, x: 1, y: 2, code: 'hax' }));
+  assert.equal(w.itemViews().length, 1);
 });

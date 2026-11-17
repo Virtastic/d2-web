@@ -6,6 +6,7 @@
 import { decodeDatPalette, decodeDc6 } from './d2-formats.mjs';
 import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 import { createPanelChrome, BORDER_LEFT } from './panel-chrome.mjs';
+import { partyRowMode } from './client-rules.mjs';
 import { relationPacket, partyRequestPacket } from './bnet-party.mjs';
 
 const MENU = 'data\\global\\ui\\Menu\\';
@@ -38,9 +39,7 @@ const NAME_CUT = { alone: 0x88, party: 0x60 };
 
 // D2Win text colours: 0 white, 1 red, 2 green, 8 orange.
 export function rowColour(row, own) {
-  if (row.hostile) return 1;
-  if (row.party !== PARTY_NONE) return row.party === own.party ? 2 : 8;
-  return 0;
+  return partyRowMode(row.party !== PARTY_NONE ? 2 : 1, row.party, own.party, !!row.hostile);
 }
 
 // The roster as rows: everyone but the local player, in roster order, at most MOST_ROWS. `roster` may be a

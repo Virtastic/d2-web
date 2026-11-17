@@ -124,7 +124,7 @@ export function realmMonsterAnimationActor(monster, gameFrame) {
     frameCountPrecise: monster.frameCountPrecise, animSpeed: monster.animSpeed, gameFrame,
     hasAnimSequence: (monster.animationFlags & 0x01) !== 0, seqMode: monster.animationFlags >> 4,
     supportsDeadMode: (monster.animationFlags & 0x02) !== 0,
-    modeEvents: monster.modeEvents ?? [] };
+    modeEvents: monster.modeEvents ?? [], cofPath: monster.cofPath };
 }
 
 // 1.13c D2Common+0x43C30 (D2Common_10884_COMPOSIT_unk): a monster in MONMODE_KNOCKBACK (13) resolves its COF with the GH token -- no KB COF exists.
@@ -157,7 +157,12 @@ export function loadMonsterAnimation(read, actor) {
   if (!/^[\x21-\x7e]{2,4}$/.test(actor.code)) throw new Error(`invalid monster code ${actor.code}`);
   // Mode 14 (SQ) is a MonSeq sequence: retail draws each step with the sequence's own mode (dwSeqMode), no SQ COF exists.
   const mode = actor.mode === 14 && actor.hasAnimSequence ? actor.seqMode : actor.mode;
-  const token = monsterModeToken(mode);
+  // The engine's composite-path routine (D2Common+0x43C30) names the COF: `...\COF\<code><token><weapon class>.COF`.
+  // A realm monster carries it (d2_realm_client_monster_cof_path); only an actor without one (local-game units)
+  // still resolves the token and weapon class here.
+  const named = typeof actor.cofPath === 'string' ? /\\COF\\([^\\]+)\.COF$/i.exec(actor.cofPath) : null;
+  const engineName = named && named[1].toUpperCase().startsWith(actor.code.toUpperCase()) ? named[1].slice(actor.code.length).toUpperCase() : null;
+  const token = engineName ? engineName.slice(0, 2) : monsterModeToken(mode);
   let cof, weaponClass;
   const usesBaseWeaponClass = mode === 4 || mode === 5;
   // Retail's monster asset list contains only DTHTH/DDHTH death COFs. Keep
@@ -166,7 +171,7 @@ export function loadMonsterAnimation(read, actor) {
   const deathMode = actor.mode === 0 || actor.mode === 12;
   const exactWeaponClass = usesBaseWeaponClass && typeof actor.baseWeaponClass === 'string' && /^[A-Z0-9]{1,4}$/.test(actor.baseWeaponClass)
     ? actor.baseWeaponClass : null;
-  const candidates = deathMode ? ['HTH']
+  const candidates = engineName ? [engineName.slice(2)] : deathMode ? ['HTH']
     : exactWeaponClass ? [exactWeaponClass] : ['HTH', '1HS', '1HT', '2HS', '2HT'];
   for (const candidate of candidates) {
     try { cof = decodeOnce(read(`data\\global\\MONSTERS\\${actor.code}\\COF\\${actor.code}${token}${candidate}.COF`), 'cof', decodeCof); weaponClass = candidate; break; }

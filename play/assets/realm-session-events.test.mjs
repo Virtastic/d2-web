@@ -59,3 +59,10 @@ test('the page takes the session events once per delivery and has no second line
   assert.match(shell, /unitSounds\?\.play\(\{ unitType: type, unitId: id, classId, soundEvent: sound/);
   assert.doesNotMatch(shell, /rosterEventLine|tradeEventLine/);
 });
+
+test('the server interface update (0x77) reaches the page with its code', () => {
+  const seen = [];
+  const p = createRealmSessionPresenter({ uiUpdate: (code) => seen.push(code) });
+  assert.equal(p.present([ev(0x77, 16), ev(0x77, 21), ev(0x77, 17)]), 3);
+  assert.deepEqual(seen, [16, 21, 17]);
+});

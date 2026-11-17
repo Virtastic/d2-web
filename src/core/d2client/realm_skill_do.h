@@ -28,11 +28,15 @@ int d2client_realm_40550(D2UnitStrc* unit, int skillId);
 int d2client_realm_a2f60(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 2
 int d2client_realm_14f40(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 16
 int d2client_realm_15da0(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 17
+int d2client_realm_15ab0(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 19
 int d2client_realm_15c40(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 18
 int d2client_realm_15820(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 20
 int d2client_realm_14fd0(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 21
 
 int d2client_realm_73cb0(D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host); // do 25
+
+// 1.13c D2Client+0x73B60: a client missile's init step (D2MissileStrc +0x54, its word +0x58 is `i`).
+void d2client_realm_73b60(D2UnitStrc* missile, int32_t i);
 
 // Runs do function `fn`; 0 when the function did nothing (or `fn` is not ported).
 int d2client_realm_skill_do(int fn, D2UnitStrc* unit, int skillId, int level, const RealmSkillDoHost& host);

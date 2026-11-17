@@ -18,6 +18,13 @@ static_assert(offsetof(FloorRect, bottom) == 0x20, "rect");
 
 extern "C" void d2_client_13560(void*, int32_t, void*, int32_t);
 
+// 1.13c D2Client+0x13CE0 (the rectangle gate): half-open on both axes.
+static inline bool floor_in_rect(int32_t l, int32_t t, int32_t r, int32_t b, int32_t x, int32_t y) { return l <= x && x < r && t <= y && y < b; }
+// The browser's floor submission gate calls this one.
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_floor_submit_visible(int32_t left, int32_t top, int32_t right, int32_t bottom, int32_t x, int32_t y) {
+    return floor_in_rect(left, top, right, bottom, x, y);
+}
+
 // The callees are other D2Client functions (0x13390.. 0x138C0, 0x80940/0x80A70) and D2Gfx 10076; `call` is their one
 // door: rva, eax/ecx/edx, the stack words in push order (top first), the word count and the stack block's address.
 typedef void (*FloorCallee)(uint32_t rva, uint32_t eax, uint32_t ecx, uint32_t edx, const uint32_t* st, uint32_t n, uint32_t blk);
@@ -29,7 +36,7 @@ extern "C" void d2_client_13ce0(FloorCtx* c, FloorTile* t, uint32_t p2, int32_t 
     if (t->flags & 0x408) return;
     FloorRect* r = (FloorRect*)(uintptr_t)c->rect;   // ctx[9] + 0x14 is never null in a running game (else the retail fatal path)
     FloorSub* s = (FloorSub*)(uintptr_t)t->sub;
-    if (!(r->left <= x && x < r->right && r->top <= y && y < r->bottom && s->gate == 0)) return;
+    if (!floor_in_rect(r->left, r->top, r->right, r->bottom, x, y) || s->gate != 0) return;
     static uint8_t blk[736];
     uint32_t b = (uint32_t)(uintptr_t)blk, sub = t->sub, bit = s->b7 & 1;
     auto C = [&](uint32_t rva, uint32_t a, uint32_t cx, uint32_t d, std::initializer_list<uint32_t> w) {

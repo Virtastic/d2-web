@@ -20,12 +20,18 @@ export function parseItemLines(raw) {
 // Retail's line order for an item no vendor is selling: the name, then the property lines. P8j's
 // colour rule: a magic (quality 4) name is D2Win blue 3, otherwise white; the engine's own
 // "\x01<digit>" markers colour each property line (1 red unmet requirement, 3 blue magical).
+// The name colour rule is the engine's (src/core/d2client/item_name_colour_93450.cpp, d2_client_item_name_colour); the shell
+// installs the export, and the same table runs here only before the engine loads.
+let colourEngine = null;
+export const setItemNameColourEngine = (fn) => { colourEngine = fn; };
+export const itemNameColour = (q, f) => (colourEngine ? colourEngine(q, f)
+  : q >= 4 && q <= 9 ? [3, 2, 9, 4, 8, 10][q - 4] : (f & 0x800 || f & 0x400000) ? 5 : 0);
 export function itemTooltipSpec(h) {
   // D2Client+0x93450: quality 4..9 -> D2Win colour 3,2,9,4,8,10 (magic blue,
   // set green, rare yellow, unique gold, crafted orange, tempered dark green); any other quality is grey (5)
   // when socketed (0x800) or ethereal (0x400000), else white.
   const q = h?.quality, f = h?.itemFlags | 0;
-  const qc = q >= 4 && q <= 9 ? [3, 2, 9, 4, 8, 10][q - 4] : (f & 0x800 || f & 0x400000) ? 5 : 0;
+  const qc = itemNameColour(q | 0, f);
   const sell = h?.sell >= 0 ? [`${h.sellLabel}${h.sell}`] : [];   // D2Client+0x46230: "Sell value: N", last line
   return { lines: [h?.name || h?.code || '', ...(h?.props || [])].filter((line) => line !== '').concat(sell),
     colours: [qc, ...(h?.propColours || [])] };

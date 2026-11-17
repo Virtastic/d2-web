@@ -294,7 +294,7 @@ export const POPUP = {
   strings: { ok: 5102, cancel: 5103, hardcore: 5303 },
 };
 
-export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCreate, onCancel, onSound, string = () => '', documentObject = globalThis.document, realm = false }) {
+export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCreate, onCancel, onSound, string = () => '', nameOk = (n) => n.length >= 2, documentObject = globalThis.document, realm = false }) {
   const palette = decodeDatPalette(read(CREATE_ASSETS.palette));
   const fontPalette = decodeDatPalette(read(FRONTEND.palette));
   const background = composeTiled(decodeDc6(read(CREATE_ASSETS.background)), palette, TITLE_COLUMNS, documentObject);
@@ -502,7 +502,8 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
   const isButtonHeld = (token) => isControlHeld(pressed, token,
     pointer ? hitControl({ x: pointer[0], y: pointer[1] }) : null);
 
-  const canCreate = () => chosen >= 0 && name.trim().length >= 2;
+  // The name rule is the engine's (D2Launch's own validator); `nameOk` is it, the default only a test seam.
+  const canCreate = () => chosen >= 0 && nameOk(name.trim());
   // The screen as retail's init leaves it after a refusal or a declined confirmation: no class
   // chosen, no hover, an empty name box, both boxes at their defaults.
   const restart = () => {

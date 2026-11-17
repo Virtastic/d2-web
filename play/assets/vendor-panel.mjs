@@ -20,6 +20,7 @@
 // on the cursor over the grid sells that item. The shell binds both (vendor-offer-click.mjs).
 import { gridCelAt } from './item-cel-place.mjs';
 import { placeItemTip } from './item-tooltip.mjs';
+import { gridCellAt } from './grid-cell.mjs';
 import { createFont, decodeFontTbl, FRONTEND, textColourPalette } from './frontend.mjs';
 import { BORDER_LEFT, BORDER_RIGHT, createPanelChrome } from './panel-chrome.mjs';
 import { recordDc6, recordPrim } from './drawlist.mjs';
@@ -195,8 +196,10 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, s
     itemAt(px, py, width, height, state) {
       split = SMITH_CLASSES.has(state?.classId);
       const [x, y] = toScreen(width, height, px, py);
-      const gx = Math.floor((x - L.gridLeft) / L.cell), gy = Math.floor((y - L.gridTop) / L.cell);
-      if (gx < 0 || gx >= L.columns || gy < 0 || gy >= L.rows) return null;
+      // D2Client+0x96AA0's cell rule (grid-cell.mjs): the engine's two divisions and grid bound.
+      const hit = gridCellAt({ left: L.gridLeft, top: L.gridTop, cellWidth: L.cell, cellHeight: L.cell, columns: L.columns, rows: L.rows }, x, y);
+      if (!hit) return null;
+      const gx = hit.x, gy = hit.y;
       // An item covers its whole footprint -- the engine's own ItemsTxt nInvWidth/nInvHeight when the
       // vendor presentation carries them -- and a click anywhere on it buys it.  Draw order is input
       // order, so the final matching cel is visually on top: a grouped Weapons page can share a cell

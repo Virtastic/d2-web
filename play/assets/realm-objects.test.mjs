@@ -229,8 +229,6 @@ test('a click on the stash walks to it, uses it on arrival, and the server reply
   player = { x: 0x0f92 + 1, y: 0x146d + 1 };
   input.tick();
   assert.deepEqual(out.at(-1), [0x13, 2, 0, 0, 0, STASH, 0, 0, 0]);
-  feed(w, [0x77, 16]);
-  assert.deepEqual(w.takeUiEvents(), [16]);
 });
 
 // The engine's object unit is the one model. These fail if the page regains an object packet parser, an object

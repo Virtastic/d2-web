@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstring>
 #include "cl_env.h"
+#include "stats_cell_bcea0.h"
 struct D2CBCEA0G { void* ctx; uint32_t (*at)(void* ctx, uint32_t rva); };
 namespace {
 constexpr uint32_t kGfxDraw = 0xd096, kStr = 0xd1ec, kHover = 0xd384, kFont = 0xd3a8, kWidth = 0xd35a, kText = 0xd37e,
@@ -229,7 +230,7 @@ extern "C" void d2cl_bcea0(const cl::Env& e, const D2CBCEA0G& g) {
         int32_t v = (int32_t)e.H(kStat, unit, w.stat, 0);
         const int32_t base = (int32_t)e.H(kStatBase, unit, w.stat, 0);
         uint32_t& col = p.D(0x10);
-        const auto cmpc = [&] { if (v > base) col = 3; else if (v < base) col = 1; };
+        const auto cmpc = [&] { col = d2cl_cell::cmpColour(v, base, col); };
         bool numDraw = false;
         switch (w.stat) {
         case 6: {
@@ -269,17 +270,12 @@ extern "C" void d2cl_bcea0(const cl::Env& e, const D2CBCEA0G& g) {
             }
             if (e.H(hi, unit)) col = 3;
             if (e.H(lo, unit)) col = 1;
-            int32_t cap = (int32_t)e.H(kStat, unit, mxs, 0);
-            if (p.G(0x119854)) v = (int32_t)((uint32_t)v + e.R(p.D(0x14)));
-            else if (p.G8(0x11c390) == 1) v = (int32_t)((uint32_t)v - 0x14);
-            else if (p.G8(0x11c390) == 2) v = (int32_t)((uint32_t)v - 0x32);
-            cap = (int32_t)((uint32_t)cap + 0x4b); if (cap >= 0x5f) cap = 0x5f;
-            if (v <= -100) v = -100;
-            if (v >= cap) {
-                v = cap;
-                if (col != 3) { col = 4; p.itoa(0x98, v); break; }
-            }
-            if (v < 0) col = 1;
+            const int32_t cap = (int32_t)e.H(kStat, unit, mxs, 0);
+            int32_t adj = 0;
+            if (p.G(0x119854)) adj = (int32_t)e.R(p.D(0x14));
+            else if (p.G8(0x11c390) == 1) adj = -0x14;
+            else if (p.G8(0x11c390) == 2) adj = -0x32;
+            col = d2cl_cell::resistCell(v, cap, col, adj, &v);
             p.itoa(0x98, v);
             break;
         }

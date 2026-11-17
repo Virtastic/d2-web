@@ -1,6 +1,7 @@
 // 1.13c D2Client+0x278B0: stamina bar and its hover text. Every callee goes through the injected dispatcher;
 // the Unicode imports are keyed by their IAT slot RVA (0xCEB00 ctor, 0xCEAB4 sprintf).
 #include "d2client_callee.h"
+#include "hud_bar_rules.h"
 // 1.13c D2Client+0x278B0
 extern "C" void d2c_278b0(const D2cSvc& v, uint32_t unit /*0x11BBFC*/, int32_t w /*0xDBC48*/, int32_t h /*0xDBC4C*/, int32_t mouseX /*0x11B828*/, int32_t mouseY /*0x11B824*/, uint8_t* pal /*0x11C4B8..BA*/) {
     int32_t cur = (int32_t)d2c_call(v, 0x26b20, 0xa, 0, 0, 0, 0);
@@ -10,11 +11,9 @@ extern "C" void d2c_278b0(const D2cSvc& v, uint32_t unit /*0x11BBFC*/, int32_t w
         pal[1] = (uint8_t)d2c_call(v, 0xd390, 0, 0, 0, 0, 0, 0xf4, 0xc0, 0x4c);
         pal[2] = (uint8_t)d2c_call(v, 0xd390, 0, 0, 0, 0, 0, 0, 0, 0xff);
     }
-    uint32_t col = pal[1];
-    if (mx + 5 < cur || d2c_call(v, 0xcbda, 0, 0, 0, 0, 0, unit, 0x18)) { col = pal[2]; mx = cur; }
-    int32_t width;
-    if (mx > 0) { width = (int32_t)((uint32_t)cur * 0x66u) / mx; if (width < 0x19) col = pal[0]; }
-    else { width = 0; col = pal[0]; }
+    const d2cl_hud::Stamina bar = d2cl_hud::staminaBar(cur, mx, d2c_call(v, 0xcbda, 0, 0, 0, 0, 0, unit, 0x18) != 0);   // hud_bar_rules.h
+    const uint32_t col = pal[bar.slot];
+    const int32_t width = bar.width;
     int32_t w2 = (w - (w >> 31)) >> 1;
     int32_t x1 = w2 - 0x7f, y1 = h - 0x1b;
     d2c_call(v, 0xd0ba, 0, 0, 0, 0, 0, (uint32_t)x1, (uint32_t)y1, (uint32_t)(x1 + width), (uint32_t)(y1 + 0x12), col, 2);

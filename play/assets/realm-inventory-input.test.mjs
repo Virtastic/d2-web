@@ -69,7 +69,7 @@ function panelOver(layout) {
 }
 
 function joined() {
-  const t = tables(), world = createRealmWorld(t); world.setOwner(OWNER);
+  const t = tables(), world = createRealmWorld({ ...t, heroStat: (stat) => ({ 14: 4321, 15: 70000 })[stat] ?? 0 }); world.setOwner(OWNER);
   const feed = (...packets) => packets.forEach((p) => world.feed(p, (b) => b.length));
   const sent = []; let clock = 0, tabs = 0;
   const input = createRealmInput({ transmit: (bytes) => { sent.push(hex(bytes)); }, scene: () => ({ ready: true, player: { x: 10, y: 20 } }), now: () => (clock += 1000) });
@@ -97,7 +97,7 @@ test('the join stream fills the panel: carried, worn and belt items, gold, and t
   assert.deepEqual([by[11].invPage, by[11].gridX, by[11].invFile], [PAGE.INVENTORY, 5, 'invax']);
   assert.deepEqual([by[12].mode, by[12].bodyLoc, by[12].invFile], [1, 1, 'invcap']);
   assert.deepEqual([by[13].invPage, by[13].gridX], [PAGE.NONE, 1]);
-  assert.deepEqual([g.world.gold, g.world.stashGold, g.world.cursorId], [4321, 70000, 0]);
+  assert.deepEqual([g.world.gold, g.world.stashGold, g.world.cursorId], [4321, 70000, 0]);   // the heroStat stub stands for the engine's stats
   assert.deepEqual(g.layout.grid, { left: 419, top: 315, columns: 10, rows: 4, cellWidth: 29, cellHeight: 29 });
   assert.deepEqual(g.layout.slots, { 4: { left: 420, right: 476, top: 110, bottom: 220 }, 1: { left: 530, right: 588, top: 60, bottom: 118 }, 5: { left: 650, right: 706, top: 110, bottom: 220 } });
 });

@@ -80,7 +80,7 @@ export function realmFrameReads(resources, world = null, tables = null, playerCl
   // Life, mana and stamina tick per packet: their current values stay the ones the orbs and the stamina bar read.
   if (heroScreen && resources) { heroScreen[4] = screen[4]; heroScreen[11] = screen[11]; heroScreen[13] = screen[13]; }
   const reads = { characterScreen: heroScreen ?? (resources ? (hud ? hud.characterSlots(playerClass, screen) && screen : screen.slice(0, 11)) : null), advancement,
-    attributeTotals: (heroScreen && hero.stat ? { strength: hero.stat(0), energy: hero.stat(1), dexterity: hero.stat(2), vitality: hero.stat(3) } : hud?.attributeTotals()) ?? null, questWords: quests?.player ?? null,
+    attributeTotals: (heroScreen && hero.stat ? { strength: hero.stat(0), energy: hero.stat(1), dexterity: hero.stat(2), vitality: hero.stat(3) } : hud?.attributeTotals()) ?? null, questWords: quests?.player ?? null, questStates: quests?.states ?? null,
     classSkills: hud?.classSkills(playerClass, skillLevels, skillBonuses) ?? null, waypointTable: hud?.waypointTable() ?? null,
     hotkeys: Array.from({ length: 8 }, (_, i) => ({ skill: hotkeys?.[i]?.skill ?? -1, left: Boolean(hotkeys?.[i]?.left) })), beltIndex: 2, beltHudBoxes: null, beltBoxCount: 0 };
   if (!world || !tables) return reads;

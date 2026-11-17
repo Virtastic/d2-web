@@ -1125,6 +1125,7 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
   const u32at = (p) => { const b = Module.HEAPU8, o = Number(p); return (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0; };
   const put32 = (p, v) => { const b = Module.HEAPU8, o = Number(p); b[o] = v & 0xff; b[o + 1] = (v >>> 8) & 0xff; b[o + 2] = (v >>> 16) & 0xff; b[o + 3] = (v >>> 24) & 0xff; };
   const call = (n, rt, a, v) => Module.ccall(n, rt, a, v);
+  const cofPaths = new Map();
   let weaponSet = 0;
   const hotkeys = Array.from({ length: 16 }, () => ({ skill: -1, left: false, owner: 0xffffffff }));
   const rd = (p, n) => Array.from(Module.HEAPU8.subarray(Number(p), Number(p) + n));
@@ -1544,6 +1545,19 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
             flags: r[9], holder: r[10], fillers: r[11] & 0xff, applied: (r[11] & 0x100) !== 0 }; });
       } finally { Module._free(p); }
     },
+    // The items lying on the ground in the wasm client (placed by 0x9C, taken away by 0x0A and 0x03), in the shape
+    // d2gsClientItems gives, with the gold pile's amount as `gold`. Null when the engine build has no such read.
+    d2gsClientGroundItems: () => {
+      if (!Module._d2_realm_client_ground_items) return null;
+      const CAP = 512, p = Module._malloc(CAP * 48);
+      try {
+        const n = call('d2_realm_client_ground_items', 'number', ['bigint', 'number'], [BigInt(p), CAP]);
+        const w = new Uint32Array(Module.HEAPU8.buffer.slice(Number(p), Number(p) + n * 48));
+        return Array.from({ length: n }, (_, i) => { const r = w.subarray(i * 12, i * 12 + 12);
+          return { guid: r[0], classId: r[1], code: r[2], mode: r[3], x: r[4], y: r[5], page: r[6], bodyLoc: r[7], quality: r[8],
+            flags: r[9], holder: r[10], gold: r[2] === 0x20646c67 ? call('d2_realm_client_item_gold', 'number', ['number'], [r[0]]) : -1 }; });
+      } finally { Module._free(p); }
+    },
     // The item-box colour tests of a held item against the selected player (the bits of the local game's read); 0 = not found.
     d2gsClientItemBoxState: (guid) => (Module._d2_realm_client_item_box_state
       ? call('d2_realm_client_item_box_state', 'number', ['number'], [guid >>> 0]) >>> 0 : 0),
@@ -1572,6 +1586,15 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
         difficulty: view.getUint32(60, true), mapHideCount: view.getUint32(64, true), mapRevision: view.getUint32(68, true) };
     },
     d2gsClientMonsters: () => {
+      // The COF the engine names for a class and the mode the unit draws (a sequence step draws its own mode);
+      // a pure function of the tables, so one answer per pair.
+      const monsterCofPath = (classId, mode, flags) => {
+        if (!Module._d2_realm_client_monster_cof_path) return undefined;
+        const drawn = mode === 14 && (flags & 0x01) ? flags >> 4 : mode, key = classId * 16 + drawn;
+        let path = cofPaths.get(key);
+        if (path === undefined) cofPaths.set(key, path = call('d2_realm_client_monster_cof_path', 'string', ['number', 'number'], [classId, drawn]) || null);
+        return path || undefined;
+      };
       const count = call('d2_realm_client_monster_count', 'number', [], []);
       let modeEvents = [];
       if (Module._d2_realm_client_monster_death_mode_event_count && Module._d2_realm_client_monster_death_mode_events) {
@@ -1609,7 +1632,7 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
           framePrecise: view.getUint32(at + 24, true), frameCountPrecise: view.getUint32(at + 28, true),
           components: Array.from({ length: 16 }, (_, i) => fourcc(view.getUint32(at + 32 + i * 4, true))),
           animSpeed: view.getUint16(at + 96, true), direction: view.getUint8(at + 98),
-          animationFlags: view.getUint8(at + 99), modeEvents: eventsByGuid.get(view.getUint32(at + 8, true)) ?? [],
+          animationFlags: view.getUint8(at + 99), cofPath: monsterCofPath(view.getUint32(at + 12, true), view.getUint32(at + 20, true), view.getUint8(at + 99)), modeEvents: eventsByGuid.get(view.getUint32(at + 8, true)) ?? [],
           x: view.getUint32(at + 100, true), y: view.getUint32(at + 104, true),
           hpPct: view.getUint32(at + 108, true), typeFlags: view.getUint32(at + 112, true) };
       }).map((monster) => withLife(withPrecise(monster, 1), 1));
