@@ -428,18 +428,6 @@ D2DrlgLevelStrc* __stdcall DRLG_GetLevel(D2DrlgStrc* pDrlg, int nLevelId)
 	return DRLG_AllocLevel(pDrlg, nLevelId);
 }
 
-//D2Common.0x6FD749D0
-// not-1.13c: retail has no such helper; DUNGEON_GetHoradricStaffTombLevelId (D2Common+0x3B270) asserts the act and returns act+0x48 itself
-int __fastcall DRLG_GetHoradricStaffTombLevelId(D2DrlgStrc* pDrlg)
-{
-	if (pDrlg)
-	{
-		return pDrlg->nStaffTombLevel;
-	}
-
-	return 0;
-}
-
 //D2Common.0x6FD749E0
 // 1.13c D2Common+0x2D470
 int __fastcall DRLG_GetDirectionFromCoordinates(D2DrlgCoordStrc* pDrlgCoord1, D2DrlgCoordStrc* pDrlgCoord2)
@@ -518,13 +506,6 @@ void __fastcall DRLG_CreateRoomForRoomEx(D2DrlgStrc* pDrlg, D2DrlgRoomStrc* pDrl
 		pDrlgRoom->pRoom = DUNGEON_AllocRoom(pDrlg->pAct, pDrlgRoom, &pDrlgCoords, &pDrlgRoom->pTileGrid->pTiles, nD2webRoomSeed, dwFlags);
 		{ extern void d2client_unitseed_room(const D2ActiveRoomStrc*, uint32_t); d2client_unitseed_room(pDrlgRoom->pRoom, (uint32_t)nD2webRoomSeed); }   // d2-web: the client room's seed
 	}
-}
-
-//D2Common.0x6FD74B30
-// not-1.13c: retail has no such function; DUNGEON_GetWarpCoordinatesFromRoom (D2Common+0x3B1A0) computes room->level->warp-x array inline
-int* __fastcall DRLG_GetRoomCenterX_RoomWarpXFromRoom(D2DrlgRoomStrc* pDrlgRoom)
-{
-	return pDrlgRoom->pLevel->nRoom_Center_Warp_X;
 }
 
 //D2Common.0x6FD74B40

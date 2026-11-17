@@ -580,14 +580,10 @@ void __fastcall DRLG_UpdateAndFreeInactiveRooms(D2DrlgStrc* pDrlg);
 D2COMMON_DLL_DECL D2DrlgLevelStrc* __fastcall DRLG_AllocLevel(D2DrlgStrc* pDrlg, int nLevelId);
 //D2Common.0x6FD749A0 (#10005)
 D2COMMON_DLL_DECL D2DrlgLevelStrc* __stdcall DRLG_GetLevel(D2DrlgStrc* pDrlg, int nLevelId);
-//D2Common.0x6FD749D0
-int __fastcall DRLG_GetHoradricStaffTombLevelId(D2DrlgStrc* pDrlg);
 //D2Common.0x6FD749E0
 int __fastcall DRLG_GetDirectionFromCoordinates(D2DrlgCoordStrc* pDrlgCoord1, D2DrlgCoordStrc* pDrlgCoord2);
 //D2Common.0x6FD74A40
 void __fastcall DRLG_CreateRoomForRoomEx(D2DrlgStrc* pDrlg, D2DrlgRoomStrc* pDrlgRoom);
-//D2Common.0x6FD74B30
-int* __fastcall DRLG_GetRoomCenterX_RoomWarpXFromRoom(D2DrlgRoomStrc* pDrlgRoom);
 //D2Common.0x6FD74B40
 void __fastcall DRLG_ComputeLevelWarpInfo(D2DrlgLevelStrc* pLevel);
 //D2Common.0x6FD74C10 (#10006)

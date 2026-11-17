@@ -65,7 +65,7 @@ void __stdcall DUNGEON_FreeAct(D2DrlgActStrc* pAct)
 
 	if (pAct->pEnvironment)
 	{
-		ENVIRONMENT_FreeDrlgEnvironment(pAct->pMemPool, pAct->pEnvironment);
+		D2_FREE_POOL(pAct->pMemPool, pAct->pEnvironment);
 		pAct->pEnvironment = NULL;
 	}
 
@@ -1136,7 +1136,7 @@ int* __stdcall DUNGEON_GetWarpCoordinatesFromRoom(D2ActiveRoomStrc* pRoom)
 {
 	D2_ASSERT(pRoom);
 
-	return DRLG_GetRoomCenterX_RoomWarpXFromRoom(pRoom->pDrlgRoom);
+	return pRoom->pDrlgRoom->pLevel->nRoom_Center_Warp_X;
 }
 
 //D2Common.0x6FD8D220 (#10091)
@@ -1183,7 +1183,7 @@ int __stdcall D2Common_10095(D2ActiveRoomStrc* pRoom, int nX, int nY)
 		return 0;
 	}
 
-	return DRLGLOGIC_GetRoomCoordListIndex(pFound->pDrlgRoom, nX, nY);
+	return DRLGLOGIC_GetRoomCoordListIndex(pFound->pDrlgRoom, nX / 5, nY / 5);
 }
 
 //D2Common.0x6FD8D3A0 (#10096)
@@ -1252,12 +1252,12 @@ int __stdcall DUNGEON_GetTownLevelIdFromAct(D2DrlgActStrc* pAct)
 }
 
 //D2Common.0x6FD8D520 (#10047)
-// 1.13c D2Common+0x3B080: a null act or a null drlg gives 0
+// 1.13c D2Common+0x3B080 (#10518): a null act or a null drlg gives 0
 int __stdcall DUNGEON_GetHoradricStaffTombLevelId(D2DrlgActStrc* pAct)
 {
 	if (pAct && pAct->pDrlg)
 	{
-		return DRLG_GetHoradricStaffTombLevelId(pAct->pDrlg);
+		return pAct->pDrlg->nStaffTombLevel;
 	}
 
 	return 0;

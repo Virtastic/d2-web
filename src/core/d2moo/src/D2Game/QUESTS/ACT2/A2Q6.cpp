@@ -113,12 +113,6 @@ D2NPCMessageTableStrc gpAct2Q6NpcMessages[] =
 };
 
 
-// not-1.13c: retail's Tyrael AI (D2Game+0x19880) calls the unit iterator 0xDFCC0 with callback 0xC4CC0 directly; there is no wrapper
-void __fastcall ACT2Q6_AttachCompletionSoundToPlayers(D2GameStrc* pGame)
-{
-	SUNIT_IterateUnitsOfType(pGame, 0, nullptr, ACT2Q6_UnitIterate_AttachCompletionSound);
-}
-
 // 1.13c D2Game+0xC4CC0
 int32_t __fastcall ACT2Q6_UnitIterate_AttachCompletionSound(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {

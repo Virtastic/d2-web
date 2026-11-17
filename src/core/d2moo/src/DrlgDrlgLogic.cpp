@@ -493,10 +493,10 @@ void __fastcall DRLGLOGIC_AllocCoordLists(D2DrlgRoomStrc* pDrlgRoom)
 }
 
 //D2Common.0x6FD77080
-// not-1.13c: retail has no function; the callers read the coord list by tile coordinates (D2Common+0x810A0) and take its index field. This wrapper divides subtile coordinates by 5 for them.
+// 1.13c D2Common+0x819C0 (ECX = tile y, EDX = room, stack = tile x); nX and nY are tile coordinates, -1 for no coord list
 int __fastcall DRLGLOGIC_GetRoomCoordListIndex(D2DrlgRoomStrc* pDrlgRoom, int nX, int nY)
 {
-	D2RoomCoordListStrc* pRoomCoordList = sub_6FD77110(pDrlgRoom, nX / 5, nY / 5);
+	D2RoomCoordListStrc* pRoomCoordList = sub_6FD77110(pDrlgRoom, nX, nY);
 
 	if (pRoomCoordList)
 	{

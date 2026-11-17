@@ -52,8 +52,6 @@ struct D2Act2Quest6Strc							//sizeof 0x68
 
 
 
-//D2Game.0x6FCA4650
-void __fastcall ACT2Q6_AttachCompletionSoundToPlayers(D2GameStrc* pGame);
 //D2Game.0x6FCA4660
 int32_t __fastcall ACT2Q6_UnitIterate_AttachCompletionSound(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData);
 //D2Game.0x6FCA46A0

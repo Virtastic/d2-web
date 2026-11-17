@@ -20,9 +20,5 @@ BOOL __fastcall DRLGOUTWILD_TestSpawnRiver(D2DrlgLevelStrc* pLevel, int nX);
 void __fastcall DRLGOUTWILD_SpawnRiver(D2DrlgLevelStrc* pLevel, int nX);
 //D2Common.0x6FD85390
 BOOL __fastcall DRLGOUTWILD_SpawnCliffCaves(D2DrlgLevelStrc* pLevel, int nX, int nY);
-//D2Common.0x6FD853F0
-void __fastcall DRLGOUTWILD_SpawnTownTransitionsAndCaves(D2DrlgLevelStrc* pLevel);
-//D2Common.0x6FD85520
-void __fastcall DRLGOUTWILD_SpawnSpecialPresets(D2DrlgLevelStrc* pLevel);
 //D2Common.0x6FD85920
 void __fastcall DRLGOUTWILD_SpawnCottage(D2DrlgLevelStrc* pLevel, int nLvlPrestId, int a3);

@@ -4735,49 +4735,6 @@ void __fastcall AITHINK_Fn050_Mephisto(D2GameStrc* pGame, D2UnitStrc* pUnit, D2A
 }
 
 #ifdef D2_VERSION_HAS_UBERS
-// not-1.13c: retail's uber Mephisto/Diablo think slots (AI 146 -> 0x7B4E0, AI 147 -> 0xA39D0, table 0x10E788)
-// are empty `ret`s, so nothing in 1.13c picks an uber-minion target; kept only for AITHINK_Fn147_UberDiablo.
-//1.14d: 0x005F8010
-D2UnitStrc* __fastcall AITHINK_GetTargetForUberMinion(D2GameStrc* pGame, D2UnitStrc* pUnit)
-{
-	D2UnitStrc* pTarget = nullptr;
-
-	const int32_t nX = CLIENTS_GetUnitX(pUnit);
-	const int32_t nY = CLIENTS_GetUnitY(pUnit);
-
-	int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(pUnit));
-	for (int32_t i = 0; i < 8; i++)
-	{
-		D2TargetNodeStrc* pTargetNode = pGame->pTargetNodes[i];
-		if (pTargetNode)
-		{
-			D2UnitStrc* pPlayer = pTargetNode->pUnit;
-			if (DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(pPlayer)) == nLevelId
-			&& !SUNIT_IsDead(pPlayer)
-			&& AIUTIL_GetDistanceToCoordinates_NoUnitSize(pPlayer, nX, nY) < 1020)
-			{
-				D2_ASSERT(pPlayer && pPlayer->dwUnitType == UNIT_PLAYER);
-				const int32_t nClassChance[7] = {
-					35, // Amazon
-					40, // Sorceress
-					30, // Necromancer
-					20, // Paladin
-					0,  // Barbarian
-					25, // Druid
-					10  // Assassin
-				};
-				// This check always returns a positive value, is it a bug?
-				if ((ITEMS_RollRandomNumber(&pUnit->pSeed) % 20) + nClassChance[pPlayer->dwClassId] > -1)
-				{
-					pTarget = pPlayer;
-				}
-			}
-		}
-	}
-
-	return pTarget;
-}
-
 // 1.13c D2Game+0x7B4E0
 // Retail's AI table slot 146 (UberMephisto, table 0x10E788) holds an empty think: a bare `ret`.
 // The D2MOO 1.11/1.14d uber body (minion spawning plus the Mephisto think) is not in 1.13c.
@@ -9091,7 +9048,17 @@ int32_t __fastcall sub_6FCE34E0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
 	const int32_t nDistance = AIUTIL_GetDistanceToCoordinates_FullUnitSize(pUnit, pOwner);
 	D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pOwner);
 
-	const int32_t a8a = std::min((PLAYERPETS_GetTotalPetCount(pOwner) >> 1) + a8, 36);
+	// 1.13c D2Game+0x1E140: the total pet count is a loop over the pet types, inlined
+	int32_t nTotalPets = 0;
+	if (pPlayerData && pPlayerData->pPlayerPets)
+	{
+		for (int32_t i = 0; i < sgptDataTables->nPetTypeTxtRecordCount; ++i)
+		{
+			nTotalPets += pPlayerData->pPlayerPets->pPetList[i].nCurrent;
+		}
+	}
+
+	const int32_t a8a = std::min((nTotalPets >> 1) + a8, 36);
 
 	if (nDistance > 1 || pOwner->dwAnimMode != 1 || a5)
 	{
@@ -11039,7 +11006,8 @@ void __fastcall AITHINK_Fn054_NpcStationary(D2GameStrc* pGame, D2UnitStrc* pUnit
 			if (ACT2Q6_IsInRangeOfTyrael(pGame, pUnit) && AITHINK_NeutralIfNoInteract_15BB0(pGame, pUnit, pMonInteract))
 			{
 				AITACTICS_ChangeModeAndTargetCoordinates(pGame, pUnit, 0, 0, 0);
-				ACT2Q6_AttachCompletionSoundToPlayers(pGame);
+				// 1.13c D2Game+0x19880 iterates players with callback D2Game+0xC4CC0 directly
+				SUNIT_IterateUnitsOfType(pGame, 0, nullptr, ACT2Q6_UnitIterate_AttachCompletionSound);
 				return;
 			}
 		}

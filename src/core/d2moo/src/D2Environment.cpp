@@ -211,13 +211,6 @@ void __fastcall ENVIRONMENT_UpdateLightColor(D2DrlgEnvironmentStrc* pEnvironment
 	pEnvironment->nBlue  = LerpLightColor(pCurrEnvironmentCycle->nBlue,  pNextEnvironmentCycle->nBlue,  dLerpRatio);
 }
 
-//D2Common.6FD8DBE0
-// not-1.13c: retail frees the environment block inline in its act teardown
-void __fastcall ENVIRONMENT_FreeDrlgEnvironment(void* pMemPool, D2DrlgEnvironmentStrc* pEnvironment)
-{
-	D2_FREE_POOL(pMemPool, pEnvironment);
-}
-
 //D2Common.0x6FD8DC00 (#10923)
 // 1.13c D2Common+0x37AF0
 BOOL __stdcall ENVIRONMENT_UpdatePeriodOfDay(D2DrlgActStrc* pAct, D2ActiveRoomStrc* pRoom)

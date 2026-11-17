@@ -1014,16 +1014,6 @@ D2SetsTxt* __stdcall DATATBLS_GetSetsTxtRecord(int nSetId)
 	return nullptr;
 }
 
-// not-1.13c: inlined in retail callers (no function at any retail address); only Items.cpp calls it
-D2SetsTxt* __stdcall DATATBLS_GetSetsTxtRecordFromSetItemId(int nSetItemId)
-{
-	if (D2SetItemsTxt* pSetItemTxt = DATATBLS_GetSetItemsTxtRecord(nSetItemId))
-	{
-		return DATATBLS_GetSetsTxtRecord(pSetItemTxt->nSetId);
-	}
-	return nullptr;
-}
-
 //D2Common.0x6FD5AE40
 // 1.13c D2Common+0x74E70
 void __fastcall DATATBLS_LoadQualityItemsTxt(HD2ARCHIVE hArchive)

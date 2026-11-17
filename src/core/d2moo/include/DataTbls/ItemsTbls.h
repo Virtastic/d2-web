@@ -660,8 +660,6 @@ inline D2SetItemsTxt* DATATBLS_GetSetItemOfSet(const D2SetsTxt* pSet, int i) {
 }
 // Inlined
 D2SetsTxt* __stdcall DATATBLS_GetSetsTxtRecord(int nSetId);
-// Inlined
-D2SetsTxt* __stdcall DATATBLS_GetSetsTxtRecordFromSetItemId(int nSetItemId);
 //D2Common.0x6FD5AE40
 void __fastcall DATATBLS_LoadQualityItemsTxt(HD2ARCHIVE hArchive);
 //D2Common.0x6FD5B250

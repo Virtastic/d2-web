@@ -1100,17 +1100,6 @@ void __fastcall AIUTIL_ToggleAiControlFlag(D2AiControlStrc* pAiControl, uint16_t
 	}
 }
 
-//D2Game.0x6FCF2E20
-// not-1.13c: retail inlines the ai-control lookup and the 0x20 flag set/clear into its callers (e.g. D2Game+0xF2540)
-void __fastcall AIUTIL_ToggleAiControlFlag0x20(D2UnitStrc* pUnit, int32_t bSet)
-{
-	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
-	if (pAiControl)
-	{
-		AIUTIL_ToggleAiControlFlag(pAiControl, 0x20, bSet);
-	}
-}
-
 //D2Game.0x6FCF2E70
 // 1.13c D2Game+0xB0BE0
 int32_t __fastcall sub_6FCF2E70(D2UnitStrc* pUnit)

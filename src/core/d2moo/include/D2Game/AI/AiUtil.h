@@ -140,8 +140,6 @@ D2UnitStrc* __fastcall sub_6FCF2CC0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_
 int32_t __fastcall AIUTIL_CheckAiControlFlag(D2AiControlStrc* pAiControl, uint16_t nFlag);
 //D2Game.0x6FCF2E00
 void __fastcall AIUTIL_ToggleAiControlFlag(D2AiControlStrc* pAiControl, uint16_t nFlag, int32_t bSet);
-//D2Game.0x6FCF2E20
-void __fastcall AIUTIL_ToggleAiControlFlag0x20(D2UnitStrc* pUnit, int32_t bSet);
 //D2Game.0x6FCF2E70
 int32_t __fastcall sub_6FCF2E70(D2UnitStrc* pUnit);
 //D2Game.0x6FCF2E90

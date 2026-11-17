@@ -82,7 +82,5 @@ void __fastcall sub_6FC7E640(D2GameStrc* pGame, D2UnitStrc* pPlayer);
 void __fastcall PLAYERPETS_IteratePets(D2GameStrc* pGame, D2UnitStrc* pPlayer, void(__fastcall* pCallback)(D2GameStrc*, D2UnitStrc*, D2UnitStrc*, void*), void* a4);
 //D2Game.0x6FC7E8B0
 D2UnitStrc* __fastcall sub_6FC7E8B0(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nPetType, int32_t a4);
-//D2Game.0x6FC7E930
-int32_t __fastcall PLAYERPETS_GetTotalPetCount(D2UnitStrc* pPlayer);
 //D2Game.0x6FC7E970
 void __fastcall D2GAME_PLAYERPETS_Last_6FC7E970(D2ClientStrc* pClient, D2UnitStrc* pPlayer);

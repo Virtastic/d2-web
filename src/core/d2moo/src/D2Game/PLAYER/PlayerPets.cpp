@@ -1039,25 +1039,6 @@ D2UnitStrc* __fastcall sub_6FC7E8B0(D2GameStrc* pGame, D2UnitStrc* pPlayer, int3
     return nullptr;
 }
 
-//D2Game.0x6FC7E930
-// not-1.13c: inlined in D2Game+0x1E140 (its only caller, AiThink.cpp:sub_6FCE34E0): a loop over nPetTypeTxtRecordCount summing nCurrent; the 1.13c layout has no function between 0x96880 and 0x96920
-int32_t __fastcall PLAYERPETS_GetTotalPetCount(D2UnitStrc* pPlayer)
-{
-    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
-    if (!pPlayerData || !pPlayerData->pPlayerPets)
-    {
-        return 0;
-    }
-
-    int32_t nPets = 0;
-    for (int32_t i = 0; i < sgptDataTables->nPetTypeTxtRecordCount; ++i)
-    {
-        nPets += pPlayerData->pPlayerPets->pPetList[i].nCurrent;
-    }
-
-    return nPets;
-}
-
 //D2Game.0x6FC7E970
 // 1.13c D2Game+0x96920 (a null player is fatal there, line 0xA2A)
 void __fastcall D2GAME_PLAYERPETS_Last_6FC7E970(D2ClientStrc* pClient, D2UnitStrc* pPlayer)

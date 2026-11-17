@@ -638,7 +638,10 @@ void __fastcall MONSTERUNIQUE_UMod26_Teleport(D2UnitStrc* pUnit, int32_t nUMod, 
     {
         D2GAME_SetSkills_6FD14C60(pUnit, SKILL_MONTELEPORT, 1, 1);
         SKILLS_SetSkillMode(SKILLS_GetHighestLevelSkillFromUnitAndId(pUnit, SKILL_MONTELEPORT), 4);
-        AIUTIL_ToggleAiControlFlag0x20(pUnit, 1);
+        if (D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit))
+        {
+            pAiControl->nAiFlags |= 0x20;
+        }
     }
 }
 

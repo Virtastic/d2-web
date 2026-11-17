@@ -4063,7 +4063,7 @@ uint32_t __stdcall ITEMS_GetSetItemsMask(D2UnitStrc* pPlayer, D2UnitStrc* pSetIt
 
 	int nFileIndex = pSetItem->pItemData->dwFileIndex;
 	D2SetItemsTxt* pSetItemTxt = DATATBLS_GetSetItemsTxtRecord(nFileIndex);
-	if(!pSetItemTxt || !DATATBLS_GetSetsTxtRecordFromSetItemId(pSetItemTxt->nSetId))
+	if(!pSetItemTxt || !DATATBLS_GetSetsTxtRecord(pSetItemTxt->nSetId))
 	{
 		return 0;
 	}
