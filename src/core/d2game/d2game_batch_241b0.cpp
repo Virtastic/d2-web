@@ -30,7 +30,6 @@
 void __fastcall MONSTERUNIQUE_SetUniqueFlag_6FC43260(D2GameStrc*, D2UnitStrc*);
 
 static int32_t add32(int32_t a, int32_t b) { return uint32_t(a) + uint32_t(b); }
-static int32_t sub32(int32_t a, int32_t b) { return uint32_t(a) - uint32_t(b); }
 
 // 1.13c D2Game+0x241B0
 extern "C" void d2game_241b0(D2UnitStrc* unit, int32_t unique)

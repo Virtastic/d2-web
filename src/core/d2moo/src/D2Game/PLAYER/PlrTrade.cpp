@@ -2218,8 +2218,8 @@ void __fastcall sub_6FC92EF0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // Opens the trade window on both clients and moves both players to trade state 3 (retail: EAX = pPlayer1, ESI = pPlayer2, stack = the two player-data blocks).
 void __fastcall PLRTRADE_OpenTradeUi(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, D2PlayerDataStrc* pPlayerData1, D2PlayerDataStrc* pPlayerData2)
 {
-    D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pPlayer1, __FILE__, __LINE__), UPDATEUI_OPENTRADE);
-    D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pPlayer2, __FILE__, __LINE__), UPDATEUI_OPENTRADE);
+    D2_CALL(D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0, D2_CALL(SUNIT_GetClientFromPlayer, pPlayer1, __FILE__, __LINE__), UPDATEUI_OPENTRADE);
+    D2_CALL(D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0, D2_CALL(SUNIT_GetClientFromPlayer, pPlayer2, __FILE__, __LINE__), UPDATEUI_OPENTRADE);
     pPlayerData1->dwTradeState = 3;
     pPlayerData2->dwTradeState = 3;
 }
