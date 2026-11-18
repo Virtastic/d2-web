@@ -1901,7 +1901,7 @@ static void NPC_GrantAkaraReset(D2UnitStrc* pPlayer, D2GameStrc* pGame)
 
 // 1.13c D2Game+0x9F9A0 (eax = skill id, esi = unit, stack level and remove): assign, then the passive and pet refresh run
 // for every id. D2MOO's D2GAME_SetSkills_6FD14C60 is the 1.10f twin, which skips the refresh for an id out of range.
-static void NPC_AssignSkill(D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t bRemove)
+void NPC_AssignSkill(D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t bRemove)
 {
     if (nSkillId >= 0 && nSkillId < sgptDataTables->nSkillsTxtRecordCount)
     {
@@ -1916,7 +1916,7 @@ static void NPC_AssignSkill(D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillL
 }
 
 // 1.13c D2Game+0xA1280 (eax = unit, stack pGame): every class skill is removed, its hard points go back as skill points
-static void NPC_ResetSkills(D2UnitStrc* pUnit, D2GameStrc* pGame)
+void NPC_ResetSkills(D2UnitStrc* pUnit, D2GameStrc* pGame)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_PLAYER)
     {
@@ -1924,25 +1924,25 @@ static void NPC_ResetSkills(D2UnitStrc* pUnit, D2GameStrc* pGame)
     }
 
     const int32_t nClassId = pUnit->dwClassId;
-    const int32_t nCount = SKILLS_GetPlayerSkillCount(nClassId);
+    const int32_t nCount = D2_CALL(SKILLS_GetPlayerSkillCount, nClassId);
     int32_t nTotal = 0;
     for (int32_t i = 0; i < nCount; ++i)
     {
-        const int32_t nSkillId = SKILLS_GetClassSkillId(nClassId, i);
-        D2SkillStrc* pSkill = SKILLS_GetSkillById(pUnit, nSkillId, -1);
+        const int32_t nSkillId = D2_CALL(SKILLS_GetClassSkillId, nClassId, i);
+        D2SkillStrc* pSkill = D2_CALL(SKILLS_GetSkillById, pUnit, nSkillId, -1);
         if (pSkill)
         {
-            nTotal += SKILLS_GetSkillLevel(pUnit, pSkill, 0);
-            NPC_AssignSkill(pUnit, nSkillId, 0, 1);
-            D2ClientStrc* pClient = pUnit->dwUnitType == UNIT_PLAYER ? UNITS_GetPlayerData(pUnit)->pClient : nullptr;
-            D2GAME_PACKETS_SendPacket0x21_UpdateSkills_6FC3DB50(pClient, pUnit, nSkillId, 0, 1);
+            nTotal += D2_CALL(SKILLS_GetSkillLevel, pUnit, pSkill, 0);
+            D2_CALL(NPC_AssignSkill, pUnit, nSkillId, 0, 1);
+            D2ClientStrc* pClient = pUnit->dwUnitType == UNIT_PLAYER ? D2_CALL(UNITS_GetPlayerData, pUnit)->pClient : nullptr;
+            D2_CALL(D2GAME_PACKETS_SendPacket0x21_UpdateSkills_6FC3DB50, pClient, pUnit, nSkillId, 0, 1);
         }
     }
 
-    STATLIST_AddUnitStat(pUnit, STAT_SKILLPTS, nTotal, 0);
-    D2GAME_UpdatePlayerVitals_6FC4B240(pGame, pUnit);
-    D2GAME_ITEMS_UpdateInventoryItems_6FC44A90(pGame, pUnit, 0);
-    UNITS_RefreshInventory(pUnit, 1);
+    D2_CALL(STATLIST_AddUnitStat, pUnit, STAT_SKILLPTS, nTotal, 0);
+    D2_CALL(D2GAME_UpdatePlayerVitals_6FC4B240, pGame, pUnit);
+    D2_CALL(D2GAME_ITEMS_UpdateInventoryItems_6FC44A90, pGame, pUnit, 0);
+    D2_CALL(UNITS_RefreshInventory, pUnit, 1);
 }
 
 // 1.13c D2Game+0xEAE20 (eax = energy delta, esi = unit): energy moves to or from the stat pool; mana follows a gain

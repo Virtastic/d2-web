@@ -92,11 +92,7 @@ EMSCRIPTEN_KEEPALIVE void d2game_ff_msgbanner_6b54(const uint32_t* table) {
     }
 }
 
-// 1.13c D2Game+0x07460 (_strlen): the decompile's word-at-a-time scan is the C string length.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_7460(uint32_t* r) {
-    r[4] = (uint32_t)std::strlen(reinterpret_cast<const char*>((uintptr_t)r[0]));
-}
+// (0x7460, _strlen, is D2GAME_CRT_Strlen_6FC27460 in D2Game/CRT/Crt.cpp.)
 
 // 1.13c D2Game+0x0751c (__security_check_cookie): fastcall, the expected cookie in ECX. A mismatch
 // goes report_failure (0x74EB): 0x9C16(1) then ExitProcess(3), whose observable is the exit code.
@@ -156,10 +152,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_8284(char* mbch, uint16_t wch) {
     return -1;
 }
 
-// 1.13c D2Game+0x082B0 (__aulldvrm): unsigned 128/64 -> 64-bit quotient. EDX:EAX is the dividend
-// (hi=param_2, lo=param_1), the divisor is param_4:param_3, and (as with 0x3E70) both decompile limbs
-// are the restored divide whose result is the plain 64-bit quotient.
-// Implemented in src/core/fn/d2game_82b0.cpp (the FN probe).
+// (0x82B0, __aulldvrm, is D2GAME_CRT_Aulldvrm_6FC282B0 in D2Game/CRT/Crt.cpp.)
 
 // 1.13c D2Game+0x09D61 (__fptrap): __amsg_exit(2), i.e. print the "floating point not loaded" runtime
 // message and terminate with exit code 0xFF. The message is the only side effect and is not modelled.

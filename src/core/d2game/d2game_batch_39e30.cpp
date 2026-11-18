@@ -301,20 +301,7 @@ int32_t D2Game_3AB30(void* pGame, void* unit, int32_t skip, const D2GameBatchFEn
     return 1;
 }
 
-// 1.13c D2Game+0x3AFF0
-// (ecx, edx passthrough; eax, ebx, esi registers -> 0x3AE10 stack args) void
-void D2Game_3AFF0(void* ecx, void* edx, void* eax, void* ebx, void* esi, const D2GameBatchFEnv* e = &g_batchFEnv)
-{
-    e->setDamageFlags(ecx, edx, eax, ebx, esi);
-    if (esi && rd32(esi, 0) == 1 && e->ord11104(esi) == 0) {
-        const int32_t add = e->getStat(ebx, 0x78, 0);
-        if (add != 0) {
-            int32_t n = e->getStat(esi, 0x1F, 0) + add;
-            if (n < 0) n = 0;
-            e->setStat(esi, 0x1F, n, 0);
-        }
-    }
-}
+// 1.13c D2Game+0x3AFF0 is MISSMODE_SetDamageFlagsAndTargetAc (D2Game/MISSILES/MissMode.cpp).
 
 // 1.13c D2Game+0x3B070
 // (eax=unit, stack pGame) -> 0 when the spawn ran, else 1
@@ -353,17 +340,7 @@ int32_t D2Game_3BD10(void* pGame, void* unit, const D2GameBatchFEnv* e = &g_batc
     return 1;
 }
 
-// 1.13c D2Game+0x3BDA0
-// (esi=unit, stack pGame, stack arg2) void
-void D2Game_3BDA0(void* unit, void* pGame, void* arg2, const D2GameBatchFEnv* e = &g_batchFEnv)
-{
-    e->ord10637(unit, 1);
-    void* owner = (unit && Flag10(unit)) ? UnitOwner(e, pGame, unit) : nullptr;
-    int32_t v1, v2;
-    OwnerPair(e, unit, &v1, &v2);
-    e->spawnA24C0(owner, pGame, e->ord10331(unit), v2, v1, arg2, 0, 0x3C, 1);
-    e->ord10346(e->ord10331(unit), 1);
-}
+// 1.13c D2Game+0x3BDA0 is MISSMODE_CreateMissilePortal (D2Game/MISSILES/MissMode.cpp).
 
 // 1.13c D2Game+0x42AD0
 // (ecx=pGame, edx=unit, two unused stack args) -> bool: the unit has a D2Common room (#10331) and its
@@ -421,39 +398,8 @@ static void p3b_log(uint32_t rva, uint32_t eax, uint32_t ecx, uint32_t edx, uint
     w[0] = rva; w[1] = eax; w[2] = ecx; w[3] = edx; w[4] = w[5] = 0; w[6] = s0; w[7] = s1; w[8] = s2; w[9] = s3;
 }
 static inline uint32_t p32(const void* p) { return (uint32_t)(uintptr_t)p; }
-void D2Game_3BDA0_probe(void* unit, void* pGame, void* arg2, uint32_t* lg)
-{
-    g_p3b_cfg = (const uint32_t*)((uint8_t*)unit + 0x100); g_p3b_lg = lg; g_p3b_game = pGame; lg[0] = 0;
-    D2GameBatchFEnv e{};
-    e.ord10637 = [](void* u, int32_t v) { p3b_log(0xA50E, 0, 0, 0, p32(u), (uint32_t)v, 0, 0); };
-    e.getUnit = [](void* g, uint32_t guid, uint32_t type) -> void* {
-        p3b_log(0xE03A0, type, p32(g), guid, 0, 0, 0, 0); return (void*)(uintptr_t)g_p3b_cfg[0]; };
-    e.ord10750 = [](void* p) -> int32_t { p3b_log(0xA3B8, 0, 0, 0, p32(p), 0, 0, 0); return (int32_t)g_p3b_cfg[1]; };
-    e.ord10867 = [](void* p) -> int32_t { p3b_log(0xA454, 0, 0, 0, p32(p), 0, 0, 0); return (int32_t)g_p3b_cfg[2]; };
-    e.ord10331 = [](void* u) -> void* { p3b_log(0xA478, 0, 0, 0, p32(u), 0, 0, 0); return (void*)(uintptr_t)g_p3b_cfg[3]; };
-    e.spawnA24C0 = [](void* o, void* g, void* r, int32_t v2, int32_t v1, void*, int32_t, int32_t, int32_t) {
-        p3b_log(0xA24C0, p32(o), 0, 0, p32(g), p32(r), (uint32_t)v2, (uint32_t)v1); };
-    e.ord10346 = [](void* r, int32_t v) { p3b_log(0xA51A, 0, 0, 0, p32(r), (uint32_t)v, 0, 0); };
-    D2Game_3BDA0(unit, pGame, arg2, &e);
-}
 
-// function probe seam (src/core/fn/d2game_3aff0.cpp): the four callees replaced by recorders; lg as for 3A280. cfg: hireling id, then 2 stat returns in call order.
-static const uint32_t* g_p3f_cfg; static uint32_t g_p3f_n;
-int32_t D2Game_3AFF0_probe(void* eax, void* ebx, void* esi, void* ecx, void* edx, const uint32_t* cfg, uint32_t* lg)
-{
-    g_p3f_cfg = cfg; g_p3f_n = 0; g_p3a_lg = lg; lg[0] = 0;
-    D2GameBatchFEnv e{};
-    e.setDamageFlags = [](void* c, void* d, void* a, void* b, void* s) {
-        const uint32_t A = (uint32_t)(uintptr_t)a, B = (uint32_t)(uintptr_t)b, S = (uint32_t)(uintptr_t)s;
-        p3a_log(0x3AE10, (uint32_t)(uintptr_t)c, A, A, B, S);   // stack words = eax, ebx, esi
-        uint32_t* w = g_p3a_lg + 1 + (g_p3a_lg[0] - 1) * 10; w[3] = (uint32_t)(uintptr_t)d; w[4] = B; w[5] = S;
-    };
-    e.ord11104 = [](void* u) -> int32_t { p3a_log(0xA7F6, 0, 0, (uint32_t)(uintptr_t)u, 0, 0); return (int32_t)g_p3f_cfg[0]; };
-    e.getStat = [](void* u, int32_t s, int32_t l) -> int32_t { p3a_log(0xA42A, 0, 0, (uint32_t)(uintptr_t)u, (uint32_t)s, (uint32_t)l); return (int32_t)g_p3f_cfg[1 + (g_p3f_n < 1 ? g_p3f_n++ : 1)]; };
-    e.setStat = [](void* u, int32_t s, int32_t v, int32_t l) { p3a_log(0xA472, 0, 0, (uint32_t)(uintptr_t)u, (uint32_t)s, (uint32_t)v); (void)l; };
-    D2Game_3AFF0(ecx, edx, eax, ebx, esi, &e);
-    return 0;
-}
+// 1.13c D2Game+0x3AFF0 probe lives in src/core/fn/d2game_3aff0.cpp (game body MISSMODE_SetDamageFlagsAndTargetAc).
 
 // function probe seam (src/core/fn/d2game_3a1d0.cpp): the five callees replaced by recorders (p3b_log shape). cfg dwords (unit+0x40): owner, room.
 // #10750/#10867 return the descriptor's scripted values read back off the owner's record (+0x10 / +0xC), as the vector stores them there.

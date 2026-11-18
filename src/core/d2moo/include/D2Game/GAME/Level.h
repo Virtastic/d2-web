@@ -9,6 +9,8 @@ void __fastcall LEVEL_UpdateUnitsInAdjacentRooms(D2GameStrc* pGame, D2ActiveRoom
 void __fastcall LEVEL_RemoveUnitsExceptClientPlayer(D2ActiveRoomStrc* pRoom, D2ClientStrc* pClient);
 //D2Game.0x6FC3BDE0
 void __fastcall LEVEL_FreeDrlgDeletes(D2GameStrc* pGame);
+// 1.13c D2Game+0x9D950 (the first-client monster loop LEVEL_AddClient calls)
+void LEVEL_AddClientMonsterEvents(D2ActiveRoomStrc* pRoom, D2GameStrc* pGame);
 //D2Game.0x6FC3BE40
 void __fastcall LEVEL_AddClient(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2ClientStrc* pClient);
 //D2Game.0x6FC3BF00

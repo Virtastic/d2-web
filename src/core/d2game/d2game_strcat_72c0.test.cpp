@@ -1,7 +1,7 @@
 // Host test: g++ -o /tmp/t src/core/d2game/d2game_strcat_72c0.test.cpp && /tmp/t
 #include "d2game_batch_74eb.cpp"
 #include <cassert>
-extern "C" { void d2_fn_d2game_3b51(void) {} int32_t* d2game_errno_ptr() { return 0; } void d2game_unlock_3f76(int32_t) {} }  // link stubs for unrelated CRT fns in the batch file
+extern "C" { void D2GAME_CRT_Unlock12_3B51(void) {} int32_t* d2game_errno_ptr() { return 0; } void d2game_unlock_3f76(int32_t) {} }  // link stubs for unrelated CRT fns in the batch file
 #include <cstring>
 int main() {
     for (int doff = 0; doff < 4; ++doff)

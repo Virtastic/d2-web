@@ -193,34 +193,13 @@ uint32_t d2game_58ae0(void* unit, void* p2) {
     return 0;
 }
 
-// 1.13c D2Game+0x58BE0   (reg = unaff_EBX unit)
-void d2game_58be0(void* p1, void* reg) {
-    g.ord10003_v();
-    g.ord10003_v();
-    void* rec = nullptr;
-    if (p1 && rd32(p1, 0) == 0) rec = rdptr(g.ord10920(p1), 0x9c);
-    clampLevel(rec, rd8(reg, 0x6d));
-    void* n = findNode(reg, 0x24);
-    if (n) { void* s = rdptr(n, 0x18); wr32(s, 0x88, rd32(s, 0x88) + 1); }
-}
+// (0x58BE0 is ACT5Q6_GrantReward in D2Game/QUESTS/ACT5/A5Q6.cpp.)
 
 // old form of D2Game 590C0 (now d2game_590c0.cpp)
 uint32_t d2game_590c0(void* unit, void* p2) {
     uint32_t h = statHandle(g.ord10920(p2), unit);
     if ((g.ord10174(h, 0x26, 0) || g.ord10174(h, 0x26, 0xf)) || g.ord10174(h, 0x26, 0xd) || g.ord10174(h, 0x26, 0xe))
         g.sub354F0(p2, unit);
-    return 0;
-}
-
-// 1.13c D2Game+0x599E0
-uint32_t d2game_599e0(void* unit, void* p2) {
-    uint32_t h0 = statHandle(g.ord10920(p2), unit);
-    if (g.ord10174(h0, 0x28, 0) == 1) return 0;
-    void* a = g.ord10331(p2);
-    if (!a) return 0;
-    uint32_t h = statHandle(g.ord10920(p2), unit);
-    if (g.ord10826i(a) == 0x84 && !g.ord10174(h, 0x28, 0) && !g.ord10174(h, 0x28, 1))
-        d2game_58be0(p2, unit);
     return 0;
 }
 

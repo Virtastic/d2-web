@@ -45,11 +45,6 @@ struct D2GameMtInitHost {
     uint32_t (*get_current_thread_id)(void);                    // GetCurrentThreadId
 };
 
-// 1.13c D2Game+0x3B51: tail fragment into RVA 0x3F76 with lock number 0xC -- __unlock(12). Reached from
-// __updatetlocinfo (0x3B1F) when the locale it just installed is a new one.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3b51(uint32_t* r) { d2game_unlock_3f76(0xC); if (r) r[4] = 0; }  // r: FN probe, result word 0
-
 // 1.13c D2Game+0x3B5A: TlsAlloc(), result discarded. wasm has no TLS indices, and the index would leak
 // either way (retail never stores the result), so the rule is an empty statement.
 extern "C"

@@ -149,3 +149,6 @@ void __fastcall D2GAME_NPC_ResetInteract_6FCCB4D0(D2GameStrc* pGame, D2UnitStrc*
 void __fastcall D2GAME_NPC_AssignMercenary_6FCCB520(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nMonster);
 //D2Game.0x6FCCB7D0
 int32_t __fastcall D2GAME_NPC_IsItemInNpcInventory_6FCCB7D0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNpc, D2UnitStrc* pItem, int32_t a4);
+// 1.13c D2Game+0x9F9A0 / +0xA1280 (the skill-reset pair the Akara reset runs; declared for the FN probe)
+void NPC_AssignSkill(D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t bRemove);
+void NPC_ResetSkills(D2UnitStrc* pUnit, D2GameStrc* pGame);

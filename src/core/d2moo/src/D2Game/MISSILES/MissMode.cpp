@@ -3763,8 +3763,32 @@ int32_t __fastcall MISSMODE_SrvHit31_FireHead(D2GameStrc* pGame, D2UnitStrc* pMi
     return (pMissilesTxtRecord->nCollideKill != 0) + 2;
 }
 
+// 1.13c D2Game+0x3BDA0 (esi=pMissile, stack pGame and nDestLevel): mark the missile's target-x, then open the permanent portal
+// (object 60) at its position (objects, items and tiles read their static path, every other unit its dynamic path; Y before X).
+void __fastcall MISSMODE_CreateMissilePortal(D2UnitStrc* pMissile, D2GameStrc* pGame, int32_t nDestLevel)
+{
+    D2_CALL(MISSILE_SetTargetX, pMissile, 1);
+    D2UnitStrc* pOwner = D2_CALL(SUNIT_GetOwner, pGame, pMissile);
+
+    int32_t nY = 0;
+    int32_t nX = 0;
+    if (pMissile->dwUnitType == UNIT_OBJECT || pMissile->dwUnitType == UNIT_ITEM || pMissile->dwUnitType == UNIT_TILE)
+    {
+        nY = pMissile->pStaticPath->tGameCoords.nY;
+        nX = pMissile->pStaticPath->tGameCoords.nX;
+    }
+    else if (pMissile->pDynamicPath)
+    {
+        nY = D2_CALL(PATH_GetYPosition, pMissile->pDynamicPath);
+        nX = D2_CALL(PATH_GetXPosition, pMissile->pDynamicPath);
+    }
+
+    D2_CALL(D2GAME_CreatePortalObject_6FD13DF0, pGame, pOwner, D2_CALL(UNITS_GetRoom, pMissile), nX, nY, nDestLevel, nullptr, 60, 1);
+    D2_CALL(DUNGEON_ToggleHasPortalFlag, D2_CALL(UNITS_GetRoom, pMissile), 1);
+}
+
 //D2Game.0x6FC5D160
-// 1.13c D2Game+0x3BE70 (the portal block is retail's 3BDA0, inlined here)
+// 1.13c D2Game+0x3BE70 (the portal block is retail's 3BDA0, MISSMODE_CreateMissilePortal)
 int32_t __fastcall MISSMODE_SrvHit32_CairnStones(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     D2MissilesTxt* pMissilesTxtRecord = pMissile ? SKILLS_GetMissilesTxtRecord(pMissile->dwClassId) : nullptr;
@@ -3775,12 +3799,7 @@ int32_t __fastcall MISSMODE_SrvHit32_CairnStones(D2GameStrc* pGame, D2UnitStrc* 
 
     if (!MISSILE_GetTargetX(pMissile))
     {
-        MISSILE_SetTargetX(pMissile, 1);
-        D2UnitStrc* pOwner = SUNIT_GetOwner(pGame, pMissile);
-        const int32_t nY = CLIENTS_GetUnitY(pMissile);
-        const int32_t nX = CLIENTS_GetUnitX(pMissile);
-        D2GAME_CreatePortalObject_6FD13DF0(pGame, pOwner, UNITS_GetRoom(pMissile), nX, nY, pMissilesTxtRecord->dwParam[3], 0, 60u, 1);
-        DUNGEON_ToggleHasPortalFlag(UNITS_GetRoom(pMissile), 1);
+        MISSMODE_CreateMissilePortal(pMissile, pGame, pMissilesTxtRecord->dwParam[3]);
     }
 
     return 0;
@@ -4816,6 +4835,22 @@ void __fastcall MISSMODE_SrvDmg14_MoltenBoulder(D2GameStrc* pGame, D2UnitStrc* p
     }
 }
 
+// 1.13c D2Game+0x3AFF0: the hit flags, then a non-hireling monster's armor class is lowered by the missile's item_damagetargetac (floored at 0).
+void __fastcall MISSMODE_SetDamageFlagsAndTargetAc(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pDefender, D2DamageStrc* pDamage)
+{
+    D2_CALL(MISSMODE_SetDamageFlags, pGame, pMissile, pDefender, pDamage);
+
+    if (pDefender && pDefender->dwUnitType == UNIT_MONSTER && !D2_CALL(MONSTERS_GetHirelingTypeId, pDefender))
+    {
+        const int32_t nDamageTargetAc = STATLIST_UnitGetStatValue(pMissile, STAT_ITEM_DAMAGETARGETAC, 0);
+        if (nDamageTargetAc)
+        {
+            const int32_t nArmor = std::max(nDamageTargetAc + STATLIST_UnitGetStatValue(pDefender, STAT_ARMORCLASS, 0), 0);
+            STATLIST_SetUnitStat(pDefender, STAT_ARMORCLASS, nArmor, 0);
+        }
+    }
+}
+
 //D2Game.0x6FC5F4E0
 // 1.13c D2Game+0x3AE10 (checked against decompile, no delta)
 void __fastcall MISSMODE_SetDamageFlags(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pDefender, D2DamageStrc* pDamage)
@@ -5336,17 +5371,7 @@ int32_t __fastcall MISSMODE_SrvDmgHitHandler(D2GameStrc* pGame, D2UnitStrc* pMis
             gpMissileSrvDmgFnTable_6FD2E838[nDmgFunc](pGame, pMissile, pUnit, &damage);
         }
 
-        MISSMODE_SetDamageFlags(pGame, pMissile, pUnit, &damage);
-
-        if (pUnit->dwUnitType == UNIT_MONSTER && !MONSTERS_GetHirelingTypeId(pUnit))
-        {
-            const int32_t nDamageTargetAc = STATLIST_UnitGetStatValue(pMissile, STAT_ITEM_DAMAGETARGETAC, 0);
-            if (nDamageTargetAc)
-            {
-                const int32_t nArmor = std::max(nDamageTargetAc + STATLIST_UnitGetStatValue(pUnit, STAT_ARMORCLASS, 0), 0);
-                STATLIST_SetUnitStat(pUnit, STAT_ARMORCLASS, nArmor, 0);
-            }
-        }
+        MISSMODE_SetDamageFlagsAndTargetAc(pGame, pMissile, pUnit, &damage);
     }
 
     if (!(nHitResult & 1) && !a4 || !(nPierceFlags & 1))

@@ -16,10 +16,6 @@ struct D2GameCrtUnlockThunksEnv {
     void (*unlockFhandle)(int32_t fileHandle);          // 0x897B __unlock_fhandle
 };
 
-// 1.13c D2Game+0x060DE
-extern "C"
-void d2game_thunk_60de(void) { d2game_unlock_3f76(4); }
-
 // 1.13c D2Game+0x05E11
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_5e11(void) { d2game_unlock_3f76(4); }

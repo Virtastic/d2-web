@@ -286,6 +286,10 @@ struct D2SrvDmg14Seam
 extern D2SrvDmg14Seam g_d2SrvDmg14;
 //D2Game.0x6FC5F4E0
 void __fastcall MISSMODE_SetDamageFlags(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pDefender, D2DamageStrc* pDamage);
+// 1.13c D2Game+0x3BDA0
+void __fastcall MISSMODE_CreateMissilePortal(D2UnitStrc* pMissile, D2GameStrc* pGame, int32_t nDestLevel);
+// 1.13c D2Game+0x3AFF0
+void __fastcall MISSMODE_SetDamageFlagsAndTargetAc(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pDefender, D2DamageStrc* pDamage);
 //D2Game.0x6FC5F6C0
 int32_t __fastcall MISSMODE_SrvDo19_RadamentDeath(D2GameStrc* pGame, D2UnitStrc* pMissile);
 //D2Game.0x6FC5F7C0

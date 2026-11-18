@@ -1,5 +1,6 @@
 #include "GAME/Level.h"
 #include "../../../../d2game/pending_unit_updates.h"
+#include <test_seam.h>
 
 #include <D2Collision.h>
 #include <D2Dungeon.h>
@@ -142,13 +143,13 @@ void __fastcall LEVEL_FreeDrlgDeletes(D2GameStrc* pGame)
 
 // 1.13c D2Game+0x9D950: the first-client monster loop of LEVEL_AddClient. Retail takes pRoom in EAX
 // and pGame in ESI; the loop is a separate function there and is inlined in 1.10f.
-static void LEVEL_AddClientMonsterEvents(D2ActiveRoomStrc* pRoom, D2GameStrc* pGame)
+void LEVEL_AddClientMonsterEvents(D2ActiveRoomStrc* pRoom, D2GameStrc* pGame)
 {
     for (D2UnitStrc* pUnit = pRoom->pUnitFirst; pUnit; pUnit = pUnit->pRoomNext)
     {
         if (pUnit->dwUnitType == UNIT_MONSTER)
         {
-            MONSTER_UpdateAiCallbackEvent(pGame, pUnit);
+            D2_CALL(MONSTER_UpdateAiCallbackEvent, pGame, pUnit);
         }
     }
 }

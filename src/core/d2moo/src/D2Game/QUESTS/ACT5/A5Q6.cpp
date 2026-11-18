@@ -1,4 +1,5 @@
 #include "QUESTS/ACT5/A5Q6.h"
+#include <test_seam.h>
 
 #include <D2BitManip.h>
 
@@ -579,18 +580,29 @@ int32_t __fastcall ACT5Q6_UnitIterate_SetRewardGranted(D2GameStrc* pGame, D2Unit
 		return 0;
 	}
 
-	QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A5Q6, QFLAG_PRIMARYGOALDONE);
-	QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A5Q6, QFLAG_REWARDGRANTED);
+	ACT5Q6_GrantReward(pQuestFlags, pUnit, pGame);
+
+	return 0;
+}
+
+// 1.13c D2Game+0x58BE0 (EAX = quest flags, ECX = player, EBX = game; split out of the caller above, where retail inlines it)
+// Returns retail's EAX at exit: the quest's extra data after the increment, else nullptr.
+D2Act5Quest6Strc* __fastcall ACT5Q6_GrantReward(D2BitBufferStrc* pQuestFlags, D2UnitStrc* pUnit, D2GameStrc* pGame)
+{
+	D2_CALL(QUESTRECORD_SetQuestState, pQuestFlags, QUESTSTATEFLAG_A5Q6, QFLAG_PRIMARYGOALDONE);
+	D2_CALL(QUESTRECORD_SetQuestState, pQuestFlags, QUESTSTATEFLAG_A5Q6, QFLAG_REWARDGRANTED);
 
 	CLIENTS_UpdateCharacterProgression(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), 5, pGame->nDifficulty);
 
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q6_BAAL);
 	if (pQuestData)
 	{
-		++((D2Act5Quest6Strc*)pQuestData->pQuestDataEx)->nPlayersInWorldStoneChamber;
+		D2Act5Quest6Strc* pQuestDataEx = (D2Act5Quest6Strc*)pQuestData->pQuestDataEx;
+		++pQuestDataEx->nPlayersInWorldStoneChamber;
+		return pQuestDataEx;
 	}
 
-	return 0;
+	return nullptr;
 }
 
 //D2Game.0x6FCB8DE0
