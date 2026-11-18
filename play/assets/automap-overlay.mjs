@@ -179,6 +179,14 @@ export function automapTileOnScreen(tile, hero, cx, cy, width, height) {
   const sx = cx + ((tile.worldX - tile.worldY) * 5 - (hero.x - hero.y)) * 16, sy = cy + ((tile.worldX + tile.worldY) * 5 - (hero.x + hero.y)) * 8;
   return sx + 80 > 0 && sx - 80 < width && sy + 80 > 0 && sy < height;
 }
+// The rooms retail's Room1 near list holds for a hero room (D2Common 0x45550, the list 0x62AF0 walks to call
+// RevealAutomapRoom): the hero room itself and every room whose edge-to-edge gap is under `gap` tiles on both axes.
+// Rooms are in world units, five to a tile, so a gap is measured in units and divided by five.
+export function automapNearRooms(rooms, heroRoom, gap = 6) {
+  const apart = (a0, aw, b0, bw) => Math.max(a0 - (b0 + bw), b0 - (a0 + aw), 0);
+  return rooms.filter((r) => r === heroRoom
+    || (apart(r.x, r.w, heroRoom.x, heroRoom.w) < gap * 5 && apart(r.y, r.h, heroRoom.y, heroRoom.h) < gap * 5));
+}
 // LvlPrest AutoMap=1 levels that take pfAutomap at generation: every room revealed with clipFlag 1.
 export const ENTRY_REVEAL_LEVELS = new Set([1, 40, 75, 103, 109]);   // every LvlPrest AutoMap=1 level
 function line(ctx, x0, y0, x1, y1) {   // Bresenham, 1 px, no antialiasing
@@ -381,6 +389,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
       viewport: automapViewport(width, height, { mode: f.key, left: settings.left !== 'no' }) };
   };
   let frames = family('full').frames, layout = Object.freeze(makeLayout());
+  let revealGap = 0, revealRooms = 0, revealOrphan = 0, revealHeld = 0;   // instrument: retail-near rooms the reveal set lacks, and the set's size
   let visible = false, evidence = { open: false, drawn: [], unresolved: [], layout, error: null };
   // Retail's automap is CLIENT state and it is per level. D2Client keeps a D2AutomapLayerStrc per
   // level (`nLayerNo`, the pFloors/pWalls/pObjects/pExtras cell lists, `pNext` the next layer), and
@@ -450,8 +459,12 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
           const entry = rv.hero === null && rv.rooms.size === 0;
           rv.hero = `${heroRoom.x},${heroRoom.y}`;
           if (entry && ENTRY_REVEAL_LEVELS.has(levelId)) for (const r of rooms) { rv.rooms.add(`${r.x},${r.y}`); rv.entryRooms.add(`${r.x},${r.y}`); }
-          else for (const r of rooms) if (Math.abs(r.x - heroRoom.x) <= heroRoom.w && Math.abs(r.y - heroRoom.y) <= heroRoom.h) rv.rooms.add(`${r.x},${r.y}`);
         }
+        // 0x62AF0 walks the hero Room1's near list on every moved tick, so a room whose data arrives while the hero
+        // stands still (the realm sends rooms as they load) is revealed as soon as it is in the list, not on the next room entry.
+        if (heroRoom) for (const r of automapNearRooms(rooms, heroRoom)) rv.rooms.add(`${r.x},${r.y}`);
+        revealGap = heroRoom ? automapNearRooms(rooms, heroRoom).filter((r) => !rv.rooms.has(`${r.x},${r.y}`)).length : 0;
+        revealRooms = rv.rooms.size;
         // WHAT IS REVEALED IS THE ENGINE'S ANSWER, and this frame's own terrain read already carries
         // it: `d2_session_tiles` is built from the rooms that hold an active pRoom, so a tile in this
         // list is a tile of a room the engine has built for the player to be in. It used to be
@@ -474,6 +487,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
           const pAbsorb = perfT0(); perfSample('automap-tiles', tiles.length);
           live = new Set();
           const sizeBeforeAbsorb = layer.size;
+          let nOrphan = 0, nHeld = 0;   // instrument: on-screen tiles without a room, and in a room the reveal set lacks
           for (const tile of tiles) {
             if (tile.seam) continue;
             const key = cellKey(tile); live.add(key);
@@ -484,6 +498,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
             const onScreen = automapTileOnScreen(tile, hp, wcx, wcy, width, height);
             if (!onScreen && !rv.entryRooms.size) continue;
             const room = rooms.find((r) => inRoom(r, tile.worldX * 5, tile.worldY * 5));
+            if (!room) nOrphan++; else if (onScreen && !rv.rooms.has(`${room.x},${room.y}`)) nHeld++;
             if (!room || !rv.rooms.has(`${room.x},${room.y}`)) continue;
             if (!onScreen && !rv.entryRooms.has(`${room.x},${room.y}`)) continue;
             const selected = selectRecord(recordIndex, levelType, tile, Module);
@@ -501,7 +516,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
           }
           if (layer.size !== sizeBeforeAbsorb) orderedCells.invalidate(layer);
           perfT('automap-absorb', pAbsorb);
-          absorbed = { key: absorbKey, live };
+          absorbed = { key: absorbKey, live }; revealOrphan = nOrphan; revealHeld = nHeld;
         }
         // pObjects: the 0x61D00 walk over a revealed room's units. Keyed by its map point, so a unit rebuilt with
         // a new id is the same cell (retail marks the unit, bit 29, so it is added once).
@@ -634,7 +649,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
         cross(Math.round(cx) + 8, Math.round(cy) - 7, HERO_COLOUR, 'hero');
       }
       ctx.restore();
-      return (evidence = { open: true, markers, nameplates, levelType, levelName: LEVEL_NAMES[levelType] ?? 'None', cells: layer.size,
+      return (evidence = { open: true, markers, nameplates, levelType, levelName: LEVEL_NAMES[levelType] ?? 'None', cells: layer.size, revealGap, revealRooms, revealOrphan, revealHeld,
         mode, nativeMode, divisor: fam.divisor, source: fam.path, settings: { ...settings }, centre,
         unrevealed: unnamed.size, drawn, unresolved, geometry, layout, error: null });
     },

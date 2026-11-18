@@ -173,6 +173,7 @@ import { createStateFx } from './assets/state-fx.mjs';
 import { createUnitOverlayFx } from './assets/unit-overlay-fx.mjs';
 import { createMissileRenderer, parseMissileAnimations, isHoveredMissile } from './assets/missile-renderer.mjs';
 import { blizzardClient } from './assets/blizzard-client.mjs';
+import { orbClient } from './assets/orb-client.mjs';
 import { createNpcSpeechAlertRenderer } from './assets/npc-speech-alert.mjs';
 import { npcVendorIsOpen, closeInventoryPanel } from './assets/npc-vendor-state.mjs';
 import { createAreaNameBlockRenderer, engineAreaNameLayout } from './assets/area-name-block.mjs';
@@ -1323,6 +1324,7 @@ function sessionAdapter() {
           const byId = new Map(parseMissileAnimations(Module.HEAPU8.subarray(ptr, ptr + count * 28), count).map((a) => [a.id, a]));
           for (const entity of entities) if (entity.kind === 'missile') entity.missile = byId.get(entity.id);
         }
+        orbClient(Module, entities); // Frozen Orb: the client's orb, bolts and nova (orb-client.mjs)
         blizzardClient(Module, entities); // Blizzard draws the client's shards and impacts, not the server's (blizzard-client.mjs)
         let objects = [];
         if (Module._d2_session_object_presentations) {
@@ -7297,6 +7299,7 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
   get heldControlEvidence() { return { run: heldRunKeys.size > 0, standStill: heldStandStillKeys.size > 0,
     showItems: heldShowItemsKeys.size > 0, runLock: runWalkLock, standStillSuppressedMoves, shownItems: showItemsEvidence.map((item) => ({ ...item, box: item.box && { ...item.box } })) }; },
   get automapEvidence() { return automapOverlay?.evidence ?? { open: false, error: 'not built' }; },
+  get automapScene() { return { tiles: realmSceneActive ? realmSceneTiles : [], level: snapshot?.level }; },   // scenario surface: the reveal instrument's tile read
   // The live automap layer's cells as retail `.ma0` quints {layer, frame, x, y, wall} -- what the
   // engine's writer is handed on Save and Exit (F268). The scenario surface, so a row can compare the
   // .ma0 the engine composed against the exact cells it was given.

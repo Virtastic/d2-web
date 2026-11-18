@@ -28,6 +28,8 @@
 #include <Units/Missile.h>
 #include <Units/UnitRoom.h>
 #include <Units/Units.h>
+#include <emscripten.h>
+#include "clmissile_orb.h"
 
 namespace d2client_ambient { void submit(int32_t row); }
 namespace d2client_unitseed { uint32_t roll(const D2ActiveRoomStrc* r); }
@@ -37,6 +39,7 @@ namespace {
 constexpr int32_t kTeeth = 67;            // Skills.txt id, cltdofunc 17
 constexpr int32_t kActionDelay = 9;       // the cast's action frame (the Poison Nova constant, nova_73cb0.cpp: retail TravelSound at cast+8)
 constexpr int32_t kFireWall = 51;         // Skills.txt id, cltdofunc 26
+constexpr int32_t kFrozenOrb = 64;        // Skills.txt id, cltdofunc 29 (0x73D70 -> 0xA15C0 -> 0xB0450)
 constexpr int32_t kFireWallDelay = 8;     // retail's first segment TravelSound lands at cast+7
 constexpr int32_t kStepRate = 1024;       // 1.13c D2Client+0x119824 (DAT_6fbc9824), the D2Common_10226 rate
 struct Pending { int64_t due; int32_t skillId, level, targetType; uint32_t targetId; int32_t tx, ty; };
@@ -48,6 +51,11 @@ bool inUpdate = false;
 std::vector<NextHit> nextHits;            // the client's state 0x56 (Missiles.txt NextHit), held per target
 int64_t frame = 0;
 uint32_t nextId = 1;
+}
+struct OrbRec { uint32_t id, classId; int32_t x, y; uint32_t direction, framePrecise, z, trans; };
+static_assert(sizeof(OrbRec) == 32, "orb record");
+std::vector<OrbRec> orbRecs;
+namespace {
 
 const D2MissilesTxt* row(D2UnitStrc* unit) { return DATATBLS_GetMissilesTxtRecord(unit->dwClassId); }
 
@@ -95,6 +103,7 @@ bool targetDead(const D2UnitStrc* unit) {
     return false;
 }
 
+D2UnitStrc* makeChild(D2UnitStrc* owner, int32_t missileId, int32_t skillId, int32_t level, int32_t x, int32_t y, int32_t tx, int32_t ty);
 bool isShownMissile(const D2UnitStrc* unit) { for (const D2UnitStrc* s : shown) if (s == unit) return true; return false; }
 void create(D2UnitStrc* owner, int32_t missileId, int32_t skillId, int32_t level, int32_t x, int32_t y, int32_t tx, int32_t ty, int32_t activateBack);
 
@@ -135,6 +144,12 @@ bool terminal(D2UnitStrc* unit, D2UnitStrc* owner, bool wall, D2UnitStrc* target
         if (!(target->dwFlags & 0x4u)) return false;
         if (owner && STATLIST_AreUnitsAligned(target, owner) && !txt->nCollideFriend) return false;
     } else if (!wall && !txt->nAlwaysExplode) play = false;
+    if (play && txt->wCltHitFunc == 30) {   // 1.13c D2Client+0xB1420 -> pCltHitFunc 30 (0xB6010); the ring joins the stepped list behind the orb and takes its first step this pass (as an explosion does)
+        const bool wasInUpdate = inUpdate;
+        inUpdate = false;
+        d2client_clmissile_orb::ring(unit, owner, makeChild);
+        inUpdate = wasInUpdate;
+    }
     if (play) {
         if (txt->nNextHit && target) nextHits.push_back({static_cast<int32_t>(target->dwUnitType), target->dwUnitId, frame + txt->nNextDelay});
         if (static_cast<int16_t>(txt->wHitSound) >= 0) {
@@ -240,6 +255,28 @@ void makerDrop(D2UnitStrc* unit, D2UnitStrc* owner) {
     create(owner, sub, MISSILE_GetSkill(unit), MISSILE_GetLevel(unit), x, y, x, y, subTxt->nActivate);
 }
 
+// 1.13c D2Client+0xB30F0 with request flags 0x2 (a child of a missile): the created unit, null when none was made.
+D2UnitStrc* makeChild(D2UnitStrc* owner, int32_t missileId, int32_t skillId, int32_t level, int32_t x, int32_t y, int32_t tx, int32_t ty) {
+    const D2MissilesTxt* txt = DATATBLS_GetMissilesTxtRecord(missileId);
+    if (!txt || !owner) return nullptr;
+    std::vector<D2UnitStrc*>& list = inUpdate ? born : missiles;
+    const size_t before = list.size();
+    create(owner, missileId, skillId, level, x, y, tx, ty, txt->nActivate);
+    return list.size() > before ? list.back() : nullptr;
+}
+
+// 1.13c D2Client+0x73D70 (cltdofunc 29): 0xA15C0 -> 0xB0450, the Skills.txt cltmissilea (frozenorb) from the owner toward the
+// point (request flags 0x20).
+void frozenOrb(D2UnitStrc* owner, const Pending& p, int32_t tx, int32_t ty) {
+    const D2SkillsTxt* skill = DATATBLS_GetSkillsTxtRecord(p.skillId);
+    if (!skill || !tx || !ty) return;
+    const int32_t id = static_cast<int16_t>(skill->wCltMissileA);
+    const D2MissilesTxt* txt = id >= 0 ? DATATBLS_GetMissilesTxtRecord(id) : nullptr;
+    if (!txt) return;
+    d2client_unitseed::roll(UNITS_GetRoom(owner));
+    create(owner, id, 0, p.level, UNITS_GetXPosition(owner), UNITS_GetYPosition(owner), tx, ty, txt->nActivate);
+}
+
 // 1.13c D2Client+0xB17C0, one missile; returns false once it is freed.
 bool update(D2UnitStrc* unit, D2UnitStrc* owner) {
     const D2MissilesTxt* txt = row(unit);
@@ -293,6 +330,13 @@ bool bleedStep(D2UnitStrc* unit, D2UnitStrc* owner) {
 
 bool step(D2UnitStrc* unit, D2UnitStrc* owner) {
     const D2MissilesTxt* txt = row(unit);
+    if (txt && txt->wCltDoFunc == 19) {   // 0xB8840, then the update; its bolts join the stepped list and take their first step in this pass
+        const bool wasInUpdate = inUpdate;
+        inUpdate = false;
+        d2client_clmissile_orb::phaseSpawn(unit, owner, makeChild);
+        inUpdate = wasInUpdate;
+    }
+    else if (txt && txt->wCltDoFunc == 20) d2client_clmissile_orb::novaMove(unit);                  // 0xB29B0, then the update
     return txt && txt->wCltDoFunc == 2 ? bleedStep(unit, owner) : update(unit, owner);
 }
 }
@@ -346,13 +390,14 @@ void reset() {
     shownSteps = 0;
     for (D2UnitStrc* unit : missiles) freeMissile(unit);
     for (D2UnitStrc* unit : born) freeMissile(unit);
+    orbRecs.clear();
     missiles.clear(); born.clear(); foreign.clear(); shown.clear(); unitHits.clear(); pending.clear(); nextHits.clear(); frame = 0; nextId = 1;
 }
 
 // The client's cast of skillId at a unit target (its path target) or a point; the action runs kActionDelay frames later.
 void cast(int32_t skillId, int32_t level, D2UnitStrc* target, int32_t tx, int32_t ty) {
-    if (skillId != kTeeth && skillId != kFireWall) return;
-    pending.push_back({frame + (skillId == kFireWall ? kFireWallDelay : kActionDelay), skillId, level, target ? static_cast<int32_t>(target->dwUnitType) : -1,
+    if (skillId != kTeeth && skillId != kFireWall && skillId != kFrozenOrb) return;
+    pending.push_back({frame + (skillId == kFireWall || skillId == kFrozenOrb ? kFireWallDelay : kActionDelay), skillId, level, target ? static_cast<int32_t>(target->dwUnitType) : -1,
         target ? target->dwUnitId : 0u, target ? UNITS_GetXPosition(target) : tx, target ? UNITS_GetYPosition(target) : ty});
 }
 
@@ -373,16 +418,31 @@ void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)) {
         const Pending p = pending[i];
         pending.erase(pending.begin() + i);
         D2UnitStrc* target = p.targetType >= 0 && find ? find(p.targetType, p.targetId) : nullptr;
-        if (owner && p.skillId == kFireWall) {
+        if (owner && (p.skillId == kFireWall || p.skillId == kFrozenOrb)) {
             // 1.13c D2Client+0x51340: the path's target unit (a dead one is not held), else the path target point, else
             // 0x50B30: two subtiles off the owner by its direction / 8. The client player's path holds no point here.
             static constexpr int8_t kDx[8] = {0, -1, -2, -1, 0, 1, 2, 1}, kDy[8] = {2, 1, 0, -1, -2, -1, 0, 1};
             if (target && target->dwUnitType == UNIT_MONSTER && (target->dwAnimMode == MONMODE_DEATH || target->dwAnimMode == MONMODE_DEAD)) target = nullptr;
             const int32_t d = owner->pDynamicPath ? PATH_GetDirection(owner->pDynamicPath) >> 3 : 0;
-            fireWall(owner, p, target ? UNITS_GetXPosition(target) : UNITS_GetXPosition(owner) + kDx[d & 7],
-                target ? UNITS_GetYPosition(target) : UNITS_GetYPosition(owner) + kDy[d & 7]);
+            const int32_t px = target ? UNITS_GetXPosition(target) : UNITS_GetXPosition(owner) + kDx[d & 7];
+            const int32_t py = target ? UNITS_GetYPosition(target) : UNITS_GetYPosition(owner) + kDy[d & 7];
+            if (p.skillId == kFireWall) fireWall(owner, p, px, py); else frozenOrb(owner, p, px, py);
         }
         else if (owner) spread(owner, p, target ? UNITS_GetXPosition(target) : p.tx, target ? UNITS_GetYPosition(target) : p.ty);
     }
+    // The Frozen Orb's sprites of this frame: the orb, its bolts and the nova (the server has no copy a client sees).
+    orbRecs.clear();
+    for (const D2UnitStrc* m : missiles) {
+        const D2MissilesTxt* t = row(const_cast<D2UnitStrc*>(m));
+        if (!t || !m->pDynamicPath || (m->dwClassId != 260 && m->dwClassId != 261 && m->dwClassId != 262)) continue;
+        orbRecs.push_back({static_cast<uint32_t>(m->dwUnitId), static_cast<uint32_t>(m->dwClassId), static_cast<int32_t>(UNITS_GetXPosition(const_cast<D2UnitStrc*>(m))),
+            static_cast<int32_t>(UNITS_GetYPosition(const_cast<D2UnitStrc*>(m))), static_cast<uint32_t>(PATH_GetDirection(m->pDynamicPath)),
+            static_cast<uint32_t>(m->nSeqCurrentFramePrecise), 0u, static_cast<uint32_t>(t->nTrans)});
+    }
 }
 }
+
+// The client's Frozen Orb sprites of the current frame, 32 bytes each: id, Missiles.txt row, subtile x, y, 64-slot facing, frame
+// (8.8), height, nTrans. play/assets/orb-client.mjs swaps them for the server's rows 260-262.
+extern "C" EMSCRIPTEN_KEEPALIVE const void* d2_client_orb_missiles() { return d2client_clmissile::orbRecs.data(); }
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_orb_missile_count() { return static_cast<uint32_t>(d2client_clmissile::orbRecs.size()); }

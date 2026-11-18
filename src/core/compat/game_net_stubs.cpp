@@ -113,7 +113,7 @@ extern "C" const uint8_t* D2WEB_PacketStream(uint32_t* pLength, uint32_t* pPacke
     return g_d2webPacketStream;
 }
 
-namespace d2client_blizzard { void shatter(); }
+namespace d2client_blizzard { void shatter(uint32_t monsterId); }
 // The tick's 0x0C unit hit/life updates {unit type, guid, message, hit class, life}: the client's
 // 0x0C handler runs the struck unit's hit sound (D2Client 0x23630) on each, whether or not its life
 // byte moved. Kept whole, like 0x27, so the browser plays the cue because the engine sent the packet.
@@ -1204,7 +1204,7 @@ void __fastcall D2GAME_PACKETS_SendPacket0x0E_6FC3C8E0(D2ClientStrc* a0, char a1
 void __fastcall D2GAME_PACKETS_SendPacket0x11_6FC3F4A0(D2ClientStrc* a0, unsigned char a1, unsigned int a2, unsigned short a3) {}
 // 1.13c D2Game+0x8A5A0 (0xA7 state on; the shatter hook is d2web glue) and 0x8A570 (0xA9 state off): 7 bytes: opcode, unit type, guid dword, state byte; a retail recording retail a7010e00000069 / a901010000000b.
 void __fastcall D2GAME_PACKETS_SendPacket0xA7_StateOn_6FC3FC20(D2ClientStrc* a0, unsigned char a1, unsigned int a2, unsigned short a3) {
-    if (a0 && a1 == 1 && a3 == 107) d2client_blizzard::shatter();   // the client's shatter: icebreak missiles take client ids
+    if (a0 && a1 == 1 && a3 == 107) d2client_blizzard::shatter(a2);   // the client's shatter: icebreak missiles take client ids
     uint8_t b[7] = { 0xA7, a1, 0, 0, 0, 0, (uint8_t)a3 }; memcpy(b + 2, &a2, 4);
     D2GAME_PACKETS_SendPacket_6FC3C710(a0, b, sizeof b);
 }

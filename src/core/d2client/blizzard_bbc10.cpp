@@ -43,15 +43,16 @@ constexpr int32_t kCastDelay = 8;        // frames from the cast to the center's
 constexpr int32_t kCenterRange = 100, kFrequency = 4, kShardLife = 24, kRadius = 7;   // Skills.txt calc1 (par1), calc2 (par3)
 constexpr uint32_t kFirstId = 0xDC;      // the client's unit id counter at the first cast (the first center's id in a retail recording of skill 59)
 constexpr int32_t kIceBreakLife = 30;    // Missiles.txt icebreaklarge Range
+constexpr int32_t kIceRow = 274, kSmokeRow = 275, kMeltRow = 345, kSmokeLife = 15, kMeltLife = 150;   // Missiles.txt icebreaklarge, icebreaksmoke, icebreaklargemelt and their Range
 constexpr int32_t kCenterRow = 158;      // Missiles.txt blizzardcenter
-enum Kind : uint8_t { kShard, kCenter, kIce, kExplode };
+enum Kind : uint8_t { kShard, kCenter, kIce, kExplode, kSmoke, kMelt };
 struct Obj { uint32_t id; Kind kind; int32_t life, x, y; int32_t row = 0, age = 0; uint32_t dir = 0; uint64_t seed = 0; };
 struct Cast { int64_t due; int32_t type; uint32_t id; int32_t tx, ty; };
 std::vector<Obj> objs;
 std::vector<Cast> casts;
 int64_t frame = 0;
 uint32_t nextId = kFirstId;
-int32_t shatters = 0;   // monsters shattered this frame, before the walk ran
+std::vector<uint32_t> shatters;   // the monsters shattered this frame, before the walk ran
 D2ActiveRoomStrc* room = nullptr;
 
 const D2MissilesTxt* txt(int32_t row) { return row >= 0 && row < static_cast<int32_t>(sgptDataTables->nMissilesTxtRecordCount) ? &sgptDataTables->pMissilesTxt[row] : nullptr; }
@@ -83,10 +84,10 @@ struct Rec { uint32_t id, classId; int32_t x, y; uint32_t direction, framePrecis
 static_assert(sizeof(Rec) == 32, "the browser reads 32-byte records");
 std::vector<Rec> recs;
 
-void reset() { recs.clear(); objs.clear(); casts.clear(); frame = 0; nextId = kFirstId; room = nullptr; shatters = 0; }
+void reset() { recs.clear(); objs.clear(); casts.clear(); frame = 0; nextId = kFirstId; room = nullptr; shatters.clear(); }
 
 // the server set state 107 (shatter) on a monster: its client icebreak missiles take their ids after this frame's walk
-void shatter() { ++shatters; }
+void shatter(uint32_t monsterId) { shatters.push_back(monsterId); }
 
 void cast(int32_t skillId, D2UnitStrc* target, int32_t tx, int32_t ty) {
     if (skillId == kBlizzard) casts.push_back({frame + kCastDelay, target ? static_cast<int32_t>(target->dwUnitType) : -1, target ? target->dwUnitId : 0u, tx, ty});
@@ -120,7 +121,8 @@ void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)) {
             } else if (--it->life < 1) {
                 const Obj o = *it;
                 objs.erase(it);
-                if (o.kind == kIce) { ++nextId; continue; }   // icebreaklargemelt
+                if (o.kind == kSmoke || o.kind == kMelt) continue;
+                if (o.kind == kIce) { objs.push_back({nextId++, kMelt, kMeltLife, o.x, o.y, kMeltRow}); continue; }   // icebreaklargemelt (pCltHitFunc 31, 0xB05B0)
                 if (o.kind == kExplode) continue;
                 d2client_ambient::submit(kSoundImpact);
                 const D2MissilesTxt* st = txt(o.row);
@@ -134,7 +136,14 @@ void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)) {
             }
         }
     }
-    for (; shatters > 0; --shatters) { objs.push_back({nextId, kIce, kIceBreakLife, 0, 0}); nextId += 2; }
+    for (uint32_t mid : shatters) {   // where the monster stands: its corpse is on the cell it shattered (always the large pair: the size rows 272/273 are not ported)
+        D2UnitStrc* m = find ? find(UNIT_MONSTER, mid) : nullptr;
+        const int32_t x = m ? UNITS_GetXPosition(m) : 0, y = m ? UNITS_GetYPosition(m) : 0;
+        objs.push_back({nextId, kIce, kIceBreakLife, x, y, kIceRow});
+        objs.push_back({nextId + 1, kSmoke, kSmokeLife, x, y, kSmokeRow});
+        nextId += 2;
+    }
+    shatters.clear();
     for (size_t i = 0; i < casts.size();) {
         if (casts[i].due != frame) { ++i; continue; }
         const Cast c = casts[i];
@@ -160,7 +169,7 @@ void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)) {
     // what the client draws this frame: the shards and impacts (the center's CelFile is null)
     recs.clear();
     for (Obj& o : objs) {
-        if (o.kind != kShard && o.kind != kExplode) continue;
+        if (o.kind == kCenter) continue;   // its CelFile is null
         const D2MissilesTxt* t = txt(o.row);
         const int32_t len = t && t->nAnimLen > 0 ? t->nAnimLen : 1;
         const int32_t f = !t || !t->nLoopAnim ? std::min(o.age, len - 1) : o.age % len;
