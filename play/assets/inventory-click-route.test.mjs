@@ -1,4 +1,4 @@
-// Repair mode on the body slots: the engine's route (src/core/d2client/inv_click_route.cpp, compiled natively
+// Repair mode on the body slots: the engine's route (src/core/d2moo/d2client/inv_click_route.cpp, compiled natively
 // here) must answer "trade action", never "pick up", for every equipped slot, and the shell turns it into 'repair'.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inventoryClickAction, SHOP_MODE } from './inventory-click-route.mjs';
 
-const src = join(dirname(fileURLToPath(import.meta.url)), '../../src/core/d2client/inv_click_route.cpp');
+const src = join(dirname(fileURLToPath(import.meta.url)), '../../src/core/d2moo/d2client/inv_click_route.cpp');
 const dir = mkdtempSync(join(tmpdir(), 'route-'));
 writeFileSync(join(dir, 'main.cpp'), `#include "${src}"
 #include <cstdio>

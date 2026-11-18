@@ -63,7 +63,7 @@ export function bindStubRules() {
         const runIn = mx >= 255 && mx <= 272 && my >= 572 && my <= 592, menuIn = mx >= 392 && mx <= 405 && my >= 561 && my <= 587;
         const recs = [[0xd096, cellRun, (running ? 2 : 0) + (runHot && runIn ? 1 : 0), 255, 590, -1, 5, 0],
           [0xd096, cellMenu, (arrowOpen ? 2 : 0) + (arrowHot && menuIn ? 1 : 0), 392, 584, -1, 5, 0]];
-        recs.forEach((r, i) => r.forEach((v, j) => { heap[(out >> 2) + i * 8 + j] = v; }));
+        recs.forEach((r, i) => r.forEach((v, j) => { heap[(Number(out) >> 2) + i * 8 + j] = v; }));
         return recs.length;
       }
       if (name === 'd2_client_draw_orbs') {   // d2client_27bd0.cpp / d2client_27a90.cpp with no poison or frozen state, at 800x600
@@ -83,7 +83,7 @@ export function bindStubRules() {
           const f = fill(mana, manaMax, 1);
           recs.push([0xd1b6, fluid, 1, 689, 587, 0, f, 5], [0xd096, overlap, 1, 690, 591, -1, 5, 0]);
         }
-        recs.forEach((r, i) => r.forEach((v, j) => { heap[(out >> 2) + i * 8 + j] = v; }));
+        recs.forEach((r, i) => r.forEach((v, j) => { heap[(Number(out) >> 2) + i * 8 + j] = v; }));
         return recs.length;
       }
       throw new Error(`stub: ${name}`);

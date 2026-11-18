@@ -356,14 +356,15 @@ export function createBnetLobbyScreen({ read, decodeDc6, decodeDatPalette, strin
   // The pre-chat lobby's news lines (the chat log's box, D2Multi+0xC510's date / text / blank per entry) and the realm's MOTD
   // (the server box, D2Multi+0x9D60).
   let news = [], motd = '';
-  const form = { name: '', password: '', description: '', maxPlayers: '4', levelDifference: '4', levelLimit: false, difficulty: 0, focus: 'name', channel: '' };
+  // Both number boxes open at "4" and the level-restriction box is created checked, as the stock create panel builds them.
+  const form = { name: '', password: '', description: '', maxPlayers: '4', levelDifference: '4', levelLimit: true, difficulty: 0, focus: 'name', channel: '' };
   let created = now(), pinned = null;
   const clock = () => (pinned === null ? now() : pinned);
 
   const openCreate = () => {
     panel = 'create';
     const d = Math.min(2, Math.max(0, registryDifficulty | 0));
-    Object.assign(form, { name: '', password: '', description: '', maxPlayers: '4', levelDifference: '4', levelLimit: false,
+    Object.assign(form, { name: '', password: '', description: '', maxPlayers: '4', levelDifference: '4', levelLimit: true,
       difficulty: allowed[d] ? d : 0, focus: 'name' });
   };
   // The join panel asks the realm for its games once when it opens (JOIN's callback). Retail's idle loop adds a free-running 15 s timer that is only

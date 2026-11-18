@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { automapViewport, automapScrollOffset, bindAutomapLayout } from './automap-overlay.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'core', 'd2client');
+const moo = join(root, '..', 'd2moo', 'd2client');
 const have = spawnSync('g++', ['--version']).status === 0;
 
 test('native layout wrapper matches the JS automap viewport and scroll', { skip: !have && 'no g++' }, () => {
@@ -23,8 +24,8 @@ int main(){ int w,h,m,p,s,c; while (scanf("%d %d %d %d %d %d",&w,&h,&m,&p,&s,&c)
   d2_client_automap_layout(w,h,m,p,s,c,o); for(int i=0;i<8;i++) printf("%d ",o[i]); printf("\\n"); } }
 `);
     const exe = join(dir, 'amtest');
-    const build = spawnSync('g++', ['-std=c++17', '-I', dir, '-I', root, '-o', exe, join(dir, 'main.cpp'),
-      join(root, 'automap_layout.cpp'), join(root, 'batch_b46.cpp'), join(root, 'batch_b48_automap.cpp')], { encoding: 'utf8' });
+    const build = spawnSync('g++', ['-std=c++17', '-I', dir, '-I', root, '-I', join(root, '..'), '-o', exe, join(dir, 'main.cpp'),
+      join(root, 'automap_layout.cpp'), join(moo, 'batch_b46.cpp'), join(moo, 'batch_b48_automap.cpp')], { encoding: 'utf8' });
     assert.equal(build.status, 0, build.stderr);
     const cases = [];
     for (const [w, h] of [[640, 480], [800, 600], [1024, 768], [1280, 720], [1920, 1080], [801, 601]])

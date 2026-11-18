@@ -98,7 +98,7 @@ test('lobby -> CREATE -> typed game -> Enter creates it with the form', async ()
   assert.equal(s.evidence.form.difficulty, 0);
   s.typeKey('Enter');
   await tick();
-  assert.deepEqual(calls, [{ gameName: 'my game', gamePassword: 'pw', description: '', maxPlayers: 4, difficulty: 0, levelDifference: 0xff }]);
+  assert.deepEqual(calls, [{ gameName: 'my game', gamePassword: 'pw', description: '', maxPlayers: 4, difficulty: 0, levelDifference: 4 }]);
   assert.ok(s.busy, 'stays busy until the game replaces the lobby');
 });
 
@@ -360,10 +360,11 @@ test('CREATE: the name takes only letters, digits, space and \' - _, and holds 1
   assert.equal(g.gameName.length, 15);
 });
 
-test('CREATE: an empty players box sends 0 and the level byte is 0xff unless the box is on', async () => {
-  const g = await createSent(['a', 'Tab', 'Tab', 'Tab', 'Backspace']);
+test('CREATE: an empty players box sends 0; the level byte is the box\'s value, 0xff once the box is unchecked', async () => {
+  const g = await createSent(['a', 'Tab', 'Tab', 'Tab', 'Backspace'], (s) => s.activate('level-box'));
   assert.equal(g.maxPlayers, 0);
   assert.equal(g.levelDifference, 0xff);
+  assert.equal((await createSent(['a'])).levelDifference, 4);
 });
 
 test('JOIN: the open request is throttled to one per 5 s and the list starts empty', () => {

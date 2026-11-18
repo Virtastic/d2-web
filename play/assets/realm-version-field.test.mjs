@@ -10,7 +10,10 @@ function engine() {
     ccall: (name, _rt, _types, args) => {
       const out = Number(args[args.length - 1]);
       if (name === 'd2_realm_client_bncs_logon') { for (let i = 0; i < 40; i++) heap[out + i] = i + 1; return 40; }
-      if (name === 'd2_realm_d2gs_gamelogon') { heap.fill(0, out, out + 37); heap[out] = 0x68; heap.set([0x50, 0xCC, 0x5D, 0xED], out + 12); return 37; }
+      if (name === 'd2_realm_d2gs_gamelogon') {
+        heap.fill(0, out, out + 37); heap[out] = 0x68; heap[out + 8] = args[3]; heap[out + 20] = args[5];
+        heap.set(args[4] ? [0x50, 0xCC, 0x5D, 0xED] : [0xD6, 0xED, 0x85, 0x21], out + 12); return 37;
+      }
       throw new Error(`unexpected export ${name}`);
     },
   };
@@ -24,9 +27,11 @@ test('bncsLogon returns the engine body untouched for classic and expansion alik
   assert.deepEqual([...p.bncsLogon({ clientToken: 1, serverToken: 2, account: 'a', password: 'b', expansion: false })], want);
 });
 
-test('d2gsGamelogon writes 0x2185EDD6 for a classic game and the LoD sum 0xED5DCC50 for an expansion game', () => {
+test('d2gsGamelogon hands the expansion flag, version byte 0x0D and language 0 to the engine composer', () => {
   const p = engine();
   const a = { character: 'Hero', charClass: 1, gameToken: 1, gameHash: 2 };
+  assert.equal(p.d2gsGamelogon(a)[8], 0x0d);
+  assert.equal(p.d2gsGamelogon(a)[20], 0);
   assert.deepEqual([...p.d2gsGamelogon({ ...a, expansion: false }).slice(12, 16)], [0xD6, 0xED, 0x85, 0x21]);
   assert.deepEqual([...p.d2gsGamelogon({ ...a, expansion: true }).slice(12, 16)], [0x50, 0xCC, 0x5D, 0xED]);
   assert.deepEqual([...p.d2gsGamelogon(a).slice(12, 16)], [0x50, 0xCC, 0x5D, 0xED]);

@@ -10,6 +10,13 @@ import { realmViewSnapshot, realmFrameReads } from './realm-client-view.mjs';
 import { createRealmInput } from './realm-input.mjs';
 import { realmInventoryClick } from './realm-storage-input.mjs';
 import { inventoryLayoutFromEngine, inventoryItemAt, weaponTabHit, AMAZON2_INVENTORY_LAYOUT as PANEL } from './inventory-panel.mjs';
+import { setGridCellEngine } from './grid-cell.mjs';
+
+// The shell installs the engine's grid-cell rule; install the same retail rule here.
+setGridCellEngine((l, t, w, h, x, y, c, r) => {
+  const cx = Math.floor((x - l) / w), cy = Math.floor((y - t) / h);
+  return cx < 0 || cy < 0 || cx >= c || cy >= r ? null : { x: cx, y: cy };
+});
 
 const enc = (text) => new TextEncoder().encode(text);
 // Inventory.txt: the grid and three body slots (right arm 4, head 1, left arm 5) of the player's row.

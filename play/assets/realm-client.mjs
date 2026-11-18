@@ -1187,9 +1187,19 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
     bncsAuthCheck: ({ serverToken, mpq = '', challenge, product, auth }) => {
       const challengeStr = str(challenge), expansion = product === 'D2XP' ? 1 : 0;
       const keyless = !challengeStr.includes('=') || /^[A-Za-z0-9+/]*=*$/.test(challengeStr);
-      // With no revision files configured, a formula challenge gets the keyless request: the project's own realm does not verify it.
-      // A server that checks a fixed Game.exe version and checksum has them in its config (auth.exeVersion, auth.exeHash, auth.exeInfo).
-      if (keyless || !auth?.revisionFiles?.length) {
+      // With no revision files configured, a formula challenge still runs the 1.13c frame: the version, checksum and info line the
+      // revision check would have produced come from the config (auth.exeVersion, auth.exeHash, auth.exeInfo), and a missing CD key
+      // leaves its block zero, as the stock client sends it with none installed.
+      if (!keyless && !auth?.revisionFiles?.length) {
+        const keys = auth?.cdKeys ?? [];
+        const n = call('d2_realm_bncs_auth_check_fixed', 'number',
+          ['bigint', 'number', 'number', 'number', 'number', 'number', 'number', 'string', 'string', 'string', 'string', 'bigint'],
+          [BigInt(SEED), env.time(), env.tick(), serverToken, expansion, auth?.exeVersion ?? 0x01000d00, auth?.exeHash ?? 0,
+            auth?.exeInfo ?? '', keys[0] ?? '', keys[1] ?? '', auth?.keyOwner ?? '', BigInt(O)]);
+        if (n <= 0) throw new Error('AUTH_CHECK composer failed');
+        return { body: rd(O, n), clientToken: u32at(SEED) };
+      }
+      if (keyless) {
         const clientToken = (u32at(SEED) + env.tick() + env.time()) >>> 0;
         put32(SEED, clientToken);
         const revLen = keyless ? call('d2_realm_bncs_checkrev', 'number', ['string', 'string', 'number', 'bigint'], [challengeStr, '1.13.2.0', 0, BigInt(O)]) : 0;
@@ -1690,11 +1700,10 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
     } : null,
     d2gsGamelogon: ({ character, charClass, gameToken, gameHash, expansion = true }) => {
       if (Module._d2_realm_client_items_set_expansion) Module._d2_realm_client_items_set_expansion(expansion ? 1 : 0);   // picks the Inventory.txt rows of the hero's grids
-      const n = call('d2_realm_d2gs_gamelogon', 'number', ['number', 'number', 'number', 'number', 'string', 'bigint'], [gameHash, gameToken, charClass, 0x0d, character, BigInt(T)]);
-      const b = rd(T, n);
-      // Retail D2Client+0x14A50: the version dword at +12 is 0x2185EDD6, plus 0xCBD7DE7A for an expansion game (the export writes the LoD sum).
-      if (!expansion) b.splice(12, 4, 0xD6, 0xED, 0x85, 0x21);
-      return b;
+      // Version byte 0x0D is the BNClient answer; language 0 is the English string table the client loads.
+      const n = call('d2_realm_d2gs_gamelogon', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'string', 'bigint'],
+        [gameHash, gameToken, charClass, 0x0d, expansion ? 1 : 0, 0, character, BigInt(T)]);
+      return rd(T, n);
     },
     // D2Client+0x14B00: [6D][tick][avg rtt >> 1][module word * 0xB640DE41]; null while the 5 s gate holds.
     d2gsPing: (tick) => {

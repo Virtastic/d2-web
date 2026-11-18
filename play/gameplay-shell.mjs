@@ -2041,7 +2041,8 @@ async function redialBncs() {
 }
 function lobbyChatUser(name) {
   const flow = realmFlow;
-  return { character: name, realm: flow?.realms?.[0] ?? flow?.server?.region ?? '',
+  // ENTERCHAT's second string is "<realm>,<character>", the way the stock lobby entry formats it.
+  return { character: name, realm: `${flow?.realms?.[0] ?? flow?.server?.region ?? ''},${name}`,
     onEvent: (e) => { const handled = bnetLobbyScreen?.chatEvent(e) ?? false; if (handled) render(); return handled; },
     onLine: (line) => { if (realmSceneActive) { messageLines.push(line); postedAt = performance.now(); } else bnetLobbyScreen?.chatLine(line); render(); },
     onChannels: (list) => { bnetLobbyScreen?.setChannels(list); render(); },
