@@ -63,22 +63,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3C020_TakeUnitDataValue(uintptr_t pUnit)
     return *(uint32_t*)(pUnitData + 0x5c);
 }
 
-// 1.13c D2Common+0x34720
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint16_t d2_fn_d2common_34720_batch(uintptr_t pPath)
-{
-    if ((*(const uint32_t*)(pPath + 0x34) & 0x20000u) == 0)
-    {
-        return 0; // retail fatals 0x911; modelled as a return
-    }
-    int32_t nIndex = *(const int32_t*)(pPath + 0x1d4);
-    if (nIndex != 0)
-    {
-        return *(const uint16_t*)(pPath + 0x1d6 + (intptr_t)nIndex * 4);
-    }
-    return 0;
-}
-
 // 1.13c D2Common+0x22C80
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint8_t D2Common_22C80_GetItemTxtByte11D(uintptr_t pItem)

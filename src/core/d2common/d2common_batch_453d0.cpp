@@ -56,19 +56,6 @@ void D2Common_453D0(void* self, int32_t p1, void* unit, uint32_t idx)
         if (t2[s] == key && D2Common_452C0((uint8_t)s, unit, p1, idx, v)) return;
 }
 
-// 1.13c D2Common+0x3DC90: fastcall(a), EAX=b. Walks a+0x14 -> table of lists at +0x68 (count at
-// +0x260); for every node with a non-null next (+0x10) calls 36CD0(b+0x20 -> +0x3C, 1, 0, 2).
-void D2Common_3DC90(void* a, void* b)
-{
-    uint8_t* tgt = (uint8_t*)P32(b, 0x20);
-    const int32_t* q = (const int32_t*)((uint8_t*)b + 0x34);
-    const int32_t rect[4] = { q[0] - 1, q[1] - 1, q[2] + 3, q[3] + 3 };
-    void* t = P32(a, 0x14);
-    for (int32_t i = 0; i < I32(t, 0x260); ++i)
-        for (void* n = P32(t, 0x68 + 4 * i); n; n = P32(n, 0x10))
-            if (I32(n, 0x10)) d2common_36cd0_port(n, rect, tgt + 0x3C, 1, 0, 2);
-}
-
 // 1.13c D2Common+0x84AD0: fastcall(a), EDI=self; the body is d2c_84ad0_run (d2common_84ad0.cpp) with the real callees.
 static uint32_t s_84ad0_a;
 static void* Entries84AD0(int32_t idx) { return D2Common_6C4D0(s_84ad0_a, idx); }

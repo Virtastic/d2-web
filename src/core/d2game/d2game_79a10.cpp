@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x79A10 -- unit mode-start dispatch (fastcall: ECX = game, EDX = unit, stack = two words, ret 8). The handler slot is
+// D2Game +0x79A10 (marker lives on the d2moo sub_6FC81600) -- unit mode-start dispatch (fastcall: ECX = game, EDX = unit, stack = two words, ret 8). The handler slot is
 // table[unit ? *(unit+0x10) : 0] of the pointer table at D2Game+0x1079D0 (the unit's animation mode); an empty slot does nothing. A handler (same
 // register and stack arguments) that returns 2 is followed by 0x79850(game, unit, a, b).
 #include <cstdint>

@@ -2245,7 +2245,7 @@ void __fastcall OBJECTS_RemoveAll(D2GameStrc* pGame)
         while (pObject)
         {
             D2UnitStrc* pNext = SUNIT_GetNextUnitFromList(pObject);
-            SUNIT_RemoveUnit(pGame, pObject);
+            D2_CALL(SUNIT_RemoveUnit, pGame, pObject);
             pObject = pNext;
         }
     }

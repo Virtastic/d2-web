@@ -1523,6 +1523,7 @@ D2UnitStrc* __fastcall D2GAME_CreateItemUnit_6FC501A0(D2UnitStrc* pPlayer, int32
 }
 
 //D2Game.0x6FC502B0
+// 1.13c D2Game+0x10700
 void __fastcall sub_6FC502B0(D2GameStrc* pGame, D2UnitStrc* pItem)
 {
     if (ITEMS_CheckIfSocketable(pItem))

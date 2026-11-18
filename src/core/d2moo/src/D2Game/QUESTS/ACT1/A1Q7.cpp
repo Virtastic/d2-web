@@ -1,4 +1,5 @@
 #include "QUESTS/ACT1/A1Q7.h"
+#include <test_seam.h>
 
 #include <DataTbls/MonsterIds.h>
 #include <D2QuestRecord.h>
@@ -51,7 +52,7 @@ D2NPCMessageTableStrc gpAct1Q7NpcMessages[] =
 
 
 // 1.13c D2Game+0x60180
-static void __fastcall ACT1Q7_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
+void __fastcall ACT1Q7_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 }
 
@@ -81,18 +82,18 @@ void __fastcall ACT1Q7_Callback00_NpcActivate(D2QuestDataStrc* pQuest, D2QuestAr
 	}
 
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pQuest->pGame, QUEST_A1Q1_DENOFEVIL);
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];
 	if (QUESTS_GetGlobalState(pQuestArg->pGame, QUESTSTATEFLAG_A1Q1, QFLAG_PRIMARYGOALDONE)
 		|| !pQuestData->bNotIntro
-		|| QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q1, QFLAG_REWARDGRANTED)
-		|| QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q1, QFLAG_PRIMARYGOALDONE)
-		|| QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q1, QFLAG_REWARDPENDING))
+		|| D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A1Q1, QFLAG_REWARDGRANTED)
+		|| D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A1Q1, QFLAG_PRIMARYGOALDONE)
+		|| D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A1Q1, QFLAG_REWARDPENDING))
 	{
-		QUESTS_InitScrollTextChain(pQuest, pQuestArg->pTextControl, MONSTER_NAVI, ITEMS_RollRandomNumber(&pQuestArg->pPlayer->pSeed) % 3 + 2);
+		D2_CALL(QUESTS_InitScrollTextChain, pQuest, pQuestArg->pTextControl, MONSTER_NAVI, D2_CALL(ITEMS_RollRandomNumber, &pQuestArg->pPlayer->pSeed) % 3 + 2);
 	}
 	else
 	{
-		QUESTS_InitScrollTextChain(pQuest, pQuestArg->pTextControl, MONSTER_NAVI, ITEMS_RollRandomNumber(&pQuestArg->pPlayer->pSeed) & 1);
+		D2_CALL(QUESTS_InitScrollTextChain, pQuest, pQuestArg->pTextControl, MONSTER_NAVI, D2_CALL(ITEMS_RollRandomNumber, &pQuestArg->pPlayer->pSeed) & 1);
 	}
 }
 
@@ -100,16 +101,16 @@ void __fastcall ACT1Q7_Callback00_NpcActivate(D2QuestDataStrc* pQuest, D2QuestAr
 // 1.13c D2Game+0x60820
 bool __fastcall ACT1Q7_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
-	if (nNpcId != MONSTER_NAVI || !QUESTS_GetQuestData(pQuest->pGame, QUEST_A1Q1_DENOFEVIL)->bNotIntro || QUESTS_GetGlobalState(pQuest->pGame, QUESTSTATEFLAG_A1Q1, QFLAG_PRIMARYGOALDONE))
+	if (nNpcId != MONSTER_NAVI || !QUESTS_GetQuestData(pQuest->pGame, QUEST_A1Q1_DENOFEVIL)->bNotIntro || D2_CALL(QUESTS_GetGlobalState, pQuest->pGame, QUESTSTATEFLAG_A1Q1, QFLAG_PRIMARYGOALDONE))
 	{
 		return false;
 	}
 
-	D2BitBufferStrc* pFlags = UNITS_GetPlayerData(pPlayer)->pQuestData[pQuest->pGame->nDifficulty];
+	D2BitBufferStrc* pFlags = D2_CALL(UNITS_GetPlayerData, pPlayer)->pQuestData[pQuest->pGame->nDifficulty];
 
-	return !QUESTRECORD_GetQuestState(pFlags, QUESTSTATEFLAG_A1Q1, QFLAG_REWARDGRANTED)
-		&& !QUESTRECORD_GetQuestState(pFlags, QUESTSTATEFLAG_A1Q1, QFLAG_PRIMARYGOALDONE)
-		&& !QUESTRECORD_GetQuestState(pFlags, QUESTSTATEFLAG_A1Q1, QFLAG_REWARDPENDING);
+	return !D2_CALL(QUESTRECORD_GetQuestState, pFlags, QUESTSTATEFLAG_A1Q1, QFLAG_REWARDGRANTED)
+		&& !D2_CALL(QUESTRECORD_GetQuestState, pFlags, QUESTSTATEFLAG_A1Q1, QFLAG_PRIMARYGOALDONE)
+		&& !D2_CALL(QUESTRECORD_GetQuestState, pFlags, QUESTSTATEFLAG_A1Q1, QFLAG_REWARDPENDING);
 }
 
 // 1.13c D2Game+0x60170

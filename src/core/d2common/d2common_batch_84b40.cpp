@@ -75,32 +75,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2common_4EBA0_UnitState86(D2UnitStrc* pUnit)
 
 namespace
 {
-	// The compared value of one unit: the first path dword at +0x10 for object/item/tile, otherwise
-	// the short at path +0x06; a missing path is 0.
-	uint32_t Batch2_UnitCompareValue(const D2UnitStrc* pUnit)
-	{
-		const int32_t nType = (int32_t)pUnit->dwUnitType;
-
-		if (nType == 2 || (nType > 3 && nType < 6))
-		{
-			return pUnit->pDynamicPath ? *(const uint32_t*)((const uint8_t*)pUnit->pDynamicPath + 0x10) : 0;
-		}
-
-		if (!pUnit->pDynamicPath) return 0;
-		return *(const uint16_t*)((const uint8_t*)pUnit->pDynamicPath + 6);
-	}
-}
-
-// 1.13c D2Common+0x30160 (#10500): absolute difference of the two units' compared values.
-extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t D2Common_UnitPathValueDelta(D2UnitStrc* pFirst, D2UnitStrc* pSecond)
-{
-	const int32_t nDelta = (int32_t)(Batch2_UnitCompareValue(pFirst) - Batch2_UnitCompareValue(pSecond));
-	return nDelta < 0 ? -nDelta : nDelta;
-}
-
-namespace
-{
 	// 0x1470: MonStats2 dwFlags (+0x04) bit nBit of the monster row.
 	uint32_t Batch2_MonStats2FlagBit(int32_t nMonsterId, int32_t nBit)
 	{

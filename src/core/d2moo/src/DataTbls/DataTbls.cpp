@@ -220,13 +220,6 @@ int __fastcall DATATBLS_AppendMemoryBuffer(char** ppCodes, int* pSize, int* pSiz
 
 // SKILLS
 
-//D2Common.0x6FD4E4B0 (#10593)
-// not-1.13c: no retail function; retail callers (e.g. 0x5E4D0) read the charstats pointer at sgptDataTables+0xbc4 directly
-D2CharStatsTxt* __fastcall DATATBLS_GetCharstatsTxtTable()
-{
-	return sgptDataTables->pCharStatsTxt;
-}
-
 //D2Common.0x6FD4E4C0
 // not-1.13c: retail has no getter, each user (0x41DD0, 0x41EF0, 0x41F70) reads the anim-data table global directly
 D2AnimDataTableStrc* __fastcall DATATBLS_GetAnimData()
@@ -804,7 +797,10 @@ void __stdcall DATATBLS_UnloadAllBins()
 
 	DATATBLS_UnloadBin(sgptDataTables->pCharStatsTxt);
 	DATATBLS_UnloadMissilesTxt();
-	DATATBLS_UnloadOverlayTxt();
+	FOG_FreeLinker(sgptDataTables->pOverlayLinker);
+	DATATBLS_UnloadBin(sgptDataTables->pOverlayTxt);
+	sgptDataTables->pOverlayTxt = NULL;
+	sgptDataTables->nOverlayTxtRecordCount = 0;
 	DATATBLS_UnloadSkills_SkillDescTxt();
 	DATATBLS_UnloadItemStatCostTxt();
 	DATATBLS_UnloadStatesTxt();
@@ -873,7 +869,7 @@ void __stdcall DATATBLS_UnloadAllBins()
 	DATATBLS_UnloadObjectsTxt();
 	DATATBLS_UnloadObjGroupTxt();
 	DATATBLS_UnloadShrinesTxt();
-	DATATBLS_UnloadInventoryTxt();
+	DATATBLS_UnloadBin(sgptDataTables->pInventoryTxt);
 	DATATBLS_UnloadBin(sgptDataTables->pRuneDataTables.pRunesTxt);
 	FOG_FreeLinker(sgptDataTables->pRunesLinker);
 	if (sgptDataTables->pFieldData)
@@ -882,7 +878,7 @@ void __stdcall DATATBLS_UnloadAllBins()
 		sgptDataTables->pFieldData = NULL;
 	}
 	DATATBLS_FreeCollisionFieldTable();
-	DATATBLS_UnloadBeltsTxt();
+	DATATBLS_UnloadBin(gpBeltsTxtTable);
 	DATATBLS_UnloadMonItemPercentTxt();
 	DATATBLS_UnloadArenaTxt();
 	DATATBLS_UnloadCubeMainTxt();

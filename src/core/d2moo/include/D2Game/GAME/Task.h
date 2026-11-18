@@ -61,6 +61,8 @@ void __fastcall TASK_LinkList_Insert(D2LinkStrc* pPrev, D2LinkStrc* pLink);
 void __fastcall TASK_LinkList_PushFront(D2LinkStrc* pList, D2LinkStrc* pLink);
 //D2Game.0x6FC40F70
 void __fastcall TASK_LinkList_Remove(D2LinkStrc* pLink);
+//1.13c D2Game+0x1E10
+void __fastcall TASK_LinkList_InsertTail(D2LinkStrc* pHead, D2LinkStrc* pLink);
 
 
 

@@ -178,23 +178,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_1ED00_FindItemInGrid(uint32_t pInventory,
 	return 0;
 }
 
-// 1.13c D2Common+0x2FD50 (#10669): for unit types 0, 1 and 3, the dword at path(+0x2C)+0x60 when
-// path+0x58 is non-zero. The other paths are fatal in retail and yield 0 here.
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t D2Common_2FD50_PathField60(uint32_t pUnit)
-{
-	uint8_t* u = P(pUnit);
-	if (!u)
-		return 0;
-	const uint32_t nType = W(u, 0);
-	if (!(nType == 0 || nType == 1 || nType == 3))
-		return 0;
-	uint8_t* p = P(W(u, 0x2C));
-	if (!p || W(p, 0x58) == 0)
-		return 0;
-	return W(p, 0x60);
-}
-
 // Superseded by UNITS_GetDefense (src/core/d2moo/src/Units/Units.cpp, the row for 0x32890); kept for reference only.
 // D2Common 0x32890 (#10672): scaled stat total. Base = total(31) + total(2)/4;
 // bonus = total(171) + total(16); for unit types 0, 1 and 3 that carry state 101 the first matching

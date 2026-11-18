@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include <test_seam.h>
+
 #include <D2BitManip.h>
 
 #include <D2PacketDef.h>
@@ -87,6 +89,38 @@ void __fastcall MISSILES_Free(D2GameStrc* pGame, D2UnitStrc* pMissile)
 
     MISSILE_FreeMissileData(pMissile);
     sub_6FC349F0(pGame, pMissile);
+}
+
+// 1.13c D2Game+0x6F660: the pierce roll, gated on the missile's own record; signed compare of roll % 100 against the pierce value
+void __fastcall MISSILES_RollPierce(D2UnitStrc* pOwner, D2UnitStrc* pMissile)
+{
+    if (!pOwner || !pMissile || pMissile->dwUnitType != UNIT_MISSILE || (pOwner->dwUnitType != UNIT_PLAYER && pOwner->dwUnitType != UNIT_MONSTER))
+    {
+        return;
+    }
+
+    if (!(D2_CALL(SKILLS_GetMissilesTxtRecord, pMissile->dwClassId)->dwMissileFlags & gdwBitMasks[MISSILESFLAGINDEX_PIERCE]))
+    {
+        return;
+    }
+
+    const int32_t nPierceValue = D2_CALL(STATLIST_UnitGetItemStatOrSkillStatValue, pOwner, STAT_ITEM_PIERCE, 0) + D2_CALL(STATLIST_UnitGetStatValue, pOwner, STAT_SKILL_PIERCE, 0);
+    if (nPierceValue)
+    {
+        D2SeedStrc seed = {};
+        D2_CALL(SEED_InitLowSeed, &seed, D2_CALL(STATLIST_GetUnitBaseStat, pOwner, STAT_PIERCE_IDX, 0));
+
+        int32_t nPierceIndex = 0;
+        while (nPierceIndex < 4)
+        {
+            if ((int32_t)(ITEMS_RollRandomNumber(&seed) % 100) >= nPierceValue)
+            {
+                break;
+            }
+            ++nPierceIndex;
+        }
+        D2_CALL(STATLIST_SetUnitStat, pMissile, STAT_PIERCE_IDX, nPierceIndex, 0);
+    }
 }
 
 //D2Game.0x6FC55360
@@ -350,29 +384,7 @@ D2UnitStrc* __fastcall MISSILES_CreateMissileFromParams(D2GameStrc* pGame, D2Mis
 
     pMissile->dwFlags &= ~UNITFLAG_ISVALIDTARGET;
 
-    // D2Game+0x6F660: the pierce roll, gated on the missile's own record; signed compare of roll % 100 against the pierce value
-    D2UnitStrc* pOwner = missileParams->pOwner;
-    if (pOwner && pMissile->dwUnitType == UNIT_MISSILE && (pOwner->dwUnitType == UNIT_PLAYER || pOwner->dwUnitType == UNIT_MONSTER)
-        && SKILLS_GetMissilesTxtRecord(pMissile->dwClassId)->dwMissileFlags & gdwBitMasks[MISSILESFLAGINDEX_PIERCE])
-    {
-        const int32_t nPierceValue = STATLIST_UnitGetItemStatOrSkillStatValue(pOwner, STAT_ITEM_PIERCE, 0) + STATLIST_UnitGetStatValue(pOwner, STAT_SKILL_PIERCE, 0);
-        if (nPierceValue)
-        {
-            D2SeedStrc seed = {};
-            SEED_InitLowSeed(&seed, STATLIST_GetUnitBaseStat(pOwner, STAT_PIERCE_IDX, 0));
-
-            int32_t nPierceIndex = 0;
-            while (nPierceIndex < 4)
-            {
-                if ((int32_t)(ITEMS_RollRandomNumber(&seed) % 100) >= nPierceValue)
-                {
-                    break;
-                }
-                ++nPierceIndex;
-            }
-            STATLIST_SetUnitStat(pMissile, STAT_PIERCE_IDX, nPierceIndex, 0);
-        }
-    }
+    MISSILES_RollPierce(missileParams->pOwner, pMissile);
 
     if (missileParams->dwFlags & 0x1000)
     {

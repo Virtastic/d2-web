@@ -318,10 +318,9 @@ static void DRLGMAZE_PlaceCatacombsPrev(D2DrlgLevelStrc* pLevel, BOOL bLevel1)
 	}
 }
 
-// 1.13c D2Common+0x11BF0 (delta: ACT3 sewer-1 preset replace failure halts+exit(-1), 1.10f only warned)
-//1.10: D2Common.0x6FD794A0
-//1.14d: 0x00673B30
-void __fastcall DRLGMAZE_GenerateLevel(D2DrlgLevelStrc* pLevel)
+// 1.13c D2Common+0x11B30 (ESI = level): the "prev" row, then Den of Evil's row or the "down" row, then the Cave 1
+// cold-crow row and the Underground Passage 1 "next" row, all through 0x106B0.
+void __fastcall DRLGMAZE_PlaceAct1CaveStuff(D2DrlgLevelStrc* pLevel)
 {
 	static const D2MazeLevelIdStrc nAct1CavePrevIds[] =
 	{
@@ -363,6 +362,33 @@ void __fastcall DRLGMAZE_GenerateLevel(D2DrlgLevelStrc* pLevel)
 		{ LVLPREST_ACT1_CAVE_W, LVLPREST_ACT1_CAVE_NEXT_W, -1, 2 },
 	};
 
+	int nRand = SEED_RollRandomNumber(&pLevel->pSeed) & 3;
+	D2_CALL(DRLGMAZE_ScanReplaceSpecialPreset, pLevel, &nAct1CavePrevIds[nRand], &nRand);
+
+	if (pLevel->nLevelId == LEVEL_DENOFEVIL)
+	{
+		D2_CALL(DRLGMAZE_ScanReplaceSpecialPreset, pLevel, &nAct1CaveDOEIds[nRand], &nRand);
+	}
+	else
+	{
+		D2_CALL(DRLGMAZE_ScanReplaceSpecialPreset, pLevel, &nAct1CaveDownIds[nRand], &nRand);
+	}
+
+	if (pLevel->nLevelId == LEVEL_CAVELEV1)
+	{
+		D2_CALL(DRLGMAZE_ScanReplaceSpecialPreset, pLevel, &nAct1CaveColdcrowIds[nRand], &nRand);
+	}
+
+	if (pLevel->nLevelId == LEVEL_UNDERGROUNDPASSAGELEV1)
+	{
+		D2_CALL(DRLGMAZE_ScanReplaceSpecialPreset, pLevel, &nAct1CaveNextIds[nRand], &nRand);
+	}
+}
+
+// 1.13c D2Common+0x11A70 (ESI = level): the "prev" row, the Crypt's bonebreak/portal row (id 0x12), the chest row
+// (Mausoleum 0x13 and level 0x85) and the Tower Cellar "next" row (0x15-0x18), all through 0x106B0.
+void __fastcall DRLGMAZE_PlaceAct1CryptStuff(D2DrlgLevelStrc* pLevel)
+{
 	static const D2MazeLevelIdStrc nAct1CryptPrevIds[] =
 	{
 		{ LVLPREST_ACT1_CRYPT_N, LVLPREST_ACT1_CRYPT_PREV_N, -1, 3 },
@@ -399,6 +425,59 @@ void __fastcall DRLGMAZE_GenerateLevel(D2DrlgLevelStrc* pLevel)
 		{ LVLPREST_ACT1_CRYPT_W, LVLPREST_ACT1_CRYPT_NEXT_W, -1, 2 },
 	};
 
+	int nRand = SEED_RollRandomNumber(&pLevel->pSeed) & 3;
+	D2_CALL(DRLGMAZE_ScanReplaceSpecialPreset, pLevel, &nAct1CryptPrevIds[nRand], &nRand);
+
+	if (pLevel->nLevelId == LEVEL_CRYPT)
+	{
+		D2_CALL(DRLGMAZE_ScanReplaceSpecialPreset, pLevel, &nAct1CryptSpecialIds[nRand], &nRand);
+	}
+
+	if (pLevel->nLevelId == LEVEL_MAUSOLEUM || pLevel->nLevelId == LEVEL_PANDEMONIUMRUN1)
+	{
+		D2_CALL(DRLGMAZE_ScanReplaceSpecialPreset, pLevel, &nAct1CryptChestIds[nRand], &nRand);
+	}
+
+	if (pLevel->nLevelId >= LEVEL_TOWERCELLARLEV1 && pLevel->nLevelId <= LEVEL_TOWERCELLARLEV4)
+	{
+		D2_CALL(DRLGMAZE_ScanReplaceSpecialPreset, pLevel, &nAct1CryptNextIds[nRand], &nRand);
+	}
+}
+
+// 1.13c D2Common+0x11940 (ESI = level): a random "next" row, and in Catacombs 2 the following waypoint row,
+// both through 0x106B0.
+void __fastcall DRLGMAZE_PlaceAct1CatacombsStuff(D2DrlgLevelStrc* pLevel)
+{
+	static const D2MazeLevelIdStrc nAct1CatacombsNextIds[] =
+	{
+		{ LVLPREST_ACT1_CATACOMBS_N, LVLPREST_ACT1_CATACOMBS_NEXT_N, -1, 3 },
+		{ LVLPREST_ACT1_CATACOMBS_E, LVLPREST_ACT1_CATACOMBS_NEXT_E, -1, 0 },
+		{ LVLPREST_ACT1_CATACOMBS_S, LVLPREST_ACT1_CATACOMBS_NEXT_S, -1, 1 },
+		{ LVLPREST_ACT1_CATACOMBS_W, LVLPREST_ACT1_CATACOMBS_NEXT_W, -1, 2 },
+	};
+
+	static const D2MazeLevelIdStrc nAct1CatacombsWaypointIds[] =
+	{
+		{ LVLPREST_ACT1_CATACOMBS_N, LVLPREST_ACT1_CATACOMBS_WAYPOINT_N, -1, 3 },
+		{ LVLPREST_ACT1_CATACOMBS_E, LVLPREST_ACT1_CATACOMBS_WAYPOINT_E, -1, 0 },
+		{ LVLPREST_ACT1_CATACOMBS_S, LVLPREST_ACT1_CATACOMBS_WAYPOINT_S, -1, 1 },
+		{ LVLPREST_ACT1_CATACOMBS_W, LVLPREST_ACT1_CATACOMBS_WAYPOINT_W, -1, 2 },
+	};
+
+	int nRand = SEED_RollRandomNumber(&pLevel->pSeed) & 3;
+	D2_CALL(DRLGMAZE_ScanReplaceSpecialPreset, pLevel, &nAct1CatacombsNextIds[nRand], &nRand);
+
+	if (pLevel->nLevelId == LEVEL_CATACOMBSLEV2)
+	{
+		D2_CALL(DRLGMAZE_ScanReplaceSpecialPreset, pLevel, &nAct1CatacombsWaypointIds[nRand], &nRand);
+	}
+}
+
+// 1.13c D2Common+0x11BF0 (delta: ACT3 sewer-1 preset replace failure halts+exit(-1), 1.10f only warned)
+//1.10: D2Common.0x6FD794A0
+//1.14d: 0x00673B30
+void __fastcall DRLGMAZE_GenerateLevel(D2DrlgLevelStrc* pLevel)
+{
 	static const D2MazeLevelIdStrc nAct1JailPrevIds[] =
 	{
 		{ LVLPREST_ACT1_JAIL_N, LVLPREST_ACT1_JAIL_PREV_N, -1, 3 },
@@ -437,22 +516,6 @@ void __fastcall DRLGMAZE_GenerateLevel(D2DrlgLevelStrc* pLevel)
 		{ LVLPREST_ACT1_JAIL_E, LVLPREST_ACT1_JAIL_PITSPAWN_E, -1, 0 },
 		{ LVLPREST_ACT1_JAIL_S, LVLPREST_ACT1_JAIL_PITSPAWN_S, -1, 1 },
 		{ LVLPREST_ACT1_JAIL_W, LVLPREST_ACT1_JAIL_PITSPAWN_W, -1, 2 },
-	};
-
-	static const D2MazeLevelIdStrc nAct1CatacombsNextIds[] =
-	{
-		{ LVLPREST_ACT1_CATACOMBS_N, LVLPREST_ACT1_CATACOMBS_NEXT_N, -1, 3 },
-		{ LVLPREST_ACT1_CATACOMBS_E, LVLPREST_ACT1_CATACOMBS_NEXT_E, -1, 0 },
-		{ LVLPREST_ACT1_CATACOMBS_S, LVLPREST_ACT1_CATACOMBS_NEXT_S, -1, 1 },
-		{ LVLPREST_ACT1_CATACOMBS_W, LVLPREST_ACT1_CATACOMBS_NEXT_W, -1, 2 },
-	};
-
-	static const D2MazeLevelIdStrc nAct1CatacombsWaypointIds[] =
-	{
-		{ LVLPREST_ACT1_CATACOMBS_N, LVLPREST_ACT1_CATACOMBS_WAYPOINT_N, -1, 3 },
-		{ LVLPREST_ACT1_CATACOMBS_E, LVLPREST_ACT1_CATACOMBS_WAYPOINT_E, -1, 0 },
-		{ LVLPREST_ACT1_CATACOMBS_S, LVLPREST_ACT1_CATACOMBS_WAYPOINT_S, -1, 1 },
-		{ LVLPREST_ACT1_CATACOMBS_W, LVLPREST_ACT1_CATACOMBS_WAYPOINT_W, -1, 2 },
 	};
 
 	static const D2MazeLevelIdStrc nAct2ArcaneSummonerIds[] =
@@ -505,27 +568,7 @@ void __fastcall DRLGMAZE_GenerateLevel(D2DrlgLevelStrc* pLevel)
 			}
 		}
 
-		nRand = SEED_RollRandomNumber(&pLevel->pSeed) & 3;
-		DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct1CavePrevIds[nRand], &nRand);
-
-		if (pLevel->nLevelId == LEVEL_DENOFEVIL)
-		{
-			DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct1CaveDOEIds[nRand], &nRand);
-		}
-		else
-		{
-			DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct1CaveDownIds[nRand], &nRand);
-		}
-
-		if (pLevel->nLevelId == LEVEL_CAVELEV1)
-		{
-			DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct1CaveColdcrowIds[nRand], &nRand);
-		}
-
-		if (pLevel->nLevelId == LEVEL_UNDERGROUNDPASSAGELEV1)
-		{
-			DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct1CaveNextIds[nRand], &nRand);
-		}
+		DRLGMAZE_PlaceAct1CaveStuff(pLevel);
 		break;
 
 	case LVLTYPE_ACT1_CRYPT:
@@ -550,26 +593,7 @@ void __fastcall DRLGMAZE_GenerateLevel(D2DrlgLevelStrc* pLevel)
 			}
 		}
 
-		nRand = SEED_RollRandomNumber(&pLevel->pSeed) & 3;
-		DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct1CryptPrevIds[nRand], &nRand);
-		if (pLevel->nLevelId == LEVEL_CRYPT)
-		{
-			DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct1CryptSpecialIds[nRand], &nRand);
-		}
-
-#ifdef D2_VERSION_HAS_UBERS
-		if (pLevel->nLevelId == LEVEL_MAUSOLEUM || pLevel->nLevelId == LEVEL_PANDEMONIUMRUN1)
-#else
-		if (pLevel->nLevelId == LEVEL_MAUSOLEUM)
-#endif
-		{
-			DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct1CryptChestIds[nRand], &nRand);
-		}
-
-		if (pLevel->nLevelId >= LEVEL_TOWERCELLARLEV1 && pLevel->nLevelId <= LEVEL_TOWERCELLARLEV4)
-		{
-			DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct1CryptNextIds[nRand], &nRand);
-		}
+		DRLGMAZE_PlaceAct1CryptStuff(pLevel);
 		break;
 
 	case LVLTYPE_ACT1_BARRACKS:
@@ -668,13 +692,7 @@ void __fastcall DRLGMAZE_GenerateLevel(D2DrlgLevelStrc* pLevel)
 			}
 		}
 
-		nRand = SEED_RollRandomNumber(&pLevel->pSeed) & 3;
-		DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct1CatacombsNextIds[nRand], &nRand);
-
-		if (pLevel->nLevelId == LEVEL_CATACOMBSLEV2)
-		{
-			DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct1CatacombsWaypointIds[nRand], &nRand);
-		}
+		DRLGMAZE_PlaceAct1CatacombsStuff(pLevel);
 		break;
 
 	case LVLTYPE_ACT2_SEWER:

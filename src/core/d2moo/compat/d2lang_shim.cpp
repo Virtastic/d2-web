@@ -107,10 +107,21 @@ Unicode* __fastcall Unicode::strncat(Unicode* dest, const Unicode* src, int coun
     d->ch = 0;
     return dest;
 }
+extern "C" int d2lang_8c40(const uint8_t* src, int len, uint16_t* out);   // 1.13c D2Lang+0x8C40
 Unicode* Unicode::toUnicode(Unicode* dest, const char* src, int count) {  // 1.13c D2Lang+0x8CD0
-    std::u16string u = d2::utf8ToU16(src ? src : "");
-    int n = (int)u.size(); if (n > count - 1) n = count - 1; if (n < 0) n = 0;
-    for (int i = 0; i < n; i++) dest[i] = Unicode((unsigned short)u[i]);
+    if (!src || !*src) { dest[0] = Unicode(0); return dest; }
+    const int len = (int)::strlen(src) + 1;
+    int n = 0, off = 0;
+    for (;;) {
+        if (count - 1 <= n) { dest[n] = Unicode(0); return dest; }
+        uint16_t u = dest[n].ch;
+        int k = d2lang_8c40((const uint8_t*)src + off, len - off, &u);
+        dest[n].ch = u;
+        n++;
+        if (k == -1) break;
+        off += k;
+        if (!src[off]) break;
+    }
     dest[n] = Unicode(0);
     return dest;
 }

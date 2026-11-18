@@ -112,18 +112,41 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_player_in_game(uint32_t unitId, uint8_t p
 // will admit anyone. 1.13c D2Client+0x14A50 builds +12 as 0x2185EDD6 + (expansion ? 0xCBD7DE7A : 0),
 // i.e. 0xED5DCC50 for LoD, and takes `verByte` from the BNClient interface (+0x5C returns 0x0D). The
 // character name is a 16-byte null-padded field, truncated if longer.
-EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_gamelogon(uint32_t gameHash, uint16_t gameToken, uint8_t charClass, uint32_t verByte, const char* character, uint8_t* out) {
-    for (int i = 0; i < 37; i++) out[i] = 0;
-    out[0] = 0x68;
-    wu32(out + 1, gameHash);
-    wu16(out + 5, gameToken);
-    out[7] = charClass;
-    wu32(out + 8, verByte);
-    wu32(out + 12, 0xED5DCC50u);   // nVersionConstant (expansion)
-    wu32(out + 16, 0x91A519B6u);   // nConstant
-    out[20] = 0;                   // nLanguageCode
-    wstr(out + 21, character, 16);
-    return 37;
+// The bytes come from the client's own composer body (d2_client_14a50): the realm only supplies what
+// the stock client reads from its globals and interfaces -- the BNClient version byte, the expansion
+// test, the D2Lang language id, the class byte and the name.
+struct D2ClientPacket68Services {
+    uint32_t (*vtbl5c)();
+    uint32_t (*is_expansion)();
+    uint8_t (*o10009)();
+    void (*str_copy)(char* dst, const char* src, uint32_t n);
+    void (*send)(uint32_t len, uint32_t flags, const void* p);
+};
+void d2_client_14a50(uint32_t eax, uint16_t cx, uint32_t flags, uint8_t byte_a, uint8_t byte_b, const char* src,
+    uint32_t* bytes_sent, uint32_t* packets_sent, const D2ClientPacket68Services* api);
+
+namespace {
+struct GamelogonInputs { uint32_t verByte, expansion; uint8_t language; uint8_t* out; uint32_t len; };
+GamelogonInputs g_logon;
+uint32_t logon_ver() { return g_logon.verByte; }
+uint32_t logon_expansion() { return g_logon.expansion; }
+uint8_t logon_language() { return g_logon.language; }
+// Storm SStrCopy into the 16-byte name field: at most 15 characters, then the terminator.
+void logon_copy(char* dst, const char* src, uint32_t) { wstr((uint8_t*)dst, src, 15); dst[15] = 0; }
+void logon_send(uint32_t len, uint32_t, const void* p) {
+    const uint8_t* b = (const uint8_t*)p;
+    for (uint32_t i = 0; i < len; i++) g_logon.out[i] = b[i];
+    g_logon.len = len;
+}
+}  // namespace
+
+EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_gamelogon(uint32_t gameHash, uint16_t gameToken, uint8_t charClass, uint32_t verByte,
+    uint32_t expansion, uint8_t language, const char* character, uint8_t* out) {
+    static const D2ClientPacket68Services api = { logon_ver, logon_expansion, logon_language, logon_copy, logon_send };
+    g_logon = { verByte, expansion, language, out, 0 };
+    uint32_t bytesSent = 0, packetsSent = 0;
+    d2_client_14a50(gameHash, gameToken, 0, 0, charClass, character, &bytesSent, &packetsSent, &api);
+    return (int)g_logon.len;
 }
 
 // SCMD 0x6d, the client keep-alive: exactly 13 bytes, [0x6D][tick][average RTT >> 1][check * 0xB640DE41].

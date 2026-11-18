@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xCC030: the per-client life/mana/position resync. Disassembled convention: EAX = player (type 0, its player
+// D2Game +0xCC030 (marker lives on the d2moo sub_6FC82360): the per-client life/mana/position resync. Disassembled convention: EAX = player (type 0, its player
 // data's +0x9C client), ECX = the unit whose stats are sent, one stack word `flag`, ret 4. The 0x49240 record (EAX = client) holds
 // the last sent values: +0 idle count, +4 life, +6 mana, +8 stat 10, +0xA / +0xB the 0xCB840 / 0xCB720 bytes, +0xC / +0xE x / y,
 // +0x10 / +0x12 the path deltas, +0x14 gold, +0x18 experience. With flag 0 the life change must be >= 10% of max life (signed

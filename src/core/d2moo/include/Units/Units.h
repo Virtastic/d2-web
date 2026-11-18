@@ -345,8 +345,6 @@ D2COMMON_DLL_DECL BOOL __stdcall UNITS_HasCollision(D2UnitStrc* pUnit);
 D2COMMON_DLL_DECL D2SkillStrc* __stdcall UNITS_GetSkillFromSkillId(D2UnitStrc* pUnit, int nSkillId);
 //D2Common.0x6FDBFC10 (#10392)
 D2COMMON_DLL_DECL BOOL __stdcall UNITS_IsDoor(D2UnitStrc* pUnit);
-//D2Common.0x6FDBFC50
-bool __fastcall UNITS_CheckIfObjectOrientationIs1(D2UnitStrc* pUnit);
 //D2Common.0x6FDBFC90 (#10393)
 D2COMMON_DLL_DECL BOOL __stdcall UNITS_IsShrine(D2UnitStrc* pUnit);
 //D2Common.0x6FDBFCB0 (#10394)
@@ -439,8 +437,6 @@ D2COMMON_DLL_DECL unsigned int __stdcall UNITS_GetHealingCost(D2UnitStrc* pUnit)
 D2COMMON_DLL_DECL unsigned int __stdcall UNITS_GetInventoryGoldLimit(D2UnitStrc* pUnit);
 //D2Common.0x6FDC1DB0 (#10440)
 D2COMMON_DLL_DECL void __stdcall UNITS_MergeDualWieldWeaponStatLists(D2UnitStrc* pUnit, int a2);
-//D2Common.0x6FDC1EE0
-D2MonStats2Txt* __fastcall UNITS_GetMonStats2TxtRecord(int nRecordId);
 //D2Common.0x6FDC1F10 (#10442)
 D2COMMON_DLL_DECL uint8_t __stdcall UNITS_GetItemComponentId(D2UnitStrc* pUnit, D2UnitStrc* pItem);
 //D2Common.0x6FDC1FE0
@@ -563,3 +559,5 @@ struct D2UnitsPlayerDataSeams
 const D2UnitsPlayerDataSeams& UNITS_PlayerDataSeams();
 void UNITS_AllocPlayerDataWith(D2UnitStrc* pUnit, const D2UnitsPlayerDataSeams& s);
 void UNITS_FreePlayerDataWith(void* pMemPool, D2UnitStrc* pPlayer, const D2UnitsPlayerDataSeams& s);
+// 1.13c D2Common+0x2F100
+BOOL __fastcall UNITS_RecomputeSeqMode(D2UnitStrc* pUnit, unsigned int nFramePoint);

@@ -35,6 +35,7 @@ void __fastcall PATHUtil_AdvanceTowardsTarget_6FDAB890(D2DynamicPathStrc* ptPath
 
 //1.10f: D2Common.0x6FDAB940
 //1.13c: D2Common.0x6FD8E310
+// 1.13c D2Common+0x3E310
 void __fastcall sub_6FDAB940(D2PathPointStrc* pOutPathPoint, D2DynamicPathStrc* ptPath)
 {
 	D2_ASSERT(ptPath);
@@ -60,8 +61,17 @@ void __fastcall sub_6FDAB940(D2PathPointStrc* pOutPathPoint, D2DynamicPathStrc* 
 		}
 	}
 
+	// 1.13c D2Common+0x3E310: the speed byte offsets the OUTPUT point by the target's facing turned back speed*32 steps
+	// (the 1.10f body advanced the path's own target coordinate here instead). Each step is the LUT value times the
+	// speed, truncated toward zero (_ftol); its low word is added to the 16-bit coordinate.
 	if (ptPath->dwSpeed)
 	{
-		PATHUtil_AdvanceTowardsTarget_6FDAB890(ptPath);
+		const uint32_t nSpeed = (uint8_t)ptPath->dwSpeed;
+		const uint32_t nDirection = pTargetUnit->pDynamicPath ? (uint8_t)pTargetUnit->pDynamicPath->nDirection : 0;
+		const int16_t nIndex = (int16_t)(((nDirection - nSpeed * 32u) & 0x3Fu) << 3);
+		const int64_t nStepX = (int64_t)((double)FOG_10083_Cos_LUT(nIndex) * (double)nSpeed);
+		pOutPathPoint->X = (uint16_t)(pOutPathPoint->X + (uint16_t)nStepX);
+		const int64_t nStepY = (int64_t)((double)FOG_10084_Sin_LUT(nIndex) * (double)nSpeed);
+		pOutPathPoint->Y = (uint16_t)(pOutPathPoint->Y + (uint16_t)nStepY);
 	}
 }

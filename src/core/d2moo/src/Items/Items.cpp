@@ -507,7 +507,7 @@ void __stdcall ITEMS_SetVarGfxIndex(D2UnitStrc* pItem, uint8_t nIndex)
 
 // 1.13c D2Common+0x24F00 (no ordinal; the item arrives in ESI): a repairable item type whose
 // item is a throwable, stackable, non-ethereal stack -- such stacks are "repaired" by refilling.
-static BOOL ITEMS_IsRepairableStack(D2UnitStrc* pItem)
+BOOL ITEMS_IsRepairableStack(D2UnitStrc* pItem)   // not static: the 0x24F00 proof probe calls it
 {
 	D2_ASSERT(pItem);
 

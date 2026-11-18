@@ -81,7 +81,9 @@ bool busy() { return !g_drew && ((g.flags & F_BUSY) || d2_client_play_sound_busy
 
 uint32_t profile22a70Cb(uint32_t op, uint32_t arg) {
     switch (op) {
-    case 0: return (uint32_t)(uintptr_t)DATATBLS_GetSuperUniquesTxtRecord((int32_t)arg);
+    // The call's superUnique -1 is the frame's "no SuperUniques row" (monspawn_check facings), not an index: no record.
+    // 1.13c D2Common+0x53370 has no lower bound, so -1 handed to it reads the record before the table.
+    case 0: return g.superUnique < 0 ? 0u : (uint32_t)(uintptr_t)DATATBLS_GetSuperUniquesTxtRecord((int32_t)arg);
     case 1: return (uint32_t)(uintptr_t)DATATBLS_GetMonSoundsTxtRecordFromSoundId((int32_t)arg);
     case 2: return (uint32_t)(uintptr_t)DATATBLS_GetMonSoundsTxtRecordFromMonsterId((int32_t)arg);
     case 3: return (uint32_t)g.cls;

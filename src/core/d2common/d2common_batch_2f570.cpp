@@ -36,24 +36,6 @@ extern "C"
 	void (*g_d2common_fn_5D800)(int32_t, uint32_t) = nullptr;
 }
 
-// 1.13c D2Common+0x2f570: stores the switched left skill id and flags in a player unit's player data
-// (+0x84 and +0x8C). Non-player units and null units are ignored; a player unit without player data
-// is fatal 0x14A8 in retail, we return.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2common_port_2f570(D2UnitStrc* unit, int32_t nSkillId,
-                                                int32_t nSkillFlags)
-{
-	if (!unit || unit->dwUnitType != UNIT_PLAYER)
-		return;
-
-	D2PlayerDataStrc* pPlayerData = unit->pPlayerData;
-	if (!pPlayerData)
-		return;
-
-	pPlayerData->nSwitchLeftSkillId = nSkillId;
-	pPlayerData->nSwitchLeftSkillFlags = nSkillFlags;
-}
-
 // 1.13c D2Common+0x37470: a pair (value at data+0x4, minute at data+0x8/data+0x28) from the object
 // reached through pOwner+0x4. A null pOwner is fatal 0x547 in retail; we return 0. When the minute
 // divisor is zero the out minute is 0. A null data pointer reports value 0 and minute 0.

@@ -61,12 +61,6 @@ extern "C" uint32_t D2Common_22760_IsMetal(uint32_t itemId)
     return ITEMS_IsMetalItem(static_cast<int32_t>(itemId));
 }
 
-// 1.13c D2Common+0x2F520
-extern "C" void D2Common_2F520_SetSwitchRightSkill(D2UnitStrc* unit, int id, int flags)
-{
-    UNITS_SetSwitchRightSkill(unit, id, flags);
-}
-
 // 1.13c D2Common+0x37840
 extern "C" void D2Common_37840_NextTimeRate(void* act, void* room)
 {

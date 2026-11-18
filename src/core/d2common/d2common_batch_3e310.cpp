@@ -22,22 +22,6 @@
 #include "Drlg/D2DrlgTileSub.h"
 #include "DataTbls/LevelsIds.h"
 
-// 1.13c D2Common+0x3E310
-void D2Common_3E310_TargetPoint(D2PathPointStrc* out, D2DynamicPathStrc* path)
-{
-    D2_ASSERT(path);
-    D2_ASSERT(path->pTargetUnit);
-    auto* target = path->pTargetUnit;
-    out->X = static_cast<uint16_t>(UNITS_GetXPosition(target));
-    out->Y = static_cast<uint16_t>(UNITS_GetYPosition(target));
-    if (path->dwSpeed) {
-        const unsigned direction = target->pDynamicPath ? target->pDynamicPath->nDirection : 0;
-        const auto angle = static_cast<uint16_t>(((direction - 32u * path->dwSpeed) & 63u) * 8u);
-        out->X += static_cast<int64_t>(FOG_10083_Cos_LUT(angle) * static_cast<float>(path->dwSpeed));
-        out->Y += static_cast<int64_t>(FOG_10084_Sin_LUT(angle) * static_cast<float>(path->dwSpeed));
-    }
-}
-
 // D2Common 0x38220
 int D2Common_38220_LowerBound(D2StatsArrayStrc* stats, uint32_t key)
 {

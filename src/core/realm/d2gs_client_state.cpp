@@ -650,6 +650,25 @@ static bool realm_client_monster_skill_end(D2UnitStrc* unit) {
     return true;
 }
 
+// 1.13c D2Client+0x4F4A0's end rules that read the path step (0x2A700, run when the row's first column is 1):
+// rule 1 ends the mode when the step reports the path done, rule 4 when it does and the animation is at its
+// end (#10426). The end goes to the same hook as the clock rules (0x4DA60).
+static void realm_client_monster_path_end(D2UnitStrc* unit, bool pathDone) {
+    if (!pathDone || unit->dwUnitType != UNIT_MONSTER) return;
+    const D2MonStats2Txt* m2 = UNITS_GetMonStats2TxtRecordFromMonsterId((int)unit->dwClassId);
+    if (!m2) return;
+    const int32_t* r = d2c_monster_mode::row((int32_t)unit->dwClassId, unit->dwAnimMode, m2->nModeEnabledWhenMovingFlags, false);
+    if (!r || r[0] != 1 || !(r[2] == 1 || (r[2] == 4 && UNITS_IsAtEndOfFrameCycle(unit)))) return;
+    const D2MonStatsTxt* ms = DATATBLS_GetMonStatsTxtRecord((int)unit->dwClassId);
+    const int32_t baseId = ms ? ms->nBaseId : (int32_t)unit->dwClassId;
+    const D2MonStatsTxt* base = DATATBLS_GetMonStatsTxtRecord(baseId);
+    const int32_t next = d2c_monster_mode::endMode(unit->dwAnimMode, baseId, base && base->nSplClientEnd,
+        (unit->dwFlags & UNITFLAG_ISASYNC) != 0, (unit->dwFlagEx & UNITFLAGEX_UNK_PATH_RELATED) != 0);
+    if (next < 0) return;
+    d2_realm_client_unit_set_mode(unit, (uint32_t)next);
+    UNITS_SetAnimStartFrame(unit);
+}
+
 // One frame of a unit: the path step when `move` (its result: 0 when the path has run out), the animation
 // frame and the turn toward the facing asked for.
 int d2_realm_client_motion_advance_unit(D2UnitStrc* unit, bool move) {
@@ -5483,7 +5502,9 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_motion_tick() {
             }
         }
         // The mode's update (D2Client+0x4F4A0) steps a monster along its path only in a mode that moves.
-        monster.lastTickResult = d2_realm_client_motion_advance_unit(monster.motionUnit, unit_mode_move_kind(monster.motionUnit) == 1);
+        const bool pathSteps = unit_mode_move_kind(monster.motionUnit) == 1;
+        monster.lastTickResult = d2_realm_client_motion_advance_unit(monster.motionUnit, pathSteps);
+        realm_client_monster_path_end(monster.motionUnit, pathSteps && monster.lastTickResult == 0);
         if (monster.lastTickResult > 0) moving++;
         run_unit_queue(UNIT_MONSTER, monster.view.guid);
         refresh_monster_motion_view(monster);

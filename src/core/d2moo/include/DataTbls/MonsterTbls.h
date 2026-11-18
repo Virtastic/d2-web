@@ -787,4 +787,7 @@ void __fastcall DATATBLS_LoadSomeMonsterTxts(HD2ARCHIVE hArchive);
 //D2Common.0x6FD6F810
 void __fastcall DATATBLS_CreateItemTypeTreasureClasses();
 //D2Common.0x6FD6FBB0
-void __fastcall DATATBLS_UnloadSomeMonsterTxts();
+void __fastcall DATATBLS_UnloadSomeMonsterTxts();// 1.13c D2Common+0x1860 / 0x18A0
+struct D2UnitStrc;
+int __fastcall DATATBLS_GetMonsterBaseId(const D2UnitStrc* pUnit);
+uint32_t __fastcall DATATBLS_GetMonStatsFlagBit(int nMonsterId, uint32_t nBit);

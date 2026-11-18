@@ -478,32 +478,6 @@ D2EventTimerSlabListStrc* __fastcall EVENT_AllocTimerSlab(D2GameStrc* pGame)
     return pSlab;
 }
 
-// Helper function
-// not-1.13c: retail inlines the timer-to-unit link into its timer-add function D2Game+0x8E680, after the 0x8E540 allocation (its only caller here)
-static void EVENT_AssignTimerToUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, D2EventTimerStrc* pTimer)
-{
-	pTimer->pUnit = pUnit;
-	pTimer->pPrevious = nullptr;
-	pTimer->pNext = SUNIT_GetTimerFromUnit(pUnit);
-	if (pTimer->pNext)
-	{
-		pTimer->pNext->pPrevious = pTimer;
-	}
-	SUNIT_SetTimerOnUnit(pUnit, pTimer);
-
-	if (pUnit)
-	{
-		pTimer->nUnitType = pUnit->dwUnitType;
-		pTimer->nUnitGUID = pUnit->dwUnitId;
-	}
-	else
-	{
-		pTimer->nUnitType = UNIT_TYPES_COUNT;
-		pTimer->nUnitGUID = D2UnitInvalidGUID;
-	}
-
-}
-
 //1.10f: Inlined
 // 1.13c D2Game+0x8E540
 D2EventTimerStrc* EVENT_AllocateTimer(D2GameStrc* pGame)
@@ -541,7 +515,25 @@ D2EventTimerStrc* EVENT_AllocateTimer(D2GameStrc* pGame)
 D2EventTimerStrc* __fastcall EVENT_AllocateUnitTimer(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2EventTimerStrc* pNewTimer = EVENT_AllocateTimer(pGame);
-	EVENT_AssignTimerToUnit(pGame, pUnit, pNewTimer);
+	pNewTimer->pUnit = pUnit;
+	pNewTimer->pPrevious = nullptr;
+	pNewTimer->pNext = SUNIT_GetTimerFromUnit(pUnit);
+	if (pNewTimer->pNext)
+	{
+		pNewTimer->pNext->pPrevious = pNewTimer;
+	}
+	SUNIT_SetTimerOnUnit(pUnit, pNewTimer);
+
+	if (pUnit)
+	{
+		pNewTimer->nUnitType = pUnit->dwUnitType;
+		pNewTimer->nUnitGUID = pUnit->dwUnitId;
+	}
+	else
+	{
+		pNewTimer->nUnitType = UNIT_TYPES_COUNT;
+		pNewTimer->nUnitGUID = D2UnitInvalidGUID;
+	}
 
     pNewTimer->nFlags &= (~EVENTFLAG_0x2);
     return pNewTimer;

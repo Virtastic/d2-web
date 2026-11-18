@@ -277,13 +277,13 @@ void __fastcall D2GAME_AI_SpecialState02_6FCD1660(D2GameStrc* pGame, D2UnitStrc*
 		if (pAiTickParam->nTargetDistance > 10 && !pAiControl->dwAiParam[0])
 		{
 			pAiControl->dwAiParam[0] = 1;
-			D2GAME_AICORE_WalkToOwner_6FCD0B60(pGame, pUnit, pTarget, 12u);
+			D2_CALL(D2GAME_AICORE_WalkToOwner_6FCD0B60, pGame, pUnit, pTarget, 12u);
 			return;
 		}
 
 		if ((uint8_t)ITEMS_RollRandomNumber(&pUnit->pSeed) < 77u)
 		{
-			AITACTICS_WalkCloseToUnit(pGame, pUnit, 4u);
+			D2_CALL(AITACTICS_WalkCloseToUnit, pGame, pUnit, 4u);
 			return;
 		}
 
@@ -292,12 +292,12 @@ void __fastcall D2GAME_AI_SpecialState02_6FCD1660(D2GameStrc* pGame, D2UnitStrc*
 			pAiControl->dwAiParam[0] = 0;
 		}
 
-		AITACTICS_IdleInNeutralMode(pGame, pUnit, 10);
+		D2_CALL(AITACTICS_IdleInNeutralMode, pGame, pUnit, 10);
 		return;
 	}
 
-	AITHINK_ExecuteAiFn(pGame, pUnit, pAiTickParam->pAiControl, AISPECIALSTATE_NONE);
-	AITACTICS_IdleInNeutralMode(pGame, pUnit, 10);
+	D2_CALL(AITHINK_ExecuteAiFn, pGame, pUnit, pAiTickParam->pAiControl, AISPECIALSTATE_NONE);
+	D2_CALL(AITACTICS_IdleInNeutralMode, pGame, pUnit, 10);
 }
 
 
@@ -3490,8 +3490,7 @@ static bool AI_RollPctBelowParam(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickP
 	return (int32_t)AI_RollPercentage(pUnit) < AI_GetParamValue(pGame, pAiTickParam, nParamId);
 }
 
-// not-1.13c: D2MOO-only helper; retail inlines this compare in each caller (no function at this body)
-// not-1.13c: D2MOO-only helper; retail inlines this compare in each caller
+// not-1.13c: D2MOO-only helper; retail inlines this compare in each caller, drawing through RollLimited (D2Game+0x1180); no function at this body
 // Same compare where retail draws through its RollLimited(seed, 100) helper (D2Game+0x1180).
 static bool AI_RollLimitedBelowParam(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam, int32_t nParamId)
 {
@@ -7010,17 +7009,17 @@ D2UnitStrc* __fastcall AITHINK_TargetCallback_HighPriest(D2GameStrc* pGame, D2Un
 {
 	D2HighPriestAiCallbackArgStrc* pArg = (D2HighPriestAiCallbackArgStrc*)pCallbackArg;
 
-	if (!pTarget || pTarget->dwUnitType != UNIT_MONSTER || MONSTERS_IsDead(pTarget) || !STATLIST_AreUnitsAligned(pUnit, pTarget) || STATLIST_GetUnitAlignment(pTarget) != UNIT_ALIGNMENT_EVIL)
+	if (!pTarget || pTarget->dwUnitType != UNIT_MONSTER || D2_CALL(MONSTERS_IsDead, pTarget) || !D2_CALL(STATLIST_AreUnitsAligned, pUnit, pTarget) || D2_CALL(STATLIST_GetUnitAlignment, pTarget) != UNIT_ALIGNMENT_EVIL)
 	{
 		return 0;
 	}
 
-	if (AITHINK_GetSquaredDistance(pUnit, pTarget) > pArg->nMaxDistance)
+	if (D2_CALL(AITHINK_GetSquaredDistance, pUnit, pTarget) > pArg->nMaxDistance)
 	{
 		return 0;
 	}
 
-	const int32_t nLifePercentage = UNITS_GetCurrentLifePercentage(pTarget);
+	const int32_t nLifePercentage = D2_CALL(UNITS_GetCurrentLifePercentage, pTarget);
 	if (nLifePercentage > 75 || nLifePercentage >= pArg->nLifePercentage)
 	{
 		return 0;
@@ -9030,7 +9029,7 @@ void __fastcall sub_6FCE34B0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
 	}
 
 	// Retail measures from the moving pet (pArg->pUnit), not from the last pet found.
-	if (AIUTIL_GetDistanceToCoordinates_FullUnitSize(pArg->pUnit, pTarget) > 1)
+	if (D2_CALL(AIUTIL_GetDistanceToCoordinates_FullUnitSize, pArg->pUnit, pTarget) > 1)
 	{
 		return;
 	}
@@ -9957,7 +9956,7 @@ void __fastcall D2GAME_AI_SpecialState03_6FCE4CC0(D2GameStrc* pGame, D2UnitStrc*
 // 1.13c D2Game+0x15570 (minion callback of D2Game+0x173D0; checked against the disassembly: a null or dead minion sets the flag)
 void __fastcall sub_6FCE4FD0(D2UnitStrc* pUnit, void* pMinionDead, void* pUnused)
 {
-	if (!pUnit || MONSTERS_IsDead(pUnit))
+	if (!pUnit || D2_CALL(MONSTERS_IsDead, pUnit))
 	{
 		*(int32_t*)pMinionDead = 1;
 	}
@@ -16667,7 +16666,7 @@ static int32_t __fastcall AITHINK_SelectTickTarget113(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FCF0A70
-// 1.13c D2Game+0x9D3B0 (the stunned/door/leash gate is 0x9CD90, the target switch 0x9D160)
+// 1.13c D2Game+0x9D3B0 (ECX = game, EDX = unit; the stunned/door/leash gate is 0x9CD90, the target switch 0x9D160)
 void __fastcall D2GAME_MONSTERS_AiFunction03_6FCF0A70(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4)
 {
 	D2AiTickParamStrc aiTickParam = {};

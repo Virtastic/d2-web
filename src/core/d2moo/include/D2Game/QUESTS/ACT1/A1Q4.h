@@ -183,6 +183,7 @@ int32_t __fastcall ACT1Q4_SpawnCainPortalOutsideTown(D2GameStrc* pGame, D2UnitSt
 int32_t __fastcall ACT1Q4_GetCainPortalOutsideTownCoordinates(D2GameStrc* pGame, D2UnitStrc* pUnit, D2CoordStrc* pCoord);
 //D2Game.0x6FC9C990
 int32_t __fastcall ACT1Q4_UpdateCainPortalCoordinates(D2GameStrc* pGame, D2UnitStrc* pUnit);
+void ACT1Q4_MarkQuestCompleteBefore(D2GameStrc* pGame);
 //D2Game.0x6FC9C9D0
 void __fastcall ACT1Q4_SpawnCainPortalInTown(D2GameStrc* pGame);
 //D2Game.0x6FC9CBE0

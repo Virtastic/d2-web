@@ -4,7 +4,7 @@
 #include "D2Items.h"
 #include "D2StatList.h"
 #include "D2DataTbls.h"
-#include "d2common_29f30.h"
+#include "D2Common_29F30.h"
 
 static_assert(sizeof(D2ItemsTxt) == 0x1a8, "retail weapons/armor row stride");
 

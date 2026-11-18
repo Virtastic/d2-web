@@ -1441,6 +1441,7 @@ int __fastcall MISSILE_GetCalcParamValue(int32_t nParamId, void* pUserData)
 
 //D2Common.0x6FDBC080
 // 1.13c D2Common+0x69DB0
+// 1.13c D2Common+0x4F0D0 (the skill-calc table at 0x99E24 carries its own copy of this body; same code and convention)
 int __fastcall MISSILE_GetMinimum(int a1, int a2, int a3, void* pUserData)
 {
 	if (a1 >= a2)
@@ -1453,6 +1454,7 @@ int __fastcall MISSILE_GetMinimum(int a1, int a2, int a3, void* pUserData)
 
 //D2Common.0x6FDBC090
 // 1.13c D2Common+0x69DA0
+// 1.13c D2Common+0x4F0C0 (the skill-calc table at 0x99E24 carries its own copy of this body; same code and convention)
 int __fastcall MISSILE_GetMaximum(int a1, int a2, int a3, void* pUserData)
 {
 	if (a1 <= a2)

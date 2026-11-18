@@ -4,7 +4,7 @@
 
 // Prior art used: none in D2MOO (it does not port the bundled MSVC2003 CRT formatter);
 // body written from the cached 1.13c decompile. write_char/_write_multi_char/_write_string
-// (+0x38F7/+0x392A/+0x394E) are folded in as the static helpers below.
+// (+0x38F7/+0x392A/+0x394E) live in the game tree, src/core/d2moo/src/Crt/StringStream.cpp.
 
 namespace {
 // Retail's class/state lookup (0x20..0x78); class = low nibble, next state = high nibble.
@@ -22,36 +22,11 @@ struct Out {
     D2CommonStringStream2814* s;
     const D2CommonOutputCalls3985* c;
     int count;
-    // 1.13c D2Common+0x038F7
-    void ch(uint8_t b) { // _write_char
-        if (!(s->flags & 0x40) || s->base) {
-            uint32_t r;
-            if (--s->remaining < 0) r = (uint32_t)c->flushByte((int)(int8_t)b, s);
-            else { *s->cursor++ = (char)b; r = b; }
-            if (r == 0xffffffffu) { count = -1; return; }
-        }
-        ++count;
-    }
-    // 1.13c D2Common+0x0392A
-    void multi(uint8_t b, int n) { // _write_multi_char
-        while (n > 0) { --n; ch(b); if (count == -1) return; }
-    }
-    // 1.13c D2Common+0x0394E
-    void str(const char* p, int n) { // _write_string
-        if (!(s->flags & 0x40) || s->base) {
-            while (n > 0) { --n; ch((uint8_t)*p++); if (count == -1) return; }
-        } else count += n;
-    }
+    // The three writers are game-tree functions (src/core/d2moo/src/Crt/StringStream.cpp).
+    void ch(uint8_t b) { D2Common_38F7_WriteChar(b, s, c, &count); }
+    void multi(uint8_t b, int n) { D2Common_392A_WriteMultiChar(&count, b, n, s, c); }
+    void str(const char* p, int n) { D2Common_394E_WriteString(s, c, &count, p, n); }
 };
-}
-
-// Seam for the function replay of _write_string (retail regs: eax=&count, ecx=buf, edi=stream, [esp+4]=len).
-extern "C" void D2Common_394E_WriteString(D2CommonStringStream2814* s, const D2CommonOutputCalls3985* c,
-                                          int* count, const char* p, int n)
-{
-    Out o{s, c, *count};
-    o.str(p, n);
-    *count = o.count;
 }
 
 // 1.13c D2Common+0x03985

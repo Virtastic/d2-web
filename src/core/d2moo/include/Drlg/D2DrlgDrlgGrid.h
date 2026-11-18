@@ -39,10 +39,6 @@ void __fastcall DRGLGRID_XorFlag(int* pFlag, int nFlag);
 void __fastcall DRGLGRID_OverwriteFlagIfZero(int* pFlag, int nFlag);
 //D2Common.6FD75BF0
 void __fastcall DRGLGRID_AndNegatedFlag(int* pFlag, int nFlag);
-//D2Common.0x6FD75C00
-BOOL __fastcall DRLGGRID_IsGridValid(D2DrlgGridStrc* pDrlgGrid);
-//D2Common.0x6FD75C20
-BOOL __fastcall DRLGGRID_IsPointInsideGridArea(D2DrlgGridStrc* pDrlgGrid, int nX, int nY);
 //D2Common.0x6FD75C50
 void __fastcall DRLGGRID_AlterGridFlag(D2DrlgGridStrc* pDrlgGrid, int nX, int nY, int nFlag, FlagOperation eOperation);
 //D2Common.0x6FD75C80

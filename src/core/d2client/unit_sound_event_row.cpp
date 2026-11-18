@@ -1,7 +1,7 @@
 // The unit-sound resolver the play path asks: packet 0x2C {unitType, classId, event} -> a Sounds.txt row.
 // 1.13c D2Client+0x23F20 (the event switch: fixed rows, the rogue-hireling pairs, the NPC greeting) and its default case
 // 1.13c D2Client+0x23200 (a player unit: fixed rows, the class voice table behind D2Client+0xF7694[class], +0x8..+0x24).
-// Returns the row, or -1 when retail plays nothing or the row needs state not passed (events 0x11, 0x5C).
+// Returns the row, or -1 when retail plays nothing or the row needs state not passed (events 0x11, 0x12, 0x5C).
 #include <cstdint>
 #include <emscripten.h>
 
@@ -31,8 +31,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_unit_sound_event_row(int32_t u
     case 0x10: return unitType == 1 && monsterTaunt > 0 ? monsterTaunt : -1;
     case 0x0C: return skillStartRow > 0 ? skillStartRow : -1;
     case 0x5B: return isLocalPlayer ? 8 : -1;
-    case 0x12: return classId == 271 ? 4615 : 4625;
-    case 0x11: case 0x5C: return -1;
+    // 0x12: the NPC greeting, D2Client+0x9CCE0(1)'s row played on the local player (+0x11BBFC), never a fixed row on the unit
+    case 0x12: case 0x11: case 0x5C: return -1;
     default: break;
     }
     // 0x23200: only a player unit of class 0..6 reaches the player table

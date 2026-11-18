@@ -358,6 +358,8 @@ D2COMMON_DLL_DECL BOOL __stdcall ITEMS_CheckRequirements(D2UnitStrc* pItem, D2Un
 D2COMMON_DLL_DECL BOOL __stdcall ITEMS_GetQuestFromItemId(int nItemId);
 //D2Common.0x6FD99C60 (#10742)
 D2COMMON_DLL_DECL BOOL __stdcall ITEMS_GetQuest(D2UnitStrc* pItem);
+// 1.13c D2Common+0x24F00 (the item arrives in ESI in retail)
+BOOL ITEMS_IsRepairableStack(D2UnitStrc* pItem);
 //D2Common.0x6FD99D40 (#10743)
 D2COMMON_DLL_DECL uint32_t __stdcall ITEMS_GetNormalCode(D2UnitStrc* pItem);
 //D2Common.0x6FD99DB0

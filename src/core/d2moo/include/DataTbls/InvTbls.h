@@ -59,7 +59,6 @@ struct D2InventoryTxt
 //D2Common.0x6FD542D0
 void __fastcall DATATBLS_LoadInventoryTxt(HD2ARCHIVE hArchive);
 //D2Common.0x6FD54F10
-void __fastcall DATATBLS_UnloadInventoryTxt();
 //D2Common.0x6FD54F20 (#10635)
 D2COMMON_DLL_DECL void __stdcall DATATBLS_GetInventoryRect(int nInventoryTxtId, int bHigherRes, D2InvRectStrc* pInvRect);
 //D2Common.0x6FD54FB0 (#10636)

@@ -117,23 +117,6 @@ decltype(T::pStat) __fastcall StatArray_InsertStat(void* pMemPool, T* pStatsArra
 }
 
 // Helper function
-// not-1.13c: retail D2Common+0x389E0 (the only caller here) runs the 0x382B0 search and the 0x38640 insert inline; no retail function of its own
-static D2StatStrc* __fastcall STATLIST_GetOrInsertStat(void* pMemPool, D2StatsArrayStrc* pStatsArray, D2SLayerStatIdStrc::PackedType nLayer_StatId)
-{
-	bool bFoundStatInArray = false;
-	const int insertionIdx = StatArray_FindInsertionIndex(pStatsArray, nLayer_StatId, &bFoundStatInArray);
-
-	if (bFoundStatInArray)
-	{
-		return &pStatsArray->pStat[insertionIdx];
-	}
-	else
-	{
-		return StatArray_InsertStat(pMemPool, pStatsArray, nLayer_StatId, insertionIdx);
-	}
-}
-
-// Helper function
 // not-1.13c: 1.13c inlines the +0x5C change callback (gated by the ItemStatCost callback flag) into D2Common+0x389E0, +0x38940 and +0x39B60
 static void STATLIST_NotifyUnitOfStatValueChange(D2ItemStatCostTxt* pItemStatCostTxtRecord, D2StatListExStrc* pStatListEx, D2UnitStrc* pUnit, D2SLayerStatIdStrc::PackedType nLayer_StatId, int nPreviousValue, int nNewValue)
 {
@@ -699,7 +682,11 @@ int STATLIST_AddFullStatValue(D2StatListExStrc* list,
     D2SLayerStatIdStrc::PackedType id, int delta,
     D2ItemStatCostTxt* cost, D2UnitStrc* unit)
 {
-    D2StatStrc* stat = STATLIST_GetOrInsertStat(list->pMemPool, &list->FullStats, id);
+    // 1.13c inlines the find-or-insert: the index search (+0x382B0), else the insert (+0x38640)
+    bool bFound = false;
+    const int insertionIdx = StatArray_FindInsertionIndex(&list->FullStats, id, &bFound);
+    D2StatStrc* stat = bFound ? &list->FullStats.pStat[insertionIdx]
+                              : StatArray_InsertStat(list->pMemPool, &list->FullStats, id, insertionIdx);
     const int previous = stat->nValue;
     const int value = static_cast<int32_t>(static_cast<uint32_t>(previous) + static_cast<uint32_t>(delta));
     stat->nValue = value;

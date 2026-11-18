@@ -1,4 +1,5 @@
 #include "UNIT/SUnitDmg.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -1449,10 +1450,10 @@ int32_t __fastcall SUNITDMG_AddLeechedMana(D2UnitStrc* pUnit, int32_t nManaLeech
 		return 0;
 	}
 
-	const int32_t nMaxMana = STATLIST_GetMaxManaFromUnit(pUnit);
-	const int32_t nMana = STATLIST_UnitGetStatValue(pUnit, STAT_MANA, 0);
+	const int32_t nMaxMana = D2_CALL(STATLIST_GetMaxManaFromUnit, pUnit);
+	const int32_t nMana = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_MANA, 0);
 	const int32_t nNewMana = std::min(nManaLeeched + nMana, nMaxMana);
-	STATLIST_SetUnitStat(pUnit, STAT_MANA, nNewMana, 0);
+	D2_CALL(STATLIST_SetUnitStat, pUnit, STAT_MANA, nNewMana, 0);
 
 	if (nNewMana == nMaxMana)
 	{
@@ -1642,18 +1643,18 @@ void __fastcall SUNITDMG_ApplyColdState(D2UnitStrc* pAttacker, D2UnitStrc* pDefe
 void __fastcall SUNITDMG_RemoveShatterState(D2UnitStrc* pUnit, int32_t nState, D2StatListStrc* pStatList)
 {
 	D2_MAYBE_UNUSED(pStatList);
-	if (SUNIT_IsDead(pUnit) && STATES_CheckStateMaskStayDeathOnUnitByStateId(pUnit, nState))
+	if (SUNIT_IsDead(pUnit) && D2_CALL(STATES_CheckStateMaskStayDeathOnUnitByStateId, pUnit, nState))
 	{
 		return;
 	}
 
-	STATES_ToggleState(pUnit, nState, 0);
+	D2_CALL(STATES_ToggleState, pUnit, nState, 0);
 	if (!SUNIT_IsDead(pUnit))
 	{
-		STATES_ToggleState(pUnit, STATE_SHATTER, 0);
+		D2_CALL(STATES_ToggleState, pUnit, STATE_SHATTER, 0);
 	}
 
-	UNITS_UpdateAnimRateAndVelocity(pUnit, __FILE__, __LINE__);
+	D2_CALL(UNITS_UpdateAnimRateAndVelocity, pUnit, __FILE__, __LINE__);
 }
 
 //D2Game.0x6FCC0BE0

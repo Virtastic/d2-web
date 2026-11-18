@@ -2891,3 +2891,26 @@ void __fastcall DATATBLS_UnloadSomeMonsterTxts()
 		sgptDataTables->nUniqueAppellationTxtRecordCount = 0;
 	}
 }
+
+// 1.13c D2Common+0x1860 (unit in EAX): a monster's monstats base id; a class outside the table is its own base
+int __fastcall DATATBLS_GetMonsterBaseId(const D2UnitStrc* pUnit)
+{
+	if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
+	{
+		return -1;
+	}
+	const int nClassId = pUnit->dwClassId;
+	const D2MonStatsTxt* pRow = DATATBLS_GetMonStatsTxtRecord(nClassId);
+	return pRow ? pRow->nBaseId : nClassId;
+}
+
+// 1.13c D2Common+0x18A0: bit nBit of the monstats row's nMonStatsFlags bytes
+uint32_t __fastcall DATATBLS_GetMonStatsFlagBit(int nMonsterId, uint32_t nBit)
+{
+	const D2MonStatsTxt* pRow = DATATBLS_GetMonStatsTxtRecord(nMonsterId);
+	if (!pRow)
+	{
+		return 0;
+	}
+	return pRow->nMonStatsFlags[(int)nBit >> 3] & gdwBitMasks[nBit & 7];
+}

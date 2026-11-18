@@ -23,7 +23,6 @@ void __fastcall PLAYER_SynchronizeItemsToClient(D2UnitStrc* pUnit, D2ClientStrc*
 //D2Game.0x6FC7BD50
 int32_t __fastcall PLAYER_IsBusy(D2UnitStrc* pUnit);
 //D2Game.0x6FC7BDB0
-void __fastcall PLAYER_ResetBusyState(D2UnitStrc* pUnit);
 //D2Game.0x6FC7BDF0
 void __fastcall PLAYER_StopInteractions(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FC7BEC0

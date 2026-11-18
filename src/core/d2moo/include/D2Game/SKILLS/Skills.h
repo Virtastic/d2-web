@@ -237,6 +237,15 @@ void __fastcall D2GAME_MONSTERS_AiFunction10_6FD13610(D2GameStrc* pGame, D2UnitS
 int32_t __fastcall sub_6FD136E0(D2UnitStrc* pUnit, int32_t nSkillId);
 //D2Game.0x6FD13800
 void __fastcall D2GAME_AssignSkill_6FD13800(D2UnitStrc* pUnit, int32_t a2, int32_t nSkillId, int32_t nFlags);
+// 1.13c D2Game+0xA1D10 (the new-aura tail of the above)
+void __fastcall sub_A1D10_AssignAura(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId);
+
+// 1.13c D2Game+0xA2100 callee seams (null in the game; the function probe fills them)
+struct D2AssignSkillSeam
+{
+    void *STATES_CheckState, *STATES_ToggleState, *SKILLS_GetSkillById, *SKILLS_SetLeftActiveSkill, *UNITS_GetRightSkill, *SKILLS_SetRightActiveSkill, *SKILLS_GetSkillInfo, *D2GAME_PACKETS_SendPacket0x23_6FC3DC60, *SUNIT_GetClientFromPlayer, *SKILLS_GetSkillsTxtRecord, *SKILLS_GetSkillIdFromSkill, *STATLIST_GetStatListFromUnitAndState, *D2Common_10474, *STATLIST_FreeStatList, *SUNIT_GetGameFromUnit, *sub_6FC34890, *sub_A1D10_AssignAura;
+};
+extern D2AssignSkillSeam g_d2AssignSkill;
 //D2Game.0x6FD13B20
 D2UnitStrc* __fastcall D2GAME_CreateLinkPortal_6FD13B20(D2GameStrc* pGame, D2UnitStrc* pPortal, int32_t nDestLevel, int32_t nSourceLevel);
 //D2Game.0x6FD13DF0

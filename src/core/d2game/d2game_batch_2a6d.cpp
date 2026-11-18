@@ -184,7 +184,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_8c570(void* unit, void* player, const D2GameBa
     D2Game_8C570_PacketSend8D(&e8c570, (const uint8_t*)unit, (const uint8_t*)player);
 }
 
-// 1.13c D2Game+0x97420: tear down one pet list (1.10f sub_6FC7CDC0). pGame is register-only (EAX);
+// D2Game +0x97420 (marker lives on the d2moo sub_6FC7CDC0): tear down one pet list (1.10f sub_6FC7CDC0). pGame is register-only (EAX);
 // pPlayer is the argument Ghidra hides as unaff_retaddr; pPetList is the list, bHireable the pet-type
 // test and bKeep the keep flag (both retail stack arguments). For every pet data node, unlink it from
 // the unit list: the non-hireable path frees the pet by GUID (0x977E0); the hireable path finds the

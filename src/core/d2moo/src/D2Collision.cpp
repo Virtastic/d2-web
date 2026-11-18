@@ -1027,7 +1027,7 @@ uint16_t __fastcall COLLISION_TryMoveUnitCollisionMask(D2ActiveRoomStrc* pRoom, 
 }
 
 //D2Common.0x6FD44910
-// not-1.13c: retail builds the box inline at each caller (the 3x3 form is D2Common+0x4BB30)
+// not-1.13c: retail builds the box inline at each caller (the 3x3 form is D2Common+0x4BB30; D2Common+0x4BB30 builds {x-1,y-1,x+1,y+1} inline)
 void __fastcall COLLISION_CreateBoundingBox(D2BoundingBoxStrc* pBoundingBox, int nCenterX, int nCenterY, unsigned int nSizeX, unsigned int nSizeY)
 {
 	pBoundingBox->nLeft = nCenterX - (nSizeX / 2);
@@ -1042,28 +1042,6 @@ uint32_t D2Common_4D6E0_MoveCollisionMask(D2ActiveRoomStrc* pRoom, int32_t nX1, 
 uint16_t __fastcall COLLISION_TryTeleportUnitCollisionMask(D2ActiveRoomStrc* pRoom, int nX1, int nY1, int nX2, int nY2, int nCollisionPattern, uint16_t nFootprintCollisionMask, uint16_t nMoveConditionMask)
 {
 	return (uint16_t)D2Common_4D6E0_MoveCollisionMask(pRoom, nX1, nY1, nX2, nY2, nCollisionPattern, nFootprintCollisionMask, nMoveConditionMask);
-}
-
-//D2Common.0x6FD44BB0
-// not-1.13c: retail has no such function; the reset / check / set sequence is inline in its teleport step (D2Common+0xDF30)
-uint16_t __fastcall COLLISION_ForceTeleportUnitCollisionMaskAndGetCollision(D2ActiveRoomStrc* pRoom1, int nX1, int nY1, D2ActiveRoomStrc* pRoom2, int nX2, int nY2, int nUnitSize, uint16_t nFootprintCollisionMask, uint16_t nMoveConditionMask)
-{
-	COLLISION_ResetMaskWithSize(pRoom1, nX1, nY1, nUnitSize, nFootprintCollisionMask);
-
-	const uint16_t nCollidedWithMask = COLLISION_CheckMaskWithSize(pRoom2, nX2, nY2, nUnitSize, nMoveConditionMask);
-
-	COLLISION_SetMaskWithSize(pRoom2, nX2, nY2, nUnitSize, nFootprintCollisionMask);
-
-	return nCollidedWithMask;
-}
-
-//D2Common.0x6FD44E00
-// not-1.13c: retail has no such function; the reset / set pair is inline in its missile teleport (D2Common+0xDDC0)
-uint16_t __fastcall COLLISION_TeleportUnitCollisionMask(D2ActiveRoomStrc* pRoom1, int nX1, int nY1, D2ActiveRoomStrc* pRoom2, int nX2, int nY2, int nUnitSize, uint16_t nMask)
-{
-	COLLISION_ResetMaskWithSize(pRoom1, nX1, nY1, nUnitSize, nMask);
-	COLLISION_SetMaskWithSize(pRoom2, nX2, nY2, nUnitSize, nMask);
-	return 0;
 }
 
 //1.10f: D2Common.0x6FD44FF0

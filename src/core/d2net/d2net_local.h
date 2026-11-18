@@ -15,7 +15,6 @@ struct D2NetLocalConn {
     uint32_t queued;     // packets appended since the open
     uint32_t taken;      // packets taken since the open
     uint32_t unframed;   // runs the 1.13c size table does not split exactly (retail ends the process there)
-    uint32_t compressed; // the pump's flag: set by a system 0xaf, cleared by 0xb0
 };
 extern D2NetLocalConn g_d2netLocal;
 

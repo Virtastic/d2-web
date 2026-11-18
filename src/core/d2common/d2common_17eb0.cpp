@@ -4,7 +4,7 @@
 // chain; otherwise the 0x17D00 search runs with a growing bound and the found node's parent chain becomes the vertices.
 #include <cstdint>
 #include <cstring>
-#include "d2common_17d00.h"
+#include "D2Common_17D00.h"
 
 extern "C" int32_t D2Common_3E230_DirFromOffsets(int32_t eax, int32_t y1, int32_t y2, int32_t x2);
 

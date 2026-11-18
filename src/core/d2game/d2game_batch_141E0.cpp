@@ -222,46 +222,6 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_21FB0(int32_t id,
     return (int32_t)rd32(row, 0x1C);
 }
 
-// Class-id filter. EAX is the source record, ECX the destination unit, the stack argument the mode:
-// mode 0 appends at the destination string's NUL (scanning at most 9 bytes), any other mode starts at
-// 0. Source bytes are copied while the table count allows the id and the row's byte +7 is non-zero,
-// stopping at 9 written bytes, at the source NUL, at an out-of-range id, or at a null row.
-// 1.13c D2Game+0x23060
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_batch_d2game_23060(void* self, uint32_t mode, void* record,
-                                                        const D2GameBatch141E0Env* env)
-{
-    uint8_t* src = nullptr;
-    if (record != nullptr && rd32(record, 0) == 1 && rd32(record, 0x14) != 0)
-        src = (uint8_t*)(uintptr_t)rd32(record, 0x14) + 0x1C;
-    uint8_t* dst = nullptr;
-    if (self != nullptr && rd32(self, 0) == 1 && rd32(self, 0x14) != 0)
-        dst = (uint8_t*)(uintptr_t)rd32(self, 0x14) + 0x1C;
-    if (src == nullptr || dst == nullptr) return;
-
-    int32_t at = 0;
-    if (mode == 0) {
-        do {
-            if (dst[at] == 0) break;
-            ++at;
-        } while (at < 9);
-        if (at >= 9) at = 9;
-    }
-    if (at >= 9) return;
-
-    const int32_t count = (int32_t)rd32(env->dataTables, 0xC54);
-    uint8_t* w = dst + at;  // write cursor advances only on a write; 'at' counts every source byte
-    while (*src != 0) {
-        const uint32_t id = *src;
-        if (count <= (int32_t)id) return;
-        const uint32_t row = rd32(env->dataTables, 0xC50) + id * 0x20;
-        if (row == 0) return;
-        if (rd8(row, 7) != 0) *w++ = (uint8_t)id;
-        ++src;
-        if (++at > 8) return;
-    }
-}
-
 // Outgoing item-name packet: the record's 0x1A string must be shorter than 0x100 (assert 0x5BA),
 // byte +0x119 is cleared, the first 10 record bytes are copied, then the +0x0A string (16-byte copy)
 // and the +0x1A string (0x100-byte copy) follow, each with its NUL, the second starting right after the

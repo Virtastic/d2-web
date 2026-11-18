@@ -353,16 +353,6 @@ int32_t __fastcall PLAYER_IsBusy(D2UnitStrc* pUnit)
     return UNITS_GetPlayerData(pUnit)->bBusy;
 }
 
-//D2Game.0x6FC7BDB0
-// not-1.13c: retail has no such function; the packet 0x48 handler D2Game+0xCB4E0 clears PlayerData+0x4C inline (fatal 0x1C6 when already clear)
-void __fastcall PLAYER_ResetBusyState(D2UnitStrc* pUnit)
-{
-    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pUnit);
-    D2_ASSERT(pPlayerData->bBusy != 0);
-
-    pPlayerData->bBusy = 0;
-}
-
 //D2Game.0x6FC7BDF0
 // 1.13c D2Game+0x38930
 void __fastcall PLAYER_StopInteractions(D2GameStrc* pGame, D2UnitStrc* pUnit)

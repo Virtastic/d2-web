@@ -3039,7 +3039,9 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
             D2Common_10513(g_targetPlayer, g_targetPlayer, (void(__fastcall*)(D2UnitStrc*, int32_t, int32_t, D2UnitStrc*))D2GAME_UpdateAttribute_6FC822D0);
             sub_6FC82360(g_targetPlayer, g_targetPlayer, 1);
             // The rig's client learns the rooms' units from the first tick's client update instead (sent once there).
-            if (!joinBurstRig) LEVEL_UpdateUnitsInAdjacentRooms(g_game, room, g_targetClient);
+            // Retail's frame runs the queued-unit flush (D2Game+0x9D850) right after the client update, so what the update
+            // sent (each unit's changed states among it) is cleared then and not sent again by the next frame.
+            if (!joinBurstRig) { LEVEL_UpdateUnitsInAdjacentRooms(g_game, room, g_targetClient); LEVEL_UpdateQueuedUnitsInAllActs(g_game); }
         }
         D2WEB_RecordPackets(nullptr);   // the walk is over; what the game sends the client from here goes out live
         D2WEB_ResetPacketStream();

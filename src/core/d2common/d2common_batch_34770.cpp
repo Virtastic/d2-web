@@ -1,4 +1,4 @@
-// 1.13c D2Common implementation batch (rows 0x34770, 0x2EA70, 0x1A610, 0x4DF60).
+// 1.13c D2Common implementation batch (rows 0x2EA70, 0x1A610, 0x4DF60).
 // Each body was matched against the cached 1.13c decompile and retail disassembly; where a
 // vendored D2MOO 1.10f twin exists the body delegates to it, otherwise the stores are written here.
 #include <cstdint>
@@ -6,13 +6,6 @@
 #include "D2DataTbls.h"
 #include "Path/Path.h"
 #include "Units/Units.h"
-
-// 1.13c D2Common+0x34770: last saved path step X (uint16, zero-extended) of a path that carries
-// PATH_SAVE_STEPS_MASK; 0 when no steps were saved. The 1.10f twin asserts the same mask.
-uint32_t D2Common_10253_PATH_GetSaveX(D2DynamicPathStrc* pDynamicPath)
-{
-    return (uint32_t)D2COMMON_10199_PathGetSaveX(pDynamicPath);
-}
 
 // Superseded by UNITS_GetObjectPortalFlags (Units.cpp, the row for 0x2EA70): object units only (type 2); returns the object data's portal flags byte
 // (pObjectData+5). Retail fatals 0xfe4 on a null unit and 0xfe5 on a non-object unit.

@@ -107,13 +107,6 @@ void __fastcall ACT1Q1_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitS
 	}
 }
 
-// not-1.13c: retail has no such function; the packet 0x50 builder D2Game+0x35640 reads the quest-1 pQuestDataEx+0x88 word inline
-//D2Game.0x6FC97990
-int32_t __fastcall ACT1Q1_GetMonstersToBeKilled(D2QuestDataStrc* pQuestData)
-{
-	return ((D2Act1Quest1Strc*)pQuestData->pQuestDataEx)->nMonstersLeft;
-}
-
 // 1.13c D2Game+0x60750 (checked against decompile, no delta)
 //D2Game.0x6FC979A0
 // 1.13c D2Game+0x60750
@@ -573,13 +566,6 @@ void __fastcall ACT1Q1_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 		pQuestData->fState = 2;
 		pQuestData->fLastState = 1;
 	}
-}
-
-// not-1.13c: retail has no such function, the sequence cycler D2Game+0x35090 tests bNotIntro (+9) && 3 < fState (+0xC) inline
-//D2Game.0x6FC98430
-bool __fastcall ACT1Q1_CanClientFXBeTriggered(D2QuestDataStrc* pQuestData)
-{
-	return pQuestData->bNotIntro && pQuestData->fState >= 4;
 }
 
 // 1.13c D2Game+0x62170 (checked against decompile, no delta)

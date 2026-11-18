@@ -122,16 +122,7 @@ int D2Common_452C0_LinkNearbyRoom(void* headv, uint8_t level, void* roomv, int p
     return ret;
 }
 
-// 1.13c D2Common+0x3D810: copy the 3x3 neighbourhood of cell (row, col) of grid g into out[9] (esi). Order as
-// retail: out[0..2] = row+1/row/row-1 at col-1 ... i.e. out[2]=(r-1,c-1) out[1]=(r,c-1) out[0]=(r+1,c-1)
-// out[5]=(r-1,c) out[4]=(r,c) out[3]=(r+1,c) out[8]=(r-1,c+1) out[7]=(r,c+1) out[6]=(r+1,c+1).
-void D2Common_3D810_Read3x3(const B81Grid* g, int row, int col, int32_t out[9])
-{
-    auto at = [&](int r, int c) { return g->data[g->rowOff[r] + c]; };
-    out[2] = at(row - 1, col - 1); out[1] = at(row, col - 1); out[0] = at(row + 1, col - 1);
-    out[5] = at(row - 1, col);     out[4] = at(row, col);     out[3] = at(row + 1, col);
-    out[8] = at(row - 1, col + 1); out[7] = at(row, col + 1); out[6] = at(row + 1, col + 1);
-}
+// +0x3D810 (the 3x3 window read) lives in src/core/d2moo/src/D2Common_3D810.cpp.
 
 // +0x36CD0 (the line plot) is DRLG_PlotLine = sub_6FD75F60 in src/core/d2moo/src/DrlgDrlgGrid.cpp; its
 // d2common_36cd0_port shim over the retail images lives in d2common_batch_7be50.cpp.

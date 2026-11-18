@@ -200,7 +200,7 @@ void __fastcall DRLGLOGIC_SetTileGridFlags(D2UnkDrlgLogicStrc* a1, int nX, int n
 		}
 
 		int nIndex = 0;
-		if (DRLGGRID_IsGridValid(a1->pTileTypeGrid))
+		if (a1->pTileTypeGrid && a1->pTileTypeGrid->pCellsFlags)
 		{
 			nIndex = DRLGGRID_GetGridEntry(a1->pTileTypeGrid, nPosX, nPosY);
 		}

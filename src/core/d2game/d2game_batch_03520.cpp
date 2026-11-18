@@ -106,29 +106,6 @@ char* d2game_strncpy(char* dest, const char* source, size_t count)
     return dest;
 }
 
-// ---- TASK.cpp doubly-linked list ----------------------------------------------------------------
-// D2LinkStrc layout: +0 next, +4 prev. 1.10f's equivalents are declared at Task.h:60/63 (RVAs differ).
-struct D2TaskLink { D2TaskLink* next; D2TaskLink* prev; };
-
-// 1.13c D2Game+0x1E10
-void D2Task_LinkList_InsertBeforeHead(D2TaskLink* head, D2TaskLink* entry)
-{
-    if (head == nullptr) d2game_fatal(0x77);
-    if (entry == nullptr) d2game_fatal(0x78);
-    entry->next = head;
-    entry->prev = head->prev;
-    head->prev->next = entry;                            // *(head->prev) = entry
-    head->prev = entry;                                  // *(head+4) = entry
-}
-
-// 1.13c D2Game+0x1E50
-void D2Task_LinkList_Remove(D2TaskLink* entry)
-{
-    if (entry == nullptr) d2game_fatal(0x87);
-    entry->next->prev = entry->prev;                     // *(entry->next + 4) = entry->prev
-    entry->prev->next = entry->next;                     // *(entry->prev) = entry->next
-}
-
 // ---- GAME.cpp object release (caller 0x2CE20 closeGame) -----------------------------------------
 // EAX = object whose first dword is its vtable; the return-address slot doubles as the "unlock" flag.
 // 1.13c D2Game+0x1F30

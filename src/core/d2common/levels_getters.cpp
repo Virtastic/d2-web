@@ -1,4 +1,4 @@
-// D2Common 0x2D810 / +0x2D850 / +0x2D970 / +0x6CC60 / +0x6CC30: single-field readers over the levels tables
+// D2Common +0x6CC60 / +0x6CC30: single-field readers over the levels tables
 //
 #include <cstddef>
 #include <cstdint>
@@ -11,15 +11,7 @@ static_assert(offsetof(D2LevelDefBin, dwLOSDraw) == 0x98, "+0x98");
 static_assert(sizeof(D2LevelsTxt) == 0x220, "levels.txt record");
 static_assert(offsetof(D2LevelsTxt, nMud) == 6, "+6");
 static_assert(offsetof(D2LevelsTxt, nNoPer) == 7, "+7");
-// Retail faults (reads address 0x98/0x94/0x34) when id is outside [0, count); ours returns 0 there (not vectored).
-static const D2LevelDefBin* LevelDef(int32_t id)
-{
-    return (id >= 0 && id < sgptDataTables->nLevelsTxtRecordCount) ? &sgptDataTables->pLevelDefBin[id] : nullptr;
-}
-// 1.13c D2Common+0x2D850
-uint32_t D2Common_2D850_LevelDefSaveMonsters(int32_t id) { const D2LevelDefBin* d = LevelDef(id); return d ? d->dwSaveMonsters : 0; }
-// 1.13c D2Common+0x2D970
-uint32_t D2Common_2D970_LevelDefLevelType(int32_t id) { const D2LevelDefBin* d = LevelDef(id); return d ? d->dwLevelType : 0; }
+// 0x2D810 / 0x2D850 / 0x2D970 are DRLG_GetLOSDrawFromLevelId / DRLG_GetSaveMonstersFromLevelId / DRLG_GetLevelTypeFromLevelId (DrlgDrlg.cpp).
 // levels.txt byte at +7 / +6 for id in (0, count); EAX bits 8..31 keep the imul leftover, else id & 0xFFFFFF00 (as sub_6CC90).
 static uint32_t LevelsByte(uint32_t id, bool noPer)
 {

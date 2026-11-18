@@ -59,20 +59,6 @@ void __fastcall DRGLGRID_AndNegatedFlag(int* pFlag, int nFlag)
 	*pFlag &= ~nFlag;
 }
 
-//D2Common.0x6FD75C00
-// not-1.13c: retail has no such function (the grid accessors at D2Common+0x36C30, 0x36C50, 0x36CA0 are the only ones between 0x36C20 and 0x36CD0); callers test the grid and its flag array inline
-BOOL __fastcall DRLGGRID_IsGridValid(D2DrlgGridStrc* pDrlgGrid)
-{
-	return pDrlgGrid && pDrlgGrid->pCellsFlags;
-}
-
-//D2Common.0x6FD75C20
-// not-1.13c: retail has no function; the bounds test is inlined at each caller (the grid functions at D2Common+0x36C30..0x36CBE do no bounds test; grid rows start at 0x367F0)
-BOOL __fastcall DRLGGRID_IsPointInsideGridArea(D2DrlgGridStrc* pDrlgGrid, int nX, int nY)
-{
-	return nX >= 0 && nX < pDrlgGrid->nWidth && nY >= 0 && nY < pDrlgGrid->nHeight;
-}
-
 //D2Common.0x6FD75C50
 // 1.13c D2Common+0x36CA0 (grid in EAX, row in EDX; stack x, flag, operation; calls the flag-operation table entry on the cell)
 void __fastcall DRLGGRID_AlterGridFlag(D2DrlgGridStrc* pDrlgGrid, int nX, int nY, int nFlag, FlagOperation eOperation)

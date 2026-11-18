@@ -793,6 +793,17 @@ void __stdcall D2Common_10075(D2ActiveRoomStrc* pRoom, BOOL bSet)
 	}
 }
 
+// 1.13c D2Common+0x3B3A0 (room in ECX): every entry of the room's client list must be set (1.13c shares one body between
+// its three callers; the assert reports and exits on a null entry)
+BOOL __fastcall DUNGEON_ValidateClientList(D2ActiveRoomStrc* pRoom)
+{
+	for (uint32_t i = 0; i < (uint32_t)pRoom->nNumClients; ++i)
+	{
+		D2_ASSERT(pRoom->ppClients[i]);
+	}
+	return TRUE;
+}
+
 //D2Common.0x6FD8CB60 (#10079)
 // 1.13c D2Common+0x3C460
 void __stdcall DUNGEON_AddClientToRoom(D2ActiveRoomStrc* pRoom, D2ClientStrc* pClient)
@@ -801,10 +812,7 @@ void __stdcall DUNGEON_AddClientToRoom(D2ActiveRoomStrc* pRoom, D2ClientStrc* pC
 
 	D2_ASSERT(pClient);
 
-	for (int i = 0; i < pRoom->nNumClients; ++i)
-	{
-		D2_ASSERT(pRoom->ppClients[i]);
-	}
+	DUNGEON_ValidateClientList(pRoom);
 
 	D2_ASSERT(pRoom->nNumClients <= pRoom->nMaxClients);
 
@@ -828,10 +836,7 @@ void __fastcall DUNGEON_UpdateClientListOfRoom(D2ActiveRoomStrc* pRoom)
 	D2ClientStrc* pClient2 = NULL;
 	BOOL bContinue = FALSE;
 
-	for (int i = 0; i < pRoom->nNumClients; ++i)
-	{
-		D2_ASSERT(pRoom->ppClients[i]);
-	}
+	DUNGEON_ValidateClientList(pRoom);
 
 	for (int nClients = pRoom->nNumClients - 1; nClients > 0; --nClients)
 	{

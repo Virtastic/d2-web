@@ -161,7 +161,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_CCFE0(int mode, void* game
     return env->sub0xCB690(u3, d ? env->ord10750(d) : 0);
 }
 
-// 1.13c D2Game+0xCD190  (param_2 = unit, param_3 = client)
+// D2Game +0xCD190 (marker lives on the d2moo sub_6FC821C0)  (param_2 = unit, param_3 = client)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CD190(uint32_t, void* unit, void* client, void* clientTbl,
                                                         uint32_t clientIdx, const D2GameBatchCc75Env* env)
 {

@@ -108,8 +108,10 @@ void __stdcall D2Common_10884_COMPOSIT_unk(D2UnitStrc* pUnit, int nClass, int nM
 			}
 			else
 			{
-				pMonStats2TxtRecord = UNITS_GetMonStats2TxtRecord(pMonStatsTxtRecord->wMonStatsEx);
-				if (pMonStats2TxtRecord && pMonStats2TxtRecord->dwFlags & gdwBitMasks[MONSTATS2FLAGINDEX_COMPOSITEDEATH])
+				// 1.13c inlines the bounds-checked MonStats2 lookup
+				pMonStats2TxtRecord = (int)pMonStatsTxtRecord->wMonStatsEx >= 0 && (int)pMonStatsTxtRecord->wMonStatsEx < sgptDataTables->nMonStats2TxtRecordCount
+					? &sgptDataTables->pMonStats2Txt[pMonStatsTxtRecord->wMonStatsEx] : NULL;
+				if (pMonStats2TxtRecord &&pMonStats2TxtRecord->dwFlags & gdwBitMasks[MONSTATS2FLAGINDEX_COMPOSITEDEATH])
 				{
 					*pWeaponClassCode = COMPOSIT_GetWeaponClassCode(pUnit, UNIT_MONSTER, nClass, nMode, pInventory, &nWeaponClassId);
 				}

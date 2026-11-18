@@ -3520,7 +3520,8 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x48_TurnOffBusyState_6FC87E20(D2Gam
     {
         if (UNITS_GetPlayerData(pUnit)->bBusy)
         {
-            PLAYER_ResetBusyState(pUnit);
+            D2_ASSERT(UNITS_GetPlayerData(pUnit)->bBusy != 0);
+            UNITS_GetPlayerData(pUnit)->bBusy = 0;
             return 0;
         }
 

@@ -1,4 +1,5 @@
 #include "Path/Step.h"
+#include <test_seam.h>
 
 #include "D2Collision.h"
 #include "D2Dungeon.h"
@@ -282,7 +283,7 @@ uint32_t D2Common_D420_PathMoveCollision(D2DynamicPathStrc* pPath, uint32_t dst,
 //1.13c: D2Common.0x6FD5D0A0
 // The step this tick: the velocity, or (non-missile) the remaining offset to the current path point when that is
 // no further than the velocity. Returns 1 when the offset to the path point was used.
-static BOOL PATH_StepDelta_6FD5D0A0(D2DynamicPathStrc* pDynamicPath, int32_t* pDelta)
+BOOL PATH_StepDelta_6FD5D0A0(D2DynamicPathStrc* pDynamicPath, int32_t* pDelta)
 {
 	pDelta[0] = pDynamicPath->tVelocityVector.nX;
 	pDelta[1] = pDynamicPath->tVelocityVector.nY;
@@ -316,7 +317,7 @@ static BOOL PATH_StepDelta_6FD5D0A0(D2DynamicPathStrc* pDynamicPath, int32_t* pD
 // 1.13c D2Common+0xD580
 //1.13c: D2Common.0x6FD5D580
 // Walks the step tile by tile, moving the path's collision footprint each time. Returns 1 when a tile is blocked.
-static BOOL PATH_StepCrossTiles_6FD5D580(D2DynamicPathStrc* pDynamicPath, int32_t nDx, int32_t nDy, D2FP32_16* a2, uint32_t* pCount)
+BOOL PATH_StepCrossTiles_6FD5D580(D2DynamicPathStrc* pDynamicPath, int32_t nDx, int32_t nDy, D2FP32_16* a2, uint32_t* pCount)
 {
 	pDynamicPath->nSavedStepsCount = 0;
 	int32_t nStepX = nDx;
@@ -338,7 +339,7 @@ static BOOL PATH_StepCrossTiles_6FD5D580(D2DynamicPathStrc* pDynamicPath, int32_
 		const uint16_t nNextTileY = (uint16_t)(nNextY >> 16);
 		if (nTileX != nNextTileX || nTileY != nNextTileY)
 		{
-			if (!D2Common_D420_PathMoveCollision(pDynamicPath, nNextTileX | ((uint32_t)nNextTileY << 16), nTileX | ((uint32_t)nTileY << 16)))
+			if (!D2_CALL(D2Common_D420_PathMoveCollision, pDynamicPath, nNextTileX | ((uint32_t)nNextTileY << 16), nTileX | ((uint32_t)nTileY << 16)))
 			{
 				a2->dwPrecisionX = PATH_FP16FitToCenter(nX);
 				a2->dwPrecisionY = PATH_FP16FitToCenter(nY);
@@ -458,12 +459,21 @@ BOOL __fastcall sub_6FDAD5E0(D2DynamicPathStrc* pDynamicPath, D2ActiveRoomStrc* 
 			{
 				pDynamicPath->dwFlags |= PATH_UNKNOWN_FLAG_0x00008;
 			}
-			pDynamicPath->nCollidedWithMask = COLLISION_ForceTeleportUnitCollisionMaskAndGetCollision(
+			// 1.13c inlines the reset / check / set sequence here (D2Common+0xDF30)
+			COLLISION_ResetMaskWithSize(
 				pDynamicPath->pRoom, pDynamicPath->tGameCoords.wPosX, pDynamicPath->tGameCoords.wPosY,
+				pDynamicPath->dwUnitSize,
+				pDynamicPath->nFootprintCollisionMask
+			);
+			pDynamicPath->nCollidedWithMask = COLLISION_CheckMaskWithSize(
 				pDestRoom, tDest.X, tDest.Y,
 				pDynamicPath->dwUnitSize,
-				pDynamicPath->nFootprintCollisionMask,
 				pDynamicPath->nMoveTestCollisionMask
+			);
+			COLLISION_SetMaskWithSize(
+				pDestRoom, tDest.X, tDest.Y,
+				pDynamicPath->dwUnitSize,
+				pDynamicPath->nFootprintCollisionMask
 			);
 			pDynamicPath->nSavedStepsCount = 1;
 			pDynamicPath->SavedSteps[0] = tDest;
@@ -597,7 +607,9 @@ BOOL __stdcall D2Common_10231_Impl(D2DynamicPathStrc* pDynamicPath, D2ActiveRoom
 	{
 		if (tDest.X || tDest.Y)
 		{
-			COLLISION_TeleportUnitCollisionMask(pDynamicPath->pRoom, tCurrentPos.X, tCurrentPos.Y, pRoomDest, tDest.X, tDest.Y, pDynamicPath->dwUnitSize, pDynamicPath->nFootprintCollisionMask);
+			// 1.13c inlines the reset / set pair here
+			COLLISION_ResetMaskWithSize(pDynamicPath->pRoom, tCurrentPos.X, tCurrentPos.Y, pDynamicPath->dwUnitSize, pDynamicPath->nFootprintCollisionMask);
+			COLLISION_SetMaskWithSize(pRoomDest, tDest.X, tDest.Y, pDynamicPath->dwUnitSize, pDynamicPath->nFootprintCollisionMask);
 		}
 		else
 		{

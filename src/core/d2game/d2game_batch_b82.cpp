@@ -42,7 +42,7 @@ static const uint8_t* findUnit(const uint8_t* game, uint32_t base, uint32_t id, 
     return nullptr;
 }
 
-// 1.13c D2Game+0x79850 -- ECX = game, EDX = player, two stack words never read (ret 8). The mask is the low byte of
+// D2Game +0x79850 (marker lives on the d2moo sub_6FC81250) -- ECX = game, EDX = player, two stack words never read (ret 8). The mask is the low byte of
 // gdwBitMasks[2] ([gdwBitMasks + 8]).
 extern "C" void D2Game_79850_Named(void* p1, const uint8_t* p2, const D2GameB82Env* e)
 {
@@ -101,7 +101,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2game_8b3d0_send(const void* src, void (*s
     d2_fn_d2game_8B3D0(src, &env);
 }
 
-// 1.13c D2Game+0x98250  (EAX = unit)
+// D2Game +0x98250 (marker lives on the d2moo sub_6FC7E640)  (EAX = unit)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_98250_batch(const uint8_t* game, uintptr_t unit, const D2GameB82Env* e)
 {
     uintptr_t pd = e->ord10920(unit);

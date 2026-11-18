@@ -7,7 +7,7 @@
 namespace d2g79a60 {
 template <class E> void Run(E& e, uint32_t game, uint32_t unit)
 {
-    // 1.13c D2Game+0x79A60
+    // D2Game +0x79A60 (marker lives on the d2moo sub_6FC81B90)
     e.h(0x9C620, 0, game, unit, 0, 0, game);
     e.h(0x98250, unit, game);
     const uint32_t at = e.rd32(game + 0xA8) + 0x1E;

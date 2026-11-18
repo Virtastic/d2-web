@@ -40,15 +40,6 @@ void __fastcall DATATBLS_LoadOverlayTxt(HD2ARCHIVE hArchive)
 	sgptDataTables->pOverlayTxt = (D2OverlayTxt*)DATATBLS_CompileTxt(hArchive, "overlay", pTbl, &sgptDataTables->nOverlayTxtRecordCount, sizeof(D2OverlayTxt));
 }
 
-//D2Common.0x6FD72500
-// not-1.13c: retail inlines the overlay unload into the unload-all function at 0x5E870
-void __fastcall DATATBLS_UnloadOverlayTxt()
-{
-	FOG_FreeLinker(sgptDataTables->pOverlayLinker);
-	DATATBLS_UnloadBin(sgptDataTables->pOverlayTxt);
-	sgptDataTables->pOverlayTxt = NULL;
-	sgptDataTables->nOverlayTxtRecordCount = 0;
-}
 
 //D2Common.0x6FD72530 (#10674)
 // 1.13c D2Common+0x82F00

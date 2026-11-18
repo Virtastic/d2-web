@@ -91,7 +91,8 @@
 uint8_t byte_6FD31270 = 1; // sequences enabled by default: QUESTS_DisableSequences() is the only writer (sets 0), so retail .data holds 1; zero-init left Q2.. never unlocked after a save reload
 
 
-#define dword_6FD4DC34 1
+int32_t gnQuestDebugOutput = 1;   // the retail flag (D2Game+0x111C20); the proofs set it from the vector
+#define dword_6FD4DC34 gnQuestDebugOutput
 
 constexpr D2QuestInitTableStrc gpQuestInitTable[] =
 {
@@ -912,7 +913,7 @@ void __fastcall QUESTS_StatusCallback(D2GameStrc* pGame, D2UnitStrc* pUnit)
 		if (pQuestData1)
 		{
 			bSendPacket0x50 = true;
-			packet50.QuestsStatusPayload.nMonstersToBeKilled = ACT1Q1_GetMonstersToBeKilled(pQuestData1);
+			packet50.QuestsStatusPayload.nMonstersToBeKilled = ((D2Act1Quest1Strc*)pQuestData1->pQuestDataEx)->nMonstersLeft;
 		}
 	}
 
@@ -956,7 +957,7 @@ int32_t __fastcall QUESTS_DebugOutput(D2GameStrc* pGame, const char* szMessage, 
 		return 0;
 	}
 
-	sub_6FC84C70(pGame, szMessage, STRCOLOR_DARK_GOLD);
+	D2_CALL(sub_6FC84C70, pGame, szMessage, STRCOLOR_DARK_GOLD);
 	return 1;
 }
 
@@ -1028,7 +1029,7 @@ void __fastcall QUESTS_StatusCyclerEx(D2GameStrc* pGame, D2UnitStrc* pPlayer, ui
 
 	if (pQuestData->nQuestFilter == 1)
 	{
-		packet5D.field_4 = ACT1Q1_GetMonstersToBeKilled(pQuestData);
+		packet5D.field_4 = ((D2Act1Quest1Strc*)pQuestData->pQuestDataEx)->nMonstersLeft;
 	}
 	else if (pQuestData->nQuestFilter == 36)
 	{
@@ -1065,7 +1066,7 @@ int32_t __fastcall QUESTS_StateDebug(D2QuestDataStrc* pQuestData, int32_t nState
 
 	char szMsg[128] = {};
 	wsprintfA(szMsg, "changing state to %d\n", nState);
-	sub_6FC84C70(pQuestData->pGame, szMsg, STRCOLOR_DARK_GOLD);
+	D2_CALL(sub_6FC84C70, pQuestData->pGame, szMsg, STRCOLOR_DARK_GOLD);
 	return 1;
 }
 
@@ -1285,7 +1286,7 @@ void __fastcall QUESTS_SequenceCycler(D2GameStrc* pGame, D2UnitStrc* pPlayer, in
 	{
 		pQuestData1 = pQuestData1->pPrev;
 	}
-	if (pQuestData1 && ACT1Q1_CanClientFXBeTriggered(pQuestData1))
+	if (pQuestData1 && pQuestData1->bNotIntro && pQuestData1->fState >= 4)
 	{
 		D2GSPacketSrv89 packet89 = {};
 		packet89.nHeader = 0x89;
@@ -2442,7 +2443,7 @@ void __fastcall QUESTS_ResetPlayerGUIDCount(D2QuestGUIDStrc* pGUIDs)
 // not-1.13c: retail has no function for it; each quest callback loads the guid (-1 for no player) and calls D2Game+0x33830 on quest+0x1C (e.g. D2Game+0x57A20, +0x56FC0, +0x575D0, +0x340C0)
 void __fastcall QUESTS_QuickRemovePlayerGUID(D2QuestDataStrc* pQuest, D2QuestArgStrc* pQuestArg)
 {
-	QUESTS_FastRemovePlayerGUID(&pQuest->tPlayerGUIDs, pQuestArg->pPlayer ? pQuestArg->pPlayer->dwUnitId : -1);
+	D2_CALL(QUESTS_FastRemovePlayerGUID, &pQuest->tPlayerGUIDs, pQuestArg->pPlayer ? pQuestArg->pPlayer->dwUnitId : -1);
 }
 
 //D2Game.0x6FC96940

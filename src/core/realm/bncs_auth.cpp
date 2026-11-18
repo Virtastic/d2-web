@@ -260,3 +260,28 @@ extern "C" EMSCRIPTEN_KEEPALIVE int d2_realm_bncs_auth_check_env(uint32_t* seed,
     if (!d2_bnclient_12060(&g, &e)) return 0;
     return check::badKey ? -1 : (int)check::outLen;
 }
+
+// The same 0x12060 frame when the host has no revision files: 0xD320's three outputs (version, checksum, info line) come
+// from the server's config. A key that is absent or does not decode leaves its 0x24-byte block zero, as the stock client
+// sends it with no keys installed (two zero blocks and an empty owner for D2XP). Returns the body length.
+namespace { namespace fixed {
+uint32_t version = 0, hash = 0; const char* info = "";
+uint32_t lookup(uint32_t* a, uint32_t* b, char* i) { *a = version; *b = hash; sstrcopy(i, info, 0x100); return 1; }
+}  // namespace fixed
+}  // namespace
+
+extern "C" EMSCRIPTEN_KEEPALIVE int d2_realm_bncs_auth_check_fixed(uint32_t* seed, uint32_t now, uint32_t tick, uint32_t serverToken, int expansion,
+                                                                  uint32_t exeVersion, uint32_t exeHash, const char* exeInfo,
+                                                                  const char* key0, const char* key1, const char* owner, uint8_t* out) {
+    check::out = out; check::outLen = 0; check::badKey = 0;
+    check::now = now; check::tick = tick; check::expansion = expansion ? 1 : 0;
+    check::key[0] = key0; check::key[1] = key1; check::key[2] = owner;
+    fixed::version = exeVersion; fixed::hash = exeHash; fixed::info = exeInfo ? exeInfo : "";
+    const uint8_t ready = 1;
+    const uint32_t abort = 0, stamp = serverToken;
+    uint32_t fail = 0, keys[4] = {1, 0, 2, 3};
+    const Bn12060Globals g{seed, &ready, &abort, &fail, keys, &stamp};
+    const Bn12060Env e{check::time, check::tick_count, check::no_sleep, fixed::lookup, check::nop, check::nop, check::nop, check::exp,
+                       check::scopy, check::key_block, check::release, slen, check::send};
+    return d2_bnclient_12060(&g, &e) ? (int)check::outLen : 0;
+}

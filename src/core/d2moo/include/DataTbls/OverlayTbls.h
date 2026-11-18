@@ -52,7 +52,6 @@ struct D2OverlayTxt
 //D2Common.0x6FD720A0
 void __fastcall DATATBLS_LoadOverlayTxt(HD2ARCHIVE hArchive);
 //D2Common.0x6FD72500
-void __fastcall DATATBLS_UnloadOverlayTxt();
 //D2Common.0x6FD72530 (#10674)
 D2COMMON_DLL_DECL uint32_t __stdcall DATATBLS_GetFramesFromOverlayTxt(int nOverlayId);
 //D2Common.0x6FD72570 (#10675)

@@ -399,7 +399,7 @@ uint8_t PATH_UpdateTargetUnit(D2PathInfoStrc* pPathInfo)
 			}
 			// 1.13c inlines the door step here: shift the target 2 tiles past the door along its axis.
 			D2_ASSERT(UNITS_IsDoor(pPathTargetUnit));
-			if (!UNITS_CheckIfObjectOrientationIs1(pPathTargetUnit))
+			if (pPathTargetUnit->pObjectData->pObjectTxt->nOrientation != 1)
 			{
 				if (pPath->tGameCoords.wPosX >= UNITS_GetXPosition(pPathTargetUnit)) pPath->tTargetCoord.X += 2;
 				else pPath->tTargetCoord.X -= 2;

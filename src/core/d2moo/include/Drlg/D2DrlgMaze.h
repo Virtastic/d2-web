@@ -77,6 +77,10 @@ void __fastcall DRLGMAZE_PlaceAct3MephistoStuff(D2DrlgLevelStrc* pLevel);
 void __fastcall DRLGMAZE_PlaceAct5TempleStuff(D2DrlgLevelStrc* pLevel);
 //D2Common.0x6FD7C500
 void __fastcall DRLGMAZE_PlaceAct5BaalStuff(D2DrlgLevelStrc* pLevel);
+// 1.13c D2Common+0x11940 / 0x11A70 / 0x11B30 (the level-type arms of 0x11BF0)
+void __fastcall DRLGMAZE_PlaceAct1CatacombsStuff(D2DrlgLevelStrc* pLevel);
+void __fastcall DRLGMAZE_PlaceAct1CryptStuff(D2DrlgLevelStrc* pLevel);
+void __fastcall DRLGMAZE_PlaceAct1CaveStuff(D2DrlgLevelStrc* pLevel);
 //D2Common.0x6FD7C660
 void __fastcall DRLGMAZE_PlaceAct1Barracks(D2DrlgLevelStrc* pLevel);
 //D2Common.0x6FD7CA20

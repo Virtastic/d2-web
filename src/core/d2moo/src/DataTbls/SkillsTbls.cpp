@@ -946,3 +946,48 @@ D2SkillDescTxt* __fastcall DATATBLS_GetSkillDescTxtRecord(int nSkillDesc)
 
 	return NULL;
 }
+
+// skills.txt dwParam getters. Retail guards the computed row address against zero, not the table pointer.
+static const D2SkillsTxt* DATATBLS_SkillParamRow(int nSkillId)
+{
+	if (nSkillId < 0 || nSkillId >= sgptDataTables->nSkillsTxtRecordCount) return nullptr;
+	const uintptr_t nRow = (uintptr_t)sgptDataTables->pSkillsTxt + (uintptr_t)nSkillId * sizeof(D2SkillsTxt);
+	return nRow != 0 ? (const D2SkillsTxt*)nRow : nullptr;
+}
+
+// 1.13c D2Common+0x1550 / 0x1580 / 0x15B0 / 0x15E0 / 0x1610 / 0x1640: dwParam[n] of the skill row, 0 out of range
+int __fastcall DATATBLS_GetSkillParam(int nSkillId, int nParam)
+{
+	const D2SkillsTxt* pRow = DATATBLS_SkillParamRow(nSkillId);
+	return pRow ? pRow->dwParam[nParam] : 0;
+}
+
+// 1.13c D2Common+0x1550
+int __fastcall DATATBLS_GetSkillParam0(int nSkillId) { return DATATBLS_GetSkillParam(nSkillId, 0); }
+// 1.13c D2Common+0x1580
+int __fastcall DATATBLS_GetSkillParam1(int nSkillId) { return DATATBLS_GetSkillParam(nSkillId, 1); }
+// 1.13c D2Common+0x15B0
+int __fastcall DATATBLS_GetSkillParam2(int nSkillId) { return DATATBLS_GetSkillParam(nSkillId, 2); }
+// 1.13c D2Common+0x15E0
+int __fastcall DATATBLS_GetSkillParam3(int nSkillId) { return DATATBLS_GetSkillParam(nSkillId, 3); }
+// 1.13c D2Common+0x1610
+int __fastcall DATATBLS_GetSkillParam4(int nSkillId) { return DATATBLS_GetSkillParam(nSkillId, 4); }
+// 1.13c D2Common+0x1640
+int __fastcall DATATBLS_GetSkillParam5(int nSkillId) { return DATATBLS_GetSkillParam(nSkillId, 5); }
+
+// (nLevel - 1) * dwParam[nHigh] + dwParam[nLow]; level <= 0 gives 0
+static int DATATBLS_SkillParamLinear(int nSkillId, int nLevel, int nLow)
+{
+	const D2SkillsTxt* pRow = DATATBLS_SkillParamRow(nSkillId);
+	if (!pRow || nLevel <= 0) return 0;
+	return (nLevel - 1) * pRow->dwParam[nLow + 1] + pRow->dwParam[nLow];
+}
+
+// 1.13c D2Common+0x1670
+int __fastcall DATATBLS_GetSkillParamLinear01(int nSkillId, int nLevel) { return DATATBLS_SkillParamLinear(nSkillId, nLevel, 0); }
+// 1.13c D2Common+0x16B0
+int __fastcall DATATBLS_GetSkillParamLinear23(int nSkillId, int nLevel) { return DATATBLS_SkillParamLinear(nSkillId, nLevel, 2); }
+// 1.13c D2Common+0x16F0
+int __fastcall DATATBLS_GetSkillParamLinear45(int nSkillId, int nLevel) { return DATATBLS_SkillParamLinear(nSkillId, nLevel, 4); }
+// 1.13c D2Common+0x1730
+int __fastcall DATATBLS_GetSkillParamLinear67(int nSkillId, int nLevel) { return DATATBLS_SkillParamLinear(nSkillId, nLevel, 6); }

@@ -81,13 +81,6 @@ void __fastcall DATATBLS_LoadBeltsTxt(HD2ARCHIVE hArchive)
 	D2_ASSERT((nRecordCount / NUM_GAME_RESOLUTIONS) == BELT_IDX_COUNT_PER_RESOLUTION);
 }
 
-//D2Common.0x6FD493A0
-// not-1.13c: retail inlines the belts unload into the unload-all function at 0x5E870
-void __fastcall DATATBLS_UnloadBeltsTxt()
-{
-	DATATBLS_UnloadBin(gpBeltsTxtTable);
-}
-
 //D2Common.0x6FD493B0 (#10638)
 // 1.13c D2Common+0x132A0
 void __stdcall DATATBLS_GetBeltsTxtRecord(int nIndex, int bHigherRes, D2BeltsTxt* pRecord)

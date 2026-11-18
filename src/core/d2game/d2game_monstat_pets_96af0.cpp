@@ -74,7 +74,7 @@ void D2Game_96AF0_PetsForEachCallback(const Env& e, void* player, uint8_t* game,
     }
 }
 
-// 1.13c D2Game+0x96EA0 (EAX = pet type, param_2 = value; stack: player; EBX and the return address reach the FUN_7B50 call as the decompile
+// D2Game +0x96EA0 (marker lives on the d2moo sub_6FC7D150) (EAX = pet type, param_2 = value; stack: player; EBX and the return address reach the FUN_7B50 call as the decompile
 // passes them): sets the row's +8 to value, then drops pets while the row's count (+4) exceeds value. The pick and remove calls are seams.
 void D2Game_96EA0_PetTypeSetMaxAndTrim(const Env& e, void* player, uint32_t eax, int32_t value, uint32_t retArg, void* ebx)
 {

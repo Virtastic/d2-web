@@ -6,14 +6,16 @@ namespace d2 {
 static uint16_t rd16(const uint8_t* p) { return (uint16_t)(p[0] | (p[1] << 8)); }
 static uint32_t rd32(const uint8_t* p) { return (uint32_t)(p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24)); }
 
+extern "C" int d2lang_8c40(const uint8_t* src, int len, uint16_t* out);   // 1.13c D2Lang+0x8C40, one UTF-8 char
+
 std::u16string utf8ToU16(const std::string& s) {
     std::u16string out;
+    const int len = (int)s.size() + 1;
     for (size_t i = 0; i < s.size();) {
-        unsigned char c = (unsigned char)s[i];
-        if (c < 0x80) { out.push_back(c); i++; }
-        else if ((c & 0xE0) == 0xC0 && i + 1 < s.size()) { out.push_back((char16_t)(((c & 0x1F) << 6) | (s[i + 1] & 0x3F))); i += 2; }
-        else if ((c & 0xF0) == 0xE0 && i + 2 < s.size()) { out.push_back((char16_t)(((c & 0x0F) << 12) | ((s[i + 1] & 0x3F) << 6) | (s[i + 2] & 0x3F))); i += 3; }
-        else { out.push_back(c); i++; }   // retail: invalid lead byte is taken as-is
+        uint16_t u = 0;
+        int n = d2lang_8c40((const uint8_t*)s.data() + i, len - (int)i, &u);
+        if (n < 1) { out.push_back((unsigned char)s[i]); i++; }   // invalid sequence: the byte is taken as-is
+        else { out.push_back((char16_t)u); i += n; }
     }
     return out;
 }

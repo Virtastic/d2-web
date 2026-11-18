@@ -120,6 +120,8 @@ D2COMMON_DLL_DECL void __stdcall D2Common_10075(D2ActiveRoomStrc* pRoom, BOOL bS
 D2COMMON_DLL_DECL void __stdcall DUNGEON_AddClientToRoom(D2ActiveRoomStrc* pRoom, D2ClientStrc* pClient);
 //D2Common.0x6FD8CC50
 void __fastcall DUNGEON_UpdateClientListOfRoom(D2ActiveRoomStrc* pRoom);
+// 1.13c D2Common+0x3B3A0
+BOOL __fastcall DUNGEON_ValidateClientList(D2ActiveRoomStrc* pRoom);
 //D2Common.0x6FD8CD10 (#10080)
 D2COMMON_DLL_DECL void __stdcall DUNGEON_RemoveClientFromRoom(D2ActiveRoomStrc* pRoom, D2ClientStrc* pClient);
 //D2Common.0x6FD8CDF0 (#10081)

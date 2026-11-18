@@ -88,38 +88,6 @@ EMSCRIPTEN_KEEPALIVE void D2Common_UpdateStayDeathFlags(D2UnitStrc* pUnit, int32
 	UNITROOM_RefreshUnit(pUnit);
 }
 
-// 1.13c D2Common+0x2FFE0 (#10628): client coordinates of a unit, written as two dwords. Object,
-// item and tile units read the static path (x +0x04, y +0x08), everything else the dynamic path
-// (x +0x08, y +0x0C). A missing path yields 0/0.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void D2Common_2FFE0_GetUnitClientCoords(D2UnitStrc* pUnit, uint32_t* pOut)
-{
-	if (!pOut)
-		return;
-	pOut[0] = 0;
-	pOut[1] = 0;
-	if (!pUnit)
-		return;
-
-	const uint32_t nType = pUnit->dwUnitType;
-	if (nType == 2 || nType == 4 || nType == 5)
-	{
-		const D2StaticPathStrc* pPath = pUnit->pStaticPath;
-		if (!pPath)
-			return;
-		pOut[0] = static_cast<uint32_t>(pPath->dwClientCoordX);
-		pOut[1] = static_cast<uint32_t>(pPath->dwClientCoordY);
-	}
-	else
-	{
-		const D2DynamicPathStrc* pPath = pUnit->pDynamicPath;
-		if (!pPath)
-			return;
-		pOut[0] = static_cast<uint32_t>(pPath->dwClientCoordX);
-		pOut[1] = static_cast<uint32_t>(pPath->dwClientCoordY);
-	}
-}
-
 // 1.13c D2Common+0x6CA70 (#10629): copy file name nFile (0..0x1F) of lvltypes.txt record nRecord to
 // szOut. A missing table or record index leaves szOut empty; the source field is 60 bytes.
 extern "C"
@@ -304,12 +272,4 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_ItemBeltSlotFits_21ee0(int32_t nArg, D2Un
 	return static_cast<uint32_t>(pEnv->pPlaceInBelt(nArg, pItem));
 }
 
-// 1.13c D2Common+0x24240 (#10661): items.txt record for an item unit's class id must report
-// nTransmogrify (0x223D0). A null unit or another unit type is a no-op (retail exits).
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2common_ItemTransmogrifyAssert_24240(D2UnitStrc* pItem)
-{
-	if (!pItem || pItem->dwUnitType != 4)
-		return;
-	d2common_IsTransmogrify_223d0(pItem->dwClassId);
-}
+// 0x24240 (#10661) is ITEMS_GetTransmogrify in d2moo/src/Items/Items.cpp.

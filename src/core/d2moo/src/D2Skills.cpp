@@ -14,15 +14,16 @@
 #include "D2States.h"
 #include "D2StatList.h"
 #include "Units/Units.h"
+#include "Units/UnitRoom.h"
 #include <D2BitManip.h>
 #include <DataTbls/SkillsIds.h>
 #include <D2Combat.h>
 #include <D2Monsters.h>
 #include <Calc.h>
+#include <test_seam.h>
 
 //TODO: Find names
 
-extern "C" int32_t D2Common_4F0E0_PassiveState(int32_t nSkillId);   // 1.13c D2Common+0x4F0E0
 void D2Common_52480_RefreshSkill(D2UnitStrc* pUnit, int nSkillId);   // native twin of SKILLS_RefreshSkill (d2common_batch_1fb80.cpp)
 
 D2CalcCallbackInfoStrc off_6FDE5804[] =
@@ -66,8 +67,10 @@ short __stdcall SKILLS_GetPassiveState(int nSkillId)
 
 //D2Common.0x6FDAEB60 (#11271)
 // 1.13c D2Common+0x51070
-int __stdcall SKILLS_GetSpecialParamValue(D2UnitStrc* pUnit, uint8_t nParamId, int nSkillId, int nSkillLevel)
+int __stdcall SKILLS_GetSpecialParamValue(D2UnitStrc* pUnit, int nParamWord, int nSkillId, int nSkillLevel)
 {
+	// The callers hand over a full word; the function itself works on its low byte.
+	const uint8_t nParamId = (uint8_t)nParamWord;
 	D2SkillDescTxt* pSkillDescTxtRecord = NULL;
 	D2SkillsTxt* pSkillsTxtRecord = NULL;
 	D2SkillStrc* pSkill = NULL;
@@ -425,7 +428,7 @@ int __fastcall sub_6FDAF6A0(int32_t nParamId, void* pUserData)
 {
 	if (D2SkillCalcStrc * pSkillCalc = (D2SkillCalcStrc*) pUserData)
 	{
-		return SKILLS_GetSpecialParamValue(pSkillCalc->pUnit, nParamId, pSkillCalc->nSkillId, pSkillCalc->nSkillLevel);
+		return D2_CALL(SKILLS_GetSpecialParamValue, pSkillCalc->pUnit, nParamId, pSkillCalc->nSkillId, pSkillCalc->nSkillLevel);
 	}
 
 	return 0;
@@ -443,7 +446,7 @@ int __fastcall sub_6FDAF6C0(int nSkillId, int nParamId, int nUnused, void* pUser
 	{
 		if (pSkillCalc->pUnit)
 		{
-			pSkill = SKILLS_GetHighestLevelSkillFromSkillId(pSkillCalc->pUnit, nSkillId);
+			pSkill = D2_CALL(SKILLS_GetHighestLevelSkillFromSkillId, pSkillCalc->pUnit, nSkillId);
 
 			if (pSkill)
 			{
@@ -451,7 +454,7 @@ int __fastcall sub_6FDAF6C0(int nSkillId, int nParamId, int nUnused, void* pUser
 			}
 		}
 
-		return SKILLS_GetSpecialParamValue(pSkillCalc->pUnit, nParamId, nSkillId, nSkillLevel);
+		return D2_CALL(SKILLS_GetSpecialParamValue, pSkillCalc->pUnit, nParamId, nSkillId, nSkillLevel);
 	}
 	
 	return 0;
@@ -808,7 +811,7 @@ void __fastcall D2COMMON_SKILLS_RemoveSkill_6FDAFFF0(D2UnitStrc* pUnit, int nSki
 		return;
 	}
 
-	if (const int32_t nPassiveState = D2Common_4F0E0_PassiveState(nSkillId))
+	if (const int32_t nPassiveState = SKILLS_GetPassiveState(nSkillId))
 	{
 		STATES_ToggleState(pUnit, nPassiveState, 0);
 	}
@@ -1369,18 +1372,165 @@ int __fastcall SKILLS_GetSeqNumFromSkill(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 	return 0;
 }
 
+// 1.13c D2Common+0x50930 (the skill-use check's first helper): does the unit hold what the skill's own id asks for. A scroll skill
+// needs an inventory and a positive quantity; throw, left-hand throw and left-hand swing look at the equipped weapon;
+// every other skill passes.
+BOOL __fastcall SKILLS_CheckUseItemQuantity(D2SkillStrc* pSkill, D2UnitStrc* pUnit)
+{
+	D2UnitStrc* pItem = NULL;
+	BOOL bIsLeftHandItem = FALSE;
+	BOOL bContinue = FALSE;
+	int nBodyLoc = 0;
+
+	if (!pUnit || !pSkill)
+	{
+		return FALSE;
+	}
+
+	if (pSkill->pSkillsTxt->dwFlags[1] & gdwBitMasks[SKILLSFLAGINDEX2_SCROLL])
+	{
+		return pUnit->pInventory && pSkill->nQuantity > 0;
+	}
+
+	const int nSkillId = SKILLS_GetSkillIdFromSkill(pSkill, __FILE__, __LINE__);
+	if (nSkillId == SKILL_THROW)
+	{
+		if (!pUnit->pInventory)
+		{
+			return FALSE;
+		}
+
+		if (D2_CALL(UNITS_CanDualWield, pUnit))
+		{
+			if (!D2_CALL(INVENTORY_GetEquippedWeapon, pUnit->pInventory, &pItem, &nBodyLoc, &bIsLeftHandItem))
+			{
+				return FALSE;
+			}
+
+			if (!bIsLeftHandItem)
+			{
+				pItem = D2_CALL(sub_6FDB1050, pUnit->pInventory, nBodyLoc);
+			}
+
+			if (!pItem)
+			{
+				return FALSE;
+			}
+		}
+		else if (!D2_CALL(INVENTORY_GetEquippedWeapon, pUnit->pInventory, &pItem, &nBodyLoc, &bIsLeftHandItem) || !bIsLeftHandItem)
+		{
+			return FALSE;
+		}
+
+		bContinue = D2_CALL(ITEMS_CheckIfThrowable, pItem);
+		if (!bContinue)
+		{
+			bContinue = D2_CALL(STATLIST_UnitGetItemStatOrSkillStatValue, pItem, STAT_ITEM_THROWABLE, 0);
+		}
+		return bContinue != 0;
+	}
+	else if (nSkillId == SKILL_LEFTHANDTHROW)
+	{
+		if (!pUnit->pInventory || !D2_CALL(INVENTORY_GetEquippedWeapon, pUnit->pInventory, &pItem, &nBodyLoc, &bIsLeftHandItem))
+		{
+			return FALSE;
+		}
+
+		if (bIsLeftHandItem)
+		{
+			pItem = D2_CALL(sub_6FDB1050, pUnit->pInventory, nBodyLoc);
+			if (!pItem)
+			{
+				return FALSE;
+			}
+		}
+
+		bContinue = D2_CALL(ITEMS_CheckIfThrowable, pItem);
+		if (!bContinue)
+		{
+			bContinue = D2_CALL(STATLIST_UnitGetItemStatOrSkillStatValue, pItem, STAT_ITEM_THROWABLE, 0);
+		}
+		return bContinue != 0;
+	}
+	else if (nSkillId == SKILL_LEFTHANDSWING)
+	{
+		if (!pUnit->pInventory || !D2_CALL(UNITS_CanDualWield, pUnit))
+		{
+			return FALSE;
+		}
+
+		if (!D2_CALL(INVENTORY_GetEquippedWeapon, pUnit->pInventory, &pItem, &nBodyLoc, &bIsLeftHandItem))
+		{
+			return FALSE;
+		}
+
+		if (bIsLeftHandItem)
+		{
+			pItem = D2_CALL(sub_6FDB1050, pUnit->pInventory, nBodyLoc);
+			if (!pItem)
+			{
+				return FALSE;
+			}
+		}
+
+		return D2_CALL(ITEMS_CheckItemTypeId, pItem, ITEMTYPE_WEAPON) != 0;
+	}
+
+	return TRUE;
+}
+
+// 1.13c D2Common+0x50F00 (the skill-use check's second helper): do the two hand items satisfy the skill's item-type columns.
+BOOL __fastcall SKILLS_CheckUseItemTypes(D2SkillStrc* pSkill, D2UnitStrc* pUnit)
+{
+	if (!pSkill || !pSkill->pSkillsTxt)
+	{
+		return FALSE;
+	}
+
+	D2SkillsTxt* pSkillsTxt = pSkill->pSkillsTxt;
+	if (pSkillsTxt->nElemTypeAB[0][0] <= 0 && pSkillsTxt->nItemTypeAB[0][0] <= 0)
+	{
+		return TRUE;
+	}
+
+	if (!pUnit->pInventory)
+	{
+		return FALSE;
+	}
+
+	D2UnitStrc* pRightHandItem = D2_CALL(INVENTORY_GetItemFromBodyLoc, pUnit->pInventory, BODYLOC_RARM);
+	D2UnitStrc* pLeftHandItem = D2_CALL(INVENTORY_GetItemFromBodyLoc, pUnit->pInventory, BODYLOC_LARM);
+
+	if (pSkillsTxt->nSkillId == SKILL_LEFTHANDTHROW || pSkillsTxt->nSkillId == SKILL_LEFTHANDSWING)
+	{
+		D2UnitStrc* pItem = D2_CALL(INVENTORY_GetLeftHandWeapon, pUnit->pInventory);
+		if (pItem == pRightHandItem)
+		{
+			pRightHandItem = NULL;
+		}
+		else if (pItem == pLeftHandItem)
+		{
+			pLeftHandItem = NULL;
+		}
+	}
+
+	if (D2_CALL(sub_6FDB1130, pRightHandItem, pLeftHandItem, pSkillsTxt, 0))
+	{
+		return D2_CALL(sub_6FDB1130, pLeftHandItem, pRightHandItem, pSkillsTxt, 1);
+	}
+
+	if (!D2_CALL(sub_6FDB1130, pRightHandItem, pLeftHandItem, pSkillsTxt, 1))
+	{
+		return FALSE;
+	}
+
+	return D2_CALL(sub_6FDB1130, pLeftHandItem, pRightHandItem, pSkillsTxt, 0);
+}
+
 //D2Common.0x6FDB0B70 (#10964)
 // 1.13c D2Common+0x52340
 int __stdcall SKILLS_GetUseState(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
-	D2UnitStrc* pRightHandItem = NULL;
-	D2UnitStrc* pLeftHandItem = NULL;
-	D2UnitStrc* pItem = NULL;
-	BOOL bIsLeftHandItem = FALSE;
-	BOOL bContinue = FALSE;
-	int nSkillId = 0;
-	int nBodyLoc = 0;
-
 	D2_ASSERT(pSkill);
 
 	if (!pSkill->pSkillsTxt || !(pSkill->pSkillsTxt->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_INGAME]))
@@ -1403,197 +1553,37 @@ int __stdcall SKILLS_GetUseState(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 		return SKILLUSTATE_PASSIVE;
 	}
 
-	if (pSkill->pSkillsTxt->dwFlags[1] & gdwBitMasks[SKILLSFLAGINDEX2_SCROLL])
-	{
-		if (!pUnit->pInventory || pSkill->nQuantity <= 0)
-		{
-			return SKILLUSTATE_NOQUANTITY;
-		}
-	}
-	else
-	{
-		nSkillId = SKILLS_GetSkillIdFromSkill(pSkill, __FILE__, __LINE__);
-		if (nSkillId == SKILL_THROW)
-		{
-			bContinue = 0;
-			if (!pUnit->pInventory)
-			{
-				return SKILLUSTATE_NOQUANTITY;
-			}
-
-			if (UNITS_CanDualWield(pUnit))
-			{
-				if (INVENTORY_GetEquippedWeapon(pUnit->pInventory, &pItem, &nBodyLoc, &bIsLeftHandItem))
-				{
-					if (!bIsLeftHandItem)
-					{
-						pItem = sub_6FDB1050(pUnit->pInventory, nBodyLoc);
-					}
-
-					if (pItem)
-					{
-						if (ITEMS_CheckIfThrowable(pItem))
-						{
-							bContinue = 1;
-						}
-						else
-						{
-							bContinue = STATLIST_UnitGetItemStatOrSkillStatValue(pItem, STAT_ITEM_THROWABLE, 0);
-						}
-					}
-				}
-			}
-			else
-			{
-				if (INVENTORY_GetEquippedWeapon(pUnit->pInventory, &pItem, &nBodyLoc, &bIsLeftHandItem) && bIsLeftHandItem)
-				{
-					if (ITEMS_CheckIfThrowable(pItem))
-					{
-						bContinue = 1;
-					}
-					else
-					{
-						bContinue = STATLIST_UnitGetItemStatOrSkillStatValue(pItem, STAT_ITEM_THROWABLE, 0);
-					}
-				}
-			}
-
-			if (!bContinue)
-			{
-				return SKILLUSTATE_NOQUANTITY;
-			}
-		}
-		else if (nSkillId == SKILL_LEFTHANDTHROW)
-		{
-			bContinue = 0;
-			if (!pUnit->pInventory)
-			{
-				return SKILLUSTATE_NOQUANTITY;
-			}
-
-			if (INVENTORY_GetEquippedWeapon(pUnit->pInventory, &pItem, &nBodyLoc, &bIsLeftHandItem))
-			{
-				if (bIsLeftHandItem)
-				{
-					pItem = sub_6FDB1050(pUnit->pInventory, nBodyLoc);
-					if (pItem)
-					{
-						if (ITEMS_CheckIfThrowable(pItem))
-						{
-							bContinue = 1;
-						}
-						else
-						{
-							bContinue = STATLIST_UnitGetItemStatOrSkillStatValue(pItem, STAT_ITEM_THROWABLE, 0);
-						}
-					}
-				}
-				else if (!ITEMS_CheckIfThrowable(pItem))
-				{
-					bContinue = STATLIST_UnitGetItemStatOrSkillStatValue(pItem, STAT_ITEM_THROWABLE, 0);
-				}
-			}
-
-			if (!bContinue)
-			{
-				return SKILLUSTATE_NOQUANTITY;
-			}
-		}
-		else if (nSkillId == SKILL_LEFTHANDSWING)
-		{
-			if (!pUnit->pInventory || !UNITS_CanDualWield(pUnit))
-			{
-				return SKILLUSTATE_NOQUANTITY;
-			}
-
-			bContinue = 0;
-			if (INVENTORY_GetEquippedWeapon(pUnit->pInventory, &pItem, &nBodyLoc, &bIsLeftHandItem))
-			{
-				if (bIsLeftHandItem)
-				{
-					pItem = sub_6FDB1050(pUnit->pInventory, nBodyLoc);
-					if (pItem)
-					{
-						bContinue = ITEMS_CheckItemTypeId(pItem, ITEMTYPE_WEAPON);
-					}
-				}
-				else
-				{
-					bContinue = ITEMS_CheckItemTypeId(pItem, ITEMTYPE_WEAPON);
-				}
-			}
-
-			if (!bContinue)
-			{
-				return SKILLUSTATE_NOQUANTITY;
-			}
-		}
-	}
-
-	if (pSkill->pSkillsTxt->nElemTypeAB[0][0] > 0 || pSkill->pSkillsTxt->nItemTypeAB[0][0] > 0)
-	{
-		if (!pUnit->pInventory)
-		{
-			return SKILLUSTATE_NOQUANTITY;
-		}
-
-		pRightHandItem = INVENTORY_GetItemFromBodyLoc(pUnit->pInventory, BODYLOC_RARM);
-		pLeftHandItem = INVENTORY_GetItemFromBodyLoc(pUnit->pInventory, BODYLOC_LARM);
-
-		if (pSkill->pSkillsTxt->nSkillId == SKILL_LEFTHANDTHROW || pSkill->pSkillsTxt->nSkillId == SKILL_LEFTHANDSWING)
-		{
-			pItem = INVENTORY_GetLeftHandWeapon(pUnit->pInventory);
-			if (pItem == pRightHandItem)
-			{
-				pRightHandItem = NULL;
-			}
-			else if (pItem == pLeftHandItem)
-			{
-				pLeftHandItem = NULL;
-			}
-		}
-
-		if (sub_6FDB1130(pRightHandItem, pLeftHandItem, pSkill->pSkillsTxt, 0))
-		{
-			if (!sub_6FDB1130(pLeftHandItem, pRightHandItem, pSkill->pSkillsTxt, 1))
-			{
-				return SKILLUSTATE_NOQUANTITY;
-			}
-		}
-		else if (sub_6FDB1130(pRightHandItem, pLeftHandItem, pSkill->pSkillsTxt, 1))
-		{
-			if (!sub_6FDB1130(pLeftHandItem, pRightHandItem, pSkill->pSkillsTxt, 0))
-			{
-				return SKILLUSTATE_NOQUANTITY;
-			}
-		}
-		else
-		{
-			return SKILLUSTATE_NOQUANTITY;
-		}
-	}
-
-	if (!D2Common_SKILLMANA_CheckStat_6FDB0F50(pUnit, pSkill))
-	{
-		return SKILLUSTATE_NOMANA;
-	}
-
-	if (!D2Common_SKILLS_CheckShapeRestriction_6FDB1380(pUnit, pSkill))
-	{
-		return SKILLUSTATE_SHAPERESTRICT;
-	}
-
-	if (!D2Common_SKILLMANA_CheckStartStat_6FDB1400(pUnit, pSkill))
-	{
-		return SKILLUSTATE_NOMANA;
-	}
-
-	if (!sub_6FDB1070(pUnit, pSkill))
+	if (!D2_CALL(SKILLS_CheckUseItemQuantity, pSkill, pUnit))
 	{
 		return SKILLUSTATE_NOQUANTITY;
 	}
 
-	if (!SKILLS_CheckSkillDelay(pUnit, pSkill))
+	if (!D2_CALL(SKILLS_CheckUseItemTypes, pSkill, pUnit))
+	{
+		return SKILLUSTATE_NOQUANTITY;
+	}
+
+	if (!D2_CALL(D2Common_SKILLMANA_CheckStat_6FDB0F50, pUnit, pSkill))
+	{
+		return SKILLUSTATE_NOMANA;
+	}
+
+	if (!D2_CALL(D2Common_SKILLS_CheckShapeRestriction_6FDB1380, pUnit, pSkill))
+	{
+		return SKILLUSTATE_SHAPERESTRICT;
+	}
+
+	if (!D2_CALL(D2Common_SKILLMANA_CheckStartStat_6FDB1400, pUnit, pSkill))
+	{
+		return SKILLUSTATE_NOMANA;
+	}
+
+	if (!D2_CALL(sub_6FDB1070, pUnit, pSkill))
+	{
+		return SKILLUSTATE_NOQUANTITY;
+	}
+
+	if (!D2_CALL(SKILLS_CheckSkillDelay, pUnit, pSkill))
 	{
 		return SKILLUSTATE_BLOCKED;
 	}
@@ -1621,10 +1611,10 @@ BOOL __fastcall D2Common_SKILLMANA_CheckStat_6FDB0F50(D2UnitStrc* pUnit, D2Skill
 			nSkillLevel = 0;
 		}
 
-		nRequiredMana = (pSkill->pSkillsTxt->wMana + nSkillLevel * pSkill->pSkillsTxt->wLevelMana) << pSkill->pSkillsTxt->nManaShift;
-		if (STATES_CheckState(pUnit, STATE_BLOOD_MANA))
+		nRequiredMana = (pSkill->pSkillsTxt->wMana + nSkillLevel * pSkill->pSkillsTxt->wLevelMana) << (pSkill->pSkillsTxt->nManaShift & 0x1F);
+		if (D2_CALL(STATES_CheckState, pUnit, STATE_BLOOD_MANA))
 		{
-			return STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0) >= nRequiredMana;
+			return D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_HITPOINTS, 0) >= nRequiredMana;
 		}
 		else
 		{
@@ -1634,7 +1624,7 @@ BOOL __fastcall D2Common_SKILLMANA_CheckStat_6FDB0F50(D2UnitStrc* pUnit, D2Skill
 			}
 			else
 			{
-				return STATLIST_UnitGetStatValue(pUnit, STAT_MANA, 0) >= nRequiredMana;
+				return D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_MANA, 0) >= nRequiredMana;
 			}
 		}
 	}
@@ -1721,12 +1711,12 @@ BOOL __fastcall sub_6FDB1130(D2UnitStrc* pItem, D2UnitStrc* pUnit, D2SkillsTxt* 
 			return TRUE;
 		}
 
-		if ((pSkillsTxtRecord->nItemTypeAB[0][0] == ITEMTYPE_WEAPON || pSkillsTxtRecord->nItemTypeAB[0][0] == ITEMTYPE_MELEE_WEAPON || pSkillsTxtRecord->nItemTypeAB[0][0] == ITEMTYPE_HAND_TO_HAND) && pSkillsTxtRecord->nItemTypeAB[1][0] <= 0 && !ITEMS_CheckItemTypeId(NULL, ITEMTYPE_WEAPON) && !ITEMS_CheckItemTypeId(pUnit, ITEMTYPE_WEAPON))
+		if ((pSkillsTxtRecord->nItemTypeAB[0][0] == ITEMTYPE_WEAPON || pSkillsTxtRecord->nItemTypeAB[0][0] == ITEMTYPE_MELEE_WEAPON || pSkillsTxtRecord->nItemTypeAB[0][0] == ITEMTYPE_HAND_TO_HAND) && pSkillsTxtRecord->nItemTypeAB[1][0] <= 0 && !D2_CALL(ITEMS_CheckItemTypeId, NULL, ITEMTYPE_WEAPON) && !D2_CALL(ITEMS_CheckItemTypeId, pUnit, ITEMTYPE_WEAPON))
 		{
 			return TRUE;
 		}
 
-		if (pSkillsTxtRecord->nItemTypeAB[0][0] == ITEMTYPE_HAND_TO_HAND && pSkillsTxtRecord->nItemTypeAB[1][0] <= 0 && !ITEMS_CheckItemTypeId(NULL, ITEMTYPE_WEAPON) && !ITEMS_CheckItemTypeId(pUnit, ITEMTYPE_WEAPON))
+		if (pSkillsTxtRecord->nItemTypeAB[0][0] == ITEMTYPE_HAND_TO_HAND && pSkillsTxtRecord->nItemTypeAB[1][0] <= 0 && !D2_CALL(ITEMS_CheckItemTypeId, NULL, ITEMTYPE_WEAPON) && !D2_CALL(ITEMS_CheckItemTypeId, pUnit, ITEMTYPE_WEAPON))
 		{
 			return TRUE;
 		}
@@ -1742,7 +1732,7 @@ BOOL __fastcall sub_6FDB1130(D2UnitStrc* pItem, D2UnitStrc* pUnit, D2SkillsTxt* 
 			break;
 		}
 
-		if (ITEMS_CheckItemTypeId(pItem, *pEType))
+		if (D2_CALL(ITEMS_CheckItemTypeId, pItem, *pEType))
 		{
 			return FALSE;
 		}
@@ -1759,7 +1749,7 @@ BOOL __fastcall sub_6FDB1130(D2UnitStrc* pItem, D2UnitStrc* pUnit, D2SkillsTxt* 
 			return i == 0;
 		}
 
-		if (ITEMS_CheckItemTypeId(pItem, *pIType))
+		if (D2_CALL(ITEMS_CheckItemTypeId, pItem, *pIType))
 		{
 			break;
 		}
@@ -1772,47 +1762,62 @@ BOOL __fastcall sub_6FDB1130(D2UnitStrc* pItem, D2UnitStrc* pUnit, D2SkillsTxt* 
 		}
 	}
 
-	if (ITEMS_CheckItemFlag(pItem, IFLAG_NOEQUIP, __LINE__, __FILE__) || ITEMS_CheckItemFlag(pItem, IFLAG_BROKEN, __LINE__, __FILE__))
+	// 1.13c: a non-item answers TRUE up front, the item-data flags are read without a null assert, and the ammo
+	// test goes through the items.txt type row of the class id (0x230A0) instead of the item's own type
+	if (pItem->dwUnitType != UNIT_ITEM)
+	{
+		return TRUE;
+	}
+
+	D2ItemDataStrc* pItemData = pItem->pItemData;
+	if (pItemData && (pItemData->dwItemFlags & (IFLAG_NOEQUIP | IFLAG_BROKEN)))
 	{
 		return pSkillsTxtRecord->nSkillId == 0;
 	}
-	else
+
+	const int nTypeIndex = (int)D2_CALL(ITEMS_GetItemTypeFromItemId, pItem->dwClassId);
+	if (nTypeIndex < 0 || nTypeIndex >= sgptDataTables->nItemTypesTxtRecordCount)
 	{
-		if (ITEMS_GetAmmoType(pItem))
-		{
-			if (pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_NOAMMO])
-			{
-				return TRUE;
-			}
-
-			if (!pSkillsTxtRecord->nSkillId && STATLIST_UnitGetItemStatOrSkillStatValue(pItem, STAT_ITEM_MAGICARROW, 0))
-			{
-				return TRUE;
-			}
-
-			if (!pUnit || !ITEMS_CheckItemTypeId(pUnit, ITEMS_GetAmmoType(pItem)))
-			{
-				return FALSE;
-			}
-
-			if (!pSkillsTxtRecord->nSkillId && STATLIST_UnitGetItemStatOrSkillStatValue(pUnit, STAT_ITEM_MAGICARROW, 0))
-			{
-				return TRUE;
-			}
-
-			if (!ITEMS_GetTotalMaxStack(pUnit))
-			{
-				return TRUE;
-			}
-
-			if (STATLIST_UnitGetStatValue(pUnit, STAT_QUANTITY, 0) <= 0)
-			{
-				return FALSE;
-			}
-		}
-
 		return TRUE;
 	}
+
+	const D2ItemTypesTxt* pItemTypesTxtRecord = &sgptDataTables->pItemTypesTxt[nTypeIndex];
+	if (!pItemTypesTxtRecord || pItemTypesTxtRecord->wShoots == 0 || (pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_NOAMMO]))
+	{
+		return TRUE;
+	}
+
+	if (pSkillsTxtRecord->nSkillId == 0)
+	{
+		D2ItemStatCostTxt* pMagicArrowCost = &sgptDataTables->pItemStatCostTxt[STAT_ITEM_MAGICARROW];
+		if (pItem->pStatListEx && sgptDataTables->nItemStatCostTxtRecordCount > STAT_ITEM_MAGICARROW && pMagicArrowCost
+			&& D2_CALL(STATLIST_GetTotalStat_6FDB63E0, pItem->pStatListEx, D2SLayerStatIdStrc::MakeFromStatId(STAT_ITEM_MAGICARROW).nPackedValue, pMagicArrowCost))
+		{
+			return TRUE;
+		}
+	}
+
+	if (!pUnit)
+	{
+		return FALSE;
+	}
+
+	if (!D2_CALL(ITEMS_CheckItemTypeId, pUnit, D2_CALL(ITEMS_GetAmmoType, pItem)))
+	{
+		return FALSE;
+	}
+
+	if (pSkillsTxtRecord->nSkillId == 0 && D2_CALL(STATLIST_UnitGetItemStatOrSkillStatValue, pUnit, STAT_ITEM_MAGICARROW, 0))
+	{
+		return TRUE;
+	}
+
+	if (!D2_CALL(ITEMS_GetTotalMaxStack, pUnit))
+	{
+		return TRUE;
+	}
+
+	return D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_QUANTITY, 0) > 0;
 }
 
 //D2Common.0x6FDB1380
@@ -1873,11 +1878,11 @@ BOOL __fastcall D2Common_SKILLMANA_CheckStartStat_6FDB1400(D2UnitStrc* pUnit, D2
 // 1.13c D2Common+0x52210
 BOOL __fastcall SKILLS_CheckSkillDelay(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
-	if (pUnit && pUnit->dwUnitType == UNIT_PLAYER && STATES_CheckState(pUnit, STATE_SKILLDELAY))
+	if (pUnit && pUnit->dwUnitType == UNIT_PLAYER && D2_CALL(STATES_CheckState, pUnit, STATE_SKILLDELAY))
 	{
 		if (pSkill && pSkill->pSkillsTxt)
 		{
-			return SKILLS_EvaluateSkillFormula(pUnit, pSkill->pSkillsTxt->dwDelay, pSkill->pSkillsTxt->nSkillId, SKILLS_GetSkillLevel(pUnit, pSkill, TRUE)) <= 0;
+			return D2_CALL(SKILLS_EvaluateSkillFormula,pUnit, pSkill->pSkillsTxt->dwDelay, pSkill->pSkillsTxt->nSkillId, SKILLS_GetSkillLevel(pUnit, pSkill, TRUE)) <= 0;
 		}
 	}
 
@@ -2000,10 +2005,10 @@ int __stdcall SKILLS_GetSkillLevel(D2UnitStrc* pUnit, D2SkillStrc* pSkill, BOOL 
 		nSkillLevel = pSkill->nSkillLevel;
 		if (bBonus && pSkill->nOwnerGUID == D2UnitInvalidGUID)
 		{
-			nSkillLevel += SKILLS_GetBonusSkillLevel(pUnit, pSkill);
+			nSkillLevel += D2_CALL(SKILLS_GetBonusSkillLevel, pUnit, pSkill);
 		}
 
-		nMaxLevel = DATATBLS_GetMaxLevel(0);
+		nMaxLevel = D2_CALL(DATATBLS_GetMaxLevel, 0);
 
 		if (nSkillLevel < 0)
 		{
@@ -2343,59 +2348,54 @@ int __stdcall SKILLS_GetRequiredLevelBasedOnCurrent(D2UnitStrc* pUnit, int nSkil
 // 1.13c D2Common+0x4FB30 (#11101)
 BOOL __stdcall SKILLS_CheckRequiredSkills(D2UnitStrc* pUnit, int nSkillId)
 {
-	D2SkillsTxt* pReqSkillSkillsTxtRecord = NULL;
-	D2SkillsTxt* pSkillsTxtRecord = NULL;
-	D2SkillStrc* pSkill = NULL;
-	int nRequiredLevel = 0;
-	int nLevel = 0;
-
-	if (!pUnit)
-	{
-		return FALSE;
-	}
-
-	pSkillsTxtRecord = DATATBLS_GetSkillsTxtRecord(nSkillId);
+	D2SkillsTxt* pSkillsTxtRecord = DATATBLS_GetSkillsTxtRecord(nSkillId);
 	if (!pSkillsTxtRecord)
 	{
 		return FALSE;
 	}
 
-	nLevel = STATLIST_UnitGetStatValue(pUnit, STAT_LEVEL, 0);
-
-	nRequiredLevel = SKILLS_GetRequiredLevelBasedOnCurrent(pUnit, nSkillId);
-
-	if (nRequiredLevel > nLevel)
+	// 1.13c inlines the level read: the unit's level, 0 without a stat list
+	const int nLevel = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_LEVEL, 0);
+	if (D2_CALL(SKILLS_GetRequiredLevelBasedOnCurrent, pUnit, nSkillId) > nLevel)
 	{
 		return FALSE;
 	}
 
 	for (int i = 0; i < ARRAY_SIZE(pSkillsTxtRecord->nReqSkill); ++i)
 	{
-		if (pSkillsTxtRecord->nReqSkill[i] >= 0)
+		const int nReqSkill = pSkillsTxtRecord->nReqSkill[i];
+		if (nReqSkill < 0)
 		{
-			pReqSkillSkillsTxtRecord = DATATBLS_GetSkillsTxtRecord(pSkillsTxtRecord->nReqSkill[i]);
-			if (!pReqSkillSkillsTxtRecord)
+			// 1.13c asks for the required level a second time when the first prerequisite is unset
+			if (i == 0 && D2_CALL(SKILLS_GetRequiredLevelBasedOnCurrent, pUnit, nSkillId) > nLevel)
 			{
 				return FALSE;
 			}
+			continue;
+		}
 
-			pSkill = UNITS_GetStartSkill(pUnit);
-			D2_ASSERT(pSkill);
+		D2SkillsTxt* pReqSkillSkillsTxtRecord = DATATBLS_GetSkillsTxtRecord(nReqSkill);
+		if (!pReqSkillSkillsTxtRecord)
+		{
+			return FALSE;
+		}
 
-			while (pSkill->pSkillsTxt != pReqSkillSkillsTxtRecord)
-			{
-				pSkill = pSkill->pNextSkill;
-				if (!pSkill)
-				{
-					return FALSE;
-				}
-			}
+		D2SkillStrc* pSkill = D2_CALL(UNITS_GetStartSkill, pUnit);
+		D2_ASSERT(pSkill);
 
-			pSkill = SKILLS_GetSkill(pUnit, pSkillsTxtRecord->nReqSkill[i], -1);
-			if (!pSkill || pSkill->nSkillLevel <= 0)
+		while (pSkill->pSkillsTxt != pReqSkillSkillsTxtRecord)
+		{
+			pSkill = pSkill->pNextSkill;
+			if (!pSkill)
 			{
 				return FALSE;
 			}
+		}
+
+		pSkill = D2_CALL(SKILLS_GetSkill, pUnit, nReqSkill, D2UnitInvalidGUID);
+		if (!pSkill || pSkill->nSkillLevel <= 0)
+		{
+			return FALSE;
 		}
 	}
 
@@ -2429,24 +2429,30 @@ BOOL __stdcall SKILLS_CheckRequiredAttributes(D2UnitStrc* pUnit, int nSkillId)
 {
 	D2SkillsTxt* pSkillsTxtRecord = DATATBLS_GetSkillsTxtRecord(nSkillId);
 
-	if (pSkillsTxtRecord && pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_INGAME])
+	if (!pSkillsTxtRecord || !(pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_INGAME]))
 	{
-		if (SKILLS_GetRequiredLevelBasedOnCurrent(pUnit, nSkillId) <= STATLIST_UnitGetStatValue(pUnit, STAT_LEVEL, 0))
-		{
-			if (pSkillsTxtRecord->wReqStr <= STATLIST_UnitGetStatValue(pUnit, STAT_STRENGTH, 0))
-			{
-				if (pSkillsTxtRecord->wReqDex <= STATLIST_UnitGetStatValue(pUnit, STAT_DEXTERITY, 0))
-				{
-					if (pSkillsTxtRecord->wReqInt <= STATLIST_UnitGetStatValue(pUnit, STAT_ENERGY, 0))
-					{
-						return pSkillsTxtRecord->wReqVit <= STATLIST_UnitGetStatValue(pUnit, STAT_VITALITY, 0);
-					}
-				}
-			}
-		}
+		return FALSE;
 	}
 
-	return FALSE;
+	// 1.13c reads the unit level first (inlined), then the required level, then the four attributes; the minimums are signed words
+	const int nLevel = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_LEVEL, 0);
+	if (D2_CALL(SKILLS_GetRequiredLevelBasedOnCurrent, pUnit, nSkillId) > nLevel)
+	{
+		return FALSE;
+	}
+	if ((int16_t)pSkillsTxtRecord->wReqStr > D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_STRENGTH, 0))
+	{
+		return FALSE;
+	}
+	if ((int16_t)pSkillsTxtRecord->wReqDex > D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_DEXTERITY, 0))
+	{
+		return FALSE;
+	}
+	if ((int16_t)pSkillsTxtRecord->wReqInt > D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_ENERGY, 0))
+	{
+		return FALSE;
+	}
+	return (int16_t)pSkillsTxtRecord->wReqVit <= D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_VITALITY, 0);
 }
 
 //D2Common.0x6FDB2110 (#10999)
@@ -2481,7 +2487,7 @@ int __stdcall SKILLS_GetHighestSkillLevelById(D2UnitStrc* pUnit, int nSkillId)
 
 	if (pUnit)
 	{
-		pSkill = SKILLS_GetHighestLevelSkillFromSkillId(pUnit, nSkillId);
+		pSkill = D2_CALL(SKILLS_GetHighestLevelSkillFromSkillId, pUnit, nSkillId);
 		if (pSkill)
 		{
 			return SKILLS_GetSkillLevel(pUnit, pSkill, TRUE);
@@ -3049,9 +3055,9 @@ BOOL __stdcall D2COMMON_11017_CheckUnitIfConsumeable(D2UnitStrc* pUnit, int a2)
 {
 	D2MonStats2Txt* pMonStats2TxtRecord = NULL;
 
-	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && (pUnit->dwAnimMode == MONMODE_DEAD || a2 && pUnit->dwAnimMode == MONMODE_DEATH) && !STATES_CheckStateMaskUdeadOnUnit(pUnit))
+	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && (pUnit->dwAnimMode == MONMODE_DEAD || a2 && pUnit->dwAnimMode == MONMODE_DEATH) && !D2_CALL(STATES_CheckStateMaskUdeadOnUnit, pUnit))
 	{
-		pMonStats2TxtRecord = UNITS_GetMonStats2TxtRecordFromMonsterId(pUnit->dwClassId);
+		pMonStats2TxtRecord = D2_CALL(UNITS_GetMonStats2TxtRecordFromMonsterId, pUnit->dwClassId);
 		if (pMonStats2TxtRecord && pMonStats2TxtRecord->dwFlags & gdwBitMasks[MONSTATS2FLAGINDEX_CORPSESEL])
 		{
 			return sgptDataTables->pMonStatsTxt[pUnit->dwClassId].nVelocity != 0;
@@ -3065,9 +3071,15 @@ BOOL __stdcall D2COMMON_11017_CheckUnitIfConsumeable(D2UnitStrc* pUnit, int a2)
 // 1.13c D2Common+0x50020 (#10028; 500E0 has the identical body)
 BOOL __stdcall D2Common_11020(D2UnitStrc* pUnit)
 {
-	if (SKILLS_CanUnitCorpseBeSelected(pUnit) && UNITS_IsSoftMonster(pUnit))
+	// 1.13c has both tests in one body: a dead monster whose state bits miss the mask, whose class record carries the corpse-select flag and then the soft flag
+	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->dwAnimMode == MONMODE_DEAD && !D2_CALL(STATES_CheckStateMaskUdeadOnUnit, pUnit))
 	{
-		return TRUE;
+		D2MonStats2Txt* pMonStats2TxtRecord = D2_CALL(UNITS_GetMonStats2TxtRecordFromMonsterId, pUnit->dwClassId);
+		if (pMonStats2TxtRecord && pMonStats2TxtRecord->dwFlags & gdwBitMasks[MONSTATS2FLAGINDEX_CORPSESEL])
+		{
+			pMonStats2TxtRecord = D2_CALL(UNITS_GetMonStats2TxtRecordFromMonsterId, pUnit->dwClassId);
+			return pMonStats2TxtRecord && (pMonStats2TxtRecord->dwFlags & MONSTATS2FLAG_SOFT) != 0;
+		}
 	}
 
 	return FALSE;
@@ -3541,20 +3553,27 @@ BOOL __stdcall SKILLS_RemoveTransformStatesFromShapeshiftedUnit(D2UnitStrc* pUni
 {
 	D2StatListStrc* pStatList = NULL;
 
-	if (STATES_IsUnitShapeShifted(pUnit))
+	if (D2_CALL(STATES_IsUnitShapeShifted, pUnit))
 	{
-		for (int i = 0; i < sgptDataTables->nTransformStates; ++i)
+		// 1.13c: the count is a short, re-read each pass; the list is expired and freed only when it is not a base list,
+		// then the state is switched off and the unit refreshed
+		for (int i = 0; i < (short)sgptDataTables->nTransformStates; ++i)
 		{
-			if (STATES_CheckState(pUnit, sgptDataTables->pTransformStates[i]))
+			const int nState = sgptDataTables->pTransformStates[i];
+			if (D2_CALL(STATES_CheckState, pUnit, nState))
 			{
-				pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, sgptDataTables->pTransformStates[i]);
+				pStatList = D2_CALL(STATLIST_GetStatListFromUnitAndState, pUnit, nState);
 				if (pStatList)
 				{
-					D2Common_10474(pUnit, (D2StatListExStrc*)pStatList);
-					STATLIST_FreeStatList(pStatList);
+					D2_CALL(D2Common_ExpireStatList_6FDB6E30, pStatList);
+					if ((int32_t)pStatList->dwFlags >= 0)
+					{
+						D2_CALL(D2Common_STATLIST_FreeStatListImpl_6FDB7050, pStatList);
+					}
 				}
 
-				STATES_ToggleState(pUnit, sgptDataTables->pTransformStates[i], FALSE);
+				D2_CALL(D2Common_STATES_ToggleState_6FDB8900, pUnit, nState, FALSE);
+				D2_CALL(UNITROOM_RefreshUnit, pUnit);
 			}
 		}
 
@@ -3600,10 +3619,10 @@ int __stdcall D2Common_11043(D2UnitStrc* pUnit)
 		return 0;
 	}
 	
-	pItem = D2Common_10434(pUnit, 0);
+	pItem = D2_CALL(D2Common_10434, pUnit, 0);
 	if(pItem)
 	{
-		nAttackSpeed = ITEMS_GetWeaponAttackSpeed(pUnit, pItem);
+		nAttackSpeed = D2_CALL(ITEMS_GetWeaponAttackSpeed, pUnit, pItem);
 		if (nAttackSpeed <= 0)
 		{
 			return 0;
@@ -3621,15 +3640,17 @@ int __stdcall SKILLS_GetConcentrationDamageBonus(D2UnitStrc* pUnit, int nSkillId
 	D2SkillsTxt* pSkillsTxtRecord = NULL;
 	D2StatListStrc* pStatList = NULL;
 
-	if (STATES_CheckState(pUnit, STATE_CONCENTRATION))
+	if (D2_CALL(STATES_CheckState, pUnit, STATE_CONCENTRATION))
 	{
-		pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, STATE_CONCENTRATION);
+		pStatList = D2_CALL(STATLIST_GetStatListFromUnitAndState, pUnit, STATE_CONCENTRATION);
 		if (pStatList)
 		{
+			// 1.13c reads the stat value before it looks the skill row up
+			const int nDamagePercent = D2_CALL(STATLIST_GetStatValue, pStatList, STAT_DAMAGEPERCENT, 0);
 			pSkillsTxtRecord = DATATBLS_GetSkillsTxtRecord(nSkillId);
 			if (pSkillsTxtRecord)
 			{
-				return STATLIST_GetStatValue(pStatList, STAT_DAMAGEPERCENT, 0) * pSkillsTxtRecord->dwParam[0] / 8;
+				return nDamagePercent * pSkillsTxtRecord->dwParam[0] / 8;
 			}
 		}
 	}

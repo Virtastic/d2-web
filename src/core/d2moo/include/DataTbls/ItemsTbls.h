@@ -735,3 +735,5 @@ D2COMMON_DLL_DECL void __stdcall DATATBLS_AddOrChangeRunesTxtRecord(int nRecordI
 //D2Common.0x6FD5EAA0 (#10620)
 D2COMMON_DLL_DECL D2RunesTxt* __stdcall DATATBLS_GetRunesTxtRecord(int nRunewordId);
 
+// 1.13c D2Common+0x1830
+D2UniqueItemsTxt* __fastcall DATATBLS_GetUniqueItemsTxtRecord(int nUniqueItemId);

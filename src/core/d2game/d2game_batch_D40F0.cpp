@@ -227,7 +227,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_79100_batch(uint32_t eaxUnit, uint32_t pa
 
 // 0x8B010 (the 0x3E item stat packet) lives in D2GAME_PACKETS_SendPacket0x3E_6FC3EC20 (game_net_stubs.cpp).
 
-// 1.13c D2Game+0x97120
+// D2Game +0x97120 (marker lives on the d2moo PLAYERPETS_AllocPetList)
 // Pet-list allocator; the 1.10f form is PLAYERPETS_AllocPetList_6FC7CAF0. Ordinal_10920(player)
 // returns the player data (fatal 0x9A when null). An existing pet block at +0x44 is freed through
 // 0x97640. Two pool allocations follow (file PlayerPets.cpp, lines 0xA2 and 0xA6): the outer

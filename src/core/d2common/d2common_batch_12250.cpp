@@ -47,25 +47,7 @@ void D2Common_32CA0_StoreOwnerInfo(uint32_t unit, int32_t type, int32_t id, bool
  }
  w(unit,0xC8)|=0x400;
 }
-// 1.13c D2Common+0x24F00: item record gate, durability, type, and ethereal flag.
-EMSCRIPTEN_KEEPALIVE uint32_t D2Common_24F00_ItemRepairable(uint32_t item, int32_t rowCount, uint32_t rows,
- int32_t (*itemRow)(uint32_t), uint32_t (*hasDurability)(uint32_t),
- uint32_t (*validType)(uint32_t), uint32_t (*isEthereal)(uint32_t)) {
- if (!item) return 0;
- int32_t row=s(item,0)==4 && itemRow ? itemRow(item) : 0;
- if (row<0 || row>=rowCount || !rows || !p(rows+row*0xE4)[8]) return 0;
- return hasDurability && hasDurability(item) && validType && validType(item) &&
-        (!isEthereal || !isEthereal(item));
-}
-// 1.13c D2Common+0x2F100: update sequence mode, frame and event; report a mode change.
-EMSCRIPTEN_KEEPALIVE uint32_t d2common_port_2f100(uint32_t unit, uint32_t target,
- void (*compute)(uint32_t,uint32_t,uint32_t,uint32_t*,uint32_t*,int32_t*,uint32_t*)) {
- if (!unit || !compute) return 0;
- uint32_t old=w(unit,0x40),mode=0,frame=0,event=0; int32_t dir=0;
- compute(w(unit,0x30),w(unit,0x38),target,&mode,&frame,&dir,&event);
- w(unit,0x44)=frame<<8; w(unit,0x40)=mode; p(unit)[0x4E]=static_cast<uint8_t>(event);
- return mode!=old;
-}
+// 0x24F00 is ITEMS_IsRepairableStack in d2moo/src/Items/Items.cpp.
 // 1.13c D2Common+0x4F870: stat gate for category 1,2,4,5,12.
 int32_t D2Common_4F870_StatGate(uint32_t unit, int32_t category, int32_t ratio,
  uint32_t tableCount, uint32_t tableRow, uint32_t (*hasStat)(uint32_t,int32_t),
@@ -83,14 +65,6 @@ int32_t D2Common_4F870_StatGate(uint32_t unit, int32_t category, int32_t ratio,
  }
  if (!value) return 0;
  return applyRatio ? applyRatio(ratio,(int32_t)value) : 0;
-}
-// 1.13c D2Common+0x3B3A0: validate the room's counted unit-id array.
-extern "C" uint32_t D2Common_3B3A0_ValidateUnitIds(uint32_t room) {
- if (!room) return 0;
- uint32_t count=w(room,0x78), a=w(room,0x48);
- if (count && !a) return 0;
- for (uint32_t i=0;i<count;i++) if (!w(a,i*4)) return 0;
- return 1;
 }
 // 1.13c D2Common+0x3CF30: stable insertion sort of 12-byte records; retail calls compare(ecx=earlier record, edx=moving record) and shifts while it is positive.
 EMSCRIPTEN_KEEPALIVE void d2c_3cf30_legacy(uint32_t records, uint32_t count,

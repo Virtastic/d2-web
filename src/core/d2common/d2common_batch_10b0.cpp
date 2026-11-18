@@ -11,6 +11,7 @@
 
 #include "D2BitManip.h"
 #include "D2DataTbls.h"
+#include "DataTbls/SkillsTbls.h"
 #include "../d2moo/compat/datatbls_bridge.h"
 #include "../tables/shared.h"
 
@@ -91,15 +92,16 @@ namespace
 		return static_cast<int64_t>(nSkillDesc) * 0x120;
 	}
 
-	// 0x1550..0x15E0: skills.txt dwParam[0..3] of the skill row nSkillId.
+	// 0x1550..0x15E0: skills.txt dwParam[0..3] now run the game-tree bodies in SkillsTbls.cpp.
 	int32_t SkillParam(int32_t nSkillId, int nParam)
 	{
-		if (!sgptDataTables->pSkillsTxt || nSkillId < 0 || nSkillId >= sgptDataTables->nSkillsTxtRecordCount)
+		switch (nParam)
 		{
-			return 0;
+		case 0: return DATATBLS_GetSkillParam0(nSkillId);
+		case 1: return DATATBLS_GetSkillParam1(nSkillId);
+		case 2: return DATATBLS_GetSkillParam2(nSkillId);
+		default: return DATATBLS_GetSkillParam3(nSkillId);
 		}
-
-		return sgptDataTables->pSkillsTxt[nSkillId].dwParam[nParam];
 	}
 }
 

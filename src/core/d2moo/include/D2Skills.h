@@ -144,7 +144,7 @@ struct D2SkillTreeChartStrc
 //D2Common.0x6FDAEB10 (#10938)
 D2COMMON_DLL_DECL short __stdcall SKILLS_GetPassiveState(int nSkillId);
 //D2Common.0x6FDAEB60 (#11271)
-D2COMMON_DLL_DECL int __stdcall SKILLS_GetSpecialParamValue(D2UnitStrc* pUnit, uint8_t nParamId, int nSkillId, int nSkillLevel);
+D2COMMON_DLL_DECL int __stdcall SKILLS_GetSpecialParamValue(D2UnitStrc* pUnit, int nParamWord, int nSkillId, int nSkillLevel);
 //D2Common.0x6FDAF6A0
 int __fastcall sub_6FDAF6A0(int32_t nParamId, void* pUserData);
 //D2Common.0x6FDAF6C0
@@ -221,6 +221,8 @@ D2UnitStrc* __fastcall sub_6FDB1050(D2InventoryStrc* pInventory, int nBodyLoc);
 BOOL __fastcall sub_6FDB1070(D2UnitStrc* pUnit, D2SkillStrc* pSkill);
 //D2Common.0x6FDB1130
 BOOL __fastcall sub_6FDB1130(D2UnitStrc* pItem, D2UnitStrc* pUnit, D2SkillsTxt* pSkillsTxtRecord, int nType);
+BOOL __fastcall SKILLS_CheckUseItemQuantity(D2SkillStrc* pSkill, D2UnitStrc* pUnit);
+BOOL __fastcall SKILLS_CheckUseItemTypes(D2SkillStrc* pSkill, D2UnitStrc* pUnit);
 //D2Common.0x6FDB1380
 BOOL __fastcall D2Common_SKILLS_CheckShapeRestriction_6FDB1380(D2UnitStrc* pUnit, D2SkillStrc* pSkill);
 //D2Common.0x6FDB1400

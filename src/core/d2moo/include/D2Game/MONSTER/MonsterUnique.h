@@ -30,6 +30,10 @@ void __fastcall MONSTERUNIQUE_UMod1_RandomName(D2UnitStrc* pUnit, int32_t nUMod,
 void __fastcall MONSTERUNIQUE_UMod2_HealthBonus(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique);
 //D2Game.0x6FC6AF70
 int32_t __fastcall MONSTERUNIQUE_CalculatePercentage(int32_t a1, int32_t a2, int32_t a3);
+//1.13c D2Game+0x21EC0
+void __fastcall MONSTERUNIQUE_ApplyPercentLifeBonus(D2UnitStrc* pUnit, int32_t nPercent);
+//1.13c D2Game+0x23060
+void __fastcall MONSTERUNIQUE_CopyTransferableUMods(D2UnitStrc* pSource, D2UnitStrc* pDest, int32_t nMode);
 //D2Game.0x6FC6AFF0
 void __fastcall MONSTERUNIQUE_UMod4_LevelBonus(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique);
 //D2Game.0x6FC6B030

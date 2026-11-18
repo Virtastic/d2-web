@@ -1,6 +1,7 @@
 #include "UNIT/SUnitInactive.h"
 
 #include <Fog.h>
+#include <test_seam.h>
 #include <D2BitManip.h>
 
 #include <D2Items.h>
@@ -256,7 +257,7 @@ void __fastcall SUNITINACTIVE_RestoreInactiveMonsters(D2GameStrc* pGame, D2Activ
 
 						if (pInactiveMonsterNode->nUnitFlagsEx & 0x200)
 						{
-							SUNITINACTIVE_SetUnitFlagEx(pUnit, 0x200, 1);
+							pUnit->dwFlagEx |= 0x200;
 						}
 
 						pUnit->dwFlags |= pInactiveMonsterNode->nUnitFlags & UNITFLAG_NOTC | UNITFLAG_ISRESURRECT | UNITFLAG_ISINIT;
@@ -326,6 +327,22 @@ static void __fastcall SUNITINACTIVE_UnlinkInactiveList(D2GameStrc* pGame, uint8
 
 }
 
+// 1.13c D2Game+0x1FB40: restore (then free) every node of a room's inactive item list; a node whose expiry frame has passed is only freed
+void __fastcall SUNITINACTIVE_RestoreInactiveItemList(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2InactiveItemNodeStrc* pInactiveItemNode)
+{
+	while (pInactiveItemNode)
+	{
+		D2InactiveItemNodeStrc* pNextItemNode = pInactiveItemNode->pNext;
+		if (!pInactiveItemNode->nFrame || (int32_t)pGame->dwGameFrame <= pInactiveItemNode->nFrame)
+		{
+			D2_CALL(SUNITINACTIVE_RestoreInactiveItem, pGame, pRoom, pInactiveItemNode);
+		}
+
+		D2_FREE_POOL(pGame->pMemoryPool, pInactiveItemNode);
+		pInactiveItemNode = pNextItemNode;
+	}
+}
+
 // 1.13c D2Game+0x200E0: coords, 0x1EA40, item restore loop, unit-node loop
 static void __fastcall SUNITINACTIVE_RestoreInactiveRest(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, uint8_t nAct, D2DrlgCoordsStrc* pCoords)
 {
@@ -334,17 +351,7 @@ static void __fastcall SUNITINACTIVE_RestoreInactiveRest(D2GameStrc* pGame, D2Ac
 	D2InactiveUnitNodeStrc* pInactiveUnitNode = nullptr;
 	SUNITINACTIVE_UnlinkInactiveList(pGame, nAct, *pCoords, &pInactiveItemNode, &pInactiveUnitNode);
 
-	while (pInactiveItemNode)
-	{
-		D2InactiveItemNodeStrc* pNextItemNode = pInactiveItemNode->pNext;
-		if (!pInactiveItemNode->nFrame || (int32_t)pGame->dwGameFrame <= pInactiveItemNode->nFrame)
-		{
-			SUNITINACTIVE_RestoreInactiveItem(pGame, pRoom, pInactiveItemNode);
-		}
-
-		D2_FREE_POOL(pGame->pMemoryPool, pInactiveItemNode);
-		pInactiveItemNode = pNextItemNode;
-	}
+	SUNITINACTIVE_RestoreInactiveItemList(pGame, pRoom, pInactiveItemNode);
 
 	while (pInactiveUnitNode)
 	{
@@ -605,15 +612,15 @@ void __fastcall SUNITINACTIVE_FreeInactiveUnitLists(D2GameStrc* pGame)
 	}
 }
 
-//D2Game.0x6FCC4370  // 1.13c D2Game+0x20760 (monster half; 0x209B0 dispatches; checked against decompile, no delta)
-void __fastcall SUNITINACTIVE_CompressUnitIfNeeded(D2GameStrc* pGame, D2UnitStrc* pUnit)
+//D2Game.0x6FCC4370
+// 1.13c D2Game+0x20760 (monster half of SUNITINACTIVE_CompressUnitIfNeeded; 0x209B0 dispatches here; checked against decompile, no delta)
+void __fastcall SUNITINACTIVE_CompressMonsterIfNeeded(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	int32_t bCompress = 0;
 	int32_t bIsDead = 0;
 
 	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
 
-	if (pUnit->dwUnitType == UNIT_MONSTER)
 	{
 		if (SUNIT_IsDead(pUnit))
 		{
@@ -704,7 +711,7 @@ void __fastcall SUNITINACTIVE_CompressUnitIfNeeded(D2GameStrc* pGame, D2UnitStrc
 
 		if (bUnk)
 		{
-			SUNITINACTIVE_SetUnitFlagEx(pUnit, UNITFLAGEX_HASBEENDELETED, 1);
+			pUnit->dwFlagEx |= UNITFLAGEX_HASBEENDELETED;
 
 			if (bCompress)
 			{
@@ -723,9 +730,23 @@ void __fastcall SUNITINACTIVE_CompressUnitIfNeeded(D2GameStrc* pGame, D2UnitStrc
 			SUNIT_RemoveUnit(pGame, pUnit);
 		}
 	}
+}
+
+//D2Game.0x6FCC4370
+// 1.13c D2Game+0x209B0: a monster goes to 0x20760; every other unit type is compressed (if its room saves, or it was resurrected) and removed here
+void __fastcall SUNITINACTIVE_CompressUnitIfNeeded(D2GameStrc* pGame, D2UnitStrc* pUnit)
+{
+	int32_t bCompress = 0;
+
+	D2ActiveRoomStrc* pRoom = D2_CALL(UNITS_GetRoom, pUnit);
+
+	if (pUnit->dwUnitType == UNIT_MONSTER)
+	{
+		D2_CALL(SUNITINACTIVE_CompressMonsterIfNeeded, pGame, pUnit);
+	}
 	else
 	{
-		if (DRLG_GetSaveMonstersFromLevelId(DUNGEON_GetLevelIdFromRoom(pRoom)) || pUnit->dwFlags & UNITFLAG_ISRESURRECT)
+		if (D2_CALL(DRLG_GetSaveMonstersFromLevelId, D2_CALL(DUNGEON_GetLevelIdFromRoom, pRoom)) || pUnit->dwFlags & UNITFLAG_ISRESURRECT)
 		{
 			bCompress = 1;
 		}
@@ -734,19 +755,19 @@ void __fastcall SUNITINACTIVE_CompressUnitIfNeeded(D2GameStrc* pGame, D2UnitStrc
 		{
 		case UNIT_PLAYER:
 		{
-			if (STATES_CheckState(pUnit, STATE_PLAYERBODY))
+			if (D2_CALL(STATES_CheckState, pUnit, STATE_PLAYERBODY))
 			{
 				D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_ENDANIM, 0);
 				pUnit->dwFlagEx |= UNITFLAGEX_HASBEENDELETED;
-				SUNITINACTIVE_CompressInactiveUnit(pGame, pUnit);
-				UNITROOM_UpdatePath(pUnit);
+				D2_CALL(SUNITINACTIVE_CompressInactiveUnit, pGame, pUnit);
+				D2_CALL(UNITROOM_UpdatePath, pUnit);
 				return;
 			}
 			else
 			{
 				if (bCompress)
 				{
-					SUNITINACTIVE_CompressInactiveUnit(pGame, pUnit);
+					D2_CALL(SUNITINACTIVE_CompressInactiveUnit, pGame, pUnit);
 				}
 			}
 			break;
@@ -757,13 +778,13 @@ void __fastcall SUNITINACTIVE_CompressUnitIfNeeded(D2GameStrc* pGame, D2UnitStrc
 			{
 				D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_ENDANIM, 0);
 				pUnit->dwFlagEx |= UNITFLAGEX_HASBEENDELETED;
-				SUNITINACTIVE_CompressInactiveUnit(pGame, pUnit);
-				UNITROOM_UpdatePath(pUnit);
+				D2_CALL(SUNITINACTIVE_CompressInactiveUnit, pGame, pUnit);
+				D2_CALL(UNITROOM_UpdatePath, pUnit);
 				return;
 			}
 
-			const D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pUnit->dwClassId);
-			if (!pObjectsTxtRecord->nRestore || D2GAME_CheckIfSparklyChest_6FCBD7F0(pUnit) & 2)
+			const D2ObjectsTxt* pObjectsTxtRecord = D2_CALL(DATATBLS_GetObjectsTxtRecord, pUnit->dwClassId);
+			if (!pObjectsTxtRecord->nRestore || D2_CALL(D2GAME_CheckIfSparklyChest_6FCBD7F0, pUnit) & 2)
 			{
 				bCompress = 0;
 			}
@@ -777,14 +798,14 @@ void __fastcall SUNITINACTIVE_CompressUnitIfNeeded(D2GameStrc* pGame, D2UnitStrc
 
 			if (bCompress)
 			{
-				SUNITINACTIVE_CompressInactiveUnit(pGame, pUnit);
+				D2_CALL(SUNITINACTIVE_CompressInactiveUnit, pGame, pUnit);
 			}
 			break;
 		}
 		case UNIT_ITEM:
 		case UNIT_TILE:
 		{
-			SUNITINACTIVE_CompressInactiveUnit(pGame, pUnit);
+			D2_CALL(SUNITINACTIVE_CompressInactiveUnit, pGame, pUnit);
 			break;
 		}
 		default:
@@ -793,7 +814,7 @@ void __fastcall SUNITINACTIVE_CompressUnitIfNeeded(D2GameStrc* pGame, D2UnitStrc
 
 		if (pUnit->dwUnitType != UNIT_ITEM)
 		{
-			SUNIT_RemoveUnit(pGame, pUnit);
+			D2_CALL(SUNIT_RemoveUnit, pGame, pUnit);
 		}
 	}
 }
@@ -1368,24 +1389,5 @@ void __fastcall SUNITINACTIVE_DeleteExpiredItemNodes(D2GameStrc* pGame, int32_t 
 
 			pCurrent = pNext;
 		}
-	}
-}
-
-//D2Game.0x6FCC54F0
-// not-1.13c: retail has no (unit, flag, set) function; the dwFlagEx read-modify-write is inlined at its callers (0x1FB90)
-void __fastcall SUNITINACTIVE_SetUnitFlagEx(D2UnitStrc* pUnit, uint32_t nFlag, int32_t bSet)
-{
-	if (!pUnit)
-	{
-		return;
-	}
-
-	if (bSet)
-	{
-		pUnit->dwFlagEx |= nFlag;
-	}
-	else
-	{
-		pUnit->dwFlagEx &= ~nFlag;
 	}
 }

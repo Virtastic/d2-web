@@ -88,8 +88,6 @@ struct D2UbersAiCallbackArgStrc
 #pragma pack(pop)
 
 
-//Inlined in D2Game.0x6FCF1210 and D2Game.0x6FCF1310
-int32_t __fastcall AIUTIL_GetDistanceToCoordinatesWithSize(D2UnitStrc* pUnit, int32_t nX, int32_t nY, int32_t nSize);
 //D2Game.0x6FCF1210
 int32_t __fastcall AIUTIL_GetDistanceToCoordinates_FullUnitSize(D2UnitStrc* pTarget, D2UnitStrc* pSource);
 //D2Game.0x6FCF1310

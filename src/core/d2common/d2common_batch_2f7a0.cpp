@@ -94,18 +94,7 @@ EMSCRIPTEN_KEEPALIVE D2ObjModeTypeTxt* d2_fn_d2common_18E30(uint32_t nIndex, int
 	return DATATBLS_GetObjModeTypeTxtRecord((int32_t)nIndex, bGetMode);
 }
 
-// 1.13c D2Common+0x24C10 (#10291)
-// Item units (type 4) answer 0x22EC0(items.txt class id at +0x04, value): whether the row's +0xC0 dword
-// equals the value. Every other unit answers false.
-extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_24C10(uint32_t pUnit, int32_t nValue,
-                                                  const D2CommonBatch2F7A0Env* env)
-{
-	if (pUnit != 0 && rd32(pUnit, 0) == 4 && env->sub22EC0 != nullptr) {
-		return env->sub22EC0((int32_t)rd32(pUnit, 4), nValue);
-	}
-	return 0;
-}
+// 0x24C10 (#10291) is ITEMS_CheckWeaponClass in d2moo/src/Items/Items.cpp.
 
 // Superseded by UNITS_GetObjectTxtRecordFromObject (Units.cpp, the row for 0x2ECF0, #10296)
 // Object units (type 2) answer their object record, unit+0x14 -> +0x00. A null unit (fatal 0xE3C) and

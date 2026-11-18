@@ -184,7 +184,7 @@ uint32_t d2game_cb1f0(uint32_t param1, uint32_t ebxUnit) {
     return param1;
 }
 
-// 1.13c D2Game+0xCB690 (EAX=unit, EBX=range; returns 1 when the point is farther than range on either axis)
+// D2Game +0xCB690 (marker lives on the d2moo sub_6FC83C60) (EAX=unit, EBX=range; returns 1 when the point is farther than range on either axis)
 uint32_t d2game_cb690(uint32_t unit, int32_t range, uint16_t px, uint16_t py) {
     int32_t dx = (int32_t)unitX(unit) - px; if (dx < 0) dx = -dx;
     int32_t dy = (int32_t)unitY(unit) - py; if (dy < 0) dy = -dy;

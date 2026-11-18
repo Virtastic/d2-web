@@ -5,6 +5,12 @@
 #include "Units/UnitRoom.h"
 #include "Units/Units.h"
 #include <D2BitManip.h>
+#include <climits>
+#include <cstddef>
+#include <cstdint>
+
+uint32_t D2Common_33C20_BitmaskHit(bool hasOwner, bool hasRec, int32_t recFlag, const uint32_t* bits, const uint32_t* mask, int32_t nWords);
+uint32_t D2Common_33C20_UnitHasStateInMask(D2UnitStrc* pUnit, const uint32_t* pMask);
 
 //Used in some of the following functions
 // not-1.13c: 1.13c carries this range-checked mask read inline in each by-state reader (0x33A30..0x33BE0)
@@ -464,19 +470,40 @@ BOOL __stdcall STATES_CheckStateMaskOnUnit(D2UnitStrc* pUnit, int nStateMask)
 
 	if (pUnit && nStateMask >= 0 && nStateMask < 40)
 	{
-		uint32_t* pStatFlags = D2COMMON_STATES_GetStatFlags_6FDB8A90(pUnit);
-
-		if (pStatFlags)
-		{
-			for (int i = 0; i < (sgptDataTables->nStatesTxtRecordCount + 31) / 32; ++i)
-			{
-				if (pStatFlags[i] & sgptDataTables->fStateMasks[nStateMask][i])
-				{
-					return TRUE;
-				}
-			}
-		}
+		return D2Common_33C20_UnitHasStateInMask(pUnit, sgptDataTables->fStateMasks[nStateMask]) != 0;
 	}
 
 	return FALSE;
+}
+
+// Retail's 32-bit images (the guest pointers are 4 bytes; ours are 8), kept only to pin the dereferenced offsets.
+struct D2Common33C20Owner32 { uint8_t pad[0x5C]; uint32_t pRec; };
+struct D2Common33C20Rec32 { uint8_t pad0[0x10]; int32_t flag; uint8_t pad1[0x58 - 0x14]; uint32_t pBits; };
+static_assert(offsetof(D2Common33C20Owner32, pRec) == 0x5C, "33c20 owner->rec");
+static_assert(offsetof(D2Common33C20Rec32, flag) == 0x10 && offsetof(D2Common33C20Rec32, pBits) == 0x58, "33c20 rec flag/bits");
+
+// 1.13c D2Common+0x33C20 (register call: EAX = owner struct, ECX = mask pointer). The test over already-resolved
+// fields: 1 when the owner and its rec (owner+0x5C) exist, the rec flag (+0x10) has the sign bit, the bit array (+0x58)
+// exists and any of nWords words of mask AND bits is non-zero. nWords = ([sgptDataTables+0xC4] + 31) / 32 (signed),
+// 6 in 1.13c.
+uint32_t D2Common_33C20_BitmaskHit(bool hasOwner, bool hasRec, int32_t recFlag, const uint32_t* bits, const uint32_t* mask, int32_t nWords)
+{
+	if (!hasOwner || !hasRec || recFlag >= 0 || !bits) return 0;
+	for (int32_t i = 0; i < nWords; ++i) if (mask[i] & bits[i]) return 1;
+	return 0;
+}
+
+// 1.13c D2Common+0x33C20 on a unit (EAX = unit, ECX = mask): owner = unit, rec = unit->pStatListEx (+0x5C), flag = its
+// dwFlags (+0x10), bits = its StatFlags (+0x58); every guard is read from the unit, none is supplied by the caller.
+uint32_t D2Common_33C20_UnitHasStateInMask(D2UnitStrc* pUnit, const uint32_t* pMask)
+{
+	D2StatListExStrc* pList = pUnit ? pUnit->pStatListEx : nullptr;
+	return D2Common_33C20_BitmaskHit(pUnit != nullptr, pList != nullptr, pList ? (int32_t)pList->dwFlags : 0,
+	                                 pList ? pList->StatFlags : nullptr, pMask, (sgptDataTables->nStatesTxtRecordCount + 31) / 32);
+}
+
+// The same test with mask = [sgptDataTables+0xE0], which the caller supplies (the +0x34000 wrapper's scan).
+uint32_t D2Common_34000_BitmaskHitTable(bool hasOwner, bool hasRec, int32_t recFlag, const uint32_t* bits, const uint32_t* tableMask, int32_t nWords)
+{
+	return D2Common_33C20_BitmaskHit(hasOwner, hasRec, recFlag, bits, tableMask, nWords);
 }

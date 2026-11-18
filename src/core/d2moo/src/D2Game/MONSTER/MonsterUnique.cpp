@@ -1,4 +1,5 @@
 #include "../../../../d2game/d2game_21880.h"
+#include <test_seam.h>
 #include "MONSTER/MonsterUnique.h"
 #include "core/d2game/d2game_21880.h"
 
@@ -42,6 +43,7 @@
 #include "SKILLS/SkillSor.h"
 #include "UNIT/SUnit.h"
 #include "UNIT/SUnitDmg.h"
+#include <test_seam.h>
 
 
 #pragma pack(push, 1)
@@ -273,6 +275,15 @@ int32_t __fastcall MONSTERUNIQUE_CalculatePercentage(int32_t a1, int32_t a2, int
     }
 
     return a2 * (int64_t)a1 / a3;
+}
+
+// 1.13c D2Game+0x21EC0 (register form: EBX = unit, EDI = percent): max life and life both become base + base * percent / 100
+void __fastcall MONSTERUNIQUE_ApplyPercentLifeBonus(D2UnitStrc* pUnit, int32_t nPercent)
+{
+    const int32_t nBase = D2_CALL(STATLIST_GetMaxLifeFromUnit, pUnit);
+    const int32_t nNew = nBase + MONSTERUNIQUE_CalculatePercentage(nBase, nPercent, 100);
+    D2_CALL(STATLIST_SetUnitStat, pUnit, STAT_MAXHP, nNew, 0);
+    D2_CALL(STATLIST_SetUnitStat, pUnit, STAT_HITPOINTS, nNew, 0);
 }
 
 //D2Game.0x6FC6AFF0
@@ -2073,7 +2084,7 @@ void __fastcall sub_6FC6E730(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod
         return;
     }
 
-    MONSTER_UpdateAiCallbackEvent(pGame, pUnit);
+    D2_CALL(MONSTER_UpdateAiCallbackEvent, pGame, pUnit);
     EVENT_SetEvent(pGame, pUnit, EVENTTYPE_MONUMOD, pGame->dwGameFrame + 75, 0, 0);
 }
 
@@ -2608,6 +2619,55 @@ static void __fastcall MONSTERUNIQUE_ApplyMinionUMod(D2UnitStrc* pUnit, void* pM
         static_cast<int32_t>(reinterpret_cast<uintptr_t>(pUnique)));
 }
 
+// 1.13c D2Game+0x23060 (EAX = source monster, ECX = destination monster, stack = mode): the source's modifiers whose monumod.txt
+// xfer flag is set are appended to the destination's list (mode 0, after its last modifier) or written from its start (any other mode),
+// stopping at nine slots, the source's end or a modifier outside the table
+void __fastcall MONSTERUNIQUE_CopyTransferableUMods(D2UnitStrc* pSource, D2UnitStrc* pDest, int32_t nMode)
+{
+    const uint8_t* pSrcUMods = MONSTERUNIQUE_GetUMods(pSource);
+    uint8_t* pDstUMods = MONSTERUNIQUE_GetUMods(pDest);
+    if (!pSrcUMods || !pDstUMods)
+    {
+        return;
+    }
+
+    int32_t nAt = 0;
+    if (nMode == 0)
+    {
+        while (nAt < 9 && pDstUMods[nAt])
+        {
+            ++nAt;
+        }
+    }
+
+    if (nAt >= 9)
+    {
+        return;
+    }
+
+    uint8_t* pWrite = pDstUMods + nAt;
+    while (*pSrcUMods)
+    {
+        const uint8_t nUMod = *pSrcUMods;
+        const D2MonUModTxt* pRecord = D2_CALL(MONSTERUNIQUE_GetMonUModTxtRecord, nUMod);
+        if (!pRecord)
+        {
+            return;
+        }
+
+        if (pRecord->nXfer)
+        {
+            *pWrite++ = nUMod;
+        }
+
+        ++pSrcUMods;
+        if (++nAt > 8)
+        {
+            return;
+        }
+    }
+}
+
 //D2Game.0x6FC6F440
 // 1.13c D2Game+0x248A0 (the minion spawn block is its own function at 0x445A0, umod transfer 0x23060; no delta)
 void __fastcall D2GAME_SpawnMinions_6FC6F440(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, D2UnitStrc* pUnit, int32_t bSpawnMinions, int32_t nMinGroup, int32_t nMaxGroup)
@@ -2643,36 +2703,7 @@ void __fastcall D2GAME_SpawnMinions_6FC6F440(D2GameStrc* pGame, D2ActiveRoomStrc
 
                     if (pMinion)
                     {
-                        uint8_t* pOwnerUMods = MONSTERUNIQUE_GetUMods(pUnit);
-                        uint8_t* pMinionUMods = MONSTERUNIQUE_GetUMods(pMinion);
-                        if (pOwnerUMods && pMinionUMods)
-                        {
-                            int32_t nUModIndex = MONSTERUNIQUE_GetUModCount(pMinionUMods);
-                            uint8_t* pMinionUMod = &pMinionUMods[nUModIndex];
-                            while (nUModIndex < 9)
-                            {
-                                uint8_t nOwnerUMod = *pOwnerUMods;
-                                if (!nOwnerUMod)
-                                {
-                                    break;
-                                }
-
-                                D2MonUModTxt* pUModTxtRecord = MONSTERUNIQUE_GetMonUModTxtRecord(nOwnerUMod);
-                                if (!pUModTxtRecord)
-                                {
-                                    break;
-                                }
-
-                                if (pUModTxtRecord->nXfer)
-                                {
-                                    *pMinionUMod = nOwnerUMod;
-                                    ++pMinionUMod;
-                                }
-
-                                ++pOwnerUMods;
-                                ++nUModIndex;
-                            }
-                        }
+                        MONSTERUNIQUE_CopyTransferableUMods(pUnit, pMinion, 0);
 
                         AIGENERAL_SetOwnerData(pGame, pMinion, pUnit->dwUnitId, 1, 0, 0);
                         AIGENERAL_AllocMinionList(pGame, pUnit, pMinion);

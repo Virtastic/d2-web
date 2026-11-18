@@ -39,7 +39,6 @@ struct D2BeltsTxt
 //D2Common.0x6FD48880
 void __fastcall DATATBLS_LoadBeltsTxt(HD2ARCHIVE hArchive);
 //D2Common.0x6FD493A0
-void __fastcall DATATBLS_UnloadBeltsTxt();
 //D2Common.0x6FD493B0 (#10638)
 D2COMMON_DLL_DECL void __stdcall DATATBLS_GetBeltsTxtRecord(int nIndex, int bHigherRes, D2BeltsTxt* pRecord);
 //D2Common.0x6FD49420 (#10639)

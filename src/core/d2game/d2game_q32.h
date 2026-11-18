@@ -1,4 +1,4 @@
-// Shared by the 1.13c quest-record ports (D2Game+0x60080-0x63270): retail 32-bit field walks over caller memory and the retail callees as one
+// Shared by the 1.13c quest-record ports (D2Game rva 0x60080-0x63270): retail 32-bit field walks over caller memory and the retail callees as one
 // seam. A callee is called as X(rva, eax, ecx, edx, ebx, esi, stack words...) with retail argument placement; the play path maps each rva to the
 // real routine, a FUNCTION-mode probe records it. Offsets are retail 1.13c offsets.
 #pragma once

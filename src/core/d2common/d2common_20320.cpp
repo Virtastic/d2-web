@@ -5,8 +5,7 @@
 #include <cstring>
 #include "inv_place.h"
 
-struct D2UnitStrc;
-uint32_t D2Common_24430_CheckItemTypeId(const D2UnitStrc* pItem, int nItemType);
+#include "D2Items.h"
 
 namespace {
 inline uint8_t* P(uint32_t a) { return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(a)); }
@@ -27,7 +26,7 @@ uint32_t D2Common_20320_GetLeftHandWeaponImg(const InvEnv& e, uint32_t inv, uint
         const uint32_t g = D2Common_1E1B0_GetGrid(e, inv, 0, info);
         if (!g) continue;
         const uint32_t item = W(P(W(P(g), 0xC)), slot);
-        if (item && D2Common_24430_CheckItemTypeId(reinterpret_cast<const D2UnitStrc*>(P(item)), kWeaponType)
+        if (item && ITEMS_CheckItemTypeId(reinterpret_cast<const D2UnitStrc*>(P(item)), kWeaponType)
             && W(P(item), 0xC) == id)
             return item;
     }

@@ -595,8 +595,6 @@ int __fastcall DATATBLS_AppendMemoryBuffer(char** ppCodes, int* pSize, int* pSiz
 
 
 
-//D2Common.0x6FD4E4B0 (#10593)
-D2COMMON_DLL_DECL D2CharStatsTxt* __fastcall DATATBLS_GetCharstatsTxtTable();
 //D2Common.0x6FD4E4C0
 D2AnimDataTableStrc* __fastcall DATATBLS_GetAnimData();
 //D2Common.0x6FD4E4D0 (#10655)

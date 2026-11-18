@@ -9,7 +9,7 @@
 #include <Storm.h>
 #include <cstddef>
 extern "C" void d2web_msvc_qsort(void* base, size_t num, size_t width, int (*cmp)(const void*, const void*));   // d2-web: compat/msvc_qsort.cpp
-#include "../../../d2common/runes_tbl.h"   // d2-web: the growth/copy body of 0x70FF0, shared with the s3004 probe
+#include "DataTbls/RunesTblRecord.h"   // d2-web: the growth/copy body of 0x70FF0, shared with the s3004 probe
 
 //D2Common.0x6FD550E0
 // 1.13c D2Common+0x71B40
@@ -1940,7 +1940,7 @@ D2RuneDataTbl* __fastcall DATATBLS_GetRuneDataTables()
 
 // D2Common 0x70FF0 (#10621)
 // D2MOO.0x6FD5E9F0. The body matches the 1.13c decompile line for line; it lives in
-// src/core/d2common/runes_tbl.cpp so the s3004 shallow probe can pin the record array, its count and the
+// src/core/d2moo/src/DataTbls/RunesTblRecord.cpp so the s3004 shallow probe can pin the record array, its count and the
 // realloc-pool call to its own blobs.
 void __stdcall DATATBLS_AddOrChangeRunesTxtRecord(int nRecordId, D2RunesTxt* pRecord)
 {
@@ -1963,4 +1963,14 @@ D2RunesTxt* __stdcall DATATBLS_GetRunesTxtRecord(int nRunewordId)
 {
 	D2_ASSERT(nRunewordId > 0 && nRunewordId < sgptDataTables->pRuneDataTables.nRunesTxtRecordCount);
 	return &sgptDataTables->pRuneDataTables.pRunesTxt[nRunewordId];
+}
+
+// 1.13c D2Common+0x1830
+D2UniqueItemsTxt* __fastcall DATATBLS_GetUniqueItemsTxtRecord(int nUniqueItemId)
+{
+	if (nUniqueItemId >= 0 && nUniqueItemId < sgptDataTables->nUniqueItemsTxtRecordCount)
+	{
+		return &sgptDataTables->pUniqueItemsTxt[nUniqueItemId];
+	}
+	return nullptr;
 }

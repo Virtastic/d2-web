@@ -192,7 +192,7 @@ struct D2NPCMessageTableStrc
 	int32_t nMessages;						//0xC0
 };
 
-struct D2QuestDataStrc						//sizeof 0xF4
+struct D2QuestDataStrc						//sizeof 0xF8 (1.13c; 1.10f is 0xF4)
 {
 	int32_t nQuestNo;						//0x00 - internal
 	D2GameStrc* pGame;						//0x04
@@ -210,10 +210,11 @@ struct D2QuestDataStrc						//sizeof 0xF4
 	QUESTCALLBACK pfCallback[15];			//0xA0
 	D2NPCMessageTableStrc* pNPCMessages;	//0xDC
 	int32_t nQuestFilter;					//0xE0 - index in quest flag bit array, called eFilter in original code
-	QUESTSTATUS pfStatusFilter;				//0xE4
-	QUESTACTIVE pfActiveFilter;				//0xE8
-	QUESTSEQFILTER pfSeqFilter;				//0xEC
-	D2QuestDataStrc* pPrev;					//0xF0
+	uint32_t dwUnk0xE4;						//0xE4 - 1.13c only: the quest code never reads or writes it
+	QUESTSTATUS pfStatusFilter;				//0xE8
+	QUESTACTIVE pfActiveFilter;				//0xEC
+	QUESTSEQFILTER pfSeqFilter;				//0xF0
+	D2QuestDataStrc* pPrev;					//0xF4
 };
 
 struct D2QuestInitTableStrc

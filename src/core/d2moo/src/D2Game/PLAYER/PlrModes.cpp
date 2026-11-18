@@ -1444,6 +1444,7 @@ void __fastcall sub_6FC81600(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkil
 }
 
 //D2Game.0x6FC81650
+// 1.13c D2Game+0x788B0 (unit = EAX; checked against decompile, no delta; CLIENTS_GetPlayerFromClient inlined)
 void __fastcall sub_6FC81650(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2ClientStrc* pClient, int32_t a4)
 {
     D2UnitStrc* pOtherPlayer = CLIENTS_GetPlayerFromClient(pClient, 0);
@@ -1708,7 +1709,7 @@ void __fastcall D2GAME_EVENTS_Callback_6FC81BD0(D2GameStrc* pGame, D2UnitStrc* p
     };
 	static_assert(EVENTTYPE_COUNT == std::size(off_6FD28F40), "missing callbacks");
 
-    if (nEvent >= 0 && nEvent <= std::size(off_6FD28F40))
+    if (nEvent >= 0 && nEvent < std::size(off_6FD28F40))
     {
         EventCallbackFunction pCallback = off_6FD28F40[nEvent];
         if (pCallback)

@@ -260,7 +260,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8d5f0(void* target, void* unit, uin
 
 // 0xCD0E0: stat synchronisation. Client in EAX, unit in EBX. When the client's current unit differs,
 // push every opcode in the 0x6FD22DD0 table through #10587 and 0xCC2F0.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_cd0e0(void* client, void* unit, const D2GameBatch16Env* env) { // 1.13c D2Game+0xCD0E0
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_cd0e0(void* client, void* unit, const D2GameBatch16Env* env) { // D2Game +0xCD0E0 (marker lives on the d2moo sub_6FC82830)
     if (!client) d2game_fatal(0xFB);
     void* cur = d2game_current_unit(client, env);
     if (cur != unit) {

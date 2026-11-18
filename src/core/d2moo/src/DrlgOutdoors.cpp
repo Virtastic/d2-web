@@ -17,10 +17,27 @@
 #include "Drlg/D2DrlgTileSub.h"
 #include "D2Seed.h"
 #include <DataTbls/LevelsIds.h>
+#include <test_seam.h>
 
+
+// 1.13c D2Common+0x42A20 (EAX = level A, stack = level B; here as the two level ids): the vis flag of level B among the eight levels linked to level A,
+// 1 << (slot + 4) for the first slot holding level B's id, else 0.
+uint32_t DRLGOUTDOORS_GetLinkedLevelVisFlag(D2DrlgStrc* pDrlg, int nLevelIdA, int nLevelIdB)
+{
+	const int* pLevelIds = D2_CALL(DRLGROOM_GetVisArrayFromLevelId, pDrlg, nLevelIdA);
+	for (int i = 0; i < 8; ++i)
+	{
+		if (pLevelIds[i] == nLevelIdB)
+		{
+			return 1u << (i + 4);
+		}
+	}
+
+	return 0;
+}
 
 //D2Common.0x6FD7DC20
-// 1.13c D2Common+0x42C00 (the vis-flag lookup 0x42A20 is inline here)
+// 1.13c D2Common+0x42C00 (the vis-flag lookup 0x42A20 is DRLGOUTDOORS_GetLinkedLevelVisFlag)
 int __fastcall DRLGOUTDOORS_GetOutLinkVisFlag(D2DrlgLevelStrc* pLevel, D2DrlgVertexStrc* pDrlgVertex)
 {
 	static const D2CoordStrc pOffsetCoords[] =
@@ -66,14 +83,7 @@ int __fastcall DRLGOUTDOORS_GetOutLinkVisFlag(D2DrlgLevelStrc* pLevel, D2DrlgVer
 		{
 			if (!pRoomData->bInit)
 			{
-				pLevelIds = DRLGROOM_GetVisArrayFromLevelId(pLevel->pDrlg, pLevel->nLevelId);
-				for (int i = 0; i < 8; ++i)
-				{
-					if (pLevelIds[i] == pRoomData->pLevel->nLevelId)
-					{
-						return 1 << (i + 4);
-					}
-				}
+				return (int)DRLGOUTDOORS_GetLinkedLevelVisFlag(pLevel->pDrlg, pLevel->nLevelId, pRoomData->pLevel->nLevelId);
 			}
 
 			return 0;
@@ -188,7 +198,7 @@ BOOL __fastcall DRLGOUTDOORS_TestOutdoorLevelPreset(D2DrlgLevelStrc* pLevel, int
 	{
 		for (int j = nXStart; j < nXEnd; ++j)
 		{
-			if (!DRLGGRID_IsPointInsideGridArea(&pLevel->pOutdoors->pGrid[2], j, i) || !DRLGOUTDOORS_TestGridCellSpawnValid(pLevel, j, i))
+			if (!(j >= 0 && j < pLevel->pOutdoors->pGrid[2].nWidth && i >= 0 && i < pLevel->pOutdoors->pGrid[2].nHeight) || !DRLGOUTDOORS_TestGridCellSpawnValid(pLevel, j, i))
 			{
 				return FALSE;
 			}
@@ -680,21 +690,117 @@ void __fastcall DRLGOUTDOORS_AddAct124SecondaryBorder(D2DrlgLevelStrc* pLevel, i
 	DRLGTILESUB_AddSecondaryBorder(&a1);
 }
 
+// 1.13c D2Common+0x42070 (EDI = the list head slot): every vertex of the circular list is divided by 8 (toward zero), then a vertex whose successor
+// sits on the same cell absorbs it (flags OR, direction copied, successor unlinked and freed; a freed head hands the head to the absorber).
+void DRLGOUTDOORS_RoundAndMergeVertices(D2DrlgVertexStrc** ppVertex, void* pMemPool)
+{
+	D2DrlgVertexStrc* pVertex = *ppVertex;
+	do
+	{
+		pVertex->nPosX /= 8;
+		pVertex->nPosY /= 8;
+		pVertex = pVertex->pNext;
+	}
+	while (pVertex != *ppVertex);
+
+	do
+	{
+		D2DrlgVertexStrc* pNextVertex = pVertex->pNext;
+
+		if (pVertex->nPosX == pNextVertex->nPosX && pVertex->nPosY == pNextVertex->nPosY)
+		{
+			if (pNextVertex == *ppVertex)
+			{
+				*ppVertex = pVertex;
+			}
+
+			pVertex->pNext = pNextVertex->pNext;
+			pVertex->dwFlags |= pNextVertex->dwFlags;
+			pVertex->nDirection = pNextVertex->nDirection;
+			D2_CALL(FOG_FreePool, pMemPool, pNextVertex, __FILE__, __LINE__, 0);
+		}
+
+		pVertex = pVertex->pNext;
+	}
+	while (pVertex != *ppVertex);
+}
+
+// 1.13c D2Common+0x43190: the cell walk of an outdoor level. The level type picks the DT1 mask (type 2 -> 0x44103; 0x10, 0x16, 0x1B, 0x1C -> 1; 0x15 -> 4;
+// 0x1E, 0x1F -> 0x11). Each 8x8 cell, row by row from the level's top left: a picked-file cell (packed 0x200) with a nonzero preset id allocates a preset map,
+// stores the picked file (packed bits 16-19) and builds the area; any other cell without the blank bit (0x100) becomes an outdoor room. pLevel is only handed on to the callees.
+void DRLGOUTDOORS_PlaceOutdoorCells(D2DrlgLevelStrc* pLevel, D2SeedStrc* pSeed, int nLevelType, int nPosX, int nPosY, int nGridWidth, int nGridHeight,
+	D2DrlgGridStrc* pPresetGrid, D2DrlgGridStrc* pFlagsGrid, D2DrlgGridStrc* pPackedGrid, D2DrlgGridStrc* pExGrid)
+{
+	unsigned int dwDt1Mask = 0;
+	switch (nLevelType)
+	{
+	case LVLTYPE_ACT1_WILDERNESS:
+		dwDt1Mask = 0x44103u;
+		break;
+
+	case LVLTYPE_ACT3_JUNGLE:
+		dwDt1Mask = 0x04;
+		break;
+
+	case LVLTYPE_ACT2_DESERT:
+	case LVLTYPE_ACT3_KURAST:
+	case LVLTYPE_ACT4_MESA:
+	case LVLTYPE_ACT4_LAVA:
+		dwDt1Mask = 0x01;
+		break;
+
+	case LVLTYPE_ACT5_SIEGE:
+	case LVLTYPE_ACT5_BARRICADE:
+		dwDt1Mask = 0x11;
+		break;
+
+	default:
+		dwDt1Mask = 0x00;
+		break;
+	}
+
+	int nY = nPosY;
+	for (int j = 0; j < nGridHeight; ++j)
+	{
+		int nX = nPosX;
+		for (int i = 0; i < nGridWidth; ++i)
+		{
+			const int nFlags = DRLGGRID_GetGridEntry(pFlagsGrid, i, j);
+			const D2DrlgOutdoorPackedGrid2InfoStrc tGrid2PackedInfo = { (uint32_t)DRLGGRID_GetGridEntry(pPackedGrid, i, j) };
+			if (tGrid2PackedInfo.bHasPickedFile)
+			{
+				const int nPreset = DRLGGRID_GetGridEntry(pPresetGrid, i, j);
+				if (nPreset)
+				{
+					D2DrlgCoordStrc pDrlgCoord = {};
+					pDrlgCoord.nWidth = 0;
+					pDrlgCoord.nPosX = nX;
+					pDrlgCoord.nHeight = 0;
+					pDrlgCoord.nPosY = nY;
+
+					D2DrlgMapStrc* pDrlgMap = D2_CALL(DRLGPRESET_AllocDrlgMap, pLevel, nPreset, &pDrlgCoord, pSeed);
+					DRLGPRESET_SetPickedFileInDrlgMap(pDrlgMap, tGrid2PackedInfo.nPickedFile);
+					D2_CALL(DRLGPRESET_BuildArea, pLevel, pDrlgMap, nFlags, 0);
+				}
+			}
+			else if (!tGrid2PackedInfo.nUnkb08)
+			{
+				D2_CALL(DRLGOUTPLACE_CreateOutdoorRoomEx, pLevel, nX, nY, 8, 8, nFlags, tGrid2PackedInfo.nPackedValue, DRLGGRID_GetGridEntry(pExGrid, i, j), dwDt1Mask);
+			}
+
+			nX += 8;
+		}
+
+		nY += 8;
+	}
+}
+
 //1.10: D2Common.0x6FD7EBD0
 //1.14d: 0x00675360
-// 1.13c D2Common+0x43580 (vertex build 0x1B6E0, divide-by-8 and merge pass 0x42070, per-act init, and the grid walk of 0x43190 are inline here; diffed against all four: same order, same grid cells, same dt1 masks per level type, same level-0x86 act II override)
+// 1.13c D2Common+0x43580 (vertex build 0x1B6E0 and the per-act init are inline here, the grid walk of 0x43190 is DRLGOUTDOORS_PlaceOutdoorCells, the divide-by-8 merge pass 0x42070 is DRLGOUTDOORS_RoundAndMergeVertices; diffed against all four: same order, same grid cells, same dt1 masks per level type, same level-0x86 act II override)
 void __fastcall DRLGOUTDOORS_GenerateLevel(D2DrlgLevelStrc* pLevel)
 {
-	D2DrlgCoordStrc pDrlgCoord = {};
 	D2DrlgVertexStrc** ppVertex = NULL;
-	D2DrlgVertexStrc* pNextVertex = NULL;
-	D2DrlgVertexStrc* pVertex = NULL;
-	D2DrlgMapStrc* pDrlgMap = NULL;
-	unsigned int dwDt1Mask = 0;
-	int nX = 0;
-	int nY = 0;
-	int a6a = 0;
-	int v14 = 0;
 
 	D2DrlgOutdoorInfoStrc* pOutdoorInfo = pLevel->pOutdoors;
 
@@ -712,35 +818,7 @@ void __fastcall DRLGOUTDOORS_GenerateLevel(D2DrlgLevelStrc* pLevel)
 
 	DRLGVER_CreateVertices(pLevel->pDrlg->pMempool, &pOutdoorInfo->pVertex, &pLevel->pLevelCoords, 0, pOutdoorInfo->pRoomData);
 
-	pVertex = pOutdoorInfo->pVertex;
-	do
-	{
-		pVertex->nPosX /= 8;
-		pVertex->nPosY /= 8;
-		pVertex = pVertex->pNext;
-	}
-	while (pVertex != *ppVertex);
-
-	do
-	{
-		pNextVertex = pVertex->pNext;
-
-		if (pVertex->nPosX == pNextVertex->nPosX && pVertex->nPosY == pNextVertex->nPosY)
-		{
-			if (pNextVertex == *ppVertex)
-			{
-				*ppVertex = pVertex;
-			}
-
-			pVertex->pNext = pNextVertex->pNext;
-			pVertex->dwFlags |= pNextVertex->dwFlags;
-			pVertex->nDirection = pNextVertex->nDirection;
-			D2_FREE_POOL(pLevel->pDrlg->pMempool, pNextVertex);
-		}
-
-		pVertex = pVertex->pNext;
-	}
-	while (pVertex != *ppVertex);
+	DRLGOUTDOORS_RoundAndMergeVertices(ppVertex, pLevel->pDrlg->pMempool);
 
 	int nAct = DRLG_GetActNoFromLevelId(pLevel->nLevelId);
 #ifdef D2_VERSION_HAS_UBERS
@@ -780,66 +858,8 @@ void __fastcall DRLGOUTDOORS_GenerateLevel(D2DrlgLevelStrc* pLevel)
 		break;
 	}
 
-	switch (pLevel->nLevelType)
-	{
-	case LVLTYPE_ACT1_WILDERNESS:
-		dwDt1Mask = 0x44103u;
-		break;
-
-	case LVLTYPE_ACT3_JUNGLE:
-		dwDt1Mask = 0x04;
-		break;
-
-	case LVLTYPE_ACT2_DESERT:
-	case LVLTYPE_ACT3_KURAST:
-	case LVLTYPE_ACT4_MESA:
-	case LVLTYPE_ACT4_LAVA:
-		dwDt1Mask = 0x01;
-		break;
-
-	case LVLTYPE_ACT5_SIEGE:
-	case LVLTYPE_ACT5_BARRICADE:
-		dwDt1Mask = 0x11;
-		break;
-
-	default:
-		dwDt1Mask = 0x00;
-		break;
-	}
-
-	nY = pLevel->nPosY;
-	for (int j = 0; j < pOutdoorInfo->nGridHeight; ++j)
-	{
-		nX = pLevel->nPosX;
-		for (int i = 0; i < pOutdoorInfo->nGridWidth; ++i)
-		{
-			a6a = DRLGGRID_GetGridEntry(&pOutdoorInfo->pGrid[1], i, j);
-			D2DrlgOutdoorPackedGrid2InfoStrc tGrid2PackedInfo = DRLGOUTDOORS_GetPackedGrid2Info(pOutdoorInfo, i, j);
-			if (tGrid2PackedInfo.bHasPickedFile)
-			{
-				v14 = DRLGGRID_GetGridEntry(pOutdoorInfo->pGrid, i, j);
-				if (v14)
-				{
-					pDrlgCoord.nWidth = 0;
-					pDrlgCoord.nPosX = nX;
-					pDrlgCoord.nHeight = 0;
-					pDrlgCoord.nPosY = nY;
-
-					pDrlgMap = DRLGPRESET_AllocDrlgMap(pLevel, v14, &pDrlgCoord, &pLevel->pSeed);
-					DRLGPRESET_SetPickedFileInDrlgMap(pDrlgMap, tGrid2PackedInfo.nPickedFile);
-					DRLGPRESET_BuildArea(pLevel, pDrlgMap, a6a, 0);
-				}
-			}
-			else if (!tGrid2PackedInfo.nUnkb08)
-			{
-				DRLGOUTPLACE_CreateOutdoorRoomEx(pLevel, nX, nY, 8, 8, a6a, tGrid2PackedInfo.nPackedValue, DRLGGRID_GetGridEntry(&pOutdoorInfo->pGrid[3], i, j), dwDt1Mask);
-			}
-
-			nX += 8;
-		}
-
-		nY += 8;
-	}
+	DRLGOUTDOORS_PlaceOutdoorCells(pLevel, &pLevel->pSeed, pLevel->nLevelType, pLevel->nPosX, pLevel->nPosY, pOutdoorInfo->nGridWidth, pOutdoorInfo->nGridHeight,
+		&pOutdoorInfo->pGrid[0], &pOutdoorInfo->pGrid[1], &pOutdoorInfo->pGrid[2], &pOutdoorInfo->pGrid[3]);
 }
 
 //D2Common.0x6FD7EEE0
@@ -922,39 +942,27 @@ static const uint8_t byte_6FDCF958[] =
 // D2WEB: observer for the rasterised dirt-path grid (set by src/core/drlg/drlg_check.cpp).
 void (*g_d2webOnDirtPathGrid)(D2DrlgLevelStrc*, D2DrlgRoomStrc*, D2DrlgGridStrc*) = nullptr;
 
-// not-1.13c: retail has no such function; the act I branch of D2Common+0x4A670 allocates the (w+3)x(h+3) grid inline,
-// then calls D2Common+0x3DC90 (path rasteriser) and D2Common+0x3DB20 (3x3 window, 256-entry table, writes the floor grid).
-// Diffed against 0x3DC90/0x3DB20/0x3D810: same loop bounds, window slide, mask bit order and table (byte-compared).
-//D2Common.0x6FD7EFE0
-void __fastcall DRLG_OUTDOORS_GenerateDirtPath(D2DrlgLevelStrc* pLevel, D2DrlgRoomStrc* pDrlgRoom)
+// 1.13c D2Common+0x3DC90: for every path-start list, every vertex that has a next link is rasterised into the dirt-path grid
+// (sub_6FD75F60 with the rectangle coord, flag 1, OR, size 2). The coord is {room x - 1, y - 1, w + 3, h + 3}.
+void DRLGOUTDOORS_RasteriseDirtPaths(D2DrlgVertexStrc* const* ppPathStarts, int nVertices, D2DrlgGridStrc* pDirtPathGrid, D2DrlgCoordStrc* pDrlgCoord)
 {
-
-	DRLGGRID_InitializeGridCells(pLevel->pDrlg->pMempool, &pDrlgRoom->pOutdoor->pDirtPathGrid, pDrlgRoom->nTileWidth + 3, pDrlgRoom->nTileHeight + 3);
-
-	D2DrlgCoordStrc tDrlgCoord = {};
-	tDrlgCoord.nPosX = pDrlgRoom->nTileXPos - 1;
-	tDrlgCoord.nPosY = pDrlgRoom->nTileYPos - 1;
-	tDrlgCoord.nWidth = pDrlgRoom->nTileWidth + 3;
-	tDrlgCoord.nHeight = pDrlgRoom->nTileHeight + 3;
-
-	for (int i = 0; i < pLevel->pOutdoors->nVertices; ++i)
+	for (int i = 0; i < nVertices; ++i)
 	{
-		for (D2DrlgVertexStrc* pVertex = pLevel->pOutdoors->pPathStarts[i]; pVertex != nullptr; pVertex = pVertex->pNext)
+		for (D2DrlgVertexStrc* pVertex = ppPathStarts[i]; pVertex != nullptr; pVertex = pVertex->pNext)
 		{
 			if (pVertex->pNext)
 			{
-				sub_6FD75F60(&pDrlgRoom->pOutdoor->pDirtPathGrid, pVertex, &tDrlgCoord, 1, FLAG_OPERATION_OR, 2);
+				D2_CALL(sub_6FD75F60, pDirtPathGrid, pVertex, pDrlgCoord, 1, FLAG_OPERATION_OR, 2);
 			}
 		}
 	}
+}
 
-	D2DrlgGridStrc* pDirtPathGrid = &pDrlgRoom->pOutdoor->pDirtPathGrid;
-#ifdef D2_DRLG_TRACE
-	{ int nSet = 0; for (int y = 0; y < pDirtPathGrid->nHeight; y++) for (int x = 0; x < pDirtPathGrid->nWidth; x++) if (DRLGGRID_GetGridEntry(pDirtPathGrid, x, y)) nSet++;
-	  fprintf(stderr, "dirtpath: level %d room (%d,%d) vertices %d edge-cells %d\n", pLevel->nLevelId, pDrlgRoom->nTileXPos, pDrlgRoom->nTileYPos, pLevel->pOutdoors->nVertices, nSet); }
-#endif
-
-	for (int nX = 1; nX <= pDrlgRoom->pDrlgCoord.nWidth + 1; ++nX)
+// 1.13c D2Common+0x3DB20: slides a 3x3 window down every column of the dirt-path grid; where the centre cell is set, the eight neighbours
+// form a mask whose table entry (byte_6FDCF958, bytes-compared with the retail table at 0x8C4A0) becomes (entry << 8) | 0x82 in the floor grid.
+void DRLGOUTDOORS_ApplyDirtPathWalls(D2DrlgGridStrc* pDirtPathGrid, D2DrlgGridStrc* pFloorGrid, int nRoomWidth, int nRoomHeight)
+{
+	for (int nX = 1; nX <= nRoomWidth + 1; ++nX)
 	{
 		static const int nBoxDimension = 3;
 		int aFlags[nBoxDimension * nBoxDimension] = {};
@@ -966,7 +974,7 @@ void __fastcall DRLG_OUTDOORS_GenerateDirtPath(D2DrlgLevelStrc* pLevel, D2DrlgRo
 			return nBoxX * nBoxDimension + nBoxY;
 		};
 
-		const int nStartY = pDrlgRoom->pDrlgCoord.nHeight + 1;
+		const int nStartY = nRoomHeight + 1;
 		for (int nOffsetX = -1; nOffsetX <= 1; nOffsetX++)
 		{
 			for (int nOffsetY = -1; nOffsetY <= 1; nOffsetY++)
@@ -999,10 +1007,7 @@ void __fastcall DRLG_OUTDOORS_GenerateDirtPath(D2DrlgLevelStrc* pLevel, D2DrlgRo
 					if (const uint32_t v19 = byte_6FDCF958[nDirectionsWithPathFlags])
 					{
 						const uint32_t nNewFloorFLags = ((v19 << 8) | 0x82);
-						DRLGGRID_AlterGridFlag(&pDrlgRoom->pOutdoor->pFloorGrid, nX - 1, nY - 1, nNewFloorFLags, FLAG_OPERATION_OVERWRITE);
-#ifdef D2_DRLG_TRACE
-						fprintf(stderr, "dirtpath: level %d room (%d,%d) cell (%d,%d) mask %x orient %x\n", pLevel->nLevelId, pDrlgRoom->nTileXPos, pDrlgRoom->nTileYPos, nX - 1, nY - 1, nDirectionsWithPathFlags, v19);
-#endif
+						DRLGGRID_AlterGridFlag(pFloorGrid, nX - 1, nY - 1, nNewFloorFLags, FLAG_OPERATION_OVERWRITE);
 					}
 				}
 			}
@@ -1021,6 +1026,32 @@ void __fastcall DRLG_OUTDOORS_GenerateDirtPath(D2DrlgLevelStrc* pLevel, D2DrlgRo
 			}
 		}
 	}
+}
+
+// not-1.13c: retail has no such function; the act I branch of D2Common+0x4A670 allocates the (w+3)x(h+3) grid inline,
+// then calls D2Common+0x3DC90 (path rasteriser) and D2Common+0x3DB20 (3x3 window, 256-entry table, writes the floor grid);
+// those two are the functions above.
+//D2Common.0x6FD7EFE0
+void __fastcall DRLG_OUTDOORS_GenerateDirtPath(D2DrlgLevelStrc* pLevel, D2DrlgRoomStrc* pDrlgRoom)
+{
+
+	DRLGGRID_InitializeGridCells(pLevel->pDrlg->pMempool, &pDrlgRoom->pOutdoor->pDirtPathGrid, pDrlgRoom->nTileWidth + 3, pDrlgRoom->nTileHeight + 3);
+
+	D2DrlgCoordStrc tDrlgCoord = {};
+	tDrlgCoord.nPosX = pDrlgRoom->nTileXPos - 1;
+	tDrlgCoord.nPosY = pDrlgRoom->nTileYPos - 1;
+	tDrlgCoord.nWidth = pDrlgRoom->nTileWidth + 3;
+	tDrlgCoord.nHeight = pDrlgRoom->nTileHeight + 3;
+
+	DRLGOUTDOORS_RasteriseDirtPaths(pLevel->pOutdoors->pPathStarts, pLevel->pOutdoors->nVertices, &pDrlgRoom->pOutdoor->pDirtPathGrid, &tDrlgCoord);
+
+	D2DrlgGridStrc* pDirtPathGrid = &pDrlgRoom->pOutdoor->pDirtPathGrid;
+#ifdef D2_DRLG_TRACE
+	{ int nSet = 0; for (int y = 0; y < pDirtPathGrid->nHeight; y++) for (int x = 0; x < pDirtPathGrid->nWidth; x++) if (DRLGGRID_GetGridEntry(pDirtPathGrid, x, y)) nSet++;
+	  fprintf(stderr, "dirtpath: level %d room (%d,%d) vertices %d edge-cells %d\n", pLevel->nLevelId, pDrlgRoom->nTileXPos, pDrlgRoom->nTileYPos, pLevel->pOutdoors->nVertices, nSet); }
+#endif
+
+	DRLGOUTDOORS_ApplyDirtPathWalls(pDirtPathGrid, &pDrlgRoom->pOutdoor->pFloorGrid, pDrlgRoom->pDrlgCoord.nWidth, pDrlgRoom->pDrlgCoord.nHeight);
 	// D2WEB: the rasterised path grid and the floor grid this pass wrote (s178 compares both with what
 	// 1.13c's capture dumps around the same pass).
 	if (g_d2webOnDirtPathGrid) g_d2webOnDirtPathGrid(pLevel, pDrlgRoom, pDirtPathGrid);
@@ -1379,8 +1410,22 @@ void __fastcall sub_6FD7F810(D2DrlgLevelStrc* pLevel, int nVertexId)
 	}
 }
 
+// 1.13c D2Common+0x86000 (level in ESI): the Act 4 fortress-transition preset at row 1 and/or row 4, by the outdoor flags
+void __fastcall DRLGOUTDOORS_PlaceAct4FortressTransition(D2DrlgLevelStrc* pLevel)
+{
+	if (pLevel->pOutdoors->dwFlags & 0x400000)
+	{
+		D2_CALL(DRLGOUTDOORS_SpawnOutdoorLevelPresetEx, pLevel, 0, 1, LVLPREST_ACT4_FORTRESS_TRANSITION, -1, FALSE);
+	}
+
+	if (pLevel->pOutdoors->dwFlags & 0x800000)
+	{
+		D2_CALL(DRLGOUTDOORS_SpawnOutdoorLevelPresetEx, pLevel, 0, 4, LVLPREST_ACT4_FORTRESS_TRANSITION, -1, FALSE);
+	}
+}
+
 //D2Common.0x6FD7F9B0
-// 1.13c D2Common+0x861A0 (the fortress-transition pass 0x86000 and the chaos sanctum lava loop 0x85FD0 are inline here; preset tables byte-compared with the DLL)
+// 1.13c D2Common+0x861A0 (the fortress-transition pass 0x86000 is its own function; the chaos sanctum lava loop 0x85FD0 are inline here; preset tables byte-compared with the DLL)
 void __fastcall DRLGOUTDOORS_InitAct4OutdoorLevel(D2DrlgLevelStrc* pLevel)
 {
 	static const int nMesaLvlPrestIds[] =
@@ -1417,15 +1462,7 @@ void __fastcall DRLGOUTDOORS_InitAct4OutdoorLevel(D2DrlgLevelStrc* pLevel)
 	{
 		if (pLevel->nLevelId <= LEVEL_CITYOFTHEDAMNED)
 		{
-			if (pLevel->pOutdoors->dwFlags & 0x400000)
-			{
-				DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, 0, 1, LVLPREST_ACT4_FORTRESS_TRANSITION, -1, FALSE);
-			}
-
-			if (pLevel->pOutdoors->dwFlags & 0x800000)
-			{
-				DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, 0, 4, LVLPREST_ACT4_FORTRESS_TRANSITION, -1, FALSE);
-			}
+			DRLGOUTDOORS_PlaceAct4FortressTransition(pLevel);
 
 			DRLGOUTDOORS_AddAct124SecondaryBorder(pLevel, 1, LVLPREST_ACT4_MESA_BORDER_1);
 			DRLGOUTDOORS_AddAct124SecondaryBorder(pLevel, 2, LVLPREST_ACT4_MESA_BORDER_1);

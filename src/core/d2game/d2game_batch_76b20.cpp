@@ -143,7 +143,7 @@ extern "C" void D2GAME_78230(int* eax)
     fatal(0x7ba);
 }
 
-// 1.13c D2Game+0x78A90  (fastcall ecx=param_1; REG: ebx=client, edi=flag)
+// D2Game +0x78A90 (marker lives on the d2moo sub_6FC80E10)  (fastcall ecx=param_1; REG: ebx=client, edi=flag)
 extern "C" void D2GAME_78A90(int param_1, int* ebx, int edi)
 {
     if (!ebx || *ebx != 0) return;

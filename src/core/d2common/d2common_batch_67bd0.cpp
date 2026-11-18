@@ -254,16 +254,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t D2Common_24BF0_GetItem2Handed(D2UnitStrc* pUnit)
 	return static_cast<uint8_t>(ITEMS_CheckWeaponIfTwoHanded(pUnit));
 }
 
-// 1.13c D2Common+0x25BD0 (#10328) applies the base-variant check (0x24D00) to an item unit's class
-// id and returns its answer (retail tail-jumps into 0x24D00). A null unit (0x78D) or a non-item (0x78E)
-// is fatal in retail; here 0.
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint8_t D2Common_25BD0_CheckBaseVariant(D2UnitStrc* pUnit)
-{
-	if (!pUnit || pUnit->dwUnitType != UNIT_ITEM) return 0;
-
-	return (uint8_t)D2Common_24D00_ItemIsBaseVariantNotQuest((uint32_t)pUnit->dwClassId);
-}
+// 0x25BD0 (#10328) is ITEMS_GetQuest in d2moo/src/Items/Items.cpp.
 
 // 1.13c D2Common+0x1D760 (#10330) stdcall(pUnit): installs an empty two-dword missile stream (MisStream.cpp:0x2E). The
 // stream is allocated (Fog 0x9222, pool = unit+8 or 0, size 8) and zeroed unless the unit is a missile (type 3) whose data

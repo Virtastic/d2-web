@@ -1379,91 +1379,6 @@ BOOL UNITS_CanAnimModeUseAttackRate(int nUnitType, int nAnimMode, D2UnitStrc* pU
 	return FALSE;
 }
 
-// not-1.13c: uncalled; retail inlines the attack-mode rate update into D2Common+0x33110 (d2common_33110.cpp runs it)
-__forceinline void __fastcall UNITS_UpdateAttackAnimRateAndVelocity(D2UnitStrc* pUnit)
-{
-	D2UnitStrc* pRightWeapon = NULL;
-	D2UnitStrc* pLeftWeapon = NULL;
-	int nFasterAttackRate = 0;
-	int nRightAttackRate = 0;
-	int nLeftAttackRate = 0;
-	int nAttackRate = 0;
-	int nBaseSpeed = 0;
-	int nAnimSpeed = 0;
-	int nRate = 0;
-
-	UNITS_MergeDualWieldWeaponStatLists(pUnit, 1);
-
-	nFasterAttackRate = STATLIST_UnitGetItemStatOrSkillStatValue(pUnit, STAT_ITEM_FASTERATTACKRATE, 0);
-
-	if (nFasterAttackRate)
-	{
-		nFasterAttackRate = 120 * nFasterAttackRate / (nFasterAttackRate + 120);
-	}
-
-	nAttackRate = STATLIST_UnitGetStatValue(pUnit, STAT_ATTACKRATE, 0);
-	nRate = nFasterAttackRate + nAttackRate;
-
-	if (UNITS_CanDualWield(pUnit))
-	{
-		pRightWeapon = INVENTORY_GetItemFromBodyLoc(pUnit->pInventory, BODYLOC_RARM);
-		if (!ITEMS_CanBeEquipped(pRightWeapon))
-		{
-			pRightWeapon = 0;
-		}
-
-		pLeftWeapon = INVENTORY_GetItemFromBodyLoc(pUnit->pInventory, BODYLOC_LARM);
-		if (!ITEMS_CanBeEquipped(pLeftWeapon))
-		{
-			pLeftWeapon = 0;
-		}
-
-		if (ITEMS_CheckItemTypeId(pRightWeapon, ITEMTYPE_WEAPON) && ITEMS_CheckItemTypeId(pLeftWeapon, ITEMTYPE_WEAPON))
-		{
-			nRightAttackRate = STATLIST_UnitGetStatValue(pRightWeapon, STAT_ATTACKRATE, 0);
-			nLeftAttackRate = STATLIST_UnitGetStatValue(pLeftWeapon, STAT_ATTACKRATE, 0);
-
-			nRate += (nRightAttackRate + nLeftAttackRate) / 2 - nRightAttackRate;
-		}
-	}
-
-	if (!pUnit->dwUnitType && pUnit->dwAnimMode == PLRMODE_SEQUENCE)
-	{
-		nRate -= 30;
-	}
-
-	if (nRate >= 15)
-	{
-		if (nRate > 175)
-		{
-			nRate = 175;
-		}
-	}
-	else
-	{
-		nRate = 15;
-	}
-
-	if (!STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_MELEEONLY))
-	{
-		nBaseSpeed = pUnit->pAnimData->dwAnimSpeed;
-	}
-	else
-	{
-		nBaseSpeed = D2Common_11043(pUnit);
-		if (!nBaseSpeed)
-		{
-			nBaseSpeed = pUnit->pAnimData->dwAnimSpeed;
-		}
-	}
-
-	nAnimSpeed = nRate * nBaseSpeed / 100;
-	nAnimSpeed = static_cast<int16_t>(D2Clamp(nAnimSpeed, 0, 0x7FFF));
-
-	pUnit->dwSeqSpeed = nAnimSpeed;
-	pUnit->wAnimSpeed = nAnimSpeed;
-}
-
 //1.10f: Inlined
 // 1.13c D2Common+0x2EF90
 BOOL UNITS_IsAnimModeBlocking(int nUnitType, int nAnimMode)
@@ -1478,33 +1393,6 @@ BOOL UNITS_IsAnimModeBlocking(int nUnitType, int nAnimMode)
 		return FALSE;
 
 	}
-}
-
-// not-1.13c: uncalled; retail inlines the block-mode rate update into D2Common+0x33110
-__forceinline void __fastcall UNITS_UpdateBlockAnimRateAndVelocity(D2UnitStrc* pUnit)
-{
-	int nFasterBlockRate = 0;
-	int nBlockRateBonus = 0;
-	int nAnimSpeed = 0;
-
-	nFasterBlockRate = STATLIST_UnitGetItemStatOrSkillStatValue(pUnit, STAT_ITEM_FASTERBLOCKRATE, 0);
-	if (nFasterBlockRate)
-	{
-		nFasterBlockRate = 120 * nFasterBlockRate / (nFasterBlockRate + 120);
-	}
-
-	if (STATES_CheckState(pUnit, STATE_HOLYSHIELD))
-	{
-		nBlockRateBonus = 100;
-	}
-	else
-	{
-		nBlockRateBonus = 50;
-	}
-
-	nAnimSpeed = (pUnit->pAnimData->dwAnimSpeed * (nBlockRateBonus + nFasterBlockRate)) / 100;
-
-	pUnit->wAnimSpeed = static_cast<int16_t>(D2Clamp(nAnimSpeed, 1, 0x7FFF));
 }
 
 //1.10f: Inlined
@@ -1541,31 +1429,6 @@ BOOL UNITS_IsSeqAnimSpeedModulatedByFCR(D2UnitStrc* pUnit, int nUnitType, int nA
 	}
 }
 
-// not-1.13c: uncalled; retail inlines the cast-mode rate update into D2Common+0x33110
-__forceinline void __fastcall UNITS_UpdateCastAnimRateAndVelocity(D2UnitStrc* pUnit)
-{
-	int nFasterCastRate = 0;
-	int nAnimSpeed = 0;
-	int nRate = 0;
-
-	nFasterCastRate = STATLIST_UnitGetItemStatOrSkillStatValue(pUnit, STAT_ITEM_FASTERCASTRATE, 0);
-	if (nFasterCastRate)
-	{
-		nFasterCastRate = (120 * nFasterCastRate) / (nFasterCastRate + 120);
-	}
-
-	nRate = nFasterCastRate + 100;
-	if (nRate > 175)
-	{
-		nRate = 175;
-	}
-
-	nAnimSpeed = nRate * pUnit->pAnimData->dwAnimSpeed / 100;
-
-	UNITS_SetAnimationSpeed(pUnit, nAnimSpeed);
-	pUnit->dwSeqSpeed = pUnit->wAnimSpeed;
-}
-
 //1.10f: Inlined
 // 1.13c D2Common+0x2EFC0
 BOOL UNITS_IsAnimModeGetHit(int nUnitType, int nAnimMode)
@@ -1584,22 +1447,6 @@ BOOL UNITS_IsAnimModeGetHit(int nUnitType, int nAnimMode)
 	}
 }
 
-// not-1.13c: uncalled; retail inlines the get-hit rate update into D2Common+0x33110
-__forceinline void __fastcall UNITS_UpdateGetHitAnimRateAndVelocity(D2UnitStrc* pUnit)
-{
-	int nFasterGetHitRate = 0;
-	int nAnimSpeed = 0;
-
-	nFasterGetHitRate = STATLIST_UnitGetItemStatOrSkillStatValue(pUnit, STAT_ITEM_FASTERGETHITRATE, 0);
-	if (nFasterGetHitRate)
-	{
-		nFasterGetHitRate = 120 * nFasterGetHitRate / (nFasterGetHitRate + 120);
-	}
-
-	nAnimSpeed = (pUnit->pAnimData->dwAnimSpeed * (nFasterGetHitRate + 50)) / 100;
-	UNITS_SetAnimationSpeed(pUnit, nAnimSpeed);
-}
-
 //1.10f: Inlined
 // 1.13c D2Common+0x2F010
 BOOL UNITS_IsAnimModeKnockBack(int nUnitType, int nAnimMode)
@@ -1614,15 +1461,6 @@ BOOL UNITS_IsAnimModeKnockBack(int nUnitType, int nAnimMode)
 		return FALSE;
 
 	}
-}
-
-// not-1.13c: uncalled; retail inlines the knockback rate update into D2Common+0x33110
-__forceinline void __fastcall UNITS_UpdateKnockbackAnimRateAndVelocity(D2UnitStrc* pUnit, int nAnimMode, int nUnitType, int nClassId)
-{
-	int nAnimSpeed = UNITS_GetBaseAnimSpeed(nUnitType, nClassId, nAnimMode);
-
-	UNITS_SetAnimationSpeed(pUnit, nAnimSpeed);
-	PATH_SetVelocity(pUnit->pDynamicPath, 4096, __FILE__, __LINE__);
 }
 
 //1.10f: Inlined
@@ -1645,24 +1483,6 @@ BOOL UNITS_AnimModeAllowsAnimSpeed(int nUnitType, int nAnimMode, int nClassId)
 	default:
 		return FALSE;
 	}
-}
-
-// not-1.13c: uncalled; retail inlines the remaining-mode rate update into D2Common+0x33110
-__forceinline void __fastcall UNITS_UpdateOtherAnimRateAndVelocity(D2UnitStrc* pUnit, int nAnimMode, int nUnitType, int nClassId)
-{
-	int nAnimSpeed = 0;
-	if (UNITS_AnimModeAllowsAnimSpeed(nUnitType, nAnimMode, nClassId))
-	{
-		nAnimSpeed = pUnit->pAnimData->dwAnimSpeed;
-	}
-	else
-	{
-		int nOtherAnimRate = STATLIST_UnitGetStatValue(pUnit, STAT_OTHER_ANIMRATE, 0);
-		nOtherAnimRate = D2Clamp(nOtherAnimRate, 15, 175);
-
-		nAnimSpeed = (nOtherAnimRate * pUnit->pAnimData->dwAnimSpeed) / 100;
-	}
-	UNITS_SetAnimationSpeed(pUnit, nAnimSpeed);
 }
 
 
@@ -1715,39 +1535,6 @@ BOOL UNITS_CanAnimModeUseVelocityModifier(int nUnitType, int nAnimMode, D2UnitSt
 		}
 	}
 	return FALSE;
-}
-
-// not-1.13c: uncalled; retail inlines the run/walk rate update into D2Common+0x33110
-__forceinline void __fastcall UNITS_UpdateRunWalkAnimRateAndVelocity(D2UnitStrc* pUnit, int nAnimMode, int nUnitType, int nClassId, const char* szFile, int nLine)
-{
-	int nFasterMoveVelocity = 0;
-	int nVelocityPercent = 0;
-
-	if (pUnit->pDynamicPath)
-	{
-		nFasterMoveVelocity = UNITS_GetAnimStatBasePercentage(ANIMMODESTAT_MOVEVELOCITY, pUnit);
-		nVelocityPercent = nFasterMoveVelocity + STATLIST_UnitGetStatValue(pUnit, STAT_VELOCITYPERCENT, 0);
-		if (nVelocityPercent < 25)
-		{
-			nVelocityPercent = 25;
-		}
-
-		int nBaseAnimSpeed = UNITS_GetBaseAnimSpeed(nUnitType, nClassId, nAnimMode);
-		int nAnimSpeed = nVelocityPercent * nBaseAnimSpeed / 100;
-
-		if (nAnimSpeed < 0 || nAnimSpeed > 32767)
-		{
-			FOG_Trace("UnitUpdateAnimRateAndVel(): bad velocity:%d  (TYPE:%d  CLASS:%d)  FILE:%s  LINE:%d", nAnimSpeed, nUnitType, nClassId, szFile, nLine);
-		}
-		UNITS_SetAnimationSpeed(pUnit, nAnimSpeed);
-
-		const int nVelocity = UNITS_GetBaseVelocity(nUnitType, nClassId);
-		PATH_SetVelocity(pUnit->pDynamicPath, nVelocityPercent * nVelocity / 100, __FILE__, __LINE__);
-	}
-	else
-	{
-		FOG_Trace("UnitUpdateAnimRateAndVel(): NULL path (TYPE:%d  CLASS:%d)  FILE:%s  LINE:%d", nUnitType, nClassId, szFile, nLine);
-	}
 }
 
 
@@ -1964,15 +1751,6 @@ BOOL __stdcall UNITS_IsDoor(D2UnitStrc* pUnit)
 	}
 
 	return FALSE;
-}
-
-//D2Common.0x6FDBFC50
-// not-1.13c: retail inlines this check (object txt +0x13C == 1) in D2Common+0x35470
-bool __fastcall UNITS_CheckIfObjectOrientationIs1(D2UnitStrc* pUnit)
-{
-	D2_ASSERT(pUnit);
-
-	return pUnit->pObjectData->pObjectTxt->nOrientation == 1;
 }
 
 //D2Common.0x6FDBFC90 (#10393)
@@ -3366,18 +3144,6 @@ void __stdcall UNITS_MergeDualWieldWeaponStatLists(D2UnitStrc* pUnit, int a2)
 	}
 }
 
-// not-1.13c: retail has no separate MonStats2 record getter; the bounds-checked wMonStatsEx lookup is inlined (seen at D2Common+0x353D0 and the mode-flag helpers 0x1400, 0x1470, 0x84B40)
-//D2Common.0x6FDC1EE0
-D2MonStats2Txt* __fastcall UNITS_GetMonStats2TxtRecord(int nRecordId)
-{
-	if (nRecordId >= 0 && nRecordId < sgptDataTables->nMonStats2TxtRecordCount)
-	{
-		return &sgptDataTables->pMonStats2Txt[nRecordId];
-	}
-
-	return NULL;
-}
-
 // Retail fatal: Ordinal_10024(&DAT_6fdda728, Ordinal_10265(code)); _exit(-1). Seams are weak, as in d2common_batch_1a330.
 __attribute__((weak)) uint32_t Ordinal_10265(uint32_t);
 __attribute__((weak)) void Ordinal_10024(const void*, uint32_t);
@@ -4293,14 +4059,37 @@ D2UnitStrc* __stdcall D2Common_10407(D2ActiveRoomStrc* pRoom, int nX, int nY, in
 	return D2Common_10407_Impl(pRoom, nX, nY, pCallback, a5, a6, NULL);
 }
 
-// 1.13c D2Common+0x7F670 (the +0x150..+0x15C writes of D2Common+0x1000 are folded in)
+// 1.13c D2Common+0x1000: the unit in EAX, a/b/c on the stack. Re-applies the player guards and stores the notice
+// record (1, a, b, c) at playerdata+0x150..0x15C (image offsets; unk0xA8[42..45] here). Nothing on any early exit.
+void D2Common_1000_SetPlayerNotice(D2UnitStrc* pUnit, uint32_t a, uint32_t b, uint32_t c)
+{
+	if (!pUnit || pUnit->dwUnitType != UNIT_PLAYER || !pUnit->pPlayerData) return;
+	uint32_t* p = &pUnit->pPlayerData->unk0xA8[42];
+	p[0] = 1; p[1] = a; p[2] = b; p[3] = c;
+}
+
+// 1.13c D2Common+0x7F670 (sets the first notice word, then branches into D2Common+0x1000 for the record)
 void __fastcall UNITS_SetInteractData(D2UnitStrc* pUnit, int nSkillId, int nUnitType, D2UnitGUID nUnitGUID)
 {
-	if (pUnit && pUnit->dwUnitType == UNIT_PLAYER && pUnit->pPlayerData)
+	if (pUnit && pUnit->dwUnitType == UNIT_PLAYER)
 	{
-		pUnit->pPlayerData->unk0xA8[42] = 1;
-		pUnit->pPlayerData->unk0xA8[43] = nSkillId;
-		pUnit->pPlayerData->unk0xA8[44] = nUnitType;
-		pUnit->pPlayerData->unk0xA8[45] = nUnitGUID;
+		if (pUnit->pPlayerData) pUnit->pPlayerData->unk0xA8[42] = 1;
+		D2Common_1000_SetPlayerNotice(pUnit, nSkillId, nUnitType, nUnitGUID);
 	}
+}
+
+// 1.13c D2Common+0x2F100 (unit in ESI, frame point on the stack): re-derive the sequence mode, frame and event
+// from the unit's current sequence point; true when the mode changed.
+BOOL __fastcall UNITS_RecomputeSeqMode(D2UnitStrc* pUnit, unsigned int nFramePoint)
+{
+	const unsigned int nOldMode = pUnit->dwSeqMode;
+	unsigned int nMode = nFramePoint;
+	unsigned int nFrame = 0;
+	int nDirection = 0;
+	int nEvent = 0;
+	DATATBLS_ComputeSequenceAnimation(pUnit->pAnimSeq, pUnit->dwSeqFrame, (int)nFramePoint, &nMode, &nFrame, &nDirection, &nEvent);
+	pUnit->nSeqCurrentFramePrecise = nFrame << 8;
+	pUnit->dwSeqMode = nMode;
+	pUnit->nActionFrame = (uint8_t)nEvent;
+	return nMode != nOldMode;
 }

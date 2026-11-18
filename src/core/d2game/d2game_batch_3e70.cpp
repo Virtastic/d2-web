@@ -50,9 +50,12 @@ struct D2GameBatch16Env {
     void     (*unwind2)(void*, int32_t);                                       // 0x7832 __local_unwind2 (SEH helper)
 };
 
-// The CRT output helpers already recovered in src/core/d2game/crt_write.cpp.
-extern "C" void d2game_write_char(uint8_t ch, CrtFile32* f, int32_t* pCount);
-extern "C" void d2game_write_string(int32_t* pCount, const uint8_t* s, CrtFile32* f, int32_t len);
+// The CRT output helpers live in the game tree (D2Game/GAME/CrtPrintf.cpp). The printf buffer is kept
+// non-empty by the caller, so the __flsbuf stand-in below is never reached.
+#include "../d2moo/include/D2Game/GAME/CrtPrintf.h"
+static uint32_t d2game_noFlush(int32_t, D2CrtFile32*) { return 0xFFFFFFFFu; }
+static inline void d2game_write_char(uint8_t ch, CrtFile32* f, int32_t* pCount) { CRT_WriteChar(ch, (D2CrtFile32*)f, pCount, d2game_noFlush); }
+static inline void d2game_write_string(int32_t* pCount, const uint8_t* s, CrtFile32* f, int32_t len) { CRT_WriteString(pCount, s, (D2CrtFile32*)f, len, d2game_noFlush); }
 
 static inline uint16_t rd16(const void* p, uint32_t o) { uint16_t v; std::memcpy(&v, (const uint8_t*)p + o, 2); return v; }
 static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
@@ -83,13 +86,7 @@ static uint8_t g_noio[0x24];
 // state: D2 never selects a DBCS locale), so the two-byte emit path below never runs.
 static uint8_t g_mbctype[0x200];
 
-// 0x4385 write_multi_char: emit num copies of ch, stopping on the -1 count write_char reports.
-static void d2game_write_multi_char(uint8_t ch, int32_t num, CrtFile32* f, int32_t* pCount) {
-    for (; num > 0; --num) {
-        d2game_write_char(ch, f, pCount);
-        if (*pCount == -1) return;
-    }
-}
+static inline void d2game_write_multi_char(uint8_t ch, int32_t num, CrtFile32* f, int32_t* pCount) { CRT_WriteMultiChar(ch, num, (D2CrtFile32*)f, pCount, d2game_noFlush); }
 
 static const uint16_t g_wideNull[] = { '(', 'n', 'u', 'l', 'l', ')', 0 };   // 0x6FD1F334 L"(null)"
 

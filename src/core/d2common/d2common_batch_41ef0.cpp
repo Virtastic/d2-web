@@ -121,16 +121,6 @@ void d2common_unit_free_collision_318c0(D2UnitStrc* pUnit)
 	UNITS_FreeCollisionPath(pUnit);
 }
 
-// 1.13c D2Common+0x301D0 (#10410): absolute difference between two units' X coordinates. Objects,
-// items and tiles read the static path's nX (+0x0C); players, monsters and missiles read the
-// dynamic path's wPosX (+2); a missing path counts as 0.
-extern "C" EMSCRIPTEN_KEEPALIVE
-int32_t d2common_UnitsXDistance_301d0(D2UnitStrc* pUnitA, D2UnitStrc* pUnitB)
-{
-	const int32_t nDelta = UNITS_GetXPosition(pUnitA) - UNITS_GetXPosition(pUnitB);
-	return nDelta < 0 ? -nDelta : nDelta;
-}
-
 // 1.13c D2Common+0x52AE0 (#10418): reapply every passive skill to a unit. The passive list
 // (sgptDataTables+0xBB4, count +0xBB0) yields short skill ids; each must name a skills.txt row
 // with nPassiveState > 0 (+0x94). The unit's highest-level skill of that id must exist, the state

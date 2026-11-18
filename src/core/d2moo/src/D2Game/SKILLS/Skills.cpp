@@ -1,4 +1,5 @@
 #include "SKILLS/Skills.h"
+#include <test_seam.h>
 
 #include <algorithm>
 #include <bit>
@@ -2979,22 +2980,80 @@ int32_t __fastcall sub_6FD136E0(D2UnitStrc* pUnit, int32_t nSkillId)
     return 0;
 }
 
+// 1.13c D2Game+0xA1D10: the new-aura tail D2Game+0xA2100 calls once the old aura is torn down
+// (1.10f has it inline in D2GAME_AssignSkill_6FD13800). pGame is D2Game+0xDF780's result for the unit.
+void __fastcall sub_A1D10_AssignAura(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId)
+{
+    D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
+    if (pSkillsTxtRecord && pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_AURA])
+    {
+        if (pSkillsTxtRecord->nAuraState >= 0 && pSkillsTxtRecord->nAuraState < sgptDataTables->nStatesTxtRecordCount)
+        {
+            D2SkillStrc* pHighestLevelSkill = SKILLS_GetHighestLevelSkillFromUnitAndId(pUnit, nSkillId);
+            if (pHighestLevelSkill)
+            {
+                const int32_t nSkillLevel = SKILLS_GetSkillLevel(pUnit, pHighestLevelSkill, 1);
+                if (nSkillLevel > 0)
+                {
+                    if (pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_IMMEDIATE])
+                    {
+                        D2GAME_SKILLS_Handler_6FD12BA0(pGame, pUnit, nSkillId, nSkillLevel, 1, 0, 0);
+                    }
+                    else
+                    {
+                        STATES_ToggleState(pUnit, pSkillsTxtRecord->nAuraState, 1);
+
+                        D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, pSkillsTxtRecord->nAuraState);
+                        if (!pStatList)
+                        {
+                            if (pUnit)
+                            {
+                                pStatList = STATLIST_AllocStatList(pUnit->pMemoryPool, 0, 0, pUnit->dwUnitType, pUnit->dwUnitId);
+                            }
+                            else
+                            {
+                                pStatList = STATLIST_AllocStatList(nullptr, 0, 0, 6, -1);
+                            }
+                        }
+
+                        if (pStatList)
+                        {
+                            STATLIST_SetState(pStatList, pSkillsTxtRecord->nAuraState);
+                            STATLIST_SetSkillId(pStatList, nSkillId);
+                            STATLIST_SetSkillLevel(pStatList, nSkillLevel);
+                            D2COMMON_10475_PostStatToStatList(pUnit, pStatList, 1);
+                            STATLIST_SetStatIfListIsValid(pStatList, STAT_MODIFIERLIST_SKILL, nSkillId, 0);
+                            STATLIST_SetStatIfListIsValid(pStatList, STAT_MODIFIERLIST_LEVEL, nSkillLevel, 0);
+                        }
+                    }
+
+                    sub_6FD13260(pGame, pUnit, nSkillId, nSkillLevel, 1);
+                }
+            }
+        }
+    }
+}
+
+// 1.13c D2Game+0xA2100 callee seams: each member overrides the like-named callee; all null in the game (the function probe fills them)
+#define ASS(f) (g_d2AssignSkill.f ? (decltype(&f))g_d2AssignSkill.f : &f)
+D2AssignSkillSeam g_d2AssignSkill = {};
+
 //D2Game.0x6FD13800
-// 1.13c D2Game+0xA2100 (the new-aura tail is its own function in 1.13c, D2Game+0xA1D10)
+// 1.13c D2Game+0xA2100 (the new-aura tail is its own function, D2Game+0xA1D10; the old aura's event sweep walks the
+// unit's timer list and frees each periodic-skill node with D2Game+0x8E6F0 instead of calling EVENTS_Delete)
 void __fastcall D2GAME_AssignSkill_6FD13800(D2UnitStrc* pUnit, int32_t a2, int32_t nSkillId, int32_t nFlags)
 {
-    // TODO: a2
     if (nSkillId == SKILL_LEFTHANDSWING)
     {
         return;
     }
 
-    if (!a2 && STATES_CheckState(pUnit, STATE_NOMANAREGEN))
+    if (!a2 && ASS(STATES_CheckState)(pUnit, STATE_NOMANAREGEN))
     {
-        STATES_ToggleState(pUnit, STATE_NOMANAREGEN, 0);
+        ASS(STATES_ToggleState)(pUnit, STATE_NOMANAREGEN, 0);
     }
 
-    D2SkillStrc* pSkill = SKILLS_GetSkillById(pUnit, nSkillId, nFlags);
+    D2SkillStrc* pSkill = ASS(SKILLS_GetSkillById)(pUnit, nSkillId, nFlags);
     if (!pSkill)
     {
         return;
@@ -3003,96 +3062,67 @@ void __fastcall D2GAME_AssignSkill_6FD13800(D2UnitStrc* pUnit, int32_t a2, int32
     D2SkillStrc* pRightSkill = nullptr;
     if (a2)
     {
-        SKILLS_SetLeftActiveSkill(pUnit, nSkillId, nFlags);
+        ASS(SKILLS_SetLeftActiveSkill)(pUnit, nSkillId, nFlags);
     }
     else
     {
-        pRightSkill = UNITS_GetRightSkill(pUnit);
-        SKILLS_SetRightActiveSkill(pUnit, nSkillId, nFlags);
+        pRightSkill = ASS(UNITS_GetRightSkill)(pUnit);
+        ASS(SKILLS_SetRightActiveSkill)(pUnit, nSkillId, nFlags);
     }
 
     D2UnitGUID nOwnerGUID = D2UnitInvalidGUID;
-    SKILLS_GetSkillInfo(pSkill, &nOwnerGUID, nullptr, nullptr, nullptr);
+    ASS(SKILLS_GetSkillInfo)(pSkill, &nOwnerGUID, nullptr, nullptr, nullptr);
     if (pUnit && pUnit->dwUnitType == UNIT_PLAYER)
     {
-        D2GAME_PACKETS_SendPacket0x23_6FC3DC60(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), 0, pUnit->dwUnitId, a2, nSkillId, nOwnerGUID);
+        ASS(D2GAME_PACKETS_SendPacket0x23_6FC3DC60)(ASS(SUNIT_GetClientFromPlayer)(pUnit, __FILE__, __LINE__), 0, pUnit->dwUnitId, a2, nSkillId, nOwnerGUID);
     }
 
-    if (!a2)
+    if (a2)
     {
-        if (pRightSkill)
+        return;
+    }
+
+    if (pRightSkill)
+    {
+        D2SkillsTxt* pRightSkillsTxtRecord = ASS(SKILLS_GetSkillsTxtRecord)(ASS(SKILLS_GetSkillIdFromSkill)(pRightSkill, __FILE__, __LINE__));
+        if (pRightSkillsTxtRecord && (pRightSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_AURA]))
         {
-            D2SkillsTxt* pRightSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(SKILLS_GetSkillIdFromSkill(pRightSkill, __FILE__, __LINE__));
-            if (pRightSkillsTxtRecord)
+            // 1.13c tests `>= 0 || < count` here (the old aura's state), so every state passes.
+            if (pRightSkillsTxtRecord->nAuraState >= 0 || pRightSkillsTxtRecord->nAuraState < sgptDataTables->nStatesTxtRecordCount)
             {
-                if (pRightSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_AURA])
+                D2StatListStrc* pStatList = ASS(STATLIST_GetStatListFromUnitAndState)(pUnit, pRightSkillsTxtRecord->nAuraState);
+                if (pStatList)
                 {
-                    // 1.13c tests `>= 0 || < count` here (the old aura's state), so every state passes.
-                    if (pRightSkillsTxtRecord->nAuraState >= 0 || pRightSkillsTxtRecord->nAuraState < sgptDataTables->nStatesTxtRecordCount)
+                    ASS(D2Common_10474)(pUnit, pStatList);
+                    ASS(STATLIST_FreeStatList)(pStatList);
+                }
+
+                ASS(STATES_ToggleState)(pUnit, pRightSkillsTxtRecord->nAuraState, 0);
+            }
+
+            D2GameStrc* pGame = ASS(SUNIT_GetGameFromUnit)(pUnit);
+            if (pUnit)
+            {
+                D2EventTimerStrc* pTimer = pUnit->pTimer;
+                while (pTimer)
+                {
+                    D2EventTimerStrc* pNextTimer = pTimer->pNext;
+                    if (pTimer->nEventType == EVENTTYPE_PERIODICSKILLS && pTimer->dwEventCustomId == -1)
                     {
-                        D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, pRightSkillsTxtRecord->nAuraState);
-                        if (pStatList)
-                        {
-                            D2Common_10474(pUnit, pStatList);
-                            STATLIST_FreeStatList(pStatList);
-                        }
-
-                        STATES_ToggleState(pUnit, pRightSkillsTxtRecord->nAuraState, 0);
+                        ASS(sub_6FC34890)(pGame, pTimer);
                     }
-
-                    D2GAME_EVENTS_Delete_6FC34840(SUNIT_GetGameFromUnit(pUnit), pUnit, EVENTTYPE_PERIODICSKILLS, -1);
+                    pTimer = pNextTimer;
                 }
             }
         }
+    }
 
-        D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
-        if (pSkillsTxtRecord && pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_AURA])
+    if (nSkillId >= 0 && nSkillId < sgptDataTables->nSkillsTxtRecordCount)
+    {
+        const D2SkillsTxt* pRow = &sgptDataTables->pSkillsTxt[nSkillId];
+        if (pRow->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_AURA])
         {
-            D2GameStrc* pGame = SUNIT_GetGameFromUnit(pUnit);
-            if (pSkillsTxtRecord->nAuraState >= 0 && pSkillsTxtRecord->nAuraState < sgptDataTables->nStatesTxtRecordCount)
-            {
-                D2SkillStrc* pHighestLevelSkill = SKILLS_GetHighestLevelSkillFromUnitAndId(pUnit, nSkillId);
-                if (pHighestLevelSkill)
-                {
-                    const int32_t nSkillLevel = SKILLS_GetSkillLevel(pUnit, pHighestLevelSkill, 1);
-                    if (nSkillLevel > 0)
-                    {
-                        if (pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_IMMEDIATE])
-                        {
-                            D2GAME_SKILLS_Handler_6FD12BA0(pGame, pUnit, nSkillId, nSkillLevel, 1, 0, 0);
-                        }
-                        else
-                        {
-                            STATES_ToggleState(pUnit, pSkillsTxtRecord->nAuraState, 1);
-
-                            D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, pSkillsTxtRecord->nAuraState);
-                            if (!pStatList)
-                            {
-                                if (pUnit)
-                                {
-                                    pStatList = STATLIST_AllocStatList(pUnit->pMemoryPool, 0, 0, pUnit->dwUnitType, pUnit->dwUnitId);
-                                }
-                                else
-                                {
-                                    pStatList = STATLIST_AllocStatList(nullptr, 0, 0, 6, -1);
-                                }
-                            }
-
-                            if (pStatList)
-                            {
-                                STATLIST_SetState(pStatList, pSkillsTxtRecord->nAuraState);
-                                STATLIST_SetSkillId(pStatList, nSkillId);
-                                STATLIST_SetSkillLevel(pStatList, nSkillLevel);
-                                D2COMMON_10475_PostStatToStatList(pUnit, pStatList, 1);
-                                STATLIST_SetStatIfListIsValid(pStatList, STAT_MODIFIERLIST_SKILL, nSkillId, 0);
-                                STATLIST_SetStatIfListIsValid(pStatList, STAT_MODIFIERLIST_LEVEL, nSkillLevel, 0);
-                            }
-                        }
-
-                        sub_6FD13260(pGame, pUnit, nSkillId, nSkillLevel, 1);
-                    }
-                }
-            }
+            ASS(sub_A1D10_AssignAura)(ASS(SUNIT_GetGameFromUnit)(pUnit), pUnit, nSkillId);
         }
     }
 }
@@ -3179,7 +3209,7 @@ int32_t __fastcall D2GAME_CreatePortalObject_6FD13DF0(D2GameStrc* pGame, D2UnitS
         *ppSourceUnit = nullptr;
     }
 
-    if (pUnit && DUNGEON_IsRoomInTown(pRoom))
+    if (pUnit && D2_CALL(DUNGEON_IsRoomInTown, pRoom))
     {
 #ifdef D2_VERSION_HAS_UBERS
         if ((nDestLevel != LEVEL_MOOMOOFARM
@@ -3192,15 +3222,15 @@ int32_t __fastcall D2GAME_CreatePortalObject_6FD13DF0(D2GameStrc* pGame, D2UnitS
         if (nDestLevel != LEVEL_MOOMOOFARM || nObjectId != OBJECT_PERMANENT_TOWN_PORTAL)
 #endif
         {
-            SUNIT_AttachSound(pUnit, 0x18u, pUnit);
+            D2_CALL(SUNIT_AttachSound, pUnit, 0x18u, pUnit);
             return 0;
         }
     }
 
-    const int32_t nAct = DRLG_GetActNoFromLevelId(nDestLevel);
-    const int32_t nSourceLevel = DUNGEON_GetLevelIdFromRoom(pRoom);
+    const int32_t nAct = D2_CALL(DRLG_GetActNoFromLevelId, nDestLevel);
+    const int32_t nSourceLevel = D2_CALL(DUNGEON_GetLevelIdFromRoom, pRoom);
 
-    D2_ASSERT(nAct == DRLG_GetActNoFromLevelId(nSourceLevel));
+    D2_ASSERT(nAct == D2_CALL(DRLG_GetActNoFromLevelId, nSourceLevel));
 
     int32_t nTargetX = nX;
     int32_t nTargetY = nY;
@@ -3210,7 +3240,7 @@ int32_t __fastcall D2GAME_CreatePortalObject_6FD13DF0(D2GameStrc* pGame, D2UnitS
     coords.nY = nY;
     if (!bPerm)
     {
-        if (!COLLISION_GetFreeCoordinatesWithField(pRoom, &coords, &coords, 3, COLLIDE_MASK_SPAWN, 0xC01u, 0))
+        if (!D2_CALL(COLLISION_GetFreeCoordinatesWithField, pRoom, &coords, &coords, 3, COLLIDE_MASK_SPAWN, 0xC01u, 0))
         {
             return 0;
         }
@@ -3219,26 +3249,26 @@ int32_t __fastcall D2GAME_CreatePortalObject_6FD13DF0(D2GameStrc* pGame, D2UnitS
         nTargetY = coords.nY;
     }
 
-    D2ActiveRoomStrc* pTargetRoom = D2GAME_GetRoom_6FC52070(pRoom, nTargetX, nTargetY);
+    D2ActiveRoomStrc* pTargetRoom = D2_CALL(D2GAME_GetRoom_6FC52070, pRoom, nTargetX, nTargetY);
     if (!pTargetRoom)
     {
         return 0;
     }
 
-    D2UnitStrc* pPortal = SUNIT_AllocUnitData(UNIT_OBJECT, nObjectId, nTargetX, nTargetY, pGame, pTargetRoom, 1, 1, 0);
+    D2UnitStrc* pPortal = D2_CALL(SUNIT_AllocUnitData, UNIT_OBJECT, nObjectId, nTargetX, nTargetY, pGame, pTargetRoom, 1, 1, 0);
     if (ppSourceUnit)
     {
         *ppSourceUnit = pPortal;
     }
 
-    UNITS_ChangeAnimMode(pPortal, 1);
+    D2_CALL(UNITS_ChangeAnimMode, pPortal, 1);
 
-    D2UnitStrc* pLinkPortal = D2GAME_CreateLinkPortal_6FD13B20(pGame, pPortal, nDestLevel, nSourceLevel);
+    D2UnitStrc* pLinkPortal = D2_CALL(D2GAME_CreateLinkPortal_6FD13B20, pGame, pPortal, nDestLevel, nSourceLevel);
     if (pLinkPortal)
     {
-        UNITS_SetObjectPortalFlags(pLinkPortal, UNITS_GetObjectPortalFlags(pLinkPortal) | 3);
-        DUNGEON_ToggleHasPortalFlag(pTargetRoom, 0);
-        DUNGEON_ToggleHasPortalFlag(UNITS_GetRoom(pLinkPortal), 0);
+        D2_CALL(UNITS_SetObjectPortalFlags, pLinkPortal, D2_CALL(UNITS_GetObjectPortalFlags, pLinkPortal) | 3);
+        D2_CALL(DUNGEON_ToggleHasPortalFlag, pTargetRoom, 0);
+        D2_CALL(DUNGEON_ToggleHasPortalFlag, UNITS_GetRoom(pLinkPortal), 0);
         return 1;
     }
 

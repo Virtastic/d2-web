@@ -1,4 +1,5 @@
 #include "QUESTS/QuestsFX.h"
+#include <test_seam.h>
 
 #include <algorithm>
 #include <cstdlib>
@@ -85,7 +86,7 @@ void __fastcall QUESTSFX_SpawnMephistoDeathControlMissile(D2GameStrc* pGame, D2U
     missileParams.nSkillLevel = 1;
     missileParams.nRange = 100;
 
-    MISSILES_CreateMissileFromParams(pGame, &missileParams);
+    D2_CALL(MISSILES_CreateMissileFromParams, pGame, &missileParams);
 }
 
 //D2Game.0x6FCB9820

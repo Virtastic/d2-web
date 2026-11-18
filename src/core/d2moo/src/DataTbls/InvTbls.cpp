@@ -86,13 +86,6 @@ void __fastcall DATATBLS_LoadInventoryTxt(HD2ARCHIVE hArchive)
 	D2_ASSERT(sgptDataTables->nInventoryTxtRecordCount == NUM_INVENTORY_PAGE_STATS * NUM_GAME_RESOLUTIONS);
 }
 
-//D2Common.0x6FD54F10
-// not-1.13c: retail inlines the inventory unload into the unload-all function at 0x5E870
-void __fastcall DATATBLS_UnloadInventoryTxt()
-{
-	DATATBLS_UnloadBin(sgptDataTables->pInventoryTxt);
-}
-
 //D2Common.0x6FD54F20 (#10635)
 // 1.13c D2Common+0x82030 (the index bound is inclusive: retail faults only above the record count)
 void __stdcall DATATBLS_GetInventoryRect(int nInventoryTxtId, int bHigherRes, D2InvRectStrc* pInvRect)
