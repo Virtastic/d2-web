@@ -117,7 +117,8 @@ export function scan(text, weakMacros = []) {
     for (const m of weakMacros) if (new RegExp('(^|\\s)' + m + '(\\s|$)').test(s)) { weak = true; s = s.replace(new RegExp('(^|\\s)' + m + '(?=\\s|$)'), ' ').trim(); }
     const isExtern = /^extern\b/.test(s);
     const isStatic = /(^|\s)static\b/.test(s) || /(^|\s)(inline|__inline|__forceinline|constexpr)\b/.test(s);
-    const sNoExtern = s.replace(/^extern\s+/, '');
+    // `ret (NAME)(args)` defines NAME while keeping a same-named function-like macro from expanding
+    const sNoExtern = s.replace(/^extern\s+/, '').replace(/\(\s*([A-Za-z_]\w*)\s*\)(?=\s*\()/, '$1');
     // a function: first '(' at depth 0 with an identifier (or operator) before it, and not a (*pointer) variable
     const po = findFnParen(sNoExtern);
     if (po >= 0) {
