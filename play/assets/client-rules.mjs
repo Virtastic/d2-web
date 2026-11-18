@@ -25,6 +25,11 @@ export function cellColour(value, base, col = 0) {
   return call('d2_client_cell_colour', ['number', 'number', 'number'], [value | 0, base | 0, col | 0]);
 }
 
+/** Which cells a character-screen skill row draws (D2Client+0x2FD30): bit 0 damage, bit 1 attack rating. */
+export function skillRowCells(descdam, descatt) {
+  return call('d2_client_skill_row_cells', ['number', 'number'], [descdam | 0, descatt | 0]);
+}
+
 /** Party-panel row colour: 2 my party, 8 another party, 1 hostile to me, 0 none. */
 export function partyRowMode(share, party, mine, hostile) {
   return call('d2_client_party_row_mode', ['number', 'number', 'number', 'number'], [share, party, mine, hostile ? 1 : 0]);

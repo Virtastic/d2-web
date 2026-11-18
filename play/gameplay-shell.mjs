@@ -3327,6 +3327,7 @@ function drainUnitSounds() {
     if (event.soundEvent === 0x102) { unitSounds.playRow(event.nativeSelectedRow, { source: 'skill-dosound', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0xA2C90: wDoSound
     if (event.soundEvent === 0x104) { unitSounds.playRow(event.nativeSelectedRow, { source: 'neutral-footstep', kind: 'footstep', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x23C00 in neutral on the client unit's frame
     if (event.soundEvent === 0x103) { unitSounds.playRow(event.nativeSelectedRow, { source: 'shrine-state', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x24A70: shrine state sound
+    if (event.soundEvent === 0x104) { unitSounds.playRow(event.nativeSelectedRow, { source: 'transaction' }).catch(() => {}); continue; } // D2Client+0x4BC80: a 0x2A reply's unitless sound
     if (event.soundEvent === 0x101) { unitSounds.playRow(event.nativeSelectedRow, { source: 'state-onsound', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x73760: States.txt onsound on a new state set
     const spatial = unitSoundNativeSpatial(event, snapshot, listener);
     event.nativeSpatialGainByte = spatial?.gainByte ?? null;

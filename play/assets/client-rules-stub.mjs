@@ -10,6 +10,10 @@ export function bindStubRules() {
     _free: () => {},
     ccall(name, _ret, _types, a) {
       if (name === 'd2_client_cell_colour') return a[0] > a[1] ? 3 : a[0] < a[1] ? 1 : a[2];
+      if (name === 'd2_client_skill_row_cells') {   // skill_row_cells_2fd30.cpp
+        const [d, t] = a, dn = d === 0 || d === 0x5a || d === 0x69 || d === 0x89 || (d >= 0x19 && d <= 0x24) || (d >= 0x2a && d <= 0x35);
+        return (d >= 0 && d < 0x90 && !dn ? 1 : 0) | (t >= 0 && t < 0x48 && !(t === 0 || (t >= 6 && t <= 0xe)) ? 2 : 0);
+      }
       if (name === 'd2_client_party_row_mode') {
         const [share, pt, mine, hostile] = a;
         return hostile ? 1 : share > 1 && pt !== 0xffff ? (mine === pt ? 2 : 8) : 0;

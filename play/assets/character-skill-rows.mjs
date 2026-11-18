@@ -2,12 +2,10 @@
 // ord 10828) and once for UNITS_GetRightSkill (ord 10507). 0x2FD30 reads the skill's SkillDesc record through 0x17F0
 // (our d2_client_skilldesc_for_skill): the row title is wStrAlt (+0x0E) upper-cased, the damage cell is drawn only when
 // wDescDam (+0x12) names a non-null entry of the 0xF5210 calc table (< 0x90), the attack-rating cell only when wDescAtt
-// (+0x14) names a non-null entry of the 0xF52A0 table (< 0x48). The null entries below are read from those tables.
-const DAM_NULL = new Set([0, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f,
-  0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x5a, 0x69, 0x89]);
-const ATT_NULL = new Set([0, 6, 7, 8, 9, 0xa, 0xb, 0xc, 0xd, 0xe]);
-export const skillRowHasDamage = (descdam) => descdam < 0x90 && !DAM_NULL.has(descdam);
-export const skillRowHasRating = (descatt) => descatt < 0x48 && !ATT_NULL.has(descatt);
+// (+0x14) names a non-null entry of the 0xF52A0 table (< 0x48). The engine owns that gating (d2_client_skill_row_cells).
+import { skillRowCells } from './client-rules.mjs';
+export const skillRowHasDamage = (descdam) => (skillRowCells(descdam, 0) & 1) === 1;
+export const skillRowHasRating = (descatt) => (skillRowCells(0, descatt) & 2) === 2;
 
 /** [skill id, wStrAlt, wDescDam, wDescAtt] for the left then the right skill (8 ints; -1 for a hand with no record),
  *  then the 0x35270 damage cells (8 ints) and their two texts. */
