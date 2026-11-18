@@ -52,9 +52,9 @@ struct D2Client9E970Env {
 // 1.13c D2Client+0x9E970
 extern "C" void d2_client_9e970(D2Client9E970Env& e, D2Client9E970Node* node, uint32_t mode,
                                 D2Client9E970Node* (*nextNode)(uint32_t)) {
+    const uint32_t abs = e.ord10013();   // retail calls Ordinal_10013 before GetTickCount (1.13c D2Client+0x9E98x)
     const uint32_t tick = e.getTick();
     const bool timed = (int32_t)e.tickGate > 3;
-    const uint32_t abs = e.ord10013();
     if (mode > 1) { e.fatal(0xf3); return; }
     for (; node; node = node->next ? nextNode(node->next) : nullptr) {
         D2Client9E970Entry* p = e.entry(node->entry);

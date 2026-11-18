@@ -6,12 +6,13 @@
 #include <Path/Path.h>
 #include <Units/Units.h>
 #include "realm_skill_start.h"
+#include "../d2moo/compat/test_seam.h"
 
 int d2client_realm_56930(D2UnitStrc* unit, int skillId, int level) {
     D2SkillsTxt* row = DATATBLS_GetSkillsTxtRecord(skillId);
     if (!row) return 0;
-    D2SkillStrc* used = UNITS_GetUsedSkill(unit);
+    D2SkillStrc* used = D2_CALL(UNITS_GetUsedSkill, unit);
     if (!used) return 0;
-    SKILLS_SetParam1(used, SKILLS_EvaluateSkillFormula(unit, row->dwCltCalc[0], skillId, level));
+    D2_CALL(SKILLS_SetParam1, used, D2_CALL(SKILLS_EvaluateSkillFormula, unit, row->dwCltCalc[0], skillId, level));
     return 1;
 }

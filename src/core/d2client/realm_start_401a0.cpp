@@ -6,11 +6,12 @@
 #include <Path/Path.h>
 #include <Units/Units.h>
 #include "realm_skill_start.h"
+#include "../d2moo/compat/test_seam.h"
 
 int d2client_realm_401a0(D2UnitStrc* unit, int skillId, int) {
     D2SkillsTxt* row = DATATBLS_GetSkillsTxtRecord(skillId);
     if (!row) return 0;
     const int st = row->nAuraState;
     if (st < 0 || st >= sgptDataTables->nStatesTxtRecordCount) return 0;
-    return STATES_CheckState(unit, st) == 0;
+    return D2_CALL(STATES_CheckState, unit, st) == 0;
 }
