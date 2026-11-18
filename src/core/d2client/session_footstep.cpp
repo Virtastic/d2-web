@@ -1,9 +1,10 @@
 // The session replay's local player footsteps: 1.13c D2Client+0x2B1E0 -> 0x1C150 -> 0x23C00 on the local player's client unit.
 // The due rule is footstep_23c00.cpp's (d2_client_footstep_due); the row is 0x22FB0's (class group base + floor offset, + 24 in
-// run); the submit goes to the sound pump's unit queue (0x88A70). Nothing is queued unless the A trace is armed.
+// run); the submit goes to the sound pump's unit queue (0x88A70), logged when the A trace is armed, and to the play path's queue.
 #include <cstdint>
 #include <cstring>
 #include <unordered_map>
+#include <vector>
 #include "d2client_5dfd0.h"
 
 void d2client_sound_unit_submit(int32_t row);
@@ -17,6 +18,7 @@ extern "C" int32_t d2_client_footstep_due(uint32_t cur, uint32_t total, uint32_t
 namespace {
 struct ClientPlayer { uint32_t mode = 0, frame = 0, total = 0, step = 0, last = 0, serverMode = 0, entered = 0; bool seen = false; };
 ClientPlayer g_cp;
+std::vector<int32_t> g_heroSteps;   // the local player's footfall rows for the play path (d2client_session_hero_step_take)
 // D2Client+0xF7694[class] +0x28: the class footstep group base (read from the 1.13c image).
 const uint32_t kClassGait[7] = { 2768, 2720, 2720, 2768, 2816, 2720, 2720 };
 bool moving(uint32_t m) { return m == 2 || m == 3 || m == 6; }
@@ -32,7 +34,12 @@ std::unordered_map<uint32_t, bool> g_pathDone;   // units whose server walk/run 
 int32_t g_neutral[2] = { 0, 0 };   // the last monster call's neutral-mode footstep and layer rows
 }
 
-extern "C" void d2client_session_footstep_reset() { g_cp = ClientPlayer{}; g_cm.clear(); g_pathDone.clear(); }
+extern "C" void d2client_session_footstep_reset() { g_cp = ClientPlayer{}; g_heroSteps.clear(); g_cm.clear(); g_pathDone.clear(); }
+extern "C" bool d2client_session_hero_step_take(int32_t* row) {
+    if (g_heroSteps.empty()) return false;
+    *row = g_heroSteps.front(); g_heroSteps.erase(g_heroSteps.begin());
+    return true;
+}
 // The server's walk or run frame callback found its path at its end (#10342 false). The client's own copy of that path
 // (0x2A700, #10342 on the client unit) steps with the server's and ends on the same frame, at the last point or at the same
 // wall: 0x4DA60 then 0x2A6C0 put the client unit in neutral at frame 0, after the frame advance and before 0x23C00. A server
@@ -92,7 +99,9 @@ extern "C" void d2client_session_player_footstep(uint32_t serverMode, int32_t ta
     if (g_cp.step && g_cp.total && cls < 7 && d2_client_footstep_due(g_cp.frame, g_cp.total, g_cp.step, 2, 0, now, g_cp.last)) {   // 0x23C00, player: n 2, phase 0
         g_cp.last = now;
         const uint32_t f = floor >= 2 && floor <= 6 ? 4u * uint32_t(floor - 1) : 0u;
-        d2client_sound_unit_submit(int32_t(kClassGait[cls] + f + (g_cp.mode == 3 ? 24u : 0u)));   // 0x22FB0
+        const int32_t row = int32_t(kClassGait[cls] + f + (g_cp.mode == 3 ? 24u : 0u));   // 0x22FB0
+        d2client_sound_unit_submit(row);
+        if (g_heroSteps.size() < 64) g_heroSteps.push_back(row);   // the same footfall for the play path's mixer
     }
     if (g_cp.mode == 3 && (inTown || staminaZero)) { const uint32_t w = inTown ? 6u : 2u; g_cp.mode = w; g_cp.frame = 0; rate(w, &g_cp.step, &g_cp.total); return; }   // 0x19D80: stamina 0 turns run into walk, town or not
     if (g_cp.total) g_cp.frame = (g_cp.frame + g_cp.step) % g_cp.total;

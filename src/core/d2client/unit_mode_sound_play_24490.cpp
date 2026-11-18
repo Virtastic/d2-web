@@ -69,6 +69,10 @@ uint32_t g_rows[16], g_off[16], g_n = 0, g_kind = 0, g_sub = 0, g_subCalls = 0, 
 bool g_attackNext = false, g_dry = false, g_drew = false;
 uint8_t g_scratch[0x100];
 uint32_t g_stamp = 0xFFFFFC00u;   // D2Client+0x11C4C4: the tick of the last struck/death (0x23630) or attack (0x242B0) sound
+// The session client runs the same entries for its own units (d2_client_unit_mode_sounds_session) and keeps its own copy
+// of 0x11C4C4 (monster_face.cpp, d2_client_last_roll_mark); each client's entries write only its own copy.
+bool g_session = false;
+void mark() { if (g_session) d2_client_last_roll_mark(); }
 
 uint32_t unitAddr() { return (uint32_t)(uintptr_t)&g_unit; }
 void keep(uint32_t row, uint32_t kind, uint32_t off = 0) {
@@ -145,7 +149,7 @@ uint32_t host(D2cCall* c) {
         g_sub = 0x23630; g_subCalls = 0; g_hitMode = (g.type == 1) ? (m == 3 || m == 0xD) : (m == 4 || m == 0x13);
         uint32_t sfx = 0, stamp = 0xFFFFFFFFu;   // stays the marker on 0x23630's early returns (no 0x11C4C4 write)
         d2_client_23630_rule(unitAddr(), g.hit, (int32_t)m, (g.flags & F_HERO) ? unitAddr() : 0, d2_client_play_sound_now(), &sfx, &stamp, host);
-        if (stamp != 0xFFFFFFFFu) { g_stamp = stamp; d2_client_last_roll_mark(); }
+        if (stamp != 0xFFFFFFFFu) { g_stamp = stamp; mark(); }
         g_sub = 0;
         return 0;
     }
@@ -187,14 +191,14 @@ uint32_t host(D2cCall* c) {
         uint32_t last = 0xFFFFFFFFu; e.g6fbcc4c4 = &last;   // the marker stays unless 0x22CA0 submitted (its 0x11C4C4 write)
         g_skillMode = c->edx;
         d2c_22ca0(&e, unitAddr(), c->edx, g_scratch);
-        if (last != 0xFFFFFFFFu) d2_client_last_roll_mark();
+        if (last != 0xFFFFFFFFu) mark();
         return 0;
     }
     case 0x22D60: {
         // 1.13c D2Client+0x22D60 -> 0x221C0: the block row from the hit class's low nibble
         const uint32_t n = g.hit & 0xF;
         keep(n >= 1 && n <= 9 ? 0x18E : (n == 10 || n == 11) ? 0x191 : 0, K_BLOCK);
-        g_stamp = d2_client_play_sound_now(); d2_client_last_roll_mark();   // 0x22D60 writes unit+0x7C and 0x11C4C4
+        g_stamp = d2_client_play_sound_now(); mark();   // 0x22D60 writes unit+0x7C and 0x11C4C4
         return 0;
     }
     }
@@ -223,6 +227,17 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_unit_mode_sounds(uint32_t typ
     d2_client_24490(unitAddr(), mode, 1, host);
     if (type == 0 && mode == 0xC) { for (uint32_t i = 0; i < g_n; ++i) g_rows[i] = (g_rows[i] & 0xFFFF) | (K_KICK << 16); }
     return g_n;
+}
+// The same call from the session client: its 0x11C4C4 writes go to the session's copy, the play path's is left as it was
+// (otherwise the session's played attack at a tick would shut the play path's own gate for the same attack).
+extern "C" uint32_t d2_client_unit_mode_sounds_session(uint32_t type, uint32_t id, int32_t cls, uint32_t typeFlags,
+                                                       int32_t superUnique, uint32_t mode, uint32_t hit,
+                                                       uint32_t cvt, uint32_t flags, int32_t roll) {
+    const uint32_t stamp = g_stamp;
+    g_session = true;
+    const uint32_t n = d2_client_unit_mode_sounds(type, id, cls, typeFlags, superUnique, mode, hit, cvt, flags, roll);
+    g_session = false; g_stamp = stamp;
+    return n;
 }
 // 0x227E0 alone (a hit landing on a unit whose mode does not change): the impact/body pair as 0x23630 submits it.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_unit_impact_sounds(uint32_t type, int32_t cls, uint32_t hit, uint32_t mode) {

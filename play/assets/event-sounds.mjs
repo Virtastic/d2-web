@@ -52,7 +52,8 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
       const p = snapshot?.player, m = p?.motion?.active ? p.motion : p, cls = p?.renderIdentity?.classId ?? p?.classId ?? snapshot?.entities?.find((e) => e.type === 0 && e.id === snapshot.playerId)?.classId;
       if (Number.isInteger(snapshot?.level)) stepLevel = snapshot.level;
       const foot = (extra) => play((GAIT_BASE[cls] ?? 2768) + extra + floorOffset(0, 0), { kind: 'footstep', unitType: 0, classId: cls }); // 0x22FB0
-      if (m && (m.mode === 2 || m.mode === 3 || m.mode === 6)) { // 6 = town walk (a retail recording: base row, no run footfall)
+      if (snapshot?.engineHeroSteps) stepT = -2;   // the engine runs the hero's client unit (0x1C150 -> 0x23C00) and plays its footfalls
+      else if (m && (m.mode === 2 || m.mode === 3 || m.mode === 6)) { // 6 = town walk (a retail recording: base row, no run footfall)
         // Retail (D2Client+0x23C00, traced against a retail recording): the run's first footfall plays the run group at once,
         // the rest follow the walk-step model above, all in the walk group.
         if (stepT === -2) { stepT = -1; const field = m.mode === 3 && !p.explicitMove; [STEP, PER, RUNG] = field ? [151, 1024, 24] : [320, 1536, 0]; } // armed: retail submits one tick after the unit enters the mode

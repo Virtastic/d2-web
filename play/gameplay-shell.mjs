@@ -3308,7 +3308,7 @@ function drainUnitSounds() {
   if (enginePlays) { let born = []; if (Module._d2_session_missile_births) { const cb = missileBirthBuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [8])); const bp = Number(Module.ccall('d2_session_missile_births', 'bigint', ['bigint'], [BigInt(cb)])), bn = Module.HEAP32[cb >> 2]; for (let i = 0; i < bn; i++) born.push([Module.HEAP32[(bp >> 2) + 2 * i], Module.HEAP32[(bp >> 2) + 2 * i + 1]]); }
     missileSounds?.update(snapshot?.entities ?? [], engineTicks, born); }
   // D35: client-side event sounds (pickup, gold, drop, footstep) run every tick, not only on ticks the engine queued a sound.
-  if (snapshot) snapshot.engineNeutralSteps = enginePlays;   // the engine plays neutral footsteps (0x104 below)
+  if (snapshot) snapshot.engineNeutralSteps = snapshot.engineHeroSteps = enginePlays;   // the engine plays neutral footsteps (0x104) and the hero's (0x106) below
   eventSounds?.update(snapshot, readAdvancement()?.level);
   drainAmbientSounds();   // the ambient module is fed by the engine or by the realm's area audio, never both
   for (let r; (r = Module._d2_client_4bc80_take_sound?.() | 0) > 0;) if (enginePlays) unitSounds.playRow(r, { source: 'transaction', unitType: -1 }).catch(() => {});   // 0x4BC80: a 0x2A reply of result 1 (a sale) plays item_gold, no unit
@@ -3328,6 +3328,9 @@ function drainUnitSounds() {
     if (event.soundEvent === 0x104) { unitSounds.playRow(event.nativeSelectedRow, { source: 'neutral-footstep', kind: 'footstep', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x23C00 in neutral on the client unit's frame
     if (event.soundEvent === 0x103) { unitSounds.playRow(event.nativeSelectedRow, { source: 'shrine-state', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x24A70: shrine state sound
     if (event.soundEvent === 0x104) { unitSounds.playRow(event.nativeSelectedRow, { source: 'transaction' }).catch(() => {}); continue; } // D2Client+0x4BC80: a 0x2A reply's unitless sound
+    if (event.soundEvent === 0x106) { unitSounds.playRow(event.nativeSelectedRow, { source: 'hero-footstep', kind: 'footstep', unitType: 0, unitId: event.unitId, classId: event.classId }).catch(() => {}); continue; } // D2Client+0x23C00 on the local player's client unit
+    if (event.soundEvent === 0x107) { unitSounds.playRow(event.nativeSelectedRow, { source: 'npc-speech', commandReply: event.updateUnitId === 1, unitType: 0, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x7D3C0: the NPC speech line on the local player
+    if (event.soundEvent === 0x105) { unitSounds.playRow(event.nativeSelectedRow, { source: 'npc-greeting', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x23F20 case 0x12: the 0x9CCE0 greeting on the local player
     if (event.soundEvent === 0x101) { unitSounds.playRow(event.nativeSelectedRow, { source: 'state-onsound', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x73760: States.txt onsound on a new state set
     const spatial = unitSoundNativeSpatial(event, snapshot, listener);
     event.nativeSpatialGainByte = spatial?.gainByte ?? null;

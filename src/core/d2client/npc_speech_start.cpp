@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <vector>
 #include "../d2moo/include/D2Text.h"
 #include "../d2moo/include/D2PacketDef.h"
 #include "sound_unit_refs.h"
@@ -40,6 +41,8 @@ int16_t g_played[9]; uint16_t g_nPlayed = 0;   // 0x119792, count 0x1197A6
 std::string g_pendingG;
 std::string g_frameG;       // the frame step's 10048s, recorded after 0x739E0's tail
 int32_t g_sound = 0;        // DAT 0x11BF9C
+std::vector<int32_t> g_playRows;   // the 0x7D3C0 submits for the play path (d2client_npc_speech_take_row); bit 31: opened under the packet dispatch
+bool g_tailDriven = false;  // the G frame tail runs the frame step (the draw-list rig); otherwise the session frame does
 
 // 0x7BFB0: line 0 of the string is the scroll rate (atol); every further '\n'-ended run of up to 100 units is a line
 void parse(int16_t id, int32_t& count, int32_t& rate) {
@@ -70,7 +73,11 @@ void open(int16_t w, uint32_t tick) {
     clk += 1;                                    // 10184
     g_handle = 0;
     for (const Pair* p = kSpeech; p->sound != 0; ++p)
-        if (p->string == w) { g_handle = tick ? d2client_sound_speech_submit_at(tick, p->sound) : d2client_sound_speech_submit(p->sound); g_sound = p->sound; break; }
+        if (p->string == w) {
+            g_handle = tick ? d2client_sound_speech_submit_at(tick, p->sound) : d2client_sound_speech_submit(p->sound); g_sound = p->sound;
+            if (g_playRows.size() < 16) g_playRows.push_back(p->sound | (tick ? 0 : INT32_MIN));   // the same submit for the play path's mixer
+            break;
+        }
     if (!g_registered) {
         g_registered = true;
         clk += 1;                                // 7D5E3 GetTickCount
@@ -98,14 +105,19 @@ void freeMenu() { if (g_menu) TEXT_FreeTextHeader(g_menu); g_menu = nullptr; }
 
 void d2client_npc_speech_reset() {
     g_panelUp = false; g_registered = false; g_pendingG.clear(); g_frameG.clear(); g_sound = 0; g_handle = 0; g_s = {};
-    freeMenu(); g_talking = false; g_cur = -1; g_nPlayed = 0;
+    freeMenu(); g_talking = false; g_cur = -1; g_nPlayed = 0; g_playRows.clear(); g_tailDriven = false;
+}
+bool d2client_npc_speech_take_row(int32_t* row, bool* reply) {
+    if (g_playRows.empty()) return false;
+    *row = g_playRows.front() & INT32_MAX; *reply = g_playRows.front() < 0; g_playRows.erase(g_playRows.begin());
+    return true;
 }
 
 std::string d2client_npc_speech_take_g() { std::string s; s.swap(g_pendingG); return s; }
 std::string d2client_npc_speech_take_frame_g() { std::string s; s.swap(g_frameG); return s; }
 
 extern "C" void d2_client_npc_speech_packet(const D2GSPacketSrv27* p27, uint32_t guid) {
-    if (!p27 || p27->nUnitType != 1 || p27->dwUnitGUID != guid || !d2client_sound_armed()) return;
+    if (!p27 || p27->nUnitType != 1 || p27->dwUnitGUID != guid) return;
     D2TextHeaderStrc* list = TEXT_AllocTextHeader(nullptr);
     if (!list) return;
     D2MessageListStrc msgs = p27->pMessageList;
@@ -125,7 +137,15 @@ extern "C" void d2_client_npc_speech_packet(const D2GSPacketSrv27* p27, uint32_t
 }
 
 // 1.13c D2Client+0x7EA90's speech step (0x7E970 on *0x113A68), from the frame after the room walk. `tick` is the frame's tick.
-void d2client_npc_speech_frame(uint32_t tick) {
+static void speechFrame(uint32_t tick);
+void d2client_npc_speech_frame(uint32_t tick) { g_tailDriven = true; speechFrame(tick); }
+// The play path's frame (no G frame tail): the same step, timeGetTime read as the frame clock at 40 ms a frame (25 frames a second).
+void d2client_npc_speech_play_frame(uint32_t tick) {
+    if (g_tailDriven || !g_panelUp) return;
+    d2client_frame_clock() += 40;
+    speechFrame(tick);
+}
+static void speechFrame(uint32_t tick) {
     if (!g_panelUp) return;
     uint32_t& clk = d2client_frame_clock();
     // 0x7EA90's SetRect: the view bottom (client Y + H/2 for the 640x480 view) is the edx 10001 is called with

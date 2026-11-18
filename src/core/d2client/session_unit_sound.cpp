@@ -1,6 +1,6 @@
 // The session replay's client unit sounds: the D2Client unit-sound entries run on the units the session client holds, their
 // 0x88A70 submits queued for the sound pump (sound_pump.cpp logs them in the A-capture shape after 0x88DD0, where retail's
-// unit pass falls in the frame). Nothing is queued unless the A trace is armed.
+// unit pass falls in the frame). The A trace logs only when armed; the 0x2C packets and their seed steps run on the play path too.
 //   0x24490 (a unit entering a mode, bUseGiven = 1): d2_client_unit_mode_sounds, the proved dispatch with its host.
 //   0x237E0 object branch (each held object, each frame): the loop row of 0x224F0, the per-mode row of 0x22570.
 #include <cstdint>
@@ -16,7 +16,7 @@
 #include "../d2moo/include/Units/Monster.h"
 #include "../d2moo/include/D2States.h"
 
-extern "C" uint32_t d2_client_unit_mode_sounds(uint32_t type, uint32_t id, int32_t cls, uint32_t typeFlags, int32_t superUnique,
+extern "C" uint32_t d2_client_unit_mode_sounds_session(uint32_t type, uint32_t id, int32_t cls, uint32_t typeFlags, int32_t superUnique,
                                                uint32_t mode, uint32_t hit, uint32_t cvt, uint32_t flags, int32_t roll);
 extern "C" uint32_t d2_client_unit_mode_sound_at(uint32_t i);
 
@@ -29,7 +29,7 @@ void d2client_session_unit_mode(const D2UnitStrc* u, uint32_t mode, int32_t roll
     }
     D2UnitStrc* m = const_cast<D2UnitStrc*>(u);
     const uint32_t flags = (hero ? 1u : 0u) | (STATES_CheckState(m, 1) ? 4u : 0u) | (STATES_CheckState(m, 0x92) ? 8u : 0u);
-    const uint32_t n = d2_client_unit_mode_sounds(u->dwUnitType, u->dwUnitId, (int32_t)u->dwClassId, typeFlags, su, mode,
+    const uint32_t n = d2_client_unit_mode_sounds_session(u->dwUnitType, u->dwUnitId, (int32_t)u->dwClassId, typeFlags, su, mode,
                                                   u->dwLastHitClass, 0, flags, roll);
     for (uint32_t i = 0; i < n; ++i) d2client_sound_unit_submit((int32_t)(d2_client_unit_mode_sound_at(i) & 0xFFFF));
 }
@@ -94,7 +94,7 @@ void d2client_session_player_packets() {
 // (0xAD740 -> 0x23F20) runs under the next packet dispatch, d2client_session_event_packets.
 namespace { struct EvPkt { uint32_t type, id, cls, event, mode; }; std::vector<EvPkt> g_ev; }
 extern "C" void d2_client_unit_event_packet(const D2UnitStrc* u, int32_t event) {
-    if (u && d2client_sound_armed()) g_ev.push_back({ uint32_t(u->dwUnitType), uint32_t(u->dwUnitId), uint32_t(u->dwClassId), uint32_t(event) & 0xFF, uint32_t(u->dwAnimMode) });
+    if (u) g_ev.push_back({ uint32_t(u->dwUnitType), uint32_t(u->dwUnitId), uint32_t(u->dwClassId), uint32_t(event) & 0xFF, uint32_t(u->dwAnimMode) });
 }
 namespace {
 // 1.13c D2Client+0x23200 (0x23F20's default case, a player unit): the events whose row is fixed, without the class table
@@ -117,6 +117,7 @@ void d2client_9cad0_reset();
 namespace {
 uint32_t g_evCycle;
 uint8_t g_evPlayer[0x28];
+std::vector<int32_t> g_greet;   // 0x23F20 case 0x12 rows for the play path (taken by d2_session_take_sounds)
 uint32_t evRand(uint32_t n) {   // 1.13c D2Client+0x89640 on the copy's seed
     if (!n) return 0;
     uint32_t s[2]; memcpy(s, g_evPlayer + 0x20, 8);
@@ -145,7 +146,13 @@ void d2client_session_event_packets(uint32_t* heroSeed, uint32_t cycle, uint32_t
         const int32_t row = d2c_port_9cce0(p.cls, 1, g_evPlayer, 0, tick, e);
         memcpy(heroSeed, g_evPlayer + 0x20, 8);
         d2client_sound_unit_submit_now(row, 1);
+        if (row > 0 && g_greet.size() < 64) g_greet.push_back(row);   // the same submit for the play path's mixer, on the local player
     }
+}
+bool d2client_npc_greet_take(int32_t* row) {
+    if (g_greet.empty()) return false;
+    *row = g_greet.front(); g_greet.erase(g_greet.begin());
+    return true;
 }
 // The client units' state bits (D2Common #10494 / #10945 on the client unit), as the 0xA7/0xA8/0xAA/0xA9 packets set them.
 #include "../d2moo/include/D2DataTbls.h"
@@ -188,7 +195,7 @@ extern "C" void d2_client_unit_remove_packet(const D2UnitStrc* u) {
     const uint64_t lo = stateKey(u, 0);
     g_clientStates.erase(g_clientStates.lower_bound(lo), g_clientStates.lower_bound(lo + 0x10000));
 }
-void d2client_session_unit_sound_reset() { g_obj.clear(); g_plr.clear(); g_ev.clear(); g_clientStates.clear(); g_stateSounds.clear(); d2client_9cad0_reset(); }
+void d2client_session_unit_sound_reset() { g_obj.clear(); g_plr.clear(); g_ev.clear(); g_greet.clear(); g_clientStates.clear(); g_stateSounds.clear(); d2client_9cad0_reset(); }
 // An item 0x9C action 0 (added to the ground, mode 3): the client's 0x84BB0 -> 0x827C0 plays the drop flippy (row 216), then the item's
 // own drop sound (Items wDropSound) when it has one.
 #include "../d2moo/include/DataTbls/ItemsTbls.h"

@@ -20,4 +20,9 @@ void d2client_session_unit_mode(const D2UnitStrc* u, uint32_t mode, int32_t roll
 void d2client_session_objects(const D2SndUnit* u, uint32_t n);                                  // 0x237E0 object branch, each held object
 void d2client_session_player_packets();                                                         // the frame's player 0x0D packets -> 0x24490
 void d2client_session_unit_sound_reset();
+extern "C" bool d2client_session_hero_step_take(int32_t* row);   // session_footstep.cpp: the local player's footfall rows for the play path
+bool d2client_npc_speech_take_row(int32_t* row, bool* reply);   // npc_speech_start.cpp: 0x7D3C0's speech rows for the play path; reply: opened by the 0x27 packet
+void d2client_npc_speech_reset();
+void d2client_npc_speech_play_frame(uint32_t tick);   // npc_speech_start.cpp: 0x7E970's step from the session frame when no G frame tail runs it
+bool d2client_npc_greet_take(int32_t* row);      // 0x23F20 case 0x12's greeting row (submitted on the local player) for the play path
 bool d2client_state_sound_take(int32_t out[4]);   // a state packet's on/off sound for the play path: unit type, id, class, Sounds row

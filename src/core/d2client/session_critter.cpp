@@ -37,7 +37,7 @@
 #include <emscripten.h>
 
 namespace d2client_unitseed { uint32_t roll(const D2ActiveRoomStrc* r); bool known(const D2ActiveRoomStrc* r); }
-extern "C" uint32_t d2_client_unit_mode_sounds(uint32_t type, uint32_t id, int32_t cls, uint32_t typeFlags, int32_t superUnique,
+extern "C" uint32_t d2_client_unit_mode_sounds_session(uint32_t type, uint32_t id, int32_t cls, uint32_t typeFlags, int32_t superUnique,
                                                uint32_t mode, uint32_t hit, uint32_t cvt, uint32_t flags, int32_t roll);
 extern "C" uint32_t d2_client_unit_mode_sound_at(uint32_t i);
 extern "C" void d2client_critter_sound(uint32_t id, uint32_t cls, int32_t row);   // monspawn_check.cpp: the play path's unit sound queue
@@ -101,7 +101,7 @@ void setMode(Critter& c, uint32_t m, uint32_t frame) {
     c.mode = m; c.f44 = 0; anim(c);
     if (m == 2 || m == 8) rate(c);
     char b[96]; snprintf(b, sizeof b, "%u C id=%x mode=%u\n", frame, c.id, m); g_log += b;
-    const uint32_t n = d2_client_unit_mode_sounds(1, c.id, (int32_t)c.cls, 0, -1, m, 0, 0, 0, -1);
+    const uint32_t n = d2_client_unit_mode_sounds_session(1, c.id, (int32_t)c.cls, 0, -1, m, 0, 0, 0, -1);
     for (uint32_t i = 0; i < n; ++i) {
         const int32_t row = (int32_t)(d2_client_unit_mode_sound_at(i) & 0xFFFF);
         // 0x22CA0: the 0xA84 skill row waits 0x19 frames after the unit's last (+0x7C); the port reads +0x7C off a server unit
