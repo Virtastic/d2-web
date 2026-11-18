@@ -1,6 +1,7 @@
 #include "SKILLS/SkillDruid.h"
 
 #include <D2BitManip.h>
+#include <test_seam.h>
 
 #include <D2DataTbls.h>
 #include <D2States.h>
@@ -46,14 +47,14 @@
 // 1.13c D2Game+0x468A0 (skill server do-function slot 114)
 int32_t __fastcall SKILLS_SrvDo114_Raven(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
-    D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
+    D2SkillsTxt* pSkillsTxtRecord = D2_CALL(SKILLS_GetSkillsTxtRecord, nSkillId);
     if (!pSkillsTxtRecord)
     {
         return 0;
     }
 
     int32_t nSpawnMode = 0;
-    const int32_t nSummonId = D2GAME_GetSummonIdFromSkill_6FD15580(pUnit, 0, nSkillId, nSkillLevel, &nSpawnMode, 0, 0);
+    const int32_t nSummonId = D2_CALL(D2GAME_GetSummonIdFromSkill_6FD15580, pUnit, 0, nSkillId, nSkillLevel, &nSpawnMode, 0, 0);
     if (nSummonId < 0 || pSkillsTxtRecord->nPetType < 0 || pSkillsTxtRecord->nPetType >= sgptDataTables->nPetTypeTxtRecordCount)
     {
         return 0;
@@ -71,25 +72,25 @@ int32_t __fastcall SKILLS_SrvDo114_Raven(D2GameStrc* pGame, D2UnitStrc* pUnit, i
     summonArg.pOwner = pUnit;
     summonArg.nMonMode = nSpawnMode;
     summonArg.nPetType = pSkillsTxtRecord->nPetType;
-    summonArg.nPetMax = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwPetMax, nSkillId, nSkillLevel);
+    summonArg.nPetMax = D2_CALL(SKILLS_EvaluateSkillFormula, pUnit, pSkillsTxtRecord->dwPetMax, nSkillId, nSkillLevel);
 
-    D2UnitStrc* pPet = D2GAME_SummonPet_6FD14430(pGame, &summonArg);
+    D2UnitStrc* pPet = D2_CALL(D2GAME_SummonPet_6FD14430, pGame, &summonArg);
     if (!pPet)
     {
         return 0;
     }
 
     pPet->dwFlags &= 0xFFFFFFFBu;
-    STATLIST_SetUnitStat(pPet, STAT_HPREGEN, 0, 0);
+    D2_CALL(STATLIST_SetUnitStat, pPet, STAT_HPREGEN, 0, 0);
 
-    int32_t nLevel = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwCalc[1], nSkillId, nSkillLevel);
+    int32_t nLevel = D2_CALL(SKILLS_EvaluateSkillFormula, pUnit, pSkillsTxtRecord->dwCalc[1], nSkillId, nSkillLevel);
     if (nLevel < 1)
     {
         nLevel = 1;
     }
 
-    D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10(pGame, pUnit, pPet, nLevel, nSkillLevel);
-    D2GAME_SetSummonPassiveStats_6FD0C530(pGame, pUnit, pPet, nSkillId, nSkillLevel, 0);
+    D2_CALL(D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10, pGame, pUnit, pPet, nLevel, nSkillLevel);
+    D2_CALL(D2GAME_SetSummonPassiveStats_6FD0C530, pGame, pUnit, pPet, nSkillId, nSkillLevel, 0);
     return 1;
 }
 
@@ -97,14 +98,14 @@ int32_t __fastcall SKILLS_SrvDo114_Raven(D2GameStrc* pGame, D2UnitStrc* pUnit, i
 // 1.13c D2Game+0x46720 (skill server do-function slot 115)
 int32_t __fastcall SKILLS_SrvDo115_Vines(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
-    D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
+    D2SkillsTxt* pSkillsTxtRecord = D2_CALL(SKILLS_GetSkillsTxtRecord, nSkillId);
     if (!pSkillsTxtRecord)
     {
         return 0;
     }
 
     int32_t nSpawnMode = 0;
-    const int32_t nSummonId = D2GAME_GetSummonIdFromSkill_6FD15580(pUnit, 0, nSkillId, nSkillLevel, &nSpawnMode, 0, 0);
+    const int32_t nSummonId = D2_CALL(D2GAME_GetSummonIdFromSkill_6FD15580, pUnit, 0, nSkillId, nSkillLevel, &nSpawnMode, 0, 0);
     if (nSummonId < 0)
     {
         return 0;
@@ -127,24 +128,24 @@ int32_t __fastcall SKILLS_SrvDo115_Vines(D2GameStrc* pGame, D2UnitStrc* pUnit, i
     summonArg.nHcIdx = nSummonId;
     summonArg.nAiSpecialState = AISPECIALSTATE_NONE;
     summonArg.nMonMode = 8;
-    summonArg.nPetMax = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwPetMax, nSkillId, nSkillLevel);
+    summonArg.nPetMax = D2_CALL(SKILLS_EvaluateSkillFormula, pUnit, pSkillsTxtRecord->dwPetMax, nSkillId, nSkillLevel);
 
-    D2UnitStrc* pPet = D2GAME_SummonPet_6FD14430(pGame, &summonArg);
+    D2UnitStrc* pPet = D2_CALL(D2GAME_SummonPet_6FD14430, pGame, &summonArg);
     if (!pPet)
     {
         return 0;
     }
 
-    D2GAME_UpdateSummonAI_6FC401F0(pGame, pPet, 0, pUnit->dwNodeIndex);
-    STATES_ToggleState(pPet, STATE_VINE_BEAST, 1);
-    int32_t nLevel = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwCalc[1], nSkillId, nSkillLevel);
+    D2_CALL(D2GAME_UpdateSummonAI_6FC401F0, pGame, pPet, 0, pUnit->dwNodeIndex);
+    D2_CALL(STATES_ToggleState, pPet, STATE_VINE_BEAST, 1);
+    int32_t nLevel = D2_CALL(SKILLS_EvaluateSkillFormula, pUnit, pSkillsTxtRecord->dwCalc[1], nSkillId, nSkillLevel);
     if (nLevel < 1)
     {
         nLevel = 1;
     }
 
-    STATLIST_SetUnitStat(pPet, STAT_LEVEL, nLevel, 0);
-    D2GAME_SetSummonPassiveStats_6FD0C530(pGame, pUnit, pPet, nSkillId, nSkillLevel, 0);
+    D2_CALL(STATLIST_SetUnitStat, pPet, STAT_LEVEL, nLevel, 0);
+    D2_CALL(D2GAME_SetSummonPassiveStats_6FD0C530, pGame, pUnit, pPet, nSkillId, nSkillLevel, 0);
     return 1;
 }
 
@@ -426,14 +427,14 @@ int32_t __fastcall SKILLS_SrvDo118_Twister_Tornado(D2GameStrc* pGame, D2UnitStrc
 // 1.13c D2Game+0x46560 (skill server do-function slot 119)
 int32_t __fastcall SKILLS_SrvDo119_DruidSummon(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
-    D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
+    D2SkillsTxt* pSkillsTxtRecord = D2_CALL(SKILLS_GetSkillsTxtRecord, nSkillId);
     if (!pSkillsTxtRecord)
     {
         return 0;
     }
 
     int32_t nSpawnMode = 0;
-    const int32_t nSummonId = D2GAME_GetSummonIdFromSkill_6FD15580(pUnit, 0, nSkillId, nSkillLevel, &nSpawnMode, 0, 0);
+    const int32_t nSummonId = D2_CALL(D2GAME_GetSummonIdFromSkill_6FD15580, pUnit, 0, nSkillId, nSkillLevel, &nSpawnMode, 0, 0);
     if (nSummonId < 0 || pSkillsTxtRecord->nPetType < 0 || pSkillsTxtRecord->nPetType >= sgptDataTables->nPetTypeTxtRecordCount)
     {
         return 0;
@@ -446,7 +447,7 @@ int32_t __fastcall SKILLS_SrvDo119_DruidSummon(D2GameStrc* pGame, D2UnitStrc* pU
 
     int32_t nX = 0;
     int32_t nY = 0;
-    if (!D2GAME_GetXAndYFromTargetUnit_6FD14020(pGame, pUnit, &nX, &nY))
+    if (!D2_CALL(D2GAME_GetXAndYFromTargetUnit_6FD14020, pGame, pUnit, &nX, &nY))
     {
         return 0;
     }
@@ -458,24 +459,24 @@ int32_t __fastcall SKILLS_SrvDo119_DruidSummon(D2GameStrc* pGame, D2UnitStrc* pU
     summonArg.pOwner = pUnit;
     summonArg.nHcIdx = nSummonId;
     summonArg.nMonMode = nSpawnMode;
-    summonArg.nPetMax = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwPetMax, nSkillId, nSkillLevel);
+    summonArg.nPetMax = D2_CALL(SKILLS_EvaluateSkillFormula, pUnit, pSkillsTxtRecord->dwPetMax, nSkillId, nSkillLevel);
 
-    D2UnitStrc* pPet = D2GAME_SummonPet_6FD14430(pGame, &summonArg);
+    D2UnitStrc* pPet = D2_CALL(D2GAME_SummonPet_6FD14430, pGame, &summonArg);
     if (!pPet)
     {
         return 0;
     }
 
-    D2GAME_UpdateSummonAI_6FC401F0(pGame, pPet, 0, pUnit->dwNodeIndex);
+    D2_CALL(D2GAME_UpdateSummonAI_6FC401F0, pGame, pPet, 0, pUnit->dwNodeIndex);
 
-    int32_t nLevel = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwCalc[1], nSkillId, nSkillLevel);
+    int32_t nLevel = D2_CALL(SKILLS_EvaluateSkillFormula, pUnit, pSkillsTxtRecord->dwCalc[1], nSkillId, nSkillLevel);
     if (nLevel < 1)
     {
         nLevel = 1;
     }
 
-    D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10(pGame, pUnit, pPet, nLevel, nSkillLevel);
-    D2GAME_SetSummonPassiveStats_6FD0C530(pGame, pUnit, pPet, nSkillId, nSkillLevel, 0);
+    D2_CALL(D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10, pGame, pUnit, pPet, nLevel, nSkillLevel);
+    D2_CALL(D2GAME_SetSummonPassiveStats_6FD0C530, pGame, pUnit, pPet, nSkillId, nSkillLevel, 0);
     return 1;
 }
 
@@ -978,14 +979,14 @@ int32_t __fastcall SKILLS_SrvDo123_Volcano(D2GameStrc* pGame, D2UnitStrc* pUnit,
 // 1.13c D2Game+0x45CE0 (skill server do-function slot 124)
 int32_t __fastcall SKILLS_SrvDo124_Armageddon_Hurricane(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
-    D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
+    D2SkillsTxt* pSkillsTxtRecord = D2_CALL(SKILLS_GetSkillsTxtRecord, nSkillId);
     if (!pSkillsTxtRecord || pSkillsTxtRecord->nAuraState < 0 || pSkillsTxtRecord->nAuraState >= sgptDataTables->nStatesTxtRecordCount)
     {
         return 0;
     }
-    
-    D2SkillStrc* pSkill = UNITS_GetUsedSkill(pUnit);
-    if (!pSkill || SKILLS_GetSkillIdFromSkill(pSkill, __FILE__, __LINE__) != nSkillId)
+
+    D2SkillStrc* pSkill = D2_CALL(UNITS_GetUsedSkill, pUnit);
+    if (!pSkill || D2_CALL(SKILLS_GetSkillIdFromSkill, pSkill, __FILE__, __LINE__) != nSkillId)
     {
         return 0;
     }
@@ -995,16 +996,16 @@ int32_t __fastcall SKILLS_SrvDo124_Armageddon_Hurricane(D2GameStrc* pGame, D2Uni
         pUnit->dwFlags |= UNITFLAG_SKSRVDOFUNC;
     }
 
-    const uint16_t nParam = (uint16_t)ITEMS_RollRandomNumber(&pUnit->pSeed);
+    const uint16_t nParam = (uint16_t)D2_CALL(ITEMS_RollRandomNumber, &pUnit->pSeed);
 
-    int32_t nLength = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwAuraLenCalc, nSkillId, nSkillLevel);
+    int32_t nLength = D2_CALL(SKILLS_EvaluateSkillFormula, pUnit, pSkillsTxtRecord->dwAuraLenCalc, nSkillId, nSkillLevel);
     if (nLength < 1)
     {
         nLength = 1;
     }
 
     const int32_t nEndFrame = pGame->dwGameFrame + nLength;
-    D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, pSkillsTxtRecord->nAuraState);
+    D2StatListStrc* pStatList = D2_CALL(STATLIST_GetStatListFromUnitAndState, pUnit, pSkillsTxtRecord->nAuraState);
     if (!pStatList)
     {
         int32_t nUnitGUID = -1;
@@ -1016,26 +1017,26 @@ int32_t __fastcall SKILLS_SrvDo124_Armageddon_Hurricane(D2GameStrc* pGame, D2Uni
         }
 
 
-        pStatList = STATLIST_AllocStatList(pGame->pMemoryPool, 2u, nEndFrame, nUnitType, nUnitGUID);
+        pStatList = D2_CALL(STATLIST_AllocStatList, pGame->pMemoryPool, 2u, nEndFrame, nUnitType, nUnitGUID);
         if (!pStatList)
         {
             return 0;
         }
 
-        STATLIST_SetState(pStatList, pSkillsTxtRecord->nAuraState);
-        STATLIST_SetStatRemoveCallback(pStatList, sub_6FD10E50);
-        D2COMMON_10475_PostStatToStatList(pUnit, pStatList, 1);
-        STATES_ToggleState(pUnit, pSkillsTxtRecord->nAuraState, 1);
+        D2_CALL(STATLIST_SetState, pStatList, pSkillsTxtRecord->nAuraState);
+        D2_CALL(STATLIST_SetStatRemoveCallback, pStatList, sub_6FD10E50);
+        D2_CALL(D2COMMON_10475_PostStatToStatList, pUnit, pStatList, 1);
+        D2_CALL(STATES_ToggleState, pUnit, pSkillsTxtRecord->nAuraState, 1);
     }
 
-    D2COMMON_10476(pStatList, nEndFrame);
-    EVENT_SetEvent(pGame, pUnit, EVENTTYPE_REMOVESTATE, nEndFrame, 0, 0);
-    sub_6FCFE0E0(pUnit, pStatList, pSkillsTxtRecord, nSkillId, nSkillLevel);
-    STATLIST_SetStatIfListIsValid(pStatList, STAT_MODIFIERLIST_SKILL, nSkillId, 0);
-    STATLIST_SetStatIfListIsValid(pStatList, STAT_MODIFIERLIST_LEVEL, nSkillLevel, 0);
-    D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
-    EVENT_SetEvent(pGame, pUnit, EVENTTYPE_ACTIVESTATE, pGame->dwGameFrame + pSkillsTxtRecord->dwParam[3], nSkillId, nSkillLevel);
-    SKILLS_SetParam1(pSkill, nParam);
+    D2_CALL(D2COMMON_10476, pStatList, nEndFrame);
+    D2_CALL(EVENT_SetEvent, pGame, pUnit, EVENTTYPE_REMOVESTATE, nEndFrame, 0, 0);
+    D2_CALL(sub_6FCFE0E0, pUnit, pStatList, pSkillsTxtRecord, nSkillId, nSkillLevel);
+    D2_CALL(STATLIST_SetStatIfListIsValid, pStatList, STAT_MODIFIERLIST_SKILL, nSkillId, 0);
+    D2_CALL(STATLIST_SetStatIfListIsValid, pStatList, STAT_MODIFIERLIST_LEVEL, nSkillLevel, 0);
+    D2_CALL(D2GAME_EVENTS_Delete_6FC34840, pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
+    D2_CALL(EVENT_SetEvent, pGame, pUnit, EVENTTYPE_ACTIVESTATE, D2_CALL(DATATBLS_GetSkillParam3, nSkillId) + pGame->dwGameFrame, nSkillId, nSkillLevel);
+    D2_CALL(SKILLS_SetParam1, pSkill, nParam);
     return 1;
 }
 
@@ -1043,53 +1044,53 @@ int32_t __fastcall SKILLS_SrvDo124_Armageddon_Hurricane(D2GameStrc* pGame, D2Uni
 // 1.13c D2Game+0x45AF0 (skill server do-function slot 145)
 int32_t __fastcall SKILLS_SrvDo145_Unused(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
-    D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
-    if (!pSkillsTxtRecord || nSkillLevel <= 0 || pSkillsTxtRecord->nAuraState < 0 || pSkillsTxtRecord->nAuraState >= sgptDataTables->nStatesTxtRecordCount || !STATES_CheckState(pUnit, pSkillsTxtRecord->nAuraState))
+    D2SkillsTxt* pSkillsTxtRecord = D2_CALL(SKILLS_GetSkillsTxtRecord, nSkillId);
+    if (!pSkillsTxtRecord || nSkillLevel <= 0 || pSkillsTxtRecord->nAuraState < 0 || pSkillsTxtRecord->nAuraState >= sgptDataTables->nStatesTxtRecordCount || !D2_CALL(STATES_CheckState, pUnit, pSkillsTxtRecord->nAuraState))
     {
-        D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
+        D2_CALL(D2GAME_EVENTS_Delete_6FC34840, pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
         return 0;
     }
 
     if (!(pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[8]))
     {
-        D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
-        if (pRoom && DUNGEON_IsRoomInTown(pRoom))
+        D2ActiveRoomStrc* pRoom = D2_CALL(UNITS_GetRoom, pUnit);
+        if (pRoom && D2_CALL(DUNGEON_IsRoomInTown, pRoom))
         {
-            D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, pSkillsTxtRecord->nAuraState);
+            D2StatListStrc* pStatList = D2_CALL(STATLIST_GetStatListFromUnitAndState, pUnit, pSkillsTxtRecord->nAuraState);
             if (pStatList)
             {
-                D2Common_10474(pUnit, pStatList);
-                STATLIST_FreeStatList(pStatList);
+                D2_CALL(D2Common_10474, pUnit, pStatList);
+                D2_CALL(STATLIST_FreeStatList, pStatList);
             }
 
-            STATES_ToggleState(pUnit, pSkillsTxtRecord->nAuraState, 0);
-            D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
+            D2_CALL(STATES_ToggleState, pUnit, pSkillsTxtRecord->nAuraState, 0);
+            D2_CALL(D2GAME_EVENTS_Delete_6FC34840, pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
             return 0;
         }
     }
 
-    const int32_t nRange = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwAuraRangeCalc, nSkillId, nSkillLevel);
+    const int32_t nRange = D2_CALL(SKILLS_EvaluateSkillFormula, pUnit, pSkillsTxtRecord->dwAuraRangeCalc, nSkillId, nSkillLevel);
     if (nRange <= 0)
     {
-        D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
+        D2_CALL(D2GAME_EVENTS_Delete_6FC34840, pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
         return 0;
     }
 
-    D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
-    EVENT_SetEvent(pGame, pUnit, EVENTTYPE_ACTIVESTATE, pSkillsTxtRecord->dwParam[3] + pGame->dwGameFrame, nSkillId, nSkillLevel);
+    D2_CALL(D2GAME_EVENTS_Delete_6FC34840, pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
+    D2_CALL(EVENT_SetEvent, pGame, pUnit, EVENTTYPE_ACTIVESTATE, D2_CALL(DATATBLS_GetSkillParam3, nSkillId) + pGame->dwGameFrame, nSkillId, nSkillLevel);
 
-    D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
-    if (!pRoom || DUNGEON_IsRoomInTown(pRoom))
+    D2ActiveRoomStrc* pRoom = D2_CALL(UNITS_GetRoom, pUnit);
+    if (!pRoom || D2_CALL(DUNGEON_IsRoomInTown, pRoom))
     {
         return 0;
     }
 
     D2DamageStrc damage = {};
-    D2GAME_RollPhysicalDamage_6FD14EC0(pUnit, &damage, nSkillId, nSkillLevel);
-    D2GAME_RollElementalDamage_6FD14DD0(pUnit, &damage, nSkillId, nSkillLevel);
+    D2_CALL(D2GAME_RollPhysicalDamage_6FD14EC0, pUnit, &damage, nSkillId, nSkillLevel);
+    D2_CALL(D2GAME_RollElementalDamage_6FD14DD0, pUnit, &damage, nSkillId, nSkillLevel);
     damage.wResultFlags |= pSkillsTxtRecord->wResultFlags;
     damage.dwHitFlags |= pSkillsTxtRecord->dwHitFlags;
-    sub_6FD10200(pGame, pUnit, 0, 0, nRange, &damage, pSkillsTxtRecord->dwAuraFilter);
+    D2_CALL(sub_6FD10200, pGame, pUnit, 0, 0, nRange, &damage, pSkillsTxtRecord->dwAuraFilter);
     return 1;
 }
 
@@ -1097,75 +1098,81 @@ int32_t __fastcall SKILLS_SrvDo145_Unused(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 // 1.13c D2Game+0x45850 (skill server do-function slot 146; the retry loop walks on from the room the last try found)
 int32_t __fastcall SKILLS_SrvDo146_Unused(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
-    D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
-    if (!pSkillsTxtRecord || nSkillLevel <= 0 || pSkillsTxtRecord->nAuraState < 0 || pSkillsTxtRecord->nAuraState >= sgptDataTables->nStatesTxtRecordCount || !STATES_CheckState(pUnit, pSkillsTxtRecord->nAuraState))
+    D2SkillsTxt* pSkillsTxtRecord = D2_CALL(SKILLS_GetSkillsTxtRecord, nSkillId);
+    if (!pSkillsTxtRecord || nSkillLevel <= 0 || pSkillsTxtRecord->nAuraState < 0 || pSkillsTxtRecord->nAuraState >= sgptDataTables->nStatesTxtRecordCount || !D2_CALL(STATES_CheckState, pUnit, pSkillsTxtRecord->nAuraState))
     {
-        D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
+        D2_CALL(D2GAME_EVENTS_Delete_6FC34840, pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
         return 0;
     }
 
     if (!(pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_INTOWN]))
     {
-        D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
-        if (pRoom && DUNGEON_IsRoomInTown(pRoom))
+        D2ActiveRoomStrc* pRoom = D2_CALL(UNITS_GetRoom, pUnit);
+        if (pRoom && D2_CALL(DUNGEON_IsRoomInTown, pRoom))
         {
-            D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, pSkillsTxtRecord->nAuraState);
+            D2StatListStrc* pStatList = D2_CALL(STATLIST_GetStatListFromUnitAndState, pUnit, pSkillsTxtRecord->nAuraState);
             if (pStatList)
             {
-                D2Common_10474(pUnit, pStatList);
-                STATLIST_FreeStatList(pStatList);
+                D2_CALL(D2Common_10474, pUnit, pStatList);
+                D2_CALL(STATLIST_FreeStatList, pStatList);
             }
 
-            STATES_ToggleState(pUnit, pSkillsTxtRecord->nAuraState, 0);
-            D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
+            D2_CALL(STATES_ToggleState, pUnit, pSkillsTxtRecord->nAuraState, 0);
+            D2_CALL(D2GAME_EVENTS_Delete_6FC34840, pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
             return 0;
         }
     }
 
-    const int32_t nMissileId = SKILLS_GetProgressiveSkillMissileId(pUnit, nSkillId);
+    const int32_t nMissileId = D2_CALL(SKILLS_GetProgressiveSkillMissileId, pUnit, nSkillId);
     if (nMissileId <= 0)
     {
-        D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
+        D2_CALL(D2GAME_EVENTS_Delete_6FC34840, pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
         return 0;
     }
 
-    D2SkillStrc* pSkill = SKILLS_GetHighestLevelSkillFromUnitAndId(pUnit, nSkillId);
+    D2SkillStrc* pSkill = D2_CALL(SKILLS_GetHighestLevelSkillFromUnitAndId, pUnit, nSkillId);
     if (!pSkill)
     {
-        D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
+        D2_CALL(D2GAME_EVENTS_Delete_6FC34840, pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
         return 0;
     }
-    
-    const int32_t nRange = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwAuraRangeCalc, nSkillId, nSkillLevel);
+
+    const int32_t nRange = D2_CALL(SKILLS_EvaluateSkillFormula, pUnit, pSkillsTxtRecord->dwAuraRangeCalc, nSkillId, nSkillLevel);
     if (nRange <= 0)
     {
-        D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
+        D2_CALL(D2GAME_EVENTS_Delete_6FC34840, pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
         return 0;
     }
 
-    D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
-    EVENT_SetEvent(pGame, pUnit, EVENTTYPE_ACTIVESTATE, pGame->dwGameFrame + pSkillsTxtRecord->dwParam[3], nSkillId, nSkillLevel);
-    
-    D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
-    if (!pRoom || DUNGEON_IsRoomInTown(pRoom))
+    D2_CALL(D2GAME_EVENTS_Delete_6FC34840, pGame, pUnit, EVENTTYPE_ACTIVESTATE, nSkillId);
+    D2_CALL(EVENT_SetEvent, pGame, pUnit, EVENTTYPE_ACTIVESTATE, D2_CALL(DATATBLS_GetSkillParam3, nSkillId) + pGame->dwGameFrame, nSkillId, nSkillLevel);
+
+    D2ActiveRoomStrc* pRoom = D2_CALL(UNITS_GetRoom, pUnit);
+    if (!pRoom || D2_CALL(DUNGEON_IsRoomInTown, pRoom))
     {
         return 0;
     }
 
-    SEED_InitLowSeed(&pUnit->pSeed, SKILLS_GetParam1(pSkill));
-    SKILLS_SetParam1(pSkill, ITEMS_RollRandomNumber(&pUnit->pSeed) % 1000000);
+    D2_CALL(SEED_InitLowSeed, &pUnit->pSeed, D2_CALL(SKILLS_GetParam1, pSkill));
+    D2_CALL(SKILLS_SetParam1, pSkill, D2_CALL(ITEMS_RollLimitedRandomNumber, &pUnit->pSeed, 1000000));
+    // 1.13c asks the unit position once before the loop (the result is not kept)
+    D2_CALL(CLIENTS_GetUnitX, pUnit);
+    D2_CALL(CLIENTS_GetUnitY, pUnit);
 
     for (int32_t i = 0; i < 5; ++i)
     {
-        const int32_t nX = CLIENTS_GetUnitX(pUnit) + ITEMS_RollLimitedRandomNumber(&pUnit->pSeed, 2 * nRange + 1) - nRange;
-        const int32_t nY = CLIENTS_GetUnitY(pUnit) + ITEMS_RollLimitedRandomNumber(&pUnit->pSeed, 2 * nRange + 1) - nRange;
-        if (D2Common_11026(nX, nY, pUnit, COLLIDE_MASK_RADIAL_BARRIER))
+        // roll first, then the position (the order the call log sees)
+        const int32_t nRollX = D2_CALL(ITEMS_RollLimitedRandomNumber, &pUnit->pSeed, 2 * nRange + 1);
+        const int32_t nX = nRollX - nRange + D2_CALL(CLIENTS_GetUnitX, pUnit);
+        const int32_t nRollY = D2_CALL(ITEMS_RollLimitedRandomNumber, &pUnit->pSeed, 2 * nRange + 1);
+        const int32_t nY = nRollY - nRange + D2_CALL(CLIENTS_GetUnitY, pUnit);
+        if (D2_CALL(D2Common_11026, nX, nY, pUnit, COLLIDE_MASK_RADIAL_BARRIER))
         {
-            pRoom = D2GAME_GetRoom_6FC52070(pRoom, nX, nY);
-            if (pRoom && !COLLISION_CheckMask(pRoom, nX, nY, 1u))
+            pRoom = D2_CALL(D2GAME_GetRoom_6FC52070, pRoom, nX, nY);
+            if (pRoom && !D2_CALL(COLLISION_CheckMask, pRoom, nX, nY, 1u))
             {
-                D2GAME_CreateMissile_6FD115E0(pGame, pUnit, nSkillId, nSkillLevel, nMissileId, nX, nY);
-                sub_6FCC6300(pUnit, 0, nSkillId, nSkillLevel, nX, nY, 0);
+                D2_CALL(D2GAME_CreateMissile_6FD115E0, pGame, pUnit, nSkillId, nSkillLevel, nMissileId, nX, nY);
+                D2_CALL(sub_6FCC6300, pUnit, 0, nSkillId, nSkillLevel, nX, nY, 0);
                 return 1;
             }
         }

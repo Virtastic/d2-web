@@ -3,6 +3,8 @@
 
 #include <test_seam.h>
 
+#include <test_seam.h>
+
 #include <algorithm>
 
 #include <Fog.h>
