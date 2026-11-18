@@ -4,12 +4,25 @@
 // Frames are `FF id len16LE body`. Pure of the engine, so the bytes are testable in node.
 import { getGamesPacket, GAME_LIST_ID } from './bnet-gamelist.mjs';
 import { newsRequestPacket } from './bnet-news.mjs';
+import { bnftpDownload } from './bnet-terms.mjs';
 const enc = new TextEncoder(), dec = new TextDecoder();
 const cstr = (s) => [...enc.encode(String(s)), 0];
 export const bncsPacket = (id, body = []) => Uint8Array.from([0xff, id, (body.length + 4) & 0xff, (body.length + 4) >> 8, ...body]);
 // BNClient's ENTERCHAT sender (+0xC520) copies each string with a 0x100-byte limit: at most 255 bytes, then the NUL.
 const capped = (s) => [...enc.encode(String(s)).subarray(0, 255), 0];
 export const enterChatPacket = (name, realm = '') => bncsPacket(0x0a, [...capped(name), ...capped(realm)]);
+// SID_CHECKAD (0x15): 'IX86', the product, the last ad id and a time; the shown report 0x21 is the same with the ad id and 0 0.
+const le32 = (n) => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
+const productDword = (expansion) => (expansion ? [0x50, 0x58, 0x32, 0x44] : [0x56, 0x44, 0x32, 0x44]);
+export const checkAdPacket = (lastId, time, expansion = true) => bncsPacket(0x15, [0x36, 0x38, 0x58, 0x49, ...productDword(expansion), ...le32(lastId), ...le32(time)]);
+export const adShownPacket = (id, expansion = true) => bncsPacket(0x21, [0x36, 0x38, 0x58, 0x49, ...productDword(expansion), ...le32(id), 0, 0]);
+// The 0x15 reply: ad id, file extension, FILETIME, file name.
+export function parseCheckAd(body) {
+  if (body.length < 17) return null;
+  const v = new DataView(body.buffer, body.byteOffset, body.byteLength);
+  let e = body.indexOf(0, 16); if (e < 0) e = body.length;
+  return { id: v.getUint32(0, true), ext: v.getUint32(4, true), fileTime: v.getBigUint64(8, true), name: dec.decode(body.subarray(16, e)) };
+}
 // The body is the product dword: 'VD2D' for classic, 'PX2D' for Lord of Destruction.
 export const getChannelListPacket = (expansion = true) => bncsPacket(0x0b, expansion ? [0x50, 0x58, 0x32, 0x44] : [0x56, 0x44, 0x32, 0x44]);
 // flags 5: the first join of a Diablo II client, which lands in the product's own channel.
@@ -69,8 +82,9 @@ export const parseEnterChat = (body) => { let e = body.indexOf(0); if (e < 0) e 
 // Owns the open BNCS transport and its reader. `onEvent` sees every parsed event first (true: handled);
 // `onLine` gets each displayable line it left. `onNews` gets each SID_NEWS_INFO body, `onEntered` the ENTERCHAT unique name.
 export function createBnetChat({ transport, reader, character, realm = '', expansion = true, channel = 'Diablo II', onLine = () => {}, onEvent = () => false, onGames = () => {}, onChannels = () => {}, onClose = () => {},
-  onNews = () => {}, onEntered = () => {},
+  onNews = () => {}, onEntered = () => {}, dialFiles = null, onAd = () => {}, adMs = 15000, now = () => Math.floor(Date.now() / 1000),
 }) {
+  let adId = 0, adTimer = null;
   let entered = false, wantJoin = false, joined = false, closed = false, current = '', wantFlags, uniqueName = '';
   const send = (bytes) => transport.send(bytes);
   const handle = ({ id, body }) => {
@@ -78,6 +92,7 @@ export function createBnetChat({ transport, reader, character, realm = '', expan
     else if (id === GAME_LIST_ID) onGames(body);
     else if (id === 0x0b) onChannels(parseChannelList(body));
     else if (id === 0x46) onNews(body);
+    else if (id === 0x15) adReply(parseCheckAd(body));
     else if (id === 0x0a) { entered = true; uniqueName = parseEnterChat(body); onEntered(uniqueName); if (wantJoin) { wantJoin = false; join(); } }
     else if (id === 0x0f) {
       const e = parseChatEvent(body); if (!e) return;
@@ -86,6 +101,15 @@ export function createBnetChat({ transport, reader, character, realm = '', expan
       const line = chatLine(e); if (line) onLine(line);
     }
   };
+  // The ad service: the stock client asks every 15 s, downloads a new ad's file on a file connection, then reports it shown (0x21).
+  const adReply = async (ad) => {
+    if (!ad || closed) return;
+    if (dialFiles && ad.id !== adId) {
+      try { const r = await bnftpDownload(dialFiles, ad.name, { request: { bannerId: ad.id, bannerExt: ad.ext, fileTime: ad.fileTime } }); onAd(ad, r.data); } catch { /* the ad is skipped */ }
+    }
+    adId = ad.id; if (!closed) send(adShownPacket(ad.id, expansion));
+  };
+  const adTick = () => { if (!closed) send(checkAdPacket(adId, now(), expansion)); };
   const join = (name = channel, flags = wantFlags) => { send(joinChannelPacket(name, flags)); };
   // SID_NULL is not sent here: the connection's keep-alive (realm-client's startBncsNull) owns it, since retail's pump does.
   (async () => {
@@ -118,10 +142,13 @@ export function createBnetChat({ transport, reader, character, realm = '', expan
     // bytes of a stock client (relay recordings bnet-proof/live1, live2). A join of another's game sends no 0x1C.
     enterGame(name, { created = false } = {}) {
       if (closed) return false;
+      clearInterval(adTimer); adTimer = null;
       if (created) send(startAdvPacket(name));
       send(notifyJoinPacket(name, expansion));
       return this.leave();
     },
-    close() { closed = true; try { reader.cancel(); } catch { /* done */ } try { transport.close(); } catch { /* done */ } },
+    // The ad loop: the first request now, then every `adMs`; stopped by enterGame and close.
+    ads(on = true) { clearInterval(adTimer); adTimer = null; if (on && !closed) { adTick(); adTimer = setInterval(adTick, adMs); } },
+    close() { closed = true; clearInterval(adTimer); try { reader.cancel(); } catch { /* done */ } try { transport.close(); } catch { /* done */ } },
   };
 }

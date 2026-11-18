@@ -2032,7 +2032,7 @@ async function redialBncs() {
   try {
     await transport.ready(); protocol = rc.bindEngineProtocol(Module);
     const login = await rc.bncsLogin(transport, protocol, { account: c.account, password: c.password, realm: flow.server.region,
-      auth: await realmAuthConfig(flow.server.auth) });
+      auth: await realmAuthConfig(flow.server.auth), dialFiles: realmFileDial(flow.server) });
     if (realmFlow !== flow) throw new Error('realm session ended during the chat redial');
     flow.realmReply = login.handoff.realmReply; flow.mpq = login.mpq; flow.realms = login.realmList.map((r) => r.title);
     return { transport, reader: login.reader };
@@ -2081,11 +2081,13 @@ function lobbyCharacter(name) {
   return c && { name: c.name, charClass: c.charClass, level: c.level, expansion: (c.flags & 0x20) !== 0,
     hardcore: (c.flags & 0x04) !== 0, dead: (c.flags & 0x08) !== 0, ladder: (c.flags & 0x40) !== 0, progression: c.progression ?? 0 };
 }
+// A fresh BNCS-port connection for the file transfers (BNClient+0xDC50): the 0x33 ini and the 0x15 ads.
+function realmFileDial(server) { return () => rcEngineMod.webSocketTransport(realmServiceUrl(server.ws, 'bncs')); }
 function startLobbyChat(name) {
   const flow = realmFlow;
   if (!flow?.chat && !flow?.chatLink) return null;
   if (!flow.chatLink) {
-    flow.chatLink = createChatLink({ dial: redialBncs, createChat: createBnetChat,
+    flow.chatLink = createChatLink({ dial: redialBncs, createChat: (o) => createBnetChat({ ...o, dialFiles: realmFileDial(flow.server) }),
       onState: (on) => { if (realmFlow === flow) flow.chatSession = flow.chatLink?.session ?? null; bnetLobbyScreen?.chatLive(on); },
       onFail: (error) => { bnetLobbyScreen?.chatLine({ text: `Chat connection lost: ${error?.message ?? error}`, colour: 1 }); render(); } });
     flow.chatLink.attach(flow.chat, lobbyChatUser(name));
@@ -2137,7 +2139,7 @@ function enterBnetLobby(name) {
   if (realmFlow) {
     realmFlow.news ??= createNews();
     bnetLobbyScreen?.setNews(newsLines(realmFlow.news.shown()));
-    if (chatSession?.open && !chatSession.joined) chatSession.news(realmFlow.news.newest);
+    if (chatSession?.open && !chatSession.joined) { chatSession.news(realmFlow.news.newest); chatSession.ads(); }
     const flow = realmFlow, games = lobbyRealmGames(c.name);
     void games?.ready.then((on) => {
       if (!on || realmFlow !== flow || !flow.mcpSession || !rcEngineMod) return;
@@ -2193,6 +2195,15 @@ function connectConfiguredRealm(server) {
       attempt.bncs = webSocketTransport(realmServiceUrl(server.ws, 'bncs'));
       await dialBnet(attempt.bncs, { popup });
       if (bnetConnecting !== attempt) { attempt.bncs.close(); return; }
+      // The connect step of the stock client (BNClient+0xF430) runs here, on the open connection: selector, AUTH_INFO, AUTH_CHECK, the
+      // gateway-list request. The LOG IN after it sends only the logon (stockgs12: 0x51 at 0.4 s, 0x3a when the player submits).
+      {
+        const { bncsAuthenticate, bindEngineProtocol } = await import('./assets/realm-client.mjs');
+        const protocol = bindEngineProtocol(Module);
+        try { await bncsAuthenticate(attempt.bncs, protocol, { auth: await realmAuthConfig(server.auth), dialFiles: realmFileDial(server) }); }
+        finally { try { protocol.free(); } catch { /* engine gone */ } }
+        if (bnetConnecting !== attempt) { attempt.bncs.close(); return; }
+      }
       bnetConnecting = null; titleScreen?.setOverlay(null);
       showConfiguredRealmLogin(server, attempt.bncs);
     } catch (error) {
@@ -2309,7 +2320,7 @@ async function authenticateConfiguredRealm({ account, password }) {
     if (!bncs?.isOpen) throw transportFailure('the Battle.net connection was lost');
     realmFlow.bncs = null;
     protocol = bindEngineProtocol(Module);
-    const login = await bncsLogin(bncs, protocol, { account, password, realm: server.region, auth: await realmAuthConfig(server.auth) });
+    const login = await bncsLogin(bncs, protocol, { account, password, realm: server.region, auth: await realmAuthConfig(server.auth), dialFiles: realmFileDial(server) });
     // The BNCS socket stays open for the session, as retail's does: it carries the lobby's chat.
     try { realmFlow.chat?.close(); } catch { /* already closed */ }
     realmFlow.chat = { transport: bncs, reader: login.reader }; bncs = null;
