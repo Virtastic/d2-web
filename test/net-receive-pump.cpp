@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "core/realm/d2gs_client_packets.cpp"
-#include "core/d2client/d2client_43920.cpp"
+#include "core/d2moo/d2client/d2client_43920.cpp"
 #include "core/d2client/server_packet_table.h"
 
 namespace {
@@ -16,27 +16,23 @@ int g_used;
 D2NetPktNode* alloc() { return &g_pool[g_used++]; }
 
 D2NetPktQueues g_q;
-uint8_t g_buf[0x240];   // the pump's 512-byte stack buffer plus a canary tail
-struct Event { uint32_t rva, first, arg; };
+struct Event { uint32_t rva, first, arg, last; };
 std::vector<Event> g_log;
 
-uint32_t pop(D2NetPktNode*& head, uint32_t len) {
+uint32_t pop(D2NetPktNode*& head, uint8_t* buf, uint32_t len) {
     if (!head) return 0xFFFFFFFFu;
     D2NetPktNode* n = head;
     head = n->next;
-    memcpy(g_buf, n->data, n->size < len ? n->size : len);   // D2Net+0x7200 copies min(len, node size)
+    memcpy(buf, n->data, n->size < len ? n->size : len);   // D2Net+0x7200 copies min(len, node size)
     return n->size;
 }
-uint32_t host(D2cCall* c) {
-    switch (c->rva) {
-    case 0xD210: return pop(g_q.second, c->s[1]);
-    case 0xD24C: return pop(g_q.normal, c->s[1]);
-    case 0xACD70: case 0xACBF0: g_log.push_back({ c->rva, g_buf[0], 0 }); return 0;
-    case 0xACE20: g_log.push_back({ c->rva, g_buf[0], c->s[0] }); return 0;
-    default: assert(!"unexpected callee"); return 0;
-    }
-}
-void reset() { g_used = 0; g_q = {}; g_log.clear(); memset(g_buf, 0xEE, sizeof g_buf); }
+uint32_t takeSystem(uint8_t* b, uint32_t len) { return pop(g_q.second, b, len); }
+uint32_t takeGame(uint8_t* b, uint32_t len) { return pop(g_q.normal, b, len); }
+void acd70(const uint8_t* p) { g_log.push_back({ 0xACD70, p[0], 0, 0 }); }
+void acbf0(const uint8_t* p) { g_log.push_back({ 0xACBF0, p[0], 0, 0 }); }
+void ace20(const uint8_t* p, int32_t n) { g_log.push_back({ 0xACE20, p[0], static_cast<uint32_t>(n), p[0x1ff] }); }
+void run(int32_t* flag) { const D2c43920Env e = { takeSystem, takeGame, acd70, acbf0, ace20, flag }; d2c_43920(&e); }
+void reset() { g_used = 0; g_q = {}; g_log.clear(); }
 void feed(std::initializer_list<uint8_t> bytes) {
     std::vector<uint8_t> v(bytes);
     assert(d2_realm_d2net_6bd0(v.data(), static_cast<int>(v.size()), &g_q, alloc, 1234));
@@ -64,7 +60,7 @@ static void order() {
     // arrival order: game, refusal, game, close flag, game, connection info
     feed({ 0x00, 0xB4, 1, 0, 0, 0, 0x02, 0xB0, 0x04, 0xAF, 0x01 });
     int32_t flag = 7;
-    d2c_43920_run(host, g_buf, &flag);
+    run(&flag);
     // the system queue drains first, in arrival order; then the game queue in arrival order; each ends on -1
     assert(g_log.size() == 5);
     assert(g_log[0].rva == 0xACBF0 && g_log[0].first == 0xB4);
@@ -79,7 +75,7 @@ static void flags_and_chunks() {
     reset();
     feed({ 0xAF, 0x01, 0xB0, 0xB3, 2, 0, 0, 0, 0, 0, 0 });
     int32_t flag = 0;
-    d2c_43920_run(host, g_buf, &flag);
+    run(&flag);
     assert(flag == 0);   // 0xAF set, 0xB0 cleared
     assert(g_log.size() == 2 && g_log[0].rva == 0xACD70 && g_log[0].first == 0xB3);
 }
@@ -88,7 +84,7 @@ static void unbounded() {
     reset();
     for (int i = 0; i < 300; ++i) feed({ 0x00 });
     int32_t flag = 0;
-    d2c_43920_run(host, g_buf, &flag);
+    run(&flag);
     // no cap per pass: every queued packet is dispatched, then the terminating -1
     assert(g_log.size() == 301 && g_log.back().arg == 0xFFFFFFFFu);
     for (int i = 0; i < 300; ++i) assert(g_log[i].rva == 0xACE20 && g_log[i].arg == 1);
@@ -101,10 +97,10 @@ static void oversize() {
     big[0] = 0x16; big[1] = 0x03; big[2] = 0x02;
     assert(d2_realm_d2net_6bd0(big.data(), static_cast<int>(big.size()), &g_q, alloc, 0));
     int32_t flag = 0;
-    d2c_43920_run(host, g_buf, &flag);
+    run(&flag);
     // retail hands the dispatcher the node's size (0x203) but copied only 0x200 bytes: the tail is the stack's
     assert(g_log.size() == 2 && g_log[0].arg == 0x203);
-    assert(g_buf[0x1ff] == 0x11 && g_buf[0x200] == 0xEE);
+    assert(g_log[0].last == 0x11);
 }
 
 int main() { sizes(); order(); flags_and_chunks(); unbounded(); oversize(); std::puts("ok"); return 0; }

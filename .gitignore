@@ -50,7 +50,6 @@ play/.engine-key
 
 # per-function probes stay private; only the ones the engine links against are tracked
 src/core/fn/*
-!src/core/fn/crt_leaves_b19.cpp
 !src/core/fn/d2common_19810.cpp
 !src/core/fn/d2common_bf70.cpp
 !src/core/fn/d2common_unit_getters.cpp
@@ -79,9 +78,6 @@ src/core/fn/*
 !src/core/fn/d2mcpclient_probe.h
 !src/core/fn/hookenv.h
 !src/core/fn/d2game_seam_probe.h
-!src/core/fn/storm_149e0.cpp
-!src/core/fn/storm_feb0.cpp
-!src/core/fn/storm_leaves_b23.cpp
 
 # Private-only content (never shipped by the public export): the agent loop, RE notes, captures, retail assets
 .claude/

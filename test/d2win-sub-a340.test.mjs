@@ -26,6 +26,6 @@ int main(){ uint32_t b[5]={1,2,3,4,5};
  puts(ok?"OK":"BAD"); }
 `);
   execFileSync('g++', ['-fpermissive', '-w', '-I', d, '-o', join(d, 't'), join(d, 't.cpp'),
-    'src/core/gfx/d2win_batch_93c0.cpp'], { stdio: 'pipe' });
+    'src/core/d2moo/gfx/d2win_batch_93c0.cpp'], { stdio: 'pipe' });
   assert.equal(execFileSync(join(d, 't')).toString().trim(), 'OK');
 });

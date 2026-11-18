@@ -1,5 +1,5 @@
 #include <cassert>
-#include "../../src/core/storm/storm_batch_3b1e0.cpp"
+#include "../../src/core/d2moo/storm/storm_batch_3b1e0.cpp"
 namespace {
 StormEventNode3b1e0 node{};
 unsigned phase;

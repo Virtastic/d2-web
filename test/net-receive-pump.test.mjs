@@ -12,7 +12,7 @@ test('the receive pump drains the system queue then the game queue, unbounded, s
   const dir = mkdtempSync(join(tmpdir(), 'd2-net-pump-'));
   try {
     const binary = join(dir, 'net-receive-pump-test');
-    const built = spawnSync('g++', ['-std=c++20', '-Wall', '-Wextra', '-Itest/stub', '-Isrc', resolve('test/net-receive-pump.cpp'), '-o', binary], { encoding: 'utf8' });
+    const built = spawnSync('g++', ['-std=c++20', '-Wall', '-Wextra', '-Itest/stub', '-Isrc', '-Isrc/core/d2client', resolve('test/net-receive-pump.cpp'), '-o', binary], { encoding: 'utf8' });
     assert.equal(built.status, 0, built.stderr || built.stdout);
     const run = spawnSync(binary, [], { encoding: 'utf8' });
     assert.equal(run.status, 0, run.stderr || run.stdout);

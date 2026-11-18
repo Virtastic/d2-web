@@ -50,7 +50,7 @@ export BUILDER_IMAGE="$TOOLCHAIN_ID"
 
 # Engine builds are rationed: every worktree queues on the same slot pool in the main checkout. The worktree artifact lock
 # also spans compilation, staging and cache publication; separate trees still build in parallel.
-# At most D2_MAX_BUILDS (default 6) heavy builds run at once; ci/build-slot.sh is the counting semaphore.
+# At most D2_MAX_BUILDS (default 12) heavy builds run at once; ci/build-slot.sh is the counting semaphore.
 # Each takes nproc/D2_MAX_BUILDS compile jobs (at least 4), so a full pool fills the cores without oversubscribing them.
 T0=$(date +%s)
 # An unchanged engine needs no link: a cached build for this tree's source key is staged instead
@@ -74,7 +74,7 @@ source "$SRC/ci/build-slot.sh"
 # build, stage and landing of the same tree for as long as the slots stay busy. Let go, wait, take it back.
 slot_waited=""
 # A freed slot goes to whichever waiter looks first, so merge and coverage builds look far more often than the rest.
-slot_poll=5; case "${D2_BUILD_ROLE:-}" in merge|coverage) slot_poll=0.3 ;; esac
+slot_poll=5; case "${D2_BUILD_ROLE:-}" in merge|coverage|goal) slot_poll=0.3 ;; esac
 until D2_BUILD_SLOT_NOWAIT=1 d2_build_slot_acquire "$LOCK_DIR"; do
   [ -n "$slot_waited" ] || echo "==> waiting for a build slot (artifact lock released meanwhile)"
   [ -n "$slot_waited" ] || slot_since=$SECONDS
@@ -82,7 +82,7 @@ until D2_BUILD_SLOT_NOWAIT=1 d2_build_slot_acquire "$LOCK_DIR"; do
   [ $(( SECONDS - slot_since )) -lt 300 ] || slot_poll=0.3
   slot_waited=1; flock -u 8; sleep "${D2_BUILD_SLOT_POLL:-$slot_poll}"; flock -x 8
 done
-got=$D2_BUILD_SLOT; SLOTS="${D2_MAX_BUILDS:-6}"
+got=$D2_BUILD_SLOT; SLOTS="${D2_MAX_BUILDS:-12}"
 JOBS="${D2_COMPILE_JOBS:-$(( $(nproc) / SLOTS > 4 ? $(nproc) / SLOTS : 4 ))}"
 echo "==> build slot $got of $SLOTS, $JOBS compile jobs"
 WAIT=$(( $(date +%s) - T0 ))
