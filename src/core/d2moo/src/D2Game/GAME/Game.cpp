@@ -212,6 +212,7 @@ void __stdcall GAME_InitGameDataTable(D2GameDataTableStrc* pGameDataTbl, void* p
 }
 
 //D2Game.0x6FC358E0
+// 1.13c D2Game+0x2A330
 void __stdcall GAME_SetServerCallbackFunctions(D2ServerCallbackFunctions* pD2ServerCallbackFunctions)
 {
     if (pD2ServerCallbackFunctions)
