@@ -12,10 +12,10 @@ struct D2c9EE90Env {
     uint32_t (*ord10265)(uint32_t id);
     void (*ord10024)(uint32_t fmtAddr, uint32_t a);
     void (*exitProc)(int32_t code);                   // _exit
-    void (*f58230)(uint32_t src, uint8_t* r, uint8_t* g, uint8_t* b, uint8_t* a); // D2Client+0x58230
+    void (*f58230)(uint32_t eaxSrc, uint32_t ecxSrc, uint8_t* r, uint8_t* g, uint8_t* b, uint8_t* a); // D2Client+0x58230 (eax = node+8 side, ecx = node+4 side)
     int32_t (*ord10001)(uint32_t cel, int32_t x, int32_t y, const uint32_t* colors, uint32_t g);
     int32_t (*ord10058)(uint32_t cel, int32_t x, int32_t y, const uint32_t* colors, uint32_t g, uint32_t alpha);
-    void (*f166d0)(uint32_t p);                       // D2Client+0x166D0
+    void (*f166d0)(uint32_t p, uint32_t color);       // D2Client+0x666D0 (eax = 0, ecx = p, stack word = color)
 };
 extern "C" {
 // 1.13c D2Client+0x9EE90
@@ -65,7 +65,8 @@ EMSCRIPTEN_KEEPALIVE void d2c_9ee90(const D2c9EE90Env* e, uint32_t ctx) {
                     uint32_t col[8];
                     for (uint32_t i = 0; i < cnt; i++) {
                         uint8_t r, g, b, a;
-                        e->f58230(e->rd32(node + 4) + e->rd32(tab + idx * 0x30 + i * 8) * 8, &r, &g, &b, &a);
+                        e->f58230(e->rd32(node + 8) + e->rd32(tab + idx * 0x30 + i * 8 + 4) * 8,
+                                  e->rd32(node + 4) + e->rd32(tab + idx * 0x30 + i * 8) * 8, &r, &g, &b, &a);
                         col[i] = r | (uint32_t)g << 8 | (uint32_t)b << 16 | (uint32_t)a << 24;
                     }
                     int32_t x, y;
@@ -83,8 +84,17 @@ EMSCRIPTEN_KEEPALIVE void d2c_9ee90(const D2c9EE90Env* e, uint32_t ctx) {
                 }
             }
         }
-        // second walk over entry[+4] list: only dead stack stores of a tile lookup, then f166d0(node->data)
-        for (uint32_t node = e->rd32(ent + 4); node; node = e->rd32(node + 0x10)) e->f166d0(e->rd32(node + 0xc));
+        // second walk over the entry[+4] list (0x9F120): the tile at (node+4 >> 3, node+8 >> 3) less the view origin, clamped to
+        // 0..0x2f, in the 48-wide table at 0x6fbb5208 (8 bytes a tile); the colour is the tile's dword +4 when 0x6fb8e830 is set,
+        // else only its byte +4 (the rest is stack residue, read 0 here)
+        for (uint32_t node = e->rd32(ent + 4); node; node = e->rd32(node + 0x10)) {
+            int32_t cx = ((int32_t)e->rd32(node + 4) >> 3) - (int32_t)e->rd32(0x6fbb4df0);
+            int32_t cy = ((int32_t)e->rd32(node + 8) >> 3) - (int32_t)e->rd32(0x6fbb4df4);
+            cx = cx < 0 ? 0 : cx > 0x2f ? 0x2f : cx; cy = cy < 0 ? 0 : cy > 0x2f ? 0x2f : cy;
+            const uint32_t tile = 0x6fbb5208u + (uint32_t)(cy * 0x30 + cx) * 8;
+            const uint32_t col = e->rd32(0x6fb8e830) ? e->rd32(tile + 4) : e->rd8(tile + 4);
+            e->f166d0(e->rd32(node + 0xc), col);
+        }
         ent += 0x24;
     } while (left);
 }

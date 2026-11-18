@@ -42,7 +42,7 @@ struct D2Client9E970Env {
     uint32_t (*ord10013)();   // selects absolute vs ctx-relative position
     uint32_t (*getTick)();    // GetTickCount
     void (*fatal)(uint32_t code);                 // Ordinal_10265(code)+10024+_exit(-1)
-    uint32_t (*loadColor)(uint32_t src, uint8_t out[4]);   // 0xA8230: out[0..3] = first, 41, 42, 43 order
+    uint32_t (*loadColor)(uint32_t eaxSrc, uint32_t ecxSrc, uint8_t out[4]);   // 0xA8230: eax = y-side source, ecx = x-side
     uint32_t (*draw)(uint32_t cel, int32_t x, int32_t y, const uint32_t* cols, uint32_t mask);               // ord 10001
     uint32_t (*drawAlpha)(uint32_t cel, int32_t x, int32_t y, const uint32_t* cols, uint32_t mask, uint32_t a); // ord 10058
     D2Client9E970Entry* (*entry)(uint32_t p);     // retail ptr -> host
@@ -75,7 +75,8 @@ extern "C" void d2_client_9e970(D2Client9E970Env& e, D2Client9E970Node* node, ui
             uint32_t cols[8] = {};
             for (uint32_t i = 0; i < n; i++) {
                 uint8_t c[4];
-                e.loadColor(node->base + tab[idx * 12 + i * 2] * 8, c);   // 0x30/4 dwords per cel, 2 dwords per slot
+                e.loadColor(node->y + tab[idx * 12 + i * 2 + 1] * 8, node->base + tab[idx * 12 + i * 2] * 8, c);   // 0x30/4 dwords per cel, 2 dwords per slot
+                // 1.13c D2Client+0x9EB1F..0x9EB4D: s3<<24 | s2<<16 | s1<<8 | s0 of the 0xA8230 out bytes
                 cols[i] = (uint32_t)c[0] | (uint32_t)c[1] << 8 | (uint32_t)c[2] << 16 | (uint32_t)c[3] << 24;
             }
             int32_t x, y;

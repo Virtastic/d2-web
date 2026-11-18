@@ -523,14 +523,14 @@ struct D2ClientCellWalk9f270Env { uint32_t arg; void (*sub666d0)(uint32_t); uint
 // D2Client+0x9E970 over the arena's cell+0x14 list (overlay_list_9e970.cpp). Draw tables are retail .data (counts read 0, as 9EE90), colours not carried.
 struct D2Client9E970Node; struct D2Client9E970Entry;
 struct D2Client9E970Env { uint32_t colorMask, tickGate; const uint32_t *perCelCount, *tabNormal, *tabAlt; uint32_t ctxX, ctxY, ctxOffX, ctxOffY;
-    uint32_t (*ord10013)(); uint32_t (*getTick)(); void (*fatal)(uint32_t); uint32_t (*loadColor)(uint32_t, uint8_t*);
+    uint32_t (*ord10013)(); uint32_t (*getTick)(); void (*fatal)(uint32_t); uint32_t (*loadColor)(uint32_t, uint32_t, uint8_t*);
     uint32_t (*draw)(uint32_t, int32_t, int32_t, const uint32_t*, uint32_t); uint32_t (*drawAlpha)(uint32_t, int32_t, int32_t, const uint32_t*, uint32_t, uint32_t);
     D2Client9E970Entry* (*entry)(uint32_t); uint32_t (*celIndex)(uint32_t); };
 extern "C" void d2_client_9e970(D2Client9E970Env&, D2Client9E970Node*, uint32_t, D2Client9E970Node* (*)(uint32_t));
 struct D2c9EE90Env { uint32_t (*rd32)(uint32_t); uint8_t (*rd8)(uint32_t); void (*wr32)(uint32_t, uint32_t); void (*wr8)(uint32_t, uint8_t);
     int32_t (*ord10013)(); uint32_t (*getTick)(); uint32_t (*ord10265)(uint32_t); void (*ord10024)(uint32_t, uint32_t); void (*exitProc)(int32_t);
-    void (*f58230)(uint32_t, uint8_t*, uint8_t*, uint8_t*, uint8_t*); int32_t (*ord10001)(uint32_t, int32_t, int32_t, const uint32_t*, uint32_t);
-    int32_t (*ord10058)(uint32_t, int32_t, int32_t, const uint32_t*, uint32_t, uint32_t); void (*f166d0)(uint32_t); };
+    void (*f58230)(uint32_t, uint32_t, uint8_t*, uint8_t*, uint8_t*, uint8_t*); int32_t (*ord10001)(uint32_t, int32_t, int32_t, const uint32_t*, uint32_t);
+    int32_t (*ord10058)(uint32_t, int32_t, int32_t, const uint32_t*, uint32_t, uint32_t); void (*f166d0)(uint32_t, uint32_t); };
 extern "C" void d2_client_9f270(const uint8_t*, uint32_t, D2ClientCellWalk9f270Env*);
 extern "C" void d2c_666d0(D2cHost, int32_t, uint32_t, int32_t, uint32_t);
 extern "C" void d2c_728b0(D2cHost, uint32_t, uint32_t);
@@ -853,7 +853,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
             ++g_n9e970;
             static const uint32_t z[1024] = {};
             D2Client9E970Env e{0, 0, z, z, z, 0, 0, 0, 0, []() -> uint32_t { gRec(10013, {}, 0, g_ledx); g_ledx = 0; return g_r13; }, []() -> uint32_t { return g_now; }, [](uint32_t) {},
-                [](uint32_t, uint8_t* o) -> uint32_t { o[0] = o[1] = o[2] = o[3] = 0; return 0; },
+                [](uint32_t, uint32_t, uint8_t* o) -> uint32_t { o[0] = o[1] = o[2] = o[3] = 0; return 0; },
                 [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g) -> uint32_t { gRec(10001, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g}, y > 0 ? y : 0); return 1; },
                 [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g, uint32_t al) -> uint32_t { gRec(10058, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g, al}, y > 0 ? y : 0); return 1; },
                 [](uint32_t p) { return (D2Client9E970Entry*)(g_arena + p); }, [](uint32_t p) { return gRd32(p); }};
@@ -865,9 +865,9 @@ EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
     D2c9EE90Env e{gRd32, [](uint32_t a) -> uint8_t { return a < sizeof g_arena ? g_arena[a] : 0; }, [](uint32_t a, uint32_t v) { if (a < sizeof g_arena - 4) memcpy(g_arena + a, &v, 4); },
         // each 10001/10058 returns with ecx = edx = 0 (the 10013 after one reads 0,0)
         [](uint32_t a, uint8_t v) { if (a < sizeof g_arena) g_arena[a] = v; }, []() -> int32_t { gRec(10013, {}); return g_r13; }, []() -> uint32_t { ++g_n9ee90; return g_now; },
-        [](uint32_t) -> uint32_t { return 0; }, [](uint32_t, uint32_t) {}, [](int32_t) {}, [](uint32_t, uint8_t* r, uint8_t* g, uint8_t* b, uint8_t* a) { *r = *g = *b = *a = 0; },
+        [](uint32_t) -> uint32_t { return 0; }, [](uint32_t, uint32_t) {}, [](int32_t) {}, [](uint32_t, uint32_t, uint8_t* r, uint8_t* g, uint8_t* b, uint8_t* a) { *r = *g = *b = *a = 0; },
         [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g) -> int32_t { gRec(10001, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g}, y > 0 ? y : 0); g_lecx = g_ledx = 0; return 1; },
-        [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g, uint32_t al) -> int32_t { gRec(10058, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g, al}, y > 0 ? y : 0); g_lecx = g_ledx = 0; return 1; }, unit666d0};
+        [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g, uint32_t al) -> int32_t { gRec(10058, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g, al}, y > 0 ? y : 0); g_lecx = g_ledx = 0; return 1; }, [](uint32_t rec, uint32_t) { unit666d0(rec); }};
     d2c_9ee90(&e, kCtx);
     // 1.13c D2Client+0x13A00, run by 8B110 when a roof node set the pool's mask bit 1 (79D30): 10013, 10047, then the roof
     // lists (cell+0x1C) layer by layer 1..4; a node whose tile is hidden or pitch black (0x408) is skipped, the rest are
