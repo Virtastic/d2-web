@@ -2740,6 +2740,7 @@ static bool g_sessionClientRig = false;      // d2_session_client_feed(3), see b
 // rig's frame re-rooms that client as retail's client update does (sub_6FC33670) and has no client flush (no vitals sync).
 extern "C" bool g_sessionRigJoined = false;
 static bool g_fixtureOwnRoomOnly = false;
+static bool g_bareAiFixture = false;   // d2_aitarget_attach_at (the aitrace/combat captures' fixture): no client frame runs after the attach
 // The capture's D2CAPTURE_SESSION_CLIENT join (the retail capture tool/main.cpp "capture-client") lists the client in its own room and
 // then in every built room of the level through D2Common #10879 (0x3C460) directly -- no LEVEL_AddClient, so no unit sends.
 // a retail recording sets it: retail's monster b sits in a room only that join reaches, and AI scans client rooms only (D2Game+0xB0CE0).
@@ -3041,7 +3042,9 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
             // The rig's client learns the rooms' units from the first tick's client update instead (sent once there).
             // Retail's frame runs the queued-unit flush (D2Game+0x9D850) right after the client update, so what the update
             // sent (each unit's changed states among it) is cleared then and not sent again by the next frame.
-            if (!joinBurstRig) { LEVEL_UpdateUnitsInAdjacentRooms(g_game, room, g_targetClient); LEVEL_UpdateQueuedUnitsInAllActs(g_game); }
+            // The bare aitrace fixture (own room only, no feed) is not a client frame: retail's aitrace capture reads the player's
+            // flags with the update bits still set, so the flush is for the session joins only.
+            if (!joinBurstRig) { LEVEL_UpdateUnitsInAdjacentRooms(g_game, room, g_targetClient); if (!g_bareAiFixture) LEVEL_UpdateQueuedUnitsInAllActs(g_game); }
         }
         D2WEB_RecordPackets(nullptr);   // the walk is over; what the game sends the client from here goes out live
         D2WEB_ResetPacketStream();
@@ -3177,9 +3180,12 @@ static bool g_sessionClientFeed = false;
 // but its first-client wake events do not fire early; join the adjacent rooms' client arrays only (no events, no packets).
 // on == 3: the capture rig's fed join (D2CAPTURE_SESSION_CLIENT + _A2), reproduced packet for packet in attachSessionPlayerAt.
 EMSCRIPTEN_KEEPALIVE void d2_session_client_feed(int on) { g_sessionClientFeed = on == 1 || on == 3; g_sessionClientAdjCount = on == 2; g_sessionClientRig = on == 3; }
-EMSCRIPTEN_KEEPALIVE int d2_aitarget_attach() {
+static int aitargetAttachBody();
+// The exported attach is the bare AI/combat fixture (no client frame follows it); sessions enter through aitargetAttachBody.
+EMSCRIPTEN_KEEPALIVE int d2_aitarget_attach() { const bool was = g_bareAiFixture; g_bareAiFixture = true; const int ok = aitargetAttachBody(); g_bareAiFixture = was; return ok; }
+static int aitargetAttachBody() {
     if (!g_game || !g_lastLevel || g_targetPlayer) return 0;
-    if (g_attachAtX < 0 && g_sessionStartX >= 0) { g_attachAtX = g_sessionStartX; g_attachAtY = g_sessionStartY; g_sessionStartX = g_sessionStartY = -1; const int ok = d2_aitarget_attach(); g_attachAtX = g_attachAtY = -1; if (ok) return 1; }
+    if (g_attachAtX < 0 && g_sessionStartX >= 0) { g_attachAtX = g_sessionStartX; g_attachAtY = g_sessionStartY; g_sessionStartX = g_sessionStartY = -1; const int ok = aitargetAttachBody(); g_attachAtX = g_attachAtY = -1; if (ok) return 1; }
     uint16_t roomIdx = 0;
     for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext, roomIdx++) {
         // A room a previous fixture left keeps its (empty) client array; only a live client counts.
@@ -3439,9 +3445,9 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_skillprobe_cast(int skillId, int mode) {
     return g_skillProbe;
 }
 EMSCRIPTEN_KEEPALIVE int d2_aitarget_attach_at(int x, int y) {
-    g_attachAtX = x; g_attachAtY = y; g_fixtureOwnRoomOnly = true;
+    g_attachAtX = x; g_attachAtY = y; g_fixtureOwnRoomOnly = true; g_bareAiFixture = true;
     const int ok = d2_aitarget_attach();
-    g_fixtureOwnRoomOnly = false;
+    g_fixtureOwnRoomOnly = false; g_bareAiFixture = false;
     g_attachAtX = g_attachAtY = -1;
     return ok;
 }
@@ -3889,7 +3895,7 @@ static int d2_session_create_for_class(uint32_t seed, int difficulty, int act, i
     g_sessionNeighbourNext.clear();
     const bool sessionAttachAt = g_sessionAttachAtX >= 0 && g_sessionAttachAtY >= 0;
     if (sessionAttachAt) { g_attachAtX = g_sessionAttachAtX; g_attachAtY = g_sessionAttachAtY; g_fixtureOwnRoomOnly = !g_sessionClientFeed; }
-    const int attachedOk = d2_aitarget_attach();
+    const int attachedOk = aitargetAttachBody();
     if (sessionAttachAt) { g_attachAtX = g_attachAtY = -1; g_fixtureOwnRoomOnly = false; }
     g_sessionClientStaysInRoom = sessionAttachAt; // retail's headless session never re-rooms the client (QTRACE: 0 hits on 4B1D0)
     if (!attachedOk) { updateSessionSnapshot(); return 0; }
@@ -5832,7 +5838,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_reattach_near(uint32_t anchorClass) {
     if (g_targetClient) sub_6FC33020(g_targetClient, nullptr);
     detachTargetFixture();
     g_sessionAnchorClass = anchorClass;
-    const int ok = d2_aitarget_attach();
+    const int ok = aitargetAttachBody();
     g_sessionAnchorClass = 0xFFFFFFFF;
     updateSessionSnapshot();
     return ok;
