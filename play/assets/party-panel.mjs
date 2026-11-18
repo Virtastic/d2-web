@@ -124,8 +124,27 @@ export function clickResult(hit, own) {
   return null;
 }
 
+/** The engine's party host (src/core/d2client/host_party.cpp: D2Client 0x772E0 rows, 0x76B20 mouse tooltips), set by the shell. */
+let partyHost = null;
+export function setPartyHost(host) { partyHost = host; }
+/** The relation-box tooltip 0x76B20 draws at the pointer (800x600 screen coordinates): {first, second, x, colour} or null. */
+export function engineBoxTip(px, py, rows, own, lootShown) {
+  const h = partyHost;
+  h.begin(PANEL.x, PANEL.y, lootShown !== false, own.inTown);
+  h.add(own.level, own.party, 0, own.id);
+  for (const r of rows) h.add(r.level, r.party, r.flags, r.id);
+  h.build();
+  const n = h.tip(px, py), lines = [];
+  let x = 0;
+  for (let i = 0; i < n; i++) {
+    if (h.op(i, 0) === 0) x = h.op(i, 3);
+    else if (h.op(i, 0) === 1) lines.push({ id: h.op(i, 1), y: h.op(i, 3), colour: h.op(i, 4) });
+  }
+  return lines.length ? { first: lines[0].id, second: lines[1]?.id ?? 0, x, colour: lines[0].colour } : null;
+}
 // Tooltip under the pointer: [first string id, second id or 0, centre x] or null.
-export function tooltipFor(hit, rows, own) {
+export function tooltipFor(hit, rows, own, point = null, lootShown = true) {
+  if (hit?.box && point && partyHost?.ready()) return engineBoxTip(point.x, point.y, rows, own, lootShown);
   if (hit?.leave) return { first: 0x1018, second: 0, x: 0xd5 };
   if (hit?.button) {
     const first = ({ [REL.NONE]: 0x1004, [REL.INVITES_ME]: 0x1006, [REL.ASKED]: 0x1008 })[hit.row.relation] ?? 0x1018;
@@ -221,14 +240,14 @@ export function createPartyPanelRenderer(read, documentObject = globalThis.docum
       BORDER_LEFT.forEach(([i, x, y]) => chrome.cel(ctx, A, 'data\\global\\ui\\PANEL\\800BorderFrame.dc6', i, x, y));
       // The tooltip under the pointer: a dark box of the wider line + 10, one line at 0x37 or two at 0x32 / 0x41.
       const p = s.pointer ? toScreen(s.pointer.x, s.pointer.y, width, height) : null;
-      const tip = p ? tooltipFor(hitTest(p.x, p.y, rows, own), rows, own) : null;
+      const tip = p ? tooltipFor(hitTest(p.x, p.y, rows, own), rows, own, p, s.lootShown) : null;
       if (tip) {
         const f8 = measure('font8'), a = string(tip.first), b2 = tip.second ? string(tip.second) : '';
         const w = Math.max(f8(a), f8(b2)), two = Boolean(b2), top = two ? 0x23 : 0x2a;
         ctx.fillStyle = 'rgba(0,0,0,0.75)';
         ctx.fillRect(PANEL.x + tip.x - (w >> 1) - 5, PANEL.y + top, w + 10, two ? 0x1e : 0xf);
-        put('font8', 0, a, tip.x, two ? 0x32 : 0x37, true);
-        if (two) put('font8', 0, b2, tip.x, 0x41, true);
+        put('font8', tip.colour ?? 0, a, tip.x, two ? 0x32 : 0x37, true);
+        if (two) put('font8', tip.colour ?? 0, b2, tip.x, 0x41, true);
       }
       ctx.restore();
       return { rows: rows.map((r) => ({ ...r })), texts, blits, tooltip: tip };

@@ -60,7 +60,7 @@ import { savedCharacterReadError, setFrontdoorError } from './assets/frontdoor-e
 import { setOverlayFont, setOverlayText } from './assets/overlay-text.mjs';
 import { createQuestLogRenderer, createMessageLogRenderer, QUESTS_IN_ACT, ACT_BASE, ACT_DONE, questStatus, questWord, messageScrollMax, COMPLETING, MSG_LIST } from './assets/quest-log.mjs';
 import { createListPress } from './assets/list-press.mjs';
-import { createPartyPanelRenderer, partyRows, ownState, clickResult as partyClickResult } from './assets/party-panel.mjs';
+import { createPartyPanelRenderer, setPartyHost, partyRows, ownState, clickResult as partyClickResult } from './assets/party-panel.mjs';
 import { createBubbleRenderer } from './assets/game-bubbles.mjs';
 import { createQuestCloseGesture } from './assets/quest-close-gesture.mjs';
 import { createQuestPickGesture, questPickTarget, applyQuestPick } from './assets/quest-pick-gesture.mjs';
@@ -194,7 +194,7 @@ import { createPointerLayer } from './assets/pointer-layer.mjs';
 import { createFrontendHoverSync } from './assets/frontend-hover-sync.mjs';
 import { DROPPED_GAMEPLAY_KEYS } from './assets/retail-key-bindings.mjs';
 import { createHelpOverlayRenderer } from './assets/help-overlay.mjs';
-import { CONFIGURE_CONTROLS_SLOTS, CONFIGURE_CONTROLS_STORAGE_KEY, beltKeyNames, controlActionForKey, controlCodeForAction, createConfigureControls, restoreControlBindings } from './assets/configure-controls.mjs';
+import { CONFIGURE_CONTROLS_SLOTS, CONFIGURE_CONTROLS_STORAGE_KEY, beltKeyNames, controlActionForKey, setControlBindEngine, controlCodeForAction, createConfigureControls, restoreControlBindings } from './assets/configure-controls.mjs';
 import { createAutomapOverlay } from './assets/automap-overlay.mjs';
 import { parseMa0 } from './assets/ma0.mjs';
 import { panelCloseAt } from './assets/panel-close.mjs';
@@ -787,6 +787,20 @@ if (plugyStash.enabled) (async () => {
   } catch (e) { plugyError = `PlugY art: ${e}`; }
 })();
 let repairConfirmRenderer = null;
+// Key bindings run through the engine's D2Client key-binding runtime (host_keybind.cpp: 0x38AD0 scan, 0x3A270 assign).
+setControlBindEngine({
+  ready: () => Boolean(Module._d2_client_bind_scan),
+  rowCmd: (row) => Module._d2_client_bind_row_cmd(row), reset: () => Module._d2_client_bind_reset(), put: (...a) => Module._d2_client_bind_put(...a),
+  get: (i) => Module._d2_client_bind_get(i, 1), scan: (vk) => Module._d2_client_bind_scan(vk),
+  assign: (...a) => Module._d2_client_bind_assign(...a),
+});
+// The party panel's rows and relation-box tooltips run the engine's 1.13c code (host_party.cpp: 0x772E0 rows, 0x76B20 tooltips).
+setPartyHost({
+  ready: () => Boolean(Module._d2_client_party_host_tip),
+  begin: (...a) => Module._d2_client_party_host_begin(...a), add: (...a) => Module._d2_client_party_host_add(...a),
+  build: () => Module._d2_client_party_host_build(), tip: (x, y) => Module._d2_client_party_host_tip(x, y),
+  op: (i, f) => Module._d2_client_party_host_op(i, f),
+});
 const storeOfferClick = createStoreOfferClick((...a) => (Module._d2_client_store_offer_click ? Module.ccall('d2_client_store_offer_click', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'number'], a) : (a[0] === 0 && a[4] ? 2 : 0)));
 // The stash close button's hit test is the engine's; its layout follows the game's expansion flag
 // (the realm's character flags, else the session's client save flags, CLIENTSAVEFLAG_EXPANSION 0x20).

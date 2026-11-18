@@ -134,10 +134,48 @@ export function controlBindingMatches(bindings, functionName, code) {
   return controlActionForKey(bindings, code) === functionName;
 }
 
+/** The engine's key-binding runtime (src/core/d2client/host_keybind.cpp: D2Client+0x38AD0 scan, 0x38CD0, 0x3A270), set by the
+ *  shell once the wasm is up; without it (unit tests, before load) the JS rules below answer. */
+let bindEngine = null;
+export function setControlBindEngine(engine) { bindEngine = engine; }
+const VK_NAMED = { Space: 0x20, Tab: 9, Enter: 0xd, 'Print Screen': 0x2c, Shift: 0x10, Ctrl: 0x11, Alt: 0x12, '~': 0xc0 };
+/** The Windows virtual key retail records for a key name (0xFFFF: none). */
+export function keyNameVk(name) {
+  if (name == null) return 0xffff;
+  if (name in VK_NAMED) return VK_NAMED[name];
+  if (/^[A-Z0-9]$/.test(name)) return name.charCodeAt(0);
+  let m = /^F(\d+)$/.exec(name); if (m) return 0x6f + Number(m[1]);
+  m = /^Num Pad (\d)$/.exec(name); if (m) return 0x60 + Number(m[1]);
+  return 0xffff;
+}
+// Retail's command number of a slot is the command in that row of its own list table (D2Client+0xF8928), asked of the engine.
+const slotCmds = () => { const m = []; CONFIGURE_CONTROLS_SLOTS.forEach((e, slot) => { const c = e ? bindEngine.rowCmd(slot) : -1; if (c >= 0) m.push([slot, c]); }); return m; };
+/** Load a binding snapshot into the engine's 114-record table: record 2*cmd + cell. */
+function loadEngineBinds(bindings) {
+  bindEngine.reset();
+  for (const [slot, cmd] of slotCmds()) for (let cell = 0; cell < 2; cell++) bindEngine.put(cmd * 2 + cell, cmd, keyNameVk(bindings?.[slot]?.[cell] ?? null), cell);
+}
+/** Assign a key name to (slot, cell) of a binding snapshot through retail's 0x3A270 (last writer wins). null: no engine; false: refused. */
+export function assignControlKey(bindings, slot, cell, name) {
+  if (!bindEngine?.ready()) return null;
+  loadEngineBinds(bindings);
+  if (!bindEngine.assign(bindEngine.rowCmd(slot), cell, keyNameVk(name))) return false;
+  for (const [s, cmd] of slotCmds()) for (let c = 0; c < 2; c++) {
+    const vk = bindEngine.get(cmd * 2 + c);
+    bindings[s][c] = vk === 0xffff ? null : (keyCodes.find(([, n]) => keyNameVk(n) === vk)?.[1] ?? null);
+  }
+  return true;
+}
+
 /** Resolve the configured retail action for a DOM key. Last-writer-wins keeps each key unique. */
 export function controlActionForKey(bindings, code) {
   const name = keyName(code);
   if (!name) return null;
+  if (bindEngine?.ready()) {
+    loadEngineBinds(bindings);
+    const cmd = bindEngine.scan(keyNameVk(name));
+    return cmd < 0 ? null : CONFIGURE_CONTROLS_SLOTS[slotCmds().find(([, c]) => c === cmd)[0]][0];
+  }
   for (let slot = 0; slot < CONFIGURE_CONTROLS_SLOTS.length; slot++) {
     const entry = CONFIGURE_CONTROLS_SLOTS[slot];
     if (entry && bindings?.[slot]?.some((key) => key === name)) return entry[0];
@@ -274,11 +312,13 @@ export function createConfigureControls({ read, palettePath = () => 'data\\globa
   /** Retail's conflict rule, measured (`configure-controls-conflict.txt`): last writer wins -- the new
    *  owner takes the key and the old one's cell becomes unbound, with no warning. */
   const assign = (slot, cell, name) => {
-    for (let s = 0; s < pending.length; s++) {
-      const b = pending[s]; if (!b) continue;
-      for (let c = 0; c < 2; c++) if (b[c] === name && !(s === slot && c === cell)) b[c] = null;
+    if (assignControlKey(pending, slot, cell, name) === null) {
+      for (let s = 0; s < pending.length; s++) {
+        const b = pending[s]; if (!b) continue;
+        for (let c = 0; c < 2; c++) if (b[c] === name && !(s === slot && c === cell)) b[c] = null;
+      }
+      pending[slot][cell] = name;
     }
-    pending[slot][cell] = name;
     armed = null;
   };
 
