@@ -30,6 +30,8 @@ struct D2Act3Quest2Strc						//sizeof 0xB0
 
 
 
+// 1.13c D2Game+0xE2DB0
+void __fastcall ACT3Q2_AddFlailsDropped(D2GameStrc* pGame, int32_t nFlailsDropped);
 //D2Game.0x6FCA7B70
 bool __fastcall ACT3Q2_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC);
 //D2Game.0x6FCA7CD0

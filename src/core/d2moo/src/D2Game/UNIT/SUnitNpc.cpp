@@ -943,26 +943,65 @@ void __fastcall sub_6FCC7E20(D2GameStrc* pGame, D2UnitStrc* pNpc, D2UnitStrc* pI
         }
     }
 
-    pNpcRecord = SUNITPROXY_GetNpcRecordFromUnit(pGame, pNpc, &nUnused);
-    if (pNpcRecord)
+    if ((uint8_t)SUNITNPC_IsStockedItem_BCAA0(pNpc, pGame, pItem))
     {
-        const uint32_t nBaseCode = ITEMS_GetBaseCode(pItem);
-        if (pGame->nDifficulty && (nBaseCode == ' 4ph' || nBaseCode == ' 5ph' || nBaseCode == ' 4pm' || nBaseCode == ' 5pm'))
-        {
-            return;
-        }
-
-        for (int32_t i = 0; i < pNpcRecord->npcTrade.pProxy.nPerms; ++i)
-        {
-            if (nBaseCode == pNpcRecord->npcTrade.pProxy.pPermCache[i])
-            {
-                return;
-            }
-        }
+        return;
     }
 
     sub_6FCC6F10(pNpc, pItem, pGame, 1);
     return;
+}
+
+// 1.13c D2Game+0xBCAA0 (EAX = npc, EBX = game, stack = item). The answer is AL: the item's base code is one of the npc record's
+// permanent codes, or on a non-normal difficulty one of hp4 / hp5 / mp4 / mp5. Retail leaves the code's upper three bytes in EAX
+// (0 with no record), so the whole word is returned.
+uint32_t __fastcall SUNITNPC_IsStockedItem_BCAA0(D2UnitStrc* pNpc, D2GameStrc* pGame, D2UnitStrc* pItem)
+{
+    int32_t nUnused = 0;
+    D2NpcRecordStrc* pNpcRecord = D2_CALL(SUNITPROXY_GetNpcRecordFromClassId, pGame, pNpc ? pNpc->dwClassId : -1, &nUnused);
+    if (!pNpcRecord)
+    {
+        return 0;
+    }
+
+    const uint32_t nBaseCode = D2_CALL(ITEMS_GetBaseCode, pItem);
+    if (pGame->nDifficulty && (nBaseCode == ' 4ph' || nBaseCode == ' 5ph' || nBaseCode == ' 4pm' || nBaseCode == ' 5pm'))
+    {
+        return (nBaseCode & 0xFFFFFF00u) | 1;
+    }
+
+    for (int32_t i = 0; i < pNpcRecord->npcTrade.pProxy.nPerms; ++i)
+    {
+        if (nBaseCode == pNpcRecord->npcTrade.pProxy.pPermCache[i])
+        {
+            return (nBaseCode & 0xFFFFFF00u) | 1;
+        }
+    }
+
+    return nBaseCode & 0xFFFFFF00u;
+}
+
+// 1.13c D2Game+0xBCE60 (ESI = item, EDI = owner, stack = flag). Marks the item 0x10; with the flag set it also marks it a vendor item,
+// sets item flag 1 for a socketable item whose own inventory holds items, refreshes the owner and adds the item to its trade inventory.
+void __fastcall SUNITNPC_AddStoreItem_BCE60(D2UnitStrc* pItem, D2UnitStrc* pOwner, int32_t bFlag)
+{
+    D2_CALL(ITEMS_SetItemFlag, pItem, 0x10, 1);
+    if (!bFlag)
+    {
+        return;
+    }
+
+    if (pItem)
+    {
+        pItem->dwFlagEx |= UNITFLAGEX_ISVENDORITEM;
+        if (pItem->dwUnitType == UNIT_ITEM && D2_CALL(ITEMS_CheckIfSocketable, pItem) && pItem->pInventory && D2_CALL(INVENTORY_GetItemCount, pItem->pInventory))
+        {
+            D2_CALL(ITEMS_SetItemFlag, pItem, 1, 1);
+        }
+    }
+
+    D2_CALL(UNITS_RefreshInventory, pOwner, 1);
+    D2_CALL(INVENTORY_AddItemToTradeInventory, pOwner->pInventory, pItem);
 }
 
 // 1.13c D2Game+0xBD160 (split out of the hire handler: once no offered hireling is left unhired the

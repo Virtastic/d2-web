@@ -1832,6 +1832,7 @@ BOOL __fastcall D2Common_SKILLS_CheckShapeRestriction_6FDB1380(D2UnitStrc* pUnit
 	D2SkillsTxt* pSkillsTxt = pSkill->pSkillsTxt;
 	if (pSkillsTxt->nRestrict == 0)
 	{
+		// 1.13c D2Common+0x33F40 (restrict mask test, inline here; both uses below are the same call)
 		return !STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_RESTRICT);
 	}
 

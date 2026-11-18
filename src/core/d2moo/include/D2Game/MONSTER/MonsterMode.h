@@ -113,6 +113,10 @@ int32_t __fastcall sub_6FC64510(D2GameStrc* pGame, D2UnitStrc* pUnit);
 int32_t __fastcall sub_6FC64540(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange);
 //D2Game.0x6FC645E0
 int32_t __fastcall sub_6FC645E0(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange);
+//D2Game.0x6FC64A40
+void __fastcall D2GAME_MONSTERMODE_QuillRatVolley_75A40(D2UnitStrc* pUnit, D2GameStrc* pGame, int32_t nMissileId);
+//1.13c D2Game+0x75C60
+int32_t MONSTERMODE_FireAttackMissile(D2UnitStrc* pUnit, D2GameStrc* pGame, int32_t bMoving);
 //D2Game.0x6FC64790
 int32_t __fastcall sub_6FC64790(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FC64B10

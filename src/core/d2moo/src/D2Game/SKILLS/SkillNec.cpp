@@ -1169,6 +1169,7 @@ int32_t __fastcall SKILLS_SrvDo031_RaiseSkeleton_Mage(D2GameStrc* pGame, D2UnitS
     }
 
     D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10(pGame, pUnit, pPet, 0, nSkillLevel);
+    // 1.13c D2Game+0x4EB50 (skeleton/mage class dispatch, inlined in the raise-skeleton skill)
     if (pPet->dwClassId == MONSTER_NECROSKELETON)
     {
         int32_t nLevel = 1;

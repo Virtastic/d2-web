@@ -78,3 +78,5 @@ int32_t __fastcall sub_6FC93740(D2GameStrc* pGame, D2UnitStrc* pUnit);
 int32_t __fastcall D2GAME_PLRTRADE_IsInteractingWithPlayer(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FC937F0
 void __fastcall D2GAME_PLRTRADE_Last_6FC937F0(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t a3, int32_t a4);
+//D2Game+0x711D0 (1.13c only; 1.10f inlines it in PLRTRADE_CreateCubeOutputs)
+int32_t __fastcall PLRTRADE_RemoveCubeItems_711D0(D2ClientStrc* pClient, D2UnitStrc* pPlayer, D2GameStrc* pGame);

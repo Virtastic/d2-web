@@ -106,6 +106,8 @@ void __fastcall OBJECTS_InitFunction73_AncientsDoor(D2ObjInitFnStrc* pOp);
 int32_t __fastcall OBJECTS_OperateFunction65_AncientsAltar(D2ObjOperateFnStrc* pOp, int32_t nOperate);
 //D2Game.0x6FCB7F40
 int32_t __fastcall ACT5Q5_UnitIterate_ClosePortals(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData);
+//1.13c: D2Game.0x6FC7D080 (QUESTS/ACT5/A5Q5_5d080.cpp)
+void __fastcall ACT5Q5_CloseAllPortals(D2GameStrc* pGame);
 //D2Game.0x6FCB7F80
 int32_t __fastcall OBJECTS_OperateFunction66_AncientsDoor(D2ObjOperateFnStrc* pOp, int32_t nOperate);
 //D2Game.0x6FCB80B0

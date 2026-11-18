@@ -17,6 +17,7 @@
 #include "QUESTS/ACT2/A2Q4.h"
 #include "QUESTS/ACT2/A2Q6.h"
 #include "UNIT/SUnit.h"
+#include <test_seam.h>
 
 
 //D2Game.0x6FD35238
@@ -943,4 +944,14 @@ int32_t __fastcall ACT2Q2_UnitIterate_DetermineCubeDropCount(D2GameStrc* pGame, 
 void __fastcall ACT2Q2_Callback10_PlayerLeavesGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	QUESTS_RemovePlayerGUID(pQuestData, pQuestArg);
+}
+
+// 1.13c D2Game+0xC2380 (EAX = quest data, arg = amount): adds to the Horadric staff quest's amulet count
+void __fastcall ACT2Q2_AddAmulets_C2380(D2QuestDataStrc* pQuestData, int32_t nAdd)
+{
+	D2QuestDataStrc* pStaff = D2_CALL(QUESTS_GetQuestData, pQuestData->pGame, QUEST_A2Q2_HORADRICSTAFF);
+	if (pStaff)
+	{
+		((D2Act2Quest2Strc*)pStaff->pQuestDataEx)->nAmulets += nAdd;
+	}
 }

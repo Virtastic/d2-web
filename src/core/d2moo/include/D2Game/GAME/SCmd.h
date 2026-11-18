@@ -15,6 +15,8 @@ void __fastcall sub_6FC3C6B0(int32_t nClientId);
 void __fastcall sub_6FC3C6D0(int32_t nClientId, uint32_t nErrorCode);
 //D2Game.0x6FC3C6F0
 void __fastcall D2GAME_PACKETS_SendHeaderOnlyPacket(D2ClientStrc* pClient, uint8_t nHeader);
+//1.13c D2Game+0x8A770
+void D2GAME_PACKETS_SendCopiedSixBytes_8A770(const void* pSrc, D2ClientStrc* pClient);
 //D2Game.0x6FC3C710
 void __fastcall D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, int32_t nPacketSize);
 //D2Game.0x6FC3C7C0

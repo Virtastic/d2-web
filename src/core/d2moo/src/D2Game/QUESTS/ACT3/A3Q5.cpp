@@ -792,13 +792,7 @@ void __fastcall ACT3Q5_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 		{
 			pQuestDataEx->bFlailDropped = 1;
 
-			D2QuestDataStrc* pQuestData16 = QUESTS_GetQuestData(pQuestData->pGame, QUEST_A3Q2_KHALIMFLAIL);
-			if (pQuestData16)
-			{
-				D2Act3Quest2Strc* pQuestDataEx16 = (D2Act3Quest2Strc*)pQuestData16->pQuestDataEx;
-				pQuestDataEx16->bFlailDropped = 1;
-				pQuestDataEx16->nFlailsDropped += nFlailsDropped;
-			}
+			ACT3Q2_AddFlailsDropped(pQuestData->pGame, nFlailsDropped);
 		}
 	}
 
@@ -999,6 +993,18 @@ int32_t __fastcall ACT3Q5_IsDuranceOfHateClosed(D2GameStrc* pGame, D2UnitStrc* p
 	if (pRoom && DUNGEON_GetLevelIdFromRoom(pRoom) == LEVEL_DURANCEOFHATELEV2 || !pQuestData)
 	{
 		return 0;
+	}
+
+	return ((D2Act3Quest5Strc*)pQuestData->pQuestDataEx)->bOrbSmashed == 0;
+}
+
+// 1.13c D2Game+0xE2960 (EAX = game; true while the Travincal orb is not smashed, or when the game has no quest 19 record)
+bool __fastcall ACT3Q5_IsOrbIntact(D2GameStrc* pGame)
+{
+	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A3Q5_TRAVINCAL);
+	if (!pQuestData)
+	{
+		return true;
 	}
 
 	return ((D2Act3Quest5Strc*)pQuestData->pQuestDataEx)->bOrbSmashed == 0;

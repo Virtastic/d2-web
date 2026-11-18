@@ -1,4 +1,5 @@
 #include "QUESTS/ACT3/A3Q4.h"
+#include <test_seam.h>
 
 #include <DataTbls/LevelsIds.h>
 #include <DataTbls/MonsterIds.h>
@@ -207,6 +208,21 @@ void __fastcall ACT3Q4_UnitIterate_UpdateCurrentQuestState(D2GameStrc* pGame, D2
 	{
 		QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q4, ((D2Act3Quest4Strc*)pQuestData->pQuestDataEx)->nCurrentQuestFlag);
 	}
+}
+
+// 1.13c D2Game+0xE6B90 (EAX = player unit, ESI = game; a player in a game runs the current-quest-state update over its party)
+int32_t __fastcall ACT3Q4_UnitIterate_UpdatePartyCurrentQuestState(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
+{
+	if (pUnit && pUnit->pGame && pUnit->dwUnitType == UNIT_PLAYER)
+	{
+		const int16_t nPartyId = D2_CALL(PARTY_GetPartyIdForUnitOwner, pGame, pUnit);
+		if (nPartyId != -1)
+		{
+			D2_CALL(PARTY_IteratePartyMembers, pGame, nPartyId, ACT3Q4_UnitIterate_UpdateCurrentQuestState, nullptr);
+		}
+	}
+
+	return 0;
 }
 
 //D2Game.0x6FCAA270

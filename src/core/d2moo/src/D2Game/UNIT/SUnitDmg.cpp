@@ -1202,6 +1202,7 @@ void __fastcall SUNITDMG_ExecuteEvents(D2GameStrc* pGame, D2UnitStrc* pAttacker,
 	const int32_t nHp = STATLIST_UnitGetStatValue(pDefender, STAT_HITPOINTS, 0);
 	pDamage->dwPhysDamage = std::min(pDamage->dwPhysDamage, nHp);
 
+	// 1.13c D2Game+0xDBA40 (leech block, inline here)
 	if (pDamage->dwLifeLeech || pDamage->dwManaLeech)
 	{
 		int32_t nDrain = 0;
@@ -1891,6 +1892,7 @@ void __fastcall SUNITDMG_KillMonster(D2GameStrc* pGame, D2UnitStrc* pDefender, D
 		{
 			switch (pDefender->dwClassId)
 			{
+			// 1.13c D2Game+0xDAB00 (barricade room loop, inline here)
 			case MONSTER_BARRICADEDOOR1:
 			{
 				D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pDefender);
@@ -2737,6 +2739,7 @@ void __fastcall SUNITDMG_AllocCombat(D2GameStrc* pGame, D2UnitStrc* pAttacker, D
 		return;
 	}
 
+	// 1.13c D2Game+0xDAB90 (pCombat node alloc, inline here)
 	D2CombatStrc* pCombat = D2_ALLOC_STRC_POOL(pGame->pMemoryPool, D2CombatStrc);
 	pCombat->pGame = pGame;
 	pCombat->dwAttackerType = pAttacker->dwUnitType;
@@ -2987,8 +2990,9 @@ void __fastcall SUNITDMG_DistributeExperience(D2GameStrc* pGame, D2UnitStrc* pAt
 			return;
 		}
 
+		// 1.13c D2Game+0xDB5E0 (owner lookup, inline here)
 		D2UnitStrc* pOwner = AIGENERAL_GetMinionOwner(pAttacker);
-		
+
 		D2StatListStrc* pStatList = nullptr;
 		if (STATES_CheckStateMaskExpOnUnit(pAttacker))
 		{
@@ -3160,6 +3164,7 @@ uint32_t __fastcall SUNITDMG_ComputeExperienceGain(D2GameStrc* pGame, D2UnitStrc
 		return 0;
 	}
 
+	// 1.13c D2Game+0xDB6B0 (hireling experience cap, inline here)
 	D2HirelingTxt* pHirelingTxtRecord = DATATBLS_GetHirelingTxtRecordFromIdAndLevel(pGame->bExpansion, pPetInfo->nHirelingId, nAttackerLevel);
 	if (!pHirelingTxtRecord)
 	{

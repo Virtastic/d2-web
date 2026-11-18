@@ -21,6 +21,7 @@
 #include "UNIT/Party.h"
 #include "UNIT/SUnit.h"
 #include "SKILLS/Skills.h"
+#include <test_seam.h>
 
 
 //D2Game.0x6FD36BC8
@@ -1110,6 +1111,27 @@ void __fastcall OBJECTS_InitFunction38_TyraelsDoor(D2ObjInitFnStrc* pOp)
 	{
 		UNITS_ChangeAnimMode(pOp->pObject, OBJMODE_OPENED);
 	}
+}
+
+// 1.13c D2Game+0xC1A00 (EAX = game): 0 when Duriel's quest is a real quest below state 4, else 1
+int32_t __fastcall ACT2Q6_NotActiveOrState4Plus_C1A00(D2GameStrc* pGame)
+{
+	D2QuestDataStrc* pQuestData = D2_CALL(QUESTS_GetQuestData, pGame, QUEST_A2Q6_DURIEL);
+	return !(pQuestData && pQuestData->bNotIntro && pQuestData->fState < 4);
+}
+
+// 1.13c D2Game+0xC1B20 (EAX = game): 1 when Duriel's quest is a real quest in state 1, else 0
+int32_t __fastcall ACT2Q6_ActiveAndStateIs1_C1B20(D2GameStrc* pGame)
+{
+	D2QuestDataStrc* pQuestData = D2_CALL(QUESTS_GetQuestData, pGame, QUEST_A2Q6_DURIEL);
+	return pQuestData && pQuestData->bNotIntro && pQuestData->fState == 1;
+}
+
+// 1.13c D2Game+0xC1B60 (EAX = game): 0 when Duriel's quest is a real quest below state 2, else 1
+int32_t __fastcall ACT2Q6_NotActiveOrState2Plus_C1B60(D2GameStrc* pGame)
+{
+	D2QuestDataStrc* pQuestData = D2_CALL(QUESTS_GetQuestData, pGame, QUEST_A2Q6_DURIEL);
+	return !(pQuestData && pQuestData->bNotIntro && pQuestData->fState < 2);
 }
 
 // 1.13c D2Game+0xC1A60

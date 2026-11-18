@@ -1332,9 +1332,110 @@ int32_t __fastcall sub_6FC645E0(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
     return 1;
 }
 
+//D2Game.0x6FC64A40
+// 1.13c D2Game+0x75A40 (EDI = unit, stack = game, missile id; a quill rat base monster refires its volley around the target)
+void __fastcall D2GAME_MONSTERMODE_QuillRatVolley_75A40(D2UnitStrc* pUnit, D2GameStrc* pGame, int32_t nMissileId)
+{
+    if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER || pUnit->dwClassId < 0)
+    {
+        return;
+    }
+
+    int32_t nBaseId = pUnit->dwClassId;
+    D2MonStatsTxt* pBaseRecord = MONSTERMODE_GetMonStatsTxtRecord(nBaseId);
+    if (pBaseRecord)
+    {
+        nBaseId = pBaseRecord->nBaseId;
+    }
+
+    if (nBaseId != MONSTER_QUILLRAT1)
+    {
+        return;
+    }
+
+    D2DynamicPathStrc* pPath = pUnit->pDynamicPath;
+    D2_CALL(sub_6FCBC7E0, pGame, pUnit);
+    D2UnitStrc* pTarget = D2_CALL(PATH_GetTargetUnit, pPath);
+    int32_t nX = 0;
+    int32_t nY = 0;
+    if (pTarget == pUnit || !pTarget)
+    {
+        pTarget = nullptr;
+        nX = D2_CALL(D2COMMON_10175_PathGetFirstPointX, pPath);
+        nY = D2_CALL(D2COMMON_10176_PathGetFirstPointY, pPath);
+    }
+    else if (pTarget->dwUnitType == UNIT_OBJECT || pTarget->dwUnitType == UNIT_MISSILE || pTarget->dwUnitType == UNIT_ITEM)
+    {
+        nX = pTarget->pStaticPath->tGameCoords.nX;
+        nY = pTarget->pStaticPath->tGameCoords.nY;
+    }
+    else
+    {
+        nX = pTarget->pDynamicPath ? D2_CALL(PATH_GetXPosition, pTarget->pDynamicPath) : 0;
+        nY = pTarget->pDynamicPath ? D2_CALL(PATH_GetYPosition, pTarget->pDynamicPath) : 0;
+    }
+
+    int32_t nXOffset = 5;
+    int32_t nYOffset = 5;
+    D2_CALL(PATH_SetTargetUnit, pPath, nullptr);
+
+    D2SeedStrc seed = {};
+    D2_CALL(SEED_InitSeed, &seed);
+    D2_CALL(SEED_InitLowSeed, &seed, 'SEIS');
+    seed.nHighSeed = pUnit->dwUnitId;
+
+    const int32_t nParam = MONSTERMODE_GetMonStatsTxtRecord(pUnit->dwClassId)->wAiParam[2][pGame->nDifficulty];
+    for (int32_t i = 0; i < nParam; ++i)
+    {
+        if (ITEMS_RollRandomNumber(&seed) & 1)
+        {
+            nXOffset = -nXOffset;
+        }
+
+        if (ITEMS_RollRandomNumber(&seed) & 1)
+        {
+            nYOffset = -nYOffset;
+        }
+
+        D2_CALL(D2COMMON_10170_PathSetTargetPos, pPath, nX + nXOffset, nY + nYOffset);
+        D2_CALL(sub_6FD11420, pGame, nMissileId, pUnit, 0, 1, 0, 0, 0, 0, 0);
+    }
+
+    D2_CALL(PATH_SetTargetUnit, pPath, pTarget);
+}
+
+// 1.13c D2Game+0x75C60: EAX = unit, EBX = game, one stack word (the moving-mode flag, ret 4). Fires the unit's attack missile (id from D2Common #11050); 0 when
+// there is no unit or no missile. The level is the game's difficulty bonus + 1, or the unit's level for a mercenary; after a spawn the quill rat volley (+0x75A40) runs.
+int32_t MONSTERMODE_FireAttackMissile(D2UnitStrc* pUnit, D2GameStrc* pGame, int32_t bMoving)
+{
+    if (!pUnit)
+    {
+        return 0;
+    }
+
+    const int32_t nMissileId = D2_CALL(D2Common_11050, pUnit, bMoving);
+    if (nMissileId < 0)
+    {
+        return 0;
+    }
+
+    int32_t nSkillLevel = D2_CALL(DATATBLS_GetDifficultyLevelsTxtRecord, pGame->nDifficulty)->dwMonsterSkillBonus + 1;
+    if (pUnit->dwFlags & UNITFLAG_ISMERC)
+    {
+        nSkillLevel = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_LEVEL, 0);
+    }
+
+    if (D2_CALL(sub_6FD11420, pGame, nMissileId, pUnit, 0, nSkillLevel, 0, 0, 0, 0, 1))
+    {
+        D2_CALL(D2GAME_MONSTERMODE_QuillRatVolley_75A40, pUnit, pGame, nMissileId);
+    }
+
+    return 1;
+}
+
 //D2Game.0x6FC64790
 // 1.13c D2Game+0x75CE0 (attack update callback; the moving-mode test is +0x74F20, the missile shot +0x75C60 and
-// the quill rat volley +0x75A40, all inline here: volley seed high word = unit GUID, combat target fetched once)
+// the quill rat volley +0x75A40 are split out above)
 int32_t __fastcall sub_6FC64790(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2SkillStrc* pSkill = UNITS_GetUsedSkill(pUnit);
@@ -1388,73 +1489,7 @@ int32_t __fastcall sub_6FC64790(D2GameStrc* pGame, D2UnitStrc* pUnit)
             }
         }
 
-        int32_t nMissileId = D2Common_11050(pUnit, v10);
-        if (nMissileId >= 0)
-        {
-            int32_t nSkillLevel = DATATBLS_GetDifficultyLevelsTxtRecord(pGame->nDifficulty)->dwMonsterSkillBonus + 1;
-            if (pUnit->dwFlags & UNITFLAG_ISMERC)
-            {
-                nSkillLevel = STATLIST_UnitGetStatValue(pUnit, STAT_LEVEL, 0);
-            }
-
-            if (sub_6FD11420(pGame, nMissileId, pUnit, 0, nSkillLevel, 0, 0, 0, 0, 1) && pUnit && pUnit->dwUnitType == UNIT_MONSTER)
-            {
-                int32_t nBaseId = pUnit->dwClassId;
-                D2MonStatsTxt* pBaseMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nBaseId);
-                if (pBaseMonStatsTxtRecord)
-                {
-                    nBaseId = pBaseMonStatsTxtRecord->nBaseId;
-                }
-
-                if (nBaseId == MONSTER_QUILLRAT1)
-                {
-                    D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
-                    int32_t nX = 0;
-                    int32_t nY = 0;
-                    if (pTarget)
-                    {
-                        nX = CLIENTS_GetUnitX(pTarget);
-                        nY = CLIENTS_GetUnitY(pTarget);
-                    }
-                    else
-                    {
-                        nX = D2COMMON_10175_PathGetFirstPointX(pUnit->pDynamicPath);
-                        nY = D2COMMON_10176_PathGetFirstPointY(pUnit->pDynamicPath);
-                    }
-
-                    int32_t nYOffset = 5;
-                    int32_t nXOffset = 5;
-                    
-                    PATH_SetTargetUnit(pUnit->pDynamicPath, nullptr);
-
-                    D2SeedStrc seed = {};
-                    SEED_InitSeed(&seed);
-                    SEED_InitLowSeed(&seed, 'SEIS');
-                    seed.nHighSeed = pUnit->dwUnitId;
-
-                    const int32_t nParam = MONSTERMODE_GetMonStatsTxtRecord(pUnit->dwClassId)->wAiParam[2][pGame->nDifficulty];
-                    for (int32_t i = 0; i < nParam; ++i)
-                    {
-                        if (ITEMS_RollRandomNumber(&seed) & 1)
-                        {
-                            nXOffset = -nXOffset;
-                        }
-
-                        if (ITEMS_RollRandomNumber(&seed) & 1)
-                        {
-                            nYOffset = -nYOffset;
-                        }
-
-                        D2COMMON_10170_PathSetTargetPos(pUnit->pDynamicPath, nX + nXOffset, nY + nYOffset);
-                        sub_6FD11420(pGame, nMissileId, pUnit, 0, 1, 0, 0, 0, 0, 0);
-                    }
-
-                    PATH_SetTargetUnit(pUnit->pDynamicPath, pTarget);
-                    return 1;
-                }
-            }
-        }
-        else
+        if (!MONSTERMODE_FireAttackMissile(pUnit, pGame, v10))
         {
             sub_6FC62D90(pUnit, pGame);
 

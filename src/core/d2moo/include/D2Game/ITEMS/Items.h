@@ -111,6 +111,8 @@ void __fastcall ITEMS_RemoveAll(D2GameStrc* pGame);
 void __fastcall ITEMS_RemoveFromAllPlayers(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FC50340
 void __fastcall ITEMS_PlayerIterateCallback_RemoveItem(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pArg);
+//1.13c: D2Game.0x6FC2E1C0 (ITEMS/Items_e1c0.cpp)
+void __fastcall ITEMS_RemoveItemFromInventory(D2UnitStrc* pItem, D2InventoryStrc* pInventory);
 //D2Game.0x6FC503A0
 int32_t __fastcall ITEMS_IsInPlayersInventory(D2UnitStrc* pPlayer, D2UnitStrc* pItem, D2InventoryStrc* pInventory);
 //D2Game.0x6FC50410

@@ -1566,25 +1566,10 @@ void __fastcall ITEMS_RemoveFromAllPlayers(D2GameStrc* pGame, D2UnitStrc* pUnit)
     SUNIT_RemoveUnit(pGame, pUnit);
 }
 
-//D2Game.0x6FC50340
+//D2Game.0x6FC50340 // 1.13c D2Game+0xE7E0 (a thunk into 0xE1C0 with the player's inventory)
 void __fastcall ITEMS_PlayerIterateCallback_RemoveItem(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pArg)
 {
-    D2UnitStrc* pItem = (D2UnitStrc*)pArg;
-
-    for (D2UnitStrc* i = INVENTORY_GetFirstItem(pUnit->pInventory); i; i = INVENTORY_GetNextItem(i))
-    {
-        if (INVENTORY_UnitIsItem(i) == pItem)
-        {
-            INVENTORY_RemoveItemFromInventory(pUnit->pInventory, pItem);
-            return;
-        }
-    }
-
-    D2UnitStrc* pCursorItem = INVENTORY_GetCursorItem(pUnit->pInventory);
-    if (pCursorItem && pCursorItem == pItem)
-    {
-        INVENTORY_SetCursorItem(pUnit->pInventory, nullptr);
-    }
+    ITEMS_RemoveItemFromInventory((D2UnitStrc*)pArg, pUnit->pInventory);
 }
 
 //D2Game.0x6FC503A0 // 1.13c D2Game+0xE150

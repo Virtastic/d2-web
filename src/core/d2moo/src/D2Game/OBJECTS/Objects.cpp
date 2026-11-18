@@ -2115,6 +2115,7 @@ void __fastcall OBJECTS_PopulationHandler(D2GameStrc* pGame, D2ActiveRoomStrc* p
     if (nLevelId == d2_trace_level) fprintf(stderr, "objpop region: field_4 %d populated %d healing %d wells %d shrines %d; obj[grp0] subclass %d\n", pObjectRegion->field_4, pObjectRegion->nPopulatedRooms, pObjectRegion->nHealingShrines, pObjectRegion->nWells, pObjectRegion->nShrines, DATATBLS_GetObjectsTxtRecord(pLevelsTxtRecord->nObjGroup[0])->nSubClass);
 #endif
 
+    // 1.13c D2Game+0x2EAD0 (theme roll, inlined in the population handler)
     if (pLevelsTxtRecord->dwThemes && pObjectRegion->nPopulatedRooms >= 10 * pObjectRegion->unk0x0C)
     {
         D2ObjectControlStrc* pObjectControl = OBJRGN_GetObjectControlFromGame(pGame);

@@ -89,6 +89,8 @@ void __fastcall SUNITINACTIVE_FreeInactiveMonsterNode(D2GameStrc* pGame, D2Inact
 D2UnitStrc* __fastcall SUNITINACTIVE_RestoreInactiveItem(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2InactiveItemNodeStrc* pInactiveItemNode);
 //1.13c D2Game+0x1FB40
 void __fastcall SUNITINACTIVE_RestoreInactiveItemList(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2InactiveItemNodeStrc* pInactiveItemNode);
+// 1.13c D2Game+0x1EBD0
+void __fastcall SUNITINACTIVE_FreeInactiveMonsterChain(D2GameStrc* pGame, D2InactiveUnitListStrc* pList);
 //D2Game.0x6FCC4270
 void __fastcall SUNITINACTIVE_FreeInactiveUnitLists(D2GameStrc* pGame);
 //D2Game.0x6FCC4370

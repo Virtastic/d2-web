@@ -18,9 +18,11 @@
 #include "OBJECTS/Objects.h"
 #include "OBJECTS/ObjMode.h"
 #include "QUESTS/Quests.h"
+#include "QUESTS/ACT2/A2Q6.h"
 #include "UNIT/Party.h"
 #include "UNIT/SUnit.h"
 #include "SKILLS/Skills.h"
+#include <test_seam.h>
 
 
 //D2Game.0x6FD35F58
@@ -662,22 +664,30 @@ void __fastcall ACT2Q4_InitializeJerhynMonster(D2QuestDataStrc* pQuestData, D2Un
 	}
 }
 
-// 1.13c D2Game+0xC69D0 (the sequence-filter dispatch, retail D2Game+0xC1FF0, is inlined; its result is dropped and the callback always reports 1)
+// 1.13c D2Game+0xC1FF0 (EDI = quest data): runs the sequence filter of the quest this one is sequenced after
+int32_t __fastcall ACT2Q4_CallSeqFilter_C1FF0(D2QuestDataStrc* pQuestData)
+{
+	D2QuestDataStrc* pQuest = D2_CALL(QUESTS_GetQuestData, pQuestData->pGame, (D2Quests)pQuestData->nSeqId);
+	if (!pQuest)
+	{
+		return 0;
+	}
+
+	if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
+	{
+		FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
+		exit(-1);
+	}
+	return pQuest->pfSeqFilter(pQuest);
+}
+
+// 1.13c D2Game+0xC69D0 (the callback always reports 1; the filter's result is dropped)
 bool __fastcall ACT2Q4_SeqCallback(D2QuestDataStrc* pQuestData)
 {
 	if (!pQuestData->fState && pQuestData->bNotIntro == 1)
 	{
 		QUESTS_StateDebug(pQuestData, 1, __FILE__, __LINE__);
-		D2QuestDataStrc* pQuest = QUESTS_GetQuestData(pQuestData->pGame, (D2Quests)pQuestData->nSeqId);
-		if (pQuest)
-		{
-			if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
-			{
-				FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
-				exit(-1);
-			}
-			pQuest->pfSeqFilter(pQuest);
-		}
+		ACT2Q4_CallSeqFilter_C1FF0(pQuestData);
 	}
 	return true;
 }
@@ -877,7 +887,7 @@ void __fastcall OBJECTS_InitFunction30_HaremBlocker(D2ObjInitFnStrc* pOp)
 	}
 }
 
-// 1.13c D2Game+0xC3260 (the two lookups it calls, retail D2Game+0xC2460 and D2Game+0xC1A00, are inlined)
+// 1.13c D2Game+0xC3260 (the lookup retail D2Game+0xC2460 is inlined; D2Game+0xC1A00 is ACT2Q6_NotActiveOrState4Plus_C1A00)
 int32_t __fastcall ACT2Q4_IsJerhynPalaceActivated(D2GameStrc* pGame)
 {
 	D2QuestDataStrc* pQuestData11 = QUESTS_GetQuestData(pGame, QUEST_A2Q4_HORAZONTOME);
@@ -886,8 +896,7 @@ int32_t __fastcall ACT2Q4_IsJerhynPalaceActivated(D2GameStrc* pGame)
 		D2QuestDataStrc* pQuestData8 = QUESTS_GetQuestData(pGame, QUEST_A2Q1_RADAMENT);
 		if (pQuestData8 && pQuestData8->bNotIntro && pQuestData8->fState != 5)
 		{
-			D2QuestDataStrc* pQuestData13 = QUESTS_GetQuestData(pGame, QUEST_A2Q6_DURIEL);
-			if (pQuestData13 && pQuestData13->bNotIntro && pQuestData13->fState < 4)
+			if (!ACT2Q6_NotActiveOrState4Plus_C1A00(pGame))
 			{
 				if (pQuestData11->bNotIntro == 1 && pQuestData11->fState < 2)
 				{
@@ -948,7 +957,7 @@ int32_t __fastcall ACT2Q4_GetGuardCoordinates(D2GameStrc* pGame, D2CoordStrc* pC
 	return 0;
 }
 
-// 1.13c D2Game+0xC8990 (the Duriel-quest lookups, retail D2Game+0xC1B60 and D2Game+0xC1B20, are inlined)
+// 1.13c D2Game+0xC8990 (the Duriel-quest tests are ACT2Q6_NotActiveOrState2Plus_C1B60 and ACT2Q6_ActiveAndStateIs1_C1B20)
 void __fastcall ACT2Q4_GetAndUpdatePalaceNpcState(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t* a3, int32_t* pIdle)
 {
 	D2QuestDataStrc* pQuestData11 = QUESTS_GetQuestData(pGame, QUEST_A2Q4_HORAZONTOME);
@@ -968,15 +977,14 @@ void __fastcall ACT2Q4_GetAndUpdatePalaceNpcState(D2GameStrc* pGame, D2UnitStrc*
 	}
 
 	// The retail test order: both global primary-goal flags, then Duriel's quest not between its states 0 and 1, then the already-handled flag.
-	D2QuestDataStrc* pQuestData13 = QUESTS_GetQuestData(pGame, QUEST_A2Q6_DURIEL);
-	if (QUESTS_GetGlobalState(pGame, QUESTSTATEFLAG_A2Q4, QFLAG_PRIMARYGOALDONE) || QUESTS_GetGlobalState(pGame, QUESTSTATEFLAG_A2Q6, QFLAG_PRIMARYGOALDONE) || !pQuestData13 || !pQuestData13->bNotIntro || pQuestData13->fState >= 2 || pQuestDataEx->unk0x14)
+	if (QUESTS_GetGlobalState(pGame, QUESTSTATEFLAG_A2Q4, QFLAG_PRIMARYGOALDONE) || QUESTS_GetGlobalState(pGame, QUESTSTATEFLAG_A2Q6, QFLAG_PRIMARYGOALDONE) || ACT2Q6_NotActiveOrState2Plus_C1B60(pGame) || pQuestDataEx->unk0x14)
 	{
 		*a3 = 1;
 		*pIdle = 0;
 		return;
 	}
 
-	if (pQuestData13->fState == 1)
+	if (ACT2Q6_ActiveAndStateIs1_C1B20(pGame))
 	{
 		pQuestDataEx->unk0x12 = 1;
 	}

@@ -29,6 +29,9 @@ struct D2AuraCallbackStrc
 	void* pArgs;       //+0C
 };
 
+// 1.13c D2Game+0xA1210 (SkillAuraOutlined.cpp)
+int32_t __fastcall SKILLS_DamageAuraCallback_A1210(D2AuraCallbackStrc* pAuraCallback, D2UnitStrc* pUnit);
+
 struct D2StaticFieldCallbackArgStrc
 {
 	int32_t nMinDamage;       //+00

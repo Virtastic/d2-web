@@ -120,3 +120,5 @@ struct D2A4Q2PortalSeam
 extern D2A4Q2PortalSeam g_d2A4Q2Portal;
 //D2Game.0x6FCAFDF0
 int32_t __fastcall OBJECTS_OperateFunction73_LastLastPortal(D2ObjOperateFnStrc* pOp, int32_t nOperate);
+//D2Game+0xBAFF0 (1.13c only; 1.10f inlines it in the A4Q2 callbacks)
+D2UnitStrc* __fastcall QUESTS_SpawnPortalToAct5_BAFF0(D2QuestArgStrc* pQuestArg, D2Act4Quest2Strc* pQuestDataEx);

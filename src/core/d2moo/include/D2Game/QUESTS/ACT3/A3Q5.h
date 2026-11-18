@@ -79,5 +79,7 @@ int32_t __fastcall ACT3Q5_UnitIterate_AttachCompletionSound(D2GameStrc* pGame, D
 int32_t __fastcall ACT3Q5_UnitIterate_DetermineFlailAndCubeDropCounts(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData);
 //D2Game.0x6FCAC1B0
 int32_t __fastcall ACT3Q5_IsDuranceOfHateClosed(D2GameStrc* pGame, D2UnitStrc* pUnit);
+// 1.13c D2Game+0xE2960
+bool __fastcall ACT3Q5_IsOrbIntact(D2GameStrc* pGame);
 //
 void __fastcall ACT3Q5_Callback10_PlayerLeavesGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg);

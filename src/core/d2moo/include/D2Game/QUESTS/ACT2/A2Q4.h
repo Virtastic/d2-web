@@ -68,6 +68,8 @@ void __fastcall ACT2Q4_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2Qu
 void __fastcall ACT2Q4_InitializeJerhynMonster(D2QuestDataStrc* pQuestData, D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom, D2CoordStrc* pCoord);
 //D2Game.0x6FCA3160
 bool __fastcall ACT2Q4_SeqCallback(D2QuestDataStrc* pQuestData);
+// 1.13c D2Game+0xC1FF0
+int32_t __fastcall ACT2Q4_CallSeqFilter_C1FF0(D2QuestDataStrc* pQuestData);
 //D2Game.0x6FCA31E0
 void __fastcall ACT2Q4_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg);
 //D2Game.0x6FCA3320

@@ -41,6 +41,7 @@
 #include "UNIT/SUnit.h"
 #include "UNIT/SUnitEvent.h"
 #include "UNIT/SUnitMsg.h"
+#include <test_seam.h>
 
 
 #pragma pack(push, 1)
@@ -554,6 +555,7 @@ void __fastcall D2GAME_ITEMS_UpdateItemStatlist_6FC42310(D2GameStrc* pGame, D2Un
 
     if (pUnit->dwUnitType == UNIT_PLAYER)
     {
+        // 1.13c D2Game+0xD4670 (assert unit/item, then the player-only 0xD43E0 call, inline here)
         sub_6FC42120(pUnit, pItem, 1);
     }
 
@@ -623,6 +625,7 @@ void __fastcall D2GAME_ITEMS_UpdateTransferredProperties_6FC424E0(D2GameStrc* pG
 
     if (pTarget->dwUnitType == UNIT_PLAYER)
     {
+        // 1.13c D2Game+0xD4630 (assert unit/item, then the player-only 0xD43E0 call, inline here)
         sub_6FC42120(pTarget, pItem, 0);
     }
 
@@ -1043,6 +1046,7 @@ int32_t __fastcall sub_6FC42F20(D2UnitStrc* pUnit, D2UnitStrc* pItem, int32_t* p
 }
 
 //D2Game.0x6FC43160
+// 1.13c D2Game+0xD1F60
 void __fastcall sub_6FC43160(D2UnitStrc* pUnit, D2UnitStrc* pItem, D2ItemModeArgStrc* pItemModeArg)
 {
     D2_ASSERT(pItem);
@@ -1280,6 +1284,7 @@ int32_t __fastcall D2GAME_PickupItem_6FC43340(D2GameStrc* pGame, D2UnitStrc* pUn
 
     if (!pUnit->dwUnitType)
     {
+        // 1.13c D2Game+0xD4670 (inline here)
         sub_6FC42120(pUnit, pItem, 1);
     }
 
@@ -1570,6 +1575,7 @@ int32_t __fastcall sub_6FC43E60(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
 
     if (pUnit->dwUnitType == UNIT_PLAYER)
     {
+        // 1.13c D2Game+0xD4670 (inline here)
         sub_6FC42120(pUnit, pItem, 1);
     }
 
@@ -1781,6 +1787,7 @@ int32_t __fastcall D2GAME_PlaceItem_6FC44410(const char* szFile, int32_t nLine, 
 
     if (ITEMS_GetInvPage(pItem) != INVPAGE_STASH && pPlayer->dwUnitType == UNIT_PLAYER)
     {
+        // 1.13c D2Game+0xD4670 (inline here)
         sub_6FC42120(pPlayer, pItem, 1);
     }
 
@@ -1969,6 +1976,29 @@ int32_t __fastcall sub_6FC446B0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nI
     return 1;
 }
 
+// 1.13c D2Game+0xD1830 (EAX = unit, EBX = item): the item's requirement check result, or 0 when it is a quiver
+// whose type the unit's other arm item does not satisfy
+int32_t __fastcall ITEMS_CheckRequirementsWithQuiver_D1830(D2UnitStrc* pUnit, D2UnitStrc* pItem)
+{
+	const int32_t nResult = D2_CALL(ITEMS_CheckRequirements, pItem, pUnit, 0, nullptr, nullptr, nullptr);
+	if (nResult == 0 || D2_CALL(ITEMS_GetQuiverType, pItem) == 0)
+	{
+		return nResult;
+	}
+
+	D2UnitStrc* pOtherArmItem = D2_CALL(INVENTORY_GetItemFromBodyLoc, pUnit->pInventory, BODYLOC_RARM);
+	if (pOtherArmItem == pItem)
+	{
+		pOtherArmItem = D2_CALL(INVENTORY_GetItemFromBodyLoc, pUnit->pInventory, BODYLOC_LARM);
+	}
+
+	if (pOtherArmItem && D2_CALL(ITEMS_CheckItemTypeId, pOtherArmItem, D2_CALL(ITEMS_GetQuiverType, pItem)))
+	{
+		return nResult;
+	}
+	return 0;
+}
+
 //D2Game.0x6FC44A90
 // 1.13c D2Game+0xD51A0
 void __fastcall D2GAME_ITEMS_UpdateInventoryItems_6FC44A90(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t bRefresh)
@@ -1993,28 +2023,8 @@ void __fastcall D2GAME_ITEMS_UpdateInventoryItems_6FC44A90(D2GameStrc* pGame, D2
             && INVENTORY_GetItemNodePage(pItem) == 1
             && ITEMS_IsCharmUsable(pItem, pUnit)
             && !STATLIST_GetOwner(pItem, nullptr)
-            && ITEMS_CheckRequirements(pItem, pUnit, 0, nullptr, nullptr, nullptr))
+            && ITEMS_CheckRequirementsWithQuiver_D1830(pUnit, pItem))
         {
-            int32_t bUpdate = 0;
-            if (!ITEMS_GetQuiverType(pItem))
-            {
-                bUpdate = 1;
-            }
-            else
-            {
-                D2UnitStrc* pOtherArmItem = INVENTORY_GetItemFromBodyLoc(pUnit->pInventory, BODYLOC_RARM);
-                if (pOtherArmItem == pItem)
-                {
-                    pOtherArmItem = INVENTORY_GetItemFromBodyLoc(pUnit->pInventory, BODYLOC_LARM);
-                }
-
-                if (pOtherArmItem && ITEMS_CheckItemTypeId(pOtherArmItem, ITEMS_GetQuiverType(pItem)))
-                {
-                    bUpdate = 1;
-                }
-            }
-
-            if (bUpdate)
             {
                 ITEMS_SetItemFlag(pItem, IFLAG_NOEQUIP, 0);
 
@@ -2658,6 +2668,7 @@ void __fastcall sub_6FC45930(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
 
             if (pUnit->dwUnitType == UNIT_PLAYER)
             {
+                // 1.13c D2Game+0xD4630 (inline here)
                 sub_6FC42120(pUnit, pBeltItem, 0);
             }
 
@@ -3475,6 +3486,7 @@ int32_t __fastcall sub_6FC46D40(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nC
 }
 
 //D2Game.0x6FC471F0
+// 1.13c D2Game+0xD2D90 (same asserts, unlink and free; NOT yet diffed: retail also runs the INVENTORY_Return grid-return (commented out above) and gates the 0x0A packet on a unit-position value instead of bSendPacket)
 void __fastcall D2GAME_RemoveItem_6FC471F0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem, int32_t bSendPacket)
 {
     D2_ASSERT(pGame);
@@ -3504,6 +3516,7 @@ void __fastcall D2GAME_RemoveItem_6FC471F0(D2GameStrc* pGame, D2UnitStrc* pUnit,
 }
 
 //D2Game.0x6FC47380
+// 1.13c D2Game+0xD2CF0 (belt-item removal: clear targetable, unlink, assert same item, free from all players)
 void __fastcall sub_6FC47380(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem)
 {
     D2GAME_SendP0x9C_ItemAction_RemoveFromBelt_6FC3EBE0(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), pUnit, pItem, 0x20);
@@ -4266,6 +4279,7 @@ int32_t __fastcall sub_6FC48940(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nI
 
     if (pUnit->dwUnitType == UNIT_PLAYER)
     {
+        // 1.13c D2Game+0xD4670 (inline here)
         sub_6FC42120(pUnit, pItem, 1);
     }
 
@@ -4467,6 +4481,7 @@ void __fastcall sub_6FC49090(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
 // (column 0's rows, from the used column's row index), so a drink from any column but the first
 // never refilled it and column 0 was reshuffled instead. 1.13c (D2Game 0x6FCF2540) walks the four
 // rows of the used column -- slot column + 4*row -- and packs them down from row 0.
+// 1.13c D2Game+0xD2540
 void __fastcall sub_6FC49140(D2GameStrc* pGame, D2UnitStrc* pUnit, int8_t nX)
 {
     const int32_t nPosition = D2Clamp(nX & 3, 0, 3);
@@ -5175,6 +5190,7 @@ int32_t __fastcall D2GAME_DoKeyCheck_6FC4A4B0(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FC4A660
+// 1.13c D2Game+0xD8440 (checked against the decompile: asserts game/unit/item, transmogrify flag and type lookup, stored-mode gate, tmog min/max quantity, place at the old cell else anywhere else drop; no delta)
 int32_t __fastcall D2GAME_Transmogrify_6FC4A660(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem)
 {
     D2_ASSERT(pGame);
@@ -5531,6 +5547,7 @@ int32_t __fastcall sub_6FC4AD80(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
 
                                     if (pPlayer->dwUnitType == UNIT_PLAYER)
                                     {
+                                        // 1.13c D2Game+0xD4670 (inline here)
                                         sub_6FC42120(pPlayer, pCorpseItem, 1);
                                     }
 

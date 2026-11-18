@@ -266,6 +266,7 @@ D2UnitStrc* __fastcall sub_6FC68D70(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_
 #include <D2CMP.h>
 static const int32_t gaPlacementOffsets_6FD1C278[4][2] = { { 0, -3 }, { 3, 0 }, { 0, 3 }, { -3, 0 } };
 
+// 1.13c D2Game+0xEDF60 (verified by s05-monspawn)
 // D2Game 1.13c 0x6FD0DF60: pick a random floor tile of the room (walkable, not blocked for a
 // 2-wide monster in any of the four 3-subtile offsets) starting at a rolled index and wrapping.
 static BOOL MONSTERSPAWN_PlaceOnFloorTile(D2ActiveRoomStrc* pRoom, int32_t* pX, int32_t* pY)

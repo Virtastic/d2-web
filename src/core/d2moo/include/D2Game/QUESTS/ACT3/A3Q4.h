@@ -35,6 +35,8 @@ bool __fastcall ACT3Q4_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 bool __fastcall ACT3Q4_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitStrc* pPlayer, D2BitBufferStrc* pGlobalFlags, D2BitBufferStrc* pFlags, uint8_t* pStatus);
 //D2Game.0x6FCAA210
 void __fastcall ACT3Q4_UnitIterate_UpdateCurrentQuestState(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData);
+// 1.13c D2Game+0xE6B90
+int32_t __fastcall ACT3Q4_UnitIterate_UpdatePartyCurrentQuestState(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData);
 //D2Game.0x6FCAA270
 void __fastcall ACT3Q4_InitQuestData(D2QuestDataStrc* pQuestData);
 //D2Game.0x6FCAA360

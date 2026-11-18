@@ -24,6 +24,10 @@ int32_t __fastcall AIBAAL_CullPotentialTargets(D2UnitStrc* pBaal, D2UnitStrc* pT
 int32_t __fastcall AIBAAL_RollRandomAiParam(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiControlStrc* pAiControl, D2UnitStrc* pTarget, int32_t nMax, int32_t nCount, D2AiCmdStrc* pAiCmd);
 //D2Game.0x6FCCE040
 int32_t __fastcall AI_CheckSpecialSkillsOnPrimeEvil(D2UnitStrc* pUnit);
+//1.13c D2Game+0xB6C90
+int32_t AIBAAL_IsPrimeEvilSpecialSkill(D2UnitStrc* pUnit, D2SkillStrc* pSkill);
+//1.13c D2Game+0xB75D0
+int32_t __fastcall AIBAAL_RollRandomAiParamForCollidingUnit(D2UnitStrc* pTarget, D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nCount, int32_t bInMediumRange, int32_t bInFarRange);
 //D2Game.0x6FCCE100
 int32_t __fastcall AI_GetRandomArrayIndex(int32_t* pArray, int32_t nArraySize, D2UnitStrc* pUnit, int32_t nDefaultValue);
 //D2Game.0x6FCCE1A0

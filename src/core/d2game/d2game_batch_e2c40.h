@@ -12,7 +12,6 @@ struct D2GameBatchE2C40Env {
     int      (*findQuestItem)(uint32_t code);
 };
 
-void d2game_E34D0(D2GameBatchE2C40Env& e, uint32_t eax, const uint32_t* unit, const void* game);
 uint32_t d2game_E2D40(D2GameBatchE2C40Env& e, void* p);
 uint32_t d2game_E2E80(D2GameBatchE2C40Env& e, void* p);
 uint32_t d2game_E2F00(D2GameBatchE2C40Env& e, void* p);

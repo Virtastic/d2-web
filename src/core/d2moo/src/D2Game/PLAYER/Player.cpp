@@ -175,6 +175,7 @@ void __fastcall sub_6FC7B7A0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, i
 }
 
 //D2Game.0x6FC7B800
+// 1.13c D2Game+0x38470 (start-item create: IFLAG_STARTITEM, body location, belt/body/inventory branches)
 // 1.13c D2Game+0x38090 (item-create helper takes the level from a separate call; no other delta)
 void __fastcall PLAYER_CreateStartItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2CharStatsTxt* pCharStatsTxt, int32_t nCount, D2CharItemStrc* pCharItem)
 {

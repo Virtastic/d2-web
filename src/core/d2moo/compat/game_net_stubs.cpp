@@ -40,6 +40,7 @@
 #include <PLAYER/PlrModes.h>  // sub_6FC81650: the player updates CLIENTS_ChangeRoom sends on leaving the client room
 #include <AI/AiGeneral.h>
 #include <cstring>
+#include <test_seam.h>
 #include <vector>
 
 // Every packet the headless server queues for the session client, in order, so a retail
@@ -531,6 +532,7 @@ void CLIENTS_ToggleFlag(D2ClientStrc* pClient, uint16_t nFlag, int32_t bSet) {
 // PLRSAVE2_CheckPlayerFlags gates Nightmare (>= 5 expansion / 4 classic) and Hell (>= 10 / 8) on.
 // This was a no-op, so every file this engine wrote recorded progression 0 and could only ever be
 // loaded back at Normal (client-parity C3p).
+// 1.13c D2Game+0xE34D0
 void CLIENTS_UpdateCharacterProgression(D2ClientStrc* pClient, uint16_t nAct, uint16_t nDifficulty)
 {
     if (!pClient) return;
@@ -540,6 +542,12 @@ void CLIENTS_UpdateCharacterProgression(D2ClientStrc* pClient, uint16_t nAct, ui
     {
         pClient->tSaveFlags.nProgression = (uint16_t)nNewActDifficulty;
     }
+}
+// 1.13c D2Game+0x8A770 (EAX = the 6-byte source, client on the stack): a dword and a word copied to a local and sent as a 6-byte packet through 0x8A3E0.
+void D2GAME_PACKETS_SendCopiedSixBytes_8A770(const void* pSrc, D2ClientStrc* pClient) {
+    uint8_t packet[6];
+    std::memcpy(packet, pSrc, 6);
+    D2_CALL(D2GAME_PACKETS_SendPacket_6FC3C710, pClient, packet, 6);
 }
 // 1.13c D2Game+0x8C490: the one-byte packet {header} through the send queue 0x8A3E0.
 void D2GAME_PACKETS_SendHeaderOnlyPacket(D2ClientStrc* pClient, uint8_t nHeader) {

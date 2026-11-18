@@ -1269,7 +1269,7 @@ int32_t __fastcall OBJECTS_OperateFunction65_AncientsAltar(D2ObjOperateFnStrc* p
 		{
 			if (pQuestDataEx->nActivePortalCount > 0)
 			{
-				SUNIT_IterateUnitsOfType(pOp->pGame, 0, 0, ACT5Q5_UnitIterate_ClosePortals);
+				ACT5Q5_CloseAllPortals(pOp->pGame);
 			}
 
 			QUESTS_SendScrollMessage(pOp->pPlayer, pOp->pObject, 20002);
@@ -1278,7 +1278,7 @@ int32_t __fastcall OBJECTS_OperateFunction65_AncientsAltar(D2ObjOperateFnStrc* p
 		{
 			if (pQuestDataEx->nActivePortalCount > 0)
 			{
-				SUNIT_IterateUnitsOfType(pOp->pGame, 0, 0, ACT5Q5_UnitIterate_ClosePortals);
+				ACT5Q5_CloseAllPortals(pOp->pGame);
 			}
 
 			QUESTS_SendScrollMessage(pOp->pPlayer, pOp->pObject, 20002);

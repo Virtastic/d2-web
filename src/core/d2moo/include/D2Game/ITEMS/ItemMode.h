@@ -88,6 +88,8 @@ int32_t __fastcall D2GAME_PlaceItem_6FC44410(const char* szFile, int32_t nLine, 
 int32_t __fastcall sub_6FC446B0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nItemGUID, int32_t* a4, int32_t a5, int32_t bSetQuantityFlag, D2InventoryStrc* pInventoryArg, int32_t a8);
 //D2Game.0x6FC44A90
 void __fastcall D2GAME_ITEMS_UpdateInventoryItems_6FC44A90(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t bRefresh);
+// 1.13c D2Game+0xD1830
+int32_t __fastcall ITEMS_CheckRequirementsWithQuiver_D1830(D2UnitStrc* pUnit, D2UnitStrc* pItem);
 //D2Game.0x6FC44F00
 void __fastcall sub_6FC44F00(D2UnitStrc* pUnit, D2UnkItemModeStrc* a2);
 //D2Game.0x6FC44FB0
@@ -98,6 +100,14 @@ void __fastcall D2GAME_ITEMS_UpdateInventoryItems_6FC45050(D2GameStrc* pGame, D2
 int32_t __fastcall sub_6FC45060(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nItemGUID, uint8_t nBodyLoc, int32_t bSkipRequirementCheck, int32_t* a6);
 //D2Game.0x6FC45300
 void __fastcall sub_6FC45300(D2UnitStrc* pUnit);
+// 1.13c D2Game+0xD1A30 (ItemModeOutlined.cpp)
+int32_t __fastcall ITEMMODE_SkillHasUseState_D1A30(D2UnitStrc* pUnit, D2SkillStrc* pSkill);
+// 1.13c D2Game+0xD1A50 (ItemModeOutlined.cpp)
+uintptr_t __fastcall ITEMMODE_GetHandWeapons_D1A50(D2UnitStrc* pUnit, D2UnitStrc** ppMainWeapon, D2UnitStrc** ppRightHandWeapon);
+// 1.13c D2Game+0xD1720 and +0xD2540 (ItemModeOutlined.cpp)
+uint32_t __fastcall ITEMMODE_GetPairedSlot_D1720(uint32_t nSlot);
+void __fastcall ITEMMODE_PackBeltRows_D2540(uint32_t nStartSlot, D2UnitStrc* pUnit);
+void __stdcall D2COMMON_10267_Return(D2InventoryStrc* pInventory, int32_t nSlot);   // D2Common+0x1DF90, a bare return
 //D2Game.0x6FC45550
 int32_t __fastcall sub_6FC45550(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nItemGUID, uint8_t nBodyLoc, int32_t bSkipRequirementCheck, int32_t* a6);
 //D2Game.0x6FC45930

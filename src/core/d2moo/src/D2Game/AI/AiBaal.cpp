@@ -476,7 +476,7 @@ int32_t __fastcall AIBAAL_RollRandomAiParam(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 // 1.13c D2Game+0xB6C90: one skill, the owner unit in a register
-static int32_t AIBAAL_IsPrimeEvilSpecialSkill(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
+int32_t AIBAAL_IsPrimeEvilSpecialSkill(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
 	if (pSkill)
 	{
@@ -507,6 +507,56 @@ int32_t __fastcall AI_CheckSpecialSkillsOnPrimeEvil(D2UnitStrc* pUnit)
 {
 	return AIBAAL_IsPrimeEvilSpecialSkill(pUnit, UNITS_GetRightSkill(pUnit))
 		|| AIBAAL_IsPrimeEvilSpecialSkill(pUnit, UNITS_GetLeftSkill(pUnit));
+}
+
+// 1.13c D2Game+0xB75D0: the weighted 16-slot pick for a target that is colliding with the caster (EAX = target; stack = game, unit, count, medium, far, ret 0x14).
+// Slot 1 = (125 on Normal, else 100) + 100 - the caster's life percentage; slots 2, 3, 4, 6 = 20, 8 = 80, 9 = 70. count < 2: slot 2 = 45, slot 10 = 25.
+// The target's right skill, then its left, go through the per-skill check (+0xB6C90). A hit with medium clear sets slots 13 and 14 to 50; medium set
+// (hit or not) clears slots 2 and 6 and sets 3 = 35, 11 = 25, 13 = 25. far sets slot 5 = 60. The pick uses the caster's seed; an empty table answers slot 1.
+int32_t __fastcall AIBAAL_RollRandomAiParamForCollidingUnit(D2UnitStrc* pTarget, D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nCount, int32_t bInMediumRange, int32_t bInFarRange)
+{
+	int32_t aiParams[16] = {};
+	aiParams[2] = aiParams[3] = aiParams[4] = aiParams[6] = 20;
+	aiParams[8] = 80;
+	aiParams[9] = 70;
+	const int32_t nBonus = pGame->nDifficulty == 0 ? 125 : 100;
+	if (nCount < 2)
+	{
+		aiParams[2] = 45;
+		aiParams[10] = 25;
+	}
+
+	aiParams[1] = nBonus + (100 - D2_CALL(UNITS_GetCurrentLifePercentage, pUnit));
+
+	int32_t bHit = D2_CALL(AIBAAL_IsPrimeEvilSpecialSkill, pTarget, D2_CALL(UNITS_GetRightSkill, pTarget)) != 0;
+	if (!bHit)
+	{
+		bHit = D2_CALL(AIBAAL_IsPrimeEvilSpecialSkill, pTarget, D2_CALL(UNITS_GetLeftSkill, pTarget)) != 0;
+	}
+
+	if (bHit || bInMediumRange)
+	{
+		if (bInMediumRange)
+		{
+			aiParams[2] = 0;
+			aiParams[6] = 0;
+			aiParams[3] = 35;
+			aiParams[11] = 25;
+			aiParams[13] = 25;
+		}
+		else
+		{
+			aiParams[14] = 50;
+			aiParams[13] = 50;
+		}
+	}
+
+	if (bInFarRange)
+	{
+		aiParams[5] = 60;
+	}
+
+	return AI_GetRandomArrayIndex(aiParams, 16, pUnit, 1);
 }
 
 // 1.13c D2Game+0xB7300 (retail's copy sums the table the caller sizes and falls back to index 1; the default index is a parameter here)

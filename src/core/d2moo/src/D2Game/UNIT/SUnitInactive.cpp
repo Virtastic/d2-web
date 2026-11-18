@@ -519,6 +519,29 @@ void __fastcall SUNITINACTIVE_FreeInactiveMonsterNode(D2GameStrc* pGame, D2Inact
 	D2_FREE_POOL(pGame->pMemoryPool, pInactiveMonsterNode);
 }
 
+// 1.13c D2Game+0x1EBD0 (EAX = inactive-unit list, EDI = game): frees the list's monster chain. Per node the minion list (AiGeneral.cpp
+// line 0x246), the map AI (D2Common #10850) and the node itself (SUnitInactive.cpp line 0x8D) -- retail inlines both loops, so the
+// pool-free file/line pairs are retail's, not this file's __LINE__.
+void __fastcall SUNITINACTIVE_FreeInactiveMonsterChain(D2GameStrc* pGame, D2InactiveUnitListStrc* pList)
+{
+	for (D2InactiveMonsterNodeStrc* pNode = pList->pInactiveMonsters; pNode;)
+	{
+		D2InactiveMonsterNodeStrc* pNext = pNode->pNext;
+		for (D2MinionListStrc* pMinion = pNode->pMinionList; pMinion;)
+		{
+			D2MinionListStrc* pMinionNext = pMinion->pNext;
+			FOG_FreePool(pGame->pMemoryPool, pMinion, "..\\Source\\D2Game\\Ai\\AiGeneral.cpp", 0x246, 0);
+			pMinion = pMinionNext;
+		}
+		if (pNode->pMapAI)
+		{
+			D2_CALL(DRLGPRESET_FreeMapAI, pGame->pMemoryPool, pNode->pMapAI);
+		}
+		FOG_FreePool(pGame->pMemoryPool, pNode, "..\\Source\\D2Game\\UNIT\\SUnitInactive.cpp", 0x8D, 0);
+		pNode = pNext;
+	}
+}
+
 //D2Game.0x6FCC4120
 // 1.13c D2Game+0x1F9F0
 D2UnitStrc* __fastcall SUNITINACTIVE_RestoreInactiveItem(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2InactiveItemNodeStrc* pInactiveItemNode)
@@ -596,14 +619,7 @@ void __fastcall SUNITINACTIVE_FreeInactiveUnitLists(D2GameStrc* pGame)
 				pCurrentInactiveItem = pNextInactiveItem;
 			}
 
-			D2InactiveMonsterNodeStrc* pCurrentInactiveMonster = pCurrentList->pInactiveMonsters;
-			while (pCurrentInactiveMonster)
-			{
-				D2InactiveMonsterNodeStrc* pNextInactiveMonster = pCurrentInactiveMonster->pNext;
-				AIGENERAL_FreeAllMinionLists(pGame, pCurrentInactiveMonster->pMinionList);
-				SUNITINACTIVE_FreeInactiveMonsterNode(pGame, pCurrentInactiveMonster);
-				pCurrentInactiveMonster = pNextInactiveMonster;
-			}
+			SUNITINACTIVE_FreeInactiveMonsterChain(pGame, pCurrentList);
 
 			D2_FREE_POOL(pGame->pMemoryPool, pCurrentList);
 

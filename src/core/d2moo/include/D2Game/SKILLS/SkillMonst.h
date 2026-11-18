@@ -60,6 +60,7 @@ void __fastcall SKILLS_SetInfernoFrame(D2SkillsTxt* pSkillsTxtRecord, D2UnitStrc
 int32_t __fastcall SKILLS_SrvDo095_MonInferno(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel);
 //D2Game.0x6FD081E0
 int32_t __fastcall SKILLS_UpdateInfernoAnimationParameters(D2UnitStrc* pUnit, D2UnitStrc* pMissile, int32_t nSkillId, int32_t nSkillLevel);
+int32_t __fastcall SKILLS_EndAnimTail_B6720(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FD082D0
 int32_t __fastcall SKILLS_SrvDo152_DiabLight(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel);
 //D2Game.0x6FD08680

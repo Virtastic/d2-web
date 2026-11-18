@@ -638,12 +638,7 @@ int32_t __fastcall OBJECTS_OperateFunction24_TaintedSunAltar(D2ObjOperateFnStrc*
 		}
 	}
 
-	// retail D2Game+0xC2380
-	D2QuestDataStrc* pQuestDataStaff = QUESTS_GetQuestData(pQuestData->pGame, QUEST_A2Q2_HORADRICSTAFF);
-	if (pQuestDataStaff)
-	{
-		((D2Act2Quest2Strc*)pQuestDataStaff->pQuestDataEx)->nAmulets += nAmuletsDropped;
-	}
+	ACT2Q2_AddAmulets_C2380(pQuestData, nAmuletsDropped);
 
 	OBJMODE_DropFromChestTCWithQuality(pOp, ITEMQUAL_MAGIC);
 

@@ -105,6 +105,9 @@ void __fastcall D2GAME_STORES_CreateVendorCache_6FCC74F0(D2GameStrc* pGame, D2Un
 int32_t __fastcall D2GAME_STORES_SellItem_6FCC7680(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nNpcGUID, int32_t nItemGUID, uint16_t nItemMode, int32_t a6);
 //D2Game.0x6FCC7E20
 void __fastcall sub_6FCC7E20(D2GameStrc* pGame, D2UnitStrc* pNpc, D2UnitStrc* pItem, D2UnitStrc* pUnit, int32_t a5);
+// 1.13c D2Game+0xBCAA0 / +0xBCE60 (split out of sub_6FCC7E20 and the store add)
+uint32_t __fastcall SUNITNPC_IsStockedItem_BCAA0(D2UnitStrc* pNpc, D2GameStrc* pGame, D2UnitStrc* pItem);
+void __fastcall SUNITNPC_AddStoreItem_BCE60(D2UnitStrc* pItem, D2UnitStrc* pOwner, int32_t bFlag);
 //D2Game.0x6FCC7FA0
 void __fastcall sub_6FCC7FA0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNpc, uint16_t wName);
 //D2Game.0x6FCC84D0

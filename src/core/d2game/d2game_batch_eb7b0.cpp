@@ -242,21 +242,6 @@ static const D2GameBatchEEnv g_batchEEnv{};
     return 0;
 }
 
-// ---- 0x1E900: walk a unit's timer chain, then branch on *(*ppThing+0x14) -----------------------
-// unit arrived in EDX, ppThing on the stack; the chain node's kind byte is at +0x00, next at +0x24.
-static void TimerWalkAndBranch(void* p1, void* unit, void* ppThing, const D2GameBatchEEnv* env)
-{
-    // 1.13c records are 32-bit: the link words are read as dwords, not host pointers.
-    auto p32 = [](const void* p, uint32_t o) { return (void*)(uintptr_t)rd32(p, o); };
-    if (unit != nullptr) {
-        for (void* timer = p32(unit, 0xDC); timer != nullptr; timer = p32(timer, 0x24)) {
-            if (rd8(timer, 0x00) == 2) env->freeTimer(timer);   // 0x8E6F0
-        }
-    }
-    if (rd32(p32(ppThing, 0x00), 0x14) == 0) env->branchList(p1, unit, ppThing); // 0x1E640
-    else env->branchSingle(p1, unit, ppThing);                                          // 0x1E3D0
-}
-
 // ---- FN-path exports (r[0..3] args, r[4] result; argument 5 rides in r[5]) ----------------------
 
 // The four section writers (quest, skill, iron golem, corpses) are the FN probes' d2g_* ports in d2game_eb7b0.cpp,
@@ -269,26 +254,4 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3e70(uint32_t* r)
     const uint64_t q = d2game_aulldiv(r[0], r[1], r[2], r[3]);
     r[4] = (uint32_t)q;
     r[5] = (uint32_t)(q >> 32);
-}
-
-// 1.13c D2Game+0x1E900
-// FN probe: r[0]=pGame (ECX) r[1]=pUnit (EDX) r[2]=ppThing r[3]=call-log blob (retail ignores that 4th stack word).
-// The three callees are recorded the way the capture's hooks log them: count, then 10 words per call (rva, eax, ecx, edx, ebx, esi, s0..s3).
-static uint32_t* g_log1e900;
-static void log1e900(uint32_t rva, uint32_t eax, uint32_t s0, uint32_t s1 = 0)
-{
-    uint32_t* w = g_log1e900 + 1 + g_log1e900[0]++ * 10;
-    w[0] = rva; w[1] = eax; w[2] = w[3] = w[4] = w[5] = 0; w[6] = s0; w[7] = s1; w[8] = w[9] = 0;
-}
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_1e900(uint32_t* r)
-{
-    D2GameBatchEEnv env{};
-    env.freeTimer = [](void* t) { log1e900(0x8E6F0, (uint32_t)(uintptr_t)t, 0); };
-    env.branchList = [](void* g, void* u, void* pp) { log1e900(0x1E640, (uint32_t)(uintptr_t)u, (uint32_t)(uintptr_t)g, (uint32_t)(uintptr_t)pp); };
-    env.branchSingle = [](void* g, void* u, void* pp) { (void)u; log1e900(0x1E3D0, (uint32_t)(uintptr_t)pp, (uint32_t)(uintptr_t)g); };
-    g_log1e900 = (uint32_t*)(uintptr_t)r[3];
-    g_log1e900[0] = 0;
-    TimerWalkAndBranch((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1], (void*)(uintptr_t)r[2], &env);
-    r[4] = 0;
 }

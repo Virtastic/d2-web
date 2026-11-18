@@ -108,6 +108,10 @@ void __fastcall OBJECTS_InitFunction37_Unused(D2ObjInitFnStrc* pOp);
 void __fastcall OBJECTS_InitFunction38_TyraelsDoor(D2ObjInitFnStrc* pOp);
 //D2Game.0x6FCA5C30
 int32_t __fastcall ACT2Q6_IsDurielsLairClosed(D2GameStrc* pGame, D2UnitStrc* pUnit);
+// 1.13c D2Game+0xC1A00, +0xC1B20, +0xC1B60: Duriel quest state tests (retail takes the game in EAX)
+int32_t __fastcall ACT2Q6_NotActiveOrState4Plus_C1A00(D2GameStrc* pGame);
+int32_t __fastcall ACT2Q6_ActiveAndStateIs1_C1B20(D2GameStrc* pGame);
+int32_t __fastcall ACT2Q6_NotActiveOrState2Plus_C1B60(D2GameStrc* pGame);
 //D2Game.0x6FCA5C60
 void __fastcall OBJECTS_InitFunction21_HoradricOrifice(D2ObjInitFnStrc* pOp);
 //D2Game.0x6FCA5CE0

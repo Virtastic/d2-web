@@ -809,6 +809,18 @@ void __fastcall OBJECTS_InitFunction41_SewerStairs(D2ObjInitFnStrc* pOp)
 	}
 }
 
+// 1.13c D2Game+0xE2DB0 (EAX = game; flags the flail as dropped on the Khalim's Will quest record and adds to its flail count)
+void __fastcall ACT3Q2_AddFlailsDropped(D2GameStrc* pGame, int32_t nFlailsDropped)
+{
+	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A3Q2_KHALIMFLAIL);
+	if (pQuestData)
+	{
+		D2Act3Quest2Strc* pQuestDataEx = (D2Act3Quest2Strc*)pQuestData->pQuestDataEx;
+		pQuestDataEx->bFlailDropped = 1;
+		pQuestDataEx->nFlailsDropped += nFlailsDropped;
+	}
+}
+
 // 1.13c D2Game+0xE2E00
 void __fastcall OBJECTS_InitFunction42_SewerLever(D2ObjInitFnStrc* pOp)
 {
