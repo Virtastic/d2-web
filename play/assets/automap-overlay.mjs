@@ -35,7 +35,7 @@ export const AUTOMAP_PATH = AUTOMAP_PATHS.full;
 // explicit: the binary's initial value is zero, but its runtime producer/meaning is not yet recovered.
 let engineLayout = null;
 export function bindAutomapLayout(Module) {
-  if (typeof Module?._d2_client_automap_layout !== 'function' || typeof Module._malloc !== 'function') { engineLayout = null; return false; }
+  if (typeof Module?._d2_client_automap_layout !== 'function' || typeof Module._malloc !== 'function') return false;
   const at = Module._malloc(32);
   engineLayout = (width, height, mode, left, selector284, center) => {
     Module.ccall('d2_client_automap_layout', null, ['number', 'number', 'number', 'number', 'number', 'number', 'bigint'],
@@ -46,17 +46,10 @@ export function bindAutomapLayout(Module) {
 }
 export function automapViewport(width, height, { mode = 'full', left = true, selector284 = 0 } = {}) {
   const mini = nativeAutomapMode(mode) === 1;
-  // 0x6fb0f9f0: AutoMapLeft writes 0 to the X anchor (0x6fbcc23c) and `(sel == 2) - 1 & 0x60` to the Y anchor (0x6fbcc238);
-  // the viewport's left/right are built from 0x23c and its top/bottom from 0x238, and 0x608D0's scroll subtracts 0x23c from W/3.
-  let anchorX = left ? 0 : Math.floor(2 * width / 3);
-  let anchorY = left ? (selector284 === 2 ? 0 : 96) : 78;
-  let viewport = mini
-    ? { left: anchorX - 8, top: anchorY, right: anchorX + Math.floor(width / 3), bottom: anchorY + Math.floor(height / 3) }
-    : { left: -16, top: -16, right: width, bottom: height };
-  if (engineLayout) {   // the engine's 0x5F9F0 port; the arithmetic above is the fallback while the export is unbound
-    const o = engineLayout(width, height, mode, left, selector284, false);
-    anchorX = o[0]; anchorY = o[1]; viewport = { left: o[2], top: o[3], right: o[4], bottom: o[5] };
-  }
+  if (!engineLayout) throw new Error('automap layout export is not bound');
+  // The engine's 0x5F9F0 port: anchor and marker viewport.
+  const o = engineLayout(width, height, mode, left, selector284, false);
+  const anchorX = o[0], anchorY = o[1], viewport = { left: o[2], top: o[3], right: o[4], bottom: o[5] };
   const cellClip = !mini ? null : left
     ? { left: 0, top: selector284 === 2 ? -21 : 75, right: 279, bottom: (selector284 === 2 ? -21 : 75) + 225 }
     : { left: width - 281, top: 57, right: width - 2, bottom: 282 };
@@ -71,11 +64,10 @@ export function automapMarkerInViewport(x, y, viewport) {
 }
 export function automapScrollOffset(width, height, { mode = 'full', center = 'yes', anchorX, anchorY } = {}) {
   if (nativeAutomapMode(mode) !== 1 || center !== 'yes') return { x: 0, y: 0 };
-  if (engineLayout) {   // the engine's 0x608D0 port: it reads only the X anchor (0 = AutoMapLeft panel) and the screen size
-    const o = engineLayout(width, height, mode, anchorX === 0, anchorX === 0 && anchorY === 0 ? 2 : 0, true);
-    return { x: o[6], y: o[7] };
-  }
-  return { x: Math.floor(width / 3) - anchorX - 16, y: Math.floor(height / 3) - anchorY - 16 };
+  if (!engineLayout) throw new Error('automap layout export is not bound');
+  // The engine's 0x608D0 port: it reads only the X anchor (0 = AutoMapLeft panel) and the screen size.
+  const o = engineLayout(width, height, mode, anchorX === 0, anchorX === 0 && anchorY === 0 ? 2 : 0, true);
+  return { x: o[6], y: o[7] };
 }
 
 function decodeText(bytes) { return new TextDecoder('latin1').decode(bytes).replace(/^﻿/, ''); }

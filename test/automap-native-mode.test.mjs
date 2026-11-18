@@ -1,3 +1,4 @@
+import './automap-engine-stub.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createAutomapOverlay, AUTOMAP_PATHS, automapViewport, automapScrollOffset } from '../play/assets/automap-overlay.mjs';
@@ -75,7 +76,7 @@ test('native modes 0/1/2 retain drawn family, scale and distinct Fade behavior',
 test('native mode 1 shares mini viewport and center offset; mode 2 shares full geometry', () => {
   assert.deepEqual(automapViewport(800, 600, { mode: 1 }), automapViewport(800, 600, { mode: 'mini' }));
   assert.deepEqual(automapViewport(800, 600, { mode: 2 }), automapViewport(800, 600, { mode: 'full' }));
-  assert.deepEqual(automapScrollOffset(800, 600, { mode: 1, anchorX: 96, anchorY: 0 }), { x: 154, y: 184 });
+  assert.deepEqual(automapScrollOffset(800, 600, { mode: 1, anchorX: 96, anchorY: 0 }), { x: -283, y: 106 });   // the engine reads only whether the anchor is the left panel (0)
   assert.deepEqual(automapScrollOffset(800, 600, { mode: 2, anchorX: 96, anchorY: 0 }), { x: 0, y: 0 });
   for (const invalid of [3, -1, 1.5, undefined]) assert.equal(nativeAutomapMode(invalid), 0);
 });

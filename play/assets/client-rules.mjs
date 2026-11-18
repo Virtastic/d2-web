@@ -157,3 +157,27 @@ export function hudButtonsDrawList(mx, my, running, runHot, arrowOpen, arrowHot,
     return decodeDrawList(mod.HEAP32, p >> 2, n);
   } finally { mod._free(raw); }
 }
+
+/** The control panel's six base cels (D2Client+0x27290 against a recording D2Gfx): records [0xD096, cell 5, frame, x, bottom row, -1, mode, 0]. */
+export function panelBaseDrawList(width = 800, height = 600, flag = 1) {
+  if (!mod) throw new Error('client rules are not bound to the engine');
+  const raw = mod._malloc(8 * 16 * 4), p = Number(raw);
+  try {
+    const n = mod.ccall('d2_client_draw_panel_base', 'number', ['number', 'number', 'number', 'bigint'], [width, height, flag, BigInt(p)]);
+    return decodeDrawList(mod.HEAP32, p >> 2, n);
+  } finally { mod._free(raw); }
+}
+
+/** The stamina bar (D2Client+0x278B0): its one box [0xD0BA, colour, mode, x1, y1, x2, y2]
+ *  as { colour, mode, x1, y1, x2, y2 }, or null when it draws nothing. `raw` values are 1/256 stat points; `colours` the palette indices for [red, gold, blue]. */
+export function staminaDrawList(cur, max, over, colours, width = 800, height = 600) {
+  if (!mod) throw new Error('client rules are not bound to the engine');
+  const raw = mod._malloc(8 * 4), p = Number(raw);
+  try {
+    const n = mod.ccall('d2_client_draw_stamina', 'number', [...Array(8).fill('number'), 'bigint'],
+      [cur | 0, max | 0, over ? 1 : 0, width, height, colours[0], colours[1], colours[2], BigInt(p)]);
+    if (!n) return null;
+    const h = mod.HEAP32, o = p >> 2;
+    return { colour: h[o + 1], mode: h[o + 2], x1: h[o + 3], y1: h[o + 4], x2: h[o + 5], y2: h[o + 6] };
+  } finally { mod._free(raw); }
+}

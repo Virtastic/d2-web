@@ -36,17 +36,19 @@ int main(){ int w,h,m,p,s,c; while (scanf("%d %d %d %d %d %d",&w,&h,&m,&p,&s,&c)
     assert.equal(rows.length, cases.length);
     cases.forEach(([w, h, mode, left, sel], i) => {
       const jsMode = mode === 1 ? 'mini' : 'full';
-      const v = automapViewport(w, h, { mode: jsMode, left: !!left, selector284: sel });
+      // Oracle: the arithmetic the JS used before the export became the only implementation.
+      const mini = mode === 1, ax = left ? 0 : Math.floor(2 * w / 3), ay = left ? (sel === 2 ? 0 : 96) : 78;
+      const vp = mini ? [ax - 8, ay, ax + Math.floor(w / 3), ay + Math.floor(h / 3)] : [-16, -16, w, h];
       const o = rows[i], tag = JSON.stringify([w, h, mode, left, sel]);
-      assert.deepEqual(o.slice(0, 2), [v.anchorX, v.anchorY], `anchor ${tag}`);
-      assert.deepEqual(o.slice(2, 6), [v.viewport.left, v.viewport.top, v.viewport.right, v.viewport.bottom], `viewport ${tag}`);
-      const s = automapScrollOffset(w, h, { mode: jsMode, center: 'yes', anchorX: v.anchorX, anchorY: v.anchorY });
-      assert.deepEqual(o.slice(6, 8), [s.x, s.y], `scroll ${tag}`);
+      assert.deepEqual(o.slice(0, 2), [ax, ay], `anchor ${tag}`);
+      assert.deepEqual(o.slice(2, 6), vp, `viewport ${tag}`);
+      if (mini) assert.deepEqual(o.slice(6, 8), [Math.floor(w / 3) - ax - 16, Math.floor(h / 3) - ay - 16], `scroll ${tag}`);
     });
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('bindAutomapLayout leaves the JS fallback when the export is missing', () => {
+test('without the engine export there is no JS layout', () => {
   assert.equal(bindAutomapLayout({}), false);
-  assert.equal(automapViewport(800, 600, { mode: 'mini' }).anchorY, 96);
+  assert.throws(() => automapViewport(800, 600, { mode: 'mini' }));
+  assert.throws(() => automapScrollOffset(800, 600, { mode: 'mini', anchorX: 0, anchorY: 96 }));
 });

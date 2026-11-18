@@ -52,3 +52,20 @@ export function replayCels(ctx, list, cels, record, originY = 496) {
   }
   return placed;
 }
+
+export const CELL_PANEL = 5;
+
+/**
+ * Replay the control panel's base cels (D2Client+0x27290). `cels[CELL_PANEL][frame]` as in replayOrbs. The first and last frame are the
+ * side pieces a wide view pushes out by `edge` (left -edge, right +edge); the middle frames stay where the port put them.
+ */
+export function replayPanel(ctx, list, cels, edge, record, originY = 496) {
+  const frames = cels[CELL_PANEL] || [], last = frames.length - 1;
+  for (const r of list) {
+    const c = r.rva === DRAW_CEL && r.cell === CELL_PANEL ? frames[r.frame] : null;
+    if (!c) continue;
+    const x = r.x + (r.frame === 0 ? -edge : r.frame === last ? edge : 0), top = r.y - c.image.height + 1;
+    ctx.drawImage(c.image, x, top - originY);
+    record(c.path, c.frame, c.dc6, x, top);
+  }
+}

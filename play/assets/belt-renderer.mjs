@@ -25,7 +25,8 @@ export function createBeltRenderer(read, documentObject = globalThis.document) {
   };
   return {
     // ops: the engine's draw list; items: the belt items the 'item' ops index ({ invFile }); boxes: the record's boxes (evidence only).
-    draw(ctx, ops, items, boxes = []) {
+    draw(ctx, ops, items, shown) {
+      const boxes = shown ?? [];   // the shell passes null until the engine hands the boxes over
       let count = 0, pixels = 0;
       const bgCalls = [];
       for (const op of ops || []) {

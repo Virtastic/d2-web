@@ -1,7 +1,7 @@
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { recordDc6, recordPrim } from './drawlist.mjs';
-import { rulesBound, expBarPixels, orbDrawList, hudButtonsDrawList, staminaBar, staminaColours } from './client-rules.mjs';
-import { replayOrbs, replayCels, CELL_FLUID, CELL_OVERLAP, CELL_RUN, CELL_MENU } from './draw-list.mjs';
+import { rulesBound, expBarPixels, orbDrawList, hudButtonsDrawList, panelBaseDrawList, staminaDrawList, staminaColours } from './client-rules.mjs';
+import { replayOrbs, replayCels, replayPanel, CELL_PANEL, CELL_FLUID, CELL_OVERLAP, CELL_RUN, CELL_MENU } from './draw-list.mjs';
 
 export function resourceRatio(value, maximum) {
   const max = Number(maximum), current = Number(value);
@@ -203,6 +203,8 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
   // records are what makes "the thing asked for is the thing drawn" checkable per blit.
   const staminaBlend = (() => { try { return createStaminaBlend(read, palette); } catch { return null; } })();
   let staminaSlots = null;
+  const PANEL_PATH = 'data\\global\\ui\\PANEL\\800ctrlpnl7.dc6';
+  const panelCels = { [CELL_PANEL]: p.map((image, i) => ({ image, path: PANEL_PATH, frame: i, dc6: panel.frames[i] })) };
   const record = (spec, index, frame, left, top) =>
     recordDc6(spec.path, index, frame, left, top, { op: 'cel', mode: 5 });
 
@@ -238,12 +240,8 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     const edge = x0 / scale;
     // Per-blit records in retail's own order: the six panel frames, then each orb's fluid
     // (celex, extra = the fluid rows shown, of the cel's height) and its overlap.
-    const PANEL_PATH = 'data\\global\\ui\\PANEL\\800ctrlpnl7.dc6', top = PANEL_SCREEN_TOP;
-    ctx.drawImage(p[0], CONTROL_LAYOUT.healthX - edge, 0);
-    recordDc6(PANEL_PATH, 0, panel.frames[0], CONTROL_LAYOUT.healthX - edge, top);
-    let x = CONTROL_LAYOUT.centerX; for (let i = 1; i <= 4; i++) { ctx.drawImage(p[i], x, CONTROL_LAYOUT.height - p[i].height + 1); recordDc6(PANEL_PATH, i, panel.frames[i], x, top + CONTROL_LAYOUT.height - p[i].height + 1); x += p[i].width; }
-    ctx.drawImage(p[5], CONTROL_LAYOUT.manaX + edge, 0);
-    recordDc6(PANEL_PATH, 5, panel.frames[5], CONTROL_LAYOUT.manaX + edge, top);
+    // The six base cels are the ported D2Client+0x27290's own D2Gfx calls (draw sink), replayed in its order.
+    if (rulesBound()) replayPanel(ctx, panelBaseDrawList(800, 600, 1), panelCels, edge, recordDc6);
     const life = resourceRatio(snapshot?.player?.hp, snapshot?.player?.hpMax);
     const mana = resourceRatio(snapshot?.player?.mana, snapshot?.player?.manaMax);
     // D2Client+0x27BD0 / +0x27A90 (engine rule): fill rows = cur * 80 / max, integer; the float rounding below is the pre-engine fallback.
@@ -266,14 +264,15 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     const local = (spec) => ({ x: spec.x, y: spec.y - PANEL_SCREEN_TOP });
     const stamina = hud.stamina || null;
     const staminaRatio = stamina ? resourceRatio(stamina.value, stamina.maximum) : 0;
-    // D2Client+0x278B0 (engine rule, hud_bar_rules.h): width = cur * 0x66 / max in integers; the fallback is the pre-engine float.
+    // The bar is the ported D2Client+0x278B0's own D2Gfx box (draw sink): its width, colour slot and rectangle are the port's.
     // 278B0 reads raw 1/256 values (its max + 5 blue test is 5/256 of a point): hud.orbs when the engine gave them, else whole points shifted up.
-    const staminaRule = stamina && rulesBound() ? (orbs ? staminaBar(orbs.stamina, orbs.staminaMax) : staminaBar(stamina.value * 256, stamina.maximum * 256)) : null;
-    const staminaPixels = staminaRule ? Math.min(HUD_LAYOUT.stamina.width, staminaRule.width) : Math.floor(staminaRatio * HUD_LAYOUT.stamina.width);
-    // 278B0's colour: the slot it picks (red below 0x19 px, blue over max + 5) indexes the three colours it latched on its
-    // first draw (staminaColours); the pre-engine fallback is the normal colour's index 109.
-    if (staminaRule && !staminaSlots) staminaSlots = staminaColours(palette);
-    const staminaIndex = staminaRule && staminaSlots ? staminaSlots[staminaRule.slot] : HUD_LAYOUT.stamina.index;
+    // The three colours it latches on its first draw come from D2Win #10190 over the palette (staminaColours); [109, 109, 109] without the engine.
+    if (stamina && rulesBound() && !staminaSlots) staminaSlots = staminaColours(palette);
+    const staminaBox = stamina && rulesBound()
+      ? (orbs ? staminaDrawList(orbs.stamina, orbs.staminaMax, false, staminaSlots || Array(3).fill(HUD_LAYOUT.stamina.index))
+        : staminaDrawList(stamina.value * 256, stamina.maximum * 256, false, staminaSlots || Array(3).fill(HUD_LAYOUT.stamina.index))) : null;
+    const staminaPixels = staminaBox ? staminaBox.x2 - staminaBox.x1 : 0;
+    const staminaIndex = staminaBox ? staminaBox.colour : HUD_LAYOUT.stamina.index;
     // The run button's cel follows the engine's own run/walk toggle (hud.runToggle), never a click
     // this module saw: the toggle's action goes to the engine and this reads the engine back.
     const running = hud.runToggle === true;

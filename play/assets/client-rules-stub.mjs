@@ -54,6 +54,23 @@ export function bindStubRules() {
         if (kind === 0 && alive && fill > 0 && fill <= 2) fill = 2;
         return fill;
       }
+      if (name === 'd2_client_draw_panel_base') {   // d2client_batch_27290.cpp, wide: frame 0, four middle frames, the last
+        const [w, h, ebx, out] = a, recs = [[0xd096, 5, 0, 0, h - ebx, -1, 5, 0]];
+        for (let i = 0; i < 4; i++) recs.push([0xd096, 5, i + 1, (w >> 1) - 0xeb + i * 128, h, -1, 5, 0]);
+        recs.push([0xd096, 5, 5, w - 0x75, h - ebx, -1, 5, 0]);
+        recs.forEach((r, i) => r.forEach((v, j) => { heap[(Number(out) >> 2) + i * 8 + j] = v; }));
+        return recs.length;
+      }
+      if (name === 'd2_client_draw_stamina') {   // d2client_278b0.cpp's box at 800x600
+        const [cur, max, over, w, h, c0, c1, c2, out] = a;
+        let mx = max, slot = 1;
+        if (mx + 5 < cur || over) { slot = 2; mx = cur; }
+        const width = mx <= 0 ? 0 : Number(BigInt.asIntN(32, BigInt(cur >>> 0) * 0x66n)) / mx | 0;
+        if (width < 0x19) slot = 0;
+        const x1 = (w >> 1) - 0x7f, y1 = h - 0x1b;
+        [0xd0ba, [c0, c1, c2][slot], 2, x1, y1, x1 + width, y1 + 0x12, 0].forEach((v, j) => { heap[(Number(out) >> 2) + j] = v; });
+        return 1;
+      }
       if (name === 'd2_client_stamina_bar') {   // hud_bar_rules.h staminaBar
         let [cur, mx, over] = a, slot = 1;
         if (mx + 5 < cur || over) { slot = 2; mx = cur; }

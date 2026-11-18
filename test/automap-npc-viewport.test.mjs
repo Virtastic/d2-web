@@ -1,3 +1,4 @@
+import './automap-engine-stub.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { automapNpcsInViewport, automapViewport } from '../play/assets/automap-overlay.mjs';
