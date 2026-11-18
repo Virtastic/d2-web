@@ -1619,7 +1619,7 @@ static void __fastcall DRLGOUTPLACE_CreateAct4LevelConnections(D2DrlgStrc* pDrlg
 }
 
 // 1.13c D2Common+0x17930
-static void __fastcall DRLGOUTPLACE_CreateAct5LevelConnections(D2DrlgStrc* pDrlg)
+void __fastcall DRLGOUTPLACE_CreateAct5LevelConnections(D2DrlgStrc* pDrlg)
 {
 	sub_6FD823C0(pDrlg, gAct5OutdoorDrlgLink, NULL, NULL);
 	sub_6FD823C0(pDrlg, gAct5TundraDrlgLink, NULL, NULL);
