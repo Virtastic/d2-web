@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { bncsLogin, mcpListCharacters, mcpLogonCharacter, mcpListen, mcpRequestMotd, mcpCreateAndJoin } from './realm-client.mjs';
+import { bncsLogin, mcpListCharacters, mcpReturnToLobby, mcpLogonCharacter, mcpListen, mcpRequestMotd, mcpCreateAndJoin } from './realm-client.mjs';
 import { authRefusalEvent, logonFailureEvent } from './bnet-login-screen.mjs';
 import { createBnetChat, parseChatEvent } from './bnet-chat.mjs';
 import { createNews, createMotd } from './bnet-news.mjs';
@@ -242,7 +242,7 @@ async function oursOverBncs(chunks) {
     t.releaseAll(); await settle();
     chat.close();
   }
-  const records = [];
+  const records = []; let realmSeen = 0;
   for (const f of bncsFrames(stream(chunks.slice(0, t.at), 's2c'))) {
     let r;
     if (f.id === 0x25) r = { echo: t.echoes.shift() };
@@ -262,7 +262,11 @@ async function oursOverBncs(chunks) {
       r = { result, event: result === 0 ? null : logonFailureEvent(error), ...(result === 6 ? { text: error.logonReason } : {}) };
     } else if (f.id === 0x59) r = { emailRequested: t.transport.bncsEmailRequested };
     else if (f.id === 0x40 && out) r = { titles: out.realmList.map((x) => x.title).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)) };
-    else if (f.id === 0x3e && out) r = { stored: hex(out.handoff.realmReply), ip: out.handoff.ip, port: out.handoff.port };
+    else if (f.id === 0x3e && out) {
+      // The first reply is the one bncsLogin kept; a later one (the realm logon again, back in the lobby) is read the same way.
+      const h = realmSeen++ === 0 ? out.handoff : { realmReply: [...f.body], ip: [...f.body.subarray(16, 20)].join('.'), port: (f.body[20] << 8) | f.body[21] };
+      r = { stored: hex(h.realmReply), ip: h.ip, port: h.port };
+    }
     else if (f.id === 0x0f && !parseChatEvent(f.body)) r = { invalid: true };
     else if (got[f.id]?.length) r = got[f.id].shift();
     else if (f.id === 0x00) r = { noop: true };   // the chat loop's frames with no case: read and dropped
@@ -283,12 +287,17 @@ async function oursOverMcp(chunks, handoff) {
     mcpCreateGame: () => [], mcpJoinGame: () => [],
   };
   const got = { 0x01: [], 0x19: [], 0x07: [], 0x12: [], 0x03: [], 0x04: [] };
-  const listed = await mcpListCharacters(t.transport, protocol, { realmReply: handoff.realmReply, keepAliveMs: 1e9 });
+  const logon = t.c2s.find((x) => x.key === 0x07);
+  // The way back to the lobby sends the selector, STARTUP and CHARLOGON only (no 0x19): retail's roster is the one the lobby holds.
+  const back = !t.c2s.some((x) => x.key === 0x19) && logon;
+  const listed = back
+    ? await mcpReturnToLobby(t.transport, protocol, { realmReply: handoff.realmReply, character: cstr(logon.body, 0), characters: [{ name: cstr(logon.body, 0), expiry: 0 }], keepAliveMs: 1e9 })
+    : await mcpListCharacters(t.transport, protocol, { realmReply: handoff.realmReply, keepAliveMs: 1e9 });
   const session = listed.session; clearInterval(session.keepAlive);
   got[0x01].push({ result: 0 });
-  got[0x19].push({ total: listed.total, returned: listed.returned, names: listed.characters.map((c) => c.name), expiry: listed.characters.map((c) => c.expiry) });
-  const logon = t.c2s.find((x) => x.key === 0x07);
-  if (logon) { await mcpLogonCharacter(session, cstr(logon.body, 0), { timeoutMs: 500 }); got[0x07].push({ result: 0 }); }
+  if (back) got[0x07].push({ result: 0 });
+  else got[0x19].push({ total: listed.total, returned: listed.returned, names: listed.characters.map((c) => c.name), expiry: listed.characters.map((c) => c.expiry) });
+  if (logon && !back) { await mcpLogonCharacter(session, cstr(logon.body, 0), { timeoutMs: 500 }); got[0x07].push({ result: 0 }); }
   const motd = createMotd();
   mcpListen(session, () => false);
   if (t.c2s.some((x) => x.key === 0x12)) mcpRequestMotd(session, (key, bytes) => got[0x12].push({ motd: motd.add(key, bytes) }));
@@ -317,11 +326,14 @@ async function replay() {
   const tally = new Map(); const differing = [];
   const add = (key, same, detail) => { const t = tally.get(key) ?? { frames: 0, same: 0 }; t.frames++; if (same) t.same++; else differing.push(detail); tally.set(key, t); };
   for (const run of runs) {
-    const conns = connections(run); let handoff = null;
+    const conns = connections(run); let handoff = null; let replies = [], mcpAt = 0;
     for (const [cid, chunks] of conns) {
       if (!isBncs(chunks)) continue;
       const { records, out, seen, c2s } = await oursOverBncs(chunks);
       if (out) handoff = out.handoff;
+      // A run may log on to the realm again on the same BNCS connection (the lobby after a game): each MCP connection answers the
+      // n-th 0x3E, and its STARTUP is that reply's [0,16) + [24,72), the same slice our handoff takes.
+      replies = bncsFrames(stream(chunks, 's2c')).filter((f) => f.id === 0x3e).map((f) => f.body);
       // Retail's own C>S frames: its echo of each ping, the realm it named in the realm logon.
       const retailEchoes = bncsFrames(stream(chunks, 'c2s')).filter((f) => f.id === 0x25).map((f) => hex(f.frame));
       const realmEx = c2s.find((f) => f.key === 0x3e);
@@ -336,12 +348,14 @@ async function replay() {
     }
     for (const [cid, chunks] of conns) {
       if (!isMcp(chunks) || !handoff) continue;
+      const reply = replies[mcpAt++];
+      const conn = reply ? { ...handoff, realmReply: [...reply], startup: [...reply.subarray(0, 16), ...reply.subarray(24, 72)] } : handoff;
       // Retail's MCP STARTUP is the hand-off it stored, less the IP and port: the second oracle for 0x3E.
       const startup = mcpFrames(stream(chunks, 'c2s').subarray(1)).find((f) => f.id === 0x01);
-      const stored = Buffer.from(handoff.realmReply);
+      const stored = Buffer.from(conn.realmReply);
       assert.equal(hex(startup.body), hex(Buffer.concat([stored.subarray(0, 16), stored.subarray(24)])), `${run}/${cid}: retail's STARTUP is its stored 0x3E`);
-      assert.equal(hex(handoff.startup), hex(startup.body.subarray(0, 64)), `${run}/${cid}: our startup block`);
-      const { records, pending } = await oursOverMcp(chunks, handoff);
+      assert.equal(hex(conn.startup), hex(startup.body.subarray(0, 64)), `${run}/${cid}: our startup block`);
+      const { records, pending } = await oursOverMcp(chunks, conn);
       const state = { pending };
       for (const { id, body, ours } of records) {
         const retail = retailMcpRecord(id, body, state);
