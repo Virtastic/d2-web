@@ -41,7 +41,6 @@ extern "C" uint32_t d2_game_7ba40(const uint8_t* unit, const uint8_t* cand, uint
 extern "C" uint32_t d2_game_7bb00(const uint8_t* unit, const uint8_t* cand, uint8_t* acc, const D2g7b860Env* e);
 extern "C" uint32_t d2_game_7be10(const uint8_t* game, uint8_t* unit, const D2g7b860Env* e);
 extern "C" uint32_t d2_game_7bf50(const uint8_t* game, uint8_t* unit, const uint8_t* ctx, const D2g7b860Env* e);
-extern "C" uint32_t d2_game_7c060(const uint8_t* game, uint8_t* unit, const uint8_t* ctx, const D2g7b860Env* e);
 extern "C" uint32_t d2_game_7c580(const uint8_t* game, uint8_t* unit, const uint8_t* ctx, const D2g7b860Env* e);
 extern "C" uint32_t d2_game_7c1d0(const uint8_t* game, uint8_t* unit, const uint8_t* ctx, const D2g7b860Env* e);
 

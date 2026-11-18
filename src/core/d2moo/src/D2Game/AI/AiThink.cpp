@@ -6687,7 +6687,7 @@ enum D2C_TrapNovaAIParams
 };
 
 //D2Game.0x6FCDE8B0
-// 1.13c D2Game+0x7C1D0 (ai 80); ai 92 is D2Game+0x7C060, a byte-identical copy of this body
+// 1.13c D2Game+0x7C1D0 (ai 80); ai 92 is 1.13c D2Game+0x7C060, a byte-identical copy of this body
 void __fastcall AITHINK_Fn080_092_TrapPoison_TrapNova(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	D2AiControlStrc* pAiControl = pAiTickParam->pAiControl;
