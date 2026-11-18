@@ -123,6 +123,8 @@ D2COMMON_DLL_DECL void __stdcall ITEMMODS_AddCraftPropertyList(D2UnitStrc* pItem
 int __fastcall ITEMMODS_PropertyFunc01(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, const D2PropertyStrc* pProperty, int nSet, short nStatId, int nLayer, int nValue, int nState, int fStatList, D2UnitStrc* a11);
 //D2Common.0x6FD96110
 int __fastcall ITEMMODS_AddPropertyToItemStatList(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, const D2PropertyStrc* pProperty, int nSet, short nStatId, int nLayer, int nValue, int nState, int fStatList, D2UnitStrc* pUnused);
+// 1.13c D2Common+0x465B0 (the roll between two bounds with the item's seed)
+int __fastcall ITEMMODS_RollRandomValueInRange(D2UnitStrc* pItem, int nMin, int nMax);
 //D2Common.0x6FD96210
 int __fastcall ITEMMODS_PropertyFunc02(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, const D2PropertyStrc* pProperty, int nSet, short nStatId, int nLayer, int nValue, int nState, int fStatList, D2UnitStrc* a11);
 //D2Common.0x6FD96350
