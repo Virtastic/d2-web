@@ -41,32 +41,7 @@ void D2Common_7ECC0(void* pObj, int32_t base, const int32_t* tbl,
     if (rd<B>(p, 0) & 0x14) call7EB40();
 }
 
-// 1.13c D2Common+0x42920: find-or-create a per-id round-robin node on the list at +0x1cc of pCtx
-// (node: id, count, cursor, next), seed LCG at +0x1c4/+0x1c8, then advance cursor = (cursor+1)%count.
-// pRow = the 0x1b0-byte table row (id at +0, count at +0x40); alloc = Ordinal_10045.
-int32_t D2Common_42920(void* pCtx, int32_t id, const void* pRow, int32_t* (*alloc)())
-{
-    // list links are 4-byte retail pointers (wasm32 host addresses), not native pointer width
-    int32_t* n = (int32_t*)(uintptr_t)rd<uint32_t>(pCtx, 0x1cc);
-    for (; n; n = (int32_t*)(uintptr_t)rd<uint32_t>(n, 12)) if (n[0] == id) goto found;
-    {
-        n = alloc();
-        n[0] = rd<int32_t>(pRow, 0); n[1] = rd<int32_t>(pRow, 0x40); n[2] = 0; n[3] = 0;
-        uint32_t c = (uint32_t)n[1], r;
-        if ((int32_t)c < 1) r = 0;
-        else {
-            uint64_t s = (uint64_t)rd<uint32_t>(pCtx, 0x1c4) * 0x6ac690c5ull + rd<uint32_t>(pCtx, 0x1c8);
-            wr<uint64_t>(pCtx, 0x1c4, s);
-            r = (c & (c - 1)) == 0 ? (c - 1) & (uint32_t)s : (uint32_t)((s & 0xffffffffull) % c);
-        }
-        n[2] = (int32_t)r;
-        wr<uint32_t>(n, 12, rd<uint32_t>(pCtx, 0x1cc));
-        wr<uint32_t>(pCtx, 0x1cc, (uint32_t)(uintptr_t)n);
-    }
-found:
-    n[2] = (n[2] + 1) % n[1];
-    return n[2];   // EAX on return: the advanced cursor (0x42A70 takes it as the flag)
-}
+// D2Common+0x42920 lives in the game tree (src/core/d2moo/src/Retail/D2Common_42920.cpp).
 
 // Shared tail of 0x68CD0 / 0x68F00: apply the 'flags' word (unaff_EBX / param_5) to rec[5].
 static void ApplyFlags(int32_t* r, uint32_t f, uint32_t (*ord10051)(int32_t))

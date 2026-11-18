@@ -19,6 +19,8 @@
 // 1.13c D2Common+0x33C20 (already defined in sub_33c20.cpp; same translation unit set).
 uint32_t D2Common_33C20_BitmaskHit(bool hasOwner, bool hasRec, int32_t recFlag, const uint32_t* bits, const uint32_t* mask, int32_t nWords);
 
+extern uint32_t D2Common_37DB0_UnitStateBit(const D2UnitStrc* pUnit, int32_t nBit);
+
 namespace
 {
 	// MonStats2 flag bit of the monster row nMonsterId, bit nBit of its dwFlags/nFlags (+0x04);
@@ -31,13 +33,8 @@ namespace
 		return sgptDataTables->pMonStats2Txt[nMonStats2].nFlags[nBit >> 3] & gdwBitMasks[nBit & 7];
 	}
 
-	// 1.13c D2Common+0x37DB0: state bit nBit of the unit's stat list (sign bit = extended list).
-	inline uint32_t UnitStateBit(D2UnitStrc* pUnit, int32_t nBit)
-	{
-		D2StatListExStrc* pStatList = pUnit ? pUnit->pStatListEx : nullptr;
-		if (!pStatList || (int32_t)pStatList->dwFlags >= 0 || !pStatList->StatFlags) return 0;
-		return pStatList->StatFlags[nBit >> 5] & gdwBitMasks[nBit & 31];
-	}
+	// State bit of the unit's stat list: the game-tree body of 0x37DB0.
+	inline uint32_t UnitStateBit(D2UnitStrc* pUnit, int32_t nBit) { return D2Common_37DB0_UnitStateBit(pUnit, nBit); }
 }
 
 // stand-alone twin of D2Common 0x52660 (the proven row runs SKILLS_AddSkill), #10008: skills.txt row's passive state, stat-list bits, then add skill

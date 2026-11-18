@@ -4,49 +4,7 @@ typedef uintptr_t P;
 static inline uint32_t ru(P b, uint32_t o) { return *(const uint32_t*)(b + o); }
 static inline int32_t ri(P b, uint32_t o) { return *(const int32_t*)(b + o); }
 
-extern int D2Common_83B30(int x, int y, P p3, P p2);
-extern void D2Common_83990(int a, int b, int x, int y, P p1, P p3, P p2);
-
-// seed at unit+0x1c4 (lo) / +0x1c8 (hi): 64-bit LCG, state = lo*0x6AC690C5 + hi.
-static uint32_t seedRand(P s, uint32_t n)
-{
-    if ((int32_t)n < 1) return 0;
-    uint64_t v = (uint64_t)ru(s, 0x1c4) * 0x6ac690c5ull + ru(s, 0x1c8);
-    *(uint64_t*)(s + 0x1c4) = v;
-    return (n & (n - 1)) == 0 ? (n - 1) & (uint32_t)v : (uint32_t)v % n;
-}
-
-// 1.13c D2Common+0x83E20
-uint32_t D2Common_83E20(P p1, P p2, P p3)
-{
-    P u = (P)ru(p1, 0);
-    int32_t t = ri(u, 0x1d0);
-    bool small = t >= 2 && t <= 7;
-    int32_t step = (ri(p1, 24) == 1 && (ru((P)ru(u, 0x14), 0) & 0xc)) ? -1 : 1;
-    int32_t w = ri((P)ru(p1, 4), 8) - ri(p3, 8) * ri(p2, 0x4c) + step;
-    int32_t h = ri((P)ru(p1, 4), 0xc) - ri(p3, 12) * ri(p2, 0x4c) + 1;
-    uint32_t n = (uint32_t)(h * w);
-    if (n == 0) return 0;
-    if (n > 256) return 0; // retail local_808[514] holds 256 (x,y) cells; larger windows never occur (guard, not a 1.13c path)
-    uint32_t cell[514]; // [0]=count [1]=skip-centre flag, then (x,y) pairs from [2]
-    cell[1] = (ri(p1, 24) == 1 && small && w <= 5 && h <= 5) ? 1 : 0;
-    for (int32_t i = 0; i < (int32_t)n; i++) { cell[2 + i * 2] = i % w; cell[3 + i * 2] = i / w; }
-    for (cell[0] = n; cell[0]; cell[0]--) { // Fisher-Yates-ish: two random picks swapped
-        uint32_t a = seedRand(u, n), b = seedRand(u, n);
-        uint32_t x = cell[2 + a * 2], y = cell[3 + a * 2];
-        cell[2 + a * 2] = cell[2 + b * 2]; cell[3 + a * 2] = cell[3 + b * 2];
-        cell[2 + b * 2] = x; cell[3 + b * 2] = y;
-    }
-    for (uint32_t i = 0; (int32_t)i < (int32_t)n; i++) {
-        uint32_t cx = cell[2 + i * 2], cy = cell[3 + i * 2];
-        if (cell[1] && cx == 2 && cy == 2) continue;
-        if (!D2Common_83B30(cx, cy, p3, p2)) continue;
-        uint32_t r = seedRand(u, ru(p3, 20)) ; // 0 when param_3[5] < 1
-        D2Common_83990(r + 1, (ri(p3, 8) + 1) * (r + 1), cx, cy, p1, p3, p2);
-        if (ri(p2, 0x44) == 0 || ri(p2, 0x44) == 1) return 1;
-    }
-    return 0;
-}
+// D2Common+0x83E20 lives in the game tree (src/core/d2moo/src/Retail/D2Common_83e20.cpp).
 
 // stand-alone 32-bit layout twin of D2Common 0x68340 (the proven row runs DRLGROOMTILE_FindTilePresetUnit): search the static table (stride 0x1c at 0x6fddbf2c-based rows) in
 // ranges [lo,hi] selected by key==param_1 (triplets at 0x6fddbd68, stride 12). tbl = range table, rows = row table.

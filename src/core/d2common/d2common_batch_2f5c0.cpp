@@ -40,26 +40,6 @@ struct D2CommonBatch2F5C0Env {
 	uint32_t (*sub1080)(uint32_t pCell);
 };
 
-// 1.13c D2Common+0x3C1B0 (#10767)
-// Walks the node chain rooted at record+0x10 and answers the first node whose rectangle contains
-// the point: x (argument 2) inside [node+0x5C, node+0x5C+node+0x64) and y (argument 3) inside
-// [node+0x60, node+0x60+node+0x68). The next node is node+0x7C; an exhausted chain answers null.
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3C1B0_FindNodeAtPoint(uint32_t pRecord, int32_t nX, int32_t nY)
-{
-	uint32_t pNode = pRecord != 0 ? rd32(pRecord, 0x10) : 0;
-	while (pNode != 0) {
-		const int32_t nLeft = (int32_t)rd32(pNode, 0x5C);
-		const int32_t nTop = (int32_t)rd32(pNode, 0x60);
-		if (nLeft <= nX && nX < nLeft + (int32_t)rd32(pNode, 0x64) &&
-		    nTop <= nY && nY < nTop + (int32_t)rd32(pNode, 0x68)) {
-			return pNode;
-		}
-		pNode = rd32(pNode, 0x7C);
-	}
-	return 0;
-}
-
 // 1.13c D2Common+0x3D120 (#10778)
 // Counts the qualifying nodes of the list at record+8 -- a node qualifies when its second dword
 // (node+4) is zero -- and returns the first word of the node at index nIndex. A node's successor

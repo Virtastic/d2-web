@@ -20,42 +20,12 @@ uint32_t D2Common_33C20_BitmaskHit(bool hasOwner, bool hasRec, int32_t recFlag,
 extern "C" uint32_t* g_d2common_dat_6fdeff54 = nullptr;
 extern "C" int32_t g_d2common_dat_6fdeff5c = 0;
 
-// 1.13c D2Common+0x84B40 (#10491) D2GetDropRoom: index the MonStats2 composit table of a monster
-// row's wMonStatsEx: component nComponent (0..15) choice nChoice selects a byte in the 0x26 array
-// (0xC per component), which indexes the global drop-room table. Every out-of-range index answers 0.
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t D2GetDropRoom(int32_t nMonsterId, uint32_t nComponent,
-	uint32_t nChoice)
-{
-	if (nComponent > 0xF) return 0;
-	if (nMonsterId < 0 || nMonsterId >= sgptDataTables->nMonStatsTxtRecordCount) return 0;
-	if (!sgptDataTables->pMonStatsTxt) return 0;
-
-	const int32_t nMonStats2 = sgptDataTables->pMonStatsTxt[nMonsterId].wMonStatsEx;
-	if (nMonStats2 < 0) return 0;
-	if (nMonStats2 >= sgptDataTables->nMonStats2TxtRecordCount) return 0;
-	if (!sgptDataTables->pMonStats2Txt) return 0;
-
-	const D2MonStats2Txt* pRow = &sgptDataTables->pMonStats2Txt[nMonStats2];
-	if (nChoice >= pRow->nComponentChoiceCounts[nComponent]) return 0;
-
-	const uint32_t nIndex = ((const uint8_t*)&pRow->unk0x26[nComponent])[nChoice];
-	// DAT_6fdeff54/5c in 1.13c are the compcode table the loader fills (sgptDataTables->pCompCodeTxt and its count).
-	if ((int32_t)nIndex >= sgptDataTables->nCompCodeTxtRecordCount) return 0;
-	if (!sgptDataTables->pCompCodeTxt) return 0;
-	return sgptDataTables->pCompCodeTxt[nIndex].dwCode;
-}
+// D2GetDropRoom (0x84B40) and the state-bit test (0x37DB0) live in the game tree, src/core/d2moo/src/Retail.
+extern uint32_t D2Common_37DB0_UnitStateBit(const D2UnitStrc* pUnit, int32_t nBit);
 
 namespace
 {
-	// 1.13c D2Common+0x37DB0: state bit nBit of the unit's extended stat list (sign bit of dwFlags).
-	uint32_t Batch2_UnitStateBit(const D2UnitStrc* pUnit, int32_t nBit)
-	{
-		if (!pUnit) return 0;
-		D2StatListExStrc* pStatList = pUnit->pStatListEx;
-		if (!pStatList || (int32_t)pStatList->dwFlags >= 0 || !pStatList->StatFlags) return 0;
-		return pStatList->StatFlags[nBit >> 5] & gdwBitMasks[nBit & 31];
-	}
+	uint32_t Batch2_UnitStateBit(const D2UnitStrc* pUnit, int32_t nBit) { return D2Common_37DB0_UnitStateBit(pUnit, nBit); }
 }
 
 // 1.13c D2Common+0x4EBA0 (#10497): 2 when the unit is one of the three state-bearing types and state

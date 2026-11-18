@@ -45,17 +45,6 @@ void d2_fn_d2common_4e110_batch(uint32_t pRecord, uint32_t nValue) {   // 1.13c 
 	*reinterpret_cast<uint32_t*>(P(pRecord) + 0x10) = nValue;
 }
 
-// +0x3BF00: true when the byte at (pointer+0x10)->0x44 is at least 3.
-extern "C"
-EMSCRIPTEN_KEEPALIVE bool D2Common_3BF00_InnerByte44AtLeast3(uint32_t pRecord) {   // 1.13c D2Common+0x3bf00
-	if (!pRecord)
-		return false;
-	const uint32_t pInner = R(P(pRecord), 0x10);
-	if (!pInner)
-		return false;
-	return P(pInner)[0x44] >= 3;
-}
-
 // +0x4E030: the dword at +0x18 of the record; a null record is retail's fatal path
 // and answers 0.
 extern "C"

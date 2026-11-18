@@ -151,20 +151,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_61EA_Unlock4(void)
 
 // --- fourth tiny batch (rows 0x70F80, 0x87537, 0x867D6, 0x867E9, 0x87C5B, 0x876BE) ---------------
 
-// 1.13c D2Common+0x70F80: always returns 1; when its second argument is zero it closes the logging
-// subsystem first (0x12AA0 __log_close) and otherwise touches nothing. The first decompiled argument
-// is unread. 0x12AA0 is still UNMAPPED, so it stays a caller-supplied seam, as in
-// d2common_batch_233b0.cpp.
-typedef void (*D2CommonLogCloseFn)(void);  // 0x12AA0 __log_close
-
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_70F80(uint32_t unused, int32_t nFlag,
-	D2CommonLogCloseFn log_close)
-{
-	(void)unused;
-	if (nFlag == 0)
-		log_close();
-	return 1;
-}
+// D2Common+0x70F80 lives in the game tree (src/core/d2moo/src/Retail/D2Common_70f80.cpp).
 
 // 1.13c D2Common+0x87C5B (__controlfp): __control87 with the __EM_INVALID bit (0x80000) cleared from
 // the mask. __control87 (0x87C29) is still UNMAPPED, so the abstract control-word transform is a
@@ -219,13 +206,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_45640_ShiftBySelector(uint32_t nSe
 	}
 }
 
-// 1.13c D2Common+0x87209 (__shift): when the offset (retail EDI) is non-zero, move the whole
-// NUL-terminated string including its terminator to pStr+offset, i.e. memmove of strlen+1 bytes.
-extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_87209_Shift(char* pStr, int32_t nOffset)
-{
-	if (nOffset != 0)
-		std::memmove(pStr + nOffset, pStr, std::strlen(pStr) + 1);
-}
+// D2Common+0x87209 (__shift) lives in the game tree (src/core/d2moo/src/Retail/D2Common_87209.cpp).
 
 // 0x22920 is ITEMS_CheckIfSocketableByItemId, mapped in d2common_batch_33020.cpp.
 extern "C" int D2Common_10211_ITEMS_CheckIfSocketableByItemId(int nItemId);
@@ -269,51 +250,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_53370_GetCountedTableRecord(
     return nIndex < nCount ? retailBase + uint32_t(nIndex) * 0x34u : 0u;
 }
 
-// 1.13c D2Common+0x533f0 (#10924): required Fog seams preserve native text/context
-// pointers; retail always terminates after reporting the error.
-using D2CommonFogErrorTextFn = const char* (*)(uint32_t);
-using D2CommonFogDisplayHaltFn = void (*)(void*, const char*);
-using D2CommonExitFn = void (*)(int);
-static void D2Common_ExitDefault(int code) { std::_Exit(code); }
-extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_533F0_FatalExit(
-    void* errorContext, D2CommonFogErrorTextFn getErrorText,
-    D2CommonFogDisplayHaltFn displayHalt, D2CommonExitFn fnExit = D2Common_ExitDefault)
-{
-    displayHalt(errorContext, getErrorText(0x6AE));
-    fnExit(-1);   // retail _exit(-1) never returns; a probe's seam may
-}
-
-// 1.13c D2Common+0x87C71 (___addl): add two unsigned dwords, store the low 32-bit sum through pOut,
-// and return 1 when the add carries out of bit 31. A carry out shows up as the sum being below
-// either operand.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_87C71_Addl(uint32_t nLeft, uint32_t nRight,
-	uint32_t* pOut)
-{
-	const uint32_t nSum = nLeft + nRight;
-	const uint32_t nCarry = (nSum < nLeft || nSum < nRight) ? 1u : 0u;
-	*pOut = nSum;
-	return nCarry;
-}
+// D2Common+0x533F0 and 0x87C71 live in the game tree (src/core/d2moo/src/Retail).
 
 // --- eighth tiny batch (rows 0x535D0, 0x87589, 0x4D970, 0x85CF0, 0x85DF0) ----------------------
 // 0x3B5B0 belongs to another change and is not touched here.
 
-// 1.13c D2Common+0x535D0: consume the next numeric field of a mutable string cursor. The cursor sits
-// one past the token after the separator is overwritten with a NUL; a missing separator leaves the
-// cursor null and the whole remaining string is parsed. The parsed integer is the return value.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_535D0_SplitAndAtoi(char** ppCursor, char cSeparator,
-    int32_t (*retailAtol)(const char*))
-{
-	char* const pStart = *ppCursor;
-	char* const pSeparator = std::strchr(pStart, cSeparator);
-	*ppCursor = pSeparator;
-	if (pSeparator != nullptr) {
-		*pSeparator = '\0';
-		*ppCursor = pSeparator + 1;
-	}
-	// The retail CRT parser is required: host long width and overflow rules differ.
-	return retailAtol(pStart);
-}
+// D2Common+0x535D0 lives in the game tree (src/core/d2moo/src/Retail/D2Common_535d0.cpp).
 
 // 1.13c D2Common+0x87589 (__ms_p5_mp_test_fdiv): probe the host for the divide-by-zero exception
 // feature through KERNEL32, and fall back to the internal CRT test (0x87549) when the module or the

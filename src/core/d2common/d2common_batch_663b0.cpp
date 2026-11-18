@@ -397,24 +397,6 @@ void D2Common_3D2B0_SortTextList(uint32_t pList)
 	free(scratch);
 }
 
-// 1.13c D2Common+0x3C520 (#10163): give the room the text list it currently lacks.
-// Retail fatals 0x3DD on a null room, 0x3DE when room+0x50 is already set, and 0x3DF on a null
-// text list; otherwise it calls 0x7BA00(0, *(int*)(pText + 0x10)).
-// The 0x7BA00 call is a pure predicate whose result is discarded, so the only retail effects are the
-// three fatal exits (_exit(-1)); this port returns on those, matching the file's convention.
-void D2Common_3C520_AssignTextToRoom(uint32_t pRoom, uint32_t pText)
-{
-	uint8_t* room = P(pRoom);
-	if (!room)
-		return;
-	if (W(room, 0x50) != 0)
-		return;
-
-	uint8_t* text = P(pText);
-	if (!text)
-		return;
-}
-
 // 1.13c D2Common+0x4D6E0 (#10166): move a collision footprint one cell.
 // The footprint mask is cleared at the source and the move-condition mask is tested at the
 // destination with the same collision pattern. On a hit the footprint is restored at the source

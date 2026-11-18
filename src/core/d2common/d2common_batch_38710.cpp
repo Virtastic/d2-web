@@ -55,17 +55,6 @@ void D2Common_1DAD0_VisitPathCells(void* unit, uint32_t mask, int context,
     }
 }
 
-// 1.13c D2Common+0x3B760
-// Returns the out pointer, which retail leaves in EAX.
-int32_t* D2Common_3B760_RoomBounds(const void* room, int32_t out[4]) {
-    if (!room) return nullptr; // retail asserts
-    out[1] = at<int32_t>(room, 0x50);
-    out[3] = at<int32_t>(room, 0x58) + out[1];
-    out[0] = at<int32_t>(room, 0x4c);
-    out[2] = at<int32_t>(room, 0x54) + out[0];
-    return out;
-}
-
 // 1.13c D2Common+0x2FA20
 uint32_t D2Common_2FA20_PathDirection(const void* unit,
                                       uint32_t (*directionTo)(const void*, unsigned, unsigned),
@@ -94,19 +83,6 @@ void D2Common_37350_GetRoomFields(const void* object, uint32_t* a, uint32_t* b,
     *b = at<uint32_t>(data, 0x20);
     *c = at<uint32_t>(data, 0x24);
     *d = 0;
-}
-
-// 1.13c D2Common+0x3C070
-void D2Common_3C070_IsoBounds(const void* room, int32_t out[4]) {
-    if (!room) return; // retail asserts
-    const int32_t x = at<int32_t>(room, 0x5c);
-    const int32_t y = at<int32_t>(room, 0x60);
-    const int32_t w = at<int32_t>(room, 0x64);
-    const int32_t h = at<int32_t>(room, 0x68);
-    out[1] = (y + 2 + x) * 0x28;
-    out[0] = (x - y - h) * 0x50 - 0x50;
-    out[2] = (x - y + w) * 0x50 - 0x50;
-    out[3] = (y + x + h + 2 + w) * 0x28;
 }
 
 // 1.13c D2Common+0x3BBD0

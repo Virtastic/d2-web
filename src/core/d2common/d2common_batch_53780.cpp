@@ -28,13 +28,15 @@ static D2TCExInfoStrc* AppendInfo(D2TCExShortStrc* pTC)
 	return DATATBLS_ReallocTCExInfo(pTC);
 }
 
-// Consume the next ',' separated numeric field (1.13c D2Common+0x535D0); *ppNext is the rest.
+// Consume the next ',' separated numeric field through the game-tree field splitter (retail 0x535D0); *ppNext is the rest.
+extern "C" int32_t D2Common_535D0_SplitAndAtoi(char** ppCursor, char cSeparator, int32_t (*retailAtol)(const char*));
+static int32_t HostAtol(const char* sz) { return (int32_t)atol(sz); }
 static int16_t TakeField(char* szValue, char** ppNext)
 {
-	char* p = strchr(szValue, ',');
-	if (p) { *p = '\0'; ++p; }
+	char* p = szValue;
+	const int32_t n = D2Common_535D0_SplitAndAtoi(&p, ',', HostAtol);
 	*ppNext = p;
-	return (int16_t)atol(szValue);
+	return (int16_t)n;
 }
 
 // Called by DATATBLS_LoadTreasureClassExTxt (MonsterTbls.cpp) in place of the 1.10f inline parser, which matched key names

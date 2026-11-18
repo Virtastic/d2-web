@@ -49,33 +49,6 @@ EMSCRIPTEN_KEEPALIVE uint8_t D2Common_ItemIsThrowable_24C30(uint32_t pItem)
 		reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pItem))));
 }
 
-// 1.13c D2Common+0x3C120: first room in the room's own list whose tile rectangle contains (nX, nY).
-// ppRoomList is +0x00 and nNumRooms +0x24; a null list entry is a retail assert (0x1B3). The 1.10f
-// twin is DUNGEON_GetAdjacentRoomByTileCoordinates; 0x3B910 is 1.13c's AreTileCoordinatesInsideRoom.
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3C120_GetAdjacentRoomByTile(uint32_t pRoom, int32_t nX, int32_t nY)
-{
-	// Retail 32-bit layout: list pointer +0x00, count +0x24; each listed room's tile rect is
-	// x +0x5C, y +0x60, width +0x64, height +0x68 (0x3B910's test).
-	if (!pRoom)
-		return 0;
-	const uint8_t* r = P(pRoom);
-	const uint8_t* list = P(R(r, 0x00));
-	const int32_t nNum = static_cast<int32_t>(R(r, 0x24));
-	for (int32_t i = 0; i < nNum; ++i)
-	{
-		const uint32_t pTemp = R(list, i * 4);
-		if (!pTemp)
-			return 0;
-		const uint8_t* t = P(pTemp);
-		const int32_t x = static_cast<int32_t>(R(t, 0x5C)), y = static_cast<int32_t>(R(t, 0x60));
-		const int32_t w = static_cast<int32_t>(R(t, 0x64)), h = static_cast<int32_t>(R(t, 0x68));
-		if (nX >= x && nX < x + w && nY >= y && nY < y + h)
-			return pTemp;
-	}
-	return 0;
-}
-
 // retail-layout seam of D2Common 0x7C170 (marker on DRLGACTIVATE_Update) (DRLGACTIVATE_Update, stack arg = the lists struct, ret 4): mirror the +8 / +0x468
 // pair into the four DAT_6FDEFB84.. globals when lists+0x8C bit 0 is set, then once every 5 or 7 timeouts
 // (+0x45C) walk the status-2 ring from +0x460 and run 0x7C0E0 on each idle room. Retail 32-bit layout:

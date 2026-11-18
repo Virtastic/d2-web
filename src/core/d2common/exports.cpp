@@ -4,6 +4,8 @@
 
 #include <D2DataTbls.h>
 
+extern "C" std::uint32_t d2common_70f40(std::uint32_t eax, std::uint32_t discarded);
+
 namespace d2common {
 
 // 1.13c D2Common+0x2D0B0 (ordinal 10003): SetBit on the bitfield `**target`. The inner call is Fog.dll
@@ -19,7 +21,8 @@ void D2Common_10003(std::uint8_t** target, std::int32_t multiplier, std::int32_t
 }
 
 // 1.13c D2Common+0x70F40 (ordinal 10352): `ret 4`, a stdcall no-op that discards its single argument.
-void D2Common_10352(std::uint32_t) {}
+// The body is d2common_70f40 in src/core/d2moo/src/D2CommonCrt.cpp.
+void D2Common_10352(std::uint32_t arg) { d2common_70f40(arg, 0); }
 
 // 1.13c D2Common+0x71280 (ordinal 10041): returns the address of the gamble.txt table header (record count, then
 // the selection array pointer), which retail keeps as a standalone global; ours is a member of sgptDataTables.

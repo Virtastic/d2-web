@@ -3,41 +3,9 @@
 namespace {
 inline uint8_t* P(uint32_t a) { return (uint8_t*)(uintptr_t)a; }
 inline uint32_t& W(uint8_t* b, int o) { return *(uint32_t*)(b + o); }
-// item data node (+0x5c) of a type-4 unit with data, else null (the 0x1E790 test)
-inline uint8_t* Node(uint32_t u) { uint8_t* p = P(u); return (p && W(p, 0) == 4 && W(p, 0x14)) ? P(W(p, 0x14)) + 0x5c : nullptr; }
 }
-// 0x1E310: write pItem into rows r0..r0+rows, columns c0..c0+cols of the grid's cell array (row stride = grid byte +8).
-// 1.13c D2Common+0x1E310
-void D2Common_1E310_FillCells(uint8_t rows, int32_t r0, int32_t c0, uint32_t grid, uint8_t cols, uint32_t val)
-{
-    uint8_t* g = P(grid);
-    for (int32_t r = r0; r < r0 + rows; ++r)
-        for (int32_t c = c0; c < c0 + cols; ++c)
-            W(P(W(g, 0xc)), ((uint32_t)g[8] * r + c) * 4) = val;
-}
-// 0x1F690: append pItem to inventory pInv's item list (+0xc first, +0x10 last; node +0 parent, +4 prev, +8 next).
-// 1.13c D2Common+0x1F690
-void D2Common_1F690_AppendItem(uint32_t pItem, uint32_t pInv)
-{
-    uint8_t *n = Node(pItem), *inv = P(pInv);
-    if (!n) return;
-    if (!W(inv, 0x10)) W(inv, 0xc) = pItem;
-    else if (uint8_t* l = Node(W(inv, 0x10))) W(l, 8) = pItem;
-    W(n, 4) = W(inv, 0x10);
-    W(inv, 0x10) = pItem;
-    W(n, 0) = pInv;
-}
-// 0x1F630: when the item's parent (node +0) == pInv, append it to the grid's list (+0 first, +4 last; node +0x10 prev, +0x14 next).
-// 1.13c D2Common+0x1F630
-void D2Common_1F630_AppendGridItem(uint32_t pItem, uint32_t grid, uint32_t pInv)
-{
-    uint8_t *n = Node(pItem), *g = P(grid);
-    if (!n || W(n, 0) != pInv) return;
-    if (!W(g, 4)) W(g, 0) = pItem;
-    else if (uint8_t* l = Node(W(g, 4))) W(l, 0x14) = pItem;
-    W(n, 0x10) = W(g, 4);
-    W(g, 4) = pItem;
-}
+// (0x1E310, 0x1F630 and 0x1F690 are the game bodies INVENTORY_FillGridCells, INVENTORY_AppendItemToGridList and
+// INVENTORY_AppendItemToList in src/core/d2moo/src/D2Inventory.cpp.)
 // 0x1E360: 1 when every cell of rows y..y+h-1, columns x..x+w-1 is empty, else 0. No bounds check against the grid size
 // (1.10f had one): out-of-range cells are read by row stride.
 // Twin of INVENTORY_AreCellsFree (the d2moo function carries the 1.13c marker)

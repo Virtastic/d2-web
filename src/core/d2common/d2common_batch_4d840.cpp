@@ -160,24 +160,6 @@ void D2Common_10527_SetByte0x90(uint8_t* pBlock, uint8_t nValue)
 	pBlock[0x90] = nValue;
 }
 
-// 1.13c D2Common+0x3BF20: when the block at +0x10 is in state 2, the address of a cell inside
-// its layer: record at [[[+0x10]+0x20]+8], offset = dword[+4] * 0x3C + 0x44 + dword[+8].
-// Otherwise a pointer to retail's static default record (DAT_6fde3338, contents not covered here).
-extern "C"
-uint8_t* D2Common_10529_GetLayerCell(int32_t* pUnit)
-{
-	static uint8_t g_D2Common_10529_default[8] = { 0 };
-	if (pUnit == nullptr)
-		return nullptr;
-	const uint32_t nBlock = static_cast<uint32_t>(pUnit[4]);
-	if (R(P(nBlock), 0x48) != 2)
-		return g_D2Common_10529_default;
-	const uint32_t nRecord = R(P(R(P(nBlock), 0x20)), 8);
-	const int32_t nRow = *reinterpret_cast<const int32_t*>(P(nRecord) + 4);
-	const int32_t nColumn = *reinterpret_cast<const int32_t*>(P(nRecord) + 8);
-	return P(static_cast<uint32_t>(nRow * 0x3c + 0x44 + nColumn));
-}
-
 // 0x66800's callees: 0x665C0 refreshes the unit's room membership, 0x391F0 answers its
 // alignment, and 0x66630 validates (room, unit, allow-already-present) - register-ordered in
 // retail (ESI=room, EDI=unit, stack flag). All three are still UNMAPPED rows.
