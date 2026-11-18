@@ -114,7 +114,7 @@ P D2GAME_470F0(P thisv, P eax, i32 ebx, P a1, P a2)
 }
 
 
-// 1.13c D2Game+0x47700 (eax = in_EAX, ebx = group idx; stack: game, p2, minB, maxB)
+// D2Game+0x47700 (marker lives on sub_6FC677D0) (eax = in_EAX, ebx = group idx; stack: game, p2, minB, maxB)
 P D2GAME_47700(P game, P p2, u32 minB, u32 maxB, P eax, i32 ebx)
 {
     u8 lo = (u8)minB, hi = (u8)maxB;

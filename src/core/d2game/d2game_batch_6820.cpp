@@ -147,7 +147,7 @@ void D2Game_RemoveAllMissiles(void* game, const D2GameBatch10Seams& s)
     }
 }
 
-// 1.13c D2Game+0xB0640
+// D2Game+0xB0640 (marker lives on MONSTER_RemoveAll)
 // MONSTER_RemoveAll: unit list row 1 (game+0x1320), and here the next pointer is stored into the bucket
 // head before removal (1.10f MONSTER_RemoveAll does the same).
 void D2Game_RemoveAllMonsters(void* game, const D2GameBatch10Seams& s)

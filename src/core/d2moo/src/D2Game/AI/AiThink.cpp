@@ -1692,21 +1692,25 @@ void __fastcall AITHINK_Fn012_Goatman(D2GameStrc* pGame, D2UnitStrc* pUnit, D2Ai
 	D2MonStatsTxt* pMonStatsTxt = pAiTickParam->pMonstatsTxt;
 	const uint8_t nDifficulty = pGame->nDifficulty;
 
+	// retail inlines the walk and change-mode helpers: the callees are MoveToTarget, the mode-info record build and ModeChange
 	if (!pAiTickParam->bCombat)
 	{
 		if ((int32_t)AI_RollPercentage(pUnit) < pMonStatsTxt->wAiParam[GOATMAN_SWARM_AI_PARAM_APPROACH_CHANCE_PCT][nDifficulty])
 		{
-			AITACTICS_WalkToTargetUnitWithFlags(pGame, pUnit, pAiTickParam->pTarget, 7);
+			D2_CALL(AITACTICS_MoveToTarget, pGame, pUnit, pAiTickParam->pTarget, MONMODE_WALK, 0, 0, (uint8_t)1, (uint8_t)7);
 			return;
 		}
 	}
 	else if ((int32_t)AI_RollPercentage(pUnit) < pMonStatsTxt->wAiParam[GOATMAN_SWARM_AI_PARAM_ATTACK_CHANCE_PCT][nDifficulty])
 	{
-		AITACTICS_ChangeModeAndTargetUnit(pGame, pUnit, MONMODE_ATTACK1, pAiTickParam->pTarget);
+		D2ModeChangeStrc modeChange = {};
+		MONSTERMODE_GetModeChangeInfo(pUnit, MONMODE_ATTACK1, &modeChange);
+		modeChange.pTargetUnit = pAiTickParam->pTarget;
+		D2_CALL(D2GAME_ModeChange_6FC65220, pGame, &modeChange, 1);
 		return;
 	}
 
-	AITACTICS_IdleInNeutralMode(pGame, pUnit, pMonStatsTxt->wAiParam[GOATMAN_SWARM_AI_PARAM_STALL_DURATION][nDifficulty]);
+	D2_CALL(AITACTICS_IdleInNeutralMode, pGame, pUnit, pMonStatsTxt->wAiParam[GOATMAN_SWARM_AI_PARAM_STALL_DURATION][nDifficulty]);
 }
 
 // 1.13c D2Game+0x82430
@@ -1715,21 +1719,25 @@ void __fastcall AITHINK_Fn019_Swarm(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTi
 	D2MonStatsTxt* pMonStatsTxt = pAiTickParam->pMonstatsTxt;
 	const uint8_t nDifficulty = pGame->nDifficulty;
 
+	// retail inlines the walk and change-mode helpers: the callees are MoveToTarget, the mode-info record build and ModeChange
 	if (!pAiTickParam->bCombat)
 	{
 		if ((int32_t)AI_RollPercentage(pUnit) < pMonStatsTxt->wAiParam[GOATMAN_SWARM_AI_PARAM_APPROACH_CHANCE_PCT][nDifficulty])
 		{
-			AITACTICS_WalkToTargetUnitWithFlags(pGame, pUnit, pAiTickParam->pTarget, 7);
+			D2_CALL(AITACTICS_MoveToTarget, pGame, pUnit, pAiTickParam->pTarget, MONMODE_WALK, 0, 0, (uint8_t)1, (uint8_t)7);
 			return;
 		}
 	}
 	else if ((int32_t)AI_RollPercentage(pUnit) < pMonStatsTxt->wAiParam[GOATMAN_SWARM_AI_PARAM_ATTACK_CHANCE_PCT][nDifficulty])
 	{
-		AITACTICS_ChangeModeAndTargetUnit(pGame, pUnit, MONMODE_ATTACK1, pAiTickParam->pTarget);
+		D2ModeChangeStrc modeChange = {};
+		MONSTERMODE_GetModeChangeInfo(pUnit, MONMODE_ATTACK1, &modeChange);
+		modeChange.pTargetUnit = pAiTickParam->pTarget;
+		D2_CALL(D2GAME_ModeChange_6FC65220, pGame, &modeChange, 1);
 		return;
 	}
 
-	AITACTICS_IdleInNeutralMode(pGame, pUnit, pMonStatsTxt->wAiParam[GOATMAN_SWARM_AI_PARAM_STALL_DURATION][nDifficulty]);
+	D2_CALL(AITACTICS_IdleInNeutralMode, pGame, pUnit, pMonStatsTxt->wAiParam[GOATMAN_SWARM_AI_PARAM_STALL_DURATION][nDifficulty]);
 }
 
 enum D2C_ScarabAIParams
@@ -5504,13 +5512,13 @@ void __fastcall AITHINK_Fn064_SkeletonMage(D2GameStrc* pGame, D2UnitStrc* pUnit,
 // 1.10f body already does the same check, toggle, special-state call and one-frame idle)
 void __fastcall D2GAME_AI_SpecialState04_6FCDC170(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
-	if (STATES_CheckState(pUnit, STATE_INFERNO))
+	if (D2_CALL(STATES_CheckState, pUnit, STATE_INFERNO))
 	{
-		STATES_ToggleState(pUnit, STATE_INFERNO, 0);
+		D2_CALL(STATES_ToggleState, pUnit, STATE_INFERNO, 0);
 	}
 
-	AITHINK_ExecuteAiFn(pGame, pUnit, pAiTickParam->pAiControl, pAiTickParam->pAiControl->nAiSpecialState);
-	AITACTICS_IdleInNeutralMode(pGame, pUnit, 1);
+	D2_CALL(AITHINK_ExecuteAiFn, pGame, pUnit, pAiTickParam->pAiControl, pAiTickParam->pAiControl->nAiSpecialState);
+	D2_CALL(AITACTICS_IdleInNeutralMode, pGame, pUnit, 1);
 }
 
 enum D2C_FetishShamanAIParams
@@ -6701,20 +6709,20 @@ void __fastcall AITHINK_Fn080_092_TrapPoison_TrapNova(D2GameStrc* pGame, D2UnitS
 			pUnit->dwFlags |= UNITFLAG_NOTC;
 		}
 
-		AITACTICS_ChangeModeAndTargetCoordinates(pGame, pUnit, MONMODE_DEATH, 0, 0);
+		D2_CALL(AITACTICS_ChangeModeAndTargetCoordinates, pGame, pUnit, MONMODE_DEATH, 0, 0);
 		return;
 	}
 
 	if (pMonStatsTxt->nSkill[0] >= 0 && !pAiControl->dwAiParam[1])
 	{
-		AITACTICS_UseSkill(pGame, pUnit, pMonStatsTxt->nSkillMode[0], pMonStatsTxt->nSkill[0], pAiTickParam->pTarget, 0, 0);
+		D2_CALL(AITACTICS_UseSkill, pGame, pUnit, pMonStatsTxt->nSkillMode[0], pMonStatsTxt->nSkill[0], pAiTickParam->pTarget, 0, 0);
 		++pAiControl->dwAiParam[0];
 		pAiControl->dwAiParam[1] = 1;
 		return;
 	}
 
 	pAiControl->dwAiParam[1] = 0;
-	AITACTICS_IdleInNeutralMode(pGame, pUnit, pMonStatsTxt->wAiParam[TRAPNOVA_AI_PARAM_DELAY][pGame->nDifficulty]);
+	D2_CALL(AITACTICS_IdleInNeutralMode, pGame, pUnit, pMonStatsTxt->wAiParam[TRAPNOVA_AI_PARAM_DELAY][pGame->nDifficulty]);
 }
 
 enum D2C_TrapMeleeAIParams
@@ -7069,7 +7077,7 @@ void __fastcall AITHINK_Fn094_DesertTurret(D2GameStrc* pGame, D2UnitStrc* pUnit,
 
 	if (pAiTickParam->pMonstatsTxt->nSkill[0] >= 0 && !pAiTickParam->pAiControl->dwAiParam[0])
 	{
-		AITACTICS_UseSkill(pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[0], pAiTickParam->pMonstatsTxt->nSkill[0], 0, 0, 0);
+		D2_CALL(AITACTICS_UseSkill, pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[0], pAiTickParam->pMonstatsTxt->nSkill[0], 0, 0, 0);
 		pAiTickParam->pAiControl->dwAiParam[2] = 0;
 		pAiTickParam->pAiControl->dwAiParam[0] = pGame->dwGameFrame;
 		return;
@@ -7077,7 +7085,7 @@ void __fastcall AITHINK_Fn094_DesertTurret(D2GameStrc* pGame, D2UnitStrc* pUnit,
 
 	if ((int32_t)pGame->dwGameFrame < (int32_t)pAiTickParam->pAiControl->dwAiParam[0])
 	{
-		AITACTICS_IdleInNeutralMode(pGame, pUnit, 10);
+		D2_CALL(AITACTICS_IdleInNeutralMode, pGame, pUnit, 10);
 		return;
 	}
 
@@ -7088,27 +7096,52 @@ void __fastcall AITHINK_Fn094_DesertTurret(D2GameStrc* pGame, D2UnitStrc* pUnit,
 			--pAiTickParam->pAiControl->dwAiParam[1];
 		}
 
-		AITACTICS_IdleInNeutralMode(pGame, pUnit, 15);
+		D2_CALL(AITACTICS_IdleInNeutralMode, pGame, pUnit, 15);
 		return;
 	}
 
 	// retail: (int)param2 % 8 signed, then (uint)Ordinal_10266(dir) & 7
 	const int32_t nIndex1 = (int32_t)pAiTickParam->pAiControl->dwAiParam[2] % 8;
-	const int32_t nIndex2 = (uint32_t)D2Common_11053(UNITS_GetDirectionToCoords(pUnit, CLIENTS_GetUnitX(pAiTickParam->pTarget), CLIENTS_GetUnitY(pAiTickParam->pTarget))) & 7;
+	// retail reads both units' coordinates inline (static path for types 2, 4, 5, else the dynamic path through
+	// PATH_GetXPosition/PATH_GetYPosition): target x, target y, unit x, unit y, before the direction call
+	const auto readX = [](D2UnitStrc* pTmp) -> int32_t
+	{
+		if (pTmp->dwUnitType == UNIT_OBJECT || pTmp->dwUnitType == UNIT_ITEM || pTmp->dwUnitType == UNIT_TILE)
+		{
+			return pTmp->pStaticPath->tGameCoords.nX;
+		}
+		return pTmp->pDynamicPath ? D2_CALL(PATH_GetXPosition, pTmp->pDynamicPath) : 0;
+	};
+	const auto readY = [](D2UnitStrc* pTmp) -> int32_t
+	{
+		if (pTmp->dwUnitType == UNIT_OBJECT || pTmp->dwUnitType == UNIT_ITEM || pTmp->dwUnitType == UNIT_TILE)
+		{
+			return pTmp->pStaticPath->tGameCoords.nY;
+		}
+		return pTmp->pDynamicPath ? D2_CALL(PATH_GetYPosition, pTmp->pDynamicPath) : 0;
+	};
+	const int32_t nTargetX = readX(pAiTickParam->pTarget);
+	const int32_t nTargetY = readY(pAiTickParam->pTarget);
+	const int32_t nUnitX = readX(pUnit);
+	const int32_t nUnitY = readY(pUnit);
+	const int32_t nIndex2 = (uint32_t)D2_CALL(D2Common_11053, D2_CALL(UNITS_GetDirectionToCoords, pUnit, nTargetX, nTargetY)) & 7;
 
 	pAiTickParam->pAiControl->dwAiParam[2] = nIndices[nIndex1 + 8 * nIndex2];
 
-	const int32_t nX = CLIENTS_GetUnitX(pUnit) + AI_GetParamValue(pGame, pAiTickParam, DESERTTURRET_AI_PARAM_SPREAD) * pOffsets[pAiTickParam->pAiControl->dwAiParam[2]].nX;
-	const int32_t nY = CLIENTS_GetUnitY(pUnit) + AI_GetParamValue(pGame, pAiTickParam, DESERTTURRET_AI_PARAM_SPREAD) * pOffsets[pAiTickParam->pAiControl->dwAiParam[2]].nY;
+	const int32_t nX = nUnitX + AI_GetParamValue(pGame, pAiTickParam, DESERTTURRET_AI_PARAM_SPREAD) * pOffsets[pAiTickParam->pAiControl->dwAiParam[2]].nX;
+	const int32_t nY = nUnitY + AI_GetParamValue(pGame, pAiTickParam, DESERTTURRET_AI_PARAM_SPREAD) * pOffsets[pAiTickParam->pAiControl->dwAiParam[2]].nY;
 
-	UNITS_SetTargetUnitForDynamicUnit(pUnit, pAiTickParam->pTarget);
+	D2_CALL(UNITS_SetTargetUnitForDynamicUnit, pUnit, pAiTickParam->pTarget);
 
-	if (pAiTickParam->pMonstatsTxt->nSkill[0] >= 0 && sub_6FC68630(pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkill[0], pAiTickParam->pTarget, nX, nY))
+	if (pAiTickParam->pMonstatsTxt->nSkill[0] >= 0 && D2_CALL(sub_6FC68630, pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkill[0], pAiTickParam->pTarget, nX, nY))
 	{
-		if (sub_6FC68630(pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkill[0], pAiTickParam->pTarget, CLIENTS_GetUnitX(pAiTickParam->pTarget), CLIENTS_GetUnitY(pAiTickParam->pTarget)))
+		// retail calls the target's Y getter, then X, before the second check
+		const int32_t nCheckY = D2_CALL(CLIENTS_GetUnitY, pAiTickParam->pTarget);
+		const int32_t nCheckX = D2_CALL(CLIENTS_GetUnitX, pAiTickParam->pTarget);
+		if (D2_CALL(sub_6FC68630, pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkill[0], pAiTickParam->pTarget, nCheckX, nCheckY))
 		{
-			AITACTICS_UseSkill(pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[0], pAiTickParam->pMonstatsTxt->nSkill[0], 0, nX, nY);
-			D2COMMON_10170_PathSetTargetPos(pUnit->pDynamicPath, nX, nY);
+			D2_CALL(AITACTICS_UseSkill, pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[0], pAiTickParam->pMonstatsTxt->nSkill[0], 0, nX, nY);
+			D2_CALL(D2COMMON_10170_PathSetTargetPos, pUnit->pDynamicPath, nX, nY);
 
 			++pAiTickParam->pAiControl->dwAiParam[1];
 
@@ -7130,7 +7163,7 @@ void __fastcall AITHINK_Fn094_DesertTurret(D2GameStrc* pGame, D2UnitStrc* pUnit,
 		--pAiTickParam->pAiControl->dwAiParam[1];
 	}
 
-	AITACTICS_IdleInNeutralMode(pGame, pUnit, 10);
+	D2_CALL(AITACTICS_IdleInNeutralMode, pGame, pUnit, 10);
 }
 
 enum D2C_MegademonAIParams
@@ -11452,14 +11485,20 @@ void __fastcall D2GAME_AI_SpecialState06_6FCE7930(D2GameStrc* pGame, D2UnitStrc*
 void __fastcall AITHINK_Fn062_TownRogue(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	int32_t nDistance = pAiTickParam->nTargetDistance;
-	D2UnitStrc* pTarget = sub_6FCF2CC0(pGame, pUnit, &nDistance, nullptr);
+	// retail passes a pointer to a stack scratch word as the melee flag out-pointer (EBX = the event buffer)
+	int32_t nInMelee = 0;
+	D2UnitStrc* pTarget = D2_CALL(sub_6FCF2CC0, pGame, pUnit, &nDistance, &nInMelee);
 	if (pTarget && nDistance < 25)
 	{
-		AITACTICS_ChangeModeAndTargetUnit(pGame, pUnit, MONMODE_ATTACK1, pTarget);
+		// ChangeModeAndTargetUnit inlined in retail
+		D2ModeChangeStrc modeChange = {};
+		D2_CALL(MONSTERMODE_GetModeChangeInfo, pUnit, MONMODE_ATTACK1, &modeChange);
+		modeChange.pTargetUnit = pTarget;
+		D2_CALL(D2GAME_ModeChange_6FC65220, pGame, &modeChange, 1);
 		return;
 	}
 
-	AITACTICS_IdleInNeutralMode(pGame, pUnit, 50);
+	D2_CALL(AITACTICS_IdleInNeutralMode, pGame, pUnit, 50);
 }
 
 //D2Game.0x6FCE7AC0

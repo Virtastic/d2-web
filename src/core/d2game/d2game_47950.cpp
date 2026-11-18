@@ -11,7 +11,7 @@ struct D2Game47950Env {
     void     (*sub47820)(void* esi, uint32_t edi, uint32_t value, uint8_t* rec);
 };
 
-// 1.13c D2Game+0x47950
+// D2Game+0x47950 (marker lives on sub_6FC679F0)
 extern "C" void D2Game_47950(void* esi, uint32_t stackWord, const D2Game47950Env* e) {
     uint8_t* st = (uint8_t*)esi;
     uint32_t lo, hi;
@@ -24,5 +24,5 @@ extern "C" void D2Game_47950(void* esi, uint32_t stackWord, const D2Game47950Env
     if ((uint32_t)v & 0x7fff || gate) return;
     const uint32_t id = e->ord10826(esi);
     uint8_t* rec = e->ord10014(id);
-    if (rec[0x2e] != 0 && rec + 0x1c != nullptr) e->sub47820(esi, stackWord, id, rec);   // 1.13c D2Game+0x47950
+    if (rec[0x2e] != 0 && rec + 0x1c != nullptr) e->sub47820(esi, stackWord, id, rec);   // D2Game+0x47950 (marker lives on sub_6FC679F0)
 }

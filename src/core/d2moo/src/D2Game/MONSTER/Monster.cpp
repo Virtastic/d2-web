@@ -335,7 +335,7 @@ int32_t __fastcall MONSTER_SetVelocityAndPosition(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FC60BC0
-// the 128-bucket monster walk of 1.13c is D2Game+0xB0640; D2Game+0x33290 is the object walk, OBJECTS_RemoveAll
+// 1.13c D2Game+0xB0640 (EBX = game): the 128-bucket monster walk; D2Game+0x33290 is the object walk, OBJECTS_RemoveAll
 void __fastcall MONSTER_RemoveAll(D2GameStrc* pGame)
 {
     for (int32_t i = 0; i < 128; ++i)

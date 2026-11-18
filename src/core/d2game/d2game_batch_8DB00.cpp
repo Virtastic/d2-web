@@ -350,7 +350,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_78dd0(uint32_t eaxUnit, uint32_t ebxUnit,
 }
 #endif  // superseded by d2game_78dd0.cpp
 
-// 1.13c D2Game+0xAF5F0
+// D2Game+0xAF5F0 (marker lives on MONSTER_GetExperienceBonus)
 // EAX = index. Indices below 9 read the nine-entry table at DAT_6FD1B614; everything above is
 // (index - 2) * 0x32.
 extern "C"

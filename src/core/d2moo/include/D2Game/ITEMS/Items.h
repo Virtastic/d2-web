@@ -129,6 +129,8 @@ void __fastcall ITEMS_HandleGoldTransaction(D2GameStrc* pGame, D2UnitStrc* pUnit
 void __fastcall ITEMS_DropPlayerEar(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FC50F70
 int32_t __fastcall ITEMS_GetHealthPotionDropCode(D2UnitStrc* pUnit);
+//D2Game.0x6FC2E310 (1.13c D2Game+0xE310): the table is the caller's; the fourth entry answers past its count
+int32_t __fastcall ITEMS_GetDropCodeByActAndDifficulty(D2UnitStrc* pUnit, const int32_t* pCodes, int32_t nCount);
 //D2Game.0x6FC50FF0
 int32_t __fastcall ITEMS_GetManaPotionDropCode(D2UnitStrc* pUnit);
 //D2Game.0x6FC51070

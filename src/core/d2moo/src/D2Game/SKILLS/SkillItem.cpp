@@ -612,30 +612,26 @@ int32_t __fastcall SKILLITEM_pSpell05_RejuvPotion(D2GameStrc* pGame, D2UnitStrc*
 // 1.13c D2Game+0xAE4D0
 int32_t __fastcall SKILLITEM_pSpell09_StaminaPotion(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem, D2UnitStrc* pTarget, int32_t nX, int32_t nY, int32_t nSkillId)
 {
-    if (!pItem)
-    {
-        return 0;
-    }
-
-    D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
+    // 1.13c: no null-item early return; the lookup runs with -1 (as 0xAF370 does) and a miss returns 0.
+    D2ItemsTxt* pItemsTxtRecord = D2_CALL(DATATBLS_GetItemsTxtRecord, pItem ? pItem->dwClassId : -1);
     if (!pItemsTxtRecord || pItemsTxtRecord->wState <= 0 || pItemsTxtRecord->wState >= sgptDataTables->nStatesTxtRecordCount)
     {
         return 0;
     }
-    
-    const int32_t nLength = ITEMMODS_EvaluateItemFormula(pUnit, pItem, pItemsTxtRecord->dwLen);
+
+    const int32_t nLength = D2_CALL(ITEMMODS_EvaluateItemFormula, pUnit, pItem, pItemsTxtRecord->dwLen);
     if (nLength <= 0)
     {
         return 0;
     }
 
-    sub_6FD11C90(pUnit, pItemsTxtRecord->wState, 0);
-    D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, pItemsTxtRecord->wState);
-    
+    D2_CALL(sub_6FD11C90, pUnit, pItemsTxtRecord->wState, 0);
+    D2StatListStrc* pStatList = D2_CALL(STATLIST_GetStatListFromUnitAndState, pUnit, pItemsTxtRecord->wState);
+
     int32_t nEndFrame = nLength;
     if (pStatList)
     {
-        nEndFrame += D2COMMON_10473(pStatList);
+        nEndFrame += D2_CALL(D2COMMON_10473, pStatList);
     }
     else
     {
@@ -652,40 +648,40 @@ int32_t __fastcall SKILLITEM_pSpell09_StaminaPotion(D2GameStrc* pGame, D2UnitStr
             nUnitType = pUnit->dwUnitType;
         }
 
-        pStatList = STATLIST_AllocStatList(pGame->pMemoryPool, 2u, 0, nUnitType, nUnitGUID);
+        pStatList = D2_CALL(STATLIST_AllocStatList, pGame->pMemoryPool, 2u, 0, nUnitType, nUnitGUID);
         if (!pStatList)
         {
             return 0;
         }
 
-        STATLIST_SetState(pStatList, pItemsTxtRecord->wState);
-        STATES_ToggleState(pUnit, pItemsTxtRecord->wState, 1);
-        STATLIST_SetStatRemoveCallback(pStatList, sub_6FD10E50);
-        D2COMMON_10475_PostStatToStatList(pUnit, pStatList, 1);
+        D2_CALL(STATLIST_SetState, pStatList, pItemsTxtRecord->wState);
+        D2_CALL(STATES_ToggleState, pUnit, pItemsTxtRecord->wState, 1);
+        D2_CALL(STATLIST_SetStatRemoveCallback, pStatList, sub_6FD10E50);
+        D2_CALL(D2COMMON_10475_PostStatToStatList, pUnit, pStatList, 1);
     }
 
     if (nEndFrame)
     {
-        D2COMMON_10476(pStatList, nEndFrame);
-        EVENT_SetEvent(pGame, pUnit, EVENTTYPE_REMOVESTATE, nEndFrame, 0, 0);
+        D2_CALL(D2COMMON_10476, pStatList, nEndFrame);
+        D2_CALL(EVENT_SetEvent, pGame, pUnit, EVENTTYPE_REMOVESTATE, nEndFrame, 0, 0);
     }
 
     for (int32_t i = 0; i < 3; ++i)
     {
-        if (SKILLS_GetItemStatCostTxtRecord(pItemsTxtRecord->wStat[i]))
+        if (D2_CALL(SKILLS_GetItemStatCostTxtRecord, pItemsTxtRecord->wStat[i]))
         {
-            const int32_t nValue = ITEMMODS_EvaluateItemFormula(pUnit, pItem, pItemsTxtRecord->dwCalc[i]);
+            const int32_t nValue = D2_CALL(ITEMMODS_EvaluateItemFormula, pUnit, pItem, pItemsTxtRecord->dwCalc[i]);
             if (nValue)
             {
-                STATLIST_SetStatIfListIsValid(pStatList, pItemsTxtRecord->wStat[i], nValue, 0);
+                D2_CALL(STATLIST_SetStatIfListIsValid, pStatList, pItemsTxtRecord->wStat[i], nValue, 0);
                 if (pItemsTxtRecord->wStat[i] == STAT_STAMINARECOVERYBONUS)
                 {
                     if (nValue > 0)
                     {
-                        const int32_t nMaxStamina = STATLIST_UnitGetStatValue(pUnit, STAT_MAXSTAMINA, 0);
-                        if (STATLIST_UnitGetStatValue(pUnit, STAT_STAMINA, 0) < nMaxStamina)
+                        const int32_t nMaxStamina = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_MAXSTAMINA, 0);
+                        if (D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_STAMINA, 0) < nMaxStamina)
                         {
-                            STATLIST_SetUnitStat(pUnit, STAT_STAMINA, nMaxStamina + 256, 0);
+                            D2_CALL(STATLIST_SetUnitStat, pUnit, STAT_STAMINA, nMaxStamina + 256, 0);
                         }
                     }
                 }
@@ -700,7 +696,7 @@ int32_t __fastcall SKILLITEM_pSpell09_StaminaPotion(D2GameStrc* pGame, D2UnitStr
 // 1.13c D2Game+0xAF370
 int32_t __fastcall SKILLITEM_pSpell09_AntidoteThawingPotion(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem, D2UnitStrc* pTarget, int32_t nX, int32_t nY, int32_t nSkillId)
 {
-    D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem ? pItem->dwClassId : -1);
+    D2ItemsTxt* pItemsTxtRecord = D2_CALL(DATATBLS_GetItemsTxtRecord, pItem ? pItem->dwClassId : -1);
     if (pItemsTxtRecord)
     {
         int32_t nResult = 0;
@@ -709,23 +705,23 @@ int32_t __fastcall SKILLITEM_pSpell09_AntidoteThawingPotion(D2GameStrc* pGame, D
             const int32_t nCurseState = pItemsTxtRecord->wCurseState[i];
             if (nCurseState > 0 && nCurseState < sgptDataTables->nStatesTxtRecordCount)
             {
-                D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, nCurseState);
+                D2StatListStrc* pStatList = D2_CALL(STATLIST_GetStatListFromUnitAndState, pUnit, nCurseState);
                 if (pStatList)
                 {
-                    D2Common_10474(pUnit, pStatList);
-                    STATLIST_FreeStatList(pStatList);
+                    D2_CALL(D2Common_10474, pUnit, pStatList);
+                    D2_CALL(STATLIST_FreeStatList, pStatList);
                 }
 
-                if (STATES_CheckState(pUnit, nCurseState))
+                if (D2_CALL(STATES_CheckState, pUnit, nCurseState))
                 {
-                    STATES_ToggleState(pUnit, nCurseState, 0);
+                    D2_CALL(STATES_ToggleState, pUnit, nCurseState, 0);
                 }
 
                 nResult = 1;
             }
         }
 
-        if (SKILLITEM_pSpell09_StaminaPotion(pGame, pUnit, pItem, pTarget, nX, nY, nSkillId))
+        if (D2_CALL(SKILLITEM_pSpell09_StaminaPotion,pGame, pUnit, pItem, pTarget, nX, nY, nSkillId))
         {
             nResult = 1;
         }

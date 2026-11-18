@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x471E0 -- pick a random spot in a room where a monster group fits (stdcall: game, room, coord list, monster id, group, &x, &y; ret 0x1C).
+// D2Game+0x471E0 (marker lives on sub_6FC67570) -- pick a random spot in a room where a monster group fits (stdcall: game, room, coord list, monster id, group, &x, &y; ret 0x1C).
 // Written from the 1.13c disassembly as a rule over the seam environment (d2game_gp.h).
 // 0x46C30(EAX = list, EDI/ESI/EBX = &baseX/&baseY/&rangeY; room, &rangeX) fills the four consecutive locals rangeX, baseX, rangeY, baseY.
 // want = list +0x28 (with a list). The room's seed (room +0x6C: lo, hi) steps as lo * 0x6AC690C5 + hi (64-bit, stored back); a roll over

@@ -273,3 +273,69 @@ uint64_t __stdcall D2GAME_CRT_Aulldvrm_6FC282B0(uint32_t nDividendLo, uint32_t n
 	}
 	return nQuotient;
 }
+
+// 1.13c D2Game+0x56BD (__write_nolock(fh, buf, count)): the ioinfo record is _pioinfo[fh >> 5] + (fh & 0x1F) * 0x24 (+0 OS handle,
+// +4 flags). Flag 0x20 (FAPPEND) seeks to the end first. Without 0x80 (FTEXT) one WriteFile; with it the buffer is copied 0x400 bytes
+// at a time inserting '\r' before every '\n', repeating while the produced length fits the written count and input remains. A
+// non-zero total returns total - newlines. Otherwise a pending error maps to errno/doserrno (5 -> 9 / 5, else __dosmaperr) and the
+// result is -1; with none, flag 0x40 with a leading 0x1A byte returns 0, else errno 0x1C / doserrno 0 and -1.
+int32_t D2GAME_CRT_WriteNolock_56BD(uint32_t fd, const char* buf, uint32_t count, const D2GameCrtWriteNolockEnv* env)
+{
+	if (count == 0) return 0;
+
+	uint8_t* io = (uint8_t*)(uintptr_t)(env->pioinfo[(int32_t)fd >> 5] + (fd & 0x1F) * 0x24);
+	if ((io[4] & 0x20) != 0) env->lseeki64lk(fd, 0, 0, 2);
+	uint32_t handle;
+	std::memcpy(&handle, io, 4);
+	uint32_t total = 0, newlines = 0, written = 0, error = 0;
+
+	if ((io[4] & 0x80) == 0)
+	{
+		if (!env->writeFile(handle, buf, count, &written, 0)) error = env->getLastError();
+		else total = written;
+	}
+	else
+	{
+		const char* src = buf;
+		uint8_t textBuf[0x402];
+		uint8_t* dst;
+		do
+		{
+			uint32_t produced = 0;
+			uint32_t offset = (uint32_t)(src - buf);
+			dst = textBuf;
+			do
+			{
+				if (count <= offset) break;
+				const char c = *src++;
+				++offset;
+				if (c == '\n') { ++newlines; *dst++ = '\r'; ++produced; }
+				*dst++ = (uint8_t)c;
+				++produced;
+			} while (produced < 0x400);
+			if (!env->writeFile(handle, textBuf, (uint32_t)(dst - textBuf), &written, 0))
+			{
+				error = env->getLastError();
+				break;
+			}
+			total += written;
+		} while (((uint32_t)(dst - textBuf) <= written) && ((uint32_t)(src - buf) < count));
+	}
+
+	if (total != 0) return (int32_t)(total - newlines);
+	if (error != 0)
+	{
+		if (error == 5)
+		{
+			*env->errnoPtr() = 9;
+			*env->doserrnoPtr() = 5;
+			return -1;
+		}
+		env->dosmaperr(error);
+		return -1;
+	}
+	if ((io[4] & 0x40) != 0 && *buf == '\x1A') return 0;
+	*env->errnoPtr() = 0x1C;
+	*env->doserrnoPtr() = 0;
+	return -1;
+}

@@ -1101,7 +1101,6 @@ void __fastcall sub_6FCC7FA0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 }
 
 //D2Game.0x6FCC84D0
-// 1.13c D2Game+0xC0B90
 void __fastcall sub_6FCC84D0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pPet)
 {
     if (!pPet || !pPlayer)

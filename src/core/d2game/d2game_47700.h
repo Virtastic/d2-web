@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x47700 (create a randomly repeated unit near a spot), transcribed from the 1.13c disassembly. Convention: EAX = first
+// D2Game+0x47700 (marker lives on sub_6FC677D0) (create a randomly repeated unit near a spot), transcribed from the 1.13c disassembly. Convention: EAX = first
 // value, EBX = a value kept in the calls, stack = (game, word, low byte, high byte), ret 0x10. Both bytes must be non-zero with
 // high >= low, else 0. 0x47450 (stack game, EAX-in, word, EBX, &out1, &out0 = the caller's own first argument slot, 1; ret 0x1C; zero
 // returns 0) fills the two outputs; 0xEF510 (EAX = EBX, ECX = 1, EDX = EAX-in, stack game, word, out1, out0, -1, 0; zero returns 0)

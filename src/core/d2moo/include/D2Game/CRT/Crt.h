@@ -51,7 +51,21 @@ struct D2GameGetStringTypeAEnv
     void (*free)(void* p);
 };
 
+struct D2GameCrtWriteNolockEnv
+{
+    uint32_t* pioinfo;                                                                          // 0x6FD3A220 _pioinfo: block pointers (32-bit retail addresses)
+    int32_t  (*lseeki64lk)(uint32_t fd, int32_t lo, int32_t hi, uint32_t origin);               // 0x871C
+    int32_t  (*writeFile)(uint32_t handle, const void* buf, uint32_t n, uint32_t* written, uint32_t overlapped); // WriteFile
+    uint32_t (*getLastError)(void);                                                             // GetLastError
+    void     (*dosmaperr)(uint32_t error);                                                      // 0x4E77 __dosmaperr
+    int32_t* (*errnoPtr)(void);                                                                 // 0x4E65
+    uint32_t* (*doserrnoPtr)(void);                                                             // 0x4E6E
+};
+
 extern "C" void d2_fn_d2game_3c04(uint8_t* ptd, const D2GameFreeflsEnv* env);
+
+//D2Game.0x56BD
+int32_t D2GAME_CRT_WriteNolock_56BD(uint32_t fd, const char* buf, uint32_t count, const D2GameCrtWriteNolockEnv* env);
 
 //D2Game.0x3B51
 void D2GAME_CRT_Unlock12_3B51();

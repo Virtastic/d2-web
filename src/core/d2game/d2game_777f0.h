@@ -7,7 +7,7 @@
 namespace d2g777f0 {
 template <class E> void Run(E& e, uint32_t target, uint32_t source, uint32_t arg)
 {
-    // 1.13c D2Game+0x777F0
+    // D2Game+0x777F0 (marker lives on sub_6FC62780)
     if (!source || !target) return;
     if ((e.rd32(target + 0xC4) >> 26) & 1) return;
     e.h(0xDEA00, arg, source, 0, 0, 0, arg, source, target);

@@ -198,7 +198,7 @@ template <class E> void PLRTRADE_AddItemTradePair(E& e, u32 esi, u32 eax)
     }
 }
 
-// 1.13c D2Game+0x75350
+// D2Game+0x75350 (marker lives on sub_6FC63E80)
 // Clear a unit's state and sound: stop the sound handle at +0xA4 (sets flag 0x100 on the unit's +0xC4), resolve
 // the state record through the unit's +0x14 (type 1), run the sub_41040 / sub_410D0 pair on the state's flag
 // bits, clear the table record's bits, and finish with the sub_13B0 / ord10706 hand-off. EAX = unit, ECX = game, stackArg = [esp+4].
@@ -239,7 +239,7 @@ have_state:
     e.sub_AF8D0();
 }
 
-// 1.13c D2Game+0x755C0
+// D2Game+0x755C0 (marker lives on sub_6FC63FD0)
 // Broadcast nearby state packets: each unit on the game's room list (+0x74, type 0, not type 0x11, within
 // ord10522 distance 3 and not yet sent) gets a 0x1C-word record built, then sub_C0B0 / sub_E0C0 / sub_CF20 send
 // it. p1 = game; EBX (game) is the register input.
@@ -260,7 +260,7 @@ template <class E> void GAME_BroadcastNearbyStatePackets(E& e, u32 p1, u32 ebx)
     }
 }
 
-// 1.13c D2Game+0x760F0
+// D2Game+0x760F0 (marker lives on sub_6FC64090)
 // Clear a skill's unit effects: EAX = unit with the flag at +0xC8 bit 10 set; its skill record comes from sub_E03A0
 // (keyed by +0x98) and must sit inside the table; the record's objects are removed, the class-2 effects of its
 // list (+0xDC) are sent through sub_8E6F0; if the hit test fails, sub_DEEE0 runs instead.

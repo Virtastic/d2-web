@@ -4022,7 +4022,7 @@ void __fastcall sub_6FD14F70(D2GameStrc* pGame, D2UnitStrc* pUnused, D2UnitStrc*
 // 1.13c D2Game+0xA35D0 (asserts the unit, then reads its game directly)
 void __fastcall sub_6FD15080(D2UnitStrc* pUnit, int32_t a2)
 {
-    sub_6FCBCFD0(SUNIT_GetGameFromUnit(pUnit), pUnit, a2);
+    D2_CALL(sub_6FCBCFD0, SUNIT_GetGameFromUnit(pUnit), pUnit, a2);
 }
 
 //D2Game.0x6FD150A0

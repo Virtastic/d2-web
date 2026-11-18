@@ -1996,7 +1996,7 @@ void __fastcall MONSTERUNIQUE_SuicideModeChange(D2GameStrc* pGame, D2UnitStrc* p
 {
     if (!pBoss || pBoss->dwAnimMode == MONMODE_DEATH || pBoss->dwAnimMode == MONMODE_DEAD)
     {
-        EVENT_SetEvent(pGame, pBoss, EVENTTYPE_MONUMOD, pGame->dwGameFrame + 4, 0, 0);
+        D2_CALL(EVENT_SetEvent, pGame, pBoss, EVENTTYPE_MONUMOD, pGame->dwGameFrame + 4, 0, 0);
         return;
     }
 
@@ -2004,8 +2004,8 @@ void __fastcall MONSTERUNIQUE_SuicideModeChange(D2GameStrc* pGame, D2UnitStrc* p
     {
         D2ModeChangeStrc modeChange = {};
         MONSTERMODE_GetModeChangeInfo(pBoss, MONMODE_DEATH, &modeChange);
-        D2GAME_ModeChange_6FC65220(pGame, &modeChange, 1);
-        EVENT_SetEvent(pGame, pBoss, EVENTTYPE_MONUMOD, pGame->dwGameFrame + 4, 0, 0);
+        D2_CALL(D2GAME_ModeChange_6FC65220, pGame, &modeChange, 1);
+        D2_CALL(EVENT_SetEvent, pGame, pBoss, EVENTTYPE_MONUMOD, pGame->dwGameFrame + 4, 0, 0);
     }
 }
 

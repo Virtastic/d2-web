@@ -13,7 +13,7 @@ struct D2Game248A0Env {
 
 static inline uint32_t rd32(uint32_t a, uint32_t o) { uint32_t v; std::memcpy(&v, (const void*)(uintptr_t)(a + o), 4); return v; }
 
-// 1.13c D2Game+0x248A0 -- regs eax=flag ecx=param1 edx=param2 edi=unit.
+// D2Game+0x248A0 (marker lives on D2GAME_SpawnMinions_6FC6F440) -- regs eax=flag ecx=param1 edx=param2 edi=unit.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_248A0_impl(uint32_t eax, uint32_t param1, uint32_t param2, uint32_t unit,
                                                   const D2Game248A0Env* env)

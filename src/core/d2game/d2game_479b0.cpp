@@ -12,7 +12,7 @@ struct D2Game479B0Env {
     void     (*sub47880)(uint32_t edi, uint32_t ebx, uint32_t s1);
 };
 
-// 1.13c D2Game+0x479B0
+// D2Game+0x479B0 (marker lives on sub_479B0)
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2game_479b0_probe(uint32_t a, uint32_t b, uint32_t p1, uint32_t p2, const D2Game479B0Env* env)
 {
     const uint32_t u = env->sub24950(1, p2, b, p1, a, 0, 0, 0xffffffffu);

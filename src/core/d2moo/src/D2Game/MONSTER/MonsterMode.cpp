@@ -1799,24 +1799,14 @@ void __fastcall D2GAME_MONSTERS_AiFunction02_6FC65150(D2GameStrc* pGame, D2UnitS
         nAnimMode = pUnit->dwAnimMode;
     }
 
-    const D2MonModeCallbackTableStrc* pMonModeCallbackTableRecord = MONSTERMODE_GetCallbackTableRecord(pUnit, nAnimMode);
+    const D2MonModeCallbackTableStrc* pMonModeCallbackTableRecord = D2_CALL(MONSTERMODE_GetCallbackTableRecord, pUnit, nAnimMode);
     if (pMonModeCallbackTableRecord && pMonModeCallbackTableRecord->unk0x08)
     {
         pMonModeCallbackTableRecord->unk0x08(pGame, pUnit);
         return;
     }
 
-    UNITS_SetUsedSkill(pUnit, nullptr);
-
-    if (nAnimMode == MONMODE_DEATH || nAnimMode == MONMODE_DEAD || !SUNIT_IsDead(pUnit))
-    {
-        D2ModeChangeStrc modeChange = {};
-
-        modeChange.pUnit = pUnit;
-        modeChange.nMode = MONMODE_NEUTRAL;
-
-        sub_6FC64310(pGame, &modeChange);
-    }
+    D2_CALL(MONSTERMODE_ResetToNeutral, pGame, pUnit, nAnimMode);
 }
 
 //D2Game.0x6FC65220
@@ -2129,7 +2119,7 @@ void __stdcall MONSTERMODE_GetModeChangeInfo(D2UnitStrc* pUnit, int32_t nMode, D
 {
     D2_ASSERT(nMode < 16);
 
-    UNITS_SetUsedSkill(pUnit, nullptr);
+    D2_CALL(UNITS_SetUsedSkill, pUnit, nullptr);
 
     memset(pModeChange, 0x00, sizeof(D2ModeChangeStrc));
 
@@ -2149,7 +2139,7 @@ void __stdcall MONSTERMODE_GetModeChangeInfo(D2UnitStrc* pUnit, int32_t nMode, D
     }
     else if (!pMonModeInfoTableRecord->unk0x04 && pMonModeInfoTableRecord->unk0x08)
     {
-        D2MonStats2Txt* pMonStats2TxtRecord = MONSTERREGION_GetMonStats2TxtRecord(pUnit->dwClassId);
+        D2MonStats2Txt* pMonStats2TxtRecord = D2_CALL(MONSTERREGION_GetMonStats2TxtRecord, pUnit->dwClassId);
         if (pMonStats2TxtRecord && pMonStats2TxtRecord->nModeEnabledWhenMovingFlags[nMode >> 3] & gdwBitMasks[nMode & 7])
         {
             pModeChange->unk0x14[1] = 101;

@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x760F0: end an effect command of a unit. EAX = unit, stack = game (ret 4). The unit needs flag 0x400 at +0xC8; its command comes
+// D2Game+0x760F0 (marker lives on sub_6FC64090): end an effect command of a unit. EAX = unit, stack = game (ret 4). The unit needs flag 0x400 at +0xC8; its command comes
 // from 0xE03A0 (+0x94 type, +0x98 id) and must index the data-table rows (count +0xA80, rows +0xA78, stride 0x1A8). Two values come from the
 // command's object (+0x2C) by its type; with the unit stat 0x3C01 and a roll they pick whether 0xF2380 starts the row's skill (+0x170, mode +0x180):
 // then the command's type-2 events are cleared through 0x8E6F0, otherwise 0xDEEE0 drops the command.
@@ -12,7 +12,7 @@ inline uint32_t rd32(uint32_t a, uint32_t o) { uint32_t v; std::memcpy(&v, (cons
 inline bool direct(int32_t t) { return t == 2 || (t > 3 && t <= 5); }
 }
 
-// 1.13c D2Game+0x760F0
+// D2Game+0x760F0 (marker lives on sub_6FC64090)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2game_760f0_port(const G760f0Env* e, uint32_t unit, uint32_t game) {
     if (unit == 0 || ((rd32(unit, 0xc8) >> 10) & 1) == 0) return;
     const uint32_t cmd = e->fE03A0(rd32(unit, 0x94), rd32(unit, 0x98), game);

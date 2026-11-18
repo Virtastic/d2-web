@@ -2038,12 +2038,12 @@ void __fastcall ACT1Q4_UpdatePortalInTown(D2QuestDataStrc* pQuestData, D2UnitStr
 
 	if (nAnimMode == OBJMODE_OPERATING)
 	{
-		UNITS_ChangeAnimMode(pUnit, OBJMODE_OPENED);
+		D2_CALL(UNITS_ChangeAnimMode, pUnit, OBJMODE_OPENED);
 	}
 	else if (nAnimMode == OBJMODE_OPENED)
 	{
 		D2Act1Quest4Strc* pQuestDataEx = (D2Act1Quest4Strc*)pQuestData->pQuestDataEx;
-		if (DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(pUnit)) == LEVEL_ROGUEENCAMPMENT)
+		if (D2_CALL(DUNGEON_GetLevelIdFromRoom, D2_CALL(UNITS_GetRoom, pUnit)) == LEVEL_ROGUEENCAMPMENT)
 		{
 			++pQuestDataEx->nObjectUpdateInvocations;
 			if (pQuestDataEx->nObjectUpdateInvocations > 5)
@@ -2053,23 +2053,23 @@ void __fastcall ACT1Q4_UpdatePortalInTown(D2QuestDataStrc* pQuestData, D2UnitStr
 
 			if (pQuestDataEx->bChangePortalInTownToSpecialMode)
 			{
-				UNITS_ChangeAnimMode(pUnit, OBJMODE_SPECIAL1);
+				D2_CALL(UNITS_ChangeAnimMode, pUnit, OBJMODE_SPECIAL1);
 			}
 		}
 		else
 		{
 			if (pQuestDataEx->bChangePortalOutsideTownToSpecialMode)
 			{
-				UNITS_ChangeAnimMode(pUnit, OBJMODE_SPECIAL1);
+				D2_CALL(UNITS_ChangeAnimMode, pUnit, OBJMODE_SPECIAL1);
 			}
 		}
 	}
 	else  if (nAnimMode == OBJMODE_SPECIAL1)
 	{
-		UNITS_ChangeAnimMode(pUnit, OBJMODE_SPECIAL2);
+		D2_CALL(UNITS_ChangeAnimMode, pUnit, OBJMODE_SPECIAL2);
 	}
 
-	EVENT_SetEvent(pQuestData->pGame, pUnit, EVENTTYPE_QUESTFN, pQuestData->pGame->dwGameFrame + 25, 0, 0);
+	D2_CALL(EVENT_SetEvent, pQuestData->pGame, pUnit, EVENTTYPE_QUESTFN, pQuestData->pGame->dwGameFrame + 25, 0, 0);
 }
 
 //D2Game.0x6FC9C7A0

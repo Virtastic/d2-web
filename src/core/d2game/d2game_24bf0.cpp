@@ -15,7 +15,7 @@ static inline uint32_t rd32(uint32_t a, uint32_t o) { uint32_t v; std::memcpy(&v
 static inline uint8_t  rd8(uint32_t a, uint32_t o) { return *(const uint8_t*)(uintptr_t)(a + o); }
 static inline void     wr8(uint32_t a, uint32_t o, uint8_t v) { *(uint8_t*)(uintptr_t)(a + o) = v; }
 
-// 1.13c D2Game+0x24BF0
+// D2Game+0x24BF0 (marker lives on D2GAME_MONSTERS_Unk_6FC6FFD0)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_24BF0(uint32_t unit, uint32_t game, uint32_t modId, const D2Game24BF0Env* env)
 {
     if (unit == 0 || rd32(unit, 0) != 1) return;
