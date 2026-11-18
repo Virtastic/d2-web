@@ -3,8 +3,8 @@
 // entered unconditionally (NULL included) and its result pre-seeds the mode #10350 reads back.
 // Siblings 0x223D0 (mode) and 0x2430 (type) share the prologue and the same nType==0 gate.
 #include <cstdint>
-#include "../d2moo/include/D2Skills.h"
-#include "../d2moo/include/Units/Units.h"
+#include "../include/D2Skills.h"
+#include "../include/Units/Units.h"
 
 // ev (optional; the capture's protocol): ev[0] = number of callee entries, ev[1 + i] = the RVA of the
 // i-th callee entered, in entry order (0xC65E = #10175, 0xC658 = #10350).

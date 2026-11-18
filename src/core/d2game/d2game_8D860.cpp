@@ -2,7 +2,7 @@
 // (the packet bytes are register-built, so the decompile hides them).
 // Sibling of 0x8D990/0x8DB00 in d2game_batch_8DB00.cpp; the 16-byte unit-move packet the caller
 // 0xF35C0 sends for any header other than 0x68.
-// Prior art: D2MOO 1.10f D2GAME_PACKETS_SendPacket0x67_6FC3CDE0 (SCmd.cpp), same layout.
+// Prior art: 1.10f D2GAME_PACKETS_SendPacket0x67_6FC3CDE0 (SCmd.cpp), same layout.
 #include <cstdint>
 #include <cstring>
 #include <unistd.h>

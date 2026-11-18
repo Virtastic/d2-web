@@ -1,6 +1,6 @@
 // F235: the SOUND OPTIONS screen's Sound and Music sliders, and the browser audio graph they drive.
 //
-// The ENGINE has no volume to bind to, and neither does our prior art: `reference/D2MOO/source/
+// The ENGINE has no volume to bind to, and neither does our prior art: `the 1.10f reference source
 // D2Sound/src/D2Sound.cpp` is a stub with no `volume`/`gain`/`SNDVOL` symbol, and `grep -rn volume
 // src/` is empty -- there is no settings surface to export. So the volume is the CLIENT's: the
 // engine decides the game, the client plays it, and each player that produces sound gets one gain.

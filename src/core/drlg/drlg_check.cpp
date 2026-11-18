@@ -1,4 +1,4 @@
-// Retail-gated DRLG check (s03-drlg): generate a level with the vendored D2MOO DRLG over our
+// Retail-gated DRLG check (s03-drlg): generate a level with the vendored the 1.10f source DRLG over our
 // tables + tile libraries, and produce the same subtile collision grid summary the retail capture tool
 // records from the running 1.13c D2Common.
 // The call sequence mirrors the capture exactly: LoadAct -> GetLevel -> InitLevel -> for each
@@ -20,7 +20,7 @@
 #include <Drlg/D2DrlgOutdoors.h>
 #include <Drlg/D2DrlgDrlgVer.h>
 #include <Drlg/D2DrlgOutRoom.h>
-#include "../d2moo/compat/datatbls_bridge.h"
+#include "../compat/datatbls_bridge.h"
 #include "../tables/shared.h"
 #include "drlg_room_trace.h"
 #include "drlg_room_snapshot.h"
@@ -639,7 +639,7 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_client_unit_context(int x, int y, int rollRoomS
     *roomTileY = static_cast<uint32_t>(drlgRoom->nTileYPos);
     if (rollRoomSeed) {
         // D2Client's 0x59 constructor rolls the seed on the active client-room record returned by
-        // its Act-coordinate lookup. D2MOO names the logical record D2ActiveRoomStrc (its seed is
+        // its Act-coordinate lookup. the 1.10f source names the logical record D2ActiveRoomStrc (its seed is
         // not the D2DrlgRoom generation seed above).
         *unitInitSeed = static_cast<uint32_t>(SEED_RollRandomNumber(&room->pSeed));
     }

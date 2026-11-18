@@ -1,5 +1,5 @@
 // A PLRMODE_SEQUENCE (18) unit draws its current sequence frame's mode and frame. Whirlwind's record
-// (src/core/d2moo/src/DataTbls/SequenceTbls.cpp, gPlayerSequenceWhirlwind): eight frames, all A1 (7).
+// (src/core/game/DataTbls/SequenceTbls.cpp, gPlayerSequenceWhirlwind): eight frames, all A1 (7).
 import assert from 'node:assert/strict';
 import { drawnPlayerState, playerModeToken } from './unit-renderer.mjs';
 const WHIRLWIND = [[7, 0], [7, 1], [7, 2], [7, 3], [7, 3], [7, 4], [7, 5], [7, 6]];

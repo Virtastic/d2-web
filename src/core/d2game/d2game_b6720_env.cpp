@@ -2,10 +2,10 @@
 // SKILLS_EndAnimTail_B6720 (D2Game/SKILLS/SkillEndAnimTailOutlined.cpp) with its callees (D2Game+0x1320, +0x8E6F0, +0x8EA80)
 // routed to the env's `sub` seam in retail argument order.
 #include <cstdint>
-#include "../d2moo/include/D2Game/SKILLS/SkillMonst.h"
-#include "../d2moo/include/D2Game/GAME/Event.h"
-#include "../d2moo/include/D2Game/MONSTER/MonsterRegion.h"
-#include "../d2moo/compat/test_seam.h"
+#include "../include/D2Game/SKILLS/SkillMonst.h"
+#include "../include/D2Game/GAME/Event.h"
+#include "../include/D2Game/MONSTER/MonsterRegion.h"
+#include "../compat/test_seam.h"
 
 struct D2GameBatchB4520Env {
     int32_t (*ord)(uint32_t n, uint32_t a, uint32_t b, uint32_t c, uint32_t d);

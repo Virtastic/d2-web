@@ -6,7 +6,7 @@
 // Host model: retail's 32-bit module globals are the statics below (retail RVA noted). Callees whose
 // implementations live elsewhere are seam function pointers on D2GameBatch16Env, in retail argument order;
 // the CRT output helpers already recovered (0x4352 write_char, 0x43A9 write_string, src/core/crt_write.cpp)
-// are called directly. Critical sections are the compat no-ops (src/core/d2moo/compat/Windows.h).
+// are called directly. Critical sections are the compat no-ops (src/core/compat/Windows.h).
 #include "d2game_scalar_helpers.h"
 #include <cstdint>
 #include <cstddef>
@@ -52,7 +52,7 @@ struct D2GameBatch16Env {
 
 // The CRT output helpers live in the game tree (D2Game/GAME/CrtPrintf.cpp). The printf buffer is kept
 // non-empty by the caller, so the __flsbuf stand-in below is never reached.
-#include "../d2moo/include/D2Game/GAME/CrtPrintf.h"
+#include "../include/D2Game/GAME/CrtPrintf.h"
 static uint32_t d2game_noFlush(int32_t, D2CrtFile32*) { return 0xFFFFFFFFu; }
 static inline void d2game_write_char(uint8_t ch, CrtFile32* f, int32_t* pCount) { CRT_WriteChar(ch, (D2CrtFile32*)f, pCount, d2game_noFlush); }
 static inline void d2game_write_string(int32_t* pCount, const uint8_t* s, CrtFile32* f, int32_t len) { CRT_WriteString(pCount, s, (D2CrtFile32*)f, len, d2game_noFlush); }

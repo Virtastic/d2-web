@@ -1,6 +1,6 @@
 #include <cstdint>
 #include <cstddef>
-// Prior art: none (D2MOO has no D2Client). Recovered from the 1.13c decompile.
+// Prior art: none (the 1.10f source has no D2Client). Recovered from the 1.13c decompile.
 // Host-driven: every global the routine touches lives in S, every callee is a hook.
 // The no-return paths (_exit after Ordinal_10265/10024) are reported via fatal().
 namespace d2client_7d3c0 {

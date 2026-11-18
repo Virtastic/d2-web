@@ -11,7 +11,7 @@
 #include <cstdint>
 #include <cstring>
 #include <emscripten.h>
-#include "../d2moo/include/D2Game/CRT/Crt.h"
+#include "../include/D2Game/CRT/Crt.h"
 
 extern "C" void d2game_free_5a8d(void* mem);   // 0x5A8D _free, ours
 extern "C" void* d2game_crt_locale_from_token(uint32_t token); // modeled records from 0x3A5E

@@ -1,5 +1,5 @@
 // D2Client 1.13c unit events and client unit associations.
-// Prior art: D2MOO has no D2Client module; community pointer tables have no names
+// Prior art: the 1.10f source has no D2Client module; community pointer tables have no names
 // for this batch. Rules come from the cached 1.13c routines, with register and
 // stack arguments checked against retail instructions (not Ghidra's prototypes).
 #include <cstddef>

@@ -55,7 +55,7 @@
 // The module's first version hard-coded right=784, so on any screen wider than 800 the block sat
 // short of the right edge (1216px short on a 2000px view).
 //
-// Prior art: none. D2MOO (1.10f) has no D2Client at all; the rule above is read from the 1.13c
+// Prior art: none. the 1.10f source (1.10f) has no D2Client at all; the rule above is read from the 1.13c
 // disassembly of the functions named.
 import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 import { decodeDatPalette, decodeDc6 } from './d2-formats.mjs';

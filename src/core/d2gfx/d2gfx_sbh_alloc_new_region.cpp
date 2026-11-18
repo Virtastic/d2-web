@@ -1,6 +1,6 @@
 #include <cstdint>
 
-// Prior art: none in D2MOO (linked MSVC 2003 CRT small-block heap).
+// Prior art: none in the 1.10f source (linked MSVC 2003 CRT small-block heap).
 // ___sbh_alloc_new_region
 // Grow the region-descriptor array (HeapReAlloc, 0x10 more entries) when full, then fill the next
 // 20-byte descriptor: [4]=HeapAlloc(zeroed,0x41c4) header, [3]=VirtualAlloc(1MiB reserve), [2]=-1,

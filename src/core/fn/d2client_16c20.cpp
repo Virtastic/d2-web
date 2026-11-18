@@ -6,9 +6,9 @@
 #include <cstdint>
 #include <cstring>
 #include "hookenv.h"
-#include "../d2moo/include/Units/Units.h"
-#include "../d2moo/include/Path/Path.h"
-#include "../d2moo/include/Drlg/D2DrlgDrlg.h"
+#include "../include/Units/Units.h"
+#include "../include/Path/Path.h"
+#include "../include/Drlg/D2DrlgDrlg.h"
 
 namespace c16c20 {
 using Predicate = int32_t (*)(D2UnitStrc*, D2UnitStrc*, D2UnitStrc**, int32_t*);

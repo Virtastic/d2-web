@@ -9,7 +9,7 @@
 // circular distance (0x895D0) mod period; strict on both sides.
 #include <cstdint>
 #include <cstdlib>
-#include "../d2moo/include/DataTbls/MonsterTbls.h"
+#include "../include/DataTbls/MonsterTbls.h"
 #include <emscripten.h>
 static int32_t circ(int32_t a, int32_t b, int32_t m) {  // 0x895D0, EDI = m
     int32_t ra = (m & (m - 1)) ? a % m : a & (m - 1), rb = (m & (m - 1)) ? b % m : b & (m - 1);

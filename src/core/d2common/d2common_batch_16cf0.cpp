@@ -1,4 +1,4 @@
-// Prior art used: D2MOO DrlgOutRoom / DrlgDrlgGrid / DrlgDrlgVer.
+// Prior art used: the 1.10f source DrlgOutRoom / DrlgDrlgGrid / DrlgDrlgVer.
 // Retail's ESI points directly at the outdoor data, not its owning room.
 #include "Drlg/D2DrlgOutRoom.h"
 #include "Drlg/D2DrlgDrlgVer.h"
@@ -10,7 +10,7 @@ extern "C" {
 W void Ordinal_10046(const char* file, int32_t line, int32_t z);
 }
 
-// D2Common 0x4A4D0 lives in d2common_4a4d0.cpp; this wrapper hands it the Fog free and the D2MOO vertex release.
+// D2Common 0x4A4D0 lives in d2common_4a4d0.cpp; this wrapper hands it the Fog free and the 1.10f source vertex release.
 namespace {
 void F4a4d0(uint32_t pool, uint32_t p, uint32_t line) { FOG_FreePool(reinterpret_cast<void*>(uintptr_t(pool)), reinterpret_cast<void*>(uintptr_t(p)), "..\\Source\\D2Common\\DRLG\\DrlgGrid.cpp", int(line), 0); }
 void V4a4d0(uint32_t pool, uint32_t list) { DRLGVER_FreeVertices(reinterpret_cast<void*>(uintptr_t(pool)), reinterpret_cast<D2DrlgVertexStrc**>(uintptr_t(list))); }

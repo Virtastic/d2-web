@@ -1,4 +1,4 @@
-// Host test: g++ -std=c++17 -I<d2moo include dirs> -Wl,--unresolved-symbols=ignore-all this.cpp && ./a.out
+// Host test: g++ -std=c++17 -I<1.10f include dirs> -Wl,--unresolved-symbols=ignore-all this.cpp && ./a.out
 #include "d2game_batch_2a9f0.cpp"
 #include <cassert>
 static int g_ret, g_n; static int32_t g_a[4];

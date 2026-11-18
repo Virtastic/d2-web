@@ -1,5 +1,5 @@
 // 1.13c D2Client+0x0AE85: ___free_lconv_num, the VS 2003 CRT helper for the three numeric
-// lconv strings. Prior art: no D2Client implementation exists in D2MOO.
+// lconv strings. Prior art: no D2Client implementation exists in the 1.10f source.
 // describes the linked CRT context, while the local 1.13c decompile establishes this row's behavior.
 #include <cstdint>
 #include <emscripten.h>

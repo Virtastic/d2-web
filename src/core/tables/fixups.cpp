@@ -85,7 +85,7 @@ static void fixObjects(uint8_t* r, size_t count, size_t recSize, const LangTable
 //        over the base's; classic rows (< 410) take run = base walk speed / 2 instead of the RN record
 // Auxiliary inputs (all through the VFS): data\global\excel\{monequip,monmode,monstats2}.bin and
 // data\global\AnimData.d2 (256 buckets of u32 count + 160-byte records; bucket = byte sum of the
-// upper-cased 8-char name, D2MOO AnimTbls.cpp).
+// upper-cased 8-char name, the 1.10f source AnimTbls.cpp).
 struct Bin { std::vector<uint8_t> data; uint32_t count = 0; size_t rec = 0;
     const uint8_t* at(size_t i) const { return data.data() + 4 + i * rec; } };
 static bool loadBin(const MpqVfs& vfs, const char* name, size_t recSize, Bin& b) {
@@ -160,7 +160,7 @@ static bool fixMonStats(uint8_t* r, size_t count, size_t recSize, const MpqVfs& 
 }
 
 // ---- itemstatcost (D2ItemStatCostTxt, 324 bytes): DATATBLS_LoadItemStatCostTxt -------------
-// The op graph, built in place (D2MOO ItemsTbls.cpp):
+// The op graph, built in place (the 1.10f source ItemsTbls.cpp):
 //   +0x5E unk0x5E[64] (u16) = 0xFFFF, then for every stat with 0 < op < 14 whose op base
 //        (+0x56) is a valid stat: base.bIsBaseOfOtherStatOp(+0x51) = 1, first free slot of
 //        base.unk0x5E (value >= count) = this stat; op 4/5 sets this.bHasOpApplyingToItem(+0x53)

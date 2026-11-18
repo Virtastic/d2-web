@@ -1,0 +1,509 @@
+#include "D2States.h"
+
+#include "D2DataTbls.h"
+#include "D2StatList.h"
+#include "Units/UnitRoom.h"
+#include "Units/Units.h"
+#include <D2BitManip.h>
+#include <climits>
+#include <cstddef>
+#include <cstdint>
+
+uint32_t D2Common_33C20_BitmaskHit(bool hasOwner, bool hasRec, int32_t recFlag, const uint32_t* bits, const uint32_t* mask, int32_t nWords);
+uint32_t D2Common_33C20_UnitHasStateInMask(D2UnitStrc* pUnit, const uint32_t* pMask);
+
+//Used in some of the following functions
+// not-1.13c: 1.13c carries this range-checked mask read inline in each by-state reader (0x33A30..0x33BE0)
+__forceinline BOOL __fastcall STATES_CheckStateMaskByStateId(int nState, int nStateMask)
+{
+	if (nState >= 0 && nState < sgptDataTables->nStatesTxtRecordCount)
+	{
+		return sgptDataTables->fStateMasks[nStateMask][nState >> 5] & gdwBitMasks[nState & 31];
+	}
+
+	return FALSE;
+}
+
+
+//D2Common.0x6FDB4560 (#10486)
+// 1.13c D2Common+0x34510
+void __stdcall STATES_ToggleState(D2UnitStrc* pUnit, int nState, BOOL bSet)
+{
+	if (nState >= 0 && nState < sgptDataTables->nStatesTxtRecordCount)
+	{
+		D2Common_STATES_ToggleState_6FDB8900(pUnit, nState, bSet);
+		UNITROOM_RefreshUnit(pUnit);
+	}
+}
+
+//D2Common.0x6FDB45A0 (#10487)
+// 1.13c D2Common+0x33CD0 (the flag-word read is the register helper at 0x37DB0)
+BOOL __stdcall STATES_CheckState(D2UnitStrc* pUnit, int nState)
+{
+	if (pUnit && (pUnit->dwUnitType == UNIT_PLAYER || pUnit->dwUnitType == UNIT_MONSTER || pUnit->dwUnitType == UNIT_MISSILE) && nState >= 0 && nState < sgptDataTables->nStatesTxtRecordCount)
+	{
+		if (pUnit->pStatListEx && STATLIST_IsExtended(pUnit->pStatListEx))
+		{
+			return pUnit->pStatListEx->StatFlags[nState >> 5] & gdwBitMasks[nState & 31];
+		}
+	}
+
+	return FALSE;
+}
+
+// 1.13c D2Common+0x34450
+//D2Common.0x6FDB45F0 (#10488)
+void __stdcall STATES_ToggleGfxStateFlag(D2UnitStrc* pUnit, int nState, BOOL bSet)
+{
+	uint32_t* pGfxFlags = D2COMMON_STATES_GetListGfxFlags_6FDB8AC0(pUnit);
+
+	// 1.13c delta: a list without its state-flag array is left alone
+	if (pGfxFlags && pUnit->pStatListEx->StatFlags && nState >= 0 && nState < sgptDataTables->nStatesTxtRecordCount)
+	{
+		if (bSet)
+		{
+			pGfxFlags[nState >> 5] |= gdwBitMasks[nState & 31];
+		}
+		else
+		{
+			pGfxFlags[nState >> 5] &= gdwInvBitMasks[nState & 31];
+		}
+
+		UNITROOM_RefreshUnit(pUnit);
+	}
+}
+
+//D2Common.0x6FDB4670 (#10489)
+// 1.13c D2Common+0x343E0
+BOOL __stdcall STATES_CheckGfxStateFlag(D2UnitStrc* pUnit, int nState)
+{
+	uint32_t* pGfxFlags = NULL;
+
+	if (nState >= 0 && nState < sgptDataTables->nStatesTxtRecordCount)
+	{
+		pGfxFlags = D2COMMON_STATES_GetListGfxFlags_6FDB8AC0(pUnit);
+		if (pGfxFlags)
+		{
+			return pGfxFlags[nState >> 5] & gdwBitMasks[nState & 31];
+		}
+	}
+
+	return FALSE;
+}
+
+// 1.13c D2Common+0x34390 (the 1.10f source memset size had the /32 outside the *4 term)
+//D2Common.0x6FDB46C0 (#10491)
+void __stdcall STATES_ClearGfxStateFlags(D2UnitStrc* pUnit)
+{
+	uint32_t* pGfxFlags = D2COMMON_STATES_GetListGfxFlags_6FDB8AC0(pUnit);
+
+	if (pGfxFlags)
+	{
+		memset(pGfxFlags, 0x00, sizeof(uint32_t) * ((sgptDataTables->nStatesTxtRecordCount + 31) / 32));
+	}
+}
+
+// 1.13c D2Common+0x34330
+// Retail inlines the extended-list gfx-word lookup; the helper below preserves native pointers.
+//D2Common.0x6FDB4710 (#10490)
+BOOL __stdcall STATES_IsAnyGfxStateFlagSet(D2UnitStrc* pUnit)
+{
+	uint32_t* pGfxFlags = NULL;
+	int nCounter = 0;
+
+	pGfxFlags = D2COMMON_STATES_GetListGfxFlags_6FDB8AC0(pUnit);
+	if (pGfxFlags && (sgptDataTables->nStatesTxtRecordCount + 31) / 32 > 0)
+	{
+		while (!pGfxFlags[nCounter])
+		{
+			++nCounter;
+			if (nCounter >= (sgptDataTables->nStatesTxtRecordCount + 31) / 32)
+			{
+				return FALSE;
+			}
+		}
+
+		return TRUE;
+	}
+
+	return FALSE;
+}
+
+// not-1.13c: no separate body; D2Common+0x342D0 (export #10315, the one D2Game+0x7A5E0 calls) is this null assert and D2COMMON_STATES_GetListGfxFlags folded into one function
+//D2Common.0x6FDB4760 (#10492)
+uint32_t* __stdcall STATES_GetGfxStateFlags(D2UnitStrc* pUnit)
+{
+	D2_ASSERT(pUnit);
+
+	return D2COMMON_STATES_GetListGfxFlags_6FDB8AC0(pUnit);
+}
+
+//D2Common.0x6FDB4790 (#10493)
+// 1.13c D2Common+0x34150
+void __stdcall STATES_UpdateStayDeathFlags(D2UnitStrc* pUnit, BOOL bIsBoss)
+{
+	uint32_t* pStatFlags = NULL;
+	uint32_t* pGfxFlags = NULL;
+
+	pGfxFlags = D2COMMON_STATES_GetListGfxFlags_6FDB8AC0(pUnit);
+	pStatFlags = D2COMMON_STATES_GetStatFlags_6FDB8A90(pUnit);
+
+	if (pGfxFlags && pStatFlags)
+	{
+		if (bIsBoss)
+		{
+			for (int i = 0; i < (sgptDataTables->nStatesTxtRecordCount + 31) / 32; ++i)
+			{
+				pGfxFlags[i] |= pStatFlags[i] & ~sgptDataTables->fStateMasks[STATEMASK_BOSSSTAYDEATH][i];
+				pStatFlags[i] &= sgptDataTables->fStateMasks[STATEMASK_BOSSSTAYDEATH][i];
+			}
+		}
+		else if (!pUnit || pUnit->dwUnitType != UNIT_PLAYER)
+		{
+			for (int i = 0; i < (sgptDataTables->nStatesTxtRecordCount + 31) / 32; ++i)
+			{
+				pGfxFlags[i] |= pStatFlags[i] & ~sgptDataTables->fStateMasks[STATEMASK_MONSTAYDEATH][i];
+				pStatFlags[i] &= sgptDataTables->fStateMasks[STATEMASK_MONSTAYDEATH][i];
+			}
+		}
+		else
+		{
+			for (int i = 0; i < (sgptDataTables->nStatesTxtRecordCount + 31) / 32; ++i)
+			{
+				pGfxFlags[i] |= pStatFlags[i] & ~sgptDataTables->fStateMasks[STATEMASK_PLRSTAYDEATH][i];
+				pStatFlags[i] &= sgptDataTables->fStateMasks[STATEMASK_PLRSTAYDEATH][i];
+			}
+		}
+
+		UNITROOM_RefreshUnit(pUnit);
+	}
+}
+
+//D2Common.0x6FDB4900 (#10495)
+// 1.13c D2Common+0x33c80
+int __fastcall STATES_GetNumberOfStateFlags()
+{
+	return (sgptDataTables->nStatesTxtRecordCount + 31) / 32;
+}
+
+//D2Common.0x6FDB4920 (#10496)
+// 1.13c D2Common+0x33BE0
+BOOL __stdcall STATES_CheckStateMaskAuraByStateId(int nState)
+{
+	return STATES_CheckStateMaskByStateId(nState, STATEMASK_AURA);
+}
+
+//D2Common.0x6FDB4960 (#10503)
+// 1.13c D2Common+0x34060 (passes the mask to the shared word scan at 0x33C20)
+BOOL __stdcall STATES_CheckStateMaskAuraOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_AURA);
+}
+
+//D2Common.0x6FDB49D0 (#10500)
+// 1.13c D2Common+0x33BA0
+BOOL __stdcall STATES_CheckStateMaskPgsvByStateId(int nState)
+{
+	return STATES_CheckStateMaskByStateId(nState, STATEMASK_PGSV);
+}
+
+//D2Common.0x6FDB4A10 (#11234)
+// 1.13c D2Common+0x34040
+BOOL __stdcall STATES_CheckStateMaskPgsvOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_PGSV);
+}
+
+//D2Common.0x6FDB4A80 (#10501)
+// 1.13c D2Common+0x344F0 (passes the pgsv mask to the shared mask loop at 0x34080)
+void __stdcall STATES_UpdatePgsvFlags(D2UnitStrc* pUnit)
+{
+	uint32_t* pStatFlags = NULL;
+	uint32_t* pGfxFlags = NULL;
+
+	pGfxFlags = D2COMMON_STATES_GetListGfxFlags_6FDB8AC0(pUnit);
+	pStatFlags = D2COMMON_STATES_GetStatFlags_6FDB8A90(pUnit);
+
+	if (pGfxFlags && pStatFlags)
+	{
+		for (int i = 0; i < (sgptDataTables->nStatesTxtRecordCount + 31) / 32; ++i)
+		{
+			pGfxFlags[i] |= pStatFlags[i] & sgptDataTables->fStateMasks[STATEMASK_PGSV][i];
+			pStatFlags[i] &= ~sgptDataTables->fStateMasks[STATEMASK_PGSV][i];
+		}
+
+		UNITROOM_RefreshUnit(pUnit);
+	}
+}
+
+//D2Common.0x6FDB4B20 (#10558)
+// 1.13c D2Common+0x33A00 (1.13c reads the hide mask without the state range check)
+BOOL __stdcall STATES_CheckStateMaskHideByStateId(int nState)
+{
+	return sgptDataTables->fStateMasks[STATEMASK_HIDE][nState >> 5] & gdwBitMasks[nState & 31];
+}
+
+//D2Common.0x6FDB4B50 (#10557)
+// 1.13c D2Common+0x34020
+BOOL __stdcall STATES_CheckStateMaskHideOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_HIDE);
+}
+
+//D2Common.0x6FDB4BC0 (#10502)
+// 1.13c D2Common+0x34000
+BOOL __stdcall STATES_CheckStateMaskActiveOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_ACTIVE);
+}
+
+//D2Common.0x6FDB4C30 (#11272)
+// 1.13c D2Common+0x33FE0
+BOOL __stdcall STATES_CheckStateMaskRemHitOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_REMHIT);
+}
+
+//D2Common.0x6FDB4CA0 (#10538)
+// 1.13c D2Common+0x33FC0
+BOOL __stdcall STATES_CheckStateMaskDamBlueOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_DAMBLUE);
+}
+
+//D2Common.0x6FDB4D10 (#10545)
+// 1.13c D2Common+0x33FA0
+BOOL __stdcall STATES_CheckStateMaskDamRedOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_DAMRED);
+}
+
+//D2Common.0x6FDB4D80 (#10537)
+// 1.13c D2Common+0x33F80
+BOOL __stdcall STATES_CheckStateMaskAttBlueOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_ATTBLUE);
+}
+
+//D2Common.0x6FDB4DF0 (#10544)
+// 1.13c D2Common+0x33F60
+BOOL __stdcall STATES_CheckStateMaskAttRedOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_ATTRED);
+}
+
+// 1.13c D2Common+0x33B80
+//D2Common.0x6FDB4E60 (#10551)
+BOOL __stdcall STATES_IsUnitShapeShifted(D2UnitStrc* pUnit)
+{
+	if (pUnit)
+	{
+		return (pUnit->dwFlagEx & UNITFLAGEX_ISSHAPESHIFTED) != 0;
+	}
+
+	return FALSE;
+}
+
+//D2Common.0x6FDB4E80 (#10497)
+// 1.13c D2Common+0x33B40
+BOOL __stdcall STATES_CheckStateMaskCurseByStateId(int nState)
+{
+	return STATES_CheckStateMaskByStateId(nState, STATEMASK_CURSE);
+}
+
+//D2Common.0x6FDB4EC0 (#10498)
+// 1.13c D2Common+0x33B00
+BOOL __stdcall STATES_CheckStateMaskCurableByStateId(int nState)
+{
+	return STATES_CheckStateMaskByStateId(nState, STATEMASK_CURABLE);
+}
+
+//D2Common.0x6FDB4F00 (#10554)
+// 1.13c D2Common+0x33AB0
+BOOL __stdcall STATES_CheckStateMaskStayDeathOnUnitByStateId(D2UnitStrc* pUnit, int nState)
+{
+	if (nState >= 0 && nState < sgptDataTables->nStatesTxtRecordCount)
+	{
+		if (pUnit && pUnit->dwUnitType == UNIT_MONSTER)
+		{
+			return sgptDataTables->fStateMasks[STATEMASK_MONSTAYDEATH][nState >> 5] & gdwBitMasks[nState & 31];
+		}
+		else
+		{
+			return sgptDataTables->fStateMasks[STATEMASK_PLRSTAYDEATH][nState >> 5] & gdwBitMasks[nState & 31];
+		}
+	}
+
+	return FALSE;
+}
+
+//D2Common.0x6FDB4FC0 (#10536)
+// 1.13c D2Common+0x33F20
+BOOL __stdcall STATES_CheckStateMaskBlueOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_BLUE);
+}
+
+//D2Common.0x6FDB5030 (#10539)
+// 1.13c D2Common+0x33F00
+BOOL __stdcall STATES_CheckStateMaskArmBlueOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_ARMBLUE);
+}
+
+//D2Common.0x6FDB50A0 (#10540)
+// 1.13c D2Common+0x33EE0
+BOOL __stdcall STATES_CheckStateMaskRFBlueOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_RFBLUE);
+}
+
+//D2Common.0x6FDB5110 (#10541)
+// 1.13c D2Common+0x33EC0
+BOOL __stdcall STATES_CheckStateMaskRCBlueOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_RCBLUE);
+}
+
+//D2Common.0x6FDB5180 (#10542)
+// 1.13c D2Common+0x33EA0
+BOOL __stdcall STATES_CheckStateMaskRLBlueOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_RLBLUE);
+}
+
+//D2Common.0x6FDB51F0 (#10543)
+// 1.13c D2Common+0x33E80
+BOOL __stdcall STATES_CheckStateMaskRPBlueOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_RPBLUE);
+}
+
+//D2Common.0x6FDB5260 (#10546)
+// 1.13c D2Common+0x33E60
+BOOL __stdcall STATES_CheckStateMaskArmRedOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_ARMRED);
+}
+
+//D2Common.0x6FDB52D0 (#10547)
+// 1.13c D2Common+0x33E40
+BOOL __stdcall STATES_CheckStateMaskRFRedOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_RFRED);
+}
+
+//D2Common.0x6FDB5340 (#10548)
+// 1.13c D2Common+0x33E20
+BOOL __stdcall STATES_CheckStateMaskRCRedOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_RCRED);
+}
+
+//D2Common.0x6FDB53B0 (#10549)
+// 1.13c D2Common+0x33E00
+BOOL __stdcall STATES_CheckStateMaskRLRedOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_RLRED);
+}
+
+//D2Common.0x6FDB5420 (#10550)
+// 1.13c D2Common+0x33DE0
+BOOL __stdcall STATES_CheckStateMaskRPRedOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_RPRED);
+}
+
+//D2Common.0x6FDB5490 (#10552)
+// 1.13c D2Common+0x33DC0
+BOOL __stdcall STATES_CheckStateMaskExpOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_EXP);
+}
+
+//D2Common.0x6FDB5500 (#10553)
+// 1.13c D2Common+0x33a70 (ordinal 10226; same body, lookup kept as the shared helper)
+BOOL __stdcall STATES_CheckStateMaskExpByStateId(int nState)
+{
+	return STATES_CheckStateMaskByStateId(nState, STATEMASK_EXP);
+}
+
+//D2Common.0x6FDB5540 (#10555)
+// 1.13c D2Common+0x33DA0
+BOOL __stdcall STATES_CheckStateMaskShatterOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_SHATTER);
+}
+
+//D2Common.0x6FDB55B0 (#10556)
+// 1.13c D2Common+0x33A30
+BOOL __stdcall STATES_CheckStateMaskShatterByStateId(int nState)
+{
+	return STATES_CheckStateMaskByStateId(nState, STATEMASK_SHATTER);
+}
+
+//D2Common.0x6FDB55F0 (#10559)
+// 1.13c D2Common+0x33D80
+BOOL __stdcall STATES_CheckStateMaskLifeOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_LIFE);
+}
+
+//D2Common.0x6FDB5660 (#10560)
+// 1.13c D2Common+0x33D60
+BOOL __stdcall STATES_CheckStateMaskUdeadOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_UDEAD);
+}
+
+//D2Common.0x6FDB56D0 (#10561)
+// 1.13c D2Common+0x33D40
+BOOL __stdcall STATES_CheckStateMaskGreenOnUnit(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_GREEN);
+}
+
+// 1.13c D2Common+0x33D10
+//D2Common.0x6FDB5740 (#11303)
+BOOL __stdcall STATES_CheckStateMaskOnUnit(D2UnitStrc* pUnit, int nStateMask)
+{
+
+	if (pUnit && nStateMask >= 0 && nStateMask < 40)
+	{
+		return D2Common_33C20_UnitHasStateInMask(pUnit, sgptDataTables->fStateMasks[nStateMask]) != 0;
+	}
+
+	return FALSE;
+}
+
+// Retail's 32-bit images (the guest pointers are 4 bytes; ours are 8), kept only to pin the dereferenced offsets.
+struct D2Common33C20Owner32 { uint8_t pad[0x5C]; uint32_t pRec; };
+struct D2Common33C20Rec32 { uint8_t pad0[0x10]; int32_t flag; uint8_t pad1[0x58 - 0x14]; uint32_t pBits; };
+static_assert(offsetof(D2Common33C20Owner32, pRec) == 0x5C, "33c20 owner->rec");
+static_assert(offsetof(D2Common33C20Rec32, flag) == 0x10 && offsetof(D2Common33C20Rec32, pBits) == 0x58, "33c20 rec flag/bits");
+
+// 1.13c D2Common+0x33C20 (register call: EAX = owner struct, ECX = mask pointer). The test over already-resolved
+// fields: 1 when the owner and its rec (owner+0x5C) exist, the rec flag (+0x10) has the sign bit, the bit array (+0x58)
+// exists and any of nWords words of mask AND bits is non-zero. nWords = ([sgptDataTables+0xC4] + 31) / 32 (signed),
+// 6 in 1.13c.
+uint32_t D2Common_33C20_BitmaskHit(bool hasOwner, bool hasRec, int32_t recFlag, const uint32_t* bits, const uint32_t* mask, int32_t nWords)
+{
+	if (!hasOwner || !hasRec || recFlag >= 0 || !bits) return 0;
+	for (int32_t i = 0; i < nWords; ++i) if (mask[i] & bits[i]) return 1;
+	return 0;
+}
+
+// 1.13c D2Common+0x33C20 on a unit (EAX = unit, ECX = mask): owner = unit, rec = unit->pStatListEx (+0x5C), flag = its
+// dwFlags (+0x10), bits = its StatFlags (+0x58); every guard is read from the unit, none is supplied by the caller.
+uint32_t D2Common_33C20_UnitHasStateInMask(D2UnitStrc* pUnit, const uint32_t* pMask)
+{
+	D2StatListExStrc* pList = pUnit ? pUnit->pStatListEx : nullptr;
+	return D2Common_33C20_BitmaskHit(pUnit != nullptr, pList != nullptr, pList ? (int32_t)pList->dwFlags : 0,
+	                                 pList ? pList->StatFlags : nullptr, pMask, (sgptDataTables->nStatesTxtRecordCount + 31) / 32);
+}
+
+// The same test with mask = [sgptDataTables+0xE0], which the caller supplies (the +0x34000 wrapper's scan).
+uint32_t D2Common_34000_BitmaskHitTable(bool hasOwner, bool hasRec, int32_t recFlag, const uint32_t* bits, const uint32_t* tableMask, int32_t nWords)
+{
+	return D2Common_33C20_BitmaskHit(hasOwner, hasRec, recFlag, bits, tableMask, nWords);
+}

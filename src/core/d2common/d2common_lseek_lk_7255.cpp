@@ -1,4 +1,4 @@
-// Prior art used: none in D2MOO (host CRT); rules from the cached 1.13c body.
+// Prior art used: none in the 1.10f source (host CRT); rules from the cached 1.13c body.
 #include "d2common_crt.h"
 
 // 1.13c D2Common+0x07255

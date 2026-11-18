@@ -13,7 +13,7 @@ struct D2GfxMsizeHeap {
     uint32_t (*heap_size)(uintptr_t, uint32_t, void*);
 };
 
-// Prior art used: D2MOO's D2Gfx is the graphics map, not the bundled CRT.
+// Prior art used: the 1.10f source's D2Gfx is the graphics map, not the bundled CRT.
 // Cross-checked the existing D2Game/D2Client CRT heap seams against this 1.13c body.
 // 1.13c D2Gfx+0x02796 (__msize): small-block lookup is protected by CRT lock 4;
 // a matching block's preceding dword includes eight sentinel bytes and the low allocation bit.

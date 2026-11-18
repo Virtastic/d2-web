@@ -1,4 +1,4 @@
-// D2Common+0x38B70 now runs as STATLIST_UnitGetStatValue (src/core/d2moo/src/D2StatList.cpp); the probes' entry
+// D2Common+0x38B70 now runs as STATLIST_UnitGetStatValue (src/core/game/D2StatList.cpp); the probes' entry
 // point stays a forward to it.
 #include <cstdint>
 #include <emscripten.h>

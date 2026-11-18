@@ -1,6 +1,6 @@
 // 1.13c D2Game+0x325C0 OBJECTS_SpawnShrine, retail 32-bit layout, every engine callee an Env member.
 // ECX = pGame, EDX = pRoom, stack = nClassId, nX, nY, nMode (ret 0x10). Classes 574..579 index a 6-row {objectId, min, max} table
-// (module data at RVA 0xFCCC0); the shrine id is roll(max - min) + min, 4 and 5 fold to 2. Delta against the 1.10f D2MOO function:
+// (module data at RVA 0xFCCC0); the shrine id is roll(max - min) + min, 4 and 5 fold to 2. Delta against the 1.10f the 1.10f source function:
 // none in the rule; SUNIT_AllocUnitData is inlined here (same field writes as the barrel spawner 0x2FEC0).
 #include <cstdint>
 #include "d2game_2e790.h"

@@ -1,4 +1,4 @@
-// stand-alone copy of D2Common 0x36030 (#11003; the game runs the D2MOO Path.cpp one): allocate the unit's dynamic path (unit+0x2C), seed position, room and size, pick
+// stand-alone copy of D2Common 0x36030 (#11003; the game runs the 1.10f source Path.cpp one): allocate the unit's dynamic path (unit+0x2C), seed position, room and size, pick
 // the path type defaults by unit type, register in the room and derive the half extents. Stdcall, six stack words
 // (ret 0x18): memory pool (handed to the Fog 10045 allocator in ECX, with EDX = 0x200, the Path.cpp file string and
 // line 0x453), room, x, y, unit, flag. Retail does not check the allocation. Every callee is a seam and every address

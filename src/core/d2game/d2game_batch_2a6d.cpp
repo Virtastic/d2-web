@@ -11,7 +11,7 @@
 // explicit parameters here and are named in each function's comment. Callees outside this batch are seam
 // function pointers on D2GameBatch2a6dEnv, in retail argument order. The fatal path is Fog Ordinal
 // 10265(id) -> Ordinal 10024(text) -> _exit(-1); only the exit is observable and is modelled.
-// Prior art: D2MOO 1.10f reference/D2MOO/source/D2Game/src/PLAYER/PlayerPets.cpp (sub_6FC7CDC0) and
+// Prior art: 1.10f the 1.10f reference source (sub_6FC7CDC0) and
 // GAME/SCmd.cpp (D2GAME_PACKETS_SendPacket0x8D_6FC3F960 / ...0x9B_6FC3FB30); the CRT routines are part
 // of the compiler runtime, cross-checked against src/core/d2client/d2client_batch_3664.cpp.
 #include <cstdint>
@@ -160,7 +160,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_8c570(void* unit, void* player, const D2GameBa
     D2Game_8C570_PacketSend8D(&e8c570, (const uint8_t*)unit, (const uint8_t*)player);
 }
 
-// D2Game +0x97420 (marker lives on the d2moo sub_6FC7CDC0): tear down one pet list (1.10f sub_6FC7CDC0). pGame is register-only (EAX);
+// D2Game +0x97420 (marker lives on the 1.10f sub_6FC7CDC0): tear down one pet list (1.10f sub_6FC7CDC0). pGame is register-only (EAX);
 // pPlayer is the argument Ghidra hides as unaff_retaddr; pPetList is the list, bHireable the pet-type
 // test and bKeep the keep flag (both retail stack arguments). For every pet data node, unlink it from
 // the unit list: the non-hireable path frees the pet by GUID (0x977E0); the hireable path finds the

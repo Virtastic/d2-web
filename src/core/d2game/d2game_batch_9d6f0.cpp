@@ -10,8 +10,8 @@
 // d2game_fatal(id): only the exit is observable. A probe passes the env pointer in r[5], the retail
 // arguments in r[0..1], and reads the result in r[4] (the retail capture tool/fn/README.md).
 //
-// Prior art (1.10f): D2MOO src/D2Game/GAME/Level.cpp LEVEL_LoadAct (0x6FC3C510) for 0x9D6F0, including
-// ARENA_IsInArenaMode/ARENA_GetAlternateStartTown (Arena.cpp) and DUNGEON_AllocAct; D2MOO
+// Prior art (1.10f): the 1.10f source src/D2Game/GAME/Level.cpp LEVEL_LoadAct (0x6FC3C510) for 0x9D6F0, including
+// ARENA_IsInArenaMode/ARENA_GetAlternateStartTown (Arena.cpp) and DUNGEON_AllocAct; the 1.10f source
 // src/D2Game/PLAYER/PlayerPets.cpp PLAYERPETS_GetPetListFromPetType (0x6FC7E2E0) and sub_6FC7E310
 // (0x6FC7E310) for 0xBFFA0. The 1.13c ordinal numbering differs from 1.10f; the names below are the
 // 1.13c imports reached through the thunks (src/core/fn/import_thunk.cpp):

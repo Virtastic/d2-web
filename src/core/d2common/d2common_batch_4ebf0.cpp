@@ -1,4 +1,4 @@
-// Prior art used: D2MOO D2Skills.cpp (sub_6FDB1050/sub_6FDB1130),
+// Prior art used: the 1.10f source D2Skills.cpp (sub_6FDB1050/sub_6FDB1130),
 // D2Inventory, D2Seed and native D2DrlgLevelStrc/D2DrlgRoomStrc fields.
 // Retail 1.13c rearranges DRLG fields; byte offsets are not native layouts.
 #include <cstdint>

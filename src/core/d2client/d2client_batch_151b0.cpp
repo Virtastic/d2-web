@@ -1,4 +1,4 @@
-// Prior art used: D2Client has no D2MOO module or solved implementation. The D2BS and PlugY
+// Prior art used: D2Client has no the 1.10f source module or solved implementation. The D2BS and PlugY
 // address tables were checked for names; OpenDiablo2's d2core/d2ui manager was only a UI-state
 // cross-check. These functions' 1.13c control flow comes from the cached local decompiles.
 #include <cstddef>

@@ -1,5 +1,5 @@
 // D2Gfx's VC7.1 CRT lock setup. Retail image base 0x6FA80000.
-// The analogous D2MOO 1.10f startup and sibling DLL implementations establish the
+// The analogous 1.10f startup and sibling DLL implementations establish the
 // CRT table layout; the 1.13c D2Gfx decompile fixes the table and arena addresses.
 #include <cstdint>
 

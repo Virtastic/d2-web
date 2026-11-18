@@ -1,4 +1,4 @@
-// Prior art used: ; D2MOO has no D2Client module. Derived from cached 1.13c decompile.
+// Prior art used: ; the 1.10f source has no D2Client module. Derived from cached 1.13c decompile.
 // Unrecovered callees are Env function pointers; register args are explicit params (guesses noted).
 // Spawn-request word indices follow stack offsets in the decompile and are approximate where noted.
 #include <cstdint>

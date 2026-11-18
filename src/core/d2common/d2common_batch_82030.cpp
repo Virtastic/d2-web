@@ -138,7 +138,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_32330_GetStatPercent(D2UnitStrc
 	return 0;
 }
 
-// Export of 1.13c D2Common 0x23400 (#11036); the body is ITEMS_CanBeRare in src/core/d2moo/src/Items/Items.cpp.
+// Export of 1.13c D2Common 0x23400 (#11036); the body is ITEMS_CanBeRare in src/core/game/Items/Items.cpp.
 extern "C" EMSCRIPTEN_KEEPALIVE uint8_t D2Common_23400_CanBeRare(D2UnitStrc* pItem) {
 	return static_cast<uint8_t>(ITEMS_CanBeRare(pItem));
 }
@@ -147,7 +147,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint8_t D2Common_23400_CanBeRare(D2UnitStrc* pIt
 // list. Only an extended list (dwFlags negative, bit 31) with a StatFlags array is valid; the bit lives
 // in the second bitset, one word past ceil(nStates/32), masked by gdwBitMasks[nState & 31] on set and
 // gdwInvBitMasks[nState & 31] on clear. Both paths refresh the unit's room membership (0x665C0).
-// The body now lives in STATES_ToggleGfxStateFlag (src/core/d2moo/src/D2States.cpp), same marker.
+// The body now lives in STATES_ToggleGfxStateFlag (src/core/game/D2States.cpp), same marker.
 
 // D2Common ordinal 11041 (not the 0x21DA0 body-location placement): class-skill id at nPosition in the unit's class skill list, i.e.
 // 0x218A0(nPosition, 0, 0, 0). A null unit or a position outside 0..0xC answers 0.

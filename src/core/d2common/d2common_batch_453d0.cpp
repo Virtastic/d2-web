@@ -22,7 +22,7 @@ void     D2Common_84500(void* self, void* e);
 extern "C" void D2Common_84890(void* self, void* e);   // C linkage: the 81bc0 port exports it under this name
 void     D2Common_fatal_10024(const void* msg, uint32_t code);
 
-// D2MOO-style form of D2Common 0x453D0 (the 1.13c port is d2common_453d0.cpp): thiscall(this, param_1, unit, idx). unit+0x58 = data, data+0x1D0 = key,
+// 1.10f-style form of D2Common 0x453D0 (the 1.13c port is d2common_453d0.cpp): thiscall(this, param_1, unit, idx). unit+0x58 = data, data+0x1D0 = key,
 // data+0x1B4 = list owner (+0x47C list head, node next at dword 0x6B, node key at dword 0x74).
 // Tries the idx-th slot whose table entry equals key first, then falls back to the first that works.
 void D2Common_453D0(void* self, int32_t p1, void* unit, uint32_t idx)

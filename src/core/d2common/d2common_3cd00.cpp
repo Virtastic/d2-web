@@ -1,5 +1,5 @@
 // 1.13c D2Common+0x3CD00 (#10264): the warp tile a room's warp to a source level arrives on
-// (retail-layout seam; the engine's DUNGEON_GetWarpTileFromRoomAndSourceLevelId in d2moo/src/D2Dungeon.cpp is the vendored form).
+// (retail-layout seam; the engine's DUNGEON_GetWarpTileFromRoomAndSourceLevelId in game/D2Dungeon.cpp is the vendored form).
 // stdcall(pRoom, nSourceLevel, ppLvlWarp), ret 0xC. 0x1A0D0 on the room's DRLG room (+0x10) yields the destination room, the destination
 // level and the level-warp row; the destination room's unit list (+0x74, next +0xE8) is walked for a tile (type 5 at +0) whose class (+4)
 // is that level. The row is stored through ppLvlWarp whether or not a tile is found. A null room or a null destination room are fatal

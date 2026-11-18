@@ -1,6 +1,6 @@
 #include <cstdint>
 
-// 0x9330, 0x87D1E and 0xDB40 live in the game tree (src/core/d2moo/src/Retail).
+// 0x9330, 0x87D1E and 0xDB40 live in the game tree (src/core/game/Retail).
 
 // 1.13c D2Common+0x87CF0
 void d2common_shl_12_87cf0(uint32_t* words)

@@ -5,13 +5,13 @@
 #include <cstdint>
 #include "hookenv.h"
 #include "fn_tag.h"
-#include "../d2moo/include/D2Game/SKILLS/Skills.h"
-#include "../d2moo/include/D2Game/UNIT/SUnit.h"
-#include "../d2moo/include/D2Game/GAME/SCmd.h"
-#include "../d2moo/include/D2Game/ITEMS/Items.h"
-#include "../d2moo/include/D2Game/PLAYER/PlrModes.h"
-#include "../d2moo/include/D2StatList.h"
-#include "../d2moo/compat/test_seam.h"
+#include "../include/D2Game/SKILLS/Skills.h"
+#include "../include/D2Game/UNIT/SUnit.h"
+#include "../include/D2Game/GAME/SCmd.h"
+#include "../include/D2Game/ITEMS/Items.h"
+#include "../include/D2Game/PLAYER/PlrModes.h"
+#include "../include/D2StatList.h"
+#include "../compat/test_seam.h"
 
 static HookEnv* E;
 static uint32_t dw(uint32_t a) { return *(const uint32_t*)(uintptr_t)a; }

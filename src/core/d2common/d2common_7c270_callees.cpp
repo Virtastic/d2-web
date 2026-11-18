@@ -1,6 +1,6 @@
 // Callees of D2Common 0x7C270(room post-init). The port in d2common_batch_b62.cpp calls these
 // two seams; they were weak stubs under the wrong names (sub_B8400, sub_5BF70) and never linked, so the
-// room's post-init skipped both calls. The seams now reach the d2moo implementations of the same RVAs:
+// room's post-init skipped both calls. The seams now reach the 1.10f implementations of the same RVAs:
 //   d2common_seam_68400 -> 0x68400  (DRLGROOMTILE_LoadDT1FilesForRoom)
 //   d2common_seam_bf70  -> 0x0BF70  (DRLGPRESET_SpawnHardcodedPresetUnits)
 #include <cstdint>

@@ -3787,7 +3787,7 @@ function resolvePointerTarget(x, y) {
   // disc. Its nearest-world-point/lower-id overlap choice is browser policy, not the retail F14
   // hover tie-break. F14's hover selector separately uses native signed priority and player-path
   // distance; candidate eligibility and stored-target behavior remain open.
-  // Retail ordering (FUN_6FB568E0 picker, same type priority as hover): among units whose box holds the cursor, the one nearest the PLAYER wins (squared path distance, first seen on ties), not the one nearest the cursor. FUN_6FB55440 is only the bit-2 eligibility predicate. Decompile not available in this tree; ordering is the documented F14/D2MOO one.
+  // Retail ordering (FUN_6FB568E0 picker, same type priority as hover): among units whose box holds the cursor, the one nearest the PLAYER wins (squared path distance, first seen on ties), not the one nearest the cursor. FUN_6FB55440 is only the bit-2 eligibility predicate. Decompile not available in this tree; ordering is the documented F14/the 1.10f source one.
   const unitId = hoveredHostileAt(x, y);
   const distance2 = (candidate) => (candidate.x - at.x) ** 2 + (candidate.y - at.y) ** 2;
   // Retail's validator (0xA68E0) accepts the cursor anywhere in the item's padded sprite rect, the
@@ -3982,7 +3982,7 @@ function ensureTerrain() {
 }
 
 // Retail's renderer brightens the final 8-bit palette before it reaches the screen (D2Gfx
-// SetGamma/contrast into the renderer DLL -- D2MOO stops at the pfSetGamma call; Fog.dll's
+// SetGamma/contrast into the renderer DLL -- the 1.10f source stops at the pfSetGamma call; Fog.dll's
 // GFXUTIL_GenerateGammaRamp generates the ramp, called with the default Gamma 155 and Contrast 100
 // by D2GFX_SetContrastAndGamma_6FA710C0). It is applied once, to the finished frame, exactly where
 // retail applies it -- and it is DOWNLOADED FROM RETAIL'S OWN SCREEN, not fitted.

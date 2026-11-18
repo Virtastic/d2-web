@@ -1,0 +1,95 @@
+// Prior art: ; the 1.10f source has no D2Client module, d2bs table is 1.14d. Decompile-derived.
+// LOW CONFIDENCE batch: Ghidra lost register args (ECX/EDX/ESI/EAX) on most of these; argument
+// roles below are best readings. Unrecovered imports (Ordinal_N) and unmapped internals (fn RVAs)
+// go through Services::ord / Services::fn.
+#include <cstdint>
+#include <cstring>
+extern "C" void* d2_client_skilldesc_for_skill(int32_t);
+namespace d2client_batch_2b530 {
+struct Services {
+ virtual ~Services()=default;
+ virtual intptr_t ord(uint32_t ordinal,intptr_t a=0,intptr_t b=0,intptr_t c=0,intptr_t d=0)=0; // imported DLL ordinal
+ virtual intptr_t fn(uint32_t rva,intptr_t a=0,intptr_t b=0,intptr_t c=0,intptr_t d=0)=0;      // D2Client internal
+ virtual const uint8_t* skillRecord(int32_t id)=0; // sgptDataTables+0xB98 + id*0x23C, null if out of range (count at +0xBA0)
+ virtual int32_t skillCount()=0; virtual int32_t tableCount6C()=0; // +0xB6C
+};
+template<class T> static T rd(const void* p,unsigned o){T v;std::memcpy(&v,(const uint8_t*)p+o,sizeof v);return v;}
+// 1.13c D2Client+0x2B530
+int sub_2B530(Services& s,uint8_t* unit,int32_t skillId){
+ if(skillId<0||skillId>=s.skillCount())return 0;
+ const uint8_t* rec=s.skillRecord(skillId); if(!rec)return 0;
+ int32_t idx=rd<int16_t>(rec,0xEA); if(idx<0||idx>=s.tableCount6C())return 0;
+ if(unit){uint32_t f=rd<uint32_t>(unit,0xC4)|0x40;std::memcpy(unit+0xC4,&f,4);}
+ if(!s.fn(0xA5F70))return 0;
+ if(!unit||!rd<int32_t>(unit,0x2C))return 0;
+ if(!s.ord(10777,rd<int32_t>(unit,0x2C)))s.fn(0x1330,(intptr_t)(unit+0x20)); else s.ord(10663,(intptr_t)unit);
+ s.fn(0x1330,(intptr_t)(unit+0x20)); s.fn(0x1630,(intptr_t)unit); s.fn(0x1660,(intptr_t)unit);
+ if(s.ord(10786,(intptr_t)unit,rd<int32_t>(rec,0x114),idx)>0)s.fn(0x1330,(intptr_t)(unit+0x20));
+ s.fn(0xB0450); return 1;
+}
+// D2Client+0x32F30 as the 34960/34960-family callers use it (skill 0: both outputs zero); the full routine is in d2client_32f30.cpp.
+void sub_32F30(Services& s,void* unit,int32_t* outMin,int32_t* outMax,intptr_t skill,intptr_t item){
+ (void)s;(void)unit;(void)skill;(void)item;
+ *outMin=0;*outMax=0;
+}
+// 1.13c D2Client+0x33240
+void sub_33240(Services& s,void* u,int32_t* a,int32_t* b,int32_t* c){ s.fn(0x31220,(intptr_t)u); s.fn(0x30E30,(intptr_t)u,(intptr_t)a,(intptr_t)b,(intptr_t)c); }
+// D2Client+0x33550 as the Services callers reach it (preconditions only); the port is sub_33550.cpp:sub_33550
+void sub_33550(Services& s,int32_t level,int32_t skillId,int32_t y){
+ if(!level||skillId<0||skillId>=s.skillCount()||!s.skillRecord(skillId))return;
+ s.fn(0x33550,level,skillId,y); // ponytail: string assembly (Ordinal_10003 ids lost) delegated wholesale
+}
+// D2Client+0x33B50 as the Services callers reach it (preconditions only); the port is sub_33550.cpp:sub_33B50
+void sub_33B50(Services& s,int32_t skillId,int32_t unit,int32_t y){
+ if(!unit||skillId<0||skillId>=s.skillCount()||!s.skillRecord(skillId))return;
+ s.fn(0x33B50,skillId,unit,y); // ponytail: same as above
+}
+// 1.13c D2Client+0x34960
+void sub_34960(Services& s,void* unit,intptr_t a,intptr_t b,intptr_t,int32_t p5,int32_t p6){
+ if(!a||!b)return; int32_t w=0,h=0;
+ if(!s.fn(0xC230))return;
+ sub_32F30(s,unit,&w,&h,0,0); s.fn(0xC190); s.fn(0xF0A0,w,0,p5,p6);
+}
+// 1.13c D2Client+0x349F0
+void sub_349F0(Services& s,void* unit,intptr_t a,const uint8_t* b,intptr_t,int32_t p5,int32_t p6){
+ if(!a||!b)return; uint8_t sc=b[0x1A5]; int32_t w=0,h=0;
+ sub_32F30(s,unit,&w,&h,0,0);
+ w=(w*sc)/128; h=h*(int32_t)sc/128; // trunc-toward-zero via +127 bias in retail; same for signed /128 in C
+ s.fn(0xE190,(intptr_t)unit); s.fn(0xF0A0,w,0,p5,p6);
+}
+// 1.13c D2Client+0x34AB0
+void sub_34AB0(Services& s,void* unit,void* b,int32_t c){
+ if(!b||!c)return; intptr_t r=s.fn(0x17F0); if(!r)return;
+ if(s.ord(10747,(intptr_t)unit)){
+  s.ord(10601,c,0xA02); s.ord(10435,(intptr_t)unit,rd<int32_t>((void*)r,0x18));
+  s.ord(10601,c,0xA03); s.ord(10435,(intptr_t)unit,rd<int32_t>((void*)r,0x1C));
+  s.fn(0x30B40,(intptr_t)b,(intptr_t)unit,c); return;
+ }
+ s.ord(10601,c,0xA0C); s.ord(10435,(intptr_t)unit,rd<int32_t>((void*)r,0x18));
+ s.ord(10601,c,0xA0D); s.ord(10435,(intptr_t)unit,rd<int32_t>((void*)r,0x1C));
+ int32_t x=0,y=0,z=0; sub_33240(s,unit,&x,&y,&z); s.fn(0xF0A0,x,z,0,(intptr_t)b);
+}
+// 1.13c D2Client+0x34C00
+void sub_34C00(Services& s,void* unit,int32_t a,const uint8_t* rec,int32_t d){
+ if(!a||!rec)return; intptr_t r=(intptr_t)d2_client_skilldesc_for_skill(rd<int16_t>(rec,0)); if(!r)return;
+ s.ord(10601,a,0x98C); s.ord(10435,(intptr_t)unit,rd<int32_t>((void*)r,0x18));
+ s.ord(10601,a,0x98D); s.ord(10435,(intptr_t)unit,rd<int32_t>((void*)r,0x1C));
+ int32_t x=0,y=0,z=0; sub_33240(s,unit,&x,&y,&z);
+ uint8_t sc=rec[0x1A5];
+ if(sc!=0x80){x=(int32_t)s.fn(0x14A0,0x80,x);y=(int32_t)s.fn(0x14A0,0x80,y);}
+ int16_t id=rd<int16_t>(rec,0);
+ int32_t p=(int32_t)s.ord(10567,(intptr_t)unit,id,d,0); s.ord(10297,(intptr_t)unit,id);
+ int32_t q=(int32_t)s.ord(10121,(intptr_t)unit,id,d,1); s.ord(11091,(intptr_t)unit,id,d,1);
+ s.fn(0xF0A0,x+(q>>8)+(p>>8),d,d,0);
+}
+// 1.13c D2Client+0x34D70 (ESI = scale; eax = pointer to third out)
+void sub_34D70(Services& s,void* unit,int32_t* outX,int32_t* outY,int32_t scale){
+ if(!scale)return; int32_t a=0,b=0;
+ s.fn(0x31220,(intptr_t)unit); s.fn(0x30E30,(intptr_t)unit,(intptr_t)&a,(intptr_t)&b);
+ *outX+=(a*scale)/128; *outY+=(b*scale)/128;
+}
+// 1.13c D2Client+0x34E00
+void sub_34E00(Services& s,void* unit,int32_t a,const uint8_t* rec,int32_t d){
+ if(a&&rec&&(intptr_t)d2_client_skilldesc_for_skill(rd<int16_t>(rec,0)))sub_34C00(s,unit,a,rec,d);
+}
+}

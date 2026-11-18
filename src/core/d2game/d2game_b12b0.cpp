@@ -1,4 +1,4 @@
-#include "../d2moo/compat/test_seam.h"
+#include "../compat/test_seam.h"
 #include "d2game_b12b0.h"
 #include "d2game_retail_rw.h"
 uint32_t D2R_B12B0_Ord(uint32_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t) { __builtin_trap(); }

@@ -14,7 +14,7 @@
 #include <GAME/Event.h>
 #include <ITEMS/Items.h>
 #include <UNIT/SUnit.h>
-#include "../d2moo/compat/datatbls_bridge.h"
+#include "../compat/datatbls_bridge.h"
 #include "../tables/shared.h"
 #include "../../../tools/vectorfmt/vectorfmt.h"
 

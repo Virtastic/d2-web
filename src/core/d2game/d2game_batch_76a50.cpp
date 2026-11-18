@@ -206,7 +206,7 @@ void D2Game_78230(D2GameBatch76Env& e, void* unit)
     d2game_fatal(0x7ba);
 }
 
-// D2Game +0x78A90 (marker lives on the d2moo sub_6FC80E10): p = ECX, unit = EBX, flag = EDI
+// D2Game +0x78A90 (marker lives on the 1.10f sub_6FC80E10): p = ECX, unit = EBX, flag = EDI
 void D2Game_78A90(D2GameBatch76Env& e, int p, void* unit, int flag)
 {
     if (!unit || rd32(unit, 0) != 0) return;

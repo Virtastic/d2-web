@@ -1,0 +1,149 @@
+// Compat: the non-table externals the vendored the 1.10f source DRLG links against, in wasm terms.
+// Everything that touched units, paths, environment or Win32 is a no-op here: the DRLG is run
+// headless for grid parity (M1), exactly the way the retail capture tool drives retail D2Common.
+#include <cstdlib>
+#include <D2Common.h>
+#include <Archive.h>
+#include <D2Seed.h>
+#include <D2Environment.h>
+#include <Units/Units.h>
+#include <Units/UnitRoom.h>
+#include <D2Monsters.h>
+#include <D2DataTbls.h>
+#include <DataTbls/FieldTbls.h>
+#include <D2Collision.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <vector>
+#include "../../../assets/mpqvfs.h"
+#include "../../prng.h"
+
+// --- Fog ------------------------------------------------------------------------------------
+void FOG_DisplayWarning(const char* m, const char* f, int l) { fprintf(stderr, "warning: %s (%s:%d)\n", m, f, l); }
+// The last retail assert, kept so a caller can say WHICH one ended the engine: most are followed by
+// exit(-1) (147 sites in D2Game alone), and stderr alone did not reach the test runner log.
+static char g_lastAssert[512];
+extern "C" __attribute__((used)) const char* d2_last_assert() { return g_lastAssert; }
+void FOG_DisplayAssert(const char* m, const char* f, int l)  {
+    snprintf(g_lastAssert, sizeof g_lastAssert, "%s (%s:%d)", m, f, l);
+    fprintf(stderr, "ASSERT: %s\n", g_lastAssert); printf("ASSERT: %s\n", g_lastAssert); fflush(stdout);
+}
+void FOG_DisplayHalt(const char* m, const char* f, int l)    { fprintf(stderr, "HALT: %s (%s:%d)\n", m, f, l); abort(); }
+void FOG_Trace(const char* fmt, ...) { va_list a; va_start(a, fmt); vfprintf(stderr, fmt, a); va_end(a); fputc('\n', stderr); }
+void FOG_TraceF(const char*, const char* fmt, ...) { va_list a; va_start(a, fmt); vfprintf(stderr, fmt, a); va_end(a); fputc('\n', stderr); }
+const char* FOG_csprintf(char* dst, const char* fmt, ...) { va_list a; va_start(a, fmt); vsprintf(dst, fmt, a); va_end(a); return dst; }
+
+// --- Archive: DS1 reads go through our layered MPQ VFS ----------------------------------------
+namespace d2 { extern MpqVfs* g_drlgVfs; }
+void* ARCHIVE_AllocateBufferAndReadFile(HD2ARCHIVE, const char* szFilePath, size_t* pdwBytesWritten, const char* szSrcPath, int nLine) {
+    std::vector<uint8_t> buf;
+    if (!d2::g_drlgVfs || !d2::g_drlgVfs->read(szFilePath, buf)) {
+        fprintf(stderr, "ARCHIVE read miss: %s (%s:%d)\n", szFilePath, szSrcPath, nLine);
+        if (pdwBytesWritten) *pdwBytesWritten = 0;
+        return nullptr;
+    }
+    // Retail allocates size + 800 (D2Win ARCHIVE_AllocateBufferAndReadFile) and some DS1s
+    // declare one more substitution group than they contain (Act1/Outdoors/Trees.ds1: 14
+    // declared, 13 present), so the parser reads into that slack. Zero slack reproduces the
+    // captured 1.13c grids; 
+    void* p = calloc(1, buf.size() + 800);
+    memcpy(p, buf.data(), buf.size());
+    if (pdwBytesWritten) *pdwBytesWritten = buf.size();
+    return p;
+}
+
+
+// --- Environment / units / paths: not modelled ---------------------------------------------------
+
+// --- Path direction lookup (D2Common 0x6FDAB750 1.10f / 0x6FDDC320 table 1.13c) -----------------
+// (path direction table sub_6FDAB750 now comes from the vendored Path/Step.cpp)
+
+// --- Path (D2Common Path/Path.cpp #10166/#10167): the room a unit's dynamic path is in ---------
+#include <Path/Path.h>
+
+// --- Storm string helpers (squall's storm/String.hpp declares them) ------------------------------
+#include <Storm.h>
+#include "../../storm/storm_batch_25220.h"
+#include "../../storm/storm_batch_3b1e0.h"
+int storm_ascii_strnicmp(const char*, const char*, size_t);
+uint32_t Storm_Sub3AFD0(const char*);
+namespace {
+storm25220::State& stormStrState() {
+    static storm25220::State s;
+    static bool init = (s.setLastError = [](uint32_t) {}, s.encode = [](const void* p) { return (uint32_t)(uintptr_t)p; }, true);
+    (void)init;
+    return s;
+}
+}
+// The string imports run retail's rows: SStrCmpI Storm+0x3B1E0, SStrCmp Storm+0x3B230, SStrCopy Storm+0x3B080, SStrLen Storm+0x3AFD0.
+int32_t SStrCmpI(const char* a, const char* b, size_t n) {
+    static StormState3b1e0 st{};
+    static StormCalls3b1e0 c = [] { StormCalls3b1e0 k{}; k.error = [](uint32_t) {}; k.strnicmp = [](const char* x, const char* y, uint32_t m) { return (int32_t)storm_ascii_strnicmp(x, y, m); }; return k; }();
+    return Storm_Sub3B1E0(a, b, (uint32_t)n, st, c);
+}
+int32_t SStrCmp(const char* a, const char* b, size_t n) { return storm25220::compare(stormStrState(), a, b, (uint32_t)n); }
+size_t  SStrCopy(char* dest, const char* src, size_t destsize) { return storm25220::copy(stormStrState(), dest, src, (uint32_t)destsize); }
+size_t  SStrLen(const char* s) { return Storm_Sub3AFD0(s); }
+// SStrVPrintf (#581) runs retail's row Storm+0x3BA00 over Storm's VS2003 CRT formatters.
+uint32_t Storm_Sub3BA00_z14(char* dst, uint32_t cap, const char* fmt, void* ap);
+int     SStrVPrintf(char* dst, size_t max, char* fmt, va_list args) {
+    va_list ap;
+    va_copy(ap, args);
+    const int n = (int)Storm_Sub3BA00_z14(dst, (uint32_t)max, fmt, &ap);
+    va_end(ap);
+    return n;
+}
+
+// Fog #10137 / #10086: the CRC-16 over a name and the 14-bit-to-2-chars encoding the client
+// preview uses. Nothing in the spawn path hashes; kept minimal until a scenario reads them.
+// These four run retail's rows: Fog+0x1F8C0 (#10137), Fog+0x18090 (#10086), Fog+0x16730 (#10083), Fog+0x16710 (#10084).
+extern "C" uint16_t fog_sub_1f8c0(const uint8_t*);
+extern "C" float fog_sub_16730(int32_t);
+extern "C" float fog_sub_16710(uint32_t);
+void __stdcall FOG_Encode14(uint8_t* pOut, uint32_t nValue);
+uint16_t FOG_ComputeStringCRC16(const char* s) { return fog_sub_1f8c0((const uint8_t*)s); }
+void FOG_Encode14BitsToString(uint16_t* p2, uint32_t v) { FOG_Encode14((uint8_t*)p2, v); }
+float FOG_10083_Cos_LUT(int16_t i) { return fog_sub_16730((int32_t)i); }
+float FOG_10084_Sin_LUT(int16_t i) { return fog_sub_16710((uint32_t)(int32_t)i); }
+
+// 1.13c D2CMP+0x04ABC -- CRT _NMSG_WRITE: looks rtc code up in the 0x13-entry table; console mode writes the text to stderr, else (code != 0xFC) a "Runtime Error!" MessageBox. Web has neither; abort path only.
+extern "C" void d2cmp_crt_nmsg_write(int) {}
+// 1.13c D2CMP+0x07875 -- MSVC CRT __security_error/report_failure: fatal, never returns.
+// Retail shows a message box (or calls the user handler) then exit(3); we abort the process.
+extern "C" [[noreturn]] void d2cmp_crt_report_failure_7875(int code)
+{
+    (void)code; // 1 = "Buffer overrun detected!", else "Unknown security failure detected!"
+    abort();
+}
+
+// 1.13c D2CMP+0x19EBB -- MSVC CRT _XcptFilter-style SEH filter: if the exception is a C++ throw
+// (code 0xE06D7363, 3 params, magic 0x19930520/21) call terminate(); else call the user filter
+// (DAT_6ff13be0) when set and valid, returning its result; otherwise 0. Web has no SEH: terminate.
+extern "C" int d2cmp_crt_xcpt_filter_19ebb(int code, int nparams, int magic)
+{
+    if (code == -0x1f928c9d && nparams == 3 && (magic == 0x19930520 || magic == 0x19930521)) abort();
+    return 0; // no user filter installed
+}
+
+// 1.13c Fog+0x21BF7 -- MSVC CRT x87 helper (pow/fmod range-reduction dispatch): jump table on
+// (EAX & 0x3f) selecting FPU-stack register pairs for sub_21AE0 or returning x/x (NaN) / ST1.
+// Operates on the x87 register stack, not expressible in wasm64; Fog never reaches it (only
+// caller is CRT sub_212C0). Deliberately no wasm body.
+void fog_sub_21bf7_x87_dispatch(void) {}
+
+// 1.13c D2CMP+0x19B65 -- MSVC CRT _atoflt: parse the C string with the CRT's 12-byte long-double
+// scanner (sub_1A153) and narrow to a 32-bit float stored through the out pointer. Only caller
+// is CRT __fassign (sub_18ABC), unreachable from D2CMP's decoders; strtof is the same grammar.
+void d2cmp_crt_atoflt(float* out, const char* str) { *out = strtof(str, nullptr); }
+
+// --- Storm: SErrDisplayErrorFmt ---------------------------------------------------------------
+// 1.13c Storm+0x12570 (#562): vsprintf the message into a 0x400 buffer, then SErrDisplayError(messageId, file, line,
+// buffer, recoverable, exitcode). Headless there is no dialog: log it, return 1 when recoverable (retail's IDNO),
+// otherwise end the process with the exit code, as retail does after the dialog.
+int32_t SErrDisplayErrorFmt(uint32_t messageId, const char* filename, int32_t linenumber, int32_t recoverable, uint32_t uExitCode, char* Format, ...) {
+    char buf[0x400];
+    va_list a; va_start(a, Format); vsnprintf(buf, sizeof buf, Format, a); va_end(a);
+    fprintf(stderr, "storm error 0x%08X %s(%d): %s\n", messageId, filename ? filename : "", linenumber, buf);
+    if (recoverable) return 1;
+    exit((int)uExitCode);
+}

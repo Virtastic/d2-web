@@ -10,7 +10,7 @@
 // named at each function. Unmapped callees are seams on D2GameBatch14Env in retail argument order.
 // The fatal path is Fog Ordinal 10265(code) -> Ordinal 10024(text) -> _exit(-1); only the exit is
 // observable and is modelled.
-// Prior art: D2MOO 1.10f for CLIENTS_GetPlayerFromClient (0x4AD10) and the packet 0x16 layout.
+// Prior art: 1.10f for CLIENTS_GetPlayerFromClient (0x4AD10) and the packet 0x16 layout.
 #include <cstdint>
 #include <cstddef>
 #include <cstring>
@@ -113,7 +113,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_8a2a0(void* client)
     wr32(block, 0, rd32(block, 0) + (size & 0xFFFF));
 }
 
-// Retail 0x6FD1A3DC: unit type -> event-queue slot (D2MOO EVENT_MapUnitTypeToIndex, 1.10f table
+// Retail 0x6FD1A3DC: unit type -> event-queue slot (the 1.10f source EVENT_MapUnitTypeToIndex, 1.10f table
 // 0x6FD27D6C; player, monster, object, missile, item, tile, other).
 static const int32_t g_d2game_6FD1A3DC[] = { 0, 1, 3, 2, 4, -1, 0 };
 

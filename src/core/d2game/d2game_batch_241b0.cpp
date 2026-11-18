@@ -1,4 +1,4 @@
-// Prior art used: D2MOO 1.10f MonsterUnique.cpp and SkillBar.cpp, checked against
+// Prior art used: 1.10f MonsterUnique.cpp and SkillBar.cpp, checked against
 // cached retail 1.13c decompiles. Typed entries expose arguments that retail passes
 // in registers. Reuse the matching full implementations; split helpers below keep
 // the narrower 1.13c contracts instead of invoking an enclosing skill handler.

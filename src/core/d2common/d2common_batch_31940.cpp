@@ -1,5 +1,5 @@
 // 1.13c D2Common implementation batch (rows 0x31940, 0x3C390, 0x228D0, 0x330F0, 0x30670, 0x242D0).
-// Each body delegates to the vendored D2MOO 1.10f function whose 1.10f/1.13c behaviour was matched
+// Each body delegates to the vendored 1.10f function whose 1.10f/1.13c behaviour was matched
 // line by line against the decompile and disassembly; 0x31940 has no 1.10f twin and is written here.
 #include <cstdint>
 #include "D2DataTbls.h"
@@ -26,7 +26,7 @@ uint32_t D2Common_10049_GetUnitLevelStatScaled(D2UnitStrc* pUnit)
     return (uint32_t)(nValue * 10000);
 }
 
-// D2Common 0x3C390 (marker on the d2moo function): null room -> FALSE, else the room's level id through the room chain
+// D2Common 0x3C390 (marker on the 1.10f function): null room -> FALSE, else the room's level id through the room chain
 // (room+0x10 -> +0x58 -> +0x1d0) tested with DRLG_IsTownLevel.
 BOOL D2Common_10057_DUNGEON_IsRoomInTown(D2ActiveRoomStrc* pRoom)
 {

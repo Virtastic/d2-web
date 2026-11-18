@@ -1,11 +1,11 @@
 // 1.13c D2Client+0x5DFD0: load the Sounds table (sounds.txt, 0x8e-byte records) and the SoundEnviron table (soundenviron.txt,
 // 0x58-byte records), then the post-pass (group base at +0x60, leading Block count at +0x80, SoundEnviron min/max).
-// The Fog table reads (#10016/#10208/#10210/#10207/#10209) are the d2moo compat FOG_* calls; the MPQ read is the shared VFS.
+// The Fog table reads (#10016/#10208/#10210/#10207/#10209) are the 1.10f compat FOG_* calls; the MPQ read is the shared VFS.
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
-#include "../d2moo/compat/Fog.h"
+#include "../compat/Fog.h"
 #include "../tables/shared.h"
 #include "d2client_5dfd0.h"
 namespace d2client_sounds {

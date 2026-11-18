@@ -123,7 +123,7 @@ int32_t D2Common_203B0_HasWeaponClassEquipped(uint32_t pInventory, int32_t nWeap
 	return 0;
 }
 
-// D2Common+0x211D0 lives in the game tree (src/core/d2moo/src/Retail/D2Common_211d0.cpp).
+// D2Common+0x211D0 lives in the game tree (src/core/game/Retail/D2Common_211d0.cpp).
 
 // Superseded by UNITS_GetStartSkill (Units.cpp), the old stand-alone (#10947): the skill list's first skill (list+0x04), or 0 without a
 // skill list. A null unit is fatal 0x638 in retail, modelled as 0.

@@ -1,7 +1,7 @@
 #include "vsprintf_2814.h"
 #include <bit>
 
-// Prior art used: D2MOO's D2Common sources do not port the bundled CRT formatter.
+// Prior art used: the 1.10f source's D2Common sources do not port the bundled CRT formatter.
 // The cached 1.13c library identification and body establish this wrapper; the
 // distinct _output and __flsbuf implementations are explicit callee seams.
 // 1.13c D2Common+0x02814

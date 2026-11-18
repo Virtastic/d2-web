@@ -1,4 +1,4 @@
-// Prior art: D2MOO D2CMP/Tilecmp.cpp and FindTiles.cpp supply the subsystem map
+// Prior art: the 1.10f source D2CMP/Tilecmp.cpp and FindTiles.cpp supply the subsystem map
 // (their bodies are empty); D2Common's D2TileLibraryEntryStrc supplies the three
 // scalar tile keys. Rules below come from the cached 1.13c bodies, checked against
 // the DLL instructions. This index supports tile lookup, not a serialized layout.

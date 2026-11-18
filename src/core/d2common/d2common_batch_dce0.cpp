@@ -1,6 +1,6 @@
 // D2Common implementation batch b41: five UNMAPPED rows translated from the pinned 1.13c
 // decompiles. Three of them have a vendored 1.10f body with the same 1.13c address recorded in the
-// D2MOO headers and are reached through it; the two items.txt field getters read the row directly,
+// the 1.10f source headers and are reached through it; the two items.txt field getters read the row directly,
 // as d2common_batch_22bc0.cpp does for nQuest.
 #include <cstddef>
 #include <cstdint>
@@ -15,7 +15,7 @@
 #include "Units/Missile.h"
 #include "Units/Units.h"
 
-// 0xDCE0 (#10223, the dynamic-path move step D2Common_10232) is the game function in src/core/d2moo/src/Path/Step.cpp.
+// 0xDCE0 (#10223, the dynamic-path move step D2Common_10232) is the game function in src/core/game/Path/Step.cpp.
 
 // 1.13c D2Common+0x223D0: items.txt[nItemId].nTransmogrify (+0x139) != 0. An id outside the table
 // (fatal 0x1EF for the null table, 0x1156 for the out-of-range id in retail) yields 0 here, the

@@ -3,7 +3,7 @@
 #include <emscripten.h>
 
 // Prior art: MSVC CRT __ioterm and the matching D2Client implementation at 0x862C.
-// D2MOO has no implementation of this CRT routine.
+// the 1.10f source has no implementation of this CRT routine.
 struct D2GameIoInfo62ed {
     int32_t handle;
     uint8_t flags;

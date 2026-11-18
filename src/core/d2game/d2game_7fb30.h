@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x7FB30 (AI think, melee charger; D2MOO CorruptLancer block): ECX = pGame, EDX = pUnit, stack = pAiTickParam (ret 4; the result is residue).
+// 1.13c D2Game+0x7FB30 (AI think, melee charger; the 1.10f source CorruptLancer block): ECX = pGame, EDX = pUnit, stack = pAiTickParam (ret 4; the result is residue).
 // Written from the 1.13c disassembly as a rule over E (see d2game_7e070.h). tp: +0 ai control (+0x14 phase flag), +8 target, +0x14 distance, +0x18 combat flag,
 // +0x1C monstats row, +0x20 monstats2 row (+0xE melee range = step count). Row words indexed by game byte +0x6D: P(k) at +0x56+6k; skill words +0x170, skill bytes +0x180.
 // Rolls: percent rolls are the inline seed step; the skill roll is 0x1180(EAX = 100, ECX = &seed). Steps byte 0 is raised to 1 by the run callees.

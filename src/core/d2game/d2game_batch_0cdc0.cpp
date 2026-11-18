@@ -11,7 +11,7 @@
 #include <emscripten.h>
 #include "../prng.h"
 #include "d2game_seam.h"
-uint8_t DRLG_GetActNoFromLevelId(int nLevelId); // D2Common 10459 (src/core/d2moo/src/DrlgDrlg.cpp)
+uint8_t DRLG_GetActNoFromLevelId(int nLevelId); // D2Common 10459 (src/core/game/DrlgDrlg.cpp)
 extern "C" struct D2ItemDataTbl* D2Common_10535_GetItemDataTables();
 extern "C" uint32_t D2Game_SEED_RollLimitedRandomNumber(d2::Seed*, int32_t);
 

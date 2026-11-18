@@ -11,8 +11,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_7e390(uint32_t* r) {   // 1.
 }
 // The skill-slot getters call the 1.13c rows in Units.cpp on a native unit whose skill list carries the blob's four slots.
 #include <cstring>
-#include "../d2moo/include/D2Skills.h"
-#include "../d2moo/include/Units/Units.h"
+#include "../include/D2Skills.h"
+#include "../include/Units/Units.h"
 namespace {
 struct NativeSkills {
     D2UnitStrc u; D2SkillListStrc list;

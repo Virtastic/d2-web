@@ -1,4 +1,4 @@
-// Prior art used: D2MOO has no D2Client CRT module. The shared descriptor
+// Prior art used: the 1.10f source has no D2Client CRT module. The shared descriptor
 // owner and errno accessor are the existing D2Client CRT implementations;
 // the cached 1.13c body supplies the mode transitions and error ordering.
 #include <cstddef>

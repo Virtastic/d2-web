@@ -14,9 +14,9 @@
 // ops 0 and 1 return the SuperUniques/MonSounds record or 0; ops 2/3 return scalars.
 #include <cstdint>
 #include <cstddef>
-#include "../d2moo/include/Units/Units.h"          // D2UnitStrc
-#include "../d2moo/include/Units/Monster.h"        // D2MonsterDataStrc
-#include "../d2moo/include/DataTbls/MonsterTbls.h" // D2SuperUniquesTxt, D2MonStatsTxt
+#include "../include/Units/Units.h"          // D2UnitStrc
+#include "../include/Units/Monster.h"        // D2MonsterDataStrc
+#include "../include/DataTbls/MonsterTbls.h" // D2SuperUniquesTxt, D2MonStatsTxt
 
 static_assert(offsetof(D2UnitStrc, dwUnitType) == 0x00, "D2UnitStrc dwUnitType");
 static_assert(offsetof(D2UnitStrc, pMonsterData) == 0x14 + 1 * (sizeof(void*) - 4), "D2UnitStrc pMonsterData");

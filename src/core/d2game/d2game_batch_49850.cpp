@@ -9,7 +9,7 @@
 // are opaque host objects addressed by retail byte offsets. The fog/Storm/D2Net imports are host seams
 // on D2GameBatch4Env in retail argument order. The fatal path is Fog Ordinal 10265(id) ->
 // Ordinal 10024(text) -> _exit(-1); only the exit is observable and is modelled.
-// Prior art: D2MOO 1.10f reference/D2MOO/source/D2Game/src/GAME/{Clients,CCmd,Game,SCmd,Task}.cpp.
+// Prior art: 1.10f the 1.10f reference source,CCmd,Game,SCmd,Task}.cpp.
 #include <cstdint>
 #include <cstddef>
 #include <cstring>

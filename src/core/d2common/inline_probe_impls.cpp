@@ -23,7 +23,7 @@ void D2Common_34CE0(uint32_t p, uint32_t v) { *(uint32_t*)(P(p) + 0x88) = v; }
 void D2Common_34D10(uint32_t p, uint32_t v) { *(uint32_t*)(P(p) + 0x84) = v; }
 // 1.13c D2Common+0x34cb0
 void D2Common_34CB0(uint32_t pp) { uint8_t* p = P(pp); *(uint32_t*)(p + 0x34) &= 0xffffffdfu; *(uint32_t*)(p + 0x28) = 0; }
-// Export of 1.13c D2Common 0x23be0; the body is ITEMS_InitItemSeed in src/core/d2moo/src/Items/Items.cpp.
+// Export of 1.13c D2Common 0x23be0; the body is ITEMS_InitItemSeed in src/core/game/Items/Items.cpp.
 void D2Common_23BE0(uint32_t pu) {
     ITEMS_InitItemSeed((D2UnitStrc*)P(pu));
 }

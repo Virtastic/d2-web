@@ -205,7 +205,7 @@ int dispatch(const uint8_t* p, int n) {
     case 0x1A: if (!need(9)) return -1; return d2_session_command_equip_packet(rd32(p + 1), rd32(p + 5));
     case 0x20: if (!need(13)) return -1; return d2_session_command_use_item(rd32(p + 1));
     case 0x26: if (!need(13)) return -1; return d2_session_command_use_belt_item(rd32(p + 1), rd32(p + 5));
-    case 0x27: if (!need(9)) return -1; return d2_session_command_use_item_action(rd32(p + 1), rd32(p + 5));   // [target item][armed item]: D2Game's UseItemAction handler (D2MOO D2Game 0x6FC85B50 -> sub_6FC47470), the identify cursor's press and its cancel
+    case 0x27: if (!need(9)) return -1; return d2_session_command_use_item_action(rd32(p + 1), rd32(p + 5));   // [target item][armed item]: D2Game's UseItemAction handler (the 1.10f source D2Game 0x6FC85B50 -> sub_6FC47470), the identify cursor's press and its cancel
     case 0x30: if (!need(9)) return -1; return d2_session_command_end_npc(rd32(p + 5));
     case 0x31: if (!need(9)) return -1; return d2_session_command_npc_response_packet(rd32(p + 1), rd32(p + 5));
     case 0x38: if (!need(13)) return -1; return d2_session_command_npc_action_packet(rd32(p + 5), rd32(p + 1));

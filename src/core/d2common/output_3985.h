@@ -24,7 +24,7 @@ struct D2CommonOutputCalls3985 {
     void (*cropzeros)(char*);                                 // PTR___fptrap_6fde9a6c
 };
 // _write_char (+0x38F7), _write_multi_char (+0x392A), _write_string (+0x394E): game tree,
-// src/core/d2moo/src/Crt/StringStream.cpp. A flush result of -1 poisons *count to -1.
+// src/core/game/Crt/StringStream.cpp. A flush result of -1 poisons *count to -1.
 extern "C" void D2Common_38F7_WriteChar(uint8_t, D2CommonStringStream2814*, const D2CommonOutputCalls3985*, int*);
 extern "C" void D2Common_392A_WriteMultiChar(int*, uint8_t, int, D2CommonStringStream2814*, const D2CommonOutputCalls3985*);
 extern "C" void D2Common_394E_WriteString(D2CommonStringStream2814*, const D2CommonOutputCalls3985*, int*, const char*, int);

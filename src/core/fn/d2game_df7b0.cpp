@@ -7,11 +7,11 @@
 #include "hookenv.h"
 #include "fn_tag.h"
 #include "mirror_layouts.h"
-#include "../d2moo/include/D2Game/UNIT/SUnit.h"
-#include "../d2moo/include/D2Game/GAME/Event.h"
-#include "../d2moo/include/D2DataTbls.h"
-#include "../d2moo/include/Units/Units.h"
-#include "../d2moo/compat/test_seam.h"
+#include "../include/D2Game/UNIT/SUnit.h"
+#include "../include/D2Game/GAME/Event.h"
+#include "../include/D2DataTbls.h"
+#include "../include/Units/Units.h"
+#include "../compat/test_seam.h"
 
 static HookEnv* E; static mirror::Mirror* M;
 

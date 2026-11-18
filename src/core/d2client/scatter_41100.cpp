@@ -2,8 +2,8 @@
 // disassembly: eax=unit, edx=seed low, stack args arg1..arg6 pushed by 0x41780 with arg1==edx).
 #include <cstdint>
 #include <cstring>
-#include "../d2moo/include/D2Seed.h"
-#include "../d2moo/include/Units/Units.h"
+#include "../include/D2Seed.h"
+#include "../include/Units/Units.h"
 
 extern "C" int32_t d2_client_1400(int32_t room, int32_t x, int32_t y);    // room_find_1400.cpp
 extern "C" void* d2client_msl_create_b30f0(const uint32_t* req);          // missile_create_b30f0.cpp

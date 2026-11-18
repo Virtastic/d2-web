@@ -7,7 +7,7 @@
 #include <D2DataTbls.h>
 #include <D2StatList.h>
 #include <Units/Units.h>
-#include "../d2moo/compat/test_seam.h"
+#include "../compat/test_seam.h"
 #include "realm_skill_do.h"
 
 // gdwBitMasks is the table of single bits; its byte +8 is the low byte of entry 2.

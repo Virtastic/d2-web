@@ -1,6 +1,6 @@
 // 1.13c D2Common implementation batch (rows 0x2E990, 0x4A450, 0x2E960, 0x4DFD0, 0x30830, 0x390A0).
 // Each body is written from the pinned 1.13c decompile and its disassembly; where the vendored
-// D2MOO 1.10f twin is the same body the twin is called by name.
+// 1.10f twin is the same body the twin is called by name.
 #include <cstddef>
 #include <cstdint>
 #include <emscripten.h>
@@ -50,10 +50,10 @@ EMSCRIPTEN_KEEPALIVE D2DrlgRoomTilesStrc* D2Common_4DFD0_GetRoomTiles(D2ActiveRo
 // 1.13c D2Common+0x30830 (#10172): overlay height of a unit. Null unit reads as type 6, so it
 // falls through to 0. Type 0 (player) is 1; type 1 (monster) is MonStats2.nOverlayHeight (0x0C)
 // minus one, or 0 when the row is missing; any other type is 0. Same body as the vendored
-// D2MOO 1.10f UNITS_GetOverlayHeight.
+// 1.10f UNITS_GetOverlayHeight.
 EMSCRIPTEN_KEEPALIVE int D2Common_30830_UNITS_GetOverlayHeight(D2UnitStrc* pUnit)
 {
 	return UNITS_GetOverlayHeight(pUnit);
 }
 
-// D2Common+0x390A0 now runs as STATLIST_GetMaxManaFromUnit (src/core/d2moo/src/D2StatList.cpp).
+// D2Common+0x390A0 now runs as STATLIST_GetMaxManaFromUnit (src/core/game/D2StatList.cpp).

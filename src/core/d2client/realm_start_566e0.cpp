@@ -6,7 +6,7 @@
 #include <Path/Path.h>
 #include <Units/Units.h>
 #include "realm_skill_start.h"
-#include "../d2moo/compat/test_seam.h"
+#include "../compat/test_seam.h"
 
 int d2client_realm_566e0(D2UnitStrc* unit, int, int) {
     D2SkillStrc* used = D2_CALL(UNITS_GetUsedSkill, unit);

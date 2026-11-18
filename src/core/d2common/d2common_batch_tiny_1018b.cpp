@@ -151,7 +151,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_61EA_Unlock4(void)
 
 // --- fourth tiny batch (rows 0x70F80, 0x87537, 0x867D6, 0x867E9, 0x87C5B, 0x876BE) ---------------
 
-// D2Common+0x70F80 lives in the game tree (src/core/d2moo/src/Retail/D2Common_70f80.cpp).
+// D2Common+0x70F80 lives in the game tree (src/core/game/Retail/D2Common_70f80.cpp).
 
 // 1.13c D2Common+0x87C5B (__controlfp): __control87 with the __EM_INVALID bit (0x80000) cleared from
 // the mask. __control87 (0x87C29) is still UNMAPPED, so the abstract control-word transform is a
@@ -206,7 +206,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_45640_ShiftBySelector(uint32_t nSe
 	}
 }
 
-// D2Common+0x87209 (__shift) lives in the game tree (src/core/d2moo/src/Retail/D2Common_87209.cpp).
+// D2Common+0x87209 (__shift) lives in the game tree (src/core/game/Retail/D2Common_87209.cpp).
 
 // 0x22920 is ITEMS_CheckIfSocketableByItemId, mapped in d2common_batch_33020.cpp.
 extern "C" int D2Common_10211_ITEMS_CheckIfSocketableByItemId(int nItemId);
@@ -250,12 +250,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_53370_GetCountedTableRecord(
     return nIndex < nCount ? retailBase + uint32_t(nIndex) * 0x34u : 0u;
 }
 
-// D2Common+0x533F0 and 0x87C71 live in the game tree (src/core/d2moo/src/Retail).
+// D2Common+0x533F0 and 0x87C71 live in the game tree (src/core/game/Retail).
 
 // --- eighth tiny batch (rows 0x535D0, 0x87589, 0x4D970, 0x85CF0, 0x85DF0) ----------------------
 // 0x3B5B0 belongs to another change and is not touched here.
 
-// D2Common+0x535D0 lives in the game tree (src/core/d2moo/src/Retail/D2Common_535d0.cpp).
+// D2Common+0x535D0 lives in the game tree (src/core/game/Retail/D2Common_535d0.cpp).
 
 // 1.13c D2Common+0x87589 (__ms_p5_mp_test_fdiv): probe the host for the divide-by-zero exception
 // feature through KERNEL32, and fall back to the internal CRT test (0x87549) when the module or the

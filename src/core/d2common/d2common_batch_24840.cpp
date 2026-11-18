@@ -1,5 +1,5 @@
 // 1.13c D2Common implementation batch (rows 0x24840 and 0x24A50).
-// Prior art: 's item-generation row; D2MOO's 1.10f
+// Prior art: 's item-generation row; 1.10f
 // ITEMS_CalculateTransactionCost is the closest named twin. The 1.13c call frames retain retail
 // EAX and stack inputs as uint32_t values. Retail pointers in records are 32-bit handles and pass
 // through resolveAddress; no retail layout field is read at wasm64 pointer width.

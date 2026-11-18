@@ -1,6 +1,6 @@
 #include <cstdint>
 
-// Prior art: none in D2MOO (linked MSVC CRT).
+// Prior art: none in the 1.10f source (linked MSVC CRT).
 // 1.13c D2Common+0x028F6 (_flsall)
 // Under lock 1, walks the CRT stream table (DAT_6fdf1820, DAT_6fdf2840 entries, handed in as
 // pTable/nCount): for each stream whose _flag (+0xC) & 0x83 is set, lock it (0x422D), re-test, then

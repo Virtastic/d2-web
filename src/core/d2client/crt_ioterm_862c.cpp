@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <emscripten.h>
 
-// Prior art: RE-map row; D2MOO has no D2Client CRT body.
+// Prior art: RE-map row; the 1.10f source has no D2Client CRT body.
 // Cross-check: src/core/realm/mcp_crt_batch_b56.cpp, d2_mcp_ioterm.
 struct D2ClientIoInfo862c {
     int32_t handle;

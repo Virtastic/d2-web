@@ -52,7 +52,7 @@ static const D2GameBatch19Env& d2game_env(const uint32_t* r) {
 static void d2game_file_unlock(FILE* stream) { (void)stream; }
 
 // 0x28E5 __lock(8) / 0x3F76 __unlock(8): Enter/LeaveCriticalSection on the CRT lock table. The compat
-// critical section (src/core/d2moo/compat/Windows.h) is a no-op, so the lock is the index.
+// critical section (src/core/compat/Windows.h) is a no-op, so the lock is the index.
 static void d2game_crt_lock(uint32_t index)   { (void)index; }
 static void d2game_crt_unlock(uint32_t index) { (void)index; }
 

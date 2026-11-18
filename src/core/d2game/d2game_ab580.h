@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xAB580 (AI think, Shadow Master / assassin minion; D2MOO AITHINK_Fn106_143_ShadowMaster): ECX = pGame, EDX = pUnit,
+// 1.13c D2Game+0xAB580 (AI think, Shadow Master / assassin minion; the 1.10f source AITHINK_Fn106_143_ShadowMaster): ECX = pGame, EDX = pUnit,
 // stack = pAiTickParam (ret 4; the result is residue). Written from the 1.13c disassembly as a rule over E.
 // tp: +0 ai control (+0x14 counter, +0x18 held skill, +0x1C level), +8 target, +0x14 distance, +0x18 combat flag, +0x1C monstats row.
 // E supplies dt (the skills table base, [[0xF829C]]) and masks ([0xF8BE0]). Percent rolls are the inline seed step on unit +0x20/+0x24;

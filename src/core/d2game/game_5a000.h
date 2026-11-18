@@ -1,6 +1,6 @@
 // 1.13c D2Game+0x5A000: ACT5Q3_UpdateResistances, retail form.
 // Convention: ESI = pUnit, EDI = nValue, one stack argument pGame (`ret 4`). Retail 32-bit layout; the vendored
-// 1.10f body is src/core/d2moo/src/D2Game/QUESTS/ACT5/A5Q3.cpp:ACT5Q3_UpdateResistances. The callees are D2Common
+// 1.10f body is src/core/game/D2Game/QUESTS/ACT5/A5Q3.cpp:ACT5Q3_UpdateResistances. The callees are D2Common
 // imports (0xA6A0, 0xA60A, 0xA6E2) and 0xCC2F0, handed in as seams (the way game_74ce0.h does).
 #pragma once
 #include <cstdint>

@@ -3,7 +3,7 @@
 // #10614 SEED_InitLowSeed and #10513 SEED_GetLowSeed run for real (D2Common, ours); the spawn and the two setters are the environment.
 #include <cstdint>
 #include <cstring>
-#include "../d2moo/include/D2Seed.h"
+#include "../include/D2Seed.h"
 #include "d2client_40df0.h"
 
 extern "C" void d2c_40df0(int32_t n, uint32_t seedLow, uint32_t p1, uint32_t p2, uint32_t p3, uint32_t p4,

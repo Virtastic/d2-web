@@ -1,6 +1,6 @@
 // 1.13c D2Game+0xDF7B0, written from the decompile as a rule over an environment E:
-// schedule the per-frame animation events of a unit's current mode. The vendored D2MOO 1.10f body
-// (src/core/d2moo/src/D2Game/UNIT/SUnit.cpp:sub_6FCBCE70) is this same rule with the walk loop rotated and
+// schedule the per-frame animation events of a unit's current mode. The vendored 1.10f body
+// (src/core/game/D2Game/UNIT/SUnit.cpp:sub_6FCBCE70) is this same rule with the walk loop rotated and
 // EVENT_SetEvent inlined into the direct D2GAME_InitTimer call; a probe's E logs and scripts the calls
 // (src/core/fn/hookenv.h).
 //

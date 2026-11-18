@@ -178,7 +178,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_1ED00_FindItemInGrid(uint32_t pInventory,
 	return 0;
 }
 
-// Superseded by UNITS_GetDefense (src/core/d2moo/src/Units/Units.cpp, the row for 0x32890); kept for reference only.
+// Superseded by UNITS_GetDefense (src/core/game/Units/Units.cpp, the row for 0x32890); kept for reference only.
 // D2Common 0x32890 (#10672): scaled stat total. Base = total(31) + total(2)/4;
 // bonus = total(171) + total(16); for unit types 0, 1 and 3 that carry state 101 the first matching
 // list node (state number at node+0x14, chains at +0x3C and +0x40 via +0x2C) adds the two stats
@@ -298,7 +298,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_50090_UnitStateHit(uint32_t pUnit,
 	return (pfn51470 && pfn51470(pUnit, 7) != 0) ? 1 : 0;
 }
 
-// D2Common+0x66410 is UNITROOM_RemoveUnitFromUpdateQueue (d2moo UnitRoom.cpp).
+// D2Common+0x66410 is UNITROOM_RemoveUnitFromUpdateQueue (1.10f UnitRoom.cpp).
 
 // 1.13c D2Common+0x46920 (#10684): roll an item's file index from the table at DAT_6fdeefa4 (count
 // DAT_6fdeefa0) with the item's seed (item data +4, LCG 0x6AC690C5), store it at item data +0x28,

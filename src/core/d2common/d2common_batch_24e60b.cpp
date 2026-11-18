@@ -2,7 +2,7 @@
 // +0x2E2C0, taken with it), +0x2DF80, +0x120F0, +0x121D0. Only +0x2DDB0 is kept here: the other
 // five were already landed on main in src/core/d2common/d2common_batch_24e60.cpp, and defining
 // them twice breaks the wasm link. +0x38B00 is the vendored
-// STATLIST_GetBaseStat_6FDB6340 and is marked there (src/core/d2moo/src/D2StatList.cpp).
+// STATLIST_GetBaseStat_6FDB6340 and is marked there (src/core/game/D2StatList.cpp).
 // The +0x2DDB0 body is src/core/d2common/d2common_2ddb0.cpp (env form, shared with its FN probe); this file
 // binds the env to the real callees. DRLG level records and their rooms are reached through the 1.13c
 // 32-bit offsets (the vendored 1.10f structs reorder those fields). A callee that is still an UNMAPPED

@@ -9,7 +9,7 @@ static_assert(sizeof(D2PlayerDataStrc::unk0xA8) / sizeof(uint32_t) == 46, "image
 static_assert(offsetof(D2PlayerDataStrc, unk0xA8) + 42 * sizeof(uint32_t) > 0x150,
               "wasm64 puts unk0xA8 past its image offset; the FN probe's skew depends on this");
 
-// 1.13c D2Common+0x1000 is the game body in src/core/d2moo/src/Units/Units.cpp.
+// 1.13c D2Common+0x1000 is the game body in src/core/game/Units/Units.cpp.
 void D2Common_1000_SetPlayerNotice(D2UnitStrc* pUnit, uint32_t a, uint32_t b, uint32_t c);
 
 // 1.13c D2Common+0x7F670 (#10329): player unit with player data: +0x150 = 1, then 0x1000 stores a, b, c.

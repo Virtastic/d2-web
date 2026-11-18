@@ -1,6 +1,6 @@
 // 1.13c D2Game+0x5C690: act-5 quest 3, spawn Drehya (monster 0x200) at her town object and open the town portal (object
 // 0xBD) at her feet. stdcall (quest, questEx), ret 8. Written from the 1.13c disassembly;
-// differs from D2MOO 1.10f in order: the object's room and X/Y are read before the "monster already spawned" test, and the
+// differs from 1.10f in order: the object's room and X/Y are read before the "monster already spawned" test, and the
 // object lookup (game +0x1520 object hash, chain +0xE4) is inlined. Callees go through Env so the FN probe can record them.
 #ifndef D2GAME_5C690_CPP
 #define D2GAME_5C690_CPP

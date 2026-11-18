@@ -4,8 +4,8 @@
 // 10350 (D2COMMON_11013_ConvertMode), which converts only a shapeshifted unit.
 #include <cstdint>
 #include <cstddef>
-#include "../d2moo/include/D2Skills.h"        // D2COMMON_11013_ConvertMode
-#include "../d2moo/include/Units/Units.h"     // UNITS_GetAnimOrSeqMode, D2UnitStrc
+#include "../include/D2Skills.h"        // D2COMMON_11013_ConvertMode
+#include "../include/Units/Units.h"     // UNITS_GetAnimOrSeqMode, D2UnitStrc
 
 // The unit fields this function copies out before the conversion (the mode itself is the callee's read).
 struct D2cUnitMode223d0 {
@@ -16,8 +16,8 @@ static_assert(offsetof(D2cUnitMode223d0, dwUnitType) == 0x00, "dwUnitType");
 static_assert(offsetof(D2cUnitMode223d0, dwClassId) == 0x04, "dwClassId");
 // This struct is compiled both 32-bit (the capture exe) and wasm64 (the engine): every pointer field is
 // 8 bytes there, so each field after a pointer sits (sizeof(void*)-4) further along than retail. The
-// retail offset plus one step per pointer field before it holds in both builds (D2MOO's own convention,
-// src/core/d2moo/src/Units/Units.cpp:2127).
+// retail offset plus one step per pointer field before it holds in both builds (the 1.10f source's own convention,
+// src/core/game/Units/Units.cpp:2127).
 static_assert(offsetof(D2UnitStrc, dwUnitType) == 0x00, "D2UnitStrc dwUnitType");
 static_assert(offsetof(D2UnitStrc, dwClassId)  == 0x04 +  0 * (sizeof(void*) - 4), "D2UnitStrc dwClassId");
 static_assert(offsetof(D2UnitStrc, dwAnimMode) == 0x10 +  1 * (sizeof(void*) - 4), "D2UnitStrc dwAnimMode");

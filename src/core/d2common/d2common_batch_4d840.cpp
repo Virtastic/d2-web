@@ -170,7 +170,7 @@ struct D2Common_10531_Env
 	uint32_t (*pValidateRoomUnit)(int32_t*, int32_t*, int32_t);
 };
 
-// Superseded by UNITROOM_AddUnitToRoomEx (src/core/d2moo/src/Units/UnitRoom.cpp, the row for 0x66800); kept for reference only.
+// Superseded by UNITROOM_AddUnitToRoomEx (src/core/game/Units/UnitRoom.cpp, the row for 0x66800); kept for reference only.
 // D2Common 0x66800: links the unit at the head of the room's unit list (room+0x74, unit
 // next at +0xE8), refreshes it, and counts it in room+0x28 when it is a plain unit or a
 // type-1 unit with alignment 2. Null unit/room (fatal 0x42/0x43) and a failed validation
@@ -247,7 +247,7 @@ void D2Common_10542_SetWordInDword0x38(uint8_t* pBlock, int32_t nValue)
 	W(pBlock, 0x38) = (R(pBlock, 0x38) & 0xff) + static_cast<uint32_t>(nValue) * 0x100;
 }
 
-// Export of 1.13c D2Common 0x24EB0: the body is ITEMS_GetAmmoType in src/core/d2moo/src/Items/Items.cpp.
+// Export of 1.13c D2Common 0x24EB0: the body is ITEMS_GetAmmoType in src/core/game/Items/Items.cpp.
 // The env seam is kept for the old probe signature and is no longer consulted.
 extern "C"
 int32_t D2Common_10543_GetItemShoots(const int32_t* pUnit, const D2Common_10523_Env*)

@@ -1,5 +1,5 @@
 // D2Game+0x7E070: AI think function (pGame ecx, pUnit edx, pAiTickParam stack). Decompile had hidden
-// register inputs; resolved from the disassembly. Prior art: D2MOO AiThink (Baboon velocity block).
+// register inputs; resolved from the disassembly. Prior art: the 1.10f source AiThink (Baboon velocity block).
 #include <cstdint>
 #include <algorithm>
 #include <D2Seed.h>

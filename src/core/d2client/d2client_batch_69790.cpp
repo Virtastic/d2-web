@@ -1,4 +1,4 @@
-// Prior art: none (D2MOO has no D2Client module); transcribed from Ghidra decompile of 1.13c D2Client.
+// Prior art: none (the 1.10f source has no D2Client module); transcribed from Ghidra decompile of 1.13c D2Client.
 // Gfx.cpp resource-cache / per-unit cel-list helpers. Imports are abstract Services; args marked GUESS are unverified.
 #include <cstdint>
 #include <cstring>

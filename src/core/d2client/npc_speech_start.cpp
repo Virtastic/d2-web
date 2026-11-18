@@ -13,8 +13,8 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
-#include "../d2moo/include/D2Text.h"
-#include "../d2moo/include/D2PacketDef.h"
+#include "../include/D2Text.h"
+#include "../include/D2PacketDef.h"
 #include "sound_unit_refs.h"
 
 extern "C" const char* d2_lang_string_by_index(int index);

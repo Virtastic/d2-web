@@ -2,7 +2,7 @@
 // _flag intersects 0x83 is flushed, its buffer freed and descriptor closed. A close error forces -1;
 // after a successful close, a non-null temporary name is freed and cleared. The flag is cleared on
 // every path, and the result is the flush status unless close failed.
-// Prior art: no matching CRT implementation in D2MOO's D2Gfx module; cross-checked the same VS2003
+// Prior art: no matching CRT implementation in the 1.10f source's D2Gfx module; cross-checked the same VS2003
 // routine already recovered for D2Client+0x03857, and kept this DLL's callees as explicit seams.
 #include <cstddef>
 #include <cstdint>

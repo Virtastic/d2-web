@@ -8,13 +8,13 @@
 #include "hookenv.h"
 #include "fn_tag.h"
 #include "D2DataTbls.h"
-#include "../d2moo/include/D2Game/SKILLS/Skills.h"
-#include "../d2moo/include/D2Game/UNIT/SUnit.h"
-#include "../d2moo/include/D2Game/GAME/SCmd.h"
-#include "../d2moo/include/D2ItemMods.h"
-#include "../d2moo/include/D2Skills.h"
-#include "../d2moo/include/D2StatList.h"
-#include "../d2moo/compat/test_seam.h"
+#include "../include/D2Game/SKILLS/Skills.h"
+#include "../include/D2Game/UNIT/SUnit.h"
+#include "../include/D2Game/GAME/SCmd.h"
+#include "../include/D2ItemMods.h"
+#include "../include/D2Skills.h"
+#include "../include/D2StatList.h"
+#include "../compat/test_seam.h"
 
 static HookEnv* E;
 static const uint32_t kFile = 0xB20FB980u;   // the source-file string retail pushes to 0xA49C, logged as its module offset

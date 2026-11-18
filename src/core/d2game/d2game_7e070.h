@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x7E070 (AI think, hit-and-run flavour; D2MOO baboon block): ECX = pGame, EDX = pUnit, stack = pAiTickParam (ret 4; the result is residue).
+// 1.13c D2Game+0x7E070 (AI think, hit-and-run flavour; the 1.10f source baboon block): ECX = pGame, EDX = pUnit, stack = pAiTickParam (ret 4; the result is residue).
 // Written from the 1.13c disassembly as a rule over E (see d2game_179a0.h). tp: +0 ai control (+0x14 phase, +0x18 counter), +8 target, +0x14 distance, +0x18 combat flag,
 // +0x1C monstats row. Row words indexed by game byte +0x6D (word per difficulty): P(k) at +0x56+6k; skill +0x170 (word, <0 none), skill byte +0x180, velocity +0x32, run +0x34.
 // Rolls: percent rolls are the inline seed step (seed = lo*0x6AC690C5 + hi, result low32 % 100); the skill roll is 0x1180(EAX = 100, ECX = &seed).

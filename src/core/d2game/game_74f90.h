@@ -1,5 +1,5 @@
 // 1.13c D2Game+0x74F90: the mode-change path resolver the 1.13c compiler
-// factorised out of D2GAME_ModeChange_6FC65220 (vendored: src/core/d2moo/src/D2Game/MONSTER/MonsterMode.cpp,
+// factorised out of D2GAME_ModeChange_6FC65220 (vendored: src/core/game/D2Game/MONSTER/MonsterMode.cpp,
 // the inlined block at line 1837). Retail 32-bit layout only -- the three slices below pin exactly the fields
 // the function reads or writes, the way src/core/d2game/game_8b340.cpp pins its client block.
 #pragma once

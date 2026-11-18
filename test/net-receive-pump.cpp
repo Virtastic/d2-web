@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "core/realm/d2gs_client_packets.cpp"
-#include "core/d2moo/d2client/d2client_43920.cpp"
+#include "core/d2client/d2client_43920.cpp"
 #include "core/d2client/server_packet_table.h"
 
 namespace {

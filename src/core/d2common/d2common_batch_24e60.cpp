@@ -21,14 +21,14 @@ namespace
 }
 
 // Item unit -> ItemTypes.txt row (via 0x230F0) field +0x0E (wQuiver), sign-extended; 0 otherwise.
-// Export of 1.13c D2Common 0x24E60; the body is ITEMS_GetQuiverType in src/core/d2moo/src/Items/Items.cpp.
+// Export of 1.13c D2Common 0x24E60; the body is ITEMS_GetQuiverType in src/core/game/Items/Items.cpp.
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_24E60_GetItemQuiver(uint32_t pUnit) {
 	return ITEMS_GetQuiverType(reinterpret_cast<D2UnitStrc*>(P(pUnit)));
 }
 
 // Maximum sockets for an item unit (ITEMS_GetMaxSockets): ItemTypes row of the item's type, cap by
 // item level (<=25 nMaxSock1, <=40 nMaxSock25, else nMaxSock40), min with items.txt nGemSockets.
-// Export of 1.13c D2Common 0x24610; the body is ITEMS_GetMaxSockets in src/core/d2moo/src/Items/Items.cpp.
+// Export of 1.13c D2Common 0x24610; the body is ITEMS_GetMaxSockets in src/core/game/Items/Items.cpp.
 extern "C" uint32_t d2_ours_d2common_24610(D2UnitStrc* pItem) {
 	return ITEMS_GetMaxSockets(pItem);
 }
@@ -89,7 +89,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_37e70_batch(uint32_t pUn
 // Build the set-item quality mask by walking inventory items and resolving their set records.
 // D2Common 0x23F90
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_legacy_d2common_23f90(uint32_t pUnit, uint32_t pItem, uint32_t nIncludeCurrent) {
-	return ITEMS_GetSetItemsMask(reinterpret_cast<D2UnitStrc*>(P(pUnit)), reinterpret_cast<D2UnitStrc*>(P(pItem)), nIncludeCurrent); // vendored D2MOO body, validated in the spec
+	return ITEMS_GetSetItemsMask(reinterpret_cast<D2UnitStrc*>(P(pUnit)), reinterpret_cast<D2UnitStrc*>(P(pItem)), nIncludeCurrent); // vendored the 1.10f source body, validated in the spec
 }
 
 // Unit stat accessor for the unit's data block. These unit types store the primary value at +0x10;
@@ -121,7 +121,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2common_24e60_2e2c0(uint32_t pDrlg) {
 	}
 }
 
-// D2Common+0x38B00 now runs as STATLIST_GetBaseStat_6FDB6340 (src/core/d2moo/src/D2StatList.cpp).
+// D2Common+0x38B00 now runs as STATLIST_GetBaseStat_6FDB6340 (src/core/game/D2StatList.cpp).
 
 // Add nDelta to a level's reference count (+0x0C, clamped at 0, delay +0x1D4 = 10), then do the same
 // to the level record of each nonzero id in its eight-entry link list (0x44CE0 on the DRLG at +0x1B4

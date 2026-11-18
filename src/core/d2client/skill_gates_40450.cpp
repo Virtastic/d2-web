@@ -6,12 +6,12 @@
 // Registers the cached decompile drops are explicit trailing parameters.
 #include <cstdint>
 #include <cstring>
-#include "../d2moo/include/D2DataTbls.h"
-#include "../d2moo/include/D2Seed.h"
-#include "../d2moo/include/D2Skills.h"
-#include "../d2moo/include/D2StatList.h"
-#include "../d2moo/include/D2BitManip.h"
-#include "../d2moo/include/Units/Missile.h"
+#include "../include/D2DataTbls.h"
+#include "../include/D2Seed.h"
+#include "../include/D2Skills.h"
+#include "../include/D2StatList.h"
+#include "../include/D2BitManip.h"
+#include "../include/Units/Missile.h"
 #include "skill_gates_40450.h"
 #include "d2client_40df0.h"
 #include "d2c_seam.h"

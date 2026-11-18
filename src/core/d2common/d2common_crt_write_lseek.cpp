@@ -1,4 +1,4 @@
-// Prior art used: none in D2MOO (host CRT); rules from the cached 1.13c bodies. Same env-seam shape as
+// Prior art used: none in the 1.10f source (host CRT); rules from the cached 1.13c bodies. Same env-seam shape as
 // bnclient_batch_6265.cpp: the ioinfo table, errno slots and lock calls are host seams.
 #include <cstdint>
 #include "Crt/D2CrtFdEnv.h"

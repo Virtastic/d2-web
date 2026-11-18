@@ -1,4 +1,4 @@
-// D2Game +0x9CB00 (marker lives on the d2moo AITHINK_Fn001_100_Idle_Buffy): monster think callback (table entry). ecx = game, edx = the monster, one stack word
+// D2Game +0x9CB00 (marker lives on the 1.10f AITHINK_Fn001_100_Idle_Buffy): monster think callback (table entry). ecx = game, edx = the monster, one stack word
 // unread (ret 4). A monster with a room (0xA478) is told to idle for 200 frames (0xF22C0: eax = game, esi = monster,
 // one stack word = 200) and that call's result is the result; with no room the result is 0.
 #pragma once

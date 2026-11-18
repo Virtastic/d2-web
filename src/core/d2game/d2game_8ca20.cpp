@@ -4,7 +4,7 @@
 // thunks 0xA2B6 / 0xA2CE / 0xA2E0) at packet+13, capacity 0xF4: mode nibble, the component block (0xAF610 / 0xADA2) or the
 // champion block (type flags, boss id, mods, name word, pet owner via 0xE03A0 / 0x96600), alignment, the sent stats
 // (0xAFBE / 0xA4C6, ItemStatCost +4 & gdwBitMasks[0], +8 bits, +9 param bits), and 0x8A3E0 sends size = bits + 13.
-// The D2MOO 1.10f counterpart is sub_6FC3FC80 (stubbed empty in compat/game_net_stubs.cpp).
+// The 1.10f counterpart is sub_6FC3FC80 (stubbed empty in compat/game_net_stubs.cpp).
 #include <cstdint>
 #include <cstring>
 

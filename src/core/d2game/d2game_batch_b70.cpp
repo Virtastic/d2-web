@@ -109,7 +109,7 @@ extern "C" void D2Game_79730(int32_t* game, int32_t* unit)
     D2Game_DA750();
 }
 
-// D2Game +0x79850 (marker lives on the d2moo sub_6FC81250)
+// D2Game +0x79850 (marker lives on the 1.10f sub_6FC81250)
 extern "C" void D2Game_79850(int32_t* game, int32_t* unit)
 {
     int32_t t = 0;

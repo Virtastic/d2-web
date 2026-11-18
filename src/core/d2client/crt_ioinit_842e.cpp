@@ -1,5 +1,5 @@
 // Prior art: src/core/realm/mcp_crt_batch_b56.cpp (__ioinit), cross-checked against the
-// cached 510-byte D2Client 1.13c body. D2MOO has no D2Client module.
+// cached 510-byte D2Client 1.13c body. the 1.10f source has no D2Client module.
 #include <cstdint>
 #include <cstddef>
 #include <cstring>

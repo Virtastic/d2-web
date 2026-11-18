@@ -47,7 +47,7 @@ void D2Common_32CA0_StoreOwnerInfo(uint32_t unit, int32_t type, int32_t id, bool
  }
  w(unit,0xC8)|=0x400;
 }
-// 0x24F00 is ITEMS_IsRepairableStack in d2moo/src/Items/Items.cpp.
+// 0x24F00 is ITEMS_IsRepairableStack in game/Items/Items.cpp.
 // 1.13c D2Common+0x4F870: stat gate for category 1,2,4,5,12.
 int32_t D2Common_4F870_StatGate(uint32_t unit, int32_t category, int32_t ratio,
  uint32_t tableCount, uint32_t tableRow, uint32_t (*hasStat)(uint32_t,int32_t),

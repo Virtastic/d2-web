@@ -14,7 +14,7 @@
 // signatures for 0x537D0/0x53470), d2game_batch_3261.cpp and d2game_batch_28ee.cpp (the host-stdio
 // collapse of the CRT FILE), d2game_crt_write.cpp (the _pioinfo/nhandle model of __close),
 // d2game_batch_2a6d.cpp and d2client_batch_908f.cpp (the InitializeCriticalSectionAndSpinCount
-// resolution), and D2MOO PLAYER/PlrSaveItems.cpp PLRSAVE_WriteItems_6FC89B50 (the 1.10f ancestor of
+// resolution), and the 1.10f source PLAYER/PlrSaveItems.cpp PLRSAVE_WriteItems_6FC89B50 (the 1.10f ancestor of
 // 0x537D0, whose item-section layout this row matches byte for byte).
 #include <cstdint>
 #include <cstddef>
@@ -210,7 +210,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_4eea(const D2GameCrtStreamEnv* env) {
 
 // 1.13c D2Game+0x537D0 (PLRSAVE item section): write the 'JM' item bitstream.
 // dest arrives in ECX, the inventory in EDX, game/unit/nSize are the first three stack arguments.
-// The 1.10f body is PLRSAVE_WriteItems_6FC89B50 (D2MOO PLAYER/PlrSaveItems.cpp); the 1.13c deltas are
+// The 1.10f body is PLRSAVE_WriteItems_6FC89B50 (the 1.10f source PLAYER/PlrSaveItems.cpp); the 1.13c deltas are
 // the item count moving to 0x53260 (cursor + non-null INVENTORY_UnitIsItem chain, ushort), and a
 // pre-pass that serialises the two hand items into a 0x2000 stack scratch through #10987 and only
 // reports failure, before the real write pass through the 0x53470 wrapper.

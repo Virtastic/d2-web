@@ -9,7 +9,7 @@
 // Not modelled: the other actions' handlers (ground to cursor, equip, swap, shop).
 #include <cstdint>
 #include <set>
-#include "../d2moo/include/D2Items.h"
+#include "../include/D2Items.h"
 
 namespace {
 std::set<uint32_t> g_held;    // item ids in the client's item hash that the room walk does not count

@@ -2,8 +2,8 @@
 #include <cstddef>
 #include <cstring>
 #include <emscripten.h>
-#include "../d2moo/include/Units/Units.h"
-#include "../d2moo/include/DataTbls/LevelsTbls.h"
+#include "../include/Units/Units.h"
+#include "../include/DataTbls/LevelsTbls.h"
 
 // 1.13c D2Client+0x226A0: the class 0..6 of the room record under a unit.
 // eax = pUnit. Reads DAT_6fbcbbfc (0x11BBFC), DAT_6fbcc254 (0x11C254), DAT_6fbcc258 (0x11C258); writes none.

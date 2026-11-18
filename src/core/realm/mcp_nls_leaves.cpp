@@ -1,5 +1,5 @@
 // Prior art used: BNClient's MSVC classification sibling (bnclient_batch2_crt.cpp)
-// and the existing MCP NLS callers. D2MOO's MCP module has only a close stub.
+// and the existing MCP NLS callers. the 1.10f source's MCP module has only a close stub.
 // Windows NLS and allocation results are supplied explicitly; no private CRT state.
 #include <cstdint>
 #include <cstring>

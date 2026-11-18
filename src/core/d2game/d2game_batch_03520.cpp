@@ -8,7 +8,7 @@
 // client record is opaque and read/written through retail byte offsets. The callees whose implementations
 // live outside this batch are seam function pointers in D2GameBatchSeams, in retail argument order -- a
 // Ghidra call that passed its only argument in a register (ESI/EAX) gets an explicit parameter here.
-// Critical sections, __lock and IsBadCodePtr are the compat no-ops (src/core/d2moo/compat/Windows.h):
+// Critical sections, __lock and IsBadCodePtr are the compat no-ops (src/core/compat/Windows.h):
 // the lock/validity paths collapse to their effect. The fatal path is Ordinal_10265(id) ->
 // Ordinal_10024(&moduleName, id) -> _exit(-1); only the exit is observable and is modelled.
 #include <cstdint>

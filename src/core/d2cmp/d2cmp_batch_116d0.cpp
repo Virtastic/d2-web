@@ -7,8 +7,8 @@
 // only the exit is observable and is d2cmp_fatal. The internal callees the decompile still names
 // (0x9720, 0x1BC00, Fog #10043 FOG_Free, Storm #423 SRegLoadValue) are seams on
 // D2CMPBatch116d0Env, passed after the retail arguments, which keep their order.
-// Prior art: D2MOO 1.10f reference/D2MOO/source/D2CMP (export/ordinal map only; the 1.10f modules
-// are stubs), and D2MOO's D2TileLibraryEntryStrc layout for the entry getters.
+// Prior art: 1.10f the 1.10f reference source (export/ordinal map only; the 1.10f modules
+// are stubs), and the 1.10f source's D2TileLibraryEntryStrc layout for the entry getters.
 #include <cstdint>
 #include <cstddef>
 #include <cstring>
@@ -44,7 +44,7 @@ uint32_t d2cmp_116d0(const void* obj) {
     return rd32(obj, 0x0C);
 }
 
-// 1.13c D2CMP+0x151E0 (export #10011, 45 bytes): the tile entry's +0x28 byte array (D2MOO
+// 1.13c D2CMP+0x151E0 (export #10011, 45 bytes): the tile entry's +0x28 byte array (the 1.10f source
 // D2TileLibraryEntryStrc dwTileFlags[4] / GetTileFlagArray). Returns the address, not the contents.
 // 1.13c D2CMP+0x151E0
 extern "C"

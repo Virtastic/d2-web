@@ -36,7 +36,7 @@ export function createObjectShadowPolicy(read, engine = globalThis.Module) {
       const row = native ? { drawUnder: native.drawUnder, blocksLight: Array.from({ length: 8 }, () => (native.blocks ? 1 : 0)) }
         : load().get(classId) || { drawUnder: 0, blocksLight: null };
       const drawUnder = row.drawUnder;
-      // D2Client 1.13c sets the unit's no-shadow bit (0x20, D2MOO's misnamed UNITFLAG_DRAWSHADOW) at object
+      // D2Client 1.13c sets the unit's no-shadow bit (0x20, the 1.10f source's misnamed UNITFLAG_DRAWSHADOW) at object
       // creation and on every mode change when Objects.txt BlocksLight[mode] is 0; the shadow draw returns
       // early on it. Measured: 1,429/1,429 shadowed
       // object instances in the retail captures have BlocksLight[mode]=1; `99` and R1/R2/R3 have 0.

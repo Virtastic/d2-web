@@ -1,7 +1,7 @@
 // Level orth node: EAX = level, three stack words (head pointer, direction, preset; callee pops them). A 0x18-byte node is allocated from the DRLG's pool (level +0x1B4 ->
 // drlg, drlg +0x478 -> pool; file DrlgRoom.cpp line 0x15F), zeroed and filled (+0 level, +4 direction, +8 preset, +0xC 0, +0x10 = level + 0x1C), then handed to the sorted
 // insert 0x44B20 (EBX = node, stack = head); its EAX is the function's. D2Common_44F20 is the retail layout (32-bit tokens, `resolve`, `alloc` and `insert` seams);
-// D2Common_44F20_Engine is the engine form on D2MOO structs.
+// D2Common_44F20_Engine is the engine form on the 1.10f source structs.
 #include <cstdint>
 #include <cstddef>
 #include <cstring>

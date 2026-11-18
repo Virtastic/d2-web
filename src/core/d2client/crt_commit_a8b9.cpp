@@ -1,4 +1,4 @@
-// Prior art: no D2MOO D2Client module exists. The adjacent D2Client CRT rows
+// Prior art: no the 1.10f source D2Client module exists. The adjacent D2Client CRT rows
 // (crt_read_8383.cpp and crt_lseeki64_lk_a4bc.cpp) establish the shared descriptor table
 // and explicit Win32 host seams; the cached 1.13c body controls this function's branches.
 #include <cstddef>

@@ -3,7 +3,7 @@ The third-party components below keep their own licences, all compatible with AG
 
 d2-web -- third-party notices
 
-src/core/d2moo/        D2MOO, MIT License, (c) The Phrozen Keep community. See src/core/d2moo/LICENSE.
+src/core/game/   D2MOO, MIT License, (c) The Phrozen Keep community. Source: https://github.com/ThePhrozenKeep/D2MOO. See src/core/LICENSE.d2moo.
 third_party/StormLib   StormLib, MIT License, (c) Ladislav Zezula. Cloned separately; not vendored.
 play/assets/vendor/unbikit.js   unbikit, MIT OR Apache-2.0. See play/assets/vendor/unbikit.LICENSE.md.
 

@@ -2,8 +2,8 @@
 // Bodies follow the cached 1.13c decompiles (build-wasm/ghidra-d2common/decomp/0x<RVA>.c); the
 // register-only operands were recovered from the retail disassembly. Rows whose body is already the
 // vendored 1.10f function are marked in place there instead of being duplicated:
-//   0x321E0 = UNITS_GetHitClass (src/core/d2moo/src/Units/Units.cpp), no delta;
-//   0x384B0 = STATLIST_GetStatListFromUnitStateOrFlag (src/core/d2moo/src/D2StatList.cpp), whose
+//   0x321E0 = UNITS_GetHitClass (src/core/game/Units/Units.cpp), no delta;
+//   0x384B0 = STATLIST_GetStatListFromUnitStateOrFlag (src/core/game/D2StatList.cpp), whose
 //             policy is identical (its inner call re-checks the same extended-list guard).
 // A callee that is still an UNMAPPED row is a function-pointer seam handed over last: a null seam
 // contributes 0 and the exported body never faults.

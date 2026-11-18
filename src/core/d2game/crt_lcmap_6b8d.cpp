@@ -2,7 +2,7 @@
 // Its callers are 0x03853 and 0x07936. The internal code-page helpers at 0x09824 and
 // 0x0986B, and the Win32 locale APIs, are supplied through the host environment.
 // Prior art: the corresponding CRT routine is implemented at src/core/d2client/crt_lcmap_77e0.cpp;
-// D2MOO supplies gameplay code, but not this linked CRT routine.
+// the 1.10f source supplies gameplay code, but not this linked CRT routine.
 #include <emscripten.h>
 #include <cstddef>
 #include <cstdint>

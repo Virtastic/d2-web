@@ -1,5 +1,5 @@
 // Prior art: the 1.13c D2Client cached decompile and the sibling CRT wrapper
-// src/core/d2client/crt_read_8383.cpp. D2MOO has no D2Client module.
+// src/core/d2client/crt_read_8383.cpp. the 1.10f source has no D2Client module.
 #include <cstddef>
 #include <cstdint>
 #include <emscripten.h>

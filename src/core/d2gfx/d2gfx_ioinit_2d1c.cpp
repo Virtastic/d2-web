@@ -1,5 +1,5 @@
 // Prior art: src/core/d2client/crt_ioinit_842e.cpp and src/core/realm/mcp_crt_batch_b56.cpp;
-// checked against the cached 510-byte D2Gfx 1.13c body. D2MOO does not supply this CRT routine.
+// checked against the cached 510-byte D2Gfx 1.13c body. the 1.10f source does not supply this CRT routine.
 #include <cstdint>
 #include <cstddef>
 #include <cstring>

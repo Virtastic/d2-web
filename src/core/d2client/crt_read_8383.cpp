@@ -1,5 +1,5 @@
 // Prior art used: existing D2Client CRT fd-table and __read_nolock implementations.
-// D2MOO has no D2Client module; control flow follows the cached 1.13c body.
+// the 1.10f source has no D2Client module; control flow follows the cached 1.13c body.
 #include <cstdint>
 #include <emscripten.h>
 

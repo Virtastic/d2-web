@@ -1,6 +1,6 @@
 #include "d2gs_party.h"
 
-// The party command table (1.13c D2Game 0xF0060-0xF0FF0 and the PARTYSCREEN handlers D2MOO names):
+// The party command table (1.13c D2Game 0xF0060-0xF0FF0 and the PARTYSCREEN handlers the 1.10f source names):
 // 1 loot, 2 hear, 3 squelch, 4 hostile, 6 invite, 7 cancel the invite, 8 accept, 9 leave.  0 and 5
 // have no handler.  `issuer` is the player who sent the packet, `target` the unit id it names.
 

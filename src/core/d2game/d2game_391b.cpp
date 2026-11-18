@@ -1,5 +1,5 @@
 // Prior art used: D2Client's ___tolower_mt model (src/core/d2client/crt_strings.cpp, 0x7604) and
-// D2Game's sibling wrappers at 0x2813 and 0x3853. D2MOO's 1.10f D2Game tree contains no copy of
+// D2Game's sibling wrappers at 0x2813 and 0x3853. 1.10f D2Game tree contains no copy of
 // this statically linked CRT helper; the cached 1.13c decompile establishes this wrapper's calls.
 #include <cstddef>
 #include <cstdint>

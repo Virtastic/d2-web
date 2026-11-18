@@ -3,7 +3,7 @@
 // Rule template over a call environment E (rd32/wr32, h(rva, eax, ecx, edx, ebx, esi, s0..s3), ed/edi). Fatal paths
 // (Fog log + _exit) return 0: game or self null (0x907/0x908), no inventory (0x911), A748 mismatch (0x948/0x949).
 // Retail keeps the item kind in the low byte of the out-pointer ARGUMENT SLOT and pushes the whole slot to the callees,
-// so the words handed on are (out & ~0xFF) | kind: `slot` below. 1.13c delta vs D2MOO 1.10f: the 0xA5E6 trace call
+// so the words handed on are (out & ~0xFF) | kind: `slot` below. 1.13c delta vs 1.10f: the 0xA5E6 trace call
 // (line 0x966) and the 0x979 flag test are new; the 1.10f function had no kind byte.
 #pragma once
 #include <cstdint>

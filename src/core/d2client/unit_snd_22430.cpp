@@ -5,8 +5,8 @@
 #include <cstdint>
 #include <emscripten.h>
 
-#include "../d2moo/include/D2Skills.h"
-#include "../d2moo/include/Units/Units.h"
+#include "../include/D2Skills.h"
+#include "../include/Units/Units.h"
 
 static_assert(UNIT_PLAYER == 0 && UNIT_MONSTER == 1, "D2C_UnitTypes");
 static_assert(offsetof(D2UnitStrc, dwUnitType) == 0x00, "D2UnitStrc::dwUnitType");

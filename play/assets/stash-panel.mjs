@@ -1,7 +1,7 @@
 // The stash: retail's personal storage in town, opened by clicking the stash object.
 //
 // Nothing here decides anything. The window is open because the ENGINE sent retail's 0x77
-// UPDATEUI_OPENSTASH (D2MOO's OBJECTS_OperateFunction32_Bank, vendored), it closes because the
+// UPDATEUI_OPENSTASH (the 1.10f source's OBJECTS_OperateFunction32_Bank, vendored), it closes because the
 // engine answered TRADEBTN_CLOSESTASH, and the grid is the Inventory.txt record retail itself uses
 // for a Lord of Destruction character -- INVENTORYRECORD_BIG_BANK_PAGE_1 (Units.cpp: bLoD ? BIG_BANK
 // : BANK), read through the engine's own accessor (d2_session_inventory_layout). One position is

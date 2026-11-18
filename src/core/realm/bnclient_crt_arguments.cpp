@@ -1,4 +1,4 @@
-// Prior art used: CE_Database's CRT export names; D2MOO has no BNClient CRT implementation.
+// Prior art used: CE_Database's CRT export names; the 1.10f source has no BNClient CRT implementation.
 // Rules checked against cached retail 1.13c body 439E and its 450A caller.
 #include "bnclient_crt_arguments.h"
 #include <cstdlib>

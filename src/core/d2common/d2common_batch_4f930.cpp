@@ -1,5 +1,5 @@
 // D2Common implementation batch 4f930: six UNMAPPED rows translated from the pinned 1.13c decompiles.
-// The two skill rows are the vendored D2MOO bodies, which match the 1.13c decompiles line for line; the
+// The two skill rows are the vendored the 1.10f source bodies, which match the 1.13c decompiles line for line; the
 // DRLG generators reach the level list through the engine's D2DrlgStrc fields (retail's +0x47C list
 // head, +0x1AC next link and +0x1D0 level id are pLevel / pNextLevel / nLevelId) and its +0x450
 // difficulty byte is nDifficulty. Linker/room helpers that are still UNMAPPED are marked partial.

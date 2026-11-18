@@ -1,4 +1,4 @@
-// Prior art used: D2MOO Storm.h identifies #501 as SStrCopy; community client pointer
+// Prior art used: the 1.10f source Storm.h identifies #501 as SStrCopy; community client pointer
 // tables provide no message-source owner. Retail 1.13c DF00/2F70/2400 cached bodies
 // plus DCA0/DD20/DED0/CDDB0/CDDF0 disassembly determine this shared registry.
 #include "message_sources.h"

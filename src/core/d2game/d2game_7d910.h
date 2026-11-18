@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x7D910 (AI_ModeAttackStep; D2MOO AITHINK_Fn075_QuillMother): ECX = pGame, EDX = pUnit, stack = pAiTickParam (ret 4; the result is residue).
+// 1.13c D2Game+0x7D910 (AI_ModeAttackStep; the 1.10f source AITHINK_Fn075_QuillMother): ECX = pGame, EDX = pUnit, stack = pAiTickParam (ret 4; the result is residue).
 // Written from the 1.13c disassembly as a rule over E (see d2game_179a0.h). tp: +8 target, +0x18 mode, +0x1C monstats row. The unit's seed steps as in 0x179A0 (Roll).
 // Row words indexed by game byte +0x6D: +0x56 / +0x5C attack chance (mode / no mode), +0x62 / +0x68 idle frames.
 // A unit (type 1) whose data (+0x14) byte +0x54 is 3 or 0x13 calls 0x212F0 (EAX = unit, stack game, &block {2 words of stack residue, 1, target type (6 if none), target +0xC (-1 if none)}),

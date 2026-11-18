@@ -1,7 +1,7 @@
 // Stage A, retail 1.13c: object placement, quest transitions and player helpers.
-// Prior art used: D2MOO Objects.cpp, Quests.cpp, Player.cpp and PlayerList.cpp.
+// Prior art used: the 1.10f source Objects.cpp, Quests.cpp, Player.cpp and PlayerList.cpp.
 // Cached decompiles were checked against the x86 instructions, including register-only
-// inputs. These entry points use native D2MOO pointers and explicit retail-width scalars;
+// inputs. These entry points use native the 1.10f source pointers and explicit retail-width scalars;
 // retail byte offsets are never applied to the widened game/unit/client structures.
 #include <cstdint>
 #include <cstddef>
@@ -65,7 +65,7 @@ void questScrollEvent(D2GameStrc* game /* EAX */, uint32_t targetGuid /* ECX */,
 void hellPortalTransition(D2GameStrc* game /* EAX */, D2UnitStrc* player /* ESI */,
                           int32_t level, D2UnitStrc* portal)
 {
-    // D2MOO's 1.10f map agrees: level 102 grants A3-completed, consumes the five
+    // 1.10f map agrees: level 102 grants A3-completed, consumes the five
     // Khalim components on the first grant, sets intro flags, then sends 61 04 once.
     // Other levels update the Mephisto portal/bridge quest state instead.
     QUESTS_HellPortalActChange(game, player, level, portal);
@@ -138,7 +138,7 @@ void findHostilePlayer(D2GameStrc*, D2UnitStrc* player, void* argument)
 void deathPenalties(D2GameStrc* game /* EBX */, D2UnitStrc* defender /* ECX */,
                     D2UnitStrc* attacker /* EAX */)
 {
-    // 0x38180 is the gold-only retail callee (d2game_c85a.cpp); the old D2MOO
+    // 0x38180 is the gold-only retail callee (d2game_c85a.cpp); the old the 1.10f source
     // PLAYER_ApplyDeathPenalty combines gold and experience.
     d2game_c85a::goldDeathPenalty(game, defender, attacker);
     if (attacker) {

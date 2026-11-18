@@ -1,5 +1,5 @@
 // Host test: E=$(mktemp -d) && echo '#define EMSCRIPTEN_KEEPALIVE' > $E/emscripten.h &&
-//   g++ -std=c++17 -I$E -Isrc/core/d2moo/compat -Isrc/core/d2moo/include -Isrc/core/d2moo/include/D2Game
+//   g++ -std=c++17 -I$E -Isrc/core/compat -Isrc/core/include -Isrc/core/include/D2Game
 //   -o $E/t src/core/realm/d2gs_client_state_stats.test.cpp && $E/t
 // A town NPC is linked into its room before its alignment state packet arrives, then the hero
 // leaves the game and every unit is unlinked. The room's friendly count must end at zero

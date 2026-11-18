@@ -14,7 +14,7 @@
 // --- BnetLog: 0x17420 and 0x17480 -----------------------------------------------------------------
 // Both take the module's critical section DAT_6FF3F898 and call the Storm logging exports through the
 // thunks at 0x800C/0x8012/0x8024/0x802A: SLogClose #541, SLogCreate #542, SLogWrite #548,
-// SLogCriticalLog #550 (reference/D2MOO/source/Storm/definitions/Storm.1.10f.def).
+// SLogCriticalLog #550 (the 1.10f reference source).
 struct BnStormLogEnv {
     void (*slog_close)(uint32_t handle);                             // Storm #541
     int  (*slog_create)(const char* name, int use_log_dir, uint32_t* out);  // Storm #542

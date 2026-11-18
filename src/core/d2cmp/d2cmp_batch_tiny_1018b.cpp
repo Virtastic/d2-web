@@ -5,7 +5,7 @@
 //
 // 0x280D (doexit) is its own function, so _exit/__exit reach it through a seam instead of a second
 // implementation here. 0x2DD8 is _unlock's LeaveCriticalSection wrapper (not a row here).
-// Prior art: D2MOO 1.10f reference/D2MOO/source/D2CMP (export map only; the CRT starts are stubs).
+// Prior art: 1.10f the 1.10f reference source (export map only; the CRT starts are stubs).
 #include <cstdint>
 #include <cstddef>
 #include <cstdlib>

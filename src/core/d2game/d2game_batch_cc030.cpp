@@ -180,7 +180,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_379e0(void* game, void* player, const D2GameBa
     }
 }
 
-// (marker now on the d2moo ARENA_FreeArenaUnit)
+// (marker now on the 1.10f ARENA_FreeArenaUnit)
 // FUN_6fcd2480 ARENA_FreeArenaUnit(pGame in ECX, pPlayer in EAX): the player data is mandatory
 // (fatal 0x52), and pArenaUnit (+0x34) is freed and cleared (Arena.cpp:0x57).
 extern "C"

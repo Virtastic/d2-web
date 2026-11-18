@@ -21,7 +21,7 @@ struct D2Game19C20Env {
 static inline uint32_t rd(uint32_t p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)(uintptr_t)p + o, 4); return v; }
 static inline void wr(uint32_t p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)(uintptr_t)p + o, &v, 4); }
 
-// (marker lives on the d2moo sub_6FCE5EE0)
+// (marker lives on the 1.10f sub_6FCE5EE0)
 extern "C" uint32_t d2game_19c20_port(uint32_t unit, uint32_t game, uint32_t pp, const D2Game19C20Env* e)
 {
     uint32_t slot = 0;

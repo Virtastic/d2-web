@@ -8,7 +8,7 @@
 // argument order. The fatal path is Fog Ordinal 10265(code) -> Ordinal 10024(text) -> _exit(-1);
 // only the exit is observable and is modelled. Bodies that rest on a seam whose retail semantics
 // the decompile does not show say so in a one-line comment at the seam.
-// Prior art: D2MOO 1.10f CLIENTS_GetPlayerFromClient (0x4AD10), ITEMS/INVENTORY iteration
+// Prior art: 1.10f CLIENTS_GetPlayerFromClient (0x4AD10), ITEMS/INVENTORY iteration
 // (#10460/#10464/#11147), and the 0x8A3E0 packet-append helper.
 #include <cstdint>
 #include <cstddef>
@@ -260,7 +260,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8d5f0(void* target, void* unit, uin
 
 // 0xCD0E0: stat synchronisation. Client in EAX, unit in EBX. When the client's current unit differs,
 // push every opcode in the 0x6FD22DD0 table through #10587 and 0xCC2F0.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_cd0e0(void* client, void* unit, const D2GameBatch16Env* env) { // D2Game +0xCD0E0 (marker lives on the d2moo sub_6FC82830)
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_cd0e0(void* client, void* unit, const D2GameBatch16Env* env) { // D2Game +0xCD0E0 (marker lives on the 1.10f sub_6FC82830)
     if (!client) d2game_fatal(0xFB);
     void* cur = d2game_current_unit(client, env);
     if (cur != unit) {

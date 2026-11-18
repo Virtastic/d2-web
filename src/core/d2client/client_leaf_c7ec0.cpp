@@ -1,9 +1,9 @@
-// Prior art: D2MOO has no D2Client module; the cached 1.13c decompiles are the
+// Prior art: the 1.10f source has no D2Client module; the cached 1.13c decompiles are the
 // authority for these leaves and linked MSVC helpers. Native pointers stay native.
 #include <cstdint>
 #include <cstddef>
 #include <cstring>
-#include "../d2moo/include/Units/Units.h"
+#include "../include/Units/Units.h"
 
 struct D2ClientGfxExtension {
     uint32_t reserved;

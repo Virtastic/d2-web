@@ -157,7 +157,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_758D0(int* param1, void* eax, 
 
 // ---- 0x75A40 (NAMED, last) / 0x75C60 ---------------------------------------------------------------
 
-// 0x75C60 now runs the game's MONSTERMODE_FireAttackMissile (src/core/d2moo/src/D2Game/MONSTER/MonsterMode.cpp).
+// 0x75C60 now runs the game's MONSTERMODE_FireAttackMissile (src/core/game/D2Game/MONSTER/MonsterMode.cpp).
 
 // ---- 0x76570 ---------------------------------------------------------------------------------------
 struct D2Game76570Env {

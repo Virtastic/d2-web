@@ -537,7 +537,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
         layoutLines(body, (t) => confirmFont.measure(t), confirmFont.lineHeight).forEach((l) => confirmFont.drawAnchored(g, l.text, l.x, l.anchor));
       }
       // Retail's pointer last, an ohand cel at (mouse x, mouse y - 1) with the DC6's own offsets
-      // (D2MOO D2WinMain.cpp; the title draws it the same way, and the retail captures
+      // (the 1.10f source D2WinMain.cpp; the title draws it the same way, and the retail captures
       // records it at x=799 y=598 for the capture's pointer at (799,599)).
       let cursor = 0;
       if (pointer) {

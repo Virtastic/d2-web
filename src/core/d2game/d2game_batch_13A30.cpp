@@ -7,7 +7,7 @@
 // in_EDX/in_ESI/in_EDI) are explicit parameters. Unmapped callees are seams on D2GameBatchB87Env in
 // retail argument order. The fatal path is Fog Ordinal 10265(code) -> Ordinal 10024(text) -> _exit(-1);
 // only the exit is observable and is modelled.
-// Prior art: D2MOO 1.10f ITEMS/ItemMod (affix rolls), ITEMS/ItemDrop (tier table walk), the 0x1180
+// Prior art: 1.10f ITEMS/ItemMod (affix rolls), ITEMS/ItemDrop (tier table walk), the 0x1180
 // ITEMS_RollLimitedRandomNumber LCG, the 0x8A3E0 packet-append helper and the 0x8D3D0 action dispatcher
 // spec. The 1.13c data-table slot numbers (+0xC0C/+0xC10/+0xC18/+0xC1C)
 // and the record strides 0x128/0x1B8/0x144 are read from the retail disassembly.

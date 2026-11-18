@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <cstring>
 #include "../tables/shared.h"
-#include "../d2moo/compat/datatbls_bridge.h"
+#include "../compat/datatbls_bridge.h"
 #include "D2DataTbls.h"
 
 // 1.13c D2Game+0x4DF60

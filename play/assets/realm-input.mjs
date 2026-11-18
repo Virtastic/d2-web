@@ -1,7 +1,7 @@
 import { rightGroundWalks } from './world-click-dispatch.mjs';
 import { corpseLootable, deathSendAllowed } from './realm-death.mjs';
 // What the player's input sends in a joined Battle.net game. The same clicks and keys a local game
-// reads become the retail 1.13c D2GS client packets (layouts: D2MOO D2PacketDef.h / PlrMsg.cpp, and the
+// reads become the retail 1.13c D2GS client packets (layouts: the 1.10f source D2PacketDef.h / PlrMsg.cpp, and the
 // size table in src/core/realm/d2gs_session.cpp); nothing here moves a unit. The server walks the
 // player to a target, runs the skill and answers with its own packets, and the position the screen
 // shows comes back from those packets only.

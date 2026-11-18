@@ -1,12 +1,12 @@
-// Prior art used: D2MOO 1.10f AiThink.cpp, checked against cached retail 1.13c
-// decompiles. AI handlers reuse the matching D2MOO handler; the packet helpers take
+// Prior art used: 1.10f AiThink.cpp, checked against cached retail 1.13c
+// decompiles. AI handlers reuse the matching the 1.10f source handler; the packet helpers take
 // the register-passed client explicitly.
 #include <cstdint>
 #include <cstring>
 #include "AI/AiThink.h"
 #include "GAME/SCmd.h"
 
-// 1.13c D2Game+0x83CE0 (Brute): ported from the retail listing in d2game_83ce0.cpp (1.13c rolls differ from the D2MOO 1.10f AITHINK_Fn007_Brute).
+// 1.13c D2Game+0x83CE0 (Brute): ported from the retail listing in d2game_83ce0.cpp (1.13c rolls differ from the 1.10f AITHINK_Fn007_Brute).
 
 // D2Game 0x851E0 (superseded: the 1.13c port is d2game_851e0.cpp) (SkeletonMage)
 extern "C" void d2game_851e0(D2GameStrc* g, D2UnitStrc* u, D2AiTickParamStrc* p) { AITHINK_Fn064_SkeletonMage(g, u, p); }

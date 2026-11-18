@@ -81,7 +81,7 @@ test('a refusal replaces the confirm, blocks a new request, and Continue (yes or
 test('both repair commands read the 0x2A result and open the refusal box', () => {
   const shell = readFileSync('play/gameplay-shell.mjs', 'utf8');
   assert.doesNotMatch(shell, /function repairAtVendor\(|function repairAllAtVendor\(|takeTradeResult/);   // the realm screen owns the refusal box
-  const stubs = readFileSync('src/core/d2moo/compat/game_net_stubs.cpp', 'utf8');
+  const stubs = readFileSync('src/core/compat/game_net_stubs.cpp', 'utf8');
   assert.match(stubs, /g_d2LastTransactionResult = \(uint8_t\)result;/);
 });
 

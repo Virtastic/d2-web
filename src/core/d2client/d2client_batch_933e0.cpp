@@ -1,5 +1,5 @@
 // Implementation batch (alpha lane): D2Client 0x933E0..0x97770, inventory/cursor UI.
-// Prior art: none (D2MOO has no D2Client module); decompile is the source. Imported DLL
+// Prior art: none (the 1.10f source has no D2Client module); decompile is the source. Imported DLL
 // calls (D2Common ordinals) and D2Client globals sit behind Env; register-passed args of the
 // retail __usercall/__fastcall forms are named by role. Guesses are marked GUESS.
 #include <cstdint>

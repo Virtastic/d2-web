@@ -26,9 +26,9 @@
 #include <cstddef>
 #include <emscripten.h>
 #include "client_host.h"
-#include "../d2moo/include/Units/Units.h"
-#include "../d2moo/include/Units/Monster.h"
-#include "../d2moo/include/D2DataTbls.h"
+#include "../include/Units/Units.h"
+#include "../include/Units/Monster.h"
+#include "../include/D2DataTbls.h"
 
 extern "C" void d2_client_24490(uint32_t uUnit, uint32_t nMode, uint32_t bUseGiven, D2cHost h);
 extern "C" void d2_client_23630_rule(uint32_t uUnit, uint32_t dwHit, int32_t nMode, uint32_t uPlayerUnit, uint32_t uFrameTick,

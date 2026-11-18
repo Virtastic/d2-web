@@ -3,7 +3,7 @@
 // grid is copied into its own trade inventory (0x1E7B0); player1's storage items are then reserved in trade inventory 2
 // (0x20D20, else *pTradeState = 0) and player2's in trade inventory 1 (else *pTradeState = 1). Both inventories are freed on
 // every path (0x21B40: an owner-less, item-less inventory frees its cell arrays, its grid array and itself). Returns 1 only
-// when both fit. The native D2MOO port reads the wasm64 unit layout and cannot run on an image unit.
+// when both fit. The native the 1.10f source port reads the wasm64 unit layout and cannot run on an image unit.
 #include <cstdint>
 #include <cstring>
 #include "inv_place.h"

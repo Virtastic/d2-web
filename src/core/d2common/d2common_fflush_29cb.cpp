@@ -1,7 +1,7 @@
 #include <cstdint>
 #include <cstdio>
 
-// Prior art: D2MOO does not provide the linked MSVC CRT body. The existing D2Common
+// Prior art: the 1.10f source does not provide the linked MSVC CRT body. The existing D2Common
 // file wrappers (including D2Common_21F5_FClose) use host FILE objects; no retail
 // _iobuf layout is overlaid on a host stream.
 // 1.13c D2Common+0x029CB

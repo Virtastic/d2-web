@@ -1,5 +1,5 @@
 // D2Common implementation batch: twelve rows translated from the pinned 1.13c decompiles.
-// The vendored D2MOO (1.10f) helpers are used by field name where their layout is the engine's;
+// The vendored the 1.10f source (1.10f) helpers are used by field name where their layout is the engine's;
 // retail images whose pointers are four bytes wide are modelled with raw 32-bit offsets.
 #include <cstddef>
 #include <cstdint>
@@ -147,7 +147,7 @@ uint32_t D2Common_22700_ItemBitField1Bit2(uint32_t nItemId)
 	return 0;
 }
 
-// Export of 1.13c D2Common 0x22AD0 (#10017): the body is ITEMS_GetMinStackFromItemId in src/core/d2moo/src/Items/Items.cpp.
+// Export of 1.13c D2Common 0x22AD0 (#10017): the body is ITEMS_GetMinStackFromItemId in src/core/game/Items/Items.cpp.
 int32_t D2Common_22AD0_ItemMinStack(uint32_t nItemId)
 {
 	return ITEMS_GetMinStackFromItemId(static_cast<int>(nItemId));

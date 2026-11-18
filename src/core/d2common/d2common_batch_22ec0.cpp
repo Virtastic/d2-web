@@ -76,7 +76,7 @@ uint32_t D2Common_22B70_GetMaxStack(uint32_t nItemId)
 // ---------------------------------------------------------------------------------------------
 // 0x23360: itemtypes.txt nNormal for an item unit's wType[0]. Non-item units, an invalid item id
 // (retail assert 0x67e in the inlined 0x230F0) and out-of-range types all yield 1.
-// Export of 1.13c D2Common 0x23360 (#10556); the body is ITEMS_CanBeNormal in src/core/d2moo/src/Items/Items.cpp.
+// Export of 1.13c D2Common 0x23360 (#10556); the body is ITEMS_CanBeNormal in src/core/game/Items/Items.cpp.
 uint8_t D2Common_23360_CanBeNormal(uint32_t pUnit)
 {
 	return static_cast<uint8_t>(ITEMS_CanBeNormal(reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit))));
@@ -341,7 +341,7 @@ int32_t D2Common_52100_SkillsGetMinPhysDamage(uint32_t pUnit, int32_t nSkillId, 
 
 // ---------------------------------------------------------------------------------------------
 // 0x1AA00: minion spawn info (base id -> id / x / y / spawn mode). The 1.13c body is the same
-// switch as D2MOO's MONSTERS_GetMinionSpawnInfo; ids are the monster ids the row validates.
+// switch as the 1.10f source's MONSTERS_GetMinionSpawnInfo; ids are the monster ids the row validates.
 // Retail's incoming-EBX chain id is modelled as the local nChainId, set only by the rows that
 // visibly call DATATBLS_GetMonsterChainInfo. Unrecovered helpers 0x10B0 and the fatal assert are
 // behind the seam; 0x1930/0x1A770/0x2FE10/0x53850/0x665C0 are the vendored 1.13c rows.

@@ -6,12 +6,12 @@
 #include "hookenv.h"
 #include "fn_tag.h"
 #include "mirror_layouts.h"
-#include "../d2moo/include/D2Game/SKILLS/Skills.h"
-#include "../d2moo/include/D2Game/PLAYER/Player.h"
-#include "../d2moo/include/D2Inventory.h"
-#include "../d2moo/include/D2Items.h"
-#include "../d2moo/include/D2StatList.h"
-#include "../d2moo/compat/test_seam.h"
+#include "../include/D2Game/SKILLS/Skills.h"
+#include "../include/D2Game/PLAYER/Player.h"
+#include "../include/D2Inventory.h"
+#include "../include/D2Items.h"
+#include "../include/D2StatList.h"
+#include "../compat/test_seam.h"
 
 static HookEnv* E; static mirror::Mirror* M;
 static uint32_t ra(const void* p) { return M->ra(p); }

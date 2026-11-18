@@ -4,8 +4,8 @@
 #include <cstdint>
 #include <cstring>
 #include <emscripten.h>
-#include "../d2moo/include/D2DataTbls.h"
-#include "../d2moo/include/DataTbls/LevelsTbls.h"
+#include "../include/D2DataTbls.h"
+#include "../include/DataTbls/LevelsTbls.h"
 #include "d2client_5dfd0.h"
 
 namespace {

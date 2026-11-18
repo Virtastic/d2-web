@@ -32,7 +32,7 @@ uintptr_t d2_batch_d2common_17b70(uintptr_t n, const uint32_t* ctx) {
 }
 
 
-// D2Common+0x7EA40 and 0x7EB40 live in the game tree (src/core/d2moo/src/Retail).
+// D2Common+0x7EA40 and 0x7EB40 live in the game tree (src/core/game/Retail).
 
 // 1.13c D2Common+0x69090: (this) look up entry 0x6c (0x72 when a3 == 0xb) of the room's owner and,
 // if the tile offset differs on both axes from the room origin, play the entry's sound.

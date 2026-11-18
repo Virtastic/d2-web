@@ -8,14 +8,14 @@
 #include "hookenv.h"
 #include "fn_tag.h"
 #include "D2DataTbls.h"
-#include "../d2moo/include/D2Game/SKILLS/Skills.h"
-#include "../d2moo/include/D2Game/SKILLS/SkillAss.h"
-#include "../d2moo/include/D2Game/SKILLS/SkillDruid.h"
-#include "../d2moo/include/D2Game/UNIT/SUnit.h"
-#include "../d2moo/include/D2Skills.h"
-#include "../d2moo/include/D2States.h"
-#include "../d2moo/include/D2StatList.h"
-#include "../d2moo/compat/test_seam.h"
+#include "../include/D2Game/SKILLS/Skills.h"
+#include "../include/D2Game/SKILLS/SkillAss.h"
+#include "../include/D2Game/SKILLS/SkillDruid.h"
+#include "../include/D2Game/UNIT/SUnit.h"
+#include "../include/D2Skills.h"
+#include "../include/D2States.h"
+#include "../include/D2StatList.h"
+#include "../compat/test_seam.h"
 
 static HookEnv* E;
 static uint32_t g_dt;

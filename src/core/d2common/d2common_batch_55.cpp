@@ -10,7 +10,7 @@ namespace
 	inline uint32_t Rd32(uint32_t a) { return *reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(a)); }
 }
 
-// D2MOO-style form of D2Common 0x47350 (the 1.13c port is d2common_47350.cpp): clamp a 3-int record (+4 -> 0..3, +8/+0xC biased by 0x100 -> 0..0x3FF)
+// 1.10f-style form of D2Common 0x47350 (the 1.13c port is d2common_47350.cpp): clamp a 3-int record (+4 -> 0..3, +8/+0xC biased by 0x100 -> 0..0x3FF)
 // and, for a valid record index below the table count (sgptDataTables+0xBD4, base +0xBCC, stride 0x144),
 // resolve a slot through 0x47020 and store (index, clampedA + (clampedY*0x400 + clampedX)*4) via 0x3A280.
 // Returns the clamped +0xC value on success, else 0. EDX = pUnit(param_2); param_1/3/5/7/8 unused.

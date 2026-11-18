@@ -1,4 +1,4 @@
-// Prior art: D2MOO does not carry the linked VC7.1 CRT heap teardown. Cross-checked
+// Prior art: the 1.10f source does not carry the linked VC7.1 CRT heap teardown. Cross-checked
 // the existing D2Gfx 0x33C8 reading against D2Game's cached 1.13c decompile.
 #include "d2game_heap_init.h"
 #include <emscripten.h>

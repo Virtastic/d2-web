@@ -16,7 +16,7 @@ struct D2Common487C0Env {
  int32_t (*roll_465b0)(int32_t param_1, int32_t* pUnit);    // 0x465B0
 };
 
-// D2MOO-style form of D2Common 0x487C0 (the 1.13c port is d2common_487c0.cpp): apply a stat-list adjustment (stats 0x15, 0x17, 0x9f) for item param_3,
+// 1.10f-style form of D2Common 0x487C0 (the 1.13c port is d2common_487c0.cpp): apply a stat-list adjustment (stats 0x15, 0x17, 0x9f) for item param_3,
 // each clamped so the item's min byte (+0xFE / +0x102 / +0x100) plus the delta stays >= 1.
 // Retail's _exit paths lie inside the callees and are not modelled here.
 EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_487c0(void* param_2, int32_t* param_3, int32_t param_4, int32_t param_5,

@@ -7,7 +7,7 @@
 // Register-only arguments (Ghidra's in_EAX/unaff_EDI/unaff_ESI/unaff_EBX, or arguments the ABI passed
 // in a register and the callsite dropped) are explicit parameters here and are named in the comment at
 // each function. A game record is opaque and read/written through retail byte offsets; unit records use
-// the 1.10f D2UnitStrc offsets (reference/D2MOO/source/D2Common/include/Units/Units.h). The fatal path
+// the 1.10f D2UnitStrc offsets (the 1.10f reference source). The fatal path
 // is Fog Ordinal 10265(id) -> Ordinal 10024(text) -> _exit(-1); only the exit is observable.
 //
 // 0x498B0 (CLIENTS_GetNameIfInGame) lives in d2game_batch_49850.cpp instead: that file already owns the

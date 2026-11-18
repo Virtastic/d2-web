@@ -1,4 +1,4 @@
-// Prior art used: D2MOO MonsterUnique.cpp (modifier stats, minion cleanup, mode
+// Prior art used: the 1.10f source MonsterUnique.cpp (modifier stats, minion cleanup, mode
 // changes, amplify-damage curse). Rules below follow the cached 1.13c bodies.
 // Retail address fields remain uint32_t. resolve maps those addresses to native
 // memory; no retail field ever stores a native pointer. Calls erased by Ghidra

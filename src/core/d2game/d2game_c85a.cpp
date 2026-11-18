@@ -1,6 +1,6 @@
 // Callee unblock batch c85a (retail 1.13c D2Game): the gold-only death penalty (0x38180) and the
 // minion-release entry (0x23BF0). 0x75E10 and 0x6F520 are the vendored native bodies
-// D2GAME_ModeChange_6FC65220 and sub_6FC79B50 (markers live on them). Native D2MOO structs; no
+// D2GAME_ModeChange_6FC65220 and sub_6FC79B50 (markers live on them). Native the 1.10f source structs; no
 // env seams. Decompile-derived from the cached 1.13c D2Game decompiles and disassembly.
 #include <cstdint>
 #include <algorithm>

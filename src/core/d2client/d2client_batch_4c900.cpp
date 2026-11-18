@@ -1,4 +1,4 @@
-// Prior art: none (D2MOO has no D2Client module); Ghidra decompile only.
+// Prior art: none (the 1.10f source has no D2Client module); Ghidra decompile only.
 // Imported-DLL and unresolved-callee calls are seams (unverified).
 #include <cstdint>
 namespace d2client_batch_4c900 {

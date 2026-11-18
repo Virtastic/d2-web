@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x7F5A0 (AI_AttackStateMachine; D2MOO AITHINK_Fn046_ElementalBeast): ECX = pGame, EDX = pUnit, stack = pAiTickParam (ret 4; the result is residue).
+// 1.13c D2Game+0x7F5A0 (AI_AttackStateMachine; the 1.10f source AITHINK_Fn046_ElementalBeast): ECX = pGame, EDX = pUnit, stack = pAiTickParam (ret 4; the result is residue).
 // Written from the 1.13c disassembly as a rule over E (see d2game_179a0.h). tp: +0 ai general (state word +0x14), +8 target, +0x14 range, +0x18 mode, +0x1C monstats row.
 // Row words indexed by game byte +0x6D: +0x56 approach chance, +0x5C activation distance, +0x62 idle frames. State 2: 0xDEEE0 (ECX = game, EDX = unit, stack target, 1).
 // State 0: range < word(+0x5C) or 0xB0BE0(EAX = unit) (a dying-unit test) starts the attack: 0xA496(unit, 0), the command {8, unit, target, 0, 0, flag << 8, 0, 0}

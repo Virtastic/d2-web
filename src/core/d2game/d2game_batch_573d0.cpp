@@ -1,6 +1,6 @@
 // src/core/d2game/d2game_batch_573d0.cpp -- twelve 1.13c D2Game.dll quest-script functions (A1 quests,
 // 0x573D0..0x687D0) transcribed from the cached Ghidra decompiles (build-wasm/ghidra-d2game/decomp).
-// Prior art: D2MOO 1.10f QUESTS/ quest callbacks (same shape, different offsets).
+// Prior art: 1.10f QUESTS/ quest callbacks (same shape, different offsets).
 // Records are opaque host objects read at retail byte offsets. Callees src/ does not own are seams on
 // D2G573Env in retail argument order. Ghidra in_EAX/unaff_* register inputs are marked REG?.
 #include <cstdint>

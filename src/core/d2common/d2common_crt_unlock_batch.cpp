@@ -1,5 +1,5 @@
 // Prior art used: existing D2Common CRT lock owner (0x2E44) and Windows.h
-// compatibility boundary. D2MOO's LevelsTbls.cpp confirms that boundary, but
+// compatibility boundary. the 1.10f source's LevelsTbls.cpp confirms that boundary, but
 // does not contain these MSVC CRT fragments; indices are from cached 1.13c RE.
 #include "d2common_crt_unlock_batch.h"
 #include "d2common_crt.h"

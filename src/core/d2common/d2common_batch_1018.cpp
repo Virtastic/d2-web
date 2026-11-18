@@ -1,16 +1,16 @@
-#include "../d2moo/include/Drlg/D2DrlgDrlg.h"
-#include "../d2moo/include/Drlg/D2DrlgDrlgVer.h"
-#include "../d2moo/include/Drlg/D2DrlgPreset.h"
-#include "../d2moo/include/Drlg/D2DrlgOutJung.h"
-#include "../d2moo/include/Drlg/D2DrlgOutdoors.h"
-#include "../d2moo/include/Drlg/D2DrlgOutDesr.h"
-#include "../d2moo/include/Drlg/D2DrlgOutSiege.h"
-#include "../d2moo/include/Drlg/D2DrlgOutPlace.h"
-#include "../d2moo/include/Drlg/D2DrlgOutWild.h"
-#include "../d2moo/compat/Fog.h"
+#include "../include/Drlg/D2DrlgDrlg.h"
+#include "../include/Drlg/D2DrlgDrlgVer.h"
+#include "../include/Drlg/D2DrlgPreset.h"
+#include "../include/Drlg/D2DrlgOutJung.h"
+#include "../include/Drlg/D2DrlgOutdoors.h"
+#include "../include/Drlg/D2DrlgOutDesr.h"
+#include "../include/Drlg/D2DrlgOutSiege.h"
+#include "../include/Drlg/D2DrlgOutPlace.h"
+#include "../include/Drlg/D2DrlgOutWild.h"
+#include "../compat/Fog.h"
 
-// Prior art: D2MOO DRLG, checked against each cached 1.13c routine.
-// Retail extracts several helpers that D2MOO inlines; the outdoor initializer
+// Prior art: the 1.10f source DRLG, checked against each cached 1.13c routine.
+// Retail extracts several helpers that the 1.10f source inlines; the outdoor initializer
 // aliases retain those helpers in their original order. Stage A only, no parity verdict.
 
 // 1.13c D2Common+0x1B6E0
@@ -51,7 +51,7 @@ void __fastcall d2c_42070_normalize_and_merge_vertices(void* pool,
 	while (vertex != *vertices);
 }
 
-// D2MOO-struct form of D2Common 0x43190 (the 1.13c port is d2common_43190.cpp).
+// the 1.10f source-struct form of D2Common 0x43190 (the 1.13c port is d2common_43190.cpp).
 void __fastcall d2c_43190_build_outdoor_rooms(D2DrlgLevelStrc* level)
 {
 	uint32_t mask = 0;

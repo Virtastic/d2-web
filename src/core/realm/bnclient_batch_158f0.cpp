@@ -1,6 +1,6 @@
 // BNClient 1.13c grid-resource cryptography and loaders, Stage A.
 // Prior art used: network row; bncsutil/bsha1.cpp for the
-// broken SHA family; D2MOO's D2MCPClient is a stub and supplies no grid loader.
+// broken SHA family; the 1.10f source's D2MCPClient is a stub and supplies no grid loader.
 // Rules below follow cached 1.13c decompiles plus x86 disassembly, especially
 // hidden EAX/EBX/EDI arguments, signed shifts, and Storm's output pointer.
 #include <algorithm>

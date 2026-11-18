@@ -21,7 +21,7 @@ const SEQ = [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1]];
 export const SLOTS = [[[0, 0], [1, 0], [1, 1], [2, 0], [0, 1], [2, 1]], SEQ, [[0, 1], [2, 0], [1, 0], [0, 0], [1, 1], [2, 1]], SEQ, SEQ];
 export const QL = Object.freeze({ left: 80, top: 61, tabX: 85, tabPitch: 62, tabY: 93, iconX: 106, iconPitch: 97, iconY: 181, rowPitch: 97,
   titleY: 308, descX: 96, descY: 330, descPitch: 20, titleCentre: 240, wrap: 250, closeX: 358, closeY: 482, descBtnX: 306, descBtnY: 482 });
-// The quest words of one act (D2MOO Quests.h D2QuestStateFlagIds). Acts I-IV start at 8*(act-1) and
+// The quest words of one act (the 1.10f source Quests.h D2QuestStateFlagIds). Acts I-IV start at 8*(act-1) and
 // carry a trailing COMPLETED word at offset 7 (Act IV, four words, at 4); word 0 is the intro, 1..n the
 // quests. **Act V does not**: its six quests are words 35..40 (QUESTSTATEFLAG_A5Q1..A5Q6), 33 is A4Q4,
 // 34 the enum's unused slot, and there is NO A5COMPLETED -- MAX_QUEST_STATUS = 41 is A5INTRO, one past

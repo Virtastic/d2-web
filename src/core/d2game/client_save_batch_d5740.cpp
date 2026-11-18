@@ -1,4 +1,4 @@
-// Prior art: D2MOO Clients, SUnit, SCmd and PlrSave2; contracts checked against
+// Prior art: the 1.10f source Clients, SUnit, SCmd and PlrSave2; contracts checked against
 // the cached 1.13c functions. These entry points preserve explicit register inputs.
 #include <cassert>
 #include <cstdint>
@@ -82,7 +82,7 @@ void D2GAME_8CF80_CorpseAssignment(D2GameStrc* game, int32_t playerId,
 }
 
 // 1.13c D2Game+0x8B5A0
-// The body is sub_6FC3DCA0 (d2moo/src/D2Game/GAME/SCmd.cpp); this name stays for the monspawn driver.
+// The body is sub_6FC3DCA0 (game/D2Game/GAME/SCmd.cpp); this name stays for the monspawn driver.
 void D2GAME_8B5A0_SendSkills(D2ClientStrc* client, D2UnitStrc* unit)
 {
     sub_6FC3DCA0(client, unit);

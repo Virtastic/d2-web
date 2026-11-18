@@ -14,7 +14,7 @@
 //   rangedStat    0x39B40 (ecx=bonusStat|-1, eax=statA, stack unit, statB)
 //   addToField    0x39260 (eax=unit, esi=record, edi=value)
 //   D2Common thunks by ordinal: stdcall, argument counts from the export's `ret N`.
-// 1.10f crosswalk: D2MOO SKILLS/SkillItem.cpp potion handlers + MONSTER/MonsterSpawn (prior art).
+// 1.10f crosswalk: the 1.10f source SKILLS/SkillItem.cpp potion handlers + MONSTER/MonsterSpawn (prior art).
 #include <cstdint>
 #include <cstring>
 #include "MISSILES/MissMode.h"

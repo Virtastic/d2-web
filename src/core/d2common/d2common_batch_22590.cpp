@@ -25,7 +25,7 @@ namespace
 	inline uint32_t& W(void* b, int o) { return *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(b) + o); }
 }
 
-// D2Common+0x22590 now runs as ITEMS_GetRealmData (src/core/d2moo/src/Items/Items.cpp).
+// D2Common+0x22590 now runs as ITEMS_GetRealmData (src/core/game/Items/Items.cpp).
 
 // 1.13c D2Common+0x2FED0 (#10574, D2SetEnabledStat): sets the unit's static path (unit+0x2C) to a
 // room and a game position: +0x00 room, +0x0C/+0x10 game X/Y, +0x04 client X = (X - Y) * 0x10,
@@ -47,9 +47,9 @@ EMSCRIPTEN_KEEPALIVE void D2SetEnabledStat(D2UnitStrc* unit, D2ActiveRoomStrc* p
 	path->dwClientCoordY = (nX + nY) * 8;
 }
 
-// D2Common+0x39050 now runs as STATLIST_GetMaxStaminaFromUnit (src/core/d2moo/src/D2StatList.cpp).
+// D2Common+0x39050 now runs as STATLIST_GetMaxStaminaFromUnit (src/core/game/D2StatList.cpp).
 
-// D2Common+0x38C20 now runs as STATLIST_GetUnitBaseStat (src/core/d2moo/src/D2StatList.cpp); the probes' entry
+// D2Common+0x38C20 now runs as STATLIST_GetUnitBaseStat (src/core/game/D2StatList.cpp); the probes' entry
 // point stays a forward to it.
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_38c20(D2UnitStrc* pUnit, int32_t nStatId, int32_t nLayer)

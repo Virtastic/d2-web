@@ -20,7 +20,7 @@
 #include <cstring>
 #include <cstdio>
 #include <emscripten.h>
-#include "../d2moo/include/D2Game/GAME/Game113c.h"
+#include "../include/D2Game/GAME/Game113c.h"
 
 // ---- module state --------------------------------------------------------------------------------
 // __cinit's initializer tables (0x6FD1F000..0x6FD1F01C, 7 entries, then 0x6FD1F020..0x6FD1F034,
@@ -45,7 +45,7 @@ static const D2GameBatch18Env& d2game_env(const uint32_t* r) {
 
 // ---- CRT leaves ----------------------------------------------------------------------------------
 // 0x3F76 __unlock(index): LeaveCriticalSection((LPCRITICAL_SECTION)(&DAT_6fd1f210)[index * 2]).
-// The compat critical section (src/core/d2moo/compat/Windows.h) is a no-op, so the lock is the index.
+// The compat critical section (src/core/compat/Windows.h) is a no-op, so the lock is the index.
 static void d2game_crt_unlock(uint32_t index) { (void)index; }
 
 // 0x4CAB __unlock_file(stream): leave the stream's critical section (the lock-table arm for a _iob entry,

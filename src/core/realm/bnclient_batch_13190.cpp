@@ -1,4 +1,4 @@
-// Stage A, BNClient 1.13c cache and SHA-1. Prior art used: D2MOO BnClient.h
+// Stage A, BNClient 1.13c cache and SHA-1. Prior art used: the 1.10f source BnClient.h
 // (interface only; no cache implementation), bncsutil sha1.c (SHA-1 cross-check),
 // Storm/MPQ hash/encryption algorithm. Logic and register arguments checked against
 // the cached 1.13c decompiles and the retail x86 instructions. Host calls are seams;

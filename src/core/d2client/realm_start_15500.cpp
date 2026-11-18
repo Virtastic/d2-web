@@ -12,7 +12,7 @@
 #include <Units/Units.h>
 #include "realm_area.h"
 #include "realm_skill_start.h"
-#include "../d2moo/compat/test_seam.h"
+#include "../compat/test_seam.h"
 
 int d2client_realm_15500(D2UnitStrc* unit, int skillId, int level) {
     if (!D2_CALL(d2client_realm_a0a30, unit)) return 0;

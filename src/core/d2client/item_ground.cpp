@@ -24,14 +24,14 @@
 #include <cstdint>
 #include <cstring>
 #include <cstddef>
-#include "../d2moo/include/Units/Units.h"
+#include "../include/Units/Units.h"
 
 static_assert((uint32_t)UNITFLAG_TARGETABLE == 0x2, "bit 1 of dwFlags is UNITFLAG_TARGETABLE");
 
 // This function addresses the unit by 1.13c byte offsets (like the other D2Client unit leaves), because
 // the FN capture's blob IS the 32-bit image: retail's 0x82EA0 reads and writes those exact bytes. The
 // tree's wasm64 D2UnitStrc widens pointer fields, so the same fields sit 4 bytes further along per
-// pointer field ahead of them (the convention at src/core/d2moo/src/Units/Units.cpp:2127); asserting the
+// pointer field ahead of them (the convention at src/core/game/Units/Units.cpp:2127); asserting the
 // tree layout catches a drift that would make these offsets wrong for a real engine unit.
 static_assert(offsetof(D2UnitStrc, dwItemMode) == 0x10 + 1 * (sizeof(void*) - 4), "unit+0x10 is the item mode");
 static_assert(offsetof(D2UnitStrc, pGfxData) == 0x54 + 6 * (sizeof(void*) - 4), "unit+0x54 is the COF list 0x69130 walks");

@@ -1,5 +1,5 @@
 // 1.13c D2Game+0x8B750 -- the 0x96 client-update packet, written bit by bit and queued to the client in EAX.
-// Prior art used: none (not in D2MOO 1.10f); the retail disassembly. The function has 5 stack arguments after the
+// Prior art used: none (not in 1.10f); the retail disassembly. The function has 5 stack arguments after the
 // register client; the earlier transcription from the decompile read them as uninitialised locals.
 #include <cstdint>
 #include <emscripten.h>

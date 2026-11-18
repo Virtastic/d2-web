@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x2A600: the full item bitstream decoder (the 1.13c successor of D2MOO's
+// 1.13c D2Common+0x2A600: the full item bitstream decoder (the 1.13c successor of the 1.10f source's
 // ITEMS_DecodeItemBitstreamComplete). stdcall (unit, buf, checkHeader, gamble, pSocketed, version), ret 0x18;
 // returns 1, or -1 when the stream named an unknown quality, a bad unique/set record or a doubled zero stat id.
 // Every callee is a seam (register-convention callees take their registers as arguments), so the function runs on

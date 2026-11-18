@@ -1,4 +1,4 @@
-// ABI mirror of D2WebWalkProbe in d2moo/include/Path/Path.h. Every slot is int32 so this
+// ABI mirror of D2WebWalkProbe in include/Path/Path.h. Every slot is int32 so this
 // diagnostic can be copied safely from wasm memory without exposing host pointers.
 export const WALK_PROBE_WORDS = 29;
 export function decodeWalkProbe(words) {

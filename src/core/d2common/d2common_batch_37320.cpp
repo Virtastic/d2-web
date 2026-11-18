@@ -91,13 +91,13 @@ EMSCRIPTEN_KEEPALIVE uint8_t D2Common_24E10_GetItemAutoStack(uint32_t pUnit) {  
 	return pRow[nItemType].nAutoStack;
 }
 
-// Export of 1.13c D2Common 0x246A0; the body is ITEMS_GetStaffMods in src/core/d2moo/src/Items/Items.cpp.
+// Export of 1.13c D2Common 0x246A0; the body is ITEMS_GetStaffMods in src/core/game/Items/Items.cpp.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint8_t D2Common_246A0_StaffMods(uint32_t pUnit) {   // the FN probe src/core/fn/d2common_246a0.cpp owns d2_fn_d2common_246a0 (r[] ABI)
 	return static_cast<uint8_t>(ITEMS_GetStaffMods(reinterpret_cast<D2UnitStrc*>(P(pUnit))));
 }
 
-// D2Common+0x34390 now runs as STATES_ClearGfxStateFlags (src/core/d2moo/src/D2States.cpp).
+// D2Common+0x34390 now runs as STATES_ClearGfxStateFlags (src/core/game/D2States.cpp).
 
 // 1.13c D2Common+0x71430: address of row param_1 in the 0x22-byte table (count at
 // DAT_6fdefd98, base at DAT_6fdefd9C; wired to sgptDataTables->pLowQualityItemDataTables, the

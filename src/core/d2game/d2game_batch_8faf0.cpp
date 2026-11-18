@@ -3,7 +3,7 @@
 // retail/D2/D2SE/CORES/1.13c/D2Game.dll at 0x6FCAFAF0). Stage A batch lane (OBJECTIVE v8.3):
 // implementation + marker only, no spec, no vector.
 //
-// Prior art (1.10f): D2MOO src/D2Game/UNIT/SUnitProxy.cpp SUNITPROXY_FreeVendorChain (0x6FCCC8C0) and
+// Prior art (1.10f): the 1.10f source src/D2Game/UNIT/SUnitProxy.cpp SUNITPROXY_FreeVendorChain (0x6FCCC8C0) and
 // SUNITPROXY_FreeNpcGamble (0x6FCCD190). 1.13c merges the two: one record lookup by NPC class id, then
 // the gamble chain (inventory drain 0x8F470 + D2Common #10820 free) and the vendor chain, both keyed on
 // the player's unit id. The 1.10f record layout is unchanged: pGamble +0x08, bGambleInit +0x0C,

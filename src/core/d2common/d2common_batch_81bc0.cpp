@@ -122,9 +122,9 @@ int D2Common_452C0_LinkNearbyRoom(void* headv, uint8_t level, void* roomv, int p
     return ret;
 }
 
-// +0x3D810 (the 3x3 window read) lives in src/core/d2moo/src/D2Common_3D810.cpp.
+// +0x3D810 (the 3x3 window read) lives in src/core/game/D2Common_3D810.cpp.
 
-// +0x36CD0 (the line plot) is DRLG_PlotLine = sub_6FD75F60 in src/core/d2moo/src/DrlgDrlgGrid.cpp; its
+// +0x36CD0 (the line plot) is DRLG_PlotLine = sub_6FD75F60 in src/core/game/DrlgDrlgGrid.cpp; its
 // d2common_36cd0_port shim over the retail images lives in d2common_batch_7be50.cpp.
 
 // 1.13c D2Common+0x83CA0: lazily build the cached preset descriptor at param+0x50. If null: 5BE50(this, param+4)

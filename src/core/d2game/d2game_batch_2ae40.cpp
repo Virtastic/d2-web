@@ -1,6 +1,6 @@
 // 1.13c D2Game alpha batch (12 rows): the game-container and task-queue
 // accessors around 0x6FC4xxxx. Source of truth is the 1.13c image (build-wasm/ghidra-d2game/decomp/
-// 0x<RVA>.c); the 1.10f sibling under reference/D2MOO/source/D2Game/src/ names the same rules.
+// 0x<RVA>.c); the 1.10f sibling under the 1.10f reference source names the same rules.
 //
 // Offset-faithful: each function reads the retail record at the offsets the decompile shows, and the
 // module state below carries its retail address. Where Ghidra drops a register argument (EAX/ECX/EDX/
@@ -18,10 +18,10 @@ namespace {
 constexpr auto kTaskFile = "..\\Source\\D2Game\\GAME\\Task.cpp";  // the pool-free call site literal
 constexpr auto kGameFile = "..\\Source\\D2Game\\GAME\\Game.cpp";  // the save-error call site literal
 
-// D2ClientStrc fields the save path touches (src/core/d2moo/include/D2Game/GAME/Clients.h).
+// D2ClientStrc fields the save path touches (src/core/include/D2Game/GAME/Clients.h).
 constexpr uint32_t kClientSaveToken = 0x60;       // nCharSaveTransactionToken
 constexpr uint32_t kClientSaveTimestamp = 0x190;  // nSaveCreationTimestamp (FILETIME, 8 bytes)
-// D2GameStrc fields (src/core/d2moo/include/D2Game/GAME/Game.h).
+// D2GameStrc fields (src/core/include/D2Game/GAME/Game.h).
 constexpr uint32_t kGameLock = 0x18;              // lpCriticalSection
 constexpr uint32_t kGameInitSeed = 0x7C;          // dwInitSeed
 constexpr uint32_t kGameClients = 0x8C;           // nClients

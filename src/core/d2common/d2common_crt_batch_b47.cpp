@@ -32,7 +32,7 @@ int32_t d2common_entry_2c8f(const D2CommonEntryEnv& e, void* h, int32_t reason, 
 // 1.13c D2Common+0x0300A _atexit: 0 when __onexit accepted the function, else -1.
 int32_t d2common_atexit_300a(uintptr_t (*onexit)(uintptr_t), uintptr_t fn) { return (onexit(fn) != 0) - 1; }
 
-// 0x301C __RTC_Initialize, 0x3445 __mtterm, 0x3462 __initptd and 0x362D __freeptd are game functions under src/core/d2moo/src/Crt.
+// 0x301C __RTC_Initialize, 0x3445 __mtterm, 0x3462 __initptd and 0x362D __freeptd are game functions under src/core/game/Crt.
 
 // 1.13c D2Common+0x034E6 __freefls: release a thread's CRT block (32-bit layout; pointers passed as u32 via env).
 struct D2CommonFreeFlsEnv {

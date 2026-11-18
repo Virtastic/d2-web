@@ -3,7 +3,7 @@
 
 // Prior art: network protocol row; d2-clientless realm startup
 // schema, cross-checked against the cached 1.13c bodies at 0x7510 and 0x6AD0.
-// No D2MOO MCP implementation exists. Native imports deliberately stay external:
+// No the 1.10f source MCP implementation exists. Native imports deliberately stay external:
 // a timer, an event or a socket is owned by the platform rather than fabricated.
 D2McpStartupState d2_mcp_startup_state{};
 

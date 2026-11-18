@@ -11,7 +11,7 @@
 
 // GAME/Clients.cpp CLIENTS_CheckFlag: whether one bit of the client's own save flags
 // (D2ClientStrc::tSaveFlags -- the word CLIENTS_GetFlags/SetFlags/ToggleFlag in
-// d2moo/compat/game_net_stubs.cpp read and write) is set. This was a constant 0, so every caller
+// compat/game_net_stubs.cpp read and write) is set. This was a constant 0, so every caller
 // that gates on it (the hardcore resurrect refusal in D2GAME_PACKETCALLBACK_Rcv0x41_Resurrect,
 // PlrModes.cpp's disconnect-instead-of-town-portal branches, PartyScreen and item-naming hardcore
 // checks) always took the softcore path no matter what the client's flags actually held.

@@ -1,4 +1,4 @@
-// Host test: g++ -std=c++17 -Isrc/core/d2moo/{compat,include,include/D2Game,squall} (+ an emscripten.h defining EMSCRIPTEN_KEEPALIVE empty)
+// Host test: g++ -std=c++17 -Isrc/core/{compat,include,include/D2Game,squall} (+ an emscripten.h defining EMSCRIPTEN_KEEPALIVE empty)
 // The in-game marker (0x04) goes out only once the client's room is ready: for a spawned client with
 // its player (a join) and for a client changing act (no player needed), never for another state, and
 // it moves the client to the in-game state and sends its items.

@@ -70,6 +70,6 @@ extern "C" void D2Common_3D250_ClearTextList(uint8_t* pTextOwner, void* pFirstNo
     *reinterpret_cast<uint16_t*>(pTextOwner + 4) = 0;
 }
 
-// D2Common+0x12AF0 lives in the game tree (src/core/d2moo/src/Retail/D2Common_12af0.cpp).
+// D2Common+0x12AF0 lives in the game tree (src/core/game/Retail/D2Common_12af0.cpp).
 
-// 0x32E10 is UNITS_CharacterStartRunningOrKnockback (src/core/d2moo/src/Units/Units.cpp); the word-array placeholder that stood here is retired.
+// 0x32E10 is UNITS_CharacterStartRunningOrKnockback (src/core/game/Units/Units.cpp); the word-array placeholder that stood here is retired.

@@ -148,4 +148,4 @@ EMSCRIPTEN_KEEPALIVE void d2_port_d2common_37170(uint32_t pRecord)
 	Wr32(rec, 0x04, pTable[nIndex + 1]);
 	Wr32(rec, 0x08, Rd32(rec, 0x28) * pTable[nIndex]);
 }
-// D2Common+0x38940 now runs as STATLIST_UpdateUnitStat_6FDB6AB0 (src/core/d2moo/src/D2StatList.cpp).
+// D2Common+0x38940 now runs as STATLIST_UpdateUnitStat_6FDB6AB0 (src/core/game/D2StatList.cpp).

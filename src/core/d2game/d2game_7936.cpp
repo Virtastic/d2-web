@@ -1,6 +1,6 @@
 // D2Game.dll 1.13c RVA 0x7936 (411 B). Stage A implementation from the cached
 // decompile at build-wasm/ghidra-d2game/decomp/0x7936.c.
-// Prior art: 's RE pipeline entries; D2MOO has no implementation of this
+// Prior art: 's RE pipeline entries; the 1.10f source has no implementation of this
 // statically linked MSVC CRT locale-table initializer. The sibling D2Client CRT routines are
 // architectural cross-checks only; this implementation follows the 1.13c D2Game body.
 #include <cstdint>

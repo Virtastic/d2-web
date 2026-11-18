@@ -1,6 +1,6 @@
 // 1.13c D2Common implementation batch: +0x4AD20, +0x24800, +0x30340, +0x31200,
 // +0x45BE0, +0x2CC60, +0x4FB30, +0x26930, +0x303E0, +0x21DD0, +0x38710. Bodies follow the
-// cached 1.13c decompile; where a vendored D2MOO function is the same body it is called rather
+// cached 1.13c decompile; where a vendored the 1.10f source function is the same body it is called rather
 // than copied. Retail's fatal paths (Fog message + _exit(-1)) are modelled as returns.
 #include <cstddef>
 #include <cstdint>

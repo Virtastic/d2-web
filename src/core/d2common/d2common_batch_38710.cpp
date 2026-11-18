@@ -177,7 +177,7 @@ void D2Common_4CB90_FindFreePosition(void* room, int32_t position[2], int radius
     *result = nullptr;
 }
 
-// Table-explicit probe form of 1.13c D2Common 0x22E70; the game runs ITEMS_CheckWeaponIfTwoHandedByItemId in src/core/d2moo/src/Items/Items.cpp.
+// Table-explicit probe form of 1.13c D2Common 0x22E70; the game runs ITEMS_CheckWeaponIfTwoHandedByItemId in src/core/game/Items/Items.cpp.
 uint8_t D2Common_22E70_ItemTableByte(uint32_t index, const void* records, uint32_t count) {
     if (index >= count || !records) return 0; // retail asserts
     return at<uint8_t>(records, size_t(index) * 0x1a8 + 0x11c);

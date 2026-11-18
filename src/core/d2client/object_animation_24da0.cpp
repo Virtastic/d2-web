@@ -1,4 +1,4 @@
-// Prior art used: community pointer tables (names/layout cross-check); D2MOO has no
+// Prior art used: community pointer tables (names/layout cross-check); the 1.10f source has no
 // D2Client implementation. Rules and erased register arguments checked against 1.13c.
 #include "object_animation_24da0.h"
 #include <cstring>

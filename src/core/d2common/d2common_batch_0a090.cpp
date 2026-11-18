@@ -1,7 +1,7 @@
 // 1.13c D2Common batch 8: +0x0A090, +0x0E1A0, +0x2EA30, +0x22C20, +0x22970, +0x70610.
 // Link-safe naming implementations: the parts pinned by the 1.13c decompile are written out; the
 // fatal paths that end in _exit(-1) are modelled as returns, as in the rest of src/core/d2common.
-// Prior art: D2MOO 1.10f where the same body exists (named in each block).
+// Prior art: 1.10f where the same body exists (named in each block).
 #include <cstddef>
 #include <cstdint>
 #include "D2DataTbls.h"
@@ -38,7 +38,7 @@ int D2Common_A090_GetObjectIndexFromObjPreset(uint8_t nAct, int32_t nUnitId)
 
 // 1.13c D2Common+0x0E1A0 (#10075): the 1.13c D2Common_10231. Calls the room/collision impl with the
 // destination room and the packed (nX, nY) point, then clears the path's dwPathPoints (+0x28) and
-// returns 1. The second argument (unit) is unused. Prior art D2MOO 1.10f
+// returns 1. The second argument (unit) is unused. Prior art 1.10f
 // D2Common_10231/10231_Impl (Step.cpp); 1.13c is the version that forwards nX/nY instead of the
 // current coordinates, so the impl is called directly here.
 BOOL __stdcall D2Common_10231_Impl(D2DynamicPathStrc* pDynamicPath, D2ActiveRoomStrc* pRoomDest, D2PathPointStrc tDest);
@@ -54,7 +54,7 @@ int __stdcall D2Common_E1A0_RepositionPath(D2DynamicPathStrc* pDynamicPath, D2Un
 
 // Superseded by UNITS_SetObjectPortalFlags (Units.cpp, the row for 0x2EA30, #10111): set an object's portal flags. Only a UNIT_OBJECT unit is valid:
 // a null unit is fatal 0xFEF and any other type fatal 0xFF0, both followed by _exit(-1) (no return
-// to model). Writes the byte at pObjectData+0x05 (nPortalFlags). Prior art D2MOO 1.10f
+// to model). Writes the byte at pObjectData+0x05 (nPortalFlags). Prior art 1.10f
 // UNITS_SetObjectPortalFlags (Units.cpp, 0x6FDC0760).
 void D2Common_2EA30_SetObjectPortalFlags(D2UnitStrc* pUnit, uint8_t nPortalFlags)
 {
@@ -63,7 +63,7 @@ void D2Common_2EA30_SetObjectPortalFlags(D2UnitStrc* pUnit, uint8_t nPortalFlags
     pUnit->pObjectData->nPortalFlags = nPortalFlags;
 }
 
-// Export of 1.13c D2Common 0x22C20 (#10119): the body is ITEMS_GetUniqueColumnFromItemsTxt in src/core/d2moo/src/Items/Items.cpp.
+// Export of 1.13c D2Common 0x22C20 (#10119): the body is ITEMS_GetUniqueColumnFromItemsTxt in src/core/game/Items/Items.cpp.
 extern "C" uint8_t D2Common_22C20_ItemUniqueColumn(D2UnitStrc* pUnit)
 {
     return static_cast<uint8_t>(ITEMS_GetUniqueColumnFromItemsTxt(pUnit));
@@ -71,7 +71,7 @@ extern "C" uint8_t D2Common_22C20_ItemUniqueColumn(D2UnitStrc* pUnit)
 
 // 1.13c D2Common+0x22970 (#10120): items.txt int16 at +0x108 (nDexBonus) for a UNIT_ITEM, except
 // that a value of 1 (or a null unit of another type, or a missing record) yields 100.
-// Prior art D2MOO 1.10f ITEMS_GetDexBonus (Items.cpp, 0x6FD9D310).
+// Prior art 1.10f ITEMS_GetDexBonus (Items.cpp, 0x6FD9D310).
 int16_t D2Common_22970_ItemDexBonus(D2UnitStrc* pUnit)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_ITEM)

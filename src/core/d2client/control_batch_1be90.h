@@ -1,6 +1,6 @@
 #pragma once
 // Prior art used: ; d2bs pointer table is 1.14d and supplies no
-// implementation for these 1.13c internals. D2MOO has no D2Client module.
+// implementation for these 1.13c internals. the 1.10f source has no D2Client module.
 #include <array>
 #include <cstdint>
 #include <cstring>

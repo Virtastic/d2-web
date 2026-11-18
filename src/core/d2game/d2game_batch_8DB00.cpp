@@ -20,9 +20,9 @@
 // #10867=0xA454, #10887=0xA472, #10892=0xA916, #10905=0xB02A, #10910=0xA802, #10913=0xA3A0,
 // #10973=0xA42A, #10976=0xAAAE, #11001=0xAB32, #11054=0xB024, #11058=0xAB4A, #11088=0xAA66,
 // #11090=0xA4A2, #11139=0xA7AE, #10265=0xA2DA.
-// Prior art: D2MOO 1.10f reference/D2MOO/source/D2Game/src/PLAYER/PlrModes.cpp
+// Prior art: 1.10f the 1.10f reference source
 // (sub_6FC81250/sub_6FC80B90, the 1.10f forms of 0x79100's skill pair and weapon pass),
-// src/core/d2moo/src/D2Game/PLAYER/PlrModes.cpp and the D2Common ordinal table.
+// src/core/game/D2Game/PLAYER/PlrModes.cpp and the D2Common ordinal table.
 #include <cstdint>
 #include <cstddef>
 #include <cstring>
@@ -245,7 +245,7 @@ EMSCRIPTEN_KEEPALIVE void d2game_f3410_impl(uint32_t ebxUnit, uint32_t client,
     env->sendPacket(client, pkt, 14);
 }
 
-// standalone port of D2Game 0x77B20 (marker on d2moo sub_6FC81560)
+// standalone port of D2Game 0x77B20 (marker on 1.10f sub_6FC81560)
 // ESI = unit, EDI = the record filled by 0x778A0. Applies each side's skill through 0x6FCC2100
 // when the skill exists, differs from the current one, and its use state is neither 2 nor 7.
 extern "C"

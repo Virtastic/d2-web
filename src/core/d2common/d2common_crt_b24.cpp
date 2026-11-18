@@ -79,7 +79,7 @@ void D2Common_1B1E_QuickExit(int32_t nCode)
     D2Common_1A4A_DoExit(static_cast<uint32_t>(nCode), 1, 0);
 }
 
-// The body of 0x422D is the game function in src/core/d2moo/src/Crt/Crt_422d.cpp; the lock table here is this file's.
+// The body of 0x422D is the game function in src/core/game/Crt/Crt_422d.cpp; the lock table here is this file's.
 void d2common_lock_file2_422d(int32_t nIndex, void* pFile, void (*pfnLock)(int32_t));
 static void lock_tbl(int32_t nIdx) { enter_cs((uint32_t)nIdx); }
 

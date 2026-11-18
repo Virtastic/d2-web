@@ -5,7 +5,7 @@
 // in retail argument order. Register-only arguments the decompile shows as unaff_*/extraout_* are
 // explicit trailing parameters. Where Ghidra's stack-struct base is ambiguous the struct starts at the
 // first zeroed/typed dword (the 23-dword missile-create request; word 0 is the request type).
-// Prior art: D2MOO 1.10f reference/D2MOO/source/D2Game/src/MISSILES (MissMode.cpp).
+// Prior art: 1.10f the 1.10f reference source (MissMode.cpp).
 #include <cstdint>
 #include <cstring>
 #include <unistd.h>

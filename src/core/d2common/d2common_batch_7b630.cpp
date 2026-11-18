@@ -1,4 +1,4 @@
-// D2Common 1.13c batch: delegates to the vendored d2moo A* driver, which calls 7B2C0, 7AE20, 7B220,
+// D2Common 1.13c batch: delegates to the vendored 1.10f A* driver, which calls 7B2C0, 7AE20, 7B220,
 // 7B3C0 and 7AB50 directly (hidden register args are explicit parameters there).
 #include <cstdint>
 #include <emscripten.h>

@@ -305,7 +305,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_7A570(uint32_t esiUnit, const D2GameBatch
 // Callback dispatch: EBX+0x10 indexes 0xC-byte rows of the 0x6FD22CE0 table; a non-null first dword is
 // called as (param_2, index) after an IsBadCodePtr gate whose failure logs the 0x148 allocation and
 // exits.
-// D2Game +0xCB8F0 (marker lives on the d2moo sub_6FC82270)
+// D2Game +0xCB8F0 (marker lives on the 1.10f sub_6FC82270)
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CB8F0(uint32_t param1, uint32_t param2, uint32_t ebx,
                                              const D2GameBatch1EF50Env* env)

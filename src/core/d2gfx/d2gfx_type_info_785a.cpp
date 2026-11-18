@@ -1,4 +1,4 @@
-// Prior art used: D2Gfx entry-point catalog and D2MOO's
+// Prior art used: D2Gfx entry-point catalog and the 1.10f source's
 // D2Gfx module (no CRT type_info body); sibling deleting-destructor seam
 // d2gfx_batch_39ad_tiny.cpp. Rule checked against the 1.13c cached decompile.
 #include <cstddef>

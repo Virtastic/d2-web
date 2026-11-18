@@ -1,4 +1,4 @@
-// Prior art used: D2MOO Storm exports have no CRT bodies. The cached
+// Prior art used: the 1.10f source Storm exports have no CRT bodies. The cached
 // 1.13c ___addl body establishes this unsigned carry contract.
 // This pure helper uses explicit retail-width operands and its cdecl argument order.
 #include <cstdint>

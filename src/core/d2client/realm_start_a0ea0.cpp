@@ -5,7 +5,7 @@
 #include <D2Items.h>
 #include <Units/Units.h>
 #include "realm_skill_start.h"
-#include "../d2moo/compat/test_seam.h"
+#include "../compat/test_seam.h"
 int d2client_realm_a0ea0(D2UnitStrc* unit, int, int) {
     if (D2_CALL(COMPOSIT_IsWeaponBowOrXBow, unit)) return D2_CALL(d2client_realm_a0a30, unit) != 0;
     D2UnitStrc* weapon = D2_CALL(D2Common_10434, unit, 0);

@@ -1,4 +1,4 @@
-// 1.13c D2Game+0xA9D40 (sub_A9D40; D2MOO AITHINK_Fn136_BaalTaunt): ECX = pGame, EDX = pUnit, stack = pAiTickParam (ret 4; the result is residue).
+// 1.13c D2Game+0xA9D40 (sub_A9D40; the 1.10f source AITHINK_Fn136_BaalTaunt): ECX = pGame, EDX = pUnit, stack = pAiTickParam (ret 4; the result is residue).
 // Written from the 1.13c disassembly as a rule over E (see d2game_179a0.h). tp: +0 ai general (counter word +0x14), +8 target, +0x14 range, +0x1C monstats row. Row words indexed
 // by game byte +0x6D: +0x56 / +0x62 range limits, +0x5C counter limit. No target idles 0x19 (0xF22C0: EAX = game, ESI = unit, stack 0x19). A target of type 0 or 1 whose +0x10 is 1
 // bumps the counter and compares it with word(+0x5C); every other case clears it. Counter over the limit casts: 0xF2380 (EAX = ai pointer with AL = 4, ECX = unit, EBX = game,

@@ -1,4 +1,4 @@
-// Object labels come from the engine's loaded retail Objects.txt rows.  The D2MOO table bridge
+// Object labels come from the engine's loaded retail Objects.txt rows.  The the 1.10f source table bridge
 // exposes that exact table, whose `wszName` field has already passed through retail's string
 // reference resolver; this keeps JS from maintaining a second object-name table.
 import { decodeDatPalette } from './d2-formats.mjs';

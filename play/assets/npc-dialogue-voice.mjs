@@ -1,6 +1,6 @@
 // NPC dialogue message IDs -> retail Sounds.txt handles.
 // Prior art: Riiablo data/speech.txt maps voice keys to StringIds; those keys are
-// matched against D2MOO StringIds.h. Quest entries are re-derived from StringIds names
+// matched against the 1.10f source StringIds.h. Quest entries are re-derived from StringIds names
 // and included only when their exact 1.13c handle exists. ID 68 is a listfile-confirmed
 // alternate WAV without a Sounds.txt row and is handled by the direct-file override below.
 import { NPC_TOWN_VOICE } from './npc-town-voices.mjs';

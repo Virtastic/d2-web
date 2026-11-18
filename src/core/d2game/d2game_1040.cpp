@@ -1,6 +1,6 @@
 // 1.13c D2Game+0x1040: set a unit stat, resetting a player's gold (0xE) or stash gold (0xF) to 0 when the value passes its limit.
 // Retail takes ESI = unit, EBX = stat, EDI = value. The three D2Common calls are seams so the captured path can be replayed; the
-// engine's own copy of this rule is the D2MOO gold helper in PLAYER/Player.cpp.
+// engine's own copy of this rule is the 1.10f source gold helper in PLAYER/Player.cpp.
 #include <cstdint>
 
 struct D2G1040Env {

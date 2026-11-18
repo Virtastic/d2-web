@@ -9,8 +9,8 @@
 // Ordinal_10024(&0x6FD19FF9, id) -> _exit(-1) is modelled by d2game_fatal, as in the other batches.
 //
 // Prior art: 1.10f D2Game has the same save-section readers in
-// reference/D2MOO/source/D2Game/src/PLAYER/PlrSave2.cpp and PlrSave.cpp, and the same pet-list
-// initialisation loop in PLAYERPETS_AllocPetList (src/core/d2moo/src/D2Game/PLAYER/PlayerPets.cpp).
+// the 1.10f reference source and PlrSave.cpp, and the same pet-list
+// initialisation loop in PLAYERPETS_AllocPetList (src/core/game/D2Game/PLAYER/PlayerPets.cpp).
 #include <cstdint>
 #include <cstddef>
 #include <cstring>

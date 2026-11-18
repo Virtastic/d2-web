@@ -9,8 +9,8 @@
 
 #include "sub_4f860.h"
 #include "d2client_5dfd0.h"
-#include "../d2moo/include/D2DataTbls.h"
-#include "../d2moo/include/DataTbls/LevelsTbls.h"
+#include "../include/D2DataTbls.h"
+#include "../include/DataTbls/LevelsTbls.h"
 
 namespace {
 using namespace d2client_4f860;

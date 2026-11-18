@@ -1,4 +1,4 @@
-// D2MOO's D2Gfx DllMain covers the game entry, not this VC7.1 CRT leaf.
+// the 1.10f source's D2Gfx DllMain covers the game entry, not this VC7.1 CRT leaf.
 // The packed environment block and allocator are supplied by the CRT host seam.
 #include <cstddef>
 #include <cstdint>

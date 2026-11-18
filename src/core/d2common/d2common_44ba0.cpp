@@ -1,6 +1,6 @@
 // Mutual orth link of two rooms: EAX = direction, ECX = first room, EBX = second room. The first room gets the second as a neighbour in `direction`, the second gets the
 // first in (direction - 2) & 3, both through 0x44950 (ESI = owner, EAX = neighbour, stack = direction); EAX is the second call's. D2Common_44BA0 is the retail layout
-// (32-bit tokens); D2Common_44BA0_Engine is the engine form on D2MOO structs.
+// (32-bit tokens); D2Common_44BA0_Engine is the engine form on the 1.10f source structs.
 #include <cstdint>
 
 struct D2DrlgRoomStrc;

@@ -6,13 +6,13 @@
 // 16-stat compact section (magic 0x6667 'fg'), 0x55050 dispatches the item section on the version
 // word (0x47 -> 0x54D90, 0x48..0x60 -> 0x54810, anything else -> 1), 0x55A10 reads the corpse list
 // (magic 0x4D4A 'JM', count at +2). Their 1.10f counterparts are sub_6FC8ADE0, sub_6FC8BC70 and
-// sub_6FC8BCC0 in reference/D2MOO/source/D2Game/src/PLAYER/PlrSave.cpp.
+// sub_6FC8BCC0 in the 1.10f reference source
 //
 // Three belong to the current parser 0xEDB50 (save versions >= 0x5C): 0xEBDA0 is
 // PLRSAVE2_ReadStats (version <= 94 branch; > 94 delegates to 0xEB910 PLRSAVE2_ReadStatsEx), 0xECA60
 // is PLRSAVE2_ReadSkills (1.13c address of the 1.10f function already carried in PlrSaveItems.cpp,
 // marker missing there), 0xECC90 is PLRSAVE2_InitializeStats (declared in PlrSave2.h, not implemented
-// in src/). Counterparts in reference/D2MOO/source/D2Game/src/PLAYER/PlrSave2.cpp.
+// in src/). Counterparts in the 1.10f reference source
 //
 // Retail is 32-bit and the decompiler dropped every register-only argument (in_EAX / unaff_ESI /
 // unaff_EDI / unaff_EBP); those are explicit parameters here. The seam struct carries every callee

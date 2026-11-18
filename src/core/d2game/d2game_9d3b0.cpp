@@ -16,7 +16,7 @@ struct D2G9D3B0Env {
     void (*handler)(uint32_t fn, uint32_t game, uint32_t unit, uint32_t ctx);   // ECX game, EDX unit, stack ctx
 };
 static inline uint32_t d9rd(uint32_t a) { uint32_t v; std::memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }
-// (marker lives on the d2moo D2GAME_MONSTERS_AiFunction03_6FCF0A70)
+// (marker lives on the 1.10f D2GAME_MONSTERS_AiFunction03_6FCF0A70)
 extern "C" void d2g_9d3b0(const D2G9D3B0Env* ep, uint32_t game, uint32_t unit) {
     const D2G9D3B0Env& e = *ep;
     uint32_t ctx[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};

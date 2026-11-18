@@ -4,9 +4,9 @@
 #include "D2DataTbls.h"
 #include "DataTbls/TokenTbls.h"
 
-// Prior art used: D2MOO's DATATBLS_LoadObjType_ModeTxt in DataTbls/TokenTbls.cpp is the 1.10f
+// Prior art used: the 1.10f source's DATATBLS_LoadObjType_ModeTxt in DataTbls/TokenTbls.cpp is the 1.10f
 // twin of 0x19190. The 1.13c decompile confirms the same objtype/objmode records, 0x34-byte
-// stride, contiguous destination allocation and split type/mode pointers. OpenD2/D2MOO layouts
+// stride, contiguous destination allocation and split type/mode pointers. OpenD2/the 1.10f source layouts
 // are the table-layout reference per .
 namespace
 {
@@ -97,7 +97,7 @@ extern "C" uint32_t d2_fn_d2common_819c0_batch(int32_t nSubY, uint32_t pRoom, in
 }
 
 // 1.13c D2Common+0x19190: load objtype and objmode rows into one contiguous 0x34-byte-record
-// allocation and publish its split pointers. This is the same loader recovered in D2MOO's
+// allocation and publish its split pointers. This is the same loader recovered in the 1.10f source's
 // DATATBLS_LoadObjType_ModeTxt; the archive handle arrives in EAX in the retail entry point.
 void d2_port_d2common_19190(HD2ARCHIVE hArchive) { // 1.13c D2Common+0x19190
 	DATATBLS_LoadObjType_ModeTxt(hArchive);

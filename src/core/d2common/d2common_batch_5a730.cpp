@@ -1,4 +1,4 @@
-// Prior art: D2MOO DataTbls, MonsterTbls, LevelsTbls, Items and DrlgTileSub;
+// Prior art: the 1.10f source DataTbls, MonsterTbls, LevelsTbls, Items and DrlgTileSub;
 // re-derived against the twelve cached 1.13c bodies. Register-only arguments are explicit.
 #include <algorithm>
 #include <cstddef>
@@ -141,7 +141,7 @@ extern "C" int32_t d2common_710f0_port(HD2ARCHIVE archive, const char* name, con
     return d2common_710f0_run(&env, name, extension);
 }
 
-// D2Common+0x1F980 lives in the game tree (src/core/d2moo/src/Retail/D2Common_1f980.cpp).
+// D2Common+0x1F980 lives in the game tree (src/core/game/Retail/D2Common_1f980.cpp).
 
 // 1.13c D2Common+0x25C10: moved to d2common_25c10.cpp (seam-based port).
 

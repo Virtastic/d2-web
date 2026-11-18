@@ -512,7 +512,6 @@ node --test test/*.test.mjs
 | path | what |
 |---|---|
 | `src/core/` | the engine, by retail DLL (common, game, client, gfx, net, ...) |
-| `src/core/d2moo/` | code adapted from D2MOO (MIT) |
 | `play/` | the browser client and the dev server |
 | `tools/` | setup and build helpers, and the realm protocol tools |
 | `tools/setup.mjs` | the one-step game-file setup |
@@ -524,7 +523,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues: [SECURITY.md](SECURITY.
 
 ## Credits
 
-- **D2MOO** (ThePhrozenKeep): part of `src/core/d2moo` is adapted from it.
+- **D2MOO** (ThePhrozenKeep): part of `src/core/game` is adapted from it.
 - **StormLib** (Ladislav Zezula): MPQ archive reading.
 - **libd2**, **d2mapapi**, **PlugY**, **d2bs**, **D2Ex2** and the **Phrozen Keep** guides: prior
   art and cross-checks.

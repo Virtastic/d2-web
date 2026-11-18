@@ -14,7 +14,7 @@ writeFileSync(join(d, 't.cpp'), `#include <cstdio>
 extern "C" int32_t d2_client_inv_click_route(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t);
 int main(){ for(int c=1;c<=6;c+=5) for(int m=0;m<0x16;m++) for(int b=0;b<=10;b++) for(int h=0;h<2;h++) for(int k=0;k<4;k++)
   printf("%d %d %d %d %d %d\\n",c,m,b,h,k,d2_client_inv_click_route(c,m,b,h,k&1,k>>1)); }`);
-execFileSync('g++', ['-std=c++17', '-o', join(d, 't'), join(d, 't.cpp'), 'src/core/d2moo/d2client/inv_click_route.cpp'], { stdio: 'pipe' });
+execFileSync('g++', ['-std=c++17', '-o', join(d, 't'), join(d, 't.cpp'), 'src/core/d2client/inv_click_route.cpp'], { stdio: 'pipe' });
 const table = new Map(execFileSync(join(d, 't')).toString().trim().split('\n').map((l) => {
   const [c, m, b, h, k, r] = l.split(' ').map(Number); return [`${c},${m},${b},${h},${k}`, r];
 }));

@@ -1,7 +1,7 @@
 // 1.13c D2Game+0x74D50: the path setter the 1.13c compiler factored out of
 // D2GAME_ModeChange_6FC65220 -- give the dynamic path a new distance and type, rebuild it, and if it yields
 // no point at all, retry the four chase types as PATHTYPE_WALL_FOLLOW. Vendored 1.10f body:
-// src/core/d2moo/src/D2Game/MONSTER/MonsterMode.cpp:sub_6FC65680. Retail 32-bit layout only.
+// src/core/game/D2Game/MONSTER/MonsterMode.cpp:sub_6FC65680. Retail 32-bit layout only.
 // Its eight D2Common callees need a live dynamic path and a live room, so -- as in game_74f90.h -- the vector
 // scripts them: the capture hooks each thunk, the probe hands in a seam that logs and returns this tuple's
 // scripted value (the retail capture tool/fn/d2game-74d50.txt).

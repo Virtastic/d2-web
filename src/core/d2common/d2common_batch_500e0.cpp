@@ -108,7 +108,7 @@ uint8_t* Current320(uint8_t* inv)
 }
 }
 
-// Twin of INVENTORY_GetEquippedWeapon (the d2moo function carries the 1.13c marker)
+// Twin of INVENTORY_GetEquippedWeapon (the 1.10f function carries the 1.13c marker)
 uint32_t D2Common_20700_EquippedHandCandidate(uint32_t pInv, uint32_t* pOutUnit, uint32_t* pOutBodyLoc, uint32_t* pOutIsHeld)
 {
     uint8_t* inv = P(pInv);

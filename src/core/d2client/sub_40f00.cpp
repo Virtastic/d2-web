@@ -1,7 +1,7 @@
 // D2Client sub_40F00 (FUN_6faf0f00): real function over the retail tables and sgptDataTables.
 #include <cstdint>
 #include <cstring>
-#include "../d2moo/include/D2Seed.h"
+#include "../include/D2Seed.h"
 #define W __attribute__((weak))
 extern "C" {
 W uint8_t* sgptDataTables;

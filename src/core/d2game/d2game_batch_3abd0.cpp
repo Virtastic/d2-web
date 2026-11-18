@@ -1,6 +1,6 @@
 // src/core/d2game/d2game_batch_3abd0.cpp -- 1.13c D2Game.dll missile-hit / missile-do callbacks
 // 0x3ABD0..0x3C260, written from the retail decompile (register arguments read off ours' 1.10f
-// crosswalk, D2MOO MissMode.cpp). Retail records are opaque host objects read at retail byte offsets;
+// crosswalk, the 1.10f source MissMode.cpp). Retail records are opaque host objects read at retail byte offsets;
 // every callee src/ does not own is a seam in retail argument order. The default env is inert.
 #include <cstdint>
 #include <cstring>

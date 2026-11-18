@@ -1,4 +1,4 @@
-// Prior art used: D2MOO's D2Gfx has no CRT malloc implementation. The same VC7.1 retry
+// Prior art used: the 1.10f source's D2Gfx has no CRT malloc implementation. The same VC7.1 retry
 // wrapper is modelled in src/core/realm/mcp_crt_batch_b58.cpp; checked against the cached
 // D2Gfx 1.13c decompile. Allocator and new-handler calls are seams after retail arguments.
 #include <cstdint>

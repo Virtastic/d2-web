@@ -12,7 +12,7 @@
 // named in each function's comment. Unmapped callees are seams on D2GameBatch46E80Env in retail
 // argument order. The fatal path Fog #10265(id) -> #10024(text) -> _exit(-1) is collapsed to the
 // exit, which is the only observable effect.
-// Prior art: D2MOO 1.10f reference/D2MOO/source/D2Game/ (QUESTS/Quest.cpp, MISSILES, ITEMS); the RNG
+// Prior art: 1.10f the 1.10f reference source (QUESTS/Quest.cpp, MISSILES, ITEMS); the RNG
 // step reuses the 0x6AC690C5 multiplier already modelled in d2game_batch_1480.cpp.
 #include <cstdint>
 #include <cstddef>

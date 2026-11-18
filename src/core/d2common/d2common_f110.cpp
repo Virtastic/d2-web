@@ -1,4 +1,4 @@
-// Prior art used: D2MOO DRLGMAZE_RollBasicPresets loop body (1.10f), split by 1.13c into
+// Prior art used: the 1.10f source DRLGMAZE_RollBasicPresets loop body (1.10f), split by 1.13c into
 // per-room helpers; checked against the cached 1.13c decompiles.
 #include <cstdint>
 #include "D2DataTbls.h"

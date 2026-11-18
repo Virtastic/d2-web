@@ -1,5 +1,5 @@
 // BNClient VC7.1 CRT lifecycle. Prior art: D2MCPClient's matching CRT lifecycle
-// (mcp_crt_batch_b56.cpp); D2MOO has no BNClient implementation. Contracts checked
+// (mcp_crt_batch_b56.cpp); the 1.10f source has no BNClient implementation. Contracts checked
 // against cached 1.13c bodies 428B/46E8/4739/49C9. No parity claim (Stage A).
 #include <cstddef>
 #include <cstdint>

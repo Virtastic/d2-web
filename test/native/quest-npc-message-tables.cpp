@@ -1,12 +1,12 @@
-// Compile with the normal d2moo include paths, -ffunction-sections and -Wl,--gc-sections.
+// Compile with the normal 1.10f include paths, -ffunction-sections and -Wl,--gc-sections.
 // The quest NPC message tables decide which NPC offers which quest line (QUESTS_InitScrollTextChain looks the
 // speaking NPC up in the table for the quest's current index). These are the entries that differed from 1.13c.
-#include "../../src/core/d2moo/src/D2Game/QUESTS/ACT1/A1Q3.cpp"
-#include "../../src/core/d2moo/src/D2Game/QUESTS/ACT2/A2Q1.cpp"
-#include "../../src/core/d2moo/src/D2Game/QUESTS/ACT3/A3Q3.cpp"
-#include "../../src/core/d2moo/src/D2Game/QUESTS/ACT5/A5Q4.cpp"
-#include "../../src/core/d2moo/src/D2Game/QUESTS/ACT5/A5Q5.cpp"
-#include "../../src/core/d2moo/src/D2Game/QUESTS/ACT5/A5Q6.cpp"
+#include "../../src/core/game/D2Game/QUESTS/ACT1/A1Q3.cpp"
+#include "../../src/core/game/D2Game/QUESTS/ACT2/A2Q1.cpp"
+#include "../../src/core/game/D2Game/QUESTS/ACT3/A3Q3.cpp"
+#include "../../src/core/game/D2Game/QUESTS/ACT5/A5Q4.cpp"
+#include "../../src/core/game/D2Game/QUESTS/ACT5/A5Q5.cpp"
+#include "../../src/core/game/D2Game/QUESTS/ACT5/A5Q6.cpp"
 #include <cstdio>
 
 static int failures;

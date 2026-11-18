@@ -1,5 +1,5 @@
 // D2Common implementation batch: four rows translated from the pinned 1.13c decompiles.
-// The vendored D2MOO (1.10f) helpers are called by name; every control-flow decision, table
+// The vendored the 1.10f source (1.10f) helpers are called by name; every control-flow decision, table
 // bound and struct offset below is the 1.13c one, checked against the image disassembly.
 #include <cstdint>
 
@@ -45,7 +45,7 @@ namespace
 	}
 }
 
-// Twin of INVENTORY_GetWieldType (the d2moo function carries the 1.13c marker): wield type from the body-location grid's both hands (-1 none, 1 one or
+// Twin of INVENTORY_GetWieldType (the 1.10f function carries the 1.13c marker): wield type from the body-location grid's both hands (-1 none, 1 one or
 // two one-handed/1-or-2-handed weapons, 2 a two-handed weapon). The grid is only read when the
 // inventory carries signature 0x01020304; the player is only used by ITEMS_Is1Or2Handed.
 int32_t D2Common_1FB80_GetWieldType(D2UnitStrc* pPlayer, D2InventoryStrc* pInventory)

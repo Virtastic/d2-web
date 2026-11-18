@@ -334,9 +334,9 @@ static_assert(sizeof(D2VecA1Q6Travel) == 36, "D2VecA1Q6Travel layout");
 
 // Monster drop (kind 29): on a fresh level with the player fixture attached, every monster in
 // Room2-list then unit-list order is handed to D2Game's monster-death drop routine (1.13c
-// 0x6FC95680, D2MOO sub_6FC631B0: TC column by monster type, quest TC, item level) with the
+// 0x6FC95680, the 1.10f source sub_6FC631B0: TC column by monster type, quest TC, item level) with the
 // player as the mode change's target. One D2VecMonDrop per monster: the inputs the routine gave
-// the treasure-class walk (D2Game 0x6FC32380 / D2MOO D2GAME_DropTC_6FC51360: TC row, quality and
+// the treasure-class walk (D2Game 0x6FC32380 / the 1.10f source D2GAME_DropTC_6FC51360: TC row, quality and
 // level arguments, number of walks) and the monster seed before and after it; one
 // D2VecMonDropItem per item unit the call added to the level (Room2-list then unit-list order).
 #pragma pack(push, 1)
@@ -370,7 +370,7 @@ static inline uint32_t d2vec_mondrop_item_hash(uint32_t h, const D2VecMonDropIte
 
 // NPC dialogue: client packet 0x13 (interact with entity) from a player standing within 6
 // subtiles of a town NPC takes retail's immediate activation path (0x6FC828D0 -> 0x6FC61C70 in
-// D2MOO's map): QUESTS_NPCActivate composes the message list and the 40-byte 0x27 packet,
+// the 1.10f source's map): QUESTS_NPCActivate composes the message list and the 40-byte 0x27 packet,
 // then the global quest flags (0x29, 97 bytes) and the player's quest record (0x28, 103 bytes)
 // are queued to the client.  One record per (game, NPC): every byte the handler queued, in
 // order, as retail composed it.
@@ -591,7 +591,7 @@ static_assert(sizeof(D2VecPrng) == 28, "prng record is 28 bytes on every platfor
 // canvas is painted") into a comparison with retail -- the standard every other subsystem is held
 // to and the one rendering was missing when every floor tile in the game drew the wrong art.
 //
-// 1.13c offsets, derived by scanning under Wine (D2CAPTURE_SCANROOM) because D2MOO's headers are
+// 1.13c offsets, derived by scanning under Wine (D2CAPTURE_SCANROOM) because the 1.10f source's headers are
 // the 1.10f decompile and differ here: Room1 records are 0x80 bytes; Room1+0x08 -> tile struct;
 // that struct holds (array pointer, count) at +0x08/+0x0C; records are 0x30 bytes and BEGIN with
 // screen X and Y -- not with a pointer to the D2CMP entry, which is the 1.10f shape.
@@ -624,7 +624,7 @@ struct D2VecTile {
 };
 
 // Kind 26 (s175): the per-lookup tile pick stream (OBJECTIVE v5 B; libd2's probe_seq is the prior
-// art). One record per D2CMP GetTiles call D2Common makes (#10059 in 1.13c, #10088 in 1.10f/D2MOO) --
+// art). One record per D2CMP GetTiles call D2Common makes (#10059 in 1.13c, #10088 in 1.10f/the 1.10f source) --
 // GetTileCache's candidate set -- with what the GetTileRarity calls (#10027; 1.10f #10081) that follow it reveal: the first `entries` calls sum the
 // weights, the rest are the rarity ladder, and the pick is the last entry the ladder consulted
 // (entry 0 when there is no ladder). The seed roll itself is inline in D2Common, so the ladder

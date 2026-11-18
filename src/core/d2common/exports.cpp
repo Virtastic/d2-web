@@ -21,7 +21,7 @@ void D2Common_10003(std::uint8_t** target, std::int32_t multiplier, std::int32_t
 }
 
 // 1.13c D2Common+0x70F40 (ordinal 10352): `ret 4`, a stdcall no-op that discards its single argument.
-// The body is d2common_70f40 in src/core/d2moo/src/D2CommonCrt.cpp.
+// The body is d2common_70f40 in src/core/game/D2CommonCrt.cpp.
 void D2Common_10352(std::uint32_t arg) { d2common_70f40(arg, 0); }
 
 // 1.13c D2Common+0x71280 (ordinal 10041): returns the address of the gamble.txt table header (record count, then

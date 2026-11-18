@@ -1,4 +1,4 @@
-// Prior art: D2MOO Fog.h owns diagnostics/allocation; the boot VFS owns streams.
+// Prior art: the 1.10f source Fog.h owns diagnostics/allocation; the boot VFS owns streams.
 #include "file_services.h"
 #include "../fog/fog_file_service.h"
 #include "../../assets/mpqvfs.h"

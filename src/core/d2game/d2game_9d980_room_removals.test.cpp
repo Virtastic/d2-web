@@ -1,4 +1,4 @@
-// Host test: g++ -std=c++17 -Isrc/core/d2moo/{compat,include,include/D2Game,squall} (+ an emscripten.h defining EMSCRIPTEN_KEEPALIVE empty)
+// Host test: g++ -std=c++17 -Isrc/core/{compat,include,include/D2Game,squall} (+ an emscripten.h defining EMSCRIPTEN_KEEPALIVE empty)
 // Leaving a room tells the client to drop each unit the room holds, in the room's order, but not missiles.
 #include "d2game_9d980_room_removals.h"
 #include <cassert>

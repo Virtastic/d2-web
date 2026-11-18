@@ -135,7 +135,7 @@ void __fastcall D2GAME_SendPacket0x0B_ClientUnit(D2ClientStrc* pClient, D2UnitSt
 #include <QUESTS/ACT1/A1Q6.h>
 #include <QUESTS/ACT5/A5Q4.h>
 #include <QUESTS/ACT5/A5Q6.h>
-#include "../d2moo/compat/datatbls_bridge.h"
+#include "../compat/datatbls_bridge.h"
 #include "../tables/shared.h"
 #include "weather_runtime.h"
 #include "../d2client/weather_sim.h"
@@ -3457,7 +3457,7 @@ EMSCRIPTEN_KEEPALIVE const D2VecAiLevel* d2_aitarget_out() { return &g_targetOut
 
 // Monster drops (kind 29, s190): the capture's D2CAPTURE_DROPS protocol. With the level populated
 // and the player fixture attached, every monster in Room2-list then unit-list order goes through
-// the monster-death drop routine (D2MOO sub_6FC631B0 = D2Game 1.13c 0x6FC95680) with the player
+// the monster-death drop routine (the 1.10f source sub_6FC631B0 = D2Game 1.13c 0x6FC95680) with the player
 // as the mode change's target; the DropTC observer records the walk's inputs, and the items are the
 // item units the call added to the level.
 extern void (*g_d2webOnDropTC)(D2UnitStrc*, D2TCExShortStrc*, int32_t, int32_t);
@@ -3950,7 +3950,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_create(uint32_t seed, int difficulty, int ac
 }
 
 // Where a player stands on entering its own act's town. Retail has ONE rule for this: D2Game
-// sub_6FC31EF0 (D2MOO Clients.cpp) places a joining player at DUNGEON_FindActSpawnLocationEx(act, the
+// sub_6FC31EF0 (the 1.10f source Clients.cpp) places a joining player at DUNGEON_FindActSpawnLocationEx(act, the
 // act's town, tile 0), whether the character is brand new or loaded from a save. Our session create
 // is a fixture and placed the player "beside the first monster" of the landing room instead.
 //
@@ -6703,7 +6703,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_take_ui_events(uint8_t* out, uint32_t c
 // boundary d2_session_take_ui_events uses.
 //
 // The D2Client event-to-row rule remains client behavior: D2CLIENT_PlaySound uses the MonSounds/Sounds
-// tables, and nothing in reference/ carries D2Client (D2MOO stops at D2Gfx/D2Win). For events 0x10 and
+// tables, and nothing in reference/ carries D2Client (the 1.10f source stops at D2Gfx/D2Win). For events 0x10 and
 // 0x0C, the drain also carries the row selected by the client's table lookup; it does not change the
 // attached event. Event 0x11 remains client-tick gated. 
 extern "C" int d2_shrine_use_take(int32_t*);
@@ -8080,7 +8080,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_fixture_a1q6_defect(int arm) {
 }
 EMSCRIPTEN_KEEPALIVE const D2SessionA1Q6Defect* d2_session_a1q6_defect() { return &g_sessionA1Q6Defect; }
 
-// GAME_UpdateProgress's pending-rooms step (D2Game, D2MOO GAME/Game.cpp), run where retail runs it:
+// GAME_UpdateProgress's pending-rooms step (D2Game, the 1.10f source GAME/Game.cpp), run where retail runs it:
 // at the start of a frame, before events and the client update. The client-room change
 // (sub_6FC33670, below) is retail's activation wave -- it creates active rooms around the player
 // and the DRLG raises the act's bHasPendingRoomsUpdates -- and THIS is what populates them:
@@ -8814,8 +8814,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         // Retail's per-frame unit ANIMATION pass, which this tree has no caller for. It is D2Client's
         // (like the rest of the draw side, D2Client is not ported): D2Common #10853 is the player
         // updater with sequence/action handling
-        // and #10193 `PATH_AdjustDirection` are exported and implemented, but nothing in D2MOO or in
-        // `src/` calls either one for a player -- D2MOO reaches StopSequence only from MonsterMode.cpp,
+        // and #10193 `PATH_AdjustDirection` are exported and implemented, but nothing in the 1.10f source or in
+        // `src/` calls either one for a player -- the 1.10f source reaches StopSequence only from MonsterMode.cpp,
         // where a monster's AI gates on its own frame. So the drawn hero's clock never left its
         // mode-start value and its facing never left 0: every mode played frame 0 for its whole length,
         // and a walk drawn both ways drew the same direction (s350, `` F47).
@@ -8857,7 +8857,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         // sequence-aware advance, which also rewrites the mode of a `pAnimSeq` unit; the render-side
         // advance is #10759 `UNITS_UpdateFrame`, the plain `nSeqCurrentFramePrecise += wAnimSpeed`
         // with the wrap at `dwFrameCountPrecise` -- also exported, also implemented, and also with no
-        // caller anywhere in this tree or in D2MOO, because the pass that called it is D2Client's.
+        // caller anywhere in this tree or in the 1.10f source, because the pass that called it is D2Client's.
         //
         // It is deliberate that the two are different functions. #10759 touches the clock and nothing
         // else: mode, `nActionFrame` and `UNITFLAG_SQGFXCHANGE` are left exactly as the game logic set
@@ -12597,7 +12597,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_create_from_save(const uint8_t* data, int le
 
     // A LOADED CHARACTER IS A GAME START, NOT A JOIN, and retail runs the quest game-start pass for
     // it. Both branches of retail's load (D2Game 0x6FC8CB40, `D2GAME_SAVE_GetUnitDataFromFile_6FC8CB40`
-    // in the D2MOO prior art at `reference/D2MOO/source/D2Game/src/PLAYER/PlrSave.cpp` -- not vendored
+    // in the 1.10f source prior art at `the 1.10f reference source` -- not vendored
     // here -- single player after D2GAME_SAVE_ReadFile_6FC8C9D0, and a realm client after
     // PLRSAVE2_ProcessSaveFile) end with `QUESTS_SequenceCycler(pGame, pPlayer, 0)`, AFTER the file's
     // sections are applied. With bGameEnter 0 that call reaches the block guarded by `bPickedSet`

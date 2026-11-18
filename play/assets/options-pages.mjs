@@ -39,7 +39,7 @@ export function nativeAudioSliderValue(logicalX) {
 }
 
 // 7 rows each, 45 px apart: the last is retail's PREVIOUS cel (SPrevious.dc6) in both pages.
-// `labels` are [path, frame, anchorX] at the row's own y; `mode` is D2MOO's DrawMode (1 = dimmed, which
+// `labels` are [path, frame, anchorX] at the row's own y; `mode` is the 1.10f source's DrawMode (1 = dimmed, which
 // is how retail draws the rows needing hardware the capture did not report: 3DSound/EAX/3DBias, and
 // Perspective on the video page).
 export const OPTIONS_PAGE_ROWS = Object.freeze({

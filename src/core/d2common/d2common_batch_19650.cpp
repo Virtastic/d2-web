@@ -1,4 +1,4 @@
-// Stage A, 1.13c cached decompiles cross-checked with D2MOO DataTbls,
+// Stage A, 1.13c cached decompiles cross-checked with the 1.10f source DataTbls,
 // D2Inventory, D2States and DRLG tile defaults. Typed adapters reuse the
 // vendored algorithms; register arguments lost by Ghidra are explicit here.
 #include <cstdint>

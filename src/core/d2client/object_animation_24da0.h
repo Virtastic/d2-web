@@ -14,7 +14,7 @@
 // to stat/spawn. spawn's 23 scalar words omit the two pointer slots: word 1 is
 // owner and word 2 is source, supplied as separate native pointers. An adapter
 // must construct the callee's native missile representation, not memcpy it.
-// D2MOO supplies the native UNITS and STATLIST operations, but they cannot
+// the 1.10f source supplies the native UNITS and STATLIST operations, but they cannot
 // consume serialized blobs directly. Globals are pinned for one retail call. No module
 // singleton is created here: the client frame dispatcher and deep client
 // callees remain separate function, so this interface is not live wiring.

@@ -11,7 +11,7 @@
 // observable.
 // Prior art: 1.10f has no separate function (the serialize call is inlined); the same
 // ITEMS_SerializeItemToBitstream(item, pBuffer, size, 1, 1, 0) call appears in
-// reference/D2MOO/source/D2Game/src/PLAYER/PlrSaveItems.cpp.
+// the 1.10f reference source
 #include <cstdint>
 #include <cstddef>
 #include <cstring>

@@ -42,7 +42,7 @@ export const ENTRY_BANNER = {
   frames: 120,     // the measured window, in retail game frames from the arrival
   rowY: 160,       // retail's own anchor: the frames' bottom row is y=160 on 800x600
   centre: 400,     // retail centres the whole file on the screen
-  mode: 5,         // D2MOO DrawMode 5 (normal), the mode both retail records carry
+  mode: 5,         // the 1.10f source DrawMode 5 (normal), the mode both retail records carry
   colour: 1,       // D2Win COL_RED, retail's `extra=1` on both records
 };
 

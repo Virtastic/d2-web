@@ -9,7 +9,7 @@ import { nativeAutomapMode } from './automap-mode.mjs';
 import { fullMapFadeDrawMode } from './automap-full-fade.mjs';
 
 // DATATBLS_LoadAutomapTxt turns these LevelName strings into its automap-type
-// enum.  This is the same 1.13c table order as D2MOO's gszAutomapLevelNames;
+// enum.  This is the same 1.13c table order as the 1.10f source's gszAutomapLevelNames;
 // the cells themselves are *only* selected from AutoMap.txt below.
 export const LEVEL_NAMES = Object.freeze([
   'None', '1 Town', '1 Wilderness', '1 Cave', '1 Crypt', '1 Monestary', '1 Courtyard',

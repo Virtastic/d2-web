@@ -4,7 +4,7 @@ import { orderFloorsByActiveNearFeed } from './session-active-near-feed.mjs';
 // F11b's retail captures place Rain3/Rain4 ground ripples on water. A DT1 subtile collision byte is
 // not a water label: +0x28 marks walk/collision properties and also equals 1 around dry town props
 // such as the Rogue Encampment firepit. The material flags at +0x06 carry TILE_FLAGS_WATER (0x2),
-// cross-checked against D2MOO D2CMP.h / MonsterSpawn.cpp and measured against rip-ford-full/dry.
+// cross-checked against the 1.10f source D2CMP.h / MonsterSpawn.cpp and measured against rip-ford-full/dry.
 // Keep eligible positions in world-screen coordinates so camera motion cannot turn a ripple into a
 // screen-space mark.
 // The native eligibility test, shared by the gate below and the ordered walk.

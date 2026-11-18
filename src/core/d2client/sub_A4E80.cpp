@@ -1,4 +1,4 @@
-// Prior art: none (D2Client has no D2MOO module). Derived from cached 1.13c decompile.
+// Prior art: none (D2Client has no the 1.10f source module). Derived from cached 1.13c decompile.
 // Env-seam style: ordinal imports and globals come in through Env; structs are 32-bit byte-offset blobs.
 #include <cstdint>
 #include <cstring>

@@ -1,7 +1,7 @@
 // Load-time fixups retail applies to a .bin table after reading it into memory
 // (D2Common DATATBLS_Load*Txt, 1.13c). Each function takes the raw record array and mutates
 // it in place to what sgptDataTables->pXxx holds; the comments list what each one does
-// and where it came from. Record layouts: D2MOO DataTbls headers, offsets verified by the
+// and where it came from. Record layouts: the 1.10f source DataTbls headers, offsets verified by the
 // s02 diff against the captured memory.
 #pragma once
 #include <cstdint>

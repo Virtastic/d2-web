@@ -92,7 +92,7 @@ function client(t, script) {
     dir = mkdtempSync(join(tmpdir(), 'd2-game-packets-'));
     const source = join(dir, 'fixture.cpp');
     writeFileSync(source, FIXTURE);
-    const built = spawnSync('g++', ['-std=c++20', '-Wall', '-Wextra', '-Werror', '-I', resolve('src/core/realm'), '-I', resolve('src/core/d2client'), source, resolve('src/core/d2moo/d2client/d2client_afa90.cpp'), '-o', join(dir, 'fixture')], { encoding: 'utf8' });
+    const built = spawnSync('g++', ['-std=c++20', '-Wall', '-Wextra', '-Werror', '-I', resolve('src/core/realm'), '-I', resolve('src/core/d2client'), source, resolve('src/core/d2client/d2client_afa90.cpp'), '-o', join(dir, 'fixture')], { encoding: 'utf8' });
     assert.equal(built.status, 0, built.stderr || built.stdout);
     binary = join(dir, 'fixture');
   }

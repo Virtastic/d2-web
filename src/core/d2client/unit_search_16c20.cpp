@@ -1,14 +1,14 @@
-// Stage A, prior art: , D2MOO Units/Path/Dungeon types.
-// D2MOO has no D2Client implementation. Read against cached 1.13c bodies and
+// Stage A, prior art: , the 1.10f source Units/Path/Dungeon types.
+// the 1.10f source has no D2Client implementation. Read against cached 1.13c bodies and
 // instructions: register arguments, two predicate output pointers, and RNG limit
 // 2 are recovered from assembly. Native objects retain native pointers; the
 // retail room +0x74 member maps semantically to D2ActiveRoomStrc::pUnitFirst
-// (the existing D2MOO room layout is from 1.10f). No serialized image is cast here.
+// (the existing the 1.10f source room layout is from 1.10f). No serialized image is cast here.
 #include <cstddef>
 #include <cstdint>
-#include "../d2moo/include/Units/Units.h"
-#include "../d2moo/include/Path/Path.h"
-#include "../d2moo/include/Drlg/D2DrlgDrlg.h"
+#include "../include/Units/Units.h"
+#include "../include/Path/Path.h"
+#include "../include/Drlg/D2DrlgDrlg.h"
 
 namespace d2client16c20 {
 static_assert(offsetof(D2UnitStrc, pDynamicPath) == 0x2c + 3*(sizeof(void*)-4));

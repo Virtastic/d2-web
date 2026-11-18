@@ -21,7 +21,7 @@ struct D2Common49340Env {
  void (*fatal)(int32_t line);                                         // 10265+10024 message, then _exit
 };
 
-// D2MOO-style form of D2Common 0x49340 (the 1.13c port is d2common_49340.cpp): item param_3 gets min-stat adjustments from its type row, then either
+// 1.10f-style form of D2Common 0x49340 (the 1.13c port is d2common_49340.cpp): item param_3 gets min-stat adjustments from its type row, then either
 // the 0x48630 path (no ratio gain) or two 0x475E0 notifications. Not an item: both 0x475E0 calls.
 EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_49340(int32_t param_1, void* param_2, int32_t* param_3, int32_t param_4,
                                                   int32_t param_5, int32_t param_6, uint32_t param_7,

@@ -1,6 +1,6 @@
 #include "d2gfx_security_init_cookie.h"
 
-// Prior art: D2MOO/source/D2Gfx/src/DllMain.cpp does not implement CRT cookie
+// Prior art: the 1.10f source/source/D2Gfx/src/DllMain.cpp does not implement CRT cookie
 // initialization. Cross-checked the sibling D2Client initializer; the cached
 // 1.13c D2Gfx body is authoritative. OS queries remain explicit native seams.
 // 1.13c D2Gfx+0x06026

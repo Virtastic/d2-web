@@ -1,4 +1,4 @@
-// D2Game +0x79B10 (marker lives on the d2moo D2GAME_EVENTS_StatRegen_6FC80F80) -- ECX game, EDX unit, 2 stack words (ret 8): announce through 0x8EA80, then for a live unit without flag +0xC6 bit 0 whose type/mode pass the filter, 0x77CB0(unit) and on a nonzero answer 0x77A50 and 0x77950 (EDI = unit).
+// D2Game +0x79B10 (marker lives on the 1.10f D2GAME_EVENTS_StatRegen_6FC80F80) -- ECX game, EDX unit, 2 stack words (ret 8): announce through 0x8EA80, then for a live unit without flag +0xC6 bit 0 whose type/mode pass the filter, 0x77CB0(unit) and on a nonzero answer 0x77A50 and 0x77950 (EDI = unit).
 #include <cstdint>
 #include "../fn/d2game_gp.h"
 namespace d2g {

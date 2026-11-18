@@ -1,4 +1,4 @@
-// Prior art: D2MOO PathUtil, D2Inventory, D2StatList, ItemMods, DrlgOutPlace,
+// Prior art: the 1.10f source PathUtil, D2Inventory, D2StatList, ItemMods, DrlgOutPlace,
 // DrlgOutRoom and DrlgDrlgRoom; checked against cached 1.13c bodies.
 // Stage A: these definitions are not a vector parity claim.
 #include <algorithm>
@@ -111,7 +111,7 @@ void D2Common_45550_RoomWarps(void* pool, D2DrlgRoomStrc* room,
     finish(room);
 }
 
-// D2MOO-style form of D2Common 0x4A670 (the 1.13c port is d2common_4a670.cpp)
+// 1.10f-style form of D2Common 0x4A670 (the 1.13c port is d2common_4a670.cpp)
 void D2Common_4A670_OutdoorGrids(D2DrlgRoomStrc* room)
 {
     auto* outdoor = room->pOutdoor;
@@ -153,7 +153,7 @@ void D2Common_4A670_OutdoorGrids(D2DrlgRoomStrc* room)
     DRLGGRID_AlterEdgeGridFlags(&outdoor->pFloorGrid, 4, FLAG_OPERATION_OR);
 }
 
-// D2Common 0x4A9B0 lives in d2common_4a9b0.cpp; this wrapper hands it the D2MOO callees.
+// D2Common 0x4A9B0 lives in d2common_4a9b0.cpp; this wrapper hands it the 1.10f source callees.
 namespace {
 uint32_t P4a9b0(void* p) { return uint32_t(uintptr_t(p)); }
 D2DrlgRoomStrc* R4a9b0(uint32_t r) { return reinterpret_cast<D2DrlgRoomStrc*>(uintptr_t(r)); }

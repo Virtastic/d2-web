@@ -1,6 +1,6 @@
 // Fog batch: bit-field helpers (+0x13xxx/+0x14xxx), Huffman-style symbol coder (+0x1Cxxx/+0x1Dxxx),
 // string helpers (+0x1F7xx..+0x1F9xx). Decompile-derived from build-wasm/ghidra-fog/decomp.
-// +0x140C0 and +0x13CA0 are marked in src/core/d2moo/src/Fog/BitManip.cpp (ReadSigned, GoToNextByte).
+// +0x140C0 and +0x13CA0 are marked in src/core/game/Fog/BitManip.cpp (ReadSigned, GoToNextByte).
 #include <cctype>
 #include <cstdint>
 #include <cstdio>

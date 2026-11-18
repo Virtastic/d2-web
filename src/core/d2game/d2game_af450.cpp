@@ -1,4 +1,4 @@
-#include "../d2moo/compat/test_seam.h"
+#include "../compat/test_seam.h"
 #include "d2game_af450.h"
 #include "d2game_retail_rw.h"
 uint32_t D2R_AF450_Room(uint32_t) { __builtin_trap(); }

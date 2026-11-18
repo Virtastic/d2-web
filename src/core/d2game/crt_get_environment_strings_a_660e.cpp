@@ -18,7 +18,7 @@ struct D2GameEnvironment660e {
 };
 
 // Prior art: sibling D2Client+0x08B43 and D2DDraw+0x024FB; checked
-// against the cached D2Game 1.13c body. No D2MOO game implementation exists.
+// against the cached D2Game 1.13c body. No the 1.10f source game implementation exists.
 // 1.13c D2Game+0x0660E
 extern "C" EMSCRIPTEN_KEEPALIVE void* d2game_environment_strings_660e(
     D2GameEnvironment660e* env) {

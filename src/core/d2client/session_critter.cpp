@@ -24,15 +24,15 @@
 #include <cstdio>
 #include <string>
 #include <vector>
-#include "../d2moo/include/D2Dungeon.h"
-#include "../d2moo/include/D2Collision.h"
-#include "../d2moo/include/D2DataTbls.h"
-#include "../d2moo/include/DataTbls/LevelsTbls.h"
-#include "../d2moo/include/DataTbls/MonsterTbls.h"
-#include "../d2moo/include/DataTbls/AnimTbls.h"
-#include "../d2moo/include/Units/Units.h"
-#include "../d2moo/include/Path/Path.h"
-#include "../d2moo/include/Path/PathMisc.h"
+#include "../include/D2Dungeon.h"
+#include "../include/D2Collision.h"
+#include "../include/D2DataTbls.h"
+#include "../include/DataTbls/LevelsTbls.h"
+#include "../include/DataTbls/MonsterTbls.h"
+#include "../include/DataTbls/AnimTbls.h"
+#include "../include/Units/Units.h"
+#include "../include/Path/Path.h"
+#include "../include/Path/PathMisc.h"
 #include "sound_unit_refs.h"
 #include <emscripten.h>
 
@@ -119,7 +119,7 @@ void neutral(Critter& c, uint32_t frame) {
     setMode(c, 1, frame);
 }
 // 0x2A040 -> D2Common #10334 (0x36230), a type 2 path with no target unit: field_14 = 1 (0x35470); the unit's footprint is lifted
-// for the build (the critters have none here); 0x678B0 (D2MOO PATH_Toward) makes the points; 0xD240 steps past those at the unit's
+// for the build (the critters have none here); 0x678B0 (the 1.10f source PATH_Toward) makes the points; 0xD240 steps past those at the unit's
 // own spot, and none left -> 0.
 bool path(Critter& c, int32_t tx, int32_t ty) {
     if (!c.room || (tx == c.x && ty == c.y)) return false;

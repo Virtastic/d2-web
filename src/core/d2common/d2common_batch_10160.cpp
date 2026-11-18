@@ -1,4 +1,4 @@
-// Prior art used: D2MOO DRLGMAZE_BuildBasicMaze (1.10f); 1.13c 0x10160 is the same room-growth loop
+// Prior art used: the 1.10f source DRLGMAZE_BuildBasicMaze (1.10f); 1.13c 0x10160 is the same room-growth loop
 // (target count = per-difficulty table, x3 staff tomb, x2 boss tomb; random room, 2-bit direction).
 #include <cstdint>
 #include "D2DataTbls.h"

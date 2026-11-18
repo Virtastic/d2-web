@@ -41,7 +41,7 @@ void D2Common_7ECC0(void* pObj, int32_t base, const int32_t* tbl,
     if (rd<B>(p, 0) & 0x14) call7EB40();
 }
 
-// D2Common+0x42920 lives in the game tree (src/core/d2moo/src/Retail/D2Common_42920.cpp).
+// D2Common+0x42920 lives in the game tree (src/core/game/Retail/D2Common_42920.cpp).
 
 // Shared tail of 0x68CD0 / 0x68F00: apply the 'flags' word (unaff_EBX / param_5) to rec[5].
 static void ApplyFlags(int32_t* r, uint32_t f, uint32_t (*ord10051)(int32_t))

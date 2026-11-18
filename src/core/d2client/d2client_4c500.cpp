@@ -20,7 +20,7 @@
 #include <D2StatList.h>
 #include <Path/Path.h>
 #include <Units/Units.h>
-#include "../d2moo/include/D2Game/UNIT/SUnit.h"
+#include "../include/D2Game/UNIT/SUnit.h"
 #include "sound_unit_refs.h"
 
 namespace d2client_unitseed { uint32_t* unit_seed(const D2GameStrc* game, uint32_t type, uint32_t id); }

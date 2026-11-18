@@ -14,8 +14,8 @@
 // per the retail capture tool/fn/README.md.
 //
 // Prior art: src/core/d2game/d2game_batch_3261.cpp (0x34B8/0x3502 SEH fragment, CRT locks),
-// src/core/d2moo/src/D2Game/PLAYER/PlrIntro.cpp (npcIndexMap, Get/SetNpcIntroFlag) and
-// src/core/d2moo/src/D2Game/QUESTS/Quests.cpp (QUESTS_GetQuestData, QUESTS_FastRemovePlayerGUID).
+// src/core/game/D2Game/PLAYER/PlrIntro.cpp (npcIndexMap, Get/SetNpcIntroFlag) and
+// src/core/game/D2Game/QUESTS/Quests.cpp (QUESTS_GetQuestData, QUESTS_FastRemovePlayerGUID).
 #include <cstdint>
 #include <cstddef>
 #include <cstdlib>
@@ -53,7 +53,7 @@ static void d2game_array_unwind(void* ptr, uint32_t size, int32_t count, void (*
 }
 
 // The NPC class-id -> intro bit index table at 1.13c 0x6FD27E50 (count 0x6FD27F68). Same pairs as the
-// vendored 1.10f npcIndexMap in src/core/d2moo/src/D2Game/PLAYER/PlrIntro.cpp; a missing id maps to 0.
+// vendored 1.10f npcIndexMap in src/core/game/D2Game/PLAYER/PlrIntro.cpp; a missing id maps to 0.
 struct D2NpcIndexMapStrc { int32_t nNpcClassId; int32_t nIndex; };
 static const D2NpcIndexMapStrc kNpcIndexMap[] = {
     { -1, 0 }, { 147, 1 }, { 148, 2 }, { 150, 3 }, { 155, 4 }, { 154, 5 }, { 265, 6 },

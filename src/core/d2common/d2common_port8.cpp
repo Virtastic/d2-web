@@ -165,7 +165,7 @@ namespace
 	}
 }
 
-// D2Common+0x38C80 now runs as STATLIST_GetStatValue (src/core/d2moo/src/D2StatList.cpp).
+// D2Common+0x38C80 now runs as STATLIST_GetStatValue (src/core/game/D2StatList.cpp).
 
 // 1.13c D2Common+0x39490: same gates, calls 0x38A80 (the clamped/maximum variant) instead.
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_39490_StatMaxById(uint32_t pDataTables, int32_t nStatCostId, uint32_t pList, int32_t nPackedStatId)

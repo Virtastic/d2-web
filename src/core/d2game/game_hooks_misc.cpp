@@ -65,7 +65,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_game_cacc0(uint32_t lo, uint32_t hi,
 #include <D2Game/UNIT/SUnitProxy.h>
 #include <D2Game/UNIT/SUnitNpc.h>
 #include "../tables/shared.h"
-#include "../d2moo/compat/datatbls_bridge.h"   // the capture ran with retail tables: monstats INTERACT rows pick the NPCs
+#include "../compat/datatbls_bridge.h"   // the capture ran with retail tables: monstats INTERACT rows pick the NPCs
 static_assert(offsetof(D2NpcTradeStrc, nAct) == 2 && offsetof(D2NpcTradeStrc, bRefreshInventory) == 7, "npc trade layout");
 static uint32_t gNpcCtlOut[6 + 64 * 4];
 extern "C" EMSCRIPTEN_KEEPALIVE unsigned d2_game_npcctl_word(int i) { return gNpcCtlOut[i]; }

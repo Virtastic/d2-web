@@ -621,7 +621,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   // A gouraud floor block the frame clips on the LEFT is shaded from the LEVEL TABLE one entry per DRAWN
   // pixel from the row's own start, not by the pixel's column in the block: retail's two clipped gouraud
   // drawers (D2gfx+0x9E90 RLE, +0xA5D0 iso) advance the table pointer once per pixel written while the
-  // source and destination pointers start at (skip + leftclip), and D2MOO's `sub_6FA72090` -- the 1.10f
+  // source and destination pointers start at (skip + leftclip), and the 1.10f source's `sub_6FA72090` -- the 1.10f
   // decompile of that same pair -- does `v24[i] = table[v19[i]][...]` with `v24 = buffer + skip + leftclip`
   // and `v19 = table + skip`. So the index is `blockColumn - leftclip[r]`, leftclip[r] being how far the
   // clip cuts into the row: clamp(canvasLeft - (blockScreenX + skip[r]), 0, run[r]). Unclipped blocks

@@ -14,8 +14,8 @@
 #include <Drlg/D2DrlgDrlg.h>
 #include <Units/Units.h>
 #include <D2Game/UNIT/SUnit.h>
-#include "../d2moo/include/D2DataTbls.h"
-#include "../d2moo/include/DataTbls/LevelsTbls.h"
+#include "../include/D2DataTbls.h"
+#include "../include/DataTbls/LevelsTbls.h"
 #include "d2client_5dfd0.h"
 
 extern "C" D2UnitStrc* d2_session_target_player_unit();   // monspawn_check.cpp

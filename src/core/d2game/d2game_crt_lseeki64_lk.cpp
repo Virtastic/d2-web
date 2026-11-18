@@ -1,4 +1,4 @@
-// Prior art used: none in D2MOO (host CRT); rules from the cached 1.13c body. Seams as d2game_crt_lseek.cpp.
+// Prior art used: none in the 1.10f source (host CRT); rules from the cached 1.13c body. Seams as d2game_crt_lseek.cpp.
 #include <cstdint>
 
 struct D2Lseeki64LkEnv {

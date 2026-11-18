@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x6F930: the missile-from-request creator (D2MOO MISSILES_CreateMissileFromParams),
+// 1.13c D2Game+0x6F930: the missile-from-request creator (the 1.10f source MISSILES_CreateMissileFromParams),
 // written from the decompile + disassembly as a rule over an environment E (src/core/fn/hookenv.h). Every D2Common ordinal and every
 // not-yet-mapped D2Game callee is one E::h(rva, eax, ecx, edx, ebx, esi, stack...) call; fields go through E::rd*/wr32 on retail-layout
 // (32-bit) addresses. Register-convention: ecx = pGame, edx = request; returns the missile unit (0 on any refusal).

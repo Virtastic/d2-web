@@ -1,4 +1,4 @@
-// Prior art: none (D2MOO has no D2Client). Derived from cached 1.13c decompile.
+// Prior art: none (the 1.10f source has no D2Client). Derived from cached 1.13c decompile.
 // Env-seam style: FUN_6fae8e80, the three Storm/Fog ordinals and the template table come in through Env.
 #include <cstdint>
 #include <cstring>

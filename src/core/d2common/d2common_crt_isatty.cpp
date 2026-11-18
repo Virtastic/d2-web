@@ -1,4 +1,4 @@
-// Prior art used: none in D2MOO (host CRT); rule from the cached 1.13c body, env-seam shape as
+// Prior art used: none in the 1.10f source (host CRT); rule from the cached 1.13c body, env-seam shape as
 // d2common_crt_write_lseek.cpp (ioinfo table is a host seam).
 #include <cstdint>
 

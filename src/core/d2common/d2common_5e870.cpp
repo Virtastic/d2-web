@@ -1,6 +1,6 @@
 // 1.13c D2Common+0x5E870 (ordinal 11023): tear down every loaded table in a fixed order. The callees and the three Fog thunks
 // are reached through D2Common5E870Env so a replay can log them; slots are the retail module words (D2Common5E870Slots).
-// Delta vs 1.10f: none claimed, shape only (D2MOO DATATBLS_UnloadAllBins); order checked against the 1.13c decompile.
+// Delta vs 1.10f: none claimed, shape only (the 1.10f source DATATBLS_UnloadAllBins); order checked against the 1.13c decompile.
 #include "d2common_5e870.h"
 
 namespace {

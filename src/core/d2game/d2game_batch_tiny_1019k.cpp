@@ -12,7 +12,7 @@
 // argument order, as the other batch files do for callees the file does not own.
 //
 // Prior art: src/core/d2game/d2game_batch_34e0.cpp (0x340C0, the callee and its ESI/EBX convention);
-// reference/D2MOO/source/D2Game/src/QUESTS/ACT5/A5Q6.cpp (QUESTS_FastRemovePlayerGUID at the inlined
+// the 1.10f reference source (QUESTS_FastRemovePlayerGUID at the inlined
 // reward-removal sites; 1.10f has no standalone wrapper).
 #include "d2game_scalar_helpers.h"
 #include <cstdint>

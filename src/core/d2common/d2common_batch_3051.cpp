@@ -1,5 +1,5 @@
 // Stage A: 1.13c control flow, with register inputs and imported calls explicit.
-// Prior art: D2MOO Items.cpp supplies the two item decoders. Other bodies follow the
+// Prior art: the 1.10f source Items.cpp supplies the two item decoders. Other bodies follow the
 // cached 1.13c routines. Retail-layout links remain 32-bit tokens; resolve them to
 // native wasm64 pointers instead of truncating native pointers to retail addresses.
 #include <cstdint>

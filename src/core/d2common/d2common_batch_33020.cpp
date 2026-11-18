@@ -1,5 +1,5 @@
 // Retail 1.13c item wrappers cross-checked against the cached decompiles.
-// Pointer fields use native D2MOO structs; scalar IDs retain retail widths.
+// Pointer fields use native the 1.10f source structs; scalar IDs retain retail widths.
 #include <cstdint>
 #include <emscripten.h>
 
@@ -10,7 +10,7 @@
 #include "Units/UnitRoom.h"
 #include "D2States.h"
 
-// Export of 1.13c D2Common 0x22920 (#10211): the body is ITEMS_CheckIfSocketableByItemId in src/core/d2moo/src/Items/Items.cpp.
+// Export of 1.13c D2Common 0x22920 (#10211): the body is ITEMS_CheckIfSocketableByItemId in src/core/game/Items/Items.cpp.
 extern "C" EMSCRIPTEN_KEEPALIVE int D2Common_10211_ITEMS_CheckIfSocketableByItemId(int nItemId)
 {
 	return ITEMS_CheckIfSocketableByItemId(nItemId);
@@ -24,7 +24,7 @@ EMSCRIPTEN_KEEPALIVE short D2Common_10213_ITEMS_GetStrengthBonus(D2UnitStrc* pIt
 	return ITEMS_GetStrengthBonus(pItem);
 }
 
-// Export of 1.13c D2Common 0x24C80 (#10217), body ITEMS_CheckBodyLocation in src/core/d2moo/src/Items/Items.cpp. The item's ItemTypesTxt body
+// Export of 1.13c D2Common 0x24C80 (#10217), body ITEMS_CheckBodyLocation in src/core/game/Items/Items.cpp. The item's ItemTypesTxt body
 // locations (ItemType index from ItemsTxt.wType[0], bytes +0x0A/+0x0B) match the requested one, or
 // the request is 0xB/0xC (either left arm) and one of them is 4/5 (right/left arm).
 EMSCRIPTEN_KEEPALIVE BOOL D2Common_10217_ITEMS_CheckBodyLocation(D2UnitStrc* pItem, uint32_t nBodyLoc)

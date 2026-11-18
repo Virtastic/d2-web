@@ -1,5 +1,5 @@
 // 1.13c D2Game+0x83CE0: Brute AI tick. ECX = game, EDX = unit, stack (ret 4) = param (+8 target word, +0x18 combat flag, +0x1C monstats row).
-// 1.13c differs from the D2MOO 1.10f AITHINK_Fn007_Brute: two LCG rolls against the monstats shorts at +0x62 / +0x68 (indexed by game+0x6D), 75E10 with a 0x20-byte request,
+// 1.13c differs from the 1.10f AITHINK_Fn007_Brute: two LCG rolls against the monstats shorts at +0x62 / +0x68 (indexed by game+0x6D), 75E10 with a 0x20-byte request,
 // F2540 mode changes. Callees are seams (thunk RVAs): A496 #11103, 1320 (EAX = class, returns the monstats row), 75E10 (game, request, 1), F2540 (ECX game, EDX unit, 6 stack words),
 // F22C0 (EAX game, ESI unit, stack v), A718 #11027 (life percent). `g` is the value of the module global at D2Game+0xF8BE0 (a struct whose +0x10 / +0x14 masks test row+0x104).
 // The fatal-exit path (clamped percent out of range) cannot fire and is not modelled; a unit without a monster block is not modelled either (retail writes through null).

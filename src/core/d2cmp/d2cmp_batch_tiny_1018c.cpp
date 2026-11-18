@@ -5,7 +5,7 @@
 // the two __onexit-side lock thunks, and the CRT lock-table leaf 0x2DD8 all of them end at.
 // Host services the decompiles name but src/ does not implement are seams after the retail arguments,
 // which keep their order (src/core/realm/mcp_crt_batch_b52.cpp pattern).
-// Prior art: D2MOO 1.10f reference/D2MOO/source (no CRT modules); the byte-identical lock leaf is
+// Prior art: 1.10f the 1.10f reference source (no CRT modules); the byte-identical lock leaf is
 // src/core/d2common/d2common_batch_tiny_1019i.cpp 0x2E44.
 #include <cstdint>
 #include <cstddef>

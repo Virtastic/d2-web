@@ -3,8 +3,8 @@
 // retail rolls gpAutomapSeed in is not the client's), so the export names the row and lets the caller read its fields.
 #include <cstdint>
 #include <emscripten.h>
-#include "../d2moo/include/D2DataTbls.h"
-#include "../d2moo/include/DataTbls/LevelsTbls.h"
+#include "../include/D2DataTbls.h"
+#include "../include/DataTbls/LevelsTbls.h"
 
 // The first row, in table order, whose level type, tile type, style and sequence match (Style/StartSequence 0xFF is
 // "any", the bounds compare as unsigned bytes); -1 when the level type has no rows or no row matches.

@@ -80,7 +80,7 @@ export const PL2_TEXT_SHIFTS = 1024 + 8192 + 4096 + 256 + 5 * 65536 + 111 * 256 
  *
  * Client-parity C3o: a saved character's component colour byte (D2SaveHeaderStrc 0x98..0xA7) is
  * `1 + index` into this bank -- the same packed value `ITEMS_GetColor` writes at save time
- * (`(colourField & 31) + 32 * pItemsTxtRecord->nTransform`, src/core/d2moo/src/Items/Items.cpp) before
+ * (`(colourField & 31) + 32 * pItemsTxtRecord->nTransform`, src/core/game/Items/Items.cpp) before
  * the save-writer increments it (0xFF/-1 = no transform). Reading it back needs only the byte, not the
  * item identity that produced it.
  */
@@ -354,7 +354,7 @@ export const LABEL_TINT = 0x64 / 0xff;
  * ExpansionString.tbl carries the 2001 line at 21882 (scanned with the engine's own
  * d2_lang_string_by_index, not read off a table file) and the classic table's "All Rights Reserved."
  * at 5105 -- the
- * expansion table has no second line of its own. D2MOO's StringIds.h names the same two classic
+ * expansion table has no second line of its own. the 1.10f source's StringIds.h names the same two classic
  * indices and leaves 21882 unnamed, i.e. the same layout on 1.10f.
  */
 export const TRADEMARK_LAYOUT = {
@@ -370,7 +370,7 @@ export const TITLE_COLUMNS = 4;
 export const TITLE_SIZE = { width: 800, height: 600 };
 
 /**
- * Where D2Win draws a background cel file's frames (D2MOO D2WinMain.cpp, confirmed by retail's title
+ * Where D2Win draws a background cel file's frames (the 1.10f source D2WinMain.cpp, confirmed by retail's title
  * draw list): 4 per row at x = 0, 256, 512, 768, the rows anchored (bottom row, inclusive) at
  * y = 256 and 512, the last row at the screen's bottom row, 599. So row 0 of the screen stays black
  * and the last two rows overlap by one line.
@@ -574,7 +574,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
     return { scale, ox: Math.round((width - background.width * scale) / 2), oy: Math.round((height - background.height * scale) / 2) };
   };
   const boxes = layout();
-  // D2Win's button label (D2MOO D2WinButton.cpp BUTTON_Draw): exocet10 on buttons 35+ tall, else
+  // D2Win's button label (the 1.10f source D2WinButton.cpp BUTTON_Draw): exocet10 on buttons 35+ tall, else
   // fontridiculous; x = left + max((w - textWidth) / 2, 0), anchor y = bottom + offY - (h - font
   // line height) / 2 with offY 4 (h >= 35) / 3 (h == 32) / 2 (h > 20) / 1, integer division.
   // `dx`/`dy` carry retail's pressedButtonOffset: a button held down draws its label 2 px left and

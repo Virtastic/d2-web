@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { automapViewport, automapScrollOffset, bindAutomapLayout } from './automap-overlay.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'core', 'd2client');
-const moo = join(root, '..', 'd2moo', 'd2client');
+const moo = root;
 const have = spawnSync('g++', ['--version']).status === 0;
 
 test('native layout wrapper matches the JS automap viewport and scroll', { skip: !have && 'no g++' }, () => {

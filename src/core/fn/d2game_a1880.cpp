@@ -6,11 +6,11 @@
 #include "hookenv.h"
 #include "fn_tag.h"
 #include "mirror_layouts.h"
-#include "../d2moo/include/D2Game/SKILLS/Skills.h"
-#include "../d2moo/include/D2Game/UNIT/SUnit.h"
-#include "../d2moo/include/D2Game/GAME/Clients.h"
-#include "../d2moo/include/D2Game/MISSILES/Missiles.h"
-#include "../d2moo/compat/test_seam.h"
+#include "../include/D2Game/SKILLS/Skills.h"
+#include "../include/D2Game/UNIT/SUnit.h"
+#include "../include/D2Game/GAME/Clients.h"
+#include "../include/D2Game/MISSILES/Missiles.h"
+#include "../compat/test_seam.h"
 
 static HookEnv* E; static mirror::Mirror* M;
 static uint32_t dw(uint32_t a) { return *(const uint32_t*)(uintptr_t)a; }

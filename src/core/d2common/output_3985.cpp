@@ -2,9 +2,9 @@
 #include <climits>
 #include <cstring>
 
-// Prior art used: none in D2MOO (it does not port the bundled MSVC2003 CRT formatter);
+// Prior art used: none in the 1.10f source (it does not port the bundled MSVC2003 CRT formatter);
 // body written from the cached 1.13c decompile. write_char/_write_multi_char/_write_string
-// (+0x38F7/+0x392A/+0x394E) live in the game tree, src/core/d2moo/src/Crt/StringStream.cpp.
+// (+0x38F7/+0x392A/+0x394E) live in the game tree, src/core/game/Crt/StringStream.cpp.
 
 namespace {
 // Retail's class/state lookup (0x20..0x78); class = low nibble, next state = high nibble.
@@ -22,7 +22,7 @@ struct Out {
     D2CommonStringStream2814* s;
     const D2CommonOutputCalls3985* c;
     int count;
-    // The three writers are game-tree functions (src/core/d2moo/src/Crt/StringStream.cpp).
+    // The three writers are game-tree functions (src/core/game/Crt/StringStream.cpp).
     void ch(uint8_t b) { D2Common_38F7_WriteChar(b, s, c, &count); }
     void multi(uint8_t b, int n) { D2Common_392A_WriteMultiChar(&count, b, n, s, c); }
     void str(const char* p, int n) { D2Common_394E_WriteString(s, c, &count, p, n); }

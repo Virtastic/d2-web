@@ -53,7 +53,7 @@ namespace
 // 1.13c D2Common+0x34150 (#10627): move the state bits selected by a stay-death mask from the first
 // bit array of an extended stat list to its second (gfx) array, then refresh the unit's room. The
 // mask is the player, monster or boss stay-death mask by unit type and bBoss; a missing stat list,
-// a non-extended one or a missing bit array is a no-op. Prior art: D2MOO 1.10f
+// a non-extended one or a missing bit array is a no-op. Prior art: 1.10f
 // STATES_UpdateStayDeathFlags, whose three branches this reproduces.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void D2Common_UpdateStayDeathFlags(D2UnitStrc* pUnit, int32_t bBoss)
@@ -252,7 +252,7 @@ struct D2Common21EE0Env
 	int32_t (*pPlaceInBelt)(int32_t nArg, D2UnitStrc* pItem);
 };
 
-// D2Common ordinal 10655 (INVENTORY_PlaceItemInBeltSlot, marked in d2moo): whether a 1x1 item that is belt-able fits the belt slot
+// D2Common ordinal 10655 (INVENTORY_PlaceItemInBeltSlot, marked in 1.10f): whether a 1x1 item that is belt-able fits the belt slot
 // requested through 0x21D70. Non-item units, non-belt-able items and other item sizes yield 0.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t D2Common_ItemBeltSlotFits_21ee0(int32_t nArg, D2UnitStrc* pItem,
@@ -272,4 +272,4 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_ItemBeltSlotFits_21ee0(int32_t nArg, D2Un
 	return static_cast<uint32_t>(pEnv->pPlaceInBelt(nArg, pItem));
 }
 
-// 0x24240 (#10661) is ITEMS_GetTransmogrify in d2moo/src/Items/Items.cpp.
+// 0x24240 (#10661) is ITEMS_GetTransmogrify in game/Items/Items.cpp.

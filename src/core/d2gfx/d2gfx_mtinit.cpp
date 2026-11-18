@@ -1,4 +1,4 @@
-// Prior art used: D2MOO D2Gfx/src/DllMain.cpp for startup context, and the
+// Prior art used: the 1.10f source D2Gfx/src/DllMain.cpp for startup context, and the
 // existing D2Client VC7.1 __mtinit implementation for the CRT layout. The
 // cached D2Gfx 1.13c decompile determines this function's call order.
 #include <cstddef>

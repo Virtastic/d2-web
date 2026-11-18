@@ -11,9 +11,9 @@
 #include <vector>
 #include "d2client_5dfd0.h"
 #include "sound_unit_refs.h"
-#include "../d2moo/include/Units/Units.h"
-#include "../d2moo/include/Units/Monster.h"
-#include "../d2moo/include/D2DataTbls.h"
+#include "../include/Units/Units.h"
+#include "../include/Units/Monster.h"
+#include "../include/D2DataTbls.h"
 
 extern "C" uint32_t d2_client_22a70(const D2UnitStrc* pUnit, int32_t monStatsCount, uint32_t (*cb)(uint32_t op, uint32_t arg));
 

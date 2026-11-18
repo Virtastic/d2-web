@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <emscripten.h>
 
-#include "../d2moo/include/Units/Units.h"
+#include "../include/Units/Units.h"
 #include "client_host.h"
 
 static_assert(offsetof(D2UnitStrc, dwSfxTicks)     == 0x7C + 12 * (sizeof(void*) - 4), "D2UnitStrc::dwSfxTicks = retail +0x7C");

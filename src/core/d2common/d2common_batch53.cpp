@@ -4,7 +4,7 @@ typedef uintptr_t P;
 static inline uint32_t ru(P b, uint32_t o) { return *(const uint32_t*)(b + o); }
 static inline int32_t ri(P b, uint32_t o) { return *(const int32_t*)(b + o); }
 
-// D2Common+0x83E20 lives in the game tree (src/core/d2moo/src/Retail/D2Common_83e20.cpp).
+// D2Common+0x83E20 lives in the game tree (src/core/game/Retail/D2Common_83e20.cpp).
 
 // stand-alone 32-bit layout twin of D2Common 0x68340 (the proven row runs DRLGROOMTILE_FindTilePresetUnit): search the static table (stride 0x1c at 0x6fddbf2c-based rows) in
 // ranges [lo,hi] selected by key==param_1 (triplets at 0x6fddbd68, stride 12). tbl = range table, rows = row table.

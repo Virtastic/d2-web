@@ -13,7 +13,7 @@ void* __attribute__((weak)) d2_fn_d2common_38640();
 void __attribute__((weak)) d2_fn_d2common_39f70(int32_t a, int32_t b);
 void __attribute__((weak)) d2_fn_d2common_38550();
 
-// D2MOO-style form of D2Common 0x475E0 (the 1.13c port is d2common_475e0.cpp)
+// 1.10f-style form of D2Common 0x475E0 (the 1.13c port is d2common_475e0.cpp)
 EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_475e0(int32_t in_eax, void* p1, uint32_t p2, int32_t p3, int16_t p4,
                                                   uint32_t p5, int32_t p6, int32_t p7, uint32_t p8, const uint8_t* dt) {
  (void)p2;

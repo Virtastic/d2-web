@@ -8,7 +8,7 @@
 // 0x97340 was checked against the retail disassembly (its stdcall ret 0xC, the game in EAX, the helper
 // register and stack pushes); 0xBFFA0's call site pushes unit, x, y with the game in EAX.
 //
-// Prior art: none for these seven (1.13c-only pet, summon and skill-dispatch code); the 1.10f D2MOO
+// Prior art: none for these seven (1.13c-only pet, summon and skill-dispatch code); the 1.10f the 1.10f source
 // PLAYER/PlayerPets.cpp sub_6FC7E310 is the shape of 0x97340, read as a shape only.
 //
 // MISMATCH notes are at each function. They are unverified transcriptions, not evidence.

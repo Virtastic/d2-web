@@ -1,5 +1,5 @@
 // Ground item labels (Alt held): the placement and colour rules of the label pass, derived from the Ghidra decompile.
-// Prior art: none (D2MOO has no D2Client module). The browser walks the ground items and measures their text;
+// Prior art: none (the 1.10f source has no D2Client module). The browser walks the ground items and measures their text;
 // everything the retail pass decides afterwards -- viewport rejection, the slide that stacks overlapping plates,
 // the hover pick, the colour index -- is decided here, and the shell reads the slots back.
 #include <cstdint>

@@ -8,7 +8,7 @@
 //     Measured on retail's title frame: gameselectscreenEXP frame 0 is drawn at y=256 and row 0 of
 //     the screen stays black; frame 8 (88 rows) at y=599 fills rows 512..599.
 //   * `op` is the renderer entry retail uses: 'cel' (pfCelDraw, slot 33) or 'celcolor' (pfCelDrawColor,
-//     slot 34, the font glyph path); `mode` is D2MOO's DrawMode (3 modulate/add, 4 burn, 5 normal).
+//     slot 34, the font glyph path); `mode` is the 1.10f source's DrawMode (3 modulate/add, 4 burn, 5 normal).
 //   * `hash` is FNV-1a over the frame's encoded DC6 bytes, the same bytes the hook hashes in memory,
 //     so a record names the exact frame drawn, not just the file it came from.
 

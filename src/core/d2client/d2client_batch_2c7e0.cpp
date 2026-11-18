@@ -1,7 +1,7 @@
 // src/core/d2client/d2client_batch_2c7e0.cpp -- signed number formatter.
 // 1.13c D2Client+0x2C7E0
 // the signed number formatter called while building stat descriptions (decompile 0x2C7E0.c).
-// Prior art used: D2MOO 1.10f has no D2Client counterpart; the 1.13c decompile at this RVA is
+// Prior art used: 1.10f has no D2Client counterpart; the 1.13c decompile at this RVA is
 // authoritative, with the narrow-to-Unicode conversion delegated through the D2Lang IAT.
 #include <cstdint>
 #include <emscripten.h>

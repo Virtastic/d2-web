@@ -1,4 +1,4 @@
-// standalone port of D2Game 0x77A50 (marker on d2moo EVENTS_StaminaRegen): one step of a unit's stamina regeneration. EDI = pUnit, no stack args, plain ret.
+// standalone port of D2Game 0x77A50 (marker on 1.10f EVENTS_StaminaRegen): one step of a unit's stamina regeneration. EDI = pUnit, no stack args, plain ret.
 // Callees are D2Common stat thunks: 0xA42A GetUnitStat(unit, stat, layer), 0xA460 the max-stamina total (unit),
 // 0xA472 SetUnitStat(unit, stat, value, layer). The value returned is EAX at retail's `ret` (no declared result):
 // the 0x1C stat on the two early exits, the max total when nothing is added, else whatever SetUnitStat leaves.

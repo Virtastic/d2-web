@@ -1,6 +1,6 @@
 // 1.13c D2Common implementation batch (rows 0x2EA70, 0x1A610, 0x4DF60).
 // Each body was matched against the cached 1.13c decompile and retail disassembly; where a
-// vendored D2MOO 1.10f twin exists the body delegates to it, otherwise the stores are written here.
+// vendored 1.10f twin exists the body delegates to it, otherwise the stores are written here.
 #include <cstdint>
 
 #include "D2DataTbls.h"

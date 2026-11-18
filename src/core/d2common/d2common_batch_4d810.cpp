@@ -1,6 +1,6 @@
 // Stage A: 1.13c entry points recovered from the cached D2Common decompiles.
-// Prior art used: D2MOO collision, item, environment, skill and inventory algorithms;
-// (D2MOO is the prose map; 1.13c controls arithmetic and defaults).
+// Prior art used: the 1.10f source collision, item, environment, skill and inventory algorithms;
+// (the 1.10f source is the prose map; 1.13c controls arithmetic and defaults).
 // Native pointers below address the wasm64 game objects. Retail table fields retain
 // their packed sizes; unit/player/environment members are accessed by name.
 #include <cstddef>

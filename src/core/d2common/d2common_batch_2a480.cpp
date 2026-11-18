@@ -67,7 +67,7 @@ extern "C" void D2Common_2A480_ItemSocketCount(uint32_t pUnit, uint32_t nMax) { 
 // and 0x221C0 (item format) pick the element, 0x45AA0 emits, 0x458C0 selects the slot, 0x1800/0x1830
 // gate modes 3/4 -- with iteration counts 3 for modes 0/2/5, 2 for mode 1, 12 for mode 3 and 2/9/10
 // for mode 4. Unknown modes fatal 0xAF.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_port_d2common_460b0(uint32_t nMode, uint32_t nArg2, uint32_t pArg3, uint32_t pArg4, uint32_t nArg5) { // D2MOO-style form of D2Common 0x460B0 (the 1.13c port is d2common_460b0.cpp)
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_port_d2common_460b0(uint32_t nMode, uint32_t nArg2, uint32_t pArg3, uint32_t pArg4, uint32_t nArg5) { // 1.10f-style form of D2Common 0x460B0 (the 1.13c port is d2common_460b0.cpp)
 	(void)nMode;
 	(void)nArg2;
 	(void)pArg3;
@@ -88,7 +88,7 @@ extern "C" void D2Common_1D710_FreeMissileStream(uint32_t pUnit, const D2CommonF
 	env->free(W(u, 8), pStream);
 }
 
-// Superseded by UNITS_FreePlayerData (src/core/d2moo/src/Units/Units.cpp, the row for 0x30880); kept for reference only.
+// Superseded by UNITS_FreePlayerData (src/core/game/Units/Units.cpp, the row for 0x30880); kept for reference only.
 // +0x30880 (#11002): clear a quest record's waypoint block. The pointer at param+0x14 addresses three
 // 12-byte entries: dwords at +0x10/+0x14/+0x18 and a uint16 waypoint state pointer at +0x1C/+0x20/+0x24.
 // A state that is neither 0x102, 0 nor 0x101 fatals 0x113; 0/0x101 become 0x102. The block pointer is

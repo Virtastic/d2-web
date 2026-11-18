@@ -1,13 +1,13 @@
 // src/core/d2common/d2common_batch_b67.cpp -- the one 1.13c D2Common.dll row of batch b67 whose body
-// is not already the vendored D2MOO function, transcribed from the cached Ghidra decompile
+// is not already the vendored the 1.10f source function, transcribed from the cached Ghidra decompile
 // (build-wasm/ghidra-d2common/decomp/0x3B160.c) and checked against the retail disassembly.
 // Image base 0x6FD50000. Retail records are opaque and are read by their retail byte offsets
 // (rd32); retail addresses travel as 32-bit integers.
 //
 // The other three rows of the batch are the vendored bodies, marked in place:
-//   0x34550 -> src/core/d2moo/src/Path/Path.cpp D2Common_10237
-//   0x2F630 -> src/core/d2moo/src/Units/Units.cpp UNITS_GetSwitchLeftSkillData
-//   0x3C460 -> src/core/d2moo/src/D2Dungeon.cpp DUNGEON_AddClientToRoom
+//   0x34550 -> src/core/game/Path/Path.cpp D2Common_10237
+//   0x2F630 -> src/core/game/Units/Units.cpp UNITS_GetSwitchLeftSkillData
+//   0x3C460 -> src/core/game/D2Dungeon.cpp DUNGEON_AddClientToRoom
 #include <cstdint>
 #include <cstring>
 #include <emscripten.h>

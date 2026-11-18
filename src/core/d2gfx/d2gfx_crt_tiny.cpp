@@ -1,5 +1,5 @@
 // D2Gfx VC7.1 CRT leaves, read against the cached retail 1.13c decompiles.
-// Prior art: D2MOO D2Gfx/DllMain.cpp has the user entry, not these CRT leaves.
+// Prior art: the 1.10f source D2Gfx/DllMain.cpp has the user entry, not these CRT leaves.
 // The existing D2Gfx CRT host-seam pattern preserves calls and image globals
 // explicitly; callbacks execute the effects rather than recording or dropping them.
 #include <cstdint>

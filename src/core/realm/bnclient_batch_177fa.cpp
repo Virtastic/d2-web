@@ -1,5 +1,5 @@
 // BNClient 1.13c Stage A: CRT exception links, signal lookup, and BNCS state leaves.
-// Prior art used: network schemas; D2MOO D2MCPClient is a stub.
+// Prior art used: network schemas; the 1.10f source D2MCPClient is a stub.
 // Cached decompiles cross-checked with retail x86 for BE60 (ECX/EDX payload),
 // 183D2 (EDX table, ESI signal, EAX result), and the SEH registration layout.
 #include <cstdint>

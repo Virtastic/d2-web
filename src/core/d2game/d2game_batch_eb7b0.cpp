@@ -5,7 +5,7 @@
 // SUnitInactive/AiGeneral chain helpers.
 //
 // Retail records are opaque host objects read at their retail byte offsets. Every callee src/ does not
-// own is a seam on D2GameBatchEEnv, in retail argument order; the 1.10f crosswalk is D2MOO
+// own is a seam on D2GameBatchEEnv, in retail argument order; the 1.10f crosswalk is the 1.10f source
 // PLAYER/PlrSave2.cpp / PlrSaveItems.cpp, which carries the same section writers (prior art):
 //   * 0xEB7B0 == the quest block inlined in PLRSAVE2_CreateSaveFile ('!ooW', 6, 298, 3x96 records)
 //   * 0xEBC40 == the 'fi' skill block inlined there (one level byte per class skill)
@@ -31,7 +31,7 @@ static inline void* rdptr(const void* p, uint32_t o) { void* v; std::memcpy(&v, 
 [[noreturn]] static void d2game_fatal(uint32_t) { _exit(-1); }
 
 // Host seams for the callees src/ does not own. Ordinal notes are the 1.13c imports; the names are the
-// 1.10f D2MOO crosswalk (the two ordinal tables are not the same numbering).
+// 1.10f the 1.10f source crosswalk (the two ordinal tables are not the same numbering).
 struct D2GameBatchEEnv {
     // D2Common #10920 UNITS_GetPlayerData
     void*    (*getPlayerData)(void* pUnit);

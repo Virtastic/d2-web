@@ -14,11 +14,11 @@
 #include <cstdlib>
 #include <unordered_map>
 #include <emscripten.h>
-#include "../d2moo/include/D2DataTbls.h"
-#include "../d2moo/include/D2Dungeon.h"
-#include "../d2moo/include/D2Skills.h"
-#include "../d2moo/include/D2States.h"
-#include "../d2moo/include/Units/Units.h"
+#include "../include/D2DataTbls.h"
+#include "../include/D2Dungeon.h"
+#include "../include/D2Skills.h"
+#include "../include/D2States.h"
+#include "../include/Units/Units.h"
 
 namespace d2client_ambient { void submit(int32_t row); }
 namespace d2client_unitseed { uint32_t roll(const D2ActiveRoomStrc* r); uint32_t init(uint32_t type, uint32_t id); }

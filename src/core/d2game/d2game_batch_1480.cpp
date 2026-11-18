@@ -14,7 +14,7 @@
 // them through the D2Game+0xF829C / +0xF8BE0 slot chain; every callee outside this batch is a seam
 // pointer on D2GameBatch17Env in retail argument order. The fatal path Fog #10265(id) -> #10024(text)
 // -> _exit(-1) is not reached by any of these functions.
-// Prior art: D2MOO 1.10f reference/D2MOO/source/D2Game/src/PLAYER/Player.cpp
+// Prior art: 1.10f the 1.10f reference source
 // (D2GAME_SetStatOrResetGold_6FC7CA70, 0x6FC7CA70 = this 0x1670), MONSTER/Monster.cpp
 // (MONSTER_GetMonPropTxtRecord), GAME/Game.cpp
 // (D2GameDataTable_TSExplicitList_InplaceNew_WithList, 0x6FC81E70 = this 0x22740); the RNG step is

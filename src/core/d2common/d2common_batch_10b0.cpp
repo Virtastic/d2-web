@@ -2,7 +2,7 @@
 // (build-wasm/ghidra-d2common/decomp/0x<RVA>.c). Probe shape: r[0..3] are the arguments in
 // descriptor order, r[4] the result. Pointer results are normalised to a byte offset from the
 // table base (0 = null/out of range), matching the other d2common table getters.
-// Prior art: D2MOO 1.10f (D2Seed.h, DATATBLS_GetSkillDescTxtRecord, UNITS_GetCharStatsTxtRecord);
+// Prior art: 1.10f (D2Seed.h, DATATBLS_GetSkillDescTxtRecord, UNITS_GetCharStatsTxtRecord);
 // the 1.13c bodies at these RVAs are the same arithmetic over the same D2DataTablesStrc layout.
 #include <cstddef>
 #include <cstdint>
@@ -12,7 +12,7 @@
 #include "D2BitManip.h"
 #include "D2DataTbls.h"
 #include "DataTbls/SkillsTbls.h"
-#include "../d2moo/compat/datatbls_bridge.h"
+#include "../compat/datatbls_bridge.h"
 #include "../tables/shared.h"
 
 static_assert(offsetof(D2SkillsTxt, dwParam) == 0x148, "skills.txt dwParam");

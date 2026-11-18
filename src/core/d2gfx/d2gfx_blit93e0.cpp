@@ -1,6 +1,6 @@
 #include <cstdint>
 
-// Prior art: D2MOO CmnSubtile.cpp's diamond row tables and palette mapping.
+// Prior art: the 1.10f source CmnSubtile.cpp's diamond row tables and palette mapping.
 // The three tables below were checked against 1.13c RVAs 0x10C44/0x10C80/0x10CBC.
 // 1.13c D2Gfx+0x93E0
 // Retail stack=destination, EBX=packed pixels, ESI=palette; +0x1477C=pitch.

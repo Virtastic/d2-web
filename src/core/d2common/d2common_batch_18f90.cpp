@@ -1,8 +1,8 @@
 // Teardown order and reset scope checked against cached retail 1.13c decompiles.
-// Prior art used: D2MOO DataTbls, MonsterTbls, ItemsTbls and TokenTbls unload routines.
+// Prior art used: the 1.10f source DataTbls, MonsterTbls, ItemsTbls and TokenTbls unload routines.
 #include <emscripten.h>
 #include "D2DataTbls.h"
-#include "../d2moo/compat/test_seam.h"
+#include "../compat/test_seam.h"
 #include "d2common_tblfree.h"
 #include "d2common_montblfree.h"
 

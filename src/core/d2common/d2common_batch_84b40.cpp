@@ -20,7 +20,7 @@ uint32_t D2Common_33C20_BitmaskHit(bool hasOwner, bool hasRec, int32_t recFlag,
 extern "C" uint32_t* g_d2common_dat_6fdeff54 = nullptr;
 extern "C" int32_t g_d2common_dat_6fdeff5c = 0;
 
-// D2GetDropRoom (0x84B40) and the state-bit test (0x37DB0) live in the game tree, src/core/d2moo/src/Retail.
+// D2GetDropRoom (0x84B40) and the state-bit test (0x37DB0) live in the game tree, src/core/game/Retail.
 extern uint32_t D2Common_37DB0_UnitStateBit(const D2UnitStrc* pUnit, int32_t nBit);
 
 namespace

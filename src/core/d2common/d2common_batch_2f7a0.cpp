@@ -94,7 +94,7 @@ EMSCRIPTEN_KEEPALIVE D2ObjModeTypeTxt* d2_fn_d2common_18E30(uint32_t nIndex, int
 	return DATATBLS_GetObjModeTypeTxtRecord((int32_t)nIndex, bGetMode);
 }
 
-// 0x24C10 (#10291) is ITEMS_CheckWeaponClass in d2moo/src/Items/Items.cpp.
+// 0x24C10 (#10291) is ITEMS_CheckWeaponClass in game/Items/Items.cpp.
 
 // Superseded by UNITS_GetObjectTxtRecordFromObject (Units.cpp, the row for 0x2ECF0, #10296)
 // Object units (type 2) answer their object record, unit+0x14 -> +0x00. A null unit (fatal 0xE3C) and

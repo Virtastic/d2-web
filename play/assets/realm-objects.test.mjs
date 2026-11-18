@@ -88,7 +88,7 @@ const artOf = (list) => list.filter((r) => r.op === 'dcc').map((r) => r.path.toL
 const dir = mkdtempSync(join(tmpdir(), 'd2-realm-objects-'));
 test.after(() => rmSync(dir, { recursive: true, force: true }));
 writeFileSync(join(dir, 'emscripten.h'), '#define EMSCRIPTEN_KEEPALIVE\n');
-const core = join(root, 'src/core/d2moo');
+const core = join(root, 'src/core');
 const build = spawnSync('g++', ['-std=c++17', '-w', '-UNDEBUG', `-I${dir}`, `-I${core}/compat`, `-I${core}/include`, `-I${core}/include/D2Game`,
   join(root, 'play/assets/realm-objects.test.cpp'), '-o', join(dir, 'probe')], { encoding: 'utf8' });
 const tableLines = [];

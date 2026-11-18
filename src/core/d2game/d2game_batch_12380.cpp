@@ -208,7 +208,7 @@ LAB_691:
 
 // 0x18480 moved to src/core/d2game/d2game_18480.h (g18480::RollActionByTable), rewritten from the disassembly with its register conventions.
 
-// D2Game +0x19C20 (marker lives on the d2moo sub_6FCE5EE0) -- AI_TryAttackStep_19C20 (591 bytes). Stack-args: r[1]=param_1 (unit-id pointer),
+// D2Game +0x19C20 (marker lives on the 1.10f sub_6FCE5EE0) -- AI_TryAttackStep_19C20 (591 bytes). Stack-args: r[1]=param_1 (unit-id pointer),
 // r[2]=param_2 (a pointer to the step record); r[0]=EAX (in_EAX, the monster unit). Returns the low byte
 // of the retail result (1 on the handled paths); the upper 24 bits are not used by any caller.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_19C20(uint32_t* r) {
@@ -391,7 +391,7 @@ LAB_9a8:
     callRva(e, 0xF22C0, {0x14});
 }
 
-// D2Game +0x1DB40 (marker lives on the d2moo AITHINK_Fn032_Npc) -- AI_CommandDispatch_1DB40 (511 bytes). __fastcall: r[0]=ECX (param_1, unit),
+// D2Game +0x1DB40 (marker lives on the 1.10f AITHINK_Fn032_Npc) -- AI_CommandDispatch_1DB40 (511 bytes). __fastcall: r[0]=ECX (param_1, unit),
 // r[1]=EDX (param_2, command record: +4 is the command id), r[2]=stack param_3. The out-params &local_8,
 // &local_c are scratch offsets S_L8/S_LC; retail's command-pair callees (0x604C0, 0xE2C40) fill two dwords through
 // ECX, so local_4 is the second dword of that pair (scratch +4), which 0xF2540 receives after the first.

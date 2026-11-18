@@ -6,7 +6,7 @@
 // The client's right skill comes from its own 0x3C select (the server refuses learn 92, so no server skill exists).
 #include <cstdint>
 #include <cstring>
-#include "../d2moo/include/D2DataTbls.h"
+#include "../include/D2DataTbls.h"
 
 namespace d2client_ambient { void submit(int32_t row); }
 

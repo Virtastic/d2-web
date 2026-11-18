@@ -1,5 +1,5 @@
 // 1.13c D2Common implementation batch (rows 0x44350, 0x46A40, 0x82F00, 0x251C0).
-// Three of the four bodies are the vendored D2MOO functions and are marked where they live
+// Three of the four bodies are the vendored the 1.10f source functions and are marked where they live
 // (D2Composit.cpp, DataTbls/OverlayTbls.cpp, Items/Items.cpp); their 1.13c deltas are fixed there.
 // The remaining row, 0x46A40, is written here from the cached 1.13c decompile
 // (build-wasm/ghidra-d2common/decomp/0x46A40.c).
@@ -58,7 +58,7 @@ namespace
 	}
 }
 
-// D2MOO-style form of D2Common 0x46A40 (#10890; the 1.13c port is d2common_46a40.cpp)
+// 1.10f-style form of D2Common 0x46A40 (#10890; the 1.13c port is d2common_46a40.cpp)
 // Seeds an item unit's base stats: an item of item type 0x2D (ITEMTYPE_WEAPON) gets the six damage
 // stats below, any other item gets armour class. Each stat is written as 3/2 of the stat list's
 // current base value (0 when the ItemStatCost row, the table or the list is missing); a successful

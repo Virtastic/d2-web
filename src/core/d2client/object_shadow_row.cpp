@@ -3,8 +3,8 @@
 // is 0 and the shadow draw returns on it; the row itself is the engine's table.
 #include <cstdint>
 #include <emscripten.h>
-#include "../d2moo/include/D2DataTbls.h"
-#include "../d2moo/include/DataTbls/ObjectsTbls.h"
+#include "../include/D2DataTbls.h"
+#include "../include/DataTbls/ObjectsTbls.h"
 
 // -1: no table or no such class. Else DrawUnder << 1 | BlocksLight[mode & 7].
 extern "C" EMSCRIPTEN_KEEPALIVE int d2_client_object_shadow_row(int classId, int mode) {

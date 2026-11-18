@@ -2603,7 +2603,7 @@ static void advance_client_missiles() {
         // moves the real dynamic path, then decrements its missile-frame lifetime.
         if (txt && MISSILE_GetRemainingFrames(unit) > txt->nInitSteps) unit->dwFlagEx &= ~0x40000u;
         // A SubLoop row (Charged Strike's bolt) loops its frames in [SubStart, SubStop) while more than
-        // AnimLen - SubStop + 1 life frames remain (#10023, D2MOO's 10375); else the plain frame step.
+        // AnimLen - SubStop + 1 life frames remain (#10023, the 1.10f source's 10375); else the plain frame step.
         if (txt && txt->nLoopAnim && txt->nSubLoop &&
             txt->nAnimLen - txt->nSubStop + 1 < MISSILE_GetCurrentFrame(unit))
             D2COMMON_10375_UNITS_SetFrameNonRate(unit, txt->nSubStart, txt->nSubStop);
@@ -2630,7 +2630,7 @@ static void advance_client_missiles() {
             if (collided) hitGuid = context.hitGuid;
             if (collided && hitGuid != 0xffffffffu) {
                 // 0xB1420 with a unit: a hit on the LastCollide missile's own owner (1.13c #10227 is
-                // D2Common+0x6A130, MISSILE_CheckUnitIfOwner(missile, hit), not D2MOO's 1.10f 10227) is no hit; otherwise a NextHit
+                // D2Common+0x6A130, MISSILE_CheckUnitIfOwner(missile, hit), not 1.10f 10227) is no hit; otherwise a NextHit
                 // missile holds the target for NextDelay frames, the hit plays, and a missile whose
                 // CollideKill is 0 is not freed. 0xB17C0 returns after a unit hit either way.
                 if (MISSILE_CheckUnitIfOwner(unit, context.hit)) break;

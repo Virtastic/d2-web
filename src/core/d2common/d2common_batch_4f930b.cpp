@@ -27,7 +27,7 @@ void D2Common_17AA0_RunActTable0(
     apply(self, index, 0x28, 0x2e);
 }
 
-// (superseded by the d2moo port DRLGOUTPLACE_CreateAct1LevelConnections; was D2Common+0x17AE0)
+// (superseded by the 1.10f port DRLGOUTPLACE_CreateAct1LevelConnections; was D2Common+0x17AE0)
 void D2Common_17AE0_RunActTable1(
     void* game, void* self, int index,
     void* tableA, int (*fnA)(), void (*postA)(int*),

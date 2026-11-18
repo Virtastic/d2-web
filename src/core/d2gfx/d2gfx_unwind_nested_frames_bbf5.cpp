@@ -2,7 +2,7 @@
 
 thread_local D2GfxEhThreadState d2gfx_eh_thread_state;
 
-// Prior art: D2MOO Fog/Exceptions.cpp has no implementation of this MSVC helper.
+// Prior art: the 1.10f source Fog/Exceptions.cpp has no implementation of this MSVC helper.
 // Cross-check: D2Game's corrected EH3 projection preserves native registration
 // addresses; no D2Game addresses or EH3 scope layout apply to this EH helper.
 // 1.13c D2Gfx+0x0BBF5 (_UnwindNestedFrames, 82 bytes).

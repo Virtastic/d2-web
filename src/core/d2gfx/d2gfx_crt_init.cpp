@@ -1,5 +1,5 @@
 // D2Gfx VC7.1 CRT lifecycle, validated against the cached 1.13c 0x1686 decompile.
-// Prior art: D2MOO D2Gfx/DllMain.cpp covers the user entry only; existing MCP CRT
+// Prior art: the 1.10f source D2Gfx/DllMain.cpp covers the user entry only; existing MCP CRT
 // lifecycle supplies the callback seam pattern. Module/OS state is explicit in env.
 #include <cstdint>
 #include <cstddef>
@@ -141,7 +141,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2gfx_crt_init(void* dll_handle, uint32_t reason, v
 
 // 1.13c D2Gfx+0x0323B: the MSVC CRT helper that supplies the environment block consumed by
 // __CRT_INIT@12. Prior art: the same VC7.1 CRT body in D2Client+0x8B43 and D2DDraw+0x24FB supplies
-// the ported branch and buffer semantics; D2MOO D2Gfx/DllMain.cpp covers the surrounding user entry,
+// the ported branch and buffer semantics; the 1.10f source D2Gfx/DllMain.cpp covers the surrounding user entry,
 // not this linked CRT helper. The module's probe word is DAT_6fa91068. Keep Win32 calls as explicit
 // seams; WCHAR is uint16_t because retail's environment block is UTF-16 regardless of wasm wchar_t.
 struct D2GfxEnvStringsEnv {

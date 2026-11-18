@@ -1,4 +1,4 @@
-// Stage A. Prior art used: D2MOO DRLG warp/orth/vertex/grid routines and
+// Stage A. Prior art used: the 1.10f source DRLG warp/orth/vertex/grid routines and
 // ITEMS_SetDefenseOrDamage; checked against each cached 1.13c decompile.
 // Native links use pointers; retail coordinates, IDs and arithmetic remain 32-bit.
 #include <cstdint>

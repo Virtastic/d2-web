@@ -1,5 +1,5 @@
 // Prior art used: CRT RE map and D2Gfx's VC7.1 SBH initializer.
-// D2MOO has no CRT allocator body. Rechecked against the cached D2Game 1.13c
+// the 1.10f source has no CRT allocator body. Rechecked against the cached D2Game 1.13c
 // decompile; preserve publication on allocation failure and native pointer width.
 #include "d2game_sbh_state.h"
 #include <emscripten.h>

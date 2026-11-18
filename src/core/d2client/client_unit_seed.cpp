@@ -15,13 +15,13 @@
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
-#include "../d2moo/include/D2Dungeon.h"
-#include "../d2moo/include/Units/Units.h"
-#include "../d2moo/include/Units/Player.h"
-#include "../d2moo/include/Path/Path.h"
-#include "../d2moo/include/D2DataTbls.h"
-#include "../d2moo/include/DataTbls/MonsterTbls.h"
-#include "../d2moo/include/D2Game/UNIT/SUnit.h"
+#include "../include/D2Dungeon.h"
+#include "../include/Units/Units.h"
+#include "../include/Units/Player.h"
+#include "../include/Path/Path.h"
+#include "../include/D2DataTbls.h"
+#include "../include/DataTbls/MonsterTbls.h"
+#include "../include/D2Game/UNIT/SUnit.h"
 
 extern "C" D2ActiveRoomStrc* d2_drlg_client_active_room(int x, int y);   // drlg_check.cpp: the client act's room at (x,y), or null
 

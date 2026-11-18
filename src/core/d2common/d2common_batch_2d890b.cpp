@@ -36,7 +36,7 @@ extern "C" int D2Common_10211_ITEMS_CheckIfSocketableByItemId(int nItemId);
 int32_t STATLIST_GetTotalStatValue(D2StatListStrc* pStatList, int nStatId, uint16_t nLayer);
 
 // 1.13c D2Common+0x26190 (#?): required level of an item unit for a player unit.
-// Prior art: D2MOO 1.10f ITEMS_GetRequiredLevel (ordinal 10920), which the vendored engine already
+// Prior art: 1.10f ITEMS_GetRequiredLevel (ordinal 10920), which the vendored engine already
 // carries and which 0x26DA0 (ITEMS_GetLevelRequirement) forwards to; that forwarder is verified by
 // s1003. This row is that body: quality switch over magic (three affixes), rare and craft (six
 // prefix/suffix slots, plus the auto affix), set (setitems.txt wLvlReq) and unique (uniqueitems.txt

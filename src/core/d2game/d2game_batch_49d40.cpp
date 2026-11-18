@@ -7,7 +7,7 @@
 // in_EAX/unaff_*) are explicit parameters, named per function. Callees outside this batch are seam
 // pointers on D2GameBatch12Env in retail argument order. The fatal path Fog #10265(id) -> #10024(text)
 // -> _exit(-1) is modelled as d2game_fatal(id): only the exit is observable.
-// Prior art: D2MOO 1.10f reference/D2MOO/source/D2Game/src/GAME/Clients.cpp (sub_6FC33910,
+// Prior art: 1.10f the 1.10f reference source (sub_6FC33910,
 // CLIENTS_AddToGame 0x6FC325E0).
 #include <cstdint>
 #include <cstddef>

@@ -1,7 +1,7 @@
 #include <cstring>
 // 1.13c D2Common implementation batch (rows 0x233B0, 0x24C30, 0x3C120, 0x7C170, 0x3B550, 0x82E40,
 // 0x12D20, 0x374E0, 0x3B470, 0x3A030, 0x4E0E0, 0x3B120).
-// Six of the bodies are the same code as a vendored D2MOO 1.10f twin (same branches, same fields), so
+// Six of the bodies are the same code as a vendored 1.10f twin (same branches, same fields), so
 // they delegate; the rest are written from the cached 1.13c decompiles. Callees whose bodies are not
 // recovered are env-seam function pointers after the retail arguments; a null seam contributes nothing
 // and the body never faults on it. Fatal paths ending in _exit(-1) are modelled as returns, as in the
@@ -33,7 +33,7 @@ struct D2CommonBatch233B0Env
 	void (*clear_unit_flag)(uint32_t pOwnerBlob, uint32_t nKey);  // 0x19810
 };
 
-// Export of 1.13c D2Common 0x233B0 (ITEMS_CanBeMagic_1_13c); the body is ITEMS_CanBeMagic in src/core/d2moo/src/Items/Items.cpp.
+// Export of 1.13c D2Common 0x233B0 (ITEMS_CanBeMagic_1_13c); the body is ITEMS_CanBeMagic in src/core/game/Items/Items.cpp.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint8_t ITEMS_CanBeMagic_1_13c(uint32_t pItem)
 {

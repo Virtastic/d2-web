@@ -68,17 +68,17 @@ fi
 SRCS=$(find src -name '*.cpp' ! -name '*.test.cpp' | sort)
 # tools/vectorfmt is shared with the Win32 capture tool: same header, same hash, no drift.
 echo "==> em++ $(echo $SRCS | wc -w) sources"
-# src/core/d2moo is vendored D2MOO (MIT, 1.10f prose map) compiled as 1.13c through the
-# shims in src/core/d2moo/compat; its Windows-isms are silenced, not fixed.
+# src/core/game is vendored 1.10f source (MIT, prose map) compiled as 1.13c through the
+# shims in src/core/compat; its Windows-isms are silenced, not fixed.
 # D2_CXXFLAGS="-g -O1 -sASSERTIONS=2 -sSAFE_HEAP=1" turns a "memory access out of bounds" into a stack.
-# The per-DLL bodies under src/core/d2moo/<dll>/ keep their headers in src/core/<dll>/: those directories are searched
+# The per-DLL bodies under src/core/<dll>/ keep their headers in src/core/<dll>/: those directories are searched
 # last, so a sibling "x.h" include still resolves to the same file and nothing that resolved before changes.
 # The -I list is written out literally: tools that check includes read it from this file.
 CXXFLAGS="-m64 -std=c++20 -O2 -pthread -fno-strict-aliasing -fwrapv ${D2_CXXFLAGS:-} \
   -Wno-unknown-pragmas -Wno-microsoft -Wno-unused-value \
   -Wno-invalid-offsetof -Wno-deprecated-volatile -Wno-writable-strings \
   -DD2_VERSION_MAJOR=1 -DD2_VERSION_MINOR=13 -DD2_VERSION_PATCH=67 \
-  -I$STORM_SRC/src -Isrc -Isrc/core/d2moo/compat -Isrc/core/d2moo/include -Isrc/core/d2moo/include/D2Game -Isrc/core/d2moo/squall \
+  -I$STORM_SRC/src -Isrc -Isrc/core/compat -Isrc/core/include -Isrc/core/include/D2Game -Isrc/core/squall \
    -Isrc/core/d2client -Isrc/core/d2cmp -Isrc/core/d2gfx -Isrc/core/d2lang -Isrc/core/d2launch -Isrc/core/d2multi -Isrc/core/d2sound -Isrc/core/d2win -Isrc/core/fog -Isrc/core/storm -Isrc/core/gfx -Isrc/core/bnclient -Isrc/core/d2mcpclient -Isrc/core/d2net -Isrc/core/lang -Isrc/core/fn"
 # Objects are cached per source under build-wasm/obj/<flags-hash>/ (the vendored tree is ~200k
 # lines; a full rebuild is minutes, a one-file change is seconds). Each compile emits a depfile

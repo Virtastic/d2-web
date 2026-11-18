@@ -1,6 +1,6 @@
 #pragma once
 // D2Common 0x33110 (#10819) UNITS_UpdateAnimRateAndVelocity, written from the 1.13c disassembly. The callees are a table so
-// the engine binds the D2MOO functions (Units.cpp) and the FN probe binds recorders. Comments name the retail callee RVA.
+// the engine binds the 1.10f source functions (Units.cpp) and the FN probe binds recorders. Comments name the retail callee RVA.
 #include <cstdint>
 #include "Units/Units.h"
 #include "D2Inventory.h"

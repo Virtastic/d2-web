@@ -3,10 +3,10 @@
 #include <cstdint>
 #include <cstring>
 #include <unistd.h>
-#include "../d2moo/include/D2DataTbls.h"
-#include "../d2moo/include/D2Skills.h"
-#include "../d2moo/include/Path/Path.h"
-#include "../d2moo/include/Units/Units.h"
+#include "../include/D2DataTbls.h"
+#include "../include/D2Skills.h"
+#include "../include/Path/Path.h"
+#include "../include/Units/Units.h"
 #include "skill_gates_40450.h"
 
 extern "C" {

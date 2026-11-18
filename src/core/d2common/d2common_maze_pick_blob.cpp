@@ -3,9 +3,9 @@
 // retail offsets; the maze's preset, picked file and flags (blob +0..+0xC) are written back in place.
 #include <cstdint>
 #include <cstring>
-#include "../d2moo/include/Drlg/D2DrlgMaze.h"
-#include "../d2moo/include/Drlg/D2DrlgDrlg.h"
-#include "../d2moo/include/Drlg/D2DrlgPreset.h"
+#include "../include/Drlg/D2DrlgMaze.h"
+#include "../include/Drlg/D2DrlgDrlg.h"
+#include "../include/Drlg/D2DrlgPreset.h"
 #include "D2DataTbls.h"
 
 static inline uint8_t* P(uint32_t v) { return (uint8_t*)(uintptr_t)v; }

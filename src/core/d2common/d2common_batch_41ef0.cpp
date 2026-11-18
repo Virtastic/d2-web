@@ -1,7 +1,7 @@
 // 1.13c D2Common Stage A implementation batch: 0x41EF0, 0x23230, 0x23050, 0x4E630, 0x3E910,
 // 0x318C0, 0x301D0, 0x52AE0, 0x30E20, 0x247C0, 0x51B80, 0x234A0.
 // Bodies are transliterated from the pinned 1.13c decompiles in our own words. Where the 1.13c
-// body is the address of a vendored D2MOO helper, the row delegates to that helper: the vendored
+// body is the address of a vendored the 1.10f source helper, the row delegates to that helper: the vendored
 // body is the 1.10f twin and the 1.13c deltas were checked line by line. Retail's fatal asserts
 // (_exit after a Fog message) are modelled as the function's neutral return.
 #include <cstddef>
@@ -146,7 +146,7 @@ void D2Common_30E20_SetTargetUnit(D2UnitStrc* pUnit, D2UnitStrc* pTargetUnit)
 	UNITS_SetTargetUnitForPlayerOrMonster(pUnit, pTargetUnit);
 }
 
-// Export of 1.13c D2Common 0x247C0 (#10432): the body is ITEMS_GetMinStack in src/core/d2moo/src/Items/Items.cpp.
+// Export of 1.13c D2Common 0x247C0 (#10432): the body is ITEMS_GetMinStack in src/core/game/Items/Items.cpp.
 // ponytail: no export, plain C++
 int32_t D2Common_247C0_UnitItemMinStack(const int32_t* pUnit)
 {

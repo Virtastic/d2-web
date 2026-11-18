@@ -1,4 +1,4 @@
-// Prior art: D2MOO's D2Gfx module supplies renderer functions, not this VS2003 CRT helper.
+// Prior art: the 1.10f source's D2Gfx module supplies renderer functions, not this VS2003 CRT helper.
 // Cross-check: D2Client+0x0617B has the same buffer-release rule; this implementation follows
 // D2Gfx's cached 1.13c decompile, including its low-word flag update.
 #include <cstddef>

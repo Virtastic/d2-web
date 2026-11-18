@@ -2,7 +2,7 @@
 // room +0, link at node +0x14, neighbour at node +0) already naming the neighbour ends it with that node in EAX; otherwise a 0x18-byte node is allocated from the
 // DRLG's pool (room +0x58 -> level, level +0x1B4 -> drlg, drlg +0x478 -> pool; file DrlgRoom.cpp line 0xD4), zeroed, filled (+0 neighbour, +4 direction, +0xC 1,
 // +0x10 = neighbour + 0x34) and pushed on the head. D2Common_44950 is the retail layout (32-bit tokens, `resolve` and `alloc` seams); D2Common_44950_Engine is the
-// engine form on D2MOO structs.
+// engine form on the 1.10f source structs.
 #include <cstdint>
 #include <cstddef>
 #include <cstring>

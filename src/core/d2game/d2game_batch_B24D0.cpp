@@ -75,7 +75,7 @@ static const D2GameBatchB74Env& batchEnv(const uint32_t* r) {
     return r[5] ? *(const D2GameBatchB74Env*)(uintptr_t)r[5] : kNoEnv;
 }
 
-// (marker now on the d2moo ARENA_AllocArenaUnit)
+// (marker now on the 1.10f ARENA_AllocArenaUnit)
 // ARENA_AllocArenaUnit. EAX=pGame (its memory pool at +0x1C), stack argument pUnit, ret 4. Allocate
 // an 8-byte D2ArenaUnitStrc from the game pool, clear both dwords, and store it in the player data
 // at +0x34. Asserts 0x4A when the unit has no player data.

@@ -1,5 +1,5 @@
 #include <unistd.h>
-#include "../d2moo/compat/test_seam.h"
+#include "../compat/test_seam.h"
 #include "d2game_b1820.h"
 #include "d2game_retail_rw.h"
 uint32_t D2R_B1820_48560(uint32_t) { __builtin_trap(); }

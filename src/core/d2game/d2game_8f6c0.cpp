@@ -1,4 +1,4 @@
-// (marker now on the d2moo SUNITPROXY_GetVendorChain) retail-layout probe port of D2Game+0x8F6C0 -- find or add a vendor-chain node for a unit.
+// (marker now on the 1.10f SUNITPROXY_GetVendorChain) retail-layout probe port of D2Game+0x8F6C0 -- find or add a vendor-chain node for a unit.
 // EAX = unit (null -> id -1), EDI = record (chain head at +0x18, node: id +0, next +8), one stack argument (ret 4) = pool owner
 // (pool at +0x1C). A miss allocates a 12-byte node (0xA2E6: ECX = pool, EDX = 12, stack file/line 0x4ED/0) pushed on the head.
 #include "d2game_8d6_common.h"

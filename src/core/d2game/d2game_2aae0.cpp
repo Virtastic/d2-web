@@ -1,4 +1,4 @@
-#include "../d2moo/compat/test_seam.h"
+#include "../compat/test_seam.h"
 #include "d2game_2aae0.h"
 #include "d2game_retail_rw.h"
 void     D2R_2AAE0_Enter(uint32_t) { __builtin_trap(); }

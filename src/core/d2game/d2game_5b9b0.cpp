@@ -1,6 +1,6 @@
 // 1.13c D2Game+0x5B9B0: act-5 quest (node type 0x20) per-player step: find the class-0x1B2 monster (mode 0xC) near the
 // player in the rooms around `unit`, drop object 0xBD at its feet and run the quest-state tail. stdcall (game, unit,
-// player), ret 0xC. Written from the 1.13c disassembly; not in D2MOO 1.10f.
+// player), ret 0xC. Written from the 1.13c disassembly; not in 1.10f.
 // Callees go through Env so the FN probe can record them in retail's call order.
 #ifndef D2GAME_5B9B0_CPP
 #define D2GAME_5B9B0_CPP

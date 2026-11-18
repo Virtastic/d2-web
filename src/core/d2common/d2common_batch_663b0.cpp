@@ -424,7 +424,7 @@ uint32_t D2Common_3D0F0_GetTextListIdByIndex(uint32_t pList, int32_t nIndex)
 	}
 }
 
-// D2Common 0x3C460 (#10079; marker on the d2moo function): append a client pointer to a room's client array, in the
+// D2Common 0x3C460 (#10079; marker on the 1.10f function): append a client pointer to a room's client array, in the
 // retail room layout (array +0x48, count +0x78, capacity +0x04). The vendored
 // DUNGEON_AddClientToRoom works on the 1.10f engine layout; this is the retail-layout form the
 // FN capture replays. Retail fatals (0x473/0x474/0x475/0x477) become silent returns. When

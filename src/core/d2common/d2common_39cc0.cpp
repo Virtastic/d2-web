@@ -1,6 +1,6 @@
 // 1.13c D2Common+0x39CC0 (#10379): stdcall(a0, a1, a2), ret 0xC. Retail-layout (32-bit) reader. Loads EAX = *(a0 + 0x5C) (the unit's
 // stat list), ESI = a1 (stat id), pushes a2 (layer) and calls 0x39380 (register EAX/ESI + one stack word, ret 4); its result is returned.
-// The callee is a seam. Prior art: none (D2MOO has no wrapper at this site).
+// The callee is a seam. Prior art: none (the 1.10f source has no wrapper at this site).
 #include <cstdint>
 #include <cstring>
 

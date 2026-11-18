@@ -1,4 +1,4 @@
-// Prior art: none (D2MOO has no D2Client); derived from cached 1.13c decompile.
+// Prior art: none (the 1.10f source has no D2Client); derived from cached 1.13c decompile.
 // Env-seam style: every import / global is a callback; the control block is a byte buffer (32-bit layout).
 #include <cstdint>
 #include <cstring>

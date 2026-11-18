@@ -1,5 +1,5 @@
 // Party control teardown on retail's 32-bit layout (the vendored typed form is PARTY_FreePartyControl in
-// d2moo/src/D2Game/UNIT/Party.cpp). EDI = game: every member node of every party, then the party, then the control
+// game/D2Game/UNIT/Party.cpp). EDI = game: every member node of every party, then the party, then the control
 // block go back to the game pool (+0x1C) through Fog's free (Party.cpp lines 0x3F, 0x43, 0x47), and +0x1D2C is cleared.
 // A null game is fatal (Fog #10265 / #10024, then exit), as in retail.
 #include "d2game_2e790.h"

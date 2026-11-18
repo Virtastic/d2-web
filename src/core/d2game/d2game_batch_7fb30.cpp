@@ -1,4 +1,4 @@
-// Prior art: D2MOO 1.10f AiThink (Baboon, BloodHawk, CorruptLancer, Zombie and
+// Prior art: 1.10f AiThink (Baboon, BloodHawk, CorruptLancer, Zombie and
 // friends); contracts and deltas checked against the cached 1.13c functions.
 // All entries are AI think functions: (pGame, pUnit, pAiTickParam).
 #include <cstdint>

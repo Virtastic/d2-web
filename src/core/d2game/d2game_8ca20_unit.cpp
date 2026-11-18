@@ -1,7 +1,7 @@
 // 1.13c D2Game+0x8CA20 -- the monster-assign packet (0xAC) for one monster, sent to one client: what a client is told
 // the first time a monster enters its rooms. This is the play-path form over the engine's own unit; the register-level
 // form of the same function is d2game_8ca20.cpp.
-// Prior art used: D2MOO 1.10f sub_6FC3FC80 (GAME/SCmd.cpp); 1.13c keeps its layout (13-byte header, 244-byte bit stream).
+// Prior art used: 1.10f sub_6FC3FC80 (GAME/SCmd.cpp); 1.13c keeps its layout (13-byte header, 244-byte bit stream).
 #include <cstdint>
 
 #include <D2BitManip.h>

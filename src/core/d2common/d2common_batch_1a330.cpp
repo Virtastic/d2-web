@@ -132,7 +132,7 @@ extern "C" uint32_t D2Common_22880_ItemGemApplyType(uint32_t nItemId)
     return pRow->nGemApplyType;
 }
 
-// Export of 1.13c D2Common 0x230A0 (#10082): the body is ITEMS_GetItemTypeFromItemId in src/core/d2moo/src/Items/Items.cpp.
+// Export of 1.13c D2Common 0x230A0 (#10082): the body is ITEMS_GetItemTypeFromItemId in src/core/game/Items/Items.cpp.
 int32_t D2Common_230A0_ItemTypeFromItemId(uint32_t nItemId)
 {
     static_assert(offsetof(D2ItemsTxt, wType) == 0x11E, "items.txt wType");

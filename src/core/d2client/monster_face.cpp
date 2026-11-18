@@ -17,11 +17,11 @@
 #include <cstdint>
 #include <vector>
 #include <unordered_map>
-#include "../d2moo/include/Units/Units.h"
-#include "../d2moo/include/Path/Path.h"
-#include "../d2moo/include/D2Game/UNIT/SUnit.h"
-#include "../d2moo/include/D2DataTbls.h"
-#include "../d2moo/include/Units/Monster.h"
+#include "../include/Units/Units.h"
+#include "../include/Path/Path.h"
+#include "../include/D2Game/UNIT/SUnit.h"
+#include "../include/D2DataTbls.h"
+#include "../include/Units/Monster.h"
 #include "sound_unit_refs.h"
 
 namespace { std::unordered_map<uint64_t, uint64_t> g_target; uint64_t key(uint32_t t, uint32_t id) { return uint64_t(t) << 32 | id; } }

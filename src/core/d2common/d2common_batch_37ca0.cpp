@@ -172,7 +172,7 @@ EMSCRIPTEN_KEEPALIVE void D2Common_3A650_DropListEntries(uint32_t pList)
 
 // D2Common #10346 (toggle the room has-portal flag) is DUNGEON_ToggleHasPortalFlag in D2Dungeon.cpp.
 
-// Superseded by UNITS_AllocPlayerData (src/core/d2moo/src/Units/Units.cpp, the row for 0x30970); kept for reference only.
+// Superseded by UNITS_AllocPlayerData (src/core/game/Units/Units.cpp, the row for 0x30970); kept for reference only.
 // D2Common 0x30970 (#10356): allocate the three-difficulty quest record set.
 // set+0x14 must be null (otherwise fatal 0xF51); the 0x16C-byte set is zeroed. Three times it
 // allocates a 0x60-byte quest record (copied from a zeroed scratch block through 0x92A0), stores

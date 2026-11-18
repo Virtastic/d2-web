@@ -33,7 +33,7 @@ static inline uint32_t rd32(uint32_t a, uint32_t o) { return rd32((const void*)(
 static inline void     wr32(uint32_t a, uint32_t o, uint32_t v) { wr32((void*)(uintptr_t)a, o, v); }
 
 // Defined elsewhere in src/core/d2game/ (marker there).
-#include "../d2moo/include/D2Game/CRT/Crt.h"              // 0x3B51 __unlock(0xC): D2GAME_CRT_Unlock12_3B51
+#include "../include/D2Game/CRT/Crt.h"              // 0x3B51 __unlock(0xC): D2GAME_CRT_Unlock12_3B51
 extern "C" void     d2game_unlock_3f76(int32_t lockNum);   // 0x3F76 __unlock
 extern "C" int32_t* d2game_errno_ptr(void);              // 0x4E65 __getptd()->_terrno
 

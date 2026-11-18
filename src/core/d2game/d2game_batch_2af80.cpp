@@ -19,7 +19,7 @@
 
 namespace {
 
-// D2GameStrc fields (src/core/d2moo/include/D2Game/GAME/Game.h).
+// D2GameStrc fields (src/core/include/D2Game/GAME/Game.h).
 constexpr uint32_t kGameLock = 0x18;              // lpCriticalSection
 constexpr uint32_t kGameId = 0x28;                // nGameId (uint16)
 constexpr uint32_t kGameType = 0x6A;              // nGameType
@@ -29,7 +29,7 @@ constexpr uint32_t kGameLastUsedGuid = 0x90;      // dwLastUsedUnitGUID[UNIT_TYP
 constexpr uint32_t kGameFrame = 0xA8;             // dwGameFrame
 constexpr uint32_t kGameUnitList = 0x1120;        // pUnitList[5][128]
 
-// D2ClientStrc fields (src/core/d2moo/include/D2Game/GAME/Clients.h).
+// D2ClientStrc fields (src/core/include/D2Game/GAME/Clients.h).
 constexpr uint32_t kClientSaveToken = 0x60;       // nCharSaveTransactionToken
 constexpr uint32_t kClientInfo = 0x68;            // pClientInfo
 constexpr uint32_t kClientSaveHeader = 0x17C;     // pSaveHeader
@@ -37,7 +37,7 @@ constexpr uint32_t kClientFlags = 0x3D4;          // dwFlags (bit 0x10: save hea
 constexpr uint32_t kClientNext = 0x4A8;           // pNext
 constexpr uint32_t kClientAccount = 0x1D;         // szAccount[16] + unk0x2D, SStrCopy reads 0x32
 
-// D2UnitStrc fields (src/core/d2moo/include/Units/Units.h).
+// D2UnitStrc fields (src/core/include/Units/Units.h).
 constexpr uint32_t kUnitType = 0x00;              // dwUnitType
 constexpr uint32_t kUnitInteractType = 0x68;      // dwInteractType
 constexpr uint32_t kUnitInteract = 0x6C;          // nInteract

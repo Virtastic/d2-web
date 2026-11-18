@@ -1,12 +1,12 @@
 // D2Client sub_41690 (0x41690) and its callee 0x41000, real functions over the real callees.
 #include <cstdint>
 #include <cstring>
-#include "../d2moo/include/D2Seed.h"
+#include "../include/D2Seed.h"
 #include <unistd.h>
-#include "../d2moo/include/D2DataTbls.h"
-#include "../d2moo/include/D2Skills.h"
-#include "../d2moo/include/Path/Path.h"
-#include "../d2moo/include/Units/Units.h"
+#include "../include/D2DataTbls.h"
+#include "../include/D2Skills.h"
+#include "../include/Path/Path.h"
+#include "../include/Units/Units.h"
 #include "skill_gates_40450.h"
 
 #define W __attribute__((weak))

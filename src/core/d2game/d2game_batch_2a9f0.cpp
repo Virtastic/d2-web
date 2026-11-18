@@ -1,7 +1,7 @@
 // Stage A: 1.13c game/client cleanup and object placement helpers.
-// Prior art: D2MOO GAME/Game.cpp and OBJECTS/Objects.cpp (1.10f); all rules below
+// Prior art: the 1.10f source GAME/Game.cpp and OBJECTS/Objects.cpp (1.10f); all rules below
 // were checked against the cached 1.13c functions. Host pointers use the native
-// D2MOO structures; retail coordinates, IDs and RNG words remain 32-bit.
+// the 1.10f source structures; retail coordinates, IDs and RNG words remain 32-bit.
 #include <algorithm>
 #include <cstddef>
 #include <cstdlib>

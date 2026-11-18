@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <unordered_map>
-#include "../d2moo/include/Path/Path.h"
+#include "../include/Path/Path.h"
 #include <emscripten.h>
 namespace {
 struct Path { int32_t x = 0, y = 0, step = 0, n = 0; int32_t px[D2DynamicPathStrc::MAXPATHLEN], py[D2DynamicPathStrc::MAXPATHLEN]; };
