@@ -64,14 +64,6 @@ struct D2DurabilityLossStrc
 	int32_t nWeight;
 };
 
-struct D2PartyExpStrc
-{
-	D2UnitStrc* pDefenderUnit;
-	D2UnitStrc* pMembers[8];
-	int32_t nMemberLevels[8];
-	int32_t nMembers;
-	int32_t nLevelSum;
-};
 #pragma pack(pop)
 
 
@@ -2307,11 +2299,12 @@ int32_t __fastcall SUNITDMG_GetHitClass(D2DamageStrc* pDamage, uint32_t nBaseHit
 	return nBaseHitClass | nHitClass;
 }
 
-//D2Game.0x6FCC1AC0
-// 1.13c D2Game+0xDED30
-void __fastcall SUNITDMG_DrainItemDurability(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender, int32_t nUnused)
+// 1.13c D2Game+0xDEBA0
+// Item wear on a successful melee hit: the attacker's weapon (players only), then one defender armor piece picked by body-location weight.
+// Returns retail's EAX on exit: -1 when it is the last callee's result (the caller of the proof probe reads that), else the literal value.
+int32_t __fastcall SUNITDMG_WearItemsOnHit(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender)
 {
-	constexpr D2DurabilityLossStrc sgDurabilityLossWeights[7] =
+	static constexpr D2DurabilityLossStrc sgDurabilityLossWeights[7] =
 	{
 		{ BODYLOC_HEAD, 3 },
 		{ BODYLOC_TORSO, 5 },
@@ -2322,6 +2315,63 @@ void __fastcall SUNITDMG_DrainItemDurability(D2GameStrc* pGame, D2UnitStrc* pAtt
 		{ BODYLOC_GLOVES, 2 },
 	};
 
+	if (pAttacker && pAttacker->dwUnitType == UNIT_PLAYER)
+	{
+		D2UnitStrc* pItem = D2_CALL(sub_6FC7C7B0, pAttacker);
+		if (pItem)
+		{
+			D2_CALL(ITEMS_UpdateDurability, pGame, pAttacker, pItem);
+		}
+	}
+
+	if (!pDefender || pDefender->dwUnitType != UNIT_PLAYER || !pDefender->pInventory)
+	{
+		return pDefender && pDefender->dwUnitType == UNIT_PLAYER ? 0 : -1;
+	}
+
+	D2UnitStrc* pItems[7] = {};
+	int32_t nTotalWeight = 0;
+	for (int32_t i = 0; i < std::size(sgDurabilityLossWeights); ++i)
+	{
+		D2UnitStrc* pItem = D2_CALL(INVENTORY_GetItemFromBodyLoc, pDefender->pInventory, sgDurabilityLossWeights[i].nBodyLoc);
+		if (pItem && D2_CALL(ITEMS_CheckItemTypeId, pItem, ITEMTYPE_ANY_ARMOR))
+		{
+			pItems[i] = pItem;
+			nTotalWeight += sgDurabilityLossWeights[i].nWeight;
+		}
+	}
+
+	if (nTotalWeight <= 0)
+	{
+		return 0;
+	}
+
+	int32_t nIndex = ITEMS_RollLimitedRandomNumber(&pDefender->pSeed, std::size(sgDurabilityLossWeights));
+	int32_t nWeight = ITEMS_RollLimitedRandomNumber(&pDefender->pSeed, nTotalWeight);
+	for (;;)
+	{
+		if (pItems[nIndex])
+		{
+			if (nWeight < sgDurabilityLossWeights[nIndex].nWeight)
+			{
+				D2_CALL(ITEMS_UpdateDurability, pGame, pDefender, pItems[nIndex]);
+				return -1;
+			}
+			nWeight -= sgDurabilityLossWeights[nIndex].nWeight;
+		}
+		const int32_t nNext = nIndex + 1;
+		nIndex = nNext % (int32_t)std::size(sgDurabilityLossWeights);
+		if (nWeight < 0)
+		{
+			return nNext / (int32_t)std::size(sgDurabilityLossWeights);
+		}
+	}
+}
+
+//D2Game.0x6FCC1AC0
+// 1.13c D2Game+0xDED30
+void __fastcall SUNITDMG_DrainItemDurability(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender, int32_t nUnused)
+{
 	D2DamageStrc* pDamage = SUNITDMG_GetDamageFromUnits(pAttacker, pDefender);
 
 	if (!pDamage)
@@ -2358,49 +2408,7 @@ void __fastcall SUNITDMG_DrainItemDurability(D2GameStrc* pGame, D2UnitStrc* pAtt
 			damageCopy.dwHitClass |= UNITS_GetHitClass(pAttacker);
 		}
 
-		if (pAttacker->dwUnitType == UNIT_PLAYER)
-		{
-			D2UnitStrc* pItem = sub_6FC7C7B0(pAttacker);
-			if (pItem)
-			{
-				ITEMS_UpdateDurability(pGame, pAttacker, pItem);
-			}
-		}
-
-		if (pDefender->dwUnitType == UNIT_PLAYER && pDefender->pInventory)
-		{
-			D2UnitStrc* pItems[7] = {};
-			int32_t nTotalWeight = 0;
-			for (int32_t i = 0; i < std::size(sgDurabilityLossWeights); ++i)
-			{
-				D2UnitStrc* pItem = INVENTORY_GetItemFromBodyLoc(pDefender->pInventory, sgDurabilityLossWeights[i].nBodyLoc);
-				if (pItem && ITEMS_CheckItemTypeId(pItem, ITEMTYPE_ANY_ARMOR))
-				{
-					pItems[i] = pItem;
-					nTotalWeight += sgDurabilityLossWeights[i].nWeight;
-				}
-			}
-
-			if (nTotalWeight > 0)
-			{
-				int32_t nIndex = ITEMS_RollLimitedRandomNumber(&pDefender->pSeed, std::size(sgDurabilityLossWeights));
-				int32_t nWeight = ITEMS_RollLimitedRandomNumber(&pDefender->pSeed, nTotalWeight);
-				do
-				{
-					if (pItems[nIndex])
-					{
-						if (nWeight < sgDurabilityLossWeights[nIndex].nWeight)
-						{
-							ITEMS_UpdateDurability(pGame, pDefender, pItems[nIndex]);
-							break;
-						}
-						nWeight -= sgDurabilityLossWeights[nIndex].nWeight;
-					}
-					nIndex = (nIndex + 1) % std::size(sgDurabilityLossWeights);
-				}
-				while (nWeight >= 0);
-			}
-		}
+		SUNITDMG_WearItemsOnHit(pGame, pAttacker, pDefender);
 	}
 
 	SUNITEVENT_Trigger(pGame, UNITEVENT_DOMELEEATTACK, pAttacker, pDefender, &damageCopy);
@@ -3052,9 +3060,15 @@ void __fastcall SUNITDMG_DistributeExperience(D2GameStrc* pGame, D2UnitStrc* pAt
 		return;
 	}
 
+	SUNITDMG_DistributePartyExperience(pGame, pPlayer, pDefender, nPlayerLevel, nDefenderLevel, nDefenderExperience);
+}
+
+// 1.13c D2Game+0xDE8F0 (the party walk collects the members and their levels; one member gets the plain gain, several share the experience inflated by 89/256 per extra member)
+void SUNITDMG_DistributePartyExperience(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pDefender, uint32_t nPlayerLevel, uint32_t nDefenderLevel, uint32_t nDefenderExperience)
+{
 	D2PartyExpStrc partyExp = {};
 	partyExp.pDefenderUnit = pDefender;
-	PARTY_IteratePartyMembersInSameLevel(pGame, pPlayer, SUNITDMG_PartyCallback_ComputePartyExperience, &partyExp);
+	D2_CALL(PARTY_IteratePartyMembersInSameLevel, pGame, pPlayer, SUNITDMG_PartyCallback_ComputePartyExperience, &partyExp);
 
 	if (partyExp.nMembers <= 0 || partyExp.nLevelSum <= 0)
 	{
@@ -3063,17 +3077,20 @@ void __fastcall SUNITDMG_DistributeExperience(D2GameStrc* pGame, D2UnitStrc* pAt
 
 	if (partyExp.nMembers == 1)
 	{
-		SUNITDMG_AddExperienceForPlayer(pGame, pPlayer, nPlayerLevel, SUNITDMG_ComputeExperienceGain(pGame, pPlayer, nPlayerLevel, nDefenderLevel, nDefenderExperience));
+		D2_CALL(SUNITDMG_AddExperienceForPlayer, pGame, pPlayer, nPlayerLevel, D2_CALL(SUNITDMG_ComputeExperienceGain, pGame, pPlayer, nPlayerLevel, nDefenderLevel, nDefenderExperience));
 		return;
 	}
 
-	// signed 32-bit arithmetic, and the division done on the x87 stack at full width before it is stored as a float
+	// signed 32-bit arithmetic, and the division done on the x87 stack at full width (fild, fidiv) before it is stored as a float
 	const int32_t nExperience = (int32_t)nDefenderExperience + 89 * ((partyExp.nMembers - 1) * (int32_t)nDefenderExperience) / 256;
-	const float multiplier = (float)((double)nExperience / (double)partyExp.nLevelSum);
+	const float multiplier = (float)((long double)nExperience / (long double)partyExp.nLevelSum);
 	for (int32_t i = 0; i < partyExp.nMembers; ++i)
 	{
-		const uint32_t nExperienceGained = SUNITDMG_ComputeExperienceGain(pGame, partyExp.pMembers[i], partyExp.nMemberLevels[i], nDefenderLevel, (uint64_t)((double)partyExp.nMemberLevels[i] * multiplier));
-		SUNITDMG_AddExperienceForPlayer(pGame, partyExp.pMembers[i], partyExp.nMemberLevels[i], nExperienceGained);
+		// the product is exact at the x87 64-bit significand; _ftol2 truncates it, and an out-of-range value is the integer indefinite, whose low dword is 0
+		const long double fShare = (long double)partyExp.nMemberLevels[i] * (long double)multiplier;
+		const uint32_t nShare = (fShare > -9223372036854775808.0L && fShare < 9223372036854775808.0L) ? (uint32_t)(uint64_t)(int64_t)fShare : 0u;
+		const uint32_t nExperienceGained = D2_CALL(SUNITDMG_ComputeExperienceGain, pGame, partyExp.pMembers[i], partyExp.nMemberLevels[i], nDefenderLevel, nShare);
+		D2_CALL(SUNITDMG_AddExperienceForPlayer, pGame, partyExp.pMembers[i], partyExp.nMemberLevels[i], nExperienceGained);
 	}
 }
 

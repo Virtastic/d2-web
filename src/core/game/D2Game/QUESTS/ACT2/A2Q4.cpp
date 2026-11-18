@@ -676,7 +676,8 @@ int32_t __fastcall ACT2Q4_CallSeqFilter_C1FF0(D2QuestDataStrc* pQuestData)
 		return 0;
 	}
 
-	if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
+	// 1.13c validates this quest's own filter slot (EDI + 0xF0), then calls the found quest's slot
+	if (IsBadCodePtr((FARPROC)pQuestData->pfSeqFilter))
 	{
 		FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
 		exit(-1);

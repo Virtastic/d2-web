@@ -22,6 +22,7 @@
 #include <Units/UnitRoom.h>
 
 #include <UselessOrdinals.h>
+#include <test_seam.h>
 
 #include "AI/AiGeneral.h"
 #include "GAME/Clients.h"
@@ -373,33 +374,39 @@ void __fastcall sub_6FC420B0(D2UnitStrc* pItem, D2ClientStrc* pClient)
     }
 }
 
+// 1.13c D2Game+0xD1AA0 (ESI = the item; 1.10f inlined it into sub_6FC42120)
+// The skill a scroll or tome item casts: its books.txt record's scroll or book skill id; -1 for any other item or a missing record.
+int32_t __fastcall sub_6FCF1AA0(D2UnitStrc* pItem)
+{
+    D2_ASSERT(pItem);
+
+    if (!D2_CALL(ITEMS_CheckItemTypeId, pItem, ITEMTYPE_SCROLL) && !D2_CALL(ITEMS_CheckItemTypeId, pItem, ITEMTYPE_BOOK))
+    {
+        return -1;
+    }
+
+    D2BooksTxt* pBooksTxtRecord = D2_CALL(DATATBLS_GetBooksTxtRecord, D2_CALL(ITEMS_GetSuffixId, pItem, 0));
+    if (pBooksTxtRecord)
+    {
+        if (D2_CALL(ITEMS_CheckItemTypeId, pItem, ITEMTYPE_SCROLL))
+        {
+            return pBooksTxtRecord->dwScrollSkillId;
+        }
+        if (D2_CALL(ITEMS_CheckItemTypeId, pItem, ITEMTYPE_BOOK))
+        {
+            return pBooksTxtRecord->dwBookSkillId;
+        }
+    }
+    return -1;
+}
+
 //D2Game.0x6FC42120
 // 1.13c D2Game+0xD43E0
 int32_t __fastcall sub_6FC42120(D2UnitStrc* pUnit, D2UnitStrc* pItem, int32_t a3)
 {
     D2_ASSERT(pItem);
 
-    if (!ITEMS_CheckItemTypeId(pItem, ITEMTYPE_SCROLL) && !ITEMS_CheckItemTypeId(pItem, ITEMTYPE_BOOK))
-    {
-        return 0;
-    }
-    
-    D2BooksTxt* pBooksTxtRecord = DATATBLS_GetBooksTxtRecord(ITEMS_GetSuffixId(pItem, 0));
-    if (!pBooksTxtRecord)
-    {
-        return 0;
-    }
-
-    int32_t nSkillId = -1;
-    if (ITEMS_CheckItemTypeId(pItem, ITEMTYPE_SCROLL))
-    {
-        nSkillId = pBooksTxtRecord->dwScrollSkillId;
-    }
-    else if (ITEMS_CheckItemTypeId(pItem, ITEMTYPE_BOOK))
-    {
-        nSkillId = pBooksTxtRecord->dwBookSkillId;
-    }
-
+    const int32_t nSkillId = sub_6FCF1AA0(pItem);
     if (nSkillId == -1)
     {
         return 0;

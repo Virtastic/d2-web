@@ -213,6 +213,7 @@ BOOL __fastcall sub_6FCC1870(D2UnitStrc* pUnit, D2DamageStrc* pDamage, int32_t n
 //D2Game.0x6FCC1A50
 int32_t __fastcall SUNITDMG_GetHitClass(D2DamageStrc* pDamage, uint32_t nBaseHitClass);
 //D2Game.0x6FCC1AC0
+int32_t __fastcall SUNITDMG_WearItemsOnHit(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender);
 void __fastcall SUNITDMG_DrainItemDurability(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender, int32_t nUnused);
 //D2Game.0x6FCC1D70
 D2DamageStrc* __fastcall SUNITDMG_GetDamageFromUnits(D2UnitStrc* pAttacker, D2UnitStrc* pDefender);
@@ -236,6 +237,17 @@ int32_t __fastcall SUNITDMG_SetMissileDamageFlagsForNearbyUnits(D2GameStrc* pGam
 void __fastcall SUNITDMG_RollSuckBloodDamage(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender, int32_t nSkillId, int32_t nSkillLevel, D2DamageStrc* pDamage);
 //D2Game.0x6FCC2C70
 void __fastcall SUNITDMG_DistributeExperience(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender);
+int32_t __fastcall SUNITDMG_WearItemsOnHit(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender);
+struct D2PartyExpStrc
+{
+	D2UnitStrc* pDefenderUnit;
+	D2UnitStrc* pMembers[8];
+	int32_t nMemberLevels[8];
+	int32_t nMembers;
+	int32_t nLevelSum;
+};
+// 1.13c D2Game+0xDE8F0 (eax = player, stack = game, defender, the player's level, the defender's level, the defender's experience; the party part of DistributeExperience)
+void SUNITDMG_DistributePartyExperience(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pDefender, uint32_t nPlayerLevel, uint32_t nDefenderLevel, uint32_t nDefenderExperience);
 //D2Game.0x6FCC2EC0
 uint32_t __fastcall SUNITDMG_ComputeExperienceGain(D2GameStrc* pGame, D2UnitStrc* pAttacker, uint32_t nAttackerLevel, uint32_t nDefenderLevel, uint32_t nDefenderExperience);
 //D2Game.0x6FCC3170

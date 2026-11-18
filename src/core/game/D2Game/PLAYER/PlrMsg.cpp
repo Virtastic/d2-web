@@ -263,6 +263,65 @@ void __fastcall D2GAME_UpdateAttribute_6FC822D0(D2UnitStrc* pUnit, WORD nStat, u
     }
 }
 
+// 1.13c D2Game+0xCB720 (mana potion percent for the client update; the stat reads keep the retail call order)
+uint8_t __fastcall D2GAME_GetManaPotionPercent_6FCEB720(D2UnitStrc* pUnit)
+{
+    const int32_t nMana = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_MANA, 0);
+    const int32_t nMaxMana = D2_CALL(STATLIST_GetMaxManaFromUnit, pUnit);
+    D2StatListStrc* pStatList = D2_CALL(STATLIST_GetStatListFromUnitAndState, pUnit, 0x6A);
+    if (!pStatList || !nMaxMana || !pUnit)
+    {
+        return 0;
+    }
+
+    D2CharStatsTxt* pCharStatsTxtRecord = PLRSAVE2_GetCharStatsTxtRecord(pUnit->dwClassId);
+    if (!pCharStatsTxtRecord)
+    {
+        return 0;
+    }
+
+    int32_t nDivisor = pCharStatsTxtRecord->nManaRegen * 0x19;
+    if (!nDivisor)
+    {
+        nDivisor = 0x1D4C;
+    }
+    int32_t nMultiplier = 1;
+    if (nMaxMana / nDivisor > 0)
+    {
+        nMultiplier = nMaxMana / nDivisor;
+    }
+
+    const int32_t nRecoveryBonus = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_MANARECOVERYBONUS, 0);
+    const int32_t nRecovery = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_MANARECOVERY, 0);
+    D2GameStrc* pGame = D2_CALL(SUNIT_GetGameFromUnit, pUnit);
+    const int32_t nFrameDiff = D2_CALL(D2COMMON_10473, pStatList) - pGame->dwGameFrame;
+
+    const int32_t nPerFrame = nRecovery + (nRecoveryBonus + 100) * nMultiplier / 100;
+    const int32_t nPercent = (int32_t)(((uint32_t)nFrameDiff * (uint32_t)nPerFrame + (uint32_t)nMana) * 100u) / nMaxMana;
+    return (uint8_t)nPercent > 100u ? 100 : (uint8_t)nPercent;
+}
+
+// 1.13c D2Game+0xCB840 (life potion percent for the client update)
+uint8_t __fastcall D2GAME_GetLifePotionPercent_6FCEB840(D2UnitStrc* pUnit)
+{
+    const int32_t nLife = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_HITPOINTS, 0);
+    const int32_t nMaxLife = D2_CALL(STATLIST_GetMaxLifeFromUnit, pUnit);
+    D2StatListStrc* pStatList = D2_CALL(STATLIST_GetStatListFromUnitAndState, pUnit, 0x64);
+    if (!pStatList || !(nMaxLife >> 8))
+    {
+        return 0;
+    }
+
+    D2_ASSERT(pUnit);
+    const int32_t nExpireFrame = D2_CALL(D2COMMON_10473, pStatList);
+    const int32_t nGameFrame = pUnit->pGame->dwGameFrame;
+    const int32_t nRegen = D2_CALL(STATLIST_GetStatValue, pStatList, STAT_HPREGEN, 0);
+
+    const int32_t nShifted = (int32_t)((uint32_t)nRegen * (uint32_t)(nExpireFrame - nGameFrame) + (uint32_t)nLife) >> 8;
+    const uint32_t nPercent = (uint32_t)(nShifted * 100 / (nMaxLife >> 8));
+    return (uint8_t)nPercent > 100u ? 100 : (uint8_t)nPercent;
+}
+
 //D2Game.0x6FC82360
 // 1.13c D2Game+0xCC030 (potion percents 0xCB840/0xCB720 are bytes; path offsets are byte differences)
 int32_t __fastcall sub_6FC82360(D2UnitStrc* pUnit, D2UnitStrc* pUnit2, int32_t bSkipHpCheck)
@@ -312,50 +371,8 @@ int32_t __fastcall sub_6FC82360(D2UnitStrc* pUnit, D2UnitStrc* pUnit2, int32_t b
     }
 
     // 1.13c: the potion percents come back from 0xCB840/0xCB720 as bytes
-    D2StatListStrc* pHealthPotStatList = STATLIST_GetStatListFromUnitAndState(pUnit, STATE_HEALTHPOT);
-    uint8_t nPotionLifePercent = 0;
-    if (pHealthPotStatList && nShiftedMaxHp)
-    {
-        D2GameStrc* pGame = SUNIT_GetGameFromUnit(pUnit);
-        const int32_t nFrameDiff = D2COMMON_10473(pHealthPotStatList) - pGame->dwGameFrame;
-
-        nPotionLifePercent = (uint8_t)(100 * ((STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0) + nFrameDiff * STATLIST_GetStatValue(pHealthPotStatList, STAT_HPREGEN, 0)) >> 8) / nShiftedMaxHp);
-        if (nPotionLifePercent > 100u)
-        {
-            nPotionLifePercent = 100;
-        }
-    }
-
-    const int32_t nMaxMana = STATLIST_GetMaxManaFromUnit(pUnit);
-    D2StatListStrc* pManaPotStatList = STATLIST_GetStatListFromUnitAndState(pUnit, STATE_MANAPOT);
-    uint8_t nPotionManaPercent = 0;
-    if (pManaPotStatList && nMaxMana)
-    {
-        D2CharStatsTxt* pCharStatsTxtRecord = PLRSAVE2_GetCharStatsTxtRecord(pUnit->dwClassId);
-        if (pCharStatsTxtRecord)
-        {
-            int32_t nManaRegen = 25 * pCharStatsTxtRecord->nManaRegen;
-            if (!nManaRegen)
-            {
-                nManaRegen = 7500;
-            }
-
-            int32_t nManaMultiplier = nMaxMana / nManaRegen;
-            if (nManaMultiplier < 1)
-            {
-                nManaMultiplier = 1;
-            }
-
-            const int32_t nFrameMultiplier = nManaMultiplier * (STATLIST_UnitGetStatValue(pUnit, STAT_MANARECOVERYBONUS, 0) + 100) / 100 + STATLIST_UnitGetStatValue(pUnit, STAT_MANARECOVERY, 0);
-            D2GameStrc* pGame = SUNIT_GetGameFromUnit(pUnit);
-            
-            nPotionManaPercent = (uint8_t)(100 * (STATLIST_UnitGetStatValue(pUnit, STAT_MANA, 0) + nFrameMultiplier * (D2COMMON_10473(pManaPotStatList) - pGame->dwGameFrame)) / nMaxMana);
-            if (nPotionManaPercent > 100u)
-            {
-                nPotionManaPercent = 100;
-            }
-        }
-    }
+    const uint8_t nPotionLifePercent = D2GAME_GetLifePotionPercent_6FCEB840(pUnit);
+    const uint8_t nPotionManaPercent = D2GAME_GetManaPotionPercent_6FCEB720(pUnit);
 
     const int32_t nShiftedMana = STATLIST_UnitGetStatValue(pUnit, STAT_MANA, 0) >> 8;
     const int32_t nStamina = STATLIST_UnitGetStatValue(pUnit, STAT_STAMINA, 0) >> 8;

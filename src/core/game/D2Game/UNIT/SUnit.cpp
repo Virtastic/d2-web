@@ -82,55 +82,61 @@ extern uint32_t dword_6FD4DC40;   // d2-web: defined in PLAYER/PlayerList.cpp (u
 
 
 
-//D2Game.0x6FCBAEE0
-// 1.13c D2Game+0xE20A0 (checked against decompile, no delta; first half is retail 0xE0C80)
-void __fastcall SUNIT_RemoveUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
+// 1.13c D2Game+0xE0BF0
+// The player's interact reset: looks up the unit the player was interacting with, lets go of it, and clears the interact slot.
+// Returns retail's EAX (nothing reads it): the interact type when nothing was interacting, 0 when the unit is gone, a callee's result
+// where the retail callee returns one (SUNIT_EAX_FROM_CALLEE, the FN probe tracks it), else the object timer pointer or type - 2.
+int64_t __fastcall SUNIT_ResetPlayerInteract(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
-    D2_ASSERT(pGame);
-    D2_ASSERT(pUnit);
-    D2_ASSERT(pUnit->dwUnitType < 6);
+    if (!(uint8_t)pUnit->nInteract)
+    {
+        return pUnit->dwInteractType;
+    }
 
-    switch (pUnit->dwUnitType)
+    D2UnitStrc* pInteractUnit = D2_CALL(SUNIT_GetServerUnit, pGame, pUnit->dwInteractType, pUnit->dwInteractGUID);
+    if (!pInteractUnit)
     {
-    case UNIT_PLAYER:
+        return 0;
+    }
+
+    int64_t nResult = SUNIT_EAX_FROM_CALLEE;
+    if (pInteractUnit->dwUnitType == UNIT_MONSTER)
     {
-        if (pUnit->nInteract)
+        D2_CALL(MONSTERAI_RemoveInteractInfoFor, pGame, pUnit, pInteractUnit->pMonsterData ? pInteractUnit->pMonsterData->pMonInteract : nullptr);
+        D2_CALL(SUNITPROXY_FreeVendorChain, pGame, pUnit, pInteractUnit);
+    }
+    else
+    {
+        nResult = (int64_t)(uint32_t)(pInteractUnit->dwUnitType - UNIT_OBJECT);
+        if (pInteractUnit->dwUnitType == UNIT_OBJECT)
         {
-            D2UnitStrc* pInteractUnit = SUNIT_GetServerUnit(pGame, pUnit->dwInteractType, pUnit->dwInteractGUID);
-            if (pInteractUnit)
+            if (pInteractUnit->dwClassId == OBJECT_STEEG_STONE)
             {
-                if (pInteractUnit->dwUnitType == UNIT_MONSTER)
+                D2TimerArg2Strc* pArg = D2_CALL(UNITS_GetTimerArg, pInteractUnit)->unk0x00;
+                if (pArg)
                 {
-                    MONSTERAI_RemoveInteractInfoFor(pGame, pUnit, pInteractUnit->pMonsterData ? pInteractUnit->pMonsterData->pMonInteract : nullptr);
-                    SUNITPROXY_FreeVendorChain(pGame, pUnit, pInteractUnit);
+                    pArg->nUnitGUID = -1;
                 }
-                else if (pInteractUnit->dwUnitType == UNIT_OBJECT)
-                {
-                    sub_6FC79C00(pGame, pInteractUnit);
-                }
-
-                pUnit->dwInteractGUID = -1;
-                pUnit->dwInteractType = 6;
-                pUnit->nInteract = 0;
+                nResult = (int64_t)(uintptr_t)pArg;
+            }
+            else
+            {
+                D2_CALL(UNITS_ChangeAnimMode, pInteractUnit, 0);
+                nResult = SUNIT_EAX_FROM_CALLEE;
             }
         }
-
-        D2Common_10228(pUnit);
-        break;
-    }
-    case UNIT_MONSTER:
-    case UNIT_OBJECT:
-    case UNIT_MISSILE:
-    {
-        D2Common_10228(pUnit);
-        break;
-    }
-    default:
-        break;
     }
 
-    UNITROOM_RemoveUnitFromRoom(pUnit);
+    pUnit->dwInteractGUID = -1;
+    pUnit->dwInteractType = 6;
+    pUnit->nInteract &= 0xFF00;
+    return nResult;
+}
 
+// 1.13c D2Game+0xE02A0
+// Unlinks the unit from its game unit list (hash bucket by unit id, or the tile list).
+void __fastcall SUNIT_UnlinkFromGameList(D2GameStrc* pGame, D2UnitStrc* pUnit)
+{
     D2UnitStrc** ppUnitList = nullptr;
     if (pUnit->dwUnitType == UNIT_TILE)
     {
@@ -163,6 +169,42 @@ void __fastcall SUNIT_RemoveUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
         }
         pPrevious = i;
     }
+}
+
+// 1.13c D2Game+0xE0C80
+// The first half of unit removal: the player's interact reset, the common unit detach (kinds 0..3), the room removal (unless nKeepRoom), the game list unlink.
+void __fastcall SUNIT_DetachUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nKeepRoom)
+{
+    D2_ASSERT(pUnit);
+    D2_ASSERT(pUnit->dwUnitType < 6);
+
+    if (pUnit->dwUnitType == UNIT_PLAYER)
+    {
+        D2_CALL(SUNIT_ResetPlayerInteract, pGame, pUnit);
+    }
+
+    if (pUnit->dwUnitType <= UNIT_MISSILE)
+    {
+        D2_CALL(D2Common_10228, pUnit);
+    }
+
+    if (!nKeepRoom)
+    {
+        D2_CALL(UNITROOM_RemoveUnitFromRoom, pUnit);
+    }
+
+    D2_CALL(SUNIT_UnlinkFromGameList, pGame, pUnit);
+}
+
+//D2Game.0x6FCBAEE0
+// 1.13c D2Game+0xE20A0 (checked against decompile, no delta; first half is retail 0xE0C80)
+void __fastcall SUNIT_RemoveUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
+{
+    D2_ASSERT(pGame);
+    D2_ASSERT(pUnit);
+    D2_ASSERT(pUnit->dwUnitType < 6);
+
+    SUNIT_DetachUnit(pGame, pUnit, 0);
 
     if (pUnit->pQuestEventList)
     {
@@ -247,6 +289,29 @@ D2UnitStrc* __fastcall SUNIT_GetNextUnitFromList(D2UnitStrc* pUnit)
     return pUnit->pListNext;
 }
 
+// 1.13c D2Game+0xDF620
+// The unit's queued next room, if it is still in the room list of the unit's act; otherwise the next-room reference is cleared and 0 returned.
+D2ActiveRoomStrc* __fastcall SUNIT_FindNextRoomInAct(D2GameStrc* pGame, D2UnitStrc* pUnit)
+{
+    D2DynamicPathStrc* pPath = pUnit->pDynamicPath;
+    D2ActiveRoomStrc* pNextRoom = D2_CALL(PATH_GetNextRoom, pPath);
+    const int32_t nLevelId = D2_CALL(DUNGEON_GetLevelIdFromRoom, D2_CALL(UNITS_GetRoom, pUnit));
+    if (nLevelId)
+    {
+        const uint8_t nActNo = D2_CALL(DRLG_GetActNoFromLevelId, nLevelId);
+        for (D2ActiveRoomStrc* pTemp = D2_CALL(DUNGEON_GetRoomFromAct, pGame->pAct[nActNo]); pTemp; pTemp = pTemp->pRoomNext)
+        {
+            if (pTemp == pNextRoom)
+            {
+                return pNextRoom;
+            }
+        }
+    }
+
+    D2_CALL(PATH_ClearNextRoom, pPath);
+    return nullptr;
+}
+
 //D2Game.0x6FCBB190
 // 1.13c D2Game+0xE1610
 void __fastcall sub_6FCBB190(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom)
@@ -267,38 +332,10 @@ void __fastcall sub_6FCBB190(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ActiveRoomS
     }
     else
     {
-        D2ActiveRoomStrc* pNextRoom = PATH_GetNextRoom(pUnit->pDynamicPath);
-
-        const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(pCurrentRoom);
-        if (nLevelId)
+        pPreviousRoom = SUNIT_FindNextRoomInAct(pGame, pUnit);
+        if (pPreviousRoom && pCurrentRoom == pPreviousRoom)
         {
-            D2ActiveRoomStrc* pTemp = DUNGEON_GetRoomFromAct(pGame->pAct[DRLG_GetActNoFromLevelId(nLevelId)]);
-            while (pTemp)
-            {
-                if (pTemp == pNextRoom)
-                {
-                    pPreviousRoom = pNextRoom;
-                    if (pNextRoom && pCurrentRoom == pPreviousRoom)
-                    {
-                        return;
-                    }
-
-                    break;
-                }
-
-                pTemp = pTemp->pRoomNext;
-            }
-
-            if (!pTemp)
-            {
-                PATH_ClearNextRoom(pUnit->pDynamicPath);
-                pPreviousRoom = nullptr;
-            }
-        }
-        else
-        {
-            PATH_ClearNextRoom(pUnit->pDynamicPath);
-            pPreviousRoom = nullptr;
+            return;
         }
     }
 

@@ -41,6 +41,11 @@ void __fastcall SUNIT_RemoveUnit(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FCBB160
 D2UnitStrc* __fastcall SUNIT_GetNextUnitFromList(D2UnitStrc* pUnit);
 //D2Game.0x6FCBB190
+constexpr int64_t SUNIT_EAX_FROM_CALLEE = INT64_MIN;   // SUNIT_ResetPlayerInteract: retail's EAX is the last callee's result (only the FN probe reads it)
+int64_t __fastcall SUNIT_ResetPlayerInteract(D2GameStrc* pGame, D2UnitStrc* pUnit);
+void __fastcall SUNIT_UnlinkFromGameList(D2GameStrc* pGame, D2UnitStrc* pUnit);
+void __fastcall SUNIT_DetachUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nKeepRoom);
+D2ActiveRoomStrc* __fastcall SUNIT_FindNextRoomInAct(D2GameStrc* pGame, D2UnitStrc* pUnit);
 void __fastcall sub_6FCBB190(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom);
 //D2Game.0x6FCBB440
 void __fastcall SUNIT_WarpPlayer(D2GameStrc* pGame, D2UnitStrc* pTarget, D2UnitStrc* pRoomTile);

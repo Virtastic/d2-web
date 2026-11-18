@@ -26,6 +26,9 @@ void __fastcall sub_6FC821C0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc*
 void __fastcall sub_6FC82270(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient);
 //D2Game.0x6FC822D0
 void __fastcall D2GAME_UpdateAttribute_6FC822D0(D2UnitStrc* pUnit, WORD nStat, uint32_t nNewValue, D2UnitStrc* pPlayer);
+// 1.13c D2Game+0xCB720 / 0xCB840: the potion percents of the client update
+uint8_t __fastcall D2GAME_GetManaPotionPercent_6FCEB720(D2UnitStrc* pUnit);
+uint8_t __fastcall D2GAME_GetLifePotionPercent_6FCEB840(D2UnitStrc* pUnit);
 //D2Game.0x6FC82360
 int32_t __fastcall sub_6FC82360(D2UnitStrc* pUnit, D2UnitStrc* pUnit2, int32_t bSkipHpCheck);
 //D2Game.0x6FC82830

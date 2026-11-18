@@ -49,6 +49,8 @@ void __fastcall D2GAME_ITEMMODE_ServerStatlistCallback_6FC41910(D2GameStrc* pGam
 void __fastcall sub_6FC42050(D2UnitStrc* pItem, D2ClientStrc* pClient);
 //D2Game.0x6FC420B0
 void __fastcall sub_6FC420B0(D2UnitStrc* pItem, D2ClientStrc* pClient);
+// 1.13c D2Game+0xD1AA0
+int32_t __fastcall sub_6FCF1AA0(D2UnitStrc* pItem);
 //D2Game.0x6FC42120
 int32_t __fastcall sub_6FC42120(D2UnitStrc* pUnit, D2UnitStrc* pItem, int32_t a3);
 //D2Game.0x6FC42310
