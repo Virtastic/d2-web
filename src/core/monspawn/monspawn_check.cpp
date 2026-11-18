@@ -6809,6 +6809,22 @@ EMSCRIPTEN_KEEPALIVE int d2_session_take_sounds(int32_t* out, int cap) {
             out[n++] = e[0]; out[n++] = e[1]; out[n++] = e[2]; out[n++] = 0x101; out[n++] = -1; out[n++] = 0; out[n++] = e[3];
         }
     }
+    {   // 1.13c D2Client+0x23F20 case 0x12: an NPC's 0x2C greeting plays 0x9CCE0(kind 1)'s row on the local player. soundEvent 0x105.
+        int32_t r;
+        while (n + 7 <= cap && d2client_npc_greet_take(&r)) {
+            out[n++] = 0; out[n++] = (int32_t)g_targetPlayer->dwUnitId; out[n++] = (int32_t)g_targetPlayer->dwClassId; out[n++] = 0x105; out[n++] = -1; out[n++] = 0; out[n++] = r;
+        }
+        // 1.13c D2Client+0x2B1E0 -> 0x1C150 -> 0x23C00: the local player's client-unit footfalls (session_footstep.cpp). soundEvent 0x106.
+        while (n + 7 <= cap && d2client_session_hero_step_take(&r)) {
+            out[n++] = 0; out[n++] = (int32_t)g_targetPlayer->dwUnitId; out[n++] = (int32_t)g_targetPlayer->dwClassId; out[n++] = 0x106; out[n++] = -1; out[n++] = 0; out[n++] = r;
+        }
+        // 1.13c D2Client+0x7D3C0: an NPC speech line, 0x88A70(player, 5, 0, 0) (npc_speech_start.cpp). soundEvent 0x107; the update
+        // id is 1 when the line was opened by the 0x27 packet, the server's reply to the interact command of the same tick.
+        bool reply = false;
+        while (n + 7 <= cap && d2client_npc_speech_take_row(&r, &reply)) {
+            out[n++] = 0; out[n++] = (int32_t)g_targetPlayer->dwUnitId; out[n++] = (int32_t)g_targetPlayer->dwClassId; out[n++] = 0x107; out[n++] = -1; out[n++] = reply ? 1 : 0; out[n++] = r;
+        }
+    }
     {   // 1.13c D2Client+0x24A70: the shrine state sound (see game_net_stubs.cpp) on the operating player.
         int32_t su[2];
         while (n + 7 <= cap && g_targetPlayer && d2_shrine_use_take(su)) {
@@ -8424,7 +8440,8 @@ void d2client_session_player_footstep(uint32_t serverMode, int32_t targetOnClien
 void d2client_session_monster_footstep(uint32_t id, int32_t cls, uint32_t serverMode, uint32_t step, uint32_t total, int32_t floor, uint32_t now, const void* game);
 void d2client_session_monster_neutral_rows(int32_t out[2]);
 extern "C" int32_t d2_session_floor_class(int32_t unitType, int32_t unitId, int32_t fallback);
-static void sessionClientMonsterModeReset() { g_sessionClientMonsterMode.clear(); g_sessionClientMonsterHits.clear();g_sessionIdleRows.clear(); g_sessionIdleRowsReady.clear(); d2client_session_unit_sound_reset(); d2client_session_footstep_reset(); d2client_critter::reset(); }
+static void sessionClientMonsterModeReset() { g_sessionClientMonsterMode.clear(); g_sessionClientMonsterHits.clear();g_sessionIdleRows.clear(); g_sessionIdleRowsReady.clear(); d2client_session_unit_sound_reset(); d2client_session_footstep_reset(); d2client_critter::reset();
+    if (!d2client_sound_armed()) d2client_npc_speech_reset(); }   // the A trace's reset clears it when armed
 // The client player unit's rate in `mode` (D2Common 0x33110 on the hero's own records): the velocity percent is the hero's less
 // the run bonus the server unit carries while it runs, plus the bonus the client unit posts itself when it enters run
 // (0x32E10: 100 * RunSpeed / WalkSpeed - 100). The hero's path, anim fields and record are put back untouched.
@@ -9032,6 +9049,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             const D2DrlgEnvironmentStrc* ev = DUNGEON_GetEnvironmentFromAct(g_game->pAct[g_currentAct]);
             d2client_session_event_packets(sessionClientHeroSeed(), ev ? (uint32_t)ev->nCycleIndex : 0u, g_sessionClientFrame + 1);
         }
+        d2client_npc_speech_play_frame(g_sessionClientFrame + 1);   // 0x7EA90 -> 0x7E970 when no G frame tail runs it
         sessionClientMonsterHitPass(g_sessionClientFrame + 1);
         { extern void d2_client_monster_order_roll(); d2_client_monster_order_roll(); extern void d2_client_monster_hit_flush(uint32_t); d2_client_monster_hit_flush(g_sessionClientFrame + 1); }   // 1.13c D2Client+0x4C500 (blood)
         ++g_sessionClientFrame; g_sessionClientFrameStepped = true;

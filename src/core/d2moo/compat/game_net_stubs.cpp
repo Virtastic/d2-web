@@ -60,7 +60,20 @@ extern "C" uint32_t D2WEB_TakeItemSeats() { const uint32_t n = g_d2webItemSeats;
 // A connected client's receiver: handed every packet at the moment the game sends it, so it sees
 // them all in emission order whatever resets or fills the bounded stream above. Unset by default.
 static void (*g_d2webPacketSink)(const uint8_t*, uint32_t) = nullptr;
-extern "C" void D2WEB_SetPacketSink(void (*sink)(const uint8_t*, uint32_t)) { g_d2webPacketSink = sink; }
+// What the game sends the session client between the end of the join walk and the moment a connection takes it over
+// (the tick that populates a neighbour level's rooms, the first unit sync): retail's client is already in game for those
+// sends, so they are kept and handed to the sink when it connects, after the join bytes. Cleared when a join starts.
+static std::vector<uint8_t> g_d2webPreSinkPackets;
+static bool g_d2webPreSinkKeep = false;
+extern "C" void D2WEB_SetPacketSink(void (*sink)(const uint8_t*, uint32_t)) {
+    g_d2webPacketSink = sink;
+    if (sink && !g_d2webPreSinkPackets.empty()) {
+        const std::vector<uint8_t> kept = std::move(g_d2webPreSinkPackets);
+        g_d2webPreSinkPackets.clear();
+        sink(kept.data(), (uint32_t)kept.size());
+    }
+    g_d2webPreSinkKeep = false;
+}
 // A recorded session's client: handed each packet the game sends a client, with that client, in emission order, so the
 // session's client act takes its map packets before the frame that reads them. Unset by default.
 static void (*g_d2webSessionPacketTap)(const void*, const uint8_t*, uint32_t) = nullptr;
@@ -69,7 +82,10 @@ extern "C" void D2WEB_SetSessionPacketTap(void (*tap)(const void*, const uint8_t
 // afterwards. The bounded stream above holds 4 KB: a join over a level seam overflows it, and every unit sent after the
 // overflow (the far rooms' objects and monsters) never reached that client. While set, each packet is appended here too.
 static std::vector<uint8_t>* g_d2webPacketRecord = nullptr;
-extern "C" void D2WEB_RecordPackets(std::vector<uint8_t>* pOut) { g_d2webPacketRecord = pOut; }
+extern "C" void D2WEB_RecordPackets(std::vector<uint8_t>* pOut) {
+    g_d2webPacketRecord = pOut;
+    if (pOut) { g_d2webPreSinkPackets.clear(); g_d2webPreSinkKeep = true; }
+}
 // Further clients in the same game (a second realm connection): retail's send takes the client, so a
 // packet addressed to one of these goes to that connection's receiver alone. The session's own client
 // (the one above) is never routed here and keeps every observation below.
@@ -993,6 +1009,8 @@ void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, in
         g_d2webPacketStreamLength += (uint32_t)nPacketSize; ++g_d2webPacketStreamPackets;
     }
     if (g_d2webPacketSink && pClient && pPacket && nPacketSize > 0) g_d2webPacketSink((const uint8_t*)pPacket, (uint32_t)nPacketSize);
+    else if (g_d2webPreSinkKeep && !g_d2webPacketRecord && pClient && pPacket && nPacketSize > 0 && g_d2webPreSinkPackets.size() < (1u << 20))
+        g_d2webPreSinkPackets.insert(g_d2webPreSinkPackets.end(), (const uint8_t*)pPacket, (const uint8_t*)pPacket + nPacketSize);
     if (g_d2webSessionPacketTap && pClient && pPacket && nPacketSize > 0) g_d2webSessionPacketTap(pClient, (const uint8_t*)pPacket, (uint32_t)nPacketSize);
     if (pClient && pPacket && nPacketSize > 0 && *static_cast<const uint8_t*>(pPacket) == 0xAC) ++g_d2webMonsterAssigns;
     // for the session client's draw list: a 0x9C that seats an item in a container (action 4) or the belt (0xE)
@@ -1269,7 +1287,8 @@ void sub_6FC3F060(D2ClientStrc* pClient, uint8_t a2, int32_t a3, uint16_t a4, ui
         const int cls = a8 == 19 ? 62 : a8 == 21 ? 45 : a8 == 22 ? 48 : 0, cnt = a8 == 19 ? 16 : 6;
         if (cls) { const D2MissilesTxt* m = DATATBLS_GetMissilesTxtRecord(cls); if (m && m->wTravelSound > 0 && m->wTravelSound != 0xFFFF) for (int i = 0; i < cnt; i++) { g_shrineUse[g_shrineUseN][0] = a6; g_shrineUse[g_shrineUseN][1] = m->wTravelSound; g_shrineUseN++; } }
     }
-    uint8_t b[17] = {0x4D, a2};
+    // 1.13c D2Game+0x8AD80: the opcode is 0x9A when a9 (the caller's eax) is nonzero, else 0x4D.
+    uint8_t b[17] = {(uint8_t)(a9 ? 0x9A : 0x4D), a2};
     memcpy(b + 2, &a3, 4); memcpy(b + 6, &a6, 4); b[10] = a8;
     memcpy(b + 11, &a4, 2); memcpy(b + 13, &a5, 2); memcpy(b + 15, &a7, 2);
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, sizeof b);
