@@ -165,7 +165,13 @@ export function createWsBridge({ listen, targets, onLog = () => {}, ...overrides
         const cut = setTimeout(() => tcp.destroy(), 2000); cut.unref?.(); tcp.once('close', () => clearTimeout(cut));
       }
       if (!released) onLog(`${why} ${addr} /${name} after ${((Date.now() - opened) / 1000).toFixed(1)}s`);
-      release(); tap?.close(String(why).startsWith("realm")); timers.forEach(clearTimeout); timers = []; sock.destroy();
+      release(); tap?.close(String(why).startsWith("realm")); timers.forEach(clearTimeout); timers = [];
+      // The browser socket is closed with a close frame and a FIN, not destroyed: bytes the realm sent just before it went
+      // away (a game server that restarts right after a player leaves) are still queued here and must reach the page.
+      if (!sock.destroyed && !sock.writableEnded) {
+        try { sock.end(encodeFrame(Buffer.alloc(0), 0x8)); } catch { sock.destroy(); return; }
+        const cutSock = setTimeout(() => sock.destroy(), 2000); cutSock.unref?.(); sock.once('close', () => clearTimeout(cutSock));
+      } else sock.destroy();
     };
     if (cfg.pingSec > 0) {
       const ms = cfg.pingSec * 1000;
