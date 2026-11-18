@@ -1,4 +1,5 @@
 #include "GAME/Game.h"
+#include "GAME/Game113c.h"
 #include <test_seam.h>
 #include "../../../../d2game/d2game_2d4b0.h"
 
@@ -961,88 +962,6 @@ void __fastcall GAME_SendActInit(int32_t nClientId)
     }
 }
 
-// helper function
-static bool IsClientNameValid(const char* szClientName)
-{
-	bool bContainsSpecialCharacter = false;
-
-	for (int32_t i = 0; i < 16; ++i)
-	{
-		switch (szClientName[i])
-		{
-		case '\'':
-		case '-':
-		case '_':
-			// Only allowed if we didn't have another special chararcter and not first or last character.
-			if (bContainsSpecialCharacter || i == 0 || szClientName[i + 1] == '\0')
-			{
-				return false;
-			}
-			bContainsSpecialCharacter = true;
-			break;
-		case 'A':
-		case 'B':
-		case 'C':
-		case 'D':
-		case 'E':
-		case 'F':
-		case 'G':
-		case 'H':
-		case 'I':
-		case 'J':
-		case 'K':
-		case 'L':
-		case 'M':
-		case 'N':
-		case 'O':
-		case 'P':
-		case 'Q':
-		case 'R':
-		case 'S':
-		case 'T':
-		case 'U':
-		case 'V':
-		case 'W':
-		case 'X':
-		case 'Y':
-		case 'Z':
-		case 'a':
-		case 'b':
-		case 'c':
-		case 'd':
-		case 'e':
-		case 'f':
-		case 'g':
-		case 'h':
-		case 'i':
-		case 'j':
-		case 'k':
-		case 'l':
-		case 'm':
-		case 'n':
-		case 'o':
-		case 'p':
-		case 'q':
-		case 'r':
-		case 's':
-		case 't':
-		case 'u':
-		case 'v':
-		case 'w':
-		case 'x':
-		case 'y':
-		case 'z':
-			break;
-
-		case '\0':
-			return i != 0;
-		default:
-			return false;
-		}
-	}
-	return false;
-}
-
 //D2Game.0x6FC36DF0
 BOOL __fastcall GAME_VerifyJoinGame(int32_t nClientId, uint16_t nGameId, uint8_t nPlayerClass, const char* szClientName, int32_t nTokenId, char* pszInOutAccountName, int32_t* pOutCharSaveTransactionToken, uint8_t nLocale, int32_t* a9, int32_t* a10) {
     if (!CCMD_IsStringZeroTerminated(szClientName, 16))
@@ -1081,7 +1000,7 @@ BOOL __fastcall GAME_VerifyJoinGame(int32_t nClientId, uint16_t nGameId, uint8_t
         return FALSE;
     }
 
-	if (IsClientNameValid(szClientName))
+	if (GAME_IsClientNameValid(szClientName, 16))
 	{
 		if (!gpD2EventCallbackTable_6FD45830)
 		{
@@ -3347,34 +3266,4 @@ void __fastcall D2GameDataTable_TSExplicitList_InitializeTerminator(STORM_EXPLIC
     pList->InitializeTerminator();
 }
 
-////D2Game.0x6FC3BB50
-// Should be __thiscall
-void __fastcall D2GameDataTable_TSExplicitList_InplaceNew(void* pMemory)
-{
-    if (TSExplicitList<D2GameStrc, 0xDDDDDDDD>* pNode = (TSExplicitList<D2GameStrc, 0xDDDDDDDD>*)pMemory)
-    {
-        // TODO: squall should be using #define LISTEXDYN(structname) TSExplicitList< structname ,(int)0xDDDDDDDD> but is not.
-        // Investigate why and fix it.
-        pNode->m_terminator.m_prevlink = 0;
-        pNode->m_terminator.m_next = 0;
-        pNode->m_terminator.m_prevlink = &pNode->m_terminator;
-        pNode->m_linkoffset = 0xDDDDDDDD;
-        pNode->m_terminator.m_next = (struct D2GameStrc*)~(uintptr_t)&pNode->m_terminator;
-    }
-}
-
-//D2Game.0x6FC3BB80
-// Should be __thiscall, nUnused is present due to using __fastcall 
-void __fastcall D2GameDataTable_TSExplicitList_InplaceNew_WithList(void* pMemory, int32_t nUnused, TSExplicitList<D2GameStrc, 0xDDDDDDDD>* pList)
-{
-    if (TSExplicitList<D2GameStrc, 0xDDDDDDDD>*pNode = (TSExplicitList<D2GameStrc, 0xDDDDDDDD>*)pMemory)
-    {
-        // TODO: squall should be using #define LISTEXDYN(structname) TSExplicitList< structname ,(int)0xDDDDDDDD> but is not.
-        // Investigate why and fix it.
-        pNode->m_terminator.m_prevlink = 0;
-        pNode->m_terminator.m_next = 0;
-        pNode->m_terminator.m_prevlink = &pNode->m_terminator;
-        pNode->m_linkoffset = pList->m_linkoffset;
-        pNode->m_terminator.m_next = (struct D2GameStrc*)~(uintptr_t)&pNode->m_terminator;
-    }
-}
+// D2Game+0x24B0 (D2GameDataTable_TSExplicitList_InplaceNew) and +0x2740 (..._WithList) live in TableListInplace.cpp, so their FN probes link without this file's server imports.

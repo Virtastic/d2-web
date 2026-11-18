@@ -44,16 +44,9 @@
 #include "UNIT/SUnitMsg.h"
 
 
-#pragma pack(push, 1)
-struct D2MonModeInfoTableStrc
-{
-    int32_t unk0x00;
-    int32_t unk0x04;
-    int32_t unk0x08;
-};
-#pragma pack(pop)
-
-constexpr D2MonModeInfoTableStrc stru_6FD28738[16] =
+// D2MonModeInfoTableStrc is declared in MonsterMode.h; the table is shared with the 0x74F20 body.
+extern const D2MonModeInfoTableStrc stru_6FD28738[16];
+const D2MonModeInfoTableStrc stru_6FD28738[16] =
 {
     { 0, 1, 0 },
     { 0, 1, 0 },
@@ -1126,9 +1119,9 @@ int32_t __fastcall sub_6FC64310(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
 {
     SUNIT_SetCombatMode(pGame, pModeChange->pUnit, 1);
 
-    if (EVENT_GetEventFrame(pGame, pModeChange->pUnit, EVENTTYPE_AITHINK) <= (int32_t)pGame->dwGameFrame)
+    if (D2_CALL(EVENT_GetEventFrame, pGame, pModeChange->pUnit, EVENTTYPE_AITHINK) <= (int32_t)pGame->dwGameFrame)
     {
-        if (STATES_CheckState(pModeChange->pUnit, STATE_STUNNED))
+        if (D2_CALL(STATES_CheckState, pModeChange->pUnit, STATE_STUNNED))
         {
             EVENT_SetEvent(pGame, pModeChange->pUnit, EVENTTYPE_AITHINK, pGame->dwGameFrame + 45, 0, 0);
             return 1;

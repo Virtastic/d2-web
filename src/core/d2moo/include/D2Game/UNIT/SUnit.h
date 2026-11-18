@@ -32,6 +32,10 @@ struct D2UnitDescriptionListStrc
 #pragma pack(pop)
 
 
+//D2Game+0xE00C0 (1.13c): the item branch of SUNIT_AllocUnitData, outlined; EAX = pGameSeed, EDI = pUnit, returns &pItemData->pSeed
+D2SeedStrc* SUNIT_InitItemSeeds(D2UnitStrc* pUnit, D2SeedStrc* pGameSeed);
+//D2Game+0x8F470 (1.13c): EAX = inventory, stack = game; removes every item unit of the inventory
+void D2GAME_DrainInventory_113c(D2InventoryStrc* pInventory, D2GameStrc* pGame);
 //D2Game.0x6FCBAEE0
 void __fastcall SUNIT_RemoveUnit(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FCBB160

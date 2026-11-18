@@ -20,6 +20,7 @@
 #include <cstring>
 #include <cstdio>
 #include <emscripten.h>
+#include "../d2moo/include/D2Game/GAME/Game113c.h"
 
 // ---- module state --------------------------------------------------------------------------------
 // __cinit's initializer tables (0x6FD1F000..0x6FD1F01C, 7 entries, then 0x6FD1F020..0x6FD1F034,
@@ -52,33 +53,7 @@ static void d2game_crt_unlock(uint32_t index) { (void)index; }
 // left to do; both SEH fragments below call this one function.
 static void d2game_file_unlock(FILE* stream) { (void)stream; }
 
-// _memmove rule: an overlap-safe byte copy. Same-pointer and size 0 return the destination untouched;
-// a destination below the source copies forward, otherwise backwards. Result is the destination.
-static void* d2game_memmove(void* dst, const void* src, size_t size) {
-    uint8_t* d = (uint8_t*)dst;
-    const uint8_t* s = (const uint8_t*)src;
-    if (d == s || size == 0) return dst;
-    if ((uintptr_t)d < (uintptr_t)s) {
-        for (size_t i = 0; i < size; ++i) d[i] = s[i];
-    } else {
-        for (size_t i = size; i != 0; --i) d[i - 1] = s[i - 1];
-    }
-    return dst;
-}
-
-// _strrev rule: the decompiled scan first computes the length (the -1/-2 counter is retail's loop
-// unrolling), then swaps the bytes in place, stopping before the middle. The NUL stays where it was.
-static char* d2game_strrev(char* str) {
-    char* end = str;
-    while (*end != '\0') ++end;
-    if (end == str) return str;                         // empty string: the iVar2 == -2 path
-    for (char* lo = str, *hi = end - 1; lo < hi; ++lo, --hi) {
-        const char c = *lo;
-        *lo = *hi;
-        *hi = c;
-    }
-    return str;
-}
+// _memmove (0x2AD0) and __strrev (0x2E10) live in the game tree (CrtMemmove.cpp, CrtStrrev.cpp).
 
 // __fsopen rule: __getstream() then __openfile(name, mode, share, stream), with errno = 0x18 when the
 // stream table is exhausted. Host stdio has neither a stream table nor a share mode: fopen fills the
@@ -161,13 +136,13 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_2a5e(uint32_t* r) {
 
 // 1.13c D2Game+0x2AD0
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_2ad0(uint32_t* r) {
-    r[4] = (uint32_t)(uintptr_t)d2game_memmove((void*)(uintptr_t)r[0], (const void*)(uintptr_t)r[1],
-                                               (size_t)r[2]);
+    r[4] = (uint32_t)(uintptr_t)D2GAME_CRT_memmove_6FC22AD0((void*)(uintptr_t)r[0], (const void*)(uintptr_t)r[1],
+                                                            (size_t)r[2]);
 }
 
 // 1.13c D2Game+0x2E10
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_2e10(uint32_t* r) {
-    r[4] = (uint32_t)(uintptr_t)d2game_strrev((char*)(uintptr_t)r[0]);
+    r[4] = (uint32_t)(uintptr_t)D2GAME_CRT_strrev_6FC22E10((char*)(uintptr_t)r[0]);
 }
 
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_2f74(uint32_t* r) {

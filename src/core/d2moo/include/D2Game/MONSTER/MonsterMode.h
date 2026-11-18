@@ -7,6 +7,14 @@
 
 #pragma pack(push, 1)
 
+// One 0xC-byte row of the mode table at 1.13c D2Game 0xFBC50 (1.10f 0x6FD28738).
+struct D2MonModeInfoTableStrc
+{
+	int32_t unk0x00;
+	int32_t unk0x04;
+	int32_t unk0x08;
+};
+
 struct D2ModeChangeStrc
 {
 	int32_t nMode;								//0x00
@@ -143,3 +151,9 @@ void __fastcall D2GAME_MONSTERS_AiFunction11_6FC65920(D2GameStrc* pGame, D2UnitS
 void __fastcall MONSTERMODE_EventHandler(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventTypes nEvent, int32_t nSkillId, int32_t nSkillLevel);
 //D2Game.0x6FC659B0
 void __fastcall sub_6FC659B0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t a4);
+// 1.13c D2Game+0x74F20: ECX = the unit, EAX = the mode. Non-zero when the mode is allowed for the unit's class (table flag, or the MonStats2 moving-mode bit).
+uint32_t __fastcall MONSTERMODE_IsModeEnabledForUnit(D2UnitStrc* pUnit, int32_t nMode);
+// 1.13c D2Game+0x750F0: ESI = the unit, EDI = the mode, one stack word = the game. Clears the used skill; a dead unit (mode other than death/dead) answers 1, else runs sub_6FC64310 with a neutral mode change and answers 0.
+int32_t __fastcall MONSTERMODE_ResetToNeutral(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMode);
+// 1.13c D2Game+0x75260: EAX = the new anim mode, ECX = the unit. Stores the monster's AI state: a state of 0x10 or more yields state - 0x10, a knockback state kept over a get-hit mode.
+void __fastcall MONSTER_StoreAiStateForMode(D2UnitStrc* pUnit, int32_t nAnimMode);

@@ -637,7 +637,7 @@ int32_t __fastcall sub_6FC4E430(D2GameStrc* pGame, D2ItemDropStrc* pItemDrop, D2
 }
 
 //D2Game.0x6FC4E4D0
-// 1.13c D2Game+0x1180
+// 1.13c D2Game+0x1180 (limit in EAX) and 1.13c D2Game+0x11D0 (seed in ECX, limit in ESI): the same body, the twins differ only in the limit's register
 uint32_t __fastcall ITEMS_RollLimitedRandomNumber(D2SeedStrc* pSeed, int32_t nMax)
 {
     return SEED_RollLimitedRandomNumber(pSeed, nMax);

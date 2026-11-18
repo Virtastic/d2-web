@@ -59,6 +59,8 @@ void __fastcall ACT3Q4_Callback09_PlayerDroppedWithQuestItem(D2QuestDataStrc* pQ
 void __fastcall ACT3Q4_Callback14_PlayerJoinedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg);
 //D2Game.0x6FCAADA0
 int32_t __fastcall ACT3Q4_UnitIterate_SetGoldenBirdBoss(D2QuestDataStrc* pQuestData, D2UnitStrc* pUnit);
+// 1.13c D2Game+0xE3B00
+void __fastcall ACT3Q4_ClearBossSpawnLatch(D2QuestDataStrc* pQuestData, D2UnitStrc* pUnit);
 //D2Game.0x6FCAAE20
 void __fastcall ACT3Q4_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg);
 //D2Game.0x6FCAAF60

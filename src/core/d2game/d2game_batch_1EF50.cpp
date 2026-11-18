@@ -255,23 +255,7 @@ level_lookup:
     wr32(param2, 0x4C, 0);
 }
 
-// Clear a one-shot flag: EAX+0x18 is a small record; when its +2 byte is 1 and its +4 dword equals
-// param_1's +0xC dword (or both are the -1 sentinel for a null param_1), it becomes +2 = 0, +1 = 1.
-// 1.13c D2Game+0xe3b00
-extern "C"
-EMSCRIPTEN_KEEPALIVE void D2Game_E3B00(uint32_t eaxUnit, uint32_t param1,
-                                             const D2GameBatch1EF50Env* env)
-{
-    (void)env;
-    const uint32_t iVar1 = rd32(eaxUnit, 0x18);
-    if (rd8(iVar1, 2) == 1) {
-        const int32_t iVar2 = param1 == 0 ? -1 : (int32_t)rd32(param1, 0xC);
-        if ((int32_t)rd32(iVar1, 4) == iVar2) {
-            wr8(iVar1, 2, 0);
-            wr8(iVar1, 1, 1);
-        }
-    }
-}
+// 1.13c D2Game+0xe3b00 lives in the game tree (QUESTS/ACT3/A3Q4ClearBoss.cpp).
 
 // Player-join style notification: Fog #10195 gives the player token; when non-zero it is embedded in an
 // 8-byte message whose tag becomes 0x11, type byte the ESI unit's type (6 when ESI is null), dword the
@@ -316,38 +300,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_7A570(uint32_t esiUnit, const D2GameBatch
     env->sub8A3E0(buf, 8);
 }
 
-// 11-byte 0x47 message: tag 0x47, type byte the EAX unit's first dword (6 when null), the unit's +0xC
-// dword (0xFFFFFFFF when null), then three zero bytes.
-// 1.13c D2Game+0x8aec0
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8AEC0(uint32_t eaxUnit, const D2GameBatch1EF50Env* env)
-{
-    uint8_t buf[0xB] = {};
-    wr8(buf, 0, 0x47);
-    wr8(buf, 1, 6);
-    wr32(buf, 3, 0);
-    wr8(buf, 7, 0);
-    wr16(buf, 8, 0);
-    wr8(buf, 10, 0);
-
-    if (eaxUnit == 0) {
-        wr32(buf, 3, 0xFFFFFFFF);
-    }
-    else {
-        wr8(buf, 1, rd8(eaxUnit, 0));
-        wr32(buf, 3, rd32(eaxUnit, 0xC));
-    }
-    env->sub8A3E0(buf, 0xB);
-}
-
-// Probe entry for 0x8AEC0 (EAX = unit, client on the stack); `send` takes the place of 0x8A3E0.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2game_8aec0_send(uint32_t eaxUnit, void (*send)(void*, uint32_t))
-{
-    D2GameBatch1EF50Env env{};
-    env.sub8A3E0 = send;
-    d2_fn_d2game_8AEC0(eaxUnit, &env);
-}
+// 1.13c D2Game+0x8aec0 lives in the game tree (GAME/SendPacket0x47.cpp).
 
 // Callback dispatch: EBX+0x10 indexes 0xC-byte rows of the 0x6FD22CE0 table; a non-null first dword is
 // called as (param_2, index) after an IsBadCodePtr gate whose failure logs the 0x148 allocation and
@@ -433,24 +386,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CBBB0(uint32_t eaxUnit, const D2GameBatch
     env->sub8A3E0(buf, 0xD);
 }
 
-// Walking the EAX+0x74 list (next link +0xE8), for every type-1 node run two passes over its +0xDC list
-// (next link +0x24): first reporting each byte-tag-2 entry and then each byte-tag-3 entry to 0x8E6F0.
-// 1.13c D2Game+0x9D8E0
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9D8E0(uint32_t eax, const D2GameBatch1EF50Env* env)
-{
-    for (uint32_t node = rd32(eax, 0x74); node != 0; node = rd32(node, 0xE8)) {
-        if (rd32(node, 0) == 1) {
-            for (uint32_t it = rd32(node, 0xDC); it != 0; it = rd32(it, 0x24)) {
-                if (rd8(it, 0) == 2) env->sub8E6F0();
-            }
-            for (uint32_t it = rd32(node, 0xDC); it != 0; it = rd32(it, 0x24)) {
-                if (rd8(it, 0) == 3) env->sub8E6F0();
-            }
-        }
-    }
-}
-
 // Pet-list teardown: from the head at param_1, walk each node's +0x14 link paying 0x977E0(EBX, node+4)
 // and one Fog #10046 (PlayerPets.cpp, line 0x4A5, 0) per node, then clear both head words.
 // 1.13c D2Game+0x964b0
@@ -522,49 +457,4 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_96C00(uint32_t param1, uint32_t param2, i
     }
 }
 
-// Single pass over the EAX list: for each unflagged node, hash the +4 id into EBX+0x1320 and walk the
-// chain (next +0xE4) for a +0xC match, paying 0x971F0(EBX) per hit.
-// 1.13c D2Game+0x972c0
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_972C0(uint32_t eaxList, uint32_t ebx,
-                                             const D2GameBatch1EF50Env* env)
-{
-    uint32_t pbVar1 = rd32(eaxList, 0);
-    for (;;) {
-        if (pbVar1 == 0) return;
-        if ((rd8(pbVar1, 0) & 1) == 0) {
-            if (ebx == 0) batch1EF50Fatal(env, 0x2D3);
-            const uint32_t id = rd32(pbVar1, 4);
-            for (uint32_t iVar2 = rd32(ebx + 0x1320 + (id & 0x7F) * 4, 0);
-                 iVar2 != 0; iVar2 = rd32(iVar2, 0xE4))
-            {
-                if (rd32(iVar2, 0xC) == id) {
-                    env->sub971F0(ebx);
-                    break;
-                }
-            }
-        }
-        pbVar1 = rd32(pbVar1, 0x14);
-    }
-}
-
-// 7-byte 0x9B message: byte 0 = 0x9B, bytes 1..2 = AX, bytes 3..6 = ECX (the disassembly stores AX at +5 and ECX at +0xB of
-// the frame, the buffer starting at +4; the decompile shows only the opcode byte). The client is the stack argument and goes to 0x8A3E0 in EAX.
-// 1.13c D2Game+0x8a690
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8A690(uint32_t ecx, uint32_t eax, const D2GameBatch1EF50Env* env)
-{
-    uint8_t buf[7];
-    buf[0] = 0x9B;
-    std::memcpy(buf + 1, &eax, 2);   // AX at bytes 1-2, ECX at bytes 3-6
-    std::memcpy(buf + 3, &ecx, 4);
-    env->sub8A3E0(buf, 7);
-}
-
-// Probe entry for 0x8A690 (ECX, AX, client on the stack); `send` takes the place of 0x8A3E0.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2game_8a690_send(uint32_t ecx, uint32_t eax, void (*send)(void*, uint32_t))
-{
-    D2GameBatch1EF50Env env{};
-    env.sub8A3E0 = send;
-    d2_fn_d2game_8A690(ecx, eax, &env);
-}
+// 1.13c D2Game+0x8a690 lives in the game tree (GAME/SendPacket0x9B.cpp).

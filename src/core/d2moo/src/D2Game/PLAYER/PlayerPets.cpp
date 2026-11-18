@@ -838,17 +838,7 @@ void __fastcall sub_6FC7E310(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t a3,
             {
                 if (pPetTypeTxtRecord->dwPetFlags & gdwBitMasks[0])
                 {
-                    for (D2PetDataStrc* pPetData = pPetList->pPetData; pPetData; pPetData = pPetData->pNext)
-                    {
-                        if (!(pPetData->nFlags & 1))
-                        {
-                            D2UnitStrc* pPet = SUNIT_GetServerUnit(pGame, UNIT_MONSTER, pPetData->nUnitGUID);
-                            if (pPet)
-                            {
-                                sub_6FC7E550(pGame, pPet, pPetData, pRoom, a3, a4);
-                            }
-                        }
-                    }
+                    PLAYERPETS_RecallPetList(pGame, pPetList, pRoom, a3, a4);
                 }
                 else if (pPetTypeTxtRecord->dwPetFlags & gdwBitMasks[1])
                 {

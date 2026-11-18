@@ -136,48 +136,7 @@ int32_t d2_fn_d2game_1870(int32_t monsterId, const D2GameBatch17Env* env)
     return (int16_t)rd16((const void*)(uintptr_t)row, 0x2);
 }
 
-// 1.13c D2Game+0x19F0
-// EAX = monster class id. Returns the MonProp row (0x138 stride) selected by the MonStats int16 at
-// +0x1A (wMonProp), or null when the class id is negative/out of range, the class row is null, the
-// property id is negative/out of range, or the base row address is null.
-void* d2_fn_d2game_19f0(int32_t monsterId, const D2GameBatch17Env* env)
-{
-    const uint8_t* dt = env->tables;
-    if (monsterId < 0 || monsterId >= (int32_t)rd32(dt, 0xA80)) return nullptr;
-    const uint32_t row = rd32(dt, 0xA78) + (uint32_t)monsterId * 0x1A8;
-    if (!row) return nullptr;
-    const int16_t prop = (int16_t)rd16((const void*)(uintptr_t)row, 0x1A);
-    if (prop < 0 || prop >= (int32_t)rd32(dt, 0xC34)) return nullptr;
-    return (void*)(uintptr_t)(rd32(dt, 0xC30) + (uint32_t)prop * 0x138);
-}
-
-// 1.13c D2Game+0x1CD0
-// Variable-width bit writer: ESI = bit buffer, EDI = value. Below 0x100 write flag 0 then 8 bits;
-// below 0x10000 write flag 1, flag 0, then 16 bits; otherwise write flag 1, flag 1, then 32 bits.
-// Fog #10128 BITMANIP_Write takes (buffer, value, bit count).
-void d2_fn_d2game_1cd0(void* buffer, uint32_t value, const D2GameBatch17Env* env)
-{
-    if (value < 0x100) {
-        env->bitWrite(buffer, 0, 1);
-        env->bitWrite(buffer, value, 8);
-    } else if (value < 0x10000) {
-        env->bitWrite(buffer, 1, 1);
-        env->bitWrite(buffer, 0, 1);
-        env->bitWrite(buffer, value, 16);
-    } else {
-        env->bitWrite(buffer, 1, 1);
-        env->bitWrite(buffer, 1, 1);
-        env->bitWrite(buffer, value, 32);
-    }
-}
-
-// Probe seam for the 0x1CD0 bit writer: 0x1CD0 with only the Fog #10128 seam bound.
-extern "C" void d2game_1cd0_probe(void* buffer, uint32_t value, void (*bitWrite)(void*, uint32_t, uint32_t))
-{
-    D2GameBatch17Env env = {};
-    env.bitWrite = bitWrite;
-    d2_fn_d2game_1cd0(buffer, value, &env);
-}
+// 1.13c D2Game+0x19F0 and 0x1CD0 live in the game tree (MonsterPropByClass.cpp, BitVariableWrite.cpp).
 
 // 1.13c D2Game+0x01d30
 // Walk the MonStats nNextInClass chain: ECX = starting class id, EBX = step limit. Returns -1 when
@@ -211,65 +170,7 @@ void* d2_fn_d2game_1df0(void* criticalSection)
     return criticalSection;
 }
 
-// 1.13c D2Game+0x26F0
-// SEH wrapper: ECX = list, stack = node. When the node is non-null, link it onto the list through
-// 0x22740 (D2MOO's D2GameDataTable_TSExplicitList_InplaceNew_WithList: node+0 := list link offset,
-// node+4 := &node+4, node+8 := ~&node+4). The host has no SEH chain to install or restore.
-void d2_fn_d2game_26f0(void* list, void* node, const D2GameBatch17Env* env)
-{
-    if (node) env->inplaceNew(node, list);
-}
-
-// 1.13c D2Game+0x2790
-// EAX = unit, EDI = row index. Zero unless the unit is a monster (type 1) whose MonStats record has
-// a non-negative wMonType (+0x1C) below the bit-table bound at dt+0xC40 and the index is also in
-// [0, that bound). Returns the dword at dt[0xC44] + (dt[0xC48]*index + (wMonType>>5))*4 ANDed with
-// gdwBitMasks[wMonType & 0x1F] (dword-indexed, i.e. 1 << (wMonType & 0x1F)).
-uint32_t d2_fn_d2game_2790(const void* unit, int32_t index, const D2GameBatch17Env* env)
-{
-    if (!unit || rd32(unit, 0) != 1) return 0;
-    const int32_t monsterId = (int32_t)rd32(unit, 4);
-    const uint8_t* dt = env->tables;
-    if (monsterId < 0 || monsterId >= (int32_t)rd32(dt, 0xA80)) return 0;
-    const uint32_t row = rd32(dt, 0xA78) + (uint32_t)monsterId * 0x1A8;
-    if (!row) return 0;
-    const int32_t monType = (int16_t)rd16((const void*)(uintptr_t)row, 0x1C);
-    const int32_t bound = (int32_t)rd32(dt, 0xC40);
-    if (monType < 0 || monType >= bound) return 0;
-    if (index < 0 || index >= bound) return 0;
-    const uint32_t word = rd32((const void*)(uintptr_t)rd32(dt, 0xC44),
-                               (rd32(dt, 0xC48) * (uint32_t)index + ((uint32_t)monType >> 5)) * 4);
-    return word & rd32(env->bitMasks, ((uint32_t)monType & 0x1F) * 4);
-}
-
-// 1.13c D2Game+0x2813 (__stricmp)
-// Case-insensitive string compare through the CRT thread data: the ptlocinfo at tiddata+0x64 is
-// refreshed through 0x3B1F when it is not the startup locale; with a null wlocale (C locale,
-// locinfo+0x14) it forwards to 0x3940 ___ascii_stricmp, else it folds each byte with 0x3853
-// ___tolower_mt and returns the first difference, stopping at a zero fold (0 - other on a prefix).
-int32_t d2_fn_d2game_2813(const char* str1, const char* str2, const D2GameBatch17Env* env)
-{
-    void* locinfo = rdptr(env->getptd(), 0x64);
-    if (locinfo != env->currentTlocinfo) locinfo = env->updateTlocinfo();
-    if (!rdptr(locinfo, 0x14)) return env->asciiStricmp(str1, str2);
-    for (;;) {
-        const int32_t a = env->tolowerMt(locinfo, (uint8_t)*str1++);
-        const int32_t b = env->tolowerMt(locinfo, (uint8_t)*str2++);
-        if (a == 0 || a != b) return a - b;
-    }
-}
-
-// FN-probe seam for 0x2813: C-locale tiddata (locinfo wlocale null) so the call forwards to 0x3940.
-int d2_fn_d2game_3940(const char*, const char*);
-int32_t d2game_stricmp_probe(const char* a, const char* b)
-{
-    static uint8_t locinfo[0x40];
-    D2GameBatch17Env env = {};
-    env.getptd = []() -> void* { static uint8_t ptd[0x80]; *(void**)(ptd + 0x64) = locinfo; return ptd; };
-    env.updateTlocinfo = []() -> void* { return locinfo; };
-    env.asciiStricmp = d2_fn_d2game_3940;
-    return d2_fn_d2game_2813(a, b, &env);
-}
+// 1.13c D2Game+0x26F0, 0x2790 and 0x2813 live in the game tree (TableListNewGuarded.cpp, MonsterTypeNest.cpp, CrtStricmp.cpp).
 
 // 1.13c D2Game+0x28E5
 // CRT _lock wrapper: acquire file lock 8 (0x402B __lock, which lazily creates the lock then enters it).

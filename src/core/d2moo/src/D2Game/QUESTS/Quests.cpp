@@ -1975,23 +1975,7 @@ void __fastcall QUESTS_SetGoldenBirdSpawn(D2GameStrc* pGame, D2UnitStrc* pUnit)
 		return;
 	}
 
-	D2Act3Quest4Strc* pQuestDataEx = (D2Act3Quest4Strc*)pQuestData->pQuestDataEx;
-	if (pQuestDataEx->unk0x02 != 1)
-	{
-		return;
-	}
-
-	int32_t nUnitGUID = -1;
-	if (pUnit)
-	{
-		nUnitGUID = pUnit->dwUnitId;
-	}
-
-	if (pQuestDataEx->nBossGUID == nUnitGUID)
-	{
-		pQuestDataEx->unk0x02 = 0;
-		pQuestDataEx->unk0x01 = 1;
-	}
+	ACT3Q4_ClearBossSpawnLatch(pQuestData, pUnit);
 }
 
 //D2Game.0x6FC95DF0

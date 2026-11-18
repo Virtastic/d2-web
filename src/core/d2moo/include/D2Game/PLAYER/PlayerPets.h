@@ -74,6 +74,8 @@ void __fastcall sub_6FC7DF40(D2GameStrc* pGame, D2UnitStrc* pPlayer);
 D2PetListStrc* __fastcall PLAYERPETS_GetPetListFromPetType(D2PlayerPetStrc* pPlayerPets, int32_t nPetType);
 //D2Game.0x6FC7E310
 void __fastcall sub_6FC7E310(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t a3, int32_t a4);
+// 1.13c D2Game+0x972C0: move each live pet of the list to pRoom (the first branch of 0x97340).
+void __fastcall PLAYERPETS_RecallPetList(D2GameStrc* pGame, D2PetListStrc* pPetList, D2ActiveRoomStrc* pRoom, int32_t a4, int32_t a5);
 //D2Game.0x6FC7E550
 void __fastcall sub_6FC7E550(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2PetDataStrc* pPetData, D2ActiveRoomStrc* pRoom, int32_t a5, int32_t a6);
 //D2Game.0x6FC7E640

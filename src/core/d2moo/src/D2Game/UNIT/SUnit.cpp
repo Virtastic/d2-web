@@ -20,7 +20,8 @@
 #include <DataTbls/LevelsIds.h>
 #include <Path/PathMisc.h>
 
-#include "core/d2game/sunit_init_item_seeds.h"   // 1.13c D2Game 0xE00C0, the outlined item-seed branch
+#include <D2Inventory.h>
+#include <cstdlib>
 
 
 #include "AI/AiGeneral.h"
@@ -460,6 +461,43 @@ void __fastcall SUNIT_InitSeed(D2UnitStrc* pUnit, D2SeedStrc* pSeed)
     }
 
     SEED_InitLowSeed(&pUnit->pSeed, pUnit->dwInitSeed);
+}
+
+// 1.13c D2Game+0xE00C0: give a freshly allocated item its seed pair. The item seed starts at {1, 666}, one game-seed roll is taken and
+// stored as the item's start seed, and the item seed's low word becomes that start seed (high stays 666). Returns the item seed
+// pointer, which is what retail leaves in EAX.
+D2SeedStrc* SUNIT_InitItemSeeds(D2UnitStrc* pUnit, D2SeedStrc* pGameSeed)
+{
+    ITEMS_InitItemSeed(pUnit);
+    ITEMS_SetItemStartSeed(pUnit, static_cast<int32_t>(ITEMS_RollRandomNumber(pGameSeed)));
+
+    const int32_t nStartSeed = ITEMS_GetItemStartSeed(pUnit);
+    D2SeedStrc* pItemSeed = ITEMS_GetItemSeed(pUnit);
+    SEED_InitLowSeed(pItemSeed, nStartSeed);
+    return pItemSeed;
+}
+
+// 1.13c D2Game+0x8F470: EAX inventory, stack game. Removes every item unit of the inventory; the next node is read before the removal
+// (deletion invalidates the node and its item data). Retail reports Fog assertion 0x1c6 and exits on a node that is not an item.
+void D2GAME_DrainInventory_113c(D2InventoryStrc* pInventory, D2GameStrc* pGame)
+{
+    if (!pInventory)
+    {
+        return;
+    }
+
+    for (D2UnitStrc* pNode = INVENTORY_GetFirstItem(pInventory); pNode;)
+    {
+        D2UnitStrc* pItem = INVENTORY_UnitIsItem(pNode);
+        D2UnitStrc* pNext = INVENTORY_GetNextItem(pNode);
+        if (!pItem)
+        {
+            std::exit(-1);
+        }
+        (void)INVENTORY_GetItemNodePage(pNode); // #10698 is a getter, not a removal
+        SUNIT_RemoveUnit(pGame, pItem);
+        pNode = pNext;
+    }
 }
 
 //D2Game.0x6FCBB6C0
@@ -1328,7 +1366,7 @@ int32_t __fastcall sub_6FCBC930(D2GameStrc* pGame, D2UnitStrc* pMissile)
 // 1.13c D2Game+0xDF980
 void __fastcall SUNIT_SetCombatMode(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMode)
 {
-    SUNIT_SetCombatModeSteps([&] { SUNITDMG_FreeAttackerCombatList(pGame, pUnit); }, [&] { UNITS_ChangeAnimMode(pUnit, nMode); });
+    SUNIT_SetCombatModeSteps([&] { D2_CALL(SUNITDMG_FreeAttackerCombatList, pGame, pUnit); }, [&] { D2_CALL(UNITS_ChangeAnimMode, pUnit, nMode); });
 }
 
 //D2Game.0x6FCBC9C0

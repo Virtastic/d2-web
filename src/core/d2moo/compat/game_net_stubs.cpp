@@ -867,7 +867,7 @@ void D2GAME_PACKETS_SendPacket0x8D_6FC3F960(D2UnitStrc* pUnit, D2UnitStrc* a2) {
     std::memcpy(b + 5, &party, 2);
     D2GAME_PACKETS_SendPacket_6FC3C710(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), b, sizeof b);
 }
-void D2GAME_PACKETS_SendPacket0x9B_6FC3FB30(D2ClientStrc* pClient, int16_t a2, int32_t a3) {}
+// D2GAME_PACKETS_SendPacket0x9B_6FC3FB30 (1.13c D2Game+0x8A690) lives in the game tree (GAME/SendPacket0x9B.cpp).
 // 1.13c D2Game+0x8bc20: [hdr][stat u8][unitId u32][value u8/u16/u32]; 9E/9F/A0 by value width.
 void D2GAME_PACKETS_SendPacket0x9E_9F_A0_6FC3D520(D2ClientStrc* pClient, D2UnitStrc* pUnit, uint16_t nStatId, uint32_t nValue) {
     if (nStatId > 0xFE) return; // retail: fatal assert + _exit
@@ -991,13 +991,7 @@ void __fastcall D2GAME_SendPacket0x28_6FC3F2F0(D2ClientStrc* pClient, BYTE nHead
     QUESTRECORD_CopyRecordToBuffer(a5, packet.pData, sizeof packet.pData, 0);
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }
-// 1.13c D2Game+0x8AE00 (SCmd.cpp 0x47): {header, type, 0, guid, 0}, 11 bytes.
-void __fastcall D2GAME_SendPacket0x47_6FC3EEE0(D2ClientStrc* pClient, D2UnitStrc* pUnit) {
-    uint8_t packet[11] = {0x47, (uint8_t)(pUnit ? pUnit->dwUnitType : 6)};
-    const int32_t guid = pUnit ? (int32_t)pUnit->dwUnitId : -1;
-    std::memcpy(packet + 3, &guid, 4);
-    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, packet, sizeof packet);
-}
+// D2GAME_SendPacket0x47_6FC3EEE0 (1.13c D2Game+0x8AEC0) lives in the game tree (GAME/SendPacket0x47.cpp).
 // 1.13c D2Game+0x8AA40: 0x65 {header, unit id, kill count}, 7 bytes.
 void __fastcall D2GAME_PACKETS_SendPacket0x65_6FC3F5E0(D2ClientStrc* pClient, DWORD dwPlayerId, WORD nCount) {
     D2GSPacketSrv65 p = {}; p.nHeader = 0x65; p.dwUnitId = dwPlayerId; p.unk0x05 = nCount;

@@ -88,73 +88,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_74E60(uint32_t param1, void* param2,
     return 1;
 }
 
-// Class/state probe: a non-null param_1 and a signed in_EAX below 0x10 index the 0xC-byte 0x6FD1BC50
-// entries. Entry word 0 non-zero answers 1; otherwise the (word 1 == 0 && word 2 != 0) entries ask
-// 0x1320 for a record and answer the mask bit (in_EAX & 7) of byte record+0x104+(in_EAX >> 3).
-// 1.13c D2Game+0x74F20
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t D2GAME_ClassStateProbe(uint32_t param1, uint32_t eaxValue,
-                                                 const D2GameBatch268E0Env* env)
-{
-    if (param1 != 0 && (int32_t)eaxValue < 0x10) {
-        const uint32_t entry = (uint32_t)eaxValue * 0xC;
-        if (rd32(env->tableFBC50, entry) != 0) return 1;
-        if (rd32(env->tableFBC50, entry + 4) == 0 && rd32(env->tableFBC50, entry + 8) != 0) {
-            const int32_t rec = env->sub1320();
-            if (rec != 0) {
-                const uint32_t mask = rd32(env->bitMasks, (eaxValue & 7) * 4);
-                const uint8_t bits = rd8((void*)(uintptr_t)(rec + 0x104 + (int32_t)(eaxValue >> 3)), 0);
-                return mask & (uint32_t)bits;
-            }
-        }
-    }
-    return 0;
-}
-
-// The 0x74E60 entry with a guard: ordinal 11103 runs first, and an EDI other than 0 or 0xC takes the
-// 0xDFA90 probe, whose non-zero answer returns 1 without reaching 0x74E60. Otherwise param_1 (the
-// decompile's iStack_4) and the local context passed as &stack0xffffffd8 reach 0x74E60, and 0 is
-// returned. EDI and the two stack values are explicit here.
-// 1.13c D2Game+0x750F0
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t D2GAME_750F0_GuardedEntry(uint32_t param1, void* esi, int32_t edi,
-                                                 const D2GameBatch268E0Env* env)
-{
-    // Disassembly 0x740F0: ESI = the unit (pushed to A496 with 0, EAX for DFA90), EDI = the mode, stack word 0 = param1 (-> ECX of 74E60).
-    env->ordinal11103(esi);
-    if (edi != 0 && edi != 0xC) {
-        if (env->subDFA90(esi) != 0) return 1;
-    }
-    uint32_t frame[8] = { 1, (uint32_t)(uintptr_t)esi, 0, 0, 0, 0, 0, 0 };   // the 0x20-byte frame EDX points at: {1, unit, 0...}
-    d2_fn_d2game_74E60(param1, frame, env);
-    return 0;
-}
-
-// Mode rewrite on a type-1 unit: with a +0x14 record, the word at record+0x54 below 0x10 is left alone
-// except that (0xD, EAX==3) pins EAX to 0xD; at or above 0x10 EAX becomes the word minus 0x10. The
-// resulting value is stored back to record+0x54 (and EAX is left untouched when the record is null).
-// The value arrives in EAX.
-// 1.13c D2Game+0x75260
-extern "C"
-EMSCRIPTEN_KEEPALIVE void UNIT_SetModeFromRecord_75260(void* param1, int32_t eaxValue,
-                                             const D2GameBatch268E0Env* env)
-{
-    (void)env;
-    if (param1 == nullptr || rd32(param1, 0) != 1) return;
-
-    const uint32_t sub = rd32(param1, 0x14);
-    int32_t value = eaxValue;
-    if (sub != 0) {
-        const int32_t mode = (int32_t)rd32(sub, 0x54);
-        if (mode < 0x10) {
-            if (mode == 0xD && value == 3) value = 0xD;
-        }
-        else {
-            value = mode - 0x10;
-        }
-    }
-    if (sub != 0) wr32((void*)(uintptr_t)sub, 0x54, (uint32_t)value);
-}
+// 0x74F20, 0x750F0 and 0x75260 run the game bodies (D2Game/MONSTER/MonsterMode*.cpp, MonsterAiStateForMode.cpp).
 
 // Player-list teardown: from EBX+0x98 walk each node's +0x10 link, paying one Fog #10046
 // (Player.cpp, line 0x2B, 0) in the loop, and clear the head at the end.

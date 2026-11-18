@@ -8,16 +8,6 @@
 #include <cstdint>
 namespace gpets {
 constexpr uint32_t kFile = 0xB20FBA38u;
-template <class E> void F972C0(E& e, uint32_t head, uint32_t ecx, uint32_t game, uint32_t w0, uint32_t w1)
-{
-    for (uint32_t n = e.rd32(head); n; n = e.rd32(n + 0x14)) {
-        if (e.rd8(n) & 1) continue;
-        if (!game) abort();
-        const uint32_t id = e.rd32(n + 4);
-        for (uint32_t u = e.rd32(game + 0x1320 + (id & 0x7F) * 4); u; u = e.rd32(u + 0xE4))
-            if (e.rd32(u + 0xC) == id) { e.h(0x971F0, u, 0, 0, 0, ecx, game, w0, w1); break; }
-    }
-}
 template <class E> void F97120(E& e, uint32_t game, uint32_t unit, uint32_t count)
 {
     const uint32_t pd = e.h(0xA4C0, 0, 0, 0, 0, 0, unit);

@@ -84,31 +84,7 @@ static void leave_crt_lock(uint32_t index) {
     LeaveCriticalSection((LPCRITICAL_SECTION)d2game_crt_lock_section(index));
 }
 
-// 1.13c D2Game+0x2A6D (_sprintf): VS2003 unbounded formatted print. The destination FILE is fixed at
-// {_cnt = 0x7FFFFFFF, _flag = 0x42, _base = _ptr = dest} and _output counts what it wrote; the caller's
-// last vararg is the va_list start. A NULL destination skips the terminator. The result (the printed
-// length) is returned through pResult so the exported shape stays `EMSCRIPTEN_KEEPALIVE void`.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_game_2a6d(char* dest, const char* format, int* pResult,
-                                       const D2GameBatch2a6dEnv* env, ...) {
-    CrtFileStrc file;
-    file._cnt = 0x7FFFFFFF;
-    file._flag = 0x42;
-    file._base = (uint32_t)(uintptr_t)dest;
-    file._ptr = file._base;
-
-    va_list args;
-    va_start(args, env);
-    const int result = env->output(&file, (const uint8_t*)format, args);
-    va_end(args);
-
-    if (dest != nullptr) {
-        file._cnt -= 1;
-        if (file._cnt < 0) env->flsbuf(0, &file);
-        else *(char*)(uintptr_t)file._ptr = '\0';
-    }
-    *pResult = result;
-}
+// _sprintf (0x2A6D) lives in the game tree (CrtSprintf.cpp).
 
 // 1.13c D2Game+0x28B5 (___crtExitProcess): if mscoree.dll is loaded and exports CorExitProcess, run it on
 // the code, then ExitProcess(code) -- which does not return. Both host lookups and the exit are seams.
@@ -274,22 +250,4 @@ EMSCRIPTEN_KEEPALIVE void d2_game_97420(void* game, void* player, void* petList,
     }
 }
 
-// 1.13c D2Game+0x9BD00: fastcall lookup in the game's unit-id map -- the map head is game->[0x1D2C]
-// (asserted non-NULL, fatal id 0xD2), its first node is [head+4]; each node is {WORD nUnitId @0,
-// next @8}. Return the matching node in *pNode, or NULL when the id is absent.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_game_9bd00(void* game, uint16_t unitId, void** pNode) {
-    const uint32_t mapHead = rd32(game, 0x1D2C);
-    if (mapHead == 0) d2game_fatal(0xD2);
-
-    // retail 32-bit record layout: dword links (an 8-byte rdptr would run past a retail-layout node)
-    uint32_t node = rd32((void*)(uintptr_t)mapHead, 4);
-    while (node != 0) {
-        if (rd16((void*)(uintptr_t)node, 0) == unitId) {
-            *pNode = (void*)(uintptr_t)node;
-            return;
-        }
-        node = rd32((void*)(uintptr_t)node, 8);
-    }
-    *pNode = nullptr;
-}
+// 1.13c D2Game+0x9BD00 lives in the game tree (UNIT/PartyById.cpp).

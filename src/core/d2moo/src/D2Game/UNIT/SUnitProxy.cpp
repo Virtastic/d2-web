@@ -1,5 +1,5 @@
 #include "UNIT/SUnitProxy.h"
-#include "../../../../d2game/inventory_drain.h"
+#include "UNIT/SUnit.h"
 
 #include <algorithm>
 
