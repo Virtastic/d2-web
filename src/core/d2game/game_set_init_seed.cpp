@@ -1,28 +1,19 @@
 #include <D2Game/GAME/Game.h>
 
-// 1.13c D2Game+0x2A210 (#10017): one store to the DLL's init-seed global (DAT 0x6FD2E354).
-int32_t gnGameInitSeed;
-
-void __stdcall GAME_SetInitSeed(int32_t nInitSeed)
-{
-    gnGameInitSeed = nInitSeed;
-}
-
-// Replay hook for s3208: set, then read the global back.
+// Replay hook for s3208 (1.13c D2Game+0x2A210, body in the game tree: GAME_SetInitSeed): set, then read the global back.
 #include <emscripten.h>
-extern "C" EMSCRIPTEN_KEEPALIVE int d2_game_set_init_seed(int v) { GAME_SetInitSeed(v); return gnGameInitSeed; }
+extern "C" EMSCRIPTEN_KEEPALIVE int d2_game_set_init_seed(int v) { GAME_SetInitSeed(v); return nInitSeed_6FDC2CA08; }
 
-// 1.13c D2Game+0x2A900 fixed-seed branch (nInitSeed != -1), s3237 replay probe: field 0..4 = +7C, +84, +D0, +D4.
+// s3237 replay hook for 1.13c D2Game+0x2A900 (game tree: GAME_InitGameSeed), fixed-seed branch (seed != -1): field 0..4 = +7C, +84, +D0, +D4.
 #include <D2Seed.h>
 #include <cstring>
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_game_seedinit(uint32_t seed, int field)
 {
     static D2GameStrc g;
     memset(&g, 0, sizeof g);
-    g.InitSeed = 1;
-    g.dwInitSeed = seed;
-    SEED_InitSeed(&g.pGameSeed);
-    SEED_InitLowSeed(&g.pGameSeed, seed);
+    GAME_SetInitSeed((int32_t)seed);
+    GAME_InitGameSeed(&g);
+    GAME_SetInitSeed(-1);
     return field == 0 ? (uint32_t)g.dwInitSeed : field == 1 ? (uint32_t)g.InitSeed : field == 2 ? g.pGameSeed.nLowSeed : g.pGameSeed.nHighSeed;
 }
 

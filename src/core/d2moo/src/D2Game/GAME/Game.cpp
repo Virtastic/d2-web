@@ -53,7 +53,6 @@
 // bodies are kept (for the game table's own callers) under a suffix so both link.
 #define GAME_LogMessage GAME_LogMessage_vendored
 #define gpD2EventCallbackTable_6FD45830 gpD2EventCallbackTable_6FD45830_vendored
-#define GAME_SetInitSeed GAME_SetInitSeed_vendored
 #define gszEmptyString_6FD447EC gszEmptyString_6FD447EC_vendored
 #define sub_6FC36C20 sub_6FC36C20_vendored
 #define GAME_DisconnectClient GAME_DisconnectClient_vendored
@@ -61,7 +60,6 @@
 #define sub_6FC37FB0 sub_6FC37FB0_vendored
 #define GAME_ForEachIngameClient GAME_ForEachIngameClient_vendored
 #define sub_6FC385A0 sub_6FC385A0_vendored
-#define GAME_ReturnArgument GAME_ReturnArgument_vendored
 #define sub_6FC3B2B0 sub_6FC3B2B0_vendored
 void __fastcall GAME_ForEachIngameClient(D2GameStrc* pGame, GAME_ForEachIngameClientCallbackPtr pFn, void* pContext);
 
@@ -211,6 +209,9 @@ void __stdcall GAME_InitGameDataTable(D2GameDataTableStrc* pGameDataTbl, void* p
     D2_ASSERT(pGameList);
 }
 
+namespace d2common { void D2Common_10352(uint32_t); }
+
+// 1.13c D2Game+0x2A330 (#10048)
 //D2Game.0x6FC358E0
 // 1.13c D2Game+0x2A330
 void __stdcall GAME_SetServerCallbackFunctions(D2ServerCallbackFunctions* pD2ServerCallbackFunctions)
@@ -219,7 +220,8 @@ void __stdcall GAME_SetServerCallbackFunctions(D2ServerCallbackFunctions* pD2Ser
     {
         gpD2EventCallbackTable_6FD45830 = pD2ServerCallbackFunctions;
         gbD2ServerCallbackFunctionsInitialized_6FD45834 = 1;
-        //D2COMMON_11277_Return((int32_t)pD2ServerCallbackFunctions->pfLoadComplete);
+        // The non-null path tail-calls D2Common#10352 with the dword at table+0x3C.
+        D2_CALL(d2common::D2Common_10352, (uint32_t)(uintptr_t)pD2ServerCallbackFunctions->pfLoadComplete);
     }
     else
     {
@@ -228,6 +230,29 @@ void __stdcall GAME_SetServerCallbackFunctions(D2ServerCallbackFunctions* pD2Ser
     }
 }
 
+// 1.13c D2Game+0x2A900: the init-seed branch of game creation (nInitSeed == -1: clock-seeded, else the fixed seed).
+void __fastcall GAME_InitGameSeed(D2GameStrc* pGame)
+{
+    if (nInitSeed_6FDC2CA08 == -1)
+    {
+        pGame->InitSeed = 0;
+
+        LARGE_INTEGER seed = {};
+        QueryPerformanceCounter(&seed);
+        SEED_InitSeed(&pGame->pGameSeed);
+        SEED_InitLowSeed(&pGame->pGameSeed, SEED_GetRandomValue(seed.LowPart));
+        pGame->dwInitSeed = SEED_GetRandomValue(ITEMS_RollRandomNumber(&pGame->pGameSeed));
+    }
+    else
+    {
+        pGame->InitSeed = 1;
+        pGame->dwInitSeed = nInitSeed_6FDC2CA08;
+        SEED_InitSeed(&pGame->pGameSeed);
+        SEED_InitLowSeed(&pGame->pGameSeed, nInitSeed_6FDC2CA08);
+    }
+}
+
+// 1.13c D2Game+0x2A210 (#10017)
 //D2Game.0x6FC35920 (#10010)
 void __stdcall GAME_SetInitSeed(int32_t nInitSeed)
 {
@@ -509,23 +534,7 @@ BOOL __stdcall GAME_CreateNewEmptyGame(char* szGameName, const char* szPassword,
 
     pGame->nDifficulty = (nFlags & GAMEFLAG_DIFFICULTY_MASK) >> GAMEFLAG_DIFFICULTY_BIT;
 
-    if (nInitSeed_6FDC2CA08 == -1)
-    {
-        pGame->InitSeed = 0;
-
-        LARGE_INTEGER seed = {};
-        QueryPerformanceCounter(&seed);
-        SEED_InitSeed(&pGame->pGameSeed);
-        SEED_InitLowSeed(&pGame->pGameSeed, SEED_GetRandomValue(seed.LowPart));
-        pGame->dwInitSeed = SEED_GetRandomValue(ITEMS_RollRandomNumber(&pGame->pGameSeed));
-    }
-    else
-    {
-        pGame->InitSeed = 1;
-        pGame->dwInitSeed = nInitSeed_6FDC2CA08;
-        SEED_InitSeed(&pGame->pGameSeed);
-        SEED_InitLowSeed(&pGame->pGameSeed, nInitSeed_6FDC2CA08);
-    }
+    GAME_InitGameSeed(pGame);
 
     EVENT_AllocEventQueue(pGame);
     ARENA_AllocArena(pGame, 0, nFlags, 0);
@@ -756,23 +765,7 @@ void __fastcall GAME_SendGameInit(int32_t nClientId, char* szGameName, uint8_t n
         pGame->dwGameType = 0;
     }
 
-    if (nInitSeed_6FDC2CA08 == -1)
-    {
-        pGame->InitSeed = 0;
-
-        LARGE_INTEGER seed = {};
-        QueryPerformanceCounter(&seed);
-        SEED_InitSeed(&pGame->pGameSeed);
-        SEED_InitLowSeed(&pGame->pGameSeed, SEED_GetRandomValue(seed.LowPart));
-        pGame->dwInitSeed = SEED_GetRandomValue(ITEMS_RollRandomNumber(&pGame->pGameSeed));
-    }
-    else
-    {
-        pGame->InitSeed = 1;
-        pGame->dwInitSeed = nInitSeed_6FDC2CA08;
-        SEED_InitSeed(&pGame->pGameSeed);
-        SEED_InitLowSeed(&pGame->pGameSeed, nInitSeed_6FDC2CA08);
-    }
+    GAME_InitGameSeed(pGame);
 
     EVENT_AllocEventQueue(pGame);
     ARENA_AllocArena(pGame, nArena, nFlags, nArenaTemplate);
@@ -2803,6 +2796,15 @@ int32_t __stdcall GAME_GetPlayerUnitsInfo(uint16_t nGameId, D2UnitInfoStrc* pUni
     return nUnitInfoCount;
 }
 
+// 1.13c D2Game+0x38BB0 (#10029): clears one DLL byte global (DAT 0x6FD2DBE8); no arguments, no callers.
+uint8_t gnGameFlag38BB0;
+
+void __stdcall GAME_ClearFlag38BB0()
+{
+    gnGameFlag38BB0 = 0;
+}
+
+// 1.13c D2Game+0x29AD0
 //D2Game.0x6FC3A6F0
 int32_t __stdcall GAME_ReturnArgument(int32_t a1)
 {

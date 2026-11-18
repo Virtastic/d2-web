@@ -111,33 +111,6 @@ extern "C" int32_t d2game_26e40_batch(D2GameStrc* game, D2SkillStrc* skill, D2Un
     return count;
 }
 
-// The landing helper resolves the saved target and sets the reflected path. Its
-// town test occurs after animation/path bookkeeping, as in retail.
-// 1.13c D2Game+0x27030
-extern "C" int32_t d2game_27030_batch(D2GameStrc* game, D2UnitStrc* unit, D2SkillStrc* skill, int32_t x, int32_t y)
-{
-    if (!skill || !unit->pDynamicPath) return 0;
-    auto* target = SUNIT_GetServerUnit(game, SKILLS_GetParam3(skill), SKILLS_GetParam4(skill));
-    if (!target) return 0;
-    SKILLS_SetFlags(skill, 1);
-    UNITS_SetAnimationFrame(unit, 12);
-    unit->dwFrameCountPrecise = (unit->dwFrameCountPrecise & 0xffffff00) + 256;
-    auto* path = unit->pDynamicPath;
-    PATH_RecacheRoomIfNeeded(path);
-    PATH_SetNewDistance(path, 5);
-    PATH_SetStepNum(path, 1);
-    PATH_SetTargetUnit(path, nullptr);
-    const int32_t tx = sub32(uint32_t(x)*3, uint32_t(CLIENTS_GetUnitX(target))*2);
-    const int32_t ty = sub32(uint32_t(y)*3, uint32_t(CLIENTS_GetUnitY(target))*2);
-    auto* room = D2GAME_GetRoom_6FC52070(UNITS_GetRoom(unit), tx, ty);
-    if (room && DUNGEON_IsRoomInTown(room)) return 0;
-    D2COMMON_10170_PathSetTargetPos(path, tx, ty);
-    PATH_SetType(path, PATHTYPE_KNOCKBACK_SERVER);
-    D2COMMON_10190_PATH_SetDistance(path, 5);
-    D2Common_10142(path, unit, 0);
-    return 1;
-}
-
 // The attack-resolution half of LeapAttack, split from the stage dispatcher.
 // 1.13c D2Game+0x27820: the rule is d2game_27820.cpp (d2game_27820_env); this builds its env from the engine functions.
 extern "C" int32_t d2game_27820_env(void*, void*, int32_t, int32_t, const D2Game27820Env*);

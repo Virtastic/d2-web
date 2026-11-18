@@ -1,12 +1,6 @@
 #include <D2Game/GAME/Game.h>
 
-// 1.13c D2Game+0x29AD0
-int32_t __stdcall GAME_ReturnArgument(int32_t value)
-{
-    return value;
-}
-
-// Replay hook for s3206.
+// Replay hook for s3206 (1.13c D2Game+0x29AD0, body in the game tree: GAME_ReturnArgument).
 #include <emscripten.h>
 extern "C" EMSCRIPTEN_KEEPALIVE int d2_game_return_argument(int v) { return GAME_ReturnArgument(v); }
 

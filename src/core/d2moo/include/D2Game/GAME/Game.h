@@ -267,6 +267,10 @@ void __stdcall GAME_InitGameDataTable(D2GameDataTableStrc* pGameDataTbl, void* p
 void __stdcall GAME_SetServerCallbackFunctions(D2ServerCallbackFunctions* pD2ServerCallbackFunctions);
 //D2Game.0x6FC35920 (#10010)
 D2GAME_DLL_DECL void __stdcall GAME_SetInitSeed(int32_t nInitSeed);
+extern int32_t nInitSeed_6FDC2CA08;
+extern uint8_t gnGameFlag38BB0;
+void __stdcall GAME_ClearFlag38BB0();
+void __fastcall GAME_InitGameSeed(D2GameStrc* pGame);
 //D2Game.0x6FC35930
 D2GAME_DLL_DECL uint32_t __fastcall D2Game_10011();
 //D2Game.0x6FC35A10

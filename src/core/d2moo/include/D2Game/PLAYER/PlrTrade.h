@@ -60,6 +60,10 @@ int32_t __fastcall sub_6FC92A90(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitS
 void __fastcall PLRTRADE_StopAllPlayerInteractions(D2GameStrc* pGame, D2UnitStrc* pPlayer);
 //D2Game.0x6FC92EF0
 void __fastcall sub_6FC92EF0(D2GameStrc* pGame, D2UnitStrc* pUnit);
+//D2Game.0x6FC90FC0 (the trade-list pair record; a seam target of sub_6FC92F10)
+void PLRTRADE_AddItemTradePair(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nItemGUID1, int32_t nItemGUID2);
+//D2Game.0x6FC90B70 (both trade windows open, both trade states 3; a seam target of sub_6FC92F10)
+void __fastcall PLRTRADE_OpenTradeUi(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, D2PlayerDataStrc* pPlayerData1, D2PlayerDataStrc* pPlayerData2);
 //D2Game.0x6FC92F10
 void __fastcall sub_6FC92F10(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem);
 //D2Game.0x6FC931D0

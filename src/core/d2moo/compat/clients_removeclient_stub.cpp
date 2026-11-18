@@ -108,6 +108,29 @@ __attribute__((weak)) void __stdcall SERVER_GetIpAddressStringFromClientId(int32
     __builtin_trap();
 }
 
+// Storm #423 as seen from D2Game_10046 (GAME/Game.cpp): a key that is absent leaves *pValue untouched. Weak so a probe link that pulls
+// Game.o resolves it; the FN probe for D2Game+0x2D4B0 hooks it through the seam.
+__attribute__((weak)) void SRegLoadValue(const char* szKey, const char* szValue, int32_t nFlags, DWORD* pValue)
+{
+}
+
+// D2Net imports Game.cpp calls (client-error disconnect, packet send, client->game GUID). Weak trapping stubs so a probe link that pulls
+// Game.o resolves them; the probes that reach them hook them through the seam.
+__attribute__((weak)) void __stdcall D2NET_10015(int32_t nClientId, const char* szFile, int32_t nLine)
+{
+    __builtin_trap();
+}
+
+__attribute__((weak)) uint32_t __stdcall D2NET_10006(int8_t a1, int32_t nClientId, void* pBuffer, uint32_t nBufferSize)
+{
+    __builtin_trap();
+}
+
+__attribute__((weak)) int32_t __stdcall SERVER_GetClientGameGUID(int32_t nClientId)
+{
+    __builtin_trap();
+}
+
 __attribute__((weak)) int32_t __stdcall SERVER_ReadFromMessageList0(uint8_t* pBuffer, int32_t nBufferSize)
 {
     __builtin_trap();
@@ -178,6 +201,19 @@ __attribute__((weak)) void __fastcall sub_6FC3F8F0(D2GameStrc*, D2UnitStrc*)
 // The relation-state packet between two players (PlayerList.cpp). A probe that pulls the player list into the
 // prove link failed on this missing definition and was dropped before it ran.
 __attribute__((weak)) void __fastcall sub_6FC3F840(D2GameStrc*, int32_t, int32_t, int16_t)
+{
+    __builtin_trap();
+}
+
+// The units-update packet Game.cpp sends each tick (SCmd.cpp is not linked). A probe link that pulls Game.o resolves it here; never executed on the FN path.
+__attribute__((weak)) void __fastcall D2GAME_PACKETS_SendPacket0x16_UnitsUpdate(D2ClientStrc*)
+{
+    __builtin_trap();
+}
+
+// The 1.10f system-message dispatcher Game.cpp's GAME_ProcessNetworkMessages calls (the 1.13c port is
+// d2game_batch_49850.cpp with a different signature, so this name has no definition). A probe link that pulls Game.o resolves it here; never executed on the FN path.
+__attribute__((weak)) void __fastcall CCMD_ProcessClientSystemMessage(void*, int32_t)
 {
     __builtin_trap();
 }

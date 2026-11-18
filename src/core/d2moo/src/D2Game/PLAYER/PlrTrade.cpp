@@ -1,5 +1,6 @@
 #include "PLAYER/PlrTrade.h"
 
+#include <test_seam.h>
 #include <algorithm>
 
 #include <Fog.h>
@@ -2191,7 +2192,7 @@ void __fastcall PLRTRADE_StopAllPlayerInteractions(D2GameStrc* pGame, D2UnitStrc
 
 // 1.13c D2Game+0x6FFC0
 // Records an (original item, duplicate item) pair at the head of the player's trade list.
-static void PLRTRADE_AddItemTradePair(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nItemGUID1, int32_t nItemGUID2)
+void PLRTRADE_AddItemTradePair(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nItemGUID1, int32_t nItemGUID2)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
     if (pPlayerData && pPlayerData->pTrade)
@@ -2212,63 +2213,78 @@ void __fastcall sub_6FC92EF0(D2GameStrc* pGame, D2UnitStrc* pUnit)
     sub_6FC4B830(pGame, pUnit);
 }
 
+//D2Game.0x6FC90B70
+// 1.13c D2Game+0x70B70
+// Opens the trade window on both clients and moves both players to trade state 3 (retail: EAX = pPlayer1, ESI = pPlayer2, stack = the two player-data blocks).
+void __fastcall PLRTRADE_OpenTradeUi(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, D2PlayerDataStrc* pPlayerData1, D2PlayerDataStrc* pPlayerData2)
+{
+    D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pPlayer1, __FILE__, __LINE__), UPDATEUI_OPENTRADE);
+    D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pPlayer2, __FILE__, __LINE__), UPDATEUI_OPENTRADE);
+    pPlayerData1->dwTradeState = 3;
+    pPlayerData2->dwTradeState = 3;
+}
+
 //D2Game.0x6FC92F10
 // 1.13c D2Game+0x71B00 (retail places the copy through its own placement entry, 0xD76A0; the engine's D2GAME_PlaceItem_6FC44410 is that step)
+// Every callee goes through D2_CALL in retail's order (the call-by-call order is what the proof compares); the player data is read after the placement.
 void __fastcall sub_6FC92F10(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem)
 {
     int32_t nUnitType = 0;
     int32_t nUnitGUID = 0;
-    if (SUNIT_GetInteractInfo(pPlayer, &nUnitType, &nUnitGUID) && nUnitType)
+    if (D2_CALL(SUNIT_GetInteractInfo, pPlayer, &nUnitType, &nUnitGUID) && nUnitType)
     {
-        D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0xCu);
+        D2ClientStrc* pClient = D2_CALL(SUNIT_GetClientFromPlayer, pPlayer, __FILE__, __LINE__);
+        D2_CALL(D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0, pClient, 0xCu);
         return;
     }
 
-    D2UnitStrc* pOtherPlayer = SUNIT_GetServerUnit(pGame, UNIT_PLAYER, nUnitGUID);
+    D2UnitStrc* pOtherPlayer = D2_CALL(SUNIT_GetServerUnit, pGame, UNIT_PLAYER, nUnitGUID);
     if (!pOtherPlayer)
     {
-        D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0xCu);
+        D2ClientStrc* pClient = D2_CALL(SUNIT_GetClientFromPlayer, pPlayer, __FILE__, __LINE__);
+        D2_CALL(D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0, pClient, 0xCu);
         return;
     }
 
-    D2UnitStrc* pDupeItem = ITEMS_Duplicate(pGame, pItem, 0, 0);
-    UNITS_ChangeAnimMode(pDupeItem, 4);
-    ITEMS_SetInvPage(pDupeItem, 1u);
+    D2UnitStrc* pDupeItem = D2_CALL(ITEMS_Duplicate, pGame, pItem, nullptr, 0);
+    const int32_t nX = D2_CALL(CLIENTS_GetUnitX, pItem);
+    const int32_t nY = D2_CALL(CLIENTS_GetUnitY, pItem);
+    D2_CALL(UNITS_ChangeAnimMode, pDupeItem, 4);
+    D2_CALL(ITEMS_SetInvPage, pDupeItem, 1u);
 
     const int32_t nItemGUID = pDupeItem ? pDupeItem->dwUnitId : -1;
 
-    D2PlayerDataStrc* pPlayerData1 = UNITS_GetPlayerData(pPlayer);
-    D2PlayerDataStrc* pPlayerData2 = UNITS_GetPlayerData(pOtherPlayer);
-    if (D2GAME_PlaceItem_6FC44410(__FILE__, __LINE__, pGame, pOtherPlayer, nItemGUID, CLIENTS_GetUnitX(pItem), CLIENTS_GetUnitY(pItem), 0, 1, 0))
+    if (D2_CALL(D2GAME_PlaceItem_6FC44410, __FILE__, __LINE__, pGame, pOtherPlayer, nItemGUID, nX, nY, 0, 1, nullptr))
     {
-        if (D2GAME_CheckHasFilledSockets_6FC4B2D0(pItem, __FILE__, __LINE__))
+        if (D2_CALL(D2GAME_CheckHasFilledSockets_6FC4B2D0, pItem, __FILE__, __LINE__))
         {
-            sub_6FC4B310(pGame, pOtherPlayer, pItem, pDupeItem, 1u);
+            D2_CALL(sub_6FC4B310, pGame, pOtherPlayer, pItem, pDupeItem, 1);
         }
 
-        PLRTRADE_AddItemTradePair(pGame, pPlayer, pItem->dwUnitId, nItemGUID);
+        D2_CALL(PLRTRADE_AddItemTradePair, pGame, pPlayer, pItem->dwUnitId, nItemGUID);
 
+        D2PlayerDataStrc* pPlayerData1 = D2_CALL(UNITS_GetPlayerData, pPlayer);
+        D2PlayerDataStrc* pPlayerData2 = D2_CALL(UNITS_GetPlayerData, pOtherPlayer);
         if (pPlayerData1->dwTradeState == 4 || pPlayerData2->dwTradeState == 4)
         {
-            D2ClientStrc* pClient1 = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
-            D2GAME_PACKETS_SendPacket0x79_6FC3E1D0(pClient1, 0, 0);
-            D2GAME_PACKETS_SendPacket0x79_6FC3E1D0(pClient1, 0, 1);
-            
-            D2ClientStrc* pClient2 = SUNIT_GetClientFromPlayer(pOtherPlayer, __FILE__, __LINE__);
-            D2GAME_PACKETS_SendPacket0x79_6FC3E1D0(pClient2, 0, 0);
-            D2GAME_PACKETS_SendPacket0x79_6FC3E1D0(pClient2, 0, 1);
+            D2ClientStrc* pClient = D2_CALL(SUNIT_GetClientFromPlayer, pPlayer, __FILE__, __LINE__);
+            D2_CALL(D2GAME_PACKETS_SendPacket0x79_6FC3E1D0, pClient, 0, 0);
+            pClient = D2_CALL(SUNIT_GetClientFromPlayer, pPlayer, __FILE__, __LINE__);
+            D2_CALL(D2GAME_PACKETS_SendPacket0x79_6FC3E1D0, pClient, 0, 1);
+            pClient = D2_CALL(SUNIT_GetClientFromPlayer, pOtherPlayer, __FILE__, __LINE__);
+            D2_CALL(D2GAME_PACKETS_SendPacket0x79_6FC3E1D0, pClient, 0, 0);
+            pClient = D2_CALL(SUNIT_GetClientFromPlayer, pOtherPlayer, __FILE__, __LINE__);
+            D2_CALL(D2GAME_PACKETS_SendPacket0x79_6FC3E1D0, pClient, 0, 1);
 
-            D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(pClient1, UPDATEUI_OPENTRADE);
-            D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(pClient2, UPDATEUI_OPENTRADE);
-
-            pPlayerData1->dwTradeState = 3;
-            pPlayerData2->dwTradeState = 3;
+            D2_CALL(PLRTRADE_OpenTradeUi, pPlayer, pOtherPlayer, pPlayerData1, pPlayerData2);
         }
     }
     else
     {
-        ITEMS_RemoveFromAllPlayers(pGame, pDupeItem);
-        sub_6FC91050(pGame, pPlayer, pOtherPlayer, pPlayerData1, pPlayerData2, 9u);
+        D2_CALL(ITEMS_RemoveFromAllPlayers, pGame, pDupeItem);
+        D2PlayerDataStrc* pPlayerData1 = D2_CALL(UNITS_GetPlayerData, pPlayer);
+        D2PlayerDataStrc* pPlayerData2 = D2_CALL(UNITS_GetPlayerData, pOtherPlayer);
+        D2_CALL(sub_6FC91050, pGame, pPlayer, pOtherPlayer, pPlayerData1, pPlayerData2, 9);
     }
 }
 
