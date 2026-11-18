@@ -155,6 +155,8 @@ int32_t __fastcall sub_6FD10880(D2AuraCallbackStrc* pAuraCallback, D2UnitStrc* p
 D2PetTypeTxt* __fastcall DATATBLS_GetPetTypeTxtRecord(int32_t nPetType);
 //D2Game.0x6FD108D0
 void __fastcall sub_6FD108D0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId);
+// 1.13c D2Game+0x9F4A0: spend one charge of the charged-skill item (by unit id) the used skill came from
+int32_t __fastcall D2GAME_SKILLMANA_ConsumeCharge_9F4A0(D2GameStrc* pGame, int32_t nItemGUID, D2UnitStrc* pPlayer, D2SkillStrc* pSkill);
 //D2Game.0x6FD10A50
 int32_t __fastcall D2GAME_SKILLMANA_Consume_6FD10A50(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nSkillId, int32_t nSkillLevel);
 //D2Game.0x6FD10C90
@@ -218,6 +220,8 @@ int32_t __fastcall SKILLS_SrvDo005_LeftHandThrow(D2GameStrc* pGame, D2UnitStrc* 
 //D2Game.0x6FD12950
 int32_t __fastcall sub_6FD12950(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t a5);
 //D2Game.0x6FD12BA0
+SkillDoFunc __fastcall D2GAME_SKILLS_GetSrvDoFunc_6FD12BA0(int32_t nDoFunc);
+SkillStartFunc __fastcall D2GAME_SKILLS_GetSrvStartFunc_6FD12BA0(int32_t nStartFunc);
 int32_t __fastcall D2GAME_SKILLS_Handler_6FD12BA0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t a5, int32_t a6, int32_t a7);
 //D2Game.0x6FD12FD0
 int32_t __fastcall sub_6FD12FD0(D2GameStrc* pGame, D2UnitStrc* pUnit);

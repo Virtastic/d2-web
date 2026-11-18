@@ -1085,76 +1085,32 @@ void __fastcall sub_6FD108D0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkil
     }
 }
 
-//D2Game.0x6FD10A50
-// 1.13c D2Game+0x9F850
-int32_t __fastcall D2GAME_SKILLMANA_Consume_6FD10A50(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nSkillId, int32_t nSkillLevel)
+// 1.13c D2Game+0x9F4A0 (1.10f has it inlined in the consume function below): the item is found by unit id in the game's item list
+int32_t __fastcall D2GAME_SKILLMANA_ConsumeCharge_9F4A0(D2GameStrc* pGame, int32_t nItemGUID, D2UnitStrc* pPlayer, D2SkillStrc* pSkill)
 {
-    if (!pPlayer || pPlayer->dwUnitType != UNIT_PLAYER)
-    {
-        return 1;
-    }
-
-    D2SkillStrc* pSkill = UNITS_GetUsedSkill(pPlayer);
-    if (!pSkill || SKILLS_GetSkillIdFromSkill(pSkill, __FILE__, __LINE__) != nSkillId || SKILLS_GetOwnerGUIDFromSkill(pSkill) == -1)
-    {
-        D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
-        if (!pSkillsTxtRecord)
-        {
-            return 0;
-        }
-
-        if (!pSkillsTxtRecord->wMana && !pSkillsTxtRecord->wLevelMana)
-        {
-            return 0;
-        }
-
-        // 1.13c: the level term is max(nSkillLevel - 1, 0), so levels 0 and 1 both cost Skills.txt `mana`.
-        const int32_t nLevelTerm = nSkillLevel - 1 > 0 ? nSkillLevel - 1 : 0;
-        int32_t nManaCost = (pSkillsTxtRecord->wMana + nLevelTerm * pSkillsTxtRecord->wLevelMana) << pSkillsTxtRecord->nManaShift;
-
-        const int32_t nMinManaCost = pSkillsTxtRecord->wMinMana << 8;
-        if (nManaCost < nMinManaCost)
-        {
-            nManaCost = nMinManaCost;
-        }
-
-        if (STATES_CheckState(pPlayer, STATE_BLOOD_MANA))
-        {
-            return D2GAME_SKILLS_BloodMana_6FD025E0(pPlayer, nManaCost);
-        }
-
-        if (STATLIST_UnitGetStatValue(pPlayer, STAT_MANA, 0) < nManaCost)
-        {
-            return 0;
-        }
-
-        STATLIST_AddUnitStat(pPlayer, STAT_MANA, -nManaCost, 0);
-        return 1;
-    }
-
-    D2UnitStrc* pItem = SUNIT_GetServerUnit(pGame, UNIT_ITEM, SKILLS_GetOwnerGUIDFromSkill(pSkill));
+    D2UnitStrc* pItem = D2_CALL(SUNIT_GetServerUnit, pGame, UNIT_ITEM, nItemGUID);
     if (!pItem)
     {
         return 0;
     }
-    
-    const int32_t nChargeSkillId = SKILLS_GetSkillIdFromSkill(pSkill, __FILE__, __LINE__);
-    const int32_t nChargeSkillLevel = SKILLS_GetSkillLevel(pPlayer, pSkill, 0);
+
+    const int32_t nChargeSkillId = D2_CALL(SKILLS_GetSkillIdFromSkill, pSkill, __FILE__, __LINE__);
+    const int32_t nChargeSkillLevel = D2_CALL(SKILLS_GetSkillLevel, pPlayer, pSkill, 0);
 
     int32_t nCharges = 0;
     D2StatListStrc* pStatList = nullptr;
-    if (!ITEMMODS_GetItemCharges(pItem, nChargeSkillId, nChargeSkillLevel, &nCharges, &pStatList) || nCharges <= 0)
+    if (!D2_CALL(ITEMMODS_GetItemCharges, pItem, nChargeSkillId, nChargeSkillLevel, &nCharges, &pStatList) || nCharges <= 0)
     {
         return 0;
     }
-    
+
     const int32_t nLayer = (nChargeSkillLevel & sgptDataTables->nShiftedStuff) + (nChargeSkillId << sgptDataTables->nStuff);
-    const int32_t nStatValue = STATLIST_GetStatValue(pStatList, STAT_ITEM_CHARGED_SKILL, nLayer);
+    const int32_t nStatValue = D2_CALL(STATLIST_GetStatValue, pStatList, STAT_ITEM_CHARGED_SKILL, nLayer);
     if (!nStatValue)
     {
         return 0;
     }
-    
+
     const int32_t nMaxCharges = nStatValue >> 8;
     if (nMaxCharges <= 0 || nMaxCharges > 255)
     {
@@ -1173,9 +1129,65 @@ int32_t __fastcall D2GAME_SKILLMANA_Consume_6FD10A50(D2GameStrc* pGame, D2UnitSt
     }
 
     const int32_t nNewValue = (uint8_t)nCharges + (nMaxCharges << 8);
-    STATLIST_SetBaseStat2(pStatList, STAT_ITEM_CHARGED_SKILL, nNewValue, nLayer, pItem);
-    D2GAME_PACKETS_SendPacket0x3E_6FC3EC20(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), pItem, 1, STAT_ITEM_CHARGED_SKILL, nNewValue, nLayer);
+    D2_CALL(STATLIST_SetBaseStat2, pStatList, STAT_ITEM_CHARGED_SKILL, nNewValue, nLayer, pItem);
+    D2_CALL(D2GAME_PACKETS_SendPacket0x3E_6FC3EC20, D2_CALL(SUNIT_GetClientFromPlayer, pPlayer, __FILE__, __LINE__), pItem, 1, STAT_ITEM_CHARGED_SKILL, nNewValue, nLayer);
     return 1;
+}
+
+//D2Game.0x6FD10A50
+// 1.13c D2Game+0x9F850
+int32_t __fastcall D2GAME_SKILLMANA_Consume_6FD10A50(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nSkillId, int32_t nSkillLevel)
+{
+    if (!pPlayer || pPlayer->dwUnitType != UNIT_PLAYER)
+    {
+        return 1;
+    }
+
+    D2SkillStrc* pSkill = D2_CALL(UNITS_GetUsedSkill, pPlayer);
+    if (pSkill && D2_CALL(SKILLS_GetSkillIdFromSkill, pSkill, __FILE__, __LINE__) == nSkillId)
+    {
+        const D2UnitGUID nOwnerGUID = D2_CALL(SKILLS_GetOwnerGUIDFromSkill, pSkill);
+        if (nOwnerGUID != -1)
+        {
+            return D2_CALL(D2GAME_SKILLMANA_ConsumeCharge_9F4A0, pGame, nOwnerGUID, pPlayer, pSkill);
+        }
+    }
+
+    {
+        D2SkillsTxt* pSkillsTxtRecord = D2_CALL(SKILLS_GetSkillsTxtRecord, nSkillId);
+        if (!pSkillsTxtRecord)
+        {
+            return 0;
+        }
+
+        if (!pSkillsTxtRecord->wMana &&!pSkillsTxtRecord->wLevelMana)
+        {
+            return 0;
+        }
+
+        // 1.13c: the level term is max(nSkillLevel - 1, 0), so levels 0 and 1 both cost Skills.txt `mana`.
+        const int32_t nLevelTerm = nSkillLevel - 1 > 0 ? nSkillLevel - 1 : 0;
+        int32_t nManaCost = (pSkillsTxtRecord->wMana + nLevelTerm * pSkillsTxtRecord->wLevelMana) << pSkillsTxtRecord->nManaShift;
+
+        const int32_t nMinManaCost = pSkillsTxtRecord->wMinMana << 8;
+        if (nManaCost < nMinManaCost)
+        {
+            nManaCost = nMinManaCost;
+        }
+
+        if (D2_CALL(STATES_CheckState, pPlayer, STATE_BLOOD_MANA))
+        {
+            return D2_CALL(D2GAME_SKILLS_BloodMana_6FD025E0, pPlayer, nManaCost);
+        }
+
+        if (D2_CALL(STATLIST_UnitGetStatValue, pPlayer, STAT_MANA, 0) < nManaCost)
+        {
+            return 0;
+        }
+
+        D2_CALL(STATLIST_AddUnitStat, pPlayer, STAT_MANA, -nManaCost, 0);
+        return 1;
+    }
 }
 
 //D2Game.0x6FD10C90
@@ -1463,26 +1475,26 @@ int32_t __fastcall sub_6FD11340(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
     }
 
     int32_t bNoQuantity = 0;
-    int32_t nQuantity = STATLIST_UnitGetStatValue(pItem, STAT_QUANTITY, 0) - 1;
+    int32_t nQuantity = D2_CALL(STATLIST_UnitGetStatValue, pItem, STAT_QUANTITY, 0) - 1;
     if (nQuantity < 0)
     {
         bNoQuantity = 1;
         nQuantity = 0;
     }
 
-    STATLIST_SetUnitStat(pItem, STAT_QUANTITY, nQuantity, 0);
-    sub_6FC51310(pGame, pItem);
+    D2_CALL(STATLIST_SetUnitStat, pItem, STAT_QUANTITY, nQuantity, 0);
+    D2_CALL(sub_6FC51310, pGame, pItem);
 
-    D2GAME_PACKETS_SendPacket0x3E_6FC3EC20(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), pItem, 1, STAT_QUANTITY, nQuantity, 0);
+    D2_CALL(D2GAME_PACKETS_SendPacket0x3E_6FC3EC20, D2_CALL(SUNIT_GetClientFromPlayer, pUnit, __FILE__, __LINE__), pItem, 1, STAT_QUANTITY, nQuantity, 0);
 
-    const int32_t nMaxDurability = STATLIST_GetMaxDurabilityFromUnit(pItem);
-    if (STATLIST_UnitGetStatValue(pItem, STAT_DURABILITY, 0) != nMaxDurability)
+    const int32_t nMaxDurability = D2_CALL(STATLIST_GetMaxDurabilityFromUnit, pItem);
+    if (D2_CALL(STATLIST_UnitGetStatValue, pItem, STAT_DURABILITY, 0) != nMaxDurability)
     {
-        STATLIST_SetUnitStat(pItem, STAT_DURABILITY, nMaxDurability, 0);
-        D2GAME_PACKETS_SendPacket0x3E_6FC3EC20(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), pItem, 1, STAT_DURABILITY, nMaxDurability, 0);
+        D2_CALL(STATLIST_SetUnitStat, pItem, STAT_DURABILITY, nMaxDurability, 0);
+        D2_CALL(D2GAME_PACKETS_SendPacket0x3E_6FC3EC20, D2_CALL(SUNIT_GetClientFromPlayer, pUnit, __FILE__, __LINE__), pItem, 1, STAT_DURABILITY, nMaxDurability, 0);
     }
 
-    sub_6FC80A30(pGame, pUnit);
+    D2_CALL(sub_6FC80A30, pGame, pUnit);
 
     if (bNoQuantity)
     {
@@ -1499,42 +1511,28 @@ D2UnitStrc* __fastcall sub_6FD11420(D2GameStrc* pGame, int32_t nMissileId, D2Uni
     D2MissileStrc missileParams = {};
     missileParams.dwFlags = 33;
     missileParams.pOwner = pUnit;
-    missileParams.nX = nX + CLIENTS_GetUnitX(pUnit);
-    missileParams.nY = nY + CLIENTS_GetUnitY(pUnit);
+    missileParams.nX = nX + D2_CALL(CLIENTS_GetUnitX, pUnit);
+    missileParams.nY = nY + D2_CALL(CLIENTS_GetUnitY, pUnit);
     missileParams.nSkill = nSkillId;
     missileParams.nSkillLevel = nSkillLevel;
     missileParams.nMissile = nMissileId;
 
+    // 1.13c: the target coordinates come from D2Game+0x9FA30 (the unit's target, else its own path point)
     if (nTargetX && nTargetY)
     {
         missileParams.nTargetX = nTargetX;
         missileParams.nTargetY = nTargetY;
     }
-    else
+    else if (!D2_CALL(D2GAME_GetXAndYFromTargetUnit_6FD14020, pGame, pUnit, &missileParams.nTargetX, &missileParams.nTargetY))
     {
-        D2UnitStrc* pTargetUnit = SUNIT_GetTargetUnit(pGame, pUnit);
-        if (pTargetUnit)
-        {
-            missileParams.nTargetX = CLIENTS_GetUnitX(pTargetUnit);
-            missileParams.nTargetY = CLIENTS_GetUnitY(pTargetUnit);
-        }
-        else
-        {
-            missileParams.nTargetX = D2COMMON_10175_PathGetFirstPointX(pUnit->pDynamicPath);
-            missileParams.nTargetY = D2COMMON_10176_PathGetFirstPointY(pUnit->pDynamicPath);
-        }
-
-        if (!missileParams.nTargetX || !missileParams.nTargetY)
-        {
-            return 0;
-        }
+        return 0;
     }
 
     if (missileParams.nTargetX && missileParams.nTargetY)
     {
         if (pUnit->dwUnitType == UNIT_MONSTER)
         {
-            const int32_t nToHit = STATLIST_UnitGetStatValue(pUnit, STAT_TOHIT, 0);
+            const int32_t nToHit = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_TOHIT, 0);
             if (nToHit)
             {
                 missileParams.nAttBonus = nToHit;
@@ -1542,9 +1540,9 @@ D2UnitStrc* __fastcall sub_6FD11420(D2GameStrc* pGame, int32_t nMissileId, D2Uni
             }
         }
 
-        if (!bCheckItemQuantity || pUnit->dwUnitType || sub_6FD118C0(pGame, pUnit) > 0)
+        if (!bCheckItemQuantity || pUnit->dwUnitType || D2_CALL(sub_6FD118C0, pGame, pUnit) > 0)
         {
-            return MISSILES_CreateMissileFromParams(pGame, &missileParams);
+            return D2_CALL(MISSILES_CreateMissileFromParams, pGame, &missileParams);
         }
     }
     return 0;
@@ -1609,37 +1607,23 @@ D2UnitStrc* __fastcall sub_6FD11710(D2GameStrc* pGame, int32_t nMissileId, D2Uni
     missileParams.pOwner = pUnit;
     missileParams.pOrigin = pUnit;
     missileParams.nSkillLevel = nSkillLevel;
-    missileParams.nX = nX + CLIENTS_GetUnitX(pUnit);
-    missileParams.nY = nY + CLIENTS_GetUnitY(pUnit);
+    missileParams.nX = nX + D2_CALL(CLIENTS_GetUnitX, pUnit);
+    missileParams.nY = nY + D2_CALL(CLIENTS_GetUnitY, pUnit);
 
+    // 1.13c: the target coordinates come from D2Game+0x9FA30
     if (nTargetX && nTargetY)
     {
         missileParams.nTargetX = nTargetX;
         missileParams.nTargetY = nTargetY;
     }
-    else
+    else if (!D2_CALL(D2GAME_GetXAndYFromTargetUnit_6FD14020, pGame, pUnit, &missileParams.nTargetX, &missileParams.nTargetY))
     {
-        D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
-        if (pTarget)
-        {
-            missileParams.nTargetX = CLIENTS_GetUnitX(pTarget);
-            missileParams.nTargetY = CLIENTS_GetUnitY(pTarget);
-        }
-        else
-        {
-            missileParams.nTargetX = D2COMMON_10175_PathGetFirstPointX(pUnit->pDynamicPath);
-            missileParams.nTargetY = D2COMMON_10176_PathGetFirstPointY(pUnit->pDynamicPath);
-        }
-
-        if (!missileParams.nTargetX || !missileParams.nTargetY)
-        {
-            return 0;
-        }
+        return 0;
     }
 
-    if (!bSkipCheck || pUnit->dwUnitType != UNIT_PLAYER || sub_6FD118C0(pGame, pUnit) > 0)
+    if (!bSkipCheck || pUnit->dwUnitType != UNIT_PLAYER || D2_CALL(sub_6FD118C0, pGame, pUnit) > 0)
     {
-        return MISSILES_CreateMissileFromParams(pGame, &missileParams);
+        return D2_CALL(MISSILES_CreateMissileFromParams, pGame, &missileParams);
     }
 
     return 0;
@@ -1654,24 +1638,24 @@ int32_t __fastcall sub_6FD118C0(D2GameStrc* pGame, D2UnitStrc* pUnit)
         return 0;
     }
 
-    D2UnitStrc* pWeapon = sub_6FC7C7B0(pUnit);
+    D2UnitStrc* pWeapon = D2_CALL(sub_6FC7C7B0, pUnit);
     int32_t bNoBow = 1;
 
-    if (ITEMS_CheckItemTypeId(pWeapon, ITEMTYPE_BOW) || ITEMS_CheckItemTypeId(pWeapon, ITEMTYPE_CROSSBOW))
+    if (D2_CALL(ITEMS_CheckItemTypeId, pWeapon, ITEMTYPE_BOW) || D2_CALL(ITEMS_CheckItemTypeId, pWeapon, ITEMTYPE_CROSSBOW))
     {
         bNoBow = 0;
     }
 
-    D2UnitStrc* pRightArmItem = INVENTORY_GetItemFromBodyLoc(pUnit->pInventory, BODYLOC_RARM);
-    if (pRightArmItem && (!bNoBow || pRightArmItem == pWeapon) && (ITEMS_CheckIfStackable(pRightArmItem) || ITEMS_CheckIfThrowable(pRightArmItem) || STATLIST_UnitGetItemStatOrSkillStatValue(pRightArmItem, STAT_ITEM_THROWABLE, 0)))
+    D2UnitStrc* pRightArmItem = D2_CALL(INVENTORY_GetItemFromBodyLoc, pUnit->pInventory, BODYLOC_RARM);
+    if (pRightArmItem && (!bNoBow || pRightArmItem == pWeapon) && (D2_CALL(ITEMS_CheckIfStackable, pRightArmItem) || D2_CALL(ITEMS_CheckIfThrowable, pRightArmItem) || D2_CALL(STATLIST_UnitGetItemStatOrSkillStatValue, pRightArmItem, STAT_ITEM_THROWABLE, 0)))
     {
-        return sub_6FD11340(pGame, pUnit, pRightArmItem);
+        return D2_CALL(sub_6FD11340, pGame, pUnit, pRightArmItem);
     }
 
-    D2UnitStrc* pLeftArmItem = INVENTORY_GetItemFromBodyLoc(pUnit->pInventory, BODYLOC_LARM);
-    if (pLeftArmItem && (!bNoBow || pLeftArmItem == pWeapon) && (ITEMS_CheckIfStackable(pLeftArmItem) || ITEMS_CheckIfThrowable(pLeftArmItem) || STATLIST_UnitGetItemStatOrSkillStatValue(pLeftArmItem, STAT_ITEM_THROWABLE, 0)))
+    D2UnitStrc* pLeftArmItem = D2_CALL(INVENTORY_GetItemFromBodyLoc, pUnit->pInventory, BODYLOC_LARM);
+    if (pLeftArmItem && (!bNoBow || pLeftArmItem == pWeapon) && (D2_CALL(ITEMS_CheckIfStackable, pLeftArmItem) || D2_CALL(ITEMS_CheckIfThrowable, pLeftArmItem) || D2_CALL(STATLIST_UnitGetItemStatOrSkillStatValue, pLeftArmItem, STAT_ITEM_THROWABLE, 0)))
     {
-        return sub_6FD11340(pGame, pUnit, pLeftArmItem);
+        return D2_CALL(sub_6FD11340, pGame, pUnit, pLeftArmItem);
     }
 
     return 0;
@@ -2497,10 +2481,23 @@ int32_t __fastcall sub_6FD12950(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nS
 }
 
 void D2WEB_ClientMissileTravelSound(int32_t nCltMissile);
+bool D2WEB_MonsterClientMissileLive();
 void D2WEB_MonsterClientMissileDo(uint32_t nUnitId, int32_t nCltMissile, int32_t nSkillId, int32_t nSkillLevel, int32_t nTargetX, int32_t nTargetY);
 // Player skill dos of this step, read by the session sound drain (client do-function sound, D2Client+0xA2C90).
 int32_t g_playerSkillDoIds[8];
 int32_t g_playerSkillDoCount;
+
+// 1.13c D2Game+0xA19A0 reads the do-function and start-function words straight out of two tables (D2Game+0x107338+0x170 and +0x107338);
+// these two readers are those table reads, so a probe can stand in for the table words.
+SkillDoFunc __fastcall D2GAME_SKILLS_GetSrvDoFunc_6FD12BA0(int32_t nDoFunc)
+{
+    return gpSkillSrvDoFnTable_6FD40A20[nDoFunc];
+}
+
+SkillStartFunc __fastcall D2GAME_SKILLS_GetSrvStartFunc_6FD12BA0(int32_t nStartFunc)
+{
+    return gpSkillSrvStartFnTable_6FD408B0[nStartFunc];
+}
 
 //D2Game.0x6FD12BA0
 // 1.13c D2Game+0xA19A0 (rule: globals instead of the pGame tables, register convention)
@@ -2511,7 +2508,7 @@ int32_t __fastcall D2GAME_SKILLS_Handler_6FD12BA0(D2GameStrc* pGame, D2UnitStrc*
         return 0;
     }
 
-    D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
+    D2SkillsTxt* pSkillsTxtRecord = D2_CALL(SKILLS_GetSkillsTxtRecord, nSkillId);
     if (!pSkillsTxtRecord)
     {
         return 0;
@@ -2521,27 +2518,27 @@ int32_t __fastcall D2GAME_SKILLS_Handler_6FD12BA0(D2GameStrc* pGame, D2UnitStrc*
     if (pUnit->dwUnitType == UNIT_PLAYER || pUnit->dwUnitType == UNIT_MONSTER)
     {
         bLivingUnit = 1;
-        D2SkillStrc* pUsedSkill = UNITS_GetUsedSkill(pUnit);
-        if (pUsedSkill && !(SKILLS_GetFlags(pUsedSkill) & 1) && !(pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_INTOWN]))
+        D2SkillStrc* pUsedSkill = D2_CALL(UNITS_GetUsedSkill, pUnit);
+        if (pUsedSkill && !(D2_CALL(SKILLS_GetFlags, pUsedSkill) & 1) && !(pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_INTOWN]))
         {
-            D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
-            if (!pRoom || DUNGEON_IsRoomInTown(pRoom))
+            D2ActiveRoomStrc* pRoom = D2_CALL(UNITS_GetRoom, pUnit);
+            if (!pRoom || D2_CALL(DUNGEON_IsRoomInTown, pRoom))
             {
-                UNITS_SetUsedSkill(pUnit, nullptr);
+                D2_CALL(UNITS_SetUsedSkill, pUnit, nullptr);
 
                 if (pUnit->dwUnitType == UNIT_PLAYER)
                 {
-                    sub_6FC817D0(pGame, pUnit, 0, PLRMODE_TOWNNEUTRAL, 0, 0, 1);
+                    D2_CALL(sub_6FC817D0, pGame, pUnit, nullptr, PLRMODE_TOWNNEUTRAL, 0, 0, 1);
                 }
 
                 return 0;
             }
         }
 
-        if (!a6 && (!pUsedSkill || SKILLS_GetSkillIdFromSkill(pUsedSkill, __FILE__, __LINE__) != nSkillId || SKILLS_GetSkillLevel(pUnit, pUsedSkill, 1) <= 0))
+        if (!a6 && (!pUsedSkill || D2_CALL(SKILLS_GetSkillIdFromSkill, pUsedSkill, __FILE__, __LINE__) != nSkillId || D2_CALL(SKILLS_GetSkillLevel, pUnit, pUsedSkill, 1) <= 0))
         {
-            D2SkillStrc* pSkill = SKILLS_GetHighestLevelSkillFromUnitAndId(pUnit, nSkillId);
-            if (!pSkill || SKILLS_GetSkillLevel(pUnit, pSkill, 1) <= 0)
+            D2SkillStrc* pSkill = D2_CALL(SKILLS_GetHighestLevelSkillFromUnitAndId, pUnit, nSkillId);
+            if (!pSkill || D2_CALL(SKILLS_GetSkillLevel, pUnit, pSkill, 1) <= 0)
             {
                 return 0;
             }
@@ -2549,7 +2546,7 @@ int32_t __fastcall D2GAME_SKILLS_Handler_6FD12BA0(D2GameStrc* pGame, D2UnitStrc*
     }
 
     int32_t nDoFunc = pSkillsTxtRecord->wSrvDoFunc;
-    if (nDoFunc < 0 || nDoFunc >= ARRAY_SIZE(gpSkillSrvDoFnTable_6FD40A20) || bLivingUnit && pSkillsTxtRecord->dwFlags[1] & gdwBitMasks[SKILLSFLAGINDEX2_USEMANAONDO] && !sub_6FD10CE0(pUnit))
+    if (nDoFunc < 0 || nDoFunc >= ARRAY_SIZE(gpSkillSrvDoFnTable_6FD40A20) || bLivingUnit && pSkillsTxtRecord->dwFlags[1] & gdwBitMasks[SKILLSFLAGINDEX2_USEMANAONDO] && !D2_CALL(sub_6FD10CE0, pUnit))
     {
         return 0;
     }
@@ -2560,7 +2557,7 @@ int32_t __fastcall D2GAME_SKILLS_Handler_6FD12BA0(D2GameStrc* pGame, D2UnitStrc*
     }
 
     // The monster's client unit runs the same do (1.13c D2Client+0xA2C90) and makes its own cltmissile there.
-    if (pUnit->dwUnitType == UNIT_MONSTER && !(pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_LOB]))
+    if (pUnit->dwUnitType == UNIT_MONSTER && !(pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_LOB]) && D2WEB_MonsterClientMissileLive())
     {
         // 0xA1340 (D2Client+0x51340): the path's target unit, else the path's first point
         D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
@@ -2569,7 +2566,7 @@ int32_t __fastcall D2GAME_SKILLS_Handler_6FD12BA0(D2GameStrc* pGame, D2UnitStrc*
         D2WEB_MonsterClientMissileDo(pUnit->dwUnitId, (int16_t)pSkillsTxtRecord->wCltMissile, nSkillId, nSkillLevel, nTx, nTy);
     }
 
-    SkillDoFunc pDoFunc = gpSkillSrvDoFnTable_6FD40A20[nDoFunc];
+    SkillDoFunc pDoFunc = D2_CALL(D2GAME_SKILLS_GetSrvDoFunc_6FD12BA0, nDoFunc);
     int32_t nResult = 0;
     if (pDoFunc)
     {
@@ -2578,7 +2575,7 @@ int32_t __fastcall D2GAME_SKILLS_Handler_6FD12BA0(D2GameStrc* pGame, D2UnitStrc*
     }
 
     const int32_t nSrvMissile = pSkillsTxtRecord->wSrvMissile;
-    if (nSrvMissile >= 0 && nSrvMissile < sgptDataTables->nMissilesTxtRecordCount && &sgptDataTables->pMissilesTxt[nSrvMissile])
+    if (nSrvMissile >= 0 && D2_CALL(DATATBLS_GetMissilesTxtRecord, nSrvMissile))
     {
 
         pUnit->dwFlags |= UNITFLAG_SKSRVDOFUNC;
@@ -2589,24 +2586,15 @@ int32_t __fastcall D2GAME_SKILLS_Handler_6FD12BA0(D2GameStrc* pGame, D2UnitStrc*
         int32_t nTargetY = 0;
         if (a6 && a7)
         {
-            D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
-            if (pTarget)
-            {
-                nX = CLIENTS_GetUnitX(pTarget);
-                nY = CLIENTS_GetUnitY(pTarget);
-            }
-            else
-            {
-                nX = D2COMMON_10175_PathGetFirstPointX(pUnit->pDynamicPath);
-                nY = D2COMMON_10176_PathGetFirstPointY(pUnit->pDynamicPath);
-            }
+            // 1.13c: the target's coordinates come from 9FA30 (retail does not take the path-point fallback here)
+            D2_CALL(D2GAME_GetXAndYFromTargetUnit_6FD14020, pGame, pUnit, &nX, &nY);
 
             if (nX && nY)
             {
                 nTargetX = nX;
                 nTargetY = nY;
-                nX -= CLIENTS_GetUnitX(pUnit);
-                nY -= CLIENTS_GetUnitY(pUnit);
+                nX -= D2_CALL(CLIENTS_GetUnitX, pUnit);
+                nY -= D2_CALL(CLIENTS_GetUnitY, pUnit);
                 nTargetX += nX;
                 nTargetY += nY;
             }
@@ -2614,13 +2602,13 @@ int32_t __fastcall D2GAME_SKILLS_Handler_6FD12BA0(D2GameStrc* pGame, D2UnitStrc*
 
         if (pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_LOB])
         {
-            sub_6FD11710(pGame, pSkillsTxtRecord->wSrvMissile, pUnit, nSkillId, nSkillLevel, nX, nY, nTargetX, nTargetY, 0);
+            D2_CALL(sub_6FD11710, pGame, pSkillsTxtRecord->wSrvMissile, pUnit, nSkillId, nSkillLevel, nX, nY, nTargetX, nTargetY, 0);
         }
         else
         {
             // The client creates its own cltmissile at the cast (its target is the mouse), so its TravelSound plays even when the
             // server missile is not made (a corpse target, no destination).
-            if (!sub_6FD11420(pGame, pSkillsTxtRecord->wSrvMissile, pUnit, nSkillId, nSkillLevel, nX, nY, nTargetX, nTargetY, 0) && pUnit->dwUnitType == UNIT_PLAYER)
+            if (!D2_CALL(sub_6FD11420, pGame, pSkillsTxtRecord->wSrvMissile, pUnit, nSkillId, nSkillLevel, nX, nY, nTargetX, nTargetY, 0) && pUnit->dwUnitType == UNIT_PLAYER)
             {
                 D2WEB_ClientMissileTravelSound(pSkillsTxtRecord->wCltMissile);
             }
@@ -2638,21 +2626,21 @@ int32_t __fastcall D2GAME_SKILLS_Handler_6FD12BA0(D2GameStrc* pGame, D2UnitStrc*
     {
         if (bLivingUnit)
         {
-            if (!gpSkillSrvStartFnTable_6FD408B0[pSkillsTxtRecord->wSrvStartFunc] || pSkillsTxtRecord->dwFlags[1] & gdwBitMasks[SKILLSFLAGINDEX2_USEMANAONDO])
+            if (!D2_CALL(D2GAME_SKILLS_GetSrvStartFunc_6FD12BA0, pSkillsTxtRecord->wSrvStartFunc) || pSkillsTxtRecord->dwFlags[1] & gdwBitMasks[SKILLSFLAGINDEX2_USEMANAONDO])
             {
-                D2GAME_SKILLMANA_Consume_6FD10A50(pGame, pUnit, nSkillId, nSkillLevel);
+                D2_CALL(D2GAME_SKILLMANA_Consume_6FD10A50, pGame, pUnit, nSkillId, nSkillLevel);
             }
 
             if (pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_DECQUANT])
             {
-                sub_6FD118C0(pGame, pUnit);
+                D2_CALL(sub_6FD118C0, pGame, pUnit);
             }
         }
 
-        const int32_t nDelay = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwDelay, nSkillId, nSkillLevel);
+        const int32_t nDelay = D2_CALL(SKILLS_EvaluateSkillFormula, pUnit, pSkillsTxtRecord->dwDelay, nSkillId, nSkillLevel);
         if (nDelay > 0 && pUnit->dwUnitType == UNIT_PLAYER && (pSkillsTxtRecord->nAnim != PLRMODE_SEQUENCE || !(pUnit->dwSeqFrame & 0xFFFFFF00)))
         {
-            D2GAME_SKILLS_SetDelay_6FD11C00(pGame, pUnit, nDelay);
+            D2_CALL(D2GAME_SKILLS_SetDelay_6FD11C00, pGame, pUnit, nDelay);
         }
     }
 
@@ -3282,13 +3270,13 @@ int32_t __fastcall D2GAME_GetXAndYFromTargetUnit_6FD14020(D2GameStrc* pGame, D2U
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
     if (pTarget)
     {
-        *pX = CLIENTS_GetUnitX(pTarget);
-        *pY = CLIENTS_GetUnitY(pTarget);
+        *pX = D2_CALL(CLIENTS_GetUnitX, pTarget);
+        *pY = D2_CALL(CLIENTS_GetUnitY, pTarget);
     }
     else
     {
-        *pX = D2COMMON_10175_PathGetFirstPointX(pUnit->pDynamicPath);
-        *pY = D2COMMON_10176_PathGetFirstPointY(pUnit->pDynamicPath);
+        *pX = D2_CALL(D2COMMON_10175_PathGetFirstPointX, pUnit->pDynamicPath);
+        *pY = D2_CALL(D2COMMON_10176_PathGetFirstPointY, pUnit->pDynamicPath);
     }
 
     return *pX && *pY;

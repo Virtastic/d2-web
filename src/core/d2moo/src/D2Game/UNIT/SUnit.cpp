@@ -740,78 +740,85 @@ D2UnitStrc* __fastcall SUNIT_AddUnitToList(D2GameStrc* pGame, D2UnitStrc* pUnit)
     return pNode;
 }
 
+// 1.13c D2Game+0xDF9A0: the monster branch of SUNIT_Add asks it whether the unit's room has clients (1.10f inlines UNITS_GetRoom + nNumClients).
+int32_t __fastcall SUNIT_RoomHasClients_DF9A0(D2UnitStrc* pUnit)
+{
+    D2ActiveRoomStrc* pCurrentRoom = UNITS_GetRoom(pUnit);
+    return pCurrentRoom && pCurrentRoom->nNumClients;
+}
+
 //D2Game.0x6FCBBCB0
-// 1.13c D2Game+0xE0F40 (checked against decompile; no semantic delta: act/pDrlgAct from the room, per-type placement, sorted unit-list insert with duplicate-id fatal, refresh, invalidate-current-room when a6 == 0)
+// 1.13c D2Game+0xE0F40: act/pDrlgAct from the room, per-type placement, sorted unit-list insert (E0310), refresh, invalidate-current-room when a6 == 0.
+// Delta vs 1.10f: the monster branch tests the room's clients through D2Game+0xDF9A0 (SUNIT_RoomHasClients_DF9A0). Callees go through D2_CALL so a probe can record them.
 void __fastcall SUNIT_Add(D2UnitStrc* pUnit, int32_t nX, int32_t nY, D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t a6)
 {
     D2_ASSERT(pGame);
     D2_ASSERT(pUnit);
 
-    pUnit->nAct = DRLG_GetActNoFromLevelId(DUNGEON_GetLevelIdFromRoom(pRoom));
+    pUnit->nAct = D2_CALL(DRLG_GetActNoFromLevelId, D2_CALL(DUNGEON_GetLevelIdFromRoom, pRoom));
     pUnit->pDrlgAct = pGame->pAct[pUnit->nAct];
 
     switch (pUnit->dwUnitType)
     {
     case UNIT_PLAYER:
     {
-        PATH_AllocDynamicPath(pGame->pMemoryPool, pRoom, nX, nY, pUnit, 0);
-        sub_6FC7B7A0(pGame, pUnit, nX, nY);
+        D2_CALL(PATH_AllocDynamicPath, pGame->pMemoryPool, pRoom, nX, nY, pUnit, 0);
+        D2_CALL(sub_6FC7B7A0, pGame, pUnit, nX, nY);
         break;
     }
     case UNIT_MONSTER:
     {
-        PATH_AllocDynamicPath(pGame->pMemoryPool, pRoom, nX, nY, pUnit, 0);
-        MONSTER_SetVelocityAndPosition(pGame, pUnit, nX, nY, a6);
-        D2ActiveRoomStrc* pCurrentRoom = UNITS_GetRoom(pUnit);
-        if (pCurrentRoom && pCurrentRoom->nNumClients)
+        D2_CALL(PATH_AllocDynamicPath, pGame->pMemoryPool, pRoom, nX, nY, pUnit, 0);
+        D2_CALL(MONSTER_SetVelocityAndPosition, pGame, pUnit, nX, nY, a6);
+        if (D2_CALL(SUNIT_RoomHasClients_DF9A0, pUnit))
         {
-            MONSTER_UpdateAiCallbackEvent(pGame, pUnit);
+            D2_CALL(MONSTER_UpdateAiCallbackEvent, pGame, pUnit);
         }
         else
         {
-            sub_6FCBC300(pGame, pUnit);
+            D2_CALL(sub_6FCBC300, pGame, pUnit);
         }
         break;
     }
     case UNIT_OBJECT:
     {
-        D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pUnit->dwClassId);
-        UNITS_InitializeStaticPath(pUnit, pRoom, nX, nY);
+        D2ObjectsTxt* pObjectsTxtRecord = D2_CALL(DATATBLS_GetObjectsTxtRecord, pUnit->dwClassId);
+        D2_CALL(UNITS_InitializeStaticPath, pUnit, pRoom, nX, nY);
         if (pObjectsTxtRecord->nHasCollision[pUnit->dwAnimMode])
         {
-            UNITS_BlockCollisionPath(pUnit, pRoom, nX, nY);
+            D2_CALL(UNITS_BlockCollisionPath, pUnit, pRoom, nX, nY);
         }
 
         D2_ASSERT(pRoom);
-        UNITROOM_AddUnitToRoom(pUnit, pRoom);
+        D2_CALL(UNITROOM_AddUnitToRoom, pUnit, pRoom);
         break;
     }
     case UNIT_MISSILE:
     {
-        PATH_AllocDynamicPath(pGame->pMemoryPool, pRoom, nX, nY, pUnit, 0);
+        D2_CALL(PATH_AllocDynamicPath, pGame->pMemoryPool, pRoom, nX, nY, pUnit, 0);
         break;
     }
     case UNIT_ITEM:
     {
         if (pUnit->dwAnimMode == IMODE_ONGROUND)
         {
-            UNITS_InitializeStaticPath(pUnit, pRoom, nX, nY);
-            UNITS_BlockCollisionPath(pUnit, pRoom, nX, nY);
+            D2_CALL(UNITS_InitializeStaticPath, pUnit, pRoom, nX, nY);
+            D2_CALL(UNITS_BlockCollisionPath, pUnit, pRoom, nX, nY);
 
             if (pRoom)
             {
-                UNITROOM_AddUnitToRoomEx(pUnit, pRoom, 0);
+                D2_CALL(UNITROOM_AddUnitToRoomEx, pUnit, pRoom, 0);
             }
         }
         break;
     }
     case UNIT_TILE:
     {
-        UNITS_InitializeStaticPath(pUnit, pRoom, nX, nY);
-        UNITS_BlockCollisionPath(pUnit, pRoom, nX, nY);
-        
+        D2_CALL(UNITS_InitializeStaticPath, pUnit, pRoom, nX, nY);
+        D2_CALL(UNITS_BlockCollisionPath, pUnit, pRoom, nX, nY);
+
         D2_ASSERT(pRoom);
-        UNITROOM_AddUnitToRoom(pUnit, pRoom);
+        D2_CALL(UNITROOM_AddUnitToRoom, pUnit, pRoom);
         break;
     }
     default:
@@ -820,16 +827,16 @@ void __fastcall SUNIT_Add(D2UnitStrc* pUnit, int32_t nX, int32_t nY, D2GameStrc*
         return;
     }
 
-    SUNIT_AddUnitToList(pGame, pUnit);
+    D2_CALL(SUNIT_AddUnitToList, pGame, pUnit);
 
-    if (UNITS_GetRoom(pUnit))
+    if (D2_CALL(UNITS_GetRoom, pUnit))
     {
-        UNITROOM_RefreshUnit(pUnit);
+        D2_CALL(UNITROOM_RefreshUnit, pUnit);
     }
 
     if (!a6)
     {
-        UNITS_SetCurrentRoomInvalid(pUnit, 1);
+        D2_CALL(UNITS_SetCurrentRoomInvalid, pUnit, 1);
     }
 }
 
@@ -1472,7 +1479,7 @@ void __fastcall D2GAME_DeletePlayerPerFrameEvents_6FCBCE50(D2GameStrc* pGame, D2
 void __fastcall sub_6FCBCE70(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     int32_t nFrame = pGame->dwGameFrame;
-    const int32_t nFrameBonus = UNITS_GetFrameBonus(pUnit) << 8;
+    const int32_t nFrameBonus = D2_CALL(UNITS_GetFrameBonus, pUnit) << 8;
 
     int32_t nAnimSpeed = 0;
     int32_t nFrameCount = 0;
@@ -1506,7 +1513,7 @@ void __fastcall sub_6FCBCE70(D2GameStrc* pGame, D2UnitStrc* pUnit)
                 int32_t nEvent = 0;
                 if (pSequence)
                 {
-                    DATATBLS_GetSequenceEvent(pSequence, nIndex << 8, &nEvent);
+                    D2_CALL(DATATBLS_GetSequenceEvent, pSequence, nIndex << 8, &nEvent);
                 }
                 else
                 {
@@ -1519,13 +1526,13 @@ void __fastcall sub_6FCBCE70(D2GameStrc* pGame, D2UnitStrc* pUnit)
                 case 2:
                 case 4:
                 {
-                    EVENT_SetEvent(pGame, pUnit, EVENTTYPE_MODECHANGE, nFrame, nEvent, nParam);
+                    D2_CALL(EVENT_SetEvent, pGame, pUnit, EVENTTYPE_MODECHANGE, nFrame, nEvent, nParam);
                     ++nParam;
                     break;
                 }
                 case 3:
                 {
-                    EVENT_SetEvent(pGame, pUnit, EVENTTYPE_MODECHANGE, nFrame, nEvent, 0);
+                    D2_CALL(EVENT_SetEvent, pGame, pUnit, EVENTTYPE_MODECHANGE, nFrame, nEvent, 0);
                     break;
                 }
                 default:
@@ -1541,12 +1548,12 @@ void __fastcall sub_6FCBCE70(D2GameStrc* pGame, D2UnitStrc* pUnit)
             ++nFrame;
         }
 
-        EVENT_SetEvent(pGame, pUnit, EVENTTYPE_ENDANIM, nFrame + 1, 0, 0);
+        D2_CALL(EVENT_SetEvent, pGame, pUnit, EVENTTYPE_ENDANIM, nFrame + 1, 0, 0);
         pUnit->nSeqCurrentFramePrecise = pGame->dwGameFrame << 8;
     }
     else
     {
-        EVENT_SetEvent(pGame, pUnit, EVENTTYPE_ENDANIM, pGame->dwGameFrame + 1, 0, 0);
+        D2_CALL(EVENT_SetEvent, pGame, pUnit, EVENTTYPE_ENDANIM, pGame->dwGameFrame + 1, 0, 0);
     }
 }
 

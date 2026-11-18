@@ -938,7 +938,9 @@ void D2WEB_ClientMissileTravelSound(int32_t nCltMissile) {
 struct MonCltMissile { int32_t missile, skill, level, tx, ty; };
 static std::unordered_map<uint32_t, std::vector<MonCltMissile>> g_monCltMissileRows;
 static std::vector<std::array<int32_t, 7>> g_monCltMissileSounds;   // those TravelSounds (0x102) and neutral footsteps (0x104) for the play path, emitted at the next drain
-void D2WEB_MonsterClientMissileDo(uint32_t nUnitId, int32_t nCltMissile, int32_t nSkillId, int32_t nSkillLevel, int32_t nTargetX, int32_t nTargetY) {
+// The skill handler reads the monster's target only when a play session records the client missile (retail's 0xA19A0 has no such read).
+bool D2WEB_MonsterClientMissileLive() { return g_sessionLive; }
+void D2WEB_MonsterClientMissileDo(uint32_t nUnitId,int32_t nCltMissile, int32_t nSkillId, int32_t nSkillLevel, int32_t nTargetX, int32_t nTargetY) {
     if (!g_sessionLive || nCltMissile <= 0 || nCltMissile >= sgptDataTables->nMissilesTxtRecordCount) return;
     g_monCltMissileRows[nUnitId].push_back({nCltMissile, nSkillId, nSkillLevel, nTargetX, nTargetY});
 }

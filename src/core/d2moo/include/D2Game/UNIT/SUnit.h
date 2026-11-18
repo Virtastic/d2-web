@@ -55,6 +55,8 @@ D2UnitStrc* __fastcall SUNIT_GetLastAttacker(D2GameStrc* pGame, D2UnitStrc* pUni
 // walk's stop node (the decompiler types the function void). `__fastcall` below is this C++ tree's
 // internal convention only -- it does not describe retail's registers. 
 D2UnitStrc* __fastcall SUNIT_AddUnitToList(D2GameStrc* pGame, D2UnitStrc* pUnit);
+//D2Game.0xDF9A0 (1.13c): does the unit's room have clients
+int32_t __fastcall SUNIT_RoomHasClients_DF9A0(D2UnitStrc* pUnit);
 //D2Game.0x6FCBBCB0
 void __fastcall SUNIT_Add(D2UnitStrc* pUnit, int32_t nX, int32_t nY, D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t a6);
 //D2Game.0x6FCBBFE0
