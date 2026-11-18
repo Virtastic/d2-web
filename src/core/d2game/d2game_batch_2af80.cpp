@@ -237,22 +237,6 @@ int32_t GAME_GetGameServerGameIds(uint16_t* pServerTokens, int32_t nMaxCount, co
     return nServerTokenCount;
 }
 
-// 1.10f sibling: GAME/Clients.cpp CLIENTS_GetClientFromClientId. The decompile hides both arguments:
-// EAX = pGame (0xE9 assert when null), ECX = nClientId; the list walks pNext at +0x4A8.
-// 1.13c D2Game+0x49FE0 (ord 10004)
-void* CLIENTS_GetClientFromClientId(void* pGame, int32_t nClientId)
-{
-    if (pGame == nullptr) d2game_fatal(0xE9);
-
-    void* pClient = rdptr(pGame, kGameClientList);
-    while (pClient != nullptr)
-    {
-        if (static_cast<int32_t>(rd32(pClient, 0)) == nClientId) return pClient;
-        pClient = rdptr(pClient, kClientNext);
-    }
-    return nullptr;
-}
-
 // 1.10f sibling: D2Game.0x6FC84D40 sub_6FC84D40 (PLAYER/PlrMsg.cpp). The 1.13c entry takes the
 // packet in EAX and the game as its single stack argument (ret 4); the packet's szText is 32 bytes at
 // +0x08 and the scan stops at the first NUL inside the first 16.

@@ -294,35 +294,6 @@ void GAME_KickClientFromGame(uint32_t clientId, const char* szFile, uint32_t nLi
     env->disconnectClient(clientId, szFile, nLine);          // Ordinal 10001
 }
 
-// 1.13c D2Game+0xCAE80
-// CCMD_ProcessClientMessage (1.10f 0x6FC31C00): the message record arrives in EAX (explicit); its first
-// word is the client id. Ordinal 10015 yields the game GUID, 0x2AAE0 locks the game (null -> return).
-// The client must be in the list (game+0x88, next +0x4A8) or the game is unlocked and the function
-// returns; 0x49FE0 fetches the client (null is the 0x1F3 fatal). Stamp GetTickCount at client+0x3D8,
-// take the player through 0x4AD10(client, 0) and, when it is a player unit (type word 0), run the
-// packet gate 0xCC550 (packet in EBX, unit in ESI, client on the stack; modelled as two arguments).
-// Unlock 0x29BA0. The packet size is not read.
-void CCMD_ProcessClientMessage(const uint32_t* msg, const D2GameBatch4Env* env)
-{
-    const uint32_t clientId = msg[0];
-    const int32_t guid = env->getClientGameGuid(clientId);   // Ordinal 10015
-    void* game = env->lockGameByGuid(guid);                  // 0x2AAE0
-    if (game == nullptr) return;
-    bool present = false;
-    for (void* c = rdptr(game, 0x88); c != nullptr; c = rdptr(c, 0x4A8))
-        if (rd32(c, 0) == clientId) { present = true; break; }
-    if (!present) {
-        env->unlockGame(game);                               // 0x29BA0
-        return;
-    }
-    void* client = env->getClientById(clientId);             // 0x49FE0
-    if (client == nullptr) d2game_fatal(0x1F3);
-    wr32(client, 0x3D8, (uint32_t)GetTickCount());
-    void* player = (void*)(uintptr_t)env->getPlayerFromClient(client, 0);   // 0x4AD10
-    if (player != nullptr && rd32(player, 0) == 0) env->packetHandler(game, player);   // 0xCC550
-    env->unlockGame(game);                                   // 0x29BA0
-}
-
 // 1.13c D2Game+0xCAF30
 // CCMD_ProcessClientSystemMessage (1.10f 0x6FC31C04): the message record is param_1; word 0 is the
 // client id, byte 4 the system command. The 1.13c opcodes are the 1.10f ones shifted one up (0x67..0x70

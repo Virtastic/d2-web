@@ -327,33 +327,7 @@ static int32_t pickRec(uint8_t* tbl, int32_t base, uint32_t lo, uint32_t hi, d2:
     return ((int32_t)pick <= (int32_t)n) ? idx[pick] : -1;
 }
 
-// 1.13c D2Game+0x0F780 -- stack (game, seed*, level, class, flag, skipType28), ret 0x18. Scans the monster
-// table from +0x18 (same 0x1a8 records), skips +0x11e == 0x28 unless skipType28, F180 filter, LCG pick.
-extern "C" int32_t D2Game_sub_F780_T(uint8_t* tbl, int32_t game, d2::Seed* seed, int32_t level, int32_t ebx, int32_t flag,
-                                     int32_t skip28)
-{
-    uint32_t rec = rd32(tbl, 0x18);
-    int32_t off = (int32_t)(rec - rd32(tbl, 4));
-    int32_t cnt = ((int32_t)rd32(tbl, 0) * 0x1a8 - (int32_t)rec + (int32_t)rd32(tbl, 4)) / 0x1a8;
-    if (rec == 0) return -1;
-    int32_t idx[1024]; uint32_t n = 0;
-    for (int32_t i = 0; i < cnt; ++i, rec += 0x1a8) {
-        const uint8_t* r = (const uint8_t*)(uintptr_t)rec;
-        if ((skip28 != 0 || rd16s(r, 0x11e) != 0x28) && D2Game_sub_F180(level, flag, ebx, r, seed) &&
-            (rd32((void*)(intptr_t)game, 0x70) != 0 || (uint16_t)rd16s(r, 0xf6) < 100) && (int32_t)n < 0x3ff)
-            idx[n++] = i + off / 0x1a8;
-    }
-    int32_t& stale = g_pickStale0[2];
-    if ((int32_t)n <= 0) return stale; // no candidate: retail returns slot 0 of its uninitialised stack buffer, i.e. the previous pick's first candidate
-    stale = idx[0];
-    uint32_t pick = 0;
-    if ((int32_t)n > 0) pick = D2Game_SEED_RollLimitedRandomNumber(seed, (int32_t)n);
-    return ((int32_t)pick <= (int32_t)n) ? idx[pick] : -1;
-}
-
-extern "C" int32_t D2Game_sub_F780(int32_t game, d2::Seed* seed, int32_t level, int32_t ebx, int32_t flag,
-                                   int32_t skip28)
-{ return D2Game_sub_F780_T((uint8_t*)D2Common_10535_GetItemDataTables(), game, seed, level, ebx, flag, skip28); }
+// 1.13c D2Game+0x0F780 and +0x0FA30 run the game bodies (ITEMS/Sub0F780.cpp, Sub0FA30.cpp); their stand-alone copies are removed.
 
 // 1.13c D2Game+0x0F8F0 -- stack (game, seed*, level, flag), ret 0x10; entry ECX -> ebx.
 extern "C" int32_t D2Game_sub_F8F0_T(uint8_t* tbl, int32_t game, d2::Seed* seed, int32_t level, int32_t flag, int32_t ebx)
@@ -361,16 +335,7 @@ extern "C" int32_t D2Game_sub_F8F0_T(uint8_t* tbl, int32_t game, d2::Seed* seed,
 extern "C" int32_t D2Game_sub_F8F0(int32_t game, d2::Seed* seed, int32_t level, int32_t flag, int32_t ebx)
 { return D2Game_sub_F8F0_T((uint8_t*)D2Common_10535_GetItemDataTables(), game, seed, level, flag, ebx); }
 
-// 1.13c D2Game+0x0FA30 -- same shape, range +0x10/+0x18.
-extern "C" int32_t D2Game_sub_FA30_T(uint8_t* tbl, int32_t game, d2::Seed* seed, int32_t level, int32_t flag, int32_t ebx)
-{ return pickRec(tbl, game, 0x10, 0x18, seed, level, flag, ebx); }
-extern "C" int32_t D2Game_sub_FA30(int32_t game, d2::Seed* seed, int32_t level, int32_t flag, int32_t ebx)
-{ return D2Game_sub_FA30_T((uint8_t*)D2Common_10535_GetItemDataTables(), game, seed, level, flag, ebx); }
-
 // Probe wrappers (old signature, env unused).
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_0F8F0(int32_t param_1, uint64_t* seed, int32_t level,
                                                           int32_t flag, int32_t ebx, const D2GameBatch0CDC0Env*)
 { return D2Game_sub_F8F0(param_1, (d2::Seed*)seed, level, flag, ebx); }
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_0FA30(int32_t param_1, uint64_t* seed, int32_t level,
-                                                          int32_t flag, int32_t ebx, const D2GameBatch0CDC0Env*)
-{ return D2Game_sub_FA30(param_1, (d2::Seed*)seed, level, flag, ebx); }
