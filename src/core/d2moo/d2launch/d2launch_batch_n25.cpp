@@ -59,6 +59,7 @@ extern "C" uint32_t d2l_141b0_core(uint32_t esi, uint32_t tag1, uint32_t tag2, u
                                    void (*f)(uint32_t, uint32_t, uint32_t, uint32_t));
 static void d2l_call121b0(uint32_t a, uint32_t, uint32_t, uint32_t esi) { FUN_6fa521b0((int)a, esi); }
 extern "C" uint32_t sub_141B0(int p) { return d2l_141b0_core(5, 0x2771, 0x57f6, (uint32_t)p, Ordinal_10227, d2l_call121b0); }
+// 1.13c D2Launch+0x141F0
 extern "C" uint32_t sub_141F0(int p) { return d2l_141b0_core(6, 0x2772, 0x57f7, (uint32_t)p, Ordinal_10227, d2l_call121b0); }
 
 // 1.13c D2Launch+0x14290
