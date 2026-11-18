@@ -110,6 +110,7 @@ export function scan(text, weakMacros = []) {
     let c = forceC || inExtC();
     s = s.replace(/\bextern\s+__EXTC__/, () => { c = true; return 'extern'; }).replace(/__EXTC__/, () => { c = true; return ''; })
          .replace(/\bextern\s+__EXTCPP__/, 'extern').replace(/__EXTCPP__/, '').trim();
+    s = s.replace(/\b_(?:Acquires|Releases)_lock_\((?:[^()]|\([^()]*\))*\)/g, ' ').trim();   // SAL lock annotations expand to nothing (compat/Windows.h); left in, they hide the function that follows
     if (!s || KW_SKIP.test(s) || /^namespace\b/.test(s) || /^(public|private|protected)\s*:/.test(s)) return;
     if (/^(struct|class|union)\b[^()=]*$/.test(s) && !isDef) return;   // forward decl / bare tag
     let weak = /__attribute__\s*\(\(\s*weak\s*\)\)/.test(s);
@@ -162,7 +163,7 @@ export function scan(text, weakMacros = []) {
       i++; continue;
     }
     if (ch === '{') {
-      const head = stmt.trim();
+      const head = stmt.replace(/\b_(?:Acquires|Releases)_lock_\((?:[^()]|\([^()]*\))*\)/g, ' ').trim();   // see parseStmt
       if (/^(inline\s+)?namespace\b/.test(head) || /\bnamespace\s*$/.test(head) || /^namespace\b/.test(head)) {
         const m = /namespace\s+([\w:]+)?/.exec(head);
         stack.push({ t: 'ns', name: (m && m[1]) || '' }); stmt = ''; i++; continue;
