@@ -1,4 +1,4 @@
-// 1.13c D2Common implementation batch 6: 0x32820, 0x20700, 0x5A850, 0x2A170, 0x1FD40, 0x3D160, 0x3B000.
+// 1.13c D2Common implementation batch 6: 0x32820, 0x20700, 0x5A850, 0x2A170, 0x1FD40, 0x3D160 (0x3B000 is the game's DUNGEON_SetActCallbackFunc).
 // The functions whose retail operands are passed in registers the decompiler drops (inv.fastcall ECX/EDX,
 // the 0x51470 / 0x38A80 / 0x1100 hidden operands) take those operands resolved, in the style of sub_33c20.cpp.
 #include <cstddef>
@@ -218,14 +218,4 @@ uint32_t D2Common_3D160_NthListEntryOfKind2(uint32_t pOwner, int32_t nIndex)
         }
         node = P(W(node, 0x08));
     }
-}
-
-// 1.13c D2Common+0x3B000 (#10118)
-// Stores nValue into the dword at pObject+0x4C. A null object is fatal in retail (Fog#10265(0x67F)
-// through Fog#10024, then _exit(-1)); the fatal path is not modelled, so a null object returns.
-void D2Common_3B000_SetField4C(uint32_t pObject, uint32_t nValue)
-{
-    uint8_t* o = P(pObject);
-    if (!o) return;
-    W(o, 0x4C) = nValue;
 }

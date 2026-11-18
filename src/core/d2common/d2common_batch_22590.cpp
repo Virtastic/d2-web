@@ -25,25 +25,7 @@ namespace
 	inline uint32_t& W(void* b, int o) { return *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(b) + o); }
 }
 
-// 1.13c D2Common+0x22590 (#10572): the two dwords at pItemData+0x1C/+0x20 for a UNIT_ITEM with a
-// non-null item data block; everything else (null unit, another unit type, null data) writes 0/0.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void ITEMS_GetRealmData(uint32_t pUnit, uint32_t* pOut1C, uint32_t* pOut20)
-{
-	D2UnitStrc* unit = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit));
-	if (unit && unit->dwUnitType == UNIT_ITEM)
-	{
-		D2ItemDataStrc* pItemData = unit->pItemData;
-		if (pItemData)
-		{
-			*pOut1C = pItemData->dwRealmData[0];
-			*pOut20 = pItemData->dwRealmData[1];
-			return;
-		}
-	}
-	*pOut1C = 0;
-	*pOut20 = 0;
-}
+// D2Common+0x22590 now runs as ITEMS_GetRealmData (src/core/d2moo/src/Items/Items.cpp).
 
 // 1.13c D2Common+0x2FED0 (#10574, D2SetEnabledStat): sets the unit's static path (unit+0x2C) to a
 // room and a game position: +0x00 room, +0x0C/+0x10 game X/Y, +0x04 client X = (X - Y) * 0x10,
