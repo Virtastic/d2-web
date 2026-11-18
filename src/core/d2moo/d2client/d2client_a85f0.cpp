@@ -1,5 +1,6 @@
 // Mark a light dirty: set its dirty flag and clear its stamp. A null light, or one of kind 2, is fatal.
 #include "d2client_light_env.h"
+// 1.13c D2Client+0xA85F0
 extern "C" void d2c_a85f0(uint32_t obj, const cl::Env& e) {
     if (!obj) { e.H(0xBF92, 0x18D); return; }
     const uint32_t kind = e.R(obj + 0xC);

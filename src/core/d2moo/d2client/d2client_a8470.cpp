@@ -2,6 +2,7 @@
 // 4 for a pure row step, 1 for a pure column step, else 2 (column major) or 3 (row major) with the 8-bit minor/major ratio.
 #include "d2client_light_env.h"
 using namespace cllight;
+// 1.13c D2Client+0xA8470
 extern "C" void d2c_a8470(uint32_t obj, int32_t x, int32_t y, const cl::Env& e) {
     int32_t dx = (int32_t)e.R(obj + 0x10) - x, dy = (int32_t)e.R(obj + 0x14) - y;
     if (!dx && !dy) { e.W(kMode, 0); return; }

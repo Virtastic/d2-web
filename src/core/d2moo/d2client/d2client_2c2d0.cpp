@@ -1,4 +1,4 @@
-// 1.13c D2Client+0x2C2D0 (EAX item or 0, ESI unit; stack p1 value out, p2 flag out, p3, p4; ret 0x10). desc = 0xC640(ECX p4) (zero: 0);
+// D2Client+0x2C2D0 (EAX item or 0, ESI unit; stack p1 value out, p2 flag out, p3, p4; ret 0x10). desc = 0xC640(ECX p4) (zero: 0);
 // *p1 = 0xCEC8(unit); item = EAX, else 0xCA0C(unit+0x60) when that is set; 0xC220(item) == 0x26 zeroes *p1 and *p2.
 // pct = (0xC1FC(unit, 0x4E) ? 0xC922(unit, item, p4, 0) : 0) + 0xC454(unit, 0x77, 0) + 0xCEAA(unit, (int16)desc[0], p3);
 // *p1 += *p1 * pct / 100 (32-bit product, C division); *p2 = 0, then 3 on 0xCEB0(unit), 1 on 0xCEBC(unit). Returns 1.
@@ -9,6 +9,7 @@
 
 static inline int32_t pctAdd(int32_t v, int32_t pct) { return (int32_t)((uint32_t)v * (uint32_t)pct) / 100 + v; }
 
+// 1.13c D2Client+0x2C2D0
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2c_2c2d0(const D2cSvc& v, uint32_t item, uint32_t unit, int32_t* p1, int32_t* p2,
                                                   uint32_t p3, uint32_t p4) {
     if (!p4) return 0;
@@ -30,7 +31,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2c_2c2d0(const D2cSvc& v, uint32_t ite
 }
 
 // The retail register-convention env port of the same function (main, fba4983815).
-// 1.13c D2Client+0x2C2D0
+// D2Client+0x2C2D0 (register form)
 // Damage/modifier percent scaler. Registers (disassembly 0x6FADC2D0): EAX = optional source unit (kept in EBX), ESI = the unit; stack p1..p4, ret 0x10.
 // p4 gates the whole function (and is the third argument of 0xC922); p1 receives the scaled value; p2 receives the 0/3/1 flag; p3 is forwarded to 0xCEAA. Every callee is a thunk with the
 // stack arguments listed (stdcall), the decompile's missing arguments restored from the disassembly.

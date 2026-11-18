@@ -2,6 +2,7 @@
 // (old * old level + new * amount) scaled by the curve at the new level (>> 16, capped at 255); without it the channels clear.
 #include "d2client_light_env.h"
 using namespace cllight;
+// 1.13c D2Client+0xA8A40
 extern "C" void d2c_a8a40(int32_t x, int32_t y, int32_t amt, uint32_t r, uint32_t g, uint32_t b, const cl::Env& e) {
     const int32_t cx = (x >> 3) - (int32_t)e.R(kOrgX);
     if (cx < 0 || cx >= 0x30) return;

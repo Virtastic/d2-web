@@ -2,6 +2,7 @@
 // lighting on, its three channels into *r, *g, *b.
 #include "d2client_light_env.h"
 using namespace cllight;
+// 1.13c D2Client+0xA8230
 extern "C" void d2c_light_a8230(int32_t x, int32_t y, uint32_t lv, uint32_t r, uint32_t g, uint32_t b, const cl::Env& e) {
     int32_t cx = (x >> 3) - (int32_t)e.R(kOrgX), cy = (y >> 3) - (int32_t)e.R(kOrgY);
     cx = cx < 0 ? 0 : cx > 0x2f ? 0x2f : cx;

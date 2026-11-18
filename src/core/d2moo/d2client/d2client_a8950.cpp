@@ -2,6 +2,7 @@
 // (2r/8 + 1)-square around it into the override lines, centred on line row/col 32; a cell outside the grid counts as blocker 1.
 #include "d2client_light_env.h"
 using namespace cllight;
+// 1.13c D2Client+0xA8950
 extern "C" void d2c_a8950(uint32_t rec, const cl::Env& e) {
     const int32_t x = (int32_t)e.R(rec + 0x10), y = (int32_t)e.R(rec + 0x14), rad = (int32_t)e.R(rec + 0x18);
     const int32_t x0 = (x - (x & 7)) - rad, y0 = (y - (y & 7)) - rad, n = (int32_t)((uint32_t)rad * 2u) >> 3;

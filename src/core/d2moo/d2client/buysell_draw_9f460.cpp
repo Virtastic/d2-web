@@ -24,6 +24,7 @@ struct D2c9F460G {
     int32_t mode; uint32_t cel0, cel1, btnCel; const uint8_t* tab; int32_t mouseY, mouseX, screenW; uint32_t lang, flag224;
 };
 extern "C" {
+// 1.13c D2Client+0x9F460
 EMSCRIPTEN_KEEPALIVE void d2c_9f460(const D2c9F460Env* e, D2c9F460G* g) {
     auto rd = [](const uint8_t* p) { int32_t v; memcpy(&v, p, 4); return v; };
     auto count = [&]() { return rd(g->tab + 0x4e); };

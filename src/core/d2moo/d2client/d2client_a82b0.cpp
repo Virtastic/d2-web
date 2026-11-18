@@ -1,6 +1,7 @@
 // Release the delayed list: for each node, free its attachment (when present) and then the node itself; clear the head.
 #include "d2client_light_env.h"
 using namespace cllight;
+// 1.13c D2Client+0xA82B0
 extern "C" void d2c_a82b0(const cl::Env& e) {
     constexpr uint32_t kFile = 0xB2000000u | 0xD4104u;   // the source-file tag the free call is handed
     for (uint32_t n = e.R(kDelay); n;) {

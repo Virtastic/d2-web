@@ -38,7 +38,7 @@ static void terminate_(const Env& e) {
 }
 void terminate(const Env& e) { terminate_(e); }
 // 1.13c D2Client+0xCB64D  (esi=catchable, edi=handler type; adjectives = param_1->adjectives)
-int32_t TypeMatch(const Env& e, uint32_t adjectives, P esi, P edi) {
+int32_t TypeMatch(const Env& e, uint32_t adjectives, P esi, P edi) {  // 1.13c Fog+0x22AFA (the same CRT function, statically linked in Fog)
  P t = e.rd32(esi + 4);
  if (t && e.rd8(t + 8)) {
   P u = e.rd32(edi + 4);

@@ -65,8 +65,6 @@ uint32_t d2_client_10b60(uint32_t (*const* init_tbl)(void), uint32_t n_init,
     return 1;
 }
 
-// 1.13c D2Client+0x13FD0 moved to d2client_13fd0.cpp (the register arguments of the three calls).
-
 // 1.13c D2Client+0x10C80 (334 B): main client loop. [0x11B980] = EAX; Ordinal_10144(); Ordinal_10145(0,1);
 // [0x11C558] = hInstance; GetModuleFileNameA -> 0x11B868; 0x10B60 and FUN_6fb12cf0 must be non-zero;
 // Ordinal_10100/10143/10227->10016/10008 (0 -> return 0); 10004; 10016(0, cfg[0x15]==6)->10943.

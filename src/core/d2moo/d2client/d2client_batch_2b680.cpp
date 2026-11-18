@@ -130,7 +130,6 @@ int32_t sub_2BF40(Services& s,int32_t* unit,int32_t skillId){
  if(cur)s.rva(0xA5FB0);
  s.ord(10137,a,0x1001); s.ord(10748,a,0); s.rva(0xA3220); return 1;
 }
-// 1.13c D2Client+0x2C2D0: moved to d2client_2c2d0.cpp (EAX item, ESI unit and the four stack words as retail passes them).
 // 1.13c D2Client+0x2D680
 void sub_2D680(Services& s,int32_t unit60,int32_t p2,int32_t p4,int32_t* o1,int32_t* o2){
  if(unit60)s.ord(10061,unit60); *o1=0;*o2=0; s.rva(0x2C4F0,(int32_t)(intptr_t)o1,(int32_t)(intptr_t)o2,p4,p2);

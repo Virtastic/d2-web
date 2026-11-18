@@ -1,4 +1,4 @@
-// 1.13c D2Client+0x14F40 (130 B): fastcall(ECX = unit, EDX = skill-record index), one unused stack word (ret 4).
+// D2Client+0x14F40 (130 B): fastcall(ECX = unit, EDX = skill-record index), one unused stack word (ret 4).
 // cltdofunc 16 (Jab's `dosound`): only a unit whose action-frame byte (+0x4E) is 3 does anything.
 //   idx outside 0..*(dt+0xBA0)-1, or a null record -> return 0.
 //   record = *(dt+0xB98) + idx * 0x23C. unit dword +0 == 0 and the i16 at rec+0x102 > 0 -> play(unit, id);
@@ -14,6 +14,7 @@ struct D2Client14f40Env {
     void (*play)(const void* unit, int32_t soundId);              // 0x88A70, EBX = soundId
 };
 
+// 1.13c D2Client+0x14F40
 extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t d2_client_14f40(const uint8_t* unit, int32_t idx, const D2Client14f40Env* env) {
     if (unit[0x4E] != 3) return 1;

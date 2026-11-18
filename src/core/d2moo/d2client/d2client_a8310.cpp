@@ -6,6 +6,7 @@ static uint32_t pick(const cl::Env& e, int32_t i) {
     const uint32_t v = e.R(kLineB + (uint32_t)i * 4u);
     return v ? v : e.R(kLineA + (uint32_t)i * 4u);
 }
+// 1.13c D2Client+0xA8310
 extern "C" void d2c_a8310(int32_t row, int32_t col, const cl::Env& e) {
     const uint32_t mode = e.R(kMode);
     if (mode > 4 || mode == 0) return;

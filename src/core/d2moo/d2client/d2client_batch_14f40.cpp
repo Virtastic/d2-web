@@ -16,7 +16,6 @@ struct Host {
  void (*op)(U id,P a,P b,P c);              // generic callee by RVA (see each function)
  I (*opi)(U id,P a,P b,P c);                // generic callee returning int
 };
-// 1.13c D2Client+0x14F40 moved to d2client_14f40.cpp (the sound id rides in EBX).
 // 1.13c D2Client+0x16250
 struct S16250{I g858,g854,g61c,g864; struct{U w[7];}tbl[7];};
 // 1.13c D2Client+0x16250

@@ -1,4 +1,4 @@
-// 1.13c D2Client+0x13FD0 (113 B): stdcall(a0, a1, a2, a3, a4), ret 0x14. Calls 0x13F40 three times with
+// D2Client+0x13FD0 (113 B): stdcall(a0, a1, a2, a3, a4), ret 0x14. Calls 0x13F40 three times with
 // EAX = a0 and the register pair (ESI, EDI) stepping over a 5x5 grid of the two coordinates:
 //   bx = 5 * (a1 / 5), by = 5 * (a2 / 5)   (signed, truncating)
 //   call 1: ESI = by,            EDI = bx
@@ -12,6 +12,7 @@ struct D2Client13fd0Env {
     void (*call_13f40)(uint32_t eax, uint32_t ebx, uint32_t esi, uint32_t edi);
 };
 
+// 1.13c D2Client+0x13FD0
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_13fd0(int32_t a0, int32_t a1, int32_t a2, int32_t a3, int32_t a4, const D2Client13fd0Env* env) {
     const uint32_t bx = (uint32_t)(5 * (a1 / 5));
