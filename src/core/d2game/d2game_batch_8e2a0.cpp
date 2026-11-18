@@ -273,35 +273,6 @@ EMSCRIPTEN_KEEPALIVE void d2_game_91660(const uint8_t* rec, int32_t* unit, int s
     }
 }
 
-// 1.13c D2Game+0x91A30
-// Same prologue as +0x91400; on a hit sets flag 0x40 at acc+5 and (for skill-class byte +0x1DC == 4, level
-// 2..3, nonzero 0x21BC0) adds acc[0x30]/divisor to acc[0x34].
-EMSCRIPTEN_KEEPALIVE void d2_game_91a30(void* p1, void* p2, void* ebp, uint8_t* acc, const uint8_t* dt,
-                                        const D2GameB8E2Env* e)
-{
-    const int row_i = e->o10680(p2, 0x15E, 0);
-    const uint8_t* row = b8e2Row(dt, row_i);
-    if (!row) return;
-    int v = e->o10680(p2, 0x15F, 0);
-    const int w = e->o10306(p2, e->o10630(p1, row_i, 1));
-    if (v < w) v = w;
-    if (v <= 0) return;
-    const int16_t st = *(const int16_t*)(row + 0x54);
-    if (st < 0 || st >= *(const int*)(dt + 0xBD4)) return;
-    const int lvl = e->o10680(ebp, st, 0);
-    if (lvl <= 0) return;
-    e->f9F210();
-    if (row[0x1DC] == 4 && lvl > 1 && lvl < 4) {
-        const int d = e->f21BC0();
-        if (d != 0) {
-            acc[5] |= 0x40;
-            *(int*)(acc + 0x34) += *(int*)(acc + 0x30) / d;
-            return;
-        }
-    }
-    acc[5] |= 0x40;
-}
-
 // 1.13c D2Game+0x91F10
 // Prologue as +0x91400 with unit=param_1; on a hit adds #10786 * state to the (decompile: absolute 0x0C) field
 // iRam0000000c -> `field`, then via 0xDF780/0xE0BD0 looks up a record and, if +0x108 is a valid missile

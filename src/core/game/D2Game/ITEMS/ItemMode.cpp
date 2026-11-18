@@ -643,6 +643,8 @@ void __fastcall D2GAME_ITEMS_UpdateTransferredProperties_6FC424E0(D2GameStrc* pG
 }
 
 //D2Game.0x6FC425F0
+// Same rule as retail D2Game+0xD2F00 (checked against the 1.13c decompile: quest gates, class-lock table, own-list and corpse-owner carry walk,
+// no delta); its retail-layout copy with the marker is src/core/d2game/d2game_d2f00.cpp, the one the FN probe runs. D6760's tail loop calls this.
 int32_t __fastcall sub_6FC425F0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem)
 {
     constexpr int nQuestIds[8] =
@@ -773,6 +775,8 @@ int32_t __fastcall sub_6FC425F0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
 }
 
 //D2Game.0x6FC428F0
+// Same rule as retail D2Game+0xD2070 (no delta against the 1.13c decompile; the sibling-code pairs are retail's, 0xD1A00 inlined); the
+// retail-layout copy with the marker is src/core/d2game/d2game_d2070.cpp.
 int32_t __fastcall sub_6FC428F0(D2UnitStrc* pItem, D2ItemsTxt* pItemsTxtRecordArg, D2UnitStrc* pPreviousItem)
 {
     int32_t nUniqueId = -1;
@@ -4518,7 +4522,51 @@ void __fastcall sub_6FC49140(D2GameStrc* pGame, D2UnitStrc* pUnit, int8_t nX)
     }
 }
 
+// 1.13c D2Game+0xD29F0 (inlined in 1.10f): clear the targeting flag on every item the unit carries and, for a
+// player, tell the client.
+void __fastcall ITEMMODE_ClearTargetingFlags(D2UnitStrc* pUnit)
+{
+    if (!pUnit || !pUnit->pInventory)
+    {
+        return;
+    }
+
+    for (D2UnitStrc* i = INVENTORY_GetFirstItem(pUnit->pInventory); i; i = INVENTORY_GetNextItem(i))
+    {
+        if (INVENTORY_UnitIsItem(i) && ITEMS_CheckItemFlag(i, IFLAG_TARGETING, __LINE__, __FILE__))
+        {
+            ITEMS_SetItemFlag(i, IFLAG_TARGETING, 0);
+            if (pUnit->dwUnitType == UNIT_PLAYER)
+            {
+                D2GAME_PACKETS_SendPacket0x3F_6FC3EDC0(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), i, -1, 1, 0, -1);
+            }
+        }
+    }
+}
+
+// 1.13c D2Game+0xD17B0 (inlined in 1.10f): the skill a book or scroll casts, -1 for other items; a missing
+// books.txt row is fatal.
+int32_t __fastcall ITEMMODE_GetBookOrScrollSkillId(D2UnitStrc* pItem)
+{
+    if (ITEMS_CheckItemTypeId(pItem, ITEMTYPE_BOOK))
+    {
+        D2BooksTxt* pBooksTxtRecord = DATATBLS_GetBooksTxtRecord(ITEMS_GetSuffixId(pItem, 0));
+        D2_ASSERT(pBooksTxtRecord);
+        return pBooksTxtRecord->dwBookSkillId;
+    }
+
+    if (ITEMS_CheckItemTypeId(pItem, ITEMTYPE_SCROLL))
+    {
+        D2BooksTxt* pBooksTxtRecord = DATATBLS_GetBooksTxtRecord(ITEMS_GetSuffixId(pItem, 0));
+        D2_ASSERT(pBooksTxtRecord);
+        return pBooksTxtRecord->dwScrollSkillId;
+    }
+
+    return -1;
+}
+
 //D2Game.0x6FC49220
+// 1.13c D2Game+0xD8BA0 (use a belt item)
 int32_t __fastcall sub_6FC49220(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nItemGUID, int32_t nX, int32_t nY, int32_t* a6, int32_t bUseOnMerc)
 {
     D2_ASSERT(pGame);
@@ -4526,93 +4574,82 @@ int32_t __fastcall sub_6FC49220(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nI
 
     *a6 = 0;
 
-    if (pUnit->pInventory)
-    {
-        for (D2UnitStrc* i = INVENTORY_GetFirstItem(pUnit->pInventory); i; i = INVENTORY_GetNextItem(i))
-        {
-            if (INVENTORY_UnitIsItem(i) && ITEMS_CheckItemFlag(i, IFLAG_TARGETING, __LINE__, __FILE__))
-            {
-                ITEMS_SetItemFlag(i, IFLAG_TARGETING, 0);
-                if (pUnit->dwUnitType == UNIT_PLAYER)
-                {
-                    D2GAME_PACKETS_SendPacket0x3F_6FC3EDC0(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), i, -1, 1, 0, -1);
-                }
-            }
-        }
-    }
+    D2_CALL(ITEMMODE_ClearTargetingFlags, pUnit);
 
-    D2UnitStrc* pItem = SUNIT_GetServerUnit(pGame, UNIT_ITEM, nItemGUID);
+    D2UnitStrc* pItem = D2_CALL(SUNIT_GetServerUnit, pGame, UNIT_ITEM, nItemGUID);
     if (!pItem)
     {
         *a6 = 1;
         return 0;
     }
 
-    if (pItem->dwUnitType != UNIT_ITEM || INVENTORY_GetCursorItem(pUnit->pInventory))
+    if (pItem->dwUnitType != UNIT_ITEM || D2_CALL(INVENTORY_GetCursorItem, pUnit->pInventory))
     {
         return 0;
     }
 
-    if (pItem->dwAnimMode != IMODE_INBELT || !ITEMS_CheckIfUseable(pItem))
+    if (pItem->dwAnimMode != IMODE_INBELT || !D2_CALL(ITEMS_CheckIfUseable, pItem))
     {
         *a6 = 1;
         return 0;
     }
 
-    if (D2GAME_PLRTRADE_IsInteractingWithPlayer(pGame, pUnit))
+    if (D2_CALL(D2GAME_PLRTRADE_IsInteractingWithPlayer, pGame, pUnit))
     {
         return 0;
     }
 
-    if (bUseOnMerc && pUnit->dwUnitType == UNIT_PLAYER && pGame->bExpansion && (ITEMS_CheckItemTypeId(pItem, ITEMTYPE_HEALING_POTION) || ITEMS_CheckItemTypeId(pItem, ITEMTYPE_THAWING_POTION) || ITEMS_CheckItemTypeId(pItem, ITEMTYPE_ANTIDOTE_POTION)))
+    // 1.13c: a merc drink takes only healing, thawing and antidote potions (anything else is refused), and with no
+    // live merc the potion goes to the player; 1.10f fell through to the player for other items and skipped the
+    // spell when the merc was missing.
+    D2UnitStrc* pTarget = pUnit;
+    if (bUseOnMerc && pUnit->dwUnitType == UNIT_PLAYER && pGame->bExpansion)
     {
-        D2UnitStrc* pMerc = sub_6FC7E8B0(pGame, pUnit, PETTYPE_HIREABLE, 0);
-        if (pMerc && !SKILLITEM_pSpell_Handler(pGame, pMerc, pItem, pItem, nX, nY))
+        if (!D2_CALL(ITEMS_CheckItemTypeId, pItem, ITEMTYPE_HEALING_POTION) && !D2_CALL(ITEMS_CheckItemTypeId, pItem, ITEMTYPE_THAWING_POTION) && !D2_CALL(ITEMS_CheckItemTypeId, pItem, ITEMTYPE_ANTIDOTE_POTION))
         {
             return 0;
         }
-    }
-    else
-    {
-        if (!SKILLITEM_pSpell_Handler(pGame, pUnit, pItem, pItem, nX, nY))
+
+        if (D2UnitStrc* pMerc = D2_CALL(sub_6FC7E8B0, pGame, pUnit, PETTYPE_HIREABLE, 0))
         {
-            return 0;
+            pTarget = pMerc;
         }
     }
 
-    const int8_t nOldX = CLIENTS_GetUnitX(pItem);
-
-    if (ITEMS_CheckItemTypeId(pItem, ITEMTYPE_BOOK) || ITEMS_CheckItemTypeId(pItem, ITEMTYPE_SCROLL))
+    if (!D2_CALL(SKILLITEM_pSpell_Handler, pGame, pTarget, pItem, pItem, nX, nY))
     {
-        D2BooksTxt* pBooksTxtRecord = DATATBLS_GetBooksTxtRecord(ITEMS_GetSuffixId(pItem, 0));
-        D2_ASSERT(pBooksTxtRecord);
-
-        const int32_t nSkillId = ITEMS_CheckItemTypeId(pItem, ITEMTYPE_BOOK) ? pBooksTxtRecord->dwBookSkillId : (ITEMS_CheckItemTypeId(pItem, ITEMTYPE_SCROLL) ? pBooksTxtRecord->dwScrollSkillId : -1);
-        if (nSkillId != -1)
-        {
-            sub_6FC47C90(pUnit, nSkillId);
-        }
+        return 0;
     }
 
-    if (pUnit->pInventory)
+    const int32_t nOldX = D2_CALL(CLIENTS_GetUnitX, pItem);
+
+    // 1.13c: the book/scroll charge is spent here without the 1.10f missing-skill assert, and the belt-remove
+    // packet is gone (the removal below reports the item).
+    const int32_t nSkillId = D2_CALL(ITEMMODE_GetBookOrScrollSkillId, pItem);
+    if (nSkillId != -1)
     {
-        for (D2UnitStrc* i = INVENTORY_GetFirstItem(pUnit->pInventory); i; i = INVENTORY_GetNextItem(i))
+        if (D2SkillStrc* pSkill = D2_CALL(SKILLS_GetSkillById, pUnit, nSkillId, -1))
         {
-            if (INVENTORY_UnitIsItem(i) && ITEMS_CheckItemFlag(i, IFLAG_TARGETING, __LINE__, __FILE__))
+            int32_t nQuantity = D2_CALL(SKILLS_GetQuantity, pSkill) - 1;
+            if (nQuantity < 1)
             {
-                ITEMS_SetItemFlag(i, IFLAG_TARGETING, 0);
-                if (pUnit->dwUnitType == UNIT_PLAYER)
+                if (D2_CALL(UNITS_GetRightSkill, pUnit) == pSkill)
                 {
-                    D2GAME_PACKETS_SendPacket0x3F_6FC3EDC0(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), i, -1, 1, 0, -1);
+                    D2_CALL(D2GAME_AssignSkill_6FD13800, pUnit, 0, 0, -1);
                 }
+                nQuantity = 0;
             }
+
+            D2_CALL(SKILLS_SetQuantity, pSkill, nQuantity);
+
+            D2ClientStrc* pClient = pUnit->dwUnitType == UNIT_PLAYER ? D2_CALL(SUNIT_GetClientFromPlayer, pUnit, __FILE__, __LINE__) : nullptr;
+            D2_CALL(D2GAME_PACKETS_SendPacket0x22_6FC3DBE0, pClient, (BYTE)pUnit->dwUnitType, (int32_t)pUnit->dwUnitId, (int16_t)nSkillId, (char)nQuantity);
         }
     }
 
-    D2GAME_SendP0x9C_ItemAction_RemoveFromBelt_6FC3EBE0(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), pUnit, pItem, 0x20);
-
-    sub_6FC49090(pGame, pUnit, pItem);
-    sub_6FC49140(pGame, pUnit, nOldX);
+    D2_CALL(ITEMMODE_ClearTargetingFlags, pUnit);
+    D2_CALL(sub_6FC49090, pGame, pUnit, pItem);
+    D2_CALL(sub_6FC49140, pGame, pUnit, (int8_t)nOldX);
     return 1;
 }
 

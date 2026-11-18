@@ -1113,6 +1113,23 @@ void __fastcall GAME_JoinGame(int32_t dwClientId, uint16_t nGameId, int32_t nCla
 }
 
 //D2Game.0x6FC37450
+// 1.13c D2Game+0x2A0D0 (esi = GUID)
+// Under the game-list lock, zeroes every slot of the game GUID table that holds the GUID (retail's GAME_FreeGame inlines the same loop).
+void __fastcall GAME_RemoveGuidFromList(D2GameGUID nGameGUID)
+{
+    EnterCriticalSection(&gCriticalSection_6FD45800);
+
+    for (int32_t i = 0; i < 1024; ++i)
+    {
+        if (gnGamesGUIDs_6FD447F8[i] == nGameGUID)
+        {
+            gnGamesGUIDs_6FD447F8[i] = 0;
+        }
+    }
+
+    LeaveCriticalSection(&gCriticalSection_6FD45800);
+}
+
 _Requires_lock_held_(*pGame->lpCriticalSection)
 _Releases_lock_(*pGame->lpCriticalSection)
 // 1.13c D2Game+0x2CD30
@@ -1124,17 +1141,7 @@ void __fastcall GAME_FreeGame(D2GameGUID nGameGUID, D2GameStrc* pGame)
     }
 	_Analysis_assume_(pGame != nullptr);
 
-    EnterCriticalSection(&gCriticalSection_6FD45800);
-    
-    for (int32_t i = 0; i < 1024; ++i)
-    {
-        if (gnGamesGUIDs_6FD447F8[i] == nGameGUID)
-        {
-            gnGamesGUIDs_6FD447F8[i] = 0;
-        }
-    }
-
-    LeaveCriticalSection(&gCriticalSection_6FD45800);
+    GAME_RemoveGuidFromList(nGameGUID);
 
     D2_CALL(MONSTERREGION_FreeAll, pGame->pMemoryPool, pGame->pMonReg);
     OBJRGN_FreeObjectControl(pGame);

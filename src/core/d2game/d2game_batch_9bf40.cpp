@@ -62,46 +62,7 @@ struct D2GameBatch9Env {
     void     (*playerInteractCleanup)(void* game, void* unit);
 };
 
-// ---- module state --------------------------------------------------------------------------------
-static uint32_t g_batch9_gameGuids[1024];       // 0x6FD30C08..0x6FD31C08: game GUID per slot, 0 = empty
-static CRITICAL_SECTION g_batch9_gameListLock;  // 0x6FD30BE8
-
-// 1.13c D2Game+0x9BF40
-// PARTY_GetNodeCount: the party's node count, or -1 when no party has the id.
-int32_t PARTY_GetNodeCount_113c(int16_t partyId, const D2GameBatch9Env* env)
-{
-    void* party = env->getPartyById(partyId);          // 0x9BD00, party id in DX
-    if (party == nullptr) return -1;
-
-    int32_t count = 0;
-    // retail 32-bit record layout: dword links (pPartyNodes at +0x04, node pNext at +0x04)
-    for (uint32_t node = rd32(party, 0x04); node != 0; node = rd32((const void*)(uintptr_t)node, 0x04)) {
-        ++count;
-    }
-    return count;
-}
-
-// 1.13c D2Game+0x9C7D0
-// PARTY_Delete: unlink the party with the given id from the game's party-control list and destroy it.
-// game in EAX, party id in DI. Null party control is fatal (0xB4).
-void PARTY_Delete_113c(void* game, int16_t partyId, const D2GameBatch9Env* env)
-{
-    void* control = rdptr(game, 0x1D2C);                // pGame->pPartyControl
-    if (control == nullptr) d2game_fatal(0xB4);
-
-    void* previous = nullptr;
-    void* party = rdptr(control, 0x04);                 // pPartyControl->pParties
-    if (party != nullptr) {
-        while (rd16(party, 0x00) != (uint16_t)partyId) {
-            previous = party;
-            party = rdptr(party, 0x04);                 // pParty->pNext at +0x04
-            if (party == nullptr) return;
-        }
-        if (previous != nullptr) wrptr(previous, 0x04, rdptr(party, 0x04));
-        else wrptr(control, 0x04, rdptr(party, 0x04));
-        env->freeParty(game, party);                    // 0x9C6F0
-    }
-}
+// 0x9BF40 and 0x9C7D0 live in the game tree (D2Game/UNIT/PartySub9B.cpp).
 
 // The item teardown first phase (1.10f sub_6FC502B0) lives in d2game_10700.cpp.
 
@@ -165,72 +126,6 @@ void SUNIT_RemoveUnitPre_113c(void* game, void* unit, uint32_t unlinkFlag, const
     }
 }
 
-// 1.13c D2Game+0x49630
-// CLIENTS_FreeSaveHeader (ESI = client): free the pending save header (+0x17C) through the game pool,
-// clear the size (+0x180), data-sent count (+0x188) and +0x184, and clear CLIENTFLAGEX_SAVE_LOADED
-// (0x10) in +0x3D4. A null client is fatal (0xB69).
-void CLIENTS_FreeSaveHeader_113c(void* client, const D2GameBatch9Env* env)
-{
-    if (client == nullptr) d2game_fatal(0xB69);
-    if (rdptr(client, 0x17C) != nullptr) {
-        void* pool = rdptr(rdptr(client, 0x1A8), 0x1C); // pClient->pGame->pMemoryPool
-        env->freePool(pool, rdptr(client, 0x17C));      // Clients.cpp line 0xB6C
-        wrptr(client, 0x17C, nullptr);
-    }
-    wr32(client, 0x180, 0);
-    wr32(client, 0x188, 0);
-    wr32(client, 0x184, 0);
-    wr32(client, 0x3D4, rd32(client, 0x3D4) & ~0x10u);
-}
+// 0x49630, 0x496B0, 0x49760 and 0x49790 (the GAME/Clients.cpp save-header helpers) live in the game tree (D2Game/GAME/ClientsSaveHeader.cpp).
 
-// 1.13c D2Game+0x496B0
-// CLIENTS_CopySaveDataToClient: when the stored size differs or a header is already held, free the
-// old header, allocate exactly nSize from the game pool and record it (+0x17C / +0x180), then copy
-// the data in. 1.13c copies unconditionally after the allocation (1.10f guarded on a non-null
-// header); a null client is fatal (0xB55). nSize arrived in EAX, pData on the stack, client in ECX.
-void CLIENTS_CopySaveDataToClient_113c(void* client, const void* data, uint32_t size,
-                                       const D2GameBatch9Env* env)
-{
-    if (client == nullptr) d2game_fatal(0xB55);
-
-    if (rd32(client, 0x180) != size || rdptr(client, 0x17C) != nullptr) {
-        void* pool = rdptr(rdptr(client, 0x1A8), 0x1C); // pClient->pGame->pMemoryPool
-        if (rdptr(client, 0x17C) != nullptr) {
-            env->freePool(pool, rdptr(client, 0x17C));  // Clients.cpp line 0xB5A
-        }
-        wrptr(client, 0x17C, env->allocPool(pool, size)); // #10045, Clients.cpp line 0xB5C
-        wr32(client, 0x180, size);
-    }
-    std::memcpy(rdptr(client, 0x17C), data, size);
-}
-
-// 1.13c D2Game+0x49760
-// CLIENTS_GetSaveHeaderSize: the pending save header's size (+0x180); null client fatal (0xB4B).
-uint32_t CLIENTS_GetSaveHeaderSize_113c(void* client)
-{
-    if (client == nullptr) d2game_fatal(0xB4B);
-    return rd32(client, 0x180);
-}
-
-// 1.13c D2Game+0x49790
-// CLIENTS_GetSaveHeader: the pending save header pointer (+0x17C); null client fatal (0xB41).
-void* CLIENTS_GetSaveHeader_113c(void* client)
-{
-    if (client == nullptr) d2game_fatal(0xB41);
-    return rdptr(client, 0x17C);
-}
-
-// FN probe access to the game GUID list (0x6FD30C08).
-uint32_t* d2game_9bf40_guidList(void) { return g_batch9_gameGuids; }
-
-// 1.13c D2Game+0x2A0D0
-// GAME_RemoveGuidFromList (ESI = GUID): under the game-list lock, zero every slot whose GUID equals
-// the argument. The list is the 1024 dwords at 0x6FD30C08..0x6FD31C08.
-void GAME_RemoveGuidFromList_113c(uint32_t guid)
-{
-    EnterCriticalSection(&g_batch9_gameListLock);       // Fog #10050
-    for (int32_t i = 0; i < 1024; ++i) {                // piVar1 < 0x6FD31C08
-        if (g_batch9_gameGuids[i] == guid) g_batch9_gameGuids[i] = 0;
-    }
-    LeaveCriticalSection(&g_batch9_gameListLock);
-}
+// 0x2A0D0 (GAME_RemoveGuidFromList) lives in the game tree (D2Game/GAME/Game.cpp).

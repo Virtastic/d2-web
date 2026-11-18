@@ -148,6 +148,8 @@ void __fastcall sub_6FC49090(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
 //D2Game.0x6FC49140
 void __fastcall sub_6FC49140(D2GameStrc* pGame, D2UnitStrc* pUnit, int8_t nX);
 //D2Game.0x6FC49220
+void __fastcall ITEMMODE_ClearTargetingFlags(D2UnitStrc* pUnit);
+int32_t __fastcall ITEMMODE_GetBookOrScrollSkillId(D2UnitStrc* pItem);
 int32_t __fastcall sub_6FC49220(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nItemGUID, int32_t nX, int32_t nY, int32_t* a6, int32_t bUseOnMerc);
 //D2Game.0x6FC49670
 void __fastcall D2GAME_ITEMS_Identify_6FC49670(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem);

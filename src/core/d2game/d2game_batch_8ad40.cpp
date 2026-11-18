@@ -33,21 +33,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8ad40(uint32_t eaxIn, uint32_t ecxI
     env->send8A3E0(client, b, 0x67);
 }
 
-// 0x8B1F0: 6-byte packet 0x79: [1]=CL, [2..5]=EAX.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8b1f0(uint32_t eaxIn, uint32_t ecxIn, D2ClientStrc* client) { // 1.13c D2Game+0x8B1F0
-    uint8_t b[8] = {};
-    b[0] = 0x79;
-    b[1] = (uint8_t)ecxIn;
-    w32(b, 2, eaxIn);
-    D2GAME_PACKETS_SendPacket_6FC3C710(client, b, 6);
-}
-
-// 1.13c D2Game+0x8B2F0 (EAX = source, client on the stack): relays the 0x15-byte block at EAX verbatim.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8b2f0(D2ClientStrc* client, const void* src) { // 1.13c D2Game+0x8B2F0
-    uint8_t b[0x15];
-    std::memcpy(b, src, 0x15);
-    D2GAME_PACKETS_SendPacket_6FC3C710(client, b, 0x15);
-}
+// 0x8B1F0 and 0x8B2F0 live in the game tree (D2Game/GAME/Sub8B1F0.cpp).
 
 // Stand-alone body of D2Game 0x8B400 (the marker is on the play-path shim) (EAX = source, client on the stack): relays the 0x28-byte block at EAX; a NUL-terminated name at +8
 // of 16 bytes or more is fatal (Fog 10265(0x5DA) -> 10024 -> _exit(-1)).

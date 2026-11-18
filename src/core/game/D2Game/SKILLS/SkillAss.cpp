@@ -1,5 +1,6 @@
 #include "SKILLS/SkillAss.h"
 #include <test_seam.h>
+#include <D2Game/oc20g11.h>
 
 #include <algorithm>
 
@@ -412,27 +413,7 @@ void __fastcall sub_6FCF5870(D2UnitStrc* pUnit, D2DamageStrc* pDamage)
                     }
                     case 3:
                     {
-                        int32_t nSkillLevel = STATLIST_GetStatValue(pStatList, STAT_MODIFIERLIST_LEVEL, 0);
-                        const int32_t nMaxSkillLevel = SKILLS_GetSkillLevel(pUnit, SKILLS_GetHighestLevelSkillFromUnitAndId(pUnit, nSkillId), 1);
-                        if (nMaxSkillLevel > nSkillLevel)
-                        {
-                            nSkillLevel = nMaxSkillLevel;
-                        }
-
-                        if (nSkillLevel > 0 && pSkillsTxtRecord->wAuraStat[0] >= 0 && pSkillsTxtRecord->wAuraStat[0] < sgptDataTables->nItemStatCostTxtRecordCount)
-                        {
-                            const int32_t nValue = STATLIST_GetStatValue(pStatList, pSkillsTxtRecord->wAuraStat[0], 0);
-                            if (nValue > 0)
-                            {
-                                D2GAME_RollElementalDamage_6FD14DD0(pUnit, pDamage, nSkillId, nSkillLevel);
-                                if (pSkillsTxtRecord->nEType == ELEMTYPE_COLD && nValue >= 2 && nValue <= 3 && pSkillsTxtRecord->dwParam[1])
-                                {
-                                    pDamage->dwFrzLen += pDamage->dwColdLen / pSkillsTxtRecord->dwParam[1];
-                                }
-
-                                pDamage->wResultFlags |= 0x4000u;
-                            }
-                        }
+                        sub_91A30(pUnit, pStatList, pDamage);   // 1.13c D2Game+0x91A30
                         break;
                     }
                     case 4:

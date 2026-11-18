@@ -32,6 +32,8 @@ using PartyCallbackFunction = void(__fastcall*)(D2GameStrc*, D2UnitStrc*, void*)
 
 //D2Game.0x6FCB9B00
 void __fastcall PARTY_AllocPartyControl(D2GameStrc* pGame);
+// 1.13c D2Game+0x9C6F0
+void __fastcall sub_6FCBC6F0(D2GameStrc* pGame, D2PartyStrc* pParty);
 //D2Game.0x6FCB9BA0
 void __fastcall PARTY_FreePartyControl(D2GameStrc* pGame);
 //D2Game.0x6FCB9C40

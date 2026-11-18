@@ -1,6 +1,8 @@
 #include "UNIT/Party.h"
 
+#include <D2Game/oc20g11.h>
 #include <algorithm>
+#include <test_seam.h>
 
 #include <Fog.h>
 #include <test_seam.h>
@@ -76,27 +78,9 @@ int16_t __fastcall sub_6FCB9C40(D2GameStrc* pGame)
 
     D2PartyControlStrc* pPartyControl = pGame->pPartyControl;
 
-    int16_t nPartyId = std::max(pPartyControl->field_0, (int16_t)3);
+    sub_9BD40(pGame);   // 1.13c 0x9BD40 picks the id and advances the counter
+    const int16_t nPartyId = pPartyControl->field_0 - 1;
 
-    while (1)
-    {
-        D2PartyStrc* pCurrent = pPartyControl->pParties;
-        while (pCurrent && pCurrent->nPartyId != nPartyId)
-        {
-            pCurrent = pCurrent->pNext;
-        }
-
-        if (!pCurrent)
-        {
-            break;
-        }
-
-        ++nPartyId;
-
-        nPartyId = std::max(nPartyId, (int16_t)3);
-    }
-
-    pPartyControl->field_0 = nPartyId + 1;
     pParty->nPartyId = nPartyId;
     pParty->pNext = pPartyControl->pParties;
     pPartyControl->pParties = pParty;
@@ -265,6 +249,30 @@ void __fastcall PARTY_LeaveParty(D2GameStrc* pGame, D2UnitStrc* pUnit)
 
         pPreviousParty = pCurrentParty;
     }
+}
+
+// 1.13c D2Game+0x9C6F0 (not in 1.10f: the destroy-party tail of 0x9C840 as a function PARTY_Delete 0x9C7D0 calls;
+// the game arrives in EAX, the party on the stack). Each member must exist (fatal otherwise); it is told it left
+// (the living-player walk 0xDFC10 with 0xF0B10, then the 0x8D packet 0x8C570) and its node freed (Party.cpp line 0xA2);
+// the party itself is freed last (line 0xA5).
+void __fastcall sub_6FCBC6F0(D2GameStrc* pGame, D2PartyStrc* pParty)
+{
+    D2_ASSERT(pParty);   // 1.13c fatal 0x95
+
+    D2PartyNodeStrc* pNode = pParty->pPartyNodes;
+    while (pNode)
+    {
+        D2_ASSERT(pGame);   // 1.13c fatal 0x2D3
+        D2UnitStrc* pPartyMember = SUNIT_GetServerUnit(pGame, UNIT_PLAYER, pNode->nUnitGUID);
+        D2_ASSERT(pPartyMember);   // 1.13c fatal 0x9A
+        D2_CALL(sub_6FC7B450, pGame, pPartyMember);
+        D2_CALL(D2GAME_PACKETS_SendPacket0x8D_6FC3F960, pPartyMember, pPartyMember);
+        D2PartyNodeStrc* pNext = pNode->pNext;
+        FOG_FreePool(pGame->pMemoryPool, pNode, "..\\Source\\D2Game\\UNIT\\Party.cpp", 0xA2, 0);
+        pNode = pNext;
+    }
+
+    FOG_FreePool(pGame->pMemoryPool, pParty, "..\\Source\\D2Game\\UNIT\\Party.cpp", 0xA5, 0);
 }
 
 //D2Game.0x6FCBA0C0

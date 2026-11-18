@@ -75,42 +75,8 @@ int D2Game_993A0(Env98& e, uint32_t p1, int* p2, int p3) {
 
 // The unit-list ownership test: d2game_9b570.cpp is its own file.
 
-// 1.13c D2Game+0x9BC70 ; in_EAX = amount, unaff_EDI = out1
-void D2Game_9BC70(Env98& e, void* unit, int* out2, int amount, int* out1) {
-  int a = e.ord10049(unit), b = e.ord10973(unit, 0xe, 0);   // 10973(unit, 0xe, 0): retail pushes 0, 0xe, EBX (stat 0xE)
-  *out2 = 0;
-  *out1 = amount;
-  if (a < (int)((unsigned)b + (unsigned)amount)) { *out1 = a - b; *out2 = (int)((unsigned)amount - (unsigned)(a - b)); }   // 32-bit wrap as retail's lea/cmp/jle
-}
-
-// 1.13c D2Game+0x9BD40 ; in_EAX = game (party list at +0x1d2c); returns nothing, bumps *list
-void D2Game_9BD40(char* game) {
-  // retail pointer fields are dwords (game+0x1D2C, head+4, slot+8): an 8-byte read runs past them
-  uint16_t* hd = (uint16_t*)(uintptr_t)at<uint32_t>(game, 0x1d2c);
-  uint16_t v = *hd; if (v < 3) v = 3;
-  for (uint8_t* p; (p = (uint8_t*)(uintptr_t)at<uint32_t>(hd, 4)) != nullptr;) {
-    while (*(uint16_t*)p != v) { p = (uint8_t*)(uintptr_t)at<uint32_t>(p, 8); if (!p) goto done; }
-    if (++v < 3) v = 3;
-  }
-done:
-  *hd = v + 1;
-}
-
-// 1.13c D2Game+0x9BF70 ; unaff_EBX = game
-uint16_t D2Game_9BF70(Env98& e, char* game) {
-  char* hd = (char*)(uintptr_t)at<uint32_t>(game, 0x1d2c);   // dword pointer fields, as 0x9BD40 reads them
-  if (!hd) e.fatal(0x7f);
-  char* n = (char*)e.alloc10045("..\\Source\\D2Game\\UNIT\\Party.cpp", 0x80, 0);
-  if (!n) e.fatal(0x81);
-  memset(n, 0, 12);
-  *(uint16_t*)n = 0;
-  uint16_t id = 0; { // FUN_6fcbbd40 on this game
-    uint16_t* h = (uint16_t*)hd; D2Game_9BD40(game); id = (uint16_t)(*h - 1); }
-  *(uint16_t*)n = id;
-  at<uint32_t>(n, 8) = at<uint32_t>(hd, 4);
-  at<uint32_t>(hd, 4) = (uint32_t)(uintptr_t)n;
-  return id;
-}
+// 0x9BC70 and 0x9BD40 live in the game tree (D2Game/UNIT/PartySub9B.cpp); the unreferenced stand-alone
+// 0x9BF70 and 0x9C270 bodies that called them are gone (their probes are self-contained).
 
 // 1.13c D2Game+0x9C1F0
 int D2Game_9C1F0(Env98& e, void* cb) {
@@ -119,47 +85,3 @@ int D2Game_9C1F0(Env98& e, void* cb) {
   return r;
 }
 
-// 1.13c D2Game+0x9C270 ; iStack_4 = amount (guessed: = param_3), unaff_EBX = base offset, game = iStack_4 table owner
-int* D2Game_9C270(Env98& e, int* unit, int amount, char* game, int ebx) {
-  int cnt = 0;
-  e.fn_9c070(nullptr, &cnt);
-  auto clamp = [&](int amt, int** rem) {
-    int a = e.ord10049(unit), b = e.ord10973(unit, 0xe, 0);
-    int* r = nullptr; int use = amt;
-    if (a < b + amt) { use = a - b; r = (int*)(intptr_t)(amt - use); }
-    *rem = r;
-    if (unit) {
-      int c = e.ord10973(unit, 0xe, 0);
-      if (c + use < 0 || (*unit == 0 && e.ord10049(unit) < c + use)) { e.ord10887(unit, 0xe, 0, 0); return false; }
-      e.ord10551(unit, 0xe, use, 0);
-    }
-    return true;
-  };
-  int* rem;
-  if (cnt > 1) {
-    short pid = (!unit || unit[0x20] == 0 || *unit != 0) ? (short)-1 : e.fn_9beb0(unit);
-    char* party = (char*)e.fn_9bd00(pid);
-    int total = amount;
-    if (party) {
-      int own = e.ord10826(e.ord10331(unit));
-      for (uintptr_t* m = (uintptr_t*)at<uintptr_t>(party, 4); ; m = (uintptr_t*)m[1]) {
-        if (!m) { clamp(total, &rem); return rem; }
-        if (!game) e.fatal(0x2d3);
-        for (int* u = (int*)at<uintptr_t>(game, 0x1120 + (*(uint32_t*)m & 0x7f) * sizeof(uintptr_t)); u; u = (int*)at<uintptr_t>(u, 0xe4)) {
-          if ((uint32_t)u[3] == *(uint32_t*)m) {
-            int pu = e.ord10331(u);
-            if (u != unit && pu && e.ord10826(pu) == own && unit && unit[4] && unit[4] != 0x11) {
-              int hi = 0, lo = 0;
-              D2Game_9BC70(e, unit, &hi, amount, &lo);
-              e.fn_1670(0);
-              total += hi - ebx;
-            }
-            break;
-          }
-        }
-      }
-    }
-  }
-  clamp(amount, &rem);
-  return rem;
-}
