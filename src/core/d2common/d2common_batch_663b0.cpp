@@ -63,30 +63,6 @@ int32_t D2Common_1EC30_CountBeltItems(const InvEnv& e, uint32_t pInventory, uint
 	return count;
 }
 
-// 1.13c D2Common+0x24D00 (#10146): base-variant check over items.txt.
-// The item must have item type 0x32 or 0x2D (0x24500, the equivalence walk now marked in
-// Items.cpp). Then, only when uber code (+0x88) or ultra code (+0x8C) repeats the base code
-// (+0x80) and the item's primary type is not 0x26, the answer is whether nQuest (+0x12A) is
-// zero. An out-of-range id answers false (retail fatals 0x1EF if the base pointer is null).
-bool D2Common_24D00_ItemIsBaseVariantNotQuest(uint32_t nItemId)
-{
-	static_assert(offsetof(D2ItemsTxt, dwCode) == 0x80, "items.txt dwCode");
-	static_assert(offsetof(D2ItemsTxt, dwUberCode) == 0x88, "items.txt dwUberCode");
-	static_assert(offsetof(D2ItemsTxt, dwUltraCode) == 0x8C, "items.txt dwUltraCode");
-	static_assert(offsetof(D2ItemsTxt, nQuest) == 0x12A, "items.txt nQuest");
-
-	const D2ItemsTxt* row = DATATBLS_GetItemsTxtRecord(static_cast<int32_t>(nItemId));
-	if (!row)
-		return false;
-	if (!ITEMS_CheckItemTypeIdByItemId(static_cast<int>(nItemId), 0x32) &&
-	    !ITEMS_CheckItemTypeIdByItemId(static_cast<int>(nItemId), 0x2D))
-		return false;
-	if ((row->dwUberCode == row->dwCode || row->dwUltraCode == row->dwCode) &&
-	    ITEMS_GetItemTypeFromItemId(nItemId) != 0x26)
-		return row->nQuest == 0;
-	return false;
-}
-
 // 1.13c D2Common+0x51070 (#10147): skills.txt field/stat dispatcher.
 // nSkillId indexes skills.txt (row stride 0x23C); nSelector picks the field or formula below.
 //  0x00-0x06: dwParam pairs. Even selectors (0,2,4,6) are (lvl-1)*high+low (0 for lvl<=0, thunks

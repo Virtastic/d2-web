@@ -18,8 +18,6 @@
 #include "Units/MissileStream.h"
 #include "Units/Units.h"
 
-// Implemented in d2common_batch_663b0.cpp; called by 0x25BD0.
-bool D2Common_24D00_ItemIsBaseVariantNotQuest(uint32_t nItemId);
 // Implemented in d2common_batch_1fb80.cpp; called by 0x51C60.
 D2UnitStrc* D2Common_20320_GetLeftHandWeapon(D2InventoryStrc* pInventory);
 // Implemented in d2common_batch_33020.cpp / d2common_batch_0a090.cpp; called by 0x51C60.
