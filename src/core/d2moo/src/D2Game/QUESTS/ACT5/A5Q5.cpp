@@ -1,5 +1,7 @@
 #include "QUESTS/ACT5/A5Q5.h"
 
+#include <test_seam.h>
+
 #include <DataTbls/LevelsIds.h>
 #include <DataTbls/MonsterIds.h>
 #include <DataTbls/ObjectsIds.h>
@@ -1408,18 +1410,19 @@ void __fastcall ACT5Q5_OnPlayerDied(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // 1.13c D2Game+0x57440
 int32_t __fastcall ACT5Q5_UnitIterate_CountLivingPlayers(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
-	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
-	if (!pRoom || DUNGEON_GetLevelIdFromRoom(pRoom) != LEVEL_ROCKYSUMMIT)
+	D2ActiveRoomStrc* pRoom = D2_CALL(UNITS_GetRoom, pUnit);
+	if (!pRoom || D2_CALL(DUNGEON_GetLevelIdFromRoom, pRoom) != LEVEL_ROCKYSUMMIT)
 	{
 		return 0;
 	}
 
-	if (pUnit->dwAnimMode == PLRMODE_DEATH || pUnit->dwAnimMode == PLRMODE_DEAD)
+	// 1.13c tests the unit after the room and level lookups
+	if (!pUnit || pUnit->dwAnimMode == PLRMODE_DEATH || pUnit->dwAnimMode == PLRMODE_DEAD)
 	{
 		return 0;
 	}
 
-	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q5_ANCIENTS);
+	D2QuestDataStrc* pQuestData = D2_CALL(QUESTS_GetQuestData, pGame, QUEST_A5Q5_ANCIENTS);
 	++((D2Act5Quest5Strc*)pQuestData->pQuestDataEx)->nLivingPlayersOnSummit;
 
 	return 0;

@@ -1229,19 +1229,20 @@ void __fastcall MONSTERUNIQUE_CastNova(D2GameStrc* pGame, D2UnitStrc* pUnit, int
     D2UnitStrc* pOwner = AIGENERAL_GetMinionOwner(pUnit);
     if (pOwner)
     {
-        D2SkillStrc* pSkill = SKILLS_GetHighestLevelSkillFromUnitAndId(pOwner, SKILL_SHADOWWARRIOR);
+        D2SkillStrc* pSkill = D2_CALL(SKILLS_GetHighestLevelSkillFromUnitAndId, pOwner, SKILL_SHADOWWARRIOR);
         if (pSkill)
         {
-            nSkillLevel = std::min(SKILLS_GetSkillLevel(pOwner, pSkill, 1) / 2 + 1, 15);
+            nSkillLevel = std::min(D2_CALL(SKILLS_GetSkillLevel, pOwner, pSkill, 1) / 2 + 1, 15);
         }
     }
 
-    if (UNITS_GetCurrentLifePercentage(pUnit) > 10)
+    if (D2_CALL(UNITS_GetCurrentLifePercentage, pUnit) > 10)
     {
         nSkillLevel = 1;
     }
 
-    sub_6FD14170(pGame, pUnit, pUnit, MISSILE_NOVA, 0, nSkillLevel, DATATBLS_GetMissileVelocityFromMissilesTxt(MISSILE_NOVA, 0));
+    const int32_t nVelocity = D2_CALL(DATATBLS_GetMissileVelocityFromMissilesTxt, MISSILE_NOVA, 0);
+    D2_CALL(sub_6FD14170, pGame, pUnit, pUnit, MISSILE_NOVA, 0, nSkillLevel, nVelocity);
 }
 
 //D2Game.0x6FC6CB40

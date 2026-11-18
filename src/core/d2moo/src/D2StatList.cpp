@@ -644,7 +644,7 @@ void __fastcall STATLIST_RemoveStat_6FDB6A30(void* pMemPool, D2StatsArrayStrc* p
 		if ((pStatEx->nCapacity - pStatEx->nStatCount) > D2StatsArrayStrc::nShrinkThreshold)
 		{
 			pStatEx->nCapacity -= D2StatsArrayStrc::nGrowthAmount;
-			pStatEx->pStat = (D2StatStrc*)D2_REALLOC_POOL(pMemPool, pStatEx->pStat, pStatEx->nCapacity * sizeof(D2StatStrc));
+			pStatEx->pStat = (D2StatStrc*)D2_CALL(FOG_ReallocPool, pMemPool, pStatEx->pStat, pStatEx->nCapacity * sizeof(D2StatStrc), __FILE__, __LINE__, 0);   // seam: the 0x3A650 probe records the call
 		}
 	}
 }
@@ -1182,35 +1182,50 @@ void __stdcall D2COMMON_10475_PostStatToStatList(D2UnitStrc* pUnit, D2StatListSt
 // 1.13c D2Common+0x3A330
 void __stdcall STATLIST_AddStat(D2StatListStrc* pStatList, int nStatId, int nValue, uint16_t nLayer)
 {
+	STATLIST_AddStatEax(pStatList, nStatId, nValue, nLayer, 0);
+}
+
+// 1.13c D2Common+0x3A330: the body of STATLIST_AddStat; returns the EAX retail leaves. Delta from the 1.10f body: the tail tests the
+// list flags (+0x10, sign bit = extended list) and the owner kind (+8, 0 = player) directly; the 1.13c insert is not null-checked
+// (a failed insert is fatal there, a return here); the value add wraps.
+uint32_t STATLIST_AddStatEax(D2StatListStrc* pStatList, int nStatId, int nValue, uint16_t nLayer, uint32_t nEaxIn)
+{
 	if (!pStatList || !nValue)
 	{
-		return;
+		return nEaxIn;
 	}
 
 	D2StatsArrayStrc* pStatsArray = &pStatList->Stats;
+	const D2SLayerStatIdStrc::PackedType nPacked = D2SLayerStatIdStrc::Make(nLayer, nStatId).nPackedValue;
 
-	D2StatStrc* pStat = STATLIST_FindStat_6FDB6920(pStatsArray, D2SLayerStatIdStrc::Make(nLayer, nStatId).nPackedValue);
-
+	D2StatStrc* pStat = STATLIST_FindStat_6FDB6920(pStatsArray, nPacked);
 	if (!pStat)
 	{
-		pStat = STATLIST_InsertStatOrFail_6FDB6970(pStatList->pMemPool, pStatsArray, D2SLayerStatIdStrc::Make(nLayer, nStatId).nPackedValue);
+		pStat = STATLIST_InsertStatOrFail_6FDB6970(pStatList->pMemPool, pStatsArray, nPacked);
+	}
+	if (!pStat)
+	{
+		return nEaxIn;
 	}
 
-	pStat->nValue += nValue;
+	pStat->nValue = (int32_t)((uint32_t)pStat->nValue + (uint32_t)nValue);
 
 	if (pStat->nValue == 0)
 	{
 		STATLIST_RemoveStat_6FDB6A30(pStatList->pMemPool, pStatsArray, pStat);
 	}
 
-	sub_6FDB6C10((D2StatListExStrc*)pStatList, D2SLayerStatIdStrc::Make(nLayer, nStatId).nPackedValue, nValue, 0);
-	if (D2StatListExStrc* pStatListEx = STATLIST_StatListExCast(pStatList))
+	sub_6FDB6C10((D2StatListExStrc*)pStatList, nPacked, nValue, 0);
+	if ((int32_t)pStatList->dwFlags >= 0)
 	{
-		if (pStatList->dwOwnerType == UNIT_PLAYER)
-		{
-			STATLIST_InsertStatModOrFail_6FDB7690(pStatListEx, D2SLayerStatIdStrc::Make(nLayer,nStatId).nPackedValue);
-		}
+		return pStatList->dwFlags;
 	}
+	if (pStatList->dwOwnerType != 0)
+	{
+		return (uint32_t)pStatList->dwOwnerType;
+	}
+	STATLIST_InsertStatModOrFail_6FDB7690(pStatList, nPacked);
+	return nPacked;
 }
 
 //D2Common.0x6FDB7690
@@ -1249,6 +1264,13 @@ void __fastcall STATLIST_InsertStatModOrFail_6FDB7690(D2StatListStrc* pStatList,
 BOOL __stdcall STATLIST_SetStat(D2StatListStrc* pStatList, int nStatId, int nValue, uint16_t nLayer)
 {
 	return STATLIST_SetBaseStat(pStatList, nStatId, nValue, nLayer, NULL);
+}
+
+// 1.13c D2Common+0x3A780 sub_3A780: register shim, EAX = layer, ECX = value, EDX = stat id, one stack word = list
+// -> 0x3A280 STATLIST_SetStat(list, statId, value, layer); the result passes through (ret 4).
+BOOL D2Common_3A780_SetStatRegs(uint32_t layer, int value, int statId, D2StatListStrc* list)
+{
+	return STATLIST_SetStat(list, statId, value, (uint16_t)layer);
 }
 
 //D2Common.0x6FDB7910 (#10465)
@@ -1299,12 +1321,12 @@ BOOL __stdcall STATLIST_SetBaseStat(D2StatListStrc* pStatList, int nStatId, int 
 		STATLIST_RemoveStat_6FDB6A30(pStatList->pMemPool, pBaseStatsArray, pStat);
 	}
 
-	sub_6FDB6C10((D2StatListExStrc*)pStatList, nLayer_StatId.nPackedValue, nDiffValue, pUnit);
+	D2_CALL(sub_6FDB6C10, (D2StatListExStrc*)pStatList, nLayer_StatId.nPackedValue, nDiffValue, pUnit);   // seam: the 0x3A650 probe records the 0x39F70 call
 	if (D2StatListExStrc* pStatListEx = STATLIST_StatListExCast(pStatList))
 	{
 		if (pStatList->dwOwnerType == UNIT_PLAYER)
 		{
-			STATLIST_InsertStatModOrFail_6FDB7690(pStatListEx, nLayer_StatId.nPackedValue);
+			D2_CALL(STATLIST_InsertStatModOrFail_6FDB7690, (D2StatListStrc*)pStatListEx, nLayer_StatId.nPackedValue);   // seam: the 0x38550 call
 		}
 	}
 
@@ -1527,15 +1549,27 @@ int __stdcall D2Common_10467(D2StatListStrc* pStatList, int nStat)
 // 1.13c D2Common+0x3A650
 void __stdcall STATLIST_RemoveAllStats(D2StatListStrc* pStatList)
 {
+	STATLIST_RemoveAllStatsEax(pStatList, 0);
+}
+
+// 1.13c D2Common+0x3A650: the body of STATLIST_RemoveAllStats; returns the EAX retail leaves (nEaxIn is the caller's EAX at the call):
+// after the last removal the list flags when non-negative, else the owner kind when non-zero, else the stat key (0x38550's own EAX is
+// not modelled); a null or empty list leaves nEaxIn. Retail's first entry never has value 0 (it would spin on it, as this loop does).
+uint32_t STATLIST_RemoveAllStatsEax(D2StatListStrc* pStatList, uint32_t nEaxIn)
+{
 	if (pStatList == nullptr)
 	{
-		return;
+		return nEaxIn;
 	}
 
-	while (pStatList->Stats.nStatCount > 0)
+	uint32_t nEax = nEaxIn;
+	while ((int16_t)pStatList->Stats.nStatCount > 0)
 	{
+		const uint32_t nKey = (uint32_t)pStatList->Stats.pStat->nPackedValue;
 		STATLIST_SetStat(pStatList, pStatList->Stats.pStat->nStat, 0, pStatList->Stats.pStat->nLayer);
+		nEax = (int32_t)pStatList->dwFlags >= 0 ? pStatList->dwFlags : (pStatList->dwOwnerType != 0 ? (uint32_t)pStatList->dwOwnerType : nKey);
 	}
+	return nEax;
 }
 
 //D2Common.0x6FDB8190
@@ -1751,12 +1785,25 @@ void __stdcall D2Common_10512(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, int nStatI
 // 1.13c D2Common+0x38850
 void __stdcall D2Common_10513(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, void (__fastcall* pfCallback)(D2UnitStrc*, int, int, D2UnitStrc*))
 {
-	if (!pUnit1 || (!pUnit2 && pfCallback) || !pUnit1->pStatListEx || !STATLIST_IsExtended(pUnit1->pStatListEx))
+	D2Common_10513Eax(pUnit1, pUnit2, pfCallback, 0);
+}
+
+// 1.13c D2Common+0x38850: the body of D2Common_10513; returns the EAX retail leaves (nEaxUnit is the unit's value as retail holds
+// it, the result on the early exits and a null list): the list flags when the walk does not run, else the sign-extended mod-stat
+// count reloaded after the last callback (the loop bound is the live count, as in retail).
+uint32_t D2Common_10513Eax(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, void (__fastcall* pfCallback)(D2UnitStrc*, int, int, D2UnitStrc*), uint32_t nEaxUnit)
+{
+	if (!pUnit1 || (!pUnit2 && pfCallback) || !pUnit1->pStatListEx)
 	{
-		return;
+		return nEaxUnit;
+	}
+	if (!STATLIST_IsExtended(pUnit1->pStatListEx) || (int16_t)pUnit1->pStatListEx->ModStats.nStatCount <= 0)
+	{
+		return pUnit1->pStatListEx->dwFlags;
 	}
 	D2StatListExStrc* pUnit1StatList = pUnit1->pStatListEx;
-	for (int i = 0; i < pUnit1StatList->ModStats.nStatCount; ++i)
+	int i = 0;
+	for (; i < (int16_t)pUnit1StatList->ModStats.nStatCount; ++i)
 	{
 		const D2SLayerStatIdStrc* pModStat = &pUnit1StatList->ModStats.pStat[i];
 		int nBaseStatValue = 0;
@@ -1767,6 +1814,7 @@ void __stdcall D2Common_10513(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, void (__fa
 
 		pfCallback(pUnit1, pModStat->nStat, nBaseStatValue, pUnit2);
 	}
+	return (uint32_t)(int32_t)(int16_t)pUnit1StatList->ModStats.nStatCount;
 }
 
 //D2Common.0x6FDB85D0 (#10511)
@@ -2005,7 +2053,6 @@ int __stdcall STATLIST_GetBaseStatsData(D2StatListStrc* pStatListEx, D2StatStrc*
 
 // 1.13c D2Common+0x3A330 (src/core/d2common/d2common_batch_31d20.cpp)
 void D2Common_3A330_AddStatLayer(D2StatListStrc* pStatList, int32_t nStatId, int32_t nDelta, uint16_t nLayer);
-uint32_t D2Common_3A330_AddStatLayerEax(D2StatListStrc* pStatList, int32_t nStatId, int32_t nDelta, uint16_t nLayer, uint32_t nEaxIn);
 
 //D2Common.0x6FDB8C50 (#10573)
 // 1.13c D2Common+0x3A600: every base entry of the source (raw stat id at +2, value at +4) is added
@@ -2023,7 +2070,7 @@ uint32_t STATLIST_MergeBaseStatsEax(D2StatListStrc* pTargetStatList, D2StatListS
 	uint32_t nEax = static_cast<uint32_t>(nCount);
 	for (D2StatStrc* i = pSourceStatlist->Stats.pStat; i < pSourceStatlist->Stats.pStat + nCount; ++i)
 	{
-		nEax = D2Common_3A330_AddStatLayerEax(pTargetStatList, i->nStat, i->nValue, i->nLayer, static_cast<uint16_t>(i->nStat));
+		nEax = STATLIST_AddStatEax(pTargetStatList, i->nStat, i->nValue, i->nLayer, static_cast<uint16_t>(i->nStat));
 	}
 	return nEax;
 }

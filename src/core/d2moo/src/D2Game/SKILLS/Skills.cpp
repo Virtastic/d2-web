@@ -980,7 +980,7 @@ D2UnitStrc* __fastcall sub_6FD107F0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_
     args.unk0x04 = -1;
     args.unk0x08 = 0;
     args.unk0x14 = 0;
-    sub_6FD0FE80(pGame, pUnit, nX, nY, nAuraRange, nAuraFilter | 0xA783, sub_6FD10880, &args, 0, __FILE__, __LINE__);
+    D2_CALL(sub_6FD0FE80, pGame, pUnit, nX, nY, nAuraRange, nAuraFilter | 0xA783, sub_6FD10880, &args, 0, __FILE__, __LINE__);
 
     if (!args.unk0x00)
     {
@@ -4177,7 +4177,7 @@ int32_t __fastcall sub_6FD15340(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nM
 // not-1.13c: inlined at its callers (D2Game+0x4C600 and D2Game+0x27B90 add 4 to the melee-range ordinal themselves)
 int32_t __fastcall sub_6FD15460(D2UnitStrc* pUnit)
 {
-    return UNITS_GetMeleeRange(pUnit) + 4;
+    return D2_CALL(UNITS_GetMeleeRange, pUnit) + 4;
 }
 
 //D2Game.0x6FD15470

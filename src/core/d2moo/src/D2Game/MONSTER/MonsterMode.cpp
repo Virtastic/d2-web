@@ -1109,13 +1109,13 @@ int32_t __fastcall sub_6FC642C0(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
     {
         if (pModeChange->pUnit->dwAnimMode)
         {
-            sub_6FC63E80(pGame, pModeChange->pUnit, pModeChange->unk0x14[0]);
+            D2_CALL(sub_6FC63E80, pGame, pModeChange->pUnit, pModeChange->unk0x14[0]);
         }
     }
 
-    SUNIT_SetCombatMode(pGame, pModeChange->pUnit, 12);
-    D2GAME_EVENTS_Delete_6FC34840(pGame, pModeChange->pUnit, EVENTTYPE_PERIODICSKILLS, 0);
-    D2GAME_EVENTS_Delete_6FC34840(pGame, pModeChange->pUnit, EVENTTYPE_PERIODICSTATS, 0);
+    D2_CALL(SUNIT_SetCombatMode, pGame, pModeChange->pUnit, 12);
+    D2_CALL(D2GAME_EVENTS_Delete_6FC34840, pGame, pModeChange->pUnit, EVENTTYPE_PERIODICSKILLS, 0);
+    D2_CALL(D2GAME_EVENTS_Delete_6FC34840, pGame, pModeChange->pUnit, EVENTTYPE_PERIODICSTATS, 0);
 
     return 1;
 }
@@ -1553,32 +1553,30 @@ int32_t __fastcall sub_6FC64B60(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
         return 0;
     }
 
-    D2MonStats2Txt* pMonStats2TxtRecord = MONSTERREGION_GetMonStats2TxtRecord(pModeChange->pUnit->dwClassId);
+    D2MonStats2Txt* pMonStats2TxtRecord = D2_CALL(MONSTERREGION_GetMonStats2TxtRecord, pModeChange->pUnit->dwClassId);
     if (pMonStats2TxtRecord && pMonStats2TxtRecord->dwModeFlags & gdwBitMasks[3] && pMonStats2TxtRecord->dwModeFlags & gdwBitMasks[13])
     {
         if (pModeChange->pUnit->dwAnimMode)
         {
-            PATH_SetType(pModeChange->pUnit->pDynamicPath, PATHTYPE_KNOCKBACK_SERVER);
+            D2_CALL(PATH_SetType, pModeChange->pUnit->pDynamicPath, PATHTYPE_KNOCKBACK_SERVER);
 
+            // 1.13c reads the base id for every unit type here (the 1.10f monster-only test is gone)
             int32_t nDistance = 5;
-            if (pModeChange->pUnit->dwUnitType == UNIT_MONSTER)
+            int32_t nBaseId = pModeChange->pUnit->dwClassId;
+            D2MonStatsTxt* pMonStatsTxtRecord = D2_CALL(MONSTERMODE_GetMonStatsTxtRecord, nBaseId);
+            if (pMonStatsTxtRecord)
             {
-                int32_t nBaseId = pModeChange->pUnit->dwClassId;
-                D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nBaseId);
-                if (pMonStatsTxtRecord)
-                {
-                    nBaseId = pMonStatsTxtRecord->nBaseId;
-                }
-
-                if (nBaseId == MONSTER_SANDLEAPER1)
-                {
-                    nDistance = 10;
-                }
+                nBaseId = pMonStatsTxtRecord->nBaseId;
             }
 
-            D2COMMON_10190_PATH_SetDistance(pModeChange->pUnit->pDynamicPath, nDistance);
-            D2Common_10142(pModeChange->pUnit->pDynamicPath, pModeChange->pUnit, 0);
-            SUNIT_SetCombatMode(pGame, pModeChange->pUnit, 13);
+            if (nBaseId == MONSTER_SANDLEAPER1)
+            {
+                nDistance = 10;
+            }
+
+            D2_CALL(D2COMMON_10190_PATH_SetDistance, pModeChange->pUnit->pDynamicPath, nDistance);
+            D2_CALL(D2Common_10142, pModeChange->pUnit->pDynamicPath, pModeChange->pUnit, 0);
+            D2_CALL(SUNIT_SetCombatMode, pGame, pModeChange->pUnit, 13);
         }
 
         return 1;

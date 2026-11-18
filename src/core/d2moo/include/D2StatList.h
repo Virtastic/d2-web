@@ -562,6 +562,9 @@ D2COMMON_DLL_DECL int __stdcall STATLIST_GetExpireFrame(D2StatListStrc* pStatLis
 D2COMMON_DLL_DECL void __stdcall D2COMMON_10475_PostStatToStatList(D2UnitStrc* pUnit, D2StatListStrc* pStatList, BOOL bResetFlag);
 //D2Common.0x6FDB7560 (#10464)
 D2COMMON_DLL_DECL void __stdcall STATLIST_AddStat(D2StatListStrc* pStatList, int nStatId, int nValue, uint16_t nLayer);
+uint32_t STATLIST_RemoveAllStatsEax(D2StatListStrc* pStatList, uint32_t nEaxIn);   // 1.13c D2Common+0x3A650 with the EAX it leaves
+// Same body, returning the EAX retail leaves (nEaxIn is the caller's EAX at the call); the FN capture records it.
+uint32_t STATLIST_AddStatEax(D2StatListStrc* pStatList, int nStatId, int nValue, uint16_t nLayer, uint32_t nEaxIn);
 //D2Common.0x6FDB7690
 void __fastcall STATLIST_InsertStatModOrFail_6FDB7690(D2StatListStrc* pStatList, D2SLayerStatIdStrc::PackedType nLayer_StatId);
 //D2Common.0x6FDB77B0 (#10463)
@@ -615,6 +618,7 @@ D2COMMON_DLL_DECL D2UnitStrc* __stdcall STATLIST_GetOwner(D2UnitStrc* pUnit, BOO
 D2COMMON_DLL_DECL void __stdcall D2Common_10512(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, int nStatId, void(__fastcall* pfCallback)(D2UnitStrc*, int, int, D2UnitStrc*));
 //D2Common.0x6FDB84E0 (#10513)
 D2COMMON_DLL_DECL void __stdcall D2Common_10513(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, void(__fastcall* pfCallback)(D2UnitStrc*, int, int, D2UnitStrc*));
+uint32_t D2Common_10513Eax(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, void(__fastcall* pfCallback)(D2UnitStrc*, int, int, D2UnitStrc*), uint32_t nEaxUnit);
 //D2Common.0x6FDB85D0 (#10511)
 D2COMMON_DLL_DECL void __stdcall STATLIST_FreeModStats(D2UnitStrc* pUnit);
 //D2Common.0x6FDB8620 (#10562)

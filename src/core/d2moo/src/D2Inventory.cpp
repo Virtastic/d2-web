@@ -823,6 +823,64 @@ BOOL __fastcall INVENTORY_AreCellsFree(D2InventoryGridStrc* pInventoryGrid, int 
 	return TRUE;
 }
 
+// 1.13c D2Common+0x1E310: write pItem into rows nRow..nRow+nRows-1, columns nCol..nCol+nCols-1 of the grid's cell array
+// (row stride = the grid width). No bounds test.
+void __fastcall INVENTORY_FillGridCells(uint8_t nRows, int nRow, int nCol, D2InventoryGridStrc* pInventoryGrid, uint8_t nCols, D2UnitStrc* pItem)
+{
+	for (int nY = nRow; nY < nRow + nRows; ++nY)
+	{
+		for (int nX = nCol; nX < nCol + nCols; ++nX)
+		{
+			pInventoryGrid->ppItems[(int32_t)((uint32_t)pInventoryGrid->nGridWidth * (uint32_t)nY + (uint32_t)nX)] = pItem;
+		}
+	}
+}
+
+// 1.13c D2Common+0x1F690: append pItem to the inventory's item list; an item without extra data is ignored.
+void __fastcall INVENTORY_AppendItemToList(D2InventoryStrc* pInventory, D2UnitStrc* pItem)
+{
+	D2ItemExtraDataStrc* pNode = INVENTORY_GetItemExtraDataFromItem(pItem);
+	if (!pNode)
+	{
+		return;
+	}
+
+	if (!pInventory->pLastItem)
+	{
+		pInventory->pFirstItem = pItem;
+	}
+	else if (D2ItemExtraDataStrc* pLastNode = INVENTORY_GetItemExtraDataFromItem(pInventory->pLastItem))
+	{
+		pLastNode->pNextItem = pItem;
+	}
+
+	pNode->pPreviousItem = pInventory->pLastItem;
+	pInventory->pLastItem = pItem;
+	pNode->pParentInv = pInventory;
+}
+
+// 1.13c D2Common+0x1F630: when the item's parent inventory is pInventory, append it to the grid's item list.
+void __fastcall INVENTORY_AppendItemToGridList(D2UnitStrc* pItem, D2InventoryGridStrc* pInventoryGrid, D2InventoryStrc* pInventory)
+{
+	D2ItemExtraDataStrc* pNode = INVENTORY_GetItemExtraDataFromItem(pItem);
+	if (!pNode || pNode->pParentInv != pInventory)
+	{
+		return;
+	}
+
+	if (!pInventoryGrid->pLastItem)
+	{
+		pInventoryGrid->pItem = pItem;
+	}
+	else if (D2ItemExtraDataStrc* pLastNode = INVENTORY_GetItemExtraDataFromItem(pInventoryGrid->pLastItem))
+	{
+		pLastNode->pNextGridItem = pItem;
+	}
+
+	pNode->pPreviousGridItem = pInventoryGrid->pLastItem;
+	pInventoryGrid->pLastItem = pItem;
+}
+
 // 1.13c: the four grid finders test the anchor cell before the bounds and footprint tests, so an item with a zero
 // width or height is still refused on an occupied anchor (1.10f's placement test alone accepts it there).
 static BOOL INVENTORY_FinderFits(D2InventoryGridStrc* pInventoryGrid, int nX, int nY, uint8_t nItemWidth, uint8_t nItemHeight)
@@ -1167,46 +1225,9 @@ BOOL __fastcall INVENTORY_PlaceItemInGrid(D2InventoryStrc* pInventory, D2UnitStr
 
 	INVENTORY_RemoveItem(pItem);
 
-	if (pInventory->pLastItem)
-	{
-		D2ItemExtraDataStrc* pLastItemExtraData = INVENTORY_GetItemExtraDataFromItem(pInventory->pLastItem);
-		if (pLastItemExtraData)
-		{
-			pLastItemExtraData->pNextItem = pItem;
-		}
-	}
-	else
-	{
-		pInventory->pFirstItem = pItem;
-	}
-
-	pItemExtraData->pPreviousItem = pInventory->pLastItem;
-	pInventory->pLastItem = pItem;
-	pItemExtraData->pParentInv = pInventory;
-
-	if (pInventoryGrid->pLastItem)
-	{
-		D2ItemExtraDataStrc* pLastItemExtraData = INVENTORY_GetItemExtraDataFromItem(pInventoryGrid->pLastItem);
-		if (pLastItemExtraData)
-		{
-			pLastItemExtraData->pNextGridItem = pItem;
-		}
-	}
-	else
-	{
-		pInventoryGrid->pItem = pItem;
-	}
-
-	pItemExtraData->pPreviousGridItem = pInventoryGrid->pLastItem;
-	pInventoryGrid->pLastItem = pItem;
-
-	for (int y = 0; y < nHeight; ++y)
-	{
-		for (int x = 0; x < nWidth; ++x)
-		{
-			pInventoryGrid->ppItems[nXPos + x + (nYPos + y) * pInventoryGrid->nGridWidth] = pItem;
-		}
-	}
+	INVENTORY_AppendItemToList(pInventory, pItem);
+	INVENTORY_AppendItemToGridList(pItem, pInventoryGrid, pInventory);
+	INVENTORY_FillGridCells(nHeight, nYPos, nXPos, pInventoryGrid, nWidth, pItem);
 
 	pItemExtraData->nNodePos = nInventoryGrid + 1;
 	++pInventory->dwItemCount;

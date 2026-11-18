@@ -1042,14 +1042,39 @@ D2DrlgRoomStrc* __fastcall DRLGPRESET_InitPresetRoomData(D2DrlgLevelStrc* pLevel
 	return pDrlgRoom;
 }
 
+// 1.13c D2Common+0xA360 (usercall, context in EBX; its only caller is +0xAB50). Walks the map's singly linked preset-unit list;
+// a unit whose (x, y) lies inside the rect [dx*5, dx*5+w*5) x [dy*5, dy*5+h*5) is shifted by (-dx*5, -dy*5), unlinked from the
+// map and pushed on the free list. Others stay in place.
+void D2Common_A360_MoveNodesInRect(D2DrlgPresetRoomStrc* pMaze, int32_t dx, int32_t dy, int32_t w, int32_t h, D2PresetUnitStrc** ppFreeList)
+{
+	D2DrlgMapStrc* pMap = pMaze->pMap;
+	const int32_t x0 = dx * 5, y0 = dy * 5;
+	D2PresetUnitStrc* pPrev = nullptr;
+	for (D2PresetUnitStrc* pUnit = pMap->pPresetUnit; pUnit;)
+	{
+		D2PresetUnitStrc* pNext = pUnit->pNext;
+		if (pUnit->nXpos < x0 || pUnit->nYpos < y0 || pUnit->nXpos >= w * 5 + x0 || pUnit->nYpos >= y0 + h * 5)
+		{
+			pPrev = pUnit;
+		}
+		else
+		{
+			pUnit->nXpos -= x0;
+			pUnit->nYpos -= y0;
+			(pPrev ? pPrev->pNext : pMap->pPresetUnit) = pNext;
+			pUnit->pNext = *ppFreeList;
+			*ppFreeList = pUnit;
+		}
+		pUnit = pNext;
+	}
+}
+
 // 1.13c D2Common+0xAB50
 // Retail uses map width + 1 for each borrowed layer stride, tags layers before
 // setting edge flags, then transfers the contained preset units (0xA360).
 //D2Common.0x6FD86E50
 void __fastcall DRLGPRESET_InitPresetRoomGrids(D2DrlgRoomStrc* pDrlgRoom)
 {
-	D2PresetUnitStrc* pPresetUnit = NULL;
-	D2PresetUnitStrc* pPrevious = NULL;
 	D2DrlgCoordStrc pDrlgCoord = {};
 	int nWidth = 0;
 
@@ -1091,51 +1116,7 @@ void __fastcall DRLGPRESET_InitPresetRoomGrids(D2DrlgRoomStrc* pDrlgRoom)
 
 	DRLGGRID_AlterEdgeGridFlags(&pDrlgRoom->pMaze->pCellGrid, 132, FLAG_OPERATION_OR);
 
-	pDrlgCoord.nPosX = pDrlgRoom->nTileXPos;
-	pDrlgCoord.nPosY = pDrlgRoom->nTileYPos;
-	pDrlgCoord.nWidth = pDrlgRoom->nTileWidth;
-	pDrlgCoord.nHeight = pDrlgRoom->nTileHeight;
-
-	DUNGEON_GameTileToSubtileCoords(&pDrlgCoord.nPosX, &pDrlgCoord.nPosY);
-	DUNGEON_GameTileToSubtileCoords(&pDrlgCoord.nWidth, &pDrlgCoord.nHeight);
-
-	pPresetUnit = pDrlgRoom->pMaze->pMap->pPresetUnit;
-	pPrevious = NULL;
-
-	while (pPresetUnit)
-	{
-		if (DRLGROOM_AreXYInsideCoordinates(&pDrlgCoord, pPresetUnit->nXpos, pPresetUnit->nYpos))
-		{
-			pPresetUnit->nXpos -= 5 * pDrlgRoom->nTileXPos;
-			pPresetUnit->nYpos -= 5 * pDrlgRoom->nTileYPos;
-
-			if (pPrevious)
-			{
-				pPrevious->pNext = pPresetUnit->pNext;
-			}
-			else
-			{
-				pDrlgRoom->pMaze->pMap->pPresetUnit = pPresetUnit->pNext;
-			}
-
-			pPresetUnit->pNext = pDrlgRoom->pPresetUnits;
-			pDrlgRoom->pPresetUnits = pPresetUnit;
-
-			if (pPrevious)
-			{
-				pPresetUnit = pPrevious->pNext;
-			}
-			else
-			{
-				pPresetUnit = pDrlgRoom->pMaze->pMap->pPresetUnit;
-			}
-		}
-		else
-		{
-			pPrevious = pPresetUnit;
-			pPresetUnit = pPresetUnit->pNext;
-		}
-	}
+	D2Common_A360_MoveNodesInRect(pDrlgRoom->pMaze, pDrlgRoom->nTileXPos, pDrlgRoom->nTileYPos, pDrlgRoom->nTileWidth, pDrlgRoom->nTileHeight, &pDrlgRoom->pPresetUnits);
 }
 
 // 1.13c D2Common+0x3B0D0 (1.10f: 0x6FD870F0)

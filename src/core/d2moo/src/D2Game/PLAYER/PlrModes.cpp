@@ -410,6 +410,8 @@ int32_t __fastcall sub_6FC7FBB0(D2UnitStrc* pPlayer)
 
 //1.10f: D2Game.0x6FC7FBD0
 //1.13c: D2Game.0x6FC99210
+// 1.13c D2Game+0x79210 (the >15 corpse drop-all is the outlined D2Game+0x78FA0 with the gold helper 0x78C50; the corpse experience is
+// 75% of the loss, (loss / 100) * 75 once the loss passes 0x100000 so the product cannot overflow)
 D2UnitStrc* __fastcall D2GAME_CORPSE_Handler_6FC7FBD0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY, D2ActiveRoomStrc* pRoom)
 {
     if (pUnit->pInventory)
@@ -498,7 +500,7 @@ D2UnitStrc* __fastcall D2GAME_CORPSE_Handler_6FC7FBD0(D2GameStrc* pGame, D2UnitS
 
     const int32_t nExpLoss = CLIENTS_GetExperienceLoss(pClient);
     CLIENTS_SetExperienceLoss(pClient, 0);
-    STATLIST_SetUnitStat(pDeadBody, STAT_EXPERIENCE, 75 * nExpLoss / 100, 0);
+    STATLIST_SetUnitStat(pDeadBody, STAT_EXPERIENCE, nExpLoss <= 0x100000 ? 75 * nExpLoss / 100 : (nExpLoss / 100) * 75, 0);
 
     INVENTORY_CreateCorpseForPlayer(pUnit->pInventory, pDeadBody->dwUnitId, 0, 1);
 

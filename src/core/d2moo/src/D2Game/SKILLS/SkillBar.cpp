@@ -732,21 +732,23 @@ int32_t __fastcall SKILLS_SrvDo009_Frenzy(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 
     if (((pUnit->dwSeqFrame >> 8) % 2) == 0)
     {
-        SUNITDMG_DrainItemDurability(pGame, pUnit, pTarget, 0);
-        SUNITDMG_FreeAttackerDefenderCombatList(pGame, pUnit, pTarget);
-        sub_6FC80A30(pGame, pUnit);
-        sub_6FC80E10(pGame, pUnit);
-        SKILLS_ApplyFrenzyStats(pGame, pUnit, nSkillId, nSkillLevel);
-        return SKILLS_RollFrenzyDamage(pGame, pUnit, pTarget, nSkillId, nSkillLevel);
+        D2_CALL(SUNITDMG_DrainItemDurability, pGame, pUnit, pTarget, 0);
+        D2_CALL(SUNITDMG_FreeAttackerDefenderCombatList, pGame, pUnit, pTarget);
+        D2_CALL(sub_6FC80A30, pGame, pUnit);
+        D2_CALL(sub_6FC80E10, pGame, pUnit);
+        D2_CALL(SKILLS_ApplyFrenzyStats, pGame, pUnit, nSkillId, nSkillLevel);
+        return D2_CALL(SKILLS_RollFrenzyDamage, pGame, pUnit, pTarget, nSkillId, nSkillLevel);
     }
 
     pUnit->dwFlags |= UNITFLAG_SKSRVDOFUNC;
 
-    SUNITDMG_DrainItemDurability(pGame, pUnit, pTarget, 0);
-    sub_6FC80A30(pGame, pUnit);
-    sub_6FC80E10(pGame, pUnit);
-    SKILLS_ApplyFrenzyStats(pGame, pUnit, nSkillId, nSkillLevel);
-    return SKILLS_RollFrenzyDamage(pGame, pUnit, sub_6FD107F0(pGame, pUnit, 0, 0, sub_6FD15460(pUnit), 0x20003u, pTarget->dwUnitId, 0), nSkillId, nSkillLevel);
+    D2_CALL(SUNITDMG_DrainItemDurability, pGame, pUnit, pTarget, 0);
+    D2_CALL(sub_6FC80A30, pGame, pUnit);
+    D2_CALL(sub_6FC80E10, pGame, pUnit);
+    D2_CALL(SKILLS_ApplyFrenzyStats, pGame, pUnit, nSkillId, nSkillLevel);
+    const int32_t nRange = sub_6FD15460(pUnit);
+    D2UnitStrc* pNearest = D2_CALL(sub_6FD107F0, pGame, pUnit, 0, 0, nRange, 0x20003u, pTarget->dwUnitId, nullptr);
+    return D2_CALL(SKILLS_RollFrenzyDamage, pGame, pUnit, pNearest, nSkillId, nSkillLevel);
 }
 
 //D2Game.0x6FCFBF80

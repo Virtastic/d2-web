@@ -4933,27 +4933,29 @@ int32_t __fastcall MISSMODE_SrvDo19_RadamentDeath(D2GameStrc* pGame, D2UnitStrc*
 // 1.13c D2Game+0x39930 (the redemption effect inlined: chance formula evaluated first, then RollLimited(100) compared signed)
 int32_t __fastcall MISSMODE_RadamentDeathAreaEffectCallback(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pCorpse, int32_t nSkillLevel, int32_t nUnused)
 {
-    D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(SKILL_REDEMPTION);
-    if (!pSkillsTxtRecord || !pCorpse || !SKILLS_CanUnitCorpseBeSelected(pCorpse))
+    D2SkillsTxt* pSkillsTxtRecord = D2_CALL(SKILLS_GetSkillsTxtRecord, SKILL_REDEMPTION);
+    if (!pSkillsTxtRecord || !pCorpse || !D2_CALL(SKILLS_CanUnitCorpseBeSelected, pCorpse))
     {
         return 0;
     }
 
-    const int32_t nChance = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwCalc[0], SKILL_REDEMPTION, nSkillLevel);
-    if ((int32_t)ITEMS_RollLimitedRandomNumber(&pUnit->pSeed, 100) >= nChance)
+    const int32_t nChance = D2_CALL(SKILLS_EvaluateSkillFormula, pUnit, pSkillsTxtRecord->dwCalc[0], SKILL_REDEMPTION, nSkillLevel);
+    if ((int32_t)D2_CALL(ITEMS_RollLimitedRandomNumber, &pUnit->pSeed, 100) >= nChance)
     {
         return 0;
     }
 
-    const int32_t nLife = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwCalc[1], SKILL_REDEMPTION, nSkillLevel);
-    const int32_t nMaxLife = STATLIST_GetMaxLifeFromUnit(pUnit);
-    STATLIST_SetUnitStat(pUnit, STAT_HITPOINTS, std::min(STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0) + (nLife << 8), nMaxLife), 0);
+    const int32_t nLife = D2_CALL(SKILLS_EvaluateSkillFormula, pUnit, pSkillsTxtRecord->dwCalc[1], SKILL_REDEMPTION, nSkillLevel);
+    const int32_t nMaxLife = D2_CALL(STATLIST_GetMaxLifeFromUnit, pUnit);
+    const int32_t nLifeNow = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_HITPOINTS, 0);
+    D2_CALL(STATLIST_SetUnitStat, pUnit, STAT_HITPOINTS, std::min(nLifeNow + (nLife << 8), nMaxLife), 0);
 
-    const int32_t nMana = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwCalc[2], SKILL_REDEMPTION, nSkillLevel);
-    const int32_t nMaxMana = STATLIST_GetMaxManaFromUnit(pUnit);
-    STATLIST_SetUnitStat(pUnit, STAT_MANA, std::min(STATLIST_UnitGetStatValue(pUnit, STAT_MANA, 0) + (nMana << 8), nMaxMana), 0);
+    const int32_t nMana = D2_CALL(SKILLS_EvaluateSkillFormula, pUnit, pSkillsTxtRecord->dwCalc[2], SKILL_REDEMPTION, nSkillLevel);
+    const int32_t nMaxMana = D2_CALL(STATLIST_GetMaxManaFromUnit, pUnit);
+    const int32_t nManaNow = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_MANA, 0);
+    D2_CALL(STATLIST_SetUnitStat, pUnit, STAT_MANA, std::min(nManaNow + (nMana << 8), nMaxMana), 0);
 
-    STATES_ToggleState(pCorpse, STATE_REDEEMED, 1);
+    D2_CALL(STATES_ToggleState, pCorpse, STATE_REDEEMED, 1);
     pCorpse->dwFlags &= ~(UNITFLAG_TARGETABLE | UNITFLAG_CANBEATTACKED);
     return 1;
 }

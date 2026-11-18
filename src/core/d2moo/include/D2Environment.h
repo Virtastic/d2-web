@@ -71,6 +71,8 @@ D2DrlgEnvironmentStrc* __fastcall ENVIRONMENT_AllocDrlgEnvironment(void* pMemPoo
 void __fastcall ENVIRONMENT_UpdateLightIntensity(D2DrlgEnvironmentStrc* pEnvironment, int nLevelId, int nAct);
 //D2Common.0x6FD8DAC0
 void __fastcall ENVIRONMENT_UpdateLightColor(D2DrlgEnvironmentStrc* pEnvironment, int nAct);
+// not-1.13c split: D2Common+0x37170 (record in EAX), seamed by the FN probes of the three cycle setters
+void __fastcall ENVIRONMENT_ApplyCycleStart(D2DrlgEnvironmentStrc* pEnvironment);
 //D2Common.0x6FD8DC00 (#10923)
 D2COMMON_DLL_DECL BOOL __stdcall ENVIRONMENT_UpdatePeriodOfDay(D2DrlgActStrc* pAct, D2ActiveRoomStrc* pRoom);
 //D2Common.0x6FD8DC70

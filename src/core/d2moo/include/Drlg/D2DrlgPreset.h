@@ -133,6 +133,7 @@ void __fastcall DRLGPRESET_AllocPresetRoomData(D2DrlgRoomStrc* pDrlgRoom);
 D2DrlgRoomStrc* __fastcall DRLGPRESET_InitPresetRoomData(D2DrlgLevelStrc* pLevel, D2DrlgMapStrc* pDrlgMap, D2DrlgCoordStrc* pDrlgCoord, uint32_t dwDT1Mask, int dwRoomFlags, int dwPresetFlags, D2DrlgGridStrc* a7);
 //D2Common.0x6FD86E50
 void __fastcall DRLGPRESET_InitPresetRoomGrids(D2DrlgRoomStrc* pDrlgRoom);
+void D2Common_A360_MoveNodesInRect(D2DrlgPresetRoomStrc* pMaze, int32_t dx, int32_t dy, int32_t w, int32_t h, D2PresetUnitStrc** ppFreeList);
 //D2Common.0x6FD870F0
 void __fastcall DRLGPRESET_GetTombStoneTileCoords(D2DrlgRoomStrc* pDrlgRoom, D2CoordStrc** ppTombStoneTiles, int* pnTombStoneTiles);
 //D2Common.0x6FD87130

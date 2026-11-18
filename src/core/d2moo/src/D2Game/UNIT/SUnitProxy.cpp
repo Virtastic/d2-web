@@ -3,6 +3,8 @@
 
 #include <algorithm>
 
+#include <test_seam.h>
+
 #include <Fog.h>
 #include <D2BitManip.h>
 
@@ -83,7 +85,7 @@ void __fastcall SUNITPROXY_AllocNpcEvent(D2UnitStrc* pNpc, D2GameStrc* pGame, D2
 {
     int32_t nUnused = 0;
     D2NpcEventStrc* pNpcEvent = D2_ALLOC_STRC_POOL(pGame->pMemoryPool, D2NpcEventStrc);
-    D2NpcRecordStrc* pNpcRecord = SUNITPROXY_GetNpcRecordFromUnit(pGame, pNpc, &nUnused);
+    D2NpcRecordStrc* pNpcRecord = D2_CALL(SUNITPROXY_GetNpcRecordFromUnit, pGame, pNpc, &nUnused);
     if (pNpcRecord)
     {
         pNpcEvent->pNext = pNpcRecord->pEvent;
@@ -94,7 +96,7 @@ void __fastcall SUNITPROXY_AllocNpcEvent(D2UnitStrc* pNpc, D2GameStrc* pGame, D2
     }
     else
     {
-        ITEMS_RemoveFromAllPlayers(pGame, pPlayer);
+        D2_CALL(ITEMS_RemoveFromAllPlayers, pGame, pPlayer);
     }
 }
 

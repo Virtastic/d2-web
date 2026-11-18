@@ -198,6 +198,9 @@ D2InventoryGridStrc* __fastcall INVENTORY_GetGrid(D2InventoryStrc* pInventory, i
 BOOL __fastcall INVENTORY_CanItemBePlacedAtPos(D2InventoryGridStrc* pInventoryGrid, int nX, int nY, uint8_t nItemWidth, uint8_t nItemHeight);
 // The footprint-empty loop of the test above, without its bounds test (1.13c 0x1E360)
 BOOL __fastcall INVENTORY_AreCellsFree(D2InventoryGridStrc* pInventoryGrid, int nX, int nY, uint8_t nItemWidth, uint8_t nItemHeight);
+void __fastcall INVENTORY_FillGridCells(uint8_t nRows, int nRow, int nCol, D2InventoryGridStrc* pInventoryGrid, uint8_t nCols, D2UnitStrc* pItem);
+void __fastcall INVENTORY_AppendItemToList(D2InventoryStrc* pInventory, D2UnitStrc* pItem);
+void __fastcall INVENTORY_AppendItemToGridList(D2UnitStrc* pItem, D2InventoryGridStrc* pInventoryGrid, D2InventoryStrc* pInventory);
 //D2Common.0x6FD8ECF0
 BOOL __fastcall INVENTORY_FindFreePositionBottomRightToTopLeftWithWeight(D2InventoryGridStrc* pInventoryGrid, int* pFreeX, int* pFreeY, uint8_t nItemWidth, uint8_t nItemHeight);
 //D2Common.0x6FD8EE20

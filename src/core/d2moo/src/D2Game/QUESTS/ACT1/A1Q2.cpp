@@ -1,5 +1,7 @@
 #include "QUESTS/ACT1/A1Q2.h"
 
+#include <test_seam.h>
+
 #include <DataTbls/LevelsIds.h>
 #include <DataTbls/MonsterIds.h>
 #include <Drlg/D2DrlgDrlg.h>
@@ -231,7 +233,7 @@ int32_t __fastcall ACT1Q2_UnitIterate_UpdateQuestStateFlags(D2GameStrc* pGame, D
 //D2Game.0x6FC98760
 void __fastcall ACT1Q2_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];
 
 	if (pQuestArg->nNPCNo != MONSTER_KASHYA)
 	{
@@ -241,22 +243,22 @@ void __fastcall ACT1Q2_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 	if (pQuestArg->nMessageIndex == 81)
 	{
 		((D2Act1Quest2Strc*)pQuestData->pQuestDataEx)->bKashyaActivated = 1;
-		QUESTS_StateDebug(pQuestData, 2, __FILE__, __LINE__);
-		SUNIT_IterateUnitsOfType(pQuestData->pGame, 0, 0, ACT1Q2_UnitIterate_UpdateQuestStateFlags);
-		QUESTS_NPCActivateSpeeches(pQuestArg->pGame, pQuestArg->pPlayer, pQuestArg->pTarget);
+		D2_CALL(QUESTS_StateDebug, pQuestData, 2, __FILE__, __LINE__);
+		D2_CALL(SUNIT_IterateUnitsOfType, pQuestData->pGame, 0, nullptr, ACT1Q2_UnitIterate_UpdateQuestStateFlags);
+		D2_CALL(QUESTS_NPCActivateSpeeches, pQuestArg->pGame, pQuestArg->pPlayer, pQuestArg->pTarget);
 	}
 	else if (pQuestArg->nMessageIndex == 92)
 	{
-		if (!QUESTRECORD_GetQuestState(pQuestFlags, pQuestData->nQuestFilter, QFLAG_REWARDPENDING))
+		if (!D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, pQuestData->nQuestFilter, QFLAG_REWARDPENDING))
 		{
 			return;
 		}
 
-		if (QUESTRECORD_GetQuestState(pQuestFlags, pQuestData->nQuestFilter, QFLAG_PRIMARYGOALDONE) && pQuestData->fState != 5)
+		if (D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, pQuestData->nQuestFilter, QFLAG_PRIMARYGOALDONE) && pQuestData->fState != 5)
 		{
 			pQuestData->dwFlags &= 0xFFFFFF00;
 			QUESTS_UnitIterate(pQuestData, 13, 0, ACT1Q2_UnitIterate_StatusCyclerEx, 0);
-			QUESTS_StateDebug(pQuestData, 5, __FILE__, __LINE__);
+			D2_CALL(QUESTS_StateDebug, pQuestData, 5, __FILE__, __LINE__);
 
 			if (IsBadCodePtr((FARPROC)pQuestData->pfSeqFilter))
 			{
@@ -266,9 +268,9 @@ void __fastcall ACT1Q2_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 			pQuestData->pfSeqFilter(pQuestData);
 		}
 
-		QUESTRECORD_SetQuestState(pQuestFlags, pQuestData->nQuestFilter, QFLAG_REWARDGRANTED);
-		QUESTRECORD_ClearQuestState(pQuestFlags, pQuestData->nQuestFilter, QFLAG_REWARDPENDING);
-		QUESTS_UpdatePlayerFlags(pQuestData->pGame, pQuestArg->pPlayer);
+		D2_CALL(QUESTRECORD_SetQuestState, pQuestFlags, pQuestData->nQuestFilter, QFLAG_REWARDGRANTED);
+		D2_CALL(QUESTRECORD_ClearQuestState, pQuestFlags, pQuestData->nQuestFilter, QFLAG_REWARDPENDING);
+		D2_CALL(QUESTS_UpdatePlayerFlags, pQuestData->pGame, pQuestArg->pPlayer);
 
 		int32_t nUnitId = -1;
 		if (pQuestArg->pPlayer)
@@ -276,9 +278,9 @@ void __fastcall ACT1Q2_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 			nUnitId = pQuestArg->pPlayer->dwUnitId;
 		}
 
-		QUESTS_AddPlayerGUID(&pQuestData->tPlayerGUIDs, nUnitId);
-		D2GAME_NPC_AssignMercenary_6FCCB520(pQuestData->pGame, pQuestArg->pPlayer, MONSTER_KASHYA);
-		QUESTS_NPCActivateSpeeches(pQuestArg->pGame, pQuestArg->pPlayer, pQuestArg->pTarget);
+		D2_CALL(QUESTS_AddPlayerGUID, &pQuestData->tPlayerGUIDs, nUnitId);
+		D2_CALL(D2GAME_NPC_AssignMercenary_6FCCB520, pQuestData->pGame, pQuestArg->pPlayer, MONSTER_KASHYA);
+		D2_CALL(QUESTS_NPCActivateSpeeches, pQuestArg->pGame, pQuestArg->pPlayer, pQuestArg->pTarget);
 	}
 }
 

@@ -5,6 +5,7 @@
 #include "D2Dungeon.h"
 #include "D2Math.h"
 #include <DataTbls/LevelsIds.h>
+#include <test_seam.h>
 
 #define M_PI 3.14159265358979323846
 #define NUM_TIME_RATES 3
@@ -433,6 +434,15 @@ int __stdcall ENVIRONMENT_GetCycleIndexFromAct(D2DrlgActStrc* pAct)
 	return DUNGEON_GetEnvironmentFromAct(pAct)->nCycleIndex;
 }
 
+// 1.13c D2Common+0x37170 (record in EAX): the period of day and the starting tick of the record's current cycle, from the table the
+// eclipse flag picks. Retail calls it from the three cycle setters; d2-web splits it out so a probe can seam it.
+void __fastcall ENVIRONMENT_ApplyCycleStart(D2DrlgEnvironmentStrc* pEnvironment)
+{
+	const D2EnvironmentCycleStrc* pEnvironmentCycle = pEnvironment->bEclipse ? &gEclipseEnvironmentCycle[pEnvironment->nCycleIndex] : &gNormalEnvironmentCycle[pEnvironment->nCycleIndex];
+	pEnvironment->nPeriodOfDay = pEnvironmentCycle->nPeriodOfDay;
+	pEnvironment->nTicks = pEnvironment->nTimeRate * pEnvironmentCycle->nTicksBegin;
+}
+
 // 1.13c D2Common+0x37920
 //D2Common.0x6FD8DF40 (#10932)
 void __stdcall ENVIRONMENT_InitializeEnvironment(D2DrlgActStrc* pAct, D2ActiveRoomStrc* pRoom, int nIndex, int nTicks, BOOL bEclipse)
@@ -463,20 +473,20 @@ void __stdcall ENVIRONMENT_InitializeEnvironment(D2DrlgActStrc* pAct, D2ActiveRo
 
 	pEnvironment->nPeriodOfDay = pEnvironmentCycle->nPeriodOfDay;
 
-	const int nLevelId = pRoom ? DUNGEON_GetLevelIdFromRoom(pRoom) : 0;
-	const int nAct = DRLG_GetActNoFromLevelId(nLevelId);
+	// 1.13c: the level comes from the room's chain (+0x10, +0x58, +0x1D0), the act from D2Common+0x2D2C0 kept to its low byte
+	const int nLevelId = pRoom ? D2_CALL(DUNGEON_GetLevelIdFromRoom, pRoom) : 0;
+	const int nAct = (uint8_t)D2_CALL(DRLG_GetActNoFromLevelId, nLevelId);
 
-	ENVIRONMENT_UpdateLightIntensity(pEnvironment, nLevelId, nAct);
+	D2_CALL(ENVIRONMENT_UpdateLightIntensity, pEnvironment, nLevelId, nAct);
 
 	pEnvironment->bEclipse = bEclipse;
 
 	if (bEclipse)
 	{
-		pEnvironment->nPeriodOfDay = gEclipseEnvironmentCycle[pEnvironment->nCycleIndex].nPeriodOfDay;
-		pEnvironment->nTicks = gEclipseEnvironmentCycle[pEnvironment->nCycleIndex].nTicksBegin * pEnvironment->nTimeRate;
+		D2_CALL(ENVIRONMENT_ApplyCycleStart, pEnvironment);
 
-		ENVIRONMENT_UpdateLightIntensity(pEnvironment, nLevelId, nAct);
-		ENVIRONMENT_UpdateLightColor(pEnvironment, nAct);
+		D2_CALL(ENVIRONMENT_UpdateLightIntensity, pEnvironment, nLevelId, nAct);
+		D2_CALL(ENVIRONMENT_UpdateLightColor, pEnvironment, nAct);
 	}
 
 	if (nLevelId == LEVEL_ROCKYSUMMIT)
@@ -579,14 +589,14 @@ void __stdcall ENVIRONMENT_TaintedSunBegin(D2DrlgActStrc* pAct)
 	pEnvironment->nTicks = 0;
 	pEnvironment->nPeriodOfDay = gEclipseEnvironmentCycle[ENVCYCLE_SUNRISE].nPeriodOfDay;
 
-	ENVIRONMENT_UpdateLightIntensity(pEnvironment, 0, 0);
+	const int nAct = (uint8_t)D2_CALL(DRLG_GetActNoFromLevelId, 0); // 1.13c D2Common+0x2D2C0(0), low byte
+	D2_CALL(ENVIRONMENT_UpdateLightIntensity, pEnvironment, 0, nAct);
 
 	pEnvironment->bEclipse = TRUE;
-	pEnvironment->nPeriodOfDay = gEclipseEnvironmentCycle[pEnvironment->nCycleIndex].nPeriodOfDay;
-	pEnvironment->nTicks = gEclipseEnvironmentCycle[pEnvironment->nCycleIndex].nTicksBegin * pEnvironment->nTimeRate;
+	D2_CALL(ENVIRONMENT_ApplyCycleStart, pEnvironment);
 
-	ENVIRONMENT_UpdateLightIntensity(pEnvironment, 0, 0);
-	ENVIRONMENT_UpdateLightColor(pEnvironment, 0);
+	D2_CALL(ENVIRONMENT_UpdateLightIntensity, pEnvironment, 0, nAct);
+	D2_CALL(ENVIRONMENT_UpdateLightColor, pEnvironment, nAct);
 }
 
 // 1.13c D2Common+0x37C20
@@ -602,7 +612,7 @@ void __stdcall ENVIRONMENT_TaintedSunEnd(D2DrlgActStrc* pAct)
 	pEnvironment->nTicks = 0;
 	pEnvironment->nPeriodOfDay = gNormalEnvironmentCycle[ENVCYCLE_NOON].nPeriodOfDay;
 
-	ENVIRONMENT_UpdateLightIntensity(pEnvironment, 0, 0);
+	D2_CALL(ENVIRONMENT_UpdateLightIntensity, pEnvironment, 0, (uint8_t)D2_CALL(DRLG_GetActNoFromLevelId, 0)); // 1.13c D2Common+0x2D2C0(0), low byte
 
 	pEnvironment->bEclipse = FALSE;
 }
