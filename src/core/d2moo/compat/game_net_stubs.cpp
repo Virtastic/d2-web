@@ -368,6 +368,15 @@ void CLIENTS_SetRoomInClient(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
     if (pClient->pRoom != pRoom) sub_6FC33020(pClient, pRoom);
     pClient->pRoom = pRoom;
 }
+// 1.13c D2Game+0x49E90 (EDI = game; GAME_FreeGame calls it, Clients.cpp is not linked): free every client on the game list,
+// the next link read before each pool free (Clients.cpp line 0x603).
+void __fastcall CLIENTS_FreeClientsFromGame(D2GameStrc* pGame) {
+    for (D2ClientStrc* pClient = pGame->pClientList; pClient; ) {
+        D2ClientStrc* pNext = pClient->pNext;
+        FOG_FreePool(pGame->pMemoryPool, pClient, __FILE__, 0x603, 0);
+        pClient = pNext;
+    }
+}
 
 // The client setters the save-header reader needs, missing from the vendored tree (they were
 // declared in D2Game's header with no definition). Backed by the real struct, like the getters

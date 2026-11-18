@@ -3116,7 +3116,11 @@ BOOL __stdcall ITEMS_CheckItemTypeIdByItemId(int nItemId, int nItemType)
 	if (nItemType >= 0 && nItemType < sgptDataTables->nItemTypesTxtRecordCount)
 	{
 		const D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(nItemId);
-		D2_ASSERT(pItemsTxtRecord);
+		if (!pItemsTxtRecord)
+		{
+			// 1.13c D2Common+0x24500: an item id past the items table answers 0 (no assert).
+			return FALSE;
+		}
 		if (pItemsTxtRecord->wType[0] >= 0 && pItemsTxtRecord->wType[0] < sgptDataTables->nItemTypesTxtRecordCount)
 		{
 			if (ITEMS_CheckTypeEquivalenceFromLUT(ITEMS_TypeEquivalenceLUT(pItemsTxtRecord->wType[0]), nItemType))

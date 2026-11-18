@@ -276,6 +276,8 @@ int32_t __fastcall CLIENTS_GetUnitX(D2UnitStrc* pUnit);
 int32_t __fastcall CLIENTS_GetUnitY(D2UnitStrc* pUnit);
 //D2Game.0x6FC33570
 void __fastcall CLIENTS_SetUnitsUpdateList(D2ClientStrc* pClient, D2ClientUnitUpdateSortStrc* pSort);
+// 1.13c D2Game+0x4A460 (inlined into CLIENTS_RefreshUnitsUpdateList in 1.10f)
+void __fastcall D2GAME_ClientsUpdateInsert_6FC6A460(D2UnitStrc* pUnit, int32_t nY, uint32_t* pCurrentMax, D2ClientStrc* pClient, uint32_t nUpdateSize, D2ClientUnitUpdateSortStrc* pSort, int32_t nX);
 //D2Game.0x6FC33670
 void __fastcall sub_6FC33670(D2GameStrc* pGame, D2ClientStrc* pClient);
 //D2Game.0x6FC337B0

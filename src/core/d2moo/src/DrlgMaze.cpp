@@ -8,6 +8,29 @@
 #include <DataTbls/LevelsIds.h>
 #include <test_seam.h>
 
+// Every call from this file to a function the FN probes stand in for (d2common_maze_mirror.h, d2common_preset_mirror.h) goes through the
+// seam, so a probe that hooks the callee sees the call as the capture recorded it; an empty slot is the direct call. The definitions below
+// write the name in parentheses so the macro does not touch them. D2_CALL is restated with the direct call in parentheses so a call
+// written as D2_CALL(name, ...) in this file does not expand the name's macro a second time.
+#undef D2_CALL
+#define D2_CALL(fn, ...) (D2Seam<&fn>::hook ? D2Seam<&fn>::hook(__VA_ARGS__) : (fn)(__VA_ARGS__))
+#define DRLGROOM_AllocRoomEx(...) D2_CALL(DRLGROOM_AllocRoomEx, __VA_ARGS__)
+#define DRLGROOM_FreeRoomEx(...) D2_CALL(DRLGROOM_FreeRoomEx, __VA_ARGS__)
+#define DRLGROOM_AllocDrlgOrthsForRooms(...) D2_CALL(DRLGROOM_AllocDrlgOrthsForRooms, __VA_ARGS__)
+#define DRLGROOM_AddOrth(...) D2_CALL(DRLGROOM_AddOrth, __VA_ARGS__)
+#define DRLG_GetLevel(...) D2_CALL(DRLG_GetLevel, __VA_ARGS__)
+#define DRLGMAZE_LinkMazeRooms(...) D2_CALL(DRLGMAZE_LinkMazeRooms, __VA_ARGS__)
+#define DRLGMAZE_MergeWithTouchingRooms(...) D2_CALL(DRLGMAZE_MergeWithTouchingRooms, __VA_ARGS__)
+#define DRLGMAZE_PickRoomPreset(...) D2_CALL(DRLGMAZE_PickRoomPreset, __VA_ARGS__)
+#define DRLGMAZE_AddSpecialPreset(...) D2_CALL(DRLGMAZE_AddSpecialPreset, __VA_ARGS__)
+#define DRLGMAZE_ScanReplaceSpecialPreset(...) D2_CALL(DRLGMAZE_ScanReplaceSpecialPreset, __VA_ARGS__)
+#define DRLGMAZE_AllocLinkedMazeRoom(...) D2_CALL(DRLGMAZE_AllocLinkedMazeRoom, __VA_ARGS__)
+#define DRLGMAZE_FillBlankMazeSpaces(...) D2_CALL(DRLGMAZE_FillBlankMazeSpaces, __VA_ARGS__)
+#define DRLGMAZE_GetFreeLocationForRoomNorth(...) D2_CALL(DRLGMAZE_GetFreeLocationForRoomNorth, __VA_ARGS__)
+#define DRLGMAZE_GetFreeLocationForRoomSouth(...) D2_CALL(DRLGMAZE_GetFreeLocationForRoomSouth, __VA_ARGS__)
+#define DRLGMAZE_GetFreeLocationForRoomEast(...) D2_CALL(DRLGMAZE_GetFreeLocationForRoomEast, __VA_ARGS__)
+#define DRLGMAZE_GetFreeLocationForRoomWest(...) D2_CALL(DRLGMAZE_GetFreeLocationForRoomWest, __VA_ARGS__)
+
 // Helper functions
 // not-1.13c: no standalone body; the four free-location scans 0x10730/0x10820/0x10910/0x10A00 walk the orth list inline.
 static bool DRLGMAZE_OrthWithDirectionExists(D2DrlgRoomStrc* pDrlgRoom, int nDirection)
@@ -27,7 +50,7 @@ static bool DRLGMAZE_OrthWithDirectionExists(D2DrlgRoomStrc* pDrlgRoom, int nDir
 
 //D2Common.0x6FD78E50
 // 1.13c D2Common+0x10910: the minimum-x room that is map-less, has no west link and takes a trial room there (freed again)
-D2DrlgRoomStrc* __fastcall DRLGMAZE_GetFreeLocationForRoomEast(D2DrlgLevelStrc* pLevel)
+D2DrlgRoomStrc* __fastcall (DRLGMAZE_GetFreeLocationForRoomEast)(D2DrlgLevelStrc* pLevel)
 {
 	D2DrlgRoomStrc* pResult = nullptr;
 
@@ -47,7 +70,7 @@ D2DrlgRoomStrc* __fastcall DRLGMAZE_GetFreeLocationForRoomEast(D2DrlgLevelStrc* 
 
 //D2Common.0x6FD79240
 // 1.13c D2Common+0x10820: the maximum-x room, the same test in the east direction
-D2DrlgRoomStrc* __fastcall DRLGMAZE_GetFreeLocationForRoomWest(D2DrlgLevelStrc* pLevel)
+D2DrlgRoomStrc* __fastcall (DRLGMAZE_GetFreeLocationForRoomWest)(D2DrlgLevelStrc* pLevel)
 {
 	D2DrlgRoomStrc* pResult = nullptr;
 
@@ -66,7 +89,7 @@ D2DrlgRoomStrc* __fastcall DRLGMAZE_GetFreeLocationForRoomWest(D2DrlgLevelStrc* 
 
 //D2Common.0x6FD79360
 // 1.13c D2Common+0x10730: the maximum-y room, the same test in the south direction
-D2DrlgRoomStrc* __fastcall DRLGMAZE_GetFreeLocationForRoomNorth(D2DrlgLevelStrc* pLevel)
+D2DrlgRoomStrc* __fastcall (DRLGMAZE_GetFreeLocationForRoomNorth)(D2DrlgLevelStrc* pLevel)
 {
 	D2DrlgRoomStrc* pResult = nullptr;
 
@@ -82,7 +105,7 @@ D2DrlgRoomStrc* __fastcall DRLGMAZE_GetFreeLocationForRoomNorth(D2DrlgLevelStrc*
 }
 
 // 1.13c D2Common+0x10A00: the minimum-y room, the same test in the north direction (level arrives in EAX)
-D2DrlgRoomStrc* __fastcall DRLGMAZE_GetFreeLocationForRoomSouth(D2DrlgLevelStrc* pLevel)
+D2DrlgRoomStrc* __fastcall (DRLGMAZE_GetFreeLocationForRoomSouth)(D2DrlgLevelStrc* pLevel)
 {
 	D2DrlgRoomStrc* pResult = nullptr;
 
@@ -100,7 +123,7 @@ D2DrlgRoomStrc* __fastcall DRLGMAZE_GetFreeLocationForRoomSouth(D2DrlgLevelStrc*
 //D2Common.0x6FD78F70
 // 1.13c D2Common+0x0E490
 //Named sSetChamberPreset in the original code ?
-void __fastcall DRLGMAZE_PickRoomPreset(D2DrlgRoomStrc* pDrlgRoom, BOOL bResetFlag)
+void __fastcall (DRLGMAZE_PickRoomPreset)(D2DrlgRoomStrc* pDrlgRoom, BOOL bResetFlag)
 {
 	//D2Common.0x6FDCE710
 	//Remapping of presets for harem, basement and spider cave. Effictively preventing any non diagonal presets since not every direction exists.
@@ -928,7 +951,7 @@ D2DrlgRoomStrc* __fastcall DRLGMAZE_AddAdjacentMazeRoom(D2DrlgRoomStrc* pDrlgRoo
 // 1.13c D2Common+0x0F000
 // Alloc a preset room of the maze size next to pParent in nDirection (direction arrives in EAX), link it,
 // optionally merge with touching rooms, push it at the head of the level list. NULL (room freed) if it does not fit.
-D2DrlgRoomStrc* __fastcall DRLGMAZE_AllocLinkedMazeRoom(D2DrlgRoomStrc* pParent, int nDirection, BOOL bMergeRooms)
+D2DrlgRoomStrc* __fastcall (DRLGMAZE_AllocLinkedMazeRoom)(D2DrlgRoomStrc* pParent, int nDirection, BOOL bMergeRooms)
 {
 	D2DrlgRoomStrc* pNewRoomEx = DRLGROOM_AllocRoomEx(pParent->pLevel, DRLGTYPE_PRESET);
 	pNewRoomEx->nTileWidth = pNewRoomEx->pLevel->pMaze->dwSizeX;
@@ -950,7 +973,7 @@ D2DrlgRoomStrc* __fastcall DRLGMAZE_AllocLinkedMazeRoom(D2DrlgRoomStrc* pParent,
 // 1.13c D2Common+0x0EB80
 // Merge pass split out of DRLGMAZE_PlaceAdjacentPresetRoom in 1.13c: for each other
 // map-less room that touches pNewRoomEx diagonally-free, roll its seed against dwMerge.
-void __fastcall DRLGMAZE_MergeWithTouchingRooms(D2DrlgRoomStrc* pNewRoomEx)
+void __fastcall (DRLGMAZE_MergeWithTouchingRooms)(D2DrlgRoomStrc* pNewRoomEx)
 {
 	if (DRLGMAZE_HasMapDS1(pNewRoomEx))
 	{
@@ -1098,7 +1121,7 @@ void __fastcall DRLGMAZE_InitBasicMazeLayout(D2DrlgLevelStrc* pLevel, int nRooms
 
 //D2Common.0x6FD7A340
 // 1.13c D2Common+0x0EEC0
-BOOL __fastcall DRLGMAZE_LinkMazeRooms(D2DrlgRoomStrc* pDrlgRoom1, D2DrlgRoomStrc* pDrlgRoom2, int nDirection)
+BOOL __fastcall (DRLGMAZE_LinkMazeRooms)(D2DrlgRoomStrc* pDrlgRoom1, D2DrlgRoomStrc* pDrlgRoom2, int nDirection)
 {
 	switch (nDirection)
 	{
@@ -1269,7 +1292,7 @@ void __fastcall DRLGMAZE_PlaceAct5LavaPresets(D2DrlgLevelStrc* pLevel)
 
 //D2Common.0x6FD7A9B0
 // 1.13c D2Common+0x10010 (EAX = level; stack: preset, ignored room)
-void __fastcall DRLGMAZE_FillBlankMazeSpaces(D2DrlgLevelStrc* pLevel, int nLevelPrest, D2DrlgRoomStrc* pIgnoreRoomEx)
+void __fastcall (DRLGMAZE_FillBlankMazeSpaces)(D2DrlgLevelStrc* pLevel, int nLevelPrest, D2DrlgRoomStrc* pIgnoreRoomEx)
 {
 	const int nRooms = pLevel->nRooms;
 	if (nRooms > 0)
@@ -1459,7 +1482,7 @@ void __fastcall DRLGMAZE_PlaceArcaneSanctuary(D2DrlgLevelStrc* pLevel)
 // 1.13c D2Common+0x106B0 (EDX = table row, stack: level, rand): retag the first map-less room still showing the
 // row's base preset, else hang a new fixed-preset room off the first map-less room that has space (0x105C0);
 // the rand cursor then advances modulo 4 either way.
-void __fastcall DRLGMAZE_ScanReplaceSpecialPreset(D2DrlgLevelStrc* pLevel, const D2MazeLevelIdStrc* pMazeInit, int* pRand)
+void __fastcall (DRLGMAZE_ScanReplaceSpecialPreset)(D2DrlgLevelStrc* pLevel, const D2MazeLevelIdStrc* pMazeInit, int* pRand)
 {
 	D2DrlgRoomStrc* i = pLevel->pFirstRoomEx;
 	for (; i; i = i->pDrlgRoomNext)
@@ -1485,7 +1508,6 @@ void __fastcall DRLGMAZE_ScanReplaceSpecialPreset(D2DrlgLevelStrc* pLevel, const
 }
 
 // the later placements call the row scan through the test seam (empty in the game)
-#define DRLGMAZE_ScanReplaceSpecialPreset(pLevel, pMazeInit, pRand) D2_CALL(DRLGMAZE_ScanReplaceSpecialPreset, pLevel, pMazeInit, pRand)
 
 //D2Common.0x6FD7B330
 // 1.13c D2Common+0x116B0 (ESI = level): Sewers 1 chains rooms north and east from the 0x10A00 / 0x10820 free
@@ -1599,21 +1621,11 @@ void __fastcall DRLGMAZE_ScanReplaceSpecialAct2SewersPresets(D2DrlgLevelStrc* pL
 			DRLGMAZE_PickRoomPreset(pDrlgRoom5, 1);
 		}
 
-		pMazeLevelIds = &nAct2SewerNextIds[nRand];
-		if (!DRLGMAZE_ReplaceRoomPreset(pLevel, pMazeLevelIds->nLevelPrestId1, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile, 0))
-		{
-			DRLGMAZE_AddSpecialPreset(pLevel, pMazeLevelIds->nDirection, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile);
-		}
+		DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct2SewerNextIds[nRand], &nRand);
 		break;
 
 	case LEVEL_SEWERSLEV2:
-		pMazeLevelIds = &nAct2SewerPrevIds[nRand];
-		if (!DRLGMAZE_ReplaceRoomPreset(pLevel, pMazeLevelIds->nLevelPrestId1, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile, 0))
-		{
-			DRLGMAZE_AddSpecialPreset(pLevel, pMazeLevelIds->nDirection, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile);
-		}
-
-		nRand = (nRand + 1) % 4;
+		DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct2SewerPrevIds[nRand], &nRand);
 		DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct2SewerWaypointIds[nRand], &nRand);
 		DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct2SewerNextIds[nRand], &nRand);
 		break;
@@ -1636,7 +1648,7 @@ void __fastcall DRLGMAZE_ScanReplaceSpecialAct2SewersPresets(D2DrlgLevelStrc* pL
 //D2Common.0x6FD7B660
 // 1.13c D2Common+0x105C0 (EAX = level; stack: direction, preset, file): the first map-less room that takes a
 // fixed-preset neighbour in that direction gets it (the old InitRoomFixedPreset body is inlined here).
-D2DrlgRoomStrc* __fastcall DRLGMAZE_AddSpecialPreset(D2DrlgLevelStrc* pLevel, int nDirection, int nLvlPrestId, int nFile)
+D2DrlgRoomStrc* __fastcall (DRLGMAZE_AddSpecialPreset)(D2DrlgLevelStrc* pLevel, int nDirection, int nLvlPrestId, int nFile)
 {
 	for (D2DrlgRoomStrc* pDrlgRoom = pLevel->pFirstRoomEx; pDrlgRoom; pDrlgRoom = pDrlgRoom->pDrlgRoomNext)
 	{
@@ -1800,91 +1812,45 @@ void __fastcall DRLGMAZE_PlaceAct2TombStuff(D2DrlgLevelStrc* pLevel)
 		return;
 	}
 
-	if (pLevel->nLevelId >= LEVEL_STONYTOMBLEV1 && pLevel->nLevelId <= LEVEL_CLAWVIPERTEMPLELEV1)
+	// 1.13c runs every row through the 0x106B0 scan, which advances the counter itself.
+	if (pLevel->nLevelId >= LEVEL_STONYTOMBLEV1 &&pLevel->nLevelId <= LEVEL_CLAWVIPERTEMPLELEV1)
 	{
-		pMazeLevelIds = &nAct2TombNextIds[nDirection];
-		if (!DRLGMAZE_ReplaceRoomPreset(pLevel, pMazeLevelIds->nLevelPrestId1, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile, 0))
-		{
-			DRLGMAZE_AddSpecialPreset(pLevel, pMazeLevelIds->nDirection, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile);
-		}
-		nDirection = (nDirection + 1) % 4;
+		DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct2TombNextIds[nDirection], &nDirection);
 	}
 
 	if (pLevel->nLevelId == LEVEL_HALLSOFTHEDEADLEV2)
 	{
-		pMazeLevelIds = &nAct2TombWaypointIds[nDirection];
-		if (!DRLGMAZE_ReplaceRoomPreset(pLevel, pMazeLevelIds->nLevelPrestId1, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile, 0))
-		{
-			DRLGMAZE_AddSpecialPreset(pLevel, pMazeLevelIds->nDirection, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile);
-		}
-
-		nDirection = (nDirection + 1) % 4;
+		DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct2TombWaypointIds[nDirection], &nDirection);
 	}
 
 	if (pLevel->nLevelId == LEVEL_STONYTOMBLEV2 || pLevel->nLevelId == LEVEL_CLAWVIPERTEMPLELEV2)
 	{
-		pMazeLevelIds = &nAct2TombChestIds[nDirection];
-		if (!DRLGMAZE_ReplaceRoomPreset(pLevel, pMazeLevelIds->nLevelPrestId1, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile, 0))
-		{
-			DRLGMAZE_AddSpecialPreset(pLevel, pMazeLevelIds->nDirection, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile);
-		}
-
-		nDirection = (nDirection + 1) % 4;
+		DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct2TombChestIds[nDirection], &nDirection);
 	}
 
 	if (pLevel->nLevelId >= LEVEL_TALRASHASTOMB1 && pLevel->nLevelId <= LEVEL_TALRASHASTOMB7 && pLevel->nLevelId != pLevel->pDrlg->nStaffTombLevel)
 	{
-		pMazeLevelIds = &nAct2TombChestIds[nDirection];
-		if (!DRLGMAZE_ReplaceRoomPreset(pLevel, pMazeLevelIds->nLevelPrestId1, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile, 0))
-		{
-			DRLGMAZE_AddSpecialPreset(pLevel, pMazeLevelIds->nDirection, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile);
-		}
-
-		nDirection = (nDirection + 1) % 4;
+		DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct2TombChestIds[nDirection], &nDirection);
 	}
 
 	if (pLevel->nLevelId == LEVEL_STONYTOMBLEV2)
 	{
-		pMazeLevelIds = &nAct2TombLeatherarmIds[nDirection];
-		if (!DRLGMAZE_ReplaceRoomPreset(pLevel, pMazeLevelIds->nLevelPrestId1, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile, 0))
-		{
-			DRLGMAZE_AddSpecialPreset(pLevel, pMazeLevelIds->nDirection, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile);
-		}
-
-		nDirection = (nDirection + 1) % 4;
+		DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct2TombLeatherarmIds[nDirection], &nDirection);
 	}
 
 	if (pLevel->nLevelId == LEVEL_HALLSOFTHEDEADLEV3)
 	{
-		pMazeLevelIds = &nAct2TombCubeIds[nDirection];
-		if (!DRLGMAZE_ReplaceRoomPreset(pLevel, pMazeLevelIds->nLevelPrestId1, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile, 0))
-		{
-			DRLGMAZE_AddSpecialPreset(pLevel, pMazeLevelIds->nDirection, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile);
-		}
-
-		nDirection = (nDirection + 1) % 4;
+		DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct2TombCubeIds[nDirection], &nDirection);
 	}
 
 	if (pLevel->nLevelId == LEVEL_STONYTOMBLEV2 || pLevel->nLevelId == LEVEL_CLAWVIPERTEMPLELEV2)
 	{
-		pMazeLevelIds = &nAct2TombTreasureIds[nDirection];
-		if (!DRLGMAZE_ReplaceRoomPreset(pLevel, pMazeLevelIds->nLevelPrestId1, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile, 0))
-		{
-			DRLGMAZE_AddSpecialPreset(pLevel, pMazeLevelIds->nDirection, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile);
-		}
-
-		nDirection = (nDirection + 1) % 4;
+		DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct2TombTreasureIds[nDirection], &nDirection);
 	}
 
 	if (pLevel->nLevelId == pLevel->pDrlg->nStaffTombLevel)
 	{
-		pMazeLevelIds = &nAct2TombTalRashaIds[nDirection];
-		if (!DRLGMAZE_ReplaceRoomPreset(pLevel, pMazeLevelIds->nLevelPrestId1, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile, 0))
-		{
-			DRLGMAZE_AddSpecialPreset(pLevel, pMazeLevelIds->nDirection, pMazeLevelIds->nLevelPrestId2, pMazeLevelIds->nPickedFile);
-		}
-
-		nDirection = (nDirection + 1) % 4;
+		DRLGMAZE_ScanReplaceSpecialPreset(pLevel, &nAct2TombTalRashaIds[nDirection], &nDirection);
 	}
 
 	if (pLevel->nLevelId == pLevel->pDrlg->nBossTombLevel)
@@ -2097,13 +2063,6 @@ void __fastcall DRLGMAZE_PlaceAct5BaalStuff(D2DrlgLevelStrc* pLevel)
 // "next"/"forge" pair through 0x106B0 in an order set by one rand bit; finally shift and re-measure the level.
 void __fastcall DRLGMAZE_PlaceAct1Barracks(D2DrlgLevelStrc* pLevel)
 {
-	static D2DrlgRoomStrc* (__fastcall* pfGetBarracksEntryRoom[])(D2DrlgLevelStrc*) =
-	{
-		DRLGMAZE_GetFreeLocationForRoomWest,
-		DRLGMAZE_GetFreeLocationForRoomNorth,
-		DRLGMAZE_GetFreeLocationForRoomEast,
-	};
-
 	static const D2MazeLevelIdStrc nAct1BarracksNextIds[] =
 	{
 		{ LVLPREST_ACT1_BARRACKS_N, LVLPREST_ACT1_BARRACKS_NEXT_N, -1, 3 },
@@ -2136,7 +2095,13 @@ void __fastcall DRLGMAZE_PlaceAct1Barracks(D2DrlgLevelStrc* pLevel)
 	pOuterCloisterLevel = DRLG_GetLevel(pLevel->pDrlg, LEVEL_OUTERCLOISTER);
 	nDirection = pOuterCloisterLevel->pPreset->nDirection;
 
-	pDrlgRoom = pfGetBarracksEntryRoom[nDirection](pLevel);
+	// retail indexes a three-entry call table (west, north, east); the calls go through the seam so a probe's stand-ins fire
+	switch (nDirection)
+	{
+	case 0: pDrlgRoom = DRLGMAZE_GetFreeLocationForRoomWest(pLevel); break;
+	case 1: pDrlgRoom = DRLGMAZE_GetFreeLocationForRoomNorth(pLevel); break;
+	default: pDrlgRoom = DRLGMAZE_GetFreeLocationForRoomEast(pLevel); break;
+	}
 	nX = pOuterCloisterLevel->nPosX;
 	nY = pOuterCloisterLevel->nPosY;
 
@@ -2222,22 +2187,12 @@ void __fastcall DRLGMAZE_PlaceAct4Lava(D2DrlgLevelStrc* pLevel)
 
 		D2DrlgRoomStrc* pParentRoom = DRLGMAZE_GetFreeLocationForRoomNorth(pLevel);
 
-		D2DrlgRoomStrc* pNewRoomEx = DRLGROOM_AllocRoomEx(pParentRoom->pLevel, DRLGTYPE_PRESET);
-		DRLGMAZE_SetRoomSize(pNewRoomEx);
-
-		if (DRLGMAZE_LinkMazeRooms(pNewRoomEx, pParentRoom, ALTDIR_SOUTH))
+		// 1.13c links the warp room through 0xF000 (the 1.10f body spelled the alloc, link and free out by hand)
+		D2DrlgRoomStrc* pNewRoomEx = DRLGMAZE_AllocLinkedMazeRoom(pParentRoom, ALTDIR_SOUTH, FALSE);
+		if (pNewRoomEx)
 		{
-			DRLGROOM_AllocDrlgOrthsForRooms(pParentRoom, pNewRoomEx, ALTDIR_SOUTH);
-			DRLGROOM_AddRoomExToLevel(pParentRoom->pLevel, pNewRoomEx);
-			if (pNewRoomEx)
-			{
-				DRLGMAZE_PickRoomPreset(pParentRoom, TRUE);
-				DRLGMAZE_SetPickedFileAndPresetId(pNewRoomEx, LVLPREST_ACT4_LAVA_WARP_N, -1, FALSE);
-			}
-		}
-		else
-		{
-			DRLGROOM_FreeRoomEx(pNewRoomEx);
+			DRLGMAZE_PickRoomPreset(pParentRoom, TRUE);
+			DRLGMAZE_SetPickedFileAndPresetId(pNewRoomEx, LVLPREST_ACT4_LAVA_WARP_N, -1, FALSE);
 		}
 
 		pParentRoom = DRLGMAZE_GetFreeLocationForRoomSouth(pLevel);
