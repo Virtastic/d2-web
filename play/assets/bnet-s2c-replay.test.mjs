@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { bncsLogin, bncsRealmLogon, mcpReturnToLobby, mcpListCharacters, mcpLogonCharacter, mcpListen, mcpRequestMotd, mcpCreateAndJoin } from './realm-client.mjs';
+import { bncsLogin, mcpListCharacters, mcpLogonCharacter, mcpListen, mcpRequestMotd, mcpCreateAndJoin } from './realm-client.mjs';
 import { authRefusalEvent, logonFailureEvent } from './bnet-login-screen.mjs';
 import { createBnetChat, parseChatEvent } from './bnet-chat.mjs';
 import { createNews, createMotd } from './bnet-news.mjs';
@@ -209,7 +209,7 @@ function replayTransport(chunks, mcp) {
       return true;
     },
   };
-  return { transport, c2s, echoes, releaseAll: () => release(chunks.length), releaseTo: release, get at() { return at; } };
+  return { transport, c2s, echoes, releaseAll: () => release(chunks.length), get at() { return at; } };
 }
 
 // Our client over one recorded BNCS connection: the logon, then the chat leg on the socket it keeps (the channel list and
@@ -225,38 +225,24 @@ async function oursOverBncs(chunks) {
     bncsLogon: () => [], bncsQueryRealms: () => { seen.queried = true; return []; }, tickCount: () => 1, realmToken: () => 1,
     bncsRealmEx: (r) => { seen.realm = r.realm; return []; },
   };
-  let error = null, out = null; const handoffs = [];
+  let error = null, out = null;
   try { out = await bncsLogin(t.transport, protocol, { account: 'a', password: 'b', timeoutMs: 200 }); } catch (e) { error = e; }
   const got = { 0x0b: [], 0x0a: [], 0x0f: [], 0x46: [] };
   if (out) {
     const news = createNews();
-    const mkChat = () => createBnetChat({ transport: t.transport, reader: out.reader, character: 'x',
+    const chat = createBnetChat({ transport: t.transport, reader: out.reader, character: 'x',
       onChannels: (l) => got[0x0b].push({ channels: l }), onEntered: (u) => got[0x0a].push({ uniqueName: u }),
       // Retail queues the event's bytes, not a decoded string: compared on the bytes our client kept (`raw`, the statstring's source),
       // read up to their NUL the way `cstr` reads retail's.
       onEvent: (e) => { got[0x0f].push({ event: e.event, flags: e.flags, ping: e.ping, username: e.username, text: cstr(e.raw, 0) }); return true; },
       onNews: (b) => { const shown = news.apply(b); got[0x46].push(shown ? { shown } : { short: true }); } });
-    // The stock client logs on to the realm again on this connection when it leaves a game (a second 0x3E, no second 0x3A or 0x40):
-    // the chat leg up to it, the realm logon alone, then the chat leg again over the same connection.
-    const again = t.c2s.filter((x) => x.key === 0x3e).slice(1);
-    const leg = async (lo, hi) => {
-      const chat = mkChat();
-      chat.enter(); chat.news(0); chat.join();
-      await settle();
-      for (const f of t.c2s.filter((x) => x.key === 0x0e && x.i >= lo && x.i < hi)) { chat.say(cstr(f.body, 0)); await settle(); }
-      if (hi === Infinity) t.releaseAll(); else t.releaseTo(hi);
-      await settle();
-      // A middle leg only stops the chat's read loop (close() would also end the connection the next logon needs).
-      if (hi === Infinity) chat.close(); else { out.reader.cancel(); await settle(); }
-    };
-    let lo = 0;
-    for (const x of again) {
-      await leg(lo, x.i); lo = x.i;
-      handoffs.push(await bncsRealmLogon(t.transport, protocol, { realmList: out.realmList, realm: 'x', password: 'b', timeoutMs: 200 }));
-    }
-    await leg(lo, Infinity);
+    chat.enter(); chat.news(0); chat.join();
+    await settle();
+    for (const f of t.c2s.filter((x) => x.key === 0x0e)) { chat.say(cstr(f.body, 0)); await settle(); }
+    t.releaseAll(); await settle();
+    chat.close();
   }
-  const records = []; let realmSeen = 0;
+  const records = [];
   for (const f of bncsFrames(stream(chunks.slice(0, t.at), 's2c'))) {
     let r;
     if (f.id === 0x25) r = { echo: t.echoes.shift() };
@@ -276,14 +262,14 @@ async function oursOverBncs(chunks) {
       r = { result, event: result === 0 ? null : logonFailureEvent(error), ...(result === 6 ? { text: error.logonReason } : {}) };
     } else if (f.id === 0x59) r = { emailRequested: t.transport.bncsEmailRequested };
     else if (f.id === 0x40 && out) r = { titles: out.realmList.map((x) => x.title).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)) };
-    else if (f.id === 0x3e && out) { const h = (realmSeen++ ? handoffs[realmSeen - 2] : out.handoff); r = h ? { stored: hex(h.realmReply), ip: h.ip, port: h.port } : { notHandled: true }; }
+    else if (f.id === 0x3e && out) r = { stored: hex(out.handoff.realmReply), ip: out.handoff.ip, port: out.handoff.port };
     else if (f.id === 0x0f && !parseChatEvent(f.body)) r = { invalid: true };
     else if (got[f.id]?.length) r = got[f.id].shift();
     else if (f.id === 0x00) r = { noop: true };   // the chat loop's frames with no case: read and dropped
     else r = { notHandled: true };
     records.push({ id: f.id, frame: f, ours: r });
   }
-  return { records, out, seen, c2s: t.c2s, handoffs: out ? [out.handoff, ...handoffs] : [] };
+  return { records, out, seen, c2s: t.c2s };
 }
 
 // Our MCP leg over the recorded realm connection: STARTUP and the character list, the character logon, the lobby's MOTD request,
@@ -297,22 +283,12 @@ async function oursOverMcp(chunks, handoff) {
     mcpCreateGame: () => [], mcpJoinGame: () => [],
   };
   const got = { 0x01: [], 0x19: [], 0x07: [], 0x12: [], 0x03: [], 0x04: [] };
+  const listed = await mcpListCharacters(t.transport, protocol, { realmReply: handoff.realmReply, keepAliveMs: 1e9 });
+  const session = listed.session; clearInterval(session.keepAlive);
+  got[0x01].push({ result: 0 });
+  got[0x19].push({ total: listed.total, returned: listed.returned, names: listed.characters.map((c) => c.name), expiry: listed.characters.map((c) => c.expiry) });
   const logon = t.c2s.find((x) => x.key === 0x07);
-  // The way back to the lobby after a game: STARTUP and CHARLOGON only, no character list (mcpReturnToLobby).
-  const back = !t.c2s.some((x) => x.key === 0x19) && logon;
-  let session;
-  if (back) {
-    const name = cstr(logon.body, 0);
-    ({ session } = await mcpReturnToLobby(t.transport, protocol, { realmReply: handoff.realmReply, character: name, characters: [{ name }], keepAliveMs: 1e9, timeoutMs: 500 }));
-    clearInterval(session.keepAlive);
-    got[0x01].push({ result: 0 }); got[0x07].push({ result: 0 });
-  } else {
-    const listed = await mcpListCharacters(t.transport, protocol, { realmReply: handoff.realmReply, keepAliveMs: 1e9 });
-    session = listed.session; clearInterval(session.keepAlive);
-    got[0x01].push({ result: 0 });
-    got[0x19].push({ total: listed.total, returned: listed.returned, names: listed.characters.map((c) => c.name), expiry: listed.characters.map((c) => c.expiry) });
-    if (logon) { await mcpLogonCharacter(session, cstr(logon.body, 0), { timeoutMs: 500 }); got[0x07].push({ result: 0 }); }
-  }
+  if (logon) { await mcpLogonCharacter(session, cstr(logon.body, 0), { timeoutMs: 500 }); got[0x07].push({ result: 0 }); }
   const motd = createMotd();
   mcpListen(session, () => false);
   if (t.c2s.some((x) => x.key === 0x12)) mcpRequestMotd(session, (key, bytes) => got[0x12].push({ motd: motd.add(key, bytes) }));
@@ -341,11 +317,11 @@ async function replay() {
   const tally = new Map(); const differing = [];
   const add = (key, same, detail) => { const t = tally.get(key) ?? { frames: 0, same: 0 }; t.frames++; if (same) t.same++; else differing.push(detail); tally.set(key, t); };
   for (const run of runs) {
-    const conns = connections(run); let handoffs = [], mcpSeen = 0;
+    const conns = connections(run); let handoff = null;
     for (const [cid, chunks] of conns) {
       if (!isBncs(chunks)) continue;
-      const { records, out, seen, c2s, handoffs: hs } = await oursOverBncs(chunks);
-      if (out) handoffs = hs;
+      const { records, out, seen, c2s } = await oursOverBncs(chunks);
+      if (out) handoff = out.handoff;
       // Retail's own C>S frames: its echo of each ping, the realm it named in the realm logon.
       const retailEchoes = bncsFrames(stream(chunks, 'c2s')).filter((f) => f.id === 0x25).map((f) => hex(f.frame));
       const realmEx = c2s.find((f) => f.key === 0x3e);
@@ -359,15 +335,13 @@ async function replay() {
       }
     }
     for (const [cid, chunks] of conns) {
-      const handoff = handoffs[mcpSeen];
       if (!isMcp(chunks) || !handoff) continue;
-      mcpSeen++;
       // Retail's MCP STARTUP is the hand-off it stored, less the IP and port: the second oracle for 0x3E.
       const startup = mcpFrames(stream(chunks, 'c2s').subarray(1)).find((f) => f.id === 0x01);
       const stored = Buffer.from(handoff.realmReply);
       assert.equal(hex(startup.body), hex(Buffer.concat([stored.subarray(0, 16), stored.subarray(24)])), `${run}/${cid}: retail's STARTUP is its stored 0x3E`);
       assert.equal(hex(handoff.startup), hex(startup.body.subarray(0, 64)), `${run}/${cid}: our startup block`);
-      const { records, pending } = await oursOverMcp(chunks, handoff).catch((e) => { e.message = `${run}/${cid}: ${e.message}`; throw e; });
+      const { records, pending } = await oursOverMcp(chunks, handoff);
       const state = { pending };
       for (const { id, body, ours } of records) {
         const retail = retailMcpRecord(id, body, state);

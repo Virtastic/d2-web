@@ -589,16 +589,7 @@ void D2GAME_PACKETS_SendPacket0x0D_6FC3C920(D2ClientStrc* pClient, char nPacketI
 }
 // D18 skill probe: counts the unit-mode packets (0x0F coordinate, 0x10 unit target) a cast emits.
 extern "C" uint32_t g_d2webModePackets = 0;
-// 1.13c D2Game+0x8D410 (SCmd.cpp 0x1D/0x1E/0x1F): one stat to the client, in the narrowest of byte (0x1D),
-// word (0x1E) and dword (0x1F) forms; byte arrays because D2PacketDef.h's stat struct is not the wire layout.
-void D2GAME_PACKETS_SendPacket0x1D_E_F_6FC3D480(D2ClientStrc* pClient, uint16_t nStatId, uint32_t nValue) {
-    uint8_t p[6] = { 0x1D, (uint8_t)nStatId };
-    uint32_t n = 3;
-    if (nValue >= 0xFFFFu) { p[0] = 0x1F; std::memcpy(p + 2, &nValue, 4); n = 6; }
-    else if (nValue >= 0xFFu) { p[0] = 0x1E; std::memcpy(p + 2, &nValue, 2); n = 4; }
-    else p[2] = (uint8_t)nValue;
-    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, p, (int32_t)n);
-}
+// 0x1D/0x1E/0x1F (1.13c D2Game+0x8BD00) lives in d2moo/src/D2Game/GAME/SCmd.cpp.
 // 1.13c D2Game+0x8A980 (SCmd.cpp 0x7B): one hotkey slot, {header, slot, skill (low 12 bits) with the hand in bit 15, item guid}, 8 bytes.
 void __fastcall D2GAME_PACKETS_SendPacket0x7B_6FC3F720(D2ClientStrc* pClient, BYTE slot, int16_t nSkill, int32_t nHand, int32_t nItemGUID) {
     uint8_t packet[8] = { 0x7B, slot };
@@ -761,17 +752,6 @@ static void d2webSend67(D2ClientStrc* pClient, uint8_t nHeader, int32_t guid, in
     if (full) b[15] = (uint8_t)lifeByte;   // 0x8D860 writes its life argument here (a knockback's 0x67 ends with the monster's life byte)
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, sizeof b);
 }
-static void d2webSend68(D2ClientStrc* pClient, int32_t guid, int8_t msg, int8_t tType, int32_t tGuid, int8_t life, int8_t hit, int8_t maxDistArg, bool full) {
-    D2UnitStrc* pMonster = SUNIT_GetServerUnit(CLIENTS_GetGame(pClient), UNIT_MONSTER, guid);
-    if (!pMonster) return;
-    uint8_t path, maxDist; int16_t vel; d2webPathTail(pMonster, &path, &vel, &maxDist);
-    if (full) { if (path == 8) path = 11; maxDist = (uint8_t)maxDistArg; }
-    else if (path >= 5u) { if (path <= 6u) path = 2; else if (path == 8) path = 11; }
-    int16_t x = (int16_t)CLIENTS_GetUnitX(pMonster), y = (int16_t)CLIENTS_GetUnitY(pMonster);
-    uint8_t b[21] = {}; b[0] = 0x68; std::memcpy(b + 1, &guid, 4); b[5] = (uint8_t)msg; std::memcpy(b + 6, &x, 2); std::memcpy(b + 8, &y, 2);
-    b[10] = (uint8_t)tType; std::memcpy(b + 11, &tGuid, 4); b[15] = (uint8_t)life; b[16] = full ? (uint8_t)hit : 0; b[17] = path; std::memcpy(b + 18, &vel, 2); b[20] = maxDist;
-    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, sizeof b);
-}
 // 1.13c D2Game+0x8BC20 / 0x8D860 family: D2MOO SCmd.cpp 0x6FC3CBC0, 0x6FC3CDE0, 0x6FC3CA90, 0x6FC3CCB0
 void D2GAME_PACKETS_SendPacket0x67_6FC3CBC0(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int16_t nX, int16_t nY, int8_t a7) {
     d2webSend67(pClient, nHeader, nUnitGUID, a4, nX, nY, a7, 0, false);
@@ -779,12 +759,7 @@ void D2GAME_PACKETS_SendPacket0x67_6FC3CBC0(D2ClientStrc* pClient, uint8_t nHead
 void D2GAME_PACKETS_SendPacket0x67_6FC3CDE0(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int16_t nX, int16_t nY, int8_t a7, int8_t a8, int8_t a9) {
     d2webSend67(pClient, nHeader, nUnitGUID, a4, nX, nY, a7, a9, true, a8);
 }
-void D2GAME_PACKETS_SendPacket0x68_6FC3CA90(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int8_t a5, int32_t a6, int8_t a7) {
-    (void)nHeader; d2webSend68(pClient, nUnitGUID, a4, a5, a6, a7, 0, 0, false);
-}
-void D2GAME_PACKETS_SendPacket0x68_6FC3CCB0(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int8_t a5, int32_t a6, int8_t a7, int8_t a8, int8_t a9) {
-    (void)nHeader; d2webSend68(pClient, nUnitGUID, a4, a5, a6, a7, a9, a8, true);
-}
+// The 0x68 pair (0x6FC3CA90 / 0x6FC3CCB0, 1.13c D2Game+0x8DC30 / 0x8D990) lives in d2moo/src/D2Game/GAME/SCmd.cpp.
 // 1.13c D2Game+0x8C100: the 0x67/0x69-family monster mode packet
 // {header, unitId, state, x, y, lifeByte, lastHitClass}. Byte 5 is the animation state the client
 // keys on -- 6 is GETHIT, which is how a landed monster hit reaches the client at all -- and byte

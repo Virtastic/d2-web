@@ -5,7 +5,6 @@ import { parseRealmUnitInfo } from './realm-combat.mjs';
 import { parseRealmMissileSoundEvents } from './realm-missile-sounds.mjs';
 import { OBJECT_UNIT_BYTES, parseRealmObjectUnits, parseRealmObjectEvents } from './realm-objects.mjs';
 import { parseRealmUnitFx } from './realm-unit-fx.mjs';
-import { bnftpDownload } from './bnet-terms.mjs';
 import { parseSessionRooms, parseSessionSnapshot, parseSessionWarps } from '../gameplay-model.mjs';
 // The realm CLIENT half: it drives our protocol (BNCS/MCP/D2GS) over a byte-pipe transport.
 //
@@ -35,9 +34,6 @@ import { parseSessionRooms, parseSessionSnapshot, parseSessionWarps } from '../g
 export const BNCS_REPLY_MS = 45000;
 export const MCP_STARTUP_MS = 60000;
 const CONNECT_TIMEOUT_MS = 8000;
-// Game-logon time per game socket: the stock client's first keep-alive goes out ~55 ms after the logon, inside the join,
-// and the keep-alive clock runs on from that moment.
-const d2gsLogonAt = new WeakMap();
 
 const cat = (a, b) => (a.length ? Uint8Array.from([...a, ...b]) : (b instanceof Uint8Array ? b : Uint8Array.from(b)));
 const hex = (u8) => [...u8].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -90,13 +86,6 @@ function makeReader(transport) {
 // a server's 0x00 is flagged but never answered (dispatch entry 0 is a bare `mov eax,1; ret`).
 export const BNCS_NULL_MS = 180000;
 export const BNCS_NULL_FRAME = Uint8Array.of(0xff, 0x00, 0x04, 0x00);
-// The 0x51 exe fields of the stock 1.13c client (stockgs12): the version, the revision-check result for the private realm's formula
-// and the "Game.exe <mtime> <size>" line. A server config's `auth` (exeVersion, exeHash, exeInfo) overrides each; with none the
-// 130-byte frame the stock client sent goes out, not a 98-byte one with an empty info line.
-export const STOCK_EXE_AUTH = Object.freeze({ version: 0x01000d00, hash: 0x7686beca, info: 'Game.exe 11/17/26 19:52:55 61444' });
-// BNClient+0xF050, called from +0xF430 right after the 0x51 reply: SID_GETFILETIME for the gateway list, request id 0x80000004,
-// then 0, then the file name. The reply (id, 0, FILETIME, name) is the cue for the file connection that downloads the file.
-const BNCS_GETFILETIME_FRAME = Uint8Array.from([0xff, 0x33, 0x1e, 0x00, 0x04, 0x00, 0x00, 0x80, 0, 0, 0, 0, ...new TextEncoder().encode('bnserver-D2DV.ini'), 0]);
 const bncsNullStarted = new WeakSet();
 
 /**
@@ -125,13 +114,9 @@ export function startBncsNull(transport, { now = () => Date.now(), setTimer = se
 }
 
 // The BNCS reader: the keep-alive runs for the connection's life, the frame reader is the same as the realm's.
-// One reader per connection: the connect step (bncsAuthenticate) and the LOG IN after it, often tens of seconds apart, read the same buffer.
-const bncsReaders = new WeakMap();
 function bncsReader(transport) {
   startBncsNull(transport);
-  let reader = bncsReaders.get(transport);
-  if (!reader) { reader = makeReader(transport); bncsReaders.set(transport, reader); }
-  return reader;
+  return makeReader(transport);
 }
 
 // BNClient+0xF430: once the 0x50 reply is in, a link already marked lost raises failure event 0xB (over any earlier event) and the
@@ -170,7 +155,6 @@ async function readBncsFrame(reader, timeoutMs, packetWait = false, wantId = nul
     // Bnclient+0x107C0: SID_SETEMAIL sets the email-request flag (read back through interface slot +0xB4, cleared only at connect);
     // D2Launch+0xEAB0 tests it once the logon has passed and, when set, opens its email panel (+0x100C0) before the realm step.
     if (copy[1] === 0x59) reader.emailRequested = true;
-    if (copy[1] === 0x33) { try { reader.onFileTime?.(copy.subarray(4)); } catch { /* the file side never fails a wait */ } }
     if (wantId !== null && copy[1] !== wantId) continue;
     return { id: copy[1], body: copy.subarray(4) };
   }
@@ -731,38 +715,17 @@ export async function bncsChangeEmail(transport, protocol, { account, oldEmail, 
  * Returns the challenge the server issued, the realm list it advertised, and the LOGONREALMEX
  * handoff (the MCP ticket) -- the read offsets the server cannot check for us.
  */
-export async function bncsLogin(transport, protocol, { account, password, realm = 'd2-web', preferredRealm = '', product = 'D2XP', auth = null, timeoutMs = BNCS_REPLY_MS, dialFiles = null } = {}) {
+export async function bncsLogin(transport, protocol, { account, password, realm = 'd2-web', preferredRealm = '', product = 'D2XP', auth = null, timeoutMs = BNCS_REPLY_MS } = {}) {
   const reader = bncsReader(transport);
   const sent = [], received = [];
-  const send = (id, body) => { const frame = protocol.bncsFrame(id, body); sent.push({ id, bytes: frame.length }); transport.send(frame); };
-  // The connect step (selector, 0x50, 0x51, 0x33) runs when the connection opens, not at LOG IN: the stock client's 0x3a goes out when the
-  // player submits the logon screen, tens of seconds after the connect (stockgs12: 0x51 at 0.44 s, 0x3a at 35.55 s). A caller that has
-  // already run bncsAuthenticate on this connection goes straight to the logon.
-  const { serverToken, clientToken, mpqName, challenge, versionResult } = await bncsAuthenticate(transport, protocol, { product, auth, timeoutMs, dialFiles, sent, received });
-  return bncsLogonSteps(transport, protocol, reader, { account, password, realm, preferredRealm, timeoutMs, send, sent, received, serverToken, clientToken, mpqName, challenge, versionResult });
-}
-
-/**
- * The BNCS connect step, BNClient+0xF430: protocol selector, AUTH_INFO, the version-check archive on a connection of its own, AUTH_CHECK and
- * the gateway-list FILETIME request (0x33). Once per connection (transport.bncsAuth); resolves to that record.
- */
-export async function bncsAuthenticate(transport, protocol, { product = 'D2XP', auth = null, timeoutMs = BNCS_REPLY_MS, dialFiles = null, sent = [], received = [] } = {}) {
-  const reader = bncsReader(transport);
-  // The 0x33 reply names the gateway list's server FILETIME; the stock client downloads the file on a connection of its own (BnDownload,
-  // case 0x80000004 of BNClient+0xE2E0). The text is not used here (the server list is the project's config), the traffic is.
-  reader.onFileTime = (body) => {
-    if (!dialFiles || body.length < 18) return;
-    const fileTime = new DataView(body.buffer, body.byteOffset, body.byteLength).getBigUint64(8, true);
-    const end = body.indexOf(0, 16);
-    const name = new TextDecoder('latin1').decode(body.subarray(16, end < 0 ? body.length : end));
-    void bnftpDownload(dialFiles, name, { request: { fileTime } }).catch(() => {});
-  };
   const send = (id, body) => { const frame = protocol.bncsFrame(id, body); sent.push({ id, bytes: frame.length }); transport.send(frame); };
 
   // A refused logon keeps the connection (retail's does), and the next LOG IN goes straight to the logon:
   // the selector and AUTH_INFO/AUTH_CHECK are once per connection, and a second 0x01 makes the server hang up.
   let serverToken, clientToken, mpqName, challenge, versionResult;
-  if (!transport.bncsAuth) {
+  if (transport.bncsAuth) {
+    ({ serverToken, clientToken, mpqName, challenge, versionResult } = transport.bncsAuth);
+  } else {
     transport.send(protocol.bncsSelector());                       // single 0x01 protocol selector
     send(0x50, protocol.bncsAuthInfo(product));
 
@@ -774,13 +737,6 @@ export async function bncsAuthenticate(transport, protocol, { product = 'D2XP', 
     const mpq = authInfo.body.subarray(20, mpqEnd < 0 ? authInfo.body.length : mpqEnd);
     challenge = authInfo.body.subarray(mpqEnd + 1);
     mpqName = new TextDecoder().decode(mpq);
-
-    // The stock client fetches the version-check MPQ (the AUTH_INFO reply's file name and FILETIME) on a connection of its own
-    // before it sends AUTH_CHECK (stockgs12: the BNFTP request ahead of 0x51). The file is not used here; the traffic is.
-    if (dialFiles && authInfo.body.length >= 21 && mpqName) {
-      const fileTime = new DataView(authInfo.body.buffer, authInfo.body.byteOffset, authInfo.body.byteLength).getBigUint64(12, true);
-      await bnftpDownload(dialFiles, mpqName, { request: { fileTime } }).catch(() => {});
-    }
 
     // BNClient+0x12060: the token is its running seed (seed += tick + time); the version, hash and info
     // come from the server's revision formula over the configured files, the key blocks from `auth`.
@@ -804,16 +760,8 @@ export async function bncsAuthenticate(transport, protocol, { product = 'D2XP', 
     }
 
     transport.bncsAuth = { serverToken, clientToken, mpqName, challenge, versionResult, authInfo };
-    send(0x33, BNCS_GETFILETIME_FRAME.subarray(4));
-    // The 0x33 reply starts the gateway-list download at once in the stock client (0.45 s, not at the logon); wait for it here when
-    // there is a file connection to start. Nothing but unsolicited frames can be ahead of it: the logon has not been sent yet.
-    if (dialFiles) await readBncsFrame(reader, 2000, false, 0x33).catch(() => {});
   }
-  return transport.bncsAuth;
-}
 
-// The logon steps of bncsLogin, after the connect step.
-async function bncsLogonSteps(transport, protocol, reader, { account, password, realm, preferredRealm, timeoutMs, send, sent, received, serverToken, clientToken, mpqName, challenge, versionResult }) {
   // BNClient+0xC9E0 tokens the logon with GetTickCount; +0xBFD0 with its own counter (1, 2, ...).
   send(0x3a, protocol.bncsLogon({ clientToken: protocol.tickCount(), serverToken, account, password }));
   // PvPGN prompts an account with no email address (SID_SETEMAIL 0x59) ahead of the logon result: the wait passes it over and the
@@ -838,21 +786,6 @@ async function bncsLogonSteps(transport, protocol, reader, { account, password, 
   if (realms.id !== 0x40) throw new Error(`expected QUERYREALMS2 reply 0x40, got 0x${realms.id.toString(16)}`);
   const realmList = parseRealmList(realms.body);
 
-  const handoff = await bncsRealmLogon(transport, protocol, { realmList, realm, preferredRealm, password, timeoutMs, send, received });
-
-  // `reader` stays attached to the open socket: retail keeps the BNCS chat connection for the session.
-  return { clientToken, serverToken, mpq: mpqName, challenge, versionResult, logonResult, emailRequested, realmList, handoff, sent, received, reader };
-}
-
-/**
- * LOGONREALMEX (0x3e) on a connection that has passed its account logon: the realm logon alone. The stock client sends it again on the
- * same connection when it leaves a game (stockgs10: 0x3e at 97 s and 129 s, no second 0x3a or 0x40) and the reply is a fresh hand-off
- * with its own ticket. `realmList` is the one the QUERYREALMS2 reply gave.
- */
-export async function bncsRealmLogon(transport, protocol, { realmList, realm = 'd2-web', preferredRealm = '', password, timeoutMs = BNCS_REPLY_MS,
-  send = (id, body) => transport.send(protocol.bncsFrame(id, body)), received = [] } = {}) {
-  const reader = bncsReader(transport);
-  const { serverToken } = transport.bncsAuth;
   send(0x3e, protocol.bncsRealmEx({ clientToken: protocol.realmToken(), serverToken, realm: realmLogonTitle(realmList, realm, preferredRealm), password }));
   const realmEx = await readBncsFrame(reader, timeoutMs, true, 0x3e); received.push(realmEx.id);
   if (realmEx.id !== 0x3e) throw new Error(`expected LOGONREALMEX reply 0x3e, got 0x${realmEx.id.toString(16)}`);
@@ -872,7 +805,9 @@ export async function bncsRealmLogon(transport, protocol, { realmList, realm = '
     // MCP_STARTUP forwards bytes [0,16) then [24,72) of this reply -- the block the realm hands over.
     // A plain array, so the value survives the CDP hop a scenario result crosses (a typed array does not).
     startup: [...cat(realmEx.body.subarray(0, 16), realmEx.body.subarray(24, 72))] };
-  return handoff;
+
+  // `reader` stays attached to the open socket: retail keeps the BNCS chat connection for the session.
+  return { clientToken, serverToken, mpq: mpqName, challenge, versionResult, logonResult, emailRequested, realmList, handoff, sent, received, reader };
 }
 
 /**
@@ -941,16 +876,6 @@ async function d2gsJoinRun(transport, protocol, { character, charClass, gameToke
 
   const gamelogon = protocol.d2gsGamelogon({ character, charClass, gameToken, gameHash, expansion });
   sent.logonSent = transport.send(gamelogon) !== false;   // a send on a closed socket never reached the server
-  if (sent.logonSent) {
-    const at = Date.now();
-    d2gsLogonAt.set(transport, { at, pinged: false });
-    setTimeout(() => {
-      const st = d2gsLogonAt.get(transport);
-      if (!st || st.pinged || transport.isOpen === false) return;
-      const frame = protocol.d2gsPing?.((Date.now() - at + 5000) >>> 0);
-      if (frame) { st.pinged = true; transport.send(frame); }
-    }, 55);
-  }
 
   const decoded = [];
   let frameCount = 0, assignOffset = -1, handshakeEnd = -1, playerAssignment = null;
@@ -1114,8 +1039,7 @@ function findPacket(stream, protocol, opcode, from = 0) {
 /** Retail's 13-byte D2GS keep-alive, sent every five seconds while the game socket is retained. */
 export function startD2gsKeepAlive(transport, protocol, { intervalMs = 5000, now = () => Date.now(),
   setIntervalFn = setInterval, clearIntervalFn = clearInterval, onSent = () => {} } = {}) {
-  const logon = d2gsLogonAt.get(transport);
-  const started = logon && now === Date.now ? logon.at : now();
+  const started = now();
   let active = true, sent = 0;
   let timer;
   const stop = () => {
@@ -1123,22 +1047,18 @@ export function startD2gsKeepAlive(transport, protocol, { intervalMs = 5000, now
     active = false;
     clearIntervalFn(timer);
   };
-  // The stock client's tick is the system uptime, so its first ping (about 60 ms after the game logon) passes the five-second gate.
-  const clock = () => (now() - started + 5000) >>> 0;
-  const ping = () => {
+  timer = setIntervalFn(() => {
     if (!active) return;
-    const tick = clock();
+    const tick = (now() - started) >>> 0;
     const frame = protocol.d2gsPing(tick);              // null: D2Client+0x14B00's five-second gate held it
     if (!frame) return;
     transport.send(frame);
     sent++;
     onSent(sent, tick);
-  };
-  timer = setIntervalFn(ping, intervalMs);
-  if (!logon?.pinged) setTimeout(() => { if (!logon?.pinged) ping(); }, 50);
+  }, intervalMs);
   transport.onClose?.(stop);
   // D2Client+0x422E0: feed each 0x8F pong back so the next ping carries the averaged round trip.
-  const pong = (payload) => protocol.d2gsPong?.(payload, clock());
+  const pong = (payload) => protocol.d2gsPong?.(payload, (now() - started) >>> 0);
   return { stop, pong, get active() { return active; }, get sent() { return sent; } };
 }
 
@@ -1274,8 +1194,8 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
         const keys = auth?.cdKeys ?? [];
         const n = call('d2_realm_bncs_auth_check_fixed', 'number',
           ['bigint', 'number', 'number', 'number', 'number', 'number', 'number', 'string', 'string', 'string', 'string', 'bigint'],
-          [BigInt(SEED), env.time(), env.tick(), serverToken, expansion, auth?.exeVersion ?? STOCK_EXE_AUTH.version, auth?.exeHash ?? STOCK_EXE_AUTH.hash,
-            auth?.exeInfo ?? STOCK_EXE_AUTH.info, keys[0] ?? '', keys[1] ?? '', auth?.keyOwner ?? '', BigInt(O)]);
+          [BigInt(SEED), env.time(), env.tick(), serverToken, expansion, auth?.exeVersion ?? 0x01000d00, auth?.exeHash ?? 0,
+            auth?.exeInfo ?? '', keys[0] ?? '', keys[1] ?? '', auth?.keyOwner ?? '', BigInt(O)]);
         if (n <= 0) throw new Error('AUTH_CHECK composer failed');
         return { body: rd(O, n), clientToken: u32at(SEED) };
       }
@@ -1783,14 +1703,7 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
       // Version byte 0x0D is the BNClient answer; language 0 is the English string table the client loads.
       const n = call('d2_realm_d2gs_gamelogon', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'string', 'bigint'],
         [gameHash, gameToken, charClass, 0x0d, expansion ? 1 : 0, 0, character, BigInt(T)]);
-      const out = rd(T, n);
-      // D2Client+0x14A50 builds the packet in a stack buffer and SStrCopy writes only the name and its NUL, so name[7..11]
-      // (packet bytes 28..32) keep what the previous call left there. The caller 0x44F40 runs 0x42880 just before, whose last
-      // call is GetSystemMetrics(0x4b) (push 4b at 0x42946, call esi at 0x42948): its return address 6faf294a and its
-      // argument 4b, little-endian, are those five bytes in every stock recording.
-      const strLen = Math.min(new TextEncoder().encode(character).length, 15);
-      [0x4a, 0x29, 0xaf, 0x6f, 0x4b].forEach((b, i) => { if (7 + i > strLen) out[21 + 7 + i] = b; });
-      return out;
+      return rd(T, n);
     },
     // D2Client+0x14B00: [6D][tick][avg rtt >> 1][module word * 0xB640DE41]; null while the 5 s gate holds.
     d2gsPing: (tick) => {

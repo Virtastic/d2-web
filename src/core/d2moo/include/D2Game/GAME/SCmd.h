@@ -129,6 +129,10 @@ D2UnkMonsterDataStrc* __fastcall sub_6FC3E3D0(D2UnitStrc* pUnit);
 int32_t __stdcall sub_6FC3E3F0(D2UnkMonsterDataStrc* a1, int32_t nCurrentLifePercentage);
 //D2Game.0x6FC3E440
 int32_t __fastcall sub_6FC3E440(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, int32_t a3, int32_t a4);
+//1.13c D2Game+0x8D500: the monster life filter; pPlayer is the receiving player
+int32_t __fastcall SCMD_ShouldSendMonsterLifeUpdate(D2UnitStrc* pUnit, D2UnitStrc* pPlayer, int32_t nLifePercentage);
+//1.13c D2Game+0x8E110: the life update filter by unit type; pObject is the receiving player
+int32_t __fastcall SCMD_ShouldSendUnitLifeUpdate(D2UnitStrc* pObject, D2UnitStrc* pUnit, int32_t a3, int32_t a4);
 //D2Game.0x6FC3E570
 void __fastcall D2GAME_SendPacket0x9C_6FC3E570(D2ClientStrc* pClient, D2UnitStrc* pItem, char nAction, DWORD dwFlag, int32_t bGamble);
 //D2Game.0x6FC3E6F0

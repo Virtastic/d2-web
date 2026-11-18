@@ -26,7 +26,7 @@ export function termsFileName(country = 'USA') { return `tos-unicode_${country}.
  * BNClient+0xE740's request: word length (name + 0x21), word 0x100, 'IX86', 'D2DV', banner id 0, banner extension 0,
  * start position 0, the cached copy's FILETIME (0: the browser keeps no cache) and the name with its NUL.
  */
-export function bnftpRequest(name, { startPos = 0, fileTime = 0n, bannerId = 0, bannerExt = 0 } = {}) {
+export function bnftpRequest(name, { startPos = 0, fileTime = 0n } = {}) {
   const n = name.length;
   const out = new Uint8Array(0x21 + n);
   const v = new DataView(out.buffer);
@@ -34,8 +34,6 @@ export function bnftpRequest(name, { startPos = 0, fileTime = 0n, bannerId = 0, 
   v.setUint16(2, 0x0100, true);
   v.setUint32(4, 0x49583836, true); // 'IX86'
   v.setUint32(8, 0x44324456, true); // 'D2DV'
-  v.setUint32(0x0c, bannerId >>> 0, true);
-  v.setUint32(0x10, bannerExt >>> 0, true);
   v.setUint32(0x14, startPos >>> 0, true);
   v.setBigUint64(0x18, BigInt(fileTime), true);
   for (let i = 0; i < n; i++) out[0x20 + i] = name.charCodeAt(i) & 0xff;
@@ -91,7 +89,7 @@ const transportFailure = (message) => Object.assign(new Error(message), { transp
  * BNClient+0xDC50 does: up to four connects a second apart, the protocol byte and the request as two sends, then the
  * answer. Any failure is a transport failure (the terms screen then shows its disconnected notice).
  */
-export async function bnftpDownload(dial, name, { request = {}, recvMs = BNFTP_RECV_MS, tries = BNFTP_CONNECT_TRIES, retryMs = BNFTP_RETRY_MS,
+export async function bnftpDownload(dial, name, { recvMs = BNFTP_RECV_MS, tries = BNFTP_CONNECT_TRIES, retryMs = BNFTP_RETRY_MS,
   setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
   let link = null;
   for (let attempt = 1; ; attempt++) {
@@ -114,7 +112,7 @@ export async function bnftpDownload(dial, name, { request = {}, recvMs = BNFTP_R
       });
       link.onClose(() => { clearTimer(timer); reject(transportFailure('the file transfer connection closed')); });
       arm();
-      if (!link.send(Uint8Array.of(BNFTP_PROTOCOL)) || !link.send(bnftpRequest(name, request))) { clearTimer(timer); reject(transportFailure('the file transfer request could not be sent')); }
+      if (!link.send(Uint8Array.of(BNFTP_PROTOCOL)) || !link.send(bnftpRequest(name))) { clearTimer(timer); reject(transportFailure('the file transfer request could not be sent')); }
     });
   } finally { try { link.close(); } catch { /* already closed */ } }
 }

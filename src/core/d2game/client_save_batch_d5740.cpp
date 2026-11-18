@@ -82,26 +82,8 @@ void D2GAME_8CF80_CorpseAssignment(D2GameStrc* game, int32_t playerId,
 }
 
 // 1.13c D2Game+0x8B5A0
+// The body is sub_6FC3DCA0 (d2moo/src/D2Game/GAME/SCmd.cpp); this name stays for the monspawn driver.
 void D2GAME_8B5A0_SendSkills(D2ClientStrc* client, D2UnitStrc* unit)
 {
-    assert(unit && unit->pSkills && client);
-    uint32_t count = 0;
-    for (auto* s = SKILLS_GetFirstSkillFromSkillList(unit->pSkills); s; s = SKILLS_GetNextSkill(s)) ++count;
-    assert(count < 256);
-    // The wire format is six header bytes followed by three bytes per skill.
-    std::vector<uint8_t> packet(6 + 3 * count);
-    packet[0] = 0x94;
-    packet[1] = static_cast<uint8_t>(count);
-    // The header id is the unit argument's (+0xC; d2game_8b5a0.cpp, the rule over the disassembly). Retail's client
-    // +0x1A8 is only where the buffer's pool comes from, and that offset reads another field of this build's client.
-    const uint32_t id = unit->dwUnitId;
-    for (unsigned b = 0; b < 4; ++b) packet[2+b] = static_cast<uint8_t>(id >> (b*8));
-    size_t offset = 6;
-    for (auto* s = SKILLS_GetFirstSkillFromSkillList(unit->pSkills); s; s = SKILLS_GetNextSkill(s)) {
-        const uint16_t skill = SKILLS_GetSkillIdFromSkill(s, __FILE__, __LINE__);
-        packet[offset++] = static_cast<uint8_t>(skill);
-        packet[offset++] = static_cast<uint8_t>(skill >> 8);
-        packet[offset++] = static_cast<uint8_t>(SKILLS_GetSkillLevel(unit, s, 0));
-    }
-    D2GAME_PACKETS_SendPacket_6FC3C710(client, packet.data(), static_cast<int32_t>(packet.size()));
+    sub_6FC3DCA0(client, unit);
 }
