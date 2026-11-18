@@ -10639,12 +10639,15 @@ EMSCRIPTEN_KEEPALIVE const D2SessionCorpseSaveRoundTrip* d2_session_corpse_save_
     g_sessionCorpseSaveRoundTrip.bytesWritten=(uint32_t)(w-g_sessionCorpseSaveBytes.data());g_sessionCorpseSaveBytes.resize(g_sessionCorpseSaveRoundTrip.bytesWritten);
     if(g_sessionCorpseSaveBytes.size()>=4){g_sessionCorpseSaveRoundTrip.sectionCount=(uint32_t)g_sessionCorpseSaveBytes[2]|((uint32_t)g_sessionCorpseSaveBytes[3]<<8);if(g_sessionCorpseSaveBytes[0]=='J'&&g_sessionCorpseSaveBytes[1]=='M')g_sessionCorpseSaveRoundTrip.flags|=1u;}
     g_sessionCorpseSaveRoundTrip.sectionHash=sessionHashBytes(D2VEC_FNV_INIT,g_sessionCorpseSaveBytes.data(),g_sessionCorpseSaveBytes.size());
+    // The replay write runs BEFORE the read: the read adds the saved corpse back (count 1 -> 2) with the reader's own item flags and a 0,0
+    // position, and the writer keeps the highest-transaction-cost corpse with a later one winning a tie (D2Game+0xEC260). Start items all
+    // cost 1 (D2Common+0x28E80), so after the read the read-back corpse ties and wins, writing different bytes by design.
+    std::vector<uint8_t> rep(65536,0);uint8_t* re=rep.data();rc=PLRSAVE2_WriteCorpsesSection(g_game,g_targetPlayer,&re,rep.data()+rep.size(),0);rep.resize((size_t)(re-rep.data()));
+    g_sessionCorpseSaveRoundTrip.replayBytes=(uint32_t)rep.size();g_sessionCorpseSaveRoundTrip.replayHash=sessionHashBytes(D2VEC_FNV_INIT,rep.data(),rep.size());if(!rc&&rep==g_sessionCorpseSaveBytes)g_sessionCorpseSaveRoundTrip.flags|=8u;
     uint8_t* r=g_sessionCorpseSaveBytes.data();int32_t detail=0;rc=PLRSAVE2_ReadCorpses(g_game,g_targetPlayer,&r,g_sessionCorpseSaveBytes.data()+g_sessionCorpseSaveBytes.size(),96,&detail);
     g_sessionCorpseSaveRoundTrip.readerDetail=(uint32_t)detail;g_sessionCorpseSaveRoundTrip.bytesConsumed=(uint32_t)(r-g_sessionCorpseSaveBytes.data());
     if(rc){g_sessionCorpseSaveRoundTrip.result=0x200u+rc;return &g_sessionCorpseSaveRoundTrip;}if(g_sessionCorpseSaveRoundTrip.bytesConsumed==g_sessionCorpseSaveRoundTrip.bytesWritten)g_sessionCorpseSaveRoundTrip.flags|=2u;
     g_sessionCorpseSaveRoundTrip.corpseCountAfter=sessionCorpseCount(g_targetPlayer->pInventory);if(g_sessionCorpseSaveRoundTrip.corpseCountAfter==g_sessionCorpseSaveRoundTrip.corpseCountBefore+g_sessionCorpseSaveRoundTrip.sectionCount)g_sessionCorpseSaveRoundTrip.flags|=4u;
-    std::vector<uint8_t> rep(65536,0);uint8_t* re=rep.data();rc=PLRSAVE2_WriteCorpsesSection(g_game,g_targetPlayer,&re,rep.data()+rep.size(),0);rep.resize((size_t)(re-rep.data()));
-    g_sessionCorpseSaveRoundTrip.replayBytes=(uint32_t)rep.size();g_sessionCorpseSaveRoundTrip.replayHash=sessionHashBytes(D2VEC_FNV_INIT,rep.data(),rep.size());if(!rc&&rep==g_sessionCorpseSaveBytes)g_sessionCorpseSaveRoundTrip.flags|=8u;
     g_sessionCorpseSaveRoundTrip.result=g_sessionCorpseSaveRoundTrip.flags==15u?0u:2u;g_sessionCorpseSaveRoundTrip.hash=sessionHashBytes(D2VEC_FNV_INIT,&g_sessionCorpseSaveRoundTrip,offsetof(D2SessionCorpseSaveRoundTrip,hash));return &g_sessionCorpseSaveRoundTrip;
 }
 EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_corpse_save_bytes(){return g_sessionCorpseSaveBytes.data();}
