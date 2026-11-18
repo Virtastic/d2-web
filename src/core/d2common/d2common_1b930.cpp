@@ -5,7 +5,7 @@
 #include <cstring>
 
 // 1.13c D2Common+0x1B930
-int32_t D2Common_1B930_NextToken(char** cur, const char* delims) {
+int32_t DATATBLS_NextListToken(char** cur, const char* delims) {
     char* s = *cur;
     char* p = s + strcspn(s, delims);
     *cur = p;

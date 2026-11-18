@@ -282,7 +282,7 @@ void __fastcall sub_6FD745C0(D2DrlgRoomStrc* pDrlgRoom1, D2DrlgRoomStrc* pDrlgRo
 // 1.13c D2Common+0x2DDB0: whether an inactive level can be freed. Any of its rooms still needing its status or holding a
 // room blocks it (return 0, nothing freed); otherwise the near-room data of every room of its vis levels that faces back at
 // it is released as each vis level is passed, and a later vis level may still block after earlier ones were released.
-static BOOL DRLG_CanDiscardLevel(D2DrlgLevelStrc* pLevel)
+BOOL DRLG_CanDiscardLevel(D2DrlgLevelStrc* pLevel)
 {
 	D2DrlgStrc* pDrlg = pLevel->pDrlg;
 	void* pMemPool = pDrlg->pMempool;
@@ -295,7 +295,7 @@ static BOOL DRLG_CanDiscardLevel(D2DrlgLevelStrc* pLevel)
 		}
 	}
 
-	int* pVisLevelIds = DRLGROOM_GetVisArrayFromLevelId(pDrlg, pLevel->nLevelId);
+	int* pVisLevelIds = D2_CALL(DRLGROOM_GetVisArrayFromLevelId, pDrlg, pLevel->nLevelId);
 	for (int j = 0; j < 8; ++j)
 	{
 		if (!pVisLevelIds[j])
@@ -309,7 +309,7 @@ static BOOL DRLG_CanDiscardLevel(D2DrlgLevelStrc* pLevel)
 			continue;
 		}
 
-		int* pBackIds = DRLGROOM_GetVisArrayFromLevelId(pVisLevel->pDrlg, pVisLevel->nLevelId);
+		int* pBackIds = D2_CALL(DRLGROOM_GetVisArrayFromLevelId, pVisLevel->pDrlg, pVisLevel->nLevelId);
 		uint32_t dwMask = 0;
 		for (int i = 0; i < 8; ++i)
 		{
@@ -426,7 +426,7 @@ D2DrlgLevelStrc* __stdcall DRLG_GetLevel(D2DrlgStrc* pDrlg, int nLevelId)
 		}
 	}
 
-	return DRLG_AllocLevel(pDrlg, nLevelId);
+	return D2_CALL(DRLG_AllocLevel, pDrlg, nLevelId);
 }
 
 //D2Common.0x6FD749E0
@@ -466,6 +466,7 @@ int __fastcall DRLG_GetDirectionFromCoordinates(D2DrlgCoordStrc* pDrlgCoord1, D2
 	return DIRECTION_INVALID;
 }
 
+// 1.13c D2Common+0x2E1F0
 //D2Common.0x6FD74A40
 // 1.13c D2Common+0x2E1F0 (ESI = room): same body -- rect x5, seed step only when the tile grid has walls or floors,
 // flags 4 / 1 / 0 from the room flags; the two extern notes are d2-web diagnostics, not retail

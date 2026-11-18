@@ -2485,29 +2485,17 @@ void __fastcall DRLGMAZE_RollAct_1_2_3_BasicPresets(D2DrlgLevelStrc* pLevel)
 	}
 }
 
-//D2Common.0x6FD7D130
-// 1.13c D2Common+0xF110 (per room: AllocDrlgMap 0xBC60, file pick 0xECB0, BuildArea 0xC690, orth re-link, free; the
-// loop over the room list with the next pointer read first sits in 0x11BF0, which this function stands for).
-void __fastcall DRLGMAZE_RollBasicPresets(D2DrlgLevelStrc* pLevel)
+// 1.13c D2Common+0xECB0: the file pick of one basic-preset room (inlined in the 1.10f RollBasicPresets). A given file index is
+// kept; -1 picks by rotation: for the level type's base preset id, a def inside (base, base + 16) gets a per-def counter node
+// (created on first use, its cursor seeded by a roll below the file count) and the room takes the next cursor modulo the count.
+void DRLGMAZE_PickPresetFile(int nPickedFile, D2DrlgLevelStrc* pLevel, D2DrlgMapStrc* pDrlgMap)
 {
 	D2DrlgBuildStrc* pDrlgBuild = NULL;
-	D2DrlgRoomStrc* pNextRoomEx = NULL;
-	D2DrlgRoomStrc* pDrlgRoom = NULL;
-	D2DrlgRoomStrc* pTemp = NULL;
-	D2DrlgMapStrc* pDrlgMap = NULL;
 	int nLvlPrestId = 0;
-	int nPickedFile = 0;
 	int nLevelDef = 0;
 	int nFiles = 0;
 
-	pDrlgRoom = pLevel->pFirstRoomEx;
-	while (pDrlgRoom)
 	{
-		pNextRoomEx = pDrlgRoom->pDrlgRoomNext;
-
-		pDrlgMap = DRLGPRESET_AllocDrlgMap(pLevel, pDrlgRoom->pMaze->nLevelPrest, &pDrlgRoom->pDrlgCoord, &pLevel->pSeed);
-
-		nPickedFile = pDrlgRoom->pMaze->nPickedFile;
 		if (nPickedFile == -1)
 		{
 			nLevelDef = pDrlgMap->pLvlPrestTxtRecord->dwDef;
@@ -2603,7 +2591,7 @@ void __fastcall DRLGMAZE_RollBasicPresets(D2DrlgLevelStrc* pLevel)
 					pDrlgBuild->pNext = 0;
 					pDrlgBuild->nPreset = nLevelDef;
 					pDrlgBuild->nDivisor = nFiles;
-					pDrlgBuild->nRand = SEED_RollLimitedRandomNumber(&pLevel->pSeed, nFiles);
+					pDrlgBuild->nRand = D2_CALL(SEED_RollLimitedRandomNumber, &pLevel->pSeed, nFiles);
 					pDrlgBuild->pNext = pLevel->pBuild;
 					pLevel->pBuild = pDrlgBuild;
 				}
@@ -2616,6 +2604,27 @@ void __fastcall DRLGMAZE_RollBasicPresets(D2DrlgLevelStrc* pLevel)
 		{
 			pDrlgMap->nPickedFile = nPickedFile;
 		}
+	}
+}
+
+//D2Common.0x6FD7D130
+// 1.13c D2Common+0xF110 (per room: AllocDrlgMap 0xBC60, file pick 0xECB0, BuildArea 0xC690, orth re-link, free; the
+// loop over the room list with the next pointer read first sits in 0x11BF0, which this function stands for).
+void __fastcall DRLGMAZE_RollBasicPresets(D2DrlgLevelStrc* pLevel)
+{
+	D2DrlgRoomStrc* pNextRoomEx = NULL;
+	D2DrlgRoomStrc* pDrlgRoom = NULL;
+	D2DrlgRoomStrc* pTemp = NULL;
+	D2DrlgMapStrc* pDrlgMap = NULL;
+
+	pDrlgRoom = pLevel->pFirstRoomEx;
+	while (pDrlgRoom)
+	{
+		pNextRoomEx = pDrlgRoom->pDrlgRoomNext;
+
+		pDrlgMap = DRLGPRESET_AllocDrlgMap(pLevel, pDrlgRoom->pMaze->nLevelPrest, &pDrlgRoom->pDrlgCoord, &pLevel->pSeed);
+
+		DRLGMAZE_PickPresetFile(pDrlgRoom->pMaze->nPickedFile, pLevel, pDrlgMap);
 
 		pTemp = DRLGPRESET_BuildArea(pLevel, pDrlgMap, 0, pDrlgRoom->nTileWidth <= 12 && pDrlgRoom->nTileHeight <= 12);
 

@@ -13,14 +13,12 @@
 #include <cstdlib>
 #include "d2common_41340.h"
 
-// Retail 0x42A70: the footprint stamp retail calls directly (ECX=level, EDX=x, stack y, idx, flag, extra).
-extern "C" void D2Common_42A70(void*, int32_t, int32_t, int32_t, int32_t, int32_t);
-
 // 1.13c D2Common+0x41070 is in src/core/d2common/d2common_41070.cpp (one file per function).
 
 // Forwarder for the callers; the 1.13c port of 0x41340 is d2common_41340.cpp (one file per function).
+// The footprint stamp is the tagged game-tree body (DrlgOutdoors.cpp, 1.13c D2Common+0x42A70).
 static void Stamp41340(uint32_t level, int32_t x, int32_t y, int32_t preset, int32_t a, int32_t b) {
-    D2Common_42A70(reinterpret_cast<void*>(uintptr_t(level)), x, y, preset, a, b);
+    DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(reinterpret_cast<D2DrlgLevelStrc*>(uintptr_t(level)), x, y, preset, a, b);
 }
 void D2Common_41340(D2DrlgLevelStrc* level) {
     const D2Common41340Env env = { Stamp41340 };

@@ -111,6 +111,7 @@ D2AiCmdStrc* __fastcall AIGENERAL_CopyAiCommand(D2GameStrc* pGame, D2UnitStrc* p
 //D2Game.0x6FCCF090
 D2AiCmdStrc* __fastcall AIGENERAL_SetCurrentAiCommand(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nCmdParam, int32_t bSet);
 //D2Game.0x6FCCF190
+void __fastcall AIGENERAL_FreeAiCommandChain(D2GameStrc* pGame, D2AiControlStrc* pAiControl);
 void __fastcall AIGENERAL_FreeAiControl(D2GameStrc* pGame, D2AiControlStrc* pAiControl);
 //D2Game.0x6FCCF240
 D2MapAIStrc** __stdcall AIGENERAL_GetMapAiFromUnit(D2UnitStrc* pUnit);
@@ -134,6 +135,10 @@ void __fastcall AIGENERAL_ExecuteCallbackOnMinions(D2UnitStrc* pUnit, void* a2, 
 void __fastcall AIGENERAL_GetAiControlInfo(D2UnitStrc* pUnit, int32_t* pOwnerGUID, int32_t* pOwnerType, int32_t* pAiControlFlag1, int32_t* pAiControlFlag2, D2MinionListStrc** ppMinionList);
 //D2Game.0x6FCCF710
 void __fastcall AIGENERAL_SetAiControlInfo(D2GameStrc* pGame, D2UnitStrc* pUnit, DWORD nOwnerGUID, DWORD nOwnerType, int32_t bSetFlag1, int32_t bSetFlag2, D2MinionListStrc* pMinionList);
+//D2Game.0x6FCD1040
+void AIGENERAL_ClearMinionOwners(D2AiControlStrc* pAiControl);
+//D2Game.0x6FCD10D0
+void AIGENERAL_LinkMinionsToFirst(D2AiControlStrc* pAiControl, D2UnitStrc* pUnit);
 //D2Game.0x6FCCF7C0
 void __fastcall AIGENERAL_UpdateMinionList(D2UnitStrc* pUnit);
 //D2Game.0x6FCCF9B0

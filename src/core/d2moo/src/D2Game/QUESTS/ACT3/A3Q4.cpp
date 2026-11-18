@@ -203,10 +203,10 @@ void __fastcall ACT3Q4_UnitIterate_UpdateCurrentQuestState(D2GameStrc* pGame, D2
 		return;
 	}
 
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
-	if (!QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q4, QFLAG_REWARDGRANTED) && !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q4, QFLAG_REWARDPENDING))
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pUnit)->pQuestData[pGame->nDifficulty];
+	if (!D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q4, QFLAG_REWARDGRANTED) && !D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q4, QFLAG_REWARDPENDING))
 	{
-		QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q4, ((D2Act3Quest4Strc*)pQuestData->pQuestDataEx)->nCurrentQuestFlag);
+		D2_CALL(QUESTRECORD_SetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q4, ((D2Act3Quest4Strc*)pQuestData->pQuestDataEx)->nCurrentQuestFlag);
 	}
 }
 
@@ -627,10 +627,10 @@ bool __fastcall ACT3Q4_SeqCallback(D2QuestDataStrc* pQuestData)
 // 1.13c D2Game+0xE3B40 (checked against decompile, no delta)
 void __fastcall ACT3Q4_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];
 	D2Act3Quest4Strc* pQuestDataEx = (D2Act3Quest4Strc*)pQuestData->pQuestDataEx;
 
-	if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q4, QFLAG_REWARDGRANTED) || QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q4, QFLAG_REWARDPENDING))
+	if (D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q4, QFLAG_REWARDGRANTED) || D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q4, QFLAG_REWARDPENDING))
 	{
 		pQuestData->bNotIntro = 0;
 		pQuestDataEx->unk0x01 = 0;
@@ -638,11 +638,11 @@ void __fastcall ACT3Q4_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 		return;
 	}
 
-	if (ITEMS_FindQuestItem(pQuestArg->pGame, pQuestArg->pPlayer, ' 43g'))
+	if (D2_CALL(ITEMS_FindQuestItem, pQuestArg->pGame, pQuestArg->pPlayer, ' 43g'))
 	{
 		pQuestDataEx->unk0x01 = 0;
 		pQuestDataEx->unk0x0C = 0;
-		if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q4, QFLAG_ENTERAREA))
+		if (D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q4, QFLAG_ENTERAREA))
 		{
 			pQuestData->fState = 3;
 			pQuestData->fLastState = 4;
@@ -653,11 +653,11 @@ void __fastcall ACT3Q4_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 			pQuestData->fLastState = 3;
 		}
 	}
-	else if (ITEMS_FindQuestItem(pQuestArg->pGame, pQuestArg->pPlayer, ' 43j'))
+	else if (D2_CALL(ITEMS_FindQuestItem, pQuestArg->pGame, pQuestArg->pPlayer, ' 43j'))
 	{
 		pQuestDataEx->unk0x01 = 0;
 		pQuestDataEx->unk0x0C = 0;
-		if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q4, QFLAG_STARTED))
+		if (D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q4, QFLAG_STARTED))
 		{
 			pQuestData->fState = 2;
 			pQuestData->fLastState = 2;

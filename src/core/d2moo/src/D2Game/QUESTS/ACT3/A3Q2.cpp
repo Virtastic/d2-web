@@ -1,4 +1,5 @@
 #include "QUESTS/ACT3/A3Q2.h"
+#include <test_seam.h>
 
 #include <DataTbls/LevelsIds.h>
 #include <DataTbls/MonsterIds.h>
@@ -335,7 +336,7 @@ void __fastcall ACT3Q2_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2Qu
 {
 	if (pQuestArg->nNewLevel == LEVEL_GREATMARSH && pQuestData->bNotIntro && pQuestData->fState < 3)
 	{
-		QUESTS_StateDebug(pQuestData, 1, __FILE__, __LINE__);
+		D2_CALL(QUESTS_StateDebug, pQuestData, 1, __FILE__, __LINE__);
 	}
 }
 
@@ -504,11 +505,11 @@ void __fastcall ACT3Q2_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2Q
 // 1.13c D2Game+0xE6420
 int32_t __fastcall ACT3Q2_UnitIterate_StatusCyclerEx(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pUnit)->pQuestData[pGame->nDifficulty];
 
-	if (!QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q2, QFLAG_REWARDGRANTED) && !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q2, QFLAG_COMPLETEDBEFORE))
+	if (!D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q2, QFLAG_REWARDGRANTED) && !D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q2, QFLAG_COMPLETEDBEFORE))
 	{
-		QUESTS_StatusCyclerEx(pGame, pUnit, QUEST_A3Q2_KHALIMFLAIL);
+		D2_CALL(QUESTS_StatusCyclerEx, pGame, pUnit, QUEST_A3Q2_KHALIMFLAIL);
 	}
 
 	return 0;
@@ -706,13 +707,13 @@ void __fastcall ACT3Q2_Callback04_ItemPickedUp(D2QuestDataStrc* pQuestData, D2Qu
 // 1.13c D2Game+0xE49E0 (retail: reward granted, custom3, or any drop count set the finished state; started alone sets it too)
 void __fastcall ACT3Q2_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];
 
-	if (!QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q2, QFLAG_REWARDGRANTED))
+	if (!D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q2, QFLAG_REWARDGRANTED))
 	{
-		if (!QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q2, QFLAG_CUSTOM3))
+		if (!D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q2, QFLAG_CUSTOM3))
 		{
-			if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q2, QFLAG_STARTED))
+			if (D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q2, QFLAG_STARTED))
 			{
 				pQuestData->fState = 2;
 				pQuestData->fLastState = 7;
@@ -904,7 +905,7 @@ int32_t __fastcall OBJECTS_OperateFunction57_KhalimChest(D2ObjOperateFnStrc* pOp
 // 1.13c D2Game+0xE47D0
 int32_t __fastcall ACT3Q2_UnitIterate_DetermineKhalimHeartDropCount(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
-	if (ITEMS_FindQuestItem(pGame, pUnit, ' rhq') || ITEMS_FindQuestItem(pGame, pUnit, ' 2fq'))
+	if (D2_CALL(ITEMS_FindQuestItem, pGame, pUnit, ' rhq') || D2_CALL(ITEMS_FindQuestItem, pGame, pUnit, ' 2fq'))
 	{
 		return 0;
 	}
@@ -964,7 +965,7 @@ int32_t __fastcall OBJECTS_OperateFunction58_KhalimChest(D2ObjOperateFnStrc* pOp
 // 1.13c D2Game+0xE4890
 int32_t __fastcall ACT3Q2_UnitIterate_DetermineKhalimEyeDropCount(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
-	if (ITEMS_FindQuestItem(pGame, pUnit, ' yeq') || ITEMS_FindQuestItem(pGame, pUnit, ' 2fq'))
+	if (D2_CALL(ITEMS_FindQuestItem, pGame, pUnit, ' yeq') || D2_CALL(ITEMS_FindQuestItem, pGame, pUnit, ' 2fq'))
 	{
 		return 0;
 	}
@@ -1025,7 +1026,7 @@ int32_t __fastcall OBJECTS_OperateFunction59_KhalimChest(D2ObjOperateFnStrc* pOp
 // 1.13c D2Game+0xE4830
 int32_t __fastcall ACT3Q2_UnitIterate_DetermineKhalimBrainDropCount(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
-	if (ITEMS_FindQuestItem(pGame, pUnit, ' rbq') || ITEMS_FindQuestItem(pGame, pUnit, ' 2fq'))
+	if (D2_CALL(ITEMS_FindQuestItem, pGame, pUnit, ' rbq') || D2_CALL(ITEMS_FindQuestItem, pGame, pUnit, ' 2fq'))
 	{
 		return 0;
 	}

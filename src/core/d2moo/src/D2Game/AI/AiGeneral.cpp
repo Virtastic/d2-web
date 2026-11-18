@@ -292,27 +292,9 @@ D2AiCmdStrc* __fastcall AIGENERAL_SetCurrentAiCommand(D2GameStrc* pGame, D2UnitS
 	return D2_CALL(AIGENERAL_GetAiCommandFromParam, pUnit, nCmdParam, bSet);
 }
 
-// 1.13c D2Game+0x20C00 (the command-chain free loop is 0x20B60, the minion-node loop is 0x20B30; retail inlines both)
-void __fastcall AIGENERAL_FreeAiControl(D2GameStrc* pGame, D2AiControlStrc* pAiControl)
+// 1.13c D2Game+0x20B60: free every command while both the last and the current pointer are set
+void __fastcall AIGENERAL_FreeAiCommandChain(D2GameStrc* pGame, D2AiControlStrc* pAiControl)
 {
-	if (!pAiControl)
-	{
-		return;
-	}
-
-	if (pAiControl->pMapAi)
-	{
-		DRLGPRESET_FreeMapAI(pGame->pMemoryPool, pAiControl->pMapAi);
-	}
-
-	D2MinionListStrc* pNext = nullptr;
-	for (D2MinionListStrc* i = pAiControl->pMinionList; i; i = pNext)
-	{
-		pNext = i->pNext;
-		D2_FREE_POOL(pGame->pMemoryPool, i);
-	}
-
-	// 1.13c D2Game+0x20B60: free every command while both the last and the current pointer are set
 	for (D2AiCmdStrc* i = pAiControl->pLastCmd; i; i = pAiControl->pLastCmd)
 	{
 		D2AiCmdStrc* pCurrentCmd = pAiControl->pCurrentCmd;
@@ -341,6 +323,29 @@ void __fastcall AIGENERAL_FreeAiControl(D2GameStrc* pGame, D2AiControlStrc* pAiC
 
 		D2_FREE_POOL(pGame->pMemoryPool, pCurrentCmd);
 	}
+}
+
+// 1.13c D2Game+0x20C00 (the command-chain free loop is 0x20B60, the minion-node loop is 0x20B30 inlined)
+void __fastcall AIGENERAL_FreeAiControl(D2GameStrc* pGame, D2AiControlStrc* pAiControl)
+{
+	if (!pAiControl)
+	{
+		return;
+	}
+
+	if (pAiControl->pMapAi)
+	{
+		D2_CALL(DRLGPRESET_FreeMapAI, pGame->pMemoryPool, pAiControl->pMapAi);
+	}
+
+	D2MinionListStrc* pNext = nullptr;
+	for (D2MinionListStrc* i = pAiControl->pMinionList; i; i = pNext)
+	{
+		pNext = i->pNext;
+		D2_FREE_POOL(pGame->pMemoryPool, i);
+	}
+
+	D2_CALL(AIGENERAL_FreeAiCommandChain, pGame, pAiControl);
 
 	D2_FREE_POOL(pGame->pMemoryPool, pAiControl);
 }
@@ -492,7 +497,7 @@ void __fastcall sub_6FCCF4B0(D2UnitStrc* pUnit)
 		return;
 	}
 
-	D2UnitStrc* pOwner = SUNIT_GetServerUnit(pAiControl->pGame, pAiControl->dwOwnerTypeEx, pAiControl->dwOwnerGUIDEx);
+	D2UnitStrc* pOwner = D2_CALL(SUNIT_GetServerUnit, pAiControl->pGame, pAiControl->dwOwnerTypeEx, pAiControl->dwOwnerGUIDEx);
 	if (!pOwner || pOwner != pUnit)
 	{
 		return;
@@ -540,7 +545,7 @@ void __fastcall AIGENERAL_ExecuteCallbackOnMinions(D2UnitStrc* pUnit, void* a2, 
 	}
 
 	// retail stops here unless the owner resolves to a monster unit (type 1)
-	D2AiControlStrc* pOwnerAiControl = AIGENERAL_GetAiControlFromUnit(SUNIT_GetServerUnit(pAiControl->pGame, pAiControl->dwOwnerTypeEx, pAiControl->dwOwnerGUIDEx));
+	D2AiControlStrc* pOwnerAiControl = AIGENERAL_GetAiControlFromUnit(D2_CALL(SUNIT_GetServerUnit,pAiControl->pGame, pAiControl->dwOwnerTypeEx, pAiControl->dwOwnerGUIDEx));
 	if (!pOwnerAiControl)
 	{
 		return;
@@ -550,7 +555,7 @@ void __fastcall AIGENERAL_ExecuteCallbackOnMinions(D2UnitStrc* pUnit, void* a2, 
 	for (D2MinionListStrc* pMinionList = pOwnerAiControl->pMinionList; pMinionList; pMinionList = pNext)
 	{
 		pNext = pMinionList->pNext; // the callback may free this node (AIGENERAL_FreeMinionList); upstream read pNext after it
-		D2UnitStrc* pMinion = SUNIT_GetServerUnit(pOwnerAiControl->pGame, UNIT_MONSTER, pMinionList->dwMinionGUID);
+		D2UnitStrc* pMinion = D2_CALL(SUNIT_GetServerUnit, pOwnerAiControl->pGame, UNIT_MONSTER, pMinionList->dwMinionGUID);
 		if (pMinion)
 		{
 			pfnParty(pMinion, a2, a3);
@@ -593,7 +598,7 @@ void __fastcall AIGENERAL_SetAiControlInfo(D2GameStrc* pGame, D2UnitStrc* pUnit,
 }
 
 // 1.13c D2Game+0x21040: owner flag clear -> every listed minion that still exists drops its owner (guid -1, type 1, game kept)
-static void AIGENERAL_ClearMinionOwners(D2AiControlStrc* pAiControl)
+void AIGENERAL_ClearMinionOwners(D2AiControlStrc* pAiControl)
 {
 	D2GameStrc* pGame = pAiControl->pGame;
 	for (D2MinionListStrc* pMinionList = pAiControl->pMinionList; pMinionList; pMinionList = pMinionList->pNext)
@@ -609,7 +614,7 @@ static void AIGENERAL_ClearMinionOwners(D2AiControlStrc* pAiControl)
 }
 
 // 1.13c D2Game+0x210D0: owner flag set -> the first listed minion that still exists becomes the owner of the whole list
-static void AIGENERAL_LinkMinionsToFirst(D2AiControlStrc* pAiControl, D2UnitStrc* pUnit)
+void AIGENERAL_LinkMinionsToFirst(D2AiControlStrc* pAiControl, D2UnitStrc* pUnit)
 {
 	D2MinionListStrc* pHead = pAiControl->pMinionList;
 	if (!pHead)
@@ -641,7 +646,7 @@ static void AIGENERAL_LinkMinionsToFirst(D2AiControlStrc* pAiControl, D2UnitStrc
 	const int32_t nFirstGUID = pMinionList->dwMinionGUID;
 	AIGENERAL_SetOwnerData(pGame, pFirst, nFirstGUID, UNIT_MONSTER, 1, 1);
 	AIGENERAL_SetOwnerData(pGame, pUnit, nFirstGUID, UNIT_MONSTER, 0, 0);
-	AIGENERAL_AllocMinionList(pGame, pFirst, pUnit);
+	D2_CALL(AIGENERAL_AllocMinionList, pGame, pFirst, pUnit);
 
 	for (D2MinionListStrc* i = pHead; i; i = i->pNext)
 	{
@@ -649,7 +654,7 @@ static void AIGENERAL_LinkMinionsToFirst(D2AiControlStrc* pAiControl, D2UnitStrc
 		if (pOther && pOther != pFirst)
 		{
 			AIGENERAL_SetOwnerData(pGame, pOther, nFirstGUID, UNIT_MONSTER, 0, 0);
-			AIGENERAL_AllocMinionList(pGame, pFirst, pOther);
+			D2_CALL(AIGENERAL_AllocMinionList, pGame, pFirst, pOther);
 		}
 	}
 }

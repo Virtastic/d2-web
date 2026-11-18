@@ -1,4 +1,5 @@
 #include "PLAYER/PlayerPets.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -285,7 +286,7 @@ void __fastcall PLAYERPETS_RemovePetFromList(D2GameStrc* pGame, D2PetListStrc* p
             {
                 if (a4)
                 {
-                    sub_6FC7CF50(pGame, pPetData->nUnitGUID);
+                    D2_CALL(sub_6FC7CF50, pGame, pPetData->nUnitGUID);
                 }
                 else
                 {
@@ -491,12 +492,12 @@ int32_t __fastcall sub_6FC7DA40(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2PetLis
 {
     if (!pPetList->nMax)
     {
-        sub_6FC7DF40(pGame, pPlayer);
+        D2_CALL(sub_6FC7DF40, pGame, pPlayer);
     }
 
     if (!pPetList->nMax)
     {
-        sub_6FC7CF50(pGame, pPet ? pPet->dwUnitId : -1);
+        D2_CALL(sub_6FC7CF50, pGame, pPet ? pPet->dwUnitId : -1);
         return 0;
     }
 

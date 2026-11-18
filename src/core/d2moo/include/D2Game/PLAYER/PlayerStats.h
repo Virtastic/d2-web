@@ -10,4 +10,6 @@ void __fastcall PLAYERSTATS_LevelUp(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FC7EDE0
 void __fastcall PLAYERSTATS_OnPlayerLeveledUp(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pLeveledUpPlayer);
 //D2Game.0x6FC7EDF0
+void PLAYERSTATS_AddVitality(D2UnitStrc* pUnit, int32_t nCount);
+void PLAYERSTATS_AddEnergy(D2UnitStrc* pUnit, int32_t nCount);
 int32_t __fastcall PLAYERSTATS_SpendStatPoint(D2UnitStrc* pUnit, int32_t nStatId);

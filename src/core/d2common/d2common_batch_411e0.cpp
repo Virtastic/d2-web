@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include "Drlg/D2DrlgOutdoors.h"
 
 namespace {
 inline uint32_t R32(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, static_cast<const uint8_t*>(p) + o, 4); return v; }
@@ -15,7 +16,10 @@ inline int32_t RI32(const void* p, uint32_t o) { return int32_t(R32(p, o)); }
 struct D2Common411E0Env {
     void* (*resolve)(uint32_t address);                                   // retail token -> wasm address
 };
-extern "C" void D2Common_42A70(void*, int32_t, int32_t, int32_t, int32_t, int32_t);   // d2common_42a70.cpp
+// The stamp is the tagged game-tree body (DrlgOutdoors.cpp, 1.13c D2Common+0x42A70); the level is the native level.
+static void D2Common_42A70(void* ctx, int32_t x, int32_t y, int32_t id, int32_t picked, int32_t border) {
+    DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(static_cast<D2DrlgLevelStrc*>(ctx), x, y, id, picked, border);
+}
 extern "C" uint32_t d2common_sub_411e0(const D2Common411E0Env* e, void* pCtx, int32_t x, int32_t esi) {
     void* t = e->resolve(R32(pCtx, 0x14));
     const uint32_t* flags = static_cast<const uint32_t*>(e->resolve(R32(t, 0x2c)));

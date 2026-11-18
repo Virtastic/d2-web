@@ -79,19 +79,13 @@ void D2Common_1B1E_QuickExit(int32_t nCode)
     D2Common_1A4A_DoExit(static_cast<uint32_t>(nCode), 1, 0);
 }
 
-// 1.13c D2Common+0x422D
-// __lock_file2(index, file): stream slots below 0x14 live in the static lock table, so take table lock
-// index+0x10 (0x2EF9 __lock, here enter_cs); otherwise the FILE carries its own critical section at +0x20.
-// pfnLock: seam for the FN probe (logs the __lock call); null = the real table lock.
-void d2common_lock_file2_422d(int32_t nIndex, void* pFile, void (*pfnLock)(int32_t))
-{
-    if (nIndex < 0x14) { if (pfnLock) pfnLock(nIndex + 0x10); else enter_cs((uint32_t)nIndex + 0x10); }
-    else EnterCriticalSection((LPCRITICAL_SECTION)((uint8_t*)pFile + 0x20));
-}
+// The body of 0x422D is the game function in src/core/d2moo/src/Crt/Crt_422d.cpp; the lock table here is this file's.
+void d2common_lock_file2_422d(int32_t nIndex, void* pFile, void (*pfnLock)(int32_t));
+static void lock_tbl(int32_t nIdx) { enter_cs((uint32_t)nIdx); }
 
 void D2Common_422D_LockFile2(int32_t nIndex, void* pFile)
 {
-    d2common_lock_file2_422d(nIndex, pFile, nullptr);
+    d2common_lock_file2_422d(nIndex, pFile, lock_tbl);
 }
 
 // 1.13c D2Common+0x2EF9

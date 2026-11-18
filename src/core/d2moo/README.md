@@ -55,6 +55,9 @@ behaviour differs from 1.10f.
 - D2Common+0x6B2B0 MISSILE_EvaluateMissileFormula: arguments, level and id defaults, and the expression table guard match 1.13c; no change. The callback at 0x6B160 is not decompiled (Ghidra refuses the label), so its identity with MISSILE_GetCalcParamValue is unverified.
 - D2Common+0x26BA0 ITEMS_GetRunesTxtRecordFromItem: returns NULL unless the socketed inventory's signature is 0x1020304 (1.13c check added).
 - D2Common+0x28850 ITEMS_CalculateAdditionalCostsForBonusStats: all encode cases match the 1.13c arithmetic; encode 2/3 skips the stat when the skill record is missing (1.13c's null read contributes zero).
+- D2Common CRT leaves with no D2MOO twin (the game tree now carries them under src/Crt, the stand-alone copies in src/core/d2common are gone): +0x2260 strchr, +0x301C __RTC_Initialize, +0x3445 __mtterm, +0x3462 __initptd, +0x362D __freeptd, +0x422D __lock_file2, +0x44CE __dosmaperr, +0x481F __write, +0x48D0 memcpy, +0x4DD0 __aulldiv, +0x4E38 __commit, +0x6A60 memset, +0x6B50 strlen, +0x7A5A __get_osfhandle, +0x875E4 __IncMan, +0x90F0 _isdigit, +0x31F9 ___isctype_mt.
+- D2Common+0xDCE0 (D2Common_10232) and +0xE1A0 (D2Common_10231): the vendored bodies carry the 1.13c code; the markers are on them and the stand-alone ports are removed.
+- D2Common+0xECB0 DRLGMAZE_PickPresetFile (DrlgMaze.cpp): split out of the 1.10f RollBasicPresets, where the file pick was inlined; 1.13c calls it per room.
 - D2Common+0x2C910 ITEMS_UpdateSets: now the 1.13c body, routed through 0x2C7C0 (sub_6FDA4380) and 0x2C630 (sub_6FDA4490), which carry their 1.13c bodies too.
 - D2Game+0x68D70 OBJECTS_OperateFunction06_TowerTome (QUESTS/ACT1/A1Q5.cpp): returns 0 on every path (1.10f returned 1 after activating the tome); validated against the vector.
 - D2Game+0x5CD50 OBJECTS_OperateFunction67_FrozenAnya (QUESTS/ACT5/A5Q3.cpp): returns 0 on every path (1.10f returned 1 when the quest is missing and at the end).
@@ -80,7 +83,7 @@ behaviour differs from 1.10f.
 - D2Common+0x2C7C0 (Items.cpp `sub_6FDA4380`, the set-bonus walk under ITEMS_UpdateSets): the switch-on walk stops before the sixth set state (1.10f went to six), and a start index below zero toggles nothing.
 - D2Common+0x51000 D2Common_11016 (D2Skills.cpp): the skill range byte is read sign-extended (1.13c movsx), so a byte >= 0x80 is negative.
 - D2Common+0x4D140 COLLISION_GetFreeCoordinatesImpl (D2Collision.cpp): matches 1.10f: each lookup that finds a room makes it the base of the next (retail writes it over the room argument).
-- D2Common+0x54430 (core/d2common/d2common_batch_53780.cpp): DATATBLS_LoadTreasureClassExTxt calls the 1.13c item parser per slot; the 1.10f inline parser matched argument keys by prefix and stopped on an empty value.
+- D2Common+0x54430 (src/core/d2moo/src/Retail/D2Common_54430.cpp): DATATBLS_LoadTreasureClassExTxt calls the 1.13c item parser per slot; the 1.10f inline parser matched argument keys by prefix and stopped on an empty value.
 
 
 - D2Common+0x5D8B0 DATATBLS_UnloadStatesTxt (DataTbls/DataTbls.cpp): no NULL store back to pStatesTxt or pStatesLinker after the free, as retail (PRIORART batch). The -4 pool adjustment is kept as a host adaptation (FOG_FreePool is free()).

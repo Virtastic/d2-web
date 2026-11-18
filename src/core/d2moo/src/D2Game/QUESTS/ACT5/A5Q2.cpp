@@ -1,4 +1,5 @@
 #include "QUESTS/ACT5/A5Q2.h"
+#include <test_seam.h>
 
 #include <DataTbls/LevelsIds.h>
 #include <DataTbls/MonsterIds.h>
@@ -22,7 +23,7 @@
 // 1.13c D2Game+0x58260
 // Retail outlines this lookup; EAX is the soldier, ECX the quest. Keep the
 // native pointers typed and share the first-match rule with its callers.
-static int32_t ACT5Q2_FindSoldierGroup(D2QuestDataStrc* pQuestData, D2UnitStrc* pSoldier)
+int32_t ACT5Q2_FindSoldierGroup(D2QuestDataStrc* pQuestData, D2UnitStrc* pSoldier)
 {
     const int32_t nGUID = pSoldier ? static_cast<int32_t>(pSoldier->dwUnitId) : -1;
     const auto* pExtra = static_cast<D2Act5Quest2Strc*>(pQuestData->pQuestDataEx);
@@ -782,7 +783,7 @@ void __fastcall OBJECTS_InitFunction62_CagedWussie(D2ObjInitFnStrc* pOp)
 //D2Game.0x6FCB2CF0
 int32_t __fastcall ACT5Q2_CheckWussieCounters(D2GameStrc* pGame, D2UnitStrc* pWussie)
 {
-	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q2_RESCUESOLDIERS);
+	D2QuestDataStrc* pQuestData = D2_CALL(QUESTS_GetQuestData, pGame, QUEST_A5Q2_RESCUESOLDIERS);
 	if (!pQuestData || !pQuestData->bNotIntro)
 	{
 		return 0;
@@ -790,7 +791,7 @@ int32_t __fastcall ACT5Q2_CheckWussieCounters(D2GameStrc* pGame, D2UnitStrc* pWu
 
 	D2Act5Quest2Strc* pQuestDataEx = (D2Act5Quest2Strc*)pQuestData->pQuestDataEx;
 
-	const int32_t nIndex = ACT5Q2_FindSoldierGroup(pQuestData, pWussie);
+	const int32_t nIndex = D2_CALL(ACT5Q2_FindSoldierGroup, pQuestData, pWussie);
 	if (nIndex < 0)
 	{
 		return 0;
@@ -808,14 +809,14 @@ int32_t __fastcall ACT5Q2_CheckWussieCounters(D2GameStrc* pGame, D2UnitStrc* pWu
 //D2Game.0x6FCB2D60
 void __fastcall ACT5Q2_UpdateWussieCounters(D2GameStrc* pGame, int32_t nUnused, D2UnitStrc* pWussie)
 {
-	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q2_RESCUESOLDIERS);
+	D2QuestDataStrc* pQuestData = D2_CALL(QUESTS_GetQuestData, pGame, QUEST_A5Q2_RESCUESOLDIERS);
 	if (!pQuestData || !pQuestData->bNotIntro)
 	{
 		return;
 	}
 
 	D2Act5Quest2Strc* pQuestDataEx = (D2Act5Quest2Strc*)pQuestData->pQuestDataEx;
-	const int32_t nIndex = ACT5Q2_FindSoldierGroup(pQuestData, pWussie);
+	const int32_t nIndex = D2_CALL(ACT5Q2_FindSoldierGroup, pQuestData, pWussie);
 	if (nIndex >= 0)
 	{
 		++pQuestDataEx->unk0x114[nIndex];

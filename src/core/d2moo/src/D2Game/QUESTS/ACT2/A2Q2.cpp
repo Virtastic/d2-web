@@ -1,5 +1,7 @@
 #include "QUESTS/ACT2/A2Q2.h"
+#include <test_seam.h>
 
+#include <test_seam.h>
 #include <D2BitManip.h>
 
 #include <DataTbls/LevelsIds.h>
@@ -97,11 +99,11 @@ bool __fastcall ACT2Q2_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 {
 	if (nNpcId == MONSTER_CAIN2)
 	{
-		if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A2Q2, QFLAG_REWARDPENDING) == 1)
+		if (D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A2Q2, QFLAG_REWARDPENDING) == 1)
 		{
 			return true;
 		}
-		return ACT2Q2_CheckItemsAndState(pQuest, pPlayer, pQuestFlags->pBuffer) != 0;
+		return D2_CALL(ACT2Q2_CheckItemsAndState, pQuest, pPlayer, pQuestFlags->pBuffer) != 0;
 	}
 	return false;
 }
@@ -195,9 +197,9 @@ void __fastcall ACT2Q2_UpdateHoradricItemCounts(D2GameStrc* pGame, D2UnitStrc* p
 		++pQuestDataEx->nCubedStaffs;
 	}
 
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pUnit)->pQuestData[pGame->nDifficulty];
 
-	QUESTS_UpdatePlayerFlags(pGame, pUnit);
+	D2_CALL(QUESTS_UpdatePlayerFlags, pGame, pUnit);
 
 	QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A2Q2, QFLAG_CUSTOM7);
 
@@ -212,7 +214,7 @@ void __fastcall ACT2Q2_UpdateHoradricItemCounts(D2GameStrc* pGame, D2UnitStrc* p
 	{
 		if (!pQuestData11->fState)
 		{
-			QUESTS_StateDebug(pQuestData11, 1, __FILE__, __LINE__);
+			D2_CALL(QUESTS_StateDebug, pQuestData11, 1, __FILE__, __LINE__);
 		}
 
 		if (!pQuestData11->fLastState)
@@ -368,14 +370,14 @@ void __fastcall ACT2Q2_InitQuestData(D2QuestDataStrc* pQuestData)
 // 1.13c D2Game+0xC7DC0
 void __fastcall ACT2Q2_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];
 
 	if (pQuestArg->nNPCNo == MONSTER_CAIN2)
 	{
 		switch (pQuestArg->nMessageIndex)
 		{
 		case 335:
-			QUESTS_DeleteItem(pQuestArg->pGame, pQuestArg->pPlayer, ' 1rt');
+			D2_CALL(QUESTS_DeleteItem, pQuestArg->pGame, pQuestArg->pPlayer, ' 1rt');
 			QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A2Q2, QFLAG_LEAVETOWN);
 			break;
 
@@ -401,13 +403,13 @@ void __fastcall ACT2Q2_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 			QUESTRECORD_ClearQuestState(pQuestFlags, QUESTSTATEFLAG_A2Q2, QFLAG_REWARDPENDING);
 			QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A2Q2, QFLAG_LEAVETOWN);
 
-			QUESTS_AddPlayerGUID(&pQuestData->tPlayerGUIDs, (pQuestArg->pPlayer ? pQuestArg->pPlayer->dwUnitId : -1));
+			D2_CALL(QUESTS_AddPlayerGUID, &pQuestData->tPlayerGUIDs, (pQuestArg->pPlayer ? pQuestArg->pPlayer->dwUnitId : -1));
 
 			QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A2Q2, QFLAG_CUSTOM6);
 			QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A2Q2, QFLAG_ENTERAREA);
 			QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A2Q2, QFLAG_CUSTOM2);
 			QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A2Q2, QFLAG_CUSTOM1);
-			QUESTS_NPCActivateSpeeches(pQuestArg->pGame, pQuestArg->pPlayer, pQuestArg->pTarget);
+			D2_CALL(QUESTS_NPCActivateSpeeches, pQuestArg->pGame, pQuestArg->pPlayer, pQuestArg->pTarget);
 			break;
 
 		default:
@@ -639,22 +641,22 @@ void __fastcall ACT2Q2_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 void __fastcall ACT2Q2_Callback14_PlayerJoinedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	D2Act2Quest2Strc* pQuestDataEx = (D2Act2Quest2Strc*)pQuestData->pQuestDataEx;
-	if (ITEMS_FindQuestItem(pQuestArg->pGame, pQuestArg->pPlayer, ' fsm'))
+	if (D2_CALL(ITEMS_FindQuestItem, pQuestArg->pGame, pQuestArg->pPlayer, ' fsm'))
 	{
 		++pQuestDataEx->nBaseStaffs;
 	}
 
-	if (ITEMS_FindQuestItem(pQuestArg->pGame, pQuestArg->pPlayer, ' piv'))
+	if (D2_CALL(ITEMS_FindQuestItem, pQuestArg->pGame, pQuestArg->pPlayer, ' piv'))
 	{
 		++pQuestDataEx->nAmulets;
 	}
 
-	if (ITEMS_FindQuestItem(pQuestArg->pGame, pQuestArg->pPlayer, ' xob'))
+	if (D2_CALL(ITEMS_FindQuestItem, pQuestArg->pGame, pQuestArg->pPlayer, ' xob'))
 	{
 		++pQuestDataEx->nHoradricCubes;
 	}
 
-	if (ITEMS_FindQuestItem(pQuestArg->pGame, pQuestArg->pPlayer, ' tsh'))
+	if (D2_CALL(ITEMS_FindQuestItem, pQuestArg->pGame, pQuestArg->pPlayer, ' tsh'))
 	{
 		++pQuestDataEx->nCubedStaffs;
 	}
@@ -787,8 +789,8 @@ int32_t __fastcall OBJECTS_OperateFunction40_HoradricScrollChest(D2ObjOperateFnS
 // 1.13c D2Game+0xC3FC0
 int32_t __fastcall ACT2Q2_UnitIterate_DetermineHoradricScrollDropCount(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
-	if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A2Q2, QFLAG_REWARDGRANTED) == 1 || QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A2Q2, QFLAG_LEAVETOWN))
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pUnit)->pQuestData[pGame->nDifficulty];
+	if (D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A2Q2, QFLAG_REWARDGRANTED) == 1 || D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A2Q2, QFLAG_LEAVETOWN))
 	{
 		return 0;
 	}
@@ -925,7 +927,7 @@ int32_t __fastcall OBJECTS_OperateFunction39_HoradricCubeChest(D2ObjOperateFnStr
 // 1.13c D2Game+0xC3EF0
 int32_t __fastcall ACT2Q2_UnitIterate_DetermineCubeDropCount(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
-	if (ITEMS_FindQuestItem(pGame, pUnit, ' xob'))
+	if (D2_CALL(ITEMS_FindQuestItem, pGame, pUnit, ' xob'))
 	{
 		return 0;
 	}

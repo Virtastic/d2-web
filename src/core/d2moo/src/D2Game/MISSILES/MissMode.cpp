@@ -1,4 +1,5 @@
 #include "MISSILES/MissMode.h"
+#include <test_seam.h>
 
 #include <test_seam.h>
 
@@ -1068,18 +1069,18 @@ int32_t __fastcall MISSMODE_SrvDo10_BlizzardCenter(D2GameStrc* pGame, D2UnitStrc
         return 2;
     }
 
-    const int32_t nSkillId = MISSILE_GetSkill(pMissile);
+    const int32_t nSkillId = D2_CALL(MISSILE_GetSkill, pMissile);
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
     if (!pSkillsTxtRecord)
     {
         return 2;
     }
 
-    const int32_t nLevel = MISSILE_GetLevel(pMissile);
-    const int32_t nRange = SKILLS_EvaluateSkillFormula(SUNIT_GetOwner(pGame, pMissile), pSkillsTxtRecord->dwCalc[0], nSkillId, nLevel);
-    const int32_t nFrames = SKILLS_EvaluateSkillFormula(SUNIT_GetOwner(pGame, pMissile), pSkillsTxtRecord->dwCalc[1], nSkillId, nLevel);
-    MISSMODE_CreateMissileWithCollisionCheck(pGame, pMissile, nRange, nFrames, pMissilesTxtRecord->wSubMissile[0], 5);
-    return MISSMODE_HandleMissileCollision(pGame, pMissile);
+    const int32_t nLevel = D2_CALL(MISSILE_GetLevel, pMissile);
+    const int32_t nRange = D2_CALL(SKILLS_EvaluateSkillFormula, D2_CALL(SUNIT_GetOwner, pGame, pMissile), pSkillsTxtRecord->dwCalc[0], nSkillId, nLevel);
+    const int32_t nFrames = D2_CALL(SKILLS_EvaluateSkillFormula, D2_CALL(SUNIT_GetOwner, pGame, pMissile), pSkillsTxtRecord->dwCalc[1], nSkillId, nLevel);
+    D2_CALL(MISSMODE_CreateMissileWithCollisionCheck, pGame, pMissile, nRange, nFrames, pMissilesTxtRecord->wSubMissile[0], 5);
+    return D2_CALL(MISSMODE_HandleMissileCollision, pGame, pMissile);
 }
 
 //D2Game.0x6FC57B60
@@ -1267,19 +1268,19 @@ int32_t __fastcall MISSMODE_SrvDo14_GrimWard(D2GameStrc* pGame, D2UnitStrc* pMis
         nParam = pMissilesTxtRecord->dwParam[0];
     }
 
-    if (MISSILE_GetRemainingFrames(pMissile) % nParam == 0)
+    if (D2_CALL(MISSILE_GetRemainingFrames, pMissile) % nParam == 0)
     {
-        const int32_t nSkillId = MISSILE_GetSkill(pMissile);
-        const int32_t nLevel = MISSILE_GetLevel(pMissile);
+        const int32_t nSkillId = D2_CALL(MISSILE_GetSkill, pMissile);
+        const int32_t nLevel = D2_CALL(MISSILE_GetLevel, pMissile);
         if (nSkillId < 1 || nLevel < 1)
         {
             return 2;
         }
 
-        sub_6FD14400(pGame, pMissile, pMissilesTxtRecord->dwParam[1], nSkillId, nLevel);
+        D2_CALL(sub_6FD14400, pGame, pMissile, pMissilesTxtRecord->dwParam[1], nSkillId, nLevel);
     }
 
-    return MISSMODE_HandleMissileCollision(pGame, pMissile);
+    return D2_CALL(MISSMODE_HandleMissileCollision, pGame, pMissile);
 }
 
 // 1.13c D2Game+0x40CA0 (0x6FC581F0 in 1.10f)
@@ -4590,7 +4591,7 @@ void __fastcall MISSMODE_SrvDmg02_IceArrow_RoyalStrikeChaos(D2GameStrc* pGame, D
     D2MissilesTxt* pMissilesTxtRecord = SKILLS_GetMissilesTxtRecord(pMissile->dwClassId);
     if (pMissilesTxtRecord)
     {
-        pDamage->dwFrzLen = MONSTERUNIQUE_CalculatePercentage(STATLIST_UnitGetStatValue(pMissile, STAT_COLDLENGTH, 0), pMissilesTxtRecord->dwDmgParam[0], 100);
+        pDamage->dwFrzLen = MONSTERUNIQUE_CalculatePercentage(D2_CALL(STATLIST_UnitGetStatValue, pMissile, STAT_COLDLENGTH, 0), pMissilesTxtRecord->dwDmgParam[0], 100);
         pDamage->dwColdLen = 0;
     }
 }
@@ -4710,7 +4711,7 @@ void __fastcall MISSMODE_SrvDmg08_EruptionCrack(D2GameStrc* pGame, D2UnitStrc* p
         D2MissilesTxt* pMissilesTxtRecord = SKILLS_GetMissilesTxtRecord(pMissile->dwClassId);
         if (pMissilesTxtRecord && pUnit && (int16_t)pMissilesTxtRecord->wProgOverlay > 0)
         {
-            UNITS_SetOverlay(pUnit, pMissilesTxtRecord->wProgOverlay, 0);
+            D2_CALL(UNITS_SetOverlay, pUnit, pMissilesTxtRecord->wProgOverlay, 0);
         }
     }
 }
@@ -4730,7 +4731,7 @@ void __fastcall MISSMODE_SrvDmg09_Twister(D2GameStrc* pGame, D2UnitStrc* pMissil
         return;
     }
 
-    const int32_t nSkillId = MISSILE_GetSkill(pMissile);
+    const int32_t nSkillId = D2_CALL(MISSILE_GetSkill, pMissile);
     if (pMissilesTxtRecord->dwDmgParam[0] > 0)
     {
         pDamage->dwStunLen = pMissilesTxtRecord->dwDmgParam[0];
@@ -4999,7 +5000,7 @@ int32_t __fastcall MISSMODE_RadamentDeathAreaEffectCallback(D2GameStrc* pGame, D
 // 1.13c D2Game+0x39910 (checked against decompile, no delta)
 int32_t __fastcall MISSMODE_RadamentDeathAreaEffectCallbackFirstFrame(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pCorpse, int32_t nSkillLevel, int32_t nUnused)
 {
-    return SKILLS_ApplyRedemptionEffect(pGame, pUnit, pCorpse, SKILL_REDEMPTION, nSkillLevel, 1);
+    return D2_CALL(SKILLS_ApplyRedemptionEffect, pGame, pUnit, pCorpse, SKILL_REDEMPTION, nSkillLevel, 1);
 }
 
 //D2Game.0x6FC5F800
@@ -5393,7 +5394,7 @@ int32_t __fastcall MISSMODE_SrvDmgHitHandler(D2GameStrc* pGame, D2UnitStrc* pMis
 void __fastcall MISSMODE_ToggleStateOff(D2UnitStrc* pUnit, int32_t nState, D2StatListStrc* pStatList)
 {
     D2_MAYBE_UNUSED(pStatList);
-    STATES_ToggleState(pUnit, nState, 0);
+    D2_CALL(STATES_ToggleState, pUnit, nState, 0);
 }
 
 //D2Game.0x6FC60090

@@ -15,15 +15,7 @@
 #include "../d2moo/compat/datatbls_bridge.h"
 #include "../tables/shared.h"
 
-// The Units.cpp row the 0x12D0 probe calls (declared in d2moo Units.h).
-D2CharStatsTxt* __fastcall UNITS_GetCharStatsTxtRecord(int nRecordId);
-
-static_assert(sizeof(D2CharStatsTxt) == 0xC4, "charstats row size");
 static_assert(offsetof(D2SkillsTxt, dwParam) == 0x148, "skills.txt dwParam");
-static_assert(offsetof(D2SkillsTxt, wSkillDesc) == 0x194, "skills.txt wSkillDesc");
-static_assert(offsetof(D2MonStatsTxt, wMonStatsEx) == 0x18, "monstats.txt wMonStatsEx");
-static_assert(offsetof(D2MonStats2Txt, nFlags) == 0x04, "monstats2.txt nFlags");
-static_assert(offsetof(D2MonStats2Txt, nModeFlags) == 0xF0, "monstats2.txt nModeFlags");
 
 namespace
 {
@@ -52,44 +44,6 @@ namespace
 		}
 
 		return (nMax - 1) & static_cast<uint32_t>(lSeed);
-	}
-
-	// 0x1400/0x1470: bit nBit of the MonStats2 dword at byte offset nFieldOffset (0xF0 nModeFlags,
-	// 0x04 nFlags) for the monster row nMonsterId. Out-of-range ids and a missing table give 0.
-	// ponytail: the null-table guards are the probe's own; retail only bounds the ids.
-	uint32_t MonStats2Bit(int32_t nMonsterId, uint32_t nBit, int32_t nFieldOffset)
-	{
-		if (!sgptDataTables->pMonStatsTxt || nMonsterId < 0 || nMonsterId >= sgptDataTables->nMonStatsTxtRecordCount)
-		{
-			return 0;
-		}
-
-		const int32_t nMonStats2 = sgptDataTables->pMonStatsTxt[nMonsterId].wMonStatsEx;
-		if (!sgptDataTables->pMonStats2Txt || nMonStats2 < 0 || nMonStats2 >= sgptDataTables->nMonStats2TxtRecordCount)
-		{
-			return 0;
-		}
-
-		const uint8_t* pFlags = reinterpret_cast<const uint8_t*>(&sgptDataTables->pMonStats2Txt[nMonStats2]);
-		return pFlags[nFieldOffset + (static_cast<int32_t>(nBit) >> 3)] & gdwBitMasks[nBit & 7];
-	}
-
-	// 0x1500: skills.txt row -> wSkillDesc -> skilldesc.txt row, as a byte offset (0x120 rows).
-	// -1 is NULL (retail's 0 row pointer); otherwise the offset, which may be 0 for row 0.
-	int64_t SkillDescOffset(int32_t nSkillId)
-	{
-		if (!sgptDataTables->pSkillsTxt || nSkillId < 0 || nSkillId >= sgptDataTables->nSkillsTxtRecordCount)
-		{
-			return -1;
-		}
-
-		const int16_t nSkillDesc = static_cast<int16_t>(sgptDataTables->pSkillsTxt[nSkillId].wSkillDesc);
-		if (!sgptDataTables->pSkillDescTxt || nSkillDesc < 0 || nSkillDesc >= sgptDataTables->nSkillDescTxtRecordCount)
-		{
-			return -1;
-		}
-
-		return static_cast<int64_t>(nSkillDesc) * 0x120;
 	}
 
 	// 0x1550..0x15E0: skills.txt dwParam[0..3] now run the game-tree bodies in SkillsTbls.cpp.
@@ -156,45 +110,7 @@ void D2Common_1180_RollRange(uint32_t* r)
 	}
 }
 
-// 1.13c D2Common+0x1280: monstats id check, id in EAX: the id itself when 0 <= id < the monstats row count
-// (tables +0xA80), else -1. (The decompiler shows an empty body; the disassembly has the compare.)
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1280(uint32_t* r)
-{
-	if (!TablesLoaded()) { r[4] = 0x7EADBEEF; return; }
-	const int32_t nId = static_cast<int32_t>(r[0]);
-	r[4] = (nId >= 0 && nId < sgptDataTables->nMonStatsTxtRecordCount) ? static_cast<uint32_t>(nId) : 0xFFFFFFFFu;
-}
-
-// Probe of the D2Common+0x12D0 row: the charstats row for nClassId as a byte offset from the table base (0xC4 per row). It calls
-// the Units.cpp row (UNITS_GetCharStatsTxtRecord); NULL is 0xFFFFFFFF in the vector (fnptr capture), an offset of 0 is a real row.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_12d0(uint32_t* r)
-{
-	if (!TablesLoaded()) { r[4] = 0x7EADBEEF; return; }
-	const D2CharStatsTxt* p = UNITS_GetCharStatsTxtRecord(static_cast<int32_t>(r[0]));
-	r[4] = p ? static_cast<uint32_t>((p - sgptDataTables->pCharStatsTxt) * 0xC4) : 0xFFFFFFFFu;
-}
-
-// 1.13c D2Common+0x1400: MonStats2 nModeFlags (+0xF0) bit nBit of monster row nMonsterId.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1400(uint32_t* r)
-{
-	if (!TablesLoaded()) { r[4] = 0x7EADBEEF; return; }
-	r[4] = MonStats2Bit(static_cast<int32_t>(r[0]), r[1], 0xF0);
-}
-
-// 1.13c D2Common+0x1470: MonStats2 nFlags (+0x04, dwFlags) bit nBit of monster row nMonsterId.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1470(uint32_t* r)
-{
-	if (!TablesLoaded()) { r[4] = 0x7EADBEEF; return; }
-	r[4] = MonStats2Bit(static_cast<int32_t>(r[0]), r[1], 0x04);
-}
-
-// 1.13c D2Common+0x1500: skills.txt wSkillDesc (+0x194) of nSkillId -> skilldesc row offset (0x120).
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1500(uint32_t* r)
-{
-	if (!TablesLoaded()) { r[4] = 0x7EADBEEF; return; }
-	const int64_t nOffset = SkillDescOffset(static_cast<int32_t>(r[0]));
-	r[4] = nOffset < 0 ? 0xFFFFFFFFu : static_cast<uint32_t>(nOffset);
-}
+// 0x1280, 0x12D0, 0x1400, 0x1470 and 0x1500 are probed in src/core/fn/d2common_<rva>.cpp (one definition each).
 
 // 1.13c D2Common+0x1550: skills.txt dwParam[0] (+0x148) of nSkillId.
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1550(uint32_t* r)

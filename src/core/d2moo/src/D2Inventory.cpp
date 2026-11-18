@@ -1,5 +1,6 @@
 #include "D2Inventory.h"
 #include "InventoryItemDataGuard.h"
+#include <test_seam.h>
 
 #include <cstddef>
 
@@ -1900,6 +1901,7 @@ BOOL __stdcall INVENTORY_PlaceItemInBeltSlot(D2InventoryStrc* pInventory, D2Unit
 	return FALSE;
 }
 
+// 1.13c D2Common+0x1EEE0
 //D2Common.0x6FD902B0 (#10268)
 // 1.13c D2Common+0x1EEE0: not isc/tsc, any of the four belt slots with a matching potion type; no delta
 BOOL __stdcall INVENTORY_HasSimilarPotionInBelt(D2InventoryStrc* pInventory, D2UnitStrc* pPotion)
@@ -2846,7 +2848,7 @@ int __stdcall D2Common_10315(D2CorpseStrc* pCorpse)
 void __fastcall INVENTORY_InitializeComponentArray();
 
 // 1.13c D2Common+0x1FB50: the slot search over 1..254 for the alternate graphic or the code; 0 when no slot matches
-inline int INVENTORY_GetComponentArrayIndexFromItemsTxtRecord(D2ItemsTxt* pItemsTxtRecord)
+int INVENTORY_GetComponentArrayIndexFromItemsTxtRecord(D2ItemsTxt* pItemsTxtRecord)
 {
 	INVENTORY_InitializeComponentArray();   // 1.13c D2Common+0x1FB50 builds the table first
 	for (int nCounter = 1; nCounter < kComponentArrayLogicalSize; ++nCounter)
@@ -2861,7 +2863,7 @@ inline int INVENTORY_GetComponentArrayIndexFromItemsTxtRecord(D2ItemsTxt* pItems
 }
 
 // 1.13c D2Common+0x1FB50: the same search with the arm type token as both keys; 0 when no slot matches
-inline int INVENTORY_GetComponentArrayIndexFromArmTypeTxtRecord(D2ArmTypeTxt* pArmTypeTxtRecord)
+int INVENTORY_GetComponentArrayIndexFromArmTypeTxtRecord(D2ArmTypeTxt* pArmTypeTxtRecord)
 {
 	INVENTORY_InitializeComponentArray();   // 1.13c D2Common+0x1FB50 builds the table first
 	for (int nCounter = 1; nCounter < kComponentArrayLogicalSize; ++nCounter)
@@ -2875,8 +2877,25 @@ inline int INVENTORY_GetComponentArrayIndexFromArmTypeTxtRecord(D2ArmTypeTxt* pA
 	return 0;
 }
 
+// 1.13c D2Common+0x1E420 (item in EAX, 6-byte out in ECX): the six armor component bytes of the item's items.txt row; zeroed for no item.
+void INVENTORY_GetItemArmorComponents(D2UnitStrc* pItem, uint8_t* pOut)
+{
+	if (!pItem)
+	{
+		memset(pOut, 0x00, 6);
+		return;
+	}
+
+	D2ItemsTxt* pItemsTxtRecord = D2_CALL(DATATBLS_GetItemsTxtRecord, pItem->dwClassId);
+	D2_ASSERT(pItemsTxtRecord);
+	for (int i = 0; i < 6; ++i)
+	{
+		pOut[i] = pItemsTxtRecord->nArmorComp[i];
+	}
+}
+
 // 1.13c D2Common+0x21300: head and hand items. Slot from the items.txt component byte, forced to 5/6 for the composite right/left hand item.
-static void INVENTORY_UpdateEquippedItemComponent(D2UnitStrc* pPlayer, uint8_t* pComponents, uint8_t* pColor, D2UnitStrc* pItem)
+void INVENTORY_UpdateEquippedItemComponent(D2UnitStrc* pPlayer, uint8_t* pComponents, uint8_t* pColor, D2UnitStrc* pItem)
 {
 	D2InventoryStrc* pInventory = pPlayer->pInventory;
 	if (!pInventory)
@@ -2884,14 +2903,14 @@ static void INVENTORY_UpdateEquippedItemComponent(D2UnitStrc* pPlayer, uint8_t* 
 		return;
 	}
 
-	D2UnitStrc* pRightHandItem = INVENTORY_GetCompositItem(pInventory, COMPOSIT_RIGHTHAND);
-	D2UnitStrc* pLeftHandItem = INVENTORY_GetCompositItem(pInventory, COMPOSIT_LEFTHAND);
+	D2UnitStrc* pRightHandItem = D2_CALL(INVENTORY_GetCompositItem, pInventory, COMPOSIT_RIGHTHAND);
+	D2UnitStrc* pLeftHandItem = D2_CALL(INVENTORY_GetCompositItem, pInventory, COMPOSIT_LEFTHAND);
 
 	D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
 	D2_ASSERT(pItemsTxtRecord);
 
-	uint8_t nComponent = ITEMS_GetComponent(pItem);
-	const int nIndex = INVENTORY_GetComponentArrayIndexFromItemsTxtRecord(pItemsTxtRecord);
+	uint8_t nComponent = D2_CALL(ITEMS_GetComponent, pItem);
+	const int nIndex = D2_CALL(INVENTORY_GetComponentArrayIndexFromItemsTxtRecord, pItemsTxtRecord);
 	if (nIndex == 0)
 	{
 		if (nComponent < NUM_COMPONENTS)
@@ -2917,10 +2936,10 @@ static void INVENTORY_UpdateEquippedItemComponent(D2UnitStrc* pPlayer, uint8_t* 
 
 	pComponents[nComponent] = nIndex;
 
-	sub_6FD917B0(pPlayer, pComponents, pColor, pItem);
+	D2_CALL(sub_6FD917B0, pPlayer, pComponents, pColor, pItem);
 
 	uint8_t* pComponentColor = &pColor[nComponent];
-	if (ITEMS_GetColor(pPlayer, pItem, pComponentColor, 0))
+	if (D2_CALL(ITEMS_GetColor, pPlayer, pItem, pComponentColor, 0))
 	{
 		++*pComponentColor;
 	}
@@ -2948,28 +2967,25 @@ void __stdcall INVENTORY_GetItemSaveGfxInfo(D2UnitStrc* pPlayer, uint8_t* pCompo
 				{
 					if (!ITEMS_CheckType(pItemsTxtRecord->wType[0], ITEMTYPE_CIRCLET))
 					{
-						INVENTORY_UpdateEquippedItemComponent(pPlayer, pComponents, pColor, pItem);
+						D2_CALL(INVENTORY_UpdateEquippedItemComponent, pPlayer, pComponents, pColor, pItem);
 					}
 				}
 				else if (nBodyLoc == BODYLOC_TORSO)
 				{
 					uint8_t pArmorComponents[6] = {};
-					for (int i = 0; i < 6; ++i)
-					{
-						pArmorComponents[i] = pItemsTxtRecord->nArmorComp[i];
-					}
+					D2_CALL(INVENTORY_GetItemArmorComponents, pItem, pArmorComponents);
 
 					for (int i = 0; i < NUM_COMPONENTS; ++i)
 					{
 						if (COMPOSIT_IsArmorComponent(i))
 						{
-							D2ArmTypeTxt* pArmTypeTxtRecord = DATATBLS_GetArmTypeTxtRecord(COMPOSIT_GetArmorTypeFromComponent(i, pArmorComponents));
+							D2ArmTypeTxt* pArmTypeTxtRecord = DATATBLS_GetArmTypeTxtRecord(D2_CALL(COMPOSIT_GetArmorTypeFromComponent, i, pArmorComponents));
 							D2_ASSERT(pArmTypeTxtRecord);
 
 							int nIndex = 0;
 							if (pItem->dwClassId > 0)
 							{
-								nIndex = INVENTORY_GetComponentArrayIndexFromArmTypeTxtRecord(pArmTypeTxtRecord);
+								nIndex = D2_CALL(INVENTORY_GetComponentArrayIndexFromArmTypeTxtRecord, pArmTypeTxtRecord);
 							}
 
 							if (nIndex == 0)
@@ -2982,7 +2998,7 @@ void __stdcall INVENTORY_GetItemSaveGfxInfo(D2UnitStrc* pPlayer, uint8_t* pCompo
 								pComponents[i] = nIndex;
 
 								uint8_t* pComponentColor = &pColor[i];
-								if (ITEMS_GetColor(pPlayer, pItem, pComponentColor, 0))
+								if (D2_CALL(ITEMS_GetColor, pPlayer, pItem, pComponentColor, 0))
 								{
 									++*pComponentColor;
 								}
@@ -3284,6 +3300,7 @@ BOOL __fastcall INVENTORY_CanItemBePlacedInTradeInventory(D2InventoryStrc* pTrad
 }
 
 // #10762: the 1.13c body at the image layout is D2Common_21C50_CanItemsBeTraded
+// 1.13c D2Common+0x21C50
 //D2Common.0x6FD921D0 (#10302)
 BOOL __stdcall INVENTORY_CanItemsBeTraded(void* pMemPool, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, D2TradeStates* pTradeState)
 {	

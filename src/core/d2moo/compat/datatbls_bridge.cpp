@@ -8,6 +8,7 @@
 #include <D2Skills.h>
 #include <D2Waypoints.h>
 #include "../../../assets/mpqvfs.h"
+#include <cstring>
 #include "datatbls_bridge.h"
 
 namespace d2 { MpqVfs* g_drlgVfs = nullptr; }
@@ -15,8 +16,16 @@ namespace d2 { MpqVfs* g_drlgVfs = nullptr; }
 namespace d2 {
 
 bool drlgLoadTables(MpqVfs& vfs, const LangTables&) {
-    static bool loaded = false;
-    if (loaded) return true;
+    // 0 = never, 1 = a load began (still 1 on entry: it trapped part-way), 2 = loaded.
+    static int state = 0;
+    // A full-corpus replay shares one page across thousands of probes. A probe that traps leaves sgptDataTables on
+    // its side copy or a load half done, and the latch used to stay shut on those tables: every later table probe
+    // read empty tables ("got 0", asserts, unreachable). Reload from a zeroed struct when the tables are gutted.
+    // (Checks the home struct itself, not the pointer: a probe may have it pointed at a side copy while it calls here.)
+    if (state == 2 && gpDataTables.pSkillsTxt && gpDataTables.pLevelsTxt &&
+        gpDataTables.pItemDataTables.pItemsTxt && gpDataTables.nSkillsTxtRecordCount > 0) return true;
+    const bool redo = state != 0;
+    state = 0;
     // The loaders assert on a table no archive supplies. With no game data mounted (a headless host that has not
     // mounted its archives yet) report failure instead, and leave the latch open so a later call can load them.
     // GUESS: retail has no such state (its archives are opened before any table load); the first table the
@@ -24,11 +33,13 @@ bool drlgLoadTables(MpqVfs& vfs, const LangTables&) {
     auto hasTable = [&vfs](const char* bin, const char* txt) { return vfs.has(bin) || vfs.has(txt); };
     if (!hasTable("DATA\\GLOBAL\\EXCEL\\itemtypes.bin", "DATA\\GLOBAL\\EXCEL\\itemtypes.txt") ||
         !hasTable("DATA\\GLOBAL\\EXCEL\\levels.bin", "DATA\\GLOBAL\\EXCEL\\levels.txt")) return false;
-    loaded = true;
+    state = 1;
     g_drlgVfs = &vfs;
+    if (redo) { sgptDataTables = &gpDataTables; std::memset((void*)&gpDataTables, 0, sizeof gpDataTables); }
     sgptDataTables->bCompileTxt = FALSE;   // sgptDataTables is D2MOO's own global (DataTbls.cpp)
     // (hArchive, a2, a3) = (NULL, 0, 0): no eager DS1 preloading, like the retail capture tool's InitDataTables.
     DATATBLS_LoadAllTxts(nullptr, 0, 0);
+    state = 2;
     return sgptDataTables->pLevelsTxt && sgptDataTables->pLvlPrestTxt && sgptDataTables->pItemDataTables.pItemsTxt;
 }
 

@@ -1,4 +1,5 @@
 #include "QUESTS/ACT4/A4Q1.h"
+#include <test_seam.h>
 
 #include <DataTbls/LevelsIds.h>
 #include <DataTbls/MonsterIds.h>
@@ -381,12 +382,12 @@ void __fastcall ACT4Q1_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 // 1.13c D2Game+0xB9CD0
 int32_t __fastcall ACT4Q1_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pUnit)->pQuestData[pGame->nDifficulty];
 
-	if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A4Q1, QFLAG_REWARDGRANTED) != 1 && QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A4Q1, QFLAG_REWARDPENDING) != 1)
+	if (D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A4Q1, QFLAG_REWARDGRANTED) != 1 && D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A4Q1, QFLAG_REWARDPENDING) != 1)
 	{
 		QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A4Q1, QFLAG_COMPLETEDNOW);
-		QUESTS_SendLogUpdateEx(pUnit, QUEST_A4Q1_IZUAL, 0);
+		D2_CALL(QUESTS_SendLogUpdateEx, pUnit, QUEST_A4Q1_IZUAL, 0);
 	}
 
 	return 0;
@@ -396,7 +397,7 @@ int32_t __fastcall ACT4Q1_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2Uni
 // 1.13c D2Game+0xBA180
 int32_t __fastcall ACT4Q1_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
-	if (!QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A4Q1, QFLAG_PRIMARYGOALDONE))
+	if (!D2_CALL(QUESTRECORD_GetQuestState, D2_CALL(UNITS_GetPlayerData, pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A4Q1, QFLAG_PRIMARYGOALDONE))
 	{
 		return 0;
 	}
@@ -404,7 +405,7 @@ int32_t __fastcall ACT4Q1_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameSt
 	const int16_t nPartyId = SUNIT_GetPartyId(pUnit);
 	if (nPartyId != -1)
 	{
-		PARTY_IteratePartyMembers(pGame, nPartyId, ACT4Q1_UnitIterate_SetPrimaryGoalDone, 0);
+		D2_CALL(PARTY_IteratePartyMembers, pGame, nPartyId, ACT4Q1_UnitIterate_SetPrimaryGoalDone, 0);
 	}
 
 	return 0;
@@ -635,7 +636,7 @@ void __fastcall ACT4Q1_AttachCompletionSoundToPlayers(D2GameStrc* pGame)
 // 1.13c D2Game+0xB9C60
 int32_t __fastcall ACT4Q1_UnitIterate_AttachCompletionSound(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
-	if (QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A4Q1, QFLAG_PRIMARYGOALDONE))
+	if (D2_CALL(QUESTRECORD_GetQuestState, D2_CALL(UNITS_GetPlayerData, pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A4Q1, QFLAG_PRIMARYGOALDONE))
 	{
 		SUNIT_AttachSound(pUnit, 74, pUnit);
 	}

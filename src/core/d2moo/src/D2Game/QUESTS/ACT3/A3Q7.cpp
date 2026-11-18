@@ -1,4 +1,5 @@
 #include "QUESTS/ACT3/A3Q7.h"
+#include <test_seam.h>
 
 #include <DataTbls/MonsterIds.h>
 #include <DataTbls/ObjectsIds.h>
@@ -144,7 +145,7 @@ void __fastcall ACT3Q7_InitQuestData(D2QuestDataStrc* pQuestData)
 // 1.13c D2Game+0xE3050 (checked against decompile, no delta)
 void __fastcall ACT3Q7_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
-	if (QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty], QUESTSTATEFLAG_A3Q7, QFLAG_REWARDGRANTED) == 1)
+	if (D2_CALL(QUESTRECORD_GetQuestState, D2_CALL(UNITS_GetPlayerData, pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty], QUESTSTATEFLAG_A3Q7, QFLAG_REWARDGRANTED) == 1)
 	{
 		QUESTS_SetGlobalState(pQuestData->pGame, QUESTSTATEFLAG_A3Q7, QFLAG_PRIMARYGOALDONE);
 		((D2Act3Quest7Strc*)pQuestData->pQuestDataEx)->bPrimaryGoalOpen = 0;
@@ -215,15 +216,15 @@ bool __fastcall ACT3Q7_SpawnVileDogs(D2GameStrc* pGame, D2QuestDataStrc* pQuestD
 
 	D2SeedStrc* pSeed = QUESTS_GetGlobalSeed(pGame);
 
-	D2ActiveRoomStrc* pCurrentRoom = UNITS_GetRoom(pDarkWanderer);
+	D2ActiveRoomStrc* pCurrentRoom = D2_CALL(UNITS_GetRoom, pDarkWanderer);
 	D2CoordStrc pBase = {};
-	UNITS_GetCoords(pDarkWanderer, &pBase);
+	D2_CALL(UNITS_GetCoords, pDarkWanderer, &pBase);
 
 	for (int32_t i = SEED_RollRandomNumber(pSeed) & 1; i < ARRAY_SIZE(pAdjustCoords); ++i)
 	{
 		D2CoordStrc pCoords = { pBase.nX + pAdjustCoords[i].nX, pBase.nY + pAdjustCoords[i].nY };
 		D2ActiveRoomStrc* pRoom = nullptr;
-		QUESTS_GetFreePosition(pCurrentRoom, &pCoords, 3, COLLIDE_MASK_PLACEMENT, &pRoom, 100);
+		D2_CALL(QUESTS_GetFreePosition, pCurrentRoom, &pCoords, 3, COLLIDE_MASK_PLACEMENT, &pRoom, 100);
 
 		if (pRoom)
 		{
@@ -238,17 +239,17 @@ bool __fastcall ACT3Q7_SpawnVileDogs(D2GameStrc* pGame, D2QuestDataStrc* pQuestD
 // 1.13c D2Game+0xE30C0 (checked against decompile, no delta)
 int32_t __fastcall ACT3Q7_UnitIterate_SetRewardGranted(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
-	if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q7, QFLAG_REWARDGRANTED) || !UNITS_GetRoom(pUnit))
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pUnit)->pQuestData[pGame->nDifficulty];
+	if (D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q7, QFLAG_REWARDGRANTED) || !D2_CALL(UNITS_GetRoom, pUnit))
 	{
 		return 0;
 	}
 
-	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
-	const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(pRoom);
-	if (nLevelId && DRLG_GetActNoFromLevelId(nLevelId) == ACT_III)
+	D2ActiveRoomStrc* pRoom = D2_CALL(UNITS_GetRoom, pUnit);
+	const int32_t nLevelId = D2_CALL(DUNGEON_GetLevelIdFromRoom, pRoom);
+	if (nLevelId && D2_CALL(DRLG_GetActNoFromLevelId, nLevelId) == ACT_III)
 	{
-		QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q7, QFLAG_REWARDGRANTED);
+		D2_CALL(QUESTRECORD_SetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q7, QFLAG_REWARDGRANTED);
 	}
 
 	return 0;

@@ -1,6 +1,7 @@
 #include "PLAYER/PlrIntro.h"
 
 #include <algorithm>
+#include <test_seam.h>
 
 #include <Fog.h>
 #include <D2BitManip.h>
@@ -102,7 +103,7 @@ void __fastcall PLRINTRO_SetNpcIntroFlag(D2PlrIntroStrc* pPlayerIntro, int32_t n
 // bit, bit 0 on a miss); the body here is that inlined step.
 int32_t __fastcall PLRINTRO_GetNpcIntroFlag(D2PlrIntroStrc* pPlayerIntro, int32_t nNpcId)
 {
-    return BITMANIP_GetBitState(pPlayerIntro->pNpcIntroFlags->pBuffer, PLRINTRO_GetIntroBitIndex(nNpcId));
+    return D2_CALL(BITMANIP_GetBitState, pPlayerIntro->pNpcIntroFlags->pBuffer, PLRINTRO_GetIntroBitIndex(nNpcId));
 }
 
 //D2Game.0x6FC7F140

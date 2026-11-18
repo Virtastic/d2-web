@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include <Fog.h>
+#include <test_seam.h>
 
 #include <D2Dungeon.h>
 #include <D2StatList.h>
@@ -279,7 +280,7 @@ int32_t __fastcall PARTY_GetLivingPartyMemberCountInSameLevel(D2GameStrc* pGame,
 // 1.13c D2Game+0x9C000
 void __fastcall PARTY_CountLivingUnits(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pLivingUnits)
 {
-    if (pUnit && !SUNIT_IsDead(pUnit))
+    if (pUnit && !D2_CALL(SUNIT_IsDead, pUnit))
     {
         ++*((int32_t*)pLivingUnits);
     }

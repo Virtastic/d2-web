@@ -2,11 +2,16 @@
 // step, stamping each visited cell through 42A70. The cell value minus (0x371 + snow) indexes the eight-entry step
 // table (retail .rdata at DAT_6fde3770: dx at +0, dy at +4); snow is 0x4C when the level type at +0x1D0 is 0x75.
 // The walk ends with the corner stamps 0x38A and 0x389 (plus snow). Raw 1.13c offsets; pointers are wasm32 host
-// addresses, as in d2common_42a70.cpp.
+// addresses, as in the other raw-layout ports.
 #include <cstdint>
 #include <cstring>
 
-extern "C" void D2Common_42A70(void* ctx, int32_t x0, int32_t y0, int32_t idx, int32_t flag, int32_t extra);
+#include "Drlg/D2DrlgOutdoors.h"
+// The stamp is the tagged game-tree body (DrlgOutdoors.cpp, 1.13c D2Common+0x42A70); the level is the native level.
+static void D2Common_42A70(void* ctx, int32_t x0, int32_t y0, int32_t idx, int32_t flag, int32_t extra)
+{
+    DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(static_cast<D2DrlgLevelStrc*>(ctx), x0, y0, idx, flag, extra);
+}
 
 namespace {
 // DAT_6fde3770 (retail .rdata, RVA 0x93770): the eight (dx, dy) pairs, read from the retail image.

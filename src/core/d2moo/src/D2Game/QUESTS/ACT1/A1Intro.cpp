@@ -1,4 +1,5 @@
 #include "QUESTS/ACT1/A1Intro.h"
+#include <test_seam.h>
 
 #include <DataTbls/MonsterIds.h>
 #include <D2QuestRecord.h>
@@ -102,7 +103,7 @@ void __fastcall ACT1Intro_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, 
 		return;
 	}
 
-	PLRINTRO_SetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
+	D2_CALL(PLRINTRO_SetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
 }
 
 // 1.13c D2Game+0x62e50 (checked against decompile, no delta)
@@ -144,18 +145,18 @@ void __fastcall ACT1Intro_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2
 		return;
 	}
 
-	if (PLRINTRO_GetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, nNpcId))
+	if (D2_CALL(PLRINTRO_GetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, nNpcId))
 	{
 		return;
 	}
 
 	if (nPlayerClass == nSpecialClass)
 	{
-		QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, nNpcId, 1);
+		D2_CALL(QUESTS_InitScrollTextChain, pQuestData, pQuestArg->pTextControl, nNpcId, 1);
 	}
 	else
 	{
-		QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, nNpcId, 0);
+		D2_CALL(QUESTS_InitScrollTextChain, pQuestData, pQuestArg->pTextControl, nNpcId, 0);
 	}
 }
 
@@ -164,9 +165,9 @@ void __fastcall ACT1Intro_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2
 // 1.13c D2Game+0x62DF0
 bool __fastcall ACT1Intro_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
-	return QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pPlayer)->pQuestData[pQuest->pGame->nDifficulty], QUESTSTATEFLAG_A1Q1, QFLAG_REWARDGRANTED) != 1
+	return D2_CALL(QUESTRECORD_GetQuestState, D2_CALL(UNITS_GetPlayerData, pPlayer)->pQuestData[pQuest->pGame->nDifficulty], QUESTSTATEFLAG_A1Q1, QFLAG_REWARDGRANTED) != 1
 		&& nNpcId == MONSTER_AKARA
-		&& !PLRINTRO_GetQuestIntroFlag(pPlayer, pQuest->pGame, MONSTER_AKARA);
+		&& !D2_CALL(PLRINTRO_GetQuestIntroFlag, pPlayer, pQuest->pGame, MONSTER_AKARA);
 }
 
 // 1.13c D2Game+0x60810 (checked against decompile, no delta)

@@ -1,5 +1,6 @@
 #include <test_seam.h>
 #include "SKILLS/SkillNec.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -291,7 +292,7 @@ int32_t __fastcall sub_6FD0B3D0(D2UnitStrc* pUnit, int32_t nStatId, int32_t nRes
     case STAT_LIGHTRESIST:
     case STAT_COLDRESIST:
     case STAT_POISONRESIST:
-        if (nResist > 0 || pUnit && pUnit->dwUnitType == UNIT_PLAYER || MONSTERS_GetHirelingTypeId(pUnit) || STATLIST_GetUnitBaseStat(pUnit, nStatId, 0) < 100)
+        if (nResist > 0 || pUnit && pUnit->dwUnitType == UNIT_PLAYER || D2_CALL(MONSTERS_GetHirelingTypeId, pUnit) || D2_CALL(STATLIST_GetUnitBaseStat, pUnit, nStatId, 0) < 100)
         {
             return nResist;
         }
@@ -778,7 +779,7 @@ void __fastcall sub_6FD0C2B0(D2UnitStrc* pUnit, int32_t nState, D2StatListStrc* 
 // 1.13c D2Game+0x4E180 (eax = owner, edi = pet)
 void __fastcall D2GAME_SetSummonResistance_6FD0C2E0(D2UnitStrc* pUnit, D2UnitStrc* pPet)
 {
-    const int32_t nSummonRes = STATLIST_UnitGetStatValue(pUnit, STAT_PASSIVE_SUMMON_RESIST, 0);
+    const int32_t nSummonRes = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_PASSIVE_SUMMON_RESIST, 0);
     if (nSummonRes)
     {
         int32_t nUnitGUID = -1;
@@ -791,27 +792,27 @@ void __fastcall D2GAME_SetSummonResistance_6FD0C2E0(D2UnitStrc* pUnit, D2UnitStr
             pMemPool = pPet->pMemoryPool;
         }
 
-        D2StatListStrc* pStatList = STATLIST_AllocStatList(pMemPool, 0, 0, nUnitType, nUnitGUID);
+        D2StatListStrc* pStatList = D2_CALL(STATLIST_AllocStatList, pMemPool, 0, 0, nUnitType, nUnitGUID);
         if (pStatList)
         {
-            D2COMMON_10475_PostStatToStatList(pPet, pStatList, 1);
+            D2_CALL(D2COMMON_10475_PostStatToStatList, pPet, pStatList, 1);
 
-            if ((int32_t)STATLIST_UnitGetStatValue(pPet, STAT_ITEM_ABSORBFIRE_PERCENT, 0) <= 0)
+            if ((int32_t)D2_CALL(STATLIST_UnitGetStatValue, pPet, STAT_ITEM_ABSORBFIRE_PERCENT, 0) <= 0)
             {
-                STATLIST_SetStat(pStatList, STAT_FIRERESIST, nSummonRes, 0);
+                D2_CALL(STATLIST_SetStat, pStatList, STAT_FIRERESIST, nSummonRes, 0);
             }
 
-            if ((int32_t)STATLIST_UnitGetStatValue(pPet, STAT_ITEM_ABSORBLIGHT_PERCENT, 0) <= 0)
+            if ((int32_t)D2_CALL(STATLIST_UnitGetStatValue, pPet, STAT_ITEM_ABSORBLIGHT_PERCENT, 0) <= 0)
             {
-                STATLIST_SetStat(pStatList, STAT_LIGHTRESIST, nSummonRes, 0);
+                D2_CALL(STATLIST_SetStat, pStatList, STAT_LIGHTRESIST, nSummonRes, 0);
             }
 
-            if ((int32_t)STATLIST_UnitGetStatValue(pPet, STAT_ITEM_ABSORBCOLD_PERCENT, 0) <= 0)
+            if ((int32_t)D2_CALL(STATLIST_UnitGetStatValue, pPet, STAT_ITEM_ABSORBCOLD_PERCENT, 0) <= 0)
             {
-                STATLIST_SetStat(pStatList, STAT_COLDRESIST, nSummonRes, 0);
+                D2_CALL(STATLIST_SetStat, pStatList, STAT_COLDRESIST, nSummonRes, 0);
             }
 
-            STATLIST_SetStat(pStatList, STAT_POISONRESIST, nSummonRes, 0);
+            D2_CALL(STATLIST_SetStat, pStatList, STAT_POISONRESIST, nSummonRes, 0);
         }
     }
 }
@@ -1048,7 +1049,7 @@ int32_t __fastcall D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10(D2GameStrc* pGame, 
     int32_t nPetLevel = nPetLevelArg;
     if (nPetLevelArg <= 0)
     {
-        const int32_t nUnitLevel = STATLIST_UnitGetStatValue(pUnit, STAT_LEVEL, 0);
+        const int32_t nUnitLevel = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_LEVEL, 0);
 
         nPetLevel = nSkillLevel + 3 * nUnitLevel / 4;
         if (nPetLevel < 1)
@@ -1063,7 +1064,7 @@ int32_t __fastcall D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10(D2GameStrc* pGame, 
 
     if (nPetLevel)
     {
-        STATLIST_SetUnitStat(pPet, STAT_LEVEL, nPetLevel, 0);
+        D2_CALL(STATLIST_SetUnitStat, pPet, STAT_LEVEL, nPetLevel, 0);
     }
 
     if (nPetLevel >= sgptDataTables->nMonLvlTxtRecordCount - 1)
@@ -1093,8 +1094,8 @@ int32_t __fastcall D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10(D2GameStrc* pGame, 
     }
 
     const uint8_t nGameType = pGame->nGameType || pGame->dwGameType;
-    STATLIST_AddUnitStat(pPet, STAT_ARMORCLASS, nGameType ? pMonLvlTxtRecord->dwLAC[nDifficulty] : pMonLvlTxtRecord->dwAC[nDifficulty], 0);
-    STATLIST_AddUnitStat(pPet, STAT_TOHIT, nGameType ? pMonLvlTxtRecord->dwLTH[nDifficulty] : pMonLvlTxtRecord->dwTH[nDifficulty], 0);
+    D2_CALL(STATLIST_AddUnitStat, pPet, STAT_ARMORCLASS, nGameType ? pMonLvlTxtRecord->dwLAC[nDifficulty] : pMonLvlTxtRecord->dwAC[nDifficulty], 0);
+    D2_CALL(STATLIST_AddUnitStat, pPet, STAT_TOHIT,nGameType ? pMonLvlTxtRecord->dwLTH[nDifficulty] : pMonLvlTxtRecord->dwTH[nDifficulty], 0);
 
     return 1;
 }
@@ -2078,19 +2079,19 @@ int32_t __fastcall D2GAME_EventFunc22_6FD0F000(D2GameStrc* pGame, int32_t nEvent
 
     if (pSkillsTxtRecord->nAuraState >= 0 && pSkillsTxtRecord->nAuraState < sgptDataTables->nStatesTxtRecordCount)
     {
-        D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndState(pAttacker, pSkillsTxtRecord->nAuraState);
+        D2StatListStrc* pStatList = D2_CALL(STATLIST_GetStatListFromUnitAndState, pAttacker, pSkillsTxtRecord->nAuraState);
         if (pStatList)
         {
             int32_t nStat1 = pSkillsTxtRecord->wAuraStat[1];
             if (nStat1 >= 0 && nStat1 < sgptDataTables->nItemStatCostTxtRecordCount)
             {
-                int32_t nValue1 = STATLIST_GetStatValue(pStatList, nStat1, 0);
+                int32_t nValue1 = D2_CALL(STATLIST_GetStatValue, pStatList, nStat1, 0);
                 if (nValue1 > 0)
                 {
                     int32_t nStat0 = pSkillsTxtRecord->wAuraStat[0];
                     if (nStat0 >= 0 && nStat0 < sgptDataTables->nItemStatCostTxtRecordCount)
                     {
-                        int32_t nValue0 = STATLIST_GetStatValue(pStatList, nStat0, 0);
+                        int32_t nValue0 = D2_CALL(STATLIST_GetStatValue, pStatList, nStat0, 0);
                         
                         if (nValue0 > 0)
                         {
@@ -2105,25 +2106,25 @@ int32_t __fastcall D2GAME_EventFunc22_6FD0F000(D2GameStrc* pGame, int32_t nEvent
                                 nValue0 = 0;
                             }
 
-                            STATLIST_SetStatIfListIsValid(pStatList, nStat0, nValue0, 0);
+                            D2_CALL(STATLIST_SetStatIfListIsValid, pStatList, nStat0, nValue0, 0);
                         }
 
                         if (!nValue0)
                         {
-                            STATES_ToggleState(pAttacker, pSkillsTxtRecord->nAuraState, 0);
-                            D2Common_10474(pAttacker, pStatList);
-                            STATLIST_FreeStatList(pStatList);
+                            D2_CALL(STATES_ToggleState, pAttacker, pSkillsTxtRecord->nAuraState, 0);
+                            D2_CALL(D2Common_10474, pAttacker, pStatList);
+                            D2_CALL(STATLIST_FreeStatList, pStatList);
                             return 1;
                         }
 
-                        const int32_t nParam = MONSTERUNIQUE_CalculatePercentage(nValue0, 100, nValue1);
-                        int32_t nParamDiff = nParam - STATLIST_GetStatValue(pStatList, STAT_UNSENTPARAM1, 0);
+                        const int32_t nParam = D2_CALL(MONSTERUNIQUE_CalculatePercentage, nValue0, 100, nValue1);
+                        int32_t nParamDiff = nParam - D2_CALL(STATLIST_GetStatValue, pStatList, STAT_UNSENTPARAM1, 0);
                         nParamDiff = std::abs(nParamDiff);
 
                         if (nParamDiff >= 5)
                         {
-                            STATES_ToggleGfxStateFlag(pAttacker, pSkillsTxtRecord->nAuraState, 1);
-                            STATLIST_SetStatIfListIsValid(pStatList, STAT_UNSENTPARAM1, nParam, 0);
+                            D2_CALL(STATES_ToggleGfxStateFlag, pAttacker, pSkillsTxtRecord->nAuraState, 1);
+                            D2_CALL(STATLIST_SetStatIfListIsValid, pStatList, STAT_UNSENTPARAM1, nParam, 0);
                         }
 
                         return 1;
@@ -2229,8 +2230,8 @@ int32_t __fastcall sub_6FD0F590(D2UnitStrc* pUnit, int32_t nValue)
 {
     if (nValue > 0)
     {
-        const int32_t nHitPoints = STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0);
-        const int32_t nMaxHp = STATLIST_GetMaxLifeFromUnit(pUnit);
+        const int32_t nHitPoints = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_HITPOINTS, 0);
+        const int32_t nMaxHp = D2_CALL(STATLIST_GetMaxLifeFromUnit, pUnit);
         int32_t nNewHp = nValue + nHitPoints;
         if (nNewHp > nMaxHp)
         {
@@ -2238,7 +2239,7 @@ int32_t __fastcall sub_6FD0F590(D2UnitStrc* pUnit, int32_t nValue)
             nNewHp = nMaxHp;
         }
 
-        STATLIST_SetUnitStat(pUnit, STAT_HITPOINTS, nNewHp, 0);
+        D2_CALL(STATLIST_SetUnitStat, pUnit, STAT_HITPOINTS, nNewHp, 0);
         return nValue;
     }
 
@@ -2254,32 +2255,32 @@ int32_t __fastcall D2GAME_EventFunc26_6FD0F5E0(D2GameStrc* pGame, int32_t nEvent
 		return 0;
 	}
 
-	D2UnitStrc* pOwner = AIGENERAL_GetMinionOwner(pAttacker);
-	if (SUNIT_IsDead(pOwner))
+	D2UnitStrc* pOwner = D2_CALL(AIGENERAL_GetMinionOwner, pAttacker);
+	if (D2_CALL(SUNIT_IsDead, pOwner))
 	{
 		return 0;
 	}
 
-	const int32_t nHitpoints = STATLIST_UnitGetStatValue(pOwner, STAT_HITPOINTS, 0);
+	const int32_t nHitpoints = D2_CALL(STATLIST_UnitGetStatValue, pOwner, STAT_HITPOINTS, 0);
 	if (nHitpoints < 256)
 	{
 		return 0;
 	}
 
-    D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(pAttacker->dwClassId);
+    D2MonStatsTxt* pMonStatsTxtRecord = D2_CALL(MONSTERMODE_GetMonStatsTxtRecord, pAttacker->dwClassId);
 	if (!pMonStatsTxtRecord || pMonStatsTxtRecord->nSkill[0] < 0)
 	{
 		return 0;
 	}
 
-    D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(pMonStatsTxtRecord->nSkill[0]);
+    D2SkillsTxt* pSkillsTxtRecord = D2_CALL(SKILLS_GetSkillsTxtRecord, pMonStatsTxtRecord->nSkill[0]);
     int32_t nPercentage = 0;
     if (pSkillsTxtRecord)
     {
         nPercentage = pSkillsTxtRecord->dwParam[4];
     }
 
-    const int32_t nReducedDamage = MONSTERUNIQUE_CalculatePercentage(pDamage->dwDmgTotal, nPercentage, 100);
+    const int32_t nReducedDamage = D2_CALL(MONSTERUNIQUE_CalculatePercentage, pDamage->dwDmgTotal, nPercentage, 100);
 
     int32_t nNewHp = nHitpoints - nReducedDamage;
     if (nNewHp < 256)
@@ -2287,7 +2288,7 @@ int32_t __fastcall D2GAME_EventFunc26_6FD0F5E0(D2GameStrc* pGame, int32_t nEvent
         nNewHp = 256;
     }
 
-    STATLIST_SetUnitStat(pOwner, STAT_HITPOINTS, nNewHp, 0);
+    D2_CALL(STATLIST_SetUnitStat, pOwner, STAT_HITPOINTS, nNewHp, 0);
 
     pDamage->dwDmgTotal -= nReducedDamage;
 

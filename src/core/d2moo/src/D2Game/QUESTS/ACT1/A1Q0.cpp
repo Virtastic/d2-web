@@ -1,4 +1,5 @@
 #include "QUESTS/ACT1/A1Q0.h"
+#include <test_seam.h>
 
 #include <DataTbls/MonsterIds.h>
 #include <D2QuestRecord.h>
@@ -56,7 +57,7 @@ void __fastcall ACT1Q0_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 {
 	if (pQuestArg->nNPCNo == MONSTER_WARRIV1 && (pQuestArg->nMessageIndex == 0 || pQuestArg->nMessageIndex == 1))
 	{
-		QUESTRECORD_SetQuestState(UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestData->pGame->nDifficulty], QUESTSTATEFLAG_A1Q0, QFLAG_REWARDGRANTED);
+		D2_CALL(QUESTRECORD_SetQuestState, D2_CALL(UNITS_GetPlayerData, pQuestArg->pPlayer)->pQuestData[pQuestData->pGame->nDifficulty], QUESTSTATEFLAG_A1Q0, QFLAG_REWARDGRANTED);
 	}
 }
 
@@ -89,7 +90,7 @@ void __fastcall ACT1Q0_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 // 1.13c D2Game+0x607D0
 bool __fastcall ACT1Q0_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
-	return nNpcId == MONSTER_WARRIV1 && !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q0, QFLAG_REWARDGRANTED);
+	return nNpcId == MONSTER_WARRIV1 && !D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A1Q0, QFLAG_REWARDGRANTED);
 }
 
 // 1.13c D2Game+0x60800 (checked against decompile, no delta)

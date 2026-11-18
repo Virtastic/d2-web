@@ -13,7 +13,9 @@ inline bool acceptedObjectOperation(uint32_t classId, uint32_t operateFn,
     // The well (OperateFn 22, 1.13c D2Game+0x6CEE0) always returns 0, refilled or dry; accepted as it was
     // while ours returned 1.
     if (operateFn == 22) return true;
-    const bool zeroReturningQuestObject = (classId == 404 && operateFn == 53) ||
+    // 1.13c's Sanctuary tome (42), Ancients altar (65) and Ancients door (66) callbacks report 0 on every path.
+    const bool zeroReturningQuestObject = operateFn == 42 || operateFn == 65 || operateFn == 66 ||
+                                         (classId == 404 && operateFn == 53) ||
                                          (classId == 405 && operateFn == 57) ||
                                          (classId == 406 && operateFn == 59) ||
                                          (classId == 407 && operateFn == 58) ||

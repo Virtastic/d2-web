@@ -13,6 +13,7 @@
 #include "UNIT/SUnit.h"
 #include "UNIT/SUnitDmg.h"
 #include "UNIT/SUnitProxy.h"
+#include <test_seam.h>
 
 
 //D2Game.0x6FC7EA50
@@ -132,12 +133,12 @@ void __fastcall PLAYERSTATS_LevelUp(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // 1.13c D2Game+0xEB070: the walked player (EBX) receives the leveled-up player's roster line (EAX).
 void __fastcall PLAYERSTATS_OnPlayerLeveledUp(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pLeveledUpPlayer)
 {
-    SCMD_Send0x75_PartyRosterUpdate(pUnit, (D2UnitStrc*)pLeveledUpPlayer);
+    D2_CALL(SCMD_Send0x75_PartyRosterUpdate, pUnit, (D2UnitStrc*)pLeveledUpPlayer);
 }
 
 // 1.13c D2Game+0xEAE20: nCount points into energy. The mana gain only for a positive count, the max
 // mana always, then mana clamped to the max.
-static void PLAYERSTATS_AddEnergy(D2UnitStrc* pUnit, int32_t nCount)
+void PLAYERSTATS_AddEnergy(D2UnitStrc* pUnit, int32_t nCount)
 {
     if (!nCount || !pUnit)
     {
@@ -150,24 +151,24 @@ static void PLAYERSTATS_AddEnergy(D2UnitStrc* pUnit, int32_t nCount)
         return;
     }
 
-    STATLIST_AddUnitStat(pUnit, STAT_STATPTS, -nCount, 0);
-    STATLIST_AddUnitStat(pUnit, STAT_ENERGY, nCount, 0);
+    D2_CALL(STATLIST_AddUnitStat, pUnit, STAT_STATPTS, -nCount, 0);
+    D2_CALL(STATLIST_AddUnitStat, pUnit, STAT_ENERGY, nCount, 0);
     if (nCount > 0)
     {
-        STATLIST_AddUnitStat(pUnit, STAT_MANA, (pCharStatsTxtRecord->nManaPerMagic * nCount) << 6, 0);
+        D2_CALL(STATLIST_AddUnitStat, pUnit, STAT_MANA, (pCharStatsTxtRecord->nManaPerMagic * nCount) << 6, 0);
     }
-    STATLIST_AddUnitStat(pUnit, STAT_MAXMANA, (pCharStatsTxtRecord->nManaPerMagic * nCount) << 6, 0);
+    D2_CALL(STATLIST_AddUnitStat, pUnit, STAT_MAXMANA, (pCharStatsTxtRecord->nManaPerMagic * nCount) << 6, 0);
 
-    const int32_t nMaxMana = STATLIST_UnitGetStatValue(pUnit, STAT_MAXMANA, 0);
-    if (STATLIST_UnitGetStatValue(pUnit, STAT_MANA, 0) > nMaxMana)
+    const int32_t nMaxMana = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_MAXMANA, 0);
+    if (D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_MANA, 0) > nMaxMana)
     {
-        STATLIST_SetUnitStat(pUnit, STAT_MANA, nMaxMana, 0);
+        D2_CALL(STATLIST_SetUnitStat, pUnit, STAT_MANA, nMaxMana, 0);
     }
 }
 
 // 1.13c D2Game+0xEAD10: nCount points into vitality. Max life and max stamina always grow, life and
 // stamina only for a positive count, each clamped to its max.
-static void PLAYERSTATS_AddVitality(D2UnitStrc* pUnit, int32_t nCount)
+void PLAYERSTATS_AddVitality(D2UnitStrc* pUnit, int32_t nCount)
 {
     if (!nCount || !pUnit)
     {
@@ -180,28 +181,28 @@ static void PLAYERSTATS_AddVitality(D2UnitStrc* pUnit, int32_t nCount)
         return;
     }
 
-    STATLIST_AddUnitStat(pUnit, STAT_STATPTS, -nCount, 0);
-    STATLIST_AddUnitStat(pUnit, STAT_VITALITY, nCount, 0);
-    STATLIST_AddUnitStat(pUnit, STAT_MAXHP, (pCharStatsTxtRecord->nLifePerVitality * nCount) << 6, 0);
+    D2_CALL(STATLIST_AddUnitStat, pUnit, STAT_STATPTS, -nCount, 0);
+    D2_CALL(STATLIST_AddUnitStat, pUnit, STAT_VITALITY, nCount, 0);
+    D2_CALL(STATLIST_AddUnitStat, pUnit, STAT_MAXHP, (pCharStatsTxtRecord->nLifePerVitality * nCount) << 6, 0);
     if (nCount > 0)
     {
-        STATLIST_AddUnitStat(pUnit, STAT_HITPOINTS, (pCharStatsTxtRecord->nLifePerVitality * nCount) << 6, 0);
+        D2_CALL(STATLIST_AddUnitStat, pUnit, STAT_HITPOINTS, (pCharStatsTxtRecord->nLifePerVitality * nCount) << 6, 0);
     }
-    const int32_t nMaxHp = STATLIST_UnitGetStatValue(pUnit, STAT_MAXHP, 0);
-    if (STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0) > nMaxHp)
+    const int32_t nMaxHp = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_MAXHP, 0);
+    if (D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_HITPOINTS, 0) > nMaxHp)
     {
-        STATLIST_SetUnitStat(pUnit, STAT_HITPOINTS, nMaxHp, 0);
+        D2_CALL(STATLIST_SetUnitStat, pUnit, STAT_HITPOINTS, nMaxHp, 0);
     }
 
-    STATLIST_AddUnitStat(pUnit, STAT_MAXSTAMINA, (pCharStatsTxtRecord->nStaminaPerVitality * nCount) << 6, 0);
+    D2_CALL(STATLIST_AddUnitStat, pUnit, STAT_MAXSTAMINA, (pCharStatsTxtRecord->nStaminaPerVitality * nCount) << 6, 0);
     if (nCount > 0)
     {
-        STATLIST_AddUnitStat(pUnit, STAT_STAMINA, (pCharStatsTxtRecord->nStaminaPerVitality * nCount) << 6, 0);
+        D2_CALL(STATLIST_AddUnitStat, pUnit, STAT_STAMINA, (pCharStatsTxtRecord->nStaminaPerVitality * nCount) << 6, 0);
     }
-    const int32_t nMaxStamina = STATLIST_UnitGetStatValue(pUnit, STAT_MAXSTAMINA, 0);
-    if (STATLIST_UnitGetStatValue(pUnit, STAT_STAMINA, 0) > nMaxStamina)
+    const int32_t nMaxStamina = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_MAXSTAMINA, 0);
+    if (D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_STAMINA, 0) > nMaxStamina)
     {
-        STATLIST_SetUnitStat(pUnit, STAT_STAMINA, nMaxStamina, 0);
+        D2_CALL(STATLIST_SetUnitStat, pUnit, STAT_STAMINA, nMaxStamina, 0);
     }
 }
 

@@ -86,6 +86,8 @@ struct D2NpcRecordStrc
 
 #pragma pack()
 
+// 1.13c D2Game+0xBD160
+void NPC_RefillHirelingListIfExhausted(D2GameStrc* pGame, int32_t nVendorId, D2NpcRecordStrc* pNpcRecord);
 //D2Game.0x6FCC67D0
 void __fastcall D2GAME_NPC_FirstFn_6FCC67D0(D2GameStrc* pGame, int32_t nVendorId, D2NpcRecordStrc* pNpcRecord);
 //D2Game.0x6FCC6970

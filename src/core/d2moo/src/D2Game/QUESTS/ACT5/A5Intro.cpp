@@ -1,6 +1,7 @@
 #include "QUESTS/ACT5/A5Intro.h"
 
 #include <DataTbls/MonsterIds.h>
+#include <test_seam.h>
 
 #include "PLAYER/PlrIntro.h"
 #include "QUESTS/Quests.h"
@@ -194,7 +195,7 @@ void __fastcall ACT5Intro_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2
 // 1.13c D2Game+0x59680 (checked against decompile)
 bool __fastcall ACT5Intro_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
-	return nNpcId == MONSTER_MALAH && !PLRINTRO_GetQuestIntroFlag(pPlayer, pQuest->pGame, MONSTER_MALAH);
+	return nNpcId == MONSTER_MALAH && !D2_CALL(PLRINTRO_GetQuestIntroFlag, pPlayer, pQuest->pGame, MONSTER_MALAH);
 }
 
 // 1.13c D2Game+0x56EA0 (checked against decompile)

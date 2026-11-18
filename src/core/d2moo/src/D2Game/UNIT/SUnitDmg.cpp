@@ -44,6 +44,7 @@
 #include "UNIT/Party.h"
 #include "UNIT/SUnitEvent.h"
 #include "UNIT/SUnit.h"
+#include <test_seam.h>
 
 extern const char* g_d2webRegenSite;
 D2CombatTraceCallback gpCombatTraceCallback = nullptr;
@@ -2890,10 +2891,10 @@ int32_t __fastcall SUNITDMG_GetWeaponBlock(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCC2910
-// 1.13c D2Game+0xDE380
+// 1.13c D2Game+0xDE380 (the owner lookups are the inlined owner test + server-unit lookup, as in retail)
 int32_t __fastcall SUNITDMG_SetMissileDamageFlagsForNearbyUnits(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY, int32_t nSize, D2DamageStrc* pDamage, int32_t a7, int32_t a8, int32_t(__fastcall* pfCallback)(D2GameStrc*, D2UnitStrc*, D2UnitStrc*), int32_t a10)
 {
-	D2ActiveRoomStrc* pRoom = D2GAME_GetRoom_6FC52070(UNITS_GetRoom(pUnit), nX, nY);
+	D2ActiveRoomStrc* pRoom = D2_CALL(D2GAME_GetRoom_6FC52070, D2_CALL(UNITS_GetRoom, pUnit), nX, nY);
 
 	int32_t nFlags = a10;
 	if (!a10)
@@ -2908,17 +2909,25 @@ int32_t __fastcall SUNITDMG_SetMissileDamageFlagsForNearbyUnits(D2GameStrc* pGam
 	unitFindArg.nY = nY;
 
 	D2UnitFindDataStrc unitFindData = {};
-	UNITFINDS_InitializeUnitFindData(pGame->pMemoryPool, &unitFindData, pRoom, nX, nY, nSize, nullptr, &unitFindArg);
-	UNITFINDS_FindAllMatchingUnitsInNeighboredRooms(&unitFindData);
+	D2_CALL(UNITFINDS_InitializeUnitFindData, pGame->pMemoryPool, &unitFindData, pRoom, nX, nY, nSize, nullptr, &unitFindArg);
+	D2_CALL(UNITFINDS_FindAllMatchingUnitsInNeighboredRooms, &unitFindData);
 
-	D2UnitStrc* pUnitOwner = SUNIT_GetOwner(pGame, pUnit);
+	D2UnitStrc* pUnitOwner = nullptr;
+	if (pUnit && (pUnit->dwFlagEx & UNITFLAGEX_STOREOWNERINFO))
+	{
+		pUnitOwner = D2_CALL(SUNIT_GetServerUnit, pGame, pUnit->dwOwnerType, pUnit->dwOwnerGUID);
+	}
 	if (!pUnitOwner)
 	{
-		UNITFINDS_FreeUnitFindData(&unitFindData);
+		D2_CALL(UNITFINDS_FreeUnitFindData, &unitFindData);
 		return 0;
 	}
 
-	D2UnitStrc* pOwnerOwner = SUNIT_GetOwner(pGame, pUnitOwner);
+	D2UnitStrc* pOwnerOwner = nullptr;
+	if (pUnitOwner->dwFlagEx & UNITFLAGEX_STOREOWNERINFO)
+	{
+		pOwnerOwner = D2_CALL(SUNIT_GetServerUnit, pGame, pUnitOwner->dwOwnerType, pUnitOwner->dwOwnerGUID);
+	}
 
 	D2DamageStrc damageCopy = {};
 	int32_t bResult = 0;
@@ -2926,13 +2935,13 @@ int32_t __fastcall SUNITDMG_SetMissileDamageFlagsForNearbyUnits(D2GameStrc* pGam
 	{
 		D2UnitStrc* pFoundUnit = unitFindData.pUnitsArray[i];
 
-		if ((pOwnerOwner != pFoundUnit || a8) && (pUnitOwner != pFoundUnit || a7) && sub_6FCBD900(pGame, pUnitOwner, pFoundUnit) && D2Common_11026(nX, nY, pFoundUnit, COLLIDE_MASK_RADIAL_BARRIER))
+		if ((pOwnerOwner != pFoundUnit || a8) && (pUnitOwner != pFoundUnit || a7) && D2_CALL(sub_6FCBD900, pGame, pUnitOwner, pFoundUnit) && D2_CALL(D2Common_11026, nX, nY, pFoundUnit, COLLIDE_MASK_RADIAL_BARRIER))
 		{
 			memcpy(&damageCopy, pDamage, sizeof(damageCopy));
 
 			if (!pfCallback)
 			{
-				MISSMODE_SetDamageFlags(pGame, pUnit, pFoundUnit, &damageCopy);
+				D2_CALL(MISSMODE_SetDamageFlags, pGame, pUnit, pFoundUnit, &damageCopy);
 				bResult = 1;
 			}
 			else
@@ -2945,14 +2954,14 @@ int32_t __fastcall SUNITDMG_SetMissileDamageFlagsForNearbyUnits(D2GameStrc* pGam
 
 				if (pfCallback(pGame, pUnit, pFoundUnit))
 				{
-					MISSMODE_SetDamageFlags(pGame, pUnit, pFoundUnit, &damageCopy);
+					D2_CALL(MISSMODE_SetDamageFlags, pGame, pUnit, pFoundUnit, &damageCopy);
 					bResult = 1;
 				}
 			}
 		}
 	}
 
-	UNITFINDS_FreeUnitFindData(&unitFindData);
+	D2_CALL(UNITFINDS_FreeUnitFindData, &unitFindData);
 	return bResult;
 }
 
@@ -3243,41 +3252,46 @@ void __fastcall SUNITDMG_PartyCallback_ComputePartyExperience(D2GameStrc* pGame,
 }
 
 //D2Game.0x6FCC3360
-// 1.13c D2Game+0xDDCB0
+// 1.13c D2Game+0xDDCB0 (diffed against the decompile: signed bonus and level compares, the experience gained is twice the bonus, the client comes from the owner's player data)
 void __fastcall SUNITDMG_AddExperienceForHireling(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pHireling, uint32_t nLevel, uint32_t nExperienceBonus)
 {
-	if (nExperienceBonus <= 0)
+	if ((int32_t)nExperienceBonus <= 0)
 	{
 		return;
 	}
 
-	D2PetInfoStrc* pPetInfo = PLAYERPETS_GetPetInfoFromPetGUID(pPlayer, pHireling ? pHireling->dwUnitId : -1);
+	D2PetInfoStrc* pPetInfo = D2_CALL(PLAYERPETS_GetPetInfoFromPetGUID, pPlayer, pHireling ? pHireling->dwUnitId : -1);
 	if (!pPetInfo)
 	{
 		return;
 	}
 
-	D2HirelingTxt* pHirelingTxtRecord = DATATBLS_GetHirelingTxtRecordFromIdAndLevel(pGame->bExpansion, pPetInfo->nHirelingId, nLevel);
-	if (!pHirelingTxtRecord || nLevel >= STATLIST_UnitGetStatValue(pPlayer, STAT_LEVEL, 0))
+	D2HirelingTxt* pHirelingTxtRecord = D2_CALL(DATATBLS_GetHirelingTxtRecordFromIdAndLevel, pGame->bExpansion, pPetInfo->nHirelingId, nLevel);
+	if (!pHirelingTxtRecord || (int32_t)nLevel >= D2_CALL(STATLIST_UnitGetStatValue, pPlayer, STAT_LEVEL, 0))
 	{
 		return;
 	}
 
-	const uint32_t nCurrentExp = STATLIST_GetUnitBaseStat(pHireling, STAT_EXPERIENCE, 0);
-	const uint32_t nNewExp = nCurrentExp + nExperienceBonus;
-	const uint32_t nMaxLevel = DATATBLS_GetMaxLevel(0) - 1;
-	if (nLevel >= nMaxLevel)
+	const uint32_t nCurrentExp = D2_CALL(STATLIST_GetUnitBaseStat, pHireling, STAT_EXPERIENCE, 0);
+	const uint32_t nNewExp = nCurrentExp + nExperienceBonus * 2;
+	const int32_t nMaxLevel = D2_CALL(DATATBLS_GetMaxLevel, 0) - 1;
+	if ((int32_t)nLevel >= nMaxLevel)
 	{
 		return;
 	}
 
-	STATLIST_SetUnitStat(pHireling, STAT_EXPERIENCE, nNewExp, 0);
-	D2GAME_PACKETS_SendPacket0xA0_A1_A2_6FC3D610(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), pHireling, 0xDu, nCurrentExp, nNewExp);
+	D2_CALL(STATLIST_SetUnitStat, pHireling, STAT_EXPERIENCE, nNewExp, 0);
+	D2ClientStrc* pClient = nullptr;
+	if (pPlayer && pPlayer->dwUnitType == UNIT_PLAYER)
+	{
+		pClient = D2_CALL(UNITS_GetPlayerData, pPlayer)->pClient;
+	}
+	D2_CALL(D2GAME_PACKETS_SendPacket0xA0_A1_A2_6FC3D610, pClient, pHireling, 0xDu, nCurrentExp, nNewExp);
 
-	uint32_t nNewLevel = nLevel;
+	int32_t nNewLevel = (int32_t)nLevel;
 	do
 	{
-		if (MONSTERS_GetHirelingExpForNextLevel(nNewLevel + 1, pHirelingTxtRecord->dwExpPerLvl) > nNewExp)
+		if ((uint32_t)D2_CALL(MONSTERS_GetHirelingExpForNextLevel, nNewLevel + 1, pHirelingTxtRecord->dwExpPerLvl) > nNewExp)
 		{
 			break;
 		}
@@ -3286,12 +3300,12 @@ void __fastcall SUNITDMG_AddExperienceForHireling(D2GameStrc* pGame, D2UnitStrc*
 	}
 	while (nNewLevel < nMaxLevel);
 
-	if (nNewLevel > nLevel)
+	if (nNewLevel > (int32_t)nLevel)
 	{
-		MONSTERAI_UpdateMercStatsAndSkills(pGame, pPlayer, pHireling, nNewLevel);
-		MONSTERAI_SendMercStats(pGame, pPlayer, 0);
-		SUNIT_AttachSound(pHireling, 0x5Bu, pPlayer);
-		SUNITEVENT_Trigger(pGame, UNITEVENT_LEVELUP, pHireling, 0, 0);
+		D2_CALL(MONSTERAI_UpdateMercStatsAndSkills, pGame, pPlayer, pHireling, nNewLevel);
+		D2_CALL(MONSTERAI_SendMercStats, pGame, pPlayer, 0);
+		D2_CALL(SUNIT_AttachSound, pHireling, 0x5Bu, pPlayer);
+		D2_CALL(SUNITEVENT_Trigger, pGame, UNITEVENT_LEVELUP, pHireling, nullptr, nullptr);
 	}
 }
 

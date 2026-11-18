@@ -18,6 +18,7 @@
 #include "Path/PathMisc.h"
 #include "D2Seed.h"
 #include <assert.h>
+#include <test_seam.h>
 #include <DataTbls/LevelsIds.h>
 
 #include <cmath>
@@ -1621,17 +1622,17 @@ static void __fastcall DRLGOUTPLACE_CreateAct4LevelConnections(D2DrlgStrc* pDrlg
 // 1.13c D2Common+0x17930
 void __fastcall DRLGOUTPLACE_CreateAct5LevelConnections(D2DrlgStrc* pDrlg)
 {
-	sub_6FD823C0(pDrlg, gAct5OutdoorDrlgLink, NULL, NULL);
-	sub_6FD823C0(pDrlg, gAct5TundraDrlgLink, NULL, NULL);
+	D2_CALL(sub_6FD823C0, pDrlg, gAct5OutdoorDrlgLink, NULL, NULL);
+	D2_CALL(sub_6FD823C0, pDrlg, gAct5TundraDrlgLink, NULL, NULL);
 
-	sub_6FD826D0(pDrlg, LEVEL_ID_ACT5_BARRICADE_1, LEVEL_ARREATPLATEAU);
-	sub_6FD82750(pDrlg, LEVEL_ID_ACT5_BARRICADE_1, LEVEL_ARREATPLATEAU);
+	D2_CALL(sub_6FD826D0, pDrlg, LEVEL_ID_ACT5_BARRICADE_1, LEVEL_ARREATPLATEAU);
+	D2_CALL(sub_6FD82750, pDrlg, LEVEL_ID_ACT5_BARRICADE_1, LEVEL_ARREATPLATEAU);
 
-	sub_6FD826D0(pDrlg, LEVEL_BLOODYFOOTHILLS, LEVEL_ID_ACT5_BARRICADE_1);
+	D2_CALL(sub_6FD826D0, pDrlg, LEVEL_BLOODYFOOTHILLS, LEVEL_ID_ACT5_BARRICADE_1);
 
-	sub_6FD826D0(pDrlg, LEVEL_HARROGATH, LEVEL_BLOODYFOOTHILLS);
+	D2_CALL(sub_6FD826D0, pDrlg, LEVEL_HARROGATH, LEVEL_BLOODYFOOTHILLS);
 #ifdef D2_VERSION_HAS_UBERS
-	sub_6FD823C0(pDrlg, gAct5UbersDrlgLink, DRLGOUTPLACE_LinkAct5Ubers, NULL);
+	D2_CALL(sub_6FD823C0, pDrlg, gAct5UbersDrlgLink, DRLGOUTPLACE_LinkAct5Ubers, NULL);
 #endif
 }
 

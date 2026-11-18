@@ -7,7 +7,12 @@
 #include <cstring>
 
 typedef void (*B85990_Call)(void* pUnit, int32_t a, int32_t b, int32_t c, int32_t d, int32_t e);
-extern "C" void D2Common_42A70(void* pUnit, int32_t a, int32_t b, int32_t c, int32_t d, int32_t e);
+#include "Drlg/D2DrlgOutdoors.h"
+// The stamp is the tagged game-tree body (DrlgOutdoors.cpp, 1.13c D2Common+0x42A70); the level is the native level.
+static void D2Common_42A70(void* pUnit, int32_t a, int32_t b, int32_t c, int32_t d, int32_t e)
+{
+    DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(static_cast<D2DrlgLevelStrc*>(pUnit), a, b, c, d, e);
+}
 
 namespace {
     inline uint32_t ld(uint32_t a, uint32_t o) { uint32_t v; std::memcpy(&v, reinterpret_cast<const void*>(static_cast<uintptr_t>(a) + o), 4); return v; }

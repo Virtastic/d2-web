@@ -589,7 +589,7 @@ int32_t __fastcall OBJECTS_GetShrineId(D2GameStrc* pGame, uint8_t nShrineClass, 
             nShrineId = 1;
         }
     }
-    while ((uint32_t)nLevelId < DATATBLS_GetShrinesTxtRecord(nShrineId)->dwLevelMin && --nTries > 0);
+    while ((uint32_t)nLevelId < D2_CALL(DATATBLS_GetShrinesTxtRecord, nShrineId)->dwLevelMin && --nTries > 0);
 
     return nShrineId;
 }
@@ -691,7 +691,7 @@ void __fastcall OBJECTS_InitFunction03_Chest(D2ObjInitFnStrc* pOp)
 // 1.13c D2Game+0x2EF50: the chest init (0x2ECB0) is called, the object asserted, then the spark-chest flag set
 void __fastcall OBJECTS_InitFunction57_SparklyChest(D2ObjInitFnStrc* pOp)
 {
-    OBJECTS_InitFunction03_Chest(pOp);
+    D2_CALL(OBJECTS_InitFunction03_Chest, pOp);
 
     D2_ASSERT(pOp->pObject);
 
@@ -2220,10 +2220,10 @@ void __fastcall OBJECTS_FreeHoverMessage(D2GameStrc* pGame, D2UnitStrc* pObject)
 {
     if (pObject && pObject->pHoverText)
     {
-        CHAT_FreeHoverMsg(pGame->pMemoryPool, pObject->pHoverText);
+        D2_CALL(CHAT_FreeHoverMsg, pGame->pMemoryPool, pObject->pHoverText);
     }
 
-    D2TimerArgStrc* pTimerArg = UNITS_GetTimerArg(pObject);
+    D2TimerArgStrc* pTimerArg = D2_CALL(UNITS_GetTimerArg, pObject);
     D2TimerArg2Strc* pArg = pTimerArg->unk0x00;
     while (pArg)
     {
@@ -2233,7 +2233,7 @@ void __fastcall OBJECTS_FreeHoverMessage(D2GameStrc* pGame, D2UnitStrc* pObject)
     }
 
     D2_FREE_POOL(pGame->pMemoryPool, pTimerArg);
-    sub_6FC349F0(pGame, pObject);
+    D2_CALL(sub_6FC349F0, pGame, pObject);
 }
 
 //D2Game.0x6FC74520

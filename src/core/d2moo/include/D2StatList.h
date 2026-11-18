@@ -514,6 +514,8 @@ D2COMMON_DLL_DECL BOOL __stdcall STATLIST_AreUnitsAligned(D2UnitStrc* pUnit1, D2
 int __fastcall sub_6FDB5830(D2StatListExStrc* pStatListEx, D2SLayerStatIdStrc::PackedType nLayer_StatId);
 //D2Common.0x6FDB6300
 int __fastcall STATLIST_FindStatIndex_6FDB6300(D2StatsArrayStrc* pStatArray, D2SLayerStatIdStrc::PackedType nLayer_StatId);
+//D2Common.0x6FDB8160: -1 when the key is in the array, else its insertion index
+int __fastcall D2Common_38160_FindKeyIndex(D2ModStatsArrayStrc* pModStats, D2SLayerStatIdStrc::PackedType nLayer_StatId);
 //D2Common.0x6FDB6340
 int __fastcall STATLIST_GetBaseStat_6FDB6340(D2StatListStrc* pStatListEx, D2SLayerStatIdStrc::PackedType nLayer_StatId, D2ItemStatCostTxt* pItemStatCostTxtRecord);
 //D2Common.0x6FDB63E0

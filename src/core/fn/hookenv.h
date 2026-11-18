@@ -71,7 +71,7 @@ struct HookEnv {
         if (st) for (const uint32_t* p = st; p[0]; p += 2) if (p[0] == retRva) return p[1];
         return dflt;
     }
-    HookEnv(uint32_t* log, const uint32_t* seq) : L(log), sc(seq) { L[0] = 0; }
+    HookEnv(uint32_t* log, const uint32_t* seq) : L(log), sc(seq) { if (L) L[0] = 0; }   // a probe with no seamed callee passes a null log; storing through it was UB and the compiler turned the whole probe into `unreachable`
     static uint32_t rd32(uint32_t a) { uint32_t v; memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }
     static int32_t rd16s(uint32_t a) { int16_t v; memcpy(&v, (const void*)(uintptr_t)a, 2); return v; }
     static uint32_t rd8(uint32_t a) { return *(const uint8_t*)(uintptr_t)a; }

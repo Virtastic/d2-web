@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include <test_seam.h>
+
 #include <D2Collision.h>
 #include <D2Dungeon.h>
 #include <D2Math.h>
@@ -1192,18 +1194,18 @@ void __fastcall AIUTIL_ApplyTerrorCurseState(D2GameStrc* pGame, D2UnitStrc* pUni
 	}
 
 	if (pTarget->dwUnitType != UNIT_MONSTER
-		|| STATES_CheckState(pTarget, STATE_UNINTERRUPTABLE)
-		|| !UNITS_CanSwitchAI(pTarget->dwClassId))
+		|| D2_CALL(STATES_CheckState, pTarget, STATE_UNINTERRUPTABLE)
+		|| !D2_CALL(UNITS_CanSwitchAI, pTarget->dwClassId))
 	{
 		return;
 	}
 
-	if ((pTarget->dwFlags & UNITFLAG_CANBEATTACKED) == 0 && !SUNIT_IsDead(pTarget))
+	if ((pTarget->dwFlags & UNITFLAG_CANBEATTACKED) == 0 && !D2_CALL(SUNIT_IsDead, pTarget))
 	{
 		return;
 	}
 
-	if (MONSTERUNIQUE_CheckMonTypeFlag(pTarget, MONTYPEFLAG_UNIQUE | MONTYPEFLAG_SUPERUNIQUE))
+	if (D2_CALL(MONSTERUNIQUE_CheckMonTypeFlag, pTarget, MONTYPEFLAG_UNIQUE | MONTYPEFLAG_SUPERUNIQUE))
 	{
 		return;
 	}
@@ -1213,7 +1215,7 @@ void __fastcall AIUTIL_ApplyTerrorCurseState(D2GameStrc* pGame, D2UnitStrc* pUni
 		return;
 	}
 
-	if (!UNITS_CanSwitchAI(pTarget->dwClassId))
+	if (!D2_CALL(UNITS_CanSwitchAI, pTarget->dwClassId))
 	{
 		return;
 	}
@@ -1226,12 +1228,12 @@ void __fastcall AIUTIL_ApplyTerrorCurseState(D2GameStrc* pGame, D2UnitStrc* pUni
 	curse.nDuration = nDuration;
 	curse.nStat = -1;
 	curse.nState = STATE_TERROR;
-	sub_6FD10EC0(&curse);
+	D2_CALL(sub_6FD10EC0, &curse);
 
-	UNITS_SetTargetUnitForDynamicUnit(pTarget, pUnit);
+	D2_CALL(UNITS_SetTargetUnitForDynamicUnit, pTarget, pUnit);
 
 	D2AiControlStrc* pAiControl = (pTarget->dwUnitType == UNIT_MONSTER && pTarget->pMonsterData) ? pTarget->pMonsterData->pAiControl : nullptr;
-	AITHINK_ExecuteAiFn(pGame, pTarget, pAiControl, AISPECIALSTATE_TERROR);
+	D2_CALL(AITHINK_ExecuteAiFn, pGame, pTarget, pAiControl, AISPECIALSTATE_TERROR);
 	AITACTICS_Idle(pGame, pTarget, 1);
 }
 
@@ -1239,26 +1241,26 @@ void __fastcall AIUTIL_ApplyTerrorCurseState(D2GameStrc* pGame, D2UnitStrc* pUni
 // 1.13c D2Game+0xB0B20
 BOOL __fastcall AIUTIL_CanUnitSwitchAi(D2UnitStrc* pUnit, D2C_AiSpecialState nAiSpecialState)
 {
-	if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER 
+	if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER
 		|| nAiSpecialState > AISPECIALSTATE_INVALID
-		|| STATES_CheckState(pUnit, STATE_UNINTERRUPTABLE) 
-		|| !UNITS_CanSwitchAI(pUnit->dwClassId))
+		|| D2_CALL(STATES_CheckState, pUnit, STATE_UNINTERRUPTABLE)
+		|| !D2_CALL(UNITS_CanSwitchAI, pUnit->dwClassId))
 	{
 		return FALSE;
 	}
 
-	if ((pUnit->dwFlags & UNITFLAG_CANBEATTACKED) == 0 && !SUNIT_IsDead(pUnit))
+	if ((pUnit->dwFlags & UNITFLAG_CANBEATTACKED) == 0 && !D2_CALL(SUNIT_IsDead, pUnit))
 	{
 		return FALSE;
 	}
 
-	if (MONSTERUNIQUE_CheckMonTypeFlag(pUnit, MONTYPEFLAG_UNIQUE | MONTYPEFLAG_SUPERUNIQUE))
+	if (D2_CALL(MONSTERUNIQUE_CheckMonTypeFlag, pUnit, MONTYPEFLAG_UNIQUE | MONTYPEFLAG_SUPERUNIQUE))
 	{
 		return FALSE;
 	}
 
 	if (nAiSpecialState != AISPECIALSTATE_INVALID
-		&& !AITHINK_CanUnitSwitchAi(pUnit, MONSTERMODE_GetMonStatsTxtRecord(pUnit->dwClassId), nAiSpecialState, 1))
+		&& !D2_CALL(AITHINK_CanUnitSwitchAi, pUnit, D2_CALL(MONSTERMODE_GetMonStatsTxtRecord, pUnit->dwClassId), nAiSpecialState, 1))
 	{
 		return FALSE;
 	}

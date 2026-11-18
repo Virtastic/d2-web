@@ -28,9 +28,6 @@ static inline void     wrptr(void* p, uint32_t o, const void* v) { std::memcpy((
 static int32_t g_gameSlots[1025];       // 0x6FD30C04: game id per slot (0 empty, -1 free); slot i+1 == 0x6FD30C08+4i
 static constexpr int kGameSlotCount = 1024;   // the sweep bound 0x6FD30C08..0x6FD31C08
 extern "C" int32_t* d2game_game_slot_table() { return g_gameSlots + 1; }   // FN probe seam: the 1024 slots from 0x6FD30C08
-static uint32_t g_gameListCount;        // 0x6FD31C24: game-list / server-time feature gate
-static uint8_t  g_callbackByte;         // 0x6FD31C30
-static void*    g_callbacks;            // 0x6FD31C3C: optional callback block, see D2GameCallbackBlock
 static uint8_t  g_exitDirect;           // 0x6FD2FD64: exit() re-entered a direct TerminateProcess
 static uint8_t  g_exitRunning;          // 0x6FD2FD60
 static uint8_t  g_exitMode;             // 0x6FD2FD5C
@@ -42,15 +39,6 @@ static uint32_t g_inittermExit[1];      // 0x6FD1F04C
 
 // 0x6FD19FF9: the module-name literal retail passes as Ordinal_10024's source text.
 static const char kModuleName[] = "D2Game.dll";
-
-// The optional 1.13c callback block at 0x6FD31C3C. Only the two slots the decompiles call are named;
-// retail reads no other field before a null test.
-struct D2GameCallbackBlock {
-    uint8_t pad00[8];
-    void  (*fn08)(void);                 // +0x08
-    uint8_t pad0C[0x14];
-    void  (*fn20)(uint32_t);             // +0x20
-};
 
 // Unmapped callees, in the order the decompiles use them (address = retail RVA).
 struct D2GameBatchSeams {
@@ -194,41 +182,6 @@ void GAME_2BA10(const D2GameBatchSeams& s, const void* clientAddr16)
     wr16(pkt, 0x3B, 0xFFFF);                             // local_5
     s.strCopy(pkt + 0x11, kModuleName, 0x10);            // local_37
     s.sendPacket(pkt);
-}
-
-// 1.13c D2Game+0x2BB10
-void GAME_2BB10(const D2GameBatchSeams& s, uint32_t param_1, uint32_t param_4)
-{
-    if (g_gameListCount == 0) return;
-    // EnterCriticalSection(&0x6FD30BE8) / LeaveCriticalSection: compat no-ops.
-    const int32_t* slot = &g_gameSlots[param_1 & 0xFFFF]; // (&DAT_6fd30c04)[param_1 & 0xffff]
-    void* game = nullptr;
-    if (*slot != 0 && *slot != -1) game = s.getGame(slot);
-    if (game == nullptr) return;
-    s.fn10021();
-    void* p = s.fn4A9B0(game);                           // FUN_6fc6a9b0
-    const D2GameCallbackBlock* cb = (const D2GameCallbackBlock*)g_callbacks;
-    if (p == nullptr) {
-        if (cb != nullptr && cb->fn20 != nullptr) {
-            if (cb->fn20 == nullptr) d2game_fatal(0x769); // IsBadCodePtr collapses to a null test
-            cb->fn20(param_4);
-        }
-        s.unlockGame();                                  // FUN_6fc49ba0
-        s.sendPacket(nullptr);                           // Ordinal_10002(0), frame in a register
-        s.fn10000();
-        return;
-    }
-    s.fn4AC60(game);                                     // FUN_6fc4ac60
-    wr8(p, 0x1AC, g_callbackByte);                       // *(undefined1 *)(puVar2 + 0x6b)
-    s.unlockGame();
-    if (cb != nullptr && cb->fn08 != nullptr) {
-        if (cb->fn08 == nullptr) d2game_fatal(0x795);
-        cb->fn08();
-        s.fn49D40();                                     // FUN_6fc69d40
-        return;
-    }
-    uint32_t local = 0;
-    s.fn8A3E0(&local, 1);                                // FUN_6fcaa3e0(&stack0xfffffffc, 1)
 }
 
 // 1.13c D2Game+0x2D7E0

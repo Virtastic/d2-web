@@ -1049,7 +1049,7 @@ void __fastcall QUESTS_UnitIterate(D2QuestDataStrc* pQuest, int32_t nIterateStat
 	{
 		D2_ASSERT(pfIterate);
 
-		SUNIT_IterateUnitsOfType(pQuest->pGame, 0, pUnit, pfIterate);
+		D2_CALL(SUNIT_IterateUnitsOfType, pQuest->pGame, 0, pUnit, pfIterate);
 	}
 }
 
@@ -2038,7 +2038,7 @@ void __fastcall QUESTS_UpdateNPCIntros(D2GameStrc* pGame, D2UnitStrc* pUnit, uin
 {
 	D2GSPacketSrv91 packet91 = {};
 
-	D2PlrIntroStrc* pIntroFlags = UNITS_GetPlayerData(pUnit)->pPlayerIntro[pGame->nDifficulty];
+	D2PlrIntroStrc* pIntroFlags = D2_CALL(UNITS_GetPlayerData, pUnit)->pPlayerIntro[pGame->nDifficulty];
 
 	// the act picks the NPC list (6, 11, 7, 7 ids; act IV has none), then the helper at D2Game+0x34C70 packs the ids whose intro bit is set
 	const int32_t* pNPCs = nullptr;
@@ -2084,7 +2084,7 @@ void __fastcall QUESTS_UpdateNPCIntros(D2GameStrc* pGame, D2UnitStrc* pUnit, uin
 		return;
 	}
 
-	D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__);
+	D2ClientStrc* pClient = D2_CALL(SUNIT_GetClientFromPlayer, pUnit, __FILE__, __LINE__);
 	if (!pClient)
 	{
 		return;
@@ -2092,7 +2092,7 @@ void __fastcall QUESTS_UpdateNPCIntros(D2GameStrc* pGame, D2UnitStrc* pUnit, uin
 
 	packet91.nHeader = 0x91;
 	packet91.nAct = nAct;
-	D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet91, sizeof(packet91));
+	D2_CALL(D2GAME_PACKETS_SendPacket_6FC3C710, pClient, &packet91, sizeof(packet91));
 }
 
 //D2Game.0x6FC960C0
@@ -2230,19 +2230,19 @@ void __fastcall QUESTS_DeleteItemEx(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2In
 
 	if (nAnimMode == IMODE_STORED)
 	{
-		ITEMS_SetItemCell(pItem, ITEMS_GetInvPage(pItem));
-		D2GAME_UpdateClientItem_6FC3E9D0(pClient, pPlayer, pItem, 0x20);
-		D2GAME_RemoveItem_6FC471F0(pGame, pPlayer, pItem, 0);
+		D2_CALL(ITEMS_SetItemCell, pItem, D2_CALL(ITEMS_GetInvPage, pItem));
+		D2_CALL(D2GAME_UpdateClientItem_6FC3E9D0, pClient, pPlayer, pItem, 0x20);
+		D2_CALL(D2GAME_RemoveItem_6FC471F0, pGame, pPlayer, pItem, 0);
 	}
 	else if (nAnimMode == IMODE_EQUIP)
 	{
 		int32_t a5 = 0;
-		sub_6FC45B30(pGame, pPlayer, INVENTORY_GetItemsXPosition(pInventory, pItem), 1, &a5);
+		D2_CALL(sub_6FC45B30, pGame, pPlayer, D2_CALL(INVENTORY_GetItemsXPosition, pInventory, pItem), 1, &a5);
 	}
 	else if (nAnimMode == IMODE_ONCURSOR)
 	{
-		D2GAME_RemoveItemIfOnCursor_6FC49760(pGame, pPlayer, pItem);
-		INVENTORY_SetCursorItem(pInventory, nullptr);
+		D2_CALL(D2GAME_RemoveItemIfOnCursor_6FC49760, pGame, pPlayer, pItem);
+		D2_CALL(INVENTORY_SetCursorItem, pInventory, nullptr);
 	}
 }
 
@@ -2508,9 +2508,9 @@ void __fastcall QUESTS_RemovePlayerGUID(D2QuestDataStrc* pQuest, D2QuestArgStrc*
 void __fastcall QUESTS_UpdatePlayerFlags(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__);
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pUnit)->pQuestData[pGame->nDifficulty];
 
-	D2GAME_SendPacket0x28_6FC3F2F0(pClient, 0x28u, 6u, 0, pQuestFlags, 0);
+	D2_CALL(D2GAME_SendPacket0x28_6FC3F2F0, pClient, 0x28u, 6u, 0, pQuestFlags, 0);
 }
 
 //D2Game.0x6FC96D60
@@ -2551,7 +2551,7 @@ void __fastcall QUESTS_SendScrollMessage(D2UnitStrc* pPlayer, D2UnitStrc* pUnit,
 	packet27.pMessageList.pMessages[0].nMenu = 0;
 	packet27.pMessageList.pMessages[0].nStringId = nMessage;
 
-	D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet27, sizeof(packet27));
+	D2_CALL(D2GAME_PACKETS_SendPacket_6FC3C710,pClient, &packet27, sizeof(packet27));
 }
 
 //D2Game.0x6FC96E80
@@ -2559,7 +2559,7 @@ void __fastcall QUESTS_SendScrollMessage(D2UnitStrc* pPlayer, D2UnitStrc* pUnit,
 void __fastcall QUESTS_TriggerFX(D2GameStrc* pGame, uint8_t a2)
 {
 	pGame->pQuestControl->unk0x20 = a2;
-	SUNIT_IterateUnitsOfType(pGame, 0, 0, QUESTS_FXIterate);
+	D2_CALL(SUNIT_IterateUnitsOfType, pGame, 0, 0, QUESTS_FXIterate);
 }
 
 //D2Game.0x6FC96EA0
@@ -2641,18 +2641,19 @@ int32_t __fastcall QUESTS_SetObjectSelection(D2ObjOperateFnStrc* pOp)
 		return 0;
 	}
 
-	//D2CoordStrc pCoord = {};
-	//UNITS_GetCoords(pObject, &pCoord);
+	// the 1.13c code reads the coordinates (the result is unused)
+	D2CoordStrc pCoord = {};
+	D2_CALL(UNITS_GetCoords, pObject, &pCoord);
 
-	D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
+	D2ObjectsTxt* pObjectsTxtRecord = D2_CALL(DATATBLS_GetObjectsTxtRecord, pOp->nObjectIdx);
 	if (!pObjectsTxtRecord->nMode[1])
 	{
-		UNITS_ChangeAnimMode(pObject, OBJMODE_OPENED);
+		D2_CALL(UNITS_ChangeAnimMode, pObject, OBJMODE_OPENED);
 	}
 	else
 	{
-		UNITS_ChangeAnimMode(pObject, OBJMODE_OPERATING);
-		EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_ENDANIM, pOp->pGame->dwGameFrame + OBJECTS_GetOperatingTicks(pObjectsTxtRecord), 0, 0);
+		D2_CALL(UNITS_ChangeAnimMode, pObject, OBJMODE_OPERATING);
+		D2_CALL(EVENT_SetEvent,pOp->pGame, pOp->pObject, EVENTTYPE_ENDANIM, pOp->pGame->dwGameFrame + OBJECTS_GetOperatingTicks(pObjectsTxtRecord), 0, 0);
 	}
 
 	if (pObject)
@@ -2874,11 +2875,13 @@ int32_t __fastcall QUESTS_LevelWarpCheck(D2GameStrc* pGame, D2UnitStrc* pPlayer,
 // 1.13c D2Game+0x36820
 D2UnitStrc* __fastcall QUESTS_SpawnMonster(D2GameStrc* pGame, D2UnitStrc* pUnit, D2CoordStrc* pPosition, int32_t nType, int32_t nIndex)
 {
-	D2ActiveRoomStrc* pRoom = D2GAME_GetRoom_6FC52070(UNITS_GetRoom(pUnit), pPosition->nX, pPosition->nY);
+	// the 1.13c code maps the super unique id before it looks for the room
+	const int32_t nClassId = D2_CALL(DATATBLS_MapSuperUniqueId, nType, nIndex);
+	D2ActiveRoomStrc* pRoom = D2_CALL(D2GAME_GetRoom_6FC52070, D2_CALL(UNITS_GetRoom, pUnit), pPosition->nX, pPosition->nY);
 
 	if (pRoom)
 	{
-		return D2GAME_SpawnPresetMonster_6FC66560(pGame, pRoom, DATATBLS_MapSuperUniqueId(nType, nIndex), pPosition->nX, pPosition->nY, 1);
+		return D2_CALL(D2GAME_SpawnPresetMonster_6FC66560, pGame, pRoom, nClassId, pPosition->nX, pPosition->nY, 1);
 	}
 
 	return nullptr;

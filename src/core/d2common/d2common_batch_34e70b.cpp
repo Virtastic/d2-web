@@ -1,4 +1,4 @@
-// 1.13c D2Common implementation batch (rows 0x7F490, 0x6AB20, 0x6B180, 0x1E420).
+// 1.13c D2Common implementation batch (rows 0x7F490, 0x6AB20, 0x6B180; 0x1E420 is INVENTORY_GetItemArmorComponents in D2Inventory.cpp).
 // Bodies follow the cached 1.13c decompiles (build-wasm/ghidra-d2common/decomp/0x<RVA>.c).
 // Every one of these takes operands retail passes in registers the decompiler does not name
 // (0x7F490: x in EDX, y in EAX, radius in EDI; 0x6AB20: unit in EAX, percent in ESI;
@@ -149,52 +149,4 @@ int32_t D2Common_6B180_CritRoll(uint32_t pUnit, uint32_t pItem)
 	}
 
 	return 0;
-}
-
-// 1.13c D2Common+0x1E420: copy the six armor components (items.txt +0x116, nArmorComp) of the
-// item class held at source+4 (a unit's dwClassId / an inventory node's class field) into the
-// caller's 6-byte context. A null source, a null table or an out-of-range class zeroes the six
-// bytes; retail reports a fatal error for the latter two and exits, which cannot be replayed.
-// 1.13c D2Common+0x1E420 -- retail-layout form: rows is the items.txt row base (stride 0x1A8,
-// armor-component bytes at +0x116), count the row count; out-of-range class zeroes the bytes
-// (retail exits there).
-extern "C" void D2Common_1E420_ArmorCompRaw(uint32_t pOut, uint32_t pSource, const uint8_t* rows, uint32_t count)
-{
-	uint8_t* out = P(pOut);
-	if (!out)
-		return;
-	if (!pSource || !rows)
-	{
-		std::memset(out, 0, 6);
-		return;
-	}
-	const uint32_t cls = (uint32_t)I32(P(pSource), 4);
-	if (cls >= count)
-	{
-		std::memset(out, 0, 6);
-		return;
-	}
-	std::memcpy(out, rows + (size_t)cls * 0x1A8 + 0x116, 6);
-}
-
-extern "C" void D2Common_1E420_ArmorComp(uint32_t pOut, uint32_t pSource)
-{
-	uint8_t* out = P(pOut);
-	if (!out)
-		return;
-
-	if (!pSource)
-	{
-		std::memset(out, 0, 6);
-		return;
-	}
-
-	const D2ItemsTxt* pRow = DATATBLS_GetItemsTxtRecord(I32(P(pSource), 4));
-	if (!pRow)
-	{
-		std::memset(out, 0, 6);
-		return;
-	}
-
-	std::memcpy(out, pRow->nArmorComp, 6);
 }

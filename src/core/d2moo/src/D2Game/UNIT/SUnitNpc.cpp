@@ -1,4 +1,5 @@
 #include "UNIT/SUnitNpc.h"
+#include <test_seam.h>
 
 #include <test_seam.h>
 
@@ -1006,9 +1007,9 @@ void __fastcall SUNITNPC_AddStoreItem_BCE60(D2UnitStrc* pItem, D2UnitStrc* pOwne
 
 // 1.13c D2Game+0xBD160 (split out of the hire handler: once no offered hireling is left unhired the
 // list is freed and rebuilt)
-static void NPC_RefillHirelingListIfExhausted(D2GameStrc* pGame, int32_t nVendorId, D2NpcRecordStrc* pNpcRecord)
+void NPC_RefillHirelingListIfExhausted(D2GameStrc* pGame, int32_t nVendorId, D2NpcRecordStrc* pNpcRecord)
 {
-    D2HirelingTxt* pHirelingTxtRecord = DATATBLS_GetNextHirelingTxtRecordFromVendorIdAndDifficulty(pGame->bExpansion, nVendorId, 0, 0);
+    D2HirelingTxt* pHirelingTxtRecord = D2_CALL(DATATBLS_GetNextHirelingTxtRecordFromVendorIdAndDifficulty, pGame->bExpansion, nVendorId, 0, 0);
     D2_ASSERT(pHirelingTxtRecord);
 
     for (int32_t i = 0; i < pHirelingTxtRecord->wNameLast - pHirelingTxtRecord->wNameFirst + 1; ++i)
@@ -1024,7 +1025,7 @@ static void NPC_RefillHirelingListIfExhausted(D2GameStrc* pGame, int32_t nVendor
     pNpcRecord->npcTrade.bHireInit = 0;
     pNpcRecord->pMercData = nullptr;
 
-    D2GAME_NPC_FirstFn_6FCC67D0(pGame, nVendorId, pNpcRecord);
+    D2_CALL(D2GAME_NPC_FirstFn_6FCC67D0, pGame, nVendorId, pNpcRecord);
 }
 
 // 1.13c D2Game+0xC1510 (body diffed against the decompile: same level cap, quest refusals, name-range and hired checks, gold, spawn and reply order;
@@ -1196,7 +1197,7 @@ void __fastcall sub_6FCC84D0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 D2UnitStrc* __fastcall D2GAME_MERCS_Create_6FCC8630(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint16_t wName, uint32_t nSeed, int16_t wVersion, int32_t nBaseMonster, int32_t bDead)
 {
     uint8_t nAct = pPlayer->nAct;
-    const uint8_t nMercAct = MONSTERS_GetActFromHirelingTxt(pGame->bExpansion, 0, wName);
+    const int32_t nMercAct = MONSTERS_GetActFromHirelingTxt(pGame->bExpansion, 0, wName);   // signed: -1 means no such act
 
     D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
     if (pClient)

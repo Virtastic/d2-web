@@ -116,7 +116,7 @@ D2NPCMessageTableStrc gpAct3Q5NpcMessages[] =
 // 1.13c D2Game+0xE2AB0 (checked against decompile, no delta)
 bool __fastcall ACT3Q5_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
-	if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q5, QFLAG_REWARDGRANTED))
+	if (D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q5, QFLAG_REWARDGRANTED))
 	{
 		return false;
 	}
@@ -130,7 +130,7 @@ bool __fastcall ACT3Q5_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 	}
 	else if (nNpcId == MONSTER_CAIN3)
 	{
-		if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q5, QFLAG_ENTERAREA) && !((D2Act3Quest5Strc*)pQuest->pQuestDataEx)->bOrbSmashed)
+		if (D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q5, QFLAG_ENTERAREA) && !((D2Act3Quest5Strc*)pQuest->pQuestDataEx)->bOrbSmashed)
 		{
 			return true;
 		}
@@ -909,7 +909,7 @@ int32_t __fastcall ACT3Q5_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameSt
 		return 0;
 	}
 
-	const int16_t nPartyId = SUNIT_GetPartyId(pUnit);
+	const int16_t nPartyId = D2_CALL(SUNIT_GetPartyId, pUnit);
 	if (nPartyId != -1)
 	{
 		D2_CALL(PARTY_IteratePartyMembers, pGame, nPartyId, ACT3Q5_UnitIterate_SetPrimaryGoalDone, 0);
@@ -949,14 +949,14 @@ int32_t __fastcall ACT3Q5_UnitIterate_AttachCompletionSound(D2GameStrc* pGame, D
 // 1.13c D2Game+0xE36A0 (checked against decompile, no delta)
 int32_t __fastcall ACT3Q5_UnitIterate_DetermineFlailAndCubeDropCounts(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
-	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
+	D2ActiveRoomStrc* pRoom = D2_CALL(UNITS_GetRoom, pUnit);
 	if (!pRoom)
 	{
 		return 0;
 	}
 
-	const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(pRoom);
-	if (!nLevelId || DRLG_GetActNoFromLevelId(nLevelId) != ACT_III)
+	const int32_t nLevelId = D2_CALL(DUNGEON_GetLevelIdFromRoom, pRoom);
+	if (!nLevelId || D2_CALL(DRLG_GetActNoFromLevelId, nLevelId) != ACT_III)
 	{
 		return 0;
 	}
@@ -969,13 +969,13 @@ int32_t __fastcall ACT3Q5_UnitIterate_DetermineFlailAndCubeDropCounts(D2GameStrc
 
 	D2Act3Quest5Strc* pQuestDataEx = (D2Act3Quest5Strc*)pQuestData->pQuestDataEx;
 
-	if (!QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A3Q2, QFLAG_REWARDGRANTED)
-		&& !ITEMS_FindQuestItem(pGame, pUnit, ' 1fq') && !ITEMS_FindQuestItem(pGame, pUnit, ' 2fq'))
+	if (!D2_CALL(QUESTRECORD_GetQuestState, D2_CALL(UNITS_GetPlayerData, pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A3Q2, QFLAG_REWARDGRANTED)
+		&& !D2_CALL(ITEMS_FindQuestItem, pGame, pUnit, ' 1fq') && !D2_CALL(ITEMS_FindQuestItem, pGame, pUnit, ' 2fq'))
 	{
 		++pQuestDataEx->nFlailsMissing;
 	}
 
-	if (!ITEMS_FindQuestItem(pGame, pUnit, ' xob'))
+	if (!D2_CALL(ITEMS_FindQuestItem, pGame, pUnit, ' xob'))
 	{
 		++pQuestDataEx->nHoradricCubesMissing;
 	}

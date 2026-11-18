@@ -1,4 +1,5 @@
 #include "QUESTS/ACT5/A5Q4.h"
+#include <test_seam.h>
 
 #include <DataTbls/LevelsIds.h>
 #include <DataTbls/MonsterIds.h>
@@ -521,7 +522,7 @@ int32_t __fastcall ACT5Q4_UnitIterate_SetRewardPending(D2GameStrc* pGame, D2Unit
 // 1.13c D2Game+0x5AF50: the party walker runs this quest's SetPrimaryGoalDone (0x57830), not Act 5 quest 3's
 int32_t __fastcall ACT5Q4_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
-	if (!QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A5Q4, QFLAG_PRIMARYGOALDONE))
+	if (!D2_CALL(QUESTRECORD_GetQuestState, D2_CALL(UNITS_GetPlayerData, pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A5Q4, QFLAG_PRIMARYGOALDONE))
 	{
 		return 0;
 	}
@@ -529,7 +530,7 @@ int32_t __fastcall ACT5Q4_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameSt
 	const int16_t nPartyId = SUNIT_GetPartyId(pUnit);
 	if (nPartyId != -1)
 	{
-		PARTY_IteratePartyMembers(pGame, nPartyId, ACT5Q4_UnitIterate_SetPrimaryGoalDone, 0);
+		D2_CALL(PARTY_IteratePartyMembers, pGame, nPartyId, ACT5Q4_UnitIterate_SetPrimaryGoalDone, 0);
 	}
 
 	return 0;
@@ -556,7 +557,7 @@ int32_t __fastcall ACT5Q4_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2Uni
 // 1.13c D2Game+0x58FF0 (no delta)
 int32_t __fastcall ACT5Q4_UnitIterate_AttachCompletionSound(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
-	if (QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A5Q4, QFLAG_PRIMARYGOALDONE))
+	if (D2_CALL(QUESTRECORD_GetQuestState, D2_CALL(UNITS_GetPlayerData, pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A5Q4, QFLAG_PRIMARYGOALDONE))
 	{
 		SUNIT_AttachSound(pUnit, 82, pUnit);
 	}

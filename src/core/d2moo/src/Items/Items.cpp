@@ -3788,7 +3788,7 @@ D2SetItemsTxt* __fastcall ITEMS_GetSetItemsTxtRecord(int nRecordId)
 
 // 1.13c D2Common+0x241A0 (EAX = unit): TRUE when the unit's inventory has a first item and that first
 // node is an item unit (only the first node is looked at).
-static BOOL ITEMS_HasFirstInventoryItem(D2UnitStrc* pUnit)
+BOOL ITEMS_HasFirstInventoryItem(D2UnitStrc* pUnit)   // external linkage: the 241A0 probe calls this body
 {
 	D2InventoryStrc* pInventory = pUnit->pInventory;
 	if (pInventory && INVENTORY_CheckSignature(pInventory) && pInventory->pFirstItem && pInventory->pFirstItem->dwUnitType == UNIT_ITEM)
@@ -3985,7 +3985,7 @@ int __stdcall ITEMS_GetAllRepairCosts(D2GameStrc* pGame, D2UnitStrc* pUnit, int 
 }
 
 // 1.13c D2Common+0x21F70 (quality in EAX): TRUE for a quality of 1..3 or above 9.
-static BOOL ITEMS_IsPlainQuality(int nQuality)
+BOOL ITEMS_IsPlainQuality(int nQuality)
 {
 	if (nQuality == 0)
 	{

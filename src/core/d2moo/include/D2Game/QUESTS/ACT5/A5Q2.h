@@ -88,3 +88,5 @@ int32_t __fastcall ACT5Q2_FindPortal(D2GameStrc* pGame, D2UnitStrc* pUnit, D2Uni
 void __fastcall ACT5Q2_OnWussieActivated(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FCB3490
 int32_t __fastcall ACT5Q2_IsPrisonDoorDead(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pWussie);
+// 1.13c D2Game+0x58260: the soldier-group lookup shared by the wussie counter callers
+int32_t ACT5Q2_FindSoldierGroup(D2QuestDataStrc* pQuestData, D2UnitStrc* pSoldier);

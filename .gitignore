@@ -326,6 +326,8 @@ test/fixtures/bnet-tos-*.txt
 !test/realm-protodef.test.mjs
 !test/realm-selected-skills.test.mjs
 !test/realm-hotkeys.test.mjs
+!test/realm-local-cast.test.mjs
+!test/realm-local-skill-point.test.mjs
 !test/render-cache.test.mjs
 !test/render-wire.test.mjs
 !test/render-worker-hud.test.mjs

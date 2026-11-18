@@ -32,24 +32,7 @@ int32_t d2common_entry_2c8f(const D2CommonEntryEnv& e, void* h, int32_t reason, 
 // 1.13c D2Common+0x0300A _atexit: 0 when __onexit accepted the function, else -1.
 int32_t d2common_atexit_300a(uintptr_t (*onexit)(uintptr_t), uintptr_t fn) { return (onexit(fn) != 0) - 1; }
 
-// 1.13c D2Common+0x0301C __RTC_Initialize: the RTC init-table is empty (begin == end), loop never runs.
-void d2common_rtc_initialize_301c() {}
-
-// 1.13c D2Common+0x03445 __mtterm: free the FLS/TLS slot if allocated, then delete the CRT locks.
-struct D2CommonMtTermEnv { int32_t* flsIndex; void (*flsFree)(int32_t); void (*deleteLocks)(); };
-void d2common_mtterm_3445(const D2CommonMtTermEnv& e)
-{
-    if (*e.flsIndex != -1) { e.flsFree(*e.flsIndex); *e.flsIndex = -1; }
-    e.deleteLocks();
-}
-
-// 1.13c D2Common+0x03462 __initptd: per-thread data gets the init address and rand seed 1 (offsets 0x54, 0x14).
-void d2common_initptd_3462(uint8_t* ptd, uint32_t initAddr)
-{
-    std::memcpy(ptd + 0x54, &initAddr, 4);
-    const uint32_t one = 1;
-    std::memcpy(ptd + 0x14, &one, 4);
-}
+// 0x301C __RTC_Initialize, 0x3445 __mtterm, 0x3462 __initptd and 0x362D __freeptd are game functions under src/core/d2moo/src/Crt.
 
 // 1.13c D2Common+0x034E6 __freefls: release a thread's CRT block (32-bit layout; pointers passed as u32 via env).
 struct D2CommonFreeFlsEnv {
@@ -94,21 +77,6 @@ void d2common_freefls_34e6(const D2CommonFreeFlsEnv& e, uint32_t p)
     }
     e.unlockLconv();
     e.free(p);
-}
-
-// 1.13c D2Common+0x0362D __freeptd: free the calling thread's block (or the given one) and clear the slot.
-struct D2CommonFreePtdEnv {
-    int32_t flsIndex;
-    uint32_t (*flsGet)(int32_t);
-    void (*flsSet)(int32_t, uint32_t);
-    void (*freeFls)(uint32_t);
-};
-void d2common_freeptd_362d(const D2CommonFreePtdEnv& e, uint32_t ptd)
-{
-    if (e.flsIndex == -1) return;
-    if (!ptd) ptd = e.flsGet(e.flsIndex);
-    e.freeFls(ptd);
-    e.flsSet(e.flsIndex, 0);
 }
 
 // 1.13c D2Common+0x0365C __mtinit: set up locks, resolve Fls* (fall back to Tls*), allocate the main thread's block.

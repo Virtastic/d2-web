@@ -815,18 +815,18 @@ void __fastcall sub_6FCF6C10(D2UnitStrc* pMissile, int32_t nLowSeed)
         return;
     }
 
-    uint8_t nTotalFrames = MISSILE_GetTotalFrames(pMissile);
+    uint8_t nTotalFrames = D2_CALL(MISSILE_GetTotalFrames, pMissile);
     if (nTotalFrames >= 78)
     {
         nTotalFrames = 77;
-        MISSILE_SetTotalFrames(pMissile, 77);
-        MISSILE_SetCurrentFrame(pMissile, 77);
+        D2_CALL(MISSILE_SetTotalFrames, pMissile, 77);
+        D2_CALL(MISSILE_SetCurrentFrame, pMissile, 77);
     }
 
-    SEED_InitLowSeed(&pMissile->pSeed, nLowSeed);
-    PATH_SetType(pMissile->pDynamicPath, PATHTYPE_CHARGEDBOLT);
-    PATH_SetNewDistance(pMissile->pDynamicPath, nTotalFrames);
-    D2Common_10142(pMissile->pDynamicPath, pMissile, 0);
+    D2_CALL(SEED_InitLowSeed, &pMissile->pSeed, nLowSeed);
+    D2_CALL(PATH_SetType, pMissile->pDynamicPath, PATHTYPE_CHARGEDBOLT);
+    D2_CALL(PATH_SetNewDistance, pMissile->pDynamicPath, nTotalFrames);
+    D2_CALL(D2Common_10142, pMissile->pDynamicPath, pMissile, 0);
 }
 
 //D2Game.0x6FCF6C70

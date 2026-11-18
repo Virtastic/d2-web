@@ -18,6 +18,7 @@
 #include <D2Monsters.h>
 #include <D2DataTbls.h>
 #include <D2StatList.h>
+#include <test_seam.h>
 #include <D2Skills.h>
 #include <D2Items.h>
 #include <D2QuestRecord.h>
@@ -1630,10 +1631,11 @@ int32_t __fastcall OBJECTS_OperateFunction17_Obelisk(D2ObjOperateFnStrc* pOp, in
 void __fastcall D2GAME_SHRINES_Health_6FC766B0(D2ObjOperateFnStrc* pOp, D2ShrinesTxt* pShrinesTxtRecord)
 {
     D2_MAYBE_UNUSED(pShrinesTxtRecord);
-    const int32_t nDiff = STATLIST_GetMaxLifeFromUnit(pOp->pPlayer) - STATLIST_UnitGetStatValue(pOp->pPlayer, STAT_HITPOINTS, 0);
+    const int32_t nHp = D2_CALL(STATLIST_UnitGetStatValue, pOp->pPlayer, STAT_HITPOINTS, 0);
+    const int32_t nDiff = D2_CALL(STATLIST_GetMaxLifeFromUnit, pOp->pPlayer) - nHp;
     if (nDiff)
     {
-        STATLIST_AddUnitStat(pOp->pPlayer, STAT_HITPOINTS, nDiff, 0);
+        D2_CALL(STATLIST_AddUnitStat, pOp->pPlayer, STAT_HITPOINTS, nDiff, 0);
     }
 }
 

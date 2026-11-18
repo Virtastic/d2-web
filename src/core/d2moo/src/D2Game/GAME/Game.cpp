@@ -6,6 +6,7 @@
 #include <algorithm>
 
 #include <timeapi.h>
+#include <test_seam.h>
 
 #include <D2Lang.h>
 #include <cstdio>
@@ -259,20 +260,22 @@ void __stdcall GAME_SetInitSeed(int32_t nInitSeed)
     nInitSeed_6FDC2CA08 = nInitSeed;
 }
 
+// The GUID in game-list slot nId (1..0x400); a free (0) or reserved (-1) slot reads as 0.
+static D2GameGUID GAME_GetListedGUID(int32_t nId)
+{
+    const D2GameGUID nGUID = GetHashValueFromGameHandle(hGameArray_6FD447F8[nId]);
+    return (nGUID == 0 || nGUID == D2GameInvalidGUID) ? 0 : nGUID;
+}
+
 //D2Game.0x6FC35930
+// 1.13c D2Game+0x2BD70 (the first game of the list, slot 1; the lock result is kept in the current-game global)
 uint32_t __fastcall D2Game_10011()
 {
-    int32_t nGUID = 0;
     EnterCriticalSection(&gCriticalSection_6FD45800);
-
-    if (*gnGamesGUIDs_6FD447F8 && *gnGamesGUIDs_6FD447F8 != -1)
-    {
-        nGUID = *gnGamesGUIDs_6FD447F8;
-    }
-
+    const D2GameGUID nGUID = GAME_GetListedGUID(1);
     LeaveCriticalSection(&gCriticalSection_6FD45800);
 
-    gpGame_6FD457FC = GAME_LockGame(nGUID);
+    gpGame_6FD457FC = D2_CALL(GAME_LockGame, nGUID);
 
     if (!gpGame_6FD457FC)
     {
@@ -287,11 +290,11 @@ uint32_t __fastcall D2Game_10011()
 // Helper function
 D2GameStrc* GAME_FindGameWithName(const char* szGameName)
 {
-    for (int nCurrentGameGUID : gnGamesGUIDs_6FD447F8)
+    for (int32_t i = 1; i <= 0x400; ++i)
     {
-        if (nCurrentGameGUID && nCurrentGameGUID != D2GameInvalidGUID)
+        if (const D2GameGUID nCurrentGameGUID = GAME_GetListedGUID(i))
         {
-            if (D2GameStrc* pCurrentGame = GAME_LockGame(nCurrentGameGUID))
+            if (D2GameStrc* pCurrentGame = D2_CALL(GAME_LockGame, nCurrentGameGUID))
             {
                 bool bGameNameMatches = SStrCmpI(szGameName, pCurrentGame->szGameName, ARRAY_SIZE(D2GameStrc::szGameName)) == 0;
                 D2_UNLOCK(pCurrentGame->lpCriticalSection);
@@ -307,34 +310,49 @@ D2GameStrc* GAME_FindGameWithName(const char* szGameName)
 }
 
 //D2Game.0x6FC35A10
+// 1.13c D2Game+0x2BC90 (a name that is taken is cut at 11 characters when fewer than 3 of its 16 bytes would remain, then "name~0", "name~1" ... are tried;
+// reaching index 100 is the 0x25C assert)
 void __fastcall GAME_ResolveGameNameConflict(D2GameStrc* pGameToSanitize, char* szGameName, int32_t a3)
 {
-    if (!GAME_FindGameWithName(szGameName))
+    if (!D2_CALL(GAME_FindGameWithName, szGameName))
     {
         SStrCopy(pGameToSanitize->szGameName, szGameName, STORM_MAX_STR);
+        return;
     }
-    else // Name conflicts
+
+    if (15u - (uint32_t)strlen(szGameName) < 3u)
     {
-        const int nCharactersForSuffix = 3;
-        if (strlen(szGameName) + nCharactersForSuffix >= ARRAY_SIZE(D2GameStrc::szGameName))
+        szGameName[0xB] = '\0';
+    }
+
+    char szGameNameWithID[16];
+    sprintf(szGameNameWithID, "%s~%d", szGameName, 0);
+    int32_t nGameNumber = 1;
+    if (D2_CALL(GAME_FindGameWithName, szGameNameWithID))
+    {
+        for (;;)
         {
-            // Truncate so that we have enough space for the game ID
-            // Somehow the original game truncated at 10 characters instead of 11 ?
-            szGameName[ARRAY_SIZE(D2GameStrc::szGameName) - 1 - nCharactersForSuffix] = '\0';
+            if (nGameNumber >= 100)
+            {
+                D2_ASSERT(nGameNumber < 100);
+                return;
+            }
+            sprintf(szGameNameWithID, "%s~%d", szGameName, nGameNumber);
+            ++nGameNumber;
+            if (!D2_CALL(GAME_FindGameWithName, szGameNameWithID))
+            {
+                break;
+            }
         }
 
-        char szGameNameWithID[ARRAY_SIZE(D2GameStrc::szGameName)];
-        int nGameNumber = 0;
-        do
+        if (nGameNumber >= 100)
         {
-            sprintf(szGameNameWithID, "%s~%d", szGameName, nGameNumber);
             D2_ASSERT(nGameNumber < 100);
-            nGameNumber++;
+            return;
         }
-        while (GAME_FindGameWithName(szGameNameWithID) != nullptr); //Note: Original game had a slightly different version of the find loop here, but it did the same thing.
-        // Use the new name
-        SStrCopy(pGameToSanitize->szGameName, szGameNameWithID, STORM_MAX_STR);
     }
+
+    SStrCopy(pGameToSanitize->szGameName, szGameNameWithID, STORM_MAX_STR);
 }
 
 //D2Game.0x6FC35CB0
@@ -427,7 +445,7 @@ BOOL __stdcall GAME_CreateNewEmptyGame(char* szGameName, const char* szPassword,
         gwGameId_6FD2CA04 = 1;
     }
 
-    if (hGameArray_6FD447F8[nGameId - 1])
+    if (hGameArray_6FD447F8[nGameId])
     {
         while (1)
         {
@@ -446,14 +464,14 @@ BOOL __stdcall GAME_CreateNewEmptyGame(char* szGameName, const char* szPassword,
                 return FALSE;
             }
 
-            if (!hGameArray_6FD447F8[nGameId - 1])
+            if (!hGameArray_6FD447F8[nGameId])
             {
                 break;
             }
         }
     }
 
-	HGAMEDATA* pHGame = &hGameArray_6FD447F8[nGameId - 1];
+	HGAMEDATA* pHGame = &hGameArray_6FD447F8[nGameId];
     *pHGame = D2GameReservedSlotHandle;
     LeaveCriticalSection(&gCriticalSection_6FD45800);
 
@@ -700,7 +718,7 @@ void __fastcall GAME_SendGameInit(int32_t nClientId, char* szGameName, uint8_t n
         gwGameId_6FD2CA04 = 1;
     }
 
-    if (hGameArray_6FD447F8[nGameId - 1])
+    if (hGameArray_6FD447F8[nGameId])
     {
         while (1)
         {
@@ -719,9 +737,9 @@ void __fastcall GAME_SendGameInit(int32_t nClientId, char* szGameName, uint8_t n
                 break;
             }
 
-            if (!hGameArray_6FD447F8[nGameId - 1])
+            if (!hGameArray_6FD447F8[nGameId])
             {
-                hGameArray_6FD447F8[nGameId - 1] = D2GameReservedSlotHandle;
+                hGameArray_6FD447F8[nGameId] = D2GameReservedSlotHandle;
                 LeaveCriticalSection(&gCriticalSection_6FD45800);
                 break;
             }
@@ -729,7 +747,7 @@ void __fastcall GAME_SendGameInit(int32_t nClientId, char* szGameName, uint8_t n
     }
     else
     {
-        hGameArray_6FD447F8[nGameId - 1] = D2GameReservedSlotHandle;
+        hGameArray_6FD447F8[nGameId] = D2GameReservedSlotHandle;
         LeaveCriticalSection(&gCriticalSection_6FD45800);
     }
 
@@ -786,9 +804,9 @@ void __fastcall GAME_SendGameInit(int32_t nClientId, char* szGameName, uint8_t n
     QUESTS_QuestInit(pGame);
 
     EnterCriticalSection(&gCriticalSection_6FD45800);
-	D2_ASSERT(hGameArray_6FD447F8[pGame->nGameId - 1] == D2GameReservedSlotHandle);
+	D2_ASSERT(hGameArray_6FD447F8[pGame->nGameId] == D2GameReservedSlotHandle);
 
-    hGameArray_6FD447F8[pGame->nGameId - 1] = hGame;
+    hGameArray_6FD447F8[pGame->nGameId] = hGame;
     LeaveCriticalSection(&gCriticalSection_6FD45800);
 
     D2GAME_PACKETS_SendPacket0x01_6FC3C7C0(pClient, 1, pGame);
@@ -2514,14 +2532,15 @@ int32_t __fastcall GAME_GetGamesCount()
 }
 
 //D2Game.0x6FC39B70 (#10057)
+// 1.13c D2Game+0x2B9A0
 int32_t __stdcall D2Game_10057()
 {
     int32_t nExpansionGames = 0;
-    for (int32_t i = 0; i < std::size(gnGamesGUIDs_6FD447F8); ++i)
+    for (int32_t i = 1; i <= 0x400; ++i)
     {
-        if (gnGamesGUIDs_6FD447F8[i] && gnGamesGUIDs_6FD447F8[i] != -1)
+        if (const D2GameGUID nGUID = GAME_GetListedGUID(i))
         {
-            if (D2GameStrc* pGame = GAME_LockGame(gnGamesGUIDs_6FD447F8[i]))
+            if (D2GameStrc* pGame = D2_CALL(GAME_LockGame, nGUID))
             {
                 if (pGame->bExpansion)
                 {
@@ -2566,15 +2585,16 @@ void __stdcall D2Game_10053(int16_t* pCount, int32_t nArraySize)
 }
 
 //D2Game.0x6FC39D80 (#10054)
+// 1.13c D2Game+0x2B840
 void __stdcall D2Game_10054(uint16_t* a1, int32_t nMaxCount)
 {
     memset(a1, 0, sizeof(*a1) * nMaxCount);
 
-    for (int32_t i = 0; i < std::size(gnGamesGUIDs_6FD447F8); ++i)
+    for (int32_t i = 1; i <= 0x400; ++i)
     {
-        if (gnGamesGUIDs_6FD447F8[i] && gnGamesGUIDs_6FD447F8[i] != -1)
+        if (const D2GameGUID nGUID = GAME_GetListedGUID(i))
         {
-            if (D2GameStrc* pGame = GAME_LockGame(gnGamesGUIDs_6FD447F8[i]))
+            if (D2GameStrc* pGame = D2_CALL(GAME_LockGame, nGUID))
             {
                 const int32_t nSecondsPassed = pGame->dwGameFrame / DEFAULT_FRAMES_PER_SECOND;
 
@@ -2606,12 +2626,12 @@ void __stdcall GAME_GetMemoryUsage(int* pCurrentMemoryUsage, int* pPeakMemoryUsa
 }
 
 //D2Game.0x6FC39EF0 (#10013)
+// 1.13c D2Game+0x2B7C0
 int32_t __stdcall D2Game_10013(uint16_t nGameId)
 {
 	const D2GameGUID nGUID = GAME_GetGameGUIDFromGameId(nGameId);
-    D2_ASSERT(gpGameDataTbl_6FD45818);
 
-    D2GameStrc* pGame = GAME_LockGame(nGUID);
+    D2GameStrc* pGame = D2_CALL(GAME_LockGame, nGUID);
     D2_ASSERT(pGame);
     const int32_t nClients = pGame->nClients;
     
@@ -2720,14 +2740,15 @@ BOOL __stdcall GAME_GetGameInformation(uint16_t nGameId, D2GameInfoStrc* pGameIn
 }
 
 //D2Game.0x6FC3A390 (#10015)
+// 1.13c D2Game+0x2B4D0
 int32_t __stdcall GAME_GetGameServerGameIds(uint16_t* pServerToken, int32_t nMaxCount)
 {
     int32_t nServerTokenCount = 0;
-    for (int32_t i = 0; nServerTokenCount < nMaxCount && i < std::size(gnGamesGUIDs_6FD447F8); ++i)
+    for (int32_t i = 1; nServerTokenCount < nMaxCount && i <= 0x400; ++i)
     {
-        if (gnGamesGUIDs_6FD447F8[i] && gnGamesGUIDs_6FD447F8[i] != -1)
+        if (const D2GameGUID nGUID = GAME_GetListedGUID(i))
         {
-            if (D2GameStrc* pGame = GAME_LockGame(gnGamesGUIDs_6FD447F8[i]))
+            if (D2GameStrc* pGame = D2_CALL(GAME_LockGame, nGUID))
             {
                 pServerToken[nServerTokenCount] = pGame->nGameId;
                 ++nServerTokenCount;

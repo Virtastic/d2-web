@@ -1,4 +1,5 @@
 #include "PLAYER/PlrTrade.h"
+#include <test_seam.h>
 
 #include <test_seam.h>
 #include <algorithm>
@@ -1025,7 +1026,7 @@ void __fastcall sub_6FC90BE0(D2GameStrc* pGame, D2UnitStrc* pPlayer, void* pArg)
 // 1.13c D2Game+0x715E0 (the D2Common #10608 page loop over 1..12 is a ret-8 stub, so it is omitted)
 void __fastcall sub_6FC90C20(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
-    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
+    D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer);
     D2_ASSERT(pPlayerData);
 
     D2PlayerTradeStrc* pTrade = pPlayerData->pTrade;
@@ -1037,7 +1038,7 @@ void __fastcall sub_6FC90C20(D2GameStrc* pGame, D2UnitStrc* pPlayer)
         D2EventTimerStrc* pNextTimerNode = pTimerNode->pNext;
         if (pTimerNode->nEventType == EVENTTYPE_PERIODICSTATS)
         {
-            sub_6FC34890(pGame, pTimerNode);
+            D2_CALL(sub_6FC34890, pGame, pTimerNode);
         }
         pTimerNode = pNextTimerNode;
     }
@@ -1950,7 +1951,7 @@ void __fastcall PLRTRADE_HandleCubeInteraction(D2GameStrc* pGame, D2UnitStrc* pU
 // 1.13c D2Game+0x70FB0
 int32_t __fastcall PLRTRADE_AllocPlayerTrade(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
-    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
+    D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer);
     if (pPlayerData->pTrade)
     {
         return 0;
@@ -2194,7 +2195,7 @@ void __fastcall PLRTRADE_StopAllPlayerInteractions(D2GameStrc* pGame, D2UnitStrc
 // Records an (original item, duplicate item) pair at the head of the player's trade list.
 void PLRTRADE_AddItemTradePair(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nItemGUID1, int32_t nItemGUID2)
 {
-    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
+    D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer);
     if (pPlayerData && pPlayerData->pTrade)
     {
         D2ItemTradeStrc* pItemTrade = D2_ALLOC_STRC_POOL(pGame->pMemoryPool, D2ItemTradeStrc);
@@ -2362,7 +2363,7 @@ int32_t __fastcall PLRTRADE_CopyTradeSaveDataToBuffer(D2GameStrc* pGame, D2UnitS
 {
     if (bUseTradeRecord && pUnit && pUnit->dwUnitType == UNIT_PLAYER)
     {
-        D2PlayerTradeStrc* pTrade = UNITS_GetPlayerData(pUnit)->pTrade;
+        D2PlayerTradeStrc* pTrade = D2_CALL(UNITS_GetPlayerData, pUnit)->pTrade;
         if (pTrade && nBufferSize >= pTrade->nSaveLength)
         {
             memcpy(pBuffer, pTrade->pSaveData, pTrade->nSaveLength);

@@ -12,6 +12,7 @@
 // 335 (header) + 298 (quests) + 81 (waypoints) + 51 (NPC intro) = 765 -- which is two independent
 // descriptions of the same layout landing on the same number.
 #include <vector>
+#include <test_seam.h>
 #include <D2Common.h>
 #include <D2Constants.h>
 #include <D2DataTbls.h>
@@ -34,6 +35,7 @@
 #include <PLAYER/Player.h>
 #include <PLAYER/PlayerPets.h>
 #include <ITEMS/Items.h>           // sub_6FC4EC10, one item out of a section
+#include <test_seam.h>
 #include <ITEMS/ItemMode.h>        // D2GAME_ITEMS_UpdateInventoryItems_6FC45050
 #include <MONSTER/Monster.h>       // MONSTER_DeleteEvents
 #include <MONSTER/MonsterAI.h>     // MONSTERAI_UpdateMercStatsAndSkills
@@ -112,11 +114,11 @@ int16_t __fastcall PLRSAVE2_GetItemIndex(D2UnitStrc* pPlayer, int32_t nGUID)
     }
 
     int32_t nIdx = 1;
-    D2UnitStrc* pItem = INVENTORY_GetFirstItem(pPlayer->pInventory);
+    D2UnitStrc* pItem = D2_CALL(INVENTORY_GetFirstItem, pPlayer->pInventory);
     while (pItem)
     {
-        D2UnitStrc* pCheckedItem = INVENTORY_UnitIsItem(pItem);
-        pItem = INVENTORY_GetNextItem(pItem);
+        D2UnitStrc* pCheckedItem = D2_CALL(INVENTORY_UnitIsItem, pItem);
+        pItem = D2_CALL(INVENTORY_GetNextItem, pItem);
         if ((pCheckedItem ? (int32_t)pCheckedItem->dwUnitId : -1) == nGUID)
         {
             if (nIdx >= 0x7FFF)
@@ -626,13 +628,13 @@ int32_t __fastcall D2WEB_PLRSAVE2_CreateItem(D2GameStrc* pGame, D2UnitStrc* pPla
     uint32_t nSize = (uint32_t)(pEnd - pSection);
 
     D2ItemSaveStrc pItemSave = {};
-    ITEMS_GetCompactItemDataFromBitstream(pSection, nSize, 1, &pItemSave);
+    D2_CALL(ITEMS_GetCompactItemDataFromBitstreamVersioned, pSection, nSize, 1, &pItemSave, (int32_t)dwVersion);   // 1.13c reads the item header with the save's version
     if (pItemSave.nClassId == -1)
     {
         return 0;
     }
 
-    D2UnitStrc* pItem = sub_6FC4EC10(pGame, 0, pSection, nSize, 1, &pItemSave, &nSize, dwVersion);
+    D2UnitStrc* pItem = D2_CALL(sub_6FC4EC10, pGame, 0, pSection, nSize, 1, &pItemSave, &nSize, dwVersion);
     if (!pItem)
     {
         return 0;
@@ -640,33 +642,34 @@ int32_t __fastcall D2WEB_PLRSAVE2_CreateItem(D2GameStrc* pGame, D2UnitStrc* pPla
 
     uint8_t* pNext = &pSection[nSize];
 
-    for (int32_t i = 0; i < pItemSave.nItemFileIndex; ++i)
+    const int32_t nSockets = pItemSave.nItemFileIndex;   // 1.13c keeps the count; the socketed items' own reads overwrite pItemSave
+    for (int32_t i = 0; i < nSockets; ++i)
     {
         nSize = (uint32_t)(pEnd - pNext);
-        ITEMS_GetCompactItemDataFromBitstream(pNext, nSize, 1, &pItemSave);
+        D2_CALL(ITEMS_GetCompactItemDataFromBitstreamVersioned, pNext, nSize, 1, &pItemSave, (int32_t)dwVersion);
 
-        D2UnitStrc* pSocketable = sub_6FC4EC10(pGame, 0, pNext, nSize, 1, &pItemSave, &nSize, dwVersion);
+        D2UnitStrc* pSocketable = D2_CALL(sub_6FC4EC10, pGame, 0, pNext, nSize, 1, &pItemSave, &nSize, dwVersion);
         if (!pSocketable)
         {
-            SUNIT_RemoveUnit(pGame, pItem);
+            D2_CALL(SUNIT_RemoveUnit, pGame, pItem);
             return 0;
         }
 
         pNext += nSize;
-        UNITS_ChangeAnimMode(pSocketable, IMODE_ONCURSOR);
+        D2_CALL(UNITS_ChangeAnimMode, pSocketable, IMODE_ONCURSOR);
 
         int32_t bPlaced = 0;
-        if (!D2GAME_ITEMSOCKET_PlaceItem_6FC497E0(pGame, pPlayer, pSocketable->dwUnitId,
+        if (!D2_CALL(D2GAME_ITEMSOCKET_PlaceItem_6FC497E0, pGame, pPlayer, pSocketable->dwUnitId,
                 pItem ? pItem->dwUnitId : -1, &bPlaced, 0, 1, 0))
         {
-            SUNIT_RemoveUnit(pGame, pItem);
+            D2_CALL(SUNIT_RemoveUnit, pGame, pItem);
             return 0;
         }
     }
 
-    if ((ITEMS_GetItemFlags(pItem) & IFLAG_RUNEWORD) && !ITEMS_GetRunesTxtRecordFromItem(pItem))
+    if ((D2_CALL(ITEMS_GetItemFlags, pItem) & IFLAG_RUNEWORD) && !D2_CALL(ITEMS_GetRunesTxtRecordFromItem, pItem))
     {
-        D2GAME_ITEMMODE_Unk_6FC4BC10(pGame, pPlayer, pItem);
+        D2_CALL(D2GAME_ITEMMODE_Unk_6FC4BC10, pGame, pPlayer, pItem);
         pItem = nullptr;
     }
 

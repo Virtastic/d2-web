@@ -43,7 +43,6 @@ struct D2ItemModeArgStrc
 
 
 //D2Game.0x6FC41900
-int32_t __fastcall D2GAME_Return1_6FC41900();
 //D2Game.0x6FC41910
 void __fastcall D2GAME_ITEMMODE_ServerStatlistCallback_6FC41910(D2GameStrc* pGame, D2UnitStrc* pOwner, D2UnitStrc* pOther, int32_t nLayer_StatId, int32_t nPreviousValue, int32_t nNewValue);
 //D2Game.0x6FC42050

@@ -2,6 +2,7 @@
 // Prior art used: D2MOO DataTbls, MonsterTbls, ItemsTbls and TokenTbls unload routines.
 #include <emscripten.h>
 #include "D2DataTbls.h"
+#include "../d2moo/compat/test_seam.h"
 #include "d2common_tblfree.h"
 #include "d2common_montblfree.h"
 
@@ -216,8 +217,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_port_d2common_71180()
 // slots, then clear the two companion words.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_port_d2common_716b0()
 {
-	FOG_FreeLinker(sgptDataTables->pSetsLinker);
-	FOG_FreeLinker(sgptDataTables->pSetItemsLinker);
+	// Through the seam: the 716B0 probe stands in for the linker release (its linkers are recorded retail words, not engine
+	// objects); a real delete on those hung the replay ("never returned in 120s"). The slot is empty in the game.
+	D2_CALL(FOG_FreeLinker, sgptDataTables->pSetsLinker);
+	D2_CALL(FOG_FreeLinker, sgptDataTables->pSetItemsLinker);
 	if (sgptDataTables->pSetItemsTxt != 0)
 	{
 		DATATBLS_UnloadBin(sgptDataTables->pSetItemsTxt);               // DataTbls.cpp

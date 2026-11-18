@@ -1,4 +1,5 @@
 #include "D2DataTbls.h"
+#include <test_seam.h>
 
 #include "D2Composit.h"
 #include "D2Skills.h"
@@ -23,8 +24,8 @@ void __fastcall DATATBLS_LoadPlrType_ModeTxt(HD2ARCHIVE hArchive)
 		{ "end", TXTFIELD_NONE, 0, 0, NULL }
 	};
 
-	pPlrType = (D2PlrModeTypeTxt*)DATATBLS_CompileTxt(hArchive, "plrtype", pTbl, &nTypeRecords, sizeof(D2PlrModeTypeTxt));
-	pPlrMode = (D2PlrModeTypeTxt*)DATATBLS_CompileTxt(hArchive, "plrmode", pTbl, &nModeRecords, sizeof(D2PlrModeTypeTxt));
+	pPlrType = (D2PlrModeTypeTxt*)D2_CALL(DATATBLS_CompileTxt, hArchive, "plrtype", pTbl, &nTypeRecords, sizeof(D2PlrModeTypeTxt));
+	pPlrMode = (D2PlrModeTypeTxt*)D2_CALL(DATATBLS_CompileTxt, hArchive, "plrmode", pTbl, &nModeRecords, sizeof(D2PlrModeTypeTxt));
 
 	sgptDataTables->pPlrModeDataTables.nPlrModeTypeTxtRecordCount = nModeRecords + nTypeRecords;
 
@@ -38,8 +39,8 @@ void __fastcall DATATBLS_LoadPlrType_ModeTxt(HD2ARCHIVE hArchive)
 	memcpy(sgptDataTables->pPlrModeDataTables.pPlayerType, pPlrType, sizeof(D2PlrModeTypeTxt) * nTypeRecords);
 	memcpy(sgptDataTables->pPlrModeDataTables.pPlayerMode, pPlrMode, sizeof(D2PlrModeTypeTxt) * nModeRecords);
 
-	DATATBLS_UnloadBin(pPlrType);
-	DATATBLS_UnloadBin(pPlrMode);
+	D2_CALL(DATATBLS_UnloadBin, pPlrType);
+	D2_CALL(DATATBLS_UnloadBin, pPlrMode);
 }
 
 //D2Common.0x6FD72B30
@@ -93,8 +94,8 @@ void __fastcall DATATBLS_LoadObjType_ModeTxt(HD2ARCHIVE hArchive)
 		{ "end", TXTFIELD_NONE, 0, 0, NULL }
 	};
 
-	pObjType = (D2ObjModeTypeTxt*)DATATBLS_CompileTxt(hArchive, "objtype", pTbl, &nTypeRecords, sizeof(D2ObjModeTypeTxt));
-	pObjMode = (D2ObjModeTypeTxt*)DATATBLS_CompileTxt(hArchive, "objmode", pTbl, &nModeRecords, sizeof(D2ObjModeTypeTxt));
+	pObjType = (D2ObjModeTypeTxt*)D2_CALL(DATATBLS_CompileTxt, hArchive, "objtype", pTbl, &nTypeRecords, sizeof(D2ObjModeTypeTxt));
+	pObjMode = (D2ObjModeTypeTxt*)D2_CALL(DATATBLS_CompileTxt, hArchive, "objmode", pTbl, &nModeRecords, sizeof(D2ObjModeTypeTxt));
 
 	sgptDataTables->pObjModeDataTables.nObjModeTypeTxtRecordCount = nModeRecords + nTypeRecords;
 
@@ -107,8 +108,8 @@ void __fastcall DATATBLS_LoadObjType_ModeTxt(HD2ARCHIVE hArchive)
 
 	memcpy(sgptDataTables->pObjModeDataTables.pObjType, pObjType, sizeof(D2ObjModeTypeTxt) * nTypeRecords);
 	memcpy(sgptDataTables->pObjModeDataTables.pObjMode, pObjMode, sizeof(D2ObjModeTypeTxt) * nModeRecords);
-	DATATBLS_UnloadBin(pObjType);
-	DATATBLS_UnloadBin(pObjMode);
+	D2_CALL(DATATBLS_UnloadBin, pObjType);
+	D2_CALL(DATATBLS_UnloadBin, pObjMode);
 }
 
 //D2Common.0x6FD72FC0

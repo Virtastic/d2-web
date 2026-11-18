@@ -1,4 +1,5 @@
 #include "QUESTS/ACT5/A5Q5.h"
+#include <test_seam.h>
 
 #include <test_seam.h>
 
@@ -282,7 +283,7 @@ void __fastcall ACT5Q5_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitS
 // 1.13c D2Game+0x5BF70
 void __fastcall ACT5Q5_RewardPlayer(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
-	QUESTS_UpdatePlayerFlags(pGame, pUnit);
+	D2_CALL(QUESTS_UpdatePlayerFlags, pGame, pUnit);
 
 	int32_t nRewardExp = 1400000;
 	if (pGame->nDifficulty == 1)
@@ -300,16 +301,16 @@ void __fastcall ACT5Q5_RewardPlayer(D2GameStrc* pGame, D2UnitStrc* pUnit)
 		dwClassId = pUnit->dwClassId;
 	}
 
-	const int32_t nMaxLevel = DATATBLS_GetMaxLevel(dwClassId);
-	int32_t nCurrentLevel = STATLIST_UnitGetStatValue(pUnit, STAT_LEVEL, 0);
+	const int32_t nMaxLevel = D2_CALL(DATATBLS_GetMaxLevel, dwClassId);
+	int32_t nCurrentLevel = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_LEVEL, 0);
 
 	if (nCurrentLevel >= nMaxLevel)
 	{
 		return;
 	}
 
-	const uint32_t nNextThreshold = DATATBLS_GetLevelThreshold(dwClassId, nCurrentLevel + 1);
-	const int32_t nDeltaExpThreshold = nNextThreshold - DATATBLS_GetLevelThreshold(dwClassId, nCurrentLevel);
+	const uint32_t nNextThreshold = D2_CALL(DATATBLS_GetLevelThreshold, dwClassId, nCurrentLevel + 1);
+	const int32_t nDeltaExpThreshold = nNextThreshold - D2_CALL(DATATBLS_GetLevelThreshold, dwClassId, nCurrentLevel);
 
 	if (nRewardExp > (int32_t)nDeltaExpThreshold)
 	{
@@ -323,23 +324,23 @@ void __fastcall ACT5Q5_RewardPlayer(D2GameStrc* pGame, D2UnitStrc* pUnit)
 			break;
 		}
 
-		const int32_t nNextExp = STATLIST_GetUnitBaseStat(pUnit, STAT_NEXTEXP, 0);
-		const int32_t nDeltaExp = nNextExp - STATLIST_GetUnitBaseStat(pUnit, STAT_EXPERIENCE, 0);
+		const int32_t nNextExp = D2_CALL(STATLIST_GetUnitBaseStat, pUnit, STAT_NEXTEXP, 0);
+		const int32_t nDeltaExp = nNextExp - D2_CALL(STATLIST_GetUnitBaseStat, pUnit, STAT_EXPERIENCE, 0);
 
 		if ((uint32_t)nRewardExp < (uint32_t)nDeltaExp)	// 1.13c: unsigned compare (jb)
 		{
-			const int32_t nExp = STATLIST_GetUnitBaseStat(pUnit, STAT_EXPERIENCE, 0);
-			STATLIST_SetUnitStat(pUnit, STAT_EXPERIENCE, nExp + nRewardExp, 0);
+			const int32_t nExp = D2_CALL(STATLIST_GetUnitBaseStat, pUnit, STAT_EXPERIENCE, 0);
+			D2_CALL(STATLIST_SetUnitStat, pUnit, STAT_EXPERIENCE, nExp + nRewardExp, 0);
 			nRewardExp = 0;
 		}
 		else
 		{
-			STATLIST_SetUnitStat(pUnit, STAT_EXPERIENCE, nNextExp, 0);
-			STATLIST_SetUnitStat(pUnit, STAT_LASTEXP, nDeltaExp, 0);
-			PLAYERSTATS_LevelUp(pGame, pUnit);
+			D2_CALL(STATLIST_SetUnitStat, pUnit, STAT_EXPERIENCE, nNextExp, 0);
+			D2_CALL(STATLIST_SetUnitStat, pUnit, STAT_LASTEXP, nDeltaExp, 0);
+			D2_CALL(PLAYERSTATS_LevelUp, pGame, pUnit);
 
 			nRewardExp -= nDeltaExp;
-			nCurrentLevel = STATLIST_UnitGetStatValue(pUnit, STAT_LEVEL, 0);
+			nCurrentLevel = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_LEVEL, 0);
 		}
 	}
 	while (nCurrentLevel < nMaxLevel);
@@ -871,34 +872,34 @@ int32_t __fastcall ACT5Q5_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2Uni
 // 1.13c D2Game+0x5C100
 int32_t __fastcall ACT5Q5_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
-	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
+	D2ActiveRoomStrc* pRoom = D2_CALL(UNITS_GetRoom, pUnit);
 	if (!pRoom)
 	{
 		return 0;
 	}
 
-	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q5_ANCIENTS);
+	D2QuestDataStrc* pQuestData = D2_CALL(QUESTS_GetQuestData, pGame, QUEST_A5Q5_ANCIENTS);
 	D2_ASSERT(pQuestData);
 
-	if (STATLIST_GetUnitBaseStat(pUnit, STAT_LEVEL, 0) < 20 * (pGame->nDifficulty + 1) || DUNGEON_GetLevelIdFromRoom(pRoom) != LEVEL_ROCKYSUMMIT)
+	if (D2_CALL(STATLIST_GetUnitBaseStat, pUnit, STAT_LEVEL, 0) < 20 * (pGame->nDifficulty + 1) || D2_CALL(DUNGEON_GetLevelIdFromRoom, pRoom) != LEVEL_ROCKYSUMMIT)
 	{
 		return 0;
 	}
 
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
-	if (QUESTRECORD_GetQuestState(pQuestFlags, pQuestData->nQuestFilter, QFLAG_REWARDGRANTED))
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pUnit)->pQuestData[pGame->nDifficulty];
+	if (D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, pQuestData->nQuestFilter, QFLAG_REWARDGRANTED))
 	{
 		return 0;
 	}
 
-	QUESTRECORD_SetQuestState(pQuestFlags, pQuestData->nQuestFilter, QFLAG_PRIMARYGOALDONE);
-	QUESTRECORD_SetQuestState(pQuestFlags, pQuestData->nQuestFilter, QFLAG_REWARDGRANTED);
-	ACT5Q5_RewardPlayer(pGame, pUnit);
+	D2_CALL(QUESTRECORD_SetQuestState, pQuestFlags, pQuestData->nQuestFilter, QFLAG_PRIMARYGOALDONE);
+	D2_CALL(QUESTRECORD_SetQuestState, pQuestFlags, pQuestData->nQuestFilter, QFLAG_REWARDGRANTED);
+	D2_CALL(ACT5Q5_RewardPlayer, pGame, pUnit);
 
-	const int16_t nPartyId = SUNIT_GetPartyId(pUnit);
+	const int16_t nPartyId = D2_CALL(SUNIT_GetPartyId, pUnit);
 	if (nPartyId != -1)
 	{
-		PARTY_IteratePartyMembers(pGame, nPartyId, ACT5Q5_UnitIterate_SetPrimaryGoalDone, 0);
+		D2_CALL(PARTY_IteratePartyMembers, pGame, nPartyId, ACT5Q5_UnitIterate_SetPrimaryGoalDone, 0);
 	}
 
 	return 0;
@@ -1432,11 +1433,11 @@ int32_t __fastcall ACT5Q5_UnitIterate_CountLivingPlayers(D2GameStrc* pGame, D2Un
 //D2Game.0x6FCB8190
 int32_t __fastcall OBJECTS_OperateFunction69_InvisibleAncient(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pOp->pPlayer)->pQuestData[pOp->pGame->nDifficulty];
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pOp->pPlayer)->pQuestData[pOp->pGame->nDifficulty];
 
-	if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A5Q5, QFLAG_REWARDGRANTED) && !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A5Q5, QFLAG_ENTERAREA))
+	if (D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A5Q5, QFLAG_REWARDGRANTED) && !D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A5Q5, QFLAG_ENTERAREA))
 	{
-		QUESTS_SendScrollMessage(pOp->pPlayer, pOp->pObject, 20169);
+		D2_CALL(QUESTS_SendScrollMessage, pOp->pPlayer, pOp->pObject, 20169);
 	}
 
 	return 0;

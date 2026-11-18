@@ -15,19 +15,7 @@
 #include "Units/Missile.h"
 #include "Units/Units.h"
 
-// 1.13c D2Common+0xDCE0 (#10223): D2Common_10232 -- the dynamic-path move step. The decompile
-// fatals on a null unit or a unit that is neither player nor monster, then
-// COLLISION_TrySetUnitCollisionMask(x=wPosX, y=wPosY, pDestRoom, nTargetX, nTargetY,
-// dwCollisionPattern, nFootprintCollisionMask); a non-zero answer returns 0. On success a room
-// change sets path flag 0x1, the game coords are recached at the target centre, the destination
-// room is checked, and movement state is reset; it returns 1. The vendored D2MOO body already
-// carries the 1.13c branch (Step.cpp, //1.13c 0x6FD5DCE0).
-extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2common_dce0_engine(D2DynamicPathStrc* pPath, D2UnitStrc* pUnit,
-	D2ActiveRoomStrc* pDestRoom, int32_t nTargetX, int32_t nTargetY)
-{
-	return D2Common_10232(pPath, pUnit, pDestRoom, nTargetX, nTargetY) ? 1 : 0;
-}
+// 0xDCE0 (#10223, the dynamic-path move step D2Common_10232) is the game function in src/core/d2moo/src/Path/Step.cpp.
 
 // 1.13c D2Common+0x223D0: items.txt[nItemId].nTransmogrify (+0x139) != 0. An id outside the table
 // (fatal 0x1EF for the null table, 0x1156 for the out-of-range id in retail) yields 0 here, the

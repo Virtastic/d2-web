@@ -1759,6 +1759,14 @@ D2UnitStrc* __stdcall STATLIST_GetOwner(D2UnitStrc* pUnit, BOOL* pStatNotDynamic
 	return ((D2StatListExStrc*)pUnit->pStatListEx->pParent)->pOwner;
 }
 
+// 1.13c D2Common+0x38160
+int __fastcall D2Common_38160_FindKeyIndex(D2ModStatsArrayStrc* pModStats, D2SLayerStatIdStrc::PackedType nLayer_StatId)
+{
+	bool bAlreadyInArray = false;
+	const int nIndex = StatArray_FindInsertionIndex(pModStats, nLayer_StatId, &bAlreadyInArray);
+	return bAlreadyInArray ? -1 : nIndex;   // retail: -1 when the key is present, else the insertion index
+}
+
 //D2Common.0x6FDB8420 (#10512)
 // 1.13c D2Common+0x388E0
 void __stdcall D2Common_10512(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, int nStatId, void (__fastcall* pfCallback)(D2UnitStrc*, int, int, D2UnitStrc*))
@@ -1770,7 +1778,8 @@ void __stdcall D2Common_10512(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, int nStatI
 
 	const D2SLayerStatIdStrc nLayerId = D2SLayerStatIdStrc::MakeFromStatId(nStatId);
 
-	if (StatArray_DichotomicSearch(&pUnit1->pStatListEx->ModStats, nLayerId.nPackedValue) < 0)
+	// retail proceeds only when 0x38160 answers -1 (the key is in the mod-stat array), then looks the base stat up with 0x382B0
+	if (D2_CALL(D2Common_38160_FindKeyIndex, &pUnit1->pStatListEx->ModStats, nLayerId.nPackedValue) != -1)
 	{
 		return;
 	}

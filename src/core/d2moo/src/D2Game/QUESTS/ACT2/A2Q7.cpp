@@ -1,4 +1,5 @@
 #include "QUESTS/ACT2/A2Q7.h"
+#include <test_seam.h>
 
 #include <DataTbls/MonsterIds.h>
 #include <D2QuestRecord.h>
@@ -80,15 +81,15 @@ void __fastcall ACT2Q7_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 		return;
 	}
 
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];
 	if (pQuestArg->nMessageIndex == 59 || pQuestArg->nMessageIndex == 60)
 	{
-		QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A2Q7, QFLAG_PRIMARYGOALDONE);
+		D2_CALL(QUESTRECORD_SetQuestState, pQuestFlags, QUESTSTATEFLAG_A2Q7, QFLAG_PRIMARYGOALDONE);
 		pQuestData->pfCallback[QUESTEVENT_NPCDEACTIVATE] = ACT2Q7_Callback02_NpcDeactivate;
 	}
 	else
 	{
-		QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A2Q7, QFLAG_REWARDGRANTED);
+		D2_CALL(QUESTRECORD_SetQuestState, pQuestFlags, QUESTSTATEFLAG_A2Q7, QFLAG_REWARDGRANTED);
 	}
 }
 
@@ -156,13 +157,13 @@ bool __fastcall ACT2Q7_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 		return false;
 	}
 
-	D2BitBufferStrc* pFlags = UNITS_GetPlayerData(pPlayer)->pQuestData[pQuest->pGame->nDifficulty];
-	if (!QUESTRECORD_GetQuestState(pFlags, QUESTSTATEFLAG_A2Q7, QFLAG_REWARDGRANTED) && !QUESTRECORD_GetQuestState(pFlags, QUESTSTATEFLAG_A2Q7, QFLAG_PRIMARYGOALDONE))
+	D2BitBufferStrc* pFlags = D2_CALL(UNITS_GetPlayerData, pPlayer)->pQuestData[pQuest->pGame->nDifficulty];
+	if (!D2_CALL(QUESTRECORD_GetQuestState, pFlags, QUESTSTATEFLAG_A2Q7, QFLAG_REWARDGRANTED) && !D2_CALL(QUESTRECORD_GetQuestState, pFlags, QUESTSTATEFLAG_A2Q7, QFLAG_PRIMARYGOALDONE))
 	{
 		return true;
 	}
 
-	if (QUESTRECORD_GetQuestState(pFlags, QUESTSTATEFLAG_A2Q1, QFLAG_PRIMARYGOALDONE) == 1 && !QUESTRECORD_GetQuestState(pFlags, QUESTSTATEFLAG_A2Q7, QFLAG_REWARDGRANTED))
+	if (D2_CALL(QUESTRECORD_GetQuestState, pFlags, QUESTSTATEFLAG_A2Q1, QFLAG_PRIMARYGOALDONE) == 1 && !D2_CALL(QUESTRECORD_GetQuestState, pFlags, QUESTSTATEFLAG_A2Q7, QFLAG_REWARDGRANTED))
 	{
 		return true;
 	}

@@ -1,4 +1,5 @@
 #include "QUESTS/ACT2/A2Intro.h"
+#include <test_seam.h>
 
 #include <DataTbls/MonsterIds.h>
 
@@ -74,56 +75,56 @@ void __fastcall ACT2Intro_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, 
 	case MONSTER_ELZIX:
 		if (nMessageIndex == 203 || nMessageIndex == 204)
 		{
-			PLRINTRO_SetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
+			D2_CALL(PLRINTRO_SetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
 		}
 		break;
 
 	case MONSTER_GEGLASH:
 		if (nMessageIndex == 230 || nMessageIndex == 231)
 		{
-			PLRINTRO_SetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
+			D2_CALL(PLRINTRO_SetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
 		}
 		break;
 
 	case MONSTER_MESHIF1:
 		if (nMessageIndex == 241 || nMessageIndex == 242)
 		{
-			PLRINTRO_SetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
+			D2_CALL(PLRINTRO_SetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
 		}
 		break;
 
 	case MONSTER_FARA:
 		if (nMessageIndex == 263 || nMessageIndex == 264)
 		{
-			PLRINTRO_SetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
+			D2_CALL(PLRINTRO_SetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
 		}
 		break;
 
 	case MONSTER_DROGNAN:
 		if (nMessageIndex == 285 || nMessageIndex == 286)
 		{
-			PLRINTRO_SetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
+			D2_CALL(PLRINTRO_SetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
 		}
 		break;
 
 	case MONSTER_GREIZ:
 		if (nMessageIndex == 190)
 		{
-			PLRINTRO_SetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
+			D2_CALL(PLRINTRO_SetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
 		}
 		break;
 
 	case MONSTER_WARRIV2:
 		if (nMessageIndex == 215)
 		{
-			PLRINTRO_SetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
+			D2_CALL(PLRINTRO_SetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
 		}
 		break;
 
 	case MONSTER_LYSANDER:
 		if (nMessageIndex == 274)
 		{
-			PLRINTRO_SetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
+			D2_CALL(PLRINTRO_SetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
 		}
 		break;
 
@@ -181,18 +182,18 @@ void __fastcall ACT2Intro_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2
 		return;
 	}
 
-	if (PLRINTRO_GetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, nNpcId))
+	if (D2_CALL(PLRINTRO_GetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, nNpcId))
 	{
 		return;
 	}
 
 	if (nPlayerClass == nSpecialIntroClass)
 	{
-		QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, nNpcId, 1);
+		D2_CALL(QUESTS_InitScrollTextChain, pQuestData, pQuestArg->pTextControl, nNpcId, 1);
 	}
 	else
 	{
-		QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, nNpcId, 0);
+		D2_CALL(QUESTS_InitScrollTextChain, pQuestData, pQuestArg->pTextControl, nNpcId, 0);
 	}
 }
 

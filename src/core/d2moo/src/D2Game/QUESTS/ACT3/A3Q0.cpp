@@ -1,4 +1,5 @@
 #include "QUESTS/ACT3/A3Q0.h"
+#include <test_seam.h>
 
 #include <DataTbls/MonsterIds.h>
 #include <Drlg/D2DrlgPreset.h>
@@ -68,10 +69,10 @@ void __fastcall ACT3Q0_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 		return;
 	}
 
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestData->pGame->nDifficulty];
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pQuestArg->pPlayer)->pQuestData[pQuestData->pGame->nDifficulty];
 	if (pQuestArg->nMessageIndex == 465 || pQuestArg->nMessageIndex == 466)
 	{
-		QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q0, QFLAG_REWARDGRANTED);
+		D2_CALL(QUESTRECORD_SetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q0, QFLAG_REWARDGRANTED);
 		QUESTS_SetGlobalState(pQuestData->pGame, QUESTSTATEFLAG_A3Q0, QFLAG_PRIMARYGOALDONE);
 	}
 }
@@ -104,14 +105,14 @@ void __fastcall ACT3Q0_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 // 1.13c D2Game+0xE3000 (checked against decompile)
 bool __fastcall ACT3Q0_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
-	return nNpcId == MONSTER_HRATLI && !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A3Q0, QFLAG_REWARDGRANTED);
+	return nNpcId == MONSTER_HRATLI && !D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A3Q0, QFLAG_REWARDGRANTED);
 }
 
 //D2Game.0x6FCA6CE0
 // 1.13c D2Game+0xE5450 (checked against decompile)
 void __fastcall ACT3Q0_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
-	if (QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty], QUESTSTATEFLAG_A3Q0, QFLAG_REWARDGRANTED) == 1)
+	if (D2_CALL(QUESTRECORD_GetQuestState, D2_CALL(UNITS_GetPlayerData, pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty], QUESTSTATEFLAG_A3Q0, QFLAG_REWARDGRANTED) == 1)
 	{
 		QUESTS_SetGlobalState(pQuestData->pGame, QUESTSTATEFLAG_A3Q0, QFLAG_PRIMARYGOALDONE);
 	}

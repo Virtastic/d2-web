@@ -2,6 +2,7 @@
 // Provenance and scope:  This deliberately excludes the character header,
 // stats, skills, quests, waypoints, mercenary, corpse and checksum sections.
 #include <cstdint>
+#include <test_seam.h>
 #include <cstdlib>
 #include <Fog.h>
 #include <D2Common.h>
@@ -805,14 +806,14 @@ int32_t __fastcall PLRSAVE2_ReadSkills(D2GameStrc* pGame, D2UnitStrc* pPlayer, u
 int32_t __fastcall D2WEB_PLRSAVE2_WriteQuestSection(D2UnitStrc* pPlayer, uint8_t** ppSection, const uint8_t* pEnd)
 {
     if (*ppSection + 298 > pEnd) return 1;
-    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
+    D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer);
     if (!pPlayerData) return 2;
     uint8_t buffer[298] = {};
     *(uint32_t*)buffer = 0x216F6F57u;
     *(uint32_t*)&buffer[4] = 6;
     *(uint16_t*)&buffer[8] = 298;
     for (int32_t i = 0; i < 3; ++i)
-        QUESTRECORD_CopyRecordToBuffer(pPlayerData->pQuestData[i], &buffer[10 + 96 * i], 96, 1);
+        D2_CALL(QUESTRECORD_CopyRecordToBuffer, pPlayerData->pQuestData[i], &buffer[10 + 96 * i], 96, 1);
     memcpy(*ppSection, buffer, sizeof buffer);
     *ppSection += sizeof buffer;
     return 0;
@@ -823,10 +824,10 @@ int32_t __fastcall D2WEB_PLRSAVE2_ReadQuestSection(D2UnitStrc* pPlayer, uint8_t*
 {
     if (*ppSection + 298 > pEnd || *(uint32_t*)*ppSection != 0x216F6F57u || *(uint32_t*)(*ppSection + 4) != 6)
         return PLRSAVE2ERROR_BAD_QUESTRECORD;
-    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
+    D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer);
     uint8_t* record = *ppSection + 10;
     for (int32_t i = 0; i < 3; ++i, record += 96)
-        QUESTRECORD_CopyBufferToRecord(pPlayerData->pQuestData[i], record, 96, 1);
+        D2_CALL(QUESTRECORD_CopyBufferToRecord, pPlayerData->pQuestData[i], record, 96, 1);
     *ppSection += 298;
     return 0;
 }
@@ -857,7 +858,7 @@ int32_t __fastcall D2WEB_PLRSAVE2_ReadPlrIntroSection(D2UnitStrc* pPlayer, uint8
     if (*ppSection + sizeof(D2PlrIntroSaveStrc) > pEnd) return PLRSAVE2ERROR_BAD_PLAYERINTRO;
     D2PlrIntroSaveStrc* save = (D2PlrIntroSaveStrc*)*ppSection;
     if (save->nHeader != 0x7701u) return PLRSAVE2ERROR_BAD_PLAYERINTRO;
-    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
+    D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer);
     for (int32_t i = 0; i < 3; ++i) {
         memcpy(pPlayerData->pPlayerIntro[i]->pQuestIntroFlags->pBuffer, save->unk0x04[i], 8);
         memcpy(pPlayerData->pPlayerIntro[i]->pNpcIntroFlags->pBuffer, save->unk0x1C[i], 8);
@@ -870,14 +871,14 @@ int32_t __fastcall D2WEB_PLRSAVE2_ReadPlrIntroSection(D2UnitStrc* pPlayer, uint8
 // 0xEC0E0, and from 0xEC1E0 and 0x70FB0); this wrapper stays because the trade code calls it.
 int32_t __fastcall sub_6FC8A0F0(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t* pSection, int32_t nSize, int32_t a5, int32_t a6)
 {
-    return PLRSAVE_WriteItems_6FC89B50(pUnit->pInventory, pSection, nSize, a5, a6);
+    return D2_CALL(PLRSAVE_WriteItems_6FC89B50, pUnit->pInventory, pSection, nSize, a5, a6);
 }
 
 // not-1.13c: retail's item-section dispatch D2Game+0x55050 also sends version 0x47 to the legacy reader
 // D2Game+0x54D90, which is not ported; versions 0x48..0x60 go to 0x54810 as here, anything else is 1.
 int32_t __fastcall sub_6FC8BC70(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t* pSection, uint32_t dwVersion, int32_t nSize, int32_t a6, int32_t* pSize)
 {
-    if (dwVersion >= 72 && dwVersion <= 96) return PLRSAVE_ReadItems_6FC8B8A0(pGame, pUnit, pSection, dwVersion, nSize, a6, pSize);
+    if (dwVersion >= 72 && dwVersion <= 96) return D2_CALL(PLRSAVE_ReadItems_6FC8B8A0, pGame, pUnit, pSection, dwVersion, nSize, a6, pSize);
     return 1;
 }
 // 1.13c D2Game+0xEC260: of the corpses holding items, the one whose non-gold items sum to the largest

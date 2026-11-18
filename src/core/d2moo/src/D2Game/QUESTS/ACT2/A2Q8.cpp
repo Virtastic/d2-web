@@ -1,4 +1,5 @@
 #include "QUESTS/ACT2/A2Q8.h"
+#include <test_seam.h>
 
 #include <DataTbls/MonsterIds.h>
 #include <D2QuestRecord.h>
@@ -53,7 +54,7 @@ void __fastcall ACT2Q8_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 {
 	if (pQuestArg->nNPCNo == MONSTER_ACT2GUARD5 && pQuestArg->nMessageIndex == 303)
 	{
-		QUESTRECORD_SetQuestState(UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty], QUESTSTATEFLAG_A2Q8, 0);
+		D2_CALL(QUESTRECORD_SetQuestState, D2_CALL(UNITS_GetPlayerData, pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty], QUESTSTATEFLAG_A2Q8, 0);
 	}
 }
 
@@ -78,10 +79,10 @@ void __fastcall ACT2Q8_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 		return;
 	}
 
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestData->pGame->nDifficulty];
-	if (!QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A2Q6, QFLAG_REWARDPENDING) && !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A2Q6, QFLAG_REWARDGRANTED))
+	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pQuestArg->pPlayer)->pQuestData[pQuestData->pGame->nDifficulty];
+	if (!D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A2Q6, QFLAG_REWARDPENDING) && !D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A2Q6, QFLAG_REWARDGRANTED))
 	{
-		QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, MONSTER_ACT2GUARD5, 0);
+		D2_CALL(QUESTS_InitScrollTextChain, pQuestData, pQuestArg->pTextControl, MONSTER_ACT2GUARD5, 0);
 	}
 }
 
@@ -94,7 +95,7 @@ bool __fastcall ACT2Q8_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 		return false;
 	}
 
-	D2BitBufferStrc* pFlags = UNITS_GetPlayerData(pPlayer)->pQuestData[pQuest->pGame->nDifficulty];
+	D2BitBufferStrc* pFlags = D2_CALL(UNITS_GetPlayerData, pPlayer)->pQuestData[pQuest->pGame->nDifficulty];
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pQuest->pGame, 13);
 	if (!pQuestData)
 	{
@@ -102,9 +103,9 @@ bool __fastcall ACT2Q8_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 	}
 
 	return pQuestData->bNotIntro && pQuestData->fState < 2
-		&& QUESTS_GetGlobalState(pQuest->pGame, QUESTSTATEFLAG_A2Q3, QFLAG_PRIMARYGOALDONE)
-		&& !QUESTRECORD_GetQuestState(pFlags, QUESTSTATEFLAG_A2Q6, QFLAG_REWARDPENDING)
-		&& !QUESTRECORD_GetQuestState(pFlags, QUESTSTATEFLAG_A2Q6, QFLAG_REWARDGRANTED);
+		&& D2_CALL(QUESTS_GetGlobalState, pQuest->pGame, QUESTSTATEFLAG_A2Q3, QFLAG_PRIMARYGOALDONE)
+		&& !D2_CALL(QUESTRECORD_GetQuestState, pFlags, QUESTSTATEFLAG_A2Q6, QFLAG_REWARDPENDING)
+		&& !D2_CALL(QUESTRECORD_GetQuestState, pFlags, QUESTSTATEFLAG_A2Q6, QFLAG_REWARDGRANTED);
 }
 
 // 1.13c D2Game+0xC1960 (returns 0)

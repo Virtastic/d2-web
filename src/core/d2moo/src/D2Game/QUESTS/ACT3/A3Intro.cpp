@@ -1,4 +1,5 @@
 #include "QUESTS/ACT3/A3Intro.h"
+#include <test_seam.h>
 
 #include <DataTbls/MonsterIds.h>
 
@@ -67,42 +68,42 @@ void __fastcall ACT3Intro_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, 
 	case MONSTER_ALKOR:
 		if (nMessageIndex == 501 || nMessageIndex == 502)
 		{
-			PLRINTRO_SetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
+			D2_CALL(PLRINTRO_SetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
 		}
 		break;
 
 	case MONSTER_MESHIF2:
 		if (nMessageIndex == 478 || nMessageIndex == 479)
 		{
-			PLRINTRO_SetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
+			D2_CALL(PLRINTRO_SetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
 		}
 		break;
 
 	case MONSTER_ASHEARA:
 		if (nMessageIndex == 490 || nMessageIndex == 491)
 		{
-			PLRINTRO_SetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
+			D2_CALL(PLRINTRO_SetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
 		}
 		break;
 
 	case MONSTER_ORMUS:
 		if (nMessageIndex == 514 || nMessageIndex == 515)
 		{
-			PLRINTRO_SetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
+			D2_CALL(PLRINTRO_SetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
 		}
 		break;
 
 	case MONSTER_NATALYA:
 		if (nMessageIndex == 453)
 		{
-			PLRINTRO_SetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
+			D2_CALL(PLRINTRO_SetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
 		}
 		break;
 
 	case MONSTER_CAIN3:
 		if (nMessageIndex == 458)
 		{
-			PLRINTRO_SetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
+			D2_CALL(PLRINTRO_SetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, pQuestArg->nNPCNo);
 		}
 		break;
 
@@ -155,18 +156,18 @@ void __fastcall ACT3Intro_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2
 		return;
 	}
 
-	if (PLRINTRO_GetQuestIntroFlag(pQuestArg->pPlayer, pQuestArg->pGame, nNpcId))
+	if (D2_CALL(PLRINTRO_GetQuestIntroFlag, pQuestArg->pPlayer, pQuestArg->pGame, nNpcId))
 	{
 		return;
 	}
 
 	if (nPlayerClass == nSpecialIntroClass)
 	{
-		QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, nNpcId, 1);
+		D2_CALL(QUESTS_InitScrollTextChain, pQuestData, pQuestArg->pTextControl, nNpcId, 1);
 	}
 	else
 	{
-		QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, nNpcId, 0);
+		D2_CALL(QUESTS_InitScrollTextChain, pQuestData, pQuestArg->pTextControl, nNpcId, 0);
 	}
 }
 
@@ -182,5 +183,5 @@ bool __fastcall ACT3Intro_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitSt
 // 1.13c D2Game+0xE55C0 (checked against decompile)
 bool __fastcall ACT3Intro_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC)
 {
-	return nNpcId == MONSTER_CAIN3 && !PLRINTRO_GetQuestIntroFlag(pPlayer, pQuest->pGame, MONSTER_CAIN3);
+	return nNpcId == MONSTER_CAIN3 && !D2_CALL(PLRINTRO_GetQuestIntroFlag, pPlayer, pQuest->pGame, MONSTER_CAIN3);
 }

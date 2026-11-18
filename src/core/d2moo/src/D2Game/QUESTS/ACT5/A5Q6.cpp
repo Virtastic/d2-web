@@ -757,7 +757,7 @@ void __fastcall ACT5Q6_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 // 1.13c D2Game+0x598B0 (checked against decompile, no delta; register-convention wrapper)
 void __fastcall ACT5Q6_OpenWorldStoneChamber(D2GameStrc* pGame)
 {
-	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q6_BAAL);
+	D2QuestDataStrc* pQuestData = D2_CALL(QUESTS_GetQuestData, pGame, QUEST_A5Q6_BAAL);
 	if (!pQuestData)
 	{
 		return;
@@ -768,7 +768,7 @@ void __fastcall ACT5Q6_OpenWorldStoneChamber(D2GameStrc* pGame)
 	if (pQuestData->bNotIntro && pQuestData->fLastState < 3)
 	{
 		pQuestData->dwFlags &= 0xFFFFFF00;
-		QUESTS_UnitIterate(pQuestData, 3, 0, ACT5Q6_UnitIterate_StatusCyclerEx, 1);
+		D2_CALL(QUESTS_UnitIterate, pQuestData, 3, 0, ACT5Q6_UnitIterate_StatusCyclerEx, 1);
 	}
 }
 
@@ -938,16 +938,16 @@ int32_t __fastcall ACT5Q6_UnitIterate_SendZooMonsterIdToClient(D2GameStrc* pGame
 void __fastcall ACT5Q6_SpawnTyrael(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2UnitStrc* pUnit)
 {
 	D2CoordStrc coord = {};
-	UNITS_GetCoords(pUnit, &coord);
+	D2_CALL(UNITS_GetCoords, pUnit, &coord);
 	coord.nX -= 5;
 	coord.nY -= 5;
 
 	D2ActiveRoomStrc* pFreeRoom = nullptr;
-	QUESTS_GetFreePosition(pRoom, &coord, 5, 0x400u, &pFreeRoom, 100);
+	D2_CALL(QUESTS_GetFreePosition, pRoom, &coord, 5, 0x400u, &pFreeRoom, 100);
 
 	if (pFreeRoom)
 	{
-		D2GAME_SpawnMonster_6FC69F10(pGame, pFreeRoom, coord.nX, coord.nY, MONSTER_TYRAEL3, MONMODE_NEUTRAL, 4, 66);
+		D2_CALL(D2GAME_SpawnMonster_6FC69F10,pGame, pFreeRoom, coord.nX, coord.nY, MONSTER_TYRAEL3, MONMODE_NEUTRAL, 4, 66);
 	}
 }
 

@@ -673,6 +673,7 @@ BOOL __stdcall D2Common_10231_Impl(D2DynamicPathStrc* pDynamicPath, D2ActiveRoom
 //1.00:  D2Common.0x10060120 (#10228)
 //1.10f: D2Common.0x6FDADC20 (#10231)
 //1.13c: D2Common.0x6FD5E1A0 (#10075)
+// 1.13c D2Common+0x0E1A0
 int __stdcall D2Common_10231(D2DynamicPathStrc* pDynamicPath, D2UnitStrc* pUnit_unused, D2ActiveRoomStrc* pRooms, uint16_t nX, uint16_t nY)
 {
 	D2_MAYBE_UNUSED(pUnit_unused);
@@ -728,6 +729,7 @@ void PATH_ResetMovement(D2DynamicPathStrc* pDynamicPath)
 //1.00:  D2Common.0x100606B0 (#10229)
 //1.10f: D2Common.0x6FDADF50 (#10232)
 //1.13c: D2Common.0x6FD5DCE0 (#10223)
+// 1.13c D2Common+0x0DCE0
 BOOL __stdcall D2Common_10232(D2DynamicPathStrc* pPath, D2UnitStrc* pUnit, D2ActiveRoomStrc* pDestRoom, int nTargetX, int nTargetY)
 {
 	D2_ASSERT(pUnit && (pUnit->dwUnitType == UNIT_PLAYER || pUnit->dwUnitType == UNIT_MONSTER)); 

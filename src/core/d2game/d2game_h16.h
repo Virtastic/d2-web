@@ -30,11 +30,6 @@ struct Env {
 };
 
 void e2600(const Env&, uint32_t game, int32_t pct, uint32_t unit);
-uint32_t e36a0(const Env&, uint32_t game, uint32_t unit);
-void e3b40(const Env&, uint32_t node, uint32_t a);
-void e41d0(const Env&, uint32_t game, uint32_t unit);
-uint32_t e4280(const Env&, uint32_t game, uint32_t unit);
-uint32_t e4500(const Env&, uint32_t a, uint32_t id, uint32_t p3, uint32_t list);
 uint32_t e57d0(const Env&, uint32_t game, uint32_t node);
 void e6660(const Env&, uint32_t self);
 }

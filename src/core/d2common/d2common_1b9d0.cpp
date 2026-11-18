@@ -3,7 +3,7 @@
 #include <cstdint>
 
 // 1.13c D2Common+0x1B9D0. Retail passes dst in EAX and src in ECX; the port takes them as parameters.
-void D2Common_1B9D0_CopyFieldChars(char* dst, const char* src) {
+void DATATBLS_CopyFourCharField(char* dst, const char* src) {
     int32_t i = 0;
     for (; i < 4 && src[i]; ++i) dst[i] = src[i];
     for (; i < 4; ++i) dst[i] = ' ';

@@ -1107,7 +1107,7 @@ __forceinline void __fastcall DATATBLS_ProcessAdditionalTreasureClassArguments(D
 
 //1.10f: Inlined
 //1.13c: D2Common.0x6FDA3780
-// The verified 1.13c body (d2common_batch_53780.cpp) also bumps the count, so the loader no longer does.
+// The verified 1.13c body (Retail/D2Common_53780.cpp) also bumps the count, so the loader no longer does.
 D2TCExShortStrc* D2Common_53780_NewTreasureClassEx(const char* szName);
 D2TCExShortStrc* DATATBLS_NewTreasureClassEx(const char* nTreasureClass)
 {
@@ -1233,7 +1233,7 @@ void DATATBLS_ParseTreasureClassItem(D2TCExShortStrc* pTCExTxtRecord, D2Treasure
 	}
 }
 
-int D2Common_54430_ParseTreasureClassItem(D2TCExShortStrc* pTC, char* szText, int nProb); // d2common_batch_53780.cpp
+int D2Common_54430_ParseTreasureClassItem(D2TCExShortStrc* pTC, char* szText, int nProb); // Retail/D2Common_54430.cpp
 
 //D2Common.0x6FD68EC0
 // 1.13c D2Common+0x5A030

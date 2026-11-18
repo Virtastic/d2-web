@@ -179,7 +179,12 @@ void __fastcall sub_6FC81E10(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc*
 // 1.13c D2Game+0xCBA20 (mode-send table entry; packet 0x0F built in place; no delta)
 void __fastcall sub_6FC81F60(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient, int32_t nAnimMode)
 {
-    D2GAME_PACKETS_SendPacket0x0F_6FC3CA00(pClient, 0x0F, 0, pUnit->dwUnitId, (BYTE)stru_6FD30708[nAnimMode].field_4, D2COMMON_10175_PathGetFirstPointX(pUnit->pDynamicPath), D2COMMON_10176_PathGetFirstPointY(pUnit->pDynamicPath), (BYTE)pUnit->dwLastHitClass, CLIENTS_GetUnitX(pUnit), CLIENTS_GetUnitY(pUnit));
+    // retail evaluates the argument list right to left: the unit's Y and X, then the path's Y and X
+    const int32_t nUnitY = D2_CALL(CLIENTS_GetUnitY, pUnit);
+    const int32_t nUnitX = D2_CALL(CLIENTS_GetUnitX, pUnit);
+    const int32_t nPathY = D2_CALL(D2COMMON_10176_PathGetFirstPointY, pUnit->pDynamicPath);
+    const int32_t nPathX = D2_CALL(D2COMMON_10175_PathGetFirstPointX, pUnit->pDynamicPath);
+    D2_CALL(D2GAME_PACKETS_SendPacket0x0F_6FC3CA00, pClient, 0x0F, 0, pUnit->dwUnitId, (BYTE)stru_6FD30708[nAnimMode].field_4, nPathX, nPathY, (BYTE)pUnit->dwLastHitClass, nUnitX, nUnitY);
 }
 
 //D2Game.0x6FC82010
@@ -904,39 +909,39 @@ int32_t __fastcall sub_6FC83340(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStr
 // 1.13c D2Game+0xCB1F0 (no delta; fatal 0x6EE on a missing left-hand swing)
 D2SkillStrc* __fastcall sub_6FC83450(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
-    if (SKILLS_GetSkillIdFromSkill(pSkill, __FILE__, __LINE__))
+    if (D2_CALL(SKILLS_GetSkillIdFromSkill, pSkill, __FILE__, __LINE__))
     {
         return pSkill;
     }
 
-    D2UnitStrc* pRightWeapon = INVENTORY_GetItemFromBodyLoc(pUnit->pInventory, BODYLOC_RARM);
-    if (pRightWeapon && (!ITEMS_CanBeEquipped(pRightWeapon) || ITEMS_GetItemType(pRightWeapon) == ITEMTYPE_MISSILE_POTION))
+    D2UnitStrc* pRightWeapon = D2_CALL(INVENTORY_GetItemFromBodyLoc, pUnit->pInventory, BODYLOC_RARM);
+    if (pRightWeapon && (!D2_CALL(ITEMS_CanBeEquipped, pRightWeapon) || D2_CALL(ITEMS_GetItemType, pRightWeapon) == ITEMTYPE_MISSILE_POTION))
     {
         pRightWeapon = nullptr;
     }
 
-    D2UnitStrc* pLeftWeapon = INVENTORY_GetItemFromBodyLoc(pUnit->pInventory, BODYLOC_LARM);
-    if (pLeftWeapon && (!ITEMS_CanBeEquipped(pLeftWeapon) || ITEMS_GetItemType(pLeftWeapon) == ITEMTYPE_MISSILE_POTION))
+    D2UnitStrc* pLeftWeapon = D2_CALL(INVENTORY_GetItemFromBodyLoc, pUnit->pInventory, BODYLOC_LARM);
+    if (pLeftWeapon && (!D2_CALL(ITEMS_CanBeEquipped, pLeftWeapon) || D2_CALL(ITEMS_GetItemType, pLeftWeapon) == ITEMTYPE_MISSILE_POTION))
     {
         pLeftWeapon = nullptr;
     }
 
-    if (!pRightWeapon || !pLeftWeapon || !ITEMS_CheckItemTypeId(pRightWeapon, ITEMTYPE_WEAPON) || !ITEMS_CheckItemTypeId(pLeftWeapon, ITEMTYPE_WEAPON))
+    if (!pRightWeapon || !pLeftWeapon || !D2_CALL(ITEMS_CheckItemTypeId, pRightWeapon, ITEMTYPE_WEAPON) || !D2_CALL(ITEMS_CheckItemTypeId, pLeftWeapon, ITEMTYPE_WEAPON))
     {
         return pSkill;
     }
 
-    if (SKILLS_GetParam4(pSkill))
+    if (D2_CALL(SKILLS_GetParam4, pSkill))
     {
-        SKILLS_SetParam4(pSkill, 0);
+        D2_CALL(SKILLS_SetParam4, pSkill, 0);
         return pSkill;
     }
 
-    D2SkillStrc* pSwapSkill = SKILLS_GetSkillById(pUnit, SKILL_LEFTHANDSWING, -1);
+    D2SkillStrc* pSwapSkill = D2_CALL(SKILLS_GetSkillById, pUnit, SKILL_LEFTHANDSWING, -1);
 
     D2_ASSERT(pSwapSkill);
 
-    SKILLS_SetParam4(pSkill, 5);
+    D2_CALL(SKILLS_SetParam4, pSkill, 5);
 
     return pSwapSkill;
 }
@@ -1203,7 +1208,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x09_LeftSkillOnUnitHold_6FC83AC0(D2
 // 1.13c D2Game+0xCB690 (no delta)
 int32_t __fastcall sub_6FC83C60(D2UnitStrc* pUnit, uint16_t nX, uint16_t nY, int32_t nMaxDistance)
 {
-    int32_t nXDiff = CLIENTS_GetUnitX(pUnit) - nX;
+    int32_t nXDiff = D2_CALL(CLIENTS_GetUnitX, pUnit) - nX;
     nXDiff = std::abs(nXDiff);
 
     if (nXDiff > nMaxDistance)
@@ -1211,7 +1216,7 @@ int32_t __fastcall sub_6FC83C60(D2UnitStrc* pUnit, uint16_t nX, uint16_t nY, int
         return 1;
     }
 
-    int32_t nYDiff = CLIENTS_GetUnitY(pUnit) - nY;
+    int32_t nYDiff = D2_CALL(CLIENTS_GetUnitY, pUnit) - nY;
     nYDiff = std::abs(nYDiff);
 
     if (nYDiff > nMaxDistance)
