@@ -97,9 +97,11 @@ inline void GetLocalTime(LPSYSTEMTIME t) {
     t->wMilliseconds = 0;
 }
 
-#define stricmp  strcasecmp
+// stricmp is retail's CRT ___ascii_stricmp (D2Common+0x3790, src/core/d2common/d2common_ascii_stricmp_3790.cpp): -1/0/1.
+extern "C" int32_t D2Common_3790_AsciiStricmp(const char* a, const char* b);
+#define stricmp  D2Common_3790_AsciiStricmp
 #define strnicmp strncasecmp
-#define _stricmp strcasecmp
+#define _stricmp D2Common_3790_AsciiStricmp
 #define _strnicmp strncasecmp
 // MSVC "secure" CRT, both arities the vendored code uses.
 #include <stdarg.h>

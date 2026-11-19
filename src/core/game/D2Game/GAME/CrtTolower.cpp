@@ -121,3 +121,46 @@ uint32_t d2_fn_d2game_3853(void* self, const void* locinfo_, uint32_t c) {
 extern "C" uint32_t d2_fn_d2game_6f63(void* self, const void* locinfo_, int32_t c, uint32_t type) {
     return d2game_isctype_mt(self, static_cast<const D2GameCrtLocale*>(locinfo_), c, type);
 }
+
+// ---- _tolower (0x391B), folded here from the stand-alone src/core/d2game/d2game_391b.cpp ----
+#include <cstring>
+
+namespace {
+
+struct D2GameTolowerEnv {
+    void* (*getptd)();
+    void* (*updateTlocinfo)();
+    int32_t (*tolowerMt)(void* output, const void* locinfo, int32_t c);
+    const void* currentTlocinfo;
+};
+
+} // namespace
+
+// Retail calls __getptd, reads the thread's locale pointer at tiddata+0x64, refreshes it through ___updatetlocinfo unless it is the
+// startup locale, then forwards the original int to ___tolower_mt. Its ECX value is the local output buffer used by the locale mapping path.
+// 1.13c D2Game+0x0391B (_tolower)
+extern "C" int32_t d2game_tolower_impl(int32_t c, const D2GameTolowerEnv* env) {
+    void* ptd = env->getptd();
+    const void* locinfo;
+    std::memcpy(&locinfo, static_cast<const uint8_t*>(ptd) + 0x64, sizeof(locinfo));
+    if (locinfo != env->currentTlocinfo) locinfo = env->updateTlocinfo();
+    char output[3] = {};
+    return env->tolowerMt(output, locinfo, c);
+}
+
+static uint8_t g_ptd[0x80];
+static D2GameCrtLocale g_startupLocale = {};   // lcid 0: the C locale
+// Startup C locale: A-Z -> a-z. Also the FN-probe seam for 0x391B (src/core/fn/d2game_391b.cpp).
+extern "C" int32_t d2game_tolower_probe(int32_t c) {
+    const void* p = &g_startupLocale;
+    std::memcpy(g_ptd + 0x64, &p, sizeof p);
+    D2GameTolowerEnv env = {};
+    env.getptd = []() -> void* { return g_ptd; };
+    env.updateTlocinfo = []() -> void* { return &g_startupLocale; };
+    env.tolowerMt = [](void* self, const void* loc, int32_t ch) -> int32_t { return (int32_t)d2_fn_d2game_3853(self, loc, (uint32_t)ch); };
+    env.currentTlocinfo = &g_startupLocale;
+    return d2game_tolower_impl(c, &env);
+}
+
+// Game-facing _tolower: the same startup-locale path the probe runs (the locale never changes after startup).
+int32_t D2GAME_CRT_tolower_6FC2391B(int32_t c) { return d2game_tolower_probe(c); }

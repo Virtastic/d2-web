@@ -7,6 +7,8 @@
 #include <cstdio>
 #include <emscripten.h>
 
+extern "C" int32_t D2Common_3790_AsciiStricmp(const char* a, const char* b);	// 1.13c D2Common+0x3790
+
 namespace
 {
 // Byte loads avoid alignment/aliasing UB while retaining the x86 instruction's read-all-four-before-writing behaviour, even
@@ -110,6 +112,10 @@ uint32_t d2common_strcspn_26a0(const char* str, const char* control)
 // locale's byte-to-lowercase results; no host locale state is read.
 extern "C" int32_t D2Common_Stricmp_1ec0(const char* left, const char* right, const int32_t* lowercase)
 {
+	if (!lowercase)
+	{
+		return D2Common_3790_AsciiStricmp(left, right);	// retail's C-locale branch calls ___ascii_stricmp
+	}
 	for (;;)
 	{
 		const auto a = static_cast<uint8_t>(*left++);

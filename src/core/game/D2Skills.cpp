@@ -135,13 +135,13 @@ int __stdcall SKILLS_GetSpecialParamValue(D2UnitStrc* pUnit, int nParamWord, int
 			return D2Common_11033(nSkillLevel, pSkillsTxtRecord->dwParam[6], pSkillsTxtRecord->dwParam[7]);
 
 		case 8:
-			return pSkillsTxtRecord->dwParam[0];
+			return DATATBLS_GetSkillParam0(nSkillId);	// 1.13c D2Common+0x1550
 
 		case 9:
-			return pSkillsTxtRecord->dwParam[1];
+			return DATATBLS_GetSkillParam1(nSkillId);	// 1.13c D2Common+0x1580
 
 		case 10:
-			return pSkillsTxtRecord->dwParam[2];
+			return DATATBLS_GetSkillParam2(nSkillId);	// 1.13c D2Common+0x15B0
 
 		case 11:
 			return pSkillsTxtRecord->dwParam[3];

@@ -435,6 +435,7 @@ void __fastcall DATATBLS_UnloadStatesTxt()
 	FOG_FreeLinker(sgptDataTables->pStatesLinker);
 }
 
+// 1.13c D2Common+0x1770
 D2StatesTxt* DATATBLS_GetStatesTxtRecord(int nStateId)
 {
 	if (nStateId >= 0 && nStateId < sgptDataTables->nStatesTxtRecordCount)

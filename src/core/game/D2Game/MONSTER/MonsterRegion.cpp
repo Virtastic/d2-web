@@ -13,6 +13,7 @@
 
 #include "GAME/Clients.h"
 #include "GAME/Event.h"
+#include "GAME/Game113c.h"
 #include "GAME/Targets.h"
 #include "ITEMS/Items.h"
 #include "MONSTER/Monster.h"
@@ -1187,7 +1188,7 @@ void __fastcall MONSTERREGION_InitializeAll(void* pMemPool, D2MonsterRegionStrc*
             if (nPreviousNumMonstersInSpawnList > (nIndex+1))
             {
 				// Note: original game does a memcpy here, but we have overlapping inputs.
-                memmove(&monsterIds[nIndex], &monsterIds[nIndex + 1], sizeof(monsterIds[0]) * (nNumMonstersInSpawnList - nIndex));
+                D2GAME_CRT_memmove_6FC22AD0(&monsterIds[nIndex], &monsterIds[nIndex + 1], sizeof(monsterIds[0]) * (nNumMonstersInSpawnList - nIndex));
             }
 
             D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nMonsterId);

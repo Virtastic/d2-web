@@ -323,6 +323,7 @@ D2SkillDescTxt* __fastcall DATATBLS_GetSkillDescTxtRecord(int nSkillDesc);
 
 // 1.13c D2Common+0x1550..0x1640: skills.txt dwParam[0..5] of a skill row (0 when out of range)
 int __fastcall DATATBLS_GetSkillParam(int nSkillId, int nParam);
+int __fastcall DATATBLS_SkillHasValidDesc(int nSkillId);
 int __fastcall DATATBLS_GetSkillParam0(int nSkillId);
 int __fastcall DATATBLS_GetSkillParam1(int nSkillId);
 int __fastcall DATATBLS_GetSkillParam2(int nSkillId);

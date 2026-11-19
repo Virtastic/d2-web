@@ -1,6 +1,7 @@
 #include "D2DataTbls.h"
 #include <Calc.h>
 #include <Storm.h>
+#include <test_seam.h>
 
 // not-1.13c: no retail function; 1.13c 0x7C640 (the keyword mapper) calls no pack helper (callees 0x7C5F0 and the
 // Storm/Fog imports only), so the four-byte link code is built inline there. Kept as a port helper: first four characters, space-padded
@@ -47,12 +48,12 @@ int __fastcall sub_6FD62F20(char* szText, int* a2, int a3, int nKeywordNumber)
 		{
 			if (sgptDataTables->iSkillCode)
 			{
-				const int nRow = FOG_GetRowFromTxt(sgptDataTables->iSkillCode, szText, 0);
+				const int nRow = D2_CALL(FOG_GetRowFromTxt, sgptDataTables->iSkillCode, szText, 0);
 				if (nRow < 0)
 				{
 					// retail: a miss is looked up (and logged) in the skill calc linker by its four-byte code
 					*a2 = 0;
-					return FOG_GetLinkIndex(sgptDataTables->pSkillCalcLinker, MissilesTbl_PackLinkCode(szText), 1);
+					return D2_CALL(FOG_GetLinkIndex, sgptDataTables->pSkillCalcLinker,MissilesTbl_PackLinkCode(szText), 1);
 				}
 				*a2 = 1;
 				return nRow;
@@ -62,7 +63,7 @@ int __fastcall sub_6FD62F20(char* szText, int* a2, int a3, int nKeywordNumber)
 		{
 			if (sgptDataTables->pMissilesLinker)
 			{
-				const int nRow = FOG_GetRowFromTxt(sgptDataTables->pMissilesLinker, szText, 0);
+				const int nRow = D2_CALL(FOG_GetRowFromTxt, sgptDataTables->pMissilesLinker, szText, 0);
 				if (nRow >= 0)
 				{
 					*a2 = 1;
@@ -70,12 +71,12 @@ int __fastcall sub_6FD62F20(char* szText, int* a2, int a3, int nKeywordNumber)
 				}
 			}
 			*a2 = 0;
-			return FOG_GetLinkIndex(sgptDataTables->pMissileCalcLinker, MissilesTbl_PackLinkCode(szText), 1);
+			return D2_CALL(FOG_GetLinkIndex,sgptDataTables->pMissileCalcLinker, MissilesTbl_PackLinkCode(szText), 1);
 		}
 	}
 
 	*a2 = 0;
-	return FOG_GetLinkIndex(sgptDataTables->pMissileCalcLinker, MissilesTbl_PackLinkCode(szText), 1);
+	return D2_CALL(FOG_GetLinkIndex, sgptDataTables->pMissileCalcLinker, MissilesTbl_PackLinkCode(szText), 1);
 }
 
 //D2Common.0x6FD630F0
@@ -96,10 +97,10 @@ void __fastcall DATATBLS_MissileCalcLinker(char* pSrc, void* pRecord, int nOffse
 
 	if (pSrc)
 	{
-		const int nBufferSize = DATATBLS_CompileExpression(pSrc, (FOGASTNodeStrc*)pBuffer, sizeof(pBuffer), DATATBLS_MapMissilesTxtKeywordToNumber, NULL, sub_6FD62F20);
+		const int nBufferSize = D2_CALL(DATATBLS_CompileExpression, pSrc,(FOGASTNodeStrc*)pBuffer, sizeof(pBuffer), DATATBLS_MapMissilesTxtKeywordToNumber, NULL, sub_6FD62F20);
 		if (nBufferSize > 0)
 		{
-			*(uint32_t*)((char*)pRecord + nOffset) = DATATBLS_AppendMemoryBuffer((char**)&sgptDataTables->pMissCode, (int*)&sgptDataTables->nMissCodeSize, &sgptDataTables->nMissCodeSizeEx, pBuffer, nBufferSize);
+			*(uint32_t*)((char*)pRecord + nOffset) = D2_CALL(DATATBLS_AppendMemoryBuffer, (char**)&sgptDataTables->pMissCode, (int*)&sgptDataTables->nMissCodeSize, &sgptDataTables->nMissCodeSizeEx, pBuffer, nBufferSize);
 			return;
 		}
 	}

@@ -68,11 +68,6 @@ __attribute__((weak)) void __fastcall CLIENTS_PacketDataList_Reset(D2ClientStrc*
     __builtin_trap();
 }
 
-__attribute__((weak)) void __fastcall CLIENTS_RefreshUnitsUpdateList(D2ClientStrc* pClient, uint32_t nUpdateSize)
-{
-    __builtin_trap();
-}
-
 __attribute__((weak)) void __fastcall CLIENTS_SetGameData(D2GameStrc* pGame)
 {
     __builtin_trap();

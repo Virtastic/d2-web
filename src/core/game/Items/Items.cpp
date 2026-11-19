@@ -5592,8 +5592,7 @@ int __fastcall ITEMS_DecodeItemBitstreamComplete(D2UnitStrc* pItem, D2BitBufferS
 
 					if (nValue > 0 && nValue <= nMax)
 					{
-						pSkillsTxtRecord = DATATBLS_GetSkillsTxtRecord(nSkillId);
-						if (pSkillsTxtRecord && DATATBLS_GetSkillDescTxtRecord(pSkillsTxtRecord->wSkillDesc))
+						if (DATATBLS_SkillHasValidDesc(nSkillId))
 						{
 							STATLIST_SetStat(pStatList, STAT_ITEM_SINGLESKILL, nValue, nSkillId);
 						}

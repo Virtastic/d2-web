@@ -1,5 +1,6 @@
 #include "GAME/Game.h"
 #include "GAME/Game113c.h"
+extern "C" uint8_t* d2game_strcpy_72b0(uint8_t* dst, const uint8_t* src);   // 1.13c D2Game+0x72B0, game/D2Game/CRT/Strcpy72B0.cpp
 #include <test_seam.h>
 #include "../../../d2game/d2game_2d4b0.h"
 
@@ -2842,35 +2843,20 @@ int32_t __stdcall GAME_ReturnArgument(int32_t a1)
 //D2Game.0x6FC3A700
 void __fastcall GAME_GetPlayerDescription(char* szDescription, int32_t nClassId)
 {
-    // NOLINTBEGIN(clang-diagnostic-deprecated-declarations)
+    // 1.13c D2Game+0x72B0 (strcpy) is the copy retail's 0x6FC3A700 calls
+    const char* szName;
     switch (nClassId)
     {
-    case PCLASS_AMAZON:
-        strcpy(szDescription, "Amazon");
-        break;
-    case PCLASS_SORCERESS:
-        strcpy(szDescription, "Sorceress");
-        break;
-    case PCLASS_NECROMANCER:
-        strcpy(szDescription, "Necromancer");
-        break;
-    case PCLASS_PALADIN:
-        strcpy(szDescription, "Paladin");
-        break;
-    case PCLASS_BARBARIAN:
-        strcpy(szDescription, "Barbarian");
-        break;
-    case PCLASS_DRUID:
-        strcpy(szDescription, "Druid");
-        break;
-    case PCLASS_ASSASSIN:
-        strcpy(szDescription, "Assassin");
-        break;
-    default:
-        strcpy(szDescription, "Invalid Class");
-        break;
+    case PCLASS_AMAZON: szName = "Amazon"; break;
+    case PCLASS_SORCERESS: szName = "Sorceress"; break;
+    case PCLASS_NECROMANCER: szName = "Necromancer"; break;
+    case PCLASS_PALADIN: szName = "Paladin"; break;
+    case PCLASS_BARBARIAN: szName = "Barbarian"; break;
+    case PCLASS_DRUID: szName = "Druid"; break;
+    case PCLASS_ASSASSIN: szName = "Assassin"; break;
+    default: szName = "Invalid Class"; break;
     }
-    // NOLINTEND(clang-diagnostic-deprecated-declarations)
+    d2game_strcpy_72b0((uint8_t*)szDescription, (const uint8_t*)szName);
 }
 
 //D2Game.0x6FC3A7C0
@@ -2893,7 +2879,7 @@ void __fastcall GAME_GetObjectDescription(char* szDescription, int32_t nClassId)
     D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(nClassId);
     if (pObjectsTxtRecord)
     {
-        strcpy(szDescription, pObjectsTxtRecord->szName); // NOLINT(clang-diagnostic-deprecated-declarations)
+        d2game_strcpy_72b0((uint8_t*)szDescription, (const uint8_t*)pObjectsTxtRecord->szName);
     }
     else
     {
@@ -3073,7 +3059,7 @@ void __stdcall GAME_SendMessageToAllClients(int32_t a1, int32_t nPacketParam, co
                 else
                 {
                     char szCopy[256] = {};
-                    strncpy(szCopy, szMessage, 255); // NOLINT(clang-diagnostic-deprecated-declarations)
+                    D2GAME_CRT_strncpy_6FC22E50(szCopy, szMessage, 255);
                     szCopy[255] = '\0';
                     sub_6FC84CD0(pGame, szCopy, 1u);
                 }
@@ -3092,7 +3078,7 @@ void __stdcall GAME_SendMessageToGameClients(uint16_t nGameId, char* szMessage)
     D2_ASSERT(pGame);
 
 	szMessage[255] = 0;
-    if (!strncmp("<ABEND> ", szMessage, 8u))
+    if (!D2GAME_CRT_strncmp_6FC23520("<ABEND> ", szMessage, 8u))
     {
         pGame->unk0x1DDC = szMessage[8] & 0xF;
     }

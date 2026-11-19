@@ -947,6 +947,14 @@ D2SkillDescTxt* __fastcall DATATBLS_GetSkillDescTxtRecord(int nSkillDesc)
 	return NULL;
 }
 
+// 1.13c D2Common+0x18F0 (skill id in EAX): the skills row exists and its wSkillDesc indexes a valid skilldesc row.
+// Retail inlines this test where item stats are read (Items.cpp); the probe runs this same body.
+int __fastcall DATATBLS_SkillHasValidDesc(int nSkillId)
+{
+	const D2SkillsTxt* pRow = DATATBLS_GetSkillsTxtRecord(nSkillId);
+	return pRow && DATATBLS_GetSkillDescTxtRecord(pRow->wSkillDesc) ? 1 : 0;
+}
+
 // skills.txt dwParam getters. Retail guards the computed row address against zero, not the table pointer.
 static const D2SkillsTxt* DATATBLS_SkillParamRow(int nSkillId)
 {

@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "GAME/CrtRuntime.h"
+#include "GAME/Game113c.h"
 
 char D2GAME_CRT_cDecimalPoint = '.';        // DAT_6fd1f994 (locale decimal point)
 uint32_t D2GAME_CRT_dwStaticInitFlags = 0;  // DAT_6fd39fa4 (bit 0: the static initializer has run)
@@ -11,7 +12,7 @@ uint32_t D2GAME_CRT_dwStaticInitFlags = 0;  // DAT_6fd39fa4 (bit 0: the static i
 // 1.13c D2Game+0xF609C _forcdecpt: inserts the decimal point before the 'e' of a formatted float.
 void __cdecl CRT_ForceDecimalPoint_F609C(char* pszNumber)
 {
-    bool bAtExponent = tolower((unsigned char)*pszNumber) == 'e';
+    bool bAtExponent = D2GAME_CRT_tolower_6FC2391B((unsigned char)*pszNumber) == 'e';
     while (!bAtExponent)
     {
         ++pszNumber;

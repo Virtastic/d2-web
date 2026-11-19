@@ -36,6 +36,12 @@ int __cdecl D2GAME_CRT_output_6FC243E0(D2CrtFileStrc* pFile, const char* szForma
 int __cdecl D2GAME_CRT_flsbuf_6FC24239(int nChar, D2CrtFileStrc* pFile);
 // 1.13c D2Game+0x2AD0: the CRT _memmove (overlap-safe copy, returns the destination).
 void* __cdecl D2GAME_CRT_memmove_6FC22AD0(void* pDest, const void* pSrc, size_t nSize);
+// 1.13c D2Game+0x2E50 / +0x3520 / +0x391B: _strncpy, _strncmp, _tolower (startup C locale).
+char* __cdecl D2GAME_CRT_strncpy_6FC22E50(char* dest, const char* source, size_t count);
+int __cdecl D2GAME_CRT_strncmp_6FC23520(const char* s1, const char* s2, size_t maxCount);
+int32_t D2GAME_CRT_tolower_6FC2391B(int32_t c);
+// 1.13c D2Game+0x2250: unlink a 32-bit-layout hash record from its two link pairs (+4/+8, +0xC/+0x10).
+void sub_6FC22250(uint32_t* pEntry);
 // 1.13c D2Game+0x2E10: the CRT __strrev (in-place reverse, returns the string).
 char* __cdecl D2GAME_CRT_strrev_6FC22E10(char* szString);
 // 1.13c D2Game+0x2AC60: send the game init (0x01 flags packet, header-only 0) and set the client to GAME_INIT_SENT.

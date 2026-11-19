@@ -722,6 +722,8 @@ void __stdcall UNITS_CharacterStartRunningOrKnockback(D2UnitStrc* pUnit, int nCl
 }
 
 //D2Common.0x6FDBE510 (#10349)
+extern int64_t d2common_allmul(uint32_t lo1, int32_t hi1, uint32_t lo2, int32_t hi2);	// 1.13c D2Common+0x3750
+
 // 1.13c D2Common+0x335F0
 void __stdcall UNITS_SetAnimStartFrame(D2UnitStrc* pUnit)
 {
@@ -804,7 +806,21 @@ void __stdcall UNITS_SetAnimStartFrame(D2UnitStrc* pUnit)
 	{
 		if (D2MissilesTxt* pMissilesTxtRecord = DATATBLS_GetMissilesTxtRecord(nClassId))
 		{
-			pUnit->wAnimSpeed = ((int16_t)pMissilesTxtRecord->wAnimRate << 8) / 1024;
+			// 1.13c's three-way scale of the signed anim rate over 1024; a short never reaches the 64-bit branch, which
+			// retail still carries and which calls the CRT multiply (D2Common+0x3750).
+			const int32_t nRate = (int16_t)pMissilesTxtRecord->wAnimRate;
+			if (nRate < 0x10001)
+			{
+				pUnit->wAnimSpeed = (int16_t)((nRate * 0x100 + ((nRate * 0x100 >> 31) & 0x3FF)) >> 10);
+			}
+			else if ((nRate & ~0xF) < 0x4000)
+			{
+				pUnit->wAnimSpeed = (int16_t)(d2common_allmul((uint32_t)nRate, nRate >> 31, 0x100, 0) / 0x400);
+			}
+			else
+			{
+				pUnit->wAnimSpeed = (int16_t)(((nRate + ((nRate >> 31) & 0x3FF)) >> 10) << 8);
+			}
 			pUnit->dwFrameCountPrecise = pMissilesTxtRecord->nAnimLen << 8;
 		}
 		break;

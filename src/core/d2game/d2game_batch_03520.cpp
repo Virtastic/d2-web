@@ -63,36 +63,7 @@ struct D2GameBatchSeams {
     void  (*terminateProcess)(uint32_t code);           // GetCurrentProcess/TerminateProcess
 };
 
-// ---- CRT string routines -------------------------------------------------------------------------
-// 1.13c D2Game+0x3520
-int d2game_strncmp(const char* s1, const char* s2, size_t maxCount)
-{
-    if (maxCount == 0) return 0;
-    // Retail first counts s1's bytes through its terminator (capped at maxCount), then compares.
-    size_t limit = 0;
-    while (limit < maxCount && s1[limit] != '\0') ++limit;
-    if (limit < maxCount) ++limit;                       // include the compared terminator
-    for (size_t i = 0; i < limit; ++i) {
-        const unsigned char a = (unsigned char)s1[i], b = (unsigned char)s2[i];
-        if (a != b) return b <= a ? 1 : -1;              // retail: ~0xFFFFFFFE = 1, ~0 = -1
-    }
-    return 0;
-}
-
-// 1.13c D2Game+0x2E50
-char* d2game_strncpy(char* dest, const char* source, size_t count)
-{
-    if (count == 0) return dest;
-    char* d = dest;
-    for (;;) {
-        const char c = *source++;
-        *d++ = c;
-        if (--count == 0) return dest;
-        if (c == '\0') break;
-    }
-    while (count-- > 0) *d++ = '\0';                      // zero-fill the remainder
-    return dest;
-}
+// The CRT string routines 0x3520 (_strncmp) and 0x2E50 (_strncpy) live in src/core/game/D2Game/GAME/CrtStrings.cpp.
 
 // ---- GAME.cpp object release (caller 0x2CE20 closeGame) -----------------------------------------
 // EAX = object whose first dword is its vtable; the return-address slot doubles as the "unlock" flag.

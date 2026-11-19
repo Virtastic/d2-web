@@ -69,37 +69,7 @@ int D2Game_CrtFclose(FILE* stream)
     return std::fclose(stream);
 }
 
-// ---- UNIT hash entry unlink ----------------------------------------------------------------------
-// A link word is either a direct pointer (high bit clear) or a complement of one (high bit set); a
-// direct link is an offset from the pair address plus the head's +0x04 base -- the same encoding the
-// 1.10f D2HashTableStrc/D2HashItemStrc pair uses. The unlink writes the head into the resolved slot,
-// writes the link into head+0x04, and clears both words of the pair.
-static void d2game_unlink_pair(void* entry, uint32_t pairOff)
-{
-    const int32_t head = (int32_t)(intptr_t)rdptr(entry, pairOff);
-    if (head == 0) return;
-    const uint32_t link = rd32(entry, pairOff + 4);
-    uint8_t* slot;
-    if ((int32_t)link < 0) {
-        slot = (uint8_t*)(uintptr_t)(uint32_t)~link;
-    } else {
-        slot = (uint8_t*)entry + pairOff + (link - rd32((const void*)(intptr_t)head, 4));
-    }
-    *(uint32_t*)(void*)slot = (uint32_t)head;
-    wr32((void*)(intptr_t)head, 4, link);
-    wr32(entry, pairOff, 0);
-    wr32(entry, pairOff + 4, 0);
-}
-
-// 1.13c D2Game+0x2250
-// Take EAX's record (explicit here) out of two intrusive chains: the pair at +0x04/+0x08, then the pair
-// at +0x0C/+0x10. The second pair is examined only when the first pair's second word is nonzero.
-void D2Game_UnlinkHashEntry(void* entry)
-{
-    if (rd32(entry, 8) == 0) return;
-    d2game_unlink_pair(entry, 4);
-    d2game_unlink_pair(entry, 0x0C);
-}
+// The UNIT hash entry unlink (0x2250) lives in src/core/game/D2Game/GAME/Sub2250.cpp.
 
 // ---- game unit-list sweeps -----------------------------------------------------------------------
 // Host seams for the callees whose implementations live outside this batch (address = retail RVA).
