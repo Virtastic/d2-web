@@ -41,7 +41,7 @@ void __fastcall DRLGANIM_InitCache(D2DrlgStrc* pDrlg, D2DrlgTileDataStrc* pTileD
 		}
 	}
 
-	const int nSize = D2CMP_10088_GetTiles(pDrlg->pTiles, 0, nStyle, nSequence, ppTileLibraryEntry, ARRAY_SIZE(ppTileLibraryEntry));
+	const int nSize = D2_CALL(D2CMP_10088_GetTiles, pDrlg->pTiles, 0, nStyle, nSequence, ppTileLibraryEntry, ARRAY_SIZE(ppTileLibraryEntry));
 	D2_ASSERT(nSize);
 	pTileData->pTile = ppTileLibraryEntry[0];
 	pTileData->nTileType = 0;
@@ -50,7 +50,7 @@ void __fastcall DRLGANIM_InitCache(D2DrlgStrc* pDrlg, D2DrlgTileDataStrc* pTileD
 	pTileData->nBlue = 0xFF;
 	pTileData->nRed = 0xFF;
 	pTileData->dwFlags = 0x4000;
-	const uint16_t nFlags = D2CMP_10079_GetTileFlags(ppTileLibraryEntry[0]);
+	const uint16_t nFlags = D2_CALL(D2CMP_10079_GetTileFlags, ppTileLibraryEntry[0]);
 	if (nFlags & 1)
 	{
 		pTileData->dwFlags |= 4;
@@ -83,8 +83,8 @@ void __fastcall DRLGANIM_TestLoadAnimatedRoomTiles(D2DrlgRoomStrc* pDrlgRoom, D2
 				const uint8_t nStyle = nTileInfo.nTileStyle;
 				const uint8_t nSequence = nTileInfo.nTileSequence;
 
-				const int nTilesCount = D2CMP_10088_GetTiles(pDrlgRoom->pTiles, nTileType, nStyle, nSequence, ppTileLibraryEntry, ARRAY_SIZE(ppTileLibraryEntry));
-				if (nTilesCount && D2CMP_10079_GetTileFlags(ppTileLibraryEntry[0]) & TILE_FLAGS_LAVA)
+				const int nTilesCount = D2_CALL(D2CMP_10088_GetTiles, pDrlgRoom->pTiles, nTileType, nStyle, nSequence, ppTileLibraryEntry, ARRAY_SIZE(ppTileLibraryEntry));
+				if (nTilesCount && D2_CALL(D2CMP_10079_GetTileFlags, ppTileLibraryEntry[0]) & TILE_FLAGS_LAVA)
 				{
 					if (nTileInfo.bIsFloor)
 					{
@@ -165,7 +165,7 @@ D2TileLibraryEntryStrc* DRLGANIM_FindAnimatedTileFrame(D2TileLibraryEntryStrc** 
 {
 	for (int nEntryIndex = 0; nEntryIndex < nbTileEntries; nEntryIndex++)
 	{
-		if (D2CMP_10081_GetTileRarity(pTileLibraryEntries[nEntryIndex]) == nRarity)
+		if (D2_CALL(D2CMP_10081_GetTileRarity, pTileLibraryEntries[nEntryIndex]) == nRarity)
 		{
 			return pTileLibraryEntries[nEntryIndex];
 		}
@@ -195,7 +195,7 @@ void __fastcall DRLGANIM_AllocAnimationTileGrid(D2DrlgRoomStrc* pDrlgRoom, int n
 	for (int i = 0; i < nTiles; ++i)
 	{
 		D2DrlgTileDataStrc& pCurrentTileData = pTiles[i];
-		if (pCurrentTileData.pTile && D2CMP_10079_GetTileFlags(pCurrentTileData.pTile) & TILE_FLAGS_LAVA)
+		if (pCurrentTileData.pTile && D2_CALL(D2CMP_10079_GetTileFlags, pCurrentTileData.pTile) & TILE_FLAGS_LAVA)
 		{
 
 			const int32_t nGridIdx = GetMapTileLayer(pCurrentTileData.dwFlags);
@@ -205,7 +205,7 @@ void __fastcall DRLGANIM_AllocAnimationTileGrid(D2DrlgRoomStrc* pDrlgRoom, int n
 			const uint8_t nStyle = nPackedTileInformation.nTileStyle;
 			const uint8_t nSeq = nPackedTileInformation.nTileSequence;
 
-			int nFrames = D2CMP_10088_GetTiles(pDrlgRoom->pTiles, pCurrentTileData.nTileType, nStyle, nSeq, pTileLibraryEntries, ARRAY_SIZE(pTileLibraryEntries));
+			int nFrames = D2_CALL(D2CMP_10088_GetTiles, pDrlgRoom->pTiles, pCurrentTileData.nTileType, nStyle, nSeq, pTileLibraryEntries, ARRAY_SIZE(pTileLibraryEntries));
 
 			D2DrlgAnimTileGridStrc* pDrlgAnimTileGrid = D2_CALLOC_STRC_POOL(pDrlgRoom->pLevel->pDrlg->pMempool, D2DrlgAnimTileGridStrc);
 
@@ -230,15 +230,15 @@ void __fastcall DRLGANIM_AllocAnimationTileGrid(D2DrlgRoomStrc* pDrlgRoom, int n
 
 				if (pCurrentTileData.nTileType == TILETYPE_FLOOR)
 				{
-					pDrlgAnimTileGrid->ppMapTileData[nRarity] = DRLGROOMTILE_InitFloorTileData(pDrlgRoom, nullptr, nX, nY, nPackedTileInformation.nPackedValue, pTileEntry);
+					pDrlgAnimTileGrid->ppMapTileData[nRarity] = D2_CALL(DRLGROOMTILE_InitFloorTileData, pDrlgRoom, nullptr, nX, nY, nPackedTileInformation.nPackedValue, pTileEntry);
 				}
 				else if (pCurrentTileData.nTileType == TILETYPE_SHADOW)
 				{
-					pDrlgAnimTileGrid->ppMapTileData[nRarity] = DRLGROOMTILE_InitShadowTileData(pDrlgRoom, nullptr, nX, nY, nPackedTileInformation.nPackedValue, pTileEntry);
+					pDrlgAnimTileGrid->ppMapTileData[nRarity] = D2_CALL(DRLGROOMTILE_InitShadowTileData, pDrlgRoom, nullptr, nX, nY, nPackedTileInformation.nPackedValue, pTileEntry);
 				}
 				else
 				{
-					pDrlgAnimTileGrid->ppMapTileData[nRarity] = DRLGROOMTILE_InitWallTileData(pDrlgRoom, nullptr, nX, nY, nPackedTileInformation.nPackedValue, pTileEntry, pCurrentTileData.nTileType);
+					pDrlgAnimTileGrid->ppMapTileData[nRarity] = D2_CALL(DRLGROOMTILE_InitWallTileData, pDrlgRoom, nullptr, nX, nY, nPackedTileInformation.nPackedValue, pTileEntry, pCurrentTileData.nTileType);
 				}
 				// We start by displaying the first frame, hide all other frames tiles.
 				pDrlgAnimTileGrid->ppMapTileData[nRarity]->dwFlags |= MAPTILE_HIDDEN;

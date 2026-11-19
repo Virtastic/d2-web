@@ -1,6 +1,7 @@
 #include "Drlg/D2DrlgOutPlace.h"
 
 #include "D2DataTbls.h"
+#include <test_seam.h>
 #include "Drlg/D2DrlgDrlg.h"
 #include "Drlg/D2DrlgDrlgAnim.h"
 #include "Drlg/D2DrlgDrlgGrid.h"
@@ -781,7 +782,7 @@ void __fastcall DRLGOUTPLACE_PlaceAct1245OutdoorBorders(D2DrlgLevelStrc* pLevel)
 			{
 				nCurrentX += nCurrentDiffX;
 				nCurrentY += nCurrentDiffY;
-				DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, nCurrentX, nCurrentY, nLevelPrestId, -1, 0);
+				D2_CALL(DRLGOUTDOORS_SpawnOutdoorLevelPresetEx, pLevel, nCurrentX, nCurrentY, nLevelPrestId, -1, 0);
 				DRLGGRID_AlterGridFlag(&pLevel->pOutdoors->pGrid[2], nCurrentX, nCurrentY, tLvlPrestPackedInfo.nPackedValue, FLAG_OPERATION_OR);
 			}
 		}
@@ -871,8 +872,8 @@ void __fastcall DRLGOUTPLACE_PlaceAct1245OutdoorBorders(D2DrlgLevelStrc* pLevel)
 				nY += nCurrentDiffYAbs * nDiff / 2;
 
 				nIndex = nCurrentDiffX + 2 * nCurrentDiffY + 2;
-				DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, nX, nY, DRLGOUTPLACE_BorderRdata5590(0x55B8, nIndex * 2), -1, 0);
-				DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, nX + nCurrentDiffXAbs, nY + nCurrentDiffYAbs, DRLGOUTPLACE_BorderRdata5590(0x55BC, nIndex * 2), -1, 0);
+				D2_CALL(DRLGOUTDOORS_SpawnOutdoorLevelPresetEx, pLevel, nX, nY, DRLGOUTPLACE_BorderRdata5590(0x55B8, nIndex * 2), -1, 0);
+				D2_CALL(DRLGOUTDOORS_SpawnOutdoorLevelPresetEx, pLevel, nX + nCurrentDiffXAbs, nY + nCurrentDiffYAbs, DRLGOUTPLACE_BorderRdata5590(0x55BC, nIndex * 2), -1, 0);
 				break;
 
 			default:
@@ -929,12 +930,12 @@ void __fastcall DRLGOUTPLACE_PlaceAct1245OutdoorBorders(D2DrlgLevelStrc* pLevel)
 				nLevelPrestId = LVLPREST_ACT1_WILD_CLIFF_BORDER_6C;
 			}
 
-			DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, nNextX, nNextY, nLevelPrestId, -1, 0);
+			D2_CALL(DRLGOUTDOORS_SpawnOutdoorLevelPresetEx, pLevel, nNextX, nNextY, nLevelPrestId, -1, 0);
 			DRLGGRID_AlterGridFlag(&pLevel->pOutdoors->pGrid[2], nNextX, nNextY, tLvlPrestPackedInfo.nPackedValue, FLAG_OPERATION_OR);
 		}
 		else if (nLevelPrestId != LVLPREST_NONE)
 		{
-			DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(pLevel, nNextX, nNextY, nLevelPrestId, -1, 0);
+			D2_CALL(DRLGOUTDOORS_SpawnOutdoorLevelPresetEx, pLevel, nNextX, nNextY, nLevelPrestId, -1, 0);
 			DRLGGRID_AlterGridFlag(&pLevel->pOutdoors->pGrid[2], nNextX, nNextY, tLvlPrestPackedInfo.nPackedValue, FLAG_OPERATION_OR);
 		}
 
