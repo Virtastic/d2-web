@@ -310,3 +310,9 @@ int32_t __fastcall MISSMODE_SrvDmgHitHandler(D2GameStrc* pGame, D2UnitStrc* pMis
 void __fastcall MISSMODE_ToggleStateOff(D2UnitStrc* pUnit, int32_t nState, struct D2StatListStrc* pStatList);
 //D2Game.0x6FC60090
 void __fastcall MISSMODE_SrvDoHandler(D2GameStrc* pGame, D2UnitStrc* pMissile, D2C_EventTypes nEventType);
+
+// 1.13c D2Game+0x3AA20, 0x397C0, 0x3B070, 0x3E590: named here so their probes can reach them through D2Seam.
+int32_t MISSMODE_CanCollideWithUnit(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit, struct D2MissilesTxt* pMissilesTxtRecord, D2UnitStrc* pOwner);
+void __fastcall MISSMODE_ResetGuidedFlight(D2UnitStrc* pMissile, D2UnitStrc* pTarget);
+int32_t __fastcall MISSMODE_RetargetGuidedMissile(D2GameStrc* pGame, D2UnitStrc* pMissile);
+void MISSMODE_SetJustHitState(D2UnitStrc* pMissile, D2UnitStrc* pUnit);

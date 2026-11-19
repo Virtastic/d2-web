@@ -1,4 +1,5 @@
 #include "SKILLS/SkillDruid.h"
+#include <test_seam.h>
 
 #include <D2BitManip.h>
 #include <test_seam.h>
@@ -155,14 +156,14 @@ int32_t __fastcall SKILLS_SrvDo115_Vines(D2GameStrc* pGame, D2UnitStrc* pUnit, i
 //D2Game.0x6FCFE030
 void __fastcall sub_6FCFE030(D2UnitStrc* pUnit, int32_t nStateId, D2StatListStrc* pStatList)
 {
-    sub_6FD11C90(pUnit, nStateId, 1);
+    D2_CALL(sub_6FD11C90, pUnit, nStateId, 1);
 
     if (!pStatList)
     {
         return;
     }
 
-    D2SkillStrc* pSkill = SKILLS_GetHighestLevelSkillFromUnitAndId(pUnit, STATLIST_GetStatValue(pStatList, STAT_MODIFIERLIST_SKILL, 0));
+    D2SkillStrc* pSkill = D2_CALL(SKILLS_GetHighestLevelSkillFromUnitAndId, pUnit, D2_CALL(STATLIST_GetStatValue, pStatList, STAT_MODIFIERLIST_SKILL, 0));
     if (!pSkill)
     {
         return;
@@ -176,16 +177,16 @@ void __fastcall sub_6FCFE030(D2UnitStrc* pUnit, int32_t nStateId, D2StatListStrc
         nUnitType = pUnit->dwUnitType;
         if (pUnit->dwUnitType == UNIT_PLAYER)
         {
-            SKILLS_SetSkillMode(pSkill, PLRMODE_CAST);
-            STATES_ToggleState(pUnit, nStateId, 0);
+            D2_CALL(SKILLS_SetSkillMode, pSkill, PLRMODE_CAST);
+            D2_CALL(STATES_ToggleState, pUnit, nStateId, 0);
             return;
         }
         nClassId = pUnit->dwClassId;
     }
 
-    D2COMMON_11013_ConvertMode(pUnit, &nUnitType, &nClassId, &nMode, __FILE__, __LINE__);
-    SKILLS_SetSkillMode(pSkill, nMode);
-    STATES_ToggleState(pUnit, nStateId, 0);
+    D2_CALL(D2COMMON_11013_ConvertMode, pUnit, &nUnitType, &nClassId, &nMode, __FILE__, __LINE__);
+    D2_CALL(SKILLS_SetSkillMode, pSkill, nMode);
+    D2_CALL(STATES_ToggleState, pUnit, nStateId, 0);
 }
 
 //D2Game.0x6FCFE0E0

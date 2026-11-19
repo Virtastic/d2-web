@@ -3,6 +3,8 @@
 
 #include <test_seam.h>
 
+#include <test_seam.h>
+
 #include <algorithm>
 
 #include <D2BitManip.h>
@@ -89,7 +91,7 @@ static_assert(ARRAY_SIZE(stru_6FD2E5F8) == MISSMODE_COUNT, "Missile functions ta
 // 1.13c D2Game+0x3AA20: the collide test the three unit-find callbacks share (esi=pUnit, ebx=txt, edi=pOwner,
 // stack pGame, pMissile). Valid target, attackable, not just-hit when the row has NextHit, not the owner,
 // then collide when there is no owner, the owner may hit the unit, or the row collides with friends.
-static int32_t MISSMODE_CanCollideWithUnit(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit, D2MissilesTxt* pMissilesTxtRecord, D2UnitStrc* pOwner)
+int32_t MISSMODE_CanCollideWithUnit(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit, D2MissilesTxt* pMissilesTxtRecord, D2UnitStrc* pOwner)
 {
     if (!pUnit || !(pUnit->dwFlags & UNITFLAG_ISVALIDTARGET) || !(pUnit->dwFlags & UNITFLAG_CANBEATTACKED))
     {
@@ -121,7 +123,7 @@ int32_t __fastcall MISSMODE_UnitFindCallback_CanCollideWithMonster(D2UnitStrc* p
     D2MissileUnitFindArgStrc* pArg = (D2MissileUnitFindArgStrc*)pArgument;
     if (pArg && pArg->pMissilesTxtRecord && pUnit && pUnit->dwUnitType == UNIT_MONSTER)
     {
-        return MISSMODE_CanCollideWithUnit(pArg->pGame, pArg->pMissile, pUnit, pArg->pMissilesTxtRecord, pArg->pOwner) != 0;
+        return D2_CALL(MISSMODE_CanCollideWithUnit, pArg->pGame, pArg->pMissile, pUnit, pArg->pMissilesTxtRecord, pArg->pOwner) != 0;
     }
 
     return 0;
@@ -137,7 +139,7 @@ int32_t __fastcall MISSMODE_UnitFindCallback_CanCollideWithGoodAlignmentUnit(D2U
         const int32_t nUnitType = pUnit ? pUnit->dwUnitType : 6;
         if (nUnitType == UNIT_PLAYER || (nUnitType == UNIT_MONSTER && STATLIST_GetUnitAlignment(pUnit) == UNIT_ALIGNMENT_GOOD))
         {
-            return MISSMODE_CanCollideWithUnit(pArg->pGame, pArg->pMissile, pUnit, pArg->pMissilesTxtRecord, pArg->pOwner) != 0;
+            return D2_CALL(MISSMODE_CanCollideWithUnit, pArg->pGame, pArg->pMissile, pUnit, pArg->pMissilesTxtRecord, pArg->pOwner) != 0;
         }
     }
 
@@ -151,7 +153,7 @@ int32_t __fastcall MISSMODE_UnitFindCallback_CanCollideWithPlayerOrMonster(D2Uni
     D2MissileUnitFindArgStrc* pArg = (D2MissileUnitFindArgStrc*)pArgument;
     if (pArg && pArg->pMissilesTxtRecord && pUnit && (int32_t)pUnit->dwUnitType >= 0 && (int32_t)pUnit->dwUnitType < 2)
     {
-        return MISSMODE_CanCollideWithUnit(pArg->pGame, pArg->pMissile, pUnit, pArg->pMissilesTxtRecord, pArg->pOwner) != 0;
+        return D2_CALL(MISSMODE_CanCollideWithUnit, pArg->pGame, pArg->pMissile, pUnit, pArg->pMissilesTxtRecord, pArg->pOwner) != 0;
     }
 
     return 0;
@@ -2574,16 +2576,16 @@ void __fastcall MISSMODE_ResetGuidedFlight(D2UnitStrc* pMissile, D2UnitStrc* pTa
 
 // Retarget a guided missile whose flight ran out: pick a new target around it and restart the flight.
 // 1.13c D2Game+0x3B070
-static int32_t __fastcall MISSMODE_RetargetGuidedMissile(D2GameStrc* pGame, D2UnitStrc* pMissile)
+int32_t __fastcall MISSMODE_RetargetGuidedMissile(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
-    D2MissilesTxt* pMissilesTxtRecord = pMissile ? SKILLS_GetMissilesTxtRecord(pMissile->dwClassId) : nullptr;
+    D2MissilesTxt* pMissilesTxtRecord = pMissile ? D2_CALL(SKILLS_GetMissilesTxtRecord, pMissile->dwClassId) : nullptr;
     if (!pMissilesTxtRecord)
     {
         return 1;
     }
 
     const int32_t nRange = pMissilesTxtRecord->dwParam[1];
-    if (MISSILE_GetTargetX(pMissile) & 4)
+    if (D2_CALL(MISSILE_GetTargetX, pMissile) & 4)
     {
         return 1;
     }
@@ -2594,10 +2596,10 @@ static int32_t __fastcall MISSMODE_RetargetGuidedMissile(D2GameStrc* pGame, D2Un
         return 1;
     }
 
-    const int32_t nY = CLIENTS_GetUnitY(pMissile);
-    const int32_t nX = CLIENTS_GetUnitX(pMissile);
-    D2UnitStrc* pTarget = sub_6FD107F0(pGame, pOwner, nX, nY, nRange, 3, -1, nullptr);
-    MISSMODE_ResetGuidedFlight(pMissile, pTarget);
+    const int32_t nY = D2_CALL(CLIENTS_GetUnitY, pMissile);
+    const int32_t nX = D2_CALL(CLIENTS_GetUnitX, pMissile);
+    D2UnitStrc* pTarget = D2_CALL(sub_6FD107F0, pGame, pOwner, nX, nY, nRange, 3, -1, nullptr);
+    D2_CALL(MISSMODE_ResetGuidedFlight, pMissile, pTarget);
     return 0;
 }
 
@@ -4681,8 +4683,8 @@ void __fastcall MISSMODE_SrvDmg07_Warcry_ShockWave(D2GameStrc* pGame, D2UnitStrc
         return;
     }
 
-    const int32_t nSkillId = MISSILE_GetSkill(pMissile);
-    const int32_t nLevel = MISSILE_GetLevel(pMissile);
+    const int32_t nSkillId = D2_CALL(MISSILE_GetSkill, pMissile);
+    const int32_t nLevel = D2_CALL(MISSILE_GetLevel, pMissile);
     if (pMissilesTxtRecord->dwDmgParam[0] > 0)
     {
         pDamage->dwStunLen = pMissilesTxtRecord->dwDmgParam[0];
@@ -5086,23 +5088,23 @@ int32_t __fastcall MISSMODE_SrvDo01_BasicMissile(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 // 1.13c D2Game+0x3E590: the just-hit delay state the hit handler puts on its target (1.10f inlined it twice)
-static void MISSMODE_SetJustHitState(D2UnitStrc* pMissile, D2UnitStrc* pUnit)
+void MISSMODE_SetJustHitState(D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
-    D2MissilesTxt* pMissilesTxtRecord = SKILLS_GetMissilesTxtRecord(pMissile->dwClassId);
+    D2MissilesTxt* pMissilesTxtRecord = D2_CALL(SKILLS_GetMissilesTxtRecord, pMissile->dwClassId);
     if (!pMissilesTxtRecord->nNextHit || !pUnit)
     {
         return;
     }
 
     const int32_t nDelay = pMissile->pGame->dwGameFrame + pMissilesTxtRecord->nNextDelay;
-    D2StatListStrc* pStatList = STATLIST_AllocStatList(pMissile->pGame->pMemoryPool, 2u, nDelay, pUnit->dwUnitType, pUnit->dwUnitId);
+    D2StatListStrc* pStatList = D2_CALL(STATLIST_AllocStatList, pMissile->pGame->pMemoryPool, 2u, nDelay, pUnit->dwUnitType, pUnit->dwUnitId);
     if (pStatList)
     {
-        EVENT_SetEvent(pMissile->pGame, pUnit, EVENTTYPE_REMOVESTATE, nDelay, 0, 0);
-        STATLIST_SetState(pStatList, STATE_JUSTHIT);
-        STATLIST_SetStatRemoveCallback(pStatList, MISSMODE_ToggleStateOff);
-        D2COMMON_10475_PostStatToStatList(pUnit, pStatList, 1);
-        STATES_ToggleState(pUnit, STATE_JUSTHIT, 1);
+        D2_CALL(EVENT_SetEvent, pMissile->pGame, pUnit, EVENTTYPE_REMOVESTATE, nDelay, 0, 0);
+        D2_CALL(STATLIST_SetState, pStatList, STATE_JUSTHIT);
+        D2_CALL(STATLIST_SetStatRemoveCallback, pStatList, MISSMODE_ToggleStateOff);
+        D2_CALL(D2COMMON_10475_PostStatToStatList, pUnit, pStatList, 1);
+        D2_CALL(STATES_ToggleState, pUnit, STATE_JUSTHIT, 1);
     }
 }
 
