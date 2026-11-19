@@ -4280,7 +4280,7 @@ void __fastcall sub_6FD15650(D2GameStrc* pGame, D2UnitStrc* pOwner, D2UnitStrc* 
     }
     else
     {
-        pDamage->wResultFlags = SUNITDMG_GetResultFlags(pGame, pOwner, pUnit, a5, a7);
+        pDamage->wResultFlags = D2_CALL(SUNITDMG_GetResultFlags, pGame, pOwner, pUnit, a5, a7);
         if (pDamage->wResultFlags & DAMAGERESULTFLAG_SUCCESSFULHIT)
         {
             pDamage->wResultFlags |= wResultFlags;

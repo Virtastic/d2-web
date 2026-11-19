@@ -444,8 +444,8 @@ D2UnitStrc* __fastcall sub_6FCF1CB0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2Unit
 D2UnitStrc* __fastcall sub_6FCF1DC0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, void* pCallbackArg)
 {
 	D2FallenShamanAiCallbackArgStrc* pArg = (D2FallenShamanAiCallbackArgStrc*)pCallbackArg;
-	const int32_t nDistance = AIUTIL_GetDistanceToCoordinates_FullUnitSize(pUnit, pTarget);
-	if (nDistance <= pArg->nMaxDistance && pTarget && pTarget->dwUnitType == UNIT_MONSTER && pTarget->dwAnimMode == MONMODE_DEAD && pTarget->dwFlags & UNITFLAG_TARGETABLE && !STATES_CheckStateMaskUdeadOnUnit(pTarget) && AIGENERAL_GetMinionOwner(pTarget) == pUnit)
+	const int32_t nDistance = D2_CALL(AIUTIL_GetDistanceToCoordinates_FullUnitSize, pUnit, pTarget);
+	if (nDistance <= pArg->nMaxDistance && pTarget && pTarget->dwUnitType == UNIT_MONSTER && pTarget->dwAnimMode == MONMODE_DEAD && pTarget->dwFlags & UNITFLAG_TARGETABLE && !D2_CALL(STATES_CheckStateMaskUdeadOnUnit, pTarget) && D2_CALL(AIGENERAL_GetMinionOwner, pTarget) == pUnit)
 	{
 		++pArg->nCounter;
 		pArg->pTarget = pTarget;

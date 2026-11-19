@@ -8252,18 +8252,18 @@ void __fastcall AITHINK_Fn121_MinionSpawner(D2GameStrc* pGame, D2UnitStrc* pUnit
 		if (pAiTickParam->nTargetDistance <= AI_GetParamValue(pGame, pAiTickParam, MINIONSPAWNER_AI_PARAM_ACTIVATION_RANGE) && pGame->dwGameFrame >= pAiTickParam->pAiControl->dwAiParam[0])
 		{
 			arg.nMinions = 0;
-			sub_6FCF1E80(pGame, pUnit, &arg, AITHINK_TargetCallback_MinionSpawner, 1);
+			D2_CALL(sub_6FCF1E80, pGame, pUnit, &arg, AITHINK_TargetCallback_MinionSpawner, 1);
 
 			if (pAiTickParam->pMonstatsTxt->nSkill[0] >= 0 && arg.nMinions < AI_GetParamValue(pGame, pAiTickParam, MINIONSPAWNER_AI_PARAM_STALL_DURATION))
 			{
 				pAiTickParam->pAiControl->dwAiParam[0] = pGame->dwGameFrame + AI_GetParamValue(pGame, pAiTickParam, MINIONSPAWNER_AI_PARAM_SPAWN_DELAY);
 				++pAiTickParam->pAiControl->dwAiParam[1];
-				AITACTICS_UseSkill(pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[0], pAiTickParam->pMonstatsTxt->nSkill[0], pAiTickParam->pTarget, 0, 0);
+				D2_CALL(AITACTICS_UseSkill, pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[0], pAiTickParam->pMonstatsTxt->nSkill[0], pAiTickParam->pTarget, 0, 0);
 				return;
 			}
 		}
 
-		AITACTICS_IdleInNeutralMode(pGame, pUnit, AI_GetParamValue(pGame, pAiTickParam, MINIONSPAWNER_AI_PARAM_STALL_DURATION));
+		D2_CALL(AITACTICS_IdleInNeutralMode, pGame, pUnit, AI_GetParamValue(pGame, pAiTickParam, MINIONSPAWNER_AI_PARAM_STALL_DURATION));
 	}
 }
 
@@ -8307,7 +8307,7 @@ void __fastcall D2GAME_AI_SpecialState16_6FCE1D30(D2GameStrc* pGame, D2UnitStrc*
 	{
 		nIndex = (nIndex + 1) % 2;
 
-		if (SKILLS_GetSkillById(pUnit, pAiTickParam->pMonstatsTxt->nSkill[gnSkillSlots[nIndex][0]], -1))
+		if (D2_CALL(SKILLS_GetSkillById, pUnit, pAiTickParam->pMonstatsTxt->nSkill[gnSkillSlots[nIndex][0]], -1))
 		{
 			pAiTickParam->pAiControl->dwAiParam[1] = gnSkillSlots[nIndex][0];
 			pAiTickParam->pAiControl->dwAiParam[2] = gnSkillSlots[nIndex][1];
@@ -9857,13 +9857,13 @@ void __fastcall sub_6FCE4830(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMons
 // 1.13c D2Game+0x159B0
 void __fastcall D2GAME_AI_SpecialState03_6FCE4B90(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
-	D2UnitStrc* pOwner = AIGENERAL_GetMinionOwner(pUnit);
+	D2UnitStrc* pOwner = D2_CALL(AIGENERAL_GetMinionOwner, pUnit);
 	D2_ASSERT(pOwner);
 
-	const int32_t nOwnerX = CLIENTS_GetUnitX(pOwner);
-	const int32_t nOwnerY = CLIENTS_GetUnitY(pOwner);
-	pAiTickParam->pAiControl->dwAiParam[0] = CLIENTS_GetUnitX(pUnit) - nOwnerX;
-	pAiTickParam->pAiControl->dwAiParam[1] = CLIENTS_GetUnitY(pUnit) - nOwnerY;
+	const int32_t nOwnerX = D2_CALL(CLIENTS_GetUnitX, pOwner);
+	const int32_t nOwnerY = D2_CALL(CLIENTS_GetUnitY, pOwner);
+	pAiTickParam->pAiControl->dwAiParam[0] = D2_CALL(CLIENTS_GetUnitX, pUnit) - nOwnerX;
+	pAiTickParam->pAiControl->dwAiParam[1] = D2_CALL(CLIENTS_GetUnitY, pUnit) - nOwnerY;
 
 	if (pOwner == pUnit)
 	{
