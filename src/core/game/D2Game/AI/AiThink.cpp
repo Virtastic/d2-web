@@ -3976,41 +3976,41 @@ enum D2C_DurielAIParams
 // 1.13c D2Game+0x89430
 void __fastcall AITHINK_Fn044_Duriel(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
-	if (pAiTickParam->pMonstatsTxt->nSkill[3] >= 0 && !UNITS_GetRightSkill(pUnit))
+	if (pAiTickParam->pMonstatsTxt->nSkill[3] >= 0 && !D2_CALL(UNITS_GetRightSkill, pUnit))
 	{
-		D2GAME_SetSkills_6FD14C60(pUnit, pAiTickParam->pMonstatsTxt->nSkill[3], AI_GetParamValue(pGame, pAiTickParam, DURIEL_AI_PARAM_HOLY_FREEZE_LEVEL), 1);
-		D2GAME_AssignSkill_6FD13800(pUnit, 0, pAiTickParam->pMonstatsTxt->nSkill[3], -1);
+		D2_CALL(D2GAME_SetSkills_6FD14C60, pUnit, pAiTickParam->pMonstatsTxt->nSkill[3], AI_GetParamValue(pGame, pAiTickParam, DURIEL_AI_PARAM_HOLY_FREEZE_LEVEL), 1);
+		D2_CALL(D2GAME_AssignSkill_6FD13800, pUnit, 0, pAiTickParam->pMonstatsTxt->nSkill[3], -1);
 	}
 
 	if (pAiTickParam->bCombat)
 	{
 		if (pAiTickParam->pMonstatsTxt->nSkill[2] >= 0 && AI_RollPctBelowParam(pGame, pUnit, pAiTickParam, DURIEL_AI_PARAM_SMITE_CHANCE_PCT))
 		{
-			AITACTICS_UseSkill(pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[2], pAiTickParam->pMonstatsTxt->nSkill[2], pAiTickParam->pTarget, 0, 0);
+			D2_CALL(AITACTICS_UseSkill, pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[2], pAiTickParam->pMonstatsTxt->nSkill[2], pAiTickParam->pTarget, 0, 0);
 		}
 		else if (pAiTickParam->pMonstatsTxt->nSkill[1] >= 0 && AI_RollPctBelowParam(pGame, pUnit, pAiTickParam, DURIEL_AI_PARAM_JAB_CHANCE_PCT))
 		{
-			AITACTICS_UseSkill(pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[1], pAiTickParam->pMonstatsTxt->nSkill[1], pAiTickParam->pTarget, 0, 0);
+			D2_CALL(AITACTICS_UseSkill, pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[1], pAiTickParam->pMonstatsTxt->nSkill[1], pAiTickParam->pTarget, 0, 0);
 		}
 		else if (AI_RollPctBelowParam(pGame, pUnit, pAiTickParam, DURIEL_AI_PARAM_ATTACK2_CHANCE_PCT))
 		{
-			AITACTICS_ChangeModeAndTargetUnit(pGame, pUnit, MONMODE_ATTACK2, pAiTickParam->pTarget);
+			D2_CALL(AITACTICS_ChangeModeAndTargetUnit, pGame, pUnit, MONMODE_ATTACK2, pAiTickParam->pTarget);
 		}
 		else
 		{
-			AITACTICS_ChangeModeAndTargetUnit(pGame, pUnit, MONMODE_ATTACK1, pAiTickParam->pTarget);
+			D2_CALL(AITACTICS_ChangeModeAndTargetUnit, pGame, pUnit, MONMODE_ATTACK1, pAiTickParam->pTarget);
 		}
 		return;
 	}
 
 	if (pAiTickParam->pMonstatsTxt->nSkill[0] >= 0 && AI_RollPctBelowParam(pGame, pUnit, pAiTickParam, DURIEL_AI_PARAM_CHARGE_CHANCE_PCT))
 	{
-		AITACTICS_UseSkill(pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[0], pAiTickParam->pMonstatsTxt->nSkill[0], pAiTickParam->pTarget, 0, 0);
+		D2_CALL(AITACTICS_UseSkill, pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[0], pAiTickParam->pMonstatsTxt->nSkill[0], pAiTickParam->pTarget, 0, 0);
 	}
 	else
 	{
-		AITACTICS_SetVelocity(pUnit, 13, 0, 0);
-		AITACTICS_WalkToTargetUnitWithFlags(pGame, pUnit, pAiTickParam->pTarget, 7);
+		D2_CALL(AITACTICS_SetVelocity, pUnit, 13, 0, 0);
+		D2_CALL(AITACTICS_WalkToTargetUnitWithFlags, pGame, pUnit, pAiTickParam->pTarget, 7);
 	}
 }
 
