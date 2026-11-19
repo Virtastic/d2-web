@@ -121,16 +121,7 @@ EMSCRIPTEN_KEEPALIVE void* D2Common_12330_FindNearestUnit(D2UnitStrc* pUnit, int
 
 // 1.13c D2Common+0x2E3E0 (#10316) moved to d2common_2e3e0.cpp (the whole body, with callee seams).
 
-// 1.13c D2Common+0x22F50 (#10321) items.txt wMissileType (+0xFA) of an item unit; any other unit
-// type answers 0xFFFFFFFF. A missing items row is fatal in retail; we answer 0xFFFFFFFF.
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_22f50(D2UnitStrc* pUnit)
-{
-	if (!pUnit || pUnit->dwUnitType != UNIT_ITEM) return 0xFFFFFFFF;
-
-	const D2ItemsTxt* pItem = DATATBLS_GetItemsTxtRecord(pUnit->dwClassId);
-	return pItem ? pItem->wMissileType : 0xFFFFFFFF;
-}
+// Ordinal 10321 (RVA 0x22F50) lives in game/Items/Items.cpp as ITEMS_GetMissileType (the one copy).
 
 // 1.13c D2Common+0x51C60 (#10323) item damage/speed contribution: adds the itemstatcost row 137
 // total to both accumulators, merges the left-hand weapon's stat list into the unit, then folds the
