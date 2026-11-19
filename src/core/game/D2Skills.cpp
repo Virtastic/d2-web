@@ -954,11 +954,7 @@ D2SkillStrc* __stdcall SKILLS_AddSkill(D2UnitStrc* pUnit, int nSkillId)
 
 				if (pSkill)
 				{
-					nMaxSkillLevel = pSkillsTxtRecord->wMaxLvl;
-					if (nMaxSkillLevel <= 0)
-					{
-						nMaxSkillLevel = 20;
-					}
+					nMaxSkillLevel = DATATBLS_GetSkillMaxLevel(nSkillId);
 
 					if (pSkill->nSkillLevel < nMaxSkillLevel || pUnit->dwUnitType == UNIT_MONSTER)
 					{

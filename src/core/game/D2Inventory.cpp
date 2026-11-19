@@ -3406,6 +3406,7 @@ BOOL __fastcall INVENTORY_CanItemBePlacedInInventory(D2UnitStrc* pPlayer, D2Unit
 }
 
 //D2Common.0x6FD925E0
+// 1.13c D2Common+0x1050 (the probe mirrors the retail unit layout into a native unit)
 // not-1.13c: retail reads the unit's path through the path getter (D2Common+0x34BB0) at each call site
 int __fastcall UNITS_GetXPosition(D2UnitStrc* pUnit)
 {
@@ -3426,22 +3427,19 @@ int __fastcall UNITS_GetXPosition(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FD92610
+// 1.13c D2Common+0x1080 (the probe mirrors the retail unit layout into a native unit)
 // not-1.13c: retail reads the unit's path through the path getter (D2Common+0x34B80) at each call site
 int __fastcall UNITS_GetYPosition(D2UnitStrc* pUnit)
 {
 	switch (pUnit->dwUnitType)
 	{
-	case UNIT_PLAYER:
-	case UNIT_MONSTER:
-	case UNIT_MISSILE:
-		return pUnit->pDynamicPath ? pUnit->pDynamicPath->tGameCoords.wPosY : 0;
-
 	case UNIT_OBJECT:
 	case UNIT_ITEM:
 	case UNIT_TILE:
 		return pUnit->pStaticPath ? pUnit->pStaticPath->tGameCoords.nY : 0;
-	default:
-		return 0;
+
+	default: // retail tests only types 2, 4 and 5 for the static path; every other type reads the dynamic one
+		return pUnit->pDynamicPath ? pUnit->pDynamicPath->tGameCoords.wPosY : 0;
 	}
 }
 

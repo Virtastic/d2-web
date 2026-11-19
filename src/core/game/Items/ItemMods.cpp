@@ -1144,13 +1144,12 @@ BOOL __fastcall sub_6FD93230(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, co
 			if (ITEMS_GetItemFormat(pItem) < 1)
 			{
 				nPossibleRolls = nMax - nMin;
+				nMin += SEED_RollLimitedRandomNumber(ITEMS_GetItemSeed(pItem), nPossibleRolls);
 			}
 			else
 			{
-				nPossibleRolls = nMax - nMin + 1;
+				nMin = SEED_RollRange(ITEMS_GetItemSeed(pItem), nMin, nMax); // 1.13c D2Common+0x1180
 			}
-
-			nMin += SEED_RollLimitedRandomNumber(ITEMS_GetItemSeed(pItem), nPossibleRolls);
 
 			nValue = nMin;
 		}
@@ -1702,11 +1701,7 @@ BOOL __fastcall sub_6FD94190(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, co
 	{
 		nTemp = (ITEMS_GetItemLevel(pItem) - SKILLS_GetRequiredLevel(nSkillId)) / 4 + 1;
 
-		nMaxLevel = sgptDataTables->pSkillsTxt[nSkillId].wMaxLvl;
-		if (nMaxLevel <= 0)
-		{
-			nMaxLevel = 20;
-		}
+		nMaxLevel = DATATBLS_GetSkillMaxLevel(nSkillId);
 
 		if (nTemp <= 1)
 		{
@@ -3614,11 +3609,7 @@ int __fastcall ITEMMODS_PropertyFunc11(int nType, D2UnitStrc* pUnit, D2UnitStrc*
 		{
 			nLevel = (ITEMS_GetItemLevel(pItem) - SKILLS_GetRequiredLevel(pProperty->nLayer)) / 4 + 1;
 
-			nMaxLevel = sgptDataTables->pSkillsTxt[pProperty->nLayer].wMaxLvl;
-			if (nMaxLevel <= 0)
-			{
-				nMaxLevel = 20;
-			}
+			nMaxLevel = DATATBLS_GetSkillMaxLevel(pProperty->nLayer);
 
 			if (nLevel <= 1)
 			{
@@ -3731,11 +3722,7 @@ int __fastcall ITEMMODS_PropertyFunc19(int nType, D2UnitStrc* pUnit, D2UnitStrc*
 	{
 		nTemp = (ITEMS_GetItemLevel(pItem) - SKILLS_GetRequiredLevel(nSkillId)) / 4 + 1;
 
-		nMaxLevel = sgptDataTables->pSkillsTxt[nSkillId].wMaxLvl;
-		if (nMaxLevel <= 0)
-		{
-			nMaxLevel = 20;
-		}
+		nMaxLevel = DATATBLS_GetSkillMaxLevel(nSkillId);
 
 		if (nTemp <= 1)
 		{

@@ -636,7 +636,8 @@ void __fastcall DATATBLS_LoadDifficultyLevelsTxt(HD2ARCHIVE hArchive);
 
 
 //Inlined at various places
-inline D2MonStatsTxt* __fastcall DATATBLS_GetMonStatsTxtRecord(int nMonsterId)
+// 1.13c D2Common+0x12A0 (noinline: one linked body)
+inline __attribute__((noinline)) D2MonStatsTxt* __fastcall DATATBLS_GetMonStatsTxtRecord(int nMonsterId)
 {
 	if (nMonsterId >= 0 && nMonsterId < sgptDataTables->nMonStatsTxtRecordCount)
 	{

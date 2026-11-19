@@ -11,6 +11,7 @@
 
 #include "D2BitManip.h"
 #include "D2DataTbls.h"
+#include "D2Seed.h"
 #include "DataTbls/SkillsTbls.h"
 #include "../compat/datatbls_bridge.h"
 #include "../tables/shared.h"
@@ -24,27 +25,7 @@ namespace
 		return d2::drlgLoadTables(d2::sharedVfs(), d2::sharedLang());
 	}
 
-	// 0x10B0/0x1100: one LCG step, then the limited roll. Both bodies are identical; they differ
-	// only in the register carrying nMax (EAX at 0x10B0, ESI at 0x1100), which the probe models
-	// as r[1] either way. nMax < 1 returns 0 without rolling.
-	uint32_t RollLimited(uint32_t* pSeed, uint32_t nMax)
-	{
-		if (static_cast<int32_t>(nMax) < 1)
-		{
-			return 0;
-		}
-
-		const uint64_t lSeed = static_cast<uint64_t>(pSeed[0]) * 0x6AC690C5ull + pSeed[1];
-		pSeed[0] = static_cast<uint32_t>(lSeed);
-		pSeed[1] = static_cast<uint32_t>(lSeed >> 32);
-
-		if ((nMax & (nMax - 1)) != 0)
-		{
-			return static_cast<uint32_t>(lSeed) % nMax;
-		}
-
-		return (nMax - 1) & static_cast<uint32_t>(lSeed);
-	}
+	// 0x10B0/0x1100/0x1180 run the game bodies SEED_RollLimitedRandomNumber and SEED_RollRange (D2Seed.h).
 
 	// 0x1550..0x15E0: skills.txt dwParam[0..3] now run the game-tree bodies in SkillsTbls.cpp.
 	int32_t SkillParam(int32_t nSkillId, int nParam)
@@ -60,54 +41,19 @@ namespace
 }
 
 extern "C" {
-// 1.13c D2Common+0x10B0 (SEED_RollLimitedRandomNumber): r[0] = pSeed, r[1] = nMax, r[4] = roll;
-// the seed pair is advanced in place.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_10b0(uint32_t* r)
-{
-	r[4] = RollLimited(reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(r[0])), r[1]);
-}
-
+// Register-shape adapters for the seam callers (0x335F0, 0x465B0); the bodies are the game ones in D2Seed.h.
+// r[0] = pSeed, r[1] = nMax, r[4] = roll (the 0x10B0 probe is src/core/fn/d2common_10b0.cpp).
 EMSCRIPTEN_KEEPALIVE __attribute__((weak)) void d2_fn_d2common_1100(uint32_t* r);
-// 1.13c D2Common+0x1100: the second copy of the same body, nMax arriving in ESI instead of EAX.
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1100(uint32_t* r)
 {
-	r[4] = RollLimited(reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(r[0])), r[1]);
+	r[4] = SEED_RollLimitedRandomNumber(reinterpret_cast<D2SeedStrc*>(static_cast<uintptr_t>(r[0])), static_cast<int32_t>(r[1]));
 }
 
-// 1.13c D2Common+0x1180: r[0] = pSeed (ECX), r[1] = nMin (EDI), r[2] = nMax (EAX).
-// nMax <= nMin returns nMin without rolling; otherwise one LCG step gives nMin + roll over
-// (nMax - nMin + 1). The range is unsigned, so a wrapped count is rejected by its sign bit.
+// r[0] = pSeed (ECX), r[1] = nMin (EDI), r[2] = nMax (EAX).
 void D2Common_1180_RollRange(uint32_t* r)
 {
-	uint32_t* pSeed = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(r[0]));
-	const int32_t nMin = static_cast<int32_t>(r[1]);
-	const int32_t nMax = static_cast<int32_t>(r[2]);
-	if (nMax <= nMin)
-	{
-		r[4] = static_cast<uint32_t>(nMin);
-		return;
-	}
-
-	const uint32_t nRange = static_cast<uint32_t>(nMax - nMin);
-	const uint32_t nCount = nRange + 1;
-	if (static_cast<int32_t>(nCount) < 1)
-	{
-		r[4] = static_cast<uint32_t>(nMin);
-		return;
-	}
-
-	const uint64_t lSeed = static_cast<uint64_t>(pSeed[0]) * 0x6AC690C5ull + pSeed[1];
-	pSeed[0] = static_cast<uint32_t>(lSeed);
-	pSeed[1] = static_cast<uint32_t>(lSeed >> 32);
-
-	if ((nCount & nRange) != 0)
-	{
-		r[4] = static_cast<uint32_t>(nMin) + static_cast<uint32_t>(lSeed) % nCount;
-	}
-	else
-	{
-		r[4] = static_cast<uint32_t>(nMin) + (nRange & static_cast<uint32_t>(lSeed));
-	}
+	r[4] = static_cast<uint32_t>(SEED_RollRange(reinterpret_cast<D2SeedStrc*>(static_cast<uintptr_t>(r[0])),
+		static_cast<int32_t>(r[1]), static_cast<int32_t>(r[2])));
 }
 
 // 0x1280, 0x12D0, 0x1400, 0x1470 and 0x1500 are probed in src/core/fn/d2common_<rva>.cpp (one definition each).

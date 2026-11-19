@@ -46,7 +46,10 @@ inline uint64_t __fastcall SEED_RollRandomNumber(D2SeedStrc* pSeed)
 }
 
 //D2Common.0x6FD7D3E0
-inline uint32_t __fastcall SEED_RollLimitedRandomNumber(D2SeedStrc* pSeed, int nMax)
+// 1.13c D2Common+0x10B0
+// 1.13c D2Common+0x1100 (the same body with nMax in ESI)
+// noinline: the game callers link this one body (a single weak definition), so the coverage tool and the probes see it
+inline __attribute__((noinline)) uint32_t __fastcall SEED_RollLimitedRandomNumber(D2SeedStrc* pSeed, int nMax)
 {
 	if (nMax > 0)
 	{
@@ -61,6 +64,30 @@ inline uint32_t __fastcall SEED_RollLimitedRandomNumber(D2SeedStrc* pSeed, int n
 	}
 
 	return 0;
+}
+
+// 1.13c D2Common+0x1180: roll in [nMin, nMax]; nMax <= nMin returns nMin without rolling, a wrapped count (sign bit) returns nMin.
+inline __attribute__((noinline)) int32_t __fastcall SEED_RollRange(D2SeedStrc* pSeed, int32_t nMin, int32_t nMax)
+{
+	if (nMax <= nMin)
+	{
+		return nMin;
+	}
+
+	const uint32_t nRange = static_cast<uint32_t>(nMax - nMin);
+	const uint32_t nCount = nRange + 1;
+	if (static_cast<int32_t>(nCount) < 1)
+	{
+		return nMin;
+	}
+
+	const uint32_t nRoll = static_cast<uint32_t>(SEED_RollRandomNumber(pSeed));
+	if (nCount & nRange)
+	{
+		return static_cast<int32_t>(static_cast<uint32_t>(nMin) + nRoll % nCount);
+	}
+
+	return static_cast<int32_t>(static_cast<uint32_t>(nMin) + (nRange & nRoll));
 }
 
 inline uint32_t SEED_RollPercentage(D2SeedStrc* pSeed)

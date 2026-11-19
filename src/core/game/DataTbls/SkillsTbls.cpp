@@ -925,6 +925,7 @@ void __fastcall DATATBLS_UnloadSkills_SkillDescTxt()
 
 //1.10f: Inlined at various places
 //1.13c: D2Common.0x6FD51250
+// 1.13c D2Common+0x1250
 D2SkillsTxt* __fastcall DATATBLS_GetSkillsTxtRecord(int nSkillId)
 {
 	if (nSkillId >= 0 && nSkillId < sgptDataTables->nSkillsTxtRecordCount)
@@ -933,6 +934,21 @@ D2SkillsTxt* __fastcall DATATBLS_GetSkillsTxtRecord(int nSkillId)
 	}
 
 	return NULL;
+}
+
+// 1.13c D2Common+0x14D0 (EAX = skill id): the skill's maximum level, 20 for an id out of range or a maximum below 1
+int __fastcall DATATBLS_GetSkillMaxLevel(int nSkillId)
+{
+	if (nSkillId >= 0 && nSkillId < sgptDataTables->nSkillsTxtRecordCount)
+	{
+		const int nMaxLevel = static_cast<int16_t>(sgptDataTables->pSkillsTxt[nSkillId].wMaxLvl);
+		if (nMaxLevel >= 1)
+		{
+			return nMaxLevel;
+		}
+	}
+
+	return 20;
 }
 
 //Inlined at various places

@@ -318,6 +318,8 @@ void __fastcall DATATBLS_LoadSkills_SkillDescTxt(HD2ARCHIVE hArchive);
 void __fastcall DATATBLS_UnloadSkills_SkillDescTxt();
 //Inlined at various places
 D2SkillsTxt* __fastcall DATATBLS_GetSkillsTxtRecord(int nSkillId);
+//D2Common.0x6FD514D0
+int __fastcall DATATBLS_GetSkillMaxLevel(int nSkillId);
 //Inlined at various places
 D2SkillDescTxt* __fastcall DATATBLS_GetSkillDescTxtRecord(int nSkillDesc);
 
