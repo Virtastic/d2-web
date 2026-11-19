@@ -10,6 +10,7 @@
 #include "client_host.h"
 
 static std::string g_gout;
+static std::string g_gpre;   // D2Gfx calls the packet handlers made since the last frame
 namespace {
 constexpr uint32_t kCtx = 0x40;          // ctx base inside the arena (keeps 0 as null)
 constexpr uint32_t kSq = kCtx + 0x38;    // node pool header (flags word, then 0x14-byte nodes)
@@ -441,7 +442,12 @@ EMSCRIPTEN_KEEPALIVE void d2_dg_server_packet(const uint8_t* p, uint32_t n) {
     if (n >= 11 && p[0] == 0x69 && p[5] == 6) d2_dg_unit_hit(1, u32(1), p[10]);   // a monster
     else if (n >= 9 && p[0] == 0x0C && p[6] == 0x13) d2_dg_unit_hit(p[1], u32(2), p[8]);
     else if (n >= 13 && p[0] == 0x0D && p[1] == 0 && p[6] == 0x13) playerHitOverlay(u32(2), p[11]);
+    // 0x9C action 0x0E (an item put in the belt): its handler (0xAE080 case 0xE -> 0x83AD0) ends by posting a mouse move to the
+    // window D2Gfx #10048 names
+    else if (n >= 2 && p[0] == 0x9C && p[1] == 0x0E) g_gpre += "10048 0,0\n";
 }
+// The D2Gfx calls the packet handlers made since the last frame; they lead the frame's records.
+EMSCRIPTEN_KEEPALIVE const char* d2_dg_packet_g() { static std::string out; out.swap(g_gpre); g_gpre.clear(); return out.c_str(); }
 // The staged unit k's fp16 position fraction (the client unit's path; a static unit ignores it).
 EMSCRIPTEN_KEEPALIVE void d2_dg_stage_unit_frac(uint32_t k, uint32_t fx, uint32_t fy) {
     if (k < g_nUnits) { g_units[k].fx = fx & 0xffff; g_units[k].fy = fy & 0xffff; }
@@ -518,8 +524,9 @@ static void gRec(int ord, std::initializer_list<uint32_t> a, uint32_t ecx = 0, u
     for (uint32_t v : a) { if (v >= 0x100000u) g_gout += ",*"; else { std::snprintf(b, sizeof b, ",%x", v); g_gout += b; } }
     g_gout += '\n';
 }
-struct D2ClientCellWalk9f270Env { uint32_t arg; void (*sub666d0)(uint32_t); uint32_t (*ord10013)(); void (*sub1ba90)(uint32_t);
-    void (*ord10069)(uint32_t, int32_t, int32_t, uint32_t, uint32_t, uint32_t); void (*sub9e970)(uint32_t, uint32_t, uint32_t); };
+struct D2ClientCellWalk9f270Env { uint32_t arg; void (*sub666d0)(uint32_t, uint32_t); uint32_t (*ord10013)(); void (*sub1ba90)(uint32_t);
+    void (*ord10069)(uint32_t, int32_t, int32_t, uint32_t, uint32_t, uint32_t); void (*sub9e970)(uint32_t, uint32_t, uint32_t);
+    const uint8_t* lightGrid; uint32_t colourLight; int32_t viewX, viewY; };
 // D2Client+0x9E970 over the arena's cell+0x14 list (overlay_list_9e970.cpp). Draw tables are retail .data (counts read 0, as 9EE90), colours not carried.
 struct D2Client9E970Node; struct D2Client9E970Entry;
 struct D2Client9E970Env { uint32_t colorMask, tickGate; const uint32_t *perCelCount, *tabNormal, *tabAlt; uint32_t ctxX, ctxY, ctxOffX, ctxOffY;
@@ -803,7 +810,7 @@ static uint32_t stageUnit(uint32_t rec) {
     g_hself = g_hu[0] == 0 ? u : 0;
     return u;
 }
-static void unit666d0(uint32_t rec) { uint32_t u = stageUnit(rec); d2c_666d0(hostCall, 0, u, 2, 0); }
+static void unit666d0(uint32_t rec, uint32_t) { uint32_t u = stageUnit(rec); d2c_666d0(hostCall, 0, u, 2, 0); }
 // 1.13c D2Client+0x6BA90 (the flag-2 node, named "1BA90" in the walk env by mistake): 10036 (returns 0), the 10013 read, then per layer 10011 at the 6C490 position minus 2 (the 6A3D0 cull, flag 1).
 // Its first gate (0x6fb1baa0) leaves with no call when unit +0xC4 bit5 is set; a type above 2 that passes goes to 6AA30 (its own
 // 10013 read, then the shadow cel's 10011): a client missile, item and warp always carry bit5 (retail's shadow node of a light
@@ -843,6 +850,7 @@ EMSCRIPTEN_KEEPALIVE void d2_dg_set_origin(int32_t x, int32_t y) { g_vx = x; g_v
 // ctx+0x38 & gdwBitMasks[3] after the feed: the word that gates the cell walk, and the 8 in ecx of the frame's 10047/10013 pair
 // (retail: 8 on every frame that fed a floor/unit node, 0 on the first frame, whose grid holds walls only).
 EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_flag8() { return rd(kSq) & 8; }
+static const uint8_t kZeroLight[48 * 48 * 8] = {};   // the light grid is not carried here (666D0's colour is unused by the staged call)
 EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
     wr(kCtx + 0x24, (uint32_t)g_vx); wr(kCtx + 0x28, (uint32_t)g_vy);
     g_gout.clear(); g_ledx = 0; g_n9e970 = g_n9ee90 = g_n13a00 = 0;
@@ -859,7 +867,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
                 [](uint32_t p) { return (D2Client9E970Entry*)(g_arena + p); }, [](uint32_t p) { return gRd32(p); }};
             e.ctxX = gRd32(kCtx + 4); e.ctxY = gRd32(kCtx + 8); e.ctxOffX = gRd32(kCtx + 0x24); e.ctxOffY = gRd32(kCtx + 0x28);
             d2_client_9e970(e, (D2Client9E970Node*)(g_arena + gRd32(room + 0x14)), mode, [](uint32_t p) { return (D2Client9E970Node*)(g_arena + p); });
-        }};
+        }, kZeroLight, 0, 0, 0};
     // 8B110 runs 9F270 only when the pool's flag word (ctx+0x38) holds gdwBitMasks[3] (set by 79C80); retail's first frame never calls it
     if (rd(kSq) & 8) d2_client_9f270(g_arena, kCtx, &w);
     D2c9EE90Env e{gRd32, [](uint32_t a) -> uint8_t { return a < sizeof g_arena ? g_arena[a] : 0; }, [](uint32_t a, uint32_t v) { if (a < sizeof g_arena - 4) memcpy(g_arena + a, &v, 4); },
@@ -867,7 +875,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
         [](uint32_t a, uint8_t v) { if (a < sizeof g_arena) g_arena[a] = v; }, []() -> int32_t { gRec(10013, {}); return g_r13; }, []() -> uint32_t { ++g_n9ee90; return g_now; },
         [](uint32_t) -> uint32_t { return 0; }, [](uint32_t, uint32_t) {}, [](int32_t) {}, [](uint32_t, uint32_t, uint8_t* r, uint8_t* g, uint8_t* b, uint8_t* a) { *r = *g = *b = *a = 0; },
         [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g) -> int32_t { gRec(10001, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g}, y > 0 ? y : 0); g_lecx = g_ledx = 0; return 1; },
-        [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g, uint32_t al) -> int32_t { gRec(10058, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g, al}, y > 0 ? y : 0); g_lecx = g_ledx = 0; return 1; }, [](uint32_t rec, uint32_t) { unit666d0(rec); }};
+        [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g, uint32_t al) -> int32_t { gRec(10058, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g, al}, y > 0 ? y : 0); g_lecx = g_ledx = 0; return 1; }, [](uint32_t rec, uint32_t) { unit666d0(rec, 0); }};
     d2c_9ee90(&e, kCtx);
     // 1.13c D2Client+0x13A00, run by 8B110 when a roof node set the pool's mask bit 1 (79D30): 10013, 10047, then the roof
     // lists (cell+0x1C) layer by layer 1..4; a node whose tile is hidden or pitch black (0x408) is skipped, the rest are

@@ -66,7 +66,8 @@ let gFirstTick = null;
 export function gFrame(Module, phase, gateEcx = 0) {
   const tick = globalThis.__d2GTick ?? 0;
   if (phase === 0) {
-    if (gateEcx) gFirstTick = tick;   // the shell passes the first frame's 10043 leftover only on the trace's first frame
+    if (Module._d2_dg_packet_g) gLines(Module.ccall('d2_dg_packet_g', 'string', [], []));   // the packet handlers' D2Gfx calls precede the frame
+    if (gateEcx) gFirstTick = tick;  // the shell passes the first frame's 10043 leftover only on the trace's first frame
     globalThis.__d2GHud = !Module._d2_client_frame_tail_g;   // the frame tail (HUD included) comes from d2_client_frame_tail_g below
   } else if (Module._d2_client_frame_tail_g) {
     // 739E0's lead ecx: retail's 0xd22d-like first-frame value is host state (left 0), 0x221 on the second frame, 0 after
