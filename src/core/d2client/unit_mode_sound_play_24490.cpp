@@ -30,6 +30,9 @@
 #include "../include/Units/Monster.h"
 #include "../include/D2DataTbls.h"
 
+extern "C" int32_t d2_client_22430(D2UnitStrc* pUnit);
+extern "C" int32_t d2_client_22490(D2UnitStrc* pUnit, uint32_t* ev);
+extern "C" int32_t d2_client_223d0(D2UnitStrc* pUnit);
 extern "C" void d2_client_24490(uint32_t uUnit, uint32_t nMode, uint32_t bUseGiven, D2cHost h);
 extern "C" void d2_client_23630_rule(uint32_t uUnit, uint32_t dwHit, int32_t nMode, uint32_t uPlayerUnit, uint32_t uFrameTick,
                                      uint32_t* pSfxTicks, uint32_t* pOutFrameTick, D2cHost h);
@@ -130,9 +133,10 @@ uintptr_t cb242b0(uint32_t op, uintptr_t a, uintptr_t, uintptr_t c) {
 
 uint32_t host(D2cCall* c) {
     switch (c->rva) {
-    case 0x22430: return g.type;
-    case 0x22490: return (uint32_t)g.cls;
-    case 0x223D0: return g.mode;
+    // The proved UnitSnd ports run on the call's unit; g_unit is not shape-shifted, so the converter leaves the tuple as given.
+    case 0x22430: return (uint32_t)d2_client_22430(&g_unit);
+    case 0x22490: return (uint32_t)d2_client_22490(&g_unit, nullptr);
+    case 0x223D0: return (uint32_t)d2_client_223d0(&g_unit);
     case 0x22A70: return profile();
     case 0x1510:  return monStats2Flag((int32_t)c->eax, c->edx);
     case 0xC1FC:  return c->s[1] == 1 ? ((g.flags & F_STATE1) ? 1u : 0u) : c->s[1] == 0x92 ? ((g.flags & F_STATE146) ? 1u : 0u) : 0u;
@@ -208,7 +212,7 @@ uint32_t host(D2cCall* c) {
 void begin(uint32_t type, uint32_t id, int32_t cls, uint32_t typeFlags, int32_t superUnique, uint32_t hit, uint32_t cvt, uint32_t flags, int32_t roll, uint32_t mode) {
     g = { type, id, cls, typeFlags, superUnique, hit, cvt, flags, roll, mode };
     std::memset(&g_unit, 0, sizeof g_unit); std::memset(&g_md, 0, sizeof g_md);
-    g_unit.dwUnitType = type; g_unit.dwClassId = cls; g_unit.dwLastHitClass = hit;
+    g_unit.dwUnitType = type; g_unit.dwClassId = cls; g_unit.dwAnimMode = mode; g_unit.dwLastHitClass = hit;
     if (type == 1) { g_md.nTypeFlag = (uint8_t)typeFlags; g_md.wBossHcIdx = (uint16_t)superUnique; g_unit.pMonsterData = &g_md; }
     g_n = 0; g_kind = 0; g_sub = 0; g_subCalls = 0; g_attackNext = false;
 }

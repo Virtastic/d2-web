@@ -129,47 +129,7 @@ static void dl_append(uint32_t list_slot, uint32_t e) {
     wr32(c + 0x10, e);
 }
 
-// 1.13c D2Client+0x79C80 (166 B): kind-1 draw entry for obj at (x + obj[2]*5, y + obj[3]*5)*8; mask bit 3.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_79c80(uint32_t ctx_edi, uint32_t obj_ebx, int32_t x_esi, int32_t y_ebp, uint32_t list_param1,
-                     uint32_t arg2, uint32_t mask_c, void (*ord10561)(uint32_t, void*)) {
-    uint32_t e = dl_alloc(ctx_edi);
-    if (!e) return;
-    uint8_t tmp[32];
-    wr32(e, 1); wr32(e + 0xc, obj_ebx); wr32(e + 0x10, 0);
-    ord10561(arg2, tmp);
-    wr32(e + 4, (uint32_t)((x_esi + (int32_t)rd32(obj_ebx + 8) * 5) * 8));
-    wr32(e + 8, (uint32_t)((y_ebp + (int32_t)rd32(obj_ebx + 0xc) * 5) * 8));
-    wr32(ctx_edi, rd32(ctx_edi) | mask_c); // gdwBitMasks[3]
-    dl_append(list_param1 + 0x10, e);
-}
-
-// 1.13c D2Client+0x79D30 (231 B) thiscall: as 79C80 (kind 1, mask bit 1) but inserted into list+0x1c
-// sorted by (obj[0x14]>>14)&7.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_79d30(uint32_t ctx, uint32_t list_param1, uint32_t arg2, uint32_t obj_eax, int32_t y_ebx,
-                     int32_t x_ebp, uint32_t mask_4, void (*ord10561)(uint32_t, void*)) {
-    uint32_t e = dl_alloc(ctx);
-    if (!e) return;
-    uint8_t tmp[32];
-    wr32(e, 1); wr32(e + 0xc, obj_eax); wr32(e + 0x10, 0);
-    ord10561(arg2, tmp);
-    wr32(e + 4, (uint32_t)((x_ebp + (int32_t)rd32(obj_eax + 8) * 5) * 8));
-    wr32(e + 8, (uint32_t)((y_ebx + (int32_t)rd32(obj_eax + 0xc) * 5) * 8));
-    wr32(ctx, rd32(ctx) | mask_4); // gdwBitMasks[1]
-    uint32_t slot = list_param1 + 0x1c, head = rd32(slot);
-    if (!head) { wr32(slot, e); return; }
-    uint32_t cur = head, prev = 0, nx = rd32(head + 0x10), c4 = cur;
-    for (; (c4 = cur, nx != 0); nx = rd32(nx + 0x10)) {
-        if (((rd32(rd32(e + 0xc) + 0x14) >> 14) & 7) < ((rd32(rd32(c4 + 0xc) + 0x14) >> 14) & 7)) {
-            wr32(e + 0x10, c4);
-            if (!prev) wr32(slot, e); else wr32(prev + 0x10, e);
-            break;
-        }
-        cur = nx; prev = c4;
-    }
-    if (!rd32(c4 + 0x10)) wr32(c4 + 0x10, e);
-}
+// 1.13c D2Client+0x79C80 and +0x79D30: the draw-grid bodies in draw_grid_7a9f0.cpp (d2c_79c80, d2c_79d30) are the only copies.
 
 // 1.13c D2Client+0x7A0D0 (162 B): recompute cached grid size from bounds at ctx+4..+0x10; (re)alloc the
 // string at +0xEAA8 when size^2 changes. Stores +0xEAB4, +0xEAB0, +0xEAB8.
@@ -214,12 +174,7 @@ static void dl_unit(uint32_t ctx, uint32_t obj, uint32_t list_param1, uint32_t k
     dl_append(list_param1 + slot_off, e);
 }
 
-// 1.13c D2Client+0x7A180 (211 B): kind-2 entry for unit obj, mask bit 3, list+0x10.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_7a180(uint32_t obj_eax, uint32_t ctx_ebx, uint32_t list_param1, uint32_t mask_c,
-                     int32_t (*ord10867)(uint32_t), int32_t (*ord10750)(uint32_t)) {
-    dl_unit(ctx_ebx, obj_eax, list_param1, 2, mask_c, ord10867, ord10750, 0x10, true);
-}
+// 1.13c D2Client+0x7A180: the draw-grid body (d2c_7a180 in draw_grid_7a9f0.cpp) is the only copy.
 
 // 1.13c D2Client+0x7A260 (207 B): as 7A180 with kind 0.
 extern "C" EMSCRIPTEN_KEEPALIVE

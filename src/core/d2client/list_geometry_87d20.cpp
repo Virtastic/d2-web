@@ -35,12 +35,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_69090(const ValueUnit* unit, 
         if (n->id == id) return n->record->value14;
     return 0;
 }
-// 1.13c D2Client+0x7A040
-extern "C" EMSCRIPTEN_KEEPALIVE bool d2_client_7a040(const Square* square, int32_t x, int32_t y) {
-    const auto dx = std::bit_cast<int32_t>(uint32_t(x) - uint32_t(square->x_ea68));
-    const auto dy = std::bit_cast<int32_t>(uint32_t(y) - uint32_t(square->y_ea6c));
-    return dx >= 0 && dy >= 0 && dx < square->extent_ea78 && dy < square->extent_ea78;
-}
+// 1.13c D2Client+0x7A040: draw_grid_7a9f0.cpp d2c_7a040 is the only copy.
 // 1.13c D2Client+0x8BEB0
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_8beb0(uint32_t base_11b9a4, uint32_t add_dbc4c, uint32_t flag_119854) {
     return base_11b9a4 + add_dbc4c - (flag_119854 == 0 ? 0x41u : 0x40u);

@@ -66,16 +66,19 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3bd60_batch(const uint8_t* pObject)
 // (x, y)? 1.13c reads the box from the room's coordinate block (0x8BA60 copies 8 dwords from room +0x4C;
 // the first four are subtile x, y, width, height), which the vendored D2ActiveRoomStrc holds as tCoords.
 // The 1.13c register contract is ecx = room, edx = x, eax = y, edi = margin.
-static bool Batch26_RoomInSearchBox(const D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nMargin)
+// The body takes the four coordinate words so the FN probe (retail room blob) and the game share it.
+bool D2Common_121D0_BoxTest(int32_t c0, int32_t c1, int32_t c2, int32_t c3, int32_t nX, int32_t nY, int32_t nMargin)
 {
-	const int32_t c0 = pRoom->tCoords.nSubtileX;
-	const int32_t c1 = pRoom->tCoords.nSubtileY;
-	const int32_t c2 = pRoom->tCoords.nSubtileWidth;
-	const int32_t c3 = pRoom->tCoords.nSubtileHeight;
 	const bool bYOk = (nY + nMargin >= c1) || (nY - nMargin <= c3 + c1);
 	if (nX + nMargin < c0)
 		return (nX - nMargin <= c2 + c0) && bYOk;
 	return bYOk;
+}
+
+static bool Batch26_RoomInSearchBox(const D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nMargin)
+{
+	return D2Common_121D0_BoxTest(pRoom->tCoords.nSubtileX, pRoom->tCoords.nSubtileY, pRoom->tCoords.nSubtileWidth,
+		pRoom->tCoords.nSubtileHeight, nX, nY, nMargin);
 }
 
 // D2Common 0x12330 engine variant (#10314; retail-layout port in d2common_12330.cpp) walks the rooms near the unit's room, keeps those that pass 0x121D0

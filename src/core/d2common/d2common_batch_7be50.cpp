@@ -11,8 +11,6 @@
 #include "Drlg/D2DrlgDrlgVer.h"
 #include "D2Items.h"
 
-static int32_t add32(int32_t a, int32_t b) { return int32_t(uint32_t(a) + uint32_t(b)); }
-static int32_t mul32(int32_t a, int32_t b) { return int32_t(uint32_t(a) * uint32_t(b)); }
 
 // stand-alone 32-bit layout twin of D2Common 0x7BE50 (the proven row runs DRLGACTIVATE_RoomExIdentifyRealStatus) (ECX = room): same body as 0x7BC20. A status byte (+0x44) >= 4 or a zero ref count
 // at +0xC+status*2 picks the first status 0..3 with a non-zero count (4 when none), relinks through
@@ -40,33 +38,7 @@ extern "C" void D2Common_7BE50_NormaliseStatus(intptr_t pRoom)
 
 
 
-struct D2CommonPlacement13c { int32_t x, y, width, height, direction; };
-static_assert(offsetof(D2CommonPlacement13c, direction) == 0x10);
-// stand-alone 32-bit layout twin of D2Common 0x13F30 (the proven row runs sub_6FD83970)
-extern "C" void D2Common_13F30_Placement(const int32_t* origin, int32_t direction,
-    D2CommonPlacement13c* out, int32_t width, int32_t height)
-{
-    int32_t dx = 0, dy = 0;
-    switch (direction) {
-    case 0: dy = int32_t(0u - uint32_t(height)); break;
-    case 1: case 2: {
-        int32_t hi = int32_t((int64_t(height) * 0x55555555LL) >> 32);
-        dy = int32_t(uint32_t(hi) - uint32_t(height)) >> 1;
-        dy = add32(dy, -(dy >> 31));
-        dx = direction == 1 ? int32_t(0u - uint32_t(width)) : width;
-        break;
-    }
-    case 3: case 4: {
-        int32_t twice = mul32(height, -2);
-        dy = add32(twice / 3, twice >> 31);
-        dy = add32(dy, -(dy >> 31));
-        dx = direction == 3 ? int32_t(0u - uint32_t(width)) : width;
-        break;
-    }
-    }
-    out->x = add32(origin[0], dx); out->y = add32(origin[1], dy);
-    out->width = width; out->height = height; out->direction = direction;
-}
+// D2Common+0x13F30 is sub_6FD83970 in game/DrlgOutPlace.cpp; the probe runs it (stand-alone copy removed).
 
 // The 1.13c +0x37020 body is sub_6FD75DE0 in DrlgDrlgGrid.cpp; this is only the extern "C" entry the probe calls.
 extern "C" void d2common_37020_port(D2DrlgGridStrc* grid, D2DrlgVertexStrc* vertex,

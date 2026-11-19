@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <emscripten.h>
+extern "C" char* fog_strrchr_2d40(const char* s, int ch);   // Fog+0x2D40, the one copy
 
 // 1.13c D2Win+0x17a00 : append node to the singly linked list headed at DAT_6f9014a4 (next at +0x3c).
 // The head global and the links are retail 4-byte guest pointers (the blob addresses fit 32 bits), so every
@@ -35,7 +36,7 @@ char* d2win_sub_7dc0(char* buf, const char* name, const D2WinB54bEnv* e) {
     e->ord501();
     if (e->ord266(buf) == 0) {
         if (e->getModuleFileName(buf, 0x104) == 0) buf[0] = 0;
-        char* p = strrchr(buf, '\\');
+        char* p = fog_strrchr_2d40(buf, '\\');
         if (p) p[1] = 0;
         e->ord503(buf, name, 0x7fffffff);
         if (e->ord266(buf) == 0)

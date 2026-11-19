@@ -2,18 +2,7 @@
 // Base 0x6FD50000. Retail globals and callees are host seam arguments (the d2client_batch_1019h convention).
 #include <cstdint>
 
-// 1.13c D2Common+0x3790: CRT ___ascii_stricmp. Compares case-folded (A-Z -> a-z) bytes; returns -1, 0 or 1.
-extern "C" int D2Common_3790_ascii_stricmp(const uint8_t* a, const uint8_t* b) {
-  for (;;) {
-    uint8_t cb = *b++, ca = *a++;
-    if (ca != cb) {
-      uint8_t fb = (uint8_t)(cb - 'A') < 26 ? cb + 32 : cb;
-      uint8_t fa = (uint8_t)(ca - 'A') < 26 ? ca + 32 : ca;
-      if (fa != fb) return fa < fb ? -1 : 1;
-    }
-    if (cb == 0) return 0;
-  }
-}
+// 1.13c D2Common+0x3790 (CRT ___ascii_stricmp): d2common_ascii_stricmp_3790.cpp, reached through the stricmp macro.
 
 // 1.13c D2Common+0x19B60: weighted random pick among the 12-byte entries at this+0x2C (count at +0x1d8).
 // tbl = retail's 8-byte table at 0x6FDE4F48 (word0 flag, word1 group). An entry matches key if equal to it or

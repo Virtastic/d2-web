@@ -112,43 +112,7 @@ void D2Common_1180_RollRange(uint32_t* r)
 
 // 0x1280, 0x12D0, 0x1400, 0x1470 and 0x1500 are probed in src/core/fn/d2common_<rva>.cpp (one definition each).
 
-// 1.13c D2Common+0x1550: skills.txt dwParam[0] (+0x148) of nSkillId.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1550(uint32_t* r)
-{
-	if (!TablesLoaded()) { r[4] = 0x7EADBEEF; return; }
-	// The record pins sgptDataTables to blob 1: its +0xB98 holds the
-	// address of the skills rows (blob 0, retail stride 0x23C = ours), +0xBA0 the count. Run the rule on that
-	// table, then put the loaded one back.
-	D2SkillsTxt* pSaved = sgptDataTables->pSkillsTxt;
-	const int32_t nSavedCount = sgptDataTables->nSkillsTxtRecordCount;
-	if (r[13] >= 2)
-	{
-		const uint8_t* pDt = reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(r[16]));
-		uint32_t nRows = 0;
-		int32_t nCount = 0;
-		std::memcpy(&nRows, pDt + 0xB98, 4);
-		std::memcpy(&nCount, pDt + 0xBA0, 4);
-		sgptDataTables->pSkillsTxt = reinterpret_cast<D2SkillsTxt*>(static_cast<uintptr_t>(nRows));
-		sgptDataTables->nSkillsTxtRecordCount = nCount;
-	}
-	r[4] = static_cast<uint32_t>(SkillParam(static_cast<int32_t>(r[0]), 0));
-	sgptDataTables->pSkillsTxt = pSaved;
-	sgptDataTables->nSkillsTxtRecordCount = nSavedCount;
-}
-
-// 1.13c D2Common+0x1580: skills.txt dwParam[1] (+0x14C) of nSkillId.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1580(uint32_t* r)
-{
-	if (!TablesLoaded()) { r[4] = 0x7EADBEEF; return; }
-	r[4] = static_cast<uint32_t>(SkillParam(static_cast<int32_t>(r[0]), 1));
-}
-
-// 1.13c D2Common+0x15B0: skills.txt dwParam[2] (+0x150) of nSkillId.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_15b0(uint32_t* r)
-{
-	if (!TablesLoaded()) { r[4] = 0x7EADBEEF; return; }
-	r[4] = static_cast<uint32_t>(SkillParam(static_cast<int32_t>(r[0]), 2));
-}
+// 0x1550, 0x1580 and 0x15B0 are probed in src/core/fn/d2common_<rva>.cpp; D2Skills.cpp calls the game bodies.
 
 // 1.13c D2Common+0x15E0: skills.txt dwParam[3] (+0x154) of nSkillId.
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_15e0(uint32_t* r)

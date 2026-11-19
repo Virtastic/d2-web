@@ -64,7 +64,7 @@ uint32_t setRow(uint32_t dt, int32_t id) {   // 1.13c D2Common+0x17D0
 uint32_t setItemRow(uint32_t dt, int32_t id) {   // 1.13c D2Common+0x1800
     return id >= 0 && id < (int32_t)r32(dt + 0xC1C) ? (uint32_t)id * 0x1B8u + r32(dt + 0xC18) : 0;
 }
-int32_t skillValid(uint32_t dt, int32_t sk) {   // 1.13c D2Common+0x18F0
+int32_t skillValid(uint32_t dt, int32_t sk) {   // the D2Common 18F0 test over the retail blob image (body: DATATBLS_SkillHasValidDesc)
     if (sk < 0 || sk >= (int32_t)r32(dt + 0xBA0)) return 0;
     const uint32_t r = (uint32_t)sk * 0x23Cu + r32(dt + 0xB98);
     if (!r) return 0;

@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cctype>
+extern "C" char* fog_strrchr_2d40(const char* s, int ch);   // Fog+0x2D40, the one copy
 
 extern "C" {
 uint32_t Ordinal_10023(int32_t);
@@ -71,7 +72,7 @@ int32_t d2_multi_sub_ea50(uint32_t* esi) {
         uint32_t z = 0;
         int32_t h = d2m_ea50_t7bea(tmp, 0x40000000, 0, 0, 4, 0x8000000, 0);
         if (h != -1) { d2m_ea50_t7c08(h, esi[4], esi[5], (uint32_t)(uintptr_t)&z, 0); d2m_ea50_t7bf6(h); }
-        const char* dot = strrchr((const char*)(uintptr_t)esi[2], '.');
+        const char* dot = fog_strrchr_2d40((const char*)(uintptr_t)esi[2], '.');
         int lc = tolower((unsigned char)dot[1]);
         d2m_ea50_t7d10((uint32_t)DAT_6fa09178, tmp, (uint32_t)lc);
         strcpy(DAT_6fa09df0, tmp);

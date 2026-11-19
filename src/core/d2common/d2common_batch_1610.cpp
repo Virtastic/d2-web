@@ -35,12 +35,4 @@ D2SetItemsTxt* D2Common_1800_GetSetItemsTxtRecord(int32_t nSetItemId)
 	return DATATBLS_GetSetItemsTxtRecord(nSetItemId);
 }
 
-// 1.13c D2Common+0x18F0 (skill id arrives in EAX): 1 if the skill's wSkillDesc (+0x194) indexes a valid SkillDesc row
-int32_t D2Common_18F0_SkillHasValidDesc(int32_t nSkillId)
-{
-	if (nSkillId < 0 || nSkillId >= sgptDataTables->nSkillsTxtRecordCount) return 0;
-	const uint8_t* pRec = (const uint8_t*)sgptDataTables->pSkillsTxt + (uintptr_t)nSkillId * 0x23C;
-	if (!pRec) return 0;
-	const int32_t nDesc = *(const int16_t*)(pRec + 0x194);
-	return nDesc >= 0 && nDesc < sgptDataTables->nSkillDescTxtRecordCount;
-}
+// 1.13c D2Common+0x18F0: the body is DATATBLS_SkillHasValidDesc (game/DataTbls/SkillsTbls.cpp), called by Items.cpp.

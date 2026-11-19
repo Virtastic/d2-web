@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
+extern "C" int32_t fog_strncmp_90c0(const uint8_t* a, const uint8_t* b, uint32_t n);   // Fog+0x90C0, the one copy
 
 typedef char16_t z27_wc;
 
@@ -179,7 +180,7 @@ extern "C++" void z27_personalize(const z27_PersSeam* sm, z27_wc* out, const z27
 // artifacts; layout inferred: "KAMAP\n" name 0x1a | u16 count | u16 w | u8 n | n wchar | count*{u8,u8,u8,u8} | count u16.
 struct z27_SysMap { std::vector<uint8_t> chars; std::vector<uint16_t> pairs, tail; uint16_t count = 0; uint8_t n = 0; char name[0x28] = {0}; };
 extern "C++" int32_t z27_load_sysmap(z27_SysMap* m, const uint8_t* d, void (*err)(int32_t)) {
-    if (strncmp((const char*)d, "KAMAP\n", 5)) { err(0); return 0; }
+    if (fog_strncmp_90c0(d, (const uint8_t*)"KAMAP\n", 5)) { err(0); return 0; }
     int i = 0;
     while (d[6 + i] != 0x1a) { if (++i > 0x27) { err(0); return 0; } }
     memcpy(m->name, d + 6, i); m->name[i] = 0;

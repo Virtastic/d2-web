@@ -18,7 +18,6 @@ uint32_t d2_client_87e60(d2client_leaf::EntryNode*, uint32_t);
 uint32_t d2_client_87f00(d2client_leaf::EntryNode*, uint32_t);
 void d2_client_87ed0(d2client_leaf::EntryNode*, uint32_t, uint32_t);
 uint32_t d2_client_69090(const d2client_leaf::ValueUnit*, int32_t);
-bool d2_client_7a040(const d2client_leaf::Square*, int32_t, int32_t);
 uint32_t d2_client_8beb0(uint32_t, uint32_t, uint32_t);
 uint8_t* d2_client_6d6d0(uint8_t*, int32_t, int32_t);
 char16_t* d2_client_9ce00(d2client_leaf::TextNode*, int32_t);
