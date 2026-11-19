@@ -53,14 +53,16 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_1000(uint32_t block, BnSmemFreeFn smem_
 
 // 1.13c BNClient+0x01070 (66 B, no callers in the image): initialise a 16-byte object -- four dwords
 // zeroed in order. Returns nothing.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_1070(uint32_t* r) {   // r[0] = the object (function probe shape)
-    uint32_t* object = (uint32_t*)(uintptr_t)r[0];
+void bn_zero16_1070(uint32_t* object) {
     object[0] = 0;
     object[1] = 0;
     object[2] = 0;
     object[3] = 0;
-    r[4] = r[0];   // retail leaves the object pointer in EAX (vector result 0xB1000000 = blob 0)
+}
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_1070(uint32_t* r) {   // r[0] = the object (function probe shape)
+    bn_zero16_1070((uint32_t*)(uintptr_t)r[0]);
+    r[4] = r[0];  // retail leaves the object pointer in EAX (vector result 0xB1000000 = blob 0)
 }
 
 // 1.13c BNClient+0x010C0 (71 B, no callers in the image): NewsTable destructor. Under the SEH frame

@@ -49,7 +49,7 @@ const wrap = (text, width, measure) => {
 };
 
 export function createBnetConnectingPopup({ read, decodeDc6, decodeDatPalette, string = () => '', now = () => performance.now(),
-  onCancel = () => {}, documentObject = globalThis.document }) {
+  onCancel = () => {}, fill = null, documentObject = globalThis.document }) {
   const palette = decodeDatPalette(read(FRONTEND.palette));
   const skyPalette = decodeDatPalette(read(FRONTEND.backgroundPalette));
   const skyPl2 = read('data\\global\\palette\\Sky\\pal.pl2');
@@ -110,7 +110,7 @@ export function createBnetConnectingPopup({ read, decodeDc6, decodeDatPalette, s
         c.anchorY + (pressed ? 2 : 0) + 4 - Math.trunc((c.h - labelFont.lineHeight) / 2));
       drawBox(ctx, titleFont, string(S.title) || '', L.title);
       drawBox(ctx, statusFont, statusText(), L.status);
-      drawBox(ctx, dotsFont, '.'.repeat(this.dots()), L.dots);
+      drawBox(ctx, dotsFont, (fill?.('.', this.dots()) ?? '.'.repeat(this.dots())), L.dots);
       drawn = true; code = stage;
     },
     // Scene coordinates (800x600). The popup is modal: only CANCEL answers.

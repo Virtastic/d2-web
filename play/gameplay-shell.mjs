@@ -1046,6 +1046,34 @@ const realmUnits = createRealmUnits({ rowOf: (classId) => realmTables().monsters
 let realmMissileViews = [];
 let realmInputState = null;   // the joined game's input -> D2GS packet sender (assets/realm-input.mjs), made on first use
 let realmFlow = null, realmSelect = false;
+// The held news lives in the engine's NewsTable (BNClient+0x1160/+0x1110/+0x10C0 release it); JS hands each snapshot over.
+// Each entry goes in through the engine's own insert (capacity step 0x1180, growth 0x11C0, strncpy 0x1AF0).
+function engineNewsStore(entries) {
+  if (!Module._d2_bnet_news_put) return;
+  Module._d2_bnet_news_clear();
+  for (const e of entries) {
+    const bytes = new TextEncoder().encode(String(e.text) + '\0'), p = Module._malloc(bytes.length);
+    try { Module.HEAPU8.set(bytes, Number(p)); Module._d2_bnet_news_put(e.ts >>> 0, p); } finally { Module._free(p); }
+  }
+}
+// The connecting popup's dots come from the engine's _write_multi_char (0x27F9 over _write_char 0x27C6).
+function engineFill(ch, count) {
+  if (!Module._d2_bnet_fill || count <= 0) return null;
+  const p = Module._malloc(count + 1);
+  try { const n = Module._d2_bnet_fill(p, ch.charCodeAt(0), count); return String.fromCharCode(...Module.HEAPU8.subarray(Number(p), Number(p) + n)); } finally { Module._free(p); }
+}
+// The configured servers as retail's gateway list buffer ("<version>\0<selection>\0" then name, ZONE, display per gateway); the
+// engine finds a name with __strnicmp (0x165A) and picks the closest ZONE with PickClosestZone (0x15130, _strtol 0x1898).
+function engineGatewayList(servers) {
+  const enc = new TextEncoder(), parts = ['1', '00'];
+  for (const s of servers) parts.push(s.host, String(s.zone ?? 0), s.region);
+  const bytes = enc.encode(parts.join('\0') + '\0'), p = Module._malloc(bytes.length);
+  try { Module.HEAPU8.set(bytes, Number(p)); return Module._d2_bnet_gateway_list(p, bytes.length, servers.length); } finally { Module._free(p); }
+}
+function engineGatewayFind(name) {
+  const bytes = new TextEncoder().encode(String(name) + '\0'), p = Module._malloc(bytes.length);
+  try { Module.HEAPU8.set(bytes, Number(p)); return Module._d2_bnet_gateway_find(p); } finally { Module._free(p); }
+}
 let creditsScreen = null, creditsError = '', creditsTick = 0, exitEvidence = { count: 0, screen: null };
 // Retail's front end opens on the Blizzard logo movies -- New_Bliz, then BlizNorth -- and only then
 // shows the trademark screen and the menu, which is what `titlePhase` counts through (assets/
@@ -1687,6 +1715,16 @@ function ensureTitleScreen(entryPhase = null) {
       // FUN_6FA58810), it never dials. Endpoints still come only from our config.
       onGatewayOpen: () => { characterEntryReader.cancel(); },
       storage: (() => { try { return globalThis.localStorage; } catch { return null; } })(),
+      // The committed gateway is BNClient's BNGatewayAccess image in the engine (count +0x1030, current +0x1040).
+      gatewayEngine: Module._d2_bnet_gateway_commit ? {
+        commit: (count, index) => { Module._d2_bnet_gateway_commit(count, index); },
+        current: () => Module._d2_bnet_gateway_current(),
+        ...(Module._d2_bnet_gateway_list ? {
+          setList: (servers) => engineGatewayList(servers),
+          find: (name) => engineGatewayFind(name),
+          closest: (bias) => Module._d2_bnet_gateway_closest(bias),
+        } : {}),
+      } : null,
       items: [
         { label: 'SINGLE PLAYER', action: () => { enterSinglePlayer(); } },
         // With no servers configured BATTLE.NET stays inert, exactly as before. A configured region
@@ -1837,7 +1875,7 @@ function releaseRealmFlow({ closeTransports = true } = {}) {
   worldPointerHeld = false;
   realmReloading = false;
   if (realmSceneActive) { gameRoster.clear(); gameBubbles.clear(); realmSessionPresenter.reset(); partyLocal.clear(); partyVisible = false; gameSlash.replyTo = ""; realmSceneActive = false; realmAutomapOverlay = null; realmSceneTiles = []; realmSceneRevision = 0; realmSceneEvidence = null; terrain = null; snapshot = null; session = null; screen = SCREEN.TITLE; }
-  if (realmFlow === flow) realmFlow = null;
+  if (realmFlow === flow) { realmFlow = null; Module._d2_bnet_news_destroy?.(); }
   Promise.resolve(flow.d2gsReceiver?.done).catch(() => {}).then(() => {
     // A trap in the reset leaves the engine instance dead; the lobby would look normal and every join would abort.
     rcEngine().callEngine(() => flow.protocol?.d2gsClientPlayerReset?.(), { onDead: engineDied });
@@ -2063,7 +2101,7 @@ function lobbyChatUser(name) {
     onLine: (line) => { if (realmSceneActive) { messageLines.push(line); postedAt = performance.now(); } else bnetLobbyScreen?.chatLine(line); render(); },
     onChannels: (list) => { bnetLobbyScreen?.setChannels(list); render(); },
     // SID_NEWS_INFO: merged into the session's news (BNClient keeps it across lobby entries), the box redrawn.
-    onNews: (body) => { const flow = realmFlow; if (!flow) return; flow.news ??= createNews(); const shown = flow.news.apply(body); if (shown) { bnetLobbyScreen?.setNews(newsLines(shown)); render(); } },
+    onNews: (body) => { const flow = realmFlow; if (!flow) return; flow.news ??= createNews(); const shown = flow.news.apply(body); engineNewsStore(flow.news.entries); if (shown) { bnetLobbyScreen?.setNews(newsLines(shown)); render(); } },
     // SID_GETADVLISTEX's reply, kept by retail's own filter (names only), under this session's games.
     onGames: (body) => { if (!realmFlow) return; realmFlow.games = parseGameList(body); pushLobbyGames(name); render(); } };
 }
@@ -2194,7 +2232,7 @@ function connectConfiguredRealm(server) {
   cancelRealmConnect();
   const lang = (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]);
   let popup;
-  try { popup = createBnetConnectingPopup({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, string: lang, onCancel: () => cancelRealmConnect() }); }
+  try { popup = createBnetConnectingPopup({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, string: lang, fill: engineFill, onCancel: () => cancelRealmConnect() }); }
   catch (error) { realmTransport = { state: 'failed', server: { region: server?.region, host: server?.host }, result: null, error: String(error) }; return; }
   const attempt = { server, popup, bncs: null };
   bnetConnecting = attempt;
@@ -2238,6 +2276,7 @@ function showConfiguredRealmLogin(server, bncs = null) {
   if (Module._d2_session_configure_plugy_stash_grid)
     Module.ccall('d2_session_configure_plugy_stash_grid', 'number', ['number', 'number'], [0, 0]);
   bnetLoginScreen = null; bnetLoginError = '';
+  Module._d2_bnet_news_reset?.();
   realmFlow = { server, realmReply: null, bncs };
   realmPlayerView = null;
   realmPlayerRosterView = [];

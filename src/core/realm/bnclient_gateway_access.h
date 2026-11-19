@@ -4,6 +4,8 @@
 
 // Native pointers address a 36-byte retail image; its pointer-shaped slots stay u32.
 void* d2_bnclient_gateway_access_assign(void* destination, const void* source);
+uint32_t bn_gateway_num_1030(const void* self);   // BNClient+0x1030
+uint32_t bn_gateway_cur_1040(const void* self);   // BNClient+0x1040
 
 // The Storm/kernel32/Fog imports the BNGatewayAccess functions reach, as host callbacks (rows s3622-s3635).
 struct BnetGatewayHost {

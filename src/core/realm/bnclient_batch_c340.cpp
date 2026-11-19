@@ -15,16 +15,7 @@ extern "C" uint32_t d2_bnclient_c340(BnGateFn gate, BnSendFn send) {
     return 1;
 }
 
-// 1.13c BNClient+0x0C3A0
-// Gate call, time(NULL), then send id 0x15 with length 0x10. Always true.
-extern "C" uint32_t d2_bnclient_c3a0(BnGateFn gate, void (*timeNow)(), BnSendFn send) {
-    gate();
-    timeNow();
-    send(0x10, 0x15);
-    return 1;
-}
-
-// 0xC4A0 and 0xC6E0 moved to src/core/bnclient/bnclient_c4a0.cpp and bnclient_c6e0.cpp.
+// 0xC3A0, 0xC4A0 and 0xC6E0 moved to src/core/bnclient/bnclient_c3a0.cpp, bnclient_c4a0.cpp and bnclient_c6e0.cpp.
 
 // 1.13c BNClient+0x0C5F0
 // Payload u32 flags + name (<=0x100). Name null/empty: flags=1, name "Diablo II", +4 if gate nonzero and

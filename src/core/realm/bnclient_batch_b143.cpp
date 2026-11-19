@@ -3,27 +3,8 @@
 #include <cstdint>
 #include <cstring>
 
-// 1.13c BNClient+0x0C960
-// Hash seed: lowercased 0x100-byte string hashed (FUN_372c0), result stored at +0x15, len 0x3d. Always 1.
-extern "C" uint32_t d2_bnclient_c960(void (*gather)(), void (*hashStr)(), void (*store)()) {
-    gather(); hashStr(); store();
-    return 1;
-}
-
-// 1.13c BNClient+0x0C9E0
-// As C960 but clears DAT+0x3EE40/0x3EFC0 first, also hashes {param, tick, DAT+0x3F874} (0x1c bytes); store +0x1d len 0x3a.
-extern "C" uint32_t d2_bnclient_c9e0(uint32_t* g0, uint32_t* g1, void (*gather)(), void (*hashStr)(), void (*hashSeed)(), void (*store)()) {
-    *g0 = 0; *g1 = 0;
-    gather(); hashStr(); hashSeed(); store();
-    return 1;
-}
-
-// 1.13c BNClient+0x0C860
-// Two lowercased strings + tick seed hashed, store +0x31 len 0x31. Always 1.
-extern "C" uint32_t d2_bnclient_c860(void (*gather)(), void (*hashStr)(), void (*hashSeed)(), void (*store)()) {
-    gather(); hashStr(); hashSeed(); store();
-    return 1;
-}
+// 0xC860, 0xC960 and 0xC9E0 live in src/core/bnclient/bnclient_c860.cpp, bnclient_c960.cpp and bnclient_c9e0.cpp
+// (0xC9E0 is what d2_realm_client_bncs_logon runs).
 
 // 1.13c BNClient+0x0CDD0
 // Walk a double-NUL multistring, CreateProcess each (flags 0x20); close handles; 0 on first failure.

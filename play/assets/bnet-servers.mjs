@@ -97,35 +97,48 @@ export function gatewayRows(servers) {
 export const GATEWAY_STORAGE_KEY = 'd2web.bnet.gateway';
 
 /** The committed index at boot: the persisted region if it is still configured, else U.S. EAST, else the first. */
-export function initialGatewayIndex(servers, storage = null) {
+export function initialGatewayIndex(servers, storage = null, engine = null) {
   if (!servers.length) return -1;
   let stored = null;
   try { stored = storage?.getItem(GATEWAY_STORAGE_KEY) ?? null; } catch { /* blocked storage keeps the default */ }
-  const byName = (name) => servers.findIndex((s) => s.region.toUpperCase() === String(name).toUpperCase());
+  // With the engine's list loaded the name match is BNClient's __strnicmp and a list with no U.S. EAST takes PickClosestZone.
+  const listed = engine?.setList && engine.setList(servers) === servers.length;
+  const byName = listed ? (name) => engine.find(name) : (name) => servers.findIndex((s) => s.region.toUpperCase() === String(name).toUpperCase());
   const persisted = stored == null ? -1 : byName(stored);
-  return persisted >= 0 ? persisted : Math.max(0, byName('U.S. EAST'));
+  if (persisted >= 0) return persisted;
+  const east = byName('U.S. EAST');
+  return east >= 0 ? east : listed ? Math.max(0, engine.closest(new Date().getTimezoneOffset())) : 0;
 }
 
 /** A repo-owned server list presented in retail 1.13c's measured gateway selection screen. */
-export function createGatewaySelector({ servers, screen, width = 800, height = 600, onCommit = null, storage = null }) {
+export function createGatewaySelector({ servers, screen, width = 800, height = 600, onCommit = null, storage = null, engine = null }) {
   const rows = gatewayRows(servers);
-  let open = false, committed = initialGatewayIndex(servers, storage), choice = committed, hot = null, pressed = null;
+  // With the engine up, the committed gateway is BNClient's own BNGatewayAccess image (+0x1050 assign,
+  // +0x1030 count, +0x1040 current): `engine` = { commit(count, index), current() }. Without it the index stays here.
+  let held = initialGatewayIndex(servers, storage, engine);
+  if (engine && held >= 0) engine.commit(servers.length, held);
+  const state = {
+    get committed() { return engine && held >= 0 ? engine.current() : held; },
+    set committed(v) { held = v; if (engine && v >= 0) engine.commit(servers.length, v); },
+  };
+  let open = false, choice = state.committed, hot = null, pressed = null;
   let drawn = { panel: [], heading: null, body: [], rows: [], selection: null, buttons: [] };
   const rowAt = (x, y) => rows.findIndex((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
   const buttonAt = (x, y) => Object.entries(GATEWAY_LAYOUT.button).filter(([k]) => k === 'ok' || k === 'cancel')
     .find(([k, b]) => x >= b.x && x < b.x + GATEWAY_LAYOUT.button.w && y >= GATEWAY_LAYOUT.button.y && y < GATEWAY_LAYOUT.button.y + GATEWAY_LAYOUT.button.h)?.[0] ?? null;
-  const selectedServer = () => committed >= 0 ? { ...servers[committed] } : null;
+  const selectedServer = () => state.committed >= 0 ? { ...servers[state.committed] } : null;
   // The descriptor's keyboard action and matching pointer release share the same callback.
   const finish = (button) => {
     pressed = null;
     open = false;
     if (button === 'ok') {
-      committed = choice;
+      state.committed = choice;
+      const committed = state.committed;
       if (committed >= 0) { try { storage?.setItem(GATEWAY_STORAGE_KEY, servers[committed].region); } catch { /* storage failure keeps the in-memory choice */ } }
       if (onCommit && committed >= 0) onCommit({ ...servers[committed] });
       return committed;
     }
-    choice = committed;
+    choice = state.committed;
     return -1;
   };
   return {
@@ -136,8 +149,8 @@ export function createGatewaySelector({ servers, screen, width = 800, height = 6
         rows: rows.map((r) => ({ region: r.region, host: r.host, x: r.x, y: r.y, w: r.w, h: r.h, anchorY: r.anchorY })),
         open, hot, selected: selectedServer(), highlighted: choice >= 0 ? servers[choice].region : null, drawn };
     },
-    openDialog() { if (!servers.length) return false; open = true; choice = committed; hot = null; pressed = null; return true; },
-    closeDialog() { open = false; choice = committed; pressed = null; },
+    openDialog() { if (!servers.length) return false; open = true; choice = state.committed; hot = null; pressed = null; return true; },
+    closeDialog() { open = false; choice = state.committed; pressed = null; },
     targets(w, h) {
       const scale = Math.min(w / width, h / height);
       const ox = Math.round((w - width * scale) / 2), oy = Math.round((h - height * scale) / 2);
@@ -171,7 +184,7 @@ export function createGatewaySelector({ servers, screen, width = 800, height = 6
       return true;
     },
     cancel() { pressed = null; },
-    gatewayBar() { return committed >= 0 ? GATEWAY_BAR_PREFIX + servers[committed].region.toUpperCase() : DEFAULT_GATEWAY_LABEL; },
+    gatewayBar() { const committed = state.committed; return committed >= 0 ? GATEWAY_BAR_PREFIX + servers[committed].region.toUpperCase() : DEFAULT_GATEWAY_LABEL; },
     draw(ctx) {
       drawn = { panel: [], heading: null, body: [], rows: [], selection: null, buttons: [] };
       if (!open) return drawn;

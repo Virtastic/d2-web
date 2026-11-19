@@ -50,6 +50,16 @@ void* d2_bnclient_gateway_access_assign(void* destination, const void* source) {
     return destination;
 }
 
+// 1.13c BNClient+0x01030
+uint32_t bn_gateway_num_1030(const void* self) {
+    return static_cast<const BNGatewayAccess32*>(self)->gateway_count_08;
+}
+
+// 1.13c BNClient+0x01040 BNGatewayAccess::CurGateway
+uint32_t bn_gateway_cur_1040(const void* self) {
+    return static_cast<const BNGatewayAccess32*>(self)->current_gateway_0c;
+}
+
 // 1.13c BNClient+0x14EE0 BNGatewayAccess::GetBattlenetGatewayList
 // The callee (GetGatewayList, 0x14BB0) is a parameter: it reads the host config, is UNMAPPED, and `_exit(-1)`s on a
 // preset this+0x10, so the caller is a pure function of (this, callee) and the vector hooks it.

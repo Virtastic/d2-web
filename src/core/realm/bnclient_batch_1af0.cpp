@@ -150,11 +150,7 @@ static BnBeginThreadEnv g_bn_begin_thread;
 // 1.13c BNClient+0x1AF0 (292 B): _strncpy. Copy at most count bytes from src to dest stopping after the
 // NUL; when the source is shorter, pad the rest of count with zeros. The decompile's word-at-a-time loops
 // are the compiler's form of the same rule. Returns dest.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_1af0(uint32_t* r) {
-    char* const dest = (char*)(uintptr_t)r[0];
-    const char* src = (const char*)(uintptr_t)r[1];
-    size_t count = (size_t)r[2];
+char* bn_strncpy_1af0(char* dest, const char* src, size_t count) {   // the one body: the probe and the wire both call it
     char* d = dest;
     if (count != 0) {
         while (count != 0 && (*d++ = *src++) != '\0') --count;
@@ -163,7 +159,11 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_1af0(uint32_t* r) {
             while (count != 0) { *d++ = '\0'; --count; }
         }
     }
-    r[4] = (uint32_t)(uintptr_t)dest;
+    return dest;
+}
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_1af0(uint32_t* r) {
+    r[4] = (uint32_t)(uintptr_t)bn_strncpy_1af0((char*)(uintptr_t)r[0], (const char*)(uintptr_t)r[1], (size_t)r[2]);
 }
 
 // 1.13c BNClient+0x1C14 (61 B): type_info::~type_info. Store &vftable into the object, __lock(0xE), free

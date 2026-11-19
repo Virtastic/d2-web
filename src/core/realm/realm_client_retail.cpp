@@ -50,7 +50,7 @@ extern "C" uint32_t bnclient_bfd0(const BnBfd0Env* e, const BnBfd0Globals* g, co
 // ---- D2MCPClient ----
 extern "C" uint32_t d2_mcp_req_7510(const uint8_t* reply, uint8_t* out);
 extern "C" uint32_t d2_mcp_req_6cb0(uint8_t* out);
-extern "C" uint32_t d2_mcp_req_7410(const char* s, uint8_t* out);
+extern "C" uint32_t d2_mcp_6aa0(const char* s, uint8_t* out);   // D2MCPClient+0x6AA0, the exported CHARLOGON thunk into 0x7410
 extern "C" uint32_t d2_mcp_req_7330(const uint8_t* s, uint16_t w, uint8_t* out);
 extern "C" uint32_t d2_mcp_req_7290(const char* s1, const char* s2, uint16_t w, uint8_t* out);
 
@@ -137,10 +137,10 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_mcp_charlist(uint8_t* out) {
     return (int)mcpBody(d2_mcp_req_6cb0(frame), frame, out);
 }
 
-// MCP_CHARLOGON (0x07) through D2MCPClient+0x7410.
+// MCP_CHARLOGON (0x07) through D2MCPClient+0x6AA0 (-> 0x7410).
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_mcp_charlogon(const char* name, uint8_t* out) {
     static uint8_t frame[0x402];
-    return (int)mcpBody(d2_mcp_req_7410(name, frame), frame, out);
+    return (int)mcpBody(d2_mcp_6aa0(name, frame), frame, out);
 }
 
 // MCP_CREATEGAME (0x03) through D2MCPClient+0x7330. The create-game form holds three 16-byte slots (name,
