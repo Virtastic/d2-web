@@ -225,32 +225,6 @@ int32_t sub_546E0(Svc& s,const uint8_t* rec,int32_t base,void* unit,int32_t unit
  return v;
 }
 
-// 1.13c D2Client+0x54780  (param_1 = out string)
-void sub_54780(Svc& s,std::u16string& out){
- auto a=s.str(0xfa2), b=s.str(0xf9e), c=s.str(0xf9b), d=s.str(0xfa1); auto n=dec(0x32);
- out+=a+n+d+c+s.str(0xde2)+b;
-}
-
-// 1.13c D2Client+0x54880  (param_1 = unit, param_2 = out string, param_3 = Row* walked in step with the global table 6fba20d4)
-void sub_54880(Svc& s,G& g,int32_t unitArg,std::u16string& out,const G::Row* tbl){
- auto sF9e=s.str(0xf9e), sF9b=s.str(0xf9b), sFa2=s.str(0xfa2);
- int32_t want=s.ord10620(unitArg);
- for(uint32_t i=0;i<(uint32_t)g.t2128;i++,tbl++){
-  if(tbl->id!=want) continue;
-  int32_t v=s.stat10973(0x47);
-  int32_t id=tbl->id;
-  if(id==8||id==9) v>>=8;
-  if(id==6||id==7) v>>=8;
-  if(id==10||id==0xb) v>>=8;
-  std::u16string tail; if(v>0) tail=s.str(tbl->w8); else if(v<0) tail=s.str(tbl->wA);
-  if(v==0) continue;
-  auto d=dec(v);
-  if(tbl->f1!=1) s.fatal(0x141);
-  std::u16string val = v<1 ? d : sFa2+d;
-  if(g.t20d4[i].id!=2) s.fatal(0x13d);
-  out += tail+sF9b+val+sF9e;
- }
-}
 
 // old form of D2Client 54AC0 (now d2client_54ac0.cpp)  (param_1 = unit, param_2 = stat arg, param_3 = skill idx, param_4 = expected, param_5 = skill rec, param_6 = out flag)
 int32_t sub_54AC0(Svc& s,void* unit,int32_t statArg,int32_t idx,int32_t expect,const uint8_t* rec5,uint32_t* flag,

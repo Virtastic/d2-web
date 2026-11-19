@@ -7,16 +7,18 @@
 #include <Path/Path.h>
 #include <Units/Units.h>
 #include "realm_skill_start.h"
+#include "../compat/test_seam.h"
 
 int d2client_realm_406f0(D2UnitStrc* unit, int skillId, int level) {
     D2SkillsTxt* row = DATATBLS_GetSkillsTxtRecord(skillId);
     if (!row) return 0;
+    D2_CALL(d2client_realm_2a0b0, unit);
     D2DynamicPathStrc* path = unit->pDynamicPath;
     if (!path) return 0;
-    D2UnitStrc* target = PATH_GetTargetUnit(path);
-    D2SkillStrc* used = UNITS_GetUsedSkill(unit);
+    D2UnitStrc* target = D2_CALL(PATH_GetTargetUnit, path);
+    D2SkillStrc* used = D2_CALL(UNITS_GetUsedSkill, unit);
     if (!used) return 0;
-    if (!target) { SKILLS_SetParam1(used, 0); return 1; }
-    SKILLS_SetParam1(used, SKILLS_EvaluateSkillFormula(unit, row->dwCalc[0], skillId, level));
+    if (!target) { D2_CALL(SKILLS_SetParam1, used, 0); return 1; }
+    D2_CALL(SKILLS_SetParam1, used, D2_CALL(SKILLS_EvaluateSkillFormula, unit, row->dwCalc[0], skillId, level));
     return 1;
 }

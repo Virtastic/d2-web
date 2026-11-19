@@ -68,38 +68,7 @@ void d2_client_761c0(uint32_t entry, uint32_t local_unit_11bbfc, int32_t org_x_9
     }
 }
 
-// 1.13c D2Client+0x763C0 (961 B) NAMED: hover tooltip box for a party entry. player = entry's unit/player
-// record in EBX (guess): name at +0x66, id +0x10, relation +0x1c. Strings via Unicode callbacks.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_763c0(uint32_t player, uint32_t local_unit_11bbfc, int32_t org_x_9a0, int32_t org_y_9a4,
-                     uint32_t cfg_980, uint8_t col_bff8,
-                     uint32_t (*sub_4fd90)(uint32_t, uint32_t),
-                     char16_t* (*ord10003)(char16_t*), void (*uni_toUnicode)(char16_t*, const char*, int),
-                     void (*uni_strcpy)(char16_t*, const char16_t*),
-                     void (*uni_sprintf)(int, char16_t*, const char16_t*, const char16_t*),
-                     int (*ord10028)(void),
-                     void (*ord10014)(int32_t, int32_t, int32_t, int32_t, uint32_t, int),
-                     void (*ord10150)(int32_t, int32_t, int32_t)) {
-    char16_t a[256] = {0}, b[256] = {0}, name[256] = {0};
-    int32_t h = 0x10;
-    uni_toUnicode(name, (const char*)(uintptr_t)(player + 0x66), 0x80);
-    uint32_t u = local_unit_11bbfc;
-    int32_t id = u ? (int32_t)rd32(u + 0xc) : 0, pid = (int32_t)rd32(player + 0x10);
-    int self8 = u && sub_4fd90(id, 8), self1 = u && sub_4fd90(id, 1);
-    int oth8 = u && sub_4fd90(pid, 8), oth1 = u && sub_4fd90(pid, 1);
-    int32_t rel = (int32_t)rd32(player + 0x1c);
-    if (self8 == oth8) uni_strcpy(a, ord10003(0)); else uni_sprintf(0x80, a, ord10003(name), name);
-    if (*(const uint8_t*)(uintptr_t)(cfg_980 + 0x1eb) & 4) {
-        (void)rel; h = 0x1e;
-        if (self1 == oth1) uni_strcpy(b, ord10003(0)); else uni_sprintf(0x80, b, ord10003(name), name);
-    }
-    int32_t w1 = ord10028(), w2 = ord10028();
-    int32_t w = (w1 + 10 <= w2 + 10) ? w2 + 10 : w1 + 10;
-    int32_t x = org_x_9a0 + 0x24;
-    ord10014(x, 0x23 - org_y_9a4, x + w, h + 0x23 - org_y_9a4, col_bff8, 2);
-    ord10150(0x32 - org_y_9a4, 2, 0);
-    ord10150(0x41 - org_y_9a4, x, 0);
-}
+// D2Client 763C0 lives in d2client_763c0.cpp.
 
 // D2Client 76790 moved to d2client_76790.cpp.
 
@@ -218,33 +187,9 @@ void d2_client_77170(uint32_t player, uint32_t tail_ebp, uint32_t* list_fd8,
     *list_fd8 = e;
 }
 
-// 1.13c D2Client+0x77250 (144 B): party panel draw+hover, in order; then the close-button hover (rect
-// x 0x116..0x136, y 0x185..0x1a5) -> Ordinal_10003/10085.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_77250(int32_t org_x_9a0, int32_t org_y_9a4, int32_t mouse_y_824, int32_t mouse_x_828,
-                     void (*sub_50b0)(void), void (*sub_60f0)(void), void (*sub_6790)(void), void (*sub_55d0)(void),
-                     void (*sub_6050)(void), void (*sub_5d30)(void), void (*sub_6b20)(void), void (*sub_53d0)(void),
-                     void (*ord10003)(int32_t, int, int), void (*ord10085)(void)) {
-    sub_50b0(); sub_60f0(); sub_6790(); sub_55d0(); sub_6050(); sub_5d30(); sub_6b20(); sub_53d0();
-    if (org_x_9a0 + 0x116 <= mouse_x_828 && mouse_x_828 <= org_x_9a0 + 0x136 &&
-        0x185 - org_y_9a4 <= mouse_y_824 && mouse_y_824 <= 0x1a5 - org_y_9a4) {
-        ord10003(0x182 - org_y_9a4, 0, 1); ord10085();
-    }
-}
+// D2Client 77250 lives in d2client_77250.cpp.
 
-// 1.13c D2Client+0x772E0 (78 B): rebuild party list: 74F90 clears, then 77170 per player after the first
-// (loop exactly as retail: ends when the node is 0 and counter <= 8).
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_772e0(uint32_t player_list_c14, void (*sub_4f90)(void), void (*sub_7170)(uint32_t)) {
-    sub_4f90();
-    uint32_t p = player_list_c14 ? rd32(player_list_c14 + 0x80) : 0;
-    int n = 0;
-    while (p != 0 || n > 8) {
-        sub_7170(p);
-        if (p == 0) { n++; p = player_list_c14; }
-        else { n++; p = rd32(p + 0x80); }
-    }
-}
+// D2Client 772E0 lives in d2client_772e0.cpp.
 
 // 1.13c D2Client+0x77A50 (505 B): draws the 8 corner cels (frames 0-3, then 4*5+0..3 = 20-23) of the panel
 // frame at 4 positions {x0,x1} x {y0,y1}; rec[13]=param_1 (palette/mode). Frame ids 0..3 then (5*4)+0..3.
@@ -278,11 +223,4 @@ int32_t d2_client_77ca0(uint8_t idx, int32_t org_9a4, int32_t base_bc4c) {
     return (idx >= 1 && idx <= 6) ? org_9a4 + d[idx] + base_bc4c : 0;
 }
 
-// 1.13c D2Client+0x77D30 (69 B): free the cached cel slot [0x6fbc991c * 0x22 dwords] in the 6FB92500 table.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_77d30(uint32_t* slot_table_92500, uint8_t idx_c991c,
-                     void (*ord10065)(uint32_t), void (*ord10043)(int, int)) {
-    uint32_t* s = (uint32_t*)((uint8_t*)slot_table_92500 + (uint32_t)idx_c991c * 0x22);
-    uint32_t v = *s;
-    if (v) { ord10065(v); ord10043(0x7a, 0); *s = 0; }
-}
+// D2Client 77D30 lives in d2client_77d30.cpp.

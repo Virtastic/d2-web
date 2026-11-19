@@ -82,12 +82,6 @@ int32_t sub_524D0(I c2e0,I c0a0,uint8_t c5591,I a212c,uint8_t* o3,uint8_t* o4,ui
  static float (*s_f)(I); s_f=f;
  return I(sub_524D0(0,c2e0,c0a0,c5591,a212c,o3,o4,o5,[](I v)->uint64_t{return uint64_t(int64_t(double(s_f(v))*80.0));}));   // Fog 10083 result, fmul [D2Client+0xD753C] (80.0f), then _ftol
 }
-// 1.13c D2Client+0x52570 (cbbfc = global at DAT_6fbcbbfc, passed as client)
-void sub_52570(P client,Calls& c){
- P p=c.o10754(c.resolve3(U(uintptr_t(client)),1,0x220)); if(!p)return;
- U y=uy(p,c),x=ux(p,c);
- c.fn5ff10(U(uintptr_t(client)),0x271,x,y,0,1);
-}
 // old form of D2Client 52620 / 526E0 / 527A0 (now their own files): unit event message (ids 0x16b / 0x161 / 0x15b)
 static void unitMsg(P unit,U client,U id,Calls& c){
  U y=uy(unit,c),x=ux(unit,c);

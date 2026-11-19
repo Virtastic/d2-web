@@ -9,14 +9,7 @@
 static inline int16_t rs16(uint32_t a) { return *(const int16_t*)(uintptr_t)a; }
 static inline uint32_t r32(uint32_t a) { return *(const uint32_t*)(uintptr_t)a; }
 
-// 1.13c D2Client+0x71360: free three ordinal-10065 handles (c000, c008, c004), then 0xBE020.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_71360(uint32_t* h_c000, uint32_t* h_c008, uint32_t* h_c004,
-                     void (*ord10065)(uint32_t), void (*ord10043)(int, int), void (*sub_be020)(void)) {
-    uint32_t* h[3] = {h_c000, h_c008, h_c004};
-    for (auto p : h) { uint32_t v = *p; if (v) { ord10065(v); ord10043(0x7a, 0); *p = 0; } }
-    sub_be020();
-}
+// D2Client 71360 lives in d2client_71360_svc.cpp.
 
 // 1.13c D2Client+0x71740
 extern "C" EMSCRIPTEN_KEEPALIVE

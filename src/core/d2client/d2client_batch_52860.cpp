@@ -48,33 +48,6 @@ void sub_52860(Svc& s,Unit* ebx){
  if(ebx){ Rec q{}; q.w[0]=1; q.w[1]=H(ebx); q.w[5]=(uint32_t)x; q.w[6]=(uint32_t)y; q.w[11]=0; q.w[12]=1; q.w[4]=0x14c;
   Unit* p=s.f630f0(q); if(p) s.o10019(p,0); }
 }
-// 1.13c D2Client+0x529F0  (ebx = unit)
-void sub_529F0(Svc& s,Unit* ebx){
- if(!ebx) return;
- int32_t k; switch(ebx->id4){ case 0x21c:k=0x1db;break; case 0x21d:k=0x1dc;break; case 0x21e:k=0x1da;break; default:return; }
- Unit* o=s.o10754(s.o10331x(ebx,2,k)); if(!o) return;
- Rec r{}; r.w[0]=0x420; r.w[1]=H(ebx); r.w[2]=H(ebx); r.w[4]=0x21d; r.w[7]=(uint32_t)X(s,o); r.w[8]=(uint32_t)Y(s,o); r.w[12]=1;
- Unit* p=s.f630f0(r); if(p) s.o10637(p,o->id12);
-}
-// 1.13c D2Client+0x52BD0  (esi = unit; EDX = esi at the 5ff10 call)
-void sub_52BD0(Svc& s,Unit* esi){
- if(!esi) return;
- int32_t y=Y(s,esi),x=X(s,esi);
- Unit* n=s.spawn(esi,0x25a,x,y,0,1); if(n) s.o10637(n,0x19);
-}
-// 1.13c D2Client+0x52D90 (disassembly-checked: list walk over DAT_6fbba808[a2134&0x7f] via node[0x39], same compare/return rules)
-void sub_52D90(Svc& s,G& g,const char* msg5a){
- int32_t t=s.o10055();
- if(g.cc2e8==0||t>=g.cc2e8) return;
- for(Unit* n=s.listHead(g.a2134&0x7f);n;n=s.nextNode(n)){
-  if(n->id12!=g.a2134) continue;
-  if(n->type!=1){ s.o10024(msg5a,s.o10265(0x5a)); s.exit_m1(); }
-  if(n->f10!=0xc&&t<g.cc2e8-0x46) return;
-  break;
- }
- uint16_t buf[512]{}; s.fmt10003(g.cc2e8-t,buf);
- s.o10184(); s.o10028(); s.o10150(0x177,9,1); s.o10184();
-}
 // 1.13c D2Client+0x52F10
 void sub_52F10(Svc& s,G& g){
  uint32_t l4=0;
@@ -92,16 +65,6 @@ void sub_52F10(Svc& s,G& g){
  Unit* u=g.cbbfc?s.o10331(g.cbbfc):nullptr; int32_t v=u?s.o10826(u):0;
  if(g.c9624<g.c9628||v!=g.c9630){ // rep stos of 11 dwords from 0x6fbc960c
   g.c960c=0; g.c9610=0; g.c9614=g.c9615=g.c9616=g.c9617=0; g.c9618=0; g.c961c=0; g.c9620=0; g.c9624=0; g.c9628=0; g.c962c=0; g.c9630=0; g.c9634=0; }
-}
-// 1.13c D2Client+0x53070
-void sub_53070(Svc& s){ s.f45570(0x1253,0,0xfa,0,0,0); Rec r{}; s.f630f0(r); }
-// 1.13c D2Client+0x530D0  (esi = unit)
-void sub_530D0(Svc& s,Unit* esi){
- Unit* o=s.o10754(s.o10331x(esi,2,0x182));
- int32_t x,y;
- if(o){ s.f45570(0x124f,0,0x15e,0,0,0); x=X(s,o); y=Y(s,o); } else { x=X(s,esi)-0xf; y=Y(s,esi)-0xf; }
- Rec r{}; r.w[0]=0x420; r.w[4]=0x170; r.w[1]=H(esi); r.w[2]=H(esi); r.w[7]=(uint32_t)x; r.w[8]=(uint32_t)y; r.w[12]=1;
- Unit* p=s.f630f0(r); if(p&&o) s.o10637(p,o->id12);
 }
 // 1.13c D2Client+0x532C0  (eax = unit)
 void sub_532C0(Svc& s,G& g,Unit* eax){

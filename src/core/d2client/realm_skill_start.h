@@ -4,6 +4,10 @@
 #include <cstdint>
 struct D2UnitStrc;
 
+// Retail runs D2Client+0x2A0B0 (refresh the unit's path target) first in start functions 6 and 10; the engine unit's path is
+// already current, so this is a seam point only (a probe binds it to the recorder).
+void d2client_realm_2a0b0(D2UnitStrc* unit);
+
 // 1 when the hand weapon has something to shoot or throw (non-players always do).
 int d2client_realm_a0a30(D2UnitStrc* unit);
 int d2client_realm_a0ea0(D2UnitStrc* unit, int skillId, int level);   // start function 1

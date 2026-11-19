@@ -11,9 +11,7 @@
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_678e0(uint32_t* obj) { *obj = 0xD5048u; }
 
-// 1.13c D2Client+0x72BA0 (10 B): tail-call thunk to D2Client+0x20A60, no arguments. w[0] := callee RVA.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_72ba0(uint32_t* w) { w[0] = 0x20A60u; }
+// D2Client 72BA0 lives in d2client_72ba0.cpp.
 
 // 1.13c D2Client+0x20FA0 (12 B): tail-call thunk to D2Client+0x20A60, no arguments. w[0] := callee RVA.
 extern "C" EMSCRIPTEN_KEEPALIVE

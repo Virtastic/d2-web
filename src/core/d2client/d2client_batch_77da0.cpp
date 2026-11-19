@@ -23,14 +23,7 @@ void d2_client_77da0(uint32_t unit_bbfc, int32_t* tab_3d38, int (*ord11120)(uint
 
 // 1.13c D2Client+0x77F30: its own file, d2client_77f30.cpp.
 
-// 1.13c D2Client+0x781D0 (77 B) fastcall(ecx unused, edx=off): one text draw at off-0x1e0+base.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_781d0(int32_t off, int32_t y0_b9a4, int32_t y1_bc4c, void (*ord10028)(void),
-                     void (*ord10150)(int, int, int)) {
-    int32_t base = y0_b9a4 + y1_bc4c;
-    ord10028();
-    ord10150(off - 0x1e0 + base, 0, 0);
-}
+// D2Client 781D0 lives in d2client_781d0.cpp.
 
 // 1.13c D2Client+0x78330 (1174 B): three centred labels (D2Lang strings 0x1083..0x1085, drawn through D2Win 0xD37E), then a
 // per-class list of (string id, x) pairs, each drawn by sub_781D0 (EDX = x, EBX = the D2Lang string).

@@ -12,8 +12,9 @@ void d2_client_769e0(uint32_t entry, int32_t x_base, uint32_t unit, uint32_t g_b
 void d2_client_77170(uint32_t player, uint32_t tail_ebp, uint32_t* list_fd8, uint32_t (*ord10042)(uint32_t, int, int),
                      void (*sub_769e0)(uint32_t, uint32_t), uint32_t (*ord10265)(int), void (*ord10024)(uint32_t, uint32_t),
                      void (*exit_fn)(int));
-void d2_client_772e0(uint32_t player_list_c14, void (*sub_4f90)(void), void (*sub_7170)(uint32_t));
 }
+struct D2ClientRows772e0Env { void (*clear)(); void (*row)(uint32_t y, uint32_t node); };
+extern "C" void d2client_772e0_port(const uint32_t* headGlobal, const D2ClientRows772e0Env* env);
 struct D2cGlobals76B20 { uint32_t curY, curX, cfg, viewX, viewY, player, roster, rows, color; };
 struct D2cSeam76B20 {
     uint32_t (*room)(uint32_t); uint32_t (*color)(uint32_t, uint32_t, uint32_t); uint32_t (*roomTest)(uint32_t);
@@ -90,7 +91,8 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_party_host_add(int32_t level, int32_t par
 // 1.13c D2Client+0x772E0: rebuild the panel rows; returns the row count.
 EMSCRIPTEN_KEEPALIVE int32_t d2_client_party_host_build() {
     H.rosterHead = H.n ? A(H.roster[0]) : 0; clearRows();
-    d2_client_772e0(H.rosterHead, clearRows, append);
+    const D2ClientRows772e0Env env = { clearRows, [](uint32_t, uint32_t node) { append(node); } };
+    d2client_772e0_port(&H.rosterHead, &env);
     return int32_t(H.nRows);
 }
 // 1.13c D2Client+0x76B20 at the mouse point (800x600 screen coordinates); returns the number of recorded draws.

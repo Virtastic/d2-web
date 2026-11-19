@@ -17,17 +17,7 @@ struct Uni {  // Unicode:: helpers, host-supplied
     void (*toUnicode)(wch*, const char*, int); void (*win2Unicode)(wch*, const char*, int);
 };
 
-// 1.13c D2Client+0x75030 (124 B): x in EAX (guess). Draws two Ordinal_10041 button cells at panel+0xc / +0x10b.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_75030(int32_t x_eax, int32_t panel_x_bca0, int32_t panel_y_b9a4, uint32_t col_bfec,
-                     void (*ord10041)(int32_t*, int32_t, int32_t, int32_t, int32_t, int32_t)) {
-    int32_t a[18] = {0};
-    a[13] = 0;  // local_48[0]=0
-    int32_t s[4] = {1, 0, 0, 0};
-    (void)col_bfec;
-    ord10041(a, panel_x_bca0 + 0xc, 0, 0, 0, 0);
-    ord10041(s, panel_x_bca0 + 0x10b, x_eax - panel_y_b9a4, -1, 5, 0);
-}
+// D2Client 75030 lives in d2client_75030.cpp.
 
 // D2Client 750B0 moved to d2client_750b0.cpp (one frame block for all four calls, cel word = g11BFDC).
 

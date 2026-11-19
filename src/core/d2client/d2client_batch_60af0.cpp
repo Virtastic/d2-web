@@ -12,32 +12,6 @@ static inline int16_t rd16(uint32_t a) { return *(const int16_t*)(uintptr_t)a; }
 static inline void wr32(uint32_t a, uint32_t v) { *(uint32_t*)(uintptr_t)a = v; }
 static inline void wr16(uint32_t a, int16_t v) { *(int16_t*)(uintptr_t)a = v; }
 
-// 1.13c D2Client+0x61140 (470 B): for each of four list heads (via 0x5F3B0 -> chain) that is non-zero,
-// load the string id (0x4ea/0x4f1/0x4f8/0x4ff), call 0x5F360 on that entry, then 0x60510 and free (0x509..0x50c).
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_61140(uint32_t* rec_c1c4, uint32_t* tab_c3bc, uint32_t* str_c1b4,
-                     uint32_t (*sub_5f3b0)(uint32_t, int32_t*), void (*sub_5f360)(uint32_t),
-                     uint32_t (*ord10042)(int, int), void (*ord10043)(int, int), void (*sub_60510)(void)) {
-    (void)tab_c3bc;
-    if (!rec_c1c4) return;
-    int32_t a = 0, b = 0, c = 0, d = 0;
-    int l10 = 0, lc = 0, l8 = 0, l4 = 0;
-    uint32_t r = sub_5f3b0(rec_c1c4[2], &a);
-    r = sub_5f3b0(rd32(r + 0xc), &b);
-    r = sub_5f3b0(rd32(r + 0x10), &c);
-    sub_5f3b0(rd32(r + 0x14), &d);
-    if (!a && !b && !c && !d) return;
-    if (a) { *str_c1b4 = ord10042(0x4ea, 0); l10 = *str_c1b4; sub_5f360(rec_c1c4[2]); }
-    if (b) { *str_c1b4 = ord10042(0x4f1, 0); lc = *str_c1b4; sub_5f360(rec_c1c4[3]); }
-    if (c) { *str_c1b4 = ord10042(0x4f8, 0); l8 = *str_c1b4; sub_5f360(rec_c1c4[4]); }
-    if (d) { *str_c1b4 = ord10042(0x4ff, 0); l4 = *str_c1b4; sub_5f360(rec_c1c4[5]); }
-    sub_60510();
-    if (l10) ord10043(0x509, 0);
-    if (lc) ord10043(0x50a, 0);
-    if (l8) ord10043(0x50b, 0);
-    if (l4) ord10043(0x50c, 0);
-}
-
 // 1.13c D2Client+0x61320 (274 B): recursive AVL insert of node `n` into the tree at *root.
 // Key order: [n+8] (s16), [n+6] (s16), then group table [0x1155B8 + s16[n+4]*4] (-1 or equal = tie), then [n+4].
 // Balance in s16 [node+10]; children [+0xc] left, [+0x10] right. Returns 1 when the subtree height grew.
@@ -93,59 +67,6 @@ void d2_client_61440(uint32_t* head_c1c0, uint32_t* cur_c1c4, void (*sub_61140)(
     uint32_t p = *head_c1c0;
     while (p) { uint32_t node = p; p = rd32(p + 0x18); free_bf86(node, 0xc1a, 0); }
     *head_c1c0 = 0; *cur_c1c4 = 0;
-}
-
-// 1.13c D2Client+0x61490 (736 B) NAMED: EAX=unit (guess), EBX=out colour byte* (guess), ECX=param_1.
-// Picks the automap colour byte for a unit; returns 1 when *out was chosen, 0 for "no marker".
-extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2_client_61490(uint32_t unit, uint8_t* out, uint32_t local_unit_11bbfc, const uint8_t* col_c210_c218,
-                         int16_t (*sub_55b60)(void), uint32_t (*sub_1760)(uint32_t, int),
-                         uint32_t (*sub_560d0)(void), uint32_t (*sub_219f0)(void),
-                         int (*ord10866)(void), uint32_t (*ord11134)(uint32_t),
-                         uint32_t (*ord10331)(void), int (*ord10826)(uint32_t), uint32_t flag_1a16b8,
-                         uint32_t arg_ecx) {
-    uint32_t type = unit ? rd32(unit) : 6;
-    if (type == 0) {
-        if (!unit || rd32(unit + 0x10) != 0x11) {
-            if (unit == local_unit_11bbfc) { *out = col_c210_c218[0]; return 1; }
-            int16_t a = sub_55b60();
-            if (a != -1 && a == sub_55b60()) { *out = col_c210_c218[3]; return 1; }
-            *out = col_c210_c218[1]; return 1;
-        }
-        if (rd32(unit + 0x60) && ord11134(rd32(unit + 0x60)) == rd32(unit + 0xc)) { *out = col_c210_c218[2]; return 1; }
-    } else if (type == 1) {
-        if (unit) {
-            if (rd32(unit + 0x10) == 0xc) return 0;
-            if ((rd32(unit + 0xc4) >> 0x15) & 1) return 0;
-        }
-        if (sub_1760(arg_ecx, 9) == 0) {
-            if (ord10866() && sub_560d0()) {
-                int16_t a = sub_55b60();
-                if (a == -1 || a != sub_55b60()) { *out = col_c210_c218[1]; return 1; }
-                *out = col_c210_c218[4]; return 1;
-            }
-            switch (sub_219f0()) {
-            case 0: case 3: break;
-            case 1:
-                *out = col_c210_c218[4]; return 1;   // both branches of the flag test store [c214]
-            case 2:
-                if (flag_1a16b8) { *out = col_c210_c218[5]; return 1; }
-                break;
-            default: return 1;
-            }
-        } else {
-            uint32_t cls = unit ? rd32(unit + 4) : 0;
-            if (!unit || (cls != 0x219 && cls != 0x21a && cls != 0x21b)) { *out = col_c210_c218[6]; return 1; }
-        }
-    } else if (type == 2) {
-        int32_t cls = unit ? (int32_t)rd32(unit + 4) : -1;
-        if (cls == 0x3b) { *out = col_c210_c218[8]; return 1; }
-        if (cls == 0x3c) {
-            int v = ord10826(ord10331());
-            if (v != 0x7d && v != 0x7e && v != 0x7f && v != 0x6f && v != 0x70 && v != 0x75) { *out = col_c210_c218[8]; return 1; }
-        } else if (cls == 0x10b) { *out = 0; return 1; }
-    }
-    return 0;
 }
 
 // 1.13c D2Client+0x62580 (218 B, ret 0xC): stack (room, force, ctx). Retail: edi = cc4c(ecx=room); base = cc34(room, &cnt);

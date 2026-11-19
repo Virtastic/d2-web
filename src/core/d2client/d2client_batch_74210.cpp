@@ -83,14 +83,7 @@ uint32_t d2_client_74BE0(uint32_t unit, int32_t p2, int32_t p3, uint32_t tbl,
     return 1;
 }
 
-// 1.13c D2Client+0x74D80 (212 B): free five handles (globals 6fbcbfdc..bfec) via ord 10065, string 0x7a when set.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_74D80(uint32_t* h_bcbfdc_to_bfec /*5 slots*/, void (*o10065)(uint32_t), void (*o10043)(int, int)) {
-    for (int i = 0; i < 5; i++) {
-        uint32_t v = h_bcbfdc_to_bfec[i];
-        if (v) { o10065(v); o10043(0x7a, 0); h_bcbfdc_to_bfec[i] = 0; }
-    }
-}
+// D2Client 74D80 lives in d2client_74d80.cpp.
 
 // 1.13c D2Client+0x74ED0 (102 B): thin dispatcher of mode 0..6 to a text draw. Disassembly at 6FB24ED0 (the decompile
 // drops the case constants): the mode in ECX selects an id (0x103A 0x103B 0x103D 0x103E 0x103C 0x2771 0x2772 for cases 0..6,
