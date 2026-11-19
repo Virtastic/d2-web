@@ -2,6 +2,7 @@
 // build-wasm/ghidra-fog/decomp/0x17E60.c (alpha lane: NAMED, no spec, no vector; stateful).
 #include <cstdint>
 #include <cstring>
+extern "C" char* fog_strrchr_2d40(const char* s, int ch);   // Fog+0x2D40, the one copy
 
 // Host seams (registry, GetFileAttributesA, GetModuleFileNameA); default: nothing available.
 extern "C" {
@@ -18,7 +19,7 @@ extern "C" void fog_sub_17e60(char* buf, uint32_t size) {
         buf[0] = '\0';
         g_exePath(buf, size);
         buf[size - 1] = '\0';
-        char* s = std::strrchr(buf, '\\');
+        char* s = fog_strrchr_2d40(buf, '\\');
         if (s) s[1] = '\0';
         g_regWrite(buf);
     }

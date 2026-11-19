@@ -3,6 +3,7 @@
 // or family+extfamily != 0xF). Returns 0. Everything hardware is a seam.
 #include <cstdint>
 #include <cstring>
+extern "C" int32_t fog_strncmp_90c0(const uint8_t* a, const uint8_t* b, uint32_t n);   // Fog+0x90C0, the one copy
 
 struct FogCpuEnv {
     int (*has_cpuid)();                              // EFLAGS.ID toggle test
@@ -24,7 +25,7 @@ extern "C" int fog_sub_7c9c(FogCpuOut* o, const FogCpuEnv* e) {
         o->sse2 = 1;
         uint32_t fam = (ver >> 8) & 0xf;
         uint32_t ext = fam != 0xf ? 0 : (ver >> 20) & 0xff;
-        if (strncmp("AuthenticAMD", reinterpret_cast<char*>(vendor), 12) != 0 || ext + fam != 0xf) o->flag2 = 1;
+        if (fog_strncmp_90c0((const uint8_t*)"AuthenticAMD", reinterpret_cast<const uint8_t*>(vendor), 12) != 0 || ext + fam != 0xf) o->flag2 = 1;
     }
     return 0;
 }
