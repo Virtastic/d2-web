@@ -347,6 +347,7 @@ void __fastcall sub_6FC627B0(D2UnitStrc* pUnit, int32_t nMode)
 // 1.13c D2Game+0x77790 (checked against decompile: target = refreshed path target unless it is the unit itself; no delta)
 void __fastcall sub_6FC62D90(D2UnitStrc* pUnit, D2GameStrc* pGame)
 {
+	if (D2Seam<&sub_6FC62D90>::hook) { D2Seam<&sub_6FC62D90>::hook(pUnit, pGame); return; }
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
     if (pTarget)
     {
@@ -414,6 +415,7 @@ void __fastcall D2GAME_MONSTER_ApplyCriticalDamage_6FC62E70(D2UnitStrc* pAttacke
 // 1.13c D2Game+0x77060
 uint8_t __fastcall sub_6FC62F50(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&sub_6FC62F50>::hook) return D2Seam<&sub_6FC62F50>::hook(pUnit);
     if (pUnit)
     {
         const int32_t nHitpoints = STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0) >> 8;
@@ -698,6 +700,7 @@ void __fastcall D2GAME_MONSTER_ApplyStatRegen_6FC63440(D2GameStrc* pGame, D2Unit
 // 1.13c D2Game+0x1220
 D2MonStatsTxt* __fastcall MONSTERMODE_GetMonStatsTxtRecord(int32_t nMonsterId)
 {
+	if (D2Seam<&MONSTERMODE_GetMonStatsTxtRecord>::hook) return D2Seam<&MONSTERMODE_GetMonStatsTxtRecord>::hook(nMonsterId);
     if (nMonsterId >= 0 && nMonsterId < sgptDataTables->nMonStatsTxtRecordCount)
     {
         return &sgptDataTables->pMonStatsTxt[nMonsterId];
@@ -1408,6 +1411,7 @@ void __fastcall D2GAME_MONSTERMODE_QuillRatVolley_75A40(D2UnitStrc* pUnit, D2Gam
 // there is no unit or no missile. The level is the game's difficulty bonus + 1, or the unit's level for a mercenary; after a spawn the quill rat volley (+0x75A40) runs.
 int32_t MONSTERMODE_FireAttackMissile(D2UnitStrc* pUnit, D2GameStrc* pGame, int32_t bMoving)
 {
+	if (D2Seam<&MONSTERMODE_FireAttackMissile>::hook) return D2Seam<&MONSTERMODE_FireAttackMissile>::hook(pUnit, pGame, bMoving);
     if (!pUnit)
     {
         return 0;
@@ -1724,6 +1728,7 @@ int32_t __fastcall sub_6FC64E90(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // 1.13c D2Game+0x749A0 (unit in ECX, mode in EAX; an out-of-range mode returns null without a trace)
 const D2MonModeCallbackTableStrc* __fastcall MONSTERMODE_GetCallbackTableRecord(D2UnitStrc* pUnit, int32_t nMode)
 {
+	if (D2Seam<&MONSTERMODE_GetCallbackTableRecord>::hook) return D2Seam<&MONSTERMODE_GetCallbackTableRecord>::hook(pUnit, nMode);
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
     {
         return 0;
@@ -1848,6 +1853,7 @@ void __fastcall D2GAME_MONSTERS_AiFunction02_6FC65150(D2GameStrc* pGame, D2UnitS
 // 1.13c D2Game+0x75E10
 int32_t __stdcall D2GAME_ModeChange_6FC65220(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange, int32_t a3)
 {
+	if (D2Seam<&D2GAME_ModeChange_6FC65220>::hook) return D2Seam<&D2GAME_ModeChange_6FC65220>::hook(pGame, pModeChange, a3);
     // TODO: v12, v13, v31, dwNewDist
 
     D2UnitStrc* pUnit = pModeChange->pUnit;
@@ -2152,6 +2158,7 @@ int32_t __fastcall sub_6FC65680(D2UnitStrc* pUnit, int32_t nPathType, D2AiParamS
 // 1.13c D2Game+0x75070
 void __stdcall MONSTERMODE_GetModeChangeInfo(D2UnitStrc* pUnit, int32_t nMode, D2ModeChangeStrc* pModeChange)
 {
+	if (D2Seam<&MONSTERMODE_GetModeChangeInfo>::hook) { D2Seam<&MONSTERMODE_GetModeChangeInfo>::hook(pUnit, nMode, pModeChange); return; }
     D2_ASSERT(nMode < 16);
 
     D2_CALL(UNITS_SetUsedSkill, pUnit, nullptr);

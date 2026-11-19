@@ -496,6 +496,7 @@ extern "C" int D2Skills_EvaluateCalcSpan(const void* pExpression, int nExpressio
 // 1.13c D2Common+0x51BF0 (#10786)
 int __stdcall SKILLS_EvaluateSkillFormula(D2UnitStrc* pUnit, unsigned int nCalc, int nSkillId, int nSkillLevel)
 {
+	if (D2Seam<&SKILLS_EvaluateSkillFormula>::hook) return D2Seam<&SKILLS_EvaluateSkillFormula>::hook(pUnit, nCalc, nSkillId, nSkillLevel);
 	D2SkillCalcStrc pSkillCalc = {};
 
 	if (sgptDataTables->pSkillsCode && nCalc < sgptDataTables->nSkillsCodeSize)
@@ -624,6 +625,7 @@ void __stdcall SKILLS_RefreshSkill(D2UnitStrc* pUnit, int nSkillId)
 // 1.13c D2Common+0x52AE0
 void __stdcall SKILLS_RefreshPassiveSkills(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&SKILLS_RefreshPassiveSkills>::hook) { D2Seam<&SKILLS_RefreshPassiveSkills>::hook(pUnit); return; }
 	D2SkillsTxt* pSkillsTxtRecord = NULL;
 	D2SkillStrc* pSkill = NULL;
 	int nSkillId = 0;
@@ -674,6 +676,7 @@ D2SkillStrc* __fastcall SKILLS_GetHighestLevelSkillFromSkillId(D2UnitStrc* pUnit
 // 1.13c D2Common+0x4E460
 int __stdcall SKILLS_GetSkillModeFromUnit(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
+	if (D2Seam<&SKILLS_GetSkillModeFromUnit>::hook) return D2Seam<&SKILLS_GetSkillModeFromUnit>::hook(pUnit, pSkill);
 	if (pUnit && pSkill)
 	{
 		return pSkill->dwSkillMode;
@@ -784,6 +787,7 @@ D2SkillStrc* __stdcall SKILLS_GetFirstSkillFromSkillList(D2SkillListStrc* pSkill
 // not-1.13c: 1.13c exports the lookup itself (SKILLS_GetSkill); there is no separate forwarder
 D2SkillStrc* __fastcall SKILLS_GetSkillById(D2UnitStrc* pUnit, int nSkillId, D2UnitGUID nOwnerGUID)
 {
+	if (D2Seam<&SKILLS_GetSkillById>::hook) return D2Seam<&SKILLS_GetSkillById>::hook(pUnit, nSkillId, nOwnerGUID);
 	return SKILLS_GetSkill(pUnit, nSkillId, nOwnerGUID);
 }
 
@@ -791,6 +795,7 @@ D2SkillStrc* __fastcall SKILLS_GetSkillById(D2UnitStrc* pUnit, int nSkillId, D2U
 // 1.13c D2Common+0x4F070
 D2SkillStrc* __fastcall SKILLS_GetHighestLevelSkillFromUnitAndId(D2UnitStrc* pUnit, int nSkillId)
 {
+	if (D2Seam<&SKILLS_GetHighestLevelSkillFromUnitAndId>::hook) return D2Seam<&SKILLS_GetHighestLevelSkillFromUnitAndId>::hook(pUnit, nSkillId);
 	return SKILLS_GetHighestLevelSkillFromSkillId(pUnit, nSkillId);
 }
 
@@ -1321,6 +1326,7 @@ void __stdcall SKILLS_SetRightActiveSkill(D2UnitStrc* pUnit, int nSkillId, D2Uni
 // 1.13c D2Common+0x4E1D0 (retail returns 0 for a null skill without a trace; szFile/nLine are unused)
 int __stdcall SKILLS_GetSkillIdFromSkill(D2SkillStrc* pSkill, const char* szFile, int nLine)
 {
+	if (D2Seam<&SKILLS_GetSkillIdFromSkill>::hook) return D2Seam<&SKILLS_GetSkillIdFromSkill>::hook(pSkill, szFile, nLine);
 	(void)szFile;
 	(void)nLine;
 	if (pSkill)
@@ -1527,6 +1533,7 @@ BOOL __fastcall SKILLS_CheckUseItemTypes(D2SkillStrc* pSkill, D2UnitStrc* pUnit)
 // 1.13c D2Common+0x52340
 int __stdcall SKILLS_GetUseState(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
+	if (D2Seam<&SKILLS_GetUseState>::hook) return D2Seam<&SKILLS_GetUseState>::hook(pUnit, pSkill);
 	D2_ASSERT(pSkill);
 
 	if (!pSkill->pSkillsTxt || !(pSkill->pSkillsTxt->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_INGAME]))
@@ -1890,6 +1897,7 @@ BOOL __fastcall SKILLS_CheckSkillDelay(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 // 1.13c D2Common+0x4E1C0
 D2SkillsTxt* __fastcall SKILLS_GetSkillsTxtRecordFromSkill(D2SkillStrc* pSkill)
 {
+	if (D2Seam<&SKILLS_GetSkillsTxtRecordFromSkill>::hook) return D2Seam<&SKILLS_GetSkillsTxtRecordFromSkill>::hook(pSkill);
 	if (pSkill)
 	{
 		return pSkill->pSkillsTxt;
@@ -1994,6 +2002,7 @@ int __fastcall SKILLS_GetBonusSkillLevel(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 // 1.13c D2Common+0x505C0
 int __stdcall SKILLS_GetSkillLevel(D2UnitStrc* pUnit, D2SkillStrc* pSkill, BOOL bBonus)
 {
+	if (D2Seam<&SKILLS_GetSkillLevel>::hook) return D2Seam<&SKILLS_GetSkillLevel>::hook(pUnit, pSkill, bBonus);
 	int nSkillLevel = 0;
 	int nMaxLevel = 0;
 
@@ -2148,6 +2157,7 @@ void __stdcall SKILLS_SetSkillMode(D2SkillStrc* pSkill, int nSkillMode)
 // 1.13c D2Common+0x4E180 (1.13c returns 0 for a null skill with no trace)
 int __stdcall SKILLS_GetSkillMode(D2SkillStrc* pSkill)
 {
+	if (D2Seam<&SKILLS_GetSkillMode>::hook) return D2Seam<&SKILLS_GetSkillMode>::hook(pSkill);
 	if (pSkill)
 	{
 		return pSkill->dwSkillMode;
@@ -2242,6 +2252,7 @@ int __stdcall SKILLS_GetParam4(D2SkillStrc* pSkill)
 // 1.13c D2Common+0x4DF60
 void __stdcall SKILLS_SetParam1(D2SkillStrc* pSkill, int nPar1)
 {
+	if (D2Seam<&SKILLS_SetParam1>::hook) { D2Seam<&SKILLS_SetParam1>::hook(pSkill, nPar1); return; }
 	D2_ASSERT(pSkill);
 
 	pSkill->nPar1 = nPar1;
@@ -2278,6 +2289,7 @@ void __stdcall SKILLS_SetParam4(D2SkillStrc* pSkill, int nPar4)
 //D2Common.0x6FDB1B70 (#10984)
 void __stdcall SKILLS_SetFlags(D2SkillStrc* pSkill, int nFlags)
 {
+	if (D2Seam<&SKILLS_SetFlags>::hook) { D2Seam<&SKILLS_SetFlags>::hook(pSkill, nFlags); return; }
 	D2_ASSERT(pSkill);
 
 	pSkill->dwFlags = nFlags;
@@ -2287,6 +2299,7 @@ void __stdcall SKILLS_SetFlags(D2SkillStrc* pSkill, int nFlags)
 // 1.13c D2Common+0x4DE40
 int __stdcall SKILLS_GetFlags(D2SkillStrc* pSkill)
 {
+	if (D2Seam<&SKILLS_GetFlags>::hook) return D2Seam<&SKILLS_GetFlags>::hook(pSkill);
 	if (pSkill)
 	{
 		return pSkill->dwFlags;
@@ -2456,6 +2469,7 @@ BOOL __stdcall SKILLS_CheckRequiredAttributes(D2UnitStrc* pUnit, int nSkillId)
 // 1.13c D2Common+0x4EA50
 int __stdcall SKILLS_GetToHitFactor(D2UnitStrc* pUnit, int nSkillId, int nSkillLevel)
 {
+	if (D2Seam<&SKILLS_GetToHitFactor>::hook) return D2Seam<&SKILLS_GetToHitFactor>::hook(pUnit, nSkillId, nSkillLevel);
 	D2SkillsTxt* pSkillsTxtRecord = NULL;
 	unsigned int nCalc = 0;
 
@@ -2857,6 +2871,7 @@ BOOL __stdcall SKILLS_IsPlayerClassSkill(int nSkillId, int* pPlayerClass)
 //D2Common.0x6FDB2F40 (#11011)
 int __stdcall SKILLS_GetQuantity(D2SkillStrc* pSkill)
 {
+	if (D2Seam<&SKILLS_GetQuantity>::hook) return D2Seam<&SKILLS_GetQuantity>::hook(pSkill);
 	D2_ASSERT(pSkill);
 
 	return pSkill->nQuantity;
@@ -2866,6 +2881,7 @@ int __stdcall SKILLS_GetQuantity(D2SkillStrc* pSkill)
 //D2Common.0x6FDB2F70 (#11012)
 void __stdcall SKILLS_SetQuantity(D2SkillStrc* pSkill, int nQuantity)
 {
+	if (D2Seam<&SKILLS_SetQuantity>::hook) { D2Seam<&SKILLS_SetQuantity>::hook(pSkill, nQuantity); return; }
 	D2_ASSERT(pSkill);
 
 	pSkill->nQuantity = nQuantity;
@@ -3050,6 +3066,7 @@ int __stdcall D2Common_11016(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 // 1.13c D2Common+0x50150 (#10444)
 BOOL __stdcall D2COMMON_11017_CheckUnitIfConsumeable(D2UnitStrc* pUnit, int a2)
 {
+	if (D2Seam<&D2COMMON_11017_CheckUnitIfConsumeable>::hook) return D2Seam<&D2COMMON_11017_CheckUnitIfConsumeable>::hook(pUnit, a2);
 	D2MonStats2Txt* pMonStats2TxtRecord = NULL;
 
 	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && (pUnit->dwAnimMode == MONMODE_DEAD || a2 && pUnit->dwAnimMode == MONMODE_DEATH) && !D2_CALL(STATES_CheckStateMaskUdeadOnUnit, pUnit))

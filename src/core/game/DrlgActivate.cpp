@@ -1,4 +1,5 @@
 #include "Drlg/D2DrlgActivate.h"
+#include <test_seam.h>
 
 #include "Drlg/D2DrlgDrlg.h"
 #include "Drlg/D2DrlgDrlgRoom.h"
@@ -364,6 +365,7 @@ void __fastcall DRLGACTIVATE_ChangeClientRoom(D2DrlgRoomStrc* pPreviousRoom, D2D
 // 1.13c D2Common+0x7C270
 void __fastcall DRLGACTIVATE_InitializeRoomEx(D2DrlgRoomStrc* pDrlgRoom)
 {
+	if (D2Seam<&DRLGACTIVATE_InitializeRoomEx>::hook) { D2Seam<&DRLGACTIVATE_InitializeRoomEx>::hook(pDrlgRoom); return; }
 	if (!(pDrlgRoom->dwFlags & DRLGROOMFLAG_TILELIB_LOADED))
 	{
 		DRLGROOMTILE_LoadDT1FilesForRoom(pDrlgRoom);

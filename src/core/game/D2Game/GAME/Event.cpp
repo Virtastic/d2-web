@@ -33,6 +33,7 @@ __forceinline int32_t EVENT_MapUnitTypeToIndex(int32_t nUnitType)
 // 1.13c D2Game+0x8E900
 void __fastcall D2GAME_EVENTS_Delete_6FC34840(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventTypes nEventType, int32_t nEventCustomId)
 {
+	if (D2Seam<&D2GAME_EVENTS_Delete_6FC34840>::hook) { D2Seam<&D2GAME_EVENTS_Delete_6FC34840>::hook(pGame, pUnit, nEventType, nEventCustomId); return; }
     D2EventTimerStrc* pEventTimer = SUNIT_GetTimerFromUnit(pUnit);
     while (pEventTimer)
     {
@@ -50,6 +51,7 @@ void __fastcall D2GAME_EVENTS_Delete_6FC34840(D2GameStrc* pGame, D2UnitStrc* pUn
 // 1.13c D2Game+0x8E6F0
 void __fastcall sub_6FC34890(D2GameStrc* pGame, D2EventTimerStrc* pTimer)
 {
+	if (D2Seam<&sub_6FC34890>::hook) { D2Seam<&sub_6FC34890>::hook(pGame, pTimer); return; }
     if (pTimer->nFlags & EVENTFLAG_0x1)
     {
         pTimer->nFlags |= EVENTFLAG_0x8;
@@ -136,6 +138,7 @@ void __fastcall sub_6FC349B0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nEven
 // 1.13c D2Game+0x8E880
 void __fastcall sub_6FC349F0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&sub_6FC349F0>::hook) { D2Seam<&sub_6FC349F0>::hook(pGame, pUnit); return; }
     // 1.13c has one function for the 1.10f pair (sub_6FC349F0 + D2GAME_DeleteTimersOnUnit_6FC34A30): a null unit is skipped
     if (!pUnit)
     {
@@ -339,6 +342,7 @@ void __fastcall EVENT_ExecuteItemEvents(D2GameStrc* pGame, D2EventTimerQueueStrc
 // 1.13c D2Game+0x8E490
 int32_t __fastcall EVENT_GetEventFrame(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nEvent)
 {
+	if (D2Seam<&EVENT_GetEventFrame>::hook) return D2Seam<&EVENT_GetEventFrame>::hook(pGame, pUnit, nEvent);
     int32_t nEventFrame = 0;
     D2EventTimerStrc* pEventTimer = SUNIT_GetTimerFromUnit(pUnit);
     while (pEventTimer)
@@ -366,6 +370,7 @@ void (*g_d2webOnDeadRegen)(D2UnitStrc* pUnit, const char* szSite) = nullptr;
 // (1.13c 0x5E790 is not this function: that is the quest-0x22 helper in src/core/d2game/d2game_5e790.cpp)
 void __fastcall EVENT_SetEvent(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventTypes nEventType, int32_t nExpireFrame, int32_t dwEventCustomId, int32_t dwEventCustomParam)
 {
+	if (D2Seam<&EVENT_SetEvent>::hook) { D2Seam<&EVENT_SetEvent>::hook(pGame, pUnit, nEventType, nExpireFrame, dwEventCustomId, dwEventCustomParam); return; }
     if (nEventType == EVENTTYPE_STATREGEN && pUnit && pUnit->dwUnitType == UNIT_MONSTER && g_d2webOnDeadRegen &&
         (pUnit->dwAnimMode == MONMODE_DEATH || pUnit->dwAnimMode == MONMODE_DEAD))
         g_d2webOnDeadRegen(pUnit, g_d2webRegenSite);
@@ -378,6 +383,7 @@ void __fastcall EVENT_SetEvent(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventTy
 // (the nExpireFrame == -1 branch is the separate D2Game+0x8E810 in 1.13c; inline here)
 void __fastcall D2GAME_InitTimer_6FC351D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventTypes nEventType, int32_t nExpireFrame, EventTimerCallback pfCallBack, int32_t dwEventCustomId, int32_t dwEventCustomParam)
 {
+	if (D2Seam<&D2GAME_InitTimer_6FC351D0>::hook) { D2Seam<&D2GAME_InitTimer_6FC351D0>::hook(pGame, pUnit, nEventType, nExpireFrame, pfCallBack, dwEventCustomId, dwEventCustomParam); return; }
     // TODO: v19
     if (nEventType >= 15)
     {

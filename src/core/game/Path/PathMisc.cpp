@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <test_seam.h>
 #include "Path/PathMisc.h"
 #include "Path/PathContinuation.h"
 
@@ -386,6 +387,7 @@ int __fastcall PATH_Toward_6FDAA9F0(D2PathInfoStrc *pPathInfo)
 //1.13c: D2Common.0x6FDB7630
 BOOL __fastcall PATH_CheckCollisionsToNextPosition(D2DynamicPathStrc* pDynamicPath, D2PathPointStrc* pGameCoord)
 {
+	if (D2Seam<&PATH_CheckCollisionsToNextPosition>::hook) return D2Seam<&PATH_CheckCollisionsToNextPosition>::hook(pDynamicPath, pGameCoord);
 	D2PathPointStrc pPoint = {};
 
 	D2_ASSERT(pDynamicPath->pUnit && (pDynamicPath->pUnit->dwUnitType == UNIT_PLAYER || pDynamicPath->pUnit->dwUnitType == UNIT_MONSTER));
@@ -749,6 +751,7 @@ int __fastcall PATH_Knockback_Server(D2PathInfoStrc* pPathInfo)
 // 1.13c D2Common+0x66920: x87 cos/sin ring, 0x2580 radius step, 16-unit angle step, up to 77 points (checked by disassembly).
 signed int __fastcall PATH_ComputePathBlessedHammer_6FDAB3C0(D2DynamicPathStrc* pDynamicPath)
 {
+	if (D2Seam<&PATH_ComputePathBlessedHammer_6FDAB3C0>::hook) return D2Seam<&PATH_ComputePathBlessedHammer_6FDAB3C0>::hook(pDynamicPath);
 	const uint32_t dwOriginPrecisionX = pDynamicPath->tGameCoords.dwPrecisionX;
 	const uint32_t dwOriginPrecisionY = pDynamicPath->tGameCoords.dwPrecisionY;
 	D2PathPointStrc previousPoint = { PATH_FromFP16(dwOriginPrecisionX) , PATH_FromFP16(dwOriginPrecisionY) };
@@ -787,6 +790,7 @@ signed int __fastcall PATH_ComputePathBlessedHammer_6FDAB3C0(D2DynamicPathStrc* 
 // heading triple is read, so the offset helper and the direction-triple fetch are folded in here.
 int __fastcall PATH_ComputePathChargedBolt_6FDAB4A0(D2DynamicPathStrc* pDynamicPath, D2SeedStrc* pSeed)
 {
+	if (D2Seam<&PATH_ComputePathChargedBolt_6FDAB4A0>::hook) return D2Seam<&PATH_ComputePathChargedBolt_6FDAB4A0>::hook(pDynamicPath, pSeed);
 	// Note the discontinuity at the end: entries 30 and 31 are -1 and 1.
 	const int32_t anDirOffsets[32] = {
 		-1, 0, 1,  -1, 0, 1,  -1, 0, 1,  -1, 0, 1,  -1, 0, 1,
@@ -1325,6 +1329,7 @@ BOOL __stdcall D2Common_10227(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x0E1E0 (#10533)
 BOOL __stdcall D2Common_10229(D2DynamicPathStrc *pDynamicPath, D2UnitStrc *pUnit, D2ActiveRoomStrc *pDestRoom, uint32_t nDestX, uint32_t nDestY)
 {
+	if (D2Seam<&D2Common_10229>::hook) return D2Seam<&D2Common_10229>::hook(pDynamicPath, pUnit, pDestRoom, nDestX, nDestY);
 	D2PathPointStrc tCoords = { uint16_t(nDestX), uint16_t(nDestY) };
 	if (sub_6FDAD5E0(pDynamicPath, pDestRoom, tCoords))
 	{

@@ -1,4 +1,5 @@
 #include "D2DataTbls.h"
+#include <test_seam.h>
 #include <D2Lang.h>
 
 
@@ -186,6 +187,7 @@ void __fastcall DATATBLS_LoadObjectsTxt(HD2ARCHIVE hArchive)
 // 1.13c D2Common+0x3E980
 D2ObjectsTxt* __stdcall DATATBLS_GetObjectsTxtRecord(int nObjectId)
 {
+	if (D2Seam<&DATATBLS_GetObjectsTxtRecord>::hook) return D2Seam<&DATATBLS_GetObjectsTxtRecord>::hook(nObjectId);
 	D2_ASSERT(nObjectId < sgptDataTables->nObjectsTxtRecordCount);
 	D2_ASSERT(nObjectId >= 0);
 	return &sgptDataTables->pObjectsTxt[nObjectId];

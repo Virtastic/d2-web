@@ -654,6 +654,7 @@ void __fastcall ACT5Q4_SetRewardGranted(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // 1.13c D2Game+0x59C50 (no delta)
 void __fastcall ACT5Q4_OnNihlathakActivated(D2GameStrc* pGame)
 {
+	if (D2Seam<&ACT5Q4_OnNihlathakActivated>::hook) { D2Seam<&ACT5Q4_OnNihlathakActivated>::hook(pGame); return; }
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q4_NIHLATHAK);
 
 	if (!pQuestData || !pQuestData->bNotIntro || pQuestData->fLastState >= 3)

@@ -384,6 +384,7 @@ void __fastcall PLAYER_SynchronizeItemsToClient(D2UnitStrc* pUnit, D2ClientStrc*
 // 1.13c D2Game+0x37680
 int32_t __fastcall PLAYER_IsBusy(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&PLAYER_IsBusy>::hook) return D2Seam<&PLAYER_IsBusy>::hook(pUnit);
     if (!pUnit || pUnit->dwUnitType != UNIT_PLAYER)
     {
         return 0;
@@ -548,6 +549,7 @@ void __fastcall sub_6FC7BFC0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t
 // 1.13c D2Game+0x37480
 void __fastcall PLAYER_SetUniqueIdInPlayerData(D2UnitStrc* pPlayer, int32_t nUnitGUID)
 {
+	if (D2Seam<&PLAYER_SetUniqueIdInPlayerData>::hook) { D2Seam<&PLAYER_SetUniqueIdInPlayerData>::hook(pPlayer, nUnitGUID); return; }
     D2_ASSERT(pPlayer);
 
     D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer);
@@ -572,6 +574,7 @@ int32_t __fastcall PLAYER_GetUniqueIdFromPlayerData(D2UnitStrc* pPlayer)
 // 1.13c D2Game+0x386F0 (unit hash lookup inlined; fatal ids 0x259/0x25C/0x2D3 for null args)
 void __fastcall sub_6FC7C170(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
+	if (D2Seam<&sub_6FC7C170>::hook) { D2Seam<&sub_6FC7C170>::hook(pGame, pPlayer); return; }
     D2_ASSERT(pPlayer);
 
     D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer);
@@ -699,6 +702,7 @@ int32_t __fastcall sub_6FC7C3A0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
 // 1.13c D2Game+0x37890 (null/non-player and null-client return 0, hotkey slot written in place; no delta)
 int32_t __fastcall sub_6FC7C450(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nHotkeyId, int16_t nSkillId, char a4, int32_t nFlags)
 {
+	if (D2Seam<&sub_6FC7C450>::hook) return D2Seam<&sub_6FC7C450>::hook(pGame, pPlayer, nHotkeyId, nSkillId, a4, nFlags);
     D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
     if (!pClient)
     {

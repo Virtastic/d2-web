@@ -171,6 +171,7 @@ D2DrlgTileDataStrc* __stdcall DUNGEON_GetTileDataFromAct(D2DrlgActStrc* pAct)
 // 1.13c D2Common+0x3BA60: asserts the out pointer first; a null room zeroes all eight dwords
 void __stdcall DUNGEON_GetRoomCoordinates(D2ActiveRoomStrc* pRoom, D2DrlgCoordsStrc* pCoords)
 {
+	if (D2Seam<&DUNGEON_GetRoomCoordinates>::hook) { D2Seam<&DUNGEON_GetRoomCoordinates>::hook(pRoom, pCoords); return; }
 	D2_ASSERT(pCoords);
 
 	if (pRoom)
@@ -187,6 +188,7 @@ void __stdcall DUNGEON_GetRoomCoordinates(D2ActiveRoomStrc* pRoom, D2DrlgCoordsS
 // 1.13c D2Common+0x3BA20: the count (room +0x24) goes through the third argument first, then the list head (room +0x00) through the second
 void __stdcall DUNGEON_GetAdjacentRoomsListFromRoom(D2ActiveRoomStrc* pRoom, D2ActiveRoomStrc*** pppRoomList, int* pNumRooms)
 {
+	if (D2Seam<&DUNGEON_GetAdjacentRoomsListFromRoom>::hook) { D2Seam<&DUNGEON_GetAdjacentRoomsListFromRoom>::hook(pRoom, pppRoomList, pNumRooms); return; }
 	D2_ASSERT(pRoom);
 
 	*pNumRooms = pRoom->nNumRooms;
@@ -398,6 +400,7 @@ void __stdcall DUNGEON_GetRGB_IntensityFromRoom(D2ActiveRoomStrc* pRoom, uint8_t
 // Cached retail: null act, linked-list order, inclusive lower/exclusive upper bounds.
 D2ActiveRoomStrc* __stdcall DUNGEON_FindRoomBySubtileCoordinates(D2DrlgActStrc* pAct, int nX, int nY)
 {
+	if (D2Seam<&DUNGEON_FindRoomBySubtileCoordinates>::hook) return D2Seam<&DUNGEON_FindRoomBySubtileCoordinates>::hook(pAct, nX, nY);
 	if (pAct)
 	{
 		for (D2ActiveRoomStrc* pRoom = pAct->pRoom; pRoom; pRoom = pRoom->pRoomNext)
@@ -579,6 +582,7 @@ void __stdcall DUNGEON_ChangeClientRoom(D2ActiveRoomStrc* pRoom1, D2ActiveRoomSt
 // 1.13c D2Common+0x3CDA0
 D2ActiveRoomStrc* __stdcall DUNGEON_StreamRoomAtCoords(D2DrlgActStrc* pAct, int nX, int nY)
 {
+	if (D2Seam<&DUNGEON_StreamRoomAtCoords>::hook) return D2Seam<&DUNGEON_StreamRoomAtCoords>::hook(pAct, nX, nY);
 	D2_ASSERT(pAct);
 
 	return DRLGACTIVATE_StreamRoomAtCoords(pAct->pDrlg, nX, nY);
@@ -588,6 +592,7 @@ D2ActiveRoomStrc* __stdcall DUNGEON_StreamRoomAtCoords(D2DrlgActStrc* pAct, int 
 // 1.13c D2Common+0x3B550
 D2ActiveRoomStrc* __stdcall DUNGEON_GetRoomFromAct(D2DrlgActStrc* pAct)
 {
+	if (D2Seam<&DUNGEON_GetRoomFromAct>::hook) return D2Seam<&DUNGEON_GetRoomFromAct>::hook(pAct);
 	D2_ASSERT(pAct);
 
 	return pAct->pRoom;
@@ -597,6 +602,7 @@ D2ActiveRoomStrc* __stdcall DUNGEON_GetRoomFromAct(D2DrlgActStrc* pAct)
 // 1.13c D2Common+0x3C000 (null room -> 0, else room->pDrlgRoom->pLevel->nLevelId with no further null test)
 int __stdcall DUNGEON_GetLevelIdFromRoom(D2ActiveRoomStrc* pRoom)
 {
+	if (D2Seam<&DUNGEON_GetLevelIdFromRoom>::hook) return D2Seam<&DUNGEON_GetLevelIdFromRoom>::hook(pRoom);
 	if (pRoom)
 	{
 		return DRLGROOM_GetLevelId(pRoom->pDrlgRoom);
@@ -623,6 +629,7 @@ int __stdcall DUNGEON_GetWarpDestinationLevel(D2ActiveRoomStrc* pRoom, int nSour
 // room-ex. Keep the 0x800000 flag and level field through native pointers.
 int __stdcall DUNGEON_GetLevelIdFromPopulatedRoom(D2ActiveRoomStrc* pRoom)
 {
+	if (D2Seam<&DUNGEON_GetLevelIdFromPopulatedRoom>::hook) return D2Seam<&DUNGEON_GetLevelIdFromPopulatedRoom>::hook(pRoom);
 	if (pRoom)
 	{
 		D2DrlgRoomStrc* pDrlgRoom = pRoom->pDrlgRoom;
@@ -669,6 +676,7 @@ const char* __stdcall DUNGEON_GetPickedLevelPrestFilePathFromRoom(D2ActiveRoomSt
 // 1.13c D2Common+0x3B500
 void __stdcall DUNGEON_AllocDrlgDelete(D2ActiveRoomStrc* pRoom, int nUnitType, D2UnitGUID nUnitGUID)
 {
+	if (D2Seam<&DUNGEON_AllocDrlgDelete>::hook) { D2Seam<&DUNGEON_AllocDrlgDelete>::hook(pRoom, nUnitType, nUnitGUID); return; }
 	D2DrlgDeleteStrc* pDrlgDelete = NULL;
 
 	if (pRoom)
@@ -1080,6 +1088,7 @@ BOOL __stdcall DUNGEON_IsTownLevelId(int nLevelId)
 // 1.13c D2Common+0x3C390
 BOOL __stdcall DUNGEON_IsRoomInTown(D2ActiveRoomStrc* pRoom)
 {
+	if (D2Seam<&DUNGEON_IsRoomInTown>::hook) return D2Seam<&DUNGEON_IsRoomInTown>::hook(pRoom);
 	if (pRoom)
 	{
 		return DRLG_IsTownLevel(DRLGROOM_GetLevelId(pRoom->pDrlgRoom));
@@ -1113,6 +1122,7 @@ int __stdcall D2Common_10084(D2ActiveRoomStrc* pRoom)
 // 1.13c D2Common+0x3B1E0
 int __stdcall DUNGEON_GetTownLevelIdFromActNo(uint8_t nAct)
 {
+	if (D2Seam<&DUNGEON_GetTownLevelIdFromActNo>::hook) return D2Seam<&DUNGEON_GetTownLevelIdFromActNo>::hook(nAct);
 	static const int gnTownLevelIds[] = { LEVEL_ROGUEENCAMPMENT, LEVEL_LUTGHOLEIN, LEVEL_KURASTDOCKTOWN, LEVEL_THEPANDEMONIUMFORTRESS, LEVEL_HARROGATH };
 
 	D2_ASSERT(nAct < ARRAY_SIZE(gnTownLevelIds));
@@ -1133,6 +1143,7 @@ int __stdcall D2Common_10087(D2ActiveRoomStrc* pRoom)
 // 1.13c D2Common+0x3C7E0
 int __stdcall DUNGEON_GetNumberOfPopulatedRoomsInLevel(D2DrlgActStrc* pAct, int nLevelId)
 {
+	if (D2Seam<&DUNGEON_GetNumberOfPopulatedRoomsInLevel>::hook) return D2Seam<&DUNGEON_GetNumberOfPopulatedRoomsInLevel>::hook(pAct, nLevelId);
 	return DRLG_GetNumberOfPopulatedRoomsInLevel(pAct->pDrlg, nLevelId);
 }
 
@@ -1198,6 +1209,7 @@ D2RoomCoordListStrc* __fastcall DUNGEON_GetRoomCoordListFromSubtile_81950(D2Drlg
 // 1.13c D2Common+0x3C680
 D2RoomCoordListStrc* __stdcall D2Common_10096(D2ActiveRoomStrc* pRoom, int nX, int nY)
 {
+	if (D2Seam<&D2Common_10096>::hook) return D2Seam<&D2Common_10096>::hook(pRoom, nX, nY);
 	return D2_CALL(DUNGEON_GetRoomCoordListFromSubtile_81950, pRoom->pDrlgRoom, nX, nY);
 }
 
@@ -1300,6 +1312,7 @@ int __stdcall DUNGEON_GetHoradricStaffTombLevelId(D2DrlgActStrc* pAct)
 // 1.13c D2Common+0x3BC10 (#10346): room +0x10 is the drlg room, its flags +0x28; no null test on the drlg room.
 void __stdcall DUNGEON_ToggleHasPortalFlag(D2ActiveRoomStrc* pRoom, BOOL bReset)
 {
+	if (D2Seam<&DUNGEON_ToggleHasPortalFlag>::hook) { D2Seam<&DUNGEON_ToggleHasPortalFlag>::hook(pRoom, bReset); return; }
 	if (pRoom)
 	{
 		DRLGACTIVATE_ToggleHasPortalFlag(pRoom->pDrlgRoom, bReset);

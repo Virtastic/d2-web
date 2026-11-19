@@ -1031,6 +1031,7 @@ void __fastcall D2GAME_OBJECTS_TrapHandler8_9_6FC75AC0(D2GameStrc* pGame, D2Unit
 // 1.13c D2Game+0x6A050 (checked against decompile)
 void __fastcall D2GAME_SpawnTrapMonster_6FC75B40(D2ObjOperateFnStrc* pOp, int32_t nMonsterId, int32_t a3)
 {
+	if (D2Seam<&D2GAME_SpawnTrapMonster_6FC75B40>::hook) { D2Seam<&D2GAME_SpawnTrapMonster_6FC75B40>::hook(pOp, nMonsterId, a3); return; }
     if (nMonsterId >= 0 && nMonsterId < sgptDataTables->nMonStatsTxtRecordCount)
     {
         D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pOp->pObject);
@@ -3774,6 +3775,7 @@ void __fastcall sub_6FC79C30(D2GameStrc* pGame, int32_t nUnused, int32_t nPortal
 // happened. The comparisons and the shift are unsigned, as retail's.
 int32_t __fastcall OBJMODE_WellHeal(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2ObjectsTxt* pObjectsTxtRecord)
 {
+	if (D2Seam<&OBJMODE_WellHeal>::hook) return D2Seam<&OBJMODE_WellHeal>::hook(pGame, pPlayer, pObjectsTxtRecord);
     int32_t bUsed = 0;
 
     const uint32_t nMaxLife = STATLIST_GetMaxLifeFromUnit(pPlayer);
@@ -3975,6 +3977,7 @@ D2UnitStrc* __fastcall OBJMODE_DropItemWithCodeAndQuality(D2GameStrc* pGame, D2U
 // 1.13c D2Game+0x6B570
 D2UnitStrc* __fastcall OBJMODE_DropFromChestTCWithQuality(D2ObjOperateFnStrc* pOp, int32_t nItemQuality)
 {
+	if (D2Seam<&OBJMODE_DropFromChestTCWithQuality>::hook) return D2Seam<&OBJMODE_DropFromChestTCWithQuality>::hook(pOp, nItemQuality);
     constexpr int32_t nLevelIds[] =
     {
         2, 37,

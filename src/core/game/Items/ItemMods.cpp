@@ -837,6 +837,7 @@ BOOL __fastcall sub_6FD92A80(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, co
 //D2Common.0x6FD92C40
 D2StatListStrc* __fastcall ITEMMODS_GetOrCreateStatList(D2UnitStrc* pUnit, D2UnitStrc* pItem, int nState, int fFilter)
 {
+	if (D2Seam<&ITEMMODS_GetOrCreateStatList>::hook) return D2Seam<&ITEMMODS_GetOrCreateStatList>::hook(pUnit, pItem, nState, fFilter);
 	D2StatListStrc* pStatList = NULL;
 	void* pMemPool = NULL;
 	int nItemGUID = 0;
@@ -887,6 +888,7 @@ D2StatListStrc* __fastcall ITEMMODS_GetOrCreateStatList(D2UnitStrc* pUnit, D2Uni
 //D2Common.0x6FD92CF0
 void __fastcall sub_6FD92CF0(D2UnitStrc* pItem, int nStatId)
 {
+	if (D2Seam<&sub_6FD92CF0>::hook) { D2Seam<&sub_6FD92CF0>::hook(pItem, nStatId); return; }
 	D2ItemsTxt* pItemsTxtRecord = NULL;
 	int nItemId = 0;
 	int nValue = 0;
@@ -1646,6 +1648,7 @@ BOOL __fastcall sub_6FD93CB0(int nType, D2UnitStrc* pUnit, D2UnitStrc* pItem, co
 //D2Common.0x6FD94060
 void __fastcall sub_6FD94060(int nStatId, int* pValue)
 {
+	if (D2Seam<&sub_6FD94060>::hook) { D2Seam<&sub_6FD94060>::hook(nStatId, pValue); return; }
 	switch (nStatId)
 	{
 	case STAT_HITPOINTS:

@@ -467,6 +467,7 @@ void PATH_StopMovement(D2DynamicPathStrc* pDynamicPath);
 //1.10f: D2Common.0x6FDAD5E0
 BOOL __fastcall sub_6FDAD5E0(D2DynamicPathStrc* pDynamicPath, D2ActiveRoomStrc* pDestRoom, D2PathPointStrc tDest)
 {
+	if (D2Seam<&sub_6FDAD5E0>::hook) return D2Seam<&sub_6FDAD5E0>::hook(pDynamicPath, pDestRoom, tDest);
 	D2UnitStrc* pUnit = pDynamicPath->pUnit;
 	if (pUnit && pUnit->dwUnitType == UNIT_MISSILE)
 	{
@@ -604,6 +605,7 @@ BOOL __stdcall D2Common_10230(D2DynamicPathStrc* pDynamicPath, int a2, D2ActiveR
 //1.13c: D2Common.0x6FD5DC80
 void PATH_StopMovement(D2DynamicPathStrc* pDynamicPath)
 {
+	if (D2Seam<&PATH_StopMovement>::hook) { D2Seam<&PATH_StopMovement>::hook(pDynamicPath); return; }
 	PATH_RecacheRoomIfNeeded(pDynamicPath);
 	pDynamicPath->dwFlags = pDynamicPath->dwFlags & (~PATH_UNKNOWN_FLAG_0x00020);
 	pDynamicPath->dwPathPoints = 0;
@@ -676,6 +678,7 @@ BOOL __stdcall D2Common_10231_Impl(D2DynamicPathStrc* pDynamicPath, D2ActiveRoom
 // 1.13c D2Common+0x0E1A0
 int __stdcall D2Common_10231(D2DynamicPathStrc* pDynamicPath, D2UnitStrc* pUnit_unused, D2ActiveRoomStrc* pRooms, uint16_t nX, uint16_t nY)
 {
+	if (D2Seam<&D2Common_10231>::hook) return D2Seam<&D2Common_10231>::hook(pDynamicPath, pUnit_unused, pRooms, nX, nY);
 	D2_MAYBE_UNUSED(pUnit_unused);
 	D2Common_10231_Impl(pDynamicPath, pRooms, D2PathPointStrc{ pDynamicPath->tGameCoords.wPosX, pDynamicPath->tGameCoords.wPosY });
 	pDynamicPath->dwPathPoints = 0;
@@ -690,6 +693,7 @@ int __stdcall D2Common_10231(D2DynamicPathStrc* pDynamicPath, D2UnitStrc* pUnit_
 // 1.13c D2Common+0x0DA40
 void PATH_RecacheRoomAtCoordIfNeeded(D2DynamicPathStrc* pPath, D2ActiveRoomStrc* pHintRoom, uint32_t nPrecisionX, uint32_t nPrecisionY)
 {
+	if (D2Seam<&PATH_RecacheRoomAtCoordIfNeeded>::hook) { D2Seam<&PATH_RecacheRoomAtCoordIfNeeded>::hook(pPath, pHintRoom, nPrecisionX, nPrecisionY); return; }
 	if ((pPath->dwFlags & PATH_MISSILE_MASK) == 0
 		|| COLLISION_GetRoomBySubTileCoordinates(pPath->pRoom, PATH_FromFP16(nPrecisionX), PATH_FromFP16(nPrecisionY)))
 	{
@@ -713,6 +717,7 @@ void PATH_RecacheRoomAtCoordIfNeeded(D2DynamicPathStrc* pPath, D2ActiveRoomStrc*
 // 1.13c D2Common+0x0DC80
 void PATH_ResetMovement(D2DynamicPathStrc* pDynamicPath)
 {
+	if (D2Seam<&PATH_ResetMovement>::hook) { D2Seam<&PATH_ResetMovement>::hook(pDynamicPath); return; }
 	PATH_RecacheRoomAtCoordIfNeeded(
 		pDynamicPath,
 		nullptr,

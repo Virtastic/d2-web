@@ -11,6 +11,7 @@
 // The client must still be in the game's client list; otherwise the game is just unlocked.
 void __fastcall CCMD_ProcessClientMessage(void* pData, int32_t nPacketSize)
 {
+	if (D2Seam<&CCMD_ProcessClientMessage>::hook) { D2Seam<&CCMD_ProcessClientMessage>::hook(pData, nPacketSize); return; }
     const int32_t nClientId = *(int32_t*)pData;
     D2GameStrc* pGame = D2_CALL(GAME_LockGame, (D2GameGUID)D2_CALL(SERVER_GetClientGameGUID, nClientId));
     if (!pGame)

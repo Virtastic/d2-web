@@ -1,4 +1,5 @@
 #include "QUESTS/ACT5/A5Q3.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -387,6 +388,7 @@ int32_t __fastcall ACT5Q3_UnitIterate_StatusCyclerEx(D2GameStrc* pGame, D2UnitSt
 // 1.13c D2Game+0x56B10 (diffed; the one sequence function, also called by 5EB30, 5C480 and 5C690)
 bool __fastcall ACT5Q3_SeqCallback(D2QuestDataStrc* pQuestData)
 {
+	if (D2Seam<&ACT5Q3_SeqCallback>::hook) return D2Seam<&ACT5Q3_SeqCallback>::hook(pQuestData);
 	if (pQuestData->fState < 5 && pQuestData->bNotIntro)
 	{
 		if (!pQuestData->fState)
@@ -880,6 +882,7 @@ void __fastcall ACT5Q3_SpawnDrehyaInTown(D2QuestDataStrc* pQuestData, D2Act5Ques
 //TODO: Find a name
 void __fastcall sub_6FCB4400(D2QuestDataStrc* pQuestData)
 {
+	if (D2Seam<&sub_6FCB4400>::hook) { D2Seam<&sub_6FCB4400>::hook(pQuestData); return; }
 	D2Act5Quest3Strc* pQuestDataEx = (D2Act5Quest3Strc*)pQuestData->pQuestDataEx;
 	if (pQuestDataEx->bDrehyaMonsterInTownSpawned && pQuestDataEx->unk0x84 != 2)
 	{
@@ -1611,6 +1614,7 @@ int32_t __fastcall ACT5Q3_GetDrehyaPortalCoordinates(D2GameStrc* pGame, D2UnitSt
 // 1.13c D2Game+0x56A00 (diffed line by line, no delta)
 int32_t __fastcall ACT5Q3_InitializeDrehyaPortalCoordinates(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&ACT5Q3_InitializeDrehyaPortalCoordinates>::hook) return D2Seam<&ACT5Q3_InitializeDrehyaPortalCoordinates>::hook(pGame, pUnit);
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q3_PRISONOFICE);
 	if (!pQuestData)
 	{
@@ -1629,6 +1633,7 @@ int32_t __fastcall ACT5Q3_InitializeDrehyaPortalCoordinates(D2GameStrc* pGame, D
 //TODO: Find a name
 void __fastcall sub_6FCB53D0(D2GameStrc* pGame)
 {
+	if (D2Seam<&sub_6FCB53D0>::hook) { D2Seam<&sub_6FCB53D0>::hook(pGame); return; }
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q3_PRISONOFICE);
 	if (!pQuestData)
 	{

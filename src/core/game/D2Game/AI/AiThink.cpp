@@ -8755,6 +8755,7 @@ void __fastcall AITHINK_Fn067_NecroPet(D2GameStrc* pGame, D2UnitStrc* pUnit, D2A
 // 1.13c D2Game+0x1CAE0
 int32_t __fastcall D2GAME_AI_PetMove_6FCE2BA0(D2GameStrc* pGame, D2UnitStrc* pOwner, D2UnitStrc* pUnit, int32_t a4, int32_t bRun, int32_t nVelocity, int32_t a7)
 {
+	if (D2Seam<&D2GAME_AI_PetMove_6FCE2BA0>::hook) return D2Seam<&D2GAME_AI_PetMove_6FCE2BA0>::hook(pGame, pOwner, pUnit, a4, bRun, nVelocity, a7);
 	// TODO: Names
 	constexpr uint8_t byte_6FD295C4[] =
 	{
@@ -9075,6 +9076,7 @@ void __fastcall sub_6FCE34B0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
 // 1.13c D2Game+0x1E140
 int32_t __fastcall sub_6FCE34E0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, D2UnitStrc* pOwner, int32_t a5, D2AiTickParamStrc* pAiTickParam, int32_t a7, int32_t a8)
 {
+	if (D2Seam<&sub_6FCE34E0>::hook) return D2Seam<&sub_6FCE34E0>::hook(pGame, pUnit, pTarget, pOwner, a5, pAiTickParam, a7, a8);
 	//TODO: Names
 
 	const int32_t nDistance = AIUTIL_GetDistanceToCoordinates_FullUnitSize(pUnit, pOwner);
@@ -11802,6 +11804,7 @@ void __fastcall D2GAME_AI_Unk051_6FCE82F0(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 // 1.13c D2Game+0xA3E80 (score = (resists/15 + 5*(range+base) + 2*(damage+skill+2*cold) + 3*low-life) / 22, 0 -> 1)
 int32_t __fastcall AITHINK_GetTargetScore(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, D2AiCmdStrc* pAiCmd)
 {
+	if (D2Seam<&AITHINK_GetTargetScore>::hook) return D2Seam<&AITHINK_GetTargetScore>::hook(pGame, pUnit, pTarget, pAiCmd);
 	const int32_t bInRange = UNITS_IsInMeleeRange(pUnit, pTarget, 0);
 
 	int32_t nBaseValue = 0;
@@ -15653,6 +15656,7 @@ enum D2C_AncientBarb1AIParams
 //D2Game.0x6FCEF3F0
 void __fastcall AITHINK_AncientBarb1SkillHandler(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
+	if (D2Seam<&AITHINK_AncientBarb1SkillHandler>::hook) { D2Seam<&AITHINK_AncientBarb1SkillHandler>::hook(pGame, pUnit, pAiTickParam); return; }
 	if (ACT5Q5_IsNotActivatable(pGame) || STATES_CheckState(pUnit, STATE_UNINTERRUPTABLE))
 	{
 		AITACTICS_IdleInNeutralMode(pGame, pUnit, 25);
@@ -15755,6 +15759,7 @@ enum D2C_AncientBarb2AIParams
 //Inlined in D2Game.0x6FCEFBC0
 void __fastcall AITHINK_AncientBarb2SkillHandler(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
+	if (D2Seam<&AITHINK_AncientBarb2SkillHandler>::hook) { D2Seam<&AITHINK_AncientBarb2SkillHandler>::hook(pGame, pUnit, pAiTickParam); return; }
 	if (ACT5Q5_IsNotActivatable(pGame))
 	{
 		AITACTICS_IdleInNeutralMode(pGame, pUnit, 25);
@@ -15828,6 +15833,7 @@ enum D2C_AncientBarb3AIParams
 //D2Game.0x6FCEFA10
 void __fastcall AITHINK_AncientBarb3SkillHandler(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
+	if (D2Seam<&AITHINK_AncientBarb3SkillHandler>::hook) { D2Seam<&AITHINK_AncientBarb3SkillHandler>::hook(pGame, pUnit, pAiTickParam); return; }
 	if (ACT5Q5_IsNotActivatable(pGame))
 	{
 		AITACTICS_IdleInNeutralMode(pGame, pUnit, 25);
@@ -16581,6 +16587,7 @@ const D2AiTableStrc* __fastcall AITHINK_GetAiTableRecord(D2UnitStrc* pUnit, D2C_
 // 1.13c D2Game+0x9D230
 void __fastcall AITHINK_ExecuteAiFn(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiControlStrc* pAiControl, D2C_AiSpecialState nAiSpecialState)
 {
+	if (D2Seam<&AITHINK_ExecuteAiFn>::hook) { D2Seam<&AITHINK_ExecuteAiFn>::hook(pGame, pUnit, pAiControl, nAiSpecialState); return; }
 	if (STATES_CheckState(pUnit, STATE_UNINTERRUPTABLE))
 	{
 		FOG_DisplayWarning("! StatsGetState (hUnit, UNIT_STATE_UNINTERRUPTABLE)", __FILE__, __LINE__);
@@ -16721,6 +16728,7 @@ static int32_t __fastcall AITHINK_SelectTickTarget113(D2GameStrc* pGame, D2UnitS
 // 1.13c D2Game+0x9D3B0 (ECX = game, EDX = unit; the stunned/door/leash gate is 0x9CD90, the target switch 0x9D160)
 void __fastcall D2GAME_MONSTERS_AiFunction03_6FCF0A70(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4)
 {
+	if (D2Seam<&D2GAME_MONSTERS_AiFunction03_6FCF0A70>::hook) { D2Seam<&D2GAME_MONSTERS_AiFunction03_6FCF0A70>::hook(pGame, pUnit, a3, a4); return; }
 	D2AiTickParamStrc aiTickParam = {};
 
 	aiTickParam.pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
@@ -16977,6 +16985,7 @@ void __fastcall AITHINK_SetClosestTowerImp113(D2UnitStrc* unit, D2UnitStrc* cand
 // 1.13c D2Game+0x15D10
 bool __fastcall AITHINK_EnsureHomeCommand113(D2GameStrc* game, D2UnitStrc* unit)
 {
+	if (D2Seam<&AITHINK_EnsureHomeCommand113>::hook) return D2Seam<&AITHINK_EnsureHomeCommand113>::hook(game, unit);
     auto command = AIGENERAL_GetAiCommandFromParam(unit, 10, 0);
     if (!command)
     {

@@ -327,6 +327,7 @@ int32_t __fastcall AIBAAL_CullPotentialTargets(D2UnitStrc* pBaal, D2UnitStrc* pT
 // 1.13c D2Game+0xB79B0 (the melee and colliding tables are split out; the open-path table is D2Game+0xB7380)
 int32_t __fastcall AIBAAL_RollRandomAiParam(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiControlStrc* pAiControl, D2UnitStrc* pTarget, int32_t nMax, int32_t nCount, D2AiCmdStrc* pAiCmd)
 {
+	if (D2Seam<&AIBAAL_RollRandomAiParam>::hook) return D2Seam<&AIBAAL_RollRandomAiParam>::hook(pGame, pUnit, pAiControl, pTarget, nMax, nCount, pAiCmd);
 	if (pAiControl->dwAiParam[0])
 	{
 		return pAiControl->dwAiParam[0];
@@ -746,6 +747,7 @@ static int32_t AIBAAL_SpawnBaalClone(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiC
 // 1.13c D2Game+0xB8070 (the clone spawn of mode 15 is split out at D2Game+0xB7D30)
 void __fastcall AIBAAL_MainSkillHandler(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiControlStrc* pAiControl, D2UnitStrc* pTarget, int32_t nParam, D2AiCmdStrc* pAiCmd)
 {
+	if (D2Seam<&AIBAAL_MainSkillHandler>::hook) { D2Seam<&AIBAAL_MainSkillHandler>::hook(pGame, pUnit, pAiControl, pTarget, nParam, pAiCmd); return; }
 	if (!pUnit)
 	{
 		return;

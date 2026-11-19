@@ -1027,6 +1027,7 @@ void __fastcall ACT5Q5_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 // 1.13c D2Game+0x5E3C0
 void __fastcall ACT5Q5_OnPortalOpened(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&ACT5Q5_OnPortalOpened>::hook) { D2Seam<&ACT5Q5_OnPortalOpened>::hook(pGame, pUnit); return; }
 	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
 	if (DUNGEON_GetLevelIdFromRoom(pRoom) != LEVEL_ROCKYSUMMIT)
 	{
@@ -1092,6 +1093,7 @@ int32_t __fastcall ACT5Q5_IsActivatable(D2GameStrc* pGame)
 // 1.13c D2Game+0x56600
 int32_t __fastcall ACT5Q5_IsArreatSummitClosed(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nTargetLevel)
 {
+	if (D2Seam<&ACT5Q5_IsArreatSummitClosed>::hook) return D2Seam<&ACT5Q5_IsArreatSummitClosed>::hook(pGame, pUnit, nTargetLevel);
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q5_ANCIENTS);
 
 	if (pQuestData->bNotIntro)

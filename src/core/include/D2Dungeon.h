@@ -1,6 +1,7 @@
 #pragma once
 
 #include "D2CommonDefinitions.h"
+#include <test_seam.h>
 #include <Drlg/D2DrlgDrlg.h>
 
 #pragma pack(1)
@@ -234,6 +235,7 @@ inline bool DungeonTestRoomGame(const D2ActiveRoomStrc* pRoom, int nX, int nY)
 // Helper function (1.13c D2Common+0x1330)
 inline D2ActiveRoomStrc* __fastcall DUNGEON_GetRoomAtPosition(D2ActiveRoomStrc* pRoom, int32_t nSubtileX, int32_t nSubtileY)
 {
+	if (D2Seam<&DUNGEON_GetRoomAtPosition>::hook) return D2Seam<&DUNGEON_GetRoomAtPosition>::hook(pRoom, nSubtileX, nSubtileY);
     if (!pRoom)
     {
         return nullptr;

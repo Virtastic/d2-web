@@ -1,4 +1,5 @@
 #include "ITEMS/ItemsMagic.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -46,6 +47,7 @@ int16_t __fastcall ITEMS_RollMagicAffixes(D2UnitStrc* pItem, int32_t bRequireSpa
 // 1.13c D2Game+0x148A0
 int16_t __fastcall ITEMS_RollMagicAffixesOld(D2UnitStrc* pItem, int32_t bRequireSpawnableAffix, int32_t bForceAffixRoll, int32_t bAssignProperties, int32_t bPrefix, int32_t nPreferredAffixIndex)
 {
+	if (D2Seam<&ITEMS_RollMagicAffixesOld>::hook) return D2Seam<&ITEMS_RollMagicAffixesOld>::hook(pItem, bRequireSpawnableAffix, bForceAffixRoll, bAssignProperties, bPrefix, nPreferredAffixIndex);
     D2MagicAffixDataTbl* pMagicAffixDataTbl = DATATBLS_GetMagicAffixDataTables();
     if (!pMagicAffixDataTbl)
     {
@@ -249,6 +251,7 @@ static D2MagicAffixIndexAndPtrStrc* MagicItemRollAffix(
 //D2Game.0x6FC52C00
 int16_t __fastcall ITEMS_RollMagicAffixesNew(D2UnitStrc* pItem, int32_t bRequireSpawnableAffix, int32_t bForceAffixRoll, int32_t bAssignProperties, int32_t bPrefixes, int32_t nPreferredAffixIndex, int32_t nAutoMagicGroup)
 {
+	if (D2Seam<&ITEMS_RollMagicAffixesNew>::hook) return D2Seam<&ITEMS_RollMagicAffixesNew>::hook(pItem, bRequireSpawnableAffix, bForceAffixRoll, bAssignProperties, bPrefixes, nPreferredAffixIndex, nAutoMagicGroup);
 
     const D2MagicAffixDataTbl* pMagicAffixDataTables = DATATBLS_GetMagicAffixDataTables();
     if (!pMagicAffixDataTables)

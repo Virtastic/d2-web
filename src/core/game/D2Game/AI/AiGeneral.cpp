@@ -181,6 +181,7 @@ D2AiCmdStrc* __fastcall AIGENERAL_GetCurrentAiCommandFromUnit(D2UnitStrc* pUnit)
 // 1.13c D2Game+0x20E00
 D2AiCmdStrc* __fastcall AIGENERAL_GetAiCommandFromParam(D2UnitStrc* pUnit, int32_t nCmdParam, int32_t bSet)
 {
+	if (D2Seam<&AIGENERAL_GetAiCommandFromParam>::hook) return D2Seam<&AIGENERAL_GetAiCommandFromParam>::hook(pUnit, nCmdParam, bSet);
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
 	if (!pAiControl)
 	{
@@ -221,6 +222,7 @@ D2AiCmdStrc* __fastcall AIGENERAL_GetAiCommandFromParam(D2UnitStrc* pUnit, int32
 // 1.13c D2Game+0x212F0
 void __fastcall AIGENERAL_AllocCommandsForMinions(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCmdStrc* pAiCmd)
 {
+	if (D2Seam<&AIGENERAL_AllocCommandsForMinions>::hook) { D2Seam<&AIGENERAL_AllocCommandsForMinions>::hook(pGame, pUnit, pAiCmd); return; }
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
 	if (!pAiControl || !pAiControl->pGame || pUnit->dwUnitType != UNIT_MONSTER)
 	{
@@ -264,6 +266,7 @@ void __fastcall AIGENERAL_AllocCommandsForMinions(D2GameStrc* pGame, D2UnitStrc*
 // 1.13c D2Game+0x21290
 D2AiCmdStrc* __fastcall AIGENERAL_CopyAiCommand(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCmdStrc* pAiCmd)
 {
+	if (D2Seam<&AIGENERAL_CopyAiCommand>::hook) return D2Seam<&AIGENERAL_CopyAiCommand>::hook(pGame, pUnit, pAiCmd);
 	D2AiCmdStrc* pCopy = AIGENERAL_AllocAiCommand(pGame, pUnit);
 	memcpy(pCopy->nCmdParam, pAiCmd->nCmdParam, sizeof(pCopy->nCmdParam));
 
@@ -280,6 +283,7 @@ D2AiCmdStrc* __fastcall AIGENERAL_CopyAiCommand(D2GameStrc* pGame, D2UnitStrc* p
 // 1.13c D2Game+0x217D0
 D2AiCmdStrc* __fastcall AIGENERAL_SetCurrentAiCommand(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nCmdParam, int32_t bSet)
 {
+	if (D2Seam<&AIGENERAL_SetCurrentAiCommand>::hook) return D2Seam<&AIGENERAL_SetCurrentAiCommand>::hook(pGame, pUnit, nCmdParam, bSet);
 	// 1.13c: no AiControl check up front; a missing command is created through the copy routine (+0x21290)
 	// from a block whose params are { nCmdParam, 0, 0, 0, 0 }.
 	if (!D2_CALL(AIGENERAL_GetAiCommandFromParam, pUnit, nCmdParam, bSet))
@@ -403,6 +407,7 @@ void __fastcall AIGENERAL_GetOwnerData(D2UnitStrc* pUnit, int32_t* pUnitGUID, in
 // 1.13c D2Game+0x21260
 D2UnitStrc* __fastcall AIGENERAL_GetMinionOwner(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&AIGENERAL_GetMinionOwner>::hook) return D2Seam<&AIGENERAL_GetMinionOwner>::hook(pUnit);
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
 	if (pAiControl && pAiControl->pGame)
 	{
@@ -440,6 +445,7 @@ void __fastcall AIGENERAL_AllocMinionList(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 // 1.13c D2Game+0x216A0
 void __fastcall AIGENERAL_FreeMinionList(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&AIGENERAL_FreeMinionList>::hook) { D2Seam<&AIGENERAL_FreeMinionList>::hook(pUnit); return; }
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
 	if (!pAiControl || !pAiControl->pGame)
 	{

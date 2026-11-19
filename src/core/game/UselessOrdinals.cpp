@@ -1,4 +1,5 @@
 #include "UselessOrdinals.h"
+#include <test_seam.h>
 
 #include "D2DataTbls.h"
 #include "D2States.h"
@@ -27,6 +28,7 @@ void __stdcall D2COMMON_10476(D2StatListStrc* pStatList, int nExpireFrame)
 // 1.13c D2Common+0x500E0
 BOOL __stdcall D2COMMON_11018(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&D2COMMON_11018>::hook) return D2Seam<&D2COMMON_11018>::hook(pUnit);
 	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->dwAnimMode == MONMODE_DEAD && !STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_UDEAD))
 	{
 		D2MonStats2Txt* pMonStats2TxtRecord = UNITS_GetMonStats2TxtRecordFromMonsterId(pUnit->dwClassId);
@@ -45,6 +47,7 @@ BOOL __stdcall D2COMMON_11018(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x50090
 BOOL __stdcall D2COMMON_11019(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&D2COMMON_11019>::hook) return D2Seam<&D2COMMON_11019>::hook(pUnit);
 	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->dwAnimMode == MONMODE_DEAD && !STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_UDEAD))
 	{
 		D2MonStats2Txt* pMonStats2TxtRecord = UNITS_GetMonStats2TxtRecordFromMonsterId(pUnit->dwClassId);
@@ -61,6 +64,7 @@ BOOL __stdcall D2COMMON_11019(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x4FFD0
 BOOL __stdcall D2COMMON_11021(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&D2COMMON_11021>::hook) return D2Seam<&D2COMMON_11021>::hook(pUnit);
 	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->dwAnimMode == MONMODE_DEAD && !STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_UDEAD))
 	{
 		D2MonStats2Txt* pMonStats2TxtRecord = UNITS_GetMonStats2TxtRecordFromMonsterId(pUnit->dwClassId);

@@ -12,6 +12,7 @@ extern const D2MonModeInfoTableStrc stru_6FD28738[16];
 // ECX = the unit, EAX = the mode (signed, must be below 16). A mode whose table row has the first flag set is always allowed; one with the second flag clear and the third set is allowed when the unit's class has the mode's bit in its MonStats2 moving-mode flags.
 uint32_t __fastcall MONSTERMODE_IsModeEnabledForUnit(D2UnitStrc* pUnit, int32_t nMode)
 {
+	if (D2Seam<&MONSTERMODE_IsModeEnabledForUnit>::hook) return D2Seam<&MONSTERMODE_IsModeEnabledForUnit>::hook(pUnit, nMode);
     if (pUnit && nMode < 16)
     {
         const D2MonModeInfoTableStrc* pRecord = &stru_6FD28738[nMode];

@@ -9,6 +9,7 @@
 // Delta from 1.10f (GAME/Clients.cpp): none in the walk.
 D2ClientStrc* __fastcall CLIENTS_GetClientFromClientId(D2GameStrc* pGame, int32_t nClientId)
 {
+	if (D2Seam<&CLIENTS_GetClientFromClientId>::hook) return D2Seam<&CLIENTS_GetClientFromClientId>::hook(pGame, nClientId);
     D2_ASSERT(pGame);
 
     for (D2ClientStrc* pClient = pGame->pClientList; pClient; pClient = pClient->pNext)

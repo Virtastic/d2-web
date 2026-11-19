@@ -2,6 +2,7 @@
 // Unicode is D2Lang's UCS-2 char class; only the static string helpers the loaders call are here.
 // The returned Unicode* strings live as long as the tables do (they point into LangTables).
 #include <D2Common.h>
+#include <test_seam.h>
 #include <D2Unicode.h>
 #include <D2Lang.h>
 #include <D2BitManip.h>
@@ -130,6 +131,7 @@ Unicode* Unicode::toUnicode(Unicode* dest, const char* src, int count) {  // 1.1
 // string itself through pUnicode. D2LANG_GetStringByReferenceString (#10003): the string or NULL.
 // 1.13c D2Lang+0xA8A0, +0xA7B0 (wrapper over 0xA7B0: returns its index result, string via out slot)
 short D2LANG_GetTblIndex(char* szReference, const Unicode** pUnicode) {
+	if (D2Seam<&D2LANG_GetTblIndex>::hook) return D2Seam<&D2LANG_GetTblIndex>::hook(szReference, pUnicode);
     const std::u16string* v = nullptr;
     uint16_t idx = d2::sharedLang().tblIndex(szReference ? szReference : "", &v);
     if (pUnicode) *pUnicode = v ? (const Unicode*)v->c_str() : nullptr;

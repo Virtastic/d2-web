@@ -318,6 +318,7 @@ void __fastcall D2GAME_SKILLS_ApplyCurseAi_6FD0B0A0(D2GameStrc* pGame, D2UnitStr
 // 1.13c D2Game+0x50250 (ecx = target unit, edx = the curse record; the resist rule is the call to 0x4E230)
 int32_t __fastcall sub_6FD0B450(D2UnitStrc* pUnit, void* pArgs)
 {
+	if (D2Seam<&sub_6FD0B450>::hook) return D2Seam<&sub_6FD0B450>::hook(pUnit, pArgs);
     D2UnkNecSkillStrc* v2 = (D2UnkNecSkillStrc*)pArgs;
 
     if (v2->unk0x08)
@@ -1103,6 +1104,7 @@ int32_t __fastcall D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10(D2GameStrc* pGame, 
 // 1.13c D2Game+0x50070 (esi = owner, eax = pet; the base stats, passives and resistance of a fresh summon)
 void __fastcall D2GAME_SetSummonStats_6FD0B070(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pPet, int32_t nSkillId, int32_t nSkillLevel)
 {
+	if (D2Seam<&D2GAME_SetSummonStats_6FD0B070>::hook) { D2Seam<&D2GAME_SetSummonStats_6FD0B070>::hook(pGame, pUnit, pPet, nSkillId, nSkillLevel); return; }
     D2_CALL(D2GAME_SKILLS_SetSummonBaseStats_6FD0CB10, pGame, pUnit, pPet, 0, nSkillLevel);
     D2_CALL(D2GAME_SetSummonPassiveStats_6FD0C530, pGame, pUnit, pPet, nSkillId, nSkillLevel, 0);
     D2_CALL(D2GAME_SetSummonResistance_6FD0C2E0, pUnit, pPet);

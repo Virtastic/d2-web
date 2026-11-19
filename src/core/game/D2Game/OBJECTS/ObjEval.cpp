@@ -1,4 +1,5 @@
 #include "OBJECTS/ObjEval.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -16,6 +17,7 @@
 // 1.13c D2Game+0xF42D0
 void __fastcall OBJEVAL_ApplyTrapObjectDamage(D2GameStrc* pGame, D2UnitStrc* pSrcUnit, D2UnitStrc* pTargetUnit, int32_t nDamageType)
 {
+	if (D2Seam<&OBJEVAL_ApplyTrapObjectDamage>::hook) { D2Seam<&OBJEVAL_ApplyTrapObjectDamage>::hook(pGame, pSrcUnit, pTargetUnit, nDamageType); return; }
     D2ActiveRoomStrc* pTargetRoom = UNITS_GetRoom(pTargetUnit);
 
     if (DUNGEON_IsRoomInTown(pTargetRoom) || UNITS_TestCollisionBetweenInteractingUnits(pTargetUnit, pSrcUnit, COLLIDE_MASK_PLAYER_FLYING))

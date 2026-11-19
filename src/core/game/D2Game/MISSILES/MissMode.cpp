@@ -185,6 +185,7 @@ int32_t __fastcall MISSMODE_UnitFindCallback_CanMissileDestroy(D2UnitStrc* pUnit
 // 1.13c D2Game+0x3A4E0
 void __stdcall MISSMODE_FillDamageParams(D2UnitStrc* pMissile, D2UnitStrc* pTarget, D2DamageStrc* pDamage)
 {
+	if (D2Seam<&MISSMODE_FillDamageParams>::hook) { D2Seam<&MISSMODE_FillDamageParams>::hook(pMissile, pTarget, pDamage); return; }
     memset(pDamage, 0x00, sizeof(*pDamage));
 
     pDamage->dwPhysDamage = MISSMODE_RollDamageValue(pMissile, STAT_MINDAMAGE, STAT_MAXDAMAGE, -1);
@@ -665,6 +666,7 @@ void __fastcall MISSMODE_CreateImmolationArrowHitSubmissiles(D2GameStrc* pGame, 
 // 1.13c D2Game+0x3F320
 int32_t __fastcall MISSMODE_HandleMissileCollision(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
+	if (D2Seam<&MISSMODE_HandleMissileCollision>::hook) return D2Seam<&MISSMODE_HandleMissileCollision>::hook(pGame, pMissile);
     if (!pMissile)
     {
         return MISSMODE_SrvDmgHitHandler(pGame, pMissile, nullptr, 1);
@@ -988,6 +990,7 @@ int32_t __fastcall MISSMODE_SrvDo08_MonBlizzCenter(D2GameStrc* pGame, D2UnitStrc
 // 1.10f body; the 1.13c 0x3D1E0 (EAX = nFrames, EBX = missile, stack game/range/missile/mask) is src/core/d2game/d2g_3d1e0.cpp
 D2UnitStrc* __fastcall MISSMODE_CreateMissileWithCollisionCheck(D2GameStrc* pGame, D2UnitStrc* pMissile, int32_t nRange, int32_t nFrames, int32_t nMissileId, uint16_t nCollisionMask)
 {
+	if (D2Seam<&MISSMODE_CreateMissileWithCollisionCheck>::hook) return D2Seam<&MISSMODE_CreateMissileWithCollisionCheck>::hook(pGame, pMissile, nRange, nFrames, nMissileId, nCollisionMask);
     if (!nFrames || (MISSILE_GetRemainingFrames(pMissile) % nFrames) != 0)
     {
         return nullptr;
@@ -3770,6 +3773,7 @@ int32_t __fastcall MISSMODE_SrvHit31_FireHead(D2GameStrc* pGame, D2UnitStrc* pMi
 // (object 60) at its position (objects, items and tiles read their static path, every other unit its dynamic path; Y before X).
 void __fastcall MISSMODE_CreateMissilePortal(D2UnitStrc* pMissile, D2GameStrc* pGame, int32_t nDestLevel)
 {
+	if (D2Seam<&MISSMODE_CreateMissilePortal>::hook) { D2Seam<&MISSMODE_CreateMissilePortal>::hook(pMissile, pGame, nDestLevel); return; }
     D2_CALL(MISSILE_SetTargetX, pMissile, 1);
     D2UnitStrc* pOwner = D2_CALL(SUNIT_GetOwner, pGame, pMissile);
 

@@ -86,6 +86,7 @@ void __fastcall PLRINTRO_SetQuestIntroFlag(D2UnitStrc* pUnit, D2GameStrc* pGame,
 // 1.13c D2Game+0x69590
 int32_t __fastcall PLRINTRO_GetQuestIntroFlag(D2UnitStrc* pUnit, D2GameStrc* pGame, int32_t nNpcId)
 {
+	if (D2Seam<&PLRINTRO_GetQuestIntroFlag>::hook) return D2Seam<&PLRINTRO_GetQuestIntroFlag>::hook(pUnit, pGame, nNpcId);
     D2PlrIntroStrc* pPlayerIntro = UNITS_GetPlayerData(pUnit)->pPlayerIntro[pGame->nDifficulty];
     return BITMANIP_GetBitState(pPlayerIntro->pQuestIntroFlags->pBuffer, PLRINTRO_GetIntroBitIndex(nNpcId));
 }

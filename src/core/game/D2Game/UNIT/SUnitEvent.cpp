@@ -1,4 +1,5 @@
 #include "UNIT/SUnitEvent.h"
+#include <test_seam.h>
 
 #include <Fog.h>
 
@@ -56,6 +57,7 @@ D2UnitEventStrc* __fastcall SUNITEVENT_Register(D2GameStrc* pGame, D2UnitStrc* p
 // 1.13c D2Game+0x37110 (checked against decompile)
 void __fastcall SUNITEVENT_Unregister(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nTimerQueueNo, int32_t a4)
 {
+	if (D2Seam<&SUNITEVENT_Unregister>::hook) { D2Seam<&SUNITEVENT_Unregister>::hook(pGame, pUnit, nTimerQueueNo, a4); return; }
     if (!pUnit)
     {
         return;

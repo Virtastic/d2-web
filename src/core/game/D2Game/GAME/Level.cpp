@@ -320,6 +320,7 @@ void __fastcall LEVEL_ChangeAct(D2GameStrc* pGame, D2ClientStrc* pClient, int32_
 // 1.13c D2Game+0x9E170 (registers: ebp = game, eax = player, edi = destination level; the +0x1ac test is the client act compare; checked against the disassembly, no delta)
 void __fastcall LEVEL_WarpUnit(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nDestinationLevelId, int32_t nTileCalc)
 {
+	if (D2Seam<&LEVEL_WarpUnit>::hook) { D2Seam<&LEVEL_WarpUnit>::hook(pGame, pPlayer, nDestinationLevelId, nTileCalc); return; }
     D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
     D2_ASSERT(pClient);
 

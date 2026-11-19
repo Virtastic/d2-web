@@ -416,6 +416,7 @@ int32_t __fastcall sub_6FC7FBB0(D2UnitStrc* pPlayer)
 // 75% of the loss, (loss / 100) * 75 once the loss passes 0x100000 so the product cannot overflow)
 D2UnitStrc* __fastcall D2GAME_CORPSE_Handler_6FC7FBD0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY, D2ActiveRoomStrc* pRoom)
 {
+	if (D2Seam<&D2GAME_CORPSE_Handler_6FC7FBD0>::hook) return D2Seam<&D2GAME_CORPSE_Handler_6FC7FBD0>::hook(pGame, pUnit, nX, nY, pRoom);
     if (pUnit->pInventory)
     {
         D2CorpseStrc* pCorpse = INVENTORY_GetFirstCorpse(pUnit->pInventory);
@@ -907,6 +908,7 @@ void __fastcall PLRMODE_StartID_AttackCastThrowKickSpecialSequence(D2GameStrc* p
 // 1.13c D2Game+0x79100
 void __fastcall sub_6FC80A30(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&sub_6FC80A30>::hook) { D2Seam<&sub_6FC80A30>::hook(pGame, pUnit); return; }
     if (pUnit && pUnit->dwUnitType == UNIT_PLAYER && pUnit->pInventory)
     {
         D2SkillStrc* pLeftSkill = UNITS_GetLeftSkill(pUnit);
@@ -1053,6 +1055,7 @@ void __fastcall sub_6FC80B90(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 // 1.13c D2Game+0x78A90
 void __fastcall sub_6FC80E10(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
+	if (D2Seam<&sub_6FC80E10>::hook) { D2Seam<&sub_6FC80E10>::hook(pGame, pPlayer); return; }
     if (pPlayer && pPlayer->dwUnitType == UNIT_PLAYER)
     {
         D2UnitStrc* pItem = INVENTORY_GetFirstItem(pPlayer->pInventory);
@@ -1345,6 +1348,7 @@ void __fastcall sub_6FC81250(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, i
 // 1.13c D2Game+0x78230 (the client flag bit 2 is cleared inline)
 void __fastcall sub_6FC814F0(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
+	if (D2Seam<&sub_6FC814F0>::hook) { D2Seam<&sub_6FC814F0>::hook(pGame, pPlayer); return; }
     STATLIST_SetUnitStat(pPlayer, STAT_HITPOINTS, 0, 0);
     D2Common_10469(pPlayer);
     STATES_UpdateStayDeathFlags(pPlayer, 0);
@@ -1517,6 +1521,7 @@ void __fastcall sub_6FC81650(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2ClientStr
 // 1.13c D2Game+0x78550 (checked against decompile, no delta; the mode gate is D2Game+0x78340 and the interrupt check D2Game+0x77FA0)
 void __fastcall sub_6FC817D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStrc* pUsedSkill, int32_t nMode, int32_t nX, int32_t nY, int32_t a7)
 {
+	if (D2Seam<&sub_6FC817D0>::hook) { D2Seam<&sub_6FC817D0>::hook(pGame, pUnit, pUsedSkill, nMode, nX, nY, a7); return; }
     D2_ASSERT(pGame);
 
     if (sub_6FC81890(pGame, pUnit, nMode) && (a7 || D2GAME_PLRMODES_First_6FC7F340(pGame, pUnit, nMode, 1, pUsedSkill)))

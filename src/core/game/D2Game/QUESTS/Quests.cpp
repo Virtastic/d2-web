@@ -218,6 +218,7 @@ void __fastcall QUESTS_FreeChainRecord(D2GameStrc* pGame, D2QuestChainStrc* pRec
 // 1.13c D2Game+0x33F30 (walk is the same; 1.13c keeps the link at quest record +0xF4, 1.10f at +0xF0 -- layout only)
 D2QuestDataStrc* __fastcall QUESTS_GetQuestData(D2GameStrc* pGame, int32_t nId)
 {
+	if (D2Seam<&QUESTS_GetQuestData>::hook) return D2Seam<&QUESTS_GetQuestData>::hook(pGame, nId);
 	D2_ASSERT(nId >= 0);
 
 	if (!pGame || !pGame->pQuestControl)
@@ -261,6 +262,7 @@ void __fastcall QUESTS_AttachLevelChainRecord(D2GameStrc* pGame, D2UnitStrc* pUn
 // 1.13c D2Game+0x35890
 int32_t __fastcall QUESTS_CreateChainRecord(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nQuestId)
 {
+	if (D2Seam<&QUESTS_CreateChainRecord>::hook) return D2Seam<&QUESTS_CreateChainRecord>::hook(pGame, pUnit, nQuestId);
 	// 1.13c D2Game+0x35890: signed rejection precedes quest lookup.
 	if (nQuestId < 0)
 	{
@@ -325,6 +327,7 @@ int32_t __fastcall QUESTS_CreateChainRecord(D2GameStrc* pGame, D2UnitStrc* pUnit
 // 1.13c D2Game+0x33EB0 (checked against decompile, no delta)
 void __fastcall QUESTS_InitScrollTextChain(D2QuestDataStrc* pQuest, D2TextHeaderStrc* pTextControl, int32_t nNPCID, int32_t nIndex)
 {
+	if (D2Seam<&QUESTS_InitScrollTextChain>::hook) { D2Seam<&QUESTS_InitScrollTextChain>::hook(pQuest, pTextControl, nNPCID, nIndex); return; }
 	D2NPCMessageTableStrc* pNpcMessageTable = &pQuest->pNPCMessages[nIndex];
 
 	for (int32_t i = 0; i < pNpcMessageTable->nMessages; ++i)
@@ -694,6 +697,7 @@ void __fastcall QUESTS_NPCDeactivate(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2U
 // 1.13c D2Game+0x345A0
 void __fastcall QUESTS_ItemPickedUp(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem)
 {
+	if (D2Seam<&QUESTS_ItemPickedUp>::hook) { D2Seam<&QUESTS_ItemPickedUp>::hook(pGame, pPlayer, pItem); return; }
 	D2QuestArgStrc pArgs = {};
 
 	pArgs.pGame = pGame;
@@ -780,6 +784,7 @@ void __fastcall QUESTS_QuestUpdater(D2GameStrc* pGame)
 //D2Game.0x6FC94690
 void __fastcall QUESTS_CreateTimer(D2QuestDataStrc* pQuest, QUESTUPDATE pfnCallback, int32_t nTicks)
 {
+	if (D2Seam<&QUESTS_CreateTimer>::hook) { D2Seam<&QUESTS_CreateTimer>::hook(pQuest, pfnCallback, nTicks); return; }
 	if (!pQuest || !pQuest->pGame)
 	{
 		return;
@@ -953,6 +958,7 @@ void __fastcall QUESTS_StatusCallback(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // D2Game+0xCBE70 inline (seen at D2Game+0x63DD0 "started quest by jumping to level" and D2Game+0xB0320).
 int32_t __fastcall QUESTS_DebugOutput(D2GameStrc* pGame, const char* szMessage, const char* szFile, int32_t nLine)
 {
+	if (D2Seam<&QUESTS_DebugOutput>::hook) return D2Seam<&QUESTS_DebugOutput>::hook(pGame, szMessage, szFile, nLine);
 	if (!dword_6FD4DC34)
 	{
 		return 0;
@@ -966,6 +972,7 @@ int32_t __fastcall QUESTS_DebugOutput(D2GameStrc* pGame, const char* szMessage, 
 // 1.13c D2Game+0x366A0 (no standalone body; the find+delete is inlined at call sites)
 void __fastcall QUESTS_DeleteItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint32_t dwItemCode)
 {
+	if (D2Seam<&QUESTS_DeleteItem>::hook) { D2Seam<&QUESTS_DeleteItem>::hook(pGame, pPlayer, dwItemCode); return; }
 	D2UnitStrc* pItem = D2_CALL(ITEMS_FindQuestItem, pGame, pPlayer, dwItemCode);
 	if (pItem)
 	{
@@ -977,6 +984,7 @@ void __fastcall QUESTS_DeleteItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint32
 // 1.13c D2Game+0x354F0 (AL = quest id, ECX = player, stack = game; builds packet 0x5D: record 0x33F30, act check, filter callback record+0xE8 or the 0x33A30 ladder, 0x56B80 for filter 0x24, send 0x8ACD0)
 void __fastcall QUESTS_StatusCyclerEx(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint8_t nQuestId)
 {
+	if (D2Seam<&QUESTS_StatusCyclerEx>::hook) { D2Seam<&QUESTS_StatusCyclerEx>::hook(pGame, pPlayer, nQuestId); return; }
 	if (!pGame)
 	{
 		return;
@@ -1058,6 +1066,7 @@ void __fastcall QUESTS_UnitIterate(D2QuestDataStrc* pQuest, int32_t nIterateStat
 // 1.13c D2Game+0x35EB0 (state byte store, wsprintfA into a 128-byte buffer, chat message when DAT_6fd31c20 is set)
 int32_t __fastcall QUESTS_StateDebug(D2QuestDataStrc* pQuestData, int32_t nState, const char* szFile, int32_t nLine)
 {
+	if (D2Seam<&QUESTS_StateDebug>::hook) return D2Seam<&QUESTS_StateDebug>::hook(pQuestData, nState, szFile, nLine);
 	pQuestData->fState = nState;
 
 	if (!dword_6FD4DC34)
@@ -1397,6 +1406,7 @@ int32_t __fastcall QUESTS_ActiveCycler(D2GameStrc* pGame, D2UnitStrc* pPlayer, D
 // 1.13c D2Game+0x33920
 void __fastcall QUESTS_SetGlobalState(D2GameStrc* pGame, int32_t nQuestId, int32_t nState)
 {
+	if (D2Seam<&QUESTS_SetGlobalState>::hook) { D2Seam<&QUESTS_SetGlobalState>::hook(pGame, nQuestId, nState); return; }
 	D2_ASSERT(pGame && pGame->pQuestControl && pGame->pQuestControl->bPickedSet);
 
 	D2_CALL(QUESTRECORD_SetQuestState, pGame->pQuestControl->pQuestFlags, nQuestId, nState);
@@ -1406,6 +1416,7 @@ void __fastcall QUESTS_SetGlobalState(D2GameStrc* pGame, int32_t nQuestId, int32
 // 1.13c D2Game+0x338D0
 int32_t __fastcall QUESTS_GetGlobalState(D2GameStrc* pGame, int32_t nQuestId, int32_t nState)
 {
+	if (D2Seam<&QUESTS_GetGlobalState>::hook) return D2Seam<&QUESTS_GetGlobalState>::hook(pGame, nQuestId, nState);
 	D2_ASSERT(pGame && pGame->pQuestControl && pGame->pQuestControl->bPickedSet);
 
 	return QUESTRECORD_GetQuestState(pGame->pQuestControl->pQuestFlags, nQuestId, nState);
@@ -1984,6 +1995,7 @@ void __fastcall QUESTS_SetGoldenBirdSpawn(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // 1.13c D2Game+0x36470
 D2UnitStrc* __fastcall QUESTS_CreateItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint32_t dwCode, int32_t nLevel, uint8_t nQuality, int32_t bDroppable)
 {
+	if (D2Seam<&QUESTS_CreateItem>::hook) return D2Seam<&QUESTS_CreateItem>::hook(pGame, pPlayer, dwCode, nLevel, nQuality, bDroppable);
 	int32_t nItemId = 0;
 	if (!DATATBLS_GetItemRecordFromItemCode(dwCode, &nItemId))
 	{
@@ -2375,6 +2387,7 @@ void __fastcall QUESTS_SetStageIntroFlags(D2GameStrc* pGame, D2UnitStrc* pPlayer
 //D2Game.0x6FC96810
 void __fastcall QUESTS_AddPlayerGUID(D2QuestGUIDStrc* pQuestGUID, int32_t dwGUID)
 {
+	if (D2Seam<&QUESTS_AddPlayerGUID>::hook) { D2Seam<&QUESTS_AddPlayerGUID>::hook(pQuestGUID, dwGUID); return; }
 	if (pQuestGUID->nPlayerCount >= 32)
 	{
 		return;
@@ -2393,6 +2406,7 @@ void __fastcall QUESTS_AddPlayerGUID(D2QuestGUIDStrc* pQuestGUID, int32_t dwGUID
 //D2Game.0x6FC96840
 int32_t __fastcall QUESTS_FastRemovePlayerGUID(D2QuestGUIDStrc* pGUIDs, int32_t dwGUID)
 {
+	if (D2Seam<&QUESTS_FastRemovePlayerGUID>::hook) return D2Seam<&QUESTS_FastRemovePlayerGUID>::hook(pGUIDs, dwGUID);
 	for (int32_t i = 0; i < pGUIDs->nPlayerCount; ++i)
 	{
 		if (pGUIDs->nPlayerGUIDs[i] == dwGUID)
@@ -2414,6 +2428,7 @@ int32_t __fastcall QUESTS_FastRemovePlayerGUID(D2QuestGUIDStrc* pGUIDs, int32_t 
 //D2Game.0x6FC96880
 int32_t __fastcall QUESTS_QuickCheckPlayerGUID(D2QuestGUIDStrc* pGUIDs, int32_t dwGUID)
 {
+	if (D2Seam<&QUESTS_QuickCheckPlayerGUID>::hook) return D2Seam<&QUESTS_QuickCheckPlayerGUID>::hook(pGUIDs, dwGUID);
 	for (int32_t i = 0; i < pGUIDs->nPlayerCount; ++i)
 	{
 		if (pGUIDs->nPlayerGUIDs[i] == dwGUID)
@@ -2451,6 +2466,7 @@ void __fastcall QUESTS_ResetPlayerGUIDCount(D2QuestGUIDStrc* pGUIDs)
 // not-1.13c: retail has no function for it; each quest callback loads the guid (-1 for no player) and calls D2Game+0x33830 on quest+0x1C (e.g. D2Game+0x57A20, +0x56FC0, +0x575D0, +0x340C0)
 void __fastcall QUESTS_QuickRemovePlayerGUID(D2QuestDataStrc* pQuest, D2QuestArgStrc* pQuestArg)
 {
+	if (D2Seam<&QUESTS_QuickRemovePlayerGUID>::hook) { D2Seam<&QUESTS_QuickRemovePlayerGUID>::hook(pQuest, pQuestArg); return; }
 	D2_CALL(QUESTS_FastRemovePlayerGUID, &pQuest->tPlayerGUIDs, pQuestArg->pPlayer ? pQuestArg->pPlayer->dwUnitId : -1);
 }
 
@@ -2458,6 +2474,7 @@ void __fastcall QUESTS_QuickRemovePlayerGUID(D2QuestDataStrc* pQuest, D2QuestArg
 // 1.13c D2Game+0x34130
 void __fastcall QUESTS_GetFreePosition(D2ActiveRoomStrc* pRoom, D2CoordStrc* pCoord, uint32_t nSize, uint16_t fCollision, D2ActiveRoomStrc** ppRoom, int32_t nRadius)
 {
+	if (D2Seam<&QUESTS_GetFreePosition>::hook) { D2Seam<&QUESTS_GetFreePosition>::hook(pRoom, pCoord, nSize, fCollision, ppRoom, nRadius); return; }
 	const uint32_t nCenterX = pCoord->nX - (nSize >> 1);
 	const uint32_t nCenterY = pCoord->nY - (nSize >> 1);
 
@@ -2531,6 +2548,7 @@ void __fastcall QUESTS_RemovePlayerGUID(D2QuestDataStrc* pQuest, D2QuestArgStrc*
 // (D2Common #10579, size 0x60) and is sent with size 0x67 by D2Game+0x8A3E0; the 0x60 in the decompile is that buffer size, not a packet id)
 void __fastcall QUESTS_UpdatePlayerFlags(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&QUESTS_UpdatePlayerFlags>::hook) { D2Seam<&QUESTS_UpdatePlayerFlags>::hook(pGame, pUnit); return; }
 	D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__);
 	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pUnit)->pQuestData[pGame->nDifficulty];
 
@@ -2541,6 +2559,7 @@ void __fastcall QUESTS_UpdatePlayerFlags(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // 1.13c D2Game+0x35A20
 void __fastcall QUESTS_GUIDUpdate(D2GameStrc* pGame, D2QuestGUIDStrc* pQuestGUID, int32_t nQuest, uint16_t wSoundCMD)
 {
+	if (D2Seam<&QUESTS_GUIDUpdate>::hook) { D2Seam<&QUESTS_GUIDUpdate>::hook(pGame, pQuestGUID, nQuest, wSoundCMD); return; }
 	for (int32_t i = 0; i < pQuestGUID->nPlayerCount; ++i)
 	{
 		D2UnitStrc* pUnit = SUNIT_GetServerUnit(pGame, UNIT_PLAYER, pQuestGUID->nPlayerGUIDs[i]);
@@ -2565,6 +2584,7 @@ void __fastcall QUESTS_GUIDUpdate(D2GameStrc* pGame, D2QuestGUIDStrc* pQuestGUID
 // 1.13c D2Game+0x34B80
 void __fastcall QUESTS_SendScrollMessage(D2UnitStrc* pPlayer, D2UnitStrc* pUnit, uint16_t nMessage)
 {
+	if (D2Seam<&QUESTS_SendScrollMessage>::hook) { D2Seam<&QUESTS_SendScrollMessage>::hook(pPlayer, pUnit, nMessage); return; }
 	D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
 
 	D2GSPacketSrv27 packet27 = {};
@@ -2582,6 +2602,7 @@ void __fastcall QUESTS_SendScrollMessage(D2UnitStrc* pPlayer, D2UnitStrc* pUnit,
 // 1.13c D2Game+0x35E90 (unk0x20 = code, then SUNIT_IterateUnitsOfType(type 0) via 0xDFCC0; 0x1020 is a different helper)
 void __fastcall QUESTS_TriggerFX(D2GameStrc* pGame, uint8_t a2)
 {
+	if (D2Seam<&QUESTS_TriggerFX>::hook) { D2Seam<&QUESTS_TriggerFX>::hook(pGame, a2); return; }
 	pGame->pQuestControl->unk0x20 = a2;
 	D2_CALL(SUNIT_IterateUnitsOfType, pGame, 0, 0, QUESTS_FXIterate);
 }
@@ -2605,6 +2626,7 @@ int32_t __fastcall QUESTS_FXIterate(D2GameStrc* pGame, D2UnitStrc* pUnit, void* 
 // 1.13c D2Game+0x35910 (checked against decompile, no delta)
 void __fastcall QUESTS_NPCActivateSpeeches(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pTarget)
 {
+	if (D2Seam<&QUESTS_NPCActivateSpeeches>::hook) { D2Seam<&QUESTS_NPCActivateSpeeches>::hook(pGame, pPlayer, pTarget); return; }
 	D2TextHeaderStrc* pTextHeader = TEXT_AllocTextHeader(pGame->pMemoryPool);
 	D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
 
@@ -2708,6 +2730,7 @@ void __fastcall QUESTS_SendLogUpdate(D2UnitStrc* pUnit, uint8_t nQuestId)
 // 1.13c D2Game+0x34AA0
 void __fastcall QUESTS_SendLogUpdateEx(D2UnitStrc* pPlayer, uint8_t nQuestId, uint8_t nAct)
 {
+	if (D2Seam<&QUESTS_SendLogUpdateEx>::hook) { D2Seam<&QUESTS_SendLogUpdateEx>::hook(pPlayer, nQuestId, nAct); return; }
 	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pPlayer);
 	if (pRoom)
 	{
@@ -2732,6 +2755,7 @@ void __fastcall QUESTS_SendLogUpdateEx(D2UnitStrc* pPlayer, uint8_t nQuestId, ui
 // 1.13c D2Game+0x361E0
 D2UnitStrc* __fastcall QUESTS_SpawnCriticalMonster(D2GameStrc* pGame, int32_t nXpos, int32_t nYpos, D2ActiveRoomStrc* pRoom, int32_t bSpecialInit, int32_t nMonster)
 {
+	if (D2Seam<&QUESTS_SpawnCriticalMonster>::hook) return D2Seam<&QUESTS_SpawnCriticalMonster>::hook(pGame, nXpos, nYpos, pRoom, bSpecialInit, nMonster);
 	D2ActiveRoomStrc* ppRoom = pRoom;
 	D2DrlgCoordsStrc drlgCoords = {};
 	DUNGEON_GetRoomCoordinates(pRoom, &drlgCoords);

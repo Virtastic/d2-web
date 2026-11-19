@@ -111,6 +111,7 @@ D2UnitStrc* __fastcall sub_6FCCFD40(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCo
 // 1.13c D2Game+0xF30C0
 D2UnitStrc* __fastcall sub_6FCCFD70(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t* bCloseToTarget)
 {
+	if (D2Seam<&sub_6FCCFD70>::hook) return D2Seam<&sub_6FCCFD70>::hook(pGame, pUnit, bCloseToTarget);
 	if (!UNITS_GetRoom(pUnit))
 	{
 		return nullptr;
@@ -137,6 +138,7 @@ D2UnitStrc* __fastcall sub_6FCCFD70(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_
 // 1.13c D2Game+0x15D0: whether the monster class has the interact flag
 int32_t __fastcall AITACTICS_IsInteractClass(int32_t nClassId)
 {
+	if (D2Seam<&AITACTICS_IsInteractClass>::hook) return D2Seam<&AITACTICS_IsInteractClass>::hook(nClassId);
 	D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nClassId);
 	return pMonStatsTxtRecord && (gdwBitMasks[MONSTATSFLAGINDEX_INTERACT] & pMonStatsTxtRecord->dwMonStatsFlags);
 }
@@ -179,6 +181,7 @@ D2UnitStrc* __fastcall sub_6FCCFDE0(D2GameStrc* pGame, D2UnitStrc* pNPC, D2UnitS
 // 1.13c D2Game+0xF2220 (unit from EAX: mode-change info 0x75070, target unit at +0x10, then 0x75E10)
 int32_t __fastcall AITACTICS_ChangeModeAndTargetUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMode, D2UnitStrc* pTargetUnit)
 {
+	if (D2Seam<&AITACTICS_ChangeModeAndTargetUnit>::hook) return D2Seam<&AITACTICS_ChangeModeAndTargetUnit>::hook(pGame, pUnit, nMode, pTargetUnit);
 	D2ModeChangeStrc modeChange = {};
 
 	MONSTERMODE_GetModeChangeInfo(pUnit, nMode, &modeChange);
@@ -190,6 +193,7 @@ int32_t __fastcall AITACTICS_ChangeModeAndTargetUnit(D2GameStrc* pGame, D2UnitSt
 // 1.13c D2Game+0xF21E0 (mode in EAX; x/y words at block +0xC/+0x10 between 0x75070 and 0x75E10)
 int32_t __fastcall AITACTICS_ChangeModeAndTargetCoordinates(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMode, int32_t nX, int32_t nY)
 {
+	if (D2Seam<&AITACTICS_ChangeModeAndTargetCoordinates>::hook) return D2Seam<&AITACTICS_ChangeModeAndTargetCoordinates>::hook(pGame, pUnit, nMode, nX, nY);
 	D2ModeChangeStrc modeChange = {};
 
 	MONSTERMODE_GetModeChangeInfo(pUnit, nMode, &modeChange);
@@ -202,6 +206,7 @@ int32_t __fastcall AITACTICS_ChangeModeAndTargetCoordinates(D2GameStrc* pGame, D
 // 1.13c D2Game+0xF2120
 int32_t __fastcall AITACTICS_UseSequenceSkill(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, D2UnitStrc* pTargetUnit, int32_t nX, int32_t nY)
 {
+	if (D2Seam<&AITACTICS_UseSequenceSkill>::hook) return D2Seam<&AITACTICS_UseSequenceSkill>::hook(pGame, pUnit, nSkillId, pTargetUnit, nX, nY);
 	if (nSkillId < 0 || nSkillId >= sgptDataTables->nSkillsTxtRecordCount)
 	{
 		return 0;
@@ -224,6 +229,7 @@ int32_t __fastcall AITACTICS_UseSequenceSkill(D2GameStrc* pGame, D2UnitStrc* pUn
 //D2Game.0x6FCCFFB0
 int32_t __fastcall AITACTICS_UseSkill(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t nMode, int32_t nSkillId, D2UnitStrc* pTarget, int32_t nX, int32_t nY)
 {
+	if (D2Seam<&AITACTICS_UseSkill>::hook) return D2Seam<&AITACTICS_UseSkill>::hook(pGame, pUnit, nMode, nSkillId, pTarget, nX, nY);
 	if (!pUnit || nMode >= 16u)
 	{
 		return 0;
@@ -255,6 +261,7 @@ int32_t __fastcall AITACTICS_UseSkill(D2GameStrc* pGame, D2UnitStrc* pUnit, uint
 // the used skill is cleared, the byte at +0x15 is always 100 and no per-mode 101 lookup runs)
 void __fastcall AITACTICS_IdleInNeutralMode(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nFrames)
 {
+	if (D2Seam<&AITACTICS_IdleInNeutralMode>::hook) { D2Seam<&AITACTICS_IdleInNeutralMode>::hook(pGame, pUnit, nFrames); return; }
 	if (!pUnit || pUnit->dwAnimMode != MONMODE_NEUTRAL)
 	{
 		UNITS_SetUsedSkill(pUnit, nullptr);
@@ -273,6 +280,7 @@ void __fastcall AITACTICS_IdleInNeutralMode(D2GameStrc* pGame, D2UnitStrc* pUnit
 // 1.13c D2Game+0xF20C0
 void __fastcall AITACTICS_Idle(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nFrames)
 {
+	if (D2Seam<&AITACTICS_Idle>::hook) { D2Seam<&AITACTICS_Idle>::hook(pGame, pUnit, nFrames); return; }
 	if (!nFrames)
 	{
 		nFrames = 1;
@@ -324,6 +332,7 @@ void __fastcall AITACTICS_SetVelocity(D2UnitStrc* pUnit, int32_t a2, int32_t nVe
 // 1.13c D2Game+0xF30A0 (F2540 with mode 2, step 1 and the flag word in EAX)
 int32_t __fastcall AITACTICS_WalkToTargetUnitWithFlags(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTargetUnit, uint8_t nFlag)
 {
+	if (D2Seam<&AITACTICS_WalkToTargetUnitWithFlags>::hook) return D2Seam<&AITACTICS_WalkToTargetUnitWithFlags>::hook(pGame, pUnit, pTargetUnit, nFlag);
 	return AITACTICS_MoveToTarget(pGame, pUnit, pTargetUnit, MONMODE_WALK, 0, 0, 1u, nFlag);
 }
 
@@ -331,6 +340,7 @@ int32_t __fastcall AITACTICS_WalkToTargetUnitWithFlags(D2GameStrc* pGame, D2Unit
 // 1.13c D2Game+0xF2540 (decrepify reset of the velocity fields and the AI-think event sweep are inline)
 int32_t __fastcall AITACTICS_MoveToTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t nMode, int32_t nX, int32_t nY, uint8_t bStep, uint8_t nFlags)
 {
+	if (D2Seam<&AITACTICS_MoveToTarget>::hook) return D2Seam<&AITACTICS_MoveToTarget>::hook(pGame, pUnit, pTarget, nMode, nX, nY, bStep, nFlags);
 	int32_t nNewMode = nMode;
 
 	if (nMode == MONMODE_RUN && STATES_CheckState(pUnit, STATE_DECREPIFY))
@@ -394,6 +404,7 @@ int32_t __fastcall AITACTICS_MoveToTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 // 1.13c D2Game+0xF3080 (F2540 with mode 2, step 1, flags 0)
 int32_t __fastcall AITACTICS_WalkToTargetUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget)
 {
+	if (D2Seam<&AITACTICS_WalkToTargetUnit>::hook) return D2Seam<&AITACTICS_WalkToTargetUnit>::hook(pGame, pUnit, pTarget);
 	return AITACTICS_MoveToTarget(pGame, pUnit, pTarget, MONMODE_WALK, 0, 0, 1u, 0);
 }
 
@@ -486,6 +497,7 @@ int32_t __fastcall AITACTICS_RunToTargetUnitWithSteps(D2GameStrc* pGame, D2UnitS
 // 1.13c D2Game+0xF2D80 (checked against decompile; byte distance fixed)
 int32_t __fastcall D2GAME_AICORE_Escape_6FCD0560(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t nMaxDistance, int32_t bDeleteAiEventCallback)
 {
+	if (D2Seam<&D2GAME_AICORE_Escape_6FCD0560>::hook) return D2Seam<&D2GAME_AICORE_Escape_6FCD0560>::hook(pGame, pUnit, pTarget, nMaxDistance, bDeleteAiEventCallback);
 	if (!pUnit || !pTarget)
 	{
 		return 0;
@@ -540,6 +552,7 @@ int32_t __fastcall sub_6FCD06D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
 //D2Game.0x6FCD0840
 int32_t __fastcall AITACTICS_WalkCloseToUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMaxDistance)
 {
+	if (D2Seam<&AITACTICS_WalkCloseToUnit>::hook) return D2Seam<&AITACTICS_WalkCloseToUnit>::hook(pGame, pUnit, nMaxDistance);
 	int32_t nOffsetX = 0;
 	int32_t nOffsetY = 0;
 
@@ -648,6 +661,7 @@ int32_t __fastcall AITACTICS_RunCloseToTargetUnit(D2GameStrc* pGame, D2UnitStrc*
 // 1.13c D2Game+0xF26B0
 int32_t __fastcall sub_6FCD0E80(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t a4, int32_t bDeleteAiEventCallback)
 {
+	if (D2Seam<&sub_6FCD0E80>::hook) return D2Seam<&sub_6FCD0E80>::hook(pGame, pUnit, pTarget, a4, bDeleteAiEventCallback);
 	//TODO: v8
 	int32_t v8 = 0;
 	if ((uint8_t)ITEMS_RollRandomNumber(&pUnit->pSeed) < 128u)
@@ -761,6 +775,7 @@ int32_t __fastcall AITACTICS_ChangeModeAndTargetCoordinatesNoStep(D2GameStrc* pG
 // 1.13c D2Game+0xF1D90 (checked against decompile)
 int32_t __fastcall AITACTICS_MoveInRadiusToTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t nMode, int32_t a5, int32_t a6)
 {
+	if (D2Seam<&AITACTICS_MoveInRadiusToTarget>::hook) return D2Seam<&AITACTICS_MoveInRadiusToTarget>::hook(pGame, pUnit, pTarget, nMode, a5, a6);
 	const int32_t nDistance = AIUTIL_GetDistanceToCoordinates_FullUnitSize(pUnit, pTarget);
 	const int32_t nSign = D2signum(nDistance - a6);
 	const int32_t nDiff = std::min(std::abs(nDistance - a6), a5);
@@ -870,6 +885,7 @@ D2UnitStrc* __fastcall AITACTICS_GetTargetMinion(D2GameStrc* pGame, D2UnitStrc* 
 //D2Game.0x6FCD1490
 void __fastcall AITACTICS_UseSkillInRange(D2UnitStrc* pUnit, int32_t nRange, uint16_t wSkillId, uint8_t nMode)
 {
+	if (D2Seam<&AITACTICS_UseSkillInRange>::hook) { D2Seam<&AITACTICS_UseSkillInRange>::hook(pUnit, nRange, wSkillId, nMode); return; }
 	const int32_t nX = CLIENTS_GetUnitX(pUnit) + ITEMS_RollLimitedRandomNumber(&pUnit->pSeed, 2 * nRange) - nRange;
 	const int32_t nY = CLIENTS_GetUnitY(pUnit) + ITEMS_RollLimitedRandomNumber(&pUnit->pSeed, 2 * nRange) - nRange;
 

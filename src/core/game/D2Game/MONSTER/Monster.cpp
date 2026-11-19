@@ -1,4 +1,5 @@
 #include "MONSTER/Monster.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -541,6 +542,7 @@ void __fastcall MONSTER_SetComponents(D2MonRegDataStrc* pMonRegData, D2UnitStrc*
 // 1.13c D2Game+0xAF610 (retail takes the unit in EAX; non-monster/null data derefs null = crash, we return 1)
 int32_t __fastcall MONSTER_HasComponents(D2UnitStrc* pMonster)
 {
+	if (D2Seam<&MONSTER_HasComponents>::hook) return D2Seam<&MONSTER_HasComponents>::hook(pMonster);
     if (!pMonster || pMonster->dwUnitType != UNIT_MONSTER || !pMonster->pMonsterData)
     {
         return 1;

@@ -1,4 +1,5 @@
 #include "D2Waypoints.h"
+#include <test_seam.h>
 
 #include "D2DataTbls.h"
 
@@ -51,6 +52,7 @@ BOOL __stdcall WAYPOINTS_GetLevelIdFromWaypointNo(short nWaypointNo, int* pLevel
 // TRUE when that byte is not 0xFF.
 BOOL __stdcall WAYPOINTS_GetWaypointNoFromLevelId(int nLevelId, short* pWaypointNo)
 {
+	if (D2Seam<&WAYPOINTS_GetWaypointNoFromLevelId>::hook) return D2Seam<&WAYPOINTS_GetWaypointNoFromLevelId>::hook(nLevelId, pWaypointNo);
 	*pWaypointNo = 255;
 
 	// Retail reads the levels row directly (id inside 1..count-1, row base nonzero), no table accessor.
@@ -75,6 +77,7 @@ BOOL __stdcall WAYPOINTS_GetWaypointNoFromLevelId(int nLevelId, short* pWaypoint
 // table entry's word ANDed with its mask (the masked word itself, not 0/1).
 int __stdcall WAYPOINTS_IsActivated(D2WaypointDataStrc* pData, uint16_t wField)
 {
+	if (D2Seam<&WAYPOINTS_IsActivated>::hook) return D2Seam<&WAYPOINTS_IsActivated>::hook(pData, wField);
 	// Retail asserts the pointer, then the waypoint count global (0x70), then the index; the bit is the
 	// 16-bit word at index wField / 16 + 1 (the word before it is the header) masked by 1 << (wField & 15).
 	D2_ASSERT(pData);

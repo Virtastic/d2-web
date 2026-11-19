@@ -21,6 +21,7 @@ struct D2DrlgOutDesertInitStrc				// size: 0x10
 // 1.13c D2Common+0x85990
 void __fastcall DRLGOUTDESR_PlaceDesertTransitionToTown(D2DrlgLevelStrc* pLevel)
 {
+	if (D2Seam<&DRLGOUTDESR_PlaceDesertTransitionToTown>::hook) { D2Seam<&DRLGOUTDESR_PlaceDesertTransitionToTown>::hook(pLevel); return; }
 	D2DrlgOrthStrc* pTownRoomData = pLevel->pOutdoors->pRoomData;
 
 	while (pTownRoomData && pTownRoomData->pLevel->nLevelId != LEVEL_LUTGHOLEIN)
@@ -44,6 +45,7 @@ void __fastcall DRLGOUTDESR_PlaceDesertTransitionToTown(D2DrlgLevelStrc* pLevel)
 // 1.13c D2Common+0x85D90
 void __fastcall DRLGOUTDESR_PlaceFillsInRockyWaste(D2DrlgLevelStrc* pLevel)
 {
+	if (D2Seam<&DRLGOUTDESR_PlaceFillsInRockyWaste>::hook) { D2Seam<&DRLGOUTDESR_PlaceFillsInRockyWaste>::hook(pLevel); return; }
 	const int nLevelPrestIds[] = { LVLPREST_ACT2_DESERT_OASIS_1, LVLPREST_ACT2_DESERT_RUINS_08X08, LVLPREST_ACT2_DESERT_FILL_BONE_1, LVLPREST_ACT2_DESERT_FILL_BONE_2, LVLPREST_ACT2_DESERT_FILL_HEAD_1, LVLPREST_ACT2_DESERT_FILL_MESA_1, LVLPREST_ACT2_DESERT_FILL_WAGON_1 };
 
 	D2_CALL(DRLGOUTDESR_PlacePresetVariants, pLevel, nLevelPrestIds, ARRAY_SIZE(nLevelPrestIds), FALSE);
@@ -52,6 +54,7 @@ void __fastcall DRLGOUTDESR_PlaceFillsInRockyWaste(D2DrlgLevelStrc* pLevel)
 // 1.13c D2Common+0x85D20
 void __fastcall DRLGOUTDESR_PlaceFillsInDryHills(D2DrlgLevelStrc* pLevel)
 {
+	if (D2Seam<&DRLGOUTDESR_PlaceFillsInDryHills>::hook) { D2Seam<&DRLGOUTDESR_PlaceFillsInDryHills>::hook(pLevel); return; }
 	const int nLevelPrestIds1[] = { LVLPREST_ACT2_DESERT_OASIS_1, LVLPREST_ACT2_DESERT_RUINS_08X08, LVLPREST_ACT2_DESERT_FILL_HEAD_2, LVLPREST_ACT2_DESERT_FILL_MESA_1 };
 	const int nLevelPrestIds2[] = { LVLPREST_ACT2_DESERT_FILL_BERMS_1, LVLPREST_ACT2_DESERT_FILL_BERMS_2, LVLPREST_ACT2_DESERT_FILL_BERMS_3, LVLPREST_ACT2_DESERT_FILL_BERMS_4 };
 
@@ -62,6 +65,7 @@ void __fastcall DRLGOUTDESR_PlaceFillsInDryHills(D2DrlgLevelStrc* pLevel)
 // 1.13c D2Common+0x85CF0
 void __fastcall DRLGOUTDESR_PlaceOasesInFarOasis(D2DrlgLevelStrc* pLevel)
 {
+	if (D2Seam<&DRLGOUTDESR_PlaceOasesInFarOasis>::hook) { D2Seam<&DRLGOUTDESR_PlaceOasesInFarOasis>::hook(pLevel); return; }
 	const int nLevelPrestIds[] = { LVLPREST_ACT2_DESERT_OASIS_2, LVLPREST_ACT2_DESERT_OASIS_3 };
 
 	D2_CALL(DRLGOUTDESR_PlacePresetVariants, pLevel, nLevelPrestIds, ARRAY_SIZE(nLevelPrestIds), FALSE);
@@ -163,6 +167,7 @@ void __fastcall DRLGOUTDESR_PlacePresetVariants(D2DrlgLevelStrc* pLevel, const i
 // 1.13c D2Common+0x85930
 void __fastcall DRLGOUTDESR_PlaceCliffs(D2DrlgLevelStrc* pLevel)
 {
+	if (D2Seam<&DRLGOUTDESR_PlaceCliffs>::hook) { D2Seam<&DRLGOUTDESR_PlaceCliffs>::hook(pLevel); return; }
 	static const D2DrlgOutDesertInitStrc pOutDesertInit[8][5] =
 	{
 		{
@@ -234,6 +239,7 @@ void __fastcall DRLGOUTDESR_PlaceCliffs(D2DrlgLevelStrc* pLevel)
 // 1.13c D2Common+0x85DF0
 void __fastcall DRLGOUTDESR_PlaceBorders(D2DrlgLevelStrc* pLevel)
 {
+	if (D2Seam<&DRLGOUTDESR_PlaceBorders>::hook) { D2Seam<&DRLGOUTDESR_PlaceBorders>::hook(pLevel); return; }
 	D2_CALL(DRLGOUTDOORS_AddAct124SecondaryBorder, pLevel, 2, LVLPREST_ACT2_DESERT_BORDER_1);
 	D2_CALL(DRLGOUTDOORS_AddAct124SecondaryBorder, pLevel, 1, LVLPREST_ACT2_DESERT_BORDER_1);
 	D2_CALL(DRLGOUTDOORS_AddAct124SecondaryBorder, pLevel, 3, LVLPREST_ACT2_DESERT_BORDER_1);
@@ -242,6 +248,7 @@ void __fastcall DRLGOUTDESR_PlaceBorders(D2DrlgLevelStrc* pLevel)
 // 1.13c D2Common+0x859F0
 void __fastcall DRLGOUTDESR_AddExits(D2DrlgLevelStrc* pLevel)
 {
+	if (D2Seam<&DRLGOUTDESR_AddExits>::hook) { D2Seam<&DRLGOUTDESR_AddExits>::hook(pLevel); return; }
 	int nLevelPrestId = 0;
 
 	switch (pLevel->nLevelId)
@@ -278,6 +285,7 @@ void __fastcall DRLGOUTDESR_AddExits(D2DrlgLevelStrc* pLevel)
 // 1.13c D2Common+0x85C90
 void __fastcall DRLGOUTDESR_PlaceFillsInFarOasis(D2DrlgLevelStrc* pLevel)
 {
+	if (D2Seam<&DRLGOUTDESR_PlaceFillsInFarOasis>::hook) { D2Seam<&DRLGOUTDESR_PlaceFillsInFarOasis>::hook(pLevel); return; }
 	// 1.13c keeps both id tables in one frame array: the single-id table is its first word, the four-id table follows it.
 	const int nLevelPrestIds[5] = { LVLPREST_ACT2_DESERT_OASIS_1, LVLPREST_ACT2_DESERT_RUINS_08X08, LVLPREST_ACT2_DESERT_FILL_HEAD_1, LVLPREST_ACT2_DESERT_FILL_MESA_1, LVLPREST_ACT2_DESERT_FILL_WAGON_1 };
 
@@ -289,6 +297,7 @@ void __fastcall DRLGOUTDESR_PlaceFillsInFarOasis(D2DrlgLevelStrc* pLevel)
 // 1.13c D2Common+0x85C50
 void __fastcall DRLGOUTDESR_PlaceRuinsInLostCity(D2DrlgLevelStrc* pLevel)
 {
+	if (D2Seam<&DRLGOUTDESR_PlaceRuinsInLostCity>::hook) { D2Seam<&DRLGOUTDESR_PlaceRuinsInLostCity>::hook(pLevel); return; }
 	const int nLevelPrestIds[4] = { LVLPREST_ACT2_DESERT_RUINS_ELDER, LVLPREST_ACT2_DESERT_RUINS_16X16, LVLPREST_ACT2_DESERT_RUINS_16X08, LVLPREST_ACT2_DESERT_RUINS_08X16 };
 
 	D2_CALL(DRLGOUTDESR_PlacePresetVariants, pLevel, nLevelPrestIds, ARRAY_SIZE(nLevelPrestIds), FALSE);
@@ -297,6 +306,7 @@ void __fastcall DRLGOUTDESR_PlaceRuinsInLostCity(D2DrlgLevelStrc* pLevel)
 // 1.13c D2Common+0x85BE0
 void __fastcall DRLGOUTDESR_PlaceFillsInLostCity(D2DrlgLevelStrc* pLevel)
 {
+	if (D2Seam<&DRLGOUTDESR_PlaceFillsInLostCity>::hook) { D2Seam<&DRLGOUTDESR_PlaceFillsInLostCity>::hook(pLevel); return; }
 	// One frame array in 1.13c: the single-id table is its first word, the five-id table follows it.
 	const int nLevelPrestIds[6] = { LVLPREST_ACT2_DESERT_RUINS_08X08, LVLPREST_ACT2_DESERT_OASIS_1, LVLPREST_ACT2_DESERT_FILL_HEAD_2, LVLPREST_ACT2_DESERT_FILL_MESA_1, LVLPREST_ACT2_DESERT_FILL_BERMS_1, LVLPREST_ACT2_DESERT_FILL_BERMS_2 };
 
@@ -308,6 +318,7 @@ void __fastcall DRLGOUTDESR_PlaceFillsInLostCity(D2DrlgLevelStrc* pLevel)
 // 1.13c D2Common+0x858E0
 void __fastcall DRLGOUTDESR_PlaceTombEntriesInCanyon(D2DrlgLevelStrc* pLevel)
 {
+	if (D2Seam<&DRLGOUTDESR_PlaceTombEntriesInCanyon>::hook) { D2Seam<&DRLGOUTDESR_PlaceTombEntriesInCanyon>::hook(pLevel); return; }
 	static const D2DrlgOutDesertInitStrc pOutDesertInit[9] =
 	{
 		{ LVLPREST_ACT2_DESERT_CLIFF_RIGHT_KING_ENDS,	0, 8, 0 },
@@ -332,6 +343,7 @@ void __fastcall DRLGOUTDESR_PlaceTombEntriesInCanyon(D2DrlgLevelStrc* pLevel)
 // 1.13c D2Common+0x85B80
 void __fastcall DRLGOUTDESR_PlaceFillsInCanyon(D2DrlgLevelStrc* pLevel)
 {
+	if (D2Seam<&DRLGOUTDESR_PlaceFillsInCanyon>::hook) { D2Seam<&DRLGOUTDESR_PlaceFillsInCanyon>::hook(pLevel); return; }
 	// One frame array in 1.13c: the two-id table first, the five-id table after it.
 	const int nLevelPrestIds[7] = { LVLPREST_ACT2_DESERT_VALLEY_RUIN_1, LVLPREST_ACT2_DESERT_VALLEY_RUIN_2, LVLPREST_ACT2_DESERT_FILL_BONE_1, LVLPREST_ACT2_DESERT_FILL_BONE_2, LVLPREST_ACT2_DESERT_FILL_BERMS_3, LVLPREST_ACT2_DESERT_FILL_BERMS_4, LVLPREST_ACT2_DESERT_FILL_WAGON_1 };
 

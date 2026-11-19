@@ -474,6 +474,7 @@ int __fastcall STATLIST_GetBaseStat_6FDB6340(D2StatListStrc* pStatList, D2SLayer
 // 1.13c D2Common+0x38A80 (list in EBX, packed id in EDI, ItemStatCost row on the stack)
 int __fastcall STATLIST_GetTotalStat_6FDB63E0(D2StatListStrc* pStatList, D2SLayerStatIdStrc::PackedType nLayer_StatId, D2ItemStatCostTxt* pItemStatCostTxtRecord)
 {
+	if (D2Seam<&STATLIST_GetTotalStat_6FDB63E0>::hook) return D2Seam<&STATLIST_GetTotalStat_6FDB63E0>::hook(pStatList, nLayer_StatId, pItemStatCostTxtRecord);
 	D2_VERIFY(pStatList != nullptr);
 	D2StatListExStrc* pStatListEx = STATLIST_StatListExCast(pStatList);
 	D2StatsArrayStrc* pStatArray = pStatListEx ? &pStatListEx->FullStats : &pStatList->Stats;
@@ -702,6 +703,7 @@ int STATLIST_AddFullStatValue(D2StatListExStrc* list,
 // 1.13c D2Common+0x39F70
 void __fastcall sub_6FDB6C10(D2StatListExStrc* pStatListEx, D2SLayerStatIdStrc::PackedType nLayer_StatId, int nValue, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&sub_6FDB6C10>::hook) { D2Seam<&sub_6FDB6C10>::hook(pStatListEx, nLayer_StatId, nValue, pUnit); return; }
 	if (!nValue)
 	{
 		return;
@@ -862,6 +864,7 @@ void __stdcall D2Common_ExpireStatList_6FDB6E30(D2StatListStrc* pStatList)
 // 1.13c D2Common+0x3AD40
 void __stdcall STATLIST_FreeStatList(D2StatListStrc* pStatList)
 {
+	if (D2Seam<&STATLIST_FreeStatList>::hook) { D2Seam<&STATLIST_FreeStatList>::hook(pStatList); return; }
 	if (pStatList && !STATLIST_IsExtended(pStatList))
 	{
 		D2Common_STATLIST_FreeStatListImpl_6FDB7050(pStatList);
@@ -938,6 +941,7 @@ void __stdcall STATLIST_FreeStatListEx(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x38100
 D2StatListStrc* __stdcall STATLIST_AllocStatList(void* pMemPool, uint32_t fFilter, uint32_t dwTimeout, int nUnitType, D2UnitGUID nUnitGUID)
 {
+	if (D2Seam<&STATLIST_AllocStatList>::hook) return D2Seam<&STATLIST_AllocStatList>::hook(pMemPool, fFilter, dwTimeout, nUnitType, nUnitGUID);
 	D2StatListStrc* pStatList = D2_CALLOC_STRC_POOL(pMemPool, D2StatListStrc);
 
 	pStatList->dwOwnerType = nUnitType;
@@ -953,6 +957,7 @@ D2StatListStrc* __stdcall STATLIST_AllocStatList(void* pMemPool, uint32_t fFilte
 // 1.13c D2Common+0x3AF00
 void __stdcall STATLIST_AllocStatListEx(D2UnitStrc* pUnit, char nFlags, StatListValueChangeFunc pfOnValueChanged, D2GameStrc* pGame)
 {
+	if (D2Seam<&STATLIST_AllocStatListEx>::hook) { D2Seam<&STATLIST_AllocStatListEx>::hook(pUnit, nFlags, pfOnValueChanged, pGame); return; }
 	STATLIST_FreeStatListEx(pUnit);
 
 	D2StatListExStrc* pStatListEx = D2_CALLOC_STRC_POOL(pUnit->pMemoryPool, D2StatListExStrc);
@@ -1070,6 +1075,7 @@ int __stdcall STATLIST_GetExpireFrame(D2StatListStrc* pStatList)
 // 1.13c D2Common+0x3A7D0
 void __stdcall D2COMMON_10475_PostStatToStatList(D2UnitStrc* pUnit, D2StatListStrc* pStatList, BOOL bResetFlag)
 {
+	if (D2Seam<&D2COMMON_10475_PostStatToStatList>::hook) { D2Seam<&D2COMMON_10475_PostStatToStatList>::hook(pUnit, pStatList, bResetFlag); return; }
 	if (D2StatListExStrc* pUnitStatListEx = STATLIST_StatListExCast(pUnit->pStatListEx))
 	{
 		D2Common_ExpireStatList_6FDB6E30((D2StatListExStrc*)pStatList);
@@ -1182,6 +1188,7 @@ void __stdcall D2COMMON_10475_PostStatToStatList(D2UnitStrc* pUnit, D2StatListSt
 // 1.13c D2Common+0x3A330
 void __stdcall STATLIST_AddStat(D2StatListStrc* pStatList, int nStatId, int nValue, uint16_t nLayer)
 {
+	if (D2Seam<&STATLIST_AddStat>::hook) { D2Seam<&STATLIST_AddStat>::hook(pStatList, nStatId, nValue, nLayer); return; }
 	STATLIST_AddStatEax(pStatList, nStatId, nValue, nLayer, 0);
 }
 
@@ -1232,6 +1239,7 @@ uint32_t STATLIST_AddStatEax(D2StatListStrc* pStatList, int nStatId, int nValue,
 // 1.13c D2Common+0x38550
 void __fastcall STATLIST_InsertStatModOrFail_6FDB7690(D2StatListStrc* pStatList, D2SLayerStatIdStrc::PackedType nLayer_StatId)
 {
+	if (D2Seam<&STATLIST_InsertStatModOrFail_6FDB7690>::hook) { D2Seam<&STATLIST_InsertStatModOrFail_6FDB7690>::hook(pStatList, nLayer_StatId); return; }
 	if (D2StatListExStrc* pStatListEx = STATLIST_StatListExCast(pStatList))
 	{
 		uint16_t nStatId = D2SLayerStatIdStrc::FromPackedType(nLayer_StatId).nStat;
@@ -1263,6 +1271,7 @@ void __fastcall STATLIST_InsertStatModOrFail_6FDB7690(D2StatListStrc* pStatList,
 // 1.13c D2Common+0x3A280
 BOOL __stdcall STATLIST_SetStat(D2StatListStrc* pStatList, int nStatId, int nValue, uint16_t nLayer)
 {
+	if (D2Seam<&STATLIST_SetStat>::hook) return D2Seam<&STATLIST_SetStat>::hook(pStatList, nStatId, nValue, nLayer);
 	return STATLIST_SetBaseStat(pStatList, nStatId, nValue, nLayer, NULL);
 }
 
@@ -1277,6 +1286,7 @@ BOOL D2Common_3A780_SetStatRegs(uint32_t layer, int value, int statId, D2StatLis
 // 1.13c D2Common+0x3A7B0
 void __stdcall STATLIST_SetStatIfListIsValid(D2StatListStrc* pStatList, int nStatId, int nValue, uint16_t nLayer)
 {
+	if (D2Seam<&STATLIST_SetStatIfListIsValid>::hook) { D2Seam<&STATLIST_SetStatIfListIsValid>::hook(pStatList, nStatId, nValue, nLayer); return; }
 	if (pStatList)
 	{
 		STATLIST_SetStat(pStatList, nStatId, nValue, nLayer);
@@ -1352,6 +1362,7 @@ void (*gpfnStatListSetUnitStatModTrace)(D2StatListStrc*, D2SLayerStatIdStrc::Pac
 
 void __stdcall STATLIST_SetUnitStat(D2UnitStrc* pUnit, int nStatId, int nValue, uint16_t nLayer)
 {
+	if (D2Seam<&STATLIST_SetUnitStat>::hook) { D2Seam<&STATLIST_SetUnitStat>::hook(pUnit, nStatId, nValue, nLayer); return; }
 	const BOOL bSet = gpfnStatListSetUnitStatSetTrace ? gpfnStatListSetUnitStatSetTrace((D2StatListStrc*)pUnit->pStatListEx, nStatId, nValue, nLayer) : STATLIST_SetStat(pUnit->pStatListEx, nStatId, nValue, nLayer);
 	if (bSet)
 	{
@@ -1372,6 +1383,7 @@ void (*gpfnStatListAddUnitStatTrace)(D2StatListStrc*, int, int, uint16_t) = null
 
 void __stdcall STATLIST_AddUnitStat(D2UnitStrc* pUnit, int nStatId, int nValue, uint16_t nLayer)
 {
+	if (D2Seam<&STATLIST_AddUnitStat>::hook) { D2Seam<&STATLIST_AddUnitStat>::hook(pUnit, nStatId, nValue, nLayer); return; }
 	if (nValue)
 	{
 		if (gpfnStatListAddUnitStatTrace)
@@ -1384,6 +1396,7 @@ void __stdcall STATLIST_AddUnitStat(D2UnitStrc* pUnit, int nStatId, int nValue, 
 // 1.13c D2Common+0x38C20 (#10587; retail takes the layer in a register, the probe keys layer 0)
 int __stdcall STATLIST_GetUnitBaseStat(D2UnitStrc* pUnit, int nStatId, uint16_t nLayer)
 {
+	if (D2Seam<&STATLIST_GetUnitBaseStat>::hook) return D2Seam<&STATLIST_GetUnitBaseStat>::hook(pUnit, nStatId, nLayer);
 	if (!pUnit || !pUnit->pStatListEx)
 	{
 		return 0;
@@ -1427,6 +1440,7 @@ int32_t __stdcall STATLIST_GetTotalStatValue(D2StatListStrc* pStatList, int nSta
 // 1.13c D2Common+0x38B70: a null unit answers 0 (1.10f dereferenced it)
 int32_t __stdcall STATLIST_UnitGetStatValue(const D2UnitStrc* pUnit, int nStatId, uint16_t nLayer)
 {
+	if (D2Seam<&STATLIST_UnitGetStatValue>::hook) return D2Seam<&STATLIST_UnitGetStatValue>::hook(pUnit, nStatId, nLayer);
 	if (!pUnit)
 	{
 		return 0;
@@ -1445,6 +1459,7 @@ int32_t __stdcall STATLIST_UnitGetStatValue(const D2UnitStrc* pUnit, int nStatId
 // 1.13c D2Common+0x39430
 int32_t __stdcall STATLIST_UnitGetItemStatOrSkillStatValue(D2UnitStrc* pUnit, int nStatId, uint16_t nLayer)
 {
+	if (D2Seam<&STATLIST_UnitGetItemStatOrSkillStatValue>::hook) return D2Seam<&STATLIST_UnitGetItemStatOrSkillStatValue>::hook(pUnit, nStatId, nLayer);
 	return STATLIST_UnitGetStatValue(pUnit, nStatId, nLayer);
 }
 
@@ -1455,6 +1470,7 @@ int32_t __stdcall STATLIST_UnitGetItemStatOrSkillStatValue(D2UnitStrc* pUnit, in
 // body is 0x38B00 (find the entry, clamp to the record's minimum for a player/monster owner). Same as 1.10f.
 int __stdcall STATLIST_GetStatValue(D2StatListStrc* pStatList, int nStatId, uint16_t nLayer)
 {
+	if (D2Seam<&STATLIST_GetStatValue>::hook) return D2Seam<&STATLIST_GetStatValue>::hook(pStatList, nStatId, nLayer);
 	if (!pStatList)
 	{
 		return 0;
@@ -1605,6 +1621,7 @@ D2StatListStrc* __stdcall D2Common_GetStateFromStatListEx_6FDB8190(D2StatListExS
 // 1.13c D2Common+0x38520
 D2StatListStrc* __stdcall STATLIST_GetStatListFromUnitAndState(D2UnitStrc* pUnit, int nState)
 {
+	if (D2Seam<&STATLIST_GetStatListFromUnitAndState>::hook) return D2Seam<&STATLIST_GetStatListFromUnitAndState>::hook(pUnit, nState);
 	if (pUnit->pStatListEx && STATLIST_IsExtended(pUnit->pStatListEx))
 	{
 		return D2Common_GetStateFromStatListEx_6FDB8190(pUnit->pStatListEx, nState);
@@ -1677,6 +1694,7 @@ D2StatListStrc* __stdcall STATLIST_GetStatListFromUnitAndFlag(D2UnitStrc* pUnit,
 // 1.13c D2Common+0x384B0
 D2StatListStrc* __stdcall STATLIST_GetStatListFromUnitStateOrFlag(D2UnitStrc* pUnit, int nState, int nFlag)
 {
+	if (D2Seam<&STATLIST_GetStatListFromUnitStateOrFlag>::hook) return D2Seam<&STATLIST_GetStatListFromUnitStateOrFlag>::hook(pUnit, nState, nFlag);
 	if (pUnit->pStatListEx && STATLIST_IsExtended(pUnit->pStatListEx))
 	{
 		if (nState)
@@ -1694,6 +1712,7 @@ D2StatListStrc* __stdcall STATLIST_GetStatListFromUnitStateOrFlag(D2UnitStrc* pU
 // 1.13c D2Common+0x37EC0
 D2StatListStrc* __stdcall STATLIST_GetStatListFromUnitStateAndFlag(D2UnitStrc* pUnit, int nState, int nFlag)
 {
+	if (D2Seam<&STATLIST_GetStatListFromUnitStateAndFlag>::hook) return D2Seam<&STATLIST_GetStatListFromUnitStateAndFlag>::hook(pUnit, nState, nFlag);
 	if (pUnit->pStatListEx && STATLIST_IsExtended(pUnit->pStatListEx))
 	{
 		D2StatListStrc* pStatList = nFlag & STATLIST_SET ? pUnit->pStatListEx->pMyStats : pUnit->pStatListEx->pMyLastList;
@@ -1713,6 +1732,7 @@ D2StatListStrc* __stdcall STATLIST_GetStatListFromUnitStateAndFlag(D2UnitStrc* p
 //D2Common.0x6FDB8310 (#10523)
 void __stdcall STATLIST_MergeStatLists(D2UnitStrc* pTarget, D2UnitStrc* pUnit, BOOL bType)
 {
+	if (D2Seam<&STATLIST_MergeStatLists>::hook) { D2Seam<&STATLIST_MergeStatLists>::hook(pTarget, pUnit, bType); return; }
 	if (pTarget && pUnit && pUnit->pStatListEx)
 	{
 		if (pUnit->dwUnitType == UNIT_ITEM && (ITEMS_GetBodyLocation(pUnit) == BODYLOC_SWRARM || ITEMS_GetBodyLocation(pUnit) == BODYLOC_SWLARM))
@@ -1743,6 +1763,7 @@ void __stdcall STATLIST_MergeStatLists(D2UnitStrc* pTarget, D2UnitStrc* pUnit, B
 // 1.13c D2Common+0x37E70
 D2UnitStrc* __stdcall STATLIST_GetOwner(D2UnitStrc* pUnit, BOOL* pStatNotDynamic)
 {
+	if (D2Seam<&STATLIST_GetOwner>::hook) return D2Seam<&STATLIST_GetOwner>::hook(pUnit, pStatNotDynamic);
 	if (!pUnit || !pUnit->pStatListEx || !pUnit->pStatListEx->pParent || !STATLIST_IsExtended(pUnit->pStatListEx->pParent))
 	{
 		if (pStatNotDynamic)
@@ -1847,6 +1868,7 @@ void __stdcall STATLIST_FreeModStats(D2UnitStrc* pUnit)
 //D2Common.0x6FDB8620 (#10562)
 int __stdcall STATLIST_GetUnitAlignment(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&STATLIST_GetUnitAlignment>::hook) return D2Seam<&STATLIST_GetUnitAlignment>::hook(pUnit);
 	if (!pUnit || !pUnit->pStatListEx)
 	{
 		return UNIT_ALIGNMENT_EVIL;
@@ -1959,6 +1981,7 @@ void __stdcall D2Common_STATES_ToggleState_6FDB8900(D2UnitStrc* pUnit, int nStat
 // 1.13c D2Common+0x33CA0: same body
 uint32_t* __stdcall D2COMMON_STATES_GetStatFlags_6FDB8A90(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&D2COMMON_STATES_GetStatFlags_6FDB8A90>::hook) return D2Seam<&D2COMMON_STATES_GetStatFlags_6FDB8A90>::hook(pUnit);
 	if (pUnit && pUnit->pStatListEx && STATLIST_IsExtended(pUnit->pStatListEx))
 	{
 		return pUnit->pStatListEx->StatFlags;
@@ -2053,6 +2076,7 @@ int __stdcall STATLIST_GetFullStatsDataFromUnit(D2UnitStrc* pUnit, D2StatStrc* p
 // 1.13c D2Common+0x383C0
 int __stdcall STATLIST_GetBaseStatsData(D2StatListStrc* pStatListEx, D2StatStrc* pOutStatBuffer, int nBufferSize)
 {
+	if (D2Seam<&STATLIST_GetBaseStatsData>::hook) return D2Seam<&STATLIST_GetBaseStatsData>::hook(pStatListEx, pOutStatBuffer, nBufferSize);
 	if (pStatListEx)
 	{
 		return STATLIST_CopyStatsData(&pStatListEx->Stats, pOutStatBuffer, nBufferSize);
@@ -2236,6 +2260,7 @@ void __stdcall D2Common_10525(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2)
 // 1.13c D2Common+0x3A5F0
 void __stdcall D2Common_10474(D2UnitStrc* pUnused, D2StatListStrc* pStatList)
 {
+	if (D2Seam<&D2Common_10474>::hook) { D2Seam<&D2Common_10474>::hook(pUnused, pStatList); return; }
 	D2_MAYBE_UNUSED(pUnused);
 	D2Common_ExpireStatList_6FDB6E30((D2StatListExStrc*)pStatList);
 }
@@ -2244,6 +2269,7 @@ void __stdcall D2Common_10474(D2UnitStrc* pUnused, D2StatListStrc* pStatList)
 // 1.13c D2Common+0x390F0
 int __stdcall STATLIST_GetMaxLifeFromUnit(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&STATLIST_GetMaxLifeFromUnit>::hook) return D2Seam<&STATLIST_GetMaxLifeFromUnit>::hook(pUnit);
 	return D2Common_11248(NULL, pUnit, STAT_MAXHP);
 }
 
@@ -2251,6 +2277,7 @@ int __stdcall STATLIST_GetMaxLifeFromUnit(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x390A0
 int __stdcall STATLIST_GetMaxManaFromUnit(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&STATLIST_GetMaxManaFromUnit>::hook) return D2Seam<&STATLIST_GetMaxManaFromUnit>::hook(pUnit);
 	return D2Common_11248(NULL, pUnit, STAT_MAXMANA);
 }
 
@@ -2258,6 +2285,7 @@ int __stdcall STATLIST_GetMaxManaFromUnit(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x39050
 int __stdcall STATLIST_GetMaxStaminaFromUnit(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&STATLIST_GetMaxStaminaFromUnit>::hook) return D2Seam<&STATLIST_GetMaxStaminaFromUnit>::hook(pUnit);
 	return D2Common_11248(NULL, pUnit, STAT_MAXSTAMINA);
 }
 
@@ -2332,6 +2360,7 @@ int __stdcall STATLIST_GetDefenseFromUnit(D2UnitStrc* pUnit)
 //D2Common.0x6FDB9AE0 (#10524)
 void __stdcall STATLIST_ExpireUnitStatlist(D2UnitStrc* pUnused, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&STATLIST_ExpireUnitStatlist>::hook) { D2Seam<&STATLIST_ExpireUnitStatlist>::hook(pUnused, pUnit); return; }
 	D2_MAYBE_UNUSED(pUnused);
 	if (pUnit && pUnit->pStatListEx)
 	{

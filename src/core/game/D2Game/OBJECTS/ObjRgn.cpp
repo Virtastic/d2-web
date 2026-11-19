@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <test_seam.h>
 #include "OBJECTS/ObjRgn.h"
 
 #include <algorithm>
@@ -219,6 +220,7 @@ bool __fastcall OBJRGN_CanSpawnShrine(D2GameStrc* pGame, int32_t nLevelId, int32
 // 1.13c D2Game+0xB510 (checked against the decompile: cached id, act II offset into the first table, ranges 5 and 4, flying scimitar fallback; no delta)
 int32_t __fastcall OBJRGN_GetTrapMonsterId(D2ObjOperateFnStrc* pOp)
 {
+	if (D2Seam<&OBJRGN_GetTrapMonsterId>::hook) return D2Seam<&OBJRGN_GetTrapMonsterId>::hook(pOp);
     const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(pOp->pObject));
     D2ObjectRegionStrc* pObjectRegion = pOp->pGame->pObjectControl->pObjectRegion[nLevelId];
 

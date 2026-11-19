@@ -1593,6 +1593,7 @@ BOOL __fastcall GAME_VerifyDisconnect(int32_t nClientId)
 //Note: You better disable those packets as they were used to DDos servers in the past...
 void __fastcall sub_6FC38140(void *a1, int32_t a2)
 {
+	if (D2Seam<&sub_6FC38140>::hook) { D2Seam<&sub_6FC38140>::hook(a1, a2); return; }
     uint8_t a3[16];
     char szIPAddress[16];
 
@@ -2191,6 +2192,7 @@ int32_t __stdcall GAME_UpdateGamesProgress(int32_t a1)
 //D2Game.0x6FC39030
 void __fastcall sub_6FC39030(D2GameStrc* pGame, D2ClientStrc* pClient, int32_t a3, int32_t nUnused)
 {
+	if (D2Seam<&sub_6FC39030>::hook) { D2Seam<&sub_6FC39030>::hook(pGame, pClient, a3, nUnused); return; }
     D2_MAYBE_UNUSED(nUnused);
     D2_ASSERT(pGame);
     D2_ASSERT(pClient);
@@ -2377,6 +2379,7 @@ void __stdcall GAME_UpdateClients(int32_t a1, int32_t a2)
 //D2Game.0x6FC394E0
 D2GameStrc* __fastcall GAME_GetGameByClientId(int32_t nClientId)
 {
+	if (D2Seam<&GAME_GetGameByClientId>::hook) return D2Seam<&GAME_GetGameByClientId>::hook(nClientId);
     const int32_t nGameGUID = SERVER_GetClientGameGUID(nClientId);
 
     D2GameStrc* pGame = GAME_LockGame(nGameGUID);
@@ -2398,6 +2401,7 @@ D2GameStrc* __fastcall GAME_GetGameByClientId(int32_t nClientId)
 //D2Game.0x6FC395B0
 void __fastcall GAME_LeaveGamesCriticalSection(D2GameStrc* pGame)
 {
+	if (D2Seam<&GAME_LeaveGamesCriticalSection>::hook) { D2Seam<&GAME_LeaveGamesCriticalSection>::hook(pGame); return; }
     D2_ASSERT(pGame);
     D2_UNLOCK(pGame->lpCriticalSection);
 }
@@ -2434,6 +2438,7 @@ _Acquires_lock_(*(return->lpCriticalSection))
 _Acquires_lock_(return->lpCriticalSection)
 D2GameStrc* __fastcall GAME_LockGame(D2GameGUID nGameGUID)
 {
+	if (D2Seam<&GAME_LockGame>::hook) return D2Seam<&GAME_LockGame>::hook(nGameGUID);
     if (!gpGameDataTbl_6FD45818)
     {
         return nullptr;

@@ -298,6 +298,7 @@ void __fastcall PARTY_CountLivingUnits(D2GameStrc* pGame, D2UnitStrc* pUnit, voi
 // 1.13c D2Game+0x9C160
 void __fastcall PARTY_IteratePartyMembers(D2GameStrc* pGame, int16_t nPartyId, PartyCallbackFunction pCallback, void* pArgs)
 {
+	if (D2Seam<&PARTY_IteratePartyMembers>::hook) { D2Seam<&PARTY_IteratePartyMembers>::hook(pGame, nPartyId, pCallback, pArgs); return; }
     D2_ASSERT(pGame);   // 1.13c D2Game+0x9C160 asserts pGame non-null
 
     for (D2PartyStrc* pParty = pGame->pPartyControl->pParties; pParty; pParty = pParty->pNext)
@@ -481,6 +482,7 @@ void __fastcall PARTY_SynchronizeWithClient(D2GameStrc* pGame, D2UnitStrc* pUnit
 //D2Game.0x6FCBA5F0 -- 1.13c D2Game+0x9BEB0
 int16_t __fastcall PARTY_GetPartyIdForUnitOwner(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&PARTY_GetPartyIdForUnitOwner>::hook) return D2Seam<&PARTY_GetPartyIdForUnitOwner>::hook(pGame, pUnit);
     D2_ASSERT(pUnit && pUnit->dwUnitType == UNIT_PLAYER);
     D2_ASSERT(pGame);
 

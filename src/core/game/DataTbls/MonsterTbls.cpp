@@ -1,4 +1,5 @@
 #include "D2DataTbls.h"
+#include <test_seam.h>
 
 #include "D2Items.h"
 #include "D2Seed.h"
@@ -795,6 +796,7 @@ const Unicode* __fastcall DATATBLS_RollRandomUniqueAppellationString(D2UnitStrc*
 // nClassic/nProb with the record's running totals and returns the slot.
 D2TCExInfoStrc* __fastcall DATATBLS_ReallocTCExInfo(D2TCExShortStrc* pTCExShort)
 {
+	if (D2Seam<&DATATBLS_ReallocTCExInfo>::hook) return D2Seam<&DATATBLS_ReallocTCExInfo>::hook(pTCExShort);
 	const int nOldCount = pTCExShort->nTypes;
 	const int nNewCount = nOldCount + 1;
 	pTCExShort->pInfo = (D2TCExInfoStrc*)D2_REALLOC_POOL(nullptr, pTCExShort->pInfo, sizeof(D2TCExInfoStrc) * nNewCount);
@@ -809,6 +811,7 @@ D2TCExInfoStrc* __fastcall DATATBLS_ReallocTCExInfo(D2TCExShortStrc* pTCExShort)
 // 1.13c D2Common+0x53650
 void __fastcall DATATBLS_UpdateTreasureClassProbabilities(D2TCExShortStrc* pTCExShort, D2TCExInfoStrc* pTCExInfo, int nProbability, BOOL bExpansion)
 {
+	if (D2Seam<&DATATBLS_UpdateTreasureClassProbabilities>::hook) { D2Seam<&DATATBLS_UpdateTreasureClassProbabilities>::hook(pTCExShort, pTCExInfo, nProbability, bExpansion); return; }
 	int nRecordId = 0;
 	int nProbDiff = 0;
 	int nProb = 0;
@@ -1623,6 +1626,7 @@ void __fastcall DATATBLS_LoadHirelingTxt(HD2ARCHIVE hArchive)
 // 1.13c D2Common+0x1300
 D2ItemTypesTxt* __fastcall DATATBLS_GetItemTypesTxtRecord(int nItemType)
 {
+	if (D2Seam<&DATATBLS_GetItemTypesTxtRecord>::hook) return D2Seam<&DATATBLS_GetItemTypesTxtRecord>::hook(nItemType);
 	if (nItemType >= 0 && nItemType < sgptDataTables->nItemTypesTxtRecordCount)
 	{
 		return &sgptDataTables->pItemTypesTxt[nItemType];
@@ -1635,6 +1639,7 @@ D2ItemTypesTxt* __fastcall DATATBLS_GetItemTypesTxtRecord(int nItemType)
 // 1.13c D2Common+0x532C0
 D2HirelingTxt* __stdcall DATATBLS_GetHirelingTxtRecordFromIdAndLevel(BOOL bExpansion, int nId, int nLevel)
 {
+	if (D2Seam<&DATATBLS_GetHirelingTxtRecordFromIdAndLevel>::hook) return D2Seam<&DATATBLS_GetHirelingTxtRecordFromIdAndLevel>::hook(bExpansion, nId, nLevel);
 	if (nId >= 256)
 	{
 		return NULL;

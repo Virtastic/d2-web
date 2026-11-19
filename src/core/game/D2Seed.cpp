@@ -1,4 +1,5 @@
 #include <ctime>
+#include <test_seam.h>
 #include <D2Seed.h>
 #include <D2CommonDefinitions.h>
 #include <Fog.h>
@@ -36,6 +37,7 @@ int __fastcall SEED_GetRandomValue(int nValue)
 // 1.13c D2Common+0x36750
 void __fastcall SEED_InitSeed(D2SeedStrc* pSeed)
 {
+	if (D2Seam<&SEED_InitSeed>::hook) { D2Seam<&SEED_InitSeed>::hook(pSeed); return; }
 	pSeed->nLowSeed = 1;
 	pSeed->nHighSeed = 666;
 }
@@ -44,6 +46,7 @@ void __fastcall SEED_InitSeed(D2SeedStrc* pSeed)
 // 1.13c D2Common+0x36740
 void __fastcall SEED_InitLowSeed(D2SeedStrc* pSeed, int nLowSeed)
 {
+	if (D2Seam<&SEED_InitLowSeed>::hook) { D2Seam<&SEED_InitLowSeed>::hook(pSeed, nLowSeed); return; }
 	pSeed->nLowSeed = nLowSeed;
 	pSeed->nHighSeed = 666;
 }

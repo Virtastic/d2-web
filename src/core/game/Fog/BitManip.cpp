@@ -1,4 +1,5 @@
 #include "D2BitManip.h"
+#include <test_seam.h>
 
 
 // Fog.6FF71308
@@ -40,6 +41,7 @@ Notes:
 // 1.13c Fog+0x141E0
 void __stdcall BITMANIP_Initialize(D2BitBufferStrc* pBuffer, uint8_t* pBitStream, size_t nSize)
 {
+	if (D2Seam<&BITMANIP_Initialize>::hook) return D2Seam<&BITMANIP_Initialize>::hook(pBuffer, pBitStream, nSize);
 	if (!pBuffer)
 	{
 		return;
@@ -60,6 +62,7 @@ Notes:
 // 1.13c Fog+0x13D80
 size_t __stdcall BITMANIP_GetSize(D2BitBufferStrc* pBuffer)
 {
+	if (D2Seam<&BITMANIP_GetSize>::hook) return D2Seam<&BITMANIP_GetSize>::hook(pBuffer);
 	return (pBuffer->nPosBits) ? (pBuffer->nPos + 1) : pBuffer->nPos;
 }
 
@@ -71,6 +74,7 @@ Notes:
 // 1.13c Fog+0x14120
 void __stdcall BITMANIP_Write(D2BitBufferStrc* pBuffer, uint32_t dwValue, uint32_t dwBits)
 {
+	if (D2Seam<&BITMANIP_Write>::hook) return D2Seam<&BITMANIP_Write>::hook(pBuffer, dwValue, dwBits);
 	uint32_t dwBitsLeft = dwBits;
 	uint32_t dwValueEx = dwValue;
 
@@ -153,6 +157,7 @@ Notes:
 // 1.13c Fog+0x13CD0
 uint32_t __stdcall BITMANIP_Read(D2BitBufferStrc* pBuffer, int nBits)
 {
+	if (D2Seam<&BITMANIP_Read>::hook) return D2Seam<&BITMANIP_Read>::hook(pBuffer, nBits);
 	int n = pBuffer->nPosBits + nBits + 8 * pBuffer->nPos - pBuffer->nBits;
 
 	if ((signed int)n < 0)
@@ -207,6 +212,7 @@ Notes:
 // 1.13c Fog+0x13CA0
 void __stdcall BITMANIP_GoToNextByte(D2BitBufferStrc* pBuffer)
 {
+	if (D2Seam<&BITMANIP_GoToNextByte>::hook) return D2Seam<&BITMANIP_GoToNextByte>::hook(pBuffer);
 	if (pBuffer->nPosBits)
 	{
 		++pBuffer->nPos;
@@ -230,6 +236,7 @@ Notes:
 // 1.13c Fog+0x14090
 void __stdcall BITMANIP_SetBitState(uint8_t* pBitStream, int nBit)
 {
+	if (D2Seam<&BITMANIP_SetBitState>::hook) return D2Seam<&BITMANIP_SetBitState>::hook(pBitStream, nBit);
 	pBitStream[nBit >> 3] |= (uint8_t)gdwBitMasks[nBit & 7];
 }
 
@@ -241,6 +248,7 @@ Notes:
 // 1.13c Fog+0x14070
 int __stdcall BITMANIP_GetBitState(uint8_t* pBitStream, int nBit)
 {
+	if (D2Seam<&BITMANIP_GetBitState>::hook) return D2Seam<&BITMANIP_GetBitState>::hook(pBitStream, nBit);
 	return pBitStream[nBit >> 3] & (uint8_t)gdwBitMasks[nBit & 7];
 }
 

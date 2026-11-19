@@ -678,6 +678,7 @@ void __fastcall DRLGOUTPLACE_SetBlankBorderGridCells(D2DrlgLevelStrc* pLevel)
 // 1.13c D2Common+0x176F0
 void __fastcall DRLGOUTPLACE_SetOutGridLinkFlags(D2DrlgLevelStrc* pLevel)
 {
+	if (D2Seam<&DRLGOUTPLACE_SetOutGridLinkFlags>::hook) { D2Seam<&DRLGOUTPLACE_SetOutGridLinkFlags>::hook(pLevel); return; }
 	D2DrlgVertexStrc* pVertex = pLevel->pOutdoors->pVertex;
 	D2DrlgVertexStrc* pNext = pVertex->pNext;
 
@@ -703,6 +704,7 @@ void __fastcall DRLGOUTPLACE_SetOutGridLinkFlags(D2DrlgLevelStrc* pLevel)
 // 1.13c D2Common+0x17180
 void __fastcall DRLGOUTPLACE_PlaceAct1245OutdoorBorders(D2DrlgLevelStrc* pLevel)
 {
+	if (D2Seam<&DRLGOUTPLACE_PlaceAct1245OutdoorBorders>::hook) { D2Seam<&DRLGOUTPLACE_PlaceAct1245OutdoorBorders>::hook(pLevel); return; }
 	D2DrlgVertexStrc* pDrlgVertex = NULL;
 	D2DrlgVertexStrc* pNextVertex = NULL;
 	int nCurrentDiffXAbs = 0;

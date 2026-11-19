@@ -44,6 +44,7 @@ BOOL __stdcall UNITFINDS_AreUnitsInNeighboredRooms(D2UnitStrc* pDestUnit, D2Unit
 // 1.13c D2Common+0x122B0 (ordinal 10754): same rule; only the null-room assert differs. 
 D2UnitStrc* __stdcall UNITFINDS_FindUnitInNeighboredRooms(D2ActiveRoomStrc* pRoom, int nUnitType, int nClassId)
 {
+	if (D2Seam<&UNITFINDS_FindUnitInNeighboredRooms>::hook) return D2Seam<&UNITFINDS_FindUnitInNeighboredRooms>::hook(pRoom, nUnitType, nClassId);
 	D2ActiveRoomStrc** ppRoomList = NULL;
 	D2UnitStrc* pUnit = NULL;
 	int nNumRooms = 0;

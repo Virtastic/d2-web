@@ -1,4 +1,5 @@
 #include "../../d2common/varinvgfx_index.h"
+#include <test_seam.h>
 #include "D2Items.h"
 #include <Units/Item.h>
 #include "D2BitManip.h"
@@ -52,6 +53,7 @@ void __stdcall ITEMS_FreeItemData(void* pMemPool, D2UnitStrc* pItem)
 // 1.13c D2Common+0x23C50
 uint8_t __stdcall ITEMS_GetBodyLocation(D2UnitStrc* pItem)
 {
+	if (D2Seam<&ITEMS_GetBodyLocation>::hook) return D2Seam<&ITEMS_GetBodyLocation>::hook(pItem);
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
 	{
 		return pItemData->nBodyLoc;
@@ -64,6 +66,7 @@ uint8_t __stdcall ITEMS_GetBodyLocation(D2UnitStrc* pItem)
 //D2Common.0x6FD98450 (#10690)
 void __stdcall ITEMS_SetBodyLocation(D2UnitStrc* pItem, uint8_t nBodyLoc)
 {
+	if (D2Seam<&ITEMS_SetBodyLocation>::hook) { D2Seam<&ITEMS_SetBodyLocation>::hook(pItem, nBodyLoc); return; }
 	if (D2ItemDataStrc* pItemData = ITEMS_GetItemData(pItem))
 	{
 		pItemData->nBodyLoc = nBodyLoc;
@@ -158,6 +161,7 @@ uint16_t __stdcall ITEMS_GetPrefixId(D2UnitStrc* pItem, int nPrefixNo)
 //D2Common.0x6FD985D0 (#10700)
 void __stdcall ITEMS_AssignPrefix(D2UnitStrc* pItem, uint16_t nPrefix, int nPrefixNo)
 {
+	if (D2Seam<&ITEMS_AssignPrefix>::hook) { D2Seam<&ITEMS_AssignPrefix>::hook(pItem, nPrefix, nPrefixNo); return; }
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
 	{
 		pItemData->wMagicPrefix[nPrefixNo] = nPrefix;
@@ -203,6 +207,7 @@ uint16_t __stdcall ITEMS_GetSuffixId(D2UnitStrc* pItem, int nSuffixNo)
 //D2Common.0x6FD98680 (#10702)
 void __stdcall ITEMS_AssignSuffix(D2UnitStrc* pItem, uint16_t nSuffix, int nSuffixNo)
 {
+	if (D2Seam<&ITEMS_AssignSuffix>::hook) { D2Seam<&ITEMS_AssignSuffix>::hook(pItem, nSuffix, nSuffixNo); return; }
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
 	{
 		pItemData->wMagicSuffix[nSuffixNo] = nSuffix;
@@ -225,6 +230,7 @@ uint16_t __stdcall ITEMS_GetRarePrefixId(D2UnitStrc* pItem)
 //D2Common.0x6FD986E0 (#10704)
 void __stdcall ITEMS_AssignRarePrefix(D2UnitStrc* pItem, uint16_t nPrefix)
 {
+	if (D2Seam<&ITEMS_AssignRarePrefix>::hook) { D2Seam<&ITEMS_AssignRarePrefix>::hook(pItem, nPrefix); return; }
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
 	{
 		pItemData->wRarePrefix = nPrefix;
@@ -247,6 +253,7 @@ uint16_t __stdcall ITEMS_GetRareSuffixId(D2UnitStrc* pItem)
 //D2Common.0x6FD98730 (#10706)
 void __stdcall ITEMS_AssignRareSuffix(D2UnitStrc* pItem, uint16_t nSuffix)
 {
+	if (D2Seam<&ITEMS_AssignRareSuffix>::hook) { D2Seam<&ITEMS_AssignRareSuffix>::hook(pItem, nSuffix); return; }
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
 	{
 		pItemData->wRareSuffix = nSuffix;
@@ -270,6 +277,7 @@ BOOL __stdcall ITEMS_CheckItemFlag(D2UnitStrc* pItem, uint32_t dwFlag, int nLine
 // 1.13c D2Common+0x23900
 void __stdcall ITEMS_SetItemFlag(D2UnitStrc* pItem, uint32_t dwFlag, BOOL bSet)
 {
+	if (D2Seam<&ITEMS_SetItemFlag>::hook) { D2Seam<&ITEMS_SetItemFlag>::hook(pItem, dwFlag, bSet); return; }
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
 	{
 		if (bSet)
@@ -311,6 +319,7 @@ BOOL __stdcall ITEMS_CheckItemCMDFlag(D2UnitStrc* pItem, int nFlag)
 // 1.13c D2Common+0x23870
 void __stdcall ITEMS_SetItemCMDFlag(D2UnitStrc* pItem, int nFlag, BOOL bSet)
 {
+	if (D2Seam<&ITEMS_SetItemCMDFlag>::hook) { D2Seam<&ITEMS_SetItemCMDFlag>::hook(pItem, nFlag, bSet); return; }
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
 	{
 		if (bSet)
@@ -370,6 +379,7 @@ void __stdcall ITEMS_SetItemLevel(D2UnitStrc* pItem, int nItemLevel)
 // 1.13c D2Common+0x237C0
 uint8_t __stdcall ITEMS_GetInvPage(D2UnitStrc* pItem)
 {
+	if (D2Seam<&ITEMS_GetInvPage>::hook) return D2Seam<&ITEMS_GetInvPage>::hook(pItem);
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
 	{
 		return pItemData->nInvPage;
@@ -382,6 +392,7 @@ uint8_t __stdcall ITEMS_GetInvPage(D2UnitStrc* pItem)
 //D2Common.0x6FD98900 (#10720)
 void __stdcall ITEMS_SetInvPage(D2UnitStrc* pItem, uint8_t nPage)
 {
+	if (D2Seam<&ITEMS_SetInvPage>::hook) { D2Seam<&ITEMS_SetInvPage>::hook(pItem, nPage); return; }
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
 	{
 		pItemData->nInvPage = nPage;
@@ -414,6 +425,7 @@ void __stdcall ITEMS_SetCellOverlap(D2UnitStrc* pItem, int nCellOverlap)
 // 1.13c D2Common+0x23740
 uint8_t __stdcall ITEMS_GetItemCell(D2UnitStrc* pItem)
 {
+	if (D2Seam<&ITEMS_GetItemCell>::hook) return D2Seam<&ITEMS_GetItemCell>::hook(pItem);
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
 	{
 		return pItemData->nItemCell;
@@ -826,6 +838,7 @@ uint32_t __stdcall ITEMS_Get2HandWeaponClassCode(D2UnitStrc* pItem)
 static_assert(offsetof(D2ItemsTxt, dwCode) == 0x80, "1.13c sub_23290 reads +0x80");
 uint32_t __stdcall ITEMS_GetBaseCode(D2UnitStrc* pItem)
 {
+	if (D2Seam<&ITEMS_GetBaseCode>::hook) return D2Seam<&ITEMS_GetBaseCode>::hook(pItem);
 	D2_ASSERT(pItem);
 	D2_ASSERT(pItem->dwUnitType == UNIT_ITEM);
 
@@ -904,6 +917,7 @@ void __stdcall ITEMS_GetAllowedBodyLocations(D2UnitStrc* pItem, uint8_t* pBodyLo
 // 1.13c D2Common+0x230F0
 uint32_t __stdcall ITEMS_GetItemType(D2UnitStrc* pItem)
 {
+	if (D2Seam<&ITEMS_GetItemType>::hook) return D2Seam<&ITEMS_GetItemType>::hook(pItem);
 	D2ItemsTxt* pItemsTxtRecord = NULL;
 
 	D2_ASSERT(pItem);
@@ -1494,6 +1508,7 @@ int __stdcall ITEMS_CheckItemTypeIfThrowable(int nItemType)
 // 1.13c D2Common+0x24C30
 int __stdcall ITEMS_CheckIfThrowable(D2UnitStrc* pItem)
 {
+	if (D2Seam<&ITEMS_CheckIfThrowable>::hook) return D2Seam<&ITEMS_CheckIfThrowable>::hook(pItem);
 	if (pItem && pItem->dwUnitType == UNIT_ITEM)
 	{
 		return ITEMS_CheckItemTypeIfThrowable((int)ITEMS_GetItemType(pItem));
@@ -2512,6 +2527,7 @@ int __stdcall ITEMS_GetMaxStack(int nItemId)
 // 1.13c D2Common+0x260F0
 int __stdcall ITEMS_GetTotalMaxStack(D2UnitStrc* pItem)
 {
+	if (D2Seam<&ITEMS_GetTotalMaxStack>::hook) return D2Seam<&ITEMS_GetTotalMaxStack>::hook(pItem);
 	D2_ASSERT(pItem);
 	D2_ASSERT(pItem->dwUnitType == UNIT_ITEM);
 
@@ -3113,6 +3129,7 @@ static uint32_t* ITEMS_TypeEquivalenceLUT(int nItemTypeLUT)
 // primary wType[0] lookup, then wType[1] only when the primary misses and is in range.
 BOOL __stdcall ITEMS_CheckItemTypeIdByItemId(int nItemId, int nItemType)
 {
+	if (D2Seam<&ITEMS_CheckItemTypeIdByItemId>::hook) return D2Seam<&ITEMS_CheckItemTypeIdByItemId>::hook(nItemId, nItemType);
 	if (nItemType >= 0 && nItemType < sgptDataTables->nItemTypesTxtRecordCount)
 	{
 		const D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(nItemId);
@@ -3155,6 +3172,7 @@ BOOL __stdcall ITEMS_CheckType(int nItemType1, int nItemType2)
 // the class id reaches items.txt through DATATBLS_GetItemTypeFromItemId (same result, see the spec).
 BOOL __stdcall ITEMS_CheckItemTypeId(const D2UnitStrc* pItem, int nItemType)
 {
+	if (D2Seam<&ITEMS_CheckItemTypeId>::hook) return D2Seam<&ITEMS_CheckItemTypeId>::hook(pItem, nItemType);
 	if (pItem)
 	{
 		return ITEMS_CheckItemTypeIdByItemId(pItem->dwClassId, nItemType);
@@ -3223,6 +3241,7 @@ int __stdcall ITEMS_GetFileIndex(D2UnitStrc* pItem)
 // 1.13c D2Common+0x225F0
 void __stdcall ITEMS_SetFileIndex(D2UnitStrc* pItem, uint32_t dwFileIndex)
 {
+	if (D2Seam<&ITEMS_SetFileIndex>::hook) { D2Seam<&ITEMS_SetFileIndex>::hook(pItem, dwFileIndex); return; }
 	D2_ASSERT(ITEMS_GetItemData(pItem));
 	pItem->pItemData->dwFileIndex = dwFileIndex;
 }
@@ -4117,6 +4136,7 @@ D2SetItemsTxt* __stdcall ITEMS_GetSetItemsTxtRecordFromItem(D2UnitStrc* pItem)
 // 1.13c D2Common+0x23EF0
 BOOL __stdcall ITEMS_CanBeEquipped(D2UnitStrc* pItem)
 {
+	if (D2Seam<&ITEMS_CanBeEquipped>::hook) return D2Seam<&ITEMS_CanBeEquipped>::hook(pItem);
 	if (pItem)
 	{
 		if (pItem->dwUnitType != UNIT_ITEM || !pItem->pItemData)
@@ -4250,6 +4270,7 @@ int __stdcall ITEMS_GetBonusManaBasedOnClass(D2UnitStrc* pPlayer, int nValue)
 //D2Common.0x6FDA0030 (#10875)
 uint16_t __stdcall ITEMS_GetItemFormat(D2UnitStrc* pItem)
 {
+	if (D2Seam<&ITEMS_GetItemFormat>::hook) return D2Seam<&ITEMS_GetItemFormat>::hook(pItem);
 	D2_ASSERT(ITEMS_GetItemData(pItem));
 	return pItem->pItemData->wItemFormat;
 }
@@ -5837,6 +5858,7 @@ size_t __stdcall ITEMS_SerializeItemToBitstream(D2UnitStrc* pItem, uint8_t* pBit
 // 1.13c D2Common+0x25C10 (retail looks the items.txt row up itself; the caller passes it here)
 void __fastcall ITEMS_SerializeItemCompact(D2UnitStrc* pItem, D2BitBufferStrc* pBuffer, D2ItemsTxt* pItemsTxtRecord, BOOL bServer)
 {
+	if (D2Seam<&ITEMS_SerializeItemCompact>::hook) { D2Seam<&ITEMS_SerializeItemCompact>::hook(pItem, pBuffer, pItemsTxtRecord, bServer); return; }
 	D2ItemStatCostTxt* pItemStatCostTxtRecord = NULL;
 	char* szName = NULL;
 	int nItemFormat = 0;
@@ -6036,6 +6058,7 @@ void __fastcall ITEMS_WriteBitsToBitstream(D2BitBufferStrc* pBuffer, int nData, 
 //D2Common.0x6FDA3010
 void __fastcall ITEMS_SerializeItemComplete(D2UnitStrc* pItem, D2BitBufferStrc* pBuffer, BOOL bServer, BOOL bGamble)
 {
+	if (D2Seam<&ITEMS_SerializeItemComplete>::hook) { D2Seam<&ITEMS_SerializeItemComplete>::hook(pItem, pBuffer, bServer, bGamble); return; }
 	static const int gnItemSetStates_6FDD15A8[] =
 	{
 		STATE_ITEMSET1, STATE_ITEMSET2, STATE_ITEMSET3, STATE_ITEMSET4, STATE_ITEMSET5
@@ -7120,6 +7143,7 @@ BOOL __fastcall sub_6FDA4490(D2UnitStrc* pUnit, D2UnitStrc* pItem, int nMode)
 //D2Common.0x6FDA4640 (#10866)
 BOOL __stdcall ITEMS_UpdateSets(D2UnitStrc* pUnit, D2UnitStrc* pItem, int nMode, int bForceStates)
 {
+	if (D2Seam<&ITEMS_UpdateSets>::hook) return D2Seam<&ITEMS_UpdateSets>::hook(pUnit, pItem, nMode, bForceStates);
 	if (pUnit == nullptr)
 		return 0;
 	if (pItem == nullptr || pItem->dwUnitType != UNIT_ITEM || pUnit->pInventory == nullptr)

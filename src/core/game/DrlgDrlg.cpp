@@ -376,6 +376,7 @@ void __fastcall DRLG_UpdateAndFreeInactiveRooms(D2DrlgStrc* pDrlg)
 // 1.13c D2Common+0x2D9B0
 D2DrlgLevelStrc* __fastcall DRLG_AllocLevel(D2DrlgStrc* pDrlg, int nLevelId)
 {
+	if (D2Seam<&DRLG_AllocLevel>::hook) return D2Seam<&DRLG_AllocLevel>::hook(pDrlg, nLevelId);
 	D2DrlgLevelStrc* pLevel = D2_CALLOC_STRC_POOL(pDrlg->pMempool, D2DrlgLevelStrc);
 
 	pLevel->pDrlg = pDrlg;
@@ -713,6 +714,7 @@ D2DrlgRoomStrc* __fastcall DRLG_GetRoomExFromLevelAndCoordinates(D2DrlgLevelStrc
 // 1.13c D2Common+0x2E5C0
 D2DrlgRoomStrc* __fastcall DRLG_GetRoomExFromCoordinates(int nX, int nY, D2DrlgStrc* pDrlg, D2DrlgRoomStrc* pDrlgRoomHint, D2DrlgLevelStrc* pLevel)
 {
+	if (D2Seam<&DRLG_GetRoomExFromCoordinates>::hook) return D2Seam<&DRLG_GetRoomExFromCoordinates>::hook(nX, nY, pDrlg, pDrlgRoomHint, pLevel);
 
 	if (pDrlgRoomHint)
 	{
@@ -820,6 +822,7 @@ void __fastcall DRLG_SetLevelPositionAndSize(D2DrlgStrc* pDrlg, D2DrlgLevelStrc*
 // 1.13c D2Common+0x2D2C0
 uint8_t __stdcall DRLG_GetActNoFromLevelId(int nLevelId)
 {
+	if (D2Seam<&DRLG_GetActNoFromLevelId>::hook) return D2Seam<&DRLG_GetActNoFromLevelId>::hook(nLevelId);
 	//IMPROVEMENT: Lookup the act from Levels.txt
 
 	static const int gnTownIds[] = { LEVEL_ROGUEENCAMPMENT, LEVEL_LUTGHOLEIN, LEVEL_KURASTDOCKTOWN, LEVEL_THEPANDEMONIUMFORTRESS, LEVEL_HARROGATH, 1024 };
@@ -842,6 +845,7 @@ uint8_t __stdcall DRLG_GetActNoFromLevelId(int nLevelId)
 // 1.13c D2Common+0x2D850: the levels.txt SaveMonsters column of the row
 int __stdcall DRLG_GetSaveMonstersFromLevelId(int nLevelId)
 {
+	if (D2Seam<&DRLG_GetSaveMonstersFromLevelId>::hook) return D2Seam<&DRLG_GetSaveMonstersFromLevelId>::hook(nLevelId);
 	return DATATBLS_GetLevelDefRecord(nLevelId)->dwSaveMonsters;
 }
 

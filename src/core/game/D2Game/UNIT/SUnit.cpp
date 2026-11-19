@@ -200,6 +200,7 @@ void __fastcall SUNIT_DetachUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t n
 // 1.13c D2Game+0xE20A0 (checked against decompile, no delta; first half is retail 0xE0C80)
 void __fastcall SUNIT_RemoveUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&SUNIT_RemoveUnit>::hook) { D2Seam<&SUNIT_RemoveUnit>::hook(pGame, pUnit); return; }
     D2_ASSERT(pGame);
     D2_ASSERT(pUnit);
     D2_ASSERT(pUnit->dwUnitType < 6);
@@ -480,6 +481,7 @@ void __fastcall SUNIT_WarpPlayer(D2GameStrc* pGame, D2UnitStrc* pTarget, D2UnitS
 // 1.13c D2Game+0xE0110 (checked against decompile and bytes, no delta)
 void __fastcall SUNIT_InitSeed(D2UnitStrc* pUnit, D2SeedStrc* pSeed)
 {
+	if (D2Seam<&SUNIT_InitSeed>::hook) { D2Seam<&SUNIT_InitSeed>::hook(pUnit, pSeed); return; }
     D2_ASSERT(pUnit);
 
     SEED_InitSeed(&pUnit->pSeed);
@@ -542,6 +544,7 @@ void D2GAME_DrainInventory_113c(D2InventoryStrc* pInventory, D2GameStrc* pGame)
 // wrap and type<6 fatal; the item case passes no room to +0x10160; the missile case only sets the mode)
 D2UnitStrc* __fastcall SUNIT_AllocUnitData(int32_t nUnitType, int32_t nClassId, int32_t nX, int32_t nY, D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, char a7, int32_t nMode, DWORD a3)
 {
+	if (D2Seam<&SUNIT_AllocUnitData>::hook) return D2Seam<&SUNIT_AllocUnitData>::hook(nUnitType, nClassId, nX, nY, pGame, pRoom, a7, nMode, a3);
     if (nUnitType == UNIT_PLAYER)
     {
         if ((uint32_t)nClassId >= 7)
@@ -722,6 +725,7 @@ D2UnitStrc* __fastcall SUNIT_AllocUnitData(int32_t nUnitType, int32_t nClassId, 
 // 1.13c D2Game+0xE03A0 (checked against decompile, no delta)
 D2UnitStrc* __fastcall SUNIT_GetServerUnit(D2GameStrc* pGame, int32_t nUnitType, int32_t nUnitGUID)
 {
+	if (D2Seam<&SUNIT_GetServerUnit>::hook) return D2Seam<&SUNIT_GetServerUnit>::hook(pGame, nUnitType, nUnitGUID);
     D2_ASSERT(pGame);
 
     D2UnitStrc** ppUnitList = nullptr;
@@ -752,6 +756,7 @@ D2UnitStrc* __fastcall SUNIT_GetServerUnit(D2GameStrc* pGame, int32_t nUnitType,
 // 1.13c D2Game+0xE0A20
 D2UnitStrc* __fastcall SUNIT_GetOwner(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&SUNIT_GetOwner>::hook) return D2Seam<&SUNIT_GetOwner>::hook(pGame, pUnit);
     if (!pUnit || !(pUnit->dwFlagEx & UNITFLAGEX_STOREOWNERINFO))
     {
         return nullptr;
@@ -827,6 +832,7 @@ int32_t __fastcall SUNIT_RoomHasClients_DF9A0(D2UnitStrc* pUnit)
 // Delta vs 1.10f: the monster branch tests the room's clients through D2Game+0xDF9A0 (SUNIT_RoomHasClients_DF9A0). Callees go through D2_CALL so a probe can record them.
 void __fastcall SUNIT_Add(D2UnitStrc* pUnit, int32_t nX, int32_t nY, D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t a6)
 {
+	if (D2Seam<&SUNIT_Add>::hook) { D2Seam<&SUNIT_Add>::hook(pUnit, nX, nY, pGame, pRoom, a6); return; }
     D2_ASSERT(pGame);
     D2_ASSERT(pUnit);
 
@@ -1033,6 +1039,7 @@ void __fastcall SUNIT_InitClientInPlayerData(D2UnitStrc* pUnit, D2ClientStrc* pC
 // not-1.13c: retail has no function for this; the null/player-type test and the player-data client read are inlined at every call site (e.g. D2Game+0x8DFD0)
 D2ClientStrc* __fastcall SUNIT_GetClientFromPlayer(D2UnitStrc* pPlayer, const char* szFile, int32_t nLine)
 {
+	if (D2Seam<&SUNIT_GetClientFromPlayer>::hook) return D2Seam<&SUNIT_GetClientFromPlayer>::hook(pPlayer, szFile, nLine);
     if (!pPlayer || pPlayer->dwUnitType != UNIT_PLAYER)
     {
         return nullptr;
@@ -1114,6 +1121,7 @@ void __fastcall sub_6FCBC300(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // 1.13c D2Game+0xDFFD0
 void __fastcall SUNIT_AttachSound(D2UnitStrc* pUnit, int32_t nUpdateType, D2UnitStrc* pUpdateUnit)
 {
+	if (D2Seam<&SUNIT_AttachSound>::hook) { D2Seam<&SUNIT_AttachSound>::hook(pUnit, nUpdateType, pUpdateUnit); return; }
     D2_ASSERT(pUnit);
 
     pUnit->nUpdateType = nUpdateType;
@@ -1126,6 +1134,7 @@ void __fastcall SUNIT_AttachSound(D2UnitStrc* pUnit, int32_t nUpdateType, D2Unit
 // 1.13c D2Game+0xDFF10
 void __fastcall sub_6FCBC4D0(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&sub_6FCBC4D0>::hook) { D2Seam<&sub_6FCBC4D0>::hook(pUnit); return; }
     D2_ASSERT(pUnit);
 
     pUnit->nActionFrame = 0;
@@ -1341,6 +1350,7 @@ void __fastcall SUNIT_SpawnPresetUnitsInRoom(D2GameStrc* pGame, D2ActiveRoomStrc
 // 1.13c D2Game+0xE07A0
 void __fastcall sub_6FCBC7E0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&sub_6FCBC7E0>::hook) { D2Seam<&sub_6FCBC7E0>::hook(pGame, pUnit); return; }
     D2_ASSERT(pUnit);
     D2_ASSERT(pGame);
 
@@ -1379,6 +1389,7 @@ void __fastcall sub_6FCBC7E0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // 1.13c D2Game+0xE0BD0
 D2UnitStrc* __stdcall SUNIT_GetTargetUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&SUNIT_GetTargetUnit>::hook) return D2Seam<&SUNIT_GetTargetUnit>::hook(pGame, pUnit);
     D2_CALL(sub_6FCBC7E0, pGame, pUnit);
     return SUNIT_TargetOrNull(pUnit, D2_CALL(PATH_GetTargetUnit, pUnit->pDynamicPath));
 }
@@ -1387,6 +1398,7 @@ D2UnitStrc* __stdcall SUNIT_GetTargetUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // 1.13c D2Game+0xE1930
 int32_t __fastcall sub_6FCBC930(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
+	if (D2Seam<&sub_6FCBC930>::hook) return D2Seam<&sub_6FCBC930>::hook(pGame, pMissile);
     D2_ASSERT(pGame);
 
     sub_6FCBC7E0(pGame, pMissile);
@@ -1403,6 +1415,7 @@ int32_t __fastcall sub_6FCBC930(D2GameStrc* pGame, D2UnitStrc* pMissile)
 // 1.13c D2Game+0xDF980
 void __fastcall SUNIT_SetCombatMode(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMode)
 {
+	if (D2Seam<&SUNIT_SetCombatMode>::hook) { D2Seam<&SUNIT_SetCombatMode>::hook(pGame, pUnit, nMode); return; }
     SUNIT_SetCombatModeSteps([&] { D2_CALL(SUNITDMG_FreeAttackerCombatList, pGame, pUnit); }, [&] { D2_CALL(UNITS_ChangeAnimMode, pUnit, nMode); });
 }
 
@@ -1442,6 +1455,7 @@ void __fastcall sub_6FCBC9C0(D2UnitStrc* pFirst, D2UnitStrc* pSecond)
 // 1.13c D2Game+0xE1570 (stdcall game, portal; checked against disassembly, no delta)
 D2UnitStrc* __fastcall SUNIT_GetPortalOwner(D2GameStrc* pGame, D2UnitStrc* pPortal)
 {
+	if (D2Seam<&SUNIT_GetPortalOwner>::hook) return D2Seam<&SUNIT_GetPortalOwner>::hook(pGame, pPortal);
     D2_ASSERT(pPortal);
 
     const uint8_t nActNo = DRLG_GetActNoFromLevelId(pPortal->pObjectData->InteractType);
@@ -1558,6 +1572,7 @@ D2EventTimerStrc* __fastcall SUNIT_GetTimerFromUnit(D2UnitStrc* pUnit)
 // 1.13c D2Game+0xE0750
 void __fastcall D2GAME_DeletePlayerPerFrameEvents_6FCBCE50(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&D2GAME_DeletePlayerPerFrameEvents_6FCBCE50>::hook) { D2Seam<&D2GAME_DeletePlayerPerFrameEvents_6FCBCE50>::hook(pGame, pUnit); return; }
     D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_MODECHANGE, 0);
     D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_ENDANIM, 0);
 }
@@ -2009,6 +2024,7 @@ uint8_t __fastcall D2GAME_CheckIfSparklyChest_6FCBD7F0(D2UnitStrc* pUnit)
 // 1.13c D2Game+0xDF6A0 (unit in EAX, GUID out in EDX, type out on the stack; returns the byte at +0x6C)
 int32_t __stdcall SUNIT_GetInteractInfo(D2UnitStrc* pUnit, int32_t* pInteractUnitType, int32_t* pInteractUnitGUID)
 {
+	if (D2Seam<&SUNIT_GetInteractInfo>::hook) return D2Seam<&SUNIT_GetInteractInfo>::hook(pUnit, pInteractUnitType, pInteractUnitGUID);
     *pInteractUnitGUID = pUnit->dwInteractGUID;
     *pInteractUnitType = pUnit->dwInteractType;
     return *reinterpret_cast<uint8_t*>(&pUnit->nInteract);
@@ -2051,6 +2067,7 @@ void __stdcall SUNIT_ResetInteractInfo(D2UnitStrc* pUnit)
 // 1.13c D2Game+0xDFA90
 int32_t __fastcall SUNIT_IsDead(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&SUNIT_IsDead>::hook) return D2Seam<&SUNIT_IsDead>::hook(pUnit);
     if (!pUnit || pUnit->dwFlags & 0x10000)
     {
         return 1;
@@ -2081,6 +2098,7 @@ int32_t __fastcall SUNIT_IsDead(D2UnitStrc* pUnit)
 // 1.13c walks the target's owner chain while it is a monster (1.10f tested for a player there)
 int32_t __fastcall sub_6FCBD900(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget)
 {
+	if (D2Seam<&sub_6FCBD900>::hook) return D2Seam<&sub_6FCBD900>::hook(pGame, pUnit, pTarget);
     D2UnitStrc* pTestUnit = pUnit;
     if (pTestUnit)
     {
@@ -2281,6 +2299,7 @@ int32_t __fastcall SUNIT_AreUnitsAligned(D2GameStrc* pGame, D2UnitStrc* pUnit1, 
 // 1.13c D2Game+0xE0460
 void __fastcall sub_6FCBDD30(D2UnitStrc* pUnit, uint8_t nAlignNew, int32_t a3)
 {
+	if (D2Seam<&sub_6FCBDD30>::hook) { D2Seam<&sub_6FCBDD30>::hook(pUnit, nAlignNew, a3); return; }
     int32_t nAlignment = UNIT_ALIGNMENT_UNASSIGNED;
 
     if (!pUnit)
@@ -2420,6 +2439,7 @@ int32_t __fastcall sub_6FCBDF90(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2C_Even
 // 1.13c D2Game+0xE19C0 (nY in EAX, nX in ECX, room in EDX; game, unit, a6, a7 on the stack; checked against disassembly, no delta)
 int32_t __fastcall sub_6FCBDFE0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ActiveRoomStrc* pInputRoom, int32_t nX, int32_t nY, int32_t a6, int32_t a7)
 {
+	if (D2Seam<&sub_6FCBDFE0>::hook) return D2Seam<&sub_6FCBDFE0>::hook(pGame, pUnit, pInputRoom, nX, nY, a6, a7);
     D2_ASSERT(pUnit);
     D2_ASSERT(pUnit->pDynamicPath);
 
@@ -2509,6 +2529,7 @@ int32_t __fastcall sub_6FCBDFE0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ActiveRo
 // 1.13c D2Game+0xDFA60
 int16_t __fastcall SUNIT_GetPartyId(D2UnitStrc* pPlayer)
 {
+	if (D2Seam<&SUNIT_GetPartyId>::hook) return D2Seam<&SUNIT_GetPartyId>::hook(pPlayer);
     if (pPlayer && pPlayer->pGame && pPlayer->dwUnitType == UNIT_PLAYER)
     {
         return PARTY_GetPartyIdForUnitOwner(pPlayer->pGame, pPlayer);

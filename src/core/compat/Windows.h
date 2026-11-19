@@ -3,6 +3,7 @@
 // target is wasm64.
 #pragma once
 #include <stdint.h>
+#include <test_seam.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -80,7 +81,8 @@ inline long InterlockedDecrement(long volatile* p) { return *p = *p - 1; }
 // "last tick + delay" checks on fresh units behave as on a warmed-up server).
 extern "C" DWORD d2web_GetTickCount();
 extern "C" void d2web_AdvanceTickCount(DWORD ms);
-inline DWORD GetTickCount() { return d2web_GetTickCount(); }
+inline DWORD GetTickCount() {
+	if (D2Seam<&GetTickCount>::hook) { return D2Seam<&GetTickCount>::hook(); } return d2web_GetTickCount(); }
 inline void OutputDebugStringA(const char*) {}
 // Win32 SYSTEMTIME, for the Horadric Cube's date-dependent recipes (PlrTrade.cpp reads the day
 // and day of week). Retail reads the local wall clock here, and so does this -- it is the one

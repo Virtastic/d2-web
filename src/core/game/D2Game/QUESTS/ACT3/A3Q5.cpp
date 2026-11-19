@@ -143,6 +143,7 @@ bool __fastcall ACT3Q5_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 // 1.13c D2Game+0xE73C0 (checked against decompile, no delta)
 void __fastcall ACT3Q5_SpawnCouncil(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&ACT3Q5_SpawnCouncil>::hook) { D2Seam<&ACT3Q5_SpawnCouncil>::hook(pGame, pUnit); return; }
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A3Q5_TRAVINCAL);
 	if (!pQuestData || !pQuestData->bNotIntro)
 	{
@@ -987,6 +988,7 @@ int32_t __fastcall ACT3Q5_UnitIterate_DetermineFlailAndCubeDropCounts(D2GameStrc
 // 1.13c D2Game+0xE2900 (checked against decompile, no delta)
 int32_t __fastcall ACT3Q5_IsDuranceOfHateClosed(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&ACT3Q5_IsDuranceOfHateClosed>::hook) return D2Seam<&ACT3Q5_IsDuranceOfHateClosed>::hook(pGame, pUnit);
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A3Q5_TRAVINCAL);
 	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
 

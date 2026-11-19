@@ -1820,6 +1820,7 @@ void __fastcall SUNITDMG_ApplyFreezeState(D2UnitStrc* pAttacker, D2UnitStrc* pDe
 // 1.13c D2Game+0xDA750
 void __fastcall SUNITDMG_FreeAttackerCombatList(D2GameStrc* pGame, D2UnitStrc* pAttacker)
 {
+	if (D2Seam<&SUNITDMG_FreeAttackerCombatList>::hook) { D2Seam<&SUNITDMG_FreeAttackerCombatList>::hook(pGame, pAttacker); return; }
 	D2CombatStrc* pPrevious = nullptr;
 	D2CombatStrc* pNext = nullptr;
 
@@ -1887,6 +1888,7 @@ void __fastcall SUNITDMG_FreeAttackerDefenderCombatList(D2GameStrc* pGame, D2Uni
 // 1.13c D2Game+0xDEEE0
 void __fastcall SUNITDMG_KillMonster(D2GameStrc* pGame, D2UnitStrc* pDefender, D2UnitStrc* pAttacker, int32_t bPetKill)
 {
+	if (D2Seam<&SUNITDMG_KillMonster>::hook) { D2Seam<&SUNITDMG_KillMonster>::hook(pGame, pDefender, pAttacker, bPetKill); return; }
 	if (!pDefender)
 	{
 		return;
@@ -2447,6 +2449,7 @@ int32_t __fastcall SUNITDMG_WearItemsOnHit(D2GameStrc* pGame, D2UnitStrc* pAttac
 // 1.13c D2Game+0xDED30
 void __fastcall SUNITDMG_DrainItemDurability(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender, int32_t nUnused)
 {
+	if (D2Seam<&SUNITDMG_DrainItemDurability>::hook) { D2Seam<&SUNITDMG_DrainItemDurability>::hook(pGame, pAttacker, pDefender, nUnused); return; }
 	D2DamageStrc* pDamage = SUNITDMG_GetDamageFromUnits(pAttacker, pDefender);
 
 	if (!pDamage)
@@ -2702,6 +2705,7 @@ int32_t __fastcall SUNITDMG_IsHitSuccessful(D2UnitStrc* pAttacker, D2UnitStrc* p
 // 1.13c D2Game+0xDE5A0
 uint16_t __fastcall SUNITDMG_GetResultFlags(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender, int32_t nStatValue, int32_t nRangeOffset)
 {
+	if (D2Seam<&SUNITDMG_GetResultFlags>::hook) return D2Seam<&SUNITDMG_GetResultFlags>::hook(pGame, pAttacker, pDefender, nStatValue, nRangeOffset);
 	if (!pAttacker || !pDefender || pAttacker->dwUnitType != UNIT_PLAYER && pAttacker->dwUnitType != UNIT_MONSTER || pDefender->dwUnitType != UNIT_PLAYER && pDefender->dwUnitType != UNIT_MONSTER || !sub_6FCBD900(pGame, pAttacker, pDefender))
 	{
 		return 0;
@@ -2786,6 +2790,7 @@ uint16_t __fastcall SUNITDMG_GetResultFlags(D2GameStrc* pGame, D2UnitStrc* pAtta
 // (1.13c outlines the combat-record allocation below as D2Game+0xDAB90; here it is inline)
 void __fastcall SUNITDMG_AllocCombat(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender, D2DamageStrc* pDamage, uint8_t nSrcDam)
 {
+	if (D2Seam<&SUNITDMG_AllocCombat>::hook) { D2Seam<&SUNITDMG_AllocCombat>::hook(pGame, pAttacker, pDefender, pDamage, nSrcDam); return; }
 	if (!pAttacker || !pDefender)
 	{
 		return;

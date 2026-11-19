@@ -1,4 +1,5 @@
 #include "MONSTER/MonsterSpawn.h"
+#include <test_seam.h>
 
 #include <D2BitManip.h>
 
@@ -31,6 +32,7 @@
 // 1.13c D2Game+0xF3D20
 int32_t __fastcall sub_6FC68350(int32_t nMonsterId, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t a5)
 {
+	if (D2Seam<&sub_6FC68350>::hook) return D2Seam<&sub_6FC68350>::hook(nMonsterId, pRoom, nX, nY, a5);
     D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nMonsterId);
     if (pMonStatsTxtRecord)
     {
@@ -350,6 +352,7 @@ static D2ActiveRoomStrc* MONSTERSPAWN_FindRoomAt(D2ActiveRoomStrc* pRoom, int32_
 // 1.13c D2Game+0xEEF10
 D2UnitStrc* __fastcall D2GAME_SpawnNormalMonster_6FC68E30(D2UnkMonCreateStrc* pMonCreate)
 {
+	if (D2Seam<&D2GAME_SpawnNormalMonster_6FC68E30>::hook) return D2Seam<&D2GAME_SpawnNormalMonster_6FC68E30>::hook(pMonCreate);
     const int32_t nMonsterId = pMonCreate->nMonsterId;
     D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nMonsterId);
     D2MonStats2Txt* pMonStats2TxtRecord = pMonStatsTxtRecord ? MONSTERREGION_GetMonStats2TxtRecord(nMonsterId) : nullptr;
@@ -888,6 +891,7 @@ void __fastcall sub_6FC69C00(D2UnkMonCreateStrc* pMonCreate, D2UnitStrc* pUnit)
 // 1.13c D2Game+0xEF650 (checked: same fields, struct order differs only in layout)
 D2UnitStrc* __fastcall D2GAME_SpawnMonster_6FC69F10(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nMonsterId, int32_t nAnimMode, int32_t a7, int16_t nFlags)
 {
+	if (D2Seam<&D2GAME_SpawnMonster_6FC69F10>::hook) return D2Seam<&D2GAME_SpawnMonster_6FC69F10>::hook(pGame, pRoom, nX, nY, nMonsterId, nAnimMode, a7, nFlags);
     D2UnkMonCreateStrc monCreate = {};
 
     monCreate.pRoom = pRoom;

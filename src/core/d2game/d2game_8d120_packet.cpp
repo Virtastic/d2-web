@@ -4,6 +4,7 @@
 // no roster entry) and the party state between the two (u16, 1 for itself).
 // The receiver's player arrives in EBX and the described unit in EAX in 1.13c.
 #include <cstdint>
+#include <test_seam.h>
 #include <D2PacketDef.h>
 #include <D2StatList.h>
 #include <GAME/SCmd.h>
@@ -11,7 +12,8 @@
 #include <UNIT/SUnit.h>
 
 void __fastcall SCMD_Send0x75_PartyRosterUpdate(D2UnitStrc* pLocalPlayer, D2UnitStrc* pOtherPlayer)
-{ // 1.13c D2Game+0x8D120
+{
+	if (D2Seam<&SCMD_Send0x75_PartyRosterUpdate>::hook) { D2Seam<&SCMD_Send0x75_PartyRosterUpdate>::hook(pLocalPlayer, pOtherPlayer); return; } // 1.13c D2Game+0x8D120
     D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pLocalPlayer, __FILE__, __LINE__);
     D2GSPacketSrv75 packet = {};
     packet.nHeader = 0x75u;

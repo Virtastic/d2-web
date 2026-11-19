@@ -128,6 +128,7 @@ void __fastcall MISSILES_RollPierce(D2UnitStrc* pOwner, D2UnitStrc* pMissile)
 // damage block is D2Game+0x6F620, the pierce roll D2Game+0x6F660; 1.10f's trailing sub_6FC7CA10(owner, 0) is a no-op retail drops)
 D2UnitStrc* __fastcall MISSILES_CreateMissileFromParams(D2GameStrc* pGame, D2MissileStrc* missileParams)
 {
+	if (D2Seam<&MISSILES_CreateMissileFromParams>::hook) return D2Seam<&MISSILES_CreateMissileFromParams>::hook(pGame, missileParams);
     if (!missileParams->pOwner)
     {
         return 0;

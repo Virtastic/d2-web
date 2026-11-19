@@ -616,6 +616,7 @@ int32_t __fastcall sub_6FD0FA00(D2UnitStrc* pUnit, D2UnitStrc* pTarget, uint32_t
 // 1.13c D2Game+0x9E6B0
 void __fastcall sub_6FD0FDD0(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&sub_6FD0FDD0>::hook) { D2Seam<&sub_6FD0FDD0>::hook(pUnit); return; }
     const int32_t nMaxHp = STATLIST_GetMaxLifeFromUnit(pUnit);
     if (STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0) > nMaxHp)
     {
@@ -738,6 +739,7 @@ void __fastcall sub_6FD0FE80(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, i
 // 1.13c D2Game+0xA10B0
 void __fastcall sub_6FD10140(D2GameStrc* pGame, D2UnitStrc* pAttackerArg, D2UnitStrc* pUnit, D2DamageStrc* pDamage, int32_t nUnused)
 {
+	if (D2Seam<&sub_6FD10140>::hook) { D2Seam<&sub_6FD10140>::hook(pGame, pAttackerArg, pUnit, pDamage, nUnused); return; }
     D2UnitStrc* pAttacker = pAttackerArg;
 
     if (pAttackerArg && pUnit)
@@ -1284,6 +1286,7 @@ void __fastcall sub_6FD10E20(D2GameStrc* pGame, D2UnitFindDataStrc* pUnitFindDat
 // 1.13c D2Game+0x9F7A0
 void __fastcall sub_6FD10E50(D2UnitStrc* pUnit, int32_t nState, D2StatListStrc* pStatList)
 {
+	if (D2Seam<&sub_6FD10E50>::hook) { D2Seam<&sub_6FD10E50>::hook(pUnit, nState, pStatList); return; }
     D2_MAYBE_UNUSED(pStatList);
     SUNITEVENT_Unregister(SUNIT_GetGameFromUnit(pUnit), pUnit, 1, nState);
 
@@ -1304,6 +1307,7 @@ void __fastcall sub_6FD10E50(D2UnitStrc* pUnit, int32_t nState, D2StatListStrc* 
 // 1.13c D2Game+0xA00B0
 D2StatListStrc* __fastcall sub_6FD10EC0(D2CurseStrc* pCurse)
 {
+	if (D2Seam<&sub_6FD10EC0>::hook) return D2Seam<&sub_6FD10EC0>::hook(pCurse);
     D2GameStrc* pGame = SUNIT_GetGameFromUnit(pCurse->pTarget);
 
     D2StatesTxt* pStatesTxtRecord = SKILLS_GetStatesTxtRecord(pCurse->nState);
@@ -1508,6 +1512,7 @@ int32_t __fastcall sub_6FD11340(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
 // 1.13c D2Game+0xA28F0
 D2UnitStrc* __fastcall sub_6FD11420(D2GameStrc* pGame, int32_t nMissileId, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t nX, int32_t nY, int32_t nTargetX, int32_t nTargetY, int32_t bCheckItemQuantity)
 {
+	if (D2Seam<&sub_6FD11420>::hook) return D2Seam<&sub_6FD11420>::hook(pGame, nMissileId, pUnit, nSkillId, nSkillLevel, nX, nY, nTargetX, nTargetY, bCheckItemQuantity);
     D2MissileStrc missileParams = {};
     missileParams.dwFlags = 33;
     missileParams.pOwner = pUnit;
@@ -1552,6 +1557,7 @@ D2UnitStrc* __fastcall sub_6FD11420(D2GameStrc* pGame, int32_t nMissileId, D2Uni
 // 1.13c D2Game+0xA0000
 D2UnitStrc* __fastcall D2GAME_CreateMissile_6FD115E0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t nMissileId, int32_t nX, int32_t nY)
 {
+	if (D2Seam<&D2GAME_CreateMissile_6FD115E0>::hook) return D2Seam<&D2GAME_CreateMissile_6FD115E0>::hook(pGame, pUnit, nSkillId, nSkillLevel, nMissileId, nX, nY);
     if (!pUnit)
     {
         return 0;
@@ -1665,6 +1671,7 @@ int32_t __fastcall sub_6FD118C0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // 1.13c D2Game+0x9EB80
 int32_t __fastcall sub_6FD119C0(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&sub_6FD119C0>::hook) return D2Seam<&sub_6FD119C0>::hook(pUnit);
     if (!pUnit)
     {
         return 0;
@@ -2503,6 +2510,7 @@ SkillStartFunc __fastcall D2GAME_SKILLS_GetSrvStartFunc_6FD12BA0(int32_t nStartF
 // 1.13c D2Game+0xA19A0 (rule: globals instead of the pGame tables, register convention)
 int32_t __fastcall D2GAME_SKILLS_Handler_6FD12BA0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t a5, int32_t a6, int32_t a7)
 {
+	if (D2Seam<&D2GAME_SKILLS_Handler_6FD12BA0>::hook) return D2Seam<&D2GAME_SKILLS_Handler_6FD12BA0>::hook(pGame, pUnit, nSkillId, nSkillLevel, a5, a6, a7);
     if (!pGame || !pUnit)
     {
         return 0;
@@ -2757,6 +2765,7 @@ int32_t __fastcall sub_6FD12FD0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // 1.13c D2Game+0x9E970
 int32_t __fastcall SKILL_ComputePeriodicRate(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillsTxt* pSkillsTxtRecord, int32_t nSkillId, int32_t nSkillLevel)
 {
+	if (D2Seam<&SKILL_ComputePeriodicRate>::hook) return D2Seam<&SKILL_ComputePeriodicRate>::hook(pGame, pUnit, pSkillsTxtRecord, nSkillId, nSkillLevel);
     int32_t nDelay = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwPerDelay, nSkillId, nSkillLevel);
     if (nDelay <= 5)
     {
@@ -2773,6 +2782,7 @@ int32_t __fastcall SKILL_ComputePeriodicRate(D2GameStrc* pGame, D2UnitStrc* pUni
 // 1.13c D2Game+0x9F3B0
 int32_t __fastcall sub_6FD13260(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t a5)
 {
+	if (D2Seam<&sub_6FD13260>::hook) return D2Seam<&sub_6FD13260>::hook(pGame, pUnit, nSkillId, nSkillLevel, a5);
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
     if (pSkillsTxtRecord && (pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[6] || pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[5]))
     {
@@ -2823,6 +2833,7 @@ int32_t __fastcall sub_6FD13330(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a5
 // 1.13c D2Game+0xA2060
 void __fastcall sub_6FD13410(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&sub_6FD13410>::hook) { D2Seam<&sub_6FD13410>::hook(pGame, pUnit); return; }
     D2SkillStrc* pSkill = UNITS_GetUsedSkill(pUnit);
     if (pSkill)
     {
@@ -3031,6 +3042,7 @@ D2AssignSkillSeam g_d2AssignSkill = {};
 // unit's timer list and frees each periodic-skill node with D2Game+0x8E6F0 instead of calling EVENTS_Delete)
 void __fastcall D2GAME_AssignSkill_6FD13800(D2UnitStrc* pUnit, int32_t a2, int32_t nSkillId, int32_t nFlags)
 {
+	if (D2Seam<&D2GAME_AssignSkill_6FD13800>::hook) { D2Seam<&D2GAME_AssignSkill_6FD13800>::hook(pUnit, a2, nSkillId, nFlags); return; }
     if (nSkillId == SKILL_LEFTHANDSWING)
     {
         return;
@@ -3119,6 +3131,7 @@ void __fastcall D2GAME_AssignSkill_6FD13800(D2UnitStrc* pUnit, int32_t a2, int32
 // 1.13c D2Game+0xA22E0
 D2UnitStrc* __fastcall D2GAME_CreateLinkPortal_6FD13B20(D2GameStrc* pGame, D2UnitStrc* pPortal, int32_t nDestLevel, int32_t nSourceLevel)
 {
+	if (D2Seam<&D2GAME_CreateLinkPortal_6FD13B20>::hook) return D2Seam<&D2GAME_CreateLinkPortal_6FD13B20>::hook(pGame, pPortal, nDestLevel, nSourceLevel);
     const uint8_t nAct = DRLG_GetActNoFromLevelId(nDestLevel);
     int32_t nX = 0;
     int32_t nY = 0;
@@ -3190,6 +3203,7 @@ D2UnitStrc* __fastcall D2GAME_CreateLinkPortal_6FD13B20(D2GameStrc* pGame, D2Uni
 // 1.13c D2Game+0xA24C0
 int32_t __fastcall D2GAME_CreatePortalObject_6FD13DF0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nDestLevel, D2UnitStrc** ppSourceUnit, int32_t nObjectId, int32_t bPerm)
 {
+	if (D2Seam<&D2GAME_CreatePortalObject_6FD13DF0>::hook) return D2Seam<&D2GAME_CreatePortalObject_6FD13DF0>::hook(pGame, pUnit, pRoom, nX, nY, nDestLevel, ppSourceUnit, nObjectId, bPerm);
     D2_ASSERT(pRoom);
 
     if (ppSourceUnit)
@@ -3267,6 +3281,7 @@ int32_t __fastcall D2GAME_CreatePortalObject_6FD13DF0(D2GameStrc* pGame, D2UnitS
 // 1.13c D2Game+0x9FA30
 int32_t __fastcall D2GAME_GetXAndYFromTargetUnit_6FD14020(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t* pX, int32_t* pY)
 {
+	if (D2Seam<&D2GAME_GetXAndYFromTargetUnit_6FD14020>::hook) return D2Seam<&D2GAME_GetXAndYFromTargetUnit_6FD14020>::hook(pGame, pUnit, pX, pY);
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
     if (pTarget)
     {
@@ -3658,6 +3673,7 @@ void __fastcall sub_6FD14400(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nDoFu
 // 1.13c D2Game+0xA3610
 D2UnitStrc* __fastcall D2GAME_SummonPet_6FD14430(D2GameStrc* pGame, D2SummonArgStrc* pSummonArg)
 {
+	if (D2Seam<&D2GAME_SummonPet_6FD14430>::hook) return D2Seam<&D2GAME_SummonPet_6FD14430>::hook(pGame, pSummonArg);
     int32_t nX = 0;
     int32_t nY = 0;
 
@@ -3780,6 +3796,7 @@ void __fastcall sub_6FD146D0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // 1.13c D2Game+0xA06F0
 void __fastcall sub_6FD14770(D2GameStrc* pGame, int32_t nFlags, D2UnitStrc* pUnit, int32_t nSkillLevel, int32_t nRange, CurseCallbackFunc pfCurse)
 {
+	if (D2Seam<&sub_6FD14770>::hook) { D2Seam<&sub_6FD14770>::hook(pGame, nFlags, pUnit, nSkillLevel, nRange, pfCurse); return; }
     D2_ASSERT(pfCurse);
 
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
@@ -3908,6 +3925,7 @@ void __fastcall sub_6FD14C30(D2UnitStrc* pUnit)
 // 1.13c D2Game+0x9F9A0 (skill-id bounds, assign, refresh passives, player stat refresh; 0x96FA0 is sub_6FC7DF40)
 void __fastcall D2GAME_SetSkills_6FD14C60(D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t bRemove)
 {
+	if (D2Seam<&D2GAME_SetSkills_6FD14C60>::hook) { D2Seam<&D2GAME_SetSkills_6FD14C60>::hook(pUnit, nSkillId, nSkillLevel, bRemove); return; }
     if (nSkillId >= 0 && nSkillId < sgptDataTables->nSkillsTxtRecordCount)
     {
         SKILLS_AssignSkill(pUnit, nSkillId, nSkillLevel, bRemove, __FILE__, __LINE__);
@@ -3919,6 +3937,7 @@ void __fastcall D2GAME_SetSkills_6FD14C60(D2UnitStrc* pUnit, int32_t nSkillId, i
 // 1.13c D2Game+0x9E370 (checked against decompile)
 void __fastcall D2GAME_RefreshPassiveSkills_6FD14CC0(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&D2GAME_RefreshPassiveSkills_6FD14CC0>::hook) { D2Seam<&D2GAME_RefreshPassiveSkills_6FD14CC0>::hook(pUnit); return; }
     if (pUnit->pSkills)
     {
         for (D2SkillStrc* i = SKILLS_GetFirstSkillFromSkillList(pUnit->pSkills); i; i = SKILLS_GetNextSkill(i))
@@ -3959,6 +3978,7 @@ void __fastcall sub_6FD14D20(D2UnitStrc* pUnit, int32_t nUnused, D2MonSkillInfoS
 // 1.13c D2Game+0x9F210
 int32_t __fastcall D2GAME_RollElementalDamage_6FD14DD0(D2UnitStrc* pUnit, D2DamageStrc* pDamage, int32_t nSkillId, int32_t nSkillLevel)
 {
+	if (D2Seam<&D2GAME_RollElementalDamage_6FD14DD0>::hook) return D2Seam<&D2GAME_RollElementalDamage_6FD14DD0>::hook(pUnit, pDamage, nSkillId, nSkillLevel);
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
     if (pSkillsTxtRecord)
     {
@@ -4056,6 +4076,7 @@ int32_t __fastcall sub_6FD150A0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
 // 1.13c D2Game+0x9F120
 int32_t __fastcall sub_6FD15190(D2UnitStrc* pUnit, D2C_AiSpecialState nAiSpecialState)
 {
+	if (D2Seam<&sub_6FD15190>::hook) return D2Seam<&sub_6FD15190>::hook(pUnit, nAiSpecialState);
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER || pUnit->dwClassId < 0)
     {
         return AIUTIL_CanUnitSwitchAi(pUnit, nAiSpecialState) != 0;
@@ -4086,6 +4107,7 @@ int32_t __fastcall sub_6FD15190(D2UnitStrc* pUnit, D2C_AiSpecialState nAiSpecial
 // 1.13c D2Game+0x9E810
 D2UnitStrc* __fastcall sub_6FD15210(D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t nSkillId, int32_t nSkillLevel)
 {
+	if (D2Seam<&sub_6FD15210>::hook) return D2Seam<&sub_6FD15210>::hook(pUnit, pTarget, nSkillId, nSkillLevel);
     if (pUnit && nSkillLevel > 0 && pTarget)
     {
         const int32_t nX = CLIENTS_GetUnitX(pTarget);
@@ -4132,6 +4154,7 @@ int32_t __fastcall sub_6FD15320(D2UnitStrc* pUnit, D2UnitFindArgStrc* pArg)
 // 1.13c D2Game+0xA0630 (missile id in eax; the target/path point is the D2Game+0x9FA30 helper, same result)
 int32_t __fastcall sub_6FD15340(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMissileId)
 {
+	if (D2Seam<&sub_6FD15340>::hook) return D2Seam<&sub_6FD15340>::hook(pGame, pUnit, nMissileId);
     D2MissilesTxt* pMissilesTxtRecord = SKILLS_GetMissilesTxtRecord(nMissileId);
     D2_ASSERT(pMissilesTxtRecord);
 
@@ -4379,6 +4402,7 @@ D2StatesTxt* __fastcall SKILLS_GetStatesTxtRecord(int32_t nStateId)
 // 1.13c D2Game+0x10D0 (id in EAX; bounds test against the count at +0xBD4, record size 0x144 from +0xBCC)
 D2ItemStatCostTxt* __fastcall SKILLS_GetItemStatCostTxtRecord(int32_t nStatId)
 {
+	if (D2Seam<&SKILLS_GetItemStatCostTxtRecord>::hook) return D2Seam<&SKILLS_GetItemStatCostTxtRecord>::hook(nStatId);
     if (nStatId >= 0 && nStatId < sgptDataTables->nItemStatCostTxtRecordCount)
     {
         return &sgptDataTables->pItemStatCostTxt[nStatId];
@@ -4390,6 +4414,7 @@ D2ItemStatCostTxt* __fastcall SKILLS_GetItemStatCostTxtRecord(int32_t nStatId)
 // 1.13c D2Game+0x1250 (id in EAX; bounds test against the count at +0xB6C, record size 0x1A4 from +0xB64)
 D2MissilesTxt* __fastcall SKILLS_GetMissilesTxtRecord(int32_t nMissileId)
 {
+	if (D2Seam<&SKILLS_GetMissilesTxtRecord>::hook) return D2Seam<&SKILLS_GetMissilesTxtRecord>::hook(nMissileId);
     if (nMissileId >= 0 && nMissileId < sgptDataTables->nMissilesTxtRecordCount)
     {
         return &sgptDataTables->pMissilesTxt[nMissileId];

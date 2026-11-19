@@ -926,6 +926,7 @@ void __fastcall DRLGROOM_GetRGB_IntensityFromRoomEx(D2DrlgRoomStrc* pDrlgRoom, u
 // 1.13c D2Common+0x44CE0
 int* __fastcall DRLGROOM_GetVisArrayFromLevelId(D2DrlgStrc* pDrlg, int nLevelId)
 {
+	if (D2Seam<&DRLGROOM_GetVisArrayFromLevelId>::hook) return D2Seam<&DRLGROOM_GetVisArrayFromLevelId>::hook(pDrlg, nLevelId);
 	D2DrlgWarpStrc* pDrlgWarp = pDrlg->pWarp;
 
 	while (pDrlgWarp)

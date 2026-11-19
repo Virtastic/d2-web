@@ -1,4 +1,5 @@
 #include "D2DataTbls.h"
+#include <test_seam.h>
 
 #include "D2Items.h"
 #include <Archive.h>
@@ -413,6 +414,7 @@ int __stdcall DATATBLS_MapOldItemIndexToCurrent(int nItemId)
 // 1.13c D2Common+0x719A0: retail compares the id unsigned, so a negative id yields NULL
 D2ItemsTxt* __stdcall DATATBLS_GetItemsTxtRecord(int nItemId)
 {
+	if (D2Seam<&DATATBLS_GetItemsTxtRecord>::hook) return D2Seam<&DATATBLS_GetItemsTxtRecord>::hook(nItemId);
 	if ((uint32_t)nItemId < (uint32_t)sgptDataTables->pItemDataTables.nItemsTxtRecordCount)
 	{
 		D2_ASSERT(sgptDataTables->pItemDataTables.pItemsTxt);
@@ -426,6 +428,7 @@ D2ItemsTxt* __stdcall DATATBLS_GetItemsTxtRecord(int nItemId)
 //D2Common.0x6FD576D0 (#10601)
 D2ItemsTxt* __stdcall DATATBLS_GetItemRecordFromItemCode(uint32_t dwCode, int* pItemId)
 {
+	if (D2Seam<&DATATBLS_GetItemRecordFromItemCode>::hook) return D2Seam<&DATATBLS_GetItemRecordFromItemCode>::hook(dwCode, pItemId);
 	*pItemId = FOG_GetLinkIndex(sgptDataTables->pItemsLinker, dwCode, 0);
 	if (*pItemId >= 0)
 	{
@@ -440,6 +443,7 @@ D2ItemsTxt* __stdcall DATATBLS_GetItemRecordFromItemCode(uint32_t dwCode, int* p
 //D2Common.0x6FD57720 (#10602)
 int __stdcall DATATBLS_GetItemIdFromItemCode(uint32_t dwCode)
 {
+	if (D2Seam<&DATATBLS_GetItemIdFromItemCode>::hook) return D2Seam<&DATATBLS_GetItemIdFromItemCode>::hook(dwCode);
 	return FOG_GetLinkIndex(sgptDataTables->pItemsLinker, dwCode, 0);
 }
 

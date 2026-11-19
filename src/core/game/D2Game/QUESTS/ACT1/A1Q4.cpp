@@ -247,6 +247,7 @@ void __fastcall ACT1Q4_SendPacket0x5DToClient(D2UnitStrc* pUnit)
 // 1.13c D2Game+0x633C0
 void __fastcall ACT1Q4_SetMonolithOrder(D2QuestDataStrc* pQuestData)
 {
+	if (D2Seam<&ACT1Q4_SetMonolithOrder>::hook) { D2Seam<&ACT1Q4_SetMonolithOrder>::hook(pQuestData); return; }
 	const int32_t nMonolithClassIds[5] = { 17, 18, 19, 20, 21 };
 
 	D2Act1Quest4Strc* pQuestDataEx = (D2Act1Quest4Strc*)pQuestData->pQuestDataEx;
@@ -1946,6 +1947,7 @@ void __fastcall OBJECTS_InitFunction54_CainStartPosition(D2ObjInitFnStrc* pOp)
 // 1.13c D2Game+0x674A0 (the cube-output table at D2Game+0xFA5E8 reaches it through the thunk at D2Game+0x72210)
 int32_t __fastcall ACT1Q4_CreateCowPortal(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&ACT1Q4_CreateCowPortal>::hook) return D2Seam<&ACT1Q4_CreateCowPortal>::hook(pGame, pUnit);
 	D2BitBufferStrc* pQuestFlags = D2_CALL(UNITS_GetPlayerData, pUnit)->pQuestData[pGame->nDifficulty];
 
 	if (QUESTS_GetGlobalState(pGame, QUESTSTATEFLAG_A1Q4, QFLAG_CUSTOM7) || D2_CALL(QUESTRECORD_GetQuestState, pQuestFlags, QUESTSTATEFLAG_A1Q4, QFLAG_CUSTOM6))
@@ -2159,6 +2161,7 @@ int32_t __fastcall ACT1Q4_GetCainPortalOutsideTownCoordinates(D2GameStrc* pGame,
 // 1.13c D2Game+0x60400
 int32_t __fastcall ACT1Q4_UpdateCainPortalCoordinates(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&ACT1Q4_UpdateCainPortalCoordinates>::hook) return D2Seam<&ACT1Q4_UpdateCainPortalCoordinates>::hook(pGame, pUnit);
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A1Q4_CAIN);
 	if (!pQuestData)
 	{
@@ -2180,6 +2183,7 @@ int32_t __fastcall ACT1Q4_UpdateCainPortalCoordinates(D2GameStrc* pGame, D2UnitS
 // 1.13c D2Game+0x663A0
 void __fastcall ACT1Q4_SpawnCainPortalInTown(D2GameStrc* pGame)
 {
+	if (D2Seam<&ACT1Q4_SpawnCainPortalInTown>::hook) { D2Seam<&ACT1Q4_SpawnCainPortalInTown>::hook(pGame); return; }
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A1Q4_CAIN);
 	if (!pQuestData)
 	{

@@ -212,6 +212,7 @@ BOOL __fastcall DRLGOUTDOORS_TestOutdoorLevelPreset(D2DrlgLevelStrc* pLevel, int
 // 1.13c D2Common+0x42A70
 void __fastcall DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(D2DrlgLevelStrc* pLevel, int nX, int nY, int nLevelPrestId, int nPickedFile, BOOL bBorder)
 {
+	if (D2Seam<&DRLGOUTDOORS_SpawnOutdoorLevelPresetEx>::hook) { D2Seam<&DRLGOUTDOORS_SpawnOutdoorLevelPresetEx>::hook(pLevel, nX, nY, nLevelPrestId, nPickedFile, bBorder); return; }
 	D2LvlPrestTxt* pLvlPrestTxtRecord = NULL;
 	D2DrlgBuildStrc* pDrlgBuild = NULL;
 	int nSizeX = 0;
@@ -278,6 +279,7 @@ void __fastcall DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(D2DrlgLevelStrc* pLevel, 
 // 1.13c D2Common+0x42EB0
 BOOL __fastcall DRLGOUTDOORS_SpawnPresetFarAway(D2DrlgLevelStrc* pLevel, D2DrlgCoordStrc* pDrlgCoord, int nLvlPrestId, int nRand, int nOffset, char nFlags)
 {
+	if (D2Seam<&DRLGOUTDOORS_SpawnPresetFarAway>::hook) return D2Seam<&DRLGOUTDOORS_SpawnPresetFarAway>::hook(pLevel, pDrlgCoord, nLvlPrestId, nRand, nOffset, nFlags);
 	int nHeight = 0;
 	int nWidth = 0;
 	int nBaseX = 0;
@@ -360,6 +362,7 @@ BOOL __fastcall DRLGOUTDOORS_SpawnPresetFarAway(D2DrlgLevelStrc* pLevel, D2DrlgC
 // 1.13c D2Common+0x42CE0 (diffed line by line, tables byte-compared with the DLL)
 BOOL __fastcall DRLGOUTDOORS_SpawnOutdoorLevelPreset(D2DrlgLevelStrc* pLevel, int nLevelPrestId, int nRand, int nOffset, char nFlags)
 {
+	if (D2Seam<&DRLGOUTDOORS_SpawnOutdoorLevelPreset>::hook) return D2Seam<&DRLGOUTDOORS_SpawnOutdoorLevelPreset>::hook(pLevel, nLevelPrestId, nRand, nOffset, nFlags);
 	D2CoordStrc pCoord[256] = {};
 	int nWidth = 0;
 	int nRand1 = 0;
@@ -494,6 +497,7 @@ BOOL __fastcall DRLGOUTDOORS_SpawnRandomOutdoorDS1(D2DrlgLevelStrc* pLevel, int 
 // 1.13c D2Common+0x426A0 (disassembly diffed: same clamps, 0x20000 and 0x10000 marks, shuffle and seed rolls)
 void __fastcall DRLGOUTDOORS_SpawnAct12Waypoint(D2DrlgLevelStrc* pLevel)
 {
+	if (D2Seam<&DRLGOUTDOORS_SpawnAct12Waypoint>::hook) { D2Seam<&DRLGOUTDOORS_SpawnAct12Waypoint>::hook(pLevel); return; }
 	D2CoordStrc pCoord[256] = {};
 	int* pVisArray = NULL;
 	int nFlags = 0;
@@ -598,6 +602,7 @@ void __fastcall DRLGOUTDOORS_SpawnAct12Waypoint(D2DrlgLevelStrc* pLevel)
 // 1.13c D2Common+0x42460
 void __fastcall DRLGOUTDOORS_SpawnAct12Shrines(D2DrlgLevelStrc* pLevel, int nShrines)
 {
+	if (D2Seam<&DRLGOUTDOORS_SpawnAct12Shrines>::hook) { D2Seam<&DRLGOUTDOORS_SpawnAct12Shrines>::hook(pLevel, nShrines); return; }
 	static const int dword_6FDCF948[] =
 	{
 		0x1000, 0x2000, 0x4000, 0x8000
@@ -672,6 +677,7 @@ void __fastcall DRLGOUTDOORS_SpawnAct12Shrines(D2DrlgLevelStrc* pLevel, int nShr
 //TODO: a1
 void __fastcall DRLGOUTDOORS_AddAct124SecondaryBorder(D2DrlgLevelStrc* pLevel, int nLvlSubId, int nLevelPrestId)
 {
+	if (D2Seam<&DRLGOUTDOORS_AddAct124SecondaryBorder>::hook) { D2Seam<&DRLGOUTDOORS_AddAct124SecondaryBorder>::hook(pLevel, nLvlSubId, nLevelPrestId); return; }
 	D2UnkOutdoorStrc a1 = {};
 
 	a1.pLevel = pLevel;
@@ -1413,6 +1419,7 @@ void __fastcall sub_6FD7F810(D2DrlgLevelStrc* pLevel, int nVertexId)
 // 1.13c D2Common+0x86000 (level in ESI): the Act 4 fortress-transition preset at row 1 and/or row 4, by the outdoor flags
 void __fastcall DRLGOUTDOORS_PlaceAct4FortressTransition(D2DrlgLevelStrc* pLevel)
 {
+	if (D2Seam<&DRLGOUTDOORS_PlaceAct4FortressTransition>::hook) { D2Seam<&DRLGOUTDOORS_PlaceAct4FortressTransition>::hook(pLevel); return; }
 	if (pLevel->pOutdoors->dwFlags & 0x400000)
 	{
 		D2_CALL(DRLGOUTDOORS_SpawnOutdoorLevelPresetEx, pLevel, 0, 1, LVLPREST_ACT4_FORTRESS_TRANSITION, -1, FALSE);

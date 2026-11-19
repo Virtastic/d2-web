@@ -1,4 +1,5 @@
 #include "Drlg/D2DrlgOutWild.h"
+#include <test_seam.h>
 
 #include "Drlg/D2DrlgDrlg.h"
 #include "Drlg/D2DrlgDrlgGrid.h"
@@ -220,6 +221,7 @@ void DRLGOUTWILD_SpawnRiverPreset(D2DrlgLevelStrc* pLevel, int nX, int nY, bool 
 //D2Common.0x6FD850B0
 void __fastcall DRLGOUTWILD_SpawnRiver(D2DrlgLevelStrc* pLevel, int nX)
 {
+	if (D2Seam<&DRLGOUTWILD_SpawnRiver>::hook) { D2Seam<&DRLGOUTWILD_SpawnRiver>::hook(pLevel, nX); return; }
 	for (int nY = 0; nY < pLevel->pOutdoors->nGridHeight; ++nY)
 	{
 		DRLGOUTWILD_SpawnRiverPreset(pLevel, nX, nY, false);

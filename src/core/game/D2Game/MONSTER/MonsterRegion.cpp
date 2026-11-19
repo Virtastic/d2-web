@@ -1,4 +1,5 @@
 #include "MONSTER/MonsterRegion.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -146,6 +147,7 @@ D2Spawn47450Seam g_d2Spawn47450;
 // 1.13c D2Game+0x47450
 int32_t __fastcall sub_6FC66260(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t nSuperUniqueId, int32_t* pX, int32_t* pY, int32_t a7)
 {
+	if (D2Seam<&sub_6FC66260>::hook) return D2Seam<&sub_6FC66260>::hook(pGame, pRoom, pRoomCoordList, nSuperUniqueId, pX, pY, a7);
     int32_t nLeft = 0;
     int32_t nTop = 0;
     int32_t nRight = 0;
@@ -655,6 +657,7 @@ D2UnitStrc* __fastcall D2GAME_SpawnPresetMonster_6FC66560(D2GameStrc* pGame, D2A
 // 1.13c D2Game+0x1320
 D2MonStats2Txt* __fastcall MONSTERREGION_GetMonStats2TxtRecord(int32_t nMonsterId)
 {
+	if (D2Seam<&MONSTERREGION_GetMonStats2TxtRecord>::hook) return D2Seam<&MONSTERREGION_GetMonStats2TxtRecord>::hook(nMonsterId);
     if (nMonsterId >= 0 && nMonsterId < sgptDataTables->nMonStatsTxtRecordCount)
     {
         const int32_t nMonStatsEx = sgptDataTables->pMonStatsTxt[nMonsterId].wMonStatsEx;
@@ -685,6 +688,7 @@ uint32_t __fastcall MONSTERREGION_CheckMonStats2Flag(int32_t nMonsterId, int32_t
 // 1.13c D2Game+0x1850: same body (range check -> id or -1; 24 bytes)
 int32_t __fastcall MONSTERREGION_SanitizeMonsterId(int32_t nMonsterId)
 {
+	if (D2Seam<&MONSTERREGION_SanitizeMonsterId>::hook) return D2Seam<&MONSTERREGION_SanitizeMonsterId>::hook(nMonsterId);
     if (nMonsterId >= 0 && nMonsterId < sgptDataTables->nMonStatsTxtRecordCount)
     {
         return nMonsterId;

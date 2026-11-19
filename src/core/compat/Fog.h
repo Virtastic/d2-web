@@ -2,6 +2,7 @@
 // (pools are ignored), asserts abort, warnings print. Structs copied verbatim from the 1.10f source.
 #pragma once
 #include <D2Dll.h>
+#include <test_seam.h>
 #include <D2BuildInformation.h>   // D2_VERSION_* / D2_VERSION_HAS_UBERS everywhere, like the 1.10f source's CMake does
 #include <D2BasicTypes.h>
 #include <StormHandles.h>
@@ -90,7 +91,8 @@ inline void  FOG_Free(void* p, const char*, int, int) { free(p); }
 #define D2_LOCK(pCriticalSection) D2_ASSERT(pCriticalSection); FOG_10050_EnterCriticalSection(pCriticalSection, __LINE__);
 extern "C" int d2_trace_level;   // d2-web: level id that D2_MONS_TRACE prints for (set by the monspawn driver)
 #define D2_UNLOCK(pCriticalSection) D2_ASSERT(pCriticalSection); (void)0;
-inline uint32_t FOG_LeadingZeroesCount(uint32_t v) { return v ? 31u - (uint32_t)__builtin_clz(v) : (uint32_t)-1; }   // Fog #10252: bsr -- index of the highest set bit, -1 for 0 (callers loop while >= 0)
+inline uint32_t FOG_LeadingZeroesCount(uint32_t v) {
+	if (D2Seam<&FOG_LeadingZeroesCount>::hook) { return D2Seam<&FOG_LeadingZeroesCount>::hook(v); } return v ? 31u - (uint32_t)__builtin_clz(v) : (uint32_t)-1; }   // Fog #10252: bsr -- index of the highest set bit, -1 for 0 (callers loop while >= 0)
 float FOG_10083_Cos_LUT(int16_t i);   // Fog #10083/#10084: 512-entry unit-circle tables (stubs.cpp; TODO extract the exact floats from Fog.dll)
 float FOG_10084_Sin_LUT(int16_t i);
 inline int32_t FOG_10055_GetSyncTime() { return 0; }   // Fog #10055: server sync timer, no clock here

@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <test_seam.h>
 #include <cstring>
 #include <Fog.h>
 
@@ -9,6 +10,7 @@
 // Frees the held save header through the game's memory pool and resets the header size, sent-bytes and the +0x184 word; clears flag 0x10.
 void __fastcall CLIENTS_FreeSaveHeader(D2ClientStrc* pClient)
 {
+	if (D2Seam<&CLIENTS_FreeSaveHeader>::hook) { D2Seam<&CLIENTS_FreeSaveHeader>::hook(pClient); return; }
 	D2_ASSERT(pClient);
 
 	if (pClient->pSaveHeader)

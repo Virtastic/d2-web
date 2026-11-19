@@ -148,6 +148,7 @@ void __stdcall COLLISION_ResetMask(D2ActiveRoomStrc* pRoom, int nX, int nY, uint
 // 1.13c D2Common+0x4C080
 uint16_t __stdcall COLLISION_CheckMaskWithSizeXY(D2ActiveRoomStrc* pRoom, int nX, int nY, unsigned int nSizeX, unsigned int nSizeY, uint16_t nMask)
 {
+	if (D2Seam<&COLLISION_CheckMaskWithSizeXY>::hook) return D2Seam<&COLLISION_CheckMaskWithSizeXY>::hook(pRoom, nX, nY, nSizeX, nSizeY, nMask);
 	D2BoundingBoxStrc pBoundingBox = {};
 
 	if ((int)nSizeX <= 1 && (int)nSizeY <= 1)
@@ -609,6 +610,7 @@ BOOL __fastcall COLLISION_CheckAnyCollisionWithAdjacentCells(D2ActiveRoomStrc* p
 // 1.13c D2Common+0x4CE00
 uint16_t __stdcall COLLISION_CheckMaskWithSize(D2ActiveRoomStrc* pRoom, int nX, int nY, int nUnitSize, uint16_t nMask)
 {
+	if (D2Seam<&COLLISION_CheckMaskWithSize>::hook) return D2Seam<&COLLISION_CheckMaskWithSize>::hook(pRoom, nX, nY, nUnitSize, nMask);
 	D2BoundingBoxStrc pBoundingBox = {};
 
 	switch (nUnitSize)
@@ -633,6 +635,7 @@ uint16_t __stdcall COLLISION_CheckMaskWithSize(D2ActiveRoomStrc* pRoom, int nX, 
 // 1.13c D2Common+0x4BFC0
 void __stdcall COLLISION_SetMaskWithSize(D2ActiveRoomStrc* pRoom, int nX, int nY, int nUnitSize, uint16_t nMask)
 {
+	if (D2Seam<&COLLISION_SetMaskWithSize>::hook) { D2Seam<&COLLISION_SetMaskWithSize>::hook(pRoom, nX, nY, nUnitSize, nMask); return; }
 	D2BoundingBoxStrc pBoundingBox = {};
 
 	switch (nUnitSize)
@@ -702,6 +705,7 @@ void __fastcall COLLISION_SetCollisionMaskForBoundingBoxRecursively(D2ActiveRoom
 // 1.13c D2Common+0x4BE90
 void __stdcall COLLISION_SetMaskWithPattern(D2ActiveRoomStrc* pRoom, int nX, int nY, int nCollisionPattern, uint16_t nMask)
 {
+	if (D2Seam<&COLLISION_SetMaskWithPattern>::hook) { D2Seam<&COLLISION_SetMaskWithPattern>::hook(pRoom, nX, nY, nCollisionPattern, nMask); return; }
 	D2BoundingBoxStrc tBoundingBox = {};
 
 	switch (nCollisionPattern)
@@ -777,6 +781,7 @@ void __stdcall COLLISION_SetMaskWithPattern(D2ActiveRoomStrc* pRoom, int nX, int
 // 1.13c D2Common+0x4BE10
 void __stdcall COLLISION_ResetMaskWithSize(D2ActiveRoomStrc* pRoom, int nX, int nY, int nUnitSize, uint16_t nMask)
 {
+	if (D2Seam<&COLLISION_ResetMaskWithSize>::hook) { D2Seam<&COLLISION_ResetMaskWithSize>::hook(pRoom, nX, nY, nUnitSize, nMask); return; }
 	D2BoundingBoxStrc pBoundingBox = {};
 
 	if (pRoom)
@@ -861,6 +866,7 @@ void COLLISION_ResetSmallUnitPresence(D2ActiveRoomStrc* pRoom, int nX, int nY, u
 // 1.13c D2Common+0x4BCF0
 void __stdcall COLLISION_ResetMaskWithPattern(D2ActiveRoomStrc* pRoom, int nX, int nY, int nCollisionPattern, uint16_t nMask)
 {
+	if (D2Seam<&COLLISION_ResetMaskWithPattern>::hook) { D2Seam<&COLLISION_ResetMaskWithPattern>::hook(pRoom, nX, nY, nCollisionPattern, nMask); return; }
 	D2BoundingBoxStrc pBoundingBox = {};
 
 	if (pRoom)
@@ -1048,6 +1054,7 @@ uint16_t __fastcall COLLISION_TryTeleportUnitCollisionMask(D2ActiveRoomStrc* pRo
 // 1.13c D2Common+0x4D5C0 (checks with CheckAnyCollisionWithPattern, not CheckMaskWithPattern)
 int __fastcall COLLISION_TrySetUnitCollisionMask(D2ActiveRoomStrc* pRoom1, int nX1, int nY1, D2ActiveRoomStrc* pRoom2, int nX2, int nY2, int nCollisionPattern, uint16_t nFootprintCollisionMask, uint16_t nMoveConditionMask)
 {
+	if (D2Seam<&COLLISION_TrySetUnitCollisionMask>::hook) return D2Seam<&COLLISION_TrySetUnitCollisionMask>::hook(pRoom1, nX1, nY1, pRoom2, nX2, nY2, nCollisionPattern, nFootprintCollisionMask, nMoveConditionMask);
 	if (pRoom1)
 	{
 		COLLISION_ResetMaskWithPattern(pRoom1, nX1, nY1, nCollisionPattern, nFootprintCollisionMask);
@@ -1072,6 +1079,7 @@ int __fastcall COLLISION_TrySetUnitCollisionMask(D2ActiveRoomStrc* pRoom1, int n
 //D2Common.0x6FD451D0 (#10133)
 void __fastcall COLLISION_SetUnitCollisionMask(D2ActiveRoomStrc* pRoom1, int nX1, int nY1, D2ActiveRoomStrc* pRoom2, int nX2, int nY2, int nCollisionPattern, uint16_t nCollisionMask)
 {
+	if (D2Seam<&COLLISION_SetUnitCollisionMask>::hook) { D2Seam<&COLLISION_SetUnitCollisionMask>::hook(pRoom1, nX1, nY1, pRoom2, nX2, nY2, nCollisionPattern, nCollisionMask); return; }
 	if (pRoom1)
 	{
 		COLLISION_ResetMaskWithPattern(pRoom1, nX1, nY1, nCollisionPattern, nCollisionMask);
@@ -1405,6 +1413,7 @@ D2ActiveRoomStrc* __stdcall COLLISION_GetFreeCoordinatesWithMaxDistance(D2Active
 // 1.13c: as 1.10f, every lookup that finds a room stores it as the base of the next one (start cell, both scans, final).
 D2ActiveRoomStrc* __fastcall COLLISION_GetFreeCoordinatesImpl(D2ActiveRoomStrc* pRoom, D2CoordStrc* ptSpawnPoint, D2CoordStrc* pFieldCoord, int nUnitSize, unsigned int nMask, unsigned int nFieldMask, BOOL bAllowNeighborRooms, int nMaxDistance, int nPosIncrementValue)
 {
+	if (D2Seam<&COLLISION_GetFreeCoordinatesImpl>::hook) return D2Seam<&COLLISION_GetFreeCoordinatesImpl>::hook(pRoom, ptSpawnPoint, pFieldCoord, nUnitSize, nMask, nFieldMask, bAllowNeighborRooms, nMaxDistance, nPosIncrementValue);
 	D2FieldStrc* pField = NULL;
 	D2ActiveRoomStrc* v10 = NULL;
 	D2ActiveRoomStrc* pTemp = NULL;
@@ -1663,6 +1672,7 @@ D2ActiveRoomStrc* __stdcall COLLISION_GetFreeCoordinates(D2ActiveRoomStrc* pRoom
 //1.13c: D2Common.0x6FD9D810 (#11049)
 D2ActiveRoomStrc* __stdcall COLLISION_GetFreeCoordinatesEx(D2ActiveRoomStrc* pRoom, D2CoordStrc* pSpawnPoint, int nUnitSize, unsigned int nMask, int nPosIncrementValue)
 {
+	if (D2Seam<&COLLISION_GetFreeCoordinatesEx>::hook) return D2Seam<&COLLISION_GetFreeCoordinatesEx>::hook(pRoom, pSpawnPoint, nUnitSize, nMask, nPosIncrementValue);
 	return COLLISION_GetFreeCoordinatesImpl(pRoom, pSpawnPoint, NULL, nUnitSize, nMask, nMask, FALSE, 50, nPosIncrementValue);
 }
 
@@ -1670,6 +1680,7 @@ D2ActiveRoomStrc* __stdcall COLLISION_GetFreeCoordinatesEx(D2ActiveRoomStrc* pRo
 // 1.13c D2Common+0x4D7E0 (max distance 50, step 1)
 D2ActiveRoomStrc* __stdcall COLLISION_GetFreeCoordinatesWithField(D2ActiveRoomStrc* pRoom, D2CoordStrc* pSpawnPoint, D2CoordStrc* pFieldCoord, int nUnitSize, unsigned int nMask, unsigned int nFieldMask, BOOL bAllowNeighborRooms)
 {
+	if (D2Seam<&COLLISION_GetFreeCoordinatesWithField>::hook) return D2Seam<&COLLISION_GetFreeCoordinatesWithField>::hook(pRoom, pSpawnPoint, pFieldCoord, nUnitSize, nMask, nFieldMask, bAllowNeighborRooms);
 	return D2_CALL(COLLISION_GetFreeCoordinatesImpl, pRoom, pSpawnPoint, pFieldCoord, nUnitSize, nMask, nFieldMask, bAllowNeighborRooms, 50, 1);
 }
 
@@ -1753,5 +1764,6 @@ void __fastcall D2Common_10136(D2ActiveRoomStrc* pRoom, D2CoordStrc* pCoord, int
 // 1.13c D2Common+0x1330 (body is DUNGEON_GetRoomAtPosition)
 D2ActiveRoomStrc* __fastcall COLLISION_GetRoomBySubTileCoordinates(D2ActiveRoomStrc* pRoom, int nX, int nY)
 {
+	if (D2Seam<&COLLISION_GetRoomBySubTileCoordinates>::hook) return D2Seam<&COLLISION_GetRoomBySubTileCoordinates>::hook(pRoom, nX, nY);
 	return DUNGEON_GetRoomAtPosition(pRoom, nX, nY);
 }

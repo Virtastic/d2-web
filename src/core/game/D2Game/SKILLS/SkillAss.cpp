@@ -184,7 +184,8 @@ void __fastcall SKILLS_StatRemoveCallback_ProgressiveStrike(D2UnitStrc* pUnit, i
 //D2Game.0x6FCF52F0
 // 1.13c D2Game+0x95690 (charge-state block outlined to +0x95370; checked against the disassembly, no delta)
 int32_t __fastcall SKILLS_SrvDo034_TigerStrike_CobraStrike_RoyalStrike(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
-{    
+{
+	if (D2Seam<&SKILLS_SrvDo034_TigerStrike_CobraStrike_RoyalStrike>::hook) return D2Seam<&SKILLS_SrvDo034_TigerStrike_CobraStrike_RoyalStrike>::hook(pGame, pUnit, nSkillId, nSkillLevel);    
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
     if (!pTarget)
     {
@@ -434,6 +435,7 @@ void __fastcall sub_6FCF5870(D2UnitStrc* pUnit, D2DamageStrc* pDamage)
 // not-1.13c: retail inlines this range check at its callers (seen at D2Game+0x4C1C0, +0x4C3A0, +0x4CB00, +0x91340)
 D2SkillsTxt* __fastcall SKILLS_GetSkillsTxtRecord(int32_t nSkillId)
 {
+	if (D2Seam<&SKILLS_GetSkillsTxtRecord>::hook) return D2Seam<&SKILLS_GetSkillsTxtRecord>::hook(nSkillId);
     if (nSkillId >= 0 && nSkillId < sgptDataTables->nSkillsTxtRecordCount)
     {
         return &sgptDataTables->pSkillsTxt[nSkillId];
@@ -1217,6 +1219,7 @@ void __fastcall sub_6FCF7BC0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
 // 1.13c D2Game+0x92360 (checked against the disassembly, no delta)
 void __fastcall sub_6FCF7CE0(D2GameStrc* pGame, D2DamageStrc* pDamage, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t nSkillId, int32_t nSkillLevel)
 {
+	if (D2Seam<&sub_6FCF7CE0>::hook) { D2Seam<&sub_6FCF7CE0>::hook(pGame, pDamage, pUnit, pTarget, nSkillId, nSkillLevel); return; }
     sub_6FCF5680(pUnit, pDamage);
     pDamage->dwHitFlags |= 3u;
 

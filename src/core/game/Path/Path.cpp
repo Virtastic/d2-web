@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <test_seam.h>
 #include <cstddef>
 #include "Path/Path.h"
 
@@ -424,6 +425,7 @@ uint8_t PATH_UpdateTargetUnit(D2PathInfoStrc* pPathInfo)
 // 1.13c D2Common+0x36230 (#10334)
 int __stdcall D2Common_10142(D2DynamicPathStrc* pPath, D2UnitStrc* pUnit, int bAllowInTown)
 {
+	if (D2Seam<&D2Common_10142>::hook) return D2Seam<&D2Common_10142>::hook(pPath, pUnit, bAllowInTown);
 	if (!pPath)
 	{
 		return 0;
@@ -564,6 +566,7 @@ int __stdcall D2Common_10142(D2DynamicPathStrc* pPath, D2UnitStrc* pUnit, int bA
 // 1.13c D2Common+0x35530: a target 100+ tiles away on either axis is refused (returns 0), not asserted.
 int __fastcall PATH_ComputePathClassicMissile(D2DynamicPathStrc* pDynamicPath)
 {
+	if (D2Seam<&PATH_ComputePathClassicMissile>::hook) return D2Seam<&PATH_ComputePathClassicMissile>::hook(pDynamicPath);
 	D2CoordStrc pCoords = {};
 
 	pDynamicPath->dwCurrentPointIdx = 0;
@@ -1050,6 +1053,7 @@ int __stdcall PATH_GetAcceleration(D2DynamicPathStrc* pDynamicPath)
 // 1.13c D2Common+0x34CB0
 void __stdcall D2Common_10153(D2DynamicPathStrc* pDynamicPath)
 {
+	if (D2Seam<&D2Common_10153>::hook) { D2Seam<&D2Common_10153>::hook(pDynamicPath); return; }
 	pDynamicPath->dwFlags &= (~PATH_UNKNOWN_FLAG_0x00020);
 	pDynamicPath->dwPathPoints = 0;
 }
@@ -1081,6 +1085,7 @@ BOOL __stdcall D2COMMON_10209_PathCheckPathingFlag(D2DynamicPathStrc* pDynamicPa
 // 1.13c D2Common+0x34C60
 int __stdcall PATH_GetNumberOfPathPoints(D2DynamicPathStrc* pDynamicPath)
 {
+	if (D2Seam<&PATH_GetNumberOfPathPoints>::hook) return D2Seam<&PATH_GetNumberOfPathPoints>::hook(pDynamicPath);
 	return pDynamicPath->dwPathPoints;
 }
 
@@ -1158,6 +1163,7 @@ void __stdcall PATH_SetDirection(D2DynamicPathStrc* pDynamicPath, uint8_t nDirec
 // 1.13c D2Common+0x34BB0
 int __stdcall PATH_GetXPosition(D2DynamicPathStrc* pDynamicPath)
 {
+	if (D2Seam<&PATH_GetXPosition>::hook) return D2Seam<&PATH_GetXPosition>::hook(pDynamicPath);
 	D2_ASSERT(pDynamicPath);
 
 	return pDynamicPath->tGameCoords.wPosX;
@@ -1167,6 +1173,7 @@ int __stdcall PATH_GetXPosition(D2DynamicPathStrc* pDynamicPath)
 // 1.13c D2Common+0x34B80
 int __stdcall PATH_GetYPosition(D2DynamicPathStrc* pDynamicPath)
 {
+	if (D2Seam<&PATH_GetYPosition>::hook) return D2Seam<&PATH_GetYPosition>::hook(pDynamicPath);
 	D2_ASSERT(pDynamicPath);
 
 	return pDynamicPath->tGameCoords.wPosY;
@@ -1223,6 +1230,7 @@ int __stdcall PATH_GetClientCoordY(D2DynamicPathStrc* pDynamicPath)
 // 1.13c D2Common+0x34AB0
 int __stdcall D2COMMON_10175_PathGetFirstPointX(D2DynamicPathStrc* pDynamicPath)
 {
+	if (D2Seam<&D2COMMON_10175_PathGetFirstPointX>::hook) return D2Seam<&D2COMMON_10175_PathGetFirstPointX>::hook(pDynamicPath);
 	return pDynamicPath->tTargetCoord.X;
 }
 
@@ -1231,6 +1239,7 @@ int __stdcall D2COMMON_10175_PathGetFirstPointX(D2DynamicPathStrc* pDynamicPath)
 // 1.13c D2Common+0x34AA0
 int __stdcall D2COMMON_10176_PathGetFirstPointY(D2DynamicPathStrc* pDynamicPath)
 {
+	if (D2Seam<&D2COMMON_10176_PathGetFirstPointY>::hook) return D2Seam<&D2COMMON_10176_PathGetFirstPointY>::hook(pDynamicPath);
 	return pDynamicPath->tTargetCoord.Y;
 }
 
@@ -1254,6 +1263,7 @@ int __stdcall D2Common_10225(D2DynamicPathStrc* pDynamicPath)
 // 1.13c D2Common+0x34A60
 int __stdcall D2COMMON_10177_PATH_GetLastPointX(D2DynamicPathStrc* pDynamicPath)
 {
+	if (D2Seam<&D2COMMON_10177_PATH_GetLastPointX>::hook) return D2Seam<&D2COMMON_10177_PATH_GetLastPointX>::hook(pDynamicPath);
 	if (pDynamicPath->dwPathPoints > 0)
 	{
 		return pDynamicPath->PathPoints[pDynamicPath->dwPathPoints-1].X;
@@ -1266,6 +1276,7 @@ int __stdcall D2COMMON_10177_PATH_GetLastPointX(D2DynamicPathStrc* pDynamicPath)
 // 1.13c D2Common+0x34A40
 int __stdcall D2COMMON_10178_PATH_GetLastPointY(D2DynamicPathStrc* pDynamicPath)
 {
+	if (D2Seam<&D2COMMON_10178_PATH_GetLastPointY>::hook) return D2Seam<&D2COMMON_10178_PATH_GetLastPointY>::hook(pDynamicPath);
 	if (pDynamicPath->dwPathPoints > 0)
 	{
 		return pDynamicPath->PathPoints[pDynamicPath->dwPathPoints-1].Y;
@@ -1307,6 +1318,7 @@ void __stdcall PATH_ClearNextRoom(D2DynamicPathStrc* pDynamicPath)
 // 1.13c D2Common+0x349D0
 void __stdcall D2COMMON_10170_PathSetTargetPos(D2DynamicPathStrc* pDynamicPath, int nX, int nY)
 {
+	if (D2Seam<&D2COMMON_10170_PathSetTargetPos>::hook) { D2Seam<&D2COMMON_10170_PathSetTargetPos>::hook(pDynamicPath, nX, nY); return; }
 	if (pDynamicPath)
 	{
 		pDynamicPath->tTargetCoord.X = nX;
@@ -1363,6 +1375,7 @@ BOOL __stdcall PATH_GetUnusedFlag_0x00004(D2DynamicPathStrc* pDynamicPath)
 //D2Common.0x6FDA9F40 (#10179)
 void __stdcall PATH_SetTargetUnit(D2DynamicPathStrc* pDynamicPath, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&PATH_SetTargetUnit>::hook) { D2Seam<&PATH_SetTargetUnit>::hook(pDynamicPath, pUnit); return; }
 	pDynamicPath->pTargetUnit = pUnit;
 
 	if (pUnit)
@@ -1386,6 +1399,7 @@ void __stdcall PATH_GetTargetTypeAndGUID(D2DynamicPathStrc* pDynamicPath, int* p
 // 1.13c D2Common+0x348F0
 D2UnitStrc* __stdcall PATH_GetTargetUnit(D2DynamicPathStrc* pDynamicPath)
 {
+	if (D2Seam<&PATH_GetTargetUnit>::hook) return D2Seam<&PATH_GetTargetUnit>::hook(pDynamicPath);
 	if (pDynamicPath)
 	{
 		return pDynamicPath->pTargetUnit;
@@ -1456,6 +1470,7 @@ void __stdcall PATH_SetMoveTestCollisionMask(D2DynamicPathStrc* pDynamicPath, in
 // 1.13c D2Common+0x34F80
 void __stdcall PATH_SetType(D2DynamicPathStrc* pDynamicPath, int nPathType)
 {
+	if (D2Seam<&PATH_SetType>::hook) { D2Seam<&PATH_SetType>::hook(pDynamicPath, nPathType); return; }
 
 	D2_ASSERT(!(pDynamicPath->pUnit && pDynamicPath->pUnit->dwUnitType == UNIT_PLAYER && nPathType == PATHTYPE_TOWARD));
 
@@ -1483,6 +1498,7 @@ void __stdcall PATH_SetType(D2DynamicPathStrc* pDynamicPath, int nPathType)
 // 1.13c D2Common+0x35210
 void __stdcall PATH_ResetToPreviousType(D2DynamicPathStrc* pDynamicPath)
 {
+	if (D2Seam<&PATH_ResetToPreviousType>::hook) { D2Seam<&PATH_ResetToPreviousType>::hook(pDynamicPath); return; }
 	D2_ASSERT(pDynamicPath->pUnit);
 
 	if (pDynamicPath->dwFlags & PATH_WITH_PREVIOUS_VELOCITY)
@@ -1507,6 +1523,7 @@ void __stdcall PATH_ResetToPreviousType(D2DynamicPathStrc* pDynamicPath)
 // 1.13c D2Common+0x348A0
 int __stdcall PATH_GetType(D2DynamicPathStrc* pDynamicPath)
 {
+	if (D2Seam<&PATH_GetType>::hook) return D2Seam<&PATH_GetType>::hook(pDynamicPath);
 	return pDynamicPath->dwPathType;
 }
 
@@ -1530,6 +1547,7 @@ uint8_t __stdcall D2COMMON_10191_PATH_GetDistance(D2DynamicPathStrc* pDynamicPat
 //D2Common.0x6FDAA280 (#10188)
 void __stdcall PATH_SetNewDistance(D2DynamicPathStrc* pDynamicPath, uint8_t nNewDistance)
 {
+	if (D2Seam<&PATH_SetNewDistance>::hook) { D2Seam<&PATH_SetNewDistance>::hook(pDynamicPath, nNewDistance); return; }
 	if (pDynamicPath)
 	{
 		if (nNewDistance >= (D2DynamicPathStrc::MAXPATHLEN - 1))
@@ -1546,6 +1564,7 @@ void __stdcall PATH_SetNewDistance(D2DynamicPathStrc* pDynamicPath, uint8_t nNew
 // 1.13c D2Common+0x34860
 uint8_t __stdcall PATH_GetMaxDistance(D2DynamicPathStrc* pDynamicPath)
 {
+	if (D2Seam<&PATH_GetMaxDistance>::hook) return D2Seam<&PATH_GetMaxDistance>::hook(pDynamicPath);
 	return pDynamicPath->nDistMax;
 }
 
@@ -1651,6 +1670,7 @@ void __stdcall D2COMMON_10204_PATH_ClearPoint2(D2DynamicPathStrc* pDynamicPath)
 // 1.13c D2Common+0x346A0
 void __stdcall PATH_SetStepNum(D2DynamicPathStrc* pDynamicPath, uint8_t nSteps)
 {
+	if (D2Seam<&PATH_SetStepNum>::hook) { D2Seam<&PATH_SetStepNum>::hook(pDynamicPath, nSteps); return; }
 	if (pDynamicPath)
 	{
 		if (nSteps > 0 && nSteps < PATH_MAX_STEPNUM)
@@ -1786,6 +1806,7 @@ int32_t __stdcall D2Common_10213(D2UnitStrc* pUnit, int32_t nEntryEax)
 // 1.13c D2Common+0x34580
 int __stdcall PATH_ComputeSquaredDistance(int nX1, int nY1, int nX2, int nY2)
 {
+	if (D2Seam<&PATH_ComputeSquaredDistance>::hook) return D2Seam<&PATH_ComputeSquaredDistance>::hook(nX1, nY1, nX2, nY2);
 	const int deltaX = (nX2 - nX1);
 	const int deltaY = (nY2 - nY1);
 	return deltaX * deltaX + deltaY * deltaY;

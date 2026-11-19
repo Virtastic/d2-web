@@ -260,6 +260,7 @@ D2UnitStrc* __fastcall OBJECTS_SpawnPresetObject(D2GameStrc* pGame, D2ActiveRoom
 // 1.13c D2Game+0x2F300
 void __fastcall OBJECTS_InitHandler(D2GameStrc* pGame, D2UnitStrc* pObject, int32_t nUnitId, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY)
 {
+	if (D2Seam<&OBJECTS_InitHandler>::hook) { D2Seam<&OBJECTS_InitHandler>::hook(pGame, pObject, nUnitId, pRoom, nX, nY); return; }
     constexpr ObjInitFunction gpObjectInitFnTable[] =
     {
         nullptr,
@@ -1985,6 +1986,7 @@ int32_t __fastcall OBJECTS_SpawnArmorStand(D2GameStrc* pGame, D2ActiveRoomStrc* 
 // the object-control seed picks table[rand + 2 * bWeaponRack], placement is retail's 0x2E660 helper, the alloc inlined; no delta)
 void __fastcall OBJECTS_SpawnArmorStandOrWeaponRack(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2DrlgCoordsStrc* pDrlgCoords, int32_t bWeaponRack)
 {
+	if (D2Seam<&OBJECTS_SpawnArmorStandOrWeaponRack>::hook) { D2Seam<&OBJECTS_SpawnArmorStandOrWeaponRack>::hook(pGame, pRoom, pDrlgCoords, bWeaponRack); return; }
     constexpr int32_t nObjectIds[4] =
     {
         OBJECT_ARMOR_STAND_RIGHT, OBJECT_ARMOR_STAND_LEFT, OBJECT_WEAPON_RACK_RIGHT, OBJECT_WEAPON_RACK_LEFT
@@ -2256,6 +2258,7 @@ void __fastcall OBJECTS_RemoveAll(D2GameStrc* pGame)
 // 1.13c D2Game+0x2E4F0
 void __fastcall OBJECTS_SetUnitIdInTimerArg(D2UnitStrc* pPortal, int32_t nUnitId)
 {
+	if (D2Seam<&OBJECTS_SetUnitIdInTimerArg>::hook) { D2Seam<&OBJECTS_SetUnitIdInTimerArg>::hook(pPortal, nUnitId); return; }
     D2TimerArgStrc* pTimerArg = D2_CALL(UNITS_GetTimerArg, pPortal);
     if (pTimerArg)
     {

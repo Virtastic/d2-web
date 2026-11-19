@@ -400,6 +400,7 @@ int __fastcall MONSTERS_GetActFromHirelingTxt(BOOL bExpansion, int nClassId, uin
 // 1.13c D2Common+0x2C990
 int __stdcall MONSTERS_GetHirelingExpForNextLevel(int nLevel, int nExpPerLevel)
 {
+	if (D2Seam<&MONSTERS_GetHirelingExpForNextLevel>::hook) return D2Seam<&MONSTERS_GetHirelingExpForNextLevel>::hook(nLevel, nExpPerLevel);
 	return nExpPerLevel * nLevel * nLevel * (nLevel + 1);
 }
 
@@ -423,6 +424,7 @@ int __stdcall MONSTERS_GetHirelingResurrectionCost(D2UnitStrc* pHireling)
 // 1.13c D2Common+0x84C30 (unsigned index test: retail compares the index below 0x10 unsigned)
 int __stdcall D2COMMON_11068_GetCompInfo(D2UnitStrc* pMonster, int nComponent)
 {
+	if (D2Seam<&D2COMMON_11068_GetCompInfo>::hook) return D2Seam<&D2COMMON_11068_GetCompInfo>::hook(pMonster, nComponent);
 	D2MonStats2Txt* pMonStats2TxtRecord = NULL;
 
 	if (pMonster && pMonster->dwUnitType == UNIT_MONSTER && static_cast<unsigned int>(nComponent) < ARRAY_SIZE(pMonStats2TxtRecord->nComponentChoiceCounts))
@@ -1186,6 +1188,7 @@ uint8_t __stdcall MONSTERS_GetMaximalLightRadius(D2UnitStrc* pMonster)
 // 1.13c D2Common+0x1A770
 int __stdcall D2Common_11063(D2ActiveRoomStrc* pRoom, int nMonsterId)
 {
+	if (D2Seam<&D2Common_11063>::hook) return D2Seam<&D2Common_11063>::hook(pRoom, nMonsterId);
 	D2MonStatsTxt* pMonStatsTxtRecord = NULL;
 	D2LevelsTxt* pLevelsTxtRecord = NULL;
 	int nMonstersInChain = 0;

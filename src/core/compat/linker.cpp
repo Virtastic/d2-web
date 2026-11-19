@@ -10,6 +10,7 @@
 // reads data\global\excel\<name>.bin through ARCHIVE_ALLOC_BUFFER_AND_READ_FILE_TO_IT -- i.e. our
 // VFS -- so the only Fog pieces it needs are the D2BinFileStrc accessors below.
 #include <D2Common.h>
+#include <test_seam.h>
 #include <algorithm>
 #include <string>
 #include <vector>
@@ -25,7 +26,8 @@ std::string lower(const char* s) { std::string r(s ? s : ""); for (char& c : r) 
 }
 
 void* FOG_AllocLinker(const char*, int) { return new Linker(); }
-void  FOG_FreeLinker(void* p) { delete (Linker*)p; }
+void  FOG_FreeLinker(void* p) {
+	if (D2Seam<&FOG_FreeLinker>::hook) { D2Seam<&FOG_FreeLinker>::hook(p); return; } delete (Linker*)p; }
 
 int FOG_10215(void* p, int dwCode) {
     Linker* l = (Linker*)p; int idx = (int)l->names.size();
@@ -57,6 +59,7 @@ char* FOG_10255(void* p, int nId, int) {
 // 1.13c Fog+0x11E40 (#10214): a code linker's entry as text, its four code bytes with every space turned into NUL
 // ("bow " -> "bow"), then a NUL. Returns 1, or 0 for an index out of range.
 int FOG_GetStringFromLinkIndex(void* p, int nIndex, char* szString) {
+	if (D2Seam<&FOG_GetStringFromLinkIndex>::hook) return D2Seam<&FOG_GetStringFromLinkIndex>::hook(p, nIndex, szString);
     Linker* l = (Linker*)p;
     if (!l || nIndex < 0 || nIndex >= (int)l->names.size()) return 0;
     const std::string& s = l->names[nIndex];

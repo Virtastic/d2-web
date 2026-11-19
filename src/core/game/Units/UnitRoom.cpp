@@ -1,4 +1,5 @@
 #include "Units/UnitRoom.h"
+#include <test_seam.h>
 
 #include "D2Dungeon.h"
 #include "D2StatList.h"
@@ -74,12 +75,14 @@ int __stdcall UNITROOM_AddUnitToRoomEx(D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoo
 // 1.13c D2Common+0x66900
 int __stdcall UNITROOM_AddUnitToRoom(D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom)
 {
+	if (D2Seam<&UNITROOM_AddUnitToRoom>::hook) return D2Seam<&UNITROOM_AddUnitToRoom>::hook(pUnit, pRoom);
 	return UNITROOM_AddUnitToRoomEx(pUnit, pRoom, 1);
 }
 
 // 1.13c D2Common+0x665C0 (#10158)
 void __stdcall UNITROOM_RefreshUnit(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITROOM_RefreshUnit>::hook) { D2Seam<&UNITROOM_RefreshUnit>::hook(pUnit); return; }
 
 	D2_ASSERT(pUnit);
 
@@ -182,6 +185,7 @@ void UNITROOM_ResetDynamicPath(D2DynamicPathStrc* pPath)
 // 1.13c D2Common+0x668A0
 void __stdcall UNITROOM_UpdatePath(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITROOM_UpdatePath>::hook) { D2Seam<&UNITROOM_UpdatePath>::hook(pUnit); return; }
 	D2_ASSERT(pUnit);
 
 	switch (pUnit->dwUnitType)
@@ -232,6 +236,7 @@ void __stdcall UNITROOM_ClearUpdateQueue(D2ActiveRoomStrc* pRoom)
 //D2Common.0x6FDBD300 (#10386)
 void __stdcall UNITROOM_RemoveUnitFromRoom(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITROOM_RemoveUnitFromRoom>::hook) { D2Seam<&UNITROOM_RemoveUnitFromRoom>::hook(pUnit); return; }
 	D2UnitStrc** ppRoomUnit = NULL;
 	D2UnitStrc* pPreviousUnit = NULL;
 	D2UnitStrc* pRoomUnit = NULL;

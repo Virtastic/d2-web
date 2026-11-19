@@ -1,4 +1,5 @@
 #include <D2Seed.h>
+#include <test_seam.h>
 
 #include "Drlg/D2DrlgDrlg.h"
 #include "Drlg/D2DrlgDrlgLogic.h"
@@ -496,6 +497,7 @@ void __fastcall DRLGLOGIC_AllocCoordLists(D2DrlgRoomStrc* pDrlgRoom)
 // 1.13c D2Common+0x819C0 (ECX = tile y, EDX = room, stack = tile x); nX and nY are tile coordinates, -1 for no coord list
 int __fastcall DRLGLOGIC_GetRoomCoordListIndex(D2DrlgRoomStrc* pDrlgRoom, int nX, int nY)
 {
+	if (D2Seam<&DRLGLOGIC_GetRoomCoordListIndex>::hook) return D2Seam<&DRLGLOGIC_GetRoomCoordListIndex>::hook(pDrlgRoom, nX, nY);
 	D2RoomCoordListStrc* pRoomCoordList = sub_6FD77110(pDrlgRoom, nX, nY);
 
 	if (pRoomCoordList)

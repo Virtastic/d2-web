@@ -1,4 +1,5 @@
 #include "D2States.h"
+#include <test_seam.h>
 
 #include "D2DataTbls.h"
 #include "D2StatList.h"
@@ -29,6 +30,7 @@ __forceinline BOOL __fastcall STATES_CheckStateMaskByStateId(int nState, int nSt
 // 1.13c D2Common+0x34510
 void __stdcall STATES_ToggleState(D2UnitStrc* pUnit, int nState, BOOL bSet)
 {
+	if (D2Seam<&STATES_ToggleState>::hook) { D2Seam<&STATES_ToggleState>::hook(pUnit, nState, bSet); return; }
 	if (nState >= 0 && nState < sgptDataTables->nStatesTxtRecordCount)
 	{
 		D2Common_STATES_ToggleState_6FDB8900(pUnit, nState, bSet);
@@ -40,6 +42,7 @@ void __stdcall STATES_ToggleState(D2UnitStrc* pUnit, int nState, BOOL bSet)
 // 1.13c D2Common+0x33CD0 (the flag-word read is the register helper at 0x37DB0)
 BOOL __stdcall STATES_CheckState(D2UnitStrc* pUnit, int nState)
 {
+	if (D2Seam<&STATES_CheckState>::hook) return D2Seam<&STATES_CheckState>::hook(pUnit, nState);
 	if (pUnit && (pUnit->dwUnitType == UNIT_PLAYER || pUnit->dwUnitType == UNIT_MONSTER || pUnit->dwUnitType == UNIT_MISSILE) && nState >= 0 && nState < sgptDataTables->nStatesTxtRecordCount)
 	{
 		if (pUnit->pStatListEx && STATLIST_IsExtended(pUnit->pStatListEx))
@@ -55,6 +58,7 @@ BOOL __stdcall STATES_CheckState(D2UnitStrc* pUnit, int nState)
 //D2Common.0x6FDB45F0 (#10488)
 void __stdcall STATES_ToggleGfxStateFlag(D2UnitStrc* pUnit, int nState, BOOL bSet)
 {
+	if (D2Seam<&STATES_ToggleGfxStateFlag>::hook) { D2Seam<&STATES_ToggleGfxStateFlag>::hook(pUnit, nState, bSet); return; }
 	uint32_t* pGfxFlags = D2COMMON_STATES_GetListGfxFlags_6FDB8AC0(pUnit);
 
 	// 1.13c delta: a list without its state-flag array is left alone
@@ -261,6 +265,7 @@ BOOL __stdcall STATES_CheckStateMaskActiveOnUnit(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x33FE0
 BOOL __stdcall STATES_CheckStateMaskRemHitOnUnit(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&STATES_CheckStateMaskRemHitOnUnit>::hook) return D2Seam<&STATES_CheckStateMaskRemHitOnUnit>::hook(pUnit);
 	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_REMHIT);
 }
 
@@ -322,6 +327,7 @@ BOOL __stdcall STATES_CheckStateMaskCurableByStateId(int nState)
 // 1.13c D2Common+0x33AB0
 BOOL __stdcall STATES_CheckStateMaskStayDeathOnUnitByStateId(D2UnitStrc* pUnit, int nState)
 {
+	if (D2Seam<&STATES_CheckStateMaskStayDeathOnUnitByStateId>::hook) return D2Seam<&STATES_CheckStateMaskStayDeathOnUnitByStateId>::hook(pUnit, nState);
 	if (nState >= 0 && nState < sgptDataTables->nStatesTxtRecordCount)
 	{
 		if (pUnit && pUnit->dwUnitType == UNIT_MONSTER)
@@ -453,6 +459,7 @@ BOOL __stdcall STATES_CheckStateMaskLifeOnUnit(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x33D60
 BOOL __stdcall STATES_CheckStateMaskUdeadOnUnit(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&STATES_CheckStateMaskUdeadOnUnit>::hook) return D2Seam<&STATES_CheckStateMaskUdeadOnUnit>::hook(pUnit);
 	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_UDEAD);
 }
 

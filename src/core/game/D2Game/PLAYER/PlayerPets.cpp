@@ -53,6 +53,7 @@ void __fastcall PLAYERPETS_AllocPetList(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 // 1.13c D2Game+0x97730 (checked against decompile, no delta)
 void __fastcall D2GAME_KillPlayerPets_6FC7CD10(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
+	if (D2Seam<&D2GAME_KillPlayerPets_6FC7CD10>::hook) { D2Seam<&D2GAME_KillPlayerPets_6FC7CD10>::hook(pGame, pPlayer); return; }
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
     D2_ASSERT(pPlayerData);
 
@@ -232,6 +233,7 @@ void __fastcall sub_6FC7D150(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nPe
 // 1.13c D2Game+0x97B50
 void __fastcall sub_6FC7D260(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nPetGUID, int32_t a4)
 {
+	if (D2Seam<&sub_6FC7D260>::hook) { D2Seam<&sub_6FC7D260>::hook(pGame, pPlayer, nPetGUID, a4); return; }
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
     D2_ASSERT(pPlayerData);
 
@@ -362,6 +364,7 @@ void __fastcall sub_6FC7D470(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 // 1.13c D2Game+0x98070
 int32_t __fastcall sub_6FC7D5F0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pPet)
 {
+	if (D2Seam<&sub_6FC7D5F0>::hook) return D2Seam<&sub_6FC7D5F0>::hook(pGame, pPlayer, pPet);
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
     D2_ASSERT(pPlayerData);
 
@@ -631,6 +634,7 @@ void __fastcall sub_6FC7DBF0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 // 1.13c D2Game+0x96600
 int32_t __fastcall PLAYERPETS_GetPetTypeFromPetGUID(D2UnitStrc* pPlayer, int32_t nPetGUID)
 {
+	if (D2Seam<&PLAYERPETS_GetPetTypeFromPetGUID>::hook) return D2Seam<&PLAYERPETS_GetPetTypeFromPetGUID>::hook(pPlayer, nPetGUID);
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
     D2_ASSERT(pPlayerData);
 
@@ -721,6 +725,7 @@ int32_t __fastcall sub_6FC7DD90(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
 // 1.13c D2Game+0x96570
 D2PetInfoStrc* __fastcall PLAYERPETS_GetPetInfoFromPetGUID(D2UnitStrc* pUnit, int32_t nUnitGUID)
 {
+	if (D2Seam<&PLAYERPETS_GetPetInfoFromPetGUID>::hook) return D2Seam<&PLAYERPETS_GetPetInfoFromPetGUID>::hook(pUnit, nUnitGUID);
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pUnit);
     D2_ASSERT(pPlayerData);
 
@@ -751,6 +756,7 @@ D2PetInfoStrc* __fastcall PLAYERPETS_GetPetInfoFromPetGUID(D2UnitStrc* pUnit, in
 // 1.13c D2Game+0x96FA0 (checked against decompile; counters are indexed type-1 there, same slots)
 void __fastcall sub_6FC7DF40(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
+	if (D2Seam<&sub_6FC7DF40>::hook) { D2Seam<&sub_6FC7DF40>::hook(pGame, pPlayer); return; }
     if (!pPlayer || pPlayer->dwUnitType != UNIT_PLAYER)
     {
         return;
@@ -1007,6 +1013,7 @@ void __fastcall PLAYERPETS_IteratePets(D2GameStrc* pGame, D2UnitStrc* pPlayer, v
 // 1.13c D2Game+0x96A40 (checked against decompile, no delta)
 D2UnitStrc* __fastcall sub_6FC7E8B0(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nPetType, int32_t a4)
 {
+	if (D2Seam<&sub_6FC7E8B0>::hook) return D2Seam<&sub_6FC7E8B0>::hook(pGame, pPlayer, nPetType, a4);
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
     if (!pPlayerData)
     {

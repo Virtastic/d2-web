@@ -1,4 +1,5 @@
 #include "INVENTORY/InvMode.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -274,6 +275,7 @@ void __fastcall D2GAME_ResetSomeItemFlags_6FC415F0(D2GameStrc* pGame, D2UnitStrc
 // 1.13c D2Game+0x9B570
 int32_t __fastcall sub_6FC41660(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&sub_6FC41660>::hook) return D2Seam<&sub_6FC41660>::hook(pGame, pUnit);
     if (pUnit && (pUnit->dwFlagEx & 0x400000 || pUnit->dwFlagEx & 0x800000))
     {
         return 1;

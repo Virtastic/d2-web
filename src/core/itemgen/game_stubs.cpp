@@ -1,6 +1,7 @@
 // What the vendored D2Game code links against that no vendored subsystem provides yet: clients,
 // players, the D2Common path/environment pieces. Each goes away when its subsystem arrives.
 #include <D2Common.h>
+#include <test_seam.h>
 #include <D2DataTbls.h>
 #include <D2StatList.h>
 #include <D2Environment.h>
@@ -22,10 +23,12 @@ int32_t CLIENTS_CheckFlag(D2ClientStrc* pClient, uint16_t nFlag) {
 
 // GAME/Clients.cpp (not vendored: it is the client/packet layer)
 int32_t CLIENTS_GetUnitX(D2UnitStrc* u) {
+	if (D2Seam<&CLIENTS_GetUnitX>::hook) return D2Seam<&CLIENTS_GetUnitX>::hook(u);
     switch (u->dwUnitType) { case UNIT_OBJECT: case UNIT_ITEM: case UNIT_TILE: return u->pStaticPath ? u->pStaticPath->tGameCoords.nX : 0;
     default: return u->pDynamicPath ? u->pDynamicPath->tGameCoords.wPosX : 0; }   // retail: static for types 2, 4, 5, the dynamic path for every other type
 }
 int32_t CLIENTS_GetUnitY(D2UnitStrc* u) {
+	if (D2Seam<&CLIENTS_GetUnitY>::hook) return D2Seam<&CLIENTS_GetUnitY>::hook(u);
     switch (u->dwUnitType) { case UNIT_OBJECT: case UNIT_ITEM: case UNIT_TILE: return u->pStaticPath ? u->pStaticPath->tGameCoords.nY : 0;
     default: return u->pDynamicPath ? u->pDynamicPath->tGameCoords.wPosY : 0; }   // retail: static for types 2, 4, 5, the dynamic path for every other type
 }

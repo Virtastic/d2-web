@@ -499,6 +499,7 @@ static void __fastcall SUNITINACTIVE_RestoreInactiveRest(D2GameStrc* pGame, D2Ac
 // 1.13c D2Game+0x1DD0 (unit in EAX; null and monster-type tests, then monster data +0x2C)
 D2AiControlStrc* __fastcall AIGENERAL_GetAiControlFromUnit(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&AIGENERAL_GetAiControlFromUnit>::hook) return D2Seam<&AIGENERAL_GetAiControlFromUnit>::hook(pUnit);
 	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)
 	{
 		return pUnit->pMonsterData->pAiControl;
@@ -1115,6 +1116,7 @@ void __fastcall SUNITINACTIVE_DeleteSingleListNode(D2GameStrc* pGame, uint16_t n
 // 1.13c D2Game+0x1E960 (checked against decompile, no delta)
 D2InactiveUnitListStrc* __fastcall SUNITINACTIVE_GetListNodeFromActAndCoordinates(D2GameStrc* pGame, int32_t nAct, int32_t nX, int32_t nY, int32_t bAllocNewNode)
 {
+	if (D2Seam<&SUNITINACTIVE_GetListNodeFromActAndCoordinates>::hook) return D2Seam<&SUNITINACTIVE_GetListNodeFromActAndCoordinates>::hook(pGame, nAct, nX, nY, bAllocNewNode);
 	int32_t bFound = 0;
 
 	D2InactiveUnitListStrc* pCurrent = pGame->pInactiveUnitList[nAct];

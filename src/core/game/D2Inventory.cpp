@@ -507,6 +507,7 @@ D2ItemExtraDataStrc* __fastcall INVENTORY_GetItemExtraDataFromItem(D2UnitStrc* p
 // 1.13c D2Common+0x1E710
 D2InventoryStrc* __stdcall INVENTORY_AllocInventory(void* pMemPool, D2UnitStrc* pOwner)
 {
+	if (D2Seam<&INVENTORY_AllocInventory>::hook) return D2Seam<&INVENTORY_AllocInventory>::hook(pMemPool, pOwner);
 	if (!pMemPool && pOwner)
 	{
 		pMemPool = pOwner->pMemoryPool;
@@ -615,6 +616,7 @@ D2UnitStrc* __stdcall INVENTORY_RemoveItemFromInventory(D2InventoryStrc* pInvent
 // 1.13c D2Common+0x217F0
 BOOL __stdcall INVENTORY_PlaceItemInSocket(D2InventoryStrc* pInventory, D2UnitStrc* pItem, int nUnused)
 {
+	if (D2Seam<&INVENTORY_PlaceItemInSocket>::hook) return D2Seam<&INVENTORY_PlaceItemInSocket>::hook(pInventory, pItem, nUnused);
 	D2_MAYBE_UNUSED(nUnused);
 	if (!INVENTORY_GetPtrIfValid(pInventory))
 	{
@@ -680,6 +682,7 @@ BOOL __stdcall INVENTORY_PlaceItemInSocket(D2InventoryStrc* pInventory, D2UnitSt
 // 1.13c D2Common+0x1E190
 D2UnitStrc* __stdcall INVENTORY_GetFirstItem(D2InventoryStrc* pInventory)
 {
+	if (D2Seam<&INVENTORY_GetFirstItem>::hook) return D2Seam<&INVENTORY_GetFirstItem>::hook(pInventory);
 	if (INVENTORY_GetPtrIfValid(pInventory))
 	{
 		return pInventory->pFirstItem;
@@ -1157,6 +1160,7 @@ BOOL __stdcall INVENTORY_PlaceItemAtFreePosition(D2InventoryStrc* pInventory, D2
 // 1.13c D2Common+0x218a0
 BOOL __fastcall INVENTORY_PlaceItemInGrid(D2InventoryStrc* pInventory, D2UnitStrc* pItem, int nXPos, int nYPos, int nInventoryGrid, int nInventoryRecordId, BOOL bUnused)
 {
+	if (D2Seam<&INVENTORY_PlaceItemInGrid>::hook) return D2Seam<&INVENTORY_PlaceItemInGrid>::hook(pInventory, pItem, nXPos, nYPos, nInventoryGrid, nInventoryRecordId, bUnused);
 	D2_MAYBE_UNUSED(bUnused);
 	if (!INVENTORY_GetPtrIfValid(pInventory))
 	{
@@ -1479,6 +1483,7 @@ D2UnitStrc* __stdcall INVENTORY_GetItemFromInventoryPage(D2InventoryStrc* pInven
 // 1.13c D2Common+0x21DA0
 BOOL __stdcall INVENTORY_PlaceItemInBodyLoc(D2InventoryStrc* pInventory, D2UnitStrc* pItem, int nBodyLoc)
 {
+	if (D2Seam<&INVENTORY_PlaceItemInBodyLoc>::hook) return D2Seam<&INVENTORY_PlaceItemInBodyLoc>::hook(pInventory, pItem, nBodyLoc);
 	if (pInventory && INVENTORY_ValidateBodyLoc(nBodyLoc))
 	{
 		return INVENTORY_PlaceItemInGrid(pInventory, pItem, nBodyLoc, 0, INVGRID_BODYLOC, 0, 0);
@@ -1491,6 +1496,7 @@ BOOL __stdcall INVENTORY_PlaceItemInBodyLoc(D2InventoryStrc* pInventory, D2UnitS
 // 1.13c D2Common+0x1E670: signature check, slot 0..12 of the body grid; no delta
 D2UnitStrc* __stdcall INVENTORY_GetItemFromBodyLoc(D2InventoryStrc* pInventory, int nBodyLoc)
 {
+	if (D2Seam<&INVENTORY_GetItemFromBodyLoc>::hook) return D2Seam<&INVENTORY_GetItemFromBodyLoc>::hook(pInventory, nBodyLoc);
 	if (INVENTORY_GetPtrIfValid(pInventory) && INVENTORY_ValidateBodyLoc(nBodyLoc))
 	{
 		D2InventoryGridStrc* pInventoryGrid = INVENTORY_GetGrid(pInventory, INVGRID_BODYLOC, &gBodyLocInventoryGridInfo);
@@ -1560,6 +1566,7 @@ BOOL __stdcall INVENTORY_CheckEquipmentForWeaponByClass(D2InventoryStrc* pInvent
 // 1.13c D2Common+0x20320: validated, no delta (slot 5 then slot 4, weapon type check, left-hand GUID match)
 D2UnitStrc* __stdcall INVENTORY_GetLeftHandWeapon(D2InventoryStrc* pInventory)
 {
+	if (D2Seam<&INVENTORY_GetLeftHandWeapon>::hook) return D2Seam<&INVENTORY_GetLeftHandWeapon>::hook(pInventory);
 	if (INVENTORY_GetPtrIfValid(pInventory) && pInventory->dwLeftItemGUID != D2UnitInvalidGUID)
 	{
 		D2InventoryGridStrc* pInventoryGrid = INVENTORY_GetGrid(pInventory, INVGRID_BODYLOC, &gBodyLocInventoryGridInfo);
@@ -1586,6 +1593,7 @@ D2UnitStrc* __stdcall INVENTORY_GetLeftHandWeapon(D2InventoryStrc* pInventory)
 // 1.13c D2Common+0x20270: validated, no delta (weapon in slot 5 and slot 4, return the one that is not the left-hand GUID)
 D2UnitStrc* __stdcall INVENTORY_GetSecondaryWeapon(D2InventoryStrc* pInventory)
 {
+	if (D2Seam<&INVENTORY_GetSecondaryWeapon>::hook) return D2Seam<&INVENTORY_GetSecondaryWeapon>::hook(pInventory);
 	if (INVENTORY_GetPtrIfValid(pInventory) && pInventory->dwLeftItemGUID != D2UnitInvalidGUID)
 	{
 		D2InventoryGridStrc* pInventoryGrid = INVENTORY_GetGrid(pInventory, INVGRID_BODYLOC, &gBodyLocInventoryGridInfo);
@@ -1702,6 +1710,7 @@ static_assert(offsetof(D2ItemExtraDataStrc, pParentInv) == 0x00);
 // 1.13c D2Common+0x21790: validated, no delta
 void __stdcall INVENTORY_SetCursorItem(D2InventoryStrc* pInventory, D2UnitStrc* pItem)
 {
+	if (D2Seam<&INVENTORY_SetCursorItem>::hook) { D2Seam<&INVENTORY_SetCursorItem>::hook(pInventory, pItem); return; }
 	if (INVENTORY_GetPtrIfValid(pInventory))
 	{
 		if (pItem)
@@ -1724,6 +1733,7 @@ void __stdcall INVENTORY_SetCursorItem(D2InventoryStrc* pInventory, D2UnitStrc* 
 // 1.13c D2Common+0x1DFB0
 D2UnitStrc* __stdcall INVENTORY_GetCursorItem(D2InventoryStrc* pInventory)
 {
+	if (D2Seam<&INVENTORY_GetCursorItem>::hook) return D2Seam<&INVENTORY_GetCursorItem>::hook(pInventory);
 	if (INVENTORY_GetPtrIfValid(pInventory))
 	{
 		return pInventory->pCursorItem;
@@ -1832,6 +1842,7 @@ D2UnitStrc* __stdcall INVENTORY_FindEquippedItemForStack(D2InventoryStrc* pInven
 // 1.13c D2Common+0x20BC0: owner player picks the layout record, pack grid chain from the check item, book with the same suffix id and room left; no delta
 D2UnitStrc* __stdcall INVENTORY_FindFillableBook(D2InventoryStrc* pInventory, D2UnitStrc* pScrolls, D2UnitStrc* pCheckItem)
 {
+	if (D2Seam<&INVENTORY_FindFillableBook>::hook) return D2Seam<&INVENTORY_FindFillableBook>::hook(pInventory, pScrolls, pCheckItem);
 	if (!INVENTORY_GetPtrIfValid(pInventory))
 	{
 		return nullptr;
@@ -2015,6 +2026,7 @@ BOOL __stdcall INVENTORY_PlaceItemInFreeBeltSlot(D2InventoryStrc* pInventory, D2
 //D2Common.0x6FD90550 (#10271)
 D2UnitStrc* __stdcall INVENTORY_GetItemFromBeltSlot(D2InventoryStrc* pInventory, int nSlotId)
 {
+	if (D2Seam<&INVENTORY_GetItemFromBeltSlot>::hook) return D2Seam<&INVENTORY_GetItemFromBeltSlot>::hook(pInventory, nSlotId);
 	if (INVENTORY_GetPtrIfValid(pInventory))
 	{
 		D2InventoryGridStrc* pInventoryGrid = INVENTORY_GetGrid(pInventory, INVGRID_BELT, &gBeltInventoryGridInfo);
@@ -2067,6 +2079,7 @@ BOOL __stdcall INVENTORY_GetUseableItemFromBeltSlot(D2InventoryStrc* pInventory,
 // 1.13c D2Common+0x1FF40: a null inventory returns before the out pointer is cleared; a bad signature clears it and finds nothing
 BOOL __stdcall INVENTORY_GetEquippedShield(D2InventoryStrc* pInventory, D2UnitStrc** ppItem)
 {
+	if (D2Seam<&INVENTORY_GetEquippedShield>::hook) return D2Seam<&INVENTORY_GetEquippedShield>::hook(pInventory, ppItem);
 	if (!pInventory)
 	{
 		return FALSE;
@@ -2275,6 +2288,7 @@ BOOL __stdcall INVENTORY_CheckForItemInTradeInventory(D2InventoryStrc* pInventor
 // 1.13c D2Common+0x1E4F0
 void __stdcall INVENTORY_AddItemToTradeInventory(D2InventoryStrc* pInventory, D2UnitStrc* pItem)
 {
+	if (D2Seam<&INVENTORY_AddItemToTradeInventory>::hook) { D2Seam<&INVENTORY_AddItemToTradeInventory>::hook(pInventory, pItem); return; }
 	if (INVENTORY_UnitIsItem(pItem))
 	{
 		if (INVENTORY_CheckForItemInTradeInventory(pInventory, pItem->dwUnitId))
@@ -2571,6 +2585,7 @@ void __stdcall INVENTORY_UpdateWeaponGUIDOnInsert(D2InventoryStrc* pInventory, D
 // 1.13c D2Common+0x1FC70
 void __stdcall INVENTORY_UpdateWeaponGUIDOnRemoval(D2InventoryStrc* pInventory, D2UnitStrc* pItem)
 {
+	if (D2Seam<&INVENTORY_UpdateWeaponGUIDOnRemoval>::hook) { D2Seam<&INVENTORY_UpdateWeaponGUIDOnRemoval>::hook(pInventory, pItem); return; }
 	if (INVENTORY_GetPtrIfValid(pInventory) && INVENTORY_UnitIsItem(pItem) && ITEMS_CheckItemTypeId(pItem, ITEMTYPE_WEAPON))
 	{
 		if (pInventory->dwLeftItemGUID == pItem->dwUnitId)
@@ -2699,6 +2714,7 @@ void __stdcall INVENTORY_SetOwnerId(D2InventoryStrc* pInventory, D2UnitGUID nOwn
 // 1.13c D2Common+0x1DE50
 int __stdcall INVENTORY_GetOwnerId(D2InventoryStrc* pInventory)
 {
+	if (D2Seam<&INVENTORY_GetOwnerId>::hook) return D2Seam<&INVENTORY_GetOwnerId>::hook(pInventory);
 	if (INVENTORY_GetPtrIfValid(pInventory))
 	{
 		return pInventory->dwOwnerGuid;
@@ -3179,6 +3195,7 @@ int __stdcall D2Common_10299(D2UnitStrc* pUnit, int nBodyLoc, D2UnitStrc* pItem,
 // 1.13c D2Common+0x1E8F0
 D2UnitStrc* __stdcall INVENTORY_GetNextItem(D2UnitStrc* pItem)
 {
+	if (D2Seam<&INVENTORY_GetNextItem>::hook) return D2Seam<&INVENTORY_GetNextItem>::hook(pItem);
 	D2ItemExtraDataStrc* pItemExtraData = INVENTORY_GetItemExtraDataFromItem(pItem);
 	if (pItemExtraData)
 	{
@@ -3204,6 +3221,7 @@ D2UnitStrc* __stdcall INVENTORY_GetNextGridItem(D2UnitStrc* pItem)
 //D2Common.0x6FD920C0 (#10305)
 D2UnitStrc* __stdcall INVENTORY_UnitIsItem(D2UnitStrc* pItem)
 {
+	if (D2Seam<&INVENTORY_UnitIsItem>::hook) return D2Seam<&INVENTORY_UnitIsItem>::hook(pItem);
 	return pItem && pItem->dwUnitType == UNIT_ITEM ? pItem : nullptr;
 }
 

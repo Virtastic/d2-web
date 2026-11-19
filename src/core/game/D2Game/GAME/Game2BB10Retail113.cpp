@@ -13,6 +13,7 @@ extern D2GameDataTableStrc* gpGameDataTbl_6FD45818;
 // 1.13c D2Game+0x29BA0
 void __fastcall GAME_UnlockGame_29BA0(D2GameStrc* pGame)
 {
+	if (D2Seam<&GAME_UnlockGame_29BA0>::hook) { D2Seam<&GAME_UnlockGame_29BA0>::hook(pGame); return; }
 	D2_ASSERT(pGame);
 	D2_UNLOCK(pGame->lpCriticalSection);   // asserts the section exists; the host build has no lock to release
 }

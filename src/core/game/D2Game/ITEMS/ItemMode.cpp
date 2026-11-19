@@ -364,6 +364,7 @@ void __fastcall sub_6FC420B0(D2UnitStrc* pItem, D2ClientStrc* pClient)
 // The skill a scroll or tome item casts: its books.txt record's scroll or book skill id; -1 for any other item or a missing record.
 int32_t __fastcall sub_6FCF1AA0(D2UnitStrc* pItem)
 {
+	if (D2Seam<&sub_6FCF1AA0>::hook) return D2Seam<&sub_6FCF1AA0>::hook(pItem);
     D2_ASSERT(pItem);
 
     if (!D2_CALL(ITEMS_CheckItemTypeId, pItem, ITEMTYPE_SCROLL) && !D2_CALL(ITEMS_CheckItemTypeId, pItem, ITEMTYPE_BOOK))
@@ -589,6 +590,7 @@ void __fastcall D2GAME_ITEMS_UpdateItemStatlist_6FC42310(D2GameStrc* pGame, D2Un
 // 1.13c D2Game+0xD46B0 (checked against decompile, no delta)
 void __fastcall D2GAME_ITEMS_UpdateTransferredProperties_6FC424E0(D2GameStrc* pGame, D2UnitStrc* pItem, D2UnitStrc* pTarget, int32_t bUpdateStatList, int32_t bUpdateVitals)
 {
+	if (D2Seam<&D2GAME_ITEMS_UpdateTransferredProperties_6FC424E0>::hook) { D2Seam<&D2GAME_ITEMS_UpdateTransferredProperties_6FC424E0>::hook(pGame, pItem, pTarget, bUpdateStatList, bUpdateVitals); return; }
     if (!pTarget || !pItem || pItem->dwUnitType != UNIT_ITEM || (pTarget->dwUnitType == UNIT_PLAYER && STATES_CheckState(pTarget, STATE_PLAYERBODY)) || pTarget != STATLIST_GetOwner(pItem, nullptr))
     {
         return;
@@ -1450,6 +1452,7 @@ int32_t __fastcall sub_6FC437F0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
 // 1.13c D2Game+0xD31D0 (the books.txt skill lookup is out of line at 0xD1AA0)
 void __fastcall sub_6FC43AF0(D2UnitStrc* pUnit, D2UnitStrc* pItem, int32_t nQuantityBonus)
 {
+	if (D2Seam<&sub_6FC43AF0>::hook) { D2Seam<&sub_6FC43AF0>::hook(pUnit, pItem, nQuantityBonus); return; }
     D2_ASSERT(pUnit);
     D2_ASSERT(pItem);
 
@@ -1746,6 +1749,7 @@ void __fastcall sub_6FC44030(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nItem
 // 1.13c D2Game+0xD76A0 (diffed step by step: target-flag clear 0xD29F0, item type/mode 4 lookup, page record, free-position vs cell place, socket place, scroll/book learn 0xD4670 -> 0xD43E0 only for a player and a non-stash page, flag clears, trade refresh; no delta)
 int32_t __fastcall D2GAME_PlaceItem_6FC44410(const char* szFile, int32_t nLine, D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nUnitId, int32_t nX, int32_t nY, int32_t a8, int32_t a9, D2InventoryStrc* pInventory)
 {
+	if (D2Seam<&D2GAME_PlaceItem_6FC44410>::hook) return D2Seam<&D2GAME_PlaceItem_6FC44410>::hook(szFile, nLine, pGame, pPlayer, nUnitId, nX, nY, a8, a9, pInventory);
     if (!pGame || !pPlayer)
     {
         return 0;
@@ -2036,6 +2040,7 @@ int32_t __fastcall ITEMS_CheckRequirementsWithQuiver_D1830(D2UnitStrc* pUnit, D2
 // 1.13c D2Game+0xD51A0
 void __fastcall D2GAME_ITEMS_UpdateInventoryItems_6FC44A90(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t bRefresh)
 {
+	if (D2Seam<&D2GAME_ITEMS_UpdateInventoryItems_6FC44A90>::hook) { D2Seam<&D2GAME_ITEMS_UpdateInventoryItems_6FC44A90>::hook(pGame, pUnit, bRefresh); return; }
     D2UnkItemModeStrc a2 = {};
 
     if (!pUnit || (pUnit->dwUnitType != UNIT_PLAYER && !(pUnit->dwFlags & UNITFLAG_ISMERC)))
@@ -2291,6 +2296,7 @@ void __fastcall D2GAME_ITEMS_UpdateInventoryItems_6FC45050(D2GameStrc* pGame, D2
 // 1.13c D2Game+0xD60D0 (checked against the decompile: same lookup, requirement check, body-location placement, flag and refresh order; the body-location-fails path still returns 1; no delta)
 int32_t __fastcall sub_6FC45060(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nItemGUID, uint8_t nBodyLoc, int32_t bSkipRequirementCheck, int32_t* a6)
 {
+	if (D2Seam<&sub_6FC45060>::hook) return D2Seam<&sub_6FC45060>::hook(pGame, pPlayer, nItemGUID, nBodyLoc, bSkipRequirementCheck, a6);
     int32_t bIsSwitchWeapon = 0;
     if (nBodyLoc == BODYLOC_SWRARM || nBodyLoc == BODYLOC_SWLARM)
     {
@@ -3546,6 +3552,7 @@ void __fastcall D2GAME_RemoveItem_6FC471F0(D2GameStrc* pGame, D2UnitStrc* pUnit,
 // 1.13c D2Game+0xD2CF0 (belt-item removal: clear targetable, unlink, assert same item, free from all players)
 void __fastcall sub_6FC47380(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem)
 {
+	if (D2Seam<&sub_6FC47380>::hook) { D2Seam<&sub_6FC47380>::hook(pGame, pUnit, pItem); return; }
     D2GAME_SendP0x9C_ItemAction_RemoveFromBelt_6FC3EBE0(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), pUnit, pItem, 0x20);
 
     // 1.13c calls the removal out of line (0xD2CF0)
@@ -4241,6 +4248,7 @@ int32_t __stdcall D2GAME_Return0_6FC48930(int32_t a1, int32_t* a2)
 // 1.13c D2Game+0xD4E80 (checked against the decompile: belt placement from the cursor, free-slot or fixed-slot path, socket mode 2, in-belt anim mode; no delta)
 int32_t __fastcall sub_6FC48940(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nItemGUID, int32_t nBeltSlot, int32_t bFindFreeSlot, int32_t* a6)
 {
+	if (D2Seam<&sub_6FC48940>::hook) return D2Seam<&sub_6FC48940>::hook(pGame, pUnit, nItemGUID, nBeltSlot, bFindFreeSlot, a6);
     D2_ASSERT(pGame);
     D2_ASSERT(pUnit);
 
@@ -4510,6 +4518,7 @@ void __fastcall sub_6FC49090(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
 // 1.13c D2Game+0xD2540
 void __fastcall sub_6FC49140(D2GameStrc* pGame, D2UnitStrc* pUnit, int8_t nX)
 {
+	if (D2Seam<&sub_6FC49140>::hook) { D2Seam<&sub_6FC49140>::hook(pGame, pUnit, nX); return; }
     const int32_t nPosition = D2Clamp(nX & 3, 0, 3);
     int32_t j = 0;
     for (int32_t i = 0; i < 4; ++i)
@@ -4724,6 +4733,7 @@ int32_t __fastcall D2GAME_RemoveItemIfOnCursor_6FC49760(D2GameStrc* pGame, D2Uni
 // 1.13c D2Game+0xD4A70
 int32_t __fastcall D2GAME_ITEMSOCKET_PlaceItem_6FC497E0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSocketFillerGUID, int32_t nItemGUID, int32_t* bPlaced, int32_t bRefresh, int32_t bResetCursorItem, int32_t bCheckMode)
 {
+	if (D2Seam<&D2GAME_ITEMSOCKET_PlaceItem_6FC497E0>::hook) return D2Seam<&D2GAME_ITEMSOCKET_PlaceItem_6FC497E0>::hook(pGame, pUnit, nSocketFillerGUID, nItemGUID, bPlaced, bRefresh, bResetCursorItem, bCheckMode);
     D2_ASSERT(pGame);
 
     *bPlaced = 0;
@@ -5261,6 +5271,7 @@ int32_t __fastcall D2GAME_DoKeyCheck_6FC4A4B0(D2GameStrc* pGame, D2UnitStrc* pUn
 // 1.13c D2Game+0xD8440 (checked against the decompile: asserts game/unit/item, transmogrify flag and type lookup, stored-mode gate, tmog min/max quantity, place at the old cell else anywhere else drop; no delta)
 int32_t __fastcall D2GAME_Transmogrify_6FC4A660(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem)
 {
+	if (D2Seam<&D2GAME_Transmogrify_6FC4A660>::hook) return D2Seam<&D2GAME_Transmogrify_6FC4A660>::hook(pGame, pUnit, pItem);
     D2_ASSERT(pGame);
     D2_ASSERT(pUnit);
     D2_ASSERT(pItem);
@@ -5941,6 +5952,7 @@ void __fastcall D2GAME_RepairBrokenItem_6FC4B630(D2GameStrc* pGame, D2UnitStrc* 
 // 1.13c D2Game+0xD2BE0
 void __fastcall sub_6FC4B740(D2UnitStrc* pUnit, D2UnitStrc* pItem)
 {
+	if (D2Seam<&sub_6FC4B740>::hook) { D2Seam<&sub_6FC4B740>::hook(pUnit, pItem); return; }
     D2_ASSERT(pItem);
 
     if (!ITEMS_CheckItemTypeId(pItem, ITEMTYPE_SCROLL) && !ITEMS_CheckItemTypeId(pItem, ITEMTYPE_BOOK))
@@ -5989,6 +6001,7 @@ void __fastcall sub_6FC4B740(D2UnitStrc* pUnit, D2UnitStrc* pItem)
 // 1.13c D2Game+0xD4570
 void __fastcall sub_6FC4B830(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&sub_6FC4B830>::hook) { D2Seam<&sub_6FC4B830>::hook(pGame, pUnit); return; }
     int32_t nInventoryItemCounter = 0;
 
     D2UnitStrc* pItem = INVENTORY_GetFirstItem(pUnit->pInventory);
@@ -6060,6 +6073,7 @@ void __fastcall sub_6FC4B830(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // 1.13c D2Game+0xD1650
 int32_t __fastcall sub_6FC4B9D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem)
 {
+	if (D2Seam<&sub_6FC4B9D0>::hook) return D2Seam<&sub_6FC4B9D0>::hook(pGame, pUnit, pItem);
     D2_ASSERT(pUnit);
     D2_ASSERT(pItem);
 
@@ -6074,6 +6088,7 @@ int32_t __fastcall sub_6FC4B9D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
 // 1.13c D2Game+0xD5590
 void __fastcall sub_6FC4BA50(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&sub_6FC4BA50>::hook) { D2Seam<&sub_6FC4BA50>::hook(pGame, pUnit); return; }
     if (!pUnit || !pUnit->pInventory)
     {
         return;
@@ -6267,6 +6282,7 @@ void __fastcall sub_6FC4BE80(D2UnitStrc* pUnit, D2GameStrc* pGame, int32_t nUnit
 // 1.13c D2Game+0xE930
 D2ActiveRoomStrc* __fastcall D2GAME_GetFreeSpaceEx_6FC4BF00(D2ActiveRoomStrc* pRoom, D2CoordStrc* pCoords, D2CoordStrc* pReturnCoords, int32_t nUnitSize)
 {
+	if (D2Seam<&D2GAME_GetFreeSpaceEx_6FC4BF00>::hook) return D2Seam<&D2GAME_GetFreeSpaceEx_6FC4BF00>::hook(pRoom, pCoords, pReturnCoords, nUnitSize);
     const int32_t nX = pCoords->nX + 2;
     const int32_t nY = pCoords->nY + 3;
 
@@ -6339,6 +6355,7 @@ int32_t __fastcall sub_6FC4BFF0(D2GameStrc* pGame, D2SeedStrc* pSeed, int32_t nL
 // 1.13c D2Game+0xF8F0 (weapons range; filter helper 0xF180)
 int32_t __fastcall sub_6FC4C1E0(D2GameStrc* pGame, D2SeedStrc* pSeed, int32_t nLevelId, int32_t nItemType, int32_t a5)
 {
+	if (D2Seam<&sub_6FC4C1E0>::hook) return D2Seam<&sub_6FC4C1E0>::hook(pGame, pSeed, nLevelId, nItemType, a5);
     D2ItemDataTbl* pItemDataTbl = DATATBLS_GetItemDataTables();
     const int32_t nBase = pItemDataTbl->pWeapons - pItemDataTbl->pItemsTxt;
     const int32_t nCount = pItemDataTbl->pArmor - pItemDataTbl->pWeapons;

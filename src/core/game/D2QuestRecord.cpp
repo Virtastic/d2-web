@@ -1,4 +1,5 @@
 #include "D2QuestRecord.h"
+#include <test_seam.h>
 
 #include "D2BitManip.h"
 
@@ -7,6 +8,7 @@
 //D2Common.0x6FDAE800 (#11107)
 BOOL __stdcall QUESTRECORD_GetQuestState(D2BitBufferStrc* pQuestRecord, int nQuest, int nState)
 {
+	if (D2Seam<&QUESTRECORD_GetQuestState>::hook) return D2Seam<&QUESTRECORD_GetQuestState>::hook(pQuestRecord, nQuest, nState);
 	D2_ASSERT(pQuestRecord);
 
 	return BITMANIP_GetBitState(pQuestRecord->pBuffer, nState + 8 * sizeof(uint16_t) * nQuest) != 0;
@@ -16,6 +18,7 @@ BOOL __stdcall QUESTRECORD_GetQuestState(D2BitBufferStrc* pQuestRecord, int nQue
 //D2Common.0x6FDAE850 (#11108)
 void __stdcall QUESTRECORD_SetQuestState(D2BitBufferStrc* pQuestRecord, int nQuest, int nState)
 {
+	if (D2Seam<&QUESTRECORD_SetQuestState>::hook) { D2Seam<&QUESTRECORD_SetQuestState>::hook(pQuestRecord, nQuest, nState); return; }
 	D2_ASSERT(pQuestRecord);
 
 	BITMANIP_SetBitState(pQuestRecord->pBuffer, nState + 8 * sizeof(uint16_t) * nQuest);
@@ -25,6 +28,7 @@ void __stdcall QUESTRECORD_SetQuestState(D2BitBufferStrc* pQuestRecord, int nQue
 //D2Common.0x6FDAE890 (#11109)
 void __stdcall QUESTRECORD_ClearQuestState(D2BitBufferStrc* pQuestRecord, int nQuest, int nState)
 {
+	if (D2Seam<&QUESTRECORD_ClearQuestState>::hook) { D2Seam<&QUESTRECORD_ClearQuestState>::hook(pQuestRecord, nQuest, nState); return; }
 	D2_ASSERT(pQuestRecord);
 
 	BITMANIP_MaskBitstate(pQuestRecord->pBuffer, nState + 8 * sizeof(uint16_t) * nQuest);
@@ -34,6 +38,7 @@ void __stdcall QUESTRECORD_ClearQuestState(D2BitBufferStrc* pQuestRecord, int nQ
 // 1.13c D2Common+0x2D020
 void __stdcall QUESTRECORD_ResetIntermediateStateFlags(D2BitBufferStrc* pQuestRecord, int nQuest)
 {
+	if (D2Seam<&QUESTRECORD_ResetIntermediateStateFlags>::hook) { D2Seam<&QUESTRECORD_ResetIntermediateStateFlags>::hook(pQuestRecord, nQuest); return; }
 	D2_ASSERT(pQuestRecord);
 
 	for (int i = QFLAG_STARTED; i <= QFLAG_CUSTOM7; ++i)

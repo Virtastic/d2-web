@@ -215,6 +215,7 @@ uint16_t __fastcall PLAYERLIST_GetFlags(D2UnitStrc* pPlayer1, D2UnitStrc* pPlaye
 // 1.13c D2Game+0xF0220 (checked against decompile)
 void __fastcall sub_6FCBA980(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t a3)
 {
+	if (D2Seam<&sub_6FCBA980>::hook) { D2Seam<&sub_6FCBA980>::hook(pPlayer1, pPlayer2, a3); return; }
     if (pPlayer1 == pPlayer2)
     {
         return;
@@ -233,6 +234,7 @@ void __fastcall sub_6FCBA980(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, int32_t
 // 1.13c D2Game+0xF01D0 (checked against decompile)
 int16_t __fastcall sub_6FCBA9D0(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2)
 {
+	if (D2Seam<&sub_6FCBA9D0>::hook) return D2Seam<&sub_6FCBA9D0>::hook(pPlayer1, pPlayer2);
     if (pPlayer1 == pPlayer2)
     {
         return 1;

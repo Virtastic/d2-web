@@ -589,6 +589,7 @@ int32_t __fastcall ACT5Q6_UnitIterate_SetRewardGranted(D2GameStrc* pGame, D2Unit
 // Returns retail's EAX at exit: the quest's extra data after the increment, else nullptr.
 D2Act5Quest6Strc* __fastcall ACT5Q6_GrantReward(D2BitBufferStrc* pQuestFlags, D2UnitStrc* pUnit, D2GameStrc* pGame)
 {
+	if (D2Seam<&ACT5Q6_GrantReward>::hook) return D2Seam<&ACT5Q6_GrantReward>::hook(pQuestFlags, pUnit, pGame);
 	D2_CALL(QUESTRECORD_SetQuestState, pQuestFlags, QUESTSTATEFLAG_A5Q6, QFLAG_PRIMARYGOALDONE);
 	D2_CALL(QUESTRECORD_SetQuestState, pQuestFlags, QUESTSTATEFLAG_A5Q6, QFLAG_REWARDGRANTED);
 
@@ -757,6 +758,7 @@ void __fastcall ACT5Q6_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 // 1.13c D2Game+0x598B0 (checked against decompile, no delta; register-convention wrapper)
 void __fastcall ACT5Q6_OpenWorldStoneChamber(D2GameStrc* pGame)
 {
+	if (D2Seam<&ACT5Q6_OpenWorldStoneChamber>::hook) { D2Seam<&ACT5Q6_OpenWorldStoneChamber>::hook(pGame); return; }
 	D2QuestDataStrc* pQuestData = D2_CALL(QUESTS_GetQuestData, pGame, QUEST_A5Q6_BAAL);
 	if (!pQuestData)
 	{
@@ -777,6 +779,7 @@ void __fastcall ACT5Q6_OpenWorldStoneChamber(D2GameStrc* pGame)
 // Prior art: 1.10f A5Q6.cpp; checked against the complete cached 1.13c body.
 int32_t __fastcall ACT5Q6_IsWorldStoneChamberClosed(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&ACT5Q6_IsWorldStoneChamberClosed>::hook) return D2Seam<&ACT5Q6_IsWorldStoneChamberClosed>::hook(pGame, pUnit);
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q6_BAAL);
 	if (!pQuestData)
 	{

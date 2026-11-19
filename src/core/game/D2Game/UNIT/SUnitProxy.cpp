@@ -56,6 +56,7 @@ int32_t dword_6FD4DD84;
 // 1.13c D2Game+0x8F5C0 (checked against decompile, no delta)
 D2NpcRecordStrc* __fastcall SUNITPROXY_GetNpcRecordFromClassId(D2GameStrc* pGame, int32_t nNpcClassId, int32_t* pIndex)
 {
+	if (D2Seam<&SUNITPROXY_GetNpcRecordFromClassId>::hook) return D2Seam<&SUNITPROXY_GetNpcRecordFromClassId>::hook(pGame, nNpcClassId, pIndex);
     *pIndex = 0;
 
     for (int32_t nCounter = 0; nCounter < 64; ++nCounter)
@@ -376,6 +377,7 @@ void __fastcall SUNITPROXY_FreeNpcControl(D2GameStrc* pGame)
 // 1.13c D2Game+0x90170
 void __fastcall SUNITPROXY_ClearNpcRecordData(D2GameStrc* pGame, D2NpcRecordStrc* pNpcRecord)
 {
+	if (D2Seam<&SUNITPROXY_ClearNpcRecordData>::hook) { D2Seam<&SUNITPROXY_ClearNpcRecordData>::hook(pGame, pNpcRecord); return; }
     if (pNpcRecord->bGambleInit)
     {
         D2NpcGambleStrc* pGamble = pNpcRecord->pGamble;
@@ -482,6 +484,7 @@ void __fastcall SUNITPROXY_UpdateNpcsOnActChange(D2GameStrc* pGame, D2UnitStrc* 
 // 1.13c D2Game+0x90320 (the no-players reset is 0x902E0)
 void __fastcall SUNITPROXY_UpdateVendorInventory(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t nAct, int32_t bNoMorePlayersInLevel)
 {
+	if (D2Seam<&SUNITPROXY_UpdateVendorInventory>::hook) { D2Seam<&SUNITPROXY_UpdateVendorInventory>::hook(pGame, pUnit, nAct, bNoMorePlayersInLevel); return; }
     const uint32_t nTickCount = GetTickCount();
     
     for (int32_t i = 0; i < pGame->pNpcControl->nArraySize; ++i)
@@ -790,6 +793,7 @@ void __fastcall SUNITPROXY_AllocNpcInventory(D2GameStrc* pGame, D2NpcRecordStrc*
 // 1.13c D2Game+0x8F850 (checked: no delta)
 void __fastcall SUNITPROXY_FillGlobalItemCache()
 {
+	if (D2Seam<&SUNITPROXY_FillGlobalItemCache>::hook) { D2Seam<&SUNITPROXY_FillGlobalItemCache>::hook(); return; }
     for (int32_t i = 0; i < sgptDataTables->nMonStatsTxtRecordCount; ++i)
     {
         D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(i);

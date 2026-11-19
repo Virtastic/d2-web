@@ -249,6 +249,7 @@ void __fastcall sub_6FC82270(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc*
 // 1.13c D2Game+0xcc2f0
 void __fastcall D2GAME_UpdateAttribute_6FC822D0(D2UnitStrc* pUnit, WORD nStat, uint32_t nNewValue, D2UnitStrc* pPlayer)
 {
+	if (D2Seam<&D2GAME_UpdateAttribute_6FC822D0>::hook) { D2Seam<&D2GAME_UpdateAttribute_6FC822D0>::hook(pUnit, nStat, nNewValue, pPlayer); return; }
     D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
     
     D2_ASSERT(pClient);
@@ -709,6 +710,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x01_Walk_6FC82CB0(D2GameStrc* pGame
 // 1.13c D2Game+0xCBF50
 int32_t __fastcall sub_6FC82D10(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nPacketSize, uint16_t* pX, uint16_t* pY)
 {
+	if (D2Seam<&sub_6FC82D10>::hook) return D2Seam<&sub_6FC82D10>::hook(pGame, pUnit, pPacket, nPacketSize, pX, pY);
     *pX = 0;
     *pY = 0;
 
@@ -926,6 +928,7 @@ int32_t __fastcall sub_6FC83340(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStr
 // 1.13c D2Game+0xCB1F0 (no delta; fatal 0x6EE on a missing left-hand swing)
 D2SkillStrc* __fastcall sub_6FC83450(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
+	if (D2Seam<&sub_6FC83450>::hook) return D2Seam<&sub_6FC83450>::hook(pUnit, pSkill);
     if (D2_CALL(SKILLS_GetSkillIdFromSkill, pSkill, __FILE__, __LINE__))
     {
         return pSkill;

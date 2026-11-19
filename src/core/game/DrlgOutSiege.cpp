@@ -1,4 +1,5 @@
 #include "Drlg/D2DrlgOutSiege.h"
+#include <test_seam.h>
 
 #include "D2DataTbls.h"
 #include "Drlg/D2DrlgDrlg.h"
@@ -336,6 +337,7 @@ void __fastcall DRLGOUTSIEGE_AddACt5SecondaryBorder(D2DrlgLevelStrc* pLevel)
 // 1.13c D2Common+0x40C20
 int __fastcall sub_6FD84780(D2DrlgLevelStrc* pLevel, int nStyle, int a3)
 {
+	if (D2Seam<&sub_6FD84780>::hook) return D2Seam<&sub_6FD84780>::hook(pLevel, nStyle, a3);
 	static const D2DrlgOutSiegeInitStrc2 stru_6FDD0A28[] =
 	{
 		{ 49,	1,	16,	LVLPREST_ACT5_BARRICADE_1,					LVLPREST_ACT5_BARRICADE_1_SNOW },

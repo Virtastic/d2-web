@@ -249,6 +249,7 @@ void __fastcall MONSTERUNIQUE_UMod2_HealthBonus(D2UnitStrc* pUnit, int32_t nUMod
 // 1.13c D2Game+0x14D0 (checked, no delta)
 int32_t __fastcall MONSTERUNIQUE_CalculatePercentage(int32_t a1, int32_t a2, int32_t a3)
 {
+	if (D2Seam<&MONSTERUNIQUE_CalculatePercentage>::hook) return D2Seam<&MONSTERUNIQUE_CalculatePercentage>::hook(a1, a2, a3);
     if (!a3)
     {
         return 0;
@@ -280,6 +281,7 @@ int32_t __fastcall MONSTERUNIQUE_CalculatePercentage(int32_t a1, int32_t a2, int
 // 1.13c D2Game+0x21EC0 (register form: EBX = unit, EDI = percent): max life and life both become base + base * percent / 100
 void __fastcall MONSTERUNIQUE_ApplyPercentLifeBonus(D2UnitStrc* pUnit, int32_t nPercent)
 {
+	if (D2Seam<&MONSTERUNIQUE_ApplyPercentLifeBonus>::hook) { D2Seam<&MONSTERUNIQUE_ApplyPercentLifeBonus>::hook(pUnit, nPercent); return; }
     const int32_t nBase = D2_CALL(STATLIST_GetMaxLifeFromUnit, pUnit);
     const int32_t nNew = nBase + MONSTERUNIQUE_CalculatePercentage(nBase, nPercent, 100);
     D2_CALL(STATLIST_SetUnitStat, pUnit, STAT_MAXHP, nNew, 0);
@@ -2500,6 +2502,7 @@ int32_t __fastcall sub_6FC6EE90(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t* a
 //D2Game.0x6FC6F160 // 1.13c D2Game+0x1560
 uint32_t __fastcall MONSTERUNIQUE_CheckMonModeFlag(int32_t nMonsterId, int32_t nFlag)
 {
+	if (D2Seam<&MONSTERUNIQUE_CheckMonModeFlag>::hook) return D2Seam<&MONSTERUNIQUE_CheckMonModeFlag>::hook(nMonsterId, nFlag);
     D2MonStats2Txt* pMonStats2TxtRecord = MONSTERREGION_GetMonStats2TxtRecord(nMonsterId);
     if (pMonStats2TxtRecord)
     {
@@ -2513,6 +2516,7 @@ uint32_t __fastcall MONSTERUNIQUE_CheckMonModeFlag(int32_t nMonsterId, int32_t n
 //D2Game.0x6FC6F1D0 // 1.13c D2Game+0x15D0
 uint32_t __fastcall MONSTERUNIQUE_CheckMonStatsFlag(int32_t nMonsterId, int32_t nFlag)
 {
+	if (D2Seam<&MONSTERUNIQUE_CheckMonStatsFlag>::hook) return D2Seam<&MONSTERUNIQUE_CheckMonStatsFlag>::hook(nMonsterId, nFlag);
     D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nMonsterId);
     if (pMonStatsTxtRecord)
     {

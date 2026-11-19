@@ -77,6 +77,7 @@ int32_t __fastcall AIUTIL_GetDistanceToCoordinates_FullUnitSize(D2UnitStrc* pTar
 // 1.13c D2Game+0xB0980 (EBX = pUnit): both axis deltas first, then the half size, each axis clamped at 0
 int32_t __fastcall AIUTIL_GetDistanceToCoordinates_HalfUnitSize(D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
+	if (D2Seam<&AIUTIL_GetDistanceToCoordinates_HalfUnitSize>::hook) return D2Seam<&AIUTIL_GetDistanceToCoordinates_HalfUnitSize>::hook(pUnit, nX, nY);
 	int32_t nXDiff = std::abs(CLIENTS_GetUnitX(pUnit) - nX);
 	int32_t nYDiff = std::abs(CLIENTS_GetUnitY(pUnit) - nY);
 	const int32_t nSize = (int32_t)((uint32_t)UNITS_GetUnitSizeX(pUnit) >> 1) + 1;
@@ -103,6 +104,7 @@ int32_t __fastcall AIUTIL_GetDistanceToCoordinates_HalfUnitSize(D2UnitStrc* pUni
 // 1.13c D2Game+0xB08F0 (checked against decompile)
 int32_t __fastcall AIUTIL_GetDistanceToCoordinates_NoUnitSize(D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
+	if (D2Seam<&AIUTIL_GetDistanceToCoordinates_NoUnitSize>::hook) return D2Seam<&AIUTIL_GetDistanceToCoordinates_NoUnitSize>::hook(pUnit, nX, nY);
 	const int32_t nXDiff = std::abs(CLIENTS_GetUnitX(pUnit) - nX);
 	const int32_t nYDiff = std::abs(CLIENTS_GetUnitY(pUnit) - nY);
 
@@ -120,6 +122,7 @@ int32_t __fastcall AIUTIL_GetDistanceToCoordinates_NoUnitSize(D2UnitStrc* pUnit,
 // 1.13c D2Game+0xB07B0
 uint32_t __fastcall AIUTIL_GetDistanceToCoordinates(D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
+	if (D2Seam<&AIUTIL_GetDistanceToCoordinates>::hook) return D2Seam<&AIUTIL_GetDistanceToCoordinates>::hook(pUnit, nX, nY);
 	D2_ASSERT(pUnit);
 	D2_ASSERT(pUnit->pDynamicPath);
 
@@ -140,6 +143,7 @@ uint32_t __fastcall AIUTIL_GetDistanceToCoordinates(D2UnitStrc* pUnit, int32_t n
 // 1.13c D2Game+0xB0E90
 int32_t __fastcall sub_6FCF14D0(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2)
 {
+	if (D2Seam<&sub_6FCF14D0>::hook) return D2Seam<&sub_6FCF14D0>::hook(pUnit1, pUnit2);
 	constexpr uint8_t nOffsets[25] = { 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4 };
 
 	if (!pUnit1 || !pUnit2)
@@ -580,6 +584,7 @@ void __fastcall sub_6FCF20E0(D2UnitStrc* pUnit, void* pArg, void* ppUnit)
 // 1.13c D2Game+0xB1C90
 D2UnitStrc* __fastcall sub_6FCF2110(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiControlStrc* pAiControl, int32_t* pDistance, int32_t* pCombat)
 {
+	if (D2Seam<&sub_6FCF2110>::hook) return D2Seam<&sub_6FCF2110>::hook(pGame, pUnit, pAiControl, pDistance, pCombat);
 	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
 	if (!pRoom)
 	{
@@ -1028,6 +1033,7 @@ D2UnitStrc* __fastcall AIUTIL_FindTargetInAdjacentActiveRooms(D2GameStrc* pGame,
 // 1.13c D2Game+0xB1BC0
 D2UnitStrc* __fastcall sub_6FCF2CC0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t* pDistance, int32_t* pInMeleeRange)
 {
+	if (D2Seam<&sub_6FCF2CC0>::hook) return D2Seam<&sub_6FCF2CC0>::hook(pGame, pUnit, pDistance, pInMeleeRange);
 	D2UnitStrc* pTarget = nullptr;
 	int32_t nDistance = 0;
 
@@ -1118,6 +1124,7 @@ int32_t __fastcall sub_6FCF2E70(D2UnitStrc* pUnit)
 // 1.13c D2Game+0xB0840
 int32_t __fastcall AIUTIL_CheckIfMonsterUsesSkill(D2UnitStrc* pUnit, int32_t nSkillId)
 {
+	if (D2Seam<&AIUTIL_CheckIfMonsterUsesSkill>::hook) return D2Seam<&AIUTIL_CheckIfMonsterUsesSkill>::hook(pUnit, nSkillId);
 	if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
 	{
 		return 0;

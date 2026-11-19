@@ -11,6 +11,7 @@
 // Ordinal 10024(text) -> _exit(-1); only the exit is observable and is modelled.
 // Prior art: 1.10f the 1.10f reference source,CCmd,Game,SCmd,Task}.cpp.
 #include <cstdint>
+#include <test_seam.h>
 #include <cstddef>
 #include <cstring>
 #include <cstdio>
@@ -101,6 +102,7 @@ static const char kCCmdFile[] = "..\\Source\\D2Game\\GAME\\CCmd.cpp";
 // client+0x0D, return the first match's client id (0 when absent). The name arrives in a register.
 uint32_t CLIENTS_GetClientIdByName(const char* szName, const D2GameBatch4Env* env)
 {
+	if (D2Seam<&CLIENTS_GetClientIdByName>::hook) return D2Seam<&CLIENTS_GetClientIdByName>::hook(szName, env);
     uint32_t clientId = 0;
     const uint8_t bucket = (uint8_t)env->crc16(szName);   // Ordinal 10137
     EnterCriticalSection(&g_clientByNameLock);            // Ordinal 10050
@@ -142,6 +144,7 @@ int32_t CLIENTS_GetNameIfInGame(uint32_t clientId, char* szName, const D2GameBat
 // first and the 256-entry by-name list under the second, then set the initialized flag.
 void CLIENTS_Initialize(void)
 {
+	if (D2Seam<&CLIENTS_Initialize>::hook) { D2Seam<&CLIENTS_Initialize>::hook(); return; }
     InitializeCriticalSection(&g_clientListLock);
     EnterCriticalSection(&g_clientListLock);              // Ordinal 10050
     std::memset(g_clientList, 0, sizeof g_clientList);
@@ -301,6 +304,7 @@ void GAME_KickClientFromGame(uint32_t clientId, const char* szFile, uint32_t nLi
 // arguments in registers the seam takes the packet record so it can read them.
 void CCMD_ProcessClientSystemMessage(const uint32_t* msg, const D2GameBatch4Env* env)
 {
+	if (D2Seam<&CCMD_ProcessClientSystemMessage>::hook) { D2Seam<&CCMD_ProcessClientSystemMessage>::hook(msg, env); return; }
     const uint32_t clientId = msg[0];
     switch ((uint8_t)rd32(msg, 4)) {
     case 0x67:   // NEWGAME (1.10f 0x66)

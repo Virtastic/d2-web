@@ -989,6 +989,7 @@ void __fastcall PLRTRADE_Free(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // 1.13c D2Game+0x716D0
 void __fastcall sub_6FC90AE0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3)
 {
+	if (D2Seam<&sub_6FC90AE0>::hook) { D2Seam<&sub_6FC90AE0>::hook(pGame, pUnit, a3); return; }
     if (!pUnit || !UNITS_GetPlayerData(pUnit)->pTrade)
     {
         return;
@@ -1043,6 +1044,7 @@ void __fastcall sub_6FC90BE0(D2GameStrc* pGame, D2UnitStrc* pPlayer, void* pArg)
 // 1.13c D2Game+0x715E0 (the D2Common #10608 page loop over 1..12 is a ret-8 stub, so it is omitted)
 void __fastcall sub_6FC90C20(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
+	if (D2Seam<&sub_6FC90C20>::hook) { D2Seam<&sub_6FC90C20>::hook(pGame, pPlayer); return; }
     D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer);
     D2_ASSERT(pPlayerData);
 
@@ -1166,6 +1168,7 @@ void __fastcall PLRTRADE_TryToTrade(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2U
 // 1.13c D2Game+0x719A0
 void __fastcall sub_6FC91050(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, D2PlayerDataStrc* pPlayerData1, D2PlayerDataStrc* pPlayerData2, int32_t nTradeState)
 {
+	if (D2Seam<&sub_6FC91050>::hook) { D2Seam<&sub_6FC91050>::hook(pGame, pPlayer1, pPlayer2, pPlayerData1, pPlayerData2, nTradeState); return; }
     UNITS_RefreshInventory(pPlayer1, 1);
     UNITS_RefreshInventory(pPlayer2, 1);
 

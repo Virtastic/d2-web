@@ -1,4 +1,5 @@
 #include "Units/Missile.h"
+#include <test_seam.h>
 
 #include "D2DataTbls.h"
 #include "Drlg/D2DrlgMaze.h"
@@ -42,6 +43,7 @@ void __stdcall MISSILE_AllocMissileData(D2UnitStrc* pMissile)
 // 1.13c D2Common+0x6A350
 void __stdcall MISSILE_FreeMissileData(D2UnitStrc* pMissile)
 {
+	if (D2Seam<&MISSILE_FreeMissileData>::hook) { D2Seam<&MISSILE_FreeMissileData>::hook(pMissile); return; }
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
 	{
 		D2_FREE_POOL(pMissile->pMemoryPool, pMissile->pMissileData);
@@ -85,6 +87,7 @@ void __stdcall MISSILE_SetLevel(D2UnitStrc* pMissile, uint16_t nLevel)
 // 1.13c D2Common+0x6A2D0
 uint32_t __stdcall MISSILE_GetLevel(D2UnitStrc* pMissile)
 {
+	if (D2Seam<&MISSILE_GetLevel>::hook) return D2Seam<&MISSILE_GetLevel>::hook(pMissile);
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
 	{
 		return pMissile->pMissileData->nLevel;
@@ -118,6 +121,7 @@ void __stdcall MISSILE_SetSkill(D2UnitStrc* pMissile, int nSkill)
 // 1.13c D2Common+0x6A2B0
 int __stdcall MISSILE_GetSkill(D2UnitStrc* pMissile)
 {
+	if (D2Seam<&MISSILE_GetSkill>::hook) return D2Seam<&MISSILE_GetSkill>::hook(pMissile);
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
 	{
 		return pMissile->pMissileData->nSkill;
@@ -130,6 +134,7 @@ int __stdcall MISSILE_GetSkill(D2UnitStrc* pMissile)
 // 1.13c D2Common+0x6A710
 void __stdcall MISSILE_SetTotalFrames(D2UnitStrc* pMissile, int nTotalFrames)
 {
+	if (D2Seam<&MISSILE_SetTotalFrames>::hook) { D2Seam<&MISSILE_SetTotalFrames>::hook(pMissile, nTotalFrames); return; }
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
 	{
 		if (nTotalFrames > -32768)
@@ -151,6 +156,7 @@ void __stdcall MISSILE_SetTotalFrames(D2UnitStrc* pMissile, int nTotalFrames)
 // 1.13c D2Common+0x6A290
 int __stdcall MISSILE_GetTotalFrames(D2UnitStrc* pMissile)
 {
+	if (D2Seam<&MISSILE_GetTotalFrames>::hook) return D2Seam<&MISSILE_GetTotalFrames>::hook(pMissile);
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
 	{
 		return pMissile->pMissileData->nTotalFrames;
@@ -163,6 +169,7 @@ int __stdcall MISSILE_GetTotalFrames(D2UnitStrc* pMissile)
 // 1.13c D2Common+0x6A6D0
 void __stdcall MISSILE_SetCurrentFrame(D2UnitStrc* pMissile, int nCurrentFrame)
 {
+	if (D2Seam<&MISSILE_SetCurrentFrame>::hook) { D2Seam<&MISSILE_SetCurrentFrame>::hook(pMissile, nCurrentFrame); return; }
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
 	{
 		if (nCurrentFrame > -32768)
@@ -184,6 +191,7 @@ void __stdcall MISSILE_SetCurrentFrame(D2UnitStrc* pMissile, int nCurrentFrame)
 // 1.13c D2Common+0x6A270
 int __stdcall MISSILE_GetCurrentFrame(D2UnitStrc* pMissile)
 {
+	if (D2Seam<&MISSILE_GetCurrentFrame>::hook) return D2Seam<&MISSILE_GetCurrentFrame>::hook(pMissile);
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
 	{
 		return pMissile->pMissileData->nCurrentFrame;
@@ -196,6 +204,7 @@ int __stdcall MISSILE_GetCurrentFrame(D2UnitStrc* pMissile)
 // 1.13c D2Common+0x6a240
 int __stdcall MISSILE_GetRemainingFrames(D2UnitStrc* pMissile)
 {
+	if (D2Seam<&MISSILE_GetRemainingFrames>::hook) return D2Seam<&MISSILE_GetRemainingFrames>::hook(pMissile);
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
 	{
 		return pMissile->pMissileData->nTotalFrames - pMissile->pMissileData->nCurrentFrame;
@@ -396,6 +405,7 @@ void __stdcall MISSILE_SetAnimSpeed(D2UnitStrc* pMissile, int nAnimSpeed)
 // 1.13c D2Common+0x69FB0
 void __stdcall MISSILE_SetTargetX(D2UnitStrc* pMissile, int nTargetX)
 {
+	if (D2Seam<&MISSILE_SetTargetX>::hook) { D2Seam<&MISSILE_SetTargetX>::hook(pMissile, nTargetX); return; }
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
 	{
 		pMissile->pMissileData->pTargetCoords.nX = nTargetX;
@@ -406,6 +416,7 @@ void __stdcall MISSILE_SetTargetX(D2UnitStrc* pMissile, int nTargetX)
 // 1.13c D2Common+0x69F90
 int __stdcall MISSILE_GetTargetX(D2UnitStrc* pMissile)
 {
+	if (D2Seam<&MISSILE_GetTargetX>::hook) return D2Seam<&MISSILE_GetTargetX>::hook(pMissile);
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
 	{
 		return pMissile->pMissileData->pTargetCoords.nX;
@@ -418,6 +429,7 @@ int __stdcall MISSILE_GetTargetX(D2UnitStrc* pMissile)
 //D2Common.0x6FDBA4D0 (#11142)
 void __stdcall MISSILE_SetTargetY(D2UnitStrc* pMissile, int nTargetY)
 {
+	if (D2Seam<&MISSILE_SetTargetY>::hook) { D2Seam<&MISSILE_SetTargetY>::hook(pMissile, nTargetY); return; }
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
 	{
 		pMissile->pMissileData->pTargetCoords.nY = nTargetY;
@@ -428,6 +440,7 @@ void __stdcall MISSILE_SetTargetY(D2UnitStrc* pMissile, int nTargetY)
 // 1.13c D2Common+0x69f50
 int __stdcall MISSILE_GetTargetY(D2UnitStrc* pMissile)
 {
+	if (D2Seam<&MISSILE_GetTargetY>::hook) return D2Seam<&MISSILE_GetTargetY>::hook(pMissile);
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
 	{
 		return pMissile->pMissileData->pTargetCoords.nY;
@@ -1124,6 +1137,7 @@ int __stdcall MISSILE_GetMaxDamage(D2UnitStrc* pMissile, D2UnitStrc* pOwner, int
 // 1.13c D2Common+0x69E70
 uint8_t __stdcall MISSILE_GetElemTypeFromMissileId(int nMissileId)
 {
+	if (D2Seam<&MISSILE_GetElemTypeFromMissileId>::hook) return D2Seam<&MISSILE_GetElemTypeFromMissileId>::hook(nMissileId);
 	D2MissilesTxt* pMissilesTxtRecord = DATATBLS_GetMissilesTxtRecord(nMissileId);
 
 	if (pMissilesTxtRecord)
@@ -1278,6 +1292,7 @@ int __stdcall MISSILE_GetElementalLength(int nUnused, D2UnitStrc* pMissile, int 
 // 1.13c D2Common+0x6A790
 int __stdcall MISSILE_GetSpecialParamValue(D2UnitStrc* pMissile, D2UnitStrc* pOwner, uint8_t nParamId, int nMissileId, int nLevel)
 {
+	if (D2Seam<&MISSILE_GetSpecialParamValue>::hook) return D2Seam<&MISSILE_GetSpecialParamValue>::hook(pMissile, pOwner, nParamId, nMissileId, nLevel);
 	D2MissilesTxt* pMissilesTxtRecord = NULL;
 
 	if (pMissile && pMissile->dwUnitType != UNIT_MISSILE)

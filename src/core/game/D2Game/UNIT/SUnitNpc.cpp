@@ -2813,6 +2813,7 @@ void __fastcall D2GAME_STORES_CreateVendorCache_6FCCAE20(D2GameStrc* pGame, D2Un
 // 1.13c D2Game+0xBC920
 int32_t __fastcall D2GAME_NPC_RemoveStates_6FCCAF30(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&D2GAME_NPC_RemoveStates_6FCCAF30>::hook) return D2Seam<&D2GAME_NPC_RemoveStates_6FCCAF30>::hook(pUnit);
     int32_t bStateRemoved = 0;
     for (int32_t nState = 0; nState < sgptDataTables->nStatesTxtRecordCount; ++nState)
     {

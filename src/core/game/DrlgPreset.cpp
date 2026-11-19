@@ -1,4 +1,5 @@
 #include "Drlg/D2DrlgPreset.h"
+#include <test_seam.h>
 
 #include <algorithm>
 #include <cstring>
@@ -686,6 +687,7 @@ D2MapAIStrc* __fastcall DRLGPRESET_CreateCopyOfMapAI(void* pMemPool, D2MapAIStrc
 //D2Common.0x6FD864F0 (#10021)
 D2MapAIStrc* __fastcall DRLGPRESET_ChangeMapAI(D2MapAIStrc** ppMapAI1, D2MapAIStrc** ppMapAI2)
 {
+	if (D2Seam<&DRLGPRESET_ChangeMapAI>::hook) return D2Seam<&DRLGPRESET_ChangeMapAI>::hook(ppMapAI1, ppMapAI2);
 	*ppMapAI2 = *ppMapAI1;
 	*ppMapAI1 = NULL;
 
@@ -696,6 +698,7 @@ D2MapAIStrc* __fastcall DRLGPRESET_ChangeMapAI(D2MapAIStrc** ppMapAI1, D2MapAISt
 // 1.13c D2Common+0x9D90
 void __fastcall DRLGPRESET_FreeMapAI(void* pMemPool, D2MapAIStrc* pMapAI)
 {
+	if (D2Seam<&DRLGPRESET_FreeMapAI>::hook) { D2Seam<&DRLGPRESET_FreeMapAI>::hook(pMemPool, pMapAI); return; }
 	D2_FREE_POOL(pMemPool, pMapAI->pPosition);
 	D2_FREE_POOL(pMemPool, pMapAI);
 }

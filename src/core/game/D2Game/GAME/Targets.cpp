@@ -1,4 +1,5 @@
 #include "GAME/Targets.h"
+#include <test_seam.h>
 
 
 //D2Game.0x6FC40170
@@ -41,6 +42,7 @@ void __fastcall D2GAME_TARGETS_First_6FC40170(D2GameStrc* pGame, D2UnitStrc* pUn
 // 1.13c D2Game+0xEFE40
 void __fastcall D2GAME_UpdateSummonAI_6FC401F0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t nNodeIndex)
 {
+	if (D2Seam<&D2GAME_UpdateSummonAI_6FC401F0>::hook) { D2Seam<&D2GAME_UpdateSummonAI_6FC401F0>::hook(pGame, pUnit, a3, nNodeIndex); return; }
     if (!pGame || !pUnit || pUnit->dwNodeIndex != 11 || nNodeIndex >= 8 || (pUnit->dwUnitType != UNIT_PLAYER && pUnit->dwUnitType != UNIT_MONSTER))
     {
         return;
@@ -138,6 +140,7 @@ void __fastcall D2GAME_FreeUnitNode_6FC40310(D2GameStrc* pGame, D2UnitStrc* pUni
 // 1.13c D2Game+0xEFC60
 void __fastcall D2GAME_TARGETS_Last_6FC40380(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&D2GAME_TARGETS_Last_6FC40380>::hook) { D2Seam<&D2GAME_TARGETS_Last_6FC40380>::hook(pGame, pUnit); return; }
     if (!pGame || !pUnit || (pUnit->dwUnitType != UNIT_PLAYER && pUnit->dwUnitType != UNIT_MONSTER))
     {
         return;

@@ -1,4 +1,5 @@
 #include "MONSTER/MonsterAI.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -326,7 +327,8 @@ int32_t __fastcall MONSTERAI_GetInteractUnitCount(D2MonsterInteractStrc* pMonInt
 //D2Game.0x6FC61A10
 // 1.13c D2Game+0x48370
 int32_t __fastcall MONSTERAI_HasInteractUnit(D2MonsterInteractStrc* pMonInteract)
-{   
+{
+	if (D2Seam<&MONSTERAI_HasInteractUnit>::hook) return D2Seam<&MONSTERAI_HasInteractUnit>::hook(pMonInteract);   
     for (D2InteractInfoStrc* i = pMonInteract->pInteractInfo; i; i = i->pNext)
     {
         if (i->pUnit)
@@ -357,6 +359,7 @@ int32_t __fastcall MONSTERAI_IsInteractingWith(D2MonsterInteractStrc* pMonIntera
 // 1.13c D2Game+0x48300
 void __fastcall MONSTERAI_RemoveInteractInfoFor(D2GameStrc* pGame, D2UnitStrc* pMonster, D2MonsterInteractStrc* pMonInteract)
 {
+	if (D2Seam<&MONSTERAI_RemoveInteractInfoFor>::hook) { D2Seam<&MONSTERAI_RemoveInteractInfoFor>::hook(pGame, pMonster, pMonInteract); return; }
     if (!pMonInteract)
     {
         return;

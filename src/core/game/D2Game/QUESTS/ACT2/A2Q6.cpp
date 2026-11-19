@@ -1138,6 +1138,7 @@ int32_t __fastcall ACT2Q6_NotActiveOrState2Plus_C1B60(D2GameStrc* pGame)
 // 1.13c D2Game+0xC1A60
 int32_t __fastcall ACT2Q6_IsDurielsLairClosed(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&ACT2Q6_IsDurielsLairClosed>::hook) return D2Seam<&ACT2Q6_IsDurielsLairClosed>::hook(pGame, pUnit);
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A2Q6_DURIEL);
 
 	if (pQuestData && pQuestData->bNotIntro)

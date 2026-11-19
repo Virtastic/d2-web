@@ -123,6 +123,7 @@ uint32_t __stdcall DATATBLS_GetLevelThreshold(int nClass, uint32_t dwLevel)
 // 1.13c D2Common+0x5E7E0
 int __stdcall DATATBLS_GetMaxLevel(int nClass)
 {
+	if (D2Seam<&DATATBLS_GetMaxLevel>::hook) return D2Seam<&DATATBLS_GetMaxLevel>::hook(nClass);
 	if (nClass >= 0 && nClass < NUMBER_OF_PLAYERCLASSES)
 	{
 		return sgptDataTables->pExperienceTxt->tMax.dwClass[nClass];
@@ -231,6 +232,7 @@ D2AnimDataTableStrc* __fastcall DATATBLS_GetAnimData()
 // 1.13c D2Common+0x603C0
 D2DifficultyLevelsTxt* __stdcall DATATBLS_GetDifficultyLevelsTxtRecord(int nDifficulty)
 {
+	if (D2Seam<&DATATBLS_GetDifficultyLevelsTxtRecord>::hook) return D2Seam<&DATATBLS_GetDifficultyLevelsTxtRecord>::hook(nDifficulty);
 	if (nDifficulty < 0)
 	{
 		nDifficulty = 0;
@@ -631,6 +633,7 @@ void __stdcall DATATBLS_WriteBinFile(char* szFileName, void* pWriteBuffer, size_
 // 1.13c D2Common+0x5EF40
 void* __stdcall DATATBLS_CompileTxt(HD2ARCHIVE hArchive, const char* szName, D2BinFieldStrc* pTbl, int* pRecordCount, size_t dwSize)
 {
+	if (D2Seam<&DATATBLS_CompileTxt>::hook) return D2Seam<&DATATBLS_CompileTxt>::hook(hArchive, szName, pTbl, pRecordCount, dwSize);
 	D2BinFileStrc* pBinFile = NULL;
 	FILE* pFile = NULL;
 	void* pData = NULL;

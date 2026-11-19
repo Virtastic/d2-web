@@ -1,4 +1,5 @@
 #include "Units/Units.h"
+#include <test_seam.h>
 
 #include "D2Collision.h"
 #include "D2Composit.h"
@@ -55,6 +56,7 @@ D2SkillStrc* __stdcall UNITS_GetStartSkill(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x30460 (#10321)
 D2SkillStrc* __stdcall UNITS_GetLeftSkill(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_GetLeftSkill>::hook) return D2Seam<&UNITS_GetLeftSkill>::hook(pUnit);
 	D2_ASSERT(pUnit);
 	D2_ASSERT(pUnit->pSkills);
 	return pUnit->pSkills->pLeftSkill;
@@ -63,6 +65,7 @@ D2SkillStrc* __stdcall UNITS_GetLeftSkill(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x30420 (#10322)
 D2SkillStrc* __stdcall UNITS_GetRightSkill(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_GetRightSkill>::hook) return D2Seam<&UNITS_GetRightSkill>::hook(pUnit);
 	D2_ASSERT(pUnit);
 	D2_ASSERT(pUnit->pSkills);
 	return pUnit->pSkills->pRightSkill;
@@ -71,6 +74,7 @@ D2SkillStrc* __stdcall UNITS_GetRightSkill(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x303E0 (#10324)
 void __stdcall UNITS_SetUsedSkill(D2UnitStrc* pUnit, D2SkillStrc* pUsedSkill)
 {
+	if (D2Seam<&UNITS_SetUsedSkill>::hook) { D2Seam<&UNITS_SetUsedSkill>::hook(pUnit, pUsedSkill); return; }
 	D2_ASSERT(pUnit);
 	if (pUnit->pSkills)
 	{
@@ -82,6 +86,7 @@ void __stdcall UNITS_SetUsedSkill(D2UnitStrc* pUnit, D2SkillStrc* pUsedSkill)
 // 1.13c D2Common+0x303A0 (#10511)
 D2SkillStrc* __stdcall UNITS_GetUsedSkill(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_GetUsedSkill>::hook) return D2Seam<&UNITS_GetUsedSkill>::hook(pUnit);
 	D2_ASSERT(pUnit);
 	return pUnit->pSkills ? pUnit->pSkills->pUsedSkill : NULL;
 }
@@ -90,6 +95,7 @@ D2SkillStrc* __stdcall UNITS_GetUsedSkill(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x2F370
 D2UnitStrc* __stdcall UNITS_AllocUnit(void* pMemPool, int nUnitType)
 {
+	if (D2Seam<&UNITS_AllocUnit>::hook) return D2Seam<&UNITS_AllocUnit>::hook(pMemPool, nUnitType);
 	D2UnitStrc* pUnit = D2_CALLOC_STRC_POOL(pMemPool, D2UnitStrc);
 
 	pUnit->pMemoryPool = pMemPool;
@@ -166,6 +172,7 @@ int __stdcall UNITS_GetPrecisionY(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x2F2C0
 void __stdcall UNITS_SetXForStaticUnit(D2UnitStrc* pUnit, int nX)
 {
+	if (D2Seam<&UNITS_SetXForStaticUnit>::hook) { D2Seam<&UNITS_SetXForStaticUnit>::hook(pUnit, nX); return; }
 	D2_ASSERT(pUnit);
 
 	switch (pUnit->dwUnitType)
@@ -185,6 +192,7 @@ void __stdcall UNITS_SetXForStaticUnit(D2UnitStrc* pUnit, int nX)
 // 1.13c D2Common+0x2F270
 void __stdcall UNITS_SetYForStaticUnit(D2UnitStrc* pUnit, int nY)
 {
+	if (D2Seam<&UNITS_SetYForStaticUnit>::hook) { D2Seam<&UNITS_SetYForStaticUnit>::hook(pUnit, nY); return; }
 	D2_ASSERT(pUnit);
 
 	switch (pUnit->dwUnitType)
@@ -204,6 +212,7 @@ void __stdcall UNITS_SetYForStaticUnit(D2UnitStrc* pUnit, int nY)
 // 1.13c D2Common+0x30F80
 int __stdcall UNITS_GetUnitSizeX(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_GetUnitSizeX>::hook) return D2Seam<&UNITS_GetUnitSizeX>::hook(pUnit);
 	D2MonStats2Txt* pMonStats2TxtRecord = NULL;
 	D2MissilesTxt* pMissilesTxtRecord = NULL;
 
@@ -248,6 +257,7 @@ int __stdcall UNITS_GetUnitSizeX(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x30EE0
 int __stdcall UNITS_GetUnitSizeY(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_GetUnitSizeY>::hook) return D2Seam<&UNITS_GetUnitSizeY>::hook(pUnit);
 	D2MonStats2Txt* pMonStats2TxtRecord = NULL;
 	D2MissilesTxt* pMissilesTxtRecord = NULL;
 
@@ -450,6 +460,7 @@ void __stdcall UNITS_SetTargetY(D2UnitStrc* pUnit, int nTargetY)
 // 1.13c D2Common+0x30050
 void __stdcall UNITS_GetCoords(D2UnitStrc* pUnit, D2CoordStrc* pCoord)
 {
+	if (D2Seam<&UNITS_GetCoords>::hook) { D2Seam<&UNITS_GetCoords>::hook(pUnit, pCoord); return; }
 	D2_ASSERT(pUnit);
 
 	switch (pUnit->dwUnitType)
@@ -553,6 +564,7 @@ int __fastcall UNITS_GetCollisionMask(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x318C0
 void __stdcall UNITS_FreeCollisionPath(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_FreeCollisionPath>::hook) { D2Seam<&UNITS_FreeCollisionPath>::hook(pUnit); return; }
 	D2CoordStrc pCoords = {};
 
 	UNITS_GetCoords(pUnit, &pCoords);
@@ -564,6 +576,7 @@ void __stdcall UNITS_FreeCollisionPath(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x31850
 void __stdcall UNITS_BlockCollisionPath(D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom, int nX, int nY)
 {
+	if (D2Seam<&UNITS_BlockCollisionPath>::hook) { D2Seam<&UNITS_BlockCollisionPath>::hook(pUnit, pRoom, nX, nY); return; }
 	int nSizeX = 0;
 	int nSizeY = 0;
 
@@ -622,6 +635,7 @@ void __stdcall UNITS_ResetRoom(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x2FE10 (#10331)
 D2ActiveRoomStrc* __stdcall UNITS_GetRoom(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_GetRoom>::hook) return D2Seam<&UNITS_GetRoom>::hook(pUnit);
 	D2_ASSERT(pUnit);
 
 	switch (pUnit->dwUnitType)
@@ -643,6 +657,7 @@ D2ActiveRoomStrc* __stdcall UNITS_GetRoom(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x30E80
 void __stdcall UNITS_SetTargetUnitForDynamicUnit(D2UnitStrc* pUnit, D2UnitStrc* pTargetUnit)
 {
+	if (D2Seam<&UNITS_SetTargetUnitForDynamicUnit>::hook) { D2Seam<&UNITS_SetTargetUnitForDynamicUnit>::hook(pUnit, pTargetUnit); return; }
 	D2_ASSERT(pUnit);
 	D2_ASSERT((pUnit->dwUnitType == UNIT_PLAYER) || (pUnit->dwUnitType == UNIT_MONSTER) || (pUnit->dwUnitType == UNIT_MISSILE));
 	PATH_SetTargetUnit(pUnit->pDynamicPath, pTargetUnit);
@@ -849,6 +864,7 @@ void __stdcall UNITS_SetAnimStartFrame(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x33920
 BOOL __stdcall UNITS_ChangeAnimMode(D2UnitStrc* pUnit, int nMode)
 {
+	if (D2Seam<&UNITS_ChangeAnimMode>::hook) return D2Seam<&UNITS_ChangeAnimMode>::hook(pUnit, nMode);
 	if (pUnit && pUnit->dwUnitType != UNIT_TILE)
 	{
 		if (pUnit->dwAnimMode != nMode)
@@ -918,6 +934,7 @@ void __stdcall UNITS_SetCurrentRoomInvalid(D2UnitStrc* pUnit, int a2)
 // 1.13c D2Common+0x30DC0
 void __stdcall UNITS_RefreshInventory(D2UnitStrc* pUnit, BOOL bSetFlag)
 {
+	if (D2Seam<&UNITS_RefreshInventory>::hook) { D2Seam<&UNITS_RefreshInventory>::hook(pUnit, bSetFlag); return; }
 	if (bSetFlag)
 	{
 		UNITROOM_RefreshUnit(pUnit);
@@ -1017,6 +1034,7 @@ D2GfxLightStrc* __stdcall UNITS_ResetLightMap(D2UnitStrc* pUnit)
 //D2Common.0x6FDBED10 (#10369)
 int __stdcall UNITS_GetAnimOrSeqMode(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_GetAnimOrSeqMode>::hook) return D2Seam<&UNITS_GetAnimOrSeqMode>::hook(pUnit);
 	if (pUnit)
 	{
 		if (UNITS_GetAnimSeq(pUnit))
@@ -1086,6 +1104,7 @@ void __stdcall UNITS_SetAnimationFrame(D2UnitStrc* pUnit, int nFrame)
 // 1.13c D2Common+0x32460
 void __stdcall UNITS_StopSequence(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_StopSequence>::hook) { D2Seam<&UNITS_StopSequence>::hook(pUnit); return; }
 	pUnit->nActionFrame = 0;
 
 	if (pUnit->pAnimSeq)
@@ -1593,6 +1612,7 @@ const D2Common33110Env& UNITS_AnimRateEnv()
 // 1.13c D2Common+0x33110 (body: d2common/d2common_33110.cpp)
 void __stdcall UNITS_UpdateAnimRateAndVelocity(D2UnitStrc* pUnit, const char* szFile, int nLine)
 {
+	if (D2Seam<&UNITS_UpdateAnimRateAndVelocity>::hook) { D2Seam<&UNITS_UpdateAnimRateAndVelocity>::hook(pUnit, szFile, nLine); return; }
 	(void)szFile; (void)nLine;
 	D2Common_33110_UpdateAnimRate(pUnit, UNITS_AnimRateEnv());
 }
@@ -1608,6 +1628,7 @@ void __stdcall UNITS_SetAnimationSpeed(D2UnitStrc* pUnit, int nSpeed)
 // 1.13c D2Common+0x2EF30
 int __stdcall UNITS_IsAtEndOfFrameCycle(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_IsAtEndOfFrameCycle>::hook) return D2Seam<&UNITS_IsAtEndOfFrameCycle>::hook(pUnit);
 	D2_ASSERT(pUnit);
 	
 	if (pUnit->pAnimSeq)
@@ -1785,6 +1806,7 @@ BOOL __stdcall UNITS_IsShrine(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x2ECF0
 D2ObjectsTxt* __stdcall UNITS_GetObjectTxtRecordFromObject(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_GetObjectTxtRecordFromObject>::hook) return D2Seam<&UNITS_GetObjectTxtRecordFromObject>::hook(pUnit);
 	D2_ASSERT(pUnit);
 
 	if (pUnit->dwUnitType != UNIT_OBJECT)
@@ -1800,6 +1822,7 @@ D2ObjectsTxt* __stdcall UNITS_GetObjectTxtRecordFromObject(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x2ECB0 (fatal codes 0xE4E/0xE55; the read is identical)
 D2ShrinesTxt* __stdcall UNITS_GetShrineTxtRecordFromObject(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_GetShrineTxtRecordFromObject>::hook) return D2Seam<&UNITS_GetShrineTxtRecordFromObject>::hook(pUnit);
 	D2_ASSERT(pUnit);
 
 
@@ -1997,6 +2020,7 @@ void (*g_d2webOverlayHook)(D2UnitStrc* pUnit, int nOverlay) = nullptr;
 // 1.13c D2Common+0x32C10 (no null-unit branch: retail reads the unit's pool directly). The hook call is not-1.13c: web session observer.
 void __stdcall UNITS_SetOverlay(D2UnitStrc* pUnit, int nOverlay, int nUnused)
 {
+	if (D2Seam<&UNITS_SetOverlay>::hook) { D2Seam<&UNITS_SetOverlay>::hook(pUnit, nOverlay, nUnused); return; }
 	if (g_d2webOverlayHook) g_d2webOverlayHook(pUnit, nOverlay);
 	D2StatListStrc* pStatList = NULL;
 
@@ -2034,6 +2058,7 @@ int __stdcall UNITS_GetBeltType(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x32330 (stats 6 and 7 as fixed point, >>8 each, then *100 / max)
 int __stdcall UNITS_GetCurrentLifePercentage(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_GetCurrentLifePercentage>::hook) return D2Seam<&UNITS_GetCurrentLifePercentage>::hook(pUnit);
 	const int nHp = STAT_HitPointsFixedPointToInt(STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0));
 	if (const int nMaxHp = STAT_HitPointsFixedPointToInt(STATLIST_GetMaxLifeFromUnit(pUnit)))
 	{
@@ -2176,6 +2201,7 @@ char* __stdcall UNITS_GetPlayerName(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x2EB70
 D2PlayerDataStrc* __stdcall UNITS_GetPlayerData(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_GetPlayerData>::hook) return D2Seam<&UNITS_GetPlayerData>::hook(pUnit);
 	D2_ASSERT(pUnit);
 
 	D2_ASSERT(pUnit->dwUnitType == UNIT_PLAYER);
@@ -2221,6 +2247,7 @@ uint32_t __stdcall UNITS_GetNameOffsetFromObject(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x2EA70
 uint8_t __stdcall UNITS_GetObjectPortalFlags(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_GetObjectPortalFlags>::hook) return D2Seam<&UNITS_GetObjectPortalFlags>::hook(pUnit);
 	D2_ASSERT(pUnit);
 	D2_ASSERT(pUnit->dwUnitType == UNIT_OBJECT);
 	return pUnit->pObjectData->nPortalFlags;
@@ -2230,6 +2257,7 @@ uint8_t __stdcall UNITS_GetObjectPortalFlags(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x2EA30
 void __stdcall UNITS_SetObjectPortalFlags(D2UnitStrc* pUnit, uint8_t nPortalFlag)
 {
+	if (D2Seam<&UNITS_SetObjectPortalFlags>::hook) { D2Seam<&UNITS_SetObjectPortalFlags>::hook(pUnit, nPortalFlag); return; }
 	D2_ASSERT(pUnit);
 	D2_ASSERT(pUnit->dwUnitType == UNIT_OBJECT);
 	pUnit->pObjectData->nPortalFlags = nPortalFlag;
@@ -2239,6 +2267,7 @@ void __stdcall UNITS_SetObjectPortalFlags(D2UnitStrc* pUnit, uint8_t nPortalFlag
 //D2Common.0x6FDC07C0 (#10429)
 BOOL __stdcall UNITS_CheckObjectPortalFlag(D2UnitStrc* pUnit, uint8_t nFlag)
 {
+	if (D2Seam<&UNITS_CheckObjectPortalFlag>::hook) return D2Seam<&UNITS_CheckObjectPortalFlag>::hook(pUnit, nFlag);
 	D2_ASSERT(pUnit);
 	D2_ASSERT(pUnit->dwUnitType == UNIT_OBJECT);
 
@@ -2860,6 +2889,7 @@ BOOL __fastcall UNITS_TestCollision(int nX1, int nY1, int nSize1, int nX2, int n
 // 1.13c D2Common+0x314A0 (fatal 0x1290 on a null first unit; a null second unit returns FALSE)
 BOOL __stdcall UNITS_TestCollisionWithUnit(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, int nCollisionMask)
 {
+	if (D2Seam<&UNITS_TestCollisionWithUnit>::hook) return D2Seam<&UNITS_TestCollisionWithUnit>::hook(pUnit1, pUnit2, nCollisionMask);
 	D2ActiveRoomStrc* pRoom = NULL;
 	D2CoordStrc pCoords1 = {};
 	D2CoordStrc pCoords2 = {};
@@ -2938,6 +2968,7 @@ BOOL __stdcall UNITS_TestCollisionBetweenInteractingUnits(D2UnitStrc* pUnit1, D2
 // 1.13c D2Common+0x326C0
 BOOL __stdcall UNITS_IsInMeleeRange(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, int nRangeBonus)
 {
+	if (D2Seam<&UNITS_IsInMeleeRange>::hook) return D2Seam<&UNITS_IsInMeleeRange>::hook(pUnit1, pUnit2, nRangeBonus);
 	int nDistance = 0;
 	int nClassId = 0;
 
@@ -3093,6 +3124,7 @@ unsigned int __stdcall UNITS_GetHealingCost(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x31940
 unsigned int __stdcall UNITS_GetInventoryGoldLimit(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_GetInventoryGoldLimit>::hook) return D2Seam<&UNITS_GetInventoryGoldLimit>::hook(pUnit);
 	if (pUnit == nullptr)
 	{
 		return 0;
@@ -3515,6 +3547,7 @@ D2UnitGUID __stdcall UNITS_GetWeaponGUID(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x2E9C0
 unsigned int __stdcall UNITS_GetStashGoldLimit(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_GetStashGoldLimit>::hook) return D2Seam<&UNITS_GetStashGoldLimit>::hook(pUnit);
 	// 1.13c: the stash limit is a constant (the 1.10 level-scaled rule is gone).
 	(void)pUnit;
 	return 2500000;
@@ -3560,6 +3593,7 @@ void __fastcall UNITS_SetTimerArg(D2UnitStrc* pUnit, D2TimerArgStrc* pTimerArg)
 // 1.13c D2Common+0x2E960
 D2TimerArgStrc* __fastcall UNITS_GetTimerArg(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_GetTimerArg>::hook) return D2Seam<&UNITS_GetTimerArg>::hook(pUnit);
 	if (pUnit == nullptr)
 		UNITS_FatalCode(0x1513);
 
@@ -3569,6 +3603,7 @@ D2TimerArgStrc* __fastcall UNITS_GetTimerArg(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x2F410
 void __stdcall UNITS_AllocStaticPath(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_AllocStaticPath>::hook) { D2Seam<&UNITS_AllocStaticPath>::hook(pUnit); return; }
 	if (!pUnit->pStaticPath)
 	{
 		pUnit->pStaticPath = D2_CALLOC_STRC_POOL(pUnit->pMemoryPool, D2StaticPathStrc);
@@ -3589,6 +3624,7 @@ void __stdcall UNITS_FreeStaticPath(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x30530
 BOOL __stdcall UNITS_CanDualWield(D2UnitStrc* pUnit)
 {
+	if (D2Seam<&UNITS_CanDualWield>::hook) return D2Seam<&UNITS_CanDualWield>::hook(pUnit);
 	if (pUnit)
 	{
 		switch (pUnit->dwUnitType)
@@ -3775,6 +3811,7 @@ int __stdcall D2Common_10399(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2)
 // 1.13c D2Common+0x7FBD0
 int __stdcall UNITS_GetDistanceToOtherUnit(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2)
 {
+	if (D2Seam<&UNITS_GetDistanceToOtherUnit>::hook) return D2Seam<&UNITS_GetDistanceToOtherUnit>::hook(pUnit1, pUnit2);
 	D2CoordStrc pCoords1 = {};
 	D2CoordStrc pCoords2 = {};
 	int nDistanceX = 0;
@@ -3827,6 +3864,7 @@ int __stdcall UNITS_GetDistanceToOtherUnit(D2UnitStrc* pUnit1, D2UnitStrc* pUnit
 // 1.13c D2Common+0x7F5E0 (same body as 0x2F1E0; a second copy in retail)
 unsigned int __stdcall UNITS_GetDistanceToCoordinates(D2UnitStrc* pUnit, int nX, int nY)
 {
+	if (D2Seam<&UNITS_GetDistanceToCoordinates>::hook) return D2Seam<&UNITS_GetDistanceToCoordinates>::hook(pUnit, nX, nY);
 	D2CoordStrc pCoords = {};
 	int nDistanceX = 0;
 	int nDistanceY = 0;

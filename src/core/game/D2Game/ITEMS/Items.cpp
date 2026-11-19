@@ -643,6 +643,7 @@ int32_t __fastcall sub_6FC4E430(D2GameStrc* pGame, D2ItemDropStrc* pItemDrop, D2
 // 1.13c D2Game+0x1180 (limit in EAX) and 1.13c D2Game+0x11D0 (seed in ECX, limit in ESI): the same body, the twins differ only in the limit's register
 uint32_t __fastcall ITEMS_RollLimitedRandomNumber(D2SeedStrc* pSeed, int32_t nMax)
 {
+	if (D2Seam<&ITEMS_RollLimitedRandomNumber>::hook) return D2Seam<&ITEMS_RollLimitedRandomNumber>::hook(pSeed, nMax);
     return SEED_RollLimitedRandomNumber(pSeed, nMax);
 }
 
@@ -821,6 +822,7 @@ int32_t __fastcall D2GAME_InitItemStats_6FC4E520(D2GameStrc* pGame, D2UnitStrc**
 // 1.13c D2Game+0x01160
 uint32_t __fastcall ITEMS_RollRandomNumber(D2SeedStrc* pSeed)
 {
+	if (D2Seam<&ITEMS_RollRandomNumber>::hook) return D2Seam<&ITEMS_RollRandomNumber>::hook(pSeed);
     return SEED_RollRandomNumber(pSeed);
 }
 
@@ -869,7 +871,8 @@ D2CreateItemExSeam g_d2CreateItemEx = {};
 
 // 1.13c D2Game+0x11490
 D2UnitStrc* __fastcall D2GAME_CreateItemEx_6FC4ED80(D2GameStrc* pGame, D2ItemDropStrc* pItemDrop, int32_t bUseSeed)
-{    
+{
+	if (D2Seam<&D2GAME_CreateItemEx_6FC4ED80>::hook) return D2Seam<&D2GAME_CreateItemEx_6FC4ED80>::hook(pGame, pItemDrop, bUseSeed);    
     if (!pGame->bExpansion)
     {
         D2ItemsTxt* pItemsTxtRecord = CIS(DATATBLS_GetItemsTxtRecord)(pItemDrop->nId);
@@ -1085,6 +1088,7 @@ D2UnitStrc* __fastcall sub_6FC4F290(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, 
 // 1.13c D2Game+0xFFC0 (checked against the decompile: gold-code cache, level <= 0x41 assert, one roll mod 100 against the gold / armor / weapon / misc bands, no delta)
 int32_t __fastcall sub_6FC4F4A0(D2GameStrc* pGame, D2SeedStrc* pSeed, int32_t nLevelId, int32_t a4, int32_t a5, int32_t a6)
 {
+	if (D2Seam<&sub_6FC4F4A0>::hook) return D2Seam<&sub_6FC4F4A0>::hook(pGame, pSeed, nLevelId, a4, a5, a6);
     constexpr int32_t BASE_GOLD_RAND = 65;
 
     if (!gbGoldItemIdInitialized)
@@ -1395,6 +1399,7 @@ D2UnitStrc* __fastcall sub_6FC4FCA0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, 
 // 1.13c D2Game+0x11A70 (placement is D2GAME_GetFreeSpaceEx, not the 1.10f free-coordinates search; checked against objdump)
 D2UnitStrc* __fastcall D2GAME_DropItemAtUnit_6FC4FEC0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nQuality, int32_t* pItemLevel, D2ItemDropStrc* pItemDrop, int32_t a6, int32_t a7)
 {
+	if (D2Seam<&D2GAME_DropItemAtUnit_6FC4FEC0>::hook) return D2Seam<&D2GAME_DropItemAtUnit_6FC4FEC0>::hook(pGame, pUnit, nQuality, pItemLevel, pItemDrop, a6, a7);
     D2_ASSERT(pGame);
 
     D2SeedStrc* pSeed = &pUnit->pSeed;
@@ -1555,6 +1560,7 @@ void __fastcall ITEMS_RemoveAll(D2GameStrc* pGame)
 //D2Game.0x6FC50320
 void __fastcall ITEMS_RemoveFromAllPlayers(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
+	if (D2Seam<&ITEMS_RemoveFromAllPlayers>::hook) { D2Seam<&ITEMS_RemoveFromAllPlayers>::hook(pGame, pUnit); return; }
     SUNIT_IterateLivingPlayers(pGame, ITEMS_PlayerIterateCallback_RemoveItem, pUnit);
     SUNIT_RemoveUnit(pGame, pUnit);
 }
@@ -1597,6 +1603,7 @@ int32_t __fastcall ITEMS_IsInPlayersInventory(D2UnitStrc* pPlayer, D2UnitStrc* p
 // 1.13c D2Game+0xE660
 D2UnitStrc* __fastcall ITEMS_FindQuestItem(D2GameStrc* pGame, D2UnitStrc* pUnit, uint32_t dwItemCode)
 {
+	if (D2Seam<&ITEMS_FindQuestItem>::hook) return D2Seam<&ITEMS_FindQuestItem>::hook(pGame, pUnit, dwItemCode);
     if (!pUnit->pInventory)
     {
         return nullptr;
@@ -1631,6 +1638,7 @@ D2UnitStrc* __fastcall ITEMS_FindQuestItem(D2GameStrc* pGame, D2UnitStrc* pUnit,
 // 1.13c D2Game+0xE5D0
 int32_t __fastcall ITEMS_GetItemLevelForNewItem(D2UnitStrc* pUnit, int32_t nLevelId)
 {
+	if (D2Seam<&ITEMS_GetItemLevelForNewItem>::hook) return D2Seam<&ITEMS_GetItemLevelForNewItem>::hook(pUnit, nLevelId);
     if (!pUnit)
     {
         // 1.13c: a null unit with a level id is fatal (assert + _exit), otherwise level 1
@@ -1978,6 +1986,7 @@ int32_t __fastcall ITEMS_GetManaPotionDropCode(D2UnitStrc* pUnit)
 // 1.13c D2Game+0x107E0
 D2UnitStrc* __fastcall ITEMS_Duplicate(D2GameStrc* pGame, D2UnitStrc* pItem, D2UnitStrc* pOwner, int32_t bDuplicateSocketFillers)
 {
+	if (D2Seam<&ITEMS_Duplicate>::hook) return D2Seam<&ITEMS_Duplicate>::hook(pGame, pItem, pOwner, bDuplicateSocketFillers);
     D2ItemSaveStrc itemSave = {};
     uint8_t bitstream[1024] = {};
 
@@ -2598,6 +2607,7 @@ void __fastcall D2GAME_DropTC_6FC51360(D2GameStrc* pGame, D2UnitStrc* pMonster, 
 // 1.13c D2Game+0x1280 (checked against decompile, no delta; shared helper, 75 callers, hence early RVA)
 D2ActiveRoomStrc* __fastcall D2GAME_GetRoom_6FC52070(D2ActiveRoomStrc* pRoom, int32_t nSubtileX, int32_t nSubtileY)
 {
+	if (D2Seam<&D2GAME_GetRoom_6FC52070>::hook) return D2Seam<&D2GAME_GetRoom_6FC52070>::hook(pRoom, nSubtileX, nSubtileY);
     return DUNGEON_GetRoomAtPosition(pRoom, nSubtileX, nSubtileY);
 }
 
@@ -2665,6 +2675,7 @@ int32_t __fastcall ITEMS_GetGroundRemovalTime(D2GameStrc* pGame, D2UnitStrc* pUn
 // 1.13c D2Game+0xE990
 void __fastcall D2GAME_DropItem_6FC52260(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY)
 {
+	if (D2Seam<&D2GAME_DropItem_6FC52260>::hook) { D2Seam<&D2GAME_DropItem_6FC52260>::hook(pGame, pUnit, pItem, pRoom, nX, nY); return; }
     if (!pRoom)
     {
         return;
