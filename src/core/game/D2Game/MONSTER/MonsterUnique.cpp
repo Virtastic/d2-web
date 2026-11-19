@@ -1789,7 +1789,7 @@ void __fastcall MONSTERUNIQUE_LightningEnchantedModeChange(D2GameStrc* pGame, D2
 {
     if (bUnique && pBoss && pBoss->dwAnimMode == MONMODE_GETHIT)
     {
-        EVENT_SetEvent(pGame, pBoss, EVENTTYPE_MONUMOD, pGame->dwGameFrame + 2, 0, 0);
+        D2_CALL(EVENT_SetEvent, pGame, pBoss, EVENTTYPE_MONUMOD, pGame->dwGameFrame + 2, 0, 0);
     }
 }
 

@@ -1,4 +1,5 @@
 #include "PLAYER/PlrModes.h"
+#include <test_seam.h>
 
 #include <algorithm>
 
@@ -10,6 +11,7 @@
 #include <D2Items.h>
 #include <D2Skills.h>
 #include <D2States.h>
+#include <test_seam.h>
 #include <D2StatList.h>
 #include <Path/PathMisc.h>
 #include <Units/UnitRoom.h>
@@ -825,12 +827,12 @@ void __fastcall PLRMODE_StartXY_Block(D2GameStrc* pGame, D2UnitStrc* pPlayer, in
 {
     D2_ASSERT(pPlayer);
 
-    SUNITDMG_FreeAttackerCombatList(pGame, pPlayer);
-    SUNIT_SetCombatMode(pGame, pPlayer, nMode);
-    sub_6FCBC4D0(pPlayer);
-    UNITS_SetUsedSkill(pPlayer, nullptr);
-    D2GAME_DeletePlayerPerFrameEvents_6FCBCE50(pGame, pPlayer);
-    sub_6FCBCE70(pGame, pPlayer);
+    D2_CALL(SUNITDMG_FreeAttackerCombatList, pGame, pPlayer);
+    D2_CALL(SUNIT_SetCombatMode, pGame, pPlayer, nMode);
+    D2_CALL(sub_6FCBC4D0, pPlayer);
+    D2_CALL(UNITS_SetUsedSkill, pPlayer, nullptr);
+    D2_CALL(D2GAME_DeletePlayerPerFrameEvents_6FCBCE50, pGame, pPlayer);
+    D2_CALL(sub_6FCBCE70, pGame, pPlayer);
 }
 
 //D2Game.0x6FC808D0
@@ -858,12 +860,12 @@ void __fastcall PLRMODE_StartXY_GetHit(D2GameStrc* pGame, D2UnitStrc* pPlayer, i
 {
     D2_ASSERT(pPlayer);
 
-    SUNITDMG_FreeAttackerCombatList(pGame, pPlayer);
-    SUNIT_SetCombatMode(pGame, pPlayer, nMode);
-    sub_6FCBC4D0(pPlayer);
-    UNITS_SetUsedSkill(pPlayer, 0);
-    D2GAME_DeletePlayerPerFrameEvents_6FCBCE50(pGame, pPlayer);
-    sub_6FCBCE70(pGame, pPlayer);
+    D2_CALL(SUNITDMG_FreeAttackerCombatList, pGame, pPlayer);
+    D2_CALL(SUNIT_SetCombatMode, pGame, pPlayer, nMode);
+    D2_CALL(sub_6FCBC4D0, pPlayer);
+    D2_CALL(UNITS_SetUsedSkill, pPlayer, nullptr);
+    D2_CALL(D2GAME_DeletePlayerPerFrameEvents_6FCBCE50, pGame, pPlayer);
+    D2_CALL(sub_6FCBCE70, pGame, pPlayer);
 }
 
 //D2Game.0x6FC80940
@@ -1680,9 +1682,9 @@ void __fastcall sub_6FC81B20(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, i
 // 1.13c D2Game+0x79A60 (checked against decompile, no delta; party sync D2Game+0x9C620, pet sync D2Game+0x98250, event 11 at +30 frames)
 void __fastcall sub_6FC81B90(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4)
 {
-    PARTY_SynchronizeWithClient(pGame, pUnit);
-    sub_6FC7E640(pGame, pUnit);
-    EVENT_SetEvent(pGame, pUnit, EVENTTYPE_DELAYEDPORTAL, pGame->dwGameFrame + 30, 0, 0);
+    D2_CALL(PARTY_SynchronizeWithClient, pGame, pUnit);
+    D2_CALL(sub_6FC7E640, pGame, pUnit);
+    D2_CALL(EVENT_SetEvent, pGame, pUnit, EVENTTYPE_DELAYEDPORTAL, pGame->dwGameFrame + 30, 0, 0);
 }
 
 //D2Game.0x6FC81BD0

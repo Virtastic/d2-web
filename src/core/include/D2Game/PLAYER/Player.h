@@ -5,13 +5,20 @@
 
 
 //D2Game.0x6FC7B550
+void __fastcall PLAYER_CreateIntros(D2GameStrc* pGame, D2UnitStrc* pPlayer);
 void __fastcall PLAYER_Create(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nPlayerGUID);
+// 1.13c D2Game+0x37500
+void __fastcall PLAYER_FreeNodeChain(D2GameStrc* pGame, D2PlayerDataStrc* pPlayerData);
+// 1.13c D2Game+0x376B0
+void __fastcall PLAYER_FreeIntros(D2GameStrc* pGame, D2UnitStrc* pPlayer);
 //D2Game.0x6FC7B630
 void __fastcall PLAYER_Destroy(D2GameStrc* pGame, D2UnitStrc* pPlayer);
 //D2Game.0x6FC7B750
 void __fastcall PLAYER_RemoveAllPlayers(D2GameStrc* pGame);
 //D2Game.0x6FC7B7A0
 void __fastcall sub_6FC7B7A0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY);
+// 1.13c D2Game+0x38090
+D2UnitStrc* __fastcall PLAYER_CreateStartItemUnit(D2UnitStrc* pPlayer, D2CharStatsTxt* pCharStatsTxt, D2GameStrc* pGame, int32_t nCount, int32_t nItemId);
 //D2Game.0x6FC7B800
 void __fastcall PLAYER_CreateStartItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2CharStatsTxt* pCharStatsTxt, int32_t nCount, D2CharItemStrc* pCharItem);
 // 1.13c D2Game+0x37EC0
@@ -52,6 +59,10 @@ void __fastcall PLAYER_SetVirtualPlayerCount(int32_t nPlayers);
 int32_t __fastcall PLAYER_GetPlayerCount(D2GameStrc* pGame);
 //D2Game.0x6FC7C4E0
 void __fastcall PLAYER_CountLivingPlayers(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pLivingPlayers);
+// 1.13c D2Game+0x38180
+void __fastcall PLAYER_ApplyDeathGoldPenalty(D2GameStrc* pGame, D2UnitStrc* pDefender, D2UnitStrc* pAttacker);
+// 1.13c D2Game+0x37730
+void __fastcall PLAYER_LoseExperience(D2GameStrc* pGame, D2UnitStrc* pDefender);
 //D2Game.0x6FC7C500
 void __fastcall PLAYER_ApplyDeathPenalty(D2GameStrc* pGame, D2UnitStrc* pDefender, D2UnitStrc* pAttacker);
 //D2Game.0x6FC7C750

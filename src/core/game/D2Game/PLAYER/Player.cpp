@@ -50,39 +50,79 @@ struct D2RosterIterateStrc
 int32_t gnVirtualPlayerCount_6FD4DC1C;
 
 
-//D2Game.0x6FC7B550
-// 1.13c D2Game+0x38620 (PLAYER_Create; differs: flags OR 0xE, unit+0xDC freed and cleared, no sub_6FCBDD30 call)
-void __fastcall PLAYER_Create(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nPlayerGUID)
+// 1.13c D2Game+0x376F0 (outlined in 1.13c; EAX = player, ECX = game): the three intro slots are created and the bought-item id cleared
+void __fastcall PLAYER_CreateIntros(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
-    D2_ASSERT(pPlayer);
-
-    pPlayer->dwFlags |= UNITFLAG_ISVALIDTARGET | UNITFLAG_CANBEATTACKED | UNITFLAG_TARGETABLE;
-
-    pPlayer->dwUnitId = nPlayerGUID;
-
-    INVENTORY_AllocInventory(nullptr, pPlayer);
-
-    pPlayer->pSkills = SKILLS_AllocSkillList(pGame->pMemoryPool);
-    SKILLS_InitSkillList(pPlayer);
-
-    STATLIST_AllocStatListEx(pPlayer, 0, D2GAME_ITEMMODE_ServerStatlistCallback_6FC41910, pGame);
-    UNITS_AllocPlayerData(pPlayer);
-
     D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer);
     if (pPlayerData)
     {
         for (int32_t i = 0; i < 3; ++i)
         {
-            pPlayerData->pPlayerIntro[i] = PLRINTRO_Create(pGame);
+            pPlayerData->pPlayerIntro[i] = D2_CALL(PLRINTRO_Create, pGame);
         }
         pPlayerData->dwBoughtItemId = 0;
     }
+}
+
+//D2Game.0x6FC7B550
+// 1.13c D2Game+0x38620 (ESI = player, EAX = game; stack id; the retail outlines the intro setup as 0x376F0 and frees a pending timer chain only when one is set)
+void __fastcall PLAYER_Create(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nPlayerGUID)
+{
+    D2_ASSERT(pPlayer);
+
+    pPlayer->dwUnitId = nPlayerGUID;
+    pPlayer->dwFlags |= UNITFLAG_ISVALIDTARGET | UNITFLAG_CANBEATTACKED | UNITFLAG_TARGETABLE;
+
+    D2_CALL(INVENTORY_AllocInventory, nullptr, pPlayer);
+
+    pPlayer->pSkills = D2_CALL(SKILLS_AllocSkillList, pGame->pMemoryPool);
+    D2_CALL(SKILLS_InitSkillList, pPlayer);
+
+    D2_CALL(STATLIST_AllocStatListEx, pPlayer, 0, D2GAME_ITEMMODE_ServerStatlistCallback_6FC41910, pGame);
+    D2_CALL(UNITS_AllocPlayerData, pPlayer);
+
+    D2_CALL(PLAYER_CreateIntros, pGame, pPlayer);
 
     SUNIT_InitClientInPlayerData(pPlayer, nullptr);
-    D2_CALL(sub_6FC349F0, pGame, pPlayer);
+    if (pPlayer->pTimer)
+    {
+        D2_CALL(sub_6FC349F0, pGame, pPlayer);
+    }
+    pPlayer->pTimer = nullptr;
+
     D2_CALL(ARENA_AllocArenaUnit, pGame, pPlayer);
     D2_CALL(PLAYERPETS_AllocPetList, pGame, pPlayer);
     D2_CALL(sub_6FCBDD30, pPlayer, 2u, 1);
+}
+
+// 1.13c D2Game+0x37500 (outlined in 1.13c; EBX = player data, EDI = game): frees the +0x98 node chain and clears the head
+void __fastcall PLAYER_FreeNodeChain(D2GameStrc* pGame, D2PlayerDataStrc* pPlayerData)
+{
+    D2UnkPlayerDataStrc* pNode = pPlayerData->unk0x98;
+    while (pNode)
+    {
+        D2UnkPlayerDataStrc* pNext = pNode->pNext;
+        D2_CALL(FOG_FreePool, pGame->pMemoryPool, pNode, __FILE__, __LINE__, 0);
+        pNode = pNext;
+    }
+    pPlayerData->unk0x98 = nullptr;
+}
+
+// 1.13c D2Game+0x376B0 (outlined in 1.13c): no player data, nothing; else the node chain, then the three intro slots destroyed and cleared
+void __fastcall PLAYER_FreeIntros(D2GameStrc* pGame, D2UnitStrc* pPlayer)
+{
+    D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer);
+    if (!pPlayerData)
+    {
+        return;
+    }
+
+    D2_CALL(PLAYER_FreeNodeChain, pGame, pPlayerData);
+    for (int32_t i = 0; i < 3; ++i)
+    {
+        D2_CALL(PLRINTRO_Destroy, pGame, pPlayerData->pPlayerIntro[i]);
+        pPlayerData->pPlayerIntro[i] = nullptr;
+    }
 }
 
 //D2Game.0x6FC7B630
@@ -113,25 +153,7 @@ void __fastcall PLAYER_Destroy(D2GameStrc* pGame, D2UnitStrc* pPlayer)
     INVENTORY_FreeInventory(pPlayer->pInventory);
     ARENA_FreeArenaUnit(pGame, pPlayer);
 
-    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
-    if (pPlayerData)
-    {
-        // TODO: v11
-        D2UnkPlayerDataStrc* v11 = pPlayerData->unk0x98;
-        while (v11)
-        {
-            D2UnkPlayerDataStrc* pNext = v11->pNext;
-            D2_FREE_POOL(pGame->pMemoryPool, v11);
-            v11 = pNext;
-        }
-        pPlayerData->unk0x98 = nullptr;
-
-        for (int32_t i = 0; i < 3; ++i)
-        {
-            PLRINTRO_Destroy(pGame, pPlayerData->pPlayerIntro[i]);
-            pPlayerData->pPlayerIntro[i] = nullptr;
-        }
-    }
+    D2_CALL(PLAYER_FreeIntros, pGame, pPlayer);
 
     UNITS_FreePlayerData(pGame->pMemoryPool, pPlayer);
 
@@ -174,9 +196,52 @@ void __fastcall sub_6FC7B7A0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, i
     EVENT_SetEvent(pGame, pUnit, EVENTTYPE_DELAYEDPORTAL, pGame->dwGameFrame + 250, 0, 0);
 }
 
+// 1.13c D2Game+0x38090 (EAX = player, EBX = char stats record; stack game, count, item id): the start item's unit, its stat lists and its stack quantity
+D2UnitStrc* __fastcall PLAYER_CreateStartItemUnit(D2UnitStrc* pPlayer, D2CharStatsTxt* pCharStatsTxt, D2GameStrc* pGame, int32_t nCount, int32_t nItemId)
+{
+    if (!pPlayer)
+    {
+        return nullptr;
+    }
+
+    D2UnitStrc* pItem = D2_CALL(D2GAME_CreateItemUnit_6FC501A0, pPlayer, nItemId, pGame, 4u, ITEMQUAL_NORMAL, 1u, 1u, D2_CALL(ITEMS_GetItemLevelForNewItem, pPlayer, 0), 0, 0, 0);
+    D2StatListStrc* pStatList = D2_CALL(STATLIST_GetStatListFromUnitStateAndFlag, pItem, 0, 0x40u);
+    if (pStatList)
+    {
+        D2_CALL(D2Common_10474, pItem, pStatList);
+        D2_CALL(STATLIST_FreeStatList, pStatList);
+    }
+
+    if (!nCount && pCharStatsTxt->wStartSkill >= 0 && pCharStatsTxt->wStartSkill < sgptDataTables->nSkillsTxtRecordCount)
+    {
+        D2StatListStrc* pStartItemStatList = D2_CALL(STATLIST_GetStatListFromUnitStateAndFlag, pItem, 0, 0x40u);
+        if (!pStartItemStatList)
+        {
+            if (pItem)
+            {
+                pStartItemStatList = D2_CALL(STATLIST_AllocStatList, pItem->pMemoryPool, 0x40u, 0, UNIT_ITEM, pItem->dwUnitId);
+            }
+            else
+            {
+                pStartItemStatList = D2_CALL(STATLIST_AllocStatList, nullptr, 0x40u, 0, UNIT_ITEM, -1);
+            }
+
+            D2_CALL(D2COMMON_10475_PostStatToStatList, pItem, pStartItemStatList, 1);
+        }
+
+        D2_CALL(STATLIST_SetStatIfListIsValid, pStartItemStatList, STAT_ITEM_SINGLESKILL, 1, pCharStatsTxt->wStartSkill);
+    }
+
+    if (D2_CALL(ITEMS_CheckIfStackable, pItem))
+    {
+        D2_CALL(STATLIST_SetUnitStat, pItem, STAT_QUANTITY, D2_CALL(ITEMS_GetTotalMaxStack, pItem), 0);
+    }
+
+    return pItem;
+}
+
 //D2Game.0x6FC7B800
 // 1.13c D2Game+0x38470 (start-item create: IFLAG_STARTITEM, body location, belt/body/inventory branches)
-// 1.13c D2Game+0x38090 (item-create helper takes the level from a separate call; no other delta)
 void __fastcall PLAYER_CreateStartItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2CharStatsTxt* pCharStatsTxt, int32_t nCount, D2CharItemStrc* pCharItem)
 {
     int32_t nItemId = 0;
@@ -187,42 +252,7 @@ void __fastcall PLAYER_CreateStartItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, D
 
     for (int32_t i = 0; i < pCharItem->nItemCount; ++i)
     {
-        D2UnitStrc* pItem = nullptr;
-        if (pPlayer)
-        {
-            pItem = D2GAME_CreateItemUnit_6FC501A0(pPlayer, nItemId, pGame, 4u, ITEMQUAL_NORMAL, 1u, 1u, ITEMS_GetItemLevelForNewItem(pPlayer, 0), 0, 0, 0);
-            D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitStateAndFlag(pItem, 0, 0x40u);
-            if (pStatList)
-            {
-                D2Common_10474(pItem, pStatList);
-                STATLIST_FreeStatList(pStatList);
-            }
-
-            if (!nCount && pCharStatsTxt->wStartSkill >= 0 && pCharStatsTxt->wStartSkill < sgptDataTables->nSkillsTxtRecordCount)
-            {
-                D2StatListStrc* pStartItemStatList = STATLIST_GetStatListFromUnitStateAndFlag(pItem, 0, 0x40u);
-                if (!pStartItemStatList)
-                {
-                    if (pItem)
-                    {
-                        pStartItemStatList = STATLIST_AllocStatList(pItem->pMemoryPool, 0x40u, 0, UNIT_ITEM, pItem->dwUnitId);
-                    }
-                    else
-                    {
-                        pStartItemStatList = STATLIST_AllocStatList(nullptr, 0x40u, 0, UNIT_ITEM, -1);
-                    }
-
-                    D2COMMON_10475_PostStatToStatList(pItem, pStartItemStatList, 1);
-                }
-
-                STATLIST_SetStatIfListIsValid(pStartItemStatList, STAT_ITEM_SINGLESKILL, 1, pCharStatsTxt->wStartSkill);
-            }
-
-            if (ITEMS_CheckIfStackable(pItem))
-            {
-                STATLIST_SetUnitStat(pItem, STAT_QUANTITY, ITEMS_GetTotalMaxStack(pItem), 0);
-            }
-        }
+        D2UnitStrc* pItem = D2_CALL(PLAYER_CreateStartItemUnit, pPlayer, pCharStatsTxt, pGame, nCount, nItemId);
 
         ITEMS_SetItemFlag(pItem, IFLAG_STARTITEM, 1);
         ITEMS_SetBodyLocation(pItem, pCharItem->nBodyLoc);
@@ -547,7 +577,7 @@ void __fastcall sub_6FC7C170(D2GameStrc* pGame, D2UnitStrc* pPlayer)
     D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer);
     D2_ASSERT(pPlayerData);
 
-    D2UnitStrc* pPortal = SUNIT_GetServerUnit(pGame, UNIT_OBJECT, pPlayerData->dwUniqueId);
+    D2UnitStrc* pPortal = D2_CALL(SUNIT_GetServerUnit, pGame, UNIT_OBJECT, pPlayerData->dwUniqueId);
     if (!pPortal || pPortal->dwClassId != OBJECT_TOWN_PORTAL)
     {
         return;
@@ -559,11 +589,11 @@ void __fastcall sub_6FC7C170(D2GameStrc* pGame, D2UnitStrc* pPlayer)
     D2ActiveRoomStrc* pPortalRoom = D2_CALL(UNITS_GetRoom, pPortal);
     if (pPortalRoom)
     {
-        DUNGEON_AllocDrlgDelete(pPortalRoom, UNIT_OBJECT, pPortal->dwUnitId);
+        D2_CALL(DUNGEON_AllocDrlgDelete, pPortalRoom, UNIT_OBJECT, pPortal->dwUnitId);
     }
 
     D2_CALL(SUNIT_RemoveUnit, pGame, pPortal);
-    DUNGEON_ToggleHasPortalFlag(pPortalRoom, 1);
+    D2_CALL(DUNGEON_ToggleHasPortalFlag, pPortalRoom, 1);
 
     if (!pOwner)
     {
@@ -575,11 +605,11 @@ void __fastcall sub_6FC7C170(D2GameStrc* pGame, D2UnitStrc* pPlayer)
     D2ActiveRoomStrc* pOwnerRoom = D2_CALL(UNITS_GetRoom, pOwner);
     if (pOwnerRoom)
     {
-        DUNGEON_AllocDrlgDelete(pOwnerRoom, UNIT_OBJECT, pOwner->dwUnitId);
+        D2_CALL(DUNGEON_AllocDrlgDelete, pOwnerRoom, UNIT_OBJECT, pOwner->dwUnitId);
     }
 
     D2_CALL(SUNIT_RemoveUnit, pGame, pOwner);
-    DUNGEON_ToggleHasPortalFlag(pOwnerRoom, 1);
+    D2_CALL(DUNGEON_ToggleHasPortalFlag, pOwnerRoom, 1);
 }
 
 //D2Game.0x6FC7C260
@@ -714,35 +744,28 @@ void __fastcall PLAYER_CountLivingPlayers(D2GameStrc* pGame, D2UnitStrc* pUnit, 
     }
 }
 
-//D2Game.0x6FC7C500
-// 1.13c D2Game+0x383A0 (gold part D2Game+0x38180, checked against the disassembly: the only
-// carried-gold clamp is under nGameType 3; a PvE death whose penalty exceeds the carried gold
-// debits the stash. Experience part D2Game+0x37730.)
-void __fastcall PLAYER_ApplyDeathPenalty(D2GameStrc* pGame, D2UnitStrc* pDefender, D2UnitStrc* pAttacker)
+// 1.13c D2Game+0x38180 (the gold part of the death penalty: dropped gold, bank deduction, STAT_GOLDLOST; carried-gold clamp only under nGameType 3;
+// a PvE death whose penalty exceeds the carried gold debits the stash)
+void __fastcall PLAYER_ApplyDeathGoldPenalty(D2GameStrc* pGame, D2UnitStrc* pDefender, D2UnitStrc* pAttacker)
 {
     const int32_t nDefenderLevel = STATLIST_UnitGetStatValue(pDefender, STAT_LEVEL, 0);
     const int32_t nDefenderInventoryGold = STATLIST_UnitGetStatValue(pDefender, STAT_GOLD, 0);
     const int32_t nDefenderBankGold = STATLIST_UnitGetStatValue(pDefender, STAT_GOLDBANK, 0);
     const int32_t nDefenderTotalGold = nDefenderBankGold + nDefenderInventoryGold;
 
-    const int32_t nPenaltyPercentage = std::min(nDefenderLevel, 20);
+    int32_t nGoldPenalty = nDefenderTotalGold * std::min(nDefenderLevel, 20) / 100;
 
-    int32_t nGoldPenalty = nDefenderTotalGold * nPenaltyPercentage / 100;
-    
-    int32_t bAttackedByAnotherPlayer = 0;
+    bool bAttackedByAnotherPlayer = false;
     if (pAttacker && pAttacker != pDefender)
     {
         if (pAttacker->dwUnitType == UNIT_PLAYER)
         {
-            bAttackedByAnotherPlayer = 1;
+            bAttackedByAnotherPlayer = true;
         }
         else if (pAttacker->dwUnitType == UNIT_MONSTER)
         {
             D2UnitStrc* pOwner = AIGENERAL_GetMinionOwner(pAttacker);
-            if (pOwner && pOwner->dwUnitType == UNIT_PLAYER)
-            {
-                bAttackedByAnotherPlayer = 1;
-            }
+            bAttackedByAnotherPlayer = pOwner && pOwner->dwUnitType == UNIT_PLAYER;
         }
     }
 
@@ -756,6 +779,7 @@ void __fastcall PLAYER_ApplyDeathPenalty(D2GameStrc* pGame, D2UnitStrc* pDefende
         nGoldPenalty = std::min(nGoldPenalty, nDefenderInventoryGold);
     }
 
+    const int32_t nDefenderGUID = pDefender ? (int32_t)pDefender->dwUnitId : -1;
     if (bAttackedByAnotherPlayer)
     {
         if (nGoldPenalty > nDefenderInventoryGold)
@@ -764,14 +788,7 @@ void __fastcall PLAYER_ApplyDeathPenalty(D2GameStrc* pGame, D2UnitStrc* pDefende
             D2GAME_SetStatOrResetGold_6FC7CA70(pDefender, STAT_GOLD, nGoldPenalty);
         }
 
-        if (pDefender)
-        {
-            sub_6FC7C260(pGame, pDefender, pDefender->dwUnitId, nGoldPenalty);
-        }
-        else
-        {
-            sub_6FC7C260(pGame, nullptr, -1, nGoldPenalty);
-        }
+        sub_6FC7C260(pGame, pDefender, nDefenderGUID, (uint32_t)nGoldPenalty);
     }
     else
     {
@@ -779,25 +796,69 @@ void __fastcall PLAYER_ApplyDeathPenalty(D2GameStrc* pGame, D2UnitStrc* pDefende
         {
             if (pGame->nGameType != 3)
             {
-                D2GAME_SetStatOrResetGold_6FC7CA70(pDefender, STAT_GOLDBANK, nDefenderInventoryGold + nDefenderBankGold - nGoldPenalty);
+                D2GAME_SetStatOrResetGold_6FC7CA70(pDefender, STAT_GOLDBANK, nDefenderTotalGold - nGoldPenalty);
             }
         }
         else
         {
-            if (pDefender)
-            {
-                sub_6FC7C260(pGame, pDefender, pDefender->dwUnitId, nDefenderInventoryGold - nGoldPenalty);
-            }
-            else
-            {
-                sub_6FC7C260(pGame, nullptr, -1, nDefenderInventoryGold - nGoldPenalty);
-            }
+            sub_6FC7C260(pGame, pDefender, nDefenderGUID, (uint32_t)(nDefenderInventoryGold - nGoldPenalty));
         }
 
         D2GAME_SetStatOrResetGold_6FC7CA70(pDefender, STAT_GOLD, 0);
     }
 
-    D2GAME_SetStatOrResetGold_6FC7CA70(pDefender, STAT_GOLDLOST, nGoldPenalty);
+    D2GAME_SetStatOrResetGold_6FC7CA70(pDefender, STAT_GOLDLOST, std::max(nGoldPenalty, 0));
+}
+
+// 1.13c D2Game+0x37730 (EAX = game; stack player): the experience part of the death penalty
+void __fastcall PLAYER_LoseExperience(D2GameStrc* pGame, D2UnitStrc* pDefender)
+{
+    D2DifficultyLevelsTxt* pDifficultyLevelsTxtRecord = D2_CALL(DATATBLS_GetDifficultyLevelsTxtRecord, pGame->nDifficulty);
+    const int32_t nClassId = pDefender ? pDefender->dwClassId : -1;
+    const int32_t nDefenderLevel = D2_CALL(STATLIST_UnitGetStatValue, pDefender, STAT_LEVEL, 0);
+    if (nDefenderLevel <= 1)
+    {
+        return;
+    }
+
+    const uint32_t nPreviousExpThreshold = D2_CALL(DATATBLS_GetLevelThreshold, nClassId, nDefenderLevel - 1);
+    const uint32_t nCurrentExpThreshold = D2_CALL(DATATBLS_GetLevelThreshold, nClassId, nDefenderLevel);
+    const uint32_t nExperience = D2_CALL(STATLIST_UnitGetStatValue, pDefender, STAT_EXPERIENCE, 0);
+    // IMUL keeps its low 32 bits; the following MUL/SHR is an unsigned division by 100
+    uint32_t nExperiencePenalty = (uint32_t(pDifficultyLevelsTxtRecord->dwDeathExpPenalty) * (nCurrentExpThreshold - nPreviousExpThreshold)) / 100u;
+    if (!nExperiencePenalty)
+    {
+        return;
+    }
+
+    uint32_t nNewExperienceValue = nExperience - nExperiencePenalty;
+    if (nNewExperienceValue <= nPreviousExpThreshold)
+    {
+        nExperiencePenalty += nNewExperienceValue - nPreviousExpThreshold;
+        if ((int32_t)nExperiencePenalty < 0)
+        {
+            nExperiencePenalty = 0;
+        }
+        nNewExperienceValue = nPreviousExpThreshold + 1u;
+    }
+
+    D2ClientStrc* pClient = pDefender && pDefender->dwUnitType == UNIT_PLAYER ? D2_CALL(UNITS_GetPlayerData, pDefender)->pClient : nullptr;
+    if ((int32_t)nExperiencePenalty < 0)
+    {
+        std::_Exit(-1); // retail Fog assertion 0xC4A terminates with -1
+    }
+
+    // retail client+0x508 is the experience-loss field; CLIENTS_SetExperienceLoss is a no-op compatibility seam here
+    pClient->nExpLoss = (int32_t)nExperiencePenalty;
+    D2_CALL(STATLIST_SetUnitStat, pDefender, STAT_EXPERIENCE, (int32_t)nNewExperienceValue, 0);
+}
+
+//D2Game.0x6FC7C500
+// 1.13c D2Game+0x383A0 (EAX = attacker, ECX = defender, EBX = game): the gold part always runs; a player attacker, or a monster whose
+// minion owner is a player, spares the experience loss. The owner lookup (0x21260) is inlined in retail: its server-unit lookup is 0xE03A0.
+void __fastcall PLAYER_ApplyDeathPenalty(D2GameStrc* pGame, D2UnitStrc* pDefender, D2UnitStrc* pAttacker)
+{
+    D2_CALL(PLAYER_ApplyDeathGoldPenalty, pGame, pDefender, pAttacker);
 
     if (pAttacker)
     {
@@ -806,34 +867,17 @@ void __fastcall PLAYER_ApplyDeathPenalty(D2GameStrc* pGame, D2UnitStrc* pDefende
             return;
         }
 
-        D2UnitStrc* pOwner = AIGENERAL_GetMinionOwner(pAttacker);
-        if (pOwner && pOwner->dwUnitType == UNIT_PLAYER)
+        if (pAttacker->dwUnitType == UNIT_MONSTER)
         {
-            return;
-        }
-    }
-
-    if (nDefenderLevel > 1)
-    {
-        const int32_t nClassId = pDefender ? pDefender->dwClassId : -1;
-        const int32_t nPreviousExpThreshold = DATATBLS_GetLevelThreshold(nClassId, nDefenderLevel - 1);
-        const int32_t nCurrentExpThreshold = DATATBLS_GetLevelThreshold(nClassId, nDefenderLevel);
-        D2DifficultyLevelsTxt* pDifficultyLevelsTxtRecord = DATATBLS_GetDifficultyLevelsTxtRecord(pGame->nDifficulty);
-        int32_t nExperiencePenalty = (nCurrentExpThreshold - nPreviousExpThreshold) * pDifficultyLevelsTxtRecord->dwDeathExpPenalty / 100;
-        if (nExperiencePenalty)
-        {
-            int32_t nNewExperienceValue = STATLIST_UnitGetStatValue(pDefender, STAT_EXPERIENCE, 0) - nExperiencePenalty;
-            if (nNewExperienceValue <= nPreviousExpThreshold)
+            D2UnitStrc* pOwner = AIGENERAL_GetMinionOwner(pAttacker);
+            if (pOwner && pOwner->dwUnitType == UNIT_PLAYER)
             {
-                nExperiencePenalty += nNewExperienceValue - nPreviousExpThreshold;
-                nExperiencePenalty = std::max(nExperiencePenalty, 0);
-                nNewExperienceValue = nPreviousExpThreshold + 1;
+                return;
             }
-
-            CLIENTS_SetExperienceLoss(SUNIT_GetClientFromPlayer(pDefender, __FILE__, __LINE__), nExperiencePenalty);
-            STATLIST_SetUnitStat(pDefender, STAT_EXPERIENCE, nNewExperienceValue, 0);
         }
     }
+
+    D2_CALL(PLAYER_LoseExperience, pGame, pDefender);
 }
 
 //D2Game.0x6FC7C750

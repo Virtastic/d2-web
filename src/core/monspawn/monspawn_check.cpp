@@ -10968,15 +10968,18 @@ EMSCRIPTEN_KEEPALIVE int d2_session_player_weapon_class_id_for_mode(int32_t mode
 // Same effective type/class/mode tuple used by the native compositor path. The exported identity
 // deliberately keeps the source D2Unit as a player; the browser uses this tuple to choose the
 // transformed animation identity without fabricating monster-unit state or component variants.
+extern "C" int32_t d2_client_22430(D2UnitStrc*);
+extern "C" int32_t d2_client_22490(D2UnitStrc*, uint32_t*);
+extern "C" int32_t d2_client_223d0(D2UnitStrc*);
 EMSCRIPTEN_KEEPALIVE const D2SessionPlayerRenderIdentity* d2_session_player_render_identity() {
     memset(&g_sessionPlayerRenderIdentity, 0, sizeof g_sessionPlayerRenderIdentity);
     g_sessionPlayerRenderIdentity.version = 1;
     g_sessionPlayerRenderIdentity.size = sizeof g_sessionPlayerRenderIdentity;
     if (!g_targetPlayer) return &g_sessionPlayerRenderIdentity;
-    int unitType = g_targetPlayer->dwUnitType;
-    int classId = g_targetPlayer->dwClassId;
-    int mode = UNITS_GetAnimOrSeqMode(g_targetPlayer);
-    D2COMMON_11013_ConvertMode(g_targetPlayer, &unitType, &classId, &mode, __FILE__, __LINE__);
+    // 1.13c D2Client+0x22430 / +0x22490 / +0x223D0: effective type, class, mode (shapeshift converted).
+    const int unitType = d2_client_22430(g_targetPlayer);
+    const int classId = d2_client_22490(g_targetPlayer, nullptr);
+    const int mode = d2_client_223d0(g_targetPlayer);
     int weaponClassId = -1;
     COMPOSIT_GetWeaponClassId(g_targetPlayer, g_targetPlayer->pInventory, &weaponClassId, -1, TRUE);
     g_sessionPlayerRenderIdentity.unitType = (uint32_t)unitType;
@@ -10992,10 +10995,9 @@ EMSCRIPTEN_KEEPALIVE const D2SessionPlayerRenderIdentity* d2_session_player_rend
 static D2SessionMonsterAnimation g_sessionPlayerForm;
 EMSCRIPTEN_KEEPALIVE const D2SessionMonsterAnimation* d2_session_player_form_actor() {
     if (!g_targetPlayer) return nullptr;
-    int unitType = g_targetPlayer->dwUnitType;
-    int classId = g_targetPlayer->dwClassId;
-    int mode = UNITS_GetAnimOrSeqMode(g_targetPlayer);
-    D2COMMON_11013_ConvertMode(g_targetPlayer, &unitType, &classId, &mode, __FILE__, __LINE__);
+    const int unitType = d2_client_22430(g_targetPlayer);
+    const int classId = d2_client_22490(g_targetPlayer, nullptr);
+    const int mode = d2_client_223d0(g_targetPlayer);
     if (unitType != UNIT_MONSTER) return nullptr;
     D2SessionMonsterAnimation& a = g_sessionPlayerForm;
     a = {};

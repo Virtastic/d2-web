@@ -134,23 +134,6 @@ void findHostilePlayer(D2GameStrc*, D2UnitStrc* player, void* argument)
     if (PLAYERLIST_CheckFlag(args->pUnit, player, 8)) args->bFlag = 1;
 }
 
-// 1.13c D2Game+0x383A0
-void deathPenalties(D2GameStrc* game /* EBX */, D2UnitStrc* defender /* ECX */,
-                    D2UnitStrc* attacker /* EAX */)
-{
-    // 0x38180 is the gold-only retail callee (d2game_c85a.cpp); the old the 1.10f source
-    // PLAYER_ApplyDeathPenalty combines gold and experience.
-    d2game_c85a::goldDeathPenalty(game, defender, attacker);
-    if (attacker) {
-        if (attacker->dwUnitType == UNIT_PLAYER) return;
-        if (attacker->dwUnitType == UNIT_MONSTER) {
-            auto* owner = AIGENERAL_GetMinionOwner(attacker);
-            if (owner && owner->dwUnitType == UNIT_PLAYER) return;
-        }
-    }
-    loseExperience(game, defender);
-}
-
 // 1.13c D2Game+0x38AB0
 void stopDeathInteractions(D2GameStrc* game /* ESI */, D2UnitStrc* player /* EAX */)
 {

@@ -195,7 +195,7 @@ D2UnitStrc* __fastcall sub_6FCF1740(D2GameStrc* pGame, D2UnitStrc* pUnit, D2Unit
 	UnkAiStrc5* pArg = (UnkAiStrc5*)pCallbackArg;
 	if (pTarget && pTarget->dwUnitType == UNIT_MONSTER && pTarget->dwAnimMode == MONMODE_DEATH)
 	{
-		const uint32_t nDistance = (uint32_t)AIUTIL_GetDistanceToCoordinates_FullUnitSize(pTarget, pUnit);
+		const uint32_t nDistance = (uint32_t)D2_CALL(AIUTIL_GetDistanceToCoordinates_FullUnitSize, pTarget, pUnit);
 		return nDistance < (uint32_t)pArg->nMaxDistance ? pTarget : nullptr;
 	}
 

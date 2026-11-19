@@ -55,6 +55,7 @@ int32_t dword_6FD4DC18;
 
 
 //D2Game.0x6FC4D470
+// not-1.13c: no function; the 1.13c callers index the unique-items table directly (no callee for it in their lists)
 D2UniqueItemsTxt* __fastcall ITEMS_GetUniqueItemsTxtRecord(int32_t nUniqueItemId)
 {
     if (nUniqueItemId >= 0 && nUniqueItemId < sgptDataTables->nUniqueItemsTxtRecordCount)
@@ -608,6 +609,7 @@ void __fastcall sub_6FC4E1A0(D2UnitStrc** ppItem)
 }
 
 //D2Game.0x6FC4E1F0
+// 1.13c D2Game+0x109B0 (diffed against the decompile: reset item, seed, roll quality, quality 2, then the format split 0x10550/0x10600 = sub_6FC4DC20)
 void __fastcall sub_6FC4E1F0(D2GameStrc* pGame, D2ItemDropStrc* pItemDrop, D2UnitStrc** ppItem, int32_t nLowSeed)
 {
     sub_6FC4E1A0(ppItem);
@@ -622,6 +624,7 @@ void __fastcall sub_6FC4E1F0(D2GameStrc* pGame, D2ItemDropStrc* pItemDrop, D2Uni
 }
 
 //D2Game.0x6FC4E430
+// 1.13c D2Game+0x101E0 (diffed against the decompile: same steps with quality 3, seed written back, then 0x140B0; no delta)
 int32_t __fastcall sub_6FC4E430(D2GameStrc* pGame, D2ItemDropStrc* pItemDrop, D2UnitStrc** ppItem, uint32_t* pLowSeed)
 {
     D2_MAYBE_UNUSED(pGame);
@@ -1011,6 +1014,7 @@ D2UnitStrc* __fastcall D2GAME_CreateItemEx_6FC4ED80(D2GameStrc* pGame, D2ItemDro
 }
 
 //D2Game.0x6FC4F290
+// 1.13c D2Game+0x12230 (checked against the decompile: level one below the area level capped at 0x40, gold/pick 0xFFC0 with (-1,0,0), room probe at +2/+3, no delta)
 D2UnitStrc* __fastcall sub_6FC4F290(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2CoordStrc* pCoords, D2ItemDropStrc* pItemDrop)
 {
     int32_t nItemLevel = DATATBLS_GetMonsterLevelInArea(DUNGEON_GetLevelIdFromRoom(pRoom), pGame->nDifficulty, pGame->bExpansion);
@@ -1078,6 +1082,7 @@ D2UnitStrc* __fastcall sub_6FC4F290(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, 
 }
 
 //D2Game.0x6FC4F4A0
+// 1.13c D2Game+0xFFC0 (checked against the decompile: gold-code cache, level <= 0x41 assert, one roll mod 100 against the gold / armor / weapon / misc bands, no delta)
 int32_t __fastcall sub_6FC4F4A0(D2GameStrc* pGame, D2SeedStrc* pSeed, int32_t nLevelId, int32_t a4, int32_t a5, int32_t a6)
 {
     constexpr int32_t BASE_GOLD_RAND = 65;
@@ -1199,6 +1204,7 @@ void __fastcall sub_6FC4F640(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2Coord
 }
 
 //D2Game.0x6FC4F830
+// 1.13c D2Game+0x11FB0 (placement is D2GAME_GetFreeSpaceEx, not the 1.10f free-coordinates search; no +2/+3 nudge)
 D2UnitStrc* __fastcall D2GAME_DropArmor_6FC4F830(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2CoordStrc* pCoords, int32_t a4, int32_t a5, D2UnitStrc* pUnit)
 {
     int32_t nItemLevel = DATATBLS_GetMonsterLevelInArea(DUNGEON_GetLevelIdFromRoom(pRoom), pGame->nDifficulty, pGame->bExpansion);
@@ -1219,23 +1225,7 @@ D2UnitStrc* __fastcall D2GAME_DropArmor_6FC4F830(D2GameStrc* pGame, D2ActiveRoom
     }
 
     D2CoordStrc coords1 = {};
-    D2CoordStrc coords2 = {};
-
-    coords2.nX = pCoords->nX;
-    coords2.nY = pCoords->nY;
-
-    if (D2GAME_GetRoom_6FC52070(pRoom, pCoords->nX + 2, pCoords->nY + 3))
-    {
-        coords1.nX = pCoords->nX + 2;
-        coords1.nY = pCoords->nY + 3;
-    }
-    else
-    {
-        coords1.nX = coords2.nX;
-        coords1.nY = coords2.nY;
-    }
-
-    D2ActiveRoomStrc* pTargetRoom = COLLISION_GetFreeCoordinatesWithField(pRoom, &coords1, &coords2, 1, COLLIDE_MASK_SPAWN, 0x801u, 1);
+    D2ActiveRoomStrc* pTargetRoom = D2GAME_GetFreeSpaceEx_6FC4BF00(pRoom, pCoords, &coords1, 1);
     if (!pTargetRoom)
     {
         return nullptr;
@@ -1261,6 +1251,7 @@ D2UnitStrc* __fastcall D2GAME_DropArmor_6FC4F830(D2GameStrc* pGame, D2ActiveRoom
 }
 
 //D2Game.0x6FC4FA50
+// 1.13c D2Game+0x11E20 (checked against the decompile: up to 6 weapon picks until a metal item, +2/+3 room probe, flag 0x40; no delta)
 D2UnitStrc* __fastcall D2GAME_DropWeapon_6FC4FA50(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2CoordStrc* pCoords, int32_t a4, int32_t a5, D2UnitStrc* pUnit)
 {    
     int32_t nItemLevel = DATATBLS_GetMonsterLevelInArea(DUNGEON_GetLevelIdFromRoom(pRoom), pGame->nDifficulty, pGame->bExpansion);
@@ -1332,6 +1323,7 @@ D2UnitStrc* __fastcall D2GAME_DropWeapon_6FC4FA50(D2GameStrc* pGame, D2ActiveRoo
 }
 
 //D2Game.0x6FC4FCA0
+// 1.13c D2Game+0x11CA0 (the room probe is x+2,y+3; the 1.10f body reads y+2 for the x coordinate)
 D2UnitStrc* __fastcall sub_6FC4FCA0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2CoordStrc* pCoords, int32_t a4, int32_t a5, D2UnitStrc* pUnit)
 {
     const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(pRoom);
@@ -1364,9 +1356,9 @@ D2UnitStrc* __fastcall sub_6FC4FCA0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, 
     coords2.nX = pCoords->nX;
     coords2.nY = pCoords->nY;
 
-    if (D2GAME_GetRoom_6FC52070(pRoom, pCoords->nY + 2, pCoords->nY + 3))
+    if (D2GAME_GetRoom_6FC52070(pRoom, pCoords->nX + 2, pCoords->nY + 3))
     {
-        coords1.nX = pCoords->nY + 2;
+        coords1.nX = pCoords->nX + 2;
         coords1.nY = pCoords->nY + 3;
     }
     else
@@ -1559,6 +1551,7 @@ void __fastcall ITEMS_RemoveAll(D2GameStrc* pGame)
     }
 }
 
+// 1.13c D2Game+0xEE70
 //D2Game.0x6FC50320
 void __fastcall ITEMS_RemoveFromAllPlayers(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
@@ -1664,6 +1657,7 @@ int32_t __fastcall ITEMS_GetItemLevelForNewItem(D2UnitStrc* pUnit, int32_t nLeve
     return std::max(nLevel, 1);
 }
 
+// 1.13c D2Game+0x12EE0
 //D2Game.0x6FC50560
 void __fastcall ITEMS_UpdateDurability(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem)
 {
@@ -1756,6 +1750,7 @@ void __fastcall ITEMS_UpdateDurability(D2GameStrc* pGame, D2UnitStrc* pUnit, D2U
 }
 
 //D2Game.0x6FC50820
+// not-1.13c: no function; its only caller (0xC00C0) lists no such callee, the fill is inline there
 void __fastcall ITEMS_FillItemDrop(D2GameStrc* pGame, D2ItemDropStrc* pItemDrop, D2UnitStrc* pItem)
 {
     memset(pItemDrop, 0, sizeof(D2ItemDropStrc));
@@ -1865,6 +1860,7 @@ void __fastcall ITEMS_DropGoldPile(D2GameStrc* pGame, D2UnitStrc* pUnit, uint32_
 }
 
 //D2Game.0x6FC50C50
+// 1.13c D2Game+0x12DF0 (diffed against the decompile: equal -> drop the whole value, fits -> add, else add the room left and drop the rest; no delta)
 void __fastcall ITEMS_HandleGoldTransaction(D2GameStrc* pGame, D2UnitStrc* pUnit, uint32_t nValue)
 {
     const int32_t nGoldLimit = UNITS_GetInventoryGoldLimit(pUnit);
@@ -1884,6 +1880,7 @@ void __fastcall ITEMS_HandleGoldTransaction(D2GameStrc* pGame, D2UnitStrc* pUnit
     }
 }
 
+// 1.13c D2Game+0x12AF0 (room check and free-coordinate search as 0xE930, then the ground-placement tail 0xE990 with no dropping unit)
 //D2Game.0x6FC50D80
 void __fastcall ITEMS_DropPlayerEar(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
@@ -1922,16 +1919,10 @@ void __fastcall ITEMS_DropPlayerEar(D2GameStrc* pGame, D2UnitStrc* pUnit)
         return;
     }
 
-    UNITS_InitializeStaticPath(pItem, pTargetRoom, coords1.nX, coords1.nY);
-    UNITS_BlockCollisionPath(pItem, pTargetRoom, coords1.nX, coords1.nY);
-    UNITROOM_AddUnitToRoom(pItem, pTargetRoom);
-    pItem->dwFlags |= UNITFLAG_SENDREFRESHMSG | UNITFLAG_TARGETABLE;
-    UNITS_ChangeAnimMode(pItem, IMODE_ONGROUND);
-    ITEMS_SetInvPage(pItem, INVPAGE_NULL);
-    pItem->dwFlags |= IFLAG_LOWQUALITY;
-    pItem->pItemData->dwActionStamp = ITEMS_GetGroundRemovalTime(pGame, pItem);
+    D2GAME_DropItem_6FC52260(pGame, nullptr, pItem, pTargetRoom, coords1.nX, coords1.nY);
 }
 
+// 1.13c D2Game+0xE390
 //D2Game.0x6FC50F70
 int32_t __fastcall ITEMS_GetHealthPotionDropCode(D2UnitStrc* pUnit)
 {
@@ -1957,6 +1948,7 @@ int32_t __fastcall ITEMS_GetHealthPotionDropCode(D2UnitStrc* pUnit)
     return healthPotionCodes[3];
 }
 
+// 1.13c D2Game+0xE310
 //D2Game.0x6FC50FF0
 int32_t __fastcall ITEMS_GetManaPotionDropCode(D2UnitStrc* pUnit)
 {
@@ -2069,6 +2061,7 @@ void __fastcall sub_6FC51310(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //Inlined in D2Game.0x6FC51360
+// not-1.13c: no function in 1.13c; the table lookup is inline in its caller
 D2ItemTypesTxt* __fastcall ITEMS_GetItemTypesTxtRecord(int32_t nItemType)
 {
     if (nItemType >= 0 && nItemType < sgptDataTables->nItemTypesTxtRecordCount)
@@ -2702,6 +2695,7 @@ void __fastcall D2GAME_DropItem_6FC52260(D2GameStrc* pGame, D2UnitStrc* pUnit, D
     }
 }
 
+// 1.13c D2Game+0xFB70
 //D2Game.0x6FC52300
 void __fastcall ITEMS_DeleteInactiveItems(D2GameStrc* pGame, int32_t nAct)
 {
@@ -2739,6 +2733,7 @@ void __fastcall ITEMS_DeleteInactiveItems(D2GameStrc* pGame, int32_t nAct)
 }
 
 //D2Game.0x6FC523B0
+// not-1.13c: inlined into its only caller 0x72220 (runeword flag 0x4000000 cleared, prefix reset, state 0xAB list freed; no callee for it in the list)
 void __fastcall ITEMS_DestroyRunewordStatList(D2GameStrc* pGame, D2UnitStrc* pItem)
 {
     if (!pItem || pItem->dwUnitType != UNIT_ITEM || !(ITEMS_GetItemFlags(pItem) & IFLAG_RUNEWORD))
@@ -2785,6 +2780,7 @@ void __fastcall sub_6FC52410(D2UnitStrc* pUnit, D2ItemDropStrc* pItemDrop)
 }
 
 //D2Game.0x6FC52650
+// 1.13c D2Game+0x13320 (diffed against the decompile: skill count 1..3 from the roll, layer by item level, per-skill layer roll, retry up to 6, value roll; no delta)
 void __fastcall sub_6FC52650(D2UnitStrc* pUnit, int32_t nItemLvl, int32_t nClassFirstSkillId, int32_t nSkillCount, int32_t nItemDropLvl)
 {
     D2_MAYBE_UNUSED(nSkillCount);

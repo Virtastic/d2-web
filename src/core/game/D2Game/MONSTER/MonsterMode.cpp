@@ -141,7 +141,7 @@ void __fastcall sub_6FC62780(D2UnitStrc* pAttacker, D2UnitStrc* pDefender, D2Gam
 {
     if (pAttacker && pDefender && !(pDefender->dwFlags & 0x04000000))
     {
-        SUNITDMG_DistributeExperience(pGame, pAttacker, pDefender);
+        D2_CALL(SUNITDMG_DistributeExperience, pGame, pAttacker, pDefender);
     }
 }
 

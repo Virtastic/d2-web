@@ -41,10 +41,16 @@ int32_t __fastcall SKILLS_SrvSt38_Whirlwind(D2GameStrc* pGame, D2UnitStrc* pUnit
 int32_t __fastcall SKILLS_RemoveWhirlwindStats(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStrc* pSkill, int32_t a4, int32_t nX, int32_t nY);
 //D2Game.0x6FCFC4C0
 int32_t __fastcall SKILLS_SrvDo076_Whirlwind(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel);
+// 1.13c D2Game+0x26E40 (stand-alone in 1.13c; inline in SKILLS_SrvDo076_Whirlwind in 1.10f)
+int32_t SKILLS_GetWhirlwindHitCount(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStrc* pSkill);
+// 1.13c D2Game+0x26A30 (own row)
+int32_t SKILLS_IsDualWielding(D2UnitStrc* pUnit);
 //D2Game.0x6FCFC8E0
 int32_t __fastcall SKILLS_SrvSt39_Berserk(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel);
 //D2Game.0x6FCFCB30
 int32_t __fastcall SKILLS_SrvSt40_Leap(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel);
+// 1.13c D2Game+0x26B30 (a stand-alone function in 1.13c; 1.10f has it inline in SKILLS_SrvSt40_Leap)
+int32_t SKILLS_CanLeapLandAt(D2UnitStrc* pUnit, int32_t nSkillId, int32_t nX, int32_t nY);
 //D2Game.0x6FCFCF60
 int32_t __fastcall SKILLS_FindLeapTargetPosition(D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t* pX, int32_t* pY);
 //D2Game.0x6FCFD280

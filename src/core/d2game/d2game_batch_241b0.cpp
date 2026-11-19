@@ -29,7 +29,6 @@
 
 void __fastcall MONSTERUNIQUE_SetUniqueFlag_6FC43260(D2GameStrc*, D2UnitStrc*);
 
-static int32_t add32(int32_t a, int32_t b) { return uint32_t(a) + uint32_t(b); }
 
 // 1.13c D2Game+0x241B0
 extern "C" void d2game_241b0(D2UnitStrc* unit, int32_t unique)
@@ -76,38 +75,6 @@ extern "C" void d2game_26320(D2GameStrc* game, D2UnitStrc* unit, int32_t mod, in
 extern "C" int32_t d2game_26bb0(D2UnitStrc* unit, int32_t skillId, int32_t level, int32_t* x, int32_t* y)
 {
     return SKILLS_FindLeapTargetPosition(unit, skillId, level, x, y);
-}
-
-// The extracted whirlwind scheduler returns 0, 1 or 2, not a C++ bool.
-// 1.13c D2Game+0x26E40
-extern "C" int32_t d2game_26e40_batch(D2GameStrc* game, D2SkillStrc* skill, D2UnitStrc* unit)
-{
-    if (unit && unit->dwUnitType == UNIT_MONSTER)
-        return (ITEMS_RollRandomNumber(&unit->pSeed) & 1) == 0;
-    if (!game->bExpansion) return 1;
-    const int32_t frame = SKILLS_GetParam4(skill);
-    if (!frame) {
-        SKILLS_SetParam4(skill, add32(game->dwGameFrame, 4));
-        return 1;
-    }
-    if (int32_t(game->dwGameFrame) < frame) return 0;
-    int32_t duration = 10;
-    if (auto* weapon = sub_6FC7C7B0(unit)) {
-        const int32_t speed = ITEMS_GetWeaponAttackSpeed(unit, weapon);
-        duration = speed < 12 ? 4 : speed < 15 ? 6 : speed < 18 ? 8 :
-            speed < 20 ? 10 : speed < 23 ? 12 : speed < 26 ? 14 : 16;
-    }
-    int32_t count = 1;
-    if (unit->pInventory) {
-        auto* left = INVENTORY_GetCompositItem(unit->pInventory, COMPOSIT_LEFTHAND);
-        auto* right = INVENTORY_GetCompositItem(unit->pInventory, COMPOSIT_RIGHTHAND);
-        if (left && ITEMS_CheckItemTypeId(left, 0x2e) && right && ITEMS_CheckItemTypeId(right, 0x2e))
-            count = 2;
-    }
-    int32_t next = add32(frame, duration);
-    if (next < int32_t(game->dwGameFrame)) next = add32(game->dwGameFrame, duration);
-    SKILLS_SetParam4(skill, next);
-    return count;
 }
 
 // The attack-resolution half of LeapAttack, split from the stage dispatcher.

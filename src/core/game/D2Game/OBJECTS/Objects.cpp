@@ -67,21 +67,21 @@ struct D2ObjectCoordInitStrc
 };
 #pragma pack(pop)
 
+// D2Game+0xFCCC0 (1.13c .rdata): {object id, min, max} per shrine class 574..579; not const so the FN probe can pin the vector's table over it
+D2ObjectTableStrc gShrineObjectTable_6FD28C78[6] =
+{
+    { OBJECT_DESERT_SHRINE1, 2, 6 },
+    { OBJECT_DESERT_SHRINE1, 7, 7 },
+    { OBJECT_DESERT_SHRINE1, 8, 11 },
+    { OBJECT_DESERT_SHRINE1, 12, 12 },
+    { OBJECT_DESERT_SHRINE1, 1, 5 },
+    { OBJECT_DESERT_SHRINE1, 14, 14 },
+};
 
 //D2Game.0x6FC70180
 // 1.13c D2Game+0x325C0
 D2UnitStrc* __fastcall OBJECTS_SpawnShrine(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nClassId, int32_t nX, int32_t nY, int32_t nMode)
 {
-    constexpr D2ObjectTableStrc stru_6FD28C78[8] =
-    {
-        { OBJECT_DESERT_SHRINE1, 2, 6 },
-        { OBJECT_DESERT_SHRINE1, 7, 7 },
-        { OBJECT_DESERT_SHRINE1, 8, 11 },
-        { OBJECT_DESERT_SHRINE1, 12, 12 },
-        { OBJECT_DESERT_SHRINE1, 1, 5 },
-        { OBJECT_DESERT_SHRINE1, 14, 14 },
-    };
-
     if (nClassId < 574 || nClassId > 579)
     {
         return nullptr;
@@ -89,17 +89,17 @@ D2UnitStrc* __fastcall OBJECTS_SpawnShrine(D2GameStrc* pGame, D2ActiveRoomStrc* 
 
     D2_ASSERT(pRoom);
 
-    const D2ObjectTableStrc* pObjectTableRecord = &stru_6FD28C78[nClassId - 574];
-    D2UnitStrc* pShrine = SUNIT_AllocUnitData(UNIT_OBJECT, pObjectTableRecord->nObjectId, nX, nY, pGame, pRoom, 1, nMode, 0);
+    const D2ObjectTableStrc* pObjectTableRecord = &gShrineObjectTable_6FD28C78[nClassId - 574];
+    D2UnitStrc* pShrine = D2_CALL(SUNIT_AllocUnitData, UNIT_OBJECT, pObjectTableRecord->nObjectId, nX, nY, pGame, pRoom, 1, nMode, 0);
 
-    int32_t nShrineId = ITEMS_RollLimitedRandomNumber(&pShrine->pSeed, pObjectTableRecord->nMax - pObjectTableRecord->nMin) + pObjectTableRecord->nMin;
+    int32_t nShrineId = D2_CALL(ITEMS_RollLimitedRandomNumber, &pShrine->pSeed, pObjectTableRecord->nMax - pObjectTableRecord->nMin) + pObjectTableRecord->nMin;
     if (nShrineId == 5 || nShrineId == 4)
     {
         nShrineId = 2;
     }
 
     pShrine->pObjectData->InteractType = nShrineId;
-    UNITS_SetShrineTxtRecordInObjectData(pShrine, DATATBLS_GetShrinesTxtRecord(nShrineId));
+    D2_CALL(UNITS_SetShrineTxtRecordInObjectData, pShrine, D2_CALL(DATATBLS_GetShrinesTxtRecord, nShrineId));
     return pShrine;
 }
 

@@ -2860,6 +2860,7 @@ void __fastcall GAME_GetPlayerDescription(char* szDescription, int32_t nClassId)
 }
 
 //D2Game.0x6FC3A7C0
+// 1.13c D2Game+0x2A630
 void __fastcall GAME_GetMonsterDescription(char* szDescription, int32_t nClassId)
 {
     D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nClassId);

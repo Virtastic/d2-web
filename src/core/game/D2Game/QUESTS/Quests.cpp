@@ -31,6 +31,7 @@
 
 
 #include "AI/AiGeneral.h"
+#include "AI/AiTactics.h"
 #include "GAME/Clients.h"
 #include "GAME/Event.h"
 #include "GAME/SCmd.h"
@@ -1337,30 +1338,31 @@ void __fastcall QUESTS_SendCurrentFlags(D2GameStrc* pGame, D2ClientStrc* pClient
 
 //D2Game.0x6FC95490
 // 1.13c D2Game+0x34EA0
-// 1.13c walks the same list (control head, link +0xF4) and sends the 6-byte 0x8A through 0x8A770; a player with no
-// client is a fatal assert there (0x49DB0), here a return of 0 -- unreachable for a connected player.
+// 1.13c: the interact-flag gate is 0x15D0, the act is read once (0x49DB0) before the list walk, each node takes two player-data reads
+// (the null check and the quest-flag pointer), and the packet's client is read again at the send. A player with no client is a fatal
+// assert in 1.13c (0x49DB0), here a return of 0 -- unreachable for a connected player.
 int32_t __fastcall QUESTS_ActiveCycler(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNPC)
 {
 	D2_ASSERT(pPlayer && pPlayer->dwUnitType == UNIT_PLAYER);
 	D2_ASSERT(pNPC && pNPC->dwUnitType == UNIT_MONSTER);
 
-	D2MonStatsTxt* pMonstatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(pNPC->dwClassId);
-	if (!pMonstatsTxtRecord || !(pMonstatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_INTERACT]))
+	if (!D2_CALL(AITACTICS_IsInteractClass, pNPC->dwClassId))
 	{
 		return 0;
 	}
 
 	D2_ASSERT(pGame->pQuestControl->bPickedSet);
 
-	D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
+	D2ClientStrc* pClient = D2_CALL(SUNIT_GetClientFromPlayer, pPlayer, __FILE__, __LINE__);
 	if (!pClient)
 	{
 		return 0;
 	}
 
+	const uint8_t nAct = D2_CALL(CLIENTS_GetActNo, pClient);
 	for (D2QuestDataStrc* pQuestData = pGame->pQuestControl->pLastQuest; pQuestData; pQuestData = pQuestData->pPrev)
 	{
-		if (pClient->nAct == pQuestData->nActNo)
+		if (nAct == pQuestData->nActNo)
 		{
 			D2_ASSERT(pQuestData->pfActiveFilter);
 
@@ -1370,8 +1372,8 @@ int32_t __fastcall QUESTS_ActiveCycler(D2GameStrc* pGame, D2UnitStrc* pPlayer, D
 				exit(-1);
 			}
 
-			D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
-			D2_ASSERT(pPlayerData);
+			D2_ASSERT(D2_CALL(UNITS_GetPlayerData, pPlayer));
+			D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer);
 
 			D2BitBufferStrc* pQuestFlags = pPlayerData->pQuestData[pGame->nDifficulty];
 			D2_ASSERT(pQuestFlags);
@@ -1382,7 +1384,7 @@ int32_t __fastcall QUESTS_ActiveCycler(D2GameStrc* pGame, D2UnitStrc* pPlayer, D
 				packet8A.nHeader = 0x8A;
 				packet8A.nUnitType = UNIT_MONSTER;
 				packet8A.dwUnitGUID = pNPC->dwUnitId;
-				D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet8A, sizeof(packet8A));
+				D2GAME_PACKETS_SendPacket_6FC3C710(D2_CALL(SUNIT_GetClientFromPlayer, pPlayer, __FILE__, __LINE__), &packet8A, sizeof(packet8A));
 				return 1;
 			}
 		}

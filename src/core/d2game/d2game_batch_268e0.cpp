@@ -90,18 +90,4 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_74E60(uint32_t param1, void* param2,
 
 // 0x74F20, 0x750F0 and 0x75260 run the game bodies (D2Game/MONSTER/MonsterMode*.cpp, MonsterAiStateForMode.cpp).
 
-// Player-list teardown: from EBX+0x98 walk each node's +0x10 link, paying one Fog #10046
-// (Player.cpp, line 0x2B, 0) in the loop, and clear the head at the end.
-// 1.13c D2Game+0x37500
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2game_port_37500(void* ebx, const D2GameBatch268E0Env* env)
-{
-    static const char kPlayerFile[] = "..\\Source\\D2Game\\PLAYER\\Player.cpp";
-
-    uint32_t node = rd32(ebx, 0x98);
-    while (node != 0) {
-        node = rd32((void*)(uintptr_t)node, 0x10);
-        env->ordinal10046(kPlayerFile, 0x2B, 0);
-    }
-    wr32(ebx, 0x98, 0);
-}
+// 0x37500 runs the game body (D2Game/PLAYER/Player.cpp PLAYER_FreeNodeChain).

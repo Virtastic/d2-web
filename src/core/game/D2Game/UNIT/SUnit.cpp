@@ -558,7 +558,7 @@ D2UnitStrc* __fastcall SUNIT_AllocUnitData(int32_t nUnitType, int32_t nClassId, 
         }
     }
 
-    D2UnitStrc* pUnit = UNITS_AllocUnit(pGame->pMemoryPool, nUnitType);
+    D2UnitStrc* pUnit = D2_CALL(UNITS_AllocUnit, pGame->pMemoryPool, nUnitType);
     if (!pUnit)
     {
         return nullptr;
@@ -579,13 +579,13 @@ D2UnitStrc* __fastcall SUNIT_AllocUnitData(int32_t nUnitType, int32_t nClassId, 
     }
     pUnit->dwFlagEx |= UNITFLAGEX_SERVERUNIT;
 
-    pUnit->nAct = DRLG_GetActNoFromLevelId(DUNGEON_GetLevelIdFromRoom(pRoom));
+    pUnit->nAct = D2_CALL(DRLG_GetActNoFromLevelId, D2_CALL(DUNGEON_GetLevelIdFromRoom, pRoom));
     pUnit->pDrlgAct = pGame->pAct[pUnit->nAct];
     pUnit->pQuestEventList = nullptr;
 
     if (nUnitType)
     {
-        SUNIT_InitSeed(pUnit, pGame ? &pGame->pGameSeed : nullptr);
+        D2_CALL(SUNIT_InitSeed, pUnit, pGame ? &pGame->pGameSeed : nullptr);
 
         if (nUnitType == UNIT_ITEM)
         {
@@ -636,7 +636,7 @@ D2UnitStrc* __fastcall SUNIT_AllocUnitData(int32_t nUnitType, int32_t nClassId, 
     case UNIT_OBJECT:
     {
         pUnit->pObjectData = D2_CALLOC_STRC_POOL(pGame->pMemoryPool, D2ObjectDataStrc);
-        pUnit->pObjectData->pObjectTxt = DATATBLS_GetObjectsTxtRecord(nClassId);
+        pUnit->pObjectData->pObjectTxt = D2_CALL(DATATBLS_GetObjectsTxtRecord, nClassId);
         pUnit->dwAnimMode = nMode;
         // The object's sequence record -- its own Objects.txt FrameCnt/FrameDelta/Start for the mode
         // it is in -- is derived here, the same three fields `UNITS_SetAnimStartFrame` (#10349) writes
@@ -657,8 +657,8 @@ D2UnitStrc* __fastcall SUNIT_AllocUnitData(int32_t nUnitType, int32_t nClassId, 
         // `FrameDelta / 16 + FrameDelta / 8` of 256, a phase difference inside the band `s351` checks.
         // What would settle it: a capture of an object's drawn rate at spawn against its FrameDelta.
         // D19: the server unit keeps retail's own clock (zero until a mode change); the client pass runs a shadow clock (g_clientObjectClock).
-        UNITS_AllocStaticPath(pUnit);
-        OBJECTS_InitHandler(pGame, pUnit, nUnitGUID, pRoom, nX, nY);
+        D2_CALL(UNITS_AllocStaticPath, pUnit);
+        D2_CALL(OBJECTS_InitHandler, pGame, pUnit, nUnitGUID, pRoom, nX, nY);
         break;
     }
     case UNIT_ITEM:
@@ -687,8 +687,8 @@ D2UnitStrc* __fastcall SUNIT_AllocUnitData(int32_t nUnitType, int32_t nClassId, 
 
     if (a7 & 1)
     {
-        SUNIT_Add(pUnit, nX, nY, pGame, pRoom, 1);
-        { extern void d2client_unitseed_created(D2UnitStrc*); d2client_unitseed_created(pUnit); }   // d2-web: the client builds it from its unit-add packet
+        D2_CALL(SUNIT_Add, pUnit, nX, nY, pGame, pRoom, 1);
+        { extern void d2client_unitseed_created(D2UnitStrc*); D2_CALL(d2client_unitseed_created, pUnit); }   // d2-web: the client builds it from its unit-add packet
 
         if (nUnitType == UNIT_PLAYER)
         {

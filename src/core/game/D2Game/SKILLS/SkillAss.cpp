@@ -170,7 +170,7 @@ int32_t __fastcall SKILLS_SrvSt23_AssasinChargeStrikes(D2GameStrc* pGame, D2Unit
         return 0;
     }
 
-    return UNITS_IsInMeleeRange(pUnit, pTargetUnit, 0);
+    return D2_CALL(UNITS_IsInMeleeRange, pUnit, pTargetUnit, 0);
 }
 
 //D2Game.0x6FCF52E0

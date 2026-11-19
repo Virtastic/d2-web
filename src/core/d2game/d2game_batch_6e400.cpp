@@ -9,7 +9,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <emscripten.h>
-#include "d2game_a3d60.cpp"
 
 typedef uintptr_t A;  // a retail record address
 static inline uint32_t rd32(A p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
@@ -26,6 +25,7 @@ struct D2GameBatch6E400Env {
     const char* itemsFile;         // the __FILE__ string at 0x6FD1BD3C (ITEMS_CheckItemFlag in 0x70010)
     A handlerTable27BB8;           // 0x6FD27BB8: dword per +0x1B3 byte
     A fn8CF90;                     // &FUN_6fc8cf90
+    bool (*fA3D60)(int32_t skill, A unit, A flag);   // D2Game+0xA3D60, the game-tree body
     // D2Common / Fog ordinals
     A    (*o10331)(A);  A (*o10265)(A);  void (*o10024)(const char*, A);  void (*o10920)(A);
     void (*o11090)(A, A);  A (*o10695)(A);  A (*o10688)(A);  A (*o10296)(A);  A (*o10826)(A);
@@ -270,31 +270,8 @@ uint32_t d2_fn_d2game_70CF0(A eax, A ebx, A param1, A param2, const D2Game70CF0E
     return 1;
 }
 
-// ECX param1 = skill id, EDX param2 = unit, EAX = flag: the rule is d2game_a3d60.cpp (ga3d60::Allowed); this adapter runs it on the env.
-struct A3D60Env {
-    const D2GameBatch6E400Env* e;
-    static uint32_t rd32(A p) { return ::rd32(p, 0); }
-    static int32_t rd16s(A p) { return (int16_t)::rd16(p, 0); }
-    static uint32_t rd8(A p) { return ::rd8(p, 0); }
-    uint32_t h(uint32_t, uint32_t = 0, uint32_t = 0, uint32_t = 0, uint32_t = 0) { return (uint32_t)e->fB6600(); }
-};
-extern "C" EMSCRIPTEN_KEEPALIVE
-bool d2_fn_d2game_A3D60(int32_t param1, A param2, A eax, const D2GameBatch6E400Env* e)
-{
-    A3D60Env env{ e };
-    return ga3d60::Allowed(env, e->dataTables, param1, param2, (uint32_t)eax) != 0;
-}
-
-// 1.13c D2Game+0xA3E10
-extern "C" EMSCRIPTEN_KEEPALIVE
-bool d2_fn_d2game_A3E10(A param1, A param2, const D2GameBatch6E400Env* e)
-{
-    if (!param1) fatal6E400(e, 0x36C);
-    if (!param2) fatal6E400(e, 0x36D);
-    if ((uint8_t)rd32(param1, 0x18) != rd8(param2, 0x18)) return false;
-    A y = e->f21130(param1), x = e->f21100(param1);
-    return (uint32_t)e->fD08F0(x, y) < 0x3FC;
-}
+// D2Game+0xA3D60 (AITHINK_ShadowMasterCheckTargetPetType) and +0xA3E10 (AITHINK_CullPotentialTargetsForDiablo) are the game-tree bodies in
+// src/core/game/D2Game/AI/AiThink.cpp; the batch reaches 0xA3D60 through e->fA3D60 and 0xA3E10 has no other caller here.
 
 // ecx param_1 unused, param_2 (DL) = level byte, in_EAX = mode, esi = unit.
 // 1.13c D2Game+0xA41B0
@@ -326,7 +303,7 @@ uint32_t d2_fn_d2game_A44C0(int32_t param1, A eax, A ebx, const D2GameBatch6E400
     uint32_t i18 = rd32(eax, 0x18);
     if (!(param1 > -1 && param1 < (int32_t)rd32(dt, 0xBA0))) return 0;
     A row = (A)param1 * 0x23C + rdA(dt, 0xB98);
-    if (!row || !d2_fn_d2game_A3D60(param1, ebx, eax, e)) return 0;
+    if (!row || !e->fA3D60(param1, ebx, eax)) return 0;
     uint8_t cls = rd8(row, 0x230);
     if (i18 == 0) { if (cls == 4 || cls == 0xD) return 0; }
     else if (cls != 4 && cls != 0xD) return 0;
