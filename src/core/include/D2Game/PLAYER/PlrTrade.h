@@ -24,6 +24,7 @@ struct D2CubeTableStrc
 
 //D2Game.0x6FC8F3D0
 int32_t __fastcall OBJECTS_OperateFunction32_Bank(D2ObjOperateFnStrc* pOp, int32_t nOperate);
+int32_t __fastcall D2GAME_CountCubeItems(D2InventoryStrc* pInventory);
 //D2Game.0x6FC8F450
 int32_t __fastcall PLRTRADE_CheckCubeInput(D2GameStrc* pGame, D2InventoryStrc* pInventory, D2CubeMainTxt* pCubeMainTxt, int32_t nInputIndex, D2CubeItemStrc* pCubeItem, int32_t* a6);
 //D2Game.0x6FC8FE40

@@ -1711,13 +1711,13 @@ void __fastcall D2GAME_SHRINES_Portal_6FC76880(D2ObjOperateFnStrc* pOp, D2Shrine
 {
     D2_MAYBE_UNUSED(pShrinesTxtRecord);
     D2CoordStrc pCoord = {};
-    UNITS_GetCoords(pOp->pPlayer, &pCoord);
+    D2_CALL(UNITS_GetCoords, pOp->pPlayer, &pCoord);
 
-    D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pOp->pPlayer);
-    const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(pRoom);
-    const int32_t nTownId = DUNGEON_GetTownLevelIdFromActNo(DRLG_GetActNoFromLevelId(nLevelId));
+    D2ActiveRoomStrc* pRoom = D2_CALL(UNITS_GetRoom, pOp->pPlayer);
+    const int32_t nLevelId = D2_CALL(DUNGEON_GetLevelIdFromRoom, pRoom);
+    const int32_t nTownId = D2_CALL(DUNGEON_GetTownLevelIdFromActNo, D2_CALL(DRLG_GetActNoFromLevelId, nLevelId));
 
-    if (COLLISION_GetFreeCoordinates(pRoom, &pCoord, 3, 0x1C09u, 0))
+    if (D2_CALL(COLLISION_GetFreeCoordinates, pRoom, &pCoord, 3, 0x1C09u, 0))
     {
         D2GAME_CreatePortalObject_6FD13DF0(pOp->pGame, pOp->pPlayer, pRoom, pCoord.nX + 5, pCoord.nY + 5, nTownId, 0, 59u, 0);
     }

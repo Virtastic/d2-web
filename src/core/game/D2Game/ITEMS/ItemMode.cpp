@@ -630,7 +630,8 @@ void __fastcall D2GAME_ITEMS_UpdateTransferredProperties_6FC424E0(D2GameStrc* pG
 
 //D2Game.0x6FC425F0
 // Same rule as retail D2Game+0xD2F00 (checked against the 1.13c decompile: quest gates, class-lock table, own-list and corpse-owner carry walk,
-// no delta); its retail-layout copy with the marker is src/core/d2game/d2game_d2f00.cpp, the one the FN probe runs. D6760's tail loop calls this.
+// no delta); the FN probe src/core/fn/d2game_d2f00.cpp runs this body. D6760's tail loop calls this.
+// 1.13c D2Game+0xD2F00
 int32_t __fastcall sub_6FC425F0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem)
 {
     constexpr int nQuestIds[8] =
@@ -641,24 +642,33 @@ int32_t __fastcall sub_6FC425F0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
         QUESTSTATEFLAG_A4Q3, QUESTSTATEFLAG_A4Q1
     };
 
-    D2UnitStrc* pPreviousItem = INVENTORY_GetFirstItem(pUnit->pInventory);
+    // The callees run through D2_CALL so the FN probe (src/core/fn/d2game_d2f00.cpp) can stand retail's recorded answers in for them.
+    auto pQuestOf = [&](D2UnitStrc* pPlayer) { return D2_CALL(ITEMMODE_PlayerQuestRecord_D1020, pPlayer, pGame); };
+
+    D2UnitStrc* pPreviousItem = D2_CALL(INVENTORY_GetFirstItem, pUnit->pInventory);
     if (!pUnit->pInventory)
     {
         return 0;
     }
-        
-    D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem ? pItem->dwClassId : -1);
+
+    D2ItemsTxt* pItemsTxtRecord = D2_CALL(DATATBLS_GetItemsTxtRecord, pItem ? pItem->dwClassId : -1);
     if (!pItemsTxtRecord)
     {
         return 0;
     }
-    
-    if (pItem && pItem->dwUnitType == UNIT_ITEM && ITEMS_GetItemQuality(pItem) == ITEMQUAL_UNIQUE)
+
+    if (pItem && pItem->dwUnitType == UNIT_ITEM && D2_CALL(ITEMS_GetItemQuality, pItem) == ITEMQUAL_UNIQUE)
     {
-        D2UniqueItemsTxt* pUniqueItemsTxtRecord = ITEMS_GetUniqueItemsTxtRecord(ITEMS_GetFileIndex(pItem));
-        if (pUniqueItemsTxtRecord && pUniqueItemsTxtRecord->dwUniqueItemFlags & gdwBitMasks[UNIQUEITEMSFLAGINDEX_CARRY1] && sub_6FC428F0(pItem, pItemsTxtRecord, pPreviousItem))
+        // retail tests the file index's sign, then asks again for the lookup
+        int32_t nFileIndex = D2_CALL(ITEMS_GetFileIndex, pItem);
+        if (nFileIndex >= 0)
         {
-            return 0;
+            nFileIndex = D2_CALL(ITEMS_GetFileIndex, pItem);
+            D2UniqueItemsTxt* pUniqueItemsTxtRecord = D2_CALL(ITEMS_GetUniqueItemsTxtRecord, nFileIndex);
+            if (pUniqueItemsTxtRecord && pUniqueItemsTxtRecord->dwUniqueItemFlags & gdwBitMasks[UNIQUEITEMSFLAGINDEX_CARRY1] && D2_CALL(sub_6FC428F0, pItem, pItemsTxtRecord, pPreviousItem))
+            {
+                return 0;
+            }
         }
     }
 
@@ -670,45 +680,45 @@ int32_t __fastcall sub_6FC425F0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
     const uint32_t nItemCode = pItemsTxtRecord->dwCode;
     if (nItemCode == ' ssa')
     {
-        if (!QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A2Q1, QFLAG_CUSTOM1))
+        if (!D2_CALL(QUESTRECORD_GetQuestState, D2_CALL(UNITS_GetPlayerData, pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A2Q1, QFLAG_CUSTOM1))
         {
             return 0;
         }
     }
     else if (nItemCode == ' 43j')
     {
-        if (QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A3Q4, QFLAG_REWARDGRANTED))
+        if (D2_CALL(QUESTRECORD_GetQuestState, pQuestOf(pUnit), QUESTSTATEFLAG_A3Q4, QFLAG_REWARDGRANTED))
         {
             return 0;
         }
     }
     else if (nItemCode == ' zyx')
     {
-        if (!QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A3Q4, QFLAG_CUSTOM1))
+        if (!D2_CALL(QUESTRECORD_GetQuestState, pQuestOf(pUnit), QUESTSTATEFLAG_A3Q4, QFLAG_CUSTOM1))
         {
             return 0;
         }
     }
     else if (nItemCode == ' 33g')
     {
-        if (QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A3Q3, QFLAG_CUSTOM3))
+        if (D2_CALL(QUESTRECORD_GetQuestState, pQuestOf(pUnit), QUESTSTATEFLAG_A3Q3, QFLAG_CUSTOM3))
         {
             return 0;
         }
 
-        if (QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A3Q3, QFLAG_CUSTOM4))
+        if (D2_CALL(QUESTRECORD_GetQuestState, pQuestOf(pUnit), QUESTSTATEFLAG_A3Q3, QFLAG_CUSTOM4))
         {
             return 0;
         }
     }
     else if (nItemCode == ' 2rt')
     {
-        if (!QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A5Q3, QFLAG_CUSTOM4))
+        if (!D2_CALL(QUESTRECORD_GetQuestState, pQuestOf(pUnit), QUESTSTATEFLAG_A5Q3, QFLAG_CUSTOM4))
         {
             return 0;
         }
 
-        if (QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A5Q3, QFLAG_CUSTOM3))
+        if (D2_CALL(QUESTRECORD_GetQuestState, pQuestOf(pUnit), QUESTSTATEFLAG_A5Q3, QFLAG_CUSTOM3))
         {
             return 0;
         }
@@ -716,14 +726,14 @@ int32_t __fastcall sub_6FC425F0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
 
     if (pItemsTxtRecord->nQuest == QUESTSTATEFLAG_A2Q2)
     {
-        if (QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A2Q2, QFLAG_REWARDGRANTED) && pItemsTxtRecord->dwCode != ' xob')
+        if (D2_CALL(QUESTRECORD_GetQuestState, pQuestOf(pUnit), QUESTSTATEFLAG_A2Q2, QFLAG_REWARDGRANTED) && pItemsTxtRecord->dwCode != ' xob')
         {
             return 0;
         }
     }
     else if (pItemsTxtRecord->nQuest == QUESTSTATEFLAG_A1Q5)
     {
-        if (QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], QUESTSTATEFLAG_A1Q4, QFLAG_REWARDGRANTED) && pItemsTxtRecord->dwCode != ' gel')
+        if (D2_CALL(QUESTRECORD_GetQuestState, pQuestOf(pUnit), QUESTSTATEFLAG_A1Q4, QFLAG_REWARDGRANTED) && pItemsTxtRecord->dwCode != ' gel')
         {
             return 0;
         }
@@ -732,25 +742,25 @@ int32_t __fastcall sub_6FC425F0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
     {
         for (int32_t i = 0; i < 4; ++i)
         {
-            if (pItemsTxtRecord->nQuest == nQuestIds[2 * i + 1] && QUESTRECORD_GetQuestState(UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty], nQuestIds[2 * i], QFLAG_REWARDGRANTED))
+            if (pItemsTxtRecord->nQuest == nQuestIds[2 * i + 1] && D2_CALL(QUESTRECORD_GetQuestState, pQuestOf(pUnit), nQuestIds[2 * i], QFLAG_REWARDGRANTED))
             {
                 return 0;
             }
         }
     }
 
-    if (sub_6FC428F0(pItem, pItemsTxtRecord, pPreviousItem))
+    if (D2_CALL(sub_6FC428F0, pItem, pItemsTxtRecord, pPreviousItem))
     {
         return 0;
     }
 
-    for (D2CorpseStrc* pCorpse = INVENTORY_GetFirstCorpse(pUnit->pInventory); pCorpse; pCorpse = INVENTORY_GetNextCorpse(pCorpse))
+    for (D2CorpseStrc* pCorpse = D2_CALL(INVENTORY_GetFirstCorpse, pUnit->pInventory); pCorpse; pCorpse = D2_CALL(INVENTORY_GetNextCorpse, pCorpse))
     {
-        D2UnitStrc* pPlayer = SUNIT_GetServerUnit(pGame, UNIT_PLAYER, INVENTORY_GetUnitGUIDFromCorpse(pCorpse));
+        D2UnitStrc* pPlayer = D2_CALL(SUNIT_GetServerUnit, pGame, UNIT_PLAYER, D2_CALL(INVENTORY_GetUnitGUIDFromCorpse, pCorpse));
         if (pPlayer && pPlayer->pInventory)
         {
-            D2UnitStrc* pFirstItem = INVENTORY_GetFirstItem(pPlayer->pInventory);
-            if (pFirstItem && sub_6FC428F0(pItem, pItemsTxtRecord, pFirstItem))
+            D2UnitStrc* pFirstItem = D2_CALL(INVENTORY_GetFirstItem, pPlayer->pInventory);
+            if (pFirstItem && D2_CALL(sub_6FC428F0, pItem, pItemsTxtRecord, pFirstItem))
             {
                 return 0;
             }
@@ -760,15 +770,27 @@ int32_t __fastcall sub_6FC425F0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
     return 1;
 }
 
+// Retail's quest-record helper (hook key 0x1020): the player's quest record for the game's difficulty (what the quest checks above read through).
+D2BitBufferStrc* __fastcall ITEMMODE_PlayerQuestRecord_D1020(D2UnitStrc* pPlayer, D2GameStrc* pGame)
+{
+    return UNITS_GetPlayerData(pPlayer)->pQuestData[pGame->nDifficulty];
+}
+
 //D2Game.0x6FC428F0
-// Same rule as retail D2Game+0xD2070 (no delta against the 1.13c decompile; the sibling-code pairs are retail's, 0xD1A00 inlined); the
-// retail-layout copy with the marker is src/core/d2game/d2game_d2070.cpp.
+// 1.13c D2Game+0xD2070 (the sibling-code pairs are retail's; the last three go through 0xD1A00). The callees run through D2_CALL so the FN probe
+// (src/core/fn/d2game_d2070.cpp) can stand retail's recorded answers in for them.
 int32_t __fastcall sub_6FC428F0(D2UnitStrc* pItem, D2ItemsTxt* pItemsTxtRecordArg, D2UnitStrc* pPreviousItem)
 {
     int32_t nUniqueId = -1;
-    if (pItem && pItem->dwUnitType == UNIT_ITEM && ITEMS_GetItemQuality(pItem) == ITEMQUAL_UNIQUE)
+    if (pItem && pItem->dwUnitType == UNIT_ITEM && D2_CALL(ITEMS_GetItemQuality, pItem) == ITEMQUAL_UNIQUE)
     {
-        D2UniqueItemsTxt* pUniqueItemsTxtRecord = ITEMS_GetUniqueItemsTxtRecord(ITEMS_GetFileIndex(pItem));
+        // retail tests the file index's sign, then asks again for the lookup
+        int32_t nFileIndex = D2_CALL(ITEMS_GetFileIndex, pItem);
+        if (nFileIndex >= 0)
+        {
+            nFileIndex = D2_CALL(ITEMS_GetFileIndex, pItem);
+        }
+        D2UniqueItemsTxt* pUniqueItemsTxtRecord = nFileIndex >= 0 ? D2_CALL(ITEMS_GetUniqueItemsTxtRecord, nFileIndex) : nullptr;
         if (pUniqueItemsTxtRecord && pUniqueItemsTxtRecord->dwUniqueItemFlags & gdwBitMasks[UNIQUEITEMSFLAGINDEX_CARRY1])
         {
             nUniqueId = pUniqueItemsTxtRecord->wId;
@@ -778,8 +800,8 @@ int32_t __fastcall sub_6FC428F0(D2UnitStrc* pItem, D2ItemsTxt* pItemsTxtRecordAr
     D2UnitStrc* pCurrent = pPreviousItem;
     while (pCurrent)
     {
-        D2UnitStrc* pCheckedItem = INVENTORY_UnitIsItem(pCurrent);
-        D2UnitStrc* pNext = INVENTORY_GetNextItem(pCurrent);
+        D2UnitStrc* pCheckedItem = D2_CALL(INVENTORY_UnitIsItem, pCurrent);
+        D2UnitStrc* pNext = D2_CALL(INVENTORY_GetNextItem, pCurrent);
         if (pCheckedItem == pItem)
         {
             break;
@@ -787,13 +809,13 @@ int32_t __fastcall sub_6FC428F0(D2UnitStrc* pItem, D2ItemsTxt* pItemsTxtRecordAr
 
         if (pCheckedItem)
         {
-            if (nUniqueId >= 0 && ITEMS_GetInvPage(pCheckedItem) != 1 && ITEMS_GetItemQuality(pCheckedItem) == ITEMQUAL_UNIQUE && ITEMS_GetFileIndex(pCheckedItem) == nUniqueId)
+            if (nUniqueId >= 0 && D2_CALL(ITEMS_GetInvPage, pCheckedItem) != 1 && D2_CALL(ITEMS_GetItemQuality, pCheckedItem) == ITEMQUAL_UNIQUE && D2_CALL(ITEMS_GetFileIndex, pCheckedItem) == nUniqueId)
             {
                 return 1;
             }
 
-            D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pCheckedItem->dwClassId);
-            if (pItemsTxtRecord->nQuest && ITEMS_GetInvPage(pCheckedItem) != 1 && pItemsTxtRecord->nQuest == pItemsTxtRecordArg->nQuest)
+            D2ItemsTxt* pItemsTxtRecord = D2_CALL(DATATBLS_GetItemsTxtRecord, pCheckedItem->dwClassId);
+            if (pItemsTxtRecord->nQuest && D2_CALL(ITEMS_GetInvPage, pCheckedItem) != 1 && pItemsTxtRecord->nQuest == pItemsTxtRecordArg->nQuest)
             {
                 uint32_t nCode1 = pItemsTxtRecordArg->dwCode;
                 uint32_t nCode2 = pItemsTxtRecord->dwCode;
@@ -804,9 +826,9 @@ int32_t __fastcall sub_6FC428F0(D2UnitStrc* pItem, D2ItemsTxt* pItemsTxtRecordAr
                     || nCode1 == ' tsh' && nCode2 == ' fsm' || nCode1 == ' fsm' && nCode2 == ' tsh'
                     || nCode1 == ' tsh' && nCode2 == ' piv' || nCode1 == ' piv' && nCode2 == ' tsh'
                     || nCode1 == ' 2fq' && nCode2 == ' 1fq' || nCode1 == ' 1fq' && nCode2 == ' 2fq'
-                    || nCode1 == ' 2fq' && nCode2 == ' rhq' || nCode1 == ' rhq' && nCode2 == ' 2fq'
-                    || nCode1 == ' 2fq' && nCode2 == ' yeq' || nCode1 == ' yeq' && nCode2 == ' 2fq'
-                    || nCode1 == ' 2fq' && nCode2 == ' rbq' || nCode1 == ' rbq' && nCode2 == ' 2fq')
+                    || D2_CALL(ITEMMODE_CodePair_D1A00, pItemsTxtRecordArg, pItemsTxtRecord, ' 2fq', ' rhq')
+                    || D2_CALL(ITEMMODE_CodePair_D1A00, pItemsTxtRecordArg, pItemsTxtRecord, ' 2fq', ' yeq')
+                    || D2_CALL(ITEMMODE_CodePair_D1A00, pItemsTxtRecordArg, pItemsTxtRecord, ' 2fq', ' rbq'))
                 {
                     return 1;
                 }
@@ -817,6 +839,12 @@ int32_t __fastcall sub_6FC428F0(D2UnitStrc* pItem, D2ItemsTxt* pItemsTxtRecordAr
     }
 
     return 0;
+}
+
+// 1.13c D2Game+0xD1A00: the two rows' codes are the pair (nCodeA, nCodeB), either way round
+int32_t __fastcall ITEMMODE_CodePair_D1A00(D2ItemsTxt* pRowA, D2ItemsTxt* pRowB, uint32_t nCodeA, uint32_t nCodeB)
+{
+    return (pRowA->dwCode == nCodeA && pRowB->dwCode == nCodeB) || (pRowA->dwCode == nCodeB && pRowB->dwCode == nCodeA);
 }
 
 // Out of line in 1.13c: put an item back on the ground in its room and give the unit the event sound.

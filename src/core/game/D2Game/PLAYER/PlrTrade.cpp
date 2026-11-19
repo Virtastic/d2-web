@@ -73,6 +73,23 @@ int32_t __fastcall OBJECTS_OperateFunction32_Bank(D2ObjOperateFnStrc* pOp, int32
     return 1;
 }
 
+// 1.13c D2Game+0x70190: the number of items the inventory holds on the cube page (retail reads the node's item, then the next node, then the page)
+int32_t __fastcall D2GAME_CountCubeItems(D2InventoryStrc* pInventory)
+{
+    int32_t nCount = 0;
+    D2UnitStrc* pNode = D2_CALL(INVENTORY_GetFirstItem, pInventory);
+    while (pNode)
+    {
+        D2UnitStrc* pItem = D2_CALL(INVENTORY_UnitIsItem, pNode);
+        pNode = D2_CALL(INVENTORY_GetNextItem, pNode);
+        if (D2_CALL(ITEMS_GetInvPage, pItem) == INVPAGE_CUBE)
+        {
+            ++nCount;
+        }
+    }
+    return nCount;
+}
+
 //D2Game.0x6FC8F450
 // 1.13c D2Game+0x70240 (the per-slot input test; the loop over the seven slots is 0x70CF0)
 int32_t __fastcall PLRTRADE_CheckCubeInput(D2GameStrc* pGame, D2InventoryStrc* pInventory, D2CubeMainTxt* pCubeMainTxt, int32_t nInputIndex, D2CubeItemStrc* pCubeItem, int32_t* a6)
@@ -387,7 +404,7 @@ int32_t __fastcall PLRTRADE_CheckCubeInput(D2GameStrc* pGame, D2InventoryStrc* p
 // 1.13c D2Game+0x71060 (1.13c stores the version gate as wVersion < 100 || game item format >= 100, same as here)
 int16_t __fastcall PLRTRADE_RollRandomItemClassOfSameType(D2GameStrc* pGame, int32_t nItemLevel, int32_t nItemId)
 {
-    D2ItemDataTbl* pItemDataTbl = DATATBLS_GetItemDataTables();
+    D2ItemDataTbl* pItemDataTbl = D2_CALL(DATATBLS_GetItemDataTables);
     D2_ASSERT(pItemDataTbl);
 
     int32_t nIndex = ITEMS_RollLimitedRandomNumber(&pGame->pGameSeed, pItemDataTbl->nItemsTxtRecordCount);
@@ -412,7 +429,7 @@ int16_t __fastcall PLRTRADE_RollRandomItemClassOfSameType(D2GameStrc* pGame, int
             break;
         }
 
-        if (ITEMS_CheckItemTypeIdByItemId(nIndex, nItemId))
+        if (D2_CALL(ITEMS_CheckItemTypeIdByItemId, nIndex, nItemId))
         {
             D2ItemsTxt* pItemsTxtRecord = &pItemDataTbl->pItemsTxt[nIndex];
             if (pItemsTxtRecord->nSpawnable && (pItemsTxtRecord->wVersion < 100u || pGame->wItemFormat >= 100u) && pItemsTxtRecord->nLevel <= nItemLevel)

@@ -1884,25 +1884,25 @@ int32_t __fastcall SKILLITEM_TimerCallback_ReanimateMonster(D2GameStrc* pGame, i
 }
 
 //D2Game.0x6FD05B60
-// 1.13c D2Game+0xAF210
+// 1.13c D2Game+0xAF210 (the chance roll is the limited roll of 100, retail 0x11D0: the same value as the 1.10f % 100)
 int32_t __fastcall SKILLITEM_EventFunc31_Reanimate(D2GameStrc* pGame, int32_t nEvent, D2UnitStrc* pAttacker, D2UnitStrc* pUnit, D2DamageStrc* pDamage, int32_t nSkillId, int32_t nSkillLevel)
 {
-    if (!pAttacker || !pUnit || pUnit->dwUnitType != UNIT_MONSTER || MONSTERUNIQUE_CheckMonTypeFlag(pUnit, MONTYPEFLAG_UNIQUE | MONTYPEFLAG_CHAMPION))
+    if (!pAttacker || !pUnit || pUnit->dwUnitType != UNIT_MONSTER || D2_CALL(MONSTERUNIQUE_CheckMonTypeFlag, pUnit, MONTYPEFLAG_UNIQUE | MONTYPEFLAG_CHAMPION))
     {
         return 0;
     }
 
-    const int32_t nChance = STATLIST_UnitGetItemStatOrSkillStatValue(pAttacker, (uint32_t)nSkillId >> 16, nSkillId);
-    if (nChance <= 0 || (ITEMS_RollRandomNumber(&pAttacker->pSeed) % 100) >= nChance)
+    const int32_t nChance = D2_CALL(STATLIST_UnitGetItemStatOrSkillStatValue, pAttacker, (uint32_t)nSkillId >> 16, nSkillId);
+    if (nChance <= 0 || (int32_t)D2_CALL(ITEMS_RollLimitedRandomNumber, &pAttacker->pSeed, 100) >= nChance)
     {
         return 0;
     }
 
-    for (D2UnitStrc* i = pAttacker; i; i = AIGENERAL_GetMinionOwner(i))
+    for (D2UnitStrc* i = pAttacker; i; i = D2_CALL(AIGENERAL_GetMinionOwner, i))
     {
         if (i->dwUnitType == UNIT_PLAYER)
         {
-			SUNITEVENT_Register(pGame, pUnit, UNITEVENT_DEATH, (uint16_t)nSkillId, i->dwUnitId, SKILLITEM_TimerCallback_ReanimateMonster, 0, i->dwUnitId);
+			D2_CALL(SUNITEVENT_Register, pGame, pUnit, UNITEVENT_DEATH, (uint16_t)nSkillId, i->dwUnitId, SKILLITEM_TimerCallback_ReanimateMonster, 0, i->dwUnitId);
             return 1;
         }
     }

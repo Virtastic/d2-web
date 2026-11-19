@@ -61,6 +61,10 @@ void __fastcall D2GAME_ITEMS_UpdateTransferredProperties_6FC424E0(D2GameStrc* pG
 int32_t __fastcall sub_6FC425F0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem);
 //D2Game.0x6FC428F0
 int32_t __fastcall sub_6FC428F0(D2UnitStrc* pItem, D2ItemsTxt* pItemsTxtRecord, D2UnitStrc* pPreviousItem);
+// The player's quest record for the game's difficulty; retail reaches it through one helper call (hook key 0x1020) in sub_6FC425F0's quest checks
+D2BitBufferStrc* __fastcall ITEMMODE_PlayerQuestRecord_D1020(D2UnitStrc* pPlayer, D2GameStrc* pGame);
+// 1.13c D2Game+0xD1A00
+int32_t __fastcall ITEMMODE_CodePair_D1A00(D2ItemsTxt* pRowA, D2ItemsTxt* pRowB, uint32_t nCodeA, uint32_t nCodeB);
 //D2Game.0x6FC42B80
 void __fastcall D2GAME_PickupItemEx_6FC42B80(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nItemGUID, int32_t* a4);
 //D2Game.0x6FC42DD0

@@ -219,19 +219,19 @@ void __fastcall LEVEL_SynchronizeDayNightCycleWithClient(D2GameStrc* pGame, D2Cl
 {
     D2_ASSERT(pClient);
     const uint8_t nAct = CLIENTS_GetActNo(pClient);
-    D2GAME_PACKETS_SendPacket0x03_6FC3C810(pClient, 3, nAct, pGame->dwInitSeed, pGame->dwObjSeed, DUNGEON_GetTownLevelIdFromAct(pGame->pAct[nAct]));
+    D2_CALL(D2GAME_PACKETS_SendPacket0x03_6FC3C810, pClient, 3, nAct, pGame->dwInitSeed, pGame->dwObjSeed, D2_CALL(DUNGEON_GetTownLevelIdFromAct, pGame->pAct[nAct]));
 
     int32_t nCycleIndex = 0;
     int32_t nTicks = 0;
     int32_t nEclipse = 0;
-    ENVIRONMENT_GetCycleIndex_Ticks_EclipseFromAct(pGame->pAct[nAct], &nCycleIndex, &nTicks, &nEclipse);
+    D2_CALL(ENVIRONMENT_GetCycleIndex_Ticks_EclipseFromAct, pGame->pAct[nAct], &nCycleIndex, &nTicks, &nEclipse);
     
     D2GSPacketSrv53 packet53 = {};
     packet53.nHeader = 0x53u;
     packet53.unk0x01 = nCycleIndex;
     packet53.unk0x05 = nTicks;
     packet53.unk0x09 = nEclipse;
-    D2GAME_SendPacket0x53_6FC3DF50(pClient, &packet53);
+    D2_CALL(D2GAME_SendPacket0x53_6FC3DF50, pClient, &packet53);
 }
 
 //D2Game.0x6FC3C0B0

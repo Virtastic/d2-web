@@ -11627,8 +11627,8 @@ void __fastcall D2GAME_AI_SpecialState10_17_6FCE7CF0(D2GameStrc* pGame, D2UnitSt
 // taken unless it is the unit itself; player/monster/missile go to 0x48750 as 1/2/4)
 void __fastcall D2GAME_AI_SpecialState11_6FCE7E20(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
-	sub_6FCBC7E0(pGame, pUnit);
-	D2UnitStrc* pTarget = PATH_GetTargetUnit(pUnit->pDynamicPath);
+	D2_CALL(sub_6FCBC7E0, pGame, pUnit);
+	D2UnitStrc* pTarget = D2_CALL(PATH_GetTargetUnit, pUnit->pDynamicPath);
 	if (pTarget == pUnit || !pTarget)
 	{
 		return;
@@ -11636,15 +11636,15 @@ void __fastcall D2GAME_AI_SpecialState11_6FCE7E20(D2GameStrc* pGame, D2UnitStrc*
 
 	if (pTarget->dwUnitType == UNIT_PLAYER)
 	{
-		sub_6FC61E30(pUnit, 1, pTarget->dwUnitId);
+		D2_CALL(sub_6FC61E30, pUnit, 1, pTarget->dwUnitId);
 	}
 	else if (pTarget->dwUnitType == UNIT_MONSTER)
 	{
-		sub_6FC61E30(pUnit, 2, pTarget->dwUnitId);
+		D2_CALL(sub_6FC61E30, pUnit, 2, pTarget->dwUnitId);
 	}
 	else if (pTarget->dwUnitType == UNIT_MISSILE)
 	{
-		sub_6FC61E30(pUnit, 4, pTarget->dwUnitId);
+		D2_CALL(sub_6FC61E30, pUnit, 4, pTarget->dwUnitId);
 	}
 }
 
@@ -14201,15 +14201,16 @@ D2UnitStrc* __fastcall AITHINK_TargetCallback_ShadowMaster(D2GameStrc* pGame, D2
 {
 	D2ShadowMasterAiCallbackArgStrc* pArg = (D2ShadowMasterAiCallbackArgStrc*)pCallbackArg;
 
-	if (pUnit == pTarget || SUNIT_IsDead(pTarget) || !pTarget)
+	// the callees run through D2_CALL so the FN probe (src/core/fn/d2game_a5230.cpp) can stand retail's recorded answers in for them
+	if (pUnit == pTarget || D2_CALL(SUNIT_IsDead, pTarget) || !pTarget)
 	{
 		return nullptr;
 	}
 
-	if (pTarget->dwUnitType == UNIT_MONSTER && STATLIST_AreUnitsAligned(pUnit, pTarget))
+	if (pTarget->dwUnitType == UNIT_MONSTER && D2_CALL(STATLIST_AreUnitsAligned, pUnit, pTarget))
 	{
-		D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(pTarget->dwClassId);
-		
+		D2MonStatsTxt* pMonStatsTxtRecord = D2_CALL(MONSTERMODE_GetMonStatsTxtRecord, pTarget->dwClassId);
+
 		int32_t nClassId = -1;
 		if (pMonStatsTxtRecord)
 		{
@@ -14232,14 +14233,14 @@ D2UnitStrc* __fastcall AITHINK_TargetCallback_ShadowMaster(D2GameStrc* pGame, D2
 		}
 	}
 
-	if (!(pTarget->dwFlags & UNITFLAG_CANBEATTACKED) || !sub_6FCBD900(pGame, pUnit, pTarget))
+	if (!(pTarget->dwFlags & UNITFLAG_CANBEATTACKED) || !D2_CALL(sub_6FCBD900, pGame, pUnit, pTarget))
 	{
 		return nullptr;
 	}
 
 	if (pArg->unk0x00)
 	{
-		const int32_t nDistance = AITHINK_GetSquaredDistance(pArg->unk0x00, pTarget);
+		const int32_t nDistance = D2_CALL(AITHINK_GetSquaredDistance, pArg->unk0x00, pTarget);
 
 		if (nDistance <= 100)
 		{
@@ -14254,7 +14255,7 @@ D2UnitStrc* __fastcall AITHINK_TargetCallback_ShadowMaster(D2GameStrc* pGame, D2
 	}
 
 
-	const int32_t nDistance = AITHINK_GetSquaredDistance(pUnit, pTarget);
+	const int32_t nDistance = D2_CALL(AITHINK_GetSquaredDistance, pUnit, pTarget);
 	if (nDistance <= 1024)
 	{
 		++pArg->unk0x1C;
@@ -14270,7 +14271,7 @@ D2UnitStrc* __fastcall AITHINK_TargetCallback_ShadowMaster(D2GameStrc* pGame, D2
 			pArg->unk0x08 = nDistance;
 		}
 
-		if (AITHINK_IsTargetKillableByShadowMaster(pUnit, pTarget))
+		if (D2_CALL(AITHINK_IsTargetKillableByShadowMaster, pUnit, pTarget))
 		{
 			pArg->unk0x24 = pTarget;
 		}
