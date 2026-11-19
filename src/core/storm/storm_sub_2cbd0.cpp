@@ -6,10 +6,12 @@ void storm_bnvec_setcap(StormBnVec* v, uint32_t n);
 // Storm+0x3C80: set the capacity to n words (the verified storm_bnvec_setcap; same 20-byte field order).
 void Seam3C80_2CBD0(S2CBigVec* v, uint32_t n) { storm_bnvec_setcap((StormBnVec*)v, n); }
 // Storm+0x3C40 (EAX = wanted length, stack = vector): the largest power of two <= n, 0x40 stored as the grain from 0x40 up.
-uint32_t Seam3C40_2CBD0(S2CBigVec* v, uint32_t n) {
-    if (n >= 0x40) { v->grow = 0x40; return 0x40; }
-    for (uint32_t u = (n - 1) & n; u != 0; u = (u - 1) & u) n = u;
-    return n ? n : 1;
+extern "C" uint32_t Storm13c_3C40(uint32_t n, uint32_t* vec);
+uint32_t Seam3C40_2CBD0(S2CBigVec* v, uint32_t n) {   // the body takes the retail dword view; the grain is dword 3
+    uint32_t w[4] = { 0, 0, 0, v->grow };
+    const uint32_t g = Storm13c_3C40(n, w);
+    v->grow = w[3];
+    return g;
 }
 
 void Storm_2CBD0(S2CBigVec* dst, const S2CBigVec* src, uint32_t mlo, uint32_t mhi) {

@@ -309,6 +309,9 @@ static void fog_crt_exit_process(int code) {
 
 }  // namespace
 
+// 1.13c Fog+0x1790: the one body, exported so its FN probe (src/core/fn/fog_1790.cpp) drives it. EAX = n, stack = the array.
+uint32_t fog_sub_1790(uint32_t n, void* a) { return fog_next_block_size(static_cast<FogArray*>(a), n); }
+
 // Probe record ABI: arguments in retail register/stack order starting at r[0], result in r[4].
 extern "C" {
 

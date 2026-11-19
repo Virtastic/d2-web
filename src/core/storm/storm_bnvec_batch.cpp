@@ -27,12 +27,14 @@ struct StormBnVecEnv {
 };
 StormBnVecEnv* storm_bnvec_env = nullptr;
 
+extern "C" uint32_t Storm13c_3C40(uint32_t n, uint32_t* vec);
 namespace {
 // 1.13c Storm+0x3C40: default grain = largest power of two <= n (cap 0x40), stored when capped.
 uint32_t storm_bnvec_grain(StormBnVec* v, uint32_t n) {
-    if (n >= 0x40) { v->grain = 0x40; return 0x40; }
-    for (uint32_t u = (n - 1) & n; u != 0; u = (u - 1) & u) n = u;
-    return n ? n : 1;
+    uint32_t w[4] = { 0, 0, 0, v->grain };
+    const uint32_t g = Storm13c_3C40(n, w);
+    v->grain = w[3];
+    return g;
 }
 }  // namespace
 

@@ -7,21 +7,10 @@
 
 extern "C" void Storm13c_3D40(uint32_t* stream, uint32_t newcap);  // 1.13c Storm+0x3D40
 
+extern "C" uint32_t Storm13c_3D00(uint32_t n, uint32_t* obj);  // 1.13c Storm+0x3D00: the step for a stream without one
+
 namespace {
-// 1.13c Storm+0x3D00: the step for a stream without one.
-uint32_t step_for(uint32_t* s, uint32_t need) {
-    if (need >= 0x100) {
-        s[3] = 0x100;
-        return 0x100;
-    }
-    uint32_t n = need;
-    uint32_t u = (n - 1) & n;
-    while (u != 0) {
-        n = u;
-        u = (u - 1) & u;
-    }
-    return n == 0 ? 1 : n;
-}
+uint32_t step_for(uint32_t* s, uint32_t need) { return Storm13c_3D00(need, s); }
 
 // Grows the stream so that need bytes fit (need > cap on entry).
 void grow(uint32_t* s, uint32_t need) {
