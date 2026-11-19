@@ -1,4 +1,6 @@
-// Realm-path body of D2Client+0x14F40 (the 1.13c marker is on d2_client_14f40 in d2client).
+// Realm-path body of D2Client+0x14F40: fastcall(ECX = unit, EDX = skill-record index); retail returns 0 for an index outside
+// the skills table or a null record (DATATBLS_GetSkillsTxtRecord is that test).
+// 1.13c D2Client+0x14F40
 // Do function 16 (Jab): only on the action frame 3, a player plays the row's "dosound a" and a
 // monster its "dosound b" (each when above 0). Returns 1, also on the other frames.
 #include <D2DataTbls.h>
