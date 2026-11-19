@@ -12,6 +12,7 @@
 
 #define __stdcall
 #define __fastcall
+#define __vectorcall
 #define __cdecl
 #define __forceinline inline
 #define __int8 char
