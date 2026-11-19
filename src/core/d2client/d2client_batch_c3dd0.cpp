@@ -45,23 +45,6 @@ uint32_t sub_C4410(const Env& e, P u, uint32_t p1, uint32_t p2, uint32_t p3, uin
  if (flag) e.wr32(n + 0xc4, e.rd32(n + 0xc4) | 0x10000);
  return 1;
 }
-// 1.13c D2Client+0xC4830
-uint32_t sub_C4830(const Env& e, uint32_t, int32_t cls) {
- P r = clsRow(e, cls);
- uint32_t a = r ? e.rd32(r + 0x148) : 0;
- int32_t b = r ? (int32_t)e.rd32(r + 0x14c) : 0;
- int32_t c = r ? (int32_t)e.rd32(r + 0x150) : 0;
- int32_t d = r ? (int32_t)e.rd32(r + 0x154) : 0;
- c = (c * 1000) / 0x19;
- if (c != 0) {
-  e.wr32(e.gBB9CC, e.tick());
-  e.wr32(e.gBB9D8, (uint32_t)((d * 1000) / 0x19));
-  e.wr32(e.gBB9D0, (uint32_t)((b * 1000) / 0x19));
-  e.wr32(e.gBB9D4, (uint32_t)c);
-  e.wr32(e.gCBEFC, a);
- }
- return 1;
-}
 // 1.13c D2Client+0xC4960
 uint32_t sub_C4960(const Env& e, P a) {
  P p = e.f560d0(a);

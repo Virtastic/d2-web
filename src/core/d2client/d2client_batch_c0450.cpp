@@ -33,17 +33,6 @@ void sub_C0450(const Env& e, P self, P out, P p1, P p2, int32_t p3) {
  if (e.f4dc60(v, plId, a)) e.wr32(p1, 1);
  e.win2Unicode(p2, pc, 0x80);
 }
-// ---- D2Client+0xC07C0 ----
-// 1.13c D2Client+0xC07C0
-void sub_C07C0(const Env& e, int32_t p) {
- if (e.rd8(0x6fbc9721)) return;
- int32_t r = e.f70590();
- uint32_t x = e.rd32(0x6fb8bc54); int32_t y = (int32_t)e.rd32(0x6fb8bc58) - 0x48;
- if (!p) { e.f55d90(); e.o10070(y, 0, 1, r); return; }
- P s = e.f55d90();
- e.wr16(0x6fbcc980, 0);
- if (s) { e.ustrcpy(0x6fbcc980, s); e.wr32(0x6fbcca24, (uint32_t)y); e.wr32(0x6fbcca28, (uint32_t)r); e.wr32(0x6fbcca20, x); }
-}
 // 1.13c D2Client+0xC0CE0
 void sub_C0CE0(const Env& e) { if (e.rd32(0x6fbcc394)) e.f54da0(0x6fbba608, 0x6fb70680); }   // EBX = D2Client+0xC0680 (a callback)
 // 1.13c D2Client+0xC1340
@@ -171,25 +160,6 @@ void sub_C1760(const Env& e, int32_t p) {
   }
  }
  if (p) e.wr32(0x6fbcbbb4, e.rd32(0x6fbcbbb4) + 1);
-}
-// 1.13c D2Client+0xC19B0
-void sub_C19B0(const Env& e) {
- if (e.ustrlen(0x6fbcc780) == 0) return;
- P u = e.f1a80();
- if (!u || e.rd32(u) != 1) return;
- uint32_t c = 0; P x = e.rd32(u + 0x14);
- if (x && (e.rd8(x + 0x16) & 8)) c = 4;
- if (x && (e.rd8(x + 0x16) & 4)) c = 3;
- e.f6f370(6, e.o10083() + 0x27, c);
-}
-// 1.13c D2Client+0xC1A20
-void sub_C1A20(const Env& e) {
- P u = e.f1a80();
- if (!u || e.rd32(u) != 1) return;
- int32_t y = e.o10083() + 0x27;
- e.f6f370(6, y, e.rd32(0x6fbccc30));
- if (e.rd32(0x6fbcca30) || e.rd32(0x6fbcc780)) y += e.o10083();
- e.f6f370(6, y, e.rd32(0x6fbcc778));
 }
 static void fatalExit(const Env& e) { uint32_t c = e.o10265(0x139b); e.o10024(e.str_c8359f, c); e.exit_(-1); }
 static void freeHandle(const Env& e, P a) {

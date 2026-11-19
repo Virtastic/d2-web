@@ -32,28 +32,6 @@ static P clsRow(const Env& e, int32_t c) {
 }
 static int16_t s16(const Env& e, P a) { return (int16_t)e.rd32(a); }
 static bool isPlayer(const Env& e, P u) { return u == e.rd32(e.gPlayerAddr); }
-// 1.13c D2Client+0xC62E0
-uint32_t sub_C62E0(const Env& e, P c) {
- P p = sess(e, c);
- if (p && e.o10338(p, 0, 0, 0, 0, 0)) { e.wr32(c + 0xc4, e.rd32(c + 0xc4) | 0x40); e.f4c500(p, 0, 0, 0, 0, 0); return 1; }
- return 0;
-}
-// 1.13c D2Client+0xC6350
-uint32_t sub_C6350(const Env& e, P c) {
- P p = sess(e, c);
- return p && e.o10678(p, 0, 0, 0, 0, 0);
-}
-// 1.13c D2Client+0xC63A0
-uint32_t sub_C63A0(const Env& e, P c) {
- P p = sess(e, c);
- if (p) { e.wr32(c + 0xc4, e.rd32(c + 0xc4) | 0x40); e.f4c500(p, 0, 0, 0, 0, 0); }
- return p != 0;
-}
-// 1.13c D2Client+0xC6400
-uint32_t sub_C6400(const Env& e, P c) {
- P p = sess(e, c);
- return p && e.o10096(p, 0, 0, 0, 0, 0);
-}
 // 1.13c D2Client+0xC6450  (a = unaff_EDI arg of FUN_6fad25d0)
 void sub_C6450(const Env& e, P a) {
  P o = e.o10630(0, 0, 0, 0, 0, 0);
@@ -64,29 +42,6 @@ void sub_C6450(const Env& e, P a) {
   P ent = e.rd32(n);
   if (e.rd32(ent + 8) == k) { e.f38550(ent, 0, 0, 0, 0, 0); return; }
  }
-}
-// 1.13c D2Client+0xC64B0
-uint32_t sub_C64B0(const Env& e, P u) {
- uint32_t cmd = e.rd32(u + 0x2c);
- P o = e.o10630(0, 0, 0, 0, 0, 0);
- if (!o || !cmd) return 0;
- uint32_t t = e.rd32(u);
- P m = t == 0 ? 0x80 : 0x100;
- e.o10980(o, 0, 0, 0, 0, 0); e.o10649(o, 0, 0, 0, 0, 0);
- uint32_t b = (uint32_t)e.o10397(o, 0, 0, 0, 0, 0) & 0xff;
- if ((b & 3) == 3) {
-  P w = e.o10123(u, m, 0, 0, 0, 0);
-  P r = e.o10331(u, 0, 0, w, 0, 0);
-  e.o11073(r, 0, 0, 0, 0, 0);
-  e.o11056(m, m, 0, 0, 0, 0);
-  e.o11164(m, t == 0 ? 0x1c09 : 0x3c01, 0, 0, 0, 0);
-  e.o10137(o, 0, 0, 0, 0, 0);
-  P k = e.f25d0(u, 0, 0, 0, 0, 0);
-  e.f38bf0(0, k, 0, 0, 0, 0);
-  return 1;
- }
- if (b & 1) { e.o10542(u, 3, 0, 0, 0, 0); e.wr32(u + 0x48, 0x500); }
- return 1;
 }
 // 1.13c D2Client+0xC66A0  (cls = in_EAX, lim = unaff_EDI; px/py host in/out coords)
 uint32_t sub_C66A0(const Env& e, P u, P cls, int32_t lim, int32_t* px, int32_t* py) {
@@ -127,27 +82,6 @@ uint32_t sub_C66A0(const Env& e, P u, P cls, int32_t lim, int32_t* px, int32_t* 
   else break;
  }
  if (t == 0) e.f3200(u, 0x13, 0, 0, 0, 0);
- return 0;
-}
-// 1.13c D2Client+0xC6940
-uint32_t sub_C6940(const Env& e, P u) {
- uint32_t id = e.rd32(u + 0x2c);
- if (((int32_t)e.rd32(u + 0x38) & 0xffffff00) < 0x600) {
-  if (((uint32_t)e.o10862(0, 0, 0, 0, 0, 0) & 0xf) > 0xd) { e.fatal(0xb60); return 0; }
-  e.f38a70(u, 4, 0, 0, 0, 0);
-  e.da0b0();
-  if (id) {
-   P p = e.o10392(id, 0, 0, 0, 0, 0);
-   if (!p) return 1;
-   P y = e.f1660(p, 0, 0, 0, 0, 0), x = e.f1630(p, 0, 0, 0, 0, 0);
-   e.o10739(id, x, y, 0, 0, 0);
-   return 1;
-  }
- } else {
-  e.da0b0();
-  if (id) { e.o10392(id, 0, 0, 0, 0, 0); e.f51860(u, 0, 0, 3, 0xa783, e.cb509f0); return 1; }
- }
- e.fatal(0x946);
  return 0;
 }
 // 1.13c D2Client+0xC7000  (c = client, idx = class index)
