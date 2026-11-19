@@ -158,6 +158,9 @@ void bn_gateway_pick_closest_zone(uint32_t self, int32_t gmt, const BnetGatewayH
 void bn_gateway_write_default_list(uint32_t self, const BnetGatewayHost& host);
 void bn_gateway_load(uint32_t self, const BnetGatewayHost& host);
 void bn_gateway_update_from_ini(uint32_t self, const char* data, const BnetGatewayHost& host);
+const char* bn_find_key(const char* data, const char* key);
+const char* bn_find_section(const char* data, const char* name);
+int32_t bn_gateway_gmt(uint32_t self, int32_t index, const BnetGatewayHost& host);
 int32_t bn_strnicmp(const char* str1, const char* str2, uint32_t max_count);
 int32_t bn_strtol(const char* str, char** end_ptr, int32_t radix);
 
@@ -176,6 +179,9 @@ struct TimeZoneInformation {
     int32_t daylight_bias;
 };
 
+}  // namespace
+
+// 1.13c BNClient+0x14D70
 // BNGatewayAccess::FindKey (0x14D70) A key match returns the
 // first byte after the key's delimiter; scanning stops at the next section header.
 const char* bn_find_key(const char* data, const char* key) {
@@ -190,6 +196,7 @@ const char* bn_find_key(const char* data, const char* key) {
     return nullptr;
 }
 
+// 1.13c BNClient+0x14E10
 // BNGatewayAccess::FindSection (0x14E10) Returns the start of
 // the line after the section header.
 const char* bn_find_section(const char* data, const char* name) {
@@ -208,14 +215,13 @@ const char* bn_find_section(const char* data, const char* name) {
     }
 }
 
+// 1.13c BNClient+0x14F60
 // BNGatewayAccess::GMT (0x14F60): the ZONE string after the n-th gateway name, base 10.
 int32_t bn_gateway_gmt(uint32_t self, int32_t index, const BnetGatewayHost& host) {
     const char* p = bn_gateway_nth(self, index, host);
     if (*p != '\0') p += host.sstr_len(p) + 1;
     return bn_strtol(p, nullptr, 10);
 }
-
-}  // namespace
 
 // 1.13c BNClient+0x14CC0
 // BNGatewayAccess::Nth(int): the n-th gateway name in the NUL-separated buffer; a failed walk

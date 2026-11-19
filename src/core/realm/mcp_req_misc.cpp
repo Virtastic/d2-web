@@ -151,6 +151,14 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_mcp_pair_6840(const uint8_t* gz, cha
     strcpy(o1, (const char*)gz + 4); strcpy(o2, (const char*)gz + 12);
     uint32_t v; memcpy(&v, gz, 4); return v;
 }
+// 1.13c D2MCPClient+0x6800: store the realm/character-name pair. Unbounded strcpy of realm to [0xb1c0] then name to
+// [0xae88]; dword [0xae80] = v, returned. gz is the globals in the layout of d2_mcp_pair_6840 above.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_mcp_store_pair_6800(uint8_t* gz, uint32_t v, const char* realm, const char* name) {
+    memcpy(gz, &v, 4);
+    strcpy((char*)gz + 4, realm);
+    strcpy((char*)gz + 12, name);
+    return v;
+}
 // 1.13c D2MCPClient+0x7480: CHARCREATE, { 0x02, u32 class, u16 flags, strz name }; string via sub_6EC0 (exit at >= 0x400).
 // Zeroes [0xb1c8] and [0xb214] (probe glue d2mcpclient_probe.h); [0xaeb4] untouched. The dead 0xFFFE check is the
 // caller's: 6EC0 already refuses len >= 0x400, so len+7 <= 0x406. Argument order is retail's: name and class on the
