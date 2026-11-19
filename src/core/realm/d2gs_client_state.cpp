@@ -5722,13 +5722,15 @@ struct RealmPlayerFormRecord {
     uint16_t animSpeed; uint8_t direction, flags; uint32_t baseWeaponClass;
 };
 static_assert(sizeof(RealmPlayerFormRecord) == 96, "monster animation record");
+extern "C" int32_t d2_client_22430(D2UnitStrc*);
+extern "C" int32_t d2_client_22490(D2UnitStrc*, uint32_t*);
+extern "C" int32_t d2_client_223d0(D2UnitStrc*);
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_form_at(int index, RealmPlayerFormRecord* out) {
     if (!out || index < 0 || static_cast<size_t>(index) >= g_players.size()) return 0;
     const D2UnitStrc* unit = g_players[static_cast<size_t>(index)].motionUnit;
     if (!unit || !unit->pDynamicPath) return 0;
-    int unitType = static_cast<int>(unit->dwUnitType), classId = static_cast<int>(unit->dwClassId);
-    int mode = UNITS_GetAnimOrSeqMode(const_cast<D2UnitStrc*>(unit));
-    D2COMMON_11013_ConvertMode(const_cast<D2UnitStrc*>(unit), &unitType, &classId, &mode, __FILE__, __LINE__);
+    D2UnitStrc* u = const_cast<D2UnitStrc*>(unit);
+    const int unitType = d2_client_22430(u), classId = d2_client_22490(u, nullptr), mode = d2_client_223d0(u);
     if (unitType != UNIT_MONSTER) return 0;
     const D2MonStatsTxt* mon = DATATBLS_GetMonStatsTxtRecord(classId);
     const D2MonStats2Txt* mon2 = UNITS_GetMonStats2TxtRecordFromMonsterId(classId);
