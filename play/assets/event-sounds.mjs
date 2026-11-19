@@ -11,7 +11,7 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
   const rows = (p) => new TextDecoder('latin1').decode(read(p)).split(/\r?\n/).map((l) => l.split('\t'));
   // floorClass(unitType, id, level) is the engine's D2Client 0x226A0 (its level-class fallback is the native SoundEnviron "Material 1" of the level).
   let stepLevel = 1;
-  const floorOffset = (unitType, id) => { const c = floorClass ? floorClass(unitType, id, stepLevel) : 0; return c >= 2 && c <= 6 ? 4 * (c - 1) : 0; }; // 0x22FB0
+  const floorOffset = (unitType, id) => { const c = floorClass(unitType, id, stepLevel); return c >= 2 && c <= 6 ? 4 * (c - 1) : 0; }; // 0x22FB0
   const idx = new Map(rows('data\\global\\excel\\Sounds.txt').slice(1).filter((c) => c[0]).map((c) => [c[0], Number(c[1])]));
   const drop = new Map();
   for (const f of ['armor', 'weapons', 'misc']) {
@@ -33,13 +33,13 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
   // A run a cast started (no explicit move command) keeps the client unit in run mode 3 (a retail recording retail F rows: step 0x97 over a 2048 cycle, footfalls
   // mod 1024, every one the run group, gaps 7,7,6,7); an explicit move flips it to walk/town-walk after the first tick (step 0xD5, the model above).
   // The due test itself is the engine's 0x23C00 check (stepDue = _d2_client_footstep_due: two footfalls a cycle, phase 0,
-  // the 2/3-period gap); without it the hero steps only on the armed first footfall.
+  // the 2/3-period gap).
   let STEP = 320, PER = 1536, RUNG = 0;
-  const footDue = (c, ticks) => !!stepDue && stepDue(c, 2 * PER, STEP, 2, 0, ticks, 0) !== 0;
+  const footDue = (c, ticks) => stepDue(c, 2 * PER, STEP, 2, 0, ticks, 0) !== 0;
   return {
     /** D2Client 2A750's local action 2 (cast on the ground): 1C150 -> 23C00 plays the walk group's first footfall at once. */
     /** 2A750's local action 7 (cast on a unit): 24490 -> 242B0 plays the weapon-class row of the client unit; k is the hit class of its weapon, 1 with none. */
-    localAttack(k = 1) { for (const s of modeSounds?.(0, 0, 0, 0, -1, 7, 0, k & 15, 1, -1) ?? []) play(s.row, { kind: 'weapon', unitType: 0, baseRow: s.row }); },
+    localAttack(k = 1) { for (const s of modeSounds(0, 0, 0, 0, -1, 7, 0, k & 15, 1, -1)) play(s.row, { kind: 'weapon', unitType: 0, baseRow: s.row }); },
     localWalk(cls) { play((GAIT_BASE[cls] ?? 2768) + floorOffset(0, 0), { kind: 'footstep', unitType: 0, classId: cls }); },
     /** The engine's own level-up event (soundEvent 2 -> row 7) was played; the level poll below must not repeat it. */
     /** A new session replaced the world: forget the objects seen in the old one (first sight is per session). */
@@ -87,7 +87,7 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
         // (a town NPC held in its walk mode while it stands) makes no footstep. Retail's unit leaves the walk mode when it stops.
         if (!cut && (a.mode === 2 || a.mode === 0xF) && moved === 0) continue;
         if (!cut && a.mode === 1 && snapshot.engineNeutralSteps) continue;   // a neutral footstep steps on the client unit's own frame: the engine plays it
-        const row = monsterStep(a.classId, cut ? 2 : a.mode, prev[1], cut ? prev[6] : a.frameCountPrecise, cut ? prev[7] : a.animSpeed, tick, lastStep.get(e.id) ?? 0, floorClass ? floorClass(1, e.id, stepLevel) : 0);
+        const row = monsterStep(a.classId, cut ? 2 : a.mode, prev[1], cut ? prev[6] : a.frameCountPrecise, cut ? prev[7] : a.animSpeed, tick, lastStep.get(e.id) ?? 0, floorClass(1, e.id, stepLevel));
         // unitId attaches the footfall to the monster so the player places it against the listener (Falloff, pan).
         if (row) { lastStep.set(e.id, tick); play(row, { kind: 'footstep', id: e.id, unitId: e.id, unitType: 1, classId: a.classId }); const layer = monsterLayer?.(a.classId); if (layer) play(layer, { kind: 'footstep', id: e.id, unitId: e.id, unitType: 1, classId: a.classId }); /* retail 0x88A70 submits the layer row on the same footfall (FsPrb 100) */ }
       }

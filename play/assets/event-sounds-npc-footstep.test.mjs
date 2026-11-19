@@ -16,7 +16,7 @@ const read = (p) => { if (!files[p]) throw new Error(`no ${p}`); return files[p]
 function run(step, ticks = 12) {
   const got = [], asked = [];
   // The engine's due predicate stand-in: every call is a footfall, so only the movement gate decides.
-  const es = createEventSounds(read, (row, e) => got.push({ row, ...e }), (...args) => { asked.push(args); return 2768; });
+  const es = createEventSounds(read, (row, e) => got.push({ row, ...e }), (...args) => { asked.push(args); return 2768; }, null, null, () => 0);
   for (let t = 0; t < ticks; t++) {
     const x = 5000 + t * step;
     es.update({ level: 1, entities: [{ type: 1, id: 3, classId: 148, preciseX: x, preciseY: 7000,

@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRealmUnits, realmCombatSoundFrame, parseRealmUnitInfo, shrineDirectHpLoss } from './realm-combat.mjs';
 import { createMonsterTable } from './realm-tables.mjs';
+import '../../test/helpers/realm-engine.mjs';
 import { createRealmInput } from './realm-input.mjs';
 import { plateBoxes } from './hover-lifebar.mjs';
 import { readFileSync } from 'node:fs';
 import { createCombatSoundTrigger } from './combat-sound-trigger.mjs';
+import { stubCombatEngine } from './combat-sound-stub-engine.mjs';
 import { realmViewSnapshot } from './realm-client-view.mjs';
 
 // The pointer over a drawn monster, through the realm input's own pick, to the plate the single-player label draws.
@@ -40,7 +42,7 @@ test('a realm fight plays the monster attack, hit and death cues and the hero ca
   const read = (p) => readFileSync(new URL(p.split('\\').pop(), dir));
   try { read('monstats.bin'); } catch { t.skip('retail tables absent'); return; }
   // the engine's 0x24490 stands in as a recorder: which unit entered which mode, and when; its rows are the engine's
-  const entered = [], engine = { modeSounds: (type, id, cls, tf, su, mode) => { entered.push([type, id, cls, mode]); return mode === 4 ? [{ row: 2203, kind: 'attack' }] : []; }, impactSounds: () => [] };
+  const entered = [], engine = stubCombatEngine({ modeSounds: (type, id, cls, tf, su, mode) => { entered.push([type, id, cls, mode]); return mode === 4 ? [{ row: 2203, kind: 'attack' }] : []; } });
   const got = []; const trigger = createCombatSoundTrigger(read, (row, e) => got.push([e.kind, e.unitType, e.unitId, row]), engine);
   const hero = (mode) => ({ source: 'realm', guid: 1, classId: 1, renderState: { mode, framePrecise: 0 } });
   const tick = (monsterMode, heroMode, castSkill = 36) => {
@@ -164,7 +166,7 @@ test('a struck unit sounds the impact its hit class names', (t) => {
   const dir = new URL('../../retail/tables-1.13c/', import.meta.url);
   const read = (p) => readFileSync(new URL(p.split('\\').pop(), dir));
   try { read('monstats.bin'); } catch { t.skip('retail tables absent'); return; }
-  const entered = [], engine = { modeSounds: (type, id, cls, tf, su, mode, hit) => { entered.push([type, id, mode, hit]); return hit ? [{ row: 0x141, kind: 'impact' }, { row: 0x17B, kind: 'impact' }] : []; }, impactSounds: () => [] };
+  const entered = [], engine = stubCombatEngine({ modeSounds: (type, id, cls, tf, su, mode, hit) => { entered.push([type, id, mode, hit]); return hit ? [{ row: 0x141, kind: 'impact' }, { row: 0x17B, kind: 'impact' }] : []; } });
   const got = []; const trigger = createCombatSoundTrigger(read, (row, e) => got.push([e.kind, e.unitType, e.unitId, row]), engine);
   const frameOf = (mode, hitClassOf) => realmCombatSoundFrame({ entities: [{ type: 1, id: 7, classId: 5, mode }, { type: 3, id: 7, classId: 1, mode: 0 }] }, [{ guid: 7, typeFlags: 0 }], { source: 'realm', guid: 1, classId: 1, renderState: { mode: 1, framePrecise: 0 } }, 0, hitClassOf);
   const asked = [];
@@ -219,7 +221,7 @@ test('one hit sounds once while a drawn frame owes several ticks: the monster cl
   const dir = new URL('../../retail/tables-1.13c/', import.meta.url);
   const read = (p) => readFileSync(new URL(p.split('\\').pop(), dir));
   try { read('monstats.bin'); } catch { t.skip('retail tables absent'); return; }
-  const entered = [], engine = { modeSounds: (type, id, cls, tf, su, mode) => { entered.push([type, id, mode]); return []; }, impactSounds: () => [] };
+  const entered = [], engine = stubCombatEngine({ modeSounds: (type, id, cls, tf, su, mode) => { entered.push([type, id, mode]); return []; } });
   const trigger = createCombatSoundTrigger(read, () => {}, engine);
   const view = (mode, framePrecise) => [{ guid: 7, classId: 5, mode, framePrecise, frameCountPrecise: 2048, animationFlags: 0, x: 10, y: 10, direction: 0, typeFlags: 0, hpPct: 50 }];
   const snap = (views) => realmViewSnapshot({ base: null, resources: null, monsters: views, missiles: [], players: [], level: 2,

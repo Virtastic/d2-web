@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyRealmPlayerFrame, createRealmFrameFeed, REALM_READ_MAX_AGE_MS } from './realm-player-state.mjs';
+import '../../test/helpers/realm-engine.mjs';
 import { createRealmInput } from './realm-input.mjs';
 import { realmFrameReads } from './realm-client-view.mjs';
 

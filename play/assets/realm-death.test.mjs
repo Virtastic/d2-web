@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import '../../test/helpers/realm-engine.mjs';
 import { createRealmInput } from './realm-input.mjs';
 import { realmHeroFlags, realmCorpseViews, bindDeathRules } from './realm-death.mjs';
 import { DEATH_RULES } from '../../test/helpers/death-rules-double.mjs';

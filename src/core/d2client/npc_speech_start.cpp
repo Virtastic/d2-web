@@ -142,7 +142,8 @@ void d2client_npc_speech_frame(uint32_t tick) { g_tailDriven = true; speechFrame
 // The play path's frame (no G frame tail): the same step, timeGetTime read as the frame clock at 40 ms a frame (25 frames a second).
 void d2client_npc_speech_play_frame(uint32_t tick) {
     if (g_tailDriven || !g_panelUp) return;
-    d2client_frame_clock() += 40;
+    uint32_t& c = d2client_frame_clock();
+    if (c < tick * 40u) c = tick * 40u;   // the frame tail's clamp (frame_tail_g.cpp): a tick is 40 ms, the reads do not add up across frames
     speechFrame(tick);
 }
 static void speechFrame(uint32_t tick) {
@@ -164,7 +165,9 @@ static void speechFrame(uint32_t tick) {
             if (g_s.step == 0 && g_s.reps != 0) g_s.step = (now - g_s.last) / g_s.reps;
             g_s.last = now;
         }
-        g_s.pos = (int32_t)((extra + ((now - g_s.first) >> 2)) * (uint32_t)g_s.rate);
+        // the multiplier is the dword at +0x0C, which 0x7C690 never writes (the line-0 rate goes to +0x14, nothing reads it):
+        // the allocation's leftover. The recorded window ends (167 and 97 frames) fit 0x145, the struct's width word.
+        g_s.pos = (int32_t)((extra + ((now - g_s.first) >> 2)) * 0x145u);
     }
     clk += 1;
     const int32_t lines = g_s.count - 1 < 1 ? 1 : g_s.count - 1;

@@ -21,6 +21,7 @@ import { parseRealmObjectEvents, OBJECT_UNIT_BYTES } from './realm-objects.mjs';
 import { bindEngineProtocol } from './realm-client.mjs';
 import { realmViewSnapshot } from './realm-client-view.mjs';
 import { createItemTable } from './realm-tables.mjs';
+import '../../test/helpers/realm-engine.mjs';
 import { createRealmInput } from './realm-input.mjs';
 
 const JOIN = ['51020d00000025006c0f68140200', '0e020d000000030002000000', '51020c0000002500770f95140200', '0e020c000000030002000000',

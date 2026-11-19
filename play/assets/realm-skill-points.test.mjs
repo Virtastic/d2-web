@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRealmHud, STAT } from './realm-hud-state.mjs';
 import { createExperienceTable, createWaypointTable, createSkillTable } from './realm-hud-tables.mjs';
+import '../../test/helpers/realm-engine.mjs';
 import { createRealmInput } from './realm-input.mjs';
 
 const files = {

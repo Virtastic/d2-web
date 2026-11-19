@@ -20,7 +20,7 @@ import { hudState } from './render-worker-hud.mjs';
 import { loadLiveLevelTerrain, loadRealmClientTerrain, actPalettePath } from './assets/live-level-terrain.mjs';
 import { decodeDatPalette } from './assets/d2-formats.mjs';
 import { createPlayerRenderer, playerClassInfo } from './assets/unit-renderer.mjs';
-import { createRealmInput } from './assets/realm-input.mjs';
+import { createRealmInput, bindRealmEngine, engineSeam } from './assets/realm-input.mjs';
 import { routeRealmPackets } from './assets/realm-packet-routes.mjs';
 import { realmStorageClick, realmInventoryClick as realmInventoryPanelClick } from './assets/realm-storage-input.mjs';
 import { routeSocialPackets } from './assets/realm-social-packets.mjs';
@@ -823,7 +823,7 @@ setGridCellEngine((...a) => {
   try { return Module.ccall('d2_client_inv_grid_cell', 'number', [...a.map(() => 'number'), 'bigint'], [...a, p]) ? { x: Module.HEAP32[i], y: Module.HEAP32[i + 1] } : null; }
   finally { Module.ccall('free', null, ['bigint'], [p]); }
 });
-// The XP and stamina bar hover boxes are D2Client+0x26970 / +0x278B0 (d2_client_hud_bar_tip); JS keeps rectangles only before the engine loads.
+// The XP and stamina bar hover boxes are D2Client+0x26970 / +0x278B0 (d2_client_hud_bar_tip); nothing is drawn before the engine loads.
 const hudBarEngine = (...a) => {
   if (!Module._d2_client_hud_bar_tip) return null;
   const p = BigInt(Module.ccall('malloc', 'bigint', ['number'], [16])), i = Number(p) >> 2;
@@ -4304,6 +4304,7 @@ function closeRealmPanels(names) {
   for (const name of names) off[name]?.();
 }
 function realmInput() {
+  if (!realmInputState) bindRealmEngine(engineSeam(Module));
   return (realmInputState ??= createRealmInput({
     transmit: (bytes) => realmFlow?.d2gs?.isOpen ? realmFlow.d2gs.send(bytes) : false,
     now: () => performance.now(),
@@ -4865,7 +4866,7 @@ function buildChromeSounds(fresh, read) {
   if (fresh || !uiClickSounds) { try { uiClickSounds = audioVolume.attach('sound', createUiClickSoundPlayer(assetReader, canvas)); } catch (error) { musicError = String(error); } }
   if (fresh || !(unitSounds && combatSounds && eventSounds && missileSounds && ambient)) {
     realmEventFeed = null;
-    try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), combatSoundEngine(Module), (row, event) => unitSounds.noteSubmit(row, event), () => unitSounds.voices()); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a)), (c) => Number(Module._d2_client_monster_footstep_layer(c)), Module._d2_session_monster_idle_take ? (id) => Number(Module._d2_session_monster_idle_take(id)) >>> 0 : null, Module._d2_session_floor_class_level ? (type, id, level) => Number(Module._d2_session_floor_class_level(type, id, level)) : null, Module._d2_client_footstep_due, combatSoundEngine(Module)?.modeSounds); missileSounds = createMissileSounds(wasmMissileRules(Module),(row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error)), (id) => !Module._d2_session_missile_on_client || Module._d2_session_missile_on_client(id) !== 0, (id) => (Module._d2_session_client_unit_roll ? Number(Module._d2_session_client_unit_roll(id)) >>> 0 : 0), (id) => { const f = Module._d2_session_missile_bolt_seed, lo = f ? Number(f(id, 0)) >>> 0 : 0, hi = f ? Number(f(id, 1)) >>> 0 : 0; return lo || hi ? [lo, hi] : null; }); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; canvas.__d2MissileSound = missileSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, nativeAmbientSelect(Module), soundFetched)); } catch (error) { musicError = String(error); }
+    try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), combatSoundEngine(Module), (row, event) => unitSounds.noteSubmit(row, event), () => unitSounds.voices()); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a)), (c) => Number(Module._d2_client_monster_footstep_layer(c)), Module._d2_session_monster_idle_take ? (id) => Number(Module._d2_session_monster_idle_take(id)) >>> 0 : null, (type, id, level) => Number(Module._d2_session_floor_class_level(type, id, level)), Module._d2_client_footstep_due, combatSoundEngine(Module).modeSounds); missileSounds = createMissileSounds(wasmMissileRules(Module),(row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error)), (id) => !Module._d2_session_missile_on_client || Module._d2_session_missile_on_client(id) !== 0, (id) => (Module._d2_session_client_unit_roll ? Number(Module._d2_session_client_unit_roll(id)) >>> 0 : 0), (id) => { const f = Module._d2_session_missile_bolt_seed, lo = f ? Number(f(id, 0)) >>> 0 : 0, hi = f ? Number(f(id, 1)) >>> 0 : 0; return lo || hi ? [lo, hi] : null; }); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; canvas.__d2MissileSound = missileSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, nativeAmbientSelect(Module), soundFetched)); } catch (error) { musicError = String(error); }
   }
 }
 // The stash, cube and stash gold panels: built when a local game starts, and by a joined game that had none before it.

@@ -9,6 +9,19 @@ import { corpseLootable, deathSendAllowed } from './realm-death.mjs';
 export const UNIT = Object.freeze({ PLAYER: 0, MONSTER: 1, OBJECT: 2, MISSILE: 3, ITEM: 4, TILE: 5 });
 export const INV_PAGE = Object.freeze({ INVENTORY: 0, TRADE: 2, CUBE: 3, STASH: 4 });
 
+// The retail rules this module sends through come from the engine: the packet gate (D2Client+0x143E0), the 9-byte builder (0x14910)
+// and the belt-use gate (0x29920). `engineSeam(Module)` adapts the exports; `bindRealmEngine` installs it (the shell binds the page's
+// engine; a test binds the staged one). Nothing here recomputes them.
+let engine = null;
+export const bindRealmEngine = (e) => { engine = e; };
+const eng = () => { if (!engine) throw new Error('realm-input: no engine bound (bindRealmEngine)'); return engine; };
+export const engineSeam = (M) => ({
+  resetGate: () => M._d2_client_send_gate_reset(),
+  sendGate: (bytes, now) => M.ccall('d2_client_send_gate', 'number', ['array', 'number', 'number'], [bytes, bytes.length, now >>> 0]) === 1,
+  packet9: (op, a, b) => { const p = Number(M._d2_client_packet9(op, a >>> 0, b >>> 0)); return M.HEAPU8.slice(p, p + 9); },
+  useRowGate: (row) => M._d2_client_use_row_gate(row.useable | 0, row.unique | 0, row.quest | 0) === 1,
+});
+
 const le16 = (v) => [v & 255, (v >>> 8) & 255];
 const le32 = (v) => [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255];
 const make = (op, ...parts) => Uint8Array.from([op, ...parts.flat()]);
@@ -40,7 +53,7 @@ export const packets = Object.freeze({
   socketItem: (cursorGuid, itemGuid) => make(0x28, le32(cursorGuid), le32(itemGuid)),   // 9
   scrollToBook: (scrollGuid, bookGuid) => make(0x29, le32(scrollGuid), le32(bookGuid)), // 9
   itemToCube: (itemGuid, cubeGuid) => make(0x2a, le32(itemGuid), le32(cubeGuid)),       // 9
-  useOnItem: (targetGuid, useGuid) => make(0x27, le32(targetGuid), le32(useGuid)),      // 9: D2Client 0x95FE0 -> 0x14910 [0x27][clicked item][armed item]; D2GSPacketClt27
+  useOnItem: (targetGuid, useGuid) => eng().packet9(0x27, targetGuid, useGuid),     // 9: D2Client 0x95FE0 -> 0x14910 [0x27][clicked item][armed item]; D2GSPacketClt27
   useItem: (guid, x, y) => make(0x20, le32(guid), le32(x), le32(y)),        // 13
   useBeltItem: (guid, onMerc = false) => make(0x26, le32(guid), le32(onMerc ? 1 : 0), le32(0)), // 13
   npcChatStart: (type, guid) => unit(0x2f, type, guid),             // 9
@@ -57,32 +70,10 @@ export const packets = Object.freeze({
   beltPlace: (itemGuid, slot) => make(0x23, le32(itemGuid), le32(slot)),    // 9
   beltLift: (itemGuid) => make(0x24, le32(itemGuid)),               // 5
   beltSwap: (cursorGuid, beltGuid) => make(0x25, le32(cursorGuid), le32(beltGuid)),   // 9
-  dropGold: (playerGuid, amount) => make(0x50, le32(playerGuid), le32(amount)),   // 9: D2Client 0x14910's [0x50][player guid][amount]
+  dropGold: (playerGuid, amount) => eng().packet9(0x50, playerGuid, amount),   // 9: D2Client 0x14910's [0x50][player guid][amount]
   filmEnd: () => make(0x48),                                        // 1
   questLogRequest: () => make(0x40),                                // 1: D2Client 0x1E940's opening tick ends with 0x14A30(0x40)
 });
-
-// D2Client+0x143E0: the one outgoing-packet gate.  A packet equal to the last one sent, inside its
-// opcode's window, is dropped; the last-packet store is shared by every opcode.  0x3A has no window,
-// 5..0x0A and 0x0C..0x11 wait 50 ms, everything else 200 ms.
-export function sendWindow(opcode) {
-  const t = (opcode - 5) >>> 0;
-  if (t > 0x35) return 200;
-  if (t === 0x35) return 0;
-  return t === 6 || t >= 13 ? 200 : 50;
-}
-export function createSendGate(transmit) {
-  let lastTick = 0, last = null;
-  return {
-    /** Send `bytes` unless the gate drops it; returns true when it went out. */
-    send(bytes, now) {
-      const time = Number(now) >>> 0, win = sendWindow(bytes[0]);
-      if (win && last && ((time - lastTick) >>> 0) < win && last.length === bytes.length && last.every((b, i) => b === bytes[i])) return false;
-      last = Uint8Array.from(bytes); lastTick = time;
-      return transmit(bytes) !== false;
-    },
-  };
-}
 
 const MONSTER_DEATH = 0, MONSTER_DEAD = 12, PLAYER_DEAD = 17;
 const near = (dx, dy, w, up, down) => Math.abs(dx) <= w && dy >= -up && dy <= down;
@@ -118,14 +109,12 @@ const CODE_QF2 = 0x20326671, CODE_HFH = 0x20686668;
  *                                    type 0, its waiting use gated on arrival by 0x2AFB0): 1 started, 0 refused, -1 no
  *                                    client unit. Its packets are read with takeSends. Without it a player click sends nothing.
  */
-/** D2Client+0x29920 on an Items.txt row: true only for a plain useable row (useable byte 1, unique and quest bytes not 1). */
-export const canUseItemRow = (row) => row.useable === 1 && row.unique !== 1 && row.quest !== 1;
 /** The 0x81CE0 stat list: flag 2, a 12-frame timeout; the game runs 25 frames a second. */
 export const ACTION_LOCK_FRAMES = 12, GAME_FRAME_MS = 40;
 export function createRealmInput({ transmit, scene, now = () => 0, move = null, approachUnit = null, reach = null,
   actionDone = null, skillPlan = null, skillAt = null, skillOnUnit = null, onTalk = null, questFlags = null, leaveWait = null,
   queueUnit = null, clickPlayer = null, fireUnit = null, takeSends = null, refusalSound = null, onRefused = null }) {
-  const gate = createSendGate(transmit);
+  eng().resetGate();   // a new input is a new game: the last-packet store starts empty
   const evidence = { attempts: 0, sent: 0, last: null };
   // The inventory's item actions pass the leave wait's gate first (1.13c 0x923F0): an armed wait is cancelled and the action refused.
   const itemLocks = new Map();   // item guid -> tick the 12-frame action lock (0x81CE0) ends
@@ -134,7 +123,7 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     evidence.attempts++;
     // Dead, the hero sends nothing but the restart (realm-death.mjs).
     if (!deathSendAllowed(scene?.()?.playerMode, what)) { evidence.last = { what, opcode: bytes[0], sent: false, dead: true, packet: Array.from(bytes) }; return false; }
-    const sent = gate.send(bytes, now());
+    const sent = eng().sendGate(bytes, now()) && transmit(bytes) !== false;   // 0x143E0 decides, then the socket
     if (sent) evidence.sent++;
     evidence.last = { what, opcode: bytes[0], sent, packet: Array.from(bytes) };
     return sent;
@@ -395,7 +384,7 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
       if (!slot) return false;
       if (s.itemRow) {
         const row = s.itemRow(slot.classId);
-        if (!row || !canUseItemRow(row)) return false;
+        if (!row || !eng().useRowGate(row)) return false;
       }
       const t = now();
       if ((itemLocks.get(slot.id) ?? -1) > t || s.heroLocked?.()) return false;

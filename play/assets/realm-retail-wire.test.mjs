@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import '../../test/helpers/realm-engine.mjs';
 import { packets } from './realm-input.mjs';
 import { npcPackets } from './realm-npc-packets.mjs';
 

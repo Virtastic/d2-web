@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { createRealmWorld, PAGE } from './realm-world.mjs';
 import { createItemTable, createInventoryTable, createBeltTable } from './realm-tables.mjs';
 import { realmViewSnapshot, realmFrameReads } from './realm-client-view.mjs';
+import '../../test/helpers/realm-engine.mjs';
 import { createRealmInput } from './realm-input.mjs';
 import { realmInventoryClick } from './realm-storage-input.mjs';
 import { inventoryLayoutFromEngine, inventoryItemAt, weaponTabHit, AMAZON2_INVENTORY_LAYOUT as PANEL } from './inventory-panel.mjs';

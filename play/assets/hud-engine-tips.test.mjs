@@ -19,14 +19,13 @@ assert.equal(mini(() => null), null);
 assert.equal(mini(null), null);   // no engine, no plate
 console.log('ok');
 
-// the bar text goes through the engine's formatter when one is given, the JS replace otherwise
+// the bar text goes through the engine's formatter; without the engine nothing is drawn
 import { hudBarTooltip } from './hud-bar-tooltip.mjs';
 {
   const bar = () => ({ bar: 1, x: 1, y: 2, color: 0, cur: 0 });
-  const base = { experience: 5, nextExperience: 9, stamina: 1, staminaMax: 2, fmtExp: 'E %u / %u', fmtStamina: 'S %d / %d', engine: bar };
-  assert.equal(hudBarTooltip(800, 600, 0, 0, base).text, 'E 5 / 9');
+  const base = { experience: 5, nextExperience: 9, stamina: 1, staminaMax: 2, engine: bar };
+  assert.equal(hudBarTooltip(800, 600, 0, 0, base), null);
   const seen = [];
   assert.equal(hudBarTooltip(800, 600, 0, 0, { ...base, formatEngine: (id, a, b) => (seen.push([id, a, b]), 'eng') }).text, 'eng');
   assert.deepEqual(seen, [[4163, 5, 9]]);
-  assert.equal(hudBarTooltip(800, 600, 0, 0, { ...base, formatEngine: () => null }).text, 'E 5 / 9');
 }

@@ -2,6 +2,7 @@
 // Zeal (cltdofunc 21) has no dosound submit. Pins row ids and the tick of the entry.
 import assert from 'node:assert/strict';
 import { createCombatSoundTrigger } from './combat-sound-trigger.mjs';
+import { stubCombatEngine } from './combat-sound-stub-engine.mjs';
 const enc = (s) => new TextEncoder().encode(s);
 const files = {
   'data\\global\\excel\\monstats.bin': new Uint8Array(8), 'data\\global\\excel\\MonSounds.bin': new Uint8Array(8),
@@ -12,7 +13,7 @@ const files = {
 const run = (skillId) => {
   const out = [];
   let tick = 0;
-  const t = createCombatSoundTrigger((p) => { if (!files[p]) throw new Error(p); return files[p]; }, (r, i) => out.push([tick, r, i.kind]));
+  const t = createCombatSoundTrigger((p) => { if (!files[p]) throw new Error(p); return files[p]; }, (r, i) => out.push([tick, r, i.kind]), stubCombatEngine());
   const snap = { playerId: 1, player: { castSkillId: skillId }, items: [] };
   const step = (mode) => { tick++; t.update([{ type: 0, id: 1, classId: 3, mode, animation: { framePrecise: 0 } }], snap); };
   step(0); step(7); step(7);

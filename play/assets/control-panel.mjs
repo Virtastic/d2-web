@@ -354,7 +354,7 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     const experienceRatio = experienceBarRatio(experience, nextExperience, advancement?.prevExperience);
     // D2's renderer truncates the float width to an integer before its DrawRect call.
     const expStart = Number(advancement?.prevExperience) || 0;
-    const experiencePixels = rulesBound() ? expBarPixels(Math.max(0, experience - expStart), Math.max(0, nextExperience - expStart)) : Math.floor(experienceRatio * CONTROL_LAYOUT.experienceWidth); // D2Client+0x26970: into*119/span, rows H-38,H-37
+    const experiencePixels = expBarPixels(Math.max(0, experience - expStart), Math.max(0, nextExperience - expStart)); // D2Client+0x26970: into*119/span, rows H-38,H-37
     if (experiencePixels > 0) {
       ctx.fillStyle = '#fff';
       ctx.fillRect(CONTROL_LAYOUT.experienceX, CONTROL_LAYOUT.experienceY,

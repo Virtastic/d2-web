@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import '../../test/helpers/realm-engine.mjs';
 import { packets } from './realm-input.mjs';
 import { exitLocalGame } from './realm-local.mjs';
 

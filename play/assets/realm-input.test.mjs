@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { packets, sendWindow, createSendGate, createRealmInput, UNIT } from './realm-input.mjs';
+import { seam } from '../../test/helpers/realm-engine.mjs';
+import { packets, createRealmInput, UNIT } from './realm-input.mjs';
 import { createMonsterTable } from './realm-tables.mjs';
 import { bindDeathRules } from './realm-death.mjs';
 import { DEATH_RULES } from '../../test/helpers/death-rules-double.mjs';
@@ -34,24 +35,30 @@ test('field layout is little-endian as the server reads it', () => {
   assert.deepEqual([...packets.selectSkill(54, false)], [0x3c, 54, 0, 0, 0, 255, 255, 255, 255]);
 });
 
-test('the send windows are the retail table', () => {
-  for (const op of [5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17]) assert.equal(sendWindow(op), 50, op);
-  for (const op of [1, 3, 4, 11, 18, 0x13, 0x20, 0x39, 0x3b, 0x3c, 0x60]) assert.equal(sendWindow(op), 200, op);
-  assert.equal(sendWindow(0x3a), 0);
+test('the engine gate (0x143E0) drops an equal packet inside its window, shares one store, and never gates 0x3A', () => {
+  seam.resetGate();
+  const gate = { send: (b, now) => seam.sendGate(b, now) }, sent = [];
+  const go = (b, t) => { const ok = gate.send(b, t); if (ok) sent.push(b); return ok; };
+  assert.ok(go(packets.walkTo(5, 5), 1000));
+  assert.equal(go(packets.walkTo(5, 5), 1199), false);
+  assert.ok(go(packets.walkTo(5, 5), 1200));
+  assert.ok(go(packets.rightSkillAt(5, 5), 1250));
+  assert.equal(go(packets.rightSkillAt(5, 5), 1299), false);
+  assert.ok(go(packets.rightSkillAt(5, 5), 1300));
+  assert.ok(go(packets.walkTo(6, 6), 1301));        // different bytes
+  assert.ok(go(Uint8Array.of(0x3a, 1, 0, 0, 0, 0, 0), 2000));
+  assert.ok(go(Uint8Array.of(0x3a, 1, 0, 0, 0, 0, 0), 2000));
+  assert.equal(sent.length, 7);
+  // the 50 ms class (5..0x0A, 0x0C..0x11)
+  seam.resetGate();
+  assert.ok(go(packets.leftSkillAt(5, 5), 100)); assert.equal(go(packets.leftSkillAt(5, 5), 149), false); assert.ok(go(packets.leftSkillAt(5, 5), 150));
 });
 
-test('the gate drops an equal packet inside its window, shares one store, and never gates 0x3A', () => {
-  const sent = []; const gate = createSendGate((b) => sent.push(Array.from(b)));
-  assert.ok(gate.send(packets.walkTo(5, 5), 1000));
-  assert.equal(gate.send(packets.walkTo(5, 5), 1199), false);
-  assert.ok(gate.send(packets.walkTo(5, 5), 1200));
-  assert.ok(gate.send(packets.rightSkillAt(5, 5), 1250));
-  assert.equal(gate.send(packets.rightSkillAt(5, 5), 1299), false);
-  assert.ok(gate.send(packets.rightSkillAt(5, 5), 1300));
-  assert.ok(gate.send(packets.walkTo(6, 6), 1301));        // different bytes
-  assert.ok(gate.send(Uint8Array.of(0x3a, 1, 0, 0, 0, 0, 0), 2000));
-  assert.ok(gate.send(Uint8Array.of(0x3a, 1, 0, 0, 0, 0, 0), 2000));
-  assert.equal(sent.length, 7);
+test('the engine use gate (0x29920): only a plain useable row passes', () => {
+  assert.equal(seam.useRowGate({ useable: 1, unique: 0, quest: 0 }), true);
+  assert.equal(seam.useRowGate({ useable: 0, unique: 0, quest: 0 }), false);
+  assert.equal(seam.useRowGate({ useable: 1, unique: 1, quest: 0 }), false);
+  assert.equal(seam.useRowGate({ useable: 1, unique: 0, quest: 1 }), false);
 });
 
 function sceneOf(extra = {}) {

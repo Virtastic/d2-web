@@ -35,10 +35,10 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
   // The listener and unit positions of the last refresh; a source submitted between refreshes is placed against them.
   let lastSnapshot = null, lastListener = null;
   const variant = typeof options.variant === 'function' ? options.variant
-    : (row) => (typeof globalThis.Module?._d2_client_play_sound_variant === 'function' ? Number(globalThis.Module._d2_client_play_sound_variant(row)) | 0 : row);
+    : (row) => Number(globalThis.Module._d2_client_play_sound_variant(row)) | 0;
   const voices = () => (context.state === 'running' ? 1 : 0);   // D2Sound #10001 for the engine's 0x88DD0: the output can sound
   const ended = typeof options.ended === 'function' ? options.ended
-    : (h) => globalThis.Module?._d2_client_play_sound_ended?.(h);
+    : (h) => globalThis.Module._d2_client_play_sound_ended(h);
   const release = (rec) => { if (rec.queueHandle && !rec.released) { rec.released = true; ended(rec.queueHandle); } };
   const sourceGainFor = (row, spatialGainByte = 255, offset = null, level = 255) => {
     const master = sliderPercent(sliders.sound), music = sliderPercent(sliders.music);

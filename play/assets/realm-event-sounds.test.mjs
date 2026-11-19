@@ -14,7 +14,7 @@ const files = {
   'data\\global\\excel\\weapons.txt': enc('name\tcode\tdropsound\tdropsfxframe\n'),
   'data\\global\\excel\\misc.txt': enc('name\tcode\tdropsound\tdropsfxframe\n'),
 };
-const setup = () => { const got = []; const es = createEventSounds((p) => files[p], (row, e) => got.push([row, e.kind]), null, null, null, null, footstepDue); return { got, feed: createRealmEventSoundFeed(es) }; };
+const setup = () => { const got = []; const es = createEventSounds((p) => files[p], (row, e) => got.push([row, e.kind]), null, null, null, () => 0, footstepDue); return { got, feed: createRealmEventSoundFeed(es) }; };
 const item = (id, code, mode, page) => ({ id, code, mode, invPage: page, framePrecise: 0 });
 const snap = (items, mode = 1) => ({ mode, level: 1, playerClass: 1, playerId: 5, player: { x: 0, y: 0 }, entities: [], objects: [], items });
 
@@ -53,11 +53,6 @@ test('the hero walking plays footfalls from the unit mode', () => {
   for (let i = 0; i < 12; i++) feed.tick(snap([], 2), 1, w);
   assert.ok(got.filter((g) => g[1] === 'footstep').length >= 2);
   assert.equal(got.filter((g) => g[1] === 'footstep')[0][0] >= 2720, true);
-});
-test('the hero walking with no engine due test plays only the armed first footfall', () => {
-  const got = [], feed = createRealmEventSoundFeed(createEventSounds((p) => files[p], (row, e) => got.push([row, e.kind])));
-  for (let i = 0; i < 12; i++) feed.tick(snap([], 2), 1, { cursorId: 0, gold: 0 });
-  assert.equal(got.filter((g) => g[1] === 'footstep').length, 1);
 });
 test('the engine\'s footfall due test is the one the double answers with', { skip: haveEngine() ? false : 'needs the engine build' }, async () => {
   const Module = await loadEngine();

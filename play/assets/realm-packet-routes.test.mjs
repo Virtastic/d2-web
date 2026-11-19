@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { routeRealmPackets } from './realm-packet-routes.mjs';
+import '../../test/helpers/realm-engine.mjs';
 import { createRealmInput } from './realm-input.mjs';
 
 const SIZES = { 0x28: 7, 0x7b: 8, 0x01: 2 };
