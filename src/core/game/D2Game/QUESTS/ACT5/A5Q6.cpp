@@ -790,9 +790,9 @@ int32_t __fastcall ACT5Q6_IsWorldStoneChamberClosed(D2GameStrc* pGame, D2UnitStr
 // 1.13c D2Game+0x56520
 void __fastcall OBJECTS_InitFunction75_BaalsPortal(D2ObjInitFnStrc* pOp)
 {
-	D2Act5Quest6Strc* pQuestDataEx = (D2Act5Quest6Strc*)QUESTS_GetQuestData(pOp->pGame, QUEST_A5Q6_BAAL)->pQuestDataEx;
+	D2Act5Quest6Strc* pQuestDataEx = (D2Act5Quest6Strc*)D2_CALL(QUESTS_GetQuestData, pOp->pGame, QUEST_A5Q6_BAAL)->pQuestDataEx;
 
-	UNITS_ChangeAnimMode(pOp->pObject, pQuestDataEx->nBaalPortalObjectMode);
+	D2_CALL(UNITS_ChangeAnimMode, pOp->pObject, pQuestDataEx->nBaalPortalObjectMode);
 	pQuestDataEx->nBaalPortalObjectMode = OBJMODE_OPENED;
 }
 
@@ -831,9 +831,9 @@ int32_t __fastcall OBJECTS_OperateFunction70_BaalPortal(D2ObjOperateFnStrc* pOp,
 // 1.13c D2Game+0x564D0
 void __fastcall OBJECTS_InitFunction77_LastPortal(D2ObjInitFnStrc* pOp)
 {
-	D2Act5Quest6Strc* pQuestDataEx = (D2Act5Quest6Strc*)QUESTS_GetQuestData(pOp->pGame, QUEST_A5Q6_BAAL)->pQuestDataEx;
+	D2Act5Quest6Strc* pQuestDataEx = (D2Act5Quest6Strc*)D2_CALL(QUESTS_GetQuestData, pOp->pGame, QUEST_A5Q6_BAAL)->pQuestDataEx;
 
-	UNITS_ChangeAnimMode(pOp->pObject, pQuestDataEx->nLastPortalObjectMode);
+	D2_CALL(UNITS_ChangeAnimMode, pOp->pObject, pQuestDataEx->nLastPortalObjectMode);
 	pQuestDataEx->nLastPortalObjectMode = OBJMODE_OPENED;
 }
 

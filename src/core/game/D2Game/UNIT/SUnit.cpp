@@ -1521,6 +1521,19 @@ void __fastcall SUNIT_IterateLivingPlayers(D2GameStrc* pGame, void(__fastcall* p
     }
 }
 
+// 1.13c D2Game+0x38ED0 (eax = dy, ecx = dx, edx = room; stack = squared radius, x, y): 1 when the offset is within the radius and the collision-mask-4 line from (x, y) to (x + dx, y + dy) is clear
+int32_t __fastcall SUNIT_IsReachableNoCollision(int32_t nDeltaY, int32_t nDeltaX, D2ActiveRoomStrc* pRoom, int32_t nMaxDistanceSq, int32_t nX, int32_t nY)
+{
+    if (!pRoom || nDeltaX * nDeltaX + nDeltaY * nDeltaY > nMaxDistanceSq)
+    {
+        return 0;
+    }
+
+    D2CoordStrc pTo = { nX + nDeltaX, nY + nDeltaY };
+    D2CoordStrc pFrom = { nX, nY };
+    return COLLISION_RayTrace(pRoom, &pFrom, &pTo, 4) == 0;
+}
+
 // not-1.13c: retail has no function for this; the event code writes the unit's timer pointer in place
 void __fastcall SUNIT_SetTimerOnUnit(D2UnitStrc* pUnit, D2EventTimerStrc* pTimer)
 {

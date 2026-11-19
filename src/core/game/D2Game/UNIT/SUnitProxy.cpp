@@ -547,6 +547,31 @@ void __fastcall SUNITPROXY_CountPlayersInLevel(D2GameStrc* pGame, D2UnitStrc* pU
     }
 }
 
+// 1.13c D2Game+0x37650 (edx = unit, stack = {level id, counter}): counts the units in the level whose mode is neither 0 nor 0x11; the room's level id is read before the comparison
+void __fastcall SUNITPROXY_CountActivePlayersInLevel(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pArg)
+{
+    D2UnitProxyArgStrc* pUnitProxyArg = (D2UnitProxyArgStrc*)pArg;
+
+    const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(pUnit));
+    if (nLevelId != pUnitProxyArg->nLevelId || !pUnit)
+    {
+        return;
+    }
+
+    if (pUnit->dwAnimMode != 0 && pUnit->dwAnimMode != 0x11)
+    {
+        ++pUnitProxyArg->nCounter;
+    }
+}
+
+// 1.13c D2Game+0x37860 (ecx = level id, edi = game): the number of units 0x37650 counts over the living-player walk
+int32_t __fastcall SUNITPROXY_CountActivePlayersInLevelId(D2GameStrc* pGame, int32_t nLevelId)
+{
+    D2UnitProxyArgStrc unitProxyArg = { nLevelId, 0 };
+    SUNIT_IterateLivingPlayers(pGame, SUNITPROXY_CountActivePlayersInLevel, &unitProxyArg);
+    return unitProxyArg.nCounter;
+}
+
 //D2Game.0x6FCCC6B0
 // 1.13c D2Game+0x90560 (checked against decompile)
 void __fastcall SUNITPROXY_OnClientRemovedFromGame(D2GameStrc* pGame, D2UnitStrc* pUnit)

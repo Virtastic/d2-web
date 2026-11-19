@@ -1563,7 +1563,7 @@ void __fastcall sub_6FC6D440(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MISSILE)
     {
-        MONSTERUNIQUE_ApplyElementalDamage(pGame, pUnit, nUMod, bUnique);
+        D2_CALL(MONSTERUNIQUE_ApplyElementalDamage, pGame, pUnit, nUMod, bUnique);
     }
 }
 
@@ -1877,7 +1877,7 @@ void __fastcall MONSTERUNIQUE_ApplyShatterState(D2GameStrc* pGame, D2UnitStrc* p
 {
     if (!pUnit || pUnit->dwAnimMode == MONMODE_DEATH)
     {
-        STATES_ToggleState(pUnit, STATE_SHATTER, 1);
+        D2_CALL(STATES_ToggleState, pUnit, STATE_SHATTER, 1);
     }
 }
 
@@ -2178,7 +2178,7 @@ void __fastcall sub_6FC6E860(D2GameStrc* pGame, D2UnitStrc* pUnit)
 // 1.13c D2Game+0x269B0 (no delta)
 void __fastcall D2GAME_MONSTERS_AiFunction08_6FC6E870(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
-    sub_6FC6E780(pGame, pUnit, 0, 2);
+    D2_CALL(sub_6FC6E780, pGame, pUnit, 0, 2);
 }
 
 //D2Game.0x6FC6E890

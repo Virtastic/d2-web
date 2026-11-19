@@ -102,6 +102,8 @@ D2UnitStrc* __fastcall SUNIT_GetPortalOwner(D2GameStrc* pGame, D2UnitStrc* pPort
 void __fastcall SUNIT_IterateUnitsOfType(D2GameStrc* pGame, int32_t nType, void* pArg, int32_t(__fastcall* pfIterate)(D2GameStrc*, D2UnitStrc*, void*));
 //D2Game.0x6FCBCD70
 void __fastcall SUNIT_IterateLivingPlayers(D2GameStrc* pGame, void(__fastcall* pfIterate)(D2GameStrc*, D2UnitStrc*, void*), void* pArg);
+// 1.13c D2Game+0x38ED0
+int32_t __fastcall SUNIT_IsReachableNoCollision(int32_t nDeltaY, int32_t nDeltaX, D2ActiveRoomStrc* pRoom, int32_t nMaxDistanceSq, int32_t nX, int32_t nY);
 //D2Game.0x6FCBCE30
 void __fastcall SUNIT_SetTimerOnUnit(D2UnitStrc* pUnit, D2EventTimerStrc* pTimer);
 //D2Game.0x6FCBCE40

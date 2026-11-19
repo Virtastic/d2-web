@@ -363,6 +363,8 @@ void __fastcall QUESTS_DeleteItemEx(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2In
 void __fastcall QUESTS_HellPortalActChange(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nLevel, D2UnitStrc* pObject);
 //D2Game.0x6FC967D0
 void __fastcall QUESTS_SetIntroFlags(D2GameStrc* pGame, D2UnitStrc* pPlayer, const int32_t* pNPCs, int32_t nNPCs);
+// 1.13c D2Game+0x35C20
+void __fastcall QUESTS_SetStageIntroFlags(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint8_t nStage);
 //D2Game.0x6FC96810
 void __fastcall QUESTS_AddPlayerGUID(D2QuestGUIDStrc* pQuestGUID, int32_t dwGUID);
 //D2Game.0x6FC96840

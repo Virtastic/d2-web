@@ -248,6 +248,11 @@ struct D2PartyExpStrc
 };
 // 1.13c D2Game+0xDE8F0 (eax = player, stack = game, defender, the player's level, the defender's level, the defender's experience; the party part of DistributeExperience)
 void SUNITDMG_DistributePartyExperience(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pDefender, uint32_t nPlayerLevel, uint32_t nDefenderLevel, uint32_t nDefenderExperience);
+// 1.13c D2Game+0xDA930, +0xDA970, +0xDA9E0, +0xDAA40
+uint32_t __fastcall SUNITDMG_SpendStamina(uint32_t nAmount, D2UnitStrc* pUnit);
+uint32_t __fastcall SUNITDMG_SpendMana(uint32_t nAmount, D2UnitStrc* pUnit);
+int32_t __fastcall SUNITDMG_ScaleExperienceByRatio(int32_t nValue, int32_t nLevel);
+int32_t __fastcall SUNITDMG_ScaleExperienceByLevelDifference(int32_t nAttackerLevel, int32_t nDefenderLevel, int32_t nExperience);
 //D2Game.0x6FCC2EC0
 uint32_t __fastcall SUNITDMG_ComputeExperienceGain(D2GameStrc* pGame, D2UnitStrc* pAttacker, uint32_t nAttackerLevel, uint32_t nDefenderLevel, uint32_t nDefenderExperience);
 //D2Game.0x6FCC3170

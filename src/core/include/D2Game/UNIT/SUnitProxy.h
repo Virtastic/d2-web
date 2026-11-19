@@ -49,6 +49,10 @@ void __fastcall SUNITPROXY_UpdateNpcsOnActChange(D2GameStrc* pGame, D2UnitStrc* 
 void __fastcall SUNITPROXY_UpdateVendorInventory(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t nAct, int32_t bNoMorePlayersInLevel);
 //D2Game.0x6FCCC690
 void __fastcall SUNITPROXY_CountPlayersInLevel(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pArg);
+// 1.13c D2Game+0x37650
+void __fastcall SUNITPROXY_CountActivePlayersInLevel(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pArg);
+// 1.13c D2Game+0x37860
+int32_t __fastcall SUNITPROXY_CountActivePlayersInLevelId(D2GameStrc* pGame, int32_t nLevelId);
 //D2Game.0x6FCCC6B0
 void __fastcall SUNITPROXY_OnClientRemovedFromGame(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FCCC7C0

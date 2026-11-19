@@ -99,32 +99,7 @@ void MISSILES_Free_113c(void* game, void* missile, const D2GameBatch9Env* env)
     }
 }
 
-// 1.13c D2Game+0xE0C80
-// SUNIT_RemoveUnit, first phase (1.13c split of 1.10f SUNIT_RemoveUnit): assert the unit and its type
-// (< 6), run the player interact cleanup for players, reset the footprint for player/monster/object/
-// missile, and (when unlinkFlag is 0) remove it from its room. Then unlink it from the game's
-// type-indexed unit list. game in ECX/EDI, unit in EAX, unlinkFlag on the stack.
-void SUNIT_RemoveUnitPre_113c(void* game, void* unit, uint32_t unlinkFlag, const D2GameBatch9Env* env)
-{
-    if (unit == nullptr) d2game_fatal(0x3AD);
-    const uint32_t unitType = rd32(unit, 0x00);         // dwUnitType
-    if (unitType >= 6) d2game_fatal(0x3AE);
-
-    switch (unitType) {
-    case 0:                                             // UNIT_PLAYER
-        env->playerInteractCleanup(game, unit);         // 0xE0BF0
-        [[fallthrough]];
-    case 1:                                             // UNIT_MONSTER
-    case 2:                                             // UNIT_OBJECT
-    case 3:                                             // UNIT_MISSILE
-        env->resetUnitFootprint(unit);                  // D2Common #10505 (D2Common_10228)
-        [[fallthrough]];
-    default:                                            // ITEM/TILE fall straight through
-        if (unlinkFlag == 0) env->removeUnitFromRoom(unit); // D2Common #11016
-        env->unlinkFromUnitList(game, unit);            // 0xE02A0
-        return;
-    }
-}
+// 0xE0C80 (SUNIT_DetachUnit) lives in the game tree (D2Game/UNIT/SUnit.cpp); its probe drives it.
 
 // 0x49630, 0x496B0, 0x49760 and 0x49790 (the GAME/Clients.cpp save-header helpers) live in the game tree (D2Game/GAME/ClientsSaveHeader.cpp).
 

@@ -6,6 +6,7 @@
 #include "D2Monsters.h"
 #include "Units/Units.h"
 #include <D2BitManip.h>
+#include <test_seam.h>
 
 
 //D2Common.0x6FDBC680 (#10408)
@@ -91,6 +92,19 @@ int __stdcall UNITFINDS_GetTestedUnitsFromRoom(D2ActiveRoomStrc* pRoom, D2UnitSt
 	return nUnitIndex;
 }
 
+// 1.13c D2Common+0x121D0: does the circle (nX, nY, nSize) overlap the room's subtile box (branch for branch)
+int UNITFINDS_RoomOverlapTest(D2ActiveRoomStrc* pRoom, int nX, int nY, int nSize)
+{
+	D2DrlgCoordsStrc c = {};
+	DUNGEON_GetRoomCoordinates(pRoom, &c);
+	const bool yOk = c.nSubtileY <= nY + nSize || nY - nSize <= c.nSubtileHeight + c.nSubtileY;
+	if (nX + nSize < c.nSubtileX)
+	{
+		return nX - nSize <= c.nSubtileWidth + c.nSubtileX && yOk;
+	}
+	return yOk;
+}
+
 //D2Common.0x6FDBC840 (#11088)
 // 1.13c D2Common+0x12330
 D2UnitStrc* __stdcall UNITFINDS_GetNearestTestedUnit(D2UnitStrc* pUnit, int nX, int nY, int nSize, int(__fastcall* pfnUnitTest)(D2UnitStrc*, D2UnitStrc*))
@@ -101,9 +115,8 @@ D2UnitStrc* __stdcall UNITFINDS_GetNearestTestedUnit(D2UnitStrc* pUnit, int nX, 
 	int nSmallestDistance = 0;
 	int nDistance = 0;
 	int nNumRooms = 0;
-	D2DrlgCoordsStrc pRoomCoord = {};
 
-	pRoom = UNITS_GetRoom(pUnit);
+	pRoom = D2_CALL(UNITS_GetRoom, pUnit);
 	D2_ASSERT(pRoom);
 
 	DUNGEON_GetAdjacentRoomsListFromRoom(pRoom, &ppRoomList, &nNumRooms);
@@ -119,14 +132,11 @@ D2UnitStrc* __stdcall UNITFINDS_GetNearestTestedUnit(D2UnitStrc* pUnit, int nX, 
 
 	for (int i = 0; i < nNumRooms; ++i)
 	{
-		DUNGEON_GetRoomCoordinates(ppRoomList[i], &pRoomCoord);
-
-		if ((nX + nSize >= pRoomCoord.nSubtileX || nX - nSize <= pRoomCoord.nSubtileX + pRoomCoord.nSubtileWidth)
-			&& (nSize + nY >= pRoomCoord.nSubtileY || nY - nSize <= pRoomCoord.nSubtileY + pRoomCoord.nSubtileHeight))
+		if (D2_CALL(UNITFINDS_RoomOverlapTest, ppRoomList[i], nX, nY, nSize))
 		{
 			for (D2UnitStrc* j = ppRoomList[i]->pUnitFirst; j != NULL; j = j->pRoomNext)
 			{
-				nDistance = UNITS_GetDistanceToCoordinates(j, nX, nY);
+				nDistance = D2_CALL(UNITS_GetDistanceToCoordinates, j, nX, nY);
 				if (nDistance < nSize && nDistance < nSmallestDistance && pfnUnitTest(j, pUnit))
 				{
 					pResult = j;

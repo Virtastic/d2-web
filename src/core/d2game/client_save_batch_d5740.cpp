@@ -25,13 +25,6 @@ void D2GAME_49AE0_SetCreateTime(D2ClientStrc* client, uint32_t time)
     client->nCreateTime = time;
 }
 
-// 1.13c D2Game+0xE0040
-void D2GAME_E0040_SetPlayerClient(D2UnitStrc* player, D2ClientStrc* client)
-{
-    assert(player && player->dwUnitType == 0);
-    UNITS_GetPlayerData(player)->pClient = client;
-}
-
 // 1.13c D2Game+0xEB5D0
 void D2GAME_EB5D0_DecodeSkill(const uint16_t* saved, uint32_t* owner,
                               uint32_t* skill, uint32_t* flags)

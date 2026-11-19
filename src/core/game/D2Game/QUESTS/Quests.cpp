@@ -2347,6 +2347,28 @@ void __fastcall QUESTS_SetIntroFlags(D2GameStrc* pGame, D2UnitStrc* pPlayer, con
 	}
 }
 
+// 1.13c D2Game+0x35C20 (ecx = stage, eax = player, edx = game): sets the intro flags of the stage's NPC list; stage 3 and anything above 4 do nothing
+void __fastcall QUESTS_SetStageIntroFlags(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint8_t nStage)
+{
+	switch (nStage)
+	{
+	case 0:
+		QUESTS_SetIntroFlags(pGame, pPlayer, gpAct1_NPCIds, (int32_t)std::size(gpAct1_NPCIds));
+		break;
+	case 1:
+		QUESTS_SetIntroFlags(pGame, pPlayer, gpAct2_NPCIds, (int32_t)std::size(gpAct2_NPCIds));
+		break;
+	case 2:
+		QUESTS_SetIntroFlags(pGame, pPlayer, gpAct3_NPCIds, (int32_t)std::size(gpAct3_NPCIds));
+		break;
+	case 4:
+		QUESTS_SetIntroFlags(pGame, pPlayer, gpAct5_NPCIds, (int32_t)std::size(gpAct5_NPCIds));
+		break;
+	default:
+		break;
+	}
+}
+
 // 1.13c D2Game+0x33880 (checked against decompile, no delta)
 //D2Game.0x6FC96810
 void __fastcall QUESTS_AddPlayerGUID(D2QuestGUIDStrc* pQuestGUID, int32_t dwGUID)

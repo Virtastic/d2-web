@@ -118,28 +118,6 @@ int32_t b66_2B4D0(int16_t* out, int32_t max) {
     return n;
 }
 
-// 1.13c D2Game+0xDFB30  (EDI = dst, ESI = src; Ordinal_10920 register input taken as src)
-void b66_DFB30(uint8_t* dst, uint8_t* src) {
-    if (!dst) fatal(0x9ab);
-    if (!src) fatal(0x9ac);
-    const char* name;
-    if (r32(src, 0) == 0 && (name = g_b66.ord10920(src)) != nullptr) {
-        char* d = (char*)dst + 0x24;
-        do { *d = *name; } while (*name++ && d++);
-    } else dst[0x24] = 0;
-    w32(dst, 0, r32(src, 0));
-    w32(dst, 4, r32(src, 4));
-    w32(dst, 8, r32(src, 12));
-    w32(dst, 12, r32(src, 16));
-    int32_t t = ri32(src, 0);
-    void* p = rp(src, 0x2c);
-    bool direct = t == 2 || (t > 3 && t < 6);
-    w32(dst, 16, direct ? r32(p, 0xc) : p ? (uint32_t)g_b66.ord10867(p) : 0);
-    w32(dst, 20, direct ? r32(p, 0x10) : p ? (uint32_t)g_b66.ord10750(p) : 0);
-    w32(dst, 24, r32(src, 0x94));
-    w32(dst, 28, r32(src, 0x98));
-}
-
 // 1.13c D2Game+0x49FE0  (EAX = game, ECX = id)
 void* b66_49FE0(void* game, int32_t id) {
     if (!game) fatal(0xe9);

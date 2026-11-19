@@ -246,68 +246,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_e02a0(void* game, void* unit)
     }
 }
 
-// 1.13c D2Game+0xE0BF0
-// FUN_6fd00bf0: player interact cleanup (game in the argument, unit in EAX). When unit+0x6C is set,
-// look up game+0x64's interact entry: class 1 releases (0x68300) and rebuilds (0xAFAF0); class > 2
-// is a no-op; class 2 resolves entry id 0x151 through Ordinal_10181 (clearing *pTimerArg to -1) or
-// else Ordinal_11090. On success clear unit+0x64 to -1, +0x68 to 6 and +0x6C.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2_game_e0bf0(void* game, void* unit, const D2GameBatch15Env* env)
-{
-    void* result = rdptr(unit, 0x68);
-    if (rd8(unit, 0x6C) == 0) return result;
-
-    void* entry = env->getInteract(game, rd32(unit, 0x64)); // 0xE03A0
-    result = nullptr;
-    if (entry == nullptr) return result;
-
-    if (rd32(entry, 0) == 1) {
-        env->releaseInteract(unit);                         // 0x68300
-        result = env->buildInteractPayload(unit, game);     // 0xAFAF0
-    } else {
-        const uint32_t cls = rd32(entry, 0) - 2;
-        if (cls == 0) {
-            if (rd32(entry, 4) == 0x151) {
-                void* arg = env->getTimerArg(unit);         // Ordinal_10181
-                void* ptr = rdptr(arg, 0);
-                result = ptr;
-                if (ptr != nullptr) wr32(ptr, 0, 0xFFFFFFFF);
-            } else {
-                result = env->interactClear(entry, 0);      // Ordinal_11090
-            }
-        } else {
-            result = (void*)(uintptr_t)cls;
-        }
-    }
-    wr32(unit, 0x64, 0xFFFFFFFF);
-    wr32(unit, 0x68, 6);
-    ((uint8_t*)unit)[0x6C] = 0;
-    return result;
-}
-
-// 1.13c D2Game+0xE1570
-// FUN_6fd01570: room cleanup for a unit (game-pointer parameter in EAX/ESI, unit in the argument;
-// NULL unit is the 0x78B fatal). Level from the byte at playerData+4, coordinates at
-// playerData+0x18/+0x1C; try Ordinal_11010 then Ordinal_10053 on the game's per-act room table at
-// +0xBC, free the room (0x4CB80), then run the interact cleanup 0xE03A0 on unit+0x98.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_game_e1570(void* game, void* unit, const D2GameBatch15Env* env)
-{
-    if (unit == nullptr) d2game_fatal(0x78B);
-
-    void* playerData = rdptr(unit, 0x14);
-    const uint32_t level = env->levelLookup(rd8(playerData, 4));          // Ordinal_10459
-    const uint32_t y = rd32(playerData, 0x1C);
-    const uint32_t x = rd32(playerData, 0x18);
-    void* segment = rdptr(game, 0xBC + (level & 0xFF) * 4);
-
-    void* room = env->drlgGetRoom(segment, x, y);                        // Ordinal_11010
-    if (room == nullptr) {
-        room = env->drlgFindRoom(segment, x, y);                         // Ordinal_10053
-        if (room != nullptr) env->freeDrlgRoom(game, room);              // 0x4CB80
-    }
-    env->getInteract(game, rd32(unit, 0x98));                            // 0xE03A0
-}
+// 0xE0BF0 (SUNIT_ResetPlayerInteract) lives in the game tree (D2Game/UNIT/SUnit.cpp); 0xE1570 is driven by src/core/d2game/d2game_e1570.cpp.
 
 // D2Game 1.13c 0xCC030: the retail-layout port is src/core/d2game/d2game_cc030.cpp (EAX = player, ECX = unit, stack flag).
 

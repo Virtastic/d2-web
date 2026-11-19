@@ -2,22 +2,9 @@
 #include "Path/PathMisc.h"
 #include <D2Collision.h>
 #include <Units/Units.h>
+#include <test_seam.h>
 
 #include <algorithm>
-
-struct D2PathMovStrc
-{
-	int nDirectionIndex;
-	int nPoints; //nLoopLen in 1.10f
-	D2PathPointStrc tCurrentCoord;
-	D2PathPointStrc tTargetCoord;
-	BOOL bReachedDeadEnd; // Only used for debugging ?
-	int* pPrevDirection;
-	int* pNextDirection;
-	int nLastSyncPointWithOtherPathIndex;
-	BOOL bPathFinished;
-	D2PathPointStrc pPoints[200];
-};
 
 // 1.13c D2Common+0x18400
 // D2Common.0x6FD68400 (1.13C)
@@ -62,7 +49,7 @@ BOOL __vectorcall PATH_FindNonCollidingTargetPoint(D2PathInfoStrc* pInfo, D2Path
 	auto HasCollisionForNewTarget = [&] {
 		pMov->tTargetCoord.X = gnDirectionsToAdjacentCellOffsets[pMov->nDirectionIndex].nX + (pMov->tCurrentCoord).X;
 		pMov->tTargetCoord.Y = gnDirectionsToAdjacentCellOffsets[pMov->nDirectionIndex].nY + (pMov->tCurrentCoord).Y;
-		return COLLISION_CheckAnyCollisionWithPattern(pInfo->pStartRoom, pMov->tTargetCoord.X, pMov->tTargetCoord.Y, pInfo->nCollisionPattern, (uint16_t)pInfo->nCollisionMask);
+		return D2_CALL(COLLISION_CheckAnyCollisionWithPattern, pInfo->pStartRoom, pMov->tTargetCoord.X, pMov->tTargetCoord.Y, pInfo->nCollisionPattern, (uint16_t)pInfo->nCollisionMask);
 	};
 
 	pMov->bReachedDeadEnd = FALSE;
@@ -524,7 +511,7 @@ int __fastcall PATH_ComputePathOrSlideAlongObstacles(D2PathInfoStrc* ptPathInfo)
 		D2PathPointStrc tSubPathStartPoint = pStartPoint;
 		for (int nSubPathStartIdx = 0; nSubPathStartIdx < nMovementPoints; nSubPathStartIdx++)
 		{
-			if (COLLISION_CheckAnyCollisionWithPattern(ptPathInfo->pStartRoom, aPathPoints[nSubPathStartIdx].X, aPathPoints[nSubPathStartIdx].Y, ptPathInfo->nCollisionPattern, (uint16_t)ptPathInfo->nCollisionMask))
+			if (D2_CALL(COLLISION_CheckAnyCollisionWithPattern, ptPathInfo->pStartRoom, aPathPoints[nSubPathStartIdx].X, aPathPoints[nSubPathStartIdx].Y, ptPathInfo->nCollisionPattern, (uint16_t)ptPathInfo->nCollisionMask))
 			{
 				int nCacheIndex = PATH_FindSubpathWithoutObstacles(ptPathInfo, tSubPathStartPoint, aPathPoints, &nSubPathStartIdx, &nMovementPoints, nDist - nSubPathStartIdx, nMajorDirection);
 				if (!nCacheIndex)

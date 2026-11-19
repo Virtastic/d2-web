@@ -469,7 +469,7 @@ void __fastcall sub_6FC7D7A0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 // 1.13c D2Game+0x967B0 (checked against decompile, no delta)
 int32_t __fastcall sub_6FC7D9D0(D2UnitStrc* pPlayer, int32_t nPetType)
 {
-    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
+    D2PlayerDataStrc* pPlayerData = D2_CALL(UNITS_GetPlayerData, pPlayer);
     D2_ASSERT(pPlayerData);
 
     if (!pPlayerData->pPlayerPets)
@@ -552,7 +552,7 @@ int32_t __fastcall sub_6FC7DA40(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2PetLis
 // 1.13c D2Game+0x96680 (a player without a pet block is skipped there)
 void __fastcall PLAYERPETS_UpdatePetInfo(D2UnitStrc* pUnit, int32_t nPetType, int32_t nUnitGUID, D2PetInfoStrc* pPetInfo)
 {
-    D2PlayerPetStrc* pPlayerPets = UNITS_GetPlayerData(pUnit)->pPlayerPets;
+    D2PlayerPetStrc* pPlayerPets = D2_CALL(UNITS_GetPlayerData, pUnit)->pPlayerPets;
     if (!pPlayerPets)
     {
         return;

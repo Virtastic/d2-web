@@ -48,10 +48,7 @@ int32_t STATLIST_GetTotalStatValue(D2StatListStrc* pStatList, int nStatId, uint1
 // Delta: retail only requires a non-null unit of type UNIT_ITEM to enter the body (a null item data
 // pointer falls back to quality 2 and still reads items.txt); the vendored body returns 0 when the
 // item data is null. An item unit without item data is not producible by the engine.
-int D2Common_26190_GetItemRequiredLevel(D2UnitStrc* pItem, D2UnitStrc* pPlayer)
-{
-	return ITEMS_GetRequiredLevel(pItem, pPlayer);
-}
+// The body is the game tree's ITEMS_GetRequiredLevel (src/core/game/Items/Items.cpp); the 0x26190 probe calls it directly.
 
 // 1.13c D2Common+0x266E0 (#?): sum a stat over an item's contained (socketed) units.
 // The item must be UNIT_ITEM, socketable by class id (0x22920) and carry a valid inventory

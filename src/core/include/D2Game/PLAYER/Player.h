@@ -14,6 +14,10 @@ void __fastcall PLAYER_RemoveAllPlayers(D2GameStrc* pGame);
 void __fastcall sub_6FC7B7A0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY);
 //D2Game.0x6FC7B800
 void __fastcall PLAYER_CreateStartItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2CharStatsTxt* pCharStatsTxt, int32_t nCount, D2CharItemStrc* pCharItem);
+// 1.13c D2Game+0x37EC0
+int32_t __fastcall PLAYER_PlaceStartItemInBelt(D2UnitStrc* pItem, D2UnitStrc* pPlayer, D2GameStrc* pGame, int32_t bFindFreeSlot);
+// 1.13c D2Game+0x37F20
+int32_t __fastcall PLAYER_PlaceStartItemOnBody(D2UnitStrc* pItem, D2UnitStrc* pPlayer, D2GameStrc* pGame);
 //D2Game.0x6FC7BB50
 void __fastcall PLAYER_PlaceItemInInventory(D2UnitStrc* pItem, D2UnitStrc* pPlayer, D2GameStrc* pGame, int32_t a8);
 //D2Game.0x6FC7BC30

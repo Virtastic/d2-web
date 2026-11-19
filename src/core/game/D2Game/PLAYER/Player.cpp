@@ -229,22 +229,14 @@ void __fastcall PLAYER_CreateStartItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, D
 
         if (ITEMS_CheckIfBeltable(pItem))
         {
-            D2_ASSERT(pItem);
-            D2_ASSERT(pPlayer);
-
-            int32_t nUnused = 0;
-            if (!sub_6FC48940(pGame, pPlayer, pItem->dwUnitId, CLIENTS_GetUnitX(pItem), 1, &nUnused))
+            if (!PLAYER_PlaceStartItemInBelt(pItem, pPlayer, pGame, 1))
             {
                 PLAYER_PlaceItemInInventory(pItem, pPlayer, pGame, 1);
             }
         }
         else if (pCharItem->nBodyLoc)
         {
-            D2_ASSERT(pItem);
-            D2_ASSERT(pPlayer);
-
-            int32_t nUnused = 0;
-            if (!sub_6FC45060(pGame, pPlayer, pItem->dwUnitId, ITEMS_GetBodyLocation(pItem), 1, &nUnused))
+            if (!PLAYER_PlaceStartItemOnBody(pItem, pPlayer, pGame))
             {
                 PLAYER_PlaceItemInInventory(pItem, pPlayer, pGame, 1);
             }
@@ -276,6 +268,29 @@ void __fastcall PLAYER_CreateStartItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, D
             }
         }
     }
+}
+
+// 1.13c D2Game+0x37EC0 (ecx = item, edi = player; stack = game, free-slot flag): the belt branch of PLAYER_CreateStartItem, outlined; the out slot handed on is the caller's own stack argument
+int32_t __fastcall PLAYER_PlaceStartItemInBelt(D2UnitStrc* pItem, D2UnitStrc* pPlayer, D2GameStrc* pGame, int32_t bFindFreeSlot)
+{
+    D2_ASSERT(pItem);
+    D2_ASSERT(pPlayer);
+
+    const int32_t nItemGUID = pItem->dwUnitId;
+    const int32_t nBeltSlot = CLIENTS_GetUnitX(pItem);
+    return sub_6FC48940(pGame, pPlayer, nItemGUID, nBeltSlot, bFindFreeSlot, &bFindFreeSlot) != 0;
+}
+
+// 1.13c D2Game+0x37F20 (eax = item, edi = player; stack = game): the body-location branch of PLAYER_CreateStartItem, outlined; the out slot handed on is the caller's own stack argument
+int32_t __fastcall PLAYER_PlaceStartItemOnBody(D2UnitStrc* pItem, D2UnitStrc* pPlayer, D2GameStrc* pGame)
+{
+    D2_ASSERT(pItem);
+    D2_ASSERT(pPlayer);
+
+    int32_t nGameArg = (int32_t)(intptr_t)pGame;
+    const int32_t nItemGUID = pItem->dwUnitId;
+    const uint8_t nBodyLoc = ITEMS_GetBodyLocation(pItem);
+    return sub_6FC45060(pGame, pPlayer, nItemGUID, nBodyLoc, 1, &nGameArg) != 0;
 }
 
 //D2Game.0x6FC7BB50

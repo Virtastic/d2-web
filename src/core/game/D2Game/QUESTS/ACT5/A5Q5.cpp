@@ -1235,7 +1235,7 @@ void __fastcall OBJECTS_InitFunction72_AncientsAltar(D2ObjInitFnStrc* pOp)
 // 1.13c D2Game+0x565B0
 void __fastcall OBJECTS_InitFunction73_AncientsDoor(D2ObjInitFnStrc* pOp)
 {
-	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A5Q5_ANCIENTS);
+	D2QuestDataStrc* pQuestData = D2_CALL(QUESTS_GetQuestData, pOp->pGame, QUEST_A5Q5_ANCIENTS);
 
 	if (!pQuestData)
 	{
@@ -1244,11 +1244,11 @@ void __fastcall OBJECTS_InitFunction73_AncientsDoor(D2ObjInitFnStrc* pOp)
 
 	if (((D2Act5Quest5Strc*)pQuestData->pQuestDataEx)->bQuestCompletedBefore)
 	{
-		UNITS_ChangeAnimMode(pOp->pObject, OBJMODE_OPENED);
+		D2_CALL(UNITS_ChangeAnimMode, pOp->pObject, OBJMODE_OPENED);
 	}
 	else
 	{
-		UNITS_ChangeAnimMode(pOp->pObject, OBJMODE_NEUTRAL);
+		D2_CALL(UNITS_ChangeAnimMode, pOp->pObject, OBJMODE_NEUTRAL);
 	}
 }
 

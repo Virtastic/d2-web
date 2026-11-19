@@ -1350,22 +1350,12 @@ void __fastcall SUNITDMG_ExecuteEvents(D2GameStrc* pGame, D2UnitStrc* pAttacker,
 
 	if (pDamage->dwManaLeech > 0)
 	{
-		int32_t nNewMana = STATLIST_UnitGetStatValue(pDefender, STAT_MANA, 0) - pDamage->dwManaLeech;
-		if (nNewMana < 256)
-		{
-			nNewMana = 0;
-		}
-		STATLIST_SetUnitStat(pDefender, STAT_MANA, nNewMana, 0);
+		SUNITDMG_SpendMana(pDamage->dwManaLeech, pDefender);
 	}
 
 	if (pDamage->dwStamLeech > 0)
 	{
-		int32_t nNewStamina = STATLIST_UnitGetStatValue(pDefender, STAT_STAMINA, 0) - pDamage->dwStamLeech;
-		if (nNewStamina < 256)
-		{
-			nNewStamina = 0;
-		}
-		STATLIST_SetUnitStat(pDefender, STAT_STAMINA, nNewStamina, 0);
+		SUNITDMG_SpendStamina(pDamage->dwStamLeech, pDefender);
 	}
 
 	SUNITDMG_ApplyStun(pAttacker, pDefender, pDamage->dwStunLen);
@@ -1433,6 +1423,91 @@ int32_t __fastcall SUNITDMG_AddLeechedLife(D2UnitStrc* pUnit, int32_t nLifeLeech
 	}
 
 	return nLifeLeeched;
+}
+
+// 1.13c D2Game+0xDA930 (edi = amount, ebx = unit): takes the amount off the unit's stamina; a result under 256 (the 8.8 fixed-point unit) clamps to zero. Returns the amount when stamina is left, else 0.
+uint32_t __fastcall SUNITDMG_SpendStamina(uint32_t nAmount, D2UnitStrc* pUnit)
+{
+	if ((int32_t)nAmount < 1)
+	{
+		return 0;
+	}
+
+	int32_t nStamina = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_STAMINA, 0) - (int32_t)nAmount;
+	if (nStamina < 0x100)
+	{
+		nStamina = 0;
+	}
+
+	D2_CALL(STATLIST_SetUnitStat, pUnit, STAT_STAMINA, nStamina, 0);
+	return nStamina ? nAmount : 0;
+}
+
+// 1.13c D2Game+0xDA970 (edi = amount, ebx = unit): the same drain on the unit's mana.
+uint32_t __fastcall SUNITDMG_SpendMana(uint32_t nAmount, D2UnitStrc* pUnit)
+{
+	if ((int32_t)nAmount < 1)
+	{
+		return 0;
+	}
+
+	int32_t nMana = D2_CALL(STATLIST_UnitGetStatValue, pUnit, STAT_MANA, 0) - (int32_t)nAmount;
+	if (nMana < 0x100)
+	{
+		nMana = 0;
+	}
+
+	D2_CALL(STATLIST_SetUnitStat, pUnit, STAT_MANA, nMana, 0);
+	return nMana ? nAmount : 0;
+}
+
+// 1.13c D2Game+0xDA9E0 (eax = value, stack = level): scales a positive experience value by the experience ratio of the level against the base ratio.
+int32_t __fastcall SUNITDMG_ScaleExperienceByRatio(int32_t nValue, int32_t nLevel)
+{
+	if (nValue > 0)
+	{
+		const int32_t nRatio1 = D2_CALL(DATATBLS_GetExpRatio, nLevel);
+		const int32_t nRatio2 = D2_CALL(DATATBLS_GetExpRatio, 0);
+		if (nRatio2 > 0 && nRatio2 < 32)
+		{
+			if (nValue <= INT_MAX >> ((nRatio2 + (nRatio1 >> nRatio2)) & 0x1F))
+			{
+				return nValue * nRatio1 >> nRatio2;
+			}
+
+			return nRatio1 * (nValue >> nRatio2);
+		}
+	}
+
+	return nValue;
+}
+
+// 1.13c D2Game+0xDAA40 (eax = attacker level, ecx = defender level, edx = experience): the experience factor from the level gap (the two 11-entry ladders at 0x6FD1A01C and 0x6FD1A048, or the level ratio for an attacker above 24 against a defender of level 1 and up).
+int32_t __fastcall SUNITDMG_ScaleExperienceByLevelDifference(int32_t nAttackerLevel, int32_t nDefenderLevel, int32_t nExperience)
+{
+	int32_t nFactor;
+	if (nAttackerLevel < nDefenderLevel)
+	{
+		if (nAttackerLevel > 24 && nDefenderLevel > 0)
+		{
+			return D2_CALL(MONSTERUNIQUE_CalculatePercentage, nExperience, nAttackerLevel, nDefenderLevel);
+		}
+
+		constexpr int32_t experienceFactors[] = { 256, 256, 256, 256, 256, 256, 225, 174, 92, 38, 5 };
+		nFactor = experienceFactors[std::min(nDefenderLevel - nAttackerLevel, 10)];
+	}
+	else
+	{
+		constexpr int32_t experienceFactors[] = { 256, 256, 256, 256, 256, 256, 207, 159, 110, 61, 13 };
+		nFactor = experienceFactors[std::min(nAttackerLevel - nDefenderLevel, 10)];
+	}
+
+	if (nFactor == 256)
+	{
+		return nExperience;
+	}
+
+	return D2_CALL(MONSTERUNIQUE_CalculatePercentage, nExperience, nFactor, 256);
 }
 
 //D2Game.0x6FCC0660
@@ -3116,56 +3191,8 @@ uint32_t __fastcall SUNITDMG_ComputeExperienceGain(D2GameStrc* pGame, D2UnitStrc
 		return 0;
 	}
 
-	uint32_t nResult = nDefenderExperience;
-	if (nDefenderLevel <= nAttackerLevel)
-	{
-		constexpr int32_t experienceFactors[] =
-		{
-			256, 256, 256, 256, 256, 256, 207, 159, 110, 61, 13
-		};
-
-		const uint32_t nIndex = std::min<uint32_t>(nAttackerLevel - nDefenderLevel, std::size(experienceFactors) - 1);
-		const int32_t nFactor = experienceFactors[nIndex];
-		if (nFactor != 256)
-		{
-			nResult = MONSTERUNIQUE_CalculatePercentage(nDefenderExperience, nFactor, 256);
-		}
-	}
-	else if (nAttackerLevel < 25 || nDefenderLevel <= 0)
-	{
-		constexpr int32_t experienceFactors[] =
-		{
-			256, 256, 256, 256, 256, 256, 225, 174, 92, 38, 5
-		};
-
-		const uint32_t nIndex = std::min<uint32_t>(nDefenderLevel - nAttackerLevel, std::size(experienceFactors) - 1);
-		const int32_t nFactor = experienceFactors[nIndex];
-		if (nFactor != 256)
-		{
-			nResult = MONSTERUNIQUE_CalculatePercentage(nDefenderExperience, nFactor, 256);
-		}
-	}
-	else
-	{
-		nResult = MONSTERUNIQUE_CalculatePercentage(nDefenderExperience, nAttackerLevel, nDefenderLevel);
-	}
-
-	if (nResult > 0)
-	{
-		const int32_t nRatio1 = DATATBLS_GetExpRatio(nAttackerLevel);
-		const int32_t nRatio2 = DATATBLS_GetExpRatio(0);
-		if (nRatio2 > 0 && nRatio2 < 32)
-		{
-			if (nResult <= INT_MAX >> ((nRatio2 + (nRatio1 >> nRatio2)) & 0x1F))
-			{
-				nResult = nResult * nRatio1 >> nRatio2;
-			}
-			else
-			{
-				nResult = nRatio1 * (nResult >> nRatio2);
-			}
-		}
-	}
+	uint32_t nResult = SUNITDMG_ScaleExperienceByLevelDifference(nAttackerLevel, nDefenderLevel, nDefenderExperience);
+	nResult = SUNITDMG_ScaleExperienceByRatio(nResult, nAttackerLevel);
 
 	const int32_t nAddExpPct = STATLIST_UnitGetStatValue(pAttacker, STAT_ITEM_ADDEXPERIENCE, 0);
 	if (nAddExpPct)

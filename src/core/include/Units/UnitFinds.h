@@ -56,6 +56,8 @@ D2COMMON_DLL_DECL D2UnitStrc* __stdcall UNITFINDS_FindUnitInNeighboredRooms(D2Ac
 D2COMMON_DLL_DECL int __stdcall UNITFINDS_GetTestedUnitsFromRoom(D2ActiveRoomStrc* pRoom, D2UnitStrc** ppUnits, UNITFINDTEST pfnUnitTest, D2UnitFindArgStrc* pUnitFindArg);
 //D2Common.0x6FDBC840 (#11088)
 D2COMMON_DLL_DECL D2UnitStrc* __stdcall UNITFINDS_GetNearestTestedUnit(D2UnitStrc* pUnit, int nX, int nY, int nSize, int(__fastcall* pfnUnitTest)(D2UnitStrc*, D2UnitStrc*));
+//D2Common+0x121D0 (not exported): the room overlap test GetNearestTestedUnit calls (a test seam)
+int UNITFINDS_RoomOverlapTest(D2ActiveRoomStrc* pRoom, int nX, int nY, int nSize);
 //D2Common.0x6FDBC990 (#10401)
 D2COMMON_DLL_DECL void __stdcall UNITFINDS_InitializeUnitFindData(void* pMemPool, D2UnitFindDataStrc* pUnitFindData, D2ActiveRoomStrc* pRoom, int nX, int nY, int nSize, UNITFINDTEST pfnUnitTest, D2UnitFindArgStrc* pUnitFindArg);
 //D2Common.0x6FDBCA50 (#10402)

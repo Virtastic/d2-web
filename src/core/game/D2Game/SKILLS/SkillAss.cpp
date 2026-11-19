@@ -1568,12 +1568,12 @@ int32_t __fastcall SKILLS_SrvDo045_Sentry(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 
     int32_t nX = 0;
     int32_t nY = 0;
-    if (!D2GAME_GetXAndYFromTargetUnit_6FD14020(pGame, pUnit, &nX, &nY))
+    if (!D2_CALL(D2GAME_GetXAndYFromTargetUnit_6FD14020, pGame, pUnit, &nX, &nY))
     {
         return 0;
     }
 
-    return sub_6FCF8610(pGame, pUnit, nX, nY, pSkillsTxtRecord, nSkillId, nSkillLevel) != 0;
+    return D2_CALL(sub_6FCF8610, pGame, pUnit, nX, nY, pSkillsTxtRecord, nSkillId, nSkillLevel) != 0;
 }
 
 //D2Game.0x6FCF8BA0

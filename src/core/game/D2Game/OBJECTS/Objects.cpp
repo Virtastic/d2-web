@@ -817,14 +817,14 @@ void __fastcall OBJECTS_InitFunction12_PermanentPortal(D2ObjInitFnStrc* pOp)
 // 1.13c D2Game+0x2E750
 void __fastcall OBJECTS_InitFunction08_Torch(D2ObjInitFnStrc* pOp)
 {
-    UNITS_ChangeAnimMode(pOp->pObject, OBJMODE_OPENED);
+    D2_CALL(UNITS_ChangeAnimMode, pOp->pObject, OBJMODE_OPENED);
 }
 
 //D2Game.0x6FC71370
 // 1.13c D2Game+0x2E740 (checked against the decompile: mode 1; no delta)
 void __fastcall OBJECTS_InitFunction14_Brazier(D2ObjInitFnStrc* pOp)
 {
-    UNITS_ChangeAnimMode(pOp->pObject, OBJMODE_OPERATING);
+    D2_CALL(UNITS_ChangeAnimMode, pOp->pObject, OBJMODE_OPERATING);
 }
 
 //D2Game.0x6FC71380
@@ -833,7 +833,7 @@ void __fastcall OBJECTS_InitFunction34_HellBrazierFire(D2ObjInitFnStrc* pOp)
 {
     if (ITEMS_RollRandomNumber(&pOp->pGame->pObjectControl->pSeed) & 1)
     {
-        UNITS_ChangeAnimMode(pOp->pObject, OBJMODE_OPERATING);
+        D2_CALL(UNITS_ChangeAnimMode, pOp->pObject, OBJMODE_OPERATING);
     }
 }
 

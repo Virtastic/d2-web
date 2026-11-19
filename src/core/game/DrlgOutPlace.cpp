@@ -1570,19 +1570,19 @@ static void __fastcall DRLGOUTPLACE_CreateAct2LevelConnections(D2DrlgStrc* pDrlg
 
 // Lays the act 3 levels Lower Kurast..Travincal out in a column north of the jungle
 // 1.13c D2Common+0x15980
-static void __fastcall DRLGOUTPLACE_PlaceAct3KurastLevels(D2DrlgLevelStrc* pLevel)
+void __fastcall DRLGOUTPLACE_PlaceAct3KurastLevels(D2DrlgLevelStrc* pLevel)
 {
 	int nPosY = 0;
 	for (int i = LEVEL_LOWERKURAST; i <= LEVEL_TRAVINCAL; ++i)
 	{
-		D2LevelDefBin* pLevelDefBinRecord = DATATBLS_GetLevelDefRecord(i);
+		D2LevelDefBin* pLevelDefBinRecord = D2_CALL(DATATBLS_GetLevelDefRecord, i);
 
 		const int nSizeX = pLevelDefBinRecord->dwSizeX[pLevel->pDrlg->nDifficulty];
 		const int nSizeY = pLevelDefBinRecord->dwSizeY[pLevel->pDrlg->nDifficulty];
 
 		nPosY -= nSizeY;
 
-		D2DrlgLevelStrc* pAdjacentLevel = DRLG_GetLevel(pLevel->pDrlg, i);
+		D2DrlgLevelStrc* pAdjacentLevel = D2_CALL(DRLG_GetLevel, pLevel->pDrlg, i);
 
 		pAdjacentLevel->nPosX = pLevel->nWidth / 2 + pLevel->nPosX - nSizeX / 2;
 		pAdjacentLevel->nWidth = nSizeX;
