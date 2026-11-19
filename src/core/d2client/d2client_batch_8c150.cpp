@@ -144,30 +144,6 @@ int32_t d2_client_8c760(uint32_t unit, uint32_t* out, uint32_t flag_9854,
     return ord10244() ? r : 0;
 }
 
-// old form of D2Client 8C8B0 (now d2client_8c8b0.cpp) (361 B): draw the 12 text rows (stride 0xe table at 0x6FB8139C), splitting at '\n'.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_8c8b0(const int32_t* tab_139c, int32_t x_b9a0, int32_t y_b9a4,
-                     void (*ord10184)(void), const uint16_t* (*ord10003)(void), void (*ord10028)(void),
-                     void (*ord10150)(int, int, int)) {
-    ord10184();
-    for (uint32_t off = 0; off <= 0xa7; off += 0xe) {
-        uint16_t buf[100] = {0};
-        const uint16_t* src = ord10003();
-        for (int i = 0; i < 99 && src[i]; i++) buf[i] = src[i];
-        buf[99] = 0;
-        const int32_t* e = (const int32_t*)((const uint8_t*)tab_139c + off);
-        int32_t y = e[1] - y_b9a4, x = e[0] + x_b9a0;
-        int32_t len = 0; while (buf[len]) len++;
-        bool split = false;
-        for (int32_t i = 0; buf[i]; i++)
-            if (buf[i] == 10) { buf[i] = 0; if (i < len) split = true; break; }
-        if (split) { ord10028(); ord10150(y - 4, 0, 0); ord10028(); y += 4; }
-        else if (x) ord10028();
-        ord10150(y, 0, 0);
-    }
-    ord10184();
-}
-
 // 1.13c D2Client+0x8CA20 (83 B): reset UI state globals; unless ord11017(bbfc->+0x60) is true, reset 4 more.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_8ca20(int32_t* g_beec, int32_t* g_bc34, int32_t* g_b2a4, int32_t* g_b430, uint32_t bbfc_60,

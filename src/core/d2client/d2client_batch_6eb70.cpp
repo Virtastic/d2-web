@@ -34,17 +34,6 @@ static_assert(sizeof(((D2cChatState*)0)->hist[0]) == 0x202, "history stride");
 
 static int32_t wlen(const uint16_t* s) { int32_t n = 0; while (s[n]) ++n; return n; }
 
-// 1.13c D2Client+0x6EB70 (62 B, caller 0x6FCE0): in=eax, out=ebx. host(571,eax=in) returns the end
-// offset into `in` (0 = none); copy [0,end) to out + NUL, else host(501) handles it.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_6eb70(const char* in, char* out, D2cHost h) {
-    if (*in != '*') {
-        D2cCall c = {}; c.rva = 571; c.eax = (uint32_t)(uintptr_t)in;
-        uint32_t end = h(&c);
-        if (end != 0) { memcpy(out, in, end); out[end] = 0; return; }
-    }
-    D2cCall c = {}; c.rva = 501; h(&c);
-}
-
 // 1.13c D2Client+0x6EC00 (41 B, caller 0x707F0): retail re-reads w[len] (the terminator) every pass.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_6ec00(const uint16_t* w) {
     int32_t len = wlen(w);
@@ -65,38 +54,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_6edf0(D2cChatState* s, int32_t d)
     s->cur = d2_client_6edf0_cur(s->cur, s->count, d);
 }
 
-// 1.13c D2Client+0x6EE40 (116 B, edx = 0x202-byte entry)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_6ee40(D2cChatState* s, const uint16_t* e) {
-    if (s->count == 8) {
-        int32_t t = s->tail - 1;
-        s->head = s->tail; s->tail = t;
-        if (t < 0) s->tail = 7;
-    } else {
-        if (s->count != 0 && (--s->head) < 0) s->head = 7;
-        s->count++;
-    }
-    s->cur = s->head;
-    memcpy(s->hist[s->head], e, 0x202);
-}
-
 // 1.13c D2Client+0x6EEC0 (51 B, caller 0x6F200)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_6eec0(D2cChatState* s) {
     memcpy(s->line, s->hist[s->cur], 0x202);
     s->lineLen = wlen(s->hist[s->cur]);
-}
-
-// 1.13c D2Client+0x6EF20 (129 B, thiscall; callers 0x70140, 0x6F3E0): caret blink.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_6ef20(D2cChatState* s, uint32_t self, uint32_t p, D2cHost h) {
-    if (s->blink == 1) {
-        D2cCall a = {}; a.rva = 10003; a.ecx = self; a.s[0] = p; a.s[1] = 0; h(&a);
-        D2cCall b = {}; b.rva = 10150; h(&b);
-    }
-    D2cCall t = {}; t.rva = 0xF0000001; uint32_t now = h(&t);
-    if (s->blinkMs < now - s->lastTick) {
-        s->lastTick = now;
-        if (s->blink != 0) { s->blinkMs = 100; s->blink = 0; return; }
-        s->blinkMs = 500; s->blink = 1;
-    }
 }
 
 // 1.13c D2Client+0x6EFB0 (139 B, callers 0x70700, 0x70500): a=eax, b=stack. Case-insensitive

@@ -11,13 +11,6 @@ static double kf(int32_t v){ double f=(double)v; if(v<0) f+=4294967296.0; return
 static void emit(Services& s,int x,int y,const char* fmt,...) __attribute__((format(printf,4,5)));
 static void emit(Services& s,int x,int y,const char* fmt,...){
  char b[1024]; va_list a; va_start(a,fmt); vsnprintf(b,sizeof b,fmt,a); va_end(a); s.drawText(x,y,b); }
-// 1.13c D2Client+0x5A5E0
-void toggleDebug(Services& s,State& st){
- st.fpsEnable=(st.fpsEnable==0); st.detail=0;
- if(!st.fpsEnable) return;
- if(uint32_t* p=s.cacheStats()){ for(unsigned o:{1,2,4,5,9,10,11,12,13,14,0x12,0x13,0x14,0x18,0x19,0x1A}) p[o]=0; }
- s.cacheReset();
-}
 // 1.13c D2Client+0x5A680
 void cacheOverlay(Services& s){
  int32_t a,b,c,d; s.tileStats(a,b,c,d);

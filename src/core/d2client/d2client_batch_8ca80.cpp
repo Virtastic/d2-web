@@ -53,20 +53,6 @@ void d2_client_8cb90(void (*send_43e0)(const uint8_t*)) {
     send_43e0(b);
 }
 
-// old form of D2Client 8CC50 (now d2client_8cc50.cpp) (88 B) fastcall(param_1)
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_8cc50(uint32_t p, uint32_t unit_bbfc, uint32_t* g_90ec0, uint32_t (*ord10331)(uint32_t),
-                     uint32_t (*ord10826)(uint32_t), int8_t (*ord10459)(uint32_t)) {
-    if (!p || rd32(p + 4) != 0x10b) return;
-    uint32_t a = ord10331(p);
-    if (!a) return;
-    uint32_t b = ord10331(unit_bbfc);
-    if (!b) return;
-    int8_t c1 = ord10459(ord10826(b));
-    int8_t c2 = ord10459(ord10826(a));
-    if (c1 == c2) *g_90ec0 = rd32(p + 0xc);
-}
-
 // 1.13c D2Client+0x8CCB0 (67 B): FUN_6fb72790(0x19,1,0) then send {0x4F,0x12,0,0,0,0,0}.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_8ccb0(void (*f_72790)(int, int, int), void (*send_43e0)(const uint8_t*)) {
@@ -206,25 +192,6 @@ void d2_client_8d600(uint32_t param_1, uint32_t item, uint32_t unit_bbfc, void* 
     sprintf578(num, 10, "%d", v);
     win2Unicode(tmp_u, num, 9);
     ustrcat(out, (const void*)(uintptr_t)a);           // retail order: label, first string, number, second string
-    ustrcat(out, tmp_u);
-    ustrcat(out, (const void*)(uintptr_t)b);
-}
-
-// old form of D2Client 8D880 (now d2client_8d880.cpp) (183 B)
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_8d880(uint32_t unit, void* out, void* tmp_u /*>=40 B*/, uint32_t (*ord10003)(void),
-                     int (*ord10973)(uint32_t, int, int), int (*ord10463)(uint32_t),
-                     void (*ustrcpy)(void*, const void*), void (*ustrcat)(void*, const void*),
-                     void (*sprintf578)(char*, int, const char*, int), void (*win2Unicode)(void*, const char*, int)) {
-    char num[16];
-    uint32_t a = ord10003();
-    uint32_t b = ord10003();
-    if (ord10973(unit, 0x46, 0) < 1 && ord10463(unit) < 1) return;
-    ustrcpy(out, (const void*)(uintptr_t)ord10003());
-    int v = ord10973(unit, 0x46, 0);
-    sprintf578(num, 10, "%d", v);
-    win2Unicode(tmp_u, num, 9);
-    ustrcat(out, (const void*)(uintptr_t)a);
     ustrcat(out, tmp_u);
     ustrcat(out, (const void*)(uintptr_t)b);
 }

@@ -9,22 +9,12 @@ static const uint32_t NEXT_OFF=0x39*4; // puVar1[0x39] link in unit node (origin
 static uintptr_t rdp(uintptr_t a){ uintptr_t v; std::memcpy(&v,(const void*)a,sizeof v); return v; }
 static uint32_t r32(uintptr_t a){ uint32_t v; std::memcpy(&v,(const void*)a,4); return v; }
 static uint16_t r16(uintptr_t a){ uint16_t v; std::memcpy(&v,(const void*)a,2); return v; }
-static uintptr_t row(Env& e,uint32_t t){ return (uintptr_t)e.ga(0xFBA608 + 0) + (uintptr_t)t*0x80*sizeof(uintptr_t); }
 
 // 1.13c D2Client+0xAD4B0
 void sub_AD4B0(Env& e,uint32_t a){ uint8_t l[16]={0}; std::memcpy(l,(const void*)(uintptr_t)a,15); e.f62E60((uint32_t)(uintptr_t)l); }   // ECX = packet: its 15 bytes copied to a stack local, EAX = &local
 
 // 1.13c D2Client+0xAD4F0
 uint32_t sub_AD4F0(Env& e,uintptr_t p){ uint8_t l[7]; std::memcpy(l,(const void*)p,7); return e.f4C3C0(p,l); }   // EAX is the callee's
-
-// 1.13c D2Client+0xAD6B0
-void sub_AD6B0(Env& e,uintptr_t p){ uint8_t l[40]; std::memcpy(l,(const void*)p,40); e.f7DFB0(l); }
-
-// 1.13c D2Client+0xAD780
-void sub_AD780(Env& e,uintptr_t p){
- uintptr_t o=e.f4D630(p,r32(p+1));
- if(o){ uint16_t v=r16(p+5); std::memcpy((void*)(o+0x22),&v,2); e.f4DA70(v); e.f272E0(); }
-}
 
 // 1.13c D2Client+0xAD9D0
 void sub_AD9D0(Env& e,uintptr_t p){
@@ -57,20 +47,6 @@ void sub_AE080(Env& e,const uint8_t* src){
  case 0xf: e.f32C60(l); return; case 0x10: e.f32E10(l); return; case 0x12: e.f339E0(l); return;
  }
 }
-
-static void lookupAndFree(Env& e,uint32_t key,uint32_t t){
- uintptr_t u=e.f54E20(key,row(e,t),t);
- if(u) e.f32FE0(u);
-}
-// 1.13c D2Client+0xAE260
-void sub_AE260(Env& e,const uint32_t* p){ lookupAndFree(e,((p[1]&0xFFFFFF)<<8)|(p[0]>>24),(p[0]>>8)&0xff); }
-// 1.13c D2Client+0xAE2B0 (identical body to AE260)
-void sub_AE2B0(Env& e,const uint32_t* p){ lookupAndFree(e,((p[1]&0xFFFFFF)<<8)|(p[0]>>24),(p[0]>>8)&0xff); }
-// 1.13c D2Client+0xAE3F0 (unit passed in EAX)
-void sub_AE3F0(Env& e,uintptr_t unit){ if(unit) lookupAndFree(e,r32(unit+12),r32(unit)&0xff); }
-
-// 1.13c D2Client+0xAEBA0
-void sub_AEBA0(Env& e,uintptr_t p){ e.f21D60(rdp(p+8),r32(p+4),r16(p+2)); }
 
 // 1.13c D2Client+0xAEBE0 (ECX = packet; checked against the disassembly: the 16-byte local is filled by D2Client+0xAC1B0)
 void sub_AEBE0(Env& e,const uint8_t* pkt){

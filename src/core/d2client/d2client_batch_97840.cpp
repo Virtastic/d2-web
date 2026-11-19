@@ -308,21 +308,3 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9d100(const D2cClientEnv* e) {
     }
     g_group_head = 0;
 }
-
-// 1.13c D2Client+0x9D160 (eax = list head): insertion-sort an item chain by dword @+0x18, descending-stable
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9d160(uint32_t head) {
-    uint32_t sorted = 0;
-    while (head != 0) {
-        uint32_t nx = P32(head)[0x80 / 4];
-        if (sorted != 0) {
-            uint32_t p = sorted, prev = 0, at;
-            do {
-                at = p;
-                if ((int32_t)P32(at)[0x18 / 4] < (int32_t)P32(head)[0x18 / 4]) break;
-                p = P32(at)[0x80 / 4]; prev = at;
-            } while (P32(at)[0x80 / 4] != 0);
-            if (prev != 0) { P32(head)[0x80 / 4] = P32(prev)[0x80 / 4]; P32(prev)[0x80 / 4] = head; head = nx; continue; }
-        }
-        P32(head)[0x80 / 4] = sorted; sorted = head; head = nx;
-    }
-}

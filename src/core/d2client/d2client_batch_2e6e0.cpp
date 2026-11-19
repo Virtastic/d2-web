@@ -46,21 +46,8 @@ static Address classRec(const Host& h, const Env& e, int32_t idx) {   // 0x1A8-s
     return static_cast<Address>(idx) * 0x1A8 + h.read<Address>(e.dt + 0xA78);
 }
 static int32_t gArg(const Env& e) { return (e.gmode < 2 || e.gmode > 3) ? 1 : e.g2; }
-static int32_t div100(int32_t x) { return x / 100; }
 static int32_t mul32(int32_t a, int32_t b) { return static_cast<int32_t>(static_cast<uint32_t>(a) * static_cast<uint32_t>(b)); }
 // v*s/100 as 2E900 computes it (the 32-bit product or _alldiv branches chosen by magnitude).
-static int32_t pct(int32_t v, int32_t s) {
-    if (v > 0x100000) {
-        if ((v & ~0xf) < 0x640) return static_cast<int32_t>(static_cast<int64_t>(s) * v / 100);
-        return mul32(div100(v), s);
-    }
-    if (s > 0x10000) {
-        if ((s & ~0xf) < 0x640) return static_cast<int32_t>(static_cast<int64_t>(s) * v / 100);
-        return mul32(div100(s), v);
-    }
-    return div100(mul32(s, v));
-}
-
 // 1.13c D2Client+0x2E6E0 (133 B): EAX = skill row id, ECX = level, EDX = dst; plain ret. level > 1: v = (level-2)*row[+0x14C] + row[+0x148] (0 when the row is
 // out of range or level-1 <= 0); 0x2DBF0(EBX=dst; 0x10D5, v, 0), then D2Lang(0x110D), D2Lang(0xF9E). Returns 1.
 uint32_t sub_2E6E0(const Host& h, const Env& e, int32_t eax, int32_t ecx, Address dst) {
@@ -93,56 +80,6 @@ uint32_t sub_2E770(const Host& h, const Env& e, Address dst, Address item, int32
     return 1;
 }
 
-// (host-style body, superseded by d2client_2e900.cpp) D2Client+0x2E900 (632 B): stdcall(a1, dst, a3, item, a5) ret 0x14. 0xC244(itemcls, g, cls, word, 8, &local); A = local[5], B = local[6]; sum of 0xC316(a1, dword, a3, a5)
-// over the 6 words item+0x54 / dwords item+0x68 and the 5 words item+0x98 / dwords item+0xA4 whose word == 0x19; sum != 0: clamp >= -90, A += A*sum/100, B += B*sum/100;
-// then 0x2D220(EAX=0x10A0; dst, A, B, 0). Returns 1 (0 for an out-of-range class).
-uint32_t sub_2E900(const Host& h, const Env& e, uint32_t a1, Address dst, uint32_t a3, Address item, uint32_t a5) {
-    const int32_t idx = h.read<int16_t>(item + 0xBC);
-    Address rec = classRec(h, e, idx);
-    if (!rec) return 0;
-    int32_t loc[14] = {};
-    h.call(0xC244, {u(idx), u(gArg(e)), e.cls, u(h.read<int16_t>(rec + e.cls * 2 + 0xAA)), 8, out(loc)});
-    int32_t A = loc[5], B = loc[6], sum = 0;
-    for (int i = 0; i < 6; ++i)
-        if (h.read<uint16_t>(item + 0x54 + i * 2) == 0x19) sum += static_cast<int32_t>(h.call(0xC316, {a1, h.read<uint32_t>(item + 0x68 + i * 4), a3, a5}));
-    for (int i = 0; i < 5; ++i)
-        if (h.read<uint16_t>(item + 0x98 + i * 2) == 0x19) sum += static_cast<int32_t>(h.call(0xC316, {a1, h.read<uint32_t>(item + 0xA4 + i * 4), a3, a5}));
-    if (sum != 0) {
-        if (sum <= -90) sum = -90;
-        A += pct(A, sum);
-        B += pct(B, sum);
-    }
-    h.call(0x2D220, {0x10A0, dst, u(A), u(B), 0});
-    return 1;
-}
-
-// (host-style body, superseded by d2client_2e410.cpp) D2Client+0x2E410 (713 B): sibling of 0x2E900 with the stat kind 0x6F as well (ret 0x14: a1, dst, a3, item, a5). C244 as in 0x2E900; kind 0x19 entries sum
-// C316(a1, value, a3, a5) into `sum`, kind 0x6F entries add the same C316 to both A and B; sum != 0 is clamped to >= -90 and scales A and B; 0x2D220(EAX=0x10A0; dst, A, B, 0).
-uint32_t sub_2E410(const Host& h, const Env& e, uint32_t a1, Address dst, uint32_t a3, Address item, uint32_t a5) {
-    const int32_t idx = h.read<int16_t>(item + 0xBC);
-    Address rec = classRec(h, e, idx);
-    if (!rec) return 0;
-    int32_t loc[14] = {};
-    h.call(0xC244, {u(idx), u(gArg(e)), e.cls, u(h.read<int16_t>(rec + e.cls * 2 + 0xAA)), 8, out(loc)});
-    int32_t A = loc[5], B = loc[6], sum = 0;
-    auto scan = [&](Address kinds, Address vals, int n) {
-        for (int i = 0; i < n; ++i) {
-            const uint16_t k = h.read<uint16_t>(kinds + i * 2);
-            if (k == 0x19) sum += static_cast<int32_t>(h.call(0xC316, {a1, h.read<uint32_t>(vals + i * 4), a3, a5}));
-            if (k == 0x6f) { const int32_t v = static_cast<int32_t>(h.call(0xC316, {a1, h.read<uint32_t>(vals + i * 4), a3, a5})); A += v; B += v; }
-        }
-    };
-    scan(item + 0x54, item + 0x68, 6);
-    scan(item + 0x98, item + 0xA4, 5);
-    if (sum != 0) {
-        if (sum <= -90) sum = -90;
-        A += pct(A, sum);
-        B += pct(B, sum);
-    }
-    h.call(0x2D220, {0x10A0, dst, u(A), u(B), 0});
-    return 1;
-}
-
 static uint32_t modeKey(uint8_t mode) {   // jump table at 0x2EC44: mode 1..6, anything else the default
     static const uint32_t k[6] = {0x10A1, 0x10A3, 0x10C3, 0x10A2, 0x10A4, 0xDC4};
     return (mode >= 1 && mode <= 6) ? k[mode - 1] : 0x10A1;
@@ -172,17 +109,4 @@ uint32_t sub_2EC60(const Host& h, uint32_t eax, uint32_t ecx, Address unit, Addr
     return 1;
 }
 
-// 1.13c D2Client+0x2EFD0 (207 B): EAX = class index, stack dst (EBX for 0x2DCA0), pct, add, ret 0xC; void. 0xC244(idx, g, cls, word, 1, &local); on success
-// avg = (local[0] + local[1] + (sum < 0)) >> 1, total = avg + avg*pct/100 + add; total != 0: 0x2DCA0(EBX=dst; 0x10C6, total, 0).
-void sub_2EFD0(const Host& h, const Env& e, int32_t eax, Address dst, int32_t pctv, int32_t add) {
-    Address rec = classRec(h, e, eax);
-    if (!rec) return;
-    int32_t loc[14] = {};
-    if (!h.call(0xC244, {u(eax), u(gArg(e)), e.cls, u(h.read<int16_t>(rec + e.cls * 2 + 0xAA)), 1, out(loc)})) return;
-    int32_t s = loc[0] + loc[1];
-    s += s < 0 ? 1 : 0;
-    const int32_t avg = s >> 1;
-    const int32_t total = avg + div100(mul32(avg, pctv)) + add;
-    if (total) h.call(0x2DCA0, {dst, 0x10C6, u(total), 0});
-}
 } // namespace d2client_batch_2e6e0

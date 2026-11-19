@@ -14,8 +14,6 @@
 static uint8_t  g_csTable[0x200];       // +0x0DB0C8  FUN_6fab47ab's critical-section table, 8-byte stride
 static uint8_t  g_pickTable[0x200];     // +0x1175C0..+0x1177C0  16 records of 0x20 (0x5CC10)
 static uint32_t g_pickEnabled;          // +0x11C280  DAT_6fbcc280
-static uint32_t g_tickGate;             // +0x0DD5D4  DAT_6fb8d5d4
-static uint32_t g_tickDeadline;         // +0x0FAD50  DAT_6fbaad50
 static uint32_t g_seh8dc;               // +0x0DB8DC  DAT_6fb8b8dc
 static uint32_t g_seh8e0;               // +0x0DB8E0  DAT_6fb8b8e0
 static uint32_t g_seh8e4;               // +0x0DB8E4  DAT_6fb8b8e4
@@ -143,9 +141,3 @@ EMSCRIPTEN_KEEPALIVE void d2_client_a7340(uint32_t row, uint32_t value,
 // Row-table bases, for the FN replay probes (they log the base as a module-image address).
 extern "C" uintptr_t d2_client_slots_10a608() { return (uintptr_t)g_slots10A608; }
 extern "C" uintptr_t d2_client_slots_109a08() { return (uintptr_t)g_slots109A08; }
-
-// 1.13c D2Client+0xBE2E0: while 0x0DD5D4 is set, arm 0x0FAD50 to GetTickCount() + 100.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_client_be2e0(void) {
-    if (g_tickGate != 0) g_tickDeadline = GetTickCount() + 100;
-}

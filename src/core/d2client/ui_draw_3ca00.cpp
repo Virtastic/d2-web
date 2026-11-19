@@ -11,8 +11,8 @@ void Fog_Ordinal_10024(const void*, const void*, uint32_t);
 uint32_t d2_client_window_handle();  // D2Client+0xD0B4 (-> Fog 10048)
 void Storm_Sub34530_Real(uint32_t, uint32_t, uint32_t, uint32_t);  // #512
 void Storm_Sub34510_Real(uint32_t, uint32_t, uint32_t, uint32_t);  // #513
-void Storm_Sub344F0_Real(uint32_t, uint32_t, uint32_t, uint32_t);  // #514
-void Storm_Sub344D0_Real(uint32_t, uint32_t, uint32_t, uint32_t);  // #515
+void d2client_bf3e(uint32_t, uint32_t, uint32_t);  // 0xBF3E -> Storm #514
+void d2client_bf62(uint32_t, uint32_t, uint32_t);  // 0xBF62 -> Storm #515
 
 W uint8_t DAT_6fb8359f[1];
 W uint32_t DAT_6fbcc3cc, DAT_6fbc9898, DAT_6fbc9890, DAT_6fbc988c, DAT_6fba46d4;
@@ -29,8 +29,8 @@ static void real_storm(uint32_t o, uint32_t a, uint32_t c, uint32_t d, uint32_t 
     switch (o) {
     case 512: Storm_Sub34530_Real(a, c, d, s); break;
     case 513: Storm_Sub34510_Real(a, c, d, s); break;
-    case 514: Storm_Sub344F0_Real(a, c, d, s); break;
-    default: Storm_Sub344D0_Real(a, c, d, s);
+    case 514: d2client_bf3e(a, c, d); break;
+    default: d2client_bf62(a, c, d);
     }
 }
 static void real_fatal(uint32_t id) { Fog_Ordinal_10024(DAT_6fb8359f, 0, Fog_Ordinal_10265(id)); D2Client_exit_3664(-1); }

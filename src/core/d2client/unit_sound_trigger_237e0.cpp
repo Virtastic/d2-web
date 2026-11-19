@@ -89,6 +89,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_237e0(uint8_t* u, const D2c237Env
 #include <cstddef>
 #include <D2DataTbls.h>
 extern "C" uint32_t d2_session_client_rand(uint32_t n);
+extern "C" uint32_t d2_client_22040(void* env, const void* object);   // d2client_batch_21d60.cpp (env prefix: context, resolve, report)
 extern "C" int d2_session_monster_idle_facts(uint32_t id, int32_t* town, int32_t* near);
 static_assert(offsetof(D2MonSoundsTxt, dwNeutral) == 0x68 && offsetof(D2MonSoundsTxt, dwNeuTime) == 0x6c, "0x237E0 reads MonSounds +0x68/+0x6C");
 namespace {
@@ -119,7 +120,14 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_monster_idle(uint32_t id, int
     e.monSound2a70 = [](void* u) { return reinterpret_cast<uint8_t*>(const_cast<D2MonSoundsTxt*>(C(u)->snd)); };
     e.has225d0 = [](void*, int32_t) { return int32_t(0); };   // ponytail: the unit's playing-sound list (+0x78) is not mirrored; NeuTime outlasts the row
     e.get220a0 = [](void* u) { return C(u)->st->u7c ? C(u)->st->u7c - 1 : 0u; };
-    e.get22040 = [](void* u) { return C(u)->st->u80; };
+    // 0x22040 is the proved checked read of unit+0x80: run it on a unit image holding the session's +0x80 stamp. The env's
+    // report seam is its only callee (the null-unit exit, never taken: the handle is always set).
+    e.get22040 = [](void* u) {
+        struct Env22040 { void* context; void* (*resolve)(void*, uint32_t); void (*report)(void*, uint32_t); } env{ nullptr, nullptr, [](void*, uint32_t) { std::abort(); } };
+        uint8_t image[0x84] = {};
+        std::memcpy(image + 0x80, &C(u)->st->u80, 4);
+        return d2_client_22040(&env, image);
+    };
     e.set22010 = [](void* u, uint32_t v) { C(u)->st->u80 = v; };
     e.ord10331 = [](void*) { return int32_t(1); };
     e.rand39640 = [](uint32_t n) { return d2_session_client_rand(n); };

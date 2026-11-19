@@ -111,64 +111,6 @@ int32_t sub_4FF60(G& g,int32_t mx,int32_t mode,int32_t my){
  else if(mx<0x29||mx>0x49) return 0;
  return (g.d2bc4c-0x8b<my&&my<g.d2bc4c-0x66)?1:0;
 }
-static void blank(Frame& f,G& g){ for(auto& w:f.w)w=0; f.w[13]=(uint32_t)g.cc300; }
-// 1.13c D2Client+0x50020
-void sub_50020(Svc& s,G& g){
- if(s.gfxMode()!=2) return;
- Frame f; blank(f,g); f.w[0]=2;
- if(s.f4fe70()&&!g.aada4) s.textAt(s.strLookup(0xf93),g.d2bc48/2+0xb2,g.d2bc4c-0x32,0,1);
- s.o10041(f,g.d2bc48/2+0xa3,g.d2bc4c-8,-1,5,0);
-}
-// 1.13c D2Client+0x50100
-void sub_50100(Svc& s,G& g){
- if(s.gfxMode()!=2) return;
- Frame f; blank(f,g); f.w[0]=2;
- if(s.f4ff10()&&!g.aada4) s.textAt(s.strLookup(0xf92),g.d2bc48/2-0xb3,g.d2bc4c-0x32,0,1);
- s.o10041(f,g.d2bc48/2-0xc2,g.d2bc4c-8,-1,5,0);
-}
-// 1.13c D2Client+0x501F0.  Ordinal_10041 takes the Frame by value (retail pushes the stack record just built).
-void sub_501F0(Svc& s,G& g){
- int32_t mode=g.cc414;
- if(s.gfxMode()!=2&&(mode==3||g.aad90||g.aadb0||(g.aadd8&&g.aad84))){ g.cc30c=0; return; }
- int32_t x=g.d2bc48; if(mode==1) x=g.d2bc48-g.d2bc48/2;
- Frame a; for(auto& w:a.w)w=0; a.w[13]=(uint32_t)g.cc304;
- s.o10060(s.o10021(a)); s.o10003(0,0,0); s.o10028();
- if(s.gfxMode()!=2){ s.o10003(g.d2bc4c-0x8e,0,0); s.o10150(); s.o10041(a,x-0x49,g.d2bc4c-0x69,-1,5,0); }
- Frame b; blank(b,g); int32_t on;
- if(s.gfxMode()==2) on=g.cc30c?s.f4fe70():0; else on=g.cc30c?s.f4fec0(g.cb828):0;
- b.w[0]=on?1:0;
- s.o10060(s.o10021(b)); s.o10003(0,0,0); s.o10028();
- if(s.gfxMode()==2){
-  if(s.f4fe70()&&!g.aada4){ s.o10003(g.d2bc4c-0x32,0,1); s.o10085(); }
-  s.o10041(b,g.d2bc48/2+0xa3,g.d2bc4c-8,-1,5,0); return; }
- s.o10041(b,x-0x46,g.d2bc4c-0x6d,-1,5,0);
-}
-// 1.13c D2Client+0x50430
-void sub_50430(Svc& s,G& g){
- int32_t mode=g.cc414;
- if(s.gfxMode()!=2&&(mode==3||g.aad88||(g.aadd8&&(g.aad84||g.aad90))||g.aadb0)){ g.cc308=0; return; }
- int32_t x=(mode==2)?g.d2bc48/2+0x28:0x28;
- Frame a; for(auto& w:a.w)w=0; a.w[13]=(uint32_t)g.cc304;
- s.o10060(s.o10021(a)); s.o10003(0,0,0); s.o10028();
- if(s.gfxMode()!=2){ s.o10003(g.d2bc4c-0x8e,0,0); s.o10150(); s.o10041(a,x,g.d2bc4c-0x69,-1,5,0); }
- Frame b; blank(b,g); int32_t on;
- if(s.gfxMode()==2) on=g.cc308?s.f4ff10():0; else on=g.cc308?sub_4FF60(g,g.cb828,s.gfxMode(),g.cb824 /*esi = mouse Y, DAT_6fbcb824*/):0;
- b.w[0]=on?1:0;
- s.o10060(s.o10021(b)); s.o10003(0,0,0); s.o10028();
- if(s.gfxMode()!=2){ s.o10041(b,x+3,g.d2bc4c-0x6d,-1,5,0); return; }
- if(s.f4ff10()&&!g.aada4){ s.o10003(g.d2bc4c-0x32,0,1); s.o10085(); }
- s.o10041(b,g.d2bc48/2-0xc2,g.d2bc4c-8,-1,5,0);
-}
-struct Msg { uint16_t x,y; int32_t f18,f1c; };
-// 1.13c D2Client+0x50750
-void sub_50750(Svc& s,G& g,Msg* m){
- int32_t mode=s.gfxMode(), saved=g.cc414;
- if(mode==2&&g.aada4) return;
- int32_t hit=(s.gfxMode()==2)?s.f4ff10():sub_4FF60(g,m->x,s.gfxMode(),m->y);
- if(!hit){ m->f18=0; return; }
- g.cc308=1; s.f38a70(); s.f16360();
- if(saved!=2||!s.f46150()||g.c9663!=1){ m->f18=1; m->f1c=0; s.o511(m); }
-}
 // 1.13c D2Client+0x50E70
 // Returns the EAX retail leaves: aadac on the early exit; else the tail's last 10587 result, aad90, or 72790's EAX.
 uint32_t sub_50E70(Svc& s,G& g){
@@ -202,20 +144,5 @@ uint32_t sub_50E70(Svc& s,G& g){
  int32_t r=s.o10587(o,5,0);
  if(r>0) return (uint32_t)r;
  return s.f72790(7,1,0);
-}
-// 1.13c D2Client+0x510F0  (param_1 = &x, ebx = &y)
-void sub_510F0(Svc& s,G& g,int32_t* x,int32_t* y){
- int32_t w=g.d2bc48;
- if(s.o10013()){
-  *y-=*y/0x28;
-  *x=((0x28-((*y+((*y>>31)&3))>>2))*(*x-w/2))/(w/2)+*x;
- }
- *x+=g.c9960-g.cc418; *y+=g.c995c-8;
-}
-// 1.13c D2Client+0x511F0  (this nonnull, eax = key struct with id at +0xc)
-void sub_511F0(G& g,void* self,int32_t keyId,int32_t value){
- if(!self||!keyId) return;
- for(G::Q* q=g.queue;q;q=q->next) if(q->id==keyId){ q->v=value; return; }
- // retail falls through to a store at absolute address 8 (null-page write); not reproduced.
 }
 }

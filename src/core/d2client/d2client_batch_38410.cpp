@@ -58,7 +58,7 @@ static void dispatch(Services& api,uint32_t handle,int32_t sel,uint32_t id,uint3
  api.fatal(fatalNull); }
 // 1.13c D2Client+0x3CA80  (EAX=handle, ECX=id, EDX, ESI=selector)
 void sub_3CA80(Services& api,uint32_t handle,int32_t sel,uint32_t id,uint32_t edx){ dispatch(api,handle,sel,id,edx,414,0x136,0x13a); }
-// dup of D2Client+0x3CBC0
+// 1.13c D2Client+0x3CBC0 (stack = p): SendMessageA(p[0], WM_CLOSE 0x10, 0, 0); p[6] = 1; p[7] = 0.
 void sub_3CBC0(Services& api,uint32_t* p){ api.sendClose(reinterpret_cast<void*>(uintptr_t(p[0]))); p[6]=1; p[7]=0; }
 // 1.13c D2Client+0x3CCC0  (count=EAX, handle=stack param, table of 12-byte {esi,ecx,edx} entries)
 void sub_3CCC0(Services& api,uint32_t count,uint32_t handle,const uint32_t* table){

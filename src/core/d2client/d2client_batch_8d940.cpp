@@ -9,7 +9,6 @@
 namespace d2client_batch_8d940 {
 static void ucpy(wc* d,const wc* s){ while((*d++=*s++)); }
 static void ucat(wc* d,const wc* s){ while(*d) ++d; ucpy(d,s); }
-static void w2u(wc* d,const char* s,int32_t n){ while(n-- >0 && *s) *d++=(uint8_t)*s++; *d=0; }
 // Builders 0x8D940..0x8DEE0 share one shape: fetch the two colour codes (D2Lang strings 0xf9b, 0xf9e), Unicode::strcpy
 // a label string, Storm#578 _snprintf(10, "%i") the number, Unicode::win2Unicode(n, 9), Unicode::strcat colour/number/colour.
 // e.str(id) is D2Lang#10003 with the real string id; e.q(10973, unit, stat) is D2Common#10973 (layer 0).
@@ -63,20 +62,6 @@ void tooltipStat46(Env& e,int32_t unit,const uint8_t* rec,wc* out){
   ucpy(out,e.str(0xd86)); char b[12]; wc n[10]; num(b,"%ld",e.q(10973,unit,0x46),n);
   ucat(out,c0); ucat(out,n); ucat(out,c1); ucat(out,e.str(rd16(rec,0xf4)));
  }
-}
-
-// old form of D2Client 8DFB0 (now d2client_8dfb0.cpp)
-int32_t personalizedName(Env& e,wc* out){
- if(!e.q(10202,0,0)) return 0;
- wc tmp[32]; w2u(tmp,(const char*)(intptr_t)e.q(10083,0,0),32);
- e.personalize(out,tmp,0x200); return 1;
-}
-// old form of D2Client 8E080 (now d2client_8e080.cpp)
-int32_t personalizedNameInPlace(Env& e,wc* out){
- if(!e.q(10202,0,0)) return 0;
- int32_t cls=e.q(10106,0,0); if(cls>=5 && cls<=9) return 0;
- wc tmp[32],res[0x200]; w2u(tmp,(const char*)(intptr_t)e.q(10083,0,0),32);
- e.personalize(res,tmp,0x200); ucpy(out,res); return 1;
 }
 
 // 1.13c D2Client+0x8E2F0: ported to d2client_8e2f0.cpp

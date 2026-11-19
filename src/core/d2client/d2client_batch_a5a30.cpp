@@ -36,14 +36,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE bool d2_client_a6180(U u, const D2ClientA5Env* e
     return false;
 }
 
-// 1.13c D2Client+0xA6210 (56 B): ESI = unit.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a6210(U u, const D2ClientA5Env* e) {
-    uint32_t f = W(u, 0xc4) & 0xfffeffff;
-    W(u, 0xc4) = f;
-    if (W(u, 0) == 1 && e->fn_1510(f, 9) == 0) return;
-    W(u, 0xc4) = f | 4;
-}
-
 
 // ---- the rows below follow retail's call sites (d2client_batch_a5a30.h; callees through FnCallees) ----
 #include "d2client_batch_a5a30.h"

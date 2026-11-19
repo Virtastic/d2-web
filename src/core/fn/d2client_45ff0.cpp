@@ -1,14 +1,16 @@
-// 1.13c D2Client+0x45ff0 probe. r[0] = BX (the wanted id). Blob t (r[14], 32 bytes) is the 8-byte {id, value} table, its count
+// 1.13c D2Client+0x45ff0 probe; drives the client-tree body d2c_45ff0 (src/core/d2client/d2client_batch_14fd0.cpp) through its env struct.
+// r[0] = BX (the wanted id). Blob t (r[14], 32 bytes) is the 8-byte {id, value} table, its count
 // at t+12. Blob h (r[16], 4 bytes) is the dword the callee takes. Blob sk (r[18], 24 bytes) is the u16 skip list, its count at
 // sk+20. Blob lg (r[20], 512 bytes) is the hook log. The callee 0xCE08 answers the probe's queue for the h value.
 #include <cstdint>
 #include <emscripten.h>
-#include "../d2client/client_host.h"
 #include "hookenv.h"
-extern "C" uint16_t d2_client_45ff0(uint16_t bx, const uint8_t* tbl, int32_t n, uint32_t h, const uint16_t* skip, uint16_t nskip, D2cHost host);
+struct E45FF0 { int16_t (*tab)[4]; int32_t tabN; int32_t unit; int32_t (*o10778)(int32_t, int32_t);
+  int16_t* skip; uint16_t skipN; };
+extern "C" int32_t d2c_45ff0(E45FF0* e, int16_t bx);
 namespace {
 HookEnv* g_env;
-uint32_t host(D2cCall* c) { return g_env->h(c->rva, c->eax, c->ecx, c->edx, c->ebx, c->esi, c->s[0], c->s[1], c->s[2], c->s[3]); }
+int32_t o10778(int32_t unit, int32_t i) { return (int32_t)g_env->h(0xCE08, 0, 0, 0, 0, 0, (uint32_t)unit, (uint32_t)i, 0, 0); }
 const uint32_t kNone[] = { 0, 0 };
 const uint32_t k101[] = { 0xCE08, 5, 0, 0 };
 const uint32_t k102[] = { 0xCE08, 5, 0xCE08, 7, 0xCE08, 9, 0xCE08, 0xB, 0, 0 };
@@ -34,5 +36,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2client_45ff0(uint32_t* r) {
     HookEnv env(lg, pick(h));
     env.cap = 12;
     g_env = &env;
-    r[4] = d2_client_45ff0((uint16_t)r[0], t, n, h, sk, nskip, host);
+    E45FF0 e{ (int16_t (*)[4])(uintptr_t)t, n, (int32_t)h, o10778, (int16_t*)(uintptr_t)sk, nskip };
+    r[4] = (uint16_t)d2c_45ff0(&e, (int16_t)r[0]);
 }

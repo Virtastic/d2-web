@@ -28,51 +28,6 @@ void d2_client_a4b60(uintptr_t eax, const D2ClientA4b60Env* e) {
     e->wr32(eax + 0x58, 3);
 }
 
-// 1.13c D2Client+0xA4B90 (caller 0x6CC00): EAX = obj; null asserts (0xA19); if +0x58==0 false;
-// else decrement it and return (thunk 10494() == 0).
-extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2_client_a4b90(uintptr_t eax, const D2ClientA4b60Env* e) {
-    if (!eax) e->fatal(0xa19);
-    uint32_t v = e->rd32(eax + 0x58);
-    if (v == 0) return 0;
-    e->wr32(eax + 0x58, v - 1);
-    return e->o10494() == 0;
-}
-
-// 1.13c D2Client+0xA4C50 (caller 0xA54A0): ESI = obj. 10511()==0 -> true; r=10858(): if non-null and
-// r+0x10 != 0x12 -> true; if byte r+0x16 not in {0,0xff} -> byte <= (int)obj+0x38 >> 8; else false.
-extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2_client_a4c50(uintptr_t esi, const D2ClientA4b60Env* e) {
-    if (e->o10511() == 0) return 1;
-    uintptr_t r = e->o10858();
-    if (r) {
-        if ((e->rd32(r + 0x10) & 0xff) != 0x12) return 1;
-        uint32_t b = e->rd32(r + 0x16) & 0xff;
-        if (b != 0 && b != 0xff) return (int32_t)b <= ((int32_t)e->rd32(esi + 0x38) >> 8);
-    }
-    return 0;
-}
-
-// 1.13c D2Client+0xA52A0 (caller 0xA5C50): walk both 0x80-slot chains (next at +0xE4); 1 on first
-// 0xA4A90 hit.
-extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2_client_a52a0(uintptr_t param_1, const D2ClientA4b60Env* e) {
-    for (int t = 0; t < 2; t++)
-        for (int i = 0; i < 0x80; i++)
-            for (uintptr_t u = e->heads[t][i]; u; u = e->rd_ptr(u + 0xe4))
-                if (e->a4a90(u, param_1)) return 1;
-    return 0;
-}
-
-// 1.13c D2Client+0xA5310 (caller 0xA5D90): EAX = obj (may be null -> -1), arg. r=10093(arg, obj+4);
-// r ? 10014(r)+0x1be : 0.
-extern "C" EMSCRIPTEN_KEEPALIVE
-int32_t d2_client_a5310(uintptr_t eax, uint32_t arg, const D2ClientA4b60Env* e) {
-    uint32_t k = eax ? e->rd32(eax + 4) : 0xffffffffu;
-    uintptr_t r = e->o10093(arg, k);
-    return r ? e->o10014(r) + 0x1be : 0;
-}
-
 // 1.13c D2Client+0xA5360 (caller 0x47970): EAX = obj; null asserts (0x977); 0xA4DA0(table 0x10AA08).
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_a5360(uintptr_t eax, const D2ClientA4b60Env* e) {

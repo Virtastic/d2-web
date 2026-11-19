@@ -124,7 +124,7 @@ void sub_35DF0(State& s,uint32_t handle) {
  s.api.ord10010(586,365,586,411,255,255);
 }
 
-// dup of D2Client+0x358E0
+// 1.13c D2Client+0x358E0: when the dword at 0x11C44C is set, calls 0xC2790(0x15, 1, 0) and clears it.
 void sub_358E0(State& s) { if(s.g44c){ s.api.sub_C2790(0x15,1,0); s.g44c=0; } }
 // 1.13c D2Client+0x35920
 void sub_35920(State& s) { release(s,s.h438); release(s,s.h43c); release(s,s.h440); }

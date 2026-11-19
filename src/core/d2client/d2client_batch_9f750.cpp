@@ -87,23 +87,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9f9e0(int32_t* st, uint32_t unit6
     *bcc2fc = 0;
 }
 
-// 1.13c D2Client+0x9FE50
-// EDI = y (unaff), param_1 = x. Slot 0 -> 9F830, others -> 9FD70.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_9fe50(int32_t x, int32_t y, uint8_t* slotBase, int32_t slotCount,
-                                                         uint32_t (*open9f830)(void), const D2C9f750Env* env) {
-    D2C9f750Slots s{slotBase, slotCount};
-    uint32_t r = 0;
-    for (int i = 0; i < s.count; ++i) {
-        if (s.base[i * 0x28 + 0x15] && sl_i32(s, i, 0) <= x && x <= sl_i32(s, i, 4) && sl_i32(s, i, 8) <= y && y <= sl_i32(s, i, 0xC)) {
-            env->fn_88a70(0, 0, 0, 0);
-            if (i == 0) open9f830(); else env->dialog_cb_9fd70();
-            r = 1;
-        }
-    }
-    sl_clear(s);
-    return r;
-}
-
 // Fog/D2Common imports for the rows below (ordinals as in the decompile).
 struct D2C9f750Env2 {
     void* (*item_slot)(void* unit, int slot);       // Ordinal_11139

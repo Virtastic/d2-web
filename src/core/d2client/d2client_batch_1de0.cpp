@@ -38,8 +38,6 @@ static void d2c13_unlink_node(uint32_t node) {
 }
 
 static uint32_t d2_client_22c0(void* self, const D2ClientBatch1de0Env* env);
-static void d2_client_2210(uint32_t object);
-static void d2_client_21d0(uint32_t object);
 
 // 1.13c D2Client+0x01DE0 (40 B): scalar deleting destructor (vtable slot). Runs the destructor body
 // 0x66B80, then for flags bit 0 frees the object with SMemFree(this, "delete", -1, 0); returns this.
@@ -63,21 +61,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_client_1e10(int32_t idx, const uint8_t* tables)
     if (-1 < idx && idx < count)
         return array + (uint32_t)idx * 0xC;
     return array;
-}
-
-// 1.13c D2Client+0x01E80 (76 B): destructor of the 0x1F10 object. Deletes the critical section at
-// this+0x50, then runs the 0x1FB0 teardown.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_client_1e80(void* self, const D2ClientBatch1de0Env* env) {
-    DeleteCriticalSection((LPCRITICAL_SECTION)((uint8_t*)self + 0x50));
-    env->sub_1FB0(self);
-}
-
-// 1.13c D2Client+0x01ED0 (55 B): destructor body that only runs the 0x1FB0 teardown (the critical
-// section, if any, is not touched here).
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_client_1ed0(void* self, const D2ClientBatch1de0Env* env) {
-    env->sub_1FB0(self);
 }
 
 // 1.13c D2Client+0x01F10 (84 B): constructor. Runs the 0x22C0 base constructor, overwrites its vtable
@@ -106,18 +89,6 @@ static void d2_client_2190(const D2ClientBatch1de0Env* env) {
     env->sub_2540();
 }
 
-// 1.13c D2Client+0x021D0 (55 B): tail-call wrapper for 0x2210.
-static void d2_client_21d0(uint32_t object) {
-    d2_client_2210(object);
-}
-
-// 1.13c D2Client+0x02210 (170 B): unlink the two intrusive-list heads embedded in the object, at
-// object+0xC (encoded predecessor at +0x10) and object+4 (encoded predecessor at +8), in that order.
-static void d2_client_2210(uint32_t object) {
-    d2c13_unlink_node(object + 0xC);
-    d2c13_unlink_node(object + 4);
-}
-
 // 1.13c D2Client+0x022C0 (88 B): constructor. Runs the 0x2670 base constructor, sets vtable RVA
 // 0xD60C0, then [0x12] = ~this & 0x0FFFFFFF (self-relative hash) and [0x13] = 0.
 static uint32_t d2_client_22c0(void* self, const D2ClientBatch1de0Env* env) {
@@ -127,21 +98,6 @@ static uint32_t d2_client_22c0(void* self, const D2ClientBatch1de0Env* env) {
     obj[0x12] = ~(uint32_t)(uintptr_t)self & 0x0FFFFFFFu;
     obj[0x13] = 0;
     return (uint32_t)(uintptr_t)self;
-}
-
-// 1.13c D2Client+0x02320 (63 B): destructor. Drains the list head at this+0x40, releasing each chunk
-// through 0x2750 then SMemFree(chunk, "TSHashObjectChunk", -2, 0); then drains this+0x30, running the
-// 0x2210 unlink (via 0x21D0) on each entry and SMemFree(entry, "USGAMEDATA", -2, 0).
-static void d2_client_2320(void* self, const D2ClientBatch1de0Env* env) {
-    int32_t v;
-    while (v = *(const int32_t*)((const uint8_t*)self + 0x40), 0 < v) {
-        env->sub_2750((void*)(uintptr_t)(uint32_t)v);
-        env->smem_free((void*)(uintptr_t)(uint32_t)v, "TSHashObjectChunk", -2, 0);
-    }
-    while (v = *(const int32_t*)((const uint8_t*)self + 0x30), 0 < v) {
-        d2_client_21d0((uint32_t)v);
-        env->smem_free((void*)(uintptr_t)(uint32_t)v, "USGAMEDATA", -2, 0);
-    }
 }
 
 // (superseded by d2client_batch_2190.cpp:d2_client_2360) teardown of a 12-byte-row table. Clears this+0x10, calls 0x30A0,

@@ -29,37 +29,6 @@ static uint8_t* tblRec(const D2cA0State* s, size_t cntOff, size_t baseOff, int32
     return rd<uint8_t*>(s->dt, baseOff) + (size_t)i * stride;
 }
 
-// Legacy shim for d2_client_a0e70 (the retail port of 0xA0A30 is d2client_a0a30.cpp).
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_a0a30(const D2cA0Env* e, uint8_t* u) {
-    if (!u) return 0;
-    if (rd<int32_t>(u, 0) != 0) return 1;
-    uint32_t p = e->ord(10641, (uint32_t)(uintptr_t)u, 0, 0);
-    bool b = true;
-    if (!p) return 1;
-    if (e->ord(10543, p, 0, 0)) {
-        b = false;
-        uint32_t c = e->ord(10511, 0, 0, 0);
-        if (!e->ord(10601, c, 0, 0) && e->ord(10910, p, 0x9d, 0)) return 1;
-    }
-    uint32_t h = rd<uint32_t>(u, 0x18 * 4);
-    if (!h) return 0;
-    uint32_t x = e->ord(11139, h, 4, 0);
-    if (!x || (b && x != p) ||
-        (!e->ord(10048, x, 0, 0) && !e->ord(10711, x, 0, 0) && !e->ord(10910, x, 0x7d, 0))) {
-        x = e->ord(11139, h, 5, 0);
-        if (!x) return 0;
-        if (b && x != p) return 0;
-        if (!e->ord(10048, x, 0, 0) && !e->ord(10711, x, 0, 0) && !e->ord(10910, x, 0x7d, 0)) return 0;
-    }
-    return e->ord(10104, x, 0, 0);
-}
-
-// 1.13c D2Client+0xA0E70
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_a0e70(const D2cA0Env* e, uint8_t* u, uint32_t a) {
-    if (!d2_client_a0a30(e, u)) return 0;
-    return e->ord(10641, a, 0, 0) != 0;
-}
-
 // 1.13c D2Client+0xA1110
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_a1110(const D2cA0Env* e, const D2cA0State* s, uint8_t* p) {
     e->fn(0x2a0b0, nullptr, nullptr, nullptr);

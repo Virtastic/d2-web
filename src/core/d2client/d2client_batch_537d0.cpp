@@ -211,37 +211,6 @@ int32_t sub_54280(Svc& s,int32_t* in,int32_t key,std::u16string& out){
  out+=buf; return 1;
 }
 
-// old form of D2Client 546E0 (now d2client_546e0.cpp)  (eax = base value, param_1 = unit, param_2 = id, edi = skill record)
-int32_t sub_546E0(Svc& s,const uint8_t* rec,int32_t base,void* unit,int32_t unitType,int32_t id,
-                  const uint8_t* (*lookup)(int32_t idx,int32_t* ok),int32_t* okOut){
- // lookup(): sgptDataTables +0xbcc table (0x144 stride, count +0xbd4); ok=0 => retail returns 0.
- if(rec[0x54]>1&&rec[0x54]<6){
-  uint16_t idx=(uint16_t)(rec[0x56]|(rec[0x57]<<8)); int32_t ok=1;
-  const uint8_t* r2=lookup(idx,&ok); if(!ok||!r2){ if(okOut)*okOut=0; return 0; }
-  base=(s.stat10973(idx)>>(r2[0x18]&0x1f))*base>>(rec[0x55]&0x1f);
- }
- int32_t v=base>>(rec[0x18]&0x1f);
- if(id==0x7a&&unit&&unitType==4&&s.stat10744(unit,0x39)) v+=0x32;
- return v;
-}
-
-
-// old form of D2Client 54AC0 (now d2client_54ac0.cpp)  (param_1 = unit, param_2 = stat arg, param_3 = skill idx, param_4 = expected, param_5 = skill rec, param_6 = out flag)
-int32_t sub_54AC0(Svc& s,void* unit,int32_t statArg,int32_t idx,int32_t expect,const uint8_t* rec5,uint32_t* flag,
-                  int32_t count,const uint8_t* (*row)(int32_t),
-                  int32_t (*calc)(Svc&,void*,int32_t)){
- (void)statArg;
- if(*(const int16_t*)(rec5+0x3e)==0) return 0;
- for(int32_t i=count-1;i>=0;i--){
-  const uint8_t* r=row(i); if(!r) return 0;
-  if(*(const int16_t*)(rec5+0x3e)==*(const int16_t*)(r+0x3e)){
-   *flag=(i==idx);
-   s.stat(i,0);                       // Ordinal_10680(param_2,i,0)
-   if(expect!=calc(s,unit,i)) return 0;
-  }
- }
- return 1;
-}
 }
 // Probe entries: the slot table, remap table and sgptDataTables are retail 32-bit words.
 extern "C" int32_t d2c_539e0(void (*f10614)(uint32_t*,uint32_t),uint32_t* unit,uint32_t edx){

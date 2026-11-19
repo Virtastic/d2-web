@@ -165,13 +165,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE int d2_client_81e40(D2cB8G* g, const D2cB8Env* e
     return r;
 }
 
-// old form of D2Client 81F60 (now d2client_81f60.cpp)
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_81f60(D2cB8G* g, const D2cB8Env* e, const uint8_t* unit) {
-    int r = e->ord10787();
-    if (r == 0) r = (unit == g->player && g->s97f8 < g->s985c) ? 8 : 0;
-    return (r != 2 && r != 7);
-}
-
 // 1.13c D2Client+0x81FF0: ported to d2client_81ff0.cpp
 
 // 1.13c D2Client+0x82210 -- ECX = unit, EDX = p2, two stack words (p3, p4); ret 8. Finds the unit's flag-0x40 stat list

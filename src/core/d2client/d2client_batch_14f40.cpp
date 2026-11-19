@@ -37,18 +37,6 @@ void sub_43830(const Host& H,S43830& s){
  if(s.g3b8){ P u=s.gbbfc?(P)(intptr_t)H.opi(10331,s.gbbfc,0,0):nullptr; H.op(10358,s.g3b8,u,(P)5); return; }
  s.g400=1;
 }
-// old form of D2Client 526E0 / 527A0 (now their own files) (message id 0x161 / 0x15b)
-static void sendMsg(const Host& H,P e,P gbbfc,U id){
- U t=rd(e,0); P u=H.ptr(e,0x2c);
- U a,b;
- if(t==2||(t>3&&t<6)){ a=rd(u,0x10); b=rd(u,0xc); }
- else { a=u?U(H.opi(10750,u,0,0)):0; b=u?U(H.opi(10867,u,0,0)):0; }
- if(!gbbfc) return;
- U m[23]={}; m[0]=1; m[1]=U((uintptr_t)gbbfc); m[11]=0; m[12]=1; m[4]=id; m[5]=b; m[6]=a; // m[6] (uStack_44) = a: kept for the record layout
- H.op(0xB30F0,m,0,0);
-}
-void sub_526E0(const Host& H,P e,P gbbfc){ sendMsg(H,e,gbbfc,0x161); }
-void sub_527A0(const Host& H,P e,P gbbfc){ sendMsg(H,e,gbbfc,0x15b); }
 // ---- shared by 6A3D0/6A550/6A6B0/6AC60: find-or-load the unit's cel block list node
 struct Gfx{ I key; I mode; P (*findList)(void); };
 static P findNode(P head,I a,I b,bool two){ for(P n=head;n;n=*(P*)((uint8_t*)n+16)){ if(rd(n,0)==U(a)&&(!two||rd(n,4)==U(b))) return n; } return nullptr; }

@@ -92,23 +92,6 @@ EMSCRIPTEN_KEEPALIVE void* d2_client_22c0(void* self, const D2ClientBatch2190Env
     return self;
 }
 
-// 1.13c D2Client+0x02320: while the object's +0x40 head is positive, run 0x2750 on it and free that block;
-// then the same for the +0x30 head, released through 0x21D0. Both heads are re-read each iteration (retail's
-// loop shape); the callee owns advancing them.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_client_2320(void* self, const D2ClientBatch2190Env* env) {
-    uint8_t* s = (uint8_t*)self;
-    int32_t iVar1;
-    while (iVar1 = *(int32_t*)(s + 0x40), 0 < iVar1) {
-        env->f_2750(iVar1);
-        env->dbg_free((void*)(intptr_t)iVar1, "__AV__TSHashObjectChunk_USGAMEDA", 0xfffffffeu, 0);
-    }
-    while (iVar1 = *(int32_t*)(s + 0x30), 0 < iVar1) {
-        d2_client_21d0((void*)(intptr_t)iVar1);
-        env->dbg_free((void*)(intptr_t)iVar1, "__AUSGAMEDATA__", 0xfffffffeu, 0);
-    }
-}
-
 // 1.13c D2Client+0x02360: clear this+0x10, run 0x30A0, then walk this+0x18 entries of 0x0C bytes. For each:
 // while entry[+2] is positive either call the object's vtable slot 0 on it (argument 0) or, for a non-zero
 // argument, orphan the node at entry[0]+entry[+2]. Retail re-reads entry[+2] each pass; kept verbatim.

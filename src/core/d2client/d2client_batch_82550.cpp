@@ -54,19 +54,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82550(const D2cGlob82* g, const D
     }
 }
 
-// 1.13c D2Client+0x825B0   (param_1 = ECX, in_EAX, unaff_EDI = mode)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_825b0(const D2cEnv82* e, uint8_t* p1, uint8_t* eax, int32_t edi) {
-    if (!p1 || !eax) return;
-    uint32_t v = rd<uint32_t>(p1, 0x60);
-    if (!v) return;
-    uint8_t c = (uint8_t)e->ord(10417, 0, 0, 0, 0);
-    if (c == 11 || c == 12) return;
-    e->ord(10694, v, 0, 0, 0);
-    e->fn(0x69a90, P(p1), 0, 0, 0);
-    if (edi == 1 && e->ord(11160, 0, 0, 0, 0) == 0) e->fn(0x81ff0, 0, 0, 0, 0);
-    e->ord(10138, v, 0, 0, 0);
-}
-
 // 1.13c D2Client+0x82610   (ESI = unit, EDI = item, stack word a1 handed on in EAX; ret 4)
 // Every retail word is passed as retail pushes it; the file argument is the image address of the Item.cpp path (rva 0xD4964).
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82610(const D2cEnv82* e, uint8_t* esi, int32_t edi, uint32_t a1) {

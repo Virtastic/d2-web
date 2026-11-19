@@ -6,7 +6,6 @@
 namespace d2client_ac630 {
 using U = uint32_t; using I = int32_t; using P = uintptr_t;
 static U rd32(const uint8_t* p, U o) { U v; std::memcpy(&v, p + o, 4); return v; }
-static uint16_t rd16(const uint8_t* p, U o) { uint16_t v; std::memcpy(&v, p + o, 2); return v; }
 struct Block { I cap, count, f2; uint8_t* data; };            // ring block; data at orig +0xC
 struct Node { I kind; I f1, f2; U id; I f4; uint8_t* data; P f6; };
 struct Env {
@@ -34,55 +33,10 @@ struct Env {
   void (*fin1)(); void (*fin2)();
 };
 
-// 1.13c D2Client+0xAC630  (thiscall; EAX = byte count)
-void sub_AC630(Env& e, uint8_t* self, const uint8_t* src, U n) {
-  if (!self) { e.fatal(0x8a5); return; }
-  Block* b; std::memcpy(&b, self + 0xd8, sizeof b);
-  if (!b || b->count + 1 == b->cap) b = e.newBlock(self);
-  if (I(n) > e.elemSize) { e.fatal(0x127f); return; }
-  std::memcpy(b->data + size_t(b->count) * e.elemSize, src, n);
-  b->count++;
-}
-// 1.13c D2Client+0xAC750  (copies 26 bytes: 13 wchar, then call with 0)
-void sub_AC750(Env& e, const uint16_t* s) { uint16_t t[14]; std::memcpy(t, s, 26); e.fn5dd0(0, t); }
-// D2Client+0xAC800: own file d2client_ac800.cpp
-void sub_AC800(Env& e, const uint8_t* pk) {
-  if (pk[0xb]) return;
-  Node* n = e.find(0, rd32(pk, 3)); if (!n) return;
-  if (n->kind != 0) { e.fatal(0x5a); return; }
-  void* h = e.ord10708(-1); if (!h) { e.fatal(0xad6); return; }
-  e.ord10252(h, pk[9]);
-}
-// D2Client+0xAC910: own file d2client_ac910.cpp
-// 1.13c D2Client+0xAC970  (EBX = unit; walks list at +0x60)
-void sub_AC970(Env& e, uint8_t* unit) {
-  if (!unit) return;
-  P lst; std::memcpy(&lst, unit + 0x60, sizeof lst); if (!lst) return;
-  P it = e.first(lst);
-  while (it) { P nx = e.next(it); P d = e.inner(it); it = nx; if (d && *(I*)d == 4 && e.test(d, nullptr)) { e.fin1(); e.fin2(); } }
-  e.a(); e.b();
-}
-// 1.13c D2Client+0xACBF0  (switch on I32 at pkt+1; every case 1..0x1a calls the same 0x43550)
-void sub_ACBF0(Env& e, const uint8_t* pk) { e.fn3550(I(rd32(pk, 1))); }
-// 1.13c D2Client+0xACD70  (ESI = pkt)
-void sub_ACD70(Env& e, const uint8_t* pk) {
-  bool alloc = true;
-  if (e.g_bbcc) { if (!pk[2]) alloc = false; else { e.ord10043(0x5b, 0); e.g_bbcc = nullptr; e.g_bbd0 = 0; } }
-  if (alloc) e.g_bbcc = e.ord10042(0x62, 0);
-  uint8_t* d = e.g_bbcc + e.g_bbd0;
-  for (U i = 0; i < pk[1]; ++i) d[i] = pk[7 + i];
-  e.g_bbd0 += pk[1];
-  if (I(rd32(pk, 3)) == e.g_bbd0) { e.fnC530(); e.ord10043(0x71, 0); e.g_bbcc = nullptr; e.g_bbd0 = 0; }
-}
 // 1.13c D2Client+0xAD2A0
 void sub_AD2A0(Env& e, const uint8_t* pk) {
   U w = rd32(pk, 0); Node* n = e.findPlayerNode(rd32(pk, 4) << 16 | (w >> 16), 0, (w >> 8) & 0xff);
   if (n) e.fn31aa0(n);
-}
-// 1.13c D2Client+0xAD2F0
-void sub_AD2F0(Env& e, const uint8_t* pk) {
-  if (!e.g_bbfc) { e.fatal(0xd21); return; }
-  e.fn47a0(pk);
 }
 // 1.13c D2Client+0xAD370
 void sub_AD370(Env& e, const uint8_t* pk) {
@@ -91,15 +45,5 @@ void sub_AD370(Env& e, const uint8_t* pk) {
   U* h = reinterpret_cast<U*>(n->data + 0xa4);  // piVar1[0x29]; guess offset kept 32-bit
   if (*h) e.ord10422(0, reinterpret_cast<uint8_t*>(uintptr_t(*h)));
   *h = 0;
-}
-// 1.13c D2Client+0xAD450  (EAX = pkt, param_1 = ECX)
-void sub_AD450(Env& e, const uint8_t* pk, I ecx) {
-  if (ecx == -1) return;
-  switch (pk[0]) {
-    case 0xaf: e.g_c39c = 1; break;
-    case 0xb0: e.g_c39c = 0; break;
-    case 0xb3: sub_ACD70(e, pk); break;
-    case 0xb4: sub_ACBF0(e, pk); break;
-  }
 }
 }

@@ -23,18 +23,9 @@ struct Host {
     }
 };
 
-constexpr Address kBase = 0x6FAB0000;
 constexpr uint32_t ord(uint32_t n) { return 0x10000000u + n; } // import ordinal pseudo-rva
 static uintptr_t out(const void* p) { return reinterpret_cast<uintptr_t>(p); }
 
-static void appendCurrentRef(const Host& h, Address dst) { // Ordinal_10003() + Unicode::strcat
-    const Address src = static_cast<Address>(h.call(0xD1EC));
-    if (!src || !dst) return;
-    Address end = dst;
-    while (h.read<uint16_t>(end)) end += 2;
-    for (Address p = src; h.read<uint16_t>(p); p += 2, end += 2) h.write<uint16_t>(end, h.read<uint16_t>(p));
-    h.write<uint16_t>(end, 0);
-}
 static void appendLocal(const Host& h, Address dst, const char16_t* s) {
     if (!dst) return;
     Address end = dst;
@@ -225,9 +216,4 @@ int32_t sub_2FB50(const Host& h, Tables t, Address player) {
     return sum;
 }
 
-// dup of D2Client+0x2FD10 (28 B): skill-desc record (0x17F0) -> u16 at +8+idx*2, or 0x1506 when none.
-uint16_t sub_2FD10(const Host& h, int32_t idx) {
-    Address rec = static_cast<Address>(h.call(0x17F0));
-    return rec ? h.read<uint16_t>(rec + 8 + idx * 2) : 0x1506;
-}
 } // namespace d2client_batch_2f2e0

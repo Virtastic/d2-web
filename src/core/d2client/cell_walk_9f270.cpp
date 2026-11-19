@@ -20,6 +20,8 @@ static inline uint32_t rd(const uint8_t* b, uint32_t o) { uint32_t v; memcpy(&v,
 
 // 1.13c D2Client+0x9F270; mem = 32-bit guest base, ctx = guest address of EDI struct
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9f270(const uint8_t* mem, uint32_t ctx, D2ClientCellWalk9f270Env* e) {
+    static uint8_t sb2, sb3;   // frame bytes [S+2], [S+3] (stale stack)
+    uint8_t bl = sb3;
     uint32_t room = rd(mem, ctx + 0xeaa8);
     uint32_t n = rd(mem, ctx + 0xeab0); n *= n;
     for (; n; --n, room += 0x24) {
@@ -29,8 +31,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9f270(const uint8_t* mem, uint32_
                 int32_t tx = ((int32_t)rd(mem, p + 4) >> 3) - e->viewX, ty = ((int32_t)rd(mem, p + 8) >> 3) - e->viewY;
                 tx = tx < 0 ? 0 : tx > 47 ? 47 : tx; ty = ty < 0 ? 0 : ty > 47 ? 47 : ty;
                 const uint8_t* g = e->lightGrid + (uint32_t)(ty * 48 + tx) * 8;
-                // retail builds the three high bytes from stack slots written only when colour lighting is on; off, they are frame leftovers (0 here)
-                uint32_t c = e->colourLight ? rd(g, 4) : (uint32_t)g[4];
+                // retail builds the colour from bl (byte 5, set once from the frame slot [S+3] on entry) and the frame bytes [S+2], [S+3]
+                // (bytes 7, 6); only a colour-lit node writes them, an unlit one reuses what the last lit node (this or an earlier walk,
+                // same frame depth) left, which is modelled as statics.
+                if (e->colourLight) { sb2 = g[7]; sb3 = g[6]; bl = g[5]; }
+                uint32_t c = ((uint32_t)sb2 << 24) | ((uint32_t)sb3 << 16) | ((uint32_t)bl << 8) | g[4];
                 e->sub666d0(rd(mem, p + 0xc), c); continue;
             }
             uint32_t r = e->ord10013();

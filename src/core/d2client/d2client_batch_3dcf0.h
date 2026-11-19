@@ -21,11 +21,6 @@ struct H { // callees
  I (*ord10973)(P,I,I); P (*ord11139)(P,I); I (*ord10744)(P,I);
  P* cachedUnit; P hudUnit; P fallback; P tab[7];
 };
-struct H2 { // callees for the remaining rows
- P (*ord10061)(P); I (*ord10711)(P); I (*ord10048)(P); I (*ord10973)(P,I,I); I (*ord11139)(P,I); I (*ord10744)(P,I);
- P (*sub_AB17F0)(void); void (*ord10019)(U*); void (*sub_3D3C0)(P,I);
- void (*c3DCF0)(P,const int16_t*,I); void (*c3E0C0)(P,const int16_t*,I);
-};
 void sub_3DCF0(const G&,P,const int16_t*,I,I,const H&);
 void sub_3E0C0(const G&,P,const int16_t*,I,I,const H&);
 void sub_3F860(G&,I(*)(P),I(*)(P),P);

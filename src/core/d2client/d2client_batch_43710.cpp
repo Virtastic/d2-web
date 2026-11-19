@@ -54,26 +54,6 @@ void sub_4C7C0(Calls&c,const I*unit,U a1,I a2,I a3,const uint8_t*dt_a78,I dt_a80
  }
 }
 // tooltip line builder (rva 0x55B20) is transcribed in d2client_n86.cpp:sub_55B20.
-// old form of D2Client 55F10 (now d2client_55f10.cpp)  (EAX = unit/handle; EBX = item context passed to 10871 and 55B20; stack: a1, a2 passed through to 55B20; ret 8)
-void sub_55F10(Calls&c,P eax,P ebx,P a1,U a2,const uint8_t*dt_c18,I dt_c1c){
- if(c.ord10106(eax)!=5) return; I q=c.ord10620(eax);
- if(q<0||q>=dt_c1c) return; const uint8_t*rec=dt_c18+q*0x1b8; if(!rec) return;
- int16_t w; std::memcpy(&w,rec+0x2c,2);
- for(I i=0;i<6;++i){ P it=c.ord10871(ebx,c.tbl_82e50[i]);
-  if(it&&(I)w==c.ord10680(it,0x47,0)){ c.fb05b20(0,ebx,a1,a2,0,c.tbl_82e50[i],0,1); return; } }
-}
-// old form of D2Client 55FB0 (now d2client_55fb0.cpp)  (EAX = esi ctx; EDI = type-4 unit; stack: a1, a2 (ret 8); 55B20 gets (EDI, a1, a2, 0, tbl, 0, 1) with ECX = 0)
-void sub_55FB0(Calls&c,P esi,const I*edi,P a1,U a2,const U*tbl85d20){
- if(!edi||edi[0]!=4||c.ord10106((P)edi)!=5) return; const uint8_t*p=(const uint8_t*)c.ord10218((P)edi); if(!p) return;
- if(p[0x87]==1){
-  U mask=c.ord11161(esi,(P)edi,0); I me=c.ord10550((P)edi);
-  for(I i=0;i<6;++i){ if(i==me) continue; I o=i; if(me<i)o--;
-   if((mask>>i)&1) c.fb05b20(0,(P)edi,a1,a2,0,c.tbl_82e50[o],0,1); }
- } else if(p[0x87]==2){
-  U v=c.ord11161(esi,(P)edi,1); I n=v<0x40?(I)tbl85d20[v]:0;
-  for(I i=0;i<n-1;++i) c.fb05b20(0,(P)edi,a1,a2,0,c.tbl_82e50[i],0,1);
- }
-}
 // 1.13c D2Client+0x560B0  (EDI = destination W*; stack: unit, a7 (the 7th arg handed to 55B20), tail string; ret 0xc)
 void sub_560B0(Calls&c,P unit,U a7,W*dst,const W*param_3){
  static thread_local W buf[0x400]; for(int i=0;i<0x400;i++)buf[i]=0;

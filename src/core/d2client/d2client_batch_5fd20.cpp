@@ -91,15 +91,6 @@ void sub_5FFE0(Line& h, const uint8_t* game, int32_t rightEdge, int32_t& lineY) 
  if (a) nameLine(h, 0x1055, (const char*)game + 0x1b, rightEdge, lineY);
  if (game[0x241]) nameLine(h, 0x1056, (const char*)game + 0x241, rightEdge, lineY);
 }
-// 1.13c D2Client+0x601A0  (string arrives in EBX: unaff_EBX; param_1 unused GUESS)
-void sub_601A0(Host& h, const char* s /*EBX*/, int32_t y /*param_2*/, uint8_t color /*param_3*/) {
- if (!s[0]) return;
- if (color > 0xc) color = 0;
- h.setFont(0);   // Ordinal_10184 args GUESS
- W buf[24] = {}; toW(buf, s, 23);
- h.drawText(buf, color, 0); h.emit(buf, y - 10, 0);
- h.setFont(0);
-}
 // 1.13c D2Client+0x60510  record append to the save-index file (EBX = record dword array; file-open helper 0x5F3E0).
 // File ops are the retail thunks: C028 seek(handle ECX, pos EDX), C034 read(ECX, buf EDX, len, &got), C046 write(ECX, buf EDX, len, &put),
 // C03A close(ECX), kernel32 GetFileSize(handle, 0). The file is a 100-dword table of chain heads, then records: each record is
@@ -133,13 +124,6 @@ void sub_60510(const FileEnv& f, const int32_t* rec /*EBX*/) {
  for (int i = 0; i < 7; i++) f.write(h, &rec[i], 4);
  for (int i = 3; i < 7; i++) if (rec[i]) f.write(h, (const void*)(uintptr_t)rec[i + 4], rec[i]);
  f.close(h);
-}
-// 1.13c D2Client+0x60AA0  (DAT_6fbcbbfc = handle; Ordinal_10331 lookup, 10826 + FUN_6fb6e240 GUESS)
-void sub_60AA0(Host& h, int32_t looked /*Ordinal_10331(handle)*/, int32_t handle, int32_t& lineY) {
- if (!handle || !looked) return;
- // Ordinal_10826(looked); FUN_6fb6e240() -- side effects supplied by host (GUESS)
- W buf[1] = {};
- h.drawText(buf, 4, 0); h.emit(buf, 0, 0); lineY += 0x10;
 }
 // 1.13c D2Client+0x645A0  options menu table and art init. Table addresses are image addresses minus the 6FAB0000 base (RVAs).
 struct UiInit {

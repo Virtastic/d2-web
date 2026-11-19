@@ -118,30 +118,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_874e0(D2cWarden* w, const D2cWard
     w->blobLen = 0;
 }
 
-// 1.13c D2Client+0x87560
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_87560(D2cWarden* w, uint32_t param1, const D2cWardenEnv* e) {
-    if (w->pend) { d2c_drop(w->pend, e); w->pend = nullptr; }
-    uint32_t* buf = (uint32_t*)(intptr_t)e->ord401((int32_t)param1);
-    if (!buf) return 0;
-    e->fn778c0(buf, 0x10);
-    e->fn1920(buf, (int32_t)param1);
-    if (!e->sigcheck()) { e->free_(buf); return 0; }           // FUN_6fb372d0(0) false
-    void* blob = (void*)(intptr_t)e->ord401((int32_t)buf[0]);
-    if (!blob) { e->free_(buf); return 0; }
-    if (e->fn78220((int32_t)param1 - 4, blob)) { e->free_(buf); e->free_(blob); return 0; }
-    e->free_(buf);
-    void* mem = (void*)(intptr_t)e->ord401(0x14);
-    D2cWardenNode* n = mem ? e->fn19b0(mem) : nullptr;
-    if (!n) { e->free_(blob); return 0; }
-    if (!e->fn4e690(blob, n)) { e->free_(blob); e->fn4e630(n); e->free_(n); return 0; }
-    // entry = section table lookup (iVar5 chain), +0x10 slot of n
-    int32_t entry = n->entry ? 1 : 0;
-    if (!entry) { e->fn4e630(n); e->free_(blob); e->fn4e630(n); e->free_(n); return 0; }
-    e->free_(blob);
-    w->pend = n;
-    return 1;
-}
-
 // 1.13c D2Client+0x87840: moved to d2client_87840.cpp (the vtable and entry calls keyed by the pointers retail reads).
 
 // 1.13c D2Client+0x87940: moved to d2client_87940.cpp (the ctx+0xCC/+0xC8 calls and the 0x87560 registers retail passes).

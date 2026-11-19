@@ -68,37 +68,6 @@ uint32_t sub_2DD50(const Host& h, Address ebx, int16_t sel, uint32_t strId) {
     return 1;
 }
 
-// (host-style body, superseded by d2client_2de00.cpp) D2Client+0x2DE00 (326 B): EBX=scale. 24.8 fixed-point range "lo-hi" or "lo.f-hi.f".
-uint32_t sub_2DE00(const Host& h, Address dst, int16_t selA, int16_t selB, uint32_t p4, uint32_t p5,
-                   int32_t ebx) {
-    int32_t a = (int32_t)p4, b = (int32_t)p5;
-    int32_t ai = a / 256, bi = b / 256;
-    int32_t af = ((a % 256) * ebx) / 256, bf = ((b % 256) * ebx) / 256;
-    char s[32];
-    if (!ai && !bi) {
-        if (!af && !bf) return 0;
-        std::snprintf(s, sizeof s, "%d.%d-%d.%d", ai, af, bi, bf);
-    } else if (!af && !bf) std::snprintf(s, sizeof s, "%d-%d", ai, bi);
-    else std::snprintf(s, sizeof s, "%d.%d-%d.%d", ai, af, bi, bf);
-    if (selA != 0x1506) ref(h, dst);
-    ascii(h, dst, s);
-    if (selB != 0x1506) ref(h, dst);
-    ref(h, dst);
-    return 1;
-}
-
-// (host-style body, superseded by d2client_2df50.cpp) D2Client+0x2DF50 (268 B): EBX=dest; frames/25 range with one decimal.
-uint32_t sub_2DF50(const Host& h, Address ebx, int32_t lo, int32_t hi) {
-    int32_t a = lo / 25, af = ((lo % 25) * 10) / 25, b = hi / 25, bf = ((hi % 25) * 10) / 25;
-    char s[48];
-    if (a == 0 && af == 0 && b == 0) return 0;
-    if (af == 0 && bf == 0)
-        std::snprintf(s, sizeof s, "%d-%d", a, b);
-    else std::snprintf(s, sizeof s, "%d.%d-%d.%d", a, af, b, bf);
-    ref(h, ebx); ascii(h, ebx, s); ref(h, ebx); ref(h, ebx);
-    return 1;
-}
-
 // 1.13c D2Client+0x2E060 (218 B): stdcall(dst, key, frames), EAX=record. whole = frames/25, tenth = (frames%25)*10/25; both 0 returns 0.
 // Tenth 0: 0x2C7E0(eax=whole, ecx=rec, [buf]); else 0x2C790(eax=whole, ecx=tenth, edx=rec, [buf]), both ret 4.
 // Appends D2Lang(key), the number, D2Lang(whole==1 && tenth==0 ? 0x10AB : 0x10AC), D2Lang(0xF9E) to dst.
@@ -186,14 +155,4 @@ uint32_t sub_2E350(const Host& h, uint32_t unit, int32_t mode) {
     return v1;
 }
 
-// 1.13c D2Client+0x2FD30 (1317 B): SkillDesc tooltip layout; the 1317-byte body is mostly stack
-// plumbing around the callbacks at 0xF5210 (0x90 entries) and 0xF52A0 (0x48 entries) and the
-// 0xF52E8 layout rows (stride 12). Only the dispatch preconditions are reproduced.
-// ponytail: layout drawing (0xBE800/0xBC3E0/0xBC4E0 text calls) left to its own verified row.
-uint32_t sub_2FD30(const Host& h, Address skillRec, uint32_t flagsOut) {
-    (void)flagsOut;
-    if (!h.call(0xC640)) return 0;
-    uint16_t cb1 = h.read<uint16_t>(skillRec + 0x12), cb2 = h.read<uint16_t>(skillRec + 0x14);
-    return cb1 < 0x90 && cb2 < 0x48;
-}
 } // namespace d2client_batch_2dca0

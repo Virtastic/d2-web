@@ -5,7 +5,6 @@
 namespace d2client_b801f0 {
 using U=uint32_t; using I=int32_t; using P=void*;
 static U rd(P p,U n){U v;std::memcpy(&v,static_cast<uint8_t*>(p)+n,4);return v;}
-static void wr(P p,U n,U v){std::memcpy(static_cast<uint8_t*>(p)+n,&v,4);}
 struct G { // D2Client globals by RVA-less VA (6fb.. image)
  U g6fbcbf6c=0,g6fbc393c=0,g6fbc38c0=0,g6fb91380=0; // 801F0
  P h3904[4]{}; P h3890[4]{};                         // 80220 handle arrays
@@ -39,8 +38,6 @@ void sub_81470(G& g,Ops& o,I param1,U esi){
  if(esi!=g.g6fbcbf78||param1){ o.o10063(); if(rd(g.g6fbcbf68,0x114)){o.fatal(0x15b);return;} }
  g.g6fbcbf78=esi;
 }
-// 1.13c D2Client+0x81720 (ESI = esi)
-void sub_81720(Ops& o,U esi){ o.o10063(); o.o10063(); if(esi) o.f814f0(); }
 
 struct Ops2 {
  void (*fatal)(U); P (*o10871)(); void (*o10945)(); void (*o11111)(); void (*o11108)(P); void (*o10819)();
@@ -56,12 +53,6 @@ void sub_81AA0(Ops2& o,U esi){
  if(!esi){o.fatal(0xcc2);return;}
  P r=o.o10871(); if(r){o.o10945();o.o11111();o.o11108(r);o.o10819();}
 }
-// 1.13c D2Client+0x81B40 (EBX = ebx)
-bool sub_81B40(Ops2& o,U ebx){
- if(!ebx) return false;
- if(o.o11139()) o.o10608();
- return o.o11041()!=0;
-}
 // 1.13c D2Client+0x81C30 (EAX = a, EBX = ebx)
 P sub_81C30(Ops2& o,P a,P ebx){
  P r=o.o10244();
@@ -74,11 +65,6 @@ P sub_81C30(Ops2& o,P a,P ebx){
  }
  return r;
 }
-// old form of D2Client 81CB0 (now d2client_81cb0.cpp)
-U sub_81CB0(Ops2& o,P g6fbcbbfc){
- if(o.o10195()) return 1;
- return (g6fbcbbfc&&o.o10494(g6fbcbbfc,0x36))?1:0;
-}
 // 1.13c D2Client+0x81CE0 (EAX = in)
 void sub_81CE0(Ops2& o,P in,const void* lab81a90){
  P r=o.o10871();
@@ -87,10 +73,5 @@ void sub_81CE0(Ops2& o,P in,const void* lab81a90){
   if(in){a=rd(in,12);b=rd(in,0);}
   P h=o.o11013(0,2,0xc,b,a); o.o10785(h,0x36); o.o10911(h,lab81a90);
  } else o.o10785(r,0x36);
-}
-// old form of D2Client 81D30 (now d2client_81d30.cpp) (EAX = mode, ESI = unit)
-void sub_81D30(Ops2& o,I mode,P unit,I p2){
- if(mode==2){ o.o11090();
-  if(unit){ U f=rd(unit,0xc4); wr(unit,0xc4,p2?(f|2):(f&~2u)); } }
 }
 }

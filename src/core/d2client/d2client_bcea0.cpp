@@ -8,6 +8,7 @@
 #include <cstring>
 #include "cl_env.h"
 #include "stats_cell_bcea0.h"
+extern "C" char* d2client_itoa_bcb7(int32_t input, char* output, uint32_t radix);   // src/core/d2client/itoa_bcb7.cpp
 struct D2CBCEA0G { void* ctx; uint32_t (*at)(void* ctx, uint32_t rva); };
 namespace {
 constexpr uint32_t kGfxDraw = 0xd096, kStr = 0xd1ec, kHover = 0xd384, kFont = 0xd3a8, kWidth = 0xd35a, kText = 0xd37e,
@@ -57,13 +58,7 @@ struct P {
         while (i < n && e.R8(src + (uint32_t)i)) { d[i] = (char16_t)e.R8(src + (uint32_t)i); ++i; }
         if (e.R8(src + (uint32_t)i)) d[i - 1] = 0; else d[i] = 0;
     }
-    void itoa(uint32_t dst, int32_t v) const {   // wsprintfA "%i" / "%ld"
-        char t[16]; int n = 0; uint32_t u = v < 0 ? 0u - (uint32_t)v : (uint32_t)v;
-        do { t[n++] = (char)('0' + u % 10); u /= 10; } while (u);
-        char* d = Nb(dst); if (v < 0) *d++ = '-';
-        while (n) *d++ = t[--n];
-        *d = 0;
-    }
+    void itoa(uint32_t dst, int32_t v) const { d2client_itoa_bcb7(v, Nb(dst), 10); }   // wsprintfA "%i" / "%ld": the proven D2Client+0xBCB7 body
 };
 // D2Lang unicodenwidth: UTF-8 characters in the first n bytes (an invalid lead byte counts as nothing and is skipped)
 int32_t clen(const cl::Env& e, uint32_t p, int32_t n) {

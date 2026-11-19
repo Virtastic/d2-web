@@ -49,11 +49,6 @@ extern "C" void d2_client_7ae00() {
     g_c2fc = 1; g_c2f8 = 0; g_c2f4 = 0;
 }
 
-// 1.13c D2Client+0x7AEA0
-extern "C" void d2_client_7aea0(void (*draw)(const Msg*, uint32_t)) {
-    for (Msg* m = g_3ab0; m; m = m->next) draw(m, m->color);  // vtable+0x30 call; retail passes first 6 words
-}
-
 // D2Client 7AF20 moved to d2client_7af20.cpp.
 
 // 1.13c D2Client+0x7B120  (deep copy of a message node; returns the copy)
@@ -83,17 +78,8 @@ extern "C" void d2_client_7b240(const Msg* list_hdr_unused, void** head, uint32_
     d2_win_set_font(0);
 }
 
-// retired, see d2client_7b330.cpp: D2Client 0x7B330
-extern "C" void d2_client_7b330(void* const slots[6]) {
-    for (int i = 0; i < 6; i++) if (slots[i]) d2_fog_free(slots[i], 0x6af);
-    d2_fog_free((void*)slots, 0x6b2);
-}
-
 // retired, see d2client_7b3d0.cpp: D2Client 0x7B3D0
 struct Node2 { void* a; Node2* next; };
-extern "C" void d2_client_7b3d0(Node2* n) {
-    while (n) { n = n->next; d2_fog_free(nullptr, 0x60b); d2_fog_free(nullptr, 0x60c); }
-}
 
 extern "C" {
 void d2_win_10422(uint32_t a, uint32_t h);                    // Ordinal_10422 (release)
@@ -102,17 +88,6 @@ void d2_win_10097(uint32_t h, uint32_t v);                    // Ordinal_10097
 }
 uint32_t (*d2_client_lang_env)();  // env seam: D2Lang ordinal 10009 (current language id); the host or probe supplies it
 uint32_t g_3ace;  // DAT_6fbc3ace
-
-// 1.13c D2Client+0x7B470  (obj@+0xa4 = handle)
-extern "C" void d2_client_7b470(uint8_t* obj, const char* s, uint32_t esi) {
-    if (!obj) return;
-    uint32_t* h = reinterpret_cast<uint32_t*>(obj + 0xa4);
-    if (!*s) { if (*h) d2_win_10422(0, *h); *h = 0; return; }
-    uint32_t n = d2_win_10454(0, s, g_3ace);
-    d2_win_10097(n, esi);
-    if (*h) d2_win_10422(0, *h);
-    *h = n;
-}
 
 // 1.13c D2Client+0x7B4F0  (lang = EDI; widens s into out[0x100])
 extern "C" uint32_t d2_client_7b4f0(uint16_t* out, const char* s, uint32_t lang) {
